@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/TykTechnologies/leakybucket"
@@ -229,8 +230,24 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 
 	log.Debug("[QUOTA] Quota limiter key is: ", rawKey)
 	log.Debug("Renewing with TTL: ", quotaRenewalRate)
-	// INCR the key (If it equals 1 - set EXPIRE)
-	qInt := store.IncrememntWithExpire(rawKey, quotaRenewalRate)
+
+	var qInt int64
+	loopLevel := ctxLoopLevel(r)
+	if loopLevel == 0 {
+		// INCR the key (If it equals 1 - set EXPIRE)
+		qInt = store.IncrememntWithExpire(rawKey, quotaRenewalRate)
+	} else {
+		// we are in loop: don't increment, just retrieve value to correctly set remaining quota
+		if rawVal, err := store.GetRawKey(rawKey); err == nil {
+			if qInt, err = strconv.ParseInt(rawVal, 10, 64); err != nil {
+				log.Error("Error converting quota counter to int64: ", err)
+				return true
+			}
+		} else {
+			log.Error("Error retrieving quota counter: ", err)
+			return true
+		}
+	}
 
 	// if the returned val is >= quota: block
 	if qInt-1 >= quotaMax {
