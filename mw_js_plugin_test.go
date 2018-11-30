@@ -320,7 +320,6 @@ func TestJSVMRequestScheme(t *testing.T) {
 		Pre:                 true,
 	}
 	req := httptest.NewRequest("GET", "/foo", nil)
-	req.URL.Scheme = "http"
 	jsvm := JSVM{}
 	jsvm.Init(nil, logrus.NewEntry(log))
 
