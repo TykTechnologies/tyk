@@ -1,0 +1,11 @@
+[tyk-gateway]
+name=tyk_tyk-gateway
+baseurl=https://packagecloud.io/tyk/tyk-gateway/el/7/$basearch
+repo_gpgcheck=1
+gpgcheck=1
+enabled=1
+gpgkey=http://keyserver.tyk.io/tyk.io.rpm.signing.key
+       https://packagecloud.io/tyk/tyk-gateway/gpgkey
+sslverify=1
+sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+metadata_expire=300

@@ -1,0 +1,4 @@
+sysctl fs.file-max=80000
+sysctl vm.overcommit_memory=1
+sysctl net.core.somaxconn=1024
+echo never | tee /sys/kernel/mm/transparent_hugepage/enabled
