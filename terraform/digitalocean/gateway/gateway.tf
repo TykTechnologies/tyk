@@ -39,9 +39,11 @@ resource "digitalocean_droplet" "tyk-gateway" {
     inline = [
       // add redis host to system env vars
       "echo 'TYK_GW_STORAGE_HOST=${var.redis_server}' >> /etc/default/tyk-gateway",
+      "echo 'TYK_GW_SECRET=${var.secret}' >> /etc/default/tyk-gateway",
       "cat /tmp/rc.local >> /etc/rc.d/rc.local",
       "chmod +x /etc/rc.d/rc.local",
       "systemctl enable rc-local",
+      "systemctl start rc-local",
       "cat /tmp/limits.conf >> /etc/security/limits.conf",
       "yum -q makecache -y --disablerepo='*' --enablerepo='tyk-gateway'",
       "yum install tyk-gateway -y",

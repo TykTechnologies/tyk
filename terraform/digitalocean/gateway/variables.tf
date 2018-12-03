@@ -20,3 +20,5 @@ variable "centos" {
 }
 
 variable "redis_server" {}
+
+variable "secret" {}

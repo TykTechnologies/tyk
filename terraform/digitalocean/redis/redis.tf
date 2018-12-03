@@ -34,6 +34,7 @@ resource "digitalocean_droplet" "tyk-redis" {
       "cat /tmp/rc.local >> /etc/rc.d/rc.local",
       "chmod +x /etc/rc.d/rc.local",
       "systemctl enable rc-local",
+      "systemctl start rc-local",
       "cat /tmp/limits.conf >> /etc/security/limits.conf",
       "yum install epel-release -y",
       "yum install redis -y",
