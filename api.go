@@ -132,10 +132,22 @@ func applyPoliciesAndSave(keyName string, session *user.SessionState, spec *APIS
 	return nil
 }
 
+func resetAPILimits(accessRights map[string]user.AccessDefinition) {
+	for apiID := range accessRights {
+		// reset API-level limit to nil if it has a zero-value
+		if access := accessRights[apiID]; access.Limit != nil && *access.Limit == (user.APILimit{}) {
+			access.Limit = nil
+			accessRights[apiID] = access
+		}
+	}
+}
+
 func doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool) error {
 	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 
 	if len(newSession.AccessRights) > 0 {
+		// reset API-level limit to nil if any has a zero-value
+		resetAPILimits(newSession.AccessRights)
 		// We have a specific list of access rules, only add / update those
 		for apiId := range newSession.AccessRights {
 			apiSpec := getApiSpec(apiId)
@@ -987,12 +999,9 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 
 	if len(newSession.AccessRights) > 0 {
+		// reset API-level limit to nil if any has a zero-value
+		resetAPILimits(newSession.AccessRights)
 		for apiID := range newSession.AccessRights {
-			// reset API-level limit to nil if it has a zero-value
-			if access := newSession.AccessRights[apiID]; access.Limit != nil && *access.Limit == (user.APILimit{}) {
-				access.Limit = nil
-				newSession.AccessRights[apiID] = access
-			}
 			apiSpec := getApiSpec(apiID)
 			if apiSpec != nil {
 				checkAndApplyTrialPeriod(newKey, apiID, newSession)
