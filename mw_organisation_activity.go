@@ -51,6 +51,11 @@ func (k *OrganizationMonitor) setOrgHasNoSession(val bool) {
 }
 
 func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) {
+	// Skip rate limiting and quotas for looping
+	if ctxLoopLevel(r) > 0 {
+		return nil, http.StatusOK
+	}
+
 	// short path for specs which have organization limiter enabled but organization has no session
 	if k.getOrgHasNoSession() {
 		return nil, http.StatusOK
