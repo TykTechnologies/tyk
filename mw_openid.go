@@ -23,6 +23,7 @@ type OpenIDMW struct {
 	providerConfiguration     *openid.Configuration
 	provider_client_policymap map[string]map[string]string
 	lock                      sync.RWMutex
+	providerConfigs           map[string]apidef.OIDProviderConfig
 }
 
 func (k *OpenIDMW) Name() string {
@@ -42,6 +43,12 @@ func (k *OpenIDMW) Init() {
 
 	if err != nil {
 		k.Logger().WithError(err).Error("OpenID configuration error")
+	}
+
+	// prepare map issuer->config to lookup configs when processing requests
+	k.providerConfigs = make(map[string]apidef.OIDProviderConfig)
+	for _, providerConf := range k.Spec.OpenIDOptions.Providers {
+		k.providerConfigs[providerConf.Issuer] = providerConf
 	}
 }
 
@@ -113,6 +120,16 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 		return errors.New("Key not authorised"), http.StatusUnauthorized
 	}
 
+	providerConf, ok := k.providerConfigs[iss.(string)]
+	if !ok {
+		logger.Error("No issuer or audiences found!")
+		k.reportLoginFailure("[NOT GENERATED]", r)
+		return errors.New("Key not authorised"), http.StatusUnauthorized
+	}
+
+	// decide if we use policy ID from provider client settings or list of policies from scope-policy mapping
+	useScope := providerConf.ScopeFieldName != "" && providerConf.ScopeToPolicyMapping != nil
+
 	k.lock.RLock()
 	clientSet, foundIssuer := k.provider_client_policymap[iss.(string)]
 	k.lock.RUnlock()
@@ -143,7 +160,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 		}
 	}
 
-	if policyID == "" {
+	if !useScope && policyID == "" {
 		logger.Error("No matching policy found!")
 		k.reportLoginFailure("[NOT GENERATED]", r)
 		return errors.New("Key not authorised"), http.StatusUnauthorized
@@ -161,24 +178,38 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 
 	logger.Debug("Generated Session ID: ", sessionID)
 
+	var policiesToApply []string
+	if !useScope {
+		policiesToApply = append(policiesToApply, policyID)
+	} else {
+		if scope := getScopeFromClaim(token.Claims.(jwt.MapClaims), providerConf.ScopeFieldName); scope != nil {
+			// add all policies matched from scope-policy mapping
+			policiesToApply = mapScopeToPolicies(providerConf.ScopeToPolicyMapping, scope)
+		}
+	}
+
 	session, exists := k.CheckSessionAndIdentityForValidKey(sessionID, r)
 	if !exists {
 		// Create it
 		logger.Debug("Key does not exist, creating")
 		session = user.SessionState{}
 
-		// We need a base policy as a template, either get it from the token itself OR a proxy client ID within Tyk
-		newSession, err := generateSessionFromPolicy(policyID,
-			k.Spec.OrgID,
-			true)
+		if !useScope {
+			// We need a base policy as a template, either get it from the token itself OR a proxy client ID within Tyk
+			newSession, err := generateSessionFromPolicy(policyID,
+				k.Spec.OrgID,
+				true)
 
-		if err != nil {
-			k.reportLoginFailure(sessionID, r)
-			logger.Error("Could not find a valid policy to apply to this token!")
-			return errors.New("Key not authorized: no matching policy"), http.StatusForbidden
+			if err != nil {
+				k.reportLoginFailure(sessionID, r)
+				logger.Error("Could not find a valid policy to apply to this token!")
+				return errors.New("Key not authorized: no matching policy"), http.StatusForbidden
+			}
+
+			session = newSession
 		}
 
-		session = newSession
+		session.OrgID = k.Spec.OrgID
 		session.MetaData = map[string]interface{}{"TykJWTSessionID": sessionID, "ClientID": clientID}
 		session.Alias = clientID + ":" + ouser.ID
 
@@ -186,7 +217,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 		logger.Debug("Policy applied to key")
 	}
 	// apply new policy to session if any and update session
-	session.SetPolicies(policyID)
+	session.SetPolicies(policiesToApply...)
 	if err := k.ApplyPolicies(sessionID, &session); err != nil {
 		k.Logger().WithError(err).Error("Could not apply new policy from OIDC client to session")
 		return errors.New("Key not authorized: could not apply new policy"), http.StatusForbidden

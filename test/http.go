@@ -21,6 +21,7 @@ type TestCase struct {
 	Cookies         []*http.Cookie    `json:",omitempty"`
 	Delay           time.Duration     `json:",omitempty"`
 	BodyMatch       string            `json:",omitempty"`
+	BodyMatchFunc   func([]byte) bool `json:",omitempty"`
 	BodyNotMatch    string            `json:",omitempty"`
 	HeadersMatch    map[string]string `json:",omitempty"`
 	HeadersNotMatch map[string]string `json:",omitempty"`
@@ -47,6 +48,10 @@ func AssertResponse(resp *http.Response, tc TestCase) error {
 
 	if tc.BodyNotMatch != "" && bytes.Contains(body, []byte(tc.BodyNotMatch)) {
 		return fmt.Errorf("Response body should not contain `%s`. %s", tc.BodyNotMatch, string(body))
+	}
+
+	if tc.BodyMatchFunc != nil && !tc.BodyMatchFunc(body) {
+		return fmt.Errorf("Response body did not pass BodyMatchFunc: %s", string(body))
 	}
 
 	for k, v := range tc.HeadersMatch {

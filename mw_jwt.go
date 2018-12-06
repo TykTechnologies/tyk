@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
-	cache "github.com/pmylund/go-cache"
+	"github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/user"
@@ -244,6 +244,33 @@ func (k *JWTMiddleware) getUserIdFromClaim(claims jwt.MapClaims) (string, error)
 	return "", errors.New(message)
 }
 
+func getScopeFromClaim(claims jwt.MapClaims, scopeClaimName string) []string {
+	// get claim with scopes and turn it into slice of strings
+	if scope, found := claims[scopeClaimName].(string); found {
+		return strings.Split(scope, " ") // by standard is space separated list of values
+	}
+
+	// claim with scopes is optional so return nothing if it is not present
+	return nil
+}
+
+func mapScopeToPolicies(mapping map[string]string, scope []string) []string {
+	polIDs := []string{}
+
+	// add all policies matched from scope-policy mapping
+	policiesToApply := map[string]bool{}
+	for _, scopeItem := range scope {
+		if policyID, ok := mapping[scopeItem]; ok {
+			policiesToApply[policyID] = true
+		}
+	}
+	for id := range policiesToApply {
+		polIDs = append(polIDs, id)
+	}
+
+	return polIDs
+}
+
 // processCentralisedJWT Will check a JWT token centrally against the secret stored in the API Definition.
 func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token) (error, int) {
 	k.Logger().Debug("JWT authority is centralised")
@@ -278,6 +305,29 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		newSession, err := generateSessionFromPolicy(basePolicyID,
 			k.Spec.OrgID,
 			true)
+
+		// apply policies from scope if scope-to-policy mapping is specified for this API
+		if k.Spec.JWTScopeToPolicyMapping != nil {
+			if scope := getScopeFromClaim(claims, "scope"); scope != nil {
+				polIDs := []string{
+					basePolicyID, // add base policy as a first one
+				}
+
+				// add all policies matched from scope-policy mapping
+				mappedPolIDs := mapScopeToPolicies(k.Spec.JWTScopeToPolicyMapping, scope)
+
+				polIDs = append(polIDs, mappedPolIDs...)
+				newSession.SetPolicies(polIDs...)
+
+				// multiple policies assigned to a key, check if it is applicable
+				if err := k.ApplyPolicies(sessionID, &newSession); err != nil {
+					k.reportLoginFailure(baseFieldData, r)
+					k.Logger().WithError(err).Error("Could not several policies from scope-claim mapping to JWT to session")
+					return errors.New("Key not authorized: could not apply several policies"), http.StatusForbidden
+				}
+			}
+		}
+
 		if err != nil {
 			k.reportLoginFailure(baseFieldData, r)
 			k.Logger().Error("Could not find a valid policy to apply to this token!")
@@ -575,7 +625,10 @@ func generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.Se
 	session.Per = policy.Per
 	session.QuotaMax = policy.QuotaMax
 	session.QuotaRenewalRate = policy.QuotaRenewalRate
-	session.AccessRights = policy.AccessRights
+	session.AccessRights = make(map[string]user.AccessDefinition)
+	for apiID, access := range policy.AccessRights {
+		session.AccessRights[apiID] = access
+	}
 	session.HMACEnabled = policy.HMACEnabled
 	session.IsInactive = policy.IsInactive
 	session.Tags = policy.Tags

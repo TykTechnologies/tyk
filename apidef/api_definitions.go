@@ -305,8 +305,10 @@ type ServiceDiscoveryConfiguration struct {
 }
 
 type OIDProviderConfig struct {
-	Issuer    string            `bson:"issuer" json:"issuer"`
-	ClientIDs map[string]string `bson:"client_ids" json:"client_ids"`
+	Issuer               string            `bson:"issuer" json:"issuer"`
+	ClientIDs            map[string]string `bson:"client_ids" json:"client_ids"`
+	ScopeFieldName       string            `bson:"scope_field_name" json:"scope_field_name"`
+	ScopeToPolicyMapping map[string]string `bson:"scope_to_policy_mapping" json:"scope_to_policy_mapping"`
 }
 
 type OpenIDOptions struct {
@@ -352,6 +354,7 @@ type APIDefinition struct {
 	JWTExpiresAtValidationSkew uint64               `bson:"jwt_expires_at_validation_skew" json:"jwt_expires_at_validation_skew"`
 	JWTNotBeforeValidationSkew uint64               `bson:"jwt_not_before_validation_skew" json:"jwt_not_before_validation_skew"`
 	JWTSkipKid                 bool                 `bson:"jwt_skip_kid" json:"jwt_skip_kid"`
+	JWTScopeToPolicyMapping    map[string]string    `bson:"jwt_scope_to_policy_mapping" json:"jwt_scope_to_policy_mapping"`
 	NotificationsDetails       NotificationsManager `bson:"notifications" json:"notifications"`
 	EnableSignatureChecking    bool                 `bson:"enable_signature_checking" json:"enable_signature_checking"`
 	HmacAllowedClockSkew       float64              `bson:"hmac_allowed_clock_skew" json:"hmac_allowed_clock_skew"`
@@ -665,15 +668,16 @@ func DummyAPI() APIDefinition {
 	}
 
 	return APIDefinition{
-		VersionData:          versionData,
-		ConfigData:           map[string]interface{}{},
-		AllowedIPs:           []string{},
-		PinnedPublicKeys:     map[string]string{},
-		ResponseProcessors:   []ResponseProcessor{},
-		ClientCertificates:   []string{},
-		BlacklistedIPs:       []string{},
-		TagHeaders:           []string{},
-		UpstreamCertificates: map[string]string{},
+		VersionData:             versionData,
+		ConfigData:              map[string]interface{}{},
+		AllowedIPs:              []string{},
+		PinnedPublicKeys:        map[string]string{},
+		ResponseProcessors:      []ResponseProcessor{},
+		ClientCertificates:      []string{},
+		BlacklistedIPs:          []string{},
+		TagHeaders:              []string{},
+		UpstreamCertificates:    map[string]string{},
+		JWTScopeToPolicyMapping: map[string]string{},
 		CustomMiddleware: MiddlewareSection{
 			Post:        []MiddlewareDefinition{},
 			Pre:         []MiddlewareDefinition{},
