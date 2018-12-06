@@ -559,3 +559,130 @@ func (s *StringRegexMap) Init() error {
 	}
 	return nil
 }
+
+func DummyAPI() APIDefinition {
+	endpointMeta := EndPointMeta{
+		Path: "abc",
+		MethodActions: map[string]EndpointMethodMeta{
+			"GET": {
+				Action:  Reply,
+				Code:    200,
+				Data:    "testdata",
+				Headers: map[string]string{"header": "value"},
+			},
+		},
+	}
+	templateMeta := TemplateMeta{
+		TemplateData: TemplateData{Input: RequestJSON, Mode: UseBlob},
+	}
+	transformJQMeta := TransformJQMeta{
+		Filter: "filter",
+		Path:   "path",
+		Method: "method",
+	}
+	headerInjectionMeta := HeaderInjectionMeta{
+		DeleteHeaders: []string{"header1", "header2"},
+		AddHeaders:    map[string]string{},
+		Path:          "path",
+		Method:        "method",
+	}
+	hardTimeoutMeta := HardTimeoutMeta{Path: "path", Method: "method", TimeOut: 0}
+	circuitBreakerMeta := CircuitBreakerMeta{
+		Path:                 "path",
+		Method:               "method",
+		ThresholdPercent:     0.0,
+		Samples:              0,
+		ReturnToServiceAfter: 0,
+	}
+	// TODO: Extend triggers
+	urlRewriteMeta := URLRewriteMeta{
+		Path:         "",
+		Method:       "method",
+		MatchPattern: "matchpattern",
+		RewriteTo:    "rewriteto",
+		Triggers:     []RoutingTrigger{},
+	}
+	virtualMeta := VirtualMeta{
+		ResponseFunctionName: "responsefunctioname",
+		FunctionSourceType:   "functionsourcetype",
+		FunctionSourceURI:    "functionsourceuri",
+		Path:                 "path",
+		Method:               "method",
+	}
+	sizeLimit := RequestSizeMeta{
+		Path:      "path",
+		Method:    "method",
+		SizeLimit: 0,
+	}
+	methodTransformMeta := MethodTransformMeta{Path: "path", Method: "method", ToMethod: "tomethod"}
+	trackEndpointMeta := TrackEndpointMeta{Path: "path", Method: "method"}
+	validatePathMeta := ValidatePathMeta{Path: "path", Method: "method", Schema: map[string]interface{}{}, SchemaB64: ""}
+	paths := struct {
+		Ignored   []string `bson:"ignored" json:"ignored"`
+		WhiteList []string `bson:"white_list" json:"white_list"`
+		BlackList []string `bson:"black_list" json:"black_list"`
+	}{
+		Ignored:   []string{},
+		WhiteList: []string{},
+		BlackList: []string{},
+	}
+	versionInfo := VersionInfo{
+		Name:             "Default",
+		UseExtendedPaths: true,
+		Paths:            paths,
+		ExtendedPaths: ExtendedPathsSet{
+			Ignored:                 []EndPointMeta{endpointMeta},
+			WhiteList:               []EndPointMeta{endpointMeta},
+			BlackList:               []EndPointMeta{endpointMeta},
+			Cached:                  []string{},
+			Transform:               []TemplateMeta{templateMeta},
+			TransformResponse:       []TemplateMeta{templateMeta},
+			TransformJQ:             []TransformJQMeta{transformJQMeta},
+			TransformJQResponse:     []TransformJQMeta{transformJQMeta},
+			TransformHeader:         []HeaderInjectionMeta{headerInjectionMeta},
+			TransformResponseHeader: []HeaderInjectionMeta{headerInjectionMeta},
+			HardTimeouts:            []HardTimeoutMeta{hardTimeoutMeta},
+			CircuitBreaker:          []CircuitBreakerMeta{circuitBreakerMeta},
+			URLRewrite:              []URLRewriteMeta{urlRewriteMeta},
+			Virtual:                 []VirtualMeta{virtualMeta},
+			SizeLimit:               []RequestSizeMeta{sizeLimit},
+			MethodTransforms:        []MethodTransformMeta{methodTransformMeta},
+			TrackEndpoints:          []TrackEndpointMeta{trackEndpointMeta},
+			DoNotTrackEndpoints:     []TrackEndpointMeta{trackEndpointMeta},
+			ValidateJSON:            []ValidatePathMeta{validatePathMeta},
+		},
+	}
+	versionData := struct {
+		NotVersioned   bool                   `bson:"not_versioned" json:"not_versioned"`
+		DefaultVersion string                 `bson:"default_version" json:"default_version"`
+		Versions       map[string]VersionInfo `bson:"versions" json:"versions"`
+	}{
+		NotVersioned:   true,
+		DefaultVersion: "",
+		Versions: map[string]VersionInfo{
+			"Default": versionInfo,
+		},
+	}
+
+	return APIDefinition{
+		VersionData:          versionData,
+		ConfigData:           map[string]interface{}{},
+		AllowedIPs:           []string{},
+		PinnedPublicKeys:     map[string]string{},
+		ResponseProcessors:   []ResponseProcessor{},
+		ClientCertificates:   []string{},
+		BlacklistedIPs:       []string{},
+		TagHeaders:           []string{},
+		UpstreamCertificates: map[string]string{},
+		CustomMiddleware: MiddlewareSection{
+			Post:        []MiddlewareDefinition{},
+			Pre:         []MiddlewareDefinition{},
+			PostKeyAuth: []MiddlewareDefinition{},
+			AuthCheck:   MiddlewareDefinition{},
+			IdExtractor: MiddlewareIdExtractor{
+				ExtractorConfig: map[string]interface{}{},
+			},
+		},
+		Tags: []string{},
+	}
+}
