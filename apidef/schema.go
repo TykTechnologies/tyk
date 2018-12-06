@@ -102,6 +102,9 @@ const Schema = `{
         "jwt_not_before_validation_skew": {
             "type": "number"
         },
+        "jwt_scope_to_policy_mapping": {
+            "type": "object"
+        },
         "use_keyless": {
             "type": "boolean"
         },
