@@ -1,8 +1,9 @@
 package apidef
 
 import (
-	schema "github.com/xeipuuv/gojsonschema"
 	"testing"
+
+	schema "github.com/xeipuuv/gojsonschema"
 )
 
 func TestSchema(t *testing.T) {
