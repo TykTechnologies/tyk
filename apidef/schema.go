@@ -103,7 +103,7 @@ const Schema = `{
             "type": "number"
         },
         "jwt_scope_to_policy_mapping": {
-            "type": "object"
+            "type": ["object", "null"]
         },
         "use_keyless": {
             "type": "boolean"
@@ -198,10 +198,10 @@ const Schema = `{
             "type":"object",
             "properties": {
                 "pre": {
-                    "type": "array"
+                    "type": ["array", "null"]
                 },
                 "post": {
-                    "type": "array"
+                    "type": ["array", "null"]
                 }
             }
         },
