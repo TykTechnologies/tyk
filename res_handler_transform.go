@@ -116,13 +116,15 @@ func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 		}
 	}
 
-	if h.Spec.EnableContextVars {
-		bodyData["_tyk_context"] = ctxGetData(req)
-	}
+	if bodyData != nil {
+		if h.Spec.EnableContextVars {
+			bodyData["_tyk_context"] = ctxGetData(req)
+		}
 
-	if tmeta.TemplateData.EnableSession {
-		session := ctxGetSession(req)
-		bodyData["_tyk_meta"] = session.MetaData
+		if tmeta.TemplateData.EnableSession {
+			session := ctxGetSession(req)
+			bodyData["_tyk_meta"] = session.MetaData
+		}
 	}
 
 	// Apply to template
