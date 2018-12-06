@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 func TestLooping(t *testing.T) {
@@ -124,6 +125,37 @@ func TestLooping(t *testing.T) {
 
 		ts.Run(t, []test.TestCase{
 			{Method: "GET", Path: "/recursion", Code: 500, BodyMatch: "Loop level too deep. Found more than 2 loops in single request"},
+		}...)
+	})
+
+	t.Run("Quota and rate limit calculation", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			version := spec.VersionData.Versions["v1"]
+			json.Unmarshal([]byte(`{
+                "use_extended_paths": true,
+                "extended_paths": {
+                    "url_rewrites": [{
+                        "path": "/recursion",
+                        "match_pattern": "/recursion(.*)",
+                        "method": "GET",
+                        "rewrite_to": "tyk://self/recursion?loop_limit=2"
+                    }]
+                }
+            }`), &version)
+
+			spec.VersionData.Versions["v1"] = version
+			spec.Proxy.ListenPath = "/"
+			spec.UseKeylessAccess = false
+		})
+
+		keyID := createSession(func(s *user.SessionState) {
+			s.QuotaMax = 2
+		})
+
+		authHeaders := map[string]string{"authorization": keyID}
+
+		ts.Run(t, []test.TestCase{
+			{Method: "GET", Path: "/recursion", Headers: authHeaders, BodyNotMatch: "Quota exceeded"},
 		}...)
 	})
 }
