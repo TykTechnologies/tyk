@@ -324,6 +324,10 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 	spec := getApiSpec(apiID)
 	if spec != nil {
 		sessionManager = spec.SessionManager
+		// special case for basic auth with custom hashing algo
+		if spec.UseBasicAuth && strings.HasPrefix(sessionKey, spec.OrgID) {
+			sessionKey = generateToken(spec.OrgID, sessionKey)
+		}
 	}
 
 	var session user.SessionState
