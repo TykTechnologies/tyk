@@ -307,8 +307,13 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			true)
 
 		// apply policies from scope if scope-to-policy mapping is specified for this API
-		if k.Spec.JWTScopeToPolicyMapping != nil {
-			if scope := getScopeFromClaim(claims, "scope"); scope != nil {
+		if len(k.Spec.JWTScopeToPolicyMapping) != 0 {
+			scopeClaimName := k.Spec.JWTScopeClaimName
+			if scopeClaimName == "" {
+				scopeClaimName = "scope"
+			}
+
+			if scope := getScopeFromClaim(claims, scopeClaimName); scope != nil {
 				polIDs := []string{
 					basePolicyID, // add base policy as a first one
 				}

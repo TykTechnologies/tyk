@@ -120,7 +120,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 		return errors.New("Key not authorised"), http.StatusUnauthorized
 	}
 
-	providerConf, ok := k.providerConfigs[iss.(string)]
+	_, ok := k.providerConfigs[iss.(string)]
 	if !ok {
 		logger.Error("No issuer or audiences found!")
 		k.reportLoginFailure("[NOT GENERATED]", r)
@@ -128,7 +128,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 	}
 
 	// decide if we use policy ID from provider client settings or list of policies from scope-policy mapping
-	useScope := providerConf.ScopeFieldName != "" && providerConf.ScopeToPolicyMapping != nil
+	useScope := len(k.Spec.JWTScopeToPolicyMapping) != 0
 
 	k.lock.RLock()
 	clientSet, foundIssuer := k.provider_client_policymap[iss.(string)]
@@ -182,9 +182,14 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 	if !useScope {
 		policiesToApply = append(policiesToApply, policyID)
 	} else {
-		if scope := getScopeFromClaim(token.Claims.(jwt.MapClaims), providerConf.ScopeFieldName); scope != nil {
+		scopeClaimName := k.Spec.JWTScopeClaimName
+		if scopeClaimName == "" {
+			scopeClaimName = "scope"
+		}
+
+		if scope := getScopeFromClaim(token.Claims.(jwt.MapClaims), scopeClaimName); scope != nil {
 			// add all policies matched from scope-policy mapping
-			policiesToApply = mapScopeToPolicies(providerConf.ScopeToPolicyMapping, scope)
+			policiesToApply = mapScopeToPolicies(k.Spec.JWTScopeToPolicyMapping, scope)
 		}
 	}
 
