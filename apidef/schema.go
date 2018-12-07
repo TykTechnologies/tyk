@@ -105,6 +105,9 @@ const Schema = `{
         "jwt_scope_to_policy_mapping": {
             "type": ["object", "null"]
         },
+        "jwt_scope_claim_name": {
+            "type": "string"
+        },
         "use_keyless": {
             "type": "boolean"
         },
