@@ -23,7 +23,6 @@ type OpenIDMW struct {
 	providerConfiguration     *openid.Configuration
 	provider_client_policymap map[string]map[string]string
 	lock                      sync.RWMutex
-	providerConfigs           map[string]apidef.OIDProviderConfig
 }
 
 func (k *OpenIDMW) Name() string {
@@ -43,12 +42,6 @@ func (k *OpenIDMW) Init() {
 
 	if err != nil {
 		k.Logger().WithError(err).Error("OpenID configuration error")
-	}
-
-	// prepare map issuer->config to lookup configs when processing requests
-	k.providerConfigs = make(map[string]apidef.OIDProviderConfig)
-	for _, providerConf := range k.Spec.OpenIDOptions.Providers {
-		k.providerConfigs[providerConf.Issuer] = providerConf
 	}
 }
 
@@ -115,13 +108,6 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 	clients, cfound := token.Claims.(jwt.MapClaims)["aud"]
 
 	if !found && !cfound {
-		logger.Error("No issuer or audiences found!")
-		k.reportLoginFailure("[NOT GENERATED]", r)
-		return errors.New("Key not authorised"), http.StatusUnauthorized
-	}
-
-	_, ok := k.providerConfigs[iss.(string)]
-	if !ok {
 		logger.Error("No issuer or audiences found!")
 		k.reportLoginFailure("[NOT GENERATED]", r)
 		return errors.New("Key not authorised"), http.StatusUnauthorized
