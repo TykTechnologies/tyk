@@ -21,6 +21,7 @@ Google::Protobuf::DescriptorPool.generated_pool.build do
     optional :scheme, :string, 13
     optional :raw_body, :bytes, 14
     repeated :raw_certificates, :bytes, 15
+    repeated :certificate_meta, :bytes, 16
   end
 end
 

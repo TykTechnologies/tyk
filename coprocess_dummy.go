@@ -30,9 +30,10 @@ var (
 
 type CoProcessMiddleware struct {
 	BaseMiddleware
-	HookType         coprocess.HookType
-	HookName         string
-	MiddlewareDriver apidef.MiddlewareDriver
+	HookType          coprocess.HookType
+	HookName          string
+	RequireClientCert bool
+	MiddlewareDriver  apidef.MiddlewareDriver
 }
 
 func (m *CoProcessMiddleware) Name() string {

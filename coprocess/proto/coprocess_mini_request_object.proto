@@ -21,4 +21,5 @@ message MiniRequestObject {
   string scheme = 13;
   bytes raw_body = 14;
   repeated bytes raw_certificates = 15;
+  repeated bytes certificate_meta = 16;
 }

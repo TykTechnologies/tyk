@@ -109,6 +109,9 @@ func (d *dispatcher) Dispatch(ctx context.Context, object *coprocess.Object) (*c
 		if len(object.Request.RawCertificates) == 0 {
 			return d.grpcError(object, "raw_certificates is empty")
 		}
+		if len(object.Request.CertificateMeta) == 0 {
+			return d.grpcError(object, "certificate_meta is empty")
+		}
 	}
 	return object, nil
 }
@@ -343,7 +346,10 @@ func TestGRPCMutualTLS(t *testing.T) {
 		spec.Proxy.StripListenPath = true
 		spec.CustomMiddleware = apidef.MiddlewareSection{
 			Pre: []apidef.MiddlewareDefinition{
-				{Name: "testMutualTLS"},
+				{
+					Name:              "testMutualTLS",
+					RequireClientCert: true,
+				},
 			},
 			Driver: apidef.GrpcDriver,
 		}

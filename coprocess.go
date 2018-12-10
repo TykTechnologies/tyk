@@ -4,12 +4,15 @@ package main
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
+	"strconv"
 	"unicode/utf8"
 
 	"github.com/Sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/coprocess"
 
@@ -29,9 +32,10 @@ var (
 // CoProcessMiddleware is the basic CP middleware struct.
 type CoProcessMiddleware struct {
 	BaseMiddleware
-	HookType         coprocess.HookType
-	HookName         string
-	MiddlewareDriver apidef.MiddlewareDriver
+	HookType          coprocess.HookType
+	HookName          string
+	RequireClientCert bool
+	MiddlewareDriver  apidef.MiddlewareDriver
 }
 
 func (mw *CoProcessMiddleware) Name() string {
@@ -39,12 +43,13 @@ func (mw *CoProcessMiddleware) Name() string {
 }
 
 // CreateCoProcessMiddleware initializes a new CP middleware, takes hook type (pre, post, etc.), hook name ("my_hook") and driver ("python").
-func CreateCoProcessMiddleware(hookName string, hookType coprocess.HookType, mwDriver apidef.MiddlewareDriver, baseMid BaseMiddleware) func(http.Handler) http.Handler {
+func CreateCoProcessMiddleware(hookName string, hookType coprocess.HookType, requireClientCert bool, mwDriver apidef.MiddlewareDriver, baseMid BaseMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &CoProcessMiddleware{
-		BaseMiddleware:   baseMid,
-		HookType:         hookType,
-		HookName:         hookName,
-		MiddlewareDriver: mwDriver,
+		HookName:          hookName,
+		HookType:          hookType,
+		RequireClientCert: requireClientCert,
+		MiddlewareDriver:  mwDriver,
+		BaseMiddleware:    baseMid,
 	}
 
 	return createMiddleware(dMiddleware)
@@ -67,7 +72,7 @@ type CoProcessor struct {
 }
 
 // ObjectFromRequest constructs a CoProcessObject from a given http.Request.
-func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
+func (c *CoProcessor) ObjectFromRequest(r *http.Request, requireClientCert bool) *coprocess.Object {
 	headers := ProtoMap(r.Header)
 
 	host := r.Host
@@ -95,12 +100,18 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
 		Scheme:     r.URL.Scheme,
 	}
 
-	if r.TLS != nil {
-		certs := make([][]byte, len(r.TLS.PeerCertificates))
+	if r.TLS != nil && requireClientCert {
+		rawCerts := make([][]byte, len(r.TLS.PeerCertificates))
+		metaCerts := make([][]byte, len(r.TLS.PeerCertificates))
 		for i, c := range r.TLS.PeerCertificates {
-			certs[i] = c.Raw
+			rawCerts[i] = c.Raw
+			tlsCert := tls.Certificate{Leaf: c}
+			meta := certs.ExtractCertificateMeta(&tlsCert, strconv.Itoa(i))
+			metaJSON, _ := json.Marshal(meta)
+			metaCerts[i] = metaJSON
 		}
-		miniRequestObject.RawCertificates = certs
+		miniRequestObject.CertificateMeta = metaCerts
+		miniRequestObject.RawCertificates = rawCerts
 	}
 	if r.Body != nil {
 		defer r.Body.Close()
@@ -260,10 +271,8 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	// It's also possible to override the HookType:
 	coProcessor := CoProcessor{
 		Middleware: m,
-		// HookType: coprocess.PreHook,
 	}
-
-	object := coProcessor.ObjectFromRequest(r)
+	object := coProcessor.ObjectFromRequest(r, m.RequireClientCert)
 
 	returnObject, err := coProcessor.Dispatch(object)
 	if err != nil {
