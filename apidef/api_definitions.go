@@ -247,9 +247,10 @@ type EventHandlerMetaConfig struct {
 }
 
 type MiddlewareDefinition struct {
-	Name           string `bson:"name" json:"name"`
-	Path           string `bson:"path" json:"path"`
-	RequireSession bool   `bson:"require_session" json:"require_session"`
+	Name              string `bson:"name" json:"name"`
+	Path              string `bson:"path" json:"path"`
+	RequireSession    bool   `bson:"require_session" json:"require_session"`
+	RequireClientCert bool   `bson:"require_client_cert" json:"require_client_cert"`
 }
 
 type MiddlewareIdExtractor struct {
