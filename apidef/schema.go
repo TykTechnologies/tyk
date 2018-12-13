@@ -1,7 +1,7 @@
 package apidef
 
 const Schema = `{
-    "type": "object",
+    "type": ["object", "null"],
     "$schema": "http://json-schema.org/draft-04/schema",
     "id": "http://jsonschema.net",
     "additionalProperties": false,
@@ -10,7 +10,7 @@ const Schema = `{
             "type": "boolean"
         },
         "uptime_tests": {
-            "type": "object"
+            "type": ["object", "null"]
         },
         "expire_analytics_after": {
             "type": "number"
@@ -46,7 +46,7 @@ const Schema = `{
             "type": "boolean"
         },
         "openid_options": {
-            "type": "object"
+            "type": ["object", "null"]
         },
         "use_standard_auth":{
             "type": "boolean"
@@ -115,55 +115,55 @@ const Schema = `{
             "type": "boolean"
         },
         "client_certificates": {
-            "type": "array"
+            "type": ["array", "null"]
         },
         "upstream_certificates": {
-            "type": "object"
+            "type": ["object", "null"]
         },
         "pinned_public_keys": {
-            "type": "object"
+            "type": ["object", "null"]
         },
         "allowed_ips": {
-            "type": "array"
+            "type": ["array", "null"]
         },
         "blacklisted_ips": {
-            "type": "array"
+            "type": ["array", "null"]
         },
         "enable_batch_request_support": {
             "type": "boolean"
         },
         "event_handlers": {
-            "type":"object"
+            "type":["object", "null"]
         },
         "notifications": {
-            "type":"object"
+            "type":["object", "null"]
         },
         "use_oauth2": {
             "type": "boolean"
         },
         "oauth_meta": {
-            "type":"object"
+            "type":["object", "null"]
         },
         "cache_options": {
-            "type":"object"
+            "type":["object", "null"]
         },
         "tags": {
-            "type":"array"
+            "type": ["array", "null"]
         },
         "tag_headers": {
-            "type":"array"
+            "type": ["array", "null"]
         },
         "basic_auth": {
-            "type": "object"
+            "type": ["object", "null"]
         },
         "CORS": {
-            "type":"object"
+            "type":["object", "null"]
         },
         "response_processors": {
-            "type":"array"
+            "type": ["array", "null"]
         },
         "auth_provider": {
-            "type":"object",
+            "type":["object", "null"],
             "properties": {
                 "name": {
                     "type": "string",
@@ -176,7 +176,7 @@ const Schema = `{
             }
         },
         "session_provider": {
-            "type":"object",
+            "type":["object", "null"],
             "properties": {
                 "name": {
                     "type": "string",
@@ -195,7 +195,7 @@ const Schema = `{
             "type": "boolean"
             },
         "custom_middleware": {
-            "type":"object",
+            "type":["object", "null"],
             "properties": {
                 "pre": {
                     "type": ["array", "null"]
@@ -216,7 +216,7 @@ const Schema = `{
             "id": "http://jsonschema.net/active"
         },
         "auth": {
-            "type": "object",
+            "type": ["object", "null"],
             "id": "http://jsonschema.net/auth",
             "properties": {
                 "auth_header_name": {
@@ -232,7 +232,7 @@ const Schema = `{
             ]
         },
         "definition": {
-            "type": "object",
+            "type": ["object", "null"],
             "id": "http://jsonschema.net/definition",
             "properties": {
                 "key": {
@@ -269,7 +269,7 @@ const Schema = `{
             "type": "boolean"
         },
         "proxy": {
-            "type": "object",
+            "type": ["object", "null"],
             "id": "http://jsonschema.net/proxy",
             "properties": {
                 "target_url": {
@@ -283,7 +283,7 @@ const Schema = `{
                     "type": "boolean"
                 },
                 "transport": {
-                    "type": "object",
+                    "type": ["object", "null"],
                     "properties": {
                         "ssl_ciphers": {
                             "type": ["array", "null"]
@@ -302,10 +302,10 @@ const Schema = `{
             ]
         },
         "hook_references": {
-            "type": "object"
+            "type": ["object", "null"]
         },
         "version_data": {
-            "type": "object",
+            "type": ["object", "null"],
             "id": "http://jsonschema.net/version_data",
             "properties": {
                 "not_versioned": {
@@ -317,12 +317,12 @@ const Schema = `{
                     "id": "http://jsonschema.net/version_data/default_version"
                 },
                 "versions": {
-                    "type": "object",
+                    "type": ["object", "null"],
                     "id": "http://jsonschema.net/version_data/versions",
                     "patternProperties": {
                         "^[a-zA-Z0-9]+$": {
                             "title": "versionInfoProperty",
-                            "type": "object",
+                            "type": ["object", "null"],
                             "id": "http://jsonschema.net/access_rights/versionInfoProperty",
                             "properties": {
                                 "expires": {
@@ -334,19 +334,19 @@ const Schema = `{
                                     "id": "http://jsonschema.net/version_data/versions/versionInfoProperty/name"
                                 },
                                 "paths": {
-                                    "type": "object",
+                                    "type": ["object", "null"],
                                     "id": "http://jsonschema.net/version_data/versions/versionInfoProperty/paths",
                                     "properties": {
                                         "black_list": {
-                                            "type": "array",
+                                            "type": ["array", "null"],
                                             "id": "http://jsonschema.net/version_data/versions/versionInfoProperty/paths/black_list"
                                         },
                                         "ignored": {
-                                            "type": "array",
+                                            "type": ["array", "null"],
                                             "id": "http://jsonschema.net/version_data/versions/versionInfoProperty/paths/ignored"
                                         },
                                         "white_list": {
-                                            "type": "array",
+                                            "type": ["array", "null"],
                                             "id": "http://jsonschema.net/version_data/versions/versionInfoProperty/paths/white_list"
                                         }
                                     }
@@ -365,10 +365,10 @@ const Schema = `{
             ]
         },
         "config_data": {
-            "type": "object"
+            "type": ["object", "null"]
         },
         "global_rate_limit": {
-          "type": "object",
+          "type": ["object", "null"],
            "properties": {
                 "rate": {
                     "type": "number"
