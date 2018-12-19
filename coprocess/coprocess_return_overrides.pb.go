@@ -3,25 +3,57 @@
 
 package coprocess
 
-import proto "github.com/golang/protobuf/proto"
-import fmt "fmt"
-import math "math"
+import (
+	fmt "fmt"
+	math "math"
+
+	proto "github.com/golang/protobuf/proto"
+)
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
 
+// This is a compile-time assertion to ensure that this generated file
+// is compatible with the proto package it is being compiled against.
+// A compilation error at this line likely means your copy of the
+// proto package needs to be updated.
+const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
+
 type ReturnOverrides struct {
-	ResponseCode  int32             `protobuf:"varint,1,opt,name=response_code,json=responseCode" json:"response_code,omitempty"`
-	ResponseError string            `protobuf:"bytes,2,opt,name=response_error,json=responseError" json:"response_error,omitempty"`
-	Headers       map[string]string `protobuf:"bytes,3,rep,name=headers" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	ResponseCode         int32             `protobuf:"varint,1,opt,name=response_code,json=responseCode,proto3" json:"response_code,omitempty"`
+	ResponseError        string            `protobuf:"bytes,2,opt,name=response_error,json=responseError,proto3" json:"response_error,omitempty"`
+	Headers              map[string]string `protobuf:"bytes,3,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
+	XXX_unrecognized     []byte            `json:"-"`
+	XXX_sizecache        int32             `json:"-"`
 }
 
-func (m *ReturnOverrides) Reset()                    { *m = ReturnOverrides{} }
-func (m *ReturnOverrides) String() string            { return proto.CompactTextString(m) }
-func (*ReturnOverrides) ProtoMessage()               {}
-func (*ReturnOverrides) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{0} }
+func (m *ReturnOverrides) Reset()         { *m = ReturnOverrides{} }
+func (m *ReturnOverrides) String() string { return proto.CompactTextString(m) }
+func (*ReturnOverrides) ProtoMessage()    {}
+func (*ReturnOverrides) Descriptor() ([]byte, []int) {
+	return fileDescriptor_7c6abd8ea4a81548, []int{0}
+}
+
+func (m *ReturnOverrides) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_ReturnOverrides.Unmarshal(m, b)
+}
+func (m *ReturnOverrides) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_ReturnOverrides.Marshal(b, m, deterministic)
+}
+func (m *ReturnOverrides) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ReturnOverrides.Merge(m, src)
+}
+func (m *ReturnOverrides) XXX_Size() int {
+	return xxx_messageInfo_ReturnOverrides.Size(m)
+}
+func (m *ReturnOverrides) XXX_DiscardUnknown() {
+	xxx_messageInfo_ReturnOverrides.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ReturnOverrides proto.InternalMessageInfo
 
 func (m *ReturnOverrides) GetResponseCode() int32 {
 	if m != nil {
@@ -46,11 +78,12 @@ func (m *ReturnOverrides) GetHeaders() map[string]string {
 
 func init() {
 	proto.RegisterType((*ReturnOverrides)(nil), "coprocess.ReturnOverrides")
+	proto.RegisterMapType((map[string]string)(nil), "coprocess.ReturnOverrides.HeadersEntry")
 }
 
-func init() { proto.RegisterFile("coprocess_return_overrides.proto", fileDescriptor3) }
+func init() { proto.RegisterFile("coprocess_return_overrides.proto", fileDescriptor_7c6abd8ea4a81548) }
 
-var fileDescriptor3 = []byte{
+var fileDescriptor_7c6abd8ea4a81548 = []byte{
 	// 206 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0x52, 0x48, 0xce, 0x2f, 0x28,
 	0xca, 0x4f, 0x4e, 0x2d, 0x2e, 0x8e, 0x2f, 0x4a, 0x2d, 0x29, 0x2d, 0xca, 0x8b, 0xcf, 0x2f, 0x4b,
