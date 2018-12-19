@@ -19,7 +19,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/newrelic/go-agent"
+	newrelic "github.com/newrelic/go-agent"
 
 	"github.com/TykTechnologies/tyk/checkup"
 
@@ -32,9 +32,9 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/lonelycode/osin"
-	"github.com/netbrain/goautosocket"
+	gas "github.com/netbrain/goautosocket"
 	"github.com/rs/cors"
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 	"rsc.io/letsencrypt"
 
 	"github.com/TykTechnologies/goagain"
@@ -57,6 +57,7 @@ var (
 	rawLog                   = logger.GetRaw()
 	templates                *template.Template
 	analytics                RedisAnalyticsHandler
+	dnsCache                 *storage.DnsCacheStorage
 	GlobalEventsJSVM         JSVM
 	memProfFile              *os.File
 	MainNotifier             RedisNotifier
@@ -127,6 +128,10 @@ func setupGlobals() {
 
 	reloadMu.Lock()
 	defer reloadMu.Unlock()
+
+	if /* onfig.Global().Dns != nil &&*/ config.Global().Dns.EnableCaching {
+		initDnsCaching(config.Global().Dns.CheckInterval)
+	}
 
 	mainRouter = mux.NewRouter()
 	controlRouter = mux.NewRouter()
@@ -1360,5 +1365,19 @@ func listen(listener, controlListener net.Listener, err error) {
 
 	if !rpc.IsEmergencyMode() {
 		doReload()
+	}
+}
+
+func initDnsCaching(updateInterval int) {
+	dnsCache = storage.NewDnsCacheStorage(time.Duration(updateInterval))
+
+	http.DefaultClient.Transport = &http.Transport{
+		MaxIdleConnsPerHost: 64,
+		Dial: func(network string, address string) (net.Conn, error) {
+			separator := strings.LastIndex(address, ":")
+			ips, err := dnsCache.FetchItem(address[:separator])
+			log.Debugln("err: %v; got ips: %s for %v. Separator: %v", err, ips, address, separator)
+			return net.Dial("tcp", ips[0]+address[separator:])
+		},
 	}
 }

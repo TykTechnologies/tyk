@@ -81,6 +81,11 @@ type HealthCheckConfig struct {
 	HealthCheckValueTimeout int64 `json:"health_check_value_timeouts"`
 }
 
+type DnsConfig struct {
+	EnableCaching			bool 			`json:"enable_cache"`
+	CheckInterval			int 			`json:"check_interval"`
+}
+
 type MonitorConfig struct {
 	EnableTriggerMonitors bool               `json:"enable_trigger_monitors"`
 	Config                WebHookHandlerConf `json:"configuration"`
@@ -211,6 +216,7 @@ type Config struct {
 	EnableAnalytics                   bool                                  `json:"enable_analytics"`
 	AnalyticsConfig                   AnalyticsConfigConfig                 `json:"analytics_config"`
 	HealthCheck                       HealthCheckConfig                     `json:"health_check"`
+	Dns								  DnsConfig								`json:"dns"`	//TODO: Make optional
 	UseAsyncSessionWrite              bool                                  `json:"optimisations_use_async_session_write"`
 	SessionUpdatePoolSize             int                                   `json:"session_update_pool_size"`
 	SessionUpdateBufferSize           int                                   `json:"session_update_buffer_size"`
