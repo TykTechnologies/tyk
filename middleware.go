@@ -281,7 +281,7 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 				}
 
 				// check if we already have limit on API level specified when policy was created
-				if accessRights.Limit == nil {
+				if accessRights.Limit == nil || *accessRights.Limit == (user.APILimit{}) {
 					// limit was not specified on API level so we will populate it from policy
 					accessRights.Limit = &user.APILimit{
 						QuotaMax:         policy.QuotaMax,
@@ -291,9 +291,6 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 						SetByPolicy:      true,
 					}
 				}
-
-				// adjust policy access right with limit on API level
-				policy.AccessRights[apiID] = accessRights
 
 				// overwrite session access right for this API
 				rights[apiID] = accessRights
