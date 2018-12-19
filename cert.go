@@ -257,6 +257,25 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 		}
 
 		apisMu.RLock()
+
+		// Dynamically add API specific certificates
+		for _, spec := range apiSpecs {
+			if len(spec.Certificates) != 0 {
+				for _, cert := range CertificateManager.List(spec.Certificates, certs.CertificatePrivate) {
+					newConfig.Certificates = append(newConfig.Certificates, *cert)
+
+					if cert != nil {
+						if len(cert.Leaf.Subject.CommonName) > 0 {
+							newConfig.NameToCertificate[cert.Leaf.Subject.CommonName] = cert
+						}
+						for _, san := range cert.Leaf.DNSNames {
+							newConfig.NameToCertificate[san] = cert
+						}
+					}
+				}
+			}
+		}
+
 		for _, spec := range apiSpecs {
 			if spec.UseMutualTLSAuth && spec.Domain != "" && spec.Domain == hello.ServerName {
 				newConfig.ClientAuth = tls.RequireAndVerifyClientCert
