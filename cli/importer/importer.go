@@ -36,6 +36,7 @@ type Importer struct {
 	asMock         *bool
 	forAPI         *string
 	asVersion      *string
+	whitelistPaths *bool
 }
 
 func init() {
@@ -99,7 +100,7 @@ func (i *Importer) handleBluePrintMode() error {
 		if err != nil {
 			return fmt.Errorf("File load error: %v", err)
 		}
-		versionData, err := bp.ConvertIntoApiVersion(*i.asMock)
+		versionData, err := bp.ConvertIntoApiVersion(*i.asMock, *i.whitelistPaths)
 		if err != nil {
 			return fmt.Errorf("onversion into API Def failed: %v", err)
 		}
@@ -122,7 +123,7 @@ func (i *Importer) handleBluePrintMode() error {
 		return fmt.Errorf("File load error: %v", err)
 	}
 
-	def, err := bp.ToAPIDefinition(*i.orgID, *i.upstreamTarget, *i.asMock)
+	def, err := bp.ToAPIDefinition(*i.orgID, *i.upstreamTarget, *i.asMock, *i.whitelistPaths)
 	if err != nil {
 		return fmt.Errorf("Failed to create API Definition from file")
 	}
@@ -140,7 +141,7 @@ func (i *Importer) handleSwaggerMode() error {
 				return fmt.Errorf("File load error: %v", err)
 			}
 
-			def, err := s.ToAPIDefinition(*i.orgID, *i.upstreamTarget, *i.asMock)
+			def, err := s.ToAPIDefinition(*i.orgID, *i.upstreamTarget, *i.asMock, *i.whitelistPaths)
 			if err != nil {
 				return fmt.Errorf("Failed to create API Defintition from file")
 			}
@@ -172,7 +173,7 @@ func (i *Importer) handleSwaggerMode() error {
 		return fmt.Errorf("File load error: %v", err)
 	}
 
-	versionData, err := s.ConvertIntoApiVersion(*i.asMock)
+	versionData, err := s.ConvertIntoApiVersion(*i.asMock, *i.whitelistPaths)
 	if err != nil {
 		return fmt.Errorf("Conversion into API Def failed: %v", err)
 	}

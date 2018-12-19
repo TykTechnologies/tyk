@@ -98,7 +98,7 @@ func (b *BluePrintAST) LoadFrom(r io.Reader) error {
 	return json.NewDecoder(r).Decode(&b)
 }
 
-func (b *BluePrintAST) ConvertIntoApiVersion(asMock bool) (apidef.VersionInfo, error) {
+func (b *BluePrintAST) ConvertIntoApiVersion(asMock bool, whitelistPaths bool) (apidef.VersionInfo, error) {
 	versionInfo := apidef.VersionInfo{}
 	versionInfo.UseExtendedPaths = true
 	versionInfo.Name = b.Name
@@ -159,7 +159,7 @@ func (b *BluePrintAST) InsertIntoAPIDefinitionAsVersion(version apidef.VersionIn
 	return nil
 }
 
-func (b *BluePrintAST) ToAPIDefinition(orgID, upstreamURL string, asMock bool) (*apidef.APIDefinition, error) {
+func (b *BluePrintAST) ToAPIDefinition(orgID, upstreamURL string, asMock bool, whiteListPaths bool) (*apidef.APIDefinition, error) {
 	ad := apidef.APIDefinition{
 		Name:             b.Name,
 		Active:           true,
@@ -174,7 +174,7 @@ func (b *BluePrintAST) ToAPIDefinition(orgID, upstreamURL string, asMock bool) (
 	ad.Proxy.StripListenPath = true
 	ad.Proxy.TargetURL = upstreamURL
 
-	versionData, err := b.ConvertIntoApiVersion(asMock)
+	versionData, err := b.ConvertIntoApiVersion(asMock, false)
 	if err != nil {
 		return nil, err
 	}

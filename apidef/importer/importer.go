@@ -12,9 +12,9 @@ var log = logger.Get()
 
 type APIImporter interface {
 	LoadFrom(io.Reader) error
-	ConvertIntoApiVersion(bool) (apidef.VersionInfo, error)
+	ConvertIntoApiVersion(bool, bool) (apidef.VersionInfo, error)
 	InsertIntoAPIDefinitionAsVersion(apidef.VersionInfo, *apidef.APIDefinition, string) error
-	ToAPIDefinition(string, string, bool) (*apidef.APIDefinition, error)
+	ToAPIDefinition(string, string, bool, bool) (*apidef.APIDefinition, error)
 }
 
 type APIImporterSource string

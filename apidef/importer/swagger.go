@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net/http"
 	"strings"
 
 	"github.com/satori/go.uuid"
@@ -78,7 +79,7 @@ func (s *SwaggerAST) LoadFrom(r io.Reader) error {
 	return json.NewDecoder(r).Decode(&s)
 }
 
-func (s *SwaggerAST) ConvertIntoApiVersion(asMock bool) (apidef.VersionInfo, error) {
+func (s *SwaggerAST) ConvertIntoApiVersion(asMock bool, whitelist bool) (apidef.VersionInfo, error) {
 	versionInfo := apidef.VersionInfo{}
 
 	if asMock {
@@ -114,6 +115,14 @@ func (s *SwaggerAST) ConvertIntoApiVersion(asMock bool) (apidef.VersionInfo, err
 
 			newEndpointMeta.Method = methodName
 			versionInfo.ExtendedPaths.TrackEndpoints = append(versionInfo.ExtendedPaths.TrackEndpoints, newEndpointMeta)
+
+			if whitelist {
+				newWhiteListMeta := apidef.EndPointMeta{}
+				newWhiteListMeta.Path = pathName
+				newWhiteListMeta.MethodActions = map[string]apidef.EndpointMethodMeta{}
+				newWhiteListMeta.MethodActions[methodName] = apidef.EndpointMethodMeta{Action: "no_action", Code: http.StatusOK}
+				versionInfo.ExtendedPaths.WhiteList = append(versionInfo.ExtendedPaths.WhiteList, newWhiteListMeta)
+			}
 		}
 	}
 
@@ -126,7 +135,7 @@ func (s *SwaggerAST) InsertIntoAPIDefinitionAsVersion(version apidef.VersionInfo
 	return nil
 }
 
-func (s *SwaggerAST) ToAPIDefinition(orgId, upstreamURL string, as_mock bool) (*apidef.APIDefinition, error) {
+func (s *SwaggerAST) ToAPIDefinition(orgId, upstreamURL string, as_mock bool, whiteListPaths bool) (*apidef.APIDefinition, error) {
 	ad := apidef.APIDefinition{
 		Name:             s.Info.Title,
 		Active:           true,
@@ -144,7 +153,7 @@ func (s *SwaggerAST) ToAPIDefinition(orgId, upstreamURL string, as_mock bool) (*
 	if as_mock {
 		log.Warning("Mocks not supported for Swagger definitions, ignoring option")
 	}
-	versionData, err := s.ConvertIntoApiVersion(false)
+	versionData, err := s.ConvertIntoApiVersion(false, whiteListPaths)
 	if err != nil {
 		return nil, err
 	}
