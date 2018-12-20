@@ -684,6 +684,33 @@ func TestRewriterTriggers(t *testing.T) {
 		},
 		func() TestDef {
 			r, _ := http.NewRequest("GET", "/test/foo/rewrite", nil)
+			hOpt := apidef.StringRegexMap{MatchPattern: "bar"}
+			hOpt.Init()
+
+			ctxSetData(r, map[string]interface{}{
+				"rewrite": "bar-baz",
+			})
+
+			return TestDef{
+				"Request context",
+				"/test/foo/rewrite", "/change/to/me/ignore",
+				"/test/foo/rewrite", "/change/to/me/bar",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.Any,
+						Options: apidef.RoutingTriggerOptions{
+							RequestContextMatches: map[string]apidef.StringRegexMap{
+								"rewrite": hOpt,
+							},
+						},
+						RewriteTo: "/change/to/me/$tyk_context.trigger-0-rewrite",
+					},
+				},
+				r,
+			}
+		},
+		func() TestDef {
+			r, _ := http.NewRequest("GET", "/test/foo/rewrite", nil)
 			hOpt := apidef.StringRegexMap{MatchPattern: "foo"}
 			hOpt.Init()
 

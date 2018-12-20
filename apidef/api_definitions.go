@@ -139,11 +139,12 @@ type StringRegexMap struct {
 }
 
 type RoutingTriggerOptions struct {
-	HeaderMatches      map[string]StringRegexMap `bson:"header_matches" json:"header_matches"`
-	QueryValMatches    map[string]StringRegexMap `bson:"query_val_matches" json:"query_val_matches"`
-	PathPartMatches    map[string]StringRegexMap `bson:"path_part_matches" json:"path_part_matches"`
-	SessionMetaMatches map[string]StringRegexMap `bson:"session_meta_matches" json:"session_meta_matches"`
-	PayloadMatches     StringRegexMap            `bson:"payload_matches" json:"payload_matches"`
+	HeaderMatches         map[string]StringRegexMap `bson:"header_matches" json:"header_matches"`
+	QueryValMatches       map[string]StringRegexMap `bson:"query_val_matches" json:"query_val_matches"`
+	PathPartMatches       map[string]StringRegexMap `bson:"path_part_matches" json:"path_part_matches"`
+	SessionMetaMatches    map[string]StringRegexMap `bson:"session_meta_matches" json:"session_meta_matches"`
+	RequestContextMatches map[string]StringRegexMap `bson:"request_context_matches" json:"request_context_matches"`
+	PayloadMatches        StringRegexMap            `bson:"payload_matches" json:"payload_matches"`
 }
 
 type RoutingTrigger struct {
