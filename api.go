@@ -78,16 +78,16 @@ func allowMethods(next http.HandlerFunc, methods ...string) http.HandlerFunc {
 	}
 }
 
-func getSpecForOrg(apiID string) *APISpec {
+func getSpecForOrg(orgID string) *APISpec {
 	apisMu.RLock()
 	defer apisMu.RUnlock()
 	for _, v := range apisByID {
-		if v.OrgID == apiID {
+		if v.OrgID == orgID {
 			return v
 		}
 	}
 
-	// If we can't find a spec, it doesn;t matter, because we default to Redis anyway, grab whatever you can find
+	// If we can't find a spec, it doesn't matter, because we default to Redis anyway, grab whatever you can find
 	for _, v := range apisByID {
 		return v
 	}
@@ -324,10 +324,6 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 	spec := getApiSpec(apiID)
 	if spec != nil {
 		sessionManager = spec.SessionManager
-		// special case for basic auth with custom hashing algo
-		if spec.UseBasicAuth && strings.HasPrefix(sessionKey, spec.OrgID) {
-			sessionKey = generateToken(spec.OrgID, sessionKey)
-		}
 	}
 
 	var session user.SessionState
@@ -660,6 +656,26 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 	keyName := mux.Vars(r)["keyName"]
 	apiID := r.URL.Query().Get("api_id")
 	isHashed := r.URL.Query().Get("hashed") != ""
+	isUserName := r.URL.Query().Get("username") == "true"
+
+	// check if passed key is user name and convert it to real key with respect to current hashing algorithm
+	if r.Method != http.MethodPost && isUserName {
+		orgID := "default"
+		// check if we have real orgID
+		if !strings.HasPrefix(keyName, "default") && len(keyName) > 24 {
+			orgID = keyName[:24]
+		}
+		// check if organization ID is real
+		if spec := getSpecForOrg(orgID); spec == nil {
+			doJSONWrite(
+				w,
+				http.StatusNotFound,
+				apiError("Key not found"),
+			)
+			return
+		}
+		keyName = generateToken(orgID, keyName)
+	}
 
 	var obj interface{}
 	var code int

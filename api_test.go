@@ -299,8 +299,11 @@ func TestHashKeyHandler(t *testing.T) {
 		t.Run(fmt.Sprintf("%sHash fn: %s", tc.desc, tc.hashFunction), func(t *testing.T) {
 			testHashKeyHandlerHelper(t, tc.expectedHashSize)
 		})
-		t.Run(fmt.Sprintf("%sHash fn: %s and Basic Auth", tc.desc, tc.hashFunction), func(t *testing.T) {
-			testHashFuncAndBAHelper(t)
+		t.Run(fmt.Sprintf("%sHash fn: %s and Basic Auth with default OrgID", tc.desc, tc.hashFunction), func(t *testing.T) {
+			testHashFuncAndBAHelper(t, "default")
+		})
+		t.Run(fmt.Sprintf("%sHash fn: %s and Basic Auth with real OrgID", tc.desc, tc.hashFunction), func(t *testing.T) {
+			testHashFuncAndBAHelper(t, "5b5fd341e6355b5eb194765e")
 		})
 	}
 }
@@ -422,25 +425,34 @@ func testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 	})
 }
 
-func testHashFuncAndBAHelper(t *testing.T) {
+func testHashFuncAndBAHelper(t *testing.T, orgID string) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	session := testPrepareBasicAuth(false)
+	session := testPrepareBasicAuthWithOrgID(false, orgID)
+
+	userName := orgID + "user"
 
 	ts.Run(t, []test.TestCase{
 		{
 			Method:    "POST",
-			Path:      "/tyk/keys/defaultuser",
+			Path:      "/tyk/keys/" + userName,
 			Data:      session,
 			AdminAuth: true,
 			Code:      200,
 		},
 		{
 			Method:    "GET",
-			Path:      "/tyk/keys/defaultuser?api_id=test",
+			Path:      "/tyk/keys/" + userName + "?username=true",
 			AdminAuth: true,
 			Code:      200,
+		},
+		{
+			Method:    "DELETE",
+			Path:      "/tyk/keys/" + userName + "?username=true",
+			AdminAuth: true,
+			Code:      200,
+			BodyMatch: `"action":"deleted"`,
 		},
 	}...)
 }
