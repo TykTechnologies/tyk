@@ -35,23 +35,6 @@ func testPrepareBasicAuth(cacheDisabled bool) *user.SessionState {
 	return session
 }
 
-func testPrepareBasicAuthWithOrgID(cacheDisabled bool, orgID string) *user.SessionState {
-	session := createStandardSession()
-	session.BasicAuthData.Password = "password"
-	session.AccessRights = map[string]user.AccessDefinition{"test": {APIID: "test", Versions: []string{"v1"}}}
-	session.OrgID = orgID
-
-	buildAndLoadAPI(func(spec *APISpec) {
-		spec.UseBasicAuth = true
-		spec.BasicAuth.DisableCaching = cacheDisabled
-		spec.UseKeylessAccess = false
-		spec.Proxy.ListenPath = "/"
-		spec.OrgID = orgID
-	})
-
-	return session
-}
-
 func TestBasicAuth(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()

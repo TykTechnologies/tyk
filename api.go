@@ -657,23 +657,10 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := r.URL.Query().Get("api_id")
 	isHashed := r.URL.Query().Get("hashed") != ""
 	isUserName := r.URL.Query().Get("username") == "true"
+	orgID := r.URL.Query().Get("org_id")
 
 	// check if passed key is user name and convert it to real key with respect to current hashing algorithm
 	if r.Method != http.MethodPost && isUserName {
-		orgID := "default"
-		// check if we have real orgID
-		if !strings.HasPrefix(keyName, "default") && len(keyName) > 24 {
-			orgID = keyName[:24]
-		}
-		// check if organization ID is real
-		if spec := getSpecForOrg(orgID); spec == nil {
-			doJSONWrite(
-				w,
-				http.StatusNotFound,
-				apiError("Key not found"),
-			)
-			return
-		}
 		keyName = generateToken(orgID, keyName)
 	}
 
