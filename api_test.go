@@ -299,6 +299,9 @@ func TestHashKeyHandler(t *testing.T) {
 		t.Run(fmt.Sprintf("%sHash fn: %s", tc.desc, tc.hashFunction), func(t *testing.T) {
 			testHashKeyHandlerHelper(t, tc.expectedHashSize)
 		})
+		t.Run(fmt.Sprintf("%sHash fn: %s and Basic Auth", tc.desc, tc.hashFunction), func(t *testing.T) {
+			testHashFuncAndBAHelper(t)
+		})
 	}
 }
 
@@ -417,6 +420,36 @@ func testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 			},
 		}...)
 	})
+}
+
+func testHashFuncAndBAHelper(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	session := testPrepareBasicAuth(false)
+
+	ts.Run(t, []test.TestCase{
+		{
+			Method:    "POST",
+			Path:      "/tyk/keys/defaultuser",
+			Data:      session,
+			AdminAuth: true,
+			Code:      200,
+		},
+		{
+			Method:    "GET",
+			Path:      "/tyk/keys/defaultuser?username=true&org_id=default",
+			AdminAuth: true,
+			Code:      200,
+		},
+		{
+			Method:    "DELETE",
+			Path:      "/tyk/keys/defaultuser?username=true&org_id=default",
+			AdminAuth: true,
+			Code:      200,
+			BodyMatch: `"action":"deleted"`,
+		},
+	}...)
 }
 
 func TestHashKeyListingDisabled(t *testing.T) {
