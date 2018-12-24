@@ -305,6 +305,59 @@ func TestHashKeyHandler(t *testing.T) {
 	}
 }
 
+func TestHashKeyHandlerLegacyWithHashFunc(t *testing.T) {
+	globalConf := config.Global()
+
+	globalConf.HashKeys = true
+	globalConf.EnableHashedKeysListing = true
+	// settings to create BA session with legacy key format
+	globalConf.HashKeyFunction = ""
+	config.SetGlobal(globalConf)
+	defer resetTestConfig()
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	// create session with legacy key format
+	session := testPrepareBasicAuth(false)
+
+	ts.Run(t, []test.TestCase{
+		{
+			Method:    "POST",
+			Path:      "/tyk/keys/defaultuser",
+			Data:      session,
+			AdminAuth: true,
+			Code:      200,
+		},
+		{
+			Method:    "GET",
+			Path:      "/tyk/keys/defaultuser?username=true&org_id=default",
+			AdminAuth: true,
+			Code:      200,
+		},
+	}...)
+
+	// set custom hashing function and check if we still can get BA session with legacy key format
+	globalConf.HashKeyFunction = storage.HashMurmur64
+	config.SetGlobal(globalConf)
+
+	ts.Run(t, []test.TestCase{
+		{
+			Method:    "GET",
+			Path:      "/tyk/keys/defaultuser?username=true&org_id=default",
+			AdminAuth: true,
+			Code:      200,
+		},
+		{
+			Method:    "DELETE",
+			Path:      "/tyk/keys/defaultuser?username=true&org_id=default",
+			AdminAuth: true,
+			Code:      200,
+			BodyMatch: `"action":"deleted"`,
+		},
+	}...)
+}
+
 func testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 	ts := newTykTestServer()
 	defer ts.Close()
