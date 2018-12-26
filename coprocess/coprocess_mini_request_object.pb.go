@@ -3,36 +3,68 @@
 
 package coprocess
 
-import proto "github.com/golang/protobuf/proto"
-import fmt "fmt"
-import math "math"
+import (
+	fmt "fmt"
+	math "math"
+
+	proto "github.com/golang/protobuf/proto"
+)
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
 
+// This is a compile-time assertion to ensure that this generated file
+// is compatible with the proto package it is being compiled against.
+// A compilation error at this line likely means your copy of the
+// proto package needs to be updated.
+const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
+
 type MiniRequestObject struct {
-	Headers         map[string]string `protobuf:"bytes,1,rep,name=headers" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	SetHeaders      map[string]string `protobuf:"bytes,2,rep,name=set_headers,json=setHeaders" json:"set_headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	DeleteHeaders   []string          `protobuf:"bytes,3,rep,name=delete_headers,json=deleteHeaders" json:"delete_headers,omitempty"`
-	Body            string            `protobuf:"bytes,4,opt,name=body" json:"body,omitempty"`
-	Url             string            `protobuf:"bytes,5,opt,name=url" json:"url,omitempty"`
-	Params          map[string]string `protobuf:"bytes,6,rep,name=params" json:"params,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	AddParams       map[string]string `protobuf:"bytes,7,rep,name=add_params,json=addParams" json:"add_params,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	ExtendedParams  map[string]string `protobuf:"bytes,8,rep,name=extended_params,json=extendedParams" json:"extended_params,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	DeleteParams    []string          `protobuf:"bytes,9,rep,name=delete_params,json=deleteParams" json:"delete_params,omitempty"`
-	ReturnOverrides *ReturnOverrides  `protobuf:"bytes,10,opt,name=return_overrides,json=returnOverrides" json:"return_overrides,omitempty"`
-	Method          string            `protobuf:"bytes,11,opt,name=method" json:"method,omitempty"`
-	RequestUri      string            `protobuf:"bytes,12,opt,name=request_uri,json=requestUri" json:"request_uri,omitempty"`
-	Scheme          string            `protobuf:"bytes,13,opt,name=scheme" json:"scheme,omitempty"`
-	RawBody         []byte            `protobuf:"bytes,14,opt,name=raw_body,json=rawBody,proto3" json:"raw_body,omitempty"`
+	Headers              map[string]string `protobuf:"bytes,1,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	SetHeaders           map[string]string `protobuf:"bytes,2,rep,name=set_headers,json=setHeaders,proto3" json:"set_headers,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	DeleteHeaders        []string          `protobuf:"bytes,3,rep,name=delete_headers,json=deleteHeaders,proto3" json:"delete_headers,omitempty"`
+	Body                 string            `protobuf:"bytes,4,opt,name=body,proto3" json:"body,omitempty"`
+	Url                  string            `protobuf:"bytes,5,opt,name=url,proto3" json:"url,omitempty"`
+	Params               map[string]string `protobuf:"bytes,6,rep,name=params,proto3" json:"params,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	AddParams            map[string]string `protobuf:"bytes,7,rep,name=add_params,json=addParams,proto3" json:"add_params,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	ExtendedParams       map[string]string `protobuf:"bytes,8,rep,name=extended_params,json=extendedParams,proto3" json:"extended_params,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	DeleteParams         []string          `protobuf:"bytes,9,rep,name=delete_params,json=deleteParams,proto3" json:"delete_params,omitempty"`
+	ReturnOverrides      *ReturnOverrides  `protobuf:"bytes,10,opt,name=return_overrides,json=returnOverrides,proto3" json:"return_overrides,omitempty"`
+	Method               string            `protobuf:"bytes,11,opt,name=method,proto3" json:"method,omitempty"`
+	RequestUri           string            `protobuf:"bytes,12,opt,name=request_uri,json=requestUri,proto3" json:"request_uri,omitempty"`
+	Scheme               string            `protobuf:"bytes,13,opt,name=scheme,proto3" json:"scheme,omitempty"`
+	RawBody              []byte            `protobuf:"bytes,14,opt,name=raw_body,json=rawBody,proto3" json:"raw_body,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
+	XXX_unrecognized     []byte            `json:"-"`
+	XXX_sizecache        int32             `json:"-"`
 }
 
-func (m *MiniRequestObject) Reset()                    { *m = MiniRequestObject{} }
-func (m *MiniRequestObject) String() string            { return proto.CompactTextString(m) }
-func (*MiniRequestObject) ProtoMessage()               {}
-func (*MiniRequestObject) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{0} }
+func (m *MiniRequestObject) Reset()         { *m = MiniRequestObject{} }
+func (m *MiniRequestObject) String() string { return proto.CompactTextString(m) }
+func (*MiniRequestObject) ProtoMessage()    {}
+func (*MiniRequestObject) Descriptor() ([]byte, []int) {
+	return fileDescriptor_7fc17e485a5ab6a4, []int{0}
+}
+
+func (m *MiniRequestObject) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_MiniRequestObject.Unmarshal(m, b)
+}
+func (m *MiniRequestObject) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_MiniRequestObject.Marshal(b, m, deterministic)
+}
+func (m *MiniRequestObject) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MiniRequestObject.Merge(m, src)
+}
+func (m *MiniRequestObject) XXX_Size() int {
+	return xxx_messageInfo_MiniRequestObject.Size(m)
+}
+func (m *MiniRequestObject) XXX_DiscardUnknown() {
+	xxx_messageInfo_MiniRequestObject.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_MiniRequestObject proto.InternalMessageInfo
 
 func (m *MiniRequestObject) GetHeaders() map[string]string {
 	if m != nil {
@@ -134,11 +166,18 @@ func (m *MiniRequestObject) GetRawBody() []byte {
 
 func init() {
 	proto.RegisterType((*MiniRequestObject)(nil), "coprocess.MiniRequestObject")
+	proto.RegisterMapType((map[string]string)(nil), "coprocess.MiniRequestObject.AddParamsEntry")
+	proto.RegisterMapType((map[string]string)(nil), "coprocess.MiniRequestObject.ExtendedParamsEntry")
+	proto.RegisterMapType((map[string]string)(nil), "coprocess.MiniRequestObject.HeadersEntry")
+	proto.RegisterMapType((map[string]string)(nil), "coprocess.MiniRequestObject.ParamsEntry")
+	proto.RegisterMapType((map[string]string)(nil), "coprocess.MiniRequestObject.SetHeadersEntry")
 }
 
-func init() { proto.RegisterFile("coprocess_mini_request_object.proto", fileDescriptor1) }
+func init() {
+	proto.RegisterFile("coprocess_mini_request_object.proto", fileDescriptor_7fc17e485a5ab6a4)
+}
 
-var fileDescriptor1 = []byte{
+var fileDescriptor_7fc17e485a5ab6a4 = []byte{
 	// 452 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x94, 0x93, 0xd1, 0x8b, 0xd3, 0x40,
 	0x10, 0xc6, 0x49, 0x7b, 0xd7, 0x5e, 0x26, 0xbd, 0xf6, 0x5c, 0x45, 0xd6, 0xbe, 0x18, 0x3c, 0x84,

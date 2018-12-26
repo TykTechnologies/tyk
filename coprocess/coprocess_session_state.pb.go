@@ -3,24 +3,56 @@
 
 package coprocess
 
-import proto "github.com/golang/protobuf/proto"
-import fmt "fmt"
-import math "math"
+import (
+	fmt "fmt"
+	math "math"
+
+	proto "github.com/golang/protobuf/proto"
+)
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
 
+// This is a compile-time assertion to ensure that this generated file
+// is compatible with the proto package it is being compiled against.
+// A compilation error at this line likely means your copy of the
+// proto package needs to be updated.
+const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
+
 type AccessSpec struct {
-	Url     string   `protobuf:"bytes,1,opt,name=url" json:"url,omitempty"`
-	Methods []string `protobuf:"bytes,2,rep,name=methods" json:"methods,omitempty"`
+	Url                  string   `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
+	Methods              []string `protobuf:"bytes,2,rep,name=methods,proto3" json:"methods,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *AccessSpec) Reset()                    { *m = AccessSpec{} }
-func (m *AccessSpec) String() string            { return proto.CompactTextString(m) }
-func (*AccessSpec) ProtoMessage()               {}
-func (*AccessSpec) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{0} }
+func (m *AccessSpec) Reset()         { *m = AccessSpec{} }
+func (m *AccessSpec) String() string { return proto.CompactTextString(m) }
+func (*AccessSpec) ProtoMessage()    {}
+func (*AccessSpec) Descriptor() ([]byte, []int) {
+	return fileDescriptor_087f3e8bbcac7a63, []int{0}
+}
+
+func (m *AccessSpec) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_AccessSpec.Unmarshal(m, b)
+}
+func (m *AccessSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_AccessSpec.Marshal(b, m, deterministic)
+}
+func (m *AccessSpec) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_AccessSpec.Merge(m, src)
+}
+func (m *AccessSpec) XXX_Size() int {
+	return xxx_messageInfo_AccessSpec.Size(m)
+}
+func (m *AccessSpec) XXX_DiscardUnknown() {
+	xxx_messageInfo_AccessSpec.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_AccessSpec proto.InternalMessageInfo
 
 func (m *AccessSpec) GetUrl() string {
 	if m != nil {
@@ -37,16 +69,39 @@ func (m *AccessSpec) GetMethods() []string {
 }
 
 type AccessDefinition struct {
-	ApiName     string        `protobuf:"bytes,1,opt,name=api_name,json=apiName" json:"api_name,omitempty"`
-	ApiId       string        `protobuf:"bytes,2,opt,name=api_id,json=apiId" json:"api_id,omitempty"`
-	Versions    []string      `protobuf:"bytes,3,rep,name=versions" json:"versions,omitempty"`
-	AllowedUrls []*AccessSpec `protobuf:"bytes,4,rep,name=allowed_urls,json=allowedUrls" json:"allowed_urls,omitempty"`
+	ApiName              string        `protobuf:"bytes,1,opt,name=api_name,json=apiName,proto3" json:"api_name,omitempty"`
+	ApiId                string        `protobuf:"bytes,2,opt,name=api_id,json=apiId,proto3" json:"api_id,omitempty"`
+	Versions             []string      `protobuf:"bytes,3,rep,name=versions,proto3" json:"versions,omitempty"`
+	AllowedUrls          []*AccessSpec `protobuf:"bytes,4,rep,name=allowed_urls,json=allowedUrls,proto3" json:"allowed_urls,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}      `json:"-"`
+	XXX_unrecognized     []byte        `json:"-"`
+	XXX_sizecache        int32         `json:"-"`
 }
 
-func (m *AccessDefinition) Reset()                    { *m = AccessDefinition{} }
-func (m *AccessDefinition) String() string            { return proto.CompactTextString(m) }
-func (*AccessDefinition) ProtoMessage()               {}
-func (*AccessDefinition) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{1} }
+func (m *AccessDefinition) Reset()         { *m = AccessDefinition{} }
+func (m *AccessDefinition) String() string { return proto.CompactTextString(m) }
+func (*AccessDefinition) ProtoMessage()    {}
+func (*AccessDefinition) Descriptor() ([]byte, []int) {
+	return fileDescriptor_087f3e8bbcac7a63, []int{1}
+}
+
+func (m *AccessDefinition) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_AccessDefinition.Unmarshal(m, b)
+}
+func (m *AccessDefinition) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_AccessDefinition.Marshal(b, m, deterministic)
+}
+func (m *AccessDefinition) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_AccessDefinition.Merge(m, src)
+}
+func (m *AccessDefinition) XXX_Size() int {
+	return xxx_messageInfo_AccessDefinition.Size(m)
+}
+func (m *AccessDefinition) XXX_DiscardUnknown() {
+	xxx_messageInfo_AccessDefinition.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_AccessDefinition proto.InternalMessageInfo
 
 func (m *AccessDefinition) GetApiName() string {
 	if m != nil {
@@ -77,14 +132,37 @@ func (m *AccessDefinition) GetAllowedUrls() []*AccessSpec {
 }
 
 type BasicAuthData struct {
-	Password string `protobuf:"bytes,1,opt,name=password" json:"password,omitempty"`
-	Hash     string `protobuf:"bytes,2,opt,name=hash" json:"hash,omitempty"`
+	Password             string   `protobuf:"bytes,1,opt,name=password,proto3" json:"password,omitempty"`
+	Hash                 string   `protobuf:"bytes,2,opt,name=hash,proto3" json:"hash,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *BasicAuthData) Reset()                    { *m = BasicAuthData{} }
-func (m *BasicAuthData) String() string            { return proto.CompactTextString(m) }
-func (*BasicAuthData) ProtoMessage()               {}
-func (*BasicAuthData) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{2} }
+func (m *BasicAuthData) Reset()         { *m = BasicAuthData{} }
+func (m *BasicAuthData) String() string { return proto.CompactTextString(m) }
+func (*BasicAuthData) ProtoMessage()    {}
+func (*BasicAuthData) Descriptor() ([]byte, []int) {
+	return fileDescriptor_087f3e8bbcac7a63, []int{2}
+}
+
+func (m *BasicAuthData) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_BasicAuthData.Unmarshal(m, b)
+}
+func (m *BasicAuthData) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_BasicAuthData.Marshal(b, m, deterministic)
+}
+func (m *BasicAuthData) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_BasicAuthData.Merge(m, src)
+}
+func (m *BasicAuthData) XXX_Size() int {
+	return xxx_messageInfo_BasicAuthData.Size(m)
+}
+func (m *BasicAuthData) XXX_DiscardUnknown() {
+	xxx_messageInfo_BasicAuthData.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_BasicAuthData proto.InternalMessageInfo
 
 func (m *BasicAuthData) GetPassword() string {
 	if m != nil {
@@ -101,13 +179,36 @@ func (m *BasicAuthData) GetHash() string {
 }
 
 type JWTData struct {
-	Secret string `protobuf:"bytes,1,opt,name=secret" json:"secret,omitempty"`
+	Secret               string   `protobuf:"bytes,1,opt,name=secret,proto3" json:"secret,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *JWTData) Reset()                    { *m = JWTData{} }
-func (m *JWTData) String() string            { return proto.CompactTextString(m) }
-func (*JWTData) ProtoMessage()               {}
-func (*JWTData) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{3} }
+func (m *JWTData) Reset()         { *m = JWTData{} }
+func (m *JWTData) String() string { return proto.CompactTextString(m) }
+func (*JWTData) ProtoMessage()    {}
+func (*JWTData) Descriptor() ([]byte, []int) {
+	return fileDescriptor_087f3e8bbcac7a63, []int{3}
+}
+
+func (m *JWTData) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_JWTData.Unmarshal(m, b)
+}
+func (m *JWTData) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_JWTData.Marshal(b, m, deterministic)
+}
+func (m *JWTData) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_JWTData.Merge(m, src)
+}
+func (m *JWTData) XXX_Size() int {
+	return xxx_messageInfo_JWTData.Size(m)
+}
+func (m *JWTData) XXX_DiscardUnknown() {
+	xxx_messageInfo_JWTData.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_JWTData proto.InternalMessageInfo
 
 func (m *JWTData) GetSecret() string {
 	if m != nil {
@@ -117,13 +218,36 @@ func (m *JWTData) GetSecret() string {
 }
 
 type Monitor struct {
-	TriggerLimits []float64 `protobuf:"fixed64,1,rep,packed,name=trigger_limits,json=triggerLimits" json:"trigger_limits,omitempty"`
+	TriggerLimits        []float64 `protobuf:"fixed64,1,rep,packed,name=trigger_limits,json=triggerLimits,proto3" json:"trigger_limits,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}  `json:"-"`
+	XXX_unrecognized     []byte    `json:"-"`
+	XXX_sizecache        int32     `json:"-"`
 }
 
-func (m *Monitor) Reset()                    { *m = Monitor{} }
-func (m *Monitor) String() string            { return proto.CompactTextString(m) }
-func (*Monitor) ProtoMessage()               {}
-func (*Monitor) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{4} }
+func (m *Monitor) Reset()         { *m = Monitor{} }
+func (m *Monitor) String() string { return proto.CompactTextString(m) }
+func (*Monitor) ProtoMessage()    {}
+func (*Monitor) Descriptor() ([]byte, []int) {
+	return fileDescriptor_087f3e8bbcac7a63, []int{4}
+}
+
+func (m *Monitor) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Monitor.Unmarshal(m, b)
+}
+func (m *Monitor) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Monitor.Marshal(b, m, deterministic)
+}
+func (m *Monitor) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Monitor.Merge(m, src)
+}
+func (m *Monitor) XXX_Size() int {
+	return xxx_messageInfo_Monitor.Size(m)
+}
+func (m *Monitor) XXX_DiscardUnknown() {
+	xxx_messageInfo_Monitor.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Monitor proto.InternalMessageInfo
 
 func (m *Monitor) GetTriggerLimits() []float64 {
 	if m != nil {
@@ -133,42 +257,65 @@ func (m *Monitor) GetTriggerLimits() []float64 {
 }
 
 type SessionState struct {
-	LastCheck               int64                        `protobuf:"varint,1,opt,name=last_check,json=lastCheck" json:"last_check,omitempty"`
-	Allowance               float64                      `protobuf:"fixed64,2,opt,name=allowance" json:"allowance,omitempty"`
-	Rate                    float64                      `protobuf:"fixed64,3,opt,name=rate" json:"rate,omitempty"`
-	Per                     float64                      `protobuf:"fixed64,4,opt,name=per" json:"per,omitempty"`
-	Expires                 int64                        `protobuf:"varint,5,opt,name=expires" json:"expires,omitempty"`
-	QuotaMax                int64                        `protobuf:"varint,6,opt,name=quota_max,json=quotaMax" json:"quota_max,omitempty"`
-	QuotaRenews             int64                        `protobuf:"varint,7,opt,name=quota_renews,json=quotaRenews" json:"quota_renews,omitempty"`
-	QuotaRemaining          int64                        `protobuf:"varint,8,opt,name=quota_remaining,json=quotaRemaining" json:"quota_remaining,omitempty"`
-	QuotaRenewalRate        int64                        `protobuf:"varint,9,opt,name=quota_renewal_rate,json=quotaRenewalRate" json:"quota_renewal_rate,omitempty"`
-	AccessRights            map[string]*AccessDefinition `protobuf:"bytes,10,rep,name=access_rights,json=accessRights" json:"access_rights,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	OrgId                   string                       `protobuf:"bytes,11,opt,name=org_id,json=orgId" json:"org_id,omitempty"`
-	OauthClientId           string                       `protobuf:"bytes,12,opt,name=oauth_client_id,json=oauthClientId" json:"oauth_client_id,omitempty"`
-	OauthKeys               map[string]string            `protobuf:"bytes,13,rep,name=oauth_keys,json=oauthKeys" json:"oauth_keys,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	BasicAuthData           *BasicAuthData               `protobuf:"bytes,14,opt,name=basic_auth_data,json=basicAuthData" json:"basic_auth_data,omitempty"`
-	JwtData                 *JWTData                     `protobuf:"bytes,15,opt,name=jwt_data,json=jwtData" json:"jwt_data,omitempty"`
-	HmacEnabled             bool                         `protobuf:"varint,16,opt,name=hmac_enabled,json=hmacEnabled" json:"hmac_enabled,omitempty"`
-	HmacSecret              string                       `protobuf:"bytes,17,opt,name=hmac_secret,json=hmacSecret" json:"hmac_secret,omitempty"`
-	IsInactive              bool                         `protobuf:"varint,18,opt,name=is_inactive,json=isInactive" json:"is_inactive,omitempty"`
-	ApplyPolicyId           string                       `protobuf:"bytes,19,opt,name=apply_policy_id,json=applyPolicyId" json:"apply_policy_id,omitempty"`
-	DataExpires             int64                        `protobuf:"varint,20,opt,name=data_expires,json=dataExpires" json:"data_expires,omitempty"`
-	Monitor                 *Monitor                     `protobuf:"bytes,21,opt,name=monitor" json:"monitor,omitempty"`
-	EnableDetailedRecording bool                         `protobuf:"varint,22,opt,name=enable_detailed_recording,json=enableDetailedRecording" json:"enable_detailed_recording,omitempty"`
-	Metadata                map[string]string            `protobuf:"bytes,23,rep,name=metadata" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	Tags                    []string                     `protobuf:"bytes,24,rep,name=tags" json:"tags,omitempty"`
-	Alias                   string                       `protobuf:"bytes,25,opt,name=alias" json:"alias,omitempty"`
-	LastUpdated             string                       `protobuf:"bytes,26,opt,name=last_updated,json=lastUpdated" json:"last_updated,omitempty"`
-	IdExtractorDeadline     int64                        `protobuf:"varint,27,opt,name=id_extractor_deadline,json=idExtractorDeadline" json:"id_extractor_deadline,omitempty"`
-	SessionLifetime         int64                        `protobuf:"varint,28,opt,name=session_lifetime,json=sessionLifetime" json:"session_lifetime,omitempty"`
-	ApplyPolicies           []string                     `protobuf:"bytes,29,rep,name=apply_policies,json=applyPolicies" json:"apply_policies,omitempty"`
-	Certificate             string                       `protobuf:"bytes,30,opt,name=certificate" json:"certificate,omitempty"`
+	LastCheck               int64                        `protobuf:"varint,1,opt,name=last_check,json=lastCheck,proto3" json:"last_check,omitempty"`
+	Allowance               float64                      `protobuf:"fixed64,2,opt,name=allowance,proto3" json:"allowance,omitempty"`
+	Rate                    float64                      `protobuf:"fixed64,3,opt,name=rate,proto3" json:"rate,omitempty"`
+	Per                     float64                      `protobuf:"fixed64,4,opt,name=per,proto3" json:"per,omitempty"`
+	Expires                 int64                        `protobuf:"varint,5,opt,name=expires,proto3" json:"expires,omitempty"`
+	QuotaMax                int64                        `protobuf:"varint,6,opt,name=quota_max,json=quotaMax,proto3" json:"quota_max,omitempty"`
+	QuotaRenews             int64                        `protobuf:"varint,7,opt,name=quota_renews,json=quotaRenews,proto3" json:"quota_renews,omitempty"`
+	QuotaRemaining          int64                        `protobuf:"varint,8,opt,name=quota_remaining,json=quotaRemaining,proto3" json:"quota_remaining,omitempty"`
+	QuotaRenewalRate        int64                        `protobuf:"varint,9,opt,name=quota_renewal_rate,json=quotaRenewalRate,proto3" json:"quota_renewal_rate,omitempty"`
+	AccessRights            map[string]*AccessDefinition `protobuf:"bytes,10,rep,name=access_rights,json=accessRights,proto3" json:"access_rights,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	OrgId                   string                       `protobuf:"bytes,11,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`
+	OauthClientId           string                       `protobuf:"bytes,12,opt,name=oauth_client_id,json=oauthClientId,proto3" json:"oauth_client_id,omitempty"`
+	OauthKeys               map[string]string            `protobuf:"bytes,13,rep,name=oauth_keys,json=oauthKeys,proto3" json:"oauth_keys,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	BasicAuthData           *BasicAuthData               `protobuf:"bytes,14,opt,name=basic_auth_data,json=basicAuthData,proto3" json:"basic_auth_data,omitempty"`
+	JwtData                 *JWTData                     `protobuf:"bytes,15,opt,name=jwt_data,json=jwtData,proto3" json:"jwt_data,omitempty"`
+	HmacEnabled             bool                         `protobuf:"varint,16,opt,name=hmac_enabled,json=hmacEnabled,proto3" json:"hmac_enabled,omitempty"`
+	HmacSecret              string                       `protobuf:"bytes,17,opt,name=hmac_secret,json=hmacSecret,proto3" json:"hmac_secret,omitempty"`
+	IsInactive              bool                         `protobuf:"varint,18,opt,name=is_inactive,json=isInactive,proto3" json:"is_inactive,omitempty"`
+	ApplyPolicyId           string                       `protobuf:"bytes,19,opt,name=apply_policy_id,json=applyPolicyId,proto3" json:"apply_policy_id,omitempty"`
+	DataExpires             int64                        `protobuf:"varint,20,opt,name=data_expires,json=dataExpires,proto3" json:"data_expires,omitempty"`
+	Monitor                 *Monitor                     `protobuf:"bytes,21,opt,name=monitor,proto3" json:"monitor,omitempty"`
+	EnableDetailedRecording bool                         `protobuf:"varint,22,opt,name=enable_detailed_recording,json=enableDetailedRecording,proto3" json:"enable_detailed_recording,omitempty"`
+	Metadata                map[string]string            `protobuf:"bytes,23,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	Tags                    []string                     `protobuf:"bytes,24,rep,name=tags,proto3" json:"tags,omitempty"`
+	Alias                   string                       `protobuf:"bytes,25,opt,name=alias,proto3" json:"alias,omitempty"`
+	LastUpdated             string                       `protobuf:"bytes,26,opt,name=last_updated,json=lastUpdated,proto3" json:"last_updated,omitempty"`
+	IdExtractorDeadline     int64                        `protobuf:"varint,27,opt,name=id_extractor_deadline,json=idExtractorDeadline,proto3" json:"id_extractor_deadline,omitempty"`
+	SessionLifetime         int64                        `protobuf:"varint,28,opt,name=session_lifetime,json=sessionLifetime,proto3" json:"session_lifetime,omitempty"`
+	ApplyPolicies           []string                     `protobuf:"bytes,29,rep,name=apply_policies,json=applyPolicies,proto3" json:"apply_policies,omitempty"`
+	Certificate             string                       `protobuf:"bytes,30,opt,name=certificate,proto3" json:"certificate,omitempty"`
+	XXX_NoUnkeyedLiteral    struct{}                     `json:"-"`
+	XXX_unrecognized        []byte                       `json:"-"`
+	XXX_sizecache           int32                        `json:"-"`
 }
 
-func (m *SessionState) Reset()                    { *m = SessionState{} }
-func (m *SessionState) String() string            { return proto.CompactTextString(m) }
-func (*SessionState) ProtoMessage()               {}
-func (*SessionState) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{5} }
+func (m *SessionState) Reset()         { *m = SessionState{} }
+func (m *SessionState) String() string { return proto.CompactTextString(m) }
+func (*SessionState) ProtoMessage()    {}
+func (*SessionState) Descriptor() ([]byte, []int) {
+	return fileDescriptor_087f3e8bbcac7a63, []int{5}
+}
+
+func (m *SessionState) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_SessionState.Unmarshal(m, b)
+}
+func (m *SessionState) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_SessionState.Marshal(b, m, deterministic)
+}
+func (m *SessionState) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SessionState.Merge(m, src)
+}
+func (m *SessionState) XXX_Size() int {
+	return xxx_messageInfo_SessionState.Size(m)
+}
+func (m *SessionState) XXX_DiscardUnknown() {
+	xxx_messageInfo_SessionState.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_SessionState proto.InternalMessageInfo
 
 func (m *SessionState) GetLastCheck() int64 {
 	if m != nil {
@@ -387,11 +534,14 @@ func init() {
 	proto.RegisterType((*JWTData)(nil), "coprocess.JWTData")
 	proto.RegisterType((*Monitor)(nil), "coprocess.Monitor")
 	proto.RegisterType((*SessionState)(nil), "coprocess.SessionState")
+	proto.RegisterMapType((map[string]*AccessDefinition)(nil), "coprocess.SessionState.AccessRightsEntry")
+	proto.RegisterMapType((map[string]string)(nil), "coprocess.SessionState.MetadataEntry")
+	proto.RegisterMapType((map[string]string)(nil), "coprocess.SessionState.OauthKeysEntry")
 }
 
-func init() { proto.RegisterFile("coprocess_session_state.proto", fileDescriptor4) }
+func init() { proto.RegisterFile("coprocess_session_state.proto", fileDescriptor_087f3e8bbcac7a63) }
 
-var fileDescriptor4 = []byte{
+var fileDescriptor_087f3e8bbcac7a63 = []byte{
 	// 933 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x94, 0x55, 0x4f, 0x6f, 0x1b, 0xb7,
 	0x13, 0x85, 0x2c, 0xdb, 0x92, 0x66, 0x25, 0x5b, 0x61, 0xec, 0x84, 0xb6, 0xe3, 0xdf, 0x4f, 0x16,

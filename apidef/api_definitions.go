@@ -139,11 +139,12 @@ type StringRegexMap struct {
 }
 
 type RoutingTriggerOptions struct {
-	HeaderMatches      map[string]StringRegexMap `bson:"header_matches" json:"header_matches"`
-	QueryValMatches    map[string]StringRegexMap `bson:"query_val_matches" json:"query_val_matches"`
-	PathPartMatches    map[string]StringRegexMap `bson:"path_part_matches" json:"path_part_matches"`
-	SessionMetaMatches map[string]StringRegexMap `bson:"session_meta_matches" json:"session_meta_matches"`
-	PayloadMatches     StringRegexMap            `bson:"payload_matches" json:"payload_matches"`
+	HeaderMatches         map[string]StringRegexMap `bson:"header_matches" json:"header_matches"`
+	QueryValMatches       map[string]StringRegexMap `bson:"query_val_matches" json:"query_val_matches"`
+	PathPartMatches       map[string]StringRegexMap `bson:"path_part_matches" json:"path_part_matches"`
+	SessionMetaMatches    map[string]StringRegexMap `bson:"session_meta_matches" json:"session_meta_matches"`
+	RequestContextMatches map[string]StringRegexMap `bson:"request_context_matches" json:"request_context_matches"`
+	PayloadMatches        StringRegexMap            `bson:"payload_matches" json:"payload_matches"`
 }
 
 type RoutingTrigger struct {
@@ -305,10 +306,8 @@ type ServiceDiscoveryConfiguration struct {
 }
 
 type OIDProviderConfig struct {
-	Issuer               string            `bson:"issuer" json:"issuer"`
-	ClientIDs            map[string]string `bson:"client_ids" json:"client_ids"`
-	ScopeFieldName       string            `bson:"scope_field_name" json:"scope_field_name"`
-	ScopeToPolicyMapping map[string]string `bson:"scope_to_policy_mapping" json:"scope_to_policy_mapping"`
+	Issuer    string            `bson:"issuer" json:"issuer"`
+	ClientIDs map[string]string `bson:"client_ids" json:"client_ids"`
 }
 
 type OpenIDOptions struct {
@@ -355,6 +354,7 @@ type APIDefinition struct {
 	JWTNotBeforeValidationSkew uint64               `bson:"jwt_not_before_validation_skew" json:"jwt_not_before_validation_skew"`
 	JWTSkipKid                 bool                 `bson:"jwt_skip_kid" json:"jwt_skip_kid"`
 	JWTScopeToPolicyMapping    map[string]string    `bson:"jwt_scope_to_policy_mapping" json:"jwt_scope_to_policy_mapping"`
+	JWTScopeClaimName          string               `bson:"jwt_scope_claim_name" json:"jwt_scope_claim_name"`
 	NotificationsDetails       NotificationsManager `bson:"notifications" json:"notifications"`
 	EnableSignatureChecking    bool                 `bson:"enable_signature_checking" json:"enable_signature_checking"`
 	HmacAllowedClockSkew       float64              `bson:"hmac_allowed_clock_skew" json:"hmac_allowed_clock_skew"`
