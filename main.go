@@ -916,6 +916,7 @@ func getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 }
 
 func main() {
+	fmt.Printf("%v\n", os.Args)
 	cli.Init(VERSION, confPaths)
 	cli.Parse()
 	// Stop gateway process if not running in "start" mode:
@@ -1365,19 +1366,5 @@ func listen(listener, controlListener net.Listener, err error) {
 
 	if !rpc.IsEmergencyMode() {
 		doReload()
-	}
-}
-
-func initDnsCaching(updateInterval int) {
-	dnsCache = storage.NewDnsCacheStorage(time.Duration(updateInterval))
-
-	http.DefaultClient.Transport = &http.Transport{
-		MaxIdleConnsPerHost: 64,
-		Dial: func(network string, address string) (net.Conn, error) {
-			separator := strings.LastIndex(address, ":")
-			ips, err := dnsCache.FetchItem(address[:separator])
-			log.Debugln("err: %v; got ips: %s for %v. Separator: %v", err, ips, address, separator)
-			return net.Dial("tcp", ips[0]+address[separator:])
-		},
 	}
 }

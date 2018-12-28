@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/pmylund/go-cache"
+	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -303,14 +303,12 @@ type ReverseProxy struct {
 }
 
 func defaultTransport() *http.Transport {
-	// allocate a new one every time for now, to avoid modifying a
-	// global variable for each request's needs (e.g. timeouts).
 	return &http.Transport{
-		DialContext: (&net.Dialer{
+		DialContext: wrapDialer(&net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
 			DualStack: true,
-		}).DialContext,
+		}),
 		MaxIdleConns:        config.Global().MaxIdleConns,
 		MaxIdleConnsPerHost: config.Global().MaxIdleConnsPerHost, // default is 100
 		TLSHandshakeTimeout: 10 * time.Second,
@@ -508,6 +506,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	p.TykAPISpec.Lock()
 	if !outReqIsWebsocket { // check if it is a regular HTTP request
 		// create HTTP transport
+		//TODO: Check whether transport is set somewhere else ...
 		createTransport := p.TykAPISpec.HTTPTransport == nil
 
 		// Check if timeouts are set for this endpoint

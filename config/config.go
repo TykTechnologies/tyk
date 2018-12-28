@@ -82,8 +82,8 @@ type HealthCheckConfig struct {
 }
 
 type DnsConfig struct {
-	EnableCaching			bool 			`json:"enable_cache"`
-	CheckInterval			int 			`json:"check_interval"`
+	EnableCaching bool `json:"enable_cache"`
+	CheckInterval int  `json:"check_interval"`
 }
 
 type MonitorConfig struct {
@@ -216,7 +216,7 @@ type Config struct {
 	EnableAnalytics                   bool                                  `json:"enable_analytics"`
 	AnalyticsConfig                   AnalyticsConfigConfig                 `json:"analytics_config"`
 	HealthCheck                       HealthCheckConfig                     `json:"health_check"`
-	Dns								  DnsConfig								`json:"dns"`	//TODO: Make optional
+	Dns                               DnsConfig                             `json:"dns"` //TODO: Make optional
 	UseAsyncSessionWrite              bool                                  `json:"optimisations_use_async_session_write"`
 	SessionUpdatePoolSize             int                                   `json:"session_update_pool_size"`
 	SessionUpdateBufferSize           int                                   `json:"session_update_buffer_size"`
