@@ -57,7 +57,6 @@ var (
 	rawLog                   = logger.GetRaw()
 	templates                *template.Template
 	analytics                RedisAnalyticsHandler
-	dnsCache                 *storage.DnsCacheStorage
 	GlobalEventsJSVM         JSVM
 	memProfFile              *os.File
 	MainNotifier             RedisNotifier
@@ -130,7 +129,7 @@ func setupGlobals() {
 	defer reloadMu.Unlock()
 
 	if /* onfig.Global().Dns != nil &&*/ config.Global().Dns.EnableCaching {
-		initDnsCaching(config.Global().Dns.CheckInterval)
+		initDNSCaching(config.Global().Dns.TTL, config.Global().Dns.CheckInterval)
 	}
 
 	mainRouter = mux.NewRouter()

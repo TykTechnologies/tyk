@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -78,37 +79,37 @@ func TestReverseProxyRetainHost(t *testing.T) {
 }
 
 func TestReverseProxyDnsCache(t *testing.T) {
-	//TODO: Add dns mocks 
+	//TODO: Add dns mocks
 	/*
-	initDNSMock()
+		initDNSMock()
 	*/
 	const (
-		host = "orig-host.com"
-		host2 = "orig-host2.com"
+		host   = "orig-host.com"
+		host2  = "orig-host2.com"
 		wshost = "ws.orig-host.com"
-		
-		hostApiUrl = "http://orig-host.com/origpath"
-		host2HttpApiUrl = "http://orig-host2.com/origpath"
+
+		hostApiUrl       = "http://orig-host.com/origpath"
+		host2HttpApiUrl  = "http://orig-host2.com/origpath"
 		host2HttpsApiUrl = "https://orig-host2.com/origpath"
-		wsHostWsApiUrl = "http://ws.orig-host.com/connect"
+		wsHostWsApiUrl   = "http://ws.orig-host.com/connect"
 	)
 
 	var (
-		etcHostsMap = map[string][]net.IP {
-			host: []net.IP{ net.IPv4(127, 0, 0, 1), net.IPv4(127, 0, 0, 2), },
-			host2: []net.IP{ net.IPv4(10, 0, 2, 0), net.IPv4(10,0,2,1), net.IPv4(10,0,2,2), },
-			wsHost: []net.IP{ net.IPv4(127, 0, 0, 1), net.IPv4(127,0,0,1) },
+		etcHostsMap = map[string][]net.IP{
+			host:   []net.IP{net.IPv4(127, 0, 0, 1), net.IPv4(127, 0, 0, 2)},
+			host2:  []net.IP{net.IPv4(10, 0, 2, 0), net.IPv4(10, 0, 2, 1), net.IPv4(10, 0, 2, 2)},
+			wsHost: []net.IP{net.IPv4(127, 0, 0, 1), net.IPv4(127, 0, 0, 1)},
 		}
 	)
 
 	cases := []struct {
 		name string
-		
-		URL  string
-		Method string
-		Body []byte
+
+		URL     string
+		Method  string
+		Body    []byte
 		Headers net.Header
-		IPs []net.IP
+		IPs     []net.IP
 
 		shouldBeCached bool
 	}{
@@ -135,15 +136,15 @@ func TestReverseProxyDnsCache(t *testing.T) {
 		},
 		{
 			"Should populate from cache second request to Host2 with different protocol",
-			host2HttpApiUrl, 
-			http.MethodPost, []byte{"{ \"param\": \"value2\" }"}, nil,//host, port, _ := net.SplitHostPort(u.Host)
+			host2HttpApiUrl,
+			http.MethodPost, []byte{"{ \"param\": \"value2\" }"}, nil, //host, port, _ := net.SplitHostPort(u.Host)
 			etcHostsMap[host2],
 			false,
 		},
 		{
 			"Shouldn't cache request with different http verb to same host",
 			hostApiUrl,
-			http.MethodPatch, []byte{"{ \"param2\": \"value3\" }"}, nil, 
+			http.MethodPatch, []byte{"{ \"param2\": \"value3\" }"}, nil,
 			etcHostsMap[host],
 			false,
 		},
@@ -152,7 +153,7 @@ func TestReverseProxyDnsCache(t *testing.T) {
 		// 	wsHostWsApiUrl,
 		// 	http.MethodGet, nil, map[string][]string{
 		// 		"Upgrade": "websocket"
- 		// 		"Connection": "Upgrade"
+		// 		"Connection": "Upgrade"
 		// 	},
 		// 	etcHostsMap[wshost],
 		// 	true,
@@ -166,9 +167,9 @@ func TestReverseProxyDnsCache(t *testing.T) {
 
 			proxy := TykNewSingleHostReverseProxy(target, spec)
 			// proxy.Director(req)
-			
+
 			if tc.shouldBeCached {
-				
+				// dnsCache.FetchItem
 				// t.Fatalf("wanted url %q, got %q", tc.wantURL, got)
 			} else {
 

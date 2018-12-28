@@ -9,6 +9,10 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 )
 
+var (
+	dnsCache *storage.DnsCacheStorage
+)
+
 // type CachedDialer struct {
 // 	net.Dialer
 
@@ -23,9 +27,9 @@ import (
 // 	return doCachedDial(d.Dialer, ctx, network, address)
 // }
 
-type DialContextFunc func(ctx context.Context, network, address string) (net.Conn, error)
+type dialContextFunc func(ctx context.Context, network, address string) (net.Conn, error)
 
-func wrapDialer(dialer *net.Dialer) DialContextFunc {
+func wrapDialer(dialer *net.Dialer) dialContextFunc {
 	return func(ctx context.Context, network, address string) (net.Conn, error) {
 		return doCachedDial(dialer, ctx, network, address)
 	}
@@ -39,11 +43,8 @@ func doCachedDial(d *net.Dialer, ctx context.Context, network, address string) (
 	return d.DialContext(ctx, network, ips[0]+address[separator:])
 }
 
-func initDnsCaching(updateInterval int) {
-	dnsCache = storage.NewDnsCacheStorage(time.Duration(updateInterval))
-
-	// http.DefaultClient.Transport = &http.Transport{
-	// 	MaxIdleConnsPerHost: 64,
-	// 	// DialContext:         doCachedDial,
-	// }
+func initDNSCaching(ttl, checkInterval int) {
+	if dnsCache != nil {
+		dnsCache = storage.NewDnsCacheStorage(time.Duration(ttl), time.Duration(checkInterval))
+	}
 }
