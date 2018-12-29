@@ -956,6 +956,8 @@ func main() {
 		} else {
 			mainLog.Info("Starting control API listener: ", controlListener, err, controlAPIPort)
 		}
+	} else {
+		mainLog.Warn("The control_api_port should be changed for production")
 	}
 
 	start()
