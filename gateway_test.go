@@ -118,7 +118,7 @@ func TestMain(m *testing.M) {
 	// Go 1.8 and ealier
 	globalConf.ListenAddress = "127.0.0.1"
 
-	initDNSMock()
+	test.InitDNSMock(test.DomainsToAddresses, nil)
 
 	CoProcessInit()
 

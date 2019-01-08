@@ -129,7 +129,9 @@ func setupGlobals() {
 	defer reloadMu.Unlock()
 
 	if /* onfig.Global().Dns != nil &&*/ config.Global().Dns.EnableCaching {
-		initDNSCaching(config.Global().Dns.TTL, config.Global().Dns.CheckInterval)
+		initDNSCaching(
+			time.Duration(config.Global().Dns.TTL) * time.Millisecond,
+			time.Duration(config.Global().Dns.CheckInterval) * time.Millisecond)
 	}
 
 	mainRouter = mux.NewRouter()

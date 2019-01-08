@@ -506,7 +506,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	p.TykAPISpec.Lock()
 	if !outReqIsWebsocket { // check if it is a regular HTTP request
 		// create HTTP transport
-		//TODO: Check whether transport is set somewhere else ...
 		createTransport := p.TykAPISpec.HTTPTransport == nil
 
 		// Check if timeouts are set for this endpoint

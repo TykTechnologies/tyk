@@ -304,6 +304,21 @@ const confSchema = `{
 			}
 		}
 	},
+	"dns": {
+		"type": ["object", "null"],
+		"additionalProperties": false,
+		"properties": {
+			"enable_cache": {
+				"type": "boolean"
+			},
+			"ttl": {
+				"type": "integer"
+			},
+			"check_interval": {
+				"type": "integer"
+			}
+		}
+	},
 	"hide_generator_header": {
 		"type": "boolean"
 	},

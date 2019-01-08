@@ -21,6 +21,7 @@ const (
 )
 
 var (
+	//TODO: Check whether hook will work
 	HostCheckerClient = &http.Client{
 		Timeout: 500 * time.Millisecond,
 	}
