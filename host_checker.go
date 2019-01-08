@@ -112,8 +112,21 @@ func (h *HostUptimeChecker) HostReporter() {
 		case okHost := <-h.okChan:
 			// Clear host from unhealthylist if it exists
 			if h.unHealthyList[okHost.CheckURL] {
-				h.upCallback(okHost)
-				delete(h.unHealthyList, okHost.CheckURL)
+				newVal := 1
+				if count, found := h.sampleCache.Get(okHost.CheckURL); found {
+					newVal = count.(int) - 1
+				}
+
+				if newVal <= 0 {
+					// Reset the count
+					h.sampleCache.Delete(okHost.CheckURL)
+					log.Warning("[HOST CHECKER] [HOST UP]: ", okHost.CheckURL)
+					h.upCallback(okHost)
+					delete(h.unHealthyList, okHost.CheckURL)
+				} else {
+					log.Warning("[HOST CHECKER] [HOST UP BUT NOT REACHED LIMIT]: ", okHost.CheckURL)
+					h.sampleCache.Set(okHost.CheckURL, newVal, cache.DefaultExpiration)
+				}
 			}
 			go h.pingCallback(okHost)
 
@@ -123,16 +136,15 @@ func (h *HostUptimeChecker) HostReporter() {
 				newVal = count.(int) + 1
 			}
 
-			h.sampleCache.Set(failedHost.CheckURL, newVal, cache.DefaultExpiration)
-
 			if newVal >= h.sampleTriggerLimit {
-				log.Debug("[HOST CHECKER] [HOST WARNING]: ", failedHost.CheckURL)
-				// Reset the count
-				h.sampleCache.Set(failedHost.CheckURL, 1, cache.DefaultExpiration)
+				log.Warning("[HOST CHECKER] [HOST DOWN]: ", failedHost.CheckURL)
 				// track it
 				h.unHealthyList[failedHost.CheckURL] = true
 				// Call the custom callback hook
 				go h.failureCallback(failedHost)
+			} else {
+				log.Warning("[HOST CHECKER] [HOST DOWN BUT NOT REACHED LIMIT]: ", failedHost.CheckURL)
+				h.sampleCache.Set(failedHost.CheckURL, newVal, cache.DefaultExpiration)
 			}
 			go h.pingCallback(failedHost)
 
@@ -198,7 +210,7 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 }
 
 func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList map[string]HostData, failureCallback func(HostHealthReport), upCallback func(HostHealthReport), pingCallback func(HostHealthReport)) {
-	h.sampleCache = cache.New(30*time.Second, 5*time.Second)
+	h.sampleCache = cache.New(30*time.Second, 30*time.Second)
 	h.stopPollingChan = make(chan bool)
 	h.errorChan = make(chan HostHealthReport)
 	h.okChan = make(chan HostHealthReport)

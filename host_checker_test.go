@@ -149,7 +149,7 @@ func TestHostChecker(t *testing.T) {
 	}
 
 	redisStore := GlobalHostChecker.store.(storage.RedisCluster)
-	if ttl, _ := redisStore.GetKeyTTL(PoolerHostSentinelKeyPrefix + testHttpFailure); int(ttl) != GlobalHostChecker.checker.checkTimeout+1 {
+	if ttl, _ := redisStore.GetKeyTTL(PoolerHostSentinelKeyPrefix + testHttpFailure); int(ttl) != GlobalHostChecker.checker.checkTimeout*GlobalHostChecker.checker.sampleTriggerLimit {
 		t.Error("HostDown expiration key should be checkTimeout + 1", ttl)
 	}
 	GlobalHostChecker.checkerMu.Unlock()
