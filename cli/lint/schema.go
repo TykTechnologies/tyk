@@ -312,12 +312,15 @@ const confSchema = `{
 				"type": "boolean"
 			},
 			"ttl": {
-				"type": "integer"
+				"type": "integer",
+				"minimum": -1
 			},
 			"check_interval": {
-				"type": "integer"
+				"type": "integer",
+				"minimum": 1000
 			}
-		}
+		},
+		"required": ["enable_cache"]
 	},
 	"hide_generator_header": {
 		"type": "boolean"
