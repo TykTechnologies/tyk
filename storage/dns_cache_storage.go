@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/pmylund/go-cache"
-	"fmt"
 )
 
 type DnsCacheItem struct {
@@ -22,15 +21,11 @@ type DnsCacheStorage struct {
 }
 
 func NewDnsCacheStorage(expiration, checkInterval time.Duration) *DnsCacheStorage {
-	fmt.Printf("NewDnsCacheStorage: %s, %s\n", expiration, checkInterval)
 	storage := &DnsCacheStorage{cache.New(expiration, checkInterval)}
-	storage.cache.OnEvicted(func(s string, i interface{}) {
-		fmt.Printf("Evicted: %#v %s %s\n", i,s, time.Now())
-	})
 	return storage
 }
 
-//Return non expired items from cache
+//Return non expired dns cache items
 func (dc *DnsCacheStorage) Items() map[string]DnsCacheItem {
 	var nonExpiredItems map[string]cache.Item = dc.cache.Items()
 
