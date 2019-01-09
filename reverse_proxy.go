@@ -304,7 +304,7 @@ type ReverseProxy struct {
 
 func defaultTransport() *http.Transport {
 	return &http.Transport{
-		DialContext: wrapDialer(&net.Dialer{
+		DialContext: dnsCacheManager.WrapDialer(&net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
 			DualStack: true,

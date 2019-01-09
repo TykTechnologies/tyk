@@ -1,4 +1,4 @@
-package storage
+package dns_cache
 
 import (
 	"net"
@@ -61,13 +61,13 @@ func (dc *DnsCacheStorage) FetchItem(key string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	cachedItem := DnsCacheItem{addrs}
-	dc.Set(key, cachedItem)
+
+	dc.Set(key, addrs)
 	return addrs, nil
 }
 
-func (dc *DnsCacheStorage) Set(key string, item DnsCacheItem) {
-	dc.cache.Set(key, item, cache.DefaultExpiration)
+func (dc *DnsCacheStorage) Set(key string, addrs []string) {
+	dc.cache.Set(key, DnsCacheItem{addrs}, cache.DefaultExpiration)
 }
 
 func (dc *DnsCacheStorage) Clear() {

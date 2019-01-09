@@ -1,14 +1,15 @@
-package storage
+package dns_cache_test
 
 import (
 	"fmt"
+	"net"
 	"reflect"
 	"testing"
 	"time"
 
 	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/miekg/dns"
-	"net"
 )
 
 var (
@@ -43,11 +44,11 @@ type configTestStorageFetchItem struct {
 	*testing.T
 	etcHostsMap       map[string][]string
 	etcHostsErrorsMap map[string]int
-	dnsCache          *DnsCacheStorage
+	dnsCache          *storage.DnsCacheStorage
 }
 
 func setupTestStorageFetchItem(cfg *configTestStorageFetchItem) func() {
-	tearDown, err := test.InitDNSMock(cfg.etcHostsMap, cfg.etcHostsErrorsMap)
+	tearDown, _, err := test.InitDNSMock(cfg.etcHostsMap, cfg.etcHostsErrorsMap)
 	if err != nil {
 		cfg.T.Error(err.Error())
 	}
@@ -60,10 +61,14 @@ func setupTestStorageFetchItem(cfg *configTestStorageFetchItem) func() {
 }
 
 func TestStorageFetchItem(t *testing.T) {
-	dnsCache := NewDnsCacheStorage(time.Duration(expiration)*time.Second, time.Duration(updateInterval)*time.Second)
+	dnsCache := storage.NewDnsCacheStorage(time.Duration(expiration)*time.Second, time.Duration(updateInterval)*time.Second)
 
 	tearDownTestStorageFetchItem := setupTestStorageFetchItem(&configTestStorageFetchItem{t, etcHostsMap, etcHostsErrorMap, dnsCache})
-	defer tearDownTestStorageFetchItem()
+	defer func(){
+		tearDownTestStorageFetchItem()
+		dnsCache.Clear()
+		dnsCache = nil
+	}()
 
 	cases := []struct {
 		name string
@@ -208,13 +213,13 @@ func TestStorageRemoveRecordAfterExpiration(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			dnsCache := NewDnsCacheStorage(time.Duration(expiration)*time.Millisecond, time.Duration(updateInterval)*time.Millisecond)
+			dnsCache := storage.NewDnsCacheStorage(time.Duration(expiration)*time.Millisecond, time.Duration(updateInterval)*time.Millisecond)
 
 			for key, r := range tc.records {
 				if r.addDelay > 0 {
 					time.Sleep(r.addDelay)
 				}
-				dnsCache.Set(key, DnsCacheItem{r.addrs})
+				dnsCache.Set(key, r.addrs)
 			}
 
 			if tc.expireDelay > 0 {

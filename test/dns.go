@@ -8,6 +8,7 @@ import (
 	"regexp"
 
 	"github.com/miekg/dns"
+	"time"
 )
 
 var DomainsToAddresses = map[string][]string{
@@ -59,12 +60,53 @@ func (d *dnsMockHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	w.WriteMsg(&msg)
 }
 
-func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int) (func() error, error) {
-	var mockServer *dns.Server
+type DnsMockHandle struct {
+	 id string
+	mockServer *dns.Server
+	ShutdownDnsMock func() error
+}
+
+func (h *DnsMockHandle) PushDomains(domainsMap map[string][]string, domainsErrorMap map[string]int) func() {
+	dta := h.mockServer.Handler.(*dnsMockHandler).domainsToAddresses
+	dte := h.mockServer.Handler.(*dnsMockHandler).domainsToErrors
+
+	prevDta := map[string][]string{}
+	prevDte := map[string]int{}
+
+	for key, value := range dta {
+		prevDta[key] = value
+	}
+
+	for key, value := range dte {
+		prevDte[key] = value
+	}
+
+	pullDomainsFunc := func() {
+		h.mockServer.Handler.(*dnsMockHandler).domainsToAddresses = prevDta
+		h.mockServer.Handler.(*dnsMockHandler).domainsToErrors = prevDte
+	}
+
+	for key, ips := range domainsMap {
+		addr, ok := dta[key]
+		if !ok {
+			dta[key] = ips
+		} else {
+			dta[key] = append(addr, ips...)
+		}
+	}
+
+	for key, rCode := range domainsErrorMap {
+		dte[key] = rCode
+	}
+
+	return pullDomainsFunc
+}
+
+func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int) (*DnsMockHandle, error) {
 	addr, _ := net.ResolveUDPAddr("udp", ":0")
 	conn, err := net.ListenUDP("udp", addr)
 	if err != nil {
-		return nil, err
+		return &DnsMockHandle{}, err
 	}
 
 	startResultChannel := make(chan error)
@@ -72,7 +114,9 @@ func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int)
 		startResultChannel <- nil
 	}
 
-	mockServer = &dns.Server{PacketConn: conn, NotifyStartedFunc: started}
+	mockServer := &dns.Server{PacketConn: conn, NotifyStartedFunc: started}
+	handle := &DnsMockHandle{ id: time.Now().String(), mockServer: mockServer, }
+
 	if domainsMap != nil {
 		mockServer.Handler = &dnsMockHandler{domainsToAddresses: domainsMap}
 	} else {
@@ -94,7 +138,7 @@ func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int)
 	case err := <-startResultChannel:
 		if err != nil {
 			close(startResultChannel)
-			return nil, err
+			return handle, err
 		}
 	}
 
@@ -104,7 +148,6 @@ func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int)
 		PreferGo: true,
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
 			d := net.Dialer{}
-			fmt.Println("RESOLVING HOOK: ", network, address, mockServer.PacketConn.LocalAddr().String())
 			return d.DialContext(ctx, network, mockServer.PacketConn.LocalAddr().String())
 		},
 	}
@@ -115,10 +158,11 @@ func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int)
 	}
 	net.DefaultResolver = mockResolver
 
-	return func() error {
-		fmt.Println("TEAR_TOWN_OCCURED")
+	handle.ShutdownDnsMock = func() error {
 		http.DefaultTransport = defaultTransport
 		net.DefaultResolver = defaultResolver
 		return mockServer.Shutdown()
-	}, nil
+	}
+
+	return handle, nil
 }

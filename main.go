@@ -43,6 +43,7 @@ import (
 	"github.com/TykTechnologies/tyk/certs"
 	cli "github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/dns_cache"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
@@ -97,6 +98,8 @@ var (
 		// TODO: add ~/.config/tyk/tyk.conf here?
 		"/etc/tyk/tyk.conf",
 	}
+
+	dnsCacheManager = dns_cache.NewDnsCacheManager()
 )
 
 const (
@@ -128,8 +131,8 @@ func setupGlobals() {
 	reloadMu.Lock()
 	defer reloadMu.Unlock()
 
-	if /* onfig.Global().Dns != nil &&*/ config.Global().Dns.EnableCaching {
-		initDNSCaching(
+	if config.Global().Dns.EnableCaching {
+		dnsCacheManager.InitDNSCaching(
 			time.Duration(config.Global().Dns.TTL) * time.Millisecond,
 			time.Duration(config.Global().Dns.CheckInterval) * time.Millisecond)
 	}
@@ -1086,7 +1089,7 @@ func writeProfiles() {
 }
 
 func start() {
-	// Set up a default org manager so we can traverse non-live paths
+	// Set up a default org dnsCacheManager so we can traverse non-live paths
 	if !config.Global().SupressDefaultOrgStore {
 		mainLog.Debug("Initialising default org store")
 		DefaultOrgStore.Init(getGlobalStorageHandler("orgkey.", false))

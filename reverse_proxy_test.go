@@ -1,4 +1,3 @@
-//TODO: Refactor to package main_test?
 package main
 
 import (
@@ -17,8 +16,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/request"
-
-	"github.com/TykTechnologies/tyk/test"
 )
 
 func TestReverseProxyRetainHost(t *testing.T) {
@@ -84,17 +81,12 @@ type configTestReverseProxyDnsCache struct {
 }
 
 func setupTestReverseProxyDnsCache(cfg *configTestReverseProxyDnsCache) func() {
-	shutdownFunc, err := test.InitDNSMock(cfg.etcHostsMap, nil)
-	if err != nil {
-		cfg.T.Error(err.Error())
-	}
-
-	initDNSCaching(time.Duration(cfg.dnsConfig.TTL)*time.Millisecond, time.Duration(cfg.dnsConfig.CheckInterval)*time.Millisecond)
+	pullDomains := mockHandle.PushDomains(cfg.etcHostsMap, nil)
+	dnsCacheManager.InitDNSCaching(time.Duration(cfg.dnsConfig.TTL)*time.Millisecond, time.Duration(cfg.dnsConfig.CheckInterval)*time.Millisecond)
 
 	return func() {
-		shutdownFunc()
-		dnsCache.Clear()
-		dnsCache = nil
+		pullDomains()
+		dnsCacheManager.Dispose()
 	}
 }
 
@@ -189,24 +181,24 @@ func TestReverseProxyDnsCache(t *testing.T) {
 			false, etcHostsMap[host3],
 			false, false,
 		},
-		//{ //How to handle ws:// redirect within test as don't sure how(read as whether) test will be executed?
-		//	"Should cache ws protocol host dns records",
-		//	wsHostWsApiUrl,
-		//	http.MethodGet, nil,
-		//	map[string][]string{
-		//		"Upgrade":    {"websocket"},
-		//		"Connection": {"Upgrade"},
-		//	},
-		//	true,
-		//	etcHostsMap[wsHost],
-		//	true, true,
-		//},
+		{ //How to handle ws:// redirect within test as don't sure how(read as whether) test will be executed?
+			"Should cache ws protocol host dns records",
+			wsHostWsApiUrl,
+			http.MethodGet, nil,
+			map[string][]string{
+				"Upgrade":    {"websocket"},
+				"Connection": {"Upgrade"},
+			},
+			true,
+			etcHostsMap[wsHost],
+			true, true,
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cacheInstance := dnsCache
+			cacheInstance := dnsCacheManager.DnsCache
 			if !tc.isCacheEnabled {
-				dnsCache = nil
+				dnsCacheManager.DnsCache = nil
 			}
 			spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
 
@@ -220,21 +212,11 @@ func TestReverseProxyDnsCache(t *testing.T) {
 			recorder := httptest.NewRecorder()
 			proxy.WrappedServeHTTP(recorder, req, false)
 
-			//TODO: Check after mocks added
-			// var transport = proxy.TykAPISpec.HTTPTransport
-			// if tc.isWebsocket {
-			// 	transport = proxy.TykAPISpec.WSTransport
-			// }
-
 			host := Url.Hostname()
 			if tc.isCacheEnabled {
 				item, ok := cacheInstance.Get(host)
 				if !ok || !item.IsEqualsTo(tc.expectedIPs) {
 					t.Fatalf("got %q, but wanted %q. ok=%t", item, tc.expectedIPs, ok)
-				}
-
-				if tc.shouldBeCached {
-
 				}
 			} else {
 				item, ok := cacheInstance.Get(host)
@@ -243,22 +225,11 @@ func TestReverseProxyDnsCache(t *testing.T) {
 				}
 			}
 
-
 			if !tc.isCacheEnabled {
-				dnsCache = cacheInstance
+				dnsCacheManager.DnsCache = cacheInstance
 			}
 		})
 	}
-}
-
-func TestReverseProxyONLYDnsCache(t *testing.T) {
-	t.Run("Should cache dns records only for api requests", func(t *testing.T) {
-
-	})
-
-	t.Run("Shouldn't cache requests for api requests", func(t *testing.T) {
-
-	})
 }
 
 func testNewWrappedServeHTTP() *ReverseProxy {

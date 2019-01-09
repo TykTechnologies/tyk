@@ -44,6 +44,8 @@ var (
 
 	// Used to store the test bundles:
 	testMiddlewarePath, _ = ioutil.TempDir("", "tyk-middleware-path")
+
+	mockHandle *test.DnsMockHandle
 )
 
 const defaultListenPort = 8080
@@ -77,6 +79,10 @@ func reloadSimulation() {
 }
 
 func TestMain(m *testing.M) {
+	os.Exit(initTestMain(m))
+}
+
+func initTestMain(m *testing.M) int {
 	testServerRouter = testHttpHandler()
 	testServer := &http.Server{
 		Addr:           testHttpListen,
@@ -104,51 +110,44 @@ func TestMain(m *testing.M) {
 	globalConf.EnableJSVM = true
 	globalConf.Monitor.EnableTriggerMonitors = true
 	globalConf.AnalyticsConfig.NormaliseUrls.Enabled = true
-
 	// Enable coprocess and bundle downloader:
 	globalConf.CoProcessOptions.EnableCoProcess = true
 	globalConf.EnableBundleDownloader = true
 	globalConf.BundleBaseURL = testHttpBundles
 	globalConf.MiddlewarePath = testMiddlewarePath
-
 	purgeTicker = make(chan time.Time)
 	rpcPurgeTicker = make(chan time.Time)
-
 	// force ipv4 for now, to work around the docker bug affecting
 	// Go 1.8 and ealier
 	globalConf.ListenAddress = "127.0.0.1"
 
-	test.InitDNSMock(test.DomainsToAddresses, nil)
-
-	CoProcessInit()
-
-	afterConfSetup(&globalConf)
-
-	defaultTestConfig = globalConf
-
-	config.SetGlobal(globalConf)
-
-	if err := emptyRedis(); err != nil {
+	mockHandle, err = test.InitDNSMock(test.DomainsToAddresses, nil)
+	if err != nil {
 		panic(err)
 	}
 
-	cli.Init(VERSION, confPaths)
+	defer mockHandle.ShutdownDnsMock()
 
+	CoProcessInit()
+	afterConfSetup(&globalConf)
+	defaultTestConfig = globalConf
+	config.SetGlobal(globalConf)
+	if err := emptyRedis(); err != nil {
+		panic(err)
+	}
+	cli.Init(VERSION, confPaths)
 	initialiseSystem()
 	// Small part of start()
 	loadAPIEndpoints(mainRouter)
 	if analytics.GeoIPDB == nil {
 		panic("GeoIPDB was not initialized")
 	}
-
 	go reloadLoop(reloadTick)
 	go reloadQueueLoop()
 	go reloadSimulation()
-
 	exitCode := m.Run()
-
 	os.RemoveAll(config.Global().AppPath)
-	os.Exit(exitCode)
+	return exitCode
 }
 
 func emptyRedis() error {
