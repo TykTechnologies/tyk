@@ -83,10 +83,17 @@ type configTestReverseProxyDnsCache struct {
 func setupTestReverseProxyDnsCache(cfg *configTestReverseProxyDnsCache) func() {
 	pullDomains := mockHandle.PushDomains(cfg.etcHostsMap, nil)
 	dnsCacheManager.InitDNSCaching(time.Duration(cfg.dnsConfig.TTL)*time.Millisecond, time.Duration(cfg.dnsConfig.CheckInterval)*time.Millisecond)
+	var enableWebSockets bool
+	globalConf := config.Global()
+	enableWebSockets = globalConf.HttpServerOptions.EnableWebSockets
+	globalConf.HttpServerOptions.EnableWebSockets = true
+	config.SetGlobal(globalConf)
 
 	return func() {
 		pullDomains()
 		dnsCacheManager.Dispose()
+		globalConf.HttpServerOptions.EnableWebSockets = enableWebSockets
+		config.SetGlobal(globalConf)
 	}
 }
 
@@ -97,11 +104,12 @@ func TestReverseProxyDnsCache(t *testing.T) {
 		host3  = "orig-host3.com."
 		wsHost = "ws.orig-host.com."
 
-		hostApiUrl       = "http://orig-host.com/origpath"
-		host2HttpApiUrl  = "http://orig-host2.com/origpath"
-		host2HttpsApiUrl = "https://orig-host2.com/origpath"
-		host3ApiUrl      = "https://orig-host3.com/origpath"
-		wsHostWsApiUrl   = "http://ws.orig-host.com/connect"
+		hostApiUrl         = "http://orig-host.com/origpath"
+		host2HttpApiUrl    = "http://orig-host2.com/origpath"
+		host2HttpsApiUrl   = "https://orig-host2.com/origpath"
+		host3ApiUrl        = "https://orig-host3.com/origpath"
+		wsHostWsApiUrl     = "ws://ws.orig-host.com/connect"
+		wsHostWssApiUrl    = "wss://ws.orig-host.com/connect"
 
 		cacheTTL            = 5000
 		cacheUpdateInterval = 10000
@@ -181,9 +189,21 @@ func TestReverseProxyDnsCache(t *testing.T) {
 			false, etcHostsMap[host3],
 			false, false,
 		},
-		{ //How to handle ws:// redirect within test as don't sure how(read as whether) test will be executed?
+		{
 			"Should cache ws protocol host dns records",
 			wsHostWsApiUrl,
+			http.MethodGet, nil,
+			map[string][]string{
+				"Upgrade":    {"websocket"},
+				"Connection": {"Upgrade"},
+			},
+			true,
+			etcHostsMap[wsHost],
+			true, true,
+		},
+		{
+			"Should cache wss protocol host dns records",
+			wsHostWssApiUrl,
 			http.MethodGet, nil,
 			map[string][]string{
 				"Upgrade":    {"websocket"},
