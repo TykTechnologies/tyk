@@ -232,7 +232,6 @@ func TestStorageRemoveRecordAfterExpiration(t *testing.T) {
 			for key, r := range tc.notExpiredAfterDelay {
 				if item, ok := dnsCache.Get(key); !ok || !item.IsEqualsTo(r.addrs) {
 					t.Fatalf("wanted cached ips %v, got item %#v. items=%+v, ok=%t", r.addrs, item, dnsCache.Items(), ok)
-
 				}
 			}
 

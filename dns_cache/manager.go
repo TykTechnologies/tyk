@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	logger                  = log.Get().WithField("prefix", "dns_cache")
+	logger                  = log.Get().WithField("prefix", "dns-cache")
 )
 
 type dialContextFunc func(ctx context.Context, network, address string) (net.Conn, error)
@@ -47,7 +47,7 @@ func (m *DnsCacheManager) doCachedDial(d *net.Dialer, ctx context.Context, netwo
 	ips, err := m.DnsCache.FetchItem(address[:separator])
 	
 	if err != nil {
-		logger.Infoln("doCachedDial error: %v. network=%v, address=%v", err.Error(), network, address)
+		logger.Infof("doCachedDial error: %v. network=%v, address=%v", err.Error(), network, address)
 	}
 
 	return d.DialContext(ctx, network, ips[0]+address[separator:])
@@ -55,12 +55,12 @@ func (m *DnsCacheManager) doCachedDial(d *net.Dialer, ctx context.Context, netwo
 
 func (m *DnsCacheManager) InitDNSCaching(ttl, checkInterval time.Duration) {
 	if m.DnsCache == nil {
-		logger.Infoln("Initialized dns cache with ttl=%s, duration=%s\n", ttl, checkInterval)
+		logger.Infof("Initialized dns cache with ttl=%s, duration=%s", ttl, checkInterval)
 		m.DnsCache = NewDnsCacheStorage(ttl, checkInterval)
 	}
 }
 
-func (m *DnsCacheManager) Dispose() {
+func (m *DnsCacheManager) DisposeCache() {
 	m.DnsCache.Clear()
 	m.DnsCache = nil
 }

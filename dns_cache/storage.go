@@ -54,6 +54,7 @@ func (dc *DnsCacheStorage) FetchItem(key string) ([]string, error) {
 	item, ok := dc.cache.Get(key)
 	if ok {
 		result, _ := item.(DnsCacheItem)
+		logger.Debugf("Dns record was populated from cache: key=%q, addrs=%q", key, result.addrs)
 		return result.addrs, nil
 	}
 
@@ -67,6 +68,7 @@ func (dc *DnsCacheStorage) FetchItem(key string) ([]string, error) {
 }
 
 func (dc *DnsCacheStorage) Set(key string, addrs []string) {
+	logger.Debugf("Adding dns record to cache: key=%q, addrs=%q", key, addrs)
 	dc.cache.Set(key, DnsCacheItem{addrs}, cache.DefaultExpiration)
 }
 

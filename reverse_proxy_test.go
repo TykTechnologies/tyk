@@ -91,7 +91,7 @@ func setupTestReverseProxyDnsCache(cfg *configTestReverseProxyDnsCache) func() {
 
 	return func() {
 		pullDomains()
-		dnsCacheManager.Dispose()
+		dnsCacheManager.DisposeCache()
 		globalConf.HttpServerOptions.EnableWebSockets = enableWebSockets
 		config.SetGlobal(globalConf)
 	}
