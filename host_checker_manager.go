@@ -211,7 +211,7 @@ func (hc *HostCheckerManager) OnHostDown(report HostHealthReport) {
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
 	}).Debug("Update key: ", hc.getHostKey(report))
-	hc.store.SetKey(hc.getHostKey(report), "1", int64(hc.checker.checkTimeout+1))
+	hc.store.SetKey(hc.getHostKey(report), "1", int64(hc.checker.checkTimeout*hc.checker.sampleTriggerLimit))
 
 	spec := getApiSpec(report.MetaData[UnHealthyHostMetaDataAPIKey])
 	if spec == nil {
