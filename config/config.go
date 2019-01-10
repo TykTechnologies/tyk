@@ -341,7 +341,6 @@ var Default = Config{
 	AnalyticsConfig: AnalyticsConfigConfig{
 		IgnoredIPs: make([]string, 0),
 	},
-	Dns:DnsConfig{EnableCaching:false, TTL: 3600 * 1000, CheckInterval: 3600 * 1000},
 }
 
 func init() {

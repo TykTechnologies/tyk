@@ -83,9 +83,10 @@ type configTestReverseProxyDnsCache struct {
 func setupTestReverseProxyDnsCache(cfg *configTestReverseProxyDnsCache) func() {
 	pullDomains := mockHandle.PushDomains(cfg.etcHostsMap, nil)
 	dnsCacheManager.InitDNSCaching(time.Duration(cfg.dnsConfig.TTL)*time.Millisecond, time.Duration(cfg.dnsConfig.CheckInterval)*time.Millisecond)
-	var enableWebSockets bool
+
 	globalConf := config.Global()
-	enableWebSockets = globalConf.HttpServerOptions.EnableWebSockets
+	enableWebSockets := globalConf.HttpServerOptions.EnableWebSockets
+
 	globalConf.HttpServerOptions.EnableWebSockets = true
 	config.SetGlobal(globalConf)
 
