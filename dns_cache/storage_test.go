@@ -7,32 +7,32 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/dns_cache"
+	"github.com/TykTechnologies/tyk/test"
 	"github.com/miekg/dns"
 )
 
 var (
-	expiration     = 10
-	updateInterval = 5
+	expiration    = 10
+	checkInterval = 5
 )
 
 const (
 	host          = "orig-host.com."
 	host2         = "orig-host2.com."
-	host3 		  = "some.orig-host3.com"
-	host4 		  = "some.orig-host4.com"
+	host3         = "some.orig-host3.com"
+	host4         = "some.orig-host4.com"
 	hostErrorable = "unknown.orig-host.com."
 	wsHost        = "ws.orig-host.com."
 )
 
 var (
 	etcHostsMap = map[string][]string{
-		host:   {"127.0.0.1", "127.0.0.2",},
-		host2:  {"10.0.2.0", "10.0.2.1", "10.0.2.2",},
-		host3:  {"10.0.2.15", "10.0.2.16",},
-		host4:  {"10.0.2.11", "10.0.2.10",},
-		wsHost: {"127.0.0.1", "127.0.0.1",},
+		host:   {"127.0.0.1", "127.0.0.2"},
+		host2:  {"10.0.2.0", "10.0.2.1", "10.0.2.2"},
+		host3:  {"10.0.2.15", "10.0.2.16"},
+		host4:  {"10.0.2.11", "10.0.2.10"},
+		wsHost: {"127.0.0.1", "127.0.0.1"},
 	}
 
 	etcHostsErrorMap = map[string]int{
@@ -61,10 +61,10 @@ func setupTestStorageFetchItem(cfg *configTestStorageFetchItem) func() {
 }
 
 func TestStorageFetchItem(t *testing.T) {
-	dnsCache := dns_cache.NewDnsCacheStorage(time.Duration(expiration)*time.Second, time.Duration(updateInterval)*time.Second)
+	dnsCache := dns_cache.NewDnsCacheStorage(time.Duration(expiration)*time.Second, time.Duration(checkInterval)*time.Second)
 
 	tearDownTestStorageFetchItem := setupTestStorageFetchItem(&configTestStorageFetchItem{t, etcHostsMap, etcHostsErrorMap, dnsCache})
-	defer func(){
+	defer func() {
 		tearDownTestStorageFetchItem()
 		dnsCache.Clear()
 		dnsCache = nil
@@ -145,93 +145,123 @@ func TestStorageFetchItem(t *testing.T) {
 	}
 }
 
-func TestStorageRemoveRecordAfterExpiration(t *testing.T) {
+func TestStorageRecordExpiration(t *testing.T) {
 	var (
-		expiration     = 2000
-		updateInterval = 1500
+		expiration    = 2000
+		checkInterval = 1500
 	)
 
 	type testRecord struct {
+		dns      string
 		addrs    []string
 		addDelay time.Duration
 	}
+
 	cases := []struct {
 		name string
 
-		records              map[string]testRecord
-		expireDelay          time.Duration
-		notExpiredAfterDelay map[string]testRecord
+		records              []testRecord
+		sleepBeforeCleanup   time.Duration
+		notExpiredAfterDelay []testRecord
+		checkInterval        int
 	}{
 		{
 			"Should remove single dns record after expiration",
-			map[string]testRecord{
-				host: testRecord{addrs: etcHostsMap[host], },
+			[]testRecord{
+				{dns: host, addrs: etcHostsMap[host]},
 			},
 			time.Duration(expiration+10) * time.Millisecond,
-			map[string]testRecord{},
+			[]testRecord{},
+			checkInterval,
 		},
 		{
-			"Should remove >1 dns record after expiration",
-			map[string]testRecord{
-				host: testRecord{addrs: etcHostsMap[host], },
-				host2: testRecord{addrs:etcHostsMap[host2], },
-				wsHost: testRecord{addrs: etcHostsMap[wsHost],},
+			"Should leave as expired dns records if check_interval=-1",
+			[]testRecord{
+				{dns: host, addrs: etcHostsMap[host]},
+				{dns: host2, addrs: etcHostsMap[host2]},
+				{dns: wsHost, addrs: etcHostsMap[wsHost]},
+			},
+			time.Duration(checkInterval+10) * time.Millisecond,
+			[]testRecord{
+				{dns: host, addrs: etcHostsMap[host]},
+				{dns: host2, addrs: etcHostsMap[host2]},
+				{dns: wsHost, addrs: etcHostsMap[wsHost]},
+			},
+			-1,
+		},
+		{
+			"Should remove all(>1) dns records after expiration",
+			[]testRecord{
+				{dns: host2, addrs: etcHostsMap[host]},
+				{dns: host2, addrs: etcHostsMap[host2]},
+				{dns: host2, addrs: etcHostsMap[wsHost]},
 			},
 			time.Duration(expiration+10) * time.Millisecond,
-			map[string]testRecord{},
+			[]testRecord{},
+			checkInterval,
 		},
 		{
 			"Should remove only expired record after expiration",
-			map[string]testRecord{
-				host:   testRecord{addrs: etcHostsMap[host],},
-				host2:  testRecord{addrs: etcHostsMap[host2], addDelay: 500 * time.Millisecond,},
-				wsHost: testRecord{addrs: etcHostsMap[wsHost],},
+			[]testRecord{
+				testRecord{dns: host, addrs: etcHostsMap[host]},
+				testRecord{dns: host2, addrs: etcHostsMap[host2], addDelay: 500 * time.Millisecond},
+				testRecord{dns: wsHost, addrs: etcHostsMap[wsHost]},
 			},
 			time.Duration(expiration-400) * time.Millisecond,
-			map[string]testRecord{
-				host2:  testRecord{addrs: etcHostsMap[host2], },
-				wsHost: testRecord{addrs: etcHostsMap[wsHost],},
+			[]testRecord{
+				testRecord{dns: host2, addrs: etcHostsMap[host2]},
+				testRecord{dns: wsHost, addrs: etcHostsMap[wsHost]},
 			},
+			checkInterval,
 		},
 		{
 			"Should remove only expired records after expiration",
-			map[string]testRecord{
-				host:   testRecord{addrs: etcHostsMap[host],},
-				host2:  testRecord{addrs: etcHostsMap[host2], addDelay: 200 * time.Millisecond,},
-				host3:   testRecord{addrs: etcHostsMap[host3], addDelay: 100 * time.Millisecond,},
-				host4:   testRecord{addrs: etcHostsMap[host4], addDelay: 50 * time.Millisecond,},
-				wsHost: testRecord{addrs: etcHostsMap[wsHost],},
+			[]testRecord{
+				testRecord{dns: host, addrs: etcHostsMap[host]},
+				testRecord{dns: host2, addrs: etcHostsMap[host2], addDelay: 250 * time.Millisecond},
+				testRecord{dns: host3, addrs: etcHostsMap[host3], addDelay: 500 * time.Millisecond},
+				testRecord{dns: host4, addrs: etcHostsMap[host4], addDelay: 100 * time.Millisecond},
+				testRecord{dns: wsHost, addrs: etcHostsMap[wsHost]},
 			},
-			time.Duration(expiration-100) * time.Millisecond,
-			map[string]testRecord{
-				host3:  testRecord{addrs: etcHostsMap[host3],},
-				host4:  testRecord{addrs: etcHostsMap[host4],},
-				wsHost: testRecord{addrs: etcHostsMap[wsHost],},
+			time.Duration(expiration-350) * time.Millisecond,
+			[]testRecord{
+				testRecord{dns: host3, addrs: etcHostsMap[host3]},
+				testRecord{dns: host4, addrs: etcHostsMap[host4]},
+				testRecord{dns: wsHost, addrs: etcHostsMap[wsHost]},
 			},
+			checkInterval,
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			dnsCache := dns_cache.NewDnsCacheStorage(time.Duration(expiration)*time.Millisecond, time.Duration(updateInterval)*time.Millisecond)
+			dnsCache := dns_cache.NewDnsCacheStorage(time.Duration(expiration)*time.Millisecond, time.Duration(tc.checkInterval)*time.Millisecond)
 
-			for key, r := range tc.records {
+			for _, r := range tc.records {
 				if r.addDelay > 0 {
 					time.Sleep(r.addDelay)
 				}
-				dnsCache.Set(key, r.addrs)
+				dnsCache.Set(r.dns, r.addrs)
 			}
 
-			if tc.expireDelay > 0 {
-				time.Sleep(tc.expireDelay)
+			if tc.sleepBeforeCleanup > 0 {
+				time.Sleep(tc.sleepBeforeCleanup)
 			}
-			if lenNonExpired, lenCurrent := len(tc.notExpiredAfterDelay), len(dnsCache.Items()); lenNonExpired != lenCurrent {
-				t.Fatalf("wanted len(nonExpiredItems) %d, got %d. items=%+v", lenNonExpired, lenCurrent, dnsCache.Items())
+			if lenNonExpired, lenCurrent := len(tc.notExpiredAfterDelay), len(dnsCache.Items(tc.checkInterval == -1)); lenNonExpired != lenCurrent {
+				t.Fatalf("wanted len(nonExpiredItems) %d, got %d. items=%+v", lenNonExpired, lenCurrent, dnsCache.Items(tc.checkInterval == -1))
 			}
 
-			for key, r := range tc.notExpiredAfterDelay {
-				if item, ok := dnsCache.Get(key); !ok || !item.IsEqualsTo(r.addrs) {
-					t.Fatalf("wanted cached ips %v, got item %#v. items=%+v, ok=%t", r.addrs, item, dnsCache.Items(), ok)
+			if tc.checkInterval == -1 {
+				for _, r := range tc.records {
+					if item, ok := dnsCache.Items(true)[r.dns]; !ok || !item.IsEqualsTo(r.addrs) {
+						t.Fatalf("wanted expired cached ips %v, got item %#v. items=%+v, ok=%t", r.addrs, item, dnsCache.Items(true), ok)
+					}
+				}
+			} else {
+				for _, r := range tc.notExpiredAfterDelay {
+					if item, ok := dnsCache.Get(r.dns); !ok || !item.IsEqualsTo(r.addrs) {
+						t.Fatalf("wanted cached ips %v, got item %#v. items=%+v, ok=%t", r.addrs, item, dnsCache.Items(false), ok)
+					}
 				}
 			}
 

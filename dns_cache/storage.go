@@ -25,23 +25,23 @@ func NewDnsCacheStorage(expiration, checkInterval time.Duration) *DnsCacheStorag
 	return storage
 }
 
-//Return non expired dns cache items
-func (dc *DnsCacheStorage) Items() map[string]DnsCacheItem {
+//Return map of non expired dns cache items
+func (dc *DnsCacheStorage) Items(includeExpired bool) map[string]DnsCacheItem {
 	var nonExpiredItems map[string]cache.Item = dc.cache.Items()
 
 	items := map[string]DnsCacheItem{}
 
 	for k, v := range nonExpiredItems {
-		if v.Expired() {
+		if !includeExpired && v.Expired() {
 			continue
 		}
-		addrs, _ := v.Object.([]string)
-		items[k] = DnsCacheItem{addrs}
+		items[k] = v.Object.(DnsCacheItem)
 	}
 
 	return items
 }
 
+//Returns non expired item from cache
 func (dc *DnsCacheStorage) Get(key string) (DnsCacheItem, bool) {
 	item, found := dc.cache.Get(key)
 	if !found {
@@ -73,9 +73,7 @@ func (dc *DnsCacheStorage) Set(key string, addrs []string) {
 }
 
 func (dc *DnsCacheStorage) Clear() {
-	for key := range dc.cache.Items() {
-		dc.cache.Delete(key)
-	}
+	dc.cache.Flush()
 }
 
 func (dc *DnsCacheStorage) resolveDNSRecord(host string) ([]string, error) {
