@@ -325,7 +325,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 				newSession.SetPolicies(polIDs...)
 
 				// multiple policies assigned to a key, check if it is applicable
-				if err := k.ApplyPolicies(sessionID, &newSession); err != nil {
+				if err := k.ApplyPolicies(&newSession); err != nil {
 					k.reportLoginFailure(baseFieldData, r)
 					k.Logger().WithError(err).Error("Could not several policies from scope-claim mapping to JWT to session")
 					return errors.New("Key not authorized: could not apply several policies"), http.StatusForbidden
@@ -390,7 +390,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			}
 			// apply new policy to session and update session
 			session.SetPolicies(policyID)
-			if err := k.ApplyPolicies(sessionID, &session); err != nil {
+			if err := k.ApplyPolicies(&session); err != nil {
 				k.reportLoginFailure(baseFieldData, r)
 				k.Logger().WithError(err).Error("Could not apply new policy from JWT to session")
 				return errors.New("Key not authorized: could not apply new policy"), http.StatusForbidden

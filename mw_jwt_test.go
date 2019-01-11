@@ -482,7 +482,7 @@ func prepareJWTSessionRSAWithRawSourceOnWithClientID(isBench bool) string {
 	}
 	session := createJWTSessionWithRSAWithPolicy(policyID)
 
-	spec.SessionManager.ResetQuota(tokenID, session)
+	spec.SessionManager.ResetQuota(tokenID, session, false)
 	spec.SessionManager.UpdateSession(tokenID, session, 60, false)
 
 	jwtToken := createJWKToken(func(t *jwt.Token) {

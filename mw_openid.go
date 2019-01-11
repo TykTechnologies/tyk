@@ -209,7 +209,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 	}
 	// apply new policy to session if any and update session
 	session.SetPolicies(policiesToApply...)
-	if err := k.ApplyPolicies(sessionID, &session); err != nil {
+	if err := k.ApplyPolicies(&session); err != nil {
 		k.Logger().WithError(err).Error("Could not apply new policy from OIDC client to session")
 		return errors.New("Key not authorized: could not apply new policy"), http.StatusForbidden
 	}
