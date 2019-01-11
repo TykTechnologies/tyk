@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/storage"
+
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -54,6 +56,40 @@ func TestBasicAuth(t *testing.T) {
 		{Method: "GET", Path: "/", Headers: wrongPassword, Code: 401},
 		{Method: "GET", Path: "/", Headers: wrongFormat, Code: 400, BodyMatch: `Attempted access with malformed header, values not in basic auth format`},
 		{Method: "GET", Path: "/", Headers: malformed, Code: 400, BodyMatch: `Attempted access with malformed header, auth data not encoded correctly`},
+	}...)
+}
+
+func TestBasicAuthLegacyWithHashFunc(t *testing.T) {
+	globalConf := config.Global()
+
+	globalConf.HashKeys = true
+	globalConf.EnableHashedKeysListing = true
+	// settings to create BA session with legacy key format
+	globalConf.HashKeyFunction = ""
+	config.SetGlobal(globalConf)
+	defer resetTestConfig()
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	// create session with legacy key format
+	session := testPrepareBasicAuth(false)
+
+	validPassword := map[string]string{"Authorization": genAuthHeader("user", "password")}
+
+	ts.Run(t, []test.TestCase{
+		// Create base auth based key
+		{Method: "POST", Path: "/tyk/keys/defaultuser", Data: session, AdminAuth: true, Code: 200},
+		{Method: "GET", Path: "/", Headers: validPassword, Code: 200},
+	}...)
+
+	// set custom hashing function and check if we still do BA session auth with legacy key format
+	globalConf.HashKeyFunction = storage.HashMurmur64
+	config.SetGlobal(globalConf)
+
+	ts.Run(t, []test.TestCase{
+		// Create base auth based key
+		{Method: "GET", Path: "/", Headers: validPassword, Code: 200},
 	}...)
 }
 
