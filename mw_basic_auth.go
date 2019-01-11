@@ -7,6 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/pmylund/go-cache"
 	"golang.org/x/crypto/bcrypt"
@@ -82,9 +85,19 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	logger = k.Logger().WithField("key", obfuscateKey(keyName))
 	session, keyExists := k.CheckSessionAndIdentityForValidKey(keyName, r)
 	if !keyExists {
-		logger.Info("Attempted access with non-existent user.")
-
-		return k.handleAuthFail(w, r, token)
+		if config.Global().HashKeyFunction == "" {
+			logger.Warning("Attempted access with non-existent user.")
+			return k.handleAuthFail(w, r, token)
+		} else { // check for key with legacy format "org_id" + "user_name"
+			logger.Info("Could not find user, falling back to legacy format key.")
+			legacyKeyName := strings.TrimPrefix(authValues[0], k.Spec.OrgID)
+			keyName, _ = storage.GenerateToken(k.Spec.OrgID, legacyKeyName, "")
+			session, keyExists = k.CheckSessionAndIdentityForValidKey(keyName, r)
+			if !keyExists {
+				logger.Warning("Attempted access with non-existent user.")
+				return k.handleAuthFail(w, r, token)
+			}
+		}
 	}
 
 	switch session.BasicAuthData.Hash {
