@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/vendor/github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 )
 
 var (
