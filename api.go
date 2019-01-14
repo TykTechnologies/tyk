@@ -660,21 +660,32 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 	orgID := r.URL.Query().Get("org_id")
 
 	// check if passed key is user name and convert it to real key with respect to current hashing algorithm
+	origKeyName := keyName
 	if r.Method != http.MethodPost && isUserName {
 		keyName = generateToken(orgID, keyName)
 	}
 
 	var obj interface{}
 	var code int
+	hashKeyFunction := config.Global().HashKeyFunction
 
 	switch r.Method {
-	case "POST", "PUT":
+	case http.MethodPost:
 		obj, code = handleAddOrUpdate(keyName, r)
-
-	case "GET":
+	case http.MethodPut:
+		obj, code = handleAddOrUpdate(keyName, r)
+		if code != http.StatusOK && hashKeyFunction != "" {
+			// try to use legacy key format
+			obj, code = handleAddOrUpdate(origKeyName, r)
+		}
+	case http.MethodGet:
 		if keyName != "" {
 			// Return single key detail
 			obj, code = handleGetDetail(keyName, apiID, isHashed)
+			if code != http.StatusOK && hashKeyFunction != "" {
+				// try to use legacy key format
+				obj, code = handleGetDetail(origKeyName, apiID, isHashed)
+			}
 		} else {
 			// Return list of keys
 			if config.Global().HashKeys {
@@ -696,12 +707,20 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-	case "DELETE":
+	case http.MethodDelete:
 		// Remove a key
 		if !isHashed {
 			obj, code = handleDeleteKey(keyName, apiID)
 		} else {
 			obj, code = handleDeleteHashedKey(keyName, apiID)
+		}
+		if code != http.StatusOK && hashKeyFunction != "" {
+			// try to use legacy key format
+			if !isHashed {
+				obj, code = handleDeleteKey(origKeyName, apiID)
+			} else {
+				obj, code = handleDeleteHashedKey(origKeyName, apiID)
+			}
 		}
 	}
 
