@@ -19,7 +19,7 @@ import (
 	"sync"
 	"time"
 
-	newrelic "github.com/newrelic/go-agent"
+	"github.com/newrelic/go-agent"
 
 	"github.com/TykTechnologies/tyk/checkup"
 
@@ -32,9 +32,9 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/lonelycode/osin"
-	gas "github.com/netbrain/goautosocket"
+	"github.com/netbrain/goautosocket"
 	"github.com/rs/cors"
-	uuid "github.com/satori/go.uuid"
+	"github.com/satori/go.uuid"
 	"rsc.io/letsencrypt"
 
 	"github.com/TykTechnologies/goagain"
@@ -920,7 +920,6 @@ func getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 }
 
 func main() {
-	fmt.Printf("%v\n", os.Args)
 	cli.Init(VERSION, confPaths)
 	cli.Parse()
 	// Stop gateway process if not running in "start" mode:
@@ -1089,7 +1088,7 @@ func writeProfiles() {
 }
 
 func start() {
-	// Set up a default org dnsCacheManager so we can traverse non-live paths
+	// Set up a default org manager so we can traverse non-live paths
 	if !config.Global().SupressDefaultOrgStore {
 		mainLog.Debug("Initialising default org store")
 		DefaultOrgStore.Init(getGlobalStorageHandler("orgkey.", false))
