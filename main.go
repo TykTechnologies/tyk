@@ -43,7 +43,7 @@ import (
 	"github.com/TykTechnologies/tyk/certs"
 	cli "github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/evityuk/tyk/dns_cache"
+	"github.com/TykTechnologies/tyk/dns_cache"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
