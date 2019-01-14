@@ -25,27 +25,26 @@ func TestReverseProxyRetainHost(t *testing.T) {
 		inURL, inPath string
 		retainHost    bool
 		wantURL       string
-		invoke        bool
 	}{
 		{
 			"no-retain-same-path",
 			"http://orig-host.com/origpath", "/origpath",
-			false, "http://target-host.com/targetpath/origpath", true,
+			false, "http://target-host.com/targetpath/origpath",
 		},
 		{
 			"no-retain-minus-slash",
 			"http://orig-host.com/origpath", "origpath",
-			false, "http://target-host.com/targetpath/origpath", true,
+			false, "http://target-host.com/targetpath/origpath",
 		},
 		{
 			"retain-same-path",
 			"http://orig-host.com/origpath", "/origpath",
-			true, "http://orig-host.com/origpath", true,
+			true, "http://orig-host.com/origpath",
 		},
 		{
 			"retain-minus-slash",
 			"http://orig-host.com/origpath", "origpath",
-			true, "http://orig-host.com/origpath", true,
+			true, "http://orig-host.com/origpath",
 		},
 	}
 	for _, tc := range cases {
@@ -64,10 +63,6 @@ func TestReverseProxyRetainHost(t *testing.T) {
 
 			if got := req.URL.String(); got != tc.wantURL {
 				t.Fatalf("wanted url %q, got %q", tc.wantURL, got)
-			}
-
-			if tc.invoke {
-				// httptest.
 			}
 		})
 	}
@@ -105,12 +100,12 @@ func TestReverseProxyDnsCache(t *testing.T) {
 		host3  = "orig-host3.com."
 		wsHost = "ws.orig-host.com."
 
-		hostApiUrl         = "http://orig-host.com/origpath"
-		host2HttpApiUrl    = "http://orig-host2.com/origpath"
-		host2HttpsApiUrl   = "https://orig-host2.com/origpath"
-		host3ApiUrl        = "https://orig-host3.com/origpath"
-		wsHostWsApiUrl     = "ws://ws.orig-host.com/connect"
-		wsHostWssApiUrl    = "wss://ws.orig-host.com/connect"
+		hostApiUrl       = "http://orig-host.com/origpath"
+		host2HttpApiUrl  = "http://orig-host2.com/origpath"
+		host2HttpsApiUrl = "https://orig-host2.com/origpath"
+		host3ApiUrl      = "https://orig-host3.com/origpath"
+		wsHostWsApiUrl   = "ws://ws.orig-host.com/connect"
+		wsHostWssApiUrl  = "wss://ws.orig-host.com/connect"
 
 		cacheTTL            = 5000
 		cacheUpdateInterval = 10000
