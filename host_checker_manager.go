@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Sirupsen/logrus"
-	"github.com/satori/go.uuid"
-	"gopkg.in/vmihailenco/msgpack.v2"
+	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
+	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"

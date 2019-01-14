@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/gocraft/health"
 	"github.com/gorilla/mux"
-	"github.com/newrelic/go-agent"
+	newrelic "github.com/newrelic/go-agent"
 	"github.com/newrelic/go-agent/_integrations/nrgorilla/v1"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/config"
 )

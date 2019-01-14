@@ -39,3 +39,12 @@ func (e *Exception) Culprit() string {
 	}
 	return e.Stacktrace.Culprit()
 }
+
+// Exceptions allows for chained errors
+// https://docs.sentry.io/clientdev/interfaces/exception/
+type Exceptions struct {
+	// Required
+	Values []*Exception `json:"values"`
+}
+
+func (es Exceptions) Class() string { return "exception" }

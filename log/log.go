@@ -4,7 +4,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 )
 
@@ -18,7 +18,10 @@ func (f *RawFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 }
 
 func init() {
-	log.Formatter = new(prefixed.TextFormatter)
+	log.Formatter = &prefixed.TextFormatter{
+		FullTimestamp:   true,
+		TimestampFormat: "Jan 02 15:04:05",
+	}
 	rawLog.Formatter = new(RawFormatter)
 }
 
@@ -33,6 +36,7 @@ func Get() *logrus.Logger {
 	default:
 		log.Level = logrus.InfoLevel
 	}
+
 	return log
 }
 

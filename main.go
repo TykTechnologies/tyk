@@ -19,12 +19,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/newrelic/go-agent"
+	newrelic "github.com/newrelic/go-agent"
 
 	"github.com/TykTechnologies/tyk/checkup"
 
-	"github.com/Sirupsen/logrus"
-	logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/evalphobia/logrus_sentry"
 	"github.com/facebookgo/pidfile"
@@ -32,16 +30,18 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/lonelycode/osin"
-	"github.com/netbrain/goautosocket"
+	gas "github.com/netbrain/goautosocket"
 	"github.com/rs/cors"
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
+	logrus_syslog "github.com/sirupsen/logrus/hooks/syslog"
 	"rsc.io/letsencrypt"
 
 	"github.com/TykTechnologies/goagain"
 	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
-	cli "github.com/TykTechnologies/tyk/cli"
+	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
@@ -758,12 +758,10 @@ func setupLogger() {
 		if err != nil {
 			log.Errorf("Error making connection for logstash hook: %v", err)
 		}
-		hook, err := logstashHook.NewHookWithConn(conn, "tyk-gateway")
-		if err == nil {
-			log.Hooks.Add(hook)
-			rawLog.Hooks.Add(hook)
-			mainLog.Debug("Logstash hook active")
-		}
+		hook := logstashHook.New(conn, logstashHook.DefaultFormatter(logrus.Fields{"type": "tyk-gateway"}))
+		log.Hooks.Add(hook)
+		rawLog.Hooks.Add(hook)
+		mainLog.Debug("Logstash hook active")
 	}
 
 	if config.Global().UseRedisLog {

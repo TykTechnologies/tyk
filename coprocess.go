@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"unicode/utf8"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
