@@ -85,15 +85,15 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	session, keyExists := k.CheckSessionAndIdentityForValidKey(keyName, r)
 	if !keyExists {
 		if config.Global().HashKeyFunction == "" {
-			logger.Warning("Attempted access with non-existent user.")
+			logEntry.Warning("Attempted access with non-existent user.")
 			return k.handleAuthFail(w, r, token)
 		} else { // check for key with legacy format "org_id" + "user_name"
-			logger.Info("Could not find user, falling back to legacy format key.")
+			logEntry.Info("Could not find user, falling back to legacy format key.")
 			legacyKeyName := strings.TrimPrefix(authValues[0], k.Spec.OrgID)
 			keyName, _ = storage.GenerateToken(k.Spec.OrgID, legacyKeyName, "")
 			session, keyExists = k.CheckSessionAndIdentityForValidKey(keyName, r)
 			if !keyExists {
-				logger.Warning("Attempted access with non-existent user.")
+				logEntry.Warning("Attempted access with non-existent user.")
 				return k.handleAuthFail(w, r, token)
 			}
 		}
