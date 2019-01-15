@@ -5,10 +5,11 @@ import (
 	"strings"
 	"time"
 
+	cache "github.com/pmylund/go-cache"
+
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/garyburd/redigo/redis"
-	"github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"

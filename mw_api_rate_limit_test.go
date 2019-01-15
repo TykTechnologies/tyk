@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/justinas/alice"
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/tyk/user"
 )

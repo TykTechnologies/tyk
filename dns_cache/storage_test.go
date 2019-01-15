@@ -7,9 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miekg/dns"
+
 	"github.com/TykTechnologies/tyk/dns_cache"
 	"github.com/TykTechnologies/tyk/test"
-	"github.com/miekg/dns"
 )
 
 var (

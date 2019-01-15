@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/pmylund/go-cache"
+	cache "github.com/pmylund/go-cache"
 )
 
 type DnsCacheItem struct {

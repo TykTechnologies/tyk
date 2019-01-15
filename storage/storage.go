@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/buger/jsonparser"
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/murmur3"
 	"github.com/TykTechnologies/tyk/config"

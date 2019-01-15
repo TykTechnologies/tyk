@@ -6,8 +6,9 @@ import (
 	"net"
 	"regexp"
 
-	"github.com/miekg/dns"
 	"time"
+
+	"github.com/miekg/dns"
 )
 
 var DomainsToAddresses = map[string][]string{

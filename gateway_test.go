@@ -21,7 +21,7 @@ import (
 	"github.com/garyburd/redigo/redis"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-	"gopkg.in/vmihailenco/msgpack.v2"
+	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/cli"
