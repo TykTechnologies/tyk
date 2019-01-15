@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"net/http"
 	"regexp"
 
 	"github.com/miekg/dns"
@@ -142,7 +141,6 @@ func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int)
 		}
 	}
 
-	defaultTransport := http.DefaultTransport
 	defaultResolver := net.DefaultResolver
 	mockResolver := &net.Resolver{
 		PreferGo: true,
@@ -151,15 +149,10 @@ func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int)
 			return d.DialContext(ctx, network, mockServer.PacketConn.LocalAddr().String())
 		},
 	}
-	http.DefaultTransport = &http.Transport{
-		DialContext: (&net.Dialer{
-			Resolver: mockResolver,
-		}).DialContext,
-	}
+
 	net.DefaultResolver = mockResolver
 
 	handle.ShutdownDnsMock = func() error {
-		http.DefaultTransport = defaultTransport
 		net.DefaultResolver = defaultResolver
 		return mockServer.Shutdown()
 	}

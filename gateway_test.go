@@ -91,9 +91,6 @@ func initTestMain(m *testing.M) int {
 		WriteTimeout:   1 * time.Second,
 		MaxHeaderBytes: 1 << 20,
 	}
-	go func() {
-		panic(testServer.ListenAndServe())
-	}()
 	globalConf := config.Global()
 	if err := config.WriteDefault("", &globalConf); err != nil {
 		panic(err)
@@ -125,8 +122,11 @@ func initTestMain(m *testing.M) int {
 	if err != nil {
 		panic(err)
 	}
-
 	defer mockHandle.ShutdownDnsMock()
+
+	go func() {
+		panic(testServer.ListenAndServe())
+	}()
 
 	CoProcessInit()
 	afterConfSetup(&globalConf)
