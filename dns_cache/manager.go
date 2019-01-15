@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	logger                  = log.Get().WithField("prefix", "dns-cache")
+	logger = log.Get().WithField("prefix", "dns-cache")
 )
 
 type dialContextFunc func(ctx context.Context, network, address string) (net.Conn, error)
@@ -42,10 +42,10 @@ func (m *DnsCacheManager) doCachedDial(d *net.Dialer, ctx context.Context, netwo
 	if m.DnsCache == nil {
 		return d.DialContext(ctx, network, address)
 	}
-	
+
 	separator := strings.LastIndex(address, ":")
 	ips, err := m.DnsCache.FetchItem(address[:separator])
-	
+
 	if err != nil {
 		logger.Infof("doCachedDial error: %v. network=%v, address=%v", err.Error(), network, address)
 	}

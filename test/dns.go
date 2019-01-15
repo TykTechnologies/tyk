@@ -18,7 +18,7 @@ var DomainsToAddresses = map[string][]string{
 
 type dnsMockHandler struct {
 	domainsToAddresses map[string][]string
-	domainsToErrors map[string]int
+	domainsToErrors    map[string]int
 }
 
 func (d *dnsMockHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
@@ -33,7 +33,7 @@ func (d *dnsMockHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 			m := new(dns.Msg)
 			m.SetRcode(r, rcode)
 			w.WriteMsg(m)
-	 		return
+			return
 		}
 		addresses, ok := d.domainsToAddresses[domain]
 		if !ok {
@@ -60,8 +60,8 @@ func (d *dnsMockHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 }
 
 type DnsMockHandle struct {
-	 id string
-	mockServer *dns.Server
+	id              string
+	mockServer      *dns.Server
 	ShutdownDnsMock func() error
 }
 
@@ -114,7 +114,7 @@ func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int)
 	}
 
 	mockServer := &dns.Server{PacketConn: conn, NotifyStartedFunc: started}
-	handle := &DnsMockHandle{ id: time.Now().String(), mockServer: mockServer, }
+	handle := &DnsMockHandle{id: time.Now().String(), mockServer: mockServer}
 
 	if domainsMap != nil {
 		mockServer.Handler = &dnsMockHandler{domainsToAddresses: domainsMap}

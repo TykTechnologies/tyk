@@ -82,9 +82,9 @@ type HealthCheckConfig struct {
 }
 
 type DnsConfig struct {
-	EnableCaching bool 		`json:"enable_cache"`
-	TTL           int64  	`json:"ttl"`
-	CheckInterval int64  	`json:"check_interval"`
+	EnableCaching bool  `json:"enable_cache"`
+	TTL           int64 `json:"ttl"`
+	CheckInterval int64 `json:"check_interval"`
 }
 
 type MonitorConfig struct {

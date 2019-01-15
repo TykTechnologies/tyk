@@ -113,15 +113,15 @@ func skipTestReverseProxyDnsCache(t *testing.T) {
 
 	var (
 		etcHostsMap = map[string][]string{
-			host:   {"127.0.0.1", "127.0.0.2",},
-			host2:  {"10.0.2.0", "10.0.2.1", "10.0.2.2",},
-			host3:  {"10.0.2.15", "10.0.2.16",},
-			wsHost: {"127.0.0.1", "127.0.0.1",},
+			host:   {"127.0.0.1", "127.0.0.2"},
+			host2:  {"10.0.2.0", "10.0.2.1", "10.0.2.2"},
+			host3:  {"10.0.2.15", "10.0.2.16"},
+			wsHost: {"127.0.0.1", "127.0.0.1"},
 		}
 	)
 
 	tearDown := setupTestReverseProxyDnsCache(&configTestReverseProxyDnsCache{t, etcHostsMap,
-		config.DnsConfig{true, cacheTTL, cacheUpdateInterval}})
+		config.DnsConfig{EnableCaching: true, TTL: cacheTTL, CheckInterval: cacheUpdateInterval}})
 	defer tearDown()
 
 	cases := []struct {

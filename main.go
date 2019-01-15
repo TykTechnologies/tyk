@@ -133,8 +133,8 @@ func setupGlobals() {
 
 	if config.Global().Dns.EnableCaching {
 		dnsCacheManager.InitDNSCaching(
-			time.Duration(config.Global().Dns.TTL) * time.Millisecond,
-			time.Duration(config.Global().Dns.CheckInterval) * time.Millisecond)
+			time.Duration(config.Global().Dns.TTL)*time.Millisecond,
+			time.Duration(config.Global().Dns.CheckInterval)*time.Millisecond)
 	}
 
 	mainRouter = mux.NewRouter()
