@@ -744,12 +744,6 @@ func TestRewriterTriggers(t *testing.T) {
 				Triggers:     tc.triggerConf,
 			}
 
-			ctxSetSession(tc.req, &user.SessionState{
-				MetaData: map[string]interface{}{
-					"rewrite": "bar-baz",
-				},
-			}, "", false)
-
 			got, err := urlRewrite(&testConf, tc.req)
 			if err != nil {
 				t.Error("compile failed:", err)
