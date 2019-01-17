@@ -57,30 +57,34 @@ func transformBody(r *http.Request, tmeta *TransformSpec, contextVars bool) erro
 	// Put into an interface:
 	bodyData := make(map[string]interface{})
 
-	if len(body) > 0 {
-		switch tmeta.TemplateData.Input {
-		case apidef.RequestXML:
-			mxj.XmlCharsetReader = WrappedCharsetReader
-			var err error
-			bodyData, err = mxj.NewMapXml(body) // unmarshal
-			if err != nil {
-				return fmt.Errorf("error unmarshalling XML: %v", err)
-			}
-		case apidef.RequestJSON:
-			var tempBody interface{}
-			if err := json.Unmarshal(body, &tempBody); err != nil {
-				return err
-			}
-
-			switch tempBody.(type) {
-			case []interface{}:
-				bodyData["array"] = tempBody
-			case map[string]interface{}:
-				bodyData = tempBody.(map[string]interface{})
-			}
-		default:
-			return fmt.Errorf("unsupported request input type: %v", tmeta.TemplateData.Input)
+	switch tmeta.TemplateData.Input {
+	case apidef.RequestXML:
+		if len(body) == 0 {
+			body = []byte("<_/>")
 		}
+		mxj.XmlCharsetReader = WrappedCharsetReader
+		var err error
+		bodyData, err = mxj.NewMapXml(body) // unmarshal
+		if err != nil {
+			return fmt.Errorf("error unmarshalling XML: %v", err)
+		}
+	case apidef.RequestJSON:
+		if len(body) == 0 {
+			body = []byte("{}")
+		}
+		var tempBody interface{}
+		if err := json.Unmarshal(body, &tempBody); err != nil {
+			return err
+		}
+
+		switch tempBody.(type) {
+		case []interface{}:
+			bodyData["array"] = tempBody
+		case map[string]interface{}:
+			bodyData = tempBody.(map[string]interface{})
+		}
+	default:
+		return fmt.Errorf("unsupported request input type: %v", tmeta.TemplateData.Input)
 	}
 
 	if tmeta.TemplateData.EnableSession {

@@ -16,11 +16,6 @@ addons:
     - python3-pip
     - libluajit-5.1-dev
 
-branches:
-  only:
-  - master
-  - feature/issue-495-Cache_DNS
-
 matrix:
   include:
     - go: 1.10.x

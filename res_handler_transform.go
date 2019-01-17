@@ -75,36 +75,37 @@ func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 
 	_, versionPaths, _, _ := h.Spec.Version(req)
 	found, meta := h.Spec.CheckSpecMatchesStatus(req, versionPaths, TransformedResponse)
-
 	if !found {
 		return nil
 	}
 	tmeta := meta.(*TransformSpec)
 
 	respBody := respBodyReader(req, res)
+	body, _ := ioutil.ReadAll(respBody)
 	defer respBody.Close()
 
 	// Put into an interface:
 	bodyData := make(map[string]interface{})
 	switch tmeta.TemplateData.Input {
 	case apidef.RequestXML:
+		if len(body) == 0 {
+			body = []byte("<_/>")
+		}
+
 		mxj.XmlCharsetReader = WrappedCharsetReader
 		var err error
 
-		bodyBytes, err := ioutil.ReadAll(respBody)
-		if err != nil {
-			logger.WithError(err).Error("Error reading XML body")
-			// not returning error, just break out of switch.
-			break
-		}
-
-		bodyData, err = mxj.NewMapXml(bodyBytes) // unmarshal
+		bodyData, err = mxj.NewMapXml(body) // unmarshal
 		if err != nil {
 			logger.WithError(err).Error("Error unmarshalling XML")
 		}
 	default: // apidef.RequestJSON
+		if len(body) == 0 {
+			body = []byte("{}")
+		}
+
 		var tempBody interface{}
-		if err := json.NewDecoder(respBody).Decode(&tempBody); err != nil {
+		if err := json.Unmarshal(body, &tempBody); err != nil {
 			logger.WithError(err).Error("Error unmarshalling JSON")
 		}
 
