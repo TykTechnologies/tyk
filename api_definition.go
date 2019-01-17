@@ -973,10 +973,12 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 
 // CheckSpecMatchesStatus checks if a url spec has a specific status
 func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode URLStatus) (bool, interface{}) {
-	matchPath := r.URL.Path
-	if origURL := ctxGetOrigRequestURL(r); origURL != nil {
-		matchPath = origURL.Path
+	matchPath := ctxGetUrlRewritePath(r)
+	method := ctxGetRequestMethod(r)
+	if matchPath == "" {
+		matchPath = r.URL.Path
 	}
+
 	if !strings.HasPrefix(matchPath, "/") {
 		matchPath = "/" + matchPath
 	}
@@ -989,55 +991,35 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 		if mode != v.Status {
 			continue
 		}
-		match := v.Spec.MatchString(matchPath)
-
-		// only return it it's what we are looking for
-		if !match {
-			// check for special case when using url_rewrites with transform_response
-			// and specifying the same "path" expression
-
-			if mode == TransformedResponse {
-				if v.TransformResponseAction.Path != ctxGetUrlRewritePath(r) {
-					continue
-				}
-			} else if mode == HeaderInjectedResponse {
-				if v.InjectHeadersResponse.Path != ctxGetUrlRewritePath(r) {
-					continue
-				}
-			} else if mode == TransformedJQResponse {
-				if v.TransformJQResponseAction.Path != ctxGetUrlRewritePath(r) {
-					continue
-				}
-			} else {
-				continue
-			}
+		if !v.Spec.MatchString(matchPath) {
+			continue
 		}
 
 		switch v.Status {
 		case Ignored, BlackList, WhiteList, Cached:
 			return true, nil
 		case Transformed:
-			if r.Method == v.TransformAction.Method {
+			if method == v.TransformAction.Method {
 				return true, &v.TransformAction
 			}
 		case TransformedJQ:
-			if r.Method == v.TransformJQAction.Method {
+			if method == v.TransformJQAction.Method {
 				return true, &v.TransformJQAction
 			}
 		case HeaderInjected:
-			if r.Method == v.InjectHeaders.Method {
+			if method == v.InjectHeaders.Method {
 				return true, &v.InjectHeaders
 			}
 		case HeaderInjectedResponse:
-			if r.Method == v.InjectHeadersResponse.Method {
+			if method == v.InjectHeadersResponse.Method {
 				return true, &v.InjectHeadersResponse
 			}
 		case TransformedResponse:
-			if r.Method == v.TransformResponseAction.Method {
+			if method == v.TransformResponseAction.Method {
 				return true, &v.TransformResponseAction
 			}
 		case TransformedJQResponse:
-			if r.Method == v.TransformJQResponseAction.Method {
+			if method == v.TransformJQResponseAction.Method {
 				return true, &v.TransformJQResponseAction
 			}
 		case HardTimeout:
@@ -1045,35 +1027,35 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 				return true, &v.HardTimeout.TimeOut
 			}
 		case CircuitBreaker:
-			if r.Method == v.CircuitBreaker.Method {
+			if method == v.CircuitBreaker.Method {
 				return true, &v.CircuitBreaker
 			}
 		case URLRewrite:
-			if r.Method == v.URLRewrite.Method {
+			if method == v.URLRewrite.Method {
 				return true, v.URLRewrite
 			}
 		case VirtualPath:
-			if r.Method == v.VirtualPathSpec.Method {
+			if method == v.VirtualPathSpec.Method {
 				return true, &v.VirtualPathSpec
 			}
 		case RequestSizeLimit:
-			if r.Method == v.RequestSize.Method {
+			if method == v.RequestSize.Method {
 				return true, &v.RequestSize
 			}
 		case MethodTransformed:
-			if r.Method == v.MethodTransform.Method {
+			if method == v.MethodTransform.Method {
 				return true, &v.MethodTransform
 			}
 		case RequestTracked:
-			if r.Method == v.TrackEndpoint.Method {
+			if method == v.TrackEndpoint.Method {
 				return true, &v.TrackEndpoint
 			}
 		case RequestNotTracked:
-			if r.Method == v.DoNotTrackEndpoint.Method {
+			if method == v.DoNotTrackEndpoint.Method {
 				return true, &v.DoNotTrackEndpoint
 			}
 		case ValidateJSONRequest:
-			if r.Method == v.ValidatePathMeta.Method {
+			if method == v.ValidatePathMeta.Method {
 				return true, &v.ValidatePathMeta
 			}
 		}

@@ -34,19 +34,13 @@ func (t *TransformMethod) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		return nil, http.StatusOK
 	}
 	mmeta := meta.(*apidef.MethodTransformMeta)
+	toMethod := strings.ToUpper(mmeta.ToMethod)
+
+	ctxSetRequestMethod(r, r.Method)
+
 	switch strings.ToUpper(mmeta.ToMethod) {
-	case "GET":
-		r.Method = "GET"
-	case "POST":
-		r.Method = "POST"
-	case "PUT":
-		r.Method = "PUT"
-	case "DELETE":
-		r.Method = "DELETE"
-	case "OPTIONS":
-		r.Method = "OPTIONS"
-	case "PATCH":
-		r.Method = "PATCH"
+	case "GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH":
+		r.Method = toMethod
 	default:
 		return errors.New("Method not allowed"), http.StatusMethodNotAllowed
 	}
