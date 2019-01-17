@@ -947,16 +947,19 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 
 // CheckSpecMatchesStatus checks if a url spec has a specific status
 func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode URLStatus) (bool, interface{}) {
-	// Check if ignored
-	for _, v := range rxPaths {
+	matchPath := r.URL.Path
+	if origURL := ctxGetOrigRequestURL(r); origURL != nil {
+		matchPath = origURL.Path
+	}
+	if !strings.HasPrefix(matchPath, "/") {
+		matchPath = "/" + matchPath
+	}
+
+    for _, v := range rxPaths {
 		if mode != v.Status {
 			continue
 		}
 
-		matchPath := r.URL.Path
-		if !strings.HasPrefix(matchPath, "/") {
-			matchPath = "/" + matchPath
-		}
 		match := v.Spec.MatchString(matchPath)
 
 		// only return it it's what we are looking for
