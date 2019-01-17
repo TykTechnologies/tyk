@@ -1739,6 +1739,19 @@ func ctxGetUrlRewritePath(r *http.Request) string {
 	return ""
 }
 
+func ctxSetRequestMethod(r *http.Request, path string) {
+	setCtxValue(r, RequestMethod, path)
+}
+
+func ctxGetRequestMethod(r *http.Request) string {
+	if v := r.Context().Value(RequestMethod); v != nil {
+		if strVal, ok := v.(string); ok {
+			return strVal
+		}
+	}
+	return r.Method
+}
+
 func ctxGetDefaultVersion(r *http.Request) bool {
 	return r.Context().Value(VersionDefault) != nil
 }
