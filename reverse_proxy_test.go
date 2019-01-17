@@ -93,7 +93,7 @@ func setupTestReverseProxyDnsCache(cfg *configTestReverseProxyDnsCache) func() {
 	}
 }
 
-func skipTestReverseProxyDnsCache(t *testing.T) {
+func TestReverseProxyDnsCache(t *testing.T) {
 	const (
 		host   = "orig-host.com."
 		host2  = "orig-host2.com."

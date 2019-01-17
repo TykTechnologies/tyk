@@ -30,9 +30,9 @@ func createSpecTestFrom(t testing.TB, def *apidef.APIDefinition) *APISpec {
 	loader := APIDefinitionLoader{}
 	spec := loader.MakeSpec(def, nil)
 	tname := t.Name()
-	redisStore := storage.RedisCluster{KeyPrefix: tname + "-apikey."}
-	healthStore := storage.RedisCluster{KeyPrefix: tname + "-apihealth."}
-	orgStore := storage.RedisCluster{KeyPrefix: tname + "-orgKey."}
+	redisStore := &storage.RedisCluster{KeyPrefix: tname + "-apikey."}
+	healthStore := &storage.RedisCluster{KeyPrefix: tname + "-apihealth."}
+	orgStore := &storage.RedisCluster{KeyPrefix: tname + "-orgKey."}
 	spec.Init(redisStore, redisStore, healthStore, orgStore)
 	return spec
 }

@@ -35,16 +35,16 @@ type ChainObject struct {
 	Subrouter      *mux.Router
 }
 
-func prepareStorage() (storage.RedisCluster, storage.RedisCluster, storage.RedisCluster, *RPCStorageHandler, *RPCStorageHandler) {
-	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
-	redisOrgStore := storage.RedisCluster{KeyPrefix: "orgkey."}
-	healthStore := storage.RedisCluster{KeyPrefix: "apihealth."}
-	rpcAuthStore := RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
-	rpcOrgStore := RPCStorageHandler{KeyPrefix: "orgkey."}
+func prepareStorage() (*storage.RedisCluster, *storage.RedisCluster, *storage.RedisCluster, *RPCStorageHandler, *RPCStorageHandler) {
+	redisStore := &storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
+	redisOrgStore := &storage.RedisCluster{KeyPrefix: "orgkey."}
+	healthStore := &storage.RedisCluster{KeyPrefix: "apihealth."}
+	rpcAuthStore := &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
+	rpcOrgStore := &RPCStorageHandler{KeyPrefix: "orgkey."}
 
-	FallbackKeySesionManager.Init(&redisStore)
+	FallbackKeySesionManager.Init(redisStore)
 
-	return redisStore, redisOrgStore, healthStore, &rpcAuthStore, &rpcOrgStore
+	return redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore
 }
 
 func skipSpecBecauseInvalid(spec *APISpec, logger *logrus.Entry) bool {
@@ -298,7 +298,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		mwAppendEnabled(&chainArray, &TransformMiddleware{baseMid})
 		mwAppendEnabled(&chainArray, &TransformJQMiddleware{baseMid})
 		mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
-		mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: cacheStore})
+		mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: &cacheStore})
 		mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid})
@@ -406,7 +406,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		mwAppendEnabled(&chainArray, &TransformJQMiddleware{baseMid})
 		mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid})
-		mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: cacheStore})
+		mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: &cacheStore})
 		mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
 

@@ -146,7 +146,7 @@ func setupGlobals() {
 
 	// Initialise our Host Checker
 	healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:"}
-	InitHostCheckManager(healthCheckStore)
+	InitHostCheckManager(&healthCheckStore)
 
 	if config.Global().EnableAnalytics && analytics.Store == nil {
 		globalConf := config.Global()
@@ -190,7 +190,7 @@ func setupGlobals() {
 
 	// Get the notifier ready
 	mainLog.Debug("Notifier will not work in hybrid mode")
-	mainNotifierStore := storage.RedisCluster{}
+	mainNotifierStore := &storage.RedisCluster{}
 	mainNotifierStore.Connect()
 	MainNotifier = RedisNotifier{mainNotifierStore, RedisPubSubChannel}
 
@@ -916,7 +916,7 @@ func getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 			HashKeys:  hashKeys,
 		}
 	}
-	return storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys}
+	return &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys}
 }
 
 func main() {
