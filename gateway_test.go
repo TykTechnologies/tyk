@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -91,6 +92,7 @@ func initTestMain(m *testing.M) int {
 		WriteTimeout:   1 * time.Second,
 		MaxHeaderBytes: 1 << 20,
 	}
+
 	globalConf := config.Global()
 	if err := config.WriteDefault("", &globalConf); err != nil {
 		panic(err)
@@ -122,10 +124,17 @@ func initTestMain(m *testing.M) int {
 	if err != nil {
 		panic(err)
 	}
-	defer mockHandle.ShutdownDnsMock()
+
+	defer func() {
+		testServer.Shutdown(context.Background())
+		mockHandle.ShutdownDnsMock()
+	}()
 
 	go func() {
-		panic(testServer.ListenAndServe())
+		err := testServer.ListenAndServe()
+		if err != nil {
+			log.Warn("testServer.ListenAndServe() err: ", err.Error())
+		}
 	}()
 
 	CoProcessInit()

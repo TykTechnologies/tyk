@@ -35,6 +35,8 @@ type RedisCluster struct {
 	KeyPrefix string
 	HashKeys  bool
 	IsCache   bool
+
+	muClusterSingleRedisMode sync.RWMutex
 }
 
 func clusterConnectionIsOpen(cluster *RedisCluster) bool {
@@ -213,7 +215,10 @@ func (r RedisCluster) GetKey(keyName string) (string, error) {
 	r.ensureConnection()
 	log.Debug("[STORE] Getting WAS: ", keyName)
 	log.Debug("[STORE] Getting: ", r.fixKey(keyName))
+	r.muClusterSingleRedisMode.RLock()
+	defer r.muClusterSingleRedisMode.RUnlock()
 	value, err := redis.String(r.singleton().Do("GET", r.fixKey(keyName)))
+
 	if err != nil {
 		log.Debug("Error trying to get value:", err)
 		return "", ErrKeyNotFound
@@ -495,7 +500,10 @@ func (r RedisCluster) StartPubSubHandler(channel string, callback func(interface
 		return errors.New("Redis connection failed")
 	}
 
+	r.muClusterSingleRedisMode.Lock()
+	defer r.muClusterSingleRedisMode.Unlock()
 	handle := r.singleton().RandomRedisHandle()
+
 	if handle == nil {
 		return errors.New("Redis connection failed")
 	}
