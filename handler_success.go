@@ -33,6 +33,7 @@ const (
 	TrackThisEndpoint
 	DoNotTrackThisEndpoint
 	UrlRewritePath
+	RequestMethod
 	OrigRequestURL
 	LoopLevel
 	LoopLevelLimit
