@@ -955,7 +955,12 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 		matchPath = "/" + matchPath
 	}
 
-    for _, v := range rxPaths {
+	if a.Proxy.ListenPath != "/" {
+		matchPath = strings.TrimPrefix(matchPath, a.Proxy.ListenPath)
+	}
+
+	// Check if ignored
+	for _, v := range rxPaths {
 		if mode != v.Status {
 			continue
 		}
