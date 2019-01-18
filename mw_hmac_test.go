@@ -184,6 +184,7 @@ func TestHMACAuthSessionSHA512Pass(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"%s\",algorithm=\"hmac-sha512\",signature=\"%s\"", sessionKey, encodedString))
 
+	spec.HmacAllowedAlgorithms = []string{"hmac-sha512"}
 	chain := getHMACAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
