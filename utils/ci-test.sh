@@ -8,6 +8,8 @@ MATRIX=(
 )
 TIMEOUT=40s
 if [ -z "$TYK_BUILD_TEST_TIMEOUT" ]; then
+    echo "Using default timeout"
+else
     echo "Setting timeout to '$TYK_BUILD_TEST_TIMEOUT'..."
     TIMEOUT=$TYK_BUILD_TEST_TIMEOUT
 fi
