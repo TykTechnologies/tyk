@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/miekg/dns"
+	"sync"
 )
 
 var DomainsToAddresses = map[string][]string{
@@ -20,6 +21,8 @@ var DomainsToAddresses = map[string][]string{
 type dnsMockHandler struct {
 	domainsToAddresses map[string][]string
 	domainsToErrors    map[string]int
+
+	muDomainsToAddresses sync.RWMutex
 }
 
 func (d *dnsMockHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
@@ -30,12 +33,16 @@ func (d *dnsMockHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 		msg.Authoritative = true
 		domain := msg.Question[0].Name
 
+		d.muDomainsToAddresses.RLock()
+		defer d.muDomainsToAddresses.RUnlock()
+
 		if rcode, ok := d.domainsToErrors[domain]; ok {
 			m := new(dns.Msg)
 			m.SetRcode(r, rcode)
 			w.WriteMsg(m)
 			return
 		}
+
 		addresses, ok := d.domainsToAddresses[domain]
 		if !ok {
 			// ^ 				start of line
@@ -67,8 +74,12 @@ type DnsMockHandle struct {
 }
 
 func (h *DnsMockHandle) PushDomains(domainsMap map[string][]string, domainsErrorMap map[string]int) func() {
-	dta := h.mockServer.Handler.(*dnsMockHandler).domainsToAddresses
-	dte := h.mockServer.Handler.(*dnsMockHandler).domainsToErrors
+	handler := h.mockServer.Handler.(*dnsMockHandler)
+	handler.muDomainsToAddresses.Lock()
+	defer handler.muDomainsToAddresses.Unlock()
+
+	dta := handler.domainsToAddresses
+	dte := handler.domainsToErrors
 
 	prevDta := map[string][]string{}
 	prevDte := map[string]int{}
@@ -82,8 +93,12 @@ func (h *DnsMockHandle) PushDomains(domainsMap map[string][]string, domainsError
 	}
 
 	pullDomainsFunc := func() {
-		h.mockServer.Handler.(*dnsMockHandler).domainsToAddresses = prevDta
-		h.mockServer.Handler.(*dnsMockHandler).domainsToErrors = prevDte
+		handler := h.mockServer.Handler.(*dnsMockHandler)
+		handler.muDomainsToAddresses.Lock()
+		defer handler.muDomainsToAddresses.Unlock()
+
+		handler.domainsToAddresses = prevDta
+		handler.domainsToErrors = prevDte
 	}
 
 	for key, ips := range domainsMap {
@@ -117,14 +132,19 @@ func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int)
 	mockServer := &dns.Server{PacketConn: conn, NotifyStartedFunc: started}
 	handle := &DnsMockHandle{id: time.Now().String(), mockServer: mockServer}
 
+	dnsMux := &dnsMockHandler{muDomainsToAddresses: sync.RWMutex{}}
+
 	if domainsMap != nil {
-		mockServer.Handler = &dnsMockHandler{domainsToAddresses: domainsMap}
+		dnsMux.domainsToAddresses = domainsMap
 	} else {
-		mockServer.Handler = &dnsMockHandler{domainsToAddresses: DomainsToAddresses}
+		dnsMux.domainsToAddresses = DomainsToAddresses
 	}
+
 	if domainsErrorMap != nil {
-		mockServer.Handler.(*dnsMockHandler).domainsToErrors = domainsErrorMap
+		dnsMux.domainsToErrors = domainsErrorMap
 	}
+
+	mockServer.Handler = dnsMux
 
 	go func() {
 		err := mockServer.ActivateAndServe()
