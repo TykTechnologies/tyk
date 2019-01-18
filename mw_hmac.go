@@ -75,6 +75,14 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		return hm.authorizationError(r)
 	}
 
+	if len(hm.Spec.HmacAllowedAlgorithms) > 0 {
+		algorithmAllowed := false
+		if !algorithmAllowed {
+			logger.WithError(err).WithField("algorithm", fieldValues.Algorthm).Error("Algorithm not supported")
+			return hm.authorizationError(r)
+		}
+	}
+
 	// Create a signed string with the secret
 	encodedSignature := generateEncodedSignature(signatureString, secret, fieldValues.Algorthm)
 

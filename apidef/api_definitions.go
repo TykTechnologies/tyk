@@ -358,6 +358,7 @@ type APIDefinition struct {
 	NotificationsDetails       NotificationsManager `bson:"notifications" json:"notifications"`
 	EnableSignatureChecking    bool                 `bson:"enable_signature_checking" json:"enable_signature_checking"`
 	HmacAllowedClockSkew       float64              `bson:"hmac_allowed_clock_skew" json:"hmac_allowed_clock_skew"`
+	HmacAllowedAlgorithms      []string             `bson:"hmac_allowed_algorithms" json:"hmac_allowed_algorithms"`
 	BaseIdentityProvidedBy     AuthTypeEnum         `bson:"base_identity_provided_by" json:"base_identity_provided_by"`
 	VersionDefinition          struct {
 		Location  string `bson:"location" json:"location"`
@@ -678,6 +679,7 @@ func DummyAPI() APIDefinition {
 		TagHeaders:              []string{},
 		UpstreamCertificates:    map[string]string{},
 		JWTScopeToPolicyMapping: map[string]string{},
+		HmacAllowedAlgorithms:   []string{},
 		CustomMiddleware: MiddlewareSection{
 			Post:        []MiddlewareDefinition{},
 			Pre:         []MiddlewareDefinition{},
