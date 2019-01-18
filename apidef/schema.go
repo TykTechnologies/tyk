@@ -194,6 +194,9 @@ const Schema = `{
         "hmac_allowed_clock_skew": {
             "type": "number"
         },
+        "hmac_allowed_algorithms": {
+            "type": ["array", "null"]
+        },
         "dont_set_quota_on_create": {
             "type": "boolean"
             },
