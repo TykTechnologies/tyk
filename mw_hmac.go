@@ -95,7 +95,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 			}
 		}
 		if !algorithmAllowed {
-			logger.WithError(err).WithField("algorithm", fieldValues.Algorthm).Error("Algorithm not supported")
+			log.WithError(err).WithField("algorithm", fieldValues.Algorthm).Error("Algorithm not supported")
 			return hm.authorizationError(r)
 		}
 	}
