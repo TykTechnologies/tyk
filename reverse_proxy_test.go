@@ -216,7 +216,9 @@ func TestReverseProxyDnsCache(t *testing.T) {
 			if !tc.isCacheEnabled {
 				dnsCacheManager.DnsCache = nil
 			}
-			spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+			spec := &APISpec{APIDefinition: &apidef.APIDefinition{},
+				EnforcedTimeoutEnabled: true,
+				GlobalConfig:           config.Config{ProxyCloseConnections: true, ProxyDefaultTimeout: 1}}
 
 			req := testReq(t, tc.Method, tc.URL, tc.Body)
 			for name, value := range tc.Headers {
@@ -226,7 +228,10 @@ func TestReverseProxyDnsCache(t *testing.T) {
 			Url, _ := url.Parse(tc.URL)
 			proxy := TykNewSingleHostReverseProxy(Url, spec)
 			recorder := httptest.NewRecorder()
-			proxy.WrappedServeHTTP(recorder, req, false)
+			resp := proxy.WrappedServeHTTP(recorder, req, false)
+			if resp != nil {
+				t.Fatalf("Expect empty response on forced timeout, but got %#v", resp)
+			}
 
 			host := Url.Hostname()
 			if tc.isCacheEnabled {

@@ -29,10 +29,6 @@ func NewDnsCacheManager() *DnsCacheManager {
 }
 
 func (m *DnsCacheManager) WrapDialer(dialer *net.Dialer) dialContextFunc {
-	if m.DnsCache == nil {
-		return dialer.DialContext
-	}
-
 	return func(ctx context.Context, network, address string) (net.Conn, error) {
 		return m.doCachedDial(dialer, ctx, network, address)
 	}

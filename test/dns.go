@@ -8,8 +8,9 @@ import (
 
 	"time"
 
-	"github.com/miekg/dns"
 	"sync"
+
+	"github.com/miekg/dns"
 )
 
 var DomainsToAddresses = map[string][]string{
