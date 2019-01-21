@@ -1,6 +1,9 @@
 package user
 
 import (
+	"crypto/md5"
+	"fmt"
+
 	"github.com/TykTechnologies/tyk/config"
 	logger "github.com/TykTechnologies/tyk/log"
 )
@@ -89,6 +92,10 @@ type SessionState struct {
 
 	// Used to store token hash
 	keyHash string
+}
+
+func (s *SessionState) MD5Hash() string {
+	return fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%+v", s))))
 }
 
 func (s *SessionState) KeyHash() string {

@@ -184,10 +184,10 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		sessionStore = rpcAuthStore
 	}
 
-	// Health checkers are initialised per spec so that each API handler has it's own connection and redis sotorage pool
+	// Health checkers are initialised per spec so that each API handler has it's own connection and redis storage pool
 	spec.Init(authStore, sessionStore, healthStore, orgStore)
 
-	//Set up all the JSVM middleware
+	// Set up all the JSVM middleware
 	var mwAuthCheckFunc apidef.MiddlewareDefinition
 	mwPreFuncs := []apidef.MiddlewareDefinition{}
 	mwPostFuncs := []apidef.MiddlewareDefinition{}
@@ -277,12 +277,23 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		handleCORS(&chainArray, spec)
 
 		for _, obj := range mwPreFuncs {
-			if mwDriver != apidef.OttoDriver {
-
+			if mwDriver == apidef.OttoDriver {
+				chainArray = append(chainArray, createDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
+			} else if mwDriver == apidef.GoPluginDriver {
+				mwAppendEnabled(
+					&chainArray,
+					&GoPluginMiddleware{
+						BaseMiddleware: baseMid,
+						Path:           obj.Path,
+						SymbolName:     obj.Name,
+						Pre:            true,
+						UseSession:     obj.RequireSession,
+						Auth:           false,
+					},
+				)
+			} else {
 				coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
 				mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver})
-			} else {
-				chainArray = append(chainArray, createDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
 			}
 		}
 
@@ -307,12 +318,23 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid})
 
 		for _, obj := range mwPostFuncs {
-			if mwDriver != apidef.OttoDriver {
-
+			if mwDriver == apidef.OttoDriver {
+				chainArray = append(chainArray, createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
+			} else if mwDriver == apidef.GoPluginDriver {
+				mwAppendEnabled(
+					&chainArray,
+					&GoPluginMiddleware{
+						BaseMiddleware: baseMid,
+						Path:           obj.Path,
+						SymbolName:     obj.Name,
+						Pre:            false,
+						UseSession:     obj.RequireSession,
+						Auth:           false,
+					},
+				)
+			} else {
 				coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
 				mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver})
-			} else {
-				chainArray = append(chainArray, createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
 			}
 		}
 
@@ -327,12 +349,23 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 		// Add pre-process MW
 		for _, obj := range mwPreFuncs {
-			if mwDriver != apidef.OttoDriver {
-
+			if mwDriver == apidef.OttoDriver {
+				chainArray = append(chainArray, createDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
+			} else if mwDriver == apidef.GoPluginDriver {
+				mwAppendEnabled(
+					&chainArray,
+					&GoPluginMiddleware{
+						BaseMiddleware: baseMid,
+						Path:           obj.Path,
+						SymbolName:     obj.Name,
+						Pre:            true,
+						UseSession:     obj.RequireSession,
+						Auth:           false,
+					},
+				)
+			} else {
 				coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
 				mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver})
-			} else {
-				chainArray = append(chainArray, createDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
 			}
 		}
 
@@ -369,6 +402,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 		coprocessAuth := EnableCoProcess && mwDriver != apidef.OttoDriver && spec.EnableCoProcessAuth
 		ottoAuth := !coprocessAuth && mwDriver == apidef.OttoDriver && spec.EnableCoProcessAuth
+		gopluginAuth := !coprocessAuth && !ottoAuth && mwDriver == apidef.GoPluginDriver
 
 		if coprocessAuth {
 			// TODO: check if mwAuthCheckFunc is available/valid
@@ -385,6 +419,20 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 			authArray = append(authArray, createDynamicMiddleware(mwAuthCheckFunc.Name, true, false, baseMid))
 		}
 
+		if gopluginAuth {
+			mwAppendEnabled(
+				&authArray,
+				&GoPluginMiddleware{
+					BaseMiddleware: baseMid,
+					Path:           mwAuthCheckFunc.Path,
+					SymbolName:     mwAuthCheckFunc.Name,
+					Pre:            true,
+					UseSession:     false,
+					Auth:           true,
+				},
+			)
+		}
+
 		if spec.UseStandardAuth || len(authArray) == 0 {
 			logger.Info("Checking security policy: Token")
 			authArray = append(authArray, createMiddleware(&AuthKey{baseMid}))
@@ -393,9 +441,22 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		chainArray = append(chainArray, authArray...)
 
 		for _, obj := range mwPostAuthCheckFuncs {
-
-			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
-			mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_PostKeyAuth, obj.Name, mwDriver})
+			if mwDriver == apidef.GoPluginDriver {
+				mwAppendEnabled(
+					&chainArray,
+					&GoPluginMiddleware{
+						BaseMiddleware: baseMid,
+						Path:           obj.Path,
+						SymbolName:     obj.Name,
+						Pre:            false,
+						UseSession:     obj.RequireSession,
+						Auth:           false,
+					},
+				)
+			} else {
+				coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
+				mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_PostKeyAuth, obj.Name, mwDriver})
+			}
 		}
 
 		mwAppendEnabled(&chainArray, &StripAuth{baseMid})
@@ -414,12 +475,23 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
 
 		for _, obj := range mwPostFuncs {
-			if mwDriver != apidef.OttoDriver {
-
+			if mwDriver == apidef.OttoDriver {
+				chainArray = append(chainArray, createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
+			} else if mwDriver == apidef.GoPluginDriver {
+				mwAppendEnabled(
+					&chainArray,
+					&GoPluginMiddleware{
+						BaseMiddleware: baseMid,
+						Path:           obj.Path,
+						SymbolName:     obj.Name,
+						Pre:            false,
+						UseSession:     obj.RequireSession,
+						Auth:           false,
+					},
+				)
+			} else {
 				coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
 				mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver})
-			} else {
-				chainArray = append(chainArray, createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
 			}
 		}
 
@@ -488,7 +560,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if found, err := isLoop(r); found {
 		if err != nil {
 			handler := ErrorHandler{*d.SH.Base()}
-			handler.HandleError(w, r, err.Error(), http.StatusInternalServerError)
+			handler.HandleError(w, r, err.Error(), http.StatusInternalServerError, true)
 			return
 		}
 

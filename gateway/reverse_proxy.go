@@ -665,7 +665,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	if breakerEnforced {
 		if !breakerConf.CB.Ready() {
 			log.Debug("ON REQUEST: Circuit Breaker is in OPEN state")
-			p.ErrorHandler.HandleError(rw, logreq, "Service temporarily unavailable.", 503)
+			p.ErrorHandler.HandleError(rw, logreq, "Service temporarily unavailable.", 503, true)
 			return nil
 		}
 		log.Debug("ON REQUEST: Circuit Breaker is in CLOSED or HALF-OPEN state")
@@ -699,7 +699,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		}).Error("http: proxy error: ", err)
 
 		if strings.Contains(err.Error(), "timeout awaiting response headers") {
-			p.ErrorHandler.HandleError(rw, logreq, "Upstream service reached hard timeout.", http.StatusGatewayTimeout)
+			p.ErrorHandler.HandleError(rw, logreq, "Upstream service reached hard timeout.", http.StatusGatewayTimeout, true)
 
 			if p.TykAPISpec.Proxy.ServiceDiscovery.UseDiscoveryService {
 				if ServiceCache != nil {
@@ -711,16 +711,16 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		}
 
 		if strings.Contains(err.Error(), "context canceled") {
-			p.ErrorHandler.HandleError(rw, logreq, "Client closed request", 499)
+			p.ErrorHandler.HandleError(rw, logreq, "Client closed request", 499, true)
 			return nil
 		}
 
 		if strings.Contains(err.Error(), "no such host") {
-			p.ErrorHandler.HandleError(rw, logreq, "Upstream host lookup failed", http.StatusInternalServerError)
+			p.ErrorHandler.HandleError(rw, logreq, "Upstream host lookup failed", http.StatusInternalServerError, true)
 			return nil
 		}
 
-		p.ErrorHandler.HandleError(rw, logreq, "There was a problem proxying the request", http.StatusInternalServerError)
+		p.ErrorHandler.HandleError(rw, logreq, "There was a problem proxying the request", http.StatusInternalServerError, true)
 		return nil
 
 	}
