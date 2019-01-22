@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/jeffail/tunny"
-	cache "github.com/pmylund/go-cache"
+	"github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/config"
 )
@@ -59,6 +59,7 @@ type HostUptimeChecker struct {
 	stopPollingChan chan bool
 	sampleCache     *cache.Cache
 	stopLoop        bool
+	muStopLoop      sync.RWMutex
 
 	resetListMu sync.Mutex
 	doResetList bool
@@ -80,6 +81,8 @@ func (h *HostUptimeChecker) getStaggeredTime() time.Duration {
 }
 
 func (h *HostUptimeChecker) HostCheckLoop() {
+	//h.muStopLoop.RLock()
+	//h.muStopLoop.RUnlock()
 	for !h.stopLoop {
 		if runningTests {
 			<-hostCheckTicker
@@ -264,7 +267,10 @@ func (h *HostUptimeChecker) Start() {
 }
 
 func (h *HostUptimeChecker) Stop() {
+	//h.muStopLoop.Lock()
+	//defer h.muStopLoop.Unlock()
 	h.stopLoop = true
+
 	h.stopPollingChan <- true
 	log.Info("[HOST CHECKER] Stopping poller")
 	h.pool.Close()
