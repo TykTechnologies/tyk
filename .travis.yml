@@ -8,6 +8,7 @@ notifications:
 env:
   global:
     - TYK_LOGLEVEL=info
+    - TYK_BUILD_TEST_TIMEOUT=300s
 
 addons:
   apt:
