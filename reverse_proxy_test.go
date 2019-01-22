@@ -113,10 +113,10 @@ func TestReverseProxyDnsCache(t *testing.T) {
 
 	var (
 		etcHostsMap = map[string][]string{
-			host:   {"127.0.0.1", "127.0.0.2"},
-			host2:  {"10.0.2.0", "10.0.2.1", "10.0.2.2"},
-			host3:  {"10.0.2.15", "10.0.2.16"},
-			wsHost: {"127.0.0.1", "127.0.0.1"},
+			host:   {"127.0.0.10", "127.0.0.20"},
+			host2:  {"10.0.20.0", "10.0.20.1", "10.0.20.2"},
+			host3:  {"10.0.20.15", "10.0.20.16"},
+			wsHost: {"127.0.0.10", "127.0.0.10"},
 		}
 	)
 
@@ -228,10 +228,7 @@ func TestReverseProxyDnsCache(t *testing.T) {
 			Url, _ := url.Parse(tc.URL)
 			proxy := TykNewSingleHostReverseProxy(Url, spec)
 			recorder := httptest.NewRecorder()
-			resp := proxy.WrappedServeHTTP(recorder, req, false)
-			if resp != nil {
-				t.Fatalf("Expect empty response on forced timeout, but got %#v", resp)
-			}
+			proxy.WrappedServeHTTP(recorder, req, false)
 
 			host := Url.Hostname()
 			if tc.isCacheEnabled {
