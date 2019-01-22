@@ -6,14 +6,6 @@ MATRIX=(
 	"-tags 'coprocess python'"
 	"-tags 'coprocess grpc'"
 )
-TIMEOUT=40s
-if [ -z "$TYK_BUILD_TEST_TIMEOUT" ]; then
-    echo "Using default timeout"
-else
-    echo "Setting timeout to '$TYK_BUILD_TEST_TIMEOUT'..."
-    TIMEOUT=$TYK_BUILD_TEST_TIMEOUT
-fi
-
 
 # print a command and execute it
 show() {
@@ -36,7 +28,7 @@ go get -t
 # profile for multiple pkgs
 for pkg in $PKGS; do
 	for opts in "${MATRIX[@]}"; do
-		show go test -timeout $TIMEOUT -v -coverprofile=test-$i.cov $opts $pkg \
+		show go test -timeout 40s -v -coverprofile=test-$i.cov $opts $pkg \
 			|| fatal "go test errored"
 		let i++ || true
 	done
@@ -47,7 +39,7 @@ if [[ ! $LATEST_GO ]]; then
 	exit 0
 fi
 
-go test -race -timeout $TIMEOUT $PKGS || fatal "go test -race failed"
+go test -race $PKGS || fatal "go test -race failed"
 
 for opts in "${MATRIX[@]}"; do
 	show go vet $opts $PKGS || fatal "go vet errored"
