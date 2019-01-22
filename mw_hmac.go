@@ -3,8 +3,11 @@ package main
 import (
 	"crypto/hmac"
 	"crypto/sha1"
+	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/base64"
 	"errors"
+	"hash"
 	"math"
 	"net/http"
 	"net/url"
@@ -72,8 +75,22 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		return hm.authorizationError(r)
 	}
 
+	if len(hm.Spec.HmacAllowedAlgorithms) > 0 {
+		algorithmAllowed := false
+		for _, alg := range hm.Spec.HmacAllowedAlgorithms {
+			if alg == fieldValues.Algorthm {
+				algorithmAllowed = true
+				break
+			}
+		}
+		if !algorithmAllowed {
+			logger.WithError(err).WithField("algorithm", fieldValues.Algorthm).Error("Algorithm not supported")
+			return hm.authorizationError(r)
+		}
+	}
+
 	// Create a signed string with the secret
-	encodedSignature := generateEncodedSignature(signatureString, secret)
+	encodedSignature := generateEncodedSignature(signatureString, secret, fieldValues.Algorthm)
 
 	// Compare
 	matchPass := encodedSignature == fieldValues.Signature
@@ -303,11 +320,24 @@ func generateHMACSignatureStringFromRequest(r *http.Request, fieldValues *HMACFi
 	return signatureString, nil
 }
 
-func generateEncodedSignature(signatureString, secret string) string {
+func generateEncodedSignature(signatureString, secret string, algorithm string) string {
 	key := []byte(secret)
-	h := hmac.New(sha1.New, key)
-	h.Write([]byte(signatureString))
 
+	var hashFunction func() hash.Hash
+
+	switch algorithm {
+	case "hmac-sha256":
+		hashFunction = sha256.New
+	case "hmac-sha384":
+		hashFunction = sha512.New384
+	case "hmac-sha512":
+		hashFunction = sha512.New
+	default:
+		hashFunction = sha1.New
+	}
+
+	h := hmac.New(hashFunction, key)
+	h.Write([]byte(signatureString))
 	encodedString := base64.StdEncoding.EncodeToString(h.Sum(nil))
 	return url.QueryEscape(encodedString)
 }

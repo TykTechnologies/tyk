@@ -3,8 +3,10 @@ package main
 import (
 	"crypto/hmac"
 	"crypto/sha1"
+	"crypto/sha512"
 	"encoding/base64"
 	"fmt"
+	"hash"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -98,7 +100,7 @@ func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
 	}
 }
 
-func testPrepareHMACAuthSessionPass(tb testing.TB, eventWG *sync.WaitGroup, withHeader bool, isBench bool) (string, *APISpec, *http.Request, string) {
+func testPrepareHMACAuthSessionPass(tb testing.TB, hashFn func() hash.Hash, eventWG *sync.WaitGroup, withHeader bool, isBench bool) (string, *APISpec, *http.Request, string) {
 	spec := createSpecTest(tb, hmacAuthDef)
 	session := createHMACAuthSession()
 
@@ -142,7 +144,7 @@ func testPrepareHMACAuthSessionPass(tb testing.TB, eventWG *sync.WaitGroup, with
 
 	// Encode it
 	key := []byte(session.HmacSecret)
-	h := hmac.New(sha1.New, key)
+	h := hmac.New(hashFn, key)
 	h.Write([]byte(signatureString))
 
 	sigString := base64.StdEncoding.EncodeToString(h.Sum(nil))
@@ -155,11 +157,34 @@ func TestHMACAuthSessionPass(t *testing.T) {
 	// Should not receive an AuthFailure event
 	var eventWG sync.WaitGroup
 	eventWG.Add(1)
-	encodedString, spec, req, sessionKey := testPrepareHMACAuthSessionPass(t, &eventWG, false, false)
+	encodedString, spec, req, sessionKey := testPrepareHMACAuthSessionPass(t, sha1.New, &eventWG, false, false)
 
 	recorder := httptest.NewRecorder()
 	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"%s\",algorithm=\"hmac-sha1\",signature=\"%s\"", sessionKey, encodedString))
 
+	chain := getHMACAuthChain(spec)
+	chain.ServeHTTP(recorder, req)
+
+	if recorder.Code != 200 {
+		t.Error("Initial request failed with non-200 code, should have gone through!: \n", recorder.Code, recorder.Body.String())
+	}
+
+	// Check we did not get our AuthFailure event
+	if !waitTimeout(&eventWG, 20*time.Millisecond) {
+		t.Error("Request should not have generated an AuthFailure event!: \n")
+	}
+}
+
+func TestHMACAuthSessionSHA512Pass(t *testing.T) {
+	// Should not receive an AuthFailure event
+	var eventWG sync.WaitGroup
+	eventWG.Add(1)
+	encodedString, spec, req, sessionKey := testPrepareHMACAuthSessionPass(t, sha512.New, &eventWG, false, false)
+
+	recorder := httptest.NewRecorder()
+	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"%s\",algorithm=\"hmac-sha512\",signature=\"%s\"", sessionKey, encodedString))
+
+	spec.HmacAllowedAlgorithms = []string{"hmac-sha512"}
 	chain := getHMACAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
@@ -178,7 +203,7 @@ func BenchmarkHMACAuthSessionPass(b *testing.B) {
 
 	var eventWG sync.WaitGroup
 	eventWG.Add(b.N)
-	encodedString, spec, req, sessionKey := testPrepareHMACAuthSessionPass(b, &eventWG, false, true)
+	encodedString, spec, req, sessionKey := testPrepareHMACAuthSessionPass(b, sha1.New, &eventWG, false, true)
 
 	recorder := httptest.NewRecorder()
 	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"%s\",algorithm=\"hmac-sha1\",signature=\"%s\"", sessionKey, encodedString))
@@ -405,7 +430,7 @@ func TestHMACAuthSessionPassWithHeaderField(t *testing.T) {
 	// Should not receive an AuthFailure event
 	var eventWG sync.WaitGroup
 	eventWG.Add(1)
-	encodedString, spec, req, sessionKey := testPrepareHMACAuthSessionPass(t, &eventWG, true, false)
+	encodedString, spec, req, sessionKey := testPrepareHMACAuthSessionPass(t, sha1.New, &eventWG, true, false)
 
 	recorder := httptest.NewRecorder()
 	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"%s\",algorithm=\"hmac-sha1\",headers=\"(request-target) date x-test-1 x-test-2\",signature=\"%s\"", sessionKey, encodedString))
@@ -428,7 +453,7 @@ func BenchmarkHMACAuthSessionPassWithHeaderField(b *testing.B) {
 
 	var eventWG sync.WaitGroup
 	eventWG.Add(b.N)
-	encodedString, spec, req, sessionKey := testPrepareHMACAuthSessionPass(b, &eventWG, true, true)
+	encodedString, spec, req, sessionKey := testPrepareHMACAuthSessionPass(b, sha1.New, &eventWG, true, true)
 
 	recorder := httptest.NewRecorder()
 	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"%s\",algorithm=\"hmac-sha1\",headers=\"(request-target) date x-test-1 x-test-2\",signature=\"%s\"", sessionKey, encodedString))

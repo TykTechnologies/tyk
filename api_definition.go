@@ -979,11 +979,12 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 		matchPath = r.URL.Path
 	}
 
-	if !strings.HasPrefix(matchPath, "/") {
-		matchPath = "/" + matchPath
-	}
 	if a.Proxy.ListenPath != "/" {
 		matchPath = strings.TrimPrefix(matchPath, a.Proxy.ListenPath)
+	}
+
+	if !strings.HasPrefix(matchPath, "/") {
+		matchPath = "/" + matchPath
 	}
 
 	// Check if ignored
