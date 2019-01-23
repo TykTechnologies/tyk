@@ -426,6 +426,7 @@ type APIDefinition struct {
 		Debug              bool     `bson:"debug" json:"debug"`
 	} `bson:"CORS" json:"CORS"`
 	Domain            string                 `bson:"domain" json:"domain"`
+	Certificates      []string               `bson:"certificates" json:"certificates"`
 	DoNotTrack        bool                   `bson:"do_not_track" json:"do_not_track"`
 	Tags              []string               `bson:"tags" json:"tags"`
 	EnableContextVars bool                   `bson:"enable_context_vars" json:"enable_context_vars"`
