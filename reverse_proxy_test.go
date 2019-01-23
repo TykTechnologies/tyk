@@ -218,7 +218,7 @@ func TestReverseProxyDnsCache(t *testing.T) {
 			}
 			spec := &APISpec{APIDefinition: &apidef.APIDefinition{},
 				EnforcedTimeoutEnabled: true,
-				GlobalConfig: config.Config{ProxyCloseConnections: true, ProxyDefaultTimeout: 1}}
+				GlobalConfig:           config.Config{ProxyCloseConnections: true, ProxyDefaultTimeout: 1}}
 
 			req := testReq(t, tc.Method, tc.URL, tc.Body)
 			for name, value := range tc.Headers {

@@ -78,7 +78,6 @@ func (h *HostUptimeChecker) setStopLoop(newValue bool) {
 	h.muStopLoop.Unlock()
 }
 
-
 func (h *HostUptimeChecker) getStaggeredTime() time.Duration {
 	if h.checkTimeout <= 5 {
 		return time.Duration(h.checkTimeout) * time.Second

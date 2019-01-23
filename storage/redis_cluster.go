@@ -496,20 +496,21 @@ func (r *RedisCluster) DeleteKeys(keys []string) bool {
 // StartPubSubHandler will listen for a signal and run the callback for
 // every subscription and message event.
 func (r *RedisCluster) StartPubSubHandler(channel string, callback func(interface{})) error {
-	if r.singleton() == nil {
+	cluster := r.singleton()
+	if cluster == nil {
 		return errors.New("Redis connection failed")
 	}
 
 	r.muClusterSingleRedisMode.Lock()
-	handle := r.singleton().RandomRedisHandle()
+	handle := cluster.RandomRedisHandle()
 	r.muClusterSingleRedisMode.Unlock()
 
 	if handle == nil {
-		return errors.New("Redis connection failed")
+		return errors.New("Redis connection failed. Handle is nil")
 	}
 
 	psc := redis.PubSubConn{
-		Conn: r.singleton().RandomRedisHandle().Pool.Get(),
+		Conn: handle.Pool.Get(),
 	}
 	if err := psc.Subscribe(channel); err != nil {
 		return err

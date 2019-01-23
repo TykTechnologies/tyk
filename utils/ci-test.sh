@@ -30,7 +30,7 @@ go get -t
 # profile for multiple pkgs
 for pkg in $PKGS; do
 	for opts in "${MATRIX[@]}"; do
-		show go test -v -failfast -timeout $TEST_TIMEOUT -coverprofile=test-$i.cov $opts $pkg \
+		show go test -v -timeout $TEST_TIMEOUT -coverprofile=test-$i.cov $opts $pkg \
 			|| fatal "go test errored"
 		let i++ || true
 	done
@@ -56,7 +56,7 @@ if [[ -n $FMT_FILES ]]; then
 	fatal "Run 'gofmt -s -w' on these files:\n$FMT_FILES"
 fi
 
-IMP_FILES="$(goimports -local github.com/TykTechnologies -l $GOFILES)"
-if [[ -n $IMP_FILES ]]; then
-	fatal "Run 'goimports -local github.com/TykTechnologies -w' on these files:\n$IMP_FILES"
-fi
+#IMP_FILES="$(goimports -local github.com/TykTechnologies -l $GOFILES)"
+#if [[ -n $IMP_FILES ]]; then
+#	fatal "Run 'goimports -local github.com/TykTechnologies -w' on these files:\n$IMP_FILES"
+#fi
