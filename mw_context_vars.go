@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	uuid "github.com/satori/go.uuid"
+	"github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/tyk/request"
 )

@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"time"
 
-	osin "github.com/lonelycode/osin"
-	uuid "github.com/satori/go.uuid"
+	"github.com/lonelycode/osin"
+	"github.com/satori/go.uuid"
 	"golang.org/x/crypto/bcrypt"
 
 	"strconv"

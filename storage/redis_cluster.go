@@ -501,8 +501,8 @@ func (r *RedisCluster) StartPubSubHandler(channel string, callback func(interfac
 	}
 
 	r.muClusterSingleRedisMode.Lock()
-	defer r.muClusterSingleRedisMode.Unlock()
 	handle := r.singleton().RandomRedisHandle()
+	r.muClusterSingleRedisMode.Unlock()
 
 	if handle == nil {
 		return errors.New("Redis connection failed")

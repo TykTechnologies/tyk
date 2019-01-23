@@ -8,8 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	maxminddb "github.com/oschwald/maxminddb-golang"
-	msgpack "gopkg.in/vmihailenco/msgpack.v2"
+	"github.com/oschwald/maxminddb-golang"
+	"gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/regexp"

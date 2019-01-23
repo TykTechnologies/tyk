@@ -12,7 +12,7 @@ import (
 
 	"github.com/justinas/alice"
 	"github.com/lonelycode/go-uuid/uuid"
-	cache "github.com/pmylund/go-cache"
+	"github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/user"
 )

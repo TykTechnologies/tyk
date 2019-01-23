@@ -66,6 +66,19 @@ type HostUptimeChecker struct {
 	newList     map[string]HostData
 }
 
+func (h *HostUptimeChecker) getStopLoop() bool {
+	h.muStopLoop.RLock()
+	defer h.muStopLoop.RUnlock()
+	return h.stopLoop
+}
+
+func (h *HostUptimeChecker) setStopLoop(newValue bool) {
+	h.muStopLoop.Lock()
+	h.stopLoop = newValue
+	h.muStopLoop.Unlock()
+}
+
+
 func (h *HostUptimeChecker) getStaggeredTime() time.Duration {
 	if h.checkTimeout <= 5 {
 		return time.Duration(h.checkTimeout) * time.Second
@@ -81,9 +94,7 @@ func (h *HostUptimeChecker) getStaggeredTime() time.Duration {
 }
 
 func (h *HostUptimeChecker) HostCheckLoop() {
-	//h.muStopLoop.RLock()
-	//h.muStopLoop.RUnlock()
-	for !h.stopLoop {
+	for !h.getStopLoop() {
 		if runningTests {
 			<-hostCheckTicker
 		}
@@ -258,7 +269,7 @@ func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList ma
 
 func (h *HostUptimeChecker) Start() {
 	// Start the loop that checks for bum hosts
-	h.stopLoop = false
+	h.setStopLoop(false)
 	log.Debug("[HOST CHECKER] Starting...")
 	go h.HostCheckLoop()
 	log.Debug("[HOST CHECKER] Check loop started...")
@@ -267,9 +278,7 @@ func (h *HostUptimeChecker) Start() {
 }
 
 func (h *HostUptimeChecker) Stop() {
-	//h.muStopLoop.Lock()
-	//defer h.muStopLoop.Unlock()
-	h.stopLoop = true
+	h.setStopLoop(true)
 
 	h.stopPollingChan <- true
 	log.Info("[HOST CHECKER] Stopping poller")

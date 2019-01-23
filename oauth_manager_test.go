@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/lonelycode/osin"
-	uuid "github.com/satori/go.uuid"
+	"github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"

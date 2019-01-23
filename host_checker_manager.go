@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	uuid "github.com/satori/go.uuid"
-	msgpack "gopkg.in/vmihailenco/msgpack.v2"
+	"github.com/satori/go.uuid"
+	"gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"

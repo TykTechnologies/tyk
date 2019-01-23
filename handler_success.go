@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	cache "github.com/pmylund/go-cache"
+	"github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/request"
 
@@ -21,7 +21,7 @@ import (
 // Enums for keys to be stored in a session context - this is how gorilla expects
 // these to be implemented and is lifted pretty much from docs
 const (
-	SessionData = iota
+	SessionData            = iota
 	UpdateSession
 	AuthToken
 	HashedAuthToken
