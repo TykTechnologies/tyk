@@ -546,8 +546,6 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 		return len(specs[i].Proxy.ListenPath) > len(specs[j].Proxy.ListenPath)
 	})
 
-	chainChannel := make(chan *ChainObject)
-
 	// Create a new handler for each API spec
 	loadList := make([]*ChainObject, len(specs))
 	apisByListen := countApisByListenHash(specs)
@@ -584,32 +582,23 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 	}
 
 	for i, spec := range specs {
-		go func(spec *APISpec, i int) {
-			subrouter := hostRouters[spec.Domain]
-			if subrouter == nil {
-				mainLog.WithFields(logrus.Fields{
-					"domain": spec.Domain,
-					"api_id": spec.APIID,
-				}).Warning("Trying to load API with Domain when custom domains are disabled.")
-				subrouter = muxer
-			}
+		subrouter := hostRouters[spec.Domain]
+		if subrouter == nil {
+			mainLog.WithFields(logrus.Fields{
+				"domain": spec.Domain,
+				"api_id": spec.APIID,
+			}).Warning("Trying to load API with Domain when custom domains are disabled.")
+			subrouter = muxer
+		}
 
-			chainObj := processSpec(spec, apisByListen, redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore, subrouter, logrus.NewEntry(log))
-
-			chainObj.Index = i
-			chainChannel <- chainObj
-			apisMu.Lock()
-			spec.middlewareChain = chainObj
-			apisMu.Unlock()
-		}(spec, i)
+		chainObj := processSpec(spec, apisByListen, redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore, subrouter, logrus.NewEntry(log))
+		apisMu.Lock()
+		spec.middlewareChain = chainObj
+		apisMu.Unlock()
 
 		// TODO: This will not deal with skipped APis well
 		tmpSpecRegister[spec.APIID] = spec
-	}
-
-	for range specs {
-		chObj := <-chainChannel
-		loadList[chObj.Index] = chObj
+		loadList[i] = chainObj
 	}
 
 	for _, chainObj := range loadList {
