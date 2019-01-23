@@ -513,6 +513,44 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 	})
 }
 
+func TestAPICertificate(t *testing.T) {
+	_, _, combinedPEM, _ := genServerCertificate()
+	serverCertID, _ := CertificateManager.Add(combinedPEM, "")
+	defer CertificateManager.Delete(serverCertID)
+
+	globalConf := config.Global()
+	globalConf.HttpServerOptions.UseSSL = true
+	globalConf.HttpServerOptions.SSLCertificates = []string{}
+	config.SetGlobal(globalConf)
+	defer resetTestConfig()
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{
+		InsecureSkipVerify: true,
+	}}}
+
+	t.Run("Cert set via API", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Certificates = []string{serverCertID}
+			spec.UseKeylessAccess = true
+			spec.Proxy.ListenPath = "/"
+		})
+
+		ts.Run(t, test.TestCase{Code: 200, Client: client})
+	})
+
+	t.Run("Cert unknown", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = true
+			spec.Proxy.ListenPath = "/"
+		})
+
+		ts.Run(t, test.TestCase{ErrorMatch: "tls: internal error"})
+	})
+}
+
 func TestCertificateHandlerTLS(t *testing.T) {
 	_, _, combinedServerPEM, serverCert := genServerCertificate()
 	serverCertID := certs.HexSHA256(serverCert.Certificate[0])
