@@ -1414,6 +1414,7 @@ func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
 	defer ts.Close()
 
 	buildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID += "_" + time.Now().String()
 		spec.UseKeylessAccess = false
 		spec.DisableRateLimit = false
 		spec.OrgID = "default"
