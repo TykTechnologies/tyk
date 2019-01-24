@@ -257,6 +257,7 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 		}
 
 		apisMu.RLock()
+		defer apisMu.RUnlock()
 
 		// Dynamically add API specific certificates
 		for _, spec := range apiSpecs {
@@ -295,7 +296,6 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 				}
 			}
 		}
-		apisMu.RUnlock()
 
 		return newConfig, nil
 	}
