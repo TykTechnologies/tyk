@@ -43,7 +43,7 @@ import (
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/dns_cache"
+	"github.com/TykTechnologies/tyk/dnscache"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
@@ -99,7 +99,7 @@ var (
 		"/etc/tyk/tyk.conf",
 	}
 
-	dnsCacheManager = dns_cache.NewDnsCacheManager()
+	dnsCacheManager = dnscache.NewDnsCacheManager()
 )
 
 const (

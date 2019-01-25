@@ -1,4 +1,4 @@
-package dns_cache_test
+package dnscache_test
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/TykTechnologies/tyk/dns_cache"
+	"github.com/TykTechnologies/tyk/dnscache"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -45,7 +45,7 @@ type configTestStorageFetchItem struct {
 	*testing.T
 	etcHostsMap       map[string][]string
 	etcHostsErrorsMap map[string]int
-	dnsCache          *dns_cache.DnsCacheStorage
+	dnsCache          *dnscache.DnsCacheStorage
 }
 
 func setupTestStorageFetchItem(cfg *configTestStorageFetchItem) func() {
@@ -62,7 +62,7 @@ func setupTestStorageFetchItem(cfg *configTestStorageFetchItem) func() {
 }
 
 func TestStorageFetchItem(t *testing.T) {
-	dnsCache := dns_cache.NewDnsCacheStorage(time.Duration(expiration)*time.Second, time.Duration(checkInterval)*time.Second)
+	dnsCache := dnscache.NewDnsCacheStorage(time.Duration(expiration)*time.Second, time.Duration(checkInterval)*time.Second)
 
 	tearDownTestStorageFetchItem := setupTestStorageFetchItem(&configTestStorageFetchItem{t, etcHostsMap, etcHostsErrorMap, dnsCache})
 	defer func() {
@@ -236,7 +236,7 @@ func TestStorageRecordExpiration(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			dnsCache := dns_cache.NewDnsCacheStorage(time.Duration(expiration)*time.Millisecond, time.Duration(tc.checkInterval)*time.Millisecond)
+			dnsCache := dnscache.NewDnsCacheStorage(time.Duration(expiration)*time.Millisecond, time.Duration(tc.checkInterval)*time.Millisecond)
 
 			for _, r := range tc.records {
 				if r.addDelay > 0 {

@@ -1,4 +1,4 @@
-package dns_cache
+package dnscache
 
 import (
 	"context"
