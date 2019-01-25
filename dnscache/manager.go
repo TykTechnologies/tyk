@@ -14,7 +14,6 @@ var (
 )
 
 type DialContextFunc func(ctx context.Context, network, address string) (net.Conn, error)
-//type StorageBuiderFunc func() (*IDnsCacheStorage, error)
 
 type IDnsCacheManager interface {
 	InitDNSCaching(ttl, checkInterval time.Duration)
@@ -68,7 +67,7 @@ func (m *DnsCacheManager) doCachedDial(d *net.Dialer, ctx context.Context, netwo
 
 func (m *DnsCacheManager) InitDNSCaching(ttl, checkInterval time.Duration) {
 	if m.cacheStorage == nil {
-		logger.Infof("Initialized dns cache with ttl=%s, duration=%s", ttl, checkInterval)
+		logger.Infof("Initializing dns cache with ttl=%s, duration=%s", ttl, checkInterval)
 		storage := NewDnsCacheStorage(ttl, checkInterval)
 		m.cacheStorage = IDnsCacheStorage(storage)
 	}
