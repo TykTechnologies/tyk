@@ -13,34 +13,51 @@ var (
 	logger = log.Get().WithField("prefix", "dns-cache")
 )
 
-type dialContextFunc func(ctx context.Context, network, address string) (net.Conn, error)
+type DialContextFunc func(ctx context.Context, network, address string) (net.Conn, error)
+//type StorageBuiderFunc func() (*IDnsCacheStorage, error)
 
 type IDnsCacheManager interface {
 	InitDNSCaching(ttl, checkInterval time.Duration)
-	WrapDialer(dialer *net.Dialer) dialContextFunc
+	WrapDialer(dialer *net.Dialer) DialContextFunc
+	SetCacheStorage(cache IDnsCacheStorage)
+	CacheStorage()
+}
+
+type IDnsCacheStorage interface {
+	FetchItem(key string) ([]string, error)
+	Get(key string) (DnsCacheItem, bool)
+	Clear()
 }
 
 type DnsCacheManager struct {
-	DnsCache *DnsCacheStorage
+	cacheStorage IDnsCacheStorage
 }
 
 func NewDnsCacheManager() *DnsCacheManager {
 	return &DnsCacheManager{nil}
 }
 
-func (m *DnsCacheManager) WrapDialer(dialer *net.Dialer) dialContextFunc {
+func (m *DnsCacheManager) SetCacheStorage(cache IDnsCacheStorage) {
+	m.cacheStorage = cache
+}
+
+func (m *DnsCacheManager) CacheStorage() IDnsCacheStorage {
+	return m.cacheStorage
+}
+
+func (m *DnsCacheManager) WrapDialer(dialer *net.Dialer) DialContextFunc {
 	return func(ctx context.Context, network, address string) (net.Conn, error) {
 		return m.doCachedDial(dialer, ctx, network, address)
 	}
 }
 
 func (m *DnsCacheManager) doCachedDial(d *net.Dialer, ctx context.Context, network, address string) (net.Conn, error) {
-	if m.DnsCache == nil {
+	if m.cacheStorage == nil {
 		return d.DialContext(ctx, network, address)
 	}
 
 	separator := strings.LastIndex(address, ":")
-	ips, err := m.DnsCache.FetchItem(address[:separator])
+	ips, err := m.cacheStorage.FetchItem(address[:separator])
 
 	if err != nil {
 		logger.Infof("doCachedDial error: %v. network=%v, address=%v", err.Error(), network, address)
@@ -50,13 +67,14 @@ func (m *DnsCacheManager) doCachedDial(d *net.Dialer, ctx context.Context, netwo
 }
 
 func (m *DnsCacheManager) InitDNSCaching(ttl, checkInterval time.Duration) {
-	if m.DnsCache == nil {
+	if m.cacheStorage == nil {
 		logger.Infof("Initialized dns cache with ttl=%s, duration=%s", ttl, checkInterval)
-		m.DnsCache = NewDnsCacheStorage(ttl, checkInterval)
+		storage := NewDnsCacheStorage(ttl, checkInterval)
+		m.cacheStorage = IDnsCacheStorage(storage)
 	}
 }
 
 func (m *DnsCacheManager) DisposeCache() {
-	m.DnsCache.Clear()
-	m.DnsCache = nil
+	m.cacheStorage.Clear()
+	m.cacheStorage = nil
 }

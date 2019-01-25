@@ -212,9 +212,9 @@ func TestReverseProxyDnsCache(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cacheInstance := dnsCacheManager.DnsCache
+			storage := dnsCacheManager.CacheStorage()
 			if !tc.isCacheEnabled {
-				dnsCacheManager.DnsCache = nil
+				dnsCacheManager.SetCacheStorage(nil)
 			}
 			spec := &APISpec{APIDefinition: &apidef.APIDefinition{},
 				EnforcedTimeoutEnabled: true,
@@ -232,19 +232,19 @@ func TestReverseProxyDnsCache(t *testing.T) {
 
 			host := Url.Hostname()
 			if tc.isCacheEnabled {
-				item, ok := cacheInstance.Get(host)
+				item, ok := storage.Get(host)
 				if !ok || !item.IsEqualsTo(tc.expectedIPs) {
 					t.Fatalf("got %q, but wanted %q. ok=%t", item, tc.expectedIPs, ok)
 				}
 			} else {
-				item, ok := cacheInstance.Get(host)
+				item, ok := storage.Get(host)
 				if ok {
 					t.Fatalf("got %t, but wanted %t. item=%#v", ok, false, item)
 				}
 			}
 
 			if !tc.isCacheEnabled {
-				dnsCacheManager.DnsCache = cacheInstance
+				dnsCacheManager.SetCacheStorage(storage)
 			}
 		})
 	}

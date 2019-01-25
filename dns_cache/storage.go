@@ -21,8 +21,8 @@ type DnsCacheStorage struct {
 }
 
 func NewDnsCacheStorage(expiration, checkInterval time.Duration) *DnsCacheStorage {
-	storage := &DnsCacheStorage{cache.New(expiration, checkInterval)}
-	return storage
+	storage := DnsCacheStorage{cache.New(expiration, checkInterval)}
+	return &storage
 }
 
 //Return map of non expired dns cache items
