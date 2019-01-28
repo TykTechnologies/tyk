@@ -16,6 +16,7 @@ func (item *DnsCacheItem) IsEqualsTo(addrs []string) bool {
 	return reflect.DeepEqual(item.addrs, addrs)
 }
 
+//DnsCacheStorage is an in-memory cache of auto-purged dns query ip responses
 type DnsCacheStorage struct {
 	cache *cache.Cache
 }

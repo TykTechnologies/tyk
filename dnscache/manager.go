@@ -31,6 +31,9 @@ type IDnsCacheStorage interface {
 	Clear()
 }
 
+
+//DnsCacheManager is responsible for in-memory dns query records cache.
+//It allows to init dns caching and to hook into net/http dns resolution chain in order to cache query response ip records.
 type DnsCacheManager struct {
 	cacheStorage IDnsCacheStorage
 }
