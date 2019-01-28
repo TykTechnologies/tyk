@@ -304,11 +304,11 @@ const confSchema = `{
 			}
 		}
 	},
-	"dns": {
+	"dns_cache": {
 		"type": ["object", "null"],
 		"additionalProperties": false,
 		"properties": {
-			"enable_cache": {
+			"enabled": {
 				"type": "boolean"
 			},
 			"ttl": {

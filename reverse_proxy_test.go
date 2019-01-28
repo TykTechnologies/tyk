@@ -72,7 +72,7 @@ type configTestReverseProxyDnsCache struct {
 	*testing.T
 
 	etcHostsMap map[string][]string
-	dnsConfig   config.DnsConfig
+	dnsConfig   config.DnsCacheConfig
 }
 
 func setupTestReverseProxyDnsCache(cfg *configTestReverseProxyDnsCache) func() {
@@ -121,7 +121,7 @@ func TestReverseProxyDnsCache(t *testing.T) {
 	)
 
 	tearDown := setupTestReverseProxyDnsCache(&configTestReverseProxyDnsCache{t, etcHostsMap,
-		config.DnsConfig{EnableCaching: true, TTL: cacheTTL, CheckInterval: cacheUpdateInterval}})
+		config.DnsCacheConfig{Enabled: true, TTL: cacheTTL, CheckInterval: cacheUpdateInterval}})
 	defer tearDown()
 
 	cases := []struct {

@@ -3,13 +3,12 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/kelseyhightower/envconfig"
 	"io"
 	"io/ioutil"
 	"os"
 	"sync"
 	"sync/atomic"
-
-	"github.com/kelseyhightower/envconfig"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	logger "github.com/TykTechnologies/tyk/log"
@@ -81,8 +80,8 @@ type HealthCheckConfig struct {
 	HealthCheckValueTimeout int64 `json:"health_check_value_timeouts"`
 }
 
-type DnsConfig struct {
-	EnableCaching bool  `json:"enable_cache"`
+type DnsCacheConfig struct {
+	Enabled       bool  `json:"enabled"`
 	TTL           int64 `json:"ttl"`
 	CheckInterval int64 `json:"check_interval"`
 }
@@ -217,7 +216,7 @@ type Config struct {
 	EnableAnalytics                   bool                                  `json:"enable_analytics"`
 	AnalyticsConfig                   AnalyticsConfigConfig                 `json:"analytics_config"`
 	HealthCheck                       HealthCheckConfig                     `json:"health_check"`
-	Dns                               DnsConfig                             `json:"dns"`
+	DnsCache                          DnsCacheConfig                        `json:"dns_cache"`
 	UseAsyncSessionWrite              bool                                  `json:"optimisations_use_async_session_write"`
 	SessionUpdatePoolSize             int                                   `json:"session_update_pool_size"`
 	SessionUpdateBufferSize           int                                   `json:"session_update_buffer_size"`
@@ -340,6 +339,11 @@ var Default = Config{
 	},
 	AnalyticsConfig: AnalyticsConfigConfig{
 		IgnoredIPs: make([]string, 0),
+	},
+	DnsCache: DnsCacheConfig{
+		Enabled:       false,
+		TTL:           3600000,
+		CheckInterval: 60000,
 	},
 }
 

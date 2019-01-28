@@ -21,6 +21,11 @@
     "type": "",
     "ignored_ips": []
   },
+  "dns_cache": {
+    "enabled": true,
+    "ttl": 3600000,
+    "check_interval": 60000
+  },
   "optimisations_use_async_session_write": true,
   "allow_master_keys": false,
   "policies": {

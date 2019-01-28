@@ -76,12 +76,12 @@ var tests = []struct {
 		`policies.policy_source: policies.policy_source must be one of the following: "", "service", "rpc"`,
 	},
 	{
-		"MalformedDnsCacheEntry", `{"dns": { "enable_cache": true, "tttl": 10} }`,
+		"MalformedDnsCacheEntry", `{"dns_cache": { "enabled": true, "tttl": 10} }`,
 		`tttl: Additional property tttl is not allowed`,
 	},
 	{
-		"BadDnsCacheTTL", `{"dns": { "enable_cache": false, "ttl": -2 } }`,
-		`dns.ttl: Must be greater than or equal to -1`,
+		"BadDnsCacheTTL", `{"dns_cache": { "enabled": false, "ttl": -2 } }`,
+		`dns_cache.ttl: Must be greater than or equal to -1`,
 	},
 }
 
