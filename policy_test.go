@@ -1,12 +1,17 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/lonelycode/go-uuid/uuid"
+
+	"github.com/TykTechnologies/tyk/test"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -436,4 +441,191 @@ func BenchmarkApplyPolicies(b *testing.B) {
 			bmid.ApplyPolicies("", sess)
 		}
 	}
+}
+
+func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
+	policiesMu.RLock()
+	policy := user.Policy{
+		ID:               "two_of_three_with_api_limit",
+		Per:              1,
+		Rate:             1000,
+		QuotaMax:         50,
+		QuotaRenewalRate: 3600,
+		OrgID:            "default",
+		Partitions: user.PolicyPartitions{
+			PerAPI:    true,
+			Quota:     false,
+			RateLimit: false,
+			Acl:       false,
+		},
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {
+				Versions: []string{"v1"},
+				Limit: &user.APILimit{
+					QuotaMax:         100,
+					QuotaRenewalRate: 3600,
+					Rate:             1000,
+					Per:              1,
+				},
+			},
+			"api2": {
+				Versions: []string{"v1"},
+				Limit: &user.APILimit{
+					QuotaMax:         200,
+					QuotaRenewalRate: 3600,
+					Rate:             1000,
+					Per:              1,
+				},
+			},
+			"api3": {
+				Versions: []string{"v1"},
+			},
+		},
+	}
+	policiesByID = map[string]user.Policy{
+		"two_of_three_with_api_limit": policy,
+	}
+	policiesMu.RUnlock()
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	// load APIs
+	buildAndLoadAPI(
+		func(spec *APISpec) {
+			spec.Name = "api 1"
+			spec.APIID = "api1"
+			spec.UseKeylessAccess = false
+			spec.Proxy.ListenPath = "/api1"
+			spec.OrgID = "default"
+		},
+		func(spec *APISpec) {
+			spec.Name = "api 2"
+			spec.APIID = "api2"
+			spec.UseKeylessAccess = false
+			spec.Proxy.ListenPath = "/api2"
+			spec.OrgID = "default"
+		},
+		func(spec *APISpec) {
+			spec.Name = "api 3"
+			spec.APIID = "api3"
+			spec.UseKeylessAccess = false
+			spec.Proxy.ListenPath = "/api3"
+			spec.OrgID = "default"
+		},
+	)
+
+	// create test session
+	session := &user.SessionState{
+		ApplyPolicies: []string{"two_of_three_with_api_limit"},
+		OrgID:         "default",
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {
+				APIID:    "api1",
+				Versions: []string{"v1"},
+			},
+			"api2": {
+				APIID:    "api2",
+				Versions: []string{"v1"},
+			},
+			"api3": {
+				APIID:    "api3",
+				Versions: []string{"v1"},
+			},
+		},
+	}
+
+	// create key
+	key := uuid.New()
+	ts.Run(t, []test.TestCase{
+		{Method: http.MethodPost, Path: "/tyk/keys/" + key, Data: session, AdminAuth: true, Code: 200},
+	}...)
+
+	// run requests to different APIs
+	authHeader := map[string]string{"Authorization": key}
+	ts.Run(t, []test.TestCase{
+		// 2 requests to api1, API limit quota remaining should be 98
+		{Method: http.MethodGet, Path: "/api1", Headers: authHeader, Code: http.StatusOK},
+		{Method: http.MethodGet, Path: "/api1", Headers: authHeader, Code: http.StatusOK},
+		// 3 requests to api2, API limit quota remaining should be 197
+		{Method: http.MethodGet, Path: "/api2", Headers: authHeader, Code: http.StatusOK},
+		{Method: http.MethodGet, Path: "/api2", Headers: authHeader, Code: http.StatusOK},
+		{Method: http.MethodGet, Path: "/api2", Headers: authHeader, Code: http.StatusOK},
+		// 5 requests to api3, API limit quota remaining should be 45
+		{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK},
+		{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK},
+		{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK},
+		{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK},
+		{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK},
+	}...)
+
+	// check key session
+	ts.Run(t, []test.TestCase{
+		{
+			Method:    http.MethodGet,
+			Path:      "/tyk/keys/" + key,
+			AdminAuth: true,
+			Code:      http.StatusOK,
+			BodyMatchFunc: func(data []byte) bool {
+				sessionData := user.SessionState{}
+				if err := json.Unmarshal(data, &sessionData); err != nil {
+					t.Log(err.Error())
+					return false
+				}
+				api1Limit := sessionData.AccessRights["api1"].Limit
+				if api1Limit == nil {
+					t.Log("api1 limit is not set")
+					return false
+				}
+				api1LimitExpected := user.APILimit{
+					Rate:             1000,
+					Per:              1,
+					QuotaMax:         100,
+					QuotaRenewalRate: 3600,
+					QuotaRenews:      api1Limit.QuotaRenews,
+					QuotaRemaining:   98,
+				}
+				if !reflect.DeepEqual(*api1Limit, api1LimitExpected) {
+					t.Log("api1 limit received:", *api1Limit, "expected:", api1LimitExpected)
+					return false
+				}
+				api2Limit := sessionData.AccessRights["api2"].Limit
+				if api2Limit == nil {
+					t.Log("api2 limit is not set")
+					return false
+				}
+				api2LimitExpected := user.APILimit{
+					Rate:             1000,
+					Per:              1,
+					QuotaMax:         200,
+					QuotaRenewalRate: 3600,
+					QuotaRenews:      api2Limit.QuotaRenews,
+					QuotaRemaining:   197,
+				}
+				if !reflect.DeepEqual(*api2Limit, api2LimitExpected) {
+					t.Log("api2 limit received:", *api2Limit, "expected:", api2LimitExpected)
+					return false
+				}
+				api3Limit := sessionData.AccessRights["api3"].Limit
+				if api3Limit == nil {
+					t.Log("api3 limit is not set")
+					return false
+				}
+				api3LimitExpected := user.APILimit{
+					Rate:             1000,
+					Per:              1,
+					QuotaMax:         50,
+					QuotaRenewalRate: 3600,
+					QuotaRenews:      api3Limit.QuotaRenews,
+					QuotaRemaining:   45,
+					SetByPolicy:      true,
+				}
+				if !reflect.DeepEqual(*api3Limit, api3LimitExpected) {
+					t.Log("api3 limit received:", *api3Limit, "expected:", api3LimitExpected)
+					return false
+				}
+				return true
+			},
+		},
+	}...)
 }
