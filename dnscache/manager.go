@@ -15,6 +15,7 @@ var (
 
 type DialContextFunc func(ctx context.Context, network, address string) (net.Conn, error)
 
+//IDnsCacheManager is an interface for abstracting interaction with dns cache. Implemented by DnsCacheManager
 type IDnsCacheManager interface {
 	InitDNSCaching(ttl, checkInterval time.Duration)
 	WrapDialer(dialer *net.Dialer) DialContextFunc
@@ -22,6 +23,8 @@ type IDnsCacheManager interface {
 	CacheStorage()
 }
 
+//IDnsCacheStorage is an interface for working with cached storage of dns record.
+// Wrapped by IDnsCacheManager/DnsCacheManager. Implemented by DnsCacheStorage
 type IDnsCacheStorage interface {
 	FetchItem(key string) ([]string, error)
 	Get(key string) (DnsCacheItem, bool)
