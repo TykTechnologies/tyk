@@ -38,6 +38,8 @@ type DnsCacheManager struct {
 	cacheStorage IDnsCacheStorage
 }
 
+
+//Returns new empty/non-initialized DnsCacheManager
 func NewDnsCacheManager() *DnsCacheManager {
 	return &DnsCacheManager{nil}
 }
@@ -50,6 +52,7 @@ func (m *DnsCacheManager) CacheStorage() IDnsCacheStorage {
 	return m.cacheStorage
 }
 
+//Returns wrapped version of Dialer.DialContext func with hooked up caching of dns queries
 func (m *DnsCacheManager) WrapDialer(dialer *net.Dialer) DialContextFunc {
 	return func(ctx context.Context, network, address string) (net.Conn, error) {
 		return m.doCachedDial(dialer, ctx, network, address)
