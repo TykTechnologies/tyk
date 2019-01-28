@@ -357,6 +357,35 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 		}).Info("Can't retrieve key quota")
 	}
 
+	// populate remaining quota for API limits (if any)
+	for id, access := range session.AccessRights {
+		if access.Limit == nil {
+			continue
+		}
+
+		limQuotaKey := QuotaKeyPrefix + id + "-" + storage.HashKey(sessionKey)
+		if byHash {
+			limQuotaKey = QuotaKeyPrefix + id + "-" + sessionKey
+		}
+		if usedQuota, err := sessionManager.Store().GetRawKey(limQuotaKey); err == nil {
+			qInt, _ := strconv.Atoi(usedQuota)
+			remaining := access.Limit.QuotaMax - int64(qInt)
+			if remaining < 0 {
+				access.Limit.QuotaRemaining = 0
+			} else {
+				access.Limit.QuotaRemaining = remaining
+			}
+			session.AccessRights[id] = access
+		} else {
+			log.WithFields(logrus.Fields{
+				"prefix": "api",
+				"apiID":  id,
+				"key":    obfuscateKey(sessionKey),
+				"error":  err,
+			}).Info("Can't retrieve api limit quota")
+		}
+	}
+
 	mw := BaseMiddleware{Spec: spec}
 	mw.ApplyPolicies(sessionKey, &session)
 
