@@ -28,18 +28,18 @@ func NewDnsCacheStorage(expiration, checkInterval time.Duration) *DnsCacheStorag
 
 //Return map of non expired dns cache items
 func (dc *DnsCacheStorage) Items(includeExpired bool) map[string]DnsCacheItem {
-	var nonExpiredItems map[string]cache.Item = dc.cache.Items()
+	var allItems = dc.cache.Items()
 
-	items := map[string]DnsCacheItem{}
+	nonExpiredItems := map[string]DnsCacheItem{}
 
-	for k, v := range nonExpiredItems {
+	for k, v := range allItems {
 		if !includeExpired && v.Expired() {
 			continue
 		}
-		items[k] = v.Object.(DnsCacheItem)
+		nonExpiredItems[k] = v.Object.(DnsCacheItem)
 	}
 
-	return items
+	return nonExpiredItems
 }
 
 //Returns non expired item from cache
