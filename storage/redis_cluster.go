@@ -133,7 +133,7 @@ func NewRedisClusterPool(isCache bool) *rediscluster.RedisCluster {
 		cfg.Port = defaultRedisPort
 	}
 
-	seed_redii := []map[string]string{{"tyk-redis": "6379"},}
+	seed_redii := []map[string]string{}
 
 	for h, p := range cfg.Hosts {
 		seed_redii = append(seed_redii, map[string]string{h: p})
