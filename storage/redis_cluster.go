@@ -27,9 +27,6 @@ const (
 var (
 	redisSingletonMu sync.RWMutex
 
-	muRedisClusterSingleton      sync.RWMutex
-	muRedisCacheClusterSingleton sync.RWMutex
-
 	redisClusterSingleton      *rediscluster.RedisCluster
 	redisCacheClusterSingleton *rediscluster.RedisCluster
 )
@@ -136,7 +133,7 @@ func NewRedisClusterPool(isCache bool) *rediscluster.RedisCluster {
 		cfg.Port = defaultRedisPort
 	}
 
-	seed_redii := []map[string]string{}
+	seed_redii := []map[string]string{{"tyk-redis": "6379"},}
 
 	for h, p := range cfg.Hosts {
 		seed_redii = append(seed_redii, map[string]string{h: p})
@@ -180,13 +177,6 @@ func (r *RedisCluster) singleton() *rediscluster.RedisCluster {
 	return redisClusterSingleton
 }
 
-func (r *RedisCluster) getSingletonMU() *sync.RWMutex {
-	if r.IsCache {
-		return &muRedisClusterSingleton
-	}
-	return &muRedisCacheClusterSingleton
-}
-
 func (r *RedisCluster) hashKey(in string) string {
 	if !r.HashKeys {
 		// Not hashing? Return the raw key
@@ -224,10 +214,9 @@ func (r *RedisCluster) GetKey(keyName string) (string, error) {
 	r.ensureConnection()
 	log.Debug("[STORE] Getting WAS: ", keyName)
 	log.Debug("[STORE] Getting: ", r.fixKey(keyName))
-	currentMu := r.getSingletonMU()
-	currentMu.RLock() //Lock rediscluster.RedisCluster.SingleRedisMode from writes
-	defer currentMu.RUnlock()
-	value, err := redis.String(r.singleton().Do("GET", r.fixKey(keyName)))
+	cluster := r.singleton()
+
+	value, err := redis.String(cluster.Do("GET", r.fixKey(keyName)))
 
 	if err != nil {
 		log.Debug("Error trying to get value:", err)
@@ -511,11 +500,7 @@ func (r *RedisCluster) StartPubSubHandler(channel string, callback func(interfac
 		return errors.New("Redis connection failed")
 	}
 
-	currentMu := r.getSingletonMU()
-	currentMu.Lock()
 	handle := cluster.RandomRedisHandle()
-	currentMu.Unlock()
-
 	if handle == nil {
 		return errors.New("Redis connection failed. Handle is nil")
 	}
