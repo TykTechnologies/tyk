@@ -73,6 +73,7 @@ func (dc *DnsCacheStorage) Set(key string, addrs []string) {
 	dc.cache.Set(key, DnsCacheItem{addrs}, cache.DefaultExpiration)
 }
 
+//Delete all records from cache
 func (dc *DnsCacheStorage) Clear() {
 	dc.cache.Flush()
 }

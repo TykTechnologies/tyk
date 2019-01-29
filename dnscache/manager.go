@@ -21,6 +21,7 @@ type IDnsCacheManager interface {
 	WrapDialer(dialer *net.Dialer) DialContextFunc
 	SetCacheStorage(cache IDnsCacheStorage)
 	CacheStorage() IDnsCacheStorage
+	DisposeCache()
 }
 
 //IDnsCacheStorage is an interface for working with cached storage of dns record.
@@ -82,6 +83,7 @@ func (m *DnsCacheManager) InitDNSCaching(ttl, checkInterval time.Duration) {
 	}
 }
 
+//Clear all entries from cache and disposes/disables caching of dns queries
 func (m *DnsCacheManager) DisposeCache() {
 	m.cacheStorage.Clear()
 	m.cacheStorage = nil
