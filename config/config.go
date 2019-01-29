@@ -342,8 +342,8 @@ var Default = Config{
 	},
 	DnsCache: DnsCacheConfig{
 		Enabled:       false,
-		TTL:           3600000,
-		CheckInterval: 60000,
+		TTL:           3600,
+		CheckInterval: 60,
 	},
 }
 

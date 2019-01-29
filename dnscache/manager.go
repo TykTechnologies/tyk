@@ -20,7 +20,7 @@ type IDnsCacheManager interface {
 	InitDNSCaching(ttl, checkInterval time.Duration)
 	WrapDialer(dialer *net.Dialer) DialContextFunc
 	SetCacheStorage(cache IDnsCacheStorage)
-	CacheStorage()
+	CacheStorage() IDnsCacheStorage
 }
 
 //IDnsCacheStorage is an interface for working with cached storage of dns record.

@@ -77,7 +77,7 @@ type configTestReverseProxyDnsCache struct {
 
 func setupTestReverseProxyDnsCache(cfg *configTestReverseProxyDnsCache) func() {
 	pullDomains := mockHandle.PushDomains(cfg.etcHostsMap, nil)
-	dnsCacheManager.InitDNSCaching(time.Duration(cfg.dnsConfig.TTL)*time.Millisecond, time.Duration(cfg.dnsConfig.CheckInterval)*time.Millisecond)
+	dnsCacheManager.InitDNSCaching(time.Duration(cfg.dnsConfig.TTL)*time.Second, time.Duration(cfg.dnsConfig.CheckInterval)*time.Second)
 
 	globalConf := config.Global()
 	enableWebSockets := globalConf.HttpServerOptions.EnableWebSockets
@@ -107,8 +107,8 @@ func TestReverseProxyDnsCache(t *testing.T) {
 		wsHostWsApiUrl   = "ws://ws.orig-host.com/connect"
 		wsHostWssApiUrl  = "wss://ws.orig-host.com/connect"
 
-		cacheTTL            = 5000
-		cacheUpdateInterval = 10000
+		cacheTTL            = 5
+		cacheUpdateInterval = 10
 	)
 
 	var (

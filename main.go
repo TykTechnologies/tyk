@@ -99,7 +99,7 @@ var (
 		"/etc/tyk/tyk.conf",
 	}
 
-	dnsCacheManager = dnscache.NewDnsCacheManager()
+	dnsCacheManager dnscache.IDnsCacheManager
 )
 
 const (
@@ -131,10 +131,11 @@ func setupGlobals() {
 	reloadMu.Lock()
 	defer reloadMu.Unlock()
 
-	if config.Global().Dns.EnableCaching {
+	if config.Global().DnsCache.Enabled {
+		dnsCacheManager = dnscache.NewDnsCacheManager()
 		dnsCacheManager.InitDNSCaching(
-			time.Duration(config.Global().Dns.TTL)*time.Millisecond,
-			time.Duration(config.Global().Dns.CheckInterval)*time.Millisecond)
+			time.Duration(config.Global().DnsCache.TTL)*time.Second,
+			time.Duration(config.Global().DnsCache.CheckInterval)*time.Second)
 	}
 
 	mainRouter = mux.NewRouter()
