@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
@@ -41,13 +42,26 @@ func (m *RedisCacheMiddleware) EnabledForSpec() bool {
 	return m.Spec.CacheOptions.EnableCache
 }
 
-func (m *RedisCacheMiddleware) CreateCheckSum(req *http.Request, keyName string) string {
+func (m *RedisCacheMiddleware) CreateCheckSum(req *http.Request, keyName string) (string, error) {
 	h := md5.New()
 	io.WriteString(h, req.Method)
 	io.WriteString(h, "-")
 	io.WriteString(h, req.URL.String())
+	if req.Method == "POST" {
+		io.WriteString(h, "-")
+		if req.Body != nil {
+			bodyBytes, err := ioutil.ReadAll(req.Body)
+			defer req.Body.Close()
+			if err != nil {
+				return "", err
+			}
+			req.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
+			io.WriteString(h, string(bodyBytes))
+		}
+	}
+
 	reqChecksum := hex.EncodeToString(h.Sum(nil))
-	return m.Spec.APIID + keyName + reqChecksum
+	return m.Spec.APIID + keyName + reqChecksum, nil
 }
 
 func (m *RedisCacheMiddleware) getTimeTTL(cacheTTL int64) string {
@@ -101,7 +115,7 @@ func (m *RedisCacheMiddleware) decodePayload(payload string) (string, string, er
 func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 
 	// Only allow idempotent (safe) methods
-	if r.Method != "GET" && r.Method != "HEAD" && r.Method != "OPTIONS" {
+	if r.Method != "GET" && r.Method != "HEAD" && r.Method != "OPTIONS" && r.Method != "POST" {
 		return nil, http.StatusOK
 	}
 
@@ -111,9 +125,10 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	isVirtual, _ := m.Spec.CheckSpecMatchesStatus(r, versionPaths, VirtualPath)
 
 	// Lets see if we can throw a sledgehammer at this
-	if m.Spec.CacheOptions.CacheAllSafeRequests {
+	if m.Spec.CacheOptions.CacheAllSafeRequests && r.Method != "POST" {
 		stat = StatusCached
-	} else {
+	}
+	if stat != StatusCached {
 		// New request checker, more targeted, less likely to fail
 		found, _ := m.Spec.CheckSpecMatchesStatus(r, versionPaths, Cached)
 		if found {
@@ -132,10 +147,20 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		token = request.RealIP(r)
 	}
 
-	key := m.CreateCheckSum(r, token)
-	retBlob, err := m.CacheStore.GetKey(key)
+	var errCreatingChecksum bool
+	var retBlob string
+	key, err := m.CreateCheckSum(r, token)
 	if err != nil {
-		log.Debug("Cache enabled, but record not found")
+		log.Debug("Error creating checksum. Skipping cache check")
+		errCreatingChecksum = true
+	} else {
+		retBlob, err = m.CacheStore.GetKey(key)
+	}
+
+	if err != nil {
+		if !errCreatingChecksum {
+			log.Debug("Cache enabled, but record not found")
+		}
 		// Pass through to proxy AND CACHE RESULT
 
 		var reqVal *http.Response
@@ -199,7 +224,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 			}
 		}
 
-		if cacheThisRequest {
+		if cacheThisRequest && !errCreatingChecksum {
 			log.Debug("Caching request to redis")
 			var wireFormatReq bytes.Buffer
 			reqVal.Write(&wireFormatReq)
@@ -207,7 +232,6 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 			ts := m.getTimeTTL(cacheTTL)
 			toStore := m.encodePayload(wireFormatReq.String(), ts)
 			go m.CacheStore.SetKey(key, toStore, cacheTTL)
-
 		}
 
 		return nil, mwStatusRespond
