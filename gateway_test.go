@@ -1023,6 +1023,40 @@ func TestCacheAllSafeRequests(t *testing.T) {
 	}...)
 }
 
+func TestPerPathCache(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+	cache := storage.RedisCluster{KeyPrefix: "cache-"}
+	defer cache.DeleteScanMatch("*")
+
+	buildAndLoadAPI(func(spec *APISpec) {
+		spec.CacheOptions = apidef.CacheOptions{
+			CacheTimeout:         120,
+			EnableCache:          true,
+			CacheAllSafeRequests: false,
+		}
+
+		updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			json.Unmarshal([]byte(`[
+					"/"
+                                ]`), &v.ExtendedPaths.Cached)
+		})
+
+		spec.Proxy.ListenPath = "/"
+	})
+
+	headerCache := map[string]string{"x-tyk-cached-response": "1"}
+
+	ts.Run(t, []test.TestCase{
+		{Method: "GET", Path: "/", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: "GET", Path: "/", HeadersMatch: headerCache},
+		{Method: "POST", Path: "/", HeadersNotMatch: headerCache},
+		{Method: "POST", Path: "/", HeadersMatch: headerCache},
+		{Method: "GET", Path: "/", HeadersMatch: headerCache},
+		{Method: "POST", Path: "/", HeadersMatch: headerCache},
+	}...)
+}
+
 func TestCacheEtag(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
