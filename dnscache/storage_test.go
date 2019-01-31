@@ -1,7 +1,6 @@
 package dnscache_test
 
 import (
-	"fmt"
 	"net"
 	"reflect"
 	"testing"
@@ -45,7 +44,6 @@ type configTestStorageFetchItem struct {
 	*testing.T
 	etcHostsMap       map[string][]string
 	etcHostsErrorsMap map[string]int
-	dnsCache          *dnscache.DnsCacheStorage
 }
 
 func setupTestStorageFetchItem(cfg *configTestStorageFetchItem) func() {
@@ -64,7 +62,7 @@ func setupTestStorageFetchItem(cfg *configTestStorageFetchItem) func() {
 func TestStorageFetchItem(t *testing.T) {
 	dnsCache := dnscache.NewDnsCacheStorage(time.Duration(expiration)*time.Second, time.Duration(checkInterval)*time.Second)
 
-	tearDownTestStorageFetchItem := setupTestStorageFetchItem(&configTestStorageFetchItem{t, etcHostsMap, etcHostsErrorMap, dnsCache})
+	tearDownTestStorageFetchItem := setupTestStorageFetchItem(&configTestStorageFetchItem{t, etcHostsMap, etcHostsErrorMap,})
 	defer func() {
 		tearDownTestStorageFetchItem()
 		dnsCache.Clear()
@@ -78,49 +76,50 @@ func TestStorageFetchItem(t *testing.T) {
 		ExpectedIPs []string
 
 		expectedErrorType    reflect.Type
+		shouldExistInCache   bool
 		shouldBeAddedToCache bool
 	}{
 		{
 			"Should cache first dns record first fetch",
 			host, etcHostsMap[host],
-			nil, true,
+			nil, false, true,
 		},
 		{
 			"Should cache second dns record first fetch",
 			host2, etcHostsMap[host2],
-			nil, true,
+			nil, false, true,
 		},
 		{
 			"Should populate from cache first dns record second fetch",
 			host, etcHostsMap[host],
-			nil, false,
+			nil, true, false,
 		},
 		{
 			"Should populate from cache first dns record third fetch",
 			host, etcHostsMap[host],
-			nil, false,
+			nil, true, false,
 		},
 		{
 			"Should populate from cache second dns record second fetch",
 			host2, etcHostsMap[host2],
-			nil, true,
+			nil, true, false,
 		},
 		{
 			"Shouldn't cache dns record fetch in case error",
 			hostErrorable, nil,
-			reflect.TypeOf(&net.DNSError{}), false,
+			reflect.TypeOf(&net.DNSError{}), false, false,
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			fmt.Println("Run: ", tc)
 			got, err := dnsCache.FetchItem(tc.Host)
 
 			if tc.expectedErrorType != nil {
 				if err == nil || tc.expectedErrorType != reflect.TypeOf(err) {
 					t.Fatalf("wanted FetchItem error type %v, got %v. Error=%#v", tc.expectedErrorType, reflect.TypeOf(err), err)
 				}
+
 				if _, ok := dnsCache.Get(tc.Host); got != nil || ok {
 					t.Fatalf("wanted FetchItem error to omit cache. got %#v, ok=%t", got, ok)
 				}
@@ -131,7 +130,7 @@ func TestStorageFetchItem(t *testing.T) {
 				t.Fatalf("wanted ips %q, got %q. Error: %v", tc.ExpectedIPs, got, err)
 			}
 
-			if tc.shouldBeAddedToCache {
+			if tc.shouldExistInCache || tc.shouldBeAddedToCache {
 				record, ok := dnsCache.Get(tc.Host)
 
 				if !ok {
@@ -140,6 +139,10 @@ func TestStorageFetchItem(t *testing.T) {
 
 				if !record.IsEqualsTo(tc.ExpectedIPs) {
 					t.Fatalf("wanted cached ips %v, got record %v", tc.ExpectedIPs, record)
+				}
+			} else {
+				if got, ok := dnsCache.Get(tc.Host); !got.IsEqualsTo(nil) || ok {
+					t.Fatalf("wanted FetchItem to omit write to cache. got %#v, ok=%t", got, ok)
 				}
 			}
 		})

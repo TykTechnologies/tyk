@@ -5,7 +5,8 @@ import (
 	"reflect"
 	"time"
 
-	cache "github.com/pmylund/go-cache"
+	"github.com/pmylund/go-cache"
+	"fmt"
 )
 
 type DnsCacheItem struct {
@@ -51,26 +52,35 @@ func (dc *DnsCacheStorage) Get(key string) (DnsCacheItem, bool) {
 	return item.(DnsCacheItem), found
 }
 
-func (dc *DnsCacheStorage) FetchItem(key string) ([]string, error) {
-	item, ok := dc.cache.Get(key)
+func (dc *DnsCacheStorage) Delete(key string) {
+	dc.cache.Delete(key)
+}
+
+//Return list of ips from cache or resolves them and add to cache
+func (dc *DnsCacheStorage) FetchItem(hostName string) ([]string, error) {
+	if hostName == "" {
+		return nil, fmt.Errorf("hostName can't be empty. hostName=%v", hostName)
+	}
+
+	item, ok := dc.cache.Get(hostName)
 	if ok {
 		result, _ := item.(DnsCacheItem)
-		logger.Debugf("Dns record was populated from cache: key=%q, addrs=%q", key, result.addrs)
+		logger.Debugf("Dns record was populated from cache: hostName=%q, addrs=%q", hostName, result.addrs)
 		return result.addrs, nil
 	}
 
-	addrs, err := dc.resolveDNSRecord(key)
+	addrs, err := dc.resolveDNSRecord(hostName)
 	if err != nil {
 		return nil, err
 	}
 
-	dc.Set(key, addrs)
+	dc.Set(hostName, addrs)
 	return addrs, nil
 }
 
 func (dc *DnsCacheStorage) Set(key string, addrs []string) {
 	logger.Debugf("Adding dns record to cache: key=%q, addrs=%q", key, addrs)
-	dc.cache.Set(key, DnsCacheItem{addrs}, cache.DefaultExpiration)
+	dc.cache.Set(key, DnsCacheItem{addrs }, cache.DefaultExpiration)
 }
 
 //Delete all records from cache

@@ -3,14 +3,15 @@ package dnscache
 import (
 	"context"
 	"net"
-	"strings"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/TykTechnologies/tyk/log"
+	"strings"
 )
 
 var (
-	logger = log.Get().WithField("prefix", "dns-cache")
+	logger = log.Get().WithField("prefix", "dnscache")
 )
 
 type DialContextFunc func(ctx context.Context, network, address string) (net.Conn, error)
@@ -29,6 +30,7 @@ type IDnsCacheManager interface {
 type IDnsCacheStorage interface {
 	FetchItem(key string) ([]string, error)
 	Get(key string) (DnsCacheItem, bool)
+	Delete(key string)
 	Clear()
 }
 
@@ -61,20 +63,45 @@ func (m *DnsCacheManager) WrapDialer(dialer *net.Dialer) DialContextFunc {
 }
 
 func (m *DnsCacheManager) doCachedDial(d *net.Dialer, ctx context.Context, network, address string) (net.Conn, error) {
+	safeDial := func(addr string, itemKey string) (net.Conn, error) {
+		conn, err := d.DialContext(ctx, network, addr)
+		if err != nil && itemKey != "" {
+			m.cacheStorage.Delete(itemKey)
+		}
+		return conn, err
+	}
+
 	if m.cacheStorage == nil {
-		return d.DialContext(ctx, network, address)
+		return safeDial(address, "")
 	}
 
-	separator := strings.LastIndex(address, ":")
-	ips, err := m.cacheStorage.FetchItem(address[:separator])
+	parts := strings.Split(address, ":")
+	host, tail := parts[0], ""
 
+	if len(parts) >= 2 {
+		tail = ":" + strings.Join(parts[1:],"")
+	}
+
+	if ip := net.ParseIP(host); ip != nil {
+		return safeDial(address, "")
+	}
+	ips, err := m.cacheStorage.FetchItem(host)
 	if err != nil {
-		logger.Infof("doCachedDial error: %v. network=%v, address=%v", err.Error(), network, address)
+		logger.WithFields(logrus.Fields{
+			"network": network,
+			"address": address,
+		}).Errorf("doCachedDial SplitHostPort error: %v. ips=%v", err.Error(), ips)
+
+		return safeDial(ips[0] + tail, "")
 	}
 
-	return d.DialContext(ctx, network, ips[0]+address[separator:])
+	return safeDial(ips[0] + tail, host)
 }
 
+//Initializes manager's cache storage if it wasn't initialized before with provided ttl, checkinterval values
+//Initialized cache storage enables caching of previously hoooked net.Dialer DialContext calls
+//
+//Otherwise leave storage as is.
 func (m *DnsCacheManager) InitDNSCaching(ttl, checkInterval time.Duration) {
 	if m.cacheStorage == nil {
 		logger.Infof("Initializing dns cache with ttl=%s, duration=%s", ttl, checkInterval)
