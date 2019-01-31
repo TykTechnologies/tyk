@@ -35,14 +35,14 @@ type ChainObject struct {
 	Subrouter      *mux.Router
 }
 
-func prepareStorage() (*storage.RedisCluster, *storage.RedisCluster, *storage.RedisCluster, *RPCStorageHandler, *RPCStorageHandler) {
-	redisStore := &storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
-	redisOrgStore := &storage.RedisCluster{KeyPrefix: "orgkey."}
-	healthStore := &storage.RedisCluster{KeyPrefix: "apihealth."}
-	rpcAuthStore := &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
-	rpcOrgStore := &RPCStorageHandler{KeyPrefix: "orgkey."}
+func prepareStorage() (storage.RedisCluster, storage.RedisCluster, storage.RedisCluster, RPCStorageHandler, RPCStorageHandler) {
+	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
+	redisOrgStore := storage.RedisCluster{KeyPrefix: "orgkey."}
+	healthStore := storage.RedisCluster{KeyPrefix: "apihealth."}
+	rpcAuthStore := RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
+	rpcOrgStore := RPCStorageHandler{KeyPrefix: "orgkey."}
 
-	FallbackKeySesionManager.Init(redisStore)
+	FallbackKeySesionManager.Init(&redisStore)
 
 	return redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore
 }
@@ -594,7 +594,7 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 				subrouter = muxer
 			}
 
-			chainObj := processSpec(spec, apisByListen, redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore, subrouter, logrus.NewEntry(log))
+			chainObj := processSpec(spec, apisByListen, &redisStore, &redisOrgStore, &healthStore, &rpcAuthStore, &rpcOrgStore, subrouter, logrus.NewEntry(log))
 
 			chainObj.Index = i
 			chainChannel <- chainObj

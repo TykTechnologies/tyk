@@ -112,7 +112,7 @@ func traceHandler(w http.ResponseWriter, r *http.Request) {
 	loader := &APIDefinitionLoader{}
 	spec := loader.MakeSpec(traceReq.Spec, logrus.NewEntry(logger))
 
-	chainObj := processSpec(spec, nil, redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore, subrouter, logrus.NewEntry(logger))
+	chainObj := processSpec(spec, nil, &redisStore, &redisOrgStore, &healthStore, &rpcAuthStore, &rpcOrgStore, subrouter, logrus.NewEntry(logger))
 
 	if chainObj.ThisHandler == nil {
 		doJSONWrite(w, http.StatusBadRequest, traceResponse{Message: "error", Logs: logStorage.String()})
