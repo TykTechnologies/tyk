@@ -20,7 +20,7 @@ import (
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/rubyist/circuitbreaker"
+	circuit "github.com/rubyist/circuitbreaker"
 
 	"github.com/TykTechnologies/gojsonschema"
 	"github.com/TykTechnologies/tyk/apidef"

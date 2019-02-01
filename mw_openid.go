@@ -9,7 +9,7 @@ import (
 	"sync"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/dgrijalva/jwt-go"
+	jwt "github.com/dgrijalva/jwt-go"
 
 	"github.com/TykTechnologies/openid2go/openid"
 	"github.com/TykTechnologies/tyk/apidef"
