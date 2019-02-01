@@ -8,11 +8,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/satori/go.uuid"
-
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
+	uuid "github.com/satori/go.uuid"
 
 	"github.com/Sirupsen/logrus"
 )

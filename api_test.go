@@ -11,7 +11,7 @@ import (
 
 	"github.com/garyburd/redigo/redis"
 	"github.com/gorilla/mux"
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 
 	"fmt"
 
