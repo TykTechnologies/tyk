@@ -4,8 +4,13 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
+)
+
+const (
+	checkOAuthClientDeletedInetrval = 1 * time.Second
 )
 
 // Oauth2KeyExists will check if the key being used to access the API is in the request data,
@@ -42,10 +47,12 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	}
 
 	accessToken := parts[1]
-	session, keyExists := k.CheckSessionAndIdentityForValidKey(accessToken, r)
+	logger = logger.WithField("key", obfuscateKey(accessToken))
 
+	// get session for the given oauth token
+	session, keyExists := k.CheckSessionAndIdentityForValidKey(accessToken, r)
 	if !keyExists {
-		logger.WithField("key", obfuscateKey(accessToken)).Info("Attempted access with non-existent key.")
+		logger.Warning("Attempted access with non-existent key.")
 
 		// Fire Authfailed Event
 		AuthFailed(k, r, accessToken)
@@ -53,6 +60,28 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		reportHealthValue(k.Spec, KeyFailure, "-1")
 
 		return errors.New("Key not authorised"), http.StatusForbidden
+	}
+
+	// Make sure OAuth-client is still present
+	oauthClientDeletedKey := "oauth-del-" + k.Spec.APIID + session.OauthClientID
+	oauthClientDeleted := false
+	// check if that oauth client was deleted with using  memory cache first
+	if val, found := UtilCache.Get(oauthClientDeletedKey); found {
+		oauthClientDeleted = val.(bool)
+	} else {
+		// if not cached in memory then hit Redis to get oauth-client from there
+		if _, err := k.Spec.OAuthManager.OsinServer.Storage.GetClient(session.OauthClientID); err != nil {
+			// set this oauth client as deleted in memory cache forever
+			UtilCache.Set(oauthClientDeletedKey, true, -1)
+			oauthClientDeleted = true
+		} else {
+			// set this oauth client as NOT deleted in memory cache for next N sec
+			UtilCache.Set(oauthClientDeletedKey, false, checkOAuthClientDeletedInetrval)
+		}
+	}
+	if oauthClientDeleted {
+		logger.WithField("oauthClientID", session.OauthClientID).Warning("Attempted access for deleted OAuth client.")
+		return errors.New("Key not authorised. OAuth client access was revoked"), http.StatusForbidden
 	}
 
 	// Set session state on context, we will need it later
