@@ -371,8 +371,8 @@ func checkHeaderTrigger(r *http.Request, options map[string]apidef.StringRegexMa
 		vals, ok := r.Header[mhCN]
 		if ok {
 			for i, v := range vals {
-				match := mr.FindStringSubmatch(v)
-				if len(match) > 0 {
+				matched, match := mr.FindStringSubmatch(v)
+				if matched {
 					addMatchToContextData(contextData, match, triggernum, mhCN, i)
 					fCount++
 				}
@@ -400,8 +400,8 @@ func checkQueryString(r *http.Request, options map[string]apidef.StringRegexMap,
 		vals, ok := qvals[mv]
 		if ok {
 			for i, v := range vals {
-				match := mr.FindStringSubmatch(v)
-				if len(match) > 0 {
+				matched, match := mr.FindStringSubmatch(v)
+				if matched {
 					addMatchToContextData(contextData, match, triggernum, mv, i)
 					fCount++
 				}
@@ -428,8 +428,8 @@ func checkPathParts(r *http.Request, options map[string]apidef.StringRegexMap, a
 		pathParts := strings.Split(r.URL.Path, "/")
 
 		for _, part := range pathParts {
-			match := mr.FindStringSubmatch(part)
-			if len(match) > 0 {
+			matched, match := mr.FindStringSubmatch(part)
+			if matched {
 				addMatchToContextData(contextData, match, triggernum, mv, fCount)
 				fCount++
 			}
@@ -456,8 +456,8 @@ func checkSessionTrigger(r *http.Request, sess *user.SessionState, options map[s
 		if ok {
 			val, valOk := rawVal.(string)
 			if valOk {
-				match := mr.FindStringSubmatch(val)
-				if len(match) > 0 {
+				matched, match := mr.FindStringSubmatch(val)
+				if matched {
 					addMatchToContextData(contextData, match, triggernum, mh)
 					fCount++
 				}
@@ -487,8 +487,8 @@ func checkContextTrigger(r *http.Request, options map[string]apidef.StringRegexM
 		if ok {
 			val, valOk := rawVal.(string)
 			if valOk {
-				match := mr.FindStringSubmatch(val)
-				if len(match) > 0 {
+				matched, match := mr.FindStringSubmatch(val)
+				if matched {
 					addMatchToContextData(contextData, match, triggernum, mh)
 					fCount++
 				}
@@ -512,10 +512,13 @@ func checkPayload(r *http.Request, options apidef.StringRegexMap, triggernum int
 	contextData := ctxGetData(r)
 	bodyBytes, _ := ioutil.ReadAll(r.Body)
 
-	matches := options.FindAllStringSubmatch(string(bodyBytes), -1)
+	matched, matches := options.FindAllStringSubmatch(string(bodyBytes), -1)
 
-	if len(matches) > 0 {
+	if matched {
 		kn := buildTriggerKey(triggernum, "payload")
+		if len(matches) == 0 {
+			return true
+		}
 		contextData[kn] = matches[0][0]
 
 		for i, match := range matches {
@@ -531,6 +534,10 @@ func checkPayload(r *http.Request, options apidef.StringRegexMap, triggernum int
 
 func addMatchToContextData(cd map[string]interface{}, match []string, trNum int, trName string, indices ...int) {
 	kn := buildTriggerKey(trNum, trName, indices...)
+	if len(match) == 0 {
+		return
+	}
+
 	cd[kn] = match[0]
 
 	if len(match) > 1 {

@@ -317,6 +317,66 @@ func TestRewriterTriggers(t *testing.T) {
 			}
 		},
 		func() TestDef {
+			r, _ := http.NewRequest("GET", "/test/straight/rewrite", nil)
+
+			r.Header.Set("x-test", "hello")
+			r.Header.Set("x-test-Two", "world")
+
+			hOpt := apidef.StringRegexMap{MatchPattern: "hello"}
+			hOpt.Init()
+			hOpt2 := apidef.StringRegexMap{MatchPattern: "w.*", Reverse: true}
+			hOpt2.Init()
+
+			return TestDef{
+				"Header Reverse Logic Any Pass",
+				"/test/straight/rewrite", "/change/to/me/ignore",
+				"/test/straight/rewrite", "/change/to/me/hello",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.Any,
+						Options: apidef.RoutingTriggerOptions{
+							HeaderMatches: map[string]apidef.StringRegexMap{
+								"x-test":     hOpt,
+								"x-test-Two": hOpt2,
+							},
+						},
+						RewriteTo: "/change/to/me/$tyk_context.trigger-0-X-Test-0",
+					},
+				},
+				r,
+			}
+		},
+		func() TestDef {
+			r, _ := http.NewRequest("GET", "/test/straight/rewrite", nil)
+
+			r.Header.Set("x-test", "hello")
+			r.Header.Set("x-test-Two", "world")
+
+			hOpt := apidef.StringRegexMap{MatchPattern: "hello"}
+			hOpt.Init()
+			hOpt2 := apidef.StringRegexMap{MatchPattern: "w.*", Reverse: true}
+			hOpt2.Init()
+
+			return TestDef{
+				"Header Reverse Logic All Fail",
+				"/test/straight/rewrite", "/change/to/me/ignore",
+				"/test/straight/rewrite", "/change/to/me/ignore",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.All,
+						Options: apidef.RoutingTriggerOptions{
+							HeaderMatches: map[string]apidef.StringRegexMap{
+								"x-test":     hOpt,
+								"x-test-Two": hOpt2,
+							},
+						},
+						RewriteTo: "/change/to/me/$tyk_context.trigger-0-X-Test-0",
+					},
+				},
+				r,
+			}
+		},
+		func() TestDef {
 			r, _ := http.NewRequest("GET", "/test/query/rewrite?x_test=foo", nil)
 
 			hOpt := apidef.StringRegexMap{MatchPattern: "foo"}
@@ -486,6 +546,74 @@ func TestRewriterTriggers(t *testing.T) {
 			}
 		},
 		func() TestDef {
+			r, _ := http.NewRequest("GET", "/test/query/rewrite?x_test=foo", nil)
+			r.Header.Set("y-test", "bar")
+			r.Header.Set("z-test", "baz")
+
+			hOpt := apidef.StringRegexMap{MatchPattern: "foo"}
+			hOpt.Init()
+			hOpt2 := apidef.StringRegexMap{MatchPattern: "bar"}
+			hOpt2.Init()
+			hOpt3 := apidef.StringRegexMap{MatchPattern: "baz", Reverse: true}
+			hOpt3.Init()
+
+			return TestDef{
+				"Multi Multi Type Reverse Logic All Fail",
+				"/test/query/rewrite", "/change/to/me/ignore",
+				"/test/query/rewrite", "/change/to/me/ignore",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.All,
+						Options: apidef.RoutingTriggerOptions{
+							QueryValMatches: map[string]apidef.StringRegexMap{
+								"x_test": hOpt,
+							},
+							HeaderMatches: map[string]apidef.StringRegexMap{
+								"y-test": hOpt2,
+								"z-test": hOpt3,
+							},
+						},
+						RewriteTo: "/change/to/me/$tyk_context.trigger-0-Y-Test-0",
+					},
+				},
+				r,
+			}
+		},
+		func() TestDef {
+			r, _ := http.NewRequest("GET", "/test/query/rewrite?x_test=foo", nil)
+			r.Header.Set("y-test", "bar")
+			r.Header.Set("z-test", "baz")
+
+			hOpt := apidef.StringRegexMap{MatchPattern: "foo"}
+			hOpt.Init()
+			hOpt2 := apidef.StringRegexMap{MatchPattern: "bar"}
+			hOpt2.Init()
+			hOpt3 := apidef.StringRegexMap{MatchPattern: "baz", Reverse: true}
+			hOpt3.Init()
+
+			return TestDef{
+				"Multi Multi Type Reverse Logic All Fail",
+				"/test/query/rewrite", "/change/to/me/ignore",
+				"/test/query/rewrite", "/change/to/me/bar",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.Any,
+						Options: apidef.RoutingTriggerOptions{
+							QueryValMatches: map[string]apidef.StringRegexMap{
+								"x_test": hOpt,
+							},
+							HeaderMatches: map[string]apidef.StringRegexMap{
+								"y-test": hOpt2,
+								"z-test": hOpt3,
+							},
+						},
+						RewriteTo: "/change/to/me/$tyk_context.trigger-0-Y-Test-0",
+					},
+				},
+				r,
+			}
+		},
+		func() TestDef {
 			var jsonStr = []byte(`{"foo":"bar"}`)
 			r, _ := http.NewRequest("POST", "/test/pl/rewrite", bytes.NewBuffer(jsonStr))
 
@@ -555,6 +683,87 @@ func TestRewriterTriggers(t *testing.T) {
 			}
 		},
 		func() TestDef {
+			var jsonStr = []byte(`{"foo":"barxxx", "fooble":"baryyy"}`)
+			r, _ := http.NewRequest("POST", "/test/pl/rewrite", bytes.NewBuffer(jsonStr))
+
+			hOpt := apidef.StringRegexMap{MatchPattern: "bar(\\w*)"}
+			hOpt.Init()
+
+			return TestDef{
+				"Payload Multiple Match Groups",
+				"/test/pl/rewrite", "/change/to/me/ignore",
+				"/test/pl/rewrite", "/change/to/me/xxx/yyy",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.Any,
+						Options: apidef.RoutingTriggerOptions{
+							PayloadMatches: hOpt,
+						},
+						RewriteTo: "/change/to/me/$tyk_context.trigger-0-payload-0-0/$tyk_context.trigger-0-payload-1-0",
+					},
+				},
+				r,
+			}
+		},
+		func() TestDef {
+			var jsonStr = []byte(`{"foo":"bar"}`)
+			r, _ := http.NewRequest("POST", "/test/pl/rewrite", bytes.NewBuffer(jsonStr))
+			r.Header.Set("x-test", "apple")
+
+			hOpt := apidef.StringRegexMap{MatchPattern: "bar"}
+			hOpt.Init()
+			hOpt2 := apidef.StringRegexMap{MatchPattern: "apple"}
+			hOpt2.Init()
+
+			return TestDef{
+				"Multi Type All",
+				"/test/pl/rewrite", "/change/to/me/ignore",
+				"/test/pl/rewrite", "/change/to/me/bar/apple",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.All,
+						Options: apidef.RoutingTriggerOptions{
+							PayloadMatches: hOpt,
+							HeaderMatches: map[string]apidef.StringRegexMap{
+								"x-test": hOpt2,
+							},
+						},
+						RewriteTo: "/change/to/me/$tyk_context.trigger-0-payload-0/$tyk_context.trigger-0-X-Test-0",
+					},
+				},
+				r,
+			}
+		},
+		func() TestDef {
+			var jsonStr = []byte(`{"foo":"bar"}`)
+			r, _ := http.NewRequest("POST", "/test/pl/rewrite", bytes.NewBuffer(jsonStr))
+			r.Header.Set("x-test", "apple")
+
+			hOpt := apidef.StringRegexMap{MatchPattern: "bar"}
+			hOpt.Init()
+			hOpt2 := apidef.StringRegexMap{MatchPattern: "apple", Reverse: true}
+			hOpt2.Init()
+
+			return TestDef{
+				"Multi Multi Type Reverse Logic Any 1",
+				"/test/pl/rewrite", "/change/to/me/ignore",
+				"/test/pl/rewrite", "/change/to/me/bar/",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.Any,
+						Options: apidef.RoutingTriggerOptions{
+							PayloadMatches: hOpt,
+							HeaderMatches: map[string]apidef.StringRegexMap{
+								"x-test": hOpt2,
+							},
+						},
+						RewriteTo: "/change/to/me/$tyk_context.trigger-0-payload-0/$tyk_context.trigger-0-X-Test-0",
+					},
+				},
+				r,
+			}
+		},
+		func() TestDef {
 			r, _ := http.NewRequest("GET", "/test/foo/rewrite", nil)
 			hOpt := apidef.StringRegexMap{MatchPattern: "foo"}
 			hOpt.Init()
@@ -572,6 +781,64 @@ func TestRewriterTriggers(t *testing.T) {
 							},
 						},
 						RewriteTo: "/change/to/me/$tyk_context.trigger-0-pathpart-0",
+					},
+				},
+				r,
+			}
+		},
+		func() TestDef {
+			var jsonStr = []byte(`{"foo":"bar"}`)
+			r, _ := http.NewRequest("POST", "/test/pl/rewrite", bytes.NewBuffer(jsonStr))
+			r.Header.Set("x-test", "apple")
+
+			hOpt := apidef.StringRegexMap{MatchPattern: "bar", Reverse: true}
+			hOpt.Init()
+			hOpt2 := apidef.StringRegexMap{MatchPattern: "apple"}
+			hOpt2.Init()
+
+			return TestDef{
+				"Multi Multi Type Reverse Logic Any 2",
+				"/test/pl/rewrite", "/change/to/me/ignore",
+				"/test/pl/rewrite", "/change/to/me//apple",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.Any,
+						Options: apidef.RoutingTriggerOptions{
+							PayloadMatches: hOpt,
+							HeaderMatches: map[string]apidef.StringRegexMap{
+								"x-test": hOpt2,
+							},
+						},
+						RewriteTo: "/change/to/me/$tyk_context.trigger-0-payload-0/$tyk_context.trigger-0-X-Test-0",
+					},
+				},
+				r,
+			}
+		},
+		func() TestDef {
+			var jsonStr = []byte(`{"foo":"bar"}`)
+			r, _ := http.NewRequest("POST", "/test/pl/rewrite", bytes.NewBuffer(jsonStr))
+			r.Header.Set("x-test", "apple")
+
+			hOpt := apidef.StringRegexMap{MatchPattern: "bar"}
+			hOpt.Init()
+			hOpt2 := apidef.StringRegexMap{MatchPattern: "apple", Reverse: true}
+			hOpt2.Init()
+
+			return TestDef{
+				"Multi Multi Type Reverse Logic Any 3",
+				"/test/pl/rewrite", "/change/to/me/ignore",
+				"/test/pl/rewrite", "/change/to/me/bar/",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.Any,
+						Options: apidef.RoutingTriggerOptions{
+							PayloadMatches: hOpt,
+							HeaderMatches: map[string]apidef.StringRegexMap{
+								"x-test": hOpt2,
+							},
+						},
+						RewriteTo: "/change/to/me/$tyk_context.trigger-0-payload-0/$tyk_context.trigger-0-X-Test-0",
 					},
 				},
 				r,
