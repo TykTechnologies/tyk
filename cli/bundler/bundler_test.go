@@ -82,7 +82,7 @@ func TestBuild(t *testing.T) {
 		filename := writeManifestFile(t, "{", defaultManifestPath)
 		bundler.manifestPath = filename
 		err = bundler.Build(ctx)
-		if !strings.Contains("unexpected end of JSON input", err.Error()) {
+		if !strings.Contains(err.Error(), "unexpected end of JSON input") {
 			t.Fatalf("Expected JSON error, got: %s", err.Error())
 		}
 		filename = writeManifestFile(t, &apidef.BundleManifest{
