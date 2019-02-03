@@ -277,6 +277,12 @@
 			"revisionTime": "2017-12-01T01:43:01Z"
 		},
 		{
+			"checksumSHA1": "P8gNPDuOzmiK4Lz9xG7OBy4Rlm8=",
+			"path": "github.com/hashicorp/terraform/flatmap",
+			"revision": "4596c44c05ca0be0b34ff30e26abc20b887c34e1",
+			"revisionTime": "2018-12-17T20:43:59Z"
+		},
+		{
 			"checksumSHA1": "tP/Ohi+jei+mhMoXH5iEGav3ZTE=",
 			"path": "github.com/jeffail/tunny",
 			"revision": "c757dde1c2969a4756e8a99622e2f2ddbab35b10",
