@@ -33,14 +33,23 @@ const (
 	TrackThisEndpoint
 	DoNotTrackThisEndpoint
 	UrlRewritePath
+	RequestMethod
 	OrigRequestURL
 	LoopLevel
 	LoopLevelLimit
 	Trace
 )
 
-var SessionCache = cache.New(10*time.Second, 5*time.Second)
-var ExpiryCache = cache.New(600*time.Second, 10*time.Minute)
+var (
+	// key session memory cache
+	SessionCache = cache.New(10*time.Second, 5*time.Second)
+
+	// org session memory cache
+	ExpiryCache = cache.New(600*time.Second, 10*time.Minute)
+
+	// memory cache to store arbitrary items
+	UtilCache = cache.New(time.Hour, 10*time.Minute)
+)
 
 type ReturningHttpHandler interface {
 	ServeHTTP(http.ResponseWriter, *http.Request) *http.Response

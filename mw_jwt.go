@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
-	"github.com/pmylund/go-cache"
+	jwt "github.com/dgrijalva/jwt-go"
+	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/user"

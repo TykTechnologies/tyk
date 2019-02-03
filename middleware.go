@@ -292,6 +292,16 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					}
 				}
 
+				// respect current quota remaining and quota renews (on API limit level)
+				var limitQuotaRemaining int64
+				var limitQuotaRenews int64
+				if currAccessRight, ok := rights[apiID]; ok && currAccessRight.Limit != nil {
+					limitQuotaRemaining = currAccessRight.Limit.QuotaRemaining
+					limitQuotaRenews = currAccessRight.Limit.QuotaRenews
+				}
+				accessRights.Limit.QuotaRemaining = limitQuotaRemaining
+				accessRights.Limit.QuotaRenews = limitQuotaRenews
+
 				// overwrite session access right for this API
 				rights[apiID] = accessRights
 

@@ -17,7 +17,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -361,6 +361,35 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 		}).Info("Can't retrieve key quota")
 	}
 
+	// populate remaining quota for API limits (if any)
+	for id, access := range session.AccessRights {
+		if access.Limit == nil {
+			continue
+		}
+
+		limQuotaKey := QuotaKeyPrefix + id + "-" + storage.HashKey(sessionKey)
+		if byHash {
+			limQuotaKey = QuotaKeyPrefix + id + "-" + sessionKey
+		}
+		if usedQuota, err := sessionManager.Store().GetRawKey(limQuotaKey); err == nil {
+			qInt, _ := strconv.Atoi(usedQuota)
+			remaining := access.Limit.QuotaMax - int64(qInt)
+			if remaining < 0 {
+				access.Limit.QuotaRemaining = 0
+			} else {
+				access.Limit.QuotaRemaining = remaining
+			}
+			session.AccessRights[id] = access
+		} else {
+			log.WithFields(logrus.Fields{
+				"prefix": "api",
+				"apiID":  id,
+				"key":    obfuscateKey(sessionKey),
+				"error":  err,
+			}).Info("Can't retrieve api limit quota")
+		}
+	}
+
 	mw := BaseMiddleware{Spec: spec}
 	mw.ApplyPolicies(&session)
 
@@ -664,21 +693,32 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 	orgID := r.URL.Query().Get("org_id")
 
 	// check if passed key is user name and convert it to real key with respect to current hashing algorithm
+	origKeyName := keyName
 	if r.Method != http.MethodPost && isUserName {
 		keyName = generateToken(orgID, keyName)
 	}
 
 	var obj interface{}
 	var code int
+	hashKeyFunction := config.Global().HashKeyFunction
 
 	switch r.Method {
-	case "POST", "PUT":
+	case http.MethodPost:
 		obj, code = handleAddOrUpdate(keyName, r, isHashed)
-
-	case "GET":
+	case http.MethodPut:
+		obj, code = handleAddOrUpdate(keyName, r, isHashed)
+		if code != http.StatusOK && hashKeyFunction != "" {
+			// try to use legacy key format
+			obj, code = handleAddOrUpdate(origKeyName, r, isHashed)
+		}
+	case http.MethodGet:
 		if keyName != "" {
 			// Return single key detail
 			obj, code = handleGetDetail(keyName, apiID, isHashed)
+			if code != http.StatusOK && hashKeyFunction != "" {
+				// try to use legacy key format
+				obj, code = handleGetDetail(origKeyName, apiID, isHashed)
+			}
 		} else {
 			// Return list of keys
 			if config.Global().HashKeys {
@@ -700,12 +740,20 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-	case "DELETE":
+	case http.MethodDelete:
 		// Remove a key
 		if !isHashed {
 			obj, code = handleDeleteKey(keyName, apiID)
 		} else {
 			obj, code = handleDeleteHashedKey(keyName, apiID)
+		}
+		if code != http.StatusOK && hashKeyFunction != "" {
+			// try to use legacy key format
+			if !isHashed {
+				obj, code = handleDeleteKey(origKeyName, apiID)
+			} else {
+				obj, code = handleDeleteHashedKey(origKeyName, apiID)
+			}
 		}
 	}
 
@@ -1722,6 +1770,19 @@ func ctxGetUrlRewritePath(r *http.Request) string {
 		}
 	}
 	return ""
+}
+
+func ctxSetRequestMethod(r *http.Request, path string) {
+	setCtxValue(r, RequestMethod, path)
+}
+
+func ctxGetRequestMethod(r *http.Request) string {
+	if v := r.Context().Value(RequestMethod); v != nil {
+		if strVal, ok := v.(string); ok {
+			return strVal
+		}
+	}
+	return r.Method
 }
 
 func ctxGetDefaultVersion(r *http.Request) bool {

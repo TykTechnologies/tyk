@@ -4,9 +4,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/satori/go.uuid"
-
 	"github.com/TykTechnologies/tyk/request"
+	uuid "github.com/satori/go.uuid"
 )
 
 type MiddlewareContextVars struct {

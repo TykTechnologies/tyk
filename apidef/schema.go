@@ -194,6 +194,9 @@ const Schema = `{
         "hmac_allowed_clock_skew": {
             "type": "number"
         },
+        "hmac_allowed_algorithms": {
+            "type": ["array", "null"]
+        },
         "dont_set_quota_on_create": {
             "type": "boolean"
             },
@@ -267,6 +270,9 @@ const Schema = `{
         },
         "domain": {
             "type": "string"
+        },
+        "certificates": {
+            "type": ["array", "null"]
         },
         "check_host_against_uptime_tests": {
             "type": "boolean"

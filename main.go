@@ -19,7 +19,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/newrelic/go-agent"
+	newrelic "github.com/newrelic/go-agent"
 
 	"github.com/TykTechnologies/tyk/checkup"
 
@@ -32,9 +32,9 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/lonelycode/osin"
-	"github.com/netbrain/goautosocket"
+	gas "github.com/netbrain/goautosocket"
 	"github.com/rs/cors"
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 	"rsc.io/letsencrypt"
 
 	"github.com/TykTechnologies/goagain"

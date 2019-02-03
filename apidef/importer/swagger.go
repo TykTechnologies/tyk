@@ -6,9 +6,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/satori/go.uuid"
-
 	"github.com/TykTechnologies/tyk/apidef"
+	uuid "github.com/satori/go.uuid"
 )
 
 const SwaggerSource APIImporterSource = "swagger"

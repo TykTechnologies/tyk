@@ -358,6 +358,7 @@ type APIDefinition struct {
 	NotificationsDetails       NotificationsManager `bson:"notifications" json:"notifications"`
 	EnableSignatureChecking    bool                 `bson:"enable_signature_checking" json:"enable_signature_checking"`
 	HmacAllowedClockSkew       float64              `bson:"hmac_allowed_clock_skew" json:"hmac_allowed_clock_skew"`
+	HmacAllowedAlgorithms      []string             `bson:"hmac_allowed_algorithms" json:"hmac_allowed_algorithms"`
 	BaseIdentityProvidedBy     AuthTypeEnum         `bson:"base_identity_provided_by" json:"base_identity_provided_by"`
 	VersionDefinition          struct {
 		Location  string `bson:"location" json:"location"`
@@ -381,7 +382,7 @@ type APIDefinition struct {
 		PreserveHostHeader          bool                          `bson:"preserve_host_header" json:"preserve_host_header"`
 		ListenPath                  string                        `bson:"listen_path" json:"listen_path"`
 		TargetURL                   string                        `bson:"target_url" json:"target_url"`
-		DisableStripPrefix          bool                          `bson:"disable_strip_prefix" json:"disable_strip_prefix"`
+		DisableStripSlash           bool                          `bson:"disable_strip_slash" json:"disable_strip_slash"`
 		StripListenPath             bool                          `bson:"strip_listen_path" json:"strip_listen_path"`
 		EnableLoadBalancing         bool                          `bson:"enable_load_balancing" json:"enable_load_balancing"`
 		Targets                     []string                      `bson:"target_list" json:"target_list"`
@@ -425,6 +426,7 @@ type APIDefinition struct {
 		Debug              bool     `bson:"debug" json:"debug"`
 	} `bson:"CORS" json:"CORS"`
 	Domain            string                 `bson:"domain" json:"domain"`
+	Certificates      []string               `bson:"certificates" json:"certificates"`
 	DoNotTrack        bool                   `bson:"do_not_track" json:"do_not_track"`
 	Tags              []string               `bson:"tags" json:"tags"`
 	EnableContextVars bool                   `bson:"enable_context_vars" json:"enable_context_vars"`
@@ -678,6 +680,7 @@ func DummyAPI() APIDefinition {
 		TagHeaders:              []string{},
 		UpstreamCertificates:    map[string]string{},
 		JWTScopeToPolicyMapping: map[string]string{},
+		HmacAllowedAlgorithms:   []string{},
 		CustomMiddleware: MiddlewareSection{
 			Post:        []MiddlewareDefinition{},
 			Pre:         []MiddlewareDefinition{},
