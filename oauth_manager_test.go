@@ -51,6 +51,7 @@ func loadTestOAuthSpec() *APISpec {
 		spec.Auth = apidef.Auth{
 			AuthHeaderName: "authorization",
 		}
+		spec.UseKeylessAccess = false
 		spec.UseOauth2 = true
 		spec.Oauth2Meta = struct {
 			AllowedAccessTypes     []osin.AccessRequestType    `bson:"allowed_access_types" json:"allowed_access_types"`
@@ -277,6 +278,99 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 			BodyMatch: `"access_token"`,
 		})
 	})
+}
+
+func TestDeleteOauthClient(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	spec := loadTestOAuthSpec()
+
+	createTestOAuthClient(spec, authClientID)
+
+	var resp *http.Response
+
+	t.Run("Client authorize token request", func(t *testing.T) {
+		param := make(url.Values)
+		param.Set("response_type", "token")
+		param.Set("redirect_uri", authRedirectUri)
+		param.Set("client_id", authClientID)
+		param.Set("key_rules", keyRules)
+
+		headers := map[string]string{
+			"Content-Type": "application/x-www-form-urlencoded",
+		}
+
+		var err error
+		resp, err = ts.Run(t, test.TestCase{
+			Path:      "/APIID/tyk/oauth/authorize-client/",
+			AdminAuth: true,
+			Data:      param.Encode(),
+			Headers:   headers,
+			Method:    http.MethodPost,
+			Code:      http.StatusOK,
+			BodyMatch: `"access_token"`,
+		})
+		if err != nil {
+			t.Error(err)
+		}
+	})
+
+	token := tokenData{}
+	json.NewDecoder(resp.Body).Decode(&token)
+	authHeader := map[string]string{
+		"Authorization": "Bearer " + token.AccessToken,
+	}
+	t.Run("Make request to API with supplying token", func(t *testing.T) {
+		ts.Run(t, test.TestCase{
+			Path:    "/APIID/get",
+			Headers: authHeader,
+			Method:  http.MethodGet,
+			Code:    http.StatusOK,
+		})
+	})
+
+	t.Run("Delete OAuth-client and check that it is gone", func(t *testing.T) {
+		ts.Run(t,
+			test.TestCase{
+				Path:      "/tyk/oauth/clients/999999/" + authClientID,
+				AdminAuth: true,
+				Method:    http.MethodDelete,
+				Code:      http.StatusOK,
+			},
+			test.TestCase{
+				Path:      "/tyk/oauth/clients/999999/" + authClientID,
+				AdminAuth: true,
+				Method:    http.MethodGet,
+				Code:      http.StatusNotFound,
+				Delay:     1100 * time.Millisecond, // we need this to have deleted oauth client expired in memory cache
+			},
+		)
+	})
+
+	t.Run("Make sure token issued for deleted oauth-client cannot be used", func(t *testing.T) {
+		ts.Run(t,
+			test.TestCase{
+				Path:    "/APIID/get",
+				Headers: authHeader,
+				Method:  http.MethodGet,
+				Code:    http.StatusForbidden,
+			},
+			test.TestCase{
+				Path:    "/APIID/get",
+				Headers: authHeader,
+				Method:  http.MethodGet,
+				Code:    http.StatusForbidden,
+			},
+			test.TestCase{
+				Path:    "/APIID/get",
+				Headers: authHeader,
+				Method:  http.MethodGet,
+				Code:    http.StatusForbidden,
+			},
+		)
+	})
+
 }
 
 func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
