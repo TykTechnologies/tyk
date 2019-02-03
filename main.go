@@ -131,8 +131,8 @@ func setupGlobals() {
 	reloadMu.Lock()
 	defer reloadMu.Unlock()
 
+	dnsCacheManager = dnscache.NewDnsCacheManager()
 	if config.Global().DnsCache.Enabled {
-		dnsCacheManager = dnscache.NewDnsCacheManager()
 		dnsCacheManager.InitDNSCaching(
 			time.Duration(config.Global().DnsCache.TTL)*time.Second,
 			time.Duration(config.Global().DnsCache.CheckInterval)*time.Second)

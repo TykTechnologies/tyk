@@ -1,35 +1,11 @@
-package dnscache_test
+package dnscache
 
 import (
 	"context"
-	"github.com/TykTechnologies/tyk/dnscache"
 	"net"
 	"testing"
 	"time"
 )
-
-type mockStorage struct {
-	mockFetchItem func(key string) ([]string, error)
-	mockGet       func(key string) (dnscache.DnsCacheItem, bool)
-	mockDelete    func(key string)
-	mockClear     func()
-}
-
-func (ms *mockStorage) FetchItem(key string) ([]string, error) {
-	return ms.mockFetchItem(key)
-}
-
-func (ms *mockStorage) Get(key string) (dnscache.DnsCacheItem, bool) {
-	return ms.mockGet(key)
-}
-
-func (ms *mockStorage) Delete(key string) {
-	ms.mockDelete(key)
-}
-
-func (ms *mockStorage) Clear() {
-	ms.mockClear()
-}
 
 func TestWrapDialerDialContextFunc(t *testing.T) {
 	tearDownTestStorageFetchItem := setupTestStorageFetchItem(&configTestStorageFetchItem{t, etcHostsMap, etcHostsErrorMap,})
@@ -51,7 +27,7 @@ func TestWrapDialerDialContextFunc(t *testing.T) {
 		expectedHostname    string
 	}{
 		{
-			"Should parse address and call storage.FetchItem",
+			"Should parse address, call storage.FetchItem, call storage.Delete on DialContext error",
 			hostWithPort, dialerContext, true,
 			true, true, expectedHost,
 		},
@@ -65,6 +41,11 @@ func TestWrapDialerDialContextFunc(t *testing.T) {
 			"192.0.2.10:80", dialerContext, true,
 			false, false, "",
 		},
+		{
+			"Should parse address without port",
+			expectedHost, dialerContext, true,
+			true, true, expectedHost,
+		},
 	}
 
 	for _, tc := range cases {
@@ -74,22 +55,23 @@ func TestWrapDialerDialContextFunc(t *testing.T) {
 				key    string
 			}
 
-			storage := &mockStorage{func(key string) ([]string, error) {
+			storage := &MockStorage{func(key string) ([]string, error) {
 				fetchItemCall.called = true
 				fetchItemCall.key = key
 				return etcHostsMap[key+"."], nil
-			}, func(key string) (dnscache.DnsCacheItem, bool) {
+			}, func(key string) (DnsCacheItem, bool) {
 				if _, ok := etcHostsMap[key]; ok {
-					return dnscache.DnsCacheItem{}, true
+					return DnsCacheItem{}, true
 				}
 
-				return dnscache.DnsCacheItem{}, false
-			}, func(key string) {
+				return DnsCacheItem{}, false
+			}, func(key string, addrs []string) {},
+			func(key string) {
 				deleteCall.called = true
 				deleteCall.key = key
 			}, func() {}}
 
-			dnsManager := dnscache.NewDnsCacheManager()
+			dnsManager := NewDnsCacheManager()
 			if tc.initStorage {
 				dnsManager.SetCacheStorage(storage)
 			}
@@ -111,7 +93,7 @@ func TestWrapDialerDialContextFunc(t *testing.T) {
 			if tc.shouldCallDelete != deleteCall.called {
 				t.Fatalf("wanted deleteCall.called to be %v, got %v", tc.shouldCallDelete, deleteCall.called)
 			}
-			if tc.shouldCallFetchItem {
+			if tc.shouldCallDelete {
 				if deleteCall.key != tc.expectedHostname {
 					t.Fatalf("wanted deleteCall.key to be %v, got %v", tc.expectedHostname, deleteCall.key)
 				}

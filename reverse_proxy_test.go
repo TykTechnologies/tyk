@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"github.com/TykTechnologies/tyk/dnscache"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -121,7 +122,20 @@ func TestReverseProxyDnsCache(t *testing.T) {
 	)
 
 	tearDown := setupTestReverseProxyDnsCache(&configTestReverseProxyDnsCache{t, etcHostsMap,
-		config.DnsCacheConfig{Enabled: true, TTL: cacheTTL, CheckInterval: cacheUpdateInterval}})
+	config.DnsCacheConfig{Enabled: true, TTL: cacheTTL, CheckInterval: cacheUpdateInterval}}, )
+
+	currentStorage := dnsCacheManager.CacheStorage()
+	storage := &dnscache.MockStorage{func(key string) ([]string, error) {
+		return currentStorage.FetchItem(key)
+	}, func(key string) (dnscache.DnsCacheItem, bool) {
+		return currentStorage.Get(key)
+	}, func(key string, addrs []string) {
+		currentStorage.Set(key, addrs)
+	}, func(key string) {
+		//prevent deletion
+	}, currentStorage.Clear, }
+	dnsCacheManager.SetCacheStorage(storage)
+
 	defer tearDown()
 
 	cases := []struct {
@@ -132,7 +146,7 @@ func TestReverseProxyDnsCache(t *testing.T) {
 		Body    []byte
 		Headers http.Header
 
-		isWebsocket bool
+		isWebsocket  bool
 
 		expectedIPs    []string
 		shouldBeCached bool
@@ -216,6 +230,7 @@ func TestReverseProxyDnsCache(t *testing.T) {
 			if !tc.isCacheEnabled {
 				dnsCacheManager.SetCacheStorage(nil)
 			}
+
 			spec := &APISpec{APIDefinition: &apidef.APIDefinition{},
 				EnforcedTimeoutEnabled: true,
 				GlobalConfig:           config.Config{ProxyCloseConnections: true, ProxyDefaultTimeout: 1}}

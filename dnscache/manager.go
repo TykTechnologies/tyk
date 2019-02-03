@@ -30,6 +30,7 @@ type IDnsCacheManager interface {
 type IDnsCacheStorage interface {
 	FetchItem(key string) ([]string, error)
 	Get(key string) (DnsCacheItem, bool)
+	Set(key string, addrs []string)
 	Delete(key string)
 	Clear()
 }
