@@ -278,6 +278,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		newSession, err := generateSessionFromPolicy(basePolicyID,
 			k.Spec.OrgID,
 			true)
+
 		if err != nil {
 			k.reportLoginFailure(baseFieldData, r)
 			k.Logger().Error("Could not find a valid policy to apply to this token!")
@@ -335,7 +336,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			}
 			// apply new policy to session and update session
 			session.SetPolicies(policyID)
-			if err := k.ApplyPolicies(sessionID, &session); err != nil {
+			if err := k.ApplyPolicies(&session); err != nil {
 				k.reportLoginFailure(baseFieldData, r)
 				k.Logger().WithError(err).Error("Could not apply new policy from JWT to session")
 				return errors.New("Key not authorized: could not apply new policy"), http.StatusForbidden

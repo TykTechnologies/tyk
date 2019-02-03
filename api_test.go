@@ -405,6 +405,15 @@ func testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 				Code:      200,
 				BodyMatch: fmt.Sprintf(`"key_hash":"%s"`, myKeyHash),
 			},
+			// Update key by hash value with specifying hashed=true
+			{
+				Method:    "PUT",
+				Path:      "/tyk/keys/" + myKeyHash + "?hashed=true",
+				Data:      string(withAccessJSON),
+				AdminAuth: true,
+				Code:      200,
+				BodyMatch: fmt.Sprintf(`"key":"%s"`, myKeyHash),
+			},
 			// get one key by key name
 			{
 				Method:    "GET",

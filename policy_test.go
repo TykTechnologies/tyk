@@ -312,7 +312,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				policiesMu.Lock()
 				policiesByID["acl3"] = newPolicy
 				policiesMu.Unlock()
-				err := bmid.ApplyPolicies("", s)
+				err := bmid.ApplyPolicies(s)
 				if err != nil {
 					t.Fatalf("couldn't apply policy: %s", err.Error())
 				}
@@ -413,7 +413,7 @@ func TestApplyPolicies(t *testing.T) {
 			sess := &user.SessionState{}
 			sess.SetPolicies(tc.policies...)
 			errStr := ""
-			if err := bmid.ApplyPolicies("", sess); err != nil {
+			if err := bmid.ApplyPolicies(sess); err != nil {
 				errStr = err.Error()
 			}
 			if tc.errMatch == "" && errStr != "" {
@@ -438,7 +438,7 @@ func BenchmarkApplyPolicies(b *testing.B) {
 		for _, tc := range tests {
 			sess := &user.SessionState{}
 			sess.SetPolicies(tc.policies...)
-			bmid.ApplyPolicies("", sess)
+			bmid.ApplyPolicies(sess)
 		}
 	}
 }
