@@ -94,7 +94,7 @@ func getSpecForOrg(orgID string) *APISpec {
 	return nil
 }
 
-func checkAndApplyTrialPeriod(keyName, apiId string, newSession *user.SessionState) {
+func checkAndApplyTrialPeriod(keyName, apiId string, newSession *user.SessionState, isHashed bool) {
 	// Check the policies to see if we are forcing an expiry on the key
 	for _, polID := range newSession.PolicyIDs() {
 		policiesMu.RLock()
@@ -106,7 +106,7 @@ func checkAndApplyTrialPeriod(keyName, apiId string, newSession *user.SessionSta
 		// Are we foring an expiry?
 		if policy.KeyExpiresIn > 0 {
 			// We are, does the key exist?
-			_, found := getKeyDetail(keyName, apiId, false)
+			_, found := getKeyDetail(keyName, apiId, isHashed)
 			if !found {
 				// this is a new key, lets expire it
 				newSession.Expires = time.Now().Unix() + policy.KeyExpiresIn
@@ -115,17 +115,17 @@ func checkAndApplyTrialPeriod(keyName, apiId string, newSession *user.SessionSta
 	}
 }
 
-func applyPoliciesAndSave(keyName string, session *user.SessionState, spec *APISpec) error {
+func applyPoliciesAndSave(keyName string, session *user.SessionState, spec *APISpec, isHashed bool) error {
 	// use basic middleware to apply policies to key/session (it also saves it)
 	mw := BaseMiddleware{
 		Spec: spec,
 	}
-	if err := mw.ApplyPolicies(keyName, session); err != nil {
+	if err := mw.ApplyPolicies(session); err != nil {
 		return err
 	}
 
 	lifetime := session.Lifetime(spec.SessionLifetime)
-	if err := spec.SessionManager.UpdateSession(keyName, session, lifetime, false); err != nil {
+	if err := spec.SessionManager.UpdateSession(keyName, session, lifetime, isHashed); err != nil {
 		return err
 	}
 
@@ -142,7 +142,7 @@ func resetAPILimits(accessRights map[string]user.AccessDefinition) {
 	}
 }
 
-func doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool) error {
+func doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool, isHashed bool) error {
 	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 
 	if len(newSession.AccessRights) > 0 {
@@ -164,18 +164,18 @@ func doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool
 				}).Error("Could not add key for this API ID, API doesn't exist.")
 				return errors.New("API must be active to add keys")
 			}
-			checkAndApplyTrialPeriod(keyName, apiId, newSession)
+			checkAndApplyTrialPeriod(keyName, apiId, newSession, isHashed)
 
 			// Lets reset keys if they are edited by admin
 			if !apiSpec.DontSetQuotasOnCreate {
 				// Reset quote by default
 				if !dontReset {
-					apiSpec.SessionManager.ResetQuota(keyName, newSession)
+					apiSpec.SessionManager.ResetQuota(keyName, newSession, isHashed)
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
 
 				// apply polices (if any) and save key
-				if err := applyPoliciesAndSave(keyName, newSession, apiSpec); err != nil {
+				if err := applyPoliciesAndSave(keyName, newSession, apiSpec, isHashed); err != nil {
 					return err
 				}
 			}
@@ -191,13 +191,13 @@ func doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool
 		defer apisMu.RUnlock()
 		for _, spec := range apisByID {
 			if !dontReset {
-				spec.SessionManager.ResetQuota(keyName, newSession)
+				spec.SessionManager.ResetQuota(keyName, newSession, isHashed)
 				newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 			}
-			checkAndApplyTrialPeriod(keyName, spec.APIID, newSession)
+			checkAndApplyTrialPeriod(keyName, spec.APIID, newSession, isHashed)
 
 			// apply polices (if any) and save key
-			if err := applyPoliciesAndSave(keyName, newSession, spec); err != nil {
+			if err := applyPoliciesAndSave(keyName, newSession, spec, isHashed); err != nil {
 				return err
 			}
 		}
@@ -243,7 +243,7 @@ func getKeyDetail(key, apiID string, hashed bool) (user.SessionState, bool) {
 	return sessionManager.SessionDetail(key, hashed)
 }
 
-func handleAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
+func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interface{}, int) {
 	var newSession user.SessionState
 	if err := json.NewDecoder(r.Body).Decode(&newSession); err != nil {
 		log.Error("Couldn't decode new session object: ", err)
@@ -285,7 +285,7 @@ func handleAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 
 	suppressReset := r.URL.Query().Get("suppress_reset") == "1"
 
-	if err := doAddOrUpdate(keyName, &newSession, suppressReset); err != nil {
+	if err := doAddOrUpdate(keyName, &newSession, suppressReset, isHashed); err != nil {
 		return apiError("Failed to create key, ensure security settings are correct."), http.StatusInternalServerError
 	}
 
@@ -309,7 +309,11 @@ func handleAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 
 	// add key hash for newly created key
 	if config.Global().HashKeys && r.Method == http.MethodPost {
-		response.KeyHash = storage.HashKey(keyName)
+		if isHashed {
+			response.KeyHash = keyName
+		} else {
+			response.KeyHash = storage.HashKey(keyName)
+		}
 	}
 
 	return response, http.StatusOK
@@ -387,7 +391,7 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 	}
 
 	mw := BaseMiddleware{Spec: spec}
-	mw.ApplyPolicies(sessionKey, &session)
+	mw.ApplyPolicies(&session)
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
@@ -464,7 +468,7 @@ func handleDeleteKey(keyName, apiID string) (interface{}, int) {
 		apisMu.RLock()
 		for _, spec := range apisByID {
 			spec.SessionManager.RemoveSession(keyName, false)
-			spec.SessionManager.ResetQuota(keyName, &user.SessionState{})
+			spec.SessionManager.ResetQuota(keyName, &user.SessionState{}, false)
 		}
 		apisMu.RUnlock()
 
@@ -485,7 +489,7 @@ func handleDeleteKey(keyName, apiID string) (interface{}, int) {
 	}
 
 	sessionManager.RemoveSession(keyName, false)
-	sessionManager.ResetQuota(keyName, &user.SessionState{})
+	sessionManager.ResetQuota(keyName, &user.SessionState{}, false)
 
 	statusObj := apiModifyKeySuccess{
 		Key:    keyName,
@@ -700,12 +704,12 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodPost:
-		obj, code = handleAddOrUpdate(keyName, r)
+		obj, code = handleAddOrUpdate(keyName, r, isHashed)
 	case http.MethodPut:
-		obj, code = handleAddOrUpdate(keyName, r)
+		obj, code = handleAddOrUpdate(keyName, r, isHashed)
 		if code != http.StatusOK && hashKeyFunction != "" {
 			// try to use legacy key format
-			obj, code = handleAddOrUpdate(origKeyName, r)
+			obj, code = handleAddOrUpdate(origKeyName, r, isHashed)
 		}
 	case http.MethodGet:
 		if keyName != "" {
@@ -874,7 +878,7 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 	}
 
 	if r.URL.Query().Get("reset_quota") == "1" {
-		sessionManager.ResetQuota(keyName, newSession)
+		sessionManager.ResetQuota(keyName, newSession, false)
 		newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 		rawKey := QuotaKeyPrefix + storage.HashKey(keyName)
 
@@ -1059,15 +1063,15 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 		for apiID := range newSession.AccessRights {
 			apiSpec := getApiSpec(apiID)
 			if apiSpec != nil {
-				checkAndApplyTrialPeriod(newKey, apiID, newSession)
+				checkAndApplyTrialPeriod(newKey, apiID, newSession, false)
 				// If we have enabled HMAC checking for keys, we need to generate a secret for the client to use
 				if !apiSpec.DontSetQuotasOnCreate {
 					// Reset quota by default
-					apiSpec.SessionManager.ResetQuota(newKey, newSession)
+					apiSpec.SessionManager.ResetQuota(newKey, newSession, false)
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
 				// apply polices (if any) and save key
-				if err := applyPoliciesAndSave(newKey, newSession, apiSpec); err != nil {
+				if err := applyPoliciesAndSave(newKey, newSession, apiSpec, false); err != nil {
 					doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - "+err.Error()))
 					return
 				}
@@ -1075,7 +1079,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				// Use fallback
 				sessionManager := FallbackKeySesionManager
 				newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
-				sessionManager.ResetQuota(newKey, newSession)
+				sessionManager.ResetQuota(newKey, newSession, false)
 				err := sessionManager.UpdateSession(newKey, newSession, -1, false)
 				if err != nil {
 					doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - "+err.Error()))
@@ -1100,14 +1104,14 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			apisMu.RLock()
 			defer apisMu.RUnlock()
 			for _, spec := range apisByID {
-				checkAndApplyTrialPeriod(newKey, spec.APIID, newSession)
+				checkAndApplyTrialPeriod(newKey, spec.APIID, newSession, false)
 				if !spec.DontSetQuotasOnCreate {
 					// Reset quote by default
-					spec.SessionManager.ResetQuota(newKey, newSession)
+					spec.SessionManager.ResetQuota(newKey, newSession, false)
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
 				// apply polices (if any) and save key
-				if err := applyPoliciesAndSave(newKey, newSession, spec); err != nil {
+				if err := applyPoliciesAndSave(newKey, newSession, spec, false); err != nil {
 					doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - "+err.Error()))
 					return
 				}

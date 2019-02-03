@@ -35,7 +35,7 @@ type SessionHandler interface {
 	SessionDetail(keyName string, hashed bool) (user.SessionState, bool)
 	Sessions(filter string) []string
 	Store() storage.Handler
-	ResetQuota(string, *user.SessionState)
+	ResetQuota(string, *user.SessionState, bool)
 	Stop()
 }
 
@@ -182,15 +182,20 @@ func (b *DefaultSessionManager) Store() storage.Handler {
 	return b.store
 }
 
-func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.SessionState) {
-	rawKey := QuotaKeyPrefix + storage.HashKey(keyName)
+func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.SessionState, isHashed bool) {
+	origKeyName := keyName
+	if !isHashed {
+		keyName = storage.HashKey(keyName)
+	}
+
+	rawKey := QuotaKeyPrefix + keyName
 	log.WithFields(logrus.Fields{
 		"prefix":      "auth-mgr",
-		"inbound-key": obfuscateKey(keyName),
+		"inbound-key": obfuscateKey(origKeyName),
 		"key":         rawKey,
 	}).Info("Reset quota for key.")
 
-	rateLimiterSentinelKey := RateLimitKeyPrefix + storage.HashKey(keyName) + ".BLOCKED"
+	rateLimiterSentinelKey := RateLimitKeyPrefix + keyName + ".BLOCKED"
 	// Clear the rate limiter
 	go b.store.DeleteRawKey(rateLimiterSentinelKey)
 	// Fix the raw key
