@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/pmylund/go-cache"
 	"fmt"
+	"github.com/pmylund/go-cache"
 )
 
 type DnsCacheItem struct {
@@ -80,7 +80,7 @@ func (dc *DnsCacheStorage) FetchItem(hostName string) ([]string, error) {
 
 func (dc *DnsCacheStorage) Set(key string, addrs []string) {
 	logger.Debugf("Adding dns record to cache: key=%q, addrs=%q", key, addrs)
-	dc.cache.Set(key, DnsCacheItem{addrs }, cache.DefaultExpiration)
+	dc.cache.Set(key, DnsCacheItem{addrs}, cache.DefaultExpiration)
 }
 
 //Delete all records from cache

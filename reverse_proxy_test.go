@@ -122,19 +122,18 @@ func TestReverseProxyDnsCache(t *testing.T) {
 	)
 
 	tearDown := setupTestReverseProxyDnsCache(&configTestReverseProxyDnsCache{t, etcHostsMap,
-	config.DnsCacheConfig{Enabled: true, TTL: cacheTTL, CheckInterval: cacheUpdateInterval}}, )
+		config.DnsCacheConfig{Enabled: true, TTL: cacheTTL, CheckInterval: cacheUpdateInterval}})
 
 	currentStorage := dnsCacheManager.CacheStorage()
-	storage := &dnscache.MockStorage{func(key string) ([]string, error) {
-		return currentStorage.FetchItem(key)
-	}, func(key string) (dnscache.DnsCacheItem, bool) {
-		return currentStorage.Get(key)
-	}, func(key string, addrs []string) {
-		currentStorage.Set(key, addrs)
-	}, func(key string) {
-		//prevent deletion
-	}, currentStorage.Clear, }
-	dnsCacheManager.SetCacheStorage(storage)
+	falseDeleteStorage := &dnscache.MockStorage{
+		MockFetchItem: currentStorage.FetchItem,
+		MockGet:       currentStorage.Get,
+		MockSet:       currentStorage.Set,
+		MockDelete: func(key string) {
+			//prevent deletion
+		},
+		MockClear: currentStorage.Clear}
+	dnsCacheManager.SetCacheStorage(falseDeleteStorage)
 
 	defer tearDown()
 
@@ -146,7 +145,7 @@ func TestReverseProxyDnsCache(t *testing.T) {
 		Body    []byte
 		Headers http.Header
 
-		isWebsocket  bool
+		isWebsocket bool
 
 		expectedIPs    []string
 		shouldBeCached bool

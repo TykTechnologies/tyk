@@ -61,7 +61,7 @@ func setupTestStorageFetchItem(cfg *configTestStorageFetchItem) func() {
 func TestStorageFetchItem(t *testing.T) {
 	dnsCache := NewDnsCacheStorage(time.Duration(expiration)*time.Second, time.Duration(checkInterval)*time.Second)
 
-	tearDownTestStorageFetchItem := setupTestStorageFetchItem(&configTestStorageFetchItem{t, etcHostsMap, etcHostsErrorMap,})
+	tearDownTestStorageFetchItem := setupTestStorageFetchItem(&configTestStorageFetchItem{t, etcHostsMap, etcHostsErrorMap})
 	defer func() {
 		tearDownTestStorageFetchItem()
 		dnsCache.Clear()

@@ -12,9 +12,9 @@ import (
 
 func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
 	cases := []struct {
-		FieldName     string
-		EnvVarName    string
-		FieldGetter   func(*Config) interface{}
+		FieldName   string
+		EnvVarName  string
+		FieldGetter func(*Config) interface{}
 
 		defaultValue  interface{}
 		expectedValue interface{}

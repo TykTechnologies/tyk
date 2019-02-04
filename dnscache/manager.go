@@ -7,7 +7,6 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/TykTechnologies/tyk/log"
-	"strings"
 )
 
 var (
@@ -35,13 +34,11 @@ type IDnsCacheStorage interface {
 	Clear()
 }
 
-
 //DnsCacheManager is responsible for in-memory dns query records cache.
 //It allows to init dns caching and to hook into net/http dns resolution chain in order to cache query response ip records.
 type DnsCacheManager struct {
 	cacheStorage IDnsCacheStorage
 }
-
 
 //Returns new empty/non-initialized DnsCacheManager
 func NewDnsCacheManager() *DnsCacheManager {
@@ -76,16 +73,15 @@ func (m *DnsCacheManager) doCachedDial(d *net.Dialer, ctx context.Context, netwo
 		return safeDial(address, "")
 	}
 
-	parts := strings.Split(address, ":")
-	host, tail := parts[0], ""
-
-	if len(parts) >= 2 {
-		tail = ":" + strings.Join(parts[1:],"")
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return nil, err
 	}
 
 	if ip := net.ParseIP(host); ip != nil {
 		return safeDial(address, "")
 	}
+
 	ips, err := m.cacheStorage.FetchItem(host)
 	if err != nil {
 		logger.WithFields(logrus.Fields{
@@ -93,10 +89,10 @@ func (m *DnsCacheManager) doCachedDial(d *net.Dialer, ctx context.Context, netwo
 			"address": address,
 		}).Errorf("doCachedDial SplitHostPort error: %v. ips=%v", err.Error(), ips)
 
-		return safeDial(ips[0] + tail, "")
+		return safeDial(ips[0]+":"+port, "")
 	}
 
-	return safeDial(ips[0] + tail, host)
+	return safeDial(ips[0]+":"+port, host)
 }
 
 //Initializes manager's cache storage if it wasn't initialized before with provided ttl, checkinterval values
