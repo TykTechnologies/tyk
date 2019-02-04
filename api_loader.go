@@ -591,7 +591,7 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 			subrouter = muxer
 		}
 
-		chainObj := processSpec(spec, apisByListen, redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore, subrouter, logrus.NewEntry(log))
+		chainObj := processSpec(spec, apisByListen, &redisStore, &redisOrgStore, &healthStore, &rpcAuthStore, &rpcOrgStore, subrouter, logrus.NewEntry(log))
 		apisMu.Lock()
 		spec.middlewareChain = chainObj
 		apisMu.Unlock()
