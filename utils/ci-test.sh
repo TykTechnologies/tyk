@@ -1,6 +1,5 @@
 #!/bin/bash
 
-set -e
 
 MATRIX=(
 	"-tags 'coprocess python'"
@@ -19,6 +18,21 @@ fatal() {
 	exit 1
 }
 
+if [[ $LATEST_GO ]]; then
+    FMT_FILES=$(gofmt -l . | grep -v vendor)
+    if [[ -n $FMT_FILES ]]; then
+        fatal "Run 'gofmt -w' on these files:\n$FMT_FILES"
+    fi
+
+    echo "gofmt check is ok!"
+
+    IMP_FILES="$(goimports -l . | grep -v vendor)"
+    if [[ -n $IMP_FILES ]]; then
+        fatal "Run 'goimports -w' on these files:\n$IMP_FILES"
+    fi
+
+    echo "goimports check is ok!"
+fi
 
 PKGS="$(go list ./... | grep -v /vendor/)"
 
@@ -46,17 +60,3 @@ go test -race -v -timeout $TEST_TIMEOUT $PKGS || fatal "go test -race failed"
 for opts in "${MATRIX[@]}"; do
 	show go vet $opts $PKGS || fatal "go vet errored"
 done
-
-# Includes all top-level files and dirs that don't start with a dot
-# (hidden). Also excludes all of vendor/.
-GOFILES=$(find * -name '*.go' -not -path 'vendor/*')
-
-FMT_FILES="$(gofmt -s -l $GOFILES)"
-if [[ -n $FMT_FILES ]]; then
-	fatal "Run 'gofmt -s -w' on these files:\n$FMT_FILES"
-fi
-
-IMP_FILES="$(goimports -local github.com/TykTechnologies -l $GOFILES)"
-if [[ -n $IMP_FILES ]]; then
-	fatal "Run 'goimports -local github.com/TykTechnologies -w' on these files:\n$IMP_FILES"
-fi

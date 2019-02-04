@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+
 	"github.com/gocraft/health"
 	uuid "github.com/satori/go.uuid"
 

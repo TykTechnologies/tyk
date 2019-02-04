@@ -11,6 +11,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
+	cache "github.com/pmylund/go-cache"
 
 	"github.com/Sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"

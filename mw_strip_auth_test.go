@@ -84,6 +84,36 @@ func TestStripAuth_stripFromHeaders(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("strip authorization from cookie", func(t *testing.T) {
+		req, err := http.NewRequest("GET", "http://example.com", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		sa := StripAuth{}
+		sa.Spec = &APISpec{APIDefinition: &apidef.APIDefinition{}}
+		sa.Spec.Auth = apidef.Auth{}
+		key := "Cookie"
+		stripFromCookieTest(t, req, key, sa, "Authorization=AUTHORIZATION", "")
+		stripFromCookieTest(t, req, key, sa, "Authorization=AUTHORIZATION;Dummy=DUMMY", "Dummy=DUMMY")
+		stripFromCookieTest(t, req, key, sa, "Dummy=DUMMY;Authorization=AUTHORIZATION", "Dummy=DUMMY")
+		stripFromCookieTest(t, req, key, sa, "Dummy=DUMMY;Authorization=AUTHORIZATION;Dummy2=DUMMY2", "Dummy=DUMMY;Dummy2=DUMMY2")
+
+		key = "NonDefaultName"
+		sa.Spec.Auth = apidef.Auth{CookieName: key}
+		stripFromCookieTest(t, req, key, sa, "Dummy=DUMMY;Authorization=AUTHORIZATION;Dummy2=DUMMY2", "Dummy=DUMMY;Dummy2=DUMMY2")
+	})
+}
+
+func stripFromCookieTest(t *testing.T, req *http.Request, key string, sa StripAuth, value string, expected string) {
+	req.Header.Set(key, value)
+	sa.stripFromHeaders(req)
+
+	actual := req.Header.Get(key)
+
+	if expected != actual {
+		t.Fatalf("Expected %s, actual %s", expected, actual)
+	}
 }
 
 func BenchmarkStripAuth_stripFromHeaders(b *testing.B) {

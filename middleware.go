@@ -232,7 +232,7 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 
 // ApplyPolicies will check if any policies are loaded. If any are, it
 // will overwrite the session state to use the policy values.
-func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) error {
+func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	rights := session.AccessRights
 	if rights == nil {
 		rights = make(map[string]user.AccessDefinition)
@@ -291,6 +291,16 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 						SetByPolicy:      true,
 					}
 				}
+
+				// respect current quota remaining and quota renews (on API limit level)
+				var limitQuotaRemaining int64
+				var limitQuotaRenews int64
+				if currAccessRight, ok := rights[apiID]; ok && currAccessRight.Limit != nil {
+					limitQuotaRemaining = currAccessRight.Limit.QuotaRemaining
+					limitQuotaRenews = currAccessRight.Limit.QuotaRenews
+				}
+				accessRights.Limit.QuotaRemaining = limitQuotaRemaining
+				accessRights.Limit.QuotaRenews = limitQuotaRenews
 
 				// overwrite session access right for this API
 				rights[apiID] = accessRights
@@ -420,7 +430,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 		if found {
 			t.Logger().Debug("--> Key found in local cache")
 			session := cachedVal.(user.SessionState)
-			if err := t.ApplyPolicies(key, &session); err != nil {
+			if err := t.ApplyPolicies(&session); err != nil {
 				t.Logger().Error(err)
 				return session, false
 			}
@@ -440,7 +450,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 		}
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
-		if err := t.ApplyPolicies(key, &session); err != nil {
+		if err := t.ApplyPolicies(&session); err != nil {
 			t.Logger().Error(err)
 			return session, false
 		}
@@ -462,7 +472,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 		}
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
-		if err := t.ApplyPolicies(key, &session); err != nil {
+		if err := t.ApplyPolicies(&session); err != nil {
 			t.Logger().Error(err)
 			return session, false
 		}

@@ -271,6 +271,9 @@ const Schema = `{
         "domain": {
             "type": "string"
         },
+        "certificates": {
+            "type": ["array", "null"]
+        },
         "check_host_against_uptime_tests": {
             "type": "boolean"
         },
