@@ -54,7 +54,9 @@ func (m *DnsCacheManager) CacheStorage() IDnsCacheStorage {
 	return m.cacheStorage
 }
 
-//Returns wrapped version of Dialer.DialContext func with hooked up caching of dns queries
+//Returns wrapped version of net.Dialer#DialContext func with hooked up caching of dns queries
+//Actual dns server call occures in net.Resolver#LookupIPAddr method,
+//linked to net.Dialer instance by net.Dialer#Resolver field
 func (m *DnsCacheManager) WrapDialer(dialer *net.Dialer) DialContextFunc {
 	return func(ctx context.Context, network, address string) (net.Conn, error) {
 		return m.doCachedDial(dialer, ctx, network, address)

@@ -69,9 +69,10 @@ func (d *dnsMockHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 }
 
 type DnsMockHandle struct {
-	id              string
-	mockServer      *dns.Server
-	ShutdownDnsMock func() error
+	id                string
+	mockServer        *dns.Server
+	muDefaultResolver sync.RWMutex
+	ShutdownDnsMock   func() error
 }
 
 func (h *DnsMockHandle) PushDomains(domainsMap map[string][]string, domainsErrorMap map[string]int) func() {
@@ -163,11 +164,17 @@ func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int)
 		}
 	}
 
+	handle.muDefaultResolver.RLock()
 	defaultResolver := net.DefaultResolver
+	handle.muDefaultResolver.RUnlock()
 	mockResolver := &net.Resolver{
 		PreferGo: true,
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
 			d := net.Dialer{}
+
+			//Use write lock to prevent internal update of net.DefaultResolver
+			handle.muDefaultResolver.Lock()
+			defer handle.muDefaultResolver.Unlock()
 			return d.DialContext(ctx, network, mockServer.PacketConn.LocalAddr().String())
 		},
 	}
@@ -175,6 +182,9 @@ func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int)
 	net.DefaultResolver = mockResolver
 
 	handle.ShutdownDnsMock = func() error {
+		handle.muDefaultResolver.Lock()
+		defer handle.muDefaultResolver.Unlock()
+
 		net.DefaultResolver = defaultResolver
 		return mockServer.Shutdown()
 	}
