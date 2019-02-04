@@ -13,11 +13,14 @@ import (
 	"github.com/miekg/dns"
 )
 
-var DomainsToAddresses = map[string][]string{
-	"host1.local.": {"127.0.0.1"},
-	"host2.local.": {"127.0.0.1"},
-	"host3.local.": {"127.0.0.1"},
-}
+var (
+	muDefaultResolver  sync.RWMutex
+	DomainsToAddresses = map[string][]string{
+		"host1.local.": {"127.0.0.1"},
+		"host2.local.": {"127.0.0.1"},
+		"host3.local.": {"127.0.0.1"},
+	}
+)
 
 type dnsMockHandler struct {
 	domainsToAddresses map[string][]string
@@ -69,10 +72,9 @@ func (d *dnsMockHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 }
 
 type DnsMockHandle struct {
-	id                string
-	mockServer        *dns.Server
-	muDefaultResolver sync.RWMutex
-	ShutdownDnsMock   func() error
+	id              string
+	mockServer      *dns.Server
+	ShutdownDnsMock func() error
 }
 
 func (h *DnsMockHandle) PushDomains(domainsMap map[string][]string, domainsErrorMap map[string]int) func() {
@@ -164,17 +166,17 @@ func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int)
 		}
 	}
 
-	handle.muDefaultResolver.RLock()
+	muDefaultResolver.RLock()
 	defaultResolver := net.DefaultResolver
-	handle.muDefaultResolver.RUnlock()
+	muDefaultResolver.RUnlock()
 	mockResolver := &net.Resolver{
 		PreferGo: true,
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
 			d := net.Dialer{}
 
 			//Use write lock to prevent internal update of net.DefaultResolver
-			handle.muDefaultResolver.Lock()
-			defer handle.muDefaultResolver.Unlock()
+			muDefaultResolver.Lock()
+			defer muDefaultResolver.Unlock()
 			return d.DialContext(ctx, network, mockServer.PacketConn.LocalAddr().String())
 		},
 	}
@@ -182,10 +184,10 @@ func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int)
 	net.DefaultResolver = mockResolver
 
 	handle.ShutdownDnsMock = func() error {
-		handle.muDefaultResolver.Lock()
-		defer handle.muDefaultResolver.Unlock()
-
+		muDefaultResolver.Lock()
 		net.DefaultResolver = defaultResolver
+		muDefaultResolver.Unlock()
+
 		return mockServer.Shutdown()
 	}
 
