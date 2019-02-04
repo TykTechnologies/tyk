@@ -90,7 +90,7 @@ func (m *DnsCacheManager) doCachedDial(d *net.Dialer, ctx context.Context, netwo
 		logger.WithFields(logrus.Fields{
 			"network": network,
 			"address": address,
-		}).Errorf("doCachedDial SplitHostPort error: %v. ips=%v", err.Error(), ips)
+		}).Errorf("doCachedDial cachedStorage.FetchItem error: %v. ips=%v", err.Error(), ips)
 
 		return safeDial(ips[0]+":"+port, "")
 	}
