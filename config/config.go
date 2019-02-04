@@ -3,12 +3,13 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/kelseyhightower/envconfig"
 	"io"
 	"io/ioutil"
 	"os"
 	"sync"
 	"sync/atomic"
+
+	"github.com/kelseyhightower/envconfig"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	logger "github.com/TykTechnologies/tyk/log"

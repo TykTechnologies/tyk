@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+
 	"github.com/TykTechnologies/tyk/log"
 )
 
