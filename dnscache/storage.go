@@ -63,11 +63,10 @@ func (dc *DnsCacheStorage) FetchItem(hostName string) ([]string, error) {
 		return nil, fmt.Errorf("hostName can't be empty. hostName=%v", hostName)
 	}
 
-	item, ok := dc.cache.Get(hostName)
+	item, ok := dc.Get(hostName)
 	if ok {
-		result, _ := item.(DnsCacheItem)
-		logger.Debugf("Dns record was populated from cache: hostName=%q, addrs=%q", hostName, result.addrs)
-		return result.addrs, nil
+		logger.Debugf("Dns record was populated from cache: hostName=%q, addrs=%q", hostName, item.addrs)
+		return item.addrs, nil
 	}
 
 	addrs, err := dc.resolveDNSRecord(hostName)
