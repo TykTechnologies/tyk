@@ -44,7 +44,7 @@ type OAuthClient struct {
 	ClientID          string      `json:"id"`
 	ClientSecret      string      `json:"secret"`
 	ClientRedirectURI string      `json:"redirecturi"`
-	UserData          interface{} `json:"user_data,omitempty"`
+	MetaData          interface{} `json:"meta_data,omitempty"`
 	PolicyID          string      `json:"policyid"`
 }
 
@@ -61,7 +61,7 @@ func (oc *OAuthClient) GetRedirectUri() string {
 }
 
 func (oc *OAuthClient) GetUserData() interface{} {
-	return oc.UserData
+	return oc.MetaData
 }
 
 func (oc *OAuthClient) GetPolicyID() string {

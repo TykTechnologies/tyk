@@ -1174,7 +1174,7 @@ type NewClientRequest struct {
 	APIID             string      `json:"api_id"`
 	PolicyID          string      `json:"policy_id"`
 	ClientSecret      string      `json:"secret"`
-	UserData          interface{} `json:"user_data"`
+	MetaData          interface{} `json:"meta_data"`
 }
 
 func oauthClientStorageID(clientID string) string {
@@ -1213,7 +1213,7 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		ClientRedirectURI: newOauthClient.ClientRedirectURI,
 		ClientSecret:      secret,
 		PolicyID:          newOauthClient.PolicyID,
-		UserData:          newOauthClient.UserData,
+		MetaData:          newOauthClient.MetaData,
 	}
 
 	storageID := oauthClientStorageID(newClient.GetId())
@@ -1296,7 +1296,7 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		ClientSecret:      newClient.GetSecret(),
 		ClientRedirectURI: newClient.GetRedirectUri(),
 		PolicyID:          newClient.GetPolicyID(),
-		UserData:          newClient.GetUserData(),
+		MetaData:          newClient.GetUserData(),
 	}
 
 	log.WithFields(logrus.Fields{
@@ -1453,7 +1453,7 @@ func getOauthClientDetails(keyName, apiID string) (interface{}, int) {
 		ClientSecret:      clientData.GetSecret(),
 		ClientRedirectURI: clientData.GetRedirectUri(),
 		PolicyID:          clientData.GetPolicyID(),
-		UserData:          clientData.GetUserData(),
+		MetaData:          clientData.GetUserData(),
 	}
 
 	log.WithFields(logrus.Fields{
@@ -1551,7 +1551,7 @@ func getOauthClients(apiID string) (interface{}, int) {
 			ClientSecret:      osinClient.GetSecret(),
 			ClientRedirectURI: osinClient.GetRedirectUri(),
 			PolicyID:          osinClient.GetPolicyID(),
-			UserData:          osinClient.GetUserData(),
+			MetaData:          osinClient.GetUserData(),
 		}
 
 		clients = append(clients, reportableClientData)
