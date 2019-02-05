@@ -121,6 +121,9 @@ func (h *DnsMockHandle) PushDomains(domainsMap map[string][]string, domainsError
 	return pullDomainsFunc
 }
 
+// InitDNSMock initializes dns server on udp:0 address and replaces net.DefaultResolver in order
+// to route all dns queries within tests to this server.
+// InitDNSMock returns handle, which can be used to add/remove dns query mock responses or initialization error.
 func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int) (*DnsMockHandle, error) {
 	addr, _ := net.ResolveUDPAddr("udp", ":0")
 	conn, err := net.ListenUDP("udp", addr)

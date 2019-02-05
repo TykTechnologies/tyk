@@ -10,6 +10,7 @@ import (
 	"github.com/pmylund/go-cache"
 )
 
+// DnsCacheItem represents single record in cache
 type DnsCacheItem struct {
 	addrs []string
 }
@@ -18,7 +19,7 @@ func (item *DnsCacheItem) IsEqualsTo(addrs []string) bool {
 	return reflect.DeepEqual(item.addrs, addrs)
 }
 
-//DnsCacheStorage is an in-memory cache of auto-purged dns query ip responses
+// DnsCacheStorage is an in-memory cache of auto-purged dns query ip responses
 type DnsCacheStorage struct {
 	cache *cache.Cache
 }
@@ -28,7 +29,7 @@ func NewDnsCacheStorage(expiration, checkInterval time.Duration) *DnsCacheStorag
 	return &storage
 }
 
-//Return map of non expired dns cache items
+// Items returns map of non expired dns cache items
 func (dc *DnsCacheStorage) Items(includeExpired bool) map[string]DnsCacheItem {
 	var allItems = dc.cache.Items()
 
@@ -44,7 +45,7 @@ func (dc *DnsCacheStorage) Items(includeExpired bool) map[string]DnsCacheItem {
 	return nonExpiredItems
 }
 
-//Returns non expired item from cache
+// Get returns non expired item from cache
 func (dc *DnsCacheStorage) Get(key string) (DnsCacheItem, bool) {
 	item, found := dc.cache.Get(key)
 	if !found {
@@ -57,7 +58,7 @@ func (dc *DnsCacheStorage) Delete(key string) {
 	dc.cache.Delete(key)
 }
 
-//Return list of ips from cache or resolves them and add to cache
+// FetchItem returns list of ips from cache or resolves them and add to cache
 func (dc *DnsCacheStorage) FetchItem(hostName string) ([]string, error) {
 	if hostName == "" {
 		return nil, fmt.Errorf("hostName can't be empty. hostName=%v", hostName)
@@ -83,7 +84,7 @@ func (dc *DnsCacheStorage) Set(key string, addrs []string) {
 	dc.cache.Set(key, DnsCacheItem{addrs}, cache.DefaultExpiration)
 }
 
-//Delete all records from cache
+// Clear deletes all records from cache
 func (dc *DnsCacheStorage) Clear() {
 	dc.cache.Flush()
 }
