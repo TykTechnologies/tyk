@@ -41,11 +41,11 @@ Effort required by Resource Owner:
 
 // OAuthClient is a representation within an APISpec of a client
 type OAuthClient struct {
-	ClientID          string `json:"id"`
-	ClientSecret      string `json:"secret"`
-	ClientRedirectURI string `json:"redirecturi"`
-	UserData          string `json:",omitempty"`
-	PolicyID          string `json:"policyid"`
+	ClientID          string      `json:"id"`
+	ClientSecret      string      `json:"secret"`
+	ClientRedirectURI string      `json:"redirecturi"`
+	UserData          interface{} `json:"user_data,omitempty"`
+	PolicyID          string      `json:"policyid"`
 }
 
 func (oc *OAuthClient) GetId() string {
@@ -320,6 +320,16 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			session.OauthKeys[ar.Client.GetId()] = new_token.(string)
 			log.Debug("New token: ", new_token.(string))
 			log.Debug("Keys: ", session.OauthKeys)
+
+			// add oauth-client user_fields to session's meta
+			if userData := ar.Client.GetUserData(); userData != nil {
+				var ok bool
+				session.MetaData, ok = userData.(map[string]interface{})
+				if !ok {
+					log.WithField("oauthClientID", ar.Client.GetId()).
+						Error("Could not set session meta_data from oauth-client fields, type mismatch")
+				}
+			}
 
 			keyName := generateToken(o.API.OrgID, username)
 

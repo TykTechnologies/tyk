@@ -1169,11 +1169,12 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 // NewClientRequest is an outward facing JSON object translated from osin OAuthClients
 type NewClientRequest struct {
-	ClientID          string `json:"client_id"`
-	ClientRedirectURI string `json:"redirect_uri"`
-	APIID             string `json:"api_id"`
-	PolicyID          string `json:"policy_id"`
-	ClientSecret      string `json:"secret"`
+	ClientID          string      `json:"client_id"`
+	ClientRedirectURI string      `json:"redirect_uri"`
+	APIID             string      `json:"api_id"`
+	PolicyID          string      `json:"policy_id"`
+	ClientSecret      string      `json:"secret"`
+	UserData          interface{} `json:"user_data"`
 }
 
 func oauthClientStorageID(clientID string) string {
@@ -1212,6 +1213,7 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		ClientRedirectURI: newOauthClient.ClientRedirectURI,
 		ClientSecret:      secret,
 		PolicyID:          newOauthClient.PolicyID,
+		UserData:          newOauthClient.UserData,
 	}
 
 	storageID := oauthClientStorageID(newClient.GetId())
@@ -1294,6 +1296,7 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		ClientSecret:      newClient.GetSecret(),
 		ClientRedirectURI: newClient.GetRedirectUri(),
 		PolicyID:          newClient.GetPolicyID(),
+		UserData:          newClient.GetUserData(),
 	}
 
 	log.WithFields(logrus.Fields{
@@ -1450,6 +1453,7 @@ func getOauthClientDetails(keyName, apiID string) (interface{}, int) {
 		ClientSecret:      clientData.GetSecret(),
 		ClientRedirectURI: clientData.GetRedirectUri(),
 		PolicyID:          clientData.GetPolicyID(),
+		UserData:          clientData.GetUserData(),
 	}
 
 	log.WithFields(logrus.Fields{
@@ -1547,6 +1551,7 @@ func getOauthClients(apiID string) (interface{}, int) {
 			ClientSecret:      osinClient.GetSecret(),
 			ClientRedirectURI: osinClient.GetRedirectUri(),
 			PolicyID:          osinClient.GetPolicyID(),
+			UserData:          osinClient.GetUserData(),
 		}
 
 		clients = append(clients, reportableClientData)
