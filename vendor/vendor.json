@@ -277,6 +277,30 @@
 			"revisionTime": "2017-12-01T01:43:01Z"
 		},
 		{
+			"checksumSHA1": "cJZUWi8GxC1KItxFayZLgZOzaHU=",
+			"path": "github.com/hashicorp/hil",
+			"revision": "59d7c1fee952b29ee4c9ceba65c9d02ee28eb281",
+			"revisionTime": "2019-01-29T15:56:52Z"
+		},
+		{
+			"checksumSHA1": "0S0KeBcfqVFYBPeZkuJ4fhQ5mCA=",
+			"path": "github.com/hashicorp/hil/ast",
+			"revision": "59d7c1fee952b29ee4c9ceba65c9d02ee28eb281",
+			"revisionTime": "2019-01-29T15:56:52Z"
+		},
+		{
+			"checksumSHA1": "P5PZ3k7SmqWmxgJ8Q0gLzeNpGhE=",
+			"path": "github.com/hashicorp/hil/parser",
+			"revision": "59d7c1fee952b29ee4c9ceba65c9d02ee28eb281",
+			"revisionTime": "2019-01-29T15:56:52Z"
+		},
+		{
+			"checksumSHA1": "ekmuVa77ebGDPXI+4FaskrID8lQ=",
+			"path": "github.com/hashicorp/hil/scanner",
+			"revision": "59d7c1fee952b29ee4c9ceba65c9d02ee28eb281",
+			"revisionTime": "2019-01-29T15:56:52Z"
+		},
+		{
 			"checksumSHA1": "P8gNPDuOzmiK4Lz9xG7OBy4Rlm8=",
 			"path": "github.com/hashicorp/terraform/flatmap",
 			"revision": "4596c44c05ca0be0b34ff30e26abc20b887c34e1",
@@ -361,6 +385,12 @@
 			"path": "github.com/mitchellh/mapstructure",
 			"revision": "f3009df150dadf309fdee4a54ed65c124afad715",
 			"revisionTime": "2016-10-20T16:18:36Z"
+		},
+		{
+			"checksumSHA1": "nxuST3bjBv5uDVPzrX9wdruOwv0=",
+			"path": "github.com/mitchellh/reflectwalk",
+			"revision": "eecee6c969c02c8cc2ae48e1e269843ae8590796",
+			"revisionTime": "2018-08-24T00:34:11Z"
 		},
 		{
 			"checksumSHA1": "GsU3DMfKXECkDJyjINXYr2Hj3Nc=",
