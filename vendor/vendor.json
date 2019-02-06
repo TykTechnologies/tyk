@@ -11,6 +11,12 @@
 			"versionExact": "1.0"
 		},
 		{
+			"checksumSHA1": "VDeo+UvCgVhgx7lAH+f4AdP7Fm0=",
+			"path": "github.com/Masterminds/sprig",
+			"revision": "2625cd487a689ca112e1301a58b89b347ba2c994",
+			"revisionTime": "2019-04-25T14:36:10Z"
+		},
+		{
 			"checksumSHA1": "NRonvQTe073YVead6//CQ5oVgK4=",
 			"path": "github.com/Sirupsen/logrus",
 			"revision": "1deb2db2a6fff8a35532079061b903c3a25eed52",

@@ -17,8 +17,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/TykTechnologies/tyk/rpc"
-
+	"github.com/Masterminds/sprig"
 	"github.com/Sirupsen/logrus"
 	circuit "github.com/rubyist/circuitbreaker"
 
@@ -26,6 +25,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/regexp"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -557,9 +557,17 @@ var apiTemplate = template.New("").Funcs(map[string]interface{}{
 	},
 })
 
+func (a APIDefinitionLoader) filterSprigFuncs() template.FuncMap {
+	tmp := sprig.GenericFuncMap()
+	delete(tmp, "env")
+	delete(tmp, "expandenv")
+
+	return template.FuncMap(tmp)
+}
+
 func (a APIDefinitionLoader) loadFileTemplate(path string) (*template.Template, error) {
 	log.Debug("-- Loading template: ", path)
-	return apiTemplate.New("").ParseFiles(path)
+	return apiTemplate.New("").Funcs(a.filterSprigFuncs()).ParseFiles(path)
 }
 
 func (a APIDefinitionLoader) loadBlobTemplate(blob string) (*template.Template, error) {
@@ -568,7 +576,7 @@ func (a APIDefinitionLoader) loadBlobTemplate(blob string) (*template.Template, 
 	if err != nil {
 		return nil, err
 	}
-	return apiTemplate.New("").Parse(string(uDec))
+	return apiTemplate.New("").Funcs(a.filterSprigFuncs()).Parse(string(uDec))
 }
 
 func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMeta, stat URLStatus) []URLSpec {
