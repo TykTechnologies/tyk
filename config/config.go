@@ -16,6 +16,11 @@ import (
 	"github.com/TykTechnologies/tyk/regexp"
 )
 
+const (
+	dnsCacheDefaultTtl           = 3600
+	dnsCacheDefaultCheckInterval = 60
+)
+
 var log = logger.Get()
 
 var global atomic.Value
@@ -343,8 +348,8 @@ var Default = Config{
 	},
 	DnsCache: DnsCacheConfig{
 		Enabled:       false,
-		TTL:           3600,
-		CheckInterval: 60,
+		TTL:           dnsCacheDefaultTtl,
+		CheckInterval: dnsCacheDefaultCheckInterval,
 	},
 }
 

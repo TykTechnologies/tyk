@@ -7,6 +7,7 @@ import (
 
 	"fmt"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/pmylund/go-cache"
 )
 
@@ -66,7 +67,10 @@ func (dc *DnsCacheStorage) FetchItem(hostName string) ([]string, error) {
 
 	item, ok := dc.Get(hostName)
 	if ok {
-		logger.Debugf("Dns record was populated from cache: hostName=%q, addrs=%q", hostName, item.addrs)
+		logger.WithFields(logrus.Fields{
+			"hostName": hostName,
+			"addrs":    item.addrs,
+		}).Debug("Dns record was populated from cache")
 		return item.addrs, nil
 	}
 

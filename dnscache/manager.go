@@ -7,7 +7,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 
-	"github.com/TykTechnologies/tyk/log"
+	log "github.com/TykTechnologies/tyk/log"
 )
 
 var (
@@ -88,12 +88,12 @@ func (m *DnsCacheManager) doCachedDial(d *net.Dialer, ctx context.Context, netwo
 
 	ips, err := m.cacheStorage.FetchItem(host)
 	if err != nil {
-		logger.WithFields(logrus.Fields{
+		logger.WithError(err).WithFields(logrus.Fields{
 			"network": network,
 			"address": address,
-		}).Errorf("doCachedDial cachedStorage.FetchItem error: %v. ips=%v", err.Error(), ips)
+		}).Errorf("doCachedDial cachedStorage.FetchItem error. ips=%v", ips)
 
-		return safeDial(ips[0]+":"+port, "")
+		return safeDial(address, "")
 	}
 
 	return safeDial(ips[0]+":"+port, host)

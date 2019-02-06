@@ -154,19 +154,13 @@ func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int)
 	mockServer.Handler = dnsMux
 
 	go func() {
-		err := mockServer.ActivateAndServe()
-		if err != nil {
-			startResultChannel <- err
-			return
-		}
-		startResultChannel <- nil
+		startResultChannel <- mockServer.ActivateAndServe()
 	}()
-	select {
-	case err := <-startResultChannel:
-		if err != nil {
-			close(startResultChannel)
-			return handle, err
-		}
+
+	err = <-startResultChannel
+	if err != nil {
+		close(startResultChannel)
+		return handle, err
 	}
 
 	muDefaultResolver.RLock()
