@@ -2,8 +2,11 @@ package dnscache
 
 import (
 	"context"
+	"math/rand"
 	"net"
 	"time"
+
+	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/Sirupsen/logrus"
 
@@ -22,6 +25,7 @@ type IDnsCacheManager interface {
 	WrapDialer(dialer *net.Dialer) DialContextFunc
 	SetCacheStorage(cache IDnsCacheStorage)
 	CacheStorage() IDnsCacheStorage
+	IsCacheEnabled() bool
 	DisposeCache()
 }
 
@@ -39,11 +43,12 @@ type IDnsCacheStorage interface {
 // It allows to init dns caching and to hook into net/http dns resolution chain in order to cache query response ip records.
 type DnsCacheManager struct {
 	cacheStorage IDnsCacheStorage
+	strategy     config.IPsHandleStrategy
 }
 
 // NewDnsCacheManager returns new empty/non-initialized DnsCacheManager
-func NewDnsCacheManager() *DnsCacheManager {
-	return &DnsCacheManager{nil}
+func NewDnsCacheManager(multipleIPsHandleStrategy config.IPsHandleStrategy) *DnsCacheManager {
+	return &DnsCacheManager{nil, multipleIPsHandleStrategy}
 }
 
 func (m *DnsCacheManager) SetCacheStorage(cache IDnsCacheStorage) {
@@ -52,6 +57,10 @@ func (m *DnsCacheManager) SetCacheStorage(cache IDnsCacheStorage) {
 
 func (m *DnsCacheManager) CacheStorage() IDnsCacheStorage {
 	return m.cacheStorage
+}
+
+func (m *DnsCacheManager) IsCacheEnabled() bool {
+	return m.cacheStorage != nil
 }
 
 // WrapDialer returns wrapped version of net.Dialer#DialContext func with hooked up caching of dns queries.
@@ -73,7 +82,7 @@ func (m *DnsCacheManager) doCachedDial(d *net.Dialer, ctx context.Context, netwo
 		return conn, err
 	}
 
-	if m.cacheStorage == nil {
+	if !m.IsCacheEnabled() {
 		return safeDial(address, "")
 	}
 
@@ -96,6 +105,21 @@ func (m *DnsCacheManager) doCachedDial(d *net.Dialer, ctx context.Context, netwo
 		return safeDial(address, "")
 	}
 
+	if m.strategy == config.NoCacheStrategy {
+		if len(ips) > 1 {
+			m.cacheStorage.Delete(host)
+			return safeDial(ips[0]+":"+port, "")
+		}
+	}
+
+	if m.strategy == config.RandomStrategy {
+		if len(ips) > 1 {
+			rand.Seed(int64(len(ips)))
+			ip := ips[rand.Intn(len(ips))]
+			return safeDial(ip+":"+port, host)
+		}
+	}
+
 	return safeDial(ips[0]+":"+port, host)
 }
 
@@ -104,10 +128,10 @@ func (m *DnsCacheManager) doCachedDial(d *net.Dialer, ctx context.Context, netwo
 //
 // Otherwise leave storage as is.
 func (m *DnsCacheManager) InitDNSCaching(ttl, checkInterval time.Duration) {
-	if m.cacheStorage == nil {
+	if !m.IsCacheEnabled() {
 		logger.Infof("Initializing dns cache with ttl=%s, duration=%s", ttl, checkInterval)
 		storage := NewDnsCacheStorage(ttl, checkInterval)
-		m.cacheStorage = IDnsCacheStorage(storage)
+		m.SetCacheStorage(IDnsCacheStorage(storage))
 	}
 }
 

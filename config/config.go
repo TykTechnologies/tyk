@@ -93,9 +93,9 @@ type HealthCheckConfig struct {
 }
 
 type DnsCacheConfig struct {
-	Enabled                   bool   `json:"enabled"`
-	TTL                       int64  `json:"ttl"`
-	CheckInterval             int64  `json:"-" ignored:"true"` //controls cache cleanup interval. By convention shouldn't be exposed to config or env_variable_setup
+	Enabled                   bool              `json:"enabled"`
+	TTL                       int64             `json:"ttl"`
+	CheckInterval             int64             `json:"-" ignored:"true"` //controls cache cleanup interval. By convention shouldn't be exposed to config or env_variable_setup
 	MultipleIPsHandleStrategy IPsHandleStrategy `json:"multiple_ips_handle_strategy"`
 }
 

@@ -17,21 +17,23 @@ var (
 )
 
 const (
-	host          = "orig-host.com."
-	host2         = "orig-host2.com."
-	host3         = "some.orig-host3.com"
-	host4         = "some.orig-host4.com"
-	hostErrorable = "unknown.orig-host.com."
-	wsHost        = "ws.orig-host.com."
+	host             = "orig-host.com."
+	singleRecordHost = "single.orig-host.com."
+	host2            = "orig-host2.com."
+	host3            = "some.orig-host3.com"
+	host4            = "some.orig-host4.com"
+	hostErrorable    = "unknown.orig-host.com."
+	wsHost           = "ws.orig-host.com."
 )
 
 var (
 	etcHostsMap = map[string][]string{
-		host:   {"127.0.0.1", "127.0.0.2"},
-		host2:  {"10.0.2.0", "10.0.2.1", "10.0.2.2"},
-		host3:  {"10.0.2.15", "10.0.2.16"},
-		host4:  {"10.0.2.11", "10.0.2.10"},
-		wsHost: {"127.0.0.1", "127.0.0.1"},
+		singleRecordHost: {"10.0.2.10"},
+		host:             {"127.0.0.1", "127.0.0.2", "127.0.0.3", "127.0.0.4", "127.0.0.5", "127.0.0.6"},
+		host2:            {"10.0.2.0", "10.0.2.1", "10.0.2.2"},
+		host3:            {"10.0.2.15", "10.0.2.16"},
+		host4:            {"10.0.2.11", "10.0.2.10"},
+		wsHost:           {"127.0.0.1", "127.0.0.1"},
 	}
 
 	etcHostsErrorMap = map[string]int{

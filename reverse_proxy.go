@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	cache "github.com/pmylund/go-cache"
+	"github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -309,12 +309,18 @@ func defaultTransport(dialerTimeout int) *http.Transport {
 		timeout = dialerTimeout
 	}
 
+	dialer := &net.Dialer{
+		Timeout:   time.Duration(timeout) * time.Second,
+		KeepAlive: 30 * time.Second,
+		DualStack: true,
+	}
+	dialContextFunc := dialer.DialContext
+	if dnsCacheManager.IsCacheEnabled() {
+		dialContextFunc = dnsCacheManager.WrapDialer(dialer)
+	}
+
 	return &http.Transport{
-		DialContext: dnsCacheManager.WrapDialer(&net.Dialer{
-			Timeout:   time.Duration(timeout) * time.Second,
-			KeepAlive: 30 * time.Second,
-			DualStack: true,
-		}),
+		DialContext:           dialContextFunc,
 		MaxIdleConns:          config.Global().MaxIdleConns,
 		MaxIdleConnsPerHost:   config.Global().MaxIdleConnsPerHost, // default is 100
 		ResponseHeaderTimeout: time.Duration(dialerTimeout) * time.Second,

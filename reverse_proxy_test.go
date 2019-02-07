@@ -79,7 +79,8 @@ type configTestReverseProxyDnsCache struct {
 
 func setupTestReverseProxyDnsCache(cfg *configTestReverseProxyDnsCache) func() {
 	pullDomains := mockHandle.PushDomains(cfg.etcHostsMap, nil)
-	dnsCacheManager.InitDNSCaching(time.Duration(cfg.dnsConfig.TTL)*time.Second, time.Duration(cfg.dnsConfig.CheckInterval)*time.Second)
+	dnsCacheManager.InitDNSCaching(
+		time.Duration(cfg.dnsConfig.TTL)*time.Second, time.Duration(cfg.dnsConfig.CheckInterval)*time.Second)
 
 	globalConf := config.Global()
 	enableWebSockets := globalConf.HttpServerOptions.EnableWebSockets
@@ -123,7 +124,9 @@ func TestReverseProxyDnsCache(t *testing.T) {
 	)
 
 	tearDown := setupTestReverseProxyDnsCache(&configTestReverseProxyDnsCache{t, etcHostsMap,
-		config.DnsCacheConfig{Enabled: true, TTL: cacheTTL, CheckInterval: cacheUpdateInterval}})
+		config.DnsCacheConfig{
+			Enabled: true, TTL: cacheTTL, CheckInterval: cacheUpdateInterval,
+			MultipleIPsHandleStrategy: config.PickFirstStrategy}})
 
 	currentStorage := dnsCacheManager.CacheStorage()
 	falseDeleteStorage := &dnscache.MockStorage{
