@@ -29,7 +29,7 @@ const (
 var (
 	etcHostsMap = map[string][]string{
 		singleRecordHost: {"10.0.2.10"},
-		host:             {"127.0.0.1", "127.0.0.2", "127.0.0.3", "127.0.0.4", "127.0.0.5", "127.0.0.6"},
+		host:             {"127.0.0.1", "127.0.0.2", "127.0.0.3"},
 		host2:            {"10.0.2.0", "10.0.2.1", "10.0.2.2"},
 		host3:            {"10.0.2.15", "10.0.2.16"},
 		host4:            {"10.0.2.11", "10.0.2.10"},
@@ -138,11 +138,11 @@ func TestStorageFetchItem(t *testing.T) {
 					t.Fatalf("Host addresses weren't found in cache; host %q", tc.Host)
 				}
 
-				if !record.IsEqualsTo(tc.ExpectedIPs) {
+				if !test.IsDnsRecordsAddrsEqualsTo(record.Addrs, tc.ExpectedIPs) {
 					t.Fatalf("wanted cached ips %v, got record %v", tc.ExpectedIPs, record)
 				}
 			} else {
-				if got, ok := dnsCache.Get(tc.Host); !got.IsEqualsTo(nil) || ok {
+				if got, ok := dnsCache.Get(tc.Host); !test.IsDnsRecordsAddrsEqualsTo(got.Addrs, nil) || ok {
 					t.Fatalf("wanted FetchItem to omit write to cache. got %#v, ok=%t", got, ok)
 				}
 			}
@@ -258,13 +258,13 @@ func TestStorageRecordExpiration(t *testing.T) {
 
 			if tc.checkInterval == -1 {
 				for _, r := range tc.records {
-					if item, ok := dnsCache.Items(true)[r.dns]; !ok || !item.IsEqualsTo(r.addrs) {
+					if item, ok := dnsCache.Items(true)[r.dns]; !ok || !test.IsDnsRecordsAddrsEqualsTo(item.Addrs, r.addrs) {
 						t.Fatalf("wanted expired cached ips %v, got item %#v. items=%+v, ok=%t", r.addrs, item, dnsCache.Items(true), ok)
 					}
 				}
 			} else {
 				for _, r := range tc.notExpiredAfterDelay {
-					if item, ok := dnsCache.Get(r.dns); !ok || !item.IsEqualsTo(r.addrs) {
+					if item, ok := dnsCache.Get(r.dns); !ok || !test.IsDnsRecordsAddrsEqualsTo(item.Addrs, r.addrs) {
 						t.Fatalf("wanted cached ips %v, got item %#v. items=%+v, ok=%t", r.addrs, item, dnsCache.Items(false), ok)
 					}
 				}

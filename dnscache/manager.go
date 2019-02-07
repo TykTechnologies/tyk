@@ -132,7 +132,7 @@ func (m *DnsCacheManager) getRandomIp(ips []string) (string, error) {
 			m.rand = rand.New(source)
 		}
 
-		ip := ips[rand.Intn(len(ips))]
+		ip := ips[m.rand.Intn(len(ips))]
 
 		return ip, nil
 	}

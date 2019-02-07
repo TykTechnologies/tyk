@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"github.com/TykTechnologies/tyk/test"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -251,7 +252,7 @@ func TestReverseProxyDnsCache(t *testing.T) {
 			host := Url.Hostname()
 			if tc.isCacheEnabled {
 				item, ok := storage.Get(host)
-				if !ok || !item.IsEqualsTo(tc.expectedIPs) {
+				if !ok || !test.IsDnsRecordsAddrsEqualsTo(item.Addrs, tc.expectedIPs) {
 					t.Fatalf("got %q, but wanted %q. ok=%t", item, tc.expectedIPs, ok)
 				}
 			} else {

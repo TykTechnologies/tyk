@@ -2,7 +2,6 @@ package dnscache
 
 import (
 	"net"
-	"reflect"
 	"time"
 
 	"fmt"
@@ -13,11 +12,7 @@ import (
 
 // DnsCacheItem represents single record in cache
 type DnsCacheItem struct {
-	addrs []string
-}
-
-func (item *DnsCacheItem) IsEqualsTo(addrs []string) bool {
-	return reflect.DeepEqual(item.addrs, addrs)
+	Addrs []string
 }
 
 // DnsCacheStorage is an in-memory cache of auto-purged dns query ip responses
@@ -69,9 +64,9 @@ func (dc *DnsCacheStorage) FetchItem(hostName string) ([]string, error) {
 	if ok {
 		logger.WithFields(logrus.Fields{
 			"hostName": hostName,
-			"addrs":    item.addrs,
+			"addrs":    item.Addrs,
 		}).Debug("Dns record was populated from cache")
-		return item.addrs, nil
+		return item.Addrs, nil
 	}
 
 	addrs, err := dc.resolveDNSRecord(hostName)

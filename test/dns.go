@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"reflect"
 	"regexp"
 
 	"time"
@@ -191,4 +192,8 @@ func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int)
 	}
 
 	return handle, nil
+}
+
+func IsDnsRecordsAddrsEqualsTo(itemAddrs, addrs []string) bool {
+	return reflect.DeepEqual(itemAddrs, addrs)
 }
