@@ -16,9 +16,15 @@ import (
 	"github.com/TykTechnologies/tyk/regexp"
 )
 
+type IPsHandleStrategy string
+
 const (
 	dnsCacheDefaultTtl           = 3600
 	dnsCacheDefaultCheckInterval = 60
+
+	PickFirstStrategy IPsHandleStrategy = "pick_first"
+	RandomStrategy    IPsHandleStrategy = "random"
+	NoCacheStrategy   IPsHandleStrategy = "no_cache"
 )
 
 var log = logger.Get()
@@ -87,9 +93,10 @@ type HealthCheckConfig struct {
 }
 
 type DnsCacheConfig struct {
-	Enabled       bool  `json:"enabled"`
-	TTL           int64 `json:"ttl"`
-	CheckInterval int64 `json:"-"` //controls cache cleanup interval. By convention shouldn't be exposed to config
+	Enabled                   bool   `json:"enabled"`
+	TTL                       int64  `json:"ttl"`
+	CheckInterval             int64  `json:"-" ignored:"true"` //controls cache cleanup interval. By convention shouldn't be exposed to config or env_variable_setup
+	MultipleIPsHandleStrategy IPsHandleStrategy `json:"multiple_ips_handle_strategy"`
 }
 
 type MonitorConfig struct {
@@ -347,9 +354,10 @@ var Default = Config{
 		IgnoredIPs: make([]string, 0),
 	},
 	DnsCache: DnsCacheConfig{
-		Enabled:       false,
-		TTL:           dnsCacheDefaultTtl,
-		CheckInterval: dnsCacheDefaultCheckInterval,
+		Enabled:                   false,
+		TTL:                       dnsCacheDefaultTtl,
+		CheckInterval:             dnsCacheDefaultCheckInterval,
+		MultipleIPsHandleStrategy: NoCacheStrategy,
 	},
 }
 

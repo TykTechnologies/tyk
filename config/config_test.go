@@ -37,7 +37,14 @@ func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
 		{
 			"CheckInterval", "TYK_GW_DNSCACHE_CHECKINTERVAL",
 			func(c *Config) interface{} { return c.DnsCache.CheckInterval },
-			int64(60), int64(120),
+			int64(60),
+			int64(60), //CheckInterval shouldn't be configured from *.conf and env var
+		},
+		{
+			"CheckMultipleIPsHandleStrategy", "TYK_GW_DNSCACHE_MULTIPLEIPSHANDLESTRATEGY",
+			func(c *Config) interface{} { return c.DnsCache.MultipleIPsHandleStrategy },
+			NoCacheStrategy,
+			RandomStrategy,
 		},
 	}
 
@@ -50,7 +57,7 @@ func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
 				t.Fatal(err)
 			}
 			if !reflect.DeepEqual(tc.FieldGetter(conf), tc.defaultValue) {
-				t.Fatalf("Expected %s to be set to its default %s, but got %s", tc.FieldName, tc.defaultValue, tc.FieldGetter(conf))
+				t.Fatalf("Expected %v to be set to its default %v, but got %v", tc.FieldName, tc.defaultValue, tc.FieldGetter(conf))
 			}
 			expectedValue := fmt.Sprint(tc.expectedValue)
 			os.Setenv(tc.EnvVarName, expectedValue)
@@ -58,7 +65,7 @@ func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
 				t.Fatal(err)
 			}
 			if !reflect.DeepEqual(tc.FieldGetter(conf), tc.expectedValue) {
-				t.Fatalf("Expected %s to be set to %s, but got %s", tc.FieldName, tc.expectedValue, tc.FieldGetter(conf))
+				t.Fatalf("Expected %s to be set to %v, but got %v", tc.FieldName, tc.expectedValue, tc.FieldGetter(conf))
 			}
 		})
 	}

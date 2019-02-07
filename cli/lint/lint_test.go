@@ -87,6 +87,10 @@ var tests = []struct {
 		"ExtraDnsCacheCheckInterval", `{"dns_cache": { "enabled": true, "ttl": -1, "check_interval": 2500 } }`,
 		`check_interval: Additional property check_interval is not allowed`,
 	},
+	{
+		"InvalidDnsCacheMultipleIPsHandleStrategy", `{"dns_cache": { "enabled": true, "ttl": 1, "multiple_ips_handle_strategy": "true" } }`,
+		`dns_cache.multiple_ips_handle_strategy: dns_cache.multiple_ips_handle_strategy must be one of the following: "pick_first", "random", "no_cache"`,
+	},
 }
 
 func allContains(got, want []string) bool {
