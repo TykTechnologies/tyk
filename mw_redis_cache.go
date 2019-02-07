@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/murmur3"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/storage"
 )
@@ -56,7 +57,10 @@ func (m *RedisCacheMiddleware) CreateCheckSum(req *http.Request, keyName string)
 				return "", err
 			}
 			req.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
-			io.WriteString(h, string(bodyBytes))
+
+			hasher := murmur3.New128()
+			hasher.Write(bodyBytes)
+			io.WriteString(h, string(hasher.Sum(nil)))
 		}
 	}
 
