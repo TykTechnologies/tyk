@@ -89,7 +89,7 @@ type HealthCheckConfig struct {
 type DnsCacheConfig struct {
 	Enabled       bool  `json:"enabled"`
 	TTL           int64 `json:"ttl"`
-	CheckInterval int64 `json:"check_interval"`
+	CheckInterval int64 `json:"-"` //controls cache cleanup interval. By convention shouldn't be exposed to config
 }
 
 type MonitorConfig struct {

@@ -83,6 +83,10 @@ var tests = []struct {
 		"BadDnsCacheTTL", `{"dns_cache": { "enabled": false, "ttl": -2 } }`,
 		`dns_cache.ttl: Must be greater than or equal to -1`,
 	},
+	{
+		"ExtraDnsCacheCheckInterval", `{"dns_cache": { "enabled": true, "ttl": -1, "check_interval": 2500 } }`,
+		`check_interval: Additional property check_interval is not allowed`,
+	},
 }
 
 func allContains(got, want []string) bool {

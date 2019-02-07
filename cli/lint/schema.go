@@ -314,9 +314,6 @@ const confSchema = `{
 			"ttl": {
 				"type": "integer",
 				"minimum": -1
-			},
-			"check_interval": {
-				"type": "integer"
 			}
 		}
 	},

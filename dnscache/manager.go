@@ -7,7 +7,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 
-	log "github.com/TykTechnologies/tyk/log"
+	"github.com/TykTechnologies/tyk/log"
 )
 
 var (
