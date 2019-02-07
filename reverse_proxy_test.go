@@ -126,7 +126,7 @@ func TestReverseProxyDnsCache(t *testing.T) {
 	tearDown := setupTestReverseProxyDnsCache(&configTestReverseProxyDnsCache{t, etcHostsMap,
 		config.DnsCacheConfig{
 			Enabled: true, TTL: cacheTTL, CheckInterval: cacheUpdateInterval,
-			MultipleIPsHandleStrategy: config.PickFirstStrategy}})
+			MultipleIPsHandleStrategy: config.NoCacheStrategy}})
 
 	currentStorage := dnsCacheManager.CacheStorage()
 	falseDeleteStorage := &dnscache.MockStorage{

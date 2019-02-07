@@ -2,6 +2,7 @@ package dnscache
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"net"
 	"time"
@@ -44,11 +45,13 @@ type IDnsCacheStorage interface {
 type DnsCacheManager struct {
 	cacheStorage IDnsCacheStorage
 	strategy     config.IPsHandleStrategy
+	rand         *rand.Rand
 }
 
 // NewDnsCacheManager returns new empty/non-initialized DnsCacheManager
 func NewDnsCacheManager(multipleIPsHandleStrategy config.IPsHandleStrategy) *DnsCacheManager {
-	return &DnsCacheManager{nil, multipleIPsHandleStrategy}
+	manager := &DnsCacheManager{nil, multipleIPsHandleStrategy, nil}
+	return manager
 }
 
 func (m *DnsCacheManager) SetCacheStorage(cache IDnsCacheStorage) {
@@ -114,13 +117,29 @@ func (m *DnsCacheManager) doCachedDial(d *net.Dialer, ctx context.Context, netwo
 
 	if m.strategy == config.RandomStrategy {
 		if len(ips) > 1 {
-			rand.Seed(int64(len(ips)))
-			ip := ips[rand.Intn(len(ips))]
+			ip, _ := m.getRandomIp(ips)
 			return safeDial(ip+":"+port, host)
 		}
 	}
 
 	return safeDial(ips[0]+":"+port, host)
+}
+
+func (m *DnsCacheManager) getRandomIp(ips []string) (string, error) {
+	if m.strategy == config.RandomStrategy {
+		if m.rand == nil {
+			source := rand.NewSource(time.Now().Unix())
+			m.rand = rand.New(source)
+		}
+
+		ip := ips[rand.Intn(len(ips))]
+
+		return ip, nil
+	}
+
+	return "", fmt.Errorf(
+		"getRandomIp can be called only with %v strategy. strategy=%v",
+		config.RandomStrategy, m.strategy)
 }
 
 // InitDNSCaching initializes manager's cache storage if it wasn't initialized before with provided ttl, checkinterval values

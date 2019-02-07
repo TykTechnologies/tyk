@@ -15,18 +15,18 @@ func TestWrapDialerDialContextFunc(t *testing.T) {
 	defer tearDownTestStorageFetchItem()
 
 	expectedHost := "orig-host.com"
-	expecteSingleIpHost := "single.orig-host.com"
+	expectedSingleIpHost := "single.orig-host.com"
 	hostWithPort := expectedHost + ":8078"
-	singleIpHostWithPort := expecteSingleIpHost + ":8078"
+	singleIpHostWithPort := expectedSingleIpHost + ":8078"
 	dialerContext, cancel := context.WithCancel(context.TODO())
 	cancel()
 
 	cases := []struct {
 		name string
 
-		address     string
-		strategy    config.IPsHandleStrategy
-		initStorage bool
+		address          string
+		multiIPsStrategy config.IPsHandleStrategy
+		initStorage      bool
 
 		shouldCallFetchItem bool
 		shouldCallDelete    bool
@@ -36,30 +36,30 @@ func TestWrapDialerDialContextFunc(t *testing.T) {
 		{
 			"PickFirstStrategy(1 ip): Should parse address, call storage.FetchItem, cache ip, call storage.Delete on DialContext error",
 			singleIpHostWithPort, config.PickFirstStrategy, true,
-			true, true, expecteSingleIpHost, "operation was canceled",
+			true, true, expectedSingleIpHost, "operation was canceled",
 		},
 		{
-			"PickFirstStrategy(>1 ip): Should parse address, call storage.FetchItem, cache ip, call storage.Delete on DialContext error",
+			"PickFirstStrategy(>1 ip): Should parse address, call storage.FetchItem, cache all ips, call storage.Delete on DialContext error",
 			hostWithPort, config.PickFirstStrategy, true,
 			true, true, expectedHost, "operation was canceled",
 		},
 		{
 			"NoCacheStrategy(1 ip): Should parse address, call storage.FetchItem, cache ip, call storage.Delete on DialContext error",
 			singleIpHostWithPort, config.NoCacheStrategy, true,
-			true, true, expecteSingleIpHost, "operation was canceled",
+			true, true, expectedSingleIpHost, "operation was canceled",
 		},
 		{
-			"NoCacheStrategy(>1 ip): Should parse address, call storage.FetchItem, omit cache, call storage.Delete on DialContext error",
+			"NoCacheStrategy(>1 ip): Should parse address, call storage.FetchItem, remove ips caching",
 			hostWithPort, config.NoCacheStrategy, true,
 			true, true, expectedHost, "operation was canceled",
 		},
 		{
 			"RandomStrategy(1 ip): Should parse address, call storage.FetchItem, cache ip, call storage.Delete on DialContext error",
 			singleIpHostWithPort, config.RandomStrategy, true,
-			true, true, expecteSingleIpHost, "operation was canceled",
+			true, true, expectedSingleIpHost, "operation was canceled",
 		},
 		{
-			"RandomStrategy(>1 ip): Should parse address, call storage.FetchItem, cache ip, call storage.Delete on DialContext error",
+			"RandomStrategy(>1 ip): Should parse address, call storage.FetchItem, cache all ips, connect to random ip, call storage.Delete on DialContext error",
 			hostWithPort, config.RandomStrategy, true,
 			true, true, expectedHost, "operation was canceled",
 		},
@@ -105,7 +105,7 @@ func TestWrapDialerDialContextFunc(t *testing.T) {
 					deleteCall.key = key
 				}, func() {}}
 
-			dnsManager := NewDnsCacheManager(tc.strategy)
+			dnsManager := NewDnsCacheManager(tc.multiIPsStrategy)
 			if tc.initStorage {
 				dnsManager.SetCacheStorage(storage)
 			}
