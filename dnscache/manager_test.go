@@ -19,7 +19,7 @@ func TestWrapDialerDialContextFunc(t *testing.T) {
 	hostWithPort := expectedHost + ":8078"
 	singleIpHostWithPort := expectedSingleIpHost + ":8078"
 	dialerContext, cancel := context.WithCancel(context.TODO())
-	cancel()
+	cancel() //Manually disable connection establishment
 
 	cases := []struct {
 		name string
@@ -54,11 +54,6 @@ func TestWrapDialerDialContextFunc(t *testing.T) {
 			true, true, expectedHost, "operation was canceled",
 		},
 		{
-			"RandomStrategy(1 ip): Should parse address, call storage.FetchItem, cache ip, call storage.Delete on DialContext error",
-			singleIpHostWithPort, config.RandomStrategy, true,
-			true, true, expectedSingleIpHost, "operation was canceled",
-		},
-		{
 			"RandomStrategy(>1 ip): Should parse address, call storage.FetchItem, cache all ips, connect to random ip, call storage.Delete on DialContext error",
 			hostWithPort, config.RandomStrategy, true,
 			true, true, expectedHost, "operation was canceled",
@@ -85,7 +80,6 @@ func TestWrapDialerDialContextFunc(t *testing.T) {
 			var fetchItemCall, deleteCall struct {
 				called bool
 				key    string
-				times  int
 			}
 
 			storage := &MockStorage{func(key string) ([]string, error) {
@@ -100,7 +94,6 @@ func TestWrapDialerDialContextFunc(t *testing.T) {
 				return DnsCacheItem{}, false
 			}, func(key string, addrs []string) {},
 				func(key string) {
-					deleteCall.times += 1
 					deleteCall.called = true
 					deleteCall.key = key
 				}, func() {}}

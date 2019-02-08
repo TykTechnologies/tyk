@@ -120,6 +120,7 @@ func (m *DnsCacheManager) doCachedDial(d *net.Dialer, ctx context.Context, netwo
 			ip, _ := m.getRandomIp(ips)
 			return safeDial(ip+":"+port, host)
 		}
+		return safeDial(ips[0]+":"+port, host)
 	}
 
 	return safeDial(ips[0]+":"+port, host)

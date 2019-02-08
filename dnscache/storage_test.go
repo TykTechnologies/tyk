@@ -171,6 +171,17 @@ func TestStorageRecordExpiration(t *testing.T) {
 		checkInterval        int
 	}{
 		{
+			"Shouldn't remove dns record when ttl/expiration < 1",
+			[]testRecord{
+				{dns: host, addrs: etcHostsMap[host]},
+			},
+			time.Duration(checkInterval+10) * time.Millisecond,
+			[]testRecord{
+				{dns: host, addrs: etcHostsMap[host]},
+			},
+			checkInterval,
+		},
+		{
 			"Should remove single dns record after expiration",
 			[]testRecord{
 				{dns: host, addrs: etcHostsMap[host]},
