@@ -46,6 +46,7 @@ type OAuthClient struct {
 	ClientRedirectURI string      `json:"redirecturi"`
 	MetaData          interface{} `json:"meta_data,omitempty"`
 	PolicyID          string      `json:"policyid"`
+	Description       string      `json:"description"`
 }
 
 func (oc *OAuthClient) GetId() string {
@@ -68,17 +69,21 @@ func (oc *OAuthClient) GetPolicyID() string {
 	return oc.PolicyID
 }
 
-// OAuthNotificationType const to reduce risk of colisions
+func (oc *OAuthClient) GetDescription() string {
+	return oc.Description
+}
+
+// OAuthNotificationType const to reduce risk of collisions
 type OAuthNotificationType string
 
-// Notifcation codes for new and refresh codes
+// Notification codes for new and refresh codes
 const (
 	newAccessToken     OAuthNotificationType = "new"
 	refreshAccessToken OAuthNotificationType = "refresh"
 )
 
 // NewOAuthNotification is a notification sent to a
-// webhook when an access request or a refresh request comes in.
+// web-hook when an access request or a refresh request comes in.
 type NewOAuthNotification struct {
 	AuthCode         string                `json:"auth_code"`
 	NewOAuthToken    string                `json:"new_oauth_token"`
@@ -365,6 +370,11 @@ type OAuthClientToken struct {
 	Expires int64  `json:"expires"`
 }
 
+type ExtendedOsinClientInterface interface {
+	osin.Client
+	GetDescription() string
+}
+
 type ExtendedOsinStorageInterface interface {
 	osin.Storage
 
@@ -374,9 +384,14 @@ type ExtendedOsinStorageInterface interface {
 	// Custom getter to handle prefixing issues in Redis
 	GetClientNoPrefix(id string) (osin.Client, error)
 
+	GetExtendedClient(id string) (ExtendedOsinClientInterface, error)
+
+	// Custom getter to handle prefixing issues in Redis
+	GetExtendedClientNoPrefix(id string) (ExtendedOsinClientInterface, error)
+
 	GetClientTokens(id string) ([]OAuthClientToken, error)
 
-	GetClients(filter string, ignorePrefix bool) ([]osin.Client, error)
+	GetClients(filter string, ignorePrefix bool) ([]ExtendedOsinClientInterface, error)
 
 	DeleteClient(id string, ignorePrefix bool) error
 
@@ -461,15 +476,26 @@ func (r *RedisOsinStorageInterface) GetClientNoPrefix(id string) (osin.Client, e
 	}
 
 	client := new(OAuthClient)
-	if err := json.Unmarshal([]byte(clientJSON), &client); err != nil {
+	if err := json.Unmarshal([]byte(clientJSON), client); err != nil {
 		log.Error("Couldn't unmarshal OAuth client object: ", err)
 	}
 
 	return client, nil
 }
 
+func (r *RedisOsinStorageInterface) GetExtendedClient(id string) (ExtendedOsinClientInterface, error) {
+	osinClient, err := r.GetClient(id)
+	return osinClient.(*OAuthClient), err
+}
+
+// GetExtendedClientNoPrefix custom getter to handle prefixing issues in Redis,
+func (r *RedisOsinStorageInterface) GetExtendedClientNoPrefix(id string) (ExtendedOsinClientInterface, error) {
+	osinClient, err := r.GetClientNoPrefix(id)
+	return osinClient.(*OAuthClient), err
+}
+
 // GetClients will retrieve a list of clients for a prefix
-func (r *RedisOsinStorageInterface) GetClients(filter string, ignorePrefix bool) ([]osin.Client, error) {
+func (r *RedisOsinStorageInterface) GetClients(filter string, ignorePrefix bool) ([]ExtendedOsinClientInterface, error) {
 	key := prefixClient + filter
 	if ignorePrefix {
 		key = filter
@@ -486,7 +512,7 @@ func (r *RedisOsinStorageInterface) GetClients(filter string, ignorePrefix bool)
 		}
 	}
 
-	theseClients := []osin.Client{}
+	theseClients := []ExtendedOsinClientInterface{}
 	for _, clientJSON := range clientJSON {
 		client := new(OAuthClient)
 		if err := json.Unmarshal([]byte(clientJSON), &client); err != nil {
