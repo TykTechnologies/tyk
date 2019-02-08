@@ -127,20 +127,20 @@ func (m *DnsCacheManager) doCachedDial(d *net.Dialer, ctx context.Context, netwo
 }
 
 func (m *DnsCacheManager) getRandomIp(ips []string) (string, error) {
-	if m.strategy == config.RandomStrategy {
-		if m.rand == nil {
-			source := rand.NewSource(time.Now().Unix())
-			m.rand = rand.New(source)
-		}
-
-		ip := ips[m.rand.Intn(len(ips))]
-
-		return ip, nil
+	if m.strategy != config.RandomStrategy {
+		return "", fmt.Errorf(
+			"getRandomIp can be called only with %v strategy. strategy=%v",
+			config.RandomStrategy, m.strategy)
 	}
 
-	return "", fmt.Errorf(
-		"getRandomIp can be called only with %v strategy. strategy=%v",
-		config.RandomStrategy, m.strategy)
+	if m.rand == nil {
+		source := rand.NewSource(time.Now().Unix())
+		m.rand = rand.New(source)
+	}
+
+	ip := ips[m.rand.Intn(len(ips))]
+
+	return ip, nil
 }
 
 // InitDNSCaching initializes manager's cache storage if it wasn't initialized before with provided ttl, checkinterval values

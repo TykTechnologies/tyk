@@ -131,7 +131,7 @@ func TestReverseProxyDnsCache(t *testing.T) {
 			MultipleIPsHandleStrategy: config.NoCacheStrategy}})
 
 	currentStorage := dnsCacheManager.CacheStorage()
-	falseDeleteStorage := &dnscache.MockStorage{
+	fakeDeleteStorage := &dnscache.MockStorage{
 		MockFetchItem: currentStorage.FetchItem,
 		MockGet:       currentStorage.Get,
 		MockSet:       currentStorage.Set,
@@ -139,7 +139,7 @@ func TestReverseProxyDnsCache(t *testing.T) {
 			//prevent deletion
 		},
 		MockClear: currentStorage.Clear}
-	dnsCacheManager.SetCacheStorage(falseDeleteStorage)
+	dnsCacheManager.SetCacheStorage(fakeDeleteStorage)
 
 	defer tearDown()
 
