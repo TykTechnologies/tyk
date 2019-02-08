@@ -628,6 +628,8 @@ func generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.Se
 	session.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
 	session.Rate = policy.Rate
 	session.Per = policy.Per
+	session.ThrottleInterval = policy.ThrottleInterval
+	session.ThrottleRetryLimit = policy.ThrottleRetryLimit
 	session.QuotaMax = policy.QuotaMax
 	session.QuotaRenewalRate = policy.QuotaRenewalRate
 	session.AccessRights = make(map[string]user.AccessDefinition)

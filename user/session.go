@@ -22,13 +22,15 @@ type AccessSpec struct {
 
 // APILimit stores quota and rate limit on ACL level (per API)
 type APILimit struct {
-	Rate             float64 `json:"rate" msg:"rate"`
-	Per              float64 `json:"per" msg:"per"`
-	QuotaMax         int64   `json:"quota_max" msg:"quota_max"`
-	QuotaRenews      int64   `json:"quota_renews" msg:"quota_renews"`
-	QuotaRemaining   int64   `json:"quota_remaining" msg:"quota_remaining"`
-	QuotaRenewalRate int64   `json:"quota_renewal_rate" msg:"quota_renewal_rate"`
-	SetByPolicy      bool    `json:"set_by_policy" msg:"set_by_policy"`
+	Rate               float64 `json:"rate" msg:"rate"`
+	Per                float64 `json:"per" msg:"per"`
+	ThrottleInterval   float64 `json:"throttle_interval" msg:"throttle_interval"`
+	ThrottleRetryLimit int     `json:"throttle_retry_limit" msg:"throttle_retry_limit"`
+	QuotaMax           int64   `json:"quota_max" msg:"quota_max"`
+	QuotaRenews        int64   `json:"quota_renews" msg:"quota_renews"`
+	QuotaRemaining     int64   `json:"quota_remaining" msg:"quota_remaining"`
+	QuotaRenewalRate   int64   `json:"quota_renewal_rate" msg:"quota_renewal_rate"`
+	SetByPolicy        bool    `json:"set_by_policy" msg:"set_by_policy"`
 }
 
 // AccessDefinition defines which versions of an API a key has access to
@@ -43,21 +45,23 @@ type AccessDefinition struct {
 // SessionState objects represent a current API session, mainly used for rate limiting.
 // There's a data structure that's based on this and it's used for Protocol Buffer support, make sure to update "coprocess/proto/coprocess_session_state.proto" and generate the bindings using: cd coprocess/proto && ./update_bindings.sh
 type SessionState struct {
-	LastCheck        int64                       `json:"last_check" msg:"last_check"`
-	Allowance        float64                     `json:"allowance" msg:"allowance"`
-	Rate             float64                     `json:"rate" msg:"rate"`
-	Per              float64                     `json:"per" msg:"per"`
-	Expires          int64                       `json:"expires" msg:"expires"`
-	QuotaMax         int64                       `json:"quota_max" msg:"quota_max"`
-	QuotaRenews      int64                       `json:"quota_renews" msg:"quota_renews"`
-	QuotaRemaining   int64                       `json:"quota_remaining" msg:"quota_remaining"`
-	QuotaRenewalRate int64                       `json:"quota_renewal_rate" msg:"quota_renewal_rate"`
-	AccessRights     map[string]AccessDefinition `json:"access_rights" msg:"access_rights"`
-	OrgID            string                      `json:"org_id" msg:"org_id"`
-	OauthClientID    string                      `json:"oauth_client_id" msg:"oauth_client_id"`
-	OauthKeys        map[string]string           `json:"oauth_keys" msg:"oauth_keys"`
-	Certificate      string                      `json:"certificate" msg:"certificate"`
-	BasicAuthData    struct {
+	LastCheck          int64                       `json:"last_check" msg:"last_check"`
+	Allowance          float64                     `json:"allowance" msg:"allowance"`
+	Rate               float64                     `json:"rate" msg:"rate"`
+	Per                float64                     `json:"per" msg:"per"`
+	ThrottleInterval   float64                     `json:"throttle_interval" msg:"throttle_interval"`
+	ThrottleRetryLimit int                         `json:"throttle_retry_limit" msg:"throttle_retry_limit"`
+	Expires            int64                       `json:"expires" msg:"expires"`
+	QuotaMax           int64                       `json:"quota_max" msg:"quota_max"`
+	QuotaRenews        int64                       `json:"quota_renews" msg:"quota_renews"`
+	QuotaRemaining     int64                       `json:"quota_remaining" msg:"quota_remaining"`
+	QuotaRenewalRate   int64                       `json:"quota_renewal_rate" msg:"quota_renewal_rate"`
+	AccessRights       map[string]AccessDefinition `json:"access_rights" msg:"access_rights"`
+	OrgID              string                      `json:"org_id" msg:"org_id"`
+	OauthClientID      string                      `json:"oauth_client_id" msg:"oauth_client_id"`
+	OauthKeys          map[string]string           `json:"oauth_keys" msg:"oauth_keys"`
+	Certificate        string                      `json:"certificate" msg:"certificate"`
+	BasicAuthData      struct {
 		Password string   `json:"password" msg:"password"`
 		Hash     HashType `json:"hash_type" msg:"hash_type"`
 	} `json:"basic_auth_data" msg:"basic_auth_data"`

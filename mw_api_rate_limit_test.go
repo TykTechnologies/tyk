@@ -4,11 +4,16 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/justinas/alice"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/test"
 	uuid "github.com/satori/go.uuid"
+
+	"github.com/justinas/alice"
 
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -89,6 +94,128 @@ func TestRLOpen(t *testing.T) {
 	DRLManager.RequestTokenValue = 0
 }
 
+func requestThrottlingTest(t *testing.T) {
+	defer resetTestConfig()
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	testLevel := os.Args[0]
+	tn := strings.Split(t.Name(), "/")[1]
+
+	globalCfg := config.Global()
+
+	switch tn {
+	case "InMemoryRateLimiter":
+		DRLManager.CurrentTokenValue = 1
+		DRLManager.RequestTokenValue = 1
+	case "SentinelRateLimiter":
+		globalCfg.EnableSentinelRateLimiter = true
+	case "RedisRollingRateLimiter":
+		globalCfg.EnableRedisRollingLimiter = true
+	default:
+		t.Fatal("There is no such a rate limiter:", tn)
+	}
+
+	config.SetGlobal(globalCfg)
+
+	var per, rate, throttleInterval float64
+	var throttleRetryLimit int
+
+	per = 2
+	rate = 1
+	throttleInterval = 1
+	throttleRetryLimit = 3
+
+	for _, requestThrottlingEnabled := range []bool{false, true} {
+
+		spec := buildAndLoadAPI(func(spec *APISpec) {
+			spec.Name = "test"
+			spec.APIID = "test"
+			spec.OrgID = "default"
+			spec.UseKeylessAccess = false
+			spec.Proxy.ListenPath = "/"
+		})[0]
+
+		policyID := createPolicy(func(p *user.Policy) {
+			p.OrgID = "default"
+
+			p.AccessRights = map[string]user.AccessDefinition{
+				spec.APIID: {
+					APIName: spec.APIDefinition.Name,
+					APIID:   spec.APIID,
+				},
+			}
+
+			if testLevel == "PolicyLevel" {
+				p.Per = per
+				p.Rate = rate
+
+				if requestThrottlingEnabled {
+					p.ThrottleInterval = throttleInterval
+					p.ThrottleRetryLimit = throttleRetryLimit
+				}
+			} else if testLevel == "APILevel" {
+				a := p.AccessRights[spec.APIID]
+				a.Limit = &user.APILimit{
+					Rate: rate,
+					Per:  per,
+				}
+
+				if requestThrottlingEnabled {
+					a.Limit.ThrottleInterval = throttleInterval
+					a.Limit.ThrottleRetryLimit = throttleRetryLimit
+				}
+
+				p.AccessRights[spec.APIID] = a
+			} else {
+				t.Fatal("There is no such a test level:", testLevel)
+			}
+		})
+
+		key := createSession(func(s *user.SessionState) {
+			s.ApplyPolicies = []string{policyID}
+		})
+
+		authHeaders := map[string]string{
+			"authorization": key,
+		}
+
+		if requestThrottlingEnabled {
+			ts.Run(t, []test.TestCase{
+				{Path: "/", Headers: authHeaders, Code: 200, Delay: 100 * time.Millisecond},
+				{Path: "/", Headers: authHeaders, Code: 200},
+			}...)
+		} else {
+			ts.Run(t, []test.TestCase{
+				{Path: "/", Headers: authHeaders, Code: 200, Delay: 100 * time.Millisecond},
+				{Path: "/", Headers: authHeaders, Code: 429},
+			}...)
+		}
+
+	}
+}
+
+func TestRequestThrottlingInPolicyLevel(t *testing.T) {
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+	os.Args = []string{"PolicyLevel"}
+
+	t.Run("InMemoryRateLimiter", requestThrottlingTest)
+	t.Run("SentinelRateLimiter", requestThrottlingTest)
+	t.Run("RedisRollingRateLimiter", requestThrottlingTest)
+}
+
+func TestRequestThrottlingInAPILevel(t *testing.T) {
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+	os.Args = []string{"APILevel"}
+
+	t.Run("InMemoryRateLimiter", requestThrottlingTest)
+	t.Run("SentinelRateLimiter", requestThrottlingTest)
+	t.Run("RedisRollingRateLimiter", requestThrottlingTest)
+}
+
 func TestRLClosed(t *testing.T) {
 	spec := createSpecTest(t, closedRLDefSmall)
 
@@ -149,7 +276,7 @@ func TestRLOpenWithReload(t *testing.T) {
 		}
 	}
 
-	// CHange rate and emulate a reload
+	// Change rate and emulate a reload
 	spec.GlobalRateLimit.Rate = 20
 	chain = getRLOpenChain(spec)
 	for a := 0; a <= 30; a++ {

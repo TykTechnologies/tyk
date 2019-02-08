@@ -284,11 +284,14 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				if accessRights.Limit == nil || *accessRights.Limit == (user.APILimit{}) {
 					// limit was not specified on API level so we will populate it from policy
 					accessRights.Limit = &user.APILimit{
-						QuotaMax:         policy.QuotaMax,
-						QuotaRenewalRate: policy.QuotaRenewalRate,
-						Rate:             policy.Rate,
-						Per:              policy.Per,
-						SetByPolicy:      true,
+						QuotaMax:           policy.QuotaMax,
+						QuotaRenewalRate:   policy.QuotaRenewalRate,
+						Rate:               policy.Rate,
+						Per:                policy.Per,
+						ThrottleInterval:   policy.ThrottleInterval,
+						ThrottleRetryLimit: policy.ThrottleRetryLimit,
+
+						SetByPolicy: true,
 					}
 				}
 
@@ -339,6 +342,8 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				session.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
 				session.Rate = policy.Rate
 				session.Per = policy.Per
+				session.ThrottleInterval = policy.ThrottleInterval
+				session.ThrottleRetryLimit = policy.ThrottleRetryLimit
 				if policy.LastUpdated != "" {
 					session.LastUpdated = policy.LastUpdated
 				}
@@ -371,6 +376,8 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 			session.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
 			session.Rate = policy.Rate
 			session.Per = policy.Per
+			session.ThrottleInterval = policy.ThrottleInterval
+			session.ThrottleRetryLimit = policy.ThrottleRetryLimit
 			if policy.LastUpdated != "" {
 				session.LastUpdated = policy.LastUpdated
 			}
