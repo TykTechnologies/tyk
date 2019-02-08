@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/TykTechnologies/tyk/test"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +11,8 @@ import (
 	"testing"
 	"text/template"
 	"time"
+
+	"github.com/TykTechnologies/tyk/test"
 
 	"github.com/TykTechnologies/tyk/dnscache"
 
