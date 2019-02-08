@@ -5,8 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/rpc"
 	cache "github.com/pmylund/go-cache"
+
+	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/garyburd/redigo/redis"
 

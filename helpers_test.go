@@ -3,7 +3,6 @@ package main
 import (
 	"archive/zip"
 	"bytes"
-	"context"
 	"crypto/tls"
 	"encoding/binary"
 	"encoding/json"
@@ -16,18 +15,16 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-	"github.com/miekg/dns"
-	uuid "github.com/satori/go.uuid"
+	"github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -579,65 +576,6 @@ func loadAPI(specs ...*APISpec) (out []*APISpec) {
 
 func buildAndLoadAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 	return loadAPI(buildAPI(apiGens...)...)
-}
-
-var domainsToAddresses = map[string]string{
-	"host1.local.": "127.0.0.1",
-	"host2.local.": "127.0.0.1",
-	"host3.local.": "127.0.0.1",
-}
-
-type dnsMockHandler struct{}
-
-func (d *dnsMockHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
-	msg := dns.Msg{}
-	msg.SetReply(r)
-	switch r.Question[0].Qtype {
-	case dns.TypeA:
-		msg.Authoritative = true
-		domain := msg.Question[0].Name
-
-		address, ok := domainsToAddresses[domain]
-		if !ok {
-			// ^ 				start of line
-			// localhost\.		match literally
-			// ()* 				match between 0 and unlimited times
-			// [[:alnum:]]+\.	match single character in [a-zA-Z0-9] minimum one time and ending in . literally
-			reg := regexp.MustCompile(`^localhost\.([[:alnum:]]+\.)*`)
-			if matched := reg.MatchString(domain); !matched {
-				panic("domain not mocked: " + domain)
-			}
-
-			address = "127.0.0.1"
-		}
-
-		msg.Answer = append(msg.Answer, &dns.A{
-			Hdr: dns.RR_Header{Name: domain, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 60},
-			A:   net.ParseIP(address),
-		})
-	}
-	w.WriteMsg(&msg)
-}
-
-func initDNSMock() {
-	var dnsMock *dns.Server
-	addr, _ := net.ResolveUDPAddr("udp", ":0")
-	conn, _ := net.ListenUDP("udp", addr)
-	dnsMock = &dns.Server{PacketConn: conn}
-	dnsMock.Handler = &dnsMockHandler{}
-	go dnsMock.ActivateAndServe()
-
-	http.DefaultTransport = &http.Transport{
-		DialContext: (&net.Dialer{
-			Resolver: &net.Resolver{
-				PreferGo: true,
-				Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-					d := net.Dialer{}
-					return d.DialContext(ctx, network, dnsMock.PacketConn.LocalAddr().String())
-				},
-			},
-		}).DialContext,
-	}
 }
 
 // Taken from https://medium.com/@mlowicki/http-s-proxy-in-golang-in-less-than-100-lines-of-code-6a51c2f2c38c

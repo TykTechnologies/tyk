@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -44,6 +45,8 @@ var (
 
 	// Used to store the test bundles:
 	testMiddlewarePath, _ = ioutil.TempDir("", "tyk-middleware-path")
+
+	mockHandle *test.DnsMockHandle
 )
 
 const defaultListenPort = 8080
@@ -77,6 +80,10 @@ func reloadSimulation() {
 }
 
 func TestMain(m *testing.M) {
+	os.Exit(initTestMain(m))
+}
+
+func initTestMain(m *testing.M) int {
 	testServerRouter = testHttpHandler()
 	testServer := &http.Server{
 		Addr:           testHttpListen,
@@ -85,9 +92,7 @@ func TestMain(m *testing.M) {
 		WriteTimeout:   1 * time.Second,
 		MaxHeaderBytes: 1 << 20,
 	}
-	go func() {
-		panic(testServer.ListenAndServe())
-	}()
+
 	globalConf := config.Global()
 	if err := config.WriteDefault("", &globalConf); err != nil {
 		panic(err)
@@ -104,51 +109,54 @@ func TestMain(m *testing.M) {
 	globalConf.EnableJSVM = true
 	globalConf.Monitor.EnableTriggerMonitors = true
 	globalConf.AnalyticsConfig.NormaliseUrls.Enabled = true
-
 	// Enable coprocess and bundle downloader:
 	globalConf.CoProcessOptions.EnableCoProcess = true
 	globalConf.EnableBundleDownloader = true
 	globalConf.BundleBaseURL = testHttpBundles
 	globalConf.MiddlewarePath = testMiddlewarePath
-
 	purgeTicker = make(chan time.Time)
 	rpcPurgeTicker = make(chan time.Time)
-
 	// force ipv4 for now, to work around the docker bug affecting
 	// Go 1.8 and ealier
 	globalConf.ListenAddress = "127.0.0.1"
 
-	initDNSMock()
-
-	CoProcessInit()
-
-	afterConfSetup(&globalConf)
-
-	defaultTestConfig = globalConf
-
-	config.SetGlobal(globalConf)
-
-	if err := emptyRedis(); err != nil {
+	mockHandle, err = test.InitDNSMock(test.DomainsToAddresses, nil)
+	if err != nil {
 		panic(err)
 	}
 
-	cli.Init(VERSION, confPaths)
+	defer func() {
+		testServer.Shutdown(context.Background())
+		mockHandle.ShutdownDnsMock()
+	}()
 
+	go func() {
+		err := testServer.ListenAndServe()
+		if err != nil {
+			log.Warn("testServer.ListenAndServe() err: ", err.Error())
+		}
+	}()
+
+	CoProcessInit()
+	afterConfSetup(&globalConf)
+	defaultTestConfig = globalConf
+	config.SetGlobal(globalConf)
+	if err := emptyRedis(); err != nil {
+		panic(err)
+	}
+	cli.Init(VERSION, confPaths)
 	initialiseSystem()
 	// Small part of start()
 	loadAPIEndpoints(mainRouter)
 	if analytics.GeoIPDB == nil {
 		panic("GeoIPDB was not initialized")
 	}
-
 	go reloadLoop(reloadTick)
 	go reloadQueueLoop()
 	go reloadSimulation()
-
 	exitCode := m.Run()
-
 	os.RemoveAll(config.Global().AppPath)
-	os.Exit(exitCode)
+	return exitCode
 }
 
 func emptyRedis() error {
@@ -211,9 +219,9 @@ func ProxyHandler(p *ReverseProxy, apiSpec *APISpec) http.Handler {
 func createSpecTest(t testing.TB, def string) *APISpec {
 	spec := createDefinitionFromString(def)
 	tname := t.Name()
-	redisStore := storage.RedisCluster{KeyPrefix: tname + "-apikey."}
-	healthStore := storage.RedisCluster{KeyPrefix: tname + "-apihealth."}
-	orgStore := storage.RedisCluster{KeyPrefix: tname + "-orgKey."}
+	redisStore := &storage.RedisCluster{KeyPrefix: tname + "-apikey."}
+	healthStore := &storage.RedisCluster{KeyPrefix: tname + "-apihealth."}
+	orgStore := &storage.RedisCluster{KeyPrefix: tname + "-orgKey."}
 	spec.Init(redisStore, redisStore, healthStore, orgStore)
 	return spec
 }
@@ -1406,6 +1414,7 @@ func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
 	defer ts.Close()
 
 	buildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID += "_" + time.Now().String()
 		spec.UseKeylessAccess = false
 		spec.DisableRateLimit = false
 		spec.OrgID = "default"

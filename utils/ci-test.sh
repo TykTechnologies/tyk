@@ -5,6 +5,7 @@ MATRIX=(
 	"-tags 'coprocess python'"
 	"-tags 'coprocess grpc'"
 )
+TEST_TIMEOUT=2m
 
 # print a command and execute it
 show() {
@@ -43,7 +44,7 @@ go get -t
 # profile for multiple pkgs
 for pkg in $PKGS; do
 	for opts in "${MATRIX[@]}"; do
-		show go test -timeout 40s -v -coverprofile=test-$i.cov $opts $pkg \
+		show go test -v -timeout $TEST_TIMEOUT -coverprofile=test-$i.cov $opts $pkg \
 			|| fatal "go test errored"
 		let i++ || true
 	done
@@ -54,7 +55,7 @@ if [[ ! $LATEST_GO ]]; then
 	exit 0
 fi
 
-go test -race $PKGS || fatal "go test -race failed"
+go test -race -v -timeout $TEST_TIMEOUT $PKGS || fatal "go test -race failed"
 
 for opts in "${MATRIX[@]}"; do
 	show go vet $opts $PKGS || fatal "go vet errored"

@@ -75,6 +75,22 @@ var tests = []struct {
 		"BadPolicySource", `{"policies": {"policy_source": "internet"}}`,
 		`policies.policy_source: policies.policy_source must be one of the following: "", "service", "rpc"`,
 	},
+	{
+		"MalformedDnsCacheEntry", `{"dns_cache": { "enabled": true, "tttl": 10} }`,
+		`tttl: Additional property tttl is not allowed`,
+	},
+	{
+		"BadDnsCacheTTL", `{"dns_cache": { "enabled": false, "ttl": -2 } }`,
+		`dns_cache.ttl: Must be greater than or equal to -1`,
+	},
+	{
+		"ExtraDnsCacheCheckInterval", `{"dns_cache": { "enabled": true, "ttl": -1, "check_interval": 2500 } }`,
+		`check_interval: Additional property check_interval is not allowed`,
+	},
+	{
+		"InvalidDnsCacheMultipleIPsHandleStrategy", `{"dns_cache": { "enabled": true, "ttl": 1, "multiple_ips_handle_strategy": "true" } }`,
+		`dns_cache.multiple_ips_handle_strategy: dns_cache.multiple_ips_handle_strategy must be one of the following: "pick_first", "random", "no_cache"`,
+	},
 }
 
 func allContains(got, want []string) bool {

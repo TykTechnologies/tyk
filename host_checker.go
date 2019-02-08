@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/jeffail/tunny"
-	cache "github.com/pmylund/go-cache"
+	"github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/config"
 )
@@ -59,10 +59,23 @@ type HostUptimeChecker struct {
 	stopPollingChan chan bool
 	sampleCache     *cache.Cache
 	stopLoop        bool
+	muStopLoop      sync.RWMutex
 
 	resetListMu sync.Mutex
 	doResetList bool
 	newList     map[string]HostData
+}
+
+func (h *HostUptimeChecker) getStopLoop() bool {
+	h.muStopLoop.RLock()
+	defer h.muStopLoop.RUnlock()
+	return h.stopLoop
+}
+
+func (h *HostUptimeChecker) setStopLoop(newValue bool) {
+	h.muStopLoop.Lock()
+	h.stopLoop = newValue
+	h.muStopLoop.Unlock()
 }
 
 func (h *HostUptimeChecker) getStaggeredTime() time.Duration {
@@ -80,7 +93,7 @@ func (h *HostUptimeChecker) getStaggeredTime() time.Duration {
 }
 
 func (h *HostUptimeChecker) HostCheckLoop() {
-	for !h.stopLoop {
+	for !h.getStopLoop() {
 		if runningTests {
 			<-hostCheckTicker
 		}
@@ -255,7 +268,7 @@ func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList ma
 
 func (h *HostUptimeChecker) Start() {
 	// Start the loop that checks for bum hosts
-	h.stopLoop = false
+	h.setStopLoop(false)
 	log.Debug("[HOST CHECKER] Starting...")
 	go h.HostCheckLoop()
 	log.Debug("[HOST CHECKER] Check loop started...")
@@ -264,7 +277,8 @@ func (h *HostUptimeChecker) Start() {
 }
 
 func (h *HostUptimeChecker) Stop() {
-	h.stopLoop = true
+	h.setStopLoop(true)
+
 	h.stopPollingChan <- true
 	log.Info("[HOST CHECKER] Stopping poller")
 	h.pool.Close()

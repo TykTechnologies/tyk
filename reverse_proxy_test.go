@@ -10,6 +10,13 @@ import (
 	"strings"
 	"testing"
 	"text/template"
+	"time"
+
+	"github.com/TykTechnologies/tyk/test"
+
+	"github.com/TykTechnologies/tyk/dnscache"
+
+	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/request"
@@ -57,8 +64,207 @@ func TestReverseProxyRetainHost(t *testing.T) {
 
 			proxy := TykNewSingleHostReverseProxy(target, spec)
 			proxy.Director(req)
+
 			if got := req.URL.String(); got != tc.wantURL {
 				t.Fatalf("wanted url %q, got %q", tc.wantURL, got)
+			}
+		})
+	}
+}
+
+type configTestReverseProxyDnsCache struct {
+	*testing.T
+
+	etcHostsMap map[string][]string
+	dnsConfig   config.DnsCacheConfig
+}
+
+func setupTestReverseProxyDnsCache(cfg *configTestReverseProxyDnsCache) func() {
+	pullDomains := mockHandle.PushDomains(cfg.etcHostsMap, nil)
+	dnsCacheManager.InitDNSCaching(
+		time.Duration(cfg.dnsConfig.TTL)*time.Second, time.Duration(cfg.dnsConfig.CheckInterval)*time.Second)
+
+	globalConf := config.Global()
+	enableWebSockets := globalConf.HttpServerOptions.EnableWebSockets
+
+	globalConf.HttpServerOptions.EnableWebSockets = true
+	config.SetGlobal(globalConf)
+
+	return func() {
+		pullDomains()
+		dnsCacheManager.DisposeCache()
+		globalConf.HttpServerOptions.EnableWebSockets = enableWebSockets
+		config.SetGlobal(globalConf)
+	}
+}
+
+func TestReverseProxyDnsCache(t *testing.T) {
+	const (
+		host   = "orig-host.com."
+		host2  = "orig-host2.com."
+		host3  = "orig-host3.com."
+		wsHost = "ws.orig-host.com."
+
+		hostApiUrl       = "http://orig-host.com/origpath"
+		host2HttpApiUrl  = "http://orig-host2.com/origpath"
+		host2HttpsApiUrl = "https://orig-host2.com/origpath"
+		host3ApiUrl      = "https://orig-host3.com/origpath"
+		wsHostWsApiUrl   = "ws://ws.orig-host.com/connect"
+		wsHostWssApiUrl  = "wss://ws.orig-host.com/connect"
+
+		cacheTTL            = 5
+		cacheUpdateInterval = 10
+	)
+
+	var (
+		etcHostsMap = map[string][]string{
+			host:   {"127.0.0.10", "127.0.0.20"},
+			host2:  {"10.0.20.0", "10.0.20.1", "10.0.20.2"},
+			host3:  {"10.0.20.15", "10.0.20.16"},
+			wsHost: {"127.0.0.10", "127.0.0.10"},
+		}
+	)
+
+	tearDown := setupTestReverseProxyDnsCache(&configTestReverseProxyDnsCache{t, etcHostsMap,
+		config.DnsCacheConfig{
+			Enabled: true, TTL: cacheTTL, CheckInterval: cacheUpdateInterval,
+			MultipleIPsHandleStrategy: config.NoCacheStrategy}})
+
+	currentStorage := dnsCacheManager.CacheStorage()
+	fakeDeleteStorage := &dnscache.MockStorage{
+		MockFetchItem: currentStorage.FetchItem,
+		MockGet:       currentStorage.Get,
+		MockSet:       currentStorage.Set,
+		MockDelete: func(key string) {
+			//prevent deletion
+		},
+		MockClear: currentStorage.Clear}
+	dnsCacheManager.SetCacheStorage(fakeDeleteStorage)
+
+	defer tearDown()
+
+	cases := []struct {
+		name string
+
+		URL     string
+		Method  string
+		Body    []byte
+		Headers http.Header
+
+		isWebsocket bool
+
+		expectedIPs    []string
+		shouldBeCached bool
+		isCacheEnabled bool
+	}{
+		{
+			"Should cache first request to Host1",
+			hostApiUrl,
+			http.MethodGet, nil, nil,
+			false,
+			etcHostsMap[host],
+			true, true,
+		},
+		{
+			"Should cache first request to Host2",
+			host2HttpsApiUrl,
+			http.MethodPost, []byte("{ \"param\": \"value\" }"), nil,
+			false,
+			etcHostsMap[host2],
+			true, true,
+		},
+		{
+			"Should populate from cache second request to Host1",
+			hostApiUrl,
+			http.MethodGet, nil, nil,
+			false,
+			etcHostsMap[host],
+			false, true,
+		},
+		{
+			"Should populate from cache second request to Host2 with different protocol",
+			host2HttpApiUrl,
+			http.MethodPost, []byte("{ \"param\": \"value2\" }"), nil,
+			false,
+			etcHostsMap[host2],
+			false, true,
+		},
+		{
+			"Shouldn't cache request with different http verb to same host",
+			hostApiUrl,
+			http.MethodPatch, []byte("{ \"param2\": \"value3\" }"), nil,
+			false,
+			etcHostsMap[host],
+			false, true,
+		},
+		{
+			"Shouldn't cache dns record when cache is disabled",
+			host3ApiUrl,
+			http.MethodGet, nil, nil,
+			false, etcHostsMap[host3],
+			false, false,
+		},
+		{
+			"Should cache ws protocol host dns records",
+			wsHostWsApiUrl,
+			http.MethodGet, nil,
+			map[string][]string{
+				"Upgrade":    {"websocket"},
+				"Connection": {"Upgrade"},
+			},
+			true,
+			etcHostsMap[wsHost],
+			true, true,
+		},
+		{
+			"Should cache wss protocol host dns records",
+			wsHostWssApiUrl,
+			http.MethodGet, nil,
+			map[string][]string{
+				"Upgrade":    {"websocket"},
+				"Connection": {"Upgrade"},
+			},
+			true,
+			etcHostsMap[wsHost],
+			true, true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			storage := dnsCacheManager.CacheStorage()
+			if !tc.isCacheEnabled {
+				dnsCacheManager.SetCacheStorage(nil)
+			}
+
+			spec := &APISpec{APIDefinition: &apidef.APIDefinition{},
+				EnforcedTimeoutEnabled: true,
+				GlobalConfig:           config.Config{ProxyCloseConnections: true, ProxyDefaultTimeout: 1}}
+
+			req := testReq(t, tc.Method, tc.URL, tc.Body)
+			for name, value := range tc.Headers {
+				req.Header.Add(name, strings.Join(value, ";"))
+			}
+
+			Url, _ := url.Parse(tc.URL)
+			proxy := TykNewSingleHostReverseProxy(Url, spec)
+			recorder := httptest.NewRecorder()
+			proxy.WrappedServeHTTP(recorder, req, false)
+
+			host := Url.Hostname()
+			if tc.isCacheEnabled {
+				item, ok := storage.Get(host)
+				if !ok || !test.IsDnsRecordsAddrsEqualsTo(item.Addrs, tc.expectedIPs) {
+					t.Fatalf("got %q, but wanted %q. ok=%t", item, tc.expectedIPs, ok)
+				}
+			} else {
+				item, ok := storage.Get(host)
+				if ok {
+					t.Fatalf("got %t, but wanted %t. item=%#v", ok, false, item)
+				}
+			}
+
+			if !tc.isCacheEnabled {
+				dnsCacheManager.SetCacheStorage(storage)
 			}
 		})
 	}
@@ -416,6 +622,7 @@ func BenchmarkWrappedServeHTTP(b *testing.B) {
 		proxy.WrappedServeHTTP(recorder, req, false)
 	}
 }
+
 func BenchmarkCopyRequestResponse(b *testing.B) {
 	b.ReportAllocs()
 

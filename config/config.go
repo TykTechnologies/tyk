@@ -16,6 +16,17 @@ import (
 	"github.com/TykTechnologies/tyk/regexp"
 )
 
+type IPsHandleStrategy string
+
+const (
+	dnsCacheDefaultTtl           = 3600
+	dnsCacheDefaultCheckInterval = 60
+
+	PickFirstStrategy IPsHandleStrategy = "pick_first"
+	RandomStrategy    IPsHandleStrategy = "random"
+	NoCacheStrategy   IPsHandleStrategy = "no_cache"
+)
+
 var log = logger.Get()
 
 var global atomic.Value
@@ -79,6 +90,13 @@ type AnalyticsConfigConfig struct {
 type HealthCheckConfig struct {
 	EnableHealthChecks      bool  `json:"enable_health_checks"`
 	HealthCheckValueTimeout int64 `json:"health_check_value_timeouts"`
+}
+
+type DnsCacheConfig struct {
+	Enabled                   bool              `json:"enabled"`
+	TTL                       int64             `json:"ttl"`
+	CheckInterval             int64             `json:"-" ignored:"true"` //controls cache cleanup interval. By convention shouldn't be exposed to config or env_variable_setup
+	MultipleIPsHandleStrategy IPsHandleStrategy `json:"multiple_ips_handle_strategy"`
 }
 
 type MonitorConfig struct {
@@ -211,6 +229,7 @@ type Config struct {
 	EnableAnalytics                   bool                                  `json:"enable_analytics"`
 	AnalyticsConfig                   AnalyticsConfigConfig                 `json:"analytics_config"`
 	HealthCheck                       HealthCheckConfig                     `json:"health_check"`
+	DnsCache                          DnsCacheConfig                        `json:"dns_cache"`
 	UseAsyncSessionWrite              bool                                  `json:"optimisations_use_async_session_write"`
 	SessionUpdatePoolSize             int                                   `json:"session_update_pool_size"`
 	SessionUpdateBufferSize           int                                   `json:"session_update_buffer_size"`
@@ -333,6 +352,12 @@ var Default = Config{
 	},
 	AnalyticsConfig: AnalyticsConfigConfig{
 		IgnoredIPs: make([]string, 0),
+	},
+	DnsCache: DnsCacheConfig{
+		Enabled:                   false,
+		TTL:                       dnsCacheDefaultTtl,
+		CheckInterval:             dnsCacheDefaultCheckInterval,
+		MultipleIPsHandleStrategy: NoCacheStrategy,
 	},
 }
 
