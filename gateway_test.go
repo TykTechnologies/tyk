@@ -1397,7 +1397,7 @@ func TestKeepAliveConns(t *testing.T) {
 func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
 	globalCfg := config.Global()
 	globalCfg.EnableNonTransactionalRateLimiter = false
-	globalCfg.EnableSentinelRateLImiter = true
+	globalCfg.EnableSentinelRateLimiter = true
 	config.SetGlobal(globalCfg)
 
 	defer resetTestConfig()

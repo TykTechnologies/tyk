@@ -1829,6 +1829,42 @@ func ctxSetLoopLimit(r *http.Request, limit int) {
 	}
 }
 
+func ctxThrottleLevelLimit(r *http.Request) int {
+	if v := r.Context().Value(ThrottleLevelLimit); v != nil {
+		if intVal, ok := v.(int); ok {
+			return intVal
+		}
+	}
+
+	return 0
+}
+
+func ctxThrottleLevel(r *http.Request) int {
+	if v := r.Context().Value(ThrottleLevel); v != nil {
+		if intVal, ok := v.(int); ok {
+			return intVal
+		}
+	}
+
+	return 0
+}
+
+func ctxSetThrottleLimit(r *http.Request, limit int) {
+	// Can be set only one time per request
+	if ctxThrottleLevelLimit(r) == 0 && limit > 0 {
+		setCtxValue(r, ThrottleLevelLimit, limit)
+	}
+}
+
+func ctxSetThrottleLevel(r *http.Request, value int) {
+	setCtxValue(r, ThrottleLevel, value)
+}
+
+func ctxIncThrottleLevel(r *http.Request, throttleLimit int) {
+	ctxSetThrottleLimit(r, throttleLimit)
+	ctxSetThrottleLevel(r, ctxThrottleLevel(r)+1)
+}
+
 func ctxTraceEnabled(r *http.Request) bool {
 	return r.Context().Value(Trace) != nil
 }
