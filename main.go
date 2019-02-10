@@ -24,7 +24,7 @@ import (
 	"github.com/TykTechnologies/tyk/checkup"
 
 	"github.com/Sirupsen/logrus"
-	logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
+	"github.com/Sirupsen/logrus/hooks/syslog"
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/evalphobia/logrus_sentry"
 	"github.com/facebookgo/pidfile"
@@ -41,8 +41,9 @@ import (
 	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
-	cli "github.com/TykTechnologies/tyk/cli"
+	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/dnscache"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
@@ -97,6 +98,8 @@ var (
 		// TODO: add ~/.config/tyk/tyk.conf here?
 		"/etc/tyk/tyk.conf",
 	}
+
+	dnsCacheManager dnscache.IDnsCacheManager
 )
 
 const (
@@ -128,6 +131,13 @@ func setupGlobals() {
 	reloadMu.Lock()
 	defer reloadMu.Unlock()
 
+	dnsCacheManager = dnscache.NewDnsCacheManager(config.Global().DnsCache.MultipleIPsHandleStrategy)
+	if config.Global().DnsCache.Enabled {
+		dnsCacheManager.InitDNSCaching(
+			time.Duration(config.Global().DnsCache.TTL)*time.Second,
+			time.Duration(config.Global().DnsCache.CheckInterval)*time.Second)
+	}
+
 	mainRouter = mux.NewRouter()
 	controlRouter = mux.NewRouter()
 
@@ -137,7 +147,7 @@ func setupGlobals() {
 
 	// Initialise our Host Checker
 	healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:"}
-	InitHostCheckManager(healthCheckStore)
+	InitHostCheckManager(&healthCheckStore)
 
 	if config.Global().EnableAnalytics && analytics.Store == nil {
 		globalConf := config.Global()
@@ -181,7 +191,7 @@ func setupGlobals() {
 
 	// Get the notifier ready
 	mainLog.Debug("Notifier will not work in hybrid mode")
-	mainNotifierStore := storage.RedisCluster{}
+	mainNotifierStore := &storage.RedisCluster{}
 	mainNotifierStore.Connect()
 	MainNotifier = RedisNotifier{mainNotifierStore, RedisPubSubChannel}
 
@@ -907,7 +917,7 @@ func getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 			HashKeys:  hashKeys,
 		}
 	}
-	return storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys}
+	return &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys}
 }
 
 func main() {

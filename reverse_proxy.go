@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	cache "github.com/pmylund/go-cache"
+	"github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -302,18 +302,29 @@ type ReverseProxy struct {
 	ErrorHandler ErrorHandler
 }
 
-func defaultTransport() *http.Transport {
-	// allocate a new one every time for now, to avoid modifying a
-	// global variable for each request's needs (e.g. timeouts).
+func defaultTransport(dialerTimeout int) *http.Transport {
+	timeout := 30
+	if dialerTimeout > 0 {
+		log.Debug("Setting timeout for outbound request to: ", dialerTimeout)
+		timeout = dialerTimeout
+	}
+
+	dialer := &net.Dialer{
+		Timeout:   time.Duration(timeout) * time.Second,
+		KeepAlive: 30 * time.Second,
+		DualStack: true,
+	}
+	dialContextFunc := dialer.DialContext
+	if dnsCacheManager.IsCacheEnabled() {
+		dialContextFunc = dnsCacheManager.WrapDialer(dialer)
+	}
+
 	return &http.Transport{
-		DialContext: (&net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-			DualStack: true,
-		}).DialContext,
-		MaxIdleConns:        config.Global().MaxIdleConns,
-		MaxIdleConnsPerHost: config.Global().MaxIdleConnsPerHost, // default is 100
-		TLSHandshakeTimeout: 10 * time.Second,
+		DialContext:           dialContextFunc,
+		MaxIdleConns:          config.Global().MaxIdleConns,
+		MaxIdleConnsPerHost:   config.Global().MaxIdleConnsPerHost, // default is 100
+		ResponseHeaderTimeout: time.Duration(dialerTimeout) * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
 	}
 }
 
@@ -441,7 +452,7 @@ func proxyFromAPI(api *APISpec) func(*http.Request) (*url.URL, error) {
 }
 
 func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *ReverseProxy) http.RoundTripper {
-	transport := defaultTransport() // modifies a newly created transport
+	transport := defaultTransport(timeOut) // modifies a newly created transport
 	transport.TLSClientConfig = &tls.Config{}
 	transport.Proxy = proxyFromAPI(p.TykAPISpec)
 
@@ -479,16 +490,6 @@ func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Re
 
 	if !config.Global().ProxySSLDisableRenegotiation {
 		transport.TLSClientConfig.Renegotiation = tls.RenegotiateFreelyAsClient
-	}
-
-	// Use the default unless we've modified the timout
-	if timeOut > 0 {
-		log.Debug("Setting timeout for outbound request to: ", timeOut)
-		transport.DialContext = (&net.Dialer{
-			Timeout:   time.Duration(timeOut) * time.Second,
-			KeepAlive: 30 * time.Second,
-		}).DialContext
-		transport.ResponseHeaderTimeout = time.Duration(timeOut) * time.Second
 	}
 
 	transport.DisableKeepAlives = p.TykAPISpec.GlobalConfig.ProxyCloseConnections

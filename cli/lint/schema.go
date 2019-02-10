@@ -304,6 +304,23 @@ const confSchema = `{
 			}
 		}
 	},
+	"dns_cache": {
+		"type": ["object", "null"],
+		"additionalProperties": false,
+		"properties": {
+			"enabled": {
+				"type": "boolean"
+			},
+			"ttl": {
+				"type": "integer",
+				"minimum": -1
+			},
+			"multiple_ips_handle_strategy": {
+				"type": "string",
+				"enum": ["pick_first", "random", "no_cache"]
+			}
+		}
+	},
 	"hide_generator_header": {
 		"type": "boolean"
 	},

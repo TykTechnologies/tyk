@@ -9,9 +9,9 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
-	newrelic "github.com/newrelic/go-agent"
+	"github.com/newrelic/go-agent"
 	"github.com/paulbellamy/ratecounter"
-	cache "github.com/pmylund/go-cache"
+	"github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
