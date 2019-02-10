@@ -720,6 +720,48 @@ func (r *RedisCluster) SetRollingWindow(keyName string, per int64, value_overrid
 	return intVal, redVal[1].([]interface{})
 }
 
+func (r RedisCluster) GetRollingWindow(keyName string, per int64, pipeline bool) (int, []interface{}) {
+	r.ensureConnection()
+	now := time.Now()
+	onePeriodAgo := now.Add(time.Duration(-1*per) * time.Second)
+
+	ZREMRANGEBYSCORE := rediscluster.ClusterTransaction{}
+	ZREMRANGEBYSCORE.Cmd = "ZREMRANGEBYSCORE"
+	ZREMRANGEBYSCORE.Args = []interface{}{keyName, "-inf", onePeriodAgo.UnixNano()}
+
+	ZRANGE := rediscluster.ClusterTransaction{}
+	ZRANGE.Cmd = "ZRANGE"
+	ZRANGE.Args = []interface{}{keyName, 0, -1}
+
+	var redVal []interface{}
+	var err error
+	if pipeline {
+		redVal, err = redis.Values(r.singleton().DoPipeline([]rediscluster.ClusterTransaction{ZREMRANGEBYSCORE, ZRANGE}))
+	} else {
+		redVal, err = redis.Values(r.singleton().DoTransaction([]rediscluster.ClusterTransaction{ZREMRANGEBYSCORE, ZRANGE}))
+	}
+	if err != nil {
+		log.Error("Multi command failed: ", err)
+		return 0, nil
+	}
+
+	if len(redVal) < 2 {
+		log.Error("Multi command failed: return index is out of range")
+		return 0, nil
+	}
+
+	// Check actual value
+	if redVal[1] == nil {
+		return 0, nil
+	}
+
+	intVal := len(redVal[1].([]interface{}))
+
+	log.Debug("Returned: ", intVal)
+
+	return intVal, redVal[1].([]interface{})
+}
+
 // GetPrefix returns storage key prefix
 func (r *RedisCluster) GetKeyPrefix() string {
 	return r.KeyPrefix

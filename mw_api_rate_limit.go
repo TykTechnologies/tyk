@@ -12,7 +12,7 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-// RateLimitAndQuotaCheck will check the incomming request and key whether it is within it's quota and
+// RateLimitAndQuotaCheck will check the incoming request and key whether it is within it's quota and
 // within it's rate limit, it makes use of the SessionLimiter object to do this
 type RateLimitForAPI struct {
 	BaseMiddleware
@@ -75,6 +75,7 @@ func (k *RateLimitForAPI) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		false,
 		&k.Spec.GlobalConfig,
 		k.Spec.APIID,
+		false,
 	)
 
 	if reason == sessionFailRateLimit {

@@ -596,6 +596,11 @@ func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, val stri
 
 }
 
+func (r *RPCStorageHandler) GetRollingWindow(keyName string, per int64, pipeline bool) (int, []interface{}) {
+	log.Warning("Not Implemented!")
+	return 0, nil
+}
+
 func (r RPCStorageHandler) GetSet(keyName string) (map[string]string, error) {
 	log.Error("RPCStorageHandler.GetSet - Not implemented")
 	return nil, nil

@@ -1195,7 +1195,7 @@ func startDRL() {
 	switch {
 	case config.Global().ManagementNode:
 		return
-	case config.Global().EnableSentinelRateLImiter,
+	case config.Global().EnableSentinelRateLimiter,
 		config.Global().EnableRedisRollingLimiter:
 		mainLog.Warning("The old, non-distributed rate limiter is deprecated and we no longer recommend its use.")
 		return

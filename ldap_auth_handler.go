@@ -164,6 +164,11 @@ func (l *LDAPStorageHandler) SetRollingWindow(keyName string, per int64, val str
 	return 0, nil
 }
 
+func (l *LDAPStorageHandler) GetRollingWindow(keyName string, per int64, pipeline bool) (int, []interface{}) {
+	log.Warning("Not Implemented!")
+	return 0, nil
+}
+
 func (l LDAPStorageHandler) GetSet(keyName string) (map[string]string, error) {
 	log.Error("Not implemented")
 	return nil, nil

@@ -256,7 +256,7 @@ type Config struct {
 	EnforceOrgQuotas                  bool                                  `json:"enforce_org_quotas"`
 	ExperimentalProcessOrgOffThread   bool                                  `json:"experimental_process_org_off_thread"`
 	EnableNonTransactionalRateLimiter bool                                  `json:"enable_non_transactional_rate_limiter"`
-	EnableSentinelRateLImiter         bool                                  `json:"enable_sentinel_rate_limiter"`
+	EnableSentinelRateLimiter         bool                                  `json:"enable_sentinel_rate_limiter"`
 	EnableRedisRollingLimiter         bool                                  `json:"enable_redis_rolling_limiter"`
 	ManagementNode                    bool                                  `json:"management_node"`
 	Monitor                           MonitorConfig                         `json:"monitor"`

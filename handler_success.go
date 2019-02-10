@@ -37,6 +37,8 @@ const (
 	OrigRequestURL
 	LoopLevel
 	LoopLevelLimit
+	ThrottleLevel
+	ThrottleLevelLimit
 	Trace
 )
 
