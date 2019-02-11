@@ -508,8 +508,10 @@ func TestGetClientTokens(t *testing.T) {
 	})
 
 	// get list of tokens
-	t.Run("Get list of tokens", func(t *testing.T) {
+	t.Run("Get list of tokens with pagination", func(t *testing.T) {
 		resp, err := ts.Run(t, test.TestCase{
+			// Not specifying a page query parameter is the same
+			// thing as ?page=1
 			Path:      fmt.Sprintf("/tyk/oauth/clients/999999/%s/tokens", clientID),
 			AdminAuth: true,
 			Method:    http.MethodGet,
@@ -525,8 +527,68 @@ func TestGetClientTokens(t *testing.T) {
 		}
 
 		// check response
-		if len(tokensResp) != len(tokensID) {
-			t.Errorf("Wrong number of tokens received. Expected: %d. Got: %d", len(tokensID), len(tokensResp))
+		// 2 is the default items to be returned
+		if len(tokensResp) != 2 {
+			t.Errorf("Wrong number of tokens received. Expected: %d. Got: %d", 2, len(tokensResp))
+		}
+		for _, token := range tokensResp {
+			if !tokensID[token.Token] {
+				t.Errorf("Token %s is not found in expected result. Expecting: %v", token.Token, tokensID)
+			}
+		}
+	})
+
+	t.Run("Get list of tokens with pagination and ?page=2", func(t *testing.T) {
+		resp, err := ts.Run(t, test.TestCase{
+			Path:      fmt.Sprintf("/tyk/oauth/clients/999999/%s/tokens?page=2", clientID),
+			AdminAuth: true,
+			Method:    http.MethodGet,
+			Code:      http.StatusOK,
+		})
+		if err != nil {
+			t.Error(err)
+		}
+
+		tokensResp := []OAuthClientToken{}
+		if err := json.NewDecoder(resp.Body).Decode(&tokensResp); err != nil {
+			t.Fatal(err)
+		}
+
+		// check response
+		// 2nd page of data was requested but we have itemsPerPage set
+		// to 2 and only 3 keys were stored, so this should return only
+		// 1 item
+		if len(tokensResp) != 1 {
+			t.Errorf("Wrong number of tokens received. Expected: %d. Got: %d", 0, len(tokensResp))
+		}
+		for _, token := range tokensResp {
+			if !tokensID[token.Token] {
+				t.Errorf("Token %s is not found in expected result. Expecting: %v", token.Token, tokensID)
+			}
+		}
+	})
+
+	t.Run("Get list of tokens with pagination and ?page=3", func(t *testing.T) {
+		resp, err := ts.Run(t, test.TestCase{
+			Path:      fmt.Sprintf("/tyk/oauth/clients/999999/%s/tokens?page=3", clientID),
+			AdminAuth: true,
+			Method:    http.MethodGet,
+			Code:      http.StatusOK,
+		})
+		if err != nil {
+			t.Error(err)
+		}
+
+		tokensResp := []OAuthClientToken{}
+		if err := json.NewDecoder(resp.Body).Decode(&tokensResp); err != nil {
+			t.Fatal(err)
+		}
+
+		// check response
+		// 3rd page of data was requested but we have itemsPerPage set
+		// to 2 and only 3 keys were stored
+		if len(tokensResp) != 0 {
+			t.Errorf("Wrong number of tokens received. Expected: %d. Got: %d", 0, len(tokensResp))
 		}
 		for _, token := range tokensResp {
 			if !tokensID[token.Token] {

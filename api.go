@@ -1415,14 +1415,26 @@ func oAuthClientTokensHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	page := 1
+	if p := r.URL.Query().Get("page"); p != "" {
+		queryPage, err := strconv.Atoi(p)
+		if err == nil {
+			page = queryPage
+		}
+	}
+
+	if page <= 0 {
+		page = 1
+	}
+
 	// get tokens from redis
-	// TODO: add pagination
-	tokens, err := apiSpec.OAuthManager.OsinServer.Storage.GetClientTokens(keyName)
+	tokens, totalPages, err := apiSpec.OAuthManager.OsinServer.Storage.GetClientTokens(keyName, page)
 	if err != nil {
 		doJSONWrite(w, http.StatusInternalServerError, apiError("Get client tokens failed"))
 		return
 	}
 
+	_ = totalPages
 	doJSONWrite(w, http.StatusOK, tokens)
 }
 
