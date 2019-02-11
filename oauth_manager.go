@@ -471,7 +471,7 @@ func (r *RedisOsinStorageInterface) GetClientNoPrefix(id string) (osin.Client, e
 	clientJSON, err := r.store.GetKey(key)
 
 	if err != nil {
-		log.Error("Failure retreiving client ID key: ", err)
+		log.Error("Failure retrieving client ID key: ", err)
 		return nil, err
 	}
 
@@ -485,12 +485,21 @@ func (r *RedisOsinStorageInterface) GetClientNoPrefix(id string) (osin.Client, e
 
 func (r *RedisOsinStorageInterface) GetExtendedClient(id string) (ExtendedOsinClientInterface, error) {
 	osinClient, err := r.GetClient(id)
+	if err != nil {
+		log.WithError(err).Error("Failure retrieving client ID key")
+		return nil, err
+	}
+
 	return osinClient.(*OAuthClient), err
 }
 
 // GetExtendedClientNoPrefix custom getter to handle prefixing issues in Redis,
 func (r *RedisOsinStorageInterface) GetExtendedClientNoPrefix(id string) (ExtendedOsinClientInterface, error) {
 	osinClient, err := r.GetClientNoPrefix(id)
+	if err != nil {
+		log.WithError(err).Error("Failure retrieving client ID key")
+		return nil, err
+	}
 	return osinClient.(*OAuthClient), err
 }
 
