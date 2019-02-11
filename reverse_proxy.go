@@ -608,10 +608,15 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		// important is "Connection" because we want a persistent
 		// connection, regardless of what the client sent to us.
 		for _, h := range hopHeaders {
-			if outreq.Header.Get(h) != "" {
-				outreq.Header.Del(h)
-				logreq.Header.Del(h)
+			hv := outreq.Header.Get(h)
+			if hv == "" {
+				continue
 			}
+			if h == "Te" && hv == "trailers" {
+				continue
+			}
+			outreq.Header.Del(h)
+			logreq.Header.Del(h)
 		}
 	}
 
