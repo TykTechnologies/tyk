@@ -302,7 +302,7 @@ type Config struct {
 	ProxySSLInsecureSkipVerify        bool                                  `json:"proxy_ssl_insecure_skip_verify"`
 	ProxySSLMinVersion                uint16                                `json:"proxy_ssl_min_version"`
 	ProxySSLCipherSuites              []string                              `json:"proxy_ssl_ciphers"`
-	ProxyDefaultTimeout               int                                   `json:"proxy_default_timeout"`
+	ProxyDefaultTimeout               float64                               `json:"proxy_default_timeout"`
 	ProxySSLDisableRenegotiation      bool                                  `json:"proxy_ssl_disable_renegotiation"`
 	LogLevel                          string                                `json:"log_level"`
 	Security                          SecurityConfig                        `json:"security"`
