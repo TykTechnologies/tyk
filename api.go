@@ -1365,7 +1365,7 @@ func updateOauthClient(keyName, apiID string, r *http.Request) (interface{}, int
 
 	// invalidate tokens if we had a new policy
 	if prevPolicy := client.GetPolicyID(); prevPolicy != "" && prevPolicy != updatedClient.PolicyID {
-		tokenList, err := apiSpec.OAuthManager.OsinServer.Storage.GetClientTokens(updatedClient.ClientID)
+		tokenList, _, err := apiSpec.OAuthManager.OsinServer.Storage.GetClientTokens(updatedClient.ClientID, 1)
 		if err != nil {
 			log.WithError(err).Warning("Could not get list of tokens for updated OAuth client")
 		}
