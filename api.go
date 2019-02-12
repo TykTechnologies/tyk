@@ -1169,11 +1169,13 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 // NewClientRequest is an outward facing JSON object translated from osin OAuthClients
 type NewClientRequest struct {
-	ClientID          string `json:"client_id"`
-	ClientRedirectURI string `json:"redirect_uri"`
-	APIID             string `json:"api_id"`
-	PolicyID          string `json:"policy_id"`
-	ClientSecret      string `json:"secret"`
+	ClientID          string      `json:"client_id"`
+	ClientRedirectURI string      `json:"redirect_uri"`
+	APIID             string      `json:"api_id,omitempty"`
+	PolicyID          string      `json:"policy_id,omitempty"`
+	ClientSecret      string      `json:"secret"`
+	MetaData          interface{} `json:"meta_data"`
+	Description       string      `json:"description"`
 }
 
 func oauthClientStorageID(clientID string) string {
@@ -1190,6 +1192,47 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		}).Error("Failed to create OAuth client")
 		doJSONWrite(w, http.StatusInternalServerError, apiError("Unmarshalling failed"))
 		return
+	}
+
+	if newOauthClient.APIID == "" {
+		doJSONWrite(w, http.StatusInternalServerError,
+			apiError("api_id not specified"))
+		return
+	}
+
+	// check API
+	apiSpec := getApiSpec(newOauthClient.APIID)
+	if apiSpec == nil {
+		doJSONWrite(w, http.StatusBadRequest,
+			apiError("API doesn't exist"))
+		return
+	}
+	if !apiSpec.UseOauth2 {
+		doJSONWrite(w, http.StatusBadRequest,
+			apiError("API is not OAuth2"))
+		return
+	}
+
+	// check policy
+	if newOauthClient.PolicyID != "" {
+		policiesMu.RLock()
+		policy, ok := policiesByID[newOauthClient.PolicyID]
+		policiesMu.RUnlock()
+		if !ok {
+			doJSONWrite(w, http.StatusBadRequest,
+				apiError("Policy doesn't exist"))
+			return
+		}
+		if _, ok := policy.AccessRights[newOauthClient.APIID]; !ok {
+			doJSONWrite(w, http.StatusBadRequest,
+				apiError("Policy access rights doesn't contain API this OAuth client belongs to"))
+			return
+		}
+		if len(policy.AccessRights) != 1 {
+			doJSONWrite(w, http.StatusBadRequest,
+				apiError("Policy access rights should contain only one API"))
+			return
+		}
 	}
 
 	// Allow the client ID to be set
@@ -1212,6 +1255,8 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		ClientRedirectURI: newOauthClient.ClientRedirectURI,
 		ClientSecret:      secret,
 		PolicyID:          newOauthClient.PolicyID,
+		MetaData:          newOauthClient.MetaData,
+		Description:       newOauthClient.Description,
 	}
 
 	storageID := oauthClientStorageID(newClient.GetId())
@@ -1219,81 +1264,26 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		"prefix": "api",
 	}).Debug("Created storage ID: ", storageID)
 
-	if newOauthClient.APIID != "" {
-		// set client only for passed API ID
-		apiSpec := getApiSpec(newOauthClient.APIID)
-		if apiSpec == nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "api",
-				"apiID":  newOauthClient.APIID,
-				"status": "fail",
-				"err":    "API doesn't exist",
-			}).Error("Failed to create OAuth client")
-			doJSONWrite(w, http.StatusInternalServerError, apiError("API doesn't exist"))
-			return
-		}
-
-		err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, &newClient, true)
-		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "api",
-				"apiID":  newOauthClient.APIID,
-				"status": "fail",
-				"err":    err,
-			}).Error("Failed to create OAuth client")
-			doJSONWrite(w, http.StatusInternalServerError, apiError("Failure in storing client data."))
-			return
-		}
-	} else {
-		// set client for all APIs from the given policy
-		policiesMu.RLock()
-		policy, ok := policiesByID[newClient.PolicyID]
-		policiesMu.RUnlock()
-		if !ok {
-			log.WithFields(logrus.Fields{
-				"prefix":   "api",
-				"policyID": newClient.PolicyID,
-				"status":   "fail",
-				"err":      "Policy doesn't exist",
-			}).Error("Failed to create OAuth client")
-			doJSONWrite(w, http.StatusInternalServerError, apiError("Policy doesn't exist"))
-			return
-		}
-		// iterate over APIs and set client for each of them
-		for apiID := range policy.AccessRights {
-			apiSpec := getApiSpec(apiID)
-			if apiSpec == nil {
-				log.WithFields(logrus.Fields{
-					"prefix": "api",
-					"apiID":  apiID,
-					"status": "fail",
-					"err":    "API doesn't exist",
-				}).Error("Failed to create OAuth client")
-				doJSONWrite(w, http.StatusInternalServerError, apiError("API doesn't exist"))
-				return
-			}
-			// set oauth client if it is oauth API
-			if apiSpec.UseOauth2 {
-				err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, &newClient, true)
-				if err != nil {
-					log.WithFields(logrus.Fields{
-						"prefix": "api",
-						"apiID":  apiID,
-						"status": "fail",
-						"err":    err,
-					}).Error("Failed to create OAuth client")
-					doJSONWrite(w, http.StatusInternalServerError, apiError("Failure in storing client data."))
-					return
-				}
-			}
-		}
+	err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, &newClient, true)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"apiID":  newOauthClient.APIID,
+			"status": "fail",
+			"err":    err,
+		}).Error("Failed to create OAuth client")
+		doJSONWrite(w, http.StatusInternalServerError, apiError("Failure in storing client data."))
+		return
 	}
 
+	// we have to convert it back to NewClientRequest because NewClientRequest and OAuthClient have different json-tags
 	clientData := NewClientRequest{
 		ClientID:          newClient.GetId(),
 		ClientSecret:      newClient.GetSecret(),
 		ClientRedirectURI: newClient.GetRedirectUri(),
 		PolicyID:          newClient.GetPolicyID(),
+		MetaData:          newClient.GetUserData(),
+		Description:       newClient.GetDescription(),
 	}
 
 	log.WithFields(logrus.Fields{
@@ -1302,10 +1292,101 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		"clientID":          clientData.ClientID,
 		"clientRedirectURI": clientData.ClientRedirectURI,
 		"policyID":          clientData.PolicyID,
+		"description":       clientData.Description,
 		"status":            "ok",
 	}).Info("Created OAuth client")
 
 	doJSONWrite(w, http.StatusOK, clientData)
+}
+
+// Update Client
+func updateOauthClient(keyName, apiID string, r *http.Request) (interface{}, int) {
+	// read payload
+	var updateClientData NewClientRequest
+	if err := json.NewDecoder(r.Body).Decode(&updateClientData); err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"status": "fail",
+			"err":    err,
+		}).Error("Failed to update OAuth client")
+		return apiError("Unmarshalling failed"), http.StatusInternalServerError
+	}
+
+	// check API
+	apiSpec := getApiSpec(apiID)
+	if apiSpec == nil {
+		return apiError("API doesn't exist"), http.StatusNotFound
+	}
+
+	// check policy
+	if updateClientData.PolicyID != "" {
+		policiesMu.RLock()
+		policy, ok := policiesByID[updateClientData.PolicyID]
+		policiesMu.RUnlock()
+		if !ok {
+			return apiError("Policy doesn't exist"), http.StatusNotFound
+		}
+		if _, ok := policy.AccessRights[apiID]; !ok {
+			return apiError("Policy access rights doesn't contain API this OAuth client belongs to"),
+				http.StatusBadRequest
+		}
+		if len(policy.AccessRights) != 1 {
+			return apiError("Policy access rights should contain only one API"), http.StatusBadRequest
+		}
+	}
+
+	// get existing version of oauth-client
+	storageID := oauthClientStorageID(keyName)
+	client, err := apiSpec.OAuthManager.OsinServer.Storage.GetExtendedClientNoPrefix(storageID)
+	if err != nil {
+		return apiError("OAuth Client ID not found"), http.StatusNotFound
+	}
+
+	// update client
+	updatedClient := OAuthClient{
+		ClientID:          client.GetId(),
+		ClientSecret:      client.GetSecret(),                 // DO NOT update
+		ClientRedirectURI: updateClientData.ClientRedirectURI, // update
+		PolicyID:          updateClientData.PolicyID,          // update
+		MetaData:          client.GetUserData(),               // DO NOT update
+		Description:       updateClientData.Description,       // update
+	}
+
+	err = apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, &updatedClient, true)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"apiID":  apiID,
+			"status": "fail",
+			"err":    err,
+		}).Error("Failed to update OAuth client")
+		return apiError("Failure in storing client data"), http.StatusInternalServerError
+	}
+
+	// invalidate tokens if we had a new policy
+	if prevPolicy := client.GetPolicyID(); prevPolicy != "" && prevPolicy != updatedClient.PolicyID {
+		tokenList, err := apiSpec.OAuthManager.OsinServer.Storage.GetClientTokens(updatedClient.ClientID)
+		if err != nil {
+			log.WithError(err).Warning("Could not get list of tokens for updated OAuth client")
+		}
+		for _, token := range tokenList {
+			if err := apiSpec.OAuthManager.OsinServer.Storage.RemoveAccess(token.Token); err != nil {
+				log.WithError(err).Warning("Could not remove token for updated OAuth client policy")
+			}
+		}
+	}
+
+	// convert to outbound format
+	replyData := NewClientRequest{
+		ClientID:          updatedClient.GetId(),
+		ClientSecret:      updatedClient.GetSecret(),
+		ClientRedirectURI: updatedClient.GetRedirectUri(),
+		PolicyID:          updatedClient.GetPolicyID(),
+		MetaData:          updatedClient.GetUserData(),
+		Description:       updatedClient.GetDescription(),
+	}
+
+	return replyData, http.StatusOK
 }
 
 func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
@@ -1382,7 +1463,7 @@ func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 	var obj interface{}
 	var code int
 	switch r.Method {
-	case "GET":
+	case http.MethodGet:
 		if keyName != "" {
 			// Return single client detail
 			obj, code = getOauthClientDetails(keyName, apiID)
@@ -1390,7 +1471,10 @@ func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 			// Return list of keys
 			obj, code = getOauthClients(apiID)
 		}
-	case "DELETE":
+	case http.MethodPut:
+		// Update client
+		obj, code = updateOauthClient(keyName, apiID, r)
+	case http.MethodDelete:
 		// Remove a key
 		obj, code = handleDeleteOAuthClient(keyName, apiID)
 	}
@@ -1441,7 +1525,7 @@ func getOauthClientDetails(keyName, apiID string) (interface{}, int) {
 		return apiError("OAuth Client ID not found"), http.StatusNotFound
 	}
 
-	clientData, err := apiSpec.OAuthManager.OsinServer.Storage.GetClientNoPrefix(storageID)
+	clientData, err := apiSpec.OAuthManager.OsinServer.Storage.GetExtendedClientNoPrefix(storageID)
 	if err != nil {
 		return apiError("OAuth Client ID not found"), http.StatusNotFound
 	}
@@ -1450,6 +1534,8 @@ func getOauthClientDetails(keyName, apiID string) (interface{}, int) {
 		ClientSecret:      clientData.GetSecret(),
 		ClientRedirectURI: clientData.GetRedirectUri(),
 		PolicyID:          clientData.GetPolicyID(),
+		MetaData:          clientData.GetUserData(),
+		Description:       clientData.GetDescription(),
 	}
 
 	log.WithFields(logrus.Fields{
@@ -1547,6 +1633,8 @@ func getOauthClients(apiID string) (interface{}, int) {
 			ClientSecret:      osinClient.GetSecret(),
 			ClientRedirectURI: osinClient.GetRedirectUri(),
 			PolicyID:          osinClient.GetPolicyID(),
+			MetaData:          osinClient.GetUserData(),
+			Description:       osinClient.GetDescription(),
 		}
 
 		clients = append(clients, reportableClientData)
