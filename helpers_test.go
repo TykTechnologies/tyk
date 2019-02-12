@@ -226,10 +226,10 @@ func createPolicy(pGen ...func(p *user.Policy)) string {
 	}
 
 	policiesMu.Lock()
-	policiesByID[pID] = *pol
+	policiesByID[pol.ID] = *pol
 	policiesMu.Unlock()
 
-	return pID
+	return pol.ID
 }
 
 func createJWKToken(jGen ...func(*jwt.Token)) string {

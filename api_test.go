@@ -741,6 +741,14 @@ func TestGetOAuthClients(t *testing.T) {
 		spec.UseOauth2 = true
 	})
 
+	createPolicy(func(p *user.Policy) {
+		p.ID = "test"
+		p.AccessRights = map[string]user.AccessDefinition{
+			"test": {
+				APIID: "test",
+			},
+		}
+	})
 	oauthRequest := NewClientRequest{
 		ClientID:          "test",
 		ClientRedirectURI: "http://localhost",
@@ -750,13 +758,34 @@ func TestGetOAuthClients(t *testing.T) {
 	}
 	validOauthRequest, _ := json.Marshal(oauthRequest)
 
+	createPolicy(func(p *user.Policy) {
+		p.ID = "test2"
+		p.AccessRights = map[string]user.AccessDefinition{
+			"test": {
+				APIID: "test",
+			},
+			"abc": {
+				APIID: "abc",
+			},
+		}
+	})
+	oauthRequestWrongACL := NewClientRequest{
+		ClientID:          "test2",
+		ClientRedirectURI: "http://localhost",
+		APIID:             "test",
+		PolicyID:          "test2",
+		ClientSecret:      "secret",
+	}
+	wrongAPIOauthRequest2, _ := json.Marshal(oauthRequestWrongACL)
+
 	oauthRequest.APIID = "unknown"
 	wrongAPIOauthRequest, _ := json.Marshal(oauthRequest)
 
 	ts.Run(t, []test.TestCase{
 		{Path: "/tyk/oauth/clients/unknown", AdminAuth: true, Code: 404},
 		{Path: "/tyk/oauth/clients/test", AdminAuth: true, Code: 200, BodyMatch: `[]`},
-		{Method: "POST", Path: "/tyk/oauth/clients/create", AdminAuth: true, Data: string(wrongAPIOauthRequest), Code: 500, BodyMatch: `API doesn't exist`},
+		{Method: "POST", Path: "/tyk/oauth/clients/create", AdminAuth: true, Data: string(wrongAPIOauthRequest), Code: 400, BodyMatch: `API doesn't exist`},
+		{Method: "POST", Path: "/tyk/oauth/clients/create", AdminAuth: true, Data: string(wrongAPIOauthRequest2), Code: 400, BodyMatch: `should contain only one API`},
 		{Method: "POST", Path: "/tyk/oauth/clients/create", AdminAuth: true, Data: string(validOauthRequest), Code: 200},
 		{Path: "/tyk/oauth/clients/test", AdminAuth: true, Code: 200, BodyMatch: `[{"client_id":"test"`},
 	}...)
