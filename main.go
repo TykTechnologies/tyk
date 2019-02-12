@@ -19,6 +19,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/net/http2"
+
 	newrelic "github.com/newrelic/go-agent"
 
 	"github.com/TykTechnologies/tyk/checkup"
@@ -1143,6 +1145,10 @@ func generateListener(listenPort int) (net.Listener, error) {
 			ClientAuth:         tls.NoClientCert,
 			InsecureSkipVerify: httpServerOptions.SSLInsecureSkipVerify,
 			CipherSuites:       getCipherAliases(httpServerOptions.Ciphers),
+		}
+
+		if httpServerOptions.EnableHttp2 {
+			tlsConfig.NextProtos = append(tlsConfig.NextProtos, http2.NextProtoTLS)
 		}
 
 		tlsConfig.GetConfigForClient = getTLSConfigForClient(&tlsConfig, listenPort)

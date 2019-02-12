@@ -18,6 +18,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/net/http2"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
@@ -25,7 +27,7 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-func getTLSClient(cert *tls.Certificate, caCert []byte) *http.Client {
+func getTLSClient(cert *tls.Certificate, caCert []byte, isHttp2 bool) *http.Client {
 	// Setup HTTPS client
 	tlsConfig := &tls.Config{}
 
@@ -42,7 +44,12 @@ func getTLSClient(cert *tls.Certificate, caCert []byte) *http.Client {
 		tlsConfig.InsecureSkipVerify = true
 	}
 
-	transport := &http.Transport{TLSClientConfig: tlsConfig}
+	var transport http.RoundTripper
+	if isHttp2 {
+		transport = &http2.Transport{TLSClientConfig: tlsConfig}
+	} else {
+		transport = &http.Transport{TLSClientConfig: tlsConfig}
+	}
 
 	return &http.Client{Transport: transport}
 }
@@ -91,7 +98,7 @@ func TestGatewayTLS(t *testing.T) {
 	dir, _ := ioutil.TempDir("", "certs")
 	defer os.RemoveAll(dir)
 
-	client := getTLSClient(nil, nil)
+	client := getTLSClient(nil, nil, false)
 
 	t.Run("Without certificates", func(t *testing.T) {
 		globalConf := config.Global()
@@ -204,9 +211,9 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 	}()
 
 	clientCertPem, _, _, clientCert := genCertificate(&x509.Certificate{})
-	clientWithCert := getTLSClient(&clientCert, serverCertPem)
+	clientWithCert := getTLSClient(&clientCert, serverCertPem, false)
 
-	clientWithoutCert := getTLSClient(nil, nil)
+	clientWithoutCert := getTLSClient(nil, nil, false)
 
 	t.Run("Separate domain", func(t *testing.T) {
 		certID, _ := CertificateManager.Add(combinedPEM, "")
@@ -276,7 +283,7 @@ func TestAPIMutualTLS(t *testing.T) {
 
 	t.Run("SNI and domain per API", func(t *testing.T) {
 		t.Run("API without mutual TLS", func(t *testing.T) {
-			client := getTLSClient(&clientCert, serverCertPem)
+			client := getTLSClient(&clientCert, serverCertPem, false)
 
 			buildAndLoadAPI(func(spec *APISpec) {
 				spec.Domain = "localhost"
@@ -287,7 +294,7 @@ func TestAPIMutualTLS(t *testing.T) {
 		})
 
 		t.Run("MutualTLSCertificate not set", func(t *testing.T) {
-			client := getTLSClient(nil, nil)
+			client := getTLSClient(nil, nil, false)
 
 			buildAndLoadAPI(func(spec *APISpec) {
 				spec.Domain = "localhost"
@@ -303,7 +310,7 @@ func TestAPIMutualTLS(t *testing.T) {
 		})
 
 		t.Run("Client certificate match", func(t *testing.T) {
-			client := getTLSClient(&clientCert, serverCertPem)
+			client := getTLSClient(&clientCert, serverCertPem, false)
 			clientCertID, _ := CertificateManager.Add(clientCertPem, "")
 
 			buildAndLoadAPI(func(spec *APISpec) {
@@ -320,14 +327,14 @@ func TestAPIMutualTLS(t *testing.T) {
 			CertificateManager.Delete(clientCertID)
 			CertificateManager.FlushCache()
 
-			client = getTLSClient(&clientCert, serverCertPem)
+			client = getTLSClient(&clientCert, serverCertPem, false)
 			ts.Run(t, test.TestCase{
 				Client: client, Domain: "localhost", ErrorMatch: badcertErr,
 			})
 		})
 
 		t.Run("Client certificate differ", func(t *testing.T) {
-			client := getTLSClient(&clientCert, serverCertPem)
+			client := getTLSClient(&clientCert, serverCertPem, false)
 
 			clientCertPem2, _, _, _ := genCertificate(&x509.Certificate{})
 			clientCertID2, _ := CertificateManager.Add(clientCertPem2, "")
@@ -364,7 +371,7 @@ func TestAPIMutualTLS(t *testing.T) {
 		}
 
 		t.Run("Without certificate", func(t *testing.T) {
-			clientWithoutCert := getTLSClient(nil, nil)
+			clientWithoutCert := getTLSClient(nil, nil, false)
 
 			loadAPIS()
 
@@ -385,7 +392,7 @@ func TestAPIMutualTLS(t *testing.T) {
 		})
 
 		t.Run("Client certificate not match", func(t *testing.T) {
-			client := getTLSClient(&clientCert, serverCertPem)
+			client := getTLSClient(&clientCert, serverCertPem, false)
 
 			loadAPIS()
 
@@ -401,7 +408,7 @@ func TestAPIMutualTLS(t *testing.T) {
 
 		t.Run("Client certificate match", func(t *testing.T) {
 			loadAPIS(clientCertID)
-			client := getTLSClient(&clientCert, serverCertPem)
+			client := getTLSClient(&clientCert, serverCertPem, false)
 
 			ts.Run(t, test.TestCase{
 				Path:   "/with_mutual",
@@ -431,7 +438,7 @@ func TestUpstreamMutualTLS(t *testing.T) {
 	defer upstream.Close()
 
 	t.Run("Without API", func(t *testing.T) {
-		client := getTLSClient(&clientCert, nil)
+		client := getTLSClient(&clientCert, nil, false)
 
 		if _, err := client.Get(upstream.URL); err == nil {
 			t.Error("Should reject without certificate")
@@ -495,7 +502,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 	})
 
-	client := getTLSClient(&clientCert, nil)
+	client := getTLSClient(&clientCert, nil, false)
 
 	t.Run("Cert unknown", func(t *testing.T) {
 		ts.Run(t, test.TestCase{Code: 403, Client: client})
@@ -647,4 +654,47 @@ func TestCipherSuites(t *testing.T) {
 
 		ts.Run(t, test.TestCase{Client: client, Path: "/", ErrorMatch: "tls: handshake failure"})
 	})
+}
+
+func TestHTTP2(t *testing.T) {
+	mockHandle.PushDomains(map[string][]string{"http2.golang.org.": {"130.211.116.44"}}, nil)
+
+	// Certificates
+	serverCertPem, serverPrivPem, _, _ := genServerCertificate()
+	_, _, _, clientCert := genCertificate(&x509.Certificate{})
+
+	dir, _ := ioutil.TempDir("", "certs")
+	defer os.RemoveAll(dir)
+	certFilePath := filepath.Join(dir, "server.crt")
+	ioutil.WriteFile(certFilePath, serverCertPem, 0666)
+
+	certKeyPath := filepath.Join(dir, "server.key")
+	ioutil.WriteFile(certKeyPath, serverPrivPem, 0666)
+
+	// Configuration
+	globalConf := config.Global()
+	globalConf.HttpServerOptions.EnableHttp2 = true
+	globalConf.HttpServerOptions.Certificates = []config.CertData{{
+		Name:     "localhost",
+		CertFile: certFilePath,
+		KeyFile:  certKeyPath,
+	}}
+	globalConf.HttpServerOptions.UseSSL = true
+	config.SetGlobal(globalConf)
+	defer resetTestConfig()
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	buildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.UseKeylessAccess = true
+		spec.Proxy.TargetURL = "https://http2.golang.org" // HTTP/2 Upstream
+	})
+
+	// Client
+	http2Client := getTLSClient(&clientCert, serverCertPem, true)
+
+	ts.Run(t, test.TestCase{Client: http2Client, Path: "", Code: 200, BodyMatch: "<h1>Go + HTTP/2</h1>"})
+
 }
