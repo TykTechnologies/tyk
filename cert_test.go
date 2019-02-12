@@ -657,7 +657,6 @@ func TestCipherSuites(t *testing.T) {
 }
 
 func TestHTTP2(t *testing.T) {
-	mockHandle.PushDomains(map[string][]string{"http2.golang.org.": {"130.211.116.44"}}, nil)
 
 	// Certificates
 	serverCertPem, serverPrivPem, _, _ := genServerCertificate()
