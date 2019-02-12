@@ -659,25 +659,23 @@ func TestCipherSuites(t *testing.T) {
 func TestHTTP2(t *testing.T) {
 
 	// Certificates
-	serverCertPem, serverPrivPem, _, _ := genServerCertificate()
 	_, _, _, clientCert := genCertificate(&x509.Certificate{})
+	serverCertPem, _, combinedPEM, _ := genServerCertificate()
+	certID, _ := CertificateManager.Add(combinedPEM, "")
+	defer CertificateManager.Delete(certID)
 
-	dir, _ := ioutil.TempDir("", "certs")
-	defer os.RemoveAll(dir)
-	certFilePath := filepath.Join(dir, "server.crt")
-	ioutil.WriteFile(certFilePath, serverCertPem, 0666)
+	// Upstream server supporting HTTP/2
+	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "Hello, I am an HTTP/2 Server")
+	}))
+	upstream.StartTLS()
+	defer upstream.Close()
 
-	certKeyPath := filepath.Join(dir, "server.key")
-	ioutil.WriteFile(certKeyPath, serverPrivPem, 0666)
-
-	// Configuration
+	// Tyk
 	globalConf := config.Global()
+	globalConf.ProxySSLInsecureSkipVerify = true
 	globalConf.HttpServerOptions.EnableHttp2 = true
-	globalConf.HttpServerOptions.Certificates = []config.CertData{{
-		Name:     "localhost",
-		CertFile: certFilePath,
-		KeyFile:  certKeyPath,
-	}}
+	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
 	globalConf.HttpServerOptions.UseSSL = true
 	config.SetGlobal(globalConf)
 	defer resetTestConfig()
@@ -688,12 +686,11 @@ func TestHTTP2(t *testing.T) {
 	buildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = true
-		spec.Proxy.TargetURL = "https://http2.golang.org" // HTTP/2 Upstream
+		spec.Proxy.TargetURL = upstream.URL
 	})
 
-	// Client
+	// HTTP/2 client
 	http2Client := getTLSClient(&clientCert, serverCertPem, true)
 
-	ts.Run(t, test.TestCase{Client: http2Client, Path: "", Code: 200, BodyMatch: "<h1>Go + HTTP/2</h1>"})
-
+	ts.Run(t, test.TestCase{Client: http2Client, Path: "", Code: 200, BodyMatch: "Hello, I am an HTTP/2 Server"})
 }

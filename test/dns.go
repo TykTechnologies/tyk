@@ -17,10 +17,9 @@ import (
 var (
 	muDefaultResolver  sync.RWMutex
 	DomainsToAddresses = map[string][]string{
-		"host1.local.":      {"127.0.0.1"},
-		"host2.local.":      {"127.0.0.1"},
-		"host3.local.":      {"127.0.0.1"},
-		"http2.golang.org.": {"130.211.116.44"}, // HTTP/2 server
+		"host1.local.": {"127.0.0.1"},
+		"host2.local.": {"127.0.0.1"},
+		"host3.local.": {"127.0.0.1"},
 	}
 )
 
