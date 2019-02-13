@@ -475,7 +475,7 @@ func handleDeleteKey(keyName, apiID string) (interface{}, int) {
 		}
 		apisMu.RUnlock()
 
-		if removed {
+		if !removed {
 			log.WithFields(logrus.Fields{
 				"prefix": "api",
 				"key":    obfuscateKey(keyName),
