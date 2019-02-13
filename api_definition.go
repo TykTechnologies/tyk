@@ -108,6 +108,7 @@ type URLSpec struct {
 	Spec                      *regexp.Regexp
 	Status                    URLStatus
 	MethodActions             map[string]apidef.EndpointMethodMeta
+	CacheConfig               EndPointCacheMeta
 	TransformAction           TransformSpec
 	TransformResponseAction   TransformSpec
 	TransformJQAction         TransformJQSpec
@@ -123,6 +124,11 @@ type URLSpec struct {
 	TrackEndpoint             apidef.TrackEndpointMeta
 	DoNotTrackEndpoint        apidef.TrackEndpointMeta
 	ValidatePathMeta          apidef.ValidatePathMeta
+}
+
+type EndPointCacheMeta struct {
+	Method        string
+	CacheKeyRegex string
 }
 
 type TransformSpec struct {
@@ -489,14 +495,25 @@ func (a APIDefinitionLoader) compileExtendedPathSpec(paths []apidef.EndPointMeta
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileCachedPathSpec(paths []string) []URLSpec {
+func (a APIDefinitionLoader) compileCachedPathSpec(oldpaths []string, newpaths []apidef.CacheMeta) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
 
-	for _, stringSpec := range paths {
+	for _, stringSpec := range oldpaths {
 		newSpec := URLSpec{}
 		a.generateRegex(stringSpec, &newSpec, Cached)
+		newSpec.CacheConfig.Method = "SAFE_METHODS"
+		newSpec.CacheConfig.CacheKeyRegex = ""
+		// Extend with method actions
+		urlSpec = append(urlSpec, newSpec)
+	}
+
+	for _, spec := range newpaths {
+		newSpec := URLSpec{}
+		a.generateRegex(spec.Path, &newSpec, Cached)
+		newSpec.CacheConfig.Method = spec.Method
+		newSpec.CacheConfig.CacheKeyRegex = spec.CacheKeyRegex
 		// Extend with method actions
 		urlSpec = append(urlSpec, newSpec)
 	}
@@ -805,7 +822,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	ignoredPaths := a.compileExtendedPathSpec(apiVersionDef.ExtendedPaths.Ignored, Ignored)
 	blackListPaths := a.compileExtendedPathSpec(apiVersionDef.ExtendedPaths.BlackList, BlackList)
 	whiteListPaths := a.compileExtendedPathSpec(apiVersionDef.ExtendedPaths.WhiteList, WhiteList)
-	cachedPaths := a.compileCachedPathSpec(apiVersionDef.ExtendedPaths.Cached)
+	cachedPaths := a.compileCachedPathSpec(apiVersionDef.ExtendedPaths.Cached, apiVersionDef.ExtendedPaths.AdvanceCacheConfig)
 	transformPaths := a.compileTransformPathSpec(apiVersionDef.ExtendedPaths.Transform, Transformed)
 	transformResponsePaths := a.compileTransformPathSpec(apiVersionDef.ExtendedPaths.TransformResponse, TransformedResponse)
 	transformJQPaths := a.compileTransformJQPathSpec(apiVersionDef.ExtendedPaths.TransformJQ, TransformedJQ)
@@ -997,8 +1014,12 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 		}
 
 		switch v.Status {
-		case Ignored, BlackList, WhiteList, Cached:
+		case Ignored, BlackList, WhiteList:
 			return true, nil
+		case Cached:
+			if method == v.CacheConfig.Method || (v.CacheConfig.Method == "SAFE_METHODS" && (method == "GET" || method == "HEADERS" || method == "OPTIONS")) {
+				return true, &v.CacheConfig
+			}
 		case Transformed:
 			if method == v.TransformAction.Method {
 				return true, &v.TransformAction
