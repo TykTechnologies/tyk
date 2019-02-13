@@ -27,7 +27,7 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-func getTLSClient(cert *tls.Certificate, caCert []byte, isHttp2 bool) *http.Client {
+func getTLSClient(cert *tls.Certificate, caCert []byte) *http.Client {
 	// Setup HTTPS client
 	tlsConfig := &tls.Config{}
 
@@ -44,12 +44,7 @@ func getTLSClient(cert *tls.Certificate, caCert []byte, isHttp2 bool) *http.Clie
 		tlsConfig.InsecureSkipVerify = true
 	}
 
-	var transport http.RoundTripper
-	if isHttp2 {
-		transport = &http2.Transport{TLSClientConfig: tlsConfig}
-	} else {
-		transport = &http.Transport{TLSClientConfig: tlsConfig}
-	}
+	transport := &http.Transport{TLSClientConfig: tlsConfig}
 
 	return &http.Client{Transport: transport}
 }
@@ -98,7 +93,7 @@ func TestGatewayTLS(t *testing.T) {
 	dir, _ := ioutil.TempDir("", "certs")
 	defer os.RemoveAll(dir)
 
-	client := getTLSClient(nil, nil, false)
+	client := getTLSClient(nil, nil)
 
 	t.Run("Without certificates", func(t *testing.T) {
 		globalConf := config.Global()
@@ -211,9 +206,9 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 	}()
 
 	clientCertPem, _, _, clientCert := genCertificate(&x509.Certificate{})
-	clientWithCert := getTLSClient(&clientCert, serverCertPem, false)
+	clientWithCert := getTLSClient(&clientCert, serverCertPem)
 
-	clientWithoutCert := getTLSClient(nil, nil, false)
+	clientWithoutCert := getTLSClient(nil, nil)
 
 	t.Run("Separate domain", func(t *testing.T) {
 		certID, _ := CertificateManager.Add(combinedPEM, "")
@@ -283,7 +278,7 @@ func TestAPIMutualTLS(t *testing.T) {
 
 	t.Run("SNI and domain per API", func(t *testing.T) {
 		t.Run("API without mutual TLS", func(t *testing.T) {
-			client := getTLSClient(&clientCert, serverCertPem, false)
+			client := getTLSClient(&clientCert, serverCertPem)
 
 			buildAndLoadAPI(func(spec *APISpec) {
 				spec.Domain = "localhost"
@@ -294,7 +289,7 @@ func TestAPIMutualTLS(t *testing.T) {
 		})
 
 		t.Run("MutualTLSCertificate not set", func(t *testing.T) {
-			client := getTLSClient(nil, nil, false)
+			client := getTLSClient(nil, nil)
 
 			buildAndLoadAPI(func(spec *APISpec) {
 				spec.Domain = "localhost"
@@ -310,7 +305,7 @@ func TestAPIMutualTLS(t *testing.T) {
 		})
 
 		t.Run("Client certificate match", func(t *testing.T) {
-			client := getTLSClient(&clientCert, serverCertPem, false)
+			client := getTLSClient(&clientCert, serverCertPem)
 			clientCertID, _ := CertificateManager.Add(clientCertPem, "")
 
 			buildAndLoadAPI(func(spec *APISpec) {
@@ -327,14 +322,14 @@ func TestAPIMutualTLS(t *testing.T) {
 			CertificateManager.Delete(clientCertID)
 			CertificateManager.FlushCache()
 
-			client = getTLSClient(&clientCert, serverCertPem, false)
+			client = getTLSClient(&clientCert, serverCertPem)
 			ts.Run(t, test.TestCase{
 				Client: client, Domain: "localhost", ErrorMatch: badcertErr,
 			})
 		})
 
 		t.Run("Client certificate differ", func(t *testing.T) {
-			client := getTLSClient(&clientCert, serverCertPem, false)
+			client := getTLSClient(&clientCert, serverCertPem)
 
 			clientCertPem2, _, _, _ := genCertificate(&x509.Certificate{})
 			clientCertID2, _ := CertificateManager.Add(clientCertPem2, "")
@@ -371,7 +366,7 @@ func TestAPIMutualTLS(t *testing.T) {
 		}
 
 		t.Run("Without certificate", func(t *testing.T) {
-			clientWithoutCert := getTLSClient(nil, nil, false)
+			clientWithoutCert := getTLSClient(nil, nil)
 
 			loadAPIS()
 
@@ -392,7 +387,7 @@ func TestAPIMutualTLS(t *testing.T) {
 		})
 
 		t.Run("Client certificate not match", func(t *testing.T) {
-			client := getTLSClient(&clientCert, serverCertPem, false)
+			client := getTLSClient(&clientCert, serverCertPem)
 
 			loadAPIS()
 
@@ -408,7 +403,7 @@ func TestAPIMutualTLS(t *testing.T) {
 
 		t.Run("Client certificate match", func(t *testing.T) {
 			loadAPIS(clientCertID)
-			client := getTLSClient(&clientCert, serverCertPem, false)
+			client := getTLSClient(&clientCert, serverCertPem)
 
 			ts.Run(t, test.TestCase{
 				Path:   "/with_mutual",
@@ -438,7 +433,7 @@ func TestUpstreamMutualTLS(t *testing.T) {
 	defer upstream.Close()
 
 	t.Run("Without API", func(t *testing.T) {
-		client := getTLSClient(&clientCert, nil, false)
+		client := getTLSClient(&clientCert, nil)
 
 		if _, err := client.Get(upstream.URL); err == nil {
 			t.Error("Should reject without certificate")
@@ -502,7 +497,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 	})
 
-	client := getTLSClient(&clientCert, nil, false)
+	client := getTLSClient(&clientCert, nil)
 
 	t.Run("Cert unknown", func(t *testing.T) {
 		ts.Run(t, test.TestCase{Code: 403, Client: client})
@@ -657,6 +652,7 @@ func TestCipherSuites(t *testing.T) {
 }
 
 func TestHTTP2(t *testing.T) {
+	expected := "HTTP/2.0"
 
 	// Certificates
 	_, _, _, clientCert := genCertificate(&x509.Certificate{})
@@ -666,14 +662,23 @@ func TestHTTP2(t *testing.T) {
 
 	// Upstream server supporting HTTP/2
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		actual := r.Proto
+		if expected != actual {
+			t.Fatalf("Tyk-Upstream connection protocol is expected %s, actual %s", expected, actual)
+		}
+
 		fmt.Fprintln(w, "Hello, I am an HTTP/2 Server")
+
 	}))
+	upstream.TLS = new(tls.Config)
+	upstream.TLS.NextProtos = []string{"h2"}
 	upstream.StartTLS()
 	defer upstream.Close()
 
 	// Tyk
 	globalConf := config.Global()
 	globalConf.ProxySSLInsecureSkipVerify = true
+	globalConf.ProxyEnableHttp2 = true
 	globalConf.HttpServerOptions.EnableHttp2 = true
 	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
 	globalConf.HttpServerOptions.UseSSL = true
@@ -690,7 +695,8 @@ func TestHTTP2(t *testing.T) {
 	})
 
 	// HTTP/2 client
-	http2Client := getTLSClient(&clientCert, serverCertPem, true)
+	http2Client := getTLSClient(&clientCert, serverCertPem)
+	http2.ConfigureTransport(http2Client.Transport.(*http.Transport))
 
-	ts.Run(t, test.TestCase{Client: http2Client, Path: "", Code: 200, BodyMatch: "Hello, I am an HTTP/2 Server"})
+	ts.Run(t, test.TestCase{Client: http2Client, Path: "", Code: 200, Proto: "HTTP/2.0", BodyMatch: "Hello, I am an HTTP/2 Server"})
 }

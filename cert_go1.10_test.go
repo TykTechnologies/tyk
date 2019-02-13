@@ -204,7 +204,7 @@ func TestProxyTransport(t *testing.T) {
 			spec.Proxy.Transport.ProxyURL = proxy.URL
 		})
 
-		client := getTLSClient(nil, nil, false)
+		client := getTLSClient(nil, nil)
 		client.Transport = &http.Transport{
 			TLSNextProto: make(map[string]func(authority string, c *tls.Conn) http.RoundTripper),
 		}
