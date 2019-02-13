@@ -12,22 +12,21 @@ Table of Contents
     * [Mocking dashboard](#mocking-dashboard)
     * [Mocking RPC (Hybrid)](#mocking-rpc-hybrid)
     * [Mocking DNS](#mocking-dns)
-* [Tyk Test Framework](#tyk-test-framework)
+* [Test Framework](#test-framework)
     
 
 ## Tyk testing guide
 
+When it comes to the tests, one of the main questions is how to keep balance between expressivity, extendability, repeatability and performance. There are countless discussions if you should write integration or unit tests, should your mock or not, should you write tests first or after and etc. Since you will never find the right answer, on a growing code base, multiple people start introducing own methodology and distinct test helpers. Even looking at our quite small code base, you can find like 3-4 ways to write the same test.
 
-When it comes to the tests, one of the main questions is how to keep balance between expressivity, extendability, repeatability and performance. There are countless discussions if you should write integration or unit tests, should your mock or not, should you write tests first or after and etc. Since you will never find the right answer, on a growing code base, multiple people start introducing own methodology and distinct test helpers. Even looking at our quite small code base, I can find like 3-4 ways to write the same test. Additionally expressivity of our tests are quite bad: it is quite hard to understand what actually get tested, lot of boilerplate code not related to test logic, and amount of copy-paste growing with each test.
+This document describes Tyk test framework and unified guidelines on writing tests.
 
-In order to fix issues described above, I think it is important to have an official guide on writing the tests.
-
-This idea behind this framework is not new, and we already had pieces of it around the code. My goal was to unify all the patterns we used previously, and design a small layer on top of it, to streamline process of writing the tests. 
-
-Main points of the new framework are:
+Main points of the test framework are:
 - All tests run HTTP requests though the full HTTP stack, same as user will do
 - Test definition logic separated from test runner.
 - Official mocks for the Dashboard, RPC, and Bundler
+
+Framework located inside "github.com/TykTechnologies/tyk/test" package. See its API docs https://godoc.org/github.com/TykTechnologies/tyk/test
 
 Let’s learn by example:
 
@@ -401,7 +400,7 @@ Inside tests we override default network resolver to use custom DNS server mock,
 
 Using DNS mock means that you are able to create tests with APIs on multiple domains, without modifying machine `/etc/hosts` file. 
 
-## Tyk Test Framework
+## Test Framework
 
 Usage of framework described above is not limited by Tyk Gateway, and it is used across variety of Tyk projects. 
 The main building block is the test runner. 
@@ -418,8 +417,11 @@ func (r HTTPTestRunner) Run(t testing.TB, testCases ...TestCase) {
 By overriding its variables, you can tune runner behavior.
 For example http runner can be look like:
 ```
+import "github.com/TykTechnologies/tyk/test"
+
+...
 baseURL := "http://example.com"
-runner := HTTPTestRunner{
+runner := test.HTTPTestRunner{
     Do: func(r *http.Request, tc *TestCase) (*http.Response, error) {
       return tc.Client.Do(r)  
     }
@@ -429,11 +431,15 @@ runner := HTTPTestRunner{
     },
 }
 runner.Run(t, testCases...)
+...
 ```
 And Unit testing of http handlers can be:
 ```
+import "github.com/TykTechnologies/tyk/test"
+
+...
 handler := func(wr http.RequestWriter, r *http.Request){...}
-runner := HTTPTestRunner{
+runner := test.HTTPTestRunner{
     Do: func(r *http.Request, _ *TestCase) (*http.Response, error) {
 		rec := httptest.NewRecorder()
 		handler(rec, r)
@@ -441,6 +447,7 @@ runner := HTTPTestRunner{
 	},
 }
 runner.Run(t, testCases...)
+...
 ```
 
 This package already exports functions for cases mentioned above:
