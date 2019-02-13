@@ -786,7 +786,7 @@ func TestGetOAuthClients(t *testing.T) {
 		{Path: "/tyk/oauth/clients/test", AdminAuth: true, Code: 200, BodyMatch: `[]`},
 		{Method: "POST", Path: "/tyk/oauth/clients/create", AdminAuth: true, Data: string(wrongAPIOauthRequest), Code: 400, BodyMatch: `API doesn't exist`},
 		{Method: "POST", Path: "/tyk/oauth/clients/create", AdminAuth: true, Data: string(wrongAPIOauthRequest2), Code: 400, BodyMatch: `should contain only one API`},
-		{Method: "POST", Path: "/tyk/oauth/clients/create", AdminAuth: true, Data: string(validOauthRequest), Code: 200},
+		{Method: "POST", Path: "/tyk/oauth/clients/create", AdminAuth: true, Data: string(validOauthRequest), Code: 200, BodyMatch: `"client_id":"test"`},
 		{Path: "/tyk/oauth/clients/test", AdminAuth: true, Code: 200, BodyMatch: `[{"client_id":"test"`},
 	}...)
 }
