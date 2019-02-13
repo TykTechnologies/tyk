@@ -450,7 +450,7 @@ func handleAddKey(keyName, hashedName, sessionString, apiID string) {
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"key":    keyName,
+			"key":    obfuscateKey(keyName),
 			"status": "fail",
 			"err":    err,
 		}).Error("Failed to update key.")
@@ -466,11 +466,23 @@ func handleDeleteKey(keyName, apiID string) (interface{}, int) {
 	if apiID == "-1" {
 		// Go through ALL managed API's and delete the key
 		apisMu.RLock()
+		removed := false
 		for _, spec := range apisByID {
-			spec.SessionManager.RemoveSession(keyName, false)
+			if spec.SessionManager.RemoveSession(keyName, false) {
+				removed = true
+			}
 			spec.SessionManager.ResetQuota(keyName, &user.SessionState{}, false)
 		}
 		apisMu.RUnlock()
+
+		if !removed {
+			log.WithFields(logrus.Fields{
+				"prefix": "api",
+				"key":    obfuscateKey(keyName),
+				"status": "fail",
+			}).Error("Failed to remove the key")
+			return apiError("Failed to remove the key"), http.StatusBadRequest
+		}
 
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -488,7 +500,14 @@ func handleDeleteKey(keyName, apiID string) (interface{}, int) {
 		sessionManager = spec.SessionManager
 	}
 
-	sessionManager.RemoveSession(keyName, false)
+	if !sessionManager.RemoveSession(keyName, false) {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"key":    obfuscateKey(keyName),
+			"status": "fail",
+		}).Error("Failed to remove the key")
+		return apiError("Failed to remove the key"), http.StatusBadRequest
+	}
 	sessionManager.ResetQuota(keyName, &user.SessionState{}, false)
 
 	statusObj := apiModifyKeySuccess{
@@ -515,11 +534,23 @@ func handleDeleteKey(keyName, apiID string) (interface{}, int) {
 func handleDeleteHashedKey(keyName, apiID string) (interface{}, int) {
 	if apiID == "-1" {
 		// Go through ALL managed API's and delete the key
+		removed := false
 		apisMu.RLock()
 		for _, spec := range apisByID {
-			spec.SessionManager.RemoveSession(keyName, true)
+			if spec.SessionManager.RemoveSession(keyName, true) {
+				removed = true
+			}
 		}
 		apisMu.RUnlock()
+
+		if !removed {
+			log.WithFields(logrus.Fields{
+				"prefix": "api",
+				"key":    obfuscateKey(keyName),
+				"status": "fail",
+			}).Error("Failed to remove the key")
+			return apiError("Failed to remove the key"), http.StatusBadRequest
+		}
 
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -534,7 +565,15 @@ func handleDeleteHashedKey(keyName, apiID string) (interface{}, int) {
 	if spec := getApiSpec(apiID); spec != nil {
 		sessionManager = spec.SessionManager
 	}
-	sessionManager.RemoveSession(keyName, true)
+
+	if !sessionManager.RemoveSession(keyName, true) {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"key":    obfuscateKey(keyName),
+			"status": "fail",
+		}).Error("Failed to remove the key")
+		return apiError("Failed to remove the key"), http.StatusBadRequest
+	}
 
 	statusObj := apiModifyKeySuccess{
 		Key:    keyName,
@@ -972,7 +1011,10 @@ func handleDeleteOrgKey(orgID string) (interface{}, int) {
 		return apiError("Org not found"), http.StatusNotFound
 	}
 
-	spec.OrgSessionManager.RemoveSession(orgID, false)
+	if !spec.OrgSessionManager.RemoveSession(orgID, false) {
+		return apiError("Failed to remove the key"), http.StatusBadRequest
+	}
+
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
 		"key":    orgID,
