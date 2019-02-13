@@ -382,6 +382,9 @@ const confSchema = `{
 			"use_ssl_le": {
 				"type": "boolean"
 			},
+			"enable_http2": {
+				"type": "boolean"
+			},
 			"write_timeout": {
 				"type": "integer"
 			},
@@ -538,6 +541,9 @@ const confSchema = `{
 	},
 	"proxy_default_timeout": {
 		"type": "integer"
+	},
+	"proxy_enable_http2": {
+		"type": "boolean"
 	},
 	"proxy_ssl_insecure_skip_verify": {
 		"type": "boolean"
