@@ -19,6 +19,7 @@ type TestCase struct {
 	Path            string            `json:",omitempty"`
 	BaseURL         string            `json:",omitempty"`
 	Domain          string            `json:",omitempty"`
+	Proto           string            `json:",omitempty"`
 	Code            int               `json:",omitempty"`
 	Data            interface{}       `json:",omitempty"`
 	Headers         map[string]string `json:",omitempty"`
@@ -58,6 +59,10 @@ func AssertResponse(resp *http.Response, tc *TestCase) error {
 
 	if tc.BodyMatchFunc != nil && !tc.BodyMatchFunc(body) {
 		return fmt.Errorf("Response body did not pass BodyMatchFunc: %s", string(body))
+	}
+
+	if tc.Proto != "" && tc.Proto != resp.Proto {
+		return fmt.Errorf("Expected protocol `%s` got `%s`.", tc.Proto, resp.Proto)
 	}
 
 	for k, v := range tc.HeadersMatch {

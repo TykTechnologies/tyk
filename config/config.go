@@ -143,6 +143,7 @@ type HttpServerOptionsConfig struct {
 	WriteTimeout           int        `json:"write_timeout"`
 	UseSSL                 bool       `json:"use_ssl"`
 	UseLE_SSL              bool       `json:"use_ssl_le"`
+	EnableHttp2            bool       `json:"enable_http2"`
 	SSLInsecureSkipVerify  bool       `json:"ssl_insecure_skip_verify"`
 	EnableWebSockets       bool       `json:"enable_websockets"`
 	Certificates           []CertData `json:"certificates"`
@@ -300,6 +301,7 @@ type Config struct {
 	MaxConnTime                       int64                                 `json:"max_conn_time"`
 	ReloadWaitTime                    int                                   `bson:"reload_wait_time" json:"reload_wait_time"`
 	ProxySSLInsecureSkipVerify        bool                                  `json:"proxy_ssl_insecure_skip_verify"`
+	ProxyEnableHttp2                  bool                                  `json:"proxy_enable_http2"`
 	ProxySSLMinVersion                uint16                                `json:"proxy_ssl_min_version"`
 	ProxySSLCipherSuites              []string                              `json:"proxy_ssl_ciphers"`
 	ProxyDefaultTimeout               float64                               `json:"proxy_default_timeout"`

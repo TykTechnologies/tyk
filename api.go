@@ -1236,26 +1236,18 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if newOauthClient.APIID == "" {
-		doJSONWrite(w, http.StatusInternalServerError,
+	if newOauthClient.APIID == "" && newOauthClient.PolicyID == "" {
+		doJSONWrite(w, http.StatusBadRequest,
 			apiError("api_id not specified"))
 		return
-	}
-
-	// check API
-	apiSpec := getApiSpec(newOauthClient.APIID)
-	if apiSpec == nil {
+	} else if newOauthClient.APIID != "" && newOauthClient.PolicyID != "" {
 		doJSONWrite(w, http.StatusBadRequest,
-			apiError("API doesn't exist"))
-		return
-	}
-	if !apiSpec.UseOauth2 {
-		doJSONWrite(w, http.StatusBadRequest,
-			apiError("API is not OAuth2"))
+			apiError("both api_id and policy_id specified, you can provide only one of those"))
 		return
 	}
 
-	// check policy
+	apiID := ""
+	// get API ID and check policy if needed
 	if newOauthClient.PolicyID != "" {
 		policiesMu.RLock()
 		policy, ok := policiesByID[newOauthClient.PolicyID]
@@ -1265,16 +1257,31 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 				apiError("Policy doesn't exist"))
 			return
 		}
-		if _, ok := policy.AccessRights[newOauthClient.APIID]; !ok {
-			doJSONWrite(w, http.StatusBadRequest,
-				apiError("Policy access rights doesn't contain API this OAuth client belongs to"))
-			return
-		}
 		if len(policy.AccessRights) != 1 {
 			doJSONWrite(w, http.StatusBadRequest,
 				apiError("Policy access rights should contain only one API"))
 			return
 		}
+		// pick API ID from policy's ACL
+		for apiID = range policy.AccessRights {
+			break
+		}
+	} else {
+		// pick API ID from request
+		apiID = newOauthClient.APIID
+	}
+
+	// check API
+	apiSpec := getApiSpec(apiID)
+	if apiSpec == nil {
+		doJSONWrite(w, http.StatusBadRequest,
+			apiError("API doesn't exist"))
+		return
+	}
+	if !apiSpec.UseOauth2 {
+		doJSONWrite(w, http.StatusBadRequest,
+			apiError("API is not OAuth2"))
+		return
 	}
 
 	// Allow the client ID to be set

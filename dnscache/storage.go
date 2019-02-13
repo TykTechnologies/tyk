@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/pmylund/go-cache"
+	cache "github.com/pmylund/go-cache"
 )
 
 // DnsCacheItem represents single record in cache
