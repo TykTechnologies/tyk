@@ -26,7 +26,8 @@ Main points of the test framework are:
 - Test definition logic separated from test runner.
 - Official mocks for the Dashboard, RPC, and Bundler
 
-Framework located inside "github.com/TykTechnologies/tyk/test" package. See its API docs https://godoc.org/github.com/TykTechnologies/tyk/test
+Framework located inside "github.com/TykTechnologies/tyk/test" package.
+See its API docs https://godoc.org/github.com/TykTechnologies/tyk/test
 
 Let’s learn by example:
 
