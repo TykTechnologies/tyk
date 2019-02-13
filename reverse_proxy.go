@@ -26,8 +26,10 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/net/http2"
+
 	"github.com/Sirupsen/logrus"
-	"github.com/pmylund/go-cache"
+	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -497,6 +499,10 @@ func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p
 	if IsWebsocket(req) {
 		wsTransport := &WSDialer{transport, rw, p.TLSClientConfig}
 		return wsTransport
+	}
+
+	if config.Global().ProxyEnableHttp2 {
+		http2.ConfigureTransport(transport)
 	}
 
 	return transport
