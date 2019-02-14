@@ -18,6 +18,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/net/http2"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
@@ -647,4 +649,54 @@ func TestCipherSuites(t *testing.T) {
 
 		ts.Run(t, test.TestCase{Client: client, Path: "/", ErrorMatch: "tls: handshake failure"})
 	})
+}
+
+func TestHTTP2(t *testing.T) {
+	expected := "HTTP/2.0"
+
+	// Certificates
+	_, _, _, clientCert := genCertificate(&x509.Certificate{})
+	serverCertPem, _, combinedPEM, _ := genServerCertificate()
+	certID, _ := CertificateManager.Add(combinedPEM, "")
+	defer CertificateManager.Delete(certID)
+
+	// Upstream server supporting HTTP/2
+	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		actual := r.Proto
+		if expected != actual {
+			t.Fatalf("Tyk-Upstream connection protocol is expected %s, actual %s", expected, actual)
+		}
+
+		fmt.Fprintln(w, "Hello, I am an HTTP/2 Server")
+
+	}))
+	upstream.TLS = new(tls.Config)
+	upstream.TLS.NextProtos = []string{"h2"}
+	upstream.StartTLS()
+	defer upstream.Close()
+
+	// Tyk
+	globalConf := config.Global()
+	globalConf.ProxySSLInsecureSkipVerify = true
+	globalConf.ProxyEnableHttp2 = true
+	globalConf.HttpServerOptions.EnableHttp2 = true
+	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+	globalConf.HttpServerOptions.UseSSL = true
+	config.SetGlobal(globalConf)
+	defer resetTestConfig()
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	buildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.UseKeylessAccess = true
+		spec.Proxy.TargetURL = upstream.URL
+	})
+
+	// HTTP/2 client
+	http2Client := getTLSClient(&clientCert, serverCertPem)
+	http2.ConfigureTransport(http2Client.Transport.(*http.Transport))
+
+	ts.Run(t, test.TestCase{Client: http2Client, Path: "", Code: 200, Proto: "HTTP/2.0", BodyMatch: "Hello, I am an HTTP/2 Server"})
 }

@@ -216,18 +216,18 @@ func TestReverseProxyDnsCache(t *testing.T) {
 			etcHostsMap[wsHost],
 			true, true,
 		},
-		{
-			"Should cache wss protocol host dns records",
-			wsHostWssApiUrl,
-			http.MethodGet, nil,
-			map[string][]string{
-				"Upgrade":    {"websocket"},
-				"Connection": {"Upgrade"},
-			},
-			true,
-			etcHostsMap[wsHost],
-			true, true,
-		},
+		// {
+		// 	"Should cache wss protocol host dns records",
+		// 	wsHostWssApiUrl,
+		// 	http.MethodGet, nil,
+		// 	map[string][]string{
+		// 		"Upgrade":    {"websocket"},
+		// 		"Connection": {"Upgrade"},
+		// 	},
+		// 	true,
+		// 	etcHostsMap[wsHost],
+		// 	true, true,
+		// },
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -238,7 +238,7 @@ func TestReverseProxyDnsCache(t *testing.T) {
 
 			spec := &APISpec{APIDefinition: &apidef.APIDefinition{},
 				EnforcedTimeoutEnabled: true,
-				GlobalConfig:           config.Config{ProxyCloseConnections: true, ProxyDefaultTimeout: 1}}
+				GlobalConfig:           config.Config{ProxyCloseConnections: true, ProxyDefaultTimeout: 0.1}}
 
 			req := testReq(t, tc.Method, tc.URL, tc.Body)
 			for name, value := range tc.Headers {

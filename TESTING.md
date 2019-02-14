@@ -1,15 +1,33 @@
+Table of Contents
+=================
+
+* [Tyk testing guide](#tyk-testing-guide)
+    * [Initializing test server](#initializing-test-server)
+    * [Loading and configuring APIs](#loading-and-configuring-apis)
+    * [Running the tests](#running-the-tests)
+    * [Changing config variables](#changing-config-variables)
+    * [Upstream test server](#upstream-test-server)
+    * [Coprocess plugin testing](#coprocess-plugin-testing)
+    * [Creating user sessions](#creating-user-sessions)
+    * [Mocking dashboard](#mocking-dashboard)
+    * [Mocking RPC (Hybrid)](#mocking-rpc-hybrid)
+    * [Mocking DNS](#mocking-dns)
+* [Test Framework](#test-framework)
+    
+
 ## Tyk testing guide
 
-When it comes to the tests, one of the main questions is how to keep balance between expressivity, extendability, repeatability and performance. There are countless discussions if you should write integration or unit tests, should your mock or not, should you write tests first or after and etc. Since you will never find the right answer, on a growing code base, multiple people start introducing own methodology and distinct test helpers. Even looking at our quite small code base, I can find like 3-4 ways to write the same test. Additionally expressivity of our tests are quite bad: it is quite hard to understand what actually get tested, lot of boilerplate code not related to test logic, and amount of copy-paste growing with each test.
+When it comes to the tests, one of the main questions is how to keep balance between expressivity, extendability, repeatability and performance. There are countless discussions if you should write integration or unit tests, should your mock or not, should you write tests first or after and etc. Since you will never find the right answer, on a growing code base, multiple people start introducing own methodology and distinct test helpers. Even looking at our quite small code base, you can find like 3-4 ways to write the same test.
 
-In order to fix issues described above, I think it is important to have an official guide on writing the tests.
+This document describes Tyk test framework and unified guidelines on writing tests.
 
-This idea behind this framework is not new, and we already had pieces of it around the code. My goal was to unify all the patterns we used previously, and design a small layer on top of it, to streamline process of writing the tests. 
-
-Main points of the new framework are:
+Main points of the test framework are:
 - All tests run HTTP requests though the full HTTP stack, same as user will do
 - Test definition logic separated from test runner.
 - Official mocks for the Dashboard, RPC, and Bundler
+
+Framework located inside "github.com/TykTechnologies/tyk/test" package.
+See its API docs https://godoc.org/github.com/TykTechnologies/tyk/test
 
 Let’s learn by example:
 
@@ -201,30 +219,27 @@ Tests are defined using new `test` package `TestCase` structure, which allows yo
 
 ```go
 type TestCase struct {
-    Method                string
-    Path                     string
-    Domain                string
-    // Request body, can be any object. If not string, It will be automatically serialized
-    Data                     interface{}
-    Headers              map[string]string
-    PathParams        map[string]string
-    Cookies               []*http.Cookie
-    BeforeFn              func()
-    // If need custom http client settings, like SSL client certificate or custom timeouts
-    Client                   *http.Client
-    // If true, pass valid admin-auth header
-    AdminAuth          bool
-    // if Control API run on separate port (or domain), tell to run request on this listener
-    ControlRequest  bool 
+	Method, Path    string            `json:",omitempty"`
+	Domain          string            `json:",omitempty"`
+	Proto           string            `json:",omitempty"`
+	Code            int               `json:",omitempty"`
+	Data            interface{}       `json:",omitempty"`
+	Headers         map[string]string `json:",omitempty"`
+	PathParams      map[string]string `json:",omitempty"`
+	Cookies         []*http.Cookie    `json:",omitempty"`
+	Delay           time.Duration     `json:",omitempty"`
+	BodyMatch       string            `json:",omitempty"`
+	BodyMatchFunc   func([]byte) bool `json:",omitempty"`
+	BodyNotMatch    string            `json:",omitempty"`
+	HeadersMatch    map[string]string `json:",omitempty"`
+	HeadersNotMatch map[string]string `json:",omitempty"`
+	JSONMatch       map[string]string `json:",omitempty"`
+	ErrorMatch      string            `json:",omitempty"`
+	BeforeFn        func()            `json:"-"`
+	Client          *http.Client      `json:"-"`
 
-    // Assertions
-    Code                    int
-    BodyMatch         string
-    BodyNotMatch   string
-    HeadersMatch    map[string]string
-    HeadersNotMatch map[string]string
-         // If http request returns non http error, like TLS or Timeout
-    ErrorMatch          string
+	AdminAuth      bool `json:",omitempty"`
+	ControlRequest bool `json:",omitempty"`
 }
 ```
 
@@ -385,3 +400,57 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 Inside tests we override default network resolver to use custom DNS server mock, creating using awesome `github.com/miekg/dns` library. Domain -\> IP mapping set via map inside `helpers_test.go` file. By default you have access to domains: `localhost`, `host1.local`, `host2.local` and `host3.local`. Access to all unknown domains will cause panic. 
 
 Using DNS mock means that you are able to create tests with APIs on multiple domains, without modifying machine `/etc/hosts` file. 
+
+## Test Framework
+
+Usage of framework described above is not limited by Tyk Gateway, and it is used across variety of Tyk projects. 
+The main building block is the test runner. 
+```go
+type HTTPTestRunner struct {
+	Do             func(*http.Request, *TestCase) (*http.Response, error)
+	Assert         func(*http.Response, *TestCase) error
+	RequestBuilder func(*TestCase) (*http.Request, error)
+}
+func (r HTTPTestRunner) Run(t testing.TB, testCases ...TestCase) {
+...
+}
+```
+By overriding its variables, you can tune runner behavior.
+For example http runner can be look like:
+```
+import "github.com/TykTechnologies/tyk/test"
+
+...
+baseURL := "http://example.com"
+runner := test.HTTPTestRunner{
+    Do: func(r *http.Request, tc *TestCase) (*http.Response, error) {
+      return tc.Client.Do(r)  
+    }
+    RequestBuilder: func(tc *TestCase) (*http.Request, error) {
+        tc.BaseURL = baseURL
+        return NewRequest(tc)
+    },
+}
+runner.Run(t, testCases...)
+...
+```
+And Unit testing of http handlers can be:
+```
+import "github.com/TykTechnologies/tyk/test"
+
+...
+handler := func(wr http.RequestWriter, r *http.Request){...}
+runner := test.HTTPTestRunner{
+    Do: func(r *http.Request, _ *TestCase) (*http.Response, error) {
+		rec := httptest.NewRecorder()
+		handler(rec, r)
+		return rec.Result(), nil
+	},
+}
+runner.Run(t, testCases...)
+...
+```
+
+This package already exports functions for cases mentioned above:
+ - `func TestHttpServer(t testing.TB, baseURL string, testCases ...TestCase)`
+ - `func TestHttpHandler(t testing.TB, handle http.HandlerFunc, testCases ...TestCase)`
