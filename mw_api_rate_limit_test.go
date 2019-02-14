@@ -7,9 +7,10 @@ import (
 	"testing"
 	"time"
 
+	uuid "github.com/satori/go.uuid"
+
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
-	uuid "github.com/satori/go.uuid"
 
 	"github.com/justinas/alice"
 

@@ -7,9 +7,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/TykTechnologies/tyk/config"
-
 	"github.com/Sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/TykTechnologies/tyk/log"
 )
@@ -71,6 +71,9 @@ func (m *DnsCacheManager) IsCacheEnabled() bool {
 // Actual dns server call occures in net.Resolver#LookupIPAddr method,
 // linked to net.Dialer instance by net.Dialer#Resolver field
 func (m *DnsCacheManager) WrapDialer(dialer *net.Dialer) DialContextFunc {
+	if !m.IsCacheEnabled() {
+		return dialer.DialContext
+	}
 	return func(ctx context.Context, network, address string) (net.Conn, error) {
 		return m.doCachedDial(dialer, ctx, network, address)
 	}
@@ -157,6 +160,8 @@ func (m *DnsCacheManager) InitDNSCaching(ttl, checkInterval time.Duration) {
 
 // DisposeCache clear all entries from cache and disposes/disables caching of dns queries
 func (m *DnsCacheManager) DisposeCache() {
-	m.cacheStorage.Clear()
-	m.cacheStorage = nil
+	if m.cacheStorage != nil {
+		m.cacheStorage.Clear()
+		m.cacheStorage = nil
+	}
 }

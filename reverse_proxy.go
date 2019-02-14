@@ -314,10 +314,7 @@ func defaultTransport(dialerTimeout int) *http.Transport {
 		KeepAlive: 30 * time.Second,
 		DualStack: true,
 	}
-	dialContextFunc := dialer.DialContext
-	if dnsCacheManager.IsCacheEnabled() {
-		dialContextFunc = dnsCacheManager.WrapDialer(dialer)
-	}
+	dialContextFunc := dnsCacheManager.WrapDialer(dialer)
 
 	return &http.Transport{
 		DialContext:           dialContextFunc,

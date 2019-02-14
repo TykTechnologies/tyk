@@ -57,12 +57,22 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 		} else {
 			tlsConfig = ws.TLSClientConfig
 		}
-		dial = func(_ context.Context, network, address string) (net.Conn, error) {
-			return tls.Dial("tcp", target, tlsConfig)
+
+		dial = func(ctx context.Context, network, address string) (net.Conn, error) {
+			conn, err := ws.DialContext(ctx, network, address)
+			if err != nil {
+				return nil, err
+			}
+			//tlsConn.Handshake requires either ServerName or InsecureSkipVerify to be configured
+			tlsConfig.ServerName, _, _ = net.SplitHostPort(address)
+
+			tlsConn := tls.Client(conn, tlsConfig)
+			err = tlsConn.Handshake()
+			return tlsConn, err
 		}
 	}
 
-	d, err := dial(context.TODO(), "tcp", target)
+	conn, err := dial(context.TODO(), "tcp", target)
 	if err != nil {
 		http.Error(ws.RW, "Error contacting backend server.", http.StatusInternalServerError)
 		log.WithFields(logrus.Fields{
@@ -71,7 +81,7 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 		}).Error("Error dialing websocket backend", target, ": ", err)
 		return nil, err
 	}
-	defer d.Close()
+	defer conn.Close()
 
 	hj, ok := ws.RW.(http.Hijacker)
 	if !ok {
@@ -89,7 +99,7 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 	defer nc.Close()
 
-	if err := req.Write(d); err != nil {
+	if err := req.Write(conn); err != nil {
 		log.WithFields(logrus.Fields{
 			"path":   req.URL.Path,
 			"origin": ip,
@@ -102,8 +112,8 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 		_, err := io.Copy(dst, src)
 		errc <- err
 	}
-	go cp(d, nc)
-	go cp(nc, d)
+	go cp(conn, nc)
+	go cp(nc, conn)
 
 	for i := 0; i < 2; i++ {
 		cerr := <-errc

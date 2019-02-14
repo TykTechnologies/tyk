@@ -100,17 +100,18 @@ func setupTestReverseProxyDnsCache(cfg *configTestReverseProxyDnsCache) func() {
 
 func TestReverseProxyDnsCache(t *testing.T) {
 	const (
-		host   = "orig-host.com."
-		host2  = "orig-host2.com."
-		host3  = "orig-host3.com."
-		wsHost = "ws.orig-host.com."
+		host    = "orig-host.com."
+		host2   = "orig-host2.com."
+		host3   = "orig-host3.com."
+		wsHost  = "ws.orig-host.com."
+		wssHost = "wss.orig-host.com."
 
 		hostApiUrl       = "http://orig-host.com/origpath"
 		host2HttpApiUrl  = "http://orig-host2.com/origpath"
 		host2HttpsApiUrl = "https://orig-host2.com/origpath"
 		host3ApiUrl      = "https://orig-host3.com/origpath"
 		wsHostWsApiUrl   = "ws://ws.orig-host.com/connect"
-		wsHostWssApiUrl  = "wss://ws.orig-host.com/connect"
+		wsHostWssApiUrl  = "wss://wss.orig-host.com/connect"
 
 		cacheTTL            = 5
 		cacheUpdateInterval = 10
@@ -118,10 +119,11 @@ func TestReverseProxyDnsCache(t *testing.T) {
 
 	var (
 		etcHostsMap = map[string][]string{
-			host:   {"127.0.0.10", "127.0.0.20"},
-			host2:  {"10.0.20.0", "10.0.20.1", "10.0.20.2"},
-			host3:  {"10.0.20.15", "10.0.20.16"},
-			wsHost: {"127.0.0.10", "127.0.0.10"},
+			host:    {"192.0.15.10", "192.0.15.20"},
+			host2:   {"10.0.20.0", "10.0.20.1", "10.0.20.2"},
+			host3:   {"10.0.20.15", "10.0.20.16"},
+			wssHost: {"10.0.15.10", "10.0.15.11"},
+			wsHost:  {"10.0.20.10", "10.0.20.11"},
 		}
 	)
 
@@ -151,58 +153,63 @@ func TestReverseProxyDnsCache(t *testing.T) {
 		Body    []byte
 		Headers http.Header
 
-		isWebsocket bool
-
-		expectedIPs    []string
-		shouldBeCached bool
-		isCacheEnabled bool
+		expectedIPs       []string
+		shouldHangInCache bool
+		shouldBeCached    bool
+		isCacheEnabled    bool
 	}{
 		{
 			"Should cache first request to Host1",
 			hostApiUrl,
 			http.MethodGet, nil, nil,
-			false,
 			etcHostsMap[host],
-			true, true,
+			false, true, true,
 		},
 		{
 			"Should cache first request to Host2",
 			host2HttpsApiUrl,
 			http.MethodPost, []byte("{ \"param\": \"value\" }"), nil,
-			false,
 			etcHostsMap[host2],
-			true, true,
+			false, true, true,
 		},
 		{
 			"Should populate from cache second request to Host1",
 			hostApiUrl,
 			http.MethodGet, nil, nil,
-			false,
 			etcHostsMap[host],
-			false, true,
+			true, false, true,
 		},
 		{
 			"Should populate from cache second request to Host2 with different protocol",
 			host2HttpApiUrl,
 			http.MethodPost, []byte("{ \"param\": \"value2\" }"), nil,
-			false,
 			etcHostsMap[host2],
-			false, true,
+			true, false, true,
 		},
 		{
 			"Shouldn't cache request with different http verb to same host",
 			hostApiUrl,
 			http.MethodPatch, []byte("{ \"param2\": \"value3\" }"), nil,
-			false,
 			etcHostsMap[host],
-			false, true,
+			true, false, true,
 		},
 		{
 			"Shouldn't cache dns record when cache is disabled",
 			host3ApiUrl,
 			http.MethodGet, nil, nil,
-			false, etcHostsMap[host3],
-			false, false,
+			etcHostsMap[host3],
+			false, false, false,
+		},
+		{
+			"Shouldn't cache ws protocol host dns records when cache is disabled",
+			wsHostWsApiUrl,
+			http.MethodGet, nil,
+			map[string][]string{
+				"Upgrade":    {"websocket"},
+				"Connection": {"Upgrade"},
+			},
+			nil,
+			false, false, false,
 		},
 		{
 			"Should cache ws protocol host dns records",
@@ -212,9 +219,19 @@ func TestReverseProxyDnsCache(t *testing.T) {
 				"Upgrade":    {"websocket"},
 				"Connection": {"Upgrade"},
 			},
-			true,
 			etcHostsMap[wsHost],
-			true, true,
+			true, true, true,
+		},
+		{
+			"Shouldn't cache wss protocol host dns records when cache is disabled",
+			wsHostWssApiUrl,
+			http.MethodGet, nil,
+			map[string][]string{
+				"Upgrade":    {"websocket"},
+				"Connection": {"Upgrade"},
+			},
+			nil,
+			false, true, false,
 		},
 		{
 			"Should cache wss protocol host dns records",
@@ -224,9 +241,8 @@ func TestReverseProxyDnsCache(t *testing.T) {
 				"Upgrade":    {"websocket"},
 				"Connection": {"Upgrade"},
 			},
-			true,
-			etcHostsMap[wsHost],
-			true, true,
+			etcHostsMap[wssHost],
+			false, true, true,
 		},
 	}
 	for _, tc := range cases {
@@ -248,10 +264,18 @@ func TestReverseProxyDnsCache(t *testing.T) {
 			Url, _ := url.Parse(tc.URL)
 			proxy := TykNewSingleHostReverseProxy(Url, spec)
 			recorder := httptest.NewRecorder()
-			proxy.WrappedServeHTTP(recorder, req, false)
+			err := proxy.WrappedServeHTTP(recorder, req, false)
+
+			fmt.Println(err)
 
 			host := Url.Hostname()
 			if tc.isCacheEnabled {
+				if !tc.shouldBeCached && !tc.shouldHangInCache {
+					item, ok := storage.Get(host)
+					if ok {
+						t.Fatalf("shouldBeCached=false: got %t, but wanted %t. item=%#v", ok, false, item)
+					}
+				}
 				item, ok := storage.Get(host)
 				if !ok || !test.IsDnsRecordsAddrsEqualsTo(item.Addrs, tc.expectedIPs) {
 					t.Fatalf("got %q, but wanted %q. ok=%t", item, tc.expectedIPs, ok)
