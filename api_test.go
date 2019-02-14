@@ -741,25 +741,46 @@ func TestGetOAuthClients(t *testing.T) {
 		spec.UseOauth2 = true
 	})
 
+	oauthRequest := NewClientRequest{
+		ClientID:          "test",
+		ClientRedirectURI: "http://localhost",
+		APIID:             "test",
+		ClientSecret:      "secret",
+	}
+	validOauthRequest, _ := json.Marshal(oauthRequest)
+
+	ts.Run(t, []test.TestCase{
+		{Path: "/tyk/oauth/clients/unknown", AdminAuth: true, Code: 404},
+		{Path: "/tyk/oauth/clients/test", AdminAuth: true, Code: 200, BodyMatch: `[]`},
+		{Method: "POST", Path: "/tyk/oauth/clients/create", AdminAuth: true, Data: string(validOauthRequest), Code: 200},
+		{Path: "/tyk/oauth/clients/test", AdminAuth: true, Code: 200, BodyMatch: `[{"client_id":"test"`},
+	}...)
+}
+
+func TestCreateOAuthClient(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	buildAndLoadAPI(
+		func(spec *APISpec) {
+			spec.UseOauth2 = true
+		},
+		func(spec *APISpec) {
+			spec.APIID = "non_oauth_api"
+			spec.UseOauth2 = false
+		},
+	)
+
 	createPolicy(func(p *user.Policy) {
-		p.ID = "test"
+		p.ID = "p1"
 		p.AccessRights = map[string]user.AccessDefinition{
 			"test": {
 				APIID: "test",
 			},
 		}
 	})
-	oauthRequest := NewClientRequest{
-		ClientID:          "test",
-		ClientRedirectURI: "http://localhost",
-		APIID:             "test",
-		PolicyID:          "test",
-		ClientSecret:      "secret",
-	}
-	validOauthRequest, _ := json.Marshal(oauthRequest)
-
 	createPolicy(func(p *user.Policy) {
-		p.ID = "test2"
+		p.ID = "p2"
 		p.AccessRights = map[string]user.AccessDefinition{
 			"test": {
 				APIID: "test",
@@ -769,26 +790,82 @@ func TestGetOAuthClients(t *testing.T) {
 			},
 		}
 	})
-	oauthRequestWrongACL := NewClientRequest{
-		ClientID:          "test2",
-		ClientRedirectURI: "http://localhost",
-		APIID:             "test",
-		PolicyID:          "test2",
-		ClientSecret:      "secret",
+
+	tests := map[string]struct {
+		req       NewClientRequest
+		code      int
+		bodyMatch string
+	}{
+		"no api_id but policy_id provided": {
+			req: NewClientRequest{
+				ClientID: "client_test1",
+				PolicyID: "p1",
+			},
+			code:      http.StatusOK,
+			bodyMatch: `client_id":"client_test1"`,
+		},
+		"no policy_id but api_id provided": {
+			req: NewClientRequest{
+				ClientID: "client_test2",
+				APIID:    "test",
+			},
+			code:      http.StatusOK,
+			bodyMatch: `client_id":"client_test2"`,
+		},
+		"both api_id and policy_id provided": {
+			req: NewClientRequest{
+				PolicyID: "p1",
+				APIID:    "test",
+			},
+			code:      http.StatusBadRequest,
+			bodyMatch: "both api_id and policy_id specified",
+		},
+		"policy does not exist": {
+			req: NewClientRequest{
+				PolicyID: "unknown",
+			},
+			code:      http.StatusBadRequest,
+			bodyMatch: "Policy doesn't exist",
+		},
+		"API does not exist": {
+			req: NewClientRequest{
+				APIID: "unknown",
+			},
+			code:      http.StatusBadRequest,
+			bodyMatch: "API doesn't exist",
+		},
+		"policy should contain only one API": {
+			req: NewClientRequest{
+				PolicyID: "p2",
+			},
+			code:      http.StatusBadRequest,
+			bodyMatch: "should contain only one API",
+		},
+		"API is not OAuth": {
+			req: NewClientRequest{
+				APIID: "non_oauth_api",
+			},
+			code:      http.StatusBadRequest,
+			bodyMatch: "API is not OAuth2",
+		},
 	}
-	wrongAPIOauthRequest2, _ := json.Marshal(oauthRequestWrongACL)
 
-	oauthRequest.APIID = "unknown"
-	wrongAPIOauthRequest, _ := json.Marshal(oauthRequest)
-
-	ts.Run(t, []test.TestCase{
-		{Path: "/tyk/oauth/clients/unknown", AdminAuth: true, Code: 404},
-		{Path: "/tyk/oauth/clients/test", AdminAuth: true, Code: 200, BodyMatch: `[]`},
-		{Method: "POST", Path: "/tyk/oauth/clients/create", AdminAuth: true, Data: string(wrongAPIOauthRequest), Code: 400, BodyMatch: `API doesn't exist`},
-		{Method: "POST", Path: "/tyk/oauth/clients/create", AdminAuth: true, Data: string(wrongAPIOauthRequest2), Code: 400, BodyMatch: `should contain only one API`},
-		{Method: "POST", Path: "/tyk/oauth/clients/create", AdminAuth: true, Data: string(validOauthRequest), Code: 200},
-		{Path: "/tyk/oauth/clients/test", AdminAuth: true, Code: 200, BodyMatch: `[{"client_id":"test"`},
-	}...)
+	for testName, testData := range tests {
+		t.Run(testName, func(t *testing.T) {
+			requestData, _ := json.Marshal(testData.req)
+			ts.Run(
+				t,
+				test.TestCase{
+					Method:    http.MethodPost,
+					Path:      "/tyk/oauth/clients/create",
+					AdminAuth: true,
+					Data:      string(requestData),
+					Code:      testData.code,
+					BodyMatch: testData.bodyMatch,
+				},
+			)
+		})
+	}
 }
 
 func TestGroupResetHandler(t *testing.T) {

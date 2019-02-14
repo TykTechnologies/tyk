@@ -32,7 +32,7 @@ type AuthorisationHandler interface {
 type SessionHandler interface {
 	Init(store storage.Handler)
 	UpdateSession(keyName string, session *user.SessionState, resetTTLTo int64, hashed bool) error
-	RemoveSession(keyName string, hashed bool)
+	RemoveSession(keyName string, hashed bool) bool
 	SessionDetail(keyName string, hashed bool) (user.SessionState, bool)
 	Sessions(filter string) []string
 	Store() storage.Handler
@@ -245,11 +245,11 @@ func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.Sess
 }
 
 // RemoveSession removes session from storage
-func (b *DefaultSessionManager) RemoveSession(keyName string, hashed bool) {
+func (b *DefaultSessionManager) RemoveSession(keyName string, hashed bool) bool {
 	if hashed {
-		b.store.DeleteRawKey(b.store.GetKeyPrefix() + keyName)
+		return b.store.DeleteRawKey(b.store.GetKeyPrefix() + keyName)
 	} else {
-		b.store.DeleteKey(keyName)
+		return b.store.DeleteKey(keyName)
 	}
 }
 

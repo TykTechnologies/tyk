@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pmylund/go-cache"
+	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/request"
 

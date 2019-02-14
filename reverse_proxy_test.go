@@ -254,7 +254,7 @@ func TestReverseProxyDnsCache(t *testing.T) {
 
 			spec := &APISpec{APIDefinition: &apidef.APIDefinition{},
 				EnforcedTimeoutEnabled: true,
-				GlobalConfig:           config.Config{ProxyCloseConnections: true, ProxyDefaultTimeout: 1}}
+				GlobalConfig:           config.Config{ProxyCloseConnections: true, ProxyDefaultTimeout: 0.1}}
 
 			req := testReq(t, tc.Method, tc.URL, tc.Body)
 			for name, value := range tc.Headers {
@@ -264,9 +264,7 @@ func TestReverseProxyDnsCache(t *testing.T) {
 			Url, _ := url.Parse(tc.URL)
 			proxy := TykNewSingleHostReverseProxy(Url, spec)
 			recorder := httptest.NewRecorder()
-			err := proxy.WrappedServeHTTP(recorder, req, false)
-
-			fmt.Println(err)
+			proxy.WrappedServeHTTP(recorder, req, false)
 
 			host := Url.Hostname()
 			if tc.isCacheEnabled {

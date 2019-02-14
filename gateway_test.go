@@ -731,7 +731,7 @@ func TestAnalytics(t *testing.T) {
 
 		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
 		if len(results) != 2 {
-			t.Error("Should return 1 record: ", len(results))
+			t.Fatal("Should return 1 record: ", len(results))
 		}
 
 		// Take second cached request

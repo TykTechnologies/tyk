@@ -26,8 +26,10 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/net/http2"
+
 	"github.com/Sirupsen/logrus"
-	"github.com/pmylund/go-cache"
+	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -302,15 +304,15 @@ type ReverseProxy struct {
 	ErrorHandler ErrorHandler
 }
 
-func defaultTransport(dialerTimeout int) *http.Transport {
-	timeout := 30
+func defaultTransport(dialerTimeout float64) *http.Transport {
+	timeout := 30.0
 	if dialerTimeout > 0 {
 		log.Debug("Setting timeout for outbound request to: ", dialerTimeout)
 		timeout = dialerTimeout
 	}
 
 	dialer := &net.Dialer{
-		Timeout:   time.Duration(timeout) * time.Second,
+		Timeout:   time.Duration(float64(timeout) * float64(time.Second)),
 		KeepAlive: 30 * time.Second,
 		DualStack: true,
 	}
@@ -386,7 +388,7 @@ func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Reque
 	return resp
 }
 
-func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, int) {
+func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, float64) {
 	if !spec.EnforcedTimeoutEnabled {
 		return false, spec.GlobalConfig.ProxyDefaultTimeout
 	}
@@ -394,7 +396,7 @@ func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request
 	_, versionPaths, _, _ := spec.Version(req)
 	found, meta := spec.CheckSpecMatchesStatus(req, versionPaths, HardTimeout)
 	if found {
-		intMeta := meta.(*int)
+		intMeta := meta.(*float64)
 		log.Debug("HARD TIMEOUT ENFORCED: ", *intMeta)
 		return true, *intMeta
 	}
@@ -448,7 +450,7 @@ func proxyFromAPI(api *APISpec) func(*http.Request) (*url.URL, error) {
 	}
 }
 
-func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *ReverseProxy) http.RoundTripper {
+func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p *ReverseProxy) http.RoundTripper {
 	transport := defaultTransport(timeOut) // modifies a newly created transport
 	transport.TLSClientConfig = &tls.Config{}
 	transport.Proxy = proxyFromAPI(p.TykAPISpec)
@@ -494,6 +496,10 @@ func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Re
 	if IsWebsocket(req) {
 		wsTransport := &WSDialer{transport, rw, p.TLSClientConfig}
 		return wsTransport
+	}
+
+	if config.Global().ProxyEnableHttp2 {
+		http2.ConfigureTransport(transport)
 	}
 
 	return transport

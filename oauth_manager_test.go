@@ -130,6 +130,12 @@ func TestAuthCodeRedirect(t *testing.T) {
 
 	createTestOAuthClient(spec, authClientID)
 
+	client := &http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+
 	t.Run("Authorize request with redirect", func(t *testing.T) {
 		param := make(url.Values)
 		param.Set("response_type", "code")
@@ -145,6 +151,7 @@ func TestAuthCodeRedirect(t *testing.T) {
 			Data:    param.Encode(),
 			Headers: headers,
 			Method:  http.MethodPost,
+			Client:  client,
 			Code:    http.StatusTemporaryRedirect,
 		})
 	})
@@ -164,6 +171,12 @@ func TestAuthCodeRedirectMultipleURL(t *testing.T) {
 
 	createTestOAuthClient(spec, authClientID)
 
+	client := &http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+
 	t.Run("Client authorize request with multiple redirect URI", func(t *testing.T) {
 		param := make(url.Values)
 		param.Set("response_type", "code")
@@ -180,6 +193,7 @@ func TestAuthCodeRedirectMultipleURL(t *testing.T) {
 			Headers: headers,
 			Method:  http.MethodPost,
 			Code:    http.StatusTemporaryRedirect,
+			Client:  client,
 		})
 	})
 }
