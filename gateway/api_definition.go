@@ -17,7 +17,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/Masterminds/sprig"
+	"gopkg.in/Masterminds/sprig.v2"
 
 	"github.com/TykTechnologies/tyk/rpc"
 
