@@ -458,6 +458,8 @@ func TestGetClientTokens(t *testing.T) {
 	globalConf.OauthTokenExpire = 1
 	// cleanup tokens older than 3 seconds
 	globalConf.OauthTokenExpiredRetainPeriod = 3
+	// number of items to be retrieved per page
+	globalConf.PaginationItemsPerPage = 2
 	config.SetGlobal(globalConf)
 
 	defer resetTestConfig()
@@ -527,10 +529,10 @@ func TestGetClientTokens(t *testing.T) {
 		}
 
 		// check response
-		// 2 is the default items to be returned
-		if len(tokensResp) != 2 {
-			t.Errorf("Wrong number of tokens received. Expected: %d. Got: %d", 2, len(tokensResp))
+		if n := globalConf.PaginationItemsPerPage; len(tokensResp) != n {
+			t.Errorf("Wrong number of tokens received. Expected: %d. Got: %d", n, len(tokensResp))
 		}
+
 		for _, token := range tokensResp {
 			if !tokensID[token.Token] {
 				t.Errorf("Token %s is not found in expected result. Expecting: %v", token.Token, tokensID)
@@ -555,12 +557,14 @@ func TestGetClientTokens(t *testing.T) {
 		}
 
 		// check response
-		// 2nd page of data was requested but we have itemsPerPage set
-		// to 2 and only 3 keys were stored, so this should return only
+		// 2nd page of data was requested but we have
+		// config.PaginationItemsPerPage = 2
+		// Only 3 keys were stored, so this should return only
 		// 1 item
 		if len(tokensResp) != 1 {
-			t.Errorf("Wrong number of tokens received. Expected: %d. Got: %d", 0, len(tokensResp))
+			t.Errorf("Wrong number of tokens received. Expected: %d. Got: %d", 1, len(tokensResp))
 		}
+
 		for _, token := range tokensResp {
 			if !tokensID[token.Token] {
 				t.Errorf("Token %s is not found in expected result. Expecting: %v", token.Token, tokensID)
@@ -585,11 +589,13 @@ func TestGetClientTokens(t *testing.T) {
 		}
 
 		// check response
-		// 3rd page of data was requested but we have itemsPerPage set
-		// to 2 and only 3 keys were stored
+		// 3rd page of data was requested but we have
+		// config.PaginationItemsPerPage = 2
+		// Only 2 keys were stored
 		if len(tokensResp) != 0 {
 			t.Errorf("Wrong number of tokens received. Expected: %d. Got: %d", 0, len(tokensResp))
 		}
+
 		for _, token := range tokensResp {
 			if !tokensID[token.Token] {
 				t.Errorf("Token %s is not found in expected result. Expecting: %v", token.Token, tokensID)

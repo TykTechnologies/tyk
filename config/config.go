@@ -264,6 +264,7 @@ type Config struct {
 	OauthTokenExpire                  int32                                 `json:"oauth_token_expire"`
 	OauthTokenExpiredRetainPeriod     int32                                 `json:"oauth_token_expired_retain_period"`
 	OauthRedirectUriSeparator         string                                `json:"oauth_redirect_uri_separator"`
+	PaginationItemsPerPage            int                                   `json:"pagination_items_per_page"`
 	SlaveOptions                      SlaveOptionsConfig                    `json:"slave_options"`
 	DisableVirtualPathBlobs           bool                                  `json:"disable_virtual_path_blobs"`
 	LocalSessionCache                 LocalSessionCacheConf                 `json:"local_session_cache"`

@@ -24,7 +24,7 @@ import (
 	"github.com/TykTechnologies/tyk/checkup"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/Sirupsen/logrus/hooks/syslog"
+	logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/evalphobia/logrus_sentry"
 	"github.com/facebookgo/pidfile"
@@ -219,6 +219,11 @@ func setupGlobals() {
 
 	if config.Global().NewRelic.AppName != "" {
 		NewRelicApplication = SetupNewRelic()
+	}
+
+	if globalConfig := config.Global(); globalConfig.PaginationItemsPerPage <= 0 {
+		globalConfig.PaginationItemsPerPage = 10
+		config.SetGlobal(globalConfig)
 	}
 }
 
