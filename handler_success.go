@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/request"
 	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -39,6 +39,10 @@ const (
 	ThrottleLevel
 	ThrottleLevelLimit
 	Trace
+)
+
+const (
+	keyDataDeveloperID = "tyk_developer_id"
 )
 
 var (
@@ -99,6 +103,14 @@ func estimateTagsCapacity(session *user.SessionState, apiSpec *APISpec) int {
 	size := 5 // that number of tags expected to be added at least before we record hit
 	if session != nil {
 		size += len(session.Tags)
+
+		size += len(session.ApplyPolicies)
+
+		if session.MetaData != nil {
+			if _, ok := session.MetaData[keyDataDeveloperID]; ok {
+				size += 1
+			}
+		}
 	}
 
 	if apiSpec.GlobalConfig.DBAppConfOptions.NodeIsSegmented {
@@ -108,6 +120,25 @@ func estimateTagsCapacity(session *user.SessionState, apiSpec *APISpec) int {
 	size += len(apiSpec.TagHeaders)
 
 	return size
+}
+
+func getSessionTags(session *user.SessionState) []string {
+	tags := make([]string, 0, len(session.Tags)+len(session.ApplyPolicies)+1)
+
+	// add policy IDs
+	for _, polID := range session.ApplyPolicies {
+		tags = append(tags, "policy-"+polID)
+	}
+
+	if session.MetaData != nil {
+		if developerID, ok := session.MetaData[keyDataDeveloperID].(string); ok {
+			tags = append(tags, "developer-"+developerID)
+		}
+	}
+
+	tags = append(tags, session.Tags...)
+
+	return tags
 }
 
 func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, responseCopy *http.Response) {
@@ -137,7 +168,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, resp
 		tags := make([]string, 0, estimateTagsCapacity(session, s.Spec))
 		if session != nil {
 			oauthClientID = session.OauthClientID
-			tags = append(tags, session.Tags...)
+			tags = append(tags, getSessionTags(session)...)
 			alias = session.Alias
 		}
 
