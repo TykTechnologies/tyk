@@ -614,10 +614,15 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		// important is "Connection" because we want a persistent
 		// connection, regardless of what the client sent to us.
 		for _, h := range hopHeaders {
-			if outreq.Header.Get(h) != "" {
-				outreq.Header.Del(h)
-				logreq.Header.Del(h)
+			hv := outreq.Header.Get(h)
+			if hv == "" {
+				continue
 			}
+			if h == "Te" && hv == "trailers" {
+				continue
+			}
+			outreq.Header.Del(h)
+			logreq.Header.Del(h)
 		}
 	}
 
@@ -781,8 +786,39 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 
 	copyHeader(rw.Header(), res.Header)
 
+	announcedTrailers := len(res.Trailer)
+	if announcedTrailers > 0 {
+		trailerKeys := make([]string, 0, len(res.Trailer))
+		for k := range res.Trailer {
+			trailerKeys = append(trailerKeys, k)
+		}
+		rw.Header().Add("Trailer", strings.Join(trailerKeys, ", "))
+	}
+
 	rw.WriteHeader(res.StatusCode)
+
+	if len(res.Trailer) > 0 {
+		// Force chunking if we saw a response trailer.
+		// This prevents net/http from calculating the length for short
+		// bodies and adding a Content-Length.
+		if fl, ok := rw.(http.Flusher); ok {
+			fl.Flush()
+		}
+	}
+
 	p.CopyResponse(rw, res.Body)
+
+	if len(res.Trailer) == announcedTrailers {
+		copyHeader(rw.Header(), res.Trailer)
+		return nil
+	}
+
+	for k, vv := range res.Trailer {
+		k = http.TrailerPrefix + k
+		for _, v := range vv {
+			rw.Header().Add(k, v)
+		}
+	}
 	return nil
 }
 
