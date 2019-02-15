@@ -499,7 +499,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			handler = d.SH.Spec.middlewareChain.ThisHandler
 		} else {
 			if targetAPI := fuzzyFindAPI(r.URL.Hostname()); targetAPI != nil {
-				handler = targetAPI.middlewareChain.ThisHandler
+				handler = d.SH.Spec.middlewareChain.ThisHandler //targetAPI.middlewareChain.ThisHandler
 			} else {
 				handler := ErrorHandler{*d.SH.Base()}
 				handler.HandleError(w, r, "Can't detect loop target", http.StatusInternalServerError)
@@ -553,14 +553,15 @@ func fuzzyFindAPI(search string) *APISpec {
 	}
 
 	apisMu.RLock()
+	defer apisMu.RUnlock()
+
 	for _, api := range apisByID {
-		if trimCategories(api.Name) == search || // to excude categories
-			api.APIID == search ||
-			api.Id.Hex() == search {
+		if api.APIID == search ||
+			api.Id.Hex() == search ||
+			replaceNonAlphaNumeric(trimCategories(api.Name)) == search {
 			return api
 		}
 	}
-	apisMu.RUnlock()
 
 	return nil
 }

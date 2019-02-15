@@ -74,8 +74,8 @@ func TestLooping(t *testing.T) {
 
     t.Run("Loop to another API", func(t *testing.T) {
         buildAndLoadAPI(func(spec *APISpec) {
-            spec.APIID = "test_api"
-            spec.Name = "hidden_api"
+            spec.APIID = "testid"
+            spec.Name = "hidden api"
             spec.Proxy.ListenPath = "/somesecret"
         }, func(spec *APISpec) {
             spec.Proxy.ListenPath = "/"
@@ -88,12 +88,12 @@ func TestLooping(t *testing.T) {
                         "path": "/by_name",
                         "match_pattern": "/by_name(.*)",
                         "method": "GET",
-                        "rewrite_to": "tyk://hidden_api/get"
+                        "rewrite_to": "tyk://hidden api/get"
                     },{
                         "path": "/by_id",
                         "match_pattern": "/by_id(.*)",
                         "method": "GET",
-                        "rewrite_to": "tyk://test_api/get"
+                        "rewrite_to": "tyk://testid/get"
                     },{
                         "path": "/wrong",
                         "match_pattern": "/wrong(.*)",
