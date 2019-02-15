@@ -105,8 +105,9 @@ var (
 )
 
 const (
-	defReadTimeout  = 120 * time.Second
-	defWriteTimeout = 120 * time.Second
+	defReadTimeout            = 120 * time.Second
+	defWriteTimeout           = 120 * time.Second
+	defPaginationItemsPerPage = 10
 )
 
 func getApiSpec(apiID string) *APISpec {
@@ -224,7 +225,7 @@ func setupGlobals() {
 	}
 
 	if globalConfig := config.Global(); globalConfig.PaginationItemsPerPage <= 0 {
-		globalConfig.PaginationItemsPerPage = 10
+		globalConfig.PaginationItemsPerPage = defPaginationItemsPerPage
 		config.SetGlobal(globalConfig)
 	}
 }
@@ -415,6 +416,7 @@ func loadAPIEndpoints(muxer *mux.Router) {
 	r.HandleFunc("/oauth/clients/{apiID}", oAuthClientHandler).Methods("GET", "DELETE")
 	r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", oAuthClientHandler).Methods("GET", "DELETE")
 	r.HandleFunc("/oauth/clients/{apiID}/{keyName}/tokens", oAuthClientTokensHandler).Methods("GET")
+	r.HandleFunc("/oauth/clients/{apiID}/{keyName}/tokens/paginate", oAuthPaginatedClientTokensHandler).Methods("GET")
 
 	mainLog.Debug("Loaded API Endpoints")
 }

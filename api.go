@@ -48,6 +48,18 @@ func apiError(msg string) apiStatusMessage {
 	return apiStatusMessage{"error", msg}
 }
 
+// paginationStatus provides more information about a paginated data set
+type paginationStatus struct {
+	PageNum   int `json:"page_num"`
+	PageTotal int `json:"page_total"`
+	PageSize  int `json:"page_size"`
+}
+
+type paginatedOAuthClientTokens struct {
+	Pagination paginationStatus
+	Tokens     []OAuthClientToken
+}
+
 func doJSONWrite(w http.ResponseWriter, code int, obj interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
@@ -1414,7 +1426,7 @@ func updateOauthClient(keyName, apiID string, r *http.Request) (interface{}, int
 
 	// invalidate tokens if we had a new policy
 	if prevPolicy := client.GetPolicyID(); prevPolicy != "" && prevPolicy != updatedClient.PolicyID {
-		tokenList, _, err := apiSpec.OAuthManager.OsinServer.Storage.GetClientTokens(updatedClient.ClientID, 1)
+		tokenList, err := apiSpec.OAuthManager.OsinServer.Storage.GetClientTokens(updatedClient.ClientID)
 		if err != nil {
 			log.WithError(err).Warning("Could not get list of tokens for updated OAuth client")
 		}
@@ -1548,27 +1560,60 @@ func oAuthClientTokensHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// get tokens from redis
+	tokens, err := apiSpec.OAuthManager.OsinServer.Storage.GetClientTokens(keyName)
+	if err != nil {
+		doJSONWrite(w, http.StatusInternalServerError, apiError("Get client tokens failed"))
+		return
+	}
+
+	doJSONWrite(w, http.StatusOK, tokens)
+}
+
+func oAuthPaginatedClientTokensHandler(w http.ResponseWriter, r *http.Request) {
+	apiID := mux.Vars(r)["apiID"]
+	keyName := mux.Vars(r)["keyName"]
+
+	apiSpec := getApiSpec(apiID)
+	if apiSpec == nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"apiID":  apiID,
+			"status": "fail",
+			"client": keyName,
+			"err":    "not found",
+		}).Error("Failed to retrieve OAuth tokens")
+		doJSONWrite(w, http.StatusNotFound, apiError("OAuth Client ID not found"))
+		return
+	}
+
 	page := 1
 	if p := r.URL.Query().Get("page"); p != "" {
 		queryPage, err := strconv.Atoi(p)
 		if err == nil {
 			page = queryPage
 		}
-	}
 
-	if page <= 0 {
-		page = 1
+		if page <= 0 {
+			page = 1
+		}
 	}
 
 	// get tokens from redis
-	tokens, totalPages, err := apiSpec.OAuthManager.OsinServer.Storage.GetClientTokens(keyName, page)
+	tokens, totalPages, err := apiSpec.OAuthManager.OsinServer.Storage.GetPaginatedClientTokens(keyName, page)
 	if err != nil {
 		doJSONWrite(w, http.StatusInternalServerError, apiError("Get client tokens failed"))
 		return
 	}
 
-	_ = totalPages
-	doJSONWrite(w, http.StatusOK, tokens)
+	doJSONWrite(w, http.StatusOK, paginatedOAuthClientTokens{
+		Pagination: paginationStatus{
+			PageSize:  config.Global().PaginationItemsPerPage,
+			PageNum:   page,
+			PageTotal: totalPages,
+		},
+		Tokens: tokens,
+	})
 }
 
 // Get client details
