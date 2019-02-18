@@ -325,10 +325,19 @@ func (m *URLRewriteMiddleware) EnabledForSpec() bool {
 func (m *URLRewriteMiddleware) CheckHostRewrite(oldPath, newTarget string, r *http.Request) {
 	oldAsURL, _ := url.Parse(oldPath)
 	newAsURL, _ := url.Parse(newTarget)
-	if newAsURL.Scheme != "tyk" && oldAsURL.Host != newAsURL.Host {
+	if newAsURL.Scheme != LoopScheme && oldAsURL.Host != newAsURL.Host {
 		log.Debug("Detected a host rewrite in pattern!")
 		setCtxValue(r, RetainHost, true)
 	}
+}
+
+const LoopScheme = "tyk"
+
+var NonAlphaNumRE = regexp.MustCompile("[^A-Za-z0-9]+")
+var LoopHostRE = regexp.MustCompile("tyk://([^/]+)")
+
+func replaceNonAlphaNumeric(in string) string {
+	return NonAlphaNumRE.ReplaceAllString(in, "-")
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
@@ -350,6 +359,15 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	if err != nil {
 		log.Error(err)
 		return err, http.StatusInternalServerError
+	}
+
+	// During looping target can be API name
+	// Need make it compatible with URL parser
+	if strings.HasPrefix(p, LoopScheme) {
+		p = LoopHostRE.ReplaceAllStringFunc(p, func(match string) string {
+			host := strings.TrimPrefix(match, LoopScheme+"://")
+			return LoopScheme + "://" + replaceNonAlphaNumeric(host)
+		})
 	}
 
 	m.CheckHostRewrite(oldPath, p, r)

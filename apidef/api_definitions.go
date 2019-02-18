@@ -119,6 +119,11 @@ type TrackEndpointMeta struct {
 	Method string `bson:"method" json:"method"`
 }
 
+type InternalMeta struct {
+	Path   string `bson:"path" json:"path"`
+	Method string `bson:"method" json:"method"`
+}
+
 type RequestSizeMeta struct {
 	Path      string `bson:"path" json:"path"`
 	Method    string `bson:"method" json:"method"`
@@ -208,6 +213,7 @@ type ExtendedPathsSet struct {
 	TrackEndpoints          []TrackEndpointMeta   `bson:"track_endpoints" json:"track_endpoints,omitempty"`
 	DoNotTrackEndpoints     []TrackEndpointMeta   `bson:"do_not_track_endpoints" json:"do_not_track_endpoints,omitempty"`
 	ValidateJSON            []ValidatePathMeta    `bson:"validate_json" json:"validate_json,omitempty"`
+	Internal                []InternalMeta        `bson:"internal" json:"internal"`
 }
 
 type VersionInfo struct {
@@ -403,6 +409,7 @@ type APIDefinition struct {
 	CacheOptions              CacheOptions           `bson:"cache_options" json:"cache_options"`
 	SessionLifetime           int64                  `bson:"session_lifetime" json:"session_lifetime"`
 	Active                    bool                   `bson:"active" json:"active"`
+	Internal                  bool                   `bson:"internal" json:"internal"`
 	AuthProvider              AuthProviderMeta       `bson:"auth_provider" json:"auth_provider"`
 	SessionProvider           SessionProviderMeta    `bson:"session_provider" json:"session_provider"`
 	EventHandlers             EventHandlerMetaConfig `bson:"event_handlers" json:"event_handlers"`
@@ -621,6 +628,7 @@ func DummyAPI() APIDefinition {
 	}
 	methodTransformMeta := MethodTransformMeta{Path: "path", Method: "method", ToMethod: "tomethod"}
 	trackEndpointMeta := TrackEndpointMeta{Path: "path", Method: "method"}
+	internalMeta := InternalMeta{Path: "path", Method: "method"}
 	validatePathMeta := ValidatePathMeta{Path: "path", Method: "method", Schema: map[string]interface{}{}, SchemaB64: ""}
 	paths := struct {
 		Ignored   []string `bson:"ignored" json:"ignored"`
@@ -654,6 +662,7 @@ func DummyAPI() APIDefinition {
 			MethodTransforms:        []MethodTransformMeta{methodTransformMeta},
 			TrackEndpoints:          []TrackEndpointMeta{trackEndpointMeta},
 			DoNotTrackEndpoints:     []TrackEndpointMeta{trackEndpointMeta},
+			Internal:                []InternalMeta{internalMeta},
 			ValidateJSON:            []ValidatePathMeta{validatePathMeta},
 		},
 	}
