@@ -7,6 +7,7 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"io/ioutil"
@@ -717,7 +718,7 @@ func (s *server) SayHello(ctx context.Context, in *pb.HelloRequest) (*pb.HelloRe
 	return &pb.HelloReply{Message: "Hello " + in.Name}, nil
 }
 
-func TestGRPC_BasicAuthentication(t *testing.T) {
+func TestGRPC_TLS(t *testing.T) {
 
 	_, _, combinedPEM, _ := genServerCertificate()
 	certID, _ := CertificateManager.Add(combinedPEM, "")
@@ -750,7 +751,7 @@ func TestGRPC_BasicAuthentication(t *testing.T) {
 	name := "Furkan"
 
 	// gRPC client
-	r := sayHelloWithGRPCClient(t, nil, nil, address, name)
+	r := sayHelloWithGRPCClient(t, nil, nil, false, address, name)
 
 	// Test result
 	expected := "Hello " + name
@@ -761,7 +762,7 @@ func TestGRPC_BasicAuthentication(t *testing.T) {
 	}
 }
 
-func TestGRPC_MutualAuthentication(t *testing.T) {
+func TestGRPC_MutualTLS(t *testing.T) {
 	// Mutual Authentication for both downstream-tyk and tyk-upstream
 
 	_, _, combinedClientPEM, clientCert := genCertificate(&x509.Certificate{})
@@ -804,7 +805,7 @@ func TestGRPC_MutualAuthentication(t *testing.T) {
 	name := "Furkan"
 
 	// gRPC client
-	r := sayHelloWithGRPCClient(t, &clientCert, serverCertPem, address, name)
+	r := sayHelloWithGRPCClient(t, &clientCert, serverCertPem, false, address, name)
 
 	// Test result
 	expected := "Hello " + name
@@ -863,7 +864,7 @@ func startGRPCServer(t *testing.T, clientCert *x509.Certificate) *grpc.Server {
 	return s
 }
 
-func sayHelloWithGRPCClient(t *testing.T, cert *tls.Certificate, caCert []byte, address string, name string) *pb.HelloReply {
+func sayHelloWithGRPCClient(t *testing.T, cert *tls.Certificate, caCert []byte, basicAuth bool, address string, name string) *pb.HelloReply {
 	// gRPC client
 	tlsConfig := &tls.Config{}
 
@@ -882,7 +883,16 @@ func sayHelloWithGRPCClient(t *testing.T, cert *tls.Certificate, caCert []byte, 
 
 	creds := credentials.NewTLS(tlsConfig)
 
-	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(creds))
+	opts := []grpc.DialOption{grpc.WithTransportCredentials(creds)}
+
+	if basicAuth {
+		opts = append(opts, grpc.WithPerRPCCredentials(&loginCreds{
+			Username: "user",
+			Password: "password",
+		}))
+	}
+
+	conn, err := grpc.Dial(address, opts...)
 	if err != nil {
 		t.Fatalf("did not connect: %v", err)
 	}
@@ -897,4 +907,76 @@ func sayHelloWithGRPCClient(t *testing.T, cert *tls.Certificate, caCert []byte, 
 	}
 
 	return r
+}
+
+type loginCreds struct {
+	Username, Password string
+}
+
+func (c *loginCreds) GetRequestMetadata(context.Context, ...string) (map[string]string, error) {
+	auth := c.Username + ":" + c.Password
+	enc := base64.StdEncoding.EncodeToString([]byte(auth))
+	return map[string]string{
+		"Authorization": "Basic " + enc,
+	}, nil
+}
+
+func (c *loginCreds) RequireTransportSecurity() bool {
+	return true
+}
+
+func TestGRPC_BasicAuthentication(t *testing.T) {
+	_, _, combinedPEM, _ := genServerCertificate()
+	certID, _ := CertificateManager.Add(combinedPEM, "")
+	defer CertificateManager.Delete(certID)
+
+	// gRPC server
+	s := startGRPCServer(t, nil)
+	defer s.GracefulStop()
+
+	// Tyk
+	globalConf := config.Global()
+	globalConf.ProxySSLInsecureSkipVerify = true
+	globalConf.ProxyEnableHttp2 = true
+	globalConf.HttpServerOptions.EnableHttp2 = true
+	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+	globalConf.HttpServerOptions.UseSSL = true
+	config.SetGlobal(globalConf)
+	defer resetTestConfig()
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	session := createStandardSession()
+	session.BasicAuthData.Password = "password"
+	session.AccessRights = map[string]user.AccessDefinition{"test": {APIID: "test", Versions: []string{"v1"}}}
+	session.OrgID = "default"
+
+	buildAndLoadAPI(func(spec *APISpec) {
+		spec.UseBasicAuth = true
+		spec.Proxy.ListenPath = "/"
+		spec.UseKeylessAccess = false
+		spec.Proxy.TargetURL = "https://localhost:50051"
+		spec.OrgID = "default"
+	})
+
+	address := strings.TrimPrefix(ts.URL, "https://")
+	name := "Furkan"
+	client := getTLSClient(nil, nil)
+
+	// To create key
+	ts.Run(t, []test.TestCase{
+		{Method: "POST", Path: "/tyk/keys/defaultuser", Data: session, AdminAuth: true, Code: 200, Client: client},
+	}...)
+
+	// gRPC client
+	r := sayHelloWithGRPCClient(t, nil, nil, true, address, name)
+
+	// Test result
+	expected := "Hello " + name
+	actual := r.Message
+
+	if expected != actual {
+		t.Fatalf("Expected %s, actual %s", expected, actual)
+	}
 }
