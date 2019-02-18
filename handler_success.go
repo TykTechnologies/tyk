@@ -40,6 +40,7 @@ const (
 	ThrottleLevel
 	ThrottleLevelLimit
 	Trace
+	CheckLoopLimits
 )
 
 var (

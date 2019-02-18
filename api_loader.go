@@ -127,6 +127,11 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		return &chainDef
 	}
 
+	// Expose API only to looping
+	if spec.Internal {
+		chainDef.Skip = true
+	}
+
 	pathModified := false
 	for {
 		hash := generateDomainPath(spec.Domain, spec.Proxy.ListenPath)
@@ -494,17 +499,32 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			r.Method = methodOverride
 		}
 
+		var handler http.Handler
+		if r.URL.Hostname() == "self" {
+			handler = d.SH.Spec.middlewareChain.ThisHandler
+		} else {
+			if targetAPI := fuzzyFindAPI(r.URL.Hostname()); targetAPI != nil {
+				handler = d.SH.Spec.middlewareChain.ThisHandler //targetAPI.middlewareChain.ThisHandler
+			} else {
+				handler := ErrorHandler{*d.SH.Base()}
+				handler.HandleError(w, r, "Can't detect loop target", http.StatusInternalServerError)
+				return
+			}
+		}
+
 		// No need to handle errors, in all error cases limit will be set to 0
 		loopLevelLimit, _ := strconv.Atoi(r.URL.Query().Get("loop_limit"))
+		ctxSetCheckLoopLimits(r, r.URL.Query().Get("check_limits") == "true")
 
 		if origURL := ctxGetOrigRequestURL(r); origURL != nil {
+			r.URL.Host = origURL.Host
 			r.URL.RawQuery = origURL.RawQuery
 			ctxSetOrigRequestURL(r, nil)
 		}
 
 		ctxIncLoopLevel(r, loopLevelLimit)
 
-		d.SH.Spec.middlewareChain.ThisHandler.ServeHTTP(w, r)
+		handler.ServeHTTP(w, r)
 	} else {
 		d.SH.ServeHTTP(w, r)
 	}
@@ -523,6 +543,33 @@ func loadGlobalApps(router *mux.Router) {
 		mainLog.Info("Adding NewRelic instrumentation")
 		AddNewRelicInstrumentation(NewRelicApplication, router)
 	}
+}
+
+func trimCategories(name string) string {
+	if i := strings.Index(name, "#"); i != -1 {
+		return name[:i-1]
+	}
+
+	return name
+}
+
+func fuzzyFindAPI(search string) *APISpec {
+	if search == "" {
+		return nil
+	}
+
+	apisMu.RLock()
+	defer apisMu.RUnlock()
+
+	for _, api := range apisByID {
+		if api.APIID == search ||
+			api.Id.Hex() == search ||
+			replaceNonAlphaNumeric(trimCategories(api.Name)) == search {
+			return api
+		}
+	}
+
+	return nil
 }
 
 // Create the individual API (app) specs based on live configurations and assign middleware

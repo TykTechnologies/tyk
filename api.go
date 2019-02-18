@@ -1867,6 +1867,24 @@ func ctxGetUrlRewritePath(r *http.Request) string {
 	return ""
 }
 
+func ctxSetCheckLoopLimits(r *http.Request, b bool) {
+	setCtxValue(r, CheckLoopLimits, b)
+}
+
+// Should we check Rate limits and Quotas?
+func ctxCheckLimits(r *http.Request) bool {
+	// If looping disabled, allow all
+	if !ctxLoopingEnabled(r) {
+		return true
+	}
+
+	if v := r.Context().Value(CheckLoopLimits); v != nil {
+		return v.(bool)
+	}
+
+	return false
+}
+
 func ctxSetRequestMethod(r *http.Request, path string) {
 	setCtxValue(r, RequestMethod, path)
 }
@@ -1886,6 +1904,10 @@ func ctxGetDefaultVersion(r *http.Request) bool {
 
 func ctxSetDefaultVersion(r *http.Request) {
 	setCtxValue(r, VersionDefault, true)
+}
+
+func ctxLoopingEnabled(r *http.Request) bool {
+	return ctxLoopLevel(r) > 0
 }
 
 func ctxLoopLevel(r *http.Request) int {
