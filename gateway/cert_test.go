@@ -717,14 +717,14 @@ func (s *server) SayHello(ctx context.Context, in *pb.HelloRequest) (*pb.HelloRe
 	return &pb.HelloReply{Message: "Hello " + in.Name}, nil
 }
 
-func TestGRPC(t *testing.T) {
+func TestGRPC_BasicAuthentication(t *testing.T) {
 
 	_, _, combinedPEM, _ := genServerCertificate()
 	certID, _ := CertificateManager.Add(combinedPEM, "")
 	defer CertificateManager.Delete(certID)
 
 	// gRPC server
-	s := startGRPCServer(t)
+	s := startGRPCServer(t, nil)
 	defer s.GracefulStop()
 
 	// Tyk
@@ -750,23 +750,7 @@ func TestGRPC(t *testing.T) {
 	name := "Furkan"
 
 	// gRPC client
-	creds := credentials.NewTLS(&tls.Config{
-		InsecureSkipVerify: true,
-	})
-
-	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(creds))
-	if err != nil {
-		t.Fatalf("did not connect: %v", err)
-	}
-	defer conn.Close()
-	c := pb.NewGreeterClient(conn)
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	r, err := c.SayHello(ctx, &pb.HelloRequest{Name: name})
-	if err != nil {
-		t.Fatalf("could not greet: %v", err)
-	}
+	r := sayHelloWithGRPCClient(t, nil, nil, address, name)
 
 	// Test result
 	expected := "Hello " + name
@@ -777,7 +761,61 @@ func TestGRPC(t *testing.T) {
 	}
 }
 
-func startGRPCServer(t *testing.T) *grpc.Server {
+func TestGRPC_MutualAuthentication(t *testing.T) {
+	// Mutual Authentication for both downstream-tyk and tyk-upstream
+
+	_, _, combinedClientPEM, clientCert := genCertificate(&x509.Certificate{})
+	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
+	serverCertPem, _, combinedPEM, _ := genServerCertificate()
+
+	certID, _ := CertificateManager.Add(combinedPEM, "") // For tyk to know downstream
+	defer CertificateManager.Delete(certID)
+
+	clientCertID, _ := CertificateManager.Add(combinedClientPEM, "") // For upstream to know tyk
+	defer CertificateManager.Delete(clientCertID)
+
+	// Protected gRPC server
+	s := startGRPCServer(t, clientCert.Leaf)
+	defer s.GracefulStop()
+
+	// Tyk
+	globalConf := config.Global()
+	globalConf.ProxySSLInsecureSkipVerify = true
+	globalConf.ProxyEnableHttp2 = true
+	globalConf.HttpServerOptions.EnableHttp2 = true
+	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+	globalConf.HttpServerOptions.UseSSL = true
+	config.SetGlobal(globalConf)
+	defer resetTestConfig()
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	buildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.UseKeylessAccess = true
+		spec.UpstreamCertificates = map[string]string{
+			"*": clientCertID,
+		}
+		spec.Proxy.TargetURL = "https://localhost:50051"
+	})
+
+	address := strings.TrimPrefix(ts.URL, "https://")
+	name := "Furkan"
+
+	// gRPC client
+	r := sayHelloWithGRPCClient(t, &clientCert, serverCertPem, address, name)
+
+	// Test result
+	expected := "Hello " + name
+	actual := r.Message
+
+	if expected != actual {
+		t.Fatalf("Expected %s, actual %s", expected, actual)
+	}
+}
+
+func startGRPCServer(t *testing.T, clientCert *x509.Certificate) *grpc.Server {
 	// Server
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
@@ -786,7 +824,26 @@ func startGRPCServer(t *testing.T) *grpc.Server {
 
 	cert, key, _, _ := genCertificate(&x509.Certificate{})
 	certificate, _ := tls.X509KeyPair(cert, key)
-	creds := credentials.NewServerTLSFromCert(&certificate)
+
+	pool := x509.NewCertPool()
+
+	tlsConfig := &tls.Config{}
+	if clientCert != nil {
+		tlsConfig = &tls.Config{
+			ClientAuth:         tls.RequireAndVerifyClientCert,
+			ClientCAs:          pool,
+			InsecureSkipVerify: true,
+			Certificates:       []tls.Certificate{certificate},
+		}
+		pool.AddCert(clientCert)
+	} else {
+		tlsConfig = &tls.Config{
+			InsecureSkipVerify: true,
+			Certificates:       []tls.Certificate{certificate},
+		}
+	}
+
+	creds := credentials.NewTLS(tlsConfig)
 
 	if err != nil {
 		t.Fatalf("failed to listen: %v", err)
@@ -804,4 +861,40 @@ func startGRPCServer(t *testing.T) *grpc.Server {
 	}()
 
 	return s
+}
+
+func sayHelloWithGRPCClient(t *testing.T, cert *tls.Certificate, caCert []byte, address string, name string) *pb.HelloReply {
+	// gRPC client
+	tlsConfig := &tls.Config{}
+
+	if cert != nil {
+		tlsConfig.Certificates = []tls.Certificate{*cert}
+	}
+
+	if len(caCert) > 0 {
+		caCertPool := x509.NewCertPool()
+		caCertPool.AppendCertsFromPEM(caCert)
+		tlsConfig.RootCAs = caCertPool
+		tlsConfig.BuildNameToCertificate()
+	} else {
+		tlsConfig.InsecureSkipVerify = true
+	}
+
+	creds := credentials.NewTLS(tlsConfig)
+
+	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(creds))
+	if err != nil {
+		t.Fatalf("did not connect: %v", err)
+	}
+	defer conn.Close()
+	c := pb.NewGreeterClient(conn)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	r, err := c.SayHello(ctx, &pb.HelloRequest{Name: name})
+	if err != nil {
+		t.Fatalf("could not greet: %v", err)
+	}
+
+	return r
 }
