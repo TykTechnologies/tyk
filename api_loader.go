@@ -127,6 +127,11 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		return &chainDef
 	}
 
+	// Expose API only to looping
+	if spec.Internal {
+		chainDef.Skip = true
+	}
+
 	pathModified := false
 	for {
 		hash := generateDomainPath(spec.Domain, spec.Proxy.ListenPath)
@@ -509,6 +514,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		// No need to handle errors, in all error cases limit will be set to 0
 		loopLevelLimit, _ := strconv.Atoi(r.URL.Query().Get("loop_limit"))
+		ctxSetCheckLoopLimits(r, r.URL.Query().Get("check_limits") == "true")
 
 		if origURL := ctxGetOrigRequestURL(r); origURL != nil {
 			r.URL.Host = origURL.Host

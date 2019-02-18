@@ -27,6 +27,17 @@ func TestLooping(t *testing.T) {
             json.Unmarshal([]byte(`{
                 "use_extended_paths": true,
                 "extended_paths": {
+                    "internal": [{
+                        "path": "/get_action",
+                        "method": "GET"
+                    },{
+                        "path": "/post_action",
+                        "method": "POST"
+                    }],
+                    "white_list": [{
+                        "path": "/xml",
+                        "method_actions": {"POST": {"action": "no_action"}}
+                    }],
                     "url_rewrites": [{
                         "path": "/xml",
                         "method": "POST",
@@ -69,6 +80,11 @@ func TestLooping(t *testing.T) {
 
             // Should rewrite http method, if loop rewrite param passed
             {Method: "POST", Path: "/xml", Data: getAction, BodyMatch: `"Method":"GET"`},
+
+            // Internal endpoint can be accessed only via looping
+            {Method: "GET", Path: "/get_action", Code: 403},
+
+            {Method: "POST", Path: "/get_action", Code: 403},
         }...)
     })
 
@@ -77,8 +93,9 @@ func TestLooping(t *testing.T) {
             spec.APIID = "testid"
             spec.Name = "hidden api"
             spec.Proxy.ListenPath = "/somesecret"
+            spec.Internal = true
         }, func(spec *APISpec) {
-            spec.Proxy.ListenPath = "/"
+            spec.Proxy.ListenPath = "/test"
 
             version := spec.VersionData.Versions["v1"]
             json.Unmarshal([]byte(`{
@@ -107,9 +124,10 @@ func TestLooping(t *testing.T) {
         })
 
         ts.Run(t, []test.TestCase{
-            {Path: "/by_name", Code: 200},
-            {Path: "/by_id", Code: 200},
-            {Path: "/wrong", Code: 500},
+            {Path: "/somesecret", Code: 404},
+            {Path: "/test/by_name", Code: 200},
+            {Path: "/test/by_id", Code: 200},
+            {Path: "/test/wrong", Code: 500},
         }...)
     })
 

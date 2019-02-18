@@ -62,7 +62,7 @@ func (k *RateLimitAndQuotaCheck) handleQuotaFailure(r *http.Request, token strin
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	// Skip rate limiting and quotas for looping
-	if ctxLoopLevel(r) > 0 {
+	if !ctxCheckLimits(r) {
 		return nil, http.StatusOK
 	}
 
