@@ -4,8 +4,8 @@ info:
   title: Tyk Gateway API
   version: 2.8.0
 servers:
-  - url: 'http://localhost/tyk/'
   - url: 'https://localhost/tyk/'
+  - url: 'http://localhost/tyk/'
 paths:
   /apis:
     get:

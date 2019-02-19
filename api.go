@@ -3,7 +3,7 @@
 // The code below describes the Tyk Gateway API
 // Version: 2.8.0
 //
-//     Schemes: http, https
+//     Schemes: https, http
 //     Host: localhost
 //     BasePath: /tyk/
 //
