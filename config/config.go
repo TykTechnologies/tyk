@@ -245,6 +245,8 @@ type Config struct {
 	UseSyslog                         bool                                  `json:"use_syslog"`
 	UseGraylog                        bool                                  `json:"use_graylog"`
 	UseLogstash                       bool                                  `json:"use_logstash"`
+	LogstashSSL                       bool                                  `json:"logstash_ssl"`
+	LogstashSSLInsecureSkipVerify     bool                                  `json:"logstash_ssl_insecure_skip_verify"`
 	GraylogNetworkAddr                string                                `json:"graylog_network_addr"`
 	LogstashNetworkAddr               string                                `json:"logstash_network_addr"`
 	SyslogTransport                   string                                `json:"syslog_transport"`
