@@ -15,10 +15,6 @@ addons:
     - python3.5
     - python3-pip
     - libluajit-5.1-dev
-    ### Needed to convert the swagger 2.0 file to openapi 3.0
-    ### The swagger docs are actually written as per the 2.0 spec as there is no
-    ### support for openapi 3.0 in Go - at least for now.
-    - npm
 
 matrix:
   include:
@@ -40,7 +36,13 @@ install:
 script:
   - sudo pip3 install google
   - sudo pip3 install protobuf
-  - sudo npm install -g api-spec-converter
+    ### Needed to convert the swagger 2.0 file to openapi 3.0
+    ### The swagger docs are actually written as per the 2.0 spec as there is no
+    ### support for openapi 3.0 in Go - at least for now.
+    ### https://github.com/nodesource/distributions/blob/master/README.md#debinstall
+  - curl -sL https://deb.nodesource.com/setup_11.x | sudo -E bash -
+  - sudo -E apt-get -yq --no-install-suggests --no-install-recommends $(travis_apt_get_options) install nodejs
+  - sudo npm install -g api-spec-converter --unsafe-perm=true --allow-root
   - go build -tags 'coprocess python'
   - go build -tags 'coprocess lua'
   - go build -tags 'coprocess grpc'
