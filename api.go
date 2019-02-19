@@ -54,7 +54,7 @@ import (
 
 // apiModifyKeySuccess represents when a Key modification was successful
 //
-// swagger:response apiModifyKeySuccess
+// swagger:model apiModifyKeySuccess
 type apiModifyKeySuccess struct {
 	// in:body
 	Key     string `json:"key"`
@@ -65,7 +65,7 @@ type apiModifyKeySuccess struct {
 
 // apiStatusMessage represents an API status message
 //
-// swagger:response apiStatusMessage
+// swagger:model apiStatusMessage
 type apiStatusMessage struct {
 	Status string `json:"status"`
 	// Response details
@@ -783,11 +783,11 @@ func handleDeleteAPI(apiID string) (interface{}, int) {
 //   200:
 //     description: API created
 //     schema:
-//       "$ref": "#/responses/apiModifyKeySuccess"
+//       "$ref": "#/definitions/apiModifyKeySuccess"
 //   400:
 //     description: Malformed data
 //     schema:
-//       "$ref": "#/responses/apiStatusMessage"
+//       "$ref": "#/definitions/apiStatusMessage"
 
 // swagger:operation GET /apis/{apiID} APIs getApi
 //
@@ -819,11 +819,11 @@ func handleDeleteAPI(apiID string) (interface{}, int) {
 //   200:
 //     description: API deleted
 //     schema:
-//       $ref: "#/responses/apiStatusMessage"
+//       $ref: "#/definitions/apiStatusMessage"
 //   400:
 //     description: No API ID specified
 //     schema:
-//         $ref: "#/responses/apiStatusMessage"
+//         $ref: "#/definitions/apiStatusMessage"
 func apiHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
 
@@ -881,11 +881,11 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 //   200:
 //     description: New Key created
 //     schema:
-//       "$ref": "#/responses/apiModifyKeySuccess"
+//       "$ref": "#/definitions/apiModifyKeySuccess"
 //   400:
 //     description: Malformed data
 //     schema:
-//       "$ref": "#/responses/apiStatusMessage"
+//       "$ref": "#/definitions/apiStatusMessage"
 
 // swagger:operation PUT /keys/{keyID} Keys updateKey
 //
@@ -901,11 +901,11 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 //   200:
 //     description: Key updated
 //     schema:
-//       "$ref": "#/responses/apiModifyKeySuccess"
+//       "$ref": "#/definitions/apiModifyKeySuccess"
 //   400:
 //     description: No or incorrect Key ID specified
 //     schema:
-//       "$ref": "#/responses/apiStatusMessage"
+//       "$ref": "#/definitions/apiStatusMessage"
 
 // swagger:operation GET /keys/{keyID} Keys getKey
 //
@@ -937,11 +937,11 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 //   200:
 //     description: Key deleted
 //     schema:
-//       $ref: "#/responses/apiStatusMessage"
+//       $ref: "#/definitions/apiStatusMessage"
 //   400:
 //     description: No Key ID specified
 //     schema:
-//         $ref: "#/responses/apiStatusMessage"
+//         $ref: "#/definitions/apiStatusMessage"
 func keyHandler(w http.ResponseWriter, r *http.Request) {
 	keyName := mux.Vars(r)["keyName"]
 	apiID := r.URL.Query().Get("api_id")
@@ -1261,7 +1261,7 @@ func handleDeleteOrgKey(orgID string) (interface{}, int) {
 //    "200":
 //      description: All gateways in a cluster were successfully refreshed
 //	schema:
-//        "$ref": "#/responses/apiStatusMessage"
+//        "$ref": "#/definitions/apiStatusMessage"
 func groupResetHandler(w http.ResponseWriter, r *http.Request) {
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
@@ -1291,7 +1291,7 @@ func groupResetHandler(w http.ResponseWriter, r *http.Request) {
 //     "200":
 //       description: All gateways in a cluster were successfully refreshed
 //	 schema:
-//         "$ref": "#/responses/apiStatusMessage"
+//         "$ref": "#/definitions/apiStatusMessage"
 func resetHandler(fn func()) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var wg sync.WaitGroup
@@ -1710,7 +1710,7 @@ func updateOauthClient(keyName, apiID string, r *http.Request) (interface{}, int
 //   200:
 //     description: Deleted
 //     schema:
-//       "$ref": "#/responses/apiModifyKeySuccess"
+//       "$ref": "#/definitions/apiModifyKeySuccess"
 func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 	apiID := r.URL.Query().Get("api_id")
 	if apiID == "" {
@@ -1836,7 +1836,7 @@ func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 //   200:
 //     description: OAuth client deleted
 //     schema:
-//       "$ref": "#/responses/apiModifyKeySuccess"
+//       "$ref": "#/definitions/apiModifyKeySuccess"
 func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
 	keyName := mux.Vars(r)["keyName"]
@@ -2101,7 +2101,7 @@ func userRatesCheck(w http.ResponseWriter, r *http.Request) {
 //   200:
 //     description: Invalidate cache
 //     schema:
-//       "$ref": "#/responses/apiStatusMessage"
+//       "$ref": "#/definitions/apiStatusMessage"
 func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
 
