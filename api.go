@@ -765,10 +765,8 @@ func handleDeleteAPI(apiID string) (interface{}, int) {
 
 // swagger:operation GET /apis APIs listApis
 //
-// List APIs
-// Only if used without the Tyk Dashboard
-//
 //---
+// summary: List APIs.
 // responses:
 //   200:
 //     description: List of API definitions
@@ -779,9 +777,8 @@ func handleDeleteAPI(apiID string) (interface{}, int) {
 
 // swagger:operation POST /apis APIs createApi
 //
-// Create API
-//
 //---
+// summary: Create an API
 // responses:
 //   200:
 //     description: API created
@@ -794,10 +791,8 @@ func handleDeleteAPI(apiID string) (interface{}, int) {
 
 // swagger:operation GET /apis/{apiID} APIs getApi
 //
-// Get API
-// Only if used without the Tyk Dashboard
-//
 //---
+// summary: Get an API.
 // parameters:
 // - in: path
 //   name: apiID
@@ -812,10 +807,8 @@ func handleDeleteAPI(apiID string) (interface{}, int) {
 
 // swagger:operation DELETE /apis/{apiID} APIs deleteApi
 //
-// Delete API
-// Only if used without the Tyk Dashboard
-//
 //---
+// summary: Delete an API.
 // parameters:
 // - in: path
 //   name: apiID
@@ -870,9 +863,8 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 
 // swagger:operation GET /keys Keys listKeys
 //
-// List all keys
-//
 //---
+// summary: List all keys attached to an API
 // responses:
 //   200:
 //     description: List of all API keys
@@ -883,9 +875,8 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 
 // swagger:operation POST /keys Keys createKey
 //
-// Create a new key
-//
 //---
+// summary: Create a new API key
 // responses:
 //   200:
 //     description: New Key created
@@ -896,26 +887,10 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 //     schema:
 //       "$ref": "#/responses/apiStatusMessage"
 
-// swagger:operation POST /keys Keys addKey
-//
-// Add an existing Key
-//
-//---
-// responses:
-//   200:
-//     description: New Key added
-//     schema:
-//       "$ref": "#/responses/apiModifyKeySuccess"
-//   400:
-//     description: Malformed data
-//     schema:
-//       "$ref": "#/responses/apiStatusMessage"
-
 // swagger:operation PUT /keys/{keyID} Keys updateKey
 //
-// Update a Key
-//
 //---
+// summary: Update an API key
 // parameters:
 // - in: path
 //   name: keyID
@@ -934,9 +909,8 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 
 // swagger:operation GET /keys/{keyID} Keys getKey
 //
-// Get a key
-//
 //---
+// summary: Retrieve an API key
 // parameters:
 // - in: path
 //   name: keyID
@@ -951,9 +925,8 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 
 // swagger:operation DELETE /keys/{keyID} Keys deleteKey
 //
-// Delete a key
-//
 //---
+// summary: Delete ann API key
 // parameters:
 // - in: path
 //   name: keyID
@@ -1310,12 +1283,15 @@ func groupResetHandler(w http.ResponseWriter, r *http.Request) {
 // Otherwise, it won't block and fn will be called once the reload is
 // finished.
 //
-// swagger:route GET /reload Reload reload
+// swagger:operation GET /reload Reload a gateway instance
 //
-// Reloads a single Tyk Gateway instance
-//
-//     Responses:
-//       200: apiStatusMessage
+// ---
+//   summary: Reloads a single Tyk Gateway instance
+//   responses:
+//     "200":
+//       description: All gateways in a cluster were successfully refreshed
+//	 schema:
+//         "$ref": "#/responses/apiStatusMessage"
 func resetHandler(fn func()) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var wg sync.WaitGroup
@@ -1488,9 +1464,8 @@ func oauthClientStorageID(clientID string) string {
 
 // swagger:operation POST /oauth/clients/create OAuth createOAuthClient
 //
-// Create an OAuth client
-//
 //---
+// summary: Create a new OAuth client
 // parameters:
 //   - in: body
 //     name: client_info
@@ -1718,9 +1693,8 @@ func updateOauthClient(keyName, apiID string, r *http.Request) (interface{}, int
 
 // swagger:operation DELETE /oauth/refresh/{keyName} oauth invalidateOAuthRefresh
 //
-// Invalidate oAuth refresh token
-//
 //---
+// summary: Invalidate oAuth refresh token
 // parameters:
 //   - in: query
 //     name: api_id
@@ -1806,9 +1780,8 @@ func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 
 // swagger:operation GET /oauth/clients/{apiID} OAuth listOAuthClients
 //
-// List oAuth clients
-//
 //---
+// summary: List all Oauth clients
 // parameters:
 //   - in: path
 //     name: apiID
@@ -1825,9 +1798,8 @@ func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 
 // swagger:operation GET /oauth/clients/{apiID}/{keyName} OAuth getOAuthClient
 //
-// Get OAuth client
-//
 //---
+// summary: Retrieve an oAuth client
 // parameters:
 //   - in: path
 //     name: apiID
@@ -1847,9 +1819,8 @@ func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 
 // swagger:operation DELETE /oauth/clients/{apiID}/{keyName} oauth deleteOAuthClient
 //
-// Delete oAuth client
-//
 //---
+// summary: Delete an oAuth client
 // parameters:
 //   - in: path
 //     name: apiID
@@ -1894,9 +1865,8 @@ func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 
 // swagger:operation GET /oauth/clients/{apiID}/{keyName}/tokens OAuth getOAuthClientTokens
 //
-// Get OAuth client tokens
-//
 //---
+// summary: Get the tokens of an oAuth client
 // parameters:
 //   - in: path
 //     name: apiID
@@ -2119,9 +2089,8 @@ func userRatesCheck(w http.ResponseWriter, r *http.Request) {
 
 // swagger:operation DELETE /cache/{apiID} Cache invalidateCache
 //
-// Invalidate cache
-//
 //---
+// summary: Invalidate the cache of a given api by it's ID
 // parameters:
 //   - in: path
 //     name: apiID
