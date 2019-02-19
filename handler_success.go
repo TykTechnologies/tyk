@@ -127,12 +127,12 @@ func getSessionTags(session *user.SessionState) []string {
 
 	// add policy IDs
 	for _, polID := range session.ApplyPolicies {
-		tags = append(tags, "policy-"+polID)
+		tags = append(tags, "pol-"+polID)
 	}
 
 	if session.MetaData != nil {
 		if developerID, ok := session.MetaData[keyDataDeveloperID].(string); ok {
-			tags = append(tags, "developer-"+developerID)
+			tags = append(tags, "dev-"+developerID)
 		}
 	}
 
