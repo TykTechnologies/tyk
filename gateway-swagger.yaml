@@ -1,0 +1,1825 @@
+openapi: 3.0.0
+info:
+  description: The code below describes the Tyk Gateway API
+  title: Tyk Gateway API
+  version: 2.8.0
+servers:
+  - url: 'http://localhost/tyk/'
+  - url: 'https://localhost/tyk/'
+paths:
+  /apis:
+    get:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/APIDefinition'
+                type: array
+          description: List of API definitions
+      tags:
+        - APIs
+      operationId: listApis
+      summary: List APIs.
+    post:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiModifyKeySuccess'
+          description: API created
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiStatusMessage'
+          description: Malformed data
+      tags:
+        - APIs
+      operationId: createApi
+      summary: Create an API
+  '/apis/{apiID}':
+    delete:
+      parameters:
+        - description: The API ID
+          in: path
+          name: apiID
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiStatusMessage'
+          description: API deleted
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiStatusMessage'
+          description: No API ID specified
+      tags:
+        - APIs
+      operationId: deleteApi
+      summary: Delete an API.
+    get:
+      parameters:
+        - description: The API ID
+          in: path
+          name: apiID
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIDefinition'
+          description: API definition
+      tags:
+        - APIs
+      operationId: getApi
+      summary: Get an API.
+  '/cache/{apiID}':
+    delete:
+      parameters:
+        - description: The API ID
+          in: path
+          name: apiID
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiStatusMessage'
+          description: Invalidate cache
+      tags:
+        - Cache
+      operationId: invalidateCache
+      summary: Invalidate the cache of a given api by it's ID
+  /keys:
+    get:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  type: string
+                type: array
+          description: List of all API keys
+      tags:
+        - Keys
+      operationId: listKeys
+      summary: List all keys attached to an API
+    post:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiModifyKeySuccess'
+          description: New Key created
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiStatusMessage'
+          description: Malformed data
+      tags:
+        - Keys
+      operationId: createKey
+      summary: Create a new API key
+  '/keys/{keyID}':
+    delete:
+      parameters:
+        - description: The Key ID
+          in: path
+          name: keyID
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiStatusMessage'
+          description: Key deleted
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiStatusMessage'
+          description: No Key ID specified
+      tags:
+        - Keys
+      operationId: deleteKey
+      summary: Delete ann API key
+    get:
+      parameters:
+        - description: The Key ID
+          in: path
+          name: keyID
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionState'
+          description: Key object
+      tags:
+        - Keys
+      operationId: getKey
+      summary: Retrieve an API key
+    put:
+      parameters:
+        - description: The Key ID
+          in: path
+          name: keyID
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiModifyKeySuccess'
+          description: Key updated
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiStatusMessage'
+          description: No or incorrect Key ID specified
+      tags:
+        - Keys
+      operationId: updateKey
+      summary: Update an API key
+  /oauth/clients/create:
+    post:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewClientRequest'
+          description: Client created
+      tags:
+        - OAuth
+      operationId: createOAuthClient
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewClientRequest'
+        required: true
+      summary: Create a new OAuth client
+  '/oauth/clients/{apiID}':
+    get:
+      parameters:
+        - description: The API ID
+          in: path
+          name: apiID
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/NewClientRequest'
+                type: array
+          description: Get OAuth client details or a list of OAuth clients
+      tags:
+        - OAuth
+      operationId: listOAuthClients
+      summary: List all Oauth clients
+  '/oauth/clients/{apiID}/{keyName}':
+    delete:
+      parameters:
+        - description: The API ID
+          in: path
+          name: apiID
+          required: true
+          schema:
+            type: string
+        - description: The Client ID
+          in: path
+          name: keyName
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiModifyKeySuccess'
+          description: OAuth client deleted
+      tags:
+        - oauth
+      operationId: deleteOAuthClient
+      summary: Delete an oAuth client
+    get:
+      parameters:
+        - description: API ID
+          in: path
+          name: apiID
+          required: true
+          schema:
+            type: string
+        - description: The Client ID
+          in: path
+          name: keyName
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewClientRequest'
+          description: Get OAuth client details or a list of OAuth clients
+      tags:
+        - OAuth
+      operationId: getOAuthClient
+      summary: Retrieve an oAuth client
+  '/oauth/clients/{apiID}/{keyName}/tokens':
+    get:
+      parameters:
+        - description: The API ID
+          in: path
+          name: apiID
+          required: true
+          schema:
+            type: string
+        - description: The Client ID
+          in: path
+          name: keyName
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  type: string
+                type: array
+          description: Get a list of tokens
+      tags:
+        - OAuth
+      operationId: getOAuthClientTokens
+      summary: Get the tokens of an oAuth client
+  '/oauth/refresh/{keyName}':
+    delete:
+      parameters:
+        - description: The API id
+          in: query
+          name: api_id
+          required: true
+          schema:
+            type: string
+        - description: Refresh token
+          in: path
+          name: keyName
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiModifyKeySuccess'
+          description: Deleted
+      tags:
+        - oauth
+      operationId: invalidateOAuthRefresh
+      summary: Invalidate oAuth refresh token
+  /reload:
+    get:
+      responses:
+        '200':
+          description: All gateways in a cluster were successfully refreshed
+      tags:
+        - Reload
+        - a
+        - gateway
+      operationId: instance
+      summary: Reloads a single Tyk Gateway instance
+  /reload/group:
+    get:
+      responses:
+        '200':
+          description: All gateways in a cluster were successfully refreshed
+      tags:
+        - Reload
+      operationId: reloadGroup
+      summary: Reloads all the Tyk Gateways in a cluster
+components:
+  responses:
+    parameterBodies:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SessionState'
+      description: parameterBodies
+  schemas:
+    APIDefinition:
+      properties:
+        tags:
+          items:
+            type: string
+          type: array
+          x-go-name: Tags
+        CORS:
+          properties:
+            allow_credentials:
+              type: boolean
+              x-go-name: AllowCredentials
+            allowed_headers:
+              items:
+                type: string
+              type: array
+              x-go-name: AllowedHeaders
+            allowed_methods:
+              items:
+                type: string
+              type: array
+              x-go-name: AllowedMethods
+            allowed_origins:
+              items:
+                type: string
+              type: array
+              x-go-name: AllowedOrigins
+            debug:
+              type: boolean
+              x-go-name: Debug
+            enable:
+              type: boolean
+              x-go-name: Enable
+            exposed_headers:
+              items:
+                type: string
+              type: array
+              x-go-name: ExposedHeaders
+            max_age:
+              format: int64
+              type: integer
+              x-go-name: MaxAge
+            options_passthrough:
+              type: boolean
+              x-go-name: OptionsPassthrough
+          type: object
+        active:
+          type: boolean
+          x-go-name: Active
+        allowed_ips:
+          items:
+            type: string
+          type: array
+          x-go-name: AllowedIPs
+        api_id:
+          type: string
+          x-go-name: APIID
+        auth:
+          $ref: '#/components/schemas/Auth'
+        auth_provider:
+          $ref: '#/components/schemas/AuthProviderMeta'
+        base_identity_provided_by:
+          $ref: '#/components/schemas/AuthTypeEnum'
+        basic_auth:
+          properties:
+            cache_ttl:
+              format: int64
+              type: integer
+              x-go-name: CacheTTL
+            disable_caching:
+              type: boolean
+              x-go-name: DisableCaching
+          type: object
+          x-go-name: BasicAuth
+        blacklisted_ips:
+          items:
+            type: string
+          type: array
+          x-go-name: BlacklistedIPs
+        cache_options:
+          $ref: '#/components/schemas/CacheOptions'
+        certificates:
+          items:
+            type: string
+          type: array
+          x-go-name: Certificates
+        client_certificates:
+          items:
+            type: string
+          type: array
+          x-go-name: ClientCertificates
+        config_data:
+          additionalProperties:
+            type: object
+          type: object
+          x-go-name: ConfigData
+        custom_middleware:
+          $ref: '#/components/schemas/MiddlewareSection'
+        custom_middleware_bundle:
+          type: string
+          x-go-name: CustomMiddlewareBundle
+        definition:
+          properties:
+            key:
+              type: string
+              x-go-name: Key
+            location:
+              type: string
+              x-go-name: Location
+            strip_path:
+              type: boolean
+              x-go-name: StripPath
+          type: object
+          x-go-name: VersionDefinition
+        disable_quota:
+          type: boolean
+          x-go-name: DisableQuota
+        disable_rate_limit:
+          type: boolean
+          x-go-name: DisableRateLimit
+        do_not_track:
+          type: boolean
+          x-go-name: DoNotTrack
+        domain:
+          type: string
+          x-go-name: Domain
+        dont_set_quota_on_create:
+          type: boolean
+          x-go-name: DontSetQuotasOnCreate
+        enable_batch_request_support:
+          type: boolean
+          x-go-name: EnableBatchRequestSupport
+        enable_context_vars:
+          type: boolean
+          x-go-name: EnableContextVars
+        enable_coprocess_auth:
+          type: boolean
+          x-go-name: EnableCoProcessAuth
+        enable_ip_blacklisting:
+          type: boolean
+          x-go-name: EnableIpBlacklisting
+        enable_ip_whitelisting:
+          type: boolean
+          x-go-name: EnableIpWhiteListing
+        enable_jwt:
+          type: boolean
+          x-go-name: EnableJWT
+        enable_signature_checking:
+          type: boolean
+          x-go-name: EnableSignatureChecking
+        event_handlers:
+          $ref: '#/components/schemas/EventHandlerMetaConfig'
+        expire_analytics_after:
+          format: int64
+          type: integer
+          x-go-name: ExpireAnalyticsAfter
+        global_rate_limit:
+          $ref: '#/components/schemas/GlobalRateLimit'
+        hmac_allowed_algorithms:
+          items:
+            type: string
+          type: array
+          x-go-name: HmacAllowedAlgorithms
+        hmac_allowed_clock_skew:
+          format: double
+          type: number
+          x-go-name: HmacAllowedClockSkew
+        id:
+          $ref: '#/components/schemas/ObjectId'
+        internal:
+          type: boolean
+          x-go-name: Internal
+        jwt_client_base_field:
+          type: string
+          x-go-name: JWTClientIDBaseField
+        jwt_expires_at_validation_skew:
+          format: uint64
+          type: integer
+          x-go-name: JWTExpiresAtValidationSkew
+        jwt_identity_base_field:
+          type: string
+          x-go-name: JWTIdentityBaseField
+        jwt_issued_at_validation_skew:
+          format: uint64
+          type: integer
+          x-go-name: JWTIssuedAtValidationSkew
+        jwt_not_before_validation_skew:
+          format: uint64
+          type: integer
+          x-go-name: JWTNotBeforeValidationSkew
+        jwt_policy_field_name:
+          type: string
+          x-go-name: JWTPolicyFieldName
+        jwt_scope_claim_name:
+          type: string
+          x-go-name: JWTScopeClaimName
+        jwt_scope_to_policy_mapping:
+          additionalProperties:
+            type: string
+          type: object
+          x-go-name: JWTScopeToPolicyMapping
+        jwt_signing_method:
+          type: string
+          x-go-name: JWTSigningMethod
+        jwt_skip_kid:
+          type: boolean
+          x-go-name: JWTSkipKid
+        jwt_source:
+          type: string
+          x-go-name: JWTSource
+        name:
+          type: string
+          x-go-name: Name
+        notifications:
+          $ref: '#/components/schemas/NotificationsManager'
+        oauth_meta:
+          properties:
+            allowed_access_types:
+              items:
+                $ref: '#/components/schemas/AccessRequestType'
+              type: array
+              x-go-name: AllowedAccessTypes
+            allowed_authorize_types:
+              items:
+                $ref: '#/components/schemas/AuthorizeRequestType'
+              type: array
+              x-go-name: AllowedAuthorizeTypes
+            auth_login_redirect:
+              type: string
+              x-go-name: AuthorizeLoginRedirect
+          type: object
+          x-go-name: Oauth2Meta
+        openid_options:
+          $ref: '#/components/schemas/OpenIDOptions'
+        org_id:
+          type: string
+          x-go-name: OrgID
+        pinned_public_keys:
+          additionalProperties:
+            type: string
+          type: object
+          x-go-name: PinnedPublicKeys
+        proxy:
+          properties:
+            check_host_against_uptime_tests:
+              type: boolean
+              x-go-name: CheckHostAgainstUptimeTests
+            disable_strip_slash:
+              type: boolean
+              x-go-name: DisableStripSlash
+            enable_load_balancing:
+              type: boolean
+              x-go-name: EnableLoadBalancing
+            listen_path:
+              type: string
+              x-go-name: ListenPath
+            preserve_host_header:
+              type: boolean
+              x-go-name: PreserveHostHeader
+            service_discovery:
+              $ref: '#/components/schemas/ServiceDiscoveryConfiguration'
+            strip_listen_path:
+              type: boolean
+              x-go-name: StripListenPath
+            target_list:
+              items:
+                type: string
+              type: array
+              x-go-name: Targets
+            target_url:
+              type: string
+              x-go-name: TargetURL
+            transport:
+              properties:
+                proxy_url:
+                  type: string
+                  x-go-name: ProxyURL
+                ssl_ciphers:
+                  items:
+                    type: string
+                  type: array
+                  x-go-name: SSLCipherSuites
+                ssl_insecure_skip_verify:
+                  type: boolean
+                  x-go-name: SSLInsecureSkipVerify
+                ssl_min_version:
+                  format: uint16
+                  type: integer
+                  x-go-name: SSLMinVersion
+              type: object
+              x-go-name: Transport
+          type: object
+          x-go-name: Proxy
+        response_processors:
+          items:
+            $ref: '#/components/schemas/ResponseProcessor'
+          type: array
+          x-go-name: ResponseProcessors
+        session_lifetime:
+          format: int64
+          type: integer
+          x-go-name: SessionLifetime
+        session_provider:
+          $ref: '#/components/schemas/SessionProviderMeta'
+        slug:
+          type: string
+          x-go-name: Slug
+        strip_auth_data:
+          type: boolean
+          x-go-name: StripAuthData
+        tag_headers:
+          items:
+            type: string
+          type: array
+          x-go-name: TagHeaders
+        upstream_certificates:
+          additionalProperties:
+            type: string
+          type: object
+          x-go-name: UpstreamCertificates
+        uptime_tests:
+          properties:
+            check_list:
+              items:
+                $ref: '#/components/schemas/HostCheckObject'
+              type: array
+              x-go-name: CheckList
+            config:
+              properties:
+                expire_utime_after:
+                  format: int64
+                  type: integer
+                  x-go-name: ExpireUptimeAnalyticsAfter
+                recheck_wait:
+                  format: int64
+                  type: integer
+                  x-go-name: RecheckWait
+                service_discovery:
+                  $ref: '#/components/schemas/ServiceDiscoveryConfiguration'
+              type: object
+              x-go-name: Config
+          type: object
+          x-go-name: UptimeTests
+        use_basic_auth:
+          type: boolean
+          x-go-name: UseBasicAuth
+        use_keyless:
+          type: boolean
+          x-go-name: UseKeylessAccess
+        use_mutual_tls_auth:
+          type: boolean
+          x-go-name: UseMutualTLSAuth
+        use_oauth2:
+          type: boolean
+          x-go-name: UseOauth2
+        use_openid:
+          type: boolean
+          x-go-name: UseOpenID
+        use_standard_auth:
+          type: boolean
+          x-go-name: UseStandardAuth
+        version_data:
+          properties:
+            default_version:
+              type: string
+              x-go-name: DefaultVersion
+            not_versioned:
+              type: boolean
+              x-go-name: NotVersioned
+            versions:
+              additionalProperties:
+                $ref: '#/components/schemas/VersionInfo'
+              type: object
+              x-go-name: Versions
+          type: object
+          x-go-name: VersionData
+      title: >-
+        APIDefinition represents the configuration for a single proxied API and
+        it's versions.
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    APILimit:
+      description: APILimit stores quota and rate limit on ACL level (per API)
+      properties:
+        per:
+          format: double
+          type: number
+          x-go-name: Per
+        quota_max:
+          format: int64
+          type: integer
+          x-go-name: QuotaMax
+        quota_remaining:
+          format: int64
+          type: integer
+          x-go-name: QuotaRemaining
+        quota_renewal_rate:
+          format: int64
+          type: integer
+          x-go-name: QuotaRenewalRate
+        quota_renews:
+          format: int64
+          type: integer
+          x-go-name: QuotaRenews
+        rate:
+          format: double
+          type: number
+          x-go-name: Rate
+        set_by_policy:
+          type: boolean
+          x-go-name: SetByPolicy
+        throttle_interval:
+          format: double
+          type: number
+          x-go-name: ThrottleInterval
+        throttle_retry_limit:
+          format: int64
+          type: integer
+          x-go-name: ThrottleRetryLimit
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/user
+    AccessDefinition:
+      description: AccessDefinition defines which versions of an API a key has access to
+      properties:
+        allowed_urls:
+          items:
+            $ref: '#/components/schemas/AccessSpec'
+          type: array
+          x-go-name: AllowedURLs
+        api_id:
+          type: string
+          x-go-name: APIID
+        api_name:
+          type: string
+          x-go-name: APIName
+        limit:
+          $ref: '#/components/schemas/APILimit'
+        versions:
+          items:
+            type: string
+          type: array
+          x-go-name: Versions
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/user
+    AccessRequestType:
+      description: AccessRequestType is the type for OAuth param `grant_type`
+      type: string
+      x-go-package: github.com/TykTechnologies/tyk/vendor/github.com/lonelycode/osin
+    AccessSpec:
+      description: >-
+        AccessSpecs define what URLS a user has access to an what methods are
+        enabled
+      properties:
+        methods:
+          items:
+            type: string
+          type: array
+          x-go-name: Methods
+        url:
+          type: string
+          x-go-name: URL
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/user
+    Auth:
+      properties:
+        auth_header_name:
+          type: string
+          x-go-name: AuthHeaderName
+        cookie_name:
+          type: string
+          x-go-name: CookieName
+        param_name:
+          type: string
+          x-go-name: ParamName
+        use_certificate:
+          type: boolean
+          x-go-name: UseCertificate
+        use_cookie:
+          type: boolean
+          x-go-name: UseCookie
+        use_param:
+          type: boolean
+          x-go-name: UseParam
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    AuthProviderCode:
+      type: string
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    AuthProviderMeta:
+      properties:
+        meta:
+          additionalProperties:
+            type: object
+          type: object
+          x-go-name: Meta
+        name:
+          $ref: '#/components/schemas/AuthProviderCode'
+        storage_engine:
+          $ref: '#/components/schemas/StorageEngineCode'
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    AuthTypeEnum:
+      type: string
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    AuthorizeRequestType:
+      description: AuthorizeRequestType is the type for OAuth param `response_type`
+      type: string
+      x-go-package: github.com/TykTechnologies/tyk/vendor/github.com/lonelycode/osin
+    CacheOptions:
+      properties:
+        cache_all_safe_requests:
+          type: boolean
+          x-go-name: CacheAllSafeRequests
+        cache_control_ttl_header:
+          type: string
+          x-go-name: CacheControlTTLHeader
+        cache_response_codes:
+          items:
+            format: int64
+            type: integer
+          type: array
+          x-go-name: CacheOnlyResponseCodes
+        cache_timeout:
+          format: int64
+          type: integer
+          x-go-name: CacheTimeout
+        enable_cache:
+          type: boolean
+          x-go-name: EnableCache
+        enable_upstream_cache_control:
+          type: boolean
+          x-go-name: EnableUpstreamCacheControl
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    CircuitBreakerMeta:
+      properties:
+        method:
+          type: string
+          x-go-name: Method
+        path:
+          type: string
+          x-go-name: Path
+        return_to_service_after:
+          format: int64
+          type: integer
+          x-go-name: ReturnToServiceAfter
+        samples:
+          format: int64
+          type: integer
+          x-go-name: Samples
+        threshold_percent:
+          format: double
+          type: number
+          x-go-name: ThresholdPercent
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    EndPointMeta:
+      properties:
+        method_actions:
+          additionalProperties:
+            $ref: '#/components/schemas/EndpointMethodMeta'
+          type: object
+          x-go-name: MethodActions
+        path:
+          type: string
+          x-go-name: Path
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    EndpointMethodAction:
+      type: string
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    EndpointMethodMeta:
+      properties:
+        action:
+          $ref: '#/components/schemas/EndpointMethodAction'
+        code:
+          format: int64
+          type: integer
+          x-go-name: Code
+        data:
+          type: string
+          x-go-name: Data
+        headers:
+          additionalProperties:
+            type: string
+          type: object
+          x-go-name: Headers
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    EventHandlerMetaConfig:
+      properties:
+        events:
+          x-go-name: Events
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    ExtendedPathsSet:
+      properties:
+        black_list:
+          items:
+            $ref: '#/components/schemas/EndPointMeta'
+          type: array
+          x-go-name: BlackList
+        cache:
+          items:
+            type: string
+          type: array
+          x-go-name: Cached
+        circuit_breakers:
+          items:
+            $ref: '#/components/schemas/CircuitBreakerMeta'
+          type: array
+          x-go-name: CircuitBreaker
+        do_not_track_endpoints:
+          items:
+            $ref: '#/components/schemas/TrackEndpointMeta'
+          type: array
+          x-go-name: DoNotTrackEndpoints
+        hard_timeouts:
+          items:
+            $ref: '#/components/schemas/HardTimeoutMeta'
+          type: array
+          x-go-name: HardTimeouts
+        ignored:
+          items:
+            $ref: '#/components/schemas/EndPointMeta'
+          type: array
+          x-go-name: Ignored
+        internal:
+          items:
+            $ref: '#/components/schemas/InternalMeta'
+          type: array
+          x-go-name: Internal
+        method_transforms:
+          items:
+            $ref: '#/components/schemas/MethodTransformMeta'
+          type: array
+          x-go-name: MethodTransforms
+        size_limits:
+          items:
+            $ref: '#/components/schemas/RequestSizeMeta'
+          type: array
+          x-go-name: SizeLimit
+        track_endpoints:
+          items:
+            $ref: '#/components/schemas/TrackEndpointMeta'
+          type: array
+          x-go-name: TrackEndpoints
+        transform:
+          items:
+            $ref: '#/components/schemas/TemplateMeta'
+          type: array
+          x-go-name: Transform
+        transform_headers:
+          items:
+            $ref: '#/components/schemas/HeaderInjectionMeta'
+          type: array
+          x-go-name: TransformHeader
+        transform_jq:
+          items:
+            $ref: '#/components/schemas/TransformJQMeta'
+          type: array
+          x-go-name: TransformJQ
+        transform_jq_response:
+          items:
+            $ref: '#/components/schemas/TransformJQMeta'
+          type: array
+          x-go-name: TransformJQResponse
+        transform_response:
+          items:
+            $ref: '#/components/schemas/TemplateMeta'
+          type: array
+          x-go-name: TransformResponse
+        transform_response_headers:
+          items:
+            $ref: '#/components/schemas/HeaderInjectionMeta'
+          type: array
+          x-go-name: TransformResponseHeader
+        url_rewrites:
+          items:
+            $ref: '#/components/schemas/URLRewriteMeta'
+          type: array
+          x-go-name: URLRewrite
+        validate_json:
+          items:
+            $ref: '#/components/schemas/ValidatePathMeta'
+          type: array
+          x-go-name: ValidateJSON
+        virtual:
+          items:
+            $ref: '#/components/schemas/VirtualMeta'
+          type: array
+          x-go-name: Virtual
+        white_list:
+          items:
+            $ref: '#/components/schemas/EndPointMeta'
+          type: array
+          x-go-name: WhiteList
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    GlobalRateLimit:
+      properties:
+        per:
+          format: double
+          type: number
+          x-go-name: Per
+        rate:
+          format: double
+          type: number
+          x-go-name: Rate
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    HardTimeoutMeta:
+      properties:
+        method:
+          type: string
+          x-go-name: Method
+        path:
+          type: string
+          x-go-name: Path
+        timeout:
+          format: int64
+          type: integer
+          x-go-name: TimeOut
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    HashType:
+      type: string
+      x-go-package: github.com/TykTechnologies/tyk/user
+    HeaderInjectionMeta:
+      properties:
+        act_on:
+          type: boolean
+          x-go-name: ActOnResponse
+        add_headers:
+          additionalProperties:
+            type: string
+          type: object
+          x-go-name: AddHeaders
+        delete_headers:
+          items:
+            type: string
+          type: array
+          x-go-name: DeleteHeaders
+        method:
+          type: string
+          x-go-name: Method
+        path:
+          type: string
+          x-go-name: Path
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    HostCheckObject:
+      properties:
+        body:
+          type: string
+          x-go-name: Body
+        headers:
+          additionalProperties:
+            type: string
+          type: object
+          x-go-name: Headers
+        method:
+          type: string
+          x-go-name: Method
+        url:
+          type: string
+          x-go-name: CheckURL
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    IdExtractorSource:
+      type: string
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    IdExtractorType:
+      type: string
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    InternalMeta:
+      properties:
+        method:
+          type: string
+          x-go-name: Method
+        path:
+          type: string
+          x-go-name: Path
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    MethodTransformMeta:
+      properties:
+        method:
+          type: string
+          x-go-name: Method
+        path:
+          type: string
+          x-go-name: Path
+        to_method:
+          type: string
+          x-go-name: ToMethod
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    MiddlewareDefinition:
+      properties:
+        name:
+          type: string
+          x-go-name: Name
+        path:
+          type: string
+          x-go-name: Path
+        require_session:
+          type: boolean
+          x-go-name: RequireSession
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    MiddlewareDriver:
+      type: string
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    MiddlewareIdExtractor:
+      properties:
+        extract_from:
+          $ref: '#/components/schemas/IdExtractorSource'
+        extract_with:
+          $ref: '#/components/schemas/IdExtractorType'
+        extractor_config:
+          additionalProperties:
+            type: object
+          type: object
+          x-go-name: ExtractorConfig
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    MiddlewareSection:
+      properties:
+        auth_check:
+          $ref: '#/components/schemas/MiddlewareDefinition'
+        driver:
+          $ref: '#/components/schemas/MiddlewareDriver'
+        id_extractor:
+          $ref: '#/components/schemas/MiddlewareIdExtractor'
+        post:
+          items:
+            $ref: '#/components/schemas/MiddlewareDefinition'
+          type: array
+          x-go-name: Post
+        post_key_auth:
+          items:
+            $ref: '#/components/schemas/MiddlewareDefinition'
+          type: array
+          x-go-name: PostKeyAuth
+        pre:
+          items:
+            $ref: '#/components/schemas/MiddlewareDefinition'
+          type: array
+          x-go-name: Pre
+        response:
+          items:
+            $ref: '#/components/schemas/MiddlewareDefinition'
+          type: array
+          x-go-name: Response
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    NewClientRequest:
+      description: >-
+        NewClientRequest is an outward facing JSON object translated from osin
+        OAuthClients
+      properties:
+        api_id:
+          type: string
+          x-go-name: APIID
+        client_id:
+          type: string
+          x-go-name: ClientID
+        description:
+          type: string
+          x-go-name: Description
+        meta_data:
+          type: object
+          x-go-name: MetaData
+        policy_id:
+          type: string
+          x-go-name: PolicyID
+        redirect_uri:
+          type: string
+          x-go-name: ClientRedirectURI
+        secret:
+          type: string
+          x-go-name: ClientSecret
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk
+    NotificationsManager:
+      description: 'TODO: Make this more generic'
+      properties:
+        oauth_on_keychange_url:
+          type: string
+          x-go-name: OAuthKeyChangeURL
+        shared_secret:
+          type: string
+          x-go-name: SharedSecret
+      title: >-
+        NotificationsManager handles sending notifications to OAuth endpoints to
+        notify the provider of key changes.
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    OIDProviderConfig:
+      properties:
+        client_ids:
+          additionalProperties:
+            type: string
+          type: object
+          x-go-name: ClientIDs
+        issuer:
+          type: string
+          x-go-name: Issuer
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    ObjectId:
+      description: 'http://www.mongodb.org/display/DOCS/Object+IDs'
+      title: >-
+        ObjectId is a unique ID identifying a BSON value. It must be exactly 12
+        bytes
+
+        long. MongoDB objects by default have such a property set in their "_id"
+
+        property.
+      type: string
+      x-go-package: github.com/TykTechnologies/tyk/vendor/gopkg.in/mgo.v2/bson
+    OpenIDOptions:
+      properties:
+        providers:
+          items:
+            $ref: '#/components/schemas/OIDProviderConfig'
+          type: array
+          x-go-name: Providers
+        segregate_by_client:
+          type: boolean
+          x-go-name: SegregateByClient
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    Regexp:
+      description: Regexp is a wrapper around regexp.Regexp but with caching
+      properties:
+        FromCache:
+          type: boolean
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/regexp
+    RequestInputType:
+      type: string
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    RequestSizeMeta:
+      properties:
+        method:
+          type: string
+          x-go-name: Method
+        path:
+          type: string
+          x-go-name: Path
+        size_limit:
+          format: int64
+          type: integer
+          x-go-name: SizeLimit
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    ResponseProcessor:
+      properties:
+        name:
+          type: string
+          x-go-name: Name
+        options:
+          type: object
+          x-go-name: Options
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    RoutingTrigger:
+      properties:
+        'on':
+          $ref: '#/components/schemas/RoutingTriggerOnType'
+        options:
+          $ref: '#/components/schemas/RoutingTriggerOptions'
+        rewrite_to:
+          type: string
+          x-go-name: RewriteTo
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    RoutingTriggerOnType:
+      type: string
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    RoutingTriggerOptions:
+      properties:
+        header_matches:
+          additionalProperties:
+            $ref: '#/components/schemas/StringRegexMap'
+          type: object
+          x-go-name: HeaderMatches
+        path_part_matches:
+          additionalProperties:
+            $ref: '#/components/schemas/StringRegexMap'
+          type: object
+          x-go-name: PathPartMatches
+        payload_matches:
+          $ref: '#/components/schemas/StringRegexMap'
+        query_val_matches:
+          additionalProperties:
+            $ref: '#/components/schemas/StringRegexMap'
+          type: object
+          x-go-name: QueryValMatches
+        request_context_matches:
+          additionalProperties:
+            $ref: '#/components/schemas/StringRegexMap'
+          type: object
+          x-go-name: RequestContextMatches
+        session_meta_matches:
+          additionalProperties:
+            $ref: '#/components/schemas/StringRegexMap'
+          type: object
+          x-go-name: SessionMetaMatches
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    ServiceDiscoveryConfiguration:
+      properties:
+        cache_timeout:
+          format: int64
+          type: integer
+          x-go-name: CacheTimeout
+        data_path:
+          type: string
+          x-go-name: DataPath
+        endpoint_returns_list:
+          type: boolean
+          x-go-name: EndpointReturnsList
+        parent_data_path:
+          type: string
+          x-go-name: ParentDataPath
+        port_data_path:
+          type: string
+          x-go-name: PortDataPath
+        query_endpoint:
+          type: string
+          x-go-name: QueryEndpoint
+        target_path:
+          type: string
+          x-go-name: TargetPath
+        use_discovery_service:
+          type: boolean
+          x-go-name: UseDiscoveryService
+        use_nested_query:
+          type: boolean
+          x-go-name: UseNestedQuery
+        use_target_list:
+          type: boolean
+          x-go-name: UseTargetList
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    SessionProviderCode:
+      type: string
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    SessionProviderMeta:
+      properties:
+        meta:
+          additionalProperties:
+            type: object
+          type: object
+          x-go-name: Meta
+        name:
+          $ref: '#/components/schemas/SessionProviderCode'
+        storage_engine:
+          $ref: '#/components/schemas/StorageEngineCode'
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    SessionState:
+      description: >-
+        There's a data structure that's based on this and it's used for Protocol
+        Buffer support, make sure to update
+        "coprocess/proto/coprocess_session_state.proto" and generate the
+        bindings using: cd coprocess/proto && ./update_bindings.sh
+      properties:
+        tags:
+          items:
+            type: string
+          type: array
+          x-go-name: Tags
+        access_rights:
+          additionalProperties:
+            $ref: '#/components/schemas/AccessDefinition'
+          type: object
+          x-go-name: AccessRights
+        alias:
+          type: string
+          x-go-name: Alias
+        allowance:
+          format: double
+          type: number
+          x-go-name: Allowance
+        apply_policies:
+          items:
+            type: string
+          type: array
+          x-go-name: ApplyPolicies
+        apply_policy_id:
+          type: string
+          x-go-name: ApplyPolicyID
+        basic_auth_data:
+          properties:
+            hash_type:
+              $ref: '#/components/schemas/HashType'
+            password:
+              type: string
+              x-go-name: Password
+          type: object
+          x-go-name: BasicAuthData
+        certificate:
+          type: string
+          x-go-name: Certificate
+        data_expires:
+          format: int64
+          type: integer
+          x-go-name: DataExpires
+        enable_detail_recording:
+          type: boolean
+          x-go-name: EnableDetailedRecording
+        expires:
+          format: int64
+          type: integer
+          x-go-name: Expires
+        hmac_enabled:
+          type: boolean
+          x-go-name: HMACEnabled
+        hmac_string:
+          type: string
+          x-go-name: HmacSecret
+        id_extractor_deadline:
+          format: int64
+          type: integer
+          x-go-name: IdExtractorDeadline
+        is_inactive:
+          type: boolean
+          x-go-name: IsInactive
+        jwt_data:
+          properties:
+            secret:
+              type: string
+              x-go-name: Secret
+          type: object
+          x-go-name: JWTData
+        last_check:
+          format: int64
+          type: integer
+          x-go-name: LastCheck
+        last_updated:
+          type: string
+          x-go-name: LastUpdated
+        meta_data:
+          additionalProperties:
+            type: object
+          type: object
+          x-go-name: MetaData
+        monitor:
+          properties:
+            trigger_limits:
+              items:
+                format: double
+                type: number
+              type: array
+              x-go-name: TriggerLimits
+          type: object
+          x-go-name: Monitor
+        oauth_client_id:
+          type: string
+          x-go-name: OauthClientID
+        oauth_keys:
+          additionalProperties:
+            type: string
+          type: object
+          x-go-name: OauthKeys
+        org_id:
+          type: string
+          x-go-name: OrgID
+        per:
+          format: double
+          type: number
+          x-go-name: Per
+        quota_max:
+          format: int64
+          type: integer
+          x-go-name: QuotaMax
+        quota_remaining:
+          format: int64
+          type: integer
+          x-go-name: QuotaRemaining
+        quota_renewal_rate:
+          format: int64
+          type: integer
+          x-go-name: QuotaRenewalRate
+        quota_renews:
+          format: int64
+          type: integer
+          x-go-name: QuotaRenews
+        rate:
+          format: double
+          type: number
+          x-go-name: Rate
+        session_lifetime:
+          format: int64
+          type: integer
+          x-go-name: SessionLifetime
+        throttle_interval:
+          format: double
+          type: number
+          x-go-name: ThrottleInterval
+        throttle_retry_limit:
+          format: int64
+          type: integer
+          x-go-name: ThrottleRetryLimit
+      title: >-
+        SessionState objects represent a current API session, mainly used for
+        rate limiting.
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/user
+    StorageEngineCode:
+      type: string
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    StringRegexMap:
+      properties:
+        match_rx:
+          type: string
+          x-go-name: MatchPattern
+        reverse:
+          type: boolean
+          x-go-name: Reverse
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    TemplateData:
+      properties:
+        enable_session:
+          type: boolean
+          x-go-name: EnableSession
+        input_type:
+          $ref: '#/components/schemas/RequestInputType'
+        template_mode:
+          $ref: '#/components/schemas/TemplateMode'
+        template_source:
+          type: string
+          x-go-name: TemplateSource
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    TemplateMeta:
+      properties:
+        method:
+          type: string
+          x-go-name: Method
+        path:
+          type: string
+          x-go-name: Path
+        template_data:
+          $ref: '#/components/schemas/TemplateData'
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    TemplateMode:
+      type: string
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    TrackEndpointMeta:
+      properties:
+        method:
+          type: string
+          x-go-name: Method
+        path:
+          type: string
+          x-go-name: Path
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    TransformJQMeta:
+      properties:
+        filter:
+          type: string
+          x-go-name: Filter
+        method:
+          type: string
+          x-go-name: Method
+        path:
+          type: string
+          x-go-name: Path
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    URLRewriteMeta:
+      properties:
+        MatchRegexp:
+          $ref: '#/components/schemas/Regexp'
+        match_pattern:
+          type: string
+          x-go-name: MatchPattern
+        method:
+          type: string
+          x-go-name: Method
+        path:
+          type: string
+          x-go-name: Path
+        rewrite_to:
+          type: string
+          x-go-name: RewriteTo
+        triggers:
+          items:
+            $ref: '#/components/schemas/RoutingTrigger'
+          type: array
+          x-go-name: Triggers
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    ValidatePathMeta:
+      properties:
+        error_response_code:
+          description: >-
+            Allows override of default 422 Unprocessible Entity response code
+            for validation errors.
+          format: int64
+          type: integer
+          x-go-name: ErrorResponseCode
+        method:
+          type: string
+          x-go-name: Method
+        path:
+          type: string
+          x-go-name: Path
+        schema:
+          additionalProperties:
+            type: object
+          type: object
+          x-go-name: Schema
+        schema_b64:
+          type: string
+          x-go-name: SchemaB64
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    VersionInfo:
+      properties:
+        paths:
+          properties:
+            black_list:
+              items:
+                type: string
+              type: array
+              x-go-name: BlackList
+            ignored:
+              items:
+                type: string
+              type: array
+              x-go-name: Ignored
+            white_list:
+              items:
+                type: string
+              type: array
+              x-go-name: WhiteList
+          type: object
+          x-go-name: Paths
+        expires:
+          type: string
+          x-go-name: Expires
+        extended_paths:
+          $ref: '#/components/schemas/ExtendedPathsSet'
+        global_headers:
+          additionalProperties:
+            type: string
+          type: object
+          x-go-name: GlobalHeaders
+        global_headers_remove:
+          items:
+            type: string
+          type: array
+          x-go-name: GlobalHeadersRemove
+        global_size_limit:
+          format: int64
+          type: integer
+          x-go-name: GlobalSizeLimit
+        name:
+          type: string
+          x-go-name: Name
+        override_target:
+          type: string
+          x-go-name: OverrideTarget
+        use_extended_paths:
+          type: boolean
+          x-go-name: UseExtendedPaths
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    VirtualMeta:
+      properties:
+        function_source_type:
+          type: string
+          x-go-name: FunctionSourceType
+        function_source_uri:
+          type: string
+          x-go-name: FunctionSourceURI
+        method:
+          type: string
+          x-go-name: Method
+        path:
+          type: string
+          x-go-name: Path
+        proxy_on_error:
+          type: boolean
+          x-go-name: ProxyOnError
+        response_function_name:
+          type: string
+          x-go-name: ResponseFunctionName
+        use_session:
+          type: boolean
+          x-go-name: UseSession
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
+    apiModifyKeySuccess:
+      description: apiModifyKeySuccess represents when a Key modification was successful
+      properties:
+        action:
+          type: string
+          x-go-name: Action
+        key:
+          description: 'in:body'
+          type: string
+          x-go-name: Key
+        key_hash:
+          type: string
+          x-go-name: KeyHash
+        status:
+          type: string
+          x-go-name: Status
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk
+    apiStatusMessage:
+      description: apiStatusMessage represents an API status message
+      properties:
+        message:
+          description: Response details
+          type: string
+          x-go-name: Message
+        status:
+          type: string
+          x-go-name: Status
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk
+  securitySchemes:
+    api_key:
+      in: header
+      name: X-Tyk-Authorization
+      type: apiKey
+security:
+  - api_key: []
+

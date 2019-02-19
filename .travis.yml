@@ -15,6 +15,10 @@ addons:
     - python3.5
     - python3-pip
     - libluajit-5.1-dev
+    ### Needed to convert the swagger 2.0 file to openapi 3.0
+    ### The swagger docs are actually written as per the 2.0 spec as there is no
+    ### support for openapi 3.0 in Go - at least for now.
+    - npm
 
 matrix:
   include:
@@ -31,13 +35,16 @@ install:
   - go install ./...
     # As of 1.9, ./... no longer includes ./vendor/...
   - go install ./vendor/{golang.org/x/tools/cmd/goimports,github.com/wadey/gocovmerge,github.com/mattn/goveralls}
+  - go get github.com/go-swagger/go-swagger/cmd/swagger
 
 script:
   - sudo pip3 install google
   - sudo pip3 install protobuf
+  - sudo npm install -g api-spec-converter
   - go build -tags 'coprocess python'
   - go build -tags 'coprocess lua'
   - go build -tags 'coprocess grpc'
+  - ./utils/ci-swagger.sh
   - ./utils/ci-test.sh
   - if [[ $LATEST_GO ]]; then goveralls -coverprofile=<(gocovmerge *.cov); fi
   - ./utils/ci-benchmark.sh
