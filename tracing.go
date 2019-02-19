@@ -29,25 +29,21 @@ func (tr *traceHttpRequest) toRequest() *http.Request {
 	return r
 }
 
-// Tracing HTTP request
-//
-// swagger:model
+// TraceRequest is for tracing an HTTP request
+// swagger:model TraceRequest
 type traceRequest struct {
 	Request *traceHttpRequest     `json:"request"`
 	Spec    *apidef.APIDefinition `json:"spec"`
 }
 
-// Tracing HTTP response
-//
-// swagger:model
+// TraceResponse is for tracing an HTTP response
+// swagger:model TraceResponse
 type traceResponse struct {
 	Message  string `json:"message"`
 	Response string `json:"response"`
 	Logs     string `json:"logs"`
 }
 
-// swagger:operation POST /trace trace trace
-//
 // Tracing request
 // Used to test API definition by sending sample request,
 // and analysisng output of both response and logs
