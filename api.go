@@ -926,7 +926,7 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 // swagger:operation DELETE /keys/{keyID} Keys deleteKey
 //
 //---
-// summary: Delete ann API key
+// summary: Delete an API key
 // parameters:
 // - in: path
 //   name: keyID

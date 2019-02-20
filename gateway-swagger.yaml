@@ -163,7 +163,7 @@ paths:
       tags:
         - Keys
       operationId: deleteKey
-      summary: Delete ann API key
+      summary: Delete an API key
     get:
       parameters:
         - description: The Key ID
