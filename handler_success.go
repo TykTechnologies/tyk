@@ -15,7 +15,6 @@ import (
 	"github.com/TykTechnologies/tyk/request"
 
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
 )
 
