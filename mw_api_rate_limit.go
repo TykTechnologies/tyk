@@ -12,7 +12,7 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-// RateLimitAndQuotaCheck will check the incomming request and key whether it is within it's quota and
+// RateLimitAndQuotaCheck will check the incoming request and key whether it is within it's quota and
 // within it's rate limit, it makes use of the SessionLimiter object to do this
 type RateLimitForAPI struct {
 	BaseMiddleware
@@ -63,7 +63,7 @@ func (k *RateLimitForAPI) handleRateLimitFailure(r *http.Request, token string) 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *RateLimitForAPI) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	// Skip rate limiting and quotas for looping
-	if ctxLoopLevel(r) > 0 {
+	if !ctxCheckLimits(r) {
 		return nil, http.StatusOK
 	}
 
@@ -75,6 +75,7 @@ func (k *RateLimitForAPI) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		false,
 		&k.Spec.GlobalConfig,
 		k.Spec.APIID,
+		false,
 	)
 
 	if reason == sessionFailRateLimit {

@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
@@ -32,11 +32,11 @@ type AuthorisationHandler interface {
 type SessionHandler interface {
 	Init(store storage.Handler)
 	UpdateSession(keyName string, session *user.SessionState, resetTTLTo int64, hashed bool) error
-	RemoveSession(keyName string, hashed bool)
+	RemoveSession(keyName string, hashed bool) bool
 	SessionDetail(keyName string, hashed bool) (user.SessionState, bool)
 	Sessions(filter string) []string
 	Store() storage.Handler
-	ResetQuota(string, *user.SessionState)
+	ResetQuota(string, *user.SessionState, bool)
 	Stop()
 }
 
@@ -183,15 +183,20 @@ func (b *DefaultSessionManager) Store() storage.Handler {
 	return b.store
 }
 
-func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.SessionState) {
-	rawKey := QuotaKeyPrefix + storage.HashKey(keyName)
+func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.SessionState, isHashed bool) {
+	origKeyName := keyName
+	if !isHashed {
+		keyName = storage.HashKey(keyName)
+	}
+
+	rawKey := QuotaKeyPrefix + keyName
 	log.WithFields(logrus.Fields{
 		"prefix":      "auth-mgr",
-		"inbound-key": obfuscateKey(keyName),
+		"inbound-key": obfuscateKey(origKeyName),
 		"key":         rawKey,
 	}).Info("Reset quota for key.")
 
-	rateLimiterSentinelKey := RateLimitKeyPrefix + storage.HashKey(keyName) + ".BLOCKED"
+	rateLimiterSentinelKey := RateLimitKeyPrefix + keyName + ".BLOCKED"
 	// Clear the rate limiter
 	go b.store.DeleteRawKey(rateLimiterSentinelKey)
 	// Fix the raw key
@@ -240,11 +245,11 @@ func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.Sess
 }
 
 // RemoveSession removes session from storage
-func (b *DefaultSessionManager) RemoveSession(keyName string, hashed bool) {
+func (b *DefaultSessionManager) RemoveSession(keyName string, hashed bool) bool {
 	if hashed {
-		b.store.DeleteRawKey(b.store.GetKeyPrefix() + keyName)
+		return b.store.DeleteRawKey(b.store.GetKeyPrefix() + keyName)
 	} else {
-		b.store.DeleteKey(keyName)
+		return b.store.DeleteKey(keyName)
 	}
 }
 

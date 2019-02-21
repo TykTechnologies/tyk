@@ -15,7 +15,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
-	"github.com/pmylund/go-cache"
+	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -35,7 +35,7 @@ type ChainObject struct {
 	Subrouter      *mux.Router
 }
 
-func prepareStorage() (storage.RedisCluster, storage.RedisCluster, storage.RedisCluster, *RPCStorageHandler, *RPCStorageHandler) {
+func prepareStorage() (storage.RedisCluster, storage.RedisCluster, storage.RedisCluster, RPCStorageHandler, RPCStorageHandler) {
 	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
 	redisOrgStore := storage.RedisCluster{KeyPrefix: "orgkey."}
 	healthStore := storage.RedisCluster{KeyPrefix: "apihealth."}
@@ -44,7 +44,7 @@ func prepareStorage() (storage.RedisCluster, storage.RedisCluster, storage.Redis
 
 	FallbackKeySesionManager.Init(&redisStore)
 
-	return redisStore, redisOrgStore, healthStore, &rpcAuthStore, &rpcOrgStore
+	return redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore
 }
 
 func skipSpecBecauseInvalid(spec *APISpec, logger *logrus.Entry) bool {
@@ -125,6 +125,11 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		logger.Warning("Spec not valid, skipped!")
 		chainDef.Skip = true
 		return &chainDef
+	}
+
+	// Expose API only to looping
+	if spec.Internal {
+		chainDef.Skip = true
 	}
 
 	pathModified := false
@@ -298,7 +303,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		mwAppendEnabled(&chainArray, &TransformMiddleware{baseMid})
 		mwAppendEnabled(&chainArray, &TransformJQMiddleware{baseMid})
 		mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
-		mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: cacheStore})
+		mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: &cacheStore})
 		mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid})
@@ -406,7 +411,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		mwAppendEnabled(&chainArray, &TransformJQMiddleware{baseMid})
 		mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid})
-		mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: cacheStore})
+		mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: &cacheStore})
 		mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
 
@@ -494,17 +499,32 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			r.Method = methodOverride
 		}
 
+		var handler http.Handler
+		if r.URL.Hostname() == "self" {
+			handler = d.SH.Spec.middlewareChain.ThisHandler
+		} else {
+			if targetAPI := fuzzyFindAPI(r.URL.Hostname()); targetAPI != nil {
+				handler = d.SH.Spec.middlewareChain.ThisHandler //targetAPI.middlewareChain.ThisHandler
+			} else {
+				handler := ErrorHandler{*d.SH.Base()}
+				handler.HandleError(w, r, "Can't detect loop target", http.StatusInternalServerError)
+				return
+			}
+		}
+
 		// No need to handle errors, in all error cases limit will be set to 0
 		loopLevelLimit, _ := strconv.Atoi(r.URL.Query().Get("loop_limit"))
+		ctxSetCheckLoopLimits(r, r.URL.Query().Get("check_limits") == "true")
 
 		if origURL := ctxGetOrigRequestURL(r); origURL != nil {
+			r.URL.Host = origURL.Host
 			r.URL.RawQuery = origURL.RawQuery
 			ctxSetOrigRequestURL(r, nil)
 		}
 
 		ctxIncLoopLevel(r, loopLevelLimit)
 
-		d.SH.Spec.middlewareChain.ThisHandler.ServeHTTP(w, r)
+		handler.ServeHTTP(w, r)
 	} else {
 		d.SH.ServeHTTP(w, r)
 	}
@@ -523,6 +543,33 @@ func loadGlobalApps(router *mux.Router) {
 		mainLog.Info("Adding NewRelic instrumentation")
 		AddNewRelicInstrumentation(NewRelicApplication, router)
 	}
+}
+
+func trimCategories(name string) string {
+	if i := strings.Index(name, "#"); i != -1 {
+		return name[:i-1]
+	}
+
+	return name
+}
+
+func fuzzyFindAPI(search string) *APISpec {
+	if search == "" {
+		return nil
+	}
+
+	apisMu.RLock()
+	defer apisMu.RUnlock()
+
+	for _, api := range apisByID {
+		if api.APIID == search ||
+			api.Id.Hex() == search ||
+			replaceNonAlphaNumeric(trimCategories(api.Name)) == search {
+			return api
+		}
+	}
+
+	return nil
 }
 
 // Create the individual API (app) specs based on live configurations and assign middleware
@@ -591,7 +638,7 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 			subrouter = muxer
 		}
 
-		chainObj := processSpec(spec, apisByListen, redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore, subrouter, logrus.NewEntry(log))
+		chainObj := processSpec(spec, apisByListen, &redisStore, &redisOrgStore, &healthStore, &rpcAuthStore, &rpcOrgStore, subrouter, logrus.NewEntry(log))
 		apisMu.Lock()
 		spec.middlewareChain = chainObj
 		apisMu.Unlock()

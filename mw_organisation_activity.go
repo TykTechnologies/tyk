@@ -52,7 +52,7 @@ func (k *OrganizationMonitor) setOrgHasNoSession(val bool) {
 
 func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) {
 	// Skip rate limiting and quotas for looping
-	if ctxLoopLevel(r) > 0 {
+	if !ctxCheckLimits(r) {
 		return nil, http.StatusOK
 	}
 
@@ -112,6 +112,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession use
 		true,
 		&k.Spec.GlobalConfig,
 		k.Spec.APIID,
+		false,
 	)
 
 	sessionLifeTime := orgSession.Lifetime(k.Spec.SessionLifetime)
@@ -242,6 +243,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 		true,
 		&k.Spec.GlobalConfig,
 		k.Spec.APIID,
+		false,
 	)
 
 	sessionLifeTime := session.Lifetime(k.Spec.SessionLifetime)

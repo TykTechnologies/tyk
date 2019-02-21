@@ -304,6 +304,23 @@ const confSchema = `{
 			}
 		}
 	},
+	"dns_cache": {
+		"type": ["object", "null"],
+		"additionalProperties": false,
+		"properties": {
+			"enabled": {
+				"type": "boolean"
+			},
+			"ttl": {
+				"type": "integer",
+				"minimum": -1
+			},
+			"multiple_ips_handle_strategy": {
+				"type": "string",
+				"enum": ["pick_first", "random", "no_cache"]
+			}
+		}
+	},
 	"hide_generator_header": {
 		"type": "boolean"
 	},
@@ -363,6 +380,9 @@ const confSchema = `{
 				"type": "boolean"
 			},
 			"use_ssl_le": {
+				"type": "boolean"
+			},
+			"enable_http2": {
 				"type": "boolean"
 			},
 			"write_timeout": {
@@ -521,6 +541,9 @@ const confSchema = `{
 	},
 	"proxy_default_timeout": {
 		"type": "integer"
+	},
+	"proxy_enable_http2": {
+		"type": "boolean"
 	},
 	"proxy_ssl_insecure_skip_verify": {
 		"type": "boolean"

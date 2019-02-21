@@ -232,7 +232,7 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 
 // ApplyPolicies will check if any policies are loaded. If any are, it
 // will overwrite the session state to use the policy values.
-func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) error {
+func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	rights := session.AccessRights
 	if rights == nil {
 		rights = make(map[string]user.AccessDefinition)
@@ -284,11 +284,14 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 				if accessRights.Limit == nil || *accessRights.Limit == (user.APILimit{}) {
 					// limit was not specified on API level so we will populate it from policy
 					accessRights.Limit = &user.APILimit{
-						QuotaMax:         policy.QuotaMax,
-						QuotaRenewalRate: policy.QuotaRenewalRate,
-						Rate:             policy.Rate,
-						Per:              policy.Per,
-						SetByPolicy:      true,
+						QuotaMax:           policy.QuotaMax,
+						QuotaRenewalRate:   policy.QuotaRenewalRate,
+						Rate:               policy.Rate,
+						Per:                policy.Per,
+						ThrottleInterval:   policy.ThrottleInterval,
+						ThrottleRetryLimit: policy.ThrottleRetryLimit,
+
+						SetByPolicy: true,
 					}
 				}
 
@@ -339,6 +342,8 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 				session.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
 				session.Rate = policy.Rate
 				session.Per = policy.Per
+				session.ThrottleInterval = policy.ThrottleInterval
+				session.ThrottleRetryLimit = policy.ThrottleRetryLimit
 				if policy.LastUpdated != "" {
 					session.LastUpdated = policy.LastUpdated
 				}
@@ -371,6 +376,8 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 			session.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
 			session.Rate = policy.Rate
 			session.Per = policy.Per
+			session.ThrottleInterval = policy.ThrottleInterval
+			session.ThrottleRetryLimit = policy.ThrottleRetryLimit
 			if policy.LastUpdated != "" {
 				session.LastUpdated = policy.LastUpdated
 			}
@@ -430,7 +437,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 		if found {
 			t.Logger().Debug("--> Key found in local cache")
 			session := cachedVal.(user.SessionState)
-			if err := t.ApplyPolicies(key, &session); err != nil {
+			if err := t.ApplyPolicies(&session); err != nil {
 				t.Logger().Error(err)
 				return session, false
 			}
@@ -450,7 +457,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 		}
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
-		if err := t.ApplyPolicies(key, &session); err != nil {
+		if err := t.ApplyPolicies(&session); err != nil {
 			t.Logger().Error(err)
 			return session, false
 		}
@@ -472,7 +479,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 		}
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
-		if err := t.ApplyPolicies(key, &session); err != nil {
+		if err := t.ApplyPolicies(&session); err != nil {
 			t.Logger().Error(err)
 			return session, false
 		}

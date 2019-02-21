@@ -3,7 +3,6 @@ package main
 import (
 	"archive/zip"
 	"bytes"
-	"context"
 	"crypto/tls"
 	"encoding/binary"
 	"encoding/json"
@@ -13,10 +12,8 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -26,8 +23,7 @@ import (
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-	"github.com/miekg/dns"
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -229,10 +225,10 @@ func createPolicy(pGen ...func(p *user.Policy)) string {
 	}
 
 	policiesMu.Lock()
-	policiesByID[pID] = *pol
+	policiesByID[pol.ID] = *pol
 	policiesMu.Unlock()
 
-	return pID
+	return pol.ID
 }
 
 func createJWKToken(jGen ...func(*jwt.Token)) string {
@@ -295,6 +291,7 @@ type tykTestServer struct {
 	cln net.Listener
 	URL string
 
+	testRunner   *test.HTTPTestRunner
 	globalConfig config.Config
 	config       tykTestServerConfig
 }
@@ -334,8 +331,43 @@ func (s *tykTestServer) Start() {
 		listen(s.ln, s.cln, fmt.Errorf("Without goagain"))
 	}
 
-	s.URL = "http://" + s.ln.Addr().String()
 	s.globalConfig = globalConf
+
+	scheme := "http://"
+	if s.globalConfig.HttpServerOptions.UseSSL {
+		scheme = "https://"
+	}
+	s.URL = scheme + s.ln.Addr().String()
+
+	s.testRunner = &test.HTTPTestRunner{
+		RequestBuilder: func(tc *test.TestCase) (*http.Request, error) {
+			tc.BaseURL = s.URL
+			if tc.ControlRequest {
+				if s.config.sepatateControlAPI {
+					tc.BaseURL = scheme + s.cln.Addr().String()
+				} else if s.globalConfig.ControlAPIHostname != "" {
+					tc.Domain = s.globalConfig.ControlAPIHostname
+				}
+			}
+			r, err := test.NewRequest(tc)
+
+			if tc.AdminAuth {
+				r = withAuth(r)
+			}
+
+			if s.config.delay > 0 {
+				tc.Delay = s.config.delay
+			}
+
+			return r, err
+		},
+		Do: test.HttpServerRunner(),
+	}
+}
+
+func (s *tykTestServer) Do(tc test.TestCase) (*http.Response, error) {
+	req, _ := s.testRunner.RequestBuilder(&tc)
+	return s.testRunner.Do(req, &tc)
 }
 
 func (s *tykTestServer) Close() {
@@ -349,86 +381,11 @@ func (s *tykTestServer) Close() {
 	}
 }
 
-func (s *tykTestServer) Do(tc test.TestCase) (*http.Response, error) {
-	scheme := "http://"
-	if s.globalConfig.HttpServerOptions.UseSSL {
-		scheme = "https://"
-	}
-
-	if tc.Domain == "" {
-		tc.Domain = "127.0.0.1"
-	}
-
-	baseUrl := scheme + strings.Replace(s.ln.Addr().String(), "[::]", tc.Domain, 1)
-	baseUrl = strings.Replace(baseUrl, "127.0.0.1", tc.Domain, 1)
-
-	if tc.ControlRequest {
-		if s.config.sepatateControlAPI {
-			baseUrl = scheme + s.cln.Addr().String()
-		} else if s.globalConfig.ControlAPIHostname != "" {
-			baseUrl = strings.Replace(baseUrl, "127.0.0.1", s.globalConfig.ControlAPIHostname, 1)
-		}
-	}
-
-	req := test.NewRequest(tc)
-	req.URL, _ = url.Parse(baseUrl + tc.Path)
-
-	if tc.AdminAuth {
-		req = withAuth(req)
-	}
-
-	if tc.Client == nil {
-		tc.Client = &http.Client{
-			CheckRedirect: func(req *http.Request, via []*http.Request) error {
-				return http.ErrUseLastResponse
-			},
-		}
-	}
-
-	return tc.Client.Do(req)
-}
-
 func (s *tykTestServer) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, error) {
-	var lastResponse *http.Response
-	var lastError error
-
-	for ti, tc := range testCases {
-		lastResponse, lastError = s.Do(tc)
-		tcJSON, _ := json.Marshal(tc)
-
-		if lastError != nil {
-			if tc.ErrorMatch != "" {
-				if !strings.Contains(lastError.Error(), tc.ErrorMatch) {
-					t.Errorf("[%d] Expect error `%s` to contain `%s`. %s", ti, lastError.Error(), tc.ErrorMatch, string(tcJSON))
-				}
-			} else {
-				t.Errorf("[%d] Connection error: %s. %s", ti, lastError.Error(), string(tcJSON))
-			}
-			continue
-		} else if tc.ErrorMatch != "" {
-			t.Error("Expect error.", string(tcJSON))
-			continue
-		}
-
-		respCopy := copyResponse(lastResponse)
-		if lastError = test.AssertResponse(respCopy, tc); lastError != nil {
-			t.Errorf("[%d] %s. %s\n", ti, lastError.Error(), string(tcJSON))
-		}
-
-		delay := tc.Delay
-		if delay == 0 {
-			delay = s.config.delay
-		}
-
-		if delay > 0 {
-			time.Sleep(delay)
-		}
-	}
-
-	return lastResponse, lastError
+	return s.testRunner.Run(t, testCases...)
 }
 
-func (s *tykTestServer) RunExt(t *testing.T, testCases ...test.TestCase) {
+func (s *tykTestServer) RunExt(t testing.TB, testCases ...test.TestCase) {
 	var testMatrix = []struct {
 		goagain          bool
 		overrideDefaults bool
@@ -449,7 +406,7 @@ func (s *tykTestServer) RunExt(t *testing.T, testCases ...test.TestCase) {
 		}
 
 		title := fmt.Sprintf("hotReload: %v, overrideDefaults: %v", m.goagain, m.overrideDefaults)
-		t.Run(title, func(t *testing.T) {
+		t.(*testing.T).Run(title, func(t *testing.T) {
 			s.Run(t, testCases...)
 		})
 	}
@@ -579,65 +536,6 @@ func loadAPI(specs ...*APISpec) (out []*APISpec) {
 
 func buildAndLoadAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 	return loadAPI(buildAPI(apiGens...)...)
-}
-
-var domainsToAddresses = map[string]string{
-	"host1.local.": "127.0.0.1",
-	"host2.local.": "127.0.0.1",
-	"host3.local.": "127.0.0.1",
-}
-
-type dnsMockHandler struct{}
-
-func (d *dnsMockHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
-	msg := dns.Msg{}
-	msg.SetReply(r)
-	switch r.Question[0].Qtype {
-	case dns.TypeA:
-		msg.Authoritative = true
-		domain := msg.Question[0].Name
-
-		address, ok := domainsToAddresses[domain]
-		if !ok {
-			// ^ 				start of line
-			// localhost\.		match literally
-			// ()* 				match between 0 and unlimited times
-			// [[:alnum:]]+\.	match single character in [a-zA-Z0-9] minimum one time and ending in . literally
-			reg := regexp.MustCompile(`^localhost\.([[:alnum:]]+\.)*`)
-			if matched := reg.MatchString(domain); !matched {
-				panic("domain not mocked: " + domain)
-			}
-
-			address = "127.0.0.1"
-		}
-
-		msg.Answer = append(msg.Answer, &dns.A{
-			Hdr: dns.RR_Header{Name: domain, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 60},
-			A:   net.ParseIP(address),
-		})
-	}
-	w.WriteMsg(&msg)
-}
-
-func initDNSMock() {
-	var dnsMock *dns.Server
-	addr, _ := net.ResolveUDPAddr("udp", ":0")
-	conn, _ := net.ListenUDP("udp", addr)
-	dnsMock = &dns.Server{PacketConn: conn}
-	dnsMock.Handler = &dnsMockHandler{}
-	go dnsMock.ActivateAndServe()
-
-	http.DefaultTransport = &http.Transport{
-		DialContext: (&net.Dialer{
-			Resolver: &net.Resolver{
-				PreferGo: true,
-				Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-					d := net.Dialer{}
-					return d.DialContext(ctx, network, dnsMock.PacketConn.LocalAddr().String())
-				},
-			},
-		}).DialContext,
-	}
 }
 
 // Taken from https://medium.com/@mlowicki/http-s-proxy-in-golang-in-less-than-100-lines-of-code-6a51c2f2c38c

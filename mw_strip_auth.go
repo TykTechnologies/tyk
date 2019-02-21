@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/Sirupsen/logrus"
 )
@@ -70,4 +71,23 @@ func (sa *StripAuth) stripFromHeaders(r *http.Request) {
 	}
 
 	r.Header.Del(authHeaderName)
+
+	// Strip Authorization from Cookie Header
+	cookieName := "Cookie"
+	if config.CookieName != "" {
+		cookieName = config.CookieName
+	}
+
+	cookieValue := r.Header.Get(cookieName)
+
+	cookies := strings.Split(r.Header.Get(cookieName), ";")
+	for i, c := range cookies {
+		if strings.HasPrefix(c, authHeaderName) {
+			cookies = append(cookies[:i], cookies[i+1:]...)
+			cookieValue = strings.Join(cookies, ";")
+			r.Header.Set(cookieName, cookieValue)
+			break
+		}
+
+	}
 }

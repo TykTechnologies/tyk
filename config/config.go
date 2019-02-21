@@ -16,6 +16,17 @@ import (
 	"github.com/TykTechnologies/tyk/regexp"
 )
 
+type IPsHandleStrategy string
+
+const (
+	dnsCacheDefaultTtl           = 3600
+	dnsCacheDefaultCheckInterval = 60
+
+	PickFirstStrategy IPsHandleStrategy = "pick_first"
+	RandomStrategy    IPsHandleStrategy = "random"
+	NoCacheStrategy   IPsHandleStrategy = "no_cache"
+)
+
 var log = logger.Get()
 
 var global atomic.Value
@@ -81,6 +92,13 @@ type HealthCheckConfig struct {
 	HealthCheckValueTimeout int64 `json:"health_check_value_timeouts"`
 }
 
+type DnsCacheConfig struct {
+	Enabled                   bool              `json:"enabled"`
+	TTL                       int64             `json:"ttl"`
+	CheckInterval             int64             `json:"-" ignored:"true"` //controls cache cleanup interval. By convention shouldn't be exposed to config or env_variable_setup
+	MultipleIPsHandleStrategy IPsHandleStrategy `json:"multiple_ips_handle_strategy"`
+}
+
 type MonitorConfig struct {
 	EnableTriggerMonitors bool               `json:"enable_trigger_monitors"`
 	Config                WebHookHandlerConf `json:"configuration"`
@@ -125,6 +143,7 @@ type HttpServerOptionsConfig struct {
 	WriteTimeout           int        `json:"write_timeout"`
 	UseSSL                 bool       `json:"use_ssl"`
 	UseLE_SSL              bool       `json:"use_ssl_le"`
+	EnableHttp2            bool       `json:"enable_http2"`
 	SSLInsecureSkipVerify  bool       `json:"ssl_insecure_skip_verify"`
 	EnableWebSockets       bool       `json:"enable_websockets"`
 	Certificates           []CertData `json:"certificates"`
@@ -211,6 +230,7 @@ type Config struct {
 	EnableAnalytics                   bool                                  `json:"enable_analytics"`
 	AnalyticsConfig                   AnalyticsConfigConfig                 `json:"analytics_config"`
 	HealthCheck                       HealthCheckConfig                     `json:"health_check"`
+	DnsCache                          DnsCacheConfig                        `json:"dns_cache"`
 	UseAsyncSessionWrite              bool                                  `json:"optimisations_use_async_session_write"`
 	SessionUpdatePoolSize             int                                   `json:"session_update_pool_size"`
 	SessionUpdateBufferSize           int                                   `json:"session_update_buffer_size"`
@@ -237,7 +257,7 @@ type Config struct {
 	EnforceOrgQuotas                  bool                                  `json:"enforce_org_quotas"`
 	ExperimentalProcessOrgOffThread   bool                                  `json:"experimental_process_org_off_thread"`
 	EnableNonTransactionalRateLimiter bool                                  `json:"enable_non_transactional_rate_limiter"`
-	EnableSentinelRateLImiter         bool                                  `json:"enable_sentinel_rate_limiter"`
+	EnableSentinelRateLimiter         bool                                  `json:"enable_sentinel_rate_limiter"`
 	EnableRedisRollingLimiter         bool                                  `json:"enable_redis_rolling_limiter"`
 	ManagementNode                    bool                                  `json:"management_node"`
 	Monitor                           MonitorConfig                         `json:"monitor"`
@@ -281,9 +301,10 @@ type Config struct {
 	MaxConnTime                       int64                                 `json:"max_conn_time"`
 	ReloadWaitTime                    int                                   `bson:"reload_wait_time" json:"reload_wait_time"`
 	ProxySSLInsecureSkipVerify        bool                                  `json:"proxy_ssl_insecure_skip_verify"`
+	ProxyEnableHttp2                  bool                                  `json:"proxy_enable_http2"`
 	ProxySSLMinVersion                uint16                                `json:"proxy_ssl_min_version"`
 	ProxySSLCipherSuites              []string                              `json:"proxy_ssl_ciphers"`
-	ProxyDefaultTimeout               int                                   `json:"proxy_default_timeout"`
+	ProxyDefaultTimeout               float64                               `json:"proxy_default_timeout"`
 	ProxySSLDisableRenegotiation      bool                                  `json:"proxy_ssl_disable_renegotiation"`
 	LogLevel                          string                                `json:"log_level"`
 	Security                          SecurityConfig                        `json:"security"`
@@ -333,6 +354,12 @@ var Default = Config{
 	},
 	AnalyticsConfig: AnalyticsConfigConfig{
 		IgnoredIPs: make([]string, 0),
+	},
+	DnsCache: DnsCacheConfig{
+		Enabled:                   false,
+		TTL:                       dnsCacheDefaultTtl,
+		CheckInterval:             dnsCacheDefaultCheckInterval,
+		MultipleIPsHandleStrategy: NoCacheStrategy,
 	},
 }
 

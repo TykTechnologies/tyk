@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/TykTechnologies/tyk/request"
 )
@@ -61,7 +62,7 @@ func (k *RateLimitAndQuotaCheck) handleQuotaFailure(r *http.Request, token strin
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	// Skip rate limiting and quotas for looping
-	if ctxLoopLevel(r) > 0 {
+	if !ctxCheckLimits(r) {
 		return nil, http.StatusOK
 	}
 
@@ -78,12 +79,53 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 		!k.Spec.DisableQuota,
 		&k.Spec.GlobalConfig,
 		k.Spec.APIID,
+		false,
 	)
+
+	throttleRetryLimit := session.ThrottleRetryLimit
+	throttleInterval := session.ThrottleInterval
+
+	if len(session.AccessRights) > 0 {
+		if rights, ok := session.AccessRights[k.Spec.APIID]; ok {
+			if rights.Limit != nil {
+				throttleInterval = rights.Limit.ThrottleInterval
+				throttleRetryLimit = rights.Limit.ThrottleRetryLimit
+			}
+		}
+	}
 
 	switch reason {
 	case sessionFailNone:
 	case sessionFailRateLimit:
-		return k.handleRateLimitFailure(r, token)
+		err, errCode := k.handleRateLimitFailure(r, token)
+		if throttleRetryLimit > 0 {
+			for true {
+				ctxIncThrottleLevel(r, throttleRetryLimit)
+				time.Sleep(time.Duration(throttleInterval * float64(time.Second)))
+
+				reason = sessionLimiter.ForwardMessage(
+					r,
+					session,
+					token,
+					storeRef,
+					!k.Spec.DisableRateLimit,
+					!k.Spec.DisableQuota,
+					&k.Spec.GlobalConfig,
+					k.Spec.APIID,
+					true,
+				)
+				if reason == sessionFailNone {
+					return k.ProcessRequest(w, r, nil)
+				}
+
+				if ctxThrottleLevel(r) > throttleRetryLimit {
+					break
+				}
+
+			}
+		}
+		return err, errCode
+
 	case sessionFailQuota:
 		return k.handleQuotaFailure(r, token)
 	default:

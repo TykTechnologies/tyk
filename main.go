@@ -19,7 +19,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/newrelic/go-agent"
+	"golang.org/x/net/http2"
+
+	newrelic "github.com/newrelic/go-agent"
 
 	"github.com/TykTechnologies/tyk/checkup"
 
@@ -32,17 +34,18 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/lonelycode/osin"
-	"github.com/netbrain/goautosocket"
+	gas "github.com/netbrain/goautosocket"
 	"github.com/rs/cors"
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 	"rsc.io/letsencrypt"
 
 	"github.com/TykTechnologies/goagain"
 	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
-	cli "github.com/TykTechnologies/tyk/cli"
+	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/dnscache"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
@@ -97,6 +100,8 @@ var (
 		// TODO: add ~/.config/tyk/tyk.conf here?
 		"/etc/tyk/tyk.conf",
 	}
+
+	dnsCacheManager dnscache.IDnsCacheManager
 )
 
 const (
@@ -128,6 +133,13 @@ func setupGlobals() {
 	reloadMu.Lock()
 	defer reloadMu.Unlock()
 
+	dnsCacheManager = dnscache.NewDnsCacheManager(config.Global().DnsCache.MultipleIPsHandleStrategy)
+	if config.Global().DnsCache.Enabled {
+		dnsCacheManager.InitDNSCaching(
+			time.Duration(config.Global().DnsCache.TTL)*time.Second,
+			time.Duration(config.Global().DnsCache.CheckInterval)*time.Second)
+	}
+
 	mainRouter = mux.NewRouter()
 	controlRouter = mux.NewRouter()
 
@@ -137,7 +149,7 @@ func setupGlobals() {
 
 	// Initialise our Host Checker
 	healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:"}
-	InitHostCheckManager(healthCheckStore)
+	InitHostCheckManager(&healthCheckStore)
 
 	if config.Global().EnableAnalytics && analytics.Store == nil {
 		globalConf := config.Global()
@@ -181,7 +193,7 @@ func setupGlobals() {
 
 	// Get the notifier ready
 	mainLog.Debug("Notifier will not work in hybrid mode")
-	mainNotifierStore := storage.RedisCluster{}
+	mainNotifierStore := &storage.RedisCluster{}
 	mainNotifierStore.Connect()
 	MainNotifier = RedisNotifier{mainNotifierStore, RedisPubSubChannel}
 
@@ -382,6 +394,7 @@ func loadAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/apis/{apiID}", apiHandler).Methods("GET", "POST", "PUT", "DELETE")
 		r.HandleFunc("/health", healthCheckhandler).Methods("GET")
 		r.HandleFunc("/oauth/clients/create", createOauthClient).Methods("POST")
+		r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", oAuthClientHandler).Methods("PUT")
 		r.HandleFunc("/oauth/refresh/{keyName}", invalidateOauthRefresh).Methods("DELETE")
 		r.HandleFunc("/cache/{apiID}", invalidateCacheHandler).Methods("DELETE")
 	} else {
@@ -907,7 +920,7 @@ func getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 			HashKeys:  hashKeys,
 		}
 	}
-	return storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys}
+	return &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys}
 }
 
 func main() {
@@ -956,6 +969,8 @@ func main() {
 		} else {
 			mainLog.Info("Starting control API listener: ", controlListener, err, controlAPIPort)
 		}
+	} else {
+		mainLog.Warn("The control_api_port should be changed for production")
 	}
 
 	start()
@@ -1132,6 +1147,10 @@ func generateListener(listenPort int) (net.Listener, error) {
 			CipherSuites:       getCipherAliases(httpServerOptions.Ciphers),
 		}
 
+		if httpServerOptions.EnableHttp2 {
+			tlsConfig.NextProtos = append(tlsConfig.NextProtos, http2.NextProtoTLS)
+		}
+
 		tlsConfig.GetConfigForClient = getTLSConfigForClient(&tlsConfig, listenPort)
 
 		return tls.Listen("tcp", targetPort, &tlsConfig)
@@ -1183,7 +1202,7 @@ func startDRL() {
 	switch {
 	case config.Global().ManagementNode:
 		return
-	case config.Global().EnableSentinelRateLImiter,
+	case config.Global().EnableSentinelRateLimiter,
 		config.Global().EnableRedisRollingLimiter:
 		mainLog.Warning("The old, non-distributed rate limiter is deprecated and we no longer recommend its use.")
 		return

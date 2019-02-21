@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/buger/jsonparser"
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/murmur3"
 	"github.com/TykTechnologies/tyk/config"
@@ -41,6 +41,7 @@ type Handler interface {
 	Decrement(string)
 	IncrememntWithExpire(string, int64) int64
 	SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{})
+	GetRollingWindow(key string, per int64, pipeline bool) (int, []interface{})
 	GetSet(string) (map[string]string, error)
 	AddToSet(string, string)
 	AppendToSet(string, string)

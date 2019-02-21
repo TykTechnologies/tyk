@@ -5,11 +5,38 @@ import (
 	"strings"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/hashicorp/terraform/flatmap"
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 )
 
-var log = logrus.New()
-var rawLog = logrus.New()
+var (
+	log          = logrus.New()
+	rawLog       = logrus.New()
+	translations = make(map[string]string)
+)
+
+// LoadTranslations takes a map[string]interface and flattens it to map[string]string
+// Because translations have been loaded - we internally override log the formatter
+// Nested entries are accessible using dot notation.
+// example:   `{"foo": {"bar": "baz"}}`
+// flattened: `foo.bar: baz`
+func LoadTranslations(thing map[string]interface{}) {
+	log.Formatter = &TranslationFormatter{new(prefixed.TextFormatter)}
+	translations = flatmap.Flatten(thing)
+}
+
+type TranslationFormatter struct {
+	*prefixed.TextFormatter
+}
+
+func (t *TranslationFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+	if code, ok := entry.Data["code"]; ok {
+		if translation, ok := translations[code.(string)]; ok {
+			entry.Message = translation
+		}
+	}
+	return t.TextFormatter.Format(entry)
+}
 
 type RawFormatter struct{}
 

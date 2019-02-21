@@ -38,7 +38,7 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 	currentSession *user.SessionState,
 	store storage.Handler,
 	globalConf *config.Config,
-	apiLimit *user.APILimit) bool {
+	apiLimit *user.APILimit, dryRun bool) bool {
 
 	var per, rate float64
 
@@ -53,13 +53,19 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 	log.Debug("[RATELIMIT] Inbound raw key is: ", key)
 	log.Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
 	pipeline := globalConf.EnableNonTransactionalRateLimiter
-	ratePerPeriodNow, _ := store.SetRollingWindow(rateLimiterKey, int64(per), "-1", pipeline)
+
+	var ratePerPeriodNow int
+	if dryRun {
+		ratePerPeriodNow, _ = store.GetRollingWindow(rateLimiterKey, int64(per), pipeline)
+	} else {
+		ratePerPeriodNow, _ = store.SetRollingWindow(rateLimiterKey, int64(per), "-1", pipeline)
+	}
 
 	//log.Info("Num Requests: ", ratePerPeriodNow)
 
 	// Subtract by 1 because of the delayed add in the window
 	subtractor := 1
-	if globalConf.EnableSentinelRateLImiter {
+	if globalConf.EnableSentinelRateLimiter {
 		// and another subtraction because of the preemptive limit
 		subtractor = 2
 	}
@@ -68,8 +74,10 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 	//log.Info("break: ", (int(currentSession.Rate) - subtractor))
 	if ratePerPeriodNow > int(rate)-subtractor {
 		// Set a sentinel value with expire
-		if globalConf.EnableSentinelRateLImiter {
-			store.SetRawKey(rateLimiterSentinelKey, "1", int64(per))
+		if globalConf.EnableSentinelRateLimiter {
+			if !dryRun {
+				store.SetRawKey(rateLimiterSentinelKey, "1", int64(per))
+			}
 		}
 		return true
 	}
@@ -89,7 +97,7 @@ const (
 // sessionFailReason if session limits have been exceeded.
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages
 // Per 10 seconds
-func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.SessionState, key string, store storage.Handler, enableRL, enableQ bool, globalConf *config.Config, apiID string) sessionFailReason {
+func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.SessionState, key string, store storage.Handler, enableRL, enableQ bool, globalConf *config.Config, apiID string, dryRun bool) sessionFailReason {
 	if enableRL {
 		// check for limit on API level (set to session by ApplyPolicies)
 		var apiLimit *user.APILimit
@@ -102,7 +110,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			}
 		}
 
-		if globalConf.EnableSentinelRateLImiter {
+		if globalConf.EnableSentinelRateLimiter {
 			rateLimiterKey := RateLimitKeyPrefix + currentSession.KeyHash()
 			rateLimiterSentinelKey := RateLimitKeyPrefix + currentSession.KeyHash() + ".BLOCKED"
 			if apiLimit != nil {
@@ -110,7 +118,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 				rateLimiterSentinelKey = RateLimitKeyPrefix + apiID + "-" + currentSession.KeyHash() + ".BLOCKED"
 			}
 
-			go l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit)
+			go l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun)
 
 			// Check sentinel
 			_, sentinelActive := store.GetRawKey(rateLimiterSentinelKey)
@@ -126,7 +134,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 				rateLimiterSentinelKey = RateLimitKeyPrefix + apiID + "-" + currentSession.KeyHash() + ".BLOCKED"
 			}
 
-			if l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit) {
+			if l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun) {
 				return sessionFailRateLimit
 			}
 		} else {
@@ -156,18 +164,22 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 				rate = uint(DRLManager.CurrentTokenValue)
 			}
 
-			userBucket, err := l.bucketStore.Create(bucketKey,
-				rate,
-				time.Duration(per)*time.Second)
+			userBucket, err := l.bucketStore.Create(bucketKey, rate, time.Duration(per)*time.Second)
 			if err != nil {
 				log.Error("Failed to create bucket!")
 				return sessionFailRateLimit
 			}
 
-			_, errF := userBucket.Add(uint(DRLManager.CurrentTokenValue))
-
-			if errF != nil {
-				return sessionFailRateLimit
+			if dryRun {
+				// if userBucket is empty and not expired.
+				if userBucket.Remaining() == 0 && time.Now().Before(userBucket.Reset()) {
+					return sessionFailRateLimit
+				}
+			} else {
+				_, errF := userBucket.Add(uint(DRLManager.CurrentTokenValue))
+				if errF != nil {
+					return sessionFailRateLimit
+				}
 			}
 		}
 	}

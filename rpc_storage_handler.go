@@ -5,10 +5,11 @@ import (
 	"strings"
 	"time"
 
+	cache "github.com/pmylund/go-cache"
+
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/garyburd/redigo/redis"
-	"github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
@@ -593,6 +594,11 @@ func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, val stri
 
 	return intVal.(int), nil
 
+}
+
+func (r *RPCStorageHandler) GetRollingWindow(keyName string, per int64, pipeline bool) (int, []interface{}) {
+	log.Warning("Not Implemented!")
+	return 0, nil
 }
 
 func (r RPCStorageHandler) GetSet(keyName string) (map[string]string, error) {

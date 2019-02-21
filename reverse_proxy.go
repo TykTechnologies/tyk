@@ -26,8 +26,10 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/net/http2"
+
 	"github.com/Sirupsen/logrus"
-	"github.com/pmylund/go-cache"
+	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -302,18 +304,29 @@ type ReverseProxy struct {
 	ErrorHandler ErrorHandler
 }
 
-func defaultTransport() *http.Transport {
-	// allocate a new one every time for now, to avoid modifying a
-	// global variable for each request's needs (e.g. timeouts).
+func defaultTransport(dialerTimeout float64) *http.Transport {
+	timeout := 30.0
+	if dialerTimeout > 0 {
+		log.Debug("Setting timeout for outbound request to: ", dialerTimeout)
+		timeout = dialerTimeout
+	}
+
+	dialer := &net.Dialer{
+		Timeout:   time.Duration(float64(timeout) * float64(time.Second)),
+		KeepAlive: 30 * time.Second,
+		DualStack: true,
+	}
+	dialContextFunc := dialer.DialContext
+	if dnsCacheManager.IsCacheEnabled() {
+		dialContextFunc = dnsCacheManager.WrapDialer(dialer)
+	}
+
 	return &http.Transport{
-		DialContext: (&net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-			DualStack: true,
-		}).DialContext,
-		MaxIdleConns:        config.Global().MaxIdleConns,
-		MaxIdleConnsPerHost: config.Global().MaxIdleConnsPerHost, // default is 100
-		TLSHandshakeTimeout: 10 * time.Second,
+		DialContext:           dialContextFunc,
+		MaxIdleConns:          config.Global().MaxIdleConns,
+		MaxIdleConnsPerHost:   config.Global().MaxIdleConnsPerHost, // default is 100
+		ResponseHeaderTimeout: time.Duration(dialerTimeout) * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
 	}
 }
 
@@ -378,7 +391,7 @@ func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Reque
 	return resp
 }
 
-func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, int) {
+func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, float64) {
 	if !spec.EnforcedTimeoutEnabled {
 		return false, spec.GlobalConfig.ProxyDefaultTimeout
 	}
@@ -386,7 +399,7 @@ func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request
 	_, versionPaths, _, _ := spec.Version(req)
 	found, meta := spec.CheckSpecMatchesStatus(req, versionPaths, HardTimeout)
 	if found {
-		intMeta := meta.(*int)
+		intMeta := meta.(*float64)
 		log.Debug("HARD TIMEOUT ENFORCED: ", *intMeta)
 		return true, *intMeta
 	}
@@ -440,8 +453,8 @@ func proxyFromAPI(api *APISpec) func(*http.Request) (*url.URL, error) {
 	}
 }
 
-func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *ReverseProxy) http.RoundTripper {
-	transport := defaultTransport() // modifies a newly created transport
+func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p *ReverseProxy) http.RoundTripper {
+	transport := defaultTransport(timeOut) // modifies a newly created transport
 	transport.TLSClientConfig = &tls.Config{}
 	transport.Proxy = proxyFromAPI(p.TykAPISpec)
 
@@ -481,21 +494,15 @@ func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Re
 		transport.TLSClientConfig.Renegotiation = tls.RenegotiateFreelyAsClient
 	}
 
-	// Use the default unless we've modified the timout
-	if timeOut > 0 {
-		log.Debug("Setting timeout for outbound request to: ", timeOut)
-		transport.DialContext = (&net.Dialer{
-			Timeout:   time.Duration(timeOut) * time.Second,
-			KeepAlive: 30 * time.Second,
-		}).DialContext
-		transport.ResponseHeaderTimeout = time.Duration(timeOut) * time.Second
-	}
-
 	transport.DisableKeepAlives = p.TykAPISpec.GlobalConfig.ProxyCloseConnections
 
 	if IsWebsocket(req) {
 		wsTransport := &WSDialer{transport, rw, p.TLSClientConfig}
 		return wsTransport
+	}
+
+	if config.Global().ProxyEnableHttp2 {
+		http2.ConfigureTransport(transport)
 	}
 
 	return transport
@@ -607,10 +614,15 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		// important is "Connection" because we want a persistent
 		// connection, regardless of what the client sent to us.
 		for _, h := range hopHeaders {
-			if outreq.Header.Get(h) != "" {
-				outreq.Header.Del(h)
-				logreq.Header.Del(h)
+			hv := outreq.Header.Get(h)
+			if hv == "" {
+				continue
 			}
+			if h == "Te" && hv == "trailers" {
+				continue
+			}
+			outreq.Header.Del(h)
+			logreq.Header.Del(h)
 		}
 	}
 
@@ -774,8 +786,39 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 
 	copyHeader(rw.Header(), res.Header)
 
+	announcedTrailers := len(res.Trailer)
+	if announcedTrailers > 0 {
+		trailerKeys := make([]string, 0, len(res.Trailer))
+		for k := range res.Trailer {
+			trailerKeys = append(trailerKeys, k)
+		}
+		rw.Header().Add("Trailer", strings.Join(trailerKeys, ", "))
+	}
+
 	rw.WriteHeader(res.StatusCode)
+
+	if len(res.Trailer) > 0 {
+		// Force chunking if we saw a response trailer.
+		// This prevents net/http from calculating the length for short
+		// bodies and adding a Content-Length.
+		if fl, ok := rw.(http.Flusher); ok {
+			fl.Flush()
+		}
+	}
+
 	p.CopyResponse(rw, res.Body)
+
+	if len(res.Trailer) == announcedTrailers {
+		copyHeader(rw.Header(), res.Trailer)
+		return nil
+	}
+
+	for k, vv := range res.Trailer {
+		k = http.TrailerPrefix + k
+		for _, v := range vv {
+			rw.Header().Add(k, v)
+		}
+	}
 	return nil
 }
 

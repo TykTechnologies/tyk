@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
-	"github.com/pmylund/go-cache"
+	jwt "github.com/dgrijalva/jwt-go"
+	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/user"
@@ -325,7 +325,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 				newSession.SetPolicies(polIDs...)
 
 				// multiple policies assigned to a key, check if it is applicable
-				if err := k.ApplyPolicies(sessionID, &newSession); err != nil {
+				if err := k.ApplyPolicies(&newSession); err != nil {
 					k.reportLoginFailure(baseFieldData, r)
 					k.Logger().WithError(err).Error("Could not several policies from scope-claim mapping to JWT to session")
 					return errors.New("Key not authorized: could not apply several policies"), http.StatusForbidden
@@ -390,7 +390,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			}
 			// apply new policy to session and update session
 			session.SetPolicies(policyID)
-			if err := k.ApplyPolicies(sessionID, &session); err != nil {
+			if err := k.ApplyPolicies(&session); err != nil {
 				k.reportLoginFailure(baseFieldData, r)
 				k.Logger().WithError(err).Error("Could not apply new policy from JWT to session")
 				return errors.New("Key not authorized: could not apply new policy"), http.StatusForbidden
@@ -628,6 +628,8 @@ func generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.Se
 	session.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
 	session.Rate = policy.Rate
 	session.Per = policy.Per
+	session.ThrottleInterval = policy.ThrottleInterval
+	session.ThrottleRetryLimit = policy.ThrottleRetryLimit
 	session.QuotaMax = policy.QuotaMax
 	session.QuotaRenewalRate = policy.QuotaRenewalRate
 	session.AccessRights = make(map[string]user.AccessDefinition)

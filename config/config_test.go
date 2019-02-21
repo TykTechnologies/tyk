@@ -1,30 +1,73 @@
 package config
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
 
-func TestWriteDefaultConf(t *testing.T) {
-	conf := &Config{}
-	os.Unsetenv("TYK_GW_LISTENPORT")
-	defer os.Unsetenv("TYK_GW_LISTENPORT")
-	if err := WriteDefault("", conf); err != nil {
-		t.Fatal(err)
+func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
+	cases := []struct {
+		FieldName   string
+		EnvVarName  string
+		FieldGetter func(*Config) interface{}
+
+		defaultValue  interface{}
+		expectedValue interface{}
+	}{
+		{
+			"ListenPort", "TYK_GW_LISTENPORT",
+			func(c *Config) interface{} { return c.ListenPort },
+			8080, 9090,
+		},
+		{
+			"DnsCacheEnabled", "TYK_GW_DNSCACHE_ENABLED",
+			func(c *Config) interface{} { return c.DnsCache.Enabled },
+			false, true,
+		},
+		{
+			"DnsCacheTTL", "TYK_GW_DNSCACHE_TTL",
+			func(c *Config) interface{} { return c.DnsCache.TTL },
+			int64(3600), int64(300),
+		},
+		{
+			"CheckInterval", "TYK_GW_DNSCACHE_CHECKINTERVAL",
+			func(c *Config) interface{} { return c.DnsCache.CheckInterval },
+			int64(60),
+			int64(60), //CheckInterval shouldn't be configured from *.conf and env var
+		},
+		{
+			"CheckMultipleIPsHandleStrategy", "TYK_GW_DNSCACHE_MULTIPLEIPSHANDLESTRATEGY",
+			func(c *Config) interface{} { return c.DnsCache.MultipleIPsHandleStrategy },
+			NoCacheStrategy,
+			RandomStrategy,
+		},
 	}
-	if conf.ListenPort != 8080 {
-		t.Fatalf("Expected ListenPort to be set to its default")
-	}
-	*conf = Config{}
-	os.Setenv("TYK_GW_LISTENPORT", "9090")
-	if err := WriteDefault("", conf); err != nil {
-		t.Fatal(err)
-	}
-	if conf.ListenPort != 9090 {
-		t.Fatalf("Expected ListenPort to be set to 9090")
+
+	for _, tc := range cases {
+		t.Run(tc.FieldName, func(t *testing.T) {
+			conf := &Config{}
+			os.Unsetenv(tc.EnvVarName)
+			defer os.Unsetenv(tc.EnvVarName)
+			if err := WriteDefault("", conf); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(tc.FieldGetter(conf), tc.defaultValue) {
+				t.Fatalf("Expected %v to be set to its default %v, but got %v", tc.FieldName, tc.defaultValue, tc.FieldGetter(conf))
+			}
+			expectedValue := fmt.Sprint(tc.expectedValue)
+			os.Setenv(tc.EnvVarName, expectedValue)
+			if err := WriteDefault("", conf); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(tc.FieldGetter(conf), tc.expectedValue) {
+				t.Fatalf("Expected %s to be set to %v, but got %v", tc.FieldName, tc.expectedValue, tc.FieldGetter(conf))
+			}
+		})
 	}
 }
 

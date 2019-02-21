@@ -11,7 +11,7 @@ import (
 
 	"github.com/garyburd/redigo/redis"
 	"github.com/gorilla/mux"
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 
 	"fmt"
 
@@ -405,6 +405,15 @@ func testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 				Code:      200,
 				BodyMatch: fmt.Sprintf(`"key_hash":"%s"`, myKeyHash),
 			},
+			// Update key by hash value with specifying hashed=true
+			{
+				Method:    "PUT",
+				Path:      "/tyk/keys/" + myKeyHash + "?hashed=true",
+				Data:      string(withAccessJSON),
+				AdminAuth: true,
+				Code:      200,
+				BodyMatch: fmt.Sprintf(`"key":"%s"`, myKeyHash),
+			},
 			// get one key by key name
 			{
 				Method:    "GET",
@@ -736,21 +745,127 @@ func TestGetOAuthClients(t *testing.T) {
 		ClientID:          "test",
 		ClientRedirectURI: "http://localhost",
 		APIID:             "test",
-		PolicyID:          "test",
 		ClientSecret:      "secret",
 	}
 	validOauthRequest, _ := json.Marshal(oauthRequest)
 
-	oauthRequest.APIID = "unknown"
-	wrongAPIOauthRequest, _ := json.Marshal(oauthRequest)
-
 	ts.Run(t, []test.TestCase{
 		{Path: "/tyk/oauth/clients/unknown", AdminAuth: true, Code: 404},
 		{Path: "/tyk/oauth/clients/test", AdminAuth: true, Code: 200, BodyMatch: `[]`},
-		{Method: "POST", Path: "/tyk/oauth/clients/create", AdminAuth: true, Data: string(wrongAPIOauthRequest), Code: 500, BodyMatch: `API doesn't exist`},
 		{Method: "POST", Path: "/tyk/oauth/clients/create", AdminAuth: true, Data: string(validOauthRequest), Code: 200},
 		{Path: "/tyk/oauth/clients/test", AdminAuth: true, Code: 200, BodyMatch: `[{"client_id":"test"`},
 	}...)
+}
+
+func TestCreateOAuthClient(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	buildAndLoadAPI(
+		func(spec *APISpec) {
+			spec.UseOauth2 = true
+		},
+		func(spec *APISpec) {
+			spec.APIID = "non_oauth_api"
+			spec.UseOauth2 = false
+		},
+	)
+
+	createPolicy(func(p *user.Policy) {
+		p.ID = "p1"
+		p.AccessRights = map[string]user.AccessDefinition{
+			"test": {
+				APIID: "test",
+			},
+		}
+	})
+	createPolicy(func(p *user.Policy) {
+		p.ID = "p2"
+		p.AccessRights = map[string]user.AccessDefinition{
+			"test": {
+				APIID: "test",
+			},
+			"abc": {
+				APIID: "abc",
+			},
+		}
+	})
+
+	tests := map[string]struct {
+		req       NewClientRequest
+		code      int
+		bodyMatch string
+	}{
+		"no api_id but policy_id provided": {
+			req: NewClientRequest{
+				ClientID: "client_test1",
+				PolicyID: "p1",
+			},
+			code:      http.StatusOK,
+			bodyMatch: `client_id":"client_test1"`,
+		},
+		"no policy_id but api_id provided": {
+			req: NewClientRequest{
+				ClientID: "client_test2",
+				APIID:    "test",
+			},
+			code:      http.StatusOK,
+			bodyMatch: `client_id":"client_test2"`,
+		},
+		"both api_id and policy_id provided": {
+			req: NewClientRequest{
+				PolicyID: "p1",
+				APIID:    "test",
+			},
+			code:      http.StatusBadRequest,
+			bodyMatch: "both api_id and policy_id specified",
+		},
+		"policy does not exist": {
+			req: NewClientRequest{
+				PolicyID: "unknown",
+			},
+			code:      http.StatusBadRequest,
+			bodyMatch: "Policy doesn't exist",
+		},
+		"API does not exist": {
+			req: NewClientRequest{
+				APIID: "unknown",
+			},
+			code:      http.StatusBadRequest,
+			bodyMatch: "API doesn't exist",
+		},
+		"policy should contain only one API": {
+			req: NewClientRequest{
+				PolicyID: "p2",
+			},
+			code:      http.StatusBadRequest,
+			bodyMatch: "should contain only one API",
+		},
+		"API is not OAuth": {
+			req: NewClientRequest{
+				APIID: "non_oauth_api",
+			},
+			code:      http.StatusBadRequest,
+			bodyMatch: "API is not OAuth2",
+		},
+	}
+
+	for testName, testData := range tests {
+		t.Run(testName, func(t *testing.T) {
+			requestData, _ := json.Marshal(testData.req)
+			ts.Run(
+				t,
+				test.TestCase{
+					Method:    http.MethodPost,
+					Path:      "/tyk/oauth/clients/create",
+					AdminAuth: true,
+					Data:      string(requestData),
+					Code:      testData.code,
+					BodyMatch: testData.bodyMatch,
+				},
+			)
+		})
+	}
 }
 
 func TestGroupResetHandler(t *testing.T) {
