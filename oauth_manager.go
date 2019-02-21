@@ -333,6 +333,13 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 				if !ok {
 					log.WithField("oauthClientID", ar.Client.GetId()).
 						Error("Could not set session meta_data from oauth-client fields, type mismatch")
+				} else {
+					// set session alias to developer email as we do it for regular API keys created for developer
+					if devEmail, found := session.MetaData[keyDataDeveloperEmail].(string); found {
+						session.Alias = devEmail
+						// we don't need it in meta-data as we set it to alias
+						delete(session.MetaData, keyDataDeveloperEmail)
+					}
 				}
 			}
 
