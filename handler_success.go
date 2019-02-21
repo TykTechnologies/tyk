@@ -42,7 +42,8 @@ const (
 )
 
 const (
-	keyDataDeveloperID = "tyk_developer_id"
+	keyDataDeveloperID    = "tyk_developer_id"
+	keyDataDeveloperEmail = "tyk_developer_email"
 )
 
 var (
