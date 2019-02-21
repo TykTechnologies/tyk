@@ -1059,7 +1059,7 @@ func TestCachePostRequest(t *testing.T) {
 	headerCache := map[string]string{"x-tyk-cached-response": "1"}
 
 	ts.Run(t, []test.TestCase{
-		{Method: "POST", Path: "/", HeadersNotMatch: headerCache},
+		{Method: "POST", Path: "/", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
 		{Method: "POST", Path: "/", HeadersMatch: headerCache},
 	}...)
 }
