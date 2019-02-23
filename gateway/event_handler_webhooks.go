@@ -37,6 +37,8 @@ type WebHookHandler struct {
 	conf     config.WebHookHandlerConf
 	template *template.Template // non-nil if Init is run without error
 	store    storage.Handler
+
+	dashboardService DashboardServiceSender
 }
 
 // createConfigObject by default tyk will provide a map[string]interface{} type as a conf, converting it
@@ -105,6 +107,11 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 		log.WithFields(logrus.Fields{
 			"prefix": "webhooks",
 		}).Error("Init failed for this webhook, invalid URL, URL must be absolute")
+	}
+
+	if config.Global().UseDBAppConfigs {
+		dashboardServiceInit()
+		w.dashboardService = DashService
 	}
 
 	return nil
@@ -209,25 +216,33 @@ func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 	if w.WasHookFired(reqChecksum) {
 		return
 	}
-	// Fire web hook routine (setHookFired())
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "webhooks",
 		}).Error("Webhook request failed: ", err)
+	}
+
+	defer resp.Body.Close()
+	content, err := ioutil.ReadAll(resp.Body)
+	if err == nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "webhooks",
+		}).Info(string(content))
 	} else {
-		defer resp.Body.Close()
-		content, err := ioutil.ReadAll(resp.Body)
-		if err == nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "webhooks",
-			}).Debug(string(content))
-		} else {
-			log.WithFields(logrus.Fields{
-				"prefix": "webhooks",
-			}).Error(err)
+		log.WithFields(logrus.Fields{
+			"prefix": "webhooks",
+		}).Error(err)
+	}
+
+	if w.dashboardService != nil && em.Type == EventTriggerExceeded {
+		meta, ok := em.Meta.(EventTriggerExceededMeta)
+		if !ok {
+			return
 		}
+
+		w.dashboardService.NotifyDashboardOfKeyQuotaTrigger(meta)
 	}
 
 	w.setHookFired(reqChecksum)
