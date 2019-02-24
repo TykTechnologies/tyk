@@ -222,18 +222,18 @@ func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 		log.WithFields(logrus.Fields{
 			"prefix": "webhooks",
 		}).Error("Webhook request failed: ", err)
-	}
-
-	defer resp.Body.Close()
-	content, err := ioutil.ReadAll(resp.Body)
-	if err == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "webhooks",
-		}).Info(string(content))
 	} else {
-		log.WithFields(logrus.Fields{
-			"prefix": "webhooks",
-		}).Error(err)
+		defer resp.Body.Close()
+		content, err := ioutil.ReadAll(resp.Body)
+		if err == nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "webhooks",
+			}).Debug(string(content))
+		} else {
+			log.WithFields(logrus.Fields{
+				"prefix": "webhooks",
+			}).Error(err)
+		}
 	}
 
 	if w.dashboardService != nil && em.Type == EventTriggerExceeded {
