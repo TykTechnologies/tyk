@@ -448,7 +448,6 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 		defer ts.Close()
 		defer resetTestConfig()
 
-
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/sample"
 			spec.ConfigData = map[string]interface{}{
