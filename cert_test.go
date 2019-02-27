@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -15,8 +16,14 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
+
+	"google.golang.org/grpc"
+	pb "google.golang.org/grpc/examples/helloworld/helloworld"
+
+	"google.golang.org/grpc/credentials"
 
 	"golang.org/x/net/http2"
 
@@ -699,4 +706,102 @@ func TestHTTP2(t *testing.T) {
 	http2.ConfigureTransport(http2Client.Transport.(*http.Transport))
 
 	ts.Run(t, test.TestCase{Client: http2Client, Path: "", Code: 200, Proto: "HTTP/2.0", BodyMatch: "Hello, I am an HTTP/2 Server"})
+}
+
+// server is used to implement helloworld.GreeterServer.
+type server struct{}
+
+// SayHello implements helloworld.GreeterServer
+func (s *server) SayHello(ctx context.Context, in *pb.HelloRequest) (*pb.HelloReply, error) {
+	log.Printf("Received: %v", in.Name)
+	return &pb.HelloReply{Message: "Hello " + in.Name}, nil
+}
+
+func TestGRPC(t *testing.T) {
+
+	_, _, combinedPEM, _ := genServerCertificate()
+	certID, _ := CertificateManager.Add(combinedPEM, "")
+	defer CertificateManager.Delete(certID)
+
+	// gRPC server
+	s := startGRPCServer(t)
+	defer s.GracefulStop()
+
+	// Tyk
+	globalConf := config.Global()
+	globalConf.ProxySSLInsecureSkipVerify = true
+	globalConf.ProxyEnableHttp2 = true
+	globalConf.HttpServerOptions.EnableHttp2 = true
+	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+	globalConf.HttpServerOptions.UseSSL = true
+	config.SetGlobal(globalConf)
+	defer resetTestConfig()
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	buildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.UseKeylessAccess = true
+		spec.Proxy.TargetURL = "https://localhost:50051"
+	})
+
+	address := strings.TrimPrefix(ts.URL, "https://")
+	name := "Furkan"
+
+	// gRPC client
+	creds := credentials.NewTLS(&tls.Config{
+		InsecureSkipVerify: true,
+	})
+
+	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(creds))
+	if err != nil {
+		t.Fatalf("did not connect: %v", err)
+	}
+	defer conn.Close()
+	c := pb.NewGreeterClient(conn)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	r, err := c.SayHello(ctx, &pb.HelloRequest{Name: name})
+	if err != nil {
+		t.Fatalf("could not greet: %v", err)
+	}
+
+	// Test result
+	expected := "Hello " + name
+	actual := r.Message
+
+	if expected != actual {
+		t.Fatalf("Expected %s, actual %s", expected, actual)
+	}
+}
+
+func startGRPCServer(t *testing.T) *grpc.Server {
+	// Server
+	lis, err := net.Listen("tcp", ":50051")
+	if err != nil {
+		t.Fatalf("failed to listen: %v", err)
+	}
+
+	cert, key, _, _ := genCertificate(&x509.Certificate{})
+	certificate, _ := tls.X509KeyPair(cert, key)
+	creds := credentials.NewServerTLSFromCert(&certificate)
+
+	if err != nil {
+		t.Fatalf("failed to listen: %v", err)
+	}
+
+	s := grpc.NewServer(grpc.Creds(creds))
+
+	pb.RegisterGreeterServer(s, &server{})
+
+	go func() {
+		err := s.Serve(lis)
+		if err != nil {
+			t.Fatalf("failed to serve: %v", err)
+		}
+	}()
+
+	return s
 }

@@ -375,16 +375,18 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 			"Method": "GET",
 			"Headers": {"Accept": "application/json"},
 			"Domain": spec.config_data.base_url,
-			"Resource": "/api/get"
+			"Resource": "/api/get?param1=dummy"
 		}
 
 		var resp = TykMakeHttpRequest(JSON.stringify(newRequest));
-		var useableResponse = JSON.parse(resp);
+		var usableResponse = JSON.parse(resp);
 
-		if(useableResponse.Code > 400) {
-			request.ReturnOverrides.ResponseCode = useableResponse.code
+		if(usableResponse.Code > 400) {
+			request.ReturnOverrides.ResponseCode = usableResponse.code
 			request.ReturnOverrides.ResponseError = "error"
 		}
+
+		request.Body = usableResponse.Body
 
 		return testTykMakeHTTPRequest.ReturnData(request, {})
 	});
@@ -414,6 +416,20 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 		})
 
 		ts.Run(t, test.TestCase{Path: "/sample", Code: 404})
+	})
+
+	t.Run("Endpoint with query", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/sample"
+			spec.ConfigData = map[string]interface{}{
+				"base_url": ts.URL,
+			}
+			spec.CustomMiddlewareBundle = bundle
+		}, func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/api"
+		})
+
+		ts.Run(t, test.TestCase{Path: "/sample", BodyMatch: "/api/get?param1=dummy", Code: 200})
 	})
 }
 

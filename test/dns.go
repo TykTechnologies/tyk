@@ -6,6 +6,7 @@ import (
 	"net"
 	"reflect"
 	"regexp"
+	"strings"
 
 	"time"
 
@@ -20,6 +21,10 @@ var (
 		"host1.local.": {"127.0.0.1"},
 		"host2.local.": {"127.0.0.1"},
 		"host3.local.": {"127.0.0.1"},
+	}
+	DomainsToIgnore = []string{
+		"redis.",
+		"tyk-redis.",
 	}
 )
 
@@ -46,6 +51,25 @@ func (d *dnsMockHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 			m.SetRcode(r, rcode)
 			w.WriteMsg(m)
 			return
+		}
+
+		for _, ignore := range DomainsToIgnore {
+			if strings.HasPrefix(domain, ignore) {
+				resolver := &net.Resolver{}
+				addrs, err := resolver.LookupAddr(context.Background(), domain)
+				if err != nil {
+					m := new(dns.Msg)
+					m.SetRcode(r, dns.RcodeServerFailure)
+					w.WriteMsg(m)
+					return
+				}
+				msg.Answer = append(msg.Answer, &dns.A{
+					Hdr: dns.RR_Header{Name: domain, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 60},
+					A:   net.ParseIP(addrs[0]),
+				})
+				w.WriteMsg(&msg)
+				return
+			}
 		}
 
 		addresses, ok := d.domainsToAddresses[domain]

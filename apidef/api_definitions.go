@@ -119,6 +119,11 @@ type TrackEndpointMeta struct {
 	Method string `bson:"method" json:"method"`
 }
 
+type InternalMeta struct {
+	Path   string `bson:"path" json:"path"`
+	Method string `bson:"method" json:"method"`
+}
+
 type RequestSizeMeta struct {
 	Path      string `bson:"path" json:"path"`
 	Method    string `bson:"method" json:"method"`
@@ -135,6 +140,7 @@ type CircuitBreakerMeta struct {
 
 type StringRegexMap struct {
 	MatchPattern string `bson:"match_rx" json:"match_rx"`
+	Reverse      bool   `bson:"reverse" json:"reverse"`
 	matchRegex   *regexp.Regexp
 }
 
@@ -208,6 +214,7 @@ type ExtendedPathsSet struct {
 	TrackEndpoints          []TrackEndpointMeta   `bson:"track_endpoints" json:"track_endpoints,omitempty"`
 	DoNotTrackEndpoints     []TrackEndpointMeta   `bson:"do_not_track_endpoints" json:"do_not_track_endpoints,omitempty"`
 	ValidateJSON            []ValidatePathMeta    `bson:"validate_json" json:"validate_json,omitempty"`
+	Internal                []InternalMeta        `bson:"internal" json:"internal"`
 }
 
 type VersionInfo struct {
@@ -403,6 +410,7 @@ type APIDefinition struct {
 	CacheOptions              CacheOptions           `bson:"cache_options" json:"cache_options"`
 	SessionLifetime           int64                  `bson:"session_lifetime" json:"session_lifetime"`
 	Active                    bool                   `bson:"active" json:"active"`
+	Internal                  bool                   `bson:"internal" json:"internal"`
 	AuthProvider              AuthProviderMeta       `bson:"auth_provider" json:"auth_provider"`
 	SessionProvider           SessionProviderMeta    `bson:"session_provider" json:"session_provider"`
 	EventHandlers             EventHandlerMetaConfig `bson:"event_handlers" json:"event_handlers"`
@@ -543,25 +551,48 @@ func (a *APIDefinition) DecodeFromDB() {
 	}
 }
 
-func (s *StringRegexMap) Check(value string) string {
+func (s *StringRegexMap) Check(value string) (match string) {
+	if s.matchRegex == nil {
+		return
+	}
+
 	return s.matchRegex.FindString(value)
 }
 
-func (s *StringRegexMap) FindStringSubmatch(value string) []string {
-	return s.matchRegex.FindStringSubmatch(value)
+func (s *StringRegexMap) FindStringSubmatch(value string) (matched bool, match []string) {
+	if s.matchRegex == nil {
+		return
+	}
+
+	match = s.matchRegex.FindStringSubmatch(value)
+	if !s.Reverse {
+		matched = len(match) > 0
+	} else {
+		matched = len(match) == 0
+	}
+
+	return
 }
 
-func (s *StringRegexMap) FindAllStringSubmatch(value string, n int) [][]string {
-	return s.matchRegex.FindAllStringSubmatch(value, n)
+func (s *StringRegexMap) FindAllStringSubmatch(value string, n int) (matched bool, matches [][]string) {
+	matches = s.matchRegex.FindAllStringSubmatch(value, n)
+	if !s.Reverse {
+		matched = len(matches) > 0
+	} else {
+		matched = len(matches) == 0
+	}
+
+	return
 }
 
 func (s *StringRegexMap) Init() error {
 	var err error
 	if s.matchRegex, err = regexp.Compile(s.MatchPattern); err != nil {
 		log.WithError(err).WithField("MatchPattern", s.MatchPattern).
-			Error("Could not compile regexp for StringRegexMap")
+			Error("Could not compile matchRegex for StringRegexMap")
 		return err
 	}
+
 	return nil
 }
 
@@ -621,6 +652,7 @@ func DummyAPI() APIDefinition {
 	}
 	methodTransformMeta := MethodTransformMeta{Path: "path", Method: "method", ToMethod: "tomethod"}
 	trackEndpointMeta := TrackEndpointMeta{Path: "path", Method: "method"}
+	internalMeta := InternalMeta{Path: "path", Method: "method"}
 	validatePathMeta := ValidatePathMeta{Path: "path", Method: "method", Schema: map[string]interface{}{}, SchemaB64: ""}
 	paths := struct {
 		Ignored   []string `bson:"ignored" json:"ignored"`
@@ -654,6 +686,7 @@ func DummyAPI() APIDefinition {
 			MethodTransforms:        []MethodTransformMeta{methodTransformMeta},
 			TrackEndpoints:          []TrackEndpointMeta{trackEndpointMeta},
 			DoNotTrackEndpoints:     []TrackEndpointMeta{trackEndpointMeta},
+			Internal:                []InternalMeta{internalMeta},
 			ValidateJSON:            []ValidatePathMeta{validatePathMeta},
 		},
 	}

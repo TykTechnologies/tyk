@@ -27,6 +27,17 @@ func TestLooping(t *testing.T) {
 			json.Unmarshal([]byte(`{
                 "use_extended_paths": true,
                 "extended_paths": {
+                    "internal": [{
+                        "path": "/get_action",
+                        "method": "GET"
+                    },{
+                        "path": "/post_action",
+                        "method": "POST"
+                    }],
+                    "white_list": [{
+                        "path": "/xml",
+                        "method_actions": {"POST": {"action": "no_action"}}
+                    }],
                     "url_rewrites": [{
                         "path": "/xml",
                         "method": "POST",
@@ -69,6 +80,54 @@ func TestLooping(t *testing.T) {
 
 			// Should rewrite http method, if loop rewrite param passed
 			{Method: "POST", Path: "/xml", Data: getAction, BodyMatch: `"Method":"GET"`},
+
+			// Internal endpoint can be accessed only via looping
+			{Method: "GET", Path: "/get_action", Code: 403},
+
+			{Method: "POST", Path: "/get_action", Code: 403},
+		}...)
+	})
+
+	t.Run("Loop to another API", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = "testid"
+			spec.Name = "hidden api"
+			spec.Proxy.ListenPath = "/somesecret"
+			spec.Internal = true
+		}, func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/test"
+
+			version := spec.VersionData.Versions["v1"]
+			json.Unmarshal([]byte(`{
+                "use_extended_paths": true,
+                "extended_paths": {
+                    "url_rewrites": [{
+                        "path": "/by_name",
+                        "match_pattern": "/by_name(.*)",
+                        "method": "GET",
+                        "rewrite_to": "tyk://hidden api/get"
+                    },{
+                        "path": "/by_id",
+                        "match_pattern": "/by_id(.*)",
+                        "method": "GET",
+                        "rewrite_to": "tyk://testid/get"
+                    },{
+                        "path": "/wrong",
+                        "match_pattern": "/wrong(.*)",
+                        "method": "GET",
+                        "rewrite_to": "tyk://wrong/get"
+                    }]
+                }
+            }`), &version)
+
+			spec.VersionData.Versions["v1"] = version
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/somesecret", Code: 404},
+			{Path: "/test/by_name", Code: 200},
+			{Path: "/test/by_id", Code: 200},
+			{Path: "/test/wrong", Code: 500},
 		}...)
 	})
 

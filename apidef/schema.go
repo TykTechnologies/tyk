@@ -218,8 +218,10 @@ const Schema = `{
             "type": "boolean"
         },
         "active": {
-            "type": "boolean",
-            "id": "http://jsonschema.net/active"
+            "type": "boolean"
+        },
+        "internal": {
+            "type": "boolean"
         },
         "auth": {
             "type": ["object", "null"],
