@@ -118,6 +118,7 @@ func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 		var tempBody interface{}
 		if err := json.Unmarshal(body, &tempBody); err != nil {
 			logger.WithError(err).Error("Error unmarshalling JSON")
+			//todo return error
 		}
 
 		switch tempBody.(type) {
@@ -133,8 +134,12 @@ func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 	}
 
 	if tmeta.TemplateData.EnableSession {
-		session := ctxGetSession(req)
-		bodyData["_tyk_meta"] = session.MetaData
+		if session := ctxGetSession(req); session != nil {
+			bodyData["_tyk_meta"] = session.MetaData
+		} else {
+			logger.Error("Session context was not found.")
+			//todo return error
+		}
 	}
 
 	// Apply to template
