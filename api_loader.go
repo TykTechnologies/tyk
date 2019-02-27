@@ -28,6 +28,7 @@ type ChainObject struct {
 	ListenOn       string
 	ThisHandler    http.Handler
 	RateLimitChain http.Handler
+	Spec           *APISpec
 	RateLimitPath  string
 	Open           bool
 	Index          int
@@ -98,6 +99,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 	var chainDef ChainObject
 	chainDef.Subrouter = subrouter
+	chainDef.Spec = spec
 
 	logger = logger.WithFields(logrus.Fields{
 		"org_id":   spec.OrgID,
@@ -238,9 +240,6 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 			break
 		}
 	}
-
-	// Already vetted
-	spec.target, _ = url.Parse(spec.Proxy.TargetURL)
 
 	var proxy ReturningHttpHandler
 	if enableVersionOverrides {
@@ -530,19 +529,14 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func loadGlobalApps(router *mux.Router) {
+func loadGlobalApps() {
 	// we need to make a full copy of the slice, as loadApps will
 	// use in-place to sort the apis.
 	apisMu.RLock()
 	specs := make([]*APISpec, len(apiSpecs))
 	copy(specs, apiSpecs)
 	apisMu.RUnlock()
-	loadApps(specs, router)
-
-	if config.Global().NewRelic.AppName != "" {
-		mainLog.Info("Adding NewRelic instrumentation")
-		AddNewRelicInstrumentation(NewRelicApplication, router)
-	}
+	loadApps(specs)
 }
 
 func trimCategories(name string) string {
@@ -573,13 +567,7 @@ func fuzzyFindAPI(search string) *APISpec {
 }
 
 // Create the individual API (app) specs based on live configurations and assign middleware
-func loadApps(specs []*APISpec, muxer *mux.Router) {
-	hostname := config.Global().HostName
-	if hostname != "" {
-		muxer = muxer.Host(hostname).Subrouter()
-		mainLog.Info("API hostname set: ", hostname)
-	}
-
+func loadApps(specs []*APISpec) {
 	mainLog.Info("Loading API configurations.")
 
 	tmpSpecRegister := make(map[string]*APISpec)
@@ -594,48 +582,40 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 	})
 
 	// Create a new handler for each API spec
-	loadList := make([]*ChainObject, len(specs))
 	apisByListen := countApisByListenHash(specs)
 
-	// Set up the host sub-routers first, since we need to set up
-	// exactly one per host. If we set up one per API definition,
-	// only one of the APIs will work properly, since the router
-	// doesn't backtrack and will stop at the first host sub-router
-	// match.
-	hostRouters := map[string]*mux.Router{"": muxer}
-	var hosts []string
-	for _, spec := range specs {
-		hosts = append(hosts, spec.Domain)
-	}
-	// Decreasing sort by length and chars, so that the order of
-	// creation of the host sub-routers is deterministic and
-	// consistent with the order of the paths.
-	sort.Slice(hosts, func(i, j int) bool {
-		h1, h2 := hosts[i], hosts[j]
-		if len(h1) != len(h2) {
-			return len(h1) > len(h2)
-		}
-		return h1 > h2
-	})
-	for _, host := range hosts {
-		if !config.Global().EnableCustomDomains {
-			continue // disabled
-		}
-		if hostRouters[host] != nil {
-			continue // already set up a subrouter
-		}
-		mainLog.WithField("domain", host).Info("Sub-router created for domain")
-		hostRouters[host] = muxer.Host(host).Subrouter()
-	}
+	portRouters := map[int]*mux.Router{}
 
-	for i, spec := range specs {
-		subrouter := hostRouters[spec.Domain]
-		if subrouter == nil {
-			mainLog.WithFields(logrus.Fields{
-				"domain": spec.Domain,
-				"api_id": spec.APIID,
-			}).Warning("Trying to load API with Domain when custom domains are disabled.")
-			subrouter = muxer
+	controlAPIPort := config.Global().ControlAPIPort
+	if controlAPIPort == 0 {
+		controlAPIPort = config.Global().ListenPort
+	}
+	router := mux.NewRouter()
+	loadAPIEndpoints(router)
+	portRouters[controlAPIPort] = router
+
+	for _, spec := range specs {
+		port := spec.Proxy.ListenPort
+		if port != 0 {
+			mainLog.Info("API port set: ", spec.Proxy.ListenPort)
+		} else {
+			port = config.Global().ListenPort
+		}
+
+		router := portRouters[port]
+		if router == nil {
+			router = mux.NewRouter()
+			portRouters[port] = router
+		}
+		subrouter := router
+
+		hostname := config.Global().HostName
+		if config.Global().EnableCustomDomains && spec.Domain != "" {
+			hostname = spec.Domain
+		}
+		if hostname != "" {
+			mainLog.Info("API hostname set: ", hostname)
+			subrouter = subrouter.Host(hostname).Subrouter()
 		}
 
 		chainObj := processSpec(spec, apisByListen, &redisStore, &redisOrgStore, &healthStore, &rpcAuthStore, &rpcOrgStore, subrouter, logrus.NewEntry(log))
@@ -645,26 +625,24 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 
 		// TODO: This will not deal with skipped APis well
 		tmpSpecRegister[spec.APIID] = spec
-		loadList[i] = chainObj
-	}
 
-	for _, chainObj := range loadList {
 		if chainObj.Skip {
 			continue
 		}
+
 		if !chainObj.Open {
-			chainObj.Subrouter.Handle(chainObj.RateLimitPath, chainObj.RateLimitChain)
+			subrouter.Handle(chainObj.RateLimitPath, chainObj.RateLimitChain)
 		}
 
-		mainLog.Infof("Processed and listening on: %s%s", chainObj.Domain, chainObj.ListenOn)
-		chainObj.Subrouter.Handle(chainObj.ListenOn, chainObj.ThisHandler)
+		subrouter.Handle(chainObj.ListenOn, chainObj.ThisHandler)
 	}
 
-	// All APIs processed, now we can healthcheck
-	// Add a root message to check all is OK
-	muxer.HandleFunc("/"+config.Global().HealthCheckEndpointName, func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, "Hello Tiki")
-	})
+	usedPorts := []int{}
+	for port, router := range portRouters {
+		usedPorts = append(usedPorts, port)
+		defaultProxyMux.updateRouter(port, router)
+	}
+	defaultProxyMux.cleanup(usedPorts)
 
 	// Swap in the new register
 	apisMu.Lock()

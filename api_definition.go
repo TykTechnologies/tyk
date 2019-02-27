@@ -261,6 +261,8 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 		spec.WhiteListEnabled[v.Name] = whiteListSpecs
 	}
 
+	spec.target, _ = url.Parse(spec.Proxy.TargetURL)
+
 	return spec
 }
 

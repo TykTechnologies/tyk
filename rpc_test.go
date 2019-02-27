@@ -163,10 +163,11 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 	for _, e := range exp {
 		doReload()
 
+		// Exclude control API route
 		rtCnt := 0
-		mainRouter.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
+		router := defaultProxyMux.router(0)
+		router.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
 			rtCnt += 1
-			//fmt.Println(route.GetPathTemplate())
 			return nil
 		})
 
@@ -217,6 +218,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 	t.Run("RPC is live", func(t *testing.T) {
 		rpc := startRPCMock(dispatcher)
 		defer stopRPCMock(rpc)
+
 		ts := newTykTestServer()
 		defer ts.Close()
 

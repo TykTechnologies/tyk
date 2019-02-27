@@ -297,13 +297,13 @@ type tykTestServer struct {
 }
 
 func (s *tykTestServer) Start() {
-	s.ln, _ = generateListener(0)
+	s.ln, _ = defaultProxyMux.generateListener(-1, "")
 	_, port, _ := net.SplitHostPort(s.ln.Addr().String())
 	globalConf := config.Global()
 	globalConf.ListenPort, _ = strconv.Atoi(port)
 
 	if s.config.sepatateControlAPI {
-		s.cln, _ = net.Listen("tcp", "127.0.0.1:0")
+		s.cln, _ = defaultProxyMux.generateListener(-1, "")
 
 		_, port, _ = net.SplitHostPort(s.cln.Addr().String())
 		globalConf.ControlAPIPort, _ = strconv.Atoi(port)
@@ -316,20 +316,17 @@ func (s *tykTestServer) Start() {
 	setupGlobals()
 	// This is emulate calling start()
 	// But this lines is the only thing needed for this tests
-	if config.Global().ControlAPIPort == 0 {
-		loadAPIEndpoints(mainRouter)
-	}
+
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.Global().SupressDefaultOrgStore {
 		DefaultOrgStore.Init(getGlobalStorageHandler("orgkey.", false))
 		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
 	}
 
-	if s.config.hotReload {
-		listen(s.ln, s.cln, nil)
-	} else {
-		listen(s.ln, s.cln, fmt.Errorf("Without goagain"))
-	}
+	defaultProxyMux.serve(globalConf.ListenPort, "")
+	defaultProxyMux.serve(globalConf.ControlAPIPort, "")
+	loadAPIEndpoints(nil)
+	doReload()
 
 	s.globalConfig = globalConf
 
@@ -371,10 +368,9 @@ func (s *tykTestServer) Do(tc test.TestCase) (*http.Response, error) {
 }
 
 func (s *tykTestServer) Close() {
-	s.ln.Close()
+	defaultProxyMux.cleanup(nil)
 
 	if s.config.sepatateControlAPI {
-		s.cln.Close()
 		globalConf := config.Global()
 		globalConf.ControlAPIPort = 0
 		config.SetGlobal(globalConf)

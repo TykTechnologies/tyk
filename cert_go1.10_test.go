@@ -131,18 +131,23 @@ func TestProxyTransport(t *testing.T) {
 
 	//matching ciphers
 	t.Run("Global: Cipher match", func(t *testing.T) {
+		globalConf = config.Global()
 		globalConf.ProxySSLCipherSuites = []string{"TLS_RSA_WITH_AES_128_CBC_SHA"}
 		config.SetGlobal(globalConf)
+
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
 		})
+
 		ts.Run(t, test.TestCase{Path: "/", Code: 200})
 	})
 
 	t.Run("Global: Cipher not match", func(t *testing.T) {
+		globalConf = config.Global()
 		globalConf.ProxySSLCipherSuites = []string{"TLS_RSA_WITH_RC4_128_SHA"}
 		config.SetGlobal(globalConf)
+
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
@@ -151,8 +156,10 @@ func TestProxyTransport(t *testing.T) {
 	})
 
 	t.Run("API: Cipher override", func(t *testing.T) {
+		globalConf = config.Global()
 		globalConf.ProxySSLCipherSuites = []string{"TLS_RSA_WITH_RC4_128_SHA"}
 		config.SetGlobal(globalConf)
+
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
@@ -163,8 +170,10 @@ func TestProxyTransport(t *testing.T) {
 	})
 
 	t.Run("API: MinTLS not match", func(t *testing.T) {
+		globalConf = config.Global()
 		globalConf.ProxySSLMinVersion = 772
 		config.SetGlobal(globalConf)
+
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
@@ -175,8 +184,10 @@ func TestProxyTransport(t *testing.T) {
 	})
 
 	t.Run("API: Invalid proxy", func(t *testing.T) {
+		globalConf = config.Global()
 		globalConf.ProxySSLMinVersion = 771
 		config.SetGlobal(globalConf)
+
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
@@ -189,6 +200,7 @@ func TestProxyTransport(t *testing.T) {
 	})
 
 	t.Run("API: Valid proxy", func(t *testing.T) {
+		globalConf = config.Global()
 		globalConf.ProxySSLMinVersion = 771
 		config.SetGlobal(globalConf)
 

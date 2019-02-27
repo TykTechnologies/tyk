@@ -1,25 +1,21 @@
 package main
 
 import (
-	"crypto/tls"
-	"fmt"
 	"html/template"
 	"io/ioutil"
 	stdlog "log"
 	"log/syslog"
-	"net"
 	"net/http"
-	pprof_http "net/http/pprof"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"runtime/pprof"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
-
-	"golang.org/x/net/http2"
 
 	newrelic "github.com/newrelic/go-agent"
 
@@ -31,15 +27,12 @@ import (
 	"github.com/evalphobia/logrus_sentry"
 	"github.com/facebookgo/pidfile"
 	graylogHook "github.com/gemnasium/logrus-graylog-hook"
-	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
-	"github.com/lonelycode/osin"
 	gas "github.com/netbrain/goautosocket"
 	"github.com/rs/cors"
 	uuid "github.com/satori/go.uuid"
 	"rsc.io/letsencrypt"
 
-	"github.com/TykTechnologies/goagain"
 	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
@@ -81,10 +74,8 @@ var (
 	policiesMu   sync.RWMutex
 	policiesByID = map[string]user.Policy{}
 
-	mainRouter    *mux.Router
-	controlRouter *mux.Router
-	LE_MANAGER    letsencrypt.Manager
-	LE_FIRSTRUN   bool
+	LE_MANAGER  letsencrypt.Manager
+	LE_FIRSTRUN bool
 
 	NodeID string
 
@@ -102,11 +93,6 @@ var (
 	}
 
 	dnsCacheManager dnscache.IDnsCacheManager
-)
-
-const (
-	defReadTimeout  = 120 * time.Second
-	defWriteTimeout = 120 * time.Second
 )
 
 func getApiSpec(apiID string) *APISpec {
@@ -139,9 +125,6 @@ func setupGlobals() {
 			time.Duration(config.Global().DnsCache.TTL)*time.Second,
 			time.Duration(config.Global().DnsCache.CheckInterval)*time.Second)
 	}
-
-	mainRouter = mux.NewRouter()
-	controlRouter = mux.NewRouter()
 
 	if config.Global().EnableAnalytics && config.Global().Storage.Type != "redis" {
 		mainLog.Fatal("Analytics requires Redis Storage backend, please enable Redis in the tyk.conf file.")
@@ -342,137 +325,6 @@ func stripSlashes(next http.Handler) http.Handler {
 	return http.HandlerFunc(fn)
 }
 
-func controlAPICheckClientCertificate(certLevel string, next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if config.Global().Security.ControlAPIUseMutualTLS {
-			if err := CertificateManager.ValidateRequestCertificate(config.Global().Security.Certificates.ControlAPI, r); err != nil {
-				doJSONWrite(w, http.StatusForbidden, apiError(err.Error()))
-				return
-			}
-		}
-
-		next.ServeHTTP(w, r)
-	})
-}
-
-// Set up default Tyk control API endpoints - these are global, so need to be added first
-func loadAPIEndpoints(muxer *mux.Router) {
-	hostname := config.Global().HostName
-	if config.Global().ControlAPIHostname != "" {
-		hostname = config.Global().ControlAPIHostname
-	}
-
-	r := mux.NewRouter()
-	muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
-		stripSlashes(checkIsAPIOwner(controlAPICheckClientCertificate("/gateway/client", InstrumentationMW(r)))),
-	))
-
-	if hostname != "" {
-		muxer = muxer.Host(hostname).Subrouter()
-		mainLog.Info("Control API hostname set: ", hostname)
-	}
-
-	if *cli.HTTPProfile {
-		muxer.HandleFunc("/debug/pprof/profile", pprof_http.Profile)
-		muxer.HandleFunc("/debug/pprof/{_:.*}", pprof_http.Index)
-	}
-
-	r.MethodNotAllowedHandler = MethodNotAllowedHandler{}
-
-	mainLog.Info("Initialising Tyk REST API Endpoints")
-
-	// set up main API handlers
-	r.HandleFunc("/reload/group", groupResetHandler).Methods("GET")
-	r.HandleFunc("/reload", resetHandler(nil)).Methods("GET")
-
-	if !isRPCMode() {
-		r.HandleFunc("/org/keys", orgHandler).Methods("GET")
-		r.HandleFunc("/org/keys/{keyName:[^/]*}", orgHandler).Methods("POST", "PUT", "GET", "DELETE")
-		r.HandleFunc("/keys/policy/{keyName}", policyUpdateHandler).Methods("POST")
-		r.HandleFunc("/keys/create", createKeyHandler).Methods("POST")
-		r.HandleFunc("/apis", apiHandler).Methods("GET", "POST", "PUT", "DELETE")
-		r.HandleFunc("/apis/{apiID}", apiHandler).Methods("GET", "POST", "PUT", "DELETE")
-		r.HandleFunc("/health", healthCheckhandler).Methods("GET")
-		r.HandleFunc("/oauth/clients/create", createOauthClient).Methods("POST")
-		r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", oAuthClientHandler).Methods("PUT")
-		r.HandleFunc("/oauth/refresh/{keyName}", invalidateOauthRefresh).Methods("DELETE")
-		r.HandleFunc("/cache/{apiID}", invalidateCacheHandler).Methods("DELETE")
-	} else {
-		mainLog.Info("Node is slaved, REST API minimised")
-	}
-
-	r.HandleFunc("/debug", traceHandler).Methods("POST")
-
-	r.HandleFunc("/keys", keyHandler).Methods("POST", "PUT", "GET", "DELETE")
-	r.HandleFunc("/keys/{keyName:[^/]*}", keyHandler).Methods("POST", "PUT", "GET", "DELETE")
-	r.HandleFunc("/certs", certHandler).Methods("POST", "GET")
-	r.HandleFunc("/certs/{certID:[^/]*}", certHandler).Methods("POST", "GET", "DELETE")
-	r.HandleFunc("/oauth/clients/{apiID}", oAuthClientHandler).Methods("GET", "DELETE")
-	r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", oAuthClientHandler).Methods("GET", "DELETE")
-	r.HandleFunc("/oauth/clients/{apiID}/{keyName}/tokens", oAuthClientTokensHandler).Methods("GET")
-
-	mainLog.Debug("Loaded API Endpoints")
-}
-
-// checkIsAPIOwner will ensure that the accessor of the tyk API has the
-// correct security credentials - this is a shared secret between the
-// client and the owner and is set in the tyk.conf file. This should
-// never be made public!
-func checkIsAPIOwner(next http.Handler) http.Handler {
-	secret := config.Global().Secret
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tykAuthKey := r.Header.Get("X-Tyk-Authorization")
-		if tykAuthKey != secret {
-			// Error
-			mainLog.Warning("Attempted administrative access with invalid or missing key!")
-
-			doJSONWrite(w, http.StatusForbidden, apiError("Forbidden"))
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
-func generateOAuthPrefix(apiID string) string {
-	return "oauth-data." + apiID + "."
-}
-
-// Create API-specific OAuth handlers and respective auth servers
-func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
-	apiAuthorizePath := spec.Proxy.ListenPath + "tyk/oauth/authorize-client{_:/?}"
-	clientAuthPath := spec.Proxy.ListenPath + "oauth/authorize{_:/?}"
-	clientAccessPath := spec.Proxy.ListenPath + "oauth/token{_:/?}"
-
-	serverConfig := osin.NewServerConfig()
-	serverConfig.ErrorStatusCode = http.StatusForbidden
-	serverConfig.AllowedAccessTypes = spec.Oauth2Meta.AllowedAccessTypes
-	serverConfig.AllowedAuthorizeTypes = spec.Oauth2Meta.AllowedAuthorizeTypes
-	serverConfig.RedirectUriSeparator = config.Global().OauthRedirectUriSeparator
-
-	prefix := generateOAuthPrefix(spec.APIID)
-	storageManager := getGlobalStorageHandler(prefix, false)
-	storageManager.Connect()
-	osinStorage := &RedisOsinStorageInterface{storageManager, spec.SessionManager} //TODO: Needs storage manager from APISpec
-
-	osinServer := TykOsinNewServer(serverConfig, osinStorage)
-
-	oauthManager := OAuthManager{spec, osinServer}
-	oauthHandlers := OAuthHandlers{oauthManager}
-
-	muxer.Handle(apiAuthorizePath, checkIsAPIOwner(allowMethods(oauthHandlers.HandleGenerateAuthCodeData, "POST")))
-	muxer.HandleFunc(clientAuthPath, allowMethods(oauthHandlers.HandleAuthorizePassthrough, "GET", "POST"))
-	muxer.HandleFunc(clientAccessPath, allowMethods(oauthHandlers.HandleAccessRequest, "GET", "POST"))
-
-	return &oauthManager
-}
-
-func addBatchEndpoint(spec *APISpec, muxer *mux.Router) {
-	mainLog.Debug("Batch requests enabled for API")
-	apiBatchPath := spec.Proxy.ListenPath + "tyk/batch/"
-	batchHandler := BatchRequestHandler{API: spec}
-	muxer.HandleFunc(apiBatchPath, batchHandler.HandleBatchRequest)
-}
-
 func loadCustomMiddleware(spec *APISpec) ([]string, apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, apidef.MiddlewareDriver) {
 	mwPaths := []string{}
 	var mwAuthCheckFunc apidef.MiddlewareDefinition
@@ -638,21 +490,9 @@ func doReload() {
 	}
 
 	// We have updated specs, lets load those...
-	mainLog.Info("Preparing new router")
-	newRouter := mux.NewRouter()
-	if config.Global().HttpServerOptions.OverrideDefaults {
-		newRouter.SkipClean(config.Global().HttpServerOptions.SkipURLCleaning)
-	}
-
-	if config.Global().ControlAPIPort == 0 {
-		loadAPIEndpoints(newRouter)
-	}
-
-	loadGlobalApps(newRouter)
+	loadGlobalApps()
 
 	mainLog.Info("API reload complete")
-
-	mainRouter = newRouter
 }
 
 // startReloadChan and reloadDoneChan are used by the two reload loops
@@ -923,6 +763,48 @@ func getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 	return &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys}
 }
 
+func waitForSignal() os.Signal {
+	ch := make(chan os.Signal, 2)
+	signal.Notify(
+		ch,
+		syscall.SIGHUP,
+		syscall.SIGINT,
+		syscall.SIGQUIT,
+		syscall.SIGTERM,
+		syscall.SIGUSR1,
+		syscall.SIGUSR2,
+	)
+	for {
+		sig := <-ch
+		log.Println(sig.String())
+		switch sig {
+
+		// SIGHUP should reload configuration.
+		case syscall.SIGHUP:
+		// TODO: Reload config
+
+		// SIGINT should exit.
+		case syscall.SIGINT:
+			return syscall.SIGINT
+
+		// SIGQUIT should exit gracefully.
+		case syscall.SIGQUIT:
+			return syscall.SIGQUIT
+
+		// SIGTERM should exit.
+		case syscall.SIGTERM:
+			return syscall.SIGTERM
+
+		// SIGUSR1 should reopen logs.
+		case syscall.SIGUSR1:
+
+		// TODO: implement forking
+		case syscall.SIGUSR2:
+			return syscall.SIGUSR2
+		}
+	}
+}
+
 func main() {
 	cli.Init(VERSION, confPaths)
 	cli.Parse()
@@ -937,39 +819,28 @@ func main() {
 		mainLog.Fatalf("Error initialising system: %v", err)
 	}
 
-	var controlListener net.Listener
+	// onFork := func() {
+	// 	mainLog.Warning("PREPARING TO FORK")
 
-	onFork := func() {
-		mainLog.Warning("PREPARING TO FORK")
+	// 	if controlListener != nil {
+	// 		if err := controlListener.Close(); err != nil {
+	// 			mainLog.Error("Control listen handler exit: ", err)
+	// 		}
+	// 		mainLog.Info("Control listen closed")
+	// 	}
 
-		if controlListener != nil {
-			if err := controlListener.Close(); err != nil {
-				mainLog.Error("Control listen handler exit: ", err)
-			}
-			mainLog.Info("Control listen closed")
-		}
+	// 	if config.Global().UseDBAppConfigs {
+	// 		mainLog.Info("Stopping heartbeat")
+	// 		DashService.StopBeating()
+	// 		mainLog.Info("Waiting to de-register")
+	// 		time.Sleep(10 * time.Second)
 
-		if config.Global().UseDBAppConfigs {
-			mainLog.Info("Stopping heartbeat")
-			DashService.StopBeating()
-			mainLog.Info("Waiting to de-register")
-			time.Sleep(10 * time.Second)
+	// 		os.Setenv("TYK_SERVICE_NONCE", ServiceNonce)
+	// 		os.Setenv("TYK_SERVICE_NODEID", NodeID)
+	// 	}
+	// }
 
-			os.Setenv("TYK_SERVICE_NONCE", ServiceNonce)
-			os.Setenv("TYK_SERVICE_NODEID", NodeID)
-		}
-	}
-
-	listener, goAgainErr := goagain.Listener(onFork)
-
-	if controlAPIPort := config.Global().ControlAPIPort; controlAPIPort > 0 {
-		var err error
-		if controlListener, err = generateListener(controlAPIPort); err != nil {
-			mainLog.Fatalf("Error starting control API listener: %s", err)
-		} else {
-			mainLog.Info("Starting control API listener: ", controlListener, err, controlAPIPort)
-		}
-	} else {
+	if config.Global().ControlAPIPort == 0 {
 		mainLog.Warn("The control_api_port should be changed for production")
 	}
 
@@ -1011,35 +882,17 @@ func main() {
 		runtime.SetMutexProfileFraction(1)
 	}
 
-	if goAgainErr != nil {
-		var err error
-		if listener, err = generateListener(config.Global().ListenPort); err != nil {
-			mainLog.Fatalf("Error starting listener: %s", err)
-		}
-
-		listen(listener, controlListener, goAgainErr)
-	} else {
-		listen(listener, controlListener, nil)
-
-		// Kill the parent, now that the child has started successfully.
-		mainLog.Debug("KILLING PARENT PROCESS")
-		if err := goagain.Kill(); err != nil {
-			mainLog.Fatalln(err)
-		}
+	// TODO: replace goagain with something that support multiple listeners
+	// Example: https://gravitational.com/blog/golang-ssh-bastion-graceful-restarts/
+	startServer()
+	if !rpc.IsEmergencyMode() {
+		doReload()
 	}
-
-	// Block the main goroutine awaiting signals.
-	if _, err := goagain.Wait(listener); err != nil {
-		mainLog.Fatalln(err)
-	}
-
-	// Do whatever's necessary to ensure a graceful exit
-	// In this case, we'll simply stop listening and wait one second.
-	if err := listener.Close(); err != nil {
-		mainLog.Error("Listen handler exit: ", err)
-	}
+	waitForSignal()
 
 	mainLog.Info("Stop signal received.")
+
+	defaultProxyMux.cleanup(nil)
 
 	// stop analytics workers
 	if config.Global().EnableAnalytics && analytics.Store == nil {
@@ -1102,9 +955,7 @@ func start() {
 		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
 	}
 
-	if config.Global().ControlAPIPort == 0 {
-		loadAPIEndpoints(mainRouter)
-	}
+	loadAPIEndpoints(nil)
 
 	// Start listening for reload messages
 	if !config.Global().SuppressRedisSignalReload {
@@ -1128,48 +979,6 @@ func start() {
 	// interval counts from the start of one reload to the next.
 	go reloadLoop(time.Tick(time.Second))
 	go reloadQueueLoop()
-}
-
-func generateListener(listenPort int) (net.Listener, error) {
-	listenAddress := config.Global().ListenAddress
-
-	targetPort := listenAddress + ":" + strconv.Itoa(listenPort)
-
-	if httpServerOptions := config.Global().HttpServerOptions; httpServerOptions.UseSSL {
-		mainLog.Info("--> Using SSL (https)")
-
-		tlsConfig := tls.Config{
-			GetCertificate:     dummyGetCertificate,
-			ServerName:         httpServerOptions.ServerName,
-			MinVersion:         httpServerOptions.MinVersion,
-			ClientAuth:         tls.NoClientCert,
-			InsecureSkipVerify: httpServerOptions.SSLInsecureSkipVerify,
-			CipherSuites:       getCipherAliases(httpServerOptions.Ciphers),
-		}
-
-		if httpServerOptions.EnableHttp2 {
-			tlsConfig.NextProtos = append(tlsConfig.NextProtos, http2.NextProtoTLS)
-		}
-
-		tlsConfig.GetConfigForClient = getTLSConfigForClient(&tlsConfig, listenPort)
-
-		return tls.Listen("tcp", targetPort, &tlsConfig)
-	} else if config.Global().HttpServerOptions.UseLE_SSL {
-
-		mainLog.Info("--> Using SSL LE (https)")
-
-		GetLEState(&LE_MANAGER)
-
-		conf := tls.Config{
-			GetCertificate: LE_MANAGER.GetCertificate,
-		}
-		conf.GetConfigForClient = getTLSConfigForClient(&conf, listenPort)
-
-		return tls.Listen("tcp", targetPort, &conf)
-	} else {
-		mainLog.WithField("port", targetPort).Info("--> Standard listener (http)")
-		return net.Listen("tcp", targetPort)
-	}
 }
 
 func dashboardServiceInit() {
@@ -1212,159 +1021,19 @@ func startDRL() {
 	startRateLimitNotifications()
 }
 
-// mainHandler's only purpose is to allow mainRouter to be dynamically replaced
-type mainHandler struct{}
+func startServer() {
+	defaultProxyMux.serve(config.Global().ListenPort, "")
+	defaultProxyMux.serve(config.Global().ControlAPIPort, "")
 
-func (_ mainHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	AddNewRelicInstrumentation(NewRelicApplication, mainRouter)
+	loadAPIEndpoints(nil)
 
-	// make request body to be nopCloser and re-readable before serve it through chain of middlewares
-	nopCloseRequestBody(r)
-
-	mainRouter.ServeHTTP(w, r)
-}
-
-func listen(listener, controlListener net.Listener, err error) {
-
-	readTimeout := defReadTimeout
-	writeTimeout := defWriteTimeout
-
-	targetPort := config.Global().ListenAddress + ":" + strconv.Itoa(config.Global().ListenPort)
-	if config.Global().HttpServerOptions.ReadTimeout > 0 {
-		readTimeout = time.Duration(config.Global().HttpServerOptions.ReadTimeout) * time.Second
-	}
-
-	if config.Global().HttpServerOptions.WriteTimeout > 0 {
-		writeTimeout = time.Duration(config.Global().HttpServerOptions.WriteTimeout) * time.Second
-	}
-
-	if config.Global().ControlAPIPort > 0 {
-		loadAPIEndpoints(controlRouter)
-	}
-
-	// Error not empty if handle reload when SIGUSR2 is received
-	if err != nil {
-		// Listen on a TCP or a UNIX domain socket (TCP here).
-		mainLog.Info("Setting up Server")
-
-		// handle dashboard registration and nonces if available
-		handleDashboardRegistration()
-
-		// Use a custom server so we can control tves
-		if config.Global().HttpServerOptions.OverrideDefaults {
-			mainRouter.SkipClean(config.Global().HttpServerOptions.SkipURLCleaning)
-
-			mainLog.Infof("Custom gateway started (%s)", VERSION)
-
-			mainLog.Warning("HTTP Server Overrides detected, this could destabilise long-running http-requests")
-
-			s := &http.Server{
-				Addr:         targetPort,
-				ReadTimeout:  readTimeout,
-				WriteTimeout: writeTimeout,
-				Handler:      mainHandler{},
-			}
-
-			if config.Global().CloseConnections {
-				s.SetKeepAlivesEnabled(false)
-			}
-
-			// Accept connections in a new goroutine.
-			go s.Serve(listener)
-
-			if controlListener != nil {
-				cs := &http.Server{
-					ReadTimeout:  readTimeout,
-					WriteTimeout: writeTimeout,
-					Handler:      controlRouter,
-				}
-				go cs.Serve(controlListener)
-			}
-		} else {
-			mainLog.Printf("Gateway started (%s)", VERSION)
-
-			s := &http.Server{Handler: mainHandler{}}
-			if config.Global().CloseConnections {
-				s.SetKeepAlivesEnabled(false)
-			}
-
-			go s.Serve(listener)
-
-			if controlListener != nil {
-				go http.Serve(controlListener, controlRouter)
-			}
-		}
-	} else {
-		// handle dashboard registration and nonces if available
-		nonce := os.Getenv("TYK_SERVICE_NONCE")
-		nodeID := os.Getenv("TYK_SERVICE_NODEID")
-		if nonce == "" || nodeID == "" {
-			mainLog.Warning("No nonce found, re-registering")
-			handleDashboardRegistration()
-
-		} else {
-			NodeID = nodeID
-			ServiceNonce = nonce
-			mainLog.Info("State recovered")
-
-			os.Setenv("TYK_SERVICE_NONCE", "")
-			os.Setenv("TYK_SERVICE_NODEID", "")
-		}
-
-		if config.Global().UseDBAppConfigs {
-			dashboardServiceInit()
-			go DashService.StartBeating()
-		}
-
-		if config.Global().HttpServerOptions.OverrideDefaults {
-			mainRouter.SkipClean(config.Global().HttpServerOptions.SkipURLCleaning)
-
-			mainLog.Warning("HTTP Server Overrides detected, this could destabilise long-running http-requests")
-			s := &http.Server{
-				Addr:         ":" + targetPort,
-				ReadTimeout:  readTimeout,
-				WriteTimeout: writeTimeout,
-				Handler:      mainHandler{},
-			}
-
-			if config.Global().CloseConnections {
-				s.SetKeepAlivesEnabled(false)
-			}
-
-			mainLog.Info("Custom gateway started")
-			go s.Serve(listener)
-
-			if controlListener != nil {
-				cs := &http.Server{
-					ReadTimeout:  readTimeout,
-					WriteTimeout: writeTimeout,
-					Handler:      controlRouter,
-				}
-				go cs.Serve(controlListener)
-			}
-		} else {
-			mainLog.Printf("Gateway resumed (%s)", VERSION)
-
-			s := &http.Server{Handler: mainHandler{}}
-			if config.Global().CloseConnections {
-				s.SetKeepAlivesEnabled(false)
-			}
-
-			go s.Serve(listener)
-
-			if controlListener != nil {
-				mainLog.Info("Control API listener started: ", controlListener, controlRouter)
-
-				go http.Serve(controlListener, controlRouter)
-			}
-		}
-
-		mainLog.Info("Resuming on", listener.Addr())
-	}
+	// handle dashboard registration and nonces if available
+	handleDashboardRegistration()
 
 	// at this point NodeID is ready to use by DRL
 	drlOnce.Do(startDRL)
 
+	mainLog.Infof("Tyk Gateway started (%s)", VERSION)
 	address := config.Global().ListenAddress
 	if config.Global().ListenAddress == "" {
 		address = "(open interface)"
@@ -1372,12 +1041,4 @@ func listen(listener, controlListener net.Listener, err error) {
 	mainLog.Info("--> Listening on address: ", address)
 	mainLog.Info("--> Listening on port: ", config.Global().ListenPort)
 	mainLog.Info("--> PID: ", hostDetails.PID)
-
-	mainRouter.HandleFunc("/"+config.Global().HealthCheckEndpointName, func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "Hello Tiki")
-	})
-
-	if !rpc.IsEmergencyMode() {
-		doReload()
-	}
 }

@@ -19,6 +19,7 @@ type TestCase struct {
 	Path            string            `json:",omitempty"`
 	BaseURL         string            `json:",omitempty"`
 	Domain          string            `json:",omitempty"`
+	URI             string            `json:",omitempty"`
 	Proto           string            `json:",omitempty"`
 	Code            int               `json:",omitempty"`
 	Data            interface{}       `json:",omitempty"`
@@ -142,11 +143,19 @@ func NewRequest(tc *TestCase) (req *http.Request, err error) {
 		uri = strings.Replace(uri, "[::]", tc.Domain, 1)
 		uri = strings.Replace(uri, "127.0.0.1", tc.Domain, 1)
 
+		if tc.URI != "" {
+			uri = tc.URI
+		}
+
 		req, err = http.NewRequest(tc.Method, uri, reqBodyReader(tc.Data))
 		if err != nil {
 			return
 		}
 	} else {
+		if tc.URI != "" {
+			uri = tc.URI
+		}
+
 		req = httptest.NewRequest(tc.Method, uri, reqBodyReader(tc.Data))
 	}
 

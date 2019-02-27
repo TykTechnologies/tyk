@@ -146,8 +146,7 @@ func initTestMain(m *testing.M) int {
 	}
 	cli.Init(VERSION, confPaths)
 	initialiseSystem()
-	// Small part of start()
-	loadAPIEndpoints(mainRouter)
+	startServer()
 	if analytics.GeoIPDB == nil {
 		panic("GeoIPDB was not initialized")
 	}
@@ -593,6 +592,8 @@ func TestQuota(t *testing.T) {
 }
 
 func TestAnalytics(t *testing.T) {
+	defer resetTestConfig()
+
 	ts := newTykTestServer(tykTestServerConfig{
 		delay: 20 * time.Millisecond,
 	})
@@ -656,7 +657,6 @@ func TestAnalytics(t *testing.T) {
 	})
 
 	t.Run("Detailed analytics", func(t *testing.T) {
-		defer resetTestConfig()
 		globalConf := config.Global()
 		globalConf.AnalyticsConfig.EnableDetailedRecording = true
 		config.SetGlobal(globalConf)
@@ -700,7 +700,6 @@ func TestAnalytics(t *testing.T) {
 	})
 
 	t.Run("Detailed analytics with cache", func(t *testing.T) {
-		defer resetTestConfig()
 		globalConf := config.Global()
 		globalConf.AnalyticsConfig.EnableDetailedRecording = true
 		config.SetGlobal(globalConf)
