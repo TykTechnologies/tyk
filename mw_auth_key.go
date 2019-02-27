@@ -2,12 +2,19 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/request"
+	"github.com/TykTechnologies/tyk/signature_validator"
+)
+
+const (
+	defaultErrorCode    = http.StatusForbidden
+	defaultErrorMessage = "Not Authorized"
 )
 
 // KeyExists will check if the key being used to access the API is in the request data,
@@ -97,6 +104,66 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 		reportHealthValue(k.Spec, KeyFailure, "1")
 
 		return errors.New("Access to this API has been disallowed"), http.StatusForbidden
+	}
+
+	if config.ValidateSignature != nil {
+		if config.ValidateSignature.SignatureKey == "" {
+			err := errors.New("signature_header_key not set")
+			log.WithError(err).Error("misconfigured api definition")
+			return errors.New("internal server error"), http.StatusInternalServerError
+		}
+
+		if config.ValidateSignature.SessionMetaKey == "" {
+			err := errors.New("auth.validate_signature.session_meta_key not set")
+			log.WithError(err).Error("misconfigured api definition")
+			return errors.New("internal server error"), http.StatusInternalServerError
+		}
+
+		if config.ValidateSignature.Mode == "" {
+			err := errors.New("auth.validate_signature.mode not set")
+			log.WithError(err).Error("misconfigured api definition")
+			return errors.New("internal server error"), http.StatusInternalServerError
+		}
+
+		errorCode := defaultErrorCode
+		if config.ValidateSignature.ErrorCode != 0 {
+			errorCode = config.ValidateSignature.ErrorCode
+		}
+
+		errorMessage := defaultErrorMessage
+		if config.ValidateSignature.ErrorMessage != "" {
+			errorMessage = config.ValidateSignature.ErrorMessage
+		}
+
+		validator := signature_validator.SignatureValidator{}
+
+		if err := validator.Init(config.ValidateSignature.Mode); err != nil {
+			log.WithError(err).Error("misconfigured api definition")
+			return errors.New("internal server error"), http.StatusInternalServerError
+		}
+
+		signatureAttempt := r.Header.Get(config.ValidateSignature.SignatureKey)
+		if signatureAttempt == "" {
+			return errors.New(errorMessage), errorCode
+		}
+
+		sharedSecretIf, ok := session.MetaData[config.ValidateSignature.SessionMetaKey]
+		if !ok {
+			err := errors.New(fmt.Sprintf("session token does not contain shared secret in metadata[%s]", config.ValidateSignature.SessionMetaKey))
+			log.WithError(err).Error("misconfigured api definition")
+			return errors.New("internal server error"), http.StatusInternalServerError
+		}
+
+		sharedSecret, ok := sharedSecretIf.(string)
+		if !ok {
+			err := errors.New("key metadata config error, shared secret not string")
+			log.WithError(err).Error("misconfigured session token")
+			return errors.New("internal server error"), http.StatusInternalServerError
+		}
+
+		if err := validator.Validate(signatureAttempt, key, sharedSecret, config.ValidateSignature.AllowedClockSkew); err != nil {
+			return errors.New(errorMessage), errorCode
+		}
 	}
 
 	// Set session state on context, we will need it later
