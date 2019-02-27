@@ -35,23 +35,7 @@ func (h *HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Respon
 			res.Header.Del(dKey)
 		}
 		for nKey, nVal := range hmeta.AddHeaders {
-
-			context := make(map[string]interface{})
-
-			hmeta.EnableSession = true
-			if hmeta.EnableSession {
-				if session := ctxGetSession(req); session != nil {
-					context["_tyk_meta"] = session.MetaData
-					prefixLen := len("$tyk_meta.")
-					metadaKey := nVal[prefixLen:]
-					if metadataVal, ok := session.MetaData[metadaKey]; ok {
-						nVal = metadataVal.(string)
-					} else {
-						log.Warningf("meta data key '%s'not found", metadaKey)
-					}
-				}
-			}
-			res.Header.Set(nKey, nVal)
+			res.Header.Set(nKey, replaceTykVariables(req, nVal, false))
 		}
 	}
 
@@ -60,7 +44,7 @@ func (h *HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Respon
 		res.Header.Del(n)
 	}
 	for h, v := range h.config.AddHeaders {
-		res.Header.Set(h, v)
+		res.Header.Set(h, replaceTykVariables(req, v, false))
 	}
 
 	return nil

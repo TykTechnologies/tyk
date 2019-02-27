@@ -112,7 +112,6 @@ type HeaderInjectionMeta struct {
 	Path          string            `bson:"path" json:"path"`
 	Method        string            `bson:"method" json:"method"`
 	ActOnResponse bool              `bson:"act_on" json:"act_on"`
-	EnableSession bool              `bson:"enable_session" json:"enable_session"`
 }
 
 type HardTimeoutMeta struct {
