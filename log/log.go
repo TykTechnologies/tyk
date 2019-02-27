@@ -30,6 +30,8 @@ func Get() *logrus.Logger {
 		log.Level = logrus.WarnLevel
 	case "debug":
 		log.Level = logrus.DebugLevel
+	case "panic":
+		log.Level = logrus.PanicLevel
 	default:
 		log.Level = logrus.InfoLevel
 	}

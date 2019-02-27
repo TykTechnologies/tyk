@@ -8,8 +8,9 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/TykTechnologies/tyk/cli"
 	"github.com/lonelycode/gorpc"
+
+	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 )
