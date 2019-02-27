@@ -416,7 +416,6 @@ func loadAPIEndpoints(muxer *mux.Router) {
 	r.HandleFunc("/oauth/clients/{apiID}", oAuthClientHandler).Methods("GET", "DELETE")
 	r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", oAuthClientHandler).Methods("GET", "DELETE")
 	r.HandleFunc("/oauth/clients/{apiID}/{keyName}/tokens", oAuthClientTokensHandler).Methods("GET")
-	r.HandleFunc("/oauth/clients/{apiID}/{keyName}/tokens/paginate", oAuthPaginatedClientTokensHandler).Methods("GET")
 
 	mainLog.Debug("Loaded API Endpoints")
 }

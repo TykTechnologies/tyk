@@ -1560,35 +1560,9 @@ func oAuthClientTokensHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// get tokens from redis
-	tokens, err := apiSpec.OAuthManager.OsinServer.Storage.GetClientTokens(keyName)
-	if err != nil {
-		doJSONWrite(w, http.StatusInternalServerError, apiError("Get client tokens failed"))
-		return
-	}
-
-	doJSONWrite(w, http.StatusOK, tokens)
-}
-
-func oAuthPaginatedClientTokensHandler(w http.ResponseWriter, r *http.Request) {
-	apiID := mux.Vars(r)["apiID"]
-	keyName := mux.Vars(r)["keyName"]
-
-	apiSpec := getApiSpec(apiID)
-	if apiSpec == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"apiID":  apiID,
-			"status": "fail",
-			"client": keyName,
-			"err":    "not found",
-		}).Error("Failed to retrieve OAuth tokens")
-		doJSONWrite(w, http.StatusNotFound, apiError("OAuth Client ID not found"))
-		return
-	}
-
-	page := 1
 	if p := r.URL.Query().Get("page"); p != "" {
+		page := 1
+
 		queryPage, err := strconv.Atoi(p)
 		if err == nil {
 			page = queryPage
@@ -1597,23 +1571,32 @@ func oAuthPaginatedClientTokensHandler(w http.ResponseWriter, r *http.Request) {
 		if page <= 0 {
 			page = 1
 		}
+
+		tokens, totalPages, err := apiSpec.OAuthManager.OsinServer.Storage.GetPaginatedClientTokens(keyName, page)
+		if err != nil {
+			doJSONWrite(w, http.StatusInternalServerError, apiError("Get client tokens failed"))
+			return
+		}
+
+		doJSONWrite(w, http.StatusOK, paginatedOAuthClientTokens{
+			Pagination: paginationStatus{
+				PageSize:  config.Global().PaginationItemsPerPage,
+				PageNum:   page,
+				PageTotal: totalPages,
+			},
+			Tokens: tokens,
+		})
+
+		return
 	}
 
-	// get tokens from redis
-	tokens, totalPages, err := apiSpec.OAuthManager.OsinServer.Storage.GetPaginatedClientTokens(keyName, page)
+	tokens, err := apiSpec.OAuthManager.OsinServer.Storage.GetClientTokens(keyName)
 	if err != nil {
 		doJSONWrite(w, http.StatusInternalServerError, apiError("Get client tokens failed"))
 		return
 	}
 
-	doJSONWrite(w, http.StatusOK, paginatedOAuthClientTokens{
-		Pagination: paginationStatus{
-			PageSize:  config.Global().PaginationItemsPerPage,
-			PageNum:   page,
-			PageTotal: totalPages,
-		},
-		Tokens: tokens,
-	})
+	doJSONWrite(w, http.StatusOK, tokens)
 }
 
 // Get client details
