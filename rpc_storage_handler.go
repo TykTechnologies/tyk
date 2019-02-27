@@ -14,7 +14,7 @@ import (
 	"github.com/garyburd/redigo/redis"
 	"github.com/lonelycode/gorpc"
 	cache "github.com/pmylund/go-cache"
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"

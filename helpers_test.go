@@ -26,7 +26,7 @@ import (
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/websocket"
 	"github.com/miekg/dns"
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 
 	"github.com/gorilla/mux"
 

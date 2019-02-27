@@ -17,7 +17,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/rubyist/circuitbreaker"
+	circuit "github.com/rubyist/circuitbreaker"
 
 	"github.com/TykTechnologies/gojsonschema"
 	"github.com/TykTechnologies/tyk/apidef"
