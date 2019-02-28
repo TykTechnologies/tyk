@@ -1356,8 +1356,8 @@ func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
 
 	ts.Run(t, []test.TestCase{
 		{Headers: map[string]string{"Authorization": sess1token}, Code: http.StatusOK, Path: "/"},
-		{Headers: map[string]string{"Authorization": sess1token}, Code: http.StatusTooManyRequests, Path: "/"},
+		{Headers: map[string]string{"Authorization": sess1token}, Code: http.StatusTooManyRequests, Delay: 100, Path: "/"},
 		{Headers: map[string]string{"Authorization": sess2token}, Code: http.StatusOK, Path: "/"},
-		{Headers: map[string]string{"Authorization": sess2token}, Code: http.StatusTooManyRequests, Path: "/"},
+		{Headers: map[string]string{"Authorization": sess2token}, Code: http.StatusTooManyRequests, Delay: 100, Path: "/"},
 	}...)
 }
