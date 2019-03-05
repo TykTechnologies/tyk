@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"fmt"
 	"net"
 	"net/http"
 	"strconv"
@@ -14,6 +13,7 @@ import (
 
 	"golang.org/x/net/http2"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
 )
 
@@ -35,6 +35,7 @@ type proxy struct {
 	listener   net.Listener
 	port       int
 	protocol   string
+	router     *mux.Router
 	httpServer *http.Server
 }
 
@@ -59,77 +60,7 @@ func (m *proxyMux) getProxy(listenPort int) *proxy {
 	return nil
 }
 
-func (m *proxyMux) router(listenPort int) *mux.Router {
-	if proxy := m.getProxy(listenPort); proxy != nil {
-		return proxy.httpServer.Handler.(*handleWrapper).router
-	}
-
-	return nil
-}
-
-func (m *proxyMux) updateRouter(listenPort int, router *mux.Router) {
-	if proxy := m.getProxy(listenPort); proxy != nil {
-		router.SkipClean(config.Global().HttpServerOptions.SkipURLCleaning)
-		proxy.httpServer.Handler.(*handleWrapper).router = router
-	} else {
-		if err := m.serve(listenPort, ""); err != nil {
-			return
-		}
-
-		m.updateRouter(listenPort, router)
-	}
-}
-
-func (m *proxyMux) serve(listenPort int, protocol string) error {
-	listener, err := m.generateListener(listenPort, protocol)
-	if err != nil {
-		mainLog.WithError(err).Error("Can't start server")
-		return err
-	}
-
-	readTimeout := 120 * time.Second
-	writeTimeout := 120 * time.Second
-
-	if config.Global().HttpServerOptions.ReadTimeout > 0 {
-		readTimeout = time.Duration(config.Global().HttpServerOptions.ReadTimeout) * time.Second
-	}
-
-	if config.Global().HttpServerOptions.WriteTimeout > 0 {
-		writeTimeout = time.Duration(config.Global().HttpServerOptions.WriteTimeout) * time.Second
-	}
-
-	proxy := m.getProxy(listenPort)
-	if proxy.httpServer != nil {
-		return nil
-	}
-
-	router := mux.NewRouter()
-	router.SkipClean(config.Global().HttpServerOptions.SkipURLCleaning)
-
-	addr := config.Global().ListenAddress + ":" + strconv.Itoa(listenPort)
-	proxy.httpServer = &http.Server{
-		Addr:         addr,
-		ReadTimeout:  readTimeout,
-		WriteTimeout: writeTimeout,
-		Handler:      &handleWrapper{router},
-	}
-
-	if config.Global().CloseConnections {
-		proxy.httpServer.SetKeepAlivesEnabled(false)
-	}
-
-	go proxy.httpServer.Serve(listener)
-
-	mainLog.Warning("Started a new server on ", addr)
-
-	return nil
-}
-
-func (m *proxyMux) generateListener(listenPort int, protocol string) (l net.Listener, err error) {
-	m.Lock()
-	defer m.Unlock()
-
-	// Default protocol
+func (m *proxyMux) router(port int, protocol string) *mux.Router {
 	if protocol == "" {
 		if config.Global().HttpServerOptions.UseSSL {
 			protocol = "https"
@@ -138,31 +69,150 @@ func (m *proxyMux) generateListener(listenPort int, protocol string) (l net.List
 		}
 	}
 
-	if listenPort == 0 {
-		listenPort = config.Global().ListenPort
+	if proxy := m.getProxy(port); proxy != nil {
+		if proxy.protocol != protocol {
+			mainLog.WithField("port", port).Warningf("Can't get router for protocol %s, router for protocol %s found", protocol, proxy.protocol)
+			return nil
+		}
+
+		return proxy.router
 	}
 
-	// Special case for tests
-	if listenPort == -1 {
-		listenPort = 0
+	return nil
+}
+
+func (m *proxyMux) setRouter(port int, protocol string, router *mux.Router) {
+	if port == 0 {
+		port = config.Global().ListenPort
 	}
 
-	for _, p := range m.proxies {
-		if p.port == listenPort {
-			if p.protocol != protocol {
-				return nil, fmt.Errorf("Can't use port `%d` for protocol `%s`. Listener with `%s` protocol already exist", p.port, protocol, p.protocol)
-			}
-
-			return p.listener, nil
+	if protocol == "" {
+		if config.Global().HttpServerOptions.UseSSL {
+			protocol = "https"
+		} else {
+			protocol = "http"
 		}
 	}
 
+	router.SkipClean(config.Global().HttpServerOptions.SkipURLCleaning)
+	p := m.getProxy(port)
+	if p == nil {
+		p = &proxy{
+			port:     port,
+			protocol: protocol,
+			router:   router,
+		}
+		m.proxies = append(m.proxies, p)
+	} else {
+		if p.protocol != protocol {
+			mainLog.WithFields(logrus.Fields{
+				"port":     port,
+				"protocol": protocol,
+			}).Warningf("Can't update router. Already found service with another protocol %s", p.protocol)
+			return
+		}
+		p.router = router
+	}
+}
+
+func (m *proxyMux) swap(new *proxyMux) {
+	m.Lock()
+	defer m.Unlock()
+
+	// Shutting down and removing unused listeners/proxies
+	i := 0
+	for _, curP := range m.proxies {
+		match := new.getProxy(curP.port)
+		if match == nil || match.protocol != curP.protocol {
+			mainLog.Infof("Found unused listener at port %d, shutting down", curP.port)
+
+			if curP.httpServer != nil {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+				curP.httpServer.Shutdown(ctx)
+				cancel()
+			} else {
+				curP.listener.Close()
+			}
+		} else {
+			m.proxies[i] = curP
+			i++
+		}
+	}
+	m.proxies = m.proxies[:i]
+
+	// Replacing existing routers or starting new listeners
+	for _, newP := range new.proxies {
+		match := m.getProxy(newP.port)
+		if match == nil {
+			m.proxies = append(m.proxies, newP)
+		} else {
+			match.router = newP.router
+		}
+	}
+
+	m.serve()
+}
+
+func (m *proxyMux) serve() {
+	for _, p := range m.proxies {
+		if p.listener == nil {
+			listener, err := m.generateListener(p.port, p.protocol)
+			if err != nil {
+				mainLog.WithError(err).Error("Can't start listener")
+				continue
+			}
+
+			_, portS, _ := net.SplitHostPort(listener.Addr().String())
+			port, _ := strconv.Atoi(portS)
+			p.port = port
+			p.listener = listener
+		}
+
+		if p.protocol != "http" && p.protocol != "https" {
+			continue
+		}
+
+		// Swap the router without re-creating server
+		if p.httpServer != nil {
+			p.httpServer.Handler.(*handleWrapper).router = p.router
+			continue
+		}
+
+		readTimeout := 120 * time.Second
+		writeTimeout := 120 * time.Second
+
+		if config.Global().HttpServerOptions.ReadTimeout > 0 {
+			readTimeout = time.Duration(config.Global().HttpServerOptions.ReadTimeout) * time.Second
+		}
+
+		if config.Global().HttpServerOptions.WriteTimeout > 0 {
+			writeTimeout = time.Duration(config.Global().HttpServerOptions.WriteTimeout) * time.Second
+		}
+
+		addr := config.Global().ListenAddress + ":" + strconv.Itoa(p.port)
+		p.httpServer = &http.Server{
+			Addr:         addr,
+			ReadTimeout:  readTimeout,
+			WriteTimeout: writeTimeout,
+			Handler:      &handleWrapper{p.router},
+		}
+
+		if config.Global().CloseConnections {
+			p.httpServer.SetKeepAlivesEnabled(false)
+		}
+
+		go p.httpServer.Serve(p.listener)
+	}
+}
+
+func (m *proxyMux) generateListener(listenPort int, protocol string) (l net.Listener, err error) {
 	listenAddress := config.Global().ListenAddress
 
 	targetPort := listenAddress + ":" + strconv.Itoa(listenPort)
 
-	if httpServerOptions := config.Global().HttpServerOptions; httpServerOptions.UseSSL {
-		mainLog.Info("--> Using SSL (https)")
+	if protocol == "https" || protocol == "tcps" {
+		mainLog.Infof("--> Using SSL (%s)", protocol)
+		httpServerOptions := config.Global().HttpServerOptions
 
 		tlsConfig := tls.Config{
 			GetCertificate:     dummyGetCertificate,
@@ -180,67 +230,10 @@ func (m *proxyMux) generateListener(listenPort int, protocol string) (l net.List
 		tlsConfig.GetConfigForClient = getTLSConfigForClient(&tlsConfig, listenPort)
 
 		l, err = tls.Listen("tcp", targetPort, &tlsConfig)
-	} else if config.Global().HttpServerOptions.UseLE_SSL {
-
-		mainLog.Info("--> Using SSL LE (https)")
-
-		GetLEState(&LE_MANAGER)
-
-		conf := tls.Config{
-			GetCertificate: LE_MANAGER.GetCertificate,
-		}
-		conf.GetConfigForClient = getTLSConfigForClient(&conf, listenPort)
-
-		l, err = tls.Listen("tcp", targetPort, &conf)
 	} else {
-		mainLog.WithField("port", targetPort).Info("--> Standard listener (http)")
+		mainLog.WithField("port", targetPort).Infof("--> Standard listener (%s)", protocol)
 		l, err = net.Listen("tcp", targetPort)
 	}
 
-	if err == nil {
-		// Handle 0 port, when it assigned after listener created
-		_, portS, _ := net.SplitHostPort(l.Addr().String())
-		port, _ := strconv.Atoi(portS)
-		m.proxies = append(m.proxies, &proxy{
-			listener: l,
-			port:     port,
-			protocol: protocol,
-		})
-	} else {
-		panic(err.Error())
-	}
-
 	return l, err
-}
-
-func (m *proxyMux) cleanup(usedPorts []int) {
-	m.Lock()
-	defer m.Unlock()
-
-	activeProxies := []*proxy{}
-	for _, p := range m.proxies {
-		found := false
-		for _, port := range usedPorts {
-			if port == p.port {
-				found = true
-				break
-			}
-		}
-
-		if found {
-			activeProxies = append(activeProxies, p)
-			continue
-		}
-
-		mainLog.Infof("Found unused listener at port %d, shutting down", p.port)
-		if p.httpServer != nil {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-			p.httpServer.Shutdown(ctx)
-			cancel()
-		} else {
-			p.listener.Close()
-		}
-	}
-
-	m.proxies = activeProxies
 }

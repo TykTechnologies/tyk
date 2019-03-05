@@ -584,41 +584,34 @@ func loadApps(specs []*APISpec) {
 	// Create a new handler for each API spec
 	apisByListen := countApisByListenHash(specs)
 
-	portRouters := map[int]*mux.Router{}
+	muxer := &proxyMux{}
 
-	controlAPIPort := config.Global().ControlAPIPort
-	if controlAPIPort == 0 {
-		controlAPIPort = config.Global().ListenPort
-	}
 	router := mux.NewRouter()
 	loadAPIEndpoints(router)
-	portRouters[controlAPIPort] = router
+
+	muxer.setRouter(config.Global().ControlAPIPort, "", router)
 
 	for _, spec := range specs {
-		port := spec.Proxy.ListenPort
-		if port != 0 {
+		if spec.Proxy.ListenPort != 0 {
 			mainLog.Info("API port set: ", spec.Proxy.ListenPort)
-		} else {
-			port = config.Global().ListenPort
 		}
 
-		router := portRouters[port]
+		router := muxer.router(spec.Proxy.ListenPort, spec.Proxy.Protocol)
 		if router == nil {
 			router = mux.NewRouter()
-			portRouters[port] = router
 		}
-		subrouter := router
 
 		hostname := config.Global().HostName
 		if config.Global().EnableCustomDomains && spec.Domain != "" {
 			hostname = spec.Domain
 		}
+
 		if hostname != "" {
 			mainLog.Info("API hostname set: ", hostname)
-			subrouter = subrouter.Host(hostname).Subrouter()
+			router = router.Host(hostname).Subrouter()
 		}
 
-		chainObj := processSpec(spec, apisByListen, &redisStore, &redisOrgStore, &healthStore, &rpcAuthStore, &rpcOrgStore, subrouter, logrus.NewEntry(log))
+		chainObj := processSpec(spec, apisByListen, &redisStore, &redisOrgStore, &healthStore, &rpcAuthStore, &rpcOrgStore, router, logrus.NewEntry(log))
 		apisMu.Lock()
 		spec.middlewareChain = chainObj
 		apisMu.Unlock()
@@ -631,18 +624,15 @@ func loadApps(specs []*APISpec) {
 		}
 
 		if !chainObj.Open {
-			subrouter.Handle(chainObj.RateLimitPath, chainObj.RateLimitChain)
+			router.Handle(chainObj.RateLimitPath, chainObj.RateLimitChain)
 		}
 
-		subrouter.Handle(chainObj.ListenOn, chainObj.ThisHandler)
+		router.Handle(chainObj.ListenOn, chainObj.ThisHandler)
+
+		muxer.setRouter(spec.Proxy.ListenPort, spec.Proxy.Protocol, router)
 	}
 
-	usedPorts := []int{}
-	for port, router := range portRouters {
-		usedPorts = append(usedPorts, port)
-		defaultProxyMux.updateRouter(port, router)
-	}
-	defaultProxyMux.cleanup(usedPorts)
+	defaultProxyMux.swap(muxer)
 
 	// Swap in the new register
 	apisMu.Lock()

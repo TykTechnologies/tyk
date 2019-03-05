@@ -27,6 +27,7 @@ import (
 	"github.com/evalphobia/logrus_sentry"
 	"github.com/facebookgo/pidfile"
 	graylogHook "github.com/gemnasium/logrus-graylog-hook"
+	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	gas "github.com/netbrain/goautosocket"
 	"github.com/rs/cors"
@@ -892,7 +893,8 @@ func main() {
 
 	mainLog.Info("Stop signal received.")
 
-	defaultProxyMux.cleanup(nil)
+	// Makes it close all listeners
+	defaultProxyMux.swap(&proxyMux{})
 
 	// stop analytics workers
 	if config.Global().EnableAnalytics && analytics.Store == nil {
@@ -1022,10 +1024,18 @@ func startDRL() {
 }
 
 func startServer() {
-	defaultProxyMux.serve(config.Global().ListenPort, "")
-	defaultProxyMux.serve(config.Global().ControlAPIPort, "")
+	// Ensure that Control listener and default http listener running on first start
+	muxer := &proxyMux{}
 
-	loadAPIEndpoints(nil)
+	router := mux.NewRouter()
+	loadAPIEndpoints(router)
+	muxer.setRouter(config.Global().ControlAPIPort, "", router)
+
+	if muxer.router(config.Global().ListenPort, "") == nil {
+		muxer.setRouter(config.Global().ListenPort, "", mux.NewRouter())
+	}
+
+	defaultProxyMux.swap(muxer)
 
 	// handle dashboard registration and nonces if available
 	handleDashboardRegistration()

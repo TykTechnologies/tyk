@@ -165,7 +165,7 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 
 		// Exclude control API route
 		rtCnt := 0
-		router := defaultProxyMux.router(0)
+		router := defaultProxyMux.router(0, "")
 		router.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
 			rtCnt += 1
 			return nil

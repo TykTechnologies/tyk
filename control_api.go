@@ -21,7 +21,7 @@ func loadAPIEndpoints(router *mux.Router) {
 	}
 
 	if router == nil {
-		router = defaultProxyMux.router(config.Global().ControlAPIPort)
+		router = defaultProxyMux.router(config.Global().ControlAPIPort, "")
 		if router == nil {
 			log.Error("Can't find control API router")
 			return

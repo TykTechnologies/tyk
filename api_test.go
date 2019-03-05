@@ -910,7 +910,7 @@ func TestGroupResetHandler(t *testing.T) {
 	<-didSubscribe
 	req := withAuth(testReq(t, "GET", uri, nil))
 
-	defaultProxyMux.router(0).ServeHTTP(recorder, req)
+	defaultProxyMux.router(0, "").ServeHTTP(recorder, req)
 
 	if recorder.Code != 200 {
 		t.Fatal("Hot reload (group) failed, response code was: ", recorder.Code)
@@ -929,14 +929,14 @@ func TestGroupResetHandler(t *testing.T) {
 }
 
 func TestHotReloadSingle(t *testing.T) {
-	oldRouter := defaultProxyMux.router(0)
+	oldRouter := defaultProxyMux.router(0, "")
 	var wg sync.WaitGroup
 	wg.Add(1)
 	reloadURLStructure(wg.Done)
 	apisByID = map[string]*APISpec{"test": {}}
 	reloadTick <- time.Time{}
 	wg.Wait()
-	if defaultProxyMux.router(0) == oldRouter {
+	if defaultProxyMux.router(0, "") == oldRouter {
 		t.Fatal("router wasn't swapped")
 	}
 }

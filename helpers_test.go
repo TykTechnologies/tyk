@@ -297,17 +297,34 @@ type tykTestServer struct {
 }
 
 func (s *tykTestServer) Start() {
-	s.ln, _ = defaultProxyMux.generateListener(-1, "")
+	protocol := "http"
+
+	if config.Global().HttpServerOptions.UseSSL {
+		protocol = "https"
+	}
+
+	muxer := &proxyMux{}
+
+	s.ln, _ = defaultProxyMux.generateListener(0, protocol)
 	_, port, _ := net.SplitHostPort(s.ln.Addr().String())
 	globalConf := config.Global()
 	globalConf.ListenPort, _ = strconv.Atoi(port)
 
+	muxer.proxies = append(muxer.proxies, &proxy{listener: s.ln, port: globalConf.ListenPort, router: mux.NewRouter(), protocol: protocol})
+
 	if s.config.sepatateControlAPI {
-		s.cln, _ = defaultProxyMux.generateListener(-1, "")
+		s.cln, _ = defaultProxyMux.generateListener(0, protocol)
 
 		_, port, _ = net.SplitHostPort(s.cln.Addr().String())
 		globalConf.ControlAPIPort, _ = strconv.Atoi(port)
+
+		router := mux.NewRouter()
+		loadAPIEndpoints(router)
+
+		muxer.proxies = append(muxer.proxies, &proxy{listener: s.cln, port: globalConf.ControlAPIPort, router: router, protocol: protocol})
 	}
+
+	defaultProxyMux.swap(muxer)
 
 	globalConf.CoProcessOptions = s.config.coprocessConfig
 
@@ -323,9 +340,6 @@ func (s *tykTestServer) Start() {
 		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
 	}
 
-	defaultProxyMux.serve(globalConf.ListenPort, "")
-	defaultProxyMux.serve(globalConf.ControlAPIPort, "")
-	loadAPIEndpoints(nil)
 	doReload()
 
 	s.globalConfig = globalConf
@@ -368,7 +382,7 @@ func (s *tykTestServer) Do(tc test.TestCase) (*http.Response, error) {
 }
 
 func (s *tykTestServer) Close() {
-	defaultProxyMux.cleanup(nil)
+	defaultProxyMux.swap(&proxyMux{})
 
 	if s.config.sepatateControlAPI {
 		globalConf := config.Global()
