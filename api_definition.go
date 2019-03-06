@@ -30,8 +30,7 @@ import (
 )
 
 const (
-	LDAPStorageEngine apidef.StorageEngineCode = "ldap"
-	RPCStorageEngine  apidef.StorageEngineCode = "rpc"
+	RPCStorageEngine apidef.StorageEngineCode = "rpc"
 )
 
 // Constants used by the version check middleware

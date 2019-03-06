@@ -106,13 +106,12 @@ func traceHandler(w http.ResponseWriter, r *http.Request) {
 	logger.Level = logrus.DebugLevel
 	logger.Out = &logStorage
 
-	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore := prepareStorage()
 	subrouter := mux.NewRouter()
 
 	loader := &APIDefinitionLoader{}
 	spec := loader.MakeSpec(traceReq.Spec, logrus.NewEntry(logger))
 
-	chainObj := processSpec(spec, nil, &redisStore, &redisOrgStore, &healthStore, &rpcAuthStore, &rpcOrgStore, subrouter, logrus.NewEntry(logger))
+	chainObj := processSpec(spec, nil, subrouter, logrus.NewEntry(logger))
 
 	if chainObj.ThisHandler == nil {
 		doJSONWrite(w, http.StatusBadRequest, traceResponse{Message: "error", Logs: logStorage.String()})

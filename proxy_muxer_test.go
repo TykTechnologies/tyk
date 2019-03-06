@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -54,7 +55,7 @@ func TestMultiPortHTTP(t *testing.T) {
 		}...)
 	})
 
-	t.Run("Multiple different protocol, differnt port", func(t *testing.T) {
+	t.Run("Multiple different protocol, different port", func(t *testing.T) {
 		_, _, combinedPEM, _ := genServerCertificate()
 		serverCertID, _ := CertificateManager.Add(combinedPEM, "")
 		defer CertificateManager.Delete(serverCertID)
@@ -76,6 +77,38 @@ func TestMultiPortHTTP(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 			{Path: "/test1", Code: 200},
 			{URI: "https://localhost:30001/test2", Client: client, Code: 200},
+		}...)
+	})
+
+	t.Run("Multiple different protocol, different port, default https", func(t *testing.T) {
+		globalConf := config.Global()
+		globalConf.HttpServerOptions.UseSSL = true
+		config.SetGlobal(globalConf)
+		defer resetTestConfig()
+
+		ts := newTykTestServer()
+		defer ts.Close()
+
+		_, _, combinedPEM, _ := genServerCertificate()
+		serverCertID, _ := CertificateManager.Add(combinedPEM, "")
+		defer CertificateManager.Delete(serverCertID)
+
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/test1"
+			spec.Certificates = []string{serverCertID}
+		}, func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/test2"
+			spec.Proxy.Protocol = "http"
+			spec.Proxy.ListenPort = 30001
+		})
+
+		client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		}}}
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/test1", Client: client, Code: 200},
+			{URI: "http://localhost:30001/test2", Code: 200},
 		}...)
 	})
 }
