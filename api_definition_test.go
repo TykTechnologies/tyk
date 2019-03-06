@@ -78,6 +78,32 @@ func TestURLRewrites(t *testing.T) {
 			{Path: "/rewrite", Code: http.StatusOK, BodyMatch: `"URI":"/get?just_rewrite"`},
 		}...)
 	})
+
+	t.Run("ListenPath match with url_rewrites", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.StripListenPath = true
+			spec.Proxy.ListenPath = "/my/1.0/api"
+			spec.EnableContextVars = true
+			updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				json.Unmarshal([]byte(`[
+                        {
+                            "path": "/my/\\d.\\d/api",
+							"method": "GET",
+                			"match_pattern": "/my/\\d.\\d/api",
+                			"rewrite_to": "$tyk_context.headers_X_My_Header",
+                			"triggers": [],
+                			"MatchRegexp": null
+						}
+				]`), &v.ExtendedPaths.URLRewrite)
+			})
+		})
+
+		headers := map[string]string{"X-My-Header": "somewhere"}
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/my/1.0/api", Code: http.StatusOK, Headers: headers, BodyMatch: `"URI":"/somewhere"`},
+		}...)
+	})
 }
 
 func TestWhitelist(t *testing.T) {
@@ -332,7 +358,6 @@ func TestWhitelistMethodWithAdditionalMiddleware(t *testing.T) {
 
 		//headers := map[string]string{"foo": "bar"}
 		ts.Run(t, []test.TestCase{
-
 			//Should get original upstream response
 			//{Method: "GET", Path: "/get", Code: http.StatusOK, HeadersMatch: headers},
 			//Reject not whitelisted (but know by upstream) path
