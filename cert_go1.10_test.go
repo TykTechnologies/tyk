@@ -111,6 +111,35 @@ func TestPublicKeyPinning(t *testing.T) {
 
 		ts.Run(t, test.TestCase{Code: 500})
 	})
+
+	t.Run("TCP proxying", func(t *testing.T) {
+		tcpUpstream := test.TcpMock(true, func(in []byte, err error) (out []byte) {
+			return in
+		})
+		defer tcpUpstream.Close()
+
+		t.Run("Pub key not match", func(t *testing.T) {
+			ts := newTykTestServer()
+			defer ts.Close()
+
+			buildAndLoadAPI(func(spec *APISpec) {
+				spec.ListenPort = 30001
+				spec.Protocol = "tcp"
+				spec.Proxy.ListenPath = "/"
+				spec.PinnedPublicKeys = map[string]string{"*": "wrong"}
+				spec.Proxy.TargetURL = "tls://" + tcpUpstream.Addr().String()
+			})
+
+			tesetRunner := test.TCPTestRunner{
+				Target: replacePort(ts.Addr, 30001),
+			}
+
+			tesetRunner.Run(t, []test.TCPTestCase{
+				{"write", "ping", ""},
+				{"read", "", "connection reset by peer"},
+			}...)
+		})
+	})
 }
 
 func TestProxyTransport(t *testing.T) {

@@ -453,18 +453,45 @@ func proxyFromAPI(api *APISpec) func(*http.Request) (*url.URL, error) {
 	}
 }
 
+func tlsClientConfig(s *APISpec) *tls.Config {
+	config := &tls.Config{}
+
+	if s.GlobalConfig.ProxySSLInsecureSkipVerify {
+		config.InsecureSkipVerify = true
+	}
+
+	if s.Proxy.Transport.SSLInsecureSkipVerify {
+		config.InsecureSkipVerify = true
+	}
+
+	if s.GlobalConfig.ProxySSLMinVersion > 0 {
+		config.MinVersion = s.GlobalConfig.ProxySSLMinVersion
+	}
+
+	if s.Proxy.Transport.SSLMinVersion > 0 {
+		config.MinVersion = s.Proxy.Transport.SSLMinVersion
+	}
+
+	if len(s.GlobalConfig.ProxySSLCipherSuites) > 0 {
+		config.CipherSuites = getCipherAliases(s.GlobalConfig.ProxySSLCipherSuites)
+	}
+
+	if len(s.Proxy.Transport.SSLCipherSuites) > 0 {
+		config.CipherSuites = getCipherAliases(s.Proxy.Transport.SSLCipherSuites)
+	}
+
+	if !s.GlobalConfig.ProxySSLDisableRenegotiation {
+		config.Renegotiation = tls.RenegotiateFreelyAsClient
+	}
+
+	return config
+}
+
 func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p *ReverseProxy) http.RoundTripper {
 	transport := defaultTransport(timeOut) // modifies a newly created transport
-	transport.TLSClientConfig = &tls.Config{}
+	transport.TLSClientConfig = tlsClientConfig(p.TykAPISpec)
 	transport.Proxy = proxyFromAPI(p.TykAPISpec)
-
-	if config.Global().ProxySSLInsecureSkipVerify {
-		transport.TLSClientConfig.InsecureSkipVerify = true
-	}
-
-	if p.TykAPISpec.Proxy.Transport.SSLInsecureSkipVerify {
-		transport.TLSClientConfig.InsecureSkipVerify = true
-	}
+	transport.DisableKeepAlives = p.TykAPISpec.GlobalConfig.ProxyCloseConnections
 
 	// When request routed through the proxy `DialTLS` is not used, and only VerifyPeerCertificate is supported
 	// The reason behind two separate checks is that `DialTLS` supports specifying public keys per hostname, and `VerifyPeerCertificate` only global ones, e.g. `*`
@@ -473,28 +500,6 @@ func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p
 	} else {
 		transport.DialTLS = dialTLSPinnedCheck(p.TykAPISpec, transport.TLSClientConfig)
 	}
-
-	if p.TykAPISpec.GlobalConfig.ProxySSLMinVersion > 0 {
-		transport.TLSClientConfig.MinVersion = p.TykAPISpec.GlobalConfig.ProxySSLMinVersion
-	}
-
-	if p.TykAPISpec.Proxy.Transport.SSLMinVersion > 0 {
-		transport.TLSClientConfig.MinVersion = p.TykAPISpec.Proxy.Transport.SSLMinVersion
-	}
-
-	if len(p.TykAPISpec.GlobalConfig.ProxySSLCipherSuites) > 0 {
-		transport.TLSClientConfig.CipherSuites = getCipherAliases(p.TykAPISpec.GlobalConfig.ProxySSLCipherSuites)
-	}
-
-	if len(p.TykAPISpec.Proxy.Transport.SSLCipherSuites) > 0 {
-		transport.TLSClientConfig.CipherSuites = getCipherAliases(p.TykAPISpec.Proxy.Transport.SSLCipherSuites)
-	}
-
-	if !config.Global().ProxySSLDisableRenegotiation {
-		transport.TLSClientConfig.Renegotiation = tls.RenegotiateFreelyAsClient
-	}
-
-	transport.DisableKeepAlives = p.TykAPISpec.GlobalConfig.ProxyCloseConnections
 
 	if IsWebsocket(req) {
 		wsTransport := &WSDialer{transport, rw, p.TLSClientConfig}

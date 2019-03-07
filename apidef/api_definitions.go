@@ -327,6 +327,8 @@ type APIDefinition struct {
 	Id               bson.ObjectId `bson:"_id,omitempty" json:"id,omitempty"`
 	Name             string        `bson:"name" json:"name"`
 	Slug             string        `bson:"slug" json:"slug"`
+	ListenPort       int           `bson:"listen_port" json:"listen_port"`
+	Protocol         string        `bson:"protocol" json:"protocol"`
 	APIID            string        `bson:"api_id" json:"api_id"`
 	OrgID            string        `bson:"org_id" json:"org_id"`
 	UseKeylessAccess bool          `bson:"use_keyless" json:"use_keyless"`
@@ -388,8 +390,6 @@ type APIDefinition struct {
 	Proxy struct {
 		PreserveHostHeader          bool                          `bson:"preserve_host_header" json:"preserve_host_header"`
 		ListenPath                  string                        `bson:"listen_path" json:"listen_path"`
-		ListenPort                  int                           `bson:"listen_port" json:"listen_port"`
-		Protocol                    string                        `bson:"protocol" json:"protocol"`
 		TargetURL                   string                        `bson:"target_url" json:"target_url"`
 		DisableStripSlash           bool                          `bson:"disable_strip_slash" json:"disable_strip_slash"`
 		StripListenPath             bool                          `bson:"strip_listen_path" json:"strip_listen_path"`

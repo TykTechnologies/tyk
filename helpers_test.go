@@ -287,13 +287,19 @@ type tykTestServerConfig struct {
 }
 
 type tykTestServer struct {
-	ln  net.Listener
-	cln net.Listener
-	URL string
+	ln   net.Listener
+	cln  net.Listener
+	URL  string
+	Addr string
 
 	testRunner   *test.HTTPTestRunner
 	globalConfig config.Config
 	config       tykTestServerConfig
+}
+
+func replacePort(addr string, port int) string {
+	hostname, _, _ := net.SplitHostPort(addr)
+	return hostname + ":" + strconv.Itoa(port)
 }
 
 func (s *tykTestServer) Start() {
@@ -349,6 +355,7 @@ func (s *tykTestServer) Start() {
 		scheme = "https://"
 	}
 	s.URL = scheme + s.ln.Addr().String()
+	s.Addr = s.ln.Addr().String()
 
 	s.testRunner = &test.HTTPTestRunner{
 		RequestBuilder: func(tc *test.TestCase) (*http.Request, error) {

@@ -169,7 +169,7 @@ func dialTLSPinnedCheck(spec *APISpec, tc *tls.Config) func(network, addr string
 			}
 		}
 
-		return nil, errors.New("https://" + host + " certificate public key pinning error. Public keys do not match.")
+		return nil, errors.New(host + " certificate public key pinning error. Public keys do not match.")
 	}
 }
 
@@ -277,8 +277,21 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 			}
 		}
 
+		apisOnPort := 0
 		for _, spec := range apiSpecs {
-			if spec.UseMutualTLSAuth && spec.Domain != "" && spec.Domain == hello.ServerName {
+			if spec.ListenPort != listenPort {
+				continue
+			}
+
+			apisOnPort += 1
+		}
+
+		for _, spec := range apiSpecs {
+			if spec.ListenPort != listenPort {
+				continue
+			}
+
+			if spec.UseMutualTLSAuth && ((apisOnPort == 1 && spec.Protocol == "tls") || (spec.Domain != "" && spec.Domain == hello.ServerName)) {
 				newConfig.ClientAuth = tls.RequireAndVerifyClientCert
 				certIDs := append(spec.ClientCertificates, config.Global().Security.Certificates.API...)
 				newConfig.ClientCAs = CertificateManager.CertPool(certIDs)

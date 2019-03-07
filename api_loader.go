@@ -563,11 +563,11 @@ func fuzzyFindAPI(search string) *APISpec {
 }
 
 func loadTCPService(spec *APISpec, muxer *proxyMux) {
-
+	muxer.addTCPService(spec, nil)
 }
 
 func loadHTTPService(spec *APISpec, apisByListen map[string]int, muxer *proxyMux) {
-	router := muxer.router(spec.Proxy.ListenPort, spec.Proxy.Protocol)
+	router := muxer.router(spec.ListenPort, spec.Protocol)
 
 	if router == nil {
 		router = mux.NewRouter()
@@ -598,7 +598,7 @@ func loadHTTPService(spec *APISpec, apisByListen map[string]int, muxer *proxyMux
 
 	router.Handle(chainObj.ListenOn, chainObj.ThisHandler)
 
-	muxer.setRouter(spec.Proxy.ListenPort, spec.Proxy.Protocol, router)
+	muxer.setRouter(spec.ListenPort, spec.Protocol, router)
 }
 
 // Create the individual API (app) specs based on live configurations and assign middleware
@@ -624,16 +624,16 @@ func loadApps(specs []*APISpec) {
 	muxer.setRouter(config.Global().ControlAPIPort, "", router)
 
 	for _, spec := range specs {
-		if spec.Proxy.ListenPort != 0 {
-			mainLog.Info("API bind on custom port:", spec.Proxy.ListenPort)
+		if spec.ListenPort != spec.GlobalConfig.ListenPort {
+			mainLog.Info("API bind on custom port:", spec.ListenPort)
 		}
 
 		tmpSpecRegister[spec.APIID] = spec
 
-		switch spec.Proxy.Protocol {
+		switch spec.Protocol {
 		case "", "http", "https":
 			loadHTTPService(spec, apisByListen, muxer)
-		case "tcp", "tcps":
+		case "tcp", "tls":
 			loadTCPService(spec, muxer)
 		}
 	}

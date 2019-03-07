@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/tcp"
 
 	"golang.org/x/net/http2"
 
@@ -37,6 +38,8 @@ type proxy struct {
 	protocol   string
 	router     *mux.Router
 	httpServer *http.Server
+	tcpProxy   *tcp.Proxy
+	started    bool
 }
 
 type proxyMux struct {
@@ -115,6 +118,32 @@ func (m *proxyMux) setRouter(port int, protocol string, router *mux.Router) {
 	}
 }
 
+func (m *proxyMux) addTCPService(spec *APISpec, modifier *tcp.Modifier) {
+	hostname := spec.GlobalConfig.HostName
+	if spec.GlobalConfig.EnableCustomDomains {
+		hostname = spec.Domain
+	} else {
+		hostname = ""
+	}
+
+	if p := m.getProxy(spec.ListenPort); p != nil {
+		p.tcpProxy.AddDomainHandler(hostname, spec.Proxy.TargetURL, modifier)
+	} else {
+		tlsConfig := tlsClientConfig(spec)
+
+		p = &proxy{
+			port:     spec.ListenPort,
+			protocol: spec.Protocol,
+			tcpProxy: &tcp.Proxy{
+				DialTLS:         dialTLSPinnedCheck(spec, tlsConfig),
+				TLSConfigTarget: tlsConfig,
+			},
+		}
+		p.tcpProxy.AddDomainHandler(hostname, spec.Proxy.TargetURL, modifier)
+		m.proxies = append(m.proxies, p)
+	}
+}
+
 func (m *proxyMux) swap(new *proxyMux) {
 	m.Lock()
 	defer m.Unlock()
@@ -146,7 +175,13 @@ func (m *proxyMux) swap(new *proxyMux) {
 		if match == nil {
 			m.proxies = append(m.proxies, newP)
 		} else {
+			if match.tcpProxy != nil {
+				match.tcpProxy.Swap(newP.tcpProxy)
+			}
 			match.router = newP.router
+			if match.httpServer != nil {
+				match.httpServer.Handler.(*handleWrapper).router = newP.router
+			}
 		}
 	}
 
@@ -168,40 +203,43 @@ func (m *proxyMux) serve() {
 			p.listener = listener
 		}
 
-		if p.protocol != "http" && p.protocol != "https" {
+		if p.started {
 			continue
 		}
 
-		// Swap the router without re-creating server
-		if p.httpServer != nil {
-			p.httpServer.Handler.(*handleWrapper).router = p.router
-			continue
+		switch p.protocol {
+		case "tcp", "tls":
+			mainLog.Warning("Starting TCP server on:", p.listener.Addr().String())
+			go p.tcpProxy.Serve(p.listener)
+		case "http", "https":
+			mainLog.Warning("Starting HTTP server on:", p.listener.Addr().String())
+			readTimeout := 120 * time.Second
+			writeTimeout := 120 * time.Second
+
+			if config.Global().HttpServerOptions.ReadTimeout > 0 {
+				readTimeout = time.Duration(config.Global().HttpServerOptions.ReadTimeout) * time.Second
+			}
+
+			if config.Global().HttpServerOptions.WriteTimeout > 0 {
+				writeTimeout = time.Duration(config.Global().HttpServerOptions.WriteTimeout) * time.Second
+			}
+
+			addr := config.Global().ListenAddress + ":" + strconv.Itoa(p.port)
+			p.httpServer = &http.Server{
+				Addr:         addr,
+				ReadTimeout:  readTimeout,
+				WriteTimeout: writeTimeout,
+				Handler:      &handleWrapper{p.router},
+			}
+
+			if config.Global().CloseConnections {
+				p.httpServer.SetKeepAlivesEnabled(false)
+			}
+
+			go p.httpServer.Serve(p.listener)
 		}
 
-		readTimeout := 120 * time.Second
-		writeTimeout := 120 * time.Second
-
-		if config.Global().HttpServerOptions.ReadTimeout > 0 {
-			readTimeout = time.Duration(config.Global().HttpServerOptions.ReadTimeout) * time.Second
-		}
-
-		if config.Global().HttpServerOptions.WriteTimeout > 0 {
-			writeTimeout = time.Duration(config.Global().HttpServerOptions.WriteTimeout) * time.Second
-		}
-
-		addr := config.Global().ListenAddress + ":" + strconv.Itoa(p.port)
-		p.httpServer = &http.Server{
-			Addr:         addr,
-			ReadTimeout:  readTimeout,
-			WriteTimeout: writeTimeout,
-			Handler:      &handleWrapper{p.router},
-		}
-
-		if config.Global().CloseConnections {
-			p.httpServer.SetKeepAlivesEnabled(false)
-		}
-
-		go p.httpServer.Serve(p.listener)
+		p.started = true
 	}
 }
 
@@ -210,8 +248,9 @@ func (m *proxyMux) generateListener(listenPort int, protocol string) (l net.List
 
 	targetPort := listenAddress + ":" + strconv.Itoa(listenPort)
 
-	if protocol == "https" || protocol == "tcps" {
-		mainLog.Infof("--> Using SSL (%s)", protocol)
+	switch protocol {
+	case "https", "tls":
+		mainLog.Infof("--> Using TLS (%s)", protocol)
 		httpServerOptions := config.Global().HttpServerOptions
 
 		tlsConfig := tls.Config{
@@ -230,7 +269,7 @@ func (m *proxyMux) generateListener(listenPort int, protocol string) (l net.List
 		tlsConfig.GetConfigForClient = getTLSConfigForClient(&tlsConfig, listenPort)
 
 		l, err = tls.Listen("tcp", targetPort, &tlsConfig)
-	} else {
+	default:
 		mainLog.WithField("port", targetPort).Infof("--> Standard listener (%s)", protocol)
 		l, err = net.Listen("tcp", targetPort)
 	}

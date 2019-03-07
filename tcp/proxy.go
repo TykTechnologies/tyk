@@ -4,6 +4,7 @@ import (
     "crypto/tls"
     "errors"
     "net"
+    "net/url"
     "sync"
     "time"
 
@@ -28,6 +29,7 @@ type targetConfig struct {
 type Proxy struct {
     sync.RWMutex
 
+    DialTLS         func(network, addr string) (net.Conn, error)
     TLSConfigTarget *tls.Config
 
     ReadTimeout  time.Duration
@@ -53,6 +55,13 @@ func (p *Proxy) AddDomainHandler(domain, target string, modifier *Modifier) {
         modifier: modifier,
         target:   target,
     }
+}
+
+func (p *Proxy) Swap(new *Proxy) {
+    p.Lock()
+    defer p.Unlock()
+
+    p.muxer = new.muxer
 }
 
 func (p *Proxy) RemoveDomainHandler(domain string) {
@@ -135,13 +144,31 @@ func (p *Proxy) handleConn(conn net.Conn) error {
         return err
     }
 
+    u, uErr := url.Parse(config.target)
+    if uErr != nil {
+        u, uErr = url.Parse("tcp://" + config.target)
+
+        if uErr != nil {
+            conn.Close()
+            return uErr
+        }
+    }
+
     // connects to target server
     var rconn net.Conn
-    if p.TLSConfigTarget == nil {
-        rconn, err = net.Dial("tcp", config.target)
-    } else {
-        rconn, err = tls.Dial("tcp", config.target, p.TLSConfigTarget)
+    switch u.Scheme {
+    case "tcp":
+        rconn, err = net.Dial("tcp", u.Host)
+    case "tls":
+        if p.DialTLS != nil {
+            rconn, err = p.DialTLS("tcp", u.Host)
+        } else {
+            rconn, err = tls.Dial("tcp", u.Host, p.TLSConfigTarget)
+        }
+    default:
+        err = errors.New("Unsupported protocol. Should be empty, `tcp` or `tls`")
     }
+
     if err != nil {
         conn.Close()
         return err

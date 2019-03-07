@@ -419,6 +419,49 @@ func TestAPIMutualTLS(t *testing.T) {
 			})
 		})
 	})
+
+	t.Run("TCP proxy", func(t *testing.T) {
+		upstream := test.TcpMock(false, func(in []byte, err error) (out []byte) {
+			return in
+		})
+		defer upstream.Close()
+
+		clientCertID, _ := CertificateManager.Add(clientCertPem, "")
+
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Protocol = "tls"
+			spec.ListenPort = 30001
+			spec.UseMutualTLSAuth = true
+			spec.ClientCertificates = []string{clientCertID}
+			spec.Proxy.TargetURL = "tcp://" + upstream.Addr().String()
+		})
+
+		tesetRunner := test.TCPTestRunner{
+			Target: replacePort(ts.Addr, 30001),
+			UseSSL: true,
+			TLSClientConfig: &tls.Config{
+				Certificates:       []tls.Certificate{clientCert},
+				InsecureSkipVerify: true,
+			},
+		}
+
+		tesetRunner.Run(t, []test.TCPTestCase{
+			{"write", "ping", ""},
+			{"read", "ping", ""},
+		}...)
+
+		CertificateManager.Delete(clientCertID)
+		CertificateManager.FlushCache()
+
+		if err := tesetRunner.Run(t, test.TCPTestCase{}); err == nil {
+			t.Error("Should trigger bad certificate error")
+		} else {
+			if !strings.Contains(err.Error(), "bad certificate") {
+				t.Error("Error message not match", err.Error())
+			}
+		}
+	})
 }
 
 func TestUpstreamMutualTLS(t *testing.T) {
