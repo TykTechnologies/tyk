@@ -933,7 +933,9 @@ func TestHotReloadSingle(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	reloadURLStructure(wg.Done)
+	apisMu.Lock()
 	apisByID = map[string]*APISpec{"test": {}}
+	apisMu.Unlock()
 	reloadTick <- time.Time{}
 	wg.Wait()
 	if defaultProxyMux.router(0, "") == oldRouter {
