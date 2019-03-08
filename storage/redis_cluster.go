@@ -360,6 +360,9 @@ func (r RedisCluster) GetKeysAndValuesWithFilter(filter string) map[string]strin
 	}
 
 	keys, _ := redis.Strings(sessionsInterface, err)
+	if len(keys) == 0 {
+		return nil
+	}
 	valueObj, err := r.singleton().Do("MGET", sessionsInterface.([]interface{})...)
 	values, err := redis.Strings(valueObj, err)
 	if err != nil {
