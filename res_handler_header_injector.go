@@ -38,7 +38,7 @@ func (h *HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Respon
 
 			context := make(map[string]interface{})
 
-			hmeta.EnableSession=true
+			hmeta.EnableSession = true
 			if hmeta.EnableSession {
 				if session := ctxGetSession(req); session != nil {
 					context["_tyk_meta"] = session.MetaData
