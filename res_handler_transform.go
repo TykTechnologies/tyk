@@ -95,9 +95,13 @@ func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 		mxj.XmlCharsetReader = WrappedCharsetReader
 		var err error
 
-		bodyData, err = mxj.NewMapXml(body) // unmarshal
+		xmlMap, err := mxj.NewMapXml(body) // unmarshal
 		if err != nil {
 			logger.WithError(err).Error("Error unmarshalling XML")
+			break
+		}
+		for k, v := range xmlMap {
+			bodyData[k] = v
 		}
 	default: // apidef.RequestJSON
 		if len(body) == 0 {
