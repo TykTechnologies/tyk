@@ -431,6 +431,35 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 
 		ts.Run(t, test.TestCase{Path: "/sample", BodyMatch: "/api/get?param1=dummy", Code: 200})
 	})
+
+	t.Run("Endpoint with skip cleaning", func(t *testing.T) {
+		ts.Close()
+		globalConf := config.Global()
+		globalConf.HttpServerOptions.SkipURLCleaning = true
+		globalConf.HttpServerOptions.OverrideDefaults = true
+		config.SetGlobal(globalConf)
+
+		prevSkipClean := defaultTestConfig.HttpServerOptions.OverrideDefaults &&
+			defaultTestConfig.HttpServerOptions.SkipURLCleaning
+		testServerRouter.SkipClean(true)
+		defer testServerRouter.SkipClean(prevSkipClean)
+
+		ts := newTykTestServer()
+		defer ts.Close()
+		defer resetTestConfig()
+
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/sample"
+			spec.ConfigData = map[string]interface{}{
+				"base_url": ts.URL,
+			}
+			spec.CustomMiddlewareBundle = bundle
+		}, func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/api"
+		})
+
+		ts.Run(t, test.TestCase{Path: "/sample/99999-XXXX+%2F%2F+dog+9+fff%C3%A9o+party", BodyMatch: "URI\":\"/sample/99999-XXXX+%2F%2F+dog+9+fff%C3%A9o+party", Code: 200})
+	})
 }
 
 func TestJSVMBase64(t *testing.T) {

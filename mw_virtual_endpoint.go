@@ -144,7 +144,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	requestData := RequestObject{
 		Headers: r.Header,
 		Body:    string(originalBody),
-		URL:     r.URL.Path,
+		URL:     r.URL.String(),
 		Scheme:  scheme,
 	}
 
