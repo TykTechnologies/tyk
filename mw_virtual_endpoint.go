@@ -139,7 +139,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	requestData := RequestObject{
 		Headers: r.Header,
 		Body:    string(originalBody),
-		URL:     r.URL.Path,
+		URL:     r.URL.String(),
 	}
 
 	// We need to copy the body _back_ for the decode
