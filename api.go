@@ -1876,9 +1876,6 @@ func ctxGetVersionInfo(r *http.Request) *apidef.VersionInfo {
 }
 
 func ctxSetVersionInfo(r *http.Request, v *apidef.VersionInfo) {
-	if v == nil {
-		panic("setting a nil context VersionData")
-	}
 	setCtxValue(r, VersionData, v)
 }
 
