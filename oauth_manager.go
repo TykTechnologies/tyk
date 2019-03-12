@@ -684,7 +684,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 	log.Debug("Adding ACCESS key to sorted list: ", sortedListKey)
 	r.store.AddToSortedSet(
 		sortedListKey,
-		accessData.AccessToken,
+		storage.HashKey(accessData.AccessToken),
 		float64(accessData.CreatedAt.Unix()+int64(accessData.ExpiresIn)), // set score as token expire timestamp
 	)
 

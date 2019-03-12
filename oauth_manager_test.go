@@ -22,6 +22,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -467,11 +468,23 @@ func getAuthCode(t *testing.T, ts *tykTestServer) map[string]string {
 }
 
 func TestGetClientTokens(t *testing.T) {
+	t.Run("Without hashing", func(t *testing.T) {
+		testGetClientTokens(t, false)
+	})
+	t.Run("With hashing", func(t *testing.T) {
+		testGetClientTokens(t, true)
+	})
+}
+
+func testGetClientTokens(t *testing.T, hashed bool) {
 	globalConf := config.Global()
 	// set tokens to be expired after 1 second
 	globalConf.OauthTokenExpire = 1
 	// cleanup tokens older than 3 seconds
 	globalConf.OauthTokenExpiredRetainPeriod = 3
+
+	globalConf.HashKeys = hashed
+
 	config.SetGlobal(globalConf)
 
 	defer resetTestConfig()
@@ -516,8 +529,12 @@ func TestGetClientTokens(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			// save tokens for future check
-			tokensID[response["access_token"].(string)] = true
+			if hashed {
+				// save tokens for future check
+				tokensID[storage.HashKey(response["access_token"].(string))] = true
+			} else {
+				tokensID[response["access_token"].(string)] = true
+			}
 		}
 	})
 
