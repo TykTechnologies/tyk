@@ -117,7 +117,11 @@ func NewRedisClusterPool(isCache bool) *rediscluster.RedisCluster {
 		log.Info("--> Using clustered mode")
 	}
 
-	timeout := time.Duration(cfg.Timeout) * time.Second
+	timeout := 5 * time.Second
+
+	if cfg.Timeout > 0 {
+		timeout = time.Duration(cfg.Timeout) * time.Second
+	}
 
 	poolConf := rediscluster.PoolConfig{
 		MaxIdle:        maxIdle,
