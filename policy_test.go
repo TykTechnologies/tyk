@@ -628,4 +628,40 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 			},
 		},
 	}...)
+
+	// Reset quota
+	ts.Run(t, []test.TestCase{
+		{
+			Method:    http.MethodPut,
+			Path:      "/tyk/keys/" + key,
+			AdminAuth: true,
+			Code:      http.StatusOK,
+			Data:      session,
+		},
+		{
+			Method:    http.MethodGet,
+			Path:      "/tyk/keys/" + key,
+			AdminAuth: true,
+			Code:      http.StatusOK,
+			BodyMatchFunc: func(data []byte) bool {
+				sessionData := user.SessionState{}
+				if err := json.Unmarshal(data, &sessionData); err != nil {
+					t.Log(err.Error())
+					return false
+				}
+				api1Limit := sessionData.AccessRights["api1"].Limit
+				if api1Limit == nil {
+					t.Error("api1 limit is not set")
+					return false
+				}
+
+				if api1Limit.QuotaRemaining != 100 {
+					t.Error("Should reset quota:", api1Limit.QuotaRemaining)
+					return false
+				}
+
+				return true
+			},
+		},
+	}...)
 }
