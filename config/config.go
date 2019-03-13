@@ -55,6 +55,7 @@ type StorageOptionsConf struct {
 	Database              int               `json:"database"`
 	MaxIdle               int               `json:"optimisation_max_idle"`
 	MaxActive             int               `json:"optimisation_max_active"`
+	Timeout               int               `json:"timeout"`
 	EnableCluster         bool              `json:"enable_cluster"`
 	UseSSL                bool              `json:"use_ssl"`
 	SSLInsecureSkipVerify bool              `json:"ssl_insecure_skip_verify"`
