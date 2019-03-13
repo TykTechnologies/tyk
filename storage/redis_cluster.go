@@ -117,15 +117,24 @@ func NewRedisClusterPool(isCache bool) *rediscluster.RedisCluster {
 		log.Info("--> Using clustered mode")
 	}
 
+	timeout := 5 * time.Second
+
+	if cfg.Timeout > 0 {
+		timeout = time.Duration(cfg.Timeout) * time.Second
+	}
+
 	poolConf := rediscluster.PoolConfig{
-		MaxIdle:       maxIdle,
-		MaxActive:     maxActive,
-		IdleTimeout:   240 * time.Second,
-		Database:      cfg.Database,
-		Password:      cfg.Password,
-		IsCluster:     cfg.EnableCluster,
-		UseTLS:        cfg.UseSSL,
-		TLSSkipVerify: cfg.SSLInsecureSkipVerify,
+		MaxIdle:        maxIdle,
+		MaxActive:      maxActive,
+		IdleTimeout:    240 * time.Second,
+		ConnectTimeout: timeout,
+		ReadTimeout:    timeout,
+		WriteTimeout:   timeout,
+		Database:       cfg.Database,
+		Password:       cfg.Password,
+		IsCluster:      cfg.EnableCluster,
+		UseTLS:         cfg.UseSSL,
+		TLSSkipVerify:  cfg.SSLInsecureSkipVerify,
 	}
 
 	// If Redis port isn't set, use default one:
