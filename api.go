@@ -374,6 +374,7 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 		if usedQuota, err := sessionManager.Store().GetRawKey(limQuotaKey); err == nil {
 			qInt, _ := strconv.Atoi(usedQuota)
 			remaining := access.Limit.QuotaMax - int64(qInt)
+
 			if remaining < 0 {
 				access.Limit.QuotaRemaining = 0
 			} else {
@@ -381,6 +382,9 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 			}
 			session.AccessRights[id] = access
 		} else {
+			access.Limit.QuotaRemaining = access.Limit.QuotaMax
+			session.AccessRights[id] = access
+
 			log.WithFields(logrus.Fields{
 				"prefix": "api",
 				"apiID":  id,

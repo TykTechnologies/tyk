@@ -4,27 +4,27 @@
 package main
 
 import (
-    "encoding/json"
-    "sync"
-    "testing"
+	"encoding/json"
+	"sync"
+	"testing"
 
-    "github.com/TykTechnologies/tyk/test"
-    "github.com/TykTechnologies/tyk/user"
+	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 func TestLooping(t *testing.T) {
-    ts := newTykTestServer()
-    defer ts.Close()
+	ts := newTykTestServer()
+	defer ts.Close()
 
-    postAction := `<operation action="https://example.com/post_action">data</operation>`
-    getAction := `<operation action="https://example.com/get_action">data</operation>`
+	postAction := `<operation action="https://example.com/post_action">data</operation>`
+	getAction := `<operation action="https://example.com/get_action">data</operation>`
 
-    t.Run("Using advanced URL rewrite", func(t *testing.T) {
-        // We defined internnal advanced rewrite based on body data
-        // which rewrites to internal paths (marked as blacklist so they protected from outside world)
-        buildAndLoadAPI(func(spec *APISpec) {
-            version := spec.VersionData.Versions["v1"]
-            json.Unmarshal([]byte(`{
+	t.Run("Using advanced URL rewrite", func(t *testing.T) {
+		// We defined internnal advanced rewrite based on body data
+		// which rewrites to internal paths (marked as blacklist so they protected from outside world)
+		buildAndLoadAPI(func(spec *APISpec) {
+			version := spec.VersionData.Versions["v1"]
+			json.Unmarshal([]byte(`{
                 "use_extended_paths": true,
                 "extended_paths": {
                     "internal": [{
@@ -67,46 +67,46 @@ func TestLooping(t *testing.T) {
                 }
             }`), &version)
 
-            spec.VersionData.Versions["v1"] = version
+			spec.VersionData.Versions["v1"] = version
 
-            spec.Proxy.ListenPath = "/"
-        })
+			spec.Proxy.ListenPath = "/"
+		})
 
-        ts.Run(t, []test.TestCase{
-            {Method: "POST", Path: "/xml", Data: postAction, BodyMatch: `"Url":"/post_action`},
+		ts.Run(t, []test.TestCase{
+			{Method: "POST", Path: "/xml", Data: postAction, BodyMatch: `"Url":"/post_action`},
 
-            // Should retain original query params
-            {Method: "POST", Path: "/xml?a=b", Data: getAction, BodyMatch: `"Url":"/get_action`},
+			// Should retain original query params
+			{Method: "POST", Path: "/xml?a=b", Data: getAction, BodyMatch: `"Url":"/get_action`},
 
-            // Should rewrite http method, if loop rewrite param passed
-            {Method: "POST", Path: "/xml", Data: getAction, BodyMatch: `"Method":"GET"`},
+			// Should rewrite http method, if loop rewrite param passed
+			{Method: "POST", Path: "/xml", Data: getAction, BodyMatch: `"Method":"GET"`},
 
-            // Internal endpoint can be accessed only via looping
-            {Method: "GET", Path: "/get_action", Code: 403},
+			// Internal endpoint can be accessed only via looping
+			{Method: "GET", Path: "/get_action", Code: 403},
 
-            {Method: "POST", Path: "/get_action", Code: 403},
-        }...)
-    })
+			{Method: "POST", Path: "/get_action", Code: 403},
+		}...)
+	})
 
-    t.Run("Loop to another API", func(t *testing.T) {
-        buildAndLoadAPI(func(spec *APISpec) {
-            spec.APIID = "testid"
-            spec.Name = "hidden api"
-            spec.Proxy.ListenPath = "/somesecret"
-            spec.Internal = true
-            version := spec.VersionData.Versions["v1"]
-            json.Unmarshal([]byte(`{
+	t.Run("Loop to another API", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = "testid"
+			spec.Name = "hidden api"
+			spec.Proxy.ListenPath = "/somesecret"
+			spec.Internal = true
+			version := spec.VersionData.Versions["v1"]
+			json.Unmarshal([]byte(`{
                 "use_extended_paths": true,
                 "global_headers": {
                     "X-Name":"internal"
                 }
             }`), &version)
-            spec.VersionData.Versions["v1"] = version
-        }, func(spec *APISpec) {
-            spec.Proxy.ListenPath = "/test"
+			spec.VersionData.Versions["v1"] = version
+		}, func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/test"
 
-            version := spec.VersionData.Versions["v1"]
-            json.Unmarshal([]byte(`{
+			version := spec.VersionData.Versions["v1"]
+			json.Unmarshal([]byte(`{
                 "use_extended_paths": true,
                 "extended_paths": {
                     "url_rewrites": [{
@@ -128,19 +128,19 @@ func TestLooping(t *testing.T) {
                 }
             }`), &version)
 
-            spec.VersionData.Versions["v1"] = version
-        })
+			spec.VersionData.Versions["v1"] = version
+		})
 
-        ts.Run(t, []test.TestCase{
-            {Path: "/somesecret", Code: 404},
-            {Path: "/test/by_name", Code: 200, BodyMatch: `"X-Name":"internal"`},
-            {Path: "/test/by_id", Code: 200, BodyMatch: `"X-Name":"internal"`},
-            {Path: "/test/wrong", Code: 500},
-        }...)
-    })
+		ts.Run(t, []test.TestCase{
+			{Path: "/somesecret", Code: 404},
+			{Path: "/test/by_name", Code: 200, BodyMatch: `"X-Name":"internal"`},
+			{Path: "/test/by_id", Code: 200, BodyMatch: `"X-Name":"internal"`},
+			{Path: "/test/wrong", Code: 500},
+		}...)
+	})
 
-    t.Run("VirtualEndpoint or plugins", func(t *testing.T) {
-        testPrepareVirtualEndpoint(`
+	t.Run("VirtualEndpoint or plugins", func(t *testing.T) {
+		testPrepareVirtualEndpoint(`
             function testVirtData(request, session, config) {
                 var loopLocation = "/default"
 
@@ -160,21 +160,21 @@ func TestLooping(t *testing.T) {
             }
         `, "POST", "/virt", true)
 
-        ts.Run(t, []test.TestCase{
-            {Method: "POST", Path: "/virt", Data: postAction, BodyMatch: `"Url":"/post_action`},
+		ts.Run(t, []test.TestCase{
+			{Method: "POST", Path: "/virt", Data: postAction, BodyMatch: `"Url":"/post_action`},
 
-            // Should retain original query params
-            {Method: "POST", Path: "/virt?a=b", Data: getAction, BodyMatch: `"Url":"/get_action`},
+			// Should retain original query params
+			{Method: "POST", Path: "/virt?a=b", Data: getAction, BodyMatch: `"Url":"/get_action`},
 
-            // Should rewrite http method, if loop rewrite param passed
-            {Method: "POST", Path: "/virt", Data: getAction, BodyMatch: `"Method":"GET"`},
-        }...)
-    })
+			// Should rewrite http method, if loop rewrite param passed
+			{Method: "POST", Path: "/virt", Data: getAction, BodyMatch: `"Method":"GET"`},
+		}...)
+	})
 
-    t.Run("Loop limit", func(t *testing.T) {
-        buildAndLoadAPI(func(spec *APISpec) {
-            version := spec.VersionData.Versions["v1"]
-            json.Unmarshal([]byte(`{
+	t.Run("Loop limit", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			version := spec.VersionData.Versions["v1"]
+			json.Unmarshal([]byte(`{
                 "use_extended_paths": true,
                 "extended_paths": {
                     "url_rewrites": [{
@@ -186,19 +186,19 @@ func TestLooping(t *testing.T) {
                 }
             }`), &version)
 
-            spec.VersionData.Versions["v1"] = version
-            spec.Proxy.ListenPath = "/"
-        })
+			spec.VersionData.Versions["v1"] = version
+			spec.Proxy.ListenPath = "/"
+		})
 
-        ts.Run(t, []test.TestCase{
-            {Method: "GET", Path: "/recursion", Code: 500, BodyMatch: "Loop level too deep. Found more than 2 loops in single request"},
-        }...)
-    })
+		ts.Run(t, []test.TestCase{
+			{Method: "GET", Path: "/recursion", Code: 500, BodyMatch: "Loop level too deep. Found more than 2 loops in single request"},
+		}...)
+	})
 
-    t.Run("Quota and rate limit calculation", func(t *testing.T) {
-        buildAndLoadAPI(func(spec *APISpec) {
-            version := spec.VersionData.Versions["v1"]
-            json.Unmarshal([]byte(`{
+	t.Run("Quota and rate limit calculation", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			version := spec.VersionData.Versions["v1"]
+			json.Unmarshal([]byte(`{
                 "use_extended_paths": true,
                 "extended_paths": {
                     "url_rewrites": [{
@@ -210,42 +210,42 @@ func TestLooping(t *testing.T) {
                 }
             }`), &version)
 
-            spec.VersionData.Versions["v1"] = version
-            spec.Proxy.ListenPath = "/"
-            spec.UseKeylessAccess = false
-        })
+			spec.VersionData.Versions["v1"] = version
+			spec.Proxy.ListenPath = "/"
+			spec.UseKeylessAccess = false
+		})
 
-        keyID := createSession(func(s *user.SessionState) {
-            s.QuotaMax = 2
-        })
+		keyID := createSession(func(s *user.SessionState) {
+			s.QuotaMax = 2
+		})
 
-        authHeaders := map[string]string{"authorization": keyID}
+		authHeaders := map[string]string{"authorization": keyID}
 
-        ts.Run(t, []test.TestCase{
-            {Method: "GET", Path: "/recursion", Headers: authHeaders, BodyNotMatch: "Quota exceeded"},
-        }...)
-    })
+		ts.Run(t, []test.TestCase{
+			{Method: "GET", Path: "/recursion", Headers: authHeaders, BodyNotMatch: "Quota exceeded"},
+		}...)
+	})
 }
 
 func TestConcurrencyReloads(t *testing.T) {
-    var wg sync.WaitGroup
+	var wg sync.WaitGroup
 
-    ts := newTykTestServer()
-    defer ts.Close()
+	ts := newTykTestServer()
+	defer ts.Close()
 
-    buildAndLoadAPI()
+	buildAndLoadAPI()
 
-    for i := 0; i < 10; i++ {
-        wg.Add(1)
-        go func() {
-            ts.Run(t, test.TestCase{Path: "/sample", Code: 200})
-            wg.Done()
-        }()
-    }
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			ts.Run(t, test.TestCase{Path: "/sample", Code: 200})
+			wg.Done()
+		}()
+	}
 
-    for j := 0; j < 5; j++ {
-        buildAndLoadAPI()
-    }
+	for j := 0; j < 5; j++ {
+		buildAndLoadAPI()
+	}
 
-    wg.Wait()
+	wg.Wait()
 }
