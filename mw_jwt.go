@@ -402,8 +402,11 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 					session.Expires = int64(f)
 				}
 			}
+			b, _ := json.Marshal(session)
+			go func() {
+				SessionCache.Set(session.KeyHash(), b)
+			}()
 
-			go SessionCache.Set(session.KeyHash(), session, cache.DefaultExpiration)
 		}
 	}
 

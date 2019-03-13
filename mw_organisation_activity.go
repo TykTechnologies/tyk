@@ -1,12 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"sync"
 
 	"errors"
-
-	"time"
 
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
@@ -66,9 +65,11 @@ func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	// try to check in in-app cache 1st
 	if !k.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-		var cachedSession interface{}
-		if cachedSession, found = SessionCache.Get(k.Spec.OrgID); found {
-			orgSession = cachedSession.(user.SessionState)
+		var session user.SessionState
+		cachedSession, err := SessionCache.Get(k.Spec.OrgID)
+		if err == nil {
+			json.Unmarshal(cachedSession, session)
+			orgSession = session
 		}
 	}
 
@@ -120,7 +121,8 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession use
 	if err := k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, &orgSession, sessionLifeTime, false); err == nil {
 		// update in-app cache if needed
 		if !k.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			SessionCache.Set(k.Spec.OrgID, orgSession, time.Second*time.Duration(sessionLifeTime))
+			b, _ := json.Marshal(orgSession)
+			SessionCache.Set(k.Spec.OrgID, b)
 		}
 	} else {
 		logger.WithError(err).Error("Could not update org session")
@@ -251,7 +253,8 @@ func (k *OrganizationMonitor) AllowAccessNext(
 	if err := k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, session, sessionLifeTime, false); err == nil {
 		// update in-app cache if needed
 		if !k.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			SessionCache.Set(k.Spec.OrgID, *session, time.Second*time.Duration(sessionLifeTime))
+			b, _ := json.Marshal(*session)
+			SessionCache.Set(k.Spec.OrgID, b)
 		}
 	} else {
 		logEntry.WithError(err).WithField("orgID", k.Spec.OrgID).Error("Could not update org session")

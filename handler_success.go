@@ -10,11 +10,12 @@ import (
 	"strings"
 	"time"
 
-	cache "github.com/pmylund/go-cache"
+	"github.com/allegro/bigcache"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
+	"github.com/pmylund/go-cache"
 )
 
 // Enums for keys to be stored in a session context - this is how gorilla expects
@@ -49,7 +50,7 @@ const (
 
 var (
 	// key session memory cache
-	SessionCache = cache.New(10*time.Second, 5*time.Second)
+	SessionCache, _ = bigcache.NewBigCache(bigcache.DefaultConfig(5 * time.Second))
 
 	// org session memory cache
 	ExpiryCache = cache.New(600*time.Second, 10*time.Minute)

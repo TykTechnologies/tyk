@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -224,7 +225,8 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 	ctxDisableSessionUpdate(r)
 
 	if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-		SessionCache.Set(session.KeyHash(), *session, cache.DefaultExpiration)
+		b, _ := json.Marshal(*session)
+		SessionCache.Set(session.KeyHash(), b)
 	}
 
 	return true
@@ -433,10 +435,11 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 
 	// Check in-memory cache
 	if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-		cachedVal, found := SessionCache.Get(cacheKey)
-		if found {
+		cachedVal, err := SessionCache.Get(cacheKey)
+		if err == nil {
 			t.Logger().Debug("--> Key found in local cache")
-			session := cachedVal.(user.SessionState)
+			var session user.SessionState
+			json.Unmarshal(cachedVal, session)
 			if err := t.ApplyPolicies(&session); err != nil {
 				t.Logger().Error(err)
 				return session, false
@@ -453,7 +456,8 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 		// If exists, assume it has been authorized and pass on
 		// cache it
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			go SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
+			b, _ := json.Marshal(session)
+			SessionCache.Set(cacheKey, b)
 		}
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
@@ -475,7 +479,8 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 
 		// cache it
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			go SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
+			b, _ := json.Marshal(session)
+			SessionCache.Set(cacheKey, b)
 		}
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
