@@ -3,10 +3,9 @@ package signature_validator
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 type Validator interface {
@@ -20,9 +19,9 @@ type SignatureValidator struct {
 
 func (v *SignatureValidator) Init(hasherName string) error {
 	switch hasherName {
-	case "MasherySha256":
+	case "MasherySHA256":
 		v.h = MasherySha256Sum{}
-	case "MasheryMd5":
+	case "MasheryMD5":
 		v.h = MasheryMd5sum{}
 	default:
 		return errors.New(fmt.Sprintf("unsupported hasher type (%s)", hasherName))
@@ -31,12 +30,14 @@ func (v *SignatureValidator) Init(hasherName string) error {
 	return nil
 }
 
-func (v SignatureValidator) Validate(signatureAttempt, apiKey, sharedSecret string, allowedClockSkew int64) error {
-	signatureAttemptHex, _ := hex.DecodeString(signatureAttempt)
+func (v SignatureValidator) Validate(signature, key, secret string, allowedClockSkew int64) error {
+	signatureBytes, _ := hex.DecodeString(signature)
+
+	fmt.Println("Validating:", signature, key, secret)
 
 	now := time.Now().Unix()
 	for i := int64(0); i <= allowedClockSkew; i++ {
-		if bytes.Equal(v.h.Hash(apiKey, sharedSecret, now+i), signatureAttemptHex) {
+		if bytes.Equal(v.h.Hash(key, secret, now+i), signatureBytes) {
 			return nil
 		}
 
@@ -44,7 +45,7 @@ func (v SignatureValidator) Validate(signatureAttempt, apiKey, sharedSecret stri
 			continue
 		}
 
-		if bytes.Equal(v.h.Hash(apiKey, sharedSecret, now-i), signatureAttemptHex) {
+		if bytes.Equal(v.h.Hash(key, secret, now-i), signatureBytes) {
 			return nil
 		}
 	}

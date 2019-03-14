@@ -18,8 +18,8 @@ func TestValidateSignature_Init(t *testing.T) {
 	suite := []tt{
 		{"", errors.New("empty string in init")},
 		{"SomeJunk", errors.New("non existent")},
-		{"MasherySha256", nil},
-		{"MasheryMd5", nil},
+		{"MasherySHA256", nil},
+		{"MasheryMD5", nil},
 	}
 
 	for _, s := range suite {
@@ -58,7 +58,7 @@ func TestValidateSignature_Validate(t *testing.T) {
 	}
 
 	validator := SignatureValidator{}
-	_ = validator.Init("MasherySha256")
+	_ = validator.Init("MasherySHA256")
 
 	for _, s := range suite {
 		err := validator.Validate(s.SignatureAttempt, token, sharedSecret, allowedClockSkew)

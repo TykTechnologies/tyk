@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -13,8 +12,8 @@ import (
 )
 
 const (
-	defaultErrorCode    = http.StatusForbidden
-	defaultErrorMessage = "Not Authorized"
+	defaultSignatureErrorCode    = http.StatusUnauthorized
+	defaultSignatureErrorMessage = "Request signature verification failed"
 )
 
 // KeyExists will check if the key being used to access the API is in the request data,
@@ -104,71 +103,56 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 		return errors.New("Access to this API has been disallowed"), http.StatusForbidden
 	}
 
-	if config.ValidateSignature != nil {
-		if config.ValidateSignature.SignatureKey == "" {
-			err := errors.New("signature_header_key not set")
-			log.WithError(err).Error("misconfigured api definition")
-			return errors.New("internal server error"), http.StatusInternalServerError
-		}
-
-		if config.ValidateSignature.SessionMetaKey == "" {
-			err := errors.New("auth.validate_signature.session_meta_key not set")
-			log.WithError(err).Error("misconfigured api definition")
-			return errors.New("internal server error"), http.StatusInternalServerError
-		}
-
-		if config.ValidateSignature.Mode == "" {
-			err := errors.New("auth.validate_signature.mode not set")
-			log.WithError(err).Error("misconfigured api definition")
-			return errors.New("internal server error"), http.StatusInternalServerError
-		}
-
-		errorCode := defaultErrorCode
-		if config.ValidateSignature.ErrorCode != 0 {
-			errorCode = config.ValidateSignature.ErrorCode
-		}
-
-		errorMessage := defaultErrorMessage
-		if config.ValidateSignature.ErrorMessage != "" {
-			errorMessage = config.ValidateSignature.ErrorMessage
-		}
-
-		validator := signature_validator.SignatureValidator{}
-
-		if err := validator.Init(config.ValidateSignature.Mode); err != nil {
-			log.WithError(err).Error("misconfigured api definition")
-			return errors.New("internal server error"), http.StatusInternalServerError
-		}
-
-		signatureAttempt := r.Header.Get(config.ValidateSignature.SignatureKey)
-		if signatureAttempt == "" {
-			return errors.New(errorMessage), errorCode
-		}
-
-		sharedSecretIf, ok := session.MetaData[config.ValidateSignature.SessionMetaKey]
-		if !ok {
-			err := errors.New(fmt.Sprintf("session token does not contain shared secret in metadata[%s]", config.ValidateSignature.SessionMetaKey))
-			log.WithError(err).Error("misconfigured api definition")
-			return errors.New("internal server error"), http.StatusInternalServerError
-		}
-
-		sharedSecret, ok := sharedSecretIf.(string)
-		if !ok {
-			err := errors.New("key metadata config error, shared secret not string")
-			log.WithError(err).Error("misconfigured session token")
-			return errors.New("internal server error"), http.StatusInternalServerError
-		}
-
-		if err := validator.Validate(signatureAttempt, key, sharedSecret, config.ValidateSignature.AllowedClockSkew); err != nil {
-			return errors.New(errorMessage), errorCode
-		}
-	}
-
 	// Set session state on context, we will need it later
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.AuthToken, apidef.UnsetAuth:
 		ctxSetSession(r, &session, key, false)
 		k.setContextVars(r, key)
+	}
+
+	return k.validateSignature(r, key)
+}
+
+func (k *AuthKey) validateSignature(r *http.Request, key string) (error, int) {
+	config := k.Spec.Auth
+	logger := k.Logger().WithField("key", obfuscateKey(key))
+
+	if !config.ValidateSignature {
+		return nil, http.StatusOK
+	}
+
+	errorCode := defaultSignatureErrorCode
+	if config.Signature.ErrorCode != 0 {
+		errorCode = config.Signature.ErrorCode
+	}
+
+	errorMessage := defaultSignatureErrorMessage
+	if config.Signature.ErrorMessage != "" {
+		errorMessage = config.Signature.ErrorMessage
+	}
+
+	validator := signature_validator.SignatureValidator{}
+	if err := validator.Init(config.Signature.Algorithm); err != nil {
+		logger.WithError(err).Info("Invalid signature verification algorithm")
+		return errors.New(errorMessage), errorCode
+	}
+
+	signature := r.Header.Get(config.Signature.Header)
+	if signature == "" {
+		logger.Info("Request signature header not found or empty")
+		return errors.New(errorMessage), errorCode
+	}
+
+	secret := replaceTykVariables(r, config.Signature.Secret, false)
+
+	if secret == "" {
+		logger.Info("Request signature secret not found or empty")
+		return errors.New(errorMessage), errorCode
+	}
+
+	if err := validator.Validate(signature, key, secret, config.Signature.AllowedClockSkew); err != nil {
+		logger.WithError(err).Info("Request signature validation failed")
+		return errors.New(errorMessage), errorCode
 	}
 
 	return nil, http.StatusOK

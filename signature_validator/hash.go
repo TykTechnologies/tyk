@@ -14,7 +14,7 @@ type Hasher interface {
 type MasherySha256Sum struct{}
 
 func (m MasherySha256Sum) Name() string {
-	return "MasherySha256"
+	return "MasherySHA256"
 }
 
 func (m MasherySha256Sum) Hash(token string, sharedSecret string, timeStamp int64) []byte {
@@ -26,7 +26,7 @@ func (m MasherySha256Sum) Hash(token string, sharedSecret string, timeStamp int6
 type MasheryMd5sum struct{}
 
 func (m MasheryMd5sum) Name() string {
-	return "MasheryMd5"
+	return "MasheryMD5"
 }
 
 func (m MasheryMd5sum) Hash(token string, sharedSecret string, timeStamp int64) []byte {
