@@ -509,7 +509,7 @@ func (r RedisCluster) StartPubSubHandler(channel string, callback func(interface
 		return err
 	}
 	for {
-		switch v := psc.Receive().(type) {
+		switch v := psc.ReceiveWithTimeout(0).(type) {
 		case redis.Message:
 			callback(v)
 
