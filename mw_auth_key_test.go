@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +13,7 @@ import (
 	"github.com/lonelycode/go-uuid/uuid"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/signature_validator"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -97,6 +99,80 @@ func TestMurmur3CharBug(t *testing.T) {
 			// New hashing fixes the bug
 			genTestCase(key+"abc", 403),
 			genTestCase(key, 200),
+		}...)
+	})
+}
+
+func TestSignatureValidation(t *testing.T) {
+	defer resetTestConfig()
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	api := buildAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = false
+		spec.Proxy.ListenPath = "/"
+		spec.Auth.ValidateSignature = true
+		spec.Auth.Signature.Algorithm = "MasheryMD5"
+		spec.Auth.Signature.Header = "Signature"
+		spec.Auth.Signature.Secret = "foobar"
+		spec.Auth.Signature.AllowedClockSkew = 1
+	})[0]
+
+	t.Run("Static signature", func(t *testing.T) {
+		api.Auth.Signature.Secret = "foobar"
+		loadAPI(api)
+
+		key := createSession()
+		hasher := signature_validator.MasheryMd5sum{}
+		validHash := hasher.Hash(key, "foobar", time.Now().Unix())
+
+		validSigHeader := map[string]string{
+			"authorization": key,
+			"signature":     hex.EncodeToString(validHash),
+		}
+
+		invalidSigHeader := map[string]string{
+			"authorization": key,
+			"signature":     "junk",
+		}
+
+		emptySigHeader := map[string]string{
+			"authorization": key,
+		}
+
+		ts.Run(t, []test.TestCase{
+			{Headers: emptySigHeader, Code: 401},
+			{Headers: invalidSigHeader, Code: 401},
+			{Headers: validSigHeader, Code: 200},
+		}...)
+	})
+
+	t.Run("Dynamic signature", func(t *testing.T) {
+		api.Auth.Signature.Secret = "$tyk_meta.signature_secret"
+		loadAPI(api)
+
+		key := createSession(func(s *user.SessionState) {
+			s.MetaData = map[string]interface{}{
+				"signature_secret": "foobar",
+			}
+		})
+
+		hasher := signature_validator.MasheryMd5sum{}
+		validHash := hasher.Hash(key, "foobar", time.Now().Unix())
+
+		validSigHeader := map[string]string{
+			"authorization": key,
+			"signature":     hex.EncodeToString(validHash),
+		}
+
+		invalidSigHeader := map[string]string{
+			"authorization": key,
+			"signature":     "junk",
+		}
+
+		ts.Run(t, []test.TestCase{
+			{Headers: invalidSigHeader, Code: 401},
+			{Headers: validSigHeader, Code: 200},
 		}...)
 	})
 }
