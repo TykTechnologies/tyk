@@ -134,7 +134,7 @@ func (k *AuthKey) validateSignature(r *http.Request, key string) (error, int) {
 	validator := signature_validator.SignatureValidator{}
 	if err := validator.Init(config.Signature.Algorithm); err != nil {
 		logger.WithError(err).Info("Invalid signature verification algorithm")
-		return errors.New(errorMessage), errorCode
+		return errors.New("internal server error"), http.StatusInternalServerError
 	}
 
 	signature := r.Header.Get(config.Signature.Header)
