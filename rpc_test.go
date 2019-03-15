@@ -1,6 +1,6 @@
 // +build !race
 
-package main
+package tyk
 
 import (
 	"testing"

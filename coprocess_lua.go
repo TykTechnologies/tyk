@@ -1,7 +1,7 @@
 // +build coprocess
 // +build lua
 
-package main
+package tyk
 
 /*
 #cgo pkg-config: luajit

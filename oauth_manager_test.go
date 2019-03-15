@@ -1,4 +1,4 @@
-package main
+package tyk
 
 /*
 	NOTE: Requires the test tyk.conf to be in place and the settings to b correct - ugly, I know, but necessary for the end to end to work correctly.

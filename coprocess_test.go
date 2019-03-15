@@ -2,7 +2,7 @@
 // +build !python
 // +build !grpc
 
-package main
+package tyk
 
 import (
 	"encoding/json"

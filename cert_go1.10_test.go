@@ -1,6 +1,6 @@
 // +build go1.10
 
-package main
+package tyk
 
 import (
 	"crypto/tls"

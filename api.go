@@ -23,7 +23,7 @@
 //          in: header
 //
 // swagger:meta
-package main
+package tyk
 
 import (
 	"bytes"

@@ -1,6 +1,6 @@
 // +build !python
 
-package main
+package tyk
 
 import (
 	"crypto/md5"

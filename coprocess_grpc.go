@@ -1,7 +1,7 @@
 // +build coprocess
 // +build grpc
 
-package main
+package tyk
 
 import (
 	"errors"

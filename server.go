@@ -1,4 +1,4 @@
-package main
+package tyk
 
 import (
 	"crypto/tls"
@@ -943,7 +943,7 @@ func getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 	return &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys}
 }
 
-func main() {
+func Start() {
 	cli.Init(VERSION, confPaths)
 	cli.Parse()
 	// Stop gateway process if not running in "start" mode:

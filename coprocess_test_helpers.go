@@ -3,7 +3,7 @@
 // +build !lua
 // +build !grpc
 
-package main
+package tyk
 
 /*
 #include <stdio.h>

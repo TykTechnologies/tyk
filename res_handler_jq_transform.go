@@ -1,6 +1,6 @@
 //+build jq
 
-package main
+package tyk
 
 import (
 	"bytes"

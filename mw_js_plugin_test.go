@@ -1,6 +1,6 @@
 // +build coprocess
 
-package main
+package tyk
 
 import (
 	"bytes"

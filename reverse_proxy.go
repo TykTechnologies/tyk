@@ -9,7 +9,7 @@
 // * load balancing
 // * service discovery
 
-package main
+package tyk
 
 import (
 	"bytes"

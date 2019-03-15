@@ -1,6 +1,6 @@
 // +build jq
 
-package main
+package tyk
 
 // #cgo LDFLAGS: -ljq
 // #include <jq.h>

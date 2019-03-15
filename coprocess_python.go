@@ -1,7 +1,7 @@
 // +build coprocess
 // +build python
 
-package main
+package tyk
 
 /*
 #cgo pkg-config: python3

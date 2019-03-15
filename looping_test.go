@@ -1,7 +1,7 @@
 // +build !race
 
 // Looping by itself has race nature
-package main
+package tyk
 
 import (
 	"encoding/json"
