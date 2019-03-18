@@ -1,49 +1,31 @@
+// +build !nogoplugin
+
 package goplugin
 
 import (
+	"errors"
 	"net/http"
-
-	"github.com/TykTechnologies/tyk/user"
+	"plugin"
 )
 
-// Logger provides interface to output to Tyk's logging system with log levels INFO, DEBUG, WARN and ERROR
-type Logger interface {
-	Info(args ...interface{})
-	Infof(format string, args ...interface{})
-	Infoln(args ...interface{})
+func GetHandler(path string, symbol string) (http.HandlerFunc, error) {
+	// try to load plugin
+	loadedPlugin, err := plugin.Open(path)
+	if err != nil {
+		return nil, err
+	}
 
-	Debug(args ...interface{})
-	Debugf(format string, args ...interface{})
-	Debugln(args ...interface{})
+	// try to lookup function symbol
+	funcSymbol, err := loadedPlugin.Lookup(symbol)
+	if err != nil {
+		return nil, err
+	}
 
-	Warning(args ...interface{})
-	Warningf(format string, args ...interface{})
-	Warningln(args ...interface{})
+	// try to cast symbol to real func
+	pluginHandler, ok := funcSymbol.(func(http.ResponseWriter, *http.Request))
+	if !ok {
+		return nil, errors.New("could not cast function symbol to http.HandlerFunc")
+	}
 
-	Error(args ...interface{})
-	Errorf(format string, args ...interface{})
-	Errorln(args ...interface{})
+	return pluginHandler, nil
 }
-
-type APISpec struct {
-	OrgID      string
-	APIID      string
-	ConfigData map[string]interface{}
-}
-
-// ProcessFunc type functions are called for "pre", "post", "post_key_auth" custom middleware methods
-type ProcessFunc func(
-	http.ResponseWriter,
-	*http.Request,
-	*user.SessionState,
-	APISpec,
-	Logger,
-) error
-
-// AuthFunc type function is called for "auth_check" custom middleware method
-type AuthFunc func(
-	http.ResponseWriter,
-	*http.Request,
-	APISpec,
-	Logger,
-) (session *user.SessionState, token string, err error)

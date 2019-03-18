@@ -33,6 +33,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -224,7 +225,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 
 		targetToUse := target
 
-		if spec.URLRewriteEnabled && req.Context().Value(RetainHost) == true {
+		if spec.URLRewriteEnabled && req.Context().Value(ctx.RetainHost) == true {
 			log.Debug("Detected host rewrite, overriding target")
 			tmpTarget, err := url.Parse(req.URL.String())
 			if err != nil {
@@ -563,17 +564,17 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 	p.TykAPISpec.Unlock()
 
-	ctx := req.Context()
+	reqCtx := req.Context()
 	if cn, ok := rw.(http.CloseNotifier); ok {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithCancel(ctx)
+		reqCtx, cancel = context.WithCancel(reqCtx)
 		defer cancel()
 		notifyChan := cn.CloseNotify()
 		go func() {
 			select {
 			case <-notifyChan:
 				cancel()
-			case <-ctx.Done():
+			case <-reqCtx.Done():
 			}
 		}()
 	}
@@ -593,15 +594,15 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	log.Debug("UPSTREAM REQUEST URL: ", req.URL)
 
 	// We need to double set the context for the outbound request to reprocess the target
-	if p.TykAPISpec.URLRewriteEnabled && req.Context().Value(RetainHost) == true {
+	if p.TykAPISpec.URLRewriteEnabled && req.Context().Value(ctx.RetainHost) == true {
 		log.Debug("Detected host rewrite, notifying director")
-		setCtxValue(outreq, RetainHost, true)
+		setCtxValue(outreq, ctx.RetainHost, true)
 	}
 
 	if req.ContentLength == 0 {
 		outreq.Body = nil // Issue 16036: nil Body for http.Transport retries
 	}
-	outreq = outreq.WithContext(ctx)
+	outreq = outreq.WithContext(reqCtx)
 
 	outreq.Header = cloneHeader(req.Header)
 

@@ -3,12 +3,10 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"plugin"
 
 	"github.com/Sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/goplugin"
-	"github.com/TykTechnologies/tyk/user"
 )
 
 // customResponseWriter is a wrapper around standard http.ResponseWriter
@@ -36,14 +34,10 @@ func (w *customResponseWriter) WriteHeader(statusCode int) {
 // GoPluginMiddleware is a generic middleware that will execute Go-plugin code before continuing
 type GoPluginMiddleware struct {
 	BaseMiddleware
-	Path          string // path to .so file
-	SymbolName    string // function symbol to look up
-	Pre           bool
-	UseSession    bool
-	Auth          bool
-	mwProcessFunc goplugin.ProcessFunc
-	mwAuthFunc    goplugin.AuthFunc
-	logger        *logrus.Entry
+	Path       string // path to .so file
+	SymbolName string // function symbol to look up
+	handler    http.HandlerFunc
+	logger     *logrus.Entry
 }
 
 func (m *GoPluginMiddleware) Name() string {
@@ -54,48 +48,17 @@ func (m *GoPluginMiddleware) EnabledForSpec() bool {
 	m.logger = log.WithFields(logrus.Fields{
 		"mwPath":       m.Path,
 		"mwSymbolName": m.SymbolName,
-		"isAuth":       m.Auth,
 	})
 
-	if m.mwProcessFunc != nil || m.mwAuthFunc != nil {
+	if m.handler != nil {
 		m.logger.Info("Go-plugin middleware is already initialized")
 		return true
 	}
 
 	// try to load plugin
-	loadedPlugin, err := plugin.Open(m.Path)
-	if err != nil {
-		m.logger.WithError(err).Error("Could not load plugin")
-		return false
-	}
-
-	// try to lookup function symbol
-	funcSymbol, err := loadedPlugin.Lookup(m.SymbolName)
-	if err != nil {
-		m.logger.WithError(err).Error("Could not look up symbol in loaded plugin")
-		return false
-	}
-
-	// try to cast symbol to real func
-	var ok bool
-	if m.Auth {
-		m.mwAuthFunc, ok = funcSymbol.(func(
-			http.ResponseWriter,
-			*http.Request,
-			goplugin.APISpec,
-			goplugin.Logger,
-		) (session *user.SessionState, token string, err error))
-	} else {
-		m.mwProcessFunc, ok = funcSymbol.(func(
-			http.ResponseWriter,
-			*http.Request,
-			*user.SessionState,
-			goplugin.APISpec,
-			goplugin.Logger,
-		) error)
-	}
-	if !ok {
-		m.logger.Error("Could not cast function symbol")
+	var err error
+	if m.handler, err = goplugin.GetHandler(m.Path, m.SymbolName); err != nil {
+		m.logger.WithError(err).Error("Could not load Go-plugin")
 		return false
 	}
 
@@ -114,17 +77,10 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 
 	// prepare data to call Go-plugin function
 
+	// get session hash before Go-plugin function call
 	var prevMD5Hash string
-	var session *user.SessionState
-	if m.UseSession && !m.Pre && !m.Auth { // pass session if requested in meta and it is not auth_check or pre-process
-		session = ctxGetSession(r)
+	if session := ctxGetSession(r); session != nil {
 		prevMD5Hash = session.MD5Hash()
-	}
-
-	apiSpec := goplugin.APISpec{
-		OrgID:      m.Spec.OrgID,
-		APIID:      m.Spec.APIID,
-		ConfigData: m.Spec.ConfigData,
 	}
 
 	// make sure request's body can be re-read again
@@ -135,42 +91,27 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 		ResponseWriter: w,
 	}
 
-	// run Go-plugin function
-	if m.Auth {
-		newSession, token, authErr := m.mwAuthFunc(rw, r, apiSpec, m.logger)
-		if authErr != nil {
-			err = authErr
-		} else {
-			// add to context session and token created my custom middleware
-			// schedule update so new session will be stored
-			ctxSetSession(r, newSession, token, true)
-		}
-	} else {
-		err = m.mwProcessFunc(rw, r, session, apiSpec, m.logger)
-		if err == nil {
-			// check if session was passed to custom middleware and modified
-			if session != nil && prevMD5Hash != session.MD5Hash() {
-				ctxScheduleSessionUpdate(r)
-			}
+	// call Go-plugin function
+	m.handler(rw, r)
+
+	// check if we need to schedule session update in case session was updated by Go-plugin
+	// but update wasn't scheduled
+	if prevMD5Hash != "" {
+		if session := ctxGetSession(r); session != nil && prevMD5Hash != session.MD5Hash() {
+			ctxScheduleSessionUpdate(r)
 		}
 	}
 
-	// process returned error
-	if err != nil {
-		if rw.responseSent {
-			respCode = rw.statusCodeSent
-		} else {
-			m.logger.Warning("Go-plugin func returned error but didn't send response. Forcing 500 status")
-			w.WriteHeader(http.StatusInternalServerError)
-			respCode = http.StatusInternalServerError
-		}
-		m.logger.WithError(err).Error("Failed to run Go-plugin middleware func")
-		return
-	}
-
-	// no errors, check if response was sent
+	// check if response was sent
 	if rw.responseSent {
-		respCode = mwStatusRespond // no need to continue passing this request down to reverse proxy
+		// check if response code was an error one
+		if rw.statusCodeSent >= http.StatusBadRequest {
+			respCode = rw.statusCodeSent
+			err = fmt.Errorf("plugin function sent error response code: %d", rw.statusCodeSent)
+			m.logger.WithError(err).Error("Failed to process request with Go-plugin middleware func")
+		} else {
+			respCode = mwStatusRespond // no need to continue passing this request down to reverse proxy
+		}
 	} else {
 		respCode = http.StatusOK
 	}
