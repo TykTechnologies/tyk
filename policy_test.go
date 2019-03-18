@@ -449,7 +449,7 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 		ID:               "two_of_three_with_api_limit",
 		Per:              1,
 		Rate:             1000,
-		QuotaMax:         50,
+		QuotaMax:         5,
 		QuotaRenewalRate: 3600,
 		OrgID:            "default",
 		Partitions: user.PolicyPartitions{
@@ -462,7 +462,7 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 			"api1": {
 				Versions: []string{"v1"},
 				Limit: &user.APILimit{
-					QuotaMax:         100,
+					QuotaMax:         2,
 					QuotaRenewalRate: 3600,
 					Rate:             1000,
 					Per:              1,
@@ -547,6 +547,7 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 		// 2 requests to api1, API limit quota remaining should be 98
 		{Method: http.MethodGet, Path: "/api1", Headers: authHeader, Code: http.StatusOK},
 		{Method: http.MethodGet, Path: "/api1", Headers: authHeader, Code: http.StatusOK},
+		{Method: http.MethodGet, Path: "/api1", Headers: authHeader, Code: http.StatusForbidden},
 		// 3 requests to api2, API limit quota remaining should be 197
 		{Method: http.MethodGet, Path: "/api2", Headers: authHeader, Code: http.StatusOK},
 		{Method: http.MethodGet, Path: "/api2", Headers: authHeader, Code: http.StatusOK},
@@ -580,10 +581,10 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 				api1LimitExpected := user.APILimit{
 					Rate:             1000,
 					Per:              1,
-					QuotaMax:         100,
+					QuotaMax:         2,
 					QuotaRenewalRate: 3600,
 					QuotaRenews:      api1Limit.QuotaRenews,
-					QuotaRemaining:   98,
+					QuotaRemaining:   0,
 				}
 				if !reflect.DeepEqual(*api1Limit, api1LimitExpected) {
 					t.Log("api1 limit received:", *api1Limit, "expected:", api1LimitExpected)
@@ -614,10 +615,10 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 				api3LimitExpected := user.APILimit{
 					Rate:             1000,
 					Per:              1,
-					QuotaMax:         50,
+					QuotaMax:         5,
 					QuotaRenewalRate: 3600,
 					QuotaRenews:      api3Limit.QuotaRenews,
-					QuotaRemaining:   45,
+					QuotaRemaining:   0,
 					SetByPolicy:      true,
 				}
 				if !reflect.DeepEqual(*api3Limit, api3LimitExpected) {
@@ -631,6 +632,40 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 
 	// Reset quota
 	ts.Run(t, []test.TestCase{
+		{
+			Method:    http.MethodPut,
+			Path:      "/tyk/keys/" + key + "?suppress_reset=1",
+			AdminAuth: true,
+			Code:      http.StatusOK,
+			Data:      session,
+		},
+		{
+			Method:    http.MethodGet,
+			Path:      "/tyk/keys/" + key,
+			AdminAuth: true,
+			Code:      http.StatusOK,
+			BodyMatchFunc: func(data []byte) bool {
+				sessionData := user.SessionState{}
+				if err := json.Unmarshal(data, &sessionData); err != nil {
+					t.Log(err.Error())
+					return false
+				}
+
+				api1Limit := sessionData.AccessRights["api1"].Limit
+				if api1Limit.QuotaRemaining != 0 {
+					t.Error("Should not reset quota", api1Limit.QuotaRemaining)
+					return false
+				}
+
+				api3Limit := sessionData.AccessRights["api3"].Limit
+				if api3Limit.QuotaRemaining != 0 {
+					t.Error("Should not reset quota", api3Limit.QuotaRemaining)
+					return false
+				}
+
+				return true
+			},
+		},
 		{
 			Method:    http.MethodPut,
 			Path:      "/tyk/keys/" + key,
@@ -649,14 +684,16 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 					t.Log(err.Error())
 					return false
 				}
+
 				api1Limit := sessionData.AccessRights["api1"].Limit
-				if api1Limit == nil {
-					t.Error("api1 limit is not set")
+				if api1Limit.QuotaRemaining != 2 {
+					t.Error("Should reset quota", api1Limit.QuotaRemaining)
 					return false
 				}
 
-				if api1Limit.QuotaRemaining != 100 {
-					t.Error("Should reset quota:", api1Limit.QuotaRemaining)
+				api3Limit := sessionData.AccessRights["api3"].Limit
+				if api3Limit.QuotaRemaining != 5 {
+					t.Error("Should reset quota:", api3Limit.QuotaRemaining)
 					return false
 				}
 
