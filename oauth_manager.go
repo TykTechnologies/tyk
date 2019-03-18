@@ -669,7 +669,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 		return err
 	}
 
-	key := prefixAccess + accessData.AccessToken
+	key := prefixAccess + storage.HashKey(accessData.AccessToken)
 	log.Debug("Saving ACCESS key: ", key)
 
 	// Overide default ExpiresIn:
@@ -745,13 +745,19 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 
 // LoadAccess will load access data from redis
 func (r *RedisOsinStorageInterface) LoadAccess(token string) (*osin.AccessData, error) {
-	key := prefixAccess + token
+	key := prefixAccess + storage.HashKey(token)
 	log.Debug("Loading ACCESS key: ", key)
 	accessJSON, err := r.store.GetKey(key)
 
 	if err != nil {
-		log.Error("Failure retreiving access token by key: ", err)
-		return nil, err
+		// Fallback to unhashed value for backward compatibility
+		key = prefixAccess + token
+		accessJSON, err = r.store.GetKey(key)
+
+		if err != nil {
+			log.Error("Failure retreiving access token by key: ", err)
+			return nil, err
+		}
 	}
 
 	accessData := osin.AccessData{Client: new(OAuthClient)}
