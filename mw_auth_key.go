@@ -117,7 +117,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 
 func (k *AuthKey) validateSignature(r *http.Request, key string) (error, int) {
 	config := k.Spec.Auth
-	logger := k.Logger().WithField("key", obfuscateKey(key))
+	logger := getLogEntryForRequest(r, key, nil)
 
 	if !config.ValidateSignature {
 		return nil, http.StatusOK
