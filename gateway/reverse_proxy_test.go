@@ -12,14 +12,12 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/TykTechnologies/tyk/test"
-
-	"github.com/TykTechnologies/tyk/dnscache"
-
-	"github.com/TykTechnologies/tyk/config"
-
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/dnscache"
 	"github.com/TykTechnologies/tyk/request"
+	"github.com/TykTechnologies/tyk/test"
 )
 
 func TestCopyHeader_NoDuplicateCORSHeaders(t *testing.T) {
@@ -94,7 +92,7 @@ func TestReverseProxyRetainHost(t *testing.T) {
 			req := testReq(t, http.MethodGet, tc.inURL, nil)
 			req.URL.Path = tc.inPath
 			if tc.retainHost {
-				setCtxValue(req, RetainHost, true)
+				setCtxValue(req, ctx.RetainHost, true)
 			}
 
 			proxy := TykNewSingleHostReverseProxy(target, spec)
