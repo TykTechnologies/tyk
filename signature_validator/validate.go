@@ -32,9 +32,6 @@ func (v *SignatureValidator) Init(hasherName string) error {
 
 func (v SignatureValidator) Validate(signature, key, secret string, allowedClockSkew int64) error {
 	signatureBytes, _ := hex.DecodeString(signature)
-
-	fmt.Println("Validating:", signature, key, secret)
-
 	now := time.Now().Unix()
 	for i := int64(0); i <= allowedClockSkew; i++ {
 		if bytes.Equal(v.h.Hash(key, secret, now+i), signatureBytes) {
