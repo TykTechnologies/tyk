@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"html/template"
-	"io"
 	"io/ioutil"
 	stdlog "log"
 	"log/syslog"
@@ -82,11 +81,10 @@ var (
 	policiesMu   sync.RWMutex
 	policiesByID = map[string]user.Policy{}
 
-	mainRouter     *mux.Router
-	controlRouter  *mux.Router
-	livenessRouter *mux.Router
-	LE_MANAGER     letsencrypt.Manager
-	LE_FIRSTRUN    bool
+	mainRouter    *mux.Router
+	controlRouter *mux.Router
+	LE_MANAGER    letsencrypt.Manager
+	LE_FIRSTRUN   bool
 
 	NodeID string
 
@@ -145,7 +143,6 @@ func setupGlobals() {
 
 	mainRouter = mux.NewRouter()
 	controlRouter = mux.NewRouter()
-	livenessRouter = mux.NewRouter()
 
 	if config.Global().EnableAnalytics && config.Global().Storage.Type != "redis" {
 		mainLog.Fatal("Analytics requires Redis Storage backend, please enable Redis in the tyk.conf file.")
@@ -1398,31 +1395,7 @@ func listen(listener, controlListener net.Listener, err error) {
 		fmt.Fprintf(w, "Hello Tiki")
 	})
 
-	livenessRouter.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
-
-		redisStore := storage.RedisCluster{KeyPrefix: "livenesscheck-", HashKeys: config.Global().HashKeys}
-
-		key := "tyk-liveness-probe"
-
-		err := redisStore.SetRawKey(key, key, 10)
-		if err != nil {
-			mainLog.WithField("liveness-check", true).Error(err)
-			doJSONWrite(w, 500, apiError("Gateway is not connected to Redis. An error occurred while writing key to Redis"))
-			return
-		}
-
-		redisStore.DeleteRawKey(key)
-
-		if config.Global().UseDBAppConfigs {
-			if err = DashService.Ping(); err != nil {
-				doJSONWrite(w, 500, apiError("Dashboard is down. Gateway cannot connect to the dashboard"))
-				return
-			}
-		}
-
-		io.Copy(w, strings.NewReader("Liveness check is enabled"))
-	})
-
+	var livenessRouter *mux.Router
 	if config.Global().LivenessCheck.Enabled {
 		var l net.Listener
 
@@ -1432,6 +1405,9 @@ func listen(listener, controlListener net.Listener, err error) {
 			l, err = net.Listen("tcp", fmt.Sprintf("%s:%s", config.Global().ListenAddress, config.Global().LivenessCheck.Port))
 			if err != nil {
 				mainLog.Errorf("an error occurred while creating the liveness check router.... %v", err)
+			} else {
+				livenessRouter = mux.NewRouter()
+				livenessRouter.HandleFunc("/status", liveCheck)
 			}
 		}
 
@@ -1449,4 +1425,39 @@ func listen(listener, controlListener net.Listener, err error) {
 	if !rpc.IsEmergencyMode() {
 		doReload()
 	}
+}
+
+func liveCheck(w http.ResponseWriter, r *http.Request) {
+
+	redisStore := storage.RedisCluster{KeyPrefix: "livenesscheck-"}
+
+	key := "tyk-liveness-probe"
+
+	err := redisStore.SetRawKey(key, key, 10)
+	if err != nil {
+		mainLog.WithField("liveness-check", true).Error(err)
+		doJSONWrite(w, 500, apiError("Gateway is not connected to Redis. An error occurred while writing key to Redis"))
+		return
+	}
+
+	redisStore.DeleteRawKey(key)
+
+	if config.Global().UseDBAppConfigs {
+		if err = DashService.Ping(); err != nil {
+			doJSONWrite(w, 500, apiError("Dashboard is down. Gateway cannot connect to the dashboard"))
+			return
+		}
+	}
+
+	if config.Global().Policies.PolicySource == "rpc" {
+		rpcStore := RPCStorageHandler{KeyPrefix: "livenesscheck-"}
+
+		if !rpcStore.Connect() {
+			doJSONWrite(w, 500, apiError("RPC connection is down!!!"))
+			return
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`Gateway is alive!!!!`))
 }
