@@ -393,7 +393,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 		coprocessAuth := EnableCoProcess && mwDriver != apidef.OttoDriver && spec.EnableCoProcessAuth
 		ottoAuth := !coprocessAuth && mwDriver == apidef.OttoDriver && spec.EnableCoProcessAuth
-		gopluginAuth := !coprocessAuth && !ottoAuth && mwDriver == apidef.GoPluginDriver
+		gopluginAuth := !coprocessAuth && !ottoAuth && mwDriver == apidef.GoPluginDriver && spec.UseGoPluginAuth
 
 		if coprocessAuth {
 			// TODO: check if mwAuthCheckFunc is available/valid

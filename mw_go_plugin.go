@@ -77,12 +77,6 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 
 	// prepare data to call Go-plugin function
 
-	// get session hash before Go-plugin function call
-	var prevMD5Hash string
-	if session := ctxGetSession(r); session != nil {
-		prevMD5Hash = session.MD5Hash()
-	}
-
 	// make sure request's body can be re-read again
 	nopCloseRequestBody(r)
 
@@ -93,14 +87,6 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 
 	// call Go-plugin function
 	m.handler(rw, r)
-
-	// check if we need to schedule session update in case session was updated by Go-plugin
-	// but update wasn't scheduled
-	if prevMD5Hash != "" {
-		if session := ctxGetSession(r); session != nil && prevMD5Hash != session.MD5Hash() {
-			ctxScheduleSessionUpdate(r)
-		}
-	}
 
 	// check if response was sent
 	if rw.responseSent {

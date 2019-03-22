@@ -99,7 +99,7 @@ func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 				_, isGoPlugin := mw.(*GoPluginMiddleware)
 
 				handler := ErrorHandler{*mw.Base()}
-				handler.HandleError(w, r, err.Error(), errCode, isGoPlugin)
+				handler.HandleError(w, r, err.Error(), errCode, !isGoPlugin)
 
 				meta["error"] = err.Error()
 

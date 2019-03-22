@@ -48,9 +48,12 @@ const Schema = `{
         "openid_options": {
             "type": ["object", "null"]
         },
-        "use_standard_auth":{
+        "use_standard_auth": {
             "type": "boolean"
         },
+		"use_go_plugin_auth": {
+			"type": "boolean"
+		},
         "enable_coprocess_auth": {
             "type": "boolean"
         },

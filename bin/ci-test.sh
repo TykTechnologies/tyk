@@ -40,6 +40,9 @@ i=0
 
 go get -t
 
+# build Go-plugin used in tests
+go build -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugins || fatal "building Go-plugin failed"
+
 # need to do per-pkg because go test doesn't support a single coverage
 # profile for multiple pkgs
 for pkg in $PKGS; do
