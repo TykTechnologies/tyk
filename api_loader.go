@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -667,6 +668,32 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 	muxer.HandleFunc("/"+config.Global().HealthCheckEndpointName, func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "Hello Tiki")
 	})
+
+	if config.Global().LivenessCheck.Enabled {
+		handler := checkIsAPIOwner(http.HandlerFunc(liveCheck))
+
+		if config.Global().LivenessCheck.Port <= 0 {
+			// If not port was defined, mount the liveness check on
+			// the main router
+			muxer.Handle("/status", handler)
+		} else {
+			l, err := net.Listen("tcp", fmt.Sprintf("%s:%d", config.Global().ListenAddress, config.Global().LivenessCheck.Port))
+			if err != nil {
+				mainLog.Errorf("an error occurred while creating the liveness check router.... %v", err)
+			} else {
+				livenessRouter := mux.NewRouter()
+				livenessRouter.Handle("/status", handler)
+
+				srv := &http.Server{
+					ReadTimeout:  time.Second * 5,
+					WriteTimeout: time.Second * 5,
+					Handler:      livenessRouter,
+				}
+
+				go srv.Serve(l)
+			}
+		}
+	}
 
 	// Swap in the new register
 	apisMu.Lock()

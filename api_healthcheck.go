@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http"
 	"strconv"
 	"strings"
 	"sync"
@@ -137,4 +138,43 @@ func (h *DefaultHealthChecker) ApiHealthValues() (HealthCheckValues, error) {
 	}
 	values.AvgUpstreamLatency = roundValue(float64(runningTotal / len(vals)))
 	return values, nil
+}
+
+func liveCheck(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		doJSONWrite(w, http.StatusMethodNotAllowed, apiError(http.StatusText(http.StatusMethodNotAllowed)))
+		return
+	}
+
+	redisStore := storage.RedisCluster{KeyPrefix: "livenesscheck-"}
+
+	key := "tyk-liveness-probe"
+
+	err := redisStore.SetRawKey(key, key, 10)
+	if err != nil {
+		mainLog.WithField("liveness-check", true).Error(err)
+		doJSONWrite(w, 500, apiError("Gateway is not connected to Redis. An error occurred while writing key to Redis"))
+		return
+	}
+
+	redisStore.DeleteRawKey(key)
+
+	if config.Global().UseDBAppConfigs {
+		if err = DashService.Ping(); err != nil {
+			doJSONWrite(w, 500, apiError("Dashboard is down. Gateway cannot connect to the dashboard"))
+			return
+		}
+	}
+
+	if config.Global().Policies.PolicySource == "rpc" {
+		rpcStore := RPCStorageHandler{KeyPrefix: "livenesscheck-"}
+
+		if !rpcStore.Connect() {
+			doJSONWrite(w, 500, apiError("RPC connection is down!!!"))
+			return
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`Gateway is alive!!!!`))
 }
