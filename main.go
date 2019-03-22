@@ -1399,17 +1399,19 @@ func listen(listener, controlListener net.Listener, err error) {
 	})
 
 	livenessRouter.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
-		store := FallbackKeySesionManager.Store()
+
+		redisStore := storage.RedisCluster{KeyPrefix: "livenesscheck-", HashKeys: config.Global().HashKeys}
 
 		key := "tyk-liveness-probe"
 
-		err := store.SetRawKey(key, key, 10)
+		err := redisStore.SetRawKey(key, key, 10)
 		if err != nil {
-			doJSONWrite(w, 500, apiError("Gateway is not connected to redis"))
+			mainLog.WithField("liveness-check", true).Error(err)
+			doJSONWrite(w, 500, apiError("Gateway is not connected to Redis. An error occurred while writing key to Redis"))
 			return
 		}
 
-		store.DeleteRawKey(key)
+		redisStore.DeleteRawKey(key)
 
 		if config.Global().UseDBAppConfigs {
 			if err = DashService.Ping(); err != nil {
