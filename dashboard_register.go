@@ -25,6 +25,7 @@ type DashboardServiceSender interface {
 	DeRegister() error
 	StartBeating() error
 	StopBeating()
+	Ping() error
 }
 
 type HTTPDashboardHandler struct {
@@ -134,6 +135,12 @@ func (h *HTTPDashboardHandler) Register() error {
 	log.Debug("Registration Finished: Nonce Set: ", ServiceNonce)
 
 	return nil
+}
+
+func (h *HTTPDashboardHandler) Ping() error {
+	return h.sendHeartBeat(
+		h.newRequest(h.HeartBeatEndpoint),
+		initialiseClient(time.Second*5))
 }
 
 func (h *HTTPDashboardHandler) StartBeating() error {

@@ -1411,6 +1411,13 @@ func listen(listener, controlListener net.Listener, err error) {
 
 		store.DeleteRawKey(key)
 
+		if config.Global().UseDBAppConfigs {
+			if err = DashService.Ping(); err != nil {
+				doJSONWrite(w, 500, apiError("Dashboard is down. Gateway cannot connect to the dashboard"))
+				return
+			}
+		}
+
 		io.Copy(w, strings.NewReader("Liveness check is enabled"))
 	})
 
