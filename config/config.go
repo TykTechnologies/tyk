@@ -93,6 +93,11 @@ type HealthCheckConfig struct {
 	HealthCheckValueTimeout int64 `json:"health_check_value_timeouts"`
 }
 
+type LivenessCheckConfig struct {
+	Enabled bool   `json:"enabled"`
+	Port    string `json:"port"`
+}
+
 type DnsCacheConfig struct {
 	Enabled                   bool              `json:"enabled"`
 	TTL                       int64             `json:"ttl"`
@@ -231,6 +236,7 @@ type Config struct {
 	EnableAnalytics                   bool                                  `json:"enable_analytics"`
 	AnalyticsConfig                   AnalyticsConfigConfig                 `json:"analytics_config"`
 	HealthCheck                       HealthCheckConfig                     `json:"health_check"`
+	LivenessCheck                     LivenessCheckConfig                   `json:"liveness_check"`
 	DnsCache                          DnsCacheConfig                        `json:"dns_cache"`
 	UseAsyncSessionWrite              bool                                  `json:"optimisations_use_async_session_write"`
 	SessionUpdatePoolSize             int                                   `json:"session_update_pool_size"`

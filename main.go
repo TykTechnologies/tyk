@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"html/template"
+	"io"
 	"io/ioutil"
 	stdlog "log"
 	"log/syslog"
@@ -81,10 +82,11 @@ var (
 	policiesMu   sync.RWMutex
 	policiesByID = map[string]user.Policy{}
 
-	mainRouter    *mux.Router
-	controlRouter *mux.Router
-	LE_MANAGER    letsencrypt.Manager
-	LE_FIRSTRUN   bool
+	mainRouter     *mux.Router
+	controlRouter  *mux.Router
+	livenessRouter *mux.Router
+	LE_MANAGER     letsencrypt.Manager
+	LE_FIRSTRUN    bool
 
 	NodeID string
 
@@ -143,6 +145,7 @@ func setupGlobals() {
 
 	mainRouter = mux.NewRouter()
 	controlRouter = mux.NewRouter()
+	livenessRouter = mux.NewRouter()
 
 	if config.Global().EnableAnalytics && config.Global().Storage.Type != "redis" {
 		mainLog.Fatal("Analytics requires Redis Storage backend, please enable Redis in the tyk.conf file.")
@@ -1145,6 +1148,7 @@ func start() {
 	// interval counts from the start of one reload to the next.
 	go reloadLoop(time.Tick(time.Second))
 	go reloadQueueLoop()
+
 }
 
 func generateListener(listenPort int) (net.Listener, error) {
@@ -1393,6 +1397,45 @@ func listen(listener, controlListener net.Listener, err error) {
 	mainRouter.HandleFunc("/"+config.Global().HealthCheckEndpointName, func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Hello Tiki")
 	})
+
+	livenessRouter.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
+		store := FallbackKeySesionManager.Store()
+
+		key := "tyk-liveness-probe"
+
+		err := store.SetRawKey(key, key, 10)
+		if err != nil {
+			doJSONWrite(w, 500, apiError("Gateway is not connected to redis"))
+			return
+		}
+
+		store.DeleteRawKey(key)
+
+		io.Copy(w, strings.NewReader("Liveness check is enabled"))
+	})
+
+	if config.Global().LivenessCheck.Enabled {
+		var l net.Listener
+
+		if config.Global().LivenessCheck.Port == "" {
+			l = listener
+		} else {
+			l, err = net.Listen("tcp", fmt.Sprintf("%s:%s", config.Global().ListenAddress, config.Global().LivenessCheck.Port))
+			if err != nil {
+				mainLog.Errorf("an error occurred while creating the liveness check router.... %v", err)
+			}
+		}
+
+		if l != nil {
+			srv := &http.Server{
+				ReadTimeout:  time.Second * 5,
+				WriteTimeout: time.Second * 5,
+				Handler:      livenessRouter,
+			}
+
+			go srv.Serve(l)
+		}
+	}
 
 	if !rpc.IsEmergencyMode() {
 		doReload()
