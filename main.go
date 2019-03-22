@@ -1399,10 +1399,10 @@ func listen(listener, controlListener net.Listener, err error) {
 	if config.Global().LivenessCheck.Enabled {
 		var l net.Listener
 
-		if config.Global().LivenessCheck.Port == "" {
+		if config.Global().LivenessCheck.Port <= 0 {
 			l = listener
 		} else {
-			l, err = net.Listen("tcp", fmt.Sprintf("%s:%s", config.Global().ListenAddress, config.Global().LivenessCheck.Port))
+			l, err = net.Listen("tcp", fmt.Sprintf("%s:%d", config.Global().ListenAddress, config.Global().LivenessCheck.Port))
 			if err != nil {
 				mainLog.Errorf("an error occurred while creating the liveness check router.... %v", err)
 			} else {

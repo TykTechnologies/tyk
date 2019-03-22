@@ -307,6 +307,18 @@ const confSchema = `{
 			}
 		}
 	},
+	"liveness_check": {
+		"type": ["object", "null"],
+		"additionalProperties": false,
+		"properties": {
+			"enabled": {
+				"type": "boolean"
+			},
+			"port": {
+				"type": "integer"
+			}
+		}
+	},
 	"dns_cache": {
 		"type": ["object", "null"],
 		"additionalProperties": false,
