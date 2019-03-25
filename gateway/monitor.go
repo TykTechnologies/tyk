@@ -18,7 +18,7 @@ func (Monitor) Fire(sessionData *user.SessionState, key string, triggerLimit flo
 		Type: EventTriggerExceeded,
 		Meta: EventTriggerExceededMeta{
 			EventMetaDefault: EventMetaDefault{Message: "Quota trigger reached"},
-			Org:              sessionData.OrgID,
+			OrgID:            sessionData.OrgID,
 			Key:              key,
 			TriggerLimit:     int64(triggerLimit),
 		},

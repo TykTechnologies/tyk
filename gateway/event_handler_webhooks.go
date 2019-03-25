@@ -237,12 +237,7 @@ func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 	}
 
 	if w.dashboardService != nil && em.Type == EventTriggerExceeded {
-		meta, ok := em.Meta.(EventTriggerExceededMeta)
-		if !ok {
-			return
-		}
-
-		w.dashboardService.NotifyDashboardOfKeyQuotaTrigger(meta)
+		w.dashboardService.NotifyDashboardOfEvent(em.Meta)
 	}
 
 	w.setHookFired(reqChecksum)

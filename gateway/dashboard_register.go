@@ -26,7 +26,7 @@ type DashboardServiceSender interface {
 	DeRegister() error
 	StartBeating() error
 	StopBeating()
-	NotifyDashboardOfKeyQuotaTrigger(EventTriggerExceededMeta) error
+	NotifyDashboardOfEvent(interface{}) error
 }
 
 type HTTPDashboardHandler struct {
@@ -94,7 +94,12 @@ func (h *HTTPDashboardHandler) Init() error {
 
 // NotifyDashboardOfKeyQuotaTrigger acts as a form of event which informs the
 // dashboard of a key which has reached a certain usage quota
-func (h *HTTPDashboardHandler) NotifyDashboardOfKeyQuotaTrigger(meta EventTriggerExceededMeta) error {
+func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
+
+	meta, ok := event.(EventTriggerExceededMeta)
+	if !ok {
+		return errors.New("event type is currently not supported as a notification to the dashboard")
+	}
 
 	var b bytes.Buffer
 	if err := json.NewEncoder(&b).Encode(meta); err != nil {
