@@ -92,7 +92,7 @@ func (h *HTTPDashboardHandler) Init() error {
 	return nil
 }
 
-// NotifyDashboardOfKeyQuotaTrigger acts as a form of event which informs the
+// NotifyDashboardOfEvent acts as a form of event which informs the
 // dashboard of a key which has reached a certain usage quota
 func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 

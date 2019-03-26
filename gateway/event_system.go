@@ -75,9 +75,10 @@ type EventVersionFailureMeta struct {
 
 type EventTriggerExceededMeta struct {
 	EventMetaDefault
-	OrgID        string `json:"org_id"`
-	Key          string `json:"key"`
-	TriggerLimit int64  `json:"trigger_limit"`
+	OrgID           string `json:"org_id"`
+	Key             string `json:"key"`
+	TriggerLimit    int64  `json:"trigger_limit"`
+	UsagePercentage int64  `json:"usage_percentage"`
 }
 
 type EventTokenMeta struct {

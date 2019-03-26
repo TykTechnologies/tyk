@@ -13,7 +13,7 @@ func (Monitor) Enabled() bool {
 	return config.Global().Monitor.EnableTriggerMonitors
 }
 
-func (Monitor) Fire(sessionData *user.SessionState, key string, triggerLimit float64) {
+func (Monitor) Fire(sessionData *user.SessionState, key string, triggerLimit, usagePercentage float64) {
 	em := config.EventMessage{
 		Type: EventTriggerExceeded,
 		Meta: EventTriggerExceededMeta{
@@ -21,6 +21,7 @@ func (Monitor) Fire(sessionData *user.SessionState, key string, triggerLimit flo
 			OrgID:            sessionData.OrgID,
 			Key:              key,
 			TriggerLimit:     int64(triggerLimit),
+			UsagePercentage:  int64(usagePercentage),
 		},
 		TimeStamp: time.Now().String(),
 	}
@@ -50,13 +51,13 @@ func (m Monitor) Check(sessionData *user.SessionState, key string) {
 
 	if config.Global().Monitor.GlobalTriggerLimit > 0.0 && usagePerc >= config.Global().Monitor.GlobalTriggerLimit {
 		log.Info("Firing...")
-		m.Fire(sessionData, key, config.Global().Monitor.GlobalTriggerLimit)
+		m.Fire(sessionData, key, config.Global().Monitor.GlobalTriggerLimit, usagePerc)
 	}
 
 	for _, triggerLimit := range sessionData.Monitor.TriggerLimits {
 		if usagePerc >= triggerLimit && triggerLimit != config.Global().Monitor.GlobalTriggerLimit {
 			log.Info("Firing...")
-			m.Fire(sessionData, key, triggerLimit)
+			m.Fire(sessionData, key, triggerLimit, usagePerc)
 			break
 		}
 	}
