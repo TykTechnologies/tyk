@@ -133,6 +133,13 @@ func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 		return err
 	}
 
+	val := NodeResponseOK{}
+	if err := json.NewDecoder(resp.Body).Decode(&val); err != nil {
+		return err
+	}
+
+	ServiceNonce = val.Nonce
+
 	return nil
 }
 
