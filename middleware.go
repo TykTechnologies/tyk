@@ -538,7 +538,8 @@ func parseForm(r *http.Request) {
 		r.ParseForm()
 
 		r.Body = ioutil.NopCloser(&b)
-	} else {
-		r.ParseForm()
+		return
 	}
+
+	r.ParseForm()
 }
