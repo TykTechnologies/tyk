@@ -144,7 +144,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 
 	// We need to copy the body _back_ for the decode
 	r.Body = ioutil.NopCloser(bytes.NewReader(originalBody))
-	r.ParseForm()
+	parseForm(r)
 	requestData.Params = r.Form
 
 	requestAsJson, err := json.Marshal(requestData)
