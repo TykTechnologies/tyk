@@ -193,6 +193,8 @@ func (t BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 	t.Logger().Debug("Checking: ", orgid)
 	cachedVal, found := ExpiryCache.Get(orgid)
 	if !found {
+		// Cache failed attempt
+		t.SetOrgExpiry(orgid, 604800)
 		go t.OrgSession(orgid)
 		t.Logger().Debug("no cached entry found, returning 7 days")
 		return 604800
