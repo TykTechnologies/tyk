@@ -23,7 +23,8 @@ func (m *MiddlewareContextVars) EnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *MiddlewareContextVars) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	r.ParseForm()
+
+	parseForm(r)
 
 	contextDataObject := map[string]interface{}{
 		"request_data": r.Form, // Form params (map[string][]string)
