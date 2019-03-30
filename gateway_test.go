@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -97,7 +98,7 @@ func initTestMain(m *testing.M) int {
 	if err := config.WriteDefault("", &globalConf); err != nil {
 		panic(err)
 	}
-	globalConf.Storage.Database = 1
+	globalConf.Storage.Database = rand.Intn(15)
 	var err error
 	globalConf.AppPath, err = ioutil.TempDir("", "tyk-test-")
 	if err != nil {
