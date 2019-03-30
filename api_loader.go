@@ -364,7 +364,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 			mainLog.WithField("api_name", spec.Name).Info("Checking security policy: OAuth")
 		}
 
-		if mwAppendEnabled(&authArray, &BasicAuthKeyIsValid{baseMid, cache.New(60*time.Second, 60*time.Minute)}) {
+		if mwAppendEnabled(&authArray, &BasicAuthKeyIsValid{baseMid, cache.New(60*time.Second, 60*time.Minute), nil, nil}) {
 			mainLog.WithField("api_name", spec.Name).Info("Checking security policy: Basic")
 		}
 

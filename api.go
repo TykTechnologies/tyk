@@ -333,7 +333,7 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
 			"key":    obfuscateKey(sessionKey),
-			"error": err,
+			"error":  err,
 			"status": "ok",
 		}).Info("Can't retrieve key quota")
 	}
