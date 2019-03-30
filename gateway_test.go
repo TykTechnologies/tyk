@@ -1429,11 +1429,13 @@ func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
 		s.Rate = 1
 		s.Per = 60
 	})
+	defer FallbackKeySesionManager.RemoveSession(sess1token, false)
 
 	sess2token := createSession(func(s *user.SessionState) {
 		s.Rate = 1
 		s.Per = 60
 	})
+	defer FallbackKeySesionManager.RemoveSession(sess2token, false)
 
 	ts.Run(t, []test.TestCase{
 		{Headers: map[string]string{"Authorization": sess1token}, Code: http.StatusOK, Path: "/", Delay: 100 * time.Millisecond},
