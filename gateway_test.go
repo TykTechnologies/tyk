@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -97,7 +98,7 @@ func initTestMain(m *testing.M) int {
 	if err := config.WriteDefault("", &globalConf); err != nil {
 		panic(err)
 	}
-	globalConf.Storage.Database = 1
+	globalConf.Storage.Database = rand.Intn(15)
 	var err error
 	globalConf.AppPath, err = ioutil.TempDir("", "tyk-test-")
 	if err != nil {
@@ -1429,11 +1430,13 @@ func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
 		s.Rate = 1
 		s.Per = 60
 	})
+	defer FallbackKeySesionManager.RemoveSession(sess1token, false)
 
 	sess2token := createSession(func(s *user.SessionState) {
 		s.Rate = 1
 		s.Per = 60
 	})
+	defer FallbackKeySesionManager.RemoveSession(sess2token, false)
 
 	ts.Run(t, []test.TestCase{
 		{Headers: map[string]string{"Authorization": sess1token}, Code: http.StatusOK, Path: "/", Delay: 100 * time.Millisecond},
