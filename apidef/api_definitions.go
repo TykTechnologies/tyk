@@ -680,16 +680,16 @@ func DummyAPI() APIDefinition {
 	}
 
 	return APIDefinition{
-		VersionData:             versionData,
-		ConfigData:              map[string]interface{}{},
-		AllowedIPs:              []string{},
-		PinnedPublicKeys:        map[string]string{},
-		ResponseProcessors:      []ResponseProcessor{},
-		ClientCertificates:      []string{},
-		BlacklistedIPs:          []string{},
-		TagHeaders:              []string{},
-		UpstreamCertificates:    map[string]string{},
-		HmacAllowedAlgorithms:   []string{},
+		VersionData:           versionData,
+		ConfigData:            map[string]interface{}{},
+		AllowedIPs:            []string{},
+		PinnedPublicKeys:      map[string]string{},
+		ResponseProcessors:    []ResponseProcessor{},
+		ClientCertificates:    []string{},
+		BlacklistedIPs:        []string{},
+		TagHeaders:            []string{},
+		UpstreamCertificates:  map[string]string{},
+		HmacAllowedAlgorithms: []string{},
 		CustomMiddleware: MiddlewareSection{
 			Post:        []MiddlewareDefinition{},
 			Pre:         []MiddlewareDefinition{},
