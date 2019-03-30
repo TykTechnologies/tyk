@@ -341,8 +341,11 @@ type APIDefinition struct {
 	Auth         Auth `bson:"auth" json:"auth"`
 	UseBasicAuth bool `bson:"use_basic_auth" json:"use_basic_auth"`
 	BasicAuth    struct {
-		DisableCaching bool `bson:"disable_caching" json:"disable_caching"`
-		CacheTTL       int  `bson:"cache_ttl" json:"cache_ttl"`
+		DisableCaching     bool   `bson:"disable_caching" json:"disable_caching"`
+		CacheTTL           int    `bson:"cache_ttl" json:"cache_ttl"`
+		ExtractFromBody    bool   `bson:"extract_from_body" json:"extract_from_body"`
+		BodyUserRegexp     string `bson:"body_user_regexp" json:"body_user_regexp"`
+		BodyPasswordRegexp string `bson:"body_password_regexp" json:"body_password_regexp"`
 	} `bson:"basic_auth" json:"basic_auth"`
 	UseMutualTLSAuth           bool                 `bson:"use_mutual_tls_auth" json:"use_mutual_tls_auth"`
 	ClientCertificates         []string             `bson:"client_certificates" json:"client_certificates"`

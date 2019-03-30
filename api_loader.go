@@ -353,7 +353,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 			logger.Info("Checking security policy: OAuth")
 		}
 
-		if mwAppendEnabled(&authArray, &BasicAuthKeyIsValid{baseMid, cache.New(60*time.Second, 60*time.Minute)}) {
+		if mwAppendEnabled(&authArray, &BasicAuthKeyIsValid{baseMid, cache.New(60*time.Second, 60*time.Minute), nil, nil}) {
 			logger.Info("Checking security policy: Basic")
 		}
 

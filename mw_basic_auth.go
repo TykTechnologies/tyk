@@ -1,23 +1,23 @@
 package main
 
 import (
+	"bytes"
 	"encoding/base64"
 	"errors"
+	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
 
-	cache "github.com/pmylund/go-cache"
-
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/storage"
-
 	"github.com/Sirupsen/logrus"
+	cache "github.com/pmylund/go-cache"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/TykTechnologies/murmur3"
-
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/regexp"
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -27,6 +27,9 @@ const defaultBasicAuthTTL = time.Duration(60) * time.Second
 type BasicAuthKeyIsValid struct {
 	BaseMiddleware
 	cache *cache.Cache
+
+	bodyUserRegexp     *regexp.Regexp
+	bodyPasswordRegexp *regexp.Regexp
 }
 
 func (k *BasicAuthKeyIsValid) Name() string {
@@ -35,7 +38,32 @@ func (k *BasicAuthKeyIsValid) Name() string {
 
 // EnabledForSpec checks if UseBasicAuth is set in the API definition.
 func (k *BasicAuthKeyIsValid) EnabledForSpec() bool {
-	return k.Spec.UseBasicAuth
+	if !k.Spec.UseBasicAuth {
+		return false
+	}
+
+	var err error
+
+	if k.Spec.BasicAuth.ExtractFromBody {
+		if k.Spec.BasicAuth.BodyUserRegexp == "" || k.Spec.BasicAuth.BodyPasswordRegexp == "" {
+			k.Logger().Error("Basic Auth configured to extract credentials from body, but regexps are empty")
+			return false
+		}
+
+		k.bodyUserRegexp, err = regexp.Compile(k.Spec.BasicAuth.BodyUserRegexp)
+		if err != nil {
+			k.Logger().WithError(err).Error("Invalid user body regexp")
+			return false
+		}
+
+		k.bodyPasswordRegexp, err = regexp.Compile(k.Spec.BasicAuth.BodyPasswordRegexp)
+		if err != nil {
+			k.Logger().WithError(err).Error("Invalid user password regexp")
+			return false
+		}
+	}
+
+	return true
 }
 
 // requestForBasicAuth sends error code and message along with WWW-Authenticate header to client.
@@ -46,15 +74,15 @@ func (k *BasicAuthKeyIsValid) requestForBasicAuth(w http.ResponseWriter, msg str
 	return errors.New(msg), http.StatusUnauthorized
 }
 
-// ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
-func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+func (k *BasicAuthKeyIsValid) basicAuthHeaderCredentials(w http.ResponseWriter, r *http.Request) (username, password string, err error, code int) {
 	token := r.Header.Get("Authorization")
 	logger := k.Logger().WithField("key", obfuscateKey(token))
 	if token == "" {
 		// No header value, fail
 		logger.Info("Attempted access with malformed header, no auth header found.")
 
-		return k.requestForBasicAuth(w, "Authorization field missing")
+		err, code = k.requestForBasicAuth(w, "Authorization field missing")
+		return
 	}
 
 	bits := strings.Split(token, " ")
@@ -62,7 +90,8 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		// Header malformed
 		logger.Info("Attempted access with malformed header, header not in basic auth format.")
 
-		return errors.New("Attempted access with malformed header, header not in basic auth format"), http.StatusBadRequest
+		err, code = errors.New("Attempted access with malformed header, header not in basic auth format"), http.StatusBadRequest
+		return
 	}
 
 	// Decode the username:password string
@@ -70,7 +99,8 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		logger.Info("Base64 Decoding failed of basic auth data: ", err)
 
-		return errors.New("Attempted access with malformed header, auth data not encoded correctly"), http.StatusBadRequest
+		err, code = errors.New("Attempted access with malformed header, auth data not encoded correctly"), http.StatusBadRequest
+		return
 	}
 
 	authValues := strings.Split(string(authvaluesStr), ":")
@@ -78,12 +108,63 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		// Header malformed
 		logger.Info("Attempted access with malformed header, values not in basic auth format.")
 
-		return errors.New("Attempted access with malformed header, values not in basic auth format"), http.StatusBadRequest
+		err, code = errors.New("Attempted access with malformed header, values not in basic auth format"), http.StatusBadRequest
+		return
+	}
+
+	username, password = authValues[0], authValues[1]
+	return
+}
+
+func (k *BasicAuthKeyIsValid) basicAuthBodyCredentials(w http.ResponseWriter, r *http.Request) (username, password string, err error, code int) {
+	body, _ := ioutil.ReadAll(r.Body)
+	r.Body = ioutil.NopCloser(bytes.NewReader(body))
+
+	userMatch := k.bodyUserRegexp.FindAllSubmatch(body, 1)
+	if len(userMatch) == 0 {
+		err, code = errors.New("Body do not contain username"), http.StatusBadRequest
+		return
+	}
+
+	if len(userMatch[0]) < 2 {
+		err, code = errors.New("username should be inside regexp match group"), http.StatusBadRequest
+		return
+	}
+
+	passMatch := k.bodyPasswordRegexp.FindAllSubmatch(body, 1)
+
+	if len(passMatch) == 0 {
+		err, code = errors.New("Body do not contain password"), http.StatusBadRequest
+		return
+	}
+
+	if len(passMatch[0]) < 2 {
+		err, code = errors.New("password should be inside regexp match group"), http.StatusBadRequest
+		return
+	}
+
+	username, password = string(userMatch[0][1]), string(passMatch[0][1])
+
+	return username, password, nil, 0
+}
+
+// ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
+func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	username, password, err, code := k.basicAuthHeaderCredentials(w, r)
+	token := r.Header.Get("Authorization")
+	if err != nil {
+		if k.Spec.BasicAuth.ExtractFromBody {
+			username, password, err, code = k.basicAuthBodyCredentials(w, r)
+		}
+
+		if err != nil {
+			return err, code
+		}
 	}
 
 	// Check if API key valid
-	keyName := generateToken(k.Spec.OrgID, authValues[0])
-	logger = k.Logger().WithField("key", obfuscateKey(keyName))
+	keyName := generateToken(k.Spec.OrgID, username)
+	logger := k.Logger().WithField("key", obfuscateKey(keyName))
 	session, keyExists := k.CheckSessionAndIdentityForValidKey(keyName, r)
 	if !keyExists {
 		if config.Global().HashKeyFunction == "" {
@@ -91,7 +172,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			return k.handleAuthFail(w, r, token)
 		} else { // check for key with legacy format "org_id" + "user_name"
 			logger.Info("Could not find user, falling back to legacy format key.")
-			legacyKeyName := strings.TrimPrefix(authValues[0], k.Spec.OrgID)
+			legacyKeyName := strings.TrimPrefix(username, k.Spec.OrgID)
 			keyName, _ = storage.GenerateToken(k.Spec.OrgID, legacyKeyName, "")
 			session, keyExists = k.CheckSessionAndIdentityForValidKey(keyName, r)
 			if !keyExists {
@@ -103,12 +184,12 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	switch session.BasicAuthData.Hash {
 	case user.HashBCrypt:
-		if err := k.compareHashAndPassword(session.BasicAuthData.Password, authValues[1], logger); err != nil {
+		if err := k.compareHashAndPassword(session.BasicAuthData.Password, password, logger); err != nil {
 			logger.Warn("Attempted access with existing user, failed password check.")
 			return k.handleAuthFail(w, r, token)
 		}
 	case user.HashPlainText:
-		if session.BasicAuthData.Password != authValues[1] {
+		if session.BasicAuthData.Password != password {
 			logger.Warn("Attempted access with existing user, failed password check.")
 			return k.handleAuthFail(w, r, token)
 		}
@@ -154,7 +235,6 @@ func (k *BasicAuthKeyIsValid) compareHashAndPassword(hash string, password strin
 	hashBytes := []byte(hash)
 
 	if !cacheEnabled {
-
 		logEntry.Debug("cache disabled")
 		return bcrypt.CompareHashAndPassword(hashBytes, passwordBytes)
 	}
