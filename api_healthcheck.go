@@ -153,7 +153,7 @@ func liveCheck(w http.ResponseWriter, r *http.Request) {
 	err := redisStore.SetRawKey(key, key, 10)
 	if err != nil {
 		mainLog.WithField("liveness-check", true).Error(err)
-		doJSONWrite(w, 500, apiError("Gateway is not connected to Redis. An error occurred while writing key to Redis"))
+		doJSONWrite(w, http.StatusServiceUnavailable, apiError("Gateway is not connected to Redis. An error occurred while writing key to Redis"))
 		return
 	}
 
@@ -161,7 +161,7 @@ func liveCheck(w http.ResponseWriter, r *http.Request) {
 
 	if config.Global().UseDBAppConfigs {
 		if err = DashService.Ping(); err != nil {
-			doJSONWrite(w, 500, apiError("Dashboard is down. Gateway cannot connect to the dashboard"))
+			doJSONWrite(w, http.StatusServiceUnavailable, apiError("Dashboard is down. Gateway cannot connect to the dashboard"))
 			return
 		}
 	}
@@ -170,7 +170,7 @@ func liveCheck(w http.ResponseWriter, r *http.Request) {
 		rpcStore := RPCStorageHandler{KeyPrefix: "livenesscheck-"}
 
 		if !rpcStore.Connect() {
-			doJSONWrite(w, 500, apiError("RPC connection is down!!!"))
+			doJSONWrite(w, http.StatusServiceUnavailable, apiError("RPC connection is down!!!"))
 			return
 		}
 	}
