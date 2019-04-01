@@ -88,6 +88,46 @@ func TestLooping(t *testing.T) {
 		}...)
 	})
 
+	t.Run("Using URL rewrite with internal endpoint", func(t *testing.T) {
+		// We defined internnal advanced rewrite based on body data
+		// which rewrites to internal paths (marked as blacklist so they protected from outside world)
+		buildAndLoadAPI(func(spec *APISpec) {
+			version := spec.VersionData.Versions["v1"]
+			json.Unmarshal([]byte(`{
+                "use_extended_paths": true,
+                "extended_paths": {
+                    "internal": [{
+                        "path": "/internal_action",
+                        "method": "POST"
+                    }],
+                    "white_list": [{
+                        "path": "/xml",
+                        "method_actions": {"POST": {"action": "no_action"}}
+                    }],
+                    "url_rewrites": [{
+                        "path": "/xml",
+                        "method": "POST",
+                        "match_pattern": "/xml",
+			"rewrite_to": "tyk://self/internal_action",
+		    },{
+			"path": "/internal_action",
+                        "method": "POST",
+                        "match_pattern": "/internal_action",
+			"rewrite_to": "/upstream_action",
+		    }]
+                }
+            }`), &version)
+
+			spec.VersionData.Versions["v1"] = version
+
+			spec.Proxy.ListenPath = "/"
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Method: "POST", Path: "/xml", BodyMatch: `"Url":"/upstream_action`},
+		}...)
+	})
+
 	t.Run("Loop to another API", func(t *testing.T) {
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.APIID = "testid"
