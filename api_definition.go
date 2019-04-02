@@ -29,6 +29,9 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 )
 
+//const used by cache middleware
+const SAFE_METHODS = "SAFE_METHODS"
+
 const (
 	LDAPStorageEngine apidef.StorageEngineCode = "ldap"
 	RPCStorageEngine  apidef.StorageEngineCode = "rpc"
@@ -506,7 +509,7 @@ func (a APIDefinitionLoader) compileCachedPathSpec(oldpaths []string, newpaths [
 	for _, stringSpec := range oldpaths {
 		newSpec := URLSpec{}
 		a.generateRegex(stringSpec, &newSpec, Cached)
-		newSpec.CacheConfig.Method = "SAFE_METHODS"
+		newSpec.CacheConfig.Method = SAFE_METHODS
 		newSpec.CacheConfig.CacheKeyRegex = ""
 		// Extend with method actions
 		urlSpec = append(urlSpec, newSpec)
@@ -1046,7 +1049,7 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 		case Ignored, BlackList, WhiteList:
 			return true, nil
 		case Cached:
-			if method == v.CacheConfig.Method || (v.CacheConfig.Method == "SAFE_METHODS" && (method == "GET" || method == "HEADERS" || method == "OPTIONS")) {
+			if method == v.CacheConfig.Method || (v.CacheConfig.Method == SAFE_METHODS && (method == "GET" || method == "HEADERS" || method == "OPTIONS")) {
 				return true, &v.CacheConfig
 			}
 		case Transformed:

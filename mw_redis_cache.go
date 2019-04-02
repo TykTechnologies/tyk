@@ -49,13 +49,15 @@ func (m *RedisCacheMiddleware) CreateCheckSum(req *http.Request, keyName string,
 	io.WriteString(h, req.Method)
 	io.WriteString(h, "-")
 	io.WriteString(h, req.URL.String())
-	if req.Method == "POST" {
+	if req.Method == http.MethodPost {
 		if req.Body != nil {
 			bodyBytes, err := ioutil.ReadAll(req.Body)
-			defer req.Body.Close()
+
 			if err != nil {
 				return "", err
 			}
+
+			defer req.Body.Close()
 			req.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
 
 			m := murmur3.New128()
