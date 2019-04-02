@@ -82,12 +82,13 @@ func TestBasicAuthFromBody(t *testing.T) {
 	wrongPassword := `<User>user</User><Password>wrong</Password>`
 	withoutPassword := `<User>user</User>`
 	malformed := `<User>User>`
+	emptyAuthHeader := map[string]string{"Www-Authenticate": ""}
 
 	ts.Run(t, []test.TestCase{
 		// Create base auth based key
 		{Method: "POST", Path: "/tyk/keys/defaultuser", Data: session, AdminAuth: true, Code: 200},
 		{Method: "POST", Path: "/", Code: 400, BodyMatch: `Body do not contain username`},
-		{Method: "POST", Path: "/", Data: validPassword, Code: 200},
+		{Method: "POST", Path: "/", Data: validPassword, Code: 200, HeadersMatch: emptyAuthHeader},
 		{Method: "POST", Path: "/", Data: wrongPassword, Code: 401},
 		{Method: "POST", Path: "/", Data: withoutPassword, Code: 400, BodyMatch: `Body do not contain password`},
 		{Method: "GET", Path: "/", Data: malformed, Code: 400, BodyMatch: `Body do not contain username`},

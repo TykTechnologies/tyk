@@ -154,6 +154,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	token := r.Header.Get("Authorization")
 	if err != nil {
 		if k.Spec.BasicAuth.ExtractFromBody {
+			w.Header().Del("WWW-Authenticate")
 			username, password, err, code = k.basicAuthBodyCredentials(w, r)
 		}
 
