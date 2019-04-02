@@ -116,7 +116,7 @@ func TestLint(t *testing.T) {
 				t.Fatal(err)
 			}
 			f.Close()
-			_, got, err := Run([]string{f.Name()})
+			_, got, err := Run(ConfSchema, []string{f.Name()})
 			if err != nil {
 				got = []string{err.Error()}
 			}
