@@ -119,7 +119,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		SetHeaders:     map[string]string{},
 		DeleteHeaders:  []string{},
 		Body:           originalBody,
-		URL:            r.URL.Path,
+		URL:            r.URL.String(),
 		Params:         r.URL.Query(),
 		AddParams:      map[string]string{},
 		ExtendedParams: map[string][]string{},
@@ -207,7 +207,10 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		r.Body = ioutil.NopCloser(bytes.NewReader(newRequestData.Request.Body))
 	}
 
-	r.URL.Path = newRequestData.Request.URL
+	r.URL, err = url.ParseRequestURI(newRequestData.Request.URL)
+	if err != nil {
+		return nil, http.StatusOK
+	}
 
 	// Delete and set headers
 	for _, dh := range newRequestData.Request.DeleteHeaders {
@@ -467,8 +470,7 @@ func (j *JSVM) LoadTykJSApi() {
 			data.Set(k, v)
 		}
 
-		u, _ := url.ParseRequestURI(domain)
-		u.Path = hro.Resource
+		u, _ := url.ParseRequestURI(domain + hro.Resource)
 		urlStr := u.String() // "https://api.com/user/"
 
 		var d string

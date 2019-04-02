@@ -375,16 +375,18 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 			"Method": "GET",
 			"Headers": {"Accept": "application/json"},
 			"Domain": spec.config_data.base_url,
-			"Resource": "/api/get"
+			"Resource": "/api/get?param1=dummy"
 		}
 
 		var resp = TykMakeHttpRequest(JSON.stringify(newRequest));
-		var useableResponse = JSON.parse(resp);
+		var usableResponse = JSON.parse(resp);
 
-		if(useableResponse.Code > 400) {
-			request.ReturnOverrides.ResponseCode = useableResponse.code
+		if(usableResponse.Code > 400) {
+			request.ReturnOverrides.ResponseCode = usableResponse.code
 			request.ReturnOverrides.ResponseError = "error"
 		}
+
+		request.Body = usableResponse.Body
 
 		return testTykMakeHTTPRequest.ReturnData(request, {})
 	});
@@ -414,6 +416,49 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 		})
 
 		ts.Run(t, test.TestCase{Path: "/sample", Code: 404})
+	})
+
+	t.Run("Endpoint with query", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/sample"
+			spec.ConfigData = map[string]interface{}{
+				"base_url": ts.URL,
+			}
+			spec.CustomMiddlewareBundle = bundle
+		}, func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/api"
+		})
+
+		ts.Run(t, test.TestCase{Path: "/sample", BodyMatch: "/api/get?param1=dummy", Code: 200})
+	})
+
+	t.Run("Endpoint with skip cleaning", func(t *testing.T) {
+		ts.Close()
+		globalConf := config.Global()
+		globalConf.HttpServerOptions.SkipURLCleaning = true
+		globalConf.HttpServerOptions.OverrideDefaults = true
+		config.SetGlobal(globalConf)
+
+		prevSkipClean := defaultTestConfig.HttpServerOptions.OverrideDefaults &&
+			defaultTestConfig.HttpServerOptions.SkipURLCleaning
+		testServerRouter.SkipClean(true)
+		defer testServerRouter.SkipClean(prevSkipClean)
+
+		ts := newTykTestServer()
+		defer ts.Close()
+		defer resetTestConfig()
+
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/sample"
+			spec.ConfigData = map[string]interface{}{
+				"base_url": ts.URL,
+			}
+			spec.CustomMiddlewareBundle = bundle
+		}, func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/api"
+		})
+
+		ts.Run(t, test.TestCase{Path: "/sample/99999-XXXX+%2F%2F+dog+9+fff%C3%A9o+party", BodyMatch: "URI\":\"/sample/99999-XXXX+%2F%2F+dog+9+fff%C3%A9o+party", Code: 200})
 	})
 }
 

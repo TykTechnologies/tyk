@@ -353,7 +353,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 			logger.Info("Checking security policy: OAuth")
 		}
 
-		if mwAppendEnabled(&authArray, &BasicAuthKeyIsValid{baseMid, cache.New(60*time.Second, 60*time.Minute)}) {
+		if mwAppendEnabled(&authArray, &BasicAuthKeyIsValid{baseMid, cache.New(60*time.Second, 60*time.Minute), nil, nil}) {
 			logger.Info("Checking security policy: Basic")
 		}
 
@@ -503,8 +503,10 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Hostname() == "self" {
 			handler = d.SH.Spec.middlewareChain.ThisHandler
 		} else {
+			ctxSetVersionInfo(r, nil)
+
 			if targetAPI := fuzzyFindAPI(r.URL.Hostname()); targetAPI != nil {
-				handler = d.SH.Spec.middlewareChain.ThisHandler //targetAPI.middlewareChain.ThisHandler
+				handler = targetAPI.middlewareChain.ThisHandler
 			} else {
 				handler := ErrorHandler{*d.SH.Base()}
 				handler.HandleError(w, r, "Can't detect loop target", http.StatusInternalServerError)
