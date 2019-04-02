@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"strconv"
 	"time"
@@ -193,6 +196,8 @@ func (t BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 	t.Logger().Debug("Checking: ", orgid)
 	cachedVal, found := ExpiryCache.Get(orgid)
 	if !found {
+		// Cache failed attempt
+		t.SetOrgExpiry(orgid, 604800)
 		go t.OrgSession(orgid)
 		t.Logger().Debug("no cached entry found, returning 7 days")
 		return 604800
@@ -522,4 +527,21 @@ func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res
 		}
 	}
 	return nil
+}
+
+func parseForm(r *http.Request) {
+	// https://golang.org/pkg/net/http/#Request.ParseForm
+	// ParseForm drains the request body for a request with Content-Type of
+	// application/x-www-form-urlencoded
+	if r.Header.Get("Content-Type") == "application/x-www-form-urlencoded" {
+		var b bytes.Buffer
+		r.Body = ioutil.NopCloser(io.TeeReader(r.Body, &b))
+
+		r.ParseForm()
+
+		r.Body = ioutil.NopCloser(&b)
+		return
+	}
+
+	r.ParseForm()
 }

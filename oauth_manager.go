@@ -333,6 +333,13 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 				if !ok {
 					log.WithField("oauthClientID", ar.Client.GetId()).
 						Error("Could not set session meta_data from oauth-client fields, type mismatch")
+				} else {
+					// set session alias to developer email as we do it for regular API keys created for developer
+					if devEmail, found := session.MetaData[keyDataDeveloperEmail].(string); found {
+						session.Alias = devEmail
+						// we don't need it in meta-data as we set it to alias
+						delete(session.MetaData, keyDataDeveloperEmail)
+					}
 				}
 			}
 
@@ -662,7 +669,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 		return err
 	}
 
-	key := prefixAccess + accessData.AccessToken
+	key := prefixAccess + storage.HashKey(accessData.AccessToken)
 	log.Debug("Saving ACCESS key: ", key)
 
 	// Overide default ExpiresIn:
@@ -677,7 +684,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 	log.Debug("Adding ACCESS key to sorted list: ", sortedListKey)
 	r.store.AddToSortedSet(
 		sortedListKey,
-		accessData.AccessToken,
+		storage.HashKey(accessData.AccessToken),
 		float64(accessData.CreatedAt.Unix()+int64(accessData.ExpiresIn)), // set score as token expire timestamp
 	)
 
@@ -738,13 +745,19 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 
 // LoadAccess will load access data from redis
 func (r *RedisOsinStorageInterface) LoadAccess(token string) (*osin.AccessData, error) {
-	key := prefixAccess + token
+	key := prefixAccess + storage.HashKey(token)
 	log.Debug("Loading ACCESS key: ", key)
 	accessJSON, err := r.store.GetKey(key)
 
 	if err != nil {
-		log.Error("Failure retreiving access token by key: ", err)
-		return nil, err
+		// Fallback to unhashed value for backward compatibility
+		key = prefixAccess + token
+		accessJSON, err = r.store.GetKey(key)
+
+		if err != nil {
+			log.Error("Failure retreiving access token by key: ", err)
+			return nil, err
+		}
 	}
 
 	accessData := osin.AccessData{Client: new(OAuthClient)}

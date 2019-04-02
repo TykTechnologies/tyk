@@ -1,6 +1,6 @@
 package rediscluster
 
-import "github.com/garyburd/redigo/redis"
+import "github.com/gomodule/redigo/redis"
 import "os"
 import "time"
 
@@ -11,14 +11,17 @@ type RedisHandle struct {
 }
 
 type PoolConfig struct {
-	MaxIdle       int
-	MaxActive     int
-	IdleTimeout   time.Duration
-	Password      string
-	Database      int
-	IsCluster     bool
-	UseTLS        bool
-	TLSSkipVerify bool
+	MaxIdle        int
+	MaxActive      int
+	IdleTimeout    time.Duration
+	ConnectTimeout time.Duration
+	ReadTimeout    time.Duration
+	WriteTimeout   time.Duration
+	Password       string
+	Database       int
+	IsCluster      bool
+	UseTLS         bool
+	TLSSkipVerify  bool
 }
 
 // XXX: add some password protection - DONE
@@ -35,7 +38,7 @@ func NewRedisHandle(host string, port string, poolConfig PoolConfig, debug bool)
 			MaxActive:   poolConfig.MaxActive,
 			IdleTimeout: poolConfig.IdleTimeout,
 			Dial: func() (redis.Conn, error) {
-				c, err := redis.Dial("tcp", host+":"+port, redis.DialUseTLS(poolConfig.UseTLS), redis.DialTLSSkipVerify(poolConfig.TLSSkipVerify), redis.DialPassword(poolConfig.Password), redis.DialDatabase(poolConfig.Database))
+				c, err := redis.Dial("tcp", host+":"+port, redis.DialUseTLS(poolConfig.UseTLS), redis.DialTLSSkipVerify(poolConfig.TLSSkipVerify), redis.DialPassword(poolConfig.Password), redis.DialDatabase(poolConfig.Database), redis.DialConnectTimeout(poolConfig.ConnectTimeout), redis.DialReadTimeout(poolConfig.ReadTimeout), redis.DialWriteTimeout(poolConfig.WriteTimeout))
 				if err != nil {
 					return nil, err
 				}

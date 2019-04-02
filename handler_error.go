@@ -109,7 +109,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		if session != nil {
 			oauthClientID = session.OauthClientID
 			alias = session.Alias
-			tags = append(tags, session.Tags...)
+			tags = append(tags, getSessionTags(session)...)
 		}
 
 		if len(e.Spec.TagHeaders) > 0 {

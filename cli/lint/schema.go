@@ -34,6 +34,9 @@ const confSchema = `{
 			"optimisation_max_idle": {
 				"type": "integer"
 			},
+			"timeout": {
+				"type": "integer"
+			},
 			"password": {
 				"type": "string"
 			},
