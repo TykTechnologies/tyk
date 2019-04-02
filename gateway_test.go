@@ -1049,7 +1049,7 @@ func TestCachePostRequest(t *testing.T) {
 			json.Unmarshal([]byte(`[{
 						"method":"POST",
 						"path":"/",
-						"cache_key_regex":""
+						"cache_key_regex":"\"id\":[^,]*"
 					}
                                 ]`), &v.ExtendedPaths.AdvanceCacheConfig)
 		})
@@ -1060,8 +1060,12 @@ func TestCachePostRequest(t *testing.T) {
 	headerCache := map[string]string{"x-tyk-cached-response": "1"}
 
 	ts.Run(t, []test.TestCase{
-		{Method: "POST", Path: "/", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
-		{Method: "POST", Path: "/", HeadersMatch: headerCache},
+		{Method: "POST", Path: "/", Data: "{\"id\":\"1\",\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: "POST", Path: "/", Data: "{\"id\":\"1\",\"name\":\"test\"}", HeadersMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: "POST", Path: "/", Data: "{\"id\":\"2\",\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		// if regex match returns nil, then request body is ignored while generating cache key
+		{Method: "POST", Path: "/", Data: "{\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: "POST", Path: "/", Data: "{\"name\":\"test2\"}", HeadersMatch: headerCache, Delay: 10 * time.Millisecond},
 	}...)
 }
 
