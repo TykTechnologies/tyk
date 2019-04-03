@@ -19,6 +19,7 @@ import (
 // AnalyticsRecord encodes the details of a request
 type AnalyticsRecord struct {
 	Method        string
+	Host          string
 	Path          string // HTTP path, can be overriden by "track path" plugin
 	RawPath       string // Original HTTP path
 	ContentLength int64

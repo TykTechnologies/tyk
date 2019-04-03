@@ -12,9 +12,8 @@ import (
 
 	cache "github.com/pmylund/go-cache"
 
-	"github.com/TykTechnologies/tyk/request"
-
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -211,8 +210,14 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, resp
 			trackedPath = p
 		}
 
+		host := r.URL.Host
+		if host == "" && s.Spec.target != nil {
+			host = s.Spec.target.Host
+		}
+
 		record := AnalyticsRecord{
 			r.Method,
+			host,
 			trackedPath,
 			r.URL.Path,
 			r.ContentLength,
