@@ -94,6 +94,14 @@ func TestLooping(t *testing.T) {
 			spec.Name = "hidden api"
 			spec.Proxy.ListenPath = "/somesecret"
 			spec.Internal = true
+			version := spec.VersionData.Versions["v1"]
+			json.Unmarshal([]byte(`{
+                "use_extended_paths": true,
+                "global_headers": {
+                    "X-Name":"internal"
+                }
+            }`), &version)
+			spec.VersionData.Versions["v1"] = version
 		}, func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/test"
 
@@ -125,8 +133,8 @@ func TestLooping(t *testing.T) {
 
 		ts.Run(t, []test.TestCase{
 			{Path: "/somesecret", Code: 404},
-			{Path: "/test/by_name", Code: 200},
-			{Path: "/test/by_id", Code: 200},
+			{Path: "/test/by_name", Code: 200, BodyMatch: `"X-Name":"internal"`},
+			{Path: "/test/by_id", Code: 200, BodyMatch: `"X-Name":"internal"`},
 			{Path: "/test/wrong", Code: 500},
 		}...)
 	})

@@ -59,6 +59,42 @@ func TestBasicAuth(t *testing.T) {
 	}...)
 }
 
+func TestBasicAuthFromBody(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	session := createStandardSession()
+	session.BasicAuthData.Password = "password"
+	session.AccessRights = map[string]user.AccessDefinition{"test": {APIID: "test", Versions: []string{"v1"}}}
+	session.OrgID = "default"
+
+	buildAndLoadAPI(func(spec *APISpec) {
+		spec.UseBasicAuth = true
+		spec.BasicAuth.ExtractFromBody = true
+		spec.BasicAuth.BodyUserRegexp = `<User>(.*)</User>`
+		spec.BasicAuth.BodyPasswordRegexp = `<Password>(.*)</Password>`
+		spec.UseKeylessAccess = false
+		spec.Proxy.ListenPath = "/"
+		spec.OrgID = "default"
+	})
+
+	validPassword := `<User>user</User><Password>password</Password>`
+	wrongPassword := `<User>user</User><Password>wrong</Password>`
+	withoutPassword := `<User>user</User>`
+	malformed := `<User>User>`
+	emptyAuthHeader := map[string]string{"Www-Authenticate": ""}
+
+	ts.Run(t, []test.TestCase{
+		// Create base auth based key
+		{Method: "POST", Path: "/tyk/keys/defaultuser", Data: session, AdminAuth: true, Code: 200},
+		{Method: "POST", Path: "/", Code: 400, BodyMatch: `Body do not contain username`},
+		{Method: "POST", Path: "/", Data: validPassword, Code: 200, HeadersMatch: emptyAuthHeader},
+		{Method: "POST", Path: "/", Data: wrongPassword, Code: 401},
+		{Method: "POST", Path: "/", Data: withoutPassword, Code: 400, BodyMatch: `Body do not contain password`},
+		{Method: "GET", Path: "/", Data: malformed, Code: 400, BodyMatch: `Body do not contain username`},
+	}...)
+}
+
 func TestBasicAuthLegacyWithHashFunc(t *testing.T) {
 	globalConf := config.Global()
 

@@ -50,7 +50,7 @@ func (e *BaseExtractor) ExtractHeader(r *http.Request) (headerValue string, err 
 
 // ExtractForm is used when a FormSource is specified.
 func (e *BaseExtractor) ExtractForm(r *http.Request, paramName string) (formValue string, err error) {
-	r.ParseForm()
+	parseForm(r)
 
 	if paramName == "" {
 		return "", errors.New("no form param name set")

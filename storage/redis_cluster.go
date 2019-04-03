@@ -117,15 +117,24 @@ func NewRedisClusterPool(isCache bool) *rediscluster.RedisCluster {
 		log.Info("--> Using clustered mode")
 	}
 
+	timeout := 5 * time.Second
+
+	if cfg.Timeout > 0 {
+		timeout = time.Duration(cfg.Timeout) * time.Second
+	}
+
 	poolConf := rediscluster.PoolConfig{
-		MaxIdle:       maxIdle,
-		MaxActive:     maxActive,
-		IdleTimeout:   240 * time.Second,
-		Database:      cfg.Database,
-		Password:      cfg.Password,
-		IsCluster:     cfg.EnableCluster,
-		UseTLS:        cfg.UseSSL,
-		TLSSkipVerify: cfg.SSLInsecureSkipVerify,
+		MaxIdle:        maxIdle,
+		MaxActive:      maxActive,
+		IdleTimeout:    240 * time.Second,
+		ConnectTimeout: timeout,
+		ReadTimeout:    timeout,
+		WriteTimeout:   timeout,
+		Database:       cfg.Database,
+		Password:       cfg.Password,
+		IsCluster:      cfg.EnableCluster,
+		UseTLS:         cfg.UseSSL,
+		TLSSkipVerify:  cfg.SSLInsecureSkipVerify,
 	}
 
 	// If Redis port isn't set, use default one:
@@ -364,6 +373,9 @@ func (r *RedisCluster) GetKeysAndValuesWithFilter(filter string) map[string]stri
 	}
 
 	keys, _ := redis.Strings(sessionsInterface, err)
+	if len(keys) == 0 {
+		return nil
+	}
 	valueObj, err := r.singleton().Do("MGET", sessionsInterface.([]interface{})...)
 	values, err := redis.Strings(valueObj, err)
 	if err != nil {
@@ -512,7 +524,7 @@ func (r *RedisCluster) StartPubSubHandler(channel string, callback func(interfac
 		return err
 	}
 	for {
-		switch v := psc.Receive().(type) {
+		switch v := psc.ReceiveWithTimeout(0).(type) {
 		case redis.Message:
 			callback(v)
 
