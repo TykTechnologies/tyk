@@ -132,8 +132,14 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			trackedPath = p
 		}
 
+		host := r.URL.Host
+		if host == "" && e.Spec.target != nil {
+			host = e.Spec.target.Host
+		}
+
 		record := AnalyticsRecord{
 			r.Method,
+			host,
 			trackedPath,
 			r.URL.Path,
 			r.ContentLength,

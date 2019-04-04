@@ -14,13 +14,13 @@ import (
 // Run will lint the configuration file. It will return the path to the
 // config file that was checked, a list of warnings and an error, if any
 // happened.
-func Run(paths []string) (string, []string, error) {
+func Run(schm string, paths []string) (string, []string, error) {
 	addFormats(&schema.FormatCheckers)
 	var conf config.Config
 	if err := config.Load(paths, &conf); err != nil {
 		return "", nil, err
 	}
-	schemaLoader := schema.NewBytesLoader([]byte(confSchema))
+	schemaLoader := schema.NewBytesLoader([]byte(schm))
 
 	var orig map[string]interface{}
 	f, err := os.Open(conf.OriginalPath)

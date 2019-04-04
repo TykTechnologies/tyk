@@ -73,7 +73,7 @@ func Init(version string, confPaths []string) {
 	// Linter:
 	lintCmd := app.Command("lint", "Runs a linter on Tyk configuration file")
 	lintCmd.Action(func(c *kingpin.ParseContext) error {
-		path, lines, err := lint.Run(confPaths)
+		path, lines, err := lint.Run(lint.ConfSchema, confPaths)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
