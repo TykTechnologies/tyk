@@ -1,4 +1,4 @@
-package lint
+package linter
 
 import (
 	"encoding/json"
@@ -116,7 +116,13 @@ func TestLint(t *testing.T) {
 				t.Fatal(err)
 			}
 			f.Close()
-			_, got, err := Run(ConfSchema, []string{f.Name()})
+
+			confSchema, err := ioutil.ReadFile("cli/linter/schema.json")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, got, err := Run(string(confSchema), []string{f.Name()})
 			if err != nil {
 				got = []string{err.Error()}
 			}
