@@ -1032,6 +1032,43 @@ func TestCacheAllSafeRequests(t *testing.T) {
 	}...)
 }
 
+func TestCachePostRequest(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+	cache := storage.RedisCluster{KeyPrefix: "cache-"}
+	defer cache.DeleteScanMatch("*")
+
+	buildAndLoadAPI(func(spec *APISpec) {
+		spec.CacheOptions = apidef.CacheOptions{
+			CacheTimeout:         120,
+			EnableCache:          true,
+			CacheAllSafeRequests: false,
+		}
+
+		updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			json.Unmarshal([]byte(`[{
+						"method":"POST",
+						"path":"/",
+						"cache_key_regex":"\"id\":[^,]*"
+					}
+                                ]`), &v.ExtendedPaths.AdvanceCacheConfig)
+		})
+
+		spec.Proxy.ListenPath = "/"
+	})
+
+	headerCache := map[string]string{"x-tyk-cached-response": "1"}
+
+	ts.Run(t, []test.TestCase{
+		{Method: "POST", Path: "/", Data: "{\"id\":\"1\",\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: "POST", Path: "/", Data: "{\"id\":\"1\",\"name\":\"test\"}", HeadersMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: "POST", Path: "/", Data: "{\"id\":\"2\",\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		// if regex match returns nil, then request body is ignored while generating cache key
+		{Method: "POST", Path: "/", Data: "{\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: "POST", Path: "/", Data: "{\"name\":\"test2\"}", HeadersMatch: headerCache, Delay: 10 * time.Millisecond},
+	}...)
+}
+
 func TestCacheEtag(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()

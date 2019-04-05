@@ -79,6 +79,12 @@ type EndPointMeta struct {
 	MethodActions map[string]EndpointMethodMeta `bson:"method_actions" json:"method_actions"`
 }
 
+type CacheMeta struct {
+	Method        string `bson:"method" json:"method"`
+	Path          string `bson:"path" json:"path"`
+	CacheKeyRegex string `bson:"cache_key_regex" json:"cache_key_regex"`
+}
+
 type RequestInputType string
 
 type TemplateData struct {
@@ -199,6 +205,7 @@ type ExtendedPathsSet struct {
 	WhiteList               []EndPointMeta        `bson:"white_list" json:"white_list,omitempty"`
 	BlackList               []EndPointMeta        `bson:"black_list" json:"black_list,omitempty"`
 	Cached                  []string              `bson:"cache" json:"cache,omitempty"`
+	AdvanceCacheConfig      []CacheMeta           `bson:"advance_cache_config" json:"advance_cache_config,omitempty"`
 	Transform               []TemplateMeta        `bson:"transform" json:"transform,omitempty"`
 	TransformResponse       []TemplateMeta        `bson:"transform_response" json:"transform_response,omitempty"`
 	TransformJQ             []TransformJQMeta     `bson:"transform_jq" json:"transform_jq,omitempty"`
