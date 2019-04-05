@@ -1022,10 +1022,17 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 
 // CheckSpecMatchesStatus checks if a url spec has a specific status
 func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode URLStatus) (bool, interface{}) {
-	matchPath := ctxGetUrlRewritePath(r)
-	method := ctxGetRequestMethod(r)
-	if matchPath == "" {
+	var matchPath, method string
+
+	if mode == TransformedJQResponse || mode == HeaderInjectedResponse || mode == TransformedResponse {
+		matchPath = ctxGetUrlRewritePath(r)
+		method = ctxGetRequestMethod(r)
+		if matchPath == "" {
+			matchPath = r.URL.Path
+		}
+	} else {
 		matchPath = r.URL.Path
+		method = r.Method
 	}
 
 	if a.Proxy.ListenPath != "/" {
