@@ -2,14 +2,15 @@ package cli
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
+
+	"github.com/TykTechnologies/tyk/cli/linter"
 
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/TykTechnologies/tyk/cli/bundler"
 	"github.com/TykTechnologies/tyk/cli/importer"
-	"github.com/TykTechnologies/tyk/cli/lint"
-
 	logger "github.com/TykTechnologies/tyk/log"
 )
 
@@ -73,7 +74,11 @@ func Init(version string, confPaths []string) {
 	// Linter:
 	lintCmd := app.Command("lint", "Runs a linter on Tyk configuration file")
 	lintCmd.Action(func(c *kingpin.ParseContext) error {
-		path, lines, err := lint.Run(lint.ConfSchema, confPaths)
+		confSchema, err := ioutil.ReadFile("cli/linter/schema.json")
+		if err != nil {
+			return err
+		}
+		path, lines, err := linter.Run(string(confSchema), confPaths)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
