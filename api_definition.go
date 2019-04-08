@@ -1024,6 +1024,8 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode URLStatus) (bool, interface{}) {
 	var matchPath, method string
 
+	//If url-rewrite middleware was used, call response middleware of original path and not of rewritten path
+	// context variable UrlRewritePath is set by rewrite middleware
 	if mode == TransformedJQResponse || mode == HeaderInjectedResponse || mode == TransformedResponse {
 		matchPath = ctxGetUrlRewritePath(r)
 		method = ctxGetRequestMethod(r)
