@@ -991,10 +991,19 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 
 // CheckSpecMatchesStatus checks if a url spec has a specific status
 func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode URLStatus) (bool, interface{}) {
-	matchPath := ctxGetUrlRewritePath(r)
-	method := ctxGetRequestMethod(r)
-	if matchPath == "" {
+	var matchPath, method string
+
+	//If url-rewrite middleware was used, call response middleware of original path and not of rewritten path
+	// context variable UrlRewritePath is set by rewrite middleware
+	if mode == TransformedJQResponse || mode == HeaderInjectedResponse || mode == TransformedResponse {
+		matchPath = ctxGetUrlRewritePath(r)
+		method = ctxGetRequestMethod(r)
+		if matchPath == "" {
+			matchPath = r.URL.Path
+		}
+	} else {
 		matchPath = r.URL.Path
+		method = r.Method
 	}
 
 	if a.Proxy.ListenPath != "/" {
