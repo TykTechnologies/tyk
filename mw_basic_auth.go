@@ -79,8 +79,6 @@ func (k *BasicAuthKeyIsValid) basicAuthHeaderCredentials(w http.ResponseWriter, 
 	logger := k.Logger().WithField("key", obfuscateKey(token))
 	if token == "" {
 		// No header value, fail
-		logger.Info("Attempted access with malformed header, no auth header found.")
-
 		err, code = k.requestForBasicAuth(w, "Authorization field missing")
 		return
 	}
@@ -156,6 +154,8 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		if k.Spec.BasicAuth.ExtractFromBody {
 			w.Header().Del("WWW-Authenticate")
 			username, password, err, code = k.basicAuthBodyCredentials(w, r)
+		} else {
+			k.Logger().Warn("Attempted access with malformed header, no auth header found.")
 		}
 
 		if err != nil {
