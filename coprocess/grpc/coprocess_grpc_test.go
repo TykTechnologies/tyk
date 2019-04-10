@@ -24,8 +24,9 @@ import (
 )
 
 const (
-	grpcListenAddr = ":9999"
-	grpcListenPath = "tcp://127.0.0.1:9999"
+	grpcListenAddr  = ":9999"
+	grpcListenPath  = "tcp://127.0.0.1:9999"
+	grpcTestMaxSize = 100000000
 
 	testHeaderName  = "Testheader"
 	testHeaderValue = "testvalue"
@@ -115,7 +116,10 @@ func (d *dispatcher) DispatchEvent(ctx context.Context, event *coprocess.Event) 
 }
 
 func newTestGRPCServer() (s *grpc.Server) {
-	s = grpc.NewServer()
+	s = grpc.NewServer(
+		grpc.MaxRecvMsgSize(grpcTestMaxSize),
+		grpc.MaxSendMsgSize(grpcTestMaxSize),
+	)
 	coprocess.RegisterDispatcherServer(s, &dispatcher{})
 	return s
 }
@@ -244,6 +248,8 @@ func startTykWithGRPC() (*gateway.Test, *grpc.Server) {
 	cfg := config.CoProcessConfig{
 		EnableCoProcess:     true,
 		CoProcessGRPCServer: grpcListenPath,
+		GRPCRecvMaxSize:     grpcTestMaxSize,
+		GRPCSendMaxSize:     grpcTestMaxSize,
 	}
 	ts := gateway.StartTest(gateway.TestConfig{CoprocessConfig: cfg})
 
@@ -347,6 +353,16 @@ func TestGRPCDispatch(t *testing.T) {
 		})
 	})
 
+	t.Run("Post Hook with long message", func(t *testing.T) {
+		s := randStringBytes(20000000)
+		ts.Run(t, test.TestCase{
+			Path:    "/grpc-test-api-3/",
+			Method:  http.MethodGet,
+			Code:    http.StatusOK,
+			Headers: headers,
+			Data:    s,
+		})
+	})
 }
 
 func BenchmarkGRPCDispatch(b *testing.B) {
