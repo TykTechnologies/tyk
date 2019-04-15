@@ -287,6 +287,37 @@ func TestParambasedAuth(t *testing.T) {
 	})
 }
 
+func TestStripPathWithURLRewrite(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+	defer resetTestConfig()
+
+	t.Run("rewrite URL containing listen path", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			version := spec.VersionData.Versions["v1"]
+			json.Unmarshal([]byte(`{
+                "use_extended_paths": true,
+                "extended_paths": {
+                        "url_rewrites": [{
+                                "path": "/anything/",
+                                "match_pattern": "/anything/(.*)",
+                                "method": "GET",
+				"rewrite_to":"/something/$1"
+                        }]
+                }
+            }`), &version)
+			spec.VersionData.Versions["v1"] = version
+			spec.Proxy.ListenPath = "/myapi/"
+			spec.Proxy.StripListenPath = true
+
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/myapi/anything/a/myapi/b/c", BodyMatch: `"Url":"/something/a/myapi/b/c"`},
+		}...)
+	})
+}
+
 func TestSkipTargetPassEscapingOff(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
