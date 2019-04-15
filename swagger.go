@@ -18,4 +18,8 @@ type swaggerParameterBodies struct {
 	APIDefinition apidef.APIDefinition
 	// in: body
 	SessionState user.SessionState
+	// in:body
+	APIAllKeys apiAllKeys
+	// in: body
+	OAuthClientToken OAuthClientToken
 }

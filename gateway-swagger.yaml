@@ -39,6 +39,12 @@ paths:
       tags:
         - APIs
       operationId: createApi
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/APIDefinition'
+        required: true
       summary: Create an API
   '/apis/{apiID}':
     delete:
@@ -112,9 +118,7 @@ paths:
           content:
             application/json:
               schema:
-                items:
-                  type: string
-                type: array
+                $ref: '#/components/schemas/apiAllKeys'
           description: List of all API keys
       tags:
         - Keys
@@ -137,6 +141,12 @@ paths:
       tags:
         - Keys
       operationId: createKey
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionState'
+        required: true
       summary: Create a new API key
   '/keys/{keyID}':
     delete:
@@ -321,7 +331,7 @@ paths:
             application/json:
               schema:
                 items:
-                  type: string
+                  $ref: '#/components/schemas/OAuthClientToken'
                 type: array
           description: Get a list of tokens
       tags:
@@ -361,9 +371,7 @@ paths:
           description: All gateways in a cluster were successfully refreshed
       tags:
         - Reload
-        - a
-        - gateway
-      operationId: instance
+      operationId: resetHandler
       summary: Reloads a single Tyk Gateway instance
   /reload/group:
     get:
@@ -372,7 +380,7 @@ paths:
           description: All gateways in a cluster were successfully refreshed
       tags:
         - Reload
-      operationId: reloadGroup
+      operationId: groupResetHandler
       summary: Reloads all the Tyk Gateways in a cluster
 components:
   responses:
@@ -380,7 +388,7 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/SessionState'
+            $ref: '#/components/schemas/OAuthClientToken'
       description: parameterBodies
   schemas:
     APIDefinition:
@@ -448,6 +456,12 @@ components:
           $ref: '#/components/schemas/AuthTypeEnum'
         basic_auth:
           properties:
+            body_password_regexp:
+              type: string
+              x-go-name: BodyPasswordRegexp
+            body_user_regexp:
+              type: string
+              x-go-name: BodyUserRegexp
             cache_ttl:
               format: int64
               type: integer
@@ -455,6 +469,9 @@ components:
             disable_caching:
               type: boolean
               x-go-name: DisableCaching
+            extract_from_body:
+              type: boolean
+              x-go-name: ExtractFromBody
           type: object
           x-go-name: BasicAuth
         blacklisted_ips:
@@ -857,6 +874,8 @@ components:
         param_name:
           type: string
           x-go-name: ParamName
+        signature:
+          $ref: '#/components/schemas/SignatureConfig'
         use_certificate:
           type: boolean
           x-go-name: UseCertificate
@@ -866,6 +885,9 @@ components:
         use_param:
           type: boolean
           x-go-name: UseParam
+        validate_signature:
+          type: boolean
+          x-go-name: ValidateSignature
       type: object
       x-go-package: github.com/TykTechnologies/tyk/apidef
     AuthProviderCode:
@@ -891,6 +913,19 @@ components:
       description: AuthorizeRequestType is the type for OAuth param `response_type`
       type: string
       x-go-package: github.com/TykTechnologies/tyk/vendor/github.com/lonelycode/osin
+    CacheMeta:
+      properties:
+        cache_key_regex:
+          type: string
+          x-go-name: CacheKeyRegex
+        method:
+          type: string
+          x-go-name: Method
+        path:
+          type: string
+          x-go-name: Path
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
     CacheOptions:
       properties:
         cache_all_safe_requests:
@@ -980,6 +1015,11 @@ components:
       x-go-package: github.com/TykTechnologies/tyk/apidef
     ExtendedPathsSet:
       properties:
+        advance_cache_config:
+          items:
+            $ref: '#/components/schemas/CacheMeta'
+          type: array
+          x-go-name: AdvanceCacheConfig
         black_list:
           items:
             $ref: '#/components/schemas/EndPointMeta'
@@ -1282,6 +1322,17 @@ components:
         notify the provider of key changes.
       type: object
       x-go-package: github.com/TykTechnologies/tyk/apidef
+    OAuthClientToken:
+      properties:
+        code:
+          type: string
+          x-go-name: Token
+        expires:
+          format: int64
+          type: integer
+          x-go-name: Expires
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk
     OIDProviderConfig:
       properties:
         client_ids:
@@ -1596,6 +1647,30 @@ components:
         rate limiting.
       type: object
       x-go-package: github.com/TykTechnologies/tyk/user
+    SignatureConfig:
+      properties:
+        algorithm:
+          type: string
+          x-go-name: Algorithm
+        allowed_clock_skew:
+          format: int64
+          type: integer
+          x-go-name: AllowedClockSkew
+        error_code:
+          format: int64
+          type: integer
+          x-go-name: ErrorCode
+        error_message:
+          type: string
+          x-go-name: ErrorMessage
+        header:
+          type: string
+          x-go-name: Header
+        secret:
+          type: string
+          x-go-name: Secret
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
     StorageEngineCode:
       type: string
       x-go-package: github.com/TykTechnologies/tyk/apidef
@@ -1785,6 +1860,16 @@ components:
           x-go-name: UseSession
       type: object
       x-go-package: github.com/TykTechnologies/tyk/apidef
+    apiAllKeys:
+      description: apiAllKeys represents a list of keys in the memory store
+      properties:
+        keys:
+          items:
+            type: string
+          type: array
+          x-go-name: APIKeys
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk
     apiModifyKeySuccess:
       description: apiModifyKeySuccess represents when a Key modification was successful
       properties:

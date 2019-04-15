@@ -479,6 +479,7 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 }
 
 // apiAllKeys represents a list of keys in the memory store
+// swagger:model
 type apiAllKeys struct {
 	APIKeys []string `json:"keys"`
 }
@@ -779,6 +780,12 @@ func handleDeleteAPI(apiID string) (interface{}, int) {
 //
 //---
 // summary: Create an API
+// parameters:
+//   - in: body
+//     name: client_info
+//     required: true
+//     schema:
+//       "$ref": "#/definitions/APIDefinition"
 // responses:
 //   200:
 //     description: API created
@@ -869,14 +876,17 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 //   200:
 //     description: List of all API keys
 //     schema:
-//       type: array
-//       items:
-//         type: string
+//       "$ref": "#/definitions/apiAllKeys"
 
 // swagger:operation POST /keys Keys createKey
 //
 //---
 // summary: Create a new API key
+// parameters:
+//   - in: body
+//     required: true
+//     schema:
+//       "$ref": "#/definitions/SessionState"
 // responses:
 //   200:
 //     description: New Key created
@@ -891,6 +901,11 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 //
 //---
 // summary: Update an API key
+// parameters:
+//   - in: body
+//     required: true
+//     schema:
+//       "$ref": "#/definitions/SessionState"
 // parameters:
 // - in: path
 //   name: keyID
@@ -1254,7 +1269,7 @@ func handleDeleteOrgKey(orgID string) (interface{}, int) {
 	return statusObj, http.StatusOK
 }
 
-// swagger:operation GET /reload/group Reload reloadGroup
+// swagger:operation GET /reload/group Reload groupResetHandler
 // ---
 //  summary: Reloads all the Tyk Gateways in a cluster
 //  responses:
@@ -1283,7 +1298,7 @@ func groupResetHandler(w http.ResponseWriter, r *http.Request) {
 // Otherwise, it won't block and fn will be called once the reload is
 // finished.
 //
-// swagger:operation GET /reload Reload a gateway instance
+// swagger:operation GET /reload Reload resetHandler
 //
 // ---
 //   summary: Reloads a single Tyk Gateway instance
@@ -1468,7 +1483,6 @@ func oauthClientStorageID(clientID string) string {
 // summary: Create a new OAuth client
 // parameters:
 //   - in: body
-//     name: client_info
 //     required: true
 //     schema:
 //       "$ref": "#/definitions/NewClientRequest"
@@ -1884,7 +1898,7 @@ func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 //     schema:
 //       type: array
 //       items:
-//         type: string
+//         "$ref": "#/definitions/OAuthClientToken"
 func oAuthClientTokensHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
 	keyName := mux.Vars(r)["keyName"]
