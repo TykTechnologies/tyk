@@ -102,7 +102,7 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
 	if r.Body != nil {
 		defer r.Body.Close()
 		miniRequestObject.RawBody, _ = ioutil.ReadAll(r.Body)
-		if utf8.Valid(miniRequestObject.RawBody) {
+		if utf8.Valid(miniRequestObject.RawBody) && !miniRequestObject.RawBodyOnly {
 			miniRequestObject.Body = string(miniRequestObject.RawBody)
 		}
 	}
