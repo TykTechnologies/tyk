@@ -244,35 +244,61 @@ func getKeyDetail(key, apiID string, hashed bool) (user.SessionState, bool) {
 }
 
 func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interface{}, int) {
-	var newSession user.SessionState
+	suppressReset := r.URL.Query().Get("suppress_reset") == "1"
+
+	// decode payload
+	newSession := user.SessionState{}
 	if err := json.NewDecoder(r.Body).Decode(&newSession); err != nil {
 		log.Error("Couldn't decode new session object: ", err)
 		return apiError("Request malformed"), http.StatusBadRequest
 	}
+
 	// DO ADD OR UPDATE
+
+	// get original session in case of update and preserve fields that SHOULD NOT be updated
+	originalKey := user.SessionState{}
+	if r.Method == http.MethodPut {
+		found := false
+		for apiID := range newSession.AccessRights {
+			originalKey, found = getKeyDetail(keyName, apiID, isHashed)
+			if found {
+				break
+			}
+		}
+		if !found {
+			log.Error("Could not find key when updating")
+			return apiError("Key is not found"), http.StatusNotFound
+		}
+
+		// save existing quota_renews if suppress_reset was passed (which means don't reset quota counters)
+		// leaving quota_renews as 0 will force quota limiter to start new renewal period
+		if suppressReset {
+			// on session level
+			newSession.QuotaRenews = originalKey.QuotaRenews
+
+			// on ACL API limit level
+			for apiID, access := range originalKey.AccessRights {
+				if access.Limit == nil {
+					continue
+				}
+				if newAccess, ok := newSession.AccessRights[apiID]; ok && newAccess.Limit != nil {
+					newAccess.Limit.QuotaRenews = access.Limit.QuotaRenews
+					newSession.AccessRights[apiID] = newAccess
+				}
+			}
+		}
+	}
+
 	// Update our session object (create it)
 	if newSession.BasicAuthData.Password != "" {
 		// If we are using a basic auth user, then we need to make the keyname explicit against the OrgId in order to differentiate it
 		// Only if it's NEW
 		switch r.Method {
-		case "POST":
+		case http.MethodPost:
 			keyName = generateToken(newSession.OrgID, keyName)
 			// It's a create, so lets hash the password
 			setSessionPassword(&newSession)
-		case "PUT":
-			// Ge the session
-			var originalKey user.SessionState
-			var found bool
-			for apiID := range newSession.AccessRights {
-				originalKey, found = getKeyDetail(keyName, apiID, false)
-				if found {
-					break
-				}
-			}
-
-			if !found {
-				break
-			}
+		case http.MethodPut:
 			if originalKey.BasicAuthData.Password != newSession.BasicAuthData.Password {
 				// passwords dont match assume it's new, lets hash it
 				log.Debug("Passwords dont match, original: ", originalKey.BasicAuthData.Password)
@@ -283,15 +309,13 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 		}
 	}
 
-	suppressReset := r.URL.Query().Get("suppress_reset") == "1"
-
 	if err := doAddOrUpdate(keyName, &newSession, suppressReset, isHashed); err != nil {
 		return apiError("Failed to create key, ensure security settings are correct."), http.StatusInternalServerError
 	}
 
 	action := "modified"
 	event := EventTokenUpdated
-	if r.Method == "POST" {
+	if r.Method == http.MethodPost {
 		action = "added"
 		event = EventTokenCreated
 	}
