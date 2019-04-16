@@ -101,9 +101,9 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) (*coprocess.Object, err
 
 	if r.Body != nil {
 		defer r.Body.Close()
+		var err error
 		miniRequestObject.RawBody, err = ioutil.ReadAll(r.Body)
 		if err != nil {
-			logger.WithError(err).Error("Failed to read request body")
 			return nil, err
 		}
 		if utf8.Valid(miniRequestObject.RawBody) && !miniRequestObject.RawBodyOnly {
@@ -129,6 +129,7 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) (*coprocess.Object, err
 	if c.Middleware != nil {
 		configDataAsJson := []byte("{}")
 		if len(c.Middleware.Spec.ConfigData) > 0 {
+			var err error
 			configDataAsJson, err = json.Marshal(c.Middleware.Spec.ConfigData)
 			if err != nil {
 				return nil, err
@@ -269,6 +270,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	object, err := coProcessor.ObjectFromRequest(r)
 	if err != nil {
+		logger.WithError(err).Error("Failed to build request object")
 		return errors.New("Middleware error"), 500
 	}
 
