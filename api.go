@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -248,7 +249,11 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 
 	// decode payload
 	newSession := user.SessionState{}
-	if err := json.NewDecoder(r.Body).Decode(&newSession); err != nil {
+
+	contents, _ := ioutil.ReadAll(r.Body)
+	r.Body = ioutil.NopCloser(bytes.NewReader(contents))
+
+	if err := json.Unmarshal(contents, &newSession); err != nil {
 		log.Error("Couldn't decode new session object: ", err)
 		return apiError("Request malformed"), http.StatusBadRequest
 	}
