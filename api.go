@@ -884,6 +884,7 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 // summary: Create a new API key
 // parameters:
 //   - in: body
+//     name: createKey
 //     required: true
 //     schema:
 //       "$ref": "#/definitions/SessionState"
@@ -1484,6 +1485,7 @@ func oauthClientStorageID(clientID string) string {
 // parameters:
 //   - in: body
 //     required: true
+//     name: oauth_client
 //     schema:
 //       "$ref": "#/definitions/NewClientRequest"
 // responses:
