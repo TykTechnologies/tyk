@@ -343,6 +343,10 @@ func singleJoiningSlash(a, b string, disableStripSlash bool) string {
 }
 
 func copyHeader(dst, src http.Header) {
+	if val := dst.Get(http.CanonicalHeaderKey("Access-Control-Allow-Origin")); len(val) > 0 {
+		src.Del("Access-Control-Allow-Origin")
+	}
+
 	for k, vv := range src {
 		for _, v := range vv {
 			dst.Add(k, v)
