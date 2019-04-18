@@ -15,6 +15,41 @@ import (
 	"github.com/TykTechnologies/tyk/request"
 )
 
+func TestCopyHeader_NoDuplicateCORSHeaders(t *testing.T) {
+
+	makeHeaders := func(withCORS bool) http.Header {
+
+		var h = http.Header{}
+
+		h.Set("Vary", "Origin")
+		h.Set("Location", "https://tyk.io")
+
+		if withCORS {
+			h.Set("Access-Control-Allow-Origin", "tyk.io")
+		}
+
+		return h
+	}
+
+	tests := []struct {
+		src, dst http.Header
+	}{
+		{makeHeaders(true), makeHeaders(false)},
+		{makeHeaders(true), makeHeaders(true)},
+		{makeHeaders(false), makeHeaders(true)},
+	}
+
+	for _, v := range tests {
+		copyHeader(v.dst, v.src)
+
+		val := v.dst["Access-Control-Allow-Origin"]
+		if n := len(val); n != 1 {
+			t.Fatalf("%s found %d times", "Access-Control-Allow-Origin", n)
+		}
+	}
+
+}
+
 func TestReverseProxyRetainHost(t *testing.T) {
 	target, _ := url.Parse("http://target-host.com/targetpath")
 	cases := []struct {
