@@ -39,6 +39,8 @@ func respBodyReader(req *http.Request, resp *http.Response) io.ReadCloser {
 			log.Error("Body decompression error:", err)
 			return ioutil.NopCloser(bytes.NewReader(nil))
 		}
+		resp.ContentLength = 0 // represents unknown length
+		defer reader.Close()
 		return reader
 	case "deflate":
 		return flate.NewReader(resp.Body)

@@ -193,6 +193,8 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, resp
 			// mw_redis_cache instead? is there a reason not
 			// to include that in the analytics?
 			if responseCopy != nil {
+				responseCopy.Body = respBodyReader(r, responseCopy)
+
 				// Get the wire format representation
 				var wireFormatRes bytes.Buffer
 				responseCopy.Write(&wireFormatRes)
