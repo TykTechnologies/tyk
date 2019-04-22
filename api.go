@@ -144,7 +144,11 @@ func resetAPILimits(accessRights map[string]user.AccessDefinition) {
 }
 
 func doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool, isHashed bool) error {
-	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
+	// field last_updated plays an important role in in-mem rate limiter
+	// so update last_updated to current timestamp only if suppress_reset wasn't set to 1
+	if !dontReset {
+		newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
+	}
 
 	if len(newSession.AccessRights) > 0 {
 		// reset API-level limit to nil if any has a zero-value
@@ -275,11 +279,16 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 			return apiError("Key is not found"), http.StatusNotFound
 		}
 
-		// save existing quota_renews if suppress_reset was passed (which means don't reset quota counters)
-		// leaving quota_renews as 0 will force quota limiter to start new renewal period
+		// don't change fields related to quota and rate limiting if was passed as "suppress_reset=1"
 		if suppressReset {
+			// save existing quota_renews and last_updated if suppress_reset was passed
+			// (which means don't reset quota or rate counters)
+			// - leaving quota_renews as 0 will force quota limiter to start new renewal period
+			// - setting new last_updated with force rate limiter to start new "per" rating period
+
 			// on session level
 			newSession.QuotaRenews = originalKey.QuotaRenews
+			newSession.LastUpdated = originalKey.LastUpdated
 
 			// on ACL API limit level
 			for apiID, access := range originalKey.AccessRights {
