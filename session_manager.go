@@ -254,7 +254,7 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 		if time.Now().After(renewalDate) {
 			// The renewal date is in the past, we should update the quota!
 			// Also, this fixes legacy issues where there is no TTL on quota buckets
-			log.Warning("Incorrect key expiry setting detected, correcting")
+			log.Debug("Incorrect key expiry setting detected, correcting")
 			go store.DeleteRawKey(rawKey)
 			qInt = 1
 		} else {
