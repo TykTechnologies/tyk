@@ -8,6 +8,8 @@ notifications:
 env:
   global:
     - TYK_LOGLEVEL=info
+    - CONSUL_VERSION=1.4.4
+    - CONSUL_DIR=$HOME/consul_$CONSUL_VERSION
 
 addons:
   apt:
@@ -31,6 +33,13 @@ install:
   - go install ./...
     # As of 1.9, ./... no longer includes ./vendor/...
   - go install ./vendor/{golang.org/x/tools/cmd/goimports,github.com/wadey/gocovmerge,github.com/mattn/goveralls}
+
+before_script:
+  - 'if [[ ! -f $CONSUL_DIR/consul ]]; then (mkdir -p $CONSUL_DIR && cd $CONSUL_DIR && wget https://releases.hashicorp.com/consul/${CONSUL_VERSION}_linux_amd64.zip && unzip ${CONSUL_VERSION}_linux_amd64.zip); fi'
+  - $CONSUL_DIR/consul --version
+  - $CONSUL_DIR/consul agent --dev &
+  # Wait for consul's raft election
+  - sleep 5
 
 script:
   - sudo pip3 install google
