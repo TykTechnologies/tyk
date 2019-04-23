@@ -24,6 +24,7 @@ import (
 	newrelic "github.com/newrelic/go-agent"
 
 	"github.com/TykTechnologies/tyk/checkup"
+	"github.com/TykTechnologies/tyk/storage/kv"
 
 	"github.com/Sirupsen/logrus"
 	logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
@@ -102,6 +103,8 @@ var (
 	}
 
 	dnsCacheManager dnscache.IDnsCacheManager
+
+	consulKVStore kv.Store
 )
 
 const (
@@ -912,6 +915,37 @@ func afterConfSetup(conf *config.Config) {
 
 	if conf.HealthCheckEndpointName == "" {
 		conf.HealthCheckEndpointName = "hello"
+	}
+
+	var err error
+	conf.Secret, err = kvStore(conf.Secret)
+	if err != nil {
+		log.Fatalf("could not retrieve the secret key.. %v", err)
+	}
+}
+
+func kvStore(value string) (string, error) {
+
+	if strings.HasPrefix(value, "$consul.") {
+		key := strings.TrimPrefix(value, "$consul.")
+		log.Debugf("Retrieving %s from consul", key)
+		setUpConsul()
+		return consulKVStore.Get(key)
+	}
+
+	return value, nil
+}
+
+func setUpConsul() {
+	if consulKVStore != nil {
+		return
+	}
+
+	var err error
+
+	consulKVStore, err = kv.NewConsul(config.Global().KV.Consul)
+	if err != nil {
+		log.Fatalf("an error occurred while setting up consul... %v", err)
 	}
 }
 

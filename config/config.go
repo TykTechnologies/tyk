@@ -8,12 +8,13 @@ import (
 	"os"
 	"sync"
 	"sync/atomic"
-
-	"github.com/kelseyhightower/envconfig"
+	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
+	consul "github.com/hashicorp/consul/api"
+	"github.com/kelseyhightower/envconfig"
 )
 
 type IPsHandleStrategy string
@@ -317,6 +318,41 @@ type Config struct {
 	DisableRegexpCache                bool                                  `json:"disable_regexp_cache"`
 	RegexpCacheExpire                 int32                                 `json:"regexp_cache_expire"`
 	HealthCheckEndpointName           string                                `json:"health_check_endpoint_name"`
+	KV                                struct {
+		Consul ConsulConfig `json:"consul"`
+	} `json:"kv"`
+}
+
+// ConsulConfig is used to configure the creation of a client
+// This is a stripped down version of the Config struct in consul's API client
+type ConsulConfig struct {
+	// Address is the address of the Consul server
+	Address string
+
+	// Scheme is the URI scheme for the Consul server
+	Scheme string
+
+	// Datacenter to use. If not provided, the default agent datacenter is used.
+	Datacenter string
+
+	// HttpAuth is the auth info to use for http access.
+	HttpAuth struct {
+		// Username to use for HTTP Basic Authentication
+		Username string
+
+		// Password to use for HTTP Basic Authentication
+		Password string
+	}
+
+	// WaitTime limits how long a Watch will block. If not provided,
+	// the agent default values will be used.
+	WaitTime time.Duration
+
+	// Token is used to provide a per-request ACL token
+	// which overrides the agent's default token.
+	Token string
+
+	TLSConfig consul.TLSConfig
 }
 
 type CertData struct {
