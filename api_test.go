@@ -154,12 +154,12 @@ func TestKeyHandler(t *testing.T) {
 	policiesByID["abc_policy"] = user.Policy{
 		Active:   true,
 		QuotaMax: 5,
+		AccessRights: map[string]user.AccessDefinition{"test": {
+			APIID: "test", Versions: []string{"v1"},
+		}},
 	}
 	policiesMu.Unlock()
 	withPolicy := createStandardSession()
-	withPolicy.AccessRights = map[string]user.AccessDefinition{"test": {
-		APIID: "test", Versions: []string{"v1"},
-	}}
 	withPolicy.ApplyPolicies = []string{
 		"abc_policy",
 	}
@@ -190,7 +190,7 @@ func TestKeyHandler(t *testing.T) {
 				Path:      "/tyk/keys/create",
 				Data:      string(withPolicyJSON),
 				AdminAuth: true,
-				Code:      200,
+				Code:      400,
 			},
 			{
 				Method:    "POST",
