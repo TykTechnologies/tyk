@@ -922,6 +922,17 @@ func afterConfSetup(conf *config.Config) {
 	if err != nil {
 		log.Fatalf("could not retrieve the secret key.. %v", err)
 	}
+
+	conf.NodeSecret, err = kvStore(conf.NodeSecret)
+	if err != nil {
+		log.Fatalf("could not retrieve the NodeSecret key.. %v", err)
+	}
+
+	conf.Storage.Password, err = kvStore(conf.Storage.Password)
+	if err != nil {
+		log.Fatalf("Could not retrieve redis password... %v", err)
+	}
+
 }
 
 func kvStore(value string) (string, error) {
