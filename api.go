@@ -262,6 +262,9 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 		return apiError("Request malformed"), http.StatusBadRequest
 	}
 
+	mw := BaseMiddleware{}
+	mw.ApplyPolicies(&newSession)
+
 	// DO ADD OR UPDATE
 
 	// get original session in case of update and preserve fields that SHOULD NOT be updated
