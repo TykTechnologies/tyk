@@ -933,6 +933,10 @@ func afterConfSetup(conf *config.Config) {
 		log.Fatalf("Could not retrieve redis password... %v", err)
 	}
 
+	conf.CacheStorage.Password, err = kvStore(conf.CacheStorage.Password)
+	if err != nil {
+		log.Fatalf("Could not retrieve cache storage password... %v", err)
+	}
 }
 
 func kvStore(value string) (string, error) {
