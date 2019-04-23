@@ -937,6 +937,11 @@ func afterConfSetup(conf *config.Config) {
 	if err != nil {
 		log.Fatalf("Could not retrieve cache storage password... %v", err)
 	}
+
+	conf.Security.PrivateCertificateEncodingSecret, err = kvStore(conf.Security.PrivateCertificateEncodingSecret)
+	if err != nil {
+		log.Fatalf("Could not retrieve the private certificate encoding secret... %v", err)
+	}
 }
 
 func kvStore(value string) (string, error) {
