@@ -4,6 +4,8 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/tyk/apidef"
+	uuid "github.com/satori/go.uuid"
 	"strings"
 )
 
@@ -39,6 +41,7 @@ type WSDLBinding struct {
 	Operations []*WSDLOperation `xml:"http://schemas.xmlsoap.org/wsdl/ operation"`
 	Protocol   string
 	Method     string
+	isProcess  bool
 }
 
 type WSDLOperation struct {
@@ -49,6 +52,12 @@ type WSDLOperation struct {
 type OperationMeta struct {
 	SoapAction string
 	Endpoint   string
+}
+
+var bindingList map[string]*WSDLBinding
+
+func init() {
+	bindingList = make(map[string]*WSDLBinding)
 }
 
 func (b *WSDLBinding) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
@@ -84,7 +93,7 @@ func (b *WSDLBinding) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 				switch t.Name.Local {
 				case "binding":
 					{
-						fmt.Print("Found binding elementi of ")
+						fmt.Print("Found binding element of ")
 						switch t.Name.Space {
 						case NS_SOAP, NS_SOAP12:
 							{
@@ -95,6 +104,8 @@ func (b *WSDLBinding) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 									b.Protocol = "soap12"
 								}
 
+								//Get transport protocol
+								//TODO if transport protocol is different from http
 								var transport string
 								for _, attr := range t.Attr {
 									if attr.Name.Local == "transport" {
@@ -123,7 +134,9 @@ func (b *WSDLBinding) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 							{
 								//Unsportted binding protocol is used
 								fmt.Println("Unsupported binding protocol is used:", t.Name.Space, ":", t.Name.Local)
-								return nil
+
+								d.Skip()
+								return errors.New("Unsupported binding protocol is used")
 							}
 						}
 					}
@@ -149,6 +162,7 @@ func (b *WSDLBinding) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 			{
 				fmt.Println("Found endElement")
 				if t.Name.Space == NS_WSDL && t.Name.Local == "binding" {
+					bindingList[b.Name] = b
 					return nil
 				}
 			}
@@ -202,8 +216,8 @@ func (op *WSDLOperation) UnmarshalXML(d *xml.Decoder, start xml.StartElement) er
 						}
 					default:
 						{
-							fmt.Println("Unsupported protocol. Skipping")
-							return nil
+							d.Skip()
+							return errors.New("Unsupported protocol is used")
 						}
 					}
 
@@ -224,4 +238,148 @@ func (op *WSDLOperation) UnmarshalXML(d *xml.Decoder, start xml.StartElement) er
 		}
 
 	}
+}
+
+func (wsdl *WSDL) ConvertToTyk(upstreamURL, orgId string, portName map[string]string) (*apidef.APIDefinition, error) {
+	ad := apidef.APIDefinition{
+		Name:             wsdl.Services[0].Name,
+		Active:           true,
+		UseKeylessAccess: true,
+		OrgID:            orgId,
+		APIID:            uuid.NewV4().String(),
+	}
+
+	ad.VersionDefinition.Key = "version"
+	ad.VersionDefinition.Location = "header"
+	ad.VersionData.Versions = make(map[string]apidef.VersionInfo)
+	ad.Proxy.ListenPath = "/" + wsdl.Services[0].Name + "/"
+	ad.Proxy.StripListenPath = true
+	ad.Proxy.TargetURL = upstreamURL
+	versionData, err := wsdl.ConvertIntoApiVersion(portName)
+	if err != nil {
+		return nil, err
+	}
+
+	wsdl.InsertIntoAPIDefinitionAsVersion(versionData, &ad, "1.0.0")
+	ad.VersionData.DefaultVersion = "1.0.0"
+	return &ad, nil
+}
+
+func trimNamespace(s string) string {
+	parts := strings.SplitN(s, ":", 2)
+	if len(parts) == 1 {
+		return parts[0]
+	} else {
+		return parts[1]
+	}
+}
+
+func (wsdl *WSDL) ConvertIntoApiVersion(servicePortNames map[string]string) (apidef.VersionInfo, error) {
+	versionInfo := apidef.VersionInfo{}
+	versionInfo.UseExtendedPaths = true
+	versionInfo.Name = "1.0.0"
+	versionInfo.ExtendedPaths.TrackEndpoints = make([]apidef.TrackEndpointMeta, 0)
+	versionInfo.ExtendedPaths.URLRewrite = make([]apidef.URLRewriteMeta, 0)
+	versionInfo.ExtendedPaths.Internal = make([]apidef.InternalMeta, 0)
+
+	var foundPort bool
+	var serviceCount int
+
+	for _, service := range wsdl.Services {
+		foundPort = false
+		if service.Name == "" {
+			continue
+		}
+		for _, port := range service.Ports {
+			portName := servicePortNames[service.Name]
+			if portName == "" {
+				portName = service.Ports[0].Name
+			}
+			if port.Name == portName {
+				foundPort = true
+
+				serviceURLRewriteMeta := apidef.URLRewriteMeta{}
+				serviceInternalMeta := apidef.InternalMeta{}
+
+				fmt.Println("bindingList=", bindingList)
+				fmt.Println("Access method of ", port.Binding)
+
+				bindingName := trimNamespace(port.Binding)
+
+				binding := bindingList[bindingName]
+				if binding == nil {
+					fmt.Printf("Binding for port %s of service %s not found\n", port.Name, service.Name)
+					fmt.Println("Skiping processing of the service")
+					foundPort = false
+					break
+				}
+				method := binding.Method
+
+				if method == "" {
+					fmt.Println("Unsupported transport protocol. Skipping process of the service ", service.Name)
+					foundPort = false
+					break
+				}
+
+				if len(binding.Operations) == 0 {
+					fmt.Printf("No operation found for binding %s of service %s\n", binding.Name, service.Name)
+					break
+				}
+
+				serviceCount++
+
+				// Create internal endpoint for each service
+				serviceEndpointPath := service.Name + "Internal"
+				serviceInternalMeta.Path = serviceEndpointPath
+				serviceInternalMeta.Method = method
+
+				versionInfo.ExtendedPaths.Internal = append(versionInfo.ExtendedPaths.Internal, serviceInternalMeta)
+
+				//Rewrite from service endpoint to upstream
+				serviceURLRewriteMeta.Method = method
+				serviceURLRewriteMeta.Path = serviceEndpointPath
+				serviceURLRewriteMeta.MatchPattern = serviceEndpointPath
+				serviceURLRewriteMeta.RewriteTo = port.Address.Location
+
+				versionInfo.ExtendedPaths.URLRewrite = append(versionInfo.ExtendedPaths.URLRewrite, serviceURLRewriteMeta)
+
+				//Create endpoints for each operation
+				for _, op := range binding.Operations {
+					operationTrackEndpoint := apidef.TrackEndpointMeta{}
+					operationUrlRewrite := apidef.URLRewriteMeta{}
+
+					//Add each operation in trackendpoint
+					operationTrackEndpoint.Path = op.Name
+					operationTrackEndpoint.Method = method
+
+					versionInfo.ExtendedPaths.TrackEndpoints = append(versionInfo.ExtendedPaths.TrackEndpoints, operationTrackEndpoint)
+
+					//Rewrite operation to service endpoint
+					operationUrlRewrite.Method = method
+					operationUrlRewrite.Path = op.Name
+					operationUrlRewrite.MatchPattern = op.Name
+					operationUrlRewrite.RewriteTo = "tyk://self/" + serviceEndpointPath
+
+					versionInfo.ExtendedPaths.URLRewrite = append(versionInfo.ExtendedPaths.URLRewrite, operationUrlRewrite)
+				}
+
+			}
+		}
+		if foundPort == false {
+			fmt.Printf("Port for service %s not found. Skiping processing of the service", service.Name)
+
+		}
+	}
+
+	if serviceCount == 0 {
+		return versionInfo, errors.New("Error process wsdl file")
+	}
+
+	return versionInfo, nil
+}
+
+func (wsdl *WSDL) InsertIntoAPIDefinitionAsVersion(version apidef.VersionInfo, def *apidef.APIDefinition, versionName string) error {
+	def.VersionData.NotVersioned = false
+	def.VersionData.Versions[versionName] = version
+	return nil
 }
