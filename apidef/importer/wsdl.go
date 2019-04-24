@@ -3,7 +3,6 @@ package importer
 import (
 	"encoding/xml"
 	"errors"
-	"fmt"
 	"github.com/TykTechnologies/tyk/apidef"
 	uuid "github.com/satori/go.uuid"
 	"strings"
@@ -37,11 +36,11 @@ type WSDLAddress struct {
 }
 
 type WSDLBinding struct {
-	Name       string           `xml:"name,attr"`
-	Operations []*WSDLOperation `xml:"http://schemas.xmlsoap.org/wsdl/ operation"`
-	Protocol   string
-	Method     string
-	isProcess  bool
+	Name                string           `xml:"name,attr"`
+	Operations          []*WSDLOperation `xml:"http://schemas.xmlsoap.org/wsdl/ operation"`
+	Protocol            string
+	Method              string
+	isSupportedProtocol bool
 }
 
 type WSDLOperation struct {
@@ -69,8 +68,6 @@ func (b *WSDLBinding) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 		return errors.New("Binding name is empty. Malformed wsdl")
 	}
 
-	fmt.Println("Parsing binding:", b.Name)
-
 	//Fetch protocol specific data
 	//If soap/soap12 is used, set Method to POST
 	//If http is used, get value of verb attribute
@@ -78,22 +75,20 @@ func (b *WSDLBinding) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 	for {
 		tok, err := d.Token()
 		if err != nil {
-			fmt.Println("d.Token returned err")
+			log.Error("Error will parsing wsdl file: ", err)
 			return err
 		}
 
 		switch t := tok.(type) {
 		case xml.StartElement:
 			{
-				fmt.Println("Found startElement ", t.Name.Space, ":", t.Name.Local)
 				switch t.Name.Local {
 				case "binding":
 					{
-						fmt.Print("Found binding element of ")
 						switch t.Name.Space {
 						case NS_SOAP, NS_SOAP12:
 							{
-								fmt.Println("soap/sopa12 protocol")
+								isSupportedProtocol = true
 								if t.Name.Space == NS_SOAP {
 									b.Protocol = "soap"
 								} else {
@@ -112,11 +107,14 @@ func (b *WSDLBinding) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 								parts := strings.Split(transport, "/")
 								if parts[len(parts)-1] == "http" {
 									b.Method = "POST"
+								} else {
+									isSupportedProtocol = false
 								}
+
 							}
 						case NS_HTTP:
 							{
-								fmt.Println("http protocol")
+								isSupportedProtocol = true
 								b.Protocol = "http"
 								for _, attr := range t.Attr {
 									if attr.Name.Local == "verb" {
@@ -128,17 +126,15 @@ func (b *WSDLBinding) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 							}
 						default:
 							{
-								//Unsportted binding protocol is used
-								fmt.Println("Unsupported binding protocol is used:", t.Name.Space, ":", t.Name.Local)
-
-								d.Skip()
-								return errors.New("Unsupported binding protocol is used")
+								log.Debug("Unsupported binding protocol is used:", t.Name.Space, ":", t.Name.Local)
+								isSupportedProtocol = false
+								return nil
 							}
 						}
 					}
 				case "operation":
 					{
-						if t.Name.Space == NS_WSDL && b.Method != "" {
+						if t.Name.Space == NS_WSDL && isSupportedProtocol {
 							op := new(WSDLOperation)
 							if err := d.DecodeElement(op, &t); err != nil {
 								return err
@@ -156,7 +152,6 @@ func (b *WSDLBinding) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 			}
 		case xml.EndElement:
 			{
-				fmt.Println("Found endElement ", t.Name.Space, ":", t.Name.Local)
 				if t.Name.Space == NS_WSDL && t.Name.Local == "binding" {
 					bindingList[b.Name] = b
 					return nil
@@ -178,7 +173,6 @@ func (op *WSDLOperation) UnmarshalXML(d *xml.Decoder, start xml.StartElement) er
 		return errors.New("Operation name is empty. Malformed wsdl")
 	}
 
-	fmt.Println("Parsing operation", op.Name)
 	var protocol string
 
 	for {
@@ -190,7 +184,6 @@ func (op *WSDLOperation) UnmarshalXML(d *xml.Decoder, start xml.StartElement) er
 		switch t := tok.(type) {
 		case xml.StartElement:
 			{
-				fmt.Println("Found startElement ", t.Name.Space, ":", t.Name.Local)
 				if t.Name.Local == "operation" {
 					switch t.Name.Space {
 					case NS_SOAP, NS_SOAP12:
@@ -213,10 +206,7 @@ func (op *WSDLOperation) UnmarshalXML(d *xml.Decoder, start xml.StartElement) er
 						{
 							if err := d.Skip(); err != nil {
 								return err
-							} else {
-								return errors.New("Unsupported protocol is used")
 							}
-
 						}
 
 					}
@@ -240,8 +230,6 @@ func (op *WSDLOperation) UnmarshalXML(d *xml.Decoder, start xml.StartElement) er
 			}
 		case xml.EndElement:
 			{
-				fmt.Println("Found EndElement", t.Name.Space, ":", t.Name.Local)
-
 				if t.Name.Space == NS_WSDL && t.Name.Local == "operation" {
 					return nil
 				}
@@ -309,32 +297,29 @@ func (wsdl *WSDL) ConvertIntoApiVersion(servicePortNames map[string]string) (api
 			if port.Name == portName {
 				foundPort = true
 
-				fmt.Println("bindingList=", bindingList)
-				fmt.Println("Access method of ", port.Binding)
-
 				bindingName := trimNamespace(port.Binding)
 
 				binding := bindingList[bindingName]
 				if binding == nil {
-					fmt.Printf("Binding for port %s of service %s not found\n", port.Name, service.Name)
-					fmt.Println("Skiping processing of the service")
+					log.Debugf("Binding for port %s of service %s not found. Termination processing of the service", port.Name, service.Name)
+
 					foundPort = false
 					break
 				}
 
-				method := binding.Method
-				if method == "" {
-					fmt.Println("Unsupported transport protocol. Skipping process of the service ", service.Name)
+				if !binding.isSupportedProtocol {
+					log.Debug("Unsupported transport protocol. Skipping process of the service ", service.Name)
 					foundPort = false
 					break
 				}
 
 				if len(binding.Operations) == 0 {
-					fmt.Printf("No operation found for binding %s of service %s\n", binding.Name, service.Name)
+					log.Debugf("No operation found for binding %s of service %s\n", binding.Name, service.Name)
 					break
 				}
 
 				serviceCount++
+				method := binding.Method
 
 				//Create endpoints for each operation
 				for _, op := range binding.Operations {
@@ -383,7 +368,7 @@ func (wsdl *WSDL) ConvertIntoApiVersion(servicePortNames map[string]string) (api
 		}
 
 		if foundPort == false {
-			fmt.Printf("Port for service %s not found. Skiping processing of the service", service.Name)
+			log.Errorf("Port for service %s not found. Skiping processing of the service", service.Name)
 		}
 	}
 
