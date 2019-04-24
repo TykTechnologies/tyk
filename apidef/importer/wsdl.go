@@ -45,13 +45,9 @@ type WSDLBinding struct {
 }
 
 type WSDLOperation struct {
-	Name string `xml:"name,attr"`
-	Meta OperationMeta
-}
-
-type OperationMeta struct {
-	SoapAction string
-	Endpoint   string
+	Name             string `xml:"name,attr"`
+	Endpoint         string
+	IsUrlReplacement bool
 }
 
 var bindingList map[string]*WSDLBinding
@@ -89,7 +85,7 @@ func (b *WSDLBinding) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 		switch t := tok.(type) {
 		case xml.StartElement:
 			{
-				fmt.Println("Found startElement")
+				fmt.Println("Found startElement ", t.Name.Space, ":", t.Name.Local)
 				switch t.Name.Local {
 				case "binding":
 					{
@@ -160,7 +156,7 @@ func (b *WSDLBinding) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 			}
 		case xml.EndElement:
 			{
-				fmt.Println("Found endElement")
+				fmt.Println("Found endElement ", t.Name.Space, ":", t.Name.Local)
 				if t.Name.Space == NS_WSDL && t.Name.Local == "binding" {
 					bindingList[b.Name] = b
 					return nil
@@ -183,6 +179,7 @@ func (op *WSDLOperation) UnmarshalXML(d *xml.Decoder, start xml.StartElement) er
 	}
 
 	fmt.Println("Parsing operation", op.Name)
+	var protocol string
 
 	for {
 		tok, err := d.Token()
@@ -193,34 +190,48 @@ func (op *WSDLOperation) UnmarshalXML(d *xml.Decoder, start xml.StartElement) er
 		switch t := tok.(type) {
 		case xml.StartElement:
 			{
-				fmt.Println("Found startElement")
+				fmt.Println("Found startElement ", t.Name.Space, ":", t.Name.Local)
 				if t.Name.Local == "operation" {
 					switch t.Name.Space {
 					case NS_SOAP, NS_SOAP12:
 						{
-							for _, attr := range t.Attr {
-								if attr.Name.Local == "soapAction" {
-									op.Meta.SoapAction = attr.Value
-									break
-								}
-							}
+							protocol = "soap"
+							break
 						}
 					case NS_HTTP:
 						{
+							protocol = "http"
 							for _, attr := range t.Attr {
 								if attr.Name.Local == "location" {
-									op.Meta.Endpoint = attr.Value
+									op.Endpoint = attr.Value
 									break
 								}
 							}
+							break
 						}
 					default:
 						{
-							d.Skip()
-							return errors.New("Unsupported protocol is used")
-						}
-					}
+							if err := d.Skip(); err != nil {
+								return err
+							} else {
+								return errors.New("Unsupported protocol is used")
+							}
 
+						}
+
+					}
+				}
+
+				if protocol == "http" {
+					if t.Name.Local == "urlReplacement" {
+						op.IsUrlReplacement = true
+						endpoint := op.Endpoint
+						tmp := strings.Replace(endpoint, "(", "{", -1)
+						new_endpoint := strings.Replace(tmp, ")", "}", -1)
+
+						op.Endpoint = new_endpoint
+
+					}
 				} else {
 					if err := d.Skip(); err != nil {
 						return err
@@ -229,7 +240,7 @@ func (op *WSDLOperation) UnmarshalXML(d *xml.Decoder, start xml.StartElement) er
 			}
 		case xml.EndElement:
 			{
-				fmt.Println("Found EndElement")
+				fmt.Println("Found EndElement", t.Name.Space, ":", t.Name.Local)
 
 				if t.Name.Space == NS_WSDL && t.Name.Local == "operation" {
 					return nil
@@ -298,9 +309,6 @@ func (wsdl *WSDL) ConvertIntoApiVersion(servicePortNames map[string]string) (api
 			if port.Name == portName {
 				foundPort = true
 
-				serviceURLRewriteMeta := apidef.URLRewriteMeta{}
-				serviceInternalMeta := apidef.InternalMeta{}
-
 				fmt.Println("bindingList=", bindingList)
 				fmt.Println("Access method of ", port.Binding)
 
@@ -313,8 +321,8 @@ func (wsdl *WSDL) ConvertIntoApiVersion(servicePortNames map[string]string) (api
 					foundPort = false
 					break
 				}
-				method := binding.Method
 
+				method := binding.Method
 				if method == "" {
 					fmt.Println("Unsupported transport protocol. Skipping process of the service ", service.Name)
 					foundPort = false
@@ -328,46 +336,54 @@ func (wsdl *WSDL) ConvertIntoApiVersion(servicePortNames map[string]string) (api
 
 				serviceCount++
 
-				// Create internal endpoint for each service
-				serviceEndpointPath := service.Name + "Internal"
-				serviceInternalMeta.Path = serviceEndpointPath
-				serviceInternalMeta.Method = method
-
-				versionInfo.ExtendedPaths.Internal = append(versionInfo.ExtendedPaths.Internal, serviceInternalMeta)
-
-				//Rewrite from service endpoint to upstream
-				serviceURLRewriteMeta.Method = method
-				serviceURLRewriteMeta.Path = serviceEndpointPath
-				serviceURLRewriteMeta.MatchPattern = serviceEndpointPath
-				serviceURLRewriteMeta.RewriteTo = port.Address.Location
-
-				versionInfo.ExtendedPaths.URLRewrite = append(versionInfo.ExtendedPaths.URLRewrite, serviceURLRewriteMeta)
-
 				//Create endpoints for each operation
 				for _, op := range binding.Operations {
 					operationTrackEndpoint := apidef.TrackEndpointMeta{}
 					operationUrlRewrite := apidef.URLRewriteMeta{}
+					path := ""
+
+					if binding.Protocol == "http" {
+						if op.Endpoint[0] == '/' {
+							path = service.Name + op.Endpoint
+						} else {
+							path = service.Name + "/" + op.Endpoint
+						}
+					} else {
+						path = service.Name + "/" + op.Name
+					}
 
 					//Add each operation in trackendpoint
-					operationTrackEndpoint.Path = op.Name
+					operationTrackEndpoint.Path = path
 					operationTrackEndpoint.Method = method
 
 					versionInfo.ExtendedPaths.TrackEndpoints = append(versionInfo.ExtendedPaths.TrackEndpoints, operationTrackEndpoint)
 
 					//Rewrite operation to service endpoint
 					operationUrlRewrite.Method = method
-					operationUrlRewrite.Path = op.Name
-					operationUrlRewrite.MatchPattern = op.Name
-					operationUrlRewrite.RewriteTo = "tyk://self/" + serviceEndpointPath
+					operationUrlRewrite.Path = path
+
+					if binding.Protocol == "http" {
+						if op.IsUrlReplacement == true {
+							pattern := ReplaceWildCards(op.Endpoint)
+							operationUrlRewrite.MatchPattern = "(" + pattern + ")"
+						} else {
+							operationUrlRewrite.MatchPattern = "(" + op.Endpoint + ".*)"
+						}
+						operationUrlRewrite.RewriteTo = port.Address.Location + "$1"
+					} else {
+						operationUrlRewrite.MatchPattern = path
+						operationUrlRewrite.RewriteTo = port.Address.Location
+					}
 
 					versionInfo.ExtendedPaths.URLRewrite = append(versionInfo.ExtendedPaths.URLRewrite, operationUrlRewrite)
 				}
 
+				break
 			}
 		}
+
 		if foundPort == false {
 			fmt.Printf("Port for service %s not found. Skiping processing of the service", service.Name)
-
 		}
 	}
 
@@ -382,4 +398,25 @@ func (wsdl *WSDL) InsertIntoAPIDefinitionAsVersion(version apidef.VersionInfo, d
 	def.VersionData.NotVersioned = false
 	def.VersionData.Versions[versionName] = version
 	return nil
+}
+
+func ReplaceWildCards(endpoint string) string {
+	var result []rune
+	var inside bool
+
+	for _, s := range endpoint {
+		if s == '{' {
+			inside = true
+			continue
+		} else if s == '}' {
+			inside = false
+			result = append(result, '.', '*')
+			continue
+		}
+
+		if inside == false {
+			result = append(result, s)
+		}
+	}
+	return string(result)
 }
