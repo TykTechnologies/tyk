@@ -6,6 +6,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	uuid "github.com/satori/go.uuid"
 	"io"
+	"net/http"
 	"strings"
 )
 
@@ -25,6 +26,12 @@ const (
 	NS_SOAP   = "http://schemas.xmlsoap.org/wsdl/soap/"
 	NS_SOAP12 = "http://schemas.xmlsoap.org/wsdl/soap12/"
 	NS_HTTP   = "http://schemas.xmlsoap.org/wsdl/http/"
+)
+
+const (
+	PROT_HTTP    = "http"
+	PROT_SOAP    = "soap"
+	PROT_SOAP_12 = "soap12"
 )
 
 type WSDL struct {
@@ -96,9 +103,9 @@ func (b *WSDLBinding) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 							{
 								b.isSupportedProtocol = true
 								if t.Name.Space == NS_SOAP {
-									b.Protocol = "soap"
+									b.Protocol = PROT_SOAP
 								} else {
-									b.Protocol = "soap12"
+									b.Protocol = PROT_SOAP_12
 								}
 
 								//Get transport protocol
@@ -112,7 +119,7 @@ func (b *WSDLBinding) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 								}
 								parts := strings.Split(transport, "/")
 								if parts[len(parts)-1] == "http" {
-									b.Method = "POST"
+									b.Method = http.MethodPost
 								} else {
 									b.isSupportedProtocol = false
 								}
@@ -121,7 +128,7 @@ func (b *WSDLBinding) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 						case NS_HTTP:
 							{
 								b.isSupportedProtocol = true
-								b.Protocol = "http"
+								b.Protocol = PROT_HTTP
 								for _, attr := range t.Attr {
 									if attr.Name.Local == "verb" {
 										b.Method = attr.Value
@@ -194,12 +201,12 @@ func (op *WSDLOperation) UnmarshalXML(d *xml.Decoder, start xml.StartElement) er
 					switch t.Name.Space {
 					case NS_SOAP, NS_SOAP12:
 						{
-							protocol = "soap"
+							protocol = PROT_SOAP
 							break
 						}
 					case NS_HTTP:
 						{
-							protocol = "http"
+							protocol = PROT_HTTP
 							for _, attr := range t.Attr {
 								if attr.Name.Local == "location" {
 									op.Endpoint = attr.Value
@@ -218,7 +225,7 @@ func (op *WSDLOperation) UnmarshalXML(d *xml.Decoder, start xml.StartElement) er
 					}
 				}
 
-				if protocol == "http" {
+				if protocol == PROT_HTTP {
 					if t.Name.Local == "urlReplacement" {
 						op.IsUrlReplacement = true
 						endpoint := op.Endpoint
@@ -342,7 +349,7 @@ func (wsdl *WSDL) ConvertIntoApiVersion(bool) (apidef.VersionInfo, error) {
 					operationUrlRewrite := apidef.URLRewriteMeta{}
 					path := ""
 
-					if binding.Protocol == "http" {
+					if binding.Protocol == PROT_HTTP {
 						if op.Endpoint[0] == '/' {
 							path = service.Name + op.Endpoint
 						} else {
@@ -362,7 +369,7 @@ func (wsdl *WSDL) ConvertIntoApiVersion(bool) (apidef.VersionInfo, error) {
 					operationUrlRewrite.Method = method
 					operationUrlRewrite.Path = path
 
-					if binding.Protocol == "http" {
+					if binding.Protocol == PROT_HTTP {
 						if op.IsUrlReplacement == true {
 							pattern := ReplaceWildCards(op.Endpoint)
 							operationUrlRewrite.MatchPattern = "(" + pattern + ")"
