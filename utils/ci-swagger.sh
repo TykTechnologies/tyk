@@ -1,7 +1,7 @@
 #!/bin/bash
 
 swagger2fileName="swagger2.yaml"
-openAPIspecfileName="gateway-swagger.yaml"
+openAPIspecfileName="swagger.yml"
 
 fatal() {
 	echo "$@" >&2
