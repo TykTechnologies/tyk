@@ -3,11 +3,12 @@ package importer
 import (
 	"encoding/xml"
 	"errors"
-	"github.com/TykTechnologies/tyk/apidef"
-	uuid "github.com/satori/go.uuid"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/TykTechnologies/tyk/apidef"
+	uuid "github.com/satori/go.uuid"
 )
 
 const WSDLSource APIImporterSource = "wsdl"
