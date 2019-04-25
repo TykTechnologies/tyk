@@ -5,8 +5,20 @@ import (
 	"errors"
 	"github.com/TykTechnologies/tyk/apidef"
 	uuid "github.com/satori/go.uuid"
+	"io"
 	"strings"
 )
+
+const WSDLSource APIImporterSource = "wsdl"
+
+var portName = map[string]string{}
+var bindingList = map[string]*WSDLBinding{}
+
+func (*WSDL) SetServicePortMapping(input map[string]string) {
+	for k, v := range input {
+		portName[k] = v
+	}
+}
 
 const (
 	NS_WSDL   = "http://schemas.xmlsoap.org/wsdl/"
@@ -49,12 +61,6 @@ type WSDLOperation struct {
 	IsUrlReplacement bool
 }
 
-var bindingList map[string]*WSDLBinding
-
-func init() {
-	bindingList = make(map[string]*WSDLBinding)
-}
-
 func (b *WSDLBinding) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 	//Get value of name attribute
 	for _, attr := range start.Attr {
@@ -88,7 +94,7 @@ func (b *WSDLBinding) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 						switch t.Name.Space {
 						case NS_SOAP, NS_SOAP12:
 							{
-								isSupportedProtocol = true
+								b.isSupportedProtocol = true
 								if t.Name.Space == NS_SOAP {
 									b.Protocol = "soap"
 								} else {
@@ -108,13 +114,13 @@ func (b *WSDLBinding) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 								if parts[len(parts)-1] == "http" {
 									b.Method = "POST"
 								} else {
-									isSupportedProtocol = false
+									b.isSupportedProtocol = false
 								}
 
 							}
 						case NS_HTTP:
 							{
-								isSupportedProtocol = true
+								b.isSupportedProtocol = true
 								b.Protocol = "http"
 								for _, attr := range t.Attr {
 									if attr.Name.Local == "verb" {
@@ -127,14 +133,14 @@ func (b *WSDLBinding) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 						default:
 							{
 								log.Debug("Unsupported binding protocol is used:", t.Name.Space, ":", t.Name.Local)
-								isSupportedProtocol = false
+								b.isSupportedProtocol = false
 								return nil
 							}
 						}
 					}
 				case "operation":
 					{
-						if t.Name.Space == NS_WSDL && isSupportedProtocol {
+						if t.Name.Space == NS_WSDL && b.isSupportedProtocol {
 							op := new(WSDLOperation)
 							if err := d.DecodeElement(op, &t); err != nil {
 								return err
@@ -239,7 +245,11 @@ func (op *WSDLOperation) UnmarshalXML(d *xml.Decoder, start xml.StartElement) er
 	}
 }
 
-func (wsdl *WSDL) ConvertToTyk(upstreamURL, orgId string, portName map[string]string) (*apidef.APIDefinition, error) {
+func (s *WSDL) LoadFrom(r io.Reader) error {
+	return xml.NewDecoder(r).Decode(&s)
+}
+
+func (wsdl *WSDL) ToAPIDefinition(orgId, upstreamURL string, as_mock bool) (*apidef.APIDefinition, error) {
 	ad := apidef.APIDefinition{
 		Name:             wsdl.Services[0].Name,
 		Active:           true,
@@ -254,7 +264,12 @@ func (wsdl *WSDL) ConvertToTyk(upstreamURL, orgId string, portName map[string]st
 	ad.Proxy.ListenPath = "/" + wsdl.Services[0].Name + "/"
 	ad.Proxy.StripListenPath = true
 	ad.Proxy.TargetURL = upstreamURL
-	versionData, err := wsdl.ConvertIntoApiVersion(portName)
+
+	if as_mock {
+		log.Warning("Mocks not supported for WSDL definitions, ignoring option")
+	}
+
+	versionData, err := wsdl.ConvertIntoApiVersion(false)
 	if err != nil {
 		return nil, err
 	}
@@ -273,7 +288,7 @@ func trimNamespace(s string) string {
 	}
 }
 
-func (wsdl *WSDL) ConvertIntoApiVersion(servicePortNames map[string]string) (apidef.VersionInfo, error) {
+func (wsdl *WSDL) ConvertIntoApiVersion(bool) (apidef.VersionInfo, error) {
 	versionInfo := apidef.VersionInfo{}
 	versionInfo.UseExtendedPaths = true
 	versionInfo.Name = "1.0.0"
@@ -290,7 +305,7 @@ func (wsdl *WSDL) ConvertIntoApiVersion(servicePortNames map[string]string) (api
 			continue
 		}
 		for _, port := range service.Ports {
-			portName := servicePortNames[service.Name]
+			portName := portName[service.Name]
 			if portName == "" {
 				portName = service.Ports[0].Name
 			}
@@ -301,20 +316,20 @@ func (wsdl *WSDL) ConvertIntoApiVersion(servicePortNames map[string]string) (api
 
 				binding := bindingList[bindingName]
 				if binding == nil {
-					log.Debugf("Binding for port %s of service %s not found. Termination processing of the service", port.Name, service.Name)
+					log.Errorf("Binding for port %s of service %s not found. Termination processing of the service", port.Name, service.Name)
 
 					foundPort = false
 					break
 				}
 
 				if !binding.isSupportedProtocol {
-					log.Debug("Unsupported transport protocol. Skipping process of the service ", service.Name)
+					log.Error("Unsupported transport protocol. Skipping process of the service ", service.Name)
 					foundPort = false
 					break
 				}
 
 				if len(binding.Operations) == 0 {
-					log.Debugf("No operation found for binding %s of service %s\n", binding.Name, service.Name)
+					log.Errorf("No operation found for binding %s of service %s\n", binding.Name, service.Name)
 					break
 				}
 
@@ -373,7 +388,7 @@ func (wsdl *WSDL) ConvertIntoApiVersion(servicePortNames map[string]string) (api
 	}
 
 	if serviceCount == 0 {
-		return versionInfo, errors.New("Error process wsdl file")
+		return versionInfo, errors.New("Error processing wsdl file")
 	}
 
 	return versionInfo, nil
