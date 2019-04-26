@@ -328,6 +328,12 @@
         "null"
       ]
     },
+    "event_triggers_defunct": {
+      "type": [
+        "array",
+        "null"
+      ]
+    },
     "experimental_process_org_off_thread": {
       "type": "boolean"
     },
