@@ -127,3 +127,52 @@ func TestTransformResponse_ContextVars(t *testing.T) {
 		Headers: map[string]string{"Foo": "Bar"}, Path: "/get", Code: 200, BodyMatch: `{"foo":"Bar"}`,
 	})
 }
+
+func TestTransformResponse_WithCache(t *testing.T) {
+	const path = "/get"
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	transformResponseConf := apidef.TemplateMeta{
+		Path:   path,
+		Method: "GET",
+		TemplateData: apidef.TemplateData{
+			Mode:           "blob",
+			TemplateSource: base64.StdEncoding.EncodeToString([]byte(`{"foo":"{{._tyk_context.headers_Foo}}"}`)),
+		},
+	}
+	responseProcessorConf := []apidef.ResponseProcessor{{Name: "response_body_transform"}}
+
+	createAPI := func(withCache bool) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.CacheOptions.CacheTimeout = 60
+			spec.EnableContextVars = true
+			spec.CacheOptions.EnableCache = withCache
+			spec.ResponseProcessors = responseProcessorConf
+			updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.ExtendedPaths.TransformResponse = []apidef.TemplateMeta{transformResponseConf}
+				v.ExtendedPaths.Cached = []string{path}
+			})
+		})
+
+	}
+
+	// without cache
+	createAPI(false)
+
+	ts.Run(t, []test.TestCase{
+		{Path: path, Headers: map[string]string{"Foo": "Bar"}, Code: 200, BodyMatch: `{"foo":"Bar"}`},
+		{Path: path, Headers: map[string]string{"Foo": "Bar2"}, Code: 200, BodyMatch: `{"foo":"Bar2"}`},
+	}...)
+
+	// with cache
+	createAPI(true)
+
+	ts.Run(t, []test.TestCase{
+		{Path: path, Headers: map[string]string{"Foo": "Bar"}, Code: 200, BodyMatch: `{"foo":"Bar"}`},  // Returns response and caches it
+		{Path: path, Headers: map[string]string{"Foo": "Bar2"}, Code: 200, BodyMatch: `{"foo":"Bar"}`}, // Returns cached response directly
+	}...)
+
+}

@@ -722,6 +722,17 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		return nil
 	}
 
+	ses := new(user.SessionState)
+	if session != nil {
+		ses = session
+	}
+
+	// Middleware chain handling here - very simple, but should do
+	// the trick. Chain can be empty, in which case this is a no-op.
+	if err := handleResponseChain(p.TykAPISpec.ResponseChain, rw, res, req, ses); err != nil {
+		log.Error("Response chain failed! ", err)
+	}
+
 	inres := new(http.Response)
 	if withCache {
 		*inres = *res // includes shallow copies of maps, but okay
@@ -738,17 +749,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		// Create new ReadClosers so we can split output
 		res.Body = ioutil.NopCloser(&bodyBuffer)
 		inres.Body = ioutil.NopCloser(bodyBuffer2)
-	}
-
-	ses := new(user.SessionState)
-	if session != nil {
-		ses = session
-	}
-
-	// Middleware chain handling here - very simple, but should do
-	// the trick. Chain can be empty, in which case this is a no-op.
-	if err := handleResponseChain(p.TykAPISpec.ResponseChain, rw, res, req, ses); err != nil {
-		log.Error("Response chain failed! ", err)
 	}
 
 	// We should at least copy the status code in
