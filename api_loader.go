@@ -10,12 +10,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
-	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -353,7 +351,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 			logger.Info("Checking security policy: OAuth")
 		}
 
-		if mwAppendEnabled(&authArray, &BasicAuthKeyIsValid{baseMid, cache.New(60*time.Second, 60*time.Minute), nil, nil}) {
+		if mwAppendEnabled(&authArray, &BasicAuthKeyIsValid{baseMid, nil, nil}) {
 			logger.Info("Checking security policy: Basic")
 		}
 
