@@ -308,6 +308,7 @@ type Config struct {
 	ProxyDefaultTimeout               float64                               `json:"proxy_default_timeout"`
 	ProxySSLDisableRenegotiation      bool                                  `json:"proxy_ssl_disable_renegotiation"`
 	LogLevel                          string                                `json:"log_level"`
+	HTTPProfile                       bool                                  `json:"enable_http_profiler"`
 	Security                          SecurityConfig                        `json:"security"`
 	EnableKeyLogging                  bool                                  `json:"enable_key_logging"`
 	NewRelic                          NewRelicConfig                        `json:"newrelic"`
