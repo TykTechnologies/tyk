@@ -23,10 +23,11 @@ import (
 
 const defaultBasicAuthTTL = time.Duration(60) * time.Second
 
+var basicAuthCache = cache.New(60*time.Second, 60*time.Minute)
+
 // BasicAuthKeyIsValid uses a username instead of
 type BasicAuthKeyIsValid struct {
 	BaseMiddleware
-	cache *cache.Cache
 
 	bodyUserRegexp     *regexp.Regexp
 	bodyPasswordRegexp *regexp.Regexp
@@ -224,7 +225,7 @@ func (k *BasicAuthKeyIsValid) doBcryptWithCache(cacheDuration time.Duration, has
 
 	hasher := murmur3.New64()
 	hasher.Write(password)
-	k.cache.Set(string(hashedPassword), string(hasher.Sum(nil)), cacheDuration)
+	basicAuthCache.Set(string(hashedPassword), string(hasher.Sum(nil)), cacheDuration)
 
 	return nil
 }
@@ -245,7 +246,7 @@ func (k *BasicAuthKeyIsValid) compareHashAndPassword(hash string, password strin
 		cacheTTL = time.Duration(k.Spec.BasicAuth.CacheTTL) * time.Second
 	}
 
-	cachedPass, inCache := k.cache.Get(hash)
+	cachedPass, inCache := basicAuthCache.Get(hash)
 	if !inCache {
 
 		logEntry.Debug("cache enabled: miss: bcrypt")
