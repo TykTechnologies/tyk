@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -909,6 +910,31 @@ func TestListenPathTykPrefix(t *testing.T) {
 		Path: "/tyk-foo/",
 		Code: 200,
 	})
+}
+
+func TestReloadGoroutineLeakWithAsyncWrites(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	globalConf := config.Global()
+	globalConf.UseAsyncSessionWrite = true
+	config.SetGlobal(globalConf)
+	defer resetTestConfig()
+
+	buildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+	})
+
+	before := runtime.NumGoroutine()
+	doReload()
+
+	time.Sleep(100 * time.Millisecond)
+
+	after := runtime.NumGoroutine()
+
+	if before != after {
+		t.Errorf("Goroutine leak, was: %d, after reload: %d", before, after)
+	}
 }
 
 func TestProxyUserAgent(t *testing.T) {
