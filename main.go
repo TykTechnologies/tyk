@@ -376,7 +376,7 @@ func loadAPIEndpoints(muxer *mux.Router) {
 		mainLog.Info("Control API hostname set: ", hostname)
 	}
 
-	if *cli.HTTPProfile {
+	if *cli.HTTPProfile || config.Global().HTTPProfile {
 		muxer.HandleFunc("/debug/pprof/profile", pprof_http.Profile)
 		muxer.HandleFunc("/debug/pprof/{_:.*}", pprof_http.Index)
 	}
