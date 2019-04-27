@@ -893,7 +893,7 @@ func TestReloadGoroutineLeakWithAsyncWrites(t *testing.T) {
 
 	after := runtime.NumGoroutine()
 
-	if before != after {
+	if after-before > 10 {
 		t.Errorf("Goroutine leak, was: %d, after reload: %d", before, after)
 	}
 }
