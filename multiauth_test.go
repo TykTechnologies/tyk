@@ -12,7 +12,6 @@ import (
 
 	"github.com/justinas/alice"
 	"github.com/lonelycode/go-uuid/uuid"
-	"github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -74,11 +73,11 @@ func getMultiAuthStandardAndBasicAuthChain(spec *APISpec) http.Handler {
 	remote, _ := url.Parse(testHttpAny)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := ProxyHandler(proxy, spec)
-	baseMid := BaseMiddleware{spec, proxy}
+	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy}
 	chain := alice.New(mwList(
 		&IPWhiteListMiddleware{baseMid},
 		&IPBlackListMiddleware{BaseMiddleware: baseMid},
-		&BasicAuthKeyIsValid{baseMid, cache.New(60*time.Second, 60*time.Minute), nil, nil},
+		&BasicAuthKeyIsValid{baseMid, nil, nil},
 		&AuthKey{baseMid},
 		&VersionCheck{BaseMiddleware: baseMid},
 		&KeyExpired{baseMid},
