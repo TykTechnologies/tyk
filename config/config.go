@@ -265,7 +265,8 @@ type Config struct {
 	CoProcessOptions                  CoProcessConfig                       `json:"coprocess_options"`
 	HideGeneratorHeader               bool                                  `json:"hide_generator_header"`
 	EventHandlers                     apidef.EventHandlerMetaConfig         `json:"event_handlers"`
-	EventTriggers                     map[apidef.TykEvent][]TykEventHandler `json:"event_trigers_defunct"`
+	EventTriggers                     map[apidef.TykEvent][]TykEventHandler `json:"event_trigers_defunct"`  // Deprecated: Config.GetEventTriggers instead.
+	EventTriggersDefunct              map[apidef.TykEvent][]TykEventHandler `json:"event_triggers_defunct"` // Deprecated: Config.GetEventTriggers instead.
 	PIDFileLocation                   string                                `json:"pid_file_location"`
 	AllowInsecureConfigs              bool                                  `json:"allow_insecure_configs"`
 	PublicKeyPath                     string                                `json:"public_key_path"`
@@ -297,6 +298,25 @@ type Config struct {
 	DisableRegexpCache                bool                                  `json:"disable_regexp_cache"`
 	RegexpCacheExpire                 int32                                 `json:"regexp_cache_expire"`
 	HealthCheckEndpointName           string                                `json:"health_check_endpoint_name"`
+}
+
+// GetEventTriggers returns event triggers. There was a typo in the json tag.
+// To maintain backward compatibility, this solution is chosen.
+func (c Config) GetEventTriggers() map[apidef.TykEvent][]TykEventHandler {
+	if c.EventTriggersDefunct == nil {
+		return c.EventTriggers
+	}
+
+	if c.EventTriggers != nil {
+		log.Info("Both event_trigers_defunct and event_triggers_defunct are configured in the config," +
+			" event_triggers_defunct will be used.")
+	}
+
+	return c.EventTriggersDefunct
+}
+
+func (c *Config) SetEventTriggers(eventTriggers map[apidef.TykEvent][]TykEventHandler) {
+	c.EventTriggersDefunct = eventTriggers
 }
 
 type CertData struct {

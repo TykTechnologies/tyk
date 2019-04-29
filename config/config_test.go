@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 func TestWriteDefaultConf(t *testing.T) {
@@ -92,4 +94,50 @@ func TestConfigFiles(t *testing.T) {
 	if err := Load(paths, conf); err == nil {
 		t.Fatalf("Load with an invalid config did not error")
 	}
+}
+
+func TestConfig_GetEventTriggers(t *testing.T) {
+
+	assert := func(t *testing.T, config string, expected string) {
+		conf := &Config{}
+
+		f, err := ioutil.TempFile("", "tyk.conf")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer f.Close()
+
+		_, err = f.Write([]byte(config))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		paths := []string{f.Name()}
+
+		if err := Load(paths, conf); err != nil {
+			t.Fatal(err)
+		}
+
+		triggers := conf.GetEventTriggers()
+
+		if _, ok := triggers[apidef.TykEvent(expected)]; !ok || len(triggers) != 1 {
+			t.Fatal("Config is not loaded correctly")
+		}
+	}
+
+	t.Run("Deprecated configuration", func(t *testing.T) {
+		deprecated := `{"event_trigers_defunct": {"deprecated": []}}`
+		assert(t, deprecated, "deprecated")
+	})
+
+	t.Run("Current configuration", func(t *testing.T) {
+		current := `{"event_triggers_defunct": {"current": []}}`
+		assert(t, current, "current")
+	})
+
+	t.Run("Both configured", func(t *testing.T) {
+		both := `{"event_trigers_defunct": {"deprecated": []}, "event_triggers_defunct": {"current": []}}`
+		assert(t, both, "current")
+	})
+
 }
