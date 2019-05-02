@@ -144,7 +144,7 @@ type TransformSpec struct {
 
 type ExtendedCircuitBreakerMeta struct {
 	apidef.CircuitBreakerMeta
-	CB *circuit.Breaker
+	CB *circuit.Breaker `json:"-"`
 }
 
 // APISpec represents a path specification for an API, to avoid enumerating multiple nested lists, a single
@@ -179,6 +179,29 @@ type APISpec struct {
 	OrgHasNoSession          bool
 
 	middlewareChain *ChainObject
+
+	shouldRelease bool
+}
+
+// Release re;leases all resources associated with API spec
+func (s *APISpec) Release() {
+	// mark spec as to be released
+	s.shouldRelease = true
+
+	// release circuit breaker resources
+	for _, path := range s.RxPaths {
+		for _, urlSpec := range path {
+			if urlSpec.CircuitBreaker.CB != nil {
+				// this will force CB-event reading routing to exit
+				urlSpec.CircuitBreaker.CB.Reset()
+
+				// TODO: close all circuit breaker's event receivers
+				// which should let event reading Go-routines to exit (need to change circuitbreaker package)
+			}
+		}
+	}
+
+	// release all other resources associated with spec
 }
 
 // APIDefinitionLoader will load an Api definition from a storage
@@ -714,6 +737,12 @@ func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circui
 					})
 
 				case circuit.BreakerReset:
+					// check if this spec is set to release resources
+					if spec.shouldRelease {
+						// time to stop this Go-routine
+						return
+					}
+
 					spec.FireEvent(EventBreakerTriggered, EventCurcuitBreakerMeta{
 						EventMetaDefault: EventMetaDefault{Message: "Breaker Reset"},
 						CircuitEvent:     e,

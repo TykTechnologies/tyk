@@ -668,6 +668,12 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 
 	// Swap in the new register
 	apisMu.Lock()
+
+	// release current specs resources before overwriting map
+	for _, curSpec := range apisByID {
+		curSpec.Release()
+	}
+
 	apisByID = tmpSpecRegister
 	apisMu.Unlock()
 

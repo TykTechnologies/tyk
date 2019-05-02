@@ -518,7 +518,10 @@ func loadAPI(specs ...*APISpec) (out []*APISpec) {
 	}()
 
 	for i, spec := range specs {
-		specBytes, _ := json.Marshal(spec)
+		specBytes, err := json.Marshal(spec)
+		if err != nil {
+			panic(err)
+		}
 		specFilePath := filepath.Join(config.Global().AppPath, spec.APIID+strconv.Itoa(i)+".json")
 		if err := ioutil.WriteFile(specFilePath, specBytes, 0644); err != nil {
 			panic(err)
