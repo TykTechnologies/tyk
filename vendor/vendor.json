@@ -43,6 +43,12 @@
 			"revisionTime": "2017-11-17T14:56:08Z"
 		},
 		{
+			"checksumSHA1": "BpDucRvJ5e5NCVhxDr2ORjG7Srs=",
+			"path": "github.com/TykTechnologies/goautosocket",
+			"revision": "97bfa5e7e48185d76417daf6e2a334a0ccb24981",
+			"revisionTime": "2019-04-30T12:12:22Z"
+		},
+		{
 			"checksumSHA1": "wFnSvPbjvlEIoonJPA2AUxJnpHk=",
 			"path": "github.com/TykTechnologies/gojsonschema",
 			"revision": "dcb3e4bb79906c5695321440deca10592f4eeb2d",
@@ -397,12 +403,6 @@
 			"path": "github.com/mitchellh/reflectwalk",
 			"revision": "eecee6c969c02c8cc2ae48e1e269843ae8590796",
 			"revisionTime": "2018-08-24T00:34:11Z"
-		},
-		{
-			"checksumSHA1": "GsU3DMfKXECkDJyjINXYr2Hj3Nc=",
-			"path": "github.com/netbrain/goautosocket",
-			"revision": "bef85f0aef40c230fa5451a1ca200919722e978a",
-			"revisionTime": "2015-06-24T14:57:46Z"
 		},
 		{
 			"checksumSHA1": "fG/hdI57tzm9CfcELMa7QVXESR8=",
