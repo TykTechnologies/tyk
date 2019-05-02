@@ -307,7 +307,7 @@ func (i *Importer) swaggerLoadFile(path string) (*importer.SwaggerAST, error) {
 	return swagger.(*importer.SwaggerAST), nil
 }
 
-func (i *Importer) wsdlLoadFile(path string) (*importer.WSDL, error) {
+func (i *Importer) wsdlLoadFile(path string) (*importer.WSDLDef, error) {
 	wsdl, err := importer.GetImporterForSource(importer.WSDLSource)
 	if err != nil {
 		return nil, err
@@ -322,7 +322,7 @@ func (i *Importer) wsdlLoadFile(path string) (*importer.WSDL, error) {
 		return nil, err
 	}
 
-	return wsdl.(*importer.WSDL), nil
+	return wsdl.(*importer.WSDLDef), nil
 }
 
 func (i *Importer) bluePrintLoadFile(path string) (*importer.BluePrintAST, error) {

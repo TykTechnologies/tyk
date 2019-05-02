@@ -16,13 +16,14 @@ const WSDLSource APIImporterSource = "wsdl"
 var portName = map[string]string{}
 var bindingList = map[string]*WSDLBinding{}
 
-func (*WSDL) SetServicePortMapping(input map[string]string) {
+func (*WSDLDef) SetServicePortMapping(input map[string]string) {
 	for k, v := range input {
 		portName[k] = v
 	}
 }
 
 const (
+	NS_WSDL20 = "http://www.w3.org/ns/wsdl"
 	NS_WSDL   = "http://schemas.xmlsoap.org/wsdl/"
 	NS_SOAP   = "http://schemas.xmlsoap.org/wsdl/soap/"
 	NS_SOAP12 = "http://schemas.xmlsoap.org/wsdl/soap12/"
@@ -34,6 +35,10 @@ const (
 	PROT_SOAP    = "soap"
 	PROT_SOAP_12 = "soap12"
 )
+
+type WSDLDef struct {
+	Definition WSDL `xml:"http://schemas.xmlsoap.org/wsdl/ definitions"`
+}
 
 type WSDL struct {
 	Services []*WSDLService `xml:"http://schemas.xmlsoap.org/wsdl/ service"`
@@ -69,6 +74,16 @@ type WSDLOperation struct {
 	IsUrlReplacement bool
 }
 
+func (def *WSDLDef) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	if start.Name.Space == NS_WSDL20 {
+		return errors.New("WSDL 2.0 is not supported")
+	} else if start.Name.Space == NS_WSDL && start.Name.Local == "definitions" {
+		return d.DecodeElement(&def.Definition, &start)
+	} else {
+		return errors.New("Invalid WSDL file. WSDL definition must start contain <definitions> element")
+	}
+}
+
 func (b *WSDLBinding) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 	//Get value of name attribute
 	for _, attr := range start.Attr {
@@ -89,7 +104,7 @@ func (b *WSDLBinding) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 	for {
 		tok, err := d.Token()
 		if err != nil {
-			log.Error("Error will parsing wsdl file: ", err)
+			log.Error("Error will parsing WSDL file: ", err)
 			return err
 		}
 
@@ -140,7 +155,7 @@ func (b *WSDLBinding) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 							}
 						default:
 							{
-								log.Debug("Unsupported binding protocol is used:", t.Name.Space, ":", t.Name.Local)
+								log.Debugf("Unsupported binding protocol is used %s:%s", t.Name.Space, t.Name.Local)
 								b.isSupportedProtocol = false
 								return nil
 							}
@@ -253,13 +268,13 @@ func (op *WSDLOperation) UnmarshalXML(d *xml.Decoder, start xml.StartElement) er
 	}
 }
 
-func (s *WSDL) LoadFrom(r io.Reader) error {
+func (s *WSDLDef) LoadFrom(r io.Reader) error {
 	return xml.NewDecoder(r).Decode(&s)
 }
 
-func (wsdl *WSDL) ToAPIDefinition(orgId, upstreamURL string, as_mock bool) (*apidef.APIDefinition, error) {
+func (def *WSDLDef) ToAPIDefinition(orgId, upstreamURL string, as_mock bool) (*apidef.APIDefinition, error) {
 	ad := apidef.APIDefinition{
-		Name:             wsdl.Services[0].Name,
+		Name:             def.Definition.Services[0].Name,
 		Active:           true,
 		UseKeylessAccess: true,
 		OrgID:            orgId,
@@ -269,7 +284,7 @@ func (wsdl *WSDL) ToAPIDefinition(orgId, upstreamURL string, as_mock bool) (*api
 	ad.VersionDefinition.Key = "version"
 	ad.VersionDefinition.Location = "header"
 	ad.VersionData.Versions = make(map[string]apidef.VersionInfo)
-	ad.Proxy.ListenPath = "/" + wsdl.Services[0].Name + "/"
+	ad.Proxy.ListenPath = "/" + def.Definition.Services[0].Name + "/"
 	ad.Proxy.StripListenPath = true
 	ad.Proxy.TargetURL = upstreamURL
 
@@ -277,12 +292,12 @@ func (wsdl *WSDL) ToAPIDefinition(orgId, upstreamURL string, as_mock bool) (*api
 		log.Warning("Mocks not supported for WSDL definitions, ignoring option")
 	}
 
-	versionData, err := wsdl.ConvertIntoApiVersion(false)
+	versionData, err := def.ConvertIntoApiVersion(false)
 	if err != nil {
 		return nil, err
 	}
 
-	wsdl.InsertIntoAPIDefinitionAsVersion(versionData, &ad, "1.0.0")
+	def.InsertIntoAPIDefinitionAsVersion(versionData, &ad, "1.0.0")
 	ad.VersionData.DefaultVersion = "1.0.0"
 	return &ad, nil
 }
@@ -296,7 +311,7 @@ func trimNamespace(s string) string {
 	}
 }
 
-func (wsdl *WSDL) ConvertIntoApiVersion(bool) (apidef.VersionInfo, error) {
+func (def *WSDLDef) ConvertIntoApiVersion(bool) (apidef.VersionInfo, error) {
 	versionInfo := apidef.VersionInfo{}
 	versionInfo.UseExtendedPaths = true
 	versionInfo.Name = "1.0.0"
@@ -307,7 +322,7 @@ func (wsdl *WSDL) ConvertIntoApiVersion(bool) (apidef.VersionInfo, error) {
 	var foundPort bool
 	var serviceCount int
 
-	for _, service := range wsdl.Services {
+	for _, service := range def.Definition.Services {
 		foundPort = false
 		if service.Name == "" {
 			continue
@@ -331,7 +346,7 @@ func (wsdl *WSDL) ConvertIntoApiVersion(bool) (apidef.VersionInfo, error) {
 				}
 
 				if !binding.isSupportedProtocol {
-					log.Error("Unsupported transport protocol. Skipping process of the service ", service.Name)
+					log.Errorf("Unsupported transport protocol. Skipping process of the service %s", service.Name)
 					foundPort = false
 					break
 				}
@@ -402,9 +417,9 @@ func (wsdl *WSDL) ConvertIntoApiVersion(bool) (apidef.VersionInfo, error) {
 	return versionInfo, nil
 }
 
-func (wsdl *WSDL) InsertIntoAPIDefinitionAsVersion(version apidef.VersionInfo, def *apidef.APIDefinition, versionName string) error {
-	def.VersionData.NotVersioned = false
-	def.VersionData.Versions[versionName] = version
+func (def *WSDLDef) InsertIntoAPIDefinitionAsVersion(version apidef.VersionInfo, apidef *apidef.APIDefinition, versionName string) error {
+	apidef.VersionData.NotVersioned = false
+	apidef.VersionData.Versions[versionName] = version
 	return nil
 }
 
