@@ -7,6 +7,7 @@ package gas
 
 import (
 	"io"
+    "os"
 	"net"
 	"sync"
 	"syscall"
@@ -162,7 +163,7 @@ func (c *TCPClient) Read(b []byte) (int, error) {
 			if err := c.reconnect(); err != nil {
 				switch e := err.(type) {
 				case *net.OpError:
-					if e.Err.(syscall.Errno) == syscall.ECONNREFUSED {
+					if errno(e.Err) == syscall.ECONNREFUSED {
 						disconnected = true
 						c.lock.RLock()
 						continue
@@ -182,8 +183,8 @@ func (c *TCPClient) Read(b []byte) (int, error) {
 		}
 		switch e := err.(type) {
 		case *net.OpError:
-			if e.Err.(syscall.Errno) == syscall.ECONNRESET ||
-				e.Err.(syscall.Errno) == syscall.EPIPE {
+			if errno(e.Err) == syscall.ECONNRESET ||
+				errno(e.Err) == syscall.EPIPE {
 				disconnected = true
 			} else {
 				return n, err
@@ -219,7 +220,7 @@ func (c *TCPClient) ReadFrom(r io.Reader) (int64, error) {
 			if err := c.reconnect(); err != nil {
 				switch e := err.(type) {
 				case *net.OpError:
-					if e.Err.(syscall.Errno) == syscall.ECONNREFUSED {
+					if errno(e.Err) == syscall.ECONNREFUSED {
 						disconnected = true
 						c.lock.RLock()
 						continue
@@ -239,8 +240,8 @@ func (c *TCPClient) ReadFrom(r io.Reader) (int64, error) {
 		}
 		switch e := err.(type) {
 		case *net.OpError:
-			if e.Err.(syscall.Errno) == syscall.ECONNRESET ||
-				e.Err.(syscall.Errno) == syscall.EPIPE {
+			if errno(e.Err) == syscall.ECONNRESET ||
+				errno(e.Err) == syscall.EPIPE {
 				disconnected = true
 			} else {
 				return n, err
@@ -276,7 +277,7 @@ func (c *TCPClient) Write(b []byte) (int, error) {
 			if err := c.reconnect(); err != nil {
 				switch e := err.(type) {
 				case *net.OpError:
-					if e.Err.(syscall.Errno) == syscall.ECONNREFUSED {
+					if errno(e.Err) == syscall.ECONNREFUSED {
 						disconnected = true
 						c.lock.RLock()
 						continue
@@ -296,8 +297,8 @@ func (c *TCPClient) Write(b []byte) (int, error) {
 		}
 		switch e := err.(type) {
 		case *net.OpError:
-			if e.Err.(syscall.Errno) == syscall.ECONNRESET ||
-				e.Err.(syscall.Errno) == syscall.EPIPE {
+			if errno(e.Err) == syscall.ECONNRESET ||
+				errno(e.Err) == syscall.EPIPE {
 				disconnected = true
 			} else {
 				return n, err
@@ -308,4 +309,17 @@ func (c *TCPClient) Write(b []byte) (int, error) {
 	}
 
 	return -1, ErrMaxRetries
+}
+
+func errno(err error) syscall.Errno {
+    switch v := err.(type) {
+    case syscall.Errno:
+        return v
+    case *os.SyscallError:
+        if errno, ok := v.Err.(syscall.Errno); ok {
+            return errno
+        }
+    }
+
+    return syscall.Errno(0x0)
 }
