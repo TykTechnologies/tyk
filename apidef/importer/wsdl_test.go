@@ -7,14 +7,22 @@ import (
 
 type testWSDLInput struct {
 	wsdlDefinition string
+	isInvalidInput bool
 	data           []testWSDLData
 }
 
 type testWSDLData struct {
 	servicePortNameMapping map[string]string
-	method                 string
 	noOfEndpoints          int
+	endpoints              []endpointData
 	returnErr              bool
+}
+
+type endpointData struct {
+	method       string
+	path         string
+	matchPattern string
+	rewritePath  string
 }
 
 var testData = []testWSDLInput{
@@ -23,27 +31,171 @@ var testData = []testWSDLInput{
 		data: []testWSDLData{
 			{
 				servicePortNameMapping: map[string]string{"HolidayService2": "HolidayService2Soap"},
-				method:                 "POST",
 				noOfEndpoints:          6,
-				returnErr:              false,
+				endpoints: []endpointData{
+					{
+						path:         "HolidayService2/GetHolidaysForDateRange",
+						method:       "POST",
+						matchPattern: "HolidayService2/GetHolidaysForDateRange",
+						rewritePath:  "http://www.holidaywebservice.com/HolidayService_v2/HolidayService2.asmx",
+					},
+					{
+						path:         "HolidayService2/GetCountriesAvailable",
+						method:       "POST",
+						matchPattern: "HolidayService2/GetCountriesAvailable",
+						rewritePath:  "http://www.holidaywebservice.com/HolidayService_v2/HolidayService2.asmx",
+					},
+					{
+						path:         "HolidayService2/GetHolidaysAvailable",
+						method:       "POST",
+						matchPattern: "HolidayService2/GetHolidaysAvailable",
+						rewritePath:  "http://www.holidaywebservice.com/HolidayService_v2/HolidayService2.asmx",
+					},
+					{
+						path:         "HolidayService2/GetHolidaysForMonth",
+						method:       "POST",
+						matchPattern: "HolidayService2/GetHolidaysForMonth",
+						rewritePath:  "http://www.holidaywebservice.com/HolidayService_v2/HolidayService2.asmx",
+					},
+					{
+						path:         "HolidayService2/GetHolidaysForYear",
+						method:       "POST",
+						matchPattern: "HolidayService2/GetHolidaysForYear",
+						rewritePath:  "http://www.holidaywebservice.com/HolidayService_v2/HolidayService2.asmx",
+					},
+					{
+						path:         "HolidayService2/GetHolidayDate",
+						method:       "POST",
+						matchPattern: "HolidayService2/GetHolidayDate",
+						rewritePath:  "http://www.holidaywebservice.com/HolidayService_v2/HolidayService2.asmx",
+					},
+				},
 			},
 			{
 				servicePortNameMapping: map[string]string{"HolidayService2": "HolidayService2HttpGet"},
-				method:                 "GET",
 				noOfEndpoints:          6,
-				returnErr:              false,
+				endpoints: []endpointData{
+					{
+						path:         "HolidayService2/GetHolidaysForDateRange",
+						method:       "GET",
+						matchPattern: "(/GetHolidaysForDateRange.*)",
+						rewritePath:  "http://www.holidaywebservice.com/HolidayService_v2/HolidayService2.asmx$1",
+					},
+					{
+						path:         "HolidayService2/GetCountriesAvailable",
+						method:       "GET",
+						matchPattern: "(/GetCountriesAvailable.*)",
+						rewritePath:  "http://www.holidaywebservice.com/HolidayService_v2/HolidayService2.asmx$1",
+					},
+					{
+						path:         "HolidayService2/GetHolidaysAvailable",
+						method:       "GET",
+						matchPattern: "(/GetHolidaysAvailable.*)",
+						rewritePath:  "http://www.holidaywebservice.com/HolidayService_v2/HolidayService2.asmx$1",
+					},
+					{
+						path:         "HolidayService2/GetHolidaysForMonth",
+						method:       "GET",
+						matchPattern: "(/GetHolidaysForMonth.*)",
+						rewritePath:  "http://www.holidaywebservice.com/HolidayService_v2/HolidayService2.asmx$1",
+					},
+					{
+						path:         "HolidayService2/GetHolidaysForYear",
+						method:       "GET",
+						matchPattern: "(/GetHolidaysForYear.*)",
+						rewritePath:  "http://www.holidaywebservice.com/HolidayService_v2/HolidayService2.asmx$1",
+					},
+					{
+						path:         "HolidayService2/GetHolidayDate",
+						method:       "GET",
+						matchPattern: "(/GetHolidayDate.*)",
+						rewritePath:  "http://www.holidaywebservice.com/HolidayService_v2/HolidayService2.asmx$1",
+					},
+				},
 			},
 			{
 				servicePortNameMapping: map[string]string{"HolidayService2": "HolidayService2HttpPost"},
-				method:                 "POST",
 				noOfEndpoints:          6,
-				returnErr:              false,
+				endpoints: []endpointData{
+					{
+						path:         "HolidayService2/GetHolidaysForDateRange",
+						method:       "POST",
+						matchPattern: "(/GetHolidaysForDateRange.*)",
+						rewritePath:  "http://www.holidaywebservice.com/HolidayService_v2/HolidayService2.asmx$1",
+					},
+					{
+						path:         "HolidayService2/GetCountriesAvailable",
+						method:       "POST",
+						matchPattern: "(/GetCountriesAvailable.*)",
+						rewritePath:  "http://www.holidaywebservice.com/HolidayService_v2/HolidayService2.asmx$1",
+					},
+					{
+						path:         "HolidayService2/GetHolidaysAvailable",
+						method:       "POST",
+						matchPattern: "(/GetHolidaysAvailable.*)",
+						rewritePath:  "http://www.holidaywebservice.com/HolidayService_v2/HolidayService2.asmx$1",
+					},
+					{
+						path:         "HolidayService2/GetHolidaysForMonth",
+						method:       "POST",
+						matchPattern: "(/GetHolidaysForMonth.*)",
+						rewritePath:  "http://www.holidaywebservice.com/HolidayService_v2/HolidayService2.asmx$1",
+					},
+					{
+						path:         "HolidayService2/GetHolidaysForYear",
+						method:       "POST",
+						matchPattern: "(/GetHolidaysForYear.*)",
+						rewritePath:  "http://www.holidaywebservice.com/HolidayService_v2/HolidayService2.asmx$1",
+					},
+					{
+						path:         "HolidayService2/GetHolidayDate",
+						method:       "POST",
+						matchPattern: "(/GetHolidayDate.*)",
+						rewritePath:  "http://www.holidaywebservice.com/HolidayService_v2/HolidayService2.asmx$1",
+					},
+				},
 			},
 			{
 				servicePortNameMapping: map[string]string{"HolidayService2": ""},
-				method:                 "POST",
 				noOfEndpoints:          6,
-				returnErr:              false,
+				endpoints: []endpointData{
+					{
+						path:         "HolidayService2/GetHolidaysForDateRange",
+						method:       "POST",
+						matchPattern: "HolidayService2/GetHolidaysForDateRange",
+						rewritePath:  "http://www.holidaywebservice.com/HolidayService_v2/HolidayService2.asmx",
+					},
+					{
+						path:         "HolidayService2/GetCountriesAvailable",
+						method:       "POST",
+						matchPattern: "HolidayService2/GetCountriesAvailable",
+						rewritePath:  "http://www.holidaywebservice.com/HolidayService_v2/HolidayService2.asmx",
+					},
+					{
+						path:         "HolidayService2/GetHolidaysAvailable",
+						method:       "POST",
+						matchPattern: "HolidayService2/GetHolidaysAvailable",
+						rewritePath:  "http://www.holidaywebservice.com/HolidayService_v2/HolidayService2.asmx",
+					},
+					{
+						path:         "HolidayService2/GetHolidaysForMonth",
+						method:       "POST",
+						matchPattern: "HolidayService2/GetHolidaysForMonth",
+						rewritePath:  "http://www.holidaywebservice.com/HolidayService_v2/HolidayService2.asmx",
+					},
+					{
+						path:         "HolidayService2/GetHolidaysForYear",
+						method:       "POST",
+						matchPattern: "HolidayService2/GetHolidaysForYear",
+						rewritePath:  "http://www.holidaywebservice.com/HolidayService_v2/HolidayService2.asmx",
+					},
+					{
+						path:         "HolidayService2/GetHolidayDate",
+						method:       "POST",
+						matchPattern: "HolidayService2/GetHolidayDate",
+						rewritePath:  "http://www.holidaywebservice.com/HolidayService_v2/HolidayService2.asmx",
+					},
+				},
 			},
 			{
 				//invalid portName is provided
@@ -64,27 +216,42 @@ var testData = []testWSDLInput{
 			},
 		},
 	},
+	{
+		//Invalid input
+		wsdlDefinition: "<ghfsdfjadhfkadf>",
+		isInvalidInput: true,
+	},
+	{
+		//Invalid input
+		wsdlDefinition: wsdl_2_0_example,
+		isInvalidInput: true,
+	},
 }
 
 func TestToAPIDefinition_WSDL(t *testing.T) {
 	for _, input := range testData {
-		wsdl_imp := &WSDL{}
-
-		buff := bytes.NewBufferString(holidayService)
+		wsdl_imp := &WSDLDef{}
+		buff := bytes.NewBufferString(input.wsdlDefinition)
 
 		err := wsdl_imp.LoadFrom(buff)
 		if err != nil {
-			t.Fatal(err)
+			if input.isInvalidInput {
+				continue
+			} else {
+				t.Fatal(err)
+			}
 		}
 
 		for _, data := range input.data {
 			wsdl_imp.SetServicePortMapping(data.servicePortNameMapping)
 			def, err := wsdl_imp.ToAPIDefinition("testOrg", "http://test.com", false)
 
-			if err != nil && !data.returnErr {
-				t.Fatal(err)
-			} else {
-				return
+			if err != nil {
+				if !data.returnErr {
+					t.Fatal(err)
+				} else {
+					continue
+				}
 			}
 
 			if def.VersionData.NotVersioned {
@@ -104,12 +271,25 @@ func TestToAPIDefinition_WSDL(t *testing.T) {
 				t.Fatalf("Expected %v endpoints, found %v\n", data.noOfEndpoints, len(v.ExtendedPaths.TrackEndpoints))
 			}
 
-			for _, v := range v.ExtendedPaths.TrackEndpoints {
-				if v.Method != data.method {
-					t.Fatalf("Invalid endpoint method")
+			for _, endpoint := range data.endpoints {
+				for _, rewriteData := range v.ExtendedPaths.URLRewrite {
+
+					if rewriteData.Path == endpoint.path {
+						if rewriteData.Method != endpoint.method {
+							t.Fatalf("Invalid endpoint method. Expected %s found %s", endpoint.method, rewriteData.Method)
+						}
+
+						if rewriteData.MatchPattern != endpoint.matchPattern {
+							t.Fatalf("Invalid matchPattern. Expected %s found %s", endpoint.matchPattern, rewriteData.MatchPattern)
+						}
+
+						if rewriteData.RewriteTo != endpoint.rewritePath {
+							t.Fatalf("Invalid rewrite path. Expected %s found %s", endpoint.rewritePath, rewriteData.RewriteTo)
+						}
+					}
+
 				}
 			}
-
 		}
 	}
 }
@@ -808,4 +988,68 @@ var smtpExample string = `<?xml version="1.0"?>
     </types>
 </definitions>
 
+`
+
+var wsdl_2_0_example = `
+<?xml version = "1.0" encoding = "utf-8" ?>
+<description
+    xmlns = "http://www.w3.org/ns/wsdl"
+    targetNamespace = "http://yoursite.com/MyService"
+    xmlns:tns = "http://yoursite.com/MyService"
+    xmlns:stns = "http://yoursite.com/MyService/schema"
+    xmlns:wsoap = "http://www.w3.org/ns/wsdl/soap"
+    xmlns:soap = "http://www.w3.org/2003/05/soap-envelope"
+    xmlns:wsdlx = "http://www.w3.org/ns/wsdl-extensions">
+ 
+    <documentation>
+        This document describes my Service. You can find additional information in
+        the following web page: http://yoursite.com/MyService/help.html
+    </documentation>
+ 
+    <types>
+        <xs:schema
+        xmlns:xs = "http://www.w3.org/2001/XMLSchema"
+        targetNamespace = "http://yoursite.com/MyService/schema"
+        xmlns = "http://yoursite.com/MyService/schema" >
+            <xs:element name = "checkServiceStatus" type="tCheckServiceStatus" />
+            <xs:complexType name = "tCheckServiceStatus" >
+                <xs:sequence>
+                    <xs:element name = "checkDate" type = "xs:date" />
+                    <xs:element name = "serviceName" type = "xs:string" />
+                </xs:sequence>
+            </xs:complexType>
+            <xs:element name = " checkServiceStatusResponse" type = "xs:double" />
+            <xs:element name = "dataError" type = "xs:string" />
+        </xs:schema>
+    </types>
+ 
+    <interface name = "myServiceInterface">
+        <fault name = "dataFault" element = "stns:dataError" />
+        <operation name = "checkServiceStatusOp"
+            pattern = "http://www.w3.org/ns/wsdl/in-out"
+            style= " http://www.w3.org/ns/wsdl/style/iri"
+            wsdlx:safe = "true">
+            <input messageLabel = "In" element = "stns:checkServiceStatus" />
+            <output messageLabel = "Out" element = "stns:checkServiceStatusResponse"/>
+            <outfault messageLabel = "Out" ref = "tns:dataFault" />
+        </operation>
+    </interface>
+ 
+    <binding name = "myServiceInterfaceSOAPBinding" 
+          interface = "tns:myServiceInterface"
+          type = "http://www.w3.org/ns/wsdl/soap"
+          wsoap:protocol = "http://www.w3.org/2003/05/soap/bindings/HTTP/">
+        <operation ref = "tns:checkServiceStatusOp" 
+      wsoap:mep = "http://www.w3.org/2003/05/soap/mep/soap-response"/>
+        <fault ref = "tns:dataFault" 
+      wsoap:code = "soap:Sender"/>
+    </binding>
+ 
+    <service name = "myService" 
+       interface = "tns:myServiceInterface">
+        <endpoint name = "myServiceEndpoint" 
+               binding = "tns:myServiceInterfaceSOAPBinding"
+               address = "http://yoursite.com/MyService"/>
+    </service>
+</description>
 `
