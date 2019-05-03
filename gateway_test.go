@@ -918,21 +918,62 @@ func TestReloadGoroutineLeakWithAsyncWrites(t *testing.T) {
 
 	globalConf := config.Global()
 	globalConf.UseAsyncSessionWrite = true
+	globalConf.EnableJSVM = false
 	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
-	buildAndLoadAPI(func(spec *APISpec) {
+	specs := buildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 	})
 
 	before := runtime.NumGoroutine()
-	doReload()
+
+	loadAPI(specs...) // just doing doReload() doesn't load anything as buildAndLoadAPI cleans up folder with API specs
 
 	time.Sleep(100 * time.Millisecond)
 
 	after := runtime.NumGoroutine()
 
-	if before != after {
+	if before < after {
+		t.Errorf("Goroutine leak, was: %d, after reload: %d", before, after)
+	}
+}
+
+func TestReloadGoroutineLeakWithCircuitBreaker(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	globalConf := config.Global()
+	globalConf.EnableJSVM = false
+	config.SetGlobal(globalConf)
+	defer resetTestConfig()
+
+	specs := buildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		updateAPIVersion(spec, "v1", func(version *apidef.VersionInfo) {
+			version.ExtendedPaths = apidef.ExtendedPathsSet{
+				CircuitBreaker: []apidef.CircuitBreakerMeta{
+					{
+						Path:                 "/",
+						Method:               http.MethodGet,
+						ThresholdPercent:     0.5,
+						Samples:              5,
+						ReturnToServiceAfter: 10,
+					},
+				},
+			}
+		})
+	})
+
+	before := runtime.NumGoroutine()
+
+	loadAPI(specs...) // just doing doReload() doesn't load anything as buildAndLoadAPI cleans up folder with API specs
+
+	time.Sleep(100 * time.Millisecond)
+
+	after := runtime.NumGoroutine()
+
+	if before < after-1 { // -1 because there is one will be running until we fix circuitbreaker Subscribe() method
 		t.Errorf("Goroutine leak, was: %d, after reload: %d", before, after)
 	}
 }
