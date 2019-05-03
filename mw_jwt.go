@@ -459,18 +459,16 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 
 	if config.UseCookie {
 		authCookie, err := r.Cookie(config.AuthHeaderName)
-		if err != nil {
-			rawJWT = ""
-		} else {
+		if err == nil {
 			rawJWT = authCookie.Value
 		}
 	}
 
 	if rawJWT == "" {
 		// No header value, fail
-		logger.Info("Attempted access with malformed header, no JWT auth header found.")
+		logger.Info("Attempted access with malformed header, no JWT auth information found.")
 
-		log.Debug("Looked in: ", config.AuthHeaderName)
+		log.Debug("Looked for: ", config.AuthHeaderName)
 		log.Debug("Raw data was: ", rawJWT)
 		log.Debug("Headers are: ", r.Header)
 

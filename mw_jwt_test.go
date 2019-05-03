@@ -103,7 +103,18 @@ func createJWTSessionWithRSAWithPolicy(policyID string) *user.SessionState {
 
 type JwtCreator func() *user.SessionState
 
+type AuthSourceType int
+const (
+	cookieAndUrlParam AuthSourceType = iota
+	cookie
+	urlParam
+)
+
 func prepareGenericJWTSession(testName string, method string, claimName string, ApiSkipKid bool) (*APISpec, string) {
+	return prepareGenericJWTSessionwithAuthOptions(testName, method, claimName, ApiSkipKid, header)
+}
+
+func prepareGenericJWTSessionwithAuthOptions(testName string, method string, claimName string, apiSkipKid bool, authType AuthSourceType) (*APISpec, string) {
 	tokenKID := testKey(testName, "token")
 
 	var jwtToken string
@@ -148,7 +159,14 @@ func prepareGenericJWTSession(testName string, method string, claimName string, 
 		spec.JWTSigningMethod = method
 		spec.EnableJWT = true
 		spec.Proxy.ListenPath = "/"
-		spec.JWTSkipKid = ApiSkipKid
+		spec.JWTSkipKid = apiSkipKid
+
+		switch authType {
+		case cookie:
+			spec.Auth.UseCookie = true
+		case urlParam:
+			spec.Auth.UseParam = true
+		}
 
 		if claimName != KID {
 			spec.JWTIdentityBaseField = claimName
@@ -1576,4 +1594,20 @@ func TestJWTExpOverridesToken(t *testing.T) {
 		{Headers: authHeaders, Code: http.StatusOK, Delay: 1100 * time.Millisecond},
 		{Headers: authHeaders, Code: http.StatusOK},
 	}...)
+}
+
+func TestJWTSessionHMACWithParamAuth(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	//If we skip the check then the Id will be taken from SUB and the call will succeed
+	_, jwtToken := prepareGenericJWTSessionwithAuthOptions(t.Name(), HMACSign, KID, false, cookie)
+	defer resetTestConfig()
+
+	authHeaders := map[string]string{"authorization": jwtToken}
+	t.Run("Request with valid JWT signed with HMAC", func(t *testing.T) {
+		ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+	})
 }
