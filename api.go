@@ -1,3 +1,28 @@
+// Tyk Gateway API
+//
+// The code below describes the Tyk Gateway API
+// Version: 2.8.0
+//
+//     Schemes: https, http
+//     Host: localhost
+//     BasePath: /tyk/
+//
+//     Consumes:
+//     - application/json
+//
+//     Produces:
+//     - application/json
+//
+//     Security:
+//     - api_key:
+//
+//     SecurityDefinitions:
+//     api_key:
+//          type: apiKey
+//          name: X-Tyk-Authorization
+//          in: header
+//
+// swagger:meta
 package main
 
 import (
@@ -28,7 +53,10 @@ import (
 )
 
 // apiModifyKeySuccess represents when a Key modification was successful
+//
+// swagger:model apiModifyKeySuccess
 type apiModifyKeySuccess struct {
+	// in:body
 	Key     string `json:"key"`
 	Status  string `json:"status"`
 	Action  string `json:"action"`
@@ -36,8 +64,11 @@ type apiModifyKeySuccess struct {
 }
 
 // apiStatusMessage represents an API status message
+//
+// swagger:model apiStatusMessage
 type apiStatusMessage struct {
-	Status  string `json:"status"`
+	Status string `json:"status"`
+	// Response details
 	Message string `json:"message"`
 }
 
@@ -448,6 +479,7 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 }
 
 // apiAllKeys represents a list of keys in the memory store
+// swagger:model
 type apiAllKeys struct {
 	APIKeys []string `json:"keys"`
 }
@@ -1101,6 +1133,7 @@ func groupResetHandler(w http.ResponseWriter, r *http.Request) {
 // was in the URL parameters, it will block until the reload is done.
 // Otherwise, it won't block and fn will be called once the reload is
 // finished.
+//
 func resetHandler(fn func()) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var wg sync.WaitGroup
@@ -1255,6 +1288,8 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // NewClientRequest is an outward facing JSON object translated from osin OAuthClients
+//
+// swagger:model NewClientRequest
 type NewClientRequest struct {
 	ClientID          string      `json:"client_id"`
 	ClientRedirectURI string      `json:"redirect_uri"`

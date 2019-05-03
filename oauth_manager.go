@@ -372,6 +372,7 @@ const (
 	prefixClientTokens = "oauth-client-tokens."
 )
 
+// swagger:model
 type OAuthClientToken struct {
 	Token   string `json:"code"`
 	Expires int64  `json:"expires"`
