@@ -15,8 +15,7 @@ info:
     * Hot reloads / reloading a cluster configuration
     * OAuth client creation (only when not using the Dashboard)
 
-
-    In order to use the REST API, you'll need to set the `secret` parameter in your tyk.conf file.
+    In order to use the REST API, you¿ïll need to set the `secret` parameter in your tyk.conf file.
 
     The shared secret you set should then be sent along as a header with each REST API Request in order for it to be successful:
 
@@ -292,10 +291,7 @@ paths:
   '/hello':
     get:
       summary: Check the Health of the Gateway
-      description: |
-          From v2.7.5 you can now rename the `/hello`  endpoint by using the `health_check_endpoint_name` option
-
-          Returns 200 response in case of success
+      description: Returns 200 response in case of success
       tags:
         - Health Checking
       operationId: hello
@@ -700,7 +696,7 @@ paths:
               example:
                 code: MWY0ZDRkMzktOTYwNi00NDRiLTk2YmQtOWQxOGQ3Mjc5Yzdk
                 redirect_to: 'http://client-app.com/oauth-redirect/?code=MWY0ZDRkMzktOTYwNi00NDRiLTk2YmQtOWQxOGQ3Mjc5Yzdk'
-  /org/keys:
+  /orgs/keys:
     get:
       summary: List Organisation Keys
       description: |-
@@ -2374,4 +2370,3 @@ components:
       type: apiKey
 security:
   - api_key: []
-
