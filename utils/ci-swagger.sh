@@ -39,12 +39,9 @@ if [ $? -ne 0 ]; then
 	fatal "replace operation failed step 1"
 fi
 
-## lineToStartReplaceFrom=$(grep -n components: temp-swagger.yml | awk '{split($0,a,":components:"); print a[1]}')
-## I don't seem to be able to use the above variable in the sed command below,
-## so the line is hardcoded, if you happen to change the swagger routes, make
-# sure to update the line number with the line immediately the one that houses "components:"
+lineToStartReplaceFrom=$(grep -n "responses:" swagger.yml | tail -1 |  awk '{split($0,a,":"); print a[1]}')
 
-sed -n '851,/components:/p' $openAPIspecfileName >> $tempUpdatedOpenAPIFileName
+sed -n "$lineToStartReplaceFrom,/components:/p" $openAPIspecfileName >> $tempUpdatedOpenAPIFileName
 if [ $? -ne 0 ]; then
 	fatal "replace operation failed"
 fi
