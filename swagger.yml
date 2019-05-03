@@ -291,7 +291,10 @@ paths:
   '/hello':
     get:
       summary: Check the Health of the Gateway
-      description: Returns 200 response in case of success
+      description: |
+          From v2.7.5 you can now rename the `/hello`  endpoint by using the `health_check_endpoint_name` option
+
+          Returns 200 response in case of success
       tags:
         - Health Checking
       operationId: hello
@@ -696,7 +699,7 @@ paths:
               example:
                 code: MWY0ZDRkMzktOTYwNi00NDRiLTk2YmQtOWQxOGQ3Mjc5Yzdk
                 redirect_to: 'http://client-app.com/oauth-redirect/?code=MWY0ZDRkMzktOTYwNi00NDRiLTk2YmQtOWQxOGQ3Mjc5Yzdk'
-  /orgs/keys:
+  /org/keys:
     get:
       summary: List Organisation Keys
       description: |-
