@@ -24,8 +24,6 @@ info:
     ```
     <br/>
     <b>The Tyk Gateway API is subsumed by the Tyk Dashboard API in Pro installations.</b>
-security:
-  - api_key: []
 servers:
   - url: 'http://localhost/tyk/'
   - url: 'https://localhost/tyk/'
