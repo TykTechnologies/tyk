@@ -88,8 +88,11 @@ func transformBody(r *http.Request, tmeta *TransformSpec, contextVars bool) erro
 	}
 
 	if tmeta.TemplateData.EnableSession {
-		session := ctxGetSession(r)
-		bodyData["_tyk_meta"] = session.MetaData
+		if session := ctxGetSession(r); session != nil {
+			bodyData["_tyk_meta"] = session.MetaData
+		} else {
+			log.Error("Session context was enabled but not found.")
+		}
 	}
 
 	if contextVars {

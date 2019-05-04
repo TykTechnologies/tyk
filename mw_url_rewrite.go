@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Sirupsen/logrus"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/user"
@@ -203,7 +205,7 @@ func replaceTykVariables(r *http.Request, in string, escape bool) string {
 			in = replaceVariables(in, vars, session.MetaData, metaLabel, escape)
 		}
 	}
-
+	//todo add config_data
 	return in
 }
 
@@ -220,6 +222,11 @@ func replaceVariables(in string, vars []string, vals map[string]interface{}, lab
 			in = strings.Replace(in, v, valStr, -1)
 		} else {
 			in = strings.Replace(in, v, "", -1)
+			log.WithFields(logrus.Fields{
+				"key":       key,
+				"value":     v,
+				"in string": in,
+			}).Debug("Replaced with an empty string")
 		}
 	}
 	return in
