@@ -39,6 +39,13 @@ import (
 
 const defaultUserAgent = "Tyk/" + VERSION
 
+// Gateway's custom response headers
+const (
+	XRateLimitLimit     = "X-RateLimit-Limit"
+	XRateLimitRemaining = "X-RateLimit-Remaining"
+	XRateLimitReset     = "X-RateLimit-Reset"
+)
+
 var ServiceCache *cache.Cache
 
 func urlFromService(spec *APISpec) (*apidef.HostList, error) {
@@ -783,9 +790,10 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 	// Add resource headers
 	if ses != nil {
 		// We have found a session, lets report back
-		res.Header.Set("X-RateLimit-Limit", strconv.Itoa(int(ses.QuotaMax)))
-		res.Header.Set("X-RateLimit-Remaining", strconv.Itoa(int(ses.QuotaRemaining)))
-		res.Header.Set("X-RateLimit-Reset", strconv.Itoa(int(ses.QuotaRenews)))
+		quotaMax, quotaRemaining, _, quotaRenews := ses.GetQuotaLimitByAPIID(p.TykAPISpec.APIID)
+		res.Header.Set(XRateLimitLimit, strconv.Itoa(int(quotaMax)))
+		res.Header.Set(XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
+		res.Header.Set(XRateLimitReset, strconv.Itoa(int(quotaRenews)))
 	}
 
 	copyHeader(rw.Header(), res.Header)
