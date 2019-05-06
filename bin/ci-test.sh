@@ -34,7 +34,7 @@ if [[ $LATEST_GO ]]; then
     echo "goimports check is ok!"
 fi
 
-PKGS="$(go list ./... | grep -v /vendor/)"
+PKGS="$(go list ./... | grep -v /vendor/ |grep -v /tyk$)"
 
 i=0
 
