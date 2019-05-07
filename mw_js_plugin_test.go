@@ -613,7 +613,7 @@ func TestJSVMRequestSchemeOtto(t *testing.T) {
 		Pre:                 true,
 	}
 	req := httptest.NewRequest("GET", "/foo", nil)
-	jsvm := JSVM{}
+	jsvm := &OttoJSVM{}
 	jsvm.Init(nil, logrus.NewEntry(log))
 
 	const js = `
