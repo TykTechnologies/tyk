@@ -545,18 +545,28 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 	authHeader := map[string]string{"Authorization": key}
 	ts.Run(t, []test.TestCase{
 		// 2 requests to api1, API limit quota remaining should be 98
-		{Method: http.MethodGet, Path: "/api1", Headers: authHeader, Code: http.StatusOK},
-		{Method: http.MethodGet, Path: "/api1", Headers: authHeader, Code: http.StatusOK},
+		{Method: http.MethodGet, Path: "/api1", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{XRateLimitRemaining: "99"}},
+		{Method: http.MethodGet, Path: "/api1", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{XRateLimitRemaining: "98"}},
 		// 3 requests to api2, API limit quota remaining should be 197
-		{Method: http.MethodGet, Path: "/api2", Headers: authHeader, Code: http.StatusOK},
-		{Method: http.MethodGet, Path: "/api2", Headers: authHeader, Code: http.StatusOK},
-		{Method: http.MethodGet, Path: "/api2", Headers: authHeader, Code: http.StatusOK},
+		{Method: http.MethodGet, Path: "/api2", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{XRateLimitRemaining: "199"}},
+		{Method: http.MethodGet, Path: "/api2", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{XRateLimitRemaining: "198"}},
+		{Method: http.MethodGet, Path: "/api2", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{XRateLimitRemaining: "197"}},
 		// 5 requests to api3, API limit quota remaining should be 45
-		{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK},
-		{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK},
-		{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK},
-		{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK},
-		{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK},
+		{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{XRateLimitRemaining: "49"}},
+		{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{XRateLimitRemaining: "48"}},
+		{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{XRateLimitRemaining: "47"}},
+		{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{XRateLimitRemaining: "46"}},
+		{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{XRateLimitRemaining: "45"}},
 	}...)
 
 	// check key session
