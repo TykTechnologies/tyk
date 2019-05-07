@@ -33,11 +33,9 @@ type TykJSVM interface {
 }
 
 func InitJSVM() TykJSVM {
-
-	switch config.Global().JSVM {
-	case "goja":
+	if config.Global().EnableV2JSVM {
 		return &GojaJSVM{}
-	default:
+	} else {
 		return &OttoJSVM{}
 	}
 }

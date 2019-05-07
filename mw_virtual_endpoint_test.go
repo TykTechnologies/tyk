@@ -79,7 +79,7 @@ func TestVirtualEndpointOtto(t *testing.T) {
 
 func TestVirtualEndpointGoja(t *testing.T) {
 	globalConf := config.Global()
-	globalConf.JSVM = "goja"
+	globalConf.EnableV2JSVM = true
 	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 	ts := newTykTestServer()
@@ -113,6 +113,30 @@ func TestVirtualEndpoint500(t *testing.T) {
 func BenchmarkVirtualEndpoint(b *testing.B) {
 	b.ReportAllocs()
 
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt", true)
+
+	for i := 0; i < b.N; i++ {
+		ts.Run(b, test.TestCase{
+			Path:      "/virt",
+			Code:      202,
+			BodyMatch: "foobar",
+			HeadersMatch: map[string]string{
+				"data-foo":   "x",
+				"data-bar-y": "3",
+			},
+		})
+	}
+}
+
+func BenchmarkVirtualEndpointGoja(b *testing.B) {
+	b.ReportAllocs()
+	globalConf := config.Global()
+	globalConf.EnableV2JSVM = true
+	config.SetGlobal(globalConf)
+	defer resetTestConfig()
 	ts := newTykTestServer()
 	defer ts.Close()
 

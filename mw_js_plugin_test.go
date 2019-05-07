@@ -685,7 +685,6 @@ leakMid.NewProcessRequest(function(request, session) {
 
 func TestTykMakeHTTPRequestOtto(t *testing.T) {
 	globalConf := config.Global()
-	globalConf.JSVM = "otto"
 	config.SetGlobal(globalConf)
 	ts := newTykTestServer()
 	defer ts.Close()
@@ -800,7 +799,7 @@ func TestTykMakeHTTPRequestOtto(t *testing.T) {
 
 func TestTykMakeHTTPRequestGoja(t *testing.T) {
 	globalConf := config.Global()
-	globalConf.JSVM = "goja"
+	globalConf.EnableV2JSVM = true
 	config.SetGlobal(globalConf)
 	ts := newTykTestServer()
 	defer ts.Close()

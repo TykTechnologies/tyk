@@ -483,11 +483,9 @@ func loadCustomMiddleware(spec *APISpec) ([]string, apidef.MiddlewareDefinition,
 	mwPreFuncs := []apidef.MiddlewareDefinition{}
 	mwPostFuncs := []apidef.MiddlewareDefinition{}
 	mwPostKeyAuthFuncs := []apidef.MiddlewareDefinition{}
-	var mwDriver apidef.MiddlewareDriver
-	if config.Global().JSVM == "goja" {
+	mwDriver := apidef.OttoDriver
+	if config.Global().EnableV2JSVM {
 		mwDriver = apidef.GojaDriver
-	} else {
-		mwDriver = apidef.OttoDriver
 	}
 	// Set AuthCheck hook
 	if spec.CustomMiddleware.AuthCheck.Name != "" {
