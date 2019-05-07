@@ -333,9 +333,10 @@ func handleForcedResponse(rw http.ResponseWriter, res *http.Response, ses *user.
 	// Add resource headers
 	if ses != nil {
 		// We have found a session, lets report back
-		res.Header.Set("X-RateLimit-Limit", strconv.Itoa(int(ses.QuotaMax)))
-		res.Header.Set("X-RateLimit-Remaining", strconv.Itoa(int(ses.QuotaRemaining)))
-		res.Header.Set("X-RateLimit-Reset", strconv.Itoa(int(ses.QuotaRenews)))
+		quotaMax, quotaRemaining, _, quotaRenews := ses.GetQuotaLimitByAPIID(spec.APIID)
+		res.Header.Set(XRateLimitLimit, strconv.Itoa(int(quotaMax)))
+		res.Header.Set(XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
+		res.Header.Set(XRateLimitReset, strconv.Itoa(int(quotaRenews)))
 	}
 
 	copyHeader(rw.Header(), res.Header)
