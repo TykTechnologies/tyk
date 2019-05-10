@@ -26,8 +26,8 @@ info:
     <br/>
     <b>The Tyk Gateway API is subsumed by the Tyk Dashboard API in Pro installations.</b>
 servers:
-  - url: 'http://localhost/tyk/'
-  - url: 'https://localhost/tyk/'
+  - url: 'http://localhost/'
+  - url: 'https://localhost/'
 tags:
   - name: Keys
     description: |-
@@ -37,17 +37,17 @@ tags:
       
       Listing tokens is only possible if you set `enable_hashed_keys_listing` to `true`. See [Using Hashed Keys Environment Endpoints](https://tyk.io/docs/security/#a-name-key-hashing-a-key-hashing) section for more details.
       
-      - endpoints `POST /keys/create`, `POST /keys` and `POST /keys/{keyName}` return `"key_hash"` for future use.
-      - endpoint `GET /keys` retrieves all (or per API) key hashes. You can disable this endpoint by using the `tyk.conf` setting `enable_hashed_keys_listing` (set to false by default).
-      - endpoint `GET /keys/{keyName}` is able to get a key by its hash. You need to provide the key hash as a `keyName`. 
-      and call it with the optional query parameter `hashed=true`. So the format is `GET /keys/{keyName}?hashed=true"`.
-      - The same optional parameter is available for the `DELETE /keys/{keyName}?hashed=true` endpoint.
+      - endpoints `POST /tyk/keys/create`, `POST /tyk/keys` and `POST /tyk/keys/{keyName}` return `"key_hash"` for future use.
+      - endpoint `GET /tyk/keys` retrieves all (or per API) key hashes. You can disable this endpoint by using the `tyk.conf` setting `enable_hashed_keys_listing` (set to false by default).
+      - endpoint `GET /tyk/keys/{keyName}` is able to get a key by its hash. You need to provide the key hash as a `keyName`. 
+      and call it with the optional query parameter `hashed=true`. So the format is `GET /tyk/keys/{keyName}?hashed=true"`.
+      - The same optional parameter is available for the `DELETE /tyk/keys/{keyName}?hashed=true` endpoint.
       
       <h3>Example: Import Existing Keys into Tyk</h3>
       
 
 
-      You can use the `PUT /keys/{KEY_ID}` endpoint as defined below to import existing keys into Tyk.
+      You can use the `PUT /tyk/keys/{KEY_ID}` endpoint as defined below to import existing keys into Tyk.
       
       This example uses standard `authorization` header authentication, and assumes that the Dashboard is located at `127.0.0.1:8080` and the Tyk secret is `352d20ee67be67f6340b4c0605b044b7` - update these as necessary to match your environment.
       
@@ -321,7 +321,7 @@ tags:
 
       These methods only work on a single API node. If updating a cluster, it is important to ensure that all nodes are updated before initiating a reload.
 paths:
-  /apis:
+  /tyk/apis:
     get:
       description: |-
         List APIs
@@ -382,7 +382,7 @@ paths:
               example:
                 status: "error"
                 message: "Malformed API data"
-  '/apis/{apiID}':
+  '/tyk/apis/{apiID}':
     parameters:
       - description: The API ID
         name: apiID
@@ -476,7 +476,7 @@ paths:
               example:
                 message: API ID not specified
                 status: error
-  '/cache/{apiID}':
+  '/tyk/cache/{apiID}':
     parameters:
       - description: The API ID
         name: apiID
@@ -500,7 +500,7 @@ paths:
               example:
                 message: cache invalidated
                 status: ok
-  '/reload/':
+  '/tyk/reload/':
     get:
       summary: Hot-reload a single node
       description: Tyk is capable of reloading configurations without having to stop serving requests, this means that API configurations can be added at runtime, or even modified at runtime and those rules applied immediately without any downtime.
@@ -524,7 +524,7 @@ paths:
                 $ref: '#/components/schemas/apiStatusMessage'
               example:
                 status: ok
-  '/reload/group':
+  '/tyk/reload/group':
     get:
       summary: Hot-reload a Tyk group
       description: To reload a whole group of Tyk nodes (without using the Dashboard or host manager), you can send an API request to a single node, this node will then send a notification through the pub/sub infrastructure to all other listening nodes (including the host manager if it is being used to manage NginX) which will then trigger a global reload.
@@ -540,7 +540,7 @@ paths:
                 $ref: '#/components/schemas/apiStatusMessage'
               example:
                 status: ok
-  '/hello':
+  '/tyk/hello':
     get:
       summary: Check the Health of the Gateway
       description: |
@@ -558,7 +558,7 @@ paths:
               schema:
                 type: string
               example: "Hello Tiki"
-  '/{listenPath}/hello':
+  '/tyk/{listenPath}/hello':
     parameters:
       - in: path
         name: listenPath
@@ -580,7 +580,7 @@ paths:
               schema:
                 type: string
               example: "Hello Tiki"
-  /keys:
+  /tyk/keys:
     get:
       summary: List Keys
       description: You can retrieve all the keys in your Tyk instance. Returns an array of Key IDs.
@@ -638,7 +638,7 @@ paths:
               example:
                 message: Malformed Key data
                 status: error
-  '/keys/{keyID}':
+  '/tyk/keys/{keyID}':
     parameters:
       - description: The Key ID
         name: keyID
@@ -731,7 +731,7 @@ paths:
               example:
                 action: Key deleted
                 status: ok
-  /oauth/clients/create:
+  /tyk/oauth/clients/create:
     post:
       summary: Create new OAuth client
       description: Any OAuth keys must be generated with the help of a client ID. These need to be pre-registered with Tyk before they can be used (in a similar vein to how you would register your app with Twitter before attempting to ask user permissions using their API).
@@ -763,7 +763,7 @@ paths:
                 client_id: test
                 api_id: id
                 policy_id: policy
-  '/oauth/clients/{apiID}':
+  '/tyk/oauth/clients/{apiID}':
     get:
       summary: List oAuth clients
       description: OAuth Clients are organised by API ID, and therefore are queried as such.
@@ -786,7 +786,7 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/NewClientRequest'
-  '/oauth/clients/{apiID}/{keyName}':
+  '/tyk/oauth/clients/{apiID}/{keyName}':
     get:
       summary: Get OAuth client
       tags:
@@ -847,7 +847,7 @@ paths:
               example:
                 action: deleted
                 status: ok
-  '/oauth/clients/{apiID}/{keyName}/tokens':
+  '/tyk/oauth/clients/{apiID}/{keyName}/tokens':
     get:
       summary: List tokens
       description: This endpoint allows you to retrieve a list of all current tokens and their expiry date for a provided API ID and OAuth-client ID in the following format. This endpoint will work only for newly created tokens.
@@ -883,7 +883,7 @@ paths:
               example:
                 - "tok1"
                 - "tok2"
-  '/oauth/refresh/{keyName}':
+  '/tyk/oauth/refresh/{keyName}':
     delete:
       summary: Invalidate OAuth refresh token
       description: It is possible to invalidate refresh tokens in order to manage OAuth client access more robustly.
@@ -910,7 +910,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/apiModifyKeySuccess'
-  '/oauth/authorize-client/':
+  '/tyk/oauth/authorize-client/':
     post:
       description: With the OAuth flow you will need to create authorisation or access tokens for your clients, in order to do this, Tyk provides a private API endpoint for your application to generate these codes and redirect the end-user back to the API Client.
       summary: Authorize client
@@ -951,7 +951,7 @@ paths:
               example:
                 code: MWY0ZDRkMzktOTYwNi00NDRiLTk2YmQtOWQxOGQ3Mjc5Yzdk
                 redirect_to: 'http://client-app.com/oauth-redirect/?code=MWY0ZDRkMzktOTYwNi00NDRiLTk2YmQtOWQxOGQ3Mjc5Yzdk'
-  /org/keys:
+  /tyk/org/keys:
     get:
       summary: List Organisation Keys
       description: |-
@@ -1006,7 +1006,7 @@ paths:
                 action: created
                 key: '{...KEY JSON definition...}'
                 status: ok
-  '/orgs/keys/{keyID}':
+  '/tyk/orgs/keys/{keyID}':
     parameters:
       - description: The Key ID
         name: keyID
