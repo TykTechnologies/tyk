@@ -833,6 +833,13 @@ func initialiseSystem() error {
 		if globalConf.PIDFileLocation == "" {
 			globalConf.PIDFileLocation = "/var/run/tyk/tyk-gateway.pid"
 		}
+		if globalConf.UseDBAppConfigs && globalConf.Policies.PolicySource != config.DefaultDashPolicySource {
+			globalConf.Policies.PolicySource = config.DefaultDashPolicySource
+			globalConf.Policies.PolicyConnectionString = globalConf.DBAppConfOptions.ConnectionString
+			if globalConf.Policies.PolicyRecordName == "" {
+				globalConf.Policies.PolicyRecordName = config.DefaultDashPolicyRecordName
+			}
+		}
 		// It's necessary to set global conf before and after calling afterConfSetup as global conf
 		// is being used by dependencies of the even handler init and then conf is modified again.
 		config.SetGlobal(globalConf)
