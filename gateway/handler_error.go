@@ -94,7 +94,11 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		}
 
 		if e.Spec.Proxy.StripListenPath {
-			r.URL.Path = strings.Replace(r.URL.Path, e.Spec.Proxy.ListenPath, "", 1)
+			err := stripListenPath(r, e.Spec.Proxy.ListenPath)
+			if err != nil {
+				log.WithError(err).Error("Failed to strip listen path")
+				return
+			}
 		}
 
 		// This is an odd bugfix, will need further testing

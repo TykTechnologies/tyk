@@ -186,6 +186,57 @@ func TestStripPathWithURLRewrite(t *testing.T) {
 	})
 }
 
+func TestStripListenPath(t *testing.T) {
+
+	ts := StartTest()
+	defer ts.Close()
+	defer resetTestConfig()
+
+	t.Run("normal listen path", func(t *testing.T) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/myapi/"
+			spec.Proxy.StripListenPath = true
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/myapi/something/", BodyMatch: `"Url":"/something/"`},
+		}...)
+	})
+
+	t.Run("normal listen path, same endpoint", func(t *testing.T) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/myapi/"
+			spec.Proxy.StripListenPath = true
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/myapi/myapi/", BodyMatch: `"Url":"/myapi/"`},
+		}...)
+	})
+
+	t.Run("listen path with regex", func(t *testing.T) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/{_:.*}/myapi/"
+			spec.Proxy.StripListenPath = true
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/anything/myapi/something/", BodyMatch: `"Url":"/something/"`},
+		}...)
+	})
+
+	t.Run("listen path with regex, endpoint with same pattern ", func(t *testing.T) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/{a.*}/"
+			spec.Proxy.StripListenPath = true
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/anything/anything/", BodyMatch: `"Url":"/anything/"`},
+		}...)
+	})
+}
+
 func TestSkipTargetPassEscapingOff(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()

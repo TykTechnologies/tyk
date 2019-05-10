@@ -10,10 +10,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/regexp"
+	"github.com/gorilla/mux"
+	cache "github.com/pmylund/go-cache"
+
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
-	cache "github.com/pmylund/go-cache"
 )
 
 // Enums for keys to be stored in a session context - this is how gorilla expects
@@ -311,8 +314,11 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	// Make sure we get the correct target URL
 	if s.Spec.Proxy.StripListenPath {
 		log.Debug("Stripping: ", s.Spec.Proxy.ListenPath)
-		r.URL.Path = strings.TrimPrefix(r.URL.Path, s.Spec.Proxy.ListenPath)
-		r.URL.RawPath = strings.TrimPrefix(r.URL.RawPath, s.Spec.Proxy.ListenPath)
+		err := stripListenPath(r, s.Spec.Proxy.ListenPath)
+		if err != nil {
+			log.WithError(err).Error("Failed to strip listen path")
+			return nil
+		}
 		log.Debug("Upstream Path is: ", r.URL.Path)
 	}
 
@@ -329,6 +335,21 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 		s.RecordHit(r, int64(millisec), resp.StatusCode, resp)
 	}
 	log.Debug("Done proxy")
+	return nil
+}
+
+func stripListenPath(r *http.Request, listenPath string) error {
+	tmp := new(mux.Route).PathPrefix(listenPath)
+	s, err := tmp.GetPathRegexp()
+	if err != nil {
+		return err
+	}
+
+	reg := regexp.MustCompile(s)
+
+	r.URL.Path = reg.ReplaceAllString(r.URL.Path, "")
+	r.URL.RawPath = reg.ReplaceAllString(r.URL.RawPath, "")
+
 	return nil
 }
 
@@ -349,8 +370,11 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 
 	// Make sure we get the correct target URL
 	if s.Spec.Proxy.StripListenPath {
-		r.URL.Path = strings.TrimPrefix(r.URL.Path, s.Spec.Proxy.ListenPath)
-		r.URL.RawPath = strings.TrimPrefix(r.URL.RawPath, s.Spec.Proxy.ListenPath)
+		err := stripListenPath(r, s.Spec.Proxy.ListenPath)
+		if err != nil {
+			log.WithError(err).Error("Failed to strip listen path")
+			return nil
+		}
 	}
 
 	t1 := time.Now()
