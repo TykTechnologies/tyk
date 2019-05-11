@@ -211,16 +211,16 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.SessionState,
 	resetTTLTo int64, hashed bool) error {
 
-	// async update and return if needed
+	// async update
 	if b.asyncWrites {
 		sessionUpdate := &SessionUpdate{
 			isHashed: hashed,
 			keyVal:   keyName,
-			session:  session,
+			session:  session.Clone(), // send clone of session in update to prevent concurrent map access
 			ttl:      resetTTLTo,
 		}
 
-		// send sessionupdate object through channel to pool
+		// send sessionUpdate object through channel to pool
 		defaultSessionUpdater.updateChan <- sessionUpdate
 
 		return nil

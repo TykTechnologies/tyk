@@ -91,6 +91,61 @@ type SessionState struct {
 	keyHash string
 }
 
+// Clone returns deep copy of the given session
+func (s *SessionState) Clone() *SessionState {
+	clonedSession := &SessionState{}
+	*clonedSession = *s
+
+	// copy AccessRights map
+	clonedSession.AccessRights = map[string]AccessDefinition{}
+	for apiID, access := range s.AccessRights {
+		clonedAccess := access
+		// copy versions
+		clonedAccess.Versions = make([]string, len(access.Versions))
+		copy(clonedAccess.Versions, access.Versions)
+		// copy AllowedURLs
+		clonedAccess.AllowedURLs = make([]AccessSpec, len(access.AllowedURLs))
+		copy(clonedAccess.AllowedURLs, access.AllowedURLs)
+		for index, url := range access.AllowedURLs {
+			clonedAccess.AllowedURLs[index].Methods = make([]string, len(url.Methods))
+			copy(clonedAccess.AllowedURLs[index].Methods, url.Methods)
+		}
+		// copy API limit
+		if access.Limit != nil {
+			clonedAccess.Limit = &APILimit{}
+			*clonedAccess.Limit = *access.Limit
+		}
+
+		clonedSession.AccessRights[apiID] = clonedAccess
+	}
+
+	// copy OauthKeys map
+	clonedSession.OauthKeys = map[string]string{}
+	for key, val := range s.OauthKeys {
+		clonedSession.OauthKeys[key] = val
+	}
+
+	// copy ApplyPolicies slice
+	clonedSession.ApplyPolicies = make([]string, len(s.ApplyPolicies))
+	copy(clonedSession.ApplyPolicies, s.ApplyPolicies)
+
+	// copy TriggerLimits slice
+	clonedSession.Monitor.TriggerLimits = make([]float64, len(s.Monitor.TriggerLimits))
+	copy(clonedSession.Monitor.TriggerLimits, s.Monitor.TriggerLimits)
+
+	// copy MetaData map
+	clonedSession.MetaData = map[string]interface{}{}
+	for key, val := range s.MetaData {
+		clonedSession.MetaData[key] = val
+	}
+
+	// copy Tags slice
+	clonedSession.Tags = make([]string, len(s.Tags))
+	copy(clonedSession.Tags, s.Tags)
+
+	return clonedSession
+}
+
 func (s *SessionState) KeyHash() string {
 	if s.keyHash == "" {
 		panic("KeyHash cache not found. You should call `SetKeyHash` before.")
