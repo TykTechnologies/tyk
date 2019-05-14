@@ -282,6 +282,9 @@
     "enable_jsvm": {
       "type": "boolean"
     },
+    "enable_v2_jsvm": {
+      "type": "boolean"
+    },
     "jsvm_timeout": {
       "type": "integer"
     },
