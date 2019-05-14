@@ -303,8 +303,7 @@ func (j *OttoJSVM) LoadTykJSApi() {
 			data.Set(k, v)
 		}
 
-		u, _ := url.ParseRequestURI(domain)
-		u.Path = hro.Resource
+		u, _ := url.ParseRequestURI(domain + hro.Resource)
 		urlStr := u.String() // "https://api.com/user/"
 
 		var d string
