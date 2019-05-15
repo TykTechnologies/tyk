@@ -10,9 +10,9 @@ package gateway
 #include <stdlib.h>
 #include <string.h>
 
-#include "coprocess/api.h"
+#include "../coprocess/api.h"
 
-#include "coprocess/lua/binding.h"
+#include "../coprocess/lua/binding.h"
 
 #include <lua.h>
 #include <lualib.h>
