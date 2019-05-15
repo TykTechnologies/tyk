@@ -113,6 +113,7 @@ func initTestMain(m *testing.M) int {
 	globalConf.AnalyticsConfig.NormaliseUrls.Enabled = true
 	// Enable coprocess and bundle downloader:
 	globalConf.CoProcessOptions.EnableCoProcess = true
+	globalConf.CoProcessOptions.PythonPathPrefix = "../"
 	globalConf.EnableBundleDownloader = true
 	globalConf.BundleBaseURL = testHttpBundles
 	globalConf.MiddlewarePath = testMiddlewarePath
