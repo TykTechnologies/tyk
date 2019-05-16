@@ -13,8 +13,8 @@ import (
 	uuid "github.com/satori/go.uuid"
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/gateway/apidef"
 	"github.com/TykTechnologies/tyk/storage"
 )
 

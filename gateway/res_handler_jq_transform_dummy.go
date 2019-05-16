@@ -5,7 +5,7 @@ package gateway
 import (
 	"net/http"
 
-	"github.com/TykTechnologies/tyk/gateway/user"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 type ResponseTransformJQMiddleware struct {

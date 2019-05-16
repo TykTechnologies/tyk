@@ -11,7 +11,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
 
-	"github.com/TykTechnologies/tyk/gateway/apidef"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 type traceHttpRequest struct {

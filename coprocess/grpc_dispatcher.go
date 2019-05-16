@@ -4,7 +4,7 @@
 package coprocess
 
 import (
-	"github.com/TykTechnologies/tyk/gateway/apidef"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 const (

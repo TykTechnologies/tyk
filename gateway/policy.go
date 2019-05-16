@@ -12,7 +12,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 
-	"github.com/TykTechnologies/tyk/gateway/user"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 type DBAccessDefinition struct {

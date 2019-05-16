@@ -4,7 +4,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/TykTechnologies/tyk/gateway/apidef"
+	"github.com/TykTechnologies/tyk/apidef"
 	logger "github.com/TykTechnologies/tyk/log"
 )
 

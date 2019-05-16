@@ -13,7 +13,7 @@ import (
 
 	"github.com/justinas/alice"
 
-	"github.com/TykTechnologies/tyk/gateway/user"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 func createRLSession() *user.SessionState {

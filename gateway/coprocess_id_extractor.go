@@ -13,7 +13,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	xmlpath "gopkg.in/xmlpath.v2"
 
-	"github.com/TykTechnologies/tyk/gateway/apidef"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/regexp"
 )
 

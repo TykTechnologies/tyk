@@ -13,9 +13,9 @@ import (
 	"github.com/lonelycode/go-uuid/uuid"
 
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/gateway/user"
 	"github.com/TykTechnologies/tyk/signature_validator"
 	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 func TestMurmur3CharBug(t *testing.T) {

@@ -13,8 +13,8 @@ import (
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/lonelycode/go-uuid/uuid"
 
-	"github.com/TykTechnologies/tyk/gateway/user"
 	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const jwtSecret = "9879879878787878"

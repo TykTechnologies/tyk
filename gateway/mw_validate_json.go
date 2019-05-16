@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/TykTechnologies/gojsonschema"
-	"github.com/TykTechnologies/tyk/gateway/apidef"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 type ValidateJSON struct {

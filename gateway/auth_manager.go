@@ -10,8 +10,8 @@ import (
 	uuid "github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/gateway/user"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/Sirupsen/logrus"
 )

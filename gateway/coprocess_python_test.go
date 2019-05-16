@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/gateway/user"
 	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 var pythonBundleWithAuthCheck = map[string]string{

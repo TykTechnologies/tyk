@@ -15,9 +15,9 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/coprocess"
-	"github.com/TykTechnologies/tyk/gateway/apidef"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
