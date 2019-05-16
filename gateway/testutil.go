@@ -7,8 +7,10 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"github.com/TykTechnologies/tyk/cli"
+
+
 	"golang.org/x/net/context"
+
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -23,11 +25,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/TykTechnologies/tyk/cli"
+
+	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/garyburd/redigo/redis"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -431,7 +435,7 @@ func firstVals(vals map[string][]string) map[string]string {
 	return m
 }
 
-type tykTestServerConfig struct {
+type MockConfig struct {
 	sepatateControlAPI bool
 	delay              time.Duration
 	hotReload          bool
@@ -439,17 +443,17 @@ type tykTestServerConfig struct {
 	coprocessConfig    config.CoProcessConfig
 }
 
-type tykTestServer struct {
+type Mock struct {
 	ln  net.Listener
 	cln net.Listener
 	URL string
 
 	testRunner   *test.HTTPTestRunner
 	globalConfig config.Config
-	config       tykTestServerConfig
+	config       MockConfig
 }
 
-func (s *tykTestServer) Start() {
+func (s *Mock) Start() {
 	s.ln, _ = generateListener(0)
 	_, port, _ := net.SplitHostPort(s.ln.Addr().String())
 	globalConf := config.Global()
@@ -518,12 +522,12 @@ func (s *tykTestServer) Start() {
 	}
 }
 
-func (s *tykTestServer) Do(tc test.TestCase) (*http.Response, error) {
+func (s *Mock) Do(tc test.TestCase) (*http.Response, error) {
 	req, _ := s.testRunner.RequestBuilder(&tc)
 	return s.testRunner.Do(req, &tc)
 }
 
-func (s *tykTestServer) Close() {
+func (s *Mock) Close() {
 	s.ln.Close()
 
 	if s.config.sepatateControlAPI {
@@ -534,11 +538,11 @@ func (s *tykTestServer) Close() {
 	}
 }
 
-func (s *tykTestServer) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, error) {
+func (s *Mock) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, error) {
 	return s.testRunner.Run(t, testCases...)
 }
 
-func (s *tykTestServer) RunExt(t testing.TB, testCases ...test.TestCase) {
+func (s *Mock) RunExt(t testing.TB, testCases ...test.TestCase) {
 	var testMatrix = []struct {
 		goagain          bool
 		overrideDefaults bool
@@ -565,7 +569,7 @@ func (s *tykTestServer) RunExt(t testing.TB, testCases ...test.TestCase) {
 	}
 }
 
-func (s *tykTestServer) createSession(sGen ...func(s *user.SessionState)) string {
+func (s *Mock) createSession(sGen ...func(s *user.SessionState)) string {
 	session := CreateStandardSession()
 	if len(sGen) > 0 {
 		sGen[0](session)
@@ -593,14 +597,14 @@ func (s *tykTestServer) createSession(sGen ...func(s *user.SessionState)) string
 	return respJSON.Key
 }
 
-func StartMock(config ...tykTestServerConfig) tykTestServer {
-	s := tykTestServer{}
+func StartMock(config ...MockConfig) Mock {
+	m := Mock{}
 	if len(config) > 0 {
-		s.config = config[0]
+		m.config = config[0]
 	}
-	s.Start()
+	m.Start()
 
-	return s
+	return m
 }
 
 const sampleAPI = `{

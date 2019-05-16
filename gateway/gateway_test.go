@@ -19,11 +19,9 @@ import (
 	"testing"
 	"time"
 
-
-
+	"github.com/garyburd/redigo/redis"
 	"github.com/gorilla/websocket"
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
-	"github.com/garyburd/redigo/redis"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/cli"
@@ -58,7 +56,7 @@ func createNonThrottledSession() *user.SessionState {
 	return session
 }
 
-func TestAA(t *testing.T){
+func TestAA(t *testing.T) {
 	ts := StartMock()
 
 	ts.Start()
@@ -496,7 +494,7 @@ func TestQuota(t *testing.T) {
 }
 
 func TestAnalytics(t *testing.T) {
-	ts := StartMock(tykTestServerConfig{
+	ts := StartMock(MockConfig{
 		delay: 20 * time.Millisecond,
 	})
 	defer ts.Close()
@@ -701,7 +699,7 @@ func TestListener(t *testing.T) {
 
 // Admin api located on separate port
 func TestControlListener(t *testing.T) {
-	ts := StartMock(tykTestServerConfig{
+	ts := StartMock(MockConfig{
 		sepatateControlAPI: true,
 	})
 	defer ts.Close()
@@ -725,7 +723,7 @@ func TestHttpPprof(t *testing.T) {
 	old := cli.HTTPProfile
 	defer func() { cli.HTTPProfile = old }()
 
-	ts := StartMock(tykTestServerConfig{
+	ts := StartMock(MockConfig{
 		sepatateControlAPI: true,
 	})
 

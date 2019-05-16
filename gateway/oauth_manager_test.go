@@ -440,7 +440,7 @@ func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 	})
 }
 
-func getAuthCode(t *testing.T, ts *tykTestServer) map[string]string {
+func getAuthCode(t *testing.T, ts *Mock) map[string]string {
 	param := make(url.Values)
 	param.Set("response_type", "code")
 	param.Set("redirect_uri", authRedirectUri)
@@ -596,7 +596,7 @@ type tokenData struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
-func getToken(t *testing.T, ts *tykTestServer) tokenData {
+func getToken(t *testing.T, ts *Mock) tokenData {
 	authData := getAuthCode(t, ts)
 
 	param := make(url.Values)

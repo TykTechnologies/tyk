@@ -131,7 +131,7 @@ def MyPreHook(request, session, metadata, spec):
 }
 
 func TestPythonBundles(t *testing.T) {
-	ts := StartMock(tykTestServerConfig{
+	ts := StartMock(MockConfig{
 		coprocessConfig: config.CoProcessConfig{
 			EnableCoProcess: true,
 		}})
