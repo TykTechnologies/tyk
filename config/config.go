@@ -6,6 +6,8 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
+	"runtime"
 	"sync"
 	"sync/atomic"
 
@@ -410,6 +412,11 @@ func WriteConf(path string, conf *Config) error {
 // writeDefault will set conf to the default config and write it to disk
 // in path, if the path is non-empty.
 func WriteDefault(path string, conf *Config) error {
+	_, b, _, _ := runtime.Caller(0)
+	configPath := filepath.Dir(b)
+	rootPath := filepath.Dir(configPath)
+	Default.TemplatePath = filepath.Join(rootPath, "templates")
+
 	*conf = Default
 	if err := envconfig.Process(envPrefix, conf); err != nil {
 		return err
