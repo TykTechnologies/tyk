@@ -10,11 +10,11 @@ import (
 )
 
 func testPrepareResponseHeaderInjection() {
-	buildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = true
 		spec.Proxy.ListenPath = "/"
 		spec.OrgID = "default"
-		updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 			v.UseExtendedPaths = true
 			json.Unmarshal([]byte(`[
 				{
@@ -61,7 +61,7 @@ func testPrepareResponseHeaderInjection() {
 }
 
 func TestResponseHeaderInjection(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartMock()
 	defer ts.Close()
 
 	testPrepareResponseHeaderInjection()
@@ -83,7 +83,7 @@ func TestResponseHeaderInjection(t *testing.T) {
 func BenchmarkResponseHeaderInjection(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := newTykTestServer()
+	ts := StartMock()
 	defer ts.Close()
 
 	testPrepareResponseHeaderInjection()

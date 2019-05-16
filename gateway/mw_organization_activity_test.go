@@ -16,7 +16,7 @@ import (
 func testPrepareProcessRequestQuotaLimit(tb testing.TB, ts tykTestServer, data map[string]interface{}) {
 	// load API
 	orgID := "test-org-" + uuid.NewV4().String()
-	buildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = true
 		spec.OrgID = orgID
 		spec.Proxy.ListenPath = "/"
@@ -42,7 +42,7 @@ func TestProcessRequestLiveQuotaLimit(t *testing.T) {
 	config.SetGlobal(globalConf)
 
 	// run test server
-	ts := newTykTestServer()
+	ts := StartMock()
 	defer ts.Close()
 
 	// load API
@@ -91,7 +91,7 @@ func BenchmarkProcessRequestLiveQuotaLimit(b *testing.B) {
 	defer resetTestConfig()
 
 	// run test server
-	ts := newTykTestServer()
+	ts := StartMock()
 	defer ts.Close()
 
 	// load API
@@ -121,7 +121,7 @@ func TestProcessRequestOffThreadQuotaLimit(t *testing.T) {
 	defer resetTestConfig()
 
 	// run test server
-	ts := newTykTestServer()
+	ts := StartMock()
 	defer ts.Close()
 
 	// load API
@@ -193,7 +193,7 @@ func BenchmarkProcessRequestOffThreadQuotaLimit(b *testing.B) {
 	defer resetTestConfig()
 
 	// run test server
-	ts := newTykTestServer()
+	ts := StartMock()
 	defer ts.Close()
 
 	// load API
@@ -224,7 +224,7 @@ func TestProcessRequestLiveRedisRollingLimiter(t *testing.T) {
 	defer resetTestConfig()
 
 	// run test server
-	ts := newTykTestServer()
+	ts := StartMock()
 	defer ts.Close()
 
 	// load API
@@ -281,7 +281,7 @@ func BenchmarkProcessRequestLiveRedisRollingLimiter(b *testing.B) {
 	defer resetTestConfig()
 
 	// run test server
-	ts := newTykTestServer()
+	ts := StartMock()
 	defer ts.Close()
 
 	// load API
@@ -312,7 +312,7 @@ func TestProcessRequestOffThreadRedisRollingLimiter(t *testing.T) {
 	defer resetTestConfig()
 
 	// run test server
-	ts := newTykTestServer()
+	ts := StartMock()
 	defer ts.Close()
 
 	// load API
@@ -367,7 +367,7 @@ func BenchmarkProcessRequestOffThreadRedisRollingLimiter(b *testing.B) {
 	config.SetGlobal(globalConf)
 
 	// run test server
-	ts := newTykTestServer()
+	ts := StartMock()
 	defer ts.Close()
 
 	// load API

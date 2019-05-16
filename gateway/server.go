@@ -21,12 +21,12 @@ import (
 
 	"golang.org/x/net/http2"
 
-	newrelic "github.com/newrelic/go-agent"
+	"github.com/newrelic/go-agent"
 
 	"github.com/TykTechnologies/tyk/checkup"
 
 	"github.com/Sirupsen/logrus"
-	logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
+	"github.com/Sirupsen/logrus/hooks/syslog"
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/evalphobia/logrus_sentry"
 	"github.com/facebookgo/pidfile"
@@ -35,11 +35,11 @@ import (
 	"github.com/justinas/alice"
 	"github.com/lonelycode/osin"
 	"github.com/rs/cors"
-	uuid "github.com/satori/go.uuid"
+	"github.com/satori/go.uuid"
 	"rsc.io/letsencrypt"
 
 	"github.com/TykTechnologies/goagain"
-	gas "github.com/TykTechnologies/goautosocket"
+	"github.com/TykTechnologies/goautosocket"
 	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"

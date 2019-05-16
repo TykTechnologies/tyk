@@ -487,11 +487,11 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 	}
 	policiesMu.RUnlock()
 
-	ts := newTykTestServer()
+	ts := StartMock()
 	defer ts.Close()
 
 	// load APIs
-	buildAndLoadAPI(
+	BuildAndLoadAPI(
 		func(spec *APISpec) {
 			spec.Name = "api 1"
 			spec.APIID = "api1"
