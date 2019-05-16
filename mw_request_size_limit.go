@@ -29,6 +29,8 @@ func (t *RequestSizeLimitMiddleware) EnabledForSpec() bool {
 }
 
 func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimit int64) (error, int) {
+	logger := ctxGetLogger(r)
+
 	statedCL := r.Header.Get("Content-Length")
 	if statedCL == "" {
 		return errors.New("Content length is required for this request"), 411
@@ -36,7 +38,7 @@ func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimi
 
 	size, err := strconv.ParseInt(statedCL, 0, 64)
 	if err != nil {
-		t.Logger().WithError(err).Error("String conversion for content length failed")
+		logger.WithError(err).Error("String conversion for content length failed")
 		return errors.New("content length is not a valid Integer"), http.StatusBadRequest
 	}
 	if r.ContentLength > size {
@@ -45,7 +47,7 @@ func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimi
 
 	// Check stated size
 	if size > sizeLimit {
-		t.Logger().WithFields(logrus.Fields{"size": size, "limit": sizeLimit}).Info("Attempted access with large request size, blocked.")
+		logger.WithFields(logrus.Fields{"size": size, "limit": sizeLimit}).Info("Attempted access with large request size, blocked.")
 
 		return errors.New("Request is too large"), http.StatusBadRequest
 	}
@@ -55,7 +57,7 @@ func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimi
 
 // RequestSizeLimit will check a request for maximum request size, this can be a global limit or a matched limit.
 func (t *RequestSizeLimitMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	logger := t.Logger()
+	logger := ctxGetLogger(r)
 	logger.Debug("Request size limiter active")
 
 	vInfo, versionPaths, _, _ := t.Spec.Version(r)

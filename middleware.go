@@ -66,6 +66,7 @@ func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			mw.SetRequestLogger(r)
+			logger := ctxGetLogger(r)
 
 			if config.Global().NewRelic.AppName != "" {
 				if txn, ok := w.(newrelic.Transaction); ok {
@@ -86,7 +87,7 @@ func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 			job.EventKv("executed", meta)
 			job.EventKv(eventName, meta)
 			startTime := time.Now()
-			mw.Logger().WithField("ts", startTime.UnixNano()).Debug("Started")
+			logger.WithField("ts", startTime.UnixNano()).Debug("Started")
 
 			if mw.Base().Spec.CORS.OptionsPassthrough && r.Method == "OPTIONS" {
 				h.ServeHTTP(w, r)
@@ -103,14 +104,14 @@ func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 				job.TimingKv("exec_time", finishTime.Nanoseconds(), meta)
 				job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
 
-				mw.Logger().WithError(err).WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
+				logger.WithError(err).WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
 				return
 			}
 
 			finishTime := time.Since(startTime)
 			job.TimingKv("exec_time", finishTime.Nanoseconds(), meta)
 			job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
-			mw.Logger().WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
+			logger.WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
 
 			// Special code, bypasses all other execution
 			if errCode != mwStatusRespond {
@@ -163,7 +164,14 @@ func (t *BaseMiddleware) SetName(name string) {
 }
 
 func (t *BaseMiddleware) SetRequestLogger(r *http.Request) {
-	t.logger = getLogEntryForRequest(t.Logger(), r, ctxGetAuthToken(r), nil)
+	logger := ctxGetLogger(r)
+	_, initialized := logger.Data["path"]
+	token, hasToken := logger.Data["key"]
+	newToken := ctxGetAuthToken(r)
+
+	if !initialized || (!hasToken && newToken != "") || (hasToken && token.(string) != newToken) {
+		ctxSetLogger(r, getLogEntryForRequest(t.Logger(), r, ctxGetAuthToken(r), nil))
+	}
 }
 
 func (t BaseMiddleware) Init() {}
@@ -220,7 +228,8 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 
 	lifetime := session.Lifetime(t.Spec.SessionLifetime)
 	if err := t.Spec.SessionManager.UpdateSession(token, session, lifetime, false); err != nil {
-		t.Logger().WithError(err).Error("Can't update session")
+		logger := ctxGetLogger(r)
+		logger.WithError(err).Error("Can't update session")
 		return false
 	}
 
@@ -429,8 +438,10 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 		return user.SessionState{IsInactive: true}, false
 	}
 
+	logger := ctxGetLogger(r)
+
 	// Try and get the session from the session store
-	t.Logger().Debug("Querying local cache")
+	logger.Debug("Querying local cache")
 	cacheKey := key
 	if t.Spec.GlobalConfig.HashKeys {
 		cacheKey = storage.HashStr(key)
@@ -440,7 +451,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 	if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
 		cachedVal, found := SessionCache.Get(cacheKey)
 		if found {
-			t.Logger().Debug("--> Key found in local cache")
+			logger.Debug("--> Key found in local cache")
 			session := cachedVal.(user.SessionState)
 			if err := t.ApplyPolicies(&session); err != nil {
 				t.Logger().Error(err)
@@ -450,7 +461,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 	}
 
 	// Check session store
-	t.Logger().Debug("Querying keystore")
+	logger.Debug("Querying keystore")
 	session, found := t.Spec.SessionManager.SessionDetail(key, false)
 	if found {
 		session.SetKeyHash(cacheKey)
@@ -462,19 +473,20 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		if err := t.ApplyPolicies(&session); err != nil {
-			t.Logger().Error(err)
+			logger.Error(err)
+			return session, false
 		}
 		t.Logger().Debug("Got key")
 		return session, true
 	}
 
-	t.Logger().Debug("Querying authstore")
+	logger.Debug("Querying authstore")
 	// 2. If not there, get it from the AuthorizationHandler
 	session, found = t.Spec.AuthManager.KeyAuthorised(key)
 	if found {
 		session.SetKeyHash(cacheKey)
 		// If not in Session, and got it from AuthHandler, create a session with a new TTL
-		t.Logger().Info("Recreating session for key: ", key)
+		logger.Info("Recreating session for key: ", key)
 
 		// cache it
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
@@ -483,10 +495,11 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		if err := t.ApplyPolicies(&session); err != nil {
-			t.Logger().Error(err)
+			logger.Error(err)
+			return session, false
 		}
 
-		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.SessionLifetime))
+		logger.Debug("Lifetime is: ", session.Lifetime(t.Spec.SessionLifetime))
 		ctxScheduleSessionUpdate(r)
 	}
 

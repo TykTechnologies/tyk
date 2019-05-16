@@ -17,31 +17,6 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-// Enums for keys to be stored in a session context - this is how gorilla expects
-// these to be implemented and is lifted pretty much from docs
-const (
-	SessionData = iota
-	UpdateSession
-	AuthToken
-	HashedAuthToken
-	VersionData
-	VersionDefault
-	OrgSessionContext
-	ContextData
-	RetainHost
-	TrackThisEndpoint
-	DoNotTrackThisEndpoint
-	UrlRewritePath
-	RequestMethod
-	OrigRequestURL
-	LoopLevel
-	LoopLevelLimit
-	ThrottleLevel
-	ThrottleLevelLimit
-	Trace
-	CheckLoopLimits
-)
-
 const (
 	keyDataDeveloperID    = "tyk_developer_id"
 	keyDataDeveloperEmail = "tyk_developer_email"

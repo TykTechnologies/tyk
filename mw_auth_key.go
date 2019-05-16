@@ -39,6 +39,7 @@ func (k *AuthKey) setContextVars(r *http.Request, token string) {
 }
 
 func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	logger := ctxGetLogger(r)
 	config := k.Spec.Auth
 
 	key := r.Header.Get(config.AuthHeaderName)
@@ -81,7 +82,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 
 	if key == "" {
 		// No header value, fail
-		k.Logger().Info("Attempted access with malformed header, no auth header found.")
+		logger.Info("Attempted access with malformed header, no auth header found.")
 
 		return errors.New("Authorization field missing"), http.StatusUnauthorized
 	}
@@ -92,7 +93,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 	// Check if API key valid
 	session, keyExists := k.CheckSessionAndIdentityForValidKey(key, r)
 	if !keyExists {
-		k.Logger().WithField("key", obfuscateKey(key)).Info("Attempted access with non-existent key.")
+		logger.WithField("key", obfuscateKey(key)).Info("Attempted access with non-existent key.")
 
 		// Fire Authfailed Event
 		AuthFailed(k, r, key)
@@ -115,7 +116,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 
 func (k *AuthKey) validateSignature(r *http.Request, key string) (error, int) {
 	config := k.Spec.Auth
-	logger := k.Logger().WithField("key", obfuscateKey(key))
+	logger := ctxGetLogger(r).WithField("key", obfuscateKey(key))
 
 	if !config.ValidateSignature {
 		return nil, http.StatusOK

@@ -87,12 +87,12 @@ func (k *OpenIDMW) getProviders() ([]openid.Provider, error) {
 
 // We don't want any of the error handling, we use our own
 func (k *OpenIDMW) dummyErrorHandler(e error, w http.ResponseWriter, r *http.Request) bool {
-	k.Logger().WithError(e).Warning("JWT Invalid")
+	ctxGetLogger(r).WithError(e).Warning("JWT Invalid")
 	return true
 }
 
 func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	logger := k.Logger()
+	logger := ctxGetLogger(r)
 	// 1. Validate the JWT
 	ouser, token, halt := openid.AuthenticateOIDWithUser(k.providerConfiguration, w, r)
 
@@ -203,7 +203,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 }
 
 func (k *OpenIDMW) reportLoginFailure(tykId string, r *http.Request) {
-	k.Logger().WithFields(logrus.Fields{
+	ctxGetLogger(r).WithFields(logrus.Fields{
 		"key": obfuscateKey(tykId),
 	}).Warning("Attempted access with invalid key.")
 

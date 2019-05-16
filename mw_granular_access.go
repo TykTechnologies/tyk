@@ -18,7 +18,7 @@ func (m *GranularAccessMiddleware) Name() string {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	logger := m.Logger()
+	logger := ctxGetLogger(r)
 	session := ctxGetSession(r)
 
 	sessionVersionData, foundAPI := session.AccessRights[m.Spec.APIID]

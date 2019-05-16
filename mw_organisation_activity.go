@@ -94,7 +94,7 @@ func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession user.SessionState) (error, int) {
-	logger := k.Logger()
+	logger := ctxGetLogger(r)
 
 	if orgSession.IsInactive {
 		logger.Warning("Organisation access is disabled.")
@@ -210,7 +210,7 @@ func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request, orgSessio
 	)
 
 	if found && !active.(bool) {
-		k.Logger().Debug("Is not active")
+		ctxGetLogger(r).Debug("Is not active")
 		return errors.New("This organization access has been disabled or quota/rate limit is exceeded, please contact your API administrator"), http.StatusForbidden
 	}
 
@@ -225,8 +225,10 @@ func (k *OrganizationMonitor) AllowAccessNext(
 	r *http.Request,
 	session *user.SessionState) {
 
+	logger := ctxGetLogger(r)
+
 	// Is it active?
-	logEntry := getExplicitLogEntryForRequest(k.Logger(), path, IP, k.Spec.OrgID, nil)
+	logEntry := getExplicitLogEntryForRequest(logger, path, IP, k.Spec.OrgID, nil)
 	if session.IsInactive {
 		logEntry.Warning("Organisation access is disabled.")
 		orgChan <- false

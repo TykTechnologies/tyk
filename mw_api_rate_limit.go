@@ -44,7 +44,8 @@ func (k *RateLimitForAPI) EnabledForSpec() bool {
 }
 
 func (k *RateLimitForAPI) handleRateLimitFailure(r *http.Request, token string) (error, int) {
-	k.Logger().WithField("key", obfuscateKey(token)).Info("API rate limit exceeded.")
+	logger := ctxGetLogger(r)
+	logger.WithField("key", obfuscateKey(token)).Info("API rate limit exceeded.")
 
 	// Fire a rate limit exceeded event
 	k.FireEvent(EventRateLimitExceeded, EventKeyFailureMeta{

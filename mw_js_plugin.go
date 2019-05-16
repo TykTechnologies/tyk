@@ -88,7 +88,7 @@ func specToJson(spec *APISpec) string {
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	t1 := time.Now().UnixNano()
-	logger := d.Logger()
+	logger := ctxGetLogger(r)
 
 	// Create the proxy object
 	defer r.Body.Close()

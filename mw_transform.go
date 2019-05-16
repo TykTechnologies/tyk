@@ -39,13 +39,15 @@ func (t *TransformMiddleware) EnabledForSpec() bool {
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	_, versionPaths, _, _ := t.Spec.Version(r)
+	logger := ctxGetLogger(r)
+
 	found, meta := t.Spec.CheckSpecMatchesStatus(r, versionPaths, Transformed)
 	if !found {
 		return nil, http.StatusOK
 	}
 	err := transformBody(r, meta.(*TransformSpec), t.Spec.EnableContextVars)
 	if err != nil {
-		t.Logger().WithError(err).Error("Body transform failure")
+		logger.WithError(err).Error("Body transform failure")
 	}
 	return nil, http.StatusOK
 }

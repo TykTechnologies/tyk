@@ -117,6 +117,7 @@ func testHttpHandler() *mux.Router {
 			for {
 				mt, p, err := conn.ReadMessage()
 				if err != nil {
+					log.WithError(err).Error("Error while reading websocket message")
 					return
 				}
 				conn.WriteMessage(mt, []byte("reply to message: "+string(p)))

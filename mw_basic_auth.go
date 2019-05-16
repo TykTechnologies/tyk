@@ -77,7 +77,7 @@ func (k *BasicAuthKeyIsValid) requestForBasicAuth(w http.ResponseWriter, msg str
 
 func (k *BasicAuthKeyIsValid) basicAuthHeaderCredentials(w http.ResponseWriter, r *http.Request) (username, password string, err error, code int) {
 	token := r.Header.Get("Authorization")
-	logger := k.Logger().WithField("key", obfuscateKey(token))
+	logger := ctxGetLogger(r).WithField("key", obfuscateKey(token))
 	if token == "" {
 		// No header value, fail
 		err, code = k.requestForBasicAuth(w, "Authorization field missing")
@@ -151,12 +151,14 @@ func (k *BasicAuthKeyIsValid) basicAuthBodyCredentials(w http.ResponseWriter, r 
 func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	username, password, err, code := k.basicAuthHeaderCredentials(w, r)
 	token := r.Header.Get("Authorization")
+	logger := ctxGetLogger(r)
+
 	if err != nil {
 		if k.Spec.BasicAuth.ExtractFromBody {
 			w.Header().Del("WWW-Authenticate")
 			username, password, err, code = k.basicAuthBodyCredentials(w, r)
 		} else {
-			k.Logger().Warn("Attempted access with malformed header, no auth header found.")
+			logger.Warn("Attempted access with malformed header, no auth header found.")
 		}
 
 		if err != nil {
@@ -166,7 +168,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	// Check if API key valid
 	keyName := generateToken(k.Spec.OrgID, username)
-	logger := k.Logger().WithField("key", obfuscateKey(keyName))
+	logger = logger.WithField("key", obfuscateKey(keyName))
 	session, keyExists := k.CheckSessionAndIdentityForValidKey(keyName, r)
 	if !keyExists {
 		if config.Global().HashKeyFunction == "" {

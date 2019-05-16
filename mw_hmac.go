@@ -47,7 +47,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	if token == "" {
 		return hm.authorizationError(r)
 	}
-	logger := hm.Logger().WithField("key", obfuscateKey(token))
+	logger := ctxGetLogger(r).WithField("key", obfuscateKey(token))
 
 	// Clean it
 	token = stripSignature(token)
@@ -168,7 +168,7 @@ func (hm *HMACMiddleware) setContextVars(r *http.Request, token string) {
 }
 
 func (hm *HMACMiddleware) authorizationError(r *http.Request) (error, int) {
-	hm.Logger().Info("Authorization field missing or malformed")
+	ctxGetLogger(r).Info("Authorization field missing or malformed")
 
 	AuthFailed(hm, r, r.Header.Get("Authorization"))
 
@@ -224,7 +224,7 @@ func (hm *HMACMiddleware) getSecretAndSessionForKeyID(r *http.Request, keyId str
 	}
 
 	if session.HmacSecret == "" || !session.HMACEnabled {
-		hm.Logger().Info("API Requires HMAC signature, session missing HMACSecret or HMAC not enabled for key")
+		ctxGetLogger(r).Info("API Requires HMAC signature, session missing HMACSecret or HMAC not enabled for key")
 
 		return "", session, errors.New("This key ID is invalid")
 	}
