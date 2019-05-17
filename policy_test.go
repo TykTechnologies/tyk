@@ -449,7 +449,7 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 		ID:               "two_of_three_with_api_limit",
 		Per:              1,
 		Rate:             1000,
-		QuotaMax:         5,
+		QuotaMax:         50,
 		QuotaRenewalRate: 3600,
 		OrgID:            "default",
 		Partitions: user.PolicyPartitions{
@@ -624,10 +624,10 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 				api3LimitExpected := user.APILimit{
 					Rate:             1000,
 					Per:              1,
-					QuotaMax:         5,
+					QuotaMax:         50,
 					QuotaRenewalRate: 3600,
 					QuotaRenews:      api3Limit.QuotaRenews,
-					QuotaRemaining:   0,
+					QuotaRemaining:   45,
 					SetByPolicy:      true,
 				}
 				if !reflect.DeepEqual(*api3Limit, api3LimitExpected) {
@@ -661,7 +661,7 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 				}
 
 				api1Limit := sessionData.AccessRights["api3"].Limit
-				if api1Limit.QuotaRemaining != 0 {
+				if api1Limit.QuotaRemaining == 0 {
 					t.Error("Should not reset quota")
 					return false
 				}
@@ -689,7 +689,7 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 				}
 
 				api1Limit := sessionData.AccessRights["api3"].Limit
-				if api1Limit.QuotaRemaining != 5 {
+				if api1Limit.QuotaRemaining != 50 {
 					t.Error("Should reset quota:", api1Limit.QuotaRemaining)
 					return false
 				}
