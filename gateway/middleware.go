@@ -6,19 +6,14 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/gocraft/health"
 	"github.com/justinas/alice"
-	newrelic "github.com/newrelic/go-agent"
 	"github.com/paulbellamy/ratecounter"
 	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -67,26 +62,26 @@ func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			mw.SetRequestLogger(r)
 
-			if config.Global().NewRelic.AppName != "" {
-				if txn, ok := w.(newrelic.Transaction); ok {
-					defer newrelic.StartSegment(txn, mw.Name()).End()
-				}
-			}
-
-			job := instrument.NewJob("MiddlewareCall")
-			meta := health.Kvs{
-				"from_ip":  request.RealIP(r),
-				"method":   r.Method,
-				"endpoint": r.URL.Path,
-				"raw_url":  r.URL.String(),
-				"size":     strconv.Itoa(int(r.ContentLength)),
-				"mw_name":  mw.Name(),
-			}
-			eventName := mw.Name() + "." + "executed"
-			job.EventKv("executed", meta)
-			job.EventKv(eventName, meta)
-			startTime := time.Now()
-			mw.Logger().WithField("ts", startTime.UnixNano()).Debug("Started")
+			//if config.Global().NewRelic.AppName != "" {
+			//	if txn, ok := w.(newrelic.Transaction); ok {
+			//		defer newrelic.StartSegment(txn, mw.Name()).End()
+			//	}
+			//}
+			//
+			//job := instrument.NewJob("MiddlewareCall")
+			//meta := health.Kvs{
+			//	"from_ip":  request.RealIP(r),
+			//	"method":   r.Method,
+			//	"endpoint": r.URL.Path,
+			//	"raw_url":  r.URL.String(),
+			//	"size":     strconv.Itoa(int(r.ContentLength)),
+			//	"mw_name":  mw.Name(),
+			//}
+			//eventName := mw.Name() + "." + "executed"
+			//job.EventKv("executed", meta)
+			//job.EventKv(eventName, meta)
+			//startTime := time.Now()
+			//mw.Logger().WithField("ts", startTime.UnixNano()).Debug("Started")
 
 			if mw.Base().Spec.CORS.OptionsPassthrough && r.Method == "OPTIONS" {
 				h.ServeHTTP(w, r)
@@ -97,25 +92,25 @@ func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 				handler := ErrorHandler{*mw.Base()}
 				handler.HandleError(w, r, err.Error(), errCode)
 
-				meta["error"] = err.Error()
+				//meta["error"] = err.Error()
 
-				finishTime := time.Since(startTime)
-				job.TimingKv("exec_time", finishTime.Nanoseconds(), meta)
-				job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
+				//finishTime := time.Since(startTime)
+				//job.TimingKv("exec_time", finishTime.Nanoseconds(), meta)
+				//job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
 
-				mw.Logger().WithError(err).WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
+				//mw.Logger().WithError(err).WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
 				return
 			}
-
-			finishTime := time.Since(startTime)
-			job.TimingKv("exec_time", finishTime.Nanoseconds(), meta)
-			job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
-			mw.Logger().WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
+			//
+			//finishTime := time.Since(startTime)
+			//job.TimingKv("exec_time", finishTime.Nanoseconds(), meta)
+			//job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
+			//mw.Logger().WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
 
 			// Special code, bypasses all other execution
 			if errCode != mwStatusRespond {
 				// No error, carry on...
-				meta["bypass"] = "1"
+				//meta["bypass"] = "1"
 				h.ServeHTTP(w, r)
 			} else {
 				mw.Base().UpdateRequestSession(r)
