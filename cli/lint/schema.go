@@ -767,6 +767,9 @@ const confSchema = `{
 	},
 	"health_check_endpoint_name": {
 		"type": "string"
+	},
+	"enable_http_profiler": {
+		"type": "boolean"
 	}
 }
 }`
