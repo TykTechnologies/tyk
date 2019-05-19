@@ -52,6 +52,11 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
+const (
+	contentTypeHeader = "Content-Type"
+	contentTypeJson   = "application/json"
+)
+
 // apiModifyKeySuccess represents when a Key modification was successful
 //
 // swagger:model apiModifyKeySuccess
@@ -81,12 +86,12 @@ func apiError(msg string) apiStatusMessage {
 }
 
 func doJSONWrite(w http.ResponseWriter, code int, obj interface{}) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(contentTypeHeader, contentTypeJson)
 	w.WriteHeader(code)
 	if err := json.NewEncoder(w).Encode(obj); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	if code != http.StatusOK {
+	if code >= http.StatusBadRequest {
 		job := instrument.NewJob("SystemAPIError")
 		job.Event(strconv.Itoa(code))
 	}
@@ -762,43 +767,6 @@ func handleDeleteAPI(apiID string) (interface{}, int) {
 	}
 
 	return response, http.StatusOK
-}
-
-func apiHandler(w http.ResponseWriter, r *http.Request) {
-	apiID := mux.Vars(r)["apiID"]
-
-	var obj interface{}
-	var code int
-
-	switch r.Method {
-	case "GET":
-		if apiID != "" {
-			log.Debug("Requesting API definition for", apiID)
-			obj, code = handleGetAPI(apiID)
-		} else {
-			log.Debug("Requesting API list")
-			obj, code = handleGetAPIList()
-		}
-	case "POST":
-		log.Debug("Creating new definition file")
-		obj, code = handleAddOrUpdateApi(apiID, r)
-	case "PUT":
-		if apiID != "" {
-			log.Debug("Updating existing API: ", apiID)
-			obj, code = handleAddOrUpdateApi(apiID, r)
-		} else {
-			obj, code = apiError("Must specify an apiID to update"), http.StatusBadRequest
-		}
-	case "DELETE":
-		if apiID != "" {
-			log.Debug("Deleting API definition for: ", apiID)
-			obj, code = handleDeleteAPI(apiID)
-		} else {
-			obj, code = apiError("Must specify an apiID to delete"), http.StatusBadRequest
-		}
-	}
-
-	doJSONWrite(w, code, obj)
 }
 
 func keyHandler(w http.ResponseWriter, r *http.Request) {

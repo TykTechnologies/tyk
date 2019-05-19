@@ -394,8 +394,15 @@ func loadAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/org/keys/{keyName:[^/]*}", orgHandler).Methods("POST", "PUT", "GET", "DELETE")
 		r.HandleFunc("/keys/policy/{keyName}", policyUpdateHandler).Methods("POST")
 		r.HandleFunc("/keys/create", createKeyHandler).Methods("POST")
-		r.HandleFunc("/apis", apiHandler).Methods("GET", "POST", "PUT", "DELETE")
-		r.HandleFunc("/apis/{apiID}", apiHandler).Methods("GET", "POST", "PUT", "DELETE")
+
+		apiHandler := HandlerApi{}
+		r.HandleFunc("/apis", apiHandler.Index).Methods(http.MethodGet)
+		r.HandleFunc("/apis", apiHandler.Store).Methods(http.MethodPost)
+		r.HandleFunc("/apis/{apiID}", apiHandler.Show).Methods(http.MethodGet)
+		r.HandleFunc("/apis/{apiID}", apiHandler.Update).Methods(http.MethodPut)
+		//r.HandleFunc("/apis/{apiID}", apiHandler.Patch).Methods(http.MethodPatch) // TODO
+		r.HandleFunc("/apis/{apiID}", apiHandler.Delete).Methods(http.MethodDelete)
+
 		r.HandleFunc("/health", healthCheckhandler).Methods("GET")
 		r.HandleFunc("/oauth/clients/create", createOauthClient).Methods("POST")
 		r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", oAuthClientHandler).Methods("PUT")
