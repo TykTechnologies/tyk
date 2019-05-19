@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"io/ioutil"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -59,7 +60,16 @@ func (h HandlerApi) Update(w http.ResponseWriter, r *http.Request) {
 
 // Updates part of an API
 func (h HandlerApi) Patch(w http.ResponseWriter, r *http.Request) {
-	doJSONWrite(w, http.StatusNotImplemented, http.StatusText(http.StatusNotImplemented))
+	apiID := mux.Vars(r)["apiID"]
+
+	jsBody, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		doJSONWrite(w, http.StatusBadRequest, apiError("unable to read body"))
+		return
+	}
+
+	obj, code := handlePatchAPI(apiID, jsBody)
+	doJSONWrite(w, code, obj)
 }
 
 // Deletes an API

@@ -31,6 +31,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -45,6 +46,7 @@ import (
 	"github.com/gorilla/mux"
 	uuid "github.com/satori/go.uuid"
 	"golang.org/x/crypto/bcrypt"
+	jsonpatch "gopkg.in/evanphx/json-patch.v4"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -743,6 +745,75 @@ func handleAddOrUpdateApi(apiID string, r *http.Request) (interface{}, int) {
 		Key:    newDef.APIID,
 		Status: "ok",
 		Action: action,
+	}
+
+	return response, http.StatusOK
+}
+
+// TODO - This is WiP. Requires cleaning up & removing duplicate code from handleAddOrUpdateApi
+func handlePatchAPI(apiID string, data []byte) (interface{}, int) {
+	if config.Global().UseDBAppConfigs {
+		log.Error("Rejected new API Definition due to UseDBAppConfigs = true")
+		return apiError("Due to enabled use_db_app_configs, please use the Dashboard API"), http.StatusBadRequest
+	}
+
+	spec := getApiSpec(apiID)
+	if spec == nil {
+		return "api does not exist", http.StatusNotFound
+	}
+
+	// unmarshal the object into the file
+	apiDefBytes, err := json.Marshal(spec.APIDefinition)
+	if err != nil {
+		log.Error("Marshalling of API Definition failed: ", err)
+		return apiError("Marshalling failed"), http.StatusInternalServerError
+	}
+
+	patch, err := jsonpatch.DecodePatch(data)
+	if err != nil {
+		return apiError(fmt.Sprintf("decodePatch failed: %v", err)), http.StatusBadRequest
+	}
+
+	modified, err := patch.Apply(apiDefBytes)
+	if err != nil {
+		return apiError(fmt.Sprintf("patchApply failed: %v", err)), http.StatusBadRequest
+	}
+
+	var dest apidef.APIDefinition
+	if err := json.Unmarshal(modified, &dest); err != nil {
+		return apiError("unable to re-encode to apidef"), http.StatusInternalServerError
+	}
+
+	if apiID != dest.APIID {
+		log.Error("Patch operation on different APIIDs")
+		return apiError("Request APIID does not match that in Definition! For Updtae operations these must match."), http.StatusBadRequest
+	}
+
+	// Create a filename
+	defFilePath := filepath.Join(config.Global().AppPath, dest.APIID+".json")
+
+	// If it exists, delete it
+	if _, err := os.Stat(defFilePath); err == nil {
+		log.Warning("API Definition with this ID already exists, deleting file...")
+		os.Remove(defFilePath)
+	}
+
+	// unmarshal the object into the file
+	asByte, err := json.MarshalIndent(dest, "", "  ")
+	if err != nil {
+		log.Error("Marshalling of API Definition failed: ", err)
+		return apiError("Marshalling failed"), http.StatusInternalServerError
+	}
+
+	if err := ioutil.WriteFile(defFilePath, asByte, 0644); err != nil {
+		log.Error("Failed to create file! - ", err)
+		return apiError("File object creation failed, write error"), http.StatusInternalServerError
+	}
+
+	response := apiModifyKeySuccess{
+		Key:    dest.APIID,
+		Status: "ok",
+		Action: "patch",
 	}
 
 	return response, http.StatusOK
