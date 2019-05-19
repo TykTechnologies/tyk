@@ -15,9 +15,13 @@ func (h HandlerApi) RegisterRoutes(r *mux.Router) {
 	r.HandleFunc("/apis", h.Store).Methods(http.MethodPost)
 	r.HandleFunc("/apis/{apiID}", h.Show).Methods(http.MethodGet)
 	r.HandleFunc("/apis/{apiID}", h.Update).Methods(http.MethodPut)
-	r.HandleFunc("/apis/{apiID}", h.Patch).Methods(http.MethodPatch) // TODO
+	r.HandleFunc("/apis/{apiID}", h.Patch).Methods(http.MethodPatch)
 	r.HandleFunc("/apis/{apiID}", h.Delete).Methods(http.MethodDelete)
+
 	r.HandleFunc("/apis/{apiID}/cache", invalidateCacheHandler).Methods("DELETE")
+
+	// Deprecated: Prefer `/apis/{apiID}/cache` as is more idiomatic & restful
+	r.HandleFunc("/cache/{apiID}", invalidateCacheHandler).Methods("DELETE")
 }
 
 // Lists all APIs
