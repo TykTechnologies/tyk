@@ -983,33 +983,6 @@ func handleUpdateHashedKey(keyName, apiID, policyId string) (interface{}, int) {
 	return statusObj, http.StatusOK
 }
 
-func orgHandler(w http.ResponseWriter, r *http.Request) {
-	keyName := mux.Vars(r)["keyName"]
-	filter := r.URL.Query().Get("filter")
-	var obj interface{}
-	var code int
-
-	switch r.Method {
-	case "POST", "PUT":
-		obj, code = handleOrgAddOrUpdate(keyName, r)
-
-	case "GET":
-		if keyName != "" {
-			// Return single org detail
-			obj, code = handleGetOrgDetail(keyName)
-		} else {
-			// Return list of keys
-			obj, code = handleGetAllOrgKeys(filter)
-		}
-
-	case "DELETE":
-		// Remove a key
-		obj, code = handleDeleteOrgKey(keyName)
-	}
-
-	doJSONWrite(w, code, obj)
-}
-
 func handleOrgAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 	newSession := new(user.SessionState)
 
