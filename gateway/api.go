@@ -1825,38 +1825,6 @@ func userRatesCheck(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, http.StatusOK, returnSession)
 }
 
-func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
-	apiID := mux.Vars(r)["apiID"]
-
-	keyPrefix := "cache-" + apiID
-	matchPattern := keyPrefix + "*"
-	store := storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true}
-
-	if ok := store.DeleteScanMatch(matchPattern); !ok {
-		err := errors.New("scan/delete failed")
-		var orgid string
-		if spec := getApiSpec(apiID); spec != nil {
-			orgid = spec.OrgID
-		}
-		log.WithFields(logrus.Fields{
-			"prefix":      "api",
-			"api_id":      apiID,
-			"status":      "fail",
-			"err":         err,
-			"org_id":      orgid,
-			"user_id":     "system",
-			"user_ip":     requestIPHops(r),
-			"path":        "--",
-			"server_name": "system",
-		}).Error("Failed to delete cache: ", err)
-
-		doJSONWrite(w, http.StatusInternalServerError, apiError("Cache invalidation failed"))
-		return
-	}
-
-	doJSONWrite(w, http.StatusOK, apiOk("cache invalidated"))
-}
-
 // TODO: Don't modify http.Request values in-place. We must right now
 // because our middleware design doesn't pass around http.Request
 // pointers, so we have no way to modify the pointer in a middleware.
