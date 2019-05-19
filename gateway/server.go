@@ -396,18 +396,39 @@ func loadAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/keys/create", createKeyHandler).Methods("POST")
 
 		apiHandler := HandlerApi{}
-		r.HandleFunc("/apis", apiHandler.Index).Methods(http.MethodGet)
-		r.HandleFunc("/apis", apiHandler.Store).Methods(http.MethodPost)
-		r.HandleFunc("/apis/{apiID}", apiHandler.Show).Methods(http.MethodGet)
-		r.HandleFunc("/apis/{apiID}", apiHandler.Update).Methods(http.MethodPut)
-		//r.HandleFunc("/apis/{apiID}", apiHandler.Patch).Methods(http.MethodPatch) // TODO
-		r.HandleFunc("/apis/{apiID}", apiHandler.Delete).Methods(http.MethodDelete)
+		apiHandler.RegisterRoutes(r)
 
 		r.HandleFunc("/health", healthCheckhandler).Methods("GET")
 		r.HandleFunc("/oauth/clients/create", createOauthClient).Methods("POST")
 		r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", oAuthClientHandler).Methods("PUT")
 		r.HandleFunc("/oauth/refresh/{keyName}", invalidateOauthRefresh).Methods("DELETE")
 		r.HandleFunc("/cache/{apiID}", invalidateCacheHandler).Methods("DELETE")
+
+		// TODO - REMOVE WALK FUNCTION
+		_ = r.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
+			pathTemplate, err := route.GetPathTemplate()
+			if err == nil {
+				fmt.Println("ROUTE:", pathTemplate)
+			}
+			pathRegexp, err := route.GetPathRegexp()
+			if err == nil {
+				fmt.Println("Path regexp:", pathRegexp)
+			}
+			queriesTemplates, err := route.GetQueriesTemplates()
+			if err == nil {
+				fmt.Println("Queries templates:", strings.Join(queriesTemplates, ","))
+			}
+			queriesRegexps, err := route.GetQueriesRegexp()
+			if err == nil {
+				fmt.Println("Queries regexps:", strings.Join(queriesRegexps, ","))
+			}
+			methods, err := route.GetMethods()
+			if err == nil {
+				fmt.Println("Methods:", strings.Join(methods, ","))
+			}
+			fmt.Println()
+			return nil
+		})
 	} else {
 		mainLog.Info("Node is slaved, REST API minimised")
 	}
