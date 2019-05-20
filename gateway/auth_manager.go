@@ -245,6 +245,20 @@ func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.Sess
 
 // RemoveSession removes session from storage
 func (b *DefaultSessionManager) RemoveSession(keyName string, hashed bool) bool {
+	cacheKey := keyName
+	if !hashed {
+		cacheKey = storage.HashKey(keyName)
+	}
+
+	defer func() {
+		// Notify gateways in cluster to flush cache
+		n := Notification{
+			Command: KeySpaceUpdateNotification,
+			Payload: cacheKey,
+		}
+		MainNotifier.Notify(n)
+	}()
+
 	if hashed {
 		return b.store.DeleteRawKey(b.store.GetKeyPrefix() + keyName)
 	} else {
