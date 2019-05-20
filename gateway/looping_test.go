@@ -13,7 +13,7 @@ import (
 )
 
 func TestLooping(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	postAction := `<operation action="https://example.com/post_action">data</operation>`
@@ -270,7 +270,7 @@ func TestLooping(t *testing.T) {
 func TestConcurrencyReloads(t *testing.T) {
 	var wg sync.WaitGroup
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	BuildAndLoadAPI()

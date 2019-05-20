@@ -20,7 +20,7 @@ import (
 
 func TestMurmur3CharBug(t *testing.T) {
 	defer resetTestConfig()
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	api := BuildAPI(func(spec *APISpec) {
@@ -105,7 +105,7 @@ func TestMurmur3CharBug(t *testing.T) {
 
 func TestSignatureValidation(t *testing.T) {
 	defer resetTestConfig()
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	api := BuildAPI(func(spec *APISpec) {

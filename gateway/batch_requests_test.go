@@ -24,7 +24,7 @@ const testBatchRequest = `{
 			"test-header-1": "test-1",
 			"test-header-2": "test-2"
 		},
-		"relative_url": "get/?param1=this"
+		"relative_url": "get/?param1=this"te
 	},
 	{
 		"method": "POST",
@@ -40,7 +40,7 @@ const testBatchRequest = `{
 }`
 
 func TestBatch(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	BuildAndLoadAPI(func(spec *APISpec) {
@@ -146,7 +146,7 @@ func TestVirtualEndpointBatch(t *testing.T) {
 
 	defer resetTestConfig()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	BuildAndLoadAPI(func(spec *APISpec) {

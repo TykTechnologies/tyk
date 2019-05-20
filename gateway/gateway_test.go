@@ -57,7 +57,7 @@ func createNonThrottledSession() *user.SessionState {
 }
 
 func TestAA(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 
 	ts.Start()
 	defer ts.Close()
@@ -124,7 +124,7 @@ func testReq(t testing.TB, method, urlStr string, body interface{}) *http.Reques
 }
 
 func TestParambasedAuth(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	BuildAndLoadAPI(func(spec *APISpec) {
@@ -157,7 +157,7 @@ func TestParambasedAuth(t *testing.T) {
 }
 
 func TestStripPathWithURLRewrite(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 	defer resetTestConfig()
 
@@ -188,7 +188,7 @@ func TestStripPathWithURLRewrite(t *testing.T) {
 }
 
 func TestSkipTargetPassEscapingOff(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 	defer resetTestConfig()
 
@@ -305,7 +305,7 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 	testServerRouter.SkipClean(true)
 	defer testServerRouter.SkipClean(prevSkipClean)
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	t.Run("With escaping, default", func(t *testing.T) {
@@ -411,7 +411,7 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 }
 
 func TestQuota(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	var keyID string
@@ -494,7 +494,7 @@ func TestQuota(t *testing.T) {
 }
 
 func TestAnalytics(t *testing.T) {
-	ts := StartMock(MockConfig{
+	ts := StartTest(TestConfig{
 		delay: 20 * time.Millisecond,
 	})
 	defer ts.Close()
@@ -654,12 +654,12 @@ func TestAnalytics(t *testing.T) {
 
 func TestListener(t *testing.T) {
 	// Trick to get spec JSON, without loading API
-	// Specs will be reseted when we do `StartMock`
+	// Specs will be reseted when we do `StartTest`
 	specs := BuildAndLoadAPI()
 	specJSON, _ := json.Marshal(specs[0].APIDefinition)
 	listJSON := fmt.Sprintf("[%s]", string(specJSON))
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	tests := []test.TestCase{
@@ -699,7 +699,7 @@ func TestListener(t *testing.T) {
 
 // Admin api located on separate port
 func TestControlListener(t *testing.T) {
-	ts := StartMock(MockConfig{
+	ts := StartTest(TestConfig{
 		sepatateControlAPI: true,
 	})
 	defer ts.Close()
@@ -723,7 +723,7 @@ func TestHttpPprof(t *testing.T) {
 	old := cli.HTTPProfile
 	defer func() { cli.HTTPProfile = old }()
 
-	ts := StartMock(MockConfig{
+	ts := StartTest(TestConfig{
 		sepatateControlAPI: true,
 	})
 
@@ -767,7 +767,7 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 }
 
 func TestListenPathTykPrefix(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	BuildAndLoadAPI(func(spec *APISpec) {
@@ -781,7 +781,7 @@ func TestListenPathTykPrefix(t *testing.T) {
 }
 
 func TestReloadGoroutineLeakWithAsyncWrites(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	globalConf := config.Global()
@@ -808,7 +808,7 @@ func TestReloadGoroutineLeakWithAsyncWrites(t *testing.T) {
 }
 
 func TestReloadGoroutineLeakWithCircuitBreaker(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	globalConf := config.Global()
@@ -847,7 +847,7 @@ func TestReloadGoroutineLeakWithCircuitBreaker(t *testing.T) {
 }
 
 func TestProxyUserAgent(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	BuildAndLoadAPI(func(spec *APISpec) {
@@ -873,7 +873,7 @@ func TestSkipUrlCleaning(t *testing.T) {
 	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -892,7 +892,7 @@ func TestSkipUrlCleaning(t *testing.T) {
 }
 
 func TestMultiTargetProxy(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	BuildAndLoadAPI(func(spec *APISpec) {
@@ -951,7 +951,7 @@ func TestCustomDomain(t *testing.T) {
 }
 
 func TestHelloHealthcheck(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	t.Run("Without APIs", func(t *testing.T) {
@@ -973,7 +973,7 @@ func TestHelloHealthcheck(t *testing.T) {
 }
 
 func TestCacheAllSafeRequests(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-"}
 	defer cache.DeleteScanMatch("*")
@@ -999,7 +999,7 @@ func TestCacheAllSafeRequests(t *testing.T) {
 }
 
 func TestCachePostRequest(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-"}
 	defer cache.DeleteScanMatch("*")
@@ -1036,7 +1036,7 @@ func TestCachePostRequest(t *testing.T) {
 }
 
 func TestCacheEtag(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-"}
 	defer cache.DeleteScanMatch("*")
@@ -1075,7 +1075,7 @@ func TestWebsocketsUpstreamUpgradeRequest(t *testing.T) {
 	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	BuildAndLoadAPI(func(spec *APISpec) {
@@ -1100,7 +1100,7 @@ func TestWebsocketsSeveralOpenClose(t *testing.T) {
 	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	BuildAndLoadAPI(func(spec *APISpec) {
@@ -1198,7 +1198,7 @@ func TestWebsocketsAndHTTPEndpointMatch(t *testing.T) {
 	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	BuildAndLoadAPI(func(spec *APISpec) {
@@ -1327,7 +1327,7 @@ func createTestUptream(t *testing.T, allowedConns int, readsPerConn int) net.Lis
 }
 
 func TestKeepAliveConns(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 	defer resetTestConfig()
 
@@ -1414,7 +1414,7 @@ func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
 
 	defer resetTestConfig()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	BuildAndLoadAPI(func(spec *APISpec) {
@@ -1450,7 +1450,7 @@ func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
 }
 
 func TestTracing(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	prepareStorage()
@@ -1473,7 +1473,7 @@ func TestTracing(t *testing.T) {
 }
 
 func TestBrokenClients(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 	defer resetTestConfig()
 

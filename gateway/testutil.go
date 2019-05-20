@@ -272,7 +272,7 @@ func testHttpHandler() *mux.Router {
 			return
 		}
 		r.URL.Opaque = r.URL.RawPath
-		w.Header().Set("X-Tyk-Mock", "1")
+		w.Header().Set("X-Tyk-Test", "1")
 		body, _ := ioutil.ReadAll(r.Body)
 
 		err := json.NewEncoder(w).Encode(testHttpResponse{
@@ -435,7 +435,7 @@ func firstVals(vals map[string][]string) map[string]string {
 	return m
 }
 
-type MockConfig struct {
+type TestConfig struct {
 	sepatateControlAPI bool
 	delay              time.Duration
 	hotReload          bool
@@ -443,17 +443,17 @@ type MockConfig struct {
 	coprocessConfig    config.CoProcessConfig
 }
 
-type Mock struct {
+type Test struct {
 	ln  net.Listener
 	cln net.Listener
 	URL string
 
 	testRunner   *test.HTTPTestRunner
 	GlobalConfig config.Config
-	config       MockConfig
+	config       TestConfig
 }
 
-func (s *Mock) Start() {
+func (s *Test) Start() {
 	s.ln, _ = generateListener(0)
 	_, port, _ := net.SplitHostPort(s.ln.Addr().String())
 	globalConf := config.Global()
@@ -522,12 +522,12 @@ func (s *Mock) Start() {
 	}
 }
 
-func (s *Mock) Do(tc test.TestCase) (*http.Response, error) {
+func (s *Test) Do(tc test.TestCase) (*http.Response, error) {
 	req, _ := s.testRunner.RequestBuilder(&tc)
 	return s.testRunner.Do(req, &tc)
 }
 
-func (s *Mock) Close() {
+func (s *Test) Close() {
 	s.ln.Close()
 
 	if s.config.sepatateControlAPI {
@@ -538,11 +538,11 @@ func (s *Mock) Close() {
 	}
 }
 
-func (s *Mock) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, error) {
+func (s *Test) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, error) {
 	return s.testRunner.Run(t, testCases...)
 }
 
-func (s *Mock) RunExt(t testing.TB, testCases ...test.TestCase) {
+func (s *Test) RunExt(t testing.TB, testCases ...test.TestCase) {
 	var testMatrix = []struct {
 		goagain          bool
 		overrideDefaults bool
@@ -569,7 +569,7 @@ func (s *Mock) RunExt(t testing.TB, testCases ...test.TestCase) {
 	}
 }
 
-func (s *Mock) createSession(sGen ...func(s *user.SessionState)) string {
+func (s *Test) createSession(sGen ...func(s *user.SessionState)) string {
 	session := CreateStandardSession()
 	if len(sGen) > 0 {
 		sGen[0](session)
@@ -597,14 +597,14 @@ func (s *Mock) createSession(sGen ...func(s *user.SessionState)) string {
 	return respJSON.Key
 }
 
-func StartMock(config ...MockConfig) Mock {
-	m := Mock{}
+func StartTest(config ...TestConfig) Test {
+	t := Test{}
 	if len(config) > 0 {
-		m.config = config[0]
+		t.config = config[0]
 	}
-	m.Start()
+	t.Start()
 
-	return m
+	return t
 }
 
 const sampleAPI = `{

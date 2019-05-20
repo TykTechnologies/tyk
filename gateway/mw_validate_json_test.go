@@ -45,7 +45,7 @@ func testPrepareValidateJSONSchema() {
 }
 
 func TestValidateJSONSchema(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	testPrepareValidateJSONSchema()
@@ -62,7 +62,7 @@ func TestValidateJSONSchema(t *testing.T) {
 func BenchmarkValidateJSONSchema(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	testPrepareValidateJSONSchema()

@@ -351,7 +351,7 @@ leakMid.NewProcessRequest(function(request, session) {
 }
 
 func TestTykMakeHTTPRequest(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	bundle := registerBundle("jsvm_make_http_request", map[string]string{
@@ -444,7 +444,7 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 		testServerRouter.SkipClean(true)
 		defer testServerRouter.SkipClean(prevSkipClean)
 
-		ts := StartMock()
+		ts := StartTest()
 		defer ts.Close()
 		defer resetTestConfig()
 

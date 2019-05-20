@@ -18,21 +18,21 @@ func testPrepareResponseHeaderInjection() {
 			v.UseExtendedPaths = true
 			json.Unmarshal([]byte(`[
 				{
-					"delete_headers": ["X-Tyk-Mock"],
+					"delete_headers": ["X-Tyk-Test"],
 					"add_headers": {"X-Test": "test"},
 					"path": "/test-with-slash",
 					"method": "GET",
 					"act_on": false
 				},
 				{
-					"delete_headers": ["X-Tyk-Mock"],
+					"delete_headers": ["X-Tyk-Test"],
 					"add_headers": {"X-Test": "test"},
 					"path": "test-no-slash",
 					"method": "GET",
 					"act_on": false
 				},
 				{
-					"delete_headers": ["X-Tyk-Mock"],
+					"delete_headers": ["X-Tyk-Test"],
 					"add_headers": {"X-Test": "test"},
 					"path": "/rewrite-test",
 					"method": "GET",
@@ -61,13 +61,13 @@ func testPrepareResponseHeaderInjection() {
 }
 
 func TestResponseHeaderInjection(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	testPrepareResponseHeaderInjection()
 
 	addHeaders := map[string]string{"X-Test": "test"}
-	deleteHeaders := map[string]string{"X-Tyk-Mock": "1"}
+	deleteHeaders := map[string]string{"X-Tyk-Test": "1"}
 	userAgent := fmt.Sprintf("\"User-Agent\":\"Tyk/%v\"", VERSION)
 
 	ts.Run(t, []test.TestCase{
@@ -83,13 +83,13 @@ func TestResponseHeaderInjection(t *testing.T) {
 func BenchmarkResponseHeaderInjection(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	testPrepareResponseHeaderInjection()
 
 	addHeaders := map[string]string{"X-Test": "test"}
-	deleteHeaders := map[string]string{"X-Tyk-Mock": "1"}
+	deleteHeaders := map[string]string{"X-Tyk-Test": "1"}
 	userAgent := fmt.Sprintf("\"User-Agent\":\"Tyk/%v\"", VERSION)
 
 	for i := 0; i < b.N; i++ {

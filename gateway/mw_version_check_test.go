@@ -76,7 +76,7 @@ func testPrepareVersioning() (string, string) {
 }
 
 func TestVersioning(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	keyWrongVersion, keyKnownVersion := testPrepareVersioning()
@@ -119,7 +119,7 @@ func TestVersioning(t *testing.T) {
 func BenchmarkVersioning(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	keyWrongVersion, keyKnownVersion := testPrepareVersioning()

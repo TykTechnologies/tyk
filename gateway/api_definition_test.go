@@ -27,7 +27,7 @@ func createDefinitionFromString(defStr string) *APISpec {
 }
 
 func TestURLRewrites(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	t.Run("Extended Paths with url_rewrites", func(t *testing.T) {
@@ -81,7 +81,7 @@ func TestURLRewrites(t *testing.T) {
 }
 
 func TestWhitelist(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	t.Run("Extended Paths", func(t *testing.T) {
@@ -162,7 +162,7 @@ func TestWhitelist(t *testing.T) {
 }
 
 func TestBlacklist(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	t.Run("Extended Paths", func(t *testing.T) {
@@ -215,7 +215,7 @@ func TestBlacklist(t *testing.T) {
 }
 
 func TestConflictingPaths(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	BuildAndLoadAPI(func(spec *APISpec) {
@@ -243,7 +243,7 @@ func TestConflictingPaths(t *testing.T) {
 }
 
 func TestIgnored(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	t.Run("Extended Paths", func(t *testing.T) {
@@ -300,7 +300,7 @@ func TestIgnored(t *testing.T) {
 }
 
 func TestWhitelistMethodWithAdditionalMiddleware(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	t.Run("Extended Paths", func(t *testing.T) {
@@ -342,7 +342,7 @@ func TestWhitelistMethodWithAdditionalMiddleware(t *testing.T) {
 }
 
 func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
-	// Mock Dashboard
+	// Test Dashboard
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/system/apis" {
 			w.Write([]byte(`{"Status": "OK", "Nonce": "1", "Message": [{"api_definition": {}}]}`))
@@ -453,7 +453,7 @@ func (ln *customListener) Close() error {
 }
 
 func TestDefaultVersion(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	key := testPrepareDefaultVersion()
@@ -471,7 +471,7 @@ func TestDefaultVersion(t *testing.T) {
 func BenchmarkDefaultVersion(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	key := testPrepareDefaultVersion()
@@ -520,7 +520,7 @@ func testPrepareDefaultVersion() string {
 }
 
 func TestGetVersionFromRequest(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	versionInfo := apidef.VersionInfo{}
@@ -576,7 +576,7 @@ func TestGetVersionFromRequest(t *testing.T) {
 
 func BenchmarkGetVersionFromRequest(b *testing.B) {
 	b.ReportAllocs()
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	versionInfo := apidef.VersionInfo{}
@@ -640,7 +640,7 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 }
 
 func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
-	// Mock Dashboard
+	// Test Dashboard
 	callNum := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/system/apis" {

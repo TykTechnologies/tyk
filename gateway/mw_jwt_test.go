@@ -128,7 +128,7 @@ func prepareGenericJWTSession(testName string, method string, claimName string, 
 }
 
 func TestJWTSessionHMAC(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	//If we skip the check then the Id will be taken from SUB and the call will succeed
@@ -146,7 +146,7 @@ func TestJWTSessionHMAC(t *testing.T) {
 func BenchmarkJWTSessionHMAC(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	//If we skip the check then the Id will be taken from SUB and the call will succeed
@@ -163,7 +163,7 @@ func BenchmarkJWTSessionHMAC(b *testing.B) {
 
 func TestJWTHMACIdInSubClaim(t *testing.T) {
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	//Same as above
@@ -200,7 +200,7 @@ func TestJWTHMACIdInSubClaim(t *testing.T) {
 }
 
 func TestJWTRSAIdInSubClaim(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	_, jwtToken := prepareGenericJWTSession(t.Name(), RSASign, SUB, true)
@@ -231,7 +231,7 @@ func TestJWTRSAIdInSubClaim(t *testing.T) {
 }
 
 func TestJWTSessionRSA(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	//default values, keep backward compatibility
@@ -247,7 +247,7 @@ func TestJWTSessionRSA(t *testing.T) {
 func BenchmarkJWTSessionRSA(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	//default values, keep backward compatibility
@@ -262,7 +262,7 @@ func BenchmarkJWTSessionRSA(b *testing.B) {
 }
 
 func TestJWTSessionFailRSA_EmptyJWT(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	//default values, same as before (keeps backward compatibility)
@@ -277,7 +277,7 @@ func TestJWTSessionFailRSA_EmptyJWT(t *testing.T) {
 }
 
 func TestJWTSessionFailRSA_NoAuthHeader(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	//default values, same as before (keeps backward compatibility)
@@ -292,7 +292,7 @@ func TestJWTSessionFailRSA_NoAuthHeader(t *testing.T) {
 }
 
 func TestJWTSessionFailRSA_MalformedJWT(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	//default values, same as before (keeps backward compatibility)
@@ -309,7 +309,7 @@ func TestJWTSessionFailRSA_MalformedJWT(t *testing.T) {
 }
 
 func TestJWTSessionFailRSA_MalformedJWT_NOTRACK(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	//default values, same as before (keeps backward compatibility)
@@ -327,7 +327,7 @@ func TestJWTSessionFailRSA_MalformedJWT_NOTRACK(t *testing.T) {
 }
 
 func TestJWTSessionFailRSA_WrongJWT(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	//default values, same as before (keeps backward compatibility)
@@ -344,7 +344,7 @@ func TestJWTSessionFailRSA_WrongJWT(t *testing.T) {
 }
 
 func TestJWTSessionRSABearer(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	//default values, same as before (keeps backward compatibility)
@@ -361,7 +361,7 @@ func TestJWTSessionRSABearer(t *testing.T) {
 func BenchmarkJWTSessionRSABearer(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	//default values, same as before (keeps backward compatibility)
@@ -376,7 +376,7 @@ func BenchmarkJWTSessionRSABearer(b *testing.B) {
 }
 
 func TestJWTSessionRSABearerInvalid(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	//default values, same as before (keeps backward compatibility)
@@ -393,7 +393,7 @@ func TestJWTSessionRSABearerInvalid(t *testing.T) {
 }
 
 func TestJWTSessionRSABearerInvalidTwoBears(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	//default values, same as before (keeps backward compatibility)
@@ -464,7 +464,7 @@ func prepareJWTSessionRSAWithRawSourceOnWithClientID(isBench bool) string {
 }
 
 func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	jwtToken := prepareJWTSessionRSAWithRawSourceOnWithClientID(false)
@@ -480,7 +480,7 @@ func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
 func BenchmarkJWTSessionRSAWithRawSourceOnWithClientID(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	jwtToken := prepareJWTSessionRSAWithRawSourceOnWithClientID(true)
@@ -520,7 +520,7 @@ func prepareJWTSessionRSAWithRawSource() string {
 }
 
 func TestJWTSessionRSAWithRawSource(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	jwtToken := prepareJWTSessionRSAWithRawSource()
@@ -536,7 +536,7 @@ func TestJWTSessionRSAWithRawSource(t *testing.T) {
 func BenchmarkJWTSessionRSAWithRawSource(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	jwtToken := prepareJWTSessionRSAWithRawSource()
@@ -555,7 +555,7 @@ func BenchmarkJWTSessionRSAWithRawSource(b *testing.B) {
 }
 
 func TestJWTSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	spec := BuildAPI(func(spec *APISpec) {
@@ -591,7 +591,7 @@ func TestJWTSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 }
 
 func TestJWTSessionExpiresAtValidationConfigs(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	pID := CreatePolicy()
@@ -666,7 +666,7 @@ func TestJWTSessionExpiresAtValidationConfigs(t *testing.T) {
 }
 
 func TestJWTSessionIssueAtValidationConfigs(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	pID := CreatePolicy()
@@ -755,7 +755,7 @@ func TestJWTSessionIssueAtValidationConfigs(t *testing.T) {
 }
 
 func TestJWTSessionNotBeforeValidationConfigs(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	pID := CreatePolicy()
@@ -823,7 +823,7 @@ func TestJWTSessionNotBeforeValidationConfigs(t *testing.T) {
 }
 
 func TestJWTExistingSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	spec := BuildAPI(func(spec *APISpec) {
@@ -875,7 +875,7 @@ func TestJWTExistingSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 }
 
 func TestJWTScopeToPolicyMapping(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	basePolicyID := CreatePolicy(func(p *user.Policy) {
@@ -1065,7 +1065,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 }
 
 func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	spec := BuildAPI(func(spec *APISpec) {
@@ -1168,7 +1168,7 @@ func prepareJWTSessionRSAWithJWK() string {
 }
 
 func TestJWTSessionRSAWithJWK(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	jwtToken := prepareJWTSessionRSAWithJWK()
@@ -1184,7 +1184,7 @@ func TestJWTSessionRSAWithJWK(t *testing.T) {
 func BenchmarkJWTSessionRSAWithJWK(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	jwtToken := prepareJWTSessionRSAWithJWK()
@@ -1227,7 +1227,7 @@ func prepareJWTSessionRSAWithEncodedJWK() (*APISpec, string) {
 }
 
 func TestJWTSessionRSAWithEncodedJWK(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	spec, jwtToken := prepareJWTSessionRSAWithEncodedJWK()
@@ -1256,7 +1256,7 @@ func TestJWTSessionRSAWithEncodedJWK(t *testing.T) {
 func BenchmarkJWTSessionRSAWithEncodedJWK(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	spec, jwtToken := prepareJWTSessionRSAWithEncodedJWK()
@@ -1278,7 +1278,7 @@ func BenchmarkJWTSessionRSAWithEncodedJWK(b *testing.B) {
 }
 
 func TestJWTHMACIdNewClaim(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	//If we skip the check then the Id will be taken from SUB and the call will succeed
@@ -1293,7 +1293,7 @@ func TestJWTHMACIdNewClaim(t *testing.T) {
 }
 
 func TestJWTRSAIdInClaimsWithBaseField(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	BuildAndLoadAPI(func(spec *APISpec) {
@@ -1390,7 +1390,7 @@ func TestJWTRSAIdInClaimsWithBaseField(t *testing.T) {
 }
 
 func TestJWTRSAIdInClaimsWithoutBaseField(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	BuildAndLoadAPI(func(spec *APISpec) {
@@ -1438,7 +1438,7 @@ func TestJWTRSAIdInClaimsWithoutBaseField(t *testing.T) {
 }
 
 func TestJWTECDSASign(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	//If we skip the check then the Id will be taken from SUB and the call will succeed
@@ -1453,7 +1453,7 @@ func TestJWTECDSASign(t *testing.T) {
 }
 
 func TestJWTUnknownSign(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	//If we skip the check then the Id will be taken from SUB and the call will succeed
@@ -1468,7 +1468,7 @@ func TestJWTUnknownSign(t *testing.T) {
 }
 
 func TestJWTRSAInvalidPublickKey(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	BuildAndLoadAPI(func(spec *APISpec) {
@@ -1517,7 +1517,7 @@ func createExpiringPolicy(pGen ...func(p *user.Policy)) string {
 }
 
 func TestJWTExpOverridesToken(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 	//create policy which sets keys to have expiry in one second
 	pID := createExpiringPolicy()

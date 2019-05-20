@@ -25,7 +25,7 @@ func testPrepareJQMiddleware() {
 }
 
 func TestJQMiddleware(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	testPrepareJQMiddleware()
@@ -43,7 +43,7 @@ func TestJQMiddleware(t *testing.T) {
 func BenchmarkJQMiddleware(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	testPrepareJQMiddleware()

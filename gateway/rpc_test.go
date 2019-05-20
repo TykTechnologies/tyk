@@ -117,7 +117,7 @@ const apiDefListTest2 = `[{
 }]`
 
 func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
-	// Mock RPC
+	// Test RPC
 	callCount := 0
 	dispatcher := gorpc.NewDispatcher()
 	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *DefRequest) (string, error) {
@@ -178,7 +178,7 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 
 // Our RPC layer too racy, but not harmul, mostly global variables like RPCIsClientConnected
 func TestSyncAPISpecsRPCFailure(t *testing.T) {
-	// Mock RPC
+	// Test RPC
 	dispatcher := gorpc.NewDispatcher()
 	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *DefRequest) (string, error) {
 		return "malformed json", nil
@@ -197,7 +197,7 @@ func TestSyncAPISpecsRPCFailure(t *testing.T) {
 }
 
 func TestSyncAPISpecsRPCSuccess(t *testing.T) {
-	// Mock RPC
+	// Test RPC
 	dispatcher := gorpc.NewDispatcher()
 	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *DefRequest) (string, error) {
 		return jsonMarshalString(BuildAPI(func(spec *APISpec) {
@@ -217,7 +217,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 	t.Run("RPC is live", func(t *testing.T) {
 		rpc := startRPCMock(dispatcher)
 		defer stopRPCMock(rpc)
-		ts := StartMock()
+		ts := StartTest()
 		defer ts.Close()
 
 		apiBackup, _ := LoadDefinitionsFromRPCBackup()
@@ -252,7 +252,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		config.SetGlobal(globalConf)
 
 		// RPC layer is down
-		ts := StartMock()
+		ts := StartTest()
 		defer ts.Close()
 
 		// Wait for backup to load
@@ -296,7 +296,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		// Back to live
 		rpc := startRPCMock(dispatcher)
 		defer stopRPCMock(rpc)
-		ts := StartMock()
+		ts := StartTest()
 		defer ts.Close()
 
 		time.Sleep(100 * time.Millisecond)
@@ -319,7 +319,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 
 	t.Run("RPC is back, live reload", func(t *testing.T) {
 		rpc := startRPCMock(dispatcher)
-		ts := StartMock()
+		ts := StartTest()
 		defer ts.Close()
 
 		time.Sleep(100 * time.Millisecond)

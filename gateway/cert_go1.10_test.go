@@ -44,7 +44,7 @@ func TestPublicKeyPinning(t *testing.T) {
 		config.SetGlobal(globalConf)
 		defer resetTestConfig()
 
-		ts := StartMock()
+		ts := StartTest()
 		defer ts.Close()
 
 		BuildAndLoadAPI(func(spec *APISpec) {
@@ -57,7 +57,7 @@ func TestPublicKeyPinning(t *testing.T) {
 	})
 
 	t.Run("Pub key not match", func(t *testing.T) {
-		ts := StartMock()
+		ts := StartTest()
 		defer ts.Close()
 
 		BuildAndLoadAPI(func(spec *APISpec) {
@@ -75,7 +75,7 @@ func TestPublicKeyPinning(t *testing.T) {
 		config.SetGlobal(globalConf)
 		defer resetTestConfig()
 
-		ts := StartMock()
+		ts := StartTest()
 		defer ts.Close()
 
 		BuildAndLoadAPI(func(spec *APISpec) {
@@ -99,7 +99,7 @@ func TestPublicKeyPinning(t *testing.T) {
 
 		defer proxy.Stop()
 
-		ts := StartMock()
+		ts := StartTest()
 		defer ts.Close()
 
 		BuildAndLoadAPI(func(spec *APISpec) {
@@ -126,7 +126,7 @@ func TestProxyTransport(t *testing.T) {
 	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	//matching ciphers

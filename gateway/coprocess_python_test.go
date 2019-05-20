@@ -131,7 +131,7 @@ def MyPreHook(request, session, metadata, spec):
 }
 
 func TestPythonBundles(t *testing.T) {
-	ts := StartMock(MockConfig{
+	ts := StartTest(TestConfig{
 		coprocessConfig: config.CoProcessConfig{
 			EnableCoProcess: true,
 		}})

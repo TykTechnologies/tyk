@@ -204,7 +204,7 @@ func loadTestGRPCAPIs() {
 	})
 }
 
-func startTykWithGRPC() (*Mock, *grpc.Server) {
+func startTykWithGRPC() (*Test, *grpc.Server) {
 	// Setup the gRPC server:
 	listener, _ := net.Listen("tcp", grpcListenAddr)
 	grpcServer := newTestGRPCServer()
@@ -215,7 +215,7 @@ func startTykWithGRPC() (*Mock, *grpc.Server) {
 		EnableCoProcess:     true,
 		CoProcessGRPCServer: grpcListenPath,
 	}
-	ts := StartMock(MockConfig{coprocessConfig: cfg})
+	ts := StartTest(TestConfig{coprocessConfig: cfg})
 
 	// Load test APIs:
 	loadTestGRPCAPIs()

@@ -56,7 +56,7 @@ func TestHealthCheckEndpoint(t *testing.T) {
 	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	BuildAndLoadAPI()
@@ -130,7 +130,7 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 }
 
 func TestKeyHandler(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	BuildAndLoadAPI(func(spec *APISpec) {
@@ -315,7 +315,7 @@ func TestHashKeyHandlerLegacyWithHashFunc(t *testing.T) {
 	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	// create session with legacy key format
@@ -359,7 +359,7 @@ func TestHashKeyHandlerLegacyWithHashFunc(t *testing.T) {
 }
 
 func testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	BuildAndLoadAPI()
@@ -485,7 +485,7 @@ func testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 }
 
 func testHashFuncAndBAHelper(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	session := testPrepareBasicAuth(false)
@@ -524,7 +524,7 @@ func TestHashKeyListingDisabled(t *testing.T) {
 
 	defer resetTestConfig()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	BuildAndLoadAPI()
@@ -642,7 +642,7 @@ func TestHashKeyHandlerHashingDisabled(t *testing.T) {
 
 	defer resetTestConfig()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	BuildAndLoadAPI()
@@ -722,7 +722,7 @@ func TestHashKeyHandlerHashingDisabled(t *testing.T) {
 }
 
 func TestInvalidateCache(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	BuildAndLoadAPI()
@@ -734,7 +734,7 @@ func TestInvalidateCache(t *testing.T) {
 }
 
 func TestGetOAuthClients(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	BuildAndLoadAPI(func(spec *APISpec) {
@@ -758,7 +758,7 @@ func TestGetOAuthClients(t *testing.T) {
 }
 
 func TestCreateOAuthClient(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	BuildAndLoadAPI(
@@ -1051,7 +1051,7 @@ func TestApiLoaderLongestPathFirst(t *testing.T) {
 		})[0])
 	}
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 	LoadAPI(apis...)
 

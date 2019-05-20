@@ -108,7 +108,7 @@ func TestGatewayTLS(t *testing.T) {
 		config.SetGlobal(globalConf)
 		defer resetTestConfig()
 
-		ts := StartMock()
+		ts := StartTest()
 		defer ts.Close()
 
 		BuildAndLoadAPI(func(spec *APISpec) {
@@ -135,7 +135,7 @@ func TestGatewayTLS(t *testing.T) {
 		config.SetGlobal(globalConf)
 		defer resetTestConfig()
 
-		ts := StartMock()
+		ts := StartTest()
 		defer ts.Close()
 
 		BuildAndLoadAPI(func(spec *APISpec) {
@@ -157,7 +157,7 @@ func TestGatewayTLS(t *testing.T) {
 		config.SetGlobal(globalConf)
 		defer resetTestConfig()
 
-		ts := StartMock()
+		ts := StartTest()
 		defer ts.Close()
 
 		BuildAndLoadAPI(func(spec *APISpec) {
@@ -182,7 +182,7 @@ func TestGatewayTLS(t *testing.T) {
 		config.SetGlobal(globalConf)
 		defer resetTestConfig()
 
-		ts := StartMock()
+		ts := StartTest()
 		defer ts.Close()
 
 		BuildAndLoadAPI(func(spec *APISpec) {
@@ -226,7 +226,7 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
 		config.SetGlobal(globalConf)
 
-		ts := StartMock()
+		ts := StartTest()
 		defer ts.Close()
 
 		defer func() {
@@ -277,7 +277,7 @@ func TestAPIMutualTLS(t *testing.T) {
 	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	// Initialize client certificates
@@ -459,7 +459,7 @@ func TestUpstreamMutualTLS(t *testing.T) {
 		config.SetGlobal(globalConf)
 		defer resetTestConfig()
 
-		ts := StartMock()
+		ts := StartTest()
 		defer ts.Close()
 
 		clientCertID, _ := CertificateManager.Add(combinedClientPEM, "")
@@ -494,7 +494,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	BuildAndLoadAPI(func(spec *APISpec) {
@@ -533,7 +533,7 @@ func TestAPICertificate(t *testing.T) {
 	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{
@@ -567,7 +567,7 @@ func TestCertificateHandlerTLS(t *testing.T) {
 	clientPEM, _, _, clientCert := genCertificate(&x509.Certificate{})
 	clientCertID := certs.HexSHA256(clientCert.Certificate[0])
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	t.Run("List certificates, empty", func(t *testing.T) {
@@ -628,7 +628,7 @@ func TestCipherSuites(t *testing.T) {
 	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	BuildAndLoadAPI(func(spec *APISpec) {
@@ -692,7 +692,7 @@ func TestHTTP2(t *testing.T) {
 	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	BuildAndLoadAPI(func(spec *APISpec) {
@@ -737,7 +737,7 @@ func TestGRPC(t *testing.T) {
 	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	BuildAndLoadAPI(func(spec *APISpec) {

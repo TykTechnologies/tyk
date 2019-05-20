@@ -32,7 +32,7 @@ func testPrepareContextVarsMiddleware() {
 }
 
 func TestContextVarsMiddleware(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	testPrepareContextVarsMiddleware()
@@ -48,7 +48,7 @@ func TestContextVarsMiddleware(t *testing.T) {
 func BenchmarkContextVarsMiddleware(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	testPrepareContextVarsMiddleware()

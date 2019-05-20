@@ -58,7 +58,7 @@ func testPrepareVirtualEndpoint(js string, method string, path string, proxyOnEr
 }
 
 func TestVirtualEndpoint(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt", true)
@@ -75,7 +75,7 @@ func TestVirtualEndpoint(t *testing.T) {
 }
 
 func TestVirtualEndpoint500(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	testPrepareVirtualEndpoint("abc", "GET", "/abc", false)
@@ -89,7 +89,7 @@ func TestVirtualEndpoint500(t *testing.T) {
 func BenchmarkVirtualEndpoint(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt", true)

@@ -38,7 +38,7 @@ func testPrepareBasicAuth(cacheDisabled bool) *user.SessionState {
 }
 
 func TestBasicAuth(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	session := testPrepareBasicAuth(false)
@@ -60,7 +60,7 @@ func TestBasicAuth(t *testing.T) {
 }
 
 func TestBasicAuthFromBody(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	session := CreateStandardSession()
@@ -105,7 +105,7 @@ func TestBasicAuthLegacyWithHashFunc(t *testing.T) {
 	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	// create session with legacy key format
@@ -136,7 +136,7 @@ func TestBasicAuthCachedUserCollision(t *testing.T) {
 	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	session := testPrepareBasicAuth(false)
@@ -168,7 +168,7 @@ func TestBasicAuthCachedUserCollision(t *testing.T) {
 }
 
 func TestBasicAuthCachedPasswordCollision(t *testing.T) {
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	for _, useCache := range []bool{true, false} {
@@ -206,7 +206,7 @@ func TestBasicAuthCachedPasswordCollision(t *testing.T) {
 func BenchmarkBasicAuth(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	session := testPrepareBasicAuth(false)
@@ -239,7 +239,7 @@ func BenchmarkBasicAuth(b *testing.B) {
 func BenchmarkBasicAuth_CacheEnabled(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	session := testPrepareBasicAuth(false)
@@ -265,7 +265,7 @@ func BenchmarkBasicAuth_CacheEnabled(b *testing.B) {
 func BenchmarkBasicAuth_CacheDisabled(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := StartMock()
+	ts := StartTest()
 	defer ts.Close()
 
 	session := testPrepareBasicAuth(true)

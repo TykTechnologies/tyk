@@ -96,7 +96,7 @@ func requestThrottlingTest(limiter string, testLevel string) func(t *testing.T) 
 	return func(t *testing.T) {
 		defer resetTestConfig()
 
-		ts := StartMock()
+		ts := StartTest()
 		defer ts.Close()
 
 		globalCfg := config.Global()
