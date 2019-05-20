@@ -1789,25 +1789,6 @@ func getOauthClients(apiID string) (interface{}, int) {
 	return clients, http.StatusOK
 }
 
-func healthCheckhandler(w http.ResponseWriter, r *http.Request) {
-	if !config.Global().HealthCheck.EnableHealthChecks {
-		doJSONWrite(w, http.StatusBadRequest, apiError("Health checks are not enabled for this node"))
-		return
-	}
-	apiID := r.URL.Query().Get("api_id")
-	if apiID == "" {
-		doJSONWrite(w, http.StatusBadRequest, apiError("missing api_id parameter"))
-		return
-	}
-	apiSpec := getApiSpec(apiID)
-	if apiSpec == nil {
-		doJSONWrite(w, http.StatusNotFound, apiError("API ID not found"))
-		return
-	}
-	health, _ := apiSpec.Health.ApiHealthValues()
-	doJSONWrite(w, http.StatusOK, health)
-}
-
 func userRatesCheck(w http.ResponseWriter, r *http.Request) {
 	session := ctxGetSession(r)
 	if session == nil {

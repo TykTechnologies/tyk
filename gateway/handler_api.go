@@ -7,6 +7,8 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
 
+	"github.com/TykTechnologies/tyk/config"
+
 	"github.com/TykTechnologies/tyk/repository/cache"
 )
 
@@ -21,7 +23,11 @@ func (h HandlerApi) RegisterRoutes(r *mux.Router) {
 	r.HandleFunc("/apis/{apiID}", h.Patch).Methods(http.MethodPatch)
 	r.HandleFunc("/apis/{apiID}", h.Delete).Methods(http.MethodDelete)
 	r.HandleFunc("/apis/{apiID}/cache", h.DeleteCache).Methods(http.MethodDelete)
+	r.HandleFunc("/apis/{apiID}/health", h.Health).Methods(http.MethodGet)
+
+	// backwards compatibility endpoints
 	r.HandleFunc("/cache/{apiID}", h.DeleteCache).Methods(http.MethodDelete)
+	r.HandleFunc("/health", h.Health).Methods(http.MethodGet)
 }
 
 // Lists all APIs
@@ -113,4 +119,29 @@ func (h HandlerApi) DeleteCache(w http.ResponseWriter, r *http.Request) {
 	}
 
 	doJSONWrite(w, http.StatusOK, apiOk("cache invalidated"))
+}
+
+func (h HandlerApi) Health(w http.ResponseWriter, r *http.Request) {
+	if !config.Global().HealthCheck.EnableHealthChecks {
+		doJSONWrite(w, http.StatusBadRequest, apiError("Health checks are not enabled for this node"))
+		return
+	}
+
+	apiID := mux.Vars(r)["apiID"]
+	if apiID == "" {
+		// fallback to querystring
+		apiID = r.URL.Query().Get("api_id")
+	}
+	if apiID == "" {
+		doJSONWrite(w, http.StatusBadRequest, apiError("missing api_id parameter"))
+		return
+	}
+
+	apiSpec := getApiSpec(apiID)
+	if apiSpec == nil {
+		doJSONWrite(w, http.StatusNotFound, apiError("API ID not found"))
+		return
+	}
+	health, _ := apiSpec.Health.ApiHealthValues()
+	doJSONWrite(w, http.StatusOK, health)
 }
