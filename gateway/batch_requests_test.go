@@ -24,7 +24,7 @@ const testBatchRequest = `{
 			"test-header-1": "test-1",
 			"test-header-2": "test-2"
 		},
-		"relative_url": "get/?param1=this"te
+		"relative_url": "get/?param1=this"
 	},
 	{
 		"method": "POST",
