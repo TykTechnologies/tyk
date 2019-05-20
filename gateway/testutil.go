@@ -449,7 +449,7 @@ type Mock struct {
 	URL string
 
 	testRunner   *test.HTTPTestRunner
-	globalConfig config.Config
+	GlobalConfig config.Config
 	config       MockConfig
 }
 
@@ -488,10 +488,10 @@ func (s *Mock) Start() {
 		listen(s.ln, s.cln, fmt.Errorf("Without goagain"))
 	}
 
-	s.globalConfig = globalConf
+	s.GlobalConfig = globalConf
 
 	scheme := "http://"
-	if s.globalConfig.HttpServerOptions.UseSSL {
+	if s.GlobalConfig.HttpServerOptions.UseSSL {
 		scheme = "https://"
 	}
 	s.URL = scheme + s.ln.Addr().String()
@@ -502,8 +502,8 @@ func (s *Mock) Start() {
 			if tc.ControlRequest {
 				if s.config.sepatateControlAPI {
 					tc.BaseURL = scheme + s.cln.Addr().String()
-				} else if s.globalConfig.ControlAPIHostname != "" {
-					tc.Domain = s.globalConfig.ControlAPIHostname
+				} else if s.GlobalConfig.ControlAPIHostname != "" {
+					tc.Domain = s.GlobalConfig.ControlAPIHostname
 				}
 			}
 			r, err := test.NewRequest(tc)
