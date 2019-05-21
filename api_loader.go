@@ -646,7 +646,7 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 			chainObj.Index = i
 			chainChannel <- chainObj
 			apisMu.Lock()
-			spec.middlewareChain = chainObj
+			// spec.middlewareChain = chainObj
 			apisMu.Unlock()
 		}(spec, i)
 
