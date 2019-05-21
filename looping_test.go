@@ -12,7 +12,7 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-func IngoreTestLooping(t *testing.T) {
+func TestLooping(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
