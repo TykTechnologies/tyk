@@ -276,6 +276,12 @@ const confSchema = `{
 	"event_trigers_defunct": {
 		"type": ["array", "null"]
 	},
+    "event_triggers_defunct": {
+      "type": [
+        "array",
+        "null"
+      ]
+    },
 	"experimental_process_org_off_thread": {
 		"type": "boolean"
 	},
