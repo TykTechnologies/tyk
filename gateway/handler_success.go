@@ -18,6 +18,34 @@ import (
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
+	cache "github.com/pmylund/go-cache"
+)
+
+// Enums for keys to be stored in a session context - this is how gorilla expects
+// these to be implemented and is lifted pretty much from docs
+const (
+	SessionData = iota
+	UpdateSession
+	AuthToken
+	HashedAuthToken
+	VersionData
+	VersionDefault
+	OrgSessionContext
+	ContextData
+	RetainHost
+	TrackThisEndpoint
+	DoNotTrackThisEndpoint
+	UrlRewritePath
+	UrlRewriteTarget
+	RequestMethod
+	TransformedRequestMethod
+	OrigRequestURL
+	LoopLevel
+	LoopLevelLimit
+	ThrottleLevel
+	ThrottleLevelLimit
+	Trace
+	CheckLoopLimits
 )
 
 const (
