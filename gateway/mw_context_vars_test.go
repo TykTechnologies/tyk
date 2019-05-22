@@ -14,7 +14,7 @@ import (
 )
 
 func testPrepareContextVarsMiddleware() {
-	buildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.EnableContextVars = true
 		spec.VersionData.Versions = map[string]apidef.VersionInfo{
@@ -32,7 +32,7 @@ func testPrepareContextVarsMiddleware() {
 }
 
 func TestContextVarsMiddleware(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	testPrepareContextVarsMiddleware()
@@ -48,7 +48,7 @@ func TestContextVarsMiddleware(t *testing.T) {
 func BenchmarkContextVarsMiddleware(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	testPrepareContextVarsMiddleware()

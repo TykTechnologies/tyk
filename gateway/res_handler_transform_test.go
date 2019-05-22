@@ -28,13 +28,13 @@ func TestTransformResponseWithURLRewrite(t *testing.T) {
 	responseProcessorConf := []apidef.ResponseProcessor{{Name: "response_body_transform"}}
 
 	t.Run("Transform without rewrite", func(t *testing.T) {
-		ts := newTykTestServer()
+		ts := StartTest()
 		defer ts.Close()
 
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.ResponseProcessors = responseProcessorConf
-			updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.ExtendedPaths.TransformResponse = []apidef.TemplateMeta{transformResponseConf}
 			})
 		})
@@ -45,14 +45,14 @@ func TestTransformResponseWithURLRewrite(t *testing.T) {
 	})
 
 	t.Run("Transform path equals rewrite to ", func(t *testing.T) {
-		ts := newTykTestServer()
+		ts := StartTest()
 		defer ts.Close()
 
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.ResponseProcessors = responseProcessorConf
 
-			updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.ExtendedPaths.TransformResponse = []apidef.TemplateMeta{transformResponseConf}
 				v.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{urlRewriteConf}
 			})
@@ -64,16 +64,16 @@ func TestTransformResponseWithURLRewrite(t *testing.T) {
 	})
 
 	t.Run("Transform path equals rewrite path", func(t *testing.T) {
-		ts := newTykTestServer()
+		ts := StartTest()
 		defer ts.Close()
 
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.ResponseProcessors = responseProcessorConf
 
 			transformResponseConf.Path = "abc"
 
-			updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.ExtendedPaths.TransformResponse = []apidef.TemplateMeta{transformResponseConf}
 				v.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{urlRewriteConf}
 			})
@@ -86,7 +86,7 @@ func TestTransformResponseWithURLRewrite(t *testing.T) {
 }
 
 func TestTransformResponse_ContextVars(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	transformResponseConf := apidef.TemplateMeta{
@@ -101,10 +101,10 @@ func TestTransformResponse_ContextVars(t *testing.T) {
 	responseProcessorConf := []apidef.ResponseProcessor{{Name: "response_body_transform"}}
 
 	// When Context Vars are disabled
-	buildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.ResponseProcessors = responseProcessorConf
-		updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 			v.ExtendedPaths.TransformResponse = []apidef.TemplateMeta{transformResponseConf}
 		})
 	})
@@ -114,11 +114,11 @@ func TestTransformResponse_ContextVars(t *testing.T) {
 	})
 
 	// When Context Vars are enabled
-	buildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.EnableContextVars = true
 		spec.ResponseProcessors = responseProcessorConf
-		updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 			v.ExtendedPaths.TransformResponse = []apidef.TemplateMeta{transformResponseConf}
 		})
 	})
@@ -131,7 +131,7 @@ func TestTransformResponse_ContextVars(t *testing.T) {
 func TestTransformResponse_WithCache(t *testing.T) {
 	const path = "/get"
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	transformResponseConf := apidef.TemplateMeta{
@@ -145,13 +145,13 @@ func TestTransformResponse_WithCache(t *testing.T) {
 	responseProcessorConf := []apidef.ResponseProcessor{{Name: "response_body_transform"}}
 
 	createAPI := func(withCache bool) {
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.CacheOptions.CacheTimeout = 60
 			spec.EnableContextVars = true
 			spec.CacheOptions.EnableCache = withCache
 			spec.ResponseProcessors = responseProcessorConf
-			updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.ExtendedPaths.TransformResponse = []apidef.TemplateMeta{transformResponseConf}
 				v.ExtendedPaths.Cached = []string{path}
 			})

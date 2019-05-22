@@ -20,10 +20,10 @@ import (
 
 func TestMurmur3CharBug(t *testing.T) {
 	defer resetTestConfig()
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
-	api := buildAPI(func(spec *APISpec) {
+	api := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.Proxy.ListenPath = "/"
 	})[0]
@@ -37,9 +37,9 @@ func TestMurmur3CharBug(t *testing.T) {
 		globalConf.HashKeys = false
 		config.SetGlobal(globalConf)
 
-		loadAPI(api)
+		LoadAPI(api)
 
-		key := createSession()
+		key := CreateSession()
 
 		ts.Run(t, []test.TestCase{
 			genTestCase("wrong", 403),
@@ -54,9 +54,9 @@ func TestMurmur3CharBug(t *testing.T) {
 		globalConf.HashKeyFunction = ""
 		config.SetGlobal(globalConf)
 
-		loadAPI(api)
+		LoadAPI(api)
 
-		key := createSession()
+		key := CreateSession()
 
 		ts.Run(t, []test.TestCase{
 			genTestCase("wrong", 403),
@@ -72,9 +72,9 @@ func TestMurmur3CharBug(t *testing.T) {
 		globalConf.HashKeyFunction = "murmur32"
 		config.SetGlobal(globalConf)
 
-		loadAPI(api)
+		LoadAPI(api)
 
-		key := createSession()
+		key := CreateSession()
 
 		ts.Run(t, []test.TestCase{
 			genTestCase("wrong", 403),
@@ -90,9 +90,9 @@ func TestMurmur3CharBug(t *testing.T) {
 		globalConf.HashKeyFunction = "murmur64"
 		config.SetGlobal(globalConf)
 
-		loadAPI(api)
+		LoadAPI(api)
 
-		key := createSession()
+		key := CreateSession()
 
 		ts.Run(t, []test.TestCase{
 			genTestCase("wrong", 403),
@@ -105,10 +105,10 @@ func TestMurmur3CharBug(t *testing.T) {
 
 func TestSignatureValidation(t *testing.T) {
 	defer resetTestConfig()
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
-	api := buildAPI(func(spec *APISpec) {
+	api := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.Proxy.ListenPath = "/"
 		spec.Auth.ValidateSignature = true
@@ -120,9 +120,9 @@ func TestSignatureValidation(t *testing.T) {
 
 	t.Run("Static signature", func(t *testing.T) {
 		api.Auth.Signature.Secret = "foobar"
-		loadAPI(api)
+		LoadAPI(api)
 
-		key := createSession()
+		key := CreateSession()
 		hasher := signature_validator.MasheryMd5sum{}
 		validHash := hasher.Hash(key, "foobar", time.Now().Unix())
 
@@ -149,9 +149,9 @@ func TestSignatureValidation(t *testing.T) {
 
 	t.Run("Dynamic signature", func(t *testing.T) {
 		api.Auth.Signature.Secret = "$tyk_meta.signature_secret"
-		loadAPI(api)
+		LoadAPI(api)
 
-		key := createSession(func(s *user.SessionState) {
+		key := CreateSession(func(s *user.SessionState) {
 			s.MetaData = map[string]interface{}{
 				"signature_secret": "foobar",
 			}

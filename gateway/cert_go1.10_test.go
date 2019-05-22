@@ -44,10 +44,10 @@ func TestPublicKeyPinning(t *testing.T) {
 		config.SetGlobal(globalConf)
 		defer resetTestConfig()
 
-		ts := newTykTestServer()
+		ts := StartTest()
 		defer ts.Close()
 
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.PinnedPublicKeys = map[string]string{"127.0.0.1": pubID}
 			spec.Proxy.TargetURL = upstream.URL
@@ -57,10 +57,10 @@ func TestPublicKeyPinning(t *testing.T) {
 	})
 
 	t.Run("Pub key not match", func(t *testing.T) {
-		ts := newTykTestServer()
+		ts := StartTest()
 		defer ts.Close()
 
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.PinnedPublicKeys = map[string]string{"127.0.0.1": "wrong"}
 			spec.Proxy.TargetURL = upstream.URL
@@ -75,10 +75,10 @@ func TestPublicKeyPinning(t *testing.T) {
 		config.SetGlobal(globalConf)
 		defer resetTestConfig()
 
-		ts := newTykTestServer()
+		ts := StartTest()
 		defer ts.Close()
 
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
 		})
@@ -99,10 +99,10 @@ func TestPublicKeyPinning(t *testing.T) {
 
 		defer proxy.Stop()
 
-		ts := newTykTestServer()
+		ts := StartTest()
 		defer ts.Close()
 
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
 			spec.Proxy.Transport.ProxyURL = proxy.URL
@@ -126,14 +126,14 @@ func TestProxyTransport(t *testing.T) {
 	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	//matching ciphers
 	t.Run("Global: Cipher match", func(t *testing.T) {
 		globalConf.ProxySSLCipherSuites = []string{"TLS_RSA_WITH_AES_128_CBC_SHA"}
 		config.SetGlobal(globalConf)
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
 		})
@@ -143,7 +143,7 @@ func TestProxyTransport(t *testing.T) {
 	t.Run("Global: Cipher not match", func(t *testing.T) {
 		globalConf.ProxySSLCipherSuites = []string{"TLS_RSA_WITH_RC4_128_SHA"}
 		config.SetGlobal(globalConf)
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
 		})
@@ -153,7 +153,7 @@ func TestProxyTransport(t *testing.T) {
 	t.Run("API: Cipher override", func(t *testing.T) {
 		globalConf.ProxySSLCipherSuites = []string{"TLS_RSA_WITH_RC4_128_SHA"}
 		config.SetGlobal(globalConf)
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
 			spec.Proxy.Transport.SSLCipherSuites = []string{"TLS_RSA_WITH_AES_128_CBC_SHA"}
@@ -165,7 +165,7 @@ func TestProxyTransport(t *testing.T) {
 	t.Run("API: MinTLS not match", func(t *testing.T) {
 		globalConf.ProxySSLMinVersion = 772
 		config.SetGlobal(globalConf)
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
 			spec.Proxy.Transport.SSLCipherSuites = []string{"TLS_RSA_WITH_AES_128_CBC_SHA"}
@@ -177,7 +177,7 @@ func TestProxyTransport(t *testing.T) {
 	t.Run("API: Invalid proxy", func(t *testing.T) {
 		globalConf.ProxySSLMinVersion = 771
 		config.SetGlobal(globalConf)
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
 			spec.Proxy.Transport.SSLCipherSuites = []string{"TLS_RSA_WITH_AES_128_CBC_SHA"}
@@ -198,7 +198,7 @@ func TestProxyTransport(t *testing.T) {
 		})
 		defer proxy.Stop()
 
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.Transport.SSLCipherSuites = []string{"TLS_RSA_WITH_AES_128_CBC_SHA"}
 			spec.Proxy.Transport.ProxyURL = proxy.URL

@@ -17,39 +17,6 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-const jwtSecret = "9879879878787878"
-
-// openssl genrsa -out app.rsa
-const jwtRSAPrivKey = `
------BEGIN RSA PRIVATE KEY-----
-MIIEpQIBAAKCAQEAyqZ4rwKF8qCExS7kpY4cnJa/37FMkJNkalZ3OuslLB0oRL8T
-4c94kdF4aeNzSFkSe2n99IBI6Ssl79vbfMZb+t06L0Q94k+/P37x7+/RJZiff4y1
-VGjrnrnMI2iu9l4iBBRYzNmG6eblroEMMWlgk5tysHgxB59CSNIcD9gqk1hx4n/F
-gOmvKsfQgWHNlPSDTRcWGWGhB2/XgNVYG2pOlQxAPqLhBHeqGTXBbPfGF9cHzixp
-sPr6GtbzPwhsQ/8bPxoJ7hdfn+rzztks3d6+HWURcyNTLRe0mjXjjee9Z6+gZ+H+
-fS4pnP9tqT7IgU6ePUWTpjoiPtLexgsAa/ctjQIDAQABAoIBAECWvnBJRZgHQUn3
-oDiECup9wbnyMI0D7UVXObk1qSteP69pl1SpY6xWLyLQs7WjbhiXt7FuEc7/SaAh
-Wttx/W7/g8P85Bx1fmcmdsYakXaCJpPorQKyTibQ4ReIDfvIFN9n/MWNr0ptpVbx
-GonFJFrneK52IGplgCLllLwYEbnULYcJc6E25Ro8U2gQjF2r43PDa07YiDrmB/GV
-QQW4HTo+CA9rdK0bP8GpXgc0wpmBhx/t/YdnDg6qhzyUMk9As7JrAzYPjHO0cRun
-vhA/aG/mdMmRumY75nj7wB5U5DgstsN2ER75Pjr1xe1knftIyNm15AShCPfLaLGo
-dA2IpwECgYEA5E8h6ssa7QroCGwp/N0wSJW41hFYGygbOEg6yPWTJkqmMZVduD8X
-/KFqJK4LcIbFQuR28+hWJpHm/RF1AMRhbbWkAj6h02gv5izFwDiFKev5paky4Evg
-G8WfUOmSZ1D+fVxwaoG0OaRZpCovUTxYig3xrI659DMeKqpQ7e8l9ekCgYEA4zql
-l4P4Dn0ydr+TI/s4NHIQHkaLQAVk3OWwyKowijXd8LCtuZRA1NKSpqQ4ZXi0B17o
-9zzF5jEUjws3qWv4PKWdxJu3y+h/etsg7wxUeNizbY2ooUGeMbk0tWxJihbgaI7E
-XxLIT50F3Ky4EJ2cUL9GmJ+gLCw0KIaVbkiyYAUCgYEA0WyVHB76r/2VIkS1rzHm
-HG7ageKfAyoi7dmzsqsxM6q+EDWHJn8Zra8TAlp0O+AkClwvkUTJ4c9sJy9gODfr
-dwtrSnPRVW74oRbovo4Z+H5xHbi65mwzQsZggYP/u63cA3pL1Cbt/wH3CFN52/aS
-8PAhg7vYb1yEi3Z3jgoUtCECgYEAhSPX4u9waQzyhKG7lVmdlR1AVH0BGoIOl1/+
-NZWC23i0klLzd8lmM00uoHWYldwjoC38UuFJE5eudCIeeybITMC9sHWNO+z+xP2g
-TnDrDePrPkXCiLnp9ziNqb/JVyAQXTNJ3Gsk84EN7j9Fmna/IJDyzHq7XyaHaTdy
-VyxBWAECgYEA4jYS07bPx5UMhKiMJDqUmDfLNFD97XwPoJIkOdn6ezqeOSmlmo7t
-jxHLbCmsDOAsCU/0BlLXg9wMU7n5QKSlfTVGok/PU0rq2FUXQwyKGnellrqODwFQ
-YGivtXBGXk1hlVYlje1RB+W6RQuDAegI5h8vl8pYJS9JQH0wjatsDaE=
------END RSA PRIVATE KEY-----
-`
-
 // openssl rsa -in app.rsa -pubout > app.rsa.pub
 const jwtRSAPubKey = `
 -----BEGIN PUBLIC KEY-----
@@ -130,7 +97,7 @@ func prepareGenericJWTSession(testName string, method string, claimName string, 
 	case RSASign:
 		sessionFunc = createJWTSessionWithRSA
 
-		jwtToken = createJWKToken(func(t *jwt.Token) {
+		jwtToken = CreateJWKToken(func(t *jwt.Token) {
 			t.Claims.(jwt.MapClaims)["foo"] = "bar"
 			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 
@@ -143,7 +110,7 @@ func prepareGenericJWTSession(testName string, method string, claimName string, 
 		})
 	}
 
-	spec := buildAndLoadAPI(func(spec *APISpec) {
+	spec := BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.JWTSigningMethod = method
 		spec.EnableJWT = true
@@ -161,7 +128,7 @@ func prepareGenericJWTSession(testName string, method string, claimName string, 
 }
 
 func TestJWTSessionHMAC(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	//If we skip the check then the Id will be taken from SUB and the call will succeed
@@ -179,7 +146,7 @@ func TestJWTSessionHMAC(t *testing.T) {
 func BenchmarkJWTSessionHMAC(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	//If we skip the check then the Id will be taken from SUB and the call will succeed
@@ -196,7 +163,7 @@ func BenchmarkJWTSessionHMAC(b *testing.B) {
 
 func TestJWTHMACIdInSubClaim(t *testing.T) {
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	//Same as above
@@ -233,7 +200,7 @@ func TestJWTHMACIdInSubClaim(t *testing.T) {
 }
 
 func TestJWTRSAIdInSubClaim(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	_, jwtToken := prepareGenericJWTSession(t.Name(), RSASign, SUB, true)
@@ -264,7 +231,7 @@ func TestJWTRSAIdInSubClaim(t *testing.T) {
 }
 
 func TestJWTSessionRSA(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	//default values, keep backward compatibility
@@ -280,7 +247,7 @@ func TestJWTSessionRSA(t *testing.T) {
 func BenchmarkJWTSessionRSA(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	//default values, keep backward compatibility
@@ -295,7 +262,7 @@ func BenchmarkJWTSessionRSA(b *testing.B) {
 }
 
 func TestJWTSessionFailRSA_EmptyJWT(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	//default values, same as before (keeps backward compatibility)
@@ -310,7 +277,7 @@ func TestJWTSessionFailRSA_EmptyJWT(t *testing.T) {
 }
 
 func TestJWTSessionFailRSA_NoAuthHeader(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	//default values, same as before (keeps backward compatibility)
@@ -325,7 +292,7 @@ func TestJWTSessionFailRSA_NoAuthHeader(t *testing.T) {
 }
 
 func TestJWTSessionFailRSA_MalformedJWT(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	//default values, same as before (keeps backward compatibility)
@@ -342,7 +309,7 @@ func TestJWTSessionFailRSA_MalformedJWT(t *testing.T) {
 }
 
 func TestJWTSessionFailRSA_MalformedJWT_NOTRACK(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	//default values, same as before (keeps backward compatibility)
@@ -360,7 +327,7 @@ func TestJWTSessionFailRSA_MalformedJWT_NOTRACK(t *testing.T) {
 }
 
 func TestJWTSessionFailRSA_WrongJWT(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	//default values, same as before (keeps backward compatibility)
@@ -377,7 +344,7 @@ func TestJWTSessionFailRSA_WrongJWT(t *testing.T) {
 }
 
 func TestJWTSessionRSABearer(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	//default values, same as before (keeps backward compatibility)
@@ -394,7 +361,7 @@ func TestJWTSessionRSABearer(t *testing.T) {
 func BenchmarkJWTSessionRSABearer(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	//default values, same as before (keeps backward compatibility)
@@ -409,7 +376,7 @@ func BenchmarkJWTSessionRSABearer(b *testing.B) {
 }
 
 func TestJWTSessionRSABearerInvalid(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	//default values, same as before (keeps backward compatibility)
@@ -426,7 +393,7 @@ func TestJWTSessionRSABearerInvalid(t *testing.T) {
 }
 
 func TestJWTSessionRSABearerInvalidTwoBears(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	//default values, same as before (keeps backward compatibility)
@@ -451,7 +418,7 @@ func TestJWTSessionRSABearerInvalidTwoBears(t *testing.T) {
 // JWTSessionRSAWithRawSourceOnWithClientID
 
 func prepareJWTSessionRSAWithRawSourceOnWithClientID(isBench bool) string {
-	spec := buildAndLoadAPI(func(spec *APISpec) {
+	spec := BuildAndLoadAPI(func(spec *APISpec) {
 		spec.APIID = "777888"
 		spec.OrgID = "default"
 		spec.UseKeylessAccess = false
@@ -463,7 +430,7 @@ func prepareJWTSessionRSAWithRawSourceOnWithClientID(isBench bool) string {
 		spec.Proxy.ListenPath = "/"
 	})[0]
 
-	policyID := createPolicy(func(p *user.Policy) {
+	policyID := CreatePolicy(func(p *user.Policy) {
 		p.OrgID = "default"
 		p.AccessRights = map[string]user.AccessDefinition{
 			spec.APIID: {
@@ -485,7 +452,7 @@ func prepareJWTSessionRSAWithRawSourceOnWithClientID(isBench bool) string {
 	spec.SessionManager.ResetQuota(tokenID, session, false)
 	spec.SessionManager.UpdateSession(tokenID, session, 60, false)
 
-	jwtToken := createJWKToken(func(t *jwt.Token) {
+	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
 		t.Claims.(jwt.MapClaims)["user_id"] = "user"
@@ -497,7 +464,7 @@ func prepareJWTSessionRSAWithRawSourceOnWithClientID(isBench bool) string {
 }
 
 func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	jwtToken := prepareJWTSessionRSAWithRawSourceOnWithClientID(false)
@@ -513,7 +480,7 @@ func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
 func BenchmarkJWTSessionRSAWithRawSourceOnWithClientID(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	jwtToken := prepareJWTSessionRSAWithRawSourceOnWithClientID(true)
@@ -529,7 +496,7 @@ func BenchmarkJWTSessionRSAWithRawSourceOnWithClientID(b *testing.B) {
 // JWTSessionRSAWithRawSource
 
 func prepareJWTSessionRSAWithRawSource() string {
-	buildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
@@ -539,9 +506,9 @@ func prepareJWTSessionRSAWithRawSource() string {
 		spec.Proxy.ListenPath = "/"
 	})
 
-	pID := createPolicy()
+	pID := CreatePolicy()
 
-	jwtToken := createJWKToken(func(t *jwt.Token) {
+	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
 		t.Claims.(jwt.MapClaims)["user_id"] = "user"
@@ -553,7 +520,7 @@ func prepareJWTSessionRSAWithRawSource() string {
 }
 
 func TestJWTSessionRSAWithRawSource(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	jwtToken := prepareJWTSessionRSAWithRawSource()
@@ -569,7 +536,7 @@ func TestJWTSessionRSAWithRawSource(t *testing.T) {
 func BenchmarkJWTSessionRSAWithRawSource(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	jwtToken := prepareJWTSessionRSAWithRawSource()
@@ -588,10 +555,10 @@ func BenchmarkJWTSessionRSAWithRawSource(b *testing.B) {
 }
 
 func TestJWTSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
-	spec := buildAPI(func(spec *APISpec) {
+	spec := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
@@ -601,11 +568,11 @@ func TestJWTSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 	})[0]
 
-	loadAPI(spec)
+	LoadAPI(spec)
 
-	createPolicy()
+	CreatePolicy()
 
-	jwtToken := createJWKToken(func(t *jwt.Token) {
+	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
 		t.Claims.(jwt.MapClaims)["user_id"] = "user"
@@ -624,12 +591,12 @@ func TestJWTSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 }
 
 func TestJWTSessionExpiresAtValidationConfigs(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
-	pID := createPolicy()
+	pID := CreatePolicy()
 	jwtAuthHeaderGen := func(skew time.Duration) map[string]string {
-		jwtToken := createJWKToken(func(t *jwt.Token) {
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
 			t.Claims.(jwt.MapClaims)["policy_id"] = pID
 			t.Claims.(jwt.MapClaims)["user_id"] = "user123"
 			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(skew).Unix()
@@ -638,7 +605,7 @@ func TestJWTSessionExpiresAtValidationConfigs(t *testing.T) {
 		return map[string]string{"authorization": jwtToken}
 	}
 
-	spec := buildAPI(func(spec *APISpec) {
+	spec := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
@@ -651,7 +618,7 @@ func TestJWTSessionExpiresAtValidationConfigs(t *testing.T) {
 	// This test is successful by definition
 	t.Run("Expiry_After_now--Valid_jwt", func(t *testing.T) {
 		spec.JWTExpiresAtValidationSkew = 0 //Default value
-		loadAPI(spec)
+		LoadAPI(spec)
 
 		ts.Run(t, test.TestCase{
 			Headers: jwtAuthHeaderGen(+time.Second), Code: http.StatusOK,
@@ -661,7 +628,7 @@ func TestJWTSessionExpiresAtValidationConfigs(t *testing.T) {
 	// This test is successful by definition, so it's true also with skew, but just to avoid confusion.
 	t.Run("Expiry_After_now-Add_skew--Valid_jwt", func(t *testing.T) {
 		spec.JWTExpiresAtValidationSkew = 1
-		loadAPI(spec)
+		LoadAPI(spec)
 
 		ts.Run(t, test.TestCase{
 			Headers: jwtAuthHeaderGen(+time.Second), Code: http.StatusOK,
@@ -670,7 +637,7 @@ func TestJWTSessionExpiresAtValidationConfigs(t *testing.T) {
 
 	t.Run("Expiry_Before_now--Invalid_jwt", func(t *testing.T) {
 		spec.JWTExpiresAtValidationSkew = 0 //Default value
-		loadAPI(spec)
+		LoadAPI(spec)
 
 		ts.Run(t, test.TestCase{
 			Headers:   jwtAuthHeaderGen(-time.Second),
@@ -681,7 +648,7 @@ func TestJWTSessionExpiresAtValidationConfigs(t *testing.T) {
 
 	t.Run("Expired_token-Before_now-Huge_skew--Valid_jwt", func(t *testing.T) {
 		spec.JWTExpiresAtValidationSkew = 1000 // This value doesn't matter since validation is disabled
-		loadAPI(spec)
+		LoadAPI(spec)
 
 		ts.Run(t, test.TestCase{
 			Headers: jwtAuthHeaderGen(-time.Second), Code: http.StatusOK,
@@ -690,7 +657,7 @@ func TestJWTSessionExpiresAtValidationConfigs(t *testing.T) {
 
 	t.Run("Expired_token-Before_now-Add_skew--Valid_jwt", func(t *testing.T) {
 		spec.JWTExpiresAtValidationSkew = 2
-		loadAPI(spec)
+		LoadAPI(spec)
 
 		ts.Run(t, test.TestCase{
 			Headers: jwtAuthHeaderGen(-time.Second), Code: http.StatusOK,
@@ -699,12 +666,12 @@ func TestJWTSessionExpiresAtValidationConfigs(t *testing.T) {
 }
 
 func TestJWTSessionIssueAtValidationConfigs(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
-	pID := createPolicy()
+	pID := CreatePolicy()
 	jwtAuthHeaderGen := func(skew time.Duration) map[string]string {
-		jwtToken := createJWKToken(func(t *jwt.Token) {
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
 			t.Claims.(jwt.MapClaims)["policy_id"] = pID
 			t.Claims.(jwt.MapClaims)["user_id"] = "user123"
 			t.Claims.(jwt.MapClaims)["iat"] = time.Now().Add(skew).Unix()
@@ -713,7 +680,7 @@ func TestJWTSessionIssueAtValidationConfigs(t *testing.T) {
 		return map[string]string{"authorization": jwtToken}
 	}
 
-	spec := buildAPI(func(spec *APISpec) {
+	spec := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = "rsa"
@@ -727,7 +694,7 @@ func TestJWTSessionIssueAtValidationConfigs(t *testing.T) {
 	t.Run("IssuedAt_Before_now-no_skew--Valid_jwt", func(t *testing.T) {
 		spec.JWTIssuedAtValidationSkew = 0
 
-		loadAPI(spec)
+		LoadAPI(spec)
 
 		ts.Run(t, test.TestCase{
 			Headers: jwtAuthHeaderGen(-time.Second), Code: http.StatusOK,
@@ -737,7 +704,7 @@ func TestJWTSessionIssueAtValidationConfigs(t *testing.T) {
 	t.Run("Expiry_after_now--Invalid_jwt", func(t *testing.T) {
 		spec.JWTExpiresAtValidationSkew = 0 //Default value
 
-		loadAPI(spec)
+		LoadAPI(spec)
 
 		ts.Run(t, test.TestCase{
 			Headers: jwtAuthHeaderGen(-time.Second), Code: http.StatusOK,
@@ -747,7 +714,7 @@ func TestJWTSessionIssueAtValidationConfigs(t *testing.T) {
 	t.Run("IssueAt-After_now-no_skew--Invalid_jwt", func(t *testing.T) {
 		spec.JWTIssuedAtValidationSkew = 0
 
-		loadAPI(spec)
+		LoadAPI(spec)
 
 		ts.Run(t, test.TestCase{
 			Headers:   jwtAuthHeaderGen(+time.Minute),
@@ -758,7 +725,7 @@ func TestJWTSessionIssueAtValidationConfigs(t *testing.T) {
 
 	t.Run("IssueAt--After_now-Huge_skew--valid_jwt", func(t *testing.T) {
 		spec.JWTIssuedAtValidationSkew = 1000 // This value doesn't matter since validation is disabled
-		loadAPI(spec)
+		LoadAPI(spec)
 
 		ts.Run(t, test.TestCase{
 			Headers: jwtAuthHeaderGen(+time.Second),
@@ -769,7 +736,7 @@ func TestJWTSessionIssueAtValidationConfigs(t *testing.T) {
 	// True by definition
 	t.Run("IssueAt-Before_now-Add_skew--not_valid_jwt", func(t *testing.T) {
 		spec.JWTIssuedAtValidationSkew = 2 // 2 seconds
-		loadAPI(spec)
+		LoadAPI(spec)
 
 		ts.Run(t, test.TestCase{
 			Headers: jwtAuthHeaderGen(-3 * time.Second), Code: http.StatusOK,
@@ -779,7 +746,7 @@ func TestJWTSessionIssueAtValidationConfigs(t *testing.T) {
 	t.Run("IssueAt-After_now-Add_skew--Valid_jwt", func(t *testing.T) {
 		spec.JWTIssuedAtValidationSkew = 1
 
-		loadAPI(spec)
+		LoadAPI(spec)
 
 		ts.Run(t, test.TestCase{
 			Headers: jwtAuthHeaderGen(+time.Second), Code: http.StatusOK,
@@ -788,12 +755,12 @@ func TestJWTSessionIssueAtValidationConfigs(t *testing.T) {
 }
 
 func TestJWTSessionNotBeforeValidationConfigs(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
-	pID := createPolicy()
+	pID := CreatePolicy()
 	jwtAuthHeaderGen := func(skew time.Duration) map[string]string {
-		jwtToken := createJWKToken(func(t *jwt.Token) {
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
 			t.Claims.(jwt.MapClaims)["policy_id"] = pID
 			t.Claims.(jwt.MapClaims)["user_id"] = "user123"
 			t.Claims.(jwt.MapClaims)["nbf"] = time.Now().Add(skew).Unix()
@@ -801,7 +768,7 @@ func TestJWTSessionNotBeforeValidationConfigs(t *testing.T) {
 		return map[string]string{"authorization": jwtToken}
 	}
 
-	spec := buildAPI(func(spec *APISpec) {
+	spec := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
 		spec.Proxy.ListenPath = "/"
@@ -815,7 +782,7 @@ func TestJWTSessionNotBeforeValidationConfigs(t *testing.T) {
 	t.Run("NotBefore_Before_now-Valid_jwt", func(t *testing.T) {
 		spec.JWTNotBeforeValidationSkew = 0
 
-		loadAPI(spec)
+		LoadAPI(spec)
 
 		ts.Run(t, test.TestCase{
 			Headers: jwtAuthHeaderGen(-time.Second), Code: http.StatusOK,
@@ -825,7 +792,7 @@ func TestJWTSessionNotBeforeValidationConfigs(t *testing.T) {
 	t.Run("NotBefore_After_now--Invalid_jwt", func(t *testing.T) {
 		spec.JWTNotBeforeValidationSkew = 0 //Default value
 
-		loadAPI(spec)
+		LoadAPI(spec)
 
 		ts.Run(t, test.TestCase{
 			Headers:   jwtAuthHeaderGen(+time.Second),
@@ -837,7 +804,7 @@ func TestJWTSessionNotBeforeValidationConfigs(t *testing.T) {
 	t.Run("NotBefore_After_now-Add_skew--valid_jwt", func(t *testing.T) {
 		spec.JWTNotBeforeValidationSkew = 1
 
-		loadAPI(spec)
+		LoadAPI(spec)
 
 		ts.Run(t, test.TestCase{
 			Headers: jwtAuthHeaderGen(+time.Second), Code: http.StatusOK,
@@ -847,7 +814,7 @@ func TestJWTSessionNotBeforeValidationConfigs(t *testing.T) {
 	t.Run("NotBefore_After_now-Huge_skew--valid_jwt", func(t *testing.T) {
 		spec.JWTNotBeforeValidationSkew = 1000 // This value is so high that it's actually similar to disabling the claim.
 
-		loadAPI(spec)
+		LoadAPI(spec)
 
 		ts.Run(t, test.TestCase{
 			Headers: jwtAuthHeaderGen(+time.Second), Code: http.StatusOK,
@@ -856,10 +823,10 @@ func TestJWTSessionNotBeforeValidationConfigs(t *testing.T) {
 }
 
 func TestJWTExistingSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
-	spec := buildAPI(func(spec *APISpec) {
+	spec := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
@@ -869,11 +836,11 @@ func TestJWTExistingSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 	})[0]
 
-	loadAPI(spec)
+	LoadAPI(spec)
 
-	p1ID := createPolicy()
+	p1ID := CreatePolicy()
 
-	jwtToken := createJWKToken(func(t *jwt.Token) {
+	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
 		t.Claims.(jwt.MapClaims)["user_id"] = "user"
@@ -889,7 +856,7 @@ func TestJWTExistingSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	})
 
 	// put in JWT invalid policy ID and do request again
-	jwtTokenInvalidPolicy := createJWKToken(func(t *jwt.Token) {
+	jwtTokenInvalidPolicy := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
 		t.Claims.(jwt.MapClaims)["user_id"] = "user"
@@ -908,10 +875,10 @@ func TestJWTExistingSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 }
 
 func TestJWTScopeToPolicyMapping(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
-	basePolicyID := createPolicy(func(p *user.Policy) {
+	basePolicyID := CreatePolicy(func(p *user.Policy) {
 		p.AccessRights = map[string]user.AccessDefinition{
 			"base-api": {
 				Limit: &user.APILimit{
@@ -926,7 +893,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		}
 	})
 
-	spec1 := buildAPI(func(spec *APISpec) {
+	spec1 := BuildAPI(func(spec *APISpec) {
 		spec.APIID = "api1"
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
@@ -937,7 +904,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		spec.Proxy.ListenPath = "/api1"
 	})[0]
 
-	p1ID := createPolicy(func(p *user.Policy) {
+	p1ID := CreatePolicy(func(p *user.Policy) {
 		p.AccessRights = map[string]user.AccessDefinition{
 			spec1.APIID: {
 				Limit: &user.APILimit{
@@ -952,7 +919,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		}
 	})
 
-	spec2 := buildAPI(func(spec *APISpec) {
+	spec2 := BuildAPI(func(spec *APISpec) {
 		spec.APIID = "api2"
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
@@ -963,7 +930,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		spec.Proxy.ListenPath = "/api2"
 	})[0]
 
-	p2ID := createPolicy(func(p *user.Policy) {
+	p2ID := CreatePolicy(func(p *user.Policy) {
 		p.AccessRights = map[string]user.AccessDefinition{
 			spec2.APIID: {
 				Limit: &user.APILimit{
@@ -978,7 +945,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		}
 	})
 
-	spec3 := buildAPI(func(spec *APISpec) {
+	spec3 := BuildAPI(func(spec *APISpec) {
 		spec.APIID = "api3"
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
@@ -989,7 +956,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		spec.Proxy.ListenPath = "/api3"
 	})[0]
 
-	spec := buildAPI(func(spec *APISpec) {
+	spec := BuildAPI(func(spec *APISpec) {
 		spec.APIID = "base-api"
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
@@ -1004,11 +971,11 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		}
 	})[0]
 
-	loadAPI(spec, spec1, spec2, spec3)
+	LoadAPI(spec, spec1, spec2, spec3)
 
 	userID := "user-" + uuid.New()
 
-	jwtToken := createJWKToken(func(t *jwt.Token) {
+	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
 		t.Claims.(jwt.MapClaims)["user_id"] = userID
@@ -1098,10 +1065,10 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 }
 
 func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
-	spec := buildAPI(func(spec *APISpec) {
+	spec := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
@@ -1111,16 +1078,16 @@ func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 	})[0]
 
-	loadAPI(spec)
+	LoadAPI(spec)
 
-	p1ID := createPolicy(func(p *user.Policy) {
+	p1ID := CreatePolicy(func(p *user.Policy) {
 		p.QuotaMax = 111
 	})
-	p2ID := createPolicy(func(p *user.Policy) {
+	p2ID := CreatePolicy(func(p *user.Policy) {
 		p.QuotaMax = 999
 	})
 
-	jwtToken := createJWKToken(func(t *jwt.Token) {
+	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
 		t.Claims.(jwt.MapClaims)["user_id"] = "user"
@@ -1150,7 +1117,7 @@ func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
 	// check key/session quota
 
 	// put in JWT another valid policy ID and do request again
-	jwtTokenAnotherPolicy := createJWKToken(func(t *jwt.Token) {
+	jwtTokenAnotherPolicy := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
 		t.Claims.(jwt.MapClaims)["user_id"] = "user"
@@ -1178,7 +1145,7 @@ func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
 // JWTSessionRSAWithJWK
 
 func prepareJWTSessionRSAWithJWK() string {
-	buildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
@@ -1188,8 +1155,8 @@ func prepareJWTSessionRSAWithJWK() string {
 		spec.Proxy.ListenPath = "/"
 	})
 
-	pID := createPolicy()
-	jwtToken := createJWKToken(func(t *jwt.Token) {
+	pID := CreatePolicy()
+	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
 		t.Claims.(jwt.MapClaims)["user_id"] = "user"
@@ -1201,7 +1168,7 @@ func prepareJWTSessionRSAWithJWK() string {
 }
 
 func TestJWTSessionRSAWithJWK(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	jwtToken := prepareJWTSessionRSAWithJWK()
@@ -1217,7 +1184,7 @@ func TestJWTSessionRSAWithJWK(t *testing.T) {
 func BenchmarkJWTSessionRSAWithJWK(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	jwtToken := prepareJWTSessionRSAWithJWK()
@@ -1237,7 +1204,7 @@ func BenchmarkJWTSessionRSAWithJWK(b *testing.B) {
 // JWTSessionRSAWithEncodedJWK
 
 func prepareJWTSessionRSAWithEncodedJWK() (*APISpec, string) {
-	spec := buildAPI(func(spec *APISpec) {
+	spec := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
@@ -1246,8 +1213,8 @@ func prepareJWTSessionRSAWithEncodedJWK() (*APISpec, string) {
 		spec.Proxy.ListenPath = "/"
 	})[0]
 
-	pID := createPolicy()
-	jwtToken := createJWKToken(func(t *jwt.Token) {
+	pID := CreatePolicy()
+	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		// Set some claims
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
@@ -1260,7 +1227,7 @@ func prepareJWTSessionRSAWithEncodedJWK() (*APISpec, string) {
 }
 
 func TestJWTSessionRSAWithEncodedJWK(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	spec, jwtToken := prepareJWTSessionRSAWithEncodedJWK()
@@ -1269,7 +1236,7 @@ func TestJWTSessionRSAWithEncodedJWK(t *testing.T) {
 
 	t.Run("Direct JWK URL", func(t *testing.T) {
 		spec.JWTSource = testHttpJWK
-		loadAPI(spec)
+		LoadAPI(spec)
 
 		ts.Run(t, test.TestCase{
 			Headers: authHeaders, Code: http.StatusOK,
@@ -1278,7 +1245,7 @@ func TestJWTSessionRSAWithEncodedJWK(t *testing.T) {
 
 	t.Run("Base64 JWK URL", func(t *testing.T) {
 		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(testHttpJWK))
-		loadAPI(spec)
+		LoadAPI(spec)
 
 		ts.Run(t, test.TestCase{
 			Headers: authHeaders, Code: http.StatusOK,
@@ -1289,13 +1256,13 @@ func TestJWTSessionRSAWithEncodedJWK(t *testing.T) {
 func BenchmarkJWTSessionRSAWithEncodedJWK(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	spec, jwtToken := prepareJWTSessionRSAWithEncodedJWK()
 	spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(testHttpJWK))
 
-	loadAPI(spec)
+	LoadAPI(spec)
 
 	authHeaders := map[string]string{"authorization": jwtToken}
 
@@ -1311,7 +1278,7 @@ func BenchmarkJWTSessionRSAWithEncodedJWK(b *testing.B) {
 }
 
 func TestJWTHMACIdNewClaim(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	//If we skip the check then the Id will be taken from SUB and the call will succeed
@@ -1326,10 +1293,10 @@ func TestJWTHMACIdNewClaim(t *testing.T) {
 }
 
 func TestJWTRSAIdInClaimsWithBaseField(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
-	buildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
@@ -1339,10 +1306,10 @@ func TestJWTRSAIdInClaimsWithBaseField(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 	})
 
-	pID := createPolicy()
+	pID := CreatePolicy()
 
 	//First test - user id in the configured base field 'user_id'
-	jwtToken := createJWKToken(func(t *jwt.Token) {
+	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
 		t.Claims.(jwt.MapClaims)["user_id"] = "user123@test.com"
@@ -1357,7 +1324,7 @@ func TestJWTRSAIdInClaimsWithBaseField(t *testing.T) {
 	})
 
 	//user-id claim configured but it's empty - returning an error
-	jwtToken = createJWKToken(func(t *jwt.Token) {
+	jwtToken = CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
 		t.Claims.(jwt.MapClaims)["user_id"] = ""
@@ -1374,7 +1341,7 @@ func TestJWTRSAIdInClaimsWithBaseField(t *testing.T) {
 	})
 
 	//user-id claim configured but not found fallback to sub
-	jwtToken = createJWKToken(func(t *jwt.Token) {
+	jwtToken = CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
 		t.Claims.(jwt.MapClaims)["sub"] = "user123@test.com"
@@ -1389,7 +1356,7 @@ func TestJWTRSAIdInClaimsWithBaseField(t *testing.T) {
 	})
 
 	//user-id claim not found fallback to sub that is empty
-	jwtToken = createJWKToken(func(t *jwt.Token) {
+	jwtToken = CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
 		t.Claims.(jwt.MapClaims)["sub"] = ""
@@ -1406,7 +1373,7 @@ func TestJWTRSAIdInClaimsWithBaseField(t *testing.T) {
 	})
 
 	//user-id and sub claims not found
-	jwtToken = createJWKToken(func(t *jwt.Token) {
+	jwtToken = CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
 		t.Claims.(jwt.MapClaims)["policy_id"] = pID
@@ -1423,10 +1390,10 @@ func TestJWTRSAIdInClaimsWithBaseField(t *testing.T) {
 }
 
 func TestJWTRSAIdInClaimsWithoutBaseField(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
-	buildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
@@ -1436,9 +1403,9 @@ func TestJWTRSAIdInClaimsWithoutBaseField(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 	})
 
-	pID := createPolicy()
+	pID := CreatePolicy()
 
-	jwtToken := createJWKToken(func(t *jwt.Token) {
+	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
 		t.Claims.(jwt.MapClaims)["sub"] = "user123@test.com" //is ignored
@@ -1453,7 +1420,7 @@ func TestJWTRSAIdInClaimsWithoutBaseField(t *testing.T) {
 	})
 
 	//Id is not found since there's no sub claim and user_id has't been set in the api def (spec.JWTIdentityBaseField)
-	jwtToken = createJWKToken(func(t *jwt.Token) {
+	jwtToken = CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
 		t.Claims.(jwt.MapClaims)["user_id"] = "user123@test.com" //is ignored
@@ -1471,7 +1438,7 @@ func TestJWTRSAIdInClaimsWithoutBaseField(t *testing.T) {
 }
 
 func TestJWTECDSASign(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	//If we skip the check then the Id will be taken from SUB and the call will succeed
@@ -1486,7 +1453,7 @@ func TestJWTECDSASign(t *testing.T) {
 }
 
 func TestJWTUnknownSign(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	//If we skip the check then the Id will be taken from SUB and the call will succeed
@@ -1501,10 +1468,10 @@ func TestJWTUnknownSign(t *testing.T) {
 }
 
 func TestJWTRSAInvalidPublickKey(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
-	buildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
@@ -1513,9 +1480,9 @@ func TestJWTRSAInvalidPublickKey(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 	})
 
-	pID := createPolicy()
+	pID := CreatePolicy()
 
-	jwtToken := createJWKToken(func(t *jwt.Token) {
+	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
 		t.Claims.(jwt.MapClaims)["sub"] = "user123@test.com" //is ignored
@@ -1534,7 +1501,7 @@ func TestJWTRSAInvalidPublickKey(t *testing.T) {
 
 func createExpiringPolicy(pGen ...func(p *user.Policy)) string {
 	pID := keyGen.GenerateAuthKey("")
-	pol := createStandardPolicy()
+	pol := CreateStandardPolicy()
 	pol.ID = pID
 	pol.KeyExpiresIn = 1
 
@@ -1550,12 +1517,12 @@ func createExpiringPolicy(pGen ...func(p *user.Policy)) string {
 }
 
 func TestJWTExpOverridesToken(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 	//create policy which sets keys to have expiry in one second
 	pID := createExpiringPolicy()
 
-	buildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
@@ -1564,7 +1531,7 @@ func TestJWTExpOverridesToken(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 	})
 
-	jwtToken := createJWKToken(func(t *jwt.Token) {
+	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
 		t.Claims.(jwt.MapClaims)["sub"] = "user123@test.com" //is ignored
 		t.Claims.(jwt.MapClaims)["policy_id"] = pID

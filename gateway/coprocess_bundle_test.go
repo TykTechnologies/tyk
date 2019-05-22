@@ -33,7 +33,7 @@ func TestBundleLoader(t *testing.T) {
 	bundleID := registerBundle("grpc_with_auth_check", grpcBundleWithAuthCheck)
 
 	t.Run("Nonexistent bundle", func(t *testing.T) {
-		specs := buildAndLoadAPI(func(spec *APISpec) {
+		specs := BuildAndLoadAPI(func(spec *APISpec) {
 			spec.CustomMiddlewareBundle = "nonexistent.zip"
 		})
 		err := loadBundle(specs[0])
@@ -43,7 +43,7 @@ func TestBundleLoader(t *testing.T) {
 	})
 
 	t.Run("Existing bundle with auth check", func(t *testing.T) {
-		specs := buildAndLoadAPI(func(spec *APISpec) {
+		specs := BuildAndLoadAPI(func(spec *APISpec) {
 			spec.CustomMiddlewareBundle = bundleID
 		})
 		spec := specs[0]

@@ -46,7 +46,7 @@ const keyRules = `{
 }`
 
 func loadTestOAuthSpec() *APISpec {
-	spec := buildAndLoadAPI(func(spec *APISpec) {
+	spec := BuildAndLoadAPI(func(spec *APISpec) {
 		spec.APIID = "999999"
 		spec.OrgID = "default"
 		spec.Auth = apidef.Auth{
@@ -124,7 +124,7 @@ func createTestOAuthClient(spec *APISpec, clientID string) {
 }
 
 func TestAuthCodeRedirect(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	spec := loadTestOAuthSpec()
@@ -165,7 +165,7 @@ func TestAuthCodeRedirectMultipleURL(t *testing.T) {
 	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	spec := loadTestOAuthSpec()
@@ -206,7 +206,7 @@ func TestAuthCodeRedirectInvalidMultipleURL(t *testing.T) {
 	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	spec := loadTestOAuthSpec()
@@ -234,7 +234,7 @@ func TestAuthCodeRedirectInvalidMultipleURL(t *testing.T) {
 }
 
 func TestAPIClientAuthorizeAuthCode(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	spec := loadTestOAuthSpec()
@@ -265,7 +265,7 @@ func TestAPIClientAuthorizeAuthCode(t *testing.T) {
 }
 
 func TestAPIClientAuthorizeToken(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	spec := loadTestOAuthSpec()
@@ -296,7 +296,7 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 }
 
 func TestDeleteOauthClient(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	spec := loadTestOAuthSpec()
@@ -389,7 +389,7 @@ func TestDeleteOauthClient(t *testing.T) {
 }
 
 func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	spec := loadTestOAuthSpec()
@@ -440,7 +440,7 @@ func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 	})
 }
 
-func getAuthCode(t *testing.T, ts *tykTestServer) map[string]string {
+func getAuthCode(t *testing.T, ts *Test) map[string]string {
 	param := make(url.Values)
 	param.Set("response_type", "code")
 	param.Set("redirect_uri", authRedirectUri)
@@ -489,7 +489,7 @@ func testGetClientTokens(t *testing.T, hashed bool) {
 
 	defer resetTestConfig()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	spec := loadTestOAuthSpec()
@@ -596,7 +596,7 @@ type tokenData struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
-func getToken(t *testing.T, ts *tykTestServer) tokenData {
+func getToken(t *testing.T, ts *Test) tokenData {
 	authData := getAuthCode(t, ts)
 
 	param := make(url.Values)
@@ -628,7 +628,7 @@ func getToken(t *testing.T, ts *tykTestServer) tokenData {
 }
 
 func TestOAuthClientCredsGrant(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	spec := loadTestOAuthSpec()
@@ -667,7 +667,7 @@ func TestOAuthClientCredsGrant(t *testing.T) {
 }
 
 func TestClientAccessRequest(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	spec := loadTestOAuthSpec()
@@ -699,7 +699,7 @@ func TestClientAccessRequest(t *testing.T) {
 }
 
 func TestOAuthAPIRefreshInvalidate(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	spec := loadTestOAuthSpec()
@@ -756,7 +756,7 @@ func TestOAuthAPIRefreshInvalidate(t *testing.T) {
 }
 
 func TestClientRefreshRequest(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	spec := loadTestOAuthSpec()
@@ -788,7 +788,7 @@ func TestClientRefreshRequest(t *testing.T) {
 }
 
 func TestClientRefreshRequestDouble(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	spec := loadTestOAuthSpec()

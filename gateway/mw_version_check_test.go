@@ -10,7 +10,7 @@ import (
 )
 
 func testPrepareVersioning() (string, string) {
-	buildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.VersionData.NotVersioned = false
 		spec.VersionDefinition.Location = "header"
@@ -60,13 +60,13 @@ func testPrepareVersioning() (string, string) {
 		}
 	})
 
-	keyWrongVersion := createSession(func(s *user.SessionState) {
+	keyWrongVersion := CreateSession(func(s *user.SessionState) {
 		s.AccessRights = map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v3"},
 		}}
 	})
 
-	keyKnownVersion := createSession(func(s *user.SessionState) {
+	keyKnownVersion := CreateSession(func(s *user.SessionState) {
 		s.AccessRights = map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v1", "v2", "expired"},
 		}}
@@ -76,7 +76,7 @@ func testPrepareVersioning() (string, string) {
 }
 
 func TestVersioning(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	keyWrongVersion, keyKnownVersion := testPrepareVersioning()
@@ -119,7 +119,7 @@ func TestVersioning(t *testing.T) {
 func BenchmarkVersioning(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	keyWrongVersion, keyKnownVersion := testPrepareVersioning()

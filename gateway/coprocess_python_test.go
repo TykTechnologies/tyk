@@ -131,7 +131,7 @@ def MyPreHook(request, session, metadata, spec):
 }
 
 func TestPythonBundles(t *testing.T) {
-	ts := newTykTestServer(tykTestServerConfig{
+	ts := StartTest(TestConfig{
 		coprocessConfig: config.CoProcessConfig{
 			EnableCoProcess: true,
 		}})
@@ -142,7 +142,7 @@ func TestPythonBundles(t *testing.T) {
 	preHookBundle := registerBundle("python_with_pre_hook", pythonBundleWithPreHook)
 
 	t.Run("Single-file bundle with authentication hook", func(t *testing.T) {
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/test-api/"
 			spec.UseKeylessAccess = false
 			spec.EnableCoProcessAuth = true
@@ -163,14 +163,14 @@ func TestPythonBundles(t *testing.T) {
 
 	t.Run("Single-file bundle with post hook", func(t *testing.T) {
 
-		keyID := createSession(func(s *user.SessionState) {
+		keyID := CreateSession(func(s *user.SessionState) {
 			s.MetaData = map[string]interface{}{
 				"testkey":   map[string]interface{}{"nestedkey": "nestedvalue"},
 				"stringkey": "testvalue",
 			}
 		})
 
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/test-api-2/"
 			spec.UseKeylessAccess = false
 			spec.EnableCoProcessAuth = false
@@ -188,7 +188,7 @@ func TestPythonBundles(t *testing.T) {
 	})
 
 	t.Run("Single-file bundle with pre hook and UTF-8/non-UTF-8 request data", func(t *testing.T) {
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/test-api-2/"
 			spec.UseKeylessAccess = true
 			spec.EnableCoProcessAuth = false

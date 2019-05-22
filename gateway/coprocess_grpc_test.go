@@ -120,7 +120,7 @@ func newTestGRPCServer() (s *grpc.Server) {
 }
 
 func loadTestGRPCAPIs() {
-	buildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.APIID = "1"
 		spec.OrgID = mockOrgID
 		spec.Auth = apidef.Auth{
@@ -204,7 +204,7 @@ func loadTestGRPCAPIs() {
 	})
 }
 
-func startTykWithGRPC() (*tykTestServer, *grpc.Server) {
+func startTykWithGRPC() (*Test, *grpc.Server) {
 	// Setup the gRPC server:
 	listener, _ := net.Listen("tcp", grpcListenAddr)
 	grpcServer := newTestGRPCServer()
@@ -215,7 +215,7 @@ func startTykWithGRPC() (*tykTestServer, *grpc.Server) {
 		EnableCoProcess:     true,
 		CoProcessGRPCServer: grpcListenPath,
 	}
-	ts := newTykTestServer(tykTestServerConfig{coprocessConfig: cfg})
+	ts := StartTest(TestConfig{coprocessConfig: cfg})
 
 	// Load test APIs:
 	loadTestGRPCAPIs()
@@ -227,7 +227,7 @@ func TestGRPCDispatch(t *testing.T) {
 	defer ts.Close()
 	defer grpcServer.Stop()
 
-	keyID := createSession(func(s *user.SessionState) {
+	keyID := CreateSession(func(s *user.SessionState) {
 		s.MetaData = map[string]interface{}{
 			"testkey":  map[string]interface{}{"nestedkey": "nestedvalue"},
 			"testkey2": "testvalue",
@@ -310,7 +310,7 @@ func BenchmarkGRPCDispatch(b *testing.B) {
 	defer ts.Close()
 	defer grpcServer.Stop()
 
-	keyID := createSession(func(s *user.SessionState) {})
+	keyID := CreateSession(func(s *user.SessionState) {})
 	headers := map[string]string{"authorization": keyID}
 
 	b.Run("Pre Hook with SetHeaders", func(b *testing.B) {

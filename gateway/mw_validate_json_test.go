@@ -29,8 +29,8 @@ var testJsonSchema = `{
 }`
 
 func testPrepareValidateJSONSchema() {
-	buildAndLoadAPI(func(spec *APISpec) {
-		updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+	BuildAndLoadAPI(func(spec *APISpec) {
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 			json.Unmarshal([]byte(`[
 				{
 					"path": "/v",
@@ -45,7 +45,7 @@ func testPrepareValidateJSONSchema() {
 }
 
 func TestValidateJSONSchema(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	testPrepareValidateJSONSchema()
@@ -62,7 +62,7 @@ func TestValidateJSONSchema(t *testing.T) {
 func BenchmarkValidateJSONSchema(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	testPrepareValidateJSONSchema()

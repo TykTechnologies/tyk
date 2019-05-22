@@ -108,10 +108,10 @@ func TestGatewayTLS(t *testing.T) {
 		config.SetGlobal(globalConf)
 		defer resetTestConfig()
 
-		ts := newTykTestServer()
+		ts := StartTest()
 		defer ts.Close()
 
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 		})
 
@@ -135,10 +135,10 @@ func TestGatewayTLS(t *testing.T) {
 		config.SetGlobal(globalConf)
 		defer resetTestConfig()
 
-		ts := newTykTestServer()
+		ts := StartTest()
 		defer ts.Close()
 
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 		})
 
@@ -157,10 +157,10 @@ func TestGatewayTLS(t *testing.T) {
 		config.SetGlobal(globalConf)
 		defer resetTestConfig()
 
-		ts := newTykTestServer()
+		ts := StartTest()
 		defer ts.Close()
 
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 		})
 
@@ -182,10 +182,10 @@ func TestGatewayTLS(t *testing.T) {
 		config.SetGlobal(globalConf)
 		defer resetTestConfig()
 
-		ts := newTykTestServer()
+		ts := StartTest()
 		defer ts.Close()
 
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 		})
 
@@ -226,7 +226,7 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
 		config.SetGlobal(globalConf)
 
-		ts := newTykTestServer()
+		ts := StartTest()
 		defer ts.Close()
 
 		defer func() {
@@ -277,7 +277,7 @@ func TestAPIMutualTLS(t *testing.T) {
 	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	// Initialize client certificates
@@ -287,7 +287,7 @@ func TestAPIMutualTLS(t *testing.T) {
 		t.Run("API without mutual TLS", func(t *testing.T) {
 			client := getTLSClient(&clientCert, serverCertPem)
 
-			buildAndLoadAPI(func(spec *APISpec) {
+			BuildAndLoadAPI(func(spec *APISpec) {
 				spec.Domain = "localhost"
 				spec.Proxy.ListenPath = "/"
 			})
@@ -298,7 +298,7 @@ func TestAPIMutualTLS(t *testing.T) {
 		t.Run("MutualTLSCertificate not set", func(t *testing.T) {
 			client := getTLSClient(nil, nil)
 
-			buildAndLoadAPI(func(spec *APISpec) {
+			BuildAndLoadAPI(func(spec *APISpec) {
 				spec.Domain = "localhost"
 				spec.Proxy.ListenPath = "/"
 				spec.UseMutualTLSAuth = true
@@ -315,7 +315,7 @@ func TestAPIMutualTLS(t *testing.T) {
 			client := getTLSClient(&clientCert, serverCertPem)
 			clientCertID, _ := CertificateManager.Add(clientCertPem, "")
 
-			buildAndLoadAPI(func(spec *APISpec) {
+			BuildAndLoadAPI(func(spec *APISpec) {
 				spec.Domain = "localhost"
 				spec.Proxy.ListenPath = "/"
 				spec.UseMutualTLSAuth = true
@@ -342,7 +342,7 @@ func TestAPIMutualTLS(t *testing.T) {
 			clientCertID2, _ := CertificateManager.Add(clientCertPem2, "")
 			defer CertificateManager.Delete(clientCertID2)
 
-			buildAndLoadAPI(func(spec *APISpec) {
+			BuildAndLoadAPI(func(spec *APISpec) {
 				spec.Domain = "localhost"
 				spec.Proxy.ListenPath = "/"
 				spec.UseMutualTLSAuth = true
@@ -360,7 +360,7 @@ func TestAPIMutualTLS(t *testing.T) {
 		defer CertificateManager.Delete(clientCertID)
 
 		loadAPIS := func(certs ...string) {
-			buildAndLoadAPI(
+			BuildAndLoadAPI(
 				func(spec *APISpec) {
 					spec.Proxy.ListenPath = "/with_mutual"
 					spec.UseMutualTLSAuth = true
@@ -459,7 +459,7 @@ func TestUpstreamMutualTLS(t *testing.T) {
 		config.SetGlobal(globalConf)
 		defer resetTestConfig()
 
-		ts := newTykTestServer()
+		ts := StartTest()
 		defer ts.Close()
 
 		clientCertID, _ := CertificateManager.Add(combinedClientPEM, "")
@@ -467,7 +467,7 @@ func TestUpstreamMutualTLS(t *testing.T) {
 
 		pool.AddCert(clientCert.Leaf)
 
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
 			spec.UpstreamCertificates = map[string]string{
@@ -494,10 +494,10 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
-	buildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.BaseIdentityProvidedBy = apidef.AuthToken
 		spec.Auth.UseCertificate = true
@@ -511,7 +511,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 	})
 
 	t.Run("Cert known", func(t *testing.T) {
-		createSession(func(s *user.SessionState) {
+		CreateSession(func(s *user.SessionState) {
 			s.Certificate = clientCertID
 			s.AccessRights = map[string]user.AccessDefinition{"test": {
 				APIID: "test", Versions: []string{"v1"},
@@ -533,7 +533,7 @@ func TestAPICertificate(t *testing.T) {
 	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{
@@ -541,7 +541,7 @@ func TestAPICertificate(t *testing.T) {
 	}}}
 
 	t.Run("Cert set via API", func(t *testing.T) {
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Certificates = []string{serverCertID}
 			spec.UseKeylessAccess = true
 			spec.Proxy.ListenPath = "/"
@@ -551,7 +551,7 @@ func TestAPICertificate(t *testing.T) {
 	})
 
 	t.Run("Cert unknown", func(t *testing.T) {
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = true
 			spec.Proxy.ListenPath = "/"
 		})
@@ -567,7 +567,7 @@ func TestCertificateHandlerTLS(t *testing.T) {
 	clientPEM, _, _, clientCert := genCertificate(&x509.Certificate{})
 	clientCertID := certs.HexSHA256(clientCert.Certificate[0])
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	t.Run("List certificates, empty", func(t *testing.T) {
@@ -628,10 +628,10 @@ func TestCipherSuites(t *testing.T) {
 	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
-	buildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 	})
 
@@ -692,10 +692,10 @@ func TestHTTP2(t *testing.T) {
 	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
-	buildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = true
 		spec.Proxy.TargetURL = upstream.URL
@@ -737,10 +737,10 @@ func TestGRPC(t *testing.T) {
 	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
-	buildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = true
 		spec.Proxy.TargetURL = "https://localhost:50051"

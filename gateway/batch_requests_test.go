@@ -40,10 +40,10 @@ const testBatchRequest = `{
 }`
 
 func TestBatch(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
-	buildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/v1/"
 		spec.EnableBatchRequestSupport = true
 	})
@@ -146,10 +146,10 @@ func TestVirtualEndpointBatch(t *testing.T) {
 
 	defer resetTestConfig()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
-	buildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		virtualMeta := apidef.VirtualMeta{
 			ResponseFunctionName: "batchTest",
@@ -158,7 +158,7 @@ func TestVirtualEndpointBatch(t *testing.T) {
 			Path:                 "/virt",
 			Method:               "GET",
 		}
-		updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 			v.UseExtendedPaths = true
 			v.ExtendedPaths = apidef.ExtendedPathsSet{
 				Virtual: []apidef.VirtualMeta{virtualMeta},

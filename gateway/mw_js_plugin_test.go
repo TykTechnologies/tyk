@@ -351,7 +351,7 @@ leakMid.NewProcessRequest(function(request, session) {
 }
 
 func TestTykMakeHTTPRequest(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	bundle := registerBundle("jsvm_make_http_request", map[string]string{
@@ -393,7 +393,7 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 	`})
 
 	t.Run("Existing endpoint", func(t *testing.T) {
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/sample"
 			spec.ConfigData = map[string]interface{}{
 				"base_url": ts.URL,
@@ -407,7 +407,7 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 	})
 
 	t.Run("Nonexistent endpoint", func(t *testing.T) {
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/sample"
 			spec.ConfigData = map[string]interface{}{
 				"base_url": ts.URL,
@@ -419,7 +419,7 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 	})
 
 	t.Run("Endpoint with query", func(t *testing.T) {
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/sample"
 			spec.ConfigData = map[string]interface{}{
 				"base_url": ts.URL,
@@ -444,11 +444,11 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 		testServerRouter.SkipClean(true)
 		defer testServerRouter.SkipClean(prevSkipClean)
 
-		ts := newTykTestServer()
+		ts := StartTest()
 		defer ts.Close()
 		defer resetTestConfig()
 
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/sample"
 			spec.ConfigData = map[string]interface{}{
 				"base_url": ts.URL,

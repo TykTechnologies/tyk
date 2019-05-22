@@ -18,7 +18,7 @@ var testWhiteListIPData = []struct {
 }
 
 func testPrepareIPMiddlewarePass() *APISpec {
-	return buildAPI(func(spec *APISpec) {
+	return BuildAPI(func(spec *APISpec) {
 		spec.EnableIpWhiteListing = true
 		spec.AllowedIPs = []string{"127.0.0.1", "127.0.0.1/24"}
 	})[0]

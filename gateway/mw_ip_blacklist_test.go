@@ -18,7 +18,7 @@ var testBlackListIPData = []struct {
 }
 
 func testPrepareIPBlacklistMiddleware() *APISpec {
-	return buildAPI(func(spec *APISpec) {
+	return BuildAPI(func(spec *APISpec) {
 		spec.EnableIpBlacklisting = true
 		spec.BlacklistedIPs = []string{"127.0.0.1", "127.0.0.1/24"}
 	})[0]

@@ -10,10 +10,10 @@ import (
 )
 
 func testPrepareJQMiddleware() {
-	buildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.EnableContextVars = true
-		updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 			v.UseExtendedPaths = true
 			v.ExtendedPaths.TransformJQ = []apidef.TransformJQMeta{{
 				Path:   "/jq",
@@ -25,7 +25,7 @@ func testPrepareJQMiddleware() {
 }
 
 func TestJQMiddleware(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	testPrepareJQMiddleware()
@@ -43,7 +43,7 @@ func TestJQMiddleware(t *testing.T) {
 func BenchmarkJQMiddleware(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	testPrepareJQMiddleware()

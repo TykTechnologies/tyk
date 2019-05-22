@@ -7,6 +7,9 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+
+	"golang.org/x/net/context"
+
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -14,13 +17,17 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/TykTechnologies/tyk/cli"
+
 	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/garyburd/redigo/redis"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	uuid "github.com/satori/go.uuid"
@@ -31,6 +38,141 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
+
+var (
+	// to register to, but never used
+	discardMuxer = mux.NewRouter()
+
+	// to simulate time ticks for tests that do reloads
+	reloadTick = make(chan time.Time)
+
+	// Used to store the test bundles:
+	testMiddlewarePath, _ = ioutil.TempDir("", "tyk-middleware-path")
+
+	mockHandle *test.DnsMockHandle
+
+	testServerRouter  *mux.Router
+	defaultTestConfig config.Config
+)
+
+func InitTestMain(m *testing.M) int {
+	runningTests = true
+	testServerRouter = testHttpHandler()
+	testServer := &http.Server{
+		Addr:           testHttpListen,
+		Handler:        testServerRouter,
+		ReadTimeout:    1 * time.Second,
+		WriteTimeout:   1 * time.Second,
+		MaxHeaderBytes: 1 << 20,
+	}
+
+	globalConf := config.Global()
+	if err := config.WriteDefault("", &globalConf); err != nil {
+		panic(err)
+	}
+	globalConf.Storage.Database = rand.Intn(15)
+	var err error
+	globalConf.AppPath, err = ioutil.TempDir("", "tyk-test-")
+	if err != nil {
+		panic(err)
+	}
+	globalConf.EnableAnalytics = true
+	globalConf.AnalyticsConfig.EnableGeoIP = true
+	_, b, _, _ := runtime.Caller(0)
+	gatewayPath := filepath.Dir(b)
+	rootPath := filepath.Dir(gatewayPath)
+	globalConf.AnalyticsConfig.GeoIPDBLocation = filepath.Join(rootPath, "testdata", "MaxMind-DB-test-ipv4-24.mmdb")
+	globalConf.EnableJSVM = true
+	globalConf.Monitor.EnableTriggerMonitors = true
+	globalConf.AnalyticsConfig.NormaliseUrls.Enabled = true
+	globalConf.AllowInsecureConfigs = true
+	// Enable coprocess and bundle downloader:
+	globalConf.CoProcessOptions.EnableCoProcess = true
+	globalConf.CoProcessOptions.PythonPathPrefix = "../"
+	globalConf.EnableBundleDownloader = true
+	globalConf.BundleBaseURL = testHttpBundles
+	globalConf.MiddlewarePath = testMiddlewarePath
+	purgeTicker = make(chan time.Time)
+	rpcPurgeTicker = make(chan time.Time)
+	// force ipv4 for now, to work around the docker bug affecting
+	// Go 1.8 and ealier
+	globalConf.ListenAddress = "127.0.0.1"
+
+	mockHandle, err = test.InitDNSMock(test.DomainsToAddresses, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	defer func() {
+		testServer.Shutdown(context.Background())
+		mockHandle.ShutdownDnsMock()
+	}()
+
+	go func() {
+		err := testServer.ListenAndServe()
+		if err != nil {
+			log.Warn("testServer.ListenAndServe() err: ", err.Error())
+		}
+	}()
+
+	CoProcessInit()
+	afterConfSetup(&globalConf)
+	defaultTestConfig = globalConf
+	config.SetGlobal(globalConf)
+	if err := emptyRedis(); err != nil {
+		panic(err)
+	}
+	cli.Init(VERSION, confPaths)
+	initialiseSystem()
+	// Small part of start()
+	loadAPIEndpoints(mainRouter)
+	if analytics.GeoIPDB == nil {
+		panic("GeoIPDB was not initialized")
+	}
+
+	go startPubSubLoop()
+	go reloadLoop(reloadTick)
+	go reloadQueueLoop()
+	go reloadSimulation()
+	exitCode := m.Run()
+	os.RemoveAll(config.Global().AppPath)
+	return exitCode
+}
+
+func emptyRedis() error {
+	addr := config.Global().Storage.Host + ":" + strconv.Itoa(config.Global().Storage.Port)
+	c, err := redis.Dial("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("could not connect to redis: %v", err)
+	}
+	defer c.Close()
+	dbName := strconv.Itoa(config.Global().Storage.Database)
+	if _, err := c.Do("SELECT", dbName); err != nil {
+		return err
+	}
+	_, err = c.Do("FLUSHDB")
+	return err
+}
+
+// simulate reloads in the background, i.e. writes to
+// global variables that should not be accessed in a
+// racy way like the policies and api specs maps.
+func reloadSimulation() {
+	for {
+		policiesMu.Lock()
+		policiesByID["_"] = user.Policy{}
+		delete(policiesByID, "_")
+		policiesMu.Unlock()
+		apisMu.Lock()
+		old := apiSpecs
+		apiSpecs = append(apiSpecs, nil)
+		apiSpecs = old
+		apisByID["_"] = nil
+		delete(apisByID, "_")
+		apisMu.Unlock()
+		time.Sleep(5 * time.Millisecond)
+	}
+}
 
 // map[bundleName]map[fileName]fileContent
 var testBundles = map[string]map[string]string{}
@@ -129,7 +271,7 @@ func testHttpHandler() *mux.Router {
 			return
 		}
 		r.URL.Opaque = r.URL.RawPath
-		w.Header().Set("X-Tyk-Mock", "1")
+		w.Header().Set("X-Tyk-Test", "1")
 		body, _ := ioutil.ReadAll(r.Body)
 
 		err := json.NewEncoder(w).Encode(testHttpResponse{
@@ -189,9 +331,9 @@ func withAuth(r *http.Request) *http.Request {
 }
 
 // TODO: replace with /tyk/keys/create call
-func createSession(sGen ...func(s *user.SessionState)) string {
+func CreateSession(sGen ...func(s *user.SessionState)) string {
 	key := generateToken("", "")
-	session := createStandardSession()
+	session := CreateStandardSession()
 	if len(sGen) > 0 {
 		sGen[0](session)
 	}
@@ -203,7 +345,21 @@ func createSession(sGen ...func(s *user.SessionState)) string {
 	return key
 }
 
-func createStandardPolicy() *user.Policy {
+func CreateStandardSession() *user.SessionState {
+	session := new(user.SessionState)
+	session.Rate = 10000
+	session.Allowance = session.Rate
+	session.LastCheck = time.Now().Unix()
+	session.Per = 60
+	session.Expires = -1
+	session.QuotaRenewalRate = 300 // 5 minutes
+	session.QuotaRenews = time.Now().Unix() + 20
+	session.QuotaRemaining = 10
+	session.QuotaMax = -1
+	return session
+}
+
+func CreateStandardPolicy() *user.Policy {
 	return &user.Policy{
 		Rate:             1000.0,
 		Per:              1.0,
@@ -215,9 +371,9 @@ func createStandardPolicy() *user.Policy {
 	}
 }
 
-func createPolicy(pGen ...func(p *user.Policy)) string {
+func CreatePolicy(pGen ...func(p *user.Policy)) string {
 	pID := keyGen.GenerateAuthKey("")
-	pol := createStandardPolicy()
+	pol := CreateStandardPolicy()
 	pol.ID = pID
 
 	if len(pGen) > 0 {
@@ -231,7 +387,7 @@ func createPolicy(pGen ...func(p *user.Policy)) string {
 	return pol.ID
 }
 
-func createJWKToken(jGen ...func(*jwt.Token)) string {
+func CreateJWKToken(jGen ...func(*jwt.Token)) string {
 	// Create the token
 	token := jwt.New(jwt.GetSigningMethod("RS512"))
 	// Set the token ID
@@ -278,7 +434,7 @@ func firstVals(vals map[string][]string) map[string]string {
 	return m
 }
 
-type tykTestServerConfig struct {
+type TestConfig struct {
 	sepatateControlAPI bool
 	delay              time.Duration
 	hotReload          bool
@@ -286,17 +442,17 @@ type tykTestServerConfig struct {
 	coprocessConfig    config.CoProcessConfig
 }
 
-type tykTestServer struct {
+type Test struct {
 	ln  net.Listener
 	cln net.Listener
 	URL string
 
 	testRunner   *test.HTTPTestRunner
-	globalConfig config.Config
-	config       tykTestServerConfig
+	GlobalConfig config.Config
+	config       TestConfig
 }
 
-func (s *tykTestServer) Start() {
+func (s *Test) Start() {
 	s.ln, _ = generateListener(0)
 	_, port, _ := net.SplitHostPort(s.ln.Addr().String())
 	globalConf := config.Global()
@@ -331,10 +487,10 @@ func (s *tykTestServer) Start() {
 		listen(s.ln, s.cln, fmt.Errorf("Without goagain"))
 	}
 
-	s.globalConfig = globalConf
+	s.GlobalConfig = globalConf
 
 	scheme := "http://"
-	if s.globalConfig.HttpServerOptions.UseSSL {
+	if s.GlobalConfig.HttpServerOptions.UseSSL {
 		scheme = "https://"
 	}
 	s.URL = scheme + s.ln.Addr().String()
@@ -345,8 +501,8 @@ func (s *tykTestServer) Start() {
 			if tc.ControlRequest {
 				if s.config.sepatateControlAPI {
 					tc.BaseURL = scheme + s.cln.Addr().String()
-				} else if s.globalConfig.ControlAPIHostname != "" {
-					tc.Domain = s.globalConfig.ControlAPIHostname
+				} else if s.GlobalConfig.ControlAPIHostname != "" {
+					tc.Domain = s.GlobalConfig.ControlAPIHostname
 				}
 			}
 			r, err := test.NewRequest(tc)
@@ -365,12 +521,12 @@ func (s *tykTestServer) Start() {
 	}
 }
 
-func (s *tykTestServer) Do(tc test.TestCase) (*http.Response, error) {
+func (s *Test) Do(tc test.TestCase) (*http.Response, error) {
 	req, _ := s.testRunner.RequestBuilder(&tc)
 	return s.testRunner.Do(req, &tc)
 }
 
-func (s *tykTestServer) Close() {
+func (s *Test) Close() {
 	s.ln.Close()
 
 	if s.config.sepatateControlAPI {
@@ -381,11 +537,11 @@ func (s *tykTestServer) Close() {
 	}
 }
 
-func (s *tykTestServer) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, error) {
+func (s *Test) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, error) {
 	return s.testRunner.Run(t, testCases...)
 }
 
-func (s *tykTestServer) RunExt(t testing.TB, testCases ...test.TestCase) {
+func (s *Test) RunExt(t testing.TB, testCases ...test.TestCase) {
 	var testMatrix = []struct {
 		goagain          bool
 		overrideDefaults bool
@@ -412,8 +568,8 @@ func (s *tykTestServer) RunExt(t testing.TB, testCases ...test.TestCase) {
 	}
 }
 
-func (s *tykTestServer) createSession(sGen ...func(s *user.SessionState)) string {
-	session := createStandardSession()
+func (s *Test) createSession(sGen ...func(s *user.SessionState)) string {
+	session := CreateStandardSession()
 	if len(sGen) > 0 {
 		sGen[0](session)
 	}
@@ -440,14 +596,14 @@ func (s *tykTestServer) createSession(sGen ...func(s *user.SessionState)) string
 	return respJSON.Key
 }
 
-func newTykTestServer(config ...tykTestServerConfig) tykTestServer {
-	s := tykTestServer{}
+func StartTest(config ...TestConfig) Test {
+	t := Test{}
 	if len(config) > 0 {
-		s.config = config[0]
+		t.config = config[0]
 	}
-	s.Start()
+	t.Start()
 
-	return s
+	return t
 }
 
 const sampleAPI = `{
@@ -475,7 +631,7 @@ const sampleAPI = `{
     }
 }`
 
-func updateAPIVersion(spec *APISpec, name string, verGen func(version *apidef.VersionInfo)) {
+func UpdateAPIVersion(spec *APISpec, name string, verGen func(version *apidef.VersionInfo)) {
 	version := spec.VersionData.Versions[name]
 	verGen(&version)
 	spec.VersionData.Versions[name] = version
@@ -486,7 +642,7 @@ func jsonMarshalString(i interface{}) (out string) {
 	return string(b)
 }
 
-func buildAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
+func BuildAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 	if len(apiGens) == 0 {
 		apiGens = append(apiGens, func(spec *APISpec) {})
 	}
@@ -504,7 +660,7 @@ func buildAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 	return specs
 }
 
-func loadAPI(specs ...*APISpec) (out []*APISpec) {
+func LoadAPI(specs ...*APISpec) (out []*APISpec) {
 	globalConf := config.Global()
 	oldPath := globalConf.AppPath
 	globalConf.AppPath, _ = ioutil.TempDir("", "apps")
@@ -537,8 +693,8 @@ func loadAPI(specs ...*APISpec) (out []*APISpec) {
 	return out
 }
 
-func buildAndLoadAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
-	return loadAPI(buildAPI(apiGens...)...)
+func BuildAndLoadAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
+	return LoadAPI(BuildAPI(apiGens...)...)
 }
 
 // Taken from https://medium.com/@mlowicki/http-s-proxy-in-golang-in-less-than-100-lines-of-code-6a51c2f2c38c
@@ -648,3 +804,36 @@ func generateTestBinaryData() (buf *bytes.Buffer) {
 	}
 	return buf
 }
+
+// openssl genrsa -out app.rsa
+const jwtRSAPrivKey = `
+-----BEGIN RSA PRIVATE KEY-----
+MIIEpQIBAAKCAQEAyqZ4rwKF8qCExS7kpY4cnJa/37FMkJNkalZ3OuslLB0oRL8T
+4c94kdF4aeNzSFkSe2n99IBI6Ssl79vbfMZb+t06L0Q94k+/P37x7+/RJZiff4y1
+VGjrnrnMI2iu9l4iBBRYzNmG6eblroEMMWlgk5tysHgxB59CSNIcD9gqk1hx4n/F
+gOmvKsfQgWHNlPSDTRcWGWGhB2/XgNVYG2pOlQxAPqLhBHeqGTXBbPfGF9cHzixp
+sPr6GtbzPwhsQ/8bPxoJ7hdfn+rzztks3d6+HWURcyNTLRe0mjXjjee9Z6+gZ+H+
+fS4pnP9tqT7IgU6ePUWTpjoiPtLexgsAa/ctjQIDAQABAoIBAECWvnBJRZgHQUn3
+oDiECup9wbnyMI0D7UVXObk1qSteP69pl1SpY6xWLyLQs7WjbhiXt7FuEc7/SaAh
+Wttx/W7/g8P85Bx1fmcmdsYakXaCJpPorQKyTibQ4ReIDfvIFN9n/MWNr0ptpVbx
+GonFJFrneK52IGplgCLllLwYEbnULYcJc6E25Ro8U2gQjF2r43PDa07YiDrmB/GV
+QQW4HTo+CA9rdK0bP8GpXgc0wpmBhx/t/YdnDg6qhzyUMk9As7JrAzYPjHO0cRun
+vhA/aG/mdMmRumY75nj7wB5U5DgstsN2ER75Pjr1xe1knftIyNm15AShCPfLaLGo
+dA2IpwECgYEA5E8h6ssa7QroCGwp/N0wSJW41hFYGygbOEg6yPWTJkqmMZVduD8X
+/KFqJK4LcIbFQuR28+hWJpHm/RF1AMRhbbWkAj6h02gv5izFwDiFKev5paky4Evg
+G8WfUOmSZ1D+fVxwaoG0OaRZpCovUTxYig3xrI659DMeKqpQ7e8l9ekCgYEA4zql
+l4P4Dn0ydr+TI/s4NHIQHkaLQAVk3OWwyKowijXd8LCtuZRA1NKSpqQ4ZXi0B17o
+9zzF5jEUjws3qWv4PKWdxJu3y+h/etsg7wxUeNizbY2ooUGeMbk0tWxJihbgaI7E
+XxLIT50F3Ky4EJ2cUL9GmJ+gLCw0KIaVbkiyYAUCgYEA0WyVHB76r/2VIkS1rzHm
+HG7ageKfAyoi7dmzsqsxM6q+EDWHJn8Zra8TAlp0O+AkClwvkUTJ4c9sJy9gODfr
+dwtrSnPRVW74oRbovo4Z+H5xHbi65mwzQsZggYP/u63cA3pL1Cbt/wH3CFN52/aS
+8PAhg7vYb1yEi3Z3jgoUtCECgYEAhSPX4u9waQzyhKG7lVmdlR1AVH0BGoIOl1/+
+NZWC23i0klLzd8lmM00uoHWYldwjoC38UuFJE5eudCIeeybITMC9sHWNO+z+xP2g
+TnDrDePrPkXCiLnp9ziNqb/JVyAQXTNJ3Gsk84EN7j9Fmna/IJDyzHq7XyaHaTdy
+VyxBWAECgYEA4jYS07bPx5UMhKiMJDqUmDfLNFD97XwPoJIkOdn6ezqeOSmlmo7t
+jxHLbCmsDOAsCU/0BlLXg9wMU7n5QKSlfTVGok/PU0rq2FUXQwyKGnellrqODwFQ
+YGivtXBGXk1hlVYlje1RB+W6RQuDAegI5h8vl8pYJS9JQH0wjatsDaE=
+-----END RSA PRIVATE KEY-----
+`
+
+const jwtSecret = "9879879878787878"

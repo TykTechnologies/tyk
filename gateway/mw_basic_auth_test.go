@@ -21,12 +21,12 @@ func genAuthHeader(username, password string) string {
 }
 
 func testPrepareBasicAuth(cacheDisabled bool) *user.SessionState {
-	session := createStandardSession()
+	session := CreateStandardSession()
 	session.BasicAuthData.Password = "password"
 	session.AccessRights = map[string]user.AccessDefinition{"test": {APIID: "test", Versions: []string{"v1"}}}
 	session.OrgID = "default"
 
-	buildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseBasicAuth = true
 		spec.BasicAuth.DisableCaching = cacheDisabled
 		spec.UseKeylessAccess = false
@@ -38,7 +38,7 @@ func testPrepareBasicAuth(cacheDisabled bool) *user.SessionState {
 }
 
 func TestBasicAuth(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	session := testPrepareBasicAuth(false)
@@ -60,15 +60,15 @@ func TestBasicAuth(t *testing.T) {
 }
 
 func TestBasicAuthFromBody(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
-	session := createStandardSession()
+	session := CreateStandardSession()
 	session.BasicAuthData.Password = "password"
 	session.AccessRights = map[string]user.AccessDefinition{"test": {APIID: "test", Versions: []string{"v1"}}}
 	session.OrgID = "default"
 
-	buildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseBasicAuth = true
 		spec.BasicAuth.ExtractFromBody = true
 		spec.BasicAuth.BodyUserRegexp = `<User>(.*)</User>`
@@ -105,7 +105,7 @@ func TestBasicAuthLegacyWithHashFunc(t *testing.T) {
 	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	// create session with legacy key format
@@ -136,7 +136,7 @@ func TestBasicAuthCachedUserCollision(t *testing.T) {
 	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	session := testPrepareBasicAuth(false)
@@ -168,7 +168,7 @@ func TestBasicAuthCachedUserCollision(t *testing.T) {
 }
 
 func TestBasicAuthCachedPasswordCollision(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	for _, useCache := range []bool{true, false} {
@@ -206,7 +206,7 @@ func TestBasicAuthCachedPasswordCollision(t *testing.T) {
 func BenchmarkBasicAuth(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	session := testPrepareBasicAuth(false)
@@ -239,7 +239,7 @@ func BenchmarkBasicAuth(b *testing.B) {
 func BenchmarkBasicAuth_CacheEnabled(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	session := testPrepareBasicAuth(false)
@@ -265,7 +265,7 @@ func BenchmarkBasicAuth_CacheEnabled(b *testing.B) {
 func BenchmarkBasicAuth_CacheDisabled(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	session := testPrepareBasicAuth(true)

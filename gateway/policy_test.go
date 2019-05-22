@@ -19,7 +19,7 @@ import (
 )
 
 func TestLoadPoliciesFromDashboardReLogin(t *testing.T) {
-	// Mock Dashboard
+	// Test Dashboard
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(403)
 	}))
@@ -487,11 +487,11 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 	}
 	policiesMu.RUnlock()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	// load APIs
-	buildAndLoadAPI(
+	BuildAndLoadAPI(
 		func(spec *APISpec) {
 			spec.Name = "api 1"
 			spec.APIID = "api1"

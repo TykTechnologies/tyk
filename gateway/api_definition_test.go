@@ -27,12 +27,12 @@ func createDefinitionFromString(defStr string) *APISpec {
 }
 
 func TestURLRewrites(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	t.Run("Extended Paths with url_rewrites", func(t *testing.T) {
-		buildAndLoadAPI(func(spec *APISpec) {
-			updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				json.Unmarshal([]byte(`[
 						{
                             "path": "/rewrite1",
@@ -81,12 +81,12 @@ func TestURLRewrites(t *testing.T) {
 }
 
 func TestWhitelist(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	t.Run("Extended Paths", func(t *testing.T) {
-		buildAndLoadAPI(func(spec *APISpec) {
-			updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				json.Unmarshal([]byte(`[
 					{
 						"path": "/reply/{id}",
@@ -116,8 +116,8 @@ func TestWhitelist(t *testing.T) {
 	})
 
 	t.Run("Simple Paths", func(t *testing.T) {
-		buildAndLoadAPI(func(spec *APISpec) {
-			updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.Paths.WhiteList = []string{"/simple", "/regex/{id}/test"}
 				v.UseExtendedPaths = false
 			})
@@ -135,8 +135,8 @@ func TestWhitelist(t *testing.T) {
 	})
 
 	t.Run("Test #1944", func(t *testing.T) {
-		buildAndLoadAPI(func(spec *APISpec) {
-			updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.Paths.WhiteList = []string{"/foo/{fooId}$", "/foo/{fooId}/bar/{barId}$", "/baz/{bazId}"}
 				v.UseExtendedPaths = false
 			})
@@ -162,12 +162,12 @@ func TestWhitelist(t *testing.T) {
 }
 
 func TestBlacklist(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	t.Run("Extended Paths", func(t *testing.T) {
-		buildAndLoadAPI(func(spec *APISpec) {
-			updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				json.Unmarshal([]byte(`[
 					{
 						"path": "/blacklist/literal",
@@ -194,8 +194,8 @@ func TestBlacklist(t *testing.T) {
 	})
 
 	t.Run("Simple Paths", func(t *testing.T) {
-		buildAndLoadAPI(func(spec *APISpec) {
-			updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.Paths.BlackList = []string{"/blacklist/literal", "/blacklist/{id}/test"}
 				v.UseExtendedPaths = false
 			})
@@ -215,11 +215,11 @@ func TestBlacklist(t *testing.T) {
 }
 
 func TestConflictingPaths(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
-	buildAndLoadAPI(func(spec *APISpec) {
-		updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+	BuildAndLoadAPI(func(spec *APISpec) {
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 			json.Unmarshal([]byte(`[
 				{
 					"path": "/metadata/{id}",
@@ -243,12 +243,12 @@ func TestConflictingPaths(t *testing.T) {
 }
 
 func TestIgnored(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	t.Run("Extended Paths", func(t *testing.T) {
-		buildAndLoadAPI(func(spec *APISpec) {
-			updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				json.Unmarshal([]byte(`[
 					{
 						"path": "/ignored/literal",
@@ -277,8 +277,8 @@ func TestIgnored(t *testing.T) {
 	})
 
 	t.Run("Simple Paths", func(t *testing.T) {
-		buildAndLoadAPI(func(spec *APISpec) {
-			updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.Paths.Ignored = []string{"/ignored/literal", "/ignored/{id}/test"}
 				v.UseExtendedPaths = false
 			})
@@ -300,15 +300,15 @@ func TestIgnored(t *testing.T) {
 }
 
 func TestWhitelistMethodWithAdditionalMiddleware(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	t.Run("Extended Paths", func(t *testing.T) {
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = true
 			spec.Proxy.ListenPath = "/"
 
-			updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.UseExtendedPaths = true
 
 				json.Unmarshal([]byte(`[
@@ -342,7 +342,7 @@ func TestWhitelistMethodWithAdditionalMiddleware(t *testing.T) {
 }
 
 func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
-	// Mock Dashboard
+	// Test Dashboard
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/system/apis" {
 			w.Write([]byte(`{"Status": "OK", "Nonce": "1", "Message": [{"api_definition": {}}]}`))
@@ -453,7 +453,7 @@ func (ln *customListener) Close() error {
 }
 
 func TestDefaultVersion(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	key := testPrepareDefaultVersion()
@@ -471,7 +471,7 @@ func TestDefaultVersion(t *testing.T) {
 func BenchmarkDefaultVersion(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	key := testPrepareDefaultVersion()
@@ -492,7 +492,7 @@ func BenchmarkDefaultVersion(b *testing.B) {
 }
 
 func testPrepareDefaultVersion() string {
-	buildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		v1 := apidef.VersionInfo{Name: "v1"}
 		v1.Name = "v1"
 		v1.Paths.WhiteList = []string{"/foo"}
@@ -512,7 +512,7 @@ func testPrepareDefaultVersion() string {
 		spec.UseKeylessAccess = false
 	})
 
-	return createSession(func(s *user.SessionState) {
+	return CreateSession(func(s *user.SessionState) {
 		s.AccessRights = map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v1", "v2"},
 		}}
@@ -520,7 +520,7 @@ func testPrepareDefaultVersion() string {
 }
 
 func TestGetVersionFromRequest(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	versionInfo := apidef.VersionInfo{}
@@ -528,7 +528,7 @@ func TestGetVersionFromRequest(t *testing.T) {
 	versionInfo.Paths.BlackList = []string{"/bar"}
 
 	t.Run("Header location", func(t *testing.T) {
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
 			spec.VersionDefinition.Location = headerLocation
@@ -545,7 +545,7 @@ func TestGetVersionFromRequest(t *testing.T) {
 	})
 
 	t.Run("URL param location", func(t *testing.T) {
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
 			spec.VersionDefinition.Location = urlParamLocation
@@ -560,7 +560,7 @@ func TestGetVersionFromRequest(t *testing.T) {
 	})
 
 	t.Run("URL location", func(t *testing.T) {
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
 			spec.VersionDefinition.Location = urlLocation
@@ -576,7 +576,7 @@ func TestGetVersionFromRequest(t *testing.T) {
 
 func BenchmarkGetVersionFromRequest(b *testing.B) {
 	b.ReportAllocs()
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	versionInfo := apidef.VersionInfo{}
@@ -585,7 +585,7 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 
 	b.Run("Header location", func(b *testing.B) {
 		b.ReportAllocs()
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
 			spec.VersionDefinition.Location = headerLocation
@@ -605,7 +605,7 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 
 	b.Run("URL param location", func(b *testing.B) {
 		b.ReportAllocs()
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
 			spec.VersionDefinition.Location = urlParamLocation
@@ -623,7 +623,7 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 
 	b.Run("URL location", func(b *testing.B) {
 		b.ReportAllocs()
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
 			spec.VersionDefinition.Location = urlLocation
@@ -640,7 +640,7 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 }
 
 func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
-	// Mock Dashboard
+	// Test Dashboard
 	callNum := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/system/apis" {

@@ -56,10 +56,10 @@ func TestHealthCheckEndpoint(t *testing.T) {
 	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
-	buildAndLoadAPI()
+	BuildAndLoadAPI()
 
 	ts.Run(t, []test.TestCase{
 		{Path: "/tyk/health/?api_id=test", AdminAuth: true, Code: 200},
@@ -83,11 +83,11 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 
 	t.Run("Sequentieal order", func(t *testing.T) {
 		// Load initial API
-		buildAndLoadAPI(
+		BuildAndLoadAPI(
 			func(spec *APISpec) { spec.APIID = "1" },
 		)
 
-		buildAndLoadAPI(
+		BuildAndLoadAPI(
 			func(spec *APISpec) { spec.APIID = "1" },
 			func(spec *APISpec) { spec.APIID = "2" },
 			func(spec *APISpec) { spec.APIID = "3" },
@@ -102,7 +102,7 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 	})
 
 	t.Run("Should re-order", func(t *testing.T) {
-		buildAndLoadAPI(
+		BuildAndLoadAPI(
 			func(spec *APISpec) { spec.APIID = "2" },
 			func(spec *APISpec) { spec.APIID = "3" },
 		)
@@ -114,7 +114,7 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 	})
 
 	t.Run("Restore original order", func(t *testing.T) {
-		buildAndLoadAPI(
+		BuildAndLoadAPI(
 			func(spec *APISpec) { spec.APIID = "1" },
 			func(spec *APISpec) { spec.APIID = "2" },
 			func(spec *APISpec) { spec.APIID = "3" },
@@ -130,20 +130,20 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 }
 
 func TestKeyHandler(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
-	buildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.Auth.UseParam = true
 	})
 
 	// Access right not specified
-	masterKey := createStandardSession()
+	masterKey := CreateStandardSession()
 	masterKeyJSON, _ := json.Marshal(masterKey)
 
 	// with access
-	withAccess := createStandardSession()
+	withAccess := CreateStandardSession()
 	withAccess.AccessRights = map[string]user.AccessDefinition{"test": {
 		APIID: "test", Versions: []string{"v1"},
 	}}
@@ -159,14 +159,14 @@ func TestKeyHandler(t *testing.T) {
 		}},
 	}
 	policiesMu.Unlock()
-	withPolicy := createStandardSession()
+	withPolicy := CreateStandardSession()
 	withPolicy.ApplyPolicies = []string{
 		"abc_policy",
 	}
 	withPolicyJSON, _ := json.Marshal(withPolicy)
 
 	// with invalid policy
-	withBadPolicy := createStandardSession()
+	withBadPolicy := CreateStandardSession()
 	withBadPolicy.AccessRights = map[string]user.AccessDefinition{"test": {
 		APIID: "test", Versions: []string{"v1"},
 	}}
@@ -233,7 +233,7 @@ func TestKeyHandler(t *testing.T) {
 		}...)
 	})
 
-	knownKey := createSession()
+	knownKey := CreateSession()
 
 	t.Run("Get key", func(t *testing.T) {
 		ts.Run(t, []test.TestCase{
@@ -315,7 +315,7 @@ func TestHashKeyHandlerLegacyWithHashFunc(t *testing.T) {
 	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	// create session with legacy key format
@@ -359,12 +359,12 @@ func TestHashKeyHandlerLegacyWithHashFunc(t *testing.T) {
 }
 
 func testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
-	buildAndLoadAPI()
+	BuildAndLoadAPI()
 
-	withAccess := createStandardSession()
+	withAccess := CreateStandardSession()
 	withAccess.AccessRights = map[string]user.AccessDefinition{"test": {
 		APIID: "test", Versions: []string{"v1"},
 	}}
@@ -485,7 +485,7 @@ func testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 }
 
 func testHashFuncAndBAHelper(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	session := testPrepareBasicAuth(false)
@@ -524,12 +524,12 @@ func TestHashKeyListingDisabled(t *testing.T) {
 
 	defer resetTestConfig()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
-	buildAndLoadAPI()
+	BuildAndLoadAPI()
 
-	withAccess := createStandardSession()
+	withAccess := CreateStandardSession()
 	withAccess.AccessRights = map[string]user.AccessDefinition{"test": {
 		APIID: "test", Versions: []string{"v1"},
 	}}
@@ -642,12 +642,12 @@ func TestHashKeyHandlerHashingDisabled(t *testing.T) {
 
 	defer resetTestConfig()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
-	buildAndLoadAPI()
+	BuildAndLoadAPI()
 
-	withAccess := createStandardSession()
+	withAccess := CreateStandardSession()
 	withAccess.AccessRights = map[string]user.AccessDefinition{"test": {
 		APIID: "test", Versions: []string{"v1"},
 	}}
@@ -722,10 +722,10 @@ func TestHashKeyHandlerHashingDisabled(t *testing.T) {
 }
 
 func TestInvalidateCache(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
-	buildAndLoadAPI()
+	BuildAndLoadAPI()
 
 	ts.Run(t, []test.TestCase{
 		{Method: "DELETE", Path: "/tyk/cache/test", AdminAuth: true, Code: 200},
@@ -734,10 +734,10 @@ func TestInvalidateCache(t *testing.T) {
 }
 
 func TestGetOAuthClients(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
-	buildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseOauth2 = true
 	})
 
@@ -758,10 +758,10 @@ func TestGetOAuthClients(t *testing.T) {
 }
 
 func TestCreateOAuthClient(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
-	buildAndLoadAPI(
+	BuildAndLoadAPI(
 		func(spec *APISpec) {
 			spec.UseOauth2 = true
 		},
@@ -771,7 +771,7 @@ func TestCreateOAuthClient(t *testing.T) {
 		},
 	)
 
-	createPolicy(func(p *user.Policy) {
+	CreatePolicy(func(p *user.Policy) {
 		p.ID = "p1"
 		p.AccessRights = map[string]user.AccessDefinition{
 			"test": {
@@ -779,7 +779,7 @@ func TestCreateOAuthClient(t *testing.T) {
 			},
 		}
 	})
-	createPolicy(func(p *user.Policy) {
+	CreatePolicy(func(p *user.Policy) {
 		p.ID = "p2"
 		p.AccessRights = map[string]user.AccessDefinition{
 			"test": {
@@ -972,7 +972,7 @@ func BenchmarkApiReload(b *testing.B) {
 	specs := make([]*APISpec, 100)
 
 	for i := 0; i < 100; i++ {
-		specs[i] = buildAndLoadAPI(func(spec *APISpec) {
+		specs[i] = BuildAndLoadAPI(func(spec *APISpec) {
 			spec.APIID = strconv.Itoa(i + 1)
 		})[0]
 	}
@@ -1044,16 +1044,16 @@ func TestApiLoaderLongestPathFirst(t *testing.T) {
 	var apis []*APISpec
 
 	for hp := range inputs {
-		apis = append(apis, buildAPI(func(spec *APISpec) {
+		apis = append(apis, BuildAPI(func(spec *APISpec) {
 			spec.APIID = uuid.NewV4().String()
 			spec.Domain = hp.host
 			spec.Proxy.ListenPath = "/" + hp.path
 		})[0])
 	}
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
-	loadAPI(apis...)
+	LoadAPI(apis...)
 
 	var testCases []test.TestCase
 

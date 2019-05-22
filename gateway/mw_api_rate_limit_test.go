@@ -96,7 +96,7 @@ func requestThrottlingTest(limiter string, testLevel string) func(t *testing.T) 
 	return func(t *testing.T) {
 		defer resetTestConfig()
 
-		ts := newTykTestServer()
+		ts := StartTest()
 		defer ts.Close()
 
 		globalCfg := config.Global()
@@ -125,7 +125,7 @@ func requestThrottlingTest(limiter string, testLevel string) func(t *testing.T) 
 
 		for _, requestThrottlingEnabled := range []bool{false, true} {
 
-			spec := buildAndLoadAPI(func(spec *APISpec) {
+			spec := BuildAndLoadAPI(func(spec *APISpec) {
 				spec.Name = "test"
 				spec.APIID = "test"
 				spec.OrgID = "default"
@@ -133,7 +133,7 @@ func requestThrottlingTest(limiter string, testLevel string) func(t *testing.T) 
 				spec.Proxy.ListenPath = "/"
 			})[0]
 
-			policyID := createPolicy(func(p *user.Policy) {
+			policyID := CreatePolicy(func(p *user.Policy) {
 				p.OrgID = "default"
 
 				p.AccessRights = map[string]user.AccessDefinition{
@@ -169,7 +169,7 @@ func requestThrottlingTest(limiter string, testLevel string) func(t *testing.T) 
 				}
 			})
 
-			key := createSession(func(s *user.SessionState) {
+			key := CreateSession(func(s *user.SessionState) {
 				s.ApplyPolicies = []string{policyID}
 			})
 

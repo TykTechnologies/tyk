@@ -147,7 +147,7 @@ def MyAuthHook(request, session, metadata, spec):
 // Our `pythonBundleWithAuthCheck` plugin restrict more then 1 call
 // With ID extractor, it should run multiple times (because cache)
 func TestValueExtractorHeaderSource(t *testing.T) {
-	ts := newTykTestServer(tykTestServerConfig{
+	ts := StartTest(TestConfig{
 		coprocessConfig: config.CoProcessConfig{
 			EnableCoProcess: true,
 		},
@@ -155,7 +155,7 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 	})
 	defer ts.Close()
 
-	spec := buildAPI(func(spec *APISpec) {
+	spec := BuildAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = false
 		spec.EnableCoProcessAuth = true
@@ -165,7 +165,7 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 		spec.CustomMiddlewareBundle = bundleID
 		spec.APIID = "api1"
 
-		loadAPI(spec)
+		LoadAPI(spec)
 		time.Sleep(1 * time.Second)
 
 		ts.Run(t, []test.TestCase{
@@ -179,7 +179,7 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 		spec.CustomMiddlewareBundle = bundleID
 		spec.APIID = "api2"
 
-		loadAPI(spec)
+		LoadAPI(spec)
 		time.Sleep(1 * time.Second)
 
 		formHeaders := map[string]string{"Content-Type": "application/x-www-form-urlencoded"}
@@ -195,7 +195,7 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 		spec.CustomMiddlewareBundle = bundleID
 		spec.APIID = "api3"
 
-		loadAPI(spec)
+		LoadAPI(spec)
 		time.Sleep(1 * time.Second)
 
 		ts.Run(t, []test.TestCase{
