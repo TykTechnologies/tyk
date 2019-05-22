@@ -1111,6 +1111,62 @@ func TestCacheAllSafeRequests(t *testing.T) {
 	}...)
 }
 
+func TestCacheWithAdvanceUrlRewrite(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+	cache := storage.RedisCluster{KeyPrefix: "cache-"}
+	defer cache.DeleteScanMatch("*")
+
+	buildAndLoadAPI(func(spec *APISpec) {
+		version := spec.VersionData.Versions["v1"]
+		json.Unmarshal([]byte(`{
+                "use_extended_paths": true,
+                "extended_paths": {
+                    "url_rewrites": [{
+                        "path": "/test",
+                        "method": "GET",
+                        "match_pattern": "/test(.*)",
+                        "triggers": [
+                          {
+                            "on": "all",
+                            "options": {
+                              "header_matches": {
+                                "rewritePath": "newpath"
+                              }
+                            },
+                            "rewrite_to": "/newpath"
+                          }
+                        ]
+                    }],
+		    "cache":[
+			"/test"
+		    ]
+                }
+            }`), &version)
+
+		spec.CacheOptions = apidef.CacheOptions{
+			CacheTimeout: 120,
+			EnableCache:  true,
+		}
+		spec.Proxy.ListenPath = "/"
+		spec.VersionData.Versions["v1"] = version
+	})
+
+	headerCache := map[string]string{"x-tyk-cached-response": "1"}
+	matchHeaders := map[string]string{"rewritePath": "newpath"}
+	randomheaders := map[string]string{"something": "abcd"}
+
+	ts.Run(t, []test.TestCase{
+		{Method: "GET", Path: "/test", Headers: matchHeaders, HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: "GET", Path: "/test", Headers: matchHeaders, HeadersMatch: headerCache},
+		//Even if trigger condition failed, as response is cached
+		// will still get redirected response
+		{Method: "GET", Path: "/test", Headers: randomheaders, HeadersMatch: headerCache, BodyMatch: `"Url":"/newpath"`},
+		{Method: "POST", Path: "/test", HeadersNotMatch: headerCache},
+		{Method: "GET", Path: "/test", HeadersMatch: headerCache},
+	}...)
+}
+
 func TestCachePostRequest(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
