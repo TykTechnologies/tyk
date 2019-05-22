@@ -7,11 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/satori/go.uuid"
-
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
+	uuid "github.com/satori/go.uuid"
 
 	"github.com/Sirupsen/logrus"
 )
@@ -207,9 +206,27 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 	}
 }
 
+func (b *DefaultSessionManager) clearCacheForKey(keyName string, hashed bool) {
+	cacheKey := keyName
+	if !hashed {
+		cacheKey = storage.HashKey(keyName)
+	}
+
+	// Delete current gateway's cache immediately
+	SessionCache.Delete(cacheKey)
+
+	// Notify gateways in cluster to flush cache
+	n := Notification{
+		Command: KeySpaceUpdateNotification,
+		Payload: cacheKey,
+	}
+	MainNotifier.Notify(n)
+}
+
 // UpdateSession updates the session state in the storage engine
 func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.SessionState,
 	resetTTLTo int64, hashed bool) error {
+	defer b.clearCacheForKey(keyName, hashed)
 
 	// async update and return if needed
 	if b.asyncWrites {
@@ -245,6 +262,8 @@ func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.Sess
 
 // RemoveSession removes session from storage
 func (b *DefaultSessionManager) RemoveSession(keyName string, hashed bool) {
+	defer b.clearCacheForKey(keyName, hashed)
+
 	if hashed {
 		b.store.DeleteRawKey(b.store.GetKeyPrefix() + keyName)
 	} else {

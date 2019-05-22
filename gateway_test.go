@@ -107,6 +107,7 @@ func TestMain(m *testing.M) {
 	globalConf.Monitor.EnableTriggerMonitors = true
 	globalConf.AnalyticsConfig.NormaliseUrls.Enabled = true
 
+	globalConf.AllowInsecureConfigs = true
 	// Enable coprocess and bundle downloader:
 	globalConf.CoProcessOptions.EnableCoProcess = true
 	globalConf.EnableBundleDownloader = true
@@ -143,6 +144,7 @@ func TestMain(m *testing.M) {
 		panic("GeoIPDB was not initialized")
 	}
 
+	go startPubSubLoop()
 	go reloadLoop(reloadTick)
 	go reloadQueueLoop()
 	go reloadSimulation()
