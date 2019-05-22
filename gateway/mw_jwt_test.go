@@ -1437,6 +1437,157 @@ func TestJWTRSAIdInClaimsWithoutBaseField(t *testing.T) {
 	})
 }
 
+func TestJWTDefaultPolicies(t *testing.T) {
+	const apiID = "testapid"
+	const identitySource = "user_id"
+	const policyFieldName = "policy_id"
+
+	ts := StartTest()
+	defer ts.Close()
+
+	defPol1 := CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			apiID: {},
+		}
+		p.Partitions = user.PolicyPartitions{
+			Quota: true,
+		}
+	})
+
+	defPol2 := CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			apiID: {},
+		}
+		p.Partitions = user.PolicyPartitions{
+			RateLimit: true,
+		}
+	})
+
+	tokenPol := CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			apiID: {},
+		}
+		p.Partitions = user.PolicyPartitions{
+			Acl: true,
+		}
+	})
+
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.APIID = apiID
+		spec.UseKeylessAccess = false
+		spec.EnableJWT = true
+		spec.JWTSigningMethod = RSASign
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTIdentityBaseField = identitySource
+		spec.JWTDefaultPolicies = []string{
+			defPol1,
+			defPol2,
+		}
+		spec.Proxy.ListenPath = "/"
+	})[0]
+
+	t.Run("Default policies", func(t *testing.T) {
+		LoadAPI(spec)
+
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)[identitySource] = "dummy"
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+
+		ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+
+		// Making conflict between policies
+		policiesMu.Lock()
+		policiesByID[defPol2] = user.Policy{
+			AccessRights: map[string]user.AccessDefinition{
+				apiID: {},
+			},
+		}
+		policiesMu.Unlock()
+
+		ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusInternalServerError, BodyMatch: "failed to create key: cannot apply multiple policies if any are non-partitioned",
+		})
+
+		// Removing defPol2 from default policies
+		spec.JWTDefaultPolicies = []string{defPol1}
+		LoadAPI(spec)
+
+		ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+
+		// Adding defPol2 to default policies again
+		spec.JWTDefaultPolicies = []string{defPol1, defPol2}
+		LoadAPI(spec)
+
+		ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusForbidden, BodyMatch: "key not authorized: could not apply new policy",
+		})
+
+		// Reset defPol2
+		policiesMu.Lock()
+		policiesByID[defPol2] = user.Policy{
+			AccessRights: map[string]user.AccessDefinition{
+				apiID: {},
+			},
+			Partitions: user.PolicyPartitions{
+				RateLimit: true,
+			},
+		}
+		policiesMu.Unlock()
+	})
+
+	t.Run("Default policies with token policy", func(t *testing.T) {
+		spec.JWTPolicyFieldName = policyFieldName
+		LoadAPI(spec)
+
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)[identitySource] = "dummy"
+			t.Claims.(jwt.MapClaims)[policyFieldName] = tokenPol
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+
+		ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+
+		// Making conflict between policies
+		policiesMu.Lock()
+		policiesByID[tokenPol] = user.Policy{
+			AccessRights: map[string]user.AccessDefinition{
+				apiID: {},
+			},
+		}
+		policiesMu.Unlock()
+
+		ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusInternalServerError, BodyMatch: "failed to create key: cannot apply multiple policies if any are non-partitioned",
+		})
+
+		// Removing tokenPol
+		spec.JWTPolicyFieldName = ""
+		LoadAPI(spec)
+
+		ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+
+		// Adding tokenPol again
+		spec.JWTPolicyFieldName = policyFieldName
+		LoadAPI(spec)
+
+		ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusForbidden, BodyMatch: "key not authorized: could not apply new policy",
+		})
+	})
+
+}
+
 func TestJWTECDSASign(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
