@@ -532,6 +532,9 @@
         "error"
       ]
     },
+    "enable_http_profiler": {
+      "type": "boolean"
+    },
     "logstash_network_addr": {
       "type": "string"
     },

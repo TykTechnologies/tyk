@@ -46,7 +46,7 @@ script:
   - go build -tags 'coprocess python'
   - go build -tags 'coprocess lua'
   - go build -tags 'coprocess grpc'
-  - ./utils/ci-swagger.sh
-  - ./utils/ci-test.sh
+  - ./bin/ci-swagger.sh
+  - ./bin/ci-test.sh
   - if [[ $LATEST_GO ]]; then goveralls -coverprofile=<(gocovmerge *.cov); fi
-  - ./utils/ci-benchmark.sh
+  - ./bin/ci-benchmark.sh

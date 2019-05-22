@@ -9,7 +9,7 @@ info:
 
     The Tyk Gateway API is capable of:
 
-    * Managing session objects (token generation)
+    * Managing session objects (key generation)
     * Managing and listing policies
     * Managing and listing API Definitions (only when not using the Dashboard)
     * Hot reloads / reloading a cluster configuration
@@ -26,17 +26,91 @@ info:
     <br/>
     <b>The Tyk Gateway API is subsumed by the Tyk Dashboard API in Pro installations.</b>
 servers:
-  - url: 'http://localhost/tyk/'
-  - url: 'https://localhost/tyk/'
+  - url: 'http://localhost/'
+  - url: 'https://localhost/'
 tags:
   - name: Keys
     description: |-
       All keys that are used to access services via Tyk correspond to a session object that informs Tyk about the context of this particular token, like access rules and rate/quota allowance.
+      
+      <h3>Hashed Keys Environment</h3>
+      
+      Listing tokens is only possible if you set `enable_hashed_keys_listing` to `true`. See [Using Hashed Keys Environment Endpoints](https://tyk.io/docs/security/#a-name-key-hashing-a-key-hashing) section for more details.
+      
+      - endpoints `POST /tyk/keys/create`, `POST /tyk/keys` and `POST /tyk/keys/{keyName}` return `"key_hash"` for future use.
+      - endpoint `GET /tyk/keys` retrieves all (or per API) key hashes. You can disable this endpoint by using the `tyk.conf` setting `enable_hashed_keys_listing` (set to false by default).
+      - endpoint `GET /tyk/keys/{keyName}` is able to get a key by its hash. You need to provide the key hash as a `keyName`. 
+      and call it with the optional query parameter `hashed=true`. So the format is `GET /tyk/keys/{keyName}?hashed=true"`.
+      - The same optional parameter is available for the `DELETE /tyk/keys/{keyName}?hashed=true` endpoint.
+      
+      <h3>Example: Import Existing Keys into Tyk</h3>
+      
+
+
+      You can use the `PUT /tyk/keys/{KEY_ID}` endpoint as defined below to import existing keys into Tyk.
+      
+      This example uses standard `authorization` header authentication, and assumes that the Dashboard is located at `127.0.0.1:8080` and the Tyk secret is `352d20ee67be67f6340b4c0605b044b7` - update these as necessary to match your environment.
+      
+      To import a key called `abc`, save the JSON contents as `token.json` (see example below), then run the following Curl command.
+      
+      ```
+      curl http://127.0.0.1:8080/tyk/keys/abc -H 'x-tyk-authorization: 352d20ee67be67f6340b4c0605b044b7' -H 'Content-Type: application/json'  -d @token.json
+      ```
+      
+      The following request will fail as the key doesn't exist.
+      
+      ```
+      curl http://127.0.0.1:8080/quickstart/headers -H 'Authorization. invalid123'
+      ```
+      
+      But this request will now work, using the imported key.
+      
+      ```
+      curl http://127.0.0.1:8080/quickstart/headers -H 'Authorization: abc'
+      ```
+      
+      <h4>Example token.json file<h4>
+      
+      ```
+      {
+        "allowance": 1000,
+        "rate": 1000,
+        "per": 60,
+        "expires": -1,
+        "quota_max": -1,
+        "quota_renews": 1406121006,
+        "quota_remaining": 0,
+        "quota_renewal_rate": 60,
+        "access_rights": {
+          "3": {
+            "api_name": "Tyk Test API",
+            "api_id": "3"
+          }
+        },
+        "org_id": "53ac07777cbb8c2d53000002",
+        "basic_auth_data": {
+          "password": "",
+          "hash_type": ""
+        },
+        "hmac_enabled": false,
+        "hmac_string": "",
+        "is_inactive": false,
+        "apply_policy_id": "",
+        "apply_policies": [
+          "59672779fa4387000129507d",
+          "53222349fa4387004324324e",
+          "543534s9fa4387004324324d"
+          ],
+        "monitor": {
+          "trigger_limits": []
+        }
+      }
+      ```
 
       Additionally see <a href="https://tyk.io/docs/tyk-rest-api/token-session-object-details/">key session object data format</a>.
   - name: OAuth
     description: |-
-      Manage oAuth clients, and manage their tokens
+      Manage OAuth clients, and manage their tokens
   - name: Cache Invalidation
     description: |-
       Sometimes a cache might contain stale data, or it may just need to be cleared because of an invalid configuration. This call will purge all keys associated with a cache on an API-by-API basis.
@@ -47,30 +121,207 @@ tags:
     description: Check health check of the Gateway and loaded APIs
   - name: Organisation Quotas
     description: |-
-      It is possible to force API quota and rate limit across all keys that belong to a specific organisation ID. Rate limiting on an organisation level is useful for creating tiered access levels and trial accounts.
+      It is possible to force API quota and rate limit across all keys that belong to a specific organisation ID. Rate limiting at an organisation level is useful for creating tiered access levels and trial accounts.
       The Organisation rate limiting middleware works with both Quotas and Rate Limiters. In order to manage this functionality, a simple API has been put in place to manage these sessions.
       Although the Organisation session-limiter uses the same session object, all other security keys are optional as they are not used.
 
       <h3>Managing active status</h3>
-      To disallow access to an entire group of keys without rate limiting the organisation, create a session object with the "is_inactive" key set to true, this will block access before any other middleware is executed. This is useful when managing subscriptions for an organisation group and access needs to be blocked because of non-payment.
+      To disallow access to an entire group of keys without rate limiting the organisation, create a session object with the "is_inactive" key set to true. This will block access before any other middleware is executed. It is useful when managing subscriptions for an organisation group and access needs to be blocked because of non-payment.
   - name: Batch requests
     description: |-
       Tyk supports batch requests, so a client makes a single request to the API but gets a compound response object back.
 
       This is especially handy if clients have complex requests that have multiple synchronous dependencies and do not wish to have the entire request / response cycle running for each event.
+      
+      To enable batch request support, set the `enable_batch_request_support` value to `true`
 
-      See <a href="https://tyk.io/docs/tyk-rest-api/batch-requests/">detailed guide</a>
+      This is especially handy if clients have complex requests that have multiple synchronous dependencies and do not wish to have the entire request / response cycle running for each event.
+
+      Batch requests that come into Tyk are *run through the whole Tyk machinery* and *use a relative path to prevent spamming*. This means that a batch request to Tyk for three resources with the same API key will have three requests applied to their session quota and request limiting could become active if they are being throttled.
+
+      Tyk reconstructs the API request based on the data in the batch request. This is to ensure that Tyk is not being used to proxy requests to other hosts outside of the upstream API being accessed.
+      
+      Batch requests are created by POSTing to the `/{listen_path}/tyk/batch/` endpoint. These requests **do not require a valid key**, but their request list does.
+      
+      <h3>Sample Request</h3>
+
+        ```{json}
+        {
+          "requests": [
+            {
+              "method": "GET",
+              "headers": {
+                "x-tyk-test": "1",
+                "x-tyk-version": "1.2",
+                "authorization": "1dbc83b9c431649d7698faa9797e2900f"
+              },
+              "body": "",
+              "relative_url": "get"
+          },
+          {
+            "method": "GET",
+            "headers": {
+              "x-tyk-test": "2",
+              "x-tyk-version": "1.2",
+              "authorization": "1dbc83b9c431649d7698faa9797e2900f"
+            },
+            "body": "",
+            "relative_url": "get"
+            }
+          ],
+          "suppress_parallel_execution": false
+        }
+        ```
+      
+      The response will will be a structured reply that encapsulates the responses for each of the outbound requests. If `suppress_parallel_execution` is set to `true`, requests will be made synchronously. If set to `false` then they will run in parallel and the response order is not guaranteed.
+      
+      <h3>Sample Response</h3>
+      
+      ```
+      [
+        {
+          "relative_url": "get",
+          "code": 200,
+          "headers": {
+            "Access-Control-Allow-Credentials": [
+              "true"
+            ],
+            "Access-Control-Allow-Origin": [
+              "*"
+            ],
+            "Content-Length": [
+              "497"
+            ],
+            "Content-Type": [
+              "application/json"
+            ],
+            "Date": [
+              "Wed, 12 Nov 2014 15:32:43 GMT"
+            ],
+            "Server": [
+              "gunicorn/18.0"
+            ],
+            "Via": [
+              "1.1 vegur"
+            ]
+          },
+          "body": "{
+        "args": {}, 
+        "headers": {
+          "Accept-Encoding": "gzip", 
+          "Authorization": "1dbc83b9c431649d7698faa9797e2900f", 
+          "Connect-Time": "2", 
+          "Connection": "close", 
+          "Host": "httpbin.org", 
+          "Total-Route-Time": "0", 
+          "User-Agent": "Go 1.1 package http", 
+          "Via": "1.1 vegur", 
+          "X-Request-Id": "6a22499a-2776-4aa1-80c0-686581a8be4d", 
+          "X-Tyk-Test": "2", 
+          "X-Tyk-Version": "1.2"
+        }, 
+        "origin": "127.0.0.1, 62.232.114.250", 
+        "url": "http://httpbin.org/get"
+      }"
+          },
+          {
+            "relative_url": "get",
+            "code": 200,
+            "headers": {
+              "Access-Control-Allow-Credentials": [
+                "true"
+              ],
+              "Access-Control-Allow-Origin": [
+                "*"
+              ],
+              "Content-Length": [
+                "497"
+              ],
+              "Content-Type": [
+                "application/json"
+              ],
+              "Date": [
+                "Wed, 12 Nov 2014 15:32:43 GMT"
+              ],
+              "Server": [
+                "gunicorn/18.0"
+              ],
+              "Via": [
+                "1.1 vegur"
+              ]
+            },
+            "body": "{
+        "args": {}, 
+        "headers": {
+          "Accept-Encoding": "gzip", 
+          "Authorization": "1dbc83b9c431649d7698faa9797e2900f", 
+          "Connect-Time": "7", 
+          "Connection": "close", 
+          "Host": "httpbin.org", 
+          "Total-Route-Time": "0", 
+          "User-Agent": "Go 1.1 package http", 
+          "Via": "1.1 vegur", 
+          "X-Request-Id": "1ab61f50-51ff-4828-a7e2-17240385a6d2", 
+          "X-Tyk-Test": "1", 
+          "X-Tyk-Version": "1.2"
+        }, 
+        "origin": "127.0.0.1, 62.232.114.250", 
+        "url": "http://httpbin.org/get"
+      }"
+          }
+      ]
+      ```
+      With the body for each request string encoded in the `body` field.
+
+      * `expire_analytics_after`: If you are running a busy API, you may want to ensure that your MongoDB database does not overflow with old data. Set the `expire_analytics_after` value to the number of seconds you would like the data to last for. Setting this flag to anything above `0` will set an `expireAt` field for each record that is written to the database.
+          
+      **Important:** Tyk will not create the expiry index for you. In order to implement data expiry for your analytics data, ensure that the index is created This is easily achieved using the [MongoDB command line interface](https://docs.mongodb.com/getting-started/shell/client/).
+      
+      * `dont_set_quota_on_create`: This setting defaults to `false`, but if set to `true`, when the API is used to edit, create or add keys, the quota cache in Redis will not be re-set. By default, all updates or creates to Keys that have Quotas set will re-set the quota (This has been the default behaviour since 1.0).
+          
+        This behaviour can be bypassed on a case-by-case basis by using the `suppress_reset` parameter when making a REST API request. This is the advised mode of operation as it allows for manual, granular control over key quotas and reset timings.
+      
+      * `cache_options`: This section enables you to configure the caching behaviour of Tyk and to enable or disable the caching middleware for your API.
+      
+      * `cache_options.enable_cache`: Set this value to `true` if the cache should be enabled for this endpoint, setting it to false will stop all caching behaviour.
+      
+      * `cache_options.cache_timeout`: The amount of time, in seconds, to keep cached objects, defaults to `60` seconds.
+      
+      * `cache_options.cache_all_safe_requests`: Set this to `true` if you want all *safe* requests (GET, HEAD, OPTIONS) to be cached. This is a blanket setting for APIs where caching is required but you don't want to set individual paths up in the definition.
+      
+      * `cache_options.enable_upstream_cache_control`: Set this to `true` if you want your application to control the cache options for Tyk (TTL and whether to cache or not). See [Caching](/docs/reduce-latency/caching/) for more details.
+      
+      * `response_processors`: Response processors need to be specifically defined so they are loaded on API creation, otherwise the middleware will not fire. In order to have the two main response middleware components fire, the following configuration object should be supplied.
+      
+      ```{json}
+      "response_processors": [
+        {
+            "name": "header_injector",
+            "options": {
+                "add_headers": {"name": "value"},
+                "remove_headers": ["name"]
+            }
+        },
+        {
+          "name": "response_body_transform",
+          "options": {}
+        }
+      ]
+      ```
+      The options for the `header_injector` are global, and will apply to all outbound requests.
+      
+      
   - name: APIs
     description: |-
       **Note: Applies only to Tyk Gateway Community Edition**
 
       API Management is very simple using the Tyk REST API: each update only affects the underlying file, and this endpoint will only work with disk based installations, not Database-backed ones.
 
-      API's that are added this way are flushed to to disk into the app_path folder using the format: `{api-id}.json`. Updating existing API's that use a different naming convention will cause those API's to be added, which could subsequently lead to a loading error and crash if they use the same listen_path.
+      APIs that are added this way are flushed to to disk into the app_path folder using the format: `{api-id}.json`. Updating existing APIs that use a different naming convention will cause those APIs to be added, which could subsequently lead to a loading error and crash if they use the same listen_path.
 
       These methods only work on a single API node. If updating a cluster, it is important to ensure that all nodes are updated before initiating a reload.
 paths:
-  /apis:
+  /tyk/apis:
     get:
       description: |-
         List APIs
@@ -131,7 +382,7 @@ paths:
               example:
                 status: "error"
                 message: "Malformed API data"
-  '/apis/{apiID}':
+  '/tyk/apis/{apiID}':
     parameters:
       - description: The API ID
         name: apiID
@@ -225,7 +476,7 @@ paths:
               example:
                 message: API ID not specified
                 status: error
-  '/cache/{apiID}':
+  '/tyk/cache/{apiID}':
     parameters:
       - description: The API ID
         name: apiID
@@ -249,7 +500,7 @@ paths:
               example:
                 message: cache invalidated
                 status: ok
-  '/reload/':
+  '/tyk/reload/':
     get:
       summary: Hot-reload a single node
       description: Tyk is capable of reloading configurations without having to stop serving requests, this means that API configurations can be added at runtime, or even modified at runtime and those rules applied immediately without any downtime.
@@ -273,7 +524,7 @@ paths:
                 $ref: '#/components/schemas/apiStatusMessage'
               example:
                 status: ok
-  '/reload/group':
+  '/tyk/reload/group':
     get:
       summary: Hot-reload a Tyk group
       description: To reload a whole group of Tyk nodes (without using the Dashboard or host manager), you can send an API request to a single node, this node will then send a notification through the pub/sub infrastructure to all other listening nodes (including the host manager if it is being used to manage NginX) which will then trigger a global reload.
@@ -289,7 +540,7 @@ paths:
                 $ref: '#/components/schemas/apiStatusMessage'
               example:
                 status: ok
-  '/hello':
+  '/tyk/hello':
     get:
       summary: Check the Health of the Gateway
       description: |
@@ -307,7 +558,7 @@ paths:
               schema:
                 type: string
               example: "Hello Tiki"
-  '/{listenPath}/hello':
+  '/tyk/{listenPath}/hello':
     parameters:
       - in: path
         name: listenPath
@@ -329,7 +580,7 @@ paths:
               schema:
                 type: string
               example: "Hello Tiki"
-  /keys:
+  /tyk/keys:
     get:
       summary: List Keys
       description: You can retrieve all the keys in your Tyk instance. Returns an array of Key IDs.
@@ -387,7 +638,7 @@ paths:
               example:
                 message: Malformed Key data
                 status: error
-  '/keys/{keyID}':
+  '/tyk/keys/{keyID}':
     parameters:
       - description: The Key ID
         name: keyID
@@ -397,7 +648,7 @@ paths:
           type: string
     get:
       summary: Get a Key
-      description: Get session info about specified key. Should return up to date rate limit and quota usage numbers.
+      description: Get session info about the specified key. Should return up to date rate limit and quota usage numbers.
       tags:
         - Keys
       operationId: getKey
@@ -438,7 +689,7 @@ paths:
               org_id: 53ac07777cbb8c2d53000002
       parameters:
         - description: |-
-            Adding the suppress_reset parameter and setting it to 1, will cause Tyk to not reset the quota limit that is in the current live quota manager. By default Tyk will reset the quota in the live quota manager (initialising it) when adding a key. Adding the `suppress_reset` flag to the URL parameters will avoid this behaviour.
+            Adding the suppress_reset parameter and setting it to 1, will cause Tyk not to reset the quota limit that is in the current live quota manager. By default Tyk will reset the quota in the live quota manager (initialising it) when adding a key. Adding the `suppress_reset` flag to the URL parameters will avoid this behaviour.
           name: suppress_reset
           in: query
           required: false
@@ -480,13 +731,13 @@ paths:
               example:
                 action: Key deleted
                 status: ok
-  /oauth/clients/create:
+  /tyk/oauth/clients/create:
     post:
       summary: Create new OAuth client
-      description: Any oAuth keys must be generated with the help of a client ID. These need to be pre-registered with Tyk before they can be used (in a similar vein to how you would register your app with Twitter before attempting to ask user permissions using their API).
+      description: Any OAuth keys must be generated with the help of a client ID. These need to be pre-registered with Tyk before they can be used (in a similar vein to how you would register your app with Twitter before attempting to ask user permissions using their API).
         <br/><br/>
         <h3>Creating OAuth clients with Access to Multiple APIs</h3>
-        New for Tyk Gateway 2.6.0 is the ability to create OAuth clients with access to more than one API. If you provide the api_id it works the same as in previous releases. If you don¿ït provide the api_id the request uses policy access rights and enumerates APIs from their setting in the newly created OAuth-client.
+        New from Tyk Gateway 2.6.0 is the ability to create OAuth clients with access to more than one API. If you provide the api_id it works the same as in previous releases. If you donÂ¿Ã¯t provide the api_id the request uses policy access rights and enumerates APIs from their setting in the newly created OAuth-client.
 
 
       tags:
@@ -512,10 +763,10 @@ paths:
                 client_id: test
                 api_id: id
                 policy_id: policy
-  '/oauth/clients/{apiID}':
+  '/tyk/oauth/clients/{apiID}':
     get:
       summary: List oAuth clients
-      description: oAuth Clients are organised by API ID, and therefore are queried as such.
+      description: OAuth Clients are organised by API ID, and therefore are queried as such.
       tags:
         - OAuth
       operationId: listOAuthClients
@@ -535,9 +786,9 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/NewClientRequest'
-  '/oauth/clients/{apiID}/{keyName}':
+  '/tyk/oauth/clients/{apiID}/{keyName}':
     get:
-      summary: Get oAuth client
+      summary: Get OAuth client
       tags:
         - OAuth
       operationId: getOAuthClient
@@ -567,7 +818,7 @@ paths:
                 api_id: id
                 policy_id: policy
     delete:
-      summary: Delete oAuth client
+      summary: Delete OAuth client
       description: Please note that tokens issued with the client ID will still be valid until they expire.
       tags:
         - OAuth
@@ -596,7 +847,7 @@ paths:
               example:
                 action: deleted
                 status: ok
-  '/oauth/clients/{apiID}/{keyName}/tokens':
+  '/tyk/oauth/clients/{apiID}/{keyName}/tokens':
     get:
       summary: List tokens
       description: This endpoint allows you to retrieve a list of all current tokens and their expiry date for a provided API ID and OAuth-client ID in the following format. This endpoint will work only for newly created tokens.
@@ -632,7 +883,7 @@ paths:
               example:
                 - "tok1"
                 - "tok2"
-  '/oauth/refresh/{keyName}':
+  '/tyk/oauth/refresh/{keyName}':
     delete:
       summary: Invalidate OAuth refresh token
       description: It is possible to invalidate refresh tokens in order to manage OAuth client access more robustly.
@@ -659,7 +910,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/apiModifyKeySuccess'
-  '/oauth/authorize-client/':
+  '/tyk/oauth/authorize-client/':
     post:
       description: With the OAuth flow you will need to create authorisation or access tokens for your clients, in order to do this, Tyk provides a private API endpoint for your application to generate these codes and redirect the end-user back to the API Client.
       summary: Authorize client
@@ -700,11 +951,11 @@ paths:
               example:
                 code: MWY0ZDRkMzktOTYwNi00NDRiLTk2YmQtOWQxOGQ3Mjc5Yzdk
                 redirect_to: 'http://client-app.com/oauth-redirect/?code=MWY0ZDRkMzktOTYwNi00NDRiLTk2YmQtOWQxOGQ3Mjc5Yzdk'
-  /org/keys:
+  /tyk/org/keys:
     get:
       summary: List Organisation Keys
       description: |-
-        You can now set rate limits at the organisation level by using the following fields - allowance and rate. These are the number of allowed requests for the specified per value, and need to be set to the same value. If you don¿ït want to have organisation level rate limiting, set ¿írate¿ì or ¿íper¿ì to zero, or don¿ït add them to your request.
+        You can now set rate limits at the organisation level by using the following fields - allowance and rate. These are the number of allowed requests for the specified per value, and need to be set to the same value. If you donÂ¿Ã¯t want to have organisation level rate limiting, set Â¿Ã­rateÂ¿Ã¬ or Â¿Ã­perÂ¿Ã¬ to zero, or donÂ¿Ã¯t add them to your request.
       tags:
         - Organisation Quotas
       operationId: listOrgKeys
@@ -755,7 +1006,7 @@ paths:
                 action: created
                 key: '{...KEY JSON definition...}'
                 status: ok
-  '/orgs/keys/{keyID}':
+  '/tyk/orgs/keys/{keyID}':
     parameters:
       - description: The Key ID
         name: keyID
@@ -781,7 +1032,7 @@ paths:
       description: |-
         This work similar to Keys API except that Key ID is always equals Organisation ID
 
-        For Gateway v2.6.0 onwards, you can now set rate limits at the organisation level by using the following fields - allowance and rate. These are the number of allowed requests for the specified per value, and need to be set to the same value. If you don¿ït want to have organisation level rate limiting, set `rate` or `per` to zero, or don¿ït add them to your request.
+        For Gateway v2.6.0 onwards, you can now set rate limits at the organisation level by using the following fields - allowance and rate. These are the number of allowed requests for the specified per value, and need to be set to the same value. If you donÂ¿Ã¯t want to have organisation level rate limiting, set `rate` or `per` to zero, or donÂ¿Ã¯t add them to your request.
       tags:
         - Organisation Quotas
       operationId: updateOrgKey
@@ -2374,4 +2625,3 @@ components:
       type: apiKey
 security:
   - api_key: []
-

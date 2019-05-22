@@ -137,3 +137,15 @@ func (s *SessionState) SetPolicies(ids ...string) {
 	s.ApplyPolicyID = ""
 	s.ApplyPolicies = ids
 }
+
+// GetQuotaLimitByAPIID return quota max, quota remaining, quota renewal rate and quota renews for the given session
+func (s *SessionState) GetQuotaLimitByAPIID(apiID string) (int64, int64, int64, int64) {
+	if access, ok := s.AccessRights[apiID]; ok && access.Limit != nil {
+		return access.Limit.QuotaMax,
+			access.Limit.QuotaRemaining,
+			access.Limit.QuotaRenewalRate,
+			access.Limit.QuotaRenews
+	}
+
+	return s.QuotaMax, s.QuotaRemaining, s.QuotaRenewalRate, s.QuotaRenews
+}
