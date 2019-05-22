@@ -105,6 +105,7 @@ func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 		xmlMap, err := mxj.NewMapXml(body) // unmarshal
 		if err != nil {
 			logger.WithError(err).Error("Error unmarshalling XML")
+			//todo return error
 			break
 		}
 		for k, v := range xmlMap {
@@ -118,6 +119,8 @@ func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 		var tempBody interface{}
 		if err := json.Unmarshal(body, &tempBody); err != nil {
 			logger.WithError(err).Error("Error unmarshalling JSON")
+			//todo return error
+			break
 		}
 
 		switch tempBody.(type) {
@@ -133,8 +136,11 @@ func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 	}
 
 	if tmeta.TemplateData.EnableSession {
-		session := ctxGetSession(req)
-		bodyData["_tyk_meta"] = session.MetaData
+		if session := ctxGetSession(req); session != nil {
+			bodyData["_tyk_meta"] = session.MetaData
+		} else {
+			logger.Error("Session context was enabled but not found.")
+		}
 	}
 
 	// Apply to template
