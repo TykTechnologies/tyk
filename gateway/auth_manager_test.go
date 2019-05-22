@@ -17,15 +17,15 @@ func TestAuthenticationAfterDeleteKey(t *testing.T) {
 		globalConf.HashKeys = hashKeys
 		config.SetGlobal(globalConf)
 
-		ts := newTykTestServer()
+		ts := StartTest()
 		defer ts.Close()
 
-		api := buildAndLoadAPI(func(spec *APISpec) {
+		api := BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
 			spec.Proxy.ListenPath = "/"
 		})[0]
 
-		key := createSession(func(s *user.SessionState) {
+		key := CreateSession(func(s *user.SessionState) {
 			s.AccessRights = map[string]user.AccessDefinition{api.APIID: {
 				APIID: api.APIID,
 			}}
@@ -57,17 +57,17 @@ func TestAuthenticationAfterUpdateKey(t *testing.T) {
 		globalConf.HashKeys = hashKeys
 		config.SetGlobal(globalConf)
 
-		ts := newTykTestServer()
+		ts := StartTest()
 		defer ts.Close()
 
-		api := buildAndLoadAPI(func(spec *APISpec) {
+		api := BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
 			spec.Proxy.ListenPath = "/"
 		})[0]
 
 		key := generateToken("", "")
 
-		session := createStandardSession()
+		session := CreateStandardSession()
 		session.AccessRights = map[string]user.AccessDefinition{api.APIID: {
 			APIID: api.APIID,
 		}}

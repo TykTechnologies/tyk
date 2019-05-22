@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-
 	"golang.org/x/net/context"
 
 	"io"
