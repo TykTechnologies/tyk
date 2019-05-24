@@ -58,7 +58,13 @@ if [[ ! $LATEST_GO ]]; then
 	exit 0
 fi
 
+# build Go-plugin used in tests but with race support
+mv ./test/goplugins/goplugins.so ./test/goplugins/goplugins_old.so
+go build -race -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugins \
+    || fatal "building Go-plugin with race failed"
+
 go test -race -v -timeout $TEST_TIMEOUT $PKGS || fatal "go test -race failed"
+mv ./test/goplugins/goplugins_old.so ./test/goplugins/goplugins.so
 
 for opts in "${MATRIX[@]}"; do
 	show go vet $opts $PKGS || fatal "go vet errored"

@@ -1,4 +1,4 @@
-package main
+package gateway
 
 import (
 	"net/http"
@@ -12,10 +12,10 @@ import (
 // TestGoPluginMWs tests all possible Go-plugin MWs ("pre", "auth_check", "post_key_auth" and "post")
 // Please see ./test/goplugins/test_goplugins.go for plugin implementation details
 func TestGoPluginMWs(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
-	buildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.APIID = "plugin_api"
 		spec.Proxy.ListenPath = "/goplugin"
 		spec.UseKeylessAccess = false
@@ -26,23 +26,23 @@ func TestGoPluginMWs(t *testing.T) {
 			Pre: []apidef.MiddlewareDefinition{
 				{
 					Name: "MyPluginPre",
-					Path: "test/goplugins/goplugins.so",
+					Path: "../test/goplugins/goplugins.so",
 				},
 			},
 			AuthCheck: apidef.MiddlewareDefinition{
 				Name: "MyPluginAuthCheck",
-				Path: "test/goplugins/goplugins.so",
+				Path: "../test/goplugins/goplugins.so",
 			},
 			PostKeyAuth: []apidef.MiddlewareDefinition{
 				{
 					Name: "MyPluginPostKeyAuth",
-					Path: "test/goplugins/goplugins.so",
+					Path: "../test/goplugins/goplugins.so",
 				},
 			},
 			Post: []apidef.MiddlewareDefinition{
 				{
 					Name: "MyPluginPost",
-					Path: "test/goplugins/goplugins.so",
+					Path: "../test/goplugins/goplugins.so",
 				},
 			},
 		}
