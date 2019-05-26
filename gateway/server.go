@@ -1008,6 +1008,7 @@ func Start() {
 	checkup.DefaultSecrets(config.Global())
 	checkup.HealthCheck(config.Global())
 	checkup.AllowInsecureConfigs(config.Global())
+	checkup.LegacyRateLimiters(config.Global())
 
 	// Wait while Redis connection pools are ready before start serving traffic
 	if !storage.IsConnected() {
@@ -1230,9 +1231,7 @@ func startDRL() {
 	switch {
 	case config.Global().ManagementNode:
 		return
-	case config.Global().EnableSentinelRateLimiter,
-		config.Global().EnableRedisRollingLimiter:
-		mainLog.Warning("The old, non-distributed rate limiter is deprecated and we no longer recommend its use.")
+	case config.Global().EnableSentinelRateLimiter, config.Global().EnableRedisRollingLimiter:
 		return
 	}
 	mainLog.Info("Initialising distributed rate limiter")

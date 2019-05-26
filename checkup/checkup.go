@@ -21,6 +21,15 @@ const (
 	minFileDescriptors = 80000
 )
 
+func LegacyRateLimiters(c config.Config) {
+	if c.ManagementNode {
+		return
+	}
+	if c.EnableSentinelRateLimiter || c.EnableRedisRollingLimiter {
+		log.Warning("SentinelRateLimiter & RedisRollingLimiter are deprecated")
+	}
+}
+
 func AllowInsecureConfigs(c config.Config) {
 	if c.AllowInsecureConfigs {
 		log.Warning("Insecure configuration allowed: allow_insecure_configs: true")
