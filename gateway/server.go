@@ -1001,14 +1001,14 @@ func Start() {
 		mainLog.Warn("The control_api_port should be changed for production")
 	}
 
-	start()
-
 	checkup.FileDescriptors()
 	checkup.Cpus()
 	checkup.DefaultSecrets(config.Global())
 	checkup.HealthCheck(config.Global())
 	checkup.AllowInsecureConfigs(config.Global())
 	checkup.LegacyRateLimiters(config.Global())
+
+	start()
 
 	// Wait while Redis connection pools are ready before start serving traffic
 	if !storage.IsConnected() {
