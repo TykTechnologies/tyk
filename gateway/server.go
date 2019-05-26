@@ -19,12 +19,6 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/net/http2"
-
-	newrelic "github.com/newrelic/go-agent"
-
-	"github.com/TykTechnologies/tyk/checkup"
-
 	"github.com/Sirupsen/logrus"
 	logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
@@ -34,8 +28,10 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/lonelycode/osin"
+	newrelic "github.com/newrelic/go-agent"
 	"github.com/rs/cors"
 	uuid "github.com/satori/go.uuid"
+	"golang.org/x/net/http2"
 	"rsc.io/letsencrypt"
 
 	"github.com/TykTechnologies/goagain"
@@ -43,6 +39,7 @@ import (
 	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
+	"github.com/TykTechnologies/tyk/checkup"
 	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/dnscache"
@@ -1220,10 +1217,8 @@ func handleDashboardRegistration() {
 	dashboardServiceInit()
 
 	// connStr := buildConnStr("/register/node")
-
-	mainLog.Info("Registering node.")
 	if err := DashService.Register(); err != nil {
-		mainLog.Fatal("Registration failed: ", err)
+		dashLog.Fatal("Registration failed: ", err)
 	}
 
 	go DashService.StartBeating()

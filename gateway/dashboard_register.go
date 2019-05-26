@@ -8,10 +8,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Sirupsen/logrus"
-
 	"github.com/TykTechnologies/tyk/config"
 )
+
+var dashLog = log.WithField("prefix", "dashboard")
 
 type NodeResponseOK struct {
 	Status  string
@@ -56,29 +56,21 @@ func reLogin() {
 		return
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("Registering node (again).")
+	dashLog.Info("Registering node (again).")
 	DashService.StopBeating()
 	if err := DashService.DeRegister(); err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Error("Could not deregister: ", err)
+		dashLog.Error("Could not deregister: ", err)
 	}
 
 	time.Sleep(5 * time.Second)
 
 	if err := DashService.Register(); err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Error("Could not register: ", err)
+		dashLog.Error("Could not register: ", err)
 	} else {
 		go DashService.StartBeating()
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("Recovering configurations, reloading...")
+	dashLog.Info("Recovering configurations, reloading...")
 	reloadURLStructure(nil)
 }
 
@@ -87,24 +79,23 @@ func (h *HTTPDashboardHandler) Init() error {
 	h.DeRegistrationEndpoint = buildConnStr("/system/node")
 	h.HeartBeatEndpoint = buildConnStr("/register/ping")
 	if h.Secret = config.Global().NodeSecret; h.Secret == "" {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Fatal("Node secret is not set, required for dashboard connection")
+		dashLog.Fatal("Node secret is not set, required for dashboard connection")
 	}
 	return nil
 }
 
 func (h *HTTPDashboardHandler) Register() error {
+	dashLog.Info("Registering gateway node with Dashboard")
 	req := h.newRequest(h.RegistrationEndpoint)
 	c := initialiseClient(5 * time.Second)
 	resp, err := c.Do(req)
 
 	if err != nil {
-		log.Errorf("Request failed with error %v; retrying in 5s", err)
+		dashLog.Errorf("Request failed with error %v; retrying in 5s", err)
 		time.Sleep(time.Second * 5)
 		return h.Register()
 	} else if resp != nil && resp.StatusCode != 200 {
-		log.Errorf("Response failed with code %d; retrying in 5s", resp.StatusCode)
+		dashLog.Errorf("Response failed with code %d; retrying in 5s", resp.StatusCode)
 		time.Sleep(time.Second * 5)
 		return h.Register()
 	}
@@ -119,19 +110,16 @@ func (h *HTTPDashboardHandler) Register() error {
 	var found bool
 	NodeID, found = val.Message["NodeID"]
 	if !found {
-		log.Error("Failed to register node, retrying in 5s")
+		dashLog.Error("Failed to register node, retrying in 5s")
 		time.Sleep(time.Second * 5)
 		return h.Register()
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix": "dashboard",
-		"id":     NodeID,
-	}).Info("Node registered")
+	dashLog.WithField("id", NodeID).Info("Node Registered")
 
 	// Set the nonce
 	ServiceNonce = val.Nonce
-	log.Debug("Registration Finished: Nonce Set: ", ServiceNonce)
+	dashLog.Debug("Registration Finished: Nonce Set: ", ServiceNonce)
 
 	return nil
 }
@@ -144,12 +132,12 @@ func (h *HTTPDashboardHandler) StartBeating() error {
 
 	for !h.heartBeatStopSentinel {
 		if err := h.sendHeartBeat(req, client); err != nil {
-			log.Warning(err)
+			dashLog.Warning(err)
 		}
 		time.Sleep(time.Second * 2)
 	}
 
-	log.Info("Stopped Heartbeat")
+	dashLog.Info("Stopped Heartbeat")
 	h.heartBeatStopSentinel = false
 	return nil
 }
@@ -217,7 +205,7 @@ func (h *HTTPDashboardHandler) DeRegister() error {
 
 	// Set the nonce
 	ServiceNonce = val.Nonce
-	log.Info("De-registered.")
+	dashLog.Info("De-registered.")
 
 	return nil
 }
