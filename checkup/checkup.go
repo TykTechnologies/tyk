@@ -21,6 +21,12 @@ const (
 	minFileDescriptors = 80000
 )
 
+func AllowInsecureConfigs(c config.Config) {
+	if c.AllowInsecureConfigs {
+		log.Warning("Insecure configuration allowed: allow_insecure_configs: true")
+	}
+}
+
 func HealthCheck(c config.Config) {
 	if c.HealthCheck.EnableHealthChecks {
 		log.Warn("Health Checker is deprecated and not recommended")
