@@ -1006,9 +1006,10 @@ func Start() {
 
 	start()
 
-	checkup.CheckFileDescriptors()
-	checkup.CheckCpus()
-	checkup.CheckDefaultSecrets(config.Global())
+	checkup.FileDescriptors()
+	checkup.Cpus()
+	checkup.DefaultSecrets(config.Global())
+	checkup.HealthCheck(config.Global())
 
 	// Wait while Redis connection pools are ready before start serving traffic
 	if !storage.IsConnected() {

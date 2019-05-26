@@ -3,7 +3,6 @@ package gateway
 import (
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -39,16 +38,12 @@ type DefaultHealthChecker struct {
 	APIID   string
 }
 
-var healthWarn sync.Once
-
 func (h *DefaultHealthChecker) Init(storeType storage.Handler) {
-	if config.Global().HealthCheck.EnableHealthChecks {
-		log.Debug("Health Checker initialised.")
-		healthWarn.Do(func() {
-			log.Warning("The Health Checker is deprecated and we do no longer recommend its use.")
-		})
+	if !config.Global().HealthCheck.EnableHealthChecks {
+		return
 	}
 
+	log.Info("Initializing HealthChecker")
 	h.storage = storeType
 	h.storage.Connect()
 }

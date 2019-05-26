@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	log            = logger.Get()
+	log            = logger.Get().WithField("prefix", "checkup")
 	defaultConfigs = config.Config{
 		Secret:     "352d20ee67be67f6340b4c0605b044b7",
 		NodeSecret: "352d20ee67be67f6340b4c0605b044b7",
@@ -21,8 +21,13 @@ const (
 	minFileDescriptors = 80000
 )
 
-func CheckFileDescriptors() {
+func HealthCheck(c config.Config) {
+	if c.HealthCheck.EnableHealthChecks {
+		log.Warn("Health Checker is deprecated and not recommended")
+	}
+}
 
+func FileDescriptors() {
 	rlimit := &syscall.Rlimit{}
 	err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, rlimit)
 	if err == nil && rlimit.Cur < minFileDescriptors {
@@ -32,8 +37,7 @@ func CheckFileDescriptors() {
 	}
 }
 
-func CheckCpus() {
-
+func Cpus() {
 	cpus := runtime.NumCPU()
 	if cpus < minCPU {
 		log.Warningf("Num CPUs %d too low for production use. Min %d recommended.\n"+
@@ -42,8 +46,7 @@ func CheckCpus() {
 	}
 }
 
-func CheckDefaultSecrets(c config.Config) {
-
+func DefaultSecrets(c config.Config) {
 	if c.Secret == defaultConfigs.Secret {
 		log.Warningf("Default secret `%s` should be changed for production.", defaultConfigs.Secret)
 	}
