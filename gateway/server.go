@@ -825,6 +825,8 @@ func initialiseSystem() error {
 		mainLog.Debug("No configuration file defined, will try to use default (tyk.conf)")
 	}
 
+	mainLog.Infof("Tyk API Gateway %s", VERSION)
+
 	if !runningTests {
 		globalConf := config.Config{}
 		if err := config.Load(confPaths, &globalConf); err != nil {
@@ -1310,7 +1312,7 @@ func listen(listener, controlListener net.Listener, err error) {
 				go cs.Serve(controlListener)
 			}
 		} else {
-			mainLog.Printf("Gateway started (%s)", VERSION)
+			mainLog.Printf("Gateway started")
 
 			s := &http.Server{Handler: mainHandler{}}
 			if config.Global().CloseConnections {
