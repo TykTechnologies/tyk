@@ -159,7 +159,7 @@ type APISpec struct {
 	GlobalConfig             config.Config
 	OrgHasNoSession          bool
 
-	middlewareChain *ChainObject
+	middlewareChain http.Handler
 
 	shouldRelease bool
 }
