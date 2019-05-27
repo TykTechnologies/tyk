@@ -499,12 +499,12 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		var handler http.Handler
 		if r.URL.Hostname() == "self" {
-			handler = d.SH.Spec.middlewareChain.ThisHandler
+			handler = d.SH.Spec.middlewareChain
 		} else {
 			ctxSetVersionInfo(r, nil)
 
 			if targetAPI := fuzzyFindAPI(r.URL.Hostname()); targetAPI != nil {
-				handler = targetAPI.middlewareChain.ThisHandler
+				handler = targetAPI.middlewareChain
 			} else {
 				handler := ErrorHandler{*d.SH.Base()}
 				handler.HandleError(w, r, "Can't detect loop target", http.StatusInternalServerError)
@@ -640,7 +640,7 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 
 		chainObj := processSpec(spec, apisByListen, &redisStore, &redisOrgStore, &healthStore, &rpcAuthStore, &rpcOrgStore, subrouter, logrus.NewEntry(log))
 		apisMu.Lock()
-		spec.middlewareChain = chainObj
+		spec.middlewareChain = chainObj.ThisHandler
 		apisMu.Unlock()
 
 		// TODO: This will not deal with skipped APis well
