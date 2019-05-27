@@ -286,6 +286,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	data := []byte(baseFieldData)
 	keyID := fmt.Sprintf("%x", md5.Sum(data))
 	sessionID := generateToken(k.Spec.OrgID, keyID)
+	updateSession := false
 
 	k.Logger().Debug("JWT Temporary session ID is: ", sessionID)
 
@@ -338,6 +339,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			k.Logger().Error("Could not find a valid policy to apply to this token!")
 			return errors.New("Key not authorized: no matching policy"), http.StatusForbidden
 		}
+
 		//override session expiry with JWT if longer lived
 		if f, ok := claims["exp"].(float64); ok {
 			if int64(f)-newSession.Expires > 0 {
@@ -351,13 +353,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 
 		// Update the session in the session manager in case it gets called again
 		k.Logger().Debug("Policy applied to key")
-
-		switch k.Spec.BaseIdentityProvidedBy {
-		case apidef.JWTClaim, apidef.UnsetAuth:
-			ctxSetSession(r, &session, sessionID, true)
-		}
-		ctxSetJWTContextVars(k.Spec, r, token)
-		return nil, http.StatusOK
+		updateSession = true
 	} else if k.Spec.JWTPolicyFieldName != "" {
 		// extract policy ID from JWT token
 		policyID, foundPolicy := k.getPolicyIDFromToken(claims)
@@ -381,6 +377,15 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			k.Logger().Error("No policies for the found session. Failing Request.")
 			return errors.New("key not authorized: no matching policy found"), http.StatusForbidden
 		}
+
+		//override session expiry with JWT if longer lived
+		if f, ok := claims["exp"].(float64); ok {
+			if int64(f)-session.Expires > 0 {
+				session.Expires = int64(f)
+				updateSession = true
+			}
+		}
+
 		if pols[0] != policyID { // switch session to new policy and update session storage and cache
 			// check ownership before updating session
 			if policy.OrgID != k.Spec.OrgID {
@@ -396,23 +401,21 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 				return errors.New("Key not authorized: could not apply new policy"), http.StatusForbidden
 			}
 
-			//override session expiry with JWT if longer lived
-			if f, ok := claims["exp"].(float64); ok {
-				if int64(f)-session.Expires > 0 {
-					session.Expires = int64(f)
-				}
-			}
-
-			go SessionCache.Set(session.KeyHash(), session, cache.DefaultExpiration)
+			updateSession = true
 		}
 	}
 
 	k.Logger().Debug("Key found")
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.JWTClaim, apidef.UnsetAuth:
-		ctxSetSession(r, &session, sessionID, false)
+		ctxSetSession(r, &session, sessionID, updateSession)
 	}
 	ctxSetJWTContextVars(k.Spec, r, token)
+
+	if updateSession {
+		SessionCache.Set(session.KeyHash(), session, cache.DefaultExpiration)
+	}
+
 	return nil, http.StatusOK
 }
 
