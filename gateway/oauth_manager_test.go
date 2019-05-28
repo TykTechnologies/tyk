@@ -101,6 +101,7 @@ func loadTestOAuthSpec() *APISpec {
 
 func createTestOAuthClient(spec *APISpec, clientID string) {
 	pID := CreatePolicy(func(p *user.Policy) {
+		p.ID = "TEST-4321"
 		p.AccessRights = map[string]user.AccessDefinition{
 			"test": {
 				APIID: "test",
@@ -528,7 +529,7 @@ func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(session.PolicyIDs(), []string{"TEST-4321"}) {
-			t.Error("Policy not added to token!")
+			t.Error("Policy not added to token!", session.PolicyIDs())
 		}
 	})
 }

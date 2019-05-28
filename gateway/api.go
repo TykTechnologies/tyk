@@ -1355,7 +1355,13 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 				"status": "fail",
 				"err":    "API doesn't exist",
 			}).Error("Failed to create OAuth client")
-			doJSONWrite(w, http.StatusInternalServerError, apiError("API doesn't exist"))
+			doJSONWrite(w, http.StatusBadRequest, apiError("API doesn't exist"))
+			return
+		}
+
+		if !apiSpec.UseOauth2 {
+			doJSONWrite(w, http.StatusBadRequest,
+				apiError("API is not OAuth2"))
 			return
 		}
 
@@ -1382,9 +1388,11 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 				"status":   "fail",
 				"err":      "Policy doesn't exist",
 			}).Error("Failed to create OAuth client")
-			doJSONWrite(w, http.StatusInternalServerError, apiError("Policy doesn't exist"))
+			doJSONWrite(w, http.StatusBadRequest, apiError("Policy doesn't exist"))
 			return
 		}
+
+		oauth2 := false
 		// iterate over APIs and set client for each of them
 		for apiID := range policy.AccessRights {
 			apiSpec := getApiSpec(apiID)
@@ -1395,11 +1403,12 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 					"status": "fail",
 					"err":    "API doesn't exist",
 				}).Error("Failed to create OAuth client")
-				doJSONWrite(w, http.StatusInternalServerError, apiError("API doesn't exist"))
+				doJSONWrite(w, http.StatusBadRequest, apiError("API doesn't exist"))
 				return
 			}
 			// set oauth client if it is oauth API
 			if apiSpec.UseOauth2 {
+				oauth2 = true
 				err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, &newClient, true)
 				if err != nil {
 					log.WithFields(logrus.Fields{
@@ -1412,6 +1421,12 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 			}
+		}
+
+		if !oauth2 {
+			doJSONWrite(w, http.StatusBadRequest,
+				apiError("API is not OAuth2"))
+			return
 		}
 	}
 
