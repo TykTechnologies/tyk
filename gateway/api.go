@@ -1316,54 +1316,6 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if newOauthClient.APIID == "" && newOauthClient.PolicyID == "" {
-		doJSONWrite(w, http.StatusBadRequest,
-			apiError("api_id not specified"))
-		return
-	} else if newOauthClient.APIID != "" && newOauthClient.PolicyID != "" {
-		doJSONWrite(w, http.StatusBadRequest,
-			apiError("both api_id and policy_id specified, you can provide only one of those"))
-		return
-	}
-
-	apiID := ""
-	// get API ID and check policy if needed
-	if newOauthClient.PolicyID != "" {
-		policiesMu.RLock()
-		policy, ok := policiesByID[newOauthClient.PolicyID]
-		policiesMu.RUnlock()
-		if !ok {
-			doJSONWrite(w, http.StatusBadRequest,
-				apiError("Policy doesn't exist"))
-			return
-		}
-		if len(policy.AccessRights) != 1 {
-			doJSONWrite(w, http.StatusBadRequest,
-				apiError("Policy access rights should contain only one API"))
-			return
-		}
-		// pick API ID from policy's ACL
-		for apiID = range policy.AccessRights {
-			break
-		}
-	} else {
-		// pick API ID from request
-		apiID = newOauthClient.APIID
-	}
-
-	// check API
-	apiSpec := getApiSpec(apiID)
-	if apiSpec == nil {
-		doJSONWrite(w, http.StatusBadRequest,
-			apiError("API doesn't exist"))
-		return
-	}
-	if !apiSpec.UseOauth2 {
-		doJSONWrite(w, http.StatusBadRequest,
-			apiError("API is not OAuth2"))
-		return
-	}
-
 	// Allow the client ID to be set
 	cleanSting := newOauthClient.ClientID
 
@@ -1393,19 +1345,91 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		"prefix": "api",
 	}).Debug("Created storage ID: ", storageID)
 
-	err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, &newClient, true)
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"apiID":  newOauthClient.APIID,
-			"status": "fail",
-			"err":    err,
-		}).Error("Failed to create OAuth client")
-		doJSONWrite(w, http.StatusInternalServerError, apiError("Failure in storing client data."))
-		return
+	if newOauthClient.APIID != "" {
+		// set client only for passed API ID
+		apiSpec := getApiSpec(newOauthClient.APIID)
+		if apiSpec == nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "api",
+				"apiID":  newOauthClient.APIID,
+				"status": "fail",
+				"err":    "API doesn't exist",
+			}).Error("Failed to create OAuth client")
+			doJSONWrite(w, http.StatusBadRequest, apiError("API doesn't exist"))
+			return
+		}
+
+		if !apiSpec.UseOauth2 {
+			doJSONWrite(w, http.StatusBadRequest,
+				apiError("API is not OAuth2"))
+			return
+		}
+
+		err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, &newClient, true)
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "api",
+				"apiID":  newOauthClient.APIID,
+				"status": "fail",
+				"err":    err,
+			}).Error("Failed to create OAuth client")
+			doJSONWrite(w, http.StatusInternalServerError, apiError("Failure in storing client data."))
+			return
+		}
+	} else {
+		// set client for all APIs from the given policy
+		policiesMu.RLock()
+		policy, ok := policiesByID[newClient.PolicyID]
+		policiesMu.RUnlock()
+		if !ok {
+			log.WithFields(logrus.Fields{
+				"prefix":   "api",
+				"policyID": newClient.PolicyID,
+				"status":   "fail",
+				"err":      "Policy doesn't exist",
+			}).Error("Failed to create OAuth client")
+			doJSONWrite(w, http.StatusBadRequest, apiError("Policy doesn't exist"))
+			return
+		}
+
+		oauth2 := false
+		// iterate over APIs and set client for each of them
+		for apiID := range policy.AccessRights {
+			apiSpec := getApiSpec(apiID)
+			if apiSpec == nil {
+				log.WithFields(logrus.Fields{
+					"prefix": "api",
+					"apiID":  apiID,
+					"status": "fail",
+					"err":    "API doesn't exist",
+				}).Error("Failed to create OAuth client")
+				doJSONWrite(w, http.StatusBadRequest, apiError("API doesn't exist"))
+				return
+			}
+			// set oauth client if it is oauth API
+			if apiSpec.UseOauth2 {
+				oauth2 = true
+				err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, &newClient, true)
+				if err != nil {
+					log.WithFields(logrus.Fields{
+						"prefix": "api",
+						"apiID":  apiID,
+						"status": "fail",
+						"err":    err,
+					}).Error("Failed to create OAuth client")
+					doJSONWrite(w, http.StatusInternalServerError, apiError("Failure in storing client data."))
+					return
+				}
+			}
+		}
+
+		if !oauth2 {
+			doJSONWrite(w, http.StatusBadRequest,
+				apiError("API is not OAuth2"))
+			return
+		}
 	}
 
-	// we have to convert it back to NewClientRequest because NewClientRequest and OAuthClient have different json-tags
 	clientData := NewClientRequest{
 		ClientID:          newClient.GetId(),
 		ClientSecret:      newClient.GetSecret(),

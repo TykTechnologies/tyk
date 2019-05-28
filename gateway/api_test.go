@@ -812,14 +812,14 @@ func TestCreateOAuthClient(t *testing.T) {
 			code:      http.StatusOK,
 			bodyMatch: `client_id":"client_test2"`,
 		},
-		"both api_id and policy_id provided": {
-			req: NewClientRequest{
-				PolicyID: "p1",
-				APIID:    "test",
-			},
-			code:      http.StatusBadRequest,
-			bodyMatch: "both api_id and policy_id specified",
-		},
+		// "both api_id and policy_id provided": {
+		// 	req: NewClientRequest{
+		// 		PolicyID: "p1",
+		// 		APIID:    "test",
+		// 	},
+		// 	code:      http.StatusBadRequest,
+		// 	bodyMatch: "both api_id and policy_id specified",
+		// },
 		"policy does not exist": {
 			req: NewClientRequest{
 				PolicyID: "unknown",
@@ -834,13 +834,13 @@ func TestCreateOAuthClient(t *testing.T) {
 			code:      http.StatusBadRequest,
 			bodyMatch: "API doesn't exist",
 		},
-		"policy should contain only one API": {
-			req: NewClientRequest{
-				PolicyID: "p2",
-			},
-			code:      http.StatusBadRequest,
-			bodyMatch: "should contain only one API",
-		},
+		// "policy should contain only one API": {
+		// 	req: NewClientRequest{
+		// 		PolicyID: "p2",
+		// 	},
+		// 	code:      http.StatusBadRequest,
+		// 	bodyMatch: "should contain only one API",
+		// },
 		"API is not OAuth": {
 			req: NewClientRequest{
 				APIID: "non_oauth_api",
