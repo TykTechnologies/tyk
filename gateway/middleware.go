@@ -277,6 +277,9 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				log.Error(err)
 				return err
 			}
+
+			//Added this to ensure that if an API is deleted, it is removed from accessRights also.
+			newRights := make(map[string]user.AccessDefinition)
 			for apiID, accessRights := range policy.AccessRights {
 				// check if limit was already set for this API by other policy assigned to key
 				if didPerAPI[apiID] {
@@ -311,11 +314,12 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				accessRights.Limit.QuotaRenews = limitQuotaRenews
 
 				// overwrite session access right for this API
-				rights[apiID] = accessRights
+				newRights[apiID] = accessRights
 
 				// identify that limit for that API is set (to allow set it only once)
 				didPerAPI[apiID] = true
 			}
+			rights = newRights
 		} else if policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl {
 			// This is a partitioned policy, only apply what is active
 			// legacy logic when you can specify quota or rate only in no more than one policy
