@@ -1157,31 +1157,6 @@ func TestCacheEtag(t *testing.T) {
 	}...)
 }
 
-func TestWebsocketsUpstreamUpgradeRequest(t *testing.T) {
-	// setup spec and do test HTTP upgrade-request
-	globalConf := config.Global()
-	globalConf.HttpServerOptions.EnableWebSockets = true
-	config.SetGlobal(globalConf)
-	defer resetTestConfig()
-
-	ts := newTykTestServer()
-	defer ts.Close()
-
-	buildAndLoadAPI(func(spec *APISpec) {
-		spec.Proxy.ListenPath = "/"
-	})
-
-	ts.Run(t, test.TestCase{
-		Path: "/ws",
-		Headers: map[string]string{
-			"Connection":            "Upgrade",
-			"Upgrade":               "websocket",
-			"Sec-Websocket-Version": "13",
-			"Sec-Websocket-Key":     "abc",
-		},
-		Code: http.StatusSwitchingProtocols,
-	})
-}
 
 func TestWebsocketsSeveralOpenClose(t *testing.T) {
 	globalConf := config.Global()
