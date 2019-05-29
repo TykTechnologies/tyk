@@ -193,6 +193,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	mwPreFuncs := []apidef.MiddlewareDefinition{}
 	mwPostFuncs := []apidef.MiddlewareDefinition{}
 	mwPostAuthCheckFuncs := []apidef.MiddlewareDefinition{}
+	mwResponseFuncs := []apidef.MiddlewareDefinition{}
 
 	var mwDriver apidef.MiddlewareDriver
 
@@ -211,8 +212,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	logger.Debug("Initializing API")
 	var mwPaths []string
 
-	mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwDriver = loadCustomMiddleware(spec)
-
+	mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwResponseFuncs, mwDriver = loadCustomMiddleware(spec)
 	if config.Global().EnableJSVM && mwDriver == apidef.OttoDriver {
 		spec.JSVM.LoadJSPaths(mwPaths, prefix)
 	}
@@ -249,8 +249,8 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		proxy = TykNewSingleHostReverseProxy(spec.target, spec)
 	}
 
-	// Create the response processors
-	createResponseMiddlewareChain(spec)
+	// Create the response processors, pass all the loaded custom middleware response functions:
+	createResponseMiddlewareChain(spec, mwResponseFuncs)
 
 	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy, logger: logger}
 
@@ -520,7 +520,6 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		ctxIncLoopLevel(r, loopLevelLimit)
-
 		handler.ServeHTTP(w, r)
 	} else {
 		d.SH.ServeHTTP(w, r)

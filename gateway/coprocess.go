@@ -15,6 +15,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/coprocess"
+	"github.com/TykTechnologies/tyk/user"
 
 	"errors"
 	"io/ioutil"
@@ -71,39 +72,40 @@ func DoCoprocessReload() {
 
 // CoProcessor represents a CoProcess during the request.
 type CoProcessor struct {
+	HookName   string
 	HookType   coprocess.HookType
 	Middleware *CoProcessMiddleware
 }
 
-// ObjectFromRequest constructs a CoProcessObject from a given http.Request.
-func (c *CoProcessor) ObjectFromRequest(r *http.Request) (*coprocess.Object, error) {
-	headers := ProtoMap(r.Header)
+// BuildObject constructs a CoProcessObject from a given http.Request.
+func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response) *coprocess.Object {
+	headers := ProtoMap(req.Header)
 
-	host := r.Host
-	if host == "" && r.URL != nil {
-		host = r.URL.Host
+	host := req.Host
+	if host == "" && req.URL != nil {
+		host = req.URL.Host
 	}
 	if host != "" {
 		headers["Host"] = host
 	}
 	scheme := "http"
-	if r.TLS != nil {
+	if req.TLS != nil {
 		scheme = "https"
 	}
 	miniRequestObject := &coprocess.MiniRequestObject{
 		Headers:        headers,
 		SetHeaders:     map[string]string{},
 		DeleteHeaders:  []string{},
-		Url:            r.URL.String(),
-		Params:         ProtoMap(r.URL.Query()),
+		Url:            req.URL.String(),
+		Params:         ProtoMap(req.URL.Query()),
 		AddParams:      map[string]string{},
 		ExtendedParams: ProtoMap(nil),
 		DeleteParams:   []string{},
 		ReturnOverrides: &coprocess.ReturnOverrides{
 			ResponseCode: -1,
 		},
-		Method:     r.Method,
-		RequestUri: r.RequestURI,
+		Method:     req.Method,
+		RequestUri: req.RequestURI,
 		Scheme:     scheme,
 	}
 
@@ -121,7 +123,7 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) (*coprocess.Object, err
 
 	object := &coprocess.Object{
 		Request:  miniRequestObject,
-		HookName: c.Middleware.HookName,
+		HookName: c.HookName,
 	}
 
 	// If a middleware is set, take its HookType, otherwise override it with CoProcessor.HookType
@@ -153,14 +155,31 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) (*coprocess.Object, err
 
 	// Encode the session object (if not a pre-process & not a custom key check):
 	if c.HookType != coprocess.HookType_Pre && c.HookType != coprocess.HookType_CustomKeyCheck {
-		if session := ctxGetSession(r); session != nil {
+		if session := ctxGetSession(req); session != nil {
 			object.Session = ProtoSessionState(session)
 			// For compatibility purposes:
 			object.Metadata = object.Session.Metadata
 		}
 	}
 
-	return object, nil
+	// Append response data if it's available:
+	if res != nil {
+		resObj := &coprocess.ResponseObject{
+			Headers: make(map[string]string, len(res.Header)),
+		}
+		for k, v := range res.Header {
+			resObj.Headers[k] = v[0]
+		}
+		resObj.StatusCode = int32(res.StatusCode)
+		rawBody, _ := ioutil.ReadAll(res.Body)
+		if utf8.Valid(rawBody) {
+			resObj.Body = string(rawBody)
+		}
+		resObj.RawBody = rawBody
+		object.Response = resObj
+	}
+
+	return object
 }
 
 // ObjectPostProcess does CoProcessObject post-processing (adding/removing headers or params, etc.).
@@ -272,16 +291,20 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	// It's also possible to override the HookType:
+	// TODO: remove "Middleware"?
 	coProcessor := CoProcessor{
 		Middleware: m,
-		// HookType: coprocess.PreHook,
+		HookName:   m.HookName,
 	}
 
+	/*
 	object, err := coProcessor.ObjectFromRequest(r)
 	if err != nil {
 		logger.WithError(err).Error("Failed to build request object")
 		return errors.New("Middleware error"), 500
 	}
+	*/
+	object := coProcessor.BuildObject(r, nil)
 
 	t1 := time.Now()
 	returnObject, err := coProcessor.Dispatch(object)
@@ -383,4 +406,39 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	return nil, 200
+}
+
+type CustomMiddlewareResponseHook struct {
+	Spec *APISpec
+	// TODO: should we include anything here??
+	mw     apidef.MiddlewareDefinition
+	config HeaderInjectorOptions
+}
+
+func (h *CustomMiddlewareResponseHook) Init(mw interface{}, spec *APISpec) error {
+	h.Spec = spec
+	h.mw = mw.(apidef.MiddlewareDefinition)
+	return nil
+}
+
+func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
+	coProcessor := CoProcessor{
+		HookName: h.mw.Name,
+	}
+	object := coProcessor.BuildObject(req, res)
+	retObject, err := coProcessor.Dispatch(object)
+	// TODO: handle appropriately:
+	if err != nil {
+		panic(err)
+	}
+
+	// TODO: handle nil response object:
+	if retObject.Response == nil {
+	}
+
+	bodyBuf := bytes.NewBuffer(retObject.Response.RawBody)
+	res.Body = ioutil.NopCloser(bodyBuf)
+
+	// TODO: handle status, headers, etc.
+	return nil
 }
