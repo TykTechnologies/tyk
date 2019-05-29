@@ -491,12 +491,13 @@ func addBatchEndpoint(spec *APISpec, muxer *mux.Router) {
 	muxer.HandleFunc(apiBatchPath, batchHandler.HandleBatchRequest)
 }
 
-func loadCustomMiddleware(spec *APISpec) ([]string, apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, apidef.MiddlewareDriver) {
+func loadCustomMiddleware(spec *APISpec) ([]string, apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, apidef.MiddlewareDriver) {
 	mwPaths := []string{}
 	var mwAuthCheckFunc apidef.MiddlewareDefinition
 	mwPreFuncs := []apidef.MiddlewareDefinition{}
 	mwPostFuncs := []apidef.MiddlewareDefinition{}
 	mwPostKeyAuthFuncs := []apidef.MiddlewareDefinition{}
+	mwResponseFuncs := []apidef.MiddlewareDefinition{}
 	mwDriver := apidef.OttoDriver
 
 	// Set AuthCheck hook
@@ -573,10 +574,16 @@ func loadCustomMiddleware(spec *APISpec) ([]string, apidef.MiddlewareDefinition,
 		mwPostKeyAuthFuncs = append(mwPostKeyAuthFuncs, mwObj)
 	}
 
-	return mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostKeyAuthFuncs, mwDriver
+	// Load response hooks
+	for _, mw := range spec.CustomMiddleware.Response {
+		mwResponseFuncs = append(mwResponseFuncs, mw)
+	}
+
+	return mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostKeyAuthFuncs, mwResponseFuncs, mwDriver
+
 }
 
-func createResponseMiddlewareChain(spec *APISpec) {
+func createResponseMiddlewareChain(spec *APISpec, responseFuncs []apidef.MiddlewareDefinition) {
 	// Create the response processors
 
 	responseChain := make([]TykResponseHandler, len(spec.ResponseProcessors))
@@ -592,6 +599,20 @@ func createResponseMiddlewareChain(spec *APISpec) {
 		mainLog.Debug("Loading Response processor: ", processorDetail.Name)
 		responseChain[i] = processor
 	}
+
+	for _, mw := range responseFuncs {
+		processor := responseProcessorByName("custom_mw_res_hook")
+		// TODO: perhaps error when plugin support is disabled?
+		if processor == nil {
+			mainLog.Error("Couldn't find custom middleware processor")
+			return
+		}
+		if err := processor.Init(mw, spec); err != nil {
+			mainLog.Debug("Failed to init processor: ", err)
+		}
+		responseChain = append(responseChain, processor)
+	}
+
 	spec.ResponseChain = responseChain
 }
 

@@ -557,6 +557,8 @@ func responseProcessorByName(name string) TykResponseHandler {
 		return &ResponseTransformJQMiddleware{}
 	case "header_transform":
 		return &HeaderTransform{}
+	case "custom_mw_res_hook":
+		return &CustomMiddlewareResponseHook{}
 	}
 	return nil
 }
