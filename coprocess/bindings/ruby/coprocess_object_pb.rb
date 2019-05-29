@@ -4,6 +4,7 @@
 require 'google/protobuf'
 
 require 'coprocess_mini_request_object_pb'
+require 'coprocess_response_object_pb'
 require 'coprocess_session_state_pb'
 require 'coprocess_common_pb'
 Google::Protobuf::DescriptorPool.generated_pool.build do
@@ -14,6 +15,7 @@ Google::Protobuf::DescriptorPool.generated_pool.build do
     optional :session, :message, 4, "coprocess.SessionState"
     map :metadata, :string, :string, 5
     map :spec, :string, :string, 6
+    optional :response, :message, 7, "coprocess.ResponseObject"
   end
   add_message "coprocess.Event" do
     optional :payload, :string, 1
