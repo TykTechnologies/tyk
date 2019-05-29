@@ -349,8 +349,8 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 
 	// Make sure we get the correct target URL
 	if s.Spec.Proxy.StripListenPath {
-		r.URL.Path = strings.Replace(r.URL.Path, s.Spec.Proxy.ListenPath, "", 1)
-		r.URL.RawPath = strings.Replace(r.URL.RawPath, s.Spec.Proxy.ListenPath, "", 1)
+		r.URL.Path = strings.TrimPrefix(r.URL.Path, s.Spec.Proxy.ListenPath)
+		r.URL.RawPath = strings.TrimPrefix(r.URL.RawPath, s.Spec.Proxy.ListenPath)
 	}
 
 	t1 := time.Now()
