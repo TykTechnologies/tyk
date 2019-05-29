@@ -1,8 +1,11 @@
 package gateway
 
 import (
+	"bytes"
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 
@@ -15,6 +18,9 @@ type customResponseWriter struct {
 	http.ResponseWriter
 	responseSent   bool
 	statusCodeSent int
+	copyData       bool
+	data           []byte
+	dataLength     int64
 }
 
 func (w *customResponseWriter) Write(b []byte) (int, error) {
@@ -22,7 +28,24 @@ func (w *customResponseWriter) Write(b []byte) (int, error) {
 	if w.statusCodeSent == 0 {
 		w.statusCodeSent = http.StatusOK // no WriteHeader was called so it will be set to StatusOK in actual ResponseWriter
 	}
-	return w.ResponseWriter.Write(b)
+
+	// send actual data
+	num, err := w.ResponseWriter.Write(b)
+
+	// copy data sent
+	if w.copyData {
+		if w.data == nil {
+			w.data = make([]byte, num)
+			copy(w.data, b[:num])
+		} else {
+			w.data = append(w.data, b[:num]...)
+		}
+	}
+
+	// count how many bytes we sent
+	w.dataLength += int64(num)
+
+	return num, err
 }
 
 func (w *customResponseWriter) WriteHeader(statusCode int) {
@@ -31,13 +54,33 @@ func (w *customResponseWriter) WriteHeader(statusCode int) {
 	w.ResponseWriter.WriteHeader(statusCode)
 }
 
+func (w *customResponseWriter) getHttpResponse(r *http.Request) *http.Response {
+	// craft response on the fly for analytics
+	httpResponse := &http.Response{
+		Status:        http.StatusText(w.statusCodeSent),
+		StatusCode:    w.statusCodeSent,
+		Header:        w.ResponseWriter.Header(), // TODO: worth to think about trailer headers
+		Proto:         r.Proto,
+		ProtoMajor:    r.ProtoMajor,
+		ProtoMinor:    r.ProtoMinor,
+		Request:       r,
+		ContentLength: w.dataLength,
+	}
+	if w.copyData {
+		httpResponse.Body = ioutil.NopCloser(bytes.NewReader(w.data))
+	}
+
+	return httpResponse
+}
+
 // GoPluginMiddleware is a generic middleware that will execute Go-plugin code before continuing
 type GoPluginMiddleware struct {
 	BaseMiddleware
-	Path       string // path to .so file
-	SymbolName string // function symbol to look up
-	handler    http.HandlerFunc
-	logger     *logrus.Entry
+	Path           string // path to .so file
+	SymbolName     string // function symbol to look up
+	handler        http.HandlerFunc
+	logger         *logrus.Entry
+	successHandler *SuccessHandler // to record analytics
 }
 
 func (m *GoPluginMiddleware) Name() string {
@@ -62,6 +105,9 @@ func (m *GoPluginMiddleware) EnabledForSpec() bool {
 		return false
 	}
 
+	// to record 2XX hits in analytics
+	m.successHandler = &SuccessHandler{BaseMiddleware: m.BaseMiddleware}
+
 	return true
 }
 
@@ -83,20 +129,32 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 	// wrap ResponseWriter to check if response was sent
 	rw := &customResponseWriter{
 		ResponseWriter: w,
+		copyData:       recordDetail(r, m.Spec.GlobalConfig),
 	}
 
 	// call Go-plugin function
+	t1 := time.Now()
 	m.handler(rw, r)
+	t2 := time.Now()
+
+	// calculate latency
+	ms := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001
+	m.logger.WithField("ms", ms).Debug("Go-plugin request processing took")
 
 	// check if response was sent
 	if rw.responseSent {
 		// check if response code was an error one
 		if rw.statusCodeSent >= http.StatusBadRequest {
+			// base middleware will report this error to analytics if needed
 			respCode = rw.statusCodeSent
 			err = fmt.Errorf("plugin function sent error response code: %d", rw.statusCodeSent)
 			m.logger.WithError(err).Error("Failed to process request with Go-plugin middleware func")
 		} else {
-			respCode = mwStatusRespond // no need to continue passing this request down to reverse proxy
+			// record 2XX to analytics
+			m.successHandler.RecordHit(r, int64(ms), rw.statusCodeSent, rw.getHttpResponse(r))
+
+			// no need to continue passing this request down to reverse proxy
+			respCode = mwStatusRespond
 		}
 	} else {
 		respCode = http.StatusOK
