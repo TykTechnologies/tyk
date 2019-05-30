@@ -53,6 +53,8 @@ var (
 
 	testServerRouter  *mux.Router
 	defaultTestConfig config.Config
+
+	EnableTestDNSMock = true
 )
 
 func InitTestMain(m *testing.M) int {
@@ -98,15 +100,14 @@ func InitTestMain(m *testing.M) int {
 	// Go 1.8 and ealier
 	globalConf.ListenAddress = "127.0.0.1"
 
-	mockHandle, err = test.InitDNSMock(test.DomainsToAddresses, nil)
-	if err != nil {
-		panic(err)
-	}
+	if EnableTestDNSMock {
+		mockHandle, err = test.InitDNSMock(test.DomainsToAddresses, nil)
+		if err != nil {
+			panic(err)
+		}
 
-	defer func() {
-		testServer.Shutdown(context.Background())
-		mockHandle.ShutdownDnsMock()
-	}()
+		defer mockHandle.ShutdownDnsMock()
+	}
 
 	go func() {
 		err := testServer.ListenAndServe()
@@ -114,6 +115,8 @@ func InitTestMain(m *testing.M) int {
 			log.Warn("testServer.ListenAndServe() err: ", err.Error())
 		}
 	}()
+
+	defer testServer.Shutdown(context.Background())
 
 	CoProcessInit()
 	afterConfSetup(&globalConf)
