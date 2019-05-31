@@ -27,6 +27,9 @@ const (
 	PickFirstStrategy IPsHandleStrategy = "pick_first"
 	RandomStrategy    IPsHandleStrategy = "random"
 	NoCacheStrategy   IPsHandleStrategy = "no_cache"
+
+	DefaultDashPolicySource     = "service"
+	DefaultDashPolicyRecordName = "tyk_policies"
 )
 
 var log = logger.Get()
