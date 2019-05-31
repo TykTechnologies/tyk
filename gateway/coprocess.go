@@ -77,8 +77,8 @@ type CoProcessor struct {
 	Middleware *CoProcessMiddleware
 }
 
-// BuildObject constructs a CoProcessObject from a given http.Request.
-func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response) *coprocess.Object {
+// ObjectFromRequest constructs a CoProcessObject from a given http.Request.
+func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, rawBodyOnly bool) *coprocess.Object {
 	headers := ProtoMap(req.Header)
 
 	host := req.Host
@@ -109,15 +109,24 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response) *coproc
 		Scheme:     scheme,
 	}
 
-	if r.Body != nil {
-		defer r.Body.Close()
-		var err error
-		miniRequestObject.RawBody, err = ioutil.ReadAll(r.Body)
-		if err != nil {
-			return nil, err
-		}
-		if utf8.Valid(miniRequestObject.RawBody) && !c.Middleware.RawBodyOnly {
-			miniRequestObject.Body = string(miniRequestObject.RawBody)
+	/*
+		if r.Body != nil {
+			defer r.Body.Close()
+			var err error
+			miniRequestObject.RawBody, err = ioutil.ReadAll(r.Body)
+			if err != nil {
+				return nil, err
+			}
+			if utf8.Valid(miniRequestObject.RawBody) && !c.Middleware.RawBodyOnly {
+				miniRequestObject.Body = string(miniRequestObject.RawBody)
+	*/
+	if req.Body != nil {
+		defer req.Body.Close()
+		miniRequestObject.RawBody, _ = ioutil.ReadAll(req.Body)
+		if !rawBodyOnly {
+			if utf8.Valid(miniRequestObject.RawBody) {
+				miniRequestObject.Body = string(miniRequestObject.RawBody)
+			}
 		}
 	}
 
@@ -172,10 +181,13 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response) *coproc
 		}
 		resObj.StatusCode = int32(res.StatusCode)
 		rawBody, _ := ioutil.ReadAll(res.Body)
-		if utf8.Valid(rawBody) {
-			resObj.Body = string(rawBody)
-		}
 		resObj.RawBody = rawBody
+		res.Body = ioutil.NopCloser(bytes.NewReader(rawBody))
+		if !rawBodyOnly {
+			if utf8.Valid(rawBody) {
+				resObj.Body = string(rawBody)
+			}
+		}
 		object.Response = resObj
 	}
 
@@ -298,13 +310,14 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	/*
-	object, err := coProcessor.ObjectFromRequest(r)
-	if err != nil {
-		logger.WithError(err).Error("Failed to build request object")
-		return errors.New("Middleware error"), 500
-	}
+		object, err := coProcessor.ObjectFromRequest(r)
+		if err != nil {
+			logger.WithError(err).Error("Failed to build request object")
+			return errors.New("Middleware error"), 500
+		}
 	*/
-	object := coProcessor.BuildObject(r, nil)
+	// object := coProcessor.BuildObject(r, nil)
+	object := coProcessor.BuildObject(r, nil, false)
 
 	t1 := time.Now()
 	returnObject, err := coProcessor.Dispatch(object)
@@ -428,7 +441,7 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 		HookName: h.mw.Name,
 	}
 
-	object := coProcessor.BuildObject(req, res)
+	object := coProcessor.BuildObject(req, res, false)
 	object.Session = ProtoSessionState(ses)
 
 	retObject, err := coProcessor.Dispatch(object)
@@ -442,15 +455,15 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 		return errors.New("Middleware error")
 	}
 
+	// Set headers:
+	for k, v := range retObject.Response.Headers {
+		res.Header.Set(k, v)
+	}
+
 	// Set response body:
 	bodyBuf := bytes.NewBuffer(retObject.Response.RawBody)
 	res.Body = ioutil.NopCloser(bodyBuf)
 
-	// Set headers and status code:
-	// TODO: fix multiple WriteHeader calls issue
-	for k, v := range retObject.Response.Headers {
-		rw.Header().Set(k, v)
-	}
-	rw.WriteHeader(int(retObject.Response.StatusCode))
+	res.StatusCode = int(retObject.Response.StatusCode)
 	return nil
 }
