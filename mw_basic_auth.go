@@ -248,7 +248,7 @@ func (k *BasicAuthKeyIsValid) compareHashAndPassword(hash string, password strin
 
 	cachedPass, inCache := basicAuthCache.Get(hash)
 	if !inCache {
-		logEntry.Info("cache enabled: miss: bcrypt")
+		logEntry.Debug("cache enabled: miss: bcrypt")
 		_, err, _ := cacheGroup.Do(hash+"."+password, func() (interface{}, error) {
 			return nil, k.doBcryptWithCache(cacheTTL, hashBytes, passwordBytes)
 		})
