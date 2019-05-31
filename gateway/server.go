@@ -1001,12 +1001,7 @@ func Start() {
 		mainLog.Warn("The control_api_port should be changed for production")
 	}
 
-	checkup.FileDescriptors()
-	checkup.Cpus()
-	checkup.DefaultSecrets(config.Global())
-	checkup.HealthCheck(config.Global())
-	checkup.AllowInsecureConfigs(config.Global())
-	checkup.LegacyRateLimiters(config.Global())
+	checkup.Run(config.Global())
 
 	start()
 

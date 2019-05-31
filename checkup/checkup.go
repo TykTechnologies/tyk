@@ -21,7 +21,16 @@ const (
 	minFileDescriptors = 80000
 )
 
-func LegacyRateLimiters(c config.Config) {
+func Run(c config.Config) {
+	legacyRateLimiters(c)
+	allowInsecureConfigs(c)
+	healthCheck(c)
+	fileDescriptors()
+	cpus()
+	defaultSecrets(c)
+}
+
+func legacyRateLimiters(c config.Config) {
 	if c.ManagementNode {
 		return
 	}
@@ -30,19 +39,19 @@ func LegacyRateLimiters(c config.Config) {
 	}
 }
 
-func AllowInsecureConfigs(c config.Config) {
+func allowInsecureConfigs(c config.Config) {
 	if c.AllowInsecureConfigs {
 		log.Warning("Insecure configuration allowed: allow_insecure_configs: true")
 	}
 }
 
-func HealthCheck(c config.Config) {
+func healthCheck(c config.Config) {
 	if c.HealthCheck.EnableHealthChecks {
 		log.Warn("Health Checker is deprecated and not recommended")
 	}
 }
 
-func FileDescriptors() {
+func fileDescriptors() {
 	rlimit := &syscall.Rlimit{}
 	err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, rlimit)
 	if err == nil && rlimit.Cur < minFileDescriptors {
@@ -52,7 +61,7 @@ func FileDescriptors() {
 	}
 }
 
-func Cpus() {
+func cpus() {
 	cpus := runtime.NumCPU()
 	if cpus < minCPU {
 		log.Warningf("Num CPUs %d too low for production use. Min %d recommended.\n"+
@@ -61,7 +70,7 @@ func Cpus() {
 	}
 }
 
-func DefaultSecrets(c config.Config) {
+func defaultSecrets(c config.Config) {
 	if c.Secret == defaultConfigs.Secret {
 		log.Warningf("Default secret `%s` should be changed for production.", defaultConfigs.Secret)
 	}
