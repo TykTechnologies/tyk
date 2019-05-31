@@ -866,12 +866,13 @@ func initialiseSystem() error {
 
 	setupGlobals()
 
+	globalConf := config.Global()
+
 	if *cli.Port != "" {
 		portNum, err := strconv.Atoi(*cli.Port)
 		if err != nil {
 			mainLog.Error("Port specified in flags must be a number: ", err)
 		} else {
-			globalConf := config.Global()
 			globalConf.ListenPort = portNum
 			config.SetGlobal(globalConf)
 		}
