@@ -19,12 +19,6 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/net/http2"
-
-	newrelic "github.com/newrelic/go-agent"
-
-	"github.com/TykTechnologies/tyk/checkup"
-
 	"github.com/Sirupsen/logrus"
 	logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
@@ -34,8 +28,10 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/lonelycode/osin"
+	newrelic "github.com/newrelic/go-agent"
 	"github.com/rs/cors"
 	uuid "github.com/satori/go.uuid"
+	"golang.org/x/net/http2"
 	"rsc.io/letsencrypt"
 
 	"github.com/TykTechnologies/goagain"
@@ -43,6 +39,7 @@ import (
 	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
+	"github.com/TykTechnologies/tyk/checkup"
 	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/dnscache"
@@ -825,6 +822,8 @@ func initialiseSystem() error {
 		mainLog.Debug("No configuration file defined, will try to use default (tyk.conf)")
 	}
 
+	mainLog.Infof("Tyk API Gateway %s", VERSION)
+
 	if !runningTests {
 		globalConf := config.Config{}
 		if err := config.Load(confPaths, &globalConf); err != nil {
@@ -1002,11 +1001,9 @@ func Start() {
 		mainLog.Warn("The control_api_port should be changed for production")
 	}
 
-	start()
+	checkup.Run(config.Global())
 
-	checkup.CheckFileDescriptors()
-	checkup.CheckCpus()
-	checkup.CheckDefaultSecrets(config.Global())
+	start()
 
 	// Wait while Redis connection pools are ready before start serving traffic
 	if !storage.IsConnected() {
@@ -1216,10 +1213,8 @@ func handleDashboardRegistration() {
 	dashboardServiceInit()
 
 	// connStr := buildConnStr("/register/node")
-
-	mainLog.Info("Registering node.")
 	if err := DashService.Register(); err != nil {
-		mainLog.Fatal("Registration failed: ", err)
+		dashLog.Fatal("Registration failed: ", err)
 	}
 
 	go DashService.StartBeating()
@@ -1231,9 +1226,7 @@ func startDRL() {
 	switch {
 	case config.Global().ManagementNode:
 		return
-	case config.Global().EnableSentinelRateLimiter,
-		config.Global().EnableRedisRollingLimiter:
-		mainLog.Warning("The old, non-distributed rate limiter is deprecated and we no longer recommend its use.")
+	case config.Global().EnableSentinelRateLimiter, config.Global().EnableRedisRollingLimiter:
 		return
 	}
 	mainLog.Info("Initialising distributed rate limiter")
@@ -1310,7 +1303,7 @@ func listen(listener, controlListener net.Listener, err error) {
 				go cs.Serve(controlListener)
 			}
 		} else {
-			mainLog.Printf("Gateway started (%s)", VERSION)
+			mainLog.Printf("Gateway started")
 
 			s := &http.Server{Handler: mainHandler{}}
 			if config.Global().CloseConnections {

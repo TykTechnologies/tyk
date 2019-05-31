@@ -140,10 +140,6 @@ func isPayloadSignatureValid(notification Notification) bool {
 	}
 
 	if notification.Signature == "" && config.Global().AllowInsecureConfigs {
-		redisInsecureWarn.Do(func() {
-			pubSubLog.Warning("Insecure configuration detected (allowing)!")
-		})
-
 		return true
 	}
 
