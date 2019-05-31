@@ -289,6 +289,10 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	if returnObject.Request.ReturnOverrides.ResponseCode > 400 {
 		logger.WithField("key", obfuscateKey(token)).Info("Attempted access with invalid key")
 
+		for h, v := range returnObject.Request.ReturnOverrides.Headers {
+			w.Header().Set(h, v)
+		}
+
 		// Fire Authfailed Event
 		AuthFailed(m, r, token)
 
