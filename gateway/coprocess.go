@@ -411,8 +411,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 type CustomMiddlewareResponseHook struct {
 	Spec *APISpec
 	// TODO: should we include anything here??
-	mw     apidef.MiddlewareDefinition
-	config HeaderInjectorOptions
+	mw apidef.MiddlewareDefinition
 }
 
 func (h *CustomMiddlewareResponseHook) Init(mw interface{}, spec *APISpec) error {
@@ -422,23 +421,36 @@ func (h *CustomMiddlewareResponseHook) Init(mw interface{}, spec *APISpec) error
 }
 
 func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
+	log.WithFields(logrus.Fields{
+		"prefix": "coprocess",
+	}).Debugf("Response hook '%s' is called", h.mw.Name)
 	coProcessor := CoProcessor{
 		HookName: h.mw.Name,
 	}
+
 	object := coProcessor.BuildObject(req, res)
+	object.Session = ProtoSessionState(ses)
+
 	retObject, err := coProcessor.Dispatch(object)
-	// TODO: handle appropriately:
 	if err != nil {
-		panic(err)
+		log.WithError(err).Error("Dispatch error")
+		return errors.New("Middleware error")
 	}
 
-	// TODO: handle nil response object:
 	if retObject.Response == nil {
+		log.WithError(err).Error("No response object returned by response hook")
+		return errors.New("Middleware error")
 	}
 
+	// Set response body:
 	bodyBuf := bytes.NewBuffer(retObject.Response.RawBody)
 	res.Body = ioutil.NopCloser(bodyBuf)
 
-	// TODO: handle status, headers, etc.
+	// Set headers and status code:
+	// TODO: fix multiple WriteHeader calls issue
+	for k, v := range retObject.Response.Headers {
+		rw.Header().Set(k, v)
+	}
+	rw.WriteHeader(int(retObject.Response.StatusCode))
 	return nil
 }
