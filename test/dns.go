@@ -25,6 +25,8 @@ var (
 	DomainsToIgnore = []string{
 		"redis.",
 		"tyk-redis.",
+		"mongo.", // For dashboard integration tests
+		"tyk-mongo.",
 	}
 )
 
@@ -56,7 +58,7 @@ func (d *dnsMockHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 		for _, ignore := range DomainsToIgnore {
 			if strings.HasPrefix(domain, ignore) {
 				resolver := &net.Resolver{}
-				addrs, err := resolver.LookupAddr(context.Background(), domain)
+				ipAddrs, err := resolver.LookupIPAddr(context.Background(), domain)
 				if err != nil {
 					m := new(dns.Msg)
 					m.SetRcode(r, dns.RcodeServerFailure)
@@ -65,7 +67,7 @@ func (d *dnsMockHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 				}
 				msg.Answer = append(msg.Answer, &dns.A{
 					Hdr: dns.RR_Header{Name: domain, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 60},
-					A:   net.ParseIP(addrs[0]),
+					A:   ipAddrs[0].IP,
 				})
 				w.WriteMsg(&msg)
 				return
