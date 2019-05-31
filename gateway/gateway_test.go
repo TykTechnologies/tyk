@@ -11,9 +11,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"path/filepath"
 	"runtime"
-	"strconv"
 
 	"strings"
 	"sync"
