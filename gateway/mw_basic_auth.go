@@ -12,6 +12,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	cache "github.com/pmylund/go-cache"
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/murmur3"
 	"github.com/TykTechnologies/tyk/apidef"
@@ -24,6 +25,8 @@ import (
 const defaultBasicAuthTTL = time.Duration(60) * time.Second
 
 var basicAuthCache = cache.New(60*time.Second, 60*time.Minute)
+
+var cacheGroup singleflight.Group
 
 // BasicAuthKeyIsValid uses a username instead of
 type BasicAuthKeyIsValid struct {
@@ -219,7 +222,6 @@ func (k *BasicAuthKeyIsValid) handleAuthFail(w http.ResponseWriter, r *http.Requ
 
 func (k *BasicAuthKeyIsValid) doBcryptWithCache(cacheDuration time.Duration, hashedPassword []byte, password []byte) error {
 	if err := bcrypt.CompareHashAndPassword(hashedPassword, password); err != nil {
-
 		return err
 	}
 
@@ -231,12 +233,10 @@ func (k *BasicAuthKeyIsValid) doBcryptWithCache(cacheDuration time.Duration, has
 }
 
 func (k *BasicAuthKeyIsValid) compareHashAndPassword(hash string, password string, logEntry *logrus.Entry) error {
-
-	cacheEnabled := !k.Spec.BasicAuth.DisableCaching
 	passwordBytes := []byte(password)
 	hashBytes := []byte(hash)
 
-	if !cacheEnabled {
+	if k.Spec.BasicAuth.DisableCaching {
 		logEntry.Debug("cache disabled")
 		return bcrypt.CompareHashAndPassword(hashBytes, passwordBytes)
 	}
@@ -248,9 +248,12 @@ func (k *BasicAuthKeyIsValid) compareHashAndPassword(hash string, password strin
 
 	cachedPass, inCache := basicAuthCache.Get(hash)
 	if !inCache {
+		logEntry.Info("cache enabled: miss: bcrypt")
+		_, err, _ := cacheGroup.Do(hash+"."+password, func() (interface{}, error) {
+			return nil, k.doBcryptWithCache(cacheTTL, hashBytes, passwordBytes)
+		})
 
-		logEntry.Debug("cache enabled: miss: bcrypt")
-		return k.doBcryptWithCache(cacheTTL, hashBytes, passwordBytes)
+		return err
 	}
 
 	hasher := murmur3.New64()
