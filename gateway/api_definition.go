@@ -17,6 +17,8 @@ import (
 	"text/template"
 	"time"
 
+	"gopkg.in/Masterminds/sprig.v2"
+
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/Sirupsen/logrus"
@@ -557,9 +559,17 @@ var apiTemplate = template.New("").Funcs(map[string]interface{}{
 	},
 })
 
+func (a APIDefinitionLoader) filterSprigFuncs() template.FuncMap {
+	tmp := sprig.GenericFuncMap()
+	delete(tmp, "env")
+	delete(tmp, "expandenv")
+
+	return template.FuncMap(tmp)
+}
+
 func (a APIDefinitionLoader) loadFileTemplate(path string) (*template.Template, error) {
 	log.Debug("-- Loading template: ", path)
-	return apiTemplate.New("").ParseFiles(path)
+	return apiTemplate.New("").Funcs(a.filterSprigFuncs()).ParseFiles(path)
 }
 
 func (a APIDefinitionLoader) loadBlobTemplate(blob string) (*template.Template, error) {
@@ -568,7 +578,7 @@ func (a APIDefinitionLoader) loadBlobTemplate(blob string) (*template.Template, 
 	if err != nil {
 		return nil, err
 	}
-	return apiTemplate.New("").Parse(string(uDec))
+	return apiTemplate.New("").Funcs(a.filterSprigFuncs()).Parse(string(uDec))
 }
 
 func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMeta, stat URLStatus) []URLSpec {

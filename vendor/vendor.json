@@ -1074,6 +1074,12 @@
 			"versionExact": "v1.0.5"
 		},
 		{
+			"checksumSHA1": "EkdMN0N+5HzwrdFYID39Ufi5TVM=",
+			"path": "gopkg.in/Masterminds/sprig.v2",
+			"revision": "544a9b1d90f323f6509491b389714fbbd126bee3",
+			"revisionTime": "2019-01-03T23:15:13Z"
+		},
+		{
 			"checksumSHA1": "3SZTatHIy9OTKc95YlVfXKnoySg=",
 			"path": "gopkg.in/alecthomas/kingpin.v2",
 			"revision": "1087e65c9441605df944fb12c33f0fe7072d18ca",
