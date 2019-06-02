@@ -79,6 +79,12 @@ type EndPointMeta struct {
 	MethodActions map[string]EndpointMethodMeta `bson:"method_actions" json:"method_actions"`
 }
 
+type CacheMeta struct {
+	Method        string `bson:"method" json:"method"`
+	Path          string `bson:"path" json:"path"`
+	CacheKeyRegex string `bson:"cache_key_regex" json:"cache_key_regex"`
+}
+
 type RequestInputType string
 
 type TemplateData struct {
@@ -165,7 +171,7 @@ type URLRewriteMeta struct {
 	MatchPattern string           `bson:"match_pattern" json:"match_pattern"`
 	RewriteTo    string           `bson:"rewrite_to" json:"rewrite_to"`
 	Triggers     []RoutingTrigger `bson:"triggers" json:"triggers"`
-	MatchRegexp  *regexp.Regexp
+	MatchRegexp  *regexp.Regexp   `json:"-"`
 }
 
 type VirtualMeta struct {
@@ -199,6 +205,7 @@ type ExtendedPathsSet struct {
 	WhiteList               []EndPointMeta        `bson:"white_list" json:"white_list,omitempty"`
 	BlackList               []EndPointMeta        `bson:"black_list" json:"black_list,omitempty"`
 	Cached                  []string              `bson:"cache" json:"cache,omitempty"`
+	AdvanceCacheConfig      []CacheMeta           `bson:"advance_cache_config" json:"advance_cache_config,omitempty"`
 	Transform               []TemplateMeta        `bson:"transform" json:"transform,omitempty"`
 	TransformResponse       []TemplateMeta        `bson:"transform_response" json:"transform_response,omitempty"`
 	TransformJQ             []TransformJQMeta     `bson:"transform_jq" json:"transform_jq,omitempty"`
@@ -323,6 +330,8 @@ type OpenIDOptions struct {
 }
 
 // APIDefinition represents the configuration for a single proxied API and it's versions.
+//
+// swagger:model
 type APIDefinition struct {
 	Id               bson.ObjectId `bson:"_id,omitempty" json:"id,omitempty"`
 	Name             string        `bson:"name" json:"name"`
@@ -341,8 +350,11 @@ type APIDefinition struct {
 	Auth         Auth `bson:"auth" json:"auth"`
 	UseBasicAuth bool `bson:"use_basic_auth" json:"use_basic_auth"`
 	BasicAuth    struct {
-		DisableCaching bool `bson:"disable_caching" json:"disable_caching"`
-		CacheTTL       int  `bson:"cache_ttl" json:"cache_ttl"`
+		DisableCaching     bool   `bson:"disable_caching" json:"disable_caching"`
+		CacheTTL           int    `bson:"cache_ttl" json:"cache_ttl"`
+		ExtractFromBody    bool   `bson:"extract_from_body" json:"extract_from_body"`
+		BodyUserRegexp     string `bson:"body_user_regexp" json:"body_user_regexp"`
+		BodyPasswordRegexp string `bson:"body_password_regexp" json:"body_password_regexp"`
 	} `bson:"basic_auth" json:"basic_auth"`
 	UseMutualTLSAuth           bool                 `bson:"use_mutual_tls_auth" json:"use_mutual_tls_auth"`
 	ClientCertificates         []string             `bson:"client_certificates" json:"client_certificates"`
@@ -445,12 +457,23 @@ type APIDefinition struct {
 }
 
 type Auth struct {
-	UseParam       bool   `mapstructure:"use_param" bson:"use_param" json:"use_param"`
-	ParamName      string `mapstructure:"param_name" bson:"param_name" json:"param_name"`
-	UseCookie      bool   `mapstructure:"use_cookie" bson:"use_cookie" json:"use_cookie"`
-	CookieName     string `mapstructure:"cookie_name" bson:"cookie_name" json:"cookie_name"`
-	AuthHeaderName string `mapstructure:"auth_header_name" bson:"auth_header_name" json:"auth_header_name"`
-	UseCertificate bool   `mapstructure:"use_certificate" bson:"use_certificate" json:"use_certificate"`
+	UseParam          bool            `mapstructure:"use_param" bson:"use_param" json:"use_param"`
+	ParamName         string          `mapstructure:"param_name" bson:"param_name" json:"param_name"`
+	UseCookie         bool            `mapstructure:"use_cookie" bson:"use_cookie" json:"use_cookie"`
+	CookieName        string          `mapstructure:"cookie_name" bson:"cookie_name" json:"cookie_name"`
+	AuthHeaderName    string          `mapstructure:"auth_header_name" bson:"auth_header_name" json:"auth_header_name"`
+	UseCertificate    bool            `mapstructure:"use_certificate" bson:"use_certificate" json:"use_certificate"`
+	ValidateSignature bool            `mapstructure:"validate_signature" bson:"validate_signature" json:"validate_signature"`
+	Signature         SignatureConfig `mapstructure:"signature" bson:"signature" json:"signature,omitempty"`
+}
+
+type SignatureConfig struct {
+	Algorithm        string `mapstructure:"algorithm" bson:"algorithm" json:"algorithm"`
+	Header           string `mapstructure:"header" bson:"header" json:"header"`
+	Secret           string `mapstructure:"secret" bson:"secret" json:"secret"`
+	AllowedClockSkew int64  `mapstructure:"allowed_clock_skew" bson:"allowed_clock_skew" json:"allowed_clock_skew"`
+	ErrorCode        int    `mapstructure:"error_code" bson:"error_code" json:"error_code"`
+	ErrorMessage     string `mapstructure:"error_message" bson:"error_message" json:"error_message"`
 }
 
 type GlobalRateLimit struct {

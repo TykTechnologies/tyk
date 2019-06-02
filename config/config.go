@@ -6,6 +6,8 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
+	"runtime"
 	"sync"
 	"sync/atomic"
 
@@ -25,6 +27,9 @@ const (
 	PickFirstStrategy IPsHandleStrategy = "pick_first"
 	RandomStrategy    IPsHandleStrategy = "random"
 	NoCacheStrategy   IPsHandleStrategy = "no_cache"
+
+	DefaultDashPolicySource     = "service"
+	DefaultDashPolicyRecordName = "tyk_policies"
 )
 
 var log = logger.Get()
@@ -55,6 +60,7 @@ type StorageOptionsConf struct {
 	Database              int               `json:"database"`
 	MaxIdle               int               `json:"optimisation_max_idle"`
 	MaxActive             int               `json:"optimisation_max_active"`
+	Timeout               int               `json:"timeout"`
 	EnableCluster         bool              `json:"enable_cluster"`
 	UseSSL                bool              `json:"use_ssl"`
 	SSLInsecureSkipVerify bool              `json:"ssl_insecure_skip_verify"`
@@ -285,7 +291,8 @@ type Config struct {
 	CoProcessOptions                  CoProcessConfig                       `json:"coprocess_options"`
 	HideGeneratorHeader               bool                                  `json:"hide_generator_header"`
 	EventHandlers                     apidef.EventHandlerMetaConfig         `json:"event_handlers"`
-	EventTriggers                     map[apidef.TykEvent][]TykEventHandler `json:"event_trigers_defunct"`
+	EventTriggers                     map[apidef.TykEvent][]TykEventHandler `json:"event_trigers_defunct"`  // Deprecated: Config.GetEventTriggers instead.
+	EventTriggersDefunct              map[apidef.TykEvent][]TykEventHandler `json:"event_triggers_defunct"` // Deprecated: Config.GetEventTriggers instead.
 	PIDFileLocation                   string                                `json:"pid_file_location"`
 	AllowInsecureConfigs              bool                                  `json:"allow_insecure_configs"`
 	PublicKeyPath                     string                                `json:"public_key_path"`
@@ -308,6 +315,7 @@ type Config struct {
 	ProxyDefaultTimeout               float64                               `json:"proxy_default_timeout"`
 	ProxySSLDisableRenegotiation      bool                                  `json:"proxy_ssl_disable_renegotiation"`
 	LogLevel                          string                                `json:"log_level"`
+	HTTPProfile                       bool                                  `json:"enable_http_profiler"`
 	Security                          SecurityConfig                        `json:"security"`
 	EnableKeyLogging                  bool                                  `json:"enable_key_logging"`
 	NewRelic                          NewRelicConfig                        `json:"newrelic"`
@@ -317,6 +325,25 @@ type Config struct {
 	DisableRegexpCache                bool                                  `json:"disable_regexp_cache"`
 	RegexpCacheExpire                 int32                                 `json:"regexp_cache_expire"`
 	HealthCheckEndpointName           string                                `json:"health_check_endpoint_name"`
+}
+
+// GetEventTriggers returns event triggers. There was a typo in the json tag.
+// To maintain backward compatibility, this solution is chosen.
+func (c Config) GetEventTriggers() map[apidef.TykEvent][]TykEventHandler {
+	if c.EventTriggersDefunct == nil {
+		return c.EventTriggers
+	}
+
+	if c.EventTriggers != nil {
+		log.Info("Both event_trigers_defunct and event_triggers_defunct are configured in the config," +
+			" event_triggers_defunct will be used.")
+	}
+
+	return c.EventTriggersDefunct
+}
+
+func (c *Config) SetEventTriggers(eventTriggers map[apidef.TykEvent][]TykEventHandler) {
+	c.EventTriggersDefunct = eventTriggers
 }
 
 type CertData struct {
@@ -389,6 +416,11 @@ func WriteConf(path string, conf *Config) error {
 // writeDefault will set conf to the default config and write it to disk
 // in path, if the path is non-empty.
 func WriteDefault(path string, conf *Config) error {
+	_, b, _, _ := runtime.Caller(0)
+	configPath := filepath.Dir(b)
+	rootPath := filepath.Dir(configPath)
+	Default.TemplatePath = filepath.Join(rootPath, "templates")
+
 	*conf = Default
 	if err := envconfig.Process(envPrefix, conf); err != nil {
 		return err

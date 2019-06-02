@@ -26,6 +26,8 @@ func GetImporterForSource(source APIImporterSource) (APIImporter, error) {
 		return &BluePrintAST{}, nil
 	case SwaggerSource:
 		return &SwaggerAST{}, nil
+	case WSDLSource:
+		return &WSDLDef{}, nil
 	default:
 		return nil, errors.New("source not matched, failing")
 	}

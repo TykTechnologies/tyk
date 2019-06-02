@@ -97,7 +97,7 @@ func AssertResponse(resp *http.Response, tc *TestCase) error {
 	return nil
 }
 
-func reqBodyReader(body interface{}) io.Reader {
+func ReqBodyReader(body interface{}) io.Reader {
 	switch x := body.(type) {
 	case []byte:
 		return bytes.NewReader(x)
@@ -142,12 +142,12 @@ func NewRequest(tc *TestCase) (req *http.Request, err error) {
 		uri = strings.Replace(uri, "[::]", tc.Domain, 1)
 		uri = strings.Replace(uri, "127.0.0.1", tc.Domain, 1)
 
-		req, err = http.NewRequest(tc.Method, uri, reqBodyReader(tc.Data))
+		req, err = http.NewRequest(tc.Method, uri, ReqBodyReader(tc.Data))
 		if err != nil {
 			return
 		}
 	} else {
-		req = httptest.NewRequest(tc.Method, uri, reqBodyReader(tc.Data))
+		req = httptest.NewRequest(tc.Method, uri, ReqBodyReader(tc.Data))
 	}
 
 	for k, v := range tc.Headers {
