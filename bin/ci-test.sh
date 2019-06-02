@@ -2,8 +2,8 @@
 
 
 MATRIX=(
-	"-tags 'coprocess python'"
-	"-tags 'coprocess grpc'"
+	"-tags 'coprocess python goplugin'"
+	"-tags 'coprocess grpc goplugin'"
 )
 TEST_TIMEOUT=2m
 

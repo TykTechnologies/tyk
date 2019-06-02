@@ -45,8 +45,8 @@ const keyRules = `{
 	"quota_renewal_rate": 300
 }`
 
-func loadTestOAuthSpec() *APISpec {
-	spec := BuildAndLoadAPI(func(spec *APISpec) {
+func buildTestOAuthSpec(apiGens ...func(spec *APISpec)) *APISpec {
+	return BuildAPI(func(spec *APISpec) {
 		spec.APIID = "999999"
 		spec.OrgID = "default"
 		spec.Auth = apidef.Auth{
@@ -88,22 +88,29 @@ func loadTestOAuthSpec() *APISpec {
 		}
 		spec.Proxy.ListenPath = "/APIID/"
 		spec.Proxy.StripListenPath = true
-	})[0]
 
-	return spec
+		if len(apiGens) > 0 {
+			apiGens[0](spec)
+		}
+	})[0]
+}
+
+func loadTestOAuthSpec() *APISpec {
+	return LoadAPI(buildTestOAuthSpec())[0]
 }
 
 func createTestOAuthClient(spec *APISpec, clientID string) {
-	// add a test client
-	testPolicy := user.Policy{}
-	testPolicy.Rate = 100
-	testPolicy.Per = 1
-	testPolicy.QuotaMax = -1
-	testPolicy.QuotaRenewalRate = 1000000000
-
-	policiesMu.Lock()
-	policiesByID["TEST-4321"] = testPolicy
-	policiesMu.Unlock()
+	pID := CreatePolicy(func(p *user.Policy) {
+		p.ID = "TEST-4321"
+		p.AccessRights = map[string]user.AccessDefinition{
+			"test": {
+				APIID: "test",
+			},
+			"abc": {
+				APIID: "abc",
+			},
+		}
+	})
 
 	var redirectURI string
 	// If separator is not set that means multiple redirect uris not supported
@@ -118,9 +125,96 @@ func createTestOAuthClient(spec *APISpec, clientID string) {
 		ClientID:          clientID,
 		ClientSecret:      authClientSecret,
 		ClientRedirectURI: redirectURI,
-		PolicyID:          "TEST-4321",
+		PolicyID:          pID,
 	}
 	spec.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, &testClient, false)
+}
+
+func TestOauthMultipleAPIs(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+
+	spec := buildTestOAuthSpec(func(spec *APISpec) {
+		spec.APIID = "oauth2"
+		spec.UseOauth2 = true
+		spec.UseKeylessAccess = false
+		spec.Proxy.ListenPath = "/api1/"
+	})
+	spec2 := buildTestOAuthSpec(func(spec *APISpec) {
+		spec.APIID = "oauth2_copy"
+		spec.UseKeylessAccess = false
+		spec.UseOauth2 = true
+		spec.Proxy.ListenPath = "/api2/"
+	})
+
+	apis := LoadAPI(spec, spec2)
+	spec = apis[0]
+	spec2 = apis[1]
+
+	pID := CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			"oauth2": {
+				APIID: "oauth2",
+			},
+			"oauth2_copy": {
+				APIID: "oauth2_copy",
+			},
+		}
+	})
+
+	testClient := OAuthClient{
+		ClientID:          authClientID,
+		ClientSecret:      authClientSecret,
+		ClientRedirectURI: authRedirectUri,
+		PolicyID:          pID,
+	}
+	spec.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, &testClient, false)
+	spec2.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, &testClient, false)
+
+	param := make(url.Values)
+	param.Set("response_type", "token")
+	param.Set("redirect_uri", authRedirectUri)
+	param.Set("client_id", authClientID)
+	param.Set("key_rules", keyRules)
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	var err error
+	resp, err := ts.Run(t, test.TestCase{
+		Path:      "/api1/tyk/oauth/authorize-client/",
+		AdminAuth: true,
+		Data:      param.Encode(),
+		Headers:   headers,
+		Method:    http.MethodPost,
+		Code:      http.StatusOK,
+		BodyMatch: `"access_token"`,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	token := tokenData{}
+	json.NewDecoder(resp.Body).Decode(&token)
+	authHeader := map[string]string{
+		"Authorization": "Bearer " + token.AccessToken,
+	}
+
+	ts.Run(t,
+		test.TestCase{
+			Path:    "/api1/get",
+			Headers: authHeader,
+			Method:  http.MethodGet,
+			Code:    http.StatusOK,
+		},
+		test.TestCase{
+			Path:    "/api2/get",
+			Headers: authHeader,
+			Method:  http.MethodGet,
+			Code:    http.StatusOK,
+		},
+	)
 }
 
 func TestAuthCodeRedirect(t *testing.T) {
@@ -435,7 +529,7 @@ func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(session.PolicyIDs(), []string{"TEST-4321"}) {
-			t.Error("Policy not added to token!")
+			t.Error("Policy not added to token!", session.PolicyIDs())
 		}
 	})
 }

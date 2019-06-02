@@ -1,3 +1,5 @@
+// +build goplugin
+
 package gateway
 
 import (

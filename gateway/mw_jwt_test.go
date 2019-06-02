@@ -1516,11 +1516,9 @@ func createExpiringPolicy(pGen ...func(p *user.Policy)) string {
 	return pID
 }
 
-func TestJWTExpOverridesToken(t *testing.T) {
+func TestJWTExpOverride(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
-	//create policy which sets keys to have expiry in one second
-	pID := createExpiringPolicy()
 
 	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
@@ -1531,16 +1529,74 @@ func TestJWTExpOverridesToken(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 	})
 
-	jwtToken := CreateJWKToken(func(t *jwt.Token) {
-		t.Claims.(jwt.MapClaims)["foo"] = "bar"
-		t.Claims.(jwt.MapClaims)["sub"] = "user123@test.com" //is ignored
-		t.Claims.(jwt.MapClaims)["policy_id"] = pID
-		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Second * 72).Unix()
+	t.Run("JWT expiration bigger then policy", func(t *testing.T) {
+		//create policy which sets keys to have expiry in one second
+		pID := CreatePolicy(func(p *user.Policy) {
+			p.KeyExpiresIn = 1
+		})
+
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["sub"] = uuid.New()
+			t.Claims.(jwt.MapClaims)["policy_id"] = pID
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Second * 72).Unix()
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+
+		//JWT expiry overrides internal token which gets expiry from policy so second request will pass
+		ts.Run(t, []test.TestCase{
+			{Headers: authHeaders, Code: http.StatusOK, Delay: 1100 * time.Millisecond},
+			{Headers: authHeaders, Code: http.StatusOK},
+		}...)
 	})
-	authHeaders := map[string]string{"authorization": jwtToken}
-	//JWT expiry overrides internal token which gets expiry from policy so second request will pass
-	ts.Run(t, []test.TestCase{
-		{Headers: authHeaders, Code: http.StatusOK, Delay: 1100 * time.Millisecond},
-		{Headers: authHeaders, Code: http.StatusOK},
-	}...)
+
+	t.Run("JWT expiration smaller then policy", func(t *testing.T) {
+		pID := CreatePolicy(func(p *user.Policy) {
+			p.KeyExpiresIn = 5
+		})
+
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["sub"] = uuid.New()
+			t.Claims.(jwt.MapClaims)["policy_id"] = pID
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(-time.Second).Unix()
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+
+		// Should not allow expired JWTs
+		ts.Run(t, []test.TestCase{
+			{Headers: authHeaders, Code: http.StatusUnauthorized},
+		}...)
+	})
+
+	t.Run("JWT expired but renewed, policy without expiration", func(t *testing.T) {
+		pID := CreatePolicy(func(p *user.Policy) {
+			p.KeyExpiresIn = 0
+		})
+
+		userID := uuid.New()
+
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["sub"] = userID
+			t.Claims.(jwt.MapClaims)["policy_id"] = pID
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Second).Unix()
+		})
+
+		newJwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["sub"] = userID
+			t.Claims.(jwt.MapClaims)["policy_id"] = pID
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(5 * time.Second).Unix()
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+		newAuthHeaders := map[string]string{"authorization": newJwtToken}
+
+		// Should not allow expired JWTs
+		ts.Run(t, []test.TestCase{
+			{Headers: authHeaders, Code: http.StatusOK, Delay: 1100 * time.Millisecond},
+			{Headers: authHeaders, Code: http.StatusUnauthorized},
+			{Headers: newAuthHeaders, Code: http.StatusOK},
+		}...)
+	})
+
 }

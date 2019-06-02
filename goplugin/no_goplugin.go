@@ -1,4 +1,4 @@
-// +build nogoplugin
+// +build !goplugin
 
 package goplugin
 

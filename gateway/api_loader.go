@@ -267,109 +267,46 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	cacheStore.Connect()
 
 	var chain http.Handler
+	var chainArray []alice.Constructor
+	var authArray []alice.Constructor
 
 	if spec.UseKeylessAccess {
 		chainDef.Open = true
 		logger.Info("Checking security policy: Open")
+	}
 
-		// Add pre-process MW
-		chainArray := []alice.Constructor{}
-		handleCORS(&chainArray, spec)
+	handleCORS(&chainArray, spec)
 
-		for _, obj := range mwPreFuncs {
-			if mwDriver == apidef.OttoDriver {
-				chainArray = append(chainArray, createDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
-			} else if mwDriver == apidef.GoPluginDriver {
-				mwAppendEnabled(
-					&chainArray,
-					&GoPluginMiddleware{
-						BaseMiddleware: baseMid,
-						Path:           obj.Path,
-						SymbolName:     obj.Name,
-					},
-				)
-			} else {
-				coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
-				mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver})
-			}
+	for _, obj := range mwPreFuncs {
+		if mwDriver != apidef.OttoDriver {
+
+			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
+			mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver})
+		} else if mwDriver == apidef.GoPluginDriver {
+			mwAppendEnabled(
+				&chainArray,
+				&GoPluginMiddleware{
+					BaseMiddleware: baseMid,
+					Path:           obj.Path,
+					SymbolName:     obj.Name,
+				},
+			)
+		} else {
+			chainArray = append(chainArray, createDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
 		}
+	}
 
-		mwAppendEnabled(&chainArray, &RateCheckMW{BaseMiddleware: baseMid})
-		mwAppendEnabled(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
-		mwAppendEnabled(&chainArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
-		mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid})
-		mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid})
-		mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid})
-		mwAppendEnabled(&chainArray, &ValidateJSON{BaseMiddleware: baseMid})
-		mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid})
-		mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid})
-		mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid})
-		mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid})
+	mwAppendEnabled(&chainArray, &RateCheckMW{BaseMiddleware: baseMid})
+	mwAppendEnabled(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
+	mwAppendEnabled(&chainArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
+	mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid})
+	mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid})
+	mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid})
+	mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid})
+	mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid})
+	mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid})
 
-		mwAppendEnabled(&chainArray, &TransformMiddleware{baseMid})
-		mwAppendEnabled(&chainArray, &TransformJQMiddleware{baseMid})
-		mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
-		mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: &cacheStore})
-		mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
-		mwAppendEnabled(&chainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid})
-		mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid})
-
-		for _, obj := range mwPostFuncs {
-			if mwDriver == apidef.OttoDriver {
-				chainArray = append(chainArray, createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
-			} else if mwDriver == apidef.GoPluginDriver {
-				mwAppendEnabled(
-					&chainArray,
-					&GoPluginMiddleware{
-						BaseMiddleware: baseMid,
-						Path:           obj.Path,
-						SymbolName:     obj.Name,
-					},
-				)
-			} else {
-				coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
-				mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver})
-			}
-		}
-
-		// for KeyLessAccess we can't support rate limiting, versioning or access rules
-		chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid}})
-
-	} else {
-		var chainArray []alice.Constructor
-		var authArray []alice.Constructor
-
-		handleCORS(&chainArray, spec)
-
-		// Add pre-process MW
-		for _, obj := range mwPreFuncs {
-			if mwDriver == apidef.OttoDriver {
-				chainArray = append(chainArray, createDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
-			} else if mwDriver == apidef.GoPluginDriver {
-				mwAppendEnabled(
-					&chainArray,
-					&GoPluginMiddleware{
-						BaseMiddleware: baseMid,
-						Path:           obj.Path,
-						SymbolName:     obj.Name,
-					},
-				)
-			} else {
-				coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
-				mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver})
-			}
-		}
-
-		mwAppendEnabled(&chainArray, &RateCheckMW{BaseMiddleware: baseMid})
-		mwAppendEnabled(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
-		mwAppendEnabled(&chainArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
-		mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid})
-		mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid})
-		mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid})
-		mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid})
-		mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid})
-		mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid})
-
+	if !spec.UseKeylessAccess {
 		// Select the keying method to use for setting session states
 		if mwAppendEnabled(&authArray, &Oauth2KeyExists{baseMid}) {
 			logger.Info("Checking security policy: OAuth")
@@ -404,7 +341,6 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		}
 
 		if ottoAuth {
-
 			logger.Info("----> Checking security policy: JS Plugin")
 
 			authArray = append(authArray, createDynamicMiddleware(mwAuthCheckFunc.Name, true, false, baseMid))
@@ -447,39 +383,41 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		mwAppendEnabled(&chainArray, &StripAuth{baseMid})
 		mwAppendEnabled(&chainArray, &KeyExpired{baseMid})
 		mwAppendEnabled(&chainArray, &AccessRightsCheck{baseMid})
-		mwAppendEnabled(&chainArray, &RateLimitAndQuotaCheck{baseMid})
-		mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &GranularAccessMiddleware{baseMid})
-		mwAppendEnabled(&chainArray, &ValidateJSON{BaseMiddleware: baseMid})
-		mwAppendEnabled(&chainArray, &TransformMiddleware{baseMid})
-		mwAppendEnabled(&chainArray, &TransformJQMiddleware{baseMid})
-		mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
-		mwAppendEnabled(&chainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid})
-		mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: &cacheStore})
-		mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid})
-		mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &RateLimitAndQuotaCheck{baseMid})
+	}
 
-		for _, obj := range mwPostFuncs {
-			if mwDriver == apidef.OttoDriver {
-				chainArray = append(chainArray, createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
-			} else if mwDriver == apidef.GoPluginDriver {
-				mwAppendEnabled(
-					&chainArray,
-					&GoPluginMiddleware{
-						BaseMiddleware: baseMid,
-						Path:           obj.Path,
-						SymbolName:     obj.Name,
-					},
-				)
-			} else {
-				coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
-				mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver})
-			}
+	mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid})
+	mwAppendEnabled(&chainArray, &ValidateJSON{BaseMiddleware: baseMid})
+	mwAppendEnabled(&chainArray, &TransformMiddleware{baseMid})
+	mwAppendEnabled(&chainArray, &TransformJQMiddleware{baseMid})
+	mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
+	mwAppendEnabled(&chainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid})
+	mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid})
+	mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: &cacheStore})
+	mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
+
+	for _, obj := range mwPostFuncs {
+		if mwDriver != apidef.OttoDriver {
+			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
+			mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver})
+		} else if mwDriver == apidef.GoPluginDriver {
+			mwAppendEnabled(
+				&chainArray,
+				&GoPluginMiddleware{
+					BaseMiddleware: baseMid,
+					Path:           obj.Path,
+					SymbolName:     obj.Name,
+				},
+			)
+		} else {
+			chainArray = append(chainArray, createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
 		}
+	}
 
-		// Use createMiddleware(&ModifiedMiddleware{baseMid})  to run custom middleware
-		chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid}})
+	chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid}})
 
+	if !spec.UseKeylessAccess {
 		var simpleArray []alice.Constructor
 		mwAppendEnabled(&simpleArray, &IPWhiteListMiddleware{baseMid})
 		mwAppendEnabled(&simpleArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
@@ -553,12 +491,12 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		var handler http.Handler
 		if r.URL.Hostname() == "self" {
-			handler = d.SH.Spec.middlewareChain.ThisHandler
+			handler = d.SH.Spec.middlewareChain
 		} else {
 			ctxSetVersionInfo(r, nil)
 
 			if targetAPI := fuzzyFindAPI(r.URL.Hostname()); targetAPI != nil {
-				handler = targetAPI.middlewareChain.ThisHandler
+				handler = targetAPI.middlewareChain
 			} else {
 				handler := ErrorHandler{*d.SH.Base()}
 				handler.HandleError(w, r, "Can't detect loop target", http.StatusInternalServerError, true)
@@ -694,7 +632,7 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 
 		chainObj := processSpec(spec, apisByListen, &redisStore, &redisOrgStore, &healthStore, &rpcAuthStore, &rpcOrgStore, subrouter, logrus.NewEntry(log))
 		apisMu.Lock()
-		spec.middlewareChain = chainObj
+		spec.middlewareChain = chainObj.ThisHandler
 		apisMu.Unlock()
 
 		// TODO: This will not deal with skipped APis well
