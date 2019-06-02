@@ -405,7 +405,6 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 	// set tags
 	if len(tags) > 0 {
-		session.Tags = make([]string, 0, len(tags))
 		for tag := range tags {
 			session.Tags = append(session.Tags, tag)
 		}
