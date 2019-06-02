@@ -11,6 +11,12 @@
 			"versionExact": "1.0"
 		},
 		{
+			"checksumSHA1": "4Ox59zHnNrsNy7v+I0hC0lDzwv8=",
+			"path": "github.com/Masterminds/semver",
+			"revision": "059deebd1619b9ae33232c797f7ab0e8d6c6fd69",
+			"revisionTime": "2019-04-29T19:09:51Z"
+		},
+		{
 			"checksumSHA1": "NRonvQTe073YVead6//CQ5oVgK4=",
 			"path": "github.com/Sirupsen/logrus",
 			"revision": "1deb2db2a6fff8a35532079061b903c3a25eed52",
@@ -125,6 +131,12 @@
 			"path": "github.com/alecthomas/units",
 			"revision": "2efee857e7cfd4f3d0138cc3cbb1b4966962b93a",
 			"revisionTime": "2015-10-22T06:55:26Z"
+		},
+		{
+			"checksumSHA1": "XqRLTmOEU7eSYOd9bij8J48kpq8=",
+			"path": "github.com/aokoli/goutils",
+			"revision": "41ac8693c5c10a92ea1ff5ac3a7f95646f6123b0",
+			"revisionTime": "2018-12-03T09:12:26Z"
 		},
 		{
 			"checksumSHA1": "9dh0q0rB99j2KWdfon8u6GtLf6U=",
@@ -269,6 +281,12 @@
 			"revisionTime": "2019-02-26T17:44:33Z"
 		},
 		{
+			"checksumSHA1": "s5tdcjh84+tiKS3oSq77mzjB970=",
+			"path": "github.com/google/uuid",
+			"revision": "c2e93f3ae59f2904160ceaab466009f965df46d6",
+			"revisionTime": "2019-04-16T17:24:45Z"
+		},
+		{
 			"checksumSHA1": "g/V4qrXjUGG9B+e3hB+4NAYJ5Gs=",
 			"path": "github.com/gorilla/context",
 			"revision": "08b5f424b9271eedf6f9f0ce86cb9396ed337a42",
@@ -317,6 +335,18 @@
 			"path": "github.com/hashicorp/terraform/flatmap",
 			"revision": "4596c44c05ca0be0b34ff30e26abc20b887c34e1",
 			"revisionTime": "2018-12-17T20:43:59Z"
+		},
+		{
+			"checksumSHA1": "GgSlQYD/MBe2lqMqF6BP51d+67o=",
+			"path": "github.com/huandu/xstrings",
+			"revision": "8bbcf2f9ccb55755e748b7644164cd4bdce94c1d",
+			"revisionTime": "2018-09-06T15:17:51Z"
+		},
+		{
+			"checksumSHA1": "/G+e65c6drXxJkkOhFqbtSL8vDk=",
+			"path": "github.com/imdario/mergo",
+			"revision": "f757d8626a734c8a74b2b1f173d4eb4f2abbef32",
+			"revisionTime": "2019-05-31T06:39:13Z"
 		},
 		{
 			"checksumSHA1": "tP/Ohi+jei+mhMoXH5iEGav3ZTE=",
@@ -637,6 +667,18 @@
 			"path": "golang.org/x/crypto/ocsp",
 			"revision": "22ddb68eccda408bbf17759ac18d3120ce0d4f3f",
 			"revisionTime": "2017-02-07T22:51:51Z"
+		},
+		{
+			"checksumSHA1": "1MGpGDQqnUoRpv7VEcQrXOBydXE=",
+			"path": "golang.org/x/crypto/pbkdf2",
+			"revision": "20be4c3c3ed52bfccdb2d59a412ee1a936d175a7",
+			"revisionTime": "2019-04-16T00:04:41Z"
+		},
+		{
+			"checksumSHA1": "o8ysWPosGVxkSVMZHfp2tYHBTu8=",
+			"path": "golang.org/x/crypto/scrypt",
+			"revision": "20be4c3c3ed52bfccdb2d59a412ee1a936d175a7",
+			"revisionTime": "2019-04-16T00:04:41Z"
 		},
 		{
 			"checksumSHA1": "uX2McdP4VcQ6zkAF0Q4oyd0rFtU=",
