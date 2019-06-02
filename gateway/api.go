@@ -438,10 +438,10 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 		}
 	} else {
 		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"key":    obfuscateKey(sessionKey),
-			"message":  err,
-			"status": "ok",
+			"prefix":  "api",
+			"key":     obfuscateKey(sessionKey),
+			"message": err,
+			"status":  "ok",
 		}).Info("Can't retrieve key quota")
 	}
 
