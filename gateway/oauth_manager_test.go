@@ -573,7 +573,7 @@ func TestGetPaginatedClientTokens(t *testing.T) {
 
 	defer resetTestConfig()
 
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	spec := loadTestOAuthSpec()
