@@ -612,9 +612,6 @@
     "oauth_redirect_uri_separator": {
       "type": "string"
     },
-    "pagination_items_per_page": {
-      "type": "integer"
-    },
     "oauth_refresh_token_expire": {
       "type": "integer"
     },

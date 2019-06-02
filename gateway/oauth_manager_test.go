@@ -567,8 +567,6 @@ func TestGetPaginatedClientTokens(t *testing.T) {
 	globalConf.OauthTokenExpire = 1
 	// cleanup tokens older than 3 seconds
 	globalConf.OauthTokenExpiredRetainPeriod = 3
-	// number of items to be retrieved per page
-	globalConf.PaginationItemsPerPage = 4
 	config.SetGlobal(globalConf)
 
 	defer resetTestConfig()
@@ -595,7 +593,7 @@ func TestGetPaginatedClientTokens(t *testing.T) {
 			"Content-Type": "application/x-www-form-urlencoded",
 		}
 
-		for i := 0; i < 8; i++ {
+		for i := 0; i < 110; i++ {
 			resp, err := ts.Run(t, test.TestCase{
 				Path:      "/APIID/tyk/oauth/authorize-client/",
 				Data:      param.Encode(),
@@ -638,7 +636,7 @@ func TestGetPaginatedClientTokens(t *testing.T) {
 		}
 
 		// check response
-		if n := 8; len(tokensResp) != n {
+		if n := 110; len(tokensResp) != n {
 			t.Errorf("Wrong number of tokens received. Expected: %d. Got: %d", n, len(tokensResp))
 		}
 
@@ -668,7 +666,7 @@ func TestGetPaginatedClientTokens(t *testing.T) {
 		}
 
 		// check response
-		if n := globalConf.PaginationItemsPerPage; len(tokensResp.Tokens) != n {
+		if n := 100; len(tokensResp.Tokens) != n {
 			t.Errorf("Wrong number of tokens received. Expected: %d. Got: %d", n, len(tokensResp.Tokens))
 		}
 
@@ -701,7 +699,7 @@ func TestGetPaginatedClientTokens(t *testing.T) {
 		}
 
 		// check response
-		if n := globalConf.PaginationItemsPerPage; len(tokensResp.Tokens) != n {
+		if n := 10; len(tokensResp.Tokens) != n {
 			t.Errorf("Wrong number of tokens received. Expected: %d. Got: %d", n, len(tokensResp.Tokens))
 		}
 
@@ -709,31 +707,6 @@ func TestGetPaginatedClientTokens(t *testing.T) {
 			if !tokensID[token.Token] {
 				t.Errorf("Token %s is not found in expected result. Expecting: %v", token.Token, tokensID)
 			}
-		}
-	})
-
-	t.Run("Get list of tokens with ?page=3", func(t *testing.T) {
-		resp, err := ts.Run(t, test.TestCase{
-			Path:      fmt.Sprintf("/tyk/oauth/clients/999999/%s/tokens?page=3", clientID),
-			AdminAuth: true,
-			Method:    http.MethodGet,
-			Code:      http.StatusOK,
-		})
-		if err != nil {
-			t.Error(err)
-		}
-
-		tokensResp := paginatedOAuthClientTokens{}
-		if err := json.NewDecoder(resp.Body).Decode(&tokensResp); err != nil {
-			t.Fatal(err)
-		}
-
-		// check response
-		// Should be zero items, we stored 8 token items and set the
-		// pagination config to 4 items. Since this is the 3rd page,
-		// there should not be any more items
-		if n := 0; len(tokensResp.Tokens) != n {
-			t.Errorf("Wrong number of tokens received. Expected: %d. Got: %d", n, len(tokensResp.Tokens))
 		}
 	})
 

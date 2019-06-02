@@ -567,7 +567,7 @@ func (r *RedisOsinStorageInterface) GetPaginatedClientTokens(id string, page int
 		go r.store.RemoveSortedSetRange(key, "-inf", cleanupStartScore)
 	}
 
-	itemsPerPage := config.Global().PaginationItemsPerPage
+	itemsPerPage := 100
 
 	if len(tokens) == 0 {
 		return []OAuthClientToken{}, 0, nil

@@ -1684,7 +1684,7 @@ func oAuthClientTokensHandler(w http.ResponseWriter, r *http.Request) {
 
 		doJSONWrite(w, http.StatusOK, paginatedOAuthClientTokens{
 			Pagination: paginationStatus{
-				PageSize:  config.Global().PaginationItemsPerPage,
+				PageSize:  100,
 				PageNum:   page,
 				PageTotal: totalPages,
 			},

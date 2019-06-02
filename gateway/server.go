@@ -102,10 +102,9 @@ var (
 )
 
 const (
-	defReadTimeout            = 120 * time.Second
-	defWriteTimeout           = 120 * time.Second
-	defPaginationItemsPerPage = 10
-	appName                   = "tyk-gateway"
+	defReadTimeout  = 120 * time.Second
+	defWriteTimeout = 120 * time.Second
+	appName         = "tyk-gateway"
 )
 
 func getApiSpec(apiID string) *APISpec {
@@ -223,11 +222,6 @@ func setupGlobals() {
 
 	if config.Global().NewRelic.AppName != "" {
 		NewRelicApplication = SetupNewRelic()
-	}
-
-	if globalConfig := config.Global(); globalConfig.PaginationItemsPerPage <= 0 {
-		globalConfig.PaginationItemsPerPage = defPaginationItemsPerPage
-		config.SetGlobal(globalConfig)
 	}
 }
 
