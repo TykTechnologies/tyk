@@ -80,6 +80,18 @@ func apiError(msg string) apiStatusMessage {
 	return apiStatusMessage{"error", msg}
 }
 
+// paginationStatus provides more information about a paginated data set
+type paginationStatus struct {
+	PageNum   int `json:"page_num"`
+	PageTotal int `json:"page_total"`
+	PageSize  int `json:"page_size"`
+}
+
+type paginatedOAuthClientTokens struct {
+	Pagination paginationStatus
+	Tokens     []OAuthClientToken
+}
+
 func doJSONWrite(w http.ResponseWriter, code int, obj interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
@@ -426,10 +438,10 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 		}
 	} else {
 		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"key":    obfuscateKey(sessionKey),
-			"message":  err,
-			"status": "ok",
+			"prefix":  "api",
+			"key":     obfuscateKey(sessionKey),
+			"message": err,
+			"status":  "ok",
 		}).Info("Can't retrieve key quota")
 	}
 
@@ -1652,8 +1664,36 @@ func oAuthClientTokensHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// get tokens from redis
-	// TODO: add pagination
+	if p := r.URL.Query().Get("page"); p != "" {
+		page := 1
+
+		queryPage, err := strconv.Atoi(p)
+		if err == nil {
+			page = queryPage
+		}
+
+		if page <= 0 {
+			page = 1
+		}
+
+		tokens, totalPages, err := apiSpec.OAuthManager.OsinServer.Storage.GetPaginatedClientTokens(keyName, page)
+		if err != nil {
+			doJSONWrite(w, http.StatusInternalServerError, apiError("Get client tokens failed"))
+			return
+		}
+
+		doJSONWrite(w, http.StatusOK, paginatedOAuthClientTokens{
+			Pagination: paginationStatus{
+				PageSize:  100,
+				PageNum:   page,
+				PageTotal: totalPages,
+			},
+			Tokens: tokens,
+		})
+
+		return
+	}
+
 	tokens, err := apiSpec.OAuthManager.OsinServer.Storage.GetClientTokens(keyName)
 	if err != nil {
 		doJSONWrite(w, http.StatusInternalServerError, apiError("Get client tokens failed"))

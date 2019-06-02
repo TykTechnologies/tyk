@@ -561,6 +561,180 @@ func getAuthCode(t *testing.T, ts *Test) map[string]string {
 	return response
 }
 
+func TestGetPaginatedClientTokens(t *testing.T) {
+	globalConf := config.Global()
+	// set tokens to be expired after 1 second
+	globalConf.OauthTokenExpire = 1
+	// cleanup tokens older than 3 seconds
+	globalConf.OauthTokenExpiredRetainPeriod = 3
+	config.SetGlobal(globalConf)
+
+	defer resetTestConfig()
+
+	ts := StartTest()
+	defer ts.Close()
+
+	spec := loadTestOAuthSpec()
+
+	clientID := uuid.NewV4().String()
+	createTestOAuthClient(spec, clientID)
+
+	// make eight tokens
+	tokensID := map[string]bool{}
+	t.Run("Send eight token requests", func(t *testing.T) {
+		param := make(url.Values)
+		param.Set("response_type", "token")
+		param.Set("redirect_uri", authRedirectUri)
+		param.Set("client_id", clientID)
+		param.Set("client_secret", authClientSecret)
+		param.Set("key_rules", keyRules)
+
+		headers := map[string]string{
+			"Content-Type": "application/x-www-form-urlencoded",
+		}
+
+		for i := 0; i < 110; i++ {
+			resp, err := ts.Run(t, test.TestCase{
+				Path:      "/APIID/tyk/oauth/authorize-client/",
+				Data:      param.Encode(),
+				AdminAuth: true,
+				Headers:   headers,
+				Method:    http.MethodPost,
+				Code:      http.StatusOK,
+			})
+			if err != nil {
+				t.Error(err)
+			}
+
+			response := map[string]interface{}{}
+			if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+				t.Fatal(err)
+			}
+
+			// save tokens for future check
+			tokensID[response["access_token"].(string)] = true
+		}
+	})
+
+	// get list of tokens
+	t.Run("Get list of tokens without page query", func(t *testing.T) {
+		resp, err := ts.Run(t, test.TestCase{
+			// Defaults to fetching all tokens since we don't have
+			// the page query here
+			Path:      fmt.Sprintf("/tyk/oauth/clients/999999/%s/tokens", clientID),
+			AdminAuth: true,
+			Method:    http.MethodGet,
+			Code:      http.StatusOK,
+		})
+		if err != nil {
+			t.Error(err)
+		}
+
+		tokensResp := []OAuthClientToken{}
+		if err := json.NewDecoder(resp.Body).Decode(&tokensResp); err != nil {
+			t.Fatal(err)
+		}
+
+		// check response
+		if n := 110; len(tokensResp) != n {
+			t.Errorf("Wrong number of tokens received. Expected: %d. Got: %d", n, len(tokensResp))
+		}
+
+		for _, token := range tokensResp {
+			if !tokensID[token.Token] {
+				t.Errorf("Token %s is not found in expected result. Expecting: %v", token.Token, tokensID)
+			}
+		}
+	})
+
+	t.Run("Get list of tokens with a page query param lesser than 0", func(t *testing.T) {
+		resp, err := ts.Run(t, test.TestCase{
+			// strconv#Atoi successfully parses a negative integer
+			// so make sure it is being reset to the first page
+			Path:      fmt.Sprintf("/tyk/oauth/clients/999999/%s/tokens?page=-4", clientID),
+			AdminAuth: true,
+			Method:    http.MethodGet,
+			Code:      http.StatusOK,
+		})
+		if err != nil {
+			t.Error(err)
+		}
+
+		tokensResp := paginatedOAuthClientTokens{}
+		if err := json.NewDecoder(resp.Body).Decode(&tokensResp); err != nil {
+			t.Fatal(err)
+		}
+
+		// check response
+		if n := 100; len(tokensResp.Tokens) != n {
+			t.Errorf("Wrong number of tokens received. Expected: %d. Got: %d", n, len(tokensResp.Tokens))
+		}
+
+		for _, token := range tokensResp.Tokens {
+			if !tokensID[token.Token] {
+				t.Errorf("Token %s is not found in expected result. Expecting: %v", token.Token, tokensID)
+			}
+		}
+
+		// Also inspect the pagination data information
+		if tokensResp.Pagination.PageNum != 1 {
+			t.Errorf("Paginated data should default to the first page if a negative integer is provided. Expected %d. Got %d", 1, tokensResp.Pagination.PageNum)
+		}
+	})
+
+	t.Run("Get list of tokens with ?page=2", func(t *testing.T) {
+		resp, err := ts.Run(t, test.TestCase{
+			Path:      fmt.Sprintf("/tyk/oauth/clients/999999/%s/tokens?page=2", clientID),
+			AdminAuth: true,
+			Method:    http.MethodGet,
+			Code:      http.StatusOK,
+		})
+		if err != nil {
+			t.Error(err)
+		}
+
+		tokensResp := paginatedOAuthClientTokens{}
+		if err := json.NewDecoder(resp.Body).Decode(&tokensResp); err != nil {
+			t.Fatal(err)
+		}
+
+		// check response
+		if n := 10; len(tokensResp.Tokens) != n {
+			t.Errorf("Wrong number of tokens received. Expected: %d. Got: %d", n, len(tokensResp.Tokens))
+		}
+
+		for _, token := range tokensResp.Tokens {
+			if !tokensID[token.Token] {
+				t.Errorf("Token %s is not found in expected result. Expecting: %v", token.Token, tokensID)
+			}
+		}
+	})
+
+	t.Run("Get list of tokens after they expire", func(t *testing.T) {
+		// sleep to wait until tokens expire
+		time.Sleep(2 * time.Second)
+
+		resp, err := ts.Run(t, test.TestCase{
+			Path:      fmt.Sprintf("/tyk/oauth/clients/999999/%s/tokens", clientID),
+			AdminAuth: true,
+			Method:    http.MethodGet,
+			Code:      http.StatusOK,
+		})
+		if err != nil {
+			t.Error(err)
+		}
+
+		// check response
+		tokensResp := []OAuthClientToken{}
+		if err := json.NewDecoder(resp.Body).Decode(&tokensResp); err != nil {
+			t.Fatal(err)
+		}
+		if len(tokensResp) > 0 {
+			t.Errorf("Wrong number of tokens received. Expected 0 - all tokens expired. Got: %d", len(tokensResp))
+		}
+	})
+}
+
 func TestGetClientTokens(t *testing.T) {
 	t.Run("Without hashing", func(t *testing.T) {
 		testGetClientTokens(t, false)
@@ -650,9 +824,10 @@ func testGetClientTokens(t *testing.T, hashed bool) {
 		}
 
 		// check response
-		if len(tokensResp) != len(tokensID) {
-			t.Errorf("Wrong number of tokens received. Expected: %d. Got: %d", len(tokensID), len(tokensResp))
+		if n := len(tokensID); len(tokensResp) != n {
+			t.Errorf("Wrong number of tokens received. Expected: %d. Got: %d", n, len(tokensResp))
 		}
+
 		for _, token := range tokensResp {
 			if !tokensID[token.Token] {
 				t.Errorf("Token %s is not found in expected result. Expecting: %v", token.Token, tokensID)

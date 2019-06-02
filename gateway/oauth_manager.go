@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"math"
 	"net/http"
 	"time"
 
@@ -392,12 +393,13 @@ type ExtendedOsinStorageInterface interface {
 	// Custom getter to handle prefixing issues in Redis
 	GetClientNoPrefix(id string) (osin.Client, error)
 
+	GetClientTokens(id string) ([]OAuthClientToken, error)
+	GetPaginatedClientTokens(id string, page int) ([]OAuthClientToken, int, error)
+
 	GetExtendedClient(id string) (ExtendedOsinClientInterface, error)
 
 	// Custom getter to handle prefixing issues in Redis
 	GetExtendedClientNoPrefix(id string) (ExtendedOsinClientInterface, error)
-
-	GetClientTokens(id string) ([]OAuthClientToken, error)
 
 	GetClients(filter string, ignorePrefix bool) ([]ExtendedOsinClientInterface, error)
 
@@ -542,6 +544,67 @@ func (r *RedisOsinStorageInterface) GetClients(filter string, ignorePrefix bool)
 	return theseClients, nil
 }
 
+// GetPaginatedClientTokens returns all tokens associated with the given id.
+// It returns the tokens, the total number of pages of the tokens after
+// pagination and an error if any
+func (r *RedisOsinStorageInterface) GetPaginatedClientTokens(id string, page int) ([]OAuthClientToken, int, error) {
+	key := prefixClientTokens + id
+
+	// use current timestamp as a start score so all expired tokens won't be picked
+	nowTs := time.Now().Unix()
+	startScore := strconv.FormatInt(nowTs, 10)
+
+	log.Info("Getting client tokens sorted list:", key)
+
+	tokens, scores, err := r.store.GetSortedSetRange(key, startScore, "+inf")
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// clean up expired tokens in sorted set (remove all tokens with score up to current timestamp minus retention)
+	if config.Global().OauthTokenExpiredRetainPeriod > 0 {
+		cleanupStartScore := strconv.FormatInt(nowTs-int64(config.Global().OauthTokenExpiredRetainPeriod), 10)
+		go r.store.RemoveSortedSetRange(key, "-inf", cleanupStartScore)
+	}
+
+	itemsPerPage := 100
+
+	if len(tokens) == 0 {
+		return []OAuthClientToken{}, 0, nil
+	}
+
+	startIdx, endIdx := 0, itemsPerPage
+	if page > 1 {
+		startIdx = (page - 1) * itemsPerPage
+		endIdx += startIdx
+
+		// Make sure an "out of range" error never happens
+		n := len(tokens)
+		if endIdx > n {
+			endIdx = n
+		}
+
+		if startIdx > n {
+			startIdx = n
+		}
+	}
+
+	totalPages := int(math.Ceil(float64(len(tokens)) / float64(itemsPerPage)))
+
+	tokens = tokens[startIdx:endIdx]
+
+	// convert sorted set data and scores into reply struct
+	tokensData := make([]OAuthClientToken, len(tokens))
+	for i := range tokens {
+		tokensData[i] = OAuthClientToken{
+			Token:   tokens[i],
+			Expires: int64(scores[i]), // we store expire timestamp as a score
+		}
+	}
+
+	return tokensData, totalPages, nil
+}
+
 func (r *RedisOsinStorageInterface) GetClientTokens(id string) ([]OAuthClientToken, error) {
 	key := prefixClientTokens + id
 
@@ -562,9 +625,13 @@ func (r *RedisOsinStorageInterface) GetClientTokens(id string) ([]OAuthClientTok
 		go r.store.RemoveSortedSetRange(key, "-inf", cleanupStartScore)
 	}
 
+	if len(tokens) == 0 {
+		return []OAuthClientToken{}, nil
+	}
+
 	// convert sorted set data and scores into reply struct
 	tokensData := make([]OAuthClientToken, len(tokens))
-	for i := 0; i < len(tokensData); i++ {
+	for i := range tokens {
 		tokensData[i] = OAuthClientToken{
 			Token:   tokens[i],
 			Expires: int64(scores[i]), // we store expire timestamp as a score
