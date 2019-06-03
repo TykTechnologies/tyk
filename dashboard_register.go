@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -25,29 +26,34 @@ type DashboardServiceSender interface {
 	DeRegister() error
 	StartBeating() error
 	StopBeating()
+	NotifyDashboardOfEvent(interface{}) error
 }
 
 type HTTPDashboardHandler struct {
-	RegistrationEndpoint   string
-	DeRegistrationEndpoint string
-	HeartBeatEndpoint      string
-	Secret                 string
+	RegistrationEndpoint    string
+	DeRegistrationEndpoint  string
+	HeartBeatEndpoint       string
+	KeyQuotaTriggerEndpoint string
+
+	Secret string
 
 	heartBeatStopSentinel bool
 }
 
 func initialiseClient(timeout time.Duration) *http.Client {
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: timeout,
+	}
+
 	if config.Global().HttpServerOptions.UseSSL {
 		// Setup HTTPS client
 		tlsConfig := &tls.Config{
 			InsecureSkipVerify: config.Global().HttpServerOptions.SSLInsecureSkipVerify,
 		}
-		transport := &http.Transport{TLSClientConfig: tlsConfig}
-		client = &http.Client{Transport: transport, Timeout: timeout}
-	} else {
-		client = &http.Client{Timeout: timeout}
+
+		client.Transport = &http.Transport{TLSClientConfig: tlsConfig}
 	}
+
 	return client
 }
 
@@ -86,11 +92,64 @@ func (h *HTTPDashboardHandler) Init() error {
 	h.RegistrationEndpoint = buildConnStr("/register/node")
 	h.DeRegistrationEndpoint = buildConnStr("/system/node")
 	h.HeartBeatEndpoint = buildConnStr("/register/ping")
+	h.KeyQuotaTriggerEndpoint = buildConnStr("/system/key/quota_trigger")
+
 	if h.Secret = config.Global().NodeSecret; h.Secret == "" {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Fatal("Node secret is not set, required for dashboard connection")
 	}
+	return nil
+}
+
+// NotifyDashboardOfEvent acts as a form of event which informs the
+// dashboard of a key which has reached a certain usage quota
+func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
+
+	meta, ok := event.(EventTriggerExceededMeta)
+	if !ok {
+		return errors.New("event type is currently not supported as a notification to the dashboard")
+	}
+
+	var b bytes.Buffer
+	if err := json.NewEncoder(&b).Encode(meta); err != nil {
+		log.Errorf("Could not decode event metadata :%v", err)
+		return err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, h.KeyQuotaTriggerEndpoint, &b)
+	if err != nil {
+		log.Errorf("Could not create request.. %v", err)
+		return err
+	}
+
+	req.Header.Set("authorization", h.Secret)
+	req.Header.Set("x-tyk-nodeid", NodeID)
+	req.Header.Set("x-tyk-nonce", ServiceNonce)
+
+	c := initialiseClient(5 * time.Second)
+
+	resp, err := c.Do(req)
+	if err != nil {
+		log.Errorf("Request failed with error %v", err)
+		return err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		err := fmt.Errorf("Unexpected status code while trying to notify dashboard of a key limit quota trigger.. Got %d", resp.StatusCode)
+		log.Error(err)
+		return err
+	}
+
+	val := NodeResponseOK{}
+	if err := json.NewDecoder(resp.Body).Decode(&val); err != nil {
+		return err
+	}
+
+	ServiceNonce = val.Nonce
+
 	return nil
 }
 
