@@ -75,13 +75,14 @@ func (d *GRPCDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, basePat
 func grpcCallOpts() grpc.DialOption {
 	recvSize := config.Global().CoProcessOptions.GRPCRecvMaxSize
 	sendSize := config.Global().CoProcessOptions.GRPCSendMaxSize
-	if recvSize > 0 && sendSize > 0 {
-		return grpc.WithDefaultCallOptions(
-			grpc.MaxCallRecvMsgSize(recvSize),
-			grpc.MaxCallSendMsgSize(sendSize),
-		)
+	var opts []grpc.CallOption
+	if recvSize > 0 {
+		opts = append(opts, grpc.MaxCallRecvMsgSize(recvSize))
 	}
-	return grpc.WithDefaultCallOptions()
+	if sendSize > 0 {
+		opts = append(opts, grpc.MaxCallRecvMsgSize(sendSize))
+	}
+	return grpc.WithDefaultCallOptions(opts...)
 }
 
 // NewGRPCDispatcher wraps all the actions needed for this CP.
