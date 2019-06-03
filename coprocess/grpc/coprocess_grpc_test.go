@@ -353,12 +353,23 @@ func TestGRPCDispatch(t *testing.T) {
 		})
 	})
 
-	t.Run("Post Hook with long message", func(t *testing.T) {
+	t.Run("Post Hook with allowed message length", func(t *testing.T) {
 		s := randStringBytes(20000000)
 		ts.Run(t, test.TestCase{
 			Path:    "/grpc-test-api-3/",
 			Method:  http.MethodGet,
 			Code:    http.StatusOK,
+			Headers: headers,
+			Data:    s,
+		})
+	})
+
+	t.Run("Post Hook with with unallowed message length", func(t *testing.T) {
+		s := randStringBytes(150000000)
+		ts.Run(t, test.TestCase{
+			Path:    "/grpc-test-api-3/",
+			Method:  http.MethodGet,
+			Code:    http.StatusInternalServerError,
 			Headers: headers,
 			Data:    s,
 		})
