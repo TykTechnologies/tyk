@@ -29,17 +29,19 @@ import (
 	"github.com/justinas/alice"
 	"github.com/lonelycode/osin"
 	newrelic "github.com/newrelic/go-agent"
+	"github.com/opentracing/opentracing-go"
 	"github.com/rs/cors"
 	uuid "github.com/satori/go.uuid"
 	"golang.org/x/net/http2"
 	"rsc.io/letsencrypt"
+	"sourcegraph.com/sourcegraph/appdash"
+	dash "sourcegraph.com/sourcegraph/appdash/opentracing"
 
 	"github.com/TykTechnologies/goagain"
 	gas "github.com/TykTechnologies/goautosocket"
 	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
-	"github.com/TykTechnologies/tyk/checkup"
 	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/dnscache"
@@ -47,6 +49,7 @@ import (
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -99,6 +102,9 @@ var (
 	}
 
 	dnsCacheManager dnscache.IDnsCacheManager
+
+	// manages active opentrace clients.
+	traceManager = &OpenTracer{}
 )
 
 const (
@@ -223,6 +229,7 @@ func setupGlobals() {
 	if config.Global().NewRelic.AppName != "" {
 		NewRelicApplication = SetupNewRelic()
 	}
+
 }
 
 func buildConnStr(resource string) string {
@@ -364,8 +371,26 @@ func loadAPIEndpoints(muxer *mux.Router) {
 	}
 
 	r := mux.NewRouter()
+
+	// muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
+	// 	stripSlashes(checkIsAPIOwner(controlAPICheckClientCertificate("/gateway/client", InstrumentationMW(r)))),
+	// ))
 	muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
-		stripSlashes(checkIsAPIOwner(controlAPICheckClientCertificate("/gateway/client", InstrumentationMW(r)))),
+		trace.NewHandlerWithInjection(trace.StripSlash,
+			stripSlashes(
+				trace.NewHandler(trace.CheckIsAPIOwner,
+					checkIsAPIOwner(
+						trace.NewHandler(trace.ControlAPICheckClientCertificate,
+							controlAPICheckClientCertificate("/gateway/client",
+								trace.NewHandler(trace.InstrumentationMW,
+									InstrumentationMW(r),
+								),
+							),
+						),
+					),
+				),
+			),
+		),
 	))
 
 	if hostname != "" {
@@ -378,7 +403,10 @@ func loadAPIEndpoints(muxer *mux.Router) {
 		muxer.HandleFunc("/debug/pprof/{_:.*}", pprof_http.Index)
 	}
 
-	r.MethodNotAllowedHandler = MethodNotAllowedHandler{}
+	r.MethodNotAllowedHandler = trace.NewHandler(
+		trace.MethodNotAllowed,
+		MethodNotAllowedHandler{},
+	)
 
 	mainLog.Info("Initialising Tyk REST API Endpoints")
 
@@ -1001,8 +1029,15 @@ func Start() {
 		mainLog.Warn("The control_api_port should be changed for production")
 	}
 
-	checkup.Run(config.Global())
-
+	collectionServer := "appdash:7701"
+	ls, err := net.Dial("tcp", collectionServer)
+	if err != nil {
+		mainLog.Error(err)
+	} else {
+		ls.Close()
+	}
+	rc := appdash.NewRemoteCollector(collectionServer)
+	opentracing.SetGlobalTracer(dash.NewTracer(rc))
 	start()
 
 	// Wait while Redis connection pools are ready before start serving traffic
@@ -1119,6 +1154,52 @@ func writeProfiles() {
 	}
 }
 
+// OpenTracer sets opentracing for the gateway.
+type OpenTracer struct {
+	mu     sync.RWMutex
+	tracer trace.Tracer
+}
+
+func (o *OpenTracer) get() trace.Tracer {
+	o.mu.RLock()
+	t := o.tracer
+	o.mu.RUnlock()
+	return t
+}
+
+func (o *OpenTracer) set(tr trace.Tracer) {
+	if t := o.get(); t != nil {
+		err := t.Close()
+		if err != nil {
+			mainLog.Errorf("closing tracer %v\n", err)
+		}
+	}
+	o.mu.Lock()
+	mainLog.Infof("activate tracer: %s\n", tr.Name())
+	o.tracer = tr
+	opentracing.SetGlobalTracer(tr)
+	o.mu.Unlock()
+}
+
+// SetupTracing uses cfg to create and initialize a new opentracer. If there was
+// already a tracer running it will be closed before the new one is set. This is
+// safe to use concurrently.
+func (o *OpenTracer) SetupTracing(cfg config.Tracer) {
+	if !cfg.Enabled {
+		mainLog.Info("tracing is disabled")
+		return
+	}
+	tr, err := trace.Init(cfg.Name, cfg.Options)
+	if err != nil {
+		mainLog.Errorf("initializing tracer %v\n", err)
+		return
+	}
+	if _, ok := tr.(trace.NoopTracer); ok {
+		mainLog.Infof("tracer: %s was not found using NoOpTracer instead\n", cfg.Name)
+	}
+	o.set(tr)
+}
+
 func start() {
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.Global().SupressDefaultOrgStore {
@@ -1126,6 +1207,11 @@ func start() {
 		DefaultOrgStore.Init(getGlobalStorageHandler("orgkey.", false))
 		//DefaultQuotaStore.Init(getGlobalStorageHandler(CloudHandler, "orgkey.", false))
 		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
+	}
+
+	if tr := config.Global().Tracer; tr.Enabled {
+		mainLog.Debugf("initializing %s tracer\n", tr.Name)
+		traceManager.SetupTracing(tr)
 	}
 
 	if config.Global().ControlAPIPort == 0 {
@@ -1238,12 +1324,14 @@ func startDRL() {
 type mainHandler struct{}
 
 func (_ mainHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	span, req := trace.MainSpan(r)
+	defer span.Finish()
 	AddNewRelicInstrumentation(NewRelicApplication, mainRouter)
 
 	// make request body to be nopCloser and re-readable before serve it through chain of middlewares
-	nopCloseRequestBody(r)
+	nopCloseRequestBody(req)
 
-	mainRouter.ServeHTTP(w, r)
+	mainRouter.ServeHTTP(w, req)
 }
 
 func listen(listener, controlListener net.Listener, err error) {

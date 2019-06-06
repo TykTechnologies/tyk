@@ -245,6 +245,18 @@
 			"revisionTime": "2016-07-11T12:47:28Z"
 		},
 		{
+			"checksumSHA1": "i/j1EgLS3trlk3NWjbQVCKpW3RQ=",
+			"path": "github.com/gogo/protobuf/io",
+			"revision": "21df5aa0e680850681b8643f0024f92d3b09930c",
+			"revisionTime": "2019-06-01T10:31:08Z"
+		},
+		{
+			"checksumSHA1": "jyCYGbN0KvpV6PasLXLOmNsaA3s=",
+			"path": "github.com/gogo/protobuf/proto",
+			"revision": "21df5aa0e680850681b8643f0024f92d3b09930c",
+			"revisionTime": "2019-06-01T10:31:08Z"
+		},
+		{
 			"checksumSHA1": "Y2MOwzNZfl4NRNDbLCZa6sgx7O0=",
 			"path": "github.com/golang/protobuf/proto",
 			"revision": "1d3f30b51784bec5aad268e59fd3c2fc1c2fe73f",
@@ -489,6 +501,36 @@
 			"revisionTime": "2017-04-18T16:35:58Z",
 			"version": "v1.9.0",
 			"versionExact": "v1.9.0"
+		},
+		{
+			"checksumSHA1": "3xHgjmTnvXHkbNHVPJZq7GFOFeo=",
+			"path": "github.com/opentracing/basictracer-go",
+			"revision": "98b91394c2def4a44acff5e100538b4812f2f694",
+			"revisionTime": "2018-04-28T06:40:24Z"
+		},
+		{
+			"checksumSHA1": "bvLGShW2gTFyRs7kHShIczVuR1c=",
+			"path": "github.com/opentracing/basictracer-go/wire",
+			"revision": "98b91394c2def4a44acff5e100538b4812f2f694",
+			"revisionTime": "2018-04-28T06:40:24Z"
+		},
+		{
+			"checksumSHA1": "6EIQaeaWECn3zlechdGkqmIKld4=",
+			"path": "github.com/opentracing/opentracing-go",
+			"revision": "659c90643e714681897ec2521c60567dd21da733",
+			"revisionTime": "2019-03-23T20:25:03Z"
+		},
+		{
+			"checksumSHA1": "hZnCURJIhg56jbKk0UFRfZkcQ+c=",
+			"path": "github.com/opentracing/opentracing-go/ext",
+			"revision": "659c90643e714681897ec2521c60567dd21da733",
+			"revisionTime": "2019-03-23T20:25:03Z"
+		},
+		{
+			"checksumSHA1": "tnkdNJbJxNKuPZMWapP1xhKIIGw=",
+			"path": "github.com/opentracing/opentracing-go/log",
+			"revision": "659c90643e714681897ec2521c60567dd21da733",
+			"revisionTime": "2019-03-23T20:25:03Z"
 		},
 		{
 			"checksumSHA1": "xmWd9nj+yZQ5TiHznuoyj4fkknk=",
@@ -1186,6 +1228,24 @@
 			"path": "gopkg.in/xmlpath.v2",
 			"revision": "860cbeca3ebcc600db0b213c0e83ad6ce91f5739",
 			"revisionTime": "2015-08-20T20:48:37Z"
+		},
+		{
+			"checksumSHA1": "C0oqdWRUvPt0U2yrsGC5oHJDaHA=",
+			"path": "sourcegraph.com/sourcegraph/appdash",
+			"revision": "d9ea5c54f7dc06dbdbbf854ec35176e520e6dfdf",
+			"revisionTime": "2019-01-07T17:52:09Z"
+		},
+		{
+			"checksumSHA1": "JYGXK0rF/LoIg8jGrOlaO9OqPbI=",
+			"path": "sourcegraph.com/sourcegraph/appdash/internal/wire",
+			"revision": "d9ea5c54f7dc06dbdbbf854ec35176e520e6dfdf",
+			"revisionTime": "2019-01-07T17:52:09Z"
+		},
+		{
+			"checksumSHA1": "uoXbuVVf3swmwCpEQKLZGGsnP8s=",
+			"path": "sourcegraph.com/sourcegraph/appdash/opentracing",
+			"revision": "d9ea5c54f7dc06dbdbbf854ec35176e520e6dfdf",
+			"revisionTime": "2019-01-07T17:52:09Z"
 		}
 	],
 	"rootPath": "github.com/TykTechnologies/tyk"

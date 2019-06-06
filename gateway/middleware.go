@@ -13,6 +13,7 @@ import (
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
 	newrelic "github.com/newrelic/go-agent"
+	"github.com/opentracing/opentracing-go"
 	"github.com/paulbellamy/ratecounter"
 	cache "github.com/pmylund/go-cache"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -527,16 +529,48 @@ type TykResponseHandler interface {
 	HandleResponse(http.ResponseWriter, *http.Response, *http.Request, *user.SessionState) error
 }
 
+type TraceResponseHandler struct {
+	h    TykResponseHandler
+	ops  trace.Operation
+	opts []opentracing.StartSpanOption
+}
+
+func NewTraceResponseHandler(ops trace.Operation, h TykResponseHandler, opts ...opentracing.StartSpanOption) TraceResponseHandler {
+	return TraceResponseHandler{h: h, ops: ops, opts: opts}
+}
+
+func (h TraceResponseHandler) Init(a interface{}, s *APISpec) error {
+	return h.h.Init(a, s)
+}
+
+func (h TraceResponseHandler) HandleResponse(w http.ResponseWriter, res *http.Response, r *http.Request, ss *user.SessionState) error {
+	span, ctx := trace.Span(r.Context(), h.ops, h.opts...)
+	defer span.Finish()
+	return h.h.HandleResponse(w, res, r.WithContext(ctx), ss)
+}
+
 func responseProcessorByName(name string) TykResponseHandler {
 	switch name {
 	case "header_injector":
-		return &HeaderInjector{}
+		return NewTraceResponseHandler(
+			trace.HeaderInjector,
+			&HeaderInjector{},
+		)
 	case "response_body_transform":
-		return &ResponseTransformMiddleware{}
+		return NewTraceResponseHandler(
+			trace.ResponseTransformMiddleware,
+			&ResponseTransformMiddleware{},
+		)
 	case "response_body_transform_jq":
-		return &ResponseTransformJQMiddleware{}
+		return NewTraceResponseHandler(
+			trace.ResponseTransformJQMiddleware,
+			&ResponseTransformJQMiddleware{},
+		)
 	case "header_transform":
-		return &HeaderTransform{}
+		return NewTraceResponseHandler(
+			trace.HeaderTransform,
+			&HeaderTransform{},
+		)
 	}
 	return nil
 }

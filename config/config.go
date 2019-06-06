@@ -232,6 +232,23 @@ type SecurityConfig struct {
 	Certificates                     CertificatesConfig `json:"certificates"`
 }
 
+// Tracer setting for an opentracing collection server implementation.
+type Tracer struct {
+	// The name of the tracer to initialize. For instance appdash, to use appdash
+	// tracer
+	Name string `json:"name"`
+
+	// If true then this tracer will be activated and all tracing data will be sent
+	// to this tracer.NoOp tracer is used otherwise which collects traces but
+	// discard them.
+	Enabled bool `json:"enabled"`
+
+	// Key value pairs used to initialize the tracer. These are tracer specific,
+	// each tracer requires different options to operate. Please see trace package
+	// for options required by supported tracer implementation.
+	Options map[string]string `json:"options"`
+}
+
 type NewRelicConfig struct {
 	AppName    string `json:"app_name"`
 	LicenseKey string `json:"license_key"`
@@ -367,6 +384,9 @@ type Config struct {
 	SyslogNetworkAddr       string         `json:"syslog_network_addr"`
 	StatsdConnectionString  string         `json:"statsd_connection_string"`
 	StatsdPrefix            string         `json:"statsd_prefix"`
+
+	// Opentracing
+	Tracing Tracer `json:"tracing"`
 
 	// Event System
 	EventHandlers        apidef.EventHandlerMetaConfig         `json:"event_handlers"`
