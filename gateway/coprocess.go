@@ -33,6 +33,7 @@ type CoProcessMiddleware struct {
 	HookType         coprocess.HookType
 	HookName         string
 	MiddlewareDriver apidef.MiddlewareDriver
+	RawBodyOnly      bool
 }
 
 func (mw *CoProcessMiddleware) Name() string {
@@ -106,7 +107,7 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) (*coprocess.Object, err
 		if err != nil {
 			return nil, err
 		}
-		if utf8.Valid(miniRequestObject.RawBody) && !miniRequestObject.RawBodyOnly {
+		if utf8.Valid(miniRequestObject.RawBody) && !c.Middleware.RawBodyOnly {
 			miniRequestObject.Body = string(miniRequestObject.RawBody)
 		}
 	}
