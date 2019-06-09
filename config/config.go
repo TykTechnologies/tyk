@@ -20,7 +20,38 @@ import (
 
 type IPsHandleStrategy string
 
+var (
+	log      = logger.Get()
+	global   atomic.Value
+	globalMu sync.Mutex
+
+	Default = Config{
+		ListenPort:     8080,
+		Secret:         "352d20ee67be67f6340b4c0605b044b7",
+		TemplatePath:   "templates",
+		MiddlewarePath: "middleware",
+		AppPath:        "apps/",
+		Storage: StorageOptionsConf{
+			Type:    "redis",
+			Host:    "localhost",
+			MaxIdle: 100,
+			Port:    6379,
+		},
+		AnalyticsConfig: AnalyticsConfigConfig{
+			IgnoredIPs: make([]string, 0),
+		},
+		DnsCache: DnsCacheConfig{
+			Enabled:                   false,
+			TTL:                       dnsCacheDefaultTtl,
+			CheckInterval:             dnsCacheDefaultCheckInterval,
+			MultipleIPsHandleStrategy: NoCacheStrategy,
+		},
+	}
+)
+
 const (
+	envPrefix = "TYK_GW"
+
 	dnsCacheDefaultTtl           = 3600
 	dnsCacheDefaultCheckInterval = 60
 
@@ -31,11 +62,6 @@ const (
 	DefaultDashPolicySource     = "service"
 	DefaultDashPolicyRecordName = "tyk_policies"
 )
-
-var log = logger.Get()
-
-var global atomic.Value
-var globalMu sync.Mutex
 
 type PoliciesConfig struct {
 	PolicySource           string `json:"policy_source"`
@@ -218,112 +244,143 @@ type Config struct {
 	// was written.
 	OriginalPath string `json:"-"`
 
-	ListenAddress                     string                                `json:"listen_address"`
-	ListenPort                        int                                   `json:"listen_port"`
-	Secret                            string                                `json:"secret"`
-	NodeSecret                        string                                `json:"node_secret"`
-	TemplatePath                      string                                `json:"template_path"`
-	TykJSPath                         string                                `json:"tyk_js_path"`
-	MiddlewarePath                    string                                `json:"middleware_path"`
-	Policies                          PoliciesConfig                        `json:"policies"`
-	UseDBAppConfigs                   bool                                  `json:"use_db_app_configs"`
-	DBAppConfOptions                  DBAppConfOptionsConfig                `json:"db_app_conf_options"`
-	DisableDashboardZeroConf          bool                                  `json:"disable_dashboard_zeroconf"`
-	AppPath                           string                                `json:"app_path"`
-	Storage                           StorageOptionsConf                    `json:"storage"`
-	EnableSeperateCacheStore          bool                                  `json:"enable_separate_cache_store"`
-	CacheStorage                      StorageOptionsConf                    `json:"cache_storage"`
-	EnableAnalytics                   bool                                  `json:"enable_analytics"`
-	AnalyticsConfig                   AnalyticsConfigConfig                 `json:"analytics_config"`
-	HealthCheck                       HealthCheckConfig                     `json:"health_check"`
-	DnsCache                          DnsCacheConfig                        `json:"dns_cache"`
-	UseAsyncSessionWrite              bool                                  `json:"optimisations_use_async_session_write"`
-	SessionUpdatePoolSize             int                                   `json:"session_update_pool_size"`
-	SessionUpdateBufferSize           int                                   `json:"session_update_buffer_size"`
-	AllowMasterKeys                   bool                                  `json:"allow_master_keys"`
-	HashKeys                          bool                                  `json:"hash_keys"`
-	HashKeyFunction                   string                                `json:"hash_key_function"`
-	SuppressRedisSignalReload         bool                                  `json:"suppress_redis_signal_reload"`
-	SupressDefaultOrgStore            bool                                  `json:"suppress_default_org_store"`
-	UseRedisLog                       bool                                  `json:"use_redis_log"`
-	SentryCode                        string                                `json:"sentry_code"`
-	UseSentry                         bool                                  `json:"use_sentry"`
-	UseSyslog                         bool                                  `json:"use_syslog"`
-	UseGraylog                        bool                                  `json:"use_graylog"`
-	UseLogstash                       bool                                  `json:"use_logstash"`
-	GraylogNetworkAddr                string                                `json:"graylog_network_addr"`
-	LogstashNetworkAddr               string                                `json:"logstash_network_addr"`
-	SyslogTransport                   string                                `json:"syslog_transport"`
-	LogstashTransport                 string                                `json:"logstash_transport"`
-	SyslogNetworkAddr                 string                                `json:"syslog_network_addr"`
-	StatsdConnectionString            string                                `json:"statsd_connection_string"`
-	StatsdPrefix                      string                                `json:"statsd_prefix"`
-	EnforceOrgDataAge                 bool                                  `json:"enforce_org_data_age"`
-	EnforceOrgDataDetailLogging       bool                                  `json:"enforce_org_data_detail_logging"`
-	EnforceOrgQuotas                  bool                                  `json:"enforce_org_quotas"`
-	ExperimentalProcessOrgOffThread   bool                                  `json:"experimental_process_org_off_thread"`
-	EnableNonTransactionalRateLimiter bool                                  `json:"enable_non_transactional_rate_limiter"`
-	EnableSentinelRateLimiter         bool                                  `json:"enable_sentinel_rate_limiter"`
-	EnableRedisRollingLimiter         bool                                  `json:"enable_redis_rolling_limiter"`
-	ManagementNode                    bool                                  `json:"management_node"`
-	Monitor                           MonitorConfig                         `json:"monitor"`
-	OauthRefreshExpire                int64                                 `json:"oauth_refresh_token_expire"`
-	OauthTokenExpire                  int32                                 `json:"oauth_token_expire"`
-	OauthTokenExpiredRetainPeriod     int32                                 `json:"oauth_token_expired_retain_period"`
-	OauthRedirectUriSeparator         string                                `json:"oauth_redirect_uri_separator"`
-	SlaveOptions                      SlaveOptionsConfig                    `json:"slave_options"`
-	DisableVirtualPathBlobs           bool                                  `json:"disable_virtual_path_blobs"`
-	LocalSessionCache                 LocalSessionCacheConf                 `json:"local_session_cache"`
-	HttpServerOptions                 HttpServerOptionsConfig               `json:"http_server_options"`
-	ServiceDiscovery                  ServiceDiscoveryConf                  `json:"service_discovery"`
-	ProxyCloseConnections             bool                                  `json:"proxy_close_connections"`
-	CloseConnections                  bool                                  `json:"close_connections"`
-	AuthOverride                      AuthOverrideConf                      `json:"auth_override"`
-	UptimeTests                       UptimeTestsConfig                     `json:"uptime_tests"`
-	HostName                          string                                `json:"hostname"`
-	EnableAPISegregation              bool                                  `json:"enable_api_segregation"`
-	ControlAPIHostname                string                                `json:"control_api_hostname"`
-	ControlAPIPort                    int                                   `json:"control_api_port"`
-	EnableCustomDomains               bool                                  `json:"enable_custom_domains"`
-	EnableJSVM                        bool                                  `json:"enable_jsvm"`
-	JSVMTimeout                       int                                   `json:"jsvm_timeout"`
-	CoProcessOptions                  CoProcessConfig                       `json:"coprocess_options"`
-	HideGeneratorHeader               bool                                  `json:"hide_generator_header"`
-	EventHandlers                     apidef.EventHandlerMetaConfig         `json:"event_handlers"`
-	EventTriggers                     map[apidef.TykEvent][]TykEventHandler `json:"event_trigers_defunct"`  // Deprecated: Config.GetEventTriggers instead.
-	EventTriggersDefunct              map[apidef.TykEvent][]TykEventHandler `json:"event_triggers_defunct"` // Deprecated: Config.GetEventTriggers instead.
-	PIDFileLocation                   string                                `json:"pid_file_location"`
-	AllowInsecureConfigs              bool                                  `json:"allow_insecure_configs"`
-	PublicKeyPath                     string                                `json:"public_key_path"`
-	CloseIdleConnections              bool                                  `json:"close_idle_connections"`
-	DRLNotificationFrequency          int                                   `json:"drl_notification_frequency"`
-	GlobalSessionLifetime             int64                                 `bson:"global_session_lifetime" json:"global_session_lifetime"`
-	ForceGlobalSessionLifetime        bool                                  `bson:"force_global_session_lifetime" json:"force_global_session_lifetime"`
-	BundleBaseURL                     string                                `bson:"bundle_base_url" json:"bundle_base_url"`
-	EnableBundleDownloader            bool                                  `bson:"enable_bundle_downloader" json:"enable_bundle_downloader"`
-	AllowRemoteConfig                 bool                                  `bson:"allow_remote_config" json:"allow_remote_config"`
-	LegacyEnableAllowanceCountdown    bool                                  `bson:"legacy_enable_allowance_countdown" json:"legacy_enable_allowance_countdown"`
-	MaxIdleConns                      int                                   `bson:"max_idle_connections" json:"max_idle_connections"`
-	MaxIdleConnsPerHost               int                                   `bson:"max_idle_connections_per_host" json:"max_idle_connections_per_host"`
-	MaxConnTime                       int64                                 `json:"max_conn_time"`
-	ReloadWaitTime                    int                                   `bson:"reload_wait_time" json:"reload_wait_time"`
-	ProxySSLInsecureSkipVerify        bool                                  `json:"proxy_ssl_insecure_skip_verify"`
-	ProxyEnableHttp2                  bool                                  `json:"proxy_enable_http2"`
-	ProxySSLMinVersion                uint16                                `json:"proxy_ssl_min_version"`
-	ProxySSLCipherSuites              []string                              `json:"proxy_ssl_ciphers"`
-	ProxyDefaultTimeout               float64                               `json:"proxy_default_timeout"`
-	ProxySSLDisableRenegotiation      bool                                  `json:"proxy_ssl_disable_renegotiation"`
-	LogLevel                          string                                `json:"log_level"`
-	HTTPProfile                       bool                                  `json:"enable_http_profiler"`
-	Security                          SecurityConfig                        `json:"security"`
-	EnableKeyLogging                  bool                                  `json:"enable_key_logging"`
-	NewRelic                          NewRelicConfig                        `json:"newrelic"`
-	VersionHeader                     string                                `json:"version_header"`
-	EnableHashedKeysListing           bool                                  `json:"enable_hashed_keys_listing"`
-	MinTokenLength                    int                                   `json:"min_token_length"`
-	DisableRegexpCache                bool                                  `json:"disable_regexp_cache"`
-	RegexpCacheExpire                 int32                                 `json:"regexp_cache_expire"`
-	HealthCheckEndpointName           string                                `json:"health_check_endpoint_name"`
+	HostName                  string                  `json:"hostname"`
+	ListenAddress             string                  `json:"listen_address"`
+	ListenPort                int                     `json:"listen_port"`
+	ControlAPIHostname        string                  `json:"control_api_hostname"`
+	ControlAPIPort            int                     `json:"control_api_port"`
+	Secret                    string                  `json:"secret"`
+	NodeSecret                string                  `json:"node_secret"`
+	PIDFileLocation           string                  `json:"pid_file_location"`
+	AllowInsecureConfigs      bool                    `json:"allow_insecure_configs"`
+	PublicKeyPath             string                  `json:"public_key_path"`
+	AllowRemoteConfig         bool                    `bson:"allow_remote_config" json:"allow_remote_config"`
+	Security                  SecurityConfig          `json:"security"`
+	HttpServerOptions         HttpServerOptionsConfig `json:"http_server_options"`
+	ReloadWaitTime            int                     `bson:"reload_wait_time" json:"reload_wait_time"`
+	VersionHeader             string                  `json:"version_header"`
+	UseAsyncSessionWrite      bool                    `json:"optimisations_use_async_session_write"`
+	SuppressRedisSignalReload bool                    `json:"suppress_redis_signal_reload"`
+
+	// Gateway Security Policies
+	HashKeys                bool           `json:"hash_keys"`
+	HashKeyFunction         string         `json:"hash_key_function"`
+	EnableHashedKeysListing bool           `json:"enable_hashed_keys_listing"`
+	MinTokenLength          int            `json:"min_token_length"`
+	EnableAPISegregation    bool           `json:"enable_api_segregation"`
+	TemplatePath            string         `json:"template_path"`
+	Policies                PoliciesConfig `json:"policies"`
+
+	// CE Configurations
+	AppPath string `json:"app_path"`
+
+	// Dashboard Configurations
+	UseDBAppConfigs          bool                   `json:"use_db_app_configs"`
+	DBAppConfOptions         DBAppConfOptionsConfig `json:"db_app_conf_options"`
+	Storage                  StorageOptionsConf     `json:"storage"`
+	DisableDashboardZeroConf bool                   `json:"disable_dashboard_zeroconf"`
+
+	// Slave Configurations
+	SlaveOptions   SlaveOptionsConfig `json:"slave_options"`
+	ManagementNode bool               `json:"management_node"`
+	AuthOverride   AuthOverrideConf   `json:"auth_override"`
+
+	// Rate Limiting Strategy
+	EnableNonTransactionalRateLimiter bool `json:"enable_non_transactional_rate_limiter"`
+	EnableSentinelRateLimiter         bool `json:"enable_sentinel_rate_limiter"`
+	EnableRedisRollingLimiter         bool `json:"enable_redis_rolling_limiter"`
+	DRLNotificationFrequency          int  `json:"drl_notification_frequency"`
+
+	// Organization configurations
+	EnforceOrgDataAge               bool          `json:"enforce_org_data_age"`
+	EnforceOrgDataDetailLogging     bool          `json:"enforce_org_data_detail_logging"`
+	EnforceOrgQuotas                bool          `json:"enforce_org_quotas"`
+	ExperimentalProcessOrgOffThread bool          `json:"experimental_process_org_off_thread"`
+	Monitor                         MonitorConfig `json:"monitor"`
+
+	// Client-Gateway Configuration
+	MaxIdleConns         int   `bson:"max_idle_connections" json:"max_idle_connections"`
+	MaxIdleConnsPerHost  int   `bson:"max_idle_connections_per_host" json:"max_idle_connections_per_host"`
+	MaxConnTime          int64 `json:"max_conn_time"`
+	CloseIdleConnections bool  `json:"close_idle_connections"`
+	CloseConnections     bool  `json:"close_connections"`
+	EnableCustomDomains  bool  `json:"enable_custom_domains"`
+	// If AllowMasterKeys is set to true, session objects (key definitions) that do not have explicit access rights set
+	// will be allowed by Tyk. This means that keys that are created have access to ALL APIs, which in many cases is
+	// unwanted behaviour unless you are sure about what you are doing.
+	AllowMasterKeys bool `json:"allow_master_keys"`
+
+	// Gateway-Service Configuration
+	ServiceDiscovery              ServiceDiscoveryConf `json:"service_discovery"`
+	ProxySSLInsecureSkipVerify    bool                 `json:"proxy_ssl_insecure_skip_verify"`
+	ProxyEnableHttp2              bool                 `json:"proxy_enable_http2"`
+	ProxySSLMinVersion            uint16               `json:"proxy_ssl_min_version"`
+	ProxySSLCipherSuites          []string             `json:"proxy_ssl_ciphers"`
+	ProxyDefaultTimeout           float64              `json:"proxy_default_timeout"`
+	ProxySSLDisableRenegotiation  bool                 `json:"proxy_ssl_disable_renegotiation"`
+	ProxyCloseConnections         bool                 `json:"proxy_close_connections"`
+	UptimeTests                   UptimeTestsConfig    `json:"uptime_tests"`
+	HealthCheck                   HealthCheckConfig    `json:"health_check"`
+	OauthRefreshExpire            int64                `json:"oauth_refresh_token_expire"`
+	OauthTokenExpire              int32                `json:"oauth_token_expire"`
+	OauthTokenExpiredRetainPeriod int32                `json:"oauth_token_expired_retain_period"`
+	OauthRedirectUriSeparator     string               `json:"oauth_redirect_uri_separator"`
+	EnableKeyLogging              bool                 `json:"enable_key_logging"`
+
+	// Proxy analytics configuration
+	EnableAnalytics bool                  `json:"enable_analytics"`
+	AnalyticsConfig AnalyticsConfigConfig `json:"analytics_config"`
+
+	// Cache
+	DnsCache                 DnsCacheConfig        `json:"dns_cache"`
+	DisableRegexpCache       bool                  `json:"disable_regexp_cache"`
+	RegexpCacheExpire        int32                 `json:"regexp_cache_expire"`
+	LocalSessionCache        LocalSessionCacheConf `json:"local_session_cache"`
+	EnableSeperateCacheStore bool                  `json:"enable_separate_cache_store"`
+	CacheStorage             StorageOptionsConf    `json:"cache_storage"`
+
+	// Middleware/Plugin Configuration
+	EnableBundleDownloader  bool            `bson:"enable_bundle_downloader" json:"enable_bundle_downloader"`
+	BundleBaseURL           string          `bson:"bundle_base_url" json:"bundle_base_url"`
+	EnableJSVM              bool            `json:"enable_jsvm"`
+	JSVMTimeout             int             `json:"jsvm_timeout"`
+	DisableVirtualPathBlobs bool            `json:"disable_virtual_path_blobs"`
+	TykJSPath               string          `json:"tyk_js_path"`
+	MiddlewarePath          string          `json:"middleware_path"`
+	CoProcessOptions        CoProcessConfig `json:"coprocess_options"`
+
+	// Monitoring, Logging & Profiling
+	LogLevel                string         `json:"log_level"`
+	HealthCheckEndpointName string         `json:"health_check_endpoint_name"`
+	NewRelic                NewRelicConfig `json:"newrelic"`
+	HTTPProfile             bool           `json:"enable_http_profiler"`
+	UseRedisLog             bool           `json:"use_redis_log"`
+	SentryCode              string         `json:"sentry_code"`
+	UseSentry               bool           `json:"use_sentry"`
+	UseSyslog               bool           `json:"use_syslog"`
+	UseGraylog              bool           `json:"use_graylog"`
+	UseLogstash             bool           `json:"use_logstash"`
+	GraylogNetworkAddr      string         `json:"graylog_network_addr"`
+	LogstashNetworkAddr     string         `json:"logstash_network_addr"`
+	SyslogTransport         string         `json:"syslog_transport"`
+	LogstashTransport       string         `json:"logstash_transport"`
+	SyslogNetworkAddr       string         `json:"syslog_network_addr"`
+	StatsdConnectionString  string         `json:"statsd_connection_string"`
+	StatsdPrefix            string         `json:"statsd_prefix"`
+
+	// Event System
+	EventHandlers        apidef.EventHandlerMetaConfig         `json:"event_handlers"`
+	EventTriggers        map[apidef.TykEvent][]TykEventHandler `json:"event_trigers_defunct"`  // Deprecated: Config.GetEventTriggers instead.
+	EventTriggersDefunct map[apidef.TykEvent][]TykEventHandler `json:"event_triggers_defunct"` // Deprecated: Config.GetEventTriggers instead.
+
+	// TODO: These config options are not documented - What do they do?
+	SessionUpdatePoolSize          int   `json:"session_update_pool_size"`
+	SessionUpdateBufferSize        int   `json:"session_update_buffer_size"`
+	SupressDefaultOrgStore         bool  `json:"suppress_default_org_store"`
+	LegacyEnableAllowanceCountdown bool  `bson:"legacy_enable_allowance_countdown" json:"legacy_enable_allowance_countdown"`
+	GlobalSessionLifetime          int64 `bson:"global_session_lifetime" json:"global_session_lifetime"`
+	ForceGlobalSessionLifetime     bool  `bson:"force_global_session_lifetime" json:"force_global_session_lifetime"`
+	HideGeneratorHeader            bool  `json:"hide_generator_header"`
 }
 
 // GetEventTriggers returns event triggers. There was a typo in the json tag.
@@ -362,32 +419,6 @@ type EventMessage struct {
 type TykEventHandler interface {
 	Init(interface{}) error
 	HandleEvent(EventMessage)
-}
-
-const envPrefix = "TYK_GW"
-const defaultListenPort = 8080
-
-var Default = Config{
-	ListenPort:     8080,
-	Secret:         "352d20ee67be67f6340b4c0605b044b7",
-	TemplatePath:   "templates",
-	MiddlewarePath: "middleware",
-	AppPath:        "apps/",
-	Storage: StorageOptionsConf{
-		Type:    "redis",
-		Host:    "localhost",
-		MaxIdle: 100,
-		Port:    6379,
-	},
-	AnalyticsConfig: AnalyticsConfigConfig{
-		IgnoredIPs: make([]string, 0),
-	},
-	DnsCache: DnsCacheConfig{
-		Enabled:                   false,
-		TTL:                       dnsCacheDefaultTtl,
-		CheckInterval:             dnsCacheDefaultCheckInterval,
-		MultipleIPsHandleStrategy: NoCacheStrategy,
-	},
 }
 
 func init() {
