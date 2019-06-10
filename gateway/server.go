@@ -34,8 +34,6 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"golang.org/x/net/http2"
 	"rsc.io/letsencrypt"
-	"sourcegraph.com/sourcegraph/appdash"
-	dash "sourcegraph.com/sourcegraph/appdash/opentracing"
 
 	"github.com/TykTechnologies/goagain"
 	gas "github.com/TykTechnologies/goautosocket"
@@ -1029,15 +1027,6 @@ func Start() {
 		mainLog.Warn("The control_api_port should be changed for production")
 	}
 
-	collectionServer := "appdash:7701"
-	ls, err := net.Dial("tcp", collectionServer)
-	if err != nil {
-		mainLog.Error(err)
-	} else {
-		ls.Close()
-	}
-	rc := appdash.NewRemoteCollector(collectionServer)
-	opentracing.SetGlobalTracer(dash.NewTracer(rc))
 	start()
 
 	// Wait while Redis connection pools are ready before start serving traffic
