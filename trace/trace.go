@@ -8,6 +8,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/trace/appdash"
+	"github.com/TykTechnologies/tyk/trace/jaeger"
 	"github.com/opentracing/opentracing-go"
 )
 
@@ -32,10 +33,12 @@ func (n NoopTracer) Name() string {
 }
 
 // Init returns a tracer for a given name.
-func Init(name string, opts map[string]string) (Tracer, error) {
+func Init(name string, opts map[string]interface{}) (Tracer, error) {
 	switch name {
 	case appdash.Name:
 		return appdash.Init(opts)
+	case jaeger.Name:
+		return jaeger.Init(opts)
 	default:
 		return NoopTracer{}, nil
 	}

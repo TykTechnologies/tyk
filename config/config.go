@@ -246,7 +246,7 @@ type Tracer struct {
 	// Key value pairs used to initialize the tracer. These are tracer specific,
 	// each tracer requires different options to operate. Please see trace package
 	// for options required by supported tracer implementation.
-	Options map[string]string `json:"options"`
+	Options map[string]interface{} `json:"options"`
 }
 
 type NewRelicConfig struct {

@@ -1,7 +1,7 @@
 package appdash
 
 import (
-	"errors"
+	"encoding/json"
 	"time"
 
 	"github.com/opentracing/opentracing-go"
@@ -20,17 +20,25 @@ type Trace struct {
 
 // Init returns a Trace instance. This requires conn key be present in opts. It
 // is a url to connect to the appdash server.
-func Init(opts map[string]string) (Trace, error) {
-	conn, ok := opts["conn"]
-	if !ok {
-		return Trace{}, errors.New("missing conn option")
+func Init(opts map[string]interface{}) (*Trace, error) {
+	s := struct {
+		Conn string `json:"conn"`
+	}{}
+	b, err := json.Marshal(opts)
+	if err != nil {
+		return nil, err
 	}
-	rc := appdash.NewRemoteCollector(conn)
+	err = json.Unmarshal(b, &s)
+	if err != nil {
+		return nil, err
+	}
+	// The casting will panic
+	rc := appdash.NewRemoteCollector(s.Conn)
 	cc := &appdash.ChunkedCollector{
 		Collector:   rc,
 		MinInterval: time.Millisecond,
 	}
-	return Trace{
+	return &Trace{
 		Tracer: dash.NewTracer(cc),
 		cc:     cc,
 	}, nil

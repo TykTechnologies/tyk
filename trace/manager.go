@@ -56,7 +56,7 @@ func (o *OpenTracer) set(tr Tracer) {
 // SetupTracing uses cfg to create and initialize a new opentracer. If there was
 // already a tracer running it will be closed before the new one is set. This is
 // safe to use concurrently.
-func (o *OpenTracer) SetupTracing(name string, opts map[string]string) {
+func (o *OpenTracer) SetupTracing(name string, opts map[string]interface{}) {
 	tr, err := Init(name, opts)
 	if err != nil {
 		if o.log != nil {
