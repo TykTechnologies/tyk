@@ -1154,6 +1154,7 @@ func start() {
 	if tr := config.Global().Tracer; tr.Enabled {
 		mainLog.Debugf("initializing %s tracer\n", tr.Name)
 		traceManager.SetupTracing(tr.Name, tr.Options)
+		defer traceManager.Close()
 	}
 
 	if config.Global().ControlAPIPort == 0 {

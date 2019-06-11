@@ -36,12 +36,9 @@ func (o *OpenTracer) get() Tracer {
 }
 
 func (o *OpenTracer) set(tr Tracer) {
-	if t := o.get(); t != nil {
-		err := t.Close()
-		if err != nil {
-			if o.log != nil {
-				o.log.Errorf("closing tracer %v\n", err)
-			}
+	if err := o.Close(); err != nil {
+		if o.log != nil {
+			o.log.Errorf("closing tracer %v\n", err)
 		}
 	}
 	o.mu.Lock()
@@ -51,6 +48,14 @@ func (o *OpenTracer) set(tr Tracer) {
 	o.tracer = tr
 	opentracing.SetGlobalTracer(tr)
 	o.mu.Unlock()
+}
+
+// Close calls Close on the active tracer.
+func (o *OpenTracer) Close() error {
+	if t := o.get(); t != nil {
+		return t.Close()
+	}
+	return nil
 }
 
 // SetupTracing uses cfg to create and initialize a new opentracer. If there was
