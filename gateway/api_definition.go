@@ -102,7 +102,7 @@ const (
 	StatusURLRewrite               RequestStatus = "URL Rewritten"
 	StatusVirtualPath              RequestStatus = "Virtual Endpoint"
 	StatusRequestSizeControlled    RequestStatus = "Request Size Limited"
-	StatusRequesTracked            RequestStatus = "Request Tracked"
+	StatusRequestTracked           RequestStatus = "Request Tracked"
 	StatusRequestNotTracked        RequestStatus = "Request Not Tracked"
 	StatusValidateJSON             RequestStatus = "Validate JSON"
 	StatusInternal                 RequestStatus = "Internal path"
@@ -963,7 +963,7 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 	case MethodTransformed:
 		return StatusMethodTransformed
 	case RequestTracked:
-		return StatusRequesTracked
+		return StatusRequestTracked
 	case RequestNotTracked:
 		return StatusRequestNotTracked
 	case ValidateJSONRequest:

@@ -94,8 +94,12 @@ func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 			}
 			err, errCode := mw.ProcessRequest(w, r, mwConf)
 			if err != nil {
+				// GoPluginMiddleware are expected to send response in case of error
+				// but we still want to record error
+				_, isGoPlugin := mw.(*GoPluginMiddleware)
+
 				handler := ErrorHandler{*mw.Base()}
-				handler.HandleError(w, r, err.Error(), errCode)
+				handler.HandleError(w, r, err.Error(), errCode, !isGoPlugin)
 
 				meta["error"] = err.Error()
 

@@ -41,10 +41,11 @@ const (
 	RequestXML  RequestInputType = "xml"
 	RequestJSON RequestInputType = "json"
 
-	OttoDriver   MiddlewareDriver = "otto"
-	PythonDriver MiddlewareDriver = "python"
-	LuaDriver    MiddlewareDriver = "lua"
-	GrpcDriver   MiddlewareDriver = "grpc"
+	OttoDriver     MiddlewareDriver = "otto"
+	PythonDriver   MiddlewareDriver = "python"
+	LuaDriver      MiddlewareDriver = "lua"
+	GrpcDriver     MiddlewareDriver = "grpc"
+	GoPluginDriver MiddlewareDriver = "goplugin"
 
 	BodySource        IdExtractorSource = "body"
 	HeaderSource      IdExtractorSource = "header"
@@ -365,6 +366,7 @@ type APIDefinition struct {
 	PinnedPublicKeys           map[string]string    `bson:"pinned_public_keys" json:"pinned_public_keys"`
 	EnableJWT                  bool                 `bson:"enable_jwt" json:"enable_jwt"`
 	UseStandardAuth            bool                 `bson:"use_standard_auth" json:"use_standard_auth"`
+	UseGoPluginAuth            bool                 `bson:"use_go_plugin_auth" json:"use_go_plugin_auth"`
 	EnableCoProcessAuth        bool                 `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"`
 	JWTSigningMethod           string               `bson:"jwt_signing_method" json:"jwt_signing_method"`
 	JWTSource                  string               `bson:"jwt_source" json:"jwt_source"`

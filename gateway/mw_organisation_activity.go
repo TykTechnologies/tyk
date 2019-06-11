@@ -1,13 +1,12 @@
 package gateway
 
 import (
+	"errors"
 	"net/http"
 	"sync"
-
-	"errors"
-
 	"time"
 
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -171,7 +170,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession use
 	}
 
 	// Lets keep a reference of the org
-	setCtxValue(r, OrgSessionContext, orgSession)
+	setCtxValue(r, ctx.OrgSessionContext, orgSession)
 
 	// Request is valid, carry on
 	return nil, http.StatusOK
@@ -198,7 +197,7 @@ func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request, orgSessio
 	// Lets keep a reference of the org
 	// session might be updated by go-routine AllowAccessNext and we loose those changes here
 	// but it is OK as we need it in context for detailed org logging
-	setCtxValue(r, OrgSessionContext, orgSession)
+	setCtxValue(r, ctx.OrgSessionContext, orgSession)
 
 	orgSessionCopy := orgSession
 	go k.AllowAccessNext(

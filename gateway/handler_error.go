@@ -30,45 +30,57 @@ type ErrorHandler struct {
 }
 
 // HandleError is the actual error handler and will store the error details in analytics if analytics processing is enabled.
-func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMsg string, errCode int) {
+func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMsg string, errCode int, writeResponse bool) {
 	defer e.Base().UpdateRequestSession(r)
 
-	var templateExtension string
-	var contentType string
+	if writeResponse {
+		var templateExtension string
+		var contentType string
 
-	switch r.Header.Get("Content-Type") {
-	case "application/xml":
-		templateExtension = "xml"
-		contentType = "application/xml"
-	default:
-		templateExtension = "json"
-		contentType = "application/json"
+		switch r.Header.Get("Content-Type") {
+		case "application/xml":
+			templateExtension = "xml"
+			contentType = "application/xml"
+		default:
+			templateExtension = "json"
+			contentType = "application/json"
+		}
+
+		w.Header().Set("Content-Type", contentType)
+
+		templateName := "error_" + strconv.Itoa(errCode) + "." + templateExtension
+
+		// Try to use an error template that matches the HTTP error code and the content type: 500.json, 400.xml, etc.
+		tmpl := templates.Lookup(templateName)
+
+		// Fallback to a generic error template, but match the content type: error.json, error.xml, etc.
+		if tmpl == nil {
+			templateName = defaultTemplateName + "." + templateExtension
+			tmpl = templates.Lookup(templateName)
+		}
+
+		// If no template is available for this content type, fallback to "error.json".
+		if tmpl == nil {
+			templateName = defaultTemplateName + "." + defaultTemplateFormat
+			tmpl = templates.Lookup(templateName)
+			w.Header().Set("Content-Type", defaultContentType)
+		}
+
+		//If the config option is not set or is false, add the header
+		if !e.Spec.GlobalConfig.HideGeneratorHeader {
+			w.Header().Add("X-Generator", "tyk.io")
+		}
+
+		// Close connections
+		if e.Spec.GlobalConfig.CloseConnections {
+			w.Header().Add("Connection", "close")
+		}
+
+		// Need to return the correct error code!
+		w.WriteHeader(errCode)
+		apiError := APIError{errMsg}
+		tmpl.Execute(w, &apiError)
 	}
-
-	w.Header().Set("Content-Type", contentType)
-
-	templateName := "error_" + strconv.Itoa(errCode) + "." + templateExtension
-
-	// Try to use an error template that matches the HTTP error code and the content type: 500.json, 400.xml, etc.
-	tmpl := templates.Lookup(templateName)
-
-	// Fallback to a generic error template, but match the content type: error.json, error.xml, etc.
-	if tmpl == nil {
-		templateName = defaultTemplateName + "." + templateExtension
-		tmpl = templates.Lookup(templateName)
-	}
-
-	// If no template is available for this content type, fallback to "error.json".
-	if tmpl == nil {
-		templateName = defaultTemplateName + "." + defaultTemplateFormat
-		tmpl = templates.Lookup(templateName)
-		w.Header().Set("Content-Type", defaultContentType)
-	}
-
-	// Need to return the correct error code!
-	w.WriteHeader(errCode)
-	apiError := APIError{errMsg}
-	tmpl.Execute(w, &apiError)
 
 	if memProfFile != nil {
 		pprof.WriteHeapProfile(memProfFile)
@@ -191,16 +203,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
-
-	//If the config option is not set or is false, add the header
-	if !e.Spec.GlobalConfig.HideGeneratorHeader {
-		w.Header().Add("X-Generator", "tyk.io")
-	}
-
-	// Close connections
-	if e.Spec.GlobalConfig.CloseConnections {
-		w.Header().Add("Connection", "close")
-	}
 
 	if memProfFile != nil {
 		pprof.WriteHeapProfile(memProfFile)

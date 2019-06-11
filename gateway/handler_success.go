@@ -10,35 +10,12 @@ import (
 	"strings"
 	"time"
 
+	cache "github.com/pmylund/go-cache"
+
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
-	cache "github.com/pmylund/go-cache"
-)
-
-// Enums for keys to be stored in a session context - this is how gorilla expects
-// these to be implemented and is lifted pretty much from docs
-const (
-	SessionData = iota
-	UpdateSession
-	AuthToken
-	HashedAuthToken
-	VersionData
-	VersionDefault
-	OrgSessionContext
-	ContextData
-	RetainHost
-	TrackThisEndpoint
-	DoNotTrackThisEndpoint
-	UrlRewritePath
-	RequestMethod
-	OrigRequestURL
-	LoopLevel
-	LoopLevelLimit
-	ThrottleLevel
-	ThrottleLevelLimit
-	Trace
-	CheckLoopLimits
 )
 
 const (
@@ -281,7 +258,7 @@ func recordDetail(r *http.Request, globalConf config.Config) bool {
 	}
 
 	// We are, so get session data
-	ses := r.Context().Value(OrgSessionContext)
+	ses := r.Context().Value(ctx.OrgSessionContext)
 	if ses == nil {
 		// no session found, use global config
 		return globalConf.AnalyticsConfig.EnableDetailedRecording
