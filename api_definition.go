@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/rubyist/circuitbreaker"
+	circuit "github.com/rubyist/circuitbreaker"
 
 	"github.com/TykTechnologies/gojsonschema"
 	"github.com/TykTechnologies/tyk/apidef"
@@ -265,7 +265,6 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 		// If we have transitioned to extended path specifications, we should use these now
 		if v.UseExtendedPaths {
 			pathSpecs, whiteListSpecs = a.getExtendedPathSpecs(v, spec)
-
 		} else {
 			logger.Warning("Legacy path detected! Upgrade to extended.")
 			pathSpecs, whiteListSpecs = a.getPathSpecs(v)
@@ -520,16 +519,9 @@ func (a APIDefinitionLoader) compileCachedPathSpec(paths []string) []URLSpec {
 	return urlSpec
 }
 
-var apiTemplate = template.New("").Funcs(map[string]interface{}{
-	"jsonMarshal": func(v interface{}) (string, error) {
-		bs, err := json.Marshal(v)
-		return string(bs), err
-	},
-})
-
 func (a APIDefinitionLoader) loadFileTemplate(path string) (*template.Template, error) {
 	log.Debug("-- Loading template: ", path)
-	return apiTemplate.New("").ParseFiles(path)
+	return apidef.Template.New("").ParseFiles(path)
 }
 
 func (a APIDefinitionLoader) loadBlobTemplate(blob string) (*template.Template, error) {
@@ -538,7 +530,7 @@ func (a APIDefinitionLoader) loadBlobTemplate(blob string) (*template.Template, 
 	if err != nil {
 		return nil, err
 	}
-	return apiTemplate.New("").Parse(string(uDec))
+	return apidef.Template.New("").Parse(string(uDec))
 }
 
 func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMeta, stat URLStatus) []URLSpec {

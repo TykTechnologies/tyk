@@ -3,6 +3,9 @@ package apidef
 import (
 	"encoding/base64"
 	"encoding/json"
+	"text/template"
+
+	"github.com/clbanning/mxj"
 
 	"github.com/lonelycode/osin"
 	"gopkg.in/mgo.v2/bson"
@@ -691,16 +694,16 @@ func DummyAPI() APIDefinition {
 	}
 
 	return APIDefinition{
-		VersionData:             versionData,
-		ConfigData:              map[string]interface{}{},
-		AllowedIPs:              []string{},
-		PinnedPublicKeys:        map[string]string{},
-		ResponseProcessors:      []ResponseProcessor{},
-		ClientCertificates:      []string{},
-		BlacklistedIPs:          []string{},
-		TagHeaders:              []string{},
-		UpstreamCertificates:    map[string]string{},
-		HmacAllowedAlgorithms:   []string{},
+		VersionData:           versionData,
+		ConfigData:            map[string]interface{}{},
+		AllowedIPs:            []string{},
+		PinnedPublicKeys:      map[string]string{},
+		ResponseProcessors:    []ResponseProcessor{},
+		ClientCertificates:    []string{},
+		BlacklistedIPs:        []string{},
+		TagHeaders:            []string{},
+		UpstreamCertificates:  map[string]string{},
+		HmacAllowedAlgorithms: []string{},
 		CustomMiddleware: MiddlewareSection{
 			Post:        []MiddlewareDefinition{},
 			Pre:         []MiddlewareDefinition{},
@@ -713,3 +716,22 @@ func DummyAPI() APIDefinition {
 		Tags: []string{},
 	}
 }
+
+var Template = template.New("").Funcs(map[string]interface{}{
+	"jsonMarshal": func(v interface{}) (string, error) {
+		bs, err := json.Marshal(v)
+		return string(bs), err
+	},
+	"xmlMarshal": func(v interface{}) (string, error) {
+		var err error
+		var xmlValue []byte
+		mv, ok := v.(mxj.Map)
+		if ok {
+			xmlValue, err = mv.Xml()
+		} else {
+			xmlValue, err = mxj.Map(v.(map[string]interface{})).Xml()
+		}
+
+		return string(xmlValue), err
+	},
+})
