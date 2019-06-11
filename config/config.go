@@ -386,7 +386,7 @@ type Config struct {
 	StatsdPrefix            string         `json:"statsd_prefix"`
 
 	// Opentracing
-	Tracing Tracer `json:"tracing"`
+	Tracer Tracer `json:"tracing"`
 
 	// Event System
 	EventHandlers        apidef.EventHandlerMetaConfig         `json:"event_handlers"`
