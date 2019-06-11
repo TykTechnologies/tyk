@@ -1,0 +1,73 @@
+package trace
+
+import (
+	"sync"
+
+	"github.com/opentracing/opentracing-go"
+)
+
+// Logger defines api for logging messages by the OpenTracer struct. This is a
+// workaround to avoid trying this to logrus
+type Logger interface {
+	Errorf(format string, args ...interface{})
+	Info(args ...interface{})
+	Infof(format string, args ...interface{})
+}
+
+// OpenTracer sets opentracing for the gateway. This supports updating active
+// tracer on the fly without the need to restart the application.
+type OpenTracer struct {
+	mu     sync.RWMutex
+	tracer Tracer
+	log    Logger
+}
+
+// NewManager returns a new opentrace manager. If log is not nil it will be used
+// to log errors and info by the manager.
+func NewManager(log Logger) *OpenTracer {
+	return &OpenTracer{log: log}
+}
+
+func (o *OpenTracer) get() Tracer {
+	o.mu.RLock()
+	t := o.tracer
+	o.mu.RUnlock()
+	return t
+}
+
+func (o *OpenTracer) set(tr Tracer) {
+	if t := o.get(); t != nil {
+		err := t.Close()
+		if err != nil {
+			if o.log != nil {
+				o.log.Errorf("closing tracer %v\n", err)
+			}
+		}
+	}
+	o.mu.Lock()
+	if o.log != nil {
+		o.log.Infof("activate tracer: %s\n", tr.Name())
+	}
+	o.tracer = tr
+	opentracing.SetGlobalTracer(tr)
+	o.mu.Unlock()
+}
+
+// SetupTracing uses cfg to create and initialize a new opentracer. If there was
+// already a tracer running it will be closed before the new one is set. This is
+// safe to use concurrently.
+func (o *OpenTracer) SetupTracing(name string, opts map[string]string) {
+	tr, err := Init(name, opts)
+	if err != nil {
+		if o.log != nil {
+			o.log.Errorf("initializing tracer %s err=%v\n", name, err)
+		}
+		return
+	}
+	if _, ok := tr.(NoopTracer); ok {
+		if o.log != nil {
+			o.log.Infof("tracer: %s was not found using NoOpTracer instead\n", name)
+		}
+	}
+	o.set(tr)
+}

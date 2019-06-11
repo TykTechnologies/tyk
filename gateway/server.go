@@ -29,7 +29,6 @@ import (
 	"github.com/justinas/alice"
 	"github.com/lonelycode/osin"
 	newrelic "github.com/newrelic/go-agent"
-	"github.com/opentracing/opentracing-go"
 	"github.com/rs/cors"
 	uuid "github.com/satori/go.uuid"
 	"golang.org/x/net/http2"
@@ -102,7 +101,7 @@ var (
 	dnsCacheManager dnscache.IDnsCacheManager
 
 	// manages active opentrace clients.
-	traceManager = &OpenTracer{}
+	traceManager = trace.NewManager(mainLog)
 )
 
 const (
@@ -1143,52 +1142,6 @@ func writeProfiles() {
 	}
 }
 
-// OpenTracer sets opentracing for the gateway.
-type OpenTracer struct {
-	mu     sync.RWMutex
-	tracer trace.Tracer
-}
-
-func (o *OpenTracer) get() trace.Tracer {
-	o.mu.RLock()
-	t := o.tracer
-	o.mu.RUnlock()
-	return t
-}
-
-func (o *OpenTracer) set(tr trace.Tracer) {
-	if t := o.get(); t != nil {
-		err := t.Close()
-		if err != nil {
-			mainLog.Errorf("closing tracer %v\n", err)
-		}
-	}
-	o.mu.Lock()
-	mainLog.Infof("activate tracer: %s\n", tr.Name())
-	o.tracer = tr
-	opentracing.SetGlobalTracer(tr)
-	o.mu.Unlock()
-}
-
-// SetupTracing uses cfg to create and initialize a new opentracer. If there was
-// already a tracer running it will be closed before the new one is set. This is
-// safe to use concurrently.
-func (o *OpenTracer) SetupTracing(cfg config.Tracer) {
-	if !cfg.Enabled {
-		mainLog.Info("tracing is disabled")
-		return
-	}
-	tr, err := trace.Init(cfg.Name, cfg.Options)
-	if err != nil {
-		mainLog.Errorf("initializing tracer %v\n", err)
-		return
-	}
-	if _, ok := tr.(trace.NoopTracer); ok {
-		mainLog.Infof("tracer: %s was not found using NoOpTracer instead\n", cfg.Name)
-	}
-	o.set(tr)
-}
-
 func start() {
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.Global().SupressDefaultOrgStore {
@@ -1200,7 +1153,7 @@ func start() {
 
 	if tr := config.Global().Tracer; tr.Enabled {
 		mainLog.Debugf("initializing %s tracer\n", tr.Name)
-		traceManager.SetupTracing(tr)
+		traceManager.SetupTracing(tr.Name, tr.Options)
 	}
 
 	if config.Global().ControlAPIPort == 0 {
