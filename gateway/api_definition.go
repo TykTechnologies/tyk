@@ -17,7 +17,7 @@ import (
 	"text/template"
 	"time"
 
-	"gopkg.in/Masterminds/sprig.v2"
+	sprig "gopkg.in/Masterminds/sprig.v2"
 
 	"github.com/TykTechnologies/tyk/rpc"
 
@@ -286,7 +286,6 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 		// If we have transitioned to extended path specifications, we should use these now
 		if v.UseExtendedPaths {
 			pathSpecs, whiteListSpecs = a.getExtendedPathSpecs(v, spec)
-
 		} else {
 			logger.Warning("Legacy path detected! Upgrade to extended.")
 			pathSpecs, whiteListSpecs = a.getPathSpecs(v)
@@ -552,13 +551,6 @@ func (a APIDefinitionLoader) compileCachedPathSpec(oldpaths []string, newpaths [
 	return urlSpec
 }
 
-var apiTemplate = template.New("").Funcs(map[string]interface{}{
-	"jsonMarshal": func(v interface{}) (string, error) {
-		bs, err := json.Marshal(v)
-		return string(bs), err
-	},
-})
-
 func (a APIDefinitionLoader) filterSprigFuncs() template.FuncMap {
 	tmp := sprig.GenericFuncMap()
 	delete(tmp, "env")
@@ -569,7 +561,7 @@ func (a APIDefinitionLoader) filterSprigFuncs() template.FuncMap {
 
 func (a APIDefinitionLoader) loadFileTemplate(path string) (*template.Template, error) {
 	log.Debug("-- Loading template: ", path)
-	return apiTemplate.New("").Funcs(a.filterSprigFuncs()).ParseFiles(path)
+	return apidef.Template.New("").Funcs(a.filterSprigFuncs()).ParseFiles(path)
 }
 
 func (a APIDefinitionLoader) loadBlobTemplate(blob string) (*template.Template, error) {
@@ -578,7 +570,7 @@ func (a APIDefinitionLoader) loadBlobTemplate(blob string) (*template.Template, 
 	if err != nil {
 		return nil, err
 	}
-	return apiTemplate.New("").Funcs(a.filterSprigFuncs()).Parse(string(uDec))
+	return apidef.Template.New("").Funcs(a.filterSprigFuncs()).Parse(string(uDec))
 }
 
 func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMeta, stat URLStatus) []URLSpec {
