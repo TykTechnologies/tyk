@@ -278,11 +278,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	handleCORS(&chainArray, spec)
 
 	for _, obj := range mwPreFuncs {
-		if mwDriver != apidef.OttoDriver {
-
-			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
-			mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver})
-		} else if mwDriver == apidef.GoPluginDriver {
+		if mwDriver == apidef.GoPluginDriver {
 			mwAppendEnabled(
 				&chainArray,
 				&GoPluginMiddleware{
@@ -291,6 +287,9 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 					SymbolName:     obj.Name,
 				},
 			)
+		} else if mwDriver != apidef.OttoDriver {
+			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
+			mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver})
 		} else {
 			chainArray = append(chainArray, createDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
 		}
@@ -398,10 +397,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
 
 	for _, obj := range mwPostFuncs {
-		if mwDriver != apidef.OttoDriver {
-			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
-			mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver})
-		} else if mwDriver == apidef.GoPluginDriver {
+		if mwDriver == apidef.GoPluginDriver {
 			mwAppendEnabled(
 				&chainArray,
 				&GoPluginMiddleware{
@@ -410,6 +406,9 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 					SymbolName:     obj.Name,
 				},
 			)
+		} else if mwDriver != apidef.OttoDriver {
+			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
+			mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver})
 		} else {
 			chainArray = append(chainArray, createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
 		}
