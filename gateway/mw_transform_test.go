@@ -91,10 +91,10 @@ func testPrepareTransformXMLMarshal(inputType apidef.RequestInputType) (tmeta *T
 	tmeta.Template = template.Must(apidef.Template.New("").Parse(tmpl))
 
 	switch inputType {
-	case "json":
+	case apidef.RequestJSON:
 		tmeta.TemplateData.Input = apidef.RequestJSON
 		in = `{"brothers": { "name": ["Furkan", "Ahmet", "Mohammad Ali"] }}`
-	case "xml":
+	case apidef.RequestXML:
 		tmeta.TemplateData.Input = apidef.RequestXML
 		in = `<brothers><name>Furkan</name><name>Ahmet</name><name>Mohammad Ali</name></brothers>`
 	}
