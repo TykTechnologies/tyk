@@ -2,6 +2,7 @@ package appdash
 
 import (
 	"encoding/json"
+	"sync/atomic"
 	"time"
 
 	"github.com/opentracing/opentracing-go"
@@ -15,7 +16,20 @@ const Name = "appdash"
 // Trace implemants tyk trace.Tracer interface.
 type Trace struct {
 	opentracing.Tracer
-	cc *appdash.ChunkedCollector
+	cc *wrapCollector
+}
+
+type wrapCollector struct {
+	*appdash.ChunkedCollector
+	started atomic.Value
+}
+
+func (w *wrapCollector) Collect(id appdash.SpanID, args ...appdash.Annotation) error {
+	ok := w.started.Load()
+	if ok == nil {
+		w.started.Store(true)
+	}
+	return w.ChunkedCollector.Collect(id, args...)
 }
 
 // Init returns a Trace instance. This requires conn key be present in opts. It
@@ -34,9 +48,11 @@ func Init(opts map[string]interface{}) (*Trace, error) {
 	}
 	// The casting will panic
 	rc := appdash.NewRemoteCollector(s.Conn)
-	cc := &appdash.ChunkedCollector{
-		Collector:   rc,
-		MinInterval: time.Millisecond,
+	cc := &wrapCollector{
+		ChunkedCollector: &appdash.ChunkedCollector{
+			Collector:   rc,
+			MinInterval: time.Millisecond,
+		},
 	}
 	return &Trace{
 		Tracer: dash.NewTracer(cc),
@@ -45,8 +61,10 @@ func Init(opts map[string]interface{}) (*Trace, error) {
 }
 
 // Close stops the underlying appdash collector.
-func (tr Trace) Close() error {
-	tr.cc.Stop()
+func (tr *Trace) Close() error {
+	if ok := tr.cc.started.Load(); ok != nil {
+		tr.cc.Stop()
+	}
 	return nil
 }
 
