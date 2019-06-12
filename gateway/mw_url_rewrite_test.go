@@ -4,6 +4,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/test"
+
 	"bytes"
 	"net/http"
 
@@ -1173,6 +1175,49 @@ func TestInitTriggerRx(t *testing.T) {
 	if payloadMatch.Check("ghi") == "" {
 		t.Errorf("Expected PayloadMatches initalized and matched, received no match")
 	}
+}
+
+func TestURLRewriteCaseSensitivity(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+
+	assert := func(relativePath string, requestedPath string, bodyMatch string) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{{
+					Path:         relativePath,
+					Method:       "GET",
+					MatchPattern: requestedPath,
+					RewriteTo:    "/xyz",
+				}}
+			})
+		})
+
+		ts.Run(t, test.TestCase{
+			Path: requestedPath, Code: 200, BodyMatch: bodyMatch,
+		})
+	}
+
+	// Matches and rewrites
+	t.Run("Relative path lower, requested path lower", func(t *testing.T) {
+		assert("/get", "/get", `"Url":"/xyz"`)
+	})
+
+	// Doesn't match and doesn't rewrite
+	t.Run("Relative path lower, requested path upper", func(t *testing.T) {
+		assert("/get", "/Get", `"Url":"/Get"`)
+	})
+
+	// Doesn't match and doesn't rewrite
+	t.Run("Relative path upper, requested path lower", func(t *testing.T) {
+		assert("/Get", "/get", `"Url":"/get"`)
+	})
+
+	// Matches and rewrites
+	t.Run("Relative path upper, requested path upper", func(t *testing.T) {
+		assert("/Get", "/Get", `"Url":"/xyz"`)
+	})
 }
 
 func TestValToStr(t *testing.T) {
