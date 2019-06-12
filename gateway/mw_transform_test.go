@@ -238,22 +238,22 @@ func TestBodyTransformCaseSensitivity(t *testing.T) {
 	}
 
 	// Matches and transforms
-	t.Run("", func(t *testing.T) {
+	t.Run("Relative path lower, requested path lower", func(t *testing.T) {
 		assert("/get", "/get", `{"http_method":"GET"}`)
 	})
 
 	// Doesn't match and doesn't transform
-	t.Run("", func(t *testing.T) {
+	t.Run("Relative path lower, requested path upper", func(t *testing.T) {
 		assert("/get", "/Get", `"Method":"GET"`)
 	})
 
 	// Doesn't match and doesn't transform
-	t.Run("", func(t *testing.T) {
+	t.Run("Relative path upper, requested path lower", func(t *testing.T) {
 		assert("/Get", "/get", `"Method":"GET"`)
 	})
 
 	// Matches and transforms
-	t.Run("", func(t *testing.T) {
+	t.Run("Relative path upper, requested path upper", func(t *testing.T) {
 		assert("/Get", "/Get", `{"http_method":"GET"}`)
 	})
 }

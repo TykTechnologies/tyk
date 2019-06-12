@@ -172,9 +172,9 @@ func TestWhitelist(t *testing.T) {
 
 		ts.Run(t, []test.TestCase{
 			{Path: "/foo", Code: http.StatusForbidden},
-			//{Path: "/Foo", Code: http.StatusOK},
+			{Path: "/Foo", Code: http.StatusOK},
 			{Path: "/bar", Code: http.StatusOK},
-			//{Path: "/Bar", Code: http.StatusForbidden},
+			{Path: "/Bar", Code: http.StatusForbidden},
 		}...)
 	})
 }
@@ -243,9 +243,9 @@ func TestBlacklist(t *testing.T) {
 
 		ts.Run(t, []test.TestCase{
 			{Path: "/foo", Code: http.StatusOK},
-			//{Path: "/Foo", Code: http.StatusForbidden},
+			{Path: "/Foo", Code: http.StatusForbidden},
 			{Path: "/bar", Code: http.StatusForbidden},
-			//{Path: "/Bar", Code: http.StatusOK},
+			{Path: "/Bar", Code: http.StatusOK},
 		}...)
 	})
 }
