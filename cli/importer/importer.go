@@ -17,7 +17,7 @@ import (
 
 const (
 	cmdName = "import"
-	cmdDesc = "Imports a BluePrint/Swagger file"
+	cmdDesc = "Imports a BluePrint/Swagger/WSDL file"
 )
 
 var (
@@ -30,6 +30,8 @@ type Importer struct {
 	input          *string
 	swaggerMode    *bool
 	bluePrintMode  *bool
+	wsdlMode       *bool
+	portNames      *string
 	createAPI      *bool
 	orgID          *string
 	upstreamTarget *string
@@ -45,9 +47,11 @@ func init() {
 // AddTo initializes an importer object.
 func AddTo(app *kingpin.Application) {
 	cmd := app.Command(cmdName, cmdDesc)
-	imp.input = cmd.Arg("input file", "e.g. blueprint.json, swagger.json, etc.").String()
+	imp.input = cmd.Arg("input file", "e.g. blueprint.json, swagger.json, service.wsdl etc.").String()
 	imp.swaggerMode = cmd.Flag("swagger", "Use Swagger mode").Bool()
 	imp.bluePrintMode = cmd.Flag("blueprint", "Use BluePrint mode").Bool()
+	imp.wsdlMode = cmd.Flag("wsdl", "Use WSDL mode").Bool()
+	imp.portNames = cmd.Flag("port-names", "Specify port name of each service in the WSDL file. Input format is comma separated list of serviceName:portName").String()
 	imp.createAPI = cmd.Flag("create-api", "Creates a new API definition from the blueprint").Bool()
 	imp.orgID = cmd.Flag("org-id", "assign the API Definition to this org_id (required with create-api").String()
 	imp.upstreamTarget = cmd.Flag("upstream-target", "set the upstream target for the definition").PlaceHolder("URL").String()
@@ -71,12 +75,54 @@ func (i *Importer) Import(ctx *kingpin.ParseContext) (err error) {
 			log.Fatal(err)
 			os.Exit(1)
 		}
+	} else if *i.wsdlMode {
+		err = i.handleWSDLMode()
+		if err != nil {
+			log.Fatal(err)
+			os.Exit(1)
+		}
 	} else {
 		log.Fatal(errUnknownMode)
 		os.Exit(1)
 	}
 	os.Exit(0)
 	return nil
+}
+
+func (i *Importer) validateInput() error {
+
+	if *i.createAPI {
+		if *i.upstreamTarget == "" || *i.orgID == "" {
+			return fmt.Errorf("No upstream target or org ID defined, these are both required")
+		}
+	} else {
+		if *i.forAPI == "" {
+			return fmt.Errorf("If adding to an API, the path to the definition must be listed")
+		}
+
+		if *i.asVersion == "" {
+			return fmt.Errorf("No version defined for this import operation, please set an import ID using the --as-version flag")
+		}
+	}
+
+	return nil
+}
+
+func (i *Importer) processPortNames() map[string]string {
+	p := make(map[string]string)
+
+	if *i.portNames == "" {
+		return p
+	}
+
+	pairs := strings.Split(*i.portNames, ",")
+
+	for _, v := range pairs {
+		components := strings.Split(v, ":")
+		p[components[0]] = components[1]
+	}
+
+	return p
 }
 
 func (i *Importer) handleBluePrintMode() error {
@@ -186,6 +232,52 @@ func (i *Importer) handleSwaggerMode() error {
 	return nil
 }
 
+func (i *Importer) handleWSDLMode() error {
+	var def *apidef.APIDefinition
+
+	//Process Input
+	if err := i.validateInput(); err != nil {
+		return err
+	}
+	serviceportMapping := i.processPortNames()
+
+	//Load WSDL file
+	w, err := i.wsdlLoadFile(*i.input)
+	if err != nil {
+		return fmt.Errorf("File load error: %v", err)
+	}
+
+	w.SetServicePortMapping(serviceportMapping)
+
+	if *i.createAPI {
+		//Create new API
+		def, err = w.ToAPIDefinition(*i.orgID, *i.upstreamTarget, *i.asMock)
+		if err != nil {
+			return fmt.Errorf("Failed to create API Defintition from file")
+		}
+	} else {
+		//Add into existing API
+		def, err = i.apiDefLoadFile(*i.forAPI)
+		if err != nil {
+			return fmt.Errorf("failed to load and decode file data for API Definition: %v", err)
+		}
+
+		versionData, err := w.ConvertIntoApiVersion(*i.asMock)
+		if err != nil {
+			return fmt.Errorf("Conversion into API Def failed: %v", err)
+		}
+
+		if err := w.InsertIntoAPIDefinitionAsVersion(versionData, def, *i.asVersion); err != nil {
+			return fmt.Errorf("Insertion failed: %v", err)
+		}
+
+	}
+
+	i.printDef(def)
+
+	return nil
+}
+
 func (i *Importer) printDef(def *apidef.APIDefinition) {
 	asJSON, err := json.MarshalIndent(def, "", "    ")
 	if err != nil {
@@ -213,6 +305,24 @@ func (i *Importer) swaggerLoadFile(path string) (*importer.SwaggerAST, error) {
 	}
 
 	return swagger.(*importer.SwaggerAST), nil
+}
+
+func (i *Importer) wsdlLoadFile(path string) (*importer.WSDLDef, error) {
+	wsdl, err := importer.GetImporterForSource(importer.WSDLSource)
+	if err != nil {
+		return nil, err
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	if err := wsdl.LoadFrom(f); err != nil {
+		return nil, err
+	}
+
+	return wsdl.(*importer.WSDLDef), nil
 }
 
 func (i *Importer) bluePrintLoadFile(path string) (*importer.BluePrintAST, error) {

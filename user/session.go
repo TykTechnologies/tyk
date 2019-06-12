@@ -1,6 +1,9 @@
 package user
 
 import (
+	"crypto/md5"
+	"fmt"
+
 	"github.com/TykTechnologies/tyk/config"
 	logger "github.com/TykTechnologies/tyk/log"
 )
@@ -44,6 +47,8 @@ type AccessDefinition struct {
 
 // SessionState objects represent a current API session, mainly used for rate limiting.
 // There's a data structure that's based on this and it's used for Protocol Buffer support, make sure to update "coprocess/proto/coprocess_session_state.proto" and generate the bindings using: cd coprocess/proto && ./update_bindings.sh
+//
+// swagger:model
 type SessionState struct {
 	LastCheck          int64                       `json:"last_check" msg:"last_check"`
 	Allowance          float64                     `json:"allowance" msg:"allowance"`
@@ -87,6 +92,10 @@ type SessionState struct {
 
 	// Used to store token hash
 	keyHash string
+}
+
+func (s *SessionState) MD5Hash() string {
+	return fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%+v", s))))
 }
 
 func (s *SessionState) KeyHash() string {
@@ -134,4 +143,16 @@ func (s *SessionState) PolicyIDs() []string {
 func (s *SessionState) SetPolicies(ids ...string) {
 	s.ApplyPolicyID = ""
 	s.ApplyPolicies = ids
+}
+
+// GetQuotaLimitByAPIID return quota max, quota remaining, quota renewal rate and quota renews for the given session
+func (s *SessionState) GetQuotaLimitByAPIID(apiID string) (int64, int64, int64, int64) {
+	if access, ok := s.AccessRights[apiID]; ok && access.Limit != nil {
+		return access.Limit.QuotaMax,
+			access.Limit.QuotaRemaining,
+			access.Limit.QuotaRenewalRate,
+			access.Limit.QuotaRenews
+	}
+
+	return s.QuotaMax, s.QuotaRemaining, s.QuotaRenewalRate, s.QuotaRenews
 }

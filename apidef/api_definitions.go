@@ -3,6 +3,9 @@ package apidef
 import (
 	"encoding/base64"
 	"encoding/json"
+	"text/template"
+
+	"github.com/clbanning/mxj"
 
 	"github.com/lonelycode/osin"
 	"gopkg.in/mgo.v2/bson"
@@ -38,10 +41,11 @@ const (
 	RequestXML  RequestInputType = "xml"
 	RequestJSON RequestInputType = "json"
 
-	OttoDriver   MiddlewareDriver = "otto"
-	PythonDriver MiddlewareDriver = "python"
-	LuaDriver    MiddlewareDriver = "lua"
-	GrpcDriver   MiddlewareDriver = "grpc"
+	OttoDriver     MiddlewareDriver = "otto"
+	PythonDriver   MiddlewareDriver = "python"
+	LuaDriver      MiddlewareDriver = "lua"
+	GrpcDriver     MiddlewareDriver = "grpc"
+	GoPluginDriver MiddlewareDriver = "goplugin"
 
 	BodySource        IdExtractorSource = "body"
 	HeaderSource      IdExtractorSource = "header"
@@ -77,6 +81,12 @@ type EndpointMethodMeta struct {
 type EndPointMeta struct {
 	Path          string                        `bson:"path" json:"path"`
 	MethodActions map[string]EndpointMethodMeta `bson:"method_actions" json:"method_actions"`
+}
+
+type CacheMeta struct {
+	Method        string `bson:"method" json:"method"`
+	Path          string `bson:"path" json:"path"`
+	CacheKeyRegex string `bson:"cache_key_regex" json:"cache_key_regex"`
 }
 
 type RequestInputType string
@@ -165,7 +175,7 @@ type URLRewriteMeta struct {
 	MatchPattern string           `bson:"match_pattern" json:"match_pattern"`
 	RewriteTo    string           `bson:"rewrite_to" json:"rewrite_to"`
 	Triggers     []RoutingTrigger `bson:"triggers" json:"triggers"`
-	MatchRegexp  *regexp.Regexp
+	MatchRegexp  *regexp.Regexp   `json:"-"`
 }
 
 type VirtualMeta struct {
@@ -199,6 +209,7 @@ type ExtendedPathsSet struct {
 	WhiteList               []EndPointMeta        `bson:"white_list" json:"white_list,omitempty"`
 	BlackList               []EndPointMeta        `bson:"black_list" json:"black_list,omitempty"`
 	Cached                  []string              `bson:"cache" json:"cache,omitempty"`
+	AdvanceCacheConfig      []CacheMeta           `bson:"advance_cache_config" json:"advance_cache_config,omitempty"`
 	Transform               []TemplateMeta        `bson:"transform" json:"transform,omitempty"`
 	TransformResponse       []TemplateMeta        `bson:"transform_response" json:"transform_response,omitempty"`
 	TransformJQ             []TransformJQMeta     `bson:"transform_jq" json:"transform_jq,omitempty"`
@@ -323,6 +334,8 @@ type OpenIDOptions struct {
 }
 
 // APIDefinition represents the configuration for a single proxied API and it's versions.
+//
+// swagger:model
 type APIDefinition struct {
 	Id               bson.ObjectId `bson:"_id,omitempty" json:"id,omitempty"`
 	Name             string        `bson:"name" json:"name"`
@@ -353,6 +366,7 @@ type APIDefinition struct {
 	PinnedPublicKeys           map[string]string    `bson:"pinned_public_keys" json:"pinned_public_keys"`
 	EnableJWT                  bool                 `bson:"enable_jwt" json:"enable_jwt"`
 	UseStandardAuth            bool                 `bson:"use_standard_auth" json:"use_standard_auth"`
+	UseGoPluginAuth            bool                 `bson:"use_go_plugin_auth" json:"use_go_plugin_auth"`
 	EnableCoProcessAuth        bool                 `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"`
 	JWTSigningMethod           string               `bson:"jwt_signing_method" json:"jwt_signing_method"`
 	JWTSource                  string               `bson:"jwt_source" json:"jwt_source"`
@@ -740,3 +754,22 @@ func DummyAPI() APIDefinition {
 		Tags: []string{},
 	}
 }
+
+var Template = template.New("").Funcs(map[string]interface{}{
+	"jsonMarshal": func(v interface{}) (string, error) {
+		bs, err := json.Marshal(v)
+		return string(bs), err
+	},
+	"xmlMarshal": func(v interface{}) (string, error) {
+		var err error
+		var xmlValue []byte
+		mv, ok := v.(mxj.Map)
+		if ok {
+			xmlValue, err = mv.Xml()
+		} else {
+			xmlValue, err = mxj.Map(v.(map[string]interface{})).Xml()
+		}
+
+		return string(xmlValue), err
+	},
+})
