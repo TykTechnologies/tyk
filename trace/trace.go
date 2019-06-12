@@ -12,6 +12,19 @@ import (
 	"github.com/opentracing/opentracing-go"
 )
 
+// NoopKey when set in context.Context it signals that we don't want to trace
+// that path.
+//
+// This allows to dynamically enable/disable tracing in any condition by simply
+// injecting this key into the context that is passed down the request pipeline.
+type NoopKey = struct{}
+
+// DisableTracing returns a new context with NoopKey set to true effectively
+// disabling tracing for any spans created with the returned context.
+func DisableTracing(ctx context.Context) context.Context {
+	return context.WithValue(ctx, NoopKey{}, true)
+}
+
 type Tracer interface {
 	Name() string
 	opentracing.Tracer
@@ -127,7 +140,24 @@ func MainSpan(r *http.Request) (opentracing.Span, *http.Request) {
 	return span, r.WithContext(ctx)
 }
 
-// Span creates a new span for the given ops.
+var noop = opentracing.NoopTracer{}
+
+func tracingIsDisabled(ctx context.Context) bool {
+	if v := ctx.Value(NoopKey{}); v != nil {
+		return v.(bool)
+	}
+	return false
+}
+
+// Span creates a new span for the given ops. If tracing is disabled in this ctx
+// then a noop span is created and the same ctx is returned.
+//
+// Note that the returned context contains the returned span as active span. So
+// any spans created form the returned context will be children of the returned
+// span.
 func Span(ctx context.Context, ops Operation, opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context) {
+	if tracingIsDisabled(ctx) {
+		return noop.StartSpan(ops.String(), opts...), ctx
+	}
 	return opentracing.StartSpanFromContext(ctx, ops.String(), opts...)
 }
