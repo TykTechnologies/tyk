@@ -351,6 +351,7 @@ func controlAPICheckClientCertificate(certLevel string, next http.Handler) http.
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if config.Global().Security.ControlAPIUseMutualTLS {
 			if err := CertificateManager.ValidateRequestCertificate(config.Global().Security.Certificates.ControlAPI, r); err != nil {
+				trace.Error(r.Context(), err)
 				doJSONWrite(w, http.StatusForbidden, apiError(err.Error()))
 				return
 			}
@@ -369,9 +370,6 @@ func loadAPIEndpoints(muxer *mux.Router) {
 
 	r := mux.NewRouter()
 
-	// muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
-	// 	stripSlashes(checkIsAPIOwner(controlAPICheckClientCertificate("/gateway/client", InstrumentationMW(r)))),
-	// ))
 	muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
 		trace.NewHandlerWithInjection(trace.StripSlash,
 			stripSlashes(
@@ -450,6 +448,7 @@ func checkIsAPIOwner(next http.Handler) http.Handler {
 		tykAuthKey := r.Header.Get("X-Tyk-Authorization")
 		if tykAuthKey != secret {
 			// Error
+			trace.Warn(r.Context(), "Attempted administrative access with invalid or missing key!")
 			mainLog.Warning("Attempted administrative access with invalid or missing key!")
 
 			doJSONWrite(w, http.StatusForbidden, apiError("Forbidden"))
