@@ -1,10 +1,13 @@
 package gateway
 
 import (
+	"encoding/base64"
 	"io/ioutil"
 	"strings"
 	"testing"
 	"text/template"
+
+	"github.com/TykTechnologies/tyk/test"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -202,5 +205,55 @@ func TestTransformXMLMarshal(t *testing.T) {
 
 	t.Run("JSONInput", func(t *testing.T) {
 		assert(t, apidef.RequestJSON)
+	})
+}
+
+func TestBodyTransformCaseSensitivity(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+
+	assert := func(relativePath string, requestedPath string, bodyMatch string) {
+		transformResponseConf := apidef.TemplateMeta{
+			Path:   relativePath,
+			Method: "GET",
+			TemplateData: apidef.TemplateData{
+				Mode:           "blob",
+				TemplateSource: base64.StdEncoding.EncodeToString([]byte(`{"http_method":"{{.Method}}"}`)),
+			},
+		}
+
+		responseProcessorConf := []apidef.ResponseProcessor{{Name: "response_body_transform"}}
+
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.ResponseProcessors = responseProcessorConf
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.ExtendedPaths.TransformResponse = []apidef.TemplateMeta{transformResponseConf}
+			})
+		})
+
+		ts.Run(t, test.TestCase{
+			Path: requestedPath, Code: 200, BodyMatch: bodyMatch,
+		})
+	}
+
+	// Matches and transforms
+	t.Run("", func(t *testing.T) {
+		assert("/get", "/get", `{"http_method":"GET"}`)
+	})
+
+	// Doesn't match and doesn't transform
+	t.Run("", func(t *testing.T) {
+		assert("/get", "/Get", `"Method":"GET"`)
+	})
+
+	// Doesn't match and doesn't transform
+	t.Run("", func(t *testing.T) {
+		assert("/Get", "/get", `"Method":"GET"`)
+	})
+
+	// Matches and transforms
+	t.Run("", func(t *testing.T) {
+		assert("/Get", "/Get", `{"http_method":"GET"}`)
 	})
 }

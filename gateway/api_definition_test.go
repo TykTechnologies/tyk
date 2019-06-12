@@ -159,6 +159,24 @@ func TestWhitelist(t *testing.T) {
 			{Path: "/baz/1/bazz", Code: http.StatusOK},
 		}...)
 	})
+
+	t.Run("Case Sensitivity", func(t *testing.T) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.Paths.WhiteList = []string{"/Foo", "/bar"}
+				v.UseExtendedPaths = false
+			})
+
+			spec.Proxy.ListenPath = "/"
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/foo", Code: http.StatusForbidden},
+			//{Path: "/Foo", Code: http.StatusOK},
+			{Path: "/bar", Code: http.StatusOK},
+			//{Path: "/Bar", Code: http.StatusForbidden},
+		}...)
+	})
 }
 
 func TestBlacklist(t *testing.T) {
@@ -210,6 +228,24 @@ func TestBlacklist(t *testing.T) {
 			{Path: "/blacklist/123/different", Code: http.StatusOK},
 			// POST method also blacklisted
 			{Method: "POST", Path: "/blacklist/literal", Code: http.StatusForbidden},
+		}...)
+	})
+
+	t.Run("Case Sensitivity", func(t *testing.T) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.Paths.BlackList = []string{"/Foo", "/bar"}
+				v.UseExtendedPaths = false
+			})
+
+			spec.Proxy.ListenPath = "/"
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/foo", Code: http.StatusOK},
+			//{Path: "/Foo", Code: http.StatusForbidden},
+			{Path: "/bar", Code: http.StatusForbidden},
+			//{Path: "/Bar", Code: http.StatusOK},
 		}...)
 	})
 }
@@ -332,7 +368,6 @@ func TestWhitelistMethodWithAdditionalMiddleware(t *testing.T) {
 
 		//headers := map[string]string{"foo": "bar"}
 		ts.Run(t, []test.TestCase{
-
 			//Should get original upstream response
 			//{Method: "GET", Path: "/get", Code: http.StatusOK, HeadersMatch: headers},
 			//Reject not whitelisted (but know by upstream) path
