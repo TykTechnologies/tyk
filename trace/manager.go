@@ -62,7 +62,7 @@ func (o *OpenTracer) Close() error {
 // already a tracer running it will be closed before the new one is set. This is
 // safe to use concurrently.
 func (o *OpenTracer) SetupTracing(name string, opts map[string]interface{}) {
-	tr, err := Init(name, opts)
+	tr, err := Init(name, opts, o.log)
 	if err != nil {
 		if o.log != nil {
 			o.log.Errorf("initializing tracer %s err=%v\n", name, err)

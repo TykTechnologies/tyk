@@ -46,12 +46,12 @@ func (n NoopTracer) Name() string {
 }
 
 // Init returns a tracer for a given name.
-func Init(name string, opts map[string]interface{}) (Tracer, error) {
+func Init(name string, opts map[string]interface{}, logger Logger) (Tracer, error) {
 	switch name {
 	case appdash.Name:
 		return appdash.Init(opts)
 	case jaeger.Name:
-		return jaeger.Init(opts)
+		return jaeger.Init(opts, logger)
 	default:
 		return NoopTracer{}, nil
 	}
