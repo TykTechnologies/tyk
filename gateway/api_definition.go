@@ -979,10 +979,9 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 
 // URLAllowedAndIgnored checks if a url is allowed and ignored.
 func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, whiteListStatus bool) (RequestStatus, interface{}) {
-	path := strings.ToLower(r.URL.Path)
 	// Check if ignored
 	for _, v := range rxPaths {
-		if !v.Spec.MatchString(path) {
+		if !v.Spec.MatchString(r.URL.Path) {
 			continue
 		}
 
