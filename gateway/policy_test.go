@@ -675,3 +675,152 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 		},
 	}...)
 }
+
+func TestPerAPIPolicyUpdate(t *testing.T) {
+	policiesMu.RLock()
+	policy := user.Policy{
+		ID:    "per_api_policy_with_two_apis",
+		OrgID: "default",
+		Partitions: user.PolicyPartitions{
+			PerAPI:    true,
+			Quota:     false,
+			RateLimit: false,
+			Acl:       false,
+		},
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {
+				Versions: []string{"v1"},
+			},
+			"api2": {
+				Versions: []string{"v1"},
+			},
+		},
+	}
+	policiesByID = map[string]user.Policy{
+		"per_api_policy_with_two_apis": policy,
+	}
+	policiesMu.RUnlock()
+
+	ts := StartTest()
+	defer ts.Close()
+
+	// load APIs
+	BuildAndLoadAPI(
+		func(spec *APISpec) {
+			spec.Name = "api 1"
+			spec.APIID = "api1"
+			spec.UseKeylessAccess = false
+			spec.Proxy.ListenPath = "/api1"
+			spec.OrgID = "default"
+		},
+		func(spec *APISpec) {
+			spec.Name = "api 2"
+			spec.APIID = "api2"
+			spec.UseKeylessAccess = false
+			spec.Proxy.ListenPath = "/api2"
+			spec.OrgID = "default"
+		},
+	)
+
+	// create test session
+	session := &user.SessionState{
+		ApplyPolicies: []string{"per_api_policy_with_two_apis"},
+		OrgID:         "default",
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {
+				APIID:    "api1",
+				Versions: []string{"v1"},
+			},
+			"api2": {
+				APIID:    "api2",
+				Versions: []string{"v1"},
+			},
+		},
+	}
+
+	// create key
+	key := uuid.New()
+	ts.Run(t, []test.TestCase{
+		{Method: http.MethodPost, Path: "/tyk/keys/" + key, Data: session, AdminAuth: true, Code: 200},
+	}...)
+
+	// check key session
+	ts.Run(t, []test.TestCase{
+		{
+			Method:    http.MethodGet,
+			Path:      "/tyk/keys/" + key,
+			AdminAuth: true,
+			Code:      http.StatusOK,
+			BodyMatchFunc: func(data []byte) bool {
+				sessionData := user.SessionState{}
+				if err := json.Unmarshal(data, &sessionData); err != nil {
+					t.Log(err.Error())
+					return false
+				}
+
+				if len(sessionData.AccessRights) != 2 {
+					t.Fatalf("expected 2 entries in AccessRights found %d", len(sessionData.AccessRights))
+				}
+
+				_, ok1 := sessionData.AccessRights["api1"]
+				_, ok2 := sessionData.AccessRights["api2"]
+
+				if !ok1 || !ok2 {
+					t.Fatalf("expected api1 and api2 in AccessRights found %v", sessionData.AccessRights)
+				}
+
+				return true
+			},
+		},
+	}...)
+
+	//Update policy
+	policiesMu.RLock()
+	policy = user.Policy{
+		ID:    "per_api_policy_with_two_apis",
+		OrgID: "default",
+		Partitions: user.PolicyPartitions{
+			PerAPI:    true,
+			Quota:     false,
+			RateLimit: false,
+			Acl:       false,
+		},
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {
+				Versions: []string{"v1"},
+			},
+		},
+	}
+	policiesByID = map[string]user.Policy{
+		"per_api_policy_with_two_apis": policy,
+	}
+	policiesMu.RUnlock()
+
+	ts.Run(t, []test.TestCase{
+		{
+			Method:    http.MethodGet,
+			Path:      "/tyk/keys/" + key,
+			AdminAuth: true,
+			Code:      http.StatusOK,
+			BodyMatchFunc: func(data []byte) bool {
+				sessionData := user.SessionState{}
+				if err := json.Unmarshal(data, &sessionData); err != nil {
+					t.Log(err.Error())
+					return false
+				}
+
+				if len(sessionData.AccessRights) != 1 {
+					t.Fatalf("expected only 1 entry in AccessRights found %d", len(sessionData.AccessRights))
+				}
+
+				_, ok1 := sessionData.AccessRights["api1"]
+
+				if !ok1 {
+					t.Fatalf("expected api1 in AccessRights found %v", sessionData.AccessRights)
+				}
+
+				return true
+			},
+		},
+	}...)
+}
