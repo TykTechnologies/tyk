@@ -174,43 +174,45 @@ func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.T
 func (k *JWTMiddleware) getPolicyIDFromToken(claims jwt.MapClaims) (string, bool) {
 	policyID, foundPolicy := claims[k.Spec.JWTPolicyFieldName].(string)
 	if !foundPolicy {
-		k.Logger().Error("Could not identify a policy to apply to this token from field!")
+		k.Logger().Error("Could not identify a policy to apply to this token from field")
+		return "", false
+	}
+
+	if policyID == "" {
+		k.Logger().Error("Policy field has empty value")
 		return "", false
 	}
 
 	return policyID, true
 }
 
-func (k *JWTMiddleware) getBasePolicyID(r *http.Request, claims jwt.MapClaims) (string, bool) {
+func (k *JWTMiddleware) getBasePolicyID(r *http.Request, claims jwt.MapClaims) (policyID string, found bool) {
 	if k.Spec.JWTPolicyFieldName != "" {
-		return k.getPolicyIDFromToken(claims)
+		policyID, found = k.getPolicyIDFromToken(claims)
+		return
 	} else if k.Spec.JWTClientIDBaseField != "" {
 		clientID, clientIDFound := claims[k.Spec.JWTClientIDBaseField].(string)
 		if !clientIDFound {
-			k.Logger().Error("Could not identify a policy to apply to this token from field!")
-			return "", false
+			k.Logger().Error("Could not identify a policy to apply to this token from field")
+			return
 		}
 
 		// Check for a regular token that matches this client ID
 		clientSession, exists := k.CheckSessionAndIdentityForValidKey(clientID, r)
 		if !exists {
-			return "", false
+			return
 		}
 
 		pols := clientSession.PolicyIDs()
 		if len(pols) < 1 {
-			return "", false
+			return
 		}
 
 		// Use the policy from the client ID
 		return pols[0], true
 	}
 
-	if len(k.Spec.JWTDefaultPolicies) > 0 {
-		return k.Spec.JWTDefaultPolicies[0], true
-	}
-
-	return "", false
+	return
 }
 
 func (k *JWTMiddleware) getUserIdFromClaim(claims jwt.MapClaims) (string, error) {
@@ -304,6 +306,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	}
 
 	session, exists := k.CheckSessionAndIdentityForValidKey(sessionID, r)
+	isDefaultPol := false
 	if !exists {
 		// Create it
 		k.Logger().Debug("Key does not exist, creating")
@@ -311,17 +314,25 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		// We need a base policy as a template, either get it from the token itself OR a proxy client ID within Tyk
 		basePolicyID, foundPolicy := k.getBasePolicyID(r, claims)
 		if !foundPolicy {
-			k.reportLoginFailure(baseFieldData, r)
-			return errors.New("key not authorized: no matching policy found"), http.StatusForbidden
+			if len(k.Spec.JWTDefaultPolicies) == 0 {
+				k.reportLoginFailure(baseFieldData, r)
+				return errors.New("key not authorized: no matching policy found"), http.StatusForbidden
+			} else {
+				isDefaultPol = true
+				basePolicyID = k.Spec.JWTDefaultPolicies[0]
+			}
 		}
 
 		session, err = generateSessionFromPolicy(basePolicyID,
 			k.Spec.OrgID,
 			true)
 
-		for _, pol := range k.Spec.JWTDefaultPolicies {
-			if !contains(session.ApplyPolicies, pol) {
-				session.ApplyPolicies = append(session.ApplyPolicies, pol)
+		// If base policy is one of the defaults, apply other ones as well
+		if isDefaultPol {
+			for _, pol := range k.Spec.JWTDefaultPolicies {
+				if !contains(session.ApplyPolicies, pol) {
+					session.ApplyPolicies = append(session.ApplyPolicies, pol)
+				}
 			}
 		}
 
@@ -379,8 +390,13 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		// extract policy ID from JWT token
 		policyID, foundPolicy := k.getBasePolicyID(r, claims)
 		if !foundPolicy {
-			k.reportLoginFailure(baseFieldData, r)
-			return errors.New("key not authorized: no matching policy found"), http.StatusForbidden
+			if len(k.Spec.JWTDefaultPolicies) == 0 {
+				k.reportLoginFailure(baseFieldData, r)
+				return errors.New("key not authorized: no matching policy found"), http.StatusForbidden
+			} else {
+				isDefaultPol = true
+				policyID = k.Spec.JWTDefaultPolicies[0]
+			}
 		}
 		// check if we received a valid policy ID in claim
 		policiesMu.RLock()
@@ -399,18 +415,21 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			return errors.New("key not authorized: no matching policy found"), http.StatusForbidden
 		}
 
-		// check a policy is removed/added from/to default policies
 		defaultPolicyListChanged := false
 
-		for _, pol := range session.PolicyIDs() {
-			if !contains(k.Spec.JWTDefaultPolicies, pol) && policyID != pol {
-				defaultPolicyListChanged = true
-			}
-		}
+		if isDefaultPol {
+			// check a policy is removed/added from/to default policies
 
-		for _, defPol := range k.Spec.JWTDefaultPolicies {
-			if !contains(session.PolicyIDs(), defPol) {
-				defaultPolicyListChanged = true
+			for _, pol := range session.PolicyIDs() {
+				if !contains(k.Spec.JWTDefaultPolicies, pol) && policyID != pol {
+					defaultPolicyListChanged = true
+				}
+			}
+
+			for _, defPol := range k.Spec.JWTDefaultPolicies {
+				if !contains(session.PolicyIDs(), defPol) {
+					defaultPolicyListChanged = true
+				}
 			}
 		}
 
@@ -424,9 +443,11 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			updateSession = true
 			session.SetPolicies(policyID)
 
-			for _, pol := range k.Spec.JWTDefaultPolicies {
-				if !contains(session.ApplyPolicies, pol) {
-					session.ApplyPolicies = append(session.ApplyPolicies, pol)
+			if isDefaultPol {
+				for _, pol := range k.Spec.JWTDefaultPolicies {
+					if !contains(session.ApplyPolicies, pol) {
+						session.ApplyPolicies = append(session.ApplyPolicies, pol)
+					}
 				}
 			}
 

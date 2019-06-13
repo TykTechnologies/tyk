@@ -1486,65 +1486,19 @@ func TestJWTDefaultPolicies(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 	})[0]
 
-	t.Run("Default policies", func(t *testing.T) {
-		LoadAPI(spec)
+	data := []byte("dummy")
+	keyID := fmt.Sprintf("%x", md5.Sum(data))
+	sessionID := generateToken(spec.OrgID, keyID)
 
-		jwtToken := CreateJWKToken(func(t *jwt.Token) {
-			t.Claims.(jwt.MapClaims)[identitySource] = "dummy"
-		})
-
-		authHeaders := map[string]string{"authorization": jwtToken}
-
-		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: http.StatusOK,
-		})
-
-		// Making conflict between policies
-		policiesMu.Lock()
-		policiesByID[defPol2] = user.Policy{
-			AccessRights: map[string]user.AccessDefinition{
-				apiID: {},
-			},
+	assert := func(t *testing.T, expected []string) {
+		session, _ := FallbackKeySesionManager.SessionDetail(sessionID, false)
+		actual := session.PolicyIDs()
+		if !reflect.DeepEqual(expected, actual) {
+			t.Fatalf("Expected %v, actaul %v", expected, actual)
 		}
-		policiesMu.Unlock()
+	}
 
-		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: http.StatusInternalServerError, BodyMatch: "failed to create key: cannot apply multiple policies if any are non-partitioned",
-		})
-
-		// Removing defPol2 from default policies
-		spec.JWTDefaultPolicies = []string{defPol1}
-		LoadAPI(spec)
-
-		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: http.StatusOK,
-		})
-
-		// Adding defPol2 to default policies again
-		spec.JWTDefaultPolicies = []string{defPol1, defPol2}
-		LoadAPI(spec)
-
-		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: http.StatusForbidden, BodyMatch: "key not authorized: could not apply new policy",
-		})
-
-		// Reset defPol2
-		policiesMu.Lock()
-		policiesByID[defPol2] = user.Policy{
-			AccessRights: map[string]user.AccessDefinition{
-				apiID: {},
-			},
-			Partitions: user.PolicyPartitions{
-				RateLimit: true,
-			},
-		}
-		policiesMu.Unlock()
-	})
-
-	t.Run("Default policies with token policy", func(t *testing.T) {
-		spec.JWTPolicyFieldName = policyFieldName
-		LoadAPI(spec)
-
+	t.Run("Policy field name empty", func(t *testing.T) {
 		jwtToken := CreateJWKToken(func(t *jwt.Token) {
 			t.Claims.(jwt.MapClaims)[identitySource] = "dummy"
 			t.Claims.(jwt.MapClaims)[policyFieldName] = tokenPol
@@ -1552,40 +1506,155 @@ func TestJWTDefaultPolicies(t *testing.T) {
 
 		authHeaders := map[string]string{"authorization": jwtToken}
 
-		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: http.StatusOK,
-		})
-
-		// Making conflict between policies
-		policiesMu.Lock()
-		policiesByID[tokenPol] = user.Policy{
-			AccessRights: map[string]user.AccessDefinition{
-				apiID: {},
-			},
-		}
-		policiesMu.Unlock()
-
-		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: http.StatusInternalServerError, BodyMatch: "failed to create key: cannot apply multiple policies if any are non-partitioned",
-		})
-
-		// Removing tokenPol
-		spec.JWTPolicyFieldName = ""
+		// Default
 		LoadAPI(spec)
-
-		ts.Run(t, test.TestCase{
+		_, _ = ts.Run(t, test.TestCase{
 			Headers: authHeaders, Code: http.StatusOK,
 		})
+		assert(t, []string{defPol1, defPol2})
 
-		// Adding tokenPol again
+		// Same to check stored correctly
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+		assert(t, []string{defPol1, defPol2})
+
+		// Remove one of default policies
+		spec.JWTDefaultPolicies = []string{defPol1}
+		LoadAPI(spec)
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+		assert(t, []string{defPol1})
+
+		// Add a default policy
+		spec.JWTDefaultPolicies = []string{defPol1, defPol2}
+		LoadAPI(spec)
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+		assert(t, []string{defPol1, defPol2})
+	})
+
+	t.Run("Policy field name nonempty but empty claim", func(t *testing.T) {
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)[identitySource] = "dummy"
+			t.Claims.(jwt.MapClaims)[policyFieldName] = ""
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+
+		// Default
+		LoadAPI(spec)
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+		assert(t, []string{defPol1, defPol2})
+
+		// Same to check stored correctly
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+		assert(t, []string{defPol1, defPol2})
+
+		// Remove one of default policies
+		spec.JWTDefaultPolicies = []string{defPol1}
+		LoadAPI(spec)
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+		assert(t, []string{defPol1})
+
+		// Add a default policy
+		spec.JWTDefaultPolicies = []string{defPol1, defPol2}
+		LoadAPI(spec)
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+		assert(t, []string{defPol1, defPol2})
+	})
+
+	t.Run("Policy field name nonempty invalid policy ID in claim", func(t *testing.T) {
 		spec.JWTPolicyFieldName = policyFieldName
 		LoadAPI(spec)
 
-		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: http.StatusForbidden, BodyMatch: "key not authorized: could not apply new policy",
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)[identitySource] = "dummy"
+			t.Claims.(jwt.MapClaims)[policyFieldName] = "invalid"
 		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Headers: authHeaders, Code: http.StatusForbidden},
+			{Headers: authHeaders, Code: http.StatusForbidden},
+		}...)
+
+		// Reset
+		spec.JWTPolicyFieldName = ""
 	})
 
+	t.Run("Default to Claim transition", func(t *testing.T) {
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)[identitySource] = "dummy"
+			t.Claims.(jwt.MapClaims)[policyFieldName] = tokenPol
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+
+		// Default
+		LoadAPI(spec)
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+		assert(t, []string{defPol1, defPol2})
+
+		// Same to check stored correctly
+		LoadAPI(spec)
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+		assert(t, []string{defPol1, defPol2})
+
+		// Claim
+		spec.JWTPolicyFieldName = policyFieldName
+		LoadAPI(spec)
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+		assert(t, []string{tokenPol})
+	})
+
+	t.Run("Claim to Default transition", func(t *testing.T) {
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)[identitySource] = "dummy"
+			t.Claims.(jwt.MapClaims)[policyFieldName] = tokenPol
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+
+		// Claim
+		spec.JWTPolicyFieldName = policyFieldName
+		LoadAPI(spec)
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+		assert(t, []string{tokenPol})
+
+		// Same to check stored correctly
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+		assert(t, []string{tokenPol})
+
+		// Default
+		spec.JWTPolicyFieldName = ""
+		LoadAPI(spec)
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+		assert(t, []string{defPol1, defPol2})
+	})
 }
 
 func TestJWTECDSASign(t *testing.T) {
