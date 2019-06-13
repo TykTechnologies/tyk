@@ -946,6 +946,21 @@
     },
     "enable_http_profiler": {
       "type": "boolean"
+    },
+    "tracing": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "options": {
+          "type": "object"
+        }
+      }
     }
   }
 }
