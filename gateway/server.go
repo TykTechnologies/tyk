@@ -1024,7 +1024,11 @@ func Start() {
 	} else {
 		mainLog.Warn("The control_api_port should be changed for production")
 	}
-
+	if tr := config.Global().Tracer; tr.Enabled {
+		mainLog.Debugf("initializing %s tracer\n", tr.Name)
+		traceManager.SetupTracing(tr.Name, tr.Options)
+		defer traceManager.Close()
+	}
 	start()
 
 	// Wait while Redis connection pools are ready before start serving traffic
@@ -1148,12 +1152,6 @@ func start() {
 		DefaultOrgStore.Init(getGlobalStorageHandler("orgkey.", false))
 		//DefaultQuotaStore.Init(getGlobalStorageHandler(CloudHandler, "orgkey.", false))
 		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
-	}
-
-	if tr := config.Global().Tracer; tr.Enabled {
-		mainLog.Debugf("initializing %s tracer\n", tr.Name)
-		traceManager.SetupTracing(tr.Name, tr.Options)
-		defer traceManager.Close()
 	}
 
 	if config.Global().ControlAPIPort == 0 {
