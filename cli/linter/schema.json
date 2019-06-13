@@ -958,7 +958,10 @@
           "type": "boolean"
         },
         "options": {
-          "type": "object"
+          "type": [
+            "object",
+            "null"
+          ]
         }
       }
     }
