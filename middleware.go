@@ -242,6 +242,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	if rights == nil {
 		rights = make(map[string]user.AccessDefinition)
 	}
+
 	tags := make(map[string]bool)
 	didQuota, didRateLimit, didACL := false, false, false
 	didPerAPI := make(map[string]bool)
@@ -277,6 +278,11 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				log.Error(err)
 				return err
 			}
+
+			//Added this to ensure that if an API is deleted, it is removed from accessRights also.
+			if len(didPerAPI) == 0 {
+				rights = make(map[string]user.AccessDefinition)
+			}
 			for apiID, accessRights := range policy.AccessRights {
 				// check if limit was already set for this API by other policy assigned to key
 				if didPerAPI[apiID] {
@@ -303,7 +309,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				// respect current quota remaining and quota renews (on API limit level)
 				var limitQuotaRemaining int64
 				var limitQuotaRenews int64
-				if currAccessRight, ok := rights[apiID]; ok && currAccessRight.Limit != nil {
+				if currAccessRight, ok := session.AccessRights[apiID]; ok && currAccessRight.Limit != nil {
 					limitQuotaRemaining = currAccessRight.Limit.QuotaRemaining
 					limitQuotaRenews = currAccessRight.Limit.QuotaRenews
 				}
