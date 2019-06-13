@@ -3,6 +3,7 @@ package apidef
 import (
 	"encoding/base64"
 	"encoding/json"
+	"encoding/xml"
 	"text/template"
 
 	"github.com/clbanning/mxj"
@@ -766,9 +767,16 @@ var Template = template.New("").Funcs(map[string]interface{}{
 		var xmlValue []byte
 		mv, ok := v.(mxj.Map)
 		if ok {
+			mxj.XMLEscapeChars(true)
 			xmlValue, err = mv.Xml()
 		} else {
-			xmlValue, err = mxj.Map(v.(map[string]interface{})).Xml()
+			res, ok := v.(map[string]interface{})
+			if ok {
+				mxj.XMLEscapeChars(true)
+				xmlValue, err = mxj.Map(res).Xml()
+			} else {
+				xmlValue, err = xml.MarshalIndent(v, "", "  ")
+			}
 		}
 
 		return string(xmlValue), err

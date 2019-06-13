@@ -88,21 +88,18 @@ func testPrepareTransformJSONMarshal(inputType string) (tmeta *TransformSpec, in
 	return tmeta, in
 }
 
-func testPrepareTransformXMLMarshal(inputType apidef.RequestInputType) (tmeta *TransformSpec, in string) {
+func testPrepareTransformXMLMarshal(tmpl string, inputType apidef.RequestInputType) (tmeta *TransformSpec) {
 	tmeta = &TransformSpec{}
-	tmpl := `{{. | xmlMarshal}}`
 	tmeta.Template = template.Must(apidef.Template.New("").Parse(tmpl))
 
 	switch inputType {
 	case apidef.RequestJSON:
 		tmeta.TemplateData.Input = apidef.RequestJSON
-		in = `{"brothers": { "name": ["Furkan", "Ahmet", "Mohammad Ali"] }}`
 	case apidef.RequestXML:
 		tmeta.TemplateData.Input = apidef.RequestXML
-		in = `<brothers><name>Furkan</name><name>Ahmet</name><name>Mohammad Ali</name></brothers>`
 	}
 
-	return tmeta, in
+	return tmeta
 }
 
 func TestTransformJSONMarshalXMLInput(t *testing.T) {
@@ -182,11 +179,9 @@ func BenchmarkTransformJSONMarshal(b *testing.B) {
 }
 
 func TestTransformXMLMarshal(t *testing.T) {
-	assert := func(t *testing.T, inputType apidef.RequestInputType) {
-		tmeta, in := testPrepareTransformXMLMarshal(inputType)
-
-		want := `<brothers><name>Furkan</name><name>Ahmet</name><name>Mohammad Ali</name></brothers>`
-		r := testReq(t, "GET", "/", in)
+	assert := func(t *testing.T, input string, tmpl string, output string, inputType apidef.RequestInputType) {
+		tmeta := testPrepareTransformXMLMarshal(tmpl, inputType)
+		r := testReq(t, "GET", "/", input)
 		if err := transformBody(r, tmeta, false); err != nil {
 			t.Fatalf("wanted nil error, got %v", err)
 		}
@@ -194,17 +189,34 @@ func TestTransformXMLMarshal(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := string(gotBs); got != want {
-			t.Fatalf("wanted body %q, got %q", want, got)
+		if got := string(gotBs); got != output {
+			t.Fatalf("wanted body %q, got %q", output, got)
 		}
 	}
 
+	tmpl := `{{. | xmlMarshal}}`
+	output := `<brothers><name>Furkan</name><name>Ahmet</name><name>Mohammad Ali</name></brothers>`
 	t.Run("XMLInput", func(t *testing.T) {
-		assert(t, apidef.RequestXML)
+		input := `<brothers><name>Furkan</name><name>Ahmet</name><name>Mohammad Ali</name></brothers>`
+		assert(t, input, tmpl, output, apidef.RequestXML)
 	})
 
 	t.Run("JSONInput", func(t *testing.T) {
-		assert(t, apidef.RequestJSON)
+		input := `{"brothers": { "name": ["Furkan", "Ahmet", "Mohammad Ali"] }}`
+		assert(t, input, tmpl, output, apidef.RequestJSON)
+	})
+
+	t.Run("JSONInput with escaped char", func(t *testing.T) {
+		input := `{"test":"<"}`
+		output = `<test>&lt;</test>`
+		assert(t, input, tmpl, output, apidef.RequestJSON)
+	})
+
+	t.Run("JSONInput with escaped char, template applied to a single value", func(t *testing.T) {
+		input := `{"test":"<"}`
+		tmpl = `{{ index . "test" | xmlMarshal }}`
+		output = `<string>&lt;</string>`
+		assert(t, input, tmpl, output, apidef.RequestJSON)
 	})
 }
 
