@@ -72,6 +72,9 @@ const Schema = `{
         "jwt_policy_field_name": {
             "type": "string"
         },
+		"jwt_default_policies": {
+            "type": ["array", "null"]
+        },
         "jwt_signing_method": {
             "type": "string"
         },
