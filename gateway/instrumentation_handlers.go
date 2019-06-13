@@ -17,6 +17,7 @@ import (
 
 var applicationGCStats = debug.GCStats{}
 var instrument = health.NewStream()
+var instrumentationEnabled bool
 
 // setupInstrumentation handles all the intialisation of the instrumentation handler
 func setupInstrumentation() {
@@ -31,6 +32,8 @@ func setupInstrumentation() {
 		log.Error("Instrumentation is enabled, but no connectionstring set for statsd")
 		return
 	}
+
+	instrumentationEnabled = true
 
 	log.Info("Sending stats to: ", config.Global().StatsdConnectionString, " with prefix: ", config.Global().StatsdPrefix)
 	statsdSink, err := NewStatsDSink(config.Global().StatsdConnectionString,
