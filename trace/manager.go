@@ -28,14 +28,19 @@ func NewManager(log Logger) *OpenTracer {
 	return &OpenTracer{log: log}
 }
 
-func (o *OpenTracer) get() Tracer {
+//Get returns active tracer or nil
+func (o *OpenTracer) Get() Tracer {
 	o.mu.RLock()
 	t := o.tracer
 	o.mu.RUnlock()
 	return t
 }
 
-func (o *OpenTracer) set(tr Tracer) {
+// Set makes tr the active tracer. This calls opentracing.SetGlobalTracer making
+// tr the global tracer.
+//
+// If there was another running tracer it will be closed.
+func (o *OpenTracer) Set(tr Tracer) {
 	if err := o.Close(); err != nil {
 		if o.log != nil {
 			o.log.Errorf("closing tracer %v\n", err)
@@ -52,7 +57,7 @@ func (o *OpenTracer) set(tr Tracer) {
 
 // Close calls Close on the active tracer.
 func (o *OpenTracer) Close() error {
-	if t := o.get(); t != nil {
+	if t := o.Get(); t != nil {
 		return t.Close()
 	}
 	return nil
@@ -74,5 +79,5 @@ func (o *OpenTracer) SetupTracing(name string, opts map[string]interface{}) {
 			o.log.Infof("tracer: %s was not found using NoOpTracer instead\n", name)
 		}
 	}
-	o.set(tr)
+	o.Set(tr)
 }
