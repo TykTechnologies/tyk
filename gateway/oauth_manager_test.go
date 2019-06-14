@@ -563,8 +563,8 @@ func getAuthCode(t *testing.T, ts *Test) map[string]string {
 
 func TestGetPaginatedClientTokens(t *testing.T) {
 	globalConf := config.Global()
-	// set tokens to be expired after 1 second
-	globalConf.OauthTokenExpire = 1
+	// set tokens to be expired after 2 second
+	globalConf.OauthTokenExpire = 2
 	// cleanup tokens older than 3 seconds
 	globalConf.OauthTokenExpiredRetainPeriod = 3
 	config.SetGlobal(globalConf)
@@ -712,7 +712,7 @@ func TestGetPaginatedClientTokens(t *testing.T) {
 
 	t.Run("Get list of tokens after they expire", func(t *testing.T) {
 		// sleep to wait until tokens expire
-		time.Sleep(2 * time.Second)
+		time.Sleep(3 * time.Second)
 
 		resp, err := ts.Run(t, test.TestCase{
 			Path:      fmt.Sprintf("/tyk/oauth/clients/999999/%s/tokens", clientID),
