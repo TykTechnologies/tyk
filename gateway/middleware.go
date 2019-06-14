@@ -74,17 +74,22 @@ func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 			}
 
 			job := instrument.NewJob("MiddlewareCall")
-			meta := health.Kvs{
-				"from_ip":  request.RealIP(r),
-				"method":   r.Method,
-				"endpoint": r.URL.Path,
-				"raw_url":  r.URL.String(),
-				"size":     strconv.Itoa(int(r.ContentLength)),
-				"mw_name":  mw.Name(),
-			}
+			meta := health.Kvs{}
 			eventName := mw.Name() + "." + "executed"
-			job.EventKv("executed", meta)
-			job.EventKv(eventName, meta)
+
+			if instrumentationEnabled {
+				meta = health.Kvs{
+					"from_ip":  request.RealIP(r),
+					"method":   r.Method,
+					"endpoint": r.URL.Path,
+					"raw_url":  r.URL.String(),
+					"size":     strconv.Itoa(int(r.ContentLength)),
+					"mw_name":  mw.Name(),
+				}
+				job.EventKv("executed", meta)
+				job.EventKv(eventName, meta)
+			}
+
 			startTime := time.Now()
 			mw.Logger().WithField("ts", startTime.UnixNano()).Debug("Started")
 
@@ -104,16 +109,23 @@ func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 				meta["error"] = err.Error()
 
 				finishTime := time.Since(startTime)
-				job.TimingKv("exec_time", finishTime.Nanoseconds(), meta)
-				job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
+
+				if instrumentationEnabled {
+					job.TimingKv("exec_time", finishTime.Nanoseconds(), meta)
+					job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
+				}
 
 				mw.Logger().WithError(err).WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
 				return
 			}
 
 			finishTime := time.Since(startTime)
-			job.TimingKv("exec_time", finishTime.Nanoseconds(), meta)
-			job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
+
+			if instrumentationEnabled {
+				job.TimingKv("exec_time", finishTime.Nanoseconds(), meta)
+				job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
+			}
+
 			mw.Logger().WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
 
 			// Special code, bypasses all other execution
