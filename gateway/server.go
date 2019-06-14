@@ -371,13 +371,13 @@ func loadAPIEndpoints(muxer *mux.Router) {
 	r := mux.NewRouter()
 
 	muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
-		trace.NewHandlerWithInjection(trace.StripSlash,
+		trace.NewHandlerWithInjection(trace.StripRequestSlash,
 			stripSlashes(
-				trace.NewHandler(trace.CheckIsAPIOwner,
+				trace.NewHandler(trace.CheckRequestIsAPIOwner,
 					checkIsAPIOwner(
-						trace.NewHandler(trace.ControlAPICheckClientCertificate,
+						trace.NewHandler(trace.CheckControlAPIClientCertificate,
 							controlAPICheckClientCertificate("/gateway/client",
-								trace.NewHandler(trace.InstrumentationMW,
+								trace.NewHandler(trace.InstrumentRequest,
 									InstrumentationMW(r),
 								),
 							),

@@ -558,22 +558,22 @@ func responseProcessorByName(name string) TykResponseHandler {
 	switch name {
 	case "header_injector":
 		return NewTraceResponseHandler(
-			trace.HeaderInjector,
+			trace.InjectHeaders,
 			&HeaderInjector{},
 		)
 	case "response_body_transform":
 		return NewTraceResponseHandler(
-			trace.ResponseTransformMiddleware,
+			trace.TransformResponse,
 			&ResponseTransformMiddleware{},
 		)
 	case "response_body_transform_jq":
 		return NewTraceResponseHandler(
-			trace.ResponseTransformJQMiddleware,
+			trace.TransformResponseJQ,
 			&ResponseTransformJQMiddleware{},
 		)
 	case "header_transform":
 		return NewTraceResponseHandler(
-			trace.HeaderTransform,
+			trace.TransformHeader,
 			&HeaderTransform{},
 		)
 	}

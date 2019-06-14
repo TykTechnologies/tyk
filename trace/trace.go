@@ -71,16 +71,18 @@ const (
 	// All other spans are children  of this span.
 	MainEntry Operation = iota
 	Api
-	StripSlash
-	CheckIsAPIOwner
-	ControlAPICheckClientCertificate
-	InstrumentationMW
+
+	//request middleware operations
+	StripRequestSlash
+	CheckRequestIsAPIOwner
+	CheckControlAPIClientCertificate
+	InstrumentRequest
 	MethodNotAllowed
 
-	HeaderInjector
-	ResponseTransformMiddleware
-	ResponseTransformJQMiddleware
-	HeaderTransform
+	InjectHeaders
+	TransformResponse
+	TransformResponseJQ
+	TransformHeader
 )
 
 func (o Operation) String() string {
@@ -89,23 +91,23 @@ func (o Operation) String() string {
 		return "tyk-gateway"
 	case Api:
 		return "api"
-	case StripSlash:
+	case StripRequestSlash:
 		return "strip-request-slash"
-	case CheckIsAPIOwner:
+	case CheckRequestIsAPIOwner:
 		return "check-request-is-api-owner"
-	case ControlAPICheckClientCertificate:
+	case CheckControlAPIClientCertificate:
 		return "check-control-api-client-certificate"
-	case InstrumentationMW:
+	case InstrumentRequest:
 		return "instrument-request"
 	case MethodNotAllowed:
 		return "handle-method-not-allowed"
-	case HeaderInjector:
+	case InjectHeaders:
 		return "inject-headers"
-	case ResponseTransformMiddleware:
+	case TransformResponse:
 		return "transform-response"
-	case ResponseTransformJQMiddleware:
+	case TransformResponseJQ:
 		return "transform-response-jq"
-	case HeaderTransform:
+	case TransformHeader:
 		return "transform-header"
 	default:
 		return "noop"
