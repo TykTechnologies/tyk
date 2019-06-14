@@ -529,20 +529,25 @@ type TykResponseHandler interface {
 	HandleResponse(http.ResponseWriter, *http.Response, *http.Request, *user.SessionState) error
 }
 
+// TraceResponseHandler implements TykResponseHandler but wraps another
+// TykResponseHandler and apply tracing on it.
 type TraceResponseHandler struct {
 	h    TykResponseHandler
 	ops  trace.Operation
 	opts []opentracing.StartSpanOption
 }
 
+// NewTraceResponseHandler returns an initialized TraceResponseHandler
 func NewTraceResponseHandler(ops trace.Operation, h TykResponseHandler, opts ...opentracing.StartSpanOption) TraceResponseHandler {
 	return TraceResponseHandler{h: h, ops: ops, opts: opts}
 }
 
+// Init calls Init on the underlying TykResponseHandler
 func (h TraceResponseHandler) Init(a interface{}, s *APISpec) error {
 	return h.h.Init(a, s)
 }
 
+// HandleResponse traces the underlying TykResponseHandler call to HandleResponse
 func (h TraceResponseHandler) HandleResponse(w http.ResponseWriter, res *http.Response, r *http.Request, ss *user.SessionState) error {
 	span, ctx := trace.Span(r.Context(), h.ops, h.opts...)
 	defer span.Finish()
