@@ -154,5 +154,5 @@ do
 
     rpmName="$PKGNAME-$VERSION-1.${arch/amd64/x86_64}.rpm"
     echo "Signing $arch RPM"
-    $BUILDTOOLSDIR/rpm-sign.exp $rpmName
+    $BUILDTOOLSDIR/rpm-sign.sh $rpmName
 done
