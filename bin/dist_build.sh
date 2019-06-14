@@ -12,7 +12,7 @@ echo "Set version number"
 
 if [ $BUILDPKGS == "1" ]; then
     echo "Importing signing key"
-    gpg --list-keys | grep -w $SIGNKEY && echo "Key exists" || gpg --import $BUILDTOOLSDIR/build_key.key
+    gpg --list-keys | grep -w $SIGNKEY && echo "Key exists" || gpg --batch --import $BUILDTOOLSDIR/build_key.key
 fi
 
 echo "Prepare the release directories"
