@@ -33,6 +33,7 @@ type CoProcessMiddleware struct {
 	HookType         coprocess.HookType
 	HookName         string
 	MiddlewareDriver apidef.MiddlewareDriver
+	RawBodyOnly      bool
 }
 
 func (mw *CoProcessMiddleware) Name() string {
@@ -68,7 +69,7 @@ type CoProcessor struct {
 }
 
 // ObjectFromRequest constructs a CoProcessObject from a given http.Request.
-func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
+func (c *CoProcessor) ObjectFromRequest(r *http.Request) (*coprocess.Object, error) {
 	headers := ProtoMap(r.Header)
 
 	host := r.Host
@@ -101,8 +102,12 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
 
 	if r.Body != nil {
 		defer r.Body.Close()
-		miniRequestObject.RawBody, _ = ioutil.ReadAll(r.Body)
-		if utf8.Valid(miniRequestObject.RawBody) {
+		var err error
+		miniRequestObject.RawBody, err = ioutil.ReadAll(r.Body)
+		if err != nil {
+			return nil, err
+		}
+		if utf8.Valid(miniRequestObject.RawBody) && !c.Middleware.RawBodyOnly {
 			miniRequestObject.Body = string(miniRequestObject.RawBody)
 		}
 	}
@@ -125,7 +130,11 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
 	if c.Middleware != nil {
 		configDataAsJson := []byte("{}")
 		if len(c.Middleware.Spec.ConfigData) > 0 {
-			configDataAsJson, _ = json.Marshal(c.Middleware.Spec.ConfigData)
+			var err error
+			configDataAsJson, err = json.Marshal(c.Middleware.Spec.ConfigData)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		object.Spec = map[string]string{
@@ -144,7 +153,7 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
 		}
 	}
 
-	return object
+	return object, nil
 }
 
 // ObjectPostProcess does CoProcessObject post-processing (adding/removing headers or params, etc.).
@@ -260,7 +269,11 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		// HookType: coprocess.PreHook,
 	}
 
-	object := coProcessor.ObjectFromRequest(r)
+	object, err := coProcessor.ObjectFromRequest(r)
+	if err != nil {
+		logger.WithError(err).Error("Failed to build request object")
+		return errors.New("Middleware error"), 500
+	}
 
 	returnObject, err := coProcessor.Dispatch(object)
 	if err != nil {

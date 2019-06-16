@@ -271,6 +271,7 @@ type MiddlewareDefinition struct {
 	Name           string `bson:"name" json:"name"`
 	Path           string `bson:"path" json:"path"`
 	RequireSession bool   `bson:"require_session" json:"require_session"`
+	RawBodyOnly    bool   `bson:"raw_body_only" json:"raw_body_only"`
 }
 
 type MiddlewareIdExtractor struct {

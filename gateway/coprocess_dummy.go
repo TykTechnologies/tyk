@@ -33,6 +33,7 @@ type CoProcessMiddleware struct {
 	HookType         coprocess.HookType
 	HookName         string
 	MiddlewareDriver apidef.MiddlewareDriver
+	RawBodyOnly      bool
 }
 
 func (m *CoProcessMiddleware) Name() string {
