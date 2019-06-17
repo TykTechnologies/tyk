@@ -725,11 +725,11 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 	}
 	policiesMu.RUnlock()
 
-	ts := StartTest()
+	ts := newTykTestServer()
 	defer ts.Close()
 
 	// load APIs
-	BuildAndLoadAPI(
+	buildAndLoadAPI(
 		func(spec *APISpec) {
 			spec.Name = "api 1"
 			spec.APIID = "api1"
