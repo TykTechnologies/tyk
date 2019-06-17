@@ -2,7 +2,6 @@ package trace
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -11,7 +10,6 @@ import (
 	"github.com/TykTechnologies/tyk/trace/appdash"
 	"github.com/TykTechnologies/tyk/trace/jaeger"
 	"github.com/opentracing/opentracing-go"
-	"github.com/opentracing/opentracing-go/log"
 )
 
 // NoopKey when set in context.Context it signals that we don't want to trace
@@ -171,17 +169,6 @@ func Span(ctx context.Context, ops Operation, opts ...opentracing.StartSpanOptio
 		return noop.StartSpan(ops.String(), opts...), ctx
 	}
 	return opentracing.StartSpanFromContext(ctx, ops.String(), opts...)
-}
-
-// Log tries to check if there is a span in ctx and logs fields on the span.
-func Log(ctx context.Context, fields ...log.Field) {
-	if span := opentracing.SpanFromContext(ctx); span != nil {
-		span.LogFields(fields...)
-	}
-}
-
-func Info(ctx context.Context, args ...interface{}) {
-	Log(ctx, log.String("INFO", fmt.Sprint(args...)))
 }
 
 func Get(ctx context.Context) opentracing.Span {

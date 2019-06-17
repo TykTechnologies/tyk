@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/log"
 )
 
@@ -13,6 +14,7 @@ type Logrus interface {
 	Debug(args ...interface{})
 	Error(args ...interface{})
 	Warning(args ...interface{})
+	Info(args ...interface{})
 }
 
 // Debug creates debug log on both logrus and span.
@@ -29,4 +31,16 @@ func Error(ctx context.Context, logrus Logrus, args ...interface{}) {
 func Warning(ctx context.Context, logrus Logrus, args ...interface{}) {
 	logrus.Warning(args...)
 	Log(ctx, log.String("WARN", fmt.Sprint(args...)))
+}
+
+// Log tries to check if there is a span in ctx and adds logs fields on the span.
+func Log(ctx context.Context, fields ...log.Field) {
+	if span := opentracing.SpanFromContext(ctx); span != nil {
+		span.LogFields(fields...)
+	}
+}
+
+func Info(ctx context.Context, logrus Logrus, args ...interface{}) {
+	logrus.Info(args...)
+	Log(ctx, log.String("INFO", fmt.Sprint(args...)))
 }
