@@ -83,6 +83,9 @@ const (
 	TransformResponse
 	TransformResponseJQ
 	TransformHeader
+
+	HandleAPI
+	AddOrUpdateAPI
 )
 
 func (o Operation) String() string {
@@ -109,6 +112,10 @@ func (o Operation) String() string {
 		return "transform-response-jq"
 	case TransformHeader:
 		return "transform-header"
+	case HandleAPI:
+		return "handle-api"
+	case AddOrUpdateAPI:
+		return "add-or-update-api"
 	default:
 		return "noop"
 	}
@@ -173,14 +180,13 @@ func Log(ctx context.Context, fields ...log.Field) {
 	}
 }
 
-func Warn(ctx context.Context, args ...interface{}) {
-	Log(ctx, log.String("WARN", fmt.Sprint(args...)))
-}
-
 func Info(ctx context.Context, args ...interface{}) {
 	Log(ctx, log.String("INFO", fmt.Sprint(args...)))
 }
 
-func Error(ctx context.Context, err error) {
-	Log(ctx, log.Error(err))
+func Get(ctx context.Context) opentracing.Span {
+	if span := opentracing.SpanFromContext(ctx); span != nil {
+		return span
+	}
+	return noop.StartSpan("")
 }

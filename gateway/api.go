@@ -50,6 +50,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -704,20 +705,22 @@ func handleGetAPI(apiID string) (interface{}, int) {
 	return apiError("API not found"), http.StatusNotFound
 }
 
-func handleAddOrUpdateApi(apiID string, r *http.Request) (interface{}, int) {
+func handleAddOrUpdateApi(ctx context.Context, apiID string, r *http.Request) (interface{}, int) {
+	span, spanCtx := trace.Span(ctx, trace.AddOrUpdateAPI)
+	defer span.Finish()
 	if config.Global().UseDBAppConfigs {
-		log.Error("Rejected new API Definition due to UseDBAppConfigs = true")
+		trace.Error(spanCtx, log, "Rejected new API Definition due to UseDBAppConfigs = true")
 		return apiError("Due to enabled use_db_app_configs, please use the Dashboard API"), http.StatusInternalServerError
 	}
 
 	newDef := &apidef.APIDefinition{}
 	if err := json.NewDecoder(r.Body).Decode(newDef); err != nil {
-		log.Error("Couldn't decode new API Definition object: ", err)
+		trace.Error(spanCtx, log, "Couldn't decode new API Definition object: ", err)
 		return apiError("Request malformed"), http.StatusBadRequest
 	}
 
 	if apiID != "" && newDef.APIID != apiID {
-		log.Error("PUT operation on different APIIDs")
+		trace.Error(spanCtx, log, "PUT operation on different APIIDs")
 		return apiError("Request APIID does not match that in Definition! For Updtae operations these must match."), http.StatusBadRequest
 	}
 
@@ -726,19 +729,19 @@ func handleAddOrUpdateApi(apiID string, r *http.Request) (interface{}, int) {
 
 	// If it exists, delete it
 	if _, err := os.Stat(defFilePath); err == nil {
-		log.Warning("API Definition with this ID already exists, deleting file...")
+		trace.Warning(spanCtx, log, "API Definition with this ID already exists, deleting file...")
 		os.Remove(defFilePath)
 	}
 
 	// unmarshal the object into the file
 	asByte, err := json.MarshalIndent(newDef, "", "  ")
 	if err != nil {
-		log.Error("Marshalling of API Definition failed: ", err)
+		trace.Error(spanCtx, log, "Marshalling of API Definition failed: ", err)
 		return apiError("Marshalling failed"), http.StatusInternalServerError
 	}
 
 	if err := ioutil.WriteFile(defFilePath, asByte, 0644); err != nil {
-		log.Error("Failed to create file! - ", err)
+		trace.Error(spanCtx, log, "Failed to create file! - ", err)
 		return apiError("File object creation failed, write error"), http.StatusInternalServerError
 	}
 
@@ -779,32 +782,32 @@ func handleDeleteAPI(apiID string) (interface{}, int) {
 
 func apiHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
-
+	span, ctx := trace.Span(r.Context(), trace.HandleAPI)
+	defer span.Finish()
 	var obj interface{}
 	var code int
-
 	switch r.Method {
 	case "GET":
 		if apiID != "" {
-			log.Debug("Requesting API definition for", apiID)
+			trace.Debug(ctx, log, "Requesting API definition for", apiID)
 			obj, code = handleGetAPI(apiID)
 		} else {
-			log.Debug("Requesting API list")
+			trace.Debug(ctx, log, "Requesting API list")
 			obj, code = handleGetAPIList()
 		}
 	case "POST":
-		log.Debug("Creating new definition file")
-		obj, code = handleAddOrUpdateApi(apiID, r)
+		trace.Debug(ctx, log, "Creating new definition file")
+		obj, code = handleAddOrUpdateApi(r.Context(), apiID, r)
 	case "PUT":
 		if apiID != "" {
-			log.Debug("Updating existing API: ", apiID)
-			obj, code = handleAddOrUpdateApi(apiID, r)
+			trace.Debug(ctx, log, "Updating existing API: ", apiID)
+			obj, code = handleAddOrUpdateApi(r.Context(), apiID, r)
 		} else {
 			obj, code = apiError("Must specify an apiID to update"), http.StatusBadRequest
 		}
 	case "DELETE":
 		if apiID != "" {
-			log.Debug("Deleting API definition for: ", apiID)
+			trace.Debug(ctx, log, "Deleting API definition for: ", apiID)
 			obj, code = handleDeleteAPI(apiID)
 		} else {
 			obj, code = apiError("Must specify an apiID to delete"), http.StatusBadRequest
