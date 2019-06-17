@@ -53,6 +53,14 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
+// apiGetKeyResponse represents key details
+//
+// swagger:model apiGetKeyResponse
+type apiGetKeyResponse struct {
+	Session user.SessionState `json:"session"`
+	KeyHash string            `json:"key_hash,omitempty"`
+}
+
 // apiModifyKeySuccess represents when a Key modification was successful
 //
 // swagger:model apiModifyKeySuccess
@@ -423,9 +431,12 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 		return apiError("Key not found"), http.StatusNotFound
 	}
 
-	quotaKey := QuotaKeyPrefix + storage.HashKey(sessionKey)
+	var quotaKey string
+
 	if byHash {
 		quotaKey = QuotaKeyPrefix + sessionKey
+	} else {
+		quotaKey = QuotaKeyPrefix + storage.HashKey(sessionKey)
 	}
 
 	if usedQuota, err := sessionManager.Store().GetRawKey(quotaKey); err == nil {
@@ -482,13 +493,25 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 	mw := BaseMiddleware{Spec: spec}
 	mw.ApplyPolicies(&session)
 
+	response := apiGetKeyResponse{
+		Session: session,
+	}
+
+	if config.Global().HashKeys {
+		if byHash {
+			response.KeyHash = sessionKey
+		} else {
+			response.KeyHash = storage.HashKey(sessionKey)
+		}
+	}
+
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
 		"key":    obfuscateKey(sessionKey),
 		"status": "ok",
 	}).Info("Retrieved key detail.")
 
-	return session, http.StatusOK
+	return response, http.StatusOK
 }
 
 // apiAllKeys represents a list of keys in the memory store
