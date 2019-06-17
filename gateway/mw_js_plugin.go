@@ -544,7 +544,8 @@ func (j *JSVM) LoadTykJSApi() {
 		apiId := call.Argument(1).String()
 
 		obj, _ := handleGetDetail(apiKey, apiId, false)
-		bs, _ := json.Marshal(obj)
+		resp := obj.(apiGetKeyResponse)
+		bs, _ := json.Marshal(resp.Session)
 
 		returnVal, err := j.VM.ToValue(string(bs))
 		if err != nil {
