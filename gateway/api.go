@@ -1130,18 +1130,18 @@ func handleDeleteOrgKey(orgID string) (interface{}, int) {
 }
 
 func groupResetHandler(w http.ResponseWriter, r *http.Request) {
-	log.WithFields(logrus.Fields{
+	span, ctx := trace.Span(r.Context(), trace.ReloadGroup)
+	defer span.Finish()
+	trace.Info(ctx, log.WithFields(logrus.Fields{
 		"prefix": "api",
 		"status": "ok",
-	}).Info("Group reload accepted.")
-
+	}), "Group reload accepted.")
 	// Signal to the group via redis
 	MainNotifier.Notify(Notification{Command: NoticeGroupReload})
 
-	log.WithFields(logrus.Fields{
+	trace.Info(ctx, log.WithFields(logrus.Fields{
 		"prefix": "api",
-	}).Info("Reloaded URL Structure - Success")
-
+	}), "Reloaded URL Structure - Success")
 	doJSONWrite(w, http.StatusOK, apiOk(""))
 }
 

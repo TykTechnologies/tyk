@@ -84,6 +84,8 @@ const (
 
 	HandleAPI
 	AddOrUpdateAPI
+
+	ReloadGroup
 )
 
 func (o Operation) String() string {
@@ -114,6 +116,8 @@ func (o Operation) String() string {
 		return "handle-api"
 	case AddOrUpdateAPI:
 		return "add-or-update-api"
+	case ReloadGroup:
+		return "reload-group"
 	default:
 		return "noop"
 	}
