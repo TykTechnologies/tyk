@@ -421,6 +421,7 @@ func testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 				Data:      string(withAccessJSON),
 				AdminAuth: true,
 				Code:      200,
+				BodyMatch: fmt.Sprintf(`"key_hash":"%s"`, myKeyHash),
 			},
 			// get one key by hash value with specifying hashed=true (no API specified)
 			{
@@ -429,6 +430,7 @@ func testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 				Data:      string(withAccessJSON),
 				AdminAuth: true,
 				Code:      200,
+				BodyMatch: fmt.Sprintf(`"key_hash":"%s"`, myKeyHash),
 			},
 			// get one key by hash value with specifying hashed=true (API specified)
 			{
@@ -437,6 +439,7 @@ func testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 				Data:      string(withAccessJSON),
 				AdminAuth: true,
 				Code:      200,
+				BodyMatch: fmt.Sprintf(`"key_hash":"%s"`, myKeyHash),
 			},
 			// get one key by hash value without specifying hashed=true
 			{
@@ -687,11 +690,12 @@ func TestHashKeyHandlerHashingDisabled(t *testing.T) {
 			},
 			// get one key by key name
 			{
-				Method:    "GET",
-				Path:      "/tyk/keys/" + myKey,
-				Data:      string(withAccessJSON),
-				AdminAuth: true,
-				Code:      200,
+				Method:       "GET",
+				Path:         "/tyk/keys/" + myKey,
+				Data:         string(withAccessJSON),
+				AdminAuth:    true,
+				Code:         200,
+				BodyNotMatch: fmt.Sprintf(`"key_hash":"%s"`, myKeyHash),
 			},
 			// get one key by hash value with specifying hashed=true (no API specified)
 			{

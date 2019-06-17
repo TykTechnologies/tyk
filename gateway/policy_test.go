@@ -577,11 +577,14 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{}
-				if err := json.Unmarshal(data, &sessionData); err != nil {
+				response := apiGetKeyResponse{}
+
+				if err := json.Unmarshal(data, &response); err != nil {
 					t.Log(err.Error())
 					return false
 				}
+
+				sessionData := response.Session
 				api1Limit := sessionData.AccessRights["api1"].Limit
 				if api1Limit == nil {
 					t.Log("api1 limit is not set")
@@ -654,11 +657,14 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{}
-				if err := json.Unmarshal(data, &sessionData); err != nil {
+				response := apiGetKeyResponse{}
+
+				if err := json.Unmarshal(data, &response); err != nil {
 					t.Log(err.Error())
 					return false
 				}
+				sessionData := response.Session
+
 				api1Limit := sessionData.AccessRights["api1"].Limit
 				if api1Limit == nil {
 					t.Error("api1 limit is not set")
@@ -752,11 +758,13 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{}
-				if err := json.Unmarshal(data, &sessionData); err != nil {
+				response := apiGetKeyResponse{}
+
+				if err := json.Unmarshal(data, &response); err != nil {
 					t.Log(err.Error())
 					return false
 				}
+				sessionData := response.Session
 
 				if len(sessionData.AccessRights) != 2 {
 					t.Fatalf("expected 2 entries in AccessRights found %d", len(sessionData.AccessRights))
@@ -803,11 +811,14 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{}
-				if err := json.Unmarshal(data, &sessionData); err != nil {
+				response := apiGetKeyResponse{}
+
+				if err := json.Unmarshal(data, &response); err != nil {
 					t.Log(err.Error())
 					return false
 				}
+
+				sessionData := response.Session
 
 				if len(sessionData.AccessRights) != 1 {
 					t.Fatalf("expected only 1 entry in AccessRights found %d", len(sessionData.AccessRights))

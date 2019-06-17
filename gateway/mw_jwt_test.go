@@ -1011,10 +1011,15 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 						p2ID:         true,
 					}
 
-					resp := map[string]interface{}{}
+					resp := struct {
+						Session map[string]interface{}
+						KeyHash string
+					}{}
+
+					//resp := map[string]interface{}{}
 					json.Unmarshal(body, &resp)
 					realResp := map[interface{}]bool{}
-					for _, val := range resp["apply_policies"].([]interface{}) {
+					for _, val := range resp.Session["apply_policies"].([]interface{}) {
 						realResp[val] = true
 					}
 
