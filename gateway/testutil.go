@@ -3,6 +3,7 @@ package gateway
 import (
 	"archive/zip"
 	"bytes"
+	"compress/gzip"
 	"crypto/tls"
 	"encoding/binary"
 	"encoding/json"
@@ -307,6 +308,13 @@ func testHttpHandler() *mux.Router {
 	r.HandleFunc("/ws", wsHandler)
 	r.HandleFunc("/jwk.json", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, jwkTestJson)
+	})
+	r.HandleFunc("/compressed", func(w http.ResponseWriter, r *http.Request) {
+		response := "This is a compressed response"
+		w.Header().Set("Content-Encoding", "gzip")
+		gz := gzip.NewWriter(w)
+		json.NewEncoder(gz).Encode(response)
+		gz.Close()
 	})
 	r.HandleFunc("/bundles/{rest:.*}", bundleHandleFunc)
 	r.HandleFunc("/{rest:.*}", handleMethod(""))
