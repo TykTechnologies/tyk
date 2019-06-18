@@ -16,7 +16,7 @@ import (
 )
 
 type DBAccessDefinition struct {
-	APIName     string            `json:"apiname"`
+	APIName     string            `json:"api_name"`
 	APIID       string            `json:"apiid"`
 	Versions    []string          `json:"versions"`
 	AllowedURLs []user.AccessSpec `bson:"allowed_urls" json:"allowed_urls"` // mapped string MUST be a valid regex
