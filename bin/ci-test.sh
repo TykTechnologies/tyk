@@ -1,7 +1,5 @@
 #!/bin/bash
 
-
-TAGS=""
 TEST_TIMEOUT=2m
 
 # print a command and execute it
@@ -39,6 +37,7 @@ go get -t
 go build -race -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugins || fatal "building Go-plugin failed"
 
 for pkg in $PKGS; do
+    TAGS=""
     if [[ ${pkg} == *"coprocess/grpc" ]]; then
         TAGS="-tags 'coprocess grpc'"
     elif [[ ${pkg} == *"coprocess/python" ]]; then
