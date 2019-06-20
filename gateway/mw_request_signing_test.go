@@ -8,7 +8,7 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-var algoList = []string{"hmac-sha1", "hmac-sha256", "hmac-sha384", "hmac-sha512"}
+var algoList = [4]string{"hmac-sha1", "hmac-sha256", "hmac-sha384", "hmac-sha512"}
 
 func generateSpec(algo string) {
 	sessionKey := CreateSession(func(s *user.SessionState) {
