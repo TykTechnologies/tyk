@@ -78,18 +78,12 @@ import (
 	"github.com/TykTechnologies/tyk/coprocess"
 )
 
-// CoProcessName specifies the driver name.
-const CoProcessName = apidef.LuaDriver
-
 const (
 	// ModuleBasePath points to the Tyk modules path.
 	ModuleBasePath = "coprocess/lua"
 	// MiddlewareBasePath points to the custom middleware path.
 	MiddlewareBasePath = "middleware/lua"
 )
-
-// MessageType sets the default message type.
-var MessageType = coprocess.JsonMessage
 
 // gMiddlewareCache will hold LuaDispatcher.gMiddlewareCache.
 var gMiddlewareCache map[string]string
@@ -206,6 +200,12 @@ func (d *LuaDispatcher) DispatchEvent(eventJSON []byte) {
 
 // NewCoProcessDispatcher wraps all the actions needed for this CP.
 func NewCoProcessDispatcher() (coprocess.Dispatcher, error) {
+	// CoProcessName specifies the driver name.
+	CoProcessName = apidef.LuaDriver
+
+	// MessageType sets the default message type.
+	MessageType = coprocess.JsonMessage
+
 	dispatcher := &LuaDispatcher{}
 	dispatcher.LoadModules()
 	dispatcher.Reload()
