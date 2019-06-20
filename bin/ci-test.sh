@@ -31,8 +31,7 @@ if [[ ${LATEST_GO} ]]; then
     echo "goimports check is ok!"
 fi
 
-PKGS="$(go list ./... | grep -v /vendor/ |grep -v /tyk$)"
-
+PKGS="$(go list -tags "coprocess python grpc" ./...)"
 
 go get -t
 
