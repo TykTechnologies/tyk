@@ -70,7 +70,7 @@ func TestHostChecker(t *testing.T) {
 	specBuf := &bytes.Buffer{}
 	specTmpl.ExecuteTemplate(specBuf, specTmpl.Name(), &tmplData)
 
-	spec := createDefinitionFromString(specBuf.String())
+	spec := CreateDefinitionFromString(specBuf.String())
 
 	// From api_loader.go#processSpec
 	sl := apidef.NewHostListFromList(spec.Proxy.Targets)
@@ -168,7 +168,7 @@ func TestReverseProxyAllDown(t *testing.T) {
 	specBuf := &bytes.Buffer{}
 	specTmpl.ExecuteTemplate(specBuf, specTmpl.Name(), &tmplData)
 
-	spec := createDefinitionFromString(specBuf.String())
+	spec := CreateDefinitionFromString(specBuf.String())
 
 	// From api_loader.go#processSpec
 	sl := apidef.NewHostListFromList(spec.Proxy.Targets)
@@ -207,7 +207,7 @@ func TestReverseProxyAllDown(t *testing.T) {
 	remote, _ := url.Parse(testHttpAny)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 
-	req := testReq(t, "GET", "/", nil)
+	req := TestReq(t, "GET", "/", nil)
 	rec := httptest.NewRecorder()
 	proxy.ServeHTTP(rec, req)
 	if rec.Code != 503 {

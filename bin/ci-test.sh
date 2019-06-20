@@ -1,10 +1,7 @@
 #!/bin/bash
 
 
-MATRIX=(
-	"-tags 'coprocess python goplugin'"
-	"-tags 'coprocess grpc goplugin'"
-)
+TAGS=""
 TEST_TIMEOUT=2m
 
 # print a command and execute it
@@ -18,7 +15,7 @@ fatal() {
 	exit 1
 }
 
-if [[ $LATEST_GO ]]; then
+if [[ ${LATEST_GO} ]]; then
     FMT_FILES=$(gofmt -l . | grep -v vendor)
     if [[ -n $FMT_FILES ]]; then
         fatal "Run 'gofmt -w' on these files:\n$FMT_FILES"
@@ -36,36 +33,28 @@ fi
 
 PKGS="$(go list ./... | grep -v /vendor/ |grep -v /tyk$)"
 
-i=0
 
 go get -t
 
 # build Go-plugin used in tests
-go build -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugins || fatal "building Go-plugin failed"
+go build -race -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugins || fatal "building Go-plugin failed"
 
-# need to do per-pkg because go test doesn't support a single coverage
-# profile for multiple pkgs
 for pkg in $PKGS; do
-	for opts in "${MATRIX[@]}"; do
-		show go test -v -timeout $TEST_TIMEOUT -coverprofile=test-$i.cov $opts $pkg \
-			|| fatal "go test errored"
-		let i++ || true
-	done
+    if [[ ${pkg} == *"coprocess/grpc" ]]; then
+        TAGS="-tags 'coprocess grpc'"
+    elif [[ ${pkg} == *"coprocess/python" ]]; then
+        TAGS="-tags 'coprocess python'"
+    elif [[ ${pkg} == *"coprocess" ]]; then
+        TAGS="-tags 'coprocess'"
+    fi
+
+    race=""
+
+    if [[ -z ${TAGS} ]]; then
+        race="-race"
+    fi
+
+    show go test -v ${race} -timeout ${TEST_TIMEOUT} -coverprofile=test.cov $pkg ${TAGS} || fatal "Test Failed"
 done
 
-if [[ ! $LATEST_GO ]]; then
-	echo "Skipping race, checks, and coverage report"
-	exit 0
-fi
-
-# build Go-plugin used in tests but with race support
-mv ./test/goplugins/goplugins.so ./test/goplugins/goplugins_old.so
-go build -race -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugins \
-    || fatal "building Go-plugin with race failed"
-
-go test -race -v -timeout $TEST_TIMEOUT $PKGS || fatal "go test -race failed"
-mv ./test/goplugins/goplugins_old.so ./test/goplugins/goplugins.so
-
-for opts in "${MATRIX[@]}"; do
-	show go vet $opts $PKGS || fatal "go vet errored"
-done
+show go vet $PKGS || fatal "go vet errored"

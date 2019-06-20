@@ -89,7 +89,7 @@ func TestReverseProxyRetainHost(t *testing.T) {
 			spec := &APISpec{APIDefinition: &apidef.APIDefinition{}, URLRewriteEnabled: true}
 			spec.URLRewriteEnabled = true
 
-			req := testReq(t, http.MethodGet, tc.inURL, nil)
+			req := TestReq(t, http.MethodGet, tc.inURL, nil)
 			req.URL.Path = tc.inPath
 			if tc.retainHost {
 				setCtxValue(req, ctx.RetainHost, true)
@@ -273,7 +273,7 @@ func TestReverseProxyDnsCache(t *testing.T) {
 				EnforcedTimeoutEnabled: true,
 				GlobalConfig:           config.Config{ProxyCloseConnections: true, ProxyDefaultTimeout: 0.1}}
 
-			req := testReq(t, tc.Method, tc.URL, tc.Body)
+			req := TestReq(t, tc.Method, tc.URL, tc.Body)
 			for name, value := range tc.Headers {
 				req.Header.Add(name, strings.Join(value, ";"))
 			}
@@ -304,7 +304,7 @@ func TestReverseProxyDnsCache(t *testing.T) {
 }
 
 func testNewWrappedServeHTTP() *ReverseProxy {
-	target, _ := url.Parse(testHttpGet)
+	target, _ := url.Parse(TestHttpGet)
 	def := apidef.APIDefinition{}
 	def.VersionData.DefaultVersion = "Default"
 	def.VersionData.Versions = map[string]apidef.VersionInfo{
@@ -523,7 +523,7 @@ func TestCheckHeaderInRemoveList(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			spec := createSpecTest(t, specOutput.String())
+			spec := CreateSpecTest(t, specOutput.String())
 			actual := rp.CheckHeaderInRemoveList(tc.header, spec, r)
 			if actual != tc.expected {
 				t.Fatalf("want %t, got %t", tc.expected, actual)

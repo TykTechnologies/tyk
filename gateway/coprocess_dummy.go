@@ -61,4 +61,4 @@ func CoProcessInit() error {
 	return nil
 }
 
-func doCoprocessReload() {}
+func DoCoprocessReload() {}

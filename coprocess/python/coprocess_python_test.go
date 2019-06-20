@@ -1,15 +1,17 @@
 // +build coprocess
 // +build python
 
-package gateway
+package python
 
 import (
 	"bytes"
 	"mime/multipart"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/gateway"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -130,19 +132,23 @@ def MyPreHook(request, session, metadata, spec):
 `,
 }
 
+func TestMain(m *testing.M) {
+	os.Exit(gateway.InitTestMain(m))
+}
+
 func TestPythonBundles(t *testing.T) {
-	ts := StartTest(TestConfig{
-		coprocessConfig: config.CoProcessConfig{
+	ts := gateway.StartTest(gateway.TestConfig{
+		CoprocessConfig: config.CoProcessConfig{
 			EnableCoProcess: true,
 		}})
 	defer ts.Close()
 
-	authCheckBundle := registerBundle("python_with_auth_check", pythonBundleWithAuthCheck)
-	postHookBundle := registerBundle("python_with_post_hook", pythonBundleWithPostHook)
-	preHookBundle := registerBundle("python_with_pre_hook", pythonBundleWithPreHook)
+	authCheckBundle := gateway.RegisterBundle("python_with_auth_check", pythonBundleWithAuthCheck)
+	postHookBundle := gateway.RegisterBundle("python_with_post_hook", pythonBundleWithPostHook)
+	preHookBundle := gateway.RegisterBundle("python_with_pre_hook", pythonBundleWithPreHook)
 
 	t.Run("Single-file bundle with authentication hook", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 			spec.Proxy.ListenPath = "/test-api/"
 			spec.UseKeylessAccess = false
 			spec.EnableCoProcessAuth = true
@@ -163,14 +169,14 @@ func TestPythonBundles(t *testing.T) {
 
 	t.Run("Single-file bundle with post hook", func(t *testing.T) {
 
-		keyID := CreateSession(func(s *user.SessionState) {
+		keyID := gateway.CreateSession(func(s *user.SessionState) {
 			s.MetaData = map[string]interface{}{
 				"testkey":   map[string]interface{}{"nestedkey": "nestedvalue"},
 				"stringkey": "testvalue",
 			}
 		})
 
-		BuildAndLoadAPI(func(spec *APISpec) {
+		gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 			spec.Proxy.ListenPath = "/test-api-2/"
 			spec.UseKeylessAccess = false
 			spec.EnableCoProcessAuth = false
@@ -188,7 +194,7 @@ func TestPythonBundles(t *testing.T) {
 	})
 
 	t.Run("Single-file bundle with pre hook and UTF-8/non-UTF-8 request data", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 			spec.Proxy.ListenPath = "/test-api-2/"
 			spec.UseKeylessAccess = true
 			spec.EnableCoProcessAuth = false
@@ -198,7 +204,7 @@ func TestPythonBundles(t *testing.T) {
 
 		time.Sleep(1 * time.Second)
 
-		fileData := generateTestBinaryData()
+		fileData := gateway.GenerateTestBinaryData()
 		var buf bytes.Buffer
 		multipartWriter := multipart.NewWriter(&buf)
 		file, err := multipartWriter.CreateFormFile("file", "test.bin")

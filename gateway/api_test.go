@@ -41,7 +41,7 @@ const apiTestDef = `{
 }`
 
 func loadSampleAPI(t *testing.T, def string) {
-	spec := createSpecTest(t, def)
+	spec := CreateSpecTest(t, def)
 	loadApps([]*APISpec{spec}, discardMuxer)
 }
 
@@ -909,7 +909,7 @@ func TestGroupResetHandler(t *testing.T) {
 	// If we don't wait for the subscription to be done, we might do
 	// the reload before pub/sub is in place to receive our message.
 	<-didSubscribe
-	req := withAuth(testReq(t, "GET", uri, nil))
+	req := withAuth(TestReq(t, "GET", uri, nil))
 
 	mainRouter.ServeHTTP(recorder, req)
 

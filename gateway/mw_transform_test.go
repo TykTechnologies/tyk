@@ -29,7 +29,7 @@ func TestTransformNonAscii(t *testing.T) {
 	tmeta, in := testPrepareTransformNonAscii()
 	want := `["Jyväskylä", "Hyvinkää"]`
 
-	r := testReq(t, "GET", "/", in)
+	r := TestReq(t, "GET", "/", in)
 	if err := transformBody(r, tmeta, false); err != nil {
 		t.Fatalf("wanted nil error, got %v", err)
 	}
@@ -47,7 +47,7 @@ func BenchmarkTransformNonAscii(b *testing.B) {
 
 	tmeta, in := testPrepareTransformNonAscii()
 	for i := 0; i < b.N; i++ {
-		r := testReq(b, "GET", "/", in)
+		r := TestReq(b, "GET", "/", in)
 		if err := transformBody(r, tmeta, false); err != nil {
 			b.Fatalf("wanted nil error, got %v", err)
 		}
@@ -58,7 +58,7 @@ func TestTransformXMLCrash(t *testing.T) {
 	// mxj.NewMapXmlReader used to take forever and crash the
 	// process by eating up all the memory.
 	in := strings.NewReader("not xml")
-	r := testReq(t, "GET", "/", in)
+	r := TestReq(t, "GET", "/", in)
 	tmeta := &TransformSpec{}
 	tmeta.TemplateData.Input = apidef.RequestXML
 	tmeta.Template = template.Must(apidef.Template.New("").Parse(""))
@@ -106,7 +106,7 @@ func TestTransformJSONMarshalXMLInput(t *testing.T) {
 	tmeta, in := testPrepareTransformJSONMarshal("xml")
 
 	want := `["Foo\"oo", "Bàr"]`
-	r := testReq(t, "GET", "/", in)
+	r := TestReq(t, "GET", "/", in)
 	if err := transformBody(r, tmeta, false); err != nil {
 		t.Fatalf("wanted nil error, got %v", err)
 	}
@@ -123,7 +123,7 @@ func TestTransformJSONMarshalJSONInput(t *testing.T) {
 	tmeta, in := testPrepareTransformJSONMarshal("json")
 
 	want := `["Foo\"oo", "Bàr"]`
-	r := testReq(t, "GET", "/", in)
+	r := TestReq(t, "GET", "/", in)
 	if err := transformBody(r, tmeta, false); err != nil {
 		t.Fatalf("wanted nil error, got %v", err)
 	}
@@ -152,7 +152,7 @@ func TestTransformJSONMarshalJSONArrayInput(t *testing.T) {
 	tmeta, in := testPrepareTransformJSONMarshalArray(t)
 
 	want := `[123,456]`
-	r := testReq(t, "GET", "/", in)
+	r := TestReq(t, "GET", "/", in)
 	if err := transformBody(r, tmeta, false); err != nil {
 		t.Fatalf("wanted nil error, got %v", err)
 	}
@@ -171,7 +171,7 @@ func BenchmarkTransformJSONMarshal(b *testing.B) {
 	tmeta, in := testPrepareTransformJSONMarshal("xml")
 
 	for i := 0; i < b.N; i++ {
-		r := testReq(b, "GET", "/", in)
+		r := TestReq(b, "GET", "/", in)
 		if err := transformBody(r, tmeta, false); err != nil {
 			b.Fatalf("wanted nil error, got %v", err)
 		}
@@ -181,7 +181,7 @@ func BenchmarkTransformJSONMarshal(b *testing.B) {
 func TestTransformXMLMarshal(t *testing.T) {
 	assert := func(t *testing.T, input string, tmpl string, output string, inputType apidef.RequestInputType) {
 		tmeta := testPrepareTransformXMLMarshal(tmpl, inputType)
-		r := testReq(t, "GET", "/", input)
+		r := TestReq(t, "GET", "/", input)
 		if err := transformBody(r, tmeta, false); err != nil {
 			t.Fatalf("wanted nil error, got %v", err)
 		}

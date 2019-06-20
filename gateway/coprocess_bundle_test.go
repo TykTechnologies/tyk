@@ -30,7 +30,7 @@ var grpcBundleWithAuthCheck = map[string]string{
 }
 
 func TestBundleLoader(t *testing.T) {
-	bundleID := registerBundle("grpc_with_auth_check", grpcBundleWithAuthCheck)
+	bundleID := RegisterBundle("grpc_with_auth_check", grpcBundleWithAuthCheck)
 
 	t.Run("Nonexistent bundle", func(t *testing.T) {
 		specs := BuildAndLoadAPI(func(spec *APISpec) {

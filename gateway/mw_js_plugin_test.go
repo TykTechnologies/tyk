@@ -1,5 +1,3 @@
-// +build coprocess
-
 package gateway
 
 import (
@@ -172,7 +170,7 @@ testJSVMData.NewProcessRequest(function(request, session, spec) {
 	}
 	dynMid.Spec.JSVM = jsvm
 
-	r := testReq(t, "GET", "/v1/test-data", nil)
+	r := TestReq(t, "GET", "/v1/test-data", nil)
 	dynMid.ProcessRequest(nil, r, nil)
 	if want, got := "bar", r.Header.Get("data-foo"); want != got {
 		t.Fatalf("wanted header to be %q, got %q", want, got)
@@ -209,7 +207,7 @@ testJSVMData.NewProcessRequest(function(request, session, config) {
 	dynMid.Spec.JSVM = jsvm
 
 	rec := httptest.NewRecorder()
-	r := testReq(t, "GET", "/v1/test-data", nil)
+	r := TestReq(t, "GET", "/v1/test-data", nil)
 	dynMid.ProcessRequest(rec, r, nil)
 
 	wantBody := "Foobarbaz"
@@ -254,7 +252,7 @@ testJSVMData.NewProcessRequest(function(request, session, config) {
 	}
 	dynMid.Spec.JSVM = jsvm
 
-	r := testReq(t, "GET", "/v1/test-data", nil)
+	r := TestReq(t, "GET", "/v1/test-data", nil)
 	err, code := dynMid.ProcessRequest(nil, r, nil)
 
 	if want := 401; code != 401 {
@@ -303,7 +301,7 @@ testJSVMCore.NewProcessRequest(function(request, session, config) {
 	}
 	dynMid.Spec.JSVM = jsvm
 
-	r := testReq(t, "GET", "/foo", nil)
+	r := TestReq(t, "GET", "/foo", nil)
 	dynMid.ProcessRequest(nil, r, nil)
 
 	if want, got := "globalValue", r.Header.Get("global"); want != got {
@@ -354,7 +352,7 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
 
-	bundle := registerBundle("jsvm_make_http_request", map[string]string{
+	bundle := RegisterBundle("jsvm_make_http_request", map[string]string{
 		"manifest.json": `
 		{
 		    "file_list": [],

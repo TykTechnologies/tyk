@@ -9,7 +9,7 @@ import (
 
 func createGetHandler() *WebHookHandler {
 	eventHandlerConf := config.WebHookHandlerConf{
-		TargetPath:   testHttpGet,
+		TargetPath:   TestHttpGet,
 		Method:       "GET",
 		EventTimeout: 10,
 		TemplatePath: "templates/default_webhook.json",

@@ -115,7 +115,7 @@ func BenchmarkURLReplacer(b *testing.B) {
 }
 
 func TestTagHeaders(t *testing.T) {
-	req := testReq(t, "GET", "/tagmeplease", nil)
+	req := TestReq(t, "GET", "/tagmeplease", nil)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Tag-Me", "1")
 	req.Header.Set("X-Tag-Me2", "2")
@@ -159,7 +159,7 @@ func TestTagHeaders(t *testing.T) {
 func BenchmarkTagHeaders(b *testing.B) {
 	b.ReportAllocs()
 
-	req := testReq(b, "GET", "/tagmeplease", nil)
+	req := TestReq(b, "GET", "/tagmeplease", nil)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Tag-Me", "1")
 	req.Header.Set("X-Tag-Me2", "2")
