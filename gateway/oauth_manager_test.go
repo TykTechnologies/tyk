@@ -562,26 +562,26 @@ func getAuthCode(t *testing.T, ts *Test) map[string]string {
 }
 
 func TestGetPaginatedClientTokens(t *testing.T) {
-	globalConf := config.Global()
-	// set tokens to be expired after 2 second
-	globalConf.OauthTokenExpire = 2
-	// cleanup tokens older than 3 seconds
-	globalConf.OauthTokenExpiredRetainPeriod = 3
-	config.SetGlobal(globalConf)
+	testPagination := func(pageParam int, expectedPageNumber int, tokenRequestCount int, expectedRes int) {
+		globalConf := config.Global()
+		// set tokens to be expired after 100 seconds
+		globalConf.OauthTokenExpire = 100
+		// cleanup tokens older than 300 seconds
+		globalConf.OauthTokenExpiredRetainPeriod = 300
 
-	defer resetTestConfig()
+		config.SetGlobal(globalConf)
 
-	ts := StartTest()
-	defer ts.Close()
+		defer resetTestConfig()
 
-	spec := loadTestOAuthSpec()
+		ts := StartTest()
+		defer ts.Close()
 
-	clientID := uuid.NewV4().String()
-	createTestOAuthClient(spec, clientID)
+		spec := loadTestOAuthSpec()
 
-	// make eight tokens
-	tokensID := map[string]bool{}
-	t.Run("Send eight token requests", func(t *testing.T) {
+		clientID := uuid.NewV4().String()
+		createTestOAuthClient(spec, clientID)
+
+		tokensID := map[string]bool{}
 		param := make(url.Values)
 		param.Set("response_type", "token")
 		param.Set("redirect_uri", authRedirectUri)
@@ -593,7 +593,7 @@ func TestGetPaginatedClientTokens(t *testing.T) {
 			"Content-Type": "application/x-www-form-urlencoded",
 		}
 
-		for i := 0; i < 110; i++ {
+		for i := 0; i < tokenRequestCount; i++ {
 			resp, err := ts.Run(t, test.TestCase{
 				Path:      "/APIID/tyk/oauth/authorize-client/",
 				Data:      param.Encode(),
@@ -614,44 +614,11 @@ func TestGetPaginatedClientTokens(t *testing.T) {
 			// save tokens for future check
 			tokensID[response["access_token"].(string)] = true
 		}
-	})
 
-	// get list of tokens
-	t.Run("Get list of tokens without page query", func(t *testing.T) {
-		resp, err := ts.Run(t, test.TestCase{
-			// Defaults to fetching all tokens since we don't have
-			// the page query here
-			Path:      fmt.Sprintf("/tyk/oauth/clients/999999/%s/tokens", clientID),
-			AdminAuth: true,
-			Method:    http.MethodGet,
-			Code:      http.StatusOK,
-		})
-		if err != nil {
-			t.Error(err)
-		}
-
-		tokensResp := []OAuthClientToken{}
-		if err := json.NewDecoder(resp.Body).Decode(&tokensResp); err != nil {
-			t.Fatal(err)
-		}
-
-		// check response
-		if n := 110; len(tokensResp) != n {
-			t.Errorf("Wrong number of tokens received. Expected: %d. Got: %d", n, len(tokensResp))
-		}
-
-		for _, token := range tokensResp {
-			if !tokensID[token.Token] {
-				t.Errorf("Token %s is not found in expected result. Expecting: %v", token.Token, tokensID)
-			}
-		}
-	})
-
-	t.Run("Get list of tokens with a page query param lesser than 0", func(t *testing.T) {
 		resp, err := ts.Run(t, test.TestCase{
 			// strconv#Atoi successfully parses a negative integer
 			// so make sure it is being reset to the first page
-			Path:      fmt.Sprintf("/tyk/oauth/clients/999999/%s/tokens?page=-4", clientID),
+			Path:      fmt.Sprintf("/tyk/oauth/clients/999999/%s/tokens?page=%d", clientID, pageParam),
 			AdminAuth: true,
 			Method:    http.MethodGet,
 			Code:      http.StatusOK,
@@ -666,8 +633,8 @@ func TestGetPaginatedClientTokens(t *testing.T) {
 		}
 
 		// check response
-		if n := 100; len(tokensResp.Tokens) != n {
-			t.Errorf("Wrong number of tokens received. Expected: %d. Got: %d", n, len(tokensResp.Tokens))
+		if len(tokensResp.Tokens) != expectedRes {
+			t.Errorf("Wrong number of tokens received. Expected: %d. Got: %d", expectedRes, len(tokensResp.Tokens))
 		}
 
 		for _, token := range tokensResp.Tokens {
@@ -677,61 +644,29 @@ func TestGetPaginatedClientTokens(t *testing.T) {
 		}
 
 		// Also inspect the pagination data information
-		if tokensResp.Pagination.PageNum != 1 {
-			t.Errorf("Paginated data should default to the first page if a negative integer is provided. Expected %d. Got %d", 1, tokensResp.Pagination.PageNum)
+		if expectedPageNumber != tokensResp.Pagination.PageNum {
+			t.Errorf("Page number, expected %d, got %d", expectedPageNumber, tokensResp.Pagination.PageNum)
 		}
+	}
+
+	t.Run("Negative value should return first page", func(t *testing.T) {
+		testPagination(-3, 1, 110, 100)
 	})
 
-	t.Run("Get list of tokens with ?page=2", func(t *testing.T) {
-		resp, err := ts.Run(t, test.TestCase{
-			Path:      fmt.Sprintf("/tyk/oauth/clients/999999/%s/tokens?page=2", clientID),
-			AdminAuth: true,
-			Method:    http.MethodGet,
-			Code:      http.StatusOK,
-		})
-		if err != nil {
-			t.Error(err)
-		}
-
-		tokensResp := paginatedOAuthClientTokens{}
-		if err := json.NewDecoder(resp.Body).Decode(&tokensResp); err != nil {
-			t.Fatal(err)
-		}
-
-		// check response
-		if n := 10; len(tokensResp.Tokens) != n {
-			t.Errorf("Wrong number of tokens received. Expected: %d. Got: %d", n, len(tokensResp.Tokens))
-		}
-
-		for _, token := range tokensResp.Tokens {
-			if !tokensID[token.Token] {
-				t.Errorf("Token %s is not found in expected result. Expecting: %v", token.Token, tokensID)
-			}
-		}
+	t.Run("First page, less than items per page", func(t *testing.T) {
+		testPagination(1, 1, 85, 85)
 	})
 
-	t.Run("Get list of tokens after they expire", func(t *testing.T) {
-		// sleep to wait until tokens expire
-		time.Sleep(3 * time.Second)
+	t.Run("First page, greater than items per page", func(t *testing.T) {
+		testPagination(1, 1, 110, 100)
+	})
 
-		resp, err := ts.Run(t, test.TestCase{
-			Path:      fmt.Sprintf("/tyk/oauth/clients/999999/%s/tokens", clientID),
-			AdminAuth: true,
-			Method:    http.MethodGet,
-			Code:      http.StatusOK,
-		})
-		if err != nil {
-			t.Error(err)
-		}
+	t.Run("Second page, greater than items per page", func(t *testing.T) {
+		testPagination(2, 2, 110, 10)
+	})
 
-		// check response
-		tokensResp := []OAuthClientToken{}
-		if err := json.NewDecoder(resp.Body).Decode(&tokensResp); err != nil {
-			t.Fatal(err)
-		}
-		if len(tokensResp) > 0 {
-			t.Errorf("Wrong number of tokens received. Expected 0 - all tokens expired. Got: %d", len(tokensResp))
-		}
+	t.Run("Second page, multiple of items per page", func(t *testing.T) {
+		testPagination(2, 2, 200, 100)
 	})
 }
 

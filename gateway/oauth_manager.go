@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	osin "github.com/lonelycode/osin"
+	"github.com/lonelycode/osin"
 	uuid "github.com/satori/go.uuid"
 	"golang.org/x/crypto/bcrypt"
 
@@ -569,24 +569,21 @@ func (r *RedisOsinStorageInterface) GetPaginatedClientTokens(id string, page int
 
 	itemsPerPage := 100
 
-	if len(tokens) == 0 {
+	tokenNumber := len(tokens)
+
+	if tokenNumber == 0 {
 		return []OAuthClientToken{}, 0, nil
 	}
 
-	startIdx, endIdx := 0, itemsPerPage
-	if page > 1 {
-		startIdx = (page - 1) * itemsPerPage
-		endIdx += startIdx
+	startIdx := (page - 1) * itemsPerPage
+	endIdx := startIdx + itemsPerPage
 
-		// Make sure an "out of range" error never happens
-		n := len(tokens)
-		if endIdx > n {
-			endIdx = n
-		}
+	if tokenNumber < startIdx {
+		startIdx = tokenNumber
+	}
 
-		if startIdx > n {
-			startIdx = n
-		}
+	if tokenNumber < endIdx {
+		endIdx = tokenNumber
 	}
 
 	totalPages := int(math.Ceil(float64(len(tokens)) / float64(itemsPerPage)))
