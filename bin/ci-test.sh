@@ -13,6 +13,7 @@ fatal() {
 	exit 1
 }
 
+race=""
 if [[ ${LATEST_GO} ]]; then
     FMT_FILES=$(gofmt -l . | grep -v vendor)
     if [[ -n $FMT_FILES ]]; then
@@ -27,6 +28,9 @@ if [[ ${LATEST_GO} ]]; then
     fi
 
     echo "goimports check is ok!"
+
+    # Run with race if latest
+    race="-race"
 fi
 
 PKGS="$(go list -tags "coprocess python grpc" ./...)"
@@ -34,24 +38,33 @@ PKGS="$(go list -tags "coprocess python grpc" ./...)"
 go get -t
 
 # build Go-plugin used in tests
-go build -race -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugins || fatal "building Go-plugin failed"
+go build ${race} -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugins || fatal "building Go-plugin failed"
 
 for pkg in $PKGS; do
-    TAGS=""
+    tags=""
+
+    # TODO: Remove skipRace variable after solving race conditions in tests.
+    skipRace=false
     if [[ ${pkg} == *"coprocess/grpc" ]]; then
-        TAGS="-tags 'coprocess grpc'"
+        tags="-tags 'coprocess grpc'"
+        skipRace=true
     elif [[ ${pkg} == *"coprocess/python" ]]; then
-        TAGS="-tags 'coprocess python'"
+        tags="-tags 'coprocess python'"
     elif [[ ${pkg} == *"coprocess" ]]; then
-        TAGS="-tags 'coprocess'"
+        tags="-tags 'coprocess'"
+        skipRace=true
+    elif [[ ${pkg} == *"goplugin" ]]; then
+        tags="-tags 'goplugin'"
     fi
 
     race=""
 
-    if [[ -z ${TAGS} && ${LATEST_GO} ]]; then
+    # Some tests should not be run with -race. Therefore, test them with penultimate Go version.
+    # And, test with -race in latest Go version.
+    if [[ ${LATEST_GO} && ${skipRace} = false ]]; then
         race="-race"
     fi
 
-    show go test -v ${race} -timeout ${TEST_TIMEOUT} -coverprofile=test.cov $pkg ${TAGS} || fatal "Test Failed"
-    show go vet ${TAGS} $pkg || fatal "go vet errored"
+    show go test -v ${race} -timeout ${TEST_TIMEOUT} -coverprofile=test.cov $pkg ${tags} || fatal "Test Failed"
+    show go vet ${tags} $pkg || fatal "go vet errored"
 done
