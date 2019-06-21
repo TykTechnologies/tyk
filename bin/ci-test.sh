@@ -1,6 +1,6 @@
 #!/bin/bash
 
-TEST_TIMEOUT=2m
+TEST_TIMEOUT=3m
 
 # print a command and execute it
 show() {
@@ -48,11 +48,10 @@ for pkg in $PKGS; do
 
     race=""
 
-    if [[ -z ${TAGS} ]]; then
+    if [[ -z ${TAGS} && ${LATEST_GO} ]]; then
         race="-race"
     fi
 
     show go test -v ${race} -timeout ${TEST_TIMEOUT} -coverprofile=test.cov $pkg ${TAGS} || fatal "Test Failed"
+    show go vet ${TAGS} $pkg || fatal "go vet errored"
 done
-
-show go vet $PKGS || fatal "go vet errored"
