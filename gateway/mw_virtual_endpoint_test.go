@@ -13,7 +13,7 @@ const virtTestJS = `
 function testVirtData(request, session, config) {
 	var resp = {
 		Body: "foobar",
-		Headers: {v
+		Headers: {
 			"data-foo": config.config_data.foo,
 			"data-bar-y": config.config_data.bar.y.toString()
 		},
@@ -58,7 +58,6 @@ func testPrepareVirtualEndpoint(js string, method string, path string, proxyOnEr
 }
 
 func TestVirtualEndpoint(t *testing.T) {
-	t.SkipNow() // There is race condition in this test
 	ts := StartTest()
 	defer ts.Close()
 
