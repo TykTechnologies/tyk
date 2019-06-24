@@ -19,6 +19,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/trace"
 )
 
 type ChainObject struct {
@@ -437,7 +438,11 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 	logger.Debug("Setting Listen Path: ", spec.Proxy.ListenPath)
 
-	chainDef.ThisHandler = chain
+	if trace.IsEnabled() {
+		chainDef.ThisHandler = trace.Handle(spec.Name, chain)
+	} else {
+		chainDef.ThisHandler = chain
+	}
 	chainDef.ListenOn = spec.Proxy.ListenPath + "{rest:.*}"
 	chainDef.Domain = spec.Domain
 
@@ -597,6 +602,12 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 	var hosts []string
 	for _, spec := range specs {
 		hosts = append(hosts, spec.Domain)
+	}
+
+	if trace.IsEnabled() {
+		for _, spec := range specs {
+			trace.AddTracer(spec.Name)
+		}
 	}
 	// Decreasing sort by length and chars, so that the order of
 	// creation of the host sub-routers is deterministic and
