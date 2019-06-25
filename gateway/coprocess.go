@@ -78,7 +78,7 @@ type CoProcessor struct {
 }
 
 // ObjectFromRequest constructs a CoProcessObject from a given http.Request.
-func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, rawBodyOnly bool) *coprocess.Object {
+func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response) (*coprocess.Object, error) {
 	headers := ProtoMap(req.Header)
 
 	host := req.Host
@@ -109,24 +109,15 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, rawBody
 		Scheme:     scheme,
 	}
 
-	/*
-		if r.Body != nil {
-			defer r.Body.Close()
-			var err error
-			miniRequestObject.RawBody, err = ioutil.ReadAll(r.Body)
-			if err != nil {
-				return nil, err
-			}
-			if utf8.Valid(miniRequestObject.RawBody) && !c.Middleware.RawBodyOnly {
-				miniRequestObject.Body = string(miniRequestObject.RawBody)
-	*/
 	if req.Body != nil {
 		defer req.Body.Close()
-		miniRequestObject.RawBody, _ = ioutil.ReadAll(req.Body)
-		if !rawBodyOnly {
-			if utf8.Valid(miniRequestObject.RawBody) {
-				miniRequestObject.Body = string(miniRequestObject.RawBody)
-			}
+		var err error
+		miniRequestObject.RawBody, err = ioutil.ReadAll(req.Body)
+		if err != nil {
+			return nil, err
+		}
+		if utf8.Valid(miniRequestObject.RawBody) && !c.Middleware.RawBodyOnly {
+			miniRequestObject.Body = string(miniRequestObject.RawBody)
 		}
 	}
 
@@ -180,18 +171,19 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, rawBody
 			resObj.Headers[k] = v[0]
 		}
 		resObj.StatusCode = int32(res.StatusCode)
-		rawBody, _ := ioutil.ReadAll(res.Body)
+		rawBody, err := ioutil.ReadAll(res.Body)
+		if err != nil {
+			return nil, err
+		}
 		resObj.RawBody = rawBody
 		res.Body = ioutil.NopCloser(bytes.NewReader(rawBody))
-		if !rawBodyOnly {
-			if utf8.Valid(rawBody) {
-				resObj.Body = string(rawBody)
-			}
+		if utf8.Valid(rawBody) && !c.Middleware.RawBodyOnly {
+			resObj.Body = string(rawBody)
 		}
 		object.Response = resObj
 	}
 
-	return object
+	return object, nil
 }
 
 // ObjectPostProcess does CoProcessObject post-processing (adding/removing headers or params, etc.).
@@ -309,15 +301,11 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		HookName:   m.HookName,
 	}
 
-	/*
-		object, err := coProcessor.ObjectFromRequest(r)
-		if err != nil {
-			logger.WithError(err).Error("Failed to build request object")
-			return errors.New("Middleware error"), 500
-		}
-	*/
-	// object := coProcessor.BuildObject(r, nil)
-	object := coProcessor.BuildObject(r, nil, false)
+	object, err := coProcessor.BuildObject(r, nil)
+	if err == nil {
+		logger.WithError(err).Error("Failed to build request object")
+		return errors.New("Middleware error"), 500
+	}
 
 	t1 := time.Now()
 	returnObject, err := coProcessor.Dispatch(object)
@@ -441,7 +429,8 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 		HookName: h.mw.Name,
 	}
 
-	object := coProcessor.BuildObject(req, res, false)
+	// TODO: handle error
+	object, _ := coProcessor.BuildObject(req, res)
 	object.Session = ProtoSessionState(ses)
 
 	retObject, err := coProcessor.Dispatch(object)
