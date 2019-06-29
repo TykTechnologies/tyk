@@ -13,6 +13,9 @@ var (
 	defaultConfigs = config.Config{
 		Secret:     "352d20ee67be67f6340b4c0605b044b7",
 		NodeSecret: "352d20ee67be67f6340b4c0605b044b7",
+		AnalyticsConfig: config.AnalyticsConfigConfig{
+			StorageExpirationTime: 60,
+		},
 	}
 )
 
@@ -28,6 +31,7 @@ func Run(c config.Config) {
 	fileDescriptors()
 	cpus()
 	defaultSecrets(c)
+	analyticsPurger(c)
 }
 
 func legacyRateLimiters(c config.Config) {
@@ -78,4 +82,14 @@ func defaultSecrets(c config.Config) {
 	if c.NodeSecret == defaultConfigs.NodeSecret {
 		log.Warningf("Default node_secret `%s` should be changed for production.", defaultConfigs.NodeSecret)
 	}
+}
+
+func analyticsPurger(c config.Config) {
+	if !c.EnableAnalytics {
+		return
+	}
+	if c.AnalyticsConfig.StorageExpirationTime == 0 {
+		c.AnalyticsConfig.StorageExpirationTime = defaultConfigs.AnalyticsConfig.StorageExpirationTime
+	}
+	config.SetGlobal(c)
 }

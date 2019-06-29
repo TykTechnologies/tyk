@@ -21,18 +21,22 @@ type RedisPurger struct {
 func (r RedisPurger) PurgeLoop(ticker <-chan time.Time) {
 	for {
 		<-ticker
-		r.PurgeCache()
+		expireAfter := config.Global().AnalyticsConfig.StorageExpirationTime
+		exp, _ := r.Store.GetExp(analyticsKeyName)
+		switch exp {
+		case -1:
+			// no expiry set on list
+			r.Store.SetExp(analyticsKeyName, int64(expireAfter))
+			break
+		case -2:
+			// empty list
+			break
+		default:
+			time.Sleep(time.Duration(exp) * time.Second)
+		}
 	}
 }
 
 func (r *RedisPurger) PurgeCache() {
-	expireAfter := config.Global().AnalyticsConfig.StorageExpirationTime
-	if expireAfter == 0 {
-		expireAfter = 60 // 1 minute
-	}
 
-	exp, _ := r.Store.GetExp(analyticsKeyName)
-	if exp <= 0 {
-		r.Store.SetExp(analyticsKeyName, int64(expireAfter))
-	}
 }
