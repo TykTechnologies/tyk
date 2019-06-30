@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/sync/singleflight"
+
 	"github.com/TykTechnologies/murmur3"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/request"
@@ -28,8 +30,9 @@ const (
 // RedisCacheMiddleware is a caching middleware that will pull data from Redis instead of the upstream proxy
 type RedisCacheMiddleware struct {
 	BaseMiddleware
-	CacheStore storage.Handler
-	sh         SuccessHandler
+	CacheStore   storage.Handler
+	sh           SuccessHandler
+	singleFlight singleflight.Group
 }
 
 func (m *RedisCacheMiddleware) Name() string {
@@ -177,6 +180,11 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		errCreatingChecksum = true
 	} else {
 		retBlob, err = m.CacheStore.GetKey(key)
+		v, sfErr, _ := m.singleFlight.Do(key, func() (interface{}, error) {
+			return m.CacheStore.GetKey(key)
+		})
+		retBlob = v.(string)
+		err = sfErr
 	}
 
 	if err != nil {
