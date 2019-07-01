@@ -673,7 +673,7 @@ func reloadLoop(tick <-chan time.Time) {
 		mainLog.Info("reload: complete")
 
 		mainLog.Info("Initiating coprocess reload")
-		doCoprocessReload()
+		DoCoprocessReload()
 
 		reloadDoneChan <- struct{}{}
 		<-tick

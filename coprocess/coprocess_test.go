@@ -2,13 +2,14 @@
 // +build !python
 // +build !grpc
 
-package gateway
+package coprocess_test
 
 import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"testing"
 
 	"github.com/golang/protobuf/proto"
@@ -18,19 +19,24 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
+	"github.com/TykTechnologies/tyk/gateway"
+	logger "github.com/TykTechnologies/tyk/log"
 )
 
 const baseMiddlewarePath = "middleware/python"
 
 var (
-	CoProcessName     = apidef.MiddlewareDriver("test")
-	MessageType       = coprocess.ProtobufMessage
-	testDispatcher, _ = NewCoProcessDispatcher()
+	testDispatcher, _ = gateway.NewCoProcessDispatcher()
+	log               = logger.Get()
 
 	coprocessLog = log.WithFields(logrus.Fields{
 		"prefix": "coprocess",
 	})
 )
+
+func TestMain(m *testing.M) {
+	os.Exit(gateway.InitTestMain(m))
+}
 
 /* Dispatcher functions */
 
@@ -46,26 +52,26 @@ func TestCoProcessDispatch(t *testing.T) {
 }
 
 func TestCoProcessDispatchEvent(t *testing.T) {
-	spec := createSpecTest(t, basicCoProcessDef)
+	spec := gateway.CreateSpecTest(t, basicCoProcessDef)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
-	proxy := TykNewSingleHostReverseProxy(remote, spec)
-	baseMid := BaseMiddleware{spec, proxy, coprocessLog}
+	proxy := gateway.TykNewSingleHostReverseProxy(remote, spec)
+	baseMid := gateway.BaseMiddleware{Spec: spec, Proxy: proxy}
 
-	meta := EventKeyFailureMeta{
-		EventMetaDefault: EventMetaDefault{Message: "Auth Failure"},
+	meta := gateway.EventKeyFailureMeta{
+		EventMetaDefault: gateway.EventMetaDefault{Message: "Auth Failure"},
 		Path:             "/",
 		Origin:           "127.0.0.1",
 		Key:              "abc",
 	}
 
-	baseMid.FireEvent(EventAuthFailure, meta)
+	baseMid.FireEvent(gateway.EventAuthFailure, meta)
 
-	wrapper := CoProcessEventWrapper{}
-	if err := json.Unmarshal(<-CoProcessDispatchEvent, &wrapper); err != nil {
+	wrapper := gateway.CoProcessEventWrapper{}
+	if err := json.Unmarshal(<-gateway.CoProcessDispatchEvent, &wrapper); err != nil {
 		t.Fatal(err)
 	}
 
-	if wrapper.Event.Type != EventAuthFailure {
+	if wrapper.Event.Type != gateway.EventAuthFailure {
 		t.Fatal("Wrong event type")
 	}
 
@@ -77,9 +83,9 @@ func TestCoProcessDispatchEvent(t *testing.T) {
 
 func TestCoProcessReload(t *testing.T) {
 	// Use this as the GlobalDispatcher:
-	GlobalDispatcher = testDispatcher
-	doCoprocessReload()
-	if !testDispatcher.reloaded {
+	gateway.GlobalDispatcher = testDispatcher
+	gateway.DoCoprocessReload()
+	if !testDispatcher.Reloaded {
 		t.Fatal("coprocess reload wasn't run")
 	}
 }
@@ -112,9 +118,9 @@ func TestCoProcessGetSetData(t *testing.T) {
 	value := "testvalue"
 	ttl := 1000
 
-	TestTykStoreData(key, value, ttl)
+	gateway.TestTykStoreData(key, value, ttl)
 
-	retrievedValue := TestTykGetData("testkey")
+	retrievedValue := gateway.TestTykGetData("testkey")
 
 	if retrievedValue != value {
 		t.Fatal("Couldn't retrieve key value using CP API")
@@ -122,53 +128,53 @@ func TestCoProcessGetSetData(t *testing.T) {
 }
 
 func TestCoProcessTykTriggerEvent(t *testing.T) {
-	TestTykTriggerEvent("testevent", "testpayload")
+	gateway.TestTykTriggerEvent("testevent", "testpayload")
 }
 
 /* Middleware */
 
-func buildCoProcessChain(spec *APISpec, hookName string, hookType coprocess.HookType, driver apidef.MiddlewareDriver) http.Handler {
+func buildCoProcessChain(spec *gateway.APISpec, hookName string, hookType coprocess.HookType, driver apidef.MiddlewareDriver) http.Handler {
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
-	proxy := TykNewSingleHostReverseProxy(remote, spec)
-	proxyHandler := ProxyHandler(proxy, spec)
-	baseMid := BaseMiddleware{spec, proxy, coprocessLog}
-	mw := CreateCoProcessMiddleware(hookName, hookType, driver, baseMid)
+	proxy := gateway.TykNewSingleHostReverseProxy(remote, spec)
+	proxyHandler := gateway.ProxyHandler(proxy, spec)
+	baseMid := gateway.BaseMiddleware{Spec: spec, Proxy: proxy} // TODO
+	mw := gateway.CreateCoProcessMiddleware(hookName, hookType, driver, baseMid)
 	return alice.New(mw).Then(proxyHandler)
 }
 
 func TestCoProcessMiddleware(t *testing.T) {
-	spec := createSpecTest(t, basicCoProcessDef)
+	spec := gateway.CreateSpecTest(t, basicCoProcessDef)
 
 	chain := buildCoProcessChain(spec, "hook_test", coprocess.HookType_Pre, apidef.MiddlewareDriver("python"))
 
-	session := CreateStandardSession()
+	session := gateway.CreateStandardSession()
 	spec.SessionManager.UpdateSession("abc", session, 60, false)
 
 	recorder := httptest.NewRecorder()
 
-	req := testReq(t, "GET", "/headers", nil)
+	req := gateway.TestReq(t, "GET", "/headers", nil)
 	req.Header.Set("authorization", "abc")
 
 	chain.ServeHTTP(recorder, req)
 }
 
 func TestCoProcessObjectPostProcess(t *testing.T) {
-	spec := createSpecTest(t, basicCoProcessDef)
+	spec := gateway.CreateSpecTest(t, basicCoProcessDef)
 
 	chain := buildCoProcessChain(spec, "hook_test_object_postprocess", coprocess.HookType_Pre, apidef.MiddlewareDriver("python"))
 
-	session := CreateStandardSession()
+	session := gateway.CreateStandardSession()
 	spec.SessionManager.UpdateSession("abc", session, 60, false)
 
 	recorder := httptest.NewRecorder()
 
-	req := testReq(t, "GET", "/headers", nil)
+	req := gateway.TestReq(t, "GET", "/headers", nil)
 	req.Header.Set("authorization", "abc")
 	req.Header.Set("Deletethisheader", "value")
 
 	chain.ServeHTTP(recorder, req)
 
-	resp := testHttpResponse{}
+	resp := gateway.TestHttpResponse{}
 	if err := json.Unmarshal(recorder.Body.Bytes(), &resp); err != nil {
 		t.Fatal(err)
 	}
@@ -182,12 +188,12 @@ func TestCoProcessObjectPostProcess(t *testing.T) {
 	recorder = httptest.NewRecorder()
 
 	uri := "/get?a=a_value&b=123&remove=3"
-	req = testReq(t, "GET", uri, nil)
+	req = gateway.TestReq(t, "GET", uri, nil)
 	req.Header.Set("authorization", "abc")
 
 	chain.ServeHTTP(recorder, req)
 
-	resp = testHttpResponse{}
+	resp = gateway.TestHttpResponse{}
 	if err := json.Unmarshal(recorder.Body.Bytes(), &resp); err != nil {
 		t.Fatal(err)
 	}
@@ -207,16 +213,16 @@ func TestCoProcessObjectPostProcess(t *testing.T) {
 
 func TestCoProcessAuth(t *testing.T) {
 	t.Log("CP AUTH")
-	spec := createSpecTest(t, protectedCoProcessDef)
+	spec := gateway.CreateSpecTest(t, protectedCoProcessDef)
 
 	chain := buildCoProcessChain(spec, "hook_test_bad_auth", coprocess.HookType_CustomKeyCheck, apidef.MiddlewareDriver("python"))
 
-	session := CreateStandardSession()
+	session := gateway.CreateStandardSession()
 	spec.SessionManager.UpdateSession("abc", session, 60, false)
 
 	recorder := httptest.NewRecorder()
 
-	req := testReq(t, "GET", "/headers", nil)
+	req := gateway.TestReq(t, "GET", "/headers", nil)
 	req.Header.Set("authorization", "abc")
 
 	chain.ServeHTTP(recorder, req)
@@ -224,18 +230,18 @@ func TestCoProcessAuth(t *testing.T) {
 	if recorder.Code != 403 {
 		t.Fatal("Authentication should fail! But it's returning:", recorder.Code)
 	}
-	<-CoProcessDispatchEvent
+	<-gateway.CoProcessDispatchEvent
 }
 
 func TestCoProcessReturnOverrides(t *testing.T) {
-	spec := createSpecTest(t, basicCoProcessDef)
+	spec := gateway.CreateSpecTest(t, basicCoProcessDef)
 	chain := buildCoProcessChain(spec, "hook_test_return_overrides", coprocess.HookType_Pre, apidef.MiddlewareDriver("python"))
-	session := CreateStandardSession()
+	session := gateway.CreateStandardSession()
 	spec.SessionManager.UpdateSession("abc", session, 60, false)
 
 	recorder := httptest.NewRecorder()
 
-	req := testReq(t, "GET", "/headers", nil)
+	req := gateway.TestReq(t, "GET", "/headers", nil)
 	req.Header.Set("authorization", "abc")
 	chain.ServeHTTP(recorder, req)
 	if recorder.Code != 200 || recorder.Body.String() != "body" {
@@ -248,14 +254,14 @@ func TestCoProcessReturnOverrides(t *testing.T) {
 }
 
 func TestCoProcessReturnOverridesErrorMessage(t *testing.T) {
-	spec := createSpecTest(t, basicCoProcessDef)
+	spec := gateway.CreateSpecTest(t, basicCoProcessDef)
 	chain := buildCoProcessChain(spec, "hook_test_return_overrides_error", coprocess.HookType_Pre, apidef.MiddlewareDriver("python"))
-	session := CreateStandardSession()
+	session := gateway.CreateStandardSession()
 	spec.SessionManager.UpdateSession("abc", session, 60, false)
 
 	recorder := httptest.NewRecorder()
 
-	req := testReq(t, "GET", "/headers", nil)
+	req := gateway.TestReq(t, "GET", "/headers", nil)
 	req.Header.Set("authorization", "abc")
 	chain.ServeHTTP(recorder, req)
 	if recorder.Code != 401 || recorder.Body.String() != "{\n    \"error\": \"custom error message\"\n}" {
@@ -286,7 +292,7 @@ const basicCoProcessDef = `{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "` + testHttpGet + `"
+		"target_url": "` + gateway.TestHttpGet + `"
 	}
 }`
 
@@ -316,6 +322,6 @@ const protectedCoProcessDef = `{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "` + testHttpGet + `"
+		"target_url": "` + gateway.TestHttpGet + `"
 	}
 }`

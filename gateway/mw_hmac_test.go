@@ -101,7 +101,7 @@ func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
 }
 
 func testPrepareHMACAuthSessionPass(tb testing.TB, hashFn func() hash.Hash, eventWG *sync.WaitGroup, withHeader bool, isBench bool) (string, *APISpec, *http.Request, string) {
-	spec := createSpecTest(tb, hmacAuthDef)
+	spec := CreateSpecTest(tb, hmacAuthDef)
 	session := createHMACAuthSession()
 
 	// Should not receive an AuthFailure event
@@ -121,7 +121,7 @@ func testPrepareHMACAuthSessionPass(tb testing.TB, hashFn func() hash.Hash, even
 
 	spec.SessionManager.UpdateSession(sessionKey, session, 60, false)
 
-	req := testReq(tb, "GET", "/", nil)
+	req := TestReq(tb, "GET", "/", nil)
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
 
@@ -219,7 +219,7 @@ func BenchmarkHMACAuthSessionPass(b *testing.B) {
 }
 
 func TestHMACAuthSessionAuxDateHeader(t *testing.T) {
-	spec := createSpecTest(t, hmacAuthDef)
+	spec := CreateSpecTest(t, hmacAuthDef)
 	session := createHMACAuthSession()
 
 	// Should not receive an AuthFailure event
@@ -236,7 +236,7 @@ func TestHMACAuthSessionAuxDateHeader(t *testing.T) {
 	spec.SessionManager.UpdateSession("9876", session, 60, false)
 
 	recorder := httptest.NewRecorder()
-	req := testReq(t, "GET", "/", nil)
+	req := TestReq(t, "GET", "/", nil)
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
 
@@ -271,7 +271,7 @@ func TestHMACAuthSessionAuxDateHeader(t *testing.T) {
 }
 
 func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
-	spec := createSpecTest(t, hmacAuthDef)
+	spec := CreateSpecTest(t, hmacAuthDef)
 	session := createHMACAuthSession()
 
 	// Should receive an AuthFailure event
@@ -288,7 +288,7 @@ func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
 	spec.SessionManager.UpdateSession("9876", session, 60, false)
 
 	recorder := httptest.NewRecorder()
-	req := testReq(t, "GET", "/", nil)
+	req := TestReq(t, "GET", "/", nil)
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
 
@@ -323,7 +323,7 @@ func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
 }
 
 func TestHMACAuthSessionKeyMissing(t *testing.T) {
-	spec := createSpecTest(t, hmacAuthDef)
+	spec := CreateSpecTest(t, hmacAuthDef)
 	session := createHMACAuthSession()
 
 	// Should receive an AuthFailure event
@@ -340,7 +340,7 @@ func TestHMACAuthSessionKeyMissing(t *testing.T) {
 	spec.SessionManager.UpdateSession("9876", session, 60, false)
 
 	recorder := httptest.NewRecorder()
-	req := testReq(t, "GET", "/", nil)
+	req := TestReq(t, "GET", "/", nil)
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
 
@@ -375,7 +375,7 @@ func TestHMACAuthSessionKeyMissing(t *testing.T) {
 }
 
 func TestHMACAuthSessionMalformedHeader(t *testing.T) {
-	spec := createSpecTest(t, hmacAuthDef)
+	spec := CreateSpecTest(t, hmacAuthDef)
 	session := createHMACAuthSession()
 
 	// Should receive an AuthFailure event
@@ -392,7 +392,7 @@ func TestHMACAuthSessionMalformedHeader(t *testing.T) {
 	spec.SessionManager.UpdateSession("9876", session, 60, false)
 
 	recorder := httptest.NewRecorder()
-	req := testReq(t, "GET", "/", nil)
+	req := TestReq(t, "GET", "/", nil)
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
 
@@ -485,7 +485,7 @@ func replaceUpperCase(originalSignature string, lowercaseList []string) string {
 }
 
 func TestHMACAuthSessionPassWithHeaderFieldLowerCase(t *testing.T) {
-	spec := createSpecTest(t, hmacAuthDef)
+	spec := CreateSpecTest(t, hmacAuthDef)
 	session := createHMACAuthSession()
 
 	// Should not receive an AuthFailure event
@@ -502,7 +502,7 @@ func TestHMACAuthSessionPassWithHeaderFieldLowerCase(t *testing.T) {
 	spec.SessionManager.UpdateSession("9876", session, 60, false)
 
 	recorder := httptest.NewRecorder()
-	req := testReq(t, "GET", "/", nil)
+	req := TestReq(t, "GET", "/", nil)
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
 

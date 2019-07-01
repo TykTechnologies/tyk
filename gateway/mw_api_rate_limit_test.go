@@ -64,9 +64,9 @@ func getGlobalRLAuthKeyChain(spec *APISpec) http.Handler {
 }
 
 func TestRLOpen(t *testing.T) {
-	spec := createSpecTest(t, openRLDefSmall)
+	spec := CreateSpecTest(t, openRLDefSmall)
 
-	req := testReq(t, "GET", "/rl_test/", nil)
+	req := TestReq(t, "GET", "/rl_test/", nil)
 
 	DRLManager.CurrentTokenValue = 1
 	DRLManager.RequestTokenValue = 1
@@ -209,9 +209,9 @@ func TestRequestThrottling(t *testing.T) {
 }
 
 func TestRLClosed(t *testing.T) {
-	spec := createSpecTest(t, closedRLDefSmall)
+	spec := CreateSpecTest(t, closedRLDefSmall)
 
-	req := testReq(t, "GET", "/rl_closed_test/", nil)
+	req := TestReq(t, "GET", "/rl_closed_test/", nil)
 
 	session := createRLSession()
 	customToken := uuid.NewV4().String()
@@ -244,9 +244,9 @@ func TestRLClosed(t *testing.T) {
 }
 
 func TestRLOpenWithReload(t *testing.T) {
-	spec := createSpecTest(t, openRLDefSmall)
+	spec := CreateSpecTest(t, openRLDefSmall)
 
-	req := testReq(t, "GET", "/rl_test/", nil)
+	req := TestReq(t, "GET", "/rl_test/", nil)
 
 	DRLManager.CurrentTokenValue = 1
 	DRLManager.RequestTokenValue = 1

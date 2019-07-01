@@ -1,7 +1,7 @@
 // +build coprocess
 // +build python
 
-package gateway
+package python
 
 import (
 	"net/url"
@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/gateway"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -147,25 +148,25 @@ def MyAuthHook(request, session, metadata, spec):
 // Our `pythonBundleWithAuthCheck` plugin restrict more then 1 call
 // With ID extractor, it should run multiple times (because cache)
 func TestValueExtractorHeaderSource(t *testing.T) {
-	ts := StartTest(TestConfig{
-		coprocessConfig: config.CoProcessConfig{
+	ts := gateway.StartTest(gateway.TestConfig{
+		CoprocessConfig: config.CoProcessConfig{
 			EnableCoProcess: true,
 		},
-		delay: 10 * time.Millisecond,
+		Delay: 10 * time.Millisecond,
 	})
 	defer ts.Close()
 
-	spec := BuildAPI(func(spec *APISpec) {
+	spec := gateway.BuildAPI(func(spec *gateway.APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = false
 		spec.EnableCoProcessAuth = true
 	})[0]
 	t.Run("Header value", func(t *testing.T) {
-		bundleID := registerBundle("id_extractor_header_value", pythonIDExtractorHeaderValue)
+		bundleID := gateway.RegisterBundle("id_extractor_header_value", pythonIDExtractorHeaderValue)
 		spec.CustomMiddlewareBundle = bundleID
 		spec.APIID = "api1"
 
-		LoadAPI(spec)
+		gateway.LoadAPI(spec)
 		time.Sleep(1 * time.Second)
 
 		ts.Run(t, []test.TestCase{
@@ -175,11 +176,11 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 		}...)
 	})
 	t.Run("Form value", func(t *testing.T) {
-		bundleID := registerBundle("id_extractor_form_value", pythonIDExtractorFormValue)
+		bundleID := gateway.RegisterBundle("id_extractor_form_value", pythonIDExtractorFormValue)
 		spec.CustomMiddlewareBundle = bundleID
 		spec.APIID = "api2"
 
-		LoadAPI(spec)
+		gateway.LoadAPI(spec)
 		time.Sleep(1 * time.Second)
 
 		formHeaders := map[string]string{"Content-Type": "application/x-www-form-urlencoded"}
@@ -191,11 +192,11 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 		}...)
 	})
 	t.Run("Header regex", func(t *testing.T) {
-		bundleID := registerBundle("id_extractor_header_regex", pythonIDExtractorHeaderRegex)
+		bundleID := gateway.RegisterBundle("id_extractor_header_regex", pythonIDExtractorHeaderRegex)
 		spec.CustomMiddlewareBundle = bundleID
 		spec.APIID = "api3"
 
-		LoadAPI(spec)
+		gateway.LoadAPI(spec)
 		time.Sleep(1 * time.Second)
 
 		ts.Run(t, []test.TestCase{

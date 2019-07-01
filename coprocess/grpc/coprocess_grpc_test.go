@@ -1,7 +1,7 @@
 // +build coprocess
 // +build grpc
 
-package gateway
+package grpc
 
 import (
 	"bytes"
@@ -10,6 +10,7 @@ import (
 	"mime/multipart"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/coprocess"
+	"github.com/TykTechnologies/tyk/gateway"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -120,9 +122,9 @@ func newTestGRPCServer() (s *grpc.Server) {
 }
 
 func loadTestGRPCAPIs() {
-	BuildAndLoadAPI(func(spec *APISpec) {
+	gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 		spec.APIID = "1"
-		spec.OrgID = mockOrgID
+		spec.OrgID = gateway.MockOrgID
 		spec.Auth = apidef.Auth{
 			AuthHeaderName: "authorization",
 		}
@@ -147,9 +149,9 @@ func loadTestGRPCAPIs() {
 			},
 			Driver: apidef.GrpcDriver,
 		}
-	}, func(spec *APISpec) {
+	}, func(spec *gateway.APISpec) {
 		spec.APIID = "2"
-		spec.OrgID = mockOrgID
+		spec.OrgID = gateway.MockOrgID
 		spec.Auth = apidef.Auth{
 			AuthHeaderName: "authorization",
 		}
@@ -174,7 +176,7 @@ func loadTestGRPCAPIs() {
 			},
 			Driver: apidef.GrpcDriver,
 		}
-	}, func(spec *APISpec) {
+	}, func(spec *gateway.APISpec) {
 		spec.APIID = "3"
 		spec.OrgID = "default"
 		spec.Auth = apidef.Auth{
@@ -204,7 +206,7 @@ func loadTestGRPCAPIs() {
 	})
 }
 
-func startTykWithGRPC() (*Test, *grpc.Server) {
+func startTykWithGRPC() (*gateway.Test, *grpc.Server) {
 	// Setup the gRPC server:
 	listener, _ := net.Listen("tcp", grpcListenAddr)
 	grpcServer := newTestGRPCServer()
@@ -215,11 +217,15 @@ func startTykWithGRPC() (*Test, *grpc.Server) {
 		EnableCoProcess:     true,
 		CoProcessGRPCServer: grpcListenPath,
 	}
-	ts := StartTest(TestConfig{coprocessConfig: cfg})
+	ts := gateway.StartTest(gateway.TestConfig{CoprocessConfig: cfg})
 
 	// Load test APIs:
 	loadTestGRPCAPIs()
 	return &ts, grpcServer
+}
+
+func TestMain(m *testing.M) {
+	os.Exit(gateway.InitTestMain(m))
 }
 
 func TestGRPCDispatch(t *testing.T) {
@@ -227,7 +233,7 @@ func TestGRPCDispatch(t *testing.T) {
 	defer ts.Close()
 	defer grpcServer.Stop()
 
-	keyID := CreateSession(func(s *user.SessionState) {
+	keyID := gateway.CreateSession(func(s *user.SessionState) {
 		s.MetaData = map[string]interface{}{
 			"testkey":  map[string]interface{}{"nestedkey": "nestedvalue"},
 			"testkey2": "testvalue",
@@ -249,7 +255,7 @@ func TestGRPCDispatch(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Couldn't read response body: %s", err.Error())
 		}
-		var testResponse testHttpResponse
+		var testResponse gateway.TestHttpResponse
 		err = json.Unmarshal(data, &testResponse)
 		if err != nil {
 			t.Fatalf("Couldn't unmarshal test response JSON: %s", err.Error())
@@ -264,7 +270,7 @@ func TestGRPCDispatch(t *testing.T) {
 	})
 
 	t.Run("Pre Hook with UTF-8/non-UTF-8 request data", func(t *testing.T) {
-		fileData := generateTestBinaryData()
+		fileData := gateway.GenerateTestBinaryData()
 		var buf bytes.Buffer
 		multipartWriter := multipart.NewWriter(&buf)
 		file, err := multipartWriter.CreateFormFile("file", "test.bin")
@@ -310,7 +316,7 @@ func BenchmarkGRPCDispatch(b *testing.B) {
 	defer ts.Close()
 	defer grpcServer.Stop()
 
-	keyID := CreateSession(func(s *user.SessionState) {})
+	keyID := gateway.CreateSession(func(s *user.SessionState) {})
 	headers := map[string]string{"authorization": keyID}
 
 	b.Run("Pre Hook with SetHeaders", func(b *testing.B) {

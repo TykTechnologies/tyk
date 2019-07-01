@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -18,13 +17,6 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
-
-func createDefinitionFromString(defStr string) *APISpec {
-	loader := APIDefinitionLoader{}
-	def := loader.ParseDefinition(strings.NewReader(defStr))
-	spec := loader.MakeSpec(def, nil)
-	return spec
-}
 
 func TestURLRewrites(t *testing.T) {
 	ts := StartTest()

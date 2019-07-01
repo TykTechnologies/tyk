@@ -1,10 +1,8 @@
 package gateway
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -31,7 +29,6 @@ import (
 )
 
 const defaultListenPort = 8080
-const mockOrgID = "507f1f77bcf86cd799439011"
 
 func resetTestConfig() {
 	config.SetGlobal(defaultTestConfig)
@@ -75,51 +72,8 @@ type tykErrorResponse struct {
 	Error string
 }
 
-// ProxyHandler Proxies requests through to their final destination, if they make it through the middleware chain.
-func ProxyHandler(p *ReverseProxy, apiSpec *APISpec) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		baseMid := BaseMiddleware{Spec: apiSpec, Proxy: p}
-		handler := SuccessHandler{baseMid}
-		// Skip all other execution
-		handler.ServeHTTP(w, r)
-	})
-}
-
-func createSpecTest(t testing.TB, def string) *APISpec {
-	spec := createDefinitionFromString(def)
-	tname := t.Name()
-	redisStore := &storage.RedisCluster{KeyPrefix: tname + "-apikey."}
-	healthStore := &storage.RedisCluster{KeyPrefix: tname + "-apihealth."}
-	orgStore := &storage.RedisCluster{KeyPrefix: tname + "-orgKey."}
-	spec.Init(redisStore, redisStore, healthStore, orgStore)
-	return spec
-}
-
 func testKey(testName string, name string) string {
 	return fmt.Sprintf("%s-%s", testName, name)
-}
-
-func testReqBody(t testing.TB, body interface{}) io.Reader {
-	switch x := body.(type) {
-	case []byte:
-		return bytes.NewReader(x)
-	case string:
-		return strings.NewReader(x)
-	case io.Reader:
-		return x
-	case nil:
-		return nil
-	default: // JSON objects (structs)
-		bs, err := json.Marshal(x)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return bytes.NewReader(bs)
-	}
-}
-
-func testReq(t testing.TB, method, urlStr string, body interface{}) *http.Request {
-	return httptest.NewRequest(method, urlStr, testReqBody(t, body))
 }
 
 func TestParambasedAuth(t *testing.T) {
@@ -494,7 +448,7 @@ func TestQuota(t *testing.T) {
 
 func TestAnalytics(t *testing.T) {
 	ts := StartTest(TestConfig{
-		delay: 20 * time.Millisecond,
+		Delay: 20 * time.Millisecond,
 	})
 	defer ts.Close()
 

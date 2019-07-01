@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"net/http/httptest"
 
 	"golang.org/x/net/context"
 
@@ -58,7 +59,7 @@ var (
 	EnableTestDNSMock = true
 )
 
-func InitTestMain(m *testing.M) int {
+func InitTestMain(m *testing.M, genConf ...func(globalConf *config.Config)) int {
 	runningTests = true
 	testServerRouter = testHttpHandler()
 	testServer := &http.Server{
@@ -91,7 +92,7 @@ func InitTestMain(m *testing.M) int {
 	globalConf.AllowInsecureConfigs = true
 	// Enable coprocess and bundle downloader:
 	globalConf.CoProcessOptions.EnableCoProcess = true
-	globalConf.CoProcessOptions.PythonPathPrefix = "../"
+	globalConf.CoProcessOptions.PythonPathPrefix = "../../"
 	globalConf.EnableBundleDownloader = true
 	globalConf.BundleBaseURL = testHttpBundles
 	globalConf.MiddlewarePath = testMiddlewarePath
@@ -100,6 +101,9 @@ func InitTestMain(m *testing.M) int {
 	// force ipv4 for now, to work around the docker bug affecting
 	// Go 1.8 and ealier
 	globalConf.ListenAddress = "127.0.0.1"
+	if len(genConf) > 0 {
+		genConf[0](&globalConf)
+	}
 
 	if EnableTestDNSMock {
 		mockHandle, err = test.InitDNSMock(test.DomainsToAddresses, nil)
@@ -182,7 +186,7 @@ func reloadSimulation() {
 var testBundles = map[string]map[string]string{}
 var testBundleMu sync.Mutex
 
-func registerBundle(name string, files map[string]string) string {
+func RegisterBundle(name string, files map[string]string) string {
 	testBundleMu.Lock()
 	defer testBundleMu.Unlock()
 
@@ -214,13 +218,23 @@ func bundleHandleFunc(w http.ResponseWriter, r *http.Request) {
 	z.Close()
 }
 
-type testHttpResponse struct {
+type TestHttpResponse struct {
 	Method  string
 	URI     string
 	Url     string
 	Body    string
 	Headers map[string]string
 	Form    map[string]string
+}
+
+// ProxyHandler Proxies requests through to their final destination, if they make it through the middleware chain.
+func ProxyHandler(p *ReverseProxy, apiSpec *APISpec) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		baseMid := BaseMiddleware{Spec: apiSpec, Proxy: p}
+		handler := SuccessHandler{baseMid}
+		// Skip all other execution
+		handler.ServeHTTP(w, r)
+	})
 }
 
 const (
@@ -231,7 +245,7 @@ const (
 	// Accepts any http requests on /, only allows GET on /get, etc.
 	// All return a JSON with request info.
 	testHttpAny     = "http://" + testHttpListen
-	testHttpGet     = testHttpAny + "/get"
+	TestHttpGet     = testHttpAny + "/get"
 	testHttpPost    = testHttpAny + "/post"
 	testHttpJWK     = testHttpAny + "/jwk.json"
 	testHttpBundles = testHttpAny + "/bundles/"
@@ -240,6 +254,7 @@ const (
 	// testing TCP and HTTP failures.
 	testHttpFailure    = "127.0.0.1:16501"
 	testHttpFailureAny = "http://" + testHttpFailure
+	MockOrgID          = "507f1f77bcf86cd799439011"
 )
 
 func testHttpHandler() *mux.Router {
@@ -278,7 +293,7 @@ func testHttpHandler() *mux.Router {
 		w.Header().Set("X-Tyk-Test", "1")
 		body, _ := ioutil.ReadAll(r.Body)
 
-		err := json.NewEncoder(w).Encode(testHttpResponse{
+		err := json.NewEncoder(w).Encode(TestHttpResponse{
 			Method:  r.Method,
 			URI:     r.RequestURI,
 			Url:     r.URL.String(),
@@ -437,6 +452,46 @@ func createJWKTokenHMAC(jGen ...func(*jwt.Token)) string {
 	return tokenString
 }
 
+func TestReqBody(t testing.TB, body interface{}) io.Reader {
+	switch x := body.(type) {
+	case []byte:
+		return bytes.NewReader(x)
+	case string:
+		return strings.NewReader(x)
+	case io.Reader:
+		return x
+	case nil:
+		return nil
+	default: // JSON objects (structs)
+		bs, err := json.Marshal(x)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return bytes.NewReader(bs)
+	}
+}
+
+func TestReq(t testing.TB, method, urlStr string, body interface{}) *http.Request {
+	return httptest.NewRequest(method, urlStr, TestReqBody(t, body))
+}
+
+func CreateDefinitionFromString(defStr string) *APISpec {
+	loader := APIDefinitionLoader{}
+	def := loader.ParseDefinition(strings.NewReader(defStr))
+	spec := loader.MakeSpec(def, nil)
+	return spec
+}
+
+func CreateSpecTest(t testing.TB, def string) *APISpec {
+	spec := CreateDefinitionFromString(def)
+	tname := t.Name()
+	redisStore := &storage.RedisCluster{KeyPrefix: tname + "-apikey."}
+	healthStore := &storage.RedisCluster{KeyPrefix: tname + "-apihealth."}
+	orgStore := &storage.RedisCluster{KeyPrefix: tname + "-orgKey."}
+	spec.Init(redisStore, redisStore, healthStore, orgStore)
+	return spec
+}
+
 func firstVals(vals map[string][]string) map[string]string {
 	m := make(map[string]string, len(vals))
 	for k, vs := range vals {
@@ -447,10 +502,10 @@ func firstVals(vals map[string][]string) map[string]string {
 
 type TestConfig struct {
 	sepatateControlAPI bool
-	delay              time.Duration
+	Delay              time.Duration
 	hotReload          bool
 	overrideDefaults   bool
-	coprocessConfig    config.CoProcessConfig
+	CoprocessConfig    config.CoProcessConfig
 }
 
 type Test struct {
@@ -476,7 +531,7 @@ func (s *Test) Start() {
 		globalConf.ControlAPIPort, _ = strconv.Atoi(port)
 	}
 
-	globalConf.CoProcessOptions = s.config.coprocessConfig
+	globalConf.CoProcessOptions = s.config.CoprocessConfig
 
 	config.SetGlobal(globalConf)
 
@@ -522,8 +577,8 @@ func (s *Test) Start() {
 				r = withAuth(r)
 			}
 
-			if s.config.delay > 0 {
-				tc.Delay = s.config.delay
+			if s.config.Delay > 0 {
+				tc.Delay = s.config.Delay
 			}
 
 			return r, err
@@ -802,7 +857,7 @@ func initProxy(proto string, tlsConfig *tls.Config) *httpProxyHandler {
 	return proxy
 }
 
-func generateTestBinaryData() (buf *bytes.Buffer) {
+func GenerateTestBinaryData() (buf *bytes.Buffer) {
 	buf = new(bytes.Buffer)
 	type testData struct {
 		a float32

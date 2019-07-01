@@ -9,7 +9,7 @@ package gateway
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "coprocess/api.h"
+#include "../coprocess/api.h"
 
 void applyTestHooks();
 
@@ -42,7 +42,7 @@ var CoProcessDispatchEvent = make(chan []byte)
 
 type TestDispatcher struct {
 	coprocess.Dispatcher
-	reloaded bool
+	Reloaded bool
 }
 
 /* Basic CoProcessDispatcher functions */
@@ -59,12 +59,13 @@ func (d *TestDispatcher) DispatchEvent(eventJSON []byte) {
 }
 
 func (d *TestDispatcher) Reload() {
-	d.reloaded = true
+	d.Reloaded = true
 }
 
 /* General test helpers */
 
 func NewCoProcessDispatcher() (dispatcher *TestDispatcher, err error) {
+	MessageType = coprocess.ProtobufMessage
 	d := &TestDispatcher{}
 	GlobalDispatcher = d
 	EnableCoProcess = true

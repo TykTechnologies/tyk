@@ -29,6 +29,8 @@ import (
 	"unsafe"
 )
 
+var MessageType int
+
 // Dispatch prepares a CoProcessMessage, sends it to the GlobalDispatcher and gets a reply.
 func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
 	if GlobalDispatcher == nil {

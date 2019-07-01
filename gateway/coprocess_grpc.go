@@ -18,9 +18,6 @@ import (
 	"github.com/TykTechnologies/tyk/coprocess"
 )
 
-// CoProcessName specifies the driver name.
-const CoProcessName = apidef.GrpcDriver
-
 // MessageType sets the default message type.
 var MessageType = coprocess.ProtobufMessage
 
@@ -87,6 +84,8 @@ func (d *GRPCDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, basePat
 
 // NewCoProcessDispatcher wraps all the actions needed for this CP.
 func NewCoProcessDispatcher() (coprocess.Dispatcher, error) {
+	MessageType = coprocess.ProtobufMessage
+	CoProcessName = apidef.GrpcDriver
 	if config.Global().CoProcessOptions.CoProcessGRPCServer == "" {
 		return nil, errors.New("No gRPC URL is set")
 	}

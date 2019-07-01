@@ -1,23 +1,29 @@
 // +build goplugin
 
-package gateway
+package goplugin_test
 
 import (
 	"net/http"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/gateway"
 	"github.com/TykTechnologies/tyk/test"
 )
+
+func TestMain(m *testing.M) {
+	os.Exit(gateway.InitTestMain(m))
+}
 
 // TestGoPluginMWs tests all possible Go-plugin MWs ("pre", "auth_check", "post_key_auth" and "post")
 // Please see ./test/goplugins/test_goplugins.go for plugin implementation details
 func TestGoPluginMWs(t *testing.T) {
-	ts := StartTest()
+	ts := gateway.StartTest()
 	defer ts.Close()
 
-	BuildAndLoadAPI(func(spec *APISpec) {
+	gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 		spec.APIID = "plugin_api"
 		spec.Proxy.ListenPath = "/goplugin"
 		spec.UseKeylessAccess = false

@@ -39,7 +39,7 @@ func createSpecTestFrom(t testing.TB, def *apidef.APIDefinition) *APISpec {
 
 func prepareExtractor(t testing.TB, extractorSource apidef.IdExtractorSource, extractorType apidef.IdExtractorType, config map[string]interface{}) (IdExtractor, *APISpec) {
 	def := &apidef.APIDefinition{
-		OrgID: mockOrgID,
+		OrgID: MockOrgID,
 		CustomMiddleware: apidef.MiddlewareSection{
 			IdExtractor: apidef.MiddlewareIdExtractor{
 				ExtractFrom:     extractorSource,
@@ -85,7 +85,7 @@ func prepareExtractorFormRequest(values map[string]string) *http.Request {
 func generateSessionID(input string) string {
 	data := []byte(input)
 	tokenID := fmt.Sprintf("%x", md5.Sum(data))
-	return generateToken(mockOrgID, tokenID)
+	return generateToken(MockOrgID, tokenID)
 }
 
 func TestValueExtractor(t *testing.T) {

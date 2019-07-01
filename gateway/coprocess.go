@@ -25,6 +25,8 @@ var (
 
 	// GlobalDispatcher will be implemented by the current CoProcess driver.
 	GlobalDispatcher coprocess.Dispatcher
+
+	CoProcessName apidef.MiddlewareDriver
 )
 
 // CoProcessMiddleware is the basic CP middleware struct.
@@ -52,7 +54,7 @@ func CreateCoProcessMiddleware(hookName string, hookType coprocess.HookType, mwD
 	return createMiddleware(dMiddleware)
 }
 
-func doCoprocessReload() {
+func DoCoprocessReload() {
 	if GlobalDispatcher != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
