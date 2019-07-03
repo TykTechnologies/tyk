@@ -270,6 +270,61 @@ func TestKeyHandler(t *testing.T) {
 	})
 }
 
+func TestKeyHandler_UpdateKey(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Name = "test"
+		spec.UseKeylessAccess = false
+		spec.Auth.UseParam = true
+	})
+
+	accessRights := map[string]user.AccessDefinition{"test": {
+		APIID: "test", Versions: []string{"v1"},
+	}}
+
+	pID := CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = accessRights
+		p.Partitions.Acl = true
+	})
+
+	pID2 := CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = accessRights
+		p.Partitions.RateLimit = true
+	})
+
+	pID3 := CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = accessRights
+		p.Partitions.Quota = true
+	})
+
+	session, key := ts.CreateSession(func(s *user.SessionState) {
+		s.ApplyPolicies = []string{pID, pID2}
+		s.AccessRights = accessRights
+	})
+
+	t.Run("Add policy", func(t *testing.T) {
+		session.ApplyPolicies = append(session.ApplyPolicies, pID3)
+		sessionData, _ := json.Marshal(session)
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+
+	t.Run("Remove policy", func(t *testing.T) {
+		session.ApplyPolicies = []string{pID}
+		sessionData, _ := json.Marshal(session)
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+}
+
 func TestHashKeyHandler(t *testing.T) {
 	globalConf := config.Global()
 	// make it to use hashes for Redis keys
