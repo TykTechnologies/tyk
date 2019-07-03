@@ -228,15 +228,24 @@ func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 		}).Error("Webhook request failed: ", err)
 	} else {
 		defer resp.Body.Close()
-		content, err := ioutil.ReadAll(resp.Body)
-		if err == nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "webhooks",
-			}).Debug(string(content))
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			content, err := ioutil.ReadAll(resp.Body)
+			if err == nil {
+				log.WithFields(logrus.Fields{
+					"prefix":       "webhooks",
+					"responseCode": resp.StatusCode,
+				}).Debug(string(content))
+			} else {
+				log.WithFields(logrus.Fields{
+					"prefix": "webhooks",
+				}).Error(err)
+			}
+
 		} else {
 			log.WithFields(logrus.Fields{
-				"prefix": "webhooks",
-			}).Error(err)
+				"prefix":       "webhooks",
+				"responseCode": resp.StatusCode,
+			}).Error("Request to webhook failed")
 		}
 	}
 
