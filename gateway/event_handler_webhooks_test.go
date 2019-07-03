@@ -96,6 +96,10 @@ func TestBuildRequest(t *testing.T) {
 	if got := req.Header.Get("User-Agent"); got != "Tyk-Hookshot" {
 		t.Error("Header User Agent is not correct!")
 	}
+
+	if got := req.Header.Get("Content-Type"); got != "application/json" {
+		t.Error("Header Content-Type is not correct!")
+	}
 }
 
 func TestCreateBody(t *testing.T) {
