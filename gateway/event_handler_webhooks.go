@@ -182,6 +182,7 @@ func (w *WebHookHandler) BuildRequest(reqBody string) (*http.Request, error) {
 	}
 
 	req.Header.Set("User-Agent", "Tyk-Hookshot")
+	req.Header.Set("Content-Type", "application/json")
 
 	for key, val := range w.conf.HeaderList {
 		req.Header.Set(key, val)
