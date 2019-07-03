@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 
@@ -218,7 +219,9 @@ func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 		return
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	cli := &http.Client{Timeout: 30 * time.Second}
+
+	resp, err := cli.Do(req)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "webhooks",
