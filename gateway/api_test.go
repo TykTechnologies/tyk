@@ -307,7 +307,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 		}...)
 
 		sessionState, found := FallbackKeySesionManager.SessionDetail(key, false)
-		if !found && sessionState.AccessRights[testAPIID].APIID != testAPIID && len(sessionState.ApplyPolicies) != 2 {
+		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 2 {
 			t.Fatal("Adding policy to the list failed")
 		}
 	})
@@ -322,7 +322,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 		}...)
 
 		sessionState, found := FallbackKeySesionManager.SessionDetail(key, false)
-		if !found && sessionState.AccessRights[testAPIID].APIID != testAPIID && len(sessionState.ApplyPolicies) != 0 {
+		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 0 {
 			t.Fatal("Removing policy from the list failed")
 		}
 	})
