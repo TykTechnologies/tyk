@@ -643,7 +643,7 @@ func TestListener(t *testing.T) {
 	// have all needed reload ticks ready
 	go func() {
 		for i := 0; i < 4*4; i++ {
-			reloadTick <- time.Time{}
+			ReloadTick <- time.Time{}
 		}
 	}()
 

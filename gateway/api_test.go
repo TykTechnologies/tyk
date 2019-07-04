@@ -934,7 +934,7 @@ func TestHotReloadSingle(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	reloadURLStructure(wg.Done)
-	reloadTick <- time.Time{}
+	ReloadTick <- time.Time{}
 	wg.Wait()
 	if mainRouter == oldRouter {
 		t.Fatal("router wasn't swapped")
@@ -952,7 +952,7 @@ func TestHotReloadMany(t *testing.T) {
 		reloadURLStructure(wg.Done)
 	}
 	// pick it up and finish it
-	reloadTick <- time.Time{}
+	ReloadTick <- time.Time{}
 	wg.Wait()
 
 	// 5 reloads, but this time slower - the reload worker has time
@@ -961,7 +961,7 @@ func TestHotReloadMany(t *testing.T) {
 		wg.Add(1)
 		reloadURLStructure(wg.Done)
 		// pick it up and finish it
-		reloadTick <- time.Time{}
+		ReloadTick <- time.Time{}
 		wg.Wait()
 	}
 }
