@@ -94,7 +94,7 @@ func TestRLOpen(t *testing.T) {
 
 func requestThrottlingTest(limiter string, testLevel string) func(t *testing.T) {
 	return func(t *testing.T) {
-		defer resetTestConfig()
+		defer ResetTestConfig()
 
 		ts := StartTest()
 		defer ts.Close()

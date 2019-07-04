@@ -42,7 +42,7 @@ func TestPublicKeyPinning(t *testing.T) {
 		// For host using pinning, it should ignore standard verification in all cases, e.g setting variable below does nothing
 		globalConf.ProxySSLInsecureSkipVerify = false
 		config.SetGlobal(globalConf)
-		defer resetTestConfig()
+		defer ResetTestConfig()
 
 		ts := StartTest()
 		defer ts.Close()
@@ -73,7 +73,7 @@ func TestPublicKeyPinning(t *testing.T) {
 		globalConf := config.Global()
 		globalConf.Security.PinnedPublicKeys = map[string]string{"127.0.0.1": "wrong"}
 		config.SetGlobal(globalConf)
-		defer resetTestConfig()
+		defer ResetTestConfig()
 
 		ts := StartTest()
 		defer ts.Close()
@@ -95,7 +95,7 @@ func TestPublicKeyPinning(t *testing.T) {
 		globalConf := config.Global()
 		globalConf.ProxySSLInsecureSkipVerify = true
 		config.SetGlobal(globalConf)
-		defer resetTestConfig()
+		defer ResetTestConfig()
 
 		defer proxy.Stop()
 
@@ -124,7 +124,7 @@ func TestProxyTransport(t *testing.T) {
 	// force creating new transport on each reque
 	globalConf.MaxConnTime = -1
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()

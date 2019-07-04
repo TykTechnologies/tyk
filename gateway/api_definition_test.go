@@ -389,7 +389,7 @@ func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 	globalConf.DBAppConfOptions.ConnectionString = ts.URL
 	config.SetGlobal(globalConf)
 
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -694,7 +694,7 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 	globalConf.DBAppConfOptions.ConnectionString = ts.URL
 	config.SetGlobal(globalConf)
 
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	var wg sync.WaitGroup
 	wg.Add(1)

@@ -106,7 +106,7 @@ func TestGatewayTLS(t *testing.T) {
 		globalConf := config.Global()
 		globalConf.HttpServerOptions.UseSSL = true
 		config.SetGlobal(globalConf)
-		defer resetTestConfig()
+		defer ResetTestConfig()
 
 		ts := StartTest()
 		defer ts.Close()
@@ -133,7 +133,7 @@ func TestGatewayTLS(t *testing.T) {
 		}}
 		globalConf.HttpServerOptions.UseSSL = true
 		config.SetGlobal(globalConf)
-		defer resetTestConfig()
+		defer ResetTestConfig()
 
 		ts := StartTest()
 		defer ts.Close()
@@ -155,7 +155,7 @@ func TestGatewayTLS(t *testing.T) {
 		globalConf.HttpServerOptions.SSLCertificates = []string{certPath}
 		globalConf.HttpServerOptions.UseSSL = true
 		config.SetGlobal(globalConf)
-		defer resetTestConfig()
+		defer ResetTestConfig()
 
 		ts := StartTest()
 		defer ts.Close()
@@ -180,7 +180,7 @@ func TestGatewayTLS(t *testing.T) {
 		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
 		globalConf.HttpServerOptions.UseSSL = true
 		config.SetGlobal(globalConf)
-		defer resetTestConfig()
+		defer ResetTestConfig()
 
 		ts := StartTest()
 		defer ts.Close()
@@ -203,7 +203,7 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 	globalConf.HttpServerOptions.UseSSL = true
 	globalConf.Security.ControlAPIUseMutualTLS = true
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	dir, _ := ioutil.TempDir("", "certs")
 
@@ -275,7 +275,7 @@ func TestAPIMutualTLS(t *testing.T) {
 	globalConf.ListenPort = 0
 	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()
@@ -457,7 +457,7 @@ func TestUpstreamMutualTLS(t *testing.T) {
 		globalConf := config.Global()
 		globalConf.ProxySSLInsecureSkipVerify = true
 		config.SetGlobal(globalConf)
-		defer resetTestConfig()
+		defer ResetTestConfig()
 
 		ts := StartTest()
 		defer ts.Close()
@@ -492,7 +492,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 	globalConf.HttpServerOptions.UseSSL = true
 	globalConf.HttpServerOptions.SSLCertificates = []string{serverCertID}
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()
@@ -531,7 +531,7 @@ func TestAPICertificate(t *testing.T) {
 	globalConf.HttpServerOptions.UseSSL = true
 	globalConf.HttpServerOptions.SSLCertificates = []string{}
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()
@@ -626,7 +626,7 @@ func TestCipherSuites(t *testing.T) {
 	globalConf.HttpServerOptions.Ciphers = []string{"TLS_RSA_WITH_RC4_128_SHA", "TLS_RSA_WITH_3DES_EDE_CBC_SHA", "TLS_RSA_WITH_AES_128_CBC_SHA"}
 	globalConf.HttpServerOptions.SSLCertificates = []string{serverCertID}
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()
@@ -690,7 +690,7 @@ func TestHTTP2(t *testing.T) {
 	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
 	globalConf.HttpServerOptions.UseSSL = true
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()
@@ -735,7 +735,7 @@ func TestGRPC(t *testing.T) {
 	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
 	globalConf.HttpServerOptions.UseSSL = true
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()

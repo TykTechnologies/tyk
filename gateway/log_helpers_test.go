@@ -10,7 +10,7 @@ import (
 )
 
 func TestGetLogEntryForRequest(t *testing.T) {
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	testReq := httptest.NewRequest("GET", "http://tyk.io/test", nil)
 	testReq.RemoteAddr = "127.0.0.1:80"

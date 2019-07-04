@@ -133,7 +133,7 @@ func TestJWTSessionHMAC(t *testing.T) {
 
 	//If we skip the check then the Id will be taken from SUB and the call will succeed
 	_, jwtToken := prepareGenericJWTSession(t.Name(), HMACSign, KID, false)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	authHeaders := map[string]string{"authorization": jwtToken}
 	t.Run("Request with valid JWT signed with HMAC", func(t *testing.T) {
@@ -151,7 +151,7 @@ func BenchmarkJWTSessionHMAC(b *testing.B) {
 
 	//If we skip the check then the Id will be taken from SUB and the call will succeed
 	_, jwtToken := prepareGenericJWTSession(b.Name(), HMACSign, KID, false)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	authHeaders := map[string]string{"authorization": jwtToken}
 	for i := 0; i < b.N; i++ {
@@ -190,7 +190,7 @@ func TestJWTHMACIdInSubClaim(t *testing.T) {
 	// Case where the gw always check the 'kid' claim first but if this JWTSkipCheckKidAsId is set on the api level,
 	// then it'll work
 	_, jwtToken = prepareGenericJWTSession(t.Name(), HMACSign, SUB, true)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 	authHeaders = map[string]string{"authorization": jwtToken}
 	t.Run("Request with valid JWT/HMAC/Id in SuB/Global-dont-skip-kid/Api-skip-kid", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
@@ -1283,7 +1283,7 @@ func TestJWTHMACIdNewClaim(t *testing.T) {
 
 	//If we skip the check then the Id will be taken from SUB and the call will succeed
 	_, jwtToken := prepareGenericJWTSession(t.Name(), HMACSign, "user-id", true)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 	authHeaders := map[string]string{"authorization": jwtToken}
 	t.Run("Request with valid JWT/HMAC signature/id in user-id claim", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
@@ -1663,7 +1663,7 @@ func TestJWTECDSASign(t *testing.T) {
 
 	//If we skip the check then the Id will be taken from SUB and the call will succeed
 	_, jwtToken := prepareGenericJWTSession(t.Name(), ECDSASign, KID, false)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 	authHeaders := map[string]string{"authorization": jwtToken}
 	t.Run("Request with valid JWT/ECDSA signature needs a test. currently defaults to HMAC", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
@@ -1678,7 +1678,7 @@ func TestJWTUnknownSign(t *testing.T) {
 
 	//If we skip the check then the Id will be taken from SUB and the call will succeed
 	_, jwtToken := prepareGenericJWTSession(t.Name(), "bla", KID, false)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 	authHeaders := map[string]string{"authorization": jwtToken}
 	t.Run("Request with valid JWT/ECDSA signature needs a test. currently defaults to HMAC", func(t *testing.T) {
 		ts.Run(t, test.TestCase{

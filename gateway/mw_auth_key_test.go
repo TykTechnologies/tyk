@@ -19,7 +19,7 @@ import (
 )
 
 func TestMurmur3CharBug(t *testing.T) {
-	defer resetTestConfig()
+	defer ResetTestConfig()
 	ts := StartTest()
 	defer ts.Close()
 
@@ -104,7 +104,7 @@ func TestMurmur3CharBug(t *testing.T) {
 }
 
 func TestSignatureValidation(t *testing.T) {
-	defer resetTestConfig()
+	defer ResetTestConfig()
 	ts := StartTest()
 	defer ts.Close()
 

@@ -54,7 +54,7 @@ func TestHealthCheckEndpoint(t *testing.T) {
 	globalConf := config.Global()
 	globalConf.HealthCheck.EnableHealthChecks = true
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()
@@ -277,7 +277,7 @@ func TestHashKeyHandler(t *testing.T) {
 	// enable hashed keys listing
 	globalConf.EnableHashedKeysListing = true
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	hashTests := []struct {
 		hashFunction     string
@@ -313,7 +313,7 @@ func TestHashKeyHandlerLegacyWithHashFunc(t *testing.T) {
 	// settings to create BA session with legacy key format
 	globalConf.HashKeyFunction = ""
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()
@@ -522,7 +522,7 @@ func TestHashKeyListingDisabled(t *testing.T) {
 	globalConf.EnableHashedKeysListing = false
 	config.SetGlobal(globalConf)
 
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()
@@ -640,7 +640,7 @@ func TestHashKeyHandlerHashingDisabled(t *testing.T) {
 	globalConf.HashKeys = false
 	config.SetGlobal(globalConf)
 
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()
@@ -1024,7 +1024,7 @@ func TestApiLoaderLongestPathFirst(t *testing.T) {
 	globalConf.EnableCustomDomains = true
 	config.SetGlobal(globalConf)
 
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	type hostAndPath struct {
 		host, path string

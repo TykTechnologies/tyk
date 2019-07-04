@@ -257,7 +257,7 @@ func TestAuthCodeRedirectMultipleURL(t *testing.T) {
 	globalConf := config.Global()
 	globalConf.OauthRedirectUriSeparator = ","
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()
@@ -298,7 +298,7 @@ func TestAuthCodeRedirectInvalidMultipleURL(t *testing.T) {
 	globalConf := config.Global()
 	globalConf.OauthRedirectUriSeparator = ""
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()
@@ -571,7 +571,7 @@ func TestGetPaginatedClientTokens(t *testing.T) {
 
 		config.SetGlobal(globalConf)
 
-		defer resetTestConfig()
+		defer ResetTestConfig()
 
 		ts := StartTest()
 		defer ts.Close()
@@ -690,7 +690,7 @@ func testGetClientTokens(t *testing.T, hashed bool) {
 
 	config.SetGlobal(globalConf)
 
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()

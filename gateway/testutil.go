@@ -147,6 +147,10 @@ func InitTestMain(m *testing.M, genConf ...func(globalConf *config.Config)) int 
 	return exitCode
 }
 
+func ResetTestConfig() {
+	config.SetGlobal(defaultTestConfig)
+}
+
 func emptyRedis() error {
 	addr := config.Global().Storage.Host + ":" + strconv.Itoa(config.Global().Storage.Port)
 	c, err := redis.Dial("tcp", addr)
