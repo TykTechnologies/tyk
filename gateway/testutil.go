@@ -382,6 +382,8 @@ func CreateStandardSession() *user.SessionState {
 	session.QuotaRenews = time.Now().Unix() + 20
 	session.QuotaRemaining = 10
 	session.QuotaMax = -1
+	session.Tags = []string{}
+	session.MetaData = make(map[string]interface{})
 	return session
 }
 
