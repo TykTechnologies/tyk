@@ -655,10 +655,9 @@ func (s *Test) CreateSession(sGen ...func(s *user.SessionState)) (*user.SessionS
 	keySuccess := apiModifyKeySuccess{}
 	err = json.NewDecoder(resp.Body).Decode(&keySuccess)
 	if err != nil {
-		log.Fatal("Error while serializing session:", err)
+		log.Fatal("Error while decoding session response:", err)
 		return nil, ""
 	}
-	resp.Body.Close()
 
 	return session, keySuccess.Key
 }
