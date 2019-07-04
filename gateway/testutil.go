@@ -356,7 +356,7 @@ func withAuth(r *http.Request) *http.Request {
 	return r
 }
 
-// TODO: replace with /tyk/keys/create call
+// Deprecated: Use Test.CreateSession instead.
 func CreateSession(sGen ...func(s *user.SessionState)) string {
 	key := generateToken("", "")
 	session := CreateStandardSession()
@@ -634,32 +634,32 @@ func (s *Test) RunExt(t testing.TB, testCases ...test.TestCase) {
 	}
 }
 
-func (s *Test) createSession(sGen ...func(s *user.SessionState)) string {
+func (s *Test) CreateSession(sGen ...func(s *user.SessionState)) (*user.SessionState, string) {
 	session := CreateStandardSession()
 	if len(sGen) > 0 {
 		sGen[0](session)
 	}
 
 	resp, err := s.Do(test.TestCase{
-		Method: "POST",
-		Path:   "/tyk/keys/create",
-		Data:   session,
+		Method:    http.MethodPost,
+		Path:      "/tyk/keys/create",
+		Data:      session,
+		AdminAuth: true,
 	})
 
 	if err != nil {
 		log.Fatal("Error while creating session:", err)
-		return ""
+		return nil, ""
 	}
 
-	respJSON := apiModifyKeySuccess{}
-	err = json.NewDecoder(resp.Body).Decode(&respJSON)
+	keySuccess := apiModifyKeySuccess{}
+	err = json.NewDecoder(resp.Body).Decode(&keySuccess)
 	if err != nil {
-		log.Fatal("Error while serializing session:", err)
-		return ""
+		log.Fatal("Error while decoding session response:", err)
+		return nil, ""
 	}
-	resp.Body.Close()
 
-	return respJSON.Key
+	return session, keySuccess.Key
 }
 
 func StartTest(config ...TestConfig) Test {

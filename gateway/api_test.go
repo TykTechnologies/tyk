@@ -270,6 +270,64 @@ func TestKeyHandler(t *testing.T) {
 	})
 }
 
+func TestKeyHandler_UpdateKey(t *testing.T) {
+	const testAPIID = "testAPIID"
+
+	ts := StartTest()
+	defer ts.Close()
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = testAPIID
+		spec.UseKeylessAccess = false
+		spec.Auth.UseParam = true
+	})
+
+	pID := CreatePolicy(func(p *user.Policy) {
+		p.Partitions.RateLimit = true
+	})
+
+	pID2 := CreatePolicy(func(p *user.Policy) {
+		p.Partitions.Quota = true
+	})
+
+	session, key := ts.CreateSession(func(s *user.SessionState) {
+		s.ApplyPolicies = []string{pID}
+		s.AccessRights = map[string]user.AccessDefinition{testAPIID: {
+			APIID: testAPIID, Versions: []string{"v1"},
+		}}
+	})
+
+	t.Run("Add policy not enforcing acl", func(t *testing.T) {
+		session.ApplyPolicies = append(session.ApplyPolicies, pID2)
+		sessionData, _ := json.Marshal(session)
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+
+		sessionState, found := FallbackKeySesionManager.SessionDetail(key, false)
+		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 2 {
+			t.Fatal("Adding policy to the list failed")
+		}
+	})
+
+	t.Run("Remove policy not enforcing acl", func(t *testing.T) {
+		session.ApplyPolicies = []string{}
+		sessionData, _ := json.Marshal(session)
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+
+		sessionState, found := FallbackKeySesionManager.SessionDetail(key, false)
+		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 0 {
+			t.Fatal("Removing policy from the list failed")
+		}
+	})
+}
+
 func TestHashKeyHandler(t *testing.T) {
 	globalConf := config.Global()
 	// make it to use hashes for Redis keys
