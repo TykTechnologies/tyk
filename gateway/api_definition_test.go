@@ -389,7 +389,7 @@ func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 	globalConf.DBAppConfOptions.ConnectionString = ts.URL
 	config.SetGlobal(globalConf)
 
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -402,7 +402,7 @@ func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 	handleRedisEvent(msg, handled, wg.Done)
 
 	// Since we already know that reload is queued
-	reloadTick <- time.Time{}
+	ReloadTick <- time.Time{}
 
 	// Wait for the reload to finish, then check it worked
 	wg.Wait()
@@ -694,7 +694,7 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 	globalConf.DBAppConfOptions.ConnectionString = ts.URL
 	config.SetGlobal(globalConf)
 
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -707,7 +707,7 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 	handleRedisEvent(msg, handled, wg.Done)
 
 	// Since we already know that reload is queued
-	reloadTick <- time.Time{}
+	ReloadTick <- time.Time{}
 
 	// Wait for the reload to finish, then check it worked
 	wg.Wait()
@@ -724,7 +724,7 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 	handleRedisEvent(msg, handled, wg2.Done)
 
 	// Since we already know that reload is queued
-	reloadTick <- time.Time{}
+	ReloadTick <- time.Time{}
 
 	// Wait for the reload to finish, then check it worked
 	wg2.Wait()

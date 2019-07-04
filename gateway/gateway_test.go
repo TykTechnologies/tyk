@@ -30,10 +30,6 @@ import (
 
 const defaultListenPort = 8080
 
-func resetTestConfig() {
-	config.SetGlobal(defaultTestConfig)
-}
-
 func TestMain(m *testing.M) {
 	os.Exit(InitTestMain(m))
 }
@@ -112,7 +108,7 @@ func TestParambasedAuth(t *testing.T) {
 func TestStripPathWithURLRewrite(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	t.Run("rewrite URL containing listen path", func(t *testing.T) {
 		BuildAndLoadAPI(func(spec *APISpec) {
@@ -143,7 +139,7 @@ func TestStripPathWithURLRewrite(t *testing.T) {
 func TestSkipTargetPassEscapingOff(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	t.Run("With escaping, default", func(t *testing.T) {
 		globalConf := config.Global()
@@ -249,7 +245,7 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 	globalConf.HttpServerOptions.OverrideDefaults = true
 	globalConf.HttpServerOptions.SkipURLCleaning = true
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	// here we expect that test gateway will be sending to test upstream requests with not cleaned URI
 	// so test upstream shouldn't reply with 301 and process them as well
@@ -510,7 +506,7 @@ func TestAnalytics(t *testing.T) {
 	})
 
 	t.Run("Detailed analytics", func(t *testing.T) {
-		defer resetTestConfig()
+		defer ResetTestConfig()
 		globalConf := config.Global()
 		globalConf.AnalyticsConfig.EnableDetailedRecording = true
 		config.SetGlobal(globalConf)
@@ -554,7 +550,7 @@ func TestAnalytics(t *testing.T) {
 	})
 
 	t.Run("Detailed analytics with cache", func(t *testing.T) {
-		defer resetTestConfig()
+		defer ResetTestConfig()
 		globalConf := config.Global()
 		globalConf.AnalyticsConfig.EnableDetailedRecording = true
 		config.SetGlobal(globalConf)
@@ -643,7 +639,7 @@ func TestListener(t *testing.T) {
 	// have all needed reload ticks ready
 	go func() {
 		for i := 0; i < 4*4; i++ {
-			reloadTick <- time.Time{}
+			ReloadTick <- time.Time{}
 		}
 	}()
 
@@ -698,7 +694,7 @@ func TestHttpPprof(t *testing.T) {
 }
 
 func TestManagementNodeRedisEvents(t *testing.T) {
-	defer resetTestConfig()
+	defer ResetTestConfig()
 	globalConf := config.Global()
 	globalConf.ManagementNode = false
 	config.SetGlobal(globalConf)
@@ -741,7 +737,7 @@ func TestReloadGoroutineLeakWithAsyncWrites(t *testing.T) {
 	globalConf.UseAsyncSessionWrite = true
 	globalConf.EnableJSVM = false
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	specs := BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
@@ -767,7 +763,7 @@ func TestReloadGoroutineLeakWithCircuitBreaker(t *testing.T) {
 	globalConf := config.Global()
 	globalConf.EnableJSVM = false
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	specs := BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
@@ -824,7 +820,7 @@ func TestSkipUrlCleaning(t *testing.T) {
 	globalConf.HttpServerOptions.OverrideDefaults = true
 	globalConf.HttpServerOptions.SkipURLCleaning = true
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()
@@ -879,7 +875,7 @@ func TestCustomDomain(t *testing.T) {
 		globalConf := config.Global()
 		globalConf.EnableCustomDomains = true
 		config.SetGlobal(globalConf)
-		defer resetTestConfig()
+		defer ResetTestConfig()
 
 		BuildAndLoadAPI(
 			func(spec *APISpec) {
@@ -1026,7 +1022,7 @@ func TestCacheEtag(t *testing.T) {
 // 	globalConf := config.Global()
 // 	globalConf.HttpServerOptions.EnableWebSockets = true
 // 	config.SetGlobal(globalConf)
-// 	defer resetTestConfig()
+// 	defer ResetTestConfig()
 
 // 	ts := StartTest()
 // 	defer ts.Close()
@@ -1051,7 +1047,7 @@ func TestWebsocketsSeveralOpenClose(t *testing.T) {
 	globalConf := config.Global()
 	globalConf.HttpServerOptions.EnableWebSockets = true
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()
@@ -1149,7 +1145,7 @@ func TestWebsocketsAndHTTPEndpointMatch(t *testing.T) {
 	globalConf := config.Global()
 	globalConf.HttpServerOptions.EnableWebSockets = true
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()
@@ -1282,7 +1278,7 @@ func createTestUptream(t *testing.T, allowedConns int, readsPerConn int) net.Lis
 func TestKeepAliveConns(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	t.Run("Should use same connection", func(t *testing.T) {
 		// set keep alive option
@@ -1365,7 +1361,7 @@ func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
 	globalCfg.EnableSentinelRateLimiter = true
 	config.SetGlobal(globalCfg)
 
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()
@@ -1428,7 +1424,7 @@ func TestTracing(t *testing.T) {
 func TestBrokenClients(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	globalConf := config.Global()
 	globalConf.ProxyDefaultTimeout = 1

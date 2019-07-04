@@ -444,7 +444,7 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 
 		ts := StartTest()
 		defer ts.Close()
-		defer resetTestConfig()
+		defer ResetTestConfig()
 
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/sample"

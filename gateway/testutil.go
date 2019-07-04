@@ -46,7 +46,7 @@ var (
 	discardMuxer = mux.NewRouter()
 
 	// to simulate time ticks for tests that do reloads
-	reloadTick = make(chan time.Time)
+	ReloadTick = make(chan time.Time)
 
 	// Used to store the test bundles:
 	testMiddlewarePath, _ = ioutil.TempDir("", "tyk-middleware-path")
@@ -139,12 +139,16 @@ func InitTestMain(m *testing.M, genConf ...func(globalConf *config.Config)) int 
 	}
 
 	go startPubSubLoop()
-	go reloadLoop(reloadTick)
+	go reloadLoop(ReloadTick)
 	go reloadQueueLoop()
 	go reloadSimulation()
 	exitCode := m.Run()
 	os.RemoveAll(config.Global().AppPath)
 	return exitCode
+}
+
+func ResetTestConfig() {
+	config.SetGlobal(defaultTestConfig)
 }
 
 func emptyRedis() error {
@@ -382,6 +386,8 @@ func CreateStandardSession() *user.SessionState {
 	session.QuotaRenews = time.Now().Unix() + 20
 	session.QuotaRemaining = 10
 	session.QuotaMax = -1
+	session.Tags = []string{}
+	session.MetaData = make(map[string]interface{})
 	return session
 }
 

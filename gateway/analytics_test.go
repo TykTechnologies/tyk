@@ -27,7 +27,7 @@ func TestGeoIPLookup(t *testing.T) {
 }
 
 func TestURLReplacer(t *testing.T) {
-	defer resetTestConfig()
+	defer ResetTestConfig()
 	globalConf := config.Global()
 	globalConf.AnalyticsConfig.NormaliseUrls.Enabled = true
 	globalConf.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs = true
@@ -87,7 +87,7 @@ func TestURLReplacer(t *testing.T) {
 func BenchmarkURLReplacer(b *testing.B) {
 	b.ReportAllocs()
 
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	globalConf := config.Global()
 	globalConf.AnalyticsConfig.NormaliseUrls.Enabled = true

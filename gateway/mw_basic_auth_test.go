@@ -103,7 +103,7 @@ func TestBasicAuthLegacyWithHashFunc(t *testing.T) {
 	// settings to create BA session with legacy key format
 	globalConf.HashKeyFunction = ""
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()
@@ -134,7 +134,7 @@ func TestBasicAuthCachedUserCollision(t *testing.T) {
 	globalConf.HashKeys = true
 	globalConf.HashKeyFunction = "murmur64"
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()
