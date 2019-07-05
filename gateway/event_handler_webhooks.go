@@ -39,7 +39,8 @@ type WebHookHandler struct {
 	template *template.Template // non-nil if Init is run without error
 	store    storage.Handler
 
-	dashboardService DashboardServiceSender
+	useDefaultTemplate bool
+	dashboardService   DashboardServiceSender
 }
 
 // createConfigObject by default tyk will provide a map[string]interface{} type as a conf, converting it
@@ -98,6 +99,7 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 			}).Error("Could not load the default template: ", err)
 			return err
 		}
+		w.useDefaultTemplate = true
 	}
 
 	log.WithFields(logrus.Fields{
@@ -183,10 +185,13 @@ func (w *WebHookHandler) BuildRequest(reqBody string) (*http.Request, error) {
 	}
 
 	req.Header.Set("User-Agent", "Tyk-Hookshot")
-	req.Header.Set("Content-Type", "application/json")
 
 	for key, val := range w.conf.HeaderList {
 		req.Header.Set(key, val)
+	}
+
+	if req.Header.Get("Content-Type") == "" && w.useDefaultTemplate {
+		req.Header.Set("Content-Type", "application/json")
 	}
 
 	return req, nil
