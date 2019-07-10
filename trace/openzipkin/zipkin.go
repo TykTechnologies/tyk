@@ -3,6 +3,7 @@ package openzipkin
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/opentracing/opentracing-go"
@@ -112,7 +113,7 @@ func extractHTTPHeader(carrier interface{}) (spanContext, error) {
 		singleHeader       string
 	)
 	err := c.ForeachKey(func(key, val string) error {
-		switch key {
+		switch strings.ToLower(key) {
 		case b3.TraceID:
 			traceIDHeader = val
 		case b3.SpanID:
