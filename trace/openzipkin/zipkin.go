@@ -208,6 +208,15 @@ func (z *zipkinTracer) StartSpan(operationName string, opts ...opentracing.Start
 			}
 			o = append(o, zipkin.Tags(t))
 		}
+		for _, ref := range os.References {
+			switch ref.Type {
+			case opentracing.ChildOfRef:
+				sp := ref.ReferencedContext.(spanContext)
+				o = append(o, zipkin.Parent(
+					sp.SpanContext,
+				))
+			}
+		}
 	}
 	sp := z.zip.StartSpan(operationName, o...)
 	return Span{tr: z, span: sp}
