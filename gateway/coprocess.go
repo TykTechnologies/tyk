@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/url"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/Sirupsen/logrus"
@@ -221,6 +222,7 @@ func (m *CoProcessMiddleware) EnabledForSpec() bool {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
 		}).Debug("Enabling CP middleware.")
+		m.successHandler = &SuccessHandler{m.BaseMiddleware}
 		return true
 	}
 
@@ -281,7 +283,10 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		return errors.New("Middleware error"), 500
 	}
 
+	t1 := time.Now()
 	returnObject, err := coProcessor.Dispatch(object)
+	t2 := time.Now()
+
 	if err != nil {
 		logger.WithError(err).Error("Dispatch error")
 		if m.HookType == coprocess.HookType_CustomKeyCheck {
@@ -290,6 +295,9 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			return errors.New("Middleware error"), 500
 		}
 	}
+
+	ms := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001
+	m.logger.WithField("ms", ms).Debug("gRPC request processing took")
 
 	coProcessor.ObjectPostProcess(returnObject, r)
 
@@ -330,11 +338,6 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		return errors.New(errorMsg), int(returnObject.Request.ReturnOverrides.ResponseCode)
 	}
 
-	// TODO: refactor CP initialization in api_loader.go
-	if m.successHandler == nil {
-		m.successHandler = &SuccessHandler{m.BaseMiddleware}
-	}
-
 	if returnObject.Request.ReturnOverrides.ResponseCode > 0 {
 		for h, v := range returnObject.Request.ReturnOverrides.Headers {
 			w.Header().Set(h, v)
@@ -343,7 +346,6 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		w.Write([]byte(returnObject.Request.ReturnOverrides.ResponseError))
 
 		// Record analytics data:
-		// TODO: fix timing
 		res := new(http.Response)
 		res.Proto = "HTTP/1.0"
 		res.ProtoMajor = 1
@@ -352,8 +354,8 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		res.Body = nopCloser{
 			ReadSeeker: strings.NewReader(returnObject.Request.ReturnOverrides.ResponseError),
 		}
-		res.ContentLength = int64(len(resData))
-		m.successHandler.RecordHit(r, 0, int(returnObject.Request.ReturnOverrides.ResponseCode), res)
+		res.ContentLength = int64(len(returnObject.Request.ReturnOverrides.ResponseError))
+		m.successHandler.RecordHit(r, int64(ms), int(returnObject.Request.ReturnOverrides.ResponseCode), res)
 		return nil, mwStatusRespond
 	}
 
