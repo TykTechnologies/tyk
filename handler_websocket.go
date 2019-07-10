@@ -125,6 +125,11 @@ func IsWebsocket(req *http.Request) bool {
 		return false
 	}
 
+	contentType := strings.ToLower(strings.TrimSpace(req.Header.Get("Accept")))
+	if contentType == "text/event-stream" {
+		return true
+	}
+
 	connection := strings.ToLower(strings.TrimSpace(req.Header.Get("Connection")))
 	if connection != "upgrade" {
 		return false
