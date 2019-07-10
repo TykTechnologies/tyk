@@ -237,7 +237,17 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	copiedResponse := forceResponse(w, r, &newResponseData, d.Spec, session, false, d.Logger())
 
 	if copiedResponse != nil {
-		go d.sh.RecordHit(r, 0, copiedResponse.StatusCode, copiedResponse)
+		// To prevent race condition on response, make deep-copy
+		freshResp := *copiedResponse
+		contents, err := ioutil.ReadAll(copiedResponse.Body)
+		if err != nil {
+			log.Error("Error while reading response body:", err)
+		}
+
+		freshResp.Body = ioutil.NopCloser(bytes.NewReader(contents))
+		copiedResponse.Body = ioutil.NopCloser(bytes.NewReader(contents))
+
+		go d.sh.RecordHit(r, 0, copiedResponse.StatusCode, &freshResp)
 	}
 
 	return copiedResponse

@@ -319,7 +319,17 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	// Record analytics
 	if !m.Spec.DoNotTrack {
-		go m.sh.RecordHit(r, 0, newRes.StatusCode, newRes)
+		// To prevent race condition on response, make deep-copy
+		freshResp := *newRes
+		contents, err := ioutil.ReadAll(newRes.Body)
+		if err != nil {
+			log.Error("Error while reading response body:", err)
+		}
+
+		freshResp.Body = ioutil.NopCloser(bytes.NewReader(contents))
+		newRes.Body = ioutil.NopCloser(bytes.NewReader(contents))
+
+		go m.sh.RecordHit(r, 0, newRes.StatusCode, &freshResp)
 	}
 
 	// Stop any further execution
