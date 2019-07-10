@@ -34,6 +34,8 @@ type CoProcessMiddleware struct {
 	HookName         string
 	MiddlewareDriver apidef.MiddlewareDriver
 	RawBodyOnly      bool
+
+	successHandler *SuccessHandler
 }
 
 func (m *CoProcessMiddleware) Name() string {
