@@ -195,7 +195,21 @@ func NewTracer(zip *zipkin.Tracer) *zipkinTracer {
 }
 
 func (z *zipkinTracer) StartSpan(operationName string, opts ...opentracing.StartSpanOption) opentracing.Span {
-	sp := z.zip.StartSpan(operationName)
+	var o []zipkin.SpanOption
+	if len(opts) > 0 {
+		var os opentracing.StartSpanOptions
+		for _, opt := range opts {
+			opt.Apply(&os)
+		}
+		if len(os.Tags) > 0 {
+			t := make(map[string]string)
+			for k, v := range os.Tags {
+				t[k] = fmt.Sprint(v)
+			}
+			o = append(o, zipkin.Tags(t))
+		}
+	}
+	sp := z.zip.StartSpan(operationName, o...)
 	return Span{tr: z, span: sp}
 }
 
