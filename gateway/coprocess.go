@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/url"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/Sirupsen/logrus"
@@ -36,6 +37,8 @@ type CoProcessMiddleware struct {
 	HookName         string
 	MiddlewareDriver apidef.MiddlewareDriver
 	RawBodyOnly      bool
+
+	successHandler *SuccessHandler
 }
 
 func (mw *CoProcessMiddleware) Name() string {
@@ -49,6 +52,7 @@ func CreateCoProcessMiddleware(hookName string, hookType coprocess.HookType, mwD
 		HookType:         hookType,
 		HookName:         hookName,
 		MiddlewareDriver: mwDriver,
+		successHandler:   &SuccessHandler{baseMid},
 	}
 
 	return createMiddleware(dMiddleware)
@@ -326,12 +330,30 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		return errors.New(errorMsg), int(returnObject.Request.ReturnOverrides.ResponseCode)
 	}
 
+	// TODO: refactor CP initialization in api_loader.go
+	if m.successHandler == nil {
+		m.successHandler = &SuccessHandler{m.BaseMiddleware}
+	}
+
 	if returnObject.Request.ReturnOverrides.ResponseCode > 0 {
 		for h, v := range returnObject.Request.ReturnOverrides.Headers {
 			w.Header().Set(h, v)
 		}
 		w.WriteHeader(int(returnObject.Request.ReturnOverrides.ResponseCode))
 		w.Write([]byte(returnObject.Request.ReturnOverrides.ResponseError))
+
+		// Record analytics data:
+		// TODO: fix timing
+		res := new(http.Response)
+		res.Proto = "HTTP/1.0"
+		res.ProtoMajor = 1
+		res.ProtoMinor = 0
+		res.StatusCode = int(returnObject.Request.ReturnOverrides.ResponseCode)
+		res.Body = nopCloser{
+			ReadSeeker: strings.NewReader(returnObject.Request.ReturnOverrides.ResponseError),
+		}
+		res.ContentLength = int64(len(resData))
+		m.successHandler.RecordHit(r, 0, int(returnObject.Request.ReturnOverrides.ResponseCode), res)
 		return nil, mwStatusRespond
 	}
 
