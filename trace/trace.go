@@ -4,6 +4,7 @@ import (
 	"io"
 
 	"github.com/TykTechnologies/tyk/trace/jaeger"
+	"github.com/TykTechnologies/tyk/trace/openzipkin"
 	"github.com/opentracing/opentracing-go"
 )
 
@@ -11,7 +12,6 @@ type Tracer interface {
 	Name() string
 	opentracing.Tracer
 	io.Closer
-	TraceIDHeader() string
 }
 
 // NoopTracer wraps opentracing.NoopTracer to satisfy Tracer interface.
@@ -28,15 +28,13 @@ func (n NoopTracer) Name() string {
 	return "NoopTracer"
 }
 
-func (n NoopTracer) TraceIDHeader() string {
-	return ""
-}
-
 // Init returns a tracer for a given name.
 func Init(name string, service string, opts map[string]interface{}, logger Logger) (Tracer, error) {
 	switch name {
 	case jaeger.Name:
 		return jaeger.Init(service, opts, logger)
+	case openzipkin.Name:
+		return openzipkin.Init(service, opts)
 	default:
 		return NoopTracer{}, nil
 	}

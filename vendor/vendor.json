@@ -509,6 +509,48 @@
 			"revisionTime": "2019-03-23T20:25:03Z"
 		},
 		{
+			"checksumSHA1": "dFMmX9FSHumkkEI2OaZLX97lB6o=",
+			"path": "github.com/openzipkin/zipkin-go",
+			"revision": "1277a5f30075b9c13d37775aed4f0f3b44d1a710",
+			"revisionTime": "2019-07-09T15:00:55Z"
+		},
+		{
+			"checksumSHA1": "3JQxW7T5X72fM7FCPp+Aj+Wdbpc=",
+			"path": "github.com/openzipkin/zipkin-go/idgenerator",
+			"revision": "1277a5f30075b9c13d37775aed4f0f3b44d1a710",
+			"revisionTime": "2019-07-09T15:00:55Z"
+		},
+		{
+			"checksumSHA1": "xDKODRXa9xpJ5dU9G5wYD4DYyNM=",
+			"path": "github.com/openzipkin/zipkin-go/model",
+			"revision": "1277a5f30075b9c13d37775aed4f0f3b44d1a710",
+			"revisionTime": "2019-07-09T15:00:55Z"
+		},
+		{
+			"checksumSHA1": "wiE2o/B3MDs8Ma0N22Q9gdeve9g=",
+			"path": "github.com/openzipkin/zipkin-go/propagation",
+			"revision": "1277a5f30075b9c13d37775aed4f0f3b44d1a710",
+			"revisionTime": "2019-07-09T15:00:55Z"
+		},
+		{
+			"checksumSHA1": "eGW3FcVBCPA+oL5vbZb92u43W7Q=",
+			"path": "github.com/openzipkin/zipkin-go/propagation/b3",
+			"revision": "1277a5f30075b9c13d37775aed4f0f3b44d1a710",
+			"revisionTime": "2019-07-09T15:00:55Z"
+		},
+		{
+			"checksumSHA1": "UqHH+7beZuR/f0ovM5pJKoHbuwY=",
+			"path": "github.com/openzipkin/zipkin-go/reporter",
+			"revision": "1277a5f30075b9c13d37775aed4f0f3b44d1a710",
+			"revisionTime": "2019-07-09T15:00:55Z"
+		},
+		{
+			"checksumSHA1": "QFmesSCNJXbC+yhdKzrNIMt3r/4=",
+			"path": "github.com/openzipkin/zipkin-go/reporter/http",
+			"revision": "1277a5f30075b9c13d37775aed4f0f3b44d1a710",
+			"revisionTime": "2019-07-09T15:00:55Z"
+		},
+		{
 			"checksumSHA1": "xmWd9nj+yZQ5TiHznuoyj4fkknk=",
 			"path": "github.com/oschwald/maxminddb-golang",
 			"revision": "2af0544f8e032bc7a363e897fbd9c6ed4884a1d6",
