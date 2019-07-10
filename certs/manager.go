@@ -105,6 +105,8 @@ func ParsePEM(data []byte, secret string) ([]*pem.Block, error) {
 		if x509.IsEncryptedPEMBlock(block) {
 			var err error
 			block.Bytes, err = x509.DecryptPEMBlock(block, []byte(secret))
+			block.Headers = nil
+			block.Type = strings.Replace(block.Type, "ENCRYPTED ", "", 1)
 
 			if err != nil {
 				return nil, err
@@ -270,6 +272,7 @@ func (c *CertificateManager) List(certIDs []string, mode CertificateType) (out [
 		cert, err = ParsePEMCertificate(rawCert, c.secret)
 		if err != nil {
 			c.logger.Error("Error while parsing certificate: ", id, " ", err)
+			c.logger.Debug("Failed certificate: ", string(rawCert))
 			out = append(out, nil)
 			continue
 		}
