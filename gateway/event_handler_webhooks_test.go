@@ -235,8 +235,8 @@ func TestWebhookContentTypeHeader(t *testing.T) {
 		{"MissingTemplatePath/CustomHeaders", "", map[string]string{"Content-Type": "application/xml"}, "application/xml"},
 		{"InvalidTemplatePath", "randomPath", nil, "application/json"},
 		{"InvalidTemplatePath/CustomHeaders", "randomPath", map[string]string{"Content-Type": "application/xml"}, "application/xml"},
-		{"CustomTemplate", filepath.Join(templatePath, "breaker_webhook.json"), nil, ""},
-		{"CustomTemplate/CustomHeaders", filepath.Join(templatePath, "breaker_webhook.json"), map[string]string{"Content-Type": "application/json"}, "application/json"},
+		{"CustomTemplate", filepath.Join(templatePath, "transform_test.tmpl"), nil, ""},
+		{"CustomTemplate/CustomHeaders", filepath.Join(templatePath, "breaker_webhook.json"), map[string]string{"Content-Type": "application/xml"}, "application/xml"},
 	}
 
 	for _, ts := range tests {
