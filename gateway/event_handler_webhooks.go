@@ -39,8 +39,8 @@ type WebHookHandler struct {
 	template *template.Template // non-nil if Init is run without error
 	store    storage.Handler
 
-	useDefaultTemplate bool
-	dashboardService   DashboardServiceSender
+	contentType      string
+	dashboardService DashboardServiceSender
 }
 
 // createConfigObject by default tyk will provide a map[string]interface{} type as a conf, converting it
@@ -82,6 +82,10 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 				"target": w.conf.TargetPath,
 			}).Warning("Custom template load failure, using default: ", err)
 		}
+
+		if strings.HasSuffix(w.conf.TemplatePath, ".json") {
+			w.contentType = "application/json"
+		}
 	}
 
 	// We use the default if TemplatePath was empty or if we failed
@@ -99,7 +103,7 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 			}).Error("Could not load the default template: ", err)
 			return err
 		}
-		w.useDefaultTemplate = true
+		w.contentType = "application/json"
 	}
 
 	log.WithFields(logrus.Fields{
@@ -190,8 +194,8 @@ func (w *WebHookHandler) BuildRequest(reqBody string) (*http.Request, error) {
 		req.Header.Set(key, val)
 	}
 
-	if req.Header.Get("Content-Type") == "" && w.useDefaultTemplate {
-		req.Header.Set("Content-Type", "application/json")
+	if req.Header.Get("Content-Type") == "" {
+		req.Header.Set("Content-Type", w.contentType)
 	}
 
 	return req, nil

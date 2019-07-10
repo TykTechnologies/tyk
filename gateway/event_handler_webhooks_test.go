@@ -13,7 +13,7 @@ func createGetHandler() *WebHookHandler {
 		TargetPath:   TestHttpGet,
 		Method:       "GET",
 		EventTimeout: 10,
-		TemplatePath: "templates/default_webhook.json",
+		TemplatePath: "../templates/default_webhook.json",
 		HeaderList:   map[string]string{"x-tyk-test": "TEST"},
 	}
 	ev := &WebHookHandler{}
@@ -28,7 +28,7 @@ func TestNewValid(t *testing.T) {
 	err := h.Init(map[string]interface{}{
 		"method":        "POST",
 		"target_path":   testHttpPost,
-		"template_path": "templates/default_webhook.json",
+		"template_path": "../templates/default_webhook.json",
 		"header_map":    map[string]string{"X-Tyk-Test-Header": "Tyk v1.BANANA"},
 		"event_timeout": 10,
 	})
@@ -42,7 +42,7 @@ func TestNewInvalid(t *testing.T) {
 	err := h.Init(map[string]interface{}{
 		"method":        123,
 		"target_path":   testHttpPost,
-		"template_path": "templates/default_webhook.json",
+		"template_path": "../templates/default_webhook.json",
 		"header_map":    map[string]string{"X-Tyk-Test-Header": "Tyk v1.BANANA"},
 		"event_timeout": 10,
 	})
