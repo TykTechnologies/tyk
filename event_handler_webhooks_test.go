@@ -13,7 +13,7 @@ func createGetHandler() *WebHookHandler {
 		TargetPath:   testHttpGet,
 		Method:       "GET",
 		EventTimeout: 10,
-		TemplatePath: "../templates/default_webhook.json",
+		TemplatePath: "./templates/default_webhook.json",
 		HeaderList:   map[string]string{"x-tyk-test": "TEST"},
 	}
 	ev := &WebHookHandler{}
@@ -28,7 +28,7 @@ func TestNewValid(t *testing.T) {
 	err := h.Init(map[string]interface{}{
 		"method":        "POST",
 		"target_path":   testHttpPost,
-		"template_path": "../templates/default_webhook.json",
+		"template_path": "./templates/default_webhook.json",
 		"header_map":    map[string]string{"X-Tyk-Test-Header": "Tyk v1.BANANA"},
 		"event_timeout": 10,
 	})
@@ -42,7 +42,7 @@ func TestNewInvalid(t *testing.T) {
 	err := h.Init(map[string]interface{}{
 		"method":        123,
 		"target_path":   testHttpPost,
-		"template_path": "../templates/default_webhook.json",
+		"template_path": "./templates/default_webhook.json",
 		"header_map":    map[string]string{"X-Tyk-Test-Header": "Tyk v1.BANANA"},
 		"event_timeout": 10,
 	})
@@ -187,10 +187,10 @@ func TestNewCustomTemplate(t *testing.T) {
 	}{
 		{"UseDefault", false, "", false},
 		{"FallbackToDefault", false, "missing_webhook.json", false},
-		{"UseCustom", false, "templates/breaker_webhook.json", false},
+		{"UseCustom", false, "./templates/breaker_webhook.json", false},
 		{"MissingDefault", true, "", true},
 		{"MissingDefaultFallback", true, "missing_webhook.json", true},
-		{"MissingDefaultNotNeeded", true, "templates/breaker_webhook.json", false},
+		{"MissingDefaultNotNeeded", true, "./templates/breaker_webhook.json", false},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -235,7 +235,7 @@ func TestWebhookContentTypeHeader(t *testing.T) {
 		{"MissingTemplatePath/CustomHeaders", "", map[string]string{"Content-Type": "application/xml"}, "application/xml"},
 		{"InvalidTemplatePath", "randomPath", nil, "application/json"},
 		{"InvalidTemplatePath/CustomHeaders", "randomPath", map[string]string{"Content-Type": "application/xml"}, "application/xml"},
-		{"CustomTemplate", filepath.Join(templatePath, "breaker_webhook.json"), nil, ""},
+		{"CustomTemplate", filepath.Join(templatePath, "transform_test.tmpl"), nil, ""},
 		{"CustomTemplate/CustomHeaders", filepath.Join(templatePath, "breaker_webhook.json"), map[string]string{"Content-Type": "application/json"}, "application/json"},
 	}
 
