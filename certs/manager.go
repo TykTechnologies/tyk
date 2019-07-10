@@ -272,7 +272,7 @@ func (c *CertificateManager) List(certIDs []string, mode CertificateType) (out [
 		cert, err = ParsePEMCertificate(rawCert, c.secret)
 		if err != nil {
 			c.logger.Error("Error while parsing certificate: ", id, " ", err)
-			c.logger.Error("Failed certificate: ", string(rawCert))
+			c.logger.Debug("Failed certificate: ", string(rawCert))
 			out = append(out, nil)
 			continue
 		}
