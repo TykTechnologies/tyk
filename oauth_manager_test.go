@@ -930,7 +930,7 @@ func TestClientRefreshRequestDouble(t *testing.T) {
 }
 
 func TestTokenEndpointHeaders(t *testing.T) {
-	ts := StartTest()
+	ts := newTykTestServer()
 	defer ts.Close()
 
 	spec := loadTestOAuthSpec()
