@@ -1051,3 +1051,40 @@ func TestClientRefreshRequestDouble(t *testing.T) {
 		})
 	})
 }
+
+func TestTokenEndpointHeaders(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+
+	spec := loadTestOAuthSpec()
+	createTestOAuthClient(spec, authClientID)
+
+	param := make(url.Values)
+	param.Set("grant_type", "client_credentials")
+	param.Set("redirect_uri", authRedirectUri)
+	param.Set("client_id", authClientID)
+
+	headers := map[string]string{
+		"Content-Type":  "application/x-www-form-urlencoded",
+		"Authorization": "Basic MTIzNDphYWJiY2NkZA==",
+	}
+
+	securityAndCacheHeaders := map[string]string{
+		"X-Content-Type-Options":    "nosniff",
+		"X-XSS-Protection":          "1; mode=block",
+		"X-Frame-Options":           "DENY",
+		"Strict-Transport-Security": "max-age=63072000; includeSubDomains",
+		"Cache-Control":             "no-cache, no-store, must-revalidate",
+		"Pragma":                    "no-cache",
+		"Expires":                   "0",
+	}
+
+	ts.Run(t, test.TestCase{
+		Path:         "/APIID/oauth/token/",
+		Data:         param.Encode(),
+		Headers:      headers,
+		Method:       http.MethodPost,
+		Code:         http.StatusOK,
+		HeadersMatch: securityAndCacheHeaders,
+	})
+}
