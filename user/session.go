@@ -3,6 +3,7 @@ package user
 import (
 	"crypto/md5"
 	"fmt"
+	"time"
 
 	"github.com/TykTechnologies/tyk/config"
 	logger "github.com/TykTechnologies/tyk/log"
@@ -56,6 +57,7 @@ type SessionState struct {
 	Per                float64                     `json:"per" msg:"per"`
 	ThrottleInterval   float64                     `json:"throttle_interval" msg:"throttle_interval"`
 	ThrottleRetryLimit int                         `json:"throttle_retry_limit" msg:"throttle_retry_limit"`
+	DateCreated        time.Time                   `json:"date_created" msg:"date_created"`
 	Expires            int64                       `json:"expires" msg:"expires"`
 	QuotaMax           int64                       `json:"quota_max" msg:"quota_max"`
 	QuotaRenews        int64                       `json:"quota_renews" msg:"quota_renews"`
