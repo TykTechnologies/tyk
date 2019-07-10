@@ -349,7 +349,7 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 			}
 		}
 	} else {
-		newSession.CreatedAt = time.Now().Unix()
+		newSession.DateCreated = time.Now().Unix()
 	}
 
 	// Update our session object (create it)
@@ -1191,7 +1191,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
-	newSession.CreatedAt = time.Now().Unix()
+	newSession.DateCreated = time.Now().Unix()
 
 	if len(newSession.AccessRights) > 0 {
 		// reset API-level limit to nil if any has a zero-value
