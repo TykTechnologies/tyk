@@ -1238,7 +1238,9 @@ func startDRL() {
 type mainHandler struct{}
 
 func (_ mainHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	reloadMu.Lock()
 	AddNewRelicInstrumentation(NewRelicApplication, mainRouter)
+	reloadMu.Unlock()
 
 	// make request body to be nopCloser and re-readable before serve it through chain of middlewares
 	nopCloseRequestBody(r)
