@@ -10,8 +10,6 @@ import (
 // Name is the name of this tracer.
 const Name = "jaeger"
 
-const OpentracingHeader = "Uber-Trace-Id"
-
 type Trace struct {
 	opentracing.Tracer
 	io.Closer
@@ -19,10 +17,6 @@ type Trace struct {
 
 func (Trace) Name() string {
 	return Name
-}
-
-func (Trace) TraceIDHeader() string {
-	return OpentracingHeader
 }
 
 type Logger interface {
