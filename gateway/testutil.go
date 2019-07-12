@@ -509,7 +509,7 @@ func firstVals(vals map[string][]string) map[string]string {
 type TestConfig struct {
 	sepatateControlAPI bool
 	Delay              time.Duration
-	hotReload          bool
+	HotReload          bool
 	overrideDefaults   bool
 	CoprocessConfig    config.CoProcessConfig
 }
@@ -553,7 +553,7 @@ func (s *Test) Start() {
 		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
 	}
 
-	if s.config.hotReload {
+	if s.config.HotReload {
 		listen(s.ln, s.cln, nil)
 	} else {
 		listen(s.ln, s.cln, fmt.Errorf("Without goagain"))
@@ -625,7 +625,7 @@ func (s *Test) RunExt(t testing.TB, testCases ...test.TestCase) {
 	}
 
 	for i, m := range testMatrix {
-		s.config.hotReload = m.goagain
+		s.config.HotReload = m.goagain
 		s.config.overrideDefaults = m.overrideDefaults
 
 		if i > 0 {
