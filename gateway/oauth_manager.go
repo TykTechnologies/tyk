@@ -261,7 +261,7 @@ func (o *OAuthManager) HandleAuthorisation(r *http.Request, complete bool, sessi
 	return resp
 }
 
-// JSONToFormValues if r has heaert Content-Type set to application/json this
+// JSONToFormValues if r has header Content-Type set to application/json this
 // will decode json as map[string]string and adds the key/value pairs in r.Form.
 func JSONToFormValues(r *http.Request) error {
 	if r.Header.Get("Content-Type") == "application/json" {
