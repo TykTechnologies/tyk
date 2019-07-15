@@ -5,6 +5,7 @@ package gateway
 */
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/url"
 	"reflect"
@@ -1086,5 +1087,47 @@ func TestTokenEndpointHeaders(t *testing.T) {
 		Method:       http.MethodPost,
 		Code:         http.StatusOK,
 		HeadersMatch: securityAndCacheHeaders,
+	})
+}
+
+func TestJSONToFormValues(t *testing.T) {
+	o := map[string]string{
+		"username":      "test@test.com",
+		"password":      "12345678",
+		"scope":         "client",
+		"client_id":     "test-client-id",
+		"client_secret": "test-client-secret",
+		"grant_type":    "password",
+	}
+	b, _ := json.Marshal(o)
+	r, err := http.NewRequest(http.MethodPost, "/token", bytes.NewReader(b))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Run("no application/json header", func(ts *testing.T) {
+		err := JSONToFormValues(r)
+		if err != nil {
+			ts.Fatal(err)
+		}
+		for k, v := range o {
+			g := r.Form.Get(k)
+			if g == v {
+				ts.Errorf("expected %s not to be set", v)
+			}
+		}
+	})
+
+	t.Run("with application/json header", func(ts *testing.T) {
+		r.Header.Set("Content-Type", "application/json")
+		err := JSONToFormValues(r)
+		if err != nil {
+			ts.Fatal(err)
+		}
+		for k, v := range o {
+			g := r.Form.Get(k)
+			if g != v {
+				ts.Errorf("expected %s got %s", v, g)
+			}
+		}
 	})
 }

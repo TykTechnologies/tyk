@@ -7,6 +7,7 @@ import (
 	"errors"
 	"math"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/lonelycode/osin"
@@ -260,9 +261,45 @@ func (o *OAuthManager) HandleAuthorisation(r *http.Request, complete bool, sessi
 	return resp
 }
 
+// JSONToFormValues if r has header Content-Type set to application/json this
+// will decode request body as json to map[string]string and adds the key/value
+// pairs in r.Form.
+func JSONToFormValues(r *http.Request) error {
+	if r.Header.Get("Content-Type") == "application/json" {
+		var o map[string]string
+		// we don't want to mess with the original body so we are going to work with a
+		// copy.
+		body, err := r.GetBody()
+		if err != nil {
+			return err
+		}
+		err = json.NewDecoder(body).Decode(&o)
+		if err != nil {
+			return err
+		}
+		if len(o) > 0 {
+			if r.Form == nil {
+				r.Form = make(url.Values)
+			}
+			for k, v := range o {
+				r.Form.Set(k, v)
+			}
+		}
+
+	}
+	return nil
+}
+
 // HandleAccess wraps an access request with osin's primitives
 func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 	resp := o.OsinServer.NewResponse()
+	// we are intentionally ignoring errors, because this is called again by
+	// osin.We are only doing this to ensure r.From is properly initialized incase
+	// r.ParseForm was success
+	r.ParseForm()
+	if err := JSONToFormValues(r); err != nil {
+		log.Errorf("trying to set url values decoded from json body :%v", err)
+	}
 	var username string
 	if ar := o.OsinServer.HandleAccessRequest(resp, r); ar != nil {
 
