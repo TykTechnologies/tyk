@@ -34,6 +34,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -257,10 +258,10 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		} else {
 			req.URL.RawQuery = targetQuery + "&" + req.URL.RawQuery
 		}
-		if _, ok := req.Header["User-Agent"]; !ok {
+		if _, ok := req.Header[headers.UserAgent]; !ok {
 			// Set Tyk's own default user agent. Without
 			// this line, we would get the net/http default.
-			req.Header.Set("User-Agent", defaultUserAgent)
+			req.Header.Set(headers.UserAgent, defaultUserAgent)
 		}
 
 		if spec.GlobalConfig.HttpServerOptions.SkipTargetPathEscaping {
@@ -639,8 +640,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	addrs := requestIPHops(req)
-	if !p.CheckHeaderInRemoveList("X-Forwarded-For", p.TykAPISpec, req) {
-		outreq.Header.Set("X-Forwarded-For", addrs)
+	if !p.CheckHeaderInRemoveList(headers.XForwardFor, p.TykAPISpec, req) {
+		outreq.Header.Set(headers.XForwardFor, addrs)
 	}
 
 	// Circuit breaker
@@ -770,7 +771,7 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 
 	// Remove hop-by-hop headers listed in the
 	// "Connection" header of the response.
-	if c := res.Header.Get("Connection"); c != "" {
+	if c := res.Header.Get(headers.Connection); c != "" {
 		for _, f := range strings.Split(c, ",") {
 			if f = strings.TrimSpace(f); f != "" {
 				res.Header.Del(f)
@@ -785,7 +786,7 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 
 	// Close connections
 	if config.Global().CloseConnections {
-		res.Header.Set("Connection", "close")
+		res.Header.Set(headers.Connection, "close")
 	}
 
 	// Add resource headers

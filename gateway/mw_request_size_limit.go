@@ -8,6 +8,7 @@ import (
 	"github.com/Sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/headers"
 )
 
 // TransformMiddleware is a middleware that will apply a template to a request body to transform it's contents ready for an upstream API
@@ -29,7 +30,7 @@ func (t *RequestSizeLimitMiddleware) EnabledForSpec() bool {
 }
 
 func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimit int64) (error, int) {
-	statedCL := r.Header.Get("Content-Length")
+	statedCL := r.Header.Get(headers.ContentLength)
 	if statedCL == "" {
 		return errors.New("Content length is required for this request"), 411
 	}

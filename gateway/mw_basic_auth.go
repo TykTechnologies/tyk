@@ -17,6 +17,7 @@ import (
 	"github.com/TykTechnologies/murmur3"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
@@ -74,12 +75,12 @@ func (k *BasicAuthKeyIsValid) EnabledForSpec() bool {
 func (k *BasicAuthKeyIsValid) requestForBasicAuth(w http.ResponseWriter, msg string) (error, int) {
 	authReply := "Basic realm=\"" + k.Spec.Name + "\""
 
-	w.Header().Add("WWW-Authenticate", authReply)
+	w.Header().Add(headers.WWWAuthenticate, authReply)
 	return errors.New(msg), http.StatusUnauthorized
 }
 
 func (k *BasicAuthKeyIsValid) basicAuthHeaderCredentials(w http.ResponseWriter, r *http.Request) (username, password string, err error, code int) {
-	token := r.Header.Get("Authorization")
+	token := r.Header.Get(headers.Authorization)
 	logger := k.Logger().WithField("key", obfuscateKey(token))
 	if token == "" {
 		// No header value, fail
@@ -153,10 +154,10 @@ func (k *BasicAuthKeyIsValid) basicAuthBodyCredentials(w http.ResponseWriter, r 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	username, password, err, code := k.basicAuthHeaderCredentials(w, r)
-	token := r.Header.Get("Authorization")
+	token := r.Header.Get(headers.Authorization)
 	if err != nil {
 		if k.Spec.BasicAuth.ExtractFromBody {
-			w.Header().Del("WWW-Authenticate")
+			w.Header().Del(headers.WWWAuthenticate)
 			username, password, err, code = k.basicAuthBodyCredentials(w, r)
 		} else {
 			k.Logger().Warn("Attempted access with malformed header, no auth header found.")

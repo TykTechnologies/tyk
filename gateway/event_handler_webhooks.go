@@ -17,6 +17,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -84,7 +85,7 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 		}
 
 		if strings.HasSuffix(w.conf.TemplatePath, ".json") {
-			w.contentType = "application/json"
+			w.contentType = headers.ApplicationJSON
 		}
 	}
 
@@ -103,7 +104,7 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 			}).Error("Could not load the default template: ", err)
 			return err
 		}
-		w.contentType = "application/json"
+		w.contentType = headers.ApplicationJSON
 	}
 
 	log.WithFields(logrus.Fields{
@@ -188,14 +189,14 @@ func (w *WebHookHandler) BuildRequest(reqBody string) (*http.Request, error) {
 		return nil, err
 	}
 
-	req.Header.Set("User-Agent", "Tyk-Hookshot")
+	req.Header.Set(headers.UserAgent, headers.TykHookshot)
 
 	for key, val := range w.conf.HeaderList {
 		req.Header.Set(key, val)
 	}
 
-	if req.Header.Get("Content-Type") == "" {
-		req.Header.Set("Content-Type", w.contentType)
+	if req.Header.Get(headers.ContentType) == "" {
+		req.Header.Set(headers.ContentType, w.contentType)
 	}
 
 	return req, nil

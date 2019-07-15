@@ -9,13 +9,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/request"
 )
 
 const (
 	defaultTemplateName   = "error"
 	defaultTemplateFormat = "json"
-	defaultContentType    = "application/json"
+	defaultContentType    = headers.ApplicationJSON
 )
 
 // APIError is generic error object returned if there is something wrong with the request
@@ -37,16 +38,16 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		var templateExtension string
 		var contentType string
 
-		switch r.Header.Get("Content-Type") {
-		case "application/xml":
+		switch r.Header.Get(headers.ContentType) {
+		case headers.ApplicationXML:
 			templateExtension = "xml"
-			contentType = "application/xml"
+			contentType = headers.ApplicationXML
 		default:
 			templateExtension = "json"
-			contentType = "application/json"
+			contentType = headers.ApplicationJSON
 		}
 
-		w.Header().Set("Content-Type", contentType)
+		w.Header().Set(headers.ContentType, contentType)
 
 		templateName := "error_" + strconv.Itoa(errCode) + "." + templateExtension
 
@@ -63,17 +64,17 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		if tmpl == nil {
 			templateName = defaultTemplateName + "." + defaultTemplateFormat
 			tmpl = templates.Lookup(templateName)
-			w.Header().Set("Content-Type", defaultContentType)
+			w.Header().Set(headers.ContentType, defaultContentType)
 		}
 
 		//If the config option is not set or is false, add the header
 		if !e.Spec.GlobalConfig.HideGeneratorHeader {
-			w.Header().Add("X-Generator", "tyk.io")
+			w.Header().Add(headers.XGenerator, "tyk.io")
 		}
 
 		// Close connections
 		if e.Spec.GlobalConfig.CloseConnections {
-			w.Header().Add("Connection", "close")
+			w.Header().Add(headers.Connection, "close")
 		}
 
 		// Need to return the correct error code!
@@ -155,7 +156,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			trackedPath,
 			r.URL.Path,
 			r.ContentLength,
-			r.Header.Get("User-Agent"),
+			r.Header.Get(headers.UserAgent),
 			t.Day(),
 			t.Month(),
 			t.Year(),

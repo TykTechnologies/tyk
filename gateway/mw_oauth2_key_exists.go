@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/headers"
 )
 
 const (
@@ -31,7 +32,7 @@ func (k *Oauth2KeyExists) EnabledForSpec() bool {
 func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	logger := k.Logger()
 	// We're using OAuth, start checking for access keys
-	token := r.Header.Get("Authorization")
+	token := r.Header.Get(headers.Authorization)
 	parts := strings.Split(token, " ")
 
 	if len(parts) < 2 {

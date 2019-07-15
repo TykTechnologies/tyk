@@ -1,11 +1,13 @@
 package gateway
 
 import (
+	"net/http"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/headers"
 )
 
 func createGetHandler() *WebHookHandler {
@@ -90,15 +92,15 @@ func TestBuildRequest(t *testing.T) {
 	if err != nil {
 		t.Error("Request should have built cleanly.")
 	}
-	if req.Method != "GET" {
+	if req.Method != http.MethodGet {
 		t.Error("Method hould be GET")
 	}
 
-	if got := req.Header.Get("User-Agent"); got != "Tyk-Hookshot" {
+	if got := req.Header.Get(headers.UserAgent); got != headers.TykHookshot {
 		t.Error("Header User Agent is not correct!")
 	}
 
-	if got := req.Header.Get("Content-Type"); got != "application/json" {
+	if got := req.Header.Get(headers.ContentType); got != headers.ApplicationJSON {
 		t.Error("Header Content-Type is not correct!")
 	}
 }
@@ -256,7 +258,7 @@ func TestWebhookContentTypeHeader(t *testing.T) {
 				t.Fatal("Failed to build request with error ", err)
 			}
 
-			if req.Header.Get("Content-Type") != ts.ExpectedContentType {
+			if req.Header.Get(headers.ContentType) != ts.ExpectedContentType {
 				t.Fatalf("Expect Content-Type %s. Got %s", ts.ExpectedContentType, req.Header.Get("Content-Type"))
 			}
 		})

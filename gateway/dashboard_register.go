@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/headers"
 )
 
 var dashLog = log.WithField("prefix", "dashboard")
@@ -114,8 +115,8 @@ func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 	}
 
 	req.Header.Set("authorization", h.Secret)
-	req.Header.Set("x-tyk-nodeid", NodeID)
-	req.Header.Set("x-tyk-nonce", ServiceNonce)
+	req.Header.Set(headers.XTykNodeID, NodeID)
+	req.Header.Set(headers.XTykNonce, ServiceNonce)
 
 	c := initialiseClient(5 * time.Second)
 
@@ -211,13 +212,13 @@ func (h *HTTPDashboardHandler) newRequest(endpoint string) *http.Request {
 		panic(err)
 	}
 	req.Header.Set("authorization", h.Secret)
-	req.Header.Set("x-tyk-hostname", hostDetails.Hostname)
+	req.Header.Set(headers.XTykHostname, hostDetails.Hostname)
 	return req
 }
 
 func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Client) error {
-	req.Header.Set("x-tyk-nodeid", NodeID)
-	req.Header.Set("x-tyk-nonce", ServiceNonce)
+	req.Header.Set(headers.XTykNodeID, NodeID)
+	req.Header.Set(headers.XTykNonce, ServiceNonce)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -243,8 +244,8 @@ func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Cli
 func (h *HTTPDashboardHandler) DeRegister() error {
 	req := h.newRequest(h.DeRegistrationEndpoint)
 
-	req.Header.Set("x-tyk-nodeid", NodeID)
-	req.Header.Set("x-tyk-nonce", ServiceNonce)
+	req.Header.Set(headers.XTykNodeID, NodeID)
+	req.Header.Set(headers.XTykNonce, ServiceNonce)
 
 	c := initialiseClient(5 * time.Second)
 	resp, err := c.Do(req)
