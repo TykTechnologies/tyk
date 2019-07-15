@@ -428,7 +428,7 @@ func checkIsAPIOwner(next http.Handler) http.Handler {
 			// Error
 			mainLog.Warning("Attempted administrative access with invalid or missing key!")
 
-			doJSONWrite(w, http.StatusForbidden, apiError("Forbidden"))
+			doJSONWrite(w, http.StatusForbidden, apiError("Attempted administrative access with invalid or missing key!"))
 			return
 		}
 		next.ServeHTTP(w, r)
