@@ -1117,19 +1117,6 @@ func TestJSONToFormValues(t *testing.T) {
 		}
 	})
 
-	t.Run("no application/json header", func(ts *testing.T) {
-		err := JSONToFormValues(r)
-		if err != nil {
-			ts.Fatal(err)
-		}
-		for k, v := range o {
-			g := r.Form.Get(k)
-			if g == v {
-				ts.Errorf("expected %s not to be set", v)
-			}
-		}
-	})
-
 	t.Run("with application/json header", func(ts *testing.T) {
 		r.Header.Set("Content-Type", "application/json")
 		err := JSONToFormValues(r)
