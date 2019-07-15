@@ -226,8 +226,9 @@ func (m *CoProcessMiddleware) EnabledForSpec() bool {
 	if !supported {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
-		}).Errorf("Unsupported driver '%s'", m.Spec.CustomMiddleware.Driver)
-		return false
+		}).Debug("Enabling CP middleware.")
+		m.successHandler = &SuccessHandler{m.BaseMiddleware}
+		return true
 	}
 
 	if d, _ := loadedDrivers[m.Spec.CustomMiddleware.Driver]; d == nil {
@@ -283,7 +284,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	t1 := time.Now()
 	returnObject, err := coProcessor.Dispatch(object)
-	ms := DurationToMillisecond(time.Since(t1))
+	t2 := time.Now()
 
 	if err != nil {
 		logger.WithError(err).Error("Dispatch error")
@@ -294,6 +295,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
+	ms := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001
 	m.logger.WithField("ms", ms).Debug("gRPC request processing took")
 
 	coProcessor.ObjectPostProcess(returnObject, r)
