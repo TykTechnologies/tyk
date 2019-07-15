@@ -19,6 +19,9 @@ type HeaderInjector struct {
 	config HeaderInjectorOptions
 }
 
+func (HeaderInjector) Name() string {
+	return "HeaderInjector"
+}
 func (h *HeaderInjector) Init(c interface{}, spec *APISpec) error {
 	h.Spec = spec
 	return mapstructure.Decode(c, &h.config)

@@ -21,6 +21,10 @@ type ResponseTransformMiddleware struct {
 	Spec *APISpec
 }
 
+func (ResponseTransformMiddleware) Name() string {
+	return "ResponseTransformMiddleware"
+}
+
 func (h *ResponseTransformMiddleware) Init(c interface{}, spec *APISpec) error {
 	h.Spec = spec
 	return nil

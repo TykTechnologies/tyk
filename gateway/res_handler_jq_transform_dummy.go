@@ -12,6 +12,10 @@ type ResponseTransformJQMiddleware struct {
 	Spec *APISpec
 }
 
+func (ResponseTransformJQMiddleware) Name() string {
+	return "ResponseTransformJQMiddleware"
+}
+
 func (h *ResponseTransformJQMiddleware) Init(c interface{}, spec *APISpec) error {
 	h.Spec = spec
 

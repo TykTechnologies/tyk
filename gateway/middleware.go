@@ -20,6 +20,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -39,6 +40,21 @@ type TykMiddleware interface {
 	Name() string
 }
 
+type TraceMiddleware struct {
+	TykMiddleware
+}
+
+func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) {
+	if trace.IsEnabled() {
+		span, ctx := trace.Span(r.Context(),
+			tr.Name(),
+		)
+		defer span.Finish()
+		return tr.TykMiddleware.ProcessRequest(w, r.WithContext(ctx), conf)
+	}
+	return tr.TykMiddleware.ProcessRequest(w, r, conf)
+}
+
 func createDynamicMiddleware(name string, isPre, useSession bool, baseMid BaseMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &DynamicMiddleware{
 		BaseMiddleware:      baseMid,
@@ -51,7 +67,10 @@ func createDynamicMiddleware(name string, isPre, useSession bool, baseMid BaseMi
 }
 
 // Generic middleware caller to make extension easier
-func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
+func createMiddleware(actualMW TykMiddleware) func(http.Handler) http.Handler {
+	mw := &TraceMiddleware{
+		TykMiddleware: actualMW,
+	}
 	// construct a new instance
 	mw.Init()
 	mw.SetName(mw.Name())
@@ -101,7 +120,7 @@ func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 			if err != nil {
 				// GoPluginMiddleware are expected to send response in case of error
 				// but we still want to record error
-				_, isGoPlugin := mw.(*GoPluginMiddleware)
+				_, isGoPlugin := actualMW.(*GoPluginMiddleware)
 
 				handler := ErrorHandler{*mw.Base()}
 				handler.HandleError(w, r, err.Error(), errCode, !isGoPlugin)
@@ -524,6 +543,7 @@ func (t BaseMiddleware) FireEvent(name apidef.TykEvent, meta interface{}) {
 
 type TykResponseHandler interface {
 	Init(interface{}, *APISpec) error
+	Name() string
 	HandleResponse(http.ResponseWriter, *http.Response, *http.Request, *user.SessionState) error
 }
 
@@ -542,12 +562,22 @@ func responseProcessorByName(name string) TykResponseHandler {
 }
 
 func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
+	traceIsEnabled := trace.IsEnabled()
 	for _, rh := range chain {
-		if err := rh.HandleResponse(rw, res, req, ses); err != nil {
+		if err := handleResponse(rh, rw, res, req, ses, traceIsEnabled); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func handleResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState, shouldTrace bool) error {
+	if shouldTrace {
+		span, ctx := trace.Span(req.Context(), rh.Name())
+		defer span.Finish()
+		req = req.WithContext(ctx)
+	}
+	return rh.HandleResponse(rw, res, req, ses)
 }
 
 func parseForm(r *http.Request) {

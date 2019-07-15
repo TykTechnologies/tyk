@@ -29,12 +29,15 @@ import (
 	"golang.org/x/net/http2"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/ext"
 	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/regexp"
+	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -521,6 +524,12 @@ func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p
 }
 
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) *http.Response {
+	if trace.IsEnabled() {
+		span, ctx := trace.Span(req.Context(), req.URL.Path)
+		defer span.Finish()
+		ext.SpanKindRPCClient.Set(span)
+		req = req.WithContext(ctx)
+	}
 	outReqIsWebsocket := IsWebsocket(req)
 	var roundTripper http.RoundTripper
 
@@ -605,7 +614,10 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	outreq = outreq.WithContext(reqCtx)
 
 	outreq.Header = cloneHeader(req.Header)
-
+	if trace.IsEnabled() {
+		span := opentracing.SpanFromContext(req.Context())
+		trace.Inject(p.TykAPISpec.Name, span, outreq.Header)
+	}
 	p.Director(outreq)
 	outreq.Close = false
 

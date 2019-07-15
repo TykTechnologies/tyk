@@ -47,6 +47,7 @@ import (
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -1002,7 +1003,11 @@ func Start() {
 	}
 
 	checkup.Run(config.Global())
-
+	if tr := config.Global().Tracer; tr.Enabled {
+		trace.SetupTracing(tr.Name, tr.Options)
+		trace.SetLogger(mainLog)
+		defer trace.Close()
+	}
 	start()
 
 	// Wait while Redis connection pools are ready before start serving traffic
@@ -1244,7 +1249,6 @@ func (_ mainHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// make request body to be nopCloser and re-readable before serve it through chain of middlewares
 	nopCloseRequestBody(r)
-
 	mainRouter.ServeHTTP(w, r)
 }
 
