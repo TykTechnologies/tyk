@@ -43,6 +43,7 @@ import (
 	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/dnscache"
+	"github.com/TykTechnologies/tyk/headers"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
@@ -423,7 +424,7 @@ func loadAPIEndpoints(muxer *mux.Router) {
 func checkIsAPIOwner(next http.Handler) http.Handler {
 	secret := config.Global().Secret
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tykAuthKey := r.Header.Get("X-Tyk-Authorization")
+		tykAuthKey := r.Header.Get(headers.XTykAuthorization)
 		if tykAuthKey != secret {
 			// Error
 			mainLog.Warning("Attempted administrative access with invalid or missing key!")

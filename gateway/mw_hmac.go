@@ -17,6 +17,7 @@ import (
 	"github.com/Sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -170,7 +171,7 @@ func (hm *HMACMiddleware) setContextVars(r *http.Request, token string) {
 func (hm *HMACMiddleware) authorizationError(r *http.Request) (error, int) {
 	hm.Logger().Info("Authorization field missing or malformed")
 
-	AuthFailed(hm, r, r.Header.Get("Authorization"))
+	AuthFailed(hm, r, r.Header.Get(headers.Authorization))
 
 	return errors.New("Authorization field missing, malformed or invalid"), http.StatusBadRequest
 }
@@ -236,7 +237,7 @@ func getDateHeader(r *http.Request) (string, string) {
 	auxHeaderVal := r.Header.Get(altHeaderSpec)
 	// Prefer aux if present
 	if auxHeaderVal != "" {
-		token := r.Header.Get("Authorization")
+		token := r.Header.Get(headers.Authorization)
 		log.WithFields(logrus.Fields{
 			"prefix":      "hmac",
 			"auth_header": token,

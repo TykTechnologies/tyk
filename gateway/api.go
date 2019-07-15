@@ -49,6 +49,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -94,7 +95,7 @@ type paginatedOAuthClientTokens struct {
 }
 
 func doJSONWrite(w http.ResponseWriter, code int, obj interface{}) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(headers.ContentType, headers.ApplicationJSON)
 	w.WriteHeader(code)
 	if err := json.NewEncoder(w).Encode(obj); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

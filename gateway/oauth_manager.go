@@ -17,6 +17,7 @@ import (
 	"strconv"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -177,7 +178,7 @@ func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *htt
 // returns a response to the client and notifies the provider of the access request (in order to track identity against
 // OAuth tokens without revealing tokens before they are requested).
 func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(headers.ContentType, headers.ApplicationJSON)
 
 	// Handle response
 	resp := o.Manager.HandleAccess(r)
@@ -221,15 +222,15 @@ func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Reque
 	o.notifyClientOfNewOauth(newNotification)
 
 	// Setting OWASP Secure Headers
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.Header().Set("X-XSS-Protection", "1; mode=block")
-	w.Header().Set("X-Frame-Options", "DENY")
-	w.Header().Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
+	w.Header().Set(headers.XContentTypeOptions, "nosniff")
+	w.Header().Set(headers.XXSSProtection, "1; mode=block")
+	w.Header().Set(headers.XFrameOptions, "DENY")
+	w.Header().Set(headers.StrictTransportSecurity, "max-age=63072000; includeSubDomains")
 
 	// Avoid Caching of tokens
-	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-	w.Header().Set("Pragma", "no-cache")
-	w.Header().Set("Expires", "0")
+	w.Header().Set(headers.CacheControl, "no-cache, no-store, must-revalidate")
+	w.Header().Set(headers.Pragma, "no-cache")
+	w.Header().Set(headers.Expires, "0")
 
 	w.WriteHeader(http.StatusOK)
 	w.Write(msg)

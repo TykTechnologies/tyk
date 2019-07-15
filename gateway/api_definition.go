@@ -19,6 +19,7 @@ import (
 
 	sprig "gopkg.in/Masterminds/sprig.v2"
 
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/Sirupsen/logrus"
@@ -308,9 +309,9 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*A
 
 	newRequest.Header.Set("authorization", secret)
 	log.Debug("Using: NodeID: ", NodeID)
-	newRequest.Header.Set("x-tyk-nodeid", NodeID)
+	newRequest.Header.Set(headers.XTykNodeID, NodeID)
 
-	newRequest.Header.Set("x-tyk-nonce", ServiceNonce)
+	newRequest.Header.Set(headers.XTykNonce, ServiceNonce)
 
 	c := initialiseClient(120 * time.Second)
 	resp, err := c.Do(newRequest)

@@ -14,6 +14,7 @@ import (
 	"github.com/clbanning/mxj"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -32,11 +33,11 @@ func (h *ResponseTransformMiddleware) Init(c interface{}, spec *APISpec) error {
 
 func respBodyReader(req *http.Request, resp *http.Response) io.ReadCloser {
 
-	if req.Header.Get("Accept-Encoding") == "" {
+	if req.Header.Get(headers.AcceptEncoding) == "" {
 		return resp.Body
 	}
 
-	switch resp.Header.Get("Content-Encoding") {
+	switch resp.Header.Get(headers.ContentEncoding) {
 	case "gzip":
 		reader, err := gzip.NewReader(resp.Body)
 		if err != nil {
