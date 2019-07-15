@@ -6,6 +6,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/url"
+	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/Sirupsen/logrus"
@@ -36,6 +38,8 @@ type CoProcessMiddleware struct {
 	HookName         string
 	MiddlewareDriver apidef.MiddlewareDriver
 	RawBodyOnly      bool
+
+	successHandler *SuccessHandler
 }
 
 func (mw *CoProcessMiddleware) Name() string {
@@ -49,6 +53,7 @@ func CreateCoProcessMiddleware(hookName string, hookType coprocess.HookType, mwD
 		HookType:         hookType,
 		HookName:         hookName,
 		MiddlewareDriver: mwDriver,
+		successHandler:   &SuccessHandler{baseMid},
 	}
 
 	return createMiddleware(dMiddleware)
@@ -217,6 +222,7 @@ func (m *CoProcessMiddleware) EnabledForSpec() bool {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
 		}).Debug("Enabling CP middleware.")
+		m.successHandler = &SuccessHandler{m.BaseMiddleware}
 		return true
 	}
 
@@ -277,7 +283,10 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		return errors.New("Middleware error"), 500
 	}
 
+	t1 := time.Now()
 	returnObject, err := coProcessor.Dispatch(object)
+	t2 := time.Now()
+
 	if err != nil {
 		logger.WithError(err).Error("Dispatch error")
 		if m.HookType == coprocess.HookType_CustomKeyCheck {
@@ -286,6 +295,9 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			return errors.New("Middleware error"), 500
 		}
 	}
+
+	ms := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001
+	m.logger.WithField("ms", ms).Debug("gRPC request processing took")
 
 	coProcessor.ObjectPostProcess(returnObject, r)
 
@@ -332,6 +344,18 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}
 		w.WriteHeader(int(returnObject.Request.ReturnOverrides.ResponseCode))
 		w.Write([]byte(returnObject.Request.ReturnOverrides.ResponseError))
+
+		// Record analytics data:
+		res := new(http.Response)
+		res.Proto = "HTTP/1.0"
+		res.ProtoMajor = 1
+		res.ProtoMinor = 0
+		res.StatusCode = int(returnObject.Request.ReturnOverrides.ResponseCode)
+		res.Body = nopCloser{
+			ReadSeeker: strings.NewReader(returnObject.Request.ReturnOverrides.ResponseError),
+		}
+		res.ContentLength = int64(len(returnObject.Request.ReturnOverrides.ResponseError))
+		m.successHandler.RecordHit(r, int64(ms), int(returnObject.Request.ReturnOverrides.ResponseCode), res)
 		return nil, mwStatusRespond
 	}
 
