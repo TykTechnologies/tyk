@@ -584,7 +584,7 @@ func parseForm(r *http.Request) {
 	// https://golang.org/pkg/net/http/#Request.ParseForm
 	// ParseForm drains the request body for a request with Content-Type of
 	// application/x-www-form-urlencoded
-	if r.Header.Get("Content-Type") == "application/x-www-form-urlencoded" {
+	if r.Header.Get("Content-Type") == "application/x-www-form-urlencoded" && r.Form == nil {
 		var b bytes.Buffer
 		r.Body = ioutil.NopCloser(io.TeeReader(r.Body, &b))
 
