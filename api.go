@@ -509,7 +509,7 @@ func handleAddKey(keyName, hashedName, sessionString, apiID string) {
 	}).Info("Updated hashed key in slave storage.")
 }
 
-func handleDeleteKey(keyName, apiID string) (interface{}, int) {
+func handleDeleteKey(keyName, apiID string, resetQuota bool) (interface{}, int) {
 	if apiID == "-1" {
 		// Go through ALL managed API's and delete the key
 		apisMu.RLock()
@@ -536,7 +536,10 @@ func handleDeleteKey(keyName, apiID string) (interface{}, int) {
 	}
 
 	sessionManager.RemoveSession(keyName, false)
-	sessionManager.ResetQuota(keyName, &user.SessionState{}, false)
+
+	if resetQuota {
+		sessionManager.ResetQuota(keyName, &user.SessionState{}, false)
+	}
 
 	statusObj := apiModifyKeySuccess{
 		Key:    keyName,
@@ -559,7 +562,7 @@ func handleDeleteKey(keyName, apiID string) (interface{}, int) {
 	return statusObj, http.StatusOK
 }
 
-func handleDeleteHashedKey(keyName, apiID string) (interface{}, int) {
+func handleDeleteHashedKey(keyName, apiID string, resetQuota bool) (interface{}, int) {
 	if apiID == "-1" {
 		// Go through ALL managed API's and delete the key
 		apisMu.RLock()
@@ -582,6 +585,10 @@ func handleDeleteHashedKey(keyName, apiID string) (interface{}, int) {
 		sessionManager = spec.SessionManager
 	}
 	sessionManager.RemoveSession(keyName, true)
+
+	if resetQuota {
+		sessionManager.ResetQuota(keyName, &user.SessionState{}, true)
+	}
 
 	statusObj := apiModifyKeySuccess{
 		Key:    keyName,
@@ -790,16 +797,16 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodDelete:
 		// Remove a key
 		if !isHashed {
-			obj, code = handleDeleteKey(keyName, apiID)
+			obj, code = handleDeleteKey(keyName, apiID, true)
 		} else {
-			obj, code = handleDeleteHashedKey(keyName, apiID)
+			obj, code = handleDeleteHashedKey(keyName, apiID, true)
 		}
 		if code != http.StatusOK && hashKeyFunction != "" {
 			// try to use legacy key format
 			if !isHashed {
-				obj, code = handleDeleteKey(origKeyName, apiID)
+				obj, code = handleDeleteKey(origKeyName, apiID, true)
 			} else {
-				obj, code = handleDeleteHashedKey(origKeyName, apiID)
+				obj, code = handleDeleteHashedKey(origKeyName, apiID, true)
 			}
 		}
 	}
