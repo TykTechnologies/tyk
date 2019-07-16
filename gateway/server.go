@@ -1244,13 +1244,16 @@ func startDRL() {
 type mainHandler struct{}
 
 func (_ mainHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	reloadMu.Lock()
-	AddNewRelicInstrumentation(NewRelicApplication, mainRouter)
-	reloadMu.Unlock()
-
-	// make request body to be nopCloser and re-readable before serve it through chain of middlewares
+	// make request body to be nopCloser and re-readable before serve it through
+	// chain of middlewares
 	nopCloseRequestBody(r)
-	mainRouter.ServeHTTP(w, r)
+	if NewRelicApplication != nil {
+		txn := NewRelicApplication.StartTransaction(r.URL.Path, w, r)
+		defer txn.End()
+		mainRouter.ServeHTTP(txn, r)
+	} else {
+		mainRouter.ServeHTTP(w, r)
+	}
 }
 
 func listen(listener, controlListener net.Listener, err error) {

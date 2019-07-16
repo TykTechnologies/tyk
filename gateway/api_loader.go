@@ -534,11 +534,6 @@ func loadGlobalApps(router *mux.Router) {
 	copy(specs, apiSpecs)
 	apisMu.RUnlock()
 	loadApps(specs, router)
-
-	if config.Global().NewRelic.AppName != "" {
-		mainLog.Info("Adding NewRelic instrumentation")
-		AddNewRelicInstrumentation(NewRelicApplication, router)
-	}
 }
 
 func trimCategories(name string) string {
