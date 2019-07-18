@@ -416,9 +416,9 @@ func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request
 	_, versionPaths, _, _ := spec.Version(req)
 	found, meta := spec.CheckSpecMatchesStatus(req, versionPaths, HardTimeout)
 	if found {
-		intMeta := meta.(*float64)
+		intMeta := meta.(*int)
 		log.Debug("HARD TIMEOUT ENFORCED: ", *intMeta)
-		return true, *intMeta
+		return true, float64(*intMeta)
 	}
 
 	return false, spec.GlobalConfig.ProxyDefaultTimeout
