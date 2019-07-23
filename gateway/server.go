@@ -149,9 +149,6 @@ func setupGlobals() {
 	healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:"}
 	InitHostCheckManager(&healthCheckStore)
 
-	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
-	FallbackKeySesionManager.Init(&redisStore)
-
 	if config.Global().EnableAnalytics && analytics.Store == nil {
 		globalConf := config.Global()
 		globalConf.LoadIgnoredIPs()
