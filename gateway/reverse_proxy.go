@@ -470,6 +470,40 @@ func proxyFromAPI(api *APISpec) func(*http.Request) (*url.URL, error) {
 	}
 }
 
+func tlsClientConfig(s *APISpec) *tls.Config {
+	config := &tls.Config{}
+
+	if s.GlobalConfig.ProxySSLInsecureSkipVerify {
+		config.InsecureSkipVerify = true
+	}
+
+	if s.Proxy.Transport.SSLInsecureSkipVerify {
+		config.InsecureSkipVerify = true
+	}
+
+	if s.GlobalConfig.ProxySSLMinVersion > 0 {
+		config.MinVersion = s.GlobalConfig.ProxySSLMinVersion
+	}
+
+	if s.Proxy.Transport.SSLMinVersion > 0 {
+		config.MinVersion = s.Proxy.Transport.SSLMinVersion
+	}
+
+	if len(s.GlobalConfig.ProxySSLCipherSuites) > 0 {
+		config.CipherSuites = getCipherAliases(s.GlobalConfig.ProxySSLCipherSuites)
+	}
+
+	if len(s.Proxy.Transport.SSLCipherSuites) > 0 {
+		config.CipherSuites = getCipherAliases(s.Proxy.Transport.SSLCipherSuites)
+	}
+
+	if !s.GlobalConfig.ProxySSLDisableRenegotiation {
+		config.Renegotiation = tls.RenegotiateFreelyAsClient
+	}
+
+	return config
+}
+
 func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p *ReverseProxy) http.RoundTripper {
 	transport := defaultTransport(timeOut) // modifies a newly created transport
 	transport.TLSClientConfig = &tls.Config{}
