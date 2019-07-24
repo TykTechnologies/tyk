@@ -279,6 +279,12 @@ const Schema = `{
         "domain": {
             "type": "string"
         },
+        "listen_port": {
+            "type": "number"
+        },
+        "protocol": {
+            "type": "string"
+        },
         "certificates": {
             "type": ["array", "null"]
         },
