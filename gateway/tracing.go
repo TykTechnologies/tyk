@@ -109,7 +109,7 @@ func traceHandler(w http.ResponseWriter, r *http.Request) {
 	spec := loader.MakeSpec(traceReq.Spec, logrus.NewEntry(logger))
 
 	chainObj := processSpec(spec, nil, &gs, subrouter, logrus.NewEntry(logger))
-	spec.middlewareChain = chainObj.ThisHandler
+	spec.middlewareChain = chainObj
 
 	if chainObj.ThisHandler == nil {
 		doJSONWrite(w, http.StatusBadRequest, traceResponse{Message: "error", Logs: logStorage.String()})
