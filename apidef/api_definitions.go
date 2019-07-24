@@ -342,6 +342,8 @@ type APIDefinition struct {
 	Id               bson.ObjectId `bson:"_id,omitempty" json:"id,omitempty"`
 	Name             string        `bson:"name" json:"name"`
 	Slug             string        `bson:"slug" json:"slug"`
+	ListenPort       int           `bson:"listen_port" json:"listen_port"`
+	Protocol         string        `bson:"protocol" json:"protocol"`
 	APIID            string        `bson:"api_id" json:"api_id"`
 	OrgID            string        `bson:"org_id" json:"org_id"`
 	UseKeylessAccess bool          `bson:"use_keyless" json:"use_keyless"`
