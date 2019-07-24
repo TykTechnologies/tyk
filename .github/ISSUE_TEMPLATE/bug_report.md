@@ -3,12 +3,12 @@ name: Bug report
 about: Create a report to help us improve
 title: ''
 labels: bug
-assignees: buger
+assignees: 
 
 ---
 
-**Branch/Envrionment**
-- Branch: [e.g. Master/Release/Stable/Feature branch]
+**Branch/Envrionment/Version**
+- Branch/Version: [e.g. Master/Release/Stable/Feature branch]
 - Environemnt: [e.g. On-prem/Hybrid/MDCB]
 
 **Describe the bug**
@@ -30,10 +30,11 @@ A clear and concise description of what you expected to happen.
 **Screenshots/Video**
 If applicable, add screenshots or video to help explain your problem.
 
-**Browser/Os (please complete the following information):**
- - OS: [e.g. iOS]
- - Browser [e.g. chrome, safari]
- - Version [e.g. 22]
+**Logs (debug mode or log file):**
+Log from console or from log file.
+
+**Configuration (tyk config file):**
+Attach tyk configuration file
 
 **Additional context**
 Add any other context about the problem here.
