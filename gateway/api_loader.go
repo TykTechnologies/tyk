@@ -34,16 +34,15 @@ type ChainObject struct {
 	Subrouter      *mux.Router
 }
 
-func prepareStorage() (storage.RedisCluster, storage.RedisCluster, storage.RedisCluster, RPCStorageHandler, RPCStorageHandler) {
-	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
-	redisOrgStore := storage.RedisCluster{KeyPrefix: "orgkey."}
-	healthStore := storage.RedisCluster{KeyPrefix: "apihealth."}
-	rpcAuthStore := RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
-	rpcOrgStore := RPCStorageHandler{KeyPrefix: "orgkey."}
-
-	FallbackKeySesionManager.Init(&redisStore)
-
-	return redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore
+func prepareStorage() generalStores {
+	var gs generalStores
+	gs.redisStore = &storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
+	gs.redisOrgStore = &storage.RedisCluster{KeyPrefix: "orgkey."}
+	gs.healthStore = &storage.RedisCluster{KeyPrefix: "apihealth."}
+	gs.rpcAuthStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
+	gs.rpcOrgStore = &RPCStorageHandler{KeyPrefix: "orgkey."}
+	FallbackKeySesionManager.Init(gs.redisStore)
+	return gs
 }
 
 func skipSpecBecauseInvalid(spec *APISpec, logger *logrus.Entry) bool {
@@ -92,8 +91,7 @@ func countApisByListenHash(specs []*APISpec) map[string]int {
 }
 
 func processSpec(spec *APISpec, apisByListen map[string]int,
-	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore storage.Handler,
-	subrouter *mux.Router, logger *logrus.Entry) *ChainObject {
+	gs *generalStores, subrouter *mux.Router, logger *logrus.Entry) *ChainObject {
 
 	var chainDef ChainObject
 	chainDef.Subrouter = subrouter
@@ -163,30 +161,30 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	}
 
 	// Initialise the auth and session managers (use Redis for now)
-	authStore := redisStore
-	orgStore := redisOrgStore
+	authStore := gs.redisStore
+	orgStore := gs.redisOrgStore
 	switch spec.AuthProvider.StorageEngine {
 	case LDAPStorageEngine:
 		storageEngine := LDAPStorageHandler{}
 		storageEngine.LoadConfFromMeta(spec.AuthProvider.Meta)
 		authStore = &storageEngine
 	case RPCStorageEngine:
-		authStore = rpcAuthStore
-		orgStore = rpcOrgStore
+		authStore = gs.rpcAuthStore
+		orgStore = gs.rpcOrgStore
 		spec.GlobalConfig.EnforceOrgDataAge = true
 		globalConf := config.Global()
 		globalConf.EnforceOrgDataAge = true
 		config.SetGlobal(globalConf)
 	}
 
-	sessionStore := redisStore
+	sessionStore := gs.redisStore
 	switch spec.SessionProvider.StorageEngine {
 	case RPCStorageEngine:
-		sessionStore = rpcAuthStore
+		sessionStore = gs.rpcAuthStore
 	}
 
 	// Health checkers are initialised per spec so that each API handler has it's own connection and redis storage pool
-	spec.Init(authStore, sessionStore, healthStore, orgStore)
+	spec.Init(authStore, sessionStore, gs.healthStore, orgStore)
 
 	// Set up all the JSVM middleware
 	var mwAuthCheckFunc apidef.MiddlewareDefinition
@@ -568,6 +566,10 @@ func fuzzyFindAPI(search string) *APISpec {
 	return nil
 }
 
+type generalStores struct {
+	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore storage.Handler
+}
+
 // Create the individual API (app) specs based on live configurations and assign middleware
 func loadApps(specs []*APISpec, muxer *mux.Router) {
 	hostname := config.Global().HostName
@@ -581,7 +583,7 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 	tmpSpecRegister := make(map[string]*APISpec)
 
 	// Only create this once, add other types here as needed, seems wasteful but we can let the GC handle it
-	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore := prepareStorage()
+	gs := prepareStorage()
 
 	// sort by listen path from longer to shorter, so that /foo
 	// doesn't break /foo-bar
@@ -640,7 +642,7 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 			subrouter = muxer
 		}
 
-		chainObj := processSpec(spec, apisByListen, &redisStore, &redisOrgStore, &healthStore, &rpcAuthStore, &rpcOrgStore, subrouter, logrus.NewEntry(log))
+		chainObj := processSpec(spec, apisByListen, &gs, subrouter, logrus.NewEntry(log))
 		apisMu.Lock()
 		spec.middlewareChain = chainObj.ThisHandler
 		apisMu.Unlock()
