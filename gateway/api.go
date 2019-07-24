@@ -112,6 +112,22 @@ func (m MethodNotAllowedHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	doJSONWrite(w, http.StatusMethodNotAllowed, apiError("Method not supported"))
 }
 
+func addSecureAndCacheHeaders(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Setting OWASP Secure Headers
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-XSS-Protection", "1; mode=block")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
+
+		// Avoid Caching of tokens
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
+		next(w, r)
+	}
+}
+
 func allowMethods(next http.HandlerFunc, methods ...string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		for _, method := range methods {
