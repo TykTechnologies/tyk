@@ -735,3 +735,59 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 
 	mainLog.Info("Initialised API Definitions")
 }
+
+// Create the individual API (app) specs based on live configurations and assign middleware
+func loadApps2(specs []*APISpec) {
+	mainLog.Info("Loading API configurations.")
+
+	tmpSpecRegister := make(map[string]*APISpec)
+
+	// sort by listen path from longer to shorter, so that /foo
+	// doesn't break /foo-bar
+	sort.Slice(specs, func(i, j int) bool {
+		return len(specs[i].Proxy.ListenPath) > len(specs[j].Proxy.ListenPath)
+	})
+
+	// Create a new handler for each API spec
+	apisByListen := countApisByListenHash(specs)
+
+	muxer := &proxyMux{}
+
+	router := mux.NewRouter()
+	loadAPIEndpoints(router)
+
+	muxer.setRouter(config.Global().ControlAPIPort, "", router)
+	gs := prepareStorage()
+	for _, spec := range specs {
+		if spec.ListenPort != spec.GlobalConfig.ListenPort {
+			mainLog.Info("API bind on custom port:", spec.ListenPort)
+		}
+
+		tmpSpecRegister[spec.APIID] = spec
+
+		switch spec.Protocol {
+		case "", "http", "https":
+			loadHTTPService(spec, apisByListen, &gs, muxer)
+		case "tcp", "tls":
+			loadTCPService(spec, muxer)
+		}
+	}
+
+	defaultProxyMux.swap(muxer)
+
+	// Swap in the new register
+	apisMu.Lock()
+	apisByID = tmpSpecRegister
+	apisMu.Unlock()
+
+	mainLog.Debug("Checker host list")
+
+	// Kick off our host checkers
+	if !config.Global().UptimeTests.Disable {
+		SetCheckerHostList()
+	}
+
+	mainLog.Debug("Checker host Done")
+
+	mainLog.Info("Initialised API Definitions")
+}
