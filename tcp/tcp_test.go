@@ -20,8 +20,8 @@ func TestProxyModifier(t *testing.T) {
 		proxy.AddDomainHandler("", upstream.Addr().String(), nil)
 
 		testRunner(t, proxy, "", false, []test.TCPTestCase{
-			{"write", "ping", ""},
-			{"read", "ping", ""},
+			{Action: "write", Payload: "ping"},
+			{Action: "read", Payload: "ping"},
 		}...)
 	})
 
@@ -34,8 +34,8 @@ func TestProxyModifier(t *testing.T) {
 		})
 
 		testRunner(t, proxy, "", false, []test.TCPTestCase{
-			{"write", "ping", ""},
-			{"read", "pong", ""},
+			{Action: "write", Payload: "ping"},
+			{Action: "read", Payload: "pong"},
 		}...)
 	})
 
@@ -48,8 +48,8 @@ func TestProxyModifier(t *testing.T) {
 		})
 
 		testRunner(t, proxy, "", false, []test.TCPTestCase{
-			{"write", "ping", ""},
-			{"read", "pong", ""},
+			{Action: "write", Payload: "ping"},
+			{Action: "read", Payload: "pong"},
 		}...)
 	})
 }
@@ -70,8 +70,8 @@ func TestProxyMultiTarget(t *testing.T) {
 		proxy.AddDomainHandler("", target1.Addr().String(), nil)
 
 		testRunner(t, proxy, "", true, []test.TCPTestCase{
-			{"write", "ping", ""},
-			{"read", "first", ""},
+			{Action: "write", Payload: "ping"},
+			{Action: "read", Payload: "first"},
 		}...)
 	})
 
@@ -80,8 +80,8 @@ func TestProxyMultiTarget(t *testing.T) {
 		proxy.AddDomainHandler("", target1.Addr().String(), nil)
 
 		testRunner(t, proxy, "localhost", true, []test.TCPTestCase{
-			{"write", "ping", ""},
-			{"read", "first", ""},
+			{Action: "write", Payload: "ping"},
+			{Action: "read", Payload: "first"},
 		}...)
 	})
 
@@ -90,8 +90,8 @@ func TestProxyMultiTarget(t *testing.T) {
 		proxy.AddDomainHandler("localhost", target1.Addr().String(), nil)
 
 		testRunner(t, proxy, "localhost", true, []test.TCPTestCase{
-			{"write", "ping", ""},
-			{"read", "first", ""},
+			{Action: "write", Payload: "ping"},
+			{Action: "read", Payload: "first"},
 		}...)
 	})
 
@@ -101,8 +101,8 @@ func TestProxyMultiTarget(t *testing.T) {
 
 		// Should cause `Can't detect service based on provided SNI information: example.com`
 		testRunner(t, proxy, "example.com", true, []test.TCPTestCase{
-			{"write", "ping", ""},
-			{"read", "", "EOF"},
+			{Action: "write", Payload: "ping"},
+			{Action: "read", ErrorMatch: "EOF"},
 		}...)
 	})
 
@@ -113,8 +113,8 @@ func TestProxyMultiTarget(t *testing.T) {
 
 		// Should cause `Multiple services on different domains running on the same port, but no SNI (domain) information from client
 		testRunner(t, proxy, "", true, []test.TCPTestCase{
-			{"write", "ping", ""},
-			{"read", "", "EOF"},
+			{Action: "write", Payload: "ping"},
+			{Action: "read", ErrorMatch: "EOF"},
 		}...)
 	})
 
@@ -124,18 +124,18 @@ func TestProxyMultiTarget(t *testing.T) {
 		proxy.AddDomainHandler("example.com", target2.Addr().String(), nil)
 
 		testRunner(t, proxy, "localhost", true, []test.TCPTestCase{
-			{"write", "ping", ""},
-			{"read", "first", ""},
+			{Action: "write", Payload: "ping"},
+			{Action: "read", Payload: "first"},
 		}...)
 
 		testRunner(t, proxy, "example.com", true, []test.TCPTestCase{
-			{"write", "ping", ""},
-			{"read", "second", ""},
+			{Action: "write", Payload: "ping"},
+			{Action: "read", Payload: "second"},
 		}...)
 
 		testRunner(t, proxy, "wrong", true, []test.TCPTestCase{
-			{"write", "ping", ""},
-			{"read", "", "EOF"},
+			{Action: "write", Payload: "ping"},
+			{Action: "read", ErrorMatch: "EOF"},
 		}...)
 	})
 
@@ -145,14 +145,14 @@ func TestProxyMultiTarget(t *testing.T) {
 		proxy.AddDomainHandler("example.com", target2.Addr().String(), nil)
 
 		testRunner(t, proxy, "example.com", true, []test.TCPTestCase{
-			{"write", "ping", ""},
-			{"read", "second", ""},
+			{Action: "write", Payload: "ping"},
+			{Action: "read", Payload: "second"},
 		}...)
 
 		// Should fallback to target defined with empty domain
 		testRunner(t, proxy, "wrong", true, []test.TCPTestCase{
-			{"write", "ping", ""},
-			{"read", "first", ""},
+			{Action: "write", Payload: "ping"},
+			{Action: "read", Payload: "first"},
 		}...)
 	})
 }
