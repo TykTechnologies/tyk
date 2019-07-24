@@ -24,11 +24,14 @@ type handleWrapper struct {
 }
 
 func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	AddNewRelicInstrumentation(NewRelicApplication, h.router)
-
 	// make request body to be nopCloser and re-readable before serve it through chain of middlewares
 	nopCloseRequestBody(r)
-
+	if NewRelicApplication != nil {
+		txn := NewRelicApplication.StartTransaction(r.URL.Path, w, r)
+		defer txn.End()
+		h.router.ServeHTTP(txn, r)
+		return
+	}
 	h.router.ServeHTTP(w, r)
 }
 
