@@ -566,6 +566,46 @@ func fuzzyFindAPI(search string) *APISpec {
 	return nil
 }
 
+func loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStores, muxer *proxyMux) {
+	router := muxer.router(spec.ListenPort, spec.Protocol)
+
+	if router == nil {
+		router = mux.NewRouter()
+	}
+
+	hostname := config.Global().HostName
+	if config.Global().EnableCustomDomains && spec.Domain != "" {
+		hostname = spec.Domain
+	}
+
+	if hostname != "" {
+		mainLog.Info("API hostname set: ", hostname)
+		router = router.Host(hostname).Subrouter()
+	}
+
+	chainObj := processSpec(spec, apisByListen, gs, router, logrus.NewEntry(log))
+	apisMu.Lock()
+	//TODO:(gernest) change spec.middlewareChain to CHainObj
+	// spec.middlewareChain = chainObj
+	apisMu.Unlock()
+
+	if chainObj.Skip {
+		return
+	}
+
+	if !chainObj.Open {
+		router.Handle(chainObj.RateLimitPath, chainObj.RateLimitChain)
+	}
+
+	router.Handle(chainObj.ListenOn, chainObj.ThisHandler)
+
+	muxer.setRouter(spec.ListenPort, spec.Protocol, router)
+}
+
+func loadTCPService(spec *APISpec, muxer *proxyMux) {
+	muxer.addTCPService(spec, nil)
+}
+
 type generalStores struct {
 	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore storage.Handler
 }
