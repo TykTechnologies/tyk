@@ -11,12 +11,14 @@ import (
 	"net/http"
 	pprof_http "net/http/pprof"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"runtime/pprof"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
@@ -987,6 +989,48 @@ func getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 		}
 	}
 	return &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys}
+}
+
+func waitForSignal() os.Signal {
+	ch := make(chan os.Signal, 2)
+	signal.Notify(
+		ch,
+		syscall.SIGHUP,
+		syscall.SIGINT,
+		syscall.SIGQUIT,
+		syscall.SIGTERM,
+		syscall.SIGUSR1,
+		syscall.SIGUSR2,
+	)
+	for {
+		sig := <-ch
+		log.Println(sig.String())
+		switch sig {
+
+		// SIGHUP should reload configuration.
+		case syscall.SIGHUP:
+		// TODO: Reload config
+
+		// SIGINT should exit.
+		case syscall.SIGINT:
+			return syscall.SIGINT
+
+		// SIGQUIT should exit gracefully.
+		case syscall.SIGQUIT:
+			return syscall.SIGQUIT
+
+		// SIGTERM should exit.
+		case syscall.SIGTERM:
+			return syscall.SIGTERM
+
+		// SIGUSR1 should reopen logs.
+		case syscall.SIGUSR1:
+
+		// TODO: implement forking
+		case syscall.SIGUSR2:
+			return syscall.SIGUSR2
+		}
+	}
 }
 
 func Start() {
