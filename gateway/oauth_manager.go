@@ -221,17 +221,6 @@ func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Reque
 
 	o.notifyClientOfNewOauth(newNotification)
 
-	// Setting OWASP Secure Headers
-	w.Header().Set(headers.XContentTypeOptions, "nosniff")
-	w.Header().Set(headers.XXSSProtection, "1; mode=block")
-	w.Header().Set(headers.XFrameOptions, "DENY")
-	w.Header().Set(headers.StrictTransportSecurity, "max-age=63072000; includeSubDomains")
-
-	// Avoid Caching of tokens
-	w.Header().Set(headers.CacheControl, "no-cache, no-store, must-revalidate")
-	w.Header().Set(headers.Pragma, "no-cache")
-	w.Header().Set(headers.Expires, "0")
-
 	w.WriteHeader(http.StatusOK)
 	w.Write(msg)
 }
