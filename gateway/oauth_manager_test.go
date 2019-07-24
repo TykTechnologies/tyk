@@ -1080,14 +1080,21 @@ func TestTokenEndpointHeaders(t *testing.T) {
 		"Expires":                   "0",
 	}
 
-	ts.Run(t, test.TestCase{
-		Path:         "/APIID/oauth/token/",
-		Data:         param.Encode(),
-		Headers:      headers,
-		Method:       http.MethodPost,
-		Code:         http.StatusOK,
-		HeadersMatch: securityAndCacheHeaders,
-	})
+	ts.Run(t, []test.TestCase{
+		{
+			Path:         "/APIID/oauth/token/",
+			Data:         param.Encode(),
+			Headers:      headers,
+			Method:       http.MethodPost,
+			Code:         http.StatusOK,
+			HeadersMatch: securityAndCacheHeaders,
+		}, { // Set security headers even if request fails
+			Path:         "/APIID/oauth/token/",
+			Data:         param.Encode(),
+			Method:       http.MethodPost,
+			Code:         http.StatusForbidden,
+			HeadersMatch: securityAndCacheHeaders,
+		}}...)
 }
 
 func TestJSONToFormValues(t *testing.T) {
