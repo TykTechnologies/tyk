@@ -128,14 +128,6 @@ func (a *Again) Range(fn func(*Service)) {
 	})
 }
 
-func (a *Again) SetEnv(fn func(*Service)) {
-	a.services.Range(func(k, v interface{}) bool {
-		s := v.(Service)
-		fn(&s)
-		return true
-	})
-}
-
 func (a *Again) Listen(name string, ls net.Listener) {
 	a.services.Store(name, &Service{
 		Name:     name,
