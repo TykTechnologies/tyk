@@ -1439,7 +1439,7 @@ func TestBrokenClients(t *testing.T) {
 	buf := make([]byte, 1024)
 
 	t.Run("Valid client", func(t *testing.T) {
-		conn, _ := net.DialTimeout("tcp", ts.ln.Addr().String(), 0)
+		conn, _ := net.DialTimeout("tcp", mainProxy().listener.Addr().String(), 0)
 		conn.Write([]byte("GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"))
 		conn.Read(buf)
 
@@ -1452,7 +1452,7 @@ func TestBrokenClients(t *testing.T) {
 		time.Sleep(recordsBufferFlushInterval + 50*time.Millisecond)
 		analytics.Store.GetAndDeleteSet(analyticsKeyName)
 
-		conn, _ := net.DialTimeout("tcp", ts.ln.Addr().String(), 0)
+		conn, _ := net.DialTimeout("tcp", mainProxy().listener.Addr().String(), 0)
 		conn.Write([]byte("GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"))
 		conn.Close()
 		//conn.Read(buf)

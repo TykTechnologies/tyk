@@ -625,10 +625,16 @@ func loadApps(specs []*APISpec) {
 
 	muxer := &proxyMux{}
 
-	router := mux.NewRouter()
-	loadAPIEndpoints(router)
-
-	muxer.setRouter(config.Global().ControlAPIPort, "", router)
+	globalConf := config.Global()
+	r := mux.NewRouter()
+	muxer.setRouter(globalConf.ListenPort, "", r)
+	if globalConf.ControlAPIPort == 0 {
+		loadAPIEndpoints(r)
+	} else {
+		router := mux.NewRouter()
+		loadAPIEndpoints(router)
+		muxer.setRouter(globalConf.ControlAPIPort, "", router)
+	}
 	gs := prepareStorage()
 	for _, spec := range specs {
 		if spec.ListenPort != spec.GlobalConfig.ListenPort {

@@ -117,6 +117,10 @@ const apiDefListTest2 = `[{
 }]`
 
 func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+	defer ResetTestConfig()
+
 	// Test RPC
 	callCount := 0
 	dispatcher := gorpc.NewDispatcher()
@@ -159,7 +163,6 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 	if *cli.HTTPProfile {
 		exp = []int{4, 6, 8, 8, 4}
 	}
-
 	for _, e := range exp {
 		doReload()
 

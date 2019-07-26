@@ -230,7 +230,11 @@ func mainProxy() *proxy {
 }
 
 func controlProxy() *proxy {
-	return defaultProxyMux.getProxy(config.Global().ControlAPIPort)
+	p := defaultProxyMux.getProxy(config.Global().ControlAPIPort)
+	if p != nil {
+		return p
+	}
+	return mainProxy()
 }
 
 func getMainRouter(m *proxyMux) *mux.Router {
@@ -536,8 +540,6 @@ type TestConfig struct {
 }
 
 type Test struct {
-	ln  net.Listener
-	cln net.Listener
 	URL string
 
 	testRunner   *test.HTTPTestRunner
@@ -555,7 +557,7 @@ func (s *Test) Start() {
 	if s.config.sepatateControlAPI {
 		l, _ := net.Listen("tcp", "127.0.0.1:0")
 
-		_, port, _ = net.SplitHostPort(s.cln.Addr().String())
+		_, port, _ = net.SplitHostPort(l.Addr().String())
 		l.Close()
 		globalConf.ControlAPIPort, _ = strconv.Atoi(port)
 	}
@@ -563,21 +565,16 @@ func (s *Test) Start() {
 	config.SetGlobal(globalConf)
 
 	muxer := &proxyMux{}
-	muxer.setRouter(globalConf.ListenPort, "", mux.NewRouter())
+	r := mux.NewRouter()
+	muxer.setRouter(globalConf.ListenPort, "", r)
 	if globalConf.ControlAPIPort == 0 {
-		loadAPIEndpoints(mainRouter())
+		loadAPIEndpoints(r)
 	} else {
 		router := mux.NewRouter()
 		loadAPIEndpoints(router)
 		muxer.setRouter(globalConf.ControlAPIPort, "", router)
 	}
 	defaultProxyMux.swap(muxer)
-	s.ln = mainProxy().listener
-	if c := controlProxy(); c != nil {
-		s.cln = c.listener
-	} else {
-		s.cln = s.ln
-	}
 
 	setupGlobals()
 	// Set up a default org manager so we can traverse non-live paths
@@ -592,14 +589,14 @@ func (s *Test) Start() {
 	if s.GlobalConfig.HttpServerOptions.UseSSL {
 		scheme = "https://"
 	}
-	s.URL = scheme + s.ln.Addr().String()
+	s.URL = scheme + mainProxy().listener.Addr().String()
 
 	s.testRunner = &test.HTTPTestRunner{
 		RequestBuilder: func(tc *test.TestCase) (*http.Request, error) {
 			tc.BaseURL = s.URL
 			if tc.ControlRequest {
 				if s.config.sepatateControlAPI {
-					tc.BaseURL = scheme + s.cln.Addr().String()
+					tc.BaseURL = scheme + controlProxy().listener.Addr().String()
 				} else if s.GlobalConfig.ControlAPIHostname != "" {
 					tc.Domain = s.GlobalConfig.ControlAPIHostname
 				}
