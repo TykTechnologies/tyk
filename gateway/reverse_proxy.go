@@ -193,7 +193,9 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		if ServiceCache == nil {
 			log.Debug("[PROXY] Service cache initialising")
 			expiry := 120
-			if spec.GlobalConfig.ServiceDiscovery.DefaultCacheTimeout > 0 {
+			if spec.Proxy.ServiceDiscovery.CacheTimeout > 0 {
+				expiry = int(spec.Proxy.ServiceDiscovery.CacheTimeout)
+			} else if spec.GlobalConfig.ServiceDiscovery.DefaultCacheTimeout > 0 {
 				expiry = spec.GlobalConfig.ServiceDiscovery.DefaultCacheTimeout
 			}
 			ServiceCache = cache.New(time.Duration(expiry)*time.Second, 15*time.Second)
