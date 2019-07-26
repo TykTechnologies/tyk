@@ -375,6 +375,72 @@ func controlAPICheckClientCertificate(certLevel string, next http.Handler) http.
 	})
 }
 
+func loadAPIEndpoints2(muxer *mux.Router) {
+	hostname := config.Global().HostName
+	if config.Global().ControlAPIHostname != "" {
+		hostname = config.Global().ControlAPIHostname
+	}
+
+	if muxer == nil {
+		muxer = defaultProxyMux.router(config.Global().ControlAPIPort, "")
+		if muxer == nil {
+			log.Error("Can't find control API router")
+			return
+		}
+	}
+
+	r := mux.NewRouter()
+	muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
+		stripSlashes(checkIsAPIOwner(controlAPICheckClientCertificate("/gateway/client", InstrumentationMW(r)))),
+	))
+
+	if hostname != "" {
+		muxer = muxer.Host(hostname).Subrouter()
+		mainLog.Info("Control API hostname set: ", hostname)
+	}
+
+	if *cli.HTTPProfile || config.Global().HTTPProfile {
+		muxer.HandleFunc("/debug/pprof/profile", pprof_http.Profile)
+		muxer.HandleFunc("/debug/pprof/{_:.*}", pprof_http.Index)
+	}
+
+	r.MethodNotAllowedHandler = MethodNotAllowedHandler{}
+
+	mainLog.Info("Initialising Tyk REST API Endpoints")
+
+	// set up main API handlers
+	r.HandleFunc("/reload/group", groupResetHandler).Methods("GET")
+	r.HandleFunc("/reload", resetHandler(nil)).Methods("GET")
+
+	if !isRPCMode() {
+		r.HandleFunc("/org/keys", orgHandler).Methods("GET")
+		r.HandleFunc("/org/keys/{keyName:[^/]*}", orgHandler).Methods("POST", "PUT", "GET", "DELETE")
+		r.HandleFunc("/keys/policy/{keyName}", policyUpdateHandler).Methods("POST")
+		r.HandleFunc("/keys/create", createKeyHandler).Methods("POST")
+		r.HandleFunc("/apis", apiHandler).Methods("GET", "POST", "PUT", "DELETE")
+		r.HandleFunc("/apis/{apiID}", apiHandler).Methods("GET", "POST", "PUT", "DELETE")
+		r.HandleFunc("/health", healthCheckhandler).Methods("GET")
+		r.HandleFunc("/oauth/clients/create", createOauthClient).Methods("POST")
+		r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", oAuthClientHandler).Methods("PUT")
+		r.HandleFunc("/oauth/refresh/{keyName}", invalidateOauthRefresh).Methods("DELETE")
+		r.HandleFunc("/cache/{apiID}", invalidateCacheHandler).Methods("DELETE")
+	} else {
+		mainLog.Info("Node is slaved, REST API minimised")
+	}
+
+	r.HandleFunc("/debug", traceHandler).Methods("POST")
+
+	r.HandleFunc("/keys", keyHandler).Methods("POST", "PUT", "GET", "DELETE")
+	r.HandleFunc("/keys/{keyName:[^/]*}", keyHandler).Methods("POST", "PUT", "GET", "DELETE")
+	r.HandleFunc("/certs", certHandler).Methods("POST", "GET")
+	r.HandleFunc("/certs/{certID:[^/]*}", certHandler).Methods("POST", "GET", "DELETE")
+	r.HandleFunc("/oauth/clients/{apiID}", oAuthClientHandler).Methods("GET", "DELETE")
+	r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", oAuthClientHandler).Methods("GET", "DELETE")
+	r.HandleFunc("/oauth/clients/{apiID}/{keyName}/tokens", oAuthClientTokensHandler).Methods("GET")
+
+	mainLog.Debug("Loaded API Endpoints")
+}
+
 // Set up default Tyk control API endpoints - these are global, so need to be added first
 func loadAPIEndpoints(muxer *mux.Router) {
 	hostname := config.Global().HostName
