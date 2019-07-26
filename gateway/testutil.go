@@ -221,6 +221,27 @@ func bundleHandleFunc(w http.ResponseWriter, r *http.Request) {
 	}
 	z.Close()
 }
+func mainRouter() *mux.Router {
+	return getMainRouter(defaultProxyMux)
+}
+
+func mainProxy() *proxy {
+	return defaultProxyMux.getProxy(config.Global().ListenPort)
+}
+
+func controlProxy() *proxy {
+	return defaultProxyMux.getProxy(config.Global().ControlAPIPort)
+}
+
+func getMainRouter(m *proxyMux) *mux.Router {
+	var protocol string
+	if config.Global().HttpServerOptions.UseSSL {
+		protocol = "https"
+	} else {
+		protocol = "http"
+	}
+	return m.router(config.Global().ListenPort, protocol)
+}
 
 type TestHttpResponse struct {
 	Method  string
@@ -538,17 +559,27 @@ func (s *Test) Start() {
 		l.Close()
 		globalConf.ControlAPIPort, _ = strconv.Atoi(port)
 	}
-
 	globalConf.CoProcessOptions = s.config.CoprocessConfig
-
 	config.SetGlobal(globalConf)
 
-	setupGlobals()
-	// This is emulate calling start()
-	// But this lines is the only thing needed for this tests
-	if config.Global().ControlAPIPort == 0 {
-		loadAPIEndpoints(nil)
+	muxer := &proxyMux{}
+	muxer.setRouter(globalConf.ListenPort, "", mux.NewRouter())
+	if globalConf.ControlAPIPort == 0 {
+		loadAPIEndpoints(mainRouter())
+	} else {
+		router := mux.NewRouter()
+		loadAPIEndpoints(router)
+		muxer.setRouter(globalConf.ControlAPIPort, "", router)
 	}
+	defaultProxyMux.swap(muxer)
+	s.ln = mainProxy().listener
+	if c := controlProxy(); c != nil {
+		s.cln = c.listener
+	} else {
+		s.cln = s.ln
+	}
+
+	setupGlobals()
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.Global().SupressDefaultOrgStore {
 		DefaultOrgStore.Init(getGlobalStorageHandler("orgkey.", false))

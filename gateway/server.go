@@ -1214,20 +1214,6 @@ func startDRL() {
 	startRateLimitNotifications()
 }
 
-func mainRouter() *mux.Router {
-	return getMainRouter(defaultProxyMux)
-}
-
-func getMainRouter(m *proxyMux) *mux.Router {
-	var protocol string
-	if config.Global().HttpServerOptions.UseSSL {
-		protocol = "https"
-	} else {
-		protocol = "http"
-	}
-	return m.router(config.Global().ControlAPIPort, protocol)
-}
-
 func startServer() {
 	// Ensure that Control listener and default http listener running on first start
 	muxer := &proxyMux{}
