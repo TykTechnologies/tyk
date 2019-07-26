@@ -638,31 +638,33 @@ func (s *Test) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, er
 	return s.testRunner.Run(t, testCases...)
 }
 
+//TODO:(gernest) when hot reload is suppored enable this.
 func (s *Test) RunExt(t testing.TB, testCases ...test.TestCase) {
-	var testMatrix = []struct {
-		goagain          bool
-		overrideDefaults bool
-	}{
-		{false, false},
-		{false, true},
-		{true, true},
-		{true, false},
-	}
+	s.Run(t, testCases...)
+	// var testMatrix = []struct {
+	// 	goagain          bool
+	// 	overrideDefaults bool
+	// }{
+	// 	{false, false},
+	// 	{false, true},
+	// 	{true, true},
+	// 	{true, false},
+	// }
 
-	for i, m := range testMatrix {
-		s.config.HotReload = m.goagain
-		s.config.overrideDefaults = m.overrideDefaults
+	// for i, m := range testMatrix {
+	// 	s.config.HotReload = m.goagain
+	// 	s.config.overrideDefaults = m.overrideDefaults
 
-		if i > 0 {
-			s.Close()
-			s.Start()
-		}
+	// 	if i > 0 {
+	// 		s.Close()
+	// 		s.Start()
+	// 	}
 
-		title := fmt.Sprintf("hotReload: %v, overrideDefaults: %v", m.goagain, m.overrideDefaults)
-		t.(*testing.T).Run(title, func(t *testing.T) {
-			s.Run(t, testCases...)
-		})
-	}
+	// 	title := fmt.Sprintf("hotReload: %v, overrideDefaults: %v", m.goagain, m.overrideDefaults)
+	// 	t.(*testing.T).Run(title, func(t *testing.T) {
+	// 		s.Run(t, testCases...)
+	// 	})
+	// }
 }
 
 func (s *Test) CreateSession(sGen ...func(s *user.SessionState)) (*user.SessionState, string) {
