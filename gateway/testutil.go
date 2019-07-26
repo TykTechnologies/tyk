@@ -133,7 +133,7 @@ func InitTestMain(m *testing.M, genConf ...func(globalConf *config.Config)) int 
 	cli.Init(VERSION, confPaths)
 	initialiseSystem()
 	// Small part of start()
-	loadAPIEndpoints(mainRouter)
+	loadAPIEndpoints(mainRouter())
 	if analytics.GeoIPDB == nil {
 		panic("GeoIPDB was not initialized")
 	}
@@ -525,15 +525,17 @@ type Test struct {
 }
 
 func (s *Test) Start() {
-	s.ln, _ = generateListener(0)
-	_, port, _ := net.SplitHostPort(s.ln.Addr().String())
+	l, _ := net.Listen("tcp", "127.0.0.1:0")
+	_, port, _ := net.SplitHostPort(l.Addr().String())
+	l.Close()
 	globalConf := config.Global()
 	globalConf.ListenPort, _ = strconv.Atoi(port)
 
 	if s.config.sepatateControlAPI {
-		s.cln, _ = net.Listen("tcp", "127.0.0.1:0")
+		l, _ := net.Listen("tcp", "127.0.0.1:0")
 
 		_, port, _ = net.SplitHostPort(s.cln.Addr().String())
+		l.Close()
 		globalConf.ControlAPIPort, _ = strconv.Atoi(port)
 	}
 
@@ -545,18 +547,12 @@ func (s *Test) Start() {
 	// This is emulate calling start()
 	// But this lines is the only thing needed for this tests
 	if config.Global().ControlAPIPort == 0 {
-		loadAPIEndpoints(mainRouter)
+		loadAPIEndpoints(nil)
 	}
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.Global().SupressDefaultOrgStore {
 		DefaultOrgStore.Init(getGlobalStorageHandler("orgkey.", false))
 		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
-	}
-
-	if s.config.HotReload {
-		listen(s.ln, s.cln, nil)
-	} else {
-		listen(s.ln, s.cln, fmt.Errorf("Without goagain"))
 	}
 
 	s.GlobalConfig = globalConf
@@ -599,10 +595,8 @@ func (s *Test) Do(tc test.TestCase) (*http.Response, error) {
 }
 
 func (s *Test) Close() {
-	s.ln.Close()
-
+	defaultProxyMux.swap(&proxyMux{})
 	if s.config.sepatateControlAPI {
-		s.cln.Close()
 		globalConf := config.Global()
 		globalConf.ControlAPIPort = 0
 		config.SetGlobal(globalConf)

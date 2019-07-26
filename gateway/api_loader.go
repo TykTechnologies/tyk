@@ -528,19 +528,14 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func loadGlobalApps(router *mux.Router) {
+func loadGlobalApps() {
 	// we need to make a full copy of the slice, as loadApps will
 	// use in-place to sort the apis.
 	apisMu.RLock()
 	specs := make([]*APISpec, len(apiSpecs))
 	copy(specs, apiSpecs)
 	apisMu.RUnlock()
-	loadApps(specs, router)
-
-	if config.Global().NewRelic.AppName != "" {
-		mainLog.Info("Adding NewRelic instrumentation")
-		AddNewRelicInstrumentation(NewRelicApplication, router)
-	}
+	loadApps(specs)
 }
 
 func trimCategories(name string) string {
@@ -614,130 +609,7 @@ type generalStores struct {
 }
 
 // Create the individual API (app) specs based on live configurations and assign middleware
-func loadApps(specs []*APISpec, muxer *mux.Router) {
-	hostname := config.Global().HostName
-	if hostname != "" {
-		muxer = muxer.Host(hostname).Subrouter()
-		mainLog.Info("API hostname set: ", hostname)
-	}
-
-	mainLog.Info("Loading API configurations.")
-
-	tmpSpecRegister := make(map[string]*APISpec)
-
-	// Only create this once, add other types here as needed, seems wasteful but we can let the GC handle it
-	gs := prepareStorage()
-
-	// sort by listen path from longer to shorter, so that /foo
-	// doesn't break /foo-bar
-	sort.Slice(specs, func(i, j int) bool {
-		return len(specs[i].Proxy.ListenPath) > len(specs[j].Proxy.ListenPath)
-	})
-
-	// Create a new handler for each API spec
-	loadList := make([]*ChainObject, len(specs))
-	apisByListen := countApisByListenHash(specs)
-
-	// Set up the host sub-routers first, since we need to set up
-	// exactly one per host. If we set up one per API definition,
-	// only one of the APIs will work properly, since the router
-	// doesn't backtrack and will stop at the first host sub-router
-	// match.
-	hostRouters := map[string]*mux.Router{"": muxer}
-	var hosts []string
-	for _, spec := range specs {
-		hosts = append(hosts, spec.Domain)
-	}
-
-	if trace.IsEnabled() {
-		for _, spec := range specs {
-			trace.AddTracer(spec.Name)
-		}
-	}
-	// Decreasing sort by length and chars, so that the order of
-	// creation of the host sub-routers is deterministic and
-	// consistent with the order of the paths.
-	sort.Slice(hosts, func(i, j int) bool {
-		h1, h2 := hosts[i], hosts[j]
-		if len(h1) != len(h2) {
-			return len(h1) > len(h2)
-		}
-		return h1 > h2
-	})
-	for _, host := range hosts {
-		if !config.Global().EnableCustomDomains {
-			continue // disabled
-		}
-		if hostRouters[host] != nil {
-			continue // already set up a subrouter
-		}
-		mainLog.WithField("domain", host).Info("Sub-router created for domain")
-		hostRouters[host] = muxer.Host(host).Subrouter()
-	}
-
-	for i, spec := range specs {
-		subrouter := hostRouters[spec.Domain]
-		if subrouter == nil {
-			mainLog.WithFields(logrus.Fields{
-				"domain": spec.Domain,
-				"api_id": spec.APIID,
-			}).Warning("Trying to load API with Domain when custom domains are disabled.")
-			subrouter = muxer
-		}
-
-		chainObj := processSpec(spec, apisByListen, &gs, subrouter, logrus.NewEntry(log))
-		apisMu.Lock()
-		spec.middlewareChain = chainObj
-		apisMu.Unlock()
-
-		// TODO: This will not deal with skipped APis well
-		tmpSpecRegister[spec.APIID] = spec
-		loadList[i] = chainObj
-	}
-
-	for _, chainObj := range loadList {
-		if chainObj.Skip {
-			continue
-		}
-		if !chainObj.Open {
-			chainObj.Subrouter.Handle(chainObj.RateLimitPath, chainObj.RateLimitChain)
-		}
-
-		mainLog.Infof("Processed and listening on: %s%s", chainObj.Domain, chainObj.ListenOn)
-		chainObj.Subrouter.Handle(chainObj.ListenOn, chainObj.ThisHandler)
-	}
-
-	// All APIs processed, now we can healthcheck
-	// Add a root message to check all is OK
-	muxer.HandleFunc("/"+config.Global().HealthCheckEndpointName, func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, "Hello Tiki")
-	})
-
-	// Swap in the new register
-	apisMu.Lock()
-
-	// release current specs resources before overwriting map
-	for _, curSpec := range apisByID {
-		curSpec.Release()
-	}
-
-	apisByID = tmpSpecRegister
-	apisMu.Unlock()
-
-	mainLog.Debug("Checker host list")
-
-	// Kick off our host checkers
-	if !config.Global().UptimeTests.Disable {
-		SetCheckerHostList()
-	}
-
-	mainLog.Debug("Checker host Done")
-
-	mainLog.Info("Initialised API Definitions")
-}
-
-// Create the individual API (app) specs based on live configurations and assign middleware
-func loadApps2(specs []*APISpec) {
+func loadApps(specs []*APISpec) {
 	mainLog.Info("Loading API configurations.")
 
 	tmpSpecRegister := make(map[string]*APISpec)

@@ -164,7 +164,7 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 		doReload()
 
 		rtCnt := 0
-		mainRouter.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
+		mainRouter().Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
 			rtCnt += 1
 			//fmt.Println(route.GetPathTemplate())
 			return nil
