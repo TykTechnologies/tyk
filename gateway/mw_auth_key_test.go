@@ -409,3 +409,34 @@ const multiAuthDef = `{
 		"target_url": "` + testHttpAny + `"
 	}
 }`
+
+func TestStripBearer(t *testing.T) {
+	var bearerTests = []struct {
+		in  string
+		out string
+	}{
+		{"Bearer abc", "abc"},
+		{"bearer abc", "abc"},
+		{"bEaReR abc", "abc"},
+		{"Bearer: abc", "Bearer: abc"}, // invalid
+		{"Basic abc", "Basic abc"},
+		{"abc", "abc"},
+	}
+
+	for _, tt := range bearerTests {
+		t.Run(tt.in, func(t *testing.T) {
+			out := stripBearer(tt.in)
+			if out != tt.out {
+				t.Errorf("got %q, want %q", out, tt.out)
+			}
+		})
+	}
+}
+
+func BenchmarkStripBearer(b *testing.B) {
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		_ = stripBearer("Bearer abcdefghijklmnopqrstuvwxyz12345678910")
+	}
+}
