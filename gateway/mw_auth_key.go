@@ -159,9 +159,10 @@ func (k *AuthKey) validateSignature(r *http.Request, key string) (error, int) {
 }
 
 func stripBearer(token string) string {
-	token = strings.Replace(token, "Bearer", "", 1)
-	token = strings.Replace(token, "bearer", "", 1)
-	return strings.TrimSpace(token)
+	if len(token) > 6 && strings.ToUpper(token[0:7]) == "BEARER " {
+		return token[7:]
+	}
+	return token
 }
 
 func AuthFailed(m TykMiddleware, r *http.Request, token string) {
