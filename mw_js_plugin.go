@@ -250,8 +250,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return errors.New(newRequestData.Request.ReturnOverrides.ResponseError), newRequestData.Request.ReturnOverrides.ResponseCode
 	}
 
-	if newRequestData.Request.ReturnOverrides.ResponseCode != 0 && newRequestData.Request.ReturnOverrides.ResponseCode < http.StatusMultipleChoices {
-
+	if newRequestData.Request.ReturnOverrides.ResponseCode != 0 {
 		responseObject := VMResponseObject{
 			Response: ResponseObject{
 				Body:    newRequestData.Request.ReturnOverrides.ResponseError,
