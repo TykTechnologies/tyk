@@ -115,7 +115,7 @@ func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 	}
 
 	req.Header.Set("authorization", h.Secret)
-	req.Header.Set(headers.XTykNodeID, NodeID)
+	req.Header.Set(headers.XTykNodeID, getNodeID())
 	req.Header.Set(headers.XTykNonce, ServiceNonce)
 
 	c := initialiseClient(5 * time.Second)
@@ -168,14 +168,15 @@ func (h *HTTPDashboardHandler) Register() error {
 
 	// Set the NodeID
 	var found bool
-	NodeID, found = val.Message["NodeID"]
+	nodeID, found := val.Message["NodeID"]
+	setNodeID(nodeID)
 	if !found {
 		dashLog.Error("Failed to register node, retrying in 5s")
 		time.Sleep(time.Second * 5)
 		return h.Register()
 	}
 
-	dashLog.WithField("id", NodeID).Info("Node Registered")
+	dashLog.WithField("id", getNodeID()).Info("Node Registered")
 
 	// Set the nonce
 	ServiceNonce = val.Nonce
@@ -217,7 +218,7 @@ func (h *HTTPDashboardHandler) newRequest(endpoint string) *http.Request {
 }
 
 func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Client) error {
-	req.Header.Set(headers.XTykNodeID, NodeID)
+	req.Header.Set(headers.XTykNodeID, getNodeID())
 	req.Header.Set(headers.XTykNonce, ServiceNonce)
 
 	resp, err := client.Do(req)
@@ -244,7 +245,7 @@ func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Cli
 func (h *HTTPDashboardHandler) DeRegister() error {
 	req := h.newRequest(h.DeRegistrationEndpoint)
 
-	req.Header.Set(headers.XTykNodeID, NodeID)
+	req.Header.Set(headers.XTykNodeID, getNodeID())
 	req.Header.Set(headers.XTykNonce, ServiceNonce)
 
 	c := initialiseClient(5 * time.Second)

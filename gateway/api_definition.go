@@ -308,8 +308,8 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*A
 	}
 
 	newRequest.Header.Set("authorization", secret)
-	log.Debug("Using: NodeID: ", NodeID)
-	newRequest.Header.Set(headers.XTykNodeID, NodeID)
+	log.Debug("Using: NodeID: ", getNodeID())
+	newRequest.Header.Set(headers.XTykNodeID, getNodeID())
 
 	newRequest.Header.Set(headers.XTykNonce, ServiceNonce)
 
