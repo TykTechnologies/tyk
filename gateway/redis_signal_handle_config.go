@@ -56,7 +56,7 @@ func handleNewConfiguration(payload string) {
 	}
 
 	// Make sure payload matches nodeID and hostname
-	if configPayload.ForHostname != hostDetails.Hostname && configPayload.ForNodeID != NodeID {
+	if configPayload.ForHostname != hostDetails.Hostname && configPayload.ForNodeID != getNodeID() {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
 		}).Info("Configuration update received, no NodeID/Hostname match found")
@@ -151,7 +151,7 @@ func handleSendMiniConfig(payload string) {
 	}
 
 	// Make sure payload matches nodeID and hostname
-	if configPayload.FromHostname != hostDetails.Hostname && configPayload.FromNodeID != NodeID {
+	if configPayload.FromHostname != hostDetails.Hostname && configPayload.FromNodeID != getNodeID() {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
 		}).Debug("Configuration request received, no NodeID/Hostname match found, ignoring")
@@ -168,7 +168,7 @@ func handleSendMiniConfig(payload string) {
 
 	returnPayload := ReturnConfigPayload{
 		FromHostname:  hostDetails.Hostname,
-		FromNodeID:    NodeID,
+		FromNodeID:    getNodeID(),
 		Configuration: config,
 		TimeStamp:     time.Now().Unix(),
 	}

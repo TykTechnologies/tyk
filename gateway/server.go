@@ -85,7 +85,8 @@ var (
 	LE_MANAGER    letsencrypt.Manager
 	LE_FIRSTRUN   bool
 
-	NodeID string
+	muNodeID sync.Mutex // guards NodeID
+	NodeID   string
 
 	runningTests = false
 
@@ -108,6 +109,20 @@ const (
 	defWriteTimeout = 120 * time.Second
 	appName         = "tyk-gateway"
 )
+
+// setNodeID writes NodeID safely.
+func setNodeID(nodeID string) {
+	muNodeID.Lock()
+	NodeID = nodeID
+	muNodeID.Unlock()
+}
+
+// getNodeID reads NodeID safely.
+func getNodeID() string {
+	muNodeID.Lock()
+	defer muNodeID.Unlock()
+	return NodeID
+}
 
 func getApiSpec(apiID string) *APISpec {
 	apisMu.RLock()
@@ -961,7 +976,7 @@ func Start() {
 		os.Exit(0)
 	}
 
-	NodeID = "solo-" + uuid.NewV4().String()
+	setNodeID("solo-" + uuid.NewV4().String())
 
 	if err := initialiseSystem(); err != nil {
 		mainLog.Fatalf("Error initialising system: %v", err)
@@ -986,7 +1001,7 @@ func Start() {
 			time.Sleep(10 * time.Second)
 
 			os.Setenv("TYK_SERVICE_NONCE", ServiceNonce)
-			os.Setenv("TYK_SERVICE_NODEID", NodeID)
+			os.Setenv("TYK_SERVICE_NODEID", getNodeID())
 		}
 	}
 
@@ -1332,7 +1347,7 @@ func listen(listener, controlListener net.Listener, err error) {
 			handleDashboardRegistration()
 
 		} else {
-			NodeID = nodeID
+			setNodeID(nodeID)
 			ServiceNonce = nonce
 			mainLog.Info("State recovered")
 
