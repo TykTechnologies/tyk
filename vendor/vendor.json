@@ -1354,6 +1354,12 @@
 			"path": "gopkg.in/xmlpath.v2",
 			"revision": "860cbeca3ebcc600db0b213c0e83ad6ce91f5739",
 			"revisionTime": "2015-08-20T20:48:37Z"
+		},
+		{
+			"checksumSHA1": "QqDq2x8XOU7IoOR98Cx1eiV5QY8=",
+			"path": "gopkg.in/yaml.v2",
+			"revision": "51d6538a90f86fe93ac480b35f37b2be17fef232",
+			"revisionTime": "2018-11-15T11:05:04Z"
 		}
 	],
 	"rootPath": "github.com/TykTechnologies/tyk"
