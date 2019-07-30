@@ -447,6 +447,7 @@ func TestAnalytics(t *testing.T) {
 		Delay: 20 * time.Millisecond,
 	})
 	defer ts.Close()
+	base := config.Global()
 
 	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
@@ -506,7 +507,9 @@ func TestAnalytics(t *testing.T) {
 	})
 
 	t.Run("Detailed analytics", func(t *testing.T) {
-		defer ResetTestConfig()
+		defer func() {
+			config.SetGlobal(base)
+		}()
 		globalConf := config.Global()
 		globalConf.AnalyticsConfig.EnableDetailedRecording = true
 		config.SetGlobal(globalConf)
@@ -550,7 +553,9 @@ func TestAnalytics(t *testing.T) {
 	})
 
 	t.Run("Detailed analytics with cache", func(t *testing.T) {
-		defer ResetTestConfig()
+		defer func() {
+			config.SetGlobal(base)
+		}()
 		globalConf := config.Global()
 		globalConf.AnalyticsConfig.EnableDetailedRecording = true
 		config.SetGlobal(globalConf)
