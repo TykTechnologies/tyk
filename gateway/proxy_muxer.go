@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"net"
 	"net/http"
 	"strconv"
@@ -43,6 +44,14 @@ type proxy struct {
 	httpServer *http.Server
 	tcpProxy   *tcp.Proxy
 	started    bool
+}
+
+func (p proxy) String() string {
+	ls := ""
+	if p.listener != nil {
+		ls = p.listener.Addr().String()
+	}
+	return fmt.Sprintf("[proxy] :%d %s", p.port, ls)
 }
 
 type proxyMux struct {
@@ -205,7 +214,6 @@ func (m *proxyMux) serve() {
 			p.port = port
 			p.listener = listener
 		}
-
 		if p.started {
 			continue
 		}

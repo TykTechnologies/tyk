@@ -761,7 +761,6 @@ func LoadAPI(specs ...*APISpec) (out []*APISpec) {
 	oldPath := globalConf.AppPath
 	globalConf.AppPath, _ = ioutil.TempDir("", "apps")
 	config.SetGlobal(globalConf)
-
 	defer func() {
 		globalConf := config.Global()
 		os.RemoveAll(globalConf.AppPath)

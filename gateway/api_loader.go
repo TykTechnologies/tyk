@@ -566,8 +566,11 @@ func fuzzyFindAPI(search string) *APISpec {
 }
 
 func loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStores, muxer *proxyMux) {
-	router := muxer.router(spec.ListenPort, spec.Protocol)
-
+	port := config.Global().ListenPort
+	if spec.ListenPort != 0 {
+		port = spec.ListenPort
+	}
+	router := muxer.router(port, spec.Protocol)
 	if router == nil {
 		router = mux.NewRouter()
 	}

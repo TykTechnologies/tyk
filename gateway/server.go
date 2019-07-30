@@ -675,7 +675,6 @@ func doReload() {
 			return
 		}
 	}
-
 	loadGlobalApps()
 
 	mainLog.Info("API reload complete")
