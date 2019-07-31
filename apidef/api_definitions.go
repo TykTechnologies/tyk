@@ -500,8 +500,8 @@ type BundleManifest struct {
 type RequestSigningMeta struct {
 	IsEnabled bool   `bson:"is_enabled" json:"is_enabled"`
 	Secret    string `bson:"secret" json:"secret"`
-	KeyId     string `bson:"key_id", json:"key_id"`
-	Algorithm string `bson:"algorithm", json:"algorithm"`
+	KeyId     string `bson:"key_id" json:"key_id"`
+	Algorithm string `bson:"algorithm" json:"algorithm"`
 }
 
 // Clean will URL encode map[string]struct variables for saving
