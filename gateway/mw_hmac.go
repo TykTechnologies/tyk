@@ -61,7 +61,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	}
 
 	// Generate a signature string
-	signatureString, err := generateHMACSignatureStringFromRequest(r, fieldValues)
+	signatureString, err := generateHMACSignatureStringFromRequest(r, fieldValues.Headers)
 	if err != nil {
 		logger.WithError(err).WithField("signature_string", signatureString).Error("Signature string generation failed")
 		return hm.authorizationError(r)
@@ -296,9 +296,9 @@ func getFieldValues(authHeader string) (*HMACFieldValues, error) {
 
 // "Signature keyId="9876",algorithm="hmac-sha1",headers="x-test x-test-2",signature="queryEscape(base64(sig))"")
 
-func generateHMACSignatureStringFromRequest(r *http.Request, fieldValues *HMACFieldValues) (string, error) {
+func generateHMACSignatureStringFromRequest(r *http.Request, headers []string) (string, error) {
 	signatureString := ""
-	for i, header := range fieldValues.Headers {
+	for i, header := range headers {
 		loweredHeader := strings.TrimSpace(strings.ToLower(header))
 		if loweredHeader == "(request-target)" {
 			requestHeaderField := "(request-target): " + strings.ToLower(r.Method) + " " + r.URL.Path
@@ -313,7 +313,7 @@ func generateHMACSignatureStringFromRequest(r *http.Request, fieldValues *HMACFi
 			signatureString += headerField
 		}
 
-		if i != len(fieldValues.Headers)-1 {
+		if i != len(headers)-1 {
 			signatureString += "\n"
 		}
 	}

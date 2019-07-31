@@ -386,6 +386,7 @@ type APIDefinition struct {
 	EnableSignatureChecking    bool                 `bson:"enable_signature_checking" json:"enable_signature_checking"`
 	HmacAllowedClockSkew       float64              `bson:"hmac_allowed_clock_skew" json:"hmac_allowed_clock_skew"`
 	HmacAllowedAlgorithms      []string             `bson:"hmac_allowed_algorithms" json:"hmac_allowed_algorithms"`
+	RequestSigning             RequestSigningMeta   `bson:"request_signing" json:"request_signing"`
 	BaseIdentityProvidedBy     AuthTypeEnum         `bson:"base_identity_provided_by" json:"base_identity_provided_by"`
 	VersionDefinition          struct {
 		Location  string `bson:"location" json:"location"`
@@ -494,6 +495,13 @@ type BundleManifest struct {
 	CustomMiddleware MiddlewareSection `bson:"custom_middleware" json:"custom_middleware"`
 	Checksum         string            `bson:"checksum" json:"checksum"`
 	Signature        string            `bson:"signature" json:"signature"`
+}
+
+type RequestSigningMeta struct {
+	IsEnabled bool   `bson:"is_enabled" json:"is_enabled"`
+	Secret    string `bson:"secret" json:"secret"`
+	KeyId     string `bson:"key_id" json:"key_id"`
+	Algorithm string `bson:"algorithm" json:"algorithm"`
 }
 
 // Clean will URL encode map[string]struct variables for saving
