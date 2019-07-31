@@ -401,7 +401,7 @@ const Schema = `{
                 "is_enabled": {
                     "type": "boolean"
                 },
-                "key": {
+                "secret": {
                     "type": "string"
                 },
 		"key_id": {

@@ -499,7 +499,7 @@ type BundleManifest struct {
 
 type RequestSigningMeta struct {
 	IsEnabled bool   `bson:"is_enabled" json:"is_enabled"`
-	Key       string `bson:"key" json:"key"`
+	Secret    string `bson:"secret" json:"secret"`
 	KeyId     string `bson:"key_id", json:"key_id"`
 	Algorithm string `bson:"algorithm", json:"algorithm"`
 }

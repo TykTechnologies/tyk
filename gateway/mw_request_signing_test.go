@@ -37,7 +37,7 @@ func generateSpec(algo string) {
 		spec.Proxy.ListenPath = "/test"
 		spec.RequestSigning.IsEnabled = true
 		spec.RequestSigning.KeyId = sessionKey
-		spec.RequestSigning.Key = "9879879878787878"
+		spec.RequestSigning.Secret = "9879879878787878"
 		spec.RequestSigning.Algorithm = algo
 
 		version := spec.VersionData.Versions["v1"]

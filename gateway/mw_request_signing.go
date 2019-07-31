@@ -46,7 +46,7 @@ func generateHeaderList(r *http.Request) []string {
 }
 
 func (s *RequestSigning) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	if s.Spec.RequestSigning.Key == "" || s.Spec.RequestSigning.KeyId == "" || s.Spec.RequestSigning.Algorithm == "" {
+	if s.Spec.RequestSigning.Secret == "" || s.Spec.RequestSigning.KeyId == "" || s.Spec.RequestSigning.Algorithm == "" {
 		log.Error("Fields required for signing the request are missing")
 		return errors.New("Fields required for signing the request are missing"), http.StatusInternalServerError
 	}
@@ -78,7 +78,7 @@ func (s *RequestSigning) ProcessRequest(w http.ResponseWriter, r *http.Request, 
 	}
 
 	strHeaders := strings.Join(headers, " ")
-	encodedSignature := generateEncodedSignature(signatureString, s.Spec.RequestSigning.Key, s.Spec.RequestSigning.Algorithm)
+	encodedSignature := generateEncodedSignature(signatureString, s.Spec.RequestSigning.Secret, s.Spec.RequestSigning.Algorithm)
 
 	//Generate Authorization header
 	authHeader := "Signature "
