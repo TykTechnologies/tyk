@@ -34,6 +34,7 @@ install:
   - go get github.com/go-swagger/go-swagger/cmd/swagger
 
 script:
+  - pip3 install setuptools
   - sudo pip3 install google
   - sudo pip3 install protobuf
     ### Needed to convert the swagger 2.0 file to openapi 3.0
