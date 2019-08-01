@@ -257,13 +257,7 @@ func (o *OAuthManager) HandleAuthorisation(r *http.Request, complete bool, sessi
 func JSONToFormValues(r *http.Request) error {
 	if r.Header.Get("Content-Type") == "application/json" {
 		var o map[string]string
-		// we don't want to mess with the original body so we are going to work with a
-		// copy.
-		body, err := r.GetBody()
-		if err != nil {
-			return err
-		}
-		err = json.NewDecoder(body).Decode(&o)
+		err := json.NewDecoder(r.Body).Decode(&o)
 		if err != nil {
 			return err
 		}
