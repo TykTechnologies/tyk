@@ -2,16 +2,15 @@
 
 [![Build Status](https://travis-ci.org/TykTechnologies/tyk.svg?branch=master)](https://travis-ci.org/TykTechnologies/tyk)
 [![Go Report Card](https://goreportcard.com/badge/github.com/TykTechnologies/tyk)](https://goreportcard.com/report/github.com/TykTechnologies/tyk)
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk?ref=badge_shield)
 
 Tyk is a lightweight, open source API Gateway and Management Platform enables you to control who accesses your API, when they access it and how they access it. Tyk will
 also record detailed analytics on how your users are interacting with your API and when things go wrong.
 
-Go version 1.10 is required to build `master`, the current
+Go version 1.9 is required to build `master`, the current
 development version. Tyk is officially supported on `linux/amd64`,
 `linux/i386` and `linux/arm64`.
 
-Tests are run against both Go versions 1.10 & 1.11, however at present, only Go 1.10 is officially supported.
+Tests are run against both Go versions 1.9 & 1.10, however at present, only Go 1.9 is officially supported.
 
 ## What is an API Gateway?
 
@@ -56,9 +55,6 @@ All the documentation can be found at http://tyk.io/docs/.
 
 Tyk is released under the MPL v2.0; please see [LICENSE.md](LICENSE.md) for a full version of the license.
 
-
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk?ref=badge_large)
-
 ### Contributing
 
 For more information about contributing PRs and issues, see [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -66,6 +62,6 @@ For more information about contributing PRs and issues, see [CONTRIBUTING.md](CO
 ### Roadmap
 
 To coordinate development and be completely transparent as to where the project is going, the version roadmap for the next version, as well as proposed features
-and adopted proposals can be viewed on our public [Tyk Roadmap Repository](https://github.com/TykTechnologies/tyk-roadmap).
+and adopted proposals can be viewed on our public [Trello board](https://trello.com/b/59d5kAZ5/tyk-api-gateway-roadmap).
 
-Any proposals can be made in the Github issue tracker. Proposals that are adopted will be placed into roadmap.
+Any proposals can be made in the Github issue tracker. Proposals that are adopted will be placed into trello and then moved according to their status.

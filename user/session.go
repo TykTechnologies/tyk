@@ -1,8 +1,6 @@
 package user
 
 import (
-	"crypto/md5"
-	"fmt"
 	"time"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -48,8 +46,6 @@ type AccessDefinition struct {
 
 // SessionState objects represent a current API session, mainly used for rate limiting.
 // There's a data structure that's based on this and it's used for Protocol Buffer support, make sure to update "coprocess/proto/coprocess_session_state.proto" and generate the bindings using: cd coprocess/proto && ./update_bindings.sh
-//
-// swagger:model
 type SessionState struct {
 	LastCheck          int64                       `json:"last_check" msg:"last_check"`
 	Allowance          float64                     `json:"allowance" msg:"allowance"`
@@ -94,10 +90,6 @@ type SessionState struct {
 
 	// Used to store token hash
 	keyHash string
-}
-
-func (s *SessionState) MD5Hash() string {
-	return fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%+v", s))))
 }
 
 func (s *SessionState) KeyHash() string {

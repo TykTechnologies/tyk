@@ -24,24 +24,20 @@ func (c *regexpByteRetBoolCache) do(r *regexp.Regexp, b []byte, noCacheFn func([
 		return noCacheFn(b)
 	}
 
-	kb := keyBuilderPool.Get().(*keyBuilder)
-	defer keyBuilderPool.Put(kb)
-	kb.Reset()
-
 	// generate key, check key size
-	nsKey := kb.AppendString(r.String()).AppendBytes(b).UnsafeKey()
-	if len(nsKey) > maxKeySize {
+	key := r.String() + string(b)
+	if len(key) > maxKeySize {
 		return noCacheFn(b)
 	}
 
 	// cache hit
-	if res, found := c.getBool(nsKey); found {
+	if res, found := c.getBool(key); found {
 		return res
 	}
 
 	// cache miss, add to cache
 	res := noCacheFn(b)
-	c.add(kb.Key(), res)
+	c.add(key, res)
 
 	return res
 }

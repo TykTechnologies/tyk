@@ -24,18 +24,14 @@ func (c *regexpStrStrRetStrCache) do(r *regexp.Regexp, src string, repl string, 
 		return noCacheFn(src, repl)
 	}
 
-	kb := keyBuilderPool.Get().(*keyBuilder)
-	defer keyBuilderPool.Put(kb)
-	kb.Reset()
-
 	// generate key, check key size
-	nsKey := kb.AppendString(r.String()).AppendString(src).AppendString(repl).UnsafeKey()
-	if len(nsKey) > maxKeySize {
+	key := r.String() + src + repl
+	if len(key) > maxKeySize {
 		return noCacheFn(src, repl)
 	}
 
 	// cache hit
-	if res, found := c.getString(nsKey); found {
+	if res, found := c.getString(key); found {
 		return res
 	}
 
@@ -45,7 +41,7 @@ func (c *regexpStrStrRetStrCache) do(r *regexp.Regexp, src string, repl string, 
 		return res
 	}
 
-	c.add(kb.Key(), res)
+	c.add(key, res)
 
 	return res
 }

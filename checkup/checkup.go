@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	log            = logger.Get().WithField("prefix", "checkup")
+	log            = logger.Get()
 	defaultConfigs = config.Config{
 		Secret:     "352d20ee67be67f6340b4c0605b044b7",
 		NodeSecret: "352d20ee67be67f6340b4c0605b044b7",
@@ -21,37 +21,8 @@ const (
 	minFileDescriptors = 80000
 )
 
-func Run(c config.Config) {
-	legacyRateLimiters(c)
-	allowInsecureConfigs(c)
-	healthCheck(c)
-	fileDescriptors()
-	cpus()
-	defaultSecrets(c)
-}
+func CheckFileDescriptors() {
 
-func legacyRateLimiters(c config.Config) {
-	if c.ManagementNode {
-		return
-	}
-	if c.EnableSentinelRateLimiter || c.EnableRedisRollingLimiter {
-		log.Warning("SentinelRateLimiter & RedisRollingLimiter are deprecated")
-	}
-}
-
-func allowInsecureConfigs(c config.Config) {
-	if c.AllowInsecureConfigs {
-		log.Warning("Insecure configuration allowed: allow_insecure_configs: true")
-	}
-}
-
-func healthCheck(c config.Config) {
-	if c.HealthCheck.EnableHealthChecks {
-		log.Warn("Health Checker is deprecated and not recommended")
-	}
-}
-
-func fileDescriptors() {
 	rlimit := &syscall.Rlimit{}
 	err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, rlimit)
 	if err == nil && rlimit.Cur < minFileDescriptors {
@@ -61,7 +32,8 @@ func fileDescriptors() {
 	}
 }
 
-func cpus() {
+func CheckCpus() {
+
 	cpus := runtime.NumCPU()
 	if cpus < minCPU {
 		log.Warningf("Num CPUs %d too low for production use. Min %d recommended.\n"+
@@ -70,7 +42,8 @@ func cpus() {
 	}
 }
 
-func defaultSecrets(c config.Config) {
+func CheckDefaultSecrets(c config.Config) {
+
 	if c.Secret == defaultConfigs.Secret {
 		log.Warningf("Default secret `%s` should be changed for production.", defaultConfigs.Secret)
 	}

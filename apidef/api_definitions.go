@@ -42,11 +42,10 @@ const (
 	RequestXML  RequestInputType = "xml"
 	RequestJSON RequestInputType = "json"
 
-	OttoDriver     MiddlewareDriver = "otto"
-	PythonDriver   MiddlewareDriver = "python"
-	LuaDriver      MiddlewareDriver = "lua"
-	GrpcDriver     MiddlewareDriver = "grpc"
-	GoPluginDriver MiddlewareDriver = "goplugin"
+	OttoDriver   MiddlewareDriver = "otto"
+	PythonDriver MiddlewareDriver = "python"
+	LuaDriver    MiddlewareDriver = "lua"
+	GrpcDriver   MiddlewareDriver = "grpc"
 
 	BodySource        IdExtractorSource = "body"
 	HeaderSource      IdExtractorSource = "header"
@@ -82,12 +81,6 @@ type EndpointMethodMeta struct {
 type EndPointMeta struct {
 	Path          string                        `bson:"path" json:"path"`
 	MethodActions map[string]EndpointMethodMeta `bson:"method_actions" json:"method_actions"`
-}
-
-type CacheMeta struct {
-	Method        string `bson:"method" json:"method"`
-	Path          string `bson:"path" json:"path"`
-	CacheKeyRegex string `bson:"cache_key_regex" json:"cache_key_regex"`
 }
 
 type RequestInputType string
@@ -151,7 +144,6 @@ type CircuitBreakerMeta struct {
 
 type StringRegexMap struct {
 	MatchPattern string `bson:"match_rx" json:"match_rx"`
-	Reverse      bool   `bson:"reverse" json:"reverse"`
 	matchRegex   *regexp.Regexp
 }
 
@@ -176,7 +168,7 @@ type URLRewriteMeta struct {
 	MatchPattern string           `bson:"match_pattern" json:"match_pattern"`
 	RewriteTo    string           `bson:"rewrite_to" json:"rewrite_to"`
 	Triggers     []RoutingTrigger `bson:"triggers" json:"triggers"`
-	MatchRegexp  *regexp.Regexp   `json:"-"`
+	MatchRegexp  *regexp.Regexp
 }
 
 type VirtualMeta struct {
@@ -210,7 +202,6 @@ type ExtendedPathsSet struct {
 	WhiteList               []EndPointMeta        `bson:"white_list" json:"white_list,omitempty"`
 	BlackList               []EndPointMeta        `bson:"black_list" json:"black_list,omitempty"`
 	Cached                  []string              `bson:"cache" json:"cache,omitempty"`
-	AdvanceCacheConfig      []CacheMeta           `bson:"advance_cache_config" json:"advance_cache_config,omitempty"`
 	Transform               []TemplateMeta        `bson:"transform" json:"transform,omitempty"`
 	TransformResponse       []TemplateMeta        `bson:"transform_response" json:"transform_response,omitempty"`
 	TransformJQ             []TransformJQMeta     `bson:"transform_jq" json:"transform_jq,omitempty"`
@@ -271,7 +262,6 @@ type MiddlewareDefinition struct {
 	Name           string `bson:"name" json:"name"`
 	Path           string `bson:"path" json:"path"`
 	RequireSession bool   `bson:"require_session" json:"require_session"`
-	RawBodyOnly    bool   `bson:"raw_body_only" json:"raw_body_only"`
 }
 
 type MiddlewareIdExtractor struct {
@@ -336,8 +326,6 @@ type OpenIDOptions struct {
 }
 
 // APIDefinition represents the configuration for a single proxied API and it's versions.
-//
-// swagger:model
 type APIDefinition struct {
 	Id               bson.ObjectId `bson:"_id,omitempty" json:"id,omitempty"`
 	Name             string        `bson:"name" json:"name"`
@@ -368,7 +356,6 @@ type APIDefinition struct {
 	PinnedPublicKeys           map[string]string    `bson:"pinned_public_keys" json:"pinned_public_keys"`
 	EnableJWT                  bool                 `bson:"enable_jwt" json:"enable_jwt"`
 	UseStandardAuth            bool                 `bson:"use_standard_auth" json:"use_standard_auth"`
-	UseGoPluginAuth            bool                 `bson:"use_go_plugin_auth" json:"use_go_plugin_auth"`
 	EnableCoProcessAuth        bool                 `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"`
 	JWTSigningMethod           string               `bson:"jwt_signing_method" json:"jwt_signing_method"`
 	JWTSource                  string               `bson:"jwt_source" json:"jwt_source"`
@@ -380,8 +367,6 @@ type APIDefinition struct {
 	JWTExpiresAtValidationSkew uint64               `bson:"jwt_expires_at_validation_skew" json:"jwt_expires_at_validation_skew"`
 	JWTNotBeforeValidationSkew uint64               `bson:"jwt_not_before_validation_skew" json:"jwt_not_before_validation_skew"`
 	JWTSkipKid                 bool                 `bson:"jwt_skip_kid" json:"jwt_skip_kid"`
-	JWTScopeToPolicyMapping    map[string]string    `bson:"jwt_scope_to_policy_mapping" json:"jwt_scope_to_policy_mapping"`
-	JWTScopeClaimName          string               `bson:"jwt_scope_claim_name" json:"jwt_scope_claim_name"`
 	NotificationsDetails       NotificationsManager `bson:"notifications" json:"notifications"`
 	EnableSignatureChecking    bool                 `bson:"enable_signature_checking" json:"enable_signature_checking"`
 	HmacAllowedClockSkew       float64              `bson:"hmac_allowed_clock_skew" json:"hmac_allowed_clock_skew"`
@@ -582,48 +567,25 @@ func (a *APIDefinition) DecodeFromDB() {
 	}
 }
 
-func (s *StringRegexMap) Check(value string) (match string) {
-	if s.matchRegex == nil {
-		return
-	}
-
+func (s *StringRegexMap) Check(value string) string {
 	return s.matchRegex.FindString(value)
 }
 
-func (s *StringRegexMap) FindStringSubmatch(value string) (matched bool, match []string) {
-	if s.matchRegex == nil {
-		return
-	}
-
-	match = s.matchRegex.FindStringSubmatch(value)
-	if !s.Reverse {
-		matched = len(match) > 0
-	} else {
-		matched = len(match) == 0
-	}
-
-	return
+func (s *StringRegexMap) FindStringSubmatch(value string) []string {
+	return s.matchRegex.FindStringSubmatch(value)
 }
 
-func (s *StringRegexMap) FindAllStringSubmatch(value string, n int) (matched bool, matches [][]string) {
-	matches = s.matchRegex.FindAllStringSubmatch(value, n)
-	if !s.Reverse {
-		matched = len(matches) > 0
-	} else {
-		matched = len(matches) == 0
-	}
-
-	return
+func (s *StringRegexMap) FindAllStringSubmatch(value string, n int) [][]string {
+	return s.matchRegex.FindAllStringSubmatch(value, n)
 }
 
 func (s *StringRegexMap) Init() error {
 	var err error
 	if s.matchRegex, err = regexp.Compile(s.MatchPattern); err != nil {
 		log.WithError(err).WithField("MatchPattern", s.MatchPattern).
-			Error("Could not compile matchRegex for StringRegexMap")
+			Error("Could not compile regexp for StringRegexMap")
 		return err
 	}
-
 	return nil
 }
 
@@ -734,17 +696,16 @@ func DummyAPI() APIDefinition {
 	}
 
 	return APIDefinition{
-		VersionData:             versionData,
-		ConfigData:              map[string]interface{}{},
-		AllowedIPs:              []string{},
-		PinnedPublicKeys:        map[string]string{},
-		ResponseProcessors:      []ResponseProcessor{},
-		ClientCertificates:      []string{},
-		BlacklistedIPs:          []string{},
-		TagHeaders:              []string{},
-		UpstreamCertificates:    map[string]string{},
-		JWTScopeToPolicyMapping: map[string]string{},
-		HmacAllowedAlgorithms:   []string{},
+		VersionData:           versionData,
+		ConfigData:            map[string]interface{}{},
+		AllowedIPs:            []string{},
+		PinnedPublicKeys:      map[string]string{},
+		ResponseProcessors:    []ResponseProcessor{},
+		ClientCertificates:    []string{},
+		BlacklistedIPs:        []string{},
+		TagHeaders:            []string{},
+		UpstreamCertificates:  map[string]string{},
+		HmacAllowedAlgorithms: []string{},
 		CustomMiddleware: MiddlewareSection{
 			Post:        []MiddlewareDefinition{},
 			Pre:         []MiddlewareDefinition{},
