@@ -91,7 +91,9 @@ func getUpstreamCertificate(host string, spec *APISpec) (cert *tls.Certificate) 
 	certs := CertificateManager.List([]string{certID}, certs.CertificatePrivate)
 
 	if len(certs) == 0 {
+
 		return nil
+
 	}
 
 	return certs[0]
@@ -251,8 +253,12 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 
 		isControlAPI := (listenPort != 0 && config.Global().ControlAPIPort == listenPort) || (config.Global().ControlAPIHostname == hello.ServerName)
 
+		// THIS CODE IS CALLED WHEN DASHBOARD CONNECTS TO THE GATEWAY
+
 		if isControlAPI && config.Global().Security.ControlAPIUseMutualTLS {
+
 			newConfig.ClientAuth = tls.RequireAndVerifyClientCert
+
 			newConfig.ClientCAs = CertificateManager.CertPool(config.Global().Security.Certificates.ControlAPI)
 
 			return newConfig, nil

@@ -1,21 +1,19 @@
 package certs
 
 import (
-	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
 	"io/ioutil"
-	"math/big"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
+
+	"github.com/TykTechnologies/tyk/test"
 )
 
 type dummyStorage struct {
@@ -75,30 +73,6 @@ func newManager() *CertificateManager {
 	return NewCertificateManager(newDummyStorage(), "test", nil)
 }
 
-func genCertificate(template *x509.Certificate) ([]byte, []byte) {
-	priv, _ := rsa.GenerateKey(rand.Reader, 2048)
-
-	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
-	serialNumber, _ := rand.Int(rand.Reader, serialNumberLimit)
-	template.SerialNumber = serialNumber
-	template.BasicConstraintsValid = true
-	template.NotBefore = time.Now()
-	template.NotAfter = time.Now().Add(time.Hour)
-
-	derBytes, _ := x509.CreateCertificate(rand.Reader, template, template, &priv.PublicKey, priv)
-
-	var certPem, keyPem bytes.Buffer
-	pem.Encode(&certPem, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
-	pem.Encode(&keyPem, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
-
-	return certPem.Bytes(), keyPem.Bytes()
-}
-
-func genCertificateFromCommonName(cn string) ([]byte, []byte) {
-	tmpl := &x509.Certificate{Subject: pkix.Name{CommonName: cn}}
-	return genCertificate(tmpl)
-}
-
 func leafSubjectName(cert *tls.Certificate) string {
 	return cert.Leaf.Subject.CommonName
 }
@@ -106,8 +80,8 @@ func leafSubjectName(cert *tls.Certificate) string {
 func TestAddCertificate(t *testing.T) {
 	m := newManager()
 
-	certPem, keyPem := genCertificateFromCommonName("test")
-	cert2Pem, key2Pem := genCertificateFromCommonName("test2")
+	certPem, keyPem, _, _ := test.GenCertificateFromCommonName("test")
+	cert2Pem, key2Pem, _, _ := test.GenCertificateFromCommonName("test2")
 	combinedPem := append(cert2Pem, key2Pem...)
 	combinedPemWrongPrivate := append(cert2Pem, keyPem...)
 	priv, _ := rsa.GenerateKey(rand.Reader, 512)
@@ -166,14 +140,14 @@ func TestCertificateStorage(t *testing.T) {
 		os.RemoveAll(dir)
 	}()
 
-	certPem, _ := genCertificateFromCommonName("file")
+	certPem, _, _, _ := test.GenCertificateFromCommonName("file")
 	certPath := filepath.Join(dir, "cert.pem")
 	ioutil.WriteFile(certPath, certPem, 0666)
 
-	privateCertPEM, keyCertPEM := genCertificateFromCommonName("private")
+	privateCertPEM, keyCertPEM, _, _ := test.GenCertificateFromCommonName("private")
 	privateCertID, _ := m.Add(append(privateCertPEM, keyCertPEM...), "")
 
-	storageCert, _ := genCertificateFromCommonName("dummy")
+	storageCert, _, _, _ := test.GenCertificateFromCommonName("dummy")
 	storageCertID, _ := m.Add(storageCert, "")
 
 	priv, _ := rsa.GenerateKey(rand.Reader, 2048)
