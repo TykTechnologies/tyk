@@ -51,6 +51,7 @@ import (
 )
 
 var (
+	memoryBallast            []byte
 	log                      = logger.Get()
 	mainLog                  = log.WithField("prefix", "main")
 	pubSubLog                = log.WithField("prefix", "pub-sub")
@@ -154,7 +155,6 @@ var rpcPurgeTicker = time.Tick(10 * time.Second)
 
 // Create all globals and init connection handlers
 func setupGlobals(ctx context.Context) {
-
 	reloadMu.Lock()
 	defer reloadMu.Unlock()
 
@@ -255,7 +255,6 @@ func setupGlobals(ctx context.Context) {
 }
 
 func buildConnStr(resource string) string {
-
 	if config.Global().DBAppConfOptions.ConnectionString == "" && config.Global().DisableDashboardZeroConf {
 		mainLog.Fatal("Connection string is empty, failing.")
 	}
@@ -909,6 +908,9 @@ func initialiseSystem(ctx context.Context) error {
 	setupGlobals(ctx)
 
 	globalConf := config.Global()
+
+	// Sets the size of the memory ballast in GB using bitwise left shift
+	memoryBallast = make([]byte, globalConf.MemoryBallastGB << 30)
 
 	if *cli.Port != "" {
 		portNum, err := strconv.Atoi(*cli.Port)

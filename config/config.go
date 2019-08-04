@@ -283,6 +283,7 @@ type Config struct {
 	VersionHeader             string                  `json:"version_header"`
 	UseAsyncSessionWrite      bool                    `json:"optimisations_use_async_session_write"`
 	SuppressRedisSignalReload bool                    `json:"suppress_redis_signal_reload"`
+	MemoryBallastGB           int                     `json:"memory_ballast_gb"`
 
 	// Gateway Security Policies
 	HashKeys                bool           `json:"hash_keys"`
@@ -379,15 +380,15 @@ type Config struct {
 	NewRelic                NewRelicConfig `json:"newrelic"`
 	HTTPProfile             bool           `json:"enable_http_profiler"`
 	UseRedisLog             bool           `json:"use_redis_log"`
-	SentryCode              string         `json:"sentry_code"`
 	UseSentry               bool           `json:"use_sentry"`
-	UseSyslog               bool           `json:"use_syslog"`
+	SentryCode              string         `json:"sentry_code"`
 	UseGraylog              bool           `json:"use_graylog"`
-	UseLogstash             bool           `json:"use_logstash"`
 	GraylogNetworkAddr      string         `json:"graylog_network_addr"`
-	LogstashNetworkAddr     string         `json:"logstash_network_addr"`
-	SyslogTransport         string         `json:"syslog_transport"`
+	UseLogstash             bool           `json:"use_logstash"`
 	LogstashTransport       string         `json:"logstash_transport"`
+	LogstashNetworkAddr     string         `json:"logstash_network_addr"`
+	UseSyslog               bool           `json:"use_syslog"`
+	SyslogTransport         string         `json:"syslog_transport"`
 	SyslogNetworkAddr       string         `json:"syslog_network_addr"`
 	StatsdConnectionString  string         `json:"statsd_connection_string"`
 	StatsdPrefix            string         `json:"statsd_prefix"`
