@@ -251,11 +251,12 @@ func IsErrClosing(err error) bool {
 // Child returns true if this process is managed by again and its a child
 // process.
 func Child() bool {
-	var pid int
-	_, err := fmt.Sscan(os.Getenv("GOAGAIN_PID"), &pid)
-	if io.EOF == err {
-		_, err = fmt.Sscan(os.Getenv("GOAGAIN_PPID"), &pid)
+	d := os.Getenv("GOAGAIN_PID")
+	if d == "" {
+		d = os.Getenv("GOAGAIN_PPID")
 	}
+	var pid int
+	_, err := fmt.Sscan(d, &pid)
 	return err == nil
 }
 

@@ -9,14 +9,12 @@ import (
 	"net/http"
 	pprof_http "net/http/pprof"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"runtime"
 	"runtime/pprof"
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
@@ -33,6 +31,7 @@ import (
 	logrus_syslog "github.com/sirupsen/logrus/hooks/syslog"
 	"rsc.io/letsencrypt"
 
+	"github.com/TykTechnologies/again"
 	gas "github.com/TykTechnologies/goautosocket"
 	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/tyk/apidef"
@@ -975,48 +974,6 @@ func getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 	return &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys}
 }
 
-func waitForSignal() os.Signal {
-	ch := make(chan os.Signal, 2)
-	signal.Notify(
-		ch,
-		syscall.SIGHUP,
-		syscall.SIGINT,
-		syscall.SIGQUIT,
-		syscall.SIGTERM,
-		syscall.SIGUSR1,
-		syscall.SIGUSR2,
-	)
-	for {
-		sig := <-ch
-		log.Println(sig.String())
-		switch sig {
-
-		// SIGHUP should reload configuration.
-		case syscall.SIGHUP:
-		// TODO: Reload config
-
-		// SIGINT should exit.
-		case syscall.SIGINT:
-			return syscall.SIGINT
-
-		// SIGQUIT should exit gracefully.
-		case syscall.SIGQUIT:
-			return syscall.SIGQUIT
-
-		// SIGTERM should exit.
-		case syscall.SIGTERM:
-			return syscall.SIGTERM
-
-		// SIGUSR1 should reopen logs.
-		case syscall.SIGUSR1:
-
-		// TODO: implement forking
-		case syscall.SIGUSR2:
-			return syscall.SIGUSR2
-		}
-	}
-}
-
 func Start() {
 	cli.Init(VERSION, confPaths)
 	cli.Parse()
@@ -1035,6 +992,30 @@ func Start() {
 		mainLog.Warn("The control_api_port should be changed for production")
 	}
 
+	onFork := func() {
+		mainLog.Warning("PREPARING TO FORK")
+
+		// if controlListener != nil {
+		// 	if err := controlListener.Close(); err != nil {
+		// 		mainLog.Error("Control listen handler exit: ", err)
+		// 	}
+		// 	mainLog.Info("Control listen closed")
+		// }
+
+		if config.Global().UseDBAppConfigs {
+			mainLog.Info("Stopping heartbeat")
+			DashService.StopBeating()
+			mainLog.Info("Waiting to de-register")
+			time.Sleep(10 * time.Second)
+
+			os.Setenv("TYK_SERVICE_NONCE", ServiceNonce)
+			os.Setenv("TYK_SERVICE_NODEID", getNodeID())
+		}
+	}
+	err := again.ListenFrom(&defaultProxyMux.again, onFork)
+	if err != nil {
+		mainLog.Errorf("Initializing again %s", err)
+	}
 	checkup.Run(config.Global())
 	if tr := config.Global().Tracer; tr.Enabled {
 		trace.SetupTracing(tr.Name, tr.Options)
@@ -1081,13 +1062,17 @@ func Start() {
 	if !rpc.IsEmergencyMode() {
 		doReload()
 	}
-	waitForSignal()
-
+	if again.Child() {
+		// This is a child process, we need to murder the parent now
+		if err := again.Kill(); err != nil {
+			mainLog.Fatal(err)
+		}
+	}
+	again.Wait(&defaultProxyMux.again)
 	mainLog.Info("Stop signal received.")
-
-	// Makes it close all listeners
-	defaultProxyMux.swap(&proxyMux{})
-
+	if err := defaultProxyMux.again.Close(); err != nil {
+		mainLog.Error("Closing listeners: ", err)
+	}
 	// stop analytics workers
 	if config.Global().EnableAnalytics && analytics.Store == nil {
 		analytics.Stop()

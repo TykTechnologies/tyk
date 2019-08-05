@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/tcp"
 
@@ -57,9 +58,12 @@ func (p proxy) String() string {
 type proxyMux struct {
 	sync.RWMutex
 	proxies []*proxy
+	again   again.Again
 }
 
-var defaultProxyMux = &proxyMux{}
+var defaultProxyMux = &proxyMux{
+	again: again.New(),
+}
 
 func (m *proxyMux) getProxy(listenPort int) *proxy {
 	if listenPort == 0 {
@@ -159,6 +163,7 @@ func (m *proxyMux) addTCPService(spec *APISpec, modifier *tcp.Modifier) {
 func (m *proxyMux) swap(new *proxyMux) {
 	m.Lock()
 	defer m.Unlock()
+	listenAddress := config.Global().ListenAddress
 
 	// Shutting down and removing unused listeners/proxies
 	i := 0
@@ -174,6 +179,7 @@ func (m *proxyMux) swap(new *proxyMux) {
 			} else {
 				curP.listener.Close()
 			}
+			m.again.Delete(target(listenAddress, curP.port))
 		} else {
 			m.proxies[i] = curP
 			i++
@@ -261,11 +267,17 @@ func (m *proxyMux) serve() {
 	}
 }
 
+func target(listenAddress string, listenPort int) string {
+	return fmt.Sprintf("%s:%d", listenAddress, listenPort)
+}
+
 func (m *proxyMux) generateListener(listenPort int, protocol string) (l net.Listener, err error) {
 	listenAddress := config.Global().ListenAddress
 
 	targetPort := listenAddress + ":" + strconv.Itoa(listenPort)
-
+	if ls := m.again.GetListener(targetPort); ls != nil {
+		return ls, nil
+	}
 	switch protocol {
 	case "https", "tls":
 		mainLog.Infof("--> Using TLS (%s)", protocol)
@@ -291,6 +303,11 @@ func (m *proxyMux) generateListener(listenPort int, protocol string) (l net.List
 		mainLog.WithField("port", targetPort).Infof("--> Standard listener (%s)", protocol)
 		l, err = net.Listen("tcp", targetPort)
 	}
-
-	return l, err
+	if err != nil {
+		return nil, err
+	}
+	if err := (&m.again).Listen(targetPort, l); err != nil {
+		return nil, err
+	}
+	return l, nil
 }

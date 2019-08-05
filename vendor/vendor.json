@@ -31,10 +31,10 @@
 			"versionExact": "v0.11.4"
 		},
 		{
-			"checksumSHA1": "1Fs9Us5MYTbtVgReUoEjQnqzegs=",
+			"checksumSHA1": "DgSuOlMROA552OE6RYyfjd5KTMg=",
 			"path": "github.com/TykTechnologies/again",
-			"revision": "3e719fdc2ffd503d8cc2b07952ca47293f7df38b",
-			"revisionTime": "2019-08-05T09:00:11Z"
+			"revision": "0e1bf45d288e5835818aa23c86b9ccd559e62150",
+			"revisionTime": "2019-08-05T12:06:13Z"
 		},
 		{
 			"checksumSHA1": "j5NnY7tyNCx+Y5VrAMxKFqPPGWc=",
