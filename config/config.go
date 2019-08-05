@@ -219,18 +219,28 @@ type CoProcessConfig struct {
 }
 
 type CertificatesConfig struct {
-	API        []string          `json:"apis"`
-	Upstream   map[string]string `json:"upstream"`
-	ControlAPI []string          `json:"control_api"`
-	Dashboard  []string          `json:"dashboard_api"`
-	MDCB       []string          `json:"mdcb_api"`
+	// API - whitelisted user certificates for mutual tls protected apis
+	API []string `json:"apis"`
+	// Upstream - private certificates for connecting to upstream. Key - domain, Value - Upstream Url
+	Upstream map[string]string `json:"upstream"`
+
+	// Mutual tls certificates between components
+
+	// ControlAPI - whitelisted dashboard certificates
+	ControlAPI []string `json:"control_api"`
+	// Dashboard - private certificate for connections to dashboard
+	Dashboard string `json:"dashboard_api"`
+	// MDCB - private certificate for connections to MDCB
+	MDCB string `json:"mdcb_api"`
 }
 
 type SecurityConfig struct {
 	PrivateCertificateEncodingSecret string             `json:"private_certificate_encoding_secret"`
-	ControlAPIUseMutualTLS           bool               `json:"control_api_use_mutual_tls"`
 	PinnedPublicKeys                 map[string]string  `json:"pinned_public_keys"`
 	Certificates                     CertificatesConfig `json:"certificates"`
+
+	// TODO: Sergey 05.08.2019 delete this param and check certificate presence
+	ControlAPIUseMutualTLS bool `json:"control_api_use_mutual_tls"`
 }
 
 type NewRelicConfig struct {
