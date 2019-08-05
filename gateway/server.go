@@ -1241,4 +1241,7 @@ func startServer() {
 	mainLog.Info("--> Listening on address: ", address)
 	mainLog.Info("--> Listening on port: ", config.Global().ListenPort)
 	mainLog.Info("--> PID: ", hostDetails.PID)
+	if !rpc.IsEmergencyMode() {
+		doReload()
+	}
 }

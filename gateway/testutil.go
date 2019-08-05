@@ -564,18 +564,7 @@ func (s *Test) Start() {
 	globalConf.CoProcessOptions = s.config.CoprocessConfig
 	config.SetGlobal(globalConf)
 
-	muxer := &proxyMux{}
-	r := mux.NewRouter()
-	muxer.setRouter(globalConf.ListenPort, "", r)
-	if globalConf.ControlAPIPort == 0 {
-		loadAPIEndpoints(r)
-	} else {
-		router := mux.NewRouter()
-		loadAPIEndpoints(router)
-		muxer.setRouter(globalConf.ControlAPIPort, "", router)
-	}
-	defaultProxyMux.swap(muxer)
-
+	startServer()
 	setupGlobals()
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.Global().SupressDefaultOrgStore {
