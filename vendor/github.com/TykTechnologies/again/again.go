@@ -119,12 +119,38 @@ func (a Again) Close() error {
 	}
 	return nil
 }
+func hasElem(v reflect.Value) bool {
+	switch v.Kind() {
+	case reflect.Ptr, reflect.Interface:
+		return true
+	default:
+		return false
+	}
+}
 
 // Listen creates a new service with the given listener.
 func (a *Again) Listen(name string, ls net.Listener) error {
-	v := reflect.ValueOf(ls).Elem().FieldByName("fd").Elem()
+	v := reflect.ValueOf(ls)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	// check if we have net.Listener embedded. Its a workaround to support
+	// crypto/tls Listen
+	if ls := v.FieldByName("Listener"); ls.IsValid() {
+		for hasElem(ls) {
+			ls = ls.Elem()
+		}
+		v = ls
+	}
+	if v.Kind() != reflect.Struct {
+		return fmt.Errorf("Not supported by current Go version")
+	}
+	v = v.FieldByName("fd")
+	if !v.IsValid() {
+		return fmt.Errorf("Not supported by current Go version")
+	}
+	v = v.Elem()
 	fdField := v.FieldByName("sysfd")
-
 	if !fdField.IsValid() {
 		fdField = v.FieldByName("pfd").FieldByName("Sysfd")
 	}
