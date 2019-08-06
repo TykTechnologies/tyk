@@ -285,6 +285,9 @@ const Schema = `{
         "protocol": {
             "type": "string"
         },
+        "enable_proxy_protocol": {
+            "type": "boolean"
+        },
         "certificates": {
             "type": ["array", "null"]
         },
