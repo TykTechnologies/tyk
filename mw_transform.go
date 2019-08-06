@@ -72,6 +72,7 @@ func transformBody(r *http.Request, tmeta *TransformSpec, contextVars bool) erro
 		if len(body) == 0 {
 			body = []byte("{}")
 		}
+
 		var tempBody interface{}
 		if err := json.Unmarshal(body, &tempBody); err != nil {
 			return err
@@ -106,6 +107,7 @@ func transformBody(r *http.Request, tmeta *TransformSpec, contextVars bool) erro
 	}
 	r.Body = ioutil.NopCloser(&bodyBuffer)
 	r.ContentLength = int64(bodyBuffer.Len())
+	nopCloseRequestBody(r)
 
 	return nil
 }
