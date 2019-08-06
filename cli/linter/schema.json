@@ -501,6 +501,10 @@
       "type": "string",
       "format": "host-no-port"
     },
+    "memory_ballast_gb": {
+      "type": "integer",
+      "min": 0
+    },
     "listen_port": {
       "type": "integer"
     },
