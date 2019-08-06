@@ -3,8 +3,8 @@ package logrus_sentry
 import (
 	"net/http"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/getsentry/raven-go"
+	"github.com/sirupsen/logrus"
 )
 
 const (

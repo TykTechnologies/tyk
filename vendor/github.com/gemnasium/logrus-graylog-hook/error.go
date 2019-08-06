@@ -2,8 +2,6 @@ package graylog
 
 import (
 	"encoding/json"
-	"runtime"
-
 	"github.com/pkg/errors"
 )
 
@@ -46,10 +44,4 @@ func extractStackTrace(err error) errors.StackTrace {
 		return nil
 	}
 	return tracer.StackTrace()
-}
-
-func extractFileAndLine(stacktrace errors.StackTrace) (string, int) {
-	pc := uintptr(stacktrace[0])
-	fn := runtime.FuncForPC(pc)
-	return fn.FileLine(pc)
 }

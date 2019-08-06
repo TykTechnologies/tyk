@@ -26,13 +26,6 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/net/http2"
-
-	"github.com/Sirupsen/logrus"
-	opentracing "github.com/opentracing/opentracing-go"
-	"github.com/opentracing/opentracing-go/ext"
-	cache "github.com/pmylund/go-cache"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
@@ -40,6 +33,11 @@ import (
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
+	opentracing "github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/ext"
+	cache "github.com/pmylund/go-cache"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/net/http2"
 )
 
 const defaultUserAgent = "Tyk/" + VERSION

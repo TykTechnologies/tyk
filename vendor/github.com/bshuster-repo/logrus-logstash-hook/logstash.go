@@ -1,10 +1,10 @@
-package logrus_logstash
+package logrustash
 
 import (
 	"net"
 	"strings"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // Hook represents a connection to a Logstash instance
@@ -13,6 +13,7 @@ type Hook struct {
 	appName          string
 	alwaysSentFields logrus.Fields
 	hookOnlyPrefix   string
+	TimeFormat       string
 }
 
 // NewHook creates a new hook to a Logstash instance, which listens on
@@ -106,6 +107,9 @@ func (h *Hook) Fire(entry *logrus.Entry) error {
 	}
 
 	formatter := LogstashFormatter{Type: h.appName}
+	if h.TimeFormat != "" {
+		formatter.TimestampFormat = h.TimeFormat
+	}
 
 	dataBytes, err := formatter.FormatWithPrefix(entry, h.hookOnlyPrefix)
 	if err != nil {

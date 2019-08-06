@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	uuid "github.com/satori/go.uuid"
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
