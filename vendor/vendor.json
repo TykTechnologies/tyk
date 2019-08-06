@@ -569,6 +569,12 @@
 			"revisionTime": "2015-11-19T09:14:14Z"
 		},
 		{
+			"checksumSHA1": "z9escnY1HdbFBLrJozvQ3lygt1E=",
+			"path": "github.com/pires/go-proxyproto",
+			"revision": "2c19fd512994b0cd3d16abb295029bf257d48a56",
+			"revisionTime": "2019-06-15T16:34:42Z"
+		},
+		{
 			"checksumSHA1": "ynJSWoF6v+3zMnh9R0QmmG6iGV8=",
 			"path": "github.com/pkg/errors",
 			"revision": "bfd5150e4e41705ded2129ec33379de1cb90b513",

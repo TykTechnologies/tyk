@@ -13,6 +13,7 @@ import (
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/tcp"
+	"github.com/pires/go-proxyproto"
 
 	"golang.org/x/net/http2"
 
@@ -38,13 +39,14 @@ func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type proxy struct {
-	listener   net.Listener
-	port       int
-	protocol   string
-	router     *mux.Router
-	httpServer *http.Server
-	tcpProxy   *tcp.Proxy
-	started    bool
+	listener         net.Listener
+	port             int
+	protocol         string
+	useProxyProtocol bool
+	router           *mux.Router
+	httpServer       *http.Server
+	tcpProxy         *tcp.Proxy
+	started          bool
 }
 
 func (p proxy) String() string {
@@ -53,6 +55,15 @@ func (p proxy) String() string {
 		ls = p.listener.Addr().String()
 	}
 	return fmt.Sprintf("[proxy] :%d %s", p.port, ls)
+}
+
+// getListener returns a net.Listener for this proxy. If useProxyProtocol is
+// true it wraps the underlying listener to support proxyprotocol.
+func (p proxy) getListener() net.Listener {
+	if p.useProxyProtocol {
+		return &proxyproto.Listener{Listener: p.listener}
+	}
+	return p.listener
 }
 
 type proxyMux struct {
@@ -148,8 +159,9 @@ func (m *proxyMux) addTCPService(spec *APISpec, modifier *tcp.Modifier) {
 		tlsConfig := tlsClientConfig(spec)
 
 		p = &proxy{
-			port:     spec.ListenPort,
-			protocol: spec.Protocol,
+			port:             spec.ListenPort,
+			protocol:         spec.Protocol,
+			useProxyProtocol: spec.EnableProxyProtocol,
 			tcpProxy: &tcp.Proxy{
 				DialTLS:         dialTLSPinnedCheck(spec, tlsConfig),
 				TLSConfigTarget: tlsConfig,
@@ -234,7 +246,7 @@ func (m *proxyMux) serve() {
 		switch p.protocol {
 		case "tcp", "tls":
 			mainLog.Warning("Starting TCP server on:", p.listener.Addr().String())
-			go p.tcpProxy.Serve(p.listener)
+			go p.tcpProxy.Serve(p.getListener())
 		case "http", "https":
 			mainLog.Warning("Starting HTTP server on:", p.listener.Addr().String())
 			readTimeout := 120 * time.Second

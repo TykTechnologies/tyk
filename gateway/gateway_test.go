@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -10,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"runtime"
+	"strconv"
 
 	"strings"
 	"sync"
@@ -18,6 +20,7 @@ import (
 
 	"github.com/garyburd/redigo/redis"
 	"github.com/gorilla/websocket"
+	proxyproto "github.com/pires/go-proxyproto"
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -798,6 +801,72 @@ func TestReloadGoroutineLeakWithCircuitBreaker(t *testing.T) {
 
 	if before < after-1 { // -1 because there is one will be running until we fix circuitbreaker Subscribe() method
 		t.Errorf("Goroutine leak, was: %d, after reload: %d", before, after)
+	}
+}
+
+func listenProxyProto(ls net.Listener) error {
+	pl := &proxyproto.Listener{Listener: ls}
+	for {
+		conn, err := pl.Accept()
+		if err != nil {
+			return err
+		}
+		recv := make([]byte, 4)
+		_, err = conn.Read(recv)
+		if err != nil {
+			return err
+		}
+		if _, err := conn.Write([]byte("pong")); err != nil {
+			return err
+		}
+	}
+}
+
+func TestProxyProtocol(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	go listenProxyProto(l)
+	ts := StartTest()
+	defer ts.Close()
+	rp, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, port, err := net.SplitHostPort(rp.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := strconv.Atoi(port)
+	if err != nil {
+		t.Fatal(err)
+	}
+	proxyAddr := rp.Addr().String()
+	rp.Close()
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.Protocol = "tcp"
+		spec.EnableProxyProtocol = true
+		spec.ListenPort = p
+		spec.Proxy.TargetURL = l.Addr().String()
+	})
+
+	// we want to check if the gateway started listening on the tcp port.
+	ls, err := net.Dial("tcp", proxyAddr)
+	if err != nil {
+		t.Fatalf("expected the proxy to listen on address %s", proxyAddr)
+	}
+	defer ls.Close()
+	ls.Write([]byte("ping"))
+	recv := make([]byte, 4)
+	_, err = ls.Read(recv)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if !bytes.Equal(recv, []byte("pong")) {
+		t.Fatalf("bad: %v", recv)
 	}
 }
 
