@@ -346,6 +346,6 @@ func TestTestCheckerTCPHosts_correct_wrong_answers(t *testing.T) {
 	<-ctx.Done()
 	hs.Stop()
 	if !failed {
-		t.Errorf("expected the host to be down : field:%v up:%v pinged:%v", failed, up, ping)
+		t.Errorf("expected the host check to fail : field:%v up:%v pinged:%v", failed, up, ping)
 	}
 }
