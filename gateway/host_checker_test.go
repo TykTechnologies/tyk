@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"sync"
 	"testing"
 	"text/template"
@@ -219,8 +218,6 @@ func TestReverseProxyAllDown(t *testing.T) {
 }
 
 func TestTestCheckerTCPHosts_correct_answers(t *testing.T) {
-	log.Out = os.Stdout
-	log.Level = 6
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -286,8 +283,6 @@ func TestTestCheckerTCPHosts_correct_answers(t *testing.T) {
 	}
 }
 func TestTestCheckerTCPHosts_correct_wrong_answers(t *testing.T) {
-	log.Out = os.Stdout
-	log.Level = 6
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
