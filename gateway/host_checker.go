@@ -258,7 +258,6 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 
 	millisec := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001
 	report.Latency = millisec
-	log.Debug("has error ", report.IsTCPError)
 	if report.IsTCPError {
 		h.errorChan <- report
 		return
