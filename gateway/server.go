@@ -169,6 +169,10 @@ func setupGlobals() {
 	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
 	FallbackKeySesionManager.Init(&redisStore)
 
+	versionStore := storage.RedisCluster{KeyPrefix: "version-check-"}
+	versionStore.Connect()
+	_ = versionStore.SetKey("gateway", VERSION, 0)
+
 	if config.Global().EnableAnalytics && analytics.Store == nil {
 		globalConf := config.Global()
 		globalConf.LoadIgnoredIPs()
