@@ -83,7 +83,8 @@ var (
 	muNodeID sync.Mutex // guards NodeID
 	NodeID   string
 
-	runningTests = false
+	runningTestsMu sync.RWMutex
+	testMode       bool
 
 	// confPaths is the series of paths to try to use as config files. The
 	// first one to exist will be used. If none exists, a default config
@@ -110,6 +111,19 @@ func setNodeID(nodeID string) {
 	muNodeID.Lock()
 	NodeID = nodeID
 	muNodeID.Unlock()
+}
+
+func isRunningTests() bool {
+	runningTestsMu.RLock()
+	v := testMode
+	runningTestsMu.RUnlock()
+	return v
+}
+
+func setTestMode(v bool) {
+	runningTestsMu.Lock()
+	testMode = v
+	runningTestsMu.Unlock()
 }
 
 // getNodeID reads NodeID safely.
@@ -826,7 +840,7 @@ func setupLogger() {
 }
 
 func initialiseSystem() error {
-	if runningTests && os.Getenv("TYK_LOGLEVEL") == "" {
+	if isRunningTests() && os.Getenv("TYK_LOGLEVEL") == "" {
 		// `go test` without TYK_LOGLEVEL set defaults to no log
 		// output
 		log.Level = logrus.ErrorLevel
@@ -847,7 +861,7 @@ func initialiseSystem() error {
 
 	mainLog.Infof("Tyk API Gateway %s", VERSION)
 
-	if !runningTests {
+	if !isRunningTests() {
 		globalConf := config.Config{}
 		if err := config.Load(confPaths, &globalConf); err != nil {
 			return err

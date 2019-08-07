@@ -99,7 +99,7 @@ func (h *HostUptimeChecker) getStaggeredTime() time.Duration {
 
 func (h *HostUptimeChecker) HostCheckLoop() {
 	for !h.getStopLoop() {
-		if runningTests {
+		if isRunningTests() {
 			<-hostCheckTicker
 		}
 		h.resetListMu.Lock()
@@ -117,7 +117,7 @@ func (h *HostUptimeChecker) HostCheckLoop() {
 			}
 		}
 
-		if !runningTests {
+		if !isRunningTests() {
 			time.Sleep(h.getStaggeredTime())
 		}
 	}

@@ -60,7 +60,7 @@ var (
 )
 
 func InitTestMain(m *testing.M, genConf ...func(globalConf *config.Config)) int {
-	runningTests = true
+	setTestMode(true)
 	testServerRouter = testHttpHandler()
 	testServer := &http.Server{
 		Addr:           testHttpListen,

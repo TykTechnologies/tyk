@@ -257,6 +257,8 @@ func TestTestCheckerTCPHosts_correct_answers(t *testing.T) {
 	failed := false
 	up := false
 	ping := false
+	setTestMode(false)
+
 	hs.Init(1, 1, 0, map[string]HostData{
 		l.Addr().String(): data,
 	},
@@ -275,9 +277,9 @@ func TestTestCheckerTCPHosts_correct_answers(t *testing.T) {
 	)
 	hs.sampleTriggerLimit = 1
 	go hs.Start()
-	hostCheckTicker <- struct{}{}
 	<-ctx.Done()
 	hs.Stop()
+	setTestMode(true)
 	if !(ping && !failed && !up) {
 		t.Errorf("expected the host to be up : field:%v up:%v pinged:%v", failed, up, ping)
 	}
@@ -318,6 +320,7 @@ func TestTestCheckerTCPHosts_correct_wrong_answers(t *testing.T) {
 	failed := false
 	up := false
 	ping := false
+	setTestMode(false)
 	hs.Init(1, 1, 0, map[string]HostData{
 		l.Addr().String(): data,
 	},
@@ -336,10 +339,9 @@ func TestTestCheckerTCPHosts_correct_wrong_answers(t *testing.T) {
 	)
 	hs.sampleTriggerLimit = 1
 	go hs.Start()
-	hostCheckTicker <- struct{}{}
-	hostCheckTicker <- struct{}{}
 	<-ctx.Done()
 	hs.Stop()
+	setTestMode(true)
 	if !failed {
 		t.Errorf("expected the host check to fail : field:%v up:%v pinged:%v", failed, up, ping)
 	}
