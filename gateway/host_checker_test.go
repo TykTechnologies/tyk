@@ -260,7 +260,7 @@ func TestTestCheckerTCPHosts_correct_answers(t *testing.T) {
 	failed := false
 	up := false
 	ping := false
-	hs.Init(2, 1, 0, map[string]HostData{
+	hs.Init(1, 1, 0, map[string]HostData{
 		l.Addr().String(): data,
 	},
 		func(HostHealthReport) {
@@ -323,7 +323,7 @@ func TestTestCheckerTCPHosts_correct_wrong_answers(t *testing.T) {
 	failed := false
 	up := false
 	ping := false
-	hs.Init(2, 1, 0, map[string]HostData{
+	hs.Init(1, 1, 0, map[string]HostData{
 		l.Addr().String(): data,
 	},
 		func(HostHealthReport) {
@@ -341,6 +341,7 @@ func TestTestCheckerTCPHosts_correct_wrong_answers(t *testing.T) {
 	)
 	hs.sampleTriggerLimit = 1
 	go hs.Start()
+	hostCheckTicker <- struct{}{}
 	hostCheckTicker <- struct{}{}
 	<-ctx.Done()
 	hs.Stop()
