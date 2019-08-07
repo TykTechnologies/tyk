@@ -5,15 +5,10 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"net/http/httptest"
-	"sync"
 	"testing"
 	"time"
 
-	"github.com/garyburd/redigo/redis"
-
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -368,51 +363,6 @@ func TestWhitelistMethodWithAdditionalMiddleware(t *testing.T) {
 	})
 }
 
-func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
-	// Test Dashboard
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/system/apis" {
-			w.Write([]byte(`{"Status": "OK", "Nonce": "1", "Message": [{"api_definition": {}}]}`))
-		} else {
-			t.Fatal("Unknown dashboard API request", r)
-		}
-	}))
-	defer ts.Close()
-
-	apisMu.Lock()
-	apisByID = make(map[string]*APISpec)
-	apisMu.Unlock()
-
-	globalConf := config.Global()
-	globalConf.UseDBAppConfigs = true
-	globalConf.AllowInsecureConfigs = true
-	globalConf.DBAppConfOptions.ConnectionString = ts.URL
-	config.SetGlobal(globalConf)
-
-	defer ResetTestConfig()
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	msg := redis.Message{Data: []byte(`{"Command": "ApiUpdated"}`)}
-	handled := func(got NotificationCommand) {
-		if want := NoticeApiUpdated; got != want {
-			t.Fatalf("want %q, got %q", want, got)
-		}
-	}
-	handleRedisEvent(msg, handled, wg.Done)
-
-	// Since we already know that reload is queued
-	ReloadTick <- time.Time{}
-
-	// Wait for the reload to finish, then check it worked
-	wg.Wait()
-	apisMu.RLock()
-	if len(apisByID) != 1 {
-		t.Error("Should return array with one spec", apisByID)
-	}
-	apisMu.RUnlock()
-}
-
 func TestRoundRobin(t *testing.T) {
 	rr := RoundRobin{}
 	for _, want := range []int{0, 1, 2, 0} {
@@ -664,74 +614,4 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 			}...)
 		}
 	})
-}
-
-func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
-	// Test Dashboard
-	callNum := 0
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/system/apis" {
-			if callNum == 0 {
-				w.Write([]byte(`{"Status": "OK", "Nonce": "1", "Message": [{"api_definition": {}}]}`))
-			} else {
-				w.Write([]byte(`{"Status": "OK", "Nonce": "1", "Message": "this is a string"`))
-			}
-
-			callNum += 1
-		} else {
-			t.Fatal("Unknown dashboard API request", r)
-		}
-	}))
-	defer ts.Close()
-
-	apisMu.Lock()
-	apisByID = make(map[string]*APISpec)
-	apisMu.Unlock()
-
-	globalConf := config.Global()
-	globalConf.UseDBAppConfigs = true
-	globalConf.AllowInsecureConfigs = true
-	globalConf.DBAppConfOptions.ConnectionString = ts.URL
-	config.SetGlobal(globalConf)
-
-	defer ResetTestConfig()
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	msg := redis.Message{Data: []byte(`{"Command": "ApiUpdated"}`)}
-	handled := func(got NotificationCommand) {
-		if want := NoticeApiUpdated; got != want {
-			t.Fatalf("want %q, got %q", want, got)
-		}
-	}
-	handleRedisEvent(msg, handled, wg.Done)
-
-	// Since we already know that reload is queued
-	ReloadTick <- time.Time{}
-
-	// Wait for the reload to finish, then check it worked
-	wg.Wait()
-	apisMu.RLock()
-	if len(apisByID) != 1 {
-		t.Error("should return array with one spec", apisByID)
-	}
-	apisMu.RUnlock()
-
-	// Second call
-
-	var wg2 sync.WaitGroup
-	wg2.Add(1)
-	handleRedisEvent(msg, handled, wg2.Done)
-
-	// Since we already know that reload is queued
-	ReloadTick <- time.Time{}
-
-	// Wait for the reload to finish, then check it worked
-	wg2.Wait()
-	apisMu.RLock()
-	if len(apisByID) != 1 {
-		t.Error("second call should return array with one spec", apisByID)
-	}
-	apisMu.RUnlock()
-
 }

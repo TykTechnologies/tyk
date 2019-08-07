@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
 )
@@ -41,21 +43,32 @@ type HTTPDashboardHandler struct {
 	heartBeatStopSentinel bool
 }
 
-func initialiseClient(timeout time.Duration) *http.Client {
-	client := &http.Client{
-		Timeout: timeout,
+func initialiseClient(timeout time.Duration) (client *http.Client) {
+	client = &http.Client{Timeout: timeout}
+
+	cfg := config.Global()
+	if !cfg.HttpServerOptions.UseSSL && !strings.HasPrefix(cfg.DBAppConfOptions.ConnectionString, "https") {
+		return
 	}
 
-	if config.Global().HttpServerOptions.UseSSL {
-		// Setup HTTPS client
-		tlsConfig := &tls.Config{
-			InsecureSkipVerify: config.Global().HttpServerOptions.SSLInsecureSkipVerify,
+	// Setup HTTPS client
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: cfg.HttpServerOptions.SSLInsecureSkipVerify,
+	}
+
+	cert := cfg.Security.Certificates.Dashboard
+	if strings.TrimSpace(cert) != "" {
+		certs := CertificateManager.List([]string{cert}, certs.CertificatePrivate)
+
+		if len(certs) != 0 && certs[0] != nil {
+			tlsConfig.Certificates = []tls.Certificate{*certs[0]}
+			log.Info("Mutual tls for dashboard was enabled")
 		}
-
-		client.Transport = &http.Transport{TLSClientConfig: tlsConfig}
 	}
 
-	return client
+	client.Transport = &http.Transport{TLSClientConfig: tlsConfig}
+
+	return
 }
 
 func reLogin() {
