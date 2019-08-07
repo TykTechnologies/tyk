@@ -307,9 +307,19 @@ type ResponseProcessor struct {
 
 type HostCheckObject struct {
 	CheckURL string            `bson:"url" json:"url"`
+	Protocol string            `bson:"protocol" json:"protocol"`
+	Commands []CheckCommand    `bson:"commands" json:"commands"`
 	Method   string            `bson:"method" json:"method"`
 	Headers  map[string]string `bson:"headers" json:"headers"`
 	Body     string            `bson:"body" json:"body"`
+}
+
+type CheckCommand struct {
+	// the command to run, options are send for send where the message will be
+	// written on the socket and expect where message will be read and verified
+	// that it matches.
+	Name    string `bson:"name" json:"name"`
+	Message string `bson:"message" json:"message"`
 }
 
 type ServiceDiscoveryConfiguration struct {

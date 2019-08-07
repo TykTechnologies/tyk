@@ -3,7 +3,9 @@ package gateway
 import (
 	"crypto/tls"
 	"math/rand"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -11,6 +13,7 @@ import (
 	"github.com/jeffail/tunny"
 	cache "github.com/pmylund/go-cache"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 )
 
@@ -30,6 +33,8 @@ var (
 
 type HostData struct {
 	CheckURL string
+	Protocol string
+	Commands []apidef.CheckCommand
 	Method   string
 	Headers  map[string]string
 	Body     string
@@ -172,48 +177,94 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 	log.Debug("[HOST CHECKER] Checking: ", toCheck.CheckURL)
 
 	t1 := time.Now()
-
-	useMethod := toCheck.Method
-	if toCheck.Method == "" {
-		useMethod = http.MethodGet
+	report := HostHealthReport{
+		HostData: toCheck,
 	}
+	switch toCheck.Protocol {
+	case "tcp":
+		host := toCheck.CheckURL
+		if !strings.HasPrefix(host, "tcp://") {
+			host = "tcp://" + host
+		}
+		u, err := url.Parse(host)
+		if err != nil {
+			log.Error("Could not parse host: ", err)
+			return
+		}
 
-	req, err := http.NewRequest(useMethod, toCheck.CheckURL, strings.NewReader(toCheck.Body))
-	if err != nil {
-		log.Error("Could not create request: ", err)
-		return
-	}
-	for headerName, headerValue := range toCheck.Headers {
-		req.Header.Set(headerName, headerValue)
-	}
-	req.Header.Set("Connection", "close")
+		ls, err := net.Dial("tcp", u.Host)
+		if err != nil {
+			log.Error("Could not connect to host: ", err)
+			report.IsTCPError = true
+			break
+		}
+		for _, cmd := range toCheck.Commands {
+			switch cmd.Name {
+			case "send":
+				log.Debugf("%s: sending %s", host, cmd.Message)
+				_, err = ls.Write([]byte(cmd.Message))
+				if err != nil {
+					log.Errorf("Failed to send %s :%v", cmd.Message, err)
+					report.IsTCPError = true
+					break
+				}
+			case "expect":
+				buf := make([]byte, len(cmd.Message))
+				_, err = ls.Read(buf)
+				if err != nil {
+					log.Errorf("Failed to read %s :%v", cmd.Message, err)
+					report.IsTCPError = true
+					break
+				}
+				g := string(buf)
+				if g != cmd.Message {
+					log.Errorf("Failed expectation  expected %s got %s", cmd.Message, g)
+					report.IsTCPError = true
+					break
+				}
+				log.Debugf("%s: received %s", host, cmd.Message)
+			}
+		}
+		report.ResponseCode = http.StatusOK
+	default:
+		useMethod := toCheck.Method
+		if toCheck.Method == "" {
+			useMethod = http.MethodGet
+		}
+		req, err := http.NewRequest(useMethod, toCheck.CheckURL, strings.NewReader(toCheck.Body))
+		if err != nil {
+			log.Error("Could not create request: ", err)
+			return
+		}
+		for headerName, headerValue := range toCheck.Headers {
+			req.Header.Set(headerName, headerValue)
+		}
+		req.Header.Set("Connection", "close")
+		HostCheckerClient.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: config.Global().ProxySSLInsecureSkipVerify,
+			},
+		}
 
-	HostCheckerClient.Transport = &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: config.Global().ProxySSLInsecureSkipVerify,
-		},
+		response, err := HostCheckerClient.Do(req)
+		if err != nil {
+			report.IsTCPError = true
+			break
+		}
+		report.ResponseCode = response.StatusCode
 	}
-
-	response, err := HostCheckerClient.Do(req)
 
 	t2 := time.Now()
 
 	millisec := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001
-
-	report := HostHealthReport{
-		HostData: toCheck,
-		Latency:  millisec,
-	}
-
-	if err != nil {
-		report.IsTCPError = true
+	report.Latency = millisec
+	log.Debug("has error ", report.IsTCPError)
+	if report.IsTCPError {
 		h.errorChan <- report
 		return
 	}
 
-	report.ResponseCode = response.StatusCode
-
-	if response.StatusCode != http.StatusOK {
+	if report.ResponseCode != http.StatusOK {
 		h.errorChan <- report
 		return
 	}
@@ -222,7 +273,7 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 	h.okChan <- report
 }
 
-func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList map[string]HostData, failureCallback func(HostHealthReport), upCallback func(HostHealthReport), pingCallback func(HostHealthReport)) {
+func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList map[string]HostData, failureCallback, upCallback, pingCallback func(HostHealthReport)) {
 	h.sampleCache = cache.New(30*time.Second, 30*time.Second)
 	h.stopPollingChan = make(chan bool)
 	h.errorChan = make(chan HostHealthReport)

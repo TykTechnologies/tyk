@@ -309,7 +309,6 @@ func (m *proxyMux) generateListener(listenPort int, protocol string) (l net.List
 		}
 
 		tlsConfig.GetConfigForClient = getTLSConfigForClient(&tlsConfig, listenPort)
-
 		l, err = tls.Listen("tcp", targetPort, &tlsConfig)
 	default:
 		mainLog.WithField("port", targetPort).Infof("--> Standard listener (%s)", protocol)

@@ -2,8 +2,11 @@ package gateway
 
 import (
 	"bytes"
+	"context"
+	"net"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"sync"
 	"testing"
 	"text/template"
@@ -212,5 +215,136 @@ func TestReverseProxyAllDown(t *testing.T) {
 	proxy.ServeHTTP(rec, req)
 	if rec.Code != 503 {
 		t.Fatalf("wanted code to be 503, was %d", rec.Code)
+	}
+}
+
+func TestTestCheckerTCPHosts_correct_answers(t *testing.T) {
+	log.Out = os.Stdout
+	log.Level = 6
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	data := HostData{
+		CheckURL: l.Addr().String(),
+		Protocol: "tcp",
+		Commands: []apidef.CheckCommand{
+			{
+				Name: "send", Message: "ping",
+			}, {
+				Name: "expect", Message: "pong",
+			},
+		},
+	}
+	go func(ls net.Listener) {
+		for {
+			s, err := ls.Accept()
+			if err != nil {
+				return
+			}
+			buf := make([]byte, 4)
+			_, err = s.Read(buf)
+			if err != nil {
+				return
+			}
+			if string(buf) == "ping" {
+				s.Write([]byte("pong"))
+			} else {
+				s.Write([]byte("unknown"))
+			}
+		}
+	}(l)
+	ctx, cancel := context.WithCancel(context.Background())
+	hs := &HostUptimeChecker{}
+	failed := false
+	up := false
+	ping := false
+	hs.Init(2, 1, 0, map[string]HostData{
+		l.Addr().String(): data,
+	},
+		func(HostHealthReport) {
+			failed = true
+			cancel()
+		},
+		func(HostHealthReport) {
+			up = true
+			cancel()
+		},
+		func(HostHealthReport) {
+			ping = true
+			cancel()
+		},
+	)
+	hs.sampleTriggerLimit = 1
+	go hs.Start()
+	hostCheckTicker <- struct{}{}
+	<-ctx.Done()
+	hs.Stop()
+	if !(ping && !failed && !up) {
+		t.Errorf("expected the host to be up : field:%v up:%v pinged:%v", failed, up, ping)
+	}
+}
+func TestTestCheckerTCPHosts_correct_wrong_answers(t *testing.T) {
+	log.Out = os.Stdout
+	log.Level = 6
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	data := HostData{
+		CheckURL: l.Addr().String(),
+		Protocol: "tcp",
+		Commands: []apidef.CheckCommand{
+			{
+				Name: "send", Message: "ping",
+			}, {
+				Name: "expect", Message: "pong",
+			},
+		},
+	}
+	go func(ls net.Listener) {
+		for {
+			s, err := ls.Accept()
+			if err != nil {
+				return
+			}
+			buf := make([]byte, 4)
+			_, err = s.Read(buf)
+			if err != nil {
+				return
+			}
+			s.Write([]byte("unknown"))
+		}
+	}(l)
+	ctx, cancel := context.WithCancel(context.Background())
+	hs := &HostUptimeChecker{}
+	failed := false
+	up := false
+	ping := false
+	hs.Init(2, 1, 0, map[string]HostData{
+		l.Addr().String(): data,
+	},
+		func(HostHealthReport) {
+			failed = true
+			cancel()
+		},
+		func(HostHealthReport) {
+			up = true
+			cancel()
+		},
+		func(HostHealthReport) {
+			ping = true
+			cancel()
+		},
+	)
+	hs.sampleTriggerLimit = 1
+	go hs.Start()
+	hostCheckTicker <- struct{}{}
+	<-ctx.Done()
+	hs.Stop()
+	if !failed {
+		t.Errorf("expected the host to be down : field:%v up:%v pinged:%v", failed, up, ping)
 	}
 }
