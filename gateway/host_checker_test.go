@@ -217,6 +217,32 @@ func TestReverseProxyAllDown(t *testing.T) {
 	}
 }
 
+type answers struct {
+	mu             sync.RWMutex
+	ping, fail, up bool
+	cancel         func()
+}
+
+func (a *answers) onFail(_ HostHealthReport) {
+	defer a.cancel()
+	a.mu.Lock()
+	a.fail = true
+	a.mu.Unlock()
+}
+
+func (a *answers) onPing(_ HostHealthReport) {
+	defer a.cancel()
+	a.mu.Lock()
+	a.ping = true
+	a.mu.Unlock()
+}
+func (a *answers) onUp(_ HostHealthReport) {
+	defer a.cancel()
+	a.mu.Lock()
+	a.up = true
+	a.mu.Unlock()
+}
+
 func TestTestCheckerTCPHosts_correct_answers(t *testing.T) {
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -254,34 +280,23 @@ func TestTestCheckerTCPHosts_correct_answers(t *testing.T) {
 	}(l)
 	ctx, cancel := context.WithCancel(context.Background())
 	hs := &HostUptimeChecker{}
-	failed := false
-	up := false
-	ping := false
+	ans := &answers{cancel: cancel}
 	setTestMode(false)
 
 	hs.Init(1, 1, 0, map[string]HostData{
 		l.Addr().String(): data,
 	},
-		func(HostHealthReport) {
-			failed = true
-			cancel()
-		},
-		func(HostHealthReport) {
-			up = true
-			cancel()
-		},
-		func(HostHealthReport) {
-			ping = true
-			cancel()
-		},
+		ans.onFail,
+		ans.onUp,
+		ans.onPing,
 	)
 	hs.sampleTriggerLimit = 1
 	go hs.Start()
 	<-ctx.Done()
 	hs.Stop()
 	setTestMode(true)
-	if !(ping && !failed && !up) {
-		t.Errorf("expected the host to be up : field:%v up:%v pinged:%v", failed, up, ping)
+	if !(ans.ping && !ans.fail && !ans.up) {
+		t.Errorf("expected the host to be up : field:%v up:%v pinged:%v", ans.fail, ans.up, ans.ping)
 	}
 }
 func TestTestCheckerTCPHosts_correct_wrong_answers(t *testing.T) {
@@ -318,8 +333,6 @@ func TestTestCheckerTCPHosts_correct_wrong_answers(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	hs := &HostUptimeChecker{}
 	failed := false
-	up := false
-	ping := false
 	setTestMode(false)
 	hs.Init(1, 1, 0, map[string]HostData{
 		l.Addr().String(): data,
@@ -328,14 +341,8 @@ func TestTestCheckerTCPHosts_correct_wrong_answers(t *testing.T) {
 			failed = true
 			cancel()
 		},
-		func(HostHealthReport) {
-			up = true
-			cancel()
-		},
-		func(HostHealthReport) {
-			ping = true
-			cancel()
-		},
+		func(HostHealthReport) {},
+		func(HostHealthReport) {},
 	)
 	hs.sampleTriggerLimit = 1
 	go hs.Start()
@@ -343,6 +350,6 @@ func TestTestCheckerTCPHosts_correct_wrong_answers(t *testing.T) {
 	hs.Stop()
 	setTestMode(true)
 	if !failed {
-		t.Errorf("expected the host check to fail : field:%v up:%v pinged:%v", failed, up, ping)
+		t.Error("expected the host check to fai")
 	}
 }
