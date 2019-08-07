@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/base64"
+	"html/template"
 	"net/http"
 	"runtime/pprof"
 	"strconv"
@@ -20,7 +21,7 @@ const (
 
 // APIError is generic error object returned if there is something wrong with the request
 type APIError struct {
-	Message string
+	Message template.HTML
 }
 
 // ErrorHandler is invoked whenever there is an issue with a proxied request, most middleware will invoke
@@ -67,7 +68,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 	// Need to return the correct error code!
 	w.WriteHeader(errCode)
-	apiError := APIError{errMsg}
+	apiError := APIError{template.HTML(template.JSEscapeString(errMsg))}
 	tmpl.Execute(w, &apiError)
 
 	if memProfFile != nil {
