@@ -7,13 +7,13 @@ from time import sleep
 
 import tyk.decorators as decorators
 from tyk.loader import MiddlewareLoader
-from gateway import TykGateway as tyk
+# from gateway import TykGateway as tyk
 
 HandlerDecorators = list( map( lambda m: m[1], inspect.getmembers(decorators, inspect.isclass) ) )
 
 class TykMiddleware:
     def __init__(self, filepath, bundle_root_path=None):
-        tyk.log( "Loading module: '{0}'".format(filepath), "info")
+        # tyk.log( "Loading module: '{0}'".format(filepath), "info")
         self.filepath = filepath
         self.handlers = {}
 
@@ -42,7 +42,8 @@ class TykMiddleware:
             self.register_handlers()
             self.cleanup()
         except Exception as e:
-            tyk.log_error("Middleware initialization error: {0}".format(e))
+            # tyk.log_error("Middleware initialization error: {0}".format(e))
+            pass
 
     def register_handlers(self):
         new_handlers = {}
@@ -63,7 +64,7 @@ class TykMiddleware:
             for handler in self.handlers[hook_type]:
                 handler.middleware = self
                 hooks[handler.name] = handler
-                tyk.log("Loading hook '{0}' ({1})".format(handler.name, self.filepath), "debug")
+                # tyk.log("Loading hook '{0}' ({1})".format(handler.name, self.filepath), "debug")
         return hooks
 
     def cleanup(self):

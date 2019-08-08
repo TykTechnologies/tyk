@@ -28,7 +28,7 @@ class MiddlewareLoader():
   
       if not os.path.exists(self.module_path):
         error_msg = "Your bundle doesn't contain '{0}'".format(module_name)
-        tyk.log(error_msg, "error")
+        # tyk.log(error_msg, "error")
         return None
       return self
 

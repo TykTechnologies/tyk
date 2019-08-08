@@ -1,8 +1,7 @@
-// +build coprocess
-
 package gateway
 
 import (
+	"C"
 	"bytes"
 	"encoding/json"
 	"net/url"
@@ -28,7 +27,7 @@ var (
 	// GlobalDispatcher will be implemented by the current CoProcess driver.
 	GlobalDispatcher coprocess.Dispatcher
 
-	CoProcessName apidef.MiddlewareDriver
+	// CoProcessName apidef.MiddlewareDriver
 )
 
 // CoProcessMiddleware is the basic CP middleware struct.
@@ -383,4 +382,15 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	return nil, 200
+}
+
+func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
+	if GlobalDispatcher == nil {
+		return nil, errors.New("Dispatcher not initialized")
+	}
+	newObject, err := GlobalDispatcher.Dispatch(object)
+	if err != nil {
+		return nil, err
+	}
+	return newObject, nil
 }
