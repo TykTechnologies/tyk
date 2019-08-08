@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jeffail/tunny"
+	"github.com/pires/go-proxyproto"
 	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -32,13 +33,14 @@ var (
 )
 
 type HostData struct {
-	CheckURL string
-	Protocol string
-	Commands []apidef.CheckCommand
-	Method   string
-	Headers  map[string]string
-	Body     string
-	MetaData map[string]string
+	CheckURL            string
+	Protocol            string
+	EnableProxyProtocol bool
+	Commands            []apidef.CheckCommand
+	Method              string
+	Headers             map[string]string
+	Body                string
+	MetaData            map[string]string
 }
 
 type HostHealthReport struct {
@@ -198,6 +200,11 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 			report.IsTCPError = true
 			break
 		}
+		if toCheck.EnableProxyProtocol {
+			log.Debug("using proxy protocol")
+			ls = proxyproto.NewConn(ls, 0)
+		}
+		defer ls.Close()
 		for _, cmd := range toCheck.Commands {
 			switch cmd.Name {
 			case "send":
@@ -251,6 +258,7 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 			report.IsTCPError = true
 			break
 		}
+		response.Body.Close()
 		report.ResponseCode = response.StatusCode
 	}
 

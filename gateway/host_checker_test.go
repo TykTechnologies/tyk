@@ -13,6 +13,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
+	proxyproto "github.com/pires/go-proxyproto"
 )
 
 const sampleUptimeTestAPI = `{
@@ -299,6 +300,65 @@ func TestTestCheckerTCPHosts_correct_answers(t *testing.T) {
 		t.Errorf("expected the host to be up : field:%v up:%v pinged:%v", ans.fail, ans.up, ans.ping)
 	}
 }
+func TestTestCheckerTCPHosts_correct_answers_proxy_protocol(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	data := HostData{
+		CheckURL:            l.Addr().String(),
+		Protocol:            "tcp",
+		EnableProxyProtocol: true,
+		Commands: []apidef.CheckCommand{
+			{
+				Name: "send", Message: "ping",
+			}, {
+				Name: "expect", Message: "pong",
+			},
+		},
+	}
+	go func(ls net.Listener) {
+		ls = &proxyproto.Listener{Listener: ls}
+		for {
+			s, err := ls.Accept()
+			if err != nil {
+				return
+			}
+			buf := make([]byte, 4)
+			_, err = s.Read(buf)
+			if err != nil {
+				return
+			}
+			if string(buf) == "ping" {
+				s.Write([]byte("pong"))
+			} else {
+				s.Write([]byte("unknown"))
+			}
+		}
+	}(l)
+	ctx, cancel := context.WithCancel(context.Background())
+	hs := &HostUptimeChecker{}
+	ans := &answers{cancel: cancel}
+	setTestMode(false)
+
+	hs.Init(1, 1, 0, map[string]HostData{
+		l.Addr().String(): data,
+	},
+		ans.onFail,
+		ans.onUp,
+		ans.onPing,
+	)
+	hs.sampleTriggerLimit = 1
+	go hs.Start()
+	<-ctx.Done()
+	hs.Stop()
+	setTestMode(true)
+	if !(ans.ping && !ans.fail && !ans.up) {
+		t.Errorf("expected the host to be up : field:%v up:%v pinged:%v", ans.fail, ans.up, ans.ping)
+	}
+}
+
 func TestTestCheckerTCPHosts_correct_wrong_answers(t *testing.T) {
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

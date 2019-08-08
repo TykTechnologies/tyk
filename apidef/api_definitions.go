@@ -306,12 +306,13 @@ type ResponseProcessor struct {
 }
 
 type HostCheckObject struct {
-	CheckURL string            `bson:"url" json:"url"`
-	Protocol string            `bson:"protocol" json:"protocol"`
-	Commands []CheckCommand    `bson:"commands" json:"commands"`
-	Method   string            `bson:"method" json:"method"`
-	Headers  map[string]string `bson:"headers" json:"headers"`
-	Body     string            `bson:"body" json:"body"`
+	CheckURL            string            `bson:"url" json:"url"`
+	Protocol            string            `bson:"protocol" json:"protocol"`
+	EnableProxyProtocol bool              `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
+	Commands            []CheckCommand    `bson:"commands" json:"commands"`
+	Method              string            `bson:"method" json:"method"`
+	Headers             map[string]string `bson:"headers" json:"headers"`
+	Body                string            `bson:"body" json:"body"`
 }
 
 type CheckCommand struct {
