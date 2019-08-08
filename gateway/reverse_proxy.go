@@ -29,7 +29,7 @@ import (
 	"golang.org/x/net/http2"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/opentracing/opentracing-go"
+	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	cache "github.com/pmylund/go-cache"
 

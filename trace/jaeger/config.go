@@ -2,7 +2,7 @@ package jaeger
 
 import (
 	"github.com/uber/jaeger-client-go/config"
-	"gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v2"
 )
 
 // Load returns jaeger configuration from opts. Please see jaeger configuration

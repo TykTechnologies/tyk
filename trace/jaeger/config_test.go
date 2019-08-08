@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/uber/jaeger-client-go"
+	jaeger "github.com/uber/jaeger-client-go"
 	"github.com/uber/jaeger-client-go/config"
 )
 

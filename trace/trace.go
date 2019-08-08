@@ -5,7 +5,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/trace/jaeger"
 	"github.com/TykTechnologies/tyk/trace/openzipkin"
-	"github.com/opentracing/opentracing-go"
+	opentracing "github.com/opentracing/opentracing-go"
 )
 
 type Tracer interface {
