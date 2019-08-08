@@ -1,5 +1,3 @@
-// +build coprocess
-
 package gateway
 
 import (

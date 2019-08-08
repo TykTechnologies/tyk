@@ -6,11 +6,12 @@ from tyk.middleware import TykMiddleware
 from tyk.object import TykCoProcessObject
 from tyk.event import TykEvent
 
-from gateway import TykGateway as tyk
+# from gateway import TykGateway as tyk
 
 import sys
 def except_hook(type, value, traceback):
-    tyk.log_error("{0}".format(value))
+    # tyk.log_error("{0}".format(value))
+    pass
 
 sys.excepthook = except_hook
 
@@ -18,7 +19,7 @@ class TykDispatcher:
     '''A simple dispatcher'''
 
     def __init__(self, bundle_root_path):
-        tyk.log("Initializing dispatcher", "info")
+        # tyk.log("Initializing dispatcher", "info")
         self.bundle_root_path = bundle_root_path
         self.bundles = []
         self.hook_table = {}
@@ -88,4 +89,5 @@ class TykDispatcher:
             raise Exception("Couldn't dispatch '{0}' event: {1}", event.handler_name, e)
 
     def reload(self):
-        tyk.log("Reloading event handlers and middlewares.", "info")
+        # tyk.log("Reloading event handlers and middlewares.", "info")
+        pass

@@ -215,6 +215,7 @@ type CoProcessConfig struct {
 	EnableCoProcess     bool   `json:"enable_coprocess"`
 	CoProcessGRPCServer string `json:"coprocess_grpc_server"`
 	PythonPathPrefix    string `json:"python_path_prefix"`
+	PythonVersion       string `json:"python_version"`
 }
 
 type CertificatesConfig struct {
