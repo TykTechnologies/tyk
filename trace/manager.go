@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 
 	"github.com/TykTechnologies/tyk/request"
-	"github.com/opentracing/opentracing-go"
+	opentracing "github.com/opentracing/opentracing-go"
 )
 
 var ErrManagerDisabled = errors.New("trace: trace is diabled")
