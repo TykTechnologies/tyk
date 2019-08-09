@@ -288,7 +288,7 @@ func (m *proxyMux) generateListener(listenPort int, protocol string) (l net.List
 	disabled := config.Global().DisabledPorts
 	for _, d := range disabled {
 		if d.Protocol == protocol && d.Port == listenPort {
-			return nil, fmt.Errorf("%s:%s trying to open disabled port", protocol, listenPort)
+			return nil, fmt.Errorf("%s:%d trying to open disabled port", protocol, listenPort)
 		}
 	}
 
