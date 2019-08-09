@@ -30,6 +30,7 @@ type Proxy struct {
 	sync.RWMutex
 
 	DialTLS         func(network, addr string) (net.Conn, error)
+	Dial            func(network, addr string) (net.Conn, error)
 	TLSConfigTarget *tls.Config
 
 	ReadTimeout  time.Duration
@@ -158,7 +159,11 @@ func (p *Proxy) handleConn(conn net.Conn) error {
 	var rconn net.Conn
 	switch u.Scheme {
 	case "tcp":
-		rconn, err = net.Dial("tcp", u.Host)
+		if p.Dial != nil {
+			rconn, err = p.Dial("tcp", u.Host)
+		} else {
+			rconn, err = net.Dial("tcp", u.Host)
+		}
 	case "tls":
 		if p.DialTLS != nil {
 			rconn, err = p.DialTLS("tcp", u.Host)
