@@ -50,6 +50,7 @@ const (
 )
 
 var ServiceCache *cache.Cache
+var sdMu sync.RWMutex
 
 func urlFromService(spec *APISpec) (*apidef.HostList, error) {
 
@@ -63,7 +64,9 @@ func urlFromService(spec *APISpec) (*apidef.HostList, error) {
 		if err != nil {
 			return nil, err
 		}
+		sdMu.Lock()
 		spec.HasRun = true
+		sdMu.Unlock()
 		// Set the cached value
 		if data.Len() == 0 {
 			log.Warning("[PROXY][SD] Service Discovery returned empty host list! Returning last good set.")
@@ -81,9 +84,11 @@ func urlFromService(spec *APISpec) (*apidef.HostList, error) {
 		spec.LastGoodHostList = data
 		return data, nil
 	}
-
+	sdMu.RLock()
+	hasRun := spec.HasRun
+	sdMu.RUnlock()
 	// First time? Refresh the cache and return that
-	if !spec.HasRun {
+	if !hasRun {
 		log.Debug("First run! Setting cache")
 		return doCacheRefresh()
 	}
