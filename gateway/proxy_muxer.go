@@ -285,6 +285,12 @@ func target(listenAddress string, listenPort int) string {
 
 func (m *proxyMux) generateListener(listenPort int, protocol string) (l net.Listener, err error) {
 	listenAddress := config.Global().ListenAddress
+	disabled := config.Global().DisabledPorts
+	for _, d := range disabled {
+		if d.Protocol == protocol && d.Port == listenPort {
+			return nil, fmt.Errorf("%s:%s trying to open disabled port", protocol, listenPort)
+		}
+	}
 
 	targetPort := listenAddress + ":" + strconv.Itoa(listenPort)
 	if ls := m.again.GetListener(targetPort); ls != nil {
