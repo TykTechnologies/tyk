@@ -22,16 +22,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// StorageHandler is a standard interface to a storage backend,
-// used by AuthorisationManager to read and write key values to the backend
-type StorageHandler interface {
-	GetKey(string) (string, error)
-	SetKey(string, string, int64) error
-	GetKeys(string) []string
-	DeleteKey(string) bool
-	DeleteScanMatch(string) bool
-}
-
 type CertificateManager struct {
 	storage StorageHandler
 	logger  *logrus.Entry
