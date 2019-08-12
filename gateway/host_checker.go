@@ -183,18 +183,23 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 		HostData: toCheck,
 	}
 	switch toCheck.Protocol {
-	case "tcp":
+	case "tcp", "tls":
 		host := toCheck.CheckURL
-		if !strings.HasPrefix(host, "tcp://") {
-			host = "tcp://" + host
+		base := toCheck.Protocol + "://"
+		if !strings.HasPrefix(host, base) {
+			host = base + host
 		}
 		u, err := url.Parse(host)
 		if err != nil {
 			log.Error("Could not parse host: ", err)
 			return
 		}
-
-		ls, err := net.Dial("tcp", u.Host)
+		var ls net.Conn
+		if toCheck.Protocol == "tls" {
+			ls, err = tls.Dial("tls", u.Host, nil)
+		} else {
+			ls, err = net.Dial("tcp", u.Host)
+		}
 		if err != nil {
 			log.Error("Could not connect to host: ", err)
 			report.IsTCPError = true
