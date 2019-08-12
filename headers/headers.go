@@ -38,3 +38,10 @@ const (
 	XGenerator          = "X-Generator"
 	XTykAuthorization   = "X-Tyk-Authorization"
 )
+
+// Gateway's custom response headers
+const (
+	XRateLimitLimit     = "X-RateLimit-Limit"
+	XRateLimitRemaining = "X-RateLimit-Remaining"
+	XRateLimitReset     = "X-RateLimit-Reset"
+)
