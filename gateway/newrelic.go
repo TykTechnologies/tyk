@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/gocraft/health"
 	"github.com/gorilla/mux"
 	newrelic "github.com/newrelic/go-agent"

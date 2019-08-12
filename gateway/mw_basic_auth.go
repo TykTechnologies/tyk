@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	cache "github.com/pmylund/go-cache"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/sync/singleflight"

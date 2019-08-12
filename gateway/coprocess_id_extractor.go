@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/mitchellh/mapstructure"
 	xmlpath "gopkg.in/xmlpath.v2"
 

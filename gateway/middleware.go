@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
 	newrelic "github.com/newrelic/go-agent"

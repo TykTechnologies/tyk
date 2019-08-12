@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
 	uuid "github.com/satori/go.uuid"
 

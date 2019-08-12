@@ -4,8 +4,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/hashicorp/terraform/flatmap"
+	"github.com/sirupsen/logrus"
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 )
 
@@ -21,7 +21,10 @@ var (
 // example:   `{"foo": {"bar": "baz"}}`
 // flattened: `foo.bar: baz`
 func LoadTranslations(thing map[string]interface{}) {
-	log.Formatter = &TranslationFormatter{new(prefixed.TextFormatter)}
+	formatter := new(prefixed.TextFormatter)
+	formatter.TimestampFormat = `Jan 02 15:04:05`
+	formatter.FullTimestamp = true
+	log.Formatter = &TranslationFormatter{formatter}
 	translations = flatmap.Flatten(thing)
 }
 
@@ -45,7 +48,11 @@ func (f *RawFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 }
 
 func init() {
-	log.Formatter = new(prefixed.TextFormatter)
+	formatter := new(prefixed.TextFormatter)
+	formatter.TimestampFormat = `Jan 02 15:04:05`
+	formatter.FullTimestamp = true
+
+	log.Formatter = formatter
 	rawLog.Formatter = new(RawFormatter)
 }
 

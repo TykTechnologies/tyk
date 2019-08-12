@@ -6,12 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"runtime"
-	"strings"
 	"sync"
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 const StackTraceKey = "_stacktrace"
@@ -95,9 +93,13 @@ func (hook *GraylogHook) Fire(entry *logrus.Entry) error {
 	hook.mu.RLock() // Claim the mutex as a RLock - allowing multiple go routines to log simultaneously
 	defer hook.mu.RUnlock()
 
-	// get caller file and line here, it won't be available inside the goroutine
-	// 1 for the function that called us.
-	file, line := getCallerIgnoringLogMulti(1)
+	var file string
+	var line int
+
+	if entry.Caller != nil {
+		file = entry.Caller.File
+		line = entry.Caller.Line
+	}
 
 	newData := make(map[string]interface{})
 	for k, v := range entry.Data {
@@ -109,6 +111,7 @@ func (hook *GraylogHook) Fire(entry *logrus.Entry) error {
 		Data:    newData,
 		Time:    entry.Time,
 		Level:   entry.Level,
+		Caller:  entry.Caller,
 		Message: entry.Message,
 	}
 	gEntry := graylogEntry{newEntry, file, line}
@@ -141,6 +144,36 @@ func (hook *GraylogHook) fire() {
 	}
 }
 
+func logrusLevelToSylog(level logrus.Level) int32 {
+	const (
+		LOG_EMERG   = 0 /* system is unusable */
+		LOG_ALERT   = 1 /* action must be taken immediately */
+		LOG_CRIT    = 2 /* critical conditions */
+		LOG_ERR     = 3 /* error conditions */
+		LOG_WARNING = 4 /* warning conditions */
+		LOG_NOTICE  = 5 /* normal but significant condition */
+		LOG_INFO    = 6 /* informational */
+		LOG_DEBUG   = 7 /* debug-level messages */
+	)
+	// logrus has no equivalent of syslog LOG_NOTICE
+	switch level {
+	case logrus.PanicLevel:
+		return LOG_ALERT
+	case logrus.FatalLevel:
+		return LOG_CRIT
+	case logrus.ErrorLevel:
+		return LOG_ERR
+	case logrus.WarnLevel:
+		return LOG_WARNING
+	case logrus.InfoLevel:
+		return LOG_INFO
+	case logrus.DebugLevel, logrus.TraceLevel:
+		return LOG_DEBUG
+	default:
+		return LOG_DEBUG
+	}
+}
+
 // sendEntry sends an entry to graylog synchronously
 func (hook *GraylogHook) sendEntry(entry graylogEntry) {
 	if hook.gelfLogger == nil {
@@ -163,7 +196,7 @@ func (hook *GraylogHook) sendEntry(entry graylogEntry) {
 		full = p
 	}
 
-	level := int32(entry.Level) + 2 // logrus levels are lower than syslog by 2
+	level := logrusLevelToSylog(entry.Level)
 
 	// Don't modify entry.Data directly, as the entry will used after this hook was fired
 	extra := map[string]interface{}{}
@@ -172,6 +205,13 @@ func (hook *GraylogHook) sendEntry(entry graylogEntry) {
 		k = fmt.Sprintf("_%s", k) // "[...] every field you send and prefix with a _ (underscore) will be treated as an additional field."
 		extra[k] = v
 	}
+
+	if entry.Caller != nil {
+		extra["_file"] = entry.Caller.File
+		extra["_line"] = entry.Caller.Line
+		extra["_function"] = entry.Caller.Function
+	}
+
 	for k, v := range entry.Data {
 		if !hook.blacklist[k] {
 			extraK := fmt.Sprintf("_%s", k) // "[...] every field you send and prefix with a _ (underscore) will be treated as an additional field."
@@ -185,11 +225,6 @@ func (hook *GraylogHook) sendEntry(entry graylogEntry) {
 				}
 				if stackTrace := extractStackTrace(asError); stackTrace != nil {
 					extra[StackTraceKey] = fmt.Sprintf("%+v", stackTrace)
-					file, line := extractFileAndLine(stackTrace)
-					if file != "" && line != 0 {
-						entry.file = file
-						entry.line = line
-					}
 				}
 			} else {
 				extra[extraK] = v
@@ -247,39 +282,4 @@ func (hook *GraylogHook) SetWriter(w *Writer) error {
 // Writer returns the logger Gelf Writer
 func (hook *GraylogHook) Writer() *Writer {
 	return hook.gelfLogger
-}
-
-// getCaller returns the filename and the line info of a function
-// further down in the call stack.  Passing 0 in as callDepth would
-// return info on the function calling getCallerIgnoringLog, 1 the
-// parent function, and so on.  Any suffixes passed to getCaller are
-// path fragments like "/pkg/log/log.go", and functions in the call
-// stack from that file are ignored.
-func getCaller(callDepth int, suffixesToIgnore ...string) (file string, line int) {
-	// bump by 1 to ignore the getCaller (this) stackframe
-	callDepth++
-outer:
-	for {
-		var ok bool
-		_, file, line, ok = runtime.Caller(callDepth)
-		if !ok {
-			file = "???"
-			line = 0
-			break
-		}
-
-		for _, s := range suffixesToIgnore {
-			if strings.HasSuffix(file, s) {
-				callDepth++
-				continue outer
-			}
-		}
-		break
-	}
-	return
-}
-
-func getCallerIgnoringLogMulti(callDepth int) (string, int) {
-	// the +1 is to ignore this (getCallerIgnoringLogMulti) frame
-	return getCaller(callDepth+1, "logrus/hooks.go", "logrus/entry.go", "logrus/logger.go", "logrus/exported.go", "asm_amd64.s")
 }

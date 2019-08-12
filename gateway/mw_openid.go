@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	jwt "github.com/dgrijalva/jwt-go"
 
 	"github.com/TykTechnologies/openid2go/openid"

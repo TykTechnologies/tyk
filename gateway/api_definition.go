@@ -22,7 +22,7 @@ import (
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/rpc"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	circuit "github.com/rubyist/circuitbreaker"
 
 	"github.com/TykTechnologies/gojsonschema"
