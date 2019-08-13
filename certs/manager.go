@@ -23,13 +23,13 @@ import (
 )
 
 type CertificateManager struct {
-	storage StorageHandler
+	storage StorageHandlerWrapper
 	logger  *logrus.Entry
 	cache   *cache.Cache
 	secret  string
 }
 
-func NewCertificateManager(storage StorageHandler, secret string, logger *logrus.Logger) *CertificateManager {
+func NewCertificateManager(storage StorageHandlerWrapper, secret string, logger *logrus.Logger) *CertificateManager {
 	if logger == nil {
 		logger = logrus.New()
 	}

@@ -70,7 +70,7 @@ func (s *dummyStorage) GetKeys(pattern string) (keys []string) {
 }
 
 func newManager() *CertificateManager {
-	return NewCertificateManager(NewStorageHandler(newDummyStorage()), "test", nil)
+	return NewCertificateManager(NewStorageHandlerWrapper(newDummyStorage()), "test", nil)
 }
 
 func leafSubjectName(cert *tls.Certificate) string {

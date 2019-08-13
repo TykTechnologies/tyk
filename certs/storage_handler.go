@@ -2,10 +2,12 @@ package certs
 
 import "errors"
 
-// StorageHandler is an interface to a storage backend,
-// with method DeleteKey which returns an error.
+// StorageHandlerWrapper is an interface to a storage backend,
+// with a wrapped method DeleteKey which returns an error.
 // Used for providing compatibility between different storage implementations
-type StorageHandler interface {
+// Note: should be removed once we will have a single implementation
+// of redis storage
+type StorageHandlerWrapper interface {
 	GetKey(string) (string, error)
 	SetKey(string, string, int64) error
 	GetKeys(string) []string
@@ -13,9 +15,10 @@ type StorageHandler interface {
 	DeleteScanMatch(string) bool
 }
 
-// StandardStorageHandler is a standard interface to a storage backend,
+// StorageHandler is a standard interface to a storage backend,
 // used by AuthorisationManager to read and write key values to the backend
-type StandardStorageHandler interface {
+// uses the same method signatures as in tyk/storage/storage.go
+type StorageHandler interface {
 	GetKey(string) (string, error)
 	SetKey(string, string, int64) error
 	GetKeys(string) []string
@@ -24,11 +27,11 @@ type StandardStorageHandler interface {
 }
 
 type storageWrapper struct {
-	s StandardStorageHandler
+	s StorageHandler
 }
 
 // NewStorageHandler - maps StandardStorageHandler to StorageHandler
-func NewStorageHandler(s StandardStorageHandler) StorageHandler {
+func NewStorageHandlerWrapper(s StorageHandler) StorageHandlerWrapper {
 	return &storageWrapper{s}
 }
 
