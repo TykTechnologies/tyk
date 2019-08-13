@@ -411,14 +411,17 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 type CustomMiddlewareResponseHook struct {
 	Spec *APISpec
-	// TODO: should we include anything here??
-	mw apidef.MiddlewareDefinition
+	mw   apidef.MiddlewareDefinition
 }
 
 func (h *CustomMiddlewareResponseHook) Init(mw interface{}, spec *APISpec) error {
 	h.Spec = spec
 	h.mw = mw.(apidef.MiddlewareDefinition)
 	return nil
+}
+
+func (h *CustomMiddlewareResponseHook) Name() string {
+	return ""
 }
 
 func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
