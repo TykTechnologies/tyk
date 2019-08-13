@@ -35,6 +35,7 @@ var (
 type HostData struct {
 	CheckURL            string
 	Protocol            string
+	Timeout             time.Duration
 	EnableProxyProtocol bool
 	Commands            []apidef.CheckCommand
 	Method              string
@@ -195,10 +196,12 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 			return
 		}
 		var ls net.Conn
+		var d net.Dialer
+		d.Timeout = toCheck.Timeout
 		if toCheck.Protocol == "tls" {
-			ls, err = tls.Dial("tls", u.Host, nil)
+			ls, err = tls.DialWithDialer(&d, "tls", u.Host, nil)
 		} else {
-			ls, err = net.Dial("tcp", u.Host)
+			ls, err = d.Dial("tcp", u.Host)
 		}
 		if err != nil {
 			log.Error("Could not connect to host: ", err)
@@ -257,7 +260,9 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 				InsecureSkipVerify: config.Global().ProxySSLInsecureSkipVerify,
 			},
 		}
-
+		if toCheck.Timeout != 0 {
+			HostCheckerClient.Timeout = toCheck.Timeout
+		}
 		response, err := HostCheckerClient.Do(req)
 		if err != nil {
 			report.IsTCPError = true

@@ -308,6 +308,7 @@ type ResponseProcessor struct {
 type HostCheckObject struct {
 	CheckURL            string            `bson:"url" json:"url"`
 	Protocol            string            `bson:"protocol" json:"protocol"`
+	Timeout             time.Duration     `bson:"timeout" json:"timeout"`
 	EnableProxyProtocol bool              `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
 	Commands            []CheckCommand    `bson:"commands" json:"commands"`
 	Method              string            `bson:"method" json:"method"`
@@ -316,9 +317,6 @@ type HostCheckObject struct {
 }
 
 type CheckCommand struct {
-	// the command to run, options are send for send where the message will be
-	// written on the socket and expect where message will be read and verified
-	// that it matches.
 	Name    string `bson:"name" json:"name"`
 	Message string `bson:"message" json:"message"`
 }

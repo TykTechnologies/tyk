@@ -323,6 +323,7 @@ func (hc *HostCheckerManager) PrepareTrackingHost(checkObject apidef.HostCheckOb
 		},
 		Method:              checkObject.Method,
 		Protocol:            checkObject.Protocol,
+		Timeout:             checkObject.Timeout,
 		EnableProxyProtocol: checkObject.EnableProxyProtocol,
 		Commands:            checkObject.Commands,
 		Headers:             checkObject.Headers,
