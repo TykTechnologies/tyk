@@ -19,8 +19,8 @@ import (
 
 	"golang.org/x/net/http2"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
+	"github.com/sirupsen/logrus"
 )
 
 // handleWrapper's only purpose is to allow router to be dynamically replaced
