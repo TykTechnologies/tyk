@@ -220,7 +220,6 @@ func dummyGetCertificate(*tls.ClientHelloInfo) (*tls.Certificate, error) {
 }
 
 func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
-
 	// Supporting legacy certificate configuration
 	serverCerts := []tls.Certificate{}
 	certNameMap := map[string]*tls.Certificate{}
@@ -251,14 +250,11 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 	return func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
 		newConfig := baseConfig.Clone()
 
-		isControlAPI := (listenPort != 0 && config.Global().ControlAPIPort == listenPort) || (config.Global().ControlAPIHostname == hello.ServerName)
-
-		// THIS CODE IS CALLED WHEN DASHBOARD CONNECTS TO THE GATEWAY
+		isControlAPI := (listenPort != 0 && (config.Global().ControlAPIPort == listenPort || config.Global().ControlAPIPort == 0)) ||
+			config.Global().ControlAPIHostname == hello.ServerName
 
 		if isControlAPI && config.Global().Security.ControlAPIUseMutualTLS {
-
 			newConfig.ClientAuth = tls.RequireAndVerifyClientCert
-
 			newConfig.ClientCAs = CertificateManager.CertPool(config.Global().Security.Certificates.ControlAPI)
 
 			return newConfig, nil

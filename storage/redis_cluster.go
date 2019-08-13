@@ -476,7 +476,7 @@ func (r *RedisCluster) DeleteRawKey(keyName string) bool {
 	return n.(int64) > 0
 }
 
-// DeleteKeys will remove a group of keys in bulk
+// DeleteScanMatch will remove a group of keys in bulk
 func (r *RedisCluster) DeleteScanMatch(pattern string) bool {
 	r.ensureConnection()
 	log.Debug("Deleting: ", pattern)

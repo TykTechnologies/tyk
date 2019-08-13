@@ -441,7 +441,7 @@ func (c *CertificateManager) Delete(certID string) {
 func (c *CertificateManager) CertPool(certIDs []string) *x509.CertPool {
 	pool := x509.NewCertPool()
 
-	for _, cert := range c.List(certIDs, CertificatePublic) {
+	for _, cert := range c.List(certIDs, CertificateAny) {
 		if cert != nil {
 			pool.AddCert(cert.Leaf)
 		}
@@ -462,7 +462,7 @@ func (c *CertificateManager) ValidateRequestCertificate(certIDs []string, r *htt
 	leaf := r.TLS.PeerCertificates[0]
 
 	certID := HexSHA256(leaf.Raw)
-	for _, cert := range c.List(certIDs, CertificatePublic) {
+	for _, cert := range c.List(certIDs, CertificateAny) {
 		// Extensions[0] contains cache of certificate SHA256
 		if cert == nil || string(cert.Leaf.Extensions[0].Value) == certID {
 			return nil
