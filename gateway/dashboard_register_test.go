@@ -11,9 +11,8 @@ import (
 	"github.com/garyburd/redigo/redis"
 )
 
-// setup http server mock with tls for dashboard example from: TestUpstreamMutualTLS
-
 func TestConnectToDashboardWithMutualTLS(t *testing.T) {
+	// TODO: setup http server mock with tls for dashboard example from: TestUpstreamMutualTLS
 	// _, _, combinedClientPEM, clientCert := test.GenCertificate(&x509.Certificate{})
 	// clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
 	//
@@ -35,7 +34,6 @@ func TestConnectToDashboardWithMutualTLS(t *testing.T) {
 	//
 	// dashboard.StartTLS()
 	// defer dashboard.Close()
-
 }
 
 func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
