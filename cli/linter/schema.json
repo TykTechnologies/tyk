@@ -958,22 +958,10 @@
               }
             },
             "dashboard_api": {
-              "type": [
-                "array",
-                "null"
-              ],
-              "items": {
-                "type": "string"
-              }
+              "type": "string"
             },
             "mdcb_api": {
-              "type": [
-                "array",
-                "null"
-              ],
-              "items": {
-                "type": "string"
-              }
+              "type": "string"
             }
           }
         }
