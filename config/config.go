@@ -238,9 +238,10 @@ type SecurityConfig struct {
 	PrivateCertificateEncodingSecret string             `json:"private_certificate_encoding_secret"`
 	PinnedPublicKeys                 map[string]string  `json:"pinned_public_keys"`
 	Certificates                     CertificatesConfig `json:"certificates"`
+}
 
-	// TODO: Sergey 05.08.2019 delete this param and check certificate presence
-	ControlAPIUseMutualTLS bool `json:"control_api_use_mutual_tls"`
+func (c SecurityConfig) IsMutualTLSEnabled() bool {
+	return len(c.Certificates.ControlAPI) != 0
 }
 
 type NewRelicConfig struct {

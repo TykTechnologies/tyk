@@ -129,10 +129,9 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 	// Configure server
 	serverCertPem, _, combinedPEM, _ := test.GenServerCertificate()
 
-	globalConf := config.Global()
 	// make global config changes
+	globalConf := config.Global()
 	globalConf.HttpServerOptions.UseSSL = true
-	globalConf.Security.ControlAPIUseMutualTLS = true
 	config.SetGlobal(globalConf)
 	defer ResetTestConfig()
 
@@ -155,6 +154,7 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 		globalConf := config.Global()
 		globalConf.ControlAPIHostname = "localhost"
 		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+		globalConf.Security.Certificates.ControlAPI = []string{certID}
 		config.SetGlobal(globalConf)
 
 		ts := StartTest()
