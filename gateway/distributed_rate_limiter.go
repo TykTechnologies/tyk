@@ -7,7 +7,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/drl"
-	"github.com/TykTechnologies/tyk/config"
+	"github.com/anuvu/tyk/config"
 )
 
 var DRLManager = &drl.DRL{}

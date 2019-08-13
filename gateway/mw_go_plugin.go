@@ -9,7 +9,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/TykTechnologies/tyk/goplugin"
+	"github.com/anuvu/tyk/goplugin"
 )
 
 // customResponseWriter is a wrapper around standard http.ResponseWriter

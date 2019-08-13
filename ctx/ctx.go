@@ -4,8 +4,8 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/TykTechnologies/tyk/storage"
-	"github.com/TykTechnologies/tyk/user"
+	"github.com/anuvu/tyk/storage"
+	"github.com/anuvu/tyk/user"
 )
 
 const (

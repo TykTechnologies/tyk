@@ -13,8 +13,8 @@ import (
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/lonelycode/go-uuid/uuid"
 
-	"github.com/TykTechnologies/tyk/test"
-	"github.com/TykTechnologies/tyk/user"
+	"github.com/anuvu/tyk/test"
+	"github.com/anuvu/tyk/user"
 )
 
 // openssl rsa -in app.rsa -pubout > app.rsa.pub

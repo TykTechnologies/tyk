@@ -11,7 +11,7 @@ import (
 	"github.com/jeffail/tunny"
 	cache "github.com/pmylund/go-cache"
 
-	"github.com/TykTechnologies/tyk/config"
+	"github.com/anuvu/tyk/config"
 )
 
 const (

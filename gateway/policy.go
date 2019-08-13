@@ -8,11 +8,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/TykTechnologies/tyk/rpc"
+	"github.com/anuvu/tyk/rpc"
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/TykTechnologies/tyk/user"
+	"github.com/anuvu/tyk/user"
 )
 
 type DBAccessDefinition struct {

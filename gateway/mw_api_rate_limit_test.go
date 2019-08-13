@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/test"
+	"github.com/anuvu/tyk/config"
+	"github.com/anuvu/tyk/test"
 	uuid "github.com/satori/go.uuid"
 
 	"github.com/justinas/alice"
 
-	"github.com/TykTechnologies/tyk/user"
+	"github.com/anuvu/tyk/user"
 )
 
 func createRLSession() *user.SessionState {

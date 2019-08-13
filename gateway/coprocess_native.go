@@ -23,7 +23,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	"github.com/TykTechnologies/tyk/coprocess"
+	"github.com/anuvu/tyk/coprocess"
 
 	"encoding/json"
 	"unsafe"

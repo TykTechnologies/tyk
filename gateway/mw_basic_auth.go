@@ -15,12 +15,12 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/murmur3"
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/headers"
-	"github.com/TykTechnologies/tyk/regexp"
-	"github.com/TykTechnologies/tyk/storage"
-	"github.com/TykTechnologies/tyk/user"
+	"github.com/anuvu/tyk/apidef"
+	"github.com/anuvu/tyk/config"
+	"github.com/anuvu/tyk/headers"
+	"github.com/anuvu/tyk/regexp"
+	"github.com/anuvu/tyk/storage"
+	"github.com/anuvu/tyk/user"
 )
 
 const defaultBasicAuthTTL = time.Duration(60) * time.Second

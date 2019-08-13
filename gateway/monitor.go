@@ -3,8 +3,8 @@ package gateway
 import (
 	"time"
 
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/user"
+	"github.com/anuvu/tyk/config"
+	"github.com/anuvu/tyk/user"
 )
 
 type Monitor struct{}

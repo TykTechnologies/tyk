@@ -6,7 +6,7 @@ import (
 
 	uuid "github.com/satori/go.uuid"
 
-	"github.com/TykTechnologies/tyk/request"
+	"github.com/anuvu/tyk/request"
 )
 
 type MiddlewareContextVars struct {

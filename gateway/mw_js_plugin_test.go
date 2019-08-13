@@ -13,10 +13,10 @@ import (
 	"github.com/sirupsen/logrus"
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
-	logger "github.com/TykTechnologies/tyk/log"
-	"github.com/TykTechnologies/tyk/test"
+	"github.com/anuvu/tyk/apidef"
+	"github.com/anuvu/tyk/config"
+	logger "github.com/anuvu/tyk/log"
+	"github.com/anuvu/tyk/test"
 )
 
 func TestJSVMLogs(t *testing.T) {

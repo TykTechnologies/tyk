@@ -18,12 +18,12 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/coprocess"
-	"github.com/TykTechnologies/tyk/gateway"
-	"github.com/TykTechnologies/tyk/test"
-	"github.com/TykTechnologies/tyk/user"
+	"github.com/anuvu/tyk/apidef"
+	"github.com/anuvu/tyk/config"
+	"github.com/anuvu/tyk/coprocess"
+	"github.com/anuvu/tyk/gateway"
+	"github.com/anuvu/tyk/test"
+	"github.com/anuvu/tyk/user"
 )
 
 const (

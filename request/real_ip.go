@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/anuvu/tyk/headers"
 )
 
 // RealIP takes a request object, and returns the real Client IP address.

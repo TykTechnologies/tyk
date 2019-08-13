@@ -11,11 +11,11 @@ import (
 
 	"github.com/lonelycode/go-uuid/uuid"
 
-	"github.com/TykTechnologies/tyk/test"
+	"github.com/anuvu/tyk/test"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/user"
+	"github.com/anuvu/tyk/apidef"
+	"github.com/anuvu/tyk/config"
+	"github.com/anuvu/tyk/user"
 )
 
 func TestLoadPoliciesFromDashboardReLogin(t *testing.T) {

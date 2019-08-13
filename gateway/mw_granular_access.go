@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/TykTechnologies/tyk/regexp"
+	"github.com/anuvu/tyk/regexp"
 )
 
 // GranularAccessMiddleware will check if a URL is specifically enabled for the key

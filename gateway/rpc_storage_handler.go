@@ -7,12 +7,12 @@ import (
 
 	cache "github.com/pmylund/go-cache"
 
-	"github.com/TykTechnologies/tyk/rpc"
+	"github.com/anuvu/tyk/rpc"
 
 	"github.com/garyburd/redigo/redis"
 
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/storage"
+	"github.com/anuvu/tyk/config"
+	"github.com/anuvu/tyk/storage"
 
 	"github.com/sirupsen/logrus"
 )

@@ -10,8 +10,8 @@ import (
 	"github.com/sirupsen/logrus"
 	circuit "github.com/rubyist/circuitbreaker"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
+	"github.com/anuvu/tyk/apidef"
+	"github.com/anuvu/tyk/config"
 )
 
 // The name for event handlers as defined in the API Definition JSON/BSON format

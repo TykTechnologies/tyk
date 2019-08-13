@@ -18,8 +18,8 @@ import "C"
 import (
 	"github.com/sirupsen/logrus"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/storage"
+	"github.com/anuvu/tyk/apidef"
+	"github.com/anuvu/tyk/storage"
 )
 
 // CoProcessDefaultKeyPrefix is used as a key prefix for this CP.

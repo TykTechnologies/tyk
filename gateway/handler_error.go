@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/headers"
-	"github.com/TykTechnologies/tyk/request"
+	"github.com/anuvu/tyk/headers"
+	"github.com/anuvu/tyk/request"
 )
 
 const (

@@ -46,12 +46,12 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/ctx"
-	"github.com/TykTechnologies/tyk/headers"
-	"github.com/TykTechnologies/tyk/storage"
-	"github.com/TykTechnologies/tyk/user"
+	"github.com/anuvu/tyk/apidef"
+	"github.com/anuvu/tyk/config"
+	"github.com/anuvu/tyk/ctx"
+	"github.com/anuvu/tyk/headers"
+	"github.com/anuvu/tyk/storage"
+	"github.com/anuvu/tyk/user"
 )
 
 // apiModifyKeySuccess represents when a Key modification was successful

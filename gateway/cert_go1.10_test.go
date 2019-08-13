@@ -10,9 +10,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/certs"
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/test"
+	"github.com/anuvu/tyk/certs"
+	"github.com/anuvu/tyk/config"
+	"github.com/anuvu/tyk/test"
 )
 
 func TestPublicKeyPinning(t *testing.T) {

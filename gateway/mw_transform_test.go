@@ -7,9 +7,9 @@ import (
 	"testing"
 	"text/template"
 
-	"github.com/TykTechnologies/tyk/test"
+	"github.com/anuvu/tyk/test"
 
-	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/anuvu/tyk/apidef"
 )
 
 func testPrepareTransformNonAscii() (*TransformSpec, string) {

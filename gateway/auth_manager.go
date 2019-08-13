@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/storage"
-	"github.com/TykTechnologies/tyk/user"
+	"github.com/anuvu/tyk/config"
+	"github.com/anuvu/tyk/storage"
+	"github.com/anuvu/tyk/user"
 	uuid "github.com/satori/go.uuid"
 
 	"github.com/sirupsen/logrus"

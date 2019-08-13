@@ -15,7 +15,7 @@ import "C"
 import "unsafe"
 
 import (
-	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/anuvu/tyk/apidef"
 )
 
 const (
