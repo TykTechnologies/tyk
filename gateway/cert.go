@@ -91,9 +91,7 @@ func getUpstreamCertificate(host string, spec *APISpec) (cert *tls.Certificate) 
 	certs := CertificateManager.List([]string{certID}, certs.CertificatePrivate)
 
 	if len(certs) == 0 {
-
 		return nil
-
 	}
 
 	return certs[0]
