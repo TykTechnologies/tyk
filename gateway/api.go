@@ -39,11 +39,12 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/gorilla/mux"
 	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/anuvu/tyk/apidef"
@@ -1190,6 +1191,16 @@ func resetHandler(fn func()) http.HandlerFunc {
 
 		wg.Wait()
 		doJSONWrite(w, http.StatusOK, apiOk(""))
+	}
+}
+
+func hotReloadHandler(w http.ResponseWriter, r *http.Request) {
+	log.WithFields(logrus.Fields{
+		"prefix": "api",
+	}).Info("Triggering Hot Reload")
+	doJSONWrite(w, http.StatusOK, apiOk(""))
+	if err := syscall.Kill(hostDetails.PID, syscall.SIGUSR2); err != nil {
+		log.Error("Process reload failed: ", err)
 	}
 }
 

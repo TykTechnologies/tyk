@@ -402,6 +402,7 @@ func loadAPIEndpoints(muxer *mux.Router) {
 	// set up main API handlers
 	r.HandleFunc("/reload/group", groupResetHandler).Methods("GET")
 	r.HandleFunc("/reload", resetHandler(nil)).Methods("GET")
+	r.HandleFunc("/hotreload", hotReloadHandler).Methods("GET")
 
 	if !isRPCMode() {
 		r.HandleFunc("/org/keys", orgHandler).Methods("GET")
