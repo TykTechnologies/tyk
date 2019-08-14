@@ -16,6 +16,7 @@ package gateway
 import "C"
 
 import (
+	"fmt"
 	"github.com/sirupsen/logrus"
 
 	"github.com/anuvu/tyk/apidef"
@@ -65,22 +66,23 @@ func TykTriggerEvent(CEventName, CPayload *C.char) {
 func CoProcessLog(CMessage, CLogLevel *C.char) {
 	message := C.GoString(CMessage)
 	logLevel := C.GoString(CLogLevel)
+	coProcessName := fmt.Sprintf("%v", CoProcessName)
 	switch logLevel {
 	case "debug":
 		log.WithFields(logrus.Fields{
-			"prefix": CoProcessName,
+			"prefix": coProcessName,
 		}).Debug(message)
 	case "error":
 		log.WithFields(logrus.Fields{
-			"prefix": CoProcessName,
+			"prefix": coProcessName,
 		}).Error(message)
 	case "warning":
 		log.WithFields(logrus.Fields{
-			"prefix": CoProcessName,
+			"prefix": coProcessName,
 		}).Warning(message)
 	default:
 		log.WithFields(logrus.Fields{
-			"prefix": CoProcessName,
+			"prefix": coProcessName,
 		}).Info(message)
 	}
 }
