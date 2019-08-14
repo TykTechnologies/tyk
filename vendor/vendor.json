@@ -910,10 +910,10 @@
 			"revisionTime": "2018-04-25T08:40:29Z"
 		},
 		{
-			"checksumSHA1": "j4JQxmxQsZTYj/fbW/7q7g9W50s=",
+			"checksumSHA1": "35XpM1XtbNTQ3qYTaxBOOmR9Y6Q=",
 			"path": "golang.org/x/net/http2",
-			"revision": "640f4622ab692b87c2f3a94265e6f579fe38263d",
-			"revisionTime": "2018-05-02T16:14:02Z"
+			"revision": "74dc4d7220e7acc4e100824340f3e66577424772",
+			"revisionTime": "2019-08-11T06:12:18Z"
 		},
 		{
 			"checksumSHA1": "LW///cttbVyQo4Qh11kdIt0VMjs=",
