@@ -18,8 +18,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	cache "github.com/pmylund/go-cache"
+	"github.com/sirupsen/logrus"
 )
 
 // StorageHandler is a standard interface to a storage backend,

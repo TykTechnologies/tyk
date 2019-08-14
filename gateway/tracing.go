@@ -8,8 +8,8 @@ import (
 	"net/http/httputil"
 	"strings"
 
-	"github.com/sirupsen/logrus"
 	"github.com/gorilla/mux"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )

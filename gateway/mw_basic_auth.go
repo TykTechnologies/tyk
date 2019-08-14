@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	cache "github.com/pmylund/go-cache"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/sync/singleflight"
 

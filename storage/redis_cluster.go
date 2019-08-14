@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
 	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/redigocluster/rediscluster"
 	"github.com/TykTechnologies/tyk/config"
