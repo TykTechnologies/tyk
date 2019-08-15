@@ -72,8 +72,6 @@ func DoCoprocessReload() {
 
 // CoProcessor represents a CoProcess during the request.
 type CoProcessor struct {
-	HookName   string
-	HookType   coprocess.HookType
 	Middleware *CoProcessMiddleware
 }
 
@@ -123,15 +121,9 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response) (*copro
 
 	object := &coprocess.Object{
 		Request:  miniRequestObject,
-		HookName: c.HookName,
+		HookName: c.Middleware.HookName,
+		HookType: c.Middleware.HookType,
 	}
-
-	// If a middleware is set, take its HookType, otherwise override it with CoProcessor.HookType
-	if c.Middleware != nil && c.HookType == 0 {
-		c.HookType = c.Middleware.HookType
-	}
-
-	object.HookType = c.HookType
 
 	object.Spec = make(map[string]string)
 
@@ -154,7 +146,7 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response) (*copro
 	}
 
 	// Encode the session object (if not a pre-process & not a custom key check):
-	if c.HookType != coprocess.HookType_Pre && c.HookType != coprocess.HookType_CustomKeyCheck {
+	if object.HookType != coprocess.HookType_Pre && object.HookType != coprocess.HookType_CustomKeyCheck {
 		if session := ctxGetSession(req); session != nil {
 			object.Session = ProtoSessionState(session)
 			// For compatibility purposes:
@@ -294,15 +286,12 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
-	// It's also possible to override the HookType:
-	// TODO: remove "Middleware"?
 	coProcessor := CoProcessor{
 		Middleware: m,
-		HookName:   m.HookName,
 	}
 
 	object, err := coProcessor.BuildObject(r, nil)
-	if err == nil {
+	if err != nil {
 		logger.WithError(err).Error("Failed to build request object")
 		return errors.New("Middleware error"), 500
 	}
@@ -410,13 +399,19 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 }
 
 type CustomMiddlewareResponseHook struct {
-	Spec *APISpec
-	mw   apidef.MiddlewareDefinition
+	mw *CoProcessMiddleware
 }
 
-func (h *CustomMiddlewareResponseHook) Init(mw interface{}, spec *APISpec) error {
-	h.Spec = spec
-	h.mw = mw.(apidef.MiddlewareDefinition)
+func (h *CustomMiddlewareResponseHook) Init(mwDef interface{}, spec *APISpec) error {
+	mwDefinition := mwDef.(apidef.MiddlewareDefinition)
+	h.mw = &CoProcessMiddleware{
+		BaseMiddleware: BaseMiddleware{
+			Spec: spec,
+		},
+		HookName:    mwDefinition.Name,
+		HookType:    coprocess.HookType_Response,
+		RawBodyOnly: mwDefinition.RawBodyOnly,
+	}
 	return nil
 }
 
@@ -427,23 +422,26 @@ func (h *CustomMiddlewareResponseHook) Name() string {
 func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
 	log.WithFields(logrus.Fields{
 		"prefix": "coprocess",
-	}).Debugf("Response hook '%s' is called", h.mw.Name)
+	}).Debugf("Response hook '%s' is called", h.mw.Name())
 	coProcessor := CoProcessor{
-		HookName: h.mw.Name,
+		Middleware: h.mw,
 	}
 
-	// TODO: handle error
-	object, _ := coProcessor.BuildObject(req, res)
+	object, err := coProcessor.BuildObject(req, res)
+	if err != nil {
+		log.WithError(err).Debug("Couldn't build request object")
+		return errors.New("Middleware error")
+	}
 	object.Session = ProtoSessionState(ses)
 
 	retObject, err := coProcessor.Dispatch(object)
 	if err != nil {
-		log.WithError(err).Error("Dispatch error")
+		log.WithError(err).Debug("Couldn't dispatch request object")
 		return errors.New("Middleware error")
 	}
 
 	if retObject.Response == nil {
-		log.WithError(err).Error("No response object returned by response hook")
+		log.WithError(err).Debug("No response object returned by response hook")
 		return errors.New("Middleware error")
 	}
 
