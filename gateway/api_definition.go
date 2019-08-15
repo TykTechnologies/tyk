@@ -22,8 +22,8 @@ import (
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/rpc"
 
-	"github.com/sirupsen/logrus"
 	circuit "github.com/rubyist/circuitbreaker"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/gojsonschema"
 	"github.com/TykTechnologies/tyk/apidef"

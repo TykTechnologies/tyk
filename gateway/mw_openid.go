@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/sirupsen/logrus"
 	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/openid2go/openid"
 	"github.com/TykTechnologies/tyk/apidef"

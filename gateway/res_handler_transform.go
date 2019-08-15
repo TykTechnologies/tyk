@@ -10,8 +10,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/sirupsen/logrus"
 	"github.com/clbanning/mxj"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/headers"
