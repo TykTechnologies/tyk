@@ -416,7 +416,12 @@ func (h *CustomMiddlewareResponseHook) Init(mwDef interface{}, spec *APISpec) er
 }
 
 func (h *CustomMiddlewareResponseHook) Name() string {
-	return ""
+	return "CustomMiddlewareResponseHook"
+}
+
+func (h *CustomMiddlewareResponseHook) HandleError(rw http.ResponseWriter, req *http.Request) {
+	handler := ErrorHandler{h.mw.BaseMiddleware}
+	handler.HandleError(rw, req, "Middleware error", http.StatusInternalServerError, true)
 }
 
 func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {

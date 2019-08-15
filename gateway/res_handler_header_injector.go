@@ -27,6 +27,9 @@ func (h *HeaderInjector) Init(c interface{}, spec *APISpec) error {
 	return mapstructure.Decode(c, &h.config)
 }
 
+func (h *HeaderInjector) HandleError(rw http.ResponseWriter, req *http.Request) {
+}
+
 func (h *HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
 	// TODO: This should only target specific paths
 

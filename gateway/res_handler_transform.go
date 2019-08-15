@@ -10,8 +10,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/sirupsen/logrus"
 	"github.com/clbanning/mxj"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/headers"
@@ -74,6 +74,9 @@ func compressBuffer(in bytes.Buffer, encoding string) (out bytes.Buffer) {
 	}
 
 	return out
+}
+
+func (h *ResponseTransformMiddleware) HandleError(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
