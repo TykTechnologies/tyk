@@ -107,6 +107,8 @@ func (d *dispatcher) Dispatch(ctx context.Context, object *coprocess.Object) (*c
 				return d.grpcError(object, k+" doesn't match value in object.Session.Metadata")
 			}
 		}
+	case "testResponseHook":
+		object.Response.RawBody = []byte("newbody")
 	}
 	return object, nil
 }
@@ -203,7 +205,36 @@ func loadTestGRPCAPIs() {
 			},
 			Driver: apidef.GrpcDriver,
 		}
-	})
+	},
+		func(spec *gateway.APISpec) {
+			spec.APIID = "4"
+			spec.OrgID = "default"
+			spec.Auth = apidef.Auth{
+				AuthHeaderName: "authorization",
+			}
+			spec.UseKeylessAccess = false
+			spec.VersionData = struct {
+				NotVersioned   bool                          `bson:"not_versioned" json:"not_versioned"`
+				DefaultVersion string                        `bson:"default_version" json:"default_version"`
+				Versions       map[string]apidef.VersionInfo `bson:"versions" json:"versions"`
+			}{
+				NotVersioned: true,
+				Versions: map[string]apidef.VersionInfo{
+					"v1": {
+						Name: "v1",
+					},
+				},
+			}
+			spec.Proxy.ListenPath = "/grpc-test-api-4/"
+			spec.Proxy.StripListenPath = true
+			spec.CustomMiddleware = apidef.MiddlewareSection{
+				Response: []apidef.MiddlewareDefinition{
+					{Name: "testResponseHook"},
+				},
+				Driver: apidef.GrpcDriver,
+			}
+		},
+	)
 }
 
 func startTykWithGRPC() (*gateway.Test, *grpc.Server) {
@@ -306,6 +337,16 @@ func TestGRPCDispatch(t *testing.T) {
 			Method:  http.MethodGet,
 			Code:    http.StatusOK,
 			Headers: headers,
+		})
+	})
+
+	t.Run("Response hook", func(t *testing.T) {
+		ts.Run(t, test.TestCase{
+			Path:      "/grpc-test-api-4/",
+			Method:    http.MethodGet,
+			Code:      http.StatusOK,
+			Headers:   headers,
+			BodyMatch: "newbody",
 		})
 	})
 
