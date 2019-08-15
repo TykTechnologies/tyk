@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/url"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	logger "github.com/TykTechnologies/tyk/log"
@@ -26,6 +27,22 @@ type targetConfig struct {
 	target   string
 }
 
+// Stat defines basic statistics about a tcp connection
+type Stat struct {
+	Host struct {
+		LocalAddress  string
+		RemoteAddress string
+	}
+	Target struct {
+		Address       string
+		LocalAddress  string
+		RemoteAddress string
+	}
+	Duration     time.Duration
+	BytesRead    int64
+	BytesWritten int64
+}
+
 type Proxy struct {
 	sync.RWMutex
 
@@ -37,7 +54,8 @@ type Proxy struct {
 	WriteTimeout time.Duration
 
 	// Domain to config mapping
-	muxer map[string]*targetConfig
+	muxer     map[string]*targetConfig
+	SyncStats func(Stat)
 }
 
 func (p *Proxy) AddDomainHandler(domain, target string, modifier *Modifier) {
@@ -139,6 +157,16 @@ func (p *Proxy) getTargetConfig(conn net.Conn) (*targetConfig, error) {
 }
 
 func (p *Proxy) handleConn(conn net.Conn) error {
+	stat := Stat{}
+	stat.Host.LocalAddress = conn.LocalAddr().String()
+	stat.Host.RemoteAddress = conn.RemoteAddr().String()
+	start := time.Now()
+	defer func() {
+		stat.Duration = time.Since(start)
+		if p.SyncStats != nil {
+			p.SyncStats(stat)
+		}
+	}()
 	config, err := p.getTargetConfig(conn)
 	if err != nil {
 		conn.Close()
@@ -178,12 +206,34 @@ func (p *Proxy) handleConn(conn net.Conn) error {
 		conn.Close()
 		return err
 	}
+	stat.Target.Address = config.target
+	stat.Target.LocalAddress = rconn.LocalAddr().String()
+	stat.Target.RemoteAddress = rconn.RemoteAddr().String()
 
+	r := func(src, dst net.Conn, data []byte) ([]byte, error) {
+		atomic.AddInt64(&stat.BytesRead, int64(len(data)))
+		h := config.modifier.ModifyRequest
+		if h != nil {
+			return h(src, dst, data)
+		}
+		return data, nil
+	}
+	w := func(src, dst net.Conn, data []byte) ([]byte, error) {
+		atomic.AddInt64(&stat.BytesWritten, int64(len(data)))
+		h := config.modifier.ModifyResponse
+		if h != nil {
+			return h(src, dst, data)
+		}
+		return data, nil
+	}
+	var wg sync.WaitGroup
+	wg.Add(2)
 	// write to dst what it reads from src
 	var pipe = func(src, dst net.Conn, modifier func(net.Conn, net.Conn, []byte) ([]byte, error)) {
 		defer func() {
 			conn.Close()
 			rconn.Close()
+			wg.Done()
 		}()
 
 		buf := make([]byte, 65535)
@@ -225,8 +275,8 @@ func (p *Proxy) handleConn(conn net.Conn) error {
 		}
 	}
 
-	go pipe(conn, rconn, config.modifier.ModifyRequest)
-	go pipe(rconn, conn, config.modifier.ModifyResponse)
-
+	go pipe(conn, rconn, r)
+	go pipe(rconn, conn, w)
+	wg.Wait()
 	return nil
 }

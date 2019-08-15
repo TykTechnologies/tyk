@@ -53,6 +53,31 @@ func TestProxyModifier(t *testing.T) {
 		}...)
 	})
 }
+func TestProxySyncStats(t *testing.T) {
+	// Echoing
+	upstream := test.TcpMock(false, func(in []byte, err error) (out []byte) {
+		return in
+	})
+	defer upstream.Close()
+	stats := make(chan Stat, 2)
+	proxy := &Proxy{SyncStats: func(s Stat) {
+		stats <- s
+	}}
+	proxy.AddDomainHandler("", upstream.Addr().String(), nil)
+
+	testRunner(t, proxy, "", false, []test.TCPTestCase{
+		{Action: "write", Payload: "ping"},
+		{Action: "read", Payload: "ping"},
+	}...)
+	s := <-stats
+	if s.BytesRead != 4 {
+		t.Errorf("expected bytes read to be 4 got %d", s.BytesRead)
+	}
+	if s.BytesWritten != 4 {
+		t.Errorf("expected bytes written to be 4 got %d", s.BytesWritten)
+	}
+	close(stats)
+}
 
 func TestProxyMultiTarget(t *testing.T) {
 	target1 := test.TcpMock(false, func(in []byte, err error) (out []byte) {
