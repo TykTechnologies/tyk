@@ -113,16 +113,16 @@ func BenchmarkProcessRequestLiveQuotaLimit(b *testing.B) {
 }
 
 func TestProcessRequestOffThreadQuotaLimit(t *testing.T) {
+	// run test server
+	ts := StartTest()
+	defer ts.Close()
+
 	// setup global config
 	globalConf := config.Global()
 	globalConf.EnforceOrgQuotas = true
 	globalConf.ExperimentalProcessOrgOffThread = true
 	config.SetGlobal(globalConf)
 	defer ResetTestConfig()
-
-	// run test server
-	ts := StartTest()
-	defer ts.Close()
 
 	// load API
 	testPrepareProcessRequestQuotaLimit(

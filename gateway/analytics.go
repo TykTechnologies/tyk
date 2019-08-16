@@ -16,6 +16,11 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 )
 
+type NetworkStats struct {
+	BytesRead    int64
+	BytesWritten int64
+}
+
 // AnalyticsRecord encodes the details of a request
 type AnalyticsRecord struct {
 	Method        string
@@ -41,6 +46,7 @@ type AnalyticsRecord struct {
 	RawResponse   string // ^ same but for response
 	IPAddress     string
 	Geo           GeoData
+	Network       NetworkStats
 	Tags          []string
 	Alias         string
 	TrackPath     bool

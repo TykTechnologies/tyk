@@ -38,7 +38,7 @@ type Stat struct {
 		LocalAddress  string
 		RemoteAddress string
 	}
-	Duration     time.Duration
+	Duration     int64
 	BytesRead    int64
 	BytesWritten int64
 }
@@ -162,7 +162,8 @@ func (p *Proxy) handleConn(conn net.Conn) error {
 	stat.Host.RemoteAddress = conn.RemoteAddr().String()
 	start := time.Now()
 	defer func() {
-		stat.Duration = time.Since(start)
+		millisec := float64(time.Now().UnixNano()-start.UnixNano()) * 0.000001
+		stat.Duration = int64(millisec)
 		if p.SyncStats != nil {
 			p.SyncStats(stat)
 		}

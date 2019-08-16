@@ -175,6 +175,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			rawResponse,
 			ip,
 			GeoData{},
+			NetworkStats{},
 			tags,
 			alias,
 			trackEP,
@@ -202,7 +203,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 		analytics.RecordHit(&record)
 	}
-
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
 

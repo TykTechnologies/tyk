@@ -168,10 +168,52 @@ func (m *proxyMux) addTCPService(spec *APISpec, modifier *tcp.Modifier) {
 				DialTLS:         dialWithServiceDiscovery(spec, dialTLSPinnedCheck(spec, tlsConfig)),
 				Dial:            dialWithServiceDiscovery(spec, net.Dial),
 				TLSConfigTarget: tlsConfig,
+				SyncStats:       recordTCPHit(spec),
 			},
 		}
 		p.tcpProxy.AddDomainHandler(hostname, spec.Proxy.TargetURL, modifier)
 		m.proxies = append(m.proxies, p)
+	}
+}
+
+func recordTCPHit(spec *APISpec) func(tcp.Stat) {
+	if spec.DoNotTrack {
+		return nil
+	}
+	return func(stat tcp.Stat) {
+		ip, _, err := net.SplitHostPort(stat.Host.RemoteAddress)
+		if err != nil {
+			return
+		}
+		if spec.GlobalConfig.StoreAnalytics(ip) {
+			t := time.Now()
+			record := AnalyticsRecord{
+				Network: NetworkStats{
+					BytesRead:    stat.BytesRead,
+					BytesWritten: stat.BytesWritten,
+				},
+				Host:         stat.Host.LocalAddress,
+				Day:          t.Day(),
+				Month:        t.Month(),
+				Year:         t.Year(),
+				Hour:         t.Hour(),
+				ResponseCode: -1,
+				TimeStamp:    t,
+				APIName:      spec.Name,
+				APIID:        spec.APIID,
+				OrgID:        spec.OrgID,
+				RequestTime:  stat.Duration,
+			}
+			if spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
+				record.GetGeo(ip)
+			}
+			record.SetExpiry(spec.ExpireAnalyticsAfter)
+			if spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
+				record.NormalisePath(&spec.GlobalConfig)
+			}
+			analytics.RecordHit(&record)
+		}
+
 	}
 }
 
