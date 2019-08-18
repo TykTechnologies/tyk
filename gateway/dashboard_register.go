@@ -63,6 +63,8 @@ func initialiseClient(timeout time.Duration) (client *http.Client) {
 		if len(certs) != 0 && certs[0] != nil {
 			tlsConfig.Certificates = []tls.Certificate{*certs[0]}
 			log.Info("Mutual tls for dashboard was enabled")
+		} else {
+			log.Infof("No dashboard certificate with id: %v was found", cert)
 		}
 	}
 
@@ -109,7 +111,6 @@ func (h *HTTPDashboardHandler) Init() error {
 // NotifyDashboardOfEvent acts as a form of event which informs the
 // dashboard of a key which has reached a certain usage quota
 func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
-
 	meta, ok := event.(EventTriggerExceededMeta)
 	if !ok {
 		return errors.New("event type is currently not supported as a notification to the dashboard")
@@ -162,12 +163,13 @@ func (h *HTTPDashboardHandler) Register() error {
 	req := h.newRequest(h.RegistrationEndpoint)
 	c := initialiseClient(5 * time.Second)
 	resp, err := c.Do(req)
-
 	if err != nil {
+		panic(err)
 		dashLog.Errorf("Request failed with error %v; retrying in 5s", err)
 		time.Sleep(time.Second * 5)
 		return h.Register()
 	} else if resp != nil && resp.StatusCode != 200 {
+		panic("here2")
 		dashLog.Errorf("Response failed with code %d; retrying in 5s", resp.StatusCode)
 		time.Sleep(time.Second * 5)
 		return h.Register()
@@ -199,9 +201,7 @@ func (h *HTTPDashboardHandler) Register() error {
 }
 
 func (h *HTTPDashboardHandler) StartBeating() error {
-
 	req := h.newRequest(h.HeartBeatEndpoint)
-
 	client := initialiseClient(5 * time.Second)
 
 	for !h.heartBeatStopSentinel {

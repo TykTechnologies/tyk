@@ -346,7 +346,10 @@ type Config struct {
 	AppPath string `json:"app_path"`
 
 	// Dashboard Configurations
-	UseDBAppConfigs          bool                   `json:"use_db_app_configs"`
+
+	// UseDBAppConfigs - boolean flag to determine do we use dashboard configs
+	UseDBAppConfigs bool `json:"use_db_app_configs"`
+	// DBAppConfOptions - dashboard application configuration options
 	DBAppConfOptions         DBAppConfOptionsConfig `json:"db_app_conf_options"`
 	Storage                  StorageOptionsConf     `json:"storage"`
 	DisableDashboardZeroConf bool                   `json:"disable_dashboard_zeroconf"`

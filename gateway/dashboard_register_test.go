@@ -1,6 +1,8 @@
 package gateway
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -8,32 +10,68 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/test"
 	"github.com/garyburd/redigo/redis"
 )
 
-func TestConnectToDashboardWithMutualTLS(t *testing.T) {
-	// TODO: setup http server mock with tls for dashboard example from: TestUpstreamMutualTLS
-	// _, _, combinedClientPEM, clientCert := test.GenCertificate(&x509.Certificate{})
-	// clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
-	//
-	// dashboard := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	// 	if r.URL.Path == "/system/apis" {
-	// 		w.Write([]byte(`{"Status": "OK", "Nonce": "1", "Message": [{"api_definition": {}}]}`))
-	// 	} else {
-	// 		t.Fatal("Unknown dashboard API request", r)
-	// 	}
-	// }))
-	//
-	// // Mutual TLS protected dashboard
-	// pool := x509.NewCertPool()
-	// dashboard.TLS = &tls.Config{
-	// 	ClientAuth:         tls.RequireAndVerifyClientCert,
-	// 	ClientCAs:          pool,
-	// 	InsecureSkipVerify: true,
-	// }
-	//
-	// dashboard.StartTLS()
-	// defer dashboard.Close()
+func TestDeRegisterWithMutualTLS(t *testing.T) {
+	_, _, combinedClientPEM, clientCert := test.GenCertificate(&x509.Certificate{})
+	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
+
+	// Setup mutual TLS protected dashboard
+	dashboard := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/system/node" {
+			w.Write([]byte(`{"Status": "OK", "Nonce": "1", "Message": {"NodeID": "1"}}`))
+		} else {
+			t.Fatal("Unknown dashboard API request", r)
+		}
+	}))
+	pool := x509.NewCertPool()
+	pool.AddCert(clientCert.Leaf)
+	dashboard.TLS = &tls.Config{
+		ClientAuth:         tls.RequireAndVerifyClientCert,
+		ClientCAs:          pool,
+		InsecureSkipVerify: true,
+	}
+
+	dashboard.StartTLS()
+	defer dashboard.Close()
+
+	certID, _ := CertificateManager.Add(combinedClientPEM, "")
+	defer CertificateManager.Delete(certID)
+
+	getConfig := func(certID string) config.Config {
+		cfg := config.Global()
+		cfg.UseDBAppConfigs = true
+		cfg.DBAppConfOptions.ConnectionString = dashboard.URL
+		cfg.Security.Certificates.Dashboard = certID
+		cfg.NodeSecret = "somesecret"
+		// cfg.HttpServerOptions.UseSSL = true
+		cfg.HttpServerOptions.SSLInsecureSkipVerify = true
+		return cfg
+	}
+
+	var dashService DashboardServiceSender = &HTTPDashboardHandler{}
+
+	t.Run("Without dashboard certificate", func(t *testing.T) {
+		config.SetGlobal(getConfig(""))
+		defer ResetTestConfig()
+
+		dashService.Init()
+		if err := dashService.DeRegister(); err == nil {
+			t.Error("Should reject without certificate")
+		}
+	})
+
+	t.Run("With dashboard certificate", func(t *testing.T) {
+		config.SetGlobal(getConfig(certID))
+		defer ResetTestConfig()
+
+		dashService.Init()
+		if err := dashService.DeRegister(); err != nil {
+			t.Error("Should succeed with certificate")
+		}
+	})
 }
 
 func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
