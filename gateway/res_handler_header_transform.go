@@ -36,6 +36,9 @@ func (h *HeaderTransform) Init(c interface{}, spec *APISpec) error {
 	return nil
 }
 
+func (h *HeaderTransform) HandleError(rw http.ResponseWriter, req *http.Request) {
+}
+
 func (h *HeaderTransform) HandleResponse(rw http.ResponseWriter,
 	res *http.Response, req *http.Request, ses *user.SessionState) error {
 

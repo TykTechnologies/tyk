@@ -545,6 +545,7 @@ type TykResponseHandler interface {
 	Init(interface{}, *APISpec) error
 	Name() string
 	HandleResponse(http.ResponseWriter, *http.Response, *http.Request, *user.SessionState) error
+	HandleError(http.ResponseWriter, *http.Request)
 }
 
 func responseProcessorByName(name string) TykResponseHandler {
@@ -557,18 +558,25 @@ func responseProcessorByName(name string) TykResponseHandler {
 		return &ResponseTransformJQMiddleware{}
 	case "header_transform":
 		return &HeaderTransform{}
+	case "custom_mw_res_hook":
+		return &CustomMiddlewareResponseHook{}
 	}
 	return nil
 }
 
-func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
+func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) (abortRequest bool, err error) {
 	traceIsEnabled := trace.IsEnabled()
 	for _, rh := range chain {
 		if err := handleResponse(rh, rw, res, req, ses, traceIsEnabled); err != nil {
-			return err
+			// Abort the request if this handler is a response middleware hook:
+			if rh.Name() == "CustomMiddlewareResponseHook" {
+				rh.HandleError(rw, req)
+				return true, err
+			}
+			return false, err
 		}
 	}
-	return nil
+	return false, nil
 }
 
 func handleResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState, shouldTrace bool) error {

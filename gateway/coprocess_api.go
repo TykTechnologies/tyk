@@ -68,19 +68,19 @@ func CoProcessLog(CMessage, CLogLevel *C.char) {
 	switch logLevel {
 	case "debug":
 		log.WithFields(logrus.Fields{
-			"prefix": CoProcessName,
+			"prefix": "python",
 		}).Debug(message)
 	case "error":
 		log.WithFields(logrus.Fields{
-			"prefix": CoProcessName,
+			"prefix": "python",
 		}).Error(message)
 	case "warning":
 		log.WithFields(logrus.Fields{
-			"prefix": CoProcessName,
+			"prefix": "python",
 		}).Warning(message)
 	default:
 		log.WithFields(logrus.Fields{
-			"prefix": CoProcessName,
+			"prefix": "python",
 		}).Info(message)
 	}
 }

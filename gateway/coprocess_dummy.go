@@ -10,6 +10,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/coprocess"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const (
@@ -62,5 +63,25 @@ func CoProcessInit() error {
 	}).Info("Disabled feature")
 	return nil
 }
-
 func DoCoprocessReload() {}
+
+type CustomMiddlewareResponseHook struct {
+	Spec   *APISpec
+	mw     apidef.MiddlewareDefinition
+	config HeaderInjectorOptions
+}
+
+func (h *CustomMiddlewareResponseHook) Init(mw interface{}, spec *APISpec) error {
+	return nil
+}
+
+func (h *CustomMiddlewareResponseHook) HandleError(rw http.ResponseWriter, req *http.Request) {
+}
+
+func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
+	return nil
+}
+
+func (h *CustomMiddlewareResponseHook) Name() string {
+	return ""
+}

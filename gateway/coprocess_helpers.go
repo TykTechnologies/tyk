@@ -88,11 +88,11 @@ func TykSessionState(session *coprocess.SessionState) *user.SessionState {
 		MetaData:                metadata,
 		Monitor:                 monitor,
 		EnableDetailedRecording: session.EnableDetailedRecording,
-		Tags:                    session.Tags,
-		Alias:                   session.Alias,
-		LastUpdated:             session.LastUpdated,
-		IdExtractorDeadline:     session.IdExtractorDeadline,
-		SessionLifetime:         session.SessionLifetime,
+		Tags:                session.Tags,
+		Alias:               session.Alias,
+		LastUpdated:         session.LastUpdated,
+		IdExtractorDeadline: session.IdExtractorDeadline,
+		SessionLifetime:     session.SessionLifetime,
 	}
 }
 
@@ -174,11 +174,11 @@ func ProtoSessionState(session *user.SessionState) *coprocess.SessionState {
 		Monitor:                 monitor,
 		Metadata:                metadata,
 		EnableDetailedRecording: session.EnableDetailedRecording,
-		Tags:                    session.Tags,
-		Alias:                   session.Alias,
-		LastUpdated:             session.LastUpdated,
-		IdExtractorDeadline:     session.IdExtractorDeadline,
-		SessionLifetime:         session.SessionLifetime,
+		Tags:                session.Tags,
+		Alias:               session.Alias,
+		LastUpdated:         session.LastUpdated,
+		IdExtractorDeadline: session.IdExtractorDeadline,
+		SessionLifetime:     session.SessionLifetime,
 	}
 }
 

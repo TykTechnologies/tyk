@@ -15,6 +15,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/coprocess"
+	"github.com/TykTechnologies/tyk/user"
 
 	"errors"
 	"io/ioutil"
@@ -71,46 +72,45 @@ func DoCoprocessReload() {
 
 // CoProcessor represents a CoProcess during the request.
 type CoProcessor struct {
-	HookType   coprocess.HookType
 	Middleware *CoProcessMiddleware
 }
 
 // ObjectFromRequest constructs a CoProcessObject from a given http.Request.
-func (c *CoProcessor) ObjectFromRequest(r *http.Request) (*coprocess.Object, error) {
-	headers := ProtoMap(r.Header)
+func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response) (*coprocess.Object, error) {
+	headers := ProtoMap(req.Header)
 
-	host := r.Host
-	if host == "" && r.URL != nil {
-		host = r.URL.Host
+	host := req.Host
+	if host == "" && req.URL != nil {
+		host = req.URL.Host
 	}
 	if host != "" {
 		headers["Host"] = host
 	}
 	scheme := "http"
-	if r.TLS != nil {
+	if req.TLS != nil {
 		scheme = "https"
 	}
 	miniRequestObject := &coprocess.MiniRequestObject{
 		Headers:        headers,
 		SetHeaders:     map[string]string{},
 		DeleteHeaders:  []string{},
-		Url:            r.URL.String(),
-		Params:         ProtoMap(r.URL.Query()),
+		Url:            req.URL.String(),
+		Params:         ProtoMap(req.URL.Query()),
 		AddParams:      map[string]string{},
 		ExtendedParams: ProtoMap(nil),
 		DeleteParams:   []string{},
 		ReturnOverrides: &coprocess.ReturnOverrides{
 			ResponseCode: -1,
 		},
-		Method:     r.Method,
-		RequestUri: r.RequestURI,
+		Method:     req.Method,
+		RequestUri: req.RequestURI,
 		Scheme:     scheme,
 	}
 
-	if r.Body != nil {
-		defer r.Body.Close()
+	if req.Body != nil {
+		defer req.Body.Close()
 		var err error
-		miniRequestObject.RawBody, err = ioutil.ReadAll(r.Body)
+		miniRequestObject.RawBody, err = ioutil.ReadAll(req.Body)
 		if err != nil {
 			return nil, err
 		}
@@ -122,14 +122,8 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) (*coprocess.Object, err
 	object := &coprocess.Object{
 		Request:  miniRequestObject,
 		HookName: c.Middleware.HookName,
+		HookType: c.Middleware.HookType,
 	}
-
-	// If a middleware is set, take its HookType, otherwise override it with CoProcessor.HookType
-	if c.Middleware != nil && c.HookType == 0 {
-		c.HookType = c.Middleware.HookType
-	}
-
-	object.HookType = c.HookType
 
 	object.Spec = make(map[string]string)
 
@@ -152,12 +146,33 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) (*coprocess.Object, err
 	}
 
 	// Encode the session object (if not a pre-process & not a custom key check):
-	if c.HookType != coprocess.HookType_Pre && c.HookType != coprocess.HookType_CustomKeyCheck {
-		if session := ctxGetSession(r); session != nil {
+	if object.HookType != coprocess.HookType_Pre && object.HookType != coprocess.HookType_CustomKeyCheck {
+		if session := ctxGetSession(req); session != nil {
 			object.Session = ProtoSessionState(session)
 			// For compatibility purposes:
 			object.Metadata = object.Session.Metadata
 		}
+	}
+
+	// Append response data if it's available:
+	if res != nil {
+		resObj := &coprocess.ResponseObject{
+			Headers: make(map[string]string, len(res.Header)),
+		}
+		for k, v := range res.Header {
+			resObj.Headers[k] = v[0]
+		}
+		resObj.StatusCode = int32(res.StatusCode)
+		rawBody, err := ioutil.ReadAll(res.Body)
+		if err != nil {
+			return nil, err
+		}
+		resObj.RawBody = rawBody
+		res.Body = ioutil.NopCloser(bytes.NewReader(rawBody))
+		if utf8.Valid(rawBody) && !c.Middleware.RawBodyOnly {
+			resObj.Body = string(rawBody)
+		}
+		object.Response = resObj
 	}
 
 	return object, nil
@@ -271,13 +286,11 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
-	// It's also possible to override the HookType:
 	coProcessor := CoProcessor{
 		Middleware: m,
-		// HookType: coprocess.PreHook,
 	}
 
-	object, err := coProcessor.ObjectFromRequest(r)
+	object, err := coProcessor.BuildObject(r, nil)
 	if err != nil {
 		logger.WithError(err).Error("Failed to build request object")
 		return errors.New("Middleware error"), 500
@@ -383,4 +396,69 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	return nil, 200
+}
+
+type CustomMiddlewareResponseHook struct {
+	mw *CoProcessMiddleware
+}
+
+func (h *CustomMiddlewareResponseHook) Init(mwDef interface{}, spec *APISpec) error {
+	mwDefinition := mwDef.(apidef.MiddlewareDefinition)
+	h.mw = &CoProcessMiddleware{
+		BaseMiddleware: BaseMiddleware{
+			Spec: spec,
+		},
+		HookName:    mwDefinition.Name,
+		HookType:    coprocess.HookType_Response,
+		RawBodyOnly: mwDefinition.RawBodyOnly,
+	}
+	return nil
+}
+
+func (h *CustomMiddlewareResponseHook) Name() string {
+	return "CustomMiddlewareResponseHook"
+}
+
+func (h *CustomMiddlewareResponseHook) HandleError(rw http.ResponseWriter, req *http.Request) {
+	handler := ErrorHandler{h.mw.BaseMiddleware}
+	handler.HandleError(rw, req, "Middleware error", http.StatusInternalServerError, true)
+}
+
+func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
+	log.WithFields(logrus.Fields{
+		"prefix": "coprocess",
+	}).Debugf("Response hook '%s' is called", h.mw.Name())
+	coProcessor := CoProcessor{
+		Middleware: h.mw,
+	}
+
+	object, err := coProcessor.BuildObject(req, res)
+	if err != nil {
+		log.WithError(err).Debug("Couldn't build request object")
+		return errors.New("Middleware error")
+	}
+	object.Session = ProtoSessionState(ses)
+
+	retObject, err := coProcessor.Dispatch(object)
+	if err != nil {
+		log.WithError(err).Debug("Couldn't dispatch request object")
+		return errors.New("Middleware error")
+	}
+
+	if retObject.Response == nil {
+		log.WithError(err).Debug("No response object returned by response hook")
+		return errors.New("Middleware error")
+	}
+
+	// Set headers:
+	for k, v := range retObject.Response.Headers {
+		res.Header.Set(k, v)
+	}
+
+	// Set response body:
+	bodyBuf := bytes.NewBuffer(retObject.Response.RawBody)
+	res.Body = ioutil.NopCloser(bodyBuf)
+
+	res.StatusCode = int(retObject.Response.StatusCode)
+	return nil
 }

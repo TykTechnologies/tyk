@@ -8,6 +8,7 @@ enum HookType {
 	Post = 2;
 	PostKeyAuth = 3;
 	CustomKeyCheck  = 4;
+  Response = 5;
 }
 
 message StringSlice {
