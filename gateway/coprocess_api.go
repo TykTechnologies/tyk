@@ -1,6 +1,3 @@
-// +build coprocess
-// +build !grpc
-
 package gateway
 
 import "C"
