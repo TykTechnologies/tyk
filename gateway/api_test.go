@@ -152,8 +152,9 @@ func TestKeyHandler(t *testing.T) {
 	// with policy
 	policiesMu.Lock()
 	policiesByID["abc_policy"] = user.Policy{
-		Active:   true,
-		QuotaMax: 5,
+		Active:           true,
+		QuotaMax:         5,
+		QuotaRenewalRate: 300,
 		AccessRights: map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v1"},
 		}},

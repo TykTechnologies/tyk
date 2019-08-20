@@ -123,8 +123,7 @@ func requestThrottlingTest(limiter string, testLevel string) func(t *testing.T) 
 		throttleInterval = 1
 		throttleRetryLimit = 3
 
-		for _, requestThrottlingEnabled := range []bool{false, true} {
-
+		for _, requestThrottlingEnabled := range []bool{true, false} {
 			spec := BuildAndLoadAPI(func(spec *APISpec) {
 				spec.Name = "test"
 				spec.APIID = "test"
@@ -162,6 +161,8 @@ func requestThrottlingTest(limiter string, testLevel string) func(t *testing.T) 
 						a.Limit.ThrottleInterval = throttleInterval
 						a.Limit.ThrottleRetryLimit = throttleRetryLimit
 					}
+
+					p.Partitions.PerAPI = true
 
 					p.AccessRights[spec.APIID] = a
 				} else {

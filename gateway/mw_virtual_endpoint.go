@@ -287,7 +287,7 @@ func forceResponse(w http.ResponseWriter,
 
 	if !isPre {
 		// Handle response middleware
-		if _, err := handleResponseChain(spec.ResponseChain, w, newResponse, r, session); err != nil {
+		if err := handleResponseChain(spec.ResponseChain, w, newResponse, r, session); err != nil {
 			logger.WithError(err).Error("Response chain failed! ")
 		}
 	}

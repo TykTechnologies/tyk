@@ -442,6 +442,9 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 		return apiError("Key not found"), http.StatusNotFound
 	}
 
+	mw := BaseMiddleware{Spec: spec}
+	mw.ApplyPolicies(&session)
+
 	quotaKey := QuotaKeyPrefix + storage.HashKey(sessionKey)
 	if byHash {
 		quotaKey = QuotaKeyPrefix + sessionKey
@@ -459,7 +462,7 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix":  "api",
-			"key":     obfuscateKey(sessionKey),
+			"key":     obfuscateKey(quotaKey),
 			"message": err,
 			"status":  "ok",
 		}).Info("Can't retrieve key quota")
@@ -471,10 +474,16 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 			continue
 		}
 
-		limQuotaKey := QuotaKeyPrefix + id + "-" + storage.HashKey(sessionKey)
-		if byHash {
-			limQuotaKey = QuotaKeyPrefix + id + "-" + sessionKey
+		quotaScope := ""
+		if access.AllowanceScope != "" {
+			quotaScope = access.AllowanceScope + "-"
 		}
+
+		limQuotaKey := QuotaKeyPrefix + quotaScope + storage.HashKey(sessionKey)
+		if byHash {
+			limQuotaKey = QuotaKeyPrefix + quotaScope + sessionKey
+		}
+
 		if usedQuota, err := sessionManager.Store().GetRawKey(limQuotaKey); err == nil {
 			qInt, _ := strconv.Atoi(usedQuota)
 			remaining := access.Limit.QuotaMax - int64(qInt)
@@ -497,9 +506,6 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 			}).Info("Can't retrieve api limit quota")
 		}
 	}
-
-	mw := BaseMiddleware{Spec: spec}
-	mw.ApplyPolicies(&session)
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",

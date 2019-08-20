@@ -753,13 +753,10 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	// the trick. Chain can be empty, in which case this is a no-op.
 	// abortRequest is set to true when a response hook fails
 	// For reference see "HandleError" in coprocess.go
-	abortRequest, err := handleResponseChain(p.TykAPISpec.ResponseChain, rw, res, req, ses)
-	if abortRequest {
-		return nil
-	}
-
+	err = handleResponseChain(p.TykAPISpec.ResponseChain, rw, res, req, ses)
 	if err != nil {
 		log.Error("Response chain failed! ", err)
+		return nil
 	}
 
 	inres := new(http.Response)
