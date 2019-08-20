@@ -628,7 +628,6 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 					QuotaRenewalRate: 3600,
 					QuotaRenews:      api3Limit.QuotaRenews,
 					QuotaRemaining:   45,
-					SetByPolicy:      true,
 				}
 				if !reflect.DeepEqual(*api3Limit, api3LimitExpected) {
 					t.Log("api3 limit received:", *api3Limit, "expected:", api3LimitExpected)
