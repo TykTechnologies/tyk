@@ -3,7 +3,7 @@ package gateway
 import (
 	"testing"
 
-	"github.com/anuvu/tyk/config"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 func TestGeoIPLookup(t *testing.T) {

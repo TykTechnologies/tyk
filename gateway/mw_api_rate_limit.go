@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/anuvu/tyk/request"
-	"github.com/anuvu/tyk/storage"
-	"github.com/anuvu/tyk/user"
+	"github.com/TykTechnologies/tyk/request"
+	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 // RateLimitAndQuotaCheck will check the incoming request and key whether it is within it's quota and

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/anuvu/tyk/config"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 func TestMain(m *testing.M) {

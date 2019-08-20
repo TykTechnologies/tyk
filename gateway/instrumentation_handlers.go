@@ -9,10 +9,10 @@ import (
 
 	"github.com/gocraft/health"
 
-	"github.com/anuvu/tyk/cli"
-	"github.com/anuvu/tyk/request"
+	"github.com/TykTechnologies/tyk/cli"
+	"github.com/TykTechnologies/tyk/request"
 
-	"github.com/anuvu/tyk/config"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 var applicationGCStats = debug.GCStats{}

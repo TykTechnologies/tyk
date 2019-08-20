@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/anuvu/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 func TestDefaultValueAndWriteDefaultConf(t *testing.T) {

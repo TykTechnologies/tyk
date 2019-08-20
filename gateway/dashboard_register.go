@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/anuvu/tyk/config"
-	"github.com/anuvu/tyk/headers"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/headers"
 )
 
 var dashLog = log.WithField("prefix", "dashboard")

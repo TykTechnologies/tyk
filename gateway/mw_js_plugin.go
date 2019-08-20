@@ -18,8 +18,8 @@ import (
 	"github.com/robertkrimen/otto"
 	_ "github.com/robertkrimen/otto/underscore"
 
-	"github.com/anuvu/tyk/config"
-	"github.com/anuvu/tyk/user"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/sirupsen/logrus"
 )

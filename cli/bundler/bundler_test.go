@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/anuvu/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef"
 
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
 )

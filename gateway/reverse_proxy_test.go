@@ -12,12 +12,12 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/anuvu/tyk/apidef"
-	"github.com/anuvu/tyk/config"
-	"github.com/anuvu/tyk/ctx"
-	"github.com/anuvu/tyk/dnscache"
-	"github.com/anuvu/tyk/request"
-	"github.com/anuvu/tyk/test"
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/dnscache"
+	"github.com/TykTechnologies/tyk/request"
+	"github.com/TykTechnologies/tyk/test"
 )
 
 func TestCopyHeader_NoDuplicateCORSHeaders(t *testing.T) {

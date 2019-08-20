@@ -20,12 +20,12 @@ import (
 	"github.com/gorilla/websocket"
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
-	"github.com/anuvu/tyk/apidef"
-	"github.com/anuvu/tyk/cli"
-	"github.com/anuvu/tyk/config"
-	"github.com/anuvu/tyk/storage"
-	"github.com/anuvu/tyk/test"
-	"github.com/anuvu/tyk/user"
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/cli"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const defaultListenPort = 8080

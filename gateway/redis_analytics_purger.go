@@ -3,8 +3,8 @@ package gateway
 import (
 	"time"
 
-	"github.com/anuvu/tyk/config"
-	"github.com/anuvu/tyk/storage"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 // Purger is an interface that will define how the in-memory store will be purged

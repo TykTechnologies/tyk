@@ -8,7 +8,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/anuvu/tyk/request"
+	"github.com/TykTechnologies/tyk/request"
 	opentracing "github.com/opentracing/opentracing-go"
 )
 

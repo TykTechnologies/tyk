@@ -4,7 +4,7 @@
 package coprocess
 
 import (
-	"github.com/anuvu/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 const (

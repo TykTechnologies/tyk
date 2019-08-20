@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/anuvu/tyk/config"
-	"github.com/anuvu/tyk/headers"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/headers"
 )
 
 func createGetHandler() *WebHookHandler {

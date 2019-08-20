@@ -13,9 +13,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/clbanning/mxj"
 
-	"github.com/anuvu/tyk/apidef"
-	"github.com/anuvu/tyk/headers"
-	"github.com/anuvu/tyk/user"
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 type ResponseTransformMiddleware struct {

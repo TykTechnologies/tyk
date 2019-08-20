@@ -7,7 +7,7 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 
-	"github.com/anuvu/tyk/user"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 type RevProxyTransform struct {

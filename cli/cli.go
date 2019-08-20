@@ -5,13 +5,13 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/anuvu/tyk/cli/linter"
+	"github.com/TykTechnologies/tyk/cli/linter"
 
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
 
-	"github.com/anuvu/tyk/cli/bundler"
-	"github.com/anuvu/tyk/cli/importer"
-	logger "github.com/anuvu/tyk/log"
+	"github.com/TykTechnologies/tyk/cli/bundler"
+	"github.com/TykTechnologies/tyk/cli/importer"
+	logger "github.com/TykTechnologies/tyk/log"
 )
 
 const (

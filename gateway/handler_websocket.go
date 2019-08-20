@@ -12,10 +12,10 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/anuvu/tyk/headers"
-	"github.com/anuvu/tyk/request"
+	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/request"
 
-	"github.com/anuvu/tyk/config"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 func canonicalAddr(url *url.URL) string {

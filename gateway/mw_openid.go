@@ -12,8 +12,8 @@ import (
 	jwt "github.com/dgrijalva/jwt-go"
 
 	"github.com/TykTechnologies/openid2go/openid"
-	"github.com/anuvu/tyk/apidef"
-	"github.com/anuvu/tyk/user"
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const OIDPREFIX = "openid"

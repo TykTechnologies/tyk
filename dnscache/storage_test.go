@@ -8,7 +8,7 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/anuvu/tyk/test"
+	"github.com/TykTechnologies/tyk/test"
 )
 
 var (

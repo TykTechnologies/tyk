@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/anuvu/tyk/cli"
+	"github.com/TykTechnologies/tyk/cli"
 
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/garyburd/redigo/redis"
@@ -34,11 +34,11 @@ import (
 	"github.com/gorilla/websocket"
 	uuid "github.com/satori/go.uuid"
 
-	"github.com/anuvu/tyk/apidef"
-	"github.com/anuvu/tyk/config"
-	"github.com/anuvu/tyk/storage"
-	"github.com/anuvu/tyk/test"
-	"github.com/anuvu/tyk/user"
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 var (

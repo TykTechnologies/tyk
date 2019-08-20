@@ -13,9 +13,9 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
-	"github.com/anuvu/tyk/apidef"
-	"github.com/anuvu/tyk/config"
-	"github.com/anuvu/tyk/coprocess"
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/coprocess"
 )
 
 // MessageType sets the default message type.

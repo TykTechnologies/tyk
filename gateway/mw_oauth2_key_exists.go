@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/anuvu/tyk/apidef"
-	"github.com/anuvu/tyk/headers"
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/headers"
 )
 
 const (

@@ -15,11 +15,11 @@ import (
 
 	"fmt"
 
-	"github.com/anuvu/tyk/apidef"
-	"github.com/anuvu/tyk/config"
-	"github.com/anuvu/tyk/storage"
-	"github.com/anuvu/tyk/test"
-	"github.com/anuvu/tyk/user"
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const apiTestDef = `{

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/anuvu/tyk/apidef"
-	"github.com/anuvu/tyk/test"
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/test"
 )
 
 func testPrepareResponseHeaderInjection() {

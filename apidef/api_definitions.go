@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/gojsonschema"
-	"github.com/anuvu/tyk/regexp"
+	"github.com/TykTechnologies/tyk/regexp"
 )
 
 type AuthProviderCode string

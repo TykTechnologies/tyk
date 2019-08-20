@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/anuvu/tyk/config"
-	logger "github.com/anuvu/tyk/log"
+	"github.com/TykTechnologies/tyk/config"
+	logger "github.com/TykTechnologies/tyk/log"
 )
 
 var log = logger.Get()

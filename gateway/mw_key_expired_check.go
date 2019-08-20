@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/anuvu/tyk/request"
+	"github.com/TykTechnologies/tyk/request"
 )
 
 // KeyExpired middleware will check if the requesting key is expired or not. It makes use of the authManager to do so.

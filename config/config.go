@@ -13,9 +13,9 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 
-	"github.com/anuvu/tyk/apidef"
-	logger "github.com/anuvu/tyk/log"
-	"github.com/anuvu/tyk/regexp"
+	"github.com/TykTechnologies/tyk/apidef"
+	logger "github.com/TykTechnologies/tyk/log"
+	"github.com/TykTechnologies/tyk/regexp"
 )
 
 type IPsHandleStrategy string

@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/anuvu/tyk/apidef"
-	"github.com/anuvu/tyk/request"
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/request"
 )
 
 // VersionCheck will check whether the version of the requested API the request is accessing has any restrictions on URL endpoints

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/anuvu/tyk/config"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 func TestWrapDialerDialContextFunc(t *testing.T) {

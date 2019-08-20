@@ -12,9 +12,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/anuvu/tyk/config"
-	"github.com/anuvu/tyk/storage"
-	"github.com/anuvu/tyk/user"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const RPCKeyPrefix = "rpc:"

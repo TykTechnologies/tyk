@@ -17,9 +17,9 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/murmur3"
-	"github.com/anuvu/tyk/regexp"
-	"github.com/anuvu/tyk/request"
-	"github.com/anuvu/tyk/storage"
+	"github.com/TykTechnologies/tyk/regexp"
+	"github.com/TykTechnologies/tyk/request"
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 const (

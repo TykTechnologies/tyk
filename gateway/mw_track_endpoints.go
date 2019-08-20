@@ -3,7 +3,7 @@ package gateway
 import (
 	"net/http"
 
-	"github.com/anuvu/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 // TrackEndpointMiddleware sets context variables to enable or disable whether Tyk should record analytitcs for a specific path.

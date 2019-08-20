@@ -8,7 +8,7 @@ import (
 
 	schema "github.com/xeipuuv/gojsonschema"
 
-	"github.com/anuvu/tyk/config"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 // Run will lint the configuration file. It will return the path to the

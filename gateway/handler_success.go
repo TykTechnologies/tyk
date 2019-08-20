@@ -13,11 +13,11 @@ import (
 
 	cache "github.com/pmylund/go-cache"
 
-	"github.com/anuvu/tyk/config"
-	"github.com/anuvu/tyk/ctx"
-	"github.com/anuvu/tyk/headers"
-	"github.com/anuvu/tyk/request"
-	"github.com/anuvu/tyk/user"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/request"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const (

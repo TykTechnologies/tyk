@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/anuvu/tyk/config"
-	"github.com/anuvu/tyk/storage"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 type HealthPrefix string

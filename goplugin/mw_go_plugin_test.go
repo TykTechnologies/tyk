@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/anuvu/tyk/apidef"
-	"github.com/anuvu/tyk/gateway"
-	"github.com/anuvu/tyk/test"
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/gateway"
+	"github.com/TykTechnologies/tyk/test"
 )
 
 func TestMain(m *testing.M) {

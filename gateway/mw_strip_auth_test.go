@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/anuvu/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 type TestAuth struct {

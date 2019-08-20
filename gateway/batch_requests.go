@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/anuvu/tyk/config"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 // RequestDefinition defines a batch request

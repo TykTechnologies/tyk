@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/anuvu/tyk/config"
-	"github.com/anuvu/tyk/gateway"
-	"github.com/anuvu/tyk/test"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/gateway"
+	"github.com/TykTechnologies/tyk/test"
 )
 
 var pythonIDExtractorHeaderValue = map[string]string{
