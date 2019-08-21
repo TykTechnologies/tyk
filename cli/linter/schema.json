@@ -328,6 +328,12 @@
         "null"
       ]
     },
+    "event_triggers_defunct": {
+      "type": [
+        "array",
+        "null"
+      ]
+    },
     "experimental_process_org_off_thread": {
       "type": "boolean"
     },
@@ -525,6 +531,27 @@
         "warn",
         "error"
       ]
+    },
+    "enable_http_profiler": {
+      "type": "boolean"
+    },
+    "tracing": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "options": {
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      }
     },
     "logstash_network_addr": {
       "type": "string"
@@ -934,6 +961,9 @@
     },
     "health_check_endpoint_name": {
       "type": "string"
+    },
+    "enable_http_profiler": {
+      "type": "boolean"
     }
   }
 }

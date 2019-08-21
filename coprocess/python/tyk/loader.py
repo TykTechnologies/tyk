@@ -1,4 +1,4 @@
-import imp, sys, os
+import imp, sys, os, inspect
 from gateway import TykGateway as tyk
 
 class MiddlewareLoader():
@@ -6,10 +6,26 @@ class MiddlewareLoader():
         self.mw = mw
         self.bundle_root_path = mw.bundle_root_path
 
+    def is_local_import(self, stack):
+      # Inspect the stack and verify if the "import" call is local (direct call from middleware code) or not:
+      is_local = False
+      for fr in stack:
+        if fr.function != "<module>":
+          continue
+        if self.base_path not in fr.filename:
+          break
+        is_local = True
+      return is_local
+
     def find_module(self, module_name, package_path):
       module_filename = "{0}.py".format(module_name)
       self.base_path = "{0}_{1}".format(self.mw.api_id, self.mw.middleware_id)
       self.module_path = os.path.join(self.bundle_root_path, self.base_path, module_filename)
+
+      s = inspect.stack()
+      if not self.is_local_import(s):
+        return None
+  
       if not os.path.exists(self.module_path):
         error_msg = "Your bundle doesn't contain '{0}'".format(module_name)
         tyk.log(error_msg, "error")

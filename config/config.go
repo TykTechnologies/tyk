@@ -6,6 +6,8 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -19,19 +21,48 @@ import (
 
 type IPsHandleStrategy string
 
+var (
+	log      = logger.Get()
+	global   atomic.Value
+	globalMu sync.Mutex
+
+	Default = Config{
+		ListenPort:     8080,
+		Secret:         "352d20ee67be67f6340b4c0605b044b7",
+		TemplatePath:   "templates",
+		MiddlewarePath: "middleware",
+		AppPath:        "apps/",
+		Storage: StorageOptionsConf{
+			Type:    "redis",
+			Host:    "localhost",
+			MaxIdle: 100,
+			Port:    6379,
+		},
+		AnalyticsConfig: AnalyticsConfigConfig{
+			IgnoredIPs: make([]string, 0),
+		},
+		DnsCache: DnsCacheConfig{
+			Enabled:                   false,
+			TTL:                       dnsCacheDefaultTtl,
+			CheckInterval:             dnsCacheDefaultCheckInterval,
+			MultipleIPsHandleStrategy: NoCacheStrategy,
+		},
+	}
+)
+
 const (
+	envPrefix = "TYK_GW"
+
 	dnsCacheDefaultTtl           = 3600
 	dnsCacheDefaultCheckInterval = 60
 
 	PickFirstStrategy IPsHandleStrategy = "pick_first"
 	RandomStrategy    IPsHandleStrategy = "random"
 	NoCacheStrategy   IPsHandleStrategy = "no_cache"
+
+	DefaultDashPolicySource     = "service"
+	DefaultDashPolicyRecordName = "tyk_policies"
 )
-
-var log = logger.Get()
-
-var global atomic.Value
-var globalMu sync.Mutex
 
 type PoliciesConfig struct {
 	PolicySource           string `json:"policy_source"`
@@ -207,6 +238,22 @@ type NewRelicConfig struct {
 	LicenseKey string `json:"license_key"`
 }
 
+type Tracer struct {
+	// The name of the tracer to initialize. For instance appdash, to use appdash
+	// tracer
+	Name string `json:"name"`
+
+	// If true then this tracer will be activated and all tracing data will be sent
+	// to this tracer.NoOp tracer is used otherwise which collects traces but
+	// discard them.
+	Enabled bool `json:"enabled"`
+
+	// Key value pairs used to initialize the tracer. These are tracer specific,
+	// each tracer requires different options to operate. Please see trace package
+	// for options required by supported tracer implementation.
+	Options map[string]interface{} `json:"options"`
+}
+
 // Config is the configuration object used by tyk to set up various parameters.
 type Config struct {
 	// OriginalPath is the path to the config file that was read. If
@@ -355,6 +402,25 @@ type ConsulConfig struct {
 	TLSConfig consul.TLSConfig
 }
 
+// GetEventTriggers returns event triggers. There was a typo in the json tag.
+// To maintain backward compatibility, this solution is chosen.
+func (c Config) GetEventTriggers() map[apidef.TykEvent][]TykEventHandler {
+	if c.EventTriggersDefunct == nil {
+		return c.EventTriggers
+	}
+
+	if c.EventTriggers != nil {
+		log.Info("Both event_trigers_defunct and event_triggers_defunct are configured in the config," +
+			" event_triggers_defunct will be used.")
+	}
+
+	return c.EventTriggersDefunct
+}
+
+func (c *Config) SetEventTriggers(eventTriggers map[apidef.TykEvent][]TykEventHandler) {
+	c.EventTriggersDefunct = eventTriggers
+}
+
 type CertData struct {
 	Name     string `json:"domain_name"`
 	CertFile string `json:"cert_file"`
@@ -372,32 +438,6 @@ type EventMessage struct {
 type TykEventHandler interface {
 	Init(interface{}) error
 	HandleEvent(EventMessage)
-}
-
-const envPrefix = "TYK_GW"
-const defaultListenPort = 8080
-
-var Default = Config{
-	ListenPort:     8080,
-	Secret:         "352d20ee67be67f6340b4c0605b044b7",
-	TemplatePath:   "templates",
-	MiddlewarePath: "middleware",
-	AppPath:        "apps/",
-	Storage: StorageOptionsConf{
-		Type:    "redis",
-		Host:    "localhost",
-		MaxIdle: 100,
-		Port:    6379,
-	},
-	AnalyticsConfig: AnalyticsConfigConfig{
-		IgnoredIPs: make([]string, 0),
-	},
-	DnsCache: DnsCacheConfig{
-		Enabled:                   false,
-		TTL:                       dnsCacheDefaultTtl,
-		CheckInterval:             dnsCacheDefaultCheckInterval,
-		MultipleIPsHandleStrategy: NoCacheStrategy,
-	},
 }
 
 func init() {
@@ -425,6 +465,11 @@ func WriteConf(path string, conf *Config) error {
 // writeDefault will set conf to the default config and write it to disk
 // in path, if the path is non-empty.
 func WriteDefault(path string, conf *Config) error {
+	_, b, _, _ := runtime.Caller(0)
+	configPath := filepath.Dir(b)
+	rootPath := filepath.Dir(configPath)
+	Default.TemplatePath = filepath.Join(rootPath, "templates")
+
 	*conf = Default
 	if err := envconfig.Process(envPrefix, conf); err != nil {
 		return err

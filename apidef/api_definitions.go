@@ -3,6 +3,10 @@ package apidef
 import (
 	"encoding/base64"
 	"encoding/json"
+	"encoding/xml"
+	"text/template"
+
+	"github.com/clbanning/mxj"
 
 	"github.com/lonelycode/osin"
 	"gopkg.in/mgo.v2/bson"
@@ -38,10 +42,11 @@ const (
 	RequestXML  RequestInputType = "xml"
 	RequestJSON RequestInputType = "json"
 
-	OttoDriver   MiddlewareDriver = "otto"
-	PythonDriver MiddlewareDriver = "python"
-	LuaDriver    MiddlewareDriver = "lua"
-	GrpcDriver   MiddlewareDriver = "grpc"
+	OttoDriver     MiddlewareDriver = "otto"
+	PythonDriver   MiddlewareDriver = "python"
+	LuaDriver      MiddlewareDriver = "lua"
+	GrpcDriver     MiddlewareDriver = "grpc"
+	GoPluginDriver MiddlewareDriver = "goplugin"
 
 	BodySource        IdExtractorSource = "body"
 	HeaderSource      IdExtractorSource = "header"
@@ -171,7 +176,7 @@ type URLRewriteMeta struct {
 	MatchPattern string           `bson:"match_pattern" json:"match_pattern"`
 	RewriteTo    string           `bson:"rewrite_to" json:"rewrite_to"`
 	Triggers     []RoutingTrigger `bson:"triggers" json:"triggers"`
-	MatchRegexp  *regexp.Regexp
+	MatchRegexp  *regexp.Regexp   `json:"-"`
 }
 
 type VirtualMeta struct {
@@ -266,6 +271,7 @@ type MiddlewareDefinition struct {
 	Name           string `bson:"name" json:"name"`
 	Path           string `bson:"path" json:"path"`
 	RequireSession bool   `bson:"require_session" json:"require_session"`
+	RawBodyOnly    bool   `bson:"raw_body_only" json:"raw_body_only"`
 }
 
 type MiddlewareIdExtractor struct {
@@ -330,6 +336,8 @@ type OpenIDOptions struct {
 }
 
 // APIDefinition represents the configuration for a single proxied API and it's versions.
+//
+// swagger:model
 type APIDefinition struct {
 	Id               bson.ObjectId `bson:"_id,omitempty" json:"id,omitempty"`
 	Name             string        `bson:"name" json:"name"`
@@ -360,12 +368,14 @@ type APIDefinition struct {
 	PinnedPublicKeys           map[string]string    `bson:"pinned_public_keys" json:"pinned_public_keys"`
 	EnableJWT                  bool                 `bson:"enable_jwt" json:"enable_jwt"`
 	UseStandardAuth            bool                 `bson:"use_standard_auth" json:"use_standard_auth"`
+	UseGoPluginAuth            bool                 `bson:"use_go_plugin_auth" json:"use_go_plugin_auth"`
 	EnableCoProcessAuth        bool                 `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"`
 	JWTSigningMethod           string               `bson:"jwt_signing_method" json:"jwt_signing_method"`
 	JWTSource                  string               `bson:"jwt_source" json:"jwt_source"`
 	JWTIdentityBaseField       string               `bson:"jwt_identit_base_field" json:"jwt_identity_base_field"`
 	JWTClientIDBaseField       string               `bson:"jwt_client_base_field" json:"jwt_client_base_field"`
 	JWTPolicyFieldName         string               `bson:"jwt_policy_field_name" json:"jwt_policy_field_name"`
+	JWTDefaultPolicies         []string             `bson:"jwt_default_policies" json:"jwt_default_policies"`
 	JWTIssuedAtValidationSkew  uint64               `bson:"jwt_issued_at_validation_skew" json:"jwt_issued_at_validation_skew"`
 	JWTExpiresAtValidationSkew uint64               `bson:"jwt_expires_at_validation_skew" json:"jwt_expires_at_validation_skew"`
 	JWTNotBeforeValidationSkew uint64               `bson:"jwt_not_before_validation_skew" json:"jwt_not_before_validation_skew"`
@@ -376,6 +386,7 @@ type APIDefinition struct {
 	EnableSignatureChecking    bool                 `bson:"enable_signature_checking" json:"enable_signature_checking"`
 	HmacAllowedClockSkew       float64              `bson:"hmac_allowed_clock_skew" json:"hmac_allowed_clock_skew"`
 	HmacAllowedAlgorithms      []string             `bson:"hmac_allowed_algorithms" json:"hmac_allowed_algorithms"`
+	RequestSigning             RequestSigningMeta   `bson:"request_signing" json:"request_signing"`
 	BaseIdentityProvidedBy     AuthTypeEnum         `bson:"base_identity_provided_by" json:"base_identity_provided_by"`
 	VersionDefinition          struct {
 		Location  string `bson:"location" json:"location"`
@@ -484,6 +495,13 @@ type BundleManifest struct {
 	CustomMiddleware MiddlewareSection `bson:"custom_middleware" json:"custom_middleware"`
 	Checksum         string            `bson:"checksum" json:"checksum"`
 	Signature        string            `bson:"signature" json:"signature"`
+}
+
+type RequestSigningMeta struct {
+	IsEnabled bool   `bson:"is_enabled" json:"is_enabled"`
+	Secret    string `bson:"secret" json:"secret"`
+	KeyId     string `bson:"key_id" json:"key_id"`
+	Algorithm string `bson:"algorithm" json:"algorithm"`
 }
 
 // Clean will URL encode map[string]struct variables for saving
@@ -747,3 +765,29 @@ func DummyAPI() APIDefinition {
 		Tags: []string{},
 	}
 }
+
+var Template = template.New("").Funcs(map[string]interface{}{
+	"jsonMarshal": func(v interface{}) (string, error) {
+		bs, err := json.Marshal(v)
+		return string(bs), err
+	},
+	"xmlMarshal": func(v interface{}) (string, error) {
+		var err error
+		var xmlValue []byte
+		mv, ok := v.(mxj.Map)
+		if ok {
+			mxj.XMLEscapeChars(true)
+			xmlValue, err = mv.Xml()
+		} else {
+			res, ok := v.(map[string]interface{})
+			if ok {
+				mxj.XMLEscapeChars(true)
+				xmlValue, err = mxj.Map(res).Xml()
+			} else {
+				xmlValue, err = xml.MarshalIndent(v, "", "  ")
+			}
+		}
+
+		return string(xmlValue), err
+	},
+})

@@ -24,6 +24,7 @@ class TykCoProcessObject:
         self.spec = self.object.spec
         self.metadata = self.object.metadata
         self.hook_name = self.object.hook_name
+        self.response = self.object.response
 
         if self.object.hook_type == HookType.Unknown:
             self.hook_type = ''
@@ -35,6 +36,8 @@ class TykCoProcessObject:
             self.hook_type = 'postkeyauth'
         elif self.object.hook_type == HookType.CustomKeyCheck:
             self.hook_type = 'customkeycheck'
+        elif self.object.hook_type == HookType.Response:
+            self.hook_type = 'response'
 
     def dump(self):
         new_object = self.object.SerializeToString()
