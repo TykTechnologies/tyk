@@ -288,7 +288,6 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	rights := make(map[string]user.AccessDefinition)
 	tags := make(map[string]bool)
 	didQuota, didRateLimit, didACL := make(map[string]bool), make(map[string]bool), make(map[string]bool)
-	didPerAPI := make(map[string]bool)
 	policies := session.PolicyIDs()
 
 	for i, polID := range policies {
@@ -316,17 +315,10 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		}
 
 		if policy.Partitions.PerAPI {
-			// new logic when you can specify quota or rate in more than one policy but for different APIs
-			if len(didQuota) > 0 || len(didRateLimit) > 0 || len(didACL) > 0 { // no other partitions allowed
-				err := fmt.Errorf("cannot apply multiple policies when some have per_api set and some are partitioned")
-				log.Error(err)
-				return err
-			}
-
 			for apiID, accessRights := range policy.AccessRights {
-				// check if limit was already set for this API by other policy assigned to key
-				if didPerAPI[apiID] {
-					err := fmt.Errorf("cannot apply multiple policies for API: %s", apiID)
+				// new logic when you can specify quota or rate in more than one policy but for different APIs
+				if didQuota[apiID] || didRateLimit[apiID] || didACL[apiID] { // no other partitions allowed
+					err := fmt.Errorf("cannot apply multiple policies when some have per_api set and some are partitioned")
 					log.Error(err)
 					return err
 				}
@@ -355,7 +347,6 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				rights[apiID] = accessRights
 
 				// identify that limit for that API is set (to allow set it only once)
-				didPerAPI[apiID] = true
 				didACL[apiID] = true
 				didQuota[apiID] = true
 				didRateLimit[apiID] = true
@@ -456,6 +447,21 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				rights[k] = *ar
 			}
 
+			// Master policy case
+			if len(policy.AccessRights) == 0 {
+				if !usePartitions || policy.Partitions.RateLimit {
+					session.Rate = policy.Rate
+					session.Per = policy.Per
+					session.ThrottleInterval = policy.ThrottleInterval
+					session.ThrottleRetryLimit = policy.ThrottleRetryLimit
+				}
+
+				if !usePartitions || policy.Partitions.Quota {
+					session.QuotaMax = policy.QuotaMax
+					session.QuotaRenewalRate = policy.QuotaRenewalRate
+				}
+			}
+
 			if !session.HMACEnabled {
 				session.HMACEnabled = policy.HMACEnabled
 			}
@@ -496,7 +502,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	}
 
 	// If we have policies defining rules for one single API, update session root vars (legacy)
-	if len(didQuota) == 1 && len(didRateLimit) == 1 && len(didACL) == 1 {
+	if len(didQuota) == 1 && len(didRateLimit) == 1 {
 		for _, v := range rights {
 			if len(didRateLimit) == 1 {
 				session.Rate = v.Limit.Rate
