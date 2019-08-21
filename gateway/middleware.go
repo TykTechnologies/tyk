@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -15,6 +16,7 @@ import (
 	"github.com/paulbellamy/ratecounter"
 	cache "github.com/pmylund/go-cache"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -26,7 +28,10 @@ import (
 
 const mwStatusRespond = 666
 
-var GlobalRate = ratecounter.NewRateCounter(1 * time.Second)
+var (
+	GlobalRate            = ratecounter.NewRateCounter(1 * time.Second)
+	orgSessionExpiryCache singleflight.Group
+)
 
 type TykMiddleware interface {
 	Init()
@@ -216,7 +221,7 @@ func (t BaseMiddleware) OrgSession(key string) (user.SessionState, bool) {
 		// If exists, assume it has been authorized and pass on
 		// We cache org expiry data
 		t.Logger().Debug("Setting data expiry: ", session.OrgID)
-		go t.SetOrgExpiry(session.OrgID, session.DataExpires)
+		ExpiryCache.Set(session.OrgID, session.DataExpires, cache.DefaultExpiration)
 	}
 
 	session.SetKeyHash(storage.HashKey(key))
@@ -229,16 +234,23 @@ func (t BaseMiddleware) SetOrgExpiry(orgid string, expiry int64) {
 
 func (t BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 	t.Logger().Debug("Checking: ", orgid)
-	cachedVal, found := ExpiryCache.Get(orgid)
-	if !found {
-		// Cache failed attempt
-		t.SetOrgExpiry(orgid, 604800)
-		go t.OrgSession(orgid)
+	// Cache failed attempt
+	id, err, _ := orgSessionExpiryCache.Do(orgid, func() (interface{}, error) {
+		cachedVal, found := ExpiryCache.Get(orgid)
+		if found {
+			return cachedVal, nil
+		}
+		s, found := t.OrgSession(orgid)
+		if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
+			return s.DataExpires, nil
+		}
+		return 0, errors.New("missing session")
+	})
+	if err != nil {
 		t.Logger().Debug("no cached entry found, returning 7 days")
-		return 604800
+		return int64(604800)
 	}
-
-	return cachedVal.(int64)
+	return id.(int64)
 }
 
 func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
