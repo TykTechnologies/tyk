@@ -42,7 +42,7 @@ type CoProcessMiddleware struct {
 	successHandler *SuccessHandler
 }
 
-func (mw *CoProcessMiddleware) Name() string {
+func (m *CoProcessMiddleware) Name() string {
 	return "CoProcessMiddleware"
 }
 
@@ -128,10 +128,10 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response) (*copro
 
 	// Append spec data:
 	if c.Middleware != nil {
-		configDataAsJson := []byte("{}")
+		configDataAsJSON := []byte("{}")
 		if len(c.Middleware.Spec.ConfigData) > 0 {
 			var err error
-			configDataAsJson, err = json.Marshal(c.Middleware.Spec.ConfigData)
+			configDataAsJSON, err = json.Marshal(c.Middleware.Spec.ConfigData)
 			if err != nil {
 				return nil, err
 			}
@@ -140,7 +140,7 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response) (*copro
 		object.Spec = map[string]string{
 			"OrgID":       c.Middleware.Spec.OrgID,
 			"APIID":       c.Middleware.Spec.APIID,
-			"config_data": string(configDataAsJson),
+			"config_data": string(configDataAsJSON),
 		}
 	}
 
@@ -460,6 +460,8 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 
 	res.StatusCode = int(retObject.Response.StatusCode)
 	return nil
+}
+
 func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
 	if GlobalDispatcher == nil {
 		return nil, errors.New("Dispatcher not initialized")
