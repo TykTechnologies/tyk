@@ -27,9 +27,10 @@ import (
 
 const mwStatusRespond = 666
 
-var GlobalRate = ratecounter.NewRateCounter(1 * time.Second)
-
-var orgSessionExpiryCache singleflight.Group
+var (
+	GlobalRate            = ratecounter.NewRateCounter(1 * time.Second)
+	orgSessionExpiryCache singleflight.Group
+)
 
 type TykMiddleware interface {
 	Init()
