@@ -15,6 +15,7 @@ import (
 	"github.com/paulbellamy/ratecounter"
 	cache "github.com/pmylund/go-cache"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -27,6 +28,8 @@ import (
 const mwStatusRespond = 666
 
 var GlobalRate = ratecounter.NewRateCounter(1 * time.Second)
+
+var orgSessionExpiryCache singleflight.Group
 
 type TykMiddleware interface {
 	Init()
@@ -232,10 +235,17 @@ func (t BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 	cachedVal, found := ExpiryCache.Get(orgid)
 	if !found {
 		// Cache failed attempt
-		t.SetOrgExpiry(orgid, 604800)
-		go t.OrgSession(orgid)
-		t.Logger().Debug("no cached entry found, returning 7 days")
-		return 604800
+		id, _, _ := orgSessionExpiryCache.Do(orgid, func() (interface{}, error) {
+			s, found := t.OrgSession(orgid)
+			if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
+				// t.SetOrgExpiry(s.OrgID, s.DataExpires) already happened
+				// so we have s.DataExpires in ExpiryCache.
+				return s.DataExpires, nil
+			}
+			t.Logger().Debug("no cached entry found, returning 7 days")
+			return int64(604800), nil
+		})
+		return id.(int64)
 	}
 
 	return cachedVal.(int64)
