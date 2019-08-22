@@ -1001,22 +1001,22 @@ func afterConfSetup(conf *config.Config) {
 	if conf.UseDBAppConfigs {
 		conf.DBAppConfOptions.ConnectionString, err = kvStore(conf.DBAppConfOptions.ConnectionString)
 		if err != nil {
-			log.Fatal("Could not fetch mongodb connection string.. %v", err)
+			log.Fatalf("Could not fetch dashboard connection string.. %v", err)
 		}
 	}
 
 	if conf.Policies.PolicySource == "service" {
 		conf.Policies.PolicyConnectionString, err = kvStore(conf.Policies.PolicyConnectionString)
 		if err != nil {
-			log.Fatal("Could not fetch policy connection string... %v", err)
+			log.Fatalf("Could not fetch policy connection string... %v", err)
 		}
 	}
 }
 
 func kvStore(value string) (string, error) {
 
-	if strings.HasPrefix(value, "$consul.") {
-		key := strings.TrimPrefix(value, "$consul.")
+	if strings.HasPrefix(value, "consul://") {
+		key := strings.TrimPrefix(value, "consul://")
 		log.Debugf("Retrieving %s from consul", key)
 		setUpConsul()
 		return consulKVStore.Get(key)
