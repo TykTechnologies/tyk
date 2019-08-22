@@ -48,6 +48,7 @@ import (
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/storage/kv"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -102,6 +103,8 @@ var (
 	}
 
 	dnsCacheManager dnscache.IDnsCacheManager
+
+	consulKVStore kv.Store
 )
 
 const (
@@ -962,6 +965,32 @@ func afterConfSetup(conf *config.Config) {
 	if conf.HealthCheckEndpointName == "" {
 		conf.HealthCheckEndpointName = "hello"
 	}
+
+	var err error
+	conf.Secret, err = kvStore(conf.Secret)
+	if err != nil {
+		log.Fatalf("could not retrieve the secret key.. %v", err)
+	}
+
+	conf.NodeSecret, err = kvStore(conf.NodeSecret)
+	if err != nil {
+		log.Fatalf("could not retrieve the NodeSecret key.. %v", err)
+	}
+
+	conf.Storage.Password, err = kvStore(conf.Storage.Password)
+	if err != nil {
+		log.Fatalf("Could not retrieve redis password... %v", err)
+	}
+
+	conf.CacheStorage.Password, err = kvStore(conf.CacheStorage.Password)
+	if err != nil {
+		log.Fatalf("Could not retrieve cache storage password... %v", err)
+	}
+
+	conf.Security.PrivateCertificateEncodingSecret, err = kvStore(conf.Security.PrivateCertificateEncodingSecret)
+	if err != nil {
+		log.Fatalf("Could not retrieve the private certificate encoding secret... %v", err)
+	}
 }
 
 var hostDetails struct {
@@ -1444,5 +1473,30 @@ func listen(listener, controlListener net.Listener, err error) {
 
 	if !rpc.IsEmergencyMode() {
 		doReload()
+	}
+}
+
+func kvStore(value string) (string, error) {
+
+	if strings.HasPrefix(value, "$consul.") {
+		key := strings.TrimPrefix(value, "$consul.")
+		log.Debugf("Retrieving %s from consul", key)
+		setUpConsul()
+		return consulKVStore.Get(key)
+	}
+
+	return value, nil
+}
+
+func setUpConsul() {
+	if consulKVStore != nil {
+		return
+	}
+
+	var err error
+
+	consulKVStore, err = kv.NewConsul(config.Global().KV.Consul)
+	if err != nil {
+		log.Fatalf("an error occurred while setting up consul... %v", err)
 	}
 }
