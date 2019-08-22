@@ -1,6 +1,7 @@
 package tcp
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"net"
@@ -13,6 +14,14 @@ import (
 )
 
 var log = logger.Get().WithField("prefix", "tcp-proxy")
+
+type ConnState uint
+
+const (
+	Active ConnState = iota
+	Open
+	Closed
+)
 
 // Modifier define rules for tranforming incoming and outcoming TCP messages
 // To filter response set data to empty
@@ -29,18 +38,19 @@ type targetConfig struct {
 
 // Stat defines basic statistics about a tcp connection
 type Stat struct {
-	Host struct {
-		LocalAddress  string
-		RemoteAddress string
-	}
-	Target struct {
-		Address       string
-		LocalAddress  string
-		RemoteAddress string
-	}
-	Duration     int64
+	State        ConnState
 	BytesRead    int64
 	BytesWritten int64
+}
+
+func (s *Stat) Flush() Stat {
+	v := Stat{
+		BytesRead:    atomic.LoadInt64(&s.BytesRead),
+		BytesWritten: atomic.LoadInt64(&s.BytesWritten),
+	}
+	atomic.StoreInt64(&s.BytesRead, 0)
+	atomic.StoreInt64(&s.BytesWritten, 0)
+	return v
 }
 
 type Proxy struct {
@@ -56,6 +66,8 @@ type Proxy struct {
 	// Domain to config mapping
 	muxer     map[string]*targetConfig
 	SyncStats func(Stat)
+	// Duration in which connection stats will be flushed. Defaults to one second.
+	StatsSyncInterval time.Duration
 }
 
 func (p *Proxy) AddDomainHandler(domain, target string, modifier *Modifier) {
@@ -158,22 +170,36 @@ func (p *Proxy) getTargetConfig(conn net.Conn) (*targetConfig, error) {
 
 func (p *Proxy) handleConn(conn net.Conn) error {
 	stat := Stat{}
-	stat.Host.LocalAddress = conn.LocalAddr().String()
-	stat.Host.RemoteAddress = conn.RemoteAddr().String()
-	start := time.Now()
-	defer func() {
-		millisec := float64(time.Now().UnixNano()-start.UnixNano()) * 0.000001
-		stat.Duration = int64(millisec)
-		if p.SyncStats != nil {
-			p.SyncStats(stat)
-		}
-	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if p.SyncStats != nil {
+		go func() {
+			duration := p.StatsSyncInterval
+			if duration == 0 {
+				duration = time.Second
+			}
+			tick := time.NewTicker(duration)
+			defer tick.Stop()
+			p.SyncStats(Stat{State: Open})
+			for {
+				select {
+				case <-ctx.Done():
+					s := stat.Flush()
+					s.State = Closed
+					p.SyncStats(s)
+					return
+				case <-tick.C:
+					p.SyncStats(stat.Flush())
+				}
+			}
+		}()
+	}
 	config, err := p.getTargetConfig(conn)
 	if err != nil {
 		conn.Close()
 		return err
 	}
-
 	u, uErr := url.Parse(config.target)
 	if uErr != nil {
 		u, uErr = url.Parse("tcp://" + config.target)
@@ -207,10 +233,6 @@ func (p *Proxy) handleConn(conn net.Conn) error {
 		conn.Close()
 		return err
 	}
-	stat.Target.Address = config.target
-	stat.Target.LocalAddress = rconn.LocalAddr().String()
-	stat.Target.RemoteAddress = rconn.RemoteAddr().String()
-
 	r := func(src, dst net.Conn, data []byte) ([]byte, error) {
 		atomic.AddInt64(&stat.BytesRead, int64(len(data)))
 		h := config.modifier.ModifyRequest

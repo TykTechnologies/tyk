@@ -3,6 +3,7 @@ package tcp
 import (
 	"crypto/tls"
 	"net"
+	"reflect"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/test"
@@ -59,9 +60,12 @@ func TestProxySyncStats(t *testing.T) {
 		return in
 	})
 	defer upstream.Close()
-	stats := make(chan Stat, 2)
+	stats := make(chan Stat)
 	proxy := &Proxy{SyncStats: func(s Stat) {
 		stats <- s
+		if s.State == Closed {
+			close(stats)
+		}
 	}}
 	proxy.AddDomainHandler("", upstream.Addr().String(), nil)
 
@@ -69,14 +73,20 @@ func TestProxySyncStats(t *testing.T) {
 		{Action: "write", Payload: "ping"},
 		{Action: "read", Payload: "ping"},
 	}...)
-	s := <-stats
-	if s.BytesRead != 4 {
-		t.Errorf("expected bytes read to be 4 got %d", s.BytesRead)
+	var c []Stat
+	for s := range stats {
+		c = append(c, s)
 	}
-	if s.BytesWritten != 4 {
-		t.Errorf("expected bytes written to be 4 got %d", s.BytesWritten)
+	expect := []Stat{
+		{State: Open},
+		{State: Closed, BytesRead: 4, BytesWritten: 4},
 	}
-	close(stats)
+	if len(c) != len(expect) {
+		t.Fatalf("expected %d stats got %d stats", len(expect), len(c))
+	}
+	if !reflect.DeepEqual(c, expect) {
+		t.Errorf("expected %#v got %#v", expect, c)
+	}
 }
 
 func TestProxyMultiTarget(t *testing.T) {
