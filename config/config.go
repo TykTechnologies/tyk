@@ -333,39 +333,41 @@ type Config struct {
 	CoProcessOptions                  CoProcessConfig                       `json:"coprocess_options"`
 	HideGeneratorHeader               bool                                  `json:"hide_generator_header"`
 	EventHandlers                     apidef.EventHandlerMetaConfig         `json:"event_handlers"`
-	EventTriggers                     map[apidef.TykEvent][]TykEventHandler `json:"event_trigers_defunct"`
-	PIDFileLocation                   string                                `json:"pid_file_location"`
-	AllowInsecureConfigs              bool                                  `json:"allow_insecure_configs"`
-	PublicKeyPath                     string                                `json:"public_key_path"`
-	CloseIdleConnections              bool                                  `json:"close_idle_connections"`
-	DRLNotificationFrequency          int                                   `json:"drl_notification_frequency"`
-	GlobalSessionLifetime             int64                                 `bson:"global_session_lifetime" json:"global_session_lifetime"`
-	ForceGlobalSessionLifetime        bool                                  `bson:"force_global_session_lifetime" json:"force_global_session_lifetime"`
-	BundleBaseURL                     string                                `bson:"bundle_base_url" json:"bundle_base_url"`
-	EnableBundleDownloader            bool                                  `bson:"enable_bundle_downloader" json:"enable_bundle_downloader"`
-	AllowRemoteConfig                 bool                                  `bson:"allow_remote_config" json:"allow_remote_config"`
-	LegacyEnableAllowanceCountdown    bool                                  `bson:"legacy_enable_allowance_countdown" json:"legacy_enable_allowance_countdown"`
-	MaxIdleConns                      int                                   `bson:"max_idle_connections" json:"max_idle_connections"`
-	MaxIdleConnsPerHost               int                                   `bson:"max_idle_connections_per_host" json:"max_idle_connections_per_host"`
-	MaxConnTime                       int64                                 `json:"max_conn_time"`
-	ReloadWaitTime                    int                                   `bson:"reload_wait_time" json:"reload_wait_time"`
-	ProxySSLInsecureSkipVerify        bool                                  `json:"proxy_ssl_insecure_skip_verify"`
-	ProxyEnableHttp2                  bool                                  `json:"proxy_enable_http2"`
-	ProxySSLMinVersion                uint16                                `json:"proxy_ssl_min_version"`
-	ProxySSLCipherSuites              []string                              `json:"proxy_ssl_ciphers"`
-	ProxyDefaultTimeout               float64                               `json:"proxy_default_timeout"`
-	ProxySSLDisableRenegotiation      bool                                  `json:"proxy_ssl_disable_renegotiation"`
-	LogLevel                          string                                `json:"log_level"`
-	Security                          SecurityConfig                        `json:"security"`
-	EnableKeyLogging                  bool                                  `json:"enable_key_logging"`
-	NewRelic                          NewRelicConfig                        `json:"newrelic"`
-	VersionHeader                     string                                `json:"version_header"`
-	EnableHashedKeysListing           bool                                  `json:"enable_hashed_keys_listing"`
-	MinTokenLength                    int                                   `json:"min_token_length"`
-	DisableRegexpCache                bool                                  `json:"disable_regexp_cache"`
-	RegexpCacheExpire                 int32                                 `json:"regexp_cache_expire"`
-	HealthCheckEndpointName           string                                `json:"health_check_endpoint_name"`
-	KV                                struct {
+	EventTriggers                     map[apidef.TykEvent][]TykEventHandler `json:"event_trigers_defunct"`  // Deprecated: Config.GetEventTriggers instead.
+	EventTriggersDefunct              map[apidef.TykEvent][]TykEventHandler `json:"event_triggers_defunct"` // Deprecated: Config.GetEventTriggers instead.
+
+	PIDFileLocation                string         `json:"pid_file_location"`
+	AllowInsecureConfigs           bool           `json:"allow_insecure_configs"`
+	PublicKeyPath                  string         `json:"public_key_path"`
+	CloseIdleConnections           bool           `json:"close_idle_connections"`
+	DRLNotificationFrequency       int            `json:"drl_notification_frequency"`
+	GlobalSessionLifetime          int64          `bson:"global_session_lifetime" json:"global_session_lifetime"`
+	ForceGlobalSessionLifetime     bool           `bson:"force_global_session_lifetime" json:"force_global_session_lifetime"`
+	BundleBaseURL                  string         `bson:"bundle_base_url" json:"bundle_base_url"`
+	EnableBundleDownloader         bool           `bson:"enable_bundle_downloader" json:"enable_bundle_downloader"`
+	AllowRemoteConfig              bool           `bson:"allow_remote_config" json:"allow_remote_config"`
+	LegacyEnableAllowanceCountdown bool           `bson:"legacy_enable_allowance_countdown" json:"legacy_enable_allowance_countdown"`
+	MaxIdleConns                   int            `bson:"max_idle_connections" json:"max_idle_connections"`
+	MaxIdleConnsPerHost            int            `bson:"max_idle_connections_per_host" json:"max_idle_connections_per_host"`
+	MaxConnTime                    int64          `json:"max_conn_time"`
+	ReloadWaitTime                 int            `bson:"reload_wait_time" json:"reload_wait_time"`
+	ProxySSLInsecureSkipVerify     bool           `json:"proxy_ssl_insecure_skip_verify"`
+	ProxyEnableHttp2               bool           `json:"proxy_enable_http2"`
+	ProxySSLMinVersion             uint16         `json:"proxy_ssl_min_version"`
+	ProxySSLCipherSuites           []string       `json:"proxy_ssl_ciphers"`
+	ProxyDefaultTimeout            float64        `json:"proxy_default_timeout"`
+	ProxySSLDisableRenegotiation   bool           `json:"proxy_ssl_disable_renegotiation"`
+	LogLevel                       string         `json:"log_level"`
+	Security                       SecurityConfig `json:"security"`
+	EnableKeyLogging               bool           `json:"enable_key_logging"`
+	NewRelic                       NewRelicConfig `json:"newrelic"`
+	VersionHeader                  string         `json:"version_header"`
+	EnableHashedKeysListing        bool           `json:"enable_hashed_keys_listing"`
+	MinTokenLength                 int            `json:"min_token_length"`
+	DisableRegexpCache             bool           `json:"disable_regexp_cache"`
+	RegexpCacheExpire              int32          `json:"regexp_cache_expire"`
+	HealthCheckEndpointName        string         `json:"health_check_endpoint_name"`
+	KV                             struct {
 		Consul ConsulConfig `json:"consul"`
 	} `json:"kv"`
 }
