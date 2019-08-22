@@ -211,9 +211,6 @@ func flushNetworkAnalytics(ctx context.Context) {
 					OrgID:        spec.OrgID,
 				}
 				record.SetExpiry(spec.ExpireAnalyticsAfter)
-				if spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
-					record.NormalisePath(&spec.GlobalConfig)
-				}
 				analytics.RecordHit(&record)
 			}
 			apisMu.RUnlock()
