@@ -8,6 +8,8 @@ notifications:
 env:
   global:
     - TYK_LOGLEVEL=info
+    - CONSUL_VERSION=1.4.4
+    - CONSUL_DIR=$HOME/consul_$CONSUL_VERSION
 
 addons:
   apt:
