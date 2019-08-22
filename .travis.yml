@@ -33,6 +33,14 @@ install:
   - go install ./vendor/{golang.org/x/tools/cmd/goimports,github.com/wadey/gocovmerge,github.com/mattn/goveralls}
   - go get github.com/go-swagger/go-swagger/cmd/swagger
 
+
+before_script:
+   - 'if [[ ! -f $CONSUL_DIR/consul ]]; then (mkdir -p $CONSUL_DIR && cd $CONSUL_DIR && wget https://releases.hashicorp.com/consul/${CONSUL_VERSION}/consul_${CONSUL_VERSION}_linux_amd64.zip && unzip consul_${CONSUL_VERSION}_linux_amd64.zip); fi'
+   - $CONSUL_DIR/consul --version
+   - $CONSUL_DIR/consul agent --dev &
+   # Wait for consul's raft election
+   - sleep 5
+
 script:
   - pip3 install setuptools
   - sudo pip3 install google

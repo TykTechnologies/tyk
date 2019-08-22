@@ -139,6 +139,12 @@
 			"revisionTime": "2018-12-03T09:12:26Z"
 		},
 		{
+			"checksumSHA1": "gaT7FBF9uH5TY4lCo96ySrYXjek=",
+			"path": "github.com/armon/go-metrics",
+			"revision": "ec5e00d3c878b2a97bbe0884ef45ffd1b4f669f5",
+			"revisionTime": "2019-04-30T14:04:13Z"
+		},
+		{
 			"checksumSHA1": "FhhGU79deoHTgUeE4ZUfJ9UmV8c=",
 			"path": "github.com/bshuster-repo/logrus-logstash-hook",
 			"revision": "dbc1e22735aa6ed7bd9579a407c17bc7c4a4e046",
@@ -307,6 +313,36 @@
 			"revisionTime": "2017-12-01T01:43:01Z"
 		},
 		{
+			"checksumSHA1": "pgehk8TOF1V5ULO8o3IoFHNODu8=",
+			"path": "github.com/hashicorp/consul/api",
+			"revision": "59150281c52fafa4a3320c42128f1caf9dbd083b",
+			"revisionTime": "2019-08-21T22:19:47Z"
+		},
+		{
+			"checksumSHA1": "x3Hz3DwZpIp521DL8nh9FpOQP/4=",
+			"path": "github.com/hashicorp/go-cleanhttp",
+			"revision": "d3fcbee8e1810ecee4bdbf415f42f84cfd0e3361",
+			"revisionTime": "2019-04-06T16:20:18Z"
+		},
+		{
+			"checksumSHA1": "P1Enisj7Nzf3wMl6lgPPar0ljoY=",
+			"path": "github.com/hashicorp/go-immutable-radix",
+			"revision": "0146a9aba1948ded4ed290cfd3fded2c15313f63",
+			"revisionTime": "2019-05-22T20:29:52Z"
+		},
+		{
+			"checksumSHA1": "4RZ1iELCUhuMwFUEzmAMG8YStik=",
+			"path": "github.com/hashicorp/go-rootcerts",
+			"revision": "df8e78a645e18d56ed7bb9ae10ffb8174ab892e2",
+			"revisionTime": "2019-06-10T21:58:08Z"
+		},
+		{
+			"checksumSHA1": "UThRII2e7MEeIJ2sTHbCXC+4tKU=",
+			"path": "github.com/hashicorp/golang-lru/simplelru",
+			"revision": "7f827b33c0f158ec5dfbba01bb0b14a4541fd81d",
+			"revisionTime": "2019-07-26T16:11:22Z"
+		},
+		{
 			"checksumSHA1": "cJZUWi8GxC1KItxFayZLgZOzaHU=",
 			"path": "github.com/hashicorp/hil",
 			"revision": "59d7c1fee952b29ee4c9ceba65c9d02ee28eb281",
@@ -329,6 +365,12 @@
 			"path": "github.com/hashicorp/hil/scanner",
 			"revision": "59d7c1fee952b29ee4c9ceba65c9d02ee28eb281",
 			"revisionTime": "2019-01-29T15:56:52Z"
+		},
+		{
+			"checksumSHA1": "0PeWsO2aI+2PgVYlYlDPKfzCLEQ=",
+			"path": "github.com/hashicorp/serf/coordinate",
+			"revision": "9f16c020fa1c31d2b17bc3f49b34cd1fdc988794",
+			"revisionTime": "2019-07-30T22:27:38Z"
 		},
 		{
 			"checksumSHA1": "P8gNPDuOzmiK4Lz9xG7OBy4Rlm8=",
@@ -427,6 +469,12 @@
 			"path": "github.com/miekg/dns",
 			"revision": "90888765254c1fa54fa39e2eb383aa3436a2e8f8",
 			"revisionTime": "2017-12-21T10:24:07Z"
+		},
+		{
+			"checksumSHA1": "7zLQC+jG19ndjH24FVh/+ZliHac=",
+			"path": "github.com/mitchellh/go-homedir",
+			"revision": "af06845cf3004701891bf4fdb884bfe4920b3727",
+			"revisionTime": "2019-01-27T04:21:35Z"
 		},
 		{
 			"checksumSHA1": "UuXgD2dDojfS8AViUEe15gLIWZE=",
