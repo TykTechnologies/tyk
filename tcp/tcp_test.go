@@ -79,7 +79,7 @@ func TestProxySyncStats(t *testing.T) {
 	}
 	expect := []Stat{
 		{State: Open},
-		{State: Closed, BytesRead: 4, BytesWritten: 4},
+		{State: Closed, BytesIn: 4, BytesOut: 4},
 	}
 	if len(c) != len(expect) {
 		t.Fatalf("expected %d stats got %d stats", len(expect), len(c))

@@ -232,8 +232,8 @@ func recordTCPHit(spec *APISpec) func(tcp.Stat) {
 		case tcp.Closed:
 			atomic.AddInt64(&spec.network.ClosedConnection, 1)
 		}
-		atomic.AddInt64(&spec.network.BytesRead, stat.BytesRead)
-		atomic.AddInt64(&spec.network.BytesWritten, stat.BytesWritten)
+		atomic.AddInt64(&spec.network.BytesIn, stat.BytesIn)
+		atomic.AddInt64(&spec.network.BytesOut, stat.BytesOut)
 	}
 }
 

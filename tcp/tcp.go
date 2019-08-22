@@ -38,18 +38,18 @@ type targetConfig struct {
 
 // Stat defines basic statistics about a tcp connection
 type Stat struct {
-	State        ConnState
-	BytesRead    int64
-	BytesWritten int64
+	State    ConnState
+	BytesIn  int64
+	BytesOut int64
 }
 
 func (s *Stat) Flush() Stat {
 	v := Stat{
-		BytesRead:    atomic.LoadInt64(&s.BytesRead),
-		BytesWritten: atomic.LoadInt64(&s.BytesWritten),
+		BytesIn:  atomic.LoadInt64(&s.BytesIn),
+		BytesOut: atomic.LoadInt64(&s.BytesOut),
 	}
-	atomic.StoreInt64(&s.BytesRead, 0)
-	atomic.StoreInt64(&s.BytesWritten, 0)
+	atomic.StoreInt64(&s.BytesIn, 0)
+	atomic.StoreInt64(&s.BytesOut, 0)
 	return v
 }
 
@@ -234,7 +234,7 @@ func (p *Proxy) handleConn(conn net.Conn) error {
 		return err
 	}
 	r := func(src, dst net.Conn, data []byte) ([]byte, error) {
-		atomic.AddInt64(&stat.BytesRead, int64(len(data)))
+		atomic.AddInt64(&stat.BytesIn, int64(len(data)))
 		h := config.modifier.ModifyRequest
 		if h != nil {
 			return h(src, dst, data)
@@ -242,7 +242,7 @@ func (p *Proxy) handleConn(conn net.Conn) error {
 		return data, nil
 	}
 	w := func(src, dst net.Conn, data []byte) ([]byte, error) {
-		atomic.AddInt64(&stat.BytesWritten, int64(len(data)))
+		atomic.AddInt64(&stat.BytesOut, int64(len(data)))
 		h := config.modifier.ModifyResponse
 		if h != nil {
 			return h(src, dst, data)
