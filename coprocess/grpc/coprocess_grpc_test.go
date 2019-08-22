@@ -256,7 +256,7 @@ func startTykWithGRPC() (*gateway.Test, *grpc.Server) {
 }
 
 func TestMain(m *testing.M) {
-	os.Exit(gateway.InitTestMain(m))
+	os.Exit(gateway.InitTestMain(context.Background(), m))
 }
 
 func TestGRPCDispatch(t *testing.T) {
