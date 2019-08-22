@@ -6,7 +6,6 @@ package coprocess_test
 
 import (
 	"context"
-	context "context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
