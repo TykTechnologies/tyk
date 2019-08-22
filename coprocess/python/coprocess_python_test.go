@@ -5,6 +5,7 @@ package python
 
 import (
 	"bytes"
+	"context"
 	"mime/multipart"
 	"os"
 	"testing"
@@ -159,7 +160,7 @@ def MyResponseHook(request, response, session, metadata, spec):
 }
 
 func TestMain(m *testing.M) {
-	os.Exit(gateway.InitTestMain(m))
+	os.Exit(gateway.InitTestMain(context.Background(), m))
 }
 
 func TestPythonBundles(t *testing.T) {
