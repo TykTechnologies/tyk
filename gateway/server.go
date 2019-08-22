@@ -991,6 +991,20 @@ func afterConfSetup(conf *config.Config) {
 	if err != nil {
 		log.Fatalf("Could not retrieve the private certificate encoding secret... %v", err)
 	}
+
+	if conf.UseDBAppConfigs {
+		conf.DBAppConfOptions.ConnectionString, err = kvStore(conf.DBAppConfOptions.ConnectionString)
+		if err != nil {
+			log.Fatal("Could not fetch mongodb connection string.. %v", err)
+		}
+	}
+
+	if conf.Policies.PolicySource == "service" {
+		conf.Policies.PolicyConnectionString, err = kvStore(conf.Policies.PolicyConnectionString)
+		if err != nil {
+			log.Fatal("Could not fetch policy connection string... %v", err)
+		}
+	}
 }
 
 var hostDetails struct {
