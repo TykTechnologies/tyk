@@ -59,7 +59,7 @@ var (
 	EnableTestDNSMock = true
 )
 
-func InitTestMain(m *testing.M, genConf ...func(globalConf *config.Config)) int {
+func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf *config.Config)) int {
 	setTestMode(true)
 	testServerRouter = testHttpHandler()
 	testServer := &http.Server{
@@ -131,7 +131,7 @@ func InitTestMain(m *testing.M, genConf ...func(globalConf *config.Config)) int 
 		panic(err)
 	}
 	cli.Init(VERSION, confPaths)
-	initialiseSystem()
+	initialiseSystem(ctx)
 	// Small part of start()
 	loadAPIEndpoints(mainRouter())
 	if analytics.GeoIPDB == nil {
@@ -545,6 +545,7 @@ type Test struct {
 	testRunner   *test.HTTPTestRunner
 	GlobalConfig config.Config
 	config       TestConfig
+	cacnel       func()
 }
 
 func (s *Test) Start() {
@@ -565,7 +566,9 @@ func (s *Test) Start() {
 	config.SetGlobal(globalConf)
 
 	startServer()
-	setupGlobals()
+	ctx, cancel := context.WithCancel(context.Background())
+	s.cacnel = cancel
+	setupGlobals(ctx)
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.Global().SupressDefaultOrgStore {
 		DefaultOrgStore.Init(getGlobalStorageHandler("orgkey.", false))
@@ -612,6 +615,9 @@ func (s *Test) Do(tc test.TestCase) (*http.Response, error) {
 }
 
 func (s *Test) Close() {
+	if s.cacnel != nil {
+		s.cacnel()
+	}
 	defaultProxyMux.swap(&proxyMux{})
 	if s.config.sepatateControlAPI {
 		globalConf := config.Global()

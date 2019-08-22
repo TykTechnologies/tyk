@@ -47,14 +47,16 @@ func prepareStorage() generalStores {
 
 func skipSpecBecauseInvalid(spec *APISpec, logger *logrus.Entry) bool {
 
-	if spec.Proxy.ListenPath == "" {
-		logger.Error("Listen path is empty")
-		return true
-	}
-
-	if strings.Contains(spec.Proxy.ListenPath, " ") {
-		logger.Error("Listen path contains spaces, is invalid")
-		return true
+	switch spec.Protocol {
+	case "", "http", "https":
+		if spec.Proxy.ListenPath == "" {
+			logger.Error("Listen path is empty")
+			return true
+		}
+		if strings.Contains(spec.Proxy.ListenPath, " ") {
+			logger.Error("Listen path contains spaces, is invalid")
+			return true
+		}
 	}
 
 	_, err := url.Parse(spec.Proxy.TargetURL)

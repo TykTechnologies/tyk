@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"encoding/json"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +10,8 @@ import (
 	"strconv"
 	"sync/atomic"
 	"testing"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 func TestTCPDial_with_service_discovery(t *testing.T) {
@@ -99,6 +102,9 @@ func TestTCPDial_with_service_discovery(t *testing.T) {
 		spec.ListenPort = p
 		spec.Proxy.TargetURL = service1.Addr().String()
 	})
+	g := config.Global()
+	b, _ := json.Marshal(g)
+	ioutil.WriteFile("config.json", b, 0600)
 	e := "service1"
 	var result []string
 

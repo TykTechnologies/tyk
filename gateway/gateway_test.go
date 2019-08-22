@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -34,7 +35,7 @@ import (
 const defaultListenPort = 8080
 
 func TestMain(m *testing.M) {
-	os.Exit(InitTestMain(m))
+	os.Exit(InitTestMain(context.Background(), m))
 }
 
 func createNonThrottledSession() *user.SessionState {

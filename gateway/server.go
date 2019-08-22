@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"html/template"
 	"io/ioutil"
 	stdlog "log"
@@ -152,7 +153,7 @@ var purgeTicker = time.Tick(time.Second)
 var rpcPurgeTicker = time.Tick(10 * time.Second)
 
 // Create all globals and init connection handlers
-func setupGlobals() {
+func setupGlobals(ctx context.Context) {
 
 	reloadMu.Lock()
 	defer reloadMu.Unlock()
@@ -203,6 +204,7 @@ func setupGlobals() {
 				go purger.PurgeLoop(rpcPurgeTicker)
 			})
 		}
+		go flushNetworkAnalytics(ctx)
 	}
 
 	// Load all the files that have the "error" prefix.
@@ -839,7 +841,7 @@ func setupLogger() {
 	}
 }
 
-func initialiseSystem() error {
+func initialiseSystem(ctx context.Context) error {
 	if isRunningTests() && os.Getenv("TYK_LOGLEVEL") == "" {
 		// `go test` without TYK_LOGLEVEL set defaults to no log
 		// output
@@ -900,7 +902,7 @@ func initialiseSystem() error {
 	rpc.Log = log
 	rpc.Instrument = instrument
 
-	setupGlobals()
+	setupGlobals(ctx)
 
 	globalConf := config.Global()
 
@@ -989,6 +991,8 @@ func getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 }
 
 func Start() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	cli.Init(VERSION, confPaths)
 	cli.Parse()
 	// Stop gateway process if not running in "start" mode:
@@ -998,7 +1002,7 @@ func Start() {
 
 	setNodeID("solo-" + uuid.NewV4().String())
 
-	if err := initialiseSystem(); err != nil {
+	if err := initialiseSystem(ctx); err != nil {
 		mainLog.Fatalf("Error initialising system: %v", err)
 	}
 

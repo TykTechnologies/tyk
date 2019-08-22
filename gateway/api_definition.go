@@ -184,6 +184,7 @@ type APISpec struct {
 	middlewareChain *ChainObject
 
 	shouldRelease bool
+	network       NetworkStats
 }
 
 // Release re;leases all resources associated with API spec

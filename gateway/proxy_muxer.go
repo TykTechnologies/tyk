@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/TykTechnologies/again"
@@ -176,44 +177,63 @@ func (m *proxyMux) addTCPService(spec *APISpec, modifier *tcp.Modifier) {
 	}
 }
 
+func flushNetworkAnalytics(ctx context.Context) {
+	mainLog.Debug("Starting routine for flushing network analytics")
+	tick := time.NewTicker(time.Second)
+	defer tick.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case t := <-tick.C:
+
+			apisMu.RLock()
+			for _, spec := range apiSpecs {
+				switch spec.Protocol {
+				case "tcp", "tls":
+					// we only flush network analytics for these services
+				default:
+					continue
+				}
+				if spec.DoNotTrack {
+					continue
+				}
+				record := AnalyticsRecord{
+					Network:      spec.network.Flush(),
+					Day:          t.Day(),
+					Month:        t.Month(),
+					Year:         t.Year(),
+					Hour:         t.Hour(),
+					ResponseCode: -1,
+					TimeStamp:    t,
+					APIName:      spec.Name,
+					APIID:        spec.APIID,
+					OrgID:        spec.OrgID,
+				}
+				record.SetExpiry(spec.ExpireAnalyticsAfter)
+				if spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
+					record.NormalisePath(&spec.GlobalConfig)
+				}
+				analytics.RecordHit(&record)
+			}
+			apisMu.RUnlock()
+		}
+	}
+}
+
 func recordTCPHit(spec *APISpec) func(tcp.Stat) {
 	if spec.DoNotTrack {
 		return nil
 	}
 	return func(stat tcp.Stat) {
-		ip, _, err := net.SplitHostPort(stat.Host.RemoteAddress)
-		if err != nil {
-			return
+		switch stat.State {
+		case tcp.Open:
+			atomic.AddInt64(&spec.network.OpenConnections, 1)
+		case tcp.Closed:
+			atomic.AddInt64(&spec.network.ClosedConnection, 1)
 		}
-		if spec.GlobalConfig.StoreAnalytics(ip) {
-			t := time.Now()
-			record := AnalyticsRecord{
-				Network: NetworkStats{
-					BytesRead:    stat.BytesRead,
-					BytesWritten: stat.BytesWritten,
-				},
-				Host:         stat.Host.LocalAddress,
-				Day:          t.Day(),
-				Month:        t.Month(),
-				Year:         t.Year(),
-				Hour:         t.Hour(),
-				ResponseCode: -1,
-				TimeStamp:    t,
-				APIName:      spec.Name,
-				APIID:        spec.APIID,
-				OrgID:        spec.OrgID,
-				RequestTime:  stat.Duration,
-			}
-			if spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
-				record.GetGeo(ip)
-			}
-			record.SetExpiry(spec.ExpireAnalyticsAfter)
-			if spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
-				record.NormalisePath(&spec.GlobalConfig)
-			}
-			analytics.RecordHit(&record)
-		}
-
+		atomic.AddInt64(&spec.network.BytesRead, stat.BytesRead)
+		atomic.AddInt64(&spec.network.BytesWritten, stat.BytesWritten)
 	}
 }
 

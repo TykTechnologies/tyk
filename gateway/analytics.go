@@ -17,8 +17,24 @@ import (
 )
 
 type NetworkStats struct {
-	BytesRead    int64
-	BytesWritten int64
+	OpenConnections  int64
+	ClosedConnection int64
+	BytesRead        int64
+	BytesWritten     int64
+}
+
+func (n *NetworkStats) Flush() NetworkStats {
+	s := NetworkStats{
+		OpenConnections:  atomic.LoadInt64(&n.OpenConnections),
+		ClosedConnection: atomic.LoadInt64(&n.ClosedConnection),
+		BytesRead:        atomic.LoadInt64(&n.BytesRead),
+		BytesWritten:     atomic.LoadInt64(&n.BytesWritten),
+	}
+	atomic.StoreInt64(&n.OpenConnections, 0)
+	atomic.StoreInt64(&n.ClosedConnection, 0)
+	atomic.StoreInt64(&n.BytesRead, 0)
+	atomic.StoreInt64(&n.BytesWritten, 0)
+	return s
 }
 
 // AnalyticsRecord encodes the details of a request
