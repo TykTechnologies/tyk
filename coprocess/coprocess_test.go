@@ -5,6 +5,8 @@
 package coprocess_test
 
 import (
+	"context"
+	context "context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -35,7 +37,7 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	os.Exit(gateway.InitTestMain(m))
+	os.Exit(gateway.InitTestMain(context.Background(), m))
 }
 
 /* Dispatcher functions */
