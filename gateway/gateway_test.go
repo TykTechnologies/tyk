@@ -1467,3 +1467,41 @@ func TestBrokenClients(t *testing.T) {
 		}
 	})
 }
+
+func TestStripRegex(t *testing.T) {
+	sample := []struct {
+		strip  string
+		path   string
+		expect string
+		vars   map[string]string
+	}{
+		{
+			strip:  "/base",
+			path:   "/base/path",
+			expect: "/path",
+			vars:   map[string]string{},
+		},
+		{
+			strip:  "/base/{key}",
+			path:   "/base/path/path",
+			expect: "/path",
+			vars: map[string]string{
+				"key": "path",
+			},
+		},
+		{
+			strip:  "/taihoe-test/{test:[\\w\\d]+}/id/",
+			path:   "/taihoe-test/asdas234234dad/id/v1/get",
+			expect: "v1/get",
+			vars: map[string]string{
+				"test": "asdas234234dad",
+			},
+		},
+	}
+	for _, v := range sample {
+		got := stripListenPath(v.strip, v.path, v.vars)
+		if got != v.expect {
+			t.Errorf("expected %s got %s", v.expect, got)
+		}
+	}
+}
