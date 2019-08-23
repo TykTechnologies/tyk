@@ -203,10 +203,11 @@ func (s *ServiceDiscovery) ParseObject(contents string, jsonParsed *gabs.Contain
 	jp, err := gabs.ParseJSON([]byte(contents))
 	if err != nil {
 		log.Error(err)
+		return err
 	}
 	*jsonParsed = *jp
 	log.Debug("Got:", jsonParsed)
-	return err
+	return nil
 }
 
 func (s *ServiceDiscovery) ProcessRawData(rawData string) (*apidef.HostList, error) {
