@@ -23,7 +23,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -1474,21 +1473,33 @@ func TestStripRegex(t *testing.T) {
 		strip  string
 		path   string
 		expect string
+		vars   map[string]string
 	}{
 		{
 			strip:  "/base",
 			path:   "/base/path",
 			expect: "/path",
+			vars:   map[string]string{},
 		},
 		{
-			strip:  "/taihoe-test/(?P<test>[\\w\\d]+)/id/",
+			strip:  "/base/{key}",
+			path:   "/base/path/path",
+			expect: "/path",
+			vars: map[string]string{
+				"key": "path",
+			},
+		},
+		{
+			strip:  "/taihoe-test/{test:[\\w\\d]+}/id/",
 			path:   "/taihoe-test/asdas234234dad/id/v1/get",
 			expect: "v1/get",
+			vars: map[string]string{
+				"test": "asdas234234dad",
+			},
 		},
 	}
 	for _, v := range sample {
-		re := regexp.MustCompile(v.strip)
-		got := stripRegexPrefix(re, v.path)
+		got := stripListenPath(v.strip, v.path, v.vars)
 		if got != v.expect {
 			t.Errorf("expected %s got %s", v.expect, got)
 		}
