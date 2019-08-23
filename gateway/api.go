@@ -41,14 +41,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
 	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -94,7 +95,7 @@ type paginatedOAuthClientTokens struct {
 }
 
 func doJSONWrite(w http.ResponseWriter, code int, obj interface{}) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(headers.ContentType, headers.ApplicationJSON)
 	w.WriteHeader(code)
 	if err := json.NewEncoder(w).Encode(obj); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -109,6 +110,22 @@ type MethodNotAllowedHandler struct{}
 
 func (m MethodNotAllowedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, http.StatusMethodNotAllowed, apiError("Method not supported"))
+}
+
+func addSecureAndCacheHeaders(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Setting OWASP Secure Headers
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-XSS-Protection", "1; mode=block")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
+
+		// Avoid Caching of tokens
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
+		next(w, r)
+	}
 }
 
 func allowMethods(next http.HandlerFunc, methods ...string) http.HandlerFunc {
@@ -554,7 +571,7 @@ func handleAddKey(keyName, hashedName, sessionString, apiID string) {
 	}).Info("Updated hashed key in slave storage.")
 }
 
-func handleDeleteKey(keyName, apiID string) (interface{}, int) {
+func handleDeleteKey(keyName, apiID string, resetQuota bool) (interface{}, int) {
 	if apiID == "-1" {
 		// Go through ALL managed API's and delete the key
 		apisMu.RLock()
@@ -600,7 +617,10 @@ func handleDeleteKey(keyName, apiID string) (interface{}, int) {
 		}).Error("Failed to remove the key")
 		return apiError("Failed to remove the key"), http.StatusBadRequest
 	}
-	sessionManager.ResetQuota(keyName, &user.SessionState{}, false)
+
+	if resetQuota {
+		sessionManager.ResetQuota(keyName, &user.SessionState{}, false)
+	}
 
 	statusObj := apiModifyKeySuccess{
 		Key:    keyName,
@@ -623,7 +643,7 @@ func handleDeleteKey(keyName, apiID string) (interface{}, int) {
 	return statusObj, http.StatusOK
 }
 
-func handleDeleteHashedKey(keyName, apiID string) (interface{}, int) {
+func handleDeleteHashedKey(keyName, apiID string, resetQuota bool) (interface{}, int) {
 	if apiID == "-1" {
 		// Go through ALL managed API's and delete the key
 		removed := false
@@ -665,6 +685,10 @@ func handleDeleteHashedKey(keyName, apiID string) (interface{}, int) {
 			"status": "fail",
 		}).Error("Failed to remove the key")
 		return apiError("Failed to remove the key"), http.StatusBadRequest
+	}
+
+	if resetQuota {
+		sessionManager.ResetQuota(keyName, &user.SessionState{}, true)
 	}
 
 	statusObj := apiModifyKeySuccess{
@@ -874,16 +898,16 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodDelete:
 		// Remove a key
 		if !isHashed {
-			obj, code = handleDeleteKey(keyName, apiID)
+			obj, code = handleDeleteKey(keyName, apiID, true)
 		} else {
-			obj, code = handleDeleteHashedKey(keyName, apiID)
+			obj, code = handleDeleteHashedKey(keyName, apiID, true)
 		}
 		if code != http.StatusOK && hashKeyFunction != "" {
 			// try to use legacy key format
 			if !isHashed {
-				obj, code = handleDeleteKey(origKeyName, apiID)
+				obj, code = handleDeleteKey(origKeyName, apiID, true)
 			} else {
-				obj, code = handleDeleteHashedKey(origKeyName, apiID)
+				obj, code = handleDeleteHashedKey(origKeyName, apiID, true)
 			}
 		}
 	}

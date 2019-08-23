@@ -394,6 +394,26 @@ const Schema = `{
                     "type": "number"
                 }
             }
+        },
+	"request_signing": {
+          "type": ["object", "null"],
+           "properties": {
+                "is_enabled": {
+                    "type": "boolean"
+                },
+                "secret": {
+                    "type": "string"
+                },
+		"key_id": {
+                    "type": "string"
+                },
+		"algorithm": {
+                    "type": "string"
+                }
+            },
+	    "required": [
+	    	"is_enabled"
+	    ]
         }
     },
     "required": [

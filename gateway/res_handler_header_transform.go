@@ -24,12 +24,19 @@ type HeaderTransform struct {
 	config HeaderTransformOptions
 }
 
+func (HeaderTransform) Name() string {
+	return "HeaderTransform"
+}
+
 func (h *HeaderTransform) Init(c interface{}, spec *APISpec) error {
 	if err := mapstructure.Decode(c, &h.config); err != nil {
 		return err
 	}
 	h.Spec = spec
 	return nil
+}
+
+func (h *HeaderTransform) HandleError(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (h *HeaderTransform) HandleResponse(rw http.ResponseWriter,

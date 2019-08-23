@@ -1,6 +1,9 @@
 # Logrus Prefixed Log Formatter
-[Logrus](https://github.com/Sirupsen/logrus) formatter mainly based on original `logrus.TextFormatter` but with slightly
-modified colored output and support for log entry prefixes, e.g. message source followed by a colon.
+[![Build Status](https://travis-ci.org/x-cray/logrus-prefixed-formatter.svg?branch=master)](https://travis-ci.org/x-cray/logrus-prefixed-formatter)
+
+[Logrus](https://github.com/sirupsen/logrus) formatter mainly based on original `logrus.TextFormatter` but with slightly
+modified colored output and support for log entry prefixes, e.g. message source followed by a colon. In addition, custom
+color themes are supported.
 
 ![Formatter screenshot](http://cl.ly/image/1w0B3F233F3z/formatter-screenshot@2x.png)
 
@@ -31,7 +34,7 @@ Here is how it should be used:
 package main
 
 import (
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 )
 
@@ -57,15 +60,57 @@ func main() {
 ```
 
 ## API
-`prefixed.TextFormatter` exposes the following fields:
+`prefixed.TextFormatter` exposes the following fields and methods.
+
+### Fields
 
 * `ForceColors bool` — set to true to bypass checking for a TTY before outputting colors.
-* `DisableColors bool` — force disabling colors.
-* `DisableTimestamp bool` — disable timestamp logging. useful when output is redirected to logging system that already adds timestamps.
-* `ShortTimestamp bool` — enable logging of just the time passed since beginning of execution.
+* `DisableColors bool` — force disabling colors. For a TTY colors are enabled by default.
+* `DisableUppercase bool` — set to true to turn off the conversion of the log level names to uppercase.
+* `ForceFormatting bool` — force formatted layout, even for non-TTY output.
+* `DisableTimestamp bool` — disable timestamp logging. Useful when output is redirected to logging system that already adds timestamps.
+* `FullTimestamp bool` — enable logging the full timestamp when a TTY is attached instead of just the time passed since beginning of execution.
 * `TimestampFormat string` — timestamp format to use for display when a full timestamp is printed.
 * `DisableSorting bool` — the fields are sorted by default for a consistent output. For applications that log extremely frequently and don't use the JSON formatter this may not be desired.
-* `SpacePadding int` — Pad msg field with spaces on the right for display. The value for this parameter will be the size of padding. Its default value is zero, which means no padding will be applied.
+* `QuoteEmptyFields bool` — wrap empty fields in quotes if true.
+* `QuoteCharacter string` — can be set to the override the default quoting character `"` with something else. For example: `'`, or `` ` ``.
+* `SpacePadding int` — pad msg field with spaces on the right for display. The value for this parameter will be the size of padding. Its default value is zero, which means no padding will be applied.
+
+### Methods
+
+#### `SetColorScheme(colorScheme *prefixed.ColorScheme)`
+
+Sets an alternative color scheme for colored output. `prefixed.ColorScheme` struct supports the following fields:
+* `InfoLevelStyle string` — info level style.
+* `WarnLevelStyle string` — warn level style.
+* `ErrorLevelStyle string` — error style.
+* `FatalLevelStyle string` — fatal level style.
+* `PanicLevelStyle string` — panic level style.
+* `DebugLevelStyle string` — debug level style.
+* `PrefixStyle string` — prefix style.
+* `TimestampStyle string` — timestamp style.
+
+Color styles should be specified using [mgutz/ansi](https://github.com/mgutz/ansi#style-format) style syntax. For example, here is the default theme:
+
+```go
+InfoLevelStyle:  "green",
+WarnLevelStyle:  "yellow",
+ErrorLevelStyle: "red",
+FatalLevelStyle: "red",
+PanicLevelStyle: "red",
+DebugLevelStyle: "blue",
+PrefixStyle:     "cyan",
+TimestampStyle:  "black+h"
+```
+
+It's not necessary to specify all colors when changing color scheme if you want to change just specific ones:
+
+```go
+formatter.SetColorScheme(&prefixed.ColorScheme{
+    PrefixStyle:    "blue+b",
+    TimestampStyle: "white+h",
+})
+```
 
 # License
 MIT

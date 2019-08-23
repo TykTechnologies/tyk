@@ -11,14 +11,15 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/trace"
 )
 
 type ChainObject struct {
@@ -192,6 +193,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	mwPreFuncs := []apidef.MiddlewareDefinition{}
 	mwPostFuncs := []apidef.MiddlewareDefinition{}
 	mwPostAuthCheckFuncs := []apidef.MiddlewareDefinition{}
+	mwResponseFuncs := []apidef.MiddlewareDefinition{}
 
 	var mwDriver apidef.MiddlewareDriver
 
@@ -210,8 +212,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	logger.Debug("Initializing API")
 	var mwPaths []string
 
-	mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwDriver = loadCustomMiddleware(spec)
-
+	mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwResponseFuncs, mwDriver = loadCustomMiddleware(spec)
 	if config.Global().EnableJSVM && mwDriver == apidef.OttoDriver {
 		spec.JSVM.LoadJSPaths(mwPaths, prefix)
 	}
@@ -248,8 +249,8 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		proxy = TykNewSingleHostReverseProxy(spec.target, spec)
 	}
 
-	// Create the response processors
-	createResponseMiddlewareChain(spec)
+	// Create the response processors, pass all the loaded custom middleware response functions:
+	createResponseMiddlewareChain(spec, mwResponseFuncs)
 
 	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy, logger: logger}
 
@@ -289,7 +290,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 			)
 		} else if mwDriver != apidef.OttoDriver {
 			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
-			mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver, obj.RawBodyOnly})
+			mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver, obj.RawBodyOnly, nil})
 		} else {
 			chainArray = append(chainArray, createDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
 		}
@@ -336,7 +337,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 			coprocessLog.Debug("Registering coprocess middleware, hook name: ", mwAuthCheckFunc.Name, "hook type: CustomKeyCheck", ", driver: ", mwDriver)
 
 			newExtractor(spec, baseMid)
-			mwAppendEnabled(&authArray, &CoProcessMiddleware{baseMid, coprocess.HookType_CustomKeyCheck, mwAuthCheckFunc.Name, mwDriver, mwAuthCheckFunc.RawBodyOnly})
+			mwAppendEnabled(&authArray, &CoProcessMiddleware{baseMid, coprocess.HookType_CustomKeyCheck, mwAuthCheckFunc.Name, mwDriver, mwAuthCheckFunc.RawBodyOnly, nil})
 		}
 
 		if ottoAuth {
@@ -375,7 +376,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 				)
 			} else {
 				coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
-				mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_PostKeyAuth, obj.Name, mwDriver, obj.RawBodyOnly})
+				mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_PostKeyAuth, obj.Name, mwDriver, obj.RawBodyOnly, nil})
 			}
 		}
 
@@ -395,6 +396,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: &cacheStore})
 	mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
+	mwAppendEnabled(&chainArray, &RequestSigning{BaseMiddleware: baseMid})
 
 	for _, obj := range mwPostFuncs {
 		if mwDriver == apidef.GoPluginDriver {
@@ -408,7 +410,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 			)
 		} else if mwDriver != apidef.OttoDriver {
 			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
-			mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver, obj.RawBodyOnly})
+			mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver, obj.RawBodyOnly, nil})
 		} else {
 			chainArray = append(chainArray, createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
 		}
@@ -437,7 +439,11 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 	logger.Debug("Setting Listen Path: ", spec.Proxy.ListenPath)
 
-	chainDef.ThisHandler = chain
+	if trace.IsEnabled() {
+		chainDef.ThisHandler = trace.Handle(spec.Name, chain)
+	} else {
+		chainDef.ThisHandler = chain
+	}
 	chainDef.ListenOn = spec.Proxy.ListenPath + "{rest:.*}"
 	chainDef.Domain = spec.Domain
 
@@ -514,7 +520,6 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		ctxIncLoopLevel(r, loopLevelLimit)
-
 		handler.ServeHTTP(w, r)
 	} else {
 		d.SH.ServeHTTP(w, r)
@@ -597,6 +602,12 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 	var hosts []string
 	for _, spec := range specs {
 		hosts = append(hosts, spec.Domain)
+	}
+
+	if trace.IsEnabled() {
+		for _, spec := range specs {
+			trace.AddTracer(spec.Name)
+		}
 	}
 	// Decreasing sort by length and chars, so that the order of
 	// creation of the host sub-routers is deterministic and

@@ -7,13 +7,13 @@ Use this hook to send the logs to [Logstash](https://www.elastic.co/products/log
 package main
 
 import (
-        "github.com/Sirupsen/logrus"
+        "github.com/sirupsen/logrus"
         "github.com/bshuster-repo/logrus-logstash-hook"
 )
 
 func main() {
         log := logrus.New()
-        hook, err := logrus_logstash.NewHook("tcp", "172.17.0.2:9999", "myappName")
+        hook, err := logrustash.NewHook("tcp", "172.17.0.2:9999", "myappName")
 
         if err != nil {
                 log.Fatal(err)
@@ -47,7 +47,7 @@ This can be done when creating the hook:
 
 ```go
 
-hook, err := logrus_logstash.NewHookWithFields("tcp", "172.17.0.2:9999", "myappName", logrus.Fields{
+hook, err := logrustash.NewHookWithFields("tcp", "172.17.0.2:9999", "myappName", logrus.Fields{
         "hostname":    os.Hostname(),
         "serviceName": "myServiceName",
 })
@@ -83,7 +83,7 @@ For example if you don't want to see the hostname and serviceName on each log li
 ```go
 
 
-hook, err := logrus_logstash.NewHookWithFields("tcp", "172.17.0.2:9999", "myappName", logrus.Fields{
+hook, err := logrustash.NewHookWithFields("tcp", "172.17.0.2:9999", "myappName", logrus.Fields{
         "_hostname":    os.Hostname(),
         "_serviceName": "myServiceName",
 })
@@ -93,3 +93,14 @@ hook.WithPrefix("_")
 
 There are also constructors available which allow you to specify the prefix from the start.
 The std-out will not have the '\_hostname' and '\_servicename' fields, and the logstash output will, but the prefix will be dropped from the name.
+
+
+# Authors
+
+Name         | Github    | Twitter    |
+------------ | --------- | ---------- |
+Boaz Shuster | ripcurld0 | @ripcurld0 |
+
+# License
+
+MIT.

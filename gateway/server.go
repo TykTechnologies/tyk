@@ -19,8 +19,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Sirupsen/logrus"
-	logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/evalphobia/logrus_sentry"
 	"github.com/facebookgo/pidfile"
@@ -31,6 +29,8 @@ import (
 	newrelic "github.com/newrelic/go-agent"
 	"github.com/rs/cors"
 	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
+	logrus_syslog "github.com/sirupsen/logrus/hooks/syslog"
 	"golang.org/x/net/http2"
 	"rsc.io/letsencrypt"
 
@@ -43,10 +43,12 @@ import (
 	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/dnscache"
+	"github.com/TykTechnologies/tyk/headers"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -83,7 +85,8 @@ var (
 	LE_MANAGER    letsencrypt.Manager
 	LE_FIRSTRUN   bool
 
-	NodeID string
+	muNodeID sync.Mutex // guards NodeID
+	NodeID   string
 
 	runningTests = false
 
@@ -106,6 +109,20 @@ const (
 	defWriteTimeout = 120 * time.Second
 	appName         = "tyk-gateway"
 )
+
+// setNodeID writes NodeID safely.
+func setNodeID(nodeID string) {
+	muNodeID.Lock()
+	NodeID = nodeID
+	muNodeID.Unlock()
+}
+
+// getNodeID reads NodeID safely.
+func getNodeID() string {
+	muNodeID.Lock()
+	defer muNodeID.Unlock()
+	return NodeID
+}
 
 func getApiSpec(apiID string) *APISpec {
 	apisMu.RLock()
@@ -148,6 +165,10 @@ func setupGlobals() {
 	// Initialise our Host Checker
 	healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:"}
 	InitHostCheckManager(&healthCheckStore)
+
+	versionStore := storage.RedisCluster{KeyPrefix: "version-check-"}
+	versionStore.Connect()
+	_ = versionStore.SetKey("gateway", VERSION, 0)
 
 	if config.Global().EnableAnalytics && analytics.Store == nil {
 		globalConf := config.Global()
@@ -419,12 +440,12 @@ func loadAPIEndpoints(muxer *mux.Router) {
 func checkIsAPIOwner(next http.Handler) http.Handler {
 	secret := config.Global().Secret
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tykAuthKey := r.Header.Get("X-Tyk-Authorization")
+		tykAuthKey := r.Header.Get(headers.XTykAuthorization)
 		if tykAuthKey != secret {
 			// Error
 			mainLog.Warning("Attempted administrative access with invalid or missing key!")
 
-			doJSONWrite(w, http.StatusForbidden, apiError("Forbidden"))
+			doJSONWrite(w, http.StatusForbidden, apiError("Attempted administrative access with invalid or missing key!"))
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -459,7 +480,7 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 
 	muxer.Handle(apiAuthorizePath, checkIsAPIOwner(allowMethods(oauthHandlers.HandleGenerateAuthCodeData, "POST")))
 	muxer.HandleFunc(clientAuthPath, allowMethods(oauthHandlers.HandleAuthorizePassthrough, "GET", "POST"))
-	muxer.HandleFunc(clientAccessPath, allowMethods(oauthHandlers.HandleAccessRequest, "GET", "POST"))
+	muxer.HandleFunc(clientAccessPath, addSecureAndCacheHeaders(allowMethods(oauthHandlers.HandleAccessRequest, "GET", "POST")))
 
 	return &oauthManager
 }
@@ -471,12 +492,13 @@ func addBatchEndpoint(spec *APISpec, muxer *mux.Router) {
 	muxer.HandleFunc(apiBatchPath, batchHandler.HandleBatchRequest)
 }
 
-func loadCustomMiddleware(spec *APISpec) ([]string, apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, apidef.MiddlewareDriver) {
+func loadCustomMiddleware(spec *APISpec) ([]string, apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, apidef.MiddlewareDriver) {
 	mwPaths := []string{}
 	var mwAuthCheckFunc apidef.MiddlewareDefinition
 	mwPreFuncs := []apidef.MiddlewareDefinition{}
 	mwPostFuncs := []apidef.MiddlewareDefinition{}
 	mwPostKeyAuthFuncs := []apidef.MiddlewareDefinition{}
+	mwResponseFuncs := []apidef.MiddlewareDefinition{}
 	mwDriver := apidef.OttoDriver
 
 	// Set AuthCheck hook
@@ -553,10 +575,16 @@ func loadCustomMiddleware(spec *APISpec) ([]string, apidef.MiddlewareDefinition,
 		mwPostKeyAuthFuncs = append(mwPostKeyAuthFuncs, mwObj)
 	}
 
-	return mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostKeyAuthFuncs, mwDriver
+	// Load response hooks
+	for _, mw := range spec.CustomMiddleware.Response {
+		mwResponseFuncs = append(mwResponseFuncs, mw)
+	}
+
+	return mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostKeyAuthFuncs, mwResponseFuncs, mwDriver
+
 }
 
-func createResponseMiddlewareChain(spec *APISpec) {
+func createResponseMiddlewareChain(spec *APISpec, responseFuncs []apidef.MiddlewareDefinition) {
 	// Create the response processors
 
 	responseChain := make([]TykResponseHandler, len(spec.ResponseProcessors))
@@ -572,6 +600,20 @@ func createResponseMiddlewareChain(spec *APISpec) {
 		mainLog.Debug("Loading Response processor: ", processorDetail.Name)
 		responseChain[i] = processor
 	}
+
+	for _, mw := range responseFuncs {
+		processor := responseProcessorByName("custom_mw_res_hook")
+		// TODO: perhaps error when plugin support is disabled?
+		if processor == nil {
+			mainLog.Error("Couldn't find custom middleware processor")
+			return
+		}
+		if err := processor.Init(mw, spec); err != nil {
+			mainLog.Debug("Failed to init processor: ", err)
+		}
+		responseChain = append(responseChain, processor)
+	}
+
 	spec.ResponseChain = responseChain
 }
 
@@ -956,7 +998,7 @@ func Start() {
 		os.Exit(0)
 	}
 
-	NodeID = "solo-" + uuid.NewV4().String()
+	setNodeID("solo-" + uuid.NewV4().String())
 
 	if err := initialiseSystem(); err != nil {
 		mainLog.Fatalf("Error initialising system: %v", err)
@@ -981,7 +1023,7 @@ func Start() {
 			time.Sleep(10 * time.Second)
 
 			os.Setenv("TYK_SERVICE_NONCE", ServiceNonce)
-			os.Setenv("TYK_SERVICE_NODEID", NodeID)
+			os.Setenv("TYK_SERVICE_NODEID", getNodeID())
 		}
 	}
 
@@ -999,7 +1041,11 @@ func Start() {
 	}
 
 	checkup.Run(config.Global())
-
+	if tr := config.Global().Tracer; tr.Enabled {
+		trace.SetupTracing(tr.Name, tr.Options)
+		trace.SetLogger(mainLog)
+		defer trace.Close()
+	}
 	start()
 
 	// Wait while Redis connection pools are ready before start serving traffic
@@ -1241,7 +1287,6 @@ func (_ mainHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// make request body to be nopCloser and re-readable before serve it through chain of middlewares
 	nopCloseRequestBody(r)
-
 	mainRouter.ServeHTTP(w, r)
 }
 
@@ -1324,7 +1369,7 @@ func listen(listener, controlListener net.Listener, err error) {
 			handleDashboardRegistration()
 
 		} else {
-			NodeID = nodeID
+			setNodeID(nodeID)
 			ServiceNonce = nonce
 			mainLog.Info("State recovered")
 

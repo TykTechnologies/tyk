@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -9,23 +10,28 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
 	newrelic "github.com/newrelic/go-agent"
 	"github.com/paulbellamy/ratecounter"
 	cache "github.com/pmylund/go-cache"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
 )
 
 const mwStatusRespond = 666
 
-var GlobalRate = ratecounter.NewRateCounter(1 * time.Second)
+var (
+	GlobalRate            = ratecounter.NewRateCounter(1 * time.Second)
+	orgSessionExpiryCache singleflight.Group
+)
 
 type TykMiddleware interface {
 	Init()
@@ -37,6 +43,21 @@ type TykMiddleware interface {
 	ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) // Handles request
 	EnabledForSpec() bool
 	Name() string
+}
+
+type TraceMiddleware struct {
+	TykMiddleware
+}
+
+func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) {
+	if trace.IsEnabled() {
+		span, ctx := trace.Span(r.Context(),
+			tr.Name(),
+		)
+		defer span.Finish()
+		return tr.TykMiddleware.ProcessRequest(w, r.WithContext(ctx), conf)
+	}
+	return tr.TykMiddleware.ProcessRequest(w, r, conf)
 }
 
 func createDynamicMiddleware(name string, isPre, useSession bool, baseMid BaseMiddleware) func(http.Handler) http.Handler {
@@ -51,7 +72,10 @@ func createDynamicMiddleware(name string, isPre, useSession bool, baseMid BaseMi
 }
 
 // Generic middleware caller to make extension easier
-func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
+func createMiddleware(actualMW TykMiddleware) func(http.Handler) http.Handler {
+	mw := &TraceMiddleware{
+		TykMiddleware: actualMW,
+	}
 	// construct a new instance
 	mw.Init()
 	mw.SetName(mw.Name())
@@ -101,7 +125,7 @@ func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 			if err != nil {
 				// GoPluginMiddleware are expected to send response in case of error
 				// but we still want to record error
-				_, isGoPlugin := mw.(*GoPluginMiddleware)
+				_, isGoPlugin := actualMW.(*GoPluginMiddleware)
 
 				handler := ErrorHandler{*mw.Base()}
 				handler.HandleError(w, r, err.Error(), errCode, !isGoPlugin)
@@ -197,7 +221,7 @@ func (t BaseMiddleware) OrgSession(key string) (user.SessionState, bool) {
 		// If exists, assume it has been authorized and pass on
 		// We cache org expiry data
 		t.Logger().Debug("Setting data expiry: ", session.OrgID)
-		go t.SetOrgExpiry(session.OrgID, session.DataExpires)
+		ExpiryCache.Set(session.OrgID, session.DataExpires, cache.DefaultExpiration)
 	}
 
 	session.SetKeyHash(storage.HashKey(key))
@@ -210,16 +234,23 @@ func (t BaseMiddleware) SetOrgExpiry(orgid string, expiry int64) {
 
 func (t BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 	t.Logger().Debug("Checking: ", orgid)
-	cachedVal, found := ExpiryCache.Get(orgid)
-	if !found {
-		// Cache failed attempt
-		t.SetOrgExpiry(orgid, 604800)
-		go t.OrgSession(orgid)
+	// Cache failed attempt
+	id, err, _ := orgSessionExpiryCache.Do(orgid, func() (interface{}, error) {
+		cachedVal, found := ExpiryCache.Get(orgid)
+		if found {
+			return cachedVal, nil
+		}
+		s, found := t.OrgSession(orgid)
+		if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
+			return s.DataExpires, nil
+		}
+		return 0, errors.New("missing session")
+	})
+	if err != nil {
 		t.Logger().Debug("no cached entry found, returning 7 days")
-		return 604800
+		return int64(604800)
 	}
-
-	return cachedVal.(int64)
+	return id.(int64)
 }
 
 func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
@@ -524,7 +555,9 @@ func (t BaseMiddleware) FireEvent(name apidef.TykEvent, meta interface{}) {
 
 type TykResponseHandler interface {
 	Init(interface{}, *APISpec) error
+	Name() string
 	HandleResponse(http.ResponseWriter, *http.Response, *http.Request, *user.SessionState) error
+	HandleError(http.ResponseWriter, *http.Request)
 }
 
 func responseProcessorByName(name string) TykResponseHandler {
@@ -537,24 +570,41 @@ func responseProcessorByName(name string) TykResponseHandler {
 		return &ResponseTransformJQMiddleware{}
 	case "header_transform":
 		return &HeaderTransform{}
+	case "custom_mw_res_hook":
+		return &CustomMiddlewareResponseHook{}
 	}
 	return nil
 }
 
-func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
+func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) (abortRequest bool, err error) {
+	traceIsEnabled := trace.IsEnabled()
 	for _, rh := range chain {
-		if err := rh.HandleResponse(rw, res, req, ses); err != nil {
-			return err
+		if err := handleResponse(rh, rw, res, req, ses, traceIsEnabled); err != nil {
+			// Abort the request if this handler is a response middleware hook:
+			if rh.Name() == "CustomMiddlewareResponseHook" {
+				rh.HandleError(rw, req)
+				return true, err
+			}
+			return false, err
 		}
 	}
-	return nil
+	return false, nil
+}
+
+func handleResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState, shouldTrace bool) error {
+	if shouldTrace {
+		span, ctx := trace.Span(req.Context(), rh.Name())
+		defer span.Finish()
+		req = req.WithContext(ctx)
+	}
+	return rh.HandleResponse(rw, res, req, ses)
 }
 
 func parseForm(r *http.Request) {
 	// https://golang.org/pkg/net/http/#Request.ParseForm
 	// ParseForm drains the request body for a request with Content-Type of
 	// application/x-www-form-urlencoded
-	if r.Header.Get("Content-Type") == "application/x-www-form-urlencoded" {
+	if r.Header.Get("Content-Type") == "application/x-www-form-urlencoded" && r.Form == nil {
 		var b bytes.Buffer
 		r.Body = ioutil.NopCloser(io.TeeReader(r.Body, &b))
 

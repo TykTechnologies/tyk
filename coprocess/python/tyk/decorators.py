@@ -21,6 +21,8 @@ class Hook(object):
             return self.f(args[0], args[1], args[2])
         if self.arg_count == 4:
             return self.f(args[0], args[1], args[2], args[3])
+        if self.arg_count == 5:
+            return self.f(args[0], args[1], args[2], args[3], args[4])
 
 
 class Pre(HandlerDecorator):

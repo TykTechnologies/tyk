@@ -26,16 +26,18 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/net/http2"
-
-	"github.com/Sirupsen/logrus"
-	cache "github.com/pmylund/go-cache"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/regexp"
+	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
+	opentracing "github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/ext"
+	cache "github.com/pmylund/go-cache"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/net/http2"
 )
 
 const defaultUserAgent = "Tyk/" + VERSION
@@ -189,7 +191,9 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		if ServiceCache == nil {
 			log.Debug("[PROXY] Service cache initialising")
 			expiry := 120
-			if spec.GlobalConfig.ServiceDiscovery.DefaultCacheTimeout > 0 {
+			if spec.Proxy.ServiceDiscovery.CacheTimeout > 0 {
+				expiry = int(spec.Proxy.ServiceDiscovery.CacheTimeout)
+			} else if spec.GlobalConfig.ServiceDiscovery.DefaultCacheTimeout > 0 {
 				expiry = spec.GlobalConfig.ServiceDiscovery.DefaultCacheTimeout
 			}
 			ServiceCache = cache.New(time.Duration(expiry)*time.Second, 15*time.Second)
@@ -205,6 +209,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 			hostList, err = urlFromService(spec)
 			if err != nil {
 				log.Error("[PROXY] [SERVICE DISCOVERY] Failed target lookup: ", err)
+				break
 			}
 			fallthrough // implies load balancing, with replaced host list
 		case spec.Proxy.EnableLoadBalancing:
@@ -257,10 +262,10 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		} else {
 			req.URL.RawQuery = targetQuery + "&" + req.URL.RawQuery
 		}
-		if _, ok := req.Header["User-Agent"]; !ok {
+		if _, ok := req.Header[headers.UserAgent]; !ok {
 			// Set Tyk's own default user agent. Without
 			// this line, we would get the net/http default.
-			req.Header.Set("User-Agent", defaultUserAgent)
+			req.Header.Set(headers.UserAgent, defaultUserAgent)
 		}
 
 		if spec.GlobalConfig.HttpServerOptions.SkipTargetPathEscaping {
@@ -411,9 +416,9 @@ func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request
 	_, versionPaths, _, _ := spec.Version(req)
 	found, meta := spec.CheckSpecMatchesStatus(req, versionPaths, HardTimeout)
 	if found {
-		intMeta := meta.(*float64)
+		intMeta := meta.(*int)
 		log.Debug("HARD TIMEOUT ENFORCED: ", *intMeta)
-		return true, *intMeta
+		return true, float64(*intMeta)
 	}
 
 	return false, spec.GlobalConfig.ProxyDefaultTimeout
@@ -521,6 +526,12 @@ func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p
 }
 
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) *http.Response {
+	if trace.IsEnabled() {
+		span, ctx := trace.Span(req.Context(), req.URL.Path)
+		defer span.Finish()
+		ext.SpanKindRPCClient.Set(span)
+		req = req.WithContext(ctx)
+	}
 	outReqIsWebsocket := IsWebsocket(req)
 	var roundTripper http.RoundTripper
 
@@ -605,7 +616,10 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	outreq = outreq.WithContext(reqCtx)
 
 	outreq.Header = cloneHeader(req.Header)
-
+	if trace.IsEnabled() {
+		span := opentracing.SpanFromContext(req.Context())
+		trace.Inject(p.TykAPISpec.Name, span, outreq.Header)
+	}
 	p.Director(outreq)
 	outreq.Close = false
 
@@ -639,8 +653,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	addrs := requestIPHops(req)
-	if !p.CheckHeaderInRemoveList("X-Forwarded-For", p.TykAPISpec, req) {
-		outreq.Header.Set("X-Forwarded-For", addrs)
+	if !p.CheckHeaderInRemoveList(headers.XForwardFor, p.TykAPISpec, req) {
+		outreq.Header.Set(headers.XForwardFor, addrs)
 	}
 
 	// Circuit breaker
@@ -737,7 +751,14 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	// Middleware chain handling here - very simple, but should do
 	// the trick. Chain can be empty, in which case this is a no-op.
-	if err := handleResponseChain(p.TykAPISpec.ResponseChain, rw, res, req, ses); err != nil {
+	// abortRequest is set to true when a response hook fails
+	// For reference see "HandleError" in coprocess.go
+	abortRequest, err := handleResponseChain(p.TykAPISpec.ResponseChain, rw, res, req, ses)
+	if abortRequest {
+		return nil
+	}
+
+	if err != nil {
 		log.Error("Response chain failed! ", err)
 	}
 
@@ -770,7 +791,7 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 
 	// Remove hop-by-hop headers listed in the
 	// "Connection" header of the response.
-	if c := res.Header.Get("Connection"); c != "" {
+	if c := res.Header.Get(headers.Connection); c != "" {
 		for _, f := range strings.Split(c, ",") {
 			if f = strings.TrimSpace(f); f != "" {
 				res.Header.Del(f)
@@ -785,7 +806,7 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 
 	// Close connections
 	if config.Global().CloseConnections {
-		res.Header.Set("Connection", "close")
+		res.Header.Set(headers.Connection, "close")
 	}
 
 	// Add resource headers

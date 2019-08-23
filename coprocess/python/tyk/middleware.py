@@ -77,6 +77,9 @@ class TykMiddleware:
         if handlerType == decorators.Event:
             handler(object, object.spec)
             return
+        elif handler.arg_count == 5:
+            md = object.session.metadata
+            object.response = handler(object.request, object.response, object.session, md, object.spec)
         elif handler.arg_count == 4:
             md = object.session.metadata
             object.request, object.session, md = handler(object.request, object.session, md, object.spec)

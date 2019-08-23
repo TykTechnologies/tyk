@@ -387,7 +387,7 @@ func TestJWTSessionRSABearerInvalid(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers:   authHeaders,
 			Code:      http.StatusForbidden,
-			BodyMatch: "Key not authorized:illegal base64 data at input byte 0",
+			BodyMatch: "Key not authorized:illegal base64 data at input byte 6",
 		})
 	})
 }
@@ -402,7 +402,7 @@ func TestJWTSessionRSABearerInvalidTwoBears(t *testing.T) {
 
 	t.Run("Request with Bearer bearer", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders1, Code: http.StatusOK, //todo: fix code since it should be http.StatusForbidden
+			Headers: authHeaders1, Code: http.StatusForbidden,
 		})
 	})
 
@@ -410,7 +410,7 @@ func TestJWTSessionRSABearerInvalidTwoBears(t *testing.T) {
 
 	t.Run("Request with bearer Bearer", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders2, Code: http.StatusOK, //todo: fix code since it should be http.StatusForbidden
+			Headers: authHeaders2, Code: http.StatusForbidden,
 		})
 	})
 }

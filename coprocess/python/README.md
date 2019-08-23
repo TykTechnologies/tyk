@@ -53,52 +53,7 @@ def MyPreMiddleware(request, session, spec):
 
 ### Authenticating an API with Python
 
-This is a sample API definition that will let you authenticate your API using a custom Python middleware (see [coprocess_app_sample_protected.json](../../apps/coprocess_app_sample_protected.json)):
-```json
-...
-"use_keyless": false,
-"enable_coprocess_auth": true,
-"custom_middleware": {
-  "auth_check": {
-    "name": "MyAuthCheck"
-  },
-  "driver": "python"
-},
-...
-```
-
-The Python code for this middleware will look like this (see [my_auth_middleware.py](../../middleware/python/my_auth_middleware.py)):
-```python
-from tyk.decorators import *
-from gateway import TykGateway as tyk
-
-from tyk.session import AccessSpec, AccessDefinition, BasicAuthData, JWTData, Monitor
-
-@CustomKeyCheck
-def MyAuthCheck(request, session, metadata, spec):
-    print("my_auth_middleware: CustomKeyCheck hook")
-
-    print("my_auth_middleware - Request:", request)
-    print("my_auth_middleware - Session:", session)
-    print("my_auth_middleware - Spec:", spec)
-
-    valid_token = 'aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d'
-    request_token = request.get_header('Authorization')
-
-    print("my_auth_middleware - Request Token:", request_token)
-
-    if request_token == valid_token:
-        session.rate = 1000.0
-        session.per = 1.0
-
-        metadata['token'] = 'mytoken'
-    else:
-        # Invalid token!
-        request.object.return_overrides.response_code = 401
-        request.object.return_overrides.response_error = 'Not authorized (Python middleware)'
-
-    return request, session, metadata
-```
+See example: https://tyk.io/docs/customise-tyk/plugins/rich-plugins/python/custom-auth-python-tutorial/
 
 ### Writing events handlers with Python
 

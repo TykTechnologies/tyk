@@ -237,6 +237,22 @@ type NewRelicConfig struct {
 	LicenseKey string `json:"license_key"`
 }
 
+type Tracer struct {
+	// The name of the tracer to initialize. For instance appdash, to use appdash
+	// tracer
+	Name string `json:"name"`
+
+	// If true then this tracer will be activated and all tracing data will be sent
+	// to this tracer.NoOp tracer is used otherwise which collects traces but
+	// discard them.
+	Enabled bool `json:"enabled"`
+
+	// Key value pairs used to initialize the tracer. These are tracer specific,
+	// each tracer requires different options to operate. Please see trace package
+	// for options required by supported tracer implementation.
+	Options map[string]interface{} `json:"options"`
+}
+
 // Config is the configuration object used by tyk to set up various parameters.
 type Config struct {
 	// OriginalPath is the path to the config file that was read. If
@@ -352,6 +368,7 @@ type Config struct {
 	// Monitoring, Logging & Profiling
 	LogLevel                string         `json:"log_level"`
 	HealthCheckEndpointName string         `json:"health_check_endpoint_name"`
+	Tracer                  Tracer         `json:"tracing"`
 	NewRelic                NewRelicConfig `json:"newrelic"`
 	HTTPProfile             bool           `json:"enable_http_profiler"`
 	UseRedisLog             bool           `json:"use_redis_log"`

@@ -12,7 +12,7 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 	uuid "github.com/satori/go.uuid"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // AuthorisationHandler is used to validate a session key,

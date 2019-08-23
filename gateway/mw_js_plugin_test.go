@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -38,10 +38,10 @@ log('{"x": "y"}')
 rawlog("foo")
 rawlog('{"x": "y"}')
 `
-	// note how the logger leaves spaces at the end
+
 	want := []string{
-		`time=TIME level=info msg=foo type=log-msg `,
-		`time=TIME level=info msg="{\"x\": \"y\"}" type=log-msg `,
+		`time=TIME level=info msg=foo prefix=jsvm type=log-msg`,
+		`time=TIME level=info msg="{"x": "y"}" prefix=jsvm type=log-msg`,
 		`foo`,
 		`{"x": "y"}`,
 	}

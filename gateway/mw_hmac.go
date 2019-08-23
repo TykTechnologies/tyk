@@ -14,9 +14,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -60,7 +61,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	}
 
 	// Generate a signature string
-	signatureString, err := generateHMACSignatureStringFromRequest(r, fieldValues)
+	signatureString, err := generateHMACSignatureStringFromRequest(r, fieldValues.Headers)
 	if err != nil {
 		logger.WithError(err).WithField("signature_string", signatureString).Error("Signature string generation failed")
 		return hm.authorizationError(r)
@@ -170,7 +171,7 @@ func (hm *HMACMiddleware) setContextVars(r *http.Request, token string) {
 func (hm *HMACMiddleware) authorizationError(r *http.Request) (error, int) {
 	hm.Logger().Info("Authorization field missing or malformed")
 
-	AuthFailed(hm, r, r.Header.Get("Authorization"))
+	AuthFailed(hm, r, r.Header.Get(headers.Authorization))
 
 	return errors.New("Authorization field missing, malformed or invalid"), http.StatusBadRequest
 }
@@ -236,7 +237,7 @@ func getDateHeader(r *http.Request) (string, string) {
 	auxHeaderVal := r.Header.Get(altHeaderSpec)
 	// Prefer aux if present
 	if auxHeaderVal != "" {
-		token := r.Header.Get("Authorization")
+		token := r.Header.Get(headers.Authorization)
 		log.WithFields(logrus.Fields{
 			"prefix":      "hmac",
 			"auth_header": token,
@@ -295,9 +296,9 @@ func getFieldValues(authHeader string) (*HMACFieldValues, error) {
 
 // "Signature keyId="9876",algorithm="hmac-sha1",headers="x-test x-test-2",signature="queryEscape(base64(sig))"")
 
-func generateHMACSignatureStringFromRequest(r *http.Request, fieldValues *HMACFieldValues) (string, error) {
+func generateHMACSignatureStringFromRequest(r *http.Request, headers []string) (string, error) {
 	signatureString := ""
-	for i, header := range fieldValues.Headers {
+	for i, header := range headers {
 		loweredHeader := strings.TrimSpace(strings.ToLower(header))
 		if loweredHeader == "(request-target)" {
 			requestHeaderField := "(request-target): " + strings.ToLower(r.Method) + " " + r.URL.Path
@@ -312,7 +313,7 @@ func generateHMACSignatureStringFromRequest(r *http.Request, fieldValues *HMACFi
 			signatureString += headerField
 		}
 
-		if i != len(fieldValues.Headers)-1 {
+		if i != len(headers)-1 {
 			signatureString += "\n"
 		}
 	}

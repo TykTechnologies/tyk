@@ -5,6 +5,7 @@ package gateway
 */
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/url"
 	"reflect"
@@ -1079,12 +1080,61 @@ func TestTokenEndpointHeaders(t *testing.T) {
 		"Expires":                   "0",
 	}
 
-	ts.Run(t, test.TestCase{
-		Path:         "/APIID/oauth/token/",
-		Data:         param.Encode(),
-		Headers:      headers,
-		Method:       http.MethodPost,
-		Code:         http.StatusOK,
-		HeadersMatch: securityAndCacheHeaders,
+	ts.Run(t, []test.TestCase{
+		{
+			Path:         "/APIID/oauth/token/",
+			Data:         param.Encode(),
+			Headers:      headers,
+			Method:       http.MethodPost,
+			Code:         http.StatusOK,
+			HeadersMatch: securityAndCacheHeaders,
+		}, { // Set security headers even if request fails
+			Path:         "/APIID/oauth/token/",
+			Data:         param.Encode(),
+			Method:       http.MethodPost,
+			Code:         http.StatusForbidden,
+			HeadersMatch: securityAndCacheHeaders,
+		}}...)
+}
+
+func TestJSONToFormValues(t *testing.T) {
+	o := map[string]string{
+		"username":      "test@test.com",
+		"password":      "12345678",
+		"scope":         "client",
+		"client_id":     "test-client-id",
+		"client_secret": "test-client-secret",
+		"grant_type":    "password",
+	}
+	b, _ := json.Marshal(o)
+	r, err := http.NewRequest(http.MethodPost, "/token", bytes.NewReader(b))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Run("no application/json header", func(ts *testing.T) {
+		err := JSONToFormValues(r)
+		if err != nil {
+			ts.Fatal(err)
+		}
+		for k, v := range o {
+			g := r.Form.Get(k)
+			if g == v {
+				ts.Errorf("expected %s not to be set", v)
+			}
+		}
+	})
+
+	t.Run("with application/json header", func(ts *testing.T) {
+		r.Header.Set("Content-Type", "application/json")
+		err := JSONToFormValues(r)
+		if err != nil {
+			ts.Fatal(err)
+		}
+		for k, v := range o {
+			g := r.Form.Get(k)
+			if g != v {
+				ts.Errorf("expected %s got %s", v, g)
+			}
+		}
 	})
 }

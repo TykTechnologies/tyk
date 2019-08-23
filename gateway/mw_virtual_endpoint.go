@@ -22,7 +22,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // RequestObject is marshalled to JSON string and passed into JSON middleware
@@ -287,7 +287,7 @@ func forceResponse(w http.ResponseWriter,
 
 	if !isPre {
 		// Handle response middleware
-		if err := handleResponseChain(spec.ResponseChain, w, newResponse, r, session); err != nil {
+		if _, err := handleResponseChain(spec.ResponseChain, w, newResponse, r, session); err != nil {
 			logger.WithError(err).Error("Response chain failed! ")
 		}
 	}

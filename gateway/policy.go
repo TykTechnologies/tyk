@@ -10,7 +10,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/rpc"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -77,7 +77,7 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 	}
 
 	newRequest.Header.Set("authorization", secret)
-	newRequest.Header.Set("x-tyk-nodeid", NodeID)
+	newRequest.Header.Set("x-tyk-nodeid", getNodeID())
 
 	newRequest.Header.Set("x-tyk-nonce", ServiceNonce)
 

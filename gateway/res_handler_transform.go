@@ -10,15 +10,20 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/clbanning/mxj"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/user"
 )
 
 type ResponseTransformMiddleware struct {
 	Spec *APISpec
+}
+
+func (ResponseTransformMiddleware) Name() string {
+	return "ResponseTransformMiddleware"
 }
 
 func (h *ResponseTransformMiddleware) Init(c interface{}, spec *APISpec) error {
@@ -28,11 +33,11 @@ func (h *ResponseTransformMiddleware) Init(c interface{}, spec *APISpec) error {
 
 func respBodyReader(req *http.Request, resp *http.Response) io.ReadCloser {
 
-	if req.Header.Get("Accept-Encoding") == "" {
+	if req.Header.Get(headers.AcceptEncoding) == "" {
 		return resp.Body
 	}
 
-	switch resp.Header.Get("Content-Encoding") {
+	switch resp.Header.Get(headers.ContentEncoding) {
 	case "gzip":
 		reader, err := gzip.NewReader(resp.Body)
 		if err != nil {
@@ -69,6 +74,9 @@ func compressBuffer(in bytes.Buffer, encoding string) (out bytes.Buffer) {
 	}
 
 	return out
+}
+
+func (h *ResponseTransformMiddleware) HandleError(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {

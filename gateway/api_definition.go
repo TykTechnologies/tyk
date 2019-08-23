@@ -19,10 +19,12 @@ import (
 
 	sprig "gopkg.in/Masterminds/sprig.v2"
 
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/rpc"
+	"github.com/gorilla/mux"
 
-	"github.com/Sirupsen/logrus"
 	circuit "github.com/rubyist/circuitbreaker"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/gojsonschema"
 	"github.com/TykTechnologies/tyk/apidef"
@@ -307,10 +309,10 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*A
 	}
 
 	newRequest.Header.Set("authorization", secret)
-	log.Debug("Using: NodeID: ", NodeID)
-	newRequest.Header.Set("x-tyk-nodeid", NodeID)
+	log.Debug("Using: NodeID: ", getNodeID())
+	newRequest.Header.Set(headers.XTykNodeID, getNodeID())
 
-	newRequest.Header.Set("x-tyk-nonce", ServiceNonce)
+	newRequest.Header.Set(headers.XTykNonce, ServiceNonce)
 
 	c := initialiseClient(120 * time.Second)
 	resp, err := c.Do(newRequest)
@@ -1173,7 +1175,7 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 		return r.URL.Query().Get(a.VersionDefinition.Key)
 
 	case urlLocation:
-		uPath := strings.TrimPrefix(r.URL.Path, a.Proxy.ListenPath)
+		uPath := a.StripListenPath(r, r.URL.Path)
 		uPath = strings.TrimPrefix(uPath, "/"+a.Slug)
 
 		// First non-empty part of the path is the version ID
@@ -1300,6 +1302,10 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, []URLSpec, bool
 	return &version, rxPaths, whiteListStatus, StatusOk
 }
 
+func (a *APISpec) StripListenPath(r *http.Request, path string) string {
+	return stripListenPath(a.Proxy.ListenPath, path, mux.Vars(r))
+}
+
 type RoundRobin struct {
 	pos uint32
 }
@@ -1311,4 +1317,19 @@ func (r *RoundRobin) WithLen(len int) int {
 	// -1 to start at 0, not 1
 	cur := atomic.AddUint32(&r.pos, 1) - 1
 	return int(cur) % len
+}
+
+var listenPathVarsRE = regexp.MustCompile(`{[^:]+(:[^}]+)?}`)
+
+func stripListenPath(listenPath, path string, muxVars map[string]string) string {
+	if !strings.Contains(listenPath, "{") {
+		return strings.TrimPrefix(path, listenPath)
+	}
+	lp := listenPathVarsRE.ReplaceAllStringFunc(listenPath, func(match string) string {
+		match = strings.TrimLeft(match, "{")
+		match = strings.TrimRight(match, "}")
+		aliasVar := strings.Split(match, ":")[0]
+		return muxVars[aliasVar]
+	})
+	return strings.TrimPrefix(path, lp)
 }
