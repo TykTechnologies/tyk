@@ -23,6 +23,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -1466,4 +1467,30 @@ func TestBrokenClients(t *testing.T) {
 			t.Fatal("Analytics record do not match:", record)
 		}
 	})
+}
+
+func TestStripRegex(t *testing.T) {
+	sample := []struct {
+		strip  string
+		path   string
+		expect string
+	}{
+		{
+			strip:  "/base",
+			path:   "/base/path",
+			expect: "/path",
+		},
+		{
+			strip:  "/taihoe-test/(?P<test>[\\w\\d]+)/id/",
+			path:   "/taihoe-test/asdas234234dad/id/v1/get",
+			expect: "v1/get",
+		},
+	}
+	for _, v := range sample {
+		re := regexp.MustCompile(v.strip)
+		got := stripRegexPrefix(re, v.path)
+		if got != v.expect {
+			t.Errorf("expected %s got %s", v.expect, got)
+		}
+	}
 }

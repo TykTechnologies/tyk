@@ -183,7 +183,8 @@ type APISpec struct {
 
 	middlewareChain http.Handler
 
-	shouldRelease bool
+	shouldRelease    bool
+	listenPathRegexp *regexp.Regexp
 }
 
 // Release re;leases all resources associated with API spec
