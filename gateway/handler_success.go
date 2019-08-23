@@ -297,8 +297,8 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	// Make sure we get the correct target URL
 	if s.Spec.Proxy.StripListenPath {
 		log.Debug("Stripping: ", s.Spec.Proxy.ListenPath)
-		r.URL.Path = strings.TrimPrefix(r.URL.Path, s.Spec.Proxy.ListenPath)
-		r.URL.RawPath = strings.TrimPrefix(r.URL.RawPath, s.Spec.Proxy.ListenPath)
+		r.URL.Path = s.Spec.StripListenPath(r, r.URL.Path)
+		r.URL.RawPath = s.Spec.StripListenPath(r, r.URL.RawPath)
 		log.Debug("Upstream Path is: ", r.URL.Path)
 	}
 
@@ -335,8 +335,8 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 
 	// Make sure we get the correct target URL
 	if s.Spec.Proxy.StripListenPath {
-		r.URL.Path = strings.TrimPrefix(r.URL.Path, s.Spec.Proxy.ListenPath)
-		r.URL.RawPath = strings.TrimPrefix(r.URL.RawPath, s.Spec.Proxy.ListenPath)
+		r.URL.Path = s.Spec.StripListenPath(r, r.URL.Path)
+		r.URL.RawPath = s.Spec.StripListenPath(r, r.URL.RawPath)
 	}
 
 	t1 := time.Now()

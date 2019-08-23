@@ -108,7 +108,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		}
 
 		if e.Spec.Proxy.StripListenPath {
-			r.URL.Path = strings.Replace(r.URL.Path, e.Spec.Proxy.ListenPath, "", 1)
+			r.URL.Path = e.Spec.StripListenPath(r, r.URL.Path)
 		}
 
 		// This is an odd bugfix, will need further testing
