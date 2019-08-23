@@ -1,7 +1,14 @@
 package gateway
 
 import (
+	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
+	"github.com/TykTechnologies/tyk/certs"
+	"hash"
 	"net/http"
 	"strings"
 	"time"
@@ -19,34 +26,56 @@ func (s *RequestSigning) EnabledForSpec() bool {
 	return s.Spec.RequestSigning.IsEnabled
 }
 
-var supportedAlgorithms = []string{"hmac-sha1", "hmac-sha256", "hmac-sha384", "hmac-sha512"}
+var supportedAlgorithms = []string{"hmac-sha1", "hmac-sha256", "hmac-sha384", "hmac-sha512", "rsa-sha256"}
 
-func generateHeaderList(r *http.Request) []string {
-	headers := make([]string, len(r.Header)+1)
+func generateHeaderList(r *http.Request, headerList []string) []string {
+	var result []string
 
-	headers[0] = "(request-target)"
-	i := 1
+	if len(headerList) == 0 {
+		result = make([]string, len(r.Header)+1)
+		result[0] = "(request-target)"
+		i := 1
 
-	for k := range r.Header {
-		loweredCaseHeader := strings.ToLower(k)
-		headers[i] = strings.TrimSpace(loweredCaseHeader)
-		i++
+		for k := range r.Header {
+			loweredCaseHeader := strings.ToLower(k)
+			result[i] = strings.TrimSpace(loweredCaseHeader)
+			i++
+		}
+
+		// date header is must as per Signing HTTP Messages Draft
+		if r.Header.Get("date") == "" {
+			refDate := "Mon, 02 Jan 2006 15:04:05 MST"
+			tim := time.Now().Format(refDate)
+
+			r.Header.Set("date", tim)
+			result = append(result, "date")
+		}
+	} else {
+		result = make([]string, 0, len(headerList))
+
+		for _, v := range headerList {
+			if r.Header.Get(v) != "" {
+				result = append(result, v)
+			}
+		}
+
+		if len(result) == 0 {
+			headers := []string{"(request-target)", "date"}
+			result = append(result, headers...)
+
+			if r.Header.Get("date") == "" {
+				refDate := "Mon, 02 Jan 2006 15:04:05 MST"
+				tim := time.Now().Format(refDate)
+				r.Header.Set("date", tim)
+			}
+		}
 	}
 
-	//Date header is must as per Signing HTTP Messages Draft
-	if r.Header.Get("date") == "" {
-		refDate := "Mon, 02 Jan 2006 15:04:05 MST"
-		tim := time.Now().Format(refDate)
-
-		r.Header.Set("date", tim)
-		headers = append(headers, "date")
-	}
-
-	return headers
+	return result
 }
 
 func (s *RequestSigning) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	if s.Spec.RequestSigning.Secret == "" || s.Spec.RequestSigning.KeyId == "" || s.Spec.RequestSigning.Algorithm == "" {
+	if (s.Spec.RequestSigning.Secret == "" && s.Spec.RequestSigning.CertificateId == "") || s.Spec.RequestSigning.KeyId == "" || s.Spec.RequestSigning.Algorithm == "" {
 		log.Error("Fields required for signing the request are missing")
 		return errors.New("Fields required for signing the request are missing"), http.StatusInternalServerError
 	}
@@ -67,18 +96,40 @@ func (s *RequestSigning) ProcessRequest(w http.ResponseWriter, r *http.Request, 
 	}
 	if !algorithmAllowed {
 		log.WithField("algorithm", s.Spec.RequestSigning.Algorithm).Error("Algorithm not supported")
-		return errors.New("Request signing Algorithm is not supported"), http.StatusInternalServerError
+		return errors.New("Request signing algorithm is not supported"), http.StatusInternalServerError
 	}
 
-	headers := generateHeaderList(r)
-	signatureString, err := generateHMACSignatureStringFromRequest(r, headers)
+	headers := generateHeaderList(r, s.Spec.RequestSigning.HeaderList)
+
+	signatureString, err := generateSignatureStringFromRequest(r, headers)
 	if err != nil {
 		log.Error(err)
 		return err, http.StatusInternalServerError
 	}
-
 	strHeaders := strings.Join(headers, " ")
-	encodedSignature := generateEncodedSignature(signatureString, s.Spec.RequestSigning.Secret, s.Spec.RequestSigning.Algorithm)
+
+	var encodedSignature string
+
+	if strings.HasPrefix(s.Spec.RequestSigning.Algorithm, "rsa") {
+		certList := CertificateManager.List([]string{s.Spec.RequestSigning.CertificateId}, certs.CertificatePrivate)
+		if len(certList) == 0 {
+			log.Error("Certificate not found")
+			return errors.New("Certificate not found"), http.StatusInternalServerError
+		}
+		cert := certList[0]
+		rsaKey, ok := cert.PrivateKey.(*rsa.PrivateKey)
+		if !ok {
+			log.Error("Certificate does not contain RSA private key")
+			return errors.New("Certificate does not contain RSA private key"), http.StatusInternalServerError
+		}
+		encodedSignature, err = generateRSAEncodedSignature(signatureString, rsaKey, s.Spec.RequestSigning.Algorithm)
+		if err != nil {
+			log.Error("Error while generating signature:", err)
+			return err, http.StatusInternalServerError
+		}
+	} else {
+		encodedSignature = generateHMACEncodedSignature(signatureString, s.Spec.RequestSigning.Secret, s.Spec.RequestSigning.Algorithm)
+	}
 
 	//Generate Authorization header
 	authHeader := "Signature "
@@ -95,4 +146,28 @@ func (s *RequestSigning) ProcessRequest(w http.ResponseWriter, r *http.Request, 
 	log.Debug("Setting Authorization headers as =", authHeader)
 
 	return nil, http.StatusOK
+}
+
+func generateRSAEncodedSignature(signatureString string, privateKey *rsa.PrivateKey, algorithm string) (string, error) {
+	var hashFunction hash.Hash
+	var hashType crypto.Hash
+
+	switch algorithm {
+	case "rsa-sha256":
+		hashFunction = sha256.New()
+		hashType = crypto.SHA256
+	default:
+		hashFunction = sha256.New()
+		hashType = crypto.SHA256
+	}
+	hashFunction.Write([]byte(signatureString))
+	hashed := hashFunction.Sum(nil)
+
+	rawsignature, err := rsa.SignPKCS1v15(rand.Reader, privateKey, hashType, hashed)
+	if err != nil {
+		return "", err
+	}
+	encodedSignature := base64.StdEncoding.EncodeToString(rawsignature)
+
+	return encodedSignature, nil
 }
