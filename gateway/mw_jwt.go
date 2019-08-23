@@ -706,6 +706,7 @@ func generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.Se
 		session.AccessRights[apiID] = access
 	}
 	session.HMACEnabled = policy.HMACEnabled
+	session.RSAEnabled = policy.RSAEnabled
 	session.IsInactive = policy.IsInactive
 	session.Tags = policy.Tags
 

@@ -448,6 +448,10 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 			if !session.HMACEnabled {
 				session.HMACEnabled = policy.HMACEnabled
 			}
+
+			if !session.RSAEnabled {
+				session.RSAEnabled = policy.RSAEnabled
+			}
 		}
 
 		// Required for all

@@ -15,6 +15,7 @@ type Policy struct {
 	ThrottleRetryLimit int                         `bson:"throttle_retry_limit" json:"throttle_retry_limit"`
 	AccessRights       map[string]AccessDefinition `bson:"access_rights" json:"access_rights"`
 	HMACEnabled        bool                        `bson:"hmac_enabled" json:"hmac_enabled"`
+	RSAEnabled         bool                        `bson:"rsa_enabled" json:"rsa_enabled"`
 	Active             bool                        `bson:"active" json:"active"`
 	IsInactive         bool                        `bson:"is_inactive" json:"is_inactive"`
 	Tags               []string                    `bson:"tags" json:"tags"`
