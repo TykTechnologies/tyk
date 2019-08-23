@@ -1321,7 +1321,7 @@ func (r *RoundRobin) WithLen(len int) int {
 	return int(cur) % len
 }
 
-// stripRexexPrefix treates the matching portion of of path as prefix and
+// stripRexexPrefix treats the matching portion of of path as prefix and
 // returns path with matched text trimmed off.
 func stripRegexPrefix(re *regexp.Regexp, path string) string {
 	if re == nil {
