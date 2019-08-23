@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -11,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -1175,7 +1177,7 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 		return r.URL.Query().Get(a.VersionDefinition.Key)
 
 	case urlLocation:
-		uPath := strings.TrimPrefix(r.URL.Path, a.Proxy.ListenPath)
+		uPath := a.StripListenPath(r.URL.Path)
 		uPath = strings.TrimPrefix(uPath, "/"+a.Slug)
 
 		// First non-empty part of the path is the version ID
@@ -1302,6 +1304,10 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, []URLSpec, bool
 	return &version, rxPaths, whiteListStatus, StatusOk
 }
 
+func (a *APISpec) StripListenPath(path string) string {
+	return stripListenPathRegexp(a, path)
+}
+
 type RoundRobin struct {
 	pos uint32
 }
@@ -1313,4 +1319,118 @@ func (r *RoundRobin) WithLen(len int) int {
 	// -1 to start at 0, not 1
 	cur := atomic.AddUint32(&r.pos, 1) - 1
 	return int(cur) % len
+}
+
+// stripRexexPrefix treates the matching portion of of path as prefix and
+// returns path with matched text trimmed off.
+func stripRegexPrefix(re *regexp.Regexp, path string) string {
+	if re == nil {
+		return path
+	}
+	return string(bytes.TrimPrefix([]byte(path), re.Find([]byte(path))))
+}
+
+func stripListenPathRegexp(spec *APISpec, path string) string {
+	if spec.Proxy.ListenPath == "" {
+		return path
+	}
+	if spec.listenPathRegexp != nil {
+		return stripRegexPrefix(spec.listenPathRegexp, path)
+	}
+	re, err := compileListenPath(spec.Proxy.ListenPath)
+	if err != nil {
+		mainLog.Errorf("Failed to compile listen path %s:%v", spec.Proxy.ListenPath, err)
+		return strings.TrimPrefix(path, spec.Proxy.ListenPath)
+	}
+	spec.listenPathRegexp = re
+	return stripRegexPrefix(re, path)
+}
+
+func compileListenPath(tpl string) (*regexp.Regexp, error) {
+	// Check if it is well-formed.
+	idxs, errBraces := braceIndices(tpl)
+	if errBraces != nil {
+		return nil, errBraces
+	}
+	// Backup the original.
+	template := tpl
+	// Now let's parse it.
+	defaultPattern := "[^/]+"
+	varsN := make([]string, len(idxs)/2)
+	varsR := make([]*regexp.Regexp, len(idxs)/2)
+	pattern := bytes.NewBufferString("")
+	pattern.WriteByte('^')
+	reverse := bytes.NewBufferString("")
+	var end int
+	var err error
+	for i := 0; i < len(idxs); i += 2 {
+		// Set all values we are interested in.
+		raw := tpl[end:idxs[i]]
+		end = idxs[i+1]
+		parts := strings.SplitN(tpl[idxs[i]+1:end-1], ":", 2)
+		name := parts[0]
+		patt := defaultPattern
+		if len(parts) == 2 {
+			patt = parts[1]
+		}
+		// Name or pattern can't be empty.
+		if name == "" || patt == "" {
+			return nil, fmt.Errorf("mux: missing name or pattern in %q",
+				tpl[idxs[i]:end])
+		}
+		// Build the regexp pattern.
+		fmt.Fprintf(pattern, "%s(?P<%s>%s)", regexp.QuoteMeta(raw), varGroupName(i/2), patt)
+
+		// Build the reverse template.
+		fmt.Fprintf(reverse, "%s%%s", raw)
+
+		// Append variable name and compiled pattern.
+		varsN[i/2] = name
+		varsR[i/2], err = regexp.Compile(fmt.Sprintf("^%s$", patt))
+		if err != nil {
+			return nil, err
+		}
+	}
+	// Add the remaining.
+	raw := tpl[end:]
+	pattern.WriteString(regexp.QuoteMeta(raw))
+	reverse.WriteString(raw)
+	// Compile full regexp.
+	reg, errCompile := regexp.Compile(pattern.String())
+	if errCompile != nil {
+		return nil, errCompile
+	}
+
+	// Check for capturing groups which used to work in older versions
+	if reg.NumSubexp() != len(idxs)/2 {
+		return nil, fmt.Errorf("route %s contains capture groups in its regexp. Only non-capturing groups are accepted: e.g. (?:pattern) instead of (pattern)", template)
+	}
+	return reg, nil
+}
+func braceIndices(s string) ([]int, error) {
+	var level, idx int
+	var idxs []int
+	for i := 0; i < len(s); i++ {
+		switch s[i] {
+		case '{':
+			if level++; level == 1 {
+				idx = i
+			}
+		case '}':
+			if level--; level == 0 {
+				idxs = append(idxs, idx, i+1)
+			} else if level < 0 {
+				return nil, fmt.Errorf("mux: unbalanced braces in %q", s)
+			}
+		}
+	}
+	if level != 0 {
+		return nil, fmt.Errorf("mux: unbalanced braces in %q", s)
+	}
+	return idxs, nil
+}
+
+// varGroupName builds a capturing group name for the indexed variable.
+func varGroupName(idx int) string {
+	return "v" + strconv.Itoa(idx)
 }

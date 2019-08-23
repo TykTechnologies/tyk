@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"bytes"
 	"crypto/tls"
 	"fmt"
 	"html/template"
@@ -1446,29 +1445,4 @@ func listen(listener, controlListener net.Listener, err error) {
 	if !rpc.IsEmergencyMode() {
 		doReload()
 	}
-}
-
-// stripRexexPrefix treates the matching portion of of path as prefix and
-// returns path with matched text trimmed off.
-func stripRegexPrefix(re *regexp.Regexp, path string) string {
-	if re == nil {
-		return path
-	}
-	return string(bytes.TrimPrefix([]byte(path), re.Find([]byte(path))))
-}
-
-func stripListenPathRegexp(spec *APISpec, path string) string {
-	if spec.Proxy.ListenPath == "" {
-		return path
-	}
-	if spec.listenPathRegexp != nil {
-		return stripRegexPrefix(spec.listenPathRegexp, path)
-	}
-	re, err := regexp.Compile(spec.Proxy.ListenPath)
-	if err != nil {
-		mainLog.Errorf("Failed to compile listen path %s:%v", spec.Proxy.ListenPath, err)
-		return strings.TrimPrefix(path, spec.Proxy.ListenPath)
-	}
-	spec.listenPathRegexp = re
-	return stripRegexPrefix(re, path)
 }
