@@ -1,10 +1,16 @@
 package gateway
 
 import (
+	"crypto"
 	"crypto/hmac"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha1"
+	"crypto/sha256"
 	"crypto/sha512"
+	"crypto/x509"
 	"encoding/base64"
+	"encoding/pem"
 	"fmt"
 	"hash"
 	"net/http"
@@ -54,6 +60,21 @@ func createHMACAuthSession() *user.SessionState {
 	session.QuotaMax = -1
 	session.HMACEnabled = true
 	session.HmacSecret = "9879879878787878"
+	return session
+}
+
+func createRSAAuthSession(pubCertId string) *user.SessionState {
+	session := new(user.SessionState)
+	session.Rate = 8.0
+	session.Allowance = session.Rate
+	session.LastCheck = time.Now().Unix()
+	session.Per = 1.0
+	session.QuotaRenewalRate = 300 // 5 minutes
+	session.QuotaRenews = time.Now().Unix() + 20
+	session.QuotaRemaining = 1
+	session.QuotaMax = -1
+	session.RSAEnabled = true
+	session.RSACertificateId = pubCertId
 	return session
 }
 
@@ -151,6 +172,59 @@ func testPrepareHMACAuthSessionPass(tb testing.TB, hashFn func() hash.Hash, even
 	encodedString := url.QueryEscape(sigString)
 
 	return encodedString, spec, req, sessionKey
+}
+
+func testPrepareRSAAuthSessionPass(tb testing.TB, eventWG *sync.WaitGroup, privateKey *rsa.PrivateKey, pubCertId string, withHeader bool, isBench bool) (string, *APISpec, *http.Request, string) {
+	spec := CreateSpecTest(tb, hmacAuthDef)
+	session := createRSAAuthSession(pubCertId)
+
+	// Should not receive an AuthFailure event
+	cb := func(em config.EventMessage) {
+		eventWG.Done()
+	}
+	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
+		"AuthFailure": {&testAuthFailEventHandler{cb}},
+	}
+
+	sessionKey := ""
+	if isBench {
+		sessionKey = uuid.New()
+	} else {
+		sessionKey = "9876"
+	}
+
+	spec.SessionManager.UpdateSession(sessionKey, session, 60, false)
+
+	req := TestReq(tb, "GET", "/", nil)
+
+	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
+
+	// Signature needs to be: Authorization: Signature keyId="hmac-key-1",algorithm="hmac-sha1",signature="Base64(HMAC-SHA1(signing string))"
+
+	// Prep the signature string
+	tim := time.Now().Format(refDate)
+	req.Header.Set("Date", tim)
+	signatureString := ""
+	if withHeader {
+		req.Header.Set("X-Test-1", "hello")
+		req.Header.Set("X-Test-2", "world")
+		signatureString = strings.ToLower("(request-target): ") + "get /\n"
+		signatureString += strings.ToLower("Date") + ": " + tim + "\n"
+		signatureString += strings.ToLower("X-Test-1") + ": " + "hello" + "\n"
+		signatureString += strings.ToLower("X-Test-2") + ": " + "world"
+	} else {
+		signatureString = strings.ToLower("Date") + ": " + tim
+	}
+
+	h := sha256.New()
+	h.Write([]byte(signatureString))
+	hashed := h.Sum(nil)
+
+	signature, _ := rsa.SignPKCS1v15(rand.Reader, privateKey, crypto.SHA256, hashed)
+
+	sigString := base64.StdEncoding.EncodeToString(signature)
+
+	return sigString, spec, req, sessionKey
 }
 
 func TestHMACAuthSessionPass(t *testing.T) {
@@ -561,5 +635,102 @@ func TestGetFieldValues(t *testing.T) {
 	}
 	if h.Signature != sign {
 		t.Errorf("expected Signature:%s got %s", sign, h.Signature)
+	}
+}
+
+func TestRSAAuthSessionPass(t *testing.T) {
+	_, _, _, serverCert := genServerCertificate()
+	privateKey := serverCert.PrivateKey.(*rsa.PrivateKey)
+	x509Cert, _ := x509.ParseCertificate(serverCert.Certificate[0])
+	pubDer, _ := x509.MarshalPKIXPublicKey(x509Cert.PublicKey)
+	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDer})
+	pubID, _ := CertificateManager.Add(pubPem, "")
+	defer CertificateManager.Delete(pubID)
+
+	// Should not receive an AuthFailure event
+	var eventWG sync.WaitGroup
+	eventWG.Add(1)
+	encodedString, spec, req, sessionKey := testPrepareRSAAuthSessionPass(t, &eventWG, privateKey, pubID, false, false)
+
+	recorder := httptest.NewRecorder()
+	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"%s\",algorithm=\"rsa-sha256\",signature=\"%s\"", sessionKey, encodedString))
+
+	chain := getHMACAuthChain(spec)
+	chain.ServeHTTP(recorder, req)
+
+	if recorder.Code != 200 {
+		t.Error("Initial request failed with non-200 code, should have gone through!: \n", recorder.Code, recorder.Body.String())
+	}
+
+	// Check we did not get our AuthFailure event
+	if !waitTimeout(&eventWG, 20*time.Millisecond) {
+		t.Error("Request should not have generated an AuthFailure event!: \n")
+	}
+}
+
+func BenchmarkRSAAuthSessionPass(b *testing.B) {
+	b.ReportAllocs()
+
+	_, _, _, serverCert := genServerCertificate()
+	privateKey := serverCert.PrivateKey.(*rsa.PrivateKey)
+	x509Cert, _ := x509.ParseCertificate(serverCert.Certificate[0])
+	pubDer, _ := x509.MarshalPKIXPublicKey(x509Cert.PublicKey)
+	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDer})
+	pubID, _ := CertificateManager.Add(pubPem, "")
+	defer CertificateManager.Delete(pubID)
+
+	var eventWG sync.WaitGroup
+	eventWG.Add(b.N)
+	encodedString, spec, req, sessionKey := testPrepareRSAAuthSessionPass(b, &eventWG, privateKey, pubID, false, true)
+
+	recorder := httptest.NewRecorder()
+	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"%s\",algorithm=\"rsa-sha256\",signature=\"%s\"", sessionKey, encodedString))
+
+	chain := getHMACAuthChain(spec)
+
+	for i := 0; i < b.N; i++ {
+		chain.ServeHTTP(recorder, req)
+		if recorder.Code != 200 {
+			b.Error("Initial request failed with non-200 code, should have gone through!: \n", recorder.Code, recorder.Body.String())
+		}
+	}
+}
+
+func TestRSAAuthSessionKeyMissing(t *testing.T) {
+	_, _, _, serverCert := genServerCertificate()
+	privateKey := serverCert.PrivateKey.(*rsa.PrivateKey)
+	x509Cert, _ := x509.ParseCertificate(serverCert.Certificate[0])
+	pubDer, _ := x509.MarshalPKIXPublicKey(x509Cert.PublicKey)
+	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDer})
+	pubID, _ := CertificateManager.Add(pubPem, "")
+	defer CertificateManager.Delete(pubID)
+
+	spec := CreateSpecTest(t, hmacAuthDef)
+
+	// Should receive an AuthFailure event
+	var eventWG sync.WaitGroup
+	eventWG.Add(1)
+	cb := func(em config.EventMessage) {
+		eventWG.Done()
+	}
+	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
+		"AuthFailure": {&testAuthFailEventHandler{cb}},
+	}
+
+	recorder := httptest.NewRecorder()
+	encodedString, spec, req, _ := testPrepareRSAAuthSessionPass(t, &eventWG, privateKey, pubID, false, false)
+
+	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"98765\",algorithm=\"rsa-sha256\",signature=\"%s\"", encodedString))
+
+	chain := getHMACAuthChain(spec)
+	chain.ServeHTTP(recorder, req)
+
+	if recorder.Code != 400 {
+		t.Error("Request should have failed with key not found error!: \n", recorder.Code)
+	}
+
+	// Check we did get our AuthFailure event
+	if waitTimeout(&eventWG, 20*time.Millisecond) {
+		t.Error("Request should have generated an AuthFailure event!: \n")
 	}
 }
