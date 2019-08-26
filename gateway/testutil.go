@@ -668,8 +668,8 @@ func (s *Test) CreateSession(sGen ...func(s *user.SessionState)) (*user.SessionS
 	return session, keySuccess.Key
 }
 
-func StartTest(config ...TestConfig) Test {
-	t := Test{}
+func StartTest(config ...TestConfig) *Test {
+	t := &Test{}
 	if len(config) > 0 {
 		t.config = config[0]
 	}

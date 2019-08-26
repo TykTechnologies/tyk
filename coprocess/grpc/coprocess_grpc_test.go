@@ -252,7 +252,7 @@ func startTykWithGRPC() (*gateway.Test, *grpc.Server) {
 
 	// Load test APIs:
 	loadTestGRPCAPIs()
-	return &ts, grpcServer
+	return ts, grpcServer
 }
 
 func TestMain(m *testing.M) {
