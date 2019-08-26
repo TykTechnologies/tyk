@@ -37,6 +37,8 @@ PKGS="$(go list -tags "coprocess python grpc" ./...)"
 
 go get -t
 
+export PKG_PATH=$GOPATH/src/github.com/TykTechnologies/tyk
+
 # build Go-plugin used in tests
 go build ${race} -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugins || fatal "building Go-plugin failed"
 
@@ -45,12 +47,7 @@ for pkg in $PKGS; do
 
     # TODO: Remove skipRace variable after solving race conditions in tests.
     skipRace=false
-    if [[ ${pkg} == *"coprocess/grpc" ]]; then
-        tags="-tags 'coprocess grpc'"
-        skipRace=true
-    elif [[ ${pkg} == *"coprocess/python" ]]; then
-        tags="-tags 'coprocess python'"
-    elif [[ ${pkg} == *"coprocess" ]]; then
+    if [[ ${pkg} == *"coprocess" ]]; then
         tags="-tags 'coprocess'"
         skipRace=true
     elif [[ ${pkg} == *"goplugin" ]]; then
