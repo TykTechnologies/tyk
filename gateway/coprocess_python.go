@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"path/filepath"
 	"runtime"
-	"sync"
 	"unsafe"
 
 	"github.com/sirupsen/logrus"
@@ -29,7 +28,6 @@ var (
 // PythonDispatcher implements a coprocess.Dispatcher
 type PythonDispatcher struct {
 	coprocess.Dispatcher
-	mu sync.Mutex
 }
 
 // Dispatch takes a CoProcessMessage and sends it to the CP.
@@ -79,7 +77,15 @@ func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object
 		return nil, err
 	}
 
-	newObjectBytes, err := python.PyBytesAsString(newObjectPtr)
+	newObjectLen, err := python.PyTupleGetItem(result, 1)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "python",
+		}).Error(err)
+		return nil, err
+	}
+
+	newObjectBytes, err := python.PyBytesAsString(newObjectPtr, python.PyLongAsLong(newObjectLen))
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "python",
@@ -115,10 +121,9 @@ func (d *PythonDispatcher) Reload() {
 
 // HandleMiddlewareCache isn't used by Python.
 func (d *PythonDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, basePath string) {
-	d.mu.Lock()
 	go func() {
 		runtime.LockOSThread()
-
+		defer runtime.UnlockOSThread()
 		dispatcherLoadBundle, err := python.PyObjectGetAttr(dispatcherInstance, "load_bundle")
 		if err != nil {
 			log.WithFields(logrus.Fields{
@@ -191,7 +196,7 @@ func PythonNewDispatcher(bundleRootPath string) (coprocess.Dispatcher, error) {
 			"prefix": "python",
 		}).Fatal(err)
 	}
-	dispatcher := &PythonDispatcher{mu: sync.Mutex{}}
+	dispatcher := &PythonDispatcher{}
 	return dispatcher, nil
 }
 
