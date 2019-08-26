@@ -96,10 +96,9 @@ func (b *Bundle) Verify() error {
 // AddToSpec attaches the custom middleware settings to an API definition.
 func (b *Bundle) AddToSpec() {
 	b.Spec.CustomMiddleware = b.Manifest.CustomMiddleware
-
-	// Call HandleMiddlewareCache only when using rich plugins:
-	if GlobalDispatcher != nil && b.Spec.CustomMiddleware.Driver != apidef.OttoDriver {
-		GlobalDispatcher.HandleMiddlewareCache(&b.Manifest, b.Path)
+	dispatcher := loadedDrivers[b.Spec.CustomMiddleware.Driver]
+	if dispatcher != nil {
+		dispatcher.HandleMiddlewareCache(&b.Manifest, b.Path)
 	}
 }
 

@@ -20,15 +20,11 @@ import (
 	"io/ioutil"
 	"net/http"
 )
+import "fmt"
 
 var (
-	// EnableCoProcess will be overridden by config.Global().EnableCoProcess.
-	EnableCoProcess = false
-
-	// GlobalDispatcher will be implemented by the current CoProcess driver.
-	GlobalDispatcher coprocess.Dispatcher
-
-	// CoProcessName apidef.MiddlewareDriver
+	supportedDrivers = []apidef.MiddlewareDriver{apidef.PythonDriver, apidef.LuaDriver, apidef.GrpcDriver}
+	loadedDrivers    = map[apidef.MiddlewareDriver]coprocess.Dispatcher{}
 )
 
 // CoProcessMiddleware is the basic CP middleware struct.
@@ -60,13 +56,12 @@ func CreateCoProcessMiddleware(hookName string, hookType coprocess.HookType, mwD
 }
 
 func DoCoprocessReload() {
-	if GlobalDispatcher != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "coprocess",
-		}).Info("Reloading middlewares")
-		GlobalDispatcher.Reload()
+	log.WithFields(logrus.Fields{
+		"prefix": "coprocess",
+	}).Info("Reloading middlewares")
+	if dispatcher := loadedDrivers[apidef.PythonDriver]; dispatcher != nil {
+		dispatcher.Reload()
 	}
-
 }
 
 // CoProcessor represents a CoProcess during the request.
@@ -74,7 +69,7 @@ type CoProcessor struct {
 	Middleware *CoProcessMiddleware
 }
 
-// ObjectFromRequest constructs a CoProcessObject from a given http.Request.
+// BuildObject constructs a CoProcessObject from a given http.Request.
 func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response) (*coprocess.Object, error) {
 	headers := ProtoMap(req.Header)
 
@@ -204,66 +199,86 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 }
 
 // CoProcessInit creates a new CoProcessDispatcher, it will be called when Tyk starts.
-func CoProcessInit() error {
-	if isRunningTests() && GlobalDispatcher != nil {
-		return nil
+func CoProcessInit() {
+	if !config.Global().CoProcessOptions.EnableCoProcess {
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess",
+		}).Info("Rich plugins are disabled")
+		return
 	}
-	var err error
-	if config.Global().CoProcessOptions.EnableCoProcess {
-		GlobalDispatcher, err = NewCoProcessDispatcher()
-		EnableCoProcess = true
+
+	// Load Python dispatcher:
+	if config.Global().CoProcessOptions.PythonPathPrefix != "" {
+		var err error
+		loadedDrivers[apidef.PythonDriver], err = NewPythonDispatcher()
+		if err == nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "coprocess",
+			}).Info("Python dispatcher was initialized")
+		} else {
+			log.WithFields(logrus.Fields{
+				"prefix": "coprocess",
+			}).WithError(err).Error("Couldn't load Python dispatcher")
+		}
 	}
-	return err
+
+	// Load gRPC dispatcher:
+	if config.Global().CoProcessOptions.CoProcessGRPCServer != "" {
+		var err error
+		loadedDrivers[apidef.GrpcDriver], err = NewGRPCDispatcher()
+		if err == nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "coprocess",
+			}).Info("gRPC dispatcher was initialized")
+		} else {
+			log.WithFields(logrus.Fields{
+				"prefix": "coprocess",
+			}).WithError(err).Error("Couldn't load gRPC dispatcher")
+		}
+	}
 }
 
 // EnabledForSpec checks if this middleware should be enabled for a given API.
 func (m *CoProcessMiddleware) EnabledForSpec() bool {
-	// This flag is true when Tyk has been compiled with CP support and when the configuration enables it.
-	enableCoProcess := config.Global().CoProcessOptions.EnableCoProcess && EnableCoProcess
-	// This flag indicates if the current spec specifies any CP custom middleware.
-	var usesCoProcessMiddleware bool
-
-	supportedDrivers := []apidef.MiddlewareDriver{apidef.PythonDriver, apidef.LuaDriver, apidef.GrpcDriver}
-
-	for _, driver := range supportedDrivers {
-		if m.Spec.CustomMiddleware.Driver == driver && CoProcessName == driver {
-			usesCoProcessMiddleware = true
-			break
-		}
-	}
-
-	if usesCoProcessMiddleware && enableCoProcess {
-		log.WithFields(logrus.Fields{
-			"prefix": "coprocess",
-		}).Debug("Enabling CP middleware.")
-		m.successHandler = &SuccessHandler{m.BaseMiddleware}
-		return true
-	}
-
-	if usesCoProcessMiddleware && !enableCoProcess {
+	if !config.Global().CoProcessOptions.EnableCoProcess {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
 		}).Error("Your API specifies a CP custom middleware, either Tyk wasn't build with CP support or CP is not enabled in your Tyk configuration file!")
+		return false
 	}
 
-	if !usesCoProcessMiddleware && m.Spec.CustomMiddleware.Driver != "" {
+	var supported bool
+	for _, driver := range supportedDrivers {
+		if m.Spec.CustomMiddleware.Driver == driver {
+			supported = true
+		}
+	}
+
+	if !supported {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
-		}).Error("CP Driver not supported: ", m.Spec.CustomMiddleware.Driver)
+		}).Errorf("Unsupported driver '%s'", m.Spec.CustomMiddleware.Driver)
+		return false
 	}
 
-	return false
+	if d, _ := loadedDrivers[m.Spec.CustomMiddleware.Driver]; d == nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess",
+		}).Errorf("Driver '%s' isn't loaded", m.Spec.CustomMiddleware.Driver)
+		return false
+	}
+
+	log.WithFields(logrus.Fields{
+		"prefix": "coprocess",
+	}).Debug("Enabling CP middleware.")
+	m.successHandler = &SuccessHandler{m.BaseMiddleware}
+	return true
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	logger := m.Logger()
-
 	logger.Debug("CoProcess Request, HookType: ", m.HookType)
-
-	if !EnableCoProcess {
-		return nil, 200
-	}
 
 	var extractor IdExtractor
 	if m.Spec.EnableCoProcessAuth && m.Spec.CustomMiddleware.IdExtractor.Extractor != nil {
@@ -407,9 +422,10 @@ func (h *CustomMiddlewareResponseHook) Init(mwDef interface{}, spec *APISpec) er
 		BaseMiddleware: BaseMiddleware{
 			Spec: spec,
 		},
-		HookName:    mwDefinition.Name,
-		HookType:    coprocess.HookType_Response,
-		RawBodyOnly: mwDefinition.RawBodyOnly,
+		HookName:         mwDefinition.Name,
+		HookType:         coprocess.HookType_Response,
+		RawBodyOnly:      mwDefinition.RawBodyOnly,
+		MiddlewareDriver: spec.CustomMiddleware.Driver,
 	}
 	return nil
 }
@@ -463,10 +479,12 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 }
 
 func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
-	if GlobalDispatcher == nil {
-		return nil, errors.New("Dispatcher not initialized")
+	dispatcher := loadedDrivers[c.Middleware.MiddlewareDriver]
+	if dispatcher == nil {
+		err := fmt.Errorf("Couldn't dispatch request, driver '%s' isn't available", c.Middleware.MiddlewareDriver)
+		return nil, err
 	}
-	newObject, err := GlobalDispatcher.Dispatch(object)
+	newObject, err := dispatcher.Dispatch(object)
 	if err != nil {
 		return nil, err
 	}

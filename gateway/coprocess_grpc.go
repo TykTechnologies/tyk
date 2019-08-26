@@ -1,6 +1,3 @@
-// +build coprocess
-// +build grpc
-
 package gateway
 
 import (
@@ -18,11 +15,10 @@ import (
 	"github.com/TykTechnologies/tyk/coprocess"
 )
 
-// MessageType sets the default message type.
-var MessageType = coprocess.ProtobufMessage
-
-var grpcConnection *grpc.ClientConn
-var grpcClient coprocess.DispatcherClient
+var (
+	grpcConnection *grpc.ClientConn
+	grpcClient     coprocess.DispatcherClient
+)
 
 // GRPCDispatcher implements a coprocess.Dispatcher
 type GRPCDispatcher struct {
@@ -30,7 +26,7 @@ type GRPCDispatcher struct {
 }
 
 func dialer(addr string, timeout time.Duration) (net.Conn, error) {
-	grpcUrl, err := url.Parse(config.Global().CoProcessOptions.CoProcessGRPCServer)
+	grpcURL, err := url.Parse(config.Global().CoProcessOptions.CoProcessGRPCServer)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
@@ -38,7 +34,7 @@ func dialer(addr string, timeout time.Duration) (net.Conn, error) {
 		return nil, err
 	}
 
-	if grpcUrl == nil || config.Global().CoProcessOptions.CoProcessGRPCServer == "" {
+	if grpcURL == nil || config.Global().CoProcessOptions.CoProcessGRPCServer == "" {
 		errString := "No gRPC URL is set!"
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
@@ -46,19 +42,13 @@ func dialer(addr string, timeout time.Duration) (net.Conn, error) {
 		return nil, errors.New(errString)
 	}
 
-	grpcUrlString := config.Global().CoProcessOptions.CoProcessGRPCServer[len(grpcUrl.Scheme)+3:]
-	return net.DialTimeout(grpcUrl.Scheme, grpcUrlString, timeout)
+	grpcURLString := config.Global().CoProcessOptions.CoProcessGRPCServer[len(grpcURL.Scheme)+3:]
+	return net.DialTimeout(grpcURL.Scheme, grpcURLString, timeout)
 }
 
 // Dispatch takes a CoProcessMessage and sends it to the CP.
-func (d *GRPCDispatcher) DispatchObject(object *coprocess.Object) (*coprocess.Object, error) {
-	newObject, err := grpcClient.Dispatch(context.Background(), object)
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "coprocess",
-		}).Error(err)
-	}
-	return newObject, err
+func (d *GRPCDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
+	return grpcClient.Dispatch(context.Background(), object)
 }
 
 // DispatchEvent dispatches a Tyk event.
@@ -82,10 +72,8 @@ func (d *GRPCDispatcher) Reload() {}
 // HandleMiddlewareCache isn't used by gRPC.
 func (d *GRPCDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, basePath string) {}
 
-// NewCoProcessDispatcher wraps all the actions needed for this CP.
-func NewCoProcessDispatcher() (coprocess.Dispatcher, error) {
-	MessageType = coprocess.ProtobufMessage
-	CoProcessName = apidef.GrpcDriver
+// NewGRPCDispatcher wraps all the actions needed for this CP.
+func NewGRPCDispatcher() (coprocess.Dispatcher, error) {
 	if config.Global().CoProcessOptions.CoProcessGRPCServer == "" {
 		return nil, errors.New("No gRPC URL is set")
 	}
@@ -100,9 +88,4 @@ func NewCoProcessDispatcher() (coprocess.Dispatcher, error) {
 		return nil, err
 	}
 	return &GRPCDispatcher{}, nil
-}
-
-// Dispatch prepares a CoProcessMessage, sends it to the GlobalDispatcher and gets a reply.
-func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
-	return GlobalDispatcher.DispatchObject(object)
 }

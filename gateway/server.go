@@ -215,11 +215,7 @@ func setupGlobals(ctx context.Context) {
 	templatesDir := filepath.Join(config.Global().TemplatePath, "error*")
 	templates = template.Must(template.ParseGlob(templatesDir))
 
-	if config.Global().CoProcessOptions.EnableCoProcess {
-		if err := CoProcessInit(); err != nil {
-			log.WithField("prefix", "coprocess").Error(err)
-		}
-	}
+	CoProcessInit()
 
 	// Get the notifier ready
 	mainLog.Debug("Notifier will not work in hybrid mode")

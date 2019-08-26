@@ -21,10 +21,7 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-const CoProcessName = apidef.PythonDriver
-
 var (
-	MessageType        = coprocess.ProtobufMessage
 	dispatcherClass    unsafe.Pointer
 	dispatcherInstance unsafe.Pointer
 )
@@ -38,13 +35,12 @@ type PythonDispatcher struct {
 // Dispatch takes a CoProcessMessage and sends it to the CP.
 func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
 	// Prepare the PB object:
-
 	objectMsg, err := proto.Marshal(object)
 	if err != nil {
 		return nil, err
 	}
 
-	// Find the dispatch_hook stuff (this should be done during init)
+	// Find the dispatch_hook:
 	dispatchHookFunc, err := python.PyObjectGetAttr(dispatcherInstance, "dispatch_hook")
 	if err != nil {
 		log.WithFields(logrus.Fields{
@@ -144,7 +140,6 @@ func (d *PythonDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, baseP
 // PythonInit initializes the Python interpreter.
 func PythonInit() error {
 	ver := config.Global().CoProcessOptions.PythonVersion
-	// TODO: disable Python functionality (should we set a default one?)
 	if ver == "" {
 		return errors.New("Python version is not set")
 	}
@@ -224,14 +219,8 @@ func getBundlePaths() []string {
 	return directories
 }
 
-// NewCoProcessDispatcher wraps all the actions needed for this CP.
-func NewCoProcessDispatcher() (dispatcher coprocess.Dispatcher, err error) {
-	// MessageType sets the default message type.
-	// MessageType = coprocess.ProtobufMessage
-
-	// CoProcessName declares the driver name.
-	// CoProcessName = apidef.PythonDriver
-
+// NewPythonDispatcher wraps all the actions needed for this CP.
+func NewPythonDispatcher() (dispatcher coprocess.Dispatcher, err error) {
 	workDir := config.Global().CoProcessOptions.PythonPathPrefix
 
 	dispatcherPath := filepath.Join(workDir, "coprocess", "python")
