@@ -148,13 +148,18 @@ func PyBytesFromString(input []byte) (unsafe.Pointer, error) {
 }
 
 // PyBytesAsString wraps PyBytes_AsString
-func PyBytesAsString(o unsafe.Pointer) ([]byte, error) {
+func PyBytesAsString(o unsafe.Pointer, l int) ([]byte, error) {
 	cstr := PyBytes_AsString(ToPyObject(o))
 	if cstr == nil {
 		return nil, errors.New("PyBytes_AsString as string failed")
 	}
 	// defer C.free(unsafe.Pointer(cstr))
-	// TODO: should use GoBytes with specific length
-	str := C.GoString(cstr)
+	str := C.GoBytes(unsafe.Pointer(cstr), C.int(l))
 	return []byte(str), nil
+}
+
+// PyLongAsLong wraps PyLong_AsLong
+func PyLongAsLong(o unsafe.Pointer) int {
+	l := PyLong_AsLong(ToPyObject(o))
+	return int(l)
 }
