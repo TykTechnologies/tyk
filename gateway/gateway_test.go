@@ -179,7 +179,7 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = false
 			spec.Proxy.ListenPath = "/listen_me"
-			spec.Proxy.TargetURL = testHttpAny + "/sent_to_me"
+			spec.Proxy.TargetURL = TestHttpAny + "/sent_to_me"
 		})
 
 		ts.Run(t, []test.TestCase{
@@ -196,7 +196,7 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = false
 			spec.Proxy.ListenPath = "/listen_me"
-			spec.Proxy.TargetURL = testHttpAny + "/sent_to_me"
+			spec.Proxy.TargetURL = TestHttpAny + "/sent_to_me"
 		})
 
 		ts.Run(t, []test.TestCase{
@@ -213,7 +213,7 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = true
 			spec.Proxy.ListenPath = "/listen_me"
-			spec.Proxy.TargetURL = testHttpAny + "/sent_to_me"
+			spec.Proxy.TargetURL = TestHttpAny + "/sent_to_me"
 		})
 
 		ts.Run(t, []test.TestCase{
@@ -230,7 +230,7 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = true
 			spec.Proxy.ListenPath = "/listen_me"
-			spec.Proxy.TargetURL = testHttpAny + "/sent_to_me"
+			spec.Proxy.TargetURL = TestHttpAny + "/sent_to_me"
 		})
 
 		ts.Run(t, []test.TestCase{
@@ -293,7 +293,7 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = false
 			spec.Proxy.ListenPath = "/listen_me"
-			spec.Proxy.TargetURL = testHttpAny + "/sent_to_me"
+			spec.Proxy.TargetURL = TestHttpAny + "/sent_to_me"
 		})
 
 		ts.Run(t, []test.TestCase{
@@ -311,7 +311,7 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = false
 			spec.Proxy.ListenPath = "/listen_me"
-			spec.Proxy.TargetURL = testHttpAny + "/sent_to_me"
+			spec.Proxy.TargetURL = TestHttpAny + "/sent_to_me"
 		})
 
 		ts.Run(t, []test.TestCase{
@@ -329,7 +329,7 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = true
 			spec.Proxy.ListenPath = "/listen_me"
-			spec.Proxy.TargetURL = testHttpAny + "/sent_to_me"
+			spec.Proxy.TargetURL = TestHttpAny + "/sent_to_me"
 		})
 
 		ts.Run(t, []test.TestCase{
@@ -347,7 +347,7 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = true
 			spec.Proxy.ListenPath = "/listen_me"
-			spec.Proxy.TargetURL = testHttpAny + "/sent_to_me"
+			spec.Proxy.TargetURL = TestHttpAny + "/sent_to_me"
 		})
 
 		ts.Run(t, []test.TestCase{
@@ -850,7 +850,7 @@ func TestMultiTargetProxy(t *testing.T) {
 			"vdef": {Name: "vdef"},
 			"vother": {
 				Name:           "vother",
-				OverrideTarget: testHttpAny + "/vother",
+				OverrideTarget: TestHttpAny + "/vother",
 			},
 		}
 		spec.Proxy.ListenPath = "/"

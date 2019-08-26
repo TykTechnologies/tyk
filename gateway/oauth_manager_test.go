@@ -879,7 +879,7 @@ func TestClientAccessRequest(t *testing.T) {
 
 	createTestOAuthClient(spec, authClientID)
 
-	authData := getAuthCode(t, &ts)
+	authData := getAuthCode(t, ts)
 
 	t.Run("Exchane access code for token request", func(t *testing.T) {
 		param := make(url.Values)
@@ -912,7 +912,7 @@ func TestOAuthAPIRefreshInvalidate(t *testing.T) {
 	createTestOAuthClient(spec, authClientID)
 
 	// Step 1 create token
-	tokenData := getToken(t, &ts)
+	tokenData := getToken(t, ts)
 
 	// Step 2 - invalidate the refresh token
 	t.Run("Invalidate token request", func(t *testing.T) {
@@ -968,7 +968,7 @@ func TestClientRefreshRequest(t *testing.T) {
 
 	createTestOAuthClient(spec, authClientID)
 
-	tokenData := getToken(t, &ts)
+	tokenData := getToken(t, ts)
 
 	t.Run("Refresh token request", func(t *testing.T) {
 		param := make(url.Values)
@@ -1000,7 +1000,7 @@ func TestClientRefreshRequestDouble(t *testing.T) {
 
 	createTestOAuthClient(spec, authClientID)
 
-	tokenData := getToken(t, &ts)
+	tokenData := getToken(t, ts)
 
 	headers := map[string]string{
 		"Content-Type":  "application/x-www-form-urlencoded",

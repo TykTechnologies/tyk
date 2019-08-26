@@ -304,7 +304,7 @@ const openRLDefSmall = `{
 	},
 	"proxy": {
 		"listen_path": "/rl_test/",
-		"target_url": "` + testHttpAny + `"
+		"target_url": "` + TestHttpAny + `"
 	},
 	"global_rate_limit": {
 		"rate": 3,
@@ -324,7 +324,7 @@ const closedRLDefSmall = `{
 	},
 	"proxy": {
 		"listen_path": "/rl_closed_test/",
-		"target_url": "` + testHttpAny + `"
+		"target_url": "` + TestHttpAny + `"
 	},
 	"global_rate_limit": {
 		"rate": 3,

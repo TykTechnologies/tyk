@@ -77,7 +77,7 @@ const apiDefListTest = `[{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "` + testHttpAny + `"
+		"target_url": "` + TestHttpAny + `"
 	}
 }]`
 
@@ -95,7 +95,7 @@ const apiDefListTest2 = `[{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "` + testHttpAny + `"
+		"target_url": "` + TestHttpAny + `"
 	}
 },
 {
@@ -112,7 +112,7 @@ const apiDefListTest2 = `[{
 	},
 	"proxy": {
 		"listen_path": "/v2",
-		"target_url": "` + testHttpAny + `"
+		"target_url": "` + TestHttpAny + `"
 	}
 }]`
 
