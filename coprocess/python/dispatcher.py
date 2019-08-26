@@ -6,7 +6,6 @@ from tyk.middleware import TykMiddleware
 from tyk.object import TykCoProcessObject
 from tyk.event import TykEvent
 
-# TODO: handle exceptions here
 from gateway import TykGateway as tyk
 
 import sys
