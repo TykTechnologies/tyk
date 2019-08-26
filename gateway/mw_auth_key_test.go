@@ -278,7 +278,7 @@ const authKeyDef = `{
 	},
 	"proxy": {
 		"listen_path": "/auth_key_test/",
-		"target_url": "` + testHttpAny + `"
+		"target_url": "` + TestHttpAny + `"
 	}
 }`
 
@@ -331,7 +331,7 @@ const multiAuthBackwardsCompatible = `{
 	},
 	"proxy": {
 		"listen_path": "/auth_key_test/",
-		"target_url": "` + testHttpAny + `"
+		"target_url": "` + TestHttpAny + `"
 	}
 }`
 
@@ -406,7 +406,7 @@ const multiAuthDef = `{
 	},
 	"proxy": {
 		"listen_path": "/auth_key_test/",
-		"target_url": "` + testHttpAny + `"
+		"target_url": "` + TestHttpAny + `"
 	}
 }`
 

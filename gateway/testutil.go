@@ -248,11 +248,11 @@ const (
 	testHttpListen = "127.0.0.1:16500"
 	// Accepts any http requests on /, only allows GET on /get, etc.
 	// All return a JSON with request info.
-	testHttpAny     = "http://" + testHttpListen
-	TestHttpGet     = testHttpAny + "/get"
-	testHttpPost    = testHttpAny + "/post"
-	testHttpJWK     = testHttpAny + "/jwk.json"
-	testHttpBundles = testHttpAny + "/bundles/"
+	TestHttpAny     = "http://" + testHttpListen
+	TestHttpGet     = TestHttpAny + "/get"
+	testHttpPost    = TestHttpAny + "/post"
+	testHttpJWK     = TestHttpAny + "/jwk.json"
+	testHttpBundles = TestHttpAny + "/bundles/"
 
 	// Nothing should be listening on port 16501 - useful for
 	// testing TCP and HTTP failures.
@@ -699,7 +699,7 @@ const sampleAPI = `{
     },
     "proxy": {
         "listen_path": "/sample",
-        "target_url": "` + testHttpAny + `"
+        "target_url": "` + TestHttpAny + `"
     }
 }`
 
