@@ -169,7 +169,7 @@ func (m *proxyMux) addTCPService(spec *APISpec, modifier *tcp.Modifier) {
 				DialTLS:         dialWithServiceDiscovery(spec, dialTLSPinnedCheck(spec, tlsConfig)),
 				Dial:            dialWithServiceDiscovery(spec, net.Dial),
 				TLSConfigTarget: tlsConfig,
-				SyncStats:       recordTCPHit(spec),
+				SyncStats:       recordTCPHit(spec.APIID, spec.DoNotTrack),
 			},
 		}
 		p.tcpProxy.AddDomainHandler(hostname, spec.Proxy.TargetURL, modifier)
@@ -218,11 +218,17 @@ func flushNetworkAnalytics(ctx context.Context) {
 	}
 }
 
-func recordTCPHit(spec *APISpec) func(tcp.Stat) {
-	if spec.DoNotTrack {
+func recordTCPHit(specID string, doNotTrack bool) func(tcp.Stat) {
+	if doNotTrack {
 		return nil
 	}
 	return func(stat tcp.Stat) {
+		// Between reloads, pointers to the actual spec might have changed. The spec
+		// id stays the same so we need to pic the latest refence to the spec and
+		// update network stats.
+		apisMu.RLock()
+		spec := apisByID[specID]
+		apisMu.RUnlock()
 		switch stat.State {
 		case tcp.Open:
 			atomic.AddInt64(&spec.network.OpenConnections, 1)
