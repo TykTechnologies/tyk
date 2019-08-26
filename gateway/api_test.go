@@ -36,7 +36,7 @@ const apiTestDef = `{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "` + testHttpAny + `"
+		"target_url": "` + TestHttpAny + `"
 	}
 }`
 

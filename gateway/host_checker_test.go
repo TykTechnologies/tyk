@@ -63,7 +63,7 @@ func TestHostChecker(t *testing.T) {
 	tmplData := struct {
 		Host1, Host2 string
 	}{
-		testHttpAny,
+		TestHttpAny,
 		testHttpFailureAny,
 	}
 
@@ -116,7 +116,7 @@ func TestHostChecker(t *testing.T) {
 	hostCheckTicker <- struct{}{}
 	eventWG.Wait()
 
-	if GlobalHostChecker.HostDown(testHttpAny) {
+	if GlobalHostChecker.HostDown(TestHttpAny) {
 		t.Error("Should not mark as down")
 	}
 
@@ -135,7 +135,7 @@ func TestHostChecker(t *testing.T) {
 			if err != nil {
 				t.Error("Should return nil error, got", err)
 			}
-			if host != testHttpAny {
+			if host != TestHttpAny {
 				t.Error("Should return only active host, got", host)
 			}
 			targetWG.Done()
@@ -204,7 +204,7 @@ func TestReverseProxyAllDown(t *testing.T) {
 	hostCheckTicker <- struct{}{}
 	eventWG.Wait()
 
-	remote, _ := url.Parse(testHttpAny)
+	remote, _ := url.Parse(TestHttpAny)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 
 	req := TestReq(t, "GET", "/", nil)

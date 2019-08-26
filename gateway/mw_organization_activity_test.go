@@ -13,7 +13,7 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
-func testPrepareProcessRequestQuotaLimit(tb testing.TB, ts Test, data map[string]interface{}) {
+func testPrepareProcessRequestQuotaLimit(tb testing.TB, ts *Test, data map[string]interface{}) {
 	// load API
 	orgID := "test-org-" + uuid.NewV4().String()
 	BuildAndLoadAPI(func(spec *APISpec) {
