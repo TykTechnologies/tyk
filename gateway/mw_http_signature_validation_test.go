@@ -86,7 +86,7 @@ func getHMACAuthChain(spec *APISpec) http.Handler {
 	chain := alice.New(mwList(
 		&IPWhiteListMiddleware{baseMid},
 		&IPBlackListMiddleware{BaseMiddleware: baseMid},
-		&HMACMiddleware{BaseMiddleware: baseMid},
+		&HTTPSignatureValidationMiddleware{BaseMiddleware: baseMid},
 		&VersionCheck{BaseMiddleware: baseMid},
 		&KeyExpired{baseMid},
 		&AccessRightsCheck{baseMid},

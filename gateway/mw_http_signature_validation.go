@@ -29,25 +29,25 @@ import (
 const dateHeaderSpec = "Date"
 const altHeaderSpec = "x-aux-date"
 
-// SignatureVerficationMiddleware will check if the request has a signature, and if the request is allowed through
-type SignatureVerficationMiddleware struct {
+// HTTPSignatureValidationMiddleware will check if the request has a signature, and if the request is allowed through
+type HTTPSignatureValidationMiddleware struct {
 	BaseMiddleware
 	lowercasePattern *regexp.Regexp
 }
 
-func (hm *SignatureVerficationMiddleware) Name() string {
-	return "HMAC"
+func (hm *HTTPSignatureValidationMiddleware) Name() string {
+	return "HTTPSignatureValidationMiddleware"
 }
 
-func (k *SignatureVerficationMiddleware) EnabledForSpec() bool {
+func (k *HTTPSignatureValidationMiddleware) EnabledForSpec() bool {
 	return k.Spec.EnableSignatureChecking
 }
 
-func (hm *SignatureVerficationMiddleware) Init() {
+func (hm *HTTPSignatureValidationMiddleware) Init() {
 	hm.lowercasePattern = regexp.MustCompile(`%[a-f0-9][a-f0-9]`)
 }
 
-func (hm *SignatureVerficationMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	token := r.Header.Get("Authorization")
 	if token == "" {
 		return hm.authorizationError(r)
@@ -200,12 +200,12 @@ func stripSignature(token string) string {
 	return strings.TrimSpace(token)
 }
 
-func (hm *SignatureVerficationMiddleware) hasLowerCaseEscaped(signature string) (bool, []string) {
+func (hm *HTTPSignatureValidationMiddleware) hasLowerCaseEscaped(signature string) (bool, []string) {
 	foundList := hm.lowercasePattern.FindAllString(signature, -1)
 	return len(foundList) > 0, foundList
 }
 
-func (hm *SignatureVerficationMiddleware) replaceWithUpperCase(originalSignature string, lowercaseList []string) string {
+func (hm *HTTPSignatureValidationMiddleware) replaceWithUpperCase(originalSignature string, lowercaseList []string) string {
 	newSignature := originalSignature
 	for _, lStr := range lowercaseList {
 		asUpper := strings.ToUpper(lStr)
@@ -215,7 +215,7 @@ func (hm *SignatureVerficationMiddleware) replaceWithUpperCase(originalSignature
 	return newSignature
 }
 
-func (hm *SignatureVerficationMiddleware) setContextVars(r *http.Request, token string) {
+func (hm *HTTPSignatureValidationMiddleware) setContextVars(r *http.Request, token string) {
 	if !hm.Spec.EnableContextVars {
 		return
 	}
@@ -227,7 +227,7 @@ func (hm *SignatureVerficationMiddleware) setContextVars(r *http.Request, token 
 	}
 }
 
-func (hm *SignatureVerficationMiddleware) authorizationError(r *http.Request) (error, int) {
+func (hm *HTTPSignatureValidationMiddleware) authorizationError(r *http.Request) (error, int) {
 	hm.Logger().Info("Authorization field missing or malformed")
 
 	AuthFailed(hm, r, r.Header.Get(headers.Authorization))
@@ -235,7 +235,7 @@ func (hm *SignatureVerficationMiddleware) authorizationError(r *http.Request) (e
 	return errors.New("Authorization field missing, malformed or invalid"), http.StatusBadRequest
 }
 
-func (hm SignatureVerficationMiddleware) checkClockSkew(dateHeaderValue string) bool {
+func (hm HTTPSignatureValidationMiddleware) checkClockSkew(dateHeaderValue string) bool {
 	// Reference layout for parsing time: "Mon Jan 2 15:04:05 MST 2006"
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
 	// Fall back to a numeric timezone, since some environments don't provide a timezone name code
@@ -277,7 +277,7 @@ type HMACFieldValues struct {
 	Signature string
 }
 
-func (hm *SignatureVerficationMiddleware) getSecretAndSessionForKeyID(r *http.Request, keyId string) (string, user.SessionState, error) {
+func (hm *HTTPSignatureValidationMiddleware) getSecretAndSessionForKeyID(r *http.Request, keyId string) (string, user.SessionState, error) {
 	session, keyExists := hm.CheckSessionAndIdentityForValidKey(keyId, r)
 	if !keyExists {
 		return "", session, errors.New("Key ID does not exist")
@@ -292,7 +292,7 @@ func (hm *SignatureVerficationMiddleware) getSecretAndSessionForKeyID(r *http.Re
 	return session.HmacSecret, session, nil
 }
 
-func (hm *SignatureVerficationMiddleware) getRSACertificateIdAndSessionForKeyID(r *http.Request, keyId string) (string, user.SessionState, error) {
+func (hm *HTTPSignatureValidationMiddleware) getRSACertificateIdAndSessionForKeyID(r *http.Request, keyId string) (string, user.SessionState, error) {
 	session, keyExists := hm.CheckSessionAndIdentityForValidKey(keyId, r)
 	if !keyExists {
 		return "", session, errors.New("Key ID does not exist")
