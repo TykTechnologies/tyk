@@ -515,7 +515,7 @@ type RequestSigningMeta struct {
 	KeyId         string   `bson:"key_id" json:"key_id"`
 	Algorithm     string   `bson:"algorithm" json:"algorithm"`
 	HeaderList    []string `bson:"header_list" json:"header_list"`
-	CertificateId string   `bson:"certificate_id" json:"certificate"`
+	CertificateId string   `bson:"certificate_id" json:"certificate_id"`
 }
 
 // Clean will URL encode map[string]struct variables for saving
