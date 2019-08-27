@@ -981,8 +981,25 @@
     "health_check_endpoint_name": {
       "type": "string"
     },
-    "enable_http_profiler": {
-      "type": "boolean"
+    "kv": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "consul": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "address": {
+              "type": "string"
+            }
+          }
+        }
+      }
     }
   }
 }

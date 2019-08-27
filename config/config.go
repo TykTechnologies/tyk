@@ -415,32 +415,32 @@ type Config struct {
 // This is a stripped down version of the Config struct in consul's API client
 type ConsulConfig struct {
 	// Address is the address of the Consul server
-	Address string
+	Address string `json:"address"`
 
 	// Scheme is the URI scheme for the Consul server
-	Scheme string
+	Scheme string `json:"scheme"`
 
 	// Datacenter to use. If not provided, the default agent datacenter is used.
-	Datacenter string
+	Datacenter string `json:"datacenter"`
 
 	// HttpAuth is the auth info to use for http access.
 	HttpAuth struct {
 		// Username to use for HTTP Basic Authentication
-		Username string
+		Username string `json:"username"`
 
 		// Password to use for HTTP Basic Authentication
-		Password string
-	}
+		Password string `json:"password"`
+	} `json:"http_auth"`
 
 	// WaitTime limits how long a Watch will block. If not provided,
 	// the agent default values will be used.
-	WaitTime time.Duration
+	WaitTime time.Duration `json:"wait_time"`
 
 	// Token is used to provide a per-request ACL token
 	// which overrides the agent's default token.
-	Token string
+	Token string `json:"token"`
 
-	TLSConfig consul.TLSConfig
+	TLSConfig consul.TLSConfig `json:"tls_config"`
 }
 
 // GetEventTriggers returns event triggers. There was a typo in the json tag.
