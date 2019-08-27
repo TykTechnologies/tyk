@@ -7,9 +7,9 @@ assignees:
 
 ---
 
-**Branch/Envrionment/Version**
+**Branch/Environment/Version**
 - Branch/Version: [e.g. Master/Release/Stable/Feature branch]
-- Environemnt: [e.g. On-prem/Hybrid/MDCB]
+- Environment: [e.g. On-prem/Hybrid/MDCB]
 
 **Describe the bug**
 A clear and concise description of what the bug is.
