@@ -996,6 +996,55 @@
           "properties": {
             "address": {
               "type": "string"
+            },
+            "scheme": {
+              "type": "string"
+            },
+            "datacenter": {
+              "type": "string"
+            },
+            "http_auth": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "properties": {
+                "username": {
+                  "type": "string"
+                },
+                "password": {
+                  "type": "string"
+                }
+              }
+            },
+            "wait_time": {
+              "type": "integer"
+            },
+            "token": {
+              "type": "string"
+            },
+            "tls_config": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "properties": {
+                "address": {
+                  "type": "string"
+                },
+                "ca_file": {
+                  "type": "string"
+                },
+                "cert_file": {
+                  "type": "string"
+                },
+                "key_file": {
+                  "type": "string"
+                },
+                "insecure_skip_verify": {
+                  "type": "boolean"
+                }
+              }
             }
           }
         }
