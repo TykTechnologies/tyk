@@ -283,7 +283,7 @@ func (hm *SignatureVerficationMiddleware) getSecretAndSessionForKeyID(r *http.Re
 		return "", session, errors.New("Key ID does not exist")
 	}
 
-	if session.HmacSecret == "" || !session.HMACEnabled {
+	if session.HmacSecret == "" || !session.HMACEnabled && !session.EnableHTTPSignatureValidation {
 		hm.Logger().Info("API Requires HMAC signature, session missing HMACSecret or HMAC not enabled for key")
 
 		return "", session, errors.New("This key ID is invalid")
@@ -298,7 +298,7 @@ func (hm *SignatureVerficationMiddleware) getRSACertificateIdAndSessionForKeyID(
 		return "", session, errors.New("Key ID does not exist")
 	}
 
-	if session.RSACertificateId == "" || !session.RSAEnabled {
+	if session.RSACertificateId == "" || !session.EnableHTTPSignatureValidation {
 		hm.Logger().Info("API Requires RSA signature, session missing RSA Certificate Id or RSA not enabled for key")
 		return "", session, errors.New("This key ID is invalid")
 	}

@@ -73,7 +73,7 @@ func createRSAAuthSession(pubCertId string) *user.SessionState {
 	session.QuotaRenews = time.Now().Unix() + 20
 	session.QuotaRemaining = 1
 	session.QuotaMax = -1
-	session.RSAEnabled = true
+	session.EnableHTTPSignatureValidation = true
 	session.RSACertificateId = pubCertId
 	return session
 }

@@ -18,7 +18,7 @@ func generateSession(algo, data string) string {
 	sessionKey := CreateSession(func(s *user.SessionState) {
 		if strings.HasPrefix(algo, "rsa") {
 			s.RSACertificateId = data
-			s.RSAEnabled = true
+			s.EnableHTTPSignatureValidation = true
 		} else {
 			s.HmacSecret = data
 			s.HMACEnabled = true
