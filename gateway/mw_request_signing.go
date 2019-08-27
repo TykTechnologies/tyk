@@ -7,11 +7,12 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
-	"github.com/TykTechnologies/tyk/certs"
 	"hash"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/TykTechnologies/tyk/certs"
 )
 
 type RequestSigning struct {
