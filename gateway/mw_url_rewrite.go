@@ -21,12 +21,14 @@ import (
 const (
 	metaLabel        = "$tyk_meta."
 	contextLabel     = "$tyk_context."
+	consulLabel      = "$kv_consul."
 	triggerKeyPrefix = "trigger"
 	triggerKeySep    = "-"
 )
 
 var dollarMatch = regexp.MustCompile(`\$\d+`)
 var contextMatch = regexp.MustCompile(`\$tyk_context.([A-Za-z0-9_\-\.]+)`)
+var consulMatch = regexp.MustCompile(`\$kv_consul.([A-Za-z0-9\/\-\.]+)`)
 var metaMatch = regexp.MustCompile(`\$tyk_meta.([A-Za-z0-9_\-\.]+)`)
 
 func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
@@ -191,6 +193,13 @@ func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 }
 
 func replaceTykVariables(r *http.Request, in string, escape bool) string {
+
+	if strings.Contains(in, consulLabel) {
+		contextData := ctxGetData(r)
+		vars := consulMatch.FindAllString(in, -1)
+		in = replaceVariables(in, vars, contextData, consulLabel, escape)
+	}
+
 	if strings.Contains(in, contextLabel) {
 		contextData := ctxGetData(r)
 		vars := contextMatch.FindAllString(in, -1)
@@ -213,6 +222,27 @@ func replaceTykVariables(r *http.Request, in string, escape bool) string {
 func replaceVariables(in string, vars []string, vals map[string]interface{}, label string, escape bool) string {
 	for _, v := range vars {
 		key := strings.Replace(v, label, "", 1)
+
+		if label == consulLabel {
+
+			setUpConsul()
+
+			val, err := consulKVStore.Get(key)
+			if err != nil {
+				in = strings.Replace(in, v, "", -1)
+				log.WithFields(logrus.Fields{
+					"key":       key,
+					"value":     v,
+					"in string": in,
+				}).Debug("Replaced with an empty string")
+
+				continue
+			}
+
+			in = strings.Replace(in, v, val, -1)
+			continue
+		}
+
 		val, ok := vals[key]
 		if ok {
 			valStr := valToStr(val)
