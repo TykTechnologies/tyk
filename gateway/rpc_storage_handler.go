@@ -230,6 +230,12 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 	return value.(string), nil
 }
 
+func (r *RPCStorageHandler) GetMultiKey(keyNames []string) ([]string, error) {
+	log.Warning("RPCStorageHandler.GetMultiKey - Not implemented")
+
+	return nil, nil
+}
+
 func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
 	log.Debug("GetExp called")
 	value, err := rpc.FuncClientSingleton("GetExp", r.fixKey(keyName))

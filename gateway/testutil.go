@@ -362,13 +362,13 @@ func withAuth(r *http.Request) *http.Request {
 
 // Deprecated: Use Test.CreateSession instead.
 func CreateSession(sGen ...func(s *user.SessionState)) string {
-	key := generateToken("", "")
+	key := generateToken("default", "")
 	session := CreateStandardSession()
 	if len(sGen) > 0 {
 		sGen[0](session)
 	}
 	if session.Certificate != "" {
-		key = generateToken("", session.Certificate)
+		key = generateToken("default", session.Certificate)
 	}
 
 	FallbackKeySesionManager.UpdateSession(storage.HashKey(key), session, 60, config.Global().HashKeys)
@@ -388,6 +388,7 @@ func CreateStandardSession() *user.SessionState {
 	session.QuotaMax = -1
 	session.Tags = []string{}
 	session.MetaData = make(map[string]interface{})
+	session.OrgID = "default"
 	return session
 }
 
@@ -407,6 +408,7 @@ func CreatePolicy(pGen ...func(p *user.Policy)) string {
 	pID := keyGen.GenerateAuthKey("")
 	pol := CreateStandardPolicy()
 	pol.ID = pID
+	pol.OrgID = "default"
 
 	if len(pGen) > 0 {
 		pGen[0](pol)
@@ -680,6 +682,7 @@ func StartTest(config ...TestConfig) *Test {
 
 const sampleAPI = `{
     "api_id": "test",
+	"org_id": "default",
     "use_keyless": true,
     "definition": {
         "location": "header",

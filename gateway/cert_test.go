@@ -493,6 +493,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 		spec.BaseIdentityProvidedBy = apidef.AuthToken
 		spec.Auth.UseCertificate = true
 		spec.Proxy.ListenPath = "/"
+		spec.OrgID = "default"
 	})
 
 	client := getTLSClient(&clientCert, nil)
