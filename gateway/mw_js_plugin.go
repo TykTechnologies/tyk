@@ -51,7 +51,7 @@ type MiniRequestObject struct {
 
 type VMReturnObject struct {
 	Request     MiniRequestObject
-	SessionMeta map[string]interface{}
+	SessionMeta map[string]string
 	Session     user.SessionState
 	AuthValue   string
 }
@@ -192,13 +192,8 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	}
 	returnDataStr, _ := returnRaw.ToString()
 
-	targetMap := make(map[string]interface{})
-	for key, value := range session.MetaData {
-		targetMap[key] = value
-	}
-
 	// Decode the return object
-	newRequestData := VMReturnObject{SessionMeta: targetMap}
+	newRequestData := VMReturnObject{}
 	if err := json.Unmarshal([]byte(returnDataStr), &newRequestData); err != nil {
 		logger.WithError(err).Error("Failed to decode middleware request data on return from VM. Returned data: ", returnDataStr)
 		return nil, http.StatusOK
@@ -247,8 +242,9 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	// Save the session data (if modified)
 	if !d.Pre && d.UseSession {
-		if !reflect.DeepEqual(session.MetaData, newRequestData.SessionMeta) {
-			session.MetaData = newRequestData.SessionMeta
+		newMeta := mapStrsToIfaces(newRequestData.SessionMeta)
+		if !reflect.DeepEqual(session.MetaData, newMeta) {
+			session.MetaData = newMeta
 			ctxScheduleSessionUpdate(r)
 		}
 	}

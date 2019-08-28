@@ -123,14 +123,16 @@ func TestJSVMSessionMetadataUpdate(t *testing.T) {
 	jsvm.Init(nil, logrus.NewEntry(log))
 
 	s := &user.SessionState{MetaData: make(map[string]interface{})}
-	s.MetaData["host"] = "localhost"
+	s.MetaData["same"] = "same"
+	s.MetaData["updated"] = "old"
+	s.MetaData["removed"] = "dummy"
 	ctxSetSession(req, s, "", true)
 
 	const js = `
 var testJSVMMiddleware = new TykJS.TykMiddleware.NewMiddleware({});
 
 testJSVMMiddleware.NewProcessRequest(function(request, session) {
-	return testJSVMMiddleware.ReturnData(request, {password: "password"})
+	return testJSVMMiddleware.ReturnData(request, {same: "same", updated: "new"})
 });`
 	if _, err := jsvm.VM.Run(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
@@ -140,12 +142,16 @@ testJSVMMiddleware.NewProcessRequest(function(request, session) {
 
 	updatedSession := ctx.GetSession(req)
 
-	if updatedSession.MetaData["password"] != "password" {
-		t.Fatal("Failed to update session metadata for password")
+	if updatedSession.MetaData["same"] != "same" {
+		t.Fatal("Failed to update session metadata for same")
 	}
 
-	if updatedSession.MetaData["host"] != "localhost" {
-		t.Fatal("Failed to update session metadata for host")
+	if updatedSession.MetaData["updated"] != "new" {
+		t.Fatal("Failed to update session metadata for updated")
+	}
+
+	if updatedSession.MetaData["removed"] != nil {
+		t.Fatal("Failed to update session metadata for removed")
 	}
 }
 
