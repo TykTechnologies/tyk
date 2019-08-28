@@ -22,6 +22,7 @@ const (
 	metaLabel        = "$tyk_meta."
 	contextLabel     = "$tyk_context."
 	consulLabel      = "$kv_consul."
+	vaultLabel       = "$kv_vault."
 	triggerKeyPrefix = "trigger"
 	triggerKeySep    = "-"
 )
@@ -29,6 +30,7 @@ const (
 var dollarMatch = regexp.MustCompile(`\$\d+`)
 var contextMatch = regexp.MustCompile(`\$tyk_context.([A-Za-z0-9_\-\.]+)`)
 var consulMatch = regexp.MustCompile(`\$kv_consul.([A-Za-z0-9\/\-\.]+)`)
+var vaultMatch = regexp.MustCompile(`\$kv_vault.([A-Za-z0-9\/\-\.]+)`)
 var metaMatch = regexp.MustCompile(`\$tyk_meta.([A-Za-z0-9_\-\.]+)`)
 
 func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
@@ -200,6 +202,13 @@ func replaceTykVariables(r *http.Request, in string, escape bool) string {
 		in = replaceVariables(in, vars, contextData, consulLabel, escape)
 	}
 
+	if strings.Contains(in, vaultLabel) {
+		contextData := ctxGetData(r)
+		vars := vaultMatch.FindAllString(in, -1)
+		fmt.Println(vars)
+		in = replaceVariables(in, vars, contextData, vaultLabel, escape)
+	}
+
 	if strings.Contains(in, contextLabel) {
 		contextData := ctxGetData(r)
 		vars := contextMatch.FindAllString(in, -1)
@@ -223,7 +232,27 @@ func replaceVariables(in string, vars []string, vals map[string]interface{}, lab
 	for _, v := range vars {
 		key := strings.Replace(v, label, "", 1)
 
-		if label == consulLabel {
+		switch label {
+
+		case vaultLabel:
+
+			setUpVault()
+
+			val, err := vaultKVStore.Get(key)
+			if err != nil {
+				in = strings.Replace(in, v, "", -1)
+				log.WithFields(logrus.Fields{
+					"key":       key,
+					"value":     v,
+					"in string": in,
+				}).Debug("Replaced with an empty string")
+
+				continue
+			}
+
+			in = strings.Replace(in, v, val, -1)
+
+		case consulLabel:
 
 			setUpConsul()
 
@@ -240,26 +269,29 @@ func replaceVariables(in string, vars []string, vals map[string]interface{}, lab
 			}
 
 			in = strings.Replace(in, v, val, -1)
-			continue
-		}
 
-		val, ok := vals[key]
-		if ok {
-			valStr := valToStr(val)
-			// If contains url with domain
-			if escape && !strings.HasPrefix(valStr, "http") {
-				valStr = url.QueryEscape(valStr)
+		default:
+
+			val, ok := vals[key]
+			if ok {
+				valStr := valToStr(val)
+				// If contains url with domain
+				if escape && !strings.HasPrefix(valStr, "http") {
+					valStr = url.QueryEscape(valStr)
+				}
+				in = strings.Replace(in, v, valStr, -1)
+			} else {
+				in = strings.Replace(in, v, "", -1)
+				log.WithFields(logrus.Fields{
+					"key":       key,
+					"value":     v,
+					"in string": in,
+				}).Debug("Replaced with an empty string")
 			}
-			in = strings.Replace(in, v, valStr, -1)
-		} else {
-			in = strings.Replace(in, v, "", -1)
-			log.WithFields(logrus.Fields{
-				"key":       key,
-				"value":     v,
-				"in string": in,
-			}).Debug("Replaced with an empty string")
+
 		}
 	}
+
 	return in
 }
 

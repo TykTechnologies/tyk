@@ -418,20 +418,20 @@ type VaultConfig struct {
 
 	// Address is the address of the Vault server. This should be a complete
 	// URL such as "http://vault.example.com".
-	Address string
+	Address string `json:"address"`
 
 	// AgentAddress is the address of the local Vault agent. This should be a
 	// complete URL such as "http://vault.example.com".
-	AgentAddress string
+	AgentAddress string `json:"agent_address"`
 
 	// MaxRetries controls the maximum number of times to retry when a vault
 	// serer occurs
-	MaxRetries int
+	MaxRetries int `json:"max_retries"`
 
-	Timeout time.Duration
+	Timeout time.Duration `json:"timeout"`
 
 	// Token is the vault root token
-	Token string
+	Token string `json:"token"`
 }
 
 // ConsulConfig is used to configure the creation of a client
