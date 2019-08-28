@@ -102,6 +102,7 @@ var (
 	dnsCacheManager dnscache.IDnsCacheManager
 
 	consulKVStore kv.Store
+	vaultKVStore  kv.Store
 )
 
 const (
@@ -1022,7 +1023,27 @@ func kvStore(value string) (string, error) {
 		return consulKVStore.Get(key)
 	}
 
+	if strings.HasPrefix(value, "vault://") {
+		key := strings.TrimPrefix(value, "vault://")
+		log.Debugf("Retrieving %s from vault", key)
+		setUpVault()
+		return vaultKVStore.Get(key)
+	}
+
 	return value, nil
+}
+
+func setUpVault() {
+	if vaultKVStore != nil {
+		return
+	}
+
+	var err error
+
+	vaultKVStore, err = kv.NewVault(config.Global().KV.Vault)
+	if err != nil {
+		log.Fatalf("an error occurred while setting up vault... %v", err)
+	}
 }
 
 func setUpConsul() {

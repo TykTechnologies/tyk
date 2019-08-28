@@ -408,7 +408,30 @@ type Config struct {
 	HideGeneratorHeader            bool  `json:"hide_generator_header"`
 	KV                             struct {
 		Consul ConsulConfig `json:"consul"`
+		Vault  VaultConfig  `json:"vault"`
 	} `json:"kv"`
+}
+
+// VaultConfig is used to configure the creation of a client
+// This is a stripped down version of the Config struct in vault's API client
+type VaultConfig struct {
+
+	// Address is the address of the Vault server. This should be a complete
+	// URL such as "http://vault.example.com".
+	Address string
+
+	// AgentAddress is the address of the local Vault agent. This should be a
+	// complete URL such as "http://vault.example.com".
+	AgentAddress string
+
+	// MaxRetries controls the maximum number of times to retry when a vault
+	// serer occurs
+	MaxRetries int
+
+	Timeout time.Duration
+
+	// Token is the vault root token
+	Token string
 }
 
 // ConsulConfig is used to configure the creation of a client
