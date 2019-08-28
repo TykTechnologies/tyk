@@ -839,11 +839,12 @@ func TestJWTExistingSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	LoadAPI(spec)
 
 	p1ID := CreatePolicy()
+	user_id := uuid.New()
 
 	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
-		t.Claims.(jwt.MapClaims)["user_id"] = "user"
+		t.Claims.(jwt.MapClaims)["user_id"] = user_id
 		t.Claims.(jwt.MapClaims)["policy_id"] = p1ID
 		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	})
@@ -859,7 +860,7 @@ func TestJWTExistingSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	jwtTokenInvalidPolicy := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
-		t.Claims.(jwt.MapClaims)["user_id"] = "user"
+		t.Claims.(jwt.MapClaims)["user_id"] = user_id
 		t.Claims.(jwt.MapClaims)["policy_id"] = "abcdef"
 		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	})
@@ -1086,16 +1087,20 @@ func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
 	p2ID := CreatePolicy(func(p *user.Policy) {
 		p.QuotaMax = 999
 	})
+	user_id := uuid.New()
+
+	t.Log(p1ID)
+	t.Log(p2ID)
 
 	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
-		t.Claims.(jwt.MapClaims)["user_id"] = "user"
+		t.Claims.(jwt.MapClaims)["user_id"] = user_id
 		t.Claims.(jwt.MapClaims)["policy_id"] = p1ID
 		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	})
 
-	sessionID := generateToken("", fmt.Sprintf("%x", md5.Sum([]byte("user"))))
+	sessionID := generateToken("", fmt.Sprintf("%x", md5.Sum([]byte(user_id))))
 
 	authHeaders := map[string]string{"authorization": jwtToken}
 	t.Run("Initial request with 1st policy", func(t *testing.T) {
@@ -1120,7 +1125,7 @@ func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
 	jwtTokenAnotherPolicy := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
-		t.Claims.(jwt.MapClaims)["user_id"] = "user"
+		t.Claims.(jwt.MapClaims)["user_id"] = user_id
 		t.Claims.(jwt.MapClaims)["policy_id"] = p2ID
 		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	})

@@ -285,15 +285,11 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 // ApplyPolicies will check if any policies are loaded. If any are, it
 // will overwrite the session state to use the policy values.
 func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
-	rights := session.AccessRights
-	if rights == nil {
-		rights = make(map[string]user.AccessDefinition)
-	}
-
+	rights := make(map[string]user.AccessDefinition)
 	tags := make(map[string]bool)
-	didQuota, didRateLimit, didACL := false, false, false
-	didPerAPI := make(map[string]bool)
+	didQuota, didRateLimit, didACL := make(map[string]bool), make(map[string]bool), make(map[string]bool)
 	policies := session.PolicyIDs()
+
 	for i, polID := range policies {
 		policiesMu.RLock()
 		policy, ok := policiesByID[polID]
@@ -319,21 +315,10 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		}
 
 		if policy.Partitions.PerAPI {
-			// new logic when you can specify quota or rate in more than one policy but for different APIs
-			if didQuota || didRateLimit || didACL { // no other partitions allowed
-				err := fmt.Errorf("cannot apply multiple policies when some have per_api set and some are partitioned")
-				log.Error(err)
-				return err
-			}
-
-			//Added this to ensure that if an API is deleted, it is removed from accessRights also.
-			if len(didPerAPI) == 0 {
-				rights = make(map[string]user.AccessDefinition)
-			}
 			for apiID, accessRights := range policy.AccessRights {
-				// check if limit was already set for this API by other policy assigned to key
-				if didPerAPI[apiID] {
-					err := fmt.Errorf("cannot apply multiple policies for API: %s", apiID)
+				// new logic when you can specify quota or rate in more than one policy but for different APIs
+				if didQuota[apiID] || didRateLimit[apiID] || didACL[apiID] { // no other partitions allowed
+					err := fmt.Errorf("cannot apply multiple policies when some have per_api set and some are partitioned")
 					log.Error(err)
 					return err
 				}
@@ -348,101 +333,138 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 						Per:                policy.Per,
 						ThrottleInterval:   policy.ThrottleInterval,
 						ThrottleRetryLimit: policy.ThrottleRetryLimit,
-
-						SetByPolicy: true,
 					}
 				}
 
-				// respect current quota remaining and quota renews (on API limit level)
-				var limitQuotaRemaining int64
-				var limitQuotaRenews int64
-				if currAccessRight, ok := session.AccessRights[apiID]; ok && currAccessRight.Limit != nil {
-					limitQuotaRemaining = currAccessRight.Limit.QuotaRemaining
-					limitQuotaRenews = currAccessRight.Limit.QuotaRenews
+				// respect current quota renews (on API limit level)
+				if r, ok := session.AccessRights[apiID]; ok && r.Limit != nil {
+					accessRights.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
-				accessRights.Limit.QuotaRemaining = limitQuotaRemaining
-				accessRights.Limit.QuotaRenews = limitQuotaRenews
+
+				accessRights.AllowanceScope = apiID
 
 				// overwrite session access right for this API
 				rights[apiID] = accessRights
 
 				// identify that limit for that API is set (to allow set it only once)
-				didPerAPI[apiID] = true
-			}
-		} else if policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl {
-			// This is a partitioned policy, only apply what is active
-			// legacy logic when you can specify quota or rate only in no more than one policy
-			if len(didPerAPI) > 0 { // no policies with per_api set allowed
-				err := fmt.Errorf("cannot apply multiple policies when some are partitioned and some have per_api set")
-				log.Error(err)
-				return err
-			}
-			if policy.Partitions.Quota {
-				if didQuota {
-					err := fmt.Errorf("cannot apply multiple quota policies")
-					t.Logger().Error(err)
-					return err
-				}
-				didQuota = true
-				// Quotas
-				session.QuotaMax = policy.QuotaMax
-				session.QuotaRenewalRate = policy.QuotaRenewalRate
-			}
-
-			if policy.Partitions.RateLimit {
-				if didRateLimit {
-					err := fmt.Errorf("cannot apply multiple rate limit policies")
-					t.Logger().Error(err)
-					return err
-				}
-				didRateLimit = true
-				// Rate limiting
-				session.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
-				session.Rate = policy.Rate
-				session.Per = policy.Per
-				session.ThrottleInterval = policy.ThrottleInterval
-				session.ThrottleRetryLimit = policy.ThrottleRetryLimit
-				if policy.LastUpdated != "" {
-					session.LastUpdated = policy.LastUpdated
-				}
-			}
-
-			if policy.Partitions.Acl {
-				// ACL
-				if !didACL { // first, overwrite rights
-					rights = make(map[string]user.AccessDefinition)
-					didACL = true
-				}
-				// Second or later, merge
-				for k, v := range policy.AccessRights {
-					rights[k] = v
-				}
-				session.HMACEnabled = policy.HMACEnabled
+				didACL[apiID] = true
+				didQuota[apiID] = true
+				didRateLimit[apiID] = true
 			}
 		} else {
-			if len(policies) > 1 {
-				err := fmt.Errorf("cannot apply multiple policies if any are non-partitioned")
-				t.Logger().Error(err)
-				return err
-			}
-			// This is not a partitioned policy, apply everything
-			// Quotas
-			session.QuotaMax = policy.QuotaMax
-			session.QuotaRenewalRate = policy.QuotaRenewalRate
-
-			// Rate limiting
-			session.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
-			session.Rate = policy.Rate
-			session.Per = policy.Per
-			session.ThrottleInterval = policy.ThrottleInterval
-			session.ThrottleRetryLimit = policy.ThrottleRetryLimit
-			if policy.LastUpdated != "" {
-				session.LastUpdated = policy.LastUpdated
+			multiAclPolicies := false
+			if i > 0 {
+				// Check if policy works with new APIs
+				for pa := range policy.AccessRights {
+					if _, ok := rights[pa]; !ok {
+						multiAclPolicies = true
+						break
+					}
+				}
 			}
 
-			// ACL
-			rights = policy.AccessRights
-			session.HMACEnabled = policy.HMACEnabled
+			usePartitions := policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl
+
+			for k, v := range policy.AccessRights {
+				ar := &v
+
+				if v.Limit == nil {
+					v.Limit = &user.APILimit{}
+				}
+
+				if !usePartitions || policy.Partitions.Acl {
+					didACL[k] = true
+
+					// Merge ACLs for the same API
+					if r, ok := rights[k]; ok {
+						r.Versions = append(rights[k].Versions, v.Versions...)
+
+						for _, u := range v.AllowedURLs {
+							found := false
+							for ai, au := range r.AllowedURLs {
+								if u.URL == au.URL {
+									found = true
+									rights[k].AllowedURLs[ai].Methods = append(r.AllowedURLs[ai].Methods, u.Methods...)
+								}
+							}
+
+							if !found {
+								r.AllowedURLs = append(r.AllowedURLs, v.AllowedURLs...)
+							}
+						}
+						r.AllowedURLs = append(r.AllowedURLs, v.AllowedURLs...)
+
+						ar = &r
+					}
+				}
+
+				if !usePartitions || policy.Partitions.Quota {
+					didQuota[k] = true
+
+					// -1 is special "unlimited" case
+					if ar.Limit.QuotaMax != -1 && policy.QuotaMax > ar.Limit.QuotaMax {
+						ar.Limit.QuotaMax = policy.QuotaMax
+					}
+
+					if policy.QuotaRenewalRate > ar.Limit.QuotaRenewalRate {
+						ar.Limit.QuotaRenewalRate = policy.QuotaRenewalRate
+					}
+				}
+
+				if !usePartitions || policy.Partitions.RateLimit {
+					didRateLimit[k] = true
+
+					if ar.Limit.Rate != -1 && policy.Rate > ar.Limit.Rate {
+						ar.Limit.Rate = policy.Rate
+					}
+
+					if policy.Per > ar.Limit.Per {
+						ar.Limit.Per = policy.Per
+					}
+
+					if policy.ThrottleInterval > ar.Limit.ThrottleInterval {
+						ar.Limit.ThrottleInterval = policy.ThrottleInterval
+					}
+
+					if policy.ThrottleRetryLimit > ar.Limit.ThrottleRetryLimit {
+						ar.Limit.ThrottleRetryLimit = policy.ThrottleRetryLimit
+					}
+				}
+
+				if multiAclPolicies && (!usePartitions || (policy.Partitions.Quota || policy.Partitions.RateLimit)) {
+					ar.AllowanceScope = policy.ID
+				}
+
+				if !multiAclPolicies {
+					ar.Limit.QuotaRenews = session.QuotaRenews
+				}
+
+				// Respect existing QuotaRenews
+				if r, ok := session.AccessRights[k]; ok && r.Limit != nil {
+					ar.Limit.QuotaRenews = r.Limit.QuotaRenews
+				}
+
+				rights[k] = *ar
+			}
+
+			// Master policy case
+			if len(policy.AccessRights) == 0 {
+				if !usePartitions || policy.Partitions.RateLimit {
+					session.Rate = policy.Rate
+					session.Per = policy.Per
+					session.ThrottleInterval = policy.ThrottleInterval
+					session.ThrottleRetryLimit = policy.ThrottleRetryLimit
+				}
+
+				if !usePartitions || policy.Partitions.Quota {
+					session.QuotaMax = policy.QuotaMax
+					session.QuotaRenewalRate = policy.QuotaRenewalRate
+				}
+			}
+
+			if !session.HMACEnabled {
+				session.HMACEnabled = policy.HMACEnabled
+			}
 		}
 
 		// Required for all
@@ -463,7 +485,42 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		}
 	}
 
-	session.AccessRights = rights
+	// If some APIs had only ACL partitions, inherit rest from session level
+	for k, v := range rights {
+		if !didRateLimit[k] {
+			v.Limit.Rate = session.Rate
+			v.Limit.Per = session.Per
+			v.Limit.ThrottleInterval = session.ThrottleInterval
+			v.Limit.ThrottleRetryLimit = session.ThrottleRetryLimit
+		}
+
+		if !didQuota[k] {
+			v.Limit.QuotaMax = session.QuotaMax
+			v.Limit.QuotaRenewalRate = session.QuotaRenewalRate
+			v.Limit.QuotaRenews = session.QuotaRenews
+		}
+	}
+
+	// If we have policies defining rules for one single API, update session root vars (legacy)
+	if len(didQuota) == 1 && len(didRateLimit) == 1 {
+		for _, v := range rights {
+			if len(didRateLimit) == 1 {
+				session.Rate = v.Limit.Rate
+				session.Per = v.Limit.Per
+			}
+
+			if len(didQuota) == 1 {
+				session.QuotaMax = v.Limit.QuotaMax
+				session.QuotaRenews = v.Limit.QuotaRenews
+				session.QuotaRenewalRate = v.Limit.QuotaRenewalRate
+			}
+		}
+	}
+
+	// Override session ACL if at least one policy define it
+	if len(didACL) > 0 {
+		session.AccessRights = rights
+	}
 
 	return nil
 }
