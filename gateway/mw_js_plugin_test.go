@@ -10,6 +10,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/user"
+
 	"github.com/sirupsen/logrus"
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 
@@ -103,6 +106,52 @@ leakMid.NewProcessRequest(function(request, session) {
 	if got := string(bs); want != got {
 		t.Fatalf("JS plugin broke non-UTF8 body %q into %q",
 			want, got)
+	}
+}
+
+func TestJSVMSessionMetadataUpdate(t *testing.T) {
+	dynMid := &DynamicMiddleware{
+		BaseMiddleware: BaseMiddleware{
+			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}},
+		},
+		MiddlewareClassName: "testJSVMMiddleware",
+		Pre:                 false,
+		UseSession:          true,
+	}
+	req := httptest.NewRequest("GET", "/foo", nil)
+	jsvm := JSVM{}
+	jsvm.Init(nil, logrus.NewEntry(log))
+
+	s := &user.SessionState{MetaData: make(map[string]interface{})}
+	s.MetaData["same"] = "same"
+	s.MetaData["updated"] = "old"
+	s.MetaData["removed"] = "dummy"
+	ctxSetSession(req, s, "", true)
+
+	const js = `
+var testJSVMMiddleware = new TykJS.TykMiddleware.NewMiddleware({});
+
+testJSVMMiddleware.NewProcessRequest(function(request, session) {
+	return testJSVMMiddleware.ReturnData(request, {same: "same", updated: "new"})
+});`
+	if _, err := jsvm.VM.Run(js); err != nil {
+		t.Fatalf("failed to set up js plugin: %v", err)
+	}
+	dynMid.Spec.JSVM = jsvm
+	_, _ = dynMid.ProcessRequest(nil, req, nil)
+
+	updatedSession := ctx.GetSession(req)
+
+	if updatedSession.MetaData["same"] != "same" {
+		t.Fatal("Failed to update session metadata for same")
+	}
+
+	if updatedSession.MetaData["updated"] != "new" {
+		t.Fatal("Failed to update session metadata for updated")
+	}
+
+	if updatedSession.MetaData["removed"] != nil {
+		t.Fatal("Failed to update session metadata for removed")
 	}
 }
 
