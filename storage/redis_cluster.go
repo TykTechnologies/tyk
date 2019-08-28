@@ -326,7 +326,7 @@ func (r *RedisCluster) IncrememntWithExpire(keyName string, expire int64) int64 
 	fixedKey := keyName
 	val, err := redis.Int64(r.singleton().Do("INCR", fixedKey))
 	log.Debug("Incremented key: ", fixedKey, ", val is: ", val)
-	if val == 1 {
+	if val == 1 && expire != 0 {
 		log.Debug("--> Setting Expire")
 		r.singleton().Do("EXPIRE", fixedKey, expire)
 	}

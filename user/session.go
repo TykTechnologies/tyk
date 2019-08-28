@@ -44,6 +44,8 @@ type AccessDefinition struct {
 	Versions    []string     `json:"versions" msg:"versions"`
 	AllowedURLs []AccessSpec `bson:"allowed_urls" json:"allowed_urls" msg:"allowed_urls"` // mapped string MUST be a valid regex
 	Limit       *APILimit    `json:"limit" msg:"limit"`
+
+	AllowanceScope string `json:"allowance_scope" msg:"allowance_scope"`
 }
 
 // SessionState objects represent a current API session, mainly used for rate limiting.
