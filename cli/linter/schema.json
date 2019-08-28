@@ -1047,7 +1047,29 @@
               }
             }
           }
-        }
+        },
+	"vault" : {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "address": {
+              "type": "string"
+            },
+            "agent_address": {
+              "type": "string"
+            },
+            "max_retries": {
+              "type": "string"
+            },
+            "timeout": {
+              "type": "integer"
+            },
+            "token": {
+              "type": "string"
+            }
+	}
       }
     }
   }
