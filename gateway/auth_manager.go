@@ -286,20 +286,25 @@ func (b *DefaultSessionManager) SessionDetail(keyName string, hashed bool) (user
 	if hashed {
 		jsonKeyVal, err = b.store.GetRawKey(b.store.GetKeyPrefix() + keyName)
 	} else {
-		// try to get legacy and new format key at once
-		var jsonKeyValList []string
-		jsonKeyValList, err = b.store.GetMultiKey(
-			[]string{
-				keyName,
-				generateToken(b.orgID, keyName),
-			},
-		)
-		// pick the 1st non empty from the returned list
-		for _, val := range jsonKeyValList {
-			if val != "" {
-				jsonKeyVal = val
-				break
+		if storage.TokenOrg(keyName) != b.orgID {
+			// try to get legacy and new format key at once
+			var jsonKeyValList []string
+			jsonKeyValList, err = b.store.GetMultiKey(
+				[]string{
+					keyName,
+					generateToken(b.orgID, keyName),
+				},
+			)
+			// pick the 1st non empty from the returned list
+			for _, val := range jsonKeyValList {
+				if val != "" {
+					jsonKeyVal = val
+					break
+				}
 			}
+		} else {
+			// key is not an imported one
+			jsonKeyVal, err = b.store.GetKey(keyName)
 		}
 	}
 
