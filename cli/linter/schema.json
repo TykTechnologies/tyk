@@ -1061,7 +1061,7 @@
               "type": "string"
             },
             "max_retries": {
-              "type": "string"
+              "type": "integer"
             },
             "timeout": {
               "type": "integer"
@@ -1070,7 +1070,7 @@
               "type": "string"
             },
             "kv_version": {
-              "type": "string"
+              "type": "integer"
             }
           }
         }
