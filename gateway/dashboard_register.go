@@ -164,12 +164,10 @@ func (h *HTTPDashboardHandler) Register() error {
 	c := initialiseClient(5 * time.Second)
 	resp, err := c.Do(req)
 	if err != nil {
-		panic(err)
 		dashLog.Errorf("Request failed with error %v; retrying in 5s", err)
 		time.Sleep(time.Second * 5)
 		return h.Register()
 	} else if resp != nil && resp.StatusCode != 200 {
-		panic("here2")
 		dashLog.Errorf("Response failed with code %d; retrying in 5s", resp.StatusCode)
 		time.Sleep(time.Second * 5)
 		return h.Register()
