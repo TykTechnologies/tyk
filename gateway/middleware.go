@@ -286,7 +286,7 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 // will overwrite the session state to use the policy values.
 func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	rights := make(map[string]user.AccessDefinition)
-	tags := make(map[string]bool)
+	tags := make([]string, 0)
 	didQuota, didRateLimit, didACL := make(map[string]bool), make(map[string]bool), make(map[string]bool)
 	policies := session.PolicyIDs()
 
@@ -474,16 +474,16 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 			session.IsInactive = true
 		}
 		for _, tag := range policy.Tags {
-			tags[tag] = true
+			tags = appendIfMissing(tags, tag)
 		}
 	}
 
-	// set tags
-	if len(tags) > 0 {
-		for tag := range tags {
-			session.Tags = append(session.Tags, tag)
-		}
+	for _, tag := range session.Tags {
+		tags = appendIfMissing(tags, tag)
 	}
+
+	// set tags
+	session.Tags = tags
 
 	// If some APIs had only ACL partitions, inherit rest from session level
 	for k, v := range rights {
