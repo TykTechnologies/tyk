@@ -1,23 +1,7 @@
 package coprocess
 
-/*
-#include <stdio.h>
-
-#include "sds/sds.h"
-
-#include "api.h"
-
-*/
-import "C"
-
 import (
 	"github.com/TykTechnologies/tyk/apidef"
-)
-
-const (
-	_ = iota
-	JsonMessage
-	ProtobufMessage
 )
 
 // Dispatcher defines a basic interface for the CP dispatcher, check PythonDispatcher for reference.
