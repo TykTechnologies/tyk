@@ -11,6 +11,7 @@ import (
 // Vault is an implementation of a KV store which uses Consul as it's backend
 type Vault struct {
 	client *api.Client
+	kvV2   bool
 }
 
 // NewVault returns a configured vault KV store adapter
@@ -21,6 +22,15 @@ func NewVault(conf config.VaultConfig) (Store, error) {
 func (v *Vault) Get(key string) (string, error) {
 
 	logicalStore := v.client.Logical()
+
+	if v.kvV2 {
+		// Version 2 engine. Make sure to append data in front
+		splitKey := strings.Split(key, "/")
+		if len(splitKey) > 0 {
+			splitKey[0] = splitKey[0] + "/data"
+			key = strings.Join(splitKey, "/")
+		}
+	}
 
 	splitted := strings.Split(key, ".")
 	if len(splitted) != 2 {
@@ -36,20 +46,23 @@ func (v *Vault) Get(key string) (string, error) {
 		return "", ErrKeyNotFound
 	}
 
-	val, ok := secret.Data["data"]
+	var val map[string]interface{} = secret.Data
+
+	if v.kvV2 {
+		var ok bool
+		val, ok = secret.Data["data"].(map[string]interface{})
+		if !ok {
+			// This is unlikely to happen though
+			return "", ErrKeyNotFound
+		}
+	}
+
+	value, ok := val[splitted[1]]
 	if !ok {
-		// This is unlikely to happen though
 		return "", ErrKeyNotFound
 	}
 
-	mapValues := val.(map[string]interface{})
-
-	val, ok = mapValues[splitted[1]]
-	if !ok {
-		return "", ErrKeyNotFound
-	}
-
-	return val.(string), nil
+	return value.(string), nil
 }
 
 func newVault(conf config.VaultConfig) (Store, error) {
@@ -82,7 +95,14 @@ func newVault(conf config.VaultConfig) (Store, error) {
 
 	client.SetToken(conf.Token)
 
+	if conf.KVVersion >= 2 {
+		conf.KVVersion = 2
+	} else {
+		conf.KVVersion = 1
+	}
+
 	return &Vault{
 		client: client,
+		kvV2:   conf.KVVersion == 2,
 	}, nil
 }

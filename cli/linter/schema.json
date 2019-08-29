@@ -1068,6 +1068,9 @@
             },
             "token": {
               "type": "string"
+            },
+            "kv_version": {
+              "type": "string"
             }
           }
         }

@@ -432,6 +432,9 @@ type VaultConfig struct {
 
 	// Token is the vault root token
 	Token string `json:"token"`
+
+	// KVVersion is the version number of Vault. Usually defaults to 2
+	KVVersion int `json:"kv_version"`
 }
 
 // ConsulConfig is used to configure the creation of a client
