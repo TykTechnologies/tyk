@@ -291,8 +291,8 @@ func (b *DefaultSessionManager) SessionDetail(keyName string, hashed bool) (user
 			var jsonKeyValList []string
 			jsonKeyValList, err = b.store.GetMultiKey(
 				[]string{
-					keyName,
 					generateToken(b.orgID, keyName),
+					keyName,
 				},
 			)
 			// pick the 1st non empty from the returned list
