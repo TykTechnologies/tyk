@@ -3,6 +3,7 @@
 package goplugin_test
 
 import (
+	"context"
 	"net/http"
 	"os"
 	"testing"
@@ -14,7 +15,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	os.Exit(gateway.InitTestMain(m))
+	os.Exit(gateway.InitTestMain(context.Background(), m))
 }
 
 // TestGoPluginMWs tests all possible Go-plugin MWs ("pre", "auth_check", "post_key_auth" and "post")

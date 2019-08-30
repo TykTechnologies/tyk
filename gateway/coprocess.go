@@ -206,7 +206,7 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 
 // CoProcessInit creates a new CoProcessDispatcher, it will be called when Tyk starts.
 func CoProcessInit() error {
-	if runningTests && GlobalDispatcher != nil {
+	if isRunningTests() && GlobalDispatcher != nil {
 		return nil
 	}
 	var err error

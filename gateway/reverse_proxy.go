@@ -42,14 +42,8 @@ import (
 
 const defaultUserAgent = "Tyk/" + VERSION
 
-// Gateway's custom response headers
-const (
-	XRateLimitLimit     = "X-RateLimit-Limit"
-	XRateLimitRemaining = "X-RateLimit-Remaining"
-	XRateLimitReset     = "X-RateLimit-Reset"
-)
-
 var ServiceCache *cache.Cache
+var sdMu sync.RWMutex
 
 func urlFromService(spec *APISpec) (*apidef.HostList, error) {
 
@@ -63,7 +57,9 @@ func urlFromService(spec *APISpec) (*apidef.HostList, error) {
 		if err != nil {
 			return nil, err
 		}
+		sdMu.Lock()
 		spec.HasRun = true
+		sdMu.Unlock()
 		// Set the cached value
 		if data.Len() == 0 {
 			log.Warning("[PROXY][SD] Service Discovery returned empty host list! Returning last good set.")
@@ -81,9 +77,11 @@ func urlFromService(spec *APISpec) (*apidef.HostList, error) {
 		spec.LastGoodHostList = data
 		return data, nil
 	}
-
+	sdMu.RLock()
+	hasRun := spec.HasRun
+	sdMu.RUnlock()
 	// First time? Refresh the cache and return that
-	if !spec.HasRun {
+	if !hasRun {
 		log.Debug("First run! Setting cache")
 		return doCacheRefresh()
 	}
@@ -108,12 +106,20 @@ func urlFromService(spec *APISpec) (*apidef.HostList, error) {
 // httpScheme matches http://* and https://*, case insensitive
 var httpScheme = regexp.MustCompile(`^(?i)https?://`)
 
-func EnsureTransport(host string) string {
-	if httpScheme.MatchString(host) {
+func EnsureTransport(host, protocol string) string {
+	if protocol == "" {
+		for _, v := range []string{"http://", "https://"} {
+			if strings.HasPrefix(host, v) {
+				return host
+			}
+		}
+		return "http://" + host
+	}
+	prefix := protocol + "://"
+	if strings.HasPrefix(host, prefix) {
 		return host
 	}
-	// no prototcol, assume http
-	return "http://" + host
+	return prefix + host
 }
 
 func nextTarget(targetData *apidef.HostList, spec *APISpec) (string, error) {
@@ -128,7 +134,7 @@ func nextTarget(targetData *apidef.HostList, spec *APISpec) (string, error) {
 				return "", err
 			}
 
-			host := EnsureTransport(gotHost)
+			host := EnsureTransport(gotHost, spec.Protocol)
 
 			if !spec.Proxy.CheckHostAgainstUptimeTests {
 				return host, nil // we don't care if it's up
@@ -151,7 +157,7 @@ func nextTarget(targetData *apidef.HostList, spec *APISpec) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return EnsureTransport(gotHost), nil
+	return EnsureTransport(gotHost, spec.Protocol), nil
 }
 
 var (
@@ -468,6 +474,40 @@ func proxyFromAPI(api *APISpec) func(*http.Request) (*url.URL, error) {
 		}
 		return http.ProxyFromEnvironment(req)
 	}
+}
+
+func tlsClientConfig(s *APISpec) *tls.Config {
+	config := &tls.Config{}
+
+	if s.GlobalConfig.ProxySSLInsecureSkipVerify {
+		config.InsecureSkipVerify = true
+	}
+
+	if s.Proxy.Transport.SSLInsecureSkipVerify {
+		config.InsecureSkipVerify = true
+	}
+
+	if s.GlobalConfig.ProxySSLMinVersion > 0 {
+		config.MinVersion = s.GlobalConfig.ProxySSLMinVersion
+	}
+
+	if s.Proxy.Transport.SSLMinVersion > 0 {
+		config.MinVersion = s.Proxy.Transport.SSLMinVersion
+	}
+
+	if len(s.GlobalConfig.ProxySSLCipherSuites) > 0 {
+		config.CipherSuites = getCipherAliases(s.GlobalConfig.ProxySSLCipherSuites)
+	}
+
+	if len(s.Proxy.Transport.SSLCipherSuites) > 0 {
+		config.CipherSuites = getCipherAliases(s.Proxy.Transport.SSLCipherSuites)
+	}
+
+	if !s.GlobalConfig.ProxySSLDisableRenegotiation {
+		config.Renegotiation = tls.RenegotiateFreelyAsClient
+	}
+
+	return config
 }
 
 func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p *ReverseProxy) http.RoundTripper {
@@ -813,9 +853,9 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 	if ses != nil {
 		// We have found a session, lets report back
 		quotaMax, quotaRemaining, _, quotaRenews := ses.GetQuotaLimitByAPIID(p.TykAPISpec.APIID)
-		res.Header.Set(XRateLimitLimit, strconv.Itoa(int(quotaMax)))
-		res.Header.Set(XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
-		res.Header.Set(XRateLimitReset, strconv.Itoa(int(quotaRenews)))
+		res.Header.Set(headers.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
+		res.Header.Set(headers.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
+		res.Header.Set(headers.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
 	}
 
 	copyHeader(rw.Header(), res.Header)

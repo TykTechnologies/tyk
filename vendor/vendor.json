@@ -31,6 +31,12 @@
 			"versionExact": "v0.11.4"
 		},
 		{
+			"checksumSHA1": "5372siuLhg4uYim2FHz057TwWrs=",
+			"path": "github.com/TykTechnologies/again",
+			"revision": "6ad301e7eaed6b8269b77e8df301e8d2e2130071",
+			"revisionTime": "2019-08-05T13:36:18Z"
+		},
+		{
 			"checksumSHA1": "j5NnY7tyNCx+Y5VrAMxKFqPPGWc=",
 			"path": "github.com/TykTechnologies/concurrent-map",
 			"revision": "7de59d53fd5c30afb681bfcfe58842d2e14136bd",
@@ -561,6 +567,12 @@
 			"path": "github.com/paulbellamy/ratecounter",
 			"revision": "5a11f585a31379765c190c033b6ad39956584447",
 			"revisionTime": "2015-11-19T09:14:14Z"
+		},
+		{
+			"checksumSHA1": "z9escnY1HdbFBLrJozvQ3lygt1E=",
+			"path": "github.com/pires/go-proxyproto",
+			"revision": "2c19fd512994b0cd3d16abb295029bf257d48a56",
+			"revisionTime": "2019-06-15T16:34:42Z"
 		},
 		{
 			"checksumSHA1": "ynJSWoF6v+3zMnh9R0QmmG6iGV8=",

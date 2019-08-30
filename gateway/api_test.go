@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/garyburd/redigo/redis"
-	"github.com/gorilla/mux"
 	uuid "github.com/satori/go.uuid"
 
 	"fmt"
@@ -42,7 +41,7 @@ const apiTestDef = `{
 
 func loadSampleAPI(t *testing.T, def string) {
 	spec := CreateSpecTest(t, def)
-	loadApps([]*APISpec{spec}, discardMuxer)
+	loadApps([]*APISpec{spec})
 }
 
 type testAPIDefinition struct {
@@ -972,7 +971,7 @@ func TestGroupResetHandler(t *testing.T) {
 	<-didSubscribe
 	req := withAuth(TestReq(t, "GET", uri, nil))
 
-	mainRouter.ServeHTTP(recorder, req)
+	mainRouter().ServeHTTP(recorder, req)
 
 	if recorder.Code != 200 {
 		t.Fatal("Hot reload (group) failed, response code was: ", recorder.Code)
@@ -991,13 +990,13 @@ func TestGroupResetHandler(t *testing.T) {
 }
 
 func TestHotReloadSingle(t *testing.T) {
-	oldRouter := mainRouter
+	oldRouter := mainRouter()
 	var wg sync.WaitGroup
 	wg.Add(1)
 	reloadURLStructure(wg.Done)
 	ReloadTick <- time.Time{}
 	wg.Wait()
-	if mainRouter == oldRouter {
+	if mainRouter() == oldRouter {
 		t.Fatal("router wasn't swapped")
 	}
 }
@@ -1040,9 +1039,8 @@ func BenchmarkApiReload(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		newMuxes := mux.NewRouter()
-		loadAPIEndpoints(newMuxes)
-		loadApps(specs, newMuxes)
+		loadAPIEndpoints(nil)
+		loadApps(specs)
 	}
 }
 

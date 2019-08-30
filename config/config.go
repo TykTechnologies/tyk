@@ -253,6 +253,12 @@ type Tracer struct {
 	Options map[string]interface{} `json:"options"`
 }
 
+// ServicePort defines a protocol and port on which a service can bind to
+type ServicePort struct {
+	Protocol string `json:"protocol"`
+	Port     int    `json:"port"`
+}
+
 // Config is the configuration object used by tyk to set up various parameters.
 type Config struct {
 	// OriginalPath is the path to the config file that was read. If
@@ -286,6 +292,7 @@ type Config struct {
 	EnableAPISegregation    bool           `json:"enable_api_segregation"`
 	TemplatePath            string         `json:"template_path"`
 	Policies                PoliciesConfig `json:"policies"`
+	DisabledPorts           []ServicePort  `json:"disabled_ports"`
 
 	// CE Configurations
 	AppPath string `json:"app_path"`

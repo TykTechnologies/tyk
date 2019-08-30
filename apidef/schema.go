@@ -279,6 +279,15 @@ const Schema = `{
         "domain": {
             "type": "string"
         },
+        "listen_port": {
+            "type": "number"
+        },
+        "protocol": {
+            "type": "string"
+        },
+        "enable_proxy_protocol": {
+            "type": "boolean"
+        },
         "certificates": {
             "type": ["array", "null"]
         },

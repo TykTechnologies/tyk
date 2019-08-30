@@ -34,28 +34,29 @@ type ChainObject struct {
 	Subrouter      *mux.Router
 }
 
-func prepareStorage() (storage.RedisCluster, storage.RedisCluster, storage.RedisCluster, RPCStorageHandler, RPCStorageHandler) {
-	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
-	redisOrgStore := storage.RedisCluster{KeyPrefix: "orgkey."}
-	healthStore := storage.RedisCluster{KeyPrefix: "apihealth."}
-	rpcAuthStore := RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
-	rpcOrgStore := RPCStorageHandler{KeyPrefix: "orgkey."}
-
-	FallbackKeySesionManager.Init(&redisStore)
-
-	return redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore
+func prepareStorage() generalStores {
+	var gs generalStores
+	gs.redisStore = &storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
+	gs.redisOrgStore = &storage.RedisCluster{KeyPrefix: "orgkey."}
+	gs.healthStore = &storage.RedisCluster{KeyPrefix: "apihealth."}
+	gs.rpcAuthStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
+	gs.rpcOrgStore = &RPCStorageHandler{KeyPrefix: "orgkey."}
+	FallbackKeySesionManager.Init(gs.redisStore)
+	return gs
 }
 
 func skipSpecBecauseInvalid(spec *APISpec, logger *logrus.Entry) bool {
 
-	if spec.Proxy.ListenPath == "" {
-		logger.Error("Listen path is empty")
-		return true
-	}
-
-	if strings.Contains(spec.Proxy.ListenPath, " ") {
-		logger.Error("Listen path contains spaces, is invalid")
-		return true
+	switch spec.Protocol {
+	case "", "http", "https":
+		if spec.Proxy.ListenPath == "" {
+			logger.Error("Listen path is empty")
+			return true
+		}
+		if strings.Contains(spec.Proxy.ListenPath, " ") {
+			logger.Error("Listen path contains spaces, is invalid")
+			return true
+		}
 	}
 
 	_, err := url.Parse(spec.Proxy.TargetURL)
@@ -92,8 +93,7 @@ func countApisByListenHash(specs []*APISpec) map[string]int {
 }
 
 func processSpec(spec *APISpec, apisByListen map[string]int,
-	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore storage.Handler,
-	subrouter *mux.Router, logger *logrus.Entry) *ChainObject {
+	gs *generalStores, subrouter *mux.Router, logger *logrus.Entry) *ChainObject {
 
 	var chainDef ChainObject
 	chainDef.Subrouter = subrouter
@@ -163,30 +163,30 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	}
 
 	// Initialise the auth and session managers (use Redis for now)
-	authStore := redisStore
-	orgStore := redisOrgStore
+	authStore := gs.redisStore
+	orgStore := gs.redisOrgStore
 	switch spec.AuthProvider.StorageEngine {
 	case LDAPStorageEngine:
 		storageEngine := LDAPStorageHandler{}
 		storageEngine.LoadConfFromMeta(spec.AuthProvider.Meta)
 		authStore = &storageEngine
 	case RPCStorageEngine:
-		authStore = rpcAuthStore
-		orgStore = rpcOrgStore
+		authStore = gs.rpcAuthStore
+		orgStore = gs.rpcOrgStore
 		spec.GlobalConfig.EnforceOrgDataAge = true
 		globalConf := config.Global()
 		globalConf.EnforceOrgDataAge = true
 		config.SetGlobal(globalConf)
 	}
 
-	sessionStore := redisStore
+	sessionStore := gs.redisStore
 	switch spec.SessionProvider.StorageEngine {
 	case RPCStorageEngine:
-		sessionStore = rpcAuthStore
+		sessionStore = gs.rpcAuthStore
 	}
 
 	// Health checkers are initialised per spec so that each API handler has it's own connection and redis storage pool
-	spec.Init(authStore, sessionStore, healthStore, orgStore)
+	spec.Init(authStore, sessionStore, gs.healthStore, orgStore)
 
 	// Set up all the JSVM middleware
 	var mwAuthCheckFunc apidef.MiddlewareDefinition
@@ -496,12 +496,16 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		var handler http.Handler
 		if r.URL.Hostname() == "self" {
-			handler = d.SH.Spec.middlewareChain
+			if d.SH.Spec.middlewareChain != nil {
+				handler = d.SH.Spec.middlewareChain.ThisHandler
+			}
 		} else {
 			ctxSetVersionInfo(r, nil)
 
 			if targetAPI := fuzzyFindAPI(r.URL.Hostname()); targetAPI != nil {
-				handler = targetAPI.middlewareChain
+				if targetAPI.middlewareChain != nil {
+					handler = targetAPI.middlewareChain.ThisHandler
+				}
 			} else {
 				handler := ErrorHandler{*d.SH.Base()}
 				handler.HandleError(w, r, "Can't detect loop target", http.StatusInternalServerError, true)
@@ -526,19 +530,14 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func loadGlobalApps(router *mux.Router) {
+func loadGlobalApps() {
 	// we need to make a full copy of the slice, as loadApps will
 	// use in-place to sort the apis.
 	apisMu.RLock()
 	specs := make([]*APISpec, len(apiSpecs))
 	copy(specs, apiSpecs)
 	apisMu.RUnlock()
-	loadApps(specs, router)
-
-	if config.Global().NewRelic.AppName != "" {
-		mainLog.Info("Adding NewRelic instrumentation")
-		AddNewRelicInstrumentation(NewRelicApplication, router)
-	}
+	loadApps(specs)
 }
 
 func trimCategories(name string) string {
@@ -568,20 +567,57 @@ func fuzzyFindAPI(search string) *APISpec {
 	return nil
 }
 
-// Create the individual API (app) specs based on live configurations and assign middleware
-func loadApps(specs []*APISpec, muxer *mux.Router) {
-	hostname := config.Global().HostName
-	if hostname != "" {
-		muxer = muxer.Host(hostname).Subrouter()
-		mainLog.Info("API hostname set: ", hostname)
+func loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStores, muxer *proxyMux) {
+	port := config.Global().ListenPort
+	if spec.ListenPort != 0 {
+		port = spec.ListenPort
+	}
+	router := muxer.router(port, spec.Protocol)
+	if router == nil {
+		router = mux.NewRouter()
 	}
 
+	hostname := config.Global().HostName
+	if config.Global().EnableCustomDomains && spec.Domain != "" {
+		hostname = spec.Domain
+	}
+
+	if hostname != "" {
+		mainLog.Info("API hostname set: ", hostname)
+		router = router.Host(hostname).Subrouter()
+	}
+
+	chainObj := processSpec(spec, apisByListen, gs, router, logrus.NewEntry(log))
+	apisMu.Lock()
+	spec.middlewareChain = chainObj
+	apisMu.Unlock()
+
+	if chainObj.Skip {
+		return
+	}
+
+	if !chainObj.Open {
+		router.Handle(chainObj.RateLimitPath, chainObj.RateLimitChain)
+	}
+
+	router.Handle(chainObj.ListenOn, chainObj.ThisHandler)
+
+	muxer.setRouter(port, spec.Protocol, router)
+}
+
+func loadTCPService(spec *APISpec, muxer *proxyMux) {
+	muxer.addTCPService(spec, nil)
+}
+
+type generalStores struct {
+	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore storage.Handler
+}
+
+// Create the individual API (app) specs based on live configurations and assign middleware
+func loadApps(specs []*APISpec) {
 	mainLog.Info("Loading API configurations.")
 
 	tmpSpecRegister := make(map[string]*APISpec)
-
-	// Only create this once, add other types here as needed, seems wasteful but we can let the GC handle it
-	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore := prepareStorage()
 
 	// sort by listen path from longer to shorter, so that /foo
 	// doesn't break /foo-bar
@@ -590,92 +626,40 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 	})
 
 	// Create a new handler for each API spec
-	loadList := make([]*ChainObject, len(specs))
 	apisByListen := countApisByListenHash(specs)
 
-	// Set up the host sub-routers first, since we need to set up
-	// exactly one per host. If we set up one per API definition,
-	// only one of the APIs will work properly, since the router
-	// doesn't backtrack and will stop at the first host sub-router
-	// match.
-	hostRouters := map[string]*mux.Router{"": muxer}
-	var hosts []string
+	muxer := &proxyMux{}
+
+	globalConf := config.Global()
+	r := mux.NewRouter()
+	muxer.setRouter(globalConf.ListenPort, "", r)
+	if globalConf.ControlAPIPort == 0 {
+		loadAPIEndpoints(r)
+	} else {
+		router := mux.NewRouter()
+		loadAPIEndpoints(router)
+		muxer.setRouter(globalConf.ControlAPIPort, "", router)
+	}
+	gs := prepareStorage()
 	for _, spec := range specs {
-		hosts = append(hosts, spec.Domain)
-	}
-
-	if trace.IsEnabled() {
-		for _, spec := range specs {
-			trace.AddTracer(spec.Name)
-		}
-	}
-	// Decreasing sort by length and chars, so that the order of
-	// creation of the host sub-routers is deterministic and
-	// consistent with the order of the paths.
-	sort.Slice(hosts, func(i, j int) bool {
-		h1, h2 := hosts[i], hosts[j]
-		if len(h1) != len(h2) {
-			return len(h1) > len(h2)
-		}
-		return h1 > h2
-	})
-	for _, host := range hosts {
-		if !config.Global().EnableCustomDomains {
-			continue // disabled
-		}
-		if hostRouters[host] != nil {
-			continue // already set up a subrouter
-		}
-		mainLog.WithField("domain", host).Info("Sub-router created for domain")
-		hostRouters[host] = muxer.Host(host).Subrouter()
-	}
-
-	for i, spec := range specs {
-		subrouter := hostRouters[spec.Domain]
-		if subrouter == nil {
-			mainLog.WithFields(logrus.Fields{
-				"domain": spec.Domain,
-				"api_id": spec.APIID,
-			}).Warning("Trying to load API with Domain when custom domains are disabled.")
-			subrouter = muxer
+		if spec.ListenPort != spec.GlobalConfig.ListenPort {
+			mainLog.Info("API bind on custom port:", spec.ListenPort)
 		}
 
-		chainObj := processSpec(spec, apisByListen, &redisStore, &redisOrgStore, &healthStore, &rpcAuthStore, &rpcOrgStore, subrouter, logrus.NewEntry(log))
-		apisMu.Lock()
-		spec.middlewareChain = chainObj.ThisHandler
-		apisMu.Unlock()
-
-		// TODO: This will not deal with skipped APis well
 		tmpSpecRegister[spec.APIID] = spec
-		loadList[i] = chainObj
+
+		switch spec.Protocol {
+		case "", "http", "https":
+			loadHTTPService(spec, apisByListen, &gs, muxer)
+		case "tcp", "tls":
+			loadTCPService(spec, muxer)
+		}
 	}
 
-	for _, chainObj := range loadList {
-		if chainObj.Skip {
-			continue
-		}
-		if !chainObj.Open {
-			chainObj.Subrouter.Handle(chainObj.RateLimitPath, chainObj.RateLimitChain)
-		}
-
-		mainLog.Infof("Processed and listening on: %s%s", chainObj.Domain, chainObj.ListenOn)
-		chainObj.Subrouter.Handle(chainObj.ListenOn, chainObj.ThisHandler)
-	}
-
-	// All APIs processed, now we can healthcheck
-	// Add a root message to check all is OK
-	muxer.HandleFunc("/"+config.Global().HealthCheckEndpointName, func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, "Hello Tiki")
-	})
+	defaultProxyMux.swap(muxer)
 
 	// Swap in the new register
 	apisMu.Lock()
-
-	// release current specs resources before overwriting map
-	for _, curSpec := range apisByID {
-		curSpec.Release()
-	}
-
 	apisByID = tmpSpecRegister
 	apisMu.Unlock()
 

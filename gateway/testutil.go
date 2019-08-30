@@ -59,8 +59,8 @@ var (
 	EnableTestDNSMock = true
 )
 
-func InitTestMain(m *testing.M, genConf ...func(globalConf *config.Config)) int {
-	runningTests = true
+func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf *config.Config)) int {
+	setTestMode(true)
 	testServerRouter = testHttpHandler()
 	testServer := &http.Server{
 		Addr:           testHttpListen,
@@ -131,9 +131,9 @@ func InitTestMain(m *testing.M, genConf ...func(globalConf *config.Config)) int 
 		panic(err)
 	}
 	cli.Init(VERSION, confPaths)
-	initialiseSystem()
+	initialiseSystem(ctx)
 	// Small part of start()
-	loadAPIEndpoints(mainRouter)
+	loadAPIEndpoints(mainRouter())
 	if analytics.GeoIPDB == nil {
 		panic("GeoIPDB was not initialized")
 	}
@@ -220,6 +220,31 @@ func bundleHandleFunc(w http.ResponseWriter, r *http.Request) {
 		f.Write([]byte(content))
 	}
 	z.Close()
+}
+func mainRouter() *mux.Router {
+	return getMainRouter(defaultProxyMux)
+}
+
+func mainProxy() *proxy {
+	return defaultProxyMux.getProxy(config.Global().ListenPort)
+}
+
+func controlProxy() *proxy {
+	p := defaultProxyMux.getProxy(config.Global().ControlAPIPort)
+	if p != nil {
+		return p
+	}
+	return mainProxy()
+}
+
+func getMainRouter(m *proxyMux) *mux.Router {
+	var protocol string
+	if config.Global().HttpServerOptions.UseSSL {
+		protocol = "https"
+	} else {
+		protocol = "http"
+	}
+	return m.router(config.Global().ListenPort, protocol)
 }
 
 type TestHttpResponse struct {
@@ -517,48 +542,39 @@ type TestConfig struct {
 }
 
 type Test struct {
-	ln  net.Listener
-	cln net.Listener
 	URL string
 
 	testRunner   *test.HTTPTestRunner
 	GlobalConfig config.Config
 	config       TestConfig
+	cacnel       func()
 }
 
 func (s *Test) Start() {
-	s.ln, _ = generateListener(0)
-	_, port, _ := net.SplitHostPort(s.ln.Addr().String())
+	l, _ := net.Listen("tcp", "127.0.0.1:0")
+	_, port, _ := net.SplitHostPort(l.Addr().String())
+	l.Close()
 	globalConf := config.Global()
 	globalConf.ListenPort, _ = strconv.Atoi(port)
 
 	if s.config.sepatateControlAPI {
-		s.cln, _ = net.Listen("tcp", "127.0.0.1:0")
+		l, _ := net.Listen("tcp", "127.0.0.1:0")
 
-		_, port, _ = net.SplitHostPort(s.cln.Addr().String())
+		_, port, _ = net.SplitHostPort(l.Addr().String())
+		l.Close()
 		globalConf.ControlAPIPort, _ = strconv.Atoi(port)
 	}
-
 	globalConf.CoProcessOptions = s.config.CoprocessConfig
-
 	config.SetGlobal(globalConf)
 
-	setupGlobals()
-	// This is emulate calling start()
-	// But this lines is the only thing needed for this tests
-	if config.Global().ControlAPIPort == 0 {
-		loadAPIEndpoints(mainRouter)
-	}
+	startServer()
+	ctx, cancel := context.WithCancel(context.Background())
+	s.cacnel = cancel
+	setupGlobals(ctx)
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.Global().SupressDefaultOrgStore {
 		DefaultOrgStore.Init(getGlobalStorageHandler("orgkey.", false))
 		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
-	}
-
-	if s.config.HotReload {
-		listen(s.ln, s.cln, nil)
-	} else {
-		listen(s.ln, s.cln, fmt.Errorf("Without goagain"))
 	}
 
 	s.GlobalConfig = globalConf
@@ -567,14 +583,14 @@ func (s *Test) Start() {
 	if s.GlobalConfig.HttpServerOptions.UseSSL {
 		scheme = "https://"
 	}
-	s.URL = scheme + s.ln.Addr().String()
+	s.URL = scheme + mainProxy().listener.Addr().String()
 
 	s.testRunner = &test.HTTPTestRunner{
 		RequestBuilder: func(tc *test.TestCase) (*http.Request, error) {
 			tc.BaseURL = s.URL
 			if tc.ControlRequest {
 				if s.config.sepatateControlAPI {
-					tc.BaseURL = scheme + s.cln.Addr().String()
+					tc.BaseURL = scheme + controlProxy().listener.Addr().String()
 				} else if s.GlobalConfig.ControlAPIHostname != "" {
 					tc.Domain = s.GlobalConfig.ControlAPIHostname
 				}
@@ -601,10 +617,11 @@ func (s *Test) Do(tc test.TestCase) (*http.Response, error) {
 }
 
 func (s *Test) Close() {
-	s.ln.Close()
-
+	if s.cacnel != nil {
+		s.cacnel()
+	}
+	defaultProxyMux.swap(&proxyMux{})
 	if s.config.sepatateControlAPI {
-		s.cln.Close()
 		globalConf := config.Global()
 		globalConf.ControlAPIPort = 0
 		config.SetGlobal(globalConf)
@@ -615,7 +632,9 @@ func (s *Test) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, er
 	return s.testRunner.Run(t, testCases...)
 }
 
+//TODO:(gernest) when hot reload is suppored enable this.
 func (s *Test) RunExt(t testing.TB, testCases ...test.TestCase) {
+	s.Run(t, testCases...)
 	var testMatrix = []struct {
 		goagain          bool
 		overrideDefaults bool
@@ -740,7 +759,6 @@ func LoadAPI(specs ...*APISpec) (out []*APISpec) {
 	oldPath := globalConf.AppPath
 	globalConf.AppPath, _ = ioutil.TempDir("", "apps")
 	config.SetGlobal(globalConf)
-
 	defer func() {
 		globalConf := config.Global()
 		os.RemoveAll(globalConf.AppPath)

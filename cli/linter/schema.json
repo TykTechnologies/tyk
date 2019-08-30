@@ -677,6 +677,25 @@
         }
       }
     },
+    "disabled_ports": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": [
+          "object"
+        ],
+        "properties": {
+          "protocol": {
+            "type": "string"
+          },
+          "port": {
+            "type": "number"
+          }
+        }
+      }
+    },
     "proxy_default_timeout": {
       "type": "integer"
     },

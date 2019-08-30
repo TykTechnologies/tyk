@@ -223,6 +223,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, resp
 			rawResponse,
 			ip,
 			GeoData{},
+			NetworkStats{},
 			tags,
 			alias,
 			trackEP,
