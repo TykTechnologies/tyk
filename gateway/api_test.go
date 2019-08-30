@@ -158,6 +158,7 @@ func TestKeyHandler(t *testing.T) {
 		AccessRights: map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v1"},
 		}},
+		OrgID: "default",
 	}
 	policiesMu.Unlock()
 	withPolicy := CreateStandardSession()
@@ -281,6 +282,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 		spec.APIID = testAPIID
 		spec.UseKeylessAccess = false
 		spec.Auth.UseParam = true
+		spec.OrgID = "default"
 	})
 
 	pID := CreatePolicy(func(p *user.Policy) {
@@ -429,8 +431,8 @@ func testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 	}}
 	withAccessJSON, _ := json.Marshal(withAccess)
 
-	myKey := generateToken("", "")
-	myKeyHash := storage.HashKey(myKey)
+	myKey := "my_key_id"
+	myKeyHash := storage.HashKey(generateToken("default", myKey))
 
 	if len(myKeyHash) != expectedHashSize {
 		t.Errorf("Expected hash size: %d, got %d. Hash: %s. Key: %s", expectedHashSize, len(myKeyHash), myKeyHash, myKey)
@@ -473,10 +475,10 @@ func testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 				Code:      200,
 				BodyMatch: fmt.Sprintf(`"key":"%s"`, myKeyHash),
 			},
-			// get one key by key name
+			// get one key by key name (API specified)
 			{
 				Method:    "GET",
-				Path:      "/tyk/keys/" + myKey,
+				Path:      "/tyk/keys/" + myKey + "?api_id=test",
 				Data:      string(withAccessJSON),
 				AdminAuth: true,
 				Code:      200,
@@ -595,7 +597,7 @@ func TestHashKeyListingDisabled(t *testing.T) {
 	withAccessJSON, _ := json.Marshal(withAccess)
 
 	myKey := "my_key_id"
-	myKeyHash := storage.HashKey(myKey)
+	myKeyHash := storage.HashKey(generateToken("default", myKey))
 
 	t.Run("Create, get and delete key with key hashing", func(t *testing.T) {
 		ts.Run(t, []test.TestCase{
@@ -625,10 +627,10 @@ func TestHashKeyListingDisabled(t *testing.T) {
 				Code:      200,
 				BodyMatch: fmt.Sprintf(`"key_hash":"%s"`, myKeyHash),
 			},
-			// get one key by key name
+			// get one key by key name (API specified)
 			{
 				Method:    "GET",
-				Path:      "/tyk/keys/" + myKey,
+				Path:      "/tyk/keys/" + myKey + "?api_id=test",
 				Data:      string(withAccessJSON),
 				AdminAuth: true,
 				Code:      200,
@@ -713,7 +715,7 @@ func TestHashKeyHandlerHashingDisabled(t *testing.T) {
 	withAccessJSON, _ := json.Marshal(withAccess)
 
 	myKey := "my_key_id"
-	myKeyHash := storage.HashKey(myKey)
+	myKeyHash := storage.HashKey(generateToken("default", myKey))
 
 	t.Run("Create, get and delete key with key hashing", func(t *testing.T) {
 		ts.Run(t, []test.TestCase{

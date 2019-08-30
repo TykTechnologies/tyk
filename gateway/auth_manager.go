@@ -7,10 +7,11 @@ import (
 	"sync"
 	"time"
 
+	uuid "github.com/satori/go.uuid"
+
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
-	uuid "github.com/satori/go.uuid"
 
 	"github.com/sirupsen/logrus"
 )
@@ -117,6 +118,7 @@ type DefaultSessionManager struct {
 	store                    storage.Handler
 	asyncWrites              bool
 	disableCacheSessionState bool
+	orgID                    string
 }
 
 type SessionUpdate struct {
@@ -267,7 +269,10 @@ func (b *DefaultSessionManager) RemoveSession(keyName string, hashed bool) bool 
 	if hashed {
 		return b.store.DeleteRawKey(b.store.GetKeyPrefix() + keyName)
 	} else {
-		return b.store.DeleteKey(keyName)
+		// support both old and new key hashing
+		res1 := b.store.DeleteKey(keyName)
+		res2 := b.store.DeleteKey(generateToken(b.orgID, keyName))
+		return res1 || res2
 	}
 }
 
@@ -281,7 +286,26 @@ func (b *DefaultSessionManager) SessionDetail(keyName string, hashed bool) (user
 	if hashed {
 		jsonKeyVal, err = b.store.GetRawKey(b.store.GetKeyPrefix() + keyName)
 	} else {
-		jsonKeyVal, err = b.store.GetKey(keyName)
+		if storage.TokenOrg(keyName) != b.orgID {
+			// try to get legacy and new format key at once
+			var jsonKeyValList []string
+			jsonKeyValList, err = b.store.GetMultiKey(
+				[]string{
+					generateToken(b.orgID, keyName),
+					keyName,
+				},
+			)
+			// pick the 1st non empty from the returned list
+			for _, val := range jsonKeyValList {
+				if val != "" {
+					jsonKeyVal = val
+					break
+				}
+			}
+		} else {
+			// key is not an imported one
+			jsonKeyVal, err = b.store.GetKey(keyName)
+		}
 	}
 
 	if err != nil {

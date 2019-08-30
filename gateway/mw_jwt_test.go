@@ -903,6 +903,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		spec.JWTIdentityBaseField = "user_id"
 		spec.JWTPolicyFieldName = "policy_id"
 		spec.Proxy.ListenPath = "/api1"
+		spec.OrgID = "default"
 	})[0]
 
 	p1ID := CreatePolicy(func(p *user.Policy) {
@@ -929,6 +930,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		spec.JWTIdentityBaseField = "user_id"
 		spec.JWTPolicyFieldName = "policy_id"
 		spec.Proxy.ListenPath = "/api2"
+		spec.OrgID = "default"
 	})[0]
 
 	p2ID := CreatePolicy(func(p *user.Policy) {
@@ -955,6 +957,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		spec.JWTIdentityBaseField = "user_id"
 		spec.JWTPolicyFieldName = "policy_id"
 		spec.Proxy.ListenPath = "/api3"
+		spec.OrgID = "default"
 	})[0]
 
 	spec := BuildAPI(func(spec *APISpec) {
@@ -970,6 +973,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 			"user:read":  p1ID,
 			"user:write": p2ID,
 		}
+		spec.OrgID = "default"
 	})[0]
 
 	LoadAPI(spec, spec1, spec2, spec3)
@@ -996,7 +1000,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 	})
 
 	// check that key has right set of policies assigned - there should be all three - base one and two from scope
-	sessionID := generateToken("", fmt.Sprintf("%x", md5.Sum([]byte(userID))))
+	sessionID := generateToken("default", fmt.Sprintf("%x", md5.Sum([]byte(userID))))
 	t.Run("Request to check that session has got correct apply_policies value", func(t *testing.T) {
 		ts.Run(
 			t,
@@ -1077,6 +1081,7 @@ func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
 		spec.JWTIdentityBaseField = "user_id"
 		spec.JWTPolicyFieldName = "policy_id"
 		spec.Proxy.ListenPath = "/"
+		spec.OrgID = "default"
 	})[0]
 
 	LoadAPI(spec)
@@ -1100,7 +1105,7 @@ func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
 		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	})
 
-	sessionID := generateToken("", fmt.Sprintf("%x", md5.Sum([]byte(user_id))))
+	sessionID := generateToken("default", fmt.Sprintf("%x", md5.Sum([]byte("user"))))
 
 	authHeaders := map[string]string{"authorization": jwtToken}
 	t.Run("Initial request with 1st policy", func(t *testing.T) {

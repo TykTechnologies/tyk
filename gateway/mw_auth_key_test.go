@@ -60,8 +60,7 @@ func TestMurmur3CharBug(t *testing.T) {
 
 		ts.Run(t, []test.TestCase{
 			genTestCase("wrong", 403),
-			// Should reject instead, just to show bug
-			genTestCase(key+"abc", 200),
+			genTestCase(key+"abc", 403),
 			genTestCase(key, 200),
 		}...)
 	})

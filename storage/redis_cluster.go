@@ -235,6 +235,25 @@ func (r *RedisCluster) GetKey(keyName string) (string, error) {
 	return value, nil
 }
 
+// GetMultiKey gets multiple keys from the database
+func (r *RedisCluster) GetMultiKey(keyNames []string) ([]string, error) {
+	r.ensureConnection()
+	cluster := r.singleton()
+
+	fixedKeyNames := make([]interface{}, len(keyNames))
+	for index, val := range keyNames {
+		fixedKeyNames[index] = r.fixKey(val)
+	}
+
+	value, err := redis.Strings(cluster.Do("MGET", fixedKeyNames...))
+	if err != nil {
+		log.WithError(err).Debug("Error trying to get value")
+		return nil, ErrKeyNotFound
+	}
+
+	return value, nil
+}
+
 func (r *RedisCluster) GetKeyTTL(keyName string) (ttl int64, err error) {
 	r.ensureConnection()
 	return redis.Int64(r.singleton().Do("TTL", r.fixKey(keyName)))
@@ -419,23 +438,23 @@ func (r *RedisCluster) DeleteKey(keyName string) bool {
 	r.ensureConnection()
 	log.Debug("DEL Key was: ", keyName)
 	log.Debug("DEL Key became: ", r.fixKey(keyName))
-	_, err := r.singleton().Do("DEL", r.fixKey(keyName))
+	n, err := r.singleton().Do("DEL", r.fixKey(keyName))
 	if err != nil {
-		log.Error("Error trying to delete key: ", err)
+		log.WithError(err).Error("Error trying to delete key")
 	}
 
-	return true
+	return n.(int64) > 0
 }
 
 // DeleteKey will remove a key from the database without prefixing, assumes user knows what they are doing
 func (r *RedisCluster) DeleteRawKey(keyName string) bool {
 	r.ensureConnection()
-	_, err := r.singleton().Do("DEL", keyName)
+	n, err := r.singleton().Do("DEL", keyName)
 	if err != nil {
-		log.Error("Error trying to delete key: ", err)
+		log.WithError(err).Error("Error trying to delete key")
 	}
 
-	return true
+	return n.(int64) > 0
 }
 
 // DeleteKeys will remove a group of keys in bulk
