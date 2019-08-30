@@ -330,6 +330,7 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 
 	// get original session in case of update and preserve fields that SHOULD NOT be updated
 	originalKey := user.SessionState{}
+	originalKeyName := keyName
 	if r.Method == http.MethodPut {
 		found := false
 		for apiID := range newSession.AccessRights {
@@ -367,6 +368,7 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 		}
 	} else {
 		newSession.DateCreated = time.Now()
+		keyName = generateToken(newSession.OrgID, keyName)
 	}
 
 	// Update our session object (create it)
@@ -375,7 +377,6 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 		// Only if it's NEW
 		switch r.Method {
 		case http.MethodPost:
-			keyName = generateToken(newSession.OrgID, keyName)
 			// It's a create, so lets hash the password
 			setSessionPassword(&newSession)
 		case http.MethodPut:
@@ -406,7 +407,7 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 	})
 
 	response := apiModifyKeySuccess{
-		Key:    keyName,
+		Key:    originalKeyName,
 		Status: "ok",
 		Action: action,
 	}

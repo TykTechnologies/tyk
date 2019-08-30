@@ -765,7 +765,7 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 	ts.Run(t, []test.TestCase{
 		{
 			Method:    http.MethodGet,
-			Path:      "/tyk/keys/" + key,
+			Path:      "/tyk/keys/" + key + "?api_id=api1",
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {
@@ -816,7 +816,7 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 	ts.Run(t, []test.TestCase{
 		{
 			Method:    http.MethodGet,
-			Path:      "/tyk/keys/" + key,
+			Path:      "/tyk/keys/" + key + "?api_id=api1",
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {

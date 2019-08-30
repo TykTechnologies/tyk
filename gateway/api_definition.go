@@ -19,6 +19,8 @@ import (
 
 	sprig "gopkg.in/Masterminds/sprig.v2"
 
+	"github.com/gorilla/mux"
+
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/rpc"
 
@@ -248,8 +250,12 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 	// Add any new session managers or auth handlers here
 	spec.AuthManager = &DefaultAuthorisationManager{}
 
-	spec.SessionManager = &DefaultSessionManager{}
-	spec.OrgSessionManager = &DefaultSessionManager{}
+	spec.SessionManager = &DefaultSessionManager{
+		orgID: spec.OrgID,
+	}
+	spec.OrgSessionManager = &DefaultSessionManager{
+		orgID: spec.OrgID,
+	}
 
 	spec.GlobalConfig = config.Global()
 
