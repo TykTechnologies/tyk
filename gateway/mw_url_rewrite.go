@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/textproto"
 	"net/url"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -23,6 +24,7 @@ const (
 	contextLabel     = "$tyk_context."
 	consulLabel      = "$secret_consul."
 	vaultLabel       = "$secret_vault."
+	envLabel         = "$secret_env."
 	triggerKeyPrefix = "trigger"
 	triggerKeySep    = "-"
 )
@@ -31,6 +33,7 @@ var dollarMatch = regexp.MustCompile(`\$\d+`)
 var contextMatch = regexp.MustCompile(`\$tyk_context.([A-Za-z0-9_\-\.]+)`)
 var consulMatch = regexp.MustCompile(`\$secret_consul.([A-Za-z0-9\/\-\.]+)`)
 var vaultMatch = regexp.MustCompile(`\$secret_vault.([A-Za-z0-9\/\-\.]+)`)
+var envValueMatch = regexp.MustCompile(`\$secret_env.([A-Za-z0-9_\-\.]+)`)
 var metaMatch = regexp.MustCompile(`\$tyk_meta.([A-Za-z0-9_\-\.]+)`)
 
 func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
@@ -196,17 +199,22 @@ func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 
 func replaceTykVariables(r *http.Request, in string, escape bool) string {
 
-	if strings.Contains(in, consulLabel) {
+	if strings.Contains(in, envLabel) {
 		contextData := ctxGetData(r)
-		vars := consulMatch.FindAllString(in, -1)
-		in = replaceVariables(in, vars, contextData, consulLabel, escape)
+		vars := envValueMatch.FindAllString(in, -1)
+		in = replaceVariables(in, vars, contextData, envLabel, escape)
 	}
 
 	if strings.Contains(in, vaultLabel) {
 		contextData := ctxGetData(r)
 		vars := vaultMatch.FindAllString(in, -1)
-		fmt.Println(vars)
 		in = replaceVariables(in, vars, contextData, vaultLabel, escape)
+	}
+
+	if strings.Contains(in, consulLabel) {
+		contextData := ctxGetData(r)
+		vars := consulMatch.FindAllString(in, -1)
+		in = replaceVariables(in, vars, contextData, consulLabel, escape)
 	}
 
 	if strings.Contains(in, contextLabel) {
@@ -233,6 +241,22 @@ func replaceVariables(in string, vars []string, vals map[string]interface{}, lab
 		key := strings.Replace(v, label, "", 1)
 
 		switch label {
+
+		case envLabel:
+
+			val := os.Getenv(fmt.Sprintf("TYK_SECRET_%s", strings.ToUpper(key)))
+			if val == "" {
+				in = strings.Replace(in, v, "", -1)
+				log.WithFields(logrus.Fields{
+					"key":       key,
+					"value":     v,
+					"in string": in,
+				}).Debug("Replaced with an empty string")
+
+				continue
+			}
+
+			in = strings.Replace(in, v, val, -1)
 
 		case vaultLabel:
 

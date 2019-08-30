@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"fmt"
 	"html/template"
 	"io/ioutil"
 	stdlog "log"
@@ -1015,6 +1016,12 @@ func afterConfSetup(conf *config.Config) {
 }
 
 func kvStore(value string) (string, error) {
+
+	if strings.HasPrefix(value, "env://") {
+		key := strings.TrimPrefix(value, "env://")
+		log.Debugf("Retrieving %s from environment", key)
+		return os.Getenv(fmt.Sprintf("TYK_SECRET_%s", strings.ToUpper(key))), nil
+	}
 
 	if strings.HasPrefix(value, "consul://") {
 		key := strings.TrimPrefix(value, "consul://")
