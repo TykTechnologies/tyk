@@ -16,6 +16,27 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 )
 
+type NetworkStats struct {
+	OpenConnections  int64
+	ClosedConnection int64
+	BytesIn          int64
+	BytesOut         int64
+}
+
+func (n *NetworkStats) Flush() NetworkStats {
+	s := NetworkStats{
+		OpenConnections:  atomic.LoadInt64(&n.OpenConnections),
+		ClosedConnection: atomic.LoadInt64(&n.ClosedConnection),
+		BytesIn:          atomic.LoadInt64(&n.BytesIn),
+		BytesOut:         atomic.LoadInt64(&n.BytesOut),
+	}
+	atomic.StoreInt64(&n.OpenConnections, 0)
+	atomic.StoreInt64(&n.ClosedConnection, 0)
+	atomic.StoreInt64(&n.BytesIn, 0)
+	atomic.StoreInt64(&n.BytesOut, 0)
+	return s
+}
+
 // AnalyticsRecord encodes the details of a request
 type AnalyticsRecord struct {
 	Method        string
@@ -41,6 +62,7 @@ type AnalyticsRecord struct {
 	RawResponse   string // ^ same but for response
 	IPAddress     string
 	Geo           GeoData
+	Network       NetworkStats
 	Tags          []string
 	Alias         string
 	TrackPath     bool

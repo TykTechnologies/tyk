@@ -306,10 +306,19 @@ type ResponseProcessor struct {
 }
 
 type HostCheckObject struct {
-	CheckURL string            `bson:"url" json:"url"`
-	Method   string            `bson:"method" json:"method"`
-	Headers  map[string]string `bson:"headers" json:"headers"`
-	Body     string            `bson:"body" json:"body"`
+	CheckURL            string            `bson:"url" json:"url"`
+	Protocol            string            `bson:"protocol" json:"protocol"`
+	Timeout             time.Duration     `bson:"timeout" json:"timeout"`
+	EnableProxyProtocol bool              `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
+	Commands            []CheckCommand    `bson:"commands" json:"commands"`
+	Method              string            `bson:"method" json:"method"`
+	Headers             map[string]string `bson:"headers" json:"headers"`
+	Body                string            `bson:"body" json:"body"`
+}
+
+type CheckCommand struct {
+	Name    string `bson:"name" json:"name"`
+	Message string `bson:"message" json:"message"`
 }
 
 type ServiceDiscoveryConfiguration struct {
@@ -339,16 +348,19 @@ type OpenIDOptions struct {
 //
 // swagger:model
 type APIDefinition struct {
-	Id               bson.ObjectId `bson:"_id,omitempty" json:"id,omitempty"`
-	Name             string        `bson:"name" json:"name"`
-	Slug             string        `bson:"slug" json:"slug"`
-	APIID            string        `bson:"api_id" json:"api_id"`
-	OrgID            string        `bson:"org_id" json:"org_id"`
-	UseKeylessAccess bool          `bson:"use_keyless" json:"use_keyless"`
-	UseOauth2        bool          `bson:"use_oauth2" json:"use_oauth2"`
-	UseOpenID        bool          `bson:"use_openid" json:"use_openid"`
-	OpenIDOptions    OpenIDOptions `bson:"openid_options" json:"openid_options"`
-	Oauth2Meta       struct {
+	Id                  bson.ObjectId `bson:"_id,omitempty" json:"id,omitempty"`
+	Name                string        `bson:"name" json:"name"`
+	Slug                string        `bson:"slug" json:"slug"`
+	ListenPort          int           `bson:"listen_port" json:"listen_port"`
+	Protocol            string        `bson:"protocol" json:"protocol"`
+	EnableProxyProtocol bool          `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
+	APIID               string        `bson:"api_id" json:"api_id"`
+	OrgID               string        `bson:"org_id" json:"org_id"`
+	UseKeylessAccess    bool          `bson:"use_keyless" json:"use_keyless"`
+	UseOauth2           bool          `bson:"use_oauth2" json:"use_oauth2"`
+	UseOpenID           bool          `bson:"use_openid" json:"use_openid"`
+	OpenIDOptions       OpenIDOptions `bson:"openid_options" json:"openid_options"`
+	Oauth2Meta          struct {
 		AllowedAccessTypes     []osin.AccessRequestType    `bson:"allowed_access_types" json:"allowed_access_types"`
 		AllowedAuthorizeTypes  []osin.AuthorizeRequestType `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
 		AuthorizeLoginRedirect string                      `bson:"auth_login_redirect" json:"auth_login_redirect"`

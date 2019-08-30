@@ -138,7 +138,6 @@ func NewRequest(tc *TestCase) (req *http.Request, err error) {
 	if tc.BaseURL != "" {
 		uri = tc.BaseURL + tc.Path
 	}
-
 	if strings.HasPrefix(uri, "http") {
 		uri = strings.Replace(uri, "[::]", tc.Domain, 1)
 		uri = strings.Replace(uri, "127.0.0.1", tc.Domain, 1)

@@ -181,9 +181,10 @@ type APISpec struct {
 	GlobalConfig             config.Config
 	OrgHasNoSession          bool
 
-	middlewareChain http.Handler
+	middlewareChain *ChainObject
 
 	shouldRelease bool
+	network       NetworkStats
 }
 
 // Release re;leases all resources associated with API spec

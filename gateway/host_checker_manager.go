@@ -321,9 +321,13 @@ func (hc *HostCheckerManager) PrepareTrackingHost(checkObject apidef.HostCheckOb
 			UnHealthyHostMetaDataAPIKey:    apiID,
 			UnHealthyHostMetaDataHostKey:   u.Host,
 		},
-		Method:  checkObject.Method,
-		Headers: checkObject.Headers,
-		Body:    bodyData,
+		Method:              checkObject.Method,
+		Protocol:            checkObject.Protocol,
+		Timeout:             checkObject.Timeout,
+		EnableProxyProtocol: checkObject.EnableProxyProtocol,
+		Commands:            checkObject.Commands,
+		Headers:             checkObject.Headers,
+		Body:                bodyData,
 	}
 
 	return hostData, nil

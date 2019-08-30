@@ -3,14 +3,18 @@ package gateway
 import (
 	"crypto/tls"
 	"math/rand"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/jeffail/tunny"
+	"github.com/pires/go-proxyproto"
 	cache "github.com/pmylund/go-cache"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 )
 
@@ -29,11 +33,15 @@ var (
 )
 
 type HostData struct {
-	CheckURL string
-	Method   string
-	Headers  map[string]string
-	Body     string
-	MetaData map[string]string
+	CheckURL            string
+	Protocol            string
+	Timeout             time.Duration
+	EnableProxyProtocol bool
+	Commands            []apidef.CheckCommand
+	Method              string
+	Headers             map[string]string
+	Body                string
+	MetaData            map[string]string
 }
 
 type HostHealthReport struct {
@@ -94,7 +102,7 @@ func (h *HostUptimeChecker) getStaggeredTime() time.Duration {
 
 func (h *HostUptimeChecker) HostCheckLoop() {
 	for !h.getStopLoop() {
-		if runningTests {
+		if isRunningTests() {
 			<-hostCheckTicker
 		}
 		h.resetListMu.Lock()
@@ -112,7 +120,7 @@ func (h *HostUptimeChecker) HostCheckLoop() {
 			}
 		}
 
-		if !runningTests {
+		if !isRunningTests() {
 			time.Sleep(h.getStaggeredTime())
 		}
 	}
@@ -172,48 +180,108 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 	log.Debug("[HOST CHECKER] Checking: ", toCheck.CheckURL)
 
 	t1 := time.Now()
-
-	useMethod := toCheck.Method
-	if toCheck.Method == "" {
-		useMethod = http.MethodGet
+	report := HostHealthReport{
+		HostData: toCheck,
 	}
-
-	req, err := http.NewRequest(useMethod, toCheck.CheckURL, strings.NewReader(toCheck.Body))
-	if err != nil {
-		log.Error("Could not create request: ", err)
-		return
+	switch toCheck.Protocol {
+	case "tcp", "tls":
+		host := toCheck.CheckURL
+		base := toCheck.Protocol + "://"
+		if !strings.HasPrefix(host, base) {
+			host = base + host
+		}
+		u, err := url.Parse(host)
+		if err != nil {
+			log.Error("Could not parse host: ", err)
+			return
+		}
+		var ls net.Conn
+		var d net.Dialer
+		d.Timeout = toCheck.Timeout
+		if toCheck.Protocol == "tls" {
+			ls, err = tls.DialWithDialer(&d, "tls", u.Host, nil)
+		} else {
+			ls, err = d.Dial("tcp", u.Host)
+		}
+		if err != nil {
+			log.Error("Could not connect to host: ", err)
+			report.IsTCPError = true
+			break
+		}
+		if toCheck.EnableProxyProtocol {
+			log.Debug("using proxy protocol")
+			ls = proxyproto.NewConn(ls, 0)
+		}
+		defer ls.Close()
+		for _, cmd := range toCheck.Commands {
+			switch cmd.Name {
+			case "send":
+				log.Debugf("%s: sending %s", host, cmd.Message)
+				_, err = ls.Write([]byte(cmd.Message))
+				if err != nil {
+					log.Errorf("Failed to send %s :%v", cmd.Message, err)
+					report.IsTCPError = true
+					break
+				}
+			case "expect":
+				buf := make([]byte, len(cmd.Message))
+				_, err = ls.Read(buf)
+				if err != nil {
+					log.Errorf("Failed to read %s :%v", cmd.Message, err)
+					report.IsTCPError = true
+					break
+				}
+				g := string(buf)
+				if g != cmd.Message {
+					log.Errorf("Failed expectation  expected %s got %s", cmd.Message, g)
+					report.IsTCPError = true
+					break
+				}
+				log.Debugf("%s: received %s", host, cmd.Message)
+			}
+		}
+		report.ResponseCode = http.StatusOK
+	default:
+		useMethod := toCheck.Method
+		if toCheck.Method == "" {
+			useMethod = http.MethodGet
+		}
+		req, err := http.NewRequest(useMethod, toCheck.CheckURL, strings.NewReader(toCheck.Body))
+		if err != nil {
+			log.Error("Could not create request: ", err)
+			return
+		}
+		for headerName, headerValue := range toCheck.Headers {
+			req.Header.Set(headerName, headerValue)
+		}
+		req.Header.Set("Connection", "close")
+		HostCheckerClient.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: config.Global().ProxySSLInsecureSkipVerify,
+			},
+		}
+		if toCheck.Timeout != 0 {
+			HostCheckerClient.Timeout = toCheck.Timeout
+		}
+		response, err := HostCheckerClient.Do(req)
+		if err != nil {
+			report.IsTCPError = true
+			break
+		}
+		response.Body.Close()
+		report.ResponseCode = response.StatusCode
 	}
-	for headerName, headerValue := range toCheck.Headers {
-		req.Header.Set(headerName, headerValue)
-	}
-	req.Header.Set("Connection", "close")
-
-	HostCheckerClient.Transport = &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: config.Global().ProxySSLInsecureSkipVerify,
-		},
-	}
-
-	response, err := HostCheckerClient.Do(req)
 
 	t2 := time.Now()
 
 	millisec := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001
-
-	report := HostHealthReport{
-		HostData: toCheck,
-		Latency:  millisec,
-	}
-
-	if err != nil {
-		report.IsTCPError = true
+	report.Latency = millisec
+	if report.IsTCPError {
 		h.errorChan <- report
 		return
 	}
 
-	report.ResponseCode = response.StatusCode
-
-	if response.StatusCode != http.StatusOK {
+	if report.ResponseCode != http.StatusOK {
 		h.errorChan <- report
 		return
 	}
@@ -222,7 +290,7 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 	h.okChan <- report
 }
 
-func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList map[string]HostData, failureCallback func(HostHealthReport), upCallback func(HostHealthReport), pingCallback func(HostHealthReport)) {
+func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList map[string]HostData, failureCallback, upCallback, pingCallback func(HostHealthReport)) {
 	h.sampleCache = cache.New(30*time.Second, 30*time.Second)
 	h.stopPollingChan = make(chan bool)
 	h.errorChan = make(chan HostHealthReport)
