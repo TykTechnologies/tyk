@@ -95,14 +95,19 @@ func newVault(conf config.VaultConfig) (Store, error) {
 
 	client.SetToken(conf.Token)
 
-	if conf.KVVersion >= 2 {
-		conf.KVVersion = 2
-	} else {
-		conf.KVVersion = 1
+	var v2 bool
+
+	switch conf.KVVersion {
+
+	case 1:
+		v2 = false
+
+	default:
+		v2 = true
 	}
 
 	return &Vault{
 		client: client,
-		kvV2:   conf.KVVersion == 2,
+		kvV2:   v2,
 	}, nil
 }
