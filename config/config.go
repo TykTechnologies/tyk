@@ -240,7 +240,8 @@ type SecurityConfig struct {
 	Certificates                     CertificatesConfig `json:"certificates"`
 }
 
-func (c SecurityConfig) IsMutualTLSEnabled() bool {
+// IsControlApiMutualTLSEnabled - returns true when mutual tls for control api enabled
+func (c SecurityConfig) IsControlApiMutualTLSEnabled() bool {
 	return len(c.Certificates.ControlAPI) != 0
 }
 

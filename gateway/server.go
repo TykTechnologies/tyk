@@ -375,7 +375,7 @@ func stripSlashes(next http.Handler) http.Handler {
 
 func controlAPICheckClientCertificate(certLevel string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if config.Global().Security.IsMutualTLSEnabled() {
+		if config.Global().Security.IsControlApiMutualTLSEnabled() {
 			if err := CertificateManager.ValidateRequestCertificate(config.Global().Security.Certificates.ControlAPI, r); err != nil {
 				doJSONWrite(w, http.StatusForbidden, apiError(err.Error()))
 				return

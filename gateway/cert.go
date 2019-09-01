@@ -251,7 +251,7 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 		isControlAPI := (listenPort != 0 && (config.Global().ControlAPIPort == listenPort || config.Global().ControlAPIPort == 0)) ||
 			config.Global().ControlAPIHostname == hello.ServerName
 
-		if isControlAPI && config.Global().Security.IsMutualTLSEnabled() {
+		if isControlAPI && config.Global().Security.IsControlApiMutualTLSEnabled() {
 			newConfig.ClientAuth = tls.RequireAndVerifyClientCert
 			newConfig.ClientCAs = CertificateManager.CertPool(config.Global().Security.Certificates.ControlAPI)
 
