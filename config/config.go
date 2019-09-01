@@ -410,6 +410,9 @@ type Config struct {
 		Consul ConsulConfig `json:"consul"`
 		Vault  VaultConfig  `json:"vault"`
 	} `json:"kv"`
+
+	// Secrets are key-value pairs that can be accessed in the dashboard via "secrets://"
+	Secrets map[string]string `json:"secrets"`
 }
 
 // VaultConfig is used to configure the creation of a client

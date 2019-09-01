@@ -1017,6 +1017,17 @@ func afterConfSetup(conf *config.Config) {
 
 func kvStore(value string) (string, error) {
 
+	if strings.HasPrefix(value, "secrets://") {
+		key := strings.TrimPrefix(value, "secrets://")
+		log.Debugf("Retrieving %s from secret store in config", key)
+		val, ok := config.Global().Secrets[key]
+		if !ok {
+			return "", fmt.Errorf("secrets does not exist in config.. %s not found", key)
+		}
+
+		return val, nil
+	}
+
 	if strings.HasPrefix(value, "env://") {
 		key := strings.TrimPrefix(value, "env://")
 		log.Debugf("Retrieving %s from environment", key)
