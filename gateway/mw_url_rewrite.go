@@ -14,6 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/user"
@@ -25,6 +26,7 @@ const (
 	consulLabel      = "$secret_consul."
 	vaultLabel       = "$secret_vault."
 	envLabel         = "$secret_env."
+	secretsConfLabel = "$secret_conf."
 	triggerKeyPrefix = "trigger"
 	triggerKeySep    = "-"
 )
@@ -35,6 +37,7 @@ var consulMatch = regexp.MustCompile(`\$secret_consul.([A-Za-z0-9\/\-\.]+)`)
 var vaultMatch = regexp.MustCompile(`\$secret_vault.([A-Za-z0-9\/\-\.]+)`)
 var envValueMatch = regexp.MustCompile(`\$secret_env.([A-Za-z0-9_\-\.]+)`)
 var metaMatch = regexp.MustCompile(`\$tyk_meta.([A-Za-z0-9_\-\.]+)`)
+var secretsConfMatch = regexp.MustCompile(`\$secret_conf.([A-Za-z0-9[.\-\_]+)`)
 
 func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 	path := r.URL.String()
@@ -199,6 +202,12 @@ func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 
 func replaceTykVariables(r *http.Request, in string, escape bool) string {
 
+	if strings.Contains(in, secretsConfLabel) {
+		contextData := ctxGetData(r)
+		vars := secretsConfMatch.FindAllString(in, -1)
+		in = replaceVariables(in, vars, contextData, secretsConfLabel, escape)
+	}
+
 	if strings.Contains(in, envLabel) {
 		contextData := ctxGetData(r)
 		vars := envValueMatch.FindAllString(in, -1)
@@ -241,6 +250,24 @@ func replaceVariables(in string, vars []string, vals map[string]interface{}, lab
 		key := strings.Replace(v, label, "", 1)
 
 		switch label {
+
+		case secretsConfLabel:
+
+			secrets := config.Global().Secrets
+
+			val, ok := secrets[key]
+			if !ok || val == "" {
+				in = strings.Replace(in, val, "", -1)
+				log.WithFields(logrus.Fields{
+					"key":       key,
+					"value":     val,
+					"in string": in,
+				}).Debug("Replaced with an empty string")
+
+				continue
+			}
+
+			in = strings.Replace(in, v, val, -1)
 
 		case envLabel:
 
