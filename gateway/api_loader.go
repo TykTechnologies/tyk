@@ -666,7 +666,7 @@ func loadApps(specs []*APISpec) {
 		if config.Global().LivenessCheck.Port <= 0 {
 			// If not port was defined, mount the liveness check on
 			// the main router
-			muxer.Handle("/status", handler)
+			// muxer.Handle("/status", handler)
 		} else {
 			l, err := net.Listen("tcp", fmt.Sprintf("%s:%d", config.Global().ListenAddress, config.Global().LivenessCheck.Port))
 			if err != nil {

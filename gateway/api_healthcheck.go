@@ -26,6 +26,26 @@ type HealthChecker interface {
 	StoreCounterVal(HealthPrefix, string)
 }
 
+type HealthCheckStatus string
+
+const (
+	Pass HealthCheckStatus = "pass"
+	Fail                   = "fail"
+	Warn                   = "warn"
+)
+
+type HealthCheckResponse struct {
+	Status  HealthCheckStatus `json:"status"`
+	Version string            `json:"version"`
+}
+
+type HealthCheckItem struct {
+	Status        HealthCheckStatus
+	Output        string
+	ComponentType string
+	Time          string
+}
+
 type HealthCheckValues struct {
 	ThrottledRequestsPS float64 `bson:"throttle_reqests_per_second,omitempty" json:"throttle_reqests_per_second"`
 	QuotaViolationsPS   float64 `bson:"quota_violations_per_second,omitempty" json:"quota_violations_per_second"`
