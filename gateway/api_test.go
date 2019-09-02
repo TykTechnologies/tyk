@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/garyburd/redigo/redis"
-	"github.com/gorilla/mux"
 	uuid "github.com/satori/go.uuid"
 
 	"fmt"
@@ -36,13 +35,13 @@ const apiTestDef = `{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "` + testHttpAny + `"
+		"target_url": "` + TestHttpAny + `"
 	}
 }`
 
 func loadSampleAPI(t *testing.T, def string) {
-	spec := createSpecTest(t, def)
-	loadApps([]*APISpec{spec}, discardMuxer)
+	spec := CreateSpecTest(t, def)
+	loadApps([]*APISpec{spec})
 }
 
 type testAPIDefinition struct {
@@ -54,7 +53,7 @@ func TestHealthCheckEndpoint(t *testing.T) {
 	globalConf := config.Global()
 	globalConf.HealthCheck.EnableHealthChecks = true
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()
@@ -152,11 +151,13 @@ func TestKeyHandler(t *testing.T) {
 	// with policy
 	policiesMu.Lock()
 	policiesByID["abc_policy"] = user.Policy{
-		Active:   true,
-		QuotaMax: 5,
+		Active:           true,
+		QuotaMax:         5,
+		QuotaRenewalRate: 300,
 		AccessRights: map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v1"},
 		}},
+		OrgID: "default",
 	}
 	policiesMu.Unlock()
 	withPolicy := CreateStandardSession()
@@ -270,6 +271,65 @@ func TestKeyHandler(t *testing.T) {
 	})
 }
 
+func TestKeyHandler_UpdateKey(t *testing.T) {
+	const testAPIID = "testAPIID"
+
+	ts := StartTest()
+	defer ts.Close()
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = testAPIID
+		spec.UseKeylessAccess = false
+		spec.Auth.UseParam = true
+		spec.OrgID = "default"
+	})
+
+	pID := CreatePolicy(func(p *user.Policy) {
+		p.Partitions.RateLimit = true
+	})
+
+	pID2 := CreatePolicy(func(p *user.Policy) {
+		p.Partitions.Quota = true
+	})
+
+	session, key := ts.CreateSession(func(s *user.SessionState) {
+		s.ApplyPolicies = []string{pID}
+		s.AccessRights = map[string]user.AccessDefinition{testAPIID: {
+			APIID: testAPIID, Versions: []string{"v1"},
+		}}
+	})
+
+	t.Run("Add policy not enforcing acl", func(t *testing.T) {
+		session.ApplyPolicies = append(session.ApplyPolicies, pID2)
+		sessionData, _ := json.Marshal(session)
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+
+		sessionState, found := FallbackKeySesionManager.SessionDetail(key, false)
+		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 2 {
+			t.Fatal("Adding policy to the list failed")
+		}
+	})
+
+	t.Run("Remove policy not enforcing acl", func(t *testing.T) {
+		session.ApplyPolicies = []string{}
+		sessionData, _ := json.Marshal(session)
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+
+		sessionState, found := FallbackKeySesionManager.SessionDetail(key, false)
+		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 0 {
+			t.Fatal("Removing policy from the list failed")
+		}
+	})
+}
+
 func TestHashKeyHandler(t *testing.T) {
 	globalConf := config.Global()
 	// make it to use hashes for Redis keys
@@ -277,7 +337,7 @@ func TestHashKeyHandler(t *testing.T) {
 	// enable hashed keys listing
 	globalConf.EnableHashedKeysListing = true
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	hashTests := []struct {
 		hashFunction     string
@@ -313,7 +373,7 @@ func TestHashKeyHandlerLegacyWithHashFunc(t *testing.T) {
 	// settings to create BA session with legacy key format
 	globalConf.HashKeyFunction = ""
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()
@@ -370,8 +430,8 @@ func testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 	}}
 	withAccessJSON, _ := json.Marshal(withAccess)
 
-	myKey := generateToken("", "")
-	myKeyHash := storage.HashKey(myKey)
+	myKey := "my_key_id"
+	myKeyHash := storage.HashKey(generateToken("default", myKey))
 
 	if len(myKeyHash) != expectedHashSize {
 		t.Errorf("Expected hash size: %d, got %d. Hash: %s. Key: %s", expectedHashSize, len(myKeyHash), myKeyHash, myKey)
@@ -414,10 +474,10 @@ func testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 				Code:      200,
 				BodyMatch: fmt.Sprintf(`"key":"%s"`, myKeyHash),
 			},
-			// get one key by key name
+			// get one key by key name (API specified)
 			{
 				Method:    "GET",
-				Path:      "/tyk/keys/" + myKey,
+				Path:      "/tyk/keys/" + myKey + "?api_id=test",
 				Data:      string(withAccessJSON),
 				AdminAuth: true,
 				Code:      200,
@@ -522,7 +582,7 @@ func TestHashKeyListingDisabled(t *testing.T) {
 	globalConf.EnableHashedKeysListing = false
 	config.SetGlobal(globalConf)
 
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()
@@ -536,7 +596,7 @@ func TestHashKeyListingDisabled(t *testing.T) {
 	withAccessJSON, _ := json.Marshal(withAccess)
 
 	myKey := "my_key_id"
-	myKeyHash := storage.HashKey(myKey)
+	myKeyHash := storage.HashKey(generateToken("default", myKey))
 
 	t.Run("Create, get and delete key with key hashing", func(t *testing.T) {
 		ts.Run(t, []test.TestCase{
@@ -566,10 +626,10 @@ func TestHashKeyListingDisabled(t *testing.T) {
 				Code:      200,
 				BodyMatch: fmt.Sprintf(`"key_hash":"%s"`, myKeyHash),
 			},
-			// get one key by key name
+			// get one key by key name (API specified)
 			{
 				Method:    "GET",
-				Path:      "/tyk/keys/" + myKey,
+				Path:      "/tyk/keys/" + myKey + "?api_id=test",
 				Data:      string(withAccessJSON),
 				AdminAuth: true,
 				Code:      200,
@@ -640,7 +700,7 @@ func TestHashKeyHandlerHashingDisabled(t *testing.T) {
 	globalConf.HashKeys = false
 	config.SetGlobal(globalConf)
 
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()
@@ -654,7 +714,7 @@ func TestHashKeyHandlerHashingDisabled(t *testing.T) {
 	withAccessJSON, _ := json.Marshal(withAccess)
 
 	myKey := "my_key_id"
-	myKeyHash := storage.HashKey(myKey)
+	myKeyHash := storage.HashKey(generateToken("default", myKey))
 
 	t.Run("Create, get and delete key with key hashing", func(t *testing.T) {
 		ts.Run(t, []test.TestCase{
@@ -909,9 +969,9 @@ func TestGroupResetHandler(t *testing.T) {
 	// If we don't wait for the subscription to be done, we might do
 	// the reload before pub/sub is in place to receive our message.
 	<-didSubscribe
-	req := withAuth(testReq(t, "GET", uri, nil))
+	req := withAuth(TestReq(t, "GET", uri, nil))
 
-	mainRouter.ServeHTTP(recorder, req)
+	mainRouter().ServeHTTP(recorder, req)
 
 	if recorder.Code != 200 {
 		t.Fatal("Hot reload (group) failed, response code was: ", recorder.Code)
@@ -930,13 +990,13 @@ func TestGroupResetHandler(t *testing.T) {
 }
 
 func TestHotReloadSingle(t *testing.T) {
-	oldRouter := mainRouter
+	oldRouter := mainRouter()
 	var wg sync.WaitGroup
 	wg.Add(1)
 	reloadURLStructure(wg.Done)
-	reloadTick <- time.Time{}
+	ReloadTick <- time.Time{}
 	wg.Wait()
-	if mainRouter == oldRouter {
+	if mainRouter() == oldRouter {
 		t.Fatal("router wasn't swapped")
 	}
 }
@@ -952,7 +1012,7 @@ func TestHotReloadMany(t *testing.T) {
 		reloadURLStructure(wg.Done)
 	}
 	// pick it up and finish it
-	reloadTick <- time.Time{}
+	ReloadTick <- time.Time{}
 	wg.Wait()
 
 	// 5 reloads, but this time slower - the reload worker has time
@@ -961,7 +1021,7 @@ func TestHotReloadMany(t *testing.T) {
 		wg.Add(1)
 		reloadURLStructure(wg.Done)
 		// pick it up and finish it
-		reloadTick <- time.Time{}
+		ReloadTick <- time.Time{}
 		wg.Wait()
 	}
 }
@@ -979,9 +1039,8 @@ func BenchmarkApiReload(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		newMuxes := mux.NewRouter()
-		loadAPIEndpoints(newMuxes)
-		loadApps(specs, newMuxes)
+		loadAPIEndpoints(nil)
+		loadApps(specs)
 	}
 }
 
@@ -1024,7 +1083,7 @@ func TestApiLoaderLongestPathFirst(t *testing.T) {
 	globalConf.EnableCustomDomains = true
 	config.SetGlobal(globalConf)
 
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	type hostAndPath struct {
 		host, path string

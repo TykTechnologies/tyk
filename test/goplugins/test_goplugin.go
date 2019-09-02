@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -17,16 +18,16 @@ func MyPluginPre(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rw.Header().Add("X-Initial-URI", r.URL.RequestURI())
+	rw.Header().Add(headers.XInitialURI, r.URL.RequestURI())
 }
 
 // MyPluginAuthCheck does custom auth and will be used as
 // "auth_check" custom MW
 func MyPluginAuthCheck(rw http.ResponseWriter, r *http.Request) {
 	// perform auth (only one token "abc" is allowed)
-	token := r.Header.Get("Authorization")
+	token := r.Header.Get(headers.Authorization)
 	if token != "abc" {
-		rw.Header().Add("X-Auth-Result", "failed")
+		rw.Header().Add(headers.XAuthResult, "failed")
 		rw.WriteHeader(http.StatusForbidden)
 		return
 	}
@@ -38,7 +39,7 @@ func MyPluginAuthCheck(rw http.ResponseWriter, r *http.Request) {
 	}
 	ctx.SetSession(r, session, token, true)
 
-	rw.Header().Add("X-Auth-Result", "OK")
+	rw.Header().Add(headers.XAuthResult, "OK")
 }
 
 // MyPluginPostKeyAuth checks if session is present, adds custom header with session-alias
@@ -46,12 +47,12 @@ func MyPluginAuthCheck(rw http.ResponseWriter, r *http.Request) {
 func MyPluginPostKeyAuth(rw http.ResponseWriter, r *http.Request) {
 	session := ctx.GetSession(r)
 	if session == nil {
-		rw.Header().Add("X-Session-Alias", "not found")
+		rw.Header().Add(headers.XSessionAlias, "not found")
 		rw.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	rw.Header().Add("X-Session-Alias", session.Alias)
+	rw.Header().Add(headers.XSessionAlias, session.Alias)
 }
 
 // MyPluginPost prepares and sends reply, will be used as "post" custom MW
@@ -67,7 +68,7 @@ func MyPluginPost(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rw.Header().Set("Content-Type", "application/json")
+	rw.Header().Set(headers.ContentType, headers.ApplicationJSON)
 	rw.WriteHeader(http.StatusOK)
 	rw.Write(jsonData)
 }

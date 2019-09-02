@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -9,23 +10,28 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
 	newrelic "github.com/newrelic/go-agent"
 	"github.com/paulbellamy/ratecounter"
 	cache "github.com/pmylund/go-cache"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
 )
 
 const mwStatusRespond = 666
 
-var GlobalRate = ratecounter.NewRateCounter(1 * time.Second)
+var (
+	GlobalRate            = ratecounter.NewRateCounter(1 * time.Second)
+	orgSessionExpiryCache singleflight.Group
+)
 
 type TykMiddleware interface {
 	Init()
@@ -37,6 +43,21 @@ type TykMiddleware interface {
 	ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) // Handles request
 	EnabledForSpec() bool
 	Name() string
+}
+
+type TraceMiddleware struct {
+	TykMiddleware
+}
+
+func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) {
+	if trace.IsEnabled() {
+		span, ctx := trace.Span(r.Context(),
+			tr.Name(),
+		)
+		defer span.Finish()
+		return tr.TykMiddleware.ProcessRequest(w, r.WithContext(ctx), conf)
+	}
+	return tr.TykMiddleware.ProcessRequest(w, r, conf)
 }
 
 func createDynamicMiddleware(name string, isPre, useSession bool, baseMid BaseMiddleware) func(http.Handler) http.Handler {
@@ -51,7 +72,10 @@ func createDynamicMiddleware(name string, isPre, useSession bool, baseMid BaseMi
 }
 
 // Generic middleware caller to make extension easier
-func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
+func createMiddleware(actualMW TykMiddleware) func(http.Handler) http.Handler {
+	mw := &TraceMiddleware{
+		TykMiddleware: actualMW,
+	}
 	// construct a new instance
 	mw.Init()
 	mw.SetName(mw.Name())
@@ -74,17 +98,22 @@ func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 			}
 
 			job := instrument.NewJob("MiddlewareCall")
-			meta := health.Kvs{
-				"from_ip":  request.RealIP(r),
-				"method":   r.Method,
-				"endpoint": r.URL.Path,
-				"raw_url":  r.URL.String(),
-				"size":     strconv.Itoa(int(r.ContentLength)),
-				"mw_name":  mw.Name(),
-			}
+			meta := health.Kvs{}
 			eventName := mw.Name() + "." + "executed"
-			job.EventKv("executed", meta)
-			job.EventKv(eventName, meta)
+
+			if instrumentationEnabled {
+				meta = health.Kvs{
+					"from_ip":  request.RealIP(r),
+					"method":   r.Method,
+					"endpoint": r.URL.Path,
+					"raw_url":  r.URL.String(),
+					"size":     strconv.Itoa(int(r.ContentLength)),
+					"mw_name":  mw.Name(),
+				}
+				job.EventKv("executed", meta)
+				job.EventKv(eventName, meta)
+			}
+
 			startTime := time.Now()
 			mw.Logger().WithField("ts", startTime.UnixNano()).Debug("Started")
 
@@ -96,7 +125,7 @@ func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 			if err != nil {
 				// GoPluginMiddleware are expected to send response in case of error
 				// but we still want to record error
-				_, isGoPlugin := mw.(*GoPluginMiddleware)
+				_, isGoPlugin := actualMW.(*GoPluginMiddleware)
 
 				handler := ErrorHandler{*mw.Base()}
 				handler.HandleError(w, r, err.Error(), errCode, !isGoPlugin)
@@ -104,16 +133,23 @@ func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 				meta["error"] = err.Error()
 
 				finishTime := time.Since(startTime)
-				job.TimingKv("exec_time", finishTime.Nanoseconds(), meta)
-				job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
+
+				if instrumentationEnabled {
+					job.TimingKv("exec_time", finishTime.Nanoseconds(), meta)
+					job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
+				}
 
 				mw.Logger().WithError(err).WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
 				return
 			}
 
 			finishTime := time.Since(startTime)
-			job.TimingKv("exec_time", finishTime.Nanoseconds(), meta)
-			job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
+
+			if instrumentationEnabled {
+				job.TimingKv("exec_time", finishTime.Nanoseconds(), meta)
+				job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
+			}
+
 			mw.Logger().WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
 
 			// Special code, bypasses all other execution
@@ -185,7 +221,7 @@ func (t BaseMiddleware) OrgSession(key string) (user.SessionState, bool) {
 		// If exists, assume it has been authorized and pass on
 		// We cache org expiry data
 		t.Logger().Debug("Setting data expiry: ", session.OrgID)
-		go t.SetOrgExpiry(session.OrgID, session.DataExpires)
+		ExpiryCache.Set(session.OrgID, session.DataExpires, cache.DefaultExpiration)
 	}
 
 	session.SetKeyHash(storage.HashKey(key))
@@ -198,16 +234,23 @@ func (t BaseMiddleware) SetOrgExpiry(orgid string, expiry int64) {
 
 func (t BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 	t.Logger().Debug("Checking: ", orgid)
-	cachedVal, found := ExpiryCache.Get(orgid)
-	if !found {
-		// Cache failed attempt
-		t.SetOrgExpiry(orgid, 604800)
-		go t.OrgSession(orgid)
+	// Cache failed attempt
+	id, err, _ := orgSessionExpiryCache.Do(orgid, func() (interface{}, error) {
+		cachedVal, found := ExpiryCache.Get(orgid)
+		if found {
+			return cachedVal, nil
+		}
+		s, found := t.OrgSession(orgid)
+		if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
+			return s.DataExpires, nil
+		}
+		return 0, errors.New("missing session")
+	})
+	if err != nil {
 		t.Logger().Debug("no cached entry found, returning 7 days")
-		return 604800
+		return int64(604800)
 	}
-
-	return cachedVal.(int64)
+	return id.(int64)
 }
 
 func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
@@ -242,14 +285,11 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 // ApplyPolicies will check if any policies are loaded. If any are, it
 // will overwrite the session state to use the policy values.
 func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
-	rights := session.AccessRights
-	if rights == nil {
-		rights = make(map[string]user.AccessDefinition)
-	}
+	rights := make(map[string]user.AccessDefinition)
 	tags := make(map[string]bool)
-	didQuota, didRateLimit, didACL := false, false, false
-	didPerAPI := make(map[string]bool)
+	didQuota, didRateLimit, didACL := make(map[string]bool), make(map[string]bool), make(map[string]bool)
 	policies := session.PolicyIDs()
+
 	for i, polID := range policies {
 		policiesMu.RLock()
 		policy, ok := policiesByID[polID]
@@ -275,16 +315,10 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		}
 
 		if policy.Partitions.PerAPI {
-			// new logic when you can specify quota or rate in more than one policy but for different APIs
-			if didQuota || didRateLimit || didACL { // no other partitions allowed
-				err := fmt.Errorf("cannot apply multiple policies when some have per_api set and some are partitioned")
-				log.Error(err)
-				return err
-			}
 			for apiID, accessRights := range policy.AccessRights {
-				// check if limit was already set for this API by other policy assigned to key
-				if didPerAPI[apiID] {
-					err := fmt.Errorf("cannot apply multiple policies for API: %s", apiID)
+				// new logic when you can specify quota or rate in more than one policy but for different APIs
+				if didQuota[apiID] || didRateLimit[apiID] || didACL[apiID] { // no other partitions allowed
+					err := fmt.Errorf("cannot apply multiple policies when some have per_api set and some are partitioned")
 					log.Error(err)
 					return err
 				}
@@ -299,101 +333,138 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 						Per:                policy.Per,
 						ThrottleInterval:   policy.ThrottleInterval,
 						ThrottleRetryLimit: policy.ThrottleRetryLimit,
-
-						SetByPolicy: true,
 					}
 				}
 
-				// respect current quota remaining and quota renews (on API limit level)
-				var limitQuotaRemaining int64
-				var limitQuotaRenews int64
-				if currAccessRight, ok := rights[apiID]; ok && currAccessRight.Limit != nil {
-					limitQuotaRemaining = currAccessRight.Limit.QuotaRemaining
-					limitQuotaRenews = currAccessRight.Limit.QuotaRenews
+				// respect current quota renews (on API limit level)
+				if r, ok := session.AccessRights[apiID]; ok && r.Limit != nil {
+					accessRights.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
-				accessRights.Limit.QuotaRemaining = limitQuotaRemaining
-				accessRights.Limit.QuotaRenews = limitQuotaRenews
+
+				accessRights.AllowanceScope = apiID
 
 				// overwrite session access right for this API
 				rights[apiID] = accessRights
 
 				// identify that limit for that API is set (to allow set it only once)
-				didPerAPI[apiID] = true
-			}
-		} else if policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl {
-			// This is a partitioned policy, only apply what is active
-			// legacy logic when you can specify quota or rate only in no more than one policy
-			if len(didPerAPI) > 0 { // no policies with per_api set allowed
-				err := fmt.Errorf("cannot apply multiple policies when some are partitioned and some have per_api set")
-				log.Error(err)
-				return err
-			}
-			if policy.Partitions.Quota {
-				if didQuota {
-					err := fmt.Errorf("cannot apply multiple quota policies")
-					t.Logger().Error(err)
-					return err
-				}
-				didQuota = true
-				// Quotas
-				session.QuotaMax = policy.QuotaMax
-				session.QuotaRenewalRate = policy.QuotaRenewalRate
-			}
-
-			if policy.Partitions.RateLimit {
-				if didRateLimit {
-					err := fmt.Errorf("cannot apply multiple rate limit policies")
-					t.Logger().Error(err)
-					return err
-				}
-				didRateLimit = true
-				// Rate limiting
-				session.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
-				session.Rate = policy.Rate
-				session.Per = policy.Per
-				session.ThrottleInterval = policy.ThrottleInterval
-				session.ThrottleRetryLimit = policy.ThrottleRetryLimit
-				if policy.LastUpdated != "" {
-					session.LastUpdated = policy.LastUpdated
-				}
-			}
-
-			if policy.Partitions.Acl {
-				// ACL
-				if !didACL { // first, overwrite rights
-					rights = make(map[string]user.AccessDefinition)
-					didACL = true
-				}
-				// Second or later, merge
-				for k, v := range policy.AccessRights {
-					rights[k] = v
-				}
-				session.HMACEnabled = policy.HMACEnabled
+				didACL[apiID] = true
+				didQuota[apiID] = true
+				didRateLimit[apiID] = true
 			}
 		} else {
-			if len(policies) > 1 {
-				err := fmt.Errorf("cannot apply multiple policies if any are non-partitioned")
-				t.Logger().Error(err)
-				return err
-			}
-			// This is not a partitioned policy, apply everything
-			// Quotas
-			session.QuotaMax = policy.QuotaMax
-			session.QuotaRenewalRate = policy.QuotaRenewalRate
-
-			// Rate limiting
-			session.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
-			session.Rate = policy.Rate
-			session.Per = policy.Per
-			session.ThrottleInterval = policy.ThrottleInterval
-			session.ThrottleRetryLimit = policy.ThrottleRetryLimit
-			if policy.LastUpdated != "" {
-				session.LastUpdated = policy.LastUpdated
+			multiAclPolicies := false
+			if i > 0 {
+				// Check if policy works with new APIs
+				for pa := range policy.AccessRights {
+					if _, ok := rights[pa]; !ok {
+						multiAclPolicies = true
+						break
+					}
+				}
 			}
 
-			// ACL
-			rights = policy.AccessRights
-			session.HMACEnabled = policy.HMACEnabled
+			usePartitions := policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl
+
+			for k, v := range policy.AccessRights {
+				ar := &v
+
+				if v.Limit == nil {
+					v.Limit = &user.APILimit{}
+				}
+
+				if !usePartitions || policy.Partitions.Acl {
+					didACL[k] = true
+
+					// Merge ACLs for the same API
+					if r, ok := rights[k]; ok {
+						r.Versions = append(rights[k].Versions, v.Versions...)
+
+						for _, u := range v.AllowedURLs {
+							found := false
+							for ai, au := range r.AllowedURLs {
+								if u.URL == au.URL {
+									found = true
+									rights[k].AllowedURLs[ai].Methods = append(r.AllowedURLs[ai].Methods, u.Methods...)
+								}
+							}
+
+							if !found {
+								r.AllowedURLs = append(r.AllowedURLs, v.AllowedURLs...)
+							}
+						}
+						r.AllowedURLs = append(r.AllowedURLs, v.AllowedURLs...)
+
+						ar = &r
+					}
+				}
+
+				if !usePartitions || policy.Partitions.Quota {
+					didQuota[k] = true
+
+					// -1 is special "unlimited" case
+					if ar.Limit.QuotaMax != -1 && policy.QuotaMax > ar.Limit.QuotaMax {
+						ar.Limit.QuotaMax = policy.QuotaMax
+					}
+
+					if policy.QuotaRenewalRate > ar.Limit.QuotaRenewalRate {
+						ar.Limit.QuotaRenewalRate = policy.QuotaRenewalRate
+					}
+				}
+
+				if !usePartitions || policy.Partitions.RateLimit {
+					didRateLimit[k] = true
+
+					if ar.Limit.Rate != -1 && policy.Rate > ar.Limit.Rate {
+						ar.Limit.Rate = policy.Rate
+					}
+
+					if policy.Per > ar.Limit.Per {
+						ar.Limit.Per = policy.Per
+					}
+
+					if policy.ThrottleInterval > ar.Limit.ThrottleInterval {
+						ar.Limit.ThrottleInterval = policy.ThrottleInterval
+					}
+
+					if policy.ThrottleRetryLimit > ar.Limit.ThrottleRetryLimit {
+						ar.Limit.ThrottleRetryLimit = policy.ThrottleRetryLimit
+					}
+				}
+
+				if multiAclPolicies && (!usePartitions || (policy.Partitions.Quota || policy.Partitions.RateLimit)) {
+					ar.AllowanceScope = policy.ID
+				}
+
+				if !multiAclPolicies {
+					ar.Limit.QuotaRenews = session.QuotaRenews
+				}
+
+				// Respect existing QuotaRenews
+				if r, ok := session.AccessRights[k]; ok && r.Limit != nil {
+					ar.Limit.QuotaRenews = r.Limit.QuotaRenews
+				}
+
+				rights[k] = *ar
+			}
+
+			// Master policy case
+			if len(policy.AccessRights) == 0 {
+				if !usePartitions || policy.Partitions.RateLimit {
+					session.Rate = policy.Rate
+					session.Per = policy.Per
+					session.ThrottleInterval = policy.ThrottleInterval
+					session.ThrottleRetryLimit = policy.ThrottleRetryLimit
+				}
+
+				if !usePartitions || policy.Partitions.Quota {
+					session.QuotaMax = policy.QuotaMax
+					session.QuotaRenewalRate = policy.QuotaRenewalRate
+				}
+			}
+
+			if !session.HMACEnabled {
+				session.HMACEnabled = policy.HMACEnabled
+			}
 		}
 
 		// Required for all
@@ -414,7 +485,42 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		}
 	}
 
-	session.AccessRights = rights
+	// If some APIs had only ACL partitions, inherit rest from session level
+	for k, v := range rights {
+		if !didRateLimit[k] {
+			v.Limit.Rate = session.Rate
+			v.Limit.Per = session.Per
+			v.Limit.ThrottleInterval = session.ThrottleInterval
+			v.Limit.ThrottleRetryLimit = session.ThrottleRetryLimit
+		}
+
+		if !didQuota[k] {
+			v.Limit.QuotaMax = session.QuotaMax
+			v.Limit.QuotaRenewalRate = session.QuotaRenewalRate
+			v.Limit.QuotaRenews = session.QuotaRenews
+		}
+	}
+
+	// If we have policies defining rules for one single API, update session root vars (legacy)
+	if len(didQuota) == 1 && len(didRateLimit) == 1 {
+		for _, v := range rights {
+			if len(didRateLimit) == 1 {
+				session.Rate = v.Limit.Rate
+				session.Per = v.Limit.Per
+			}
+
+			if len(didQuota) == 1 {
+				session.QuotaMax = v.Limit.QuotaMax
+				session.QuotaRenews = v.Limit.QuotaRenews
+				session.QuotaRenewalRate = v.Limit.QuotaRenewalRate
+			}
+		}
+	}
+
+	// Override session ACL if at least one policy define it
+	if len(didACL) > 0 {
+		session.AccessRights = rights
+	}
 
 	return nil
 }
@@ -506,7 +612,9 @@ func (t BaseMiddleware) FireEvent(name apidef.TykEvent, meta interface{}) {
 
 type TykResponseHandler interface {
 	Init(interface{}, *APISpec) error
+	Name() string
 	HandleResponse(http.ResponseWriter, *http.Response, *http.Request, *user.SessionState) error
+	HandleError(http.ResponseWriter, *http.Request)
 }
 
 func responseProcessorByName(name string) TykResponseHandler {
@@ -519,24 +627,41 @@ func responseProcessorByName(name string) TykResponseHandler {
 		return &ResponseTransformJQMiddleware{}
 	case "header_transform":
 		return &HeaderTransform{}
+	case "custom_mw_res_hook":
+		return &CustomMiddlewareResponseHook{}
 	}
 	return nil
 }
 
-func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
+func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) (abortRequest bool, err error) {
+	traceIsEnabled := trace.IsEnabled()
 	for _, rh := range chain {
-		if err := rh.HandleResponse(rw, res, req, ses); err != nil {
-			return err
+		if err := handleResponse(rh, rw, res, req, ses, traceIsEnabled); err != nil {
+			// Abort the request if this handler is a response middleware hook:
+			if rh.Name() == "CustomMiddlewareResponseHook" {
+				rh.HandleError(rw, req)
+				return true, err
+			}
+			return false, err
 		}
 	}
-	return nil
+	return false, nil
+}
+
+func handleResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState, shouldTrace bool) error {
+	if shouldTrace {
+		span, ctx := trace.Span(req.Context(), rh.Name())
+		defer span.Finish()
+		req = req.WithContext(ctx)
+	}
+	return rh.HandleResponse(rw, res, req, ses)
 }
 
 func parseForm(r *http.Request) {
 	// https://golang.org/pkg/net/http/#Request.ParseForm
 	// ParseForm drains the request body for a request with Content-Type of
 	// application/x-www-form-urlencoded
-	if r.Header.Get("Content-Type") == "application/x-www-form-urlencoded" {
+	if r.Header.Get("Content-Type") == "application/x-www-form-urlencoded" && r.Form == nil {
 		var b bytes.Buffer
 		r.Body = ioutil.NopCloser(io.TeeReader(r.Body, &b))
 

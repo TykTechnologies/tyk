@@ -20,9 +20,10 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/user"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // RequestObject is marshalled to JSON string and passed into JSON middleware
@@ -237,7 +238,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	copiedResponse := forceResponse(w, r, &newResponseData, d.Spec, session, false, d.Logger())
 
 	if copiedResponse != nil {
-		go d.sh.RecordHit(r, 0, copiedResponse.StatusCode, copiedResponse)
+		d.sh.RecordHit(r, 0, copiedResponse.StatusCode, copiedResponse)
 	}
 
 	return copiedResponse
@@ -287,7 +288,7 @@ func forceResponse(w http.ResponseWriter,
 
 	if !isPre {
 		// Handle response middleware
-		if err := handleResponseChain(spec.ResponseChain, w, newResponse, r, session); err != nil {
+		if _, err := handleResponseChain(spec.ResponseChain, w, newResponse, r, session); err != nil {
 			logger.WithError(err).Error("Response chain failed! ")
 		}
 	}
@@ -334,9 +335,9 @@ func handleForcedResponse(rw http.ResponseWriter, res *http.Response, ses *user.
 	if ses != nil {
 		// We have found a session, lets report back
 		quotaMax, quotaRemaining, _, quotaRenews := ses.GetQuotaLimitByAPIID(spec.APIID)
-		res.Header.Set(XRateLimitLimit, strconv.Itoa(int(quotaMax)))
-		res.Header.Set(XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
-		res.Header.Set(XRateLimitReset, strconv.Itoa(int(quotaRenews)))
+		res.Header.Set(headers.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
+		res.Header.Set(headers.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
+		res.Header.Set(headers.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
 	}
 
 	copyHeader(rw.Header(), res.Header)

@@ -144,7 +144,7 @@ func TestVirtualEndpointBatch(t *testing.T) {
 	globalConf.Security.Certificates.Upstream = map[string]string{upstreamHost: clientCertID}
 	config.SetGlobal(globalConf)
 
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()

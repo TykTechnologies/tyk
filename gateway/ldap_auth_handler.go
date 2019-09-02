@@ -89,6 +89,12 @@ func (l *LDAPStorageHandler) GetKey(filter string) (string, error) {
 	return "", nil
 }
 
+func (r *LDAPStorageHandler) GetMultiKey(keyNames []string) ([]string, error) {
+	log.Warning("Not implementated")
+
+	return nil, nil
+}
+
 func (l *LDAPStorageHandler) GetRawKey(filter string) (string, error) {
 	log.Warning("Not implementated")
 

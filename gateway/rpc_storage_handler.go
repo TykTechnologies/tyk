@@ -14,7 +14,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 type InboundData struct {
@@ -228,6 +228,12 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 	}
 	//return hash key without prefix so it doesnt get double prefixed in redis
 	return value.(string), nil
+}
+
+func (r *RPCStorageHandler) GetMultiKey(keyNames []string) ([]string, error) {
+	log.Warning("RPCStorageHandler.GetMultiKey - Not implemented")
+
+	return nil, nil
 }
 
 func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
@@ -819,18 +825,26 @@ func getSessionAndCreate(keyName string, r *RPCStorageHandler) {
 }
 
 func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
+	keysToReset := map[string]bool{}
+
 	for _, key := range keys {
 		splitKeys := strings.Split(key, ":")
-		if len(splitKeys) > 1 {
+		if len(splitKeys) > 1 && splitKeys[1] == "resetQuota" {
+			keysToReset[splitKeys[0]] = true
+		}
+	}
+
+	for _, key := range keys {
+		splitKeys := strings.Split(key, ":")
+		_, resetQuota := keysToReset[splitKeys[0]]
+		if len(splitKeys) > 1 && splitKeys[1] == "hashed" {
 			key = splitKeys[0]
-			if splitKeys[1] == "hashed" {
-				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
-				handleDeleteHashedKey(splitKeys[0], "")
-				getSessionAndCreate(splitKeys[0], r)
-			}
+			log.Info("--> removing cached (hashed) key: ", splitKeys[0])
+			handleDeleteHashedKey(splitKeys[0], "", resetQuota)
+			getSessionAndCreate(splitKeys[0], r)
 		} else {
 			log.Info("--> removing cached key: ", key)
-			handleDeleteKey(key, "-1")
+			handleDeleteKey(key, "-1", resetQuota)
 			getSessionAndCreate(splitKeys[0], r)
 		}
 		SessionCache.Delete(key)

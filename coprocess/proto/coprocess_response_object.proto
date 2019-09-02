@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+import "coprocess_return_overrides.proto";
+
+package coprocess;
+
+message ResponseObject {
+  int32 status_code = 1;
+  bytes raw_body = 2;
+  string body = 3;
+  map<string, string> headers = 4;
+}

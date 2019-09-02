@@ -5,7 +5,7 @@ import (
 
 	"rsc.io/letsencrypt"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
@@ -80,7 +80,7 @@ func onLESSLStatusReceivedHandler(payload string) {
 	log.Debug("Received LE data: ", serverData)
 
 	// not great
-	if serverData.ID != NodeID {
+	if serverData.ID != getNodeID() {
 		log.Info("Received Redis LE change notification!")
 		GetLEState(&LE_MANAGER)
 	}

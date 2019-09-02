@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"bytes"
-	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -16,16 +15,8 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
-
-	"google.golang.org/grpc"
-	pb "google.golang.org/grpc/examples/helloworld/helloworld"
-
-	"google.golang.org/grpc/credentials"
-
-	"golang.org/x/net/http2"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
@@ -106,7 +97,7 @@ func TestGatewayTLS(t *testing.T) {
 		globalConf := config.Global()
 		globalConf.HttpServerOptions.UseSSL = true
 		config.SetGlobal(globalConf)
-		defer resetTestConfig()
+		defer ResetTestConfig()
 
 		ts := StartTest()
 		defer ts.Close()
@@ -133,7 +124,7 @@ func TestGatewayTLS(t *testing.T) {
 		}}
 		globalConf.HttpServerOptions.UseSSL = true
 		config.SetGlobal(globalConf)
-		defer resetTestConfig()
+		defer ResetTestConfig()
 
 		ts := StartTest()
 		defer ts.Close()
@@ -155,7 +146,7 @@ func TestGatewayTLS(t *testing.T) {
 		globalConf.HttpServerOptions.SSLCertificates = []string{certPath}
 		globalConf.HttpServerOptions.UseSSL = true
 		config.SetGlobal(globalConf)
-		defer resetTestConfig()
+		defer ResetTestConfig()
 
 		ts := StartTest()
 		defer ts.Close()
@@ -180,7 +171,7 @@ func TestGatewayTLS(t *testing.T) {
 		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
 		globalConf.HttpServerOptions.UseSSL = true
 		config.SetGlobal(globalConf)
-		defer resetTestConfig()
+		defer ResetTestConfig()
 
 		ts := StartTest()
 		defer ts.Close()
@@ -203,7 +194,7 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 	globalConf.HttpServerOptions.UseSSL = true
 	globalConf.Security.ControlAPIUseMutualTLS = true
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	dir, _ := ioutil.TempDir("", "certs")
 
@@ -275,7 +266,7 @@ func TestAPIMutualTLS(t *testing.T) {
 	globalConf.ListenPort = 0
 	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()
@@ -457,7 +448,7 @@ func TestUpstreamMutualTLS(t *testing.T) {
 		globalConf := config.Global()
 		globalConf.ProxySSLInsecureSkipVerify = true
 		config.SetGlobal(globalConf)
-		defer resetTestConfig()
+		defer ResetTestConfig()
 
 		ts := StartTest()
 		defer ts.Close()
@@ -492,7 +483,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 	globalConf.HttpServerOptions.UseSSL = true
 	globalConf.HttpServerOptions.SSLCertificates = []string{serverCertID}
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()
@@ -502,6 +493,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 		spec.BaseIdentityProvidedBy = apidef.AuthToken
 		spec.Auth.UseCertificate = true
 		spec.Proxy.ListenPath = "/"
+		spec.OrgID = "default"
 	})
 
 	client := getTLSClient(&clientCert, nil)
@@ -531,7 +523,7 @@ func TestAPICertificate(t *testing.T) {
 	globalConf.HttpServerOptions.UseSSL = true
 	globalConf.HttpServerOptions.SSLCertificates = []string{}
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()
@@ -626,7 +618,7 @@ func TestCipherSuites(t *testing.T) {
 	globalConf.HttpServerOptions.Ciphers = []string{"TLS_RSA_WITH_RC4_128_SHA", "TLS_RSA_WITH_3DES_EDE_CBC_SHA", "TLS_RSA_WITH_AES_128_CBC_SHA"}
 	globalConf.HttpServerOptions.SSLCertificates = []string{serverCertID}
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()
@@ -656,152 +648,4 @@ func TestCipherSuites(t *testing.T) {
 
 		ts.Run(t, test.TestCase{Client: client, Path: "/", ErrorMatch: "tls: handshake failure"})
 	})
-}
-
-func TestHTTP2(t *testing.T) {
-	expected := "HTTP/2.0"
-
-	// Certificates
-	_, _, _, clientCert := genCertificate(&x509.Certificate{})
-	serverCertPem, _, combinedPEM, _ := genServerCertificate()
-	certID, _ := CertificateManager.Add(combinedPEM, "")
-	defer CertificateManager.Delete(certID)
-
-	// Upstream server supporting HTTP/2
-	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		actual := r.Proto
-		if expected != actual {
-			t.Fatalf("Tyk-Upstream connection protocol is expected %s, actual %s", expected, actual)
-		}
-
-		fmt.Fprintln(w, "Hello, I am an HTTP/2 Server")
-
-	}))
-	upstream.TLS = new(tls.Config)
-	upstream.TLS.NextProtos = []string{"h2"}
-	upstream.StartTLS()
-	defer upstream.Close()
-
-	// Tyk
-	globalConf := config.Global()
-	globalConf.ProxySSLInsecureSkipVerify = true
-	globalConf.ProxyEnableHttp2 = true
-	globalConf.HttpServerOptions.EnableHttp2 = true
-	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
-	globalConf.HttpServerOptions.UseSSL = true
-	config.SetGlobal(globalConf)
-	defer resetTestConfig()
-
-	ts := StartTest()
-	defer ts.Close()
-
-	BuildAndLoadAPI(func(spec *APISpec) {
-		spec.Proxy.ListenPath = "/"
-		spec.UseKeylessAccess = true
-		spec.Proxy.TargetURL = upstream.URL
-	})
-
-	// HTTP/2 client
-	http2Client := getTLSClient(&clientCert, serverCertPem)
-	http2.ConfigureTransport(http2Client.Transport.(*http.Transport))
-
-	ts.Run(t, test.TestCase{Client: http2Client, Path: "", Code: 200, Proto: "HTTP/2.0", BodyMatch: "Hello, I am an HTTP/2 Server"})
-}
-
-// server is used to implement helloworld.GreeterServer.
-type server struct{}
-
-// SayHello implements helloworld.GreeterServer
-func (s *server) SayHello(ctx context.Context, in *pb.HelloRequest) (*pb.HelloReply, error) {
-	log.Printf("Received: %v", in.Name)
-	return &pb.HelloReply{Message: "Hello " + in.Name}, nil
-}
-
-func TestGRPC(t *testing.T) {
-
-	_, _, combinedPEM, _ := genServerCertificate()
-	certID, _ := CertificateManager.Add(combinedPEM, "")
-	defer CertificateManager.Delete(certID)
-
-	// gRPC server
-	s := startGRPCServer(t)
-	defer s.GracefulStop()
-
-	// Tyk
-	globalConf := config.Global()
-	globalConf.ProxySSLInsecureSkipVerify = true
-	globalConf.ProxyEnableHttp2 = true
-	globalConf.HttpServerOptions.EnableHttp2 = true
-	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
-	globalConf.HttpServerOptions.UseSSL = true
-	config.SetGlobal(globalConf)
-	defer resetTestConfig()
-
-	ts := StartTest()
-	defer ts.Close()
-
-	BuildAndLoadAPI(func(spec *APISpec) {
-		spec.Proxy.ListenPath = "/"
-		spec.UseKeylessAccess = true
-		spec.Proxy.TargetURL = "https://localhost:50051"
-	})
-
-	address := strings.TrimPrefix(ts.URL, "https://")
-	name := "Furkan"
-
-	// gRPC client
-	creds := credentials.NewTLS(&tls.Config{
-		InsecureSkipVerify: true,
-	})
-
-	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(creds))
-	if err != nil {
-		t.Fatalf("did not connect: %v", err)
-	}
-	defer conn.Close()
-	c := pb.NewGreeterClient(conn)
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	r, err := c.SayHello(ctx, &pb.HelloRequest{Name: name})
-	if err != nil {
-		t.Fatalf("could not greet: %v", err)
-	}
-
-	// Test result
-	expected := "Hello " + name
-	actual := r.Message
-
-	if expected != actual {
-		t.Fatalf("Expected %s, actual %s", expected, actual)
-	}
-}
-
-func startGRPCServer(t *testing.T) *grpc.Server {
-	// Server
-	lis, err := net.Listen("tcp", ":50051")
-	if err != nil {
-		t.Fatalf("failed to listen: %v", err)
-	}
-
-	cert, key, _, _ := genCertificate(&x509.Certificate{})
-	certificate, _ := tls.X509KeyPair(cert, key)
-	creds := credentials.NewServerTLSFromCert(&certificate)
-
-	if err != nil {
-		t.Fatalf("failed to listen: %v", err)
-	}
-
-	s := grpc.NewServer(grpc.Creds(creds))
-
-	pb.RegisterGreeterServer(s, &server{})
-
-	go func() {
-		err := s.Serve(lis)
-		if err != nil {
-			t.Fatalf("failed to serve: %v", err)
-		}
-	}()
-
-	return s
 }

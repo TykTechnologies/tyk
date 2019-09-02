@@ -13,6 +13,7 @@ Google::Protobuf::DescriptorPool.generated_pool.build do
     value :Post, 2
     value :PostKeyAuth, 3
     value :CustomKeyCheck, 4
+    value :Response, 5
   end
 end
 

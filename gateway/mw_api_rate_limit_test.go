@@ -64,9 +64,9 @@ func getGlobalRLAuthKeyChain(spec *APISpec) http.Handler {
 }
 
 func TestRLOpen(t *testing.T) {
-	spec := createSpecTest(t, openRLDefSmall)
+	spec := CreateSpecTest(t, openRLDefSmall)
 
-	req := testReq(t, "GET", "/rl_test/", nil)
+	req := TestReq(t, "GET", "/rl_test/", nil)
 
 	DRLManager.CurrentTokenValue = 1
 	DRLManager.RequestTokenValue = 1
@@ -94,7 +94,7 @@ func TestRLOpen(t *testing.T) {
 
 func requestThrottlingTest(limiter string, testLevel string) func(t *testing.T) {
 	return func(t *testing.T) {
-		defer resetTestConfig()
+		defer ResetTestConfig()
 
 		ts := StartTest()
 		defer ts.Close()
@@ -123,8 +123,7 @@ func requestThrottlingTest(limiter string, testLevel string) func(t *testing.T) 
 		throttleInterval = 1
 		throttleRetryLimit = 3
 
-		for _, requestThrottlingEnabled := range []bool{false, true} {
-
+		for _, requestThrottlingEnabled := range []bool{true, false} {
 			spec := BuildAndLoadAPI(func(spec *APISpec) {
 				spec.Name = "test"
 				spec.APIID = "test"
@@ -162,6 +161,8 @@ func requestThrottlingTest(limiter string, testLevel string) func(t *testing.T) 
 						a.Limit.ThrottleInterval = throttleInterval
 						a.Limit.ThrottleRetryLimit = throttleRetryLimit
 					}
+
+					p.Partitions.PerAPI = true
 
 					p.AccessRights[spec.APIID] = a
 				} else {
@@ -209,9 +210,9 @@ func TestRequestThrottling(t *testing.T) {
 }
 
 func TestRLClosed(t *testing.T) {
-	spec := createSpecTest(t, closedRLDefSmall)
+	spec := CreateSpecTest(t, closedRLDefSmall)
 
-	req := testReq(t, "GET", "/rl_closed_test/", nil)
+	req := TestReq(t, "GET", "/rl_closed_test/", nil)
 
 	session := createRLSession()
 	customToken := uuid.NewV4().String()
@@ -244,9 +245,9 @@ func TestRLClosed(t *testing.T) {
 }
 
 func TestRLOpenWithReload(t *testing.T) {
-	spec := createSpecTest(t, openRLDefSmall)
+	spec := CreateSpecTest(t, openRLDefSmall)
 
-	req := testReq(t, "GET", "/rl_test/", nil)
+	req := TestReq(t, "GET", "/rl_test/", nil)
 
 	DRLManager.CurrentTokenValue = 1
 	DRLManager.RequestTokenValue = 1
@@ -304,7 +305,7 @@ const openRLDefSmall = `{
 	},
 	"proxy": {
 		"listen_path": "/rl_test/",
-		"target_url": "` + testHttpAny + `"
+		"target_url": "` + TestHttpAny + `"
 	},
 	"global_rate_limit": {
 		"rate": 3,
@@ -324,7 +325,7 @@ const closedRLDefSmall = `{
 	},
 	"proxy": {
 		"listen_path": "/rl_closed_test/",
-		"target_url": "` + testHttpAny + `"
+		"target_url": "` + TestHttpAny + `"
 	},
 	"global_rate_limit": {
 		"rate": 3,

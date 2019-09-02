@@ -1,18 +1,21 @@
 package gateway
 
 import (
+	"net/http"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/headers"
 )
 
 func createGetHandler() *WebHookHandler {
 	eventHandlerConf := config.WebHookHandlerConf{
-		TargetPath:   testHttpGet,
+		TargetPath:   TestHttpGet,
 		Method:       "GET",
 		EventTimeout: 10,
-		TemplatePath: "templates/default_webhook.json",
+		TemplatePath: "../templates/default_webhook.json",
 		HeaderList:   map[string]string{"x-tyk-test": "TEST"},
 	}
 	ev := &WebHookHandler{}
@@ -27,7 +30,7 @@ func TestNewValid(t *testing.T) {
 	err := h.Init(map[string]interface{}{
 		"method":        "POST",
 		"target_path":   testHttpPost,
-		"template_path": "templates/default_webhook.json",
+		"template_path": "../templates/default_webhook.json",
 		"header_map":    map[string]string{"X-Tyk-Test-Header": "Tyk v1.BANANA"},
 		"event_timeout": 10,
 	})
@@ -41,7 +44,7 @@ func TestNewInvalid(t *testing.T) {
 	err := h.Init(map[string]interface{}{
 		"method":        123,
 		"target_path":   testHttpPost,
-		"template_path": "templates/default_webhook.json",
+		"template_path": "../templates/default_webhook.json",
 		"header_map":    map[string]string{"X-Tyk-Test-Header": "Tyk v1.BANANA"},
 		"event_timeout": 10,
 	})
@@ -89,12 +92,16 @@ func TestBuildRequest(t *testing.T) {
 	if err != nil {
 		t.Error("Request should have built cleanly.")
 	}
-	if req.Method != "GET" {
+	if req.Method != http.MethodGet {
 		t.Error("Method hould be GET")
 	}
 
-	if got := req.Header.Get("User-Agent"); got != "Tyk-Hookshot" {
+	if got := req.Header.Get(headers.UserAgent); got != headers.TykHookshot {
 		t.Error("Header User Agent is not correct!")
+	}
+
+	if got := req.Header.Get(headers.ContentType); got != headers.ApplicationJSON {
+		t.Error("Header Content-Type is not correct!")
 	}
 }
 
@@ -214,4 +221,47 @@ func TestNewCustomTemplate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestWebhookContentTypeHeader(t *testing.T) {
+	globalConf := config.Global()
+	templatePath := globalConf.TemplatePath
+
+	tests := []struct {
+		Name                string
+		TemplatePath        string
+		InputHeaders        map[string]string
+		ExpectedContentType string
+	}{
+		{"MissingTemplatePath", "", nil, "application/json"},
+		{"MissingTemplatePath/CustomHeaders", "", map[string]string{"Content-Type": "application/xml"}, "application/xml"},
+		{"InvalidTemplatePath", "randomPath", nil, "application/json"},
+		{"InvalidTemplatePath/CustomHeaders", "randomPath", map[string]string{"Content-Type": "application/xml"}, "application/xml"},
+		{"CustomTemplate", filepath.Join(templatePath, "transform_test.tmpl"), nil, ""},
+		{"CustomTemplate/CustomHeaders", filepath.Join(templatePath, "breaker_webhook.json"), map[string]string{"Content-Type": "application/xml"}, "application/xml"},
+	}
+
+	for _, ts := range tests {
+		t.Run(ts.Name, func(t *testing.T) {
+			conf := config.WebHookHandlerConf{
+				TemplatePath: ts.TemplatePath,
+				HeaderList:   ts.InputHeaders,
+			}
+
+			hook := &WebHookHandler{}
+			if err := hook.Init(conf); err != nil {
+				t.Fatal("Webhook Init failed with err ", err)
+			}
+
+			req, err := hook.BuildRequest("")
+			if err != nil {
+				t.Fatal("Failed to build request with error ", err)
+			}
+
+			if req.Header.Get(headers.ContentType) != ts.ExpectedContentType {
+				t.Fatalf("Expect Content-Type %s. Got %s", ts.ExpectedContentType, req.Header.Get("Content-Type"))
+			}
+		})
+	}
+
 }

@@ -133,7 +133,7 @@ func TestJWTSessionHMAC(t *testing.T) {
 
 	//If we skip the check then the Id will be taken from SUB and the call will succeed
 	_, jwtToken := prepareGenericJWTSession(t.Name(), HMACSign, KID, false)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	authHeaders := map[string]string{"authorization": jwtToken}
 	t.Run("Request with valid JWT signed with HMAC", func(t *testing.T) {
@@ -151,7 +151,7 @@ func BenchmarkJWTSessionHMAC(b *testing.B) {
 
 	//If we skip the check then the Id will be taken from SUB and the call will succeed
 	_, jwtToken := prepareGenericJWTSession(b.Name(), HMACSign, KID, false)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	authHeaders := map[string]string{"authorization": jwtToken}
 	for i := 0; i < b.N; i++ {
@@ -190,7 +190,7 @@ func TestJWTHMACIdInSubClaim(t *testing.T) {
 	// Case where the gw always check the 'kid' claim first but if this JWTSkipCheckKidAsId is set on the api level,
 	// then it'll work
 	_, jwtToken = prepareGenericJWTSession(t.Name(), HMACSign, SUB, true)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 	authHeaders = map[string]string{"authorization": jwtToken}
 	t.Run("Request with valid JWT/HMAC/Id in SuB/Global-dont-skip-kid/Api-skip-kid", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
@@ -387,7 +387,7 @@ func TestJWTSessionRSABearerInvalid(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers:   authHeaders,
 			Code:      http.StatusForbidden,
-			BodyMatch: "Key not authorized:illegal base64 data at input byte 0",
+			BodyMatch: "Key not authorized:illegal base64 data at input byte 6",
 		})
 	})
 }
@@ -402,7 +402,7 @@ func TestJWTSessionRSABearerInvalidTwoBears(t *testing.T) {
 
 	t.Run("Request with Bearer bearer", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders1, Code: http.StatusOK, //todo: fix code since it should be http.StatusForbidden
+			Headers: authHeaders1, Code: http.StatusForbidden,
 		})
 	})
 
@@ -410,7 +410,7 @@ func TestJWTSessionRSABearerInvalidTwoBears(t *testing.T) {
 
 	t.Run("Request with bearer Bearer", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders2, Code: http.StatusOK, //todo: fix code since it should be http.StatusForbidden
+			Headers: authHeaders2, Code: http.StatusForbidden,
 		})
 	})
 }
@@ -839,11 +839,12 @@ func TestJWTExistingSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	LoadAPI(spec)
 
 	p1ID := CreatePolicy()
+	user_id := uuid.New()
 
 	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
-		t.Claims.(jwt.MapClaims)["user_id"] = "user"
+		t.Claims.(jwt.MapClaims)["user_id"] = user_id
 		t.Claims.(jwt.MapClaims)["policy_id"] = p1ID
 		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	})
@@ -859,7 +860,7 @@ func TestJWTExistingSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	jwtTokenInvalidPolicy := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
-		t.Claims.(jwt.MapClaims)["user_id"] = "user"
+		t.Claims.(jwt.MapClaims)["user_id"] = user_id
 		t.Claims.(jwt.MapClaims)["policy_id"] = "abcdef"
 		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	})
@@ -902,6 +903,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		spec.JWTIdentityBaseField = "user_id"
 		spec.JWTPolicyFieldName = "policy_id"
 		spec.Proxy.ListenPath = "/api1"
+		spec.OrgID = "default"
 	})[0]
 
 	p1ID := CreatePolicy(func(p *user.Policy) {
@@ -928,6 +930,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		spec.JWTIdentityBaseField = "user_id"
 		spec.JWTPolicyFieldName = "policy_id"
 		spec.Proxy.ListenPath = "/api2"
+		spec.OrgID = "default"
 	})[0]
 
 	p2ID := CreatePolicy(func(p *user.Policy) {
@@ -954,6 +957,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		spec.JWTIdentityBaseField = "user_id"
 		spec.JWTPolicyFieldName = "policy_id"
 		spec.Proxy.ListenPath = "/api3"
+		spec.OrgID = "default"
 	})[0]
 
 	spec := BuildAPI(func(spec *APISpec) {
@@ -969,6 +973,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 			"user:read":  p1ID,
 			"user:write": p2ID,
 		}
+		spec.OrgID = "default"
 	})[0]
 
 	LoadAPI(spec, spec1, spec2, spec3)
@@ -995,7 +1000,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 	})
 
 	// check that key has right set of policies assigned - there should be all three - base one and two from scope
-	sessionID := generateToken("", fmt.Sprintf("%x", md5.Sum([]byte(userID))))
+	sessionID := generateToken("default", fmt.Sprintf("%x", md5.Sum([]byte(userID))))
 	t.Run("Request to check that session has got correct apply_policies value", func(t *testing.T) {
 		ts.Run(
 			t,
@@ -1076,6 +1081,7 @@ func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
 		spec.JWTIdentityBaseField = "user_id"
 		spec.JWTPolicyFieldName = "policy_id"
 		spec.Proxy.ListenPath = "/"
+		spec.OrgID = "default"
 	})[0]
 
 	LoadAPI(spec)
@@ -1086,16 +1092,20 @@ func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
 	p2ID := CreatePolicy(func(p *user.Policy) {
 		p.QuotaMax = 999
 	})
+	user_id := uuid.New()
+
+	t.Log(p1ID)
+	t.Log(p2ID)
 
 	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
-		t.Claims.(jwt.MapClaims)["user_id"] = "user"
+		t.Claims.(jwt.MapClaims)["user_id"] = user_id
 		t.Claims.(jwt.MapClaims)["policy_id"] = p1ID
 		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	})
 
-	sessionID := generateToken("", fmt.Sprintf("%x", md5.Sum([]byte("user"))))
+	sessionID := generateToken("default", fmt.Sprintf("%x", md5.Sum([]byte("user"))))
 
 	authHeaders := map[string]string{"authorization": jwtToken}
 	t.Run("Initial request with 1st policy", func(t *testing.T) {
@@ -1120,7 +1130,7 @@ func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
 	jwtTokenAnotherPolicy := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
-		t.Claims.(jwt.MapClaims)["user_id"] = "user"
+		t.Claims.(jwt.MapClaims)["user_id"] = user_id
 		t.Claims.(jwt.MapClaims)["policy_id"] = p2ID
 		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	})
@@ -1283,7 +1293,7 @@ func TestJWTHMACIdNewClaim(t *testing.T) {
 
 	//If we skip the check then the Id will be taken from SUB and the call will succeed
 	_, jwtToken := prepareGenericJWTSession(t.Name(), HMACSign, "user-id", true)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 	authHeaders := map[string]string{"authorization": jwtToken}
 	t.Run("Request with valid JWT/HMAC signature/id in user-id claim", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
@@ -1437,13 +1447,233 @@ func TestJWTRSAIdInClaimsWithoutBaseField(t *testing.T) {
 	})
 }
 
+func TestJWTDefaultPolicies(t *testing.T) {
+	const apiID = "testapid"
+	const identitySource = "user_id"
+	const policyFieldName = "policy_id"
+
+	ts := StartTest()
+	defer ts.Close()
+
+	defPol1 := CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			apiID: {},
+		}
+		p.Partitions = user.PolicyPartitions{
+			Quota: true,
+		}
+	})
+
+	defPol2 := CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			apiID: {},
+		}
+		p.Partitions = user.PolicyPartitions{
+			RateLimit: true,
+		}
+	})
+
+	tokenPol := CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			apiID: {},
+		}
+		p.Partitions = user.PolicyPartitions{
+			Acl: true,
+		}
+	})
+
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.APIID = apiID
+		spec.UseKeylessAccess = false
+		spec.EnableJWT = true
+		spec.JWTSigningMethod = RSASign
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTIdentityBaseField = identitySource
+		spec.JWTDefaultPolicies = []string{
+			defPol1,
+			defPol2,
+		}
+		spec.Proxy.ListenPath = "/"
+	})[0]
+
+	data := []byte("dummy")
+	keyID := fmt.Sprintf("%x", md5.Sum(data))
+	sessionID := generateToken(spec.OrgID, keyID)
+
+	assert := func(t *testing.T, expected []string) {
+		session, _ := FallbackKeySesionManager.SessionDetail(sessionID, false)
+		actual := session.PolicyIDs()
+		if !reflect.DeepEqual(expected, actual) {
+			t.Fatalf("Expected %v, actaul %v", expected, actual)
+		}
+	}
+
+	t.Run("Policy field name empty", func(t *testing.T) {
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)[identitySource] = "dummy"
+			t.Claims.(jwt.MapClaims)[policyFieldName] = tokenPol
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+
+		// Default
+		LoadAPI(spec)
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+		assert(t, []string{defPol1, defPol2})
+
+		// Same to check stored correctly
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+		assert(t, []string{defPol1, defPol2})
+
+		// Remove one of default policies
+		spec.JWTDefaultPolicies = []string{defPol1}
+		LoadAPI(spec)
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+		assert(t, []string{defPol1})
+
+		// Add a default policy
+		spec.JWTDefaultPolicies = []string{defPol1, defPol2}
+		LoadAPI(spec)
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+		assert(t, []string{defPol1, defPol2})
+	})
+
+	t.Run("Policy field name nonempty but empty claim", func(t *testing.T) {
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)[identitySource] = "dummy"
+			t.Claims.(jwt.MapClaims)[policyFieldName] = ""
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+
+		// Default
+		LoadAPI(spec)
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+		assert(t, []string{defPol1, defPol2})
+
+		// Same to check stored correctly
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+		assert(t, []string{defPol1, defPol2})
+
+		// Remove one of default policies
+		spec.JWTDefaultPolicies = []string{defPol1}
+		LoadAPI(spec)
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+		assert(t, []string{defPol1})
+
+		// Add a default policy
+		spec.JWTDefaultPolicies = []string{defPol1, defPol2}
+		LoadAPI(spec)
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+		assert(t, []string{defPol1, defPol2})
+	})
+
+	t.Run("Policy field name nonempty invalid policy ID in claim", func(t *testing.T) {
+		spec.JWTPolicyFieldName = policyFieldName
+		LoadAPI(spec)
+
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)[identitySource] = "dummy"
+			t.Claims.(jwt.MapClaims)[policyFieldName] = "invalid"
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Headers: authHeaders, Code: http.StatusForbidden},
+			{Headers: authHeaders, Code: http.StatusForbidden},
+		}...)
+
+		// Reset
+		spec.JWTPolicyFieldName = ""
+	})
+
+	t.Run("Default to Claim transition", func(t *testing.T) {
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)[identitySource] = "dummy"
+			t.Claims.(jwt.MapClaims)[policyFieldName] = tokenPol
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+
+		// Default
+		LoadAPI(spec)
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+		assert(t, []string{defPol1, defPol2})
+
+		// Same to check stored correctly
+		LoadAPI(spec)
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+		assert(t, []string{defPol1, defPol2})
+
+		// Claim
+		spec.JWTPolicyFieldName = policyFieldName
+		LoadAPI(spec)
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+		assert(t, []string{tokenPol})
+	})
+
+	t.Run("Claim to Default transition", func(t *testing.T) {
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)[identitySource] = "dummy"
+			t.Claims.(jwt.MapClaims)[policyFieldName] = tokenPol
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+
+		// Claim
+		spec.JWTPolicyFieldName = policyFieldName
+		LoadAPI(spec)
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+		assert(t, []string{tokenPol})
+
+		// Same to check stored correctly
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+		assert(t, []string{tokenPol})
+
+		// Default
+		spec.JWTPolicyFieldName = ""
+		LoadAPI(spec)
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+		assert(t, []string{defPol1, defPol2})
+	})
+}
+
 func TestJWTECDSASign(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
 
 	//If we skip the check then the Id will be taken from SUB and the call will succeed
 	_, jwtToken := prepareGenericJWTSession(t.Name(), ECDSASign, KID, false)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 	authHeaders := map[string]string{"authorization": jwtToken}
 	t.Run("Request with valid JWT/ECDSA signature needs a test. currently defaults to HMAC", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
@@ -1458,7 +1688,7 @@ func TestJWTUnknownSign(t *testing.T) {
 
 	//If we skip the check then the Id will be taken from SUB and the call will succeed
 	_, jwtToken := prepareGenericJWTSession(t.Name(), "bla", KID, false)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 	authHeaders := map[string]string{"authorization": jwtToken}
 	t.Run("Request with valid JWT/ECDSA signature needs a test. currently defaults to HMAC", func(t *testing.T) {
 		ts.Run(t, test.TestCase{

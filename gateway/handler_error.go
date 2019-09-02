@@ -3,24 +3,26 @@ package gateway
 import (
 	"bytes"
 	"encoding/base64"
+	"html/template"
 	"net/http"
 	"runtime/pprof"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/request"
 )
 
 const (
 	defaultTemplateName   = "error"
 	defaultTemplateFormat = "json"
-	defaultContentType    = "application/json"
+	defaultContentType    = headers.ApplicationJSON
 )
 
 // APIError is generic error object returned if there is something wrong with the request
 type APIError struct {
-	Message string
+	Message template.HTML
 }
 
 // ErrorHandler is invoked whenever there is an issue with a proxied request, most middleware will invoke
@@ -37,16 +39,16 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		var templateExtension string
 		var contentType string
 
-		switch r.Header.Get("Content-Type") {
-		case "application/xml":
+		switch r.Header.Get(headers.ContentType) {
+		case headers.ApplicationXML:
 			templateExtension = "xml"
-			contentType = "application/xml"
+			contentType = headers.ApplicationXML
 		default:
 			templateExtension = "json"
-			contentType = "application/json"
+			contentType = headers.ApplicationJSON
 		}
 
-		w.Header().Set("Content-Type", contentType)
+		w.Header().Set(headers.ContentType, contentType)
 
 		templateName := "error_" + strconv.Itoa(errCode) + "." + templateExtension
 
@@ -63,22 +65,22 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		if tmpl == nil {
 			templateName = defaultTemplateName + "." + defaultTemplateFormat
 			tmpl = templates.Lookup(templateName)
-			w.Header().Set("Content-Type", defaultContentType)
+			w.Header().Set(headers.ContentType, defaultContentType)
 		}
 
 		//If the config option is not set or is false, add the header
 		if !e.Spec.GlobalConfig.HideGeneratorHeader {
-			w.Header().Add("X-Generator", "tyk.io")
+			w.Header().Add(headers.XGenerator, "tyk.io")
 		}
 
 		// Close connections
 		if e.Spec.GlobalConfig.CloseConnections {
-			w.Header().Add("Connection", "close")
+			w.Header().Add(headers.Connection, "close")
 		}
 
 		// Need to return the correct error code!
 		w.WriteHeader(errCode)
-		apiError := APIError{errMsg}
+		apiError := APIError{template.HTML(template.JSEscapeString(errMsg))}
 		tmpl.Execute(w, &apiError)
 	}
 
@@ -106,7 +108,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		}
 
 		if e.Spec.Proxy.StripListenPath {
-			r.URL.Path = strings.Replace(r.URL.Path, e.Spec.Proxy.ListenPath, "", 1)
+			r.URL.Path = e.Spec.StripListenPath(r, r.URL.Path)
 		}
 
 		// This is an odd bugfix, will need further testing
@@ -155,7 +157,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			trackedPath,
 			r.URL.Path,
 			r.ContentLength,
-			r.Header.Get("User-Agent"),
+			r.Header.Get(headers.UserAgent),
 			t.Day(),
 			t.Month(),
 			t.Year(),
@@ -173,6 +175,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			rawResponse,
 			ip,
 			GeoData{},
+			NetworkStats{},
 			tags,
 			alias,
 			trackEP,
@@ -200,7 +203,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 		analytics.RecordHit(&record)
 	}
-
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
 

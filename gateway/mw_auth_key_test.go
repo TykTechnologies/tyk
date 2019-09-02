@@ -19,7 +19,7 @@ import (
 )
 
 func TestMurmur3CharBug(t *testing.T) {
-	defer resetTestConfig()
+	defer ResetTestConfig()
 	ts := StartTest()
 	defer ts.Close()
 
@@ -60,8 +60,7 @@ func TestMurmur3CharBug(t *testing.T) {
 
 		ts.Run(t, []test.TestCase{
 			genTestCase("wrong", 403),
-			// Should reject instead, just to show bug
-			genTestCase(key+"abc", 200),
+			genTestCase(key+"abc", 403),
 			genTestCase(key, 200),
 		}...)
 	})
@@ -104,7 +103,7 @@ func TestMurmur3CharBug(t *testing.T) {
 }
 
 func TestSignatureValidation(t *testing.T) {
-	defer resetTestConfig()
+	defer ResetTestConfig()
 	ts := StartTest()
 	defer ts.Close()
 
@@ -215,7 +214,7 @@ func getAuthKeyChain(spec *APISpec) http.Handler {
 }
 
 func testPrepareAuthKeySession(tb testing.TB, apiDef string, isBench bool) (string, *APISpec) {
-	spec := createSpecTest(tb, apiDef)
+	spec := CreateSpecTest(tb, apiDef)
 	session := createAuthKeyAuthSession(isBench)
 	customToken := ""
 	if isBench {
@@ -232,7 +231,7 @@ func TestBearerTokenAuthKeySession(t *testing.T) {
 	customToken, spec := testPrepareAuthKeySession(t, authKeyDef, false)
 
 	recorder := httptest.NewRecorder()
-	req := testReq(t, "GET", "/auth_key_test/", nil)
+	req := TestReq(t, "GET", "/auth_key_test/", nil)
 
 	req.Header.Set("authorization", "Bearer "+customToken)
 
@@ -251,7 +250,7 @@ func BenchmarkBearerTokenAuthKeySession(b *testing.B) {
 	customToken, spec := testPrepareAuthKeySession(b, authKeyDef, true)
 
 	recorder := httptest.NewRecorder()
-	req := testReq(b, "GET", "/auth_key_test/", nil)
+	req := TestReq(b, "GET", "/auth_key_test/", nil)
 
 	req.Header.Set("authorization", "Bearer "+customToken)
 
@@ -278,7 +277,7 @@ const authKeyDef = `{
 	},
 	"proxy": {
 		"listen_path": "/auth_key_test/",
-		"target_url": "` + testHttpAny + `"
+		"target_url": "` + TestHttpAny + `"
 	}
 }`
 
@@ -286,7 +285,7 @@ func TestMultiAuthBackwardsCompatibleSession(t *testing.T) {
 	customToken, spec := testPrepareAuthKeySession(t, multiAuthBackwardsCompatible, false)
 
 	recorder := httptest.NewRecorder()
-	req := testReq(t, "GET", fmt.Sprintf("/auth_key_test/?token=%s", customToken), nil)
+	req := TestReq(t, "GET", fmt.Sprintf("/auth_key_test/?token=%s", customToken), nil)
 
 	chain := getAuthKeyChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -303,7 +302,7 @@ func BenchmarkMultiAuthBackwardsCompatibleSession(b *testing.B) {
 	customToken, spec := testPrepareAuthKeySession(b, multiAuthBackwardsCompatible, true)
 
 	recorder := httptest.NewRecorder()
-	req := testReq(b, "GET", fmt.Sprintf("/auth_key_test/?token=%s", customToken), nil)
+	req := TestReq(b, "GET", fmt.Sprintf("/auth_key_test/?token=%s", customToken), nil)
 
 	chain := getAuthKeyChain(spec)
 
@@ -331,12 +330,12 @@ const multiAuthBackwardsCompatible = `{
 	},
 	"proxy": {
 		"listen_path": "/auth_key_test/",
-		"target_url": "` + testHttpAny + `"
+		"target_url": "` + TestHttpAny + `"
 	}
 }`
 
 func TestMultiAuthSession(t *testing.T) {
-	spec := createSpecTest(t, multiAuthDef)
+	spec := CreateSpecTest(t, multiAuthDef)
 	session := createAuthKeyAuthSession(false)
 	customToken := "54321111"
 	// AuthKey sessions are stored by {token}
@@ -344,7 +343,7 @@ func TestMultiAuthSession(t *testing.T) {
 
 	// Set the url param
 	recorder := httptest.NewRecorder()
-	req := testReq(t, "GET", fmt.Sprintf("/auth_key_test/?token=%s", customToken), nil)
+	req := TestReq(t, "GET", fmt.Sprintf("/auth_key_test/?token=%s", customToken), nil)
 
 	chain := getAuthKeyChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -356,7 +355,7 @@ func TestMultiAuthSession(t *testing.T) {
 
 	// Set the header
 	recorder = httptest.NewRecorder()
-	req = testReq(t, "GET", "/auth_key_test/?token=", nil)
+	req = TestReq(t, "GET", "/auth_key_test/?token=", nil)
 	req.Header.Set("authorization", customToken)
 
 	chain.ServeHTTP(recorder, req)
@@ -368,7 +367,7 @@ func TestMultiAuthSession(t *testing.T) {
 
 	// Set the cookie
 	recorder = httptest.NewRecorder()
-	req = testReq(t, "GET", "/auth_key_test/?token=", nil)
+	req = TestReq(t, "GET", "/auth_key_test/?token=", nil)
 	req.AddCookie(&http.Cookie{Name: "oreo", Value: customToken})
 
 	chain.ServeHTTP(recorder, req)
@@ -380,7 +379,7 @@ func TestMultiAuthSession(t *testing.T) {
 
 	// No header, param or cookie
 	recorder = httptest.NewRecorder()
-	req = testReq(t, "GET", "/auth_key_test/", nil)
+	req = TestReq(t, "GET", "/auth_key_test/", nil)
 
 	chain.ServeHTTP(recorder, req)
 
@@ -406,6 +405,37 @@ const multiAuthDef = `{
 	},
 	"proxy": {
 		"listen_path": "/auth_key_test/",
-		"target_url": "` + testHttpAny + `"
+		"target_url": "` + TestHttpAny + `"
 	}
 }`
+
+func TestStripBearer(t *testing.T) {
+	var bearerTests = []struct {
+		in  string
+		out string
+	}{
+		{"Bearer abc", "abc"},
+		{"bearer abc", "abc"},
+		{"bEaReR abc", "abc"},
+		{"Bearer: abc", "Bearer: abc"}, // invalid
+		{"Basic abc", "Basic abc"},
+		{"abc", "abc"},
+	}
+
+	for _, tt := range bearerTests {
+		t.Run(tt.in, func(t *testing.T) {
+			out := stripBearer(tt.in)
+			if out != tt.out {
+				t.Errorf("got %q, want %q", out, tt.out)
+			}
+		})
+	}
+}
+
+func BenchmarkStripBearer(b *testing.B) {
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		_ = stripBearer("Bearer abcdefghijklmnopqrstuvwxyz12345678910")
+	}
+}

@@ -13,7 +13,7 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
-func testPrepareProcessRequestQuotaLimit(tb testing.TB, ts Test, data map[string]interface{}) {
+func testPrepareProcessRequestQuotaLimit(tb testing.TB, ts *Test, data map[string]interface{}) {
 	// load API
 	orgID := "test-org-" + uuid.NewV4().String()
 	BuildAndLoadAPI(func(spec *APISpec) {
@@ -88,7 +88,7 @@ func BenchmarkProcessRequestLiveQuotaLimit(b *testing.B) {
 	globalConf.ExperimentalProcessOrgOffThread = false
 	config.SetGlobal(globalConf)
 
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	// run test server
 	ts := StartTest()
@@ -113,16 +113,16 @@ func BenchmarkProcessRequestLiveQuotaLimit(b *testing.B) {
 }
 
 func TestProcessRequestOffThreadQuotaLimit(t *testing.T) {
+	// run test server
+	ts := StartTest()
+	defer ts.Close()
+
 	// setup global config
 	globalConf := config.Global()
 	globalConf.EnforceOrgQuotas = true
 	globalConf.ExperimentalProcessOrgOffThread = true
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
-
-	// run test server
-	ts := StartTest()
-	defer ts.Close()
+	defer ResetTestConfig()
 
 	// load API
 	testPrepareProcessRequestQuotaLimit(
@@ -190,7 +190,7 @@ func BenchmarkProcessRequestOffThreadQuotaLimit(b *testing.B) {
 	globalConf.ExperimentalProcessOrgOffThread = true
 	config.SetGlobal(globalConf)
 
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	// run test server
 	ts := StartTest()
@@ -221,7 +221,7 @@ func TestProcessRequestLiveRedisRollingLimiter(t *testing.T) {
 	globalConf.EnableRedisRollingLimiter = true
 	globalConf.ExperimentalProcessOrgOffThread = false
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	// run test server
 	ts := StartTest()
@@ -278,7 +278,7 @@ func BenchmarkProcessRequestLiveRedisRollingLimiter(b *testing.B) {
 	globalConf.ExperimentalProcessOrgOffThread = false
 	config.SetGlobal(globalConf)
 
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	// run test server
 	ts := StartTest()
@@ -309,7 +309,7 @@ func TestProcessRequestOffThreadRedisRollingLimiter(t *testing.T) {
 	globalConf.EnableRedisRollingLimiter = true
 	globalConf.ExperimentalProcessOrgOffThread = true
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	// run test server
 	ts := StartTest()

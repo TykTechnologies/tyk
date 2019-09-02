@@ -1,4 +1,4 @@
-# Graylog Hook for [Logrus](https://github.com/Sirupsen/logrus) <img src="http://i.imgur.com/hTeVwmJ.png" width="40" height="40" alt=":walrus:" class="emoji" title=":walrus:" />&nbsp;[![Build Status](https://travis-ci.org/gemnasium/logrus-graylog-hook.svg?branch=master)](https://travis-ci.org/gemnasium/logrus-graylog-hook)&nbsp;[![godoc reference](https://godoc.org/github.com/gemnasium/logrus-graylog-hook?status.svg)](https://godoc.org/gopkg.in/gemnasium/logrus-graylog-hook.v2)
+# Graylog Hook for [Logrus](https://github.com/sirupsen/logrus) <img src="http://i.imgur.com/hTeVwmJ.png" width="40" height="40" alt=":walrus:" class="emoji" title=":walrus:" />&nbsp;[![Build Status](https://travis-ci.org/gemnasium/logrus-graylog-hook.svg?branch=master)](https://travis-ci.org/gemnasium/logrus-graylog-hook)&nbsp;[![godoc reference](https://godoc.org/github.com/gemnasium/logrus-graylog-hook?status.svg)](https://godoc.org/github.com/gemnasium/logrus-graylog-hook)
 
 Use this hook to send your logs to [Graylog](http://graylog2.org) server over UDP.
 The hook is non-blocking: even if UDP is used to send messages, the extra work
@@ -17,14 +17,13 @@ The hook must be configured with:
 package main
 
 import (
-    "log/syslog"
-    log "github.com/Sirupsen/logrus"
-    "gopkg.in/gemnasium/logrus-graylog-hook.v2"
+    log "github.com/sirupsen/logrus"
+    "github.com/gemnasium/logrus-graylog-hook/v3"
     )
 
 func main() {
     hook := graylog.NewGraylogHook("<graylog_ip>:<graylog_port>", map[string]interface{}{"this": "is logged every time"})
-    log.Hooks.Add(hook)
+    log.AddHook(hook)
     log.Info("some logging message")
 }
 ```
@@ -35,15 +34,14 @@ func main() {
 package main
 
 import (
-    "log/syslog"
-    log "github.com/Sirupsen/logrus"
-    "gopkg.in/gemnasium/logrus-graylog-hook.v2"
+    log "github.com/sirupsen/logrus"
+    "github.com/gemnasium/logrus-graylog-hook/v3"
     )
 
 func main() {
     hook := graylog.NewAsyncGraylogHook("<graylog_ip>:<graylog_port>", map[string]interface{}{"this": "is logged every time"})
     defer hook.Flush()
-    log.Hooks.Add(hook)
+    log.AddHook(hook)
     log.Info("some logging message")
 }
 ```
@@ -67,6 +65,6 @@ And set this formatter as the new logging formatter:
 
 ```go
 log.Infof("Log messages are now sent to Graylog (udp://%s)", graylogAddr) // Give a hint why logs are empty
-log.Hooks.Add(graylog.NewGraylogHook(graylogAddr, "api", map[string]interface{}{})) // set graylogAddr accordingly
+log.AddHook(graylog.NewGraylogHook(graylogAddr, "api", map[string]interface{}{})) // set graylogAddr accordingly
 log.SetFormatter(new(NullFormatter)) // Don't send logs to stdout
 ```

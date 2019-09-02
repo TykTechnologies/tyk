@@ -5,6 +5,7 @@ package gateway
 */
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/url"
 	"reflect"
@@ -257,7 +258,7 @@ func TestAuthCodeRedirectMultipleURL(t *testing.T) {
 	globalConf := config.Global()
 	globalConf.OauthRedirectUriSeparator = ","
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()
@@ -298,7 +299,7 @@ func TestAuthCodeRedirectInvalidMultipleURL(t *testing.T) {
 	globalConf := config.Global()
 	globalConf.OauthRedirectUriSeparator = ""
 	config.SetGlobal(globalConf)
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()
@@ -562,26 +563,26 @@ func getAuthCode(t *testing.T, ts *Test) map[string]string {
 }
 
 func TestGetPaginatedClientTokens(t *testing.T) {
-	globalConf := config.Global()
-	// set tokens to be expired after 1 second
-	globalConf.OauthTokenExpire = 1
-	// cleanup tokens older than 3 seconds
-	globalConf.OauthTokenExpiredRetainPeriod = 3
-	config.SetGlobal(globalConf)
+	testPagination := func(pageParam int, expectedPageNumber int, tokenRequestCount int, expectedRes int) {
+		globalConf := config.Global()
+		// set tokens to be expired after 100 seconds
+		globalConf.OauthTokenExpire = 100
+		// cleanup tokens older than 300 seconds
+		globalConf.OauthTokenExpiredRetainPeriod = 300
 
-	defer resetTestConfig()
+		config.SetGlobal(globalConf)
 
-	ts := StartTest()
-	defer ts.Close()
+		defer ResetTestConfig()
 
-	spec := loadTestOAuthSpec()
+		ts := StartTest()
+		defer ts.Close()
 
-	clientID := uuid.NewV4().String()
-	createTestOAuthClient(spec, clientID)
+		spec := loadTestOAuthSpec()
 
-	// make eight tokens
-	tokensID := map[string]bool{}
-	t.Run("Send eight token requests", func(t *testing.T) {
+		clientID := uuid.NewV4().String()
+		createTestOAuthClient(spec, clientID)
+
+		tokensID := map[string]bool{}
 		param := make(url.Values)
 		param.Set("response_type", "token")
 		param.Set("redirect_uri", authRedirectUri)
@@ -593,7 +594,7 @@ func TestGetPaginatedClientTokens(t *testing.T) {
 			"Content-Type": "application/x-www-form-urlencoded",
 		}
 
-		for i := 0; i < 110; i++ {
+		for i := 0; i < tokenRequestCount; i++ {
 			resp, err := ts.Run(t, test.TestCase{
 				Path:      "/APIID/tyk/oauth/authorize-client/",
 				Data:      param.Encode(),
@@ -614,44 +615,11 @@ func TestGetPaginatedClientTokens(t *testing.T) {
 			// save tokens for future check
 			tokensID[response["access_token"].(string)] = true
 		}
-	})
 
-	// get list of tokens
-	t.Run("Get list of tokens without page query", func(t *testing.T) {
-		resp, err := ts.Run(t, test.TestCase{
-			// Defaults to fetching all tokens since we don't have
-			// the page query here
-			Path:      fmt.Sprintf("/tyk/oauth/clients/999999/%s/tokens", clientID),
-			AdminAuth: true,
-			Method:    http.MethodGet,
-			Code:      http.StatusOK,
-		})
-		if err != nil {
-			t.Error(err)
-		}
-
-		tokensResp := []OAuthClientToken{}
-		if err := json.NewDecoder(resp.Body).Decode(&tokensResp); err != nil {
-			t.Fatal(err)
-		}
-
-		// check response
-		if n := 110; len(tokensResp) != n {
-			t.Errorf("Wrong number of tokens received. Expected: %d. Got: %d", n, len(tokensResp))
-		}
-
-		for _, token := range tokensResp {
-			if !tokensID[token.Token] {
-				t.Errorf("Token %s is not found in expected result. Expecting: %v", token.Token, tokensID)
-			}
-		}
-	})
-
-	t.Run("Get list of tokens with a page query param lesser than 0", func(t *testing.T) {
 		resp, err := ts.Run(t, test.TestCase{
 			// strconv#Atoi successfully parses a negative integer
 			// so make sure it is being reset to the first page
-			Path:      fmt.Sprintf("/tyk/oauth/clients/999999/%s/tokens?page=-4", clientID),
+			Path:      fmt.Sprintf("/tyk/oauth/clients/999999/%s/tokens?page=%d", clientID, pageParam),
 			AdminAuth: true,
 			Method:    http.MethodGet,
 			Code:      http.StatusOK,
@@ -666,8 +634,8 @@ func TestGetPaginatedClientTokens(t *testing.T) {
 		}
 
 		// check response
-		if n := 100; len(tokensResp.Tokens) != n {
-			t.Errorf("Wrong number of tokens received. Expected: %d. Got: %d", n, len(tokensResp.Tokens))
+		if len(tokensResp.Tokens) != expectedRes {
+			t.Errorf("Wrong number of tokens received. Expected: %d. Got: %d", expectedRes, len(tokensResp.Tokens))
 		}
 
 		for _, token := range tokensResp.Tokens {
@@ -677,61 +645,29 @@ func TestGetPaginatedClientTokens(t *testing.T) {
 		}
 
 		// Also inspect the pagination data information
-		if tokensResp.Pagination.PageNum != 1 {
-			t.Errorf("Paginated data should default to the first page if a negative integer is provided. Expected %d. Got %d", 1, tokensResp.Pagination.PageNum)
+		if expectedPageNumber != tokensResp.Pagination.PageNum {
+			t.Errorf("Page number, expected %d, got %d", expectedPageNumber, tokensResp.Pagination.PageNum)
 		}
+	}
+
+	t.Run("Negative value should return first page", func(t *testing.T) {
+		testPagination(-3, 1, 110, 100)
 	})
 
-	t.Run("Get list of tokens with ?page=2", func(t *testing.T) {
-		resp, err := ts.Run(t, test.TestCase{
-			Path:      fmt.Sprintf("/tyk/oauth/clients/999999/%s/tokens?page=2", clientID),
-			AdminAuth: true,
-			Method:    http.MethodGet,
-			Code:      http.StatusOK,
-		})
-		if err != nil {
-			t.Error(err)
-		}
-
-		tokensResp := paginatedOAuthClientTokens{}
-		if err := json.NewDecoder(resp.Body).Decode(&tokensResp); err != nil {
-			t.Fatal(err)
-		}
-
-		// check response
-		if n := 10; len(tokensResp.Tokens) != n {
-			t.Errorf("Wrong number of tokens received. Expected: %d. Got: %d", n, len(tokensResp.Tokens))
-		}
-
-		for _, token := range tokensResp.Tokens {
-			if !tokensID[token.Token] {
-				t.Errorf("Token %s is not found in expected result. Expecting: %v", token.Token, tokensID)
-			}
-		}
+	t.Run("First page, less than items per page", func(t *testing.T) {
+		testPagination(1, 1, 85, 85)
 	})
 
-	t.Run("Get list of tokens after they expire", func(t *testing.T) {
-		// sleep to wait until tokens expire
-		time.Sleep(2 * time.Second)
+	t.Run("First page, greater than items per page", func(t *testing.T) {
+		testPagination(1, 1, 110, 100)
+	})
 
-		resp, err := ts.Run(t, test.TestCase{
-			Path:      fmt.Sprintf("/tyk/oauth/clients/999999/%s/tokens", clientID),
-			AdminAuth: true,
-			Method:    http.MethodGet,
-			Code:      http.StatusOK,
-		})
-		if err != nil {
-			t.Error(err)
-		}
+	t.Run("Second page, greater than items per page", func(t *testing.T) {
+		testPagination(2, 2, 110, 10)
+	})
 
-		// check response
-		tokensResp := []OAuthClientToken{}
-		if err := json.NewDecoder(resp.Body).Decode(&tokensResp); err != nil {
-			t.Fatal(err)
-		}
-		if len(tokensResp) > 0 {
-			t.Errorf("Wrong number of tokens received. Expected 0 - all tokens expired. Got: %d", len(tokensResp))
-		}
+	t.Run("Second page, multiple of items per page", func(t *testing.T) {
+		testPagination(2, 2, 200, 100)
 	})
 }
 
@@ -755,7 +691,7 @@ func testGetClientTokens(t *testing.T, hashed bool) {
 
 	config.SetGlobal(globalConf)
 
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()
@@ -943,7 +879,7 @@ func TestClientAccessRequest(t *testing.T) {
 
 	createTestOAuthClient(spec, authClientID)
 
-	authData := getAuthCode(t, &ts)
+	authData := getAuthCode(t, ts)
 
 	t.Run("Exchane access code for token request", func(t *testing.T) {
 		param := make(url.Values)
@@ -976,7 +912,7 @@ func TestOAuthAPIRefreshInvalidate(t *testing.T) {
 	createTestOAuthClient(spec, authClientID)
 
 	// Step 1 create token
-	tokenData := getToken(t, &ts)
+	tokenData := getToken(t, ts)
 
 	// Step 2 - invalidate the refresh token
 	t.Run("Invalidate token request", func(t *testing.T) {
@@ -1032,7 +968,7 @@ func TestClientRefreshRequest(t *testing.T) {
 
 	createTestOAuthClient(spec, authClientID)
 
-	tokenData := getToken(t, &ts)
+	tokenData := getToken(t, ts)
 
 	t.Run("Refresh token request", func(t *testing.T) {
 		param := make(url.Values)
@@ -1064,7 +1000,7 @@ func TestClientRefreshRequestDouble(t *testing.T) {
 
 	createTestOAuthClient(spec, authClientID)
 
-	tokenData := getToken(t, &ts)
+	tokenData := getToken(t, ts)
 
 	headers := map[string]string{
 		"Content-Type":  "application/x-www-form-urlencoded",
@@ -1114,5 +1050,91 @@ func TestClientRefreshRequestDouble(t *testing.T) {
 			Method:  http.MethodPost,
 			Code:    http.StatusOK,
 		})
+	})
+}
+
+func TestTokenEndpointHeaders(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+
+	spec := loadTestOAuthSpec()
+	createTestOAuthClient(spec, authClientID)
+
+	param := make(url.Values)
+	param.Set("grant_type", "client_credentials")
+	param.Set("redirect_uri", authRedirectUri)
+	param.Set("client_id", authClientID)
+
+	headers := map[string]string{
+		"Content-Type":  "application/x-www-form-urlencoded",
+		"Authorization": "Basic MTIzNDphYWJiY2NkZA==",
+	}
+
+	securityAndCacheHeaders := map[string]string{
+		"X-Content-Type-Options":    "nosniff",
+		"X-XSS-Protection":          "1; mode=block",
+		"X-Frame-Options":           "DENY",
+		"Strict-Transport-Security": "max-age=63072000; includeSubDomains",
+		"Cache-Control":             "no-cache, no-store, must-revalidate",
+		"Pragma":                    "no-cache",
+		"Expires":                   "0",
+	}
+
+	ts.Run(t, []test.TestCase{
+		{
+			Path:         "/APIID/oauth/token/",
+			Data:         param.Encode(),
+			Headers:      headers,
+			Method:       http.MethodPost,
+			Code:         http.StatusOK,
+			HeadersMatch: securityAndCacheHeaders,
+		}, { // Set security headers even if request fails
+			Path:         "/APIID/oauth/token/",
+			Data:         param.Encode(),
+			Method:       http.MethodPost,
+			Code:         http.StatusForbidden,
+			HeadersMatch: securityAndCacheHeaders,
+		}}...)
+}
+
+func TestJSONToFormValues(t *testing.T) {
+	o := map[string]string{
+		"username":      "test@test.com",
+		"password":      "12345678",
+		"scope":         "client",
+		"client_id":     "test-client-id",
+		"client_secret": "test-client-secret",
+		"grant_type":    "password",
+	}
+	b, _ := json.Marshal(o)
+	r, err := http.NewRequest(http.MethodPost, "/token", bytes.NewReader(b))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Run("no application/json header", func(ts *testing.T) {
+		err := JSONToFormValues(r)
+		if err != nil {
+			ts.Fatal(err)
+		}
+		for k, v := range o {
+			g := r.Form.Get(k)
+			if g == v {
+				ts.Errorf("expected %s not to be set", v)
+			}
+		}
+	})
+
+	t.Run("with application/json header", func(ts *testing.T) {
+		r.Header.Set("Content-Type", "application/json")
+		err := JSONToFormValues(r)
+		if err != nil {
+			ts.Fatal(err)
+		}
+		for k, v := range o {
+			g := r.Form.Get(k)
+			if g != v {
+				ts.Errorf("expected %s got %s", v, g)
+			}
+		}
 	})
 }

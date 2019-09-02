@@ -10,8 +10,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/request"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -125,7 +126,12 @@ func IsWebsocket(req *http.Request) bool {
 		return false
 	}
 
-	connection := strings.ToLower(strings.TrimSpace(req.Header.Get("Connection")))
+	contentType := strings.ToLower(strings.TrimSpace(req.Header.Get(headers.Accept)))
+	if contentType == "text/event-stream" {
+		return true
+	}
+
+	connection := strings.ToLower(strings.TrimSpace(req.Header.Get(headers.Connection)))
 	if connection != "upgrade" {
 		return false
 	}

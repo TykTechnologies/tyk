@@ -3,10 +3,12 @@ package gateway
 import (
 	"archive/zip"
 	"bytes"
+	"compress/gzip"
 	"crypto/tls"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"net/http/httptest"
 
 	"golang.org/x/net/context"
 
@@ -44,7 +46,7 @@ var (
 	discardMuxer = mux.NewRouter()
 
 	// to simulate time ticks for tests that do reloads
-	reloadTick = make(chan time.Time)
+	ReloadTick = make(chan time.Time)
 
 	// Used to store the test bundles:
 	testMiddlewarePath, _ = ioutil.TempDir("", "tyk-middleware-path")
@@ -57,8 +59,8 @@ var (
 	EnableTestDNSMock = true
 )
 
-func InitTestMain(m *testing.M) int {
-	runningTests = true
+func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf *config.Config)) int {
+	setTestMode(true)
 	testServerRouter = testHttpHandler()
 	testServer := &http.Server{
 		Addr:           testHttpListen,
@@ -90,7 +92,7 @@ func InitTestMain(m *testing.M) int {
 	globalConf.AllowInsecureConfigs = true
 	// Enable coprocess and bundle downloader:
 	globalConf.CoProcessOptions.EnableCoProcess = true
-	globalConf.CoProcessOptions.PythonPathPrefix = "../"
+	globalConf.CoProcessOptions.PythonPathPrefix = "../../"
 	globalConf.EnableBundleDownloader = true
 	globalConf.BundleBaseURL = testHttpBundles
 	globalConf.MiddlewarePath = testMiddlewarePath
@@ -99,6 +101,9 @@ func InitTestMain(m *testing.M) int {
 	// force ipv4 for now, to work around the docker bug affecting
 	// Go 1.8 and ealier
 	globalConf.ListenAddress = "127.0.0.1"
+	if len(genConf) > 0 {
+		genConf[0](&globalConf)
+	}
 
 	if EnableTestDNSMock {
 		mockHandle, err = test.InitDNSMock(test.DomainsToAddresses, nil)
@@ -126,20 +131,24 @@ func InitTestMain(m *testing.M) int {
 		panic(err)
 	}
 	cli.Init(VERSION, confPaths)
-	initialiseSystem()
+	initialiseSystem(ctx)
 	// Small part of start()
-	loadAPIEndpoints(mainRouter)
+	loadAPIEndpoints(mainRouter())
 	if analytics.GeoIPDB == nil {
 		panic("GeoIPDB was not initialized")
 	}
 
 	go startPubSubLoop()
-	go reloadLoop(reloadTick)
+	go reloadLoop(ReloadTick)
 	go reloadQueueLoop()
 	go reloadSimulation()
 	exitCode := m.Run()
 	os.RemoveAll(config.Global().AppPath)
 	return exitCode
+}
+
+func ResetTestConfig() {
+	config.SetGlobal(defaultTestConfig)
 }
 
 func emptyRedis() error {
@@ -181,7 +190,7 @@ func reloadSimulation() {
 var testBundles = map[string]map[string]string{}
 var testBundleMu sync.Mutex
 
-func registerBundle(name string, files map[string]string) string {
+func RegisterBundle(name string, files map[string]string) string {
 	testBundleMu.Lock()
 	defer testBundleMu.Unlock()
 
@@ -212,14 +221,49 @@ func bundleHandleFunc(w http.ResponseWriter, r *http.Request) {
 	}
 	z.Close()
 }
+func mainRouter() *mux.Router {
+	return getMainRouter(defaultProxyMux)
+}
 
-type testHttpResponse struct {
+func mainProxy() *proxy {
+	return defaultProxyMux.getProxy(config.Global().ListenPort)
+}
+
+func controlProxy() *proxy {
+	p := defaultProxyMux.getProxy(config.Global().ControlAPIPort)
+	if p != nil {
+		return p
+	}
+	return mainProxy()
+}
+
+func getMainRouter(m *proxyMux) *mux.Router {
+	var protocol string
+	if config.Global().HttpServerOptions.UseSSL {
+		protocol = "https"
+	} else {
+		protocol = "http"
+	}
+	return m.router(config.Global().ListenPort, protocol)
+}
+
+type TestHttpResponse struct {
 	Method  string
 	URI     string
 	Url     string
 	Body    string
 	Headers map[string]string
 	Form    map[string]string
+}
+
+// ProxyHandler Proxies requests through to their final destination, if they make it through the middleware chain.
+func ProxyHandler(p *ReverseProxy, apiSpec *APISpec) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		baseMid := BaseMiddleware{Spec: apiSpec, Proxy: p}
+		handler := SuccessHandler{baseMid}
+		// Skip all other execution
+		handler.ServeHTTP(w, r)
+	})
 }
 
 const (
@@ -229,16 +273,17 @@ const (
 	testHttpListen = "127.0.0.1:16500"
 	// Accepts any http requests on /, only allows GET on /get, etc.
 	// All return a JSON with request info.
-	testHttpAny     = "http://" + testHttpListen
-	testHttpGet     = testHttpAny + "/get"
-	testHttpPost    = testHttpAny + "/post"
-	testHttpJWK     = testHttpAny + "/jwk.json"
-	testHttpBundles = testHttpAny + "/bundles/"
+	TestHttpAny     = "http://" + testHttpListen
+	TestHttpGet     = TestHttpAny + "/get"
+	testHttpPost    = TestHttpAny + "/post"
+	testHttpJWK     = TestHttpAny + "/jwk.json"
+	testHttpBundles = TestHttpAny + "/bundles/"
 
 	// Nothing should be listening on port 16501 - useful for
 	// testing TCP and HTTP failures.
 	testHttpFailure    = "127.0.0.1:16501"
 	testHttpFailureAny = "http://" + testHttpFailure
+	MockOrgID          = "507f1f77bcf86cd799439011"
 )
 
 func testHttpHandler() *mux.Router {
@@ -277,7 +322,7 @@ func testHttpHandler() *mux.Router {
 		w.Header().Set("X-Tyk-Test", "1")
 		body, _ := ioutil.ReadAll(r.Body)
 
-		err := json.NewEncoder(w).Encode(testHttpResponse{
+		err := json.NewEncoder(w).Encode(TestHttpResponse{
 			Method:  r.Method,
 			URI:     r.RequestURI,
 			Url:     r.URL.String(),
@@ -308,6 +353,13 @@ func testHttpHandler() *mux.Router {
 	r.HandleFunc("/jwk.json", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, jwkTestJson)
 	})
+	r.HandleFunc("/compressed", func(w http.ResponseWriter, r *http.Request) {
+		response := "This is a compressed response"
+		w.Header().Set("Content-Encoding", "gzip")
+		gz := gzip.NewWriter(w)
+		json.NewEncoder(gz).Encode(response)
+		gz.Close()
+	})
 	r.HandleFunc("/bundles/{rest:.*}", bundleHandleFunc)
 	r.HandleFunc("/{rest:.*}", handleMethod(""))
 
@@ -333,15 +385,15 @@ func withAuth(r *http.Request) *http.Request {
 	return r
 }
 
-// TODO: replace with /tyk/keys/create call
+// Deprecated: Use Test.CreateSession instead.
 func CreateSession(sGen ...func(s *user.SessionState)) string {
-	key := generateToken("", "")
+	key := generateToken("default", "")
 	session := CreateStandardSession()
 	if len(sGen) > 0 {
 		sGen[0](session)
 	}
 	if session.Certificate != "" {
-		key = generateToken("", session.Certificate)
+		key = generateToken("default", session.Certificate)
 	}
 
 	FallbackKeySesionManager.UpdateSession(storage.HashKey(key), session, 60, config.Global().HashKeys)
@@ -359,6 +411,9 @@ func CreateStandardSession() *user.SessionState {
 	session.QuotaRenews = time.Now().Unix() + 20
 	session.QuotaRemaining = 10
 	session.QuotaMax = -1
+	session.Tags = []string{}
+	session.MetaData = make(map[string]interface{})
+	session.OrgID = "default"
 	return session
 }
 
@@ -378,6 +433,7 @@ func CreatePolicy(pGen ...func(p *user.Policy)) string {
 	pID := keyGen.GenerateAuthKey("")
 	pol := CreateStandardPolicy()
 	pol.ID = pID
+	pol.OrgID = "default"
 
 	if len(pGen) > 0 {
 		pGen[0](pol)
@@ -429,6 +485,46 @@ func createJWKTokenHMAC(jGen ...func(*jwt.Token)) string {
 	return tokenString
 }
 
+func TestReqBody(t testing.TB, body interface{}) io.Reader {
+	switch x := body.(type) {
+	case []byte:
+		return bytes.NewReader(x)
+	case string:
+		return strings.NewReader(x)
+	case io.Reader:
+		return x
+	case nil:
+		return nil
+	default: // JSON objects (structs)
+		bs, err := json.Marshal(x)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return bytes.NewReader(bs)
+	}
+}
+
+func TestReq(t testing.TB, method, urlStr string, body interface{}) *http.Request {
+	return httptest.NewRequest(method, urlStr, TestReqBody(t, body))
+}
+
+func CreateDefinitionFromString(defStr string) *APISpec {
+	loader := APIDefinitionLoader{}
+	def := loader.ParseDefinition(strings.NewReader(defStr))
+	spec := loader.MakeSpec(def, nil)
+	return spec
+}
+
+func CreateSpecTest(t testing.TB, def string) *APISpec {
+	spec := CreateDefinitionFromString(def)
+	tname := t.Name()
+	redisStore := &storage.RedisCluster{KeyPrefix: tname + "-apikey."}
+	healthStore := &storage.RedisCluster{KeyPrefix: tname + "-apihealth."}
+	orgStore := &storage.RedisCluster{KeyPrefix: tname + "-orgKey."}
+	spec.Init(redisStore, redisStore, healthStore, orgStore)
+	return spec
+}
+
 func firstVals(vals map[string][]string) map[string]string {
 	m := make(map[string]string, len(vals))
 	for k, vs := range vals {
@@ -439,55 +535,46 @@ func firstVals(vals map[string][]string) map[string]string {
 
 type TestConfig struct {
 	sepatateControlAPI bool
-	delay              time.Duration
-	hotReload          bool
+	Delay              time.Duration
+	HotReload          bool
 	overrideDefaults   bool
-	coprocessConfig    config.CoProcessConfig
+	CoprocessConfig    config.CoProcessConfig
 }
 
 type Test struct {
-	ln  net.Listener
-	cln net.Listener
 	URL string
 
 	testRunner   *test.HTTPTestRunner
 	GlobalConfig config.Config
 	config       TestConfig
+	cacnel       func()
 }
 
 func (s *Test) Start() {
-	s.ln, _ = generateListener(0)
-	_, port, _ := net.SplitHostPort(s.ln.Addr().String())
+	l, _ := net.Listen("tcp", "127.0.0.1:0")
+	_, port, _ := net.SplitHostPort(l.Addr().String())
+	l.Close()
 	globalConf := config.Global()
 	globalConf.ListenPort, _ = strconv.Atoi(port)
 
 	if s.config.sepatateControlAPI {
-		s.cln, _ = net.Listen("tcp", "127.0.0.1:0")
+		l, _ := net.Listen("tcp", "127.0.0.1:0")
 
-		_, port, _ = net.SplitHostPort(s.cln.Addr().String())
+		_, port, _ = net.SplitHostPort(l.Addr().String())
+		l.Close()
 		globalConf.ControlAPIPort, _ = strconv.Atoi(port)
 	}
-
-	globalConf.CoProcessOptions = s.config.coprocessConfig
-
+	globalConf.CoProcessOptions = s.config.CoprocessConfig
 	config.SetGlobal(globalConf)
 
-	setupGlobals()
-	// This is emulate calling start()
-	// But this lines is the only thing needed for this tests
-	if config.Global().ControlAPIPort == 0 {
-		loadAPIEndpoints(mainRouter)
-	}
+	startServer()
+	ctx, cancel := context.WithCancel(context.Background())
+	s.cacnel = cancel
+	setupGlobals(ctx)
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.Global().SupressDefaultOrgStore {
 		DefaultOrgStore.Init(getGlobalStorageHandler("orgkey.", false))
 		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
-	}
-
-	if s.config.hotReload {
-		listen(s.ln, s.cln, nil)
-	} else {
-		listen(s.ln, s.cln, fmt.Errorf("Without goagain"))
 	}
 
 	s.GlobalConfig = globalConf
@@ -496,14 +583,14 @@ func (s *Test) Start() {
 	if s.GlobalConfig.HttpServerOptions.UseSSL {
 		scheme = "https://"
 	}
-	s.URL = scheme + s.ln.Addr().String()
+	s.URL = scheme + mainProxy().listener.Addr().String()
 
 	s.testRunner = &test.HTTPTestRunner{
 		RequestBuilder: func(tc *test.TestCase) (*http.Request, error) {
 			tc.BaseURL = s.URL
 			if tc.ControlRequest {
 				if s.config.sepatateControlAPI {
-					tc.BaseURL = scheme + s.cln.Addr().String()
+					tc.BaseURL = scheme + controlProxy().listener.Addr().String()
 				} else if s.GlobalConfig.ControlAPIHostname != "" {
 					tc.Domain = s.GlobalConfig.ControlAPIHostname
 				}
@@ -514,8 +601,8 @@ func (s *Test) Start() {
 				r = withAuth(r)
 			}
 
-			if s.config.delay > 0 {
-				tc.Delay = s.config.delay
+			if s.config.Delay > 0 {
+				tc.Delay = s.config.Delay
 			}
 
 			return r, err
@@ -530,10 +617,11 @@ func (s *Test) Do(tc test.TestCase) (*http.Response, error) {
 }
 
 func (s *Test) Close() {
-	s.ln.Close()
-
+	if s.cacnel != nil {
+		s.cacnel()
+	}
+	defaultProxyMux.swap(&proxyMux{})
 	if s.config.sepatateControlAPI {
-		s.cln.Close()
 		globalConf := config.Global()
 		globalConf.ControlAPIPort = 0
 		config.SetGlobal(globalConf)
@@ -544,7 +632,9 @@ func (s *Test) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, er
 	return s.testRunner.Run(t, testCases...)
 }
 
+//TODO:(gernest) when hot reload is suppored enable this.
 func (s *Test) RunExt(t testing.TB, testCases ...test.TestCase) {
+	s.Run(t, testCases...)
 	var testMatrix = []struct {
 		goagain          bool
 		overrideDefaults bool
@@ -556,7 +646,7 @@ func (s *Test) RunExt(t testing.TB, testCases ...test.TestCase) {
 	}
 
 	for i, m := range testMatrix {
-		s.config.hotReload = m.goagain
+		s.config.HotReload = m.goagain
 		s.config.overrideDefaults = m.overrideDefaults
 
 		if i > 0 {
@@ -571,36 +661,36 @@ func (s *Test) RunExt(t testing.TB, testCases ...test.TestCase) {
 	}
 }
 
-func (s *Test) createSession(sGen ...func(s *user.SessionState)) string {
+func (s *Test) CreateSession(sGen ...func(s *user.SessionState)) (*user.SessionState, string) {
 	session := CreateStandardSession()
 	if len(sGen) > 0 {
 		sGen[0](session)
 	}
 
 	resp, err := s.Do(test.TestCase{
-		Method: "POST",
-		Path:   "/tyk/keys/create",
-		Data:   session,
+		Method:    http.MethodPost,
+		Path:      "/tyk/keys/create",
+		Data:      session,
+		AdminAuth: true,
 	})
 
 	if err != nil {
 		log.Fatal("Error while creating session:", err)
-		return ""
+		return nil, ""
 	}
 
-	respJSON := apiModifyKeySuccess{}
-	err = json.NewDecoder(resp.Body).Decode(&respJSON)
+	keySuccess := apiModifyKeySuccess{}
+	err = json.NewDecoder(resp.Body).Decode(&keySuccess)
 	if err != nil {
-		log.Fatal("Error while serializing session:", err)
-		return ""
+		log.Fatal("Error while decoding session response:", err)
+		return nil, ""
 	}
-	resp.Body.Close()
 
-	return respJSON.Key
+	return session, keySuccess.Key
 }
 
-func StartTest(config ...TestConfig) Test {
-	t := Test{}
+func StartTest(config ...TestConfig) *Test {
+	t := &Test{}
 	if len(config) > 0 {
 		t.config = config[0]
 	}
@@ -611,6 +701,7 @@ func StartTest(config ...TestConfig) Test {
 
 const sampleAPI = `{
     "api_id": "test",
+	"org_id": "default",
     "use_keyless": true,
     "definition": {
         "location": "header",
@@ -630,7 +721,7 @@ const sampleAPI = `{
     },
     "proxy": {
         "listen_path": "/sample",
-        "target_url": "` + testHttpAny + `"
+        "target_url": "` + TestHttpAny + `"
     }
 }`
 
@@ -668,7 +759,6 @@ func LoadAPI(specs ...*APISpec) (out []*APISpec) {
 	oldPath := globalConf.AppPath
 	globalConf.AppPath, _ = ioutil.TempDir("", "apps")
 	config.SetGlobal(globalConf)
-
 	defer func() {
 		globalConf := config.Global()
 		os.RemoveAll(globalConf.AppPath)
@@ -794,7 +884,7 @@ func initProxy(proto string, tlsConfig *tls.Config) *httpProxyHandler {
 	return proxy
 }
 
-func generateTestBinaryData() (buf *bytes.Buffer) {
+func GenerateTestBinaryData() (buf *bytes.Buffer) {
 	buf = new(bytes.Buffer)
 	type testData struct {
 		a float32

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"runtime/pprof"
 	"strconv"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -170,11 +172,17 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, resp
 			// mw_redis_cache instead? is there a reason not
 			// to include that in the analytics?
 			if responseCopy != nil {
+				contents, err := ioutil.ReadAll(responseCopy.Body)
+				if err != nil {
+					log.Error("Couldn't read response body", err)
+				}
+
 				responseCopy.Body = respBodyReader(r, responseCopy)
 
 				// Get the wire format representation
 				var wireFormatRes bytes.Buffer
 				responseCopy.Write(&wireFormatRes)
+				responseCopy.Body = ioutil.NopCloser(bytes.NewBuffer(contents))
 				rawResponse = base64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
 			}
 		}
@@ -197,7 +205,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, resp
 			trackedPath,
 			r.URL.Path,
 			r.ContentLength,
-			r.Header.Get("User-Agent"),
+			r.Header.Get(headers.UserAgent),
 			t.Day(),
 			t.Month(),
 			t.Year(),
@@ -215,6 +223,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, resp
 			rawResponse,
 			ip,
 			GeoData{},
+			NetworkStats{},
 			tags,
 			alias,
 			trackEP,
@@ -288,8 +297,8 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	// Make sure we get the correct target URL
 	if s.Spec.Proxy.StripListenPath {
 		log.Debug("Stripping: ", s.Spec.Proxy.ListenPath)
-		r.URL.Path = strings.TrimPrefix(r.URL.Path, s.Spec.Proxy.ListenPath)
-		r.URL.RawPath = strings.TrimPrefix(r.URL.RawPath, s.Spec.Proxy.ListenPath)
+		r.URL.Path = s.Spec.StripListenPath(r, r.URL.Path)
+		r.URL.RawPath = s.Spec.StripListenPath(r, r.URL.RawPath)
 		log.Debug("Upstream Path is: ", r.URL.Path)
 	}
 
@@ -326,8 +335,8 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 
 	// Make sure we get the correct target URL
 	if s.Spec.Proxy.StripListenPath {
-		r.URL.Path = strings.TrimPrefix(r.URL.Path, s.Spec.Proxy.ListenPath)
-		r.URL.RawPath = strings.TrimPrefix(r.URL.RawPath, s.Spec.Proxy.ListenPath)
+		r.URL.Path = s.Spec.StripListenPath(r, r.URL.Path)
+		r.URL.RawPath = s.Spec.StripListenPath(r, r.URL.RawPath)
 	}
 
 	t1 := time.Now()

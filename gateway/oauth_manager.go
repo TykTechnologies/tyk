@@ -7,15 +7,17 @@ import (
 	"errors"
 	"math"
 	"net/http"
+	"net/url"
 	"time"
 
-	osin "github.com/lonelycode/osin"
+	"github.com/lonelycode/osin"
 	uuid "github.com/satori/go.uuid"
 	"golang.org/x/crypto/bcrypt"
 
 	"strconv"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -176,7 +178,7 @@ func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *htt
 // returns a response to the client and notifies the provider of the access request (in order to track identity against
 // OAuth tokens without revealing tokens before they are requested).
 func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(headers.ContentType, headers.ApplicationJSON)
 
 	// Handle response
 	resp := o.Manager.HandleAccess(r)
@@ -249,9 +251,39 @@ func (o *OAuthManager) HandleAuthorisation(r *http.Request, complete bool, sessi
 	return resp
 }
 
+// JSONToFormValues if r has header Content-Type set to application/json this
+// will decode request body as json to map[string]string and adds the key/value
+// pairs in r.Form.
+func JSONToFormValues(r *http.Request) error {
+	if r.Header.Get("Content-Type") == "application/json" {
+		var o map[string]string
+		err := json.NewDecoder(r.Body).Decode(&o)
+		if err != nil {
+			return err
+		}
+		if len(o) > 0 {
+			if r.Form == nil {
+				r.Form = make(url.Values)
+			}
+			for k, v := range o {
+				r.Form.Set(k, v)
+			}
+		}
+
+	}
+	return nil
+}
+
 // HandleAccess wraps an access request with osin's primitives
 func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 	resp := o.OsinServer.NewResponse()
+	// we are intentionally ignoring errors, because this is called again by
+	// osin.We are only doing this to ensure r.From is properly initialized incase
+	// r.ParseForm was success
+	r.ParseForm()
+	if err := JSONToFormValues(r); err != nil {
+		log.Errorf("trying to set url values decoded from json body :%v", err)
+	}
 	var username string
 	if ar := o.OsinServer.HandleAccessRequest(resp, r); ar != nil {
 
@@ -569,24 +601,21 @@ func (r *RedisOsinStorageInterface) GetPaginatedClientTokens(id string, page int
 
 	itemsPerPage := 100
 
-	if len(tokens) == 0 {
+	tokenNumber := len(tokens)
+
+	if tokenNumber == 0 {
 		return []OAuthClientToken{}, 0, nil
 	}
 
-	startIdx, endIdx := 0, itemsPerPage
-	if page > 1 {
-		startIdx = (page - 1) * itemsPerPage
-		endIdx += startIdx
+	startIdx := (page - 1) * itemsPerPage
+	endIdx := startIdx + itemsPerPage
 
-		// Make sure an "out of range" error never happens
-		n := len(tokens)
-		if endIdx > n {
-			endIdx = n
-		}
+	if tokenNumber < startIdx {
+		startIdx = tokenNumber
+	}
 
-		if startIdx > n {
-			startIdx = n
-		}
+	if tokenNumber < endIdx {
+		endIdx = tokenNumber
 	}
 
 	totalPages := int(math.Ceil(float64(len(tokens)) / float64(itemsPerPage)))

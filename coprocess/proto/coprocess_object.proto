@@ -1,6 +1,7 @@
 syntax = "proto3";
 
 import "coprocess_mini_request_object.proto";
+import "coprocess_response_object.proto";
 import "coprocess_session_state.proto";
 import "coprocess_common.proto";
 
@@ -13,6 +14,7 @@ message Object {
   SessionState session = 4;
   map<string, string> metadata = 5;
   map<string, string> spec = 6;
+  ResponseObject response = 7;
 }
 
 message Event {

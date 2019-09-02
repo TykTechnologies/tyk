@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
@@ -17,9 +17,6 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/coprocess"
 )
-
-// CoProcessName specifies the driver name.
-const CoProcessName = apidef.GrpcDriver
 
 // MessageType sets the default message type.
 var MessageType = coprocess.ProtobufMessage
@@ -36,7 +33,7 @@ func dialer(addr string, timeout time.Duration) (net.Conn, error) {
 	grpcUrl, err := url.Parse(config.Global().CoProcessOptions.CoProcessGRPCServer)
 	if err != nil {
 		log.WithFields(logrus.Fields{
-			"prefix": "coprocess-grpc",
+			"prefix": "coprocess",
 		}).Error(err)
 		return nil, err
 	}
@@ -44,7 +41,7 @@ func dialer(addr string, timeout time.Duration) (net.Conn, error) {
 	if grpcUrl == nil || config.Global().CoProcessOptions.CoProcessGRPCServer == "" {
 		errString := "No gRPC URL is set!"
 		log.WithFields(logrus.Fields{
-			"prefix": "coprocess-grpc",
+			"prefix": "coprocess",
 		}).Error(errString)
 		return nil, errors.New(errString)
 	}
@@ -58,7 +55,7 @@ func (d *GRPCDispatcher) DispatchObject(object *coprocess.Object) (*coprocess.Ob
 	newObject, err := grpcClient.Dispatch(context.Background(), object)
 	if err != nil {
 		log.WithFields(logrus.Fields{
-			"prefix": "coprocess-grpc",
+			"prefix": "coprocess",
 		}).Error(err)
 	}
 	return newObject, err
@@ -74,7 +71,7 @@ func (d *GRPCDispatcher) DispatchEvent(eventJSON []byte) {
 
 	if err != nil {
 		log.WithFields(logrus.Fields{
-			"prefix": "coprocess-grpc",
+			"prefix": "coprocess",
 		}).Error(err)
 	}
 }
@@ -87,6 +84,8 @@ func (d *GRPCDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, basePat
 
 // NewCoProcessDispatcher wraps all the actions needed for this CP.
 func NewCoProcessDispatcher() (coprocess.Dispatcher, error) {
+	MessageType = coprocess.ProtobufMessage
+	CoProcessName = apidef.GrpcDriver
 	if config.Global().CoProcessOptions.CoProcessGRPCServer == "" {
 		return nil, errors.New("No gRPC URL is set")
 	}
@@ -96,7 +95,7 @@ func NewCoProcessDispatcher() (coprocess.Dispatcher, error) {
 
 	if err != nil {
 		log.WithFields(logrus.Fields{
-			"prefix": "coprocess-grpc",
+			"prefix": "coprocess",
 		}).Error(err)
 		return nil, err
 	}

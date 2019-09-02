@@ -14,7 +14,10 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/sync/singleflight"
+
 	"github.com/TykTechnologies/murmur3"
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/storage"
@@ -28,8 +31,9 @@ const (
 // RedisCacheMiddleware is a caching middleware that will pull data from Redis instead of the upstream proxy
 type RedisCacheMiddleware struct {
 	BaseMiddleware
-	CacheStore storage.Handler
-	sh         SuccessHandler
+	CacheStore   storage.Handler
+	sh           SuccessHandler
+	singleFlight singleflight.Group
 }
 
 func (m *RedisCacheMiddleware) Name() string {
@@ -177,6 +181,11 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		errCreatingChecksum = true
 	} else {
 		retBlob, err = m.CacheStore.GetKey(key)
+		v, sfErr, _ := m.singleFlight.Do(key, func() (interface{}, error) {
+			return m.CacheStore.GetKey(key)
+		})
+		retBlob = v.(string)
+		err = sfErr
 	}
 
 	if err != nil {
@@ -185,22 +194,22 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		}
 		// Pass through to proxy AND CACHE RESULT
 
-		var reqVal *http.Response
+		var resVal *http.Response
 		if isVirtual {
 			log.Debug("This is a virtual function")
 			vp := VirtualEndpoint{BaseMiddleware: m.BaseMiddleware}
 			vp.Init()
-			reqVal = vp.ServeHTTPForCache(w, r, nil)
+			resVal = vp.ServeHTTPForCache(w, r, nil)
 		} else {
 			// This passes through and will write the value to the writer, but spit out a copy for the cache
 			log.Debug("Not virtual, passing")
-			reqVal = m.sh.ServeHTTPWithCache(w, r)
+			resVal = m.sh.ServeHTTPWithCache(w, r)
 		}
 
 		cacheThisRequest := true
 		cacheTTL := m.Spec.CacheOptions.CacheTimeout
 
-		if reqVal == nil {
+		if resVal == nil {
 			log.Warning("Upstream request must have failed, response is empty")
 			return nil, http.StatusOK
 		}
@@ -209,7 +218,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		if len(m.Spec.CacheOptions.CacheOnlyResponseCodes) > 0 {
 			foundCode := false
 			for _, code := range m.Spec.CacheOptions.CacheOnlyResponseCodes {
-				if code == reqVal.StatusCode {
+				if code == resVal.StatusCode {
 					foundCode = true
 					break
 				}
@@ -223,7 +232,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		if m.Spec.CacheOptions.EnableUpstreamCacheControl {
 			log.Debug("Upstream control enabled")
 			// Do we cache?
-			if reqVal.Header.Get(upstreamCacheHeader) == "" {
+			if resVal.Header.Get(upstreamCacheHeader) == "" {
 				log.Warning("Upstream cache action not found, not caching")
 				cacheThisRequest = false
 			}
@@ -233,7 +242,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 				cacheTTLHeader = m.Spec.CacheOptions.CacheControlTTLHeader
 			}
 
-			ttl := reqVal.Header.Get(cacheTTLHeader)
+			ttl := resVal.Header.Get(cacheTTLHeader)
 			if ttl != "" {
 				log.Debug("TTL Set upstream")
 				cacheAsInt, err := strconv.Atoi(ttl)
@@ -249,7 +258,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		if cacheThisRequest && !errCreatingChecksum {
 			log.Debug("Caching request to redis")
 			var wireFormatReq bytes.Buffer
-			reqVal.Write(&wireFormatReq)
+			resVal.Write(&wireFormatReq)
 			log.Debug("Cache TTL is:", cacheTTL)
 			ts := m.getTimeTTL(cacheTTL)
 			toStore := m.encodePayload(wireFormatReq.String(), ts)
@@ -290,9 +299,9 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	// Only add ratelimit data to keyed sessions
 	if session != nil {
 		quotaMax, quotaRemaining, _, quotaRenews := session.GetQuotaLimitByAPIID(m.Spec.APIID)
-		w.Header().Set(XRateLimitLimit, strconv.Itoa(int(quotaMax)))
-		w.Header().Set(XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
-		w.Header().Set(XRateLimitReset, strconv.Itoa(int(quotaRenews)))
+		w.Header().Set(headers.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
+		w.Header().Set(headers.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
+		w.Header().Set(headers.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
 	}
 	w.Header().Set("x-tyk-cached-response", "1")
 
@@ -311,7 +320,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	// Record analytics
 	if !m.Spec.DoNotTrack {
-		go m.sh.RecordHit(r, 0, newRes.StatusCode, newRes)
+		m.sh.RecordHit(r, 0, newRes.StatusCode, newRes)
 	}
 
 	// Stop any further execution

@@ -4,13 +4,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/config"
 )
 
 func TestGetLogEntryForRequest(t *testing.T) {
-	defer resetTestConfig()
+	defer ResetTestConfig()
 
 	testReq := httptest.NewRequest("GET", "http://tyk.io/test", nil)
 	testReq.RemoteAddr = "127.0.0.1:80"

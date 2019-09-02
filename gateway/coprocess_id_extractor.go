@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/mitchellh/mapstructure"
+	"github.com/sirupsen/logrus"
 	xmlpath "gopkg.in/xmlpath.v2"
 
 	"github.com/TykTechnologies/tyk/apidef"

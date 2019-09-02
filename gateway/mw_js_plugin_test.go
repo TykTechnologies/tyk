@@ -1,5 +1,3 @@
-// +build coprocess
-
 package gateway
 
 import (
@@ -12,7 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/sirupsen/logrus"
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -40,10 +41,10 @@ log('{"x": "y"}')
 rawlog("foo")
 rawlog('{"x": "y"}')
 `
-	// note how the logger leaves spaces at the end
+
 	want := []string{
-		`time=TIME level=info msg=foo type=log-msg `,
-		`time=TIME level=info msg="{\"x\": \"y\"}" type=log-msg `,
+		`time=TIME level=info msg=foo prefix=jsvm type=log-msg`,
+		`time=TIME level=info msg="{"x": "y"}" prefix=jsvm type=log-msg`,
 		`foo`,
 		`{"x": "y"}`,
 	}
@@ -105,6 +106,52 @@ leakMid.NewProcessRequest(function(request, session) {
 	if got := string(bs); want != got {
 		t.Fatalf("JS plugin broke non-UTF8 body %q into %q",
 			want, got)
+	}
+}
+
+func TestJSVMSessionMetadataUpdate(t *testing.T) {
+	dynMid := &DynamicMiddleware{
+		BaseMiddleware: BaseMiddleware{
+			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}},
+		},
+		MiddlewareClassName: "testJSVMMiddleware",
+		Pre:                 false,
+		UseSession:          true,
+	}
+	req := httptest.NewRequest("GET", "/foo", nil)
+	jsvm := JSVM{}
+	jsvm.Init(nil, logrus.NewEntry(log))
+
+	s := &user.SessionState{MetaData: make(map[string]interface{})}
+	s.MetaData["same"] = "same"
+	s.MetaData["updated"] = "old"
+	s.MetaData["removed"] = "dummy"
+	ctxSetSession(req, s, "", true)
+
+	const js = `
+var testJSVMMiddleware = new TykJS.TykMiddleware.NewMiddleware({});
+
+testJSVMMiddleware.NewProcessRequest(function(request, session) {
+	return testJSVMMiddleware.ReturnData(request, {same: "same", updated: "new"})
+});`
+	if _, err := jsvm.VM.Run(js); err != nil {
+		t.Fatalf("failed to set up js plugin: %v", err)
+	}
+	dynMid.Spec.JSVM = jsvm
+	_, _ = dynMid.ProcessRequest(nil, req, nil)
+
+	updatedSession := ctx.GetSession(req)
+
+	if updatedSession.MetaData["same"] != "same" {
+		t.Fatal("Failed to update session metadata for same")
+	}
+
+	if updatedSession.MetaData["updated"] != "new" {
+		t.Fatal("Failed to update session metadata for updated")
+	}
+
+	if updatedSession.MetaData["removed"] != nil {
+		t.Fatal("Failed to update session metadata for removed")
 	}
 }
 
@@ -172,7 +219,7 @@ testJSVMData.NewProcessRequest(function(request, session, spec) {
 	}
 	dynMid.Spec.JSVM = jsvm
 
-	r := testReq(t, "GET", "/v1/test-data", nil)
+	r := TestReq(t, "GET", "/v1/test-data", nil)
 	dynMid.ProcessRequest(nil, r, nil)
 	if want, got := "bar", r.Header.Get("data-foo"); want != got {
 		t.Fatalf("wanted header to be %q, got %q", want, got)
@@ -209,7 +256,7 @@ testJSVMData.NewProcessRequest(function(request, session, config) {
 	dynMid.Spec.JSVM = jsvm
 
 	rec := httptest.NewRecorder()
-	r := testReq(t, "GET", "/v1/test-data", nil)
+	r := TestReq(t, "GET", "/v1/test-data", nil)
 	dynMid.ProcessRequest(rec, r, nil)
 
 	wantBody := "Foobarbaz"
@@ -254,7 +301,7 @@ testJSVMData.NewProcessRequest(function(request, session, config) {
 	}
 	dynMid.Spec.JSVM = jsvm
 
-	r := testReq(t, "GET", "/v1/test-data", nil)
+	r := TestReq(t, "GET", "/v1/test-data", nil)
 	err, code := dynMid.ProcessRequest(nil, r, nil)
 
 	if want := 401; code != 401 {
@@ -303,7 +350,7 @@ testJSVMCore.NewProcessRequest(function(request, session, config) {
 	}
 	dynMid.Spec.JSVM = jsvm
 
-	r := testReq(t, "GET", "/foo", nil)
+	r := TestReq(t, "GET", "/foo", nil)
 	dynMid.ProcessRequest(nil, r, nil)
 
 	if want, got := "globalValue", r.Header.Get("global"); want != got {
@@ -354,7 +401,7 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
 
-	bundle := registerBundle("jsvm_make_http_request", map[string]string{
+	bundle := RegisterBundle("jsvm_make_http_request", map[string]string{
 		"manifest.json": `
 		{
 		    "file_list": [],
@@ -446,7 +493,7 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 
 		ts := StartTest()
 		defer ts.Close()
-		defer resetTestConfig()
+		defer ResetTestConfig()
 
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/sample"

@@ -66,6 +66,6 @@ For more information about contributing PRs and issues, see [CONTRIBUTING.md](CO
 ### Roadmap
 
 To coordinate development and be completely transparent as to where the project is going, the version roadmap for the next version, as well as proposed features
-and adopted proposals can be viewed on our public [Trello board](https://trello.com/b/59d5kAZ5/tyk-api-gateway-roadmap).
+and adopted proposals can be viewed on our public [Tyk Roadmap Repository](https://github.com/TykTechnologies/tyk-roadmap).
 
-Any proposals can be made in the Github issue tracker. Proposals that are adopted will be placed into trello and then moved according to their status.
+Any proposals can be made in the Github issue tracker. Proposals that are adopted will be placed into roadmap.

@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	circuit "github.com/rubyist/circuitbreaker"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -169,7 +169,7 @@ func (l *LogMessageEventHandler) Init(handlerConf interface{}) error {
 	conf := handlerConf.(map[string]interface{})
 	l.prefix = conf["prefix"].(string)
 	l.logger = log
-	if runningTests {
+	if isRunningTests() {
 		logger, ok := conf["logger"]
 		if ok {
 			l.logger = logger.(*logrus.Logger)

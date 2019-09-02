@@ -3,6 +3,7 @@ package apidef
 import (
 	"encoding/base64"
 	"encoding/json"
+	"encoding/xml"
 	"text/template"
 
 	"github.com/clbanning/mxj"
@@ -270,6 +271,7 @@ type MiddlewareDefinition struct {
 	Name           string `bson:"name" json:"name"`
 	Path           string `bson:"path" json:"path"`
 	RequireSession bool   `bson:"require_session" json:"require_session"`
+	RawBodyOnly    bool   `bson:"raw_body_only" json:"raw_body_only"`
 }
 
 type MiddlewareIdExtractor struct {
@@ -304,10 +306,19 @@ type ResponseProcessor struct {
 }
 
 type HostCheckObject struct {
-	CheckURL string            `bson:"url" json:"url"`
-	Method   string            `bson:"method" json:"method"`
-	Headers  map[string]string `bson:"headers" json:"headers"`
-	Body     string            `bson:"body" json:"body"`
+	CheckURL            string            `bson:"url" json:"url"`
+	Protocol            string            `bson:"protocol" json:"protocol"`
+	Timeout             time.Duration     `bson:"timeout" json:"timeout"`
+	EnableProxyProtocol bool              `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
+	Commands            []CheckCommand    `bson:"commands" json:"commands"`
+	Method              string            `bson:"method" json:"method"`
+	Headers             map[string]string `bson:"headers" json:"headers"`
+	Body                string            `bson:"body" json:"body"`
+}
+
+type CheckCommand struct {
+	Name    string `bson:"name" json:"name"`
+	Message string `bson:"message" json:"message"`
 }
 
 type ServiceDiscoveryConfiguration struct {
@@ -337,16 +348,19 @@ type OpenIDOptions struct {
 //
 // swagger:model
 type APIDefinition struct {
-	Id               bson.ObjectId `bson:"_id,omitempty" json:"id,omitempty"`
-	Name             string        `bson:"name" json:"name"`
-	Slug             string        `bson:"slug" json:"slug"`
-	APIID            string        `bson:"api_id" json:"api_id"`
-	OrgID            string        `bson:"org_id" json:"org_id"`
-	UseKeylessAccess bool          `bson:"use_keyless" json:"use_keyless"`
-	UseOauth2        bool          `bson:"use_oauth2" json:"use_oauth2"`
-	UseOpenID        bool          `bson:"use_openid" json:"use_openid"`
-	OpenIDOptions    OpenIDOptions `bson:"openid_options" json:"openid_options"`
-	Oauth2Meta       struct {
+	Id                  bson.ObjectId `bson:"_id,omitempty" json:"id,omitempty"`
+	Name                string        `bson:"name" json:"name"`
+	Slug                string        `bson:"slug" json:"slug"`
+	ListenPort          int           `bson:"listen_port" json:"listen_port"`
+	Protocol            string        `bson:"protocol" json:"protocol"`
+	EnableProxyProtocol bool          `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
+	APIID               string        `bson:"api_id" json:"api_id"`
+	OrgID               string        `bson:"org_id" json:"org_id"`
+	UseKeylessAccess    bool          `bson:"use_keyless" json:"use_keyless"`
+	UseOauth2           bool          `bson:"use_oauth2" json:"use_oauth2"`
+	UseOpenID           bool          `bson:"use_openid" json:"use_openid"`
+	OpenIDOptions       OpenIDOptions `bson:"openid_options" json:"openid_options"`
+	Oauth2Meta          struct {
 		AllowedAccessTypes     []osin.AccessRequestType    `bson:"allowed_access_types" json:"allowed_access_types"`
 		AllowedAuthorizeTypes  []osin.AuthorizeRequestType `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
 		AuthorizeLoginRedirect string                      `bson:"auth_login_redirect" json:"auth_login_redirect"`
@@ -373,6 +387,7 @@ type APIDefinition struct {
 	JWTIdentityBaseField       string               `bson:"jwt_identit_base_field" json:"jwt_identity_base_field"`
 	JWTClientIDBaseField       string               `bson:"jwt_client_base_field" json:"jwt_client_base_field"`
 	JWTPolicyFieldName         string               `bson:"jwt_policy_field_name" json:"jwt_policy_field_name"`
+	JWTDefaultPolicies         []string             `bson:"jwt_default_policies" json:"jwt_default_policies"`
 	JWTIssuedAtValidationSkew  uint64               `bson:"jwt_issued_at_validation_skew" json:"jwt_issued_at_validation_skew"`
 	JWTExpiresAtValidationSkew uint64               `bson:"jwt_expires_at_validation_skew" json:"jwt_expires_at_validation_skew"`
 	JWTNotBeforeValidationSkew uint64               `bson:"jwt_not_before_validation_skew" json:"jwt_not_before_validation_skew"`
@@ -383,6 +398,7 @@ type APIDefinition struct {
 	EnableSignatureChecking    bool                 `bson:"enable_signature_checking" json:"enable_signature_checking"`
 	HmacAllowedClockSkew       float64              `bson:"hmac_allowed_clock_skew" json:"hmac_allowed_clock_skew"`
 	HmacAllowedAlgorithms      []string             `bson:"hmac_allowed_algorithms" json:"hmac_allowed_algorithms"`
+	RequestSigning             RequestSigningMeta   `bson:"request_signing" json:"request_signing"`
 	BaseIdentityProvidedBy     AuthTypeEnum         `bson:"base_identity_provided_by" json:"base_identity_provided_by"`
 	VersionDefinition          struct {
 		Location  string `bson:"location" json:"location"`
@@ -491,6 +507,13 @@ type BundleManifest struct {
 	CustomMiddleware MiddlewareSection `bson:"custom_middleware" json:"custom_middleware"`
 	Checksum         string            `bson:"checksum" json:"checksum"`
 	Signature        string            `bson:"signature" json:"signature"`
+}
+
+type RequestSigningMeta struct {
+	IsEnabled bool   `bson:"is_enabled" json:"is_enabled"`
+	Secret    string `bson:"secret" json:"secret"`
+	KeyId     string `bson:"key_id" json:"key_id"`
+	Algorithm string `bson:"algorithm" json:"algorithm"`
 }
 
 // Clean will URL encode map[string]struct variables for saving
@@ -765,9 +788,16 @@ var Template = template.New("").Funcs(map[string]interface{}{
 		var xmlValue []byte
 		mv, ok := v.(mxj.Map)
 		if ok {
+			mxj.XMLEscapeChars(true)
 			xmlValue, err = mv.Xml()
 		} else {
-			xmlValue, err = mxj.Map(v.(map[string]interface{})).Xml()
+			res, ok := v.(map[string]interface{})
+			if ok {
+				mxj.XMLEscapeChars(true)
+				xmlValue, err = mxj.Map(res).Xml()
+			} else {
+				xmlValue, err = xml.MarshalIndent(v, "", "  ")
+			}
 		}
 
 		return string(xmlValue), err

@@ -41,14 +41,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
 	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -94,7 +95,7 @@ type paginatedOAuthClientTokens struct {
 }
 
 func doJSONWrite(w http.ResponseWriter, code int, obj interface{}) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(headers.ContentType, headers.ApplicationJSON)
 	w.WriteHeader(code)
 	if err := json.NewEncoder(w).Encode(obj); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -109,6 +110,22 @@ type MethodNotAllowedHandler struct{}
 
 func (m MethodNotAllowedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, http.StatusMethodNotAllowed, apiError("Method not supported"))
+}
+
+func addSecureAndCacheHeaders(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Setting OWASP Secure Headers
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-XSS-Protection", "1; mode=block")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
+
+		// Avoid Caching of tokens
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
+		next(w, r)
+	}
 }
 
 func allowMethods(next http.HandlerFunc, methods ...string) http.HandlerFunc {
@@ -313,6 +330,7 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 
 	// get original session in case of update and preserve fields that SHOULD NOT be updated
 	originalKey := user.SessionState{}
+	originalKeyName := keyName
 	if r.Method == http.MethodPut {
 		found := false
 		for apiID := range newSession.AccessRights {
@@ -348,6 +366,9 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 				}
 			}
 		}
+	} else {
+		newSession.DateCreated = time.Now()
+		keyName = generateToken(newSession.OrgID, keyName)
 	}
 
 	// Update our session object (create it)
@@ -356,7 +377,6 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 		// Only if it's NEW
 		switch r.Method {
 		case http.MethodPost:
-			keyName = generateToken(newSession.OrgID, keyName)
 			// It's a create, so lets hash the password
 			setSessionPassword(&newSession)
 		case http.MethodPut:
@@ -387,7 +407,7 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 	})
 
 	response := apiModifyKeySuccess{
-		Key:    keyName,
+		Key:    originalKeyName,
 		Status: "ok",
 		Action: action,
 	}
@@ -423,6 +443,9 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 		return apiError("Key not found"), http.StatusNotFound
 	}
 
+	mw := BaseMiddleware{Spec: spec}
+	mw.ApplyPolicies(&session)
+
 	quotaKey := QuotaKeyPrefix + storage.HashKey(sessionKey)
 	if byHash {
 		quotaKey = QuotaKeyPrefix + sessionKey
@@ -440,7 +463,7 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix":  "api",
-			"key":     obfuscateKey(sessionKey),
+			"key":     obfuscateKey(quotaKey),
 			"message": err,
 			"status":  "ok",
 		}).Info("Can't retrieve key quota")
@@ -452,10 +475,16 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 			continue
 		}
 
-		limQuotaKey := QuotaKeyPrefix + id + "-" + storage.HashKey(sessionKey)
-		if byHash {
-			limQuotaKey = QuotaKeyPrefix + id + "-" + sessionKey
+		quotaScope := ""
+		if access.AllowanceScope != "" {
+			quotaScope = access.AllowanceScope + "-"
 		}
+
+		limQuotaKey := QuotaKeyPrefix + quotaScope + storage.HashKey(sessionKey)
+		if byHash {
+			limQuotaKey = QuotaKeyPrefix + quotaScope + sessionKey
+		}
+
 		if usedQuota, err := sessionManager.Store().GetRawKey(limQuotaKey); err == nil {
 			qInt, _ := strconv.Atoi(usedQuota)
 			remaining := access.Limit.QuotaMax - int64(qInt)
@@ -478,9 +507,6 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 			}).Info("Can't retrieve api limit quota")
 		}
 	}
-
-	mw := BaseMiddleware{Spec: spec}
-	mw.ApplyPolicies(&session)
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
@@ -552,7 +578,7 @@ func handleAddKey(keyName, hashedName, sessionString, apiID string) {
 	}).Info("Updated hashed key in slave storage.")
 }
 
-func handleDeleteKey(keyName, apiID string) (interface{}, int) {
+func handleDeleteKey(keyName, apiID string, resetQuota bool) (interface{}, int) {
 	if apiID == "-1" {
 		// Go through ALL managed API's and delete the key
 		apisMu.RLock()
@@ -598,7 +624,10 @@ func handleDeleteKey(keyName, apiID string) (interface{}, int) {
 		}).Error("Failed to remove the key")
 		return apiError("Failed to remove the key"), http.StatusBadRequest
 	}
-	sessionManager.ResetQuota(keyName, &user.SessionState{}, false)
+
+	if resetQuota {
+		sessionManager.ResetQuota(keyName, &user.SessionState{}, false)
+	}
 
 	statusObj := apiModifyKeySuccess{
 		Key:    keyName,
@@ -621,7 +650,7 @@ func handleDeleteKey(keyName, apiID string) (interface{}, int) {
 	return statusObj, http.StatusOK
 }
 
-func handleDeleteHashedKey(keyName, apiID string) (interface{}, int) {
+func handleDeleteHashedKey(keyName, apiID string, resetQuota bool) (interface{}, int) {
 	if apiID == "-1" {
 		// Go through ALL managed API's and delete the key
 		removed := false
@@ -663,6 +692,10 @@ func handleDeleteHashedKey(keyName, apiID string) (interface{}, int) {
 			"status": "fail",
 		}).Error("Failed to remove the key")
 		return apiError("Failed to remove the key"), http.StatusBadRequest
+	}
+
+	if resetQuota {
+		sessionManager.ResetQuota(keyName, &user.SessionState{}, true)
 	}
 
 	statusObj := apiModifyKeySuccess{
@@ -872,16 +905,16 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodDelete:
 		// Remove a key
 		if !isHashed {
-			obj, code = handleDeleteKey(keyName, apiID)
+			obj, code = handleDeleteKey(keyName, apiID, true)
 		} else {
-			obj, code = handleDeleteHashedKey(keyName, apiID)
+			obj, code = handleDeleteHashedKey(keyName, apiID, true)
 		}
 		if code != http.StatusOK && hashKeyFunction != "" {
 			// try to use legacy key format
 			if !isHashed {
-				obj, code = handleDeleteKey(origKeyName, apiID)
+				obj, code = handleDeleteKey(origKeyName, apiID, true)
 			} else {
-				obj, code = handleDeleteHashedKey(origKeyName, apiID)
+				obj, code = handleDeleteHashedKey(origKeyName, apiID, true)
 			}
 		}
 	}
@@ -1189,6 +1222,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
+	newSession.DateCreated = time.Now()
 
 	if len(newSession.AccessRights) > 0 {
 		// reset API-level limit to nil if any has a zero-value

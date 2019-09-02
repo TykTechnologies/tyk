@@ -185,18 +185,12 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/coprocess"
 )
-
-// CoProcessName declares the driver name.
-const CoProcessName = apidef.PythonDriver
-
-// MessageType sets the default message type.
-var MessageType = coprocess.ProtobufMessage
 
 // PythonDispatcher implements a coprocess.Dispatcher
 type PythonDispatcher struct {
@@ -303,6 +297,12 @@ func getBundlePaths() []string {
 
 // NewCoProcessDispatcher wraps all the actions needed for this CP.
 func NewCoProcessDispatcher() (dispatcher coprocess.Dispatcher, err error) {
+	// MessageType sets the default message type.
+	MessageType = coprocess.ProtobufMessage
+
+	// CoProcessName declares the driver name.
+	CoProcessName = apidef.PythonDriver
+
 	workDir := config.Global().CoProcessOptions.PythonPathPrefix
 
 	dispatcherPath := filepath.Join(workDir, "coprocess", "python")

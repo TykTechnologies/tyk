@@ -77,7 +77,7 @@ const apiDefListTest = `[{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "` + testHttpAny + `"
+		"target_url": "` + TestHttpAny + `"
 	}
 }]`
 
@@ -95,7 +95,7 @@ const apiDefListTest2 = `[{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "` + testHttpAny + `"
+		"target_url": "` + TestHttpAny + `"
 	}
 },
 {
@@ -112,11 +112,15 @@ const apiDefListTest2 = `[{
 	},
 	"proxy": {
 		"listen_path": "/v2",
-		"target_url": "` + testHttpAny + `"
+		"target_url": "` + TestHttpAny + `"
 	}
 }]`
 
 func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+	defer ResetTestConfig()
+
 	// Test RPC
 	callCount := 0
 	dispatcher := gorpc.NewDispatcher()
@@ -159,12 +163,11 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 	if *cli.HTTPProfile {
 		exp = []int{4, 6, 8, 8, 4}
 	}
-
 	for _, e := range exp {
 		doReload()
 
 		rtCnt := 0
-		mainRouter.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
+		mainRouter().Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
 			rtCnt += 1
 			//fmt.Println(route.GetPathTemplate())
 			return nil
@@ -258,7 +261,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		// Wait for backup to load
 		time.Sleep(100 * time.Millisecond)
 		select {
-		case reloadTick <- time.Time{}:
+		case ReloadTick <- time.Time{}:
 		case <-time.After(100 * time.Millisecond):
 		}
 		time.Sleep(100 * time.Millisecond)

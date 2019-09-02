@@ -43,6 +43,7 @@ type TestCase struct {
 
 func AssertResponse(resp *http.Response, tc *TestCase) error {
 	body, _ := ioutil.ReadAll(resp.Body)
+	resp.Body = ioutil.NopCloser(bytes.NewBuffer(body))
 	defer resp.Body.Close()
 
 	if tc.Code != 0 && resp.StatusCode != tc.Code {
@@ -137,7 +138,6 @@ func NewRequest(tc *TestCase) (req *http.Request, err error) {
 	if tc.BaseURL != "" {
 		uri = tc.BaseURL + tc.Path
 	}
-
 	if strings.HasPrefix(uri, "http") {
 		uri = strings.Replace(uri, "[::]", tc.Domain, 1)
 		uri = strings.Replace(uri, "127.0.0.1", tc.Domain, 1)
