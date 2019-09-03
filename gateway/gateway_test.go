@@ -720,7 +720,7 @@ func TestListener(t *testing.T) {
 // Admin api located on separate port
 func TestControlListener(t *testing.T) {
 	ts := StartTest(TestConfig{
-		sepatateControlAPI: true,
+		separateControlAPI: true,
 	})
 	defer ts.Close()
 
@@ -744,7 +744,7 @@ func TestHttpPprof(t *testing.T) {
 	defer func() { cli.HTTPProfile = old }()
 
 	ts := StartTest(TestConfig{
-		sepatateControlAPI: true,
+		separateControlAPI: true,
 	})
 
 	ts.Run(t, []test.TestCase{

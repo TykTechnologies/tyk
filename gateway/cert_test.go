@@ -127,7 +127,6 @@ func TestGatewayTLS(t *testing.T) {
 }
 
 func TestGatewayControlAPIMutualTLS(t *testing.T) {
-	// Configure server
 	serverCertPem, _, combinedPEM, _ := test.GenServerCertificate()
 
 	// make global config changes
@@ -145,7 +144,6 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 
 	clientCertPem, _, _, clientCert := test.GenCertificate(&x509.Certificate{})
 	clientWithCert := GetTLSClient(&clientCert, serverCertPem)
-
 	clientWithoutCert := GetTLSClient(nil, nil)
 
 	t.Run("Separate domain", func(t *testing.T) {
@@ -158,7 +156,7 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 		globalConf.Security.Certificates.ControlAPI = []string{certID}
 		config.SetGlobal(globalConf)
 
-		ts := StartTest()
+		ts := StartTest(TestConfig{separateControlAPI: true})
 		defer ts.Close()
 
 		defer func() {
