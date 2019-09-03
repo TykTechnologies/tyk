@@ -77,7 +77,7 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 	}
 
 	newRequest.Header.Set("authorization", secret)
-	newRequest.Header.Set("x-tyk-nodeid", getNodeID())
+	newRequest.Header.Set("x-tyk-nodeid", GetNodeID())
 
 	newRequest.Header.Set("x-tyk-nonce", ServiceNonce)
 

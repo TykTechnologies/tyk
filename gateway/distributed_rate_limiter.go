@@ -15,7 +15,7 @@ var DRLManager = &drl.DRL{}
 func setupDRL() {
 	drlManager := &drl.DRL{}
 	drlManager.Init()
-	drlManager.ThisServerID = getNodeID() + "|" + hostDetails.Hostname
+	drlManager.ThisServerID = GetNodeID() + "|" + hostDetails.Hostname
 	log.Debug("DRL: Setting node ID: ", drlManager.ThisServerID)
 	DRLManager = drlManager
 }
@@ -29,7 +29,7 @@ func startRateLimitNotifications() {
 	go func() {
 		log.Info("Starting gateway rate limiter notifications...")
 		for {
-			if getNodeID() != "" {
+			if GetNodeID() != "" {
 				NotifyCurrentServerStatus()
 			} else {
 				log.Warning("Node not registered yet, skipping DRL Notification")
@@ -60,7 +60,7 @@ func NotifyCurrentServerStatus() {
 
 	server := drl.Server{
 		HostName:   hostDetails.Hostname,
-		ID:         getNodeID(),
+		ID:         GetNodeID(),
 		LoadPerSec: rate,
 		TagHash:    getTagHash(),
 	}
