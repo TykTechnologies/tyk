@@ -673,7 +673,7 @@ func TestControlListener(t *testing.T) {
 	}
 
 	ts.RunExt(t, tests...)
-	doReload()
+	DoReload()
 	ts.RunExt(t, tests...)
 }
 
@@ -754,7 +754,7 @@ func TestReloadGoroutineLeakWithAsyncWrites(t *testing.T) {
 
 	before := runtime.NumGoroutine()
 
-	LoadAPI(specs...) // just doing doReload() doesn't load anything as BuildAndLoadAPI cleans up folder with API specs
+	LoadAPI(specs...) // just doing DoReload() doesn't load anything as BuildAndLoadAPI cleans up folder with API specs
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -794,7 +794,7 @@ func TestReloadGoroutineLeakWithCircuitBreaker(t *testing.T) {
 
 	before := runtime.NumGoroutine()
 
-	LoadAPI(specs...) // just doing doReload() doesn't load anything as BuildAndLoadAPI cleans up folder with API specs
+	LoadAPI(specs...) // just doing DoReload() doesn't load anything as BuildAndLoadAPI cleans up folder with API specs
 
 	time.Sleep(100 * time.Millisecond)
 

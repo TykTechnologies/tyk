@@ -667,7 +667,7 @@ func rpcReloadLoop(rpcKey string) {
 
 var reloadMu sync.Mutex
 
-func doReload() {
+func DoReload() {
 	reloadMu.Lock()
 	defer reloadMu.Unlock()
 
@@ -712,7 +712,7 @@ func reloadLoop(tick <-chan time.Time) {
 	<-tick
 	for range startReloadChan {
 		mainLog.Info("reload: initiating")
-		doReload()
+		DoReload()
 		mainLog.Info("reload: complete")
 
 		mainLog.Info("Initiating coprocess reload")
@@ -1082,7 +1082,7 @@ func Start() {
 	// Example: https://gravitational.com/blog/golang-ssh-bastion-graceful-restarts/
 	startServer()
 	if !rpc.IsEmergencyMode() {
-		doReload()
+		DoReload()
 	}
 	if again.Child() {
 		// This is a child process, we need to murder the parent now
@@ -1249,6 +1249,6 @@ func startServer() {
 	mainLog.Info("--> Listening on port: ", config.Global().ListenPort)
 	mainLog.Info("--> PID: ", hostDetails.PID)
 	if !rpc.IsEmergencyMode() {
-		doReload()
+		DoReload()
 	}
 }
