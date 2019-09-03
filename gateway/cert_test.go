@@ -710,11 +710,6 @@ func TestProxyTransport(t *testing.T) {
 	}))
 	defer upstream.Close()
 
-	globalConf := config.Global()
-	globalConf.ProxySSLInsecureSkipVerify = true
-	// force creating new transport on each reque
-	globalConf.MaxConnTime = -1
-	config.SetGlobal(globalConf)
 	defer ResetTestConfig()
 
 	ts := StartTest()
@@ -722,6 +717,11 @@ func TestProxyTransport(t *testing.T) {
 
 	//matching ciphers
 	t.Run("Global: Cipher match", func(t *testing.T) {
+		globalConf := config.Global()
+		globalConf.ProxySSLInsecureSkipVerify = true
+		// force creating new transport on each reque
+		globalConf.MaxConnTime = -1
+
 		globalConf.ProxySSLCipherSuites = []string{"TLS_RSA_WITH_AES_128_CBC_SHA"}
 		config.SetGlobal(globalConf)
 		BuildAndLoadAPI(func(spec *APISpec) {
@@ -732,6 +732,11 @@ func TestProxyTransport(t *testing.T) {
 	})
 
 	t.Run("Global: Cipher not match", func(t *testing.T) {
+		globalConf := config.Global()
+		globalConf.ProxySSLInsecureSkipVerify = true
+		// force creating new transport on each reque
+		globalConf.MaxConnTime = -1
+
 		globalConf.ProxySSLCipherSuites = []string{"TLS_RSA_WITH_RC4_128_SHA"}
 		config.SetGlobal(globalConf)
 		BuildAndLoadAPI(func(spec *APISpec) {
@@ -742,6 +747,11 @@ func TestProxyTransport(t *testing.T) {
 	})
 
 	t.Run("API: Cipher override", func(t *testing.T) {
+		globalConf := config.Global()
+		globalConf.ProxySSLInsecureSkipVerify = true
+		// force creating new transport on each reque
+		globalConf.MaxConnTime = -1
+
 		globalConf.ProxySSLCipherSuites = []string{"TLS_RSA_WITH_RC4_128_SHA"}
 		config.SetGlobal(globalConf)
 		BuildAndLoadAPI(func(spec *APISpec) {
@@ -754,6 +764,11 @@ func TestProxyTransport(t *testing.T) {
 	})
 
 	t.Run("API: MinTLS not match", func(t *testing.T) {
+		globalConf := config.Global()
+		globalConf.ProxySSLInsecureSkipVerify = true
+		// force creating new transport on each reque
+		globalConf.MaxConnTime = -1
+
 		globalConf.ProxySSLMinVersion = 772
 		config.SetGlobal(globalConf)
 		BuildAndLoadAPI(func(spec *APISpec) {
@@ -766,6 +781,11 @@ func TestProxyTransport(t *testing.T) {
 	})
 
 	t.Run("API: Invalid proxy", func(t *testing.T) {
+		globalConf := config.Global()
+		globalConf.ProxySSLInsecureSkipVerify = true
+		// force creating new transport on each reque
+		globalConf.MaxConnTime = -1
+
 		globalConf.ProxySSLMinVersion = 771
 		config.SetGlobal(globalConf)
 		BuildAndLoadAPI(func(spec *APISpec) {
@@ -780,6 +800,11 @@ func TestProxyTransport(t *testing.T) {
 	})
 
 	t.Run("API: Valid proxy", func(t *testing.T) {
+		globalConf := config.Global()
+		globalConf.ProxySSLInsecureSkipVerify = true
+		// force creating new transport on each reque
+		globalConf.MaxConnTime = -1
+
 		globalConf.ProxySSLMinVersion = 771
 		config.SetGlobal(globalConf)
 
