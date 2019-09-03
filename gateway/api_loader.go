@@ -108,8 +108,6 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		"prefix": "coprocess",
 	})
 
-	logger.Info("Loading API")
-
 	if len(spec.TagHeaders) > 0 {
 		// Ensure all headers marked for tagging are lowercase
 		lowerCaseHeaders := make([]string, len(spec.TagHeaders))
