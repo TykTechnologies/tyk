@@ -107,11 +107,18 @@ const (
 	appName         = "tyk-gateway"
 )
 
-// setNodeID writes NodeID safely.
-func setNodeID(nodeID string) {
+// SetNodeID writes NodeID safely.
+func SetNodeID(nodeID string) {
 	muNodeID.Lock()
 	NodeID = nodeID
 	muNodeID.Unlock()
+}
+
+// GetNodeID reads NodeID safely.
+func GetNodeID() string {
+	muNodeID.Lock()
+	defer muNodeID.Unlock()
+	return NodeID
 }
 
 func isRunningTests() bool {
@@ -125,13 +132,6 @@ func setTestMode(v bool) {
 	runningTestsMu.Lock()
 	testMode = v
 	runningTestsMu.Unlock()
-}
-
-// getNodeID reads NodeID safely.
-func getNodeID() string {
-	muNodeID.Lock()
-	defer muNodeID.Unlock()
-	return NodeID
 }
 
 func getApiSpec(apiID string) *APISpec {
@@ -1004,7 +1004,7 @@ func Start() {
 		os.Exit(0)
 	}
 
-	setNodeID("solo-" + uuid.NewV4().String())
+	SetNodeID("solo-" + uuid.NewV4().String())
 
 	if err := initialiseSystem(ctx); err != nil {
 		mainLog.Fatalf("Error initialising system: %v", err)
@@ -1031,7 +1031,7 @@ func Start() {
 			time.Sleep(10 * time.Second)
 
 			os.Setenv("TYK_SERVICE_NONCE", ServiceNonce)
-			os.Setenv("TYK_SERVICE_NODEID", getNodeID())
+			os.Setenv("TYK_SERVICE_NODEID", GetNodeID())
 		}
 	}
 	err := again.ListenFrom(&defaultProxyMux.again, onFork)
