@@ -19,8 +19,6 @@ import (
 
 	sprig "gopkg.in/Masterminds/sprig.v2"
 
-	"github.com/gorilla/mux"
-
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/rpc"
 
