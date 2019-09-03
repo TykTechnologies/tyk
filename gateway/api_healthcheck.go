@@ -37,6 +37,7 @@ const (
 type HealthCheckResponse struct {
 	Status  HealthCheckStatus `json:"status"`
 	Version string            `json:"version"`
+	Checks  []HealthCheckItem `json:"checks"`
 }
 
 type HealthCheckItem struct {
