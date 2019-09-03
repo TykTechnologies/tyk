@@ -419,6 +419,7 @@ func CreateStandardSession() *user.SessionState {
 
 func CreateStandardPolicy() *user.Policy {
 	return &user.Policy{
+		OrgID:            "default",
 		Rate:             1000.0,
 		Per:              1.0,
 		QuotaMax:         -1,
@@ -433,7 +434,6 @@ func CreatePolicy(pGen ...func(p *user.Policy)) string {
 	pID := keyGen.GenerateAuthKey("")
 	pol := CreateStandardPolicy()
 	pol.ID = pID
-	pol.OrgID = "default"
 
 	if len(pGen) > 0 {
 		pGen[0](pol)

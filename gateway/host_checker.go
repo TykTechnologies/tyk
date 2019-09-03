@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/jeffail/tunny"
-	"github.com/pires/go-proxyproto"
+	proxyproto "github.com/pires/go-proxyproto"
 	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"

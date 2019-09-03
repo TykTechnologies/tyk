@@ -419,7 +419,6 @@ func TestJWTSessionRSABearerInvalidTwoBears(t *testing.T) {
 
 func prepareJWTSessionRSAWithRawSourceOnWithClientID(isBench bool) string {
 	spec := BuildAndLoadAPI(func(spec *APISpec) {
-		spec.APIID = "777888"
 		spec.OrgID = "default"
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
@@ -1094,9 +1093,6 @@ func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
 	})
 	user_id := uuid.New()
 
-	t.Log(p1ID)
-	t.Log(p2ID)
-
 	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
@@ -1105,7 +1101,7 @@ func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
 		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	})
 
-	sessionID := generateToken("default", fmt.Sprintf("%x", md5.Sum([]byte("user"))))
+	sessionID := generateToken("default", fmt.Sprintf("%x", md5.Sum([]byte(user_id))))
 
 	authHeaders := map[string]string{"authorization": jwtToken}
 	t.Run("Initial request with 1st policy", func(t *testing.T) {
