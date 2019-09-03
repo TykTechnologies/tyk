@@ -774,7 +774,7 @@ func LoadAPI(specs ...*APISpec) (out []*APISpec) {
 		}
 	}
 
-	doReload()
+	DoReload()
 
 	for _, spec := range specs {
 		out = append(out, getApiSpec(spec.APIID))
