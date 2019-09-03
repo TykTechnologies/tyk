@@ -80,7 +80,7 @@ func onLESSLStatusReceivedHandler(payload string) {
 	log.Debug("Received LE data: ", serverData)
 
 	// not great
-	if serverData.ID != getNodeID() {
+	if serverData.ID != GetNodeID() {
 		log.Info("Received Redis LE change notification!")
 		GetLEState(&LE_MANAGER)
 	}

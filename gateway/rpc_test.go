@@ -164,7 +164,7 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 		exp = []int{4, 6, 8, 8, 4}
 	}
 	for _, e := range exp {
-		doReload()
+		DoReload()
 
 		rtCnt := 0
 		mainRouter().Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {

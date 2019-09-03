@@ -107,11 +107,18 @@ const (
 	appName         = "tyk-gateway"
 )
 
-// setNodeID writes NodeID safely.
-func setNodeID(nodeID string) {
+// SetNodeID writes NodeID safely.
+func SetNodeID(nodeID string) {
 	muNodeID.Lock()
 	NodeID = nodeID
 	muNodeID.Unlock()
+}
+
+// GetNodeID reads NodeID safely.
+func GetNodeID() string {
+	muNodeID.Lock()
+	defer muNodeID.Unlock()
+	return NodeID
 }
 
 func isRunningTests() bool {
@@ -125,13 +132,6 @@ func setTestMode(v bool) {
 	runningTestsMu.Lock()
 	testMode = v
 	runningTestsMu.Unlock()
-}
-
-// getNodeID reads NodeID safely.
-func getNodeID() string {
-	muNodeID.Lock()
-	defer muNodeID.Unlock()
-	return NodeID
 }
 
 func getApiSpec(apiID string) *APISpec {
@@ -667,7 +667,7 @@ func rpcReloadLoop(rpcKey string) {
 
 var reloadMu sync.Mutex
 
-func doReload() {
+func DoReload() {
 	reloadMu.Lock()
 	defer reloadMu.Unlock()
 
@@ -712,7 +712,7 @@ func reloadLoop(tick <-chan time.Time) {
 	<-tick
 	for range startReloadChan {
 		mainLog.Info("reload: initiating")
-		doReload()
+		DoReload()
 		mainLog.Info("reload: complete")
 
 		mainLog.Info("Initiating coprocess reload")
@@ -1004,7 +1004,7 @@ func Start() {
 		os.Exit(0)
 	}
 
-	setNodeID("solo-" + uuid.NewV4().String())
+	SetNodeID("solo-" + uuid.NewV4().String())
 
 	if err := initialiseSystem(ctx); err != nil {
 		mainLog.Fatalf("Error initialising system: %v", err)
@@ -1031,7 +1031,7 @@ func Start() {
 			time.Sleep(10 * time.Second)
 
 			os.Setenv("TYK_SERVICE_NONCE", ServiceNonce)
-			os.Setenv("TYK_SERVICE_NODEID", getNodeID())
+			os.Setenv("TYK_SERVICE_NODEID", GetNodeID())
 		}
 	}
 	err := again.ListenFrom(&defaultProxyMux.again, onFork)
@@ -1082,7 +1082,7 @@ func Start() {
 	// Example: https://gravitational.com/blog/golang-ssh-bastion-graceful-restarts/
 	startServer()
 	if !rpc.IsEmergencyMode() {
-		doReload()
+		DoReload()
 	}
 	if again.Child() {
 		// This is a child process, we need to murder the parent now
@@ -1249,6 +1249,6 @@ func startServer() {
 	mainLog.Info("--> Listening on port: ", config.Global().ListenPort)
 	mainLog.Info("--> PID: ", hostDetails.PID)
 	if !rpc.IsEmergencyMode() {
-		doReload()
+		DoReload()
 	}
 }
