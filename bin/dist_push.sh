@@ -1,7 +1,7 @@
 #!/bin/bash
 : ${ORGDIR:="/src/github.com/TykTechnologies"}
 : ${SOURCEBINPATH:="${ORGDIR}/tyk"}
-: ${DEBVERS:="ubuntu/precise ubuntu/trusty ubuntu/xenial debian/jessie"}
+: ${DEBVERS:="ubuntu/trusty ubuntu/xenial ubuntu/bionic debian/jessie debian/stretch debian/buster"}
 : ${RPMVERS:="el/6 el7"}
 : ${PKGNAME:="tyk-gateway"}
 
