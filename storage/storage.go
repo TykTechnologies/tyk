@@ -57,6 +57,11 @@ type Handler interface {
 	RemoveSortedSetRange(string, string, string) error
 }
 
+type AnalyticsHandler interface {
+	Connect() bool
+	AppendToSetPipelinedBytes(string, [][]byte)
+}
+
 const defaultHashAlgorithm = "murmur64"
 
 // If hashing algorithm is empty, use legacy key generation

@@ -655,6 +655,32 @@ func (r *RedisCluster) AppendToSetPipelined(key string, values []string) {
 	}
 }
 
+func (r *RedisCluster) AppendToSetPipelinedBytes(key string, values [][]byte) {
+	if len(values) == 0 {
+		return
+	}
+
+	fixedKey := r.fixKey(key)
+
+	// prepare pipeline data
+	pipeLine := make([]rediscluster.ClusterTransaction, len(values))
+	for i := range values {
+		pipeLine[i] = rediscluster.ClusterTransaction{
+			Cmd: "RPUSH",
+			Args: []interface{}{
+				fixedKey,
+				values[i],
+			},
+		}
+	}
+
+	// send pipelined command to Redis
+	r.ensureConnection()
+	if _, err := r.singleton().DoPipeline(pipeLine); err != nil {
+		log.WithError(err).Error("Error trying to append to set keys")
+	}
+}
+
 func (r *RedisCluster) GetSet(keyName string) (map[string]string, error) {
 	log.Debug("Getting from key set: ", keyName)
 	log.Debug("Getting from fixed key set: ", r.fixKey(keyName))
