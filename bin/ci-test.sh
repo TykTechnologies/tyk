@@ -1,5 +1,6 @@
 #!/bin/bash
 
+PYTHON_VERSION=3.5
 TEST_TIMEOUT=3m
 
 # print a command and execute it
@@ -33,7 +34,7 @@ if [[ ${LATEST_GO} ]]; then
     race="-race"
 fi
 
-PKGS="$(go list -tags "coprocess python grpc" ./...)"
+PKGS="$(go list ./...)"
 
 go get -t
 
@@ -47,8 +48,7 @@ for pkg in $PKGS; do
 
     # TODO: Remove skipRace variable after solving race conditions in tests.
     skipRace=false
-    if [[ ${pkg} == *"coprocess" ]]; then
-        tags="-tags 'coprocess'"
+    if [[ ${pkg} == *"grpc" ]]; then
         skipRace=true
     elif [[ ${pkg} == *"goplugin" ]]; then
         tags="-tags 'goplugin'"

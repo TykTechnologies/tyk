@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-var testVersion = "3.7"
+var testVersion = ""
 
 func init() {
 	if versionOverride := os.Getenv("PYTHON_VERSION"); versionOverride != "" {
@@ -16,12 +16,12 @@ func init() {
 }
 
 func TestFindPythonConfig(t *testing.T) {
-	err := FindPythonConfig("0.0")
+	_, err := FindPythonConfig("0.0")
 	t.Logf("Library path is %s", pythonLibraryPath)
 	if err == nil {
 		t.Fatal("Should fail when loading a nonexistent Python version")
 	}
-	err = FindPythonConfig(testVersion)
+	_, err = FindPythonConfig(testVersion)
 	t.Logf("Library path is %s", pythonLibraryPath)
 	if err != nil {
 		t.Fatalf("Couldn't find Python %s", testVersion)
@@ -29,7 +29,7 @@ func TestFindPythonConfig(t *testing.T) {
 }
 
 func TestInit(t *testing.T) {
-	err := FindPythonConfig(testVersion)
+	_, err := FindPythonConfig(testVersion)
 	t.Logf("Library path is %s", pythonLibraryPath)
 	if err != nil {
 		t.Fatalf("Couldn't find Python %s", testVersion)

@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	defaultPythonVersion = "3.7"
+	defaultPythonVersion = ""
 )
 
 var (
