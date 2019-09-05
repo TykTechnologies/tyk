@@ -1,19 +1,21 @@
 from glob import glob
 from os import getcwd, chdir, path
 
-import tyk
-from tyk.middleware import TykMiddleware
-from tyk.object import TykCoProcessObject
-from tyk.event import TykEvent
-
-from gateway import TykGateway as tyk
-
 import sys
+from gateway import TykGateway as tyk
 def except_hook(type, value, traceback):
     tyk.log_error("{0}".format(value))
     pass
 
 sys.excepthook = except_hook
+
+try:
+  from tyk.middleware import TykMiddleware
+  from tyk.object import TykCoProcessObject
+  from tyk.event import TykEvent
+except Exception as e:
+  tyk.log_error(str(e))
+  sys.exit(1)
 
 class TykDispatcher:
     '''A simple dispatcher'''
