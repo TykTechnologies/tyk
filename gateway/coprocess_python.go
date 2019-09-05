@@ -9,7 +9,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"errors"
 	"fmt"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -144,12 +143,7 @@ func (d *PythonDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, baseP
 
 // PythonInit initializes the Python interpreter.
 func PythonInit() error {
-	ver := config.Global().CoProcessOptions.PythonVersion
-	if ver == "" {
-		return errors.New("Python version is not set")
-	}
-
-	err := python.FindPythonConfig(ver)
+	ver, err := python.FindPythonConfig(config.Global().CoProcessOptions.PythonVersion)
 	if err != nil {
 		return fmt.Errorf("Python version '%s' doesn't exist", ver)
 	}
