@@ -1,6 +1,5 @@
 #!/bin/bash
 
-PYTHON_VERSION=3.5
 TEST_TIMEOUT=3m
 
 # print a command and execute it
