@@ -17,6 +17,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
+	"strconv"
 	"strings"
 	"unsafe"
 
@@ -29,22 +31,26 @@ var (
 	errLibLoad        = errors.New("Couldn't load library")
 	errOSNotSupported = errors.New("OS not supported")
 
-	pythonConfigExpr = regexp.MustCompile(`python(.*)-config`)
+	pythonExpr = regexp.MustCompile(`(^python3(\.)?(\d)?(m)?(\-config)?$)`)
 
 	pythonConfigPath  string
 	pythonLibraryPath string
 
 	logger = log.Get().WithField("prefix", "dlpython")
+
+	paths = os.Getenv("PATH")
 )
 
 // FindPythonConfig scans PATH for common python-config locations.
-func FindPythonConfig(prefix string) error {
+func FindPythonConfig(customVersion string) (selectedVersion string, err error) {
 	// Not sure if this can be replaced with os.LookPath:
-	paths := os.Getenv("PATH")
 	if paths == "" {
-		return errEmptyPath
+		return selectedVersion, errEmptyPath
 	}
-	pythonConfigBinaries := []string{}
+
+	// Scan python-config binaries:
+	pythonConfigBinaries := map[float64]string{}
+
 	for _, p := range strings.Split(paths, ":") {
 		files, err := ioutil.ReadDir(p)
 		if err != nil {
@@ -52,33 +58,74 @@ func FindPythonConfig(prefix string) error {
 		}
 		for _, f := range files {
 			name := f.Name()
-			matches := pythonConfigExpr.FindAllStringSubmatch(name, -1)
-			if len(matches) > 0 {
-				version := matches[0][1]
-				logger.Debugf("Found Python installation: '%s' (using '%s')", version, name)
-				if strings.HasPrefix(version, prefix) {
-					fullPath := filepath.Join(p, name)
-					pythonConfigBinaries = append(pythonConfigBinaries, fullPath)
-				}
+			fullPath := filepath.Join(p, name)
+			matches := pythonExpr.FindAllStringSubmatch(name, -1)
+			if len(matches) == 0 {
+				continue
+			}
+
+			minorVersion := matches[0][3]
+			pyMallocBuild := matches[0][4]
+			isConfig := matches[0][5]
+			versionStr := "3"
+			if minorVersion != "" {
+				versionStr += "." + minorVersion
+			}
+			if pyMallocBuild != "" {
+				versionStr += pyMallocBuild
+			}
+
+			version, err := strconv.ParseFloat(versionStr, 64)
+			if err != nil || isConfig == "" {
+				continue
+			}
+
+			if _, exists := pythonConfigBinaries[version]; !exists {
+				pythonConfigBinaries[version] = fullPath
 			}
 		}
 	}
 
-	// Pick the first item:
-	for _, p := range pythonConfigBinaries {
-		pythonConfigPath = p
-		break
+	if len(pythonConfigBinaries) == 0 {
+		return selectedVersion, errors.New("No Python installations found")
 	}
+
+	for ver, binPath := range pythonConfigBinaries {
+		logger.Debugf("Found python-config binary: %.1f (%s)", ver, binPath)
+	}
+
+	if customVersion == "" {
+		var availableVersions []float64
+		for v := range pythonConfigBinaries {
+			availableVersions = append(availableVersions, v)
+		}
+		sort.Float64s(availableVersions)
+		lastVersion := availableVersions[len(availableVersions)-1]
+		pythonConfigPath = pythonConfigBinaries[lastVersion]
+		selectedVersion = strconv.FormatFloat(lastVersion, 'f', -1, 64)
+		logger.Debug("Using latest Python version")
+	} else {
+		prefixF, err := strconv.ParseFloat(customVersion, 64)
+		if err != nil {
+			return selectedVersion, errors.New("Couldn't parse Python version")
+		}
+		cfgPath, ok := pythonConfigBinaries[prefixF]
+		if !ok {
+			return selectedVersion, errors.New("No python-config was found for the specified version")
+		}
+		pythonConfigPath = cfgPath
+		selectedVersion = customVersion
+	}
+
 	logger.Debugf("Selected Python configuration path: %s", pythonConfigPath)
-	err := getLibraryPath()
-	if err != nil {
-		return err
+	if err := getLibraryPathFromCfg(); err != nil {
+		return selectedVersion, err
 	}
 	logger.Debugf("Selected Python library path: %s", pythonLibraryPath)
-	return nil
+	return selectedVersion, nil
 }
 
-func getLibraryPath() error {
+func getLibraryPathFromCfg() error {
 	out, err := exec.Command(pythonConfigPath, "--ldflags").Output()
 	if err != nil {
 		return err
