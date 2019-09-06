@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -22,8 +23,16 @@ type DRL struct {
 	ThisServerID      string
 	CurrentTotal      int64
 	RequestTokenValue int
-	CurrentTokenValue int
+	currentTokenValue int64
 	Ready             bool
+}
+
+func (d *DRL) SetCurrentTokenValue(newValue int64) {
+	atomic.StoreInt64(&d.currentTokenValue, newValue)
+}
+
+func (d *DRL) CurrentTokenValue() int64 {
+	return atomic.LoadInt64(&d.currentTokenValue)
 }
 
 func (d *DRL) Init() {
@@ -108,7 +117,7 @@ func (d *DRL) calculateTokenBucketValue() error {
 	}
 
 	rounded := Round(thisTokenValue, .5, 0)
-	d.CurrentTokenValue = int(rounded)
+	d.SetCurrentTokenValue(int64(rounded))
 	return nil
 }
 
@@ -128,7 +137,7 @@ func (d *DRL) AddOrUpdateServer(s Server) error {
 			return errors.New("DRL has no information on current host, waiting...")
 		}
 	}
-	
+
 	if d.serverIndex != nil {
 		d.serverIndex[d.uniqueID(s)] = s
 	}
