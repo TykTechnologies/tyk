@@ -13,12 +13,16 @@ var (
 	defaultConfigs = config.Config{
 		Secret:     "352d20ee67be67f6340b4c0605b044b7",
 		NodeSecret: "352d20ee67be67f6340b4c0605b044b7",
+		AnalyticsConfig: config.AnalyticsConfigConfig{
+			PoolSize: runtime.NumCPU(),
+		},
 	}
 )
 
 const (
-	minCPU             = 2
-	minFileDescriptors = 80000
+	minCPU               = 2
+	minFileDescriptors   = 80000
+	minRecordsBufferSize = 1000
 )
 
 func Run(c config.Config) {
@@ -28,6 +32,7 @@ func Run(c config.Config) {
 	fileDescriptors()
 	cpus()
 	defaultSecrets(c)
+	defaultAnalytics(c)
 }
 
 func legacyRateLimiters(c config.Config) {
@@ -78,4 +83,22 @@ func defaultSecrets(c config.Config) {
 	if c.NodeSecret == defaultConfigs.NodeSecret {
 		log.Warningf("Default node_secret `%s` should be changed for production.", defaultConfigs.NodeSecret)
 	}
+}
+
+func defaultAnalytics(c config.Config) {
+	if !c.EnableAnalytics {
+		return
+	}
+
+	if c.AnalyticsConfig.PoolSize == 0 {
+		log.Warningf("AnalyticsConfig.PoolSize unset. Defaulting to number of available CPUs (%d)", runtime.NumCPU())
+		c.AnalyticsConfig.PoolSize = runtime.NumCPU()
+	}
+
+	if c.AnalyticsConfig.RecordsBufferSize < minRecordsBufferSize {
+		log.Warningf("AnalyticsConfig.RecordsBufferSize < minimum (%d) - Overriding", minRecordsBufferSize)
+		c.AnalyticsConfig.RecordsBufferSize = minRecordsBufferSize
+	}
+
+	config.SetGlobal(c)
 }

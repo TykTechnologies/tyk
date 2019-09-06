@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TykTechnologies/tyk/checkup"
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/evalphobia/logrus_sentry"
 	"github.com/facebookgo/pidfile"
@@ -37,7 +38,6 @@ import (
 	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
-	"github.com/TykTechnologies/tyk/checkup"
 	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/dnscache"
@@ -152,9 +152,10 @@ var rpcPurgeOnce sync.Once
 
 // Create all globals and init connection handlers
 func setupGlobals(ctx context.Context) {
-
 	reloadMu.Lock()
 	defer reloadMu.Unlock()
+
+	checkup.Run(config.Global())
 
 	dnsCacheManager = dnscache.NewDnsCacheManager(config.Global().DnsCache.MultipleIPsHandleStrategy)
 	if config.Global().DnsCache.Enabled {
@@ -1042,7 +1043,6 @@ func Start() {
 	if err != nil {
 		mainLog.Errorf("Initializing again %s", err)
 	}
-	checkup.Run(config.Global())
 	if tr := config.Global().Tracer; tr.Enabled {
 		trace.SetupTracing(tr.Name, tr.Options)
 		trace.SetLogger(mainLog)

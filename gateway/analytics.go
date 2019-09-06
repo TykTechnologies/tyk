@@ -8,8 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	maxminddb "github.com/oschwald/maxminddb-golang"
-	msgpack "gopkg.in/vmihailenco/msgpack.v2"
+	"github.com/oschwald/maxminddb-golang"
+	"gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/regexp"
@@ -94,7 +94,6 @@ type GeoData struct {
 const analyticsKeyName = "tyk-system-analytics"
 
 const (
-	minRecordsBufferSize             = 1000
 	recordsBufferFlushInterval       = 200 * time.Millisecond
 	recordsBufferForcedFlushInterval = 1 * time.Second
 )
@@ -202,18 +201,8 @@ func (r *RedisAnalyticsHandler) Init(globalConf config.Config) {
 
 	analytics.Store.Connect()
 
-	ps := r.globalConf.AnalyticsConfig.PoolSize
-	if ps == 0 {
-		ps = 50
-	}
-	log.WithField("ps", ps).Debug("Analytics pool workers number")
-
-	recordsBufferSize := r.globalConf.AnalyticsConfig.RecordsBufferSize
-	if recordsBufferSize < minRecordsBufferSize {
-		recordsBufferSize = minRecordsBufferSize // force it to this value
-	}
-	log.WithField("recordsBufferSize", recordsBufferSize).Debug("Analytics total buffer (channel) size")
-
+	ps := config.Global().AnalyticsConfig.PoolSize
+	recordsBufferSize := config.Global().AnalyticsConfig.RecordsBufferSize
 	r.workerBufferSize = recordsBufferSize / uint64(ps)
 	log.WithField("workerBufferSize", r.workerBufferSize).Debug("Analytics pool worker buffer size")
 
