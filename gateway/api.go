@@ -856,9 +856,11 @@ func policiesHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
 		if policyID != "" {
+			log.Debug("Requesting Policy definition for", policyID)
 			obj, code = handleGetPolicy(policyID)
 		} else {
-			obj, code = policiesByID, 200
+			log.Debug("Requesting Policies list")
+			obj, code = handleGetPoliciesList()
 		}
 	}
 
@@ -875,6 +877,18 @@ func handleGetPolicy(policyID string) (interface{}, int) {
 		"policyID": policyID,
 	}).Error("Policy doesn't exist.")
 	return apiError("Policy not found"), http.StatusNotFound
+}
+
+func handleGetPoliciesList() (interface{}, int) {
+	policiesMu.RLock()
+	defer policiesMu.RUnlock()
+	policiesList := make([]user.Policy, len(policiesByID))
+	c := 0
+	for _, policy := range policiesByID {
+		policiesList[c] = policy
+		c++
+	}
+	return policiesList, http.StatusOK
 }
 
 func keyHandler(w http.ResponseWriter, r *http.Request) {
