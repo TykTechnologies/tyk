@@ -269,7 +269,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 			// check if channel was closed and it is time to exit from worker
 			if !ok {
 				// send what is left in buffer
-				r.Store.AppendToSetPipelinedBytes(analyticsKeyName, recordsBuffer)
+				r.Store.AppendToSetPipelined(analyticsKeyName, recordsBuffer)
 				return
 			}
 
@@ -324,7 +324,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 
 		// send data to Redis and reset buffer
 		if len(recordsBuffer) > 0 && (readyToSend || time.Since(lastSentTs) >= recordsBufferForcedFlushInterval) {
-			r.Store.AppendToSetPipelinedBytes(analyticsKeyName, recordsBuffer)
+			r.Store.AppendToSetPipelined(analyticsKeyName, recordsBuffer)
 			recordsBuffer = recordsBuffer[:0]
 			lastSentTs = time.Now()
 		}

@@ -47,7 +47,6 @@ type Handler interface {
 	GetSet(string) (map[string]string, error)
 	AddToSet(string, string)
 	AppendToSet(string, string)
-	AppendToSetPipelined(string, []string)
 	GetAndDeleteSet(string) []interface{}
 	RemoveFromSet(string, string)
 	DeleteScanMatch(string) bool
@@ -59,7 +58,7 @@ type Handler interface {
 
 type AnalyticsHandler interface {
 	Connect() bool
-	AppendToSetPipelinedBytes(string, [][]byte)
+	AppendToSetPipelined(string, [][]byte)
 }
 
 const defaultHashAlgorithm = "murmur64"
