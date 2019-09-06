@@ -141,6 +141,15 @@ func getApiSpec(apiID string) *APISpec {
 	return spec
 }
 
+func getPolicy(policyID string) *user.Policy {
+	policiesMu.RLock()
+	defer policiesMu.RUnlock()
+	if userPolicy, ok := policiesByID[policyID]; ok {
+		return &userPolicy
+	}
+	return nil
+}
+
 func apisByIDLen() int {
 	apisMu.RLock()
 	defer apisMu.RUnlock()
@@ -434,6 +443,8 @@ func loadAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", oAuthClientHandler).Methods("PUT")
 		r.HandleFunc("/oauth/refresh/{keyName}", invalidateOauthRefresh).Methods("DELETE")
 		r.HandleFunc("/cache/{apiID}", invalidateCacheHandler).Methods("DELETE")
+		r.HandleFunc("/policies", policiesHandler).Methods("GET", "POST", "PUT", "DELETE")
+		r.HandleFunc("/policies/{policyID}", policiesHandler).Methods("GET", "POST", "PUT", "DELETE")
 	} else {
 		mainLog.Info("Node is slaved, REST API minimised")
 	}

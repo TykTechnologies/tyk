@@ -1,5 +1,6 @@
 {
 	"default": {
+		"id": "default",
 		"rate": 1000,
 		"per": 1,
 		"quota_max": 100,

@@ -847,6 +847,36 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, code, obj)
 }
 
+func policiesHandler(w http.ResponseWriter, r *http.Request) {
+	policyID := mux.Vars(r)["policyID"]
+
+	var obj interface{}
+	var code int
+
+	switch r.Method {
+	case "GET":
+		if policyID != "" {
+			obj, code = handleGetPolicy(policyID)
+		} else {
+			obj, code = policiesByID, 200
+		}
+	}
+
+	doJSONWrite(w, code, obj)
+}
+
+func handleGetPolicy(policyID string) (interface{}, int) {
+	if policy := getPolicy(policyID); policy != nil {
+		return policy, http.StatusOK
+	}
+
+	log.WithFields(logrus.Fields{
+		"prefix":   "policies",
+		"policyID": policyID,
+	}).Error("Policy doesn't exist.")
+	return apiError("Policy not found"), http.StatusNotFound
+}
+
 func keyHandler(w http.ResponseWriter, r *http.Request) {
 	keyName := mux.Vars(r)["keyName"]
 	apiID := r.URL.Query().Get("api_id")
