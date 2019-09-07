@@ -134,6 +134,11 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	pathModified := false
 	for {
 		hash := generateDomainPath(spec.Domain, spec.Proxy.ListenPath)
+
+		if converted, err := kvStore(hash); err == nil {
+			hash = converted
+		}
+
 		if apisByListen[hash] < 2 {
 			// not a duplicate
 			break
