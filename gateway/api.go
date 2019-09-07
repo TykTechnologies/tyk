@@ -974,7 +974,7 @@ func handleAddOrUpdatePolicy(policyID string, r *http.Request) (interface{}, int
 		Action: action,
 	}
 
-	return response, http.StatusOK
+	return response, http.StatusCreated
 }
 
 func appendPolicy(policy *user.Policy) map[string]user.Policy {
@@ -999,8 +999,14 @@ func writePoliciesFile(policies map[string]user.Policy) (interface{}, int) {
 
 	// Check if the file exists
 	if _, err := os.Stat(policiesFilePath); os.IsNotExist(err) {
-		log.Error("Policies file not found on path ", policiesFilePath)
-		return apiError("Could not persist policy on file"), http.StatusInternalServerError
+		log.Warn("Policies file not found on path ", policiesFilePath)
+		emptyFile, err := os.Create(policiesFilePath)
+		if err != nil {
+			log.Error("Could not create file " + policiesFilePath)
+			return apiError("Could not persist policy on file"), http.StatusInternalServerError
+		} else {
+			emptyFile.Close()
+		}
 	}
 
 	// unmarshal the object into the file
