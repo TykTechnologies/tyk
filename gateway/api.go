@@ -1000,15 +1000,8 @@ func writePoliciesFile(policies map[string]user.Policy) (interface{}, int) {
 	}
 
 	// Check if the file exists
-	if _, err := os.Stat(policiesFilePath); os.IsNotExist(err) {
-		log.Warn("Policies file not found on path ", policiesFilePath)
-		emptyFile, err := os.Create(policiesFilePath)
-		if err != nil {
-			log.Error("Could not create file " + policiesFilePath)
-			return apiError("Could not persist policy on file"), http.StatusInternalServerError
-		} else {
-			emptyFile.Close()
-		}
+	if fileCreationResponse, statusCode := ensureFileExists(policiesFilePath); fileCreationResponse != nil {
+		return fileCreationResponse, statusCode
 	}
 
 	// unmarshal the object into the file
@@ -1065,6 +1058,21 @@ func handleDeletePolicy(policyID string) (interface{}, int) {
 	}
 
 	return response, http.StatusOK
+}
+
+func ensureFileExists(path string) (interface{}, int) {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		log.Warn("Policies file not found on path ", path)
+		emptyFile, err := os.Create(path)
+		if err != nil {
+			log.Error("Could not create file " + path)
+			return apiError("Could not persist policy on file"), http.StatusInternalServerError
+		} else {
+			emptyFile.Close()
+		}
+	}
+
+	return nil, 0
 }
 
 func keyHandler(w http.ResponseWriter, r *http.Request) {
