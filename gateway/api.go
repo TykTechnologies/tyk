@@ -908,7 +908,6 @@ func handleGetPoliciesList() (interface{}, int) {
 }
 
 func handleAddOrUpdatePolicy(policyID string, r *http.Request) (interface{}, int) {
-	var generatedPolicyID string
 	if config.Global().UseDBAppConfigs {
 		log.Error("Rejected new Policy Definition due to UseDBAppConfigs = true")
 		return apiError("Due to enabled use_db_app_configs, please use the Dashboard API"), http.StatusInternalServerError
@@ -922,14 +921,22 @@ func handleAddOrUpdatePolicy(policyID string, r *http.Request) (interface{}, int
 
 	if policyID != "" && newPolicy.ID != policyID {
 		log.Error("PUT operation on different PolicyID")
-		return apiError("Request PolicyID does not match that in Definition! For Updtae operations these must match."), http.StatusBadRequest
+		return apiError("Request PolicyID does not match that in Policy Definition! For Update operations these must match."), http.StatusBadRequest
 	}
 
 	// Generate a random ID if none provided because the policies are stored on a json object, which is required a valid key
-	if policyID == "" {
-		generatedPolicyID = uuid.NewV4().String()
-		newPolicy.ID = generatedPolicyID
-		log.Info("No PolicyID provided. Using generated key ", generatedPolicyID)
+	if newPolicy.ID == "" {
+		if policyID == "" {
+			newPolicy.ID = uuid.NewV4().String()
+			log.Info("No PolicyID provided. Using generated key ", newPolicy.ID)
+		} else {
+			newPolicy.ID = policyID
+		}
+	}
+
+	if _, ok := policiesByID[newPolicy.ID]; ok {
+		log.Error("Duplicated Policy with ", newPolicy.ID)
+		return apiError("A Policy with ID " + newPolicy.ID + " already exists"), http.StatusConflict
 	}
 
 	// Create a copy of the policies map because we need to reload all the configs
