@@ -862,6 +862,20 @@ func policiesHandler(w http.ResponseWriter, r *http.Request) {
 			log.Debug("Requesting Policies list")
 			obj, code = handleGetPoliciesList()
 		}
+	case "POST":
+		log.Debug("Creating new policy")
+	case "PUT":
+		if policyID != "" {
+			log.Debug("Updating existing API: ", policyID)
+		} else {
+			obj, code = apiError("Must specify a policyID to update"), http.StatusBadRequest
+		}
+	case "DELETE":
+		if policyID != "" {
+			log.Debug("Deleting API definition for: ", policyID)
+		} else {
+			obj, code = apiError("Must specify a policyID to update"), http.StatusBadRequest
+		}
 	}
 
 	doJSONWrite(w, code, obj)
