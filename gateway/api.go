@@ -864,9 +864,11 @@ func policiesHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	case "POST":
 		log.Debug("Creating new policy")
+		obj, code = handleAddOrUpdatePolicy(policyID, r)
 	case "PUT":
 		if policyID != "" {
 			log.Debug("Updating existing Policy: ", policyID)
+			obj, code = handleAddOrUpdatePolicy(policyID, r)
 		} else {
 			obj, code = apiError("Must specify a policyID to update"), http.StatusBadRequest
 		}
@@ -903,6 +905,80 @@ func handleGetPoliciesList() (interface{}, int) {
 		c++
 	}
 	return policiesList, http.StatusOK
+}
+
+func handleAddOrUpdatePolicy(policyID string, r *http.Request) (interface{}, int) {
+	var generatedPolicyID string
+	if config.Global().UseDBAppConfigs {
+		log.Error("Rejected new Policy Definition due to UseDBAppConfigs = true")
+		return apiError("Due to enabled use_db_app_configs, please use the Dashboard API"), http.StatusInternalServerError
+	}
+
+	newPolicy := &user.Policy{}
+	if err := json.NewDecoder(r.Body).Decode(newPolicy); err != nil {
+		log.Error("Couldn't decode new Policy Definition object: ", err)
+		return apiError("Request malformed"), http.StatusBadRequest
+	}
+
+	if policyID != "" && newPolicy.ID != policyID {
+		log.Error("PUT operation on different PolicyID")
+		return apiError("Request PolicyID does not match that in Definition! For Updtae operations these must match."), http.StatusBadRequest
+	}
+
+	// Generate a random ID if none provided because the policies are stored on a json object, which is required a valid key
+	if policyID == "" {
+		generatedPolicyID = uuid.NewV4().String()
+		newPolicy.ID = generatedPolicyID
+		log.Info("No PolicyID provided. Using generated key ", generatedPolicyID)
+	}
+
+	// Create a copy of the policies map because we need to reload all the configs
+	policiesCopy := appendPolicy(newPolicy)
+
+	// Find policies file
+	policiesFilePath := config.Global().Policies.PolicyRecordName
+
+	// Check if the file exists
+	if _, err := os.Stat(policiesFilePath); os.IsNotExist(err) {
+		log.Error("Policies file not found on path ", policiesFilePath)
+		return apiError("Could not persist policy on file"), http.StatusInternalServerError
+	}
+
+	// unmarshal the object into the file
+	asByte, err := json.MarshalIndent(policiesCopy, "", "  ")
+	if err != nil {
+		log.Error("Marshalling of Policy Definition failed: ", err)
+		return apiError("Marshalling failed"), http.StatusInternalServerError
+	}
+
+	if err := ioutil.WriteFile(policiesFilePath, asByte, 0644); err != nil {
+		log.Error("Failed to create file! - ", err)
+		return apiError("File object creation failed, write error"), http.StatusInternalServerError
+	}
+
+	action := "modified"
+	if r.Method == "POST" {
+		action = "added"
+	}
+
+	response := apiModifyKeySuccess{
+		Key:    newPolicy.ID,
+		Status: "ok",
+		Action: action,
+	}
+
+	return response, http.StatusOK
+}
+
+func appendPolicy(policy *user.Policy) map[string]user.Policy {
+	policiesMu.RLock()
+	defer policiesMu.RUnlock()
+	policiesCopy := make(map[string]user.Policy)
+	for key, value := range policiesByID {
+		policiesCopy[key] = value
+	}
+	policiesCopy[policy.ID] = *policy
+	return policiesCopy
 }
 
 func keyHandler(w http.ResponseWriter, r *http.Request) {
