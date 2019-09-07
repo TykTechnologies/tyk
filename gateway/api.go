@@ -1039,6 +1039,8 @@ func handleDeletePolicy(policyID string) (interface{}, int) {
 	}
 
 	// Make a new copy ignoring the deleted key since it's necessary to reload the files.
+	policiesMu.RLock()
+	defer policiesMu.RUnlock()
 	newPoliciesCopy := make(map[string]user.Policy)
 	for key, value := range policiesByID {
 		if key != policyID {
