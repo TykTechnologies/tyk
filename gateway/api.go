@@ -950,7 +950,7 @@ func handleAddOrUpdatePolicy(policyID string, r *http.Request) (interface{}, int
 		}
 	}
 
-	if _, ok := policiesByID[newPolicy.ID]; ok {
+	if _, ok := policiesByID[newPolicy.ID]; ok && r.Method == "POST" {
 		log.Error("Duplicated Policy with ", newPolicy.ID)
 		return apiError("A Policy with ID " + newPolicy.ID + " already exists"), http.StatusConflict
 	}
@@ -964,8 +964,10 @@ func handleAddOrUpdatePolicy(policyID string, r *http.Request) (interface{}, int
 	}
 
 	action := "modified"
+	statusCode := http.StatusOK
 	if r.Method == "POST" {
 		action = "added"
+		statusCode = http.StatusCreated
 	}
 
 	response := apiModifyKeySuccess{
@@ -974,7 +976,7 @@ func handleAddOrUpdatePolicy(policyID string, r *http.Request) (interface{}, int
 		Action: action,
 	}
 
-	return response, http.StatusCreated
+	return response, statusCode
 }
 
 func appendPolicy(policy *user.Policy) map[string]user.Policy {
