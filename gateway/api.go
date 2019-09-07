@@ -992,6 +992,11 @@ func writePoliciesFile(policies map[string]user.Policy) (interface{}, int) {
 	// Find policies file
 	policiesFilePath := config.Global().Policies.PolicyRecordName
 
+	if policiesFilePath == "" {
+		log.Error("Policies file not set")
+		return apiError("Could not persist policy on file"), http.StatusInternalServerError
+	}
+
 	// Check if the file exists
 	if _, err := os.Stat(policiesFilePath); os.IsNotExist(err) {
 		log.Error("Policies file not found on path ", policiesFilePath)
@@ -1014,6 +1019,11 @@ func writePoliciesFile(policies map[string]user.Policy) (interface{}, int) {
 }
 
 func handleDeletePolicy(policyID string) (interface{}, int) {
+	if config.Global().UseDBAppConfigs {
+		log.Error("Rejected new Policy Definition due to UseDBAppConfigs = true")
+		return apiError("Due to enabled use_db_app_configs, please use the Dashboard API"), http.StatusInternalServerError
+	}
+
 	// Check if the policy exists
 	policiesByIDFromFile, _, err := loadPolicies()
 
