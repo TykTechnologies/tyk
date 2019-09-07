@@ -651,6 +651,10 @@ func loadApps(specs []*APISpec) {
 			mainLog.Info("API bind on custom port:", spec.ListenPort)
 		}
 
+		if converted, err := kvStore(spec.Proxy.ListenPath); err == nil {
+			spec.Proxy.ListenPath = converted
+		}
+
 		tmpSpecRegister[spec.APIID] = spec
 
 		switch spec.Protocol {
