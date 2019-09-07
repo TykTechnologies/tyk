@@ -128,6 +128,99 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 	})
 }
 
+func TestPoliciesHandler(t *testing.T) {
+	globalConfig := config.Global()
+	globalConfig.Policies.PolicyRecordName = "/tmp/policies.json"
+	config.SetGlobal(globalConfig)
+
+	// Delete file before testing
+	DeleteFile(globalConfig.Policies.PolicyRecordName)
+
+	ts := StartTest()
+	defer ts.Close()
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Id = "misterykey"
+		spec.UseKeylessAccess = false
+		spec.Auth.UseParam = true
+	})
+
+	// with policy
+	policiesMu.Lock()
+	policiesByID["abc_policy"] = user.Policy{
+		ID:               "abc_policy",
+		Active:           true,
+		QuotaMax:         5,
+		QuotaRenewalRate: 300,
+		AccessRights: map[string]user.AccessDefinition{"misterykey": {
+			APIID: "misterykey", Versions: []string{"v1"},
+		}},
+		OrgID: "default",
+	}
+	policiesMu.Unlock()
+
+	// Find the defaults
+	t.Run("Should list all and find by id", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			{Method: "GET", Path: "/tyk/policies", AdminAuth: true, Code: 200},
+			{Method: "GET", Path: "/tyk/policies/abc_policy", AdminAuth: true, Code: 200},
+			{Method: "GET", Path: "/tyk/policies/somekey", AdminAuth: true, Code: 404},
+		}...)
+	})
+
+	t.Run("Should create policy", func(t *testing.T) {
+		createPolicy := BuildPolicy(func(policy *user.Policy) {
+			policy.ID = "newpolicy"
+		})[0]
+		createPolicyJSON, _ := json.Marshal(createPolicy)
+
+		ts.Run(t, []test.TestCase{
+			{Method: "POST", Path: "/tyk/policies", AdminAuth: true, Code: 201, Data: string(createPolicyJSON)},
+		}...)
+
+		// Should not list before DoReload
+		t.Run("Should not find recently created policy", func(t *testing.T) {
+			ts.Run(t, []test.TestCase{
+				{Method: "GET", Path: "/tyk/policies/newpolicy", AdminAuth: true, Code: 404},
+			}...)
+		})
+		DoReload()
+		ts.Run(t, []test.TestCase{
+			{Method: "GET", Path: "/tyk/policies/newpolicy", AdminAuth: true, Code: 200},
+		}...)
+	})
+
+	t.Run("Should update existing policy", func(t *testing.T) {
+		updatePolicy := policiesByID["abc_policy"]
+		activeValueBeforeUpdate := updatePolicy.Active
+		updatePolicy.Active = false
+		updatePolicyJSON, _ := json.Marshal(updatePolicy)
+		ts.Run(t, []test.TestCase{
+			{Method: "PUT", Path: "/tyk/policies/xpto_policy", AdminAuth: true, Code: 400, Data: string(updatePolicyJSON)},
+			{Method: "PUT", Path: "/tyk/policies/abc_policy", AdminAuth: true, Code: 200, Data: string(updatePolicyJSON)},
+		}...)
+
+		DoReload()
+
+		if activeValueBeforeUpdate == policiesByID["abc_policy"].Active {
+			t.Fail()
+		}
+	})
+
+	t.Run("Should delete existing policy", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			{Method: "DELETE", Path: "/tyk/policies/xpto_policy", AdminAuth: true, Code: 404},
+			{Method: "DELETE", Path: "/tyk/policies/abc_policy", AdminAuth: true, Code: 200},
+		}...)
+
+		DoReload()
+
+		if _, hasKey := policiesByID["abc_policy"]; hasKey {
+			t.Fail()
+		}
+	})
+}
+
 func TestKeyHandler(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()

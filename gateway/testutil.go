@@ -725,6 +725,25 @@ const sampleAPI = `{
     }
 }`
 
+const samplePolicy = `{
+	"id": "admin",
+	"rate": 1000,
+	"per": 1,
+	"quota_max": 100,
+	"quota_renewal_rate": 60,
+	"access_rights": {
+		"41433797848f41a558c1573d3e55a410": {
+			"api_name": "Tyk Test API",
+			"api_id": "1",
+			"versions": [
+				"Default"
+			]
+		}
+	},
+	"org_id": "54de205930c55e15bd000001",
+	"hmac_enabled": false
+}`
+
 func UpdateAPIVersion(spec *APISpec, name string, verGen func(version *apidef.VersionInfo)) {
 	version := spec.VersionData.Versions[name]
 	verGen(&version)
@@ -752,6 +771,32 @@ func BuildAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 	}
 
 	return specs
+}
+
+func DeleteFile(path string) {
+	if _, err := os.Stat(path); err == nil {
+		if err := os.Remove(path); err != nil {
+			log.Warn("Could not delete file " + path)
+		}
+	}
+}
+
+func BuildPolicy(policyGens ...func(policy *user.Policy)) (policies []*user.Policy) {
+	if len(policyGens) == 0 {
+		policyGens = append(policyGens, func(policy *user.Policy) {})
+	}
+
+	for _, gen := range policyGens {
+		policy := &user.Policy{}
+		if err := json.Unmarshal([]byte(samplePolicy), policy); err != nil {
+			panic(err)
+		}
+
+		gen(policy)
+		policies = append(policies, policy)
+	}
+
+	return policies
 }
 
 func LoadAPI(specs ...*APISpec) (out []*APISpec) {
