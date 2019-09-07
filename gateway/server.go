@@ -326,32 +326,14 @@ func syncAPISpecs() (int, error) {
 }
 
 func syncPolicies() (count int, err error) {
-	var pols map[string]user.Policy
-
 	mainLog.Info("Loading policies")
 
-	switch config.Global().Policies.PolicySource {
-	case "service":
-		if config.Global().Policies.PolicyConnectionString == "" {
-			mainLog.Fatal("No connection string or node ID present. Failing.")
-		}
-		connStr := config.Global().Policies.PolicyConnectionString
-		connStr = connStr + "/system/policies"
+	pols, count, err := loadPolicies()
 
-		mainLog.Info("Using Policies from Dashboard Service")
-
-		pols = LoadPoliciesFromDashboard(connStr, config.Global().NodeSecret, config.Global().Policies.AllowExplicitPolicyID)
-	case "rpc":
-		mainLog.Debug("Using Policies from RPC")
-		pols, err = LoadPoliciesFromRPC(config.Global().SlaveOptions.RPCKey)
-	default:
-		// this is the only case now where we need a policy record name
-		if config.Global().Policies.PolicyRecordName == "" {
-			mainLog.Debug("No policy record name defined, skipping...")
-			return 0, nil
-		}
-		pols = LoadPoliciesFromFile(config.Global().Policies.PolicyRecordName)
+	if pols == nil {
+		return count, err
 	}
+
 	mainLog.Infof("Policies found (%d total):", len(pols))
 	for id := range pols {
 		mainLog.Infof(" - %s", id)
@@ -364,6 +346,32 @@ func syncPolicies() (count int, err error) {
 	}
 
 	return len(pols), err
+}
+
+func loadPolicies() (map[string]user.Policy, int, error) {
+	switch config.Global().Policies.PolicySource {
+	case "service":
+		if config.Global().Policies.PolicyConnectionString == "" {
+			mainLog.Fatal("No connection string or node ID present. Failing.")
+		}
+		connStr := config.Global().Policies.PolicyConnectionString
+		connStr = connStr + "/system/policies"
+
+		mainLog.Info("Using Policies from Dashboard Service")
+
+		return LoadPoliciesFromDashboard(connStr, config.Global().NodeSecret, config.Global().Policies.AllowExplicitPolicyID), -1, nil
+	case "rpc":
+		mainLog.Debug("Using Policies from RPC")
+		ans, err := LoadPoliciesFromRPC(config.Global().SlaveOptions.RPCKey)
+		return ans, -1, err
+	default:
+		// this is the only case now where we need a policy record name
+		if config.Global().Policies.PolicyRecordName == "" {
+			mainLog.Debug("No policy record name defined, skipping...")
+			return nil, 0, nil
+		}
+		return LoadPoliciesFromFile(config.Global().Policies.PolicyRecordName), -1, nil
+	}
 }
 
 // stripSlashes removes any trailing slashes from the request's URL

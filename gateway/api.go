@@ -875,8 +875,9 @@ func policiesHandler(w http.ResponseWriter, r *http.Request) {
 	case "DELETE":
 		if policyID != "" {
 			log.Debug("Deleting Policy definition for: ", policyID)
+			obj, code = handleDeletePolicy(policyID)
 		} else {
-			obj, code = apiError("Must specify a policyID to update"), http.StatusBadRequest
+			obj, code = apiError("Must specify a policyID to delete"), http.StatusBadRequest
 		}
 	}
 
@@ -919,9 +920,24 @@ func handleAddOrUpdatePolicy(policyID string, r *http.Request) (interface{}, int
 		return apiError("Request malformed"), http.StatusBadRequest
 	}
 
-	if policyID != "" && newPolicy.ID != policyID {
-		log.Error("PUT operation on different PolicyID")
-		return apiError("Request PolicyID does not match that in Policy Definition! For Update operations these must match."), http.StatusBadRequest
+	if policyID != "" {
+		// Check if it is the same ID of the update
+		if newPolicy.ID != policyID {
+			log.Error("PUT operation on different PolicyID")
+			return apiError("Request PolicyID does not match that in Policy Definition! For Update operations these must match."), http.StatusBadRequest
+		}
+
+		// Check if the policy ID exists
+		policiesByIDFromFile, _, err := loadPolicies()
+		if err != nil {
+			log.Error("Failed do load policies from file")
+			return apiError("Failed loading current policies"), http.StatusInternalServerError
+		}
+
+		if _, hasKey := policiesByIDFromFile[policyID]; !hasKey {
+			log.Warnf("Could not find policy with ID %s", policyID)
+			return apiError("Policy not found with id " + policyID), http.StatusNotFound
+		}
 	}
 
 	// Generate a random ID if none provided because the policies are stored on a json object, which is required a valid key
@@ -942,25 +958,9 @@ func handleAddOrUpdatePolicy(policyID string, r *http.Request) (interface{}, int
 	// Create a copy of the policies map because we need to reload all the configs
 	policiesCopy := appendPolicy(newPolicy)
 
-	// Find policies file
-	policiesFilePath := config.Global().Policies.PolicyRecordName
-
-	// Check if the file exists
-	if _, err := os.Stat(policiesFilePath); os.IsNotExist(err) {
-		log.Error("Policies file not found on path ", policiesFilePath)
-		return apiError("Could not persist policy on file"), http.StatusInternalServerError
-	}
-
-	// unmarshal the object into the file
-	asByte, err := json.MarshalIndent(policiesCopy, "", "  ")
-	if err != nil {
-		log.Error("Marshalling of Policy Definition failed: ", err)
-		return apiError("Marshalling failed"), http.StatusInternalServerError
-	}
-
-	if err := ioutil.WriteFile(policiesFilePath, asByte, 0644); err != nil {
-		log.Error("Failed to create file! - ", err)
-		return apiError("File object creation failed, write error"), http.StatusInternalServerError
+	// Wrap the writing part into a separated function to reuse on delete
+	if writeResponse, code := writePoliciesFile(policiesCopy); writeResponse != nil {
+		return writeResponse, code
 	}
 
 	action := "modified"
@@ -986,6 +986,67 @@ func appendPolicy(policy *user.Policy) map[string]user.Policy {
 	}
 	policiesCopy[policy.ID] = *policy
 	return policiesCopy
+}
+
+func writePoliciesFile(policies map[string]user.Policy) (interface{}, int) {
+	// Find policies file
+	policiesFilePath := config.Global().Policies.PolicyRecordName
+
+	// Check if the file exists
+	if _, err := os.Stat(policiesFilePath); os.IsNotExist(err) {
+		log.Error("Policies file not found on path ", policiesFilePath)
+		return apiError("Could not persist policy on file"), http.StatusInternalServerError
+	}
+
+	// unmarshal the object into the file
+	asByte, err := json.MarshalIndent(policies, "", "  ")
+	if err != nil {
+		log.Error("Marshalling of Policy Definition failed: ", err)
+		return apiError("Marshalling failed"), http.StatusInternalServerError
+	}
+
+	if err := ioutil.WriteFile(policiesFilePath, asByte, 0644); err != nil {
+		log.Error("Failed to create file! - ", err)
+		return apiError("File object creation failed, write error"), http.StatusInternalServerError
+	}
+
+	return nil, 0
+}
+
+func handleDeletePolicy(policyID string) (interface{}, int) {
+	// Check if the policy exists
+	policiesByIDFromFile, _, err := loadPolicies()
+
+	if err != nil {
+		log.Error("Failed do load policies from file")
+		return apiError("Failed loading current policies"), http.StatusInternalServerError
+	}
+
+	if _, hasKey := policiesByIDFromFile[policyID]; !hasKey {
+		log.Warning("Policy do not exist with key ", policyID)
+		return apiError("Policy not found with ID " + policyID), http.StatusNotFound
+	}
+
+	// Make a new copy ignoring the deleted key since it's necessary to reload the files.
+	newPoliciesCopy := make(map[string]user.Policy)
+	for key, value := range policiesByID {
+		if key != policyID {
+			newPoliciesCopy[key] = value
+		}
+	}
+
+	// Handle the writing of the file
+	if writeResponse, code := writePoliciesFile(newPoliciesCopy); writeResponse != nil {
+		return writeResponse, code
+	}
+
+	response := apiModifyKeySuccess{
+		Key:    policyID,
+		Status: "ok",
+		Action: "deleted",
+	}
+
+	return response, http.StatusOK
 }
 
 func keyHandler(w http.ResponseWriter, r *http.Request) {
