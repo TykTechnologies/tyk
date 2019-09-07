@@ -866,13 +866,13 @@ func policiesHandler(w http.ResponseWriter, r *http.Request) {
 		log.Debug("Creating new policy")
 	case "PUT":
 		if policyID != "" {
-			log.Debug("Updating existing API: ", policyID)
+			log.Debug("Updating existing Policy: ", policyID)
 		} else {
 			obj, code = apiError("Must specify a policyID to update"), http.StatusBadRequest
 		}
 	case "DELETE":
 		if policyID != "" {
-			log.Debug("Deleting API definition for: ", policyID)
+			log.Debug("Deleting Policy definition for: ", policyID)
 		} else {
 			obj, code = apiError("Must specify a policyID to update"), http.StatusBadRequest
 		}
