@@ -751,7 +751,7 @@ func handleAddOrUpdateApi(apiID string, r *http.Request) (interface{}, int) {
 
 	if apiID != "" && newDef.APIID != apiID {
 		log.Error("PUT operation on different APIIDs")
-		return apiError("Request APIID does not match that in Definition! For Updtae operations these must match."), http.StatusBadRequest
+		return apiError("Request APIID does not match that in Definition! For Update operations these must match."), http.StatusBadRequest
 	}
 
 	// Create a filename
