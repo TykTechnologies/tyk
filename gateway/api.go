@@ -817,7 +817,7 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 	var code int
 
 	switch r.Method {
-	case "GET":
+	case http.MethodGet:
 		if apiID != "" {
 			log.Debug("Requesting API definition for", apiID)
 			obj, code = handleGetAPI(apiID)
@@ -825,17 +825,17 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 			log.Debug("Requesting API list")
 			obj, code = handleGetAPIList()
 		}
-	case "POST":
+	case http.MethodPost:
 		log.Debug("Creating new definition file")
 		obj, code = handleAddOrUpdateApi(apiID, r)
-	case "PUT":
+	case http.MethodPut:
 		if apiID != "" {
 			log.Debug("Updating existing API: ", apiID)
 			obj, code = handleAddOrUpdateApi(apiID, r)
 		} else {
 			obj, code = apiError("Must specify an apiID to update"), http.StatusBadRequest
 		}
-	case "DELETE":
+	case http.MethodDelete:
 		if apiID != "" {
 			log.Debug("Deleting API definition for: ", apiID)
 			obj, code = handleDeleteAPI(apiID)
