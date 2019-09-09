@@ -854,7 +854,7 @@ func policiesHandler(w http.ResponseWriter, r *http.Request) {
 	var code int
 
 	switch r.Method {
-	case "GET":
+	case http.MethodGet:
 		if policyID != "" {
 			log.Debug("Requesting Policy definition for", policyID)
 			obj, code = handleGetPolicy(policyID)
@@ -862,17 +862,17 @@ func policiesHandler(w http.ResponseWriter, r *http.Request) {
 			log.Debug("Requesting Policies list")
 			obj, code = handleGetPoliciesList()
 		}
-	case "POST":
+	case http.MethodPost:
 		log.Debug("Creating new policy")
 		obj, code = handleAddOrUpdatePolicy(policyID, r)
-	case "PUT":
+	case http.MethodPut:
 		if policyID != "" {
 			log.Debug("Updating existing Policy: ", policyID)
 			obj, code = handleAddOrUpdatePolicy(policyID, r)
 		} else {
 			obj, code = apiError("Must specify a policyID to update"), http.StatusBadRequest
 		}
-	case "DELETE":
+	case http.MethodDelete:
 		if policyID != "" {
 			log.Debug("Deleting Policy definition for: ", policyID)
 			obj, code = handleDeletePolicy(policyID)
