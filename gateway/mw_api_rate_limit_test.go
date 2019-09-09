@@ -68,7 +68,7 @@ func TestRLOpen(t *testing.T) {
 
 	req := TestReq(t, "GET", "/rl_test/", nil)
 
-	DRLManager.CurrentTokenValue = 1
+	DRLManager.SetCurrentTokenValue(1)
 	DRLManager.RequestTokenValue = 1
 
 	chain := getRLOpenChain(spec)
@@ -88,7 +88,7 @@ func TestRLOpen(t *testing.T) {
 		}
 	}
 
-	DRLManager.CurrentTokenValue = 0
+	DRLManager.SetCurrentTokenValue(0)
 	DRLManager.RequestTokenValue = 0
 }
 
@@ -103,7 +103,7 @@ func requestThrottlingTest(limiter string, testLevel string) func(t *testing.T) 
 
 		switch limiter {
 		case "InMemoryRateLimiter":
-			DRLManager.CurrentTokenValue = 1
+			DRLManager.SetCurrentTokenValue(1)
 			DRLManager.RequestTokenValue = 1
 		case "SentinelRateLimiter":
 			globalCfg.EnableSentinelRateLimiter = true
@@ -220,7 +220,7 @@ func TestRLClosed(t *testing.T) {
 	spec.SessionManager.UpdateSession(customToken, session, 60, false)
 	req.Header.Set("authorization", "Bearer "+customToken)
 
-	DRLManager.CurrentTokenValue = 1
+	DRLManager.SetCurrentTokenValue(1)
 	DRLManager.RequestTokenValue = 1
 
 	chain := getGlobalRLAuthKeyChain(spec)
@@ -240,7 +240,7 @@ func TestRLClosed(t *testing.T) {
 		}
 	}
 
-	DRLManager.CurrentTokenValue = 0
+	DRLManager.SetCurrentTokenValue(0)
 	DRLManager.RequestTokenValue = 0
 }
 
@@ -249,7 +249,7 @@ func TestRLOpenWithReload(t *testing.T) {
 
 	req := TestReq(t, "GET", "/rl_test/", nil)
 
-	DRLManager.CurrentTokenValue = 1
+	DRLManager.SetCurrentTokenValue(1)
 	DRLManager.RequestTokenValue = 1
 
 	chain := getRLOpenChain(spec)
@@ -288,7 +288,7 @@ func TestRLOpenWithReload(t *testing.T) {
 		}
 	}
 
-	DRLManager.CurrentTokenValue = 0
+	DRLManager.SetCurrentTokenValue(0)
 	DRLManager.RequestTokenValue = 0
 }
 
