@@ -96,6 +96,21 @@ func (b *Bundle) Verify() error {
 // AddToSpec attaches the custom middleware settings to an API definition.
 func (b *Bundle) AddToSpec() {
 	b.Spec.CustomMiddleware = b.Manifest.CustomMiddleware
+
+	// Load Python interpreter if the
+	if loadedDrivers[b.Spec.CustomMiddleware.Driver] == nil && b.Spec.CustomMiddleware.Driver == apidef.PythonDriver {
+		var err error
+		loadedDrivers[apidef.PythonDriver], err = NewPythonDispatcher()
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "coprocess",
+			}).WithError(err).Error("Couldn't load Python dispatcher")
+			return
+		}
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess",
+		}).Info("Python dispatcher was initialized")
+	}
 	dispatcher := loadedDrivers[b.Spec.CustomMiddleware.Driver]
 	if dispatcher != nil {
 		dispatcher.HandleMiddlewareCache(&b.Manifest, b.Path)

@@ -207,21 +207,6 @@ func CoProcessInit() {
 		return
 	}
 
-	// Load Python dispatcher:
-	if config.Global().CoProcessOptions.PythonPathPrefix != "" {
-		var err error
-		loadedDrivers[apidef.PythonDriver], err = NewPythonDispatcher()
-		if err == nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "coprocess",
-			}).Info("Python dispatcher was initialized")
-		} else {
-			log.WithFields(logrus.Fields{
-				"prefix": "coprocess",
-			}).WithError(err).Error("Couldn't load Python dispatcher")
-		}
-	}
-
 	// Load gRPC dispatcher:
 	if config.Global().CoProcessOptions.CoProcessGRPCServer != "" {
 		var err error

@@ -18,10 +18,15 @@ import (
 	python "github.com/TykTechnologies/tyk/dlpython"
 	"github.com/golang/protobuf/proto"
 )
+import (
+	"os"
+	"sync"
+)
 
 var (
 	dispatcherClass    unsafe.Pointer
 	dispatcherInstance unsafe.Pointer
+	mwCacheLock        = sync.Mutex{}
 )
 
 // PythonDispatcher implements a coprocess.Dispatcher
@@ -121,8 +126,8 @@ func (d *PythonDispatcher) Reload() {
 // HandleMiddlewareCache isn't used by Python.
 func (d *PythonDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, basePath string) {
 	go func() {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
+		mwCacheLock.Lock()
+		defer mwCacheLock.Unlock()
 		dispatcherLoadBundle, err := python.PyObjectGetAttr(dispatcherInstance, "load_bundle")
 		if err != nil {
 			log.WithFields(logrus.Fields{
@@ -196,11 +201,6 @@ func PythonNewDispatcher(bundleRootPath string) (coprocess.Dispatcher, error) {
 
 // PythonSetEnv sets PYTHONPATH, it's called before initializing the interpreter.
 func PythonSetEnv(pythonPaths ...string) {
-	if config.Global().CoProcessOptions.PythonPathPrefix == "" {
-		log.WithFields(logrus.Fields{
-			"prefix": "coprocess",
-		}).Warning("Python path prefix isn't set (check \"python_path_prefix\" in tyk.conf)")
-	}
 	python.SetPythonPath(pythonPaths)
 }
 
@@ -221,7 +221,13 @@ func getBundlePaths() []string {
 // NewPythonDispatcher wraps all the actions needed for this CP.
 func NewPythonDispatcher() (dispatcher coprocess.Dispatcher, err error) {
 	workDir := config.Global().CoProcessOptions.PythonPathPrefix
-
+	if workDir == "" {
+		tykBin, _ := os.Executable()
+		workDir = filepath.Dir(tykBin)
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess",
+		}).Debugf("Python path prefix isn't set, using '%s'", workDir)
+	}
 	dispatcherPath := filepath.Join(workDir, "coprocess", "python")
 	tykPath := filepath.Join(dispatcherPath, "tyk")
 	protoPath := filepath.Join(workDir, "coprocess", "python", "proto")
