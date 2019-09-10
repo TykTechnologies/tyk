@@ -1,6 +1,3 @@
-// +build coprocess
-// +build python
-
 package python
 
 import (
@@ -15,6 +12,15 @@ import (
 	"github.com/TykTechnologies/tyk/gateway"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
+)
+
+const (
+	defaultPythonVersion = "3.5"
+)
+
+var (
+	pythonVersion = defaultPythonVersion
+	pkgPath       = os.Getenv("PKG_PATH")
 )
 
 var pythonBundleWithAuthCheck = map[string]string{
@@ -159,6 +165,12 @@ def MyResponseHook(request, response, session, metadata, spec):
 `,
 }
 
+func init() {
+	if versionOverride := os.Getenv("PYTHON_VERSION"); versionOverride != "" {
+		pythonVersion = versionOverride
+	}
+}
+
 func TestMain(m *testing.M) {
 	os.Exit(gateway.InitTestMain(context.Background(), m))
 }
@@ -166,7 +178,9 @@ func TestMain(m *testing.M) {
 func TestPythonBundles(t *testing.T) {
 	ts := gateway.StartTest(gateway.TestConfig{
 		CoprocessConfig: config.CoProcessConfig{
-			EnableCoProcess: true,
+			EnableCoProcess:  true,
+			PythonVersion:    pythonVersion,
+			PythonPathPrefix: pkgPath,
 		}})
 	defer ts.Close()
 

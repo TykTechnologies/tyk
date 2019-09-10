@@ -328,7 +328,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 			logger.Info("Checking security policy: OpenID")
 		}
 
-		coprocessAuth := EnableCoProcess && mwDriver != apidef.OttoDriver && spec.EnableCoProcessAuth
+		coprocessAuth := mwDriver != apidef.OttoDriver && spec.EnableCoProcessAuth
 		ottoAuth := !coprocessAuth && mwDriver == apidef.OttoDriver && spec.EnableCoProcessAuth
 		gopluginAuth := !coprocessAuth && !ottoAuth && mwDriver == apidef.GoPluginDriver && spec.UseGoPluginAuth
 
