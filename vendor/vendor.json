@@ -43,10 +43,10 @@
 			"revisionTime": "2016-09-08T20:14:09Z"
 		},
 		{
-			"checksumSHA1": "x4O2rG2+8ioJ0ZTQBiib50NAzQY=",
+			"checksumSHA1": "xFb5HtnQU4DJ8M5Dwnyii9hyuyM=",
 			"path": "github.com/TykTechnologies/drl",
-			"revision": "36df9d02f946013b2b4ddaf813770256272c375a",
-			"revisionTime": "2017-10-28T14:04:03Z"
+			"revision": "cc541aa8e3e1734e4fac8e1301c88546066e804a",
+			"revisionTime": "2019-09-05T19:19:55Z"
 		},
 		{
 			"checksumSHA1": "HqPKaziJ4igBSUmO1i7W0cRkpVA=",
@@ -1502,6 +1502,10 @@
 			"path": "gopkg.in/yaml.v2",
 			"revision": "51d6538a90f86fe93ac480b35f37b2be17fef232",
 			"revisionTime": "2018-11-15T11:05:04Z"
+		},
+		{
+			"path": "https://github.com/TykTechnologies/drl.git",
+			"revision": ""
 		}
 	],
 	"rootPath": "github.com/TykTechnologies/tyk"
