@@ -1,284 +1,207 @@
-// +build coprocess
-// +build python
-
 package gateway
 
-/*
-#cgo pkg-config: python3
-#cgo python CFLAGS: -DENABLE_PYTHON -DPy_LIMITED_API
-
-
-#include <Python.h>
-
-#include <stdio.h>
-#include <stdlib.h>
-
-#include "../coprocess/sds/sds.h"
-
-#include "../coprocess/api.h"
-
-#include "../coprocess/python/binding.h"
-#include "../coprocess/python/dispatcher.h"
-
-#include "../coprocess/python/tyk/gateway_wrapper.h"
-
-PyGILState_STATE gilState;
-
-static int Python_Init() {
-	CoProcessLog( sdsnew("Initializing interpreter, Py_Initialize()"), "info");
-	// This exposes the glue module as "gateway_wrapper"
-	PyImport_AppendInittab("gateway_wrapper", &PyInit_gateway_wrapper);
-	Py_Initialize();
-	gilState = PyGILState_Ensure();
-	PyEval_InitThreads();
-	return Py_IsInitialized();
-}
-
-
-static int Python_LoadDispatcher() {
-	PyObject* module_name = PyUnicode_FromString( dispatcher_module_name );
-	dispatcher_module = PyImport_Import( module_name );
-
-	if( dispatcher_module == NULL ) {
-		PyErr_Print();
-		return -1;
-	}
-
-	dispatcher_module_dict = PyModule_GetDict(dispatcher_module);
-
-	if( dispatcher_module_dict == NULL ) {
-		PyErr_Print();
-		return -1;
-	}
-
-	dispatcher_class = PyDict_GetItemString(dispatcher_module_dict, dispatcher_class_name);
-
-	if( dispatcher_class == NULL ) {
-		PyErr_Print();
-		return -1;
-	}
-
-	return 0;
-}
-
-static void Python_ReloadDispatcher() {
-	gilState = PyGILState_Ensure();
-	PyObject* hook_name = PyUnicode_FromString(dispatcher_reload);
-	if( dispatcher_reload_hook == NULL ) {
-		dispatcher_reload_hook = PyObject_GetAttr(dispatcher, hook_name);
-	};
-
-	PyObject* result = PyObject_CallObject( dispatcher_reload_hook, NULL );
-
-	PyGILState_Release(gilState);
-
-}
-
-static void Python_HandleMiddlewareCache(char* bundle_path) {
-	gilState = PyGILState_Ensure();
-	if( PyCallable_Check(dispatcher_load_bundle) ) {
-		PyObject* load_bundle_args = PyTuple_Pack( 1, PyUnicode_FromString(bundle_path) );
-		PyObject_CallObject( dispatcher_load_bundle, load_bundle_args );
-	}
-	PyGILState_Release(gilState);
-}
-
-static int Python_NewDispatcher(char* bundle_root_path) {
-	PyThreadState*  mainThreadState = PyEval_SaveThread();
-	gilState = PyGILState_Ensure();
-	if( PyCallable_Check(dispatcher_class) ) {
-		dispatcher_args = PyTuple_Pack( 1, PyUnicode_FromString(bundle_root_path) );
-		dispatcher = PyObject_CallObject( dispatcher_class, dispatcher_args );
-
-		if( dispatcher == NULL) {
-			PyErr_Print();
-			PyGILState_Release(gilState);
-			return -1;
-		}
-	} else {
-		PyErr_Print();
-		PyGILState_Release(gilState);
-		return -1;
-	}
-
-	dispatcher_hook_name = PyUnicode_FromString( hook_name );
-	dispatcher_hook = PyObject_GetAttr(dispatcher, dispatcher_hook_name);
-
-	dispatch_event_name = PyUnicode_FromString( dispatch_event_name_s );
-	dispatch_event = PyObject_GetAttr(dispatcher, dispatch_event_name );
-
-	dispatcher_load_bundle_name = PyUnicode_FromString( load_bundle_name );
-	dispatcher_load_bundle = PyObject_GetAttr(dispatcher, dispatcher_load_bundle_name);
-
-	if( dispatcher_hook == NULL ) {
-		PyErr_Print();
-		PyGILState_Release(gilState);
-		return -1;
-	}
-	PyGILState_Release(gilState);
-	return 0;
-}
-
-static void Python_SetEnv(char* python_path) {
-	CoProcessLog( sdscatprintf(sdsempty(), "Setting PYTHONPATH to '%s'", python_path), "info");
-	setenv("PYTHONPATH", python_path, 1 );
-}
-
-static int Python_DispatchHook(struct CoProcessMessage* object, struct CoProcessMessage* new_object) {
-	if (object->p_data == NULL) {
-		free(object);
-		return -1;
-	}
-
-	gilState = PyGILState_Ensure();
-	PyObject* input = PyBytes_FromStringAndSize(object->p_data, object->length);
-	PyObject* args = PyTuple_Pack( 1, input );
-
-	PyObject* result = PyObject_CallObject( dispatcher_hook, args );
-
-	free(object->p_data);
-	free(object);
-
-	Py_DECREF(input);
-	Py_DECREF(args);
-
-	if( result == NULL ) {
-		PyErr_Print();
-		PyGILState_Release(gilState);
-		return -1;
-	}
-	PyObject* new_object_msg_item = PyTuple_GetItem( result, 0 );
-	char* output = PyBytes_AsString(new_object_msg_item);
-
-	PyObject* new_object_msg_length = PyTuple_GetItem( result, 1 );
-	int msg_length = PyLong_AsLong(new_object_msg_length);
-
-	// Copy the message in order to avoid accessing the result PyObject internal buffer:
-	char* output_copy = malloc(msg_length);
-	memcpy(output_copy, output, msg_length);
-
-	Py_DECREF(result);
-
-	new_object->p_data= (void*)output_copy;
-	new_object->length = msg_length;
-
-	PyGILState_Release(gilState);
-	return 0;
-}
-
-static void Python_DispatchEvent(char* event_json) {
-	gilState = PyGILState_Ensure();
-	PyObject* args = PyTuple_Pack( 1, PyUnicode_FromString(event_json) );
-	PyObject* result = PyObject_CallObject( dispatch_event, args );
-	PyGILState_Release(gilState);
-}
-
-*/
-import "C"
-
 import (
-	"errors"
+	"C"
 	"io/ioutil"
 	"path/filepath"
 	"runtime"
-	"strings"
-	"sync"
 	"unsafe"
 
 	"github.com/sirupsen/logrus"
 
+	"fmt"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/coprocess"
+
+	python "github.com/TykTechnologies/tyk/dlpython"
+	"github.com/golang/protobuf/proto"
+)
+import (
+	"os"
+	"sync"
+)
+
+var (
+	dispatcherClass    unsafe.Pointer
+	dispatcherInstance unsafe.Pointer
+	mwCacheLock        = sync.Mutex{}
 )
 
 // PythonDispatcher implements a coprocess.Dispatcher
 type PythonDispatcher struct {
 	coprocess.Dispatcher
-	mu sync.Mutex
 }
 
 // Dispatch takes a CoProcessMessage and sends it to the CP.
-func (d *PythonDispatcher) Dispatch(objectPtr unsafe.Pointer, newObjectPtr unsafe.Pointer) error {
-	object := (*C.struct_CoProcessMessage)(objectPtr)
-	newObject := (*C.struct_CoProcessMessage)(newObjectPtr)
-
-	if result := C.Python_DispatchHook(object, newObject); result != 0 {
-		return errors.New("Dispatch error")
+func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
+	// Prepare the PB object:
+	objectMsg, err := proto.Marshal(object)
+	if err != nil {
+		return nil, err
 	}
-	return nil
+
+	// Find the dispatch_hook:
+	dispatchHookFunc, err := python.PyObjectGetAttr(dispatcherInstance, "dispatch_hook")
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "python",
+		}).Error(err)
+	}
+
+	objectBytes, err := python.PyBytesFromString(objectMsg)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "python",
+		}).Error(err)
+	}
+
+	args, err := python.PyTupleNew(1)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "python",
+		}).Fatal(err)
+	}
+
+	python.PyTupleSetItem(args, 0, objectBytes)
+	result, err := python.PyObjectCallObject(dispatchHookFunc, args)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "python",
+		}).Error(err)
+		return nil, err
+	}
+
+	newObjectPtr, err := python.PyTupleGetItem(result, 0)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "python",
+		}).Error(err)
+		return nil, err
+	}
+
+	newObjectLen, err := python.PyTupleGetItem(result, 1)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "python",
+		}).Error(err)
+		return nil, err
+	}
+
+	newObjectBytes, err := python.PyBytesAsString(newObjectPtr, python.PyLongAsLong(newObjectLen))
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "python",
+		}).Error(err)
+		return nil, err
+	}
+
+	newObject := &coprocess.Object{}
+	err = proto.Unmarshal(newObjectBytes, newObject)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "python",
+		}).Error(err)
+		return nil, err
+	}
+	return newObject, nil
+
 }
 
 // DispatchEvent dispatches a Tyk event.
 func (d *PythonDispatcher) DispatchEvent(eventJSON []byte) {
-	CEventJSON := C.CString(string(eventJSON))
-	defer C.free(unsafe.Pointer(CEventJSON))
-	C.Python_DispatchEvent(CEventJSON)
+	/*
+		CEventJSON := C.CString(string(eventJSON))
+		defer C.free(unsafe.Pointer(CEventJSON))
+		C.Python_DispatchEvent(CEventJSON)
+	*/
 }
 
 // Reload triggers a reload affecting CP middlewares and event handlers.
 func (d *PythonDispatcher) Reload() {
-	C.Python_ReloadDispatcher()
+	// C.Python_ReloadDispatcher()
 }
 
 // HandleMiddlewareCache isn't used by Python.
 func (d *PythonDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, basePath string) {
-	d.mu.Lock()
 	go func() {
-		runtime.LockOSThread()
-		CBundlePath := C.CString(basePath)
-		defer func() {
-			runtime.UnlockOSThread()
-			C.free(unsafe.Pointer(CBundlePath))
-			d.mu.Unlock()
-		}()
-		C.Python_HandleMiddlewareCache(CBundlePath)
+		mwCacheLock.Lock()
+		defer mwCacheLock.Unlock()
+		dispatcherLoadBundle, err := python.PyObjectGetAttr(dispatcherInstance, "load_bundle")
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "python",
+			}).Error(err)
+		}
+
+		args, err := python.PyTupleNew(1)
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "python",
+			}).Error(err)
+		}
+		python.PyTupleSetItem(args, 0, basePath)
+		python.PyObjectCallObject(dispatcherLoadBundle, args)
 	}()
 }
 
 // PythonInit initializes the Python interpreter.
 func PythonInit() error {
-	result := C.Python_Init()
-	if result == 0 {
-		return errors.New("Can't Py_Initialize()")
+	ver, err := python.FindPythonConfig(config.Global().CoProcessOptions.PythonVersion)
+	if err != nil {
+		return fmt.Errorf("Python version '%s' doesn't exist", ver)
 	}
+	err = python.Init()
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess",
+		}).Fatal("Couldn't initialize Python")
+	}
+	log.WithFields(logrus.Fields{
+		"prefix": "coprocess",
+	}).Infof("Python version '%s' loaded", ver)
 	return nil
 }
 
 // PythonLoadDispatcher creates reference to the dispatcher class.
-func PythonLoadDispatcher() error {
-	result := C.Python_LoadDispatcher()
-	if result == -1 {
-		return errors.New("Can't load dispatcher")
+func PythonLoadDispatcher() {
+	moduleDict, err := python.LoadModuleDict("dispatcher")
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess",
+		}).Fatalf("Couldn't initialize Python dispatcher")
 	}
-	return nil
+	dispatcherClass, err = python.GetItem(moduleDict, "TykDispatcher")
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess",
+		}).Fatalf("Couldn't initialize Python dispatcher")
+	}
 }
 
 // PythonNewDispatcher creates an instance of TykDispatcher.
 func PythonNewDispatcher(bundleRootPath string) (coprocess.Dispatcher, error) {
-	CBundleRootPath := C.CString(bundleRootPath)
-	defer C.free(unsafe.Pointer(CBundleRootPath))
-
-	result := C.Python_NewDispatcher(CBundleRootPath)
-	if result == -1 {
-		return nil, errors.New("can't initialize a dispatcher")
+	args, err := python.PyTupleNew(1)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "python",
+		}).Fatal(err)
 	}
-
-	dispatcher := &PythonDispatcher{mu: sync.Mutex{}}
-
+	python.PyTupleSetItem(args, 0, bundleRootPath)
+	dispatcherInstance, err = python.PyObjectCallObject(dispatcherClass, args)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "python",
+		}).Fatal(err)
+	}
+	dispatcher := &PythonDispatcher{}
 	return dispatcher, nil
 }
 
 // PythonSetEnv sets PYTHONPATH, it's called before initializing the interpreter.
 func PythonSetEnv(pythonPaths ...string) {
-	if config.Global().CoProcessOptions.PythonPathPrefix == "" {
-		log.WithFields(logrus.Fields{
-			"prefix": "coprocess",
-		}).Warning("Python path prefix isn't set (check \"python_path_prefix\" in tyk.conf)")
-	}
-	CPythonPath := C.CString(strings.Join(pythonPaths, ":"))
-	defer C.free(unsafe.Pointer(CPythonPath))
-	C.Python_SetEnv(CPythonPath)
+	python.SetPythonPath(pythonPaths)
 }
 
 // getBundlePaths will return an array of the available bundle directories:
@@ -295,21 +218,22 @@ func getBundlePaths() []string {
 	return directories
 }
 
-// NewCoProcessDispatcher wraps all the actions needed for this CP.
-func NewCoProcessDispatcher() (dispatcher coprocess.Dispatcher, err error) {
-	// MessageType sets the default message type.
-	MessageType = coprocess.ProtobufMessage
-
-	// CoProcessName declares the driver name.
-	CoProcessName = apidef.PythonDriver
-
+// NewPythonDispatcher wraps all the actions needed for this CP.
+func NewPythonDispatcher() (dispatcher coprocess.Dispatcher, err error) {
 	workDir := config.Global().CoProcessOptions.PythonPathPrefix
-
+	if workDir == "" {
+		tykBin, _ := os.Executable()
+		workDir = filepath.Dir(tykBin)
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess",
+		}).Debugf("Python path prefix isn't set, using '%s'", workDir)
+	}
 	dispatcherPath := filepath.Join(workDir, "coprocess", "python")
+	tykPath := filepath.Join(dispatcherPath, "tyk")
 	protoPath := filepath.Join(workDir, "coprocess", "python", "proto")
 	bundleRootPath := filepath.Join(config.Global().MiddlewarePath, "bundles")
 
-	paths := []string{dispatcherPath, protoPath, bundleRootPath}
+	paths := []string{dispatcherPath, tykPath, protoPath, bundleRootPath}
 
 	// initDone is used to signal the end of Python initialization step:
 	initDone := make(chan error)
@@ -318,7 +242,11 @@ func NewCoProcessDispatcher() (dispatcher coprocess.Dispatcher, err error) {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
 		PythonSetEnv(paths...)
-		PythonInit()
+		err := PythonInit()
+		if err != nil {
+			initDone <- err
+			return
+		}
 		PythonLoadDispatcher()
 		dispatcher, err = PythonNewDispatcher(bundleRootPath)
 		if err != nil {
@@ -326,6 +254,7 @@ func NewCoProcessDispatcher() (dispatcher coprocess.Dispatcher, err error) {
 				"prefix": "coprocess",
 			}).Error(err)
 		}
+
 		initDone <- err
 	}()
 	err = <-initDone

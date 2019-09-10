@@ -1,5 +1,3 @@
-// +build !python
-
 package gateway
 
 import (

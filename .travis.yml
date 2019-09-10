@@ -14,6 +14,7 @@ addons:
     packages:
     - python3.5
     - python3-pip
+    - python3.5-dev
     - libluajit-5.1-dev
 
 matrix:

@@ -228,6 +228,9 @@
         },
         "python_path_prefix": {
           "type": "string"
+        },
+        "python_version": {
+          "type": "string"
         }
       }
     },
