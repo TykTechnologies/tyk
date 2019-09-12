@@ -123,7 +123,7 @@ func prepareGenericJWTSession(testName string, method string, claimName string, 
 			spec.JWTIdentityBaseField = claimName
 		}
 	})[0]
-	spec.SessionManager.UpdateSession(tokenKID, sessionFunc(), 60, false)
+	GlobalSessionManager.UpdateSession(tokenKID, sessionFunc(), 60, false)
 
 	return spec, jwtToken
 
@@ -450,8 +450,8 @@ func prepareJWTSessionRSAWithRawSourceOnWithClientID(isBench bool) string {
 	}
 	session := createJWTSessionWithRSAWithPolicy(policyID)
 
-	spec.SessionManager.ResetQuota(tokenID, session, false)
-	spec.SessionManager.UpdateSession(tokenID, session, 60, false)
+	GlobalSessionManager.ResetQuota(tokenID, session, false)
+	GlobalSessionManager.UpdateSession(tokenID, session, 60, false)
 
 	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
@@ -1614,7 +1614,7 @@ func TestJWTDefaultPolicies(t *testing.T) {
 	sessionID := generateToken(spec.OrgID, keyID)
 
 	assert := func(t *testing.T, expected []string) {
-		session, _ := FallbackKeySesionManager.SessionDetail(sessionID, false)
+		session, _ := GlobalSessionManager.SessionDetail(spec.OrgID, sessionID, false)
 		actual := session.PolicyIDs()
 		if !reflect.DeepEqual(expected, actual) {
 			t.Fatalf("Expected %v, actaul %v", expected, actual)
