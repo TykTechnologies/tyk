@@ -161,6 +161,8 @@ func TestKeyHandler(t *testing.T) {
 	}
 	policiesMu.Unlock()
 	withPolicy := CreateStandardSession()
+	withoutPolicyJSON, _ := json.Marshal(withPolicy)
+
 	withPolicy.ApplyPolicies = []string{
 		"abc_policy",
 	}
@@ -189,9 +191,16 @@ func TestKeyHandler(t *testing.T) {
 			{
 				Method:    "POST",
 				Path:      "/tyk/keys/create",
-				Data:      string(withPolicyJSON),
+				Data:      string(withoutPolicyJSON),
 				AdminAuth: true,
 				Code:      400,
+			},
+			{
+				Method:    "POST",
+				Path:      "/tyk/keys/create",
+				Data:      string(withPolicyJSON),
+				AdminAuth: true,
+				Code:      200,
 			},
 			{
 				Method:    "POST",

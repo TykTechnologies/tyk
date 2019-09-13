@@ -923,7 +923,8 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 type PolicyUpdateObj struct {
-	Policy string `json:"policy"`
+	Policy        string   `json:"policy"`
+	ApplyPolicies []string `json:"apply_policies"`
 }
 
 func policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
@@ -935,18 +936,18 @@ func policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if policRecord.Policy != "" {
+		policRecord.ApplyPolicies = append(policRecord.ApplyPolicies, policRecord.Policy)
+	}
+
 	keyName := mux.Vars(r)["keyName"]
-	apiID := r.URL.Query().Get("api_id")
-	obj, code := handleUpdateHashedKey(keyName, apiID, policRecord.Policy)
+	obj, code := handleUpdateHashedKey(keyName, policRecord.ApplyPolicies)
 
 	doJSONWrite(w, code, obj)
 }
 
-func handleUpdateHashedKey(keyName, apiID, policyId string) (interface{}, int) {
+func handleUpdateHashedKey(keyName string, applyPolicies []string) (interface{}, int) {
 	sessionManager := FallbackKeySesionManager
-	if spec := getApiSpec(apiID); spec != nil {
-		sessionManager = spec.SessionManager
-	}
 
 	sess, ok := sessionManager.SessionDetail(keyName, true)
 	if !ok {
@@ -961,7 +962,7 @@ func handleUpdateHashedKey(keyName, apiID, policyId string) (interface{}, int) {
 
 	// Set the policy
 	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
-	sess.SetPolicies(policyId)
+	sess.SetPolicies(applyPolicies...)
 
 	err := sessionManager.UpdateSession(keyName, &sess, 0, true)
 	if err != nil {
@@ -1224,6 +1225,9 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 	newSession.DateCreated = time.Now()
 
+	mw := BaseMiddleware{}
+	mw.ApplyPolicies(newSession)
+
 	if len(newSession.AccessRights) > 0 {
 		// reset API-level limit to nil if any has a zero-value
 		resetAPILimits(newSession.AccessRights)
@@ -1332,6 +1336,27 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	}).Info("Generated new key: (", obfuscateKey(newKey), ")")
 
 	doJSONWrite(w, http.StatusOK, obj)
+}
+
+func previewKeyHandler(w http.ResponseWriter, r *http.Request) {
+	newSession := new(user.SessionState)
+	if err := json.NewDecoder(r.Body).Decode(newSession); err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"status": "fail",
+			"err":    err,
+		}).Error("Key creation failed.")
+		doJSONWrite(w, http.StatusInternalServerError, apiError("Unmarshalling failed"))
+		return
+	}
+
+	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
+	newSession.DateCreated = time.Now()
+
+	mw := BaseMiddleware{}
+	mw.ApplyPolicies(newSession)
+
+	doJSONWrite(w, http.StatusOK, newSession)
 }
 
 // NewClientRequest is an outward facing JSON object translated from osin OAuthClients

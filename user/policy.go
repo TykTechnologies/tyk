@@ -5,6 +5,7 @@ import "gopkg.in/mgo.v2/bson"
 type Policy struct {
 	MID                bson.ObjectId               `bson:"_id,omitempty" json:"_id"`
 	ID                 string                      `bson:"id,omitempty" json:"id"`
+	Name               string                      `bson:"name" json:"name"`
 	OrgID              string                      `bson:"org_id" json:"org_id"`
 	Rate               float64                     `bson:"rate" json:"rate"`
 	Per                float64                     `bson:"per" json:"per"`
