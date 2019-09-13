@@ -97,9 +97,23 @@ func (b *Bundle) Verify() error {
 func (b *Bundle) AddToSpec() {
 	b.Spec.CustomMiddleware = b.Manifest.CustomMiddleware
 
-	// Call HandleMiddlewareCache only when using rich plugins:
-	if GlobalDispatcher != nil && b.Spec.CustomMiddleware.Driver != apidef.OttoDriver {
-		GlobalDispatcher.HandleMiddlewareCache(&b.Manifest, b.Path)
+	// Load Python interpreter if the
+	if loadedDrivers[b.Spec.CustomMiddleware.Driver] == nil && b.Spec.CustomMiddleware.Driver == apidef.PythonDriver {
+		var err error
+		loadedDrivers[apidef.PythonDriver], err = NewPythonDispatcher()
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "coprocess",
+			}).WithError(err).Error("Couldn't load Python dispatcher")
+			return
+		}
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess",
+		}).Info("Python dispatcher was initialized")
+	}
+	dispatcher := loadedDrivers[b.Spec.CustomMiddleware.Driver]
+	if dispatcher != nil {
+		dispatcher.HandleMiddlewareCache(&b.Manifest, b.Path)
 	}
 }
 

@@ -92,7 +92,6 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 	globalConf.AllowInsecureConfigs = true
 	// Enable coprocess and bundle downloader:
 	globalConf.CoProcessOptions.EnableCoProcess = true
-	globalConf.CoProcessOptions.PythonPathPrefix = "../../"
 	globalConf.EnableBundleDownloader = true
 	globalConf.BundleBaseURL = testHttpBundles
 	globalConf.MiddlewarePath = testMiddlewarePath

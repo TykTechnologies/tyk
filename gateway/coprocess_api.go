@@ -1,18 +1,5 @@
-// +build coprocess
-// +build !grpc
-
 package gateway
 
-/*
-#include <stdio.h>
-
-#include "../coprocess/api.h"
-
-#ifdef ENABLE_PYTHON
-#include "../coprocess/python/dispatcher.h"
-#include "../coprocess/python/binding.h"
-#endif
-*/
 import "C"
 
 import (
@@ -68,19 +55,19 @@ func CoProcessLog(CMessage, CLogLevel *C.char) {
 	switch logLevel {
 	case "debug":
 		log.WithFields(logrus.Fields{
-			"prefix": CoProcessName,
+			"prefix": "python",
 		}).Debug(message)
 	case "error":
 		log.WithFields(logrus.Fields{
-			"prefix": CoProcessName,
+			"prefix": "python",
 		}).Error(message)
 	case "warning":
 		log.WithFields(logrus.Fields{
-			"prefix": CoProcessName,
+			"prefix": "python",
 		}).Warning(message)
 	default:
 		log.WithFields(logrus.Fields{
-			"prefix": CoProcessName,
+			"prefix": "python",
 		}).Info(message)
 	}
 }

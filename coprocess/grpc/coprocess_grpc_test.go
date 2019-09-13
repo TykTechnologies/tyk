@@ -1,6 +1,3 @@
-// +build coprocess
-// +build grpc
-
 package grpc
 
 import (

@@ -1,4 +1,3 @@
-// +build coprocess
 // +build lua
 
 package gateway
@@ -67,6 +66,7 @@ static void LuaDispatchEvent(char* event_json) {
 import "C"
 
 import (
+	"encoding/json"
 	"errors"
 	"io/ioutil"
 	"path/filepath"
@@ -85,6 +85,20 @@ const (
 	MiddlewareBasePath = "middleware/lua"
 )
 
+func init() {
+	var err error
+	loadedDrivers[apidef.LuaDriver], err = NewLuaDispatcher()
+	if err == nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess",
+		}).Info("Lua dispatcher was initialized")
+	} else {
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess",
+		}).WithError(err).Error("Couldn't load Lua dispatcher")
+	}
+}
+
 // gMiddlewareCache will hold LuaDispatcher.gMiddlewareCache.
 var gMiddlewareCache map[string]string
 var gModuleCache map[string]string
@@ -99,13 +113,47 @@ type LuaDispatcher struct {
 }
 
 // Dispatch takes a CoProcessMessage and sends it to the CP.
-func (d *LuaDispatcher) Dispatch(objectPtr unsafe.Pointer, newObjectPtr unsafe.Pointer) error {
+func (d *LuaDispatcher) NativeDispatch(objectPtr unsafe.Pointer, newObjectPtr unsafe.Pointer) error {
 	object := (*C.struct_CoProcessMessage)(objectPtr)
 	newObject := (*C.struct_CoProcessMessage)(newObjectPtr)
 	if result := C.LuaDispatchHook(object, newObject); result != 0 {
 		return errors.New("Dispatch error")
 	}
 	return nil
+}
+
+func (d *LuaDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
+	objectMsg, err := json.Marshal(object)
+	if err != nil {
+		return nil, err
+	}
+
+	objectMsgStr := string(objectMsg)
+	CObjectStr := C.CString(objectMsgStr)
+
+	objectPtr := (*C.struct_CoProcessMessage)(C.malloc(C.size_t(unsafe.Sizeof(C.struct_CoProcessMessage{}))))
+	objectPtr.p_data = unsafe.Pointer(CObjectStr)
+	objectPtr.length = C.int(len(objectMsg))
+
+	newObjectPtr := (*C.struct_CoProcessMessage)(C.malloc(C.size_t(unsafe.Sizeof(C.struct_CoProcessMessage{}))))
+
+	// Call the dispatcher (objectPtr is freed during this call):
+	if err = d.NativeDispatch(unsafe.Pointer(objectPtr), unsafe.Pointer(newObjectPtr)); err != nil {
+		return nil, err
+	}
+	newObjectBytes := C.GoBytes(newObjectPtr.p_data, newObjectPtr.length)
+
+	newObject := &coprocess.Object{}
+
+	if err := json.Unmarshal(newObjectBytes, newObject); err != nil {
+		return nil, err
+	}
+
+	// Free the returned object memory:
+	C.free(unsafe.Pointer(newObjectPtr.p_data))
+	C.free(unsafe.Pointer(newObjectPtr))
+
+	return newObject, nil
 }
 
 // Reload will perform a middleware reload when a hot reload is triggered.
@@ -199,13 +247,7 @@ func (d *LuaDispatcher) DispatchEvent(eventJSON []byte) {
 }
 
 // NewCoProcessDispatcher wraps all the actions needed for this CP.
-func NewCoProcessDispatcher() (coprocess.Dispatcher, error) {
-	// CoProcessName specifies the driver name.
-	CoProcessName = apidef.LuaDriver
-
-	// MessageType sets the default message type.
-	MessageType = coprocess.JsonMessage
-
+func NewLuaDispatcher() (coprocess.Dispatcher, error) {
 	dispatcher := &LuaDispatcher{}
 	dispatcher.LoadModules()
 	dispatcher.Reload()
