@@ -457,6 +457,11 @@ func (r *RPCStorageHandler) DeleteKey(keyName string) bool {
 	return ok == true
 }
 
+func (r *RPCStorageHandler) DeleteAllKeys() bool {
+	log.Warning("Not implementated")
+	return false
+}
+
 // DeleteKey will remove a key from the database without prefixing, assumes user knows what they are doing
 func (r *RPCStorageHandler) DeleteRawKey(keyName string) bool {
 	ok, err := rpc.FuncClientSingleton("DeleteRawKey", keyName)

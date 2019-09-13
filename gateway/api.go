@@ -31,6 +31,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -530,15 +531,20 @@ func handleGetAllKeys(filter, apiID string) (interface{}, int) {
 	}
 
 	sessions := sessionManager.Sessions(filter)
+	if filter != "" {
+		filterB64 := base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString([]byte(fmt.Sprintf(`{"org":"%s",`, filter)))
+		orgIDB64Sessions := sessionManager.Sessions(filterB64)
+		sessions = append(sessions, orgIDB64Sessions...)
+	}
 
-	fixed_sessions := make([]string, 0)
+	fixedSessions := make([]string, 0)
 	for _, s := range sessions {
 		if !strings.HasPrefix(s, QuotaKeyPrefix) && !strings.HasPrefix(s, RateLimitKeyPrefix) {
-			fixed_sessions = append(fixed_sessions, s)
+			fixedSessions = append(fixedSessions, s)
 		}
 	}
 
-	sessionsObj := apiAllKeys{fixed_sessions}
+	sessionsObj := apiAllKeys{fixedSessions}
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",

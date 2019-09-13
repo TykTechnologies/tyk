@@ -446,6 +446,21 @@ func (r *RedisCluster) DeleteKey(keyName string) bool {
 	return n.(int64) > 0
 }
 
+// DeleteAllKeys will remove all keys from the database.
+func (r *RedisCluster) DeleteAllKeys() bool {
+	r.ensureConnection()
+	n, err := r.singleton().Do("FLUSHALL")
+	if err != nil {
+		log.WithError(err).Error("Error trying to delete keys")
+	}
+
+	if n.(string) == "OK" {
+		return true
+	}
+
+	return false
+}
+
 // DeleteKey will remove a key from the database without prefixing, assumes user knows what they are doing
 func (r *RedisCluster) DeleteRawKey(keyName string) bool {
 	r.ensureConnection()

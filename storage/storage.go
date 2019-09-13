@@ -34,6 +34,7 @@ type Handler interface {
 	GetExp(string) (int64, error) // Returns expiry of a key
 	GetKeys(string) []string
 	DeleteKey(string) bool
+	DeleteAllKeys() bool
 	DeleteRawKey(string) bool
 	Connect() bool
 	GetKeysAndValues() map[string]string

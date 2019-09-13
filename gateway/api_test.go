@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
+	"sort"
 	"strconv"
 	"sync"
 	"testing"
@@ -132,6 +134,8 @@ func TestKeyHandler(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
 
+	defer ResetTestConfig()
+
 	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.Auth.UseParam = true
@@ -241,9 +245,22 @@ func TestKeyHandler(t *testing.T) {
 				BodyMatch: `"quota_remaining":4`,
 			},
 		}...)
+
+		FallbackKeySesionManager.Store().DeleteAllKeys()
 	})
 
-	knownKey := CreateSession()
+	_, knownKey := ts.CreateSession(func(s *user.SessionState) {
+		s.AccessRights = map[string]user.AccessDefinition{"test": {
+			APIID: "test", Versions: []string{"v1"},
+		}}
+	})
+
+	_, unknownOrgKey := ts.CreateSession(func(s *user.SessionState) {
+		s.OrgID = "dummy"
+		s.AccessRights = map[string]user.AccessDefinition{"test": {
+			APIID: "test", Versions: []string{"v1"},
+		}}
+	})
 
 	t.Run("Get key", func(t *testing.T) {
 		ts.Run(t, []test.TestCase{
@@ -260,6 +277,40 @@ func TestKeyHandler(t *testing.T) {
 			{Method: "GET", Path: "/tyk/keys/?api_id=test", AdminAuth: true, Code: 200, BodyMatch: knownKey},
 			{Method: "GET", Path: "/tyk/keys/?api_id=unknown", AdminAuth: true, Code: 200, BodyMatch: knownKey},
 		}...)
+
+		globalConf := config.Global()
+		globalConf.HashKeyFunction = ""
+		config.SetGlobal(globalConf)
+		_, keyWithoutHash := ts.CreateSession(func(s *user.SessionState) {
+			s.AccessRights = map[string]user.AccessDefinition{"test": {
+				APIID: "test", Versions: []string{"v1"},
+			}}
+		})
+
+		assert := func(response *http.Response, expected []string) {
+			var keys apiAllKeys
+			_ = json.NewDecoder(response.Body).Decode(&keys)
+			actual := keys.APIKeys
+
+			sort.Strings(expected)
+			sort.Strings(actual)
+
+			if !reflect.DeepEqual(expected, actual) {
+				t.Errorf("Expected %v, actual %v", expected, actual)
+			}
+		}
+
+		t.Run(`filter=""`, func(t *testing.T) {
+			resp, _ := ts.Run(t, test.TestCase{Method: "GET", Path: "/tyk/keys/", AdminAuth: true, Code: 200, BodyMatch: knownKey})
+			expected := []string{knownKey, unknownOrgKey, keyWithoutHash}
+			assert(resp, expected)
+		})
+
+		t.Run(`filter=orgID`, func(t *testing.T) {
+			resp, _ := ts.Run(t, test.TestCase{Method: "GET", Path: "/tyk/keys/?filter=" + "default", AdminAuth: true, Code: 200, BodyMatch: knownKey})
+			expected := []string{knownKey, keyWithoutHash}
+			assert(resp, expected)
+		})
 	})
 
 	t.Run("Update key", func(t *testing.T) {
