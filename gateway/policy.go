@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/TykTechnologies/tyk/rpc"
@@ -14,6 +15,8 @@ import (
 
 	"github.com/TykTechnologies/tyk/user"
 )
+
+var policiesReadMU sync.RWMutex
 
 type DBAccessDefinition struct {
 	APIName     string            `json:"apiname"`
@@ -49,6 +52,8 @@ func (d *DBPolicy) ToRegularPolicy() user.Policy {
 }
 
 func LoadPoliciesFromFile(filePath string) map[string]user.Policy {
+	policiesReadMU.RLock()
+	defer policiesReadMU.RUnlock()
 	f, err := os.Open(filePath)
 	if err != nil {
 		log.WithFields(logrus.Fields{
