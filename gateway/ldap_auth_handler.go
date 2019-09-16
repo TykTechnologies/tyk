@@ -143,6 +143,11 @@ func (l *LDAPStorageHandler) DeleteKey(cn string) bool {
 	return l.notifyReadOnly()
 }
 
+func (r *LDAPStorageHandler) DeleteAllKeys() bool {
+	log.Warning("Not implementated")
+	return false
+}
+
 func (l *LDAPStorageHandler) DeleteRawKey(cn string) bool {
 	return l.notifyReadOnly()
 }

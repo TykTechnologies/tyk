@@ -87,6 +87,7 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 	rootPath := filepath.Dir(gatewayPath)
 	globalConf.AnalyticsConfig.GeoIPDBLocation = filepath.Join(rootPath, "testdata", "MaxMind-DB-test-ipv4-24.mmdb")
 	globalConf.EnableJSVM = true
+	globalConf.HashKeyFunction = storage.HashMurmur64
 	globalConf.Monitor.EnableTriggerMonitors = true
 	globalConf.AnalyticsConfig.NormaliseUrls.Enabled = true
 	globalConf.AllowInsecureConfigs = true
