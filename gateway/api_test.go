@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/garyburd/redigo/redis"
-	uuid "github.com/satori/go.uuid"
+	"github.com/satori/go.uuid"
 
 	"fmt"
 
@@ -703,7 +703,7 @@ func TestHashKeyListingDisabled(t *testing.T) {
 	})
 }
 
-func TestHashKeyHandlerHashingDisabled(t *testing.T) {
+func TestKeyHandler_HashingDisabled(t *testing.T) {
 	globalConf := config.Global()
 	// make it to NOT use hashes for Redis keys
 	globalConf.HashKeys = false
@@ -722,11 +722,12 @@ func TestHashKeyHandlerHashingDisabled(t *testing.T) {
 	}}
 	withAccessJSON, _ := json.Marshal(withAccess)
 
-	myKey := "my_key_id"
-	myKeyHash := storage.HashKey(generateToken("default", myKey))
+	myKeyID := "my_key_id"
+	token := generateToken("default", myKeyID)
+	myKeyHash := storage.HashKey(token)
 
 	t.Run("Create, get and delete key with key hashing", func(t *testing.T) {
-		ts.Run(t, []test.TestCase{
+		_, _ = ts.Run(t, []test.TestCase{
 			// create key
 			{
 				Method:       "POST",
@@ -744,21 +745,20 @@ func TestHashKeyHandlerHashingDisabled(t *testing.T) {
 				Code:         200,
 				BodyNotMatch: `"key_hash"`,
 			},
-			// create key with custom value
+			// create key with custom key ID
 			{
 				Method:       "POST",
-				Path:         "/tyk/keys/" + myKey,
+				Path:         "/tyk/keys/" + myKeyID,
 				Data:         string(withAccessJSON),
 				AdminAuth:    true,
 				Code:         200,
-				BodyMatch:    fmt.Sprintf(`"key":"%s"`, myKey),
+				BodyMatch:    fmt.Sprintf(`"key":"%s"`, myKeyID),
 				BodyNotMatch: fmt.Sprintf(`"key_hash":"%s"`, myKeyHash),
 			},
-			// get one key by key name
+			// get one key by generated token
 			{
 				Method:    "GET",
-				Path:      "/tyk/keys/" + myKey,
-				Data:      string(withAccessJSON),
+				Path:      "/tyk/keys/" + token,
 				AdminAuth: true,
 				Code:      200,
 			},
@@ -766,7 +766,6 @@ func TestHashKeyHandlerHashingDisabled(t *testing.T) {
 			{
 				Method:    "GET",
 				Path:      "/tyk/keys/" + myKeyHash + "?hashed=true",
-				Data:      string(withAccessJSON),
 				AdminAuth: true,
 				Code:      400,
 			},
@@ -774,7 +773,6 @@ func TestHashKeyHandlerHashingDisabled(t *testing.T) {
 			{
 				Method:    "GET",
 				Path:      "/tyk/keys/" + myKeyHash + "?hashed=true&api_id=test",
-				Data:      string(withAccessJSON),
 				AdminAuth: true,
 				Code:      400,
 			},
@@ -782,7 +780,6 @@ func TestHashKeyHandlerHashingDisabled(t *testing.T) {
 			{
 				Method:    "DELETE",
 				Path:      "/tyk/keys/" + myKeyHash + "?hashed=true&api_id=test",
-				Data:      string(withAccessJSON),
 				AdminAuth: true,
 				Code:      200,
 			},
