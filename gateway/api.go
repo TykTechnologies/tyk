@@ -532,7 +532,9 @@ func handleGetAllKeys(filter, apiID string) (interface{}, int) {
 
 	sessions := sessionManager.Sessions(filter)
 	if filter != "" {
-		filterB64 := base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString([]byte(fmt.Sprintf(`{"org":"%s",`, filter)))
+		filterB64 := base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString([]byte(fmt.Sprintf(`{"org":"%s"`, filter)))
+		// Remove last 2 digits to look exact match
+		filterB64 = filterB64[0 : len(filterB64)-2]
 		orgIDB64Sessions := sessionManager.Sessions(filterB64)
 		sessions = append(sessions, orgIDB64Sessions...)
 	}
