@@ -131,3 +131,18 @@ func TestTCPDial_with_service_discovery(t *testing.T) {
 		t.Errorf("expected %#v got %#v", expect, result)
 	}
 }
+
+func TestTCP_missing_port(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Name = "no -listen-port"
+		spec.Protocol = "tcp"
+	})
+	apisMu.RLock()
+	n := len(apiSpecs)
+	apisMu.RUnlock()
+	if n != 0 {
+		t.Errorf("expected 0 apis to be loaded got %d", n)
+	}
+}

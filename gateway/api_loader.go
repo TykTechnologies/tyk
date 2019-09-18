@@ -614,7 +614,10 @@ type generalStores struct {
 // Create the individual API (app) specs based on live configurations and assign middleware
 func loadApps(specs []*APISpec) {
 	mainLog.Info("Loading API configurations.")
-
+	if specs == nil || len(specs) == 0 {
+		mainLog.Info("No specs to load")
+		return
+	}
 	tmpSpecRegister := make(map[string]*APISpec)
 
 	// sort by listen path from longer to shorter, so that /foo
