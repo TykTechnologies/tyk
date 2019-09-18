@@ -1188,7 +1188,7 @@ func dashboardServiceInit() {
 }
 
 func handleDashboardRegistration() {
-	if !config.Global().UseDBAppConfigs {
+	if !config.Global().UseDBAppConfigs && config.Global().Policies.PolicySource != "service" {
 		return
 	}
 
