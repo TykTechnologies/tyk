@@ -58,7 +58,7 @@ do
 done
 
 echo "Building Tyk binaries"
-gox -osarch="linux/amd64 linux/386" -tags 'coprocess grpc python'
+gox -osarch="linux/amd64 linux/386" -tags 'coprocess' -cgo
 
 TEMPLATEDIR=${ARCHTGZDIRS[i386]}
 echo "Prepping TGZ Dirs"
