@@ -58,14 +58,7 @@ do
 done
 
 echo "Building Tyk binaries"
-gox -osarch="linux/arm64 linux/amd64 linux/386" -tags 'coprocess grpc'
-
-echo "Building Tyk CP binaries"
-export CPBINNAME_LUA=tyk_linux_amd64_lua
-export CPBINNAME_PYTHON=tyk_linux_amd64_python
-
-gox -osarch="linux/amd64" -tags 'coprocess python' -output '{{.Dir}}_{{.OS}}_{{.Arch}}_python'
-gox -osarch="linux/amd64" -tags 'coprocess lua' -output '{{.Dir}}_{{.OS}}_{{.Arch}}_lua'
+gox -osarch="linux/amd64 linux/386" -tags 'coprocess' -cgo
 
 TEMPLATEDIR=${ARCHTGZDIRS[i386]}
 echo "Prepping TGZ Dirs"
@@ -99,8 +92,6 @@ do
     mv tyk_linux_${arch/i386/386} $archDir/$SOURCEBIN
     cp $cliTmpDir/tyk-cli_linux_${arch/i386/386} $archDir/utils/$CLIBIN
 done
-mv $CPBINNAME_LUA ${ARCHTGZDIRS[amd64]}/$SOURCEBIN-lua
-mv $CPBINNAME_PYTHON ${ARCHTGZDIRS[amd64]}/$SOURCEBIN-python
 
 echo "Compressing"
 for arch in ${!ARCHTGZDIRS[@]}
