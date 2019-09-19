@@ -35,8 +35,6 @@ fi
 
 PKGS="$(go list ./...)"
 
-go get -t
-
 export PKG_PATH=$GOPATH/src/github.com/TykTechnologies/tyk
 
 # build Go-plugin used in tests
