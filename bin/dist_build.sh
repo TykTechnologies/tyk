@@ -41,7 +41,6 @@ cd $ORGDIR
 cd $cliDIR
 git checkout master
 git pull
-go get -v ./...
 gox -osarch="linux/arm64 linux/amd64 linux/386"
 
 echo "Copying CLI Build files"
