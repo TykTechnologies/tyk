@@ -353,12 +353,15 @@ func singleJoiningSlash(a, b string, disableStripSlash bool) string {
 	if disableStripSlash && len(b) == 0 {
 		return a
 	}
-	a = strings.TrimRight(a, "/")
-	b = strings.TrimLeft(b, "/")
-	if len(b) > 0 {
+	aslash := strings.HasSuffix(a, "/")
+	bslash := strings.HasPrefix(b, "/")
+	switch {
+	case aslash && bslash:
+		return a + b[1:]
+	case !aslash && !bslash:
 		return a + "/" + b
 	}
-	return a
+	return a + b
 }
 
 func copyHeader(dst, src http.Header) {

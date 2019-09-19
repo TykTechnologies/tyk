@@ -382,6 +382,29 @@ func TestSingleJoiningSlash(t *testing.T) {
 	}
 }
 
+func TestSingleJoinSlash_updated_go(t *testing.T) {
+	tests := []struct {
+		slasha   string
+		slashb   string
+		expected string
+	}{
+		{"https://www.google.com/", "/favicon.ico", "https://www.google.com/favicon.ico"},
+		{"https://www.google.com", "/favicon.ico", "https://www.google.com/favicon.ico"},
+		{"https://www.google.com", "favicon.ico", "https://www.google.com/favicon.ico"},
+		{"https://www.google.com", "", "https://www.google.com/"},
+		{"", "favicon.ico", "/favicon.ico"},
+	}
+	for _, tt := range tests {
+		if got := singleJoiningSlash(tt.slasha, tt.slashb, false); got != tt.expected {
+			t.Errorf("singleJoiningSlash(%s,%s) want %s got %s",
+				tt.slasha,
+				tt.slashb,
+				tt.expected,
+				got)
+		}
+	}
+}
+
 func TestRequestIP(t *testing.T) {
 	tests := []struct {
 		remote, real, forwarded, want string
