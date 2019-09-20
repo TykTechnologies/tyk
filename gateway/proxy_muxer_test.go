@@ -5,7 +5,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"reflect"
 	"strconv"
 	"sync/atomic"
@@ -89,6 +88,8 @@ func TestTCPDial_with_service_discovery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	EnablePort(p, "tcp")
+	defer ResetTestConfig()
 	address := rp.Addr().String()
 	rp.Close()
 	BuildAndLoadAPI(func(spec *APISpec) {
@@ -215,31 +216,4 @@ func TestCheckPortWhiteList(t *testing.T) {
 			}
 		})
 	}
-	m := map[string]config.PortWhiteList{
-		"http": config.PortWhiteList{
-			Ranges: []config.PortRange{
-				{
-					From: 8000,
-					To:   9000,
-				},
-			},
-		},
-		"tcp": config.PortWhiteList{
-			Ranges: []config.PortRange{
-				{
-					From: 7001,
-					To:   7900,
-				},
-			},
-		},
-		"tls": config.PortWhiteList{
-			Ports: []int{6000, 6015},
-		},
-	}
-	e := json.NewEncoder(os.Stdout)
-	e.SetIndent("", "  ")
-	e.Encode(map[string]interface{}{
-		"ports_whitelist": m,
-	})
-	t.Error("yay")
 }
