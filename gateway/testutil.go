@@ -237,6 +237,28 @@ func controlProxy() *proxy {
 	return mainProxy()
 }
 
+func EnablePort(port int, protocol string) {
+	c := config.Global()
+	if c.PortWhiteList == nil {
+		c.PortWhiteList = map[string]config.PortWhiteList{
+			protocol: config.PortWhiteList{
+				Ports: []int{port},
+			},
+		}
+	} else {
+		m, ok := c.PortWhiteList[protocol]
+		if !ok {
+			m = config.PortWhiteList{
+				Ports: []int{port},
+			}
+		} else {
+			m.Ports = append(m.Ports, port)
+		}
+		c.PortWhiteList[protocol] = m
+	}
+	config.SetGlobal(c)
+}
+
 func getMainRouter(m *proxyMux) *mux.Router {
 	var protocol string
 	if config.Global().HttpServerOptions.UseSSL {
