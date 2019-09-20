@@ -585,7 +585,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 	if found {
 		session.SetKeyHash(cacheKey)
 		// If not in Session, and got it from AuthHandler, create a session with a new TTL
-		t.Logger().Info("Recreating session for key: ", key)
+		t.Logger().Info("Recreating session for key: ", obfuscateKey(key))
 
 		// cache it
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
