@@ -5,10 +5,13 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"reflect"
 	"strconv"
 	"sync/atomic"
 	"testing"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 func TestTCPDial_with_service_discovery(t *testing.T) {
@@ -130,4 +133,113 @@ func TestTCPDial_with_service_discovery(t *testing.T) {
 	if !reflect.DeepEqual(result, expect) {
 		t.Errorf("expected %#v got %#v", expect, result)
 	}
+}
+
+func TestCheckPortWhiteList(t *testing.T) {
+	base := config.Global()
+	cases := []struct {
+		name     string
+		protocol string
+		port     int
+		fail     bool
+		wls      map[string]config.PortWhiteList
+	}{
+		{"gw port empty protocol", "", base.ListenPort, false, nil},
+		{"gw port http protocol", "http", base.ListenPort, false, nil},
+		{"gw port https protocol", "https", base.ListenPort, false, nil},
+		{"unknown tls", "tls", base.ListenPort, true, nil},
+		{"unknown tcp", "tls", base.ListenPort, true, nil},
+		{"whitelisted tcp", "tcp", base.ListenPort, false, map[string]config.PortWhiteList{
+			"tcp": config.PortWhiteList{
+				Ports: []int{base.ListenPort},
+			},
+		}},
+		{"whitelisted tls", "tls", base.ListenPort, false, map[string]config.PortWhiteList{
+			"tls": config.PortWhiteList{
+				Ports: []int{base.ListenPort},
+			},
+		}},
+		{"black listed tcp", "tcp", base.ListenPort, true, map[string]config.PortWhiteList{
+			"tls": config.PortWhiteList{
+				Ports: []int{base.ListenPort},
+			},
+		}},
+		{"blacklisted tls", "tls", base.ListenPort, true, map[string]config.PortWhiteList{
+			"tcp": config.PortWhiteList{
+				Ports: []int{base.ListenPort},
+			},
+		}},
+		{"whitelisted tls range", "tls", base.ListenPort, false, map[string]config.PortWhiteList{
+			"tls": config.PortWhiteList{
+				Ranges: []config.PortRange{
+					{
+						From: base.ListenPort - 1,
+						To:   base.ListenPort + 1,
+					},
+				},
+			},
+		}},
+		{"whitelisted tcp range", "tcp", base.ListenPort, false, map[string]config.PortWhiteList{
+			"tcp": config.PortWhiteList{
+				Ranges: []config.PortRange{
+					{
+						From: base.ListenPort - 1,
+						To:   base.ListenPort + 1,
+					},
+				},
+			},
+		}},
+		{"whitelisted http range", "http", 8090, false, map[string]config.PortWhiteList{
+			"http": config.PortWhiteList{
+				Ranges: []config.PortRange{
+					{
+						From: 8000,
+						To:   9000,
+					},
+				},
+			},
+		}},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(ts *testing.T) {
+			base.PortWhiteList = tt.wls
+			err := CheckPortWhiteList(base, tt.port, tt.protocol)
+			if tt.fail {
+				if err == nil {
+					ts.Error("expected an error got nil")
+				}
+			} else {
+				if err != nil {
+					ts.Errorf("expected an nil got %v", err)
+				}
+			}
+		})
+	}
+	m := map[string]config.PortWhiteList{
+		"http": config.PortWhiteList{
+			Ranges: []config.PortRange{
+				{
+					From: 8000,
+					To:   9000,
+				},
+			},
+		},
+		"tcp": config.PortWhiteList{
+			Ranges: []config.PortRange{
+				{
+					From: 7001,
+					To:   7900,
+				},
+			},
+		},
+		"tls": config.PortWhiteList{
+			Ports: []int{6000, 6015},
+		},
+	}
+	e := json.NewEncoder(os.Stdout)
+	e.SetIndent("", "  ")
+	e.Encode(map[string]interface{}{
+		"ports_whitelist": m,
+	})
+	t.Error("yay")
 }

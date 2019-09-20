@@ -404,15 +404,29 @@ func target(listenAddress string, listenPort int) string {
 	return fmt.Sprintf("%s:%d", listenAddress, listenPort)
 }
 
-func (m *proxyMux) generateListener(listenPort int, protocol string) (l net.Listener, err error) {
-	listenAddress := config.Global().ListenAddress
-	disabled := config.Global().DisabledPorts
-	for _, d := range disabled {
-		if d.Protocol == protocol && d.Port == listenPort {
-			return nil, fmt.Errorf("%s:%d trying to open disabled port", protocol, listenPort)
+func CheckPortWhiteList(cfg config.Config, listenPort int, protocol string) error {
+	gwPort := cfg.ListenPort
+	if protocol == "" || protocol == "http" || protocol == "https" {
+		if listenPort == gwPort {
+			return nil
 		}
 	}
+	w := cfg.PortWhiteList
+	if w != nil {
+		if ls, ok := w[protocol]; ok {
+			if ls.Ok(listenPort) {
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("%s:%d trying to open disabled port", protocol, listenPort)
+}
 
+func (m *proxyMux) generateListener(listenPort int, protocol string) (l net.Listener, err error) {
+	listenAddress := config.Global().ListenAddress
+	if err := CheckPortWhiteList(config.Global(), listenPort, protocol); err != nil {
+		return nil, err
+	}
 	targetPort := listenAddress + ":" + strconv.Itoa(listenPort)
 	if ls := m.again.GetListener(targetPort); ls != nil {
 		return ls, nil
