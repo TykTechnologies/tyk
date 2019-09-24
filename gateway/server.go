@@ -268,10 +268,9 @@ func buildConnStr(resource string) string {
 
 func syncAPISpecs() (int, error) {
 	loader := APIDefinitionLoader{}
-
 	apisMu.Lock()
 	defer apisMu.Unlock()
-
+	var s []*APISpec
 	if config.Global().UseDBAppConfigs {
 		connStr := buildConnStr("/system/apis")
 		tmpSpecs, err := loader.FromDashboardService(connStr, config.Global().NodeSecret)
@@ -280,35 +279,43 @@ func syncAPISpecs() (int, error) {
 			return 0, err
 		}
 
-		apiSpecs = tmpSpecs
+		s = tmpSpecs
 
 		mainLog.Debug("Downloading API Configurations from Dashboard Service")
 	} else if config.Global().SlaveOptions.UseRPC {
 		mainLog.Debug("Using RPC Configuration")
 
 		var err error
-		apiSpecs, err = loader.FromRPC(config.Global().SlaveOptions.RPCKey)
+		s, err = loader.FromRPC(config.Global().SlaveOptions.RPCKey)
 		if err != nil {
 			return 0, err
 		}
 	} else {
-		apiSpecs = loader.FromDir(config.Global().AppPath)
+		s = loader.FromDir(config.Global().AppPath)
 	}
 
-	mainLog.Printf("Detected %v APIs", len(apiSpecs))
+	mainLog.Printf("Detected %v APIs", len(s))
 
 	if config.Global().AuthOverride.ForceAuthProvider {
-		for i := range apiSpecs {
-			apiSpecs[i].AuthProvider = config.Global().AuthOverride.AuthProvider
+		for i := range s {
+			s[i].AuthProvider = config.Global().AuthOverride.AuthProvider
 		}
 	}
 
 	if config.Global().AuthOverride.ForceSessionProvider {
-		for i := range apiSpecs {
-			apiSpecs[i].SessionProvider = config.Global().AuthOverride.SessionProvider
+		for i := range s {
+			s[i].SessionProvider = config.Global().AuthOverride.SessionProvider
 		}
 	}
-
+	var filter []*APISpec
+	for _, v := range s {
+		if err := v.Validate(); err != nil {
+			mainLog.Infof("Skipping loading spec:%q because it failed validation with error:%v", v.Name, err)
+			continue
+		}
+		filter = append(filter, v)
+	}
+	apiSpecs = filter
 	return len(apiSpecs), nil
 }
 

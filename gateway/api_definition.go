@@ -210,6 +210,29 @@ func (s *APISpec) Release() {
 	// release all other resources associated with spec
 }
 
+// Validate returns nil if s is a valid spec and an error stating why the spec is not valid.
+func (s *APISpec) Validate() error {
+	// For tcp services we need to make sure we can bind to the port.
+	switch s.Protocol {
+	case "tcp", "tls":
+		return s.validateTCP()
+	default:
+		return s.validateHTTP()
+	}
+}
+
+func (s *APISpec) validateTCP() error {
+	if s.ListenPort == 0 {
+		return errors.New("missing listening port")
+	}
+	return nil
+}
+
+func (s *APISpec) validateHTTP() error {
+	// NOOP
+	return nil
+}
+
 // APIDefinitionLoader will load an Api definition from a storage
 // system.
 type APIDefinitionLoader struct{}
