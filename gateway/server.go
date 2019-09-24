@@ -171,7 +171,7 @@ func setupGlobals(ctx context.Context) {
 
 	// Initialise our Host Checker
 	healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:"}
-	InitHostCheckManager(&healthCheckStore)
+	InitHostCheckManager(ctx, &healthCheckStore)
 
 	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
 	FallbackKeySesionManager.Init(&redisStore)
@@ -395,9 +395,12 @@ func loadAPIEndpoints(muxer *mux.Router) {
 	}
 
 	if muxer == nil {
-		muxer = defaultProxyMux.router(config.Global().ControlAPIPort, "")
+		cp := config.Global().ControlAPIPort
+		muxer = defaultProxyMux.router(cp, "")
 		if muxer == nil {
-			log.Error("Can't find control API router")
+			if cp != 0 {
+				log.Error("Can't find control API router")
+			}
 			return
 		}
 	}
@@ -945,9 +948,8 @@ func initialiseSystem(ctx context.Context) error {
 	setupInstrumentation()
 
 	if config.Global().HttpServerOptions.UseLE_SSL {
-		go StartPeriodicStateBackup(&LE_MANAGER)
+		go StartPeriodicStateBackup(ctx, &LE_MANAGER)
 	}
-
 	return nil
 }
 
@@ -1016,6 +1018,7 @@ func Start() {
 	if config.Global().ControlAPIPort == 0 {
 		mainLog.Warn("The control_api_port should be changed for production")
 	}
+	setupPortsWhitelist()
 
 	onFork := func() {
 		mainLog.Warning("PREPARING TO FORK")
@@ -1084,9 +1087,7 @@ func Start() {
 	// TODO: replace goagain with something that support multiple listeners
 	// Example: https://gravitational.com/blog/golang-ssh-bastion-graceful-restarts/
 	startServer()
-	if !rpc.IsEmergencyMode() {
-		DoReload()
-	}
+
 	if again.Child() {
 		// This is a child process, we need to murder the parent now
 		if err := again.Kill(); err != nil {
@@ -1159,10 +1160,6 @@ func start() {
 		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
 	}
 
-	if config.Global().ControlAPIPort == 0 {
-		loadAPIEndpoints(nil)
-	}
-
 	// Start listening for reload messages
 	if !config.Global().SuppressRedisSignalReload {
 		go startPubSubLoop()
@@ -1221,6 +1218,30 @@ func startDRL() {
 	mainLog.Info("Initialising distributed rate limiter")
 	setupDRL()
 	startRateLimitNotifications()
+}
+
+func setupPortsWhitelist() {
+	// setup listen and control ports as whitelisted
+	globalConf := config.Global()
+	w := globalConf.PortWhiteList
+	if w == nil {
+		w = make(map[string]config.PortWhiteList)
+	}
+	protocol := "http"
+	if globalConf.HttpServerOptions.UseSSL {
+		protocol = "https"
+	}
+	ls := config.PortWhiteList{}
+	if v, ok := w[protocol]; ok {
+		ls = v
+	}
+	ls.Ports = append(ls.Ports, globalConf.ListenPort)
+	if globalConf.ControlAPIPort != 0 {
+		ls.Ports = append(ls.Ports, globalConf.ControlAPIPort)
+	}
+	w[protocol] = ls
+	globalConf.PortWhiteList = w
+	config.SetGlobal(globalConf)
 }
 
 func startServer() {

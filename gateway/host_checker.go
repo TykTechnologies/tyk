@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"crypto/tls"
 	"math/rand"
 	"net"
@@ -52,9 +53,7 @@ type HostHealthReport struct {
 }
 
 type HostUptimeChecker struct {
-	failureCallback    func(HostHealthReport)
-	upCallback         func(HostHealthReport)
-	pingCallback       func(HostHealthReport)
+	cb                 HostCheckCallBacks
 	workerPoolSize     int
 	sampleTriggerLimit int
 	checkTimeout       int
@@ -62,12 +61,11 @@ type HostUptimeChecker struct {
 	unHealthyList      map[string]bool
 	pool               *tunny.WorkPool
 
-	errorChan       chan HostHealthReport
-	okChan          chan HostHealthReport
-	stopPollingChan chan bool
-	sampleCache     *cache.Cache
-	stopLoop        bool
-	muStopLoop      sync.RWMutex
+	errorChan   chan HostHealthReport
+	okChan      chan HostHealthReport
+	sampleCache *cache.Cache
+	stopLoop    bool
+	muStopLoop  sync.RWMutex
 
 	resetListMu sync.Mutex
 	doResetList bool
@@ -100,36 +98,59 @@ func (h *HostUptimeChecker) getStaggeredTime() time.Duration {
 	return time.Duration(dur) * time.Second
 }
 
-func (h *HostUptimeChecker) HostCheckLoop() {
-	for !h.getStopLoop() {
-		if isRunningTests() {
-			<-hostCheckTicker
-		}
-		h.resetListMu.Lock()
-		if h.doResetList && h.newList != nil {
-			h.HostList = h.newList
-			h.newList = nil
-			h.doResetList = false
-			log.Debug("[HOST CHECKER] Host list reset")
-		}
-		h.resetListMu.Unlock()
-		for _, host := range h.HostList {
-			_, err := h.pool.SendWork(host)
-			if err != nil {
-				log.Errorf("[HOST CHECKER] could not send work, error: %v", err)
+func (h *HostUptimeChecker) HostCheckLoop(ctx context.Context) {
+	defer func() {
+		log.Info("[HOST CHECKER] Checker stopped")
+	}()
+	if isRunningTests() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-hostCheckTicker:
+				h.execCheck()
 			}
 		}
-
-		if !isRunningTests() {
-			time.Sleep(h.getStaggeredTime())
+	} else {
+		tick := time.NewTicker(h.getStaggeredTime())
+		defer tick.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-tick.C:
+				h.execCheck()
+			}
 		}
 	}
-	log.Info("[HOST CHECKER] Checker stopped")
 }
 
-func (h *HostUptimeChecker) HostReporter() {
+func (h *HostUptimeChecker) execCheck() {
+	h.resetListMu.Lock()
+	if h.doResetList && h.newList != nil {
+		h.HostList = h.newList
+		h.newList = nil
+		h.doResetList = false
+		log.Debug("[HOST CHECKER] Host list reset")
+	}
+	h.resetListMu.Unlock()
+	for _, host := range h.HostList {
+		_, err := h.pool.SendWork(host)
+		if err != nil {
+			log.Errorf("[HOST CHECKER] could not send work, error: %v", err)
+		}
+	}
+}
+
+func (h *HostUptimeChecker) HostReporter(ctx context.Context) {
 	for {
 		select {
+		case <-ctx.Done():
+			if !h.getStopLoop() {
+				h.Stop()
+				log.Debug("[HOST CHECKER] Received cancel signal")
+			}
+			return
 		case okHost := <-h.okChan:
 			// Clear host from unhealthylist if it exists
 			if h.unHealthyList[okHost.CheckURL] {
@@ -142,14 +163,18 @@ func (h *HostUptimeChecker) HostReporter() {
 					// Reset the count
 					h.sampleCache.Delete(okHost.CheckURL)
 					log.Warning("[HOST CHECKER] [HOST UP]: ", okHost.CheckURL)
-					h.upCallback(okHost)
+					if h.cb.Up != nil {
+						go h.cb.Up(ctx, okHost)
+					}
 					delete(h.unHealthyList, okHost.CheckURL)
 				} else {
 					log.Warning("[HOST CHECKER] [HOST UP BUT NOT REACHED LIMIT]: ", okHost.CheckURL)
 					h.sampleCache.Set(okHost.CheckURL, newVal, cache.DefaultExpiration)
 				}
 			}
-			go h.pingCallback(okHost)
+			if h.cb.Ping != nil {
+				go h.cb.Ping(ctx, okHost)
+			}
 
 		case failedHost := <-h.errorChan:
 			newVal := 1
@@ -162,16 +187,16 @@ func (h *HostUptimeChecker) HostReporter() {
 				// track it
 				h.unHealthyList[failedHost.CheckURL] = true
 				// Call the custom callback hook
-				go h.failureCallback(failedHost)
+				if h.cb.Fail != nil {
+					go h.cb.Fail(ctx, failedHost)
+				}
 			} else {
 				log.Warning("[HOST CHECKER] [HOST DOWN BUT NOT REACHED LIMIT]: ", failedHost.CheckURL)
 				h.sampleCache.Set(failedHost.CheckURL, newVal, cache.DefaultExpiration)
 			}
-			go h.pingCallback(failedHost)
-
-		case <-h.stopPollingChan:
-			log.Debug("[HOST CHECKER] Received kill signal")
-			return
+			if h.cb.Ping != nil {
+				go h.cb.Ping(ctx, failedHost)
+			}
 		}
 	}
 }
@@ -290,16 +315,27 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 	h.okChan <- report
 }
 
-func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList map[string]HostData, failureCallback, upCallback, pingCallback func(HostHealthReport)) {
+// HostCheckCallBacks defines call backs which will be invoked on different
+// states of the health check
+type HostCheckCallBacks struct {
+	// Up is a callback invoked when the host checker identifies a host to be up.
+	Up func(context.Context, HostHealthReport)
+
+	// Ping when provided this callback will be invoked on every every call to a
+	// remote host.
+	Ping func(context.Context, HostHealthReport)
+
+	// Fail is invoked when the host checker decides a host is not healthy.
+	Fail func(context.Context, HostHealthReport)
+}
+
+func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList map[string]HostData, cb HostCheckCallBacks) {
 	h.sampleCache = cache.New(30*time.Second, 30*time.Second)
-	h.stopPollingChan = make(chan bool)
 	h.errorChan = make(chan HostHealthReport)
 	h.okChan = make(chan HostHealthReport)
 	h.HostList = hostList
 	h.unHealthyList = make(map[string]bool)
-	h.failureCallback = failureCallback
-	h.upCallback = upCallback
-	h.pingCallback = pingCallback
+	h.cb = cb
 
 	h.workerPoolSize = workers
 	if workers == 0 {
@@ -334,22 +370,22 @@ func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList ma
 	}
 }
 
-func (h *HostUptimeChecker) Start() {
+func (h *HostUptimeChecker) Start(ctx context.Context) {
 	// Start the loop that checks for bum hosts
 	h.setStopLoop(false)
 	log.Debug("[HOST CHECKER] Starting...")
-	go h.HostCheckLoop()
+	go h.HostCheckLoop(ctx)
 	log.Debug("[HOST CHECKER] Check loop started...")
-	go h.HostReporter()
+	go h.HostReporter(ctx)
 	log.Debug("[HOST CHECKER] Host reporter started...")
 }
 
 func (h *HostUptimeChecker) Stop() {
-	h.setStopLoop(true)
-
-	h.stopPollingChan <- true
-	log.Info("[HOST CHECKER] Stopping poller")
-	h.pool.Close()
+	if !h.getStopLoop() {
+		h.setStopLoop(true)
+		log.Info("[HOST CHECKER] Stopping poller")
+		h.pool.Close()
+	}
 }
 
 func (h *HostUptimeChecker) ResetList(hostList map[string]HostData) {

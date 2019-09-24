@@ -234,7 +234,9 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 	}
 
 	for _, cert := range CertificateManager.List(config.Global().HttpServerOptions.SSLCertificates, certs.CertificatePrivate) {
-		serverCerts = append(serverCerts, *cert)
+		if cert != nil {
+			serverCerts = append(serverCerts, *cert)
+		}
 	}
 
 	baseConfig.Certificates = serverCerts
@@ -263,6 +265,9 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 		for _, spec := range apiSpecs {
 			if len(spec.Certificates) != 0 {
 				for _, cert := range CertificateManager.List(spec.Certificates, certs.CertificatePrivate) {
+					if cert == nil {
+						continue
+					}
 					newConfig.Certificates = append(newConfig.Certificates, *cert)
 
 					if cert != nil {
