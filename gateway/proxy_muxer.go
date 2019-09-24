@@ -309,7 +309,7 @@ func (m *proxyMux) swap(new *proxyMux) {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 				curP.httpServer.Shutdown(ctx)
 				cancel()
-			} else {
+			} else if curP.listener != nil {
 				curP.listener.Close()
 			}
 			m.again.Delete(target(listenAddress, curP.port))
@@ -404,12 +404,22 @@ func target(listenAddress string, listenPort int) string {
 	return fmt.Sprintf("%s:%d", listenAddress, listenPort)
 }
 
+func CheckPortWhiteList(w map[string]config.PortWhiteList, listenPort int, protocol string) error {
+	if w != nil {
+		if ls, ok := w[protocol]; ok {
+			if ls.Match(listenPort) {
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("%s:%d trying to open disabled port", protocol, listenPort)
+}
+
 func (m *proxyMux) generateListener(listenPort int, protocol string) (l net.Listener, err error) {
 	listenAddress := config.Global().ListenAddress
-	disabled := config.Global().DisabledPorts
-	for _, d := range disabled {
-		if d.Protocol == protocol && d.Port == listenPort {
-			return nil, fmt.Errorf("%s:%d trying to open disabled port", protocol, listenPort)
+	if !config.Global().DisablePortWhiteList {
+		if err := CheckPortWhiteList(config.Global().PortWhiteList, listenPort, protocol); err != nil {
+			return nil, err
 		}
 	}
 

@@ -943,7 +943,6 @@ func initialiseSystem(ctx context.Context) error {
 	if config.Global().HttpServerOptions.UseLE_SSL {
 		go StartPeriodicStateBackup(&LE_MANAGER)
 	}
-
 	return nil
 }
 
@@ -1012,6 +1011,7 @@ func Start() {
 	if config.Global().ControlAPIPort == 0 {
 		mainLog.Warn("The control_api_port should be changed for production")
 	}
+	setupPortsWhitelist()
 
 	onFork := func() {
 		mainLog.Warning("PREPARING TO FORK")
@@ -1217,6 +1217,30 @@ func startDRL() {
 	mainLog.Info("Initialising distributed rate limiter")
 	setupDRL()
 	startRateLimitNotifications()
+}
+
+func setupPortsWhitelist() {
+	// setup listen and control ports as whitelisted
+	globalConf := config.Global()
+	w := globalConf.PortWhiteList
+	if w == nil {
+		w = make(map[string]config.PortWhiteList)
+	}
+	protocol := "http"
+	if globalConf.HttpServerOptions.UseSSL {
+		protocol = "https"
+	}
+	ls := config.PortWhiteList{}
+	if v, ok := w[protocol]; ok {
+		ls = v
+	}
+	ls.Ports = append(ls.Ports, globalConf.ListenPort)
+	if globalConf.ControlAPIPort != 0 {
+		ls.Ports = append(ls.Ports, globalConf.ControlAPIPort)
+	}
+	w[protocol] = ls
+	globalConf.PortWhiteList = w
+	config.SetGlobal(globalConf)
 }
 
 func startServer() {

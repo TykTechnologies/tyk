@@ -237,6 +237,28 @@ func controlProxy() *proxy {
 	return mainProxy()
 }
 
+func EnablePort(port int, protocol string) {
+	c := config.Global()
+	if c.PortWhiteList == nil {
+		c.PortWhiteList = map[string]config.PortWhiteList{
+			protocol: config.PortWhiteList{
+				Ports: []int{port},
+			},
+		}
+	} else {
+		m, ok := c.PortWhiteList[protocol]
+		if !ok {
+			m = config.PortWhiteList{
+				Ports: []int{port},
+			}
+		} else {
+			m.Ports = append(m.Ports, port)
+		}
+		c.PortWhiteList[protocol] = m
+	}
+	config.SetGlobal(c)
+}
+
 func getMainRouter(m *proxyMux) *mux.Router {
 	var protocol string
 	if config.Global().HttpServerOptions.UseSSL {
@@ -567,6 +589,8 @@ func (s *Test) Start() {
 	globalConf.CoProcessOptions = s.config.CoprocessConfig
 	config.SetGlobal(globalConf)
 
+	setupPortsWhitelist()
+
 	startServer()
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cacnel = cancel
@@ -836,6 +860,7 @@ func (p *httpProxyHandler) handleHTTP(w http.ResponseWriter, req *http.Request) 
 }
 
 func (p *httpProxyHandler) Stop() error {
+	ResetTestConfig()
 	return p.server.Close()
 }
 
