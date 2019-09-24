@@ -956,25 +956,49 @@ func TestCustomDomain(t *testing.T) {
 		config.SetGlobal(globalConf)
 		defer ResetTestConfig()
 
+		ts := StartTest()
+		defer ts.Close()
+
 		BuildAndLoadAPI(
 			func(spec *APISpec) {
-				spec.Domain = "localhost"
+				spec.Domain = "host1"
+				spec.Proxy.ListenPath = "/with_domain"
 			},
 			func(spec *APISpec) {
 				spec.Domain = ""
+				spec.Proxy.ListenPath = "/without_domain"
 			},
 		)
+
+		ts.Run(t, []test.TestCase{
+			{Code: 200, Path: "/with_domain", Domain: "host1"},
+			{Code: 404, Path: "/with_domain"},
+			{Code: 200, Path: "/without_domain"},
+			{Code: 200, Path: "/tyk/keys", AdminAuth: true},
+		}...)
 	})
 
 	t.Run("Without custom domain support", func(t *testing.T) {
+		ts := StartTest()
+		defer ts.Close()
+
 		BuildAndLoadAPI(
 			func(spec *APISpec) {
-				spec.Domain = "localhost"
+				spec.Domain = "host1.local."
+				spec.Proxy.ListenPath = "/"
 			},
 			func(spec *APISpec) {
 				spec.Domain = ""
+				spec.Proxy.ListenPath = "/"
 			},
 		)
+
+		ts.Run(t, []test.TestCase{
+			{Code: 200, Path: "/with_domain", Domain: "host1"},
+			{Code: 200, Path: "/with_domain"},
+			{Code: 200, Path: "/without_domain"},
+			{Code: 200, Path: "/tyk/keys", AdminAuth: true},
+		}...)
 	})
 }
 

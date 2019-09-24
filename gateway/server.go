@@ -1080,9 +1080,7 @@ func Start() {
 	// TODO: replace goagain with something that support multiple listeners
 	// Example: https://gravitational.com/blog/golang-ssh-bastion-graceful-restarts/
 	startServer()
-	if !rpc.IsEmergencyMode() {
-		DoReload()
-	}
+
 	if again.Child() {
 		// This is a child process, we need to murder the parent now
 		if err := again.Kill(); err != nil {
@@ -1153,10 +1151,6 @@ func start() {
 		DefaultOrgStore.Init(getGlobalStorageHandler("orgkey.", false))
 		//DefaultQuotaStore.Init(getGlobalStorageHandler(CloudHandler, "orgkey.", false))
 		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
-	}
-
-	if config.Global().ControlAPIPort == 0 {
-		loadAPIEndpoints(nil)
 	}
 
 	// Start listening for reload messages
