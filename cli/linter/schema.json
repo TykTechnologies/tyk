@@ -706,6 +706,9 @@
         }
       }
     },
+    "enable_ports_whitelist": {
+      "type": "boolean"
+    },
     "ports_whitelist": {
       "type": [
         "object",

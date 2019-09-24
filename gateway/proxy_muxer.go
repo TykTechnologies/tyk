@@ -405,6 +405,9 @@ func target(listenAddress string, listenPort int) string {
 }
 
 func CheckPortWhiteList(cfg config.Config, listenPort int, protocol string) error {
+	if !cfg.EnablePortWhiteList {
+		return nil
+	}
 	if protocol == "" || protocol == "http" || protocol == "https" {
 		if listenPort == cfg.ListenPort || listenPort == cfg.ControlAPIPort {
 			return nil
