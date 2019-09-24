@@ -250,8 +250,12 @@ func (r *RedisCluster) GetMultiKey(keyNames []string) ([]string, error) {
 		log.WithError(err).Debug("Error trying to get value")
 		return nil, ErrKeyNotFound
 	}
-
-	return value, nil
+	for _, v := range value {
+		if v != "" {
+			return value, nil
+		}
+	}
+	return nil, ErrKeyNotFound
 }
 
 func (r *RedisCluster) GetKeyTTL(keyName string) (ttl int64, err error) {
