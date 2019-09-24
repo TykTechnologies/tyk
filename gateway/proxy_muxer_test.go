@@ -146,7 +146,11 @@ func TestCheckPortWhiteList(t *testing.T) {
 		wls      map[string]config.PortWhiteList
 	}{
 		{"gw port empty protocol", "", base.ListenPort, true, nil},
-		{"gw port http protocol", "http", base.ListenPort, false, base.PortWhiteList},
+		{"gw port http protocol", "http", base.ListenPort, false, map[string]config.PortWhiteList{
+			"http": config.PortWhiteList{
+				Ports: []int{base.ListenPort},
+			},
+		}},
 		{"unknown tls", "tls", base.ListenPort, true, nil},
 		{"unknown tcp", "tls", base.ListenPort, true, nil},
 		{"whitelisted tcp", "tcp", base.ListenPort, false, map[string]config.PortWhiteList{

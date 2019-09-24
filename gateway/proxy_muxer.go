@@ -309,7 +309,7 @@ func (m *proxyMux) swap(new *proxyMux) {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 				curP.httpServer.Shutdown(ctx)
 				cancel()
-			} else {
+			} else if curP.listener != nil {
 				curP.listener.Close()
 			}
 			m.again.Delete(target(listenAddress, curP.port))

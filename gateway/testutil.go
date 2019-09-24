@@ -589,6 +589,8 @@ func (s *Test) Start() {
 	globalConf.CoProcessOptions = s.config.CoprocessConfig
 	config.SetGlobal(globalConf)
 
+	setupPortsWhitelist()
+
 	startServer()
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cacnel = cancel
@@ -858,6 +860,7 @@ func (p *httpProxyHandler) handleHTTP(w http.ResponseWriter, req *http.Request) 
 }
 
 func (p *httpProxyHandler) Stop() error {
+	ResetTestConfig()
 	return p.server.Close()
 }
 
