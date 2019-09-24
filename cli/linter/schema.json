@@ -58,6 +58,32 @@
           "type": "string"
         }
       }
+    },
+    "PortWhiteList": {
+      "type": [
+        "object"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "ranges": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "from": {
+              "type": "integer"
+            },
+            "to": {
+              "type": "integer"
+            }
+          }
+        },
+        "ports": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        }
+      }
     }
   },
   "properties": {
@@ -680,22 +706,27 @@
         }
       }
     },
-    "disabled_ports": {
+    "disable_ports_whitelist": {
+      "type": "boolean"
+    },
+    "ports_whitelist": {
       "type": [
-        "array",
+        "object",
         "null"
       ],
-      "items": {
-        "type": [
-          "object"
-        ],
-        "properties": {
-          "protocol": {
-            "type": "string"
-          },
-          "port": {
-            "type": "number"
-          }
+      "additionalProperties": false,
+      "properties": {
+        "http": {
+          "$ref": "#/definitions/PortWhiteList"
+        },
+        "https": {
+          "$ref": "#/definitions/PortWhiteList"
+        },
+        "tcp": {
+          "$ref": "#/definitions/PortWhiteList"
+        },
+        "tls": {
+          "$ref": "#/definitions/PortWhiteList"
         }
       }
     },

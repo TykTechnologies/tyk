@@ -844,6 +844,9 @@ func TestProxyProtocol(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	EnablePort(p, "tcp")
+	defer ResetTestConfig()
+
 	proxyAddr := rp.Addr().String()
 	rp.Close()
 	BuildAndLoadAPI(func(spec *APISpec) {
