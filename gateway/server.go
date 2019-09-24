@@ -941,7 +941,7 @@ func initialiseSystem(ctx context.Context) error {
 	setupInstrumentation()
 
 	if config.Global().HttpServerOptions.UseLE_SSL {
-		go StartPeriodicStateBackup(&LE_MANAGER)
+		go StartPeriodicStateBackup(ctx, &LE_MANAGER)
 	}
 	return nil
 }
