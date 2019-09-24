@@ -296,15 +296,6 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 
 	k.Logger().Debug("JWT Temporary session ID is: ", sessionID)
 
-	contains := func(s []string, e string) bool {
-		for _, a := range s {
-			if a == e {
-				return true
-			}
-		}
-		return false
-	}
-
 	session, exists := k.CheckSessionAndIdentityForValidKey(sessionID, r)
 	isDefaultPol := false
 	if !exists {
