@@ -325,7 +325,7 @@ type Config struct {
 	EnableAPISegregation    bool           `json:"enable_api_segregation"`
 	TemplatePath            string         `json:"template_path"`
 	Policies                PoliciesConfig `json:"policies"`
-	EnablePortWhiteList     bool           `json:"enable_ports_whitelist"`
+	DisablePortWhiteList    bool           `json:"disable_ports_whitelist"`
 	// Defines the ports that will be available for the api services to bind to.
 	// This is a map of protocol to PortWhiteList. This allows per protocol
 	// configurations.

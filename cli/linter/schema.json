@@ -706,7 +706,7 @@
         }
       }
     },
-    "enable_ports_whitelist": {
+    "disable_ports_whitelist": {
       "type": "boolean"
     },
     "ports_whitelist": {

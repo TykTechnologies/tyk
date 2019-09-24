@@ -145,9 +145,8 @@ func TestCheckPortWhiteList(t *testing.T) {
 		fail     bool
 		wls      map[string]config.PortWhiteList
 	}{
-		{"gw port empty protocol", "", base.ListenPort, false, nil},
-		{"gw port http protocol", "http", base.ListenPort, false, nil},
-		{"gw port https protocol", "https", base.ListenPort, false, nil},
+		{"gw port empty protocol", "", base.ListenPort, true, nil},
+		{"gw port http protocol", "http", base.ListenPort, false, base.PortWhiteList},
 		{"unknown tls", "tls", base.ListenPort, true, nil},
 		{"unknown tcp", "tls", base.ListenPort, true, nil},
 		{"whitelisted tcp", "tcp", base.ListenPort, false, map[string]config.PortWhiteList{
@@ -201,17 +200,16 @@ func TestCheckPortWhiteList(t *testing.T) {
 			},
 		}},
 	}
-	for _, tt := range cases {
+	for i, tt := range cases {
 		t.Run(tt.name, func(ts *testing.T) {
-			base.PortWhiteList = tt.wls
-			err := CheckPortWhiteList(base, tt.port, tt.protocol)
+			err := CheckPortWhiteList(tt.wls, tt.port, tt.protocol)
 			if tt.fail {
 				if err == nil {
 					ts.Error("expected an error got nil")
 				}
 			} else {
 				if err != nil {
-					ts.Errorf("expected an nil got %v", err)
+					ts.Errorf("%d: expected an nil got %v", i, err)
 				}
 			}
 		})

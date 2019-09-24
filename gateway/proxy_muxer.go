@@ -404,16 +404,7 @@ func target(listenAddress string, listenPort int) string {
 	return fmt.Sprintf("%s:%d", listenAddress, listenPort)
 }
 
-func CheckPortWhiteList(cfg config.Config, listenPort int, protocol string) error {
-	if !cfg.EnablePortWhiteList {
-		return nil
-	}
-	if protocol == "" || protocol == "http" || protocol == "https" {
-		if listenPort == cfg.ListenPort || listenPort == cfg.ControlAPIPort {
-			return nil
-		}
-	}
-	w := cfg.PortWhiteList
+func CheckPortWhiteList(w map[string]config.PortWhiteList, listenPort int, protocol string) error {
 	if w != nil {
 		if ls, ok := w[protocol]; ok {
 			if ls.Match(listenPort) {
@@ -426,9 +417,12 @@ func CheckPortWhiteList(cfg config.Config, listenPort int, protocol string) erro
 
 func (m *proxyMux) generateListener(listenPort int, protocol string) (l net.Listener, err error) {
 	listenAddress := config.Global().ListenAddress
-	if err := CheckPortWhiteList(config.Global(), listenPort, protocol); err != nil {
-		return nil, err
+	if !config.Global().DisablePortWhiteList {
+		if err := CheckPortWhiteList(config.Global().PortWhiteList, listenPort, protocol); err != nil {
+			return nil, err
+		}
 	}
+
 	targetPort := listenAddress + ":" + strconv.Itoa(listenPort)
 	if ls := m.again.GetListener(targetPort); ls != nil {
 		return ls, nil
