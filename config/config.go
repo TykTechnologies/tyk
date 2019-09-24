@@ -266,15 +266,15 @@ type PortWhiteList struct {
 	Ports  []int       `json:"ports,omitempty"`
 }
 
-// Ok returns true if port is acceptable from the PortWhiteList.
-func (p PortWhiteList) Ok(port int) bool {
+// Match returns true if port is acceptable from the PortWhiteList.
+func (p PortWhiteList) Match(port int) bool {
 	for _, v := range p.Ports {
 		if port == v {
 			return true
 		}
 	}
 	for _, r := range p.Ranges {
-		if r.Ok(port) {
+		if r.Match(port) {
 			return true
 		}
 	}
@@ -287,8 +287,8 @@ type PortRange struct {
 	To   int `json:"to"`
 }
 
-// Ok returns true if port is within the range
-func (r PortRange) Ok(port int) bool {
+// Match returns true if port is within the range
+func (r PortRange) Match(port int) bool {
 	return r.From <= port && r.To >= port
 }
 

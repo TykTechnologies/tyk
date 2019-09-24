@@ -413,7 +413,7 @@ func CheckPortWhiteList(cfg config.Config, listenPort int, protocol string) erro
 	w := cfg.PortWhiteList
 	if w != nil {
 		if ls, ok := w[protocol]; ok {
-			if ls.Ok(listenPort) {
+			if ls.Match(listenPort) {
 				return nil
 			}
 		}
