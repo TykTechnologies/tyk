@@ -226,7 +226,7 @@ type ExtendedPathsSet struct {
 	TrackEndpoints          []TrackEndpointMeta   `bson:"track_endpoints" json:"track_endpoints,omitempty"`
 	DoNotTrackEndpoints     []TrackEndpointMeta   `bson:"do_not_track_endpoints" json:"do_not_track_endpoints,omitempty"`
 	ValidateJSON            []ValidatePathMeta    `bson:"validate_json" json:"validate_json,omitempty"`
-	Internal                []InternalMeta        `bson:"internal" json:"internal"`
+	Internal                []InternalMeta        `bson:"internal" json:"internal,omitempty"`
 }
 
 type VersionInfo struct {
