@@ -58,6 +58,7 @@ type testApplyPoliciesData struct {
 	policies  []string
 	errMatch  string                               // substring
 	sessMatch func(*testing.T, *user.SessionState) // ignored if nil
+	session   *user.SessionState
 }
 
 func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
@@ -220,36 +221,38 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 	tests := []testApplyPoliciesData{
 		{
 			"Empty", nil,
-			"", nil,
+			"", nil, nil,
 		},
 		{
 			"Single", []string{"nonpart1"},
-			"", nil,
+			"", nil, nil,
 		},
 		{
 			"Missing", []string{"nonexistent"},
-			"not found", nil,
+			"not found", nil, nil,
 		},
 		{
 			"DiffOrg", []string{"difforg"},
-			"different org", nil,
+			"different org", nil, nil,
 		},
 		{
 			"MultiNonPart", []string{"nonpart1", "nonpart2"},
-			"", nil,
+			"", nil, nil,
 		},
 		{
 			"NonpartAndPart", []string{"nonpart1", "quota1"},
-			"", nil,
+			"", nil, nil,
 		},
 		{
 			"TagMerge", []string{"tags1", "tags2"},
 			"", func(t *testing.T, s *user.SessionState) {
-				want := []string{"tagA", "tagX", "tagY"}
+				want := []string{"key-tag", "tagA", "tagX", "tagY"}
 				sort.Strings(s.Tags)
 				if !reflect.DeepEqual(want, s.Tags) {
 					t.Fatalf("want Tags %v, got %v", want, s.Tags)
 				}
+			}, &user.SessionState{
+				Tags: []string{"key-tag"},
 			},
 		},
 		{
@@ -258,7 +261,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				if !s.IsInactive {
 					t.Fatalf("want IsInactive to be true")
 				}
-			},
+			}, nil,
 		},
 		{
 			"InactiveMergeAll", []string{"inactive1", "inactive2"},
@@ -266,7 +269,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				if !s.IsInactive {
 					t.Fatalf("want IsInactive to be true")
 				}
-			},
+			}, nil,
 		},
 		{
 			"QuotaPart", []string{"quota1"},
@@ -274,7 +277,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				if s.QuotaMax != 2 {
 					t.Fatalf("want QuotaMax to be 2")
 				}
-			},
+			}, nil,
 		},
 		{
 			"QuotaParts", []string{"quota1", "quota2"},
@@ -282,7 +285,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				if s.QuotaMax != 3 {
 					t.Fatalf("Should pick bigger value")
 				}
-			},
+			}, nil,
 		},
 		{
 			"RatePart", []string{"rate1"},
@@ -290,7 +293,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				if s.Rate != 3 {
 					t.Fatalf("want Rate to be 3")
 				}
-			},
+			}, nil,
 		},
 		{
 			"RateParts", []string{"rate1", "rate2"},
@@ -298,7 +301,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				if s.Rate != 4 {
 					t.Fatalf("Should pick bigger value")
 				}
-			},
+			}, nil,
 		},
 		{
 			"AclPart", []string{"acl1"},
@@ -307,7 +310,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				if !reflect.DeepEqual(want, s.AccessRights) {
 					t.Fatalf("want %v got %v", want, s.AccessRights)
 				}
-			},
+			}, nil,
 		},
 		{
 			"AclPart", []string{"acl1", "acl2"},
@@ -316,7 +319,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				if !reflect.DeepEqual(want, s.AccessRights) {
 					t.Fatalf("want %v got %v", want, s.AccessRights)
 				}
-			},
+			}, nil,
 		},
 		{
 			"RightsUpdate", []string{"acl3"},
@@ -335,7 +338,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				if !reflect.DeepEqual(want, s.AccessRights) {
 					t.Fatalf("want %v got %v", want, s.AccessRights)
 				}
-			},
+			}, nil,
 		},
 		{
 			name:     "Per API is set with other partitions to true",
@@ -428,7 +431,10 @@ func TestApplyPolicies(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			sess := &user.SessionState{}
+			sess := tc.session
+			if sess == nil {
+				sess = &user.SessionState{}
+			}
 			sess.SetPolicies(tc.policies...)
 			errStr := ""
 			if err := bmid.ApplyPolicies(sess); err != nil {

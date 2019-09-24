@@ -346,14 +346,17 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 
 	pID := CreatePolicy(func(p *user.Policy) {
 		p.Partitions.RateLimit = true
+		p.Tags = []string{"p1-tag"}
 	})
 
 	pID2 := CreatePolicy(func(p *user.Policy) {
 		p.Partitions.Quota = true
+		p.Tags = []string{"p2-tag"}
 	})
 
 	session, key := ts.CreateSession(func(s *user.SessionState) {
 		s.ApplyPolicies = []string{pID}
+		s.Tags = []string{"key-tag1", "key-tag2"}
 		s.AccessRights = map[string]user.AccessDefinition{testAPIID: {
 			APIID: testAPIID, Versions: []string{"v1"},
 		}}
@@ -387,6 +390,43 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 0 {
 			t.Fatal("Removing policy from the list failed")
 		}
+	})
+
+	t.Run("Tag on key level", func(t *testing.T) {
+		assert := func(session *user.SessionState, expected []string) {
+			sessionData, _ := json.Marshal(session)
+			path := fmt.Sprintf("/tyk/keys/%s", key)
+
+			_, _ = ts.Run(t, []test.TestCase{
+				{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
+			}...)
+
+			sessionState, found := FallbackKeySesionManager.SessionDetail(key, false)
+			if !found || !reflect.DeepEqual(expected, sessionState.Tags) {
+				t.Fatalf("Expected %v, returned %v", expected, sessionState.Tags)
+			}
+		}
+
+		t.Run("Add", func(t *testing.T) {
+			expected := []string{"p1-tag", "p2-tag", "key-tag1", "key-tag2"}
+			session.ApplyPolicies = []string{pID, pID2}
+			assert(session, expected)
+		})
+
+		t.Run("Make unique", func(t *testing.T) {
+			expected := []string{"p1-tag", "p2-tag", "key-tag1", "key-tag2"}
+			session.ApplyPolicies = []string{pID, pID2}
+			session.Tags = append(session.Tags, "p1-tag", "key-tag1")
+			assert(session, expected)
+		})
+
+		t.Run("Remove", func(t *testing.T) {
+			expected := []string{"p1-tag", "p2-tag", "key-tag2"}
+			session.ApplyPolicies = []string{pID, pID2}
+			session.Tags = []string{"key-tag2"}
+			assert(session, expected)
+		})
+
 	})
 }
 

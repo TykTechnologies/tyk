@@ -478,11 +478,14 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		}
 	}
 
+	for _, tag := range session.Tags {
+		tags[tag] = true
+	}
+
 	// set tags
-	if len(tags) > 0 {
-		for tag := range tags {
-			session.Tags = append(session.Tags, tag)
-		}
+	session.Tags = []string{}
+	for tag, _ := range tags {
+		session.Tags = append(session.Tags, tag)
 	}
 
 	// If some APIs had only ACL partitions, inherit rest from session level
