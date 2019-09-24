@@ -327,7 +327,7 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 	if !s.Spec.VersionData.NotVersioned && versionDef.Location == "url" && versionDef.StripPath {
 		part := s.Spec.getVersionFromRequest(r)
 
-		log.Info("Stripping version from url: ", part)
+		log.Debug("Stripping version from URL: ", part)
 
 		r.URL.Path = strings.Replace(r.URL.Path, part+"/", "", 1)
 		r.URL.RawPath = strings.Replace(r.URL.RawPath, part+"/", "", 1)
