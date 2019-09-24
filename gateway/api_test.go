@@ -402,6 +402,10 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 			}...)
 
 			sessionState, found := FallbackKeySesionManager.SessionDetail(key, false)
+
+			sort.Strings(sessionState.Tags)
+			sort.Strings(expected)
+
 			if !found || !reflect.DeepEqual(expected, sessionState.Tags) {
 				t.Fatalf("Expected %v, returned %v", expected, sessionState.Tags)
 			}

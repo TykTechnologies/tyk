@@ -599,8 +599,6 @@ func loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStor
 	}
 
 	router.Handle(chainObj.ListenOn, chainObj.ThisHandler)
-
-	muxer.setRouter(port, spec.Protocol, router)
 }
 
 func loadTCPService(spec *APISpec, muxer *proxyMux) {
