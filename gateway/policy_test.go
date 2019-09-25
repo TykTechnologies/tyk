@@ -62,11 +62,27 @@ type testApplyPoliciesData struct {
 }
 
 func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
+	assert := func(t *testing.T, want, expect interface{}) {
+		if jsonMarshalString(want) != jsonMarshalString(expect) {
+			t.Fatalf("want %v got %v", jsonMarshalString(want), jsonMarshalString(expect))
+		}
+	}
+
 	policiesMu.RLock()
 	policiesByID = map[string]user.Policy{
-		"nonpart1": {},
-		"nonpart2": {},
-		"difforg":  {OrgID: "different"},
+		"nonpart1": {
+			ID:           "p1",
+			AccessRights: map[string]user.AccessDefinition{"a": {}},
+		},
+		"nonpart2": {
+			ID:           "p2",
+			AccessRights: map[string]user.AccessDefinition{"b": {}},
+		},
+		"nonpart3": {
+			ID:           "p3",
+			AccessRights: map[string]user.AccessDefinition{"a": {}, "b": {}},
+		},
+		"difforg": {OrgID: "different"},
 		"tags1": {
 			Partitions: user.PolicyPartitions{Quota: true},
 			Tags:       []string{"tagA"},
@@ -236,8 +252,38 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			"different org", nil, nil,
 		},
 		{
-			"MultiNonPart", []string{"nonpart1", "nonpart2"},
-			"", nil, nil,
+			name:     "MultiNonPart",
+			policies: []string{"nonpart1", "nonpart2"},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				want := map[string]user.AccessDefinition{
+					"a": {
+						Limit:          &user.APILimit{},
+						AllowanceScope: "p1",
+					},
+					"b": {
+						Limit:          &user.APILimit{},
+						AllowanceScope: "p2",
+					},
+				}
+
+				assert(t, want, s.AccessRights)
+			},
+		},
+		{
+			name:     "MultiACLPolicy",
+			policies: []string{"nonpart3"},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				want := map[string]user.AccessDefinition{
+					"a": {
+						Limit: &user.APILimit{},
+					},
+					"b": {
+						Limit: &user.APILimit{},
+					},
+				}
+
+				assert(t, want, s.AccessRights)
+			},
 		},
 		{
 			"NonpartAndPart", []string{"nonpart1", "quota1"},
@@ -248,9 +294,8 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			"", func(t *testing.T, s *user.SessionState) {
 				want := []string{"key-tag", "tagA", "tagX", "tagY"}
 				sort.Strings(s.Tags)
-				if !reflect.DeepEqual(want, s.Tags) {
-					t.Fatalf("want Tags %v, got %v", want, s.Tags)
-				}
+
+				assert(t, want, s.Tags)
 			}, &user.SessionState{
 				Tags: []string{"key-tag"},
 			},
@@ -307,18 +352,15 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			"AclPart", []string{"acl1"},
 			"", func(t *testing.T, s *user.SessionState) {
 				want := map[string]user.AccessDefinition{"a": {Limit: &user.APILimit{}}}
-				if !reflect.DeepEqual(want, s.AccessRights) {
-					t.Fatalf("want %v got %v", want, s.AccessRights)
-				}
+
+				assert(t, want, s.AccessRights)
 			}, nil,
 		},
 		{
 			"AclPart", []string{"acl1", "acl2"},
 			"", func(t *testing.T, s *user.SessionState) {
 				want := map[string]user.AccessDefinition{"a": {Limit: &user.APILimit{}}, "b": {Limit: &user.APILimit{}}}
-				if !reflect.DeepEqual(want, s.AccessRights) {
-					t.Fatalf("want %v got %v", want, s.AccessRights)
-				}
+				assert(t, want, s.AccessRights)
 			}, nil,
 		},
 		{
@@ -334,10 +376,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				if err != nil {
 					t.Fatalf("couldn't apply policy: %s", err.Error())
 				}
-				want := newPolicy.AccessRights
-				if !reflect.DeepEqual(want, s.AccessRights) {
-					t.Fatalf("want %v got %v", want, s.AccessRights)
-				}
+				assert(t, newPolicy.AccessRights, s.AccessRights)
 			}, nil,
 		},
 		{
@@ -373,9 +412,8 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 						AllowanceScope: "c",
 					},
 				}
-				if !reflect.DeepEqual(want, s.AccessRights) {
-					t.Fatalf("want %v got %v", want, s.AccessRights)
-				}
+
+				assert(t, want, s.AccessRights)
 			},
 		},
 		{
@@ -416,9 +454,8 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 						AllowanceScope: "d",
 					},
 				}
-				if !reflect.DeepEqual(want, s.AccessRights) {
-					t.Fatalf("want %v got %v", want, s.AccessRights)
-				}
+
+				assert(t, want, s.AccessRights)
 			},
 		},
 	}
