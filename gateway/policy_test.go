@@ -64,9 +64,15 @@ type testApplyPoliciesData struct {
 func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 	policiesMu.RLock()
 	policiesByID = map[string]user.Policy{
-		"nonpart1": {},
-		"nonpart2": {},
-		"difforg":  {OrgID: "different"},
+		"nonpart1": {
+			ID:           "p1",
+			AccessRights: map[string]user.AccessDefinition{"a": {}},
+		},
+		"nonpart2": {
+			ID:           "p2",
+			AccessRights: map[string]user.AccessDefinition{"b": {}},
+		},
+		"difforg": {OrgID: "different"},
 		"tags1": {
 			Partitions: user.PolicyPartitions{Quota: true},
 			Tags:       []string{"tagA"},
@@ -236,8 +242,24 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			"different org", nil, nil,
 		},
 		{
-			"MultiNonPart", []string{"nonpart1", "nonpart2"},
-			"", nil, nil,
+			name:     "MultiNonPart",
+			policies: []string{"nonpart1", "nonpart2"},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				want := map[string]user.AccessDefinition{
+					"a": {
+						Limit:          &user.APILimit{},
+						AllowanceScope: "p1",
+					},
+					"b": {
+						Limit:          &user.APILimit{},
+						AllowanceScope: "p2",
+					},
+				}
+
+				if !reflect.DeepEqual(want, s.AccessRights) {
+					t.Fatalf("want %v got %v", want, s.AccessRights)
+				}
+			},
 		},
 		{
 			"NonpartAndPart", []string{"nonpart1", "quota1"},

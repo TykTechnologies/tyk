@@ -290,6 +290,19 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	didQuota, didRateLimit, didACL := make(map[string]bool), make(map[string]bool), make(map[string]bool)
 	policies := session.PolicyIDs()
 
+	policiesMu.RLock()
+	uniqueACLs := map[string]bool{}
+	for _, polID := range policies {
+		policy, ok := policiesByID[polID]
+		if !ok {
+			continue
+		}
+		for pa := range policy.AccessRights {
+			uniqueACLs[pa] = true
+		}
+	}
+	policiesMu.RUnlock()
+
 	for i, polID := range policies {
 		policiesMu.RLock()
 		policy, ok := policiesByID[polID]
@@ -352,17 +365,6 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				didRateLimit[apiID] = true
 			}
 		} else {
-			multiAclPolicies := false
-			if i > 0 {
-				// Check if policy works with new APIs
-				for pa := range policy.AccessRights {
-					if _, ok := rights[pa]; !ok {
-						multiAclPolicies = true
-						break
-					}
-				}
-			}
-
 			usePartitions := policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl
 
 			for k, v := range policy.AccessRights {
@@ -431,11 +433,12 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					}
 				}
 
-				if multiAclPolicies && (!usePartitions || (policy.Partitions.Quota || policy.Partitions.RateLimit)) {
+				// If we have multiple distinct ACL rules, turn on policy level scoping
+				if len(uniqueACLs) > 1 && (!usePartitions || (policy.Partitions.Quota || policy.Partitions.RateLimit)) {
 					ar.AllowanceScope = policy.ID
 				}
 
-				if !multiAclPolicies {
+				if len(uniqueACLs) <= 1 {
 					ar.Limit.QuotaRenews = session.QuotaRenews
 				}
 
@@ -484,7 +487,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 	// set tags
 	session.Tags = []string{}
-	for tag, _ := range tags {
+	for tag := range tags {
 		session.Tags = append(session.Tags, tag)
 	}
 
