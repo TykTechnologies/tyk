@@ -215,9 +215,11 @@ func serverHandler(s *Server, workersCh chan struct{}) {
 func serverHandleConnection(s *Server, conn net.Conn, workersCh chan struct{}) {
 	defer s.stopWg.Done()
 	var clientAddr string
+	var err error
+	var newConn net.Conn
 
 	if s.OnConnect != nil {
-		newConn, clientAddr, err := s.OnConnect(conn)
+		newConn, clientAddr, err = s.OnConnect(conn)
 		if err != nil {
 			s.LogError("gorpc.Server: [%s]->[%s]. OnConnect error: [%s]", clientAddr, s.Addr, err)
 			conn.Close()
@@ -231,7 +233,6 @@ func serverHandleConnection(s *Server, conn net.Conn, workersCh chan struct{}) {
 	}
 
 	var enabledCompression bool
-	var err error
 	zChan := make(chan bool, 1)
 	go func() {
 		var buf [1]byte
