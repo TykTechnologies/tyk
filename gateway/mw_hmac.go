@@ -11,7 +11,9 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
+	"text/scanner"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -256,19 +258,56 @@ func getDateHeader(r *http.Request) (string, string) {
 	return "", ""
 }
 
+// parses v which is a string of key1=value1,,key2=value2 ... format and returns
+// a map of key:value pairs.
+func loadKeyValues(v string) map[string]string {
+	s := &scanner.Scanner{}
+	s.Init(strings.NewReader(v))
+	m := make(map[string]string)
+	// the state of the scanner.
+	// 0 - key
+	// 1 - value
+	var mode int
+	var key string
+	for {
+		tok := s.Scan()
+		if tok == scanner.EOF {
+			break
+		}
+		text := s.TokenText()
+		switch text {
+		case "=":
+			mode = 1
+			continue
+		case ",":
+			mode = 0
+			continue
+		default:
+			switch mode {
+			case 0:
+				key = text
+				mode = 1
+			case 1:
+				m[key] = text
+				mode = 0
+			}
+		}
+	}
+	return m
+}
+
 func getFieldValues(authHeader string) (*HMACFieldValues, error) {
 	set := HMACFieldValues{}
-
-	for _, element := range strings.Split(authHeader, ",") {
-		kv := strings.Split(element, "=")
-		if len(kv) != 2 {
-			return nil, errors.New("Header field value malformed (need two elements in field)")
+	m := loadKeyValues(authHeader)
+	for key, value := range m {
+		if len(value) > 0 && value[0] == '"' {
+			v, err := strconv.Unquote(m[key])
+			if err != nil {
+				return nil, err
+			}
+			value = v
 		}
-
-		key := strings.ToLower(kv[0])
-		value := strings.Trim(kv[1], `"`)
-
-		switch key {
+		switch strings.ToLower(key) {
 		case "keyid":
 			set.KeyID = value
 		case "algorithm":
@@ -280,7 +319,7 @@ func getFieldValues(authHeader string) (*HMACFieldValues, error) {
 		default:
 			log.WithFields(logrus.Fields{
 				"prefix": "hmac",
-				"field":  kv[0],
+				"field":  key,
 			}).Warning("Invalid header field found")
 			return nil, errors.New("Header key is not valid, not in allowed parameter list")
 		}

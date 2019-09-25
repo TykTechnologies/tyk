@@ -543,3 +543,23 @@ func TestHMACAuthSessionPassWithHeaderFieldLowerCase(t *testing.T) {
 		t.Error("Request should not have generated an AuthFailure event!: \n")
 	}
 }
+
+func TestGetFieldValues(t *testing.T) {
+	key := `eyJvcmciOiI1ZDgzOTczNDk4NThkYzEwYWU3NjA2ZjQiLCJpZCI6ImU2M2M2MTg4ZjFlYzQ2NzU4N2VlMTA1MzZkYmFjMzk0IiwiaCI6Im11cm11cjY0In0=`
+	algo := `hmac-sha1`
+	sign := `j27%2FQtZHmlQuWmnQT%2BxLjHcgPl8%3D`
+	s := `KeyId="eyJvcmciOiI1ZDgzOTczNDk4NThkYzEwYWU3NjA2ZjQiLCJpZCI6ImU2M2M2MTg4ZjFlYzQ2NzU4N2VlMTA1MzZkYmFjMzk0IiwiaCI6Im11cm11cjY0In0=",algorithm="hmac-sha1",signature="j27%2FQtZHmlQuWmnQT%2BxLjHcgPl8%3D"`
+	h, err := getFieldValues(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h.KeyID != key {
+		t.Errorf("expected keyID:%s got %s", key, h.KeyID)
+	}
+	if h.Algorthm != algo {
+		t.Errorf("expected Algorithm:%s got %s", algo, h.Algorthm)
+	}
+	if h.Signature != sign {
+		t.Errorf("expected Signature:%s got %s", sign, h.Signature)
+	}
+}
