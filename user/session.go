@@ -34,7 +34,7 @@ type APILimit struct {
 	QuotaRenews        int64   `json:"quota_renews" msg:"quota_renews"`
 	QuotaRemaining     int64   `json:"quota_remaining" msg:"quota_remaining"`
 	QuotaRenewalRate   int64   `json:"quota_renewal_rate" msg:"quota_renewal_rate"`
-	SetByPolicy        bool    `json:"set_by_policy" msg:"set_by_policy"`
+	SetBy              string  `json:"-" msg:"-"`
 }
 
 // AccessDefinition defines which versions of an API a key has access to
