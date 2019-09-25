@@ -238,7 +238,7 @@ func validateType(t reflect.Type) (err error) {
 	})
 
 	switch t.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Interface, reflect.UnsafePointer:
+	case reflect.Chan, reflect.Func, reflect.UnsafePointer:
 		err = fmt.Errorf("%s. Found [%s]", t.Kind(), t)
 		return
 	case reflect.Array, reflect.Slice:
@@ -365,7 +365,7 @@ func dispatchRequest(serviceMap map[string]*serviceData, clientAddr string, req 
 		if fd.inNum > dt {
 			reqv := reflect.ValueOf(req.Request)
 			reqt := reflect.TypeOf(req.Request)
-			if reqt != fd.reqt {
+			if fd.reqt.String() != "interface {}" && reqt != fd.reqt {
 				return &dispatcherResponse{
 					Error: fmt.Sprintf("gorpc.Dispatcher: unexpected request type for method [%s]: %s. Expected %s", req.Name, reqt, fd.reqt),
 				}
