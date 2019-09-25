@@ -290,19 +290,6 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	didQuota, didRateLimit, didACL := make(map[string]bool), make(map[string]bool), make(map[string]bool)
 	policies := session.PolicyIDs()
 
-	policiesMu.RLock()
-	uniqueACLs := map[string]bool{}
-	for _, polID := range policies {
-		policy, ok := policiesByID[polID]
-		if !ok {
-			continue
-		}
-		for pa := range policy.AccessRights {
-			uniqueACLs[pa] = true
-		}
-	}
-	policiesMu.RUnlock()
-
 	for i, polID := range policies {
 		policiesMu.RLock()
 		policy, ok := policiesByID[polID]
@@ -355,6 +342,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				}
 
 				accessRights.AllowanceScope = apiID
+				accessRights.Limit.SetBy = apiID
 
 				// overwrite session access right for this API
 				rights[apiID] = accessRights
@@ -398,6 +386,8 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 						ar = &r
 					}
+
+					ar.Limit.SetBy = policy.ID
 				}
 
 				if !usePartitions || policy.Partitions.Quota {
@@ -431,15 +421,6 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					if policy.ThrottleRetryLimit > ar.Limit.ThrottleRetryLimit {
 						ar.Limit.ThrottleRetryLimit = policy.ThrottleRetryLimit
 					}
-				}
-
-				// If we have multiple distinct ACL rules, turn on policy level scoping
-				if len(uniqueACLs) > 1 && (!usePartitions || (policy.Partitions.Quota || policy.Partitions.RateLimit)) {
-					ar.AllowanceScope = policy.ID
-				}
-
-				if len(uniqueACLs) <= 1 {
-					ar.Limit.QuotaRenews = session.QuotaRenews
 				}
 
 				// Respect existing QuotaRenews
@@ -491,6 +472,13 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		session.Tags = append(session.Tags, tag)
 	}
 
+	distinctACL := map[string]bool{}
+	for _, v := range rights {
+		if v.Limit.SetBy != "" {
+			distinctACL[v.Limit.SetBy] = true
+		}
+	}
+
 	// If some APIs had only ACL partitions, inherit rest from session level
 	for k, v := range rights {
 		if !didRateLimit[k] {
@@ -505,6 +493,15 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 			v.Limit.QuotaRenewalRate = session.QuotaRenewalRate
 			v.Limit.QuotaRenews = session.QuotaRenews
 		}
+
+		// If multime ACL
+		if len(distinctACL) > 1 {
+			if v.AllowanceScope == "" && v.Limit.SetBy != "" {
+				v.AllowanceScope = v.Limit.SetBy
+			}
+		}
+
+		rights[k] = v
 	}
 
 	// If we have policies defining rules for one single API, update session root vars (legacy)
