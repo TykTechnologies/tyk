@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"time"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -18,10 +19,16 @@ type RedisPurger struct {
 	Store storage.Handler
 }
 
-func (r RedisPurger) PurgeLoop(ticker <-chan time.Time) {
+func (r RedisPurger) PurgeLoop(ctx context.Context) {
+	tick := time.NewTicker(time.Second)
+	defer tick.Stop()
 	for {
-		<-ticker
-		r.PurgeCache()
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+			r.PurgeCache()
+		}
 	}
 }
 
