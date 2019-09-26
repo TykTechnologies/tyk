@@ -10,12 +10,12 @@ import (
 	"testing"
 
 	"github.com/lonelycode/go-uuid/uuid"
-
-	"github.com/TykTechnologies/tyk/headers"
-	"github.com/TykTechnologies/tyk/test"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -62,12 +62,6 @@ type testApplyPoliciesData struct {
 }
 
 func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
-	assert := func(t *testing.T, want, expect interface{}) {
-		if jsonMarshalString(want) != jsonMarshalString(expect) {
-			t.Fatalf("want %v got %v", jsonMarshalString(want), jsonMarshalString(expect))
-		}
-	}
-
 	policiesMu.RLock()
 	policiesByID = map[string]user.Policy{
 		"nonpart1": {
@@ -266,7 +260,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 					},
 				}
 
-				assert(t, want, s.AccessRights)
+				assert.Equal(t, want, s.AccessRights)
 			},
 		},
 		{
@@ -282,7 +276,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 					},
 				}
 
-				assert(t, want, s.AccessRights)
+				assert.Equal(t, want, s.AccessRights)
 			},
 		},
 		{
@@ -295,7 +289,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				want := []string{"key-tag", "tagA", "tagX", "tagY"}
 				sort.Strings(s.Tags)
 
-				assert(t, want, s.Tags)
+				assert.Equal(t, want, s.Tags)
 			}, &user.SessionState{
 				Tags: []string{"key-tag"},
 			},
@@ -353,14 +347,14 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			"", func(t *testing.T, s *user.SessionState) {
 				want := map[string]user.AccessDefinition{"a": {Limit: &user.APILimit{}}}
 
-				assert(t, want, s.AccessRights)
+				assert.Equal(t, want, s.AccessRights)
 			}, nil,
 		},
 		{
 			"AclPart", []string{"acl1", "acl2"},
 			"", func(t *testing.T, s *user.SessionState) {
 				want := map[string]user.AccessDefinition{"a": {Limit: &user.APILimit{}}, "b": {Limit: &user.APILimit{}}}
-				assert(t, want, s.AccessRights)
+				assert.Equal(t, want, s.AccessRights)
 			}, nil,
 		},
 		{
@@ -376,7 +370,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				if err != nil {
 					t.Fatalf("couldn't apply policy: %s", err.Error())
 				}
-				assert(t, newPolicy.AccessRights, s.AccessRights)
+				assert.Equal(t, newPolicy.AccessRights, s.AccessRights)
 			}, nil,
 		},
 		{
@@ -413,7 +407,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 					},
 				}
 
-				assert(t, want, s.AccessRights)
+				assert.Equal(t, want, s.AccessRights)
 			},
 		},
 		{
@@ -455,7 +449,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 					},
 				}
 
-				assert(t, want, s.AccessRights)
+				assert.Equal(t, want, s.AccessRights)
 			},
 		},
 	}
@@ -690,6 +684,7 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 					QuotaRenews:      api3Limit.QuotaRenews,
 					QuotaRemaining:   45,
 				}
+
 				if !reflect.DeepEqual(*api3Limit, api3LimitExpected) {
 					t.Log("api3 limit received:", *api3Limit, "expected:", api3LimitExpected)
 					return false
@@ -729,6 +724,177 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 					t.Error("Should reset quota:", api1Limit.QuotaRemaining)
 					return false
 				}
+
+				return true
+			},
+		},
+	}...)
+}
+
+func TestApplyMultiPolicies(t *testing.T) {
+	policiesMu.RLock()
+	policy1 := user.Policy{
+		ID:               "policy1",
+		Rate:             1000,
+		Per:              1,
+		QuotaMax:         50,
+		QuotaRenewalRate: 3600,
+		OrgID:            "default",
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {
+				Versions: []string{"v1"},
+			},
+		},
+	}
+
+	policy2 := user.Policy{
+		ID:               "policy2",
+		Rate:             100,
+		Per:              1,
+		QuotaMax:         100,
+		QuotaRenewalRate: 3600,
+		OrgID:            "default",
+		AccessRights: map[string]user.AccessDefinition{
+			"api2": {
+				Versions: []string{"v1"},
+			},
+			"api3": {
+				Versions: []string{"v1"},
+			},
+		},
+	}
+
+	policiesByID = map[string]user.Policy{
+		"policy1": policy1,
+		"policy2": policy2,
+	}
+	policiesMu.RUnlock()
+
+	ts := StartTest()
+	defer ts.Close()
+
+	// load APIs
+	BuildAndLoadAPI(
+		func(spec *APISpec) {
+			spec.Name = "api 1"
+			spec.APIID = "api1"
+			spec.UseKeylessAccess = false
+			spec.Proxy.ListenPath = "/api1"
+			spec.OrgID = "default"
+		},
+		func(spec *APISpec) {
+			spec.Name = "api 2"
+			spec.APIID = "api2"
+			spec.UseKeylessAccess = false
+			spec.Proxy.ListenPath = "/api2"
+			spec.OrgID = "default"
+		},
+		func(spec *APISpec) {
+			spec.Name = "api 3"
+			spec.APIID = "api3"
+			spec.UseKeylessAccess = false
+			spec.Proxy.ListenPath = "/api3"
+			spec.OrgID = "default"
+		},
+	)
+
+	// create test session
+	session := &user.SessionState{
+		ApplyPolicies: []string{"policy1", "policy2"},
+		OrgID:         "default",
+	}
+
+	// create key
+	key := uuid.New()
+	ts.Run(t, []test.TestCase{
+		{Method: http.MethodPost, Path: "/tyk/keys/" + key, Data: session, AdminAuth: true, Code: 200},
+	}...)
+
+	// run requests to different APIs
+	authHeader := map[string]string{"Authorization": key}
+	ts.Run(t, []test.TestCase{
+		// 2 requests to api1, API limit quota remaining should be 48
+		{Path: "/api1", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "49"}},
+		{Path: "/api1", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "48"}},
+
+		// 3 requests to api2, API limit quota remaining should be 197
+		{Path: "/api2", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "99"}},
+		{Path: "/api2", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "98"}},
+		{Path: "/api2", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "97"}},
+
+		// 3 requests to api3, should consume policy2 quota, same as for api2
+		{Path: "/api3", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "96"}},
+		{Path: "/api3", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "95"}},
+		{Path: "/api3", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "94"}},
+	}...)
+
+	// check key session
+	ts.Run(t, []test.TestCase{
+		{
+			Method:    http.MethodGet,
+			Path:      "/tyk/keys/" + key,
+			AdminAuth: true,
+			Code:      http.StatusOK,
+			BodyMatchFunc: func(data []byte) bool {
+				sessionData := user.SessionState{}
+				json.Unmarshal(data, &sessionData)
+
+				policy1Expected := user.APILimit{
+					Rate:             1000,
+					Per:              1,
+					QuotaMax:         50,
+					QuotaRenewalRate: 3600,
+					QuotaRenews:      sessionData.AccessRights["api1"].Limit.QuotaRenews,
+					QuotaRemaining:   48,
+				}
+				assert.Equal(t, policy1Expected, *sessionData.AccessRights["api1"].Limit, "API1 limit do not match")
+
+				policy2Expected := user.APILimit{
+					Rate:             100,
+					Per:              1,
+					QuotaMax:         100,
+					QuotaRenewalRate: 3600,
+					QuotaRenews:      sessionData.AccessRights["api2"].Limit.QuotaRenews,
+					QuotaRemaining:   94,
+				}
+
+				assert.Equal(t, policy2Expected, *sessionData.AccessRights["api2"].Limit, "API2 limit do not match")
+				assert.Equal(t, policy2Expected, *sessionData.AccessRights["api3"].Limit, "API3 limit do not match")
+
+				return true
+			},
+		},
+	}...)
+
+	// Reset quota
+	ts.Run(t, []test.TestCase{
+		{
+			Method:    http.MethodPut,
+			Path:      "/tyk/keys/" + key,
+			AdminAuth: true,
+			Code:      http.StatusOK,
+			Data:      session,
+		},
+		{
+			Method:    http.MethodGet,
+			Path:      "/tyk/keys/" + key,
+			AdminAuth: true,
+			Code:      http.StatusOK,
+			BodyMatchFunc: func(data []byte) bool {
+				sessionData := user.SessionState{}
+				json.Unmarshal(data, &sessionData)
+
+				assert.EqualValues(t, 50, sessionData.AccessRights["api1"].Limit.QuotaRemaining, "should reset policy1 quota")
+				assert.EqualValues(t, 100, sessionData.AccessRights["api2"].Limit.QuotaRemaining, "should reset policy2 quota")
+				assert.EqualValues(t, 100, sessionData.AccessRights["api3"].Limit.QuotaRemaining, "should reset policy2 quota")
 
 				return true
 			},
