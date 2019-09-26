@@ -916,6 +916,7 @@ func TestApplyMultiPolicies(t *testing.T) {
 	policy1.Rate = 1
 	policy1.LastUpdated = strconv.Itoa(int(time.Now().Unix() + 1))
 	DRLManager.SetCurrentTokenValue(100)
+	defer DRLManager.SetCurrentTokenValue(0)
 
 	policiesByID = map[string]user.Policy{
 		"policy1": policy1,
