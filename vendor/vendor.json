@@ -171,6 +171,12 @@
 			"revisionTime": "2017-06-20T21:51:35Z"
 		},
 		{
+			"checksumSHA1": "CSPbwbyzqA6sfORicn4HFtIhF/c=",
+			"path": "github.com/davecgh/go-spew/spew",
+			"revision": "d8f796af33cc11cb798c1aaeb27a4ebc5099927d",
+			"revisionTime": "2018-08-30T19:11:22Z"
+		},
+		{
 			"checksumSHA1": "2Fy1Y6Z3lRRX1891WF/+HT4XS2I=",
 			"path": "github.com/dgrijalva/jwt-go",
 			"revision": "9ed569b5d1ac936e6494082958d63a6aa4fff99a",
@@ -581,6 +587,12 @@
 			"revisionTime": "2017-02-27T22:00:37Z"
 		},
 		{
+			"checksumSHA1": "LuFv4/jlrmFNnDb/5SCSEPAM9vU=",
+			"path": "github.com/pmezard/go-difflib/difflib",
+			"revision": "5d4384ee4fb2527b0a1256a821ebfc92f91efefc",
+			"revisionTime": "2018-12-26T10:54:42Z"
+		},
+		{
 			"checksumSHA1": "D+eX5lLgOgij1Hs7NO10OLdUVZo=",
 			"path": "github.com/pmylund/go-cache",
 			"revision": "1881a9bccb818787f68c52bfba648c6cf34c34fa",
@@ -693,6 +705,12 @@
 			"path": "github.com/square/go-jose/json",
 			"revision": "63d7cfa0284d0bc9bf41d58f802037559c45ce8f",
 			"revisionTime": "2016-10-27T01:03:14Z"
+		},
+		{
+			"checksumSHA1": "QELcZ0cB4PrpjIoeESHQCGDpMsk=",
+			"path": "github.com/stretchr/testify/assert",
+			"revision": "85f2b59c4459e5bf57488796be8c3667cb8246d6",
+			"revisionTime": "2018-07-16T14:42:29Z"
 		},
 		{
 			"checksumSHA1": "9W312a36vZ/J33+kGZb4SsHYNEQ=",
