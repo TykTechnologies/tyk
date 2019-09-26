@@ -501,6 +501,8 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 			}
 		}
 
+		v.Limit.SetBy = ""
+
 		rights[k] = v
 	}
 
