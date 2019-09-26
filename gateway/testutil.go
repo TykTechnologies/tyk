@@ -241,7 +241,7 @@ func EnablePort(port int, protocol string) {
 	c := config.Global()
 	if c.PortWhiteList == nil {
 		c.PortWhiteList = map[string]config.PortWhiteList{
-			protocol: config.PortWhiteList{
+			protocol: {
 				Ports: []int{port},
 			},
 		}
