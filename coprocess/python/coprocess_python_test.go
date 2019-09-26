@@ -139,6 +139,12 @@ def MyPreHook(request, session, metadata, spec):
 `,
 }
 
+func init() {
+	if versionOverride := os.Getenv("PYTHON_VERSION"); versionOverride != "" {
+		pythonVersion = versionOverride
+	}
+}
+
 func TestMain(m *testing.M) {
 	os.Exit(gateway.InitTestMain(context.Background(), m))
 }
