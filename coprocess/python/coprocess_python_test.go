@@ -6,6 +6,8 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -16,14 +18,12 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-const (
-	defaultPythonVersion = "3.5"
-)
+var pkgPath string
 
-var (
-	pythonVersion = defaultPythonVersion
-	pkgPath       = os.Getenv("PKG_PATH")
-)
+func init() {
+	_, filename, _, _ := runtime.Caller(0)
+	pkgPath = filepath.Dir(filename) + "./../../"
+}
 
 var pythonBundleWithAuthCheck = map[string]string{
 	"manifest.json": `
@@ -182,12 +182,6 @@ def MyPreHook(request, session, metadata, spec):
 `,
 }
 
-func init() {
-	if versionOverride := os.Getenv("PYTHON_VERSION"); versionOverride != "" {
-		pythonVersion = versionOverride
-	}
-}
-
 func TestMain(m *testing.M) {
 	os.Exit(gateway.InitTestMain(context.Background(), m))
 }
@@ -196,7 +190,6 @@ func TestPythonBundles(t *testing.T) {
 	ts := gateway.StartTest(gateway.TestConfig{
 		CoprocessConfig: config.CoProcessConfig{
 			EnableCoProcess:  true,
-			PythonVersion:    pythonVersion,
 			PythonPathPrefix: pkgPath,
 		}})
 	defer ts.Close()
