@@ -148,7 +148,6 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 	ts := gateway.StartTest(gateway.TestConfig{
 		CoprocessConfig: config.CoProcessConfig{
 			EnableCoProcess:  true,
-			PythonVersion:    pythonVersion,
 			PythonPathPrefix: pkgPath,
 		},
 		Delay: 10 * time.Millisecond,
