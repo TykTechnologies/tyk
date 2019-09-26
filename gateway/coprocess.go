@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"C"
 	"bytes"
 	"encoding/json"
 	"net/url"
