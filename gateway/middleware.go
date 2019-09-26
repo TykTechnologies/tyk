@@ -460,6 +460,10 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		for _, tag := range policy.Tags {
 			tags[tag] = true
 		}
+
+		if policy.LastUpdated > session.LastUpdated {
+			session.LastUpdated = policy.LastUpdated
+		}
 	}
 
 	for _, tag := range session.Tags {
