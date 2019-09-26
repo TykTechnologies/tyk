@@ -6,8 +6,10 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/lonelycode/go-uuid/uuid"
 	"github.com/stretchr/testify/assert"
@@ -900,6 +902,34 @@ func TestApplyMultiPolicies(t *testing.T) {
 			},
 		},
 	}...)
+
+	// Rate limits before
+	ts.Run(t, []test.TestCase{
+		// 2 requests to api1, API limit quota remaining should be 48
+		{Path: "/api1", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "49"}},
+		{Path: "/api1", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "48"}},
+	}...)
+
+	policiesMu.RLock()
+	policy1.Rate = 1
+	policy1.LastUpdated = strconv.Itoa(int(time.Now().Unix() + 1))
+	DRLManager.SetCurrentTokenValue(100)
+
+	policiesByID = map[string]user.Policy{
+		"policy1": policy1,
+		"policy2": policy2,
+	}
+	policiesMu.RUnlock()
+
+	// Rate limits after policy update
+	ts.Run(t, []test.TestCase{
+		{Path: "/api1", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "47"}},
+		{Path: "/api1", Headers: authHeader, Code: http.StatusTooManyRequests},
+	}...)
+
 }
 
 func TestPerAPIPolicyUpdate(t *testing.T) {
