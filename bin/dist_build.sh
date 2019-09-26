@@ -58,7 +58,9 @@ do
 done
 
 echo "Building Tyk binaries"
-gox -osarch="linux/amd64 linux/386" -tags 'coprocess' -cgo
+gox -osarch="linux/amd64 linux/386" -cgo
+# Build arm64 without CGO (no Python plugins), an improved cross-compilation toolkit is needed for that
+gox -osarch="linux/arm64"
 
 TEMPLATEDIR=${ARCHTGZDIRS[i386]}
 echo "Prepping TGZ Dirs"

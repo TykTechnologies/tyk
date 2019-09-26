@@ -1,3 +1,5 @@
+// +build cgo
+
 package gateway
 
 import (
