@@ -847,7 +847,7 @@ func TestKeyHandler_HashingDisabled(t *testing.T) {
 				Data:         string(withAccessJSON),
 				AdminAuth:    true,
 				Code:         200,
-				BodyMatch:    fmt.Sprintf(`"key":"%s"`, myKeyID),
+				BodyMatch:    fmt.Sprintf(`"key":"%s"`, token),
 				BodyNotMatch: fmt.Sprintf(`"key_hash":"%s"`, myKeyHash),
 			},
 			// get one key by generated token
