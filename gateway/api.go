@@ -1532,7 +1532,7 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 }
 
 // Update Client
-func updateOauthClient(keyName, apiID string, r *http.Request) (interface{}, int) {
+func updateOauthClient(keyName, apiID string, forceSecretUpdate bool, r *http.Request) (interface{}, int) {
 	// read payload
 	var updateClientData NewClientRequest
 	if err := json.NewDecoder(r.Body).Decode(&updateClientData); err != nil {
@@ -1574,11 +1574,17 @@ func updateOauthClient(keyName, apiID string, r *http.Request) (interface{}, int
 		return apiError("OAuth Client ID not found"), http.StatusNotFound
 	}
 
+	var secret = client.GetSecret()
+
+	if forceSecretUpdate {
+		secret = base64.StdEncoding.EncodeToString([]byte(uuid.NewV4().String()))
+	}
+
 	// update client
 	updatedClient := OAuthClient{
 		ClientID:          client.GetId(),
-		ClientSecret:      client.GetSecret(),                 // DO NOT update
 		ClientRedirectURI: updateClientData.ClientRedirectURI, // update
+		ClientSecret:      secret,
 		PolicyID:          updateClientData.PolicyID,          // update
 		MetaData:          updateClientData.MetaData,          // update
 		Description:       updateClientData.Description,       // update
@@ -1688,6 +1694,16 @@ func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, http.StatusOK, success)
 }
 
+func rotateOauthClientHandler(w http.ResponseWriter, r *http.Request) {
+
+	apiID := mux.Vars(r)["apiID"]
+	keyName := mux.Vars(r)["keyName"]
+
+	obj, code := updateOauthClient(keyName, apiID, true, r)
+
+	doJSONWrite(w, code, obj)
+}
+
 func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
 	keyName := mux.Vars(r)["keyName"]
@@ -1705,7 +1721,7 @@ func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	case http.MethodPut:
 		// Update client
-		obj, code = updateOauthClient(keyName, apiID, r)
+		obj, code = updateOauthClient(keyName, apiID, false, r)
 	case http.MethodDelete:
 		// Remove a key
 		obj, code = handleDeleteOAuthClient(keyName, apiID)
