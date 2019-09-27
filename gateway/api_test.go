@@ -3,6 +3,8 @@ package gateway
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/go-redis/redis"
+	uuid "github.com/satori/go.uuid"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -11,9 +13,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/garyburd/redigo/redis"
-	uuid "github.com/satori/go.uuid"
 
 	"fmt"
 
@@ -1138,11 +1137,11 @@ func TestGroupResetHandler(t *testing.T) {
 	go func() {
 		err := cacheStore.StartPubSubHandler(RedisPubSubChannel, func(v interface{}) {
 			switch x := v.(type) {
-			case redis.Subscription:
+			case *redis.Subscription:
 				didSubscribe <- true
-			case redis.Message:
+			case *redis.Message:
 				notf := Notification{}
-				if err := json.Unmarshal(x.Data, &notf); err != nil {
+				if err := json.Unmarshal([]byte(x.Payload), &notf); err != nil {
 					t.Fatal(err)
 				}
 				if notf.Command == NoticeGroupReload {
