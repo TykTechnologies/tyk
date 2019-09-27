@@ -573,6 +573,7 @@ func loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStor
 	router := muxer.router(port, spec.Protocol)
 	if router == nil {
 		router = mux.NewRouter()
+		muxer.setRouter(port, spec.Protocol, router)
 	}
 
 	hostname := config.Global().HostName
