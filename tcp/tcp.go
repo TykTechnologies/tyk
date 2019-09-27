@@ -4,8 +4,10 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"io"
 	"net"
 	"net/url"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -169,6 +171,9 @@ func (p *Proxy) getTargetConfig(conn net.Conn) (*targetConfig, error) {
 }
 
 func (p *Proxy) handleConn(conn net.Conn) error {
+	var connectionClosed atomic.Value
+	connectionClosed.Store(false)
+
 	stat := Stat{}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -228,78 +233,152 @@ func (p *Proxy) handleConn(conn net.Conn) error {
 	default:
 		err = errors.New("Unsupported protocol. Should be empty, `tcp` or `tls`")
 	}
-
 	if err != nil {
 		conn.Close()
 		return err
 	}
-	r := func(src, dst net.Conn, data []byte) ([]byte, error) {
-		atomic.AddInt64(&stat.BytesIn, int64(len(data)))
-		h := config.modifier.ModifyRequest
-		if h != nil {
-			return h(src, dst, data)
-		}
-		return data, nil
-	}
-	w := func(src, dst net.Conn, data []byte) ([]byte, error) {
-		atomic.AddInt64(&stat.BytesOut, int64(len(data)))
-		h := config.modifier.ModifyResponse
-		if h != nil {
-			return h(src, dst, data)
-		}
-		return data, nil
-	}
+	defer func() {
+		conn.Close()
+		rconn.Close()
+	}()
 	var wg sync.WaitGroup
 	wg.Add(2)
-	// write to dst what it reads from src
-	var pipe = func(src, dst net.Conn, modifier func(net.Conn, net.Conn, []byte) ([]byte, error)) {
-		defer func() {
-			conn.Close()
-			rconn.Close()
-			wg.Done()
-		}()
 
-		buf := make([]byte, 65535)
-
-		for {
-			var readDeadline time.Time
-			if p.ReadTimeout != 0 {
-				readDeadline = time.Now().Add(p.ReadTimeout)
+	r := pipeOpts{
+		modifier: func(src, dst net.Conn, data []byte) ([]byte, error) {
+			atomic.AddInt64(&stat.BytesIn, int64(len(data)))
+			h := config.modifier.ModifyRequest
+			if h != nil {
+				return h(src, dst, data)
 			}
-			src.SetReadDeadline(readDeadline)
-			n, err := src.Read(buf)
-			if err != nil {
-				log.Println(err)
+			return data, nil
+		},
+		beforeExit: func() {
+			wg.Done()
+		},
+		onReadError: func(err error) {
+			if IsSocketClosed(err) && connectionClosed.Load().(bool) {
 				return
 			}
-			b := buf[:n]
-
-			if modifier != nil {
-				if b, err = modifier(src, dst, b); err != nil {
-					log.WithError(err).Warning("Closing connection")
-					return
-				}
+			if err == io.EOF {
+				// End of stream from the client.
+				connectionClosed.Store(true)
+				log.WithField("conn", clientConn(conn)).Debug("End of client stream")
+			} else {
+				log.WithError(err).Error("Failed to read from client connection")
 			}
-
-			if len(b) == 0 {
-				continue
+		},
+		onWriteError: func(err error) {
+			log.WithError(err).Info("Failed to write to upstream socket")
+		},
+	}
+	w := pipeOpts{
+		modifier: func(src, dst net.Conn, data []byte) ([]byte, error) {
+			atomic.AddInt64(&stat.BytesOut, int64(len(data)))
+			h := config.modifier.ModifyResponse
+			if h != nil {
+				return h(src, dst, data)
 			}
-
-			var writeDeadline time.Time
-			if p.WriteTimeout != 0 {
-				writeDeadline = time.Now().Add(p.WriteTimeout)
+			return data, nil
+		},
+		beforeExit: func() {
+			wg.Done()
+		},
+		onReadError: func(err error) {
+			if IsSocketClosed(err) && connectionClosed.Load().(bool) {
+				return
 			}
-			dst.SetWriteDeadline(writeDeadline)
-			_, err = dst.Write(b)
-			if err != nil {
-				log.Println(err)
+			if err == io.EOF {
+				// End of stream from upstream
+				connectionClosed.Store(true)
+				log.WithField("conn", upstreamConn(rconn)).Debug("End of upstream stream")
+			} else {
+				log.WithError(err).Error("Failed to read from upstream connection")
+			}
+		},
+		onWriteError: func(err error) {
+			log.WithError(err).Info("Failed to write to client connection")
+		},
+	}
+	go p.pipe(conn, rconn, r)
+	go p.pipe(rconn, conn, w)
+	wg.Wait()
+	return nil
+}
+
+func upstreamConn(c net.Conn) string {
+	return formatAddress(c.LocalAddr(), c.RemoteAddr())
+}
+
+func clientConn(c net.Conn) string {
+	return formatAddress(c.RemoteAddr(), c.LocalAddr())
+}
+
+func formatAddress(a, b net.Addr) string {
+	return a.String() + "->" + b.String()
+}
+
+// IsSocketClosed returns true if err is a result of reading from closed network
+// connection
+func IsSocketClosed(err error) bool {
+	return strings.Contains(err.Error(), "use of closed network connection")
+}
+
+type pipeOpts struct {
+	modifier     func(net.Conn, net.Conn, []byte) ([]byte, error)
+	onReadError  func(error)
+	onWriteError func(error)
+	beforeExit   func()
+}
+
+func (p *Proxy) pipe(src, dst net.Conn, opts pipeOpts) {
+	defer func() {
+		src.Close()
+		dst.Close()
+		if opts.beforeExit != nil {
+			opts.beforeExit()
+		}
+	}()
+
+	buf := make([]byte, 65535)
+
+	for {
+		var readDeadline time.Time
+		if p.ReadTimeout != 0 {
+			readDeadline = time.Now().Add(p.ReadTimeout)
+		}
+		src.SetReadDeadline(readDeadline)
+		n, err := src.Read(buf)
+		if err != nil {
+			if opts.onReadError != nil {
+				opts.onReadError(err)
+			}
+			return
+		}
+		b := buf[:n]
+
+		if opts.modifier != nil {
+			if b, err = opts.modifier(src, dst, b); err != nil {
+				log.WithError(err).Warning("Closing connection")
 				return
 			}
 		}
-	}
 
-	go pipe(conn, rconn, r)
-	go pipe(rconn, conn, w)
-	wg.Wait()
-	return nil
+		if len(b) == 0 {
+			continue
+		}
+
+		var writeDeadline time.Time
+		if p.WriteTimeout != 0 {
+			writeDeadline = time.Now().Add(p.WriteTimeout)
+		}
+		dst.SetWriteDeadline(writeDeadline)
+		_, err = dst.Write(b)
+		if err != nil {
+			if opts.onWriteError != nil {
+				opts.onWriteError(err)
+			}
+			return
+		}
+	}
 }
