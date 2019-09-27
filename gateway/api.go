@@ -331,7 +331,6 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 
 	// get original session in case of update and preserve fields that SHOULD NOT be updated
 	originalKey := user.SessionState{}
-	originalKeyName := keyName
 	if r.Method == http.MethodPut {
 		found := false
 		for apiID := range newSession.AccessRights {
@@ -408,7 +407,7 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 	})
 
 	response := apiModifyKeySuccess{
-		Key:    originalKeyName,
+		Key:    keyName,
 		Status: "ok",
 		Action: action,
 	}
