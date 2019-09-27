@@ -2,6 +2,8 @@ package gateway
 
 import (
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -151,6 +153,24 @@ func TestTCP_missing_port(t *testing.T) {
 	}
 }
 
+// getUnusedPort returns a tcp port that is a vailable for binding.
+func getUnusedPort() (int, error) {
+	rp, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return 0, err
+	}
+	defer rp.Close()
+	_, port, err := net.SplitHostPort(rp.Addr().String())
+	if err != nil {
+		return 0, err
+	}
+	p, err := strconv.Atoi(port)
+	if err != nil {
+		return 0, err
+	}
+	return p, nil
+}
+
 func TestCheckPortWhiteList(t *testing.T) {
 	base := config.Global()
 	cases := []struct {
@@ -232,5 +252,40 @@ func TestCheckPortWhiteList(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestHTTP_custom_ports(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+	echo := "Hello, world"
+	us := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(echo))
+	}))
+	defer us.Close()
+	port, err := getUnusedPort()
+	if err != nil {
+		t.Fatal(err)
+	}
+	EnablePort(port, "http")
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.Protocol = "http"
+		spec.ListenPort = port
+		spec.Proxy.TargetURL = us.URL
+	})
+	s := fmt.Sprintf("http://localhost:%d", port)
+	w, err := http.Get(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Body.Close()
+	b, err := ioutil.ReadAll(w.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bs := string(b)
+	if bs != echo {
+		t.Errorf("expected %s to %s", echo, bs)
 	}
 }
