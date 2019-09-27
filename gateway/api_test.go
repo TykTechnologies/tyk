@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -12,7 +13,7 @@ import (
 	"time"
 
 	"github.com/garyburd/redigo/redis"
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 
 	"fmt"
 
@@ -1025,6 +1026,116 @@ func TestCreateOAuthClient(t *testing.T) {
 					BodyMatch: testData.bodyMatch,
 				},
 			)
+		})
+	}
+}
+
+func TestUpdateOauthClientHandler(t *testing.T) {
+
+	ts := StartTest()
+	defer ts.Close()
+
+	BuildAndLoadAPI(
+		func(spec *APISpec) {
+			spec.UseOauth2 = true
+		},
+		func(spec *APISpec) {
+			spec.APIID = "non_oauth_api"
+			spec.UseOauth2 = false
+		},
+	)
+
+	CreatePolicy(func(p *user.Policy) {
+		p.ID = "p1"
+		p.AccessRights = map[string]user.AccessDefinition{
+			"test": {
+				APIID: "test",
+			},
+		}
+	})
+	CreatePolicy(func(p *user.Policy) {
+		p.ID = "p2"
+		p.AccessRights = map[string]user.AccessDefinition{
+			"test": {
+				APIID: "test",
+			},
+			"abc": {
+				APIID: "abc",
+			},
+		}
+	})
+
+	var b bytes.Buffer
+
+	json.NewEncoder(&b).Encode(NewClientRequest{
+		ClientID: "12345",
+		APIID:    "test",
+		PolicyID: "p1",
+	})
+
+	ts.Run(
+		t,
+		test.TestCase{
+			Method:    http.MethodPost,
+			Path:      "/tyk/oauth/clients/create",
+			AdminAuth: true,
+			Data:      b.String(),
+			Code:      http.StatusOK,
+			BodyMatch: `"client_id":"12345"`,
+		},
+	)
+
+	tests := map[string]struct {
+		req          NewClientRequest
+		code         int
+		bodyMatch    string
+		bodyNotMatch string
+	}{
+		"Update description": {
+			req: NewClientRequest{
+				ClientID:    "12345",
+				APIID:       "test",
+				PolicyID:    "p1",
+				Description: "Updated field",
+			},
+			code:         http.StatusOK,
+			bodyMatch:    `"description":"Updated field"`,
+			bodyNotMatch: "",
+		},
+		"Secret cannot be updated": {
+			req: NewClientRequest{
+				ClientID:     "12345",
+				APIID:        "test",
+				PolicyID:     "p1",
+				Description:  "Updated field",
+				ClientSecret: "super-new-secret",
+			},
+			code:         http.StatusOK,
+			bodyNotMatch: `"secret":"super-new-secret"`,
+			bodyMatch:    "",
+		},
+	}
+
+	for testName, testData := range tests {
+		t.Run(testName, func(t *testing.T) {
+			requestData, _ := json.Marshal(testData.req)
+			testCase := test.TestCase{
+				Method:    http.MethodPut,
+				Path:      "/tyk/oauth/clients/test/12345",
+				AdminAuth: true,
+				Data:      string(requestData),
+				Code:      testData.code,
+			}
+
+			if testData.bodyMatch != "" {
+				testCase.BodyMatch = testData.bodyMatch
+			}
+
+			if testData.bodyNotMatch != "" {
+				testCase.BodyNotMatch = testData.bodyNotMatch
+			}
+
+			ts.Run(t, testCase)
 		})
 	}
 }
