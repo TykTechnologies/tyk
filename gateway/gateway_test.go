@@ -14,14 +14,15 @@ import (
 	"runtime"
 	"strconv"
 
-	"github.com/go-redis/redis"
-	"github.com/gorilla/websocket"
-	proxyproto "github.com/pires/go-proxyproto"
-	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/go-redis/redis"
+	"github.com/gorilla/websocket"
+	proxyproto "github.com/pires/go-proxyproto"
+	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/cli"
