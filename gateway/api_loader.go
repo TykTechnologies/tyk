@@ -1,9 +1,7 @@
 package gateway
 
 import (
-	"crypto/md5"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -90,6 +88,12 @@ func countApisByListenHash(specs []*APISpec) map[string]int {
 		count[domainHash]++
 	}
 	return count
+}
+
+func fixFuncPath(pathPrefix string, funcs []apidef.MiddlewareDefinition) {
+	for index := range funcs {
+		funcs[index].Path = filepath.Join(pathPrefix, funcs[index].Path)
+	}
 }
 
 func processSpec(spec *APISpec, apisByListen map[string]int,
@@ -198,13 +202,9 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	var prefix string
 	if spec.CustomMiddlewareBundle != "" {
 		if err := loadBundle(spec); err != nil {
-			logger.Error("Couldn't load bundle")
+			logger.WithError(err).Error("Couldn't load bundle")
 		}
-		tykBundlePath := filepath.Join(config.Global().MiddlewarePath, "bundles")
-		bundleNameHash := md5.New()
-		io.WriteString(bundleNameHash, spec.CustomMiddlewareBundle)
-		bundlePath := fmt.Sprintf("%s_%x", spec.APIID, bundleNameHash.Sum(nil))
-		prefix = filepath.Join(tykBundlePath, bundlePath)
+		prefix = getBundleDestPath(spec)
 	}
 
 	logger.Debug("Initializing API")
@@ -213,6 +213,15 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwResponseFuncs, mwDriver = loadCustomMiddleware(spec)
 	if config.Global().EnableJSVM && mwDriver == apidef.OttoDriver {
 		spec.JSVM.LoadJSPaths(mwPaths, prefix)
+	}
+
+	//  if bundle was used - fix paths for goplugin-type custom middle-wares
+	if mwDriver == apidef.GoPluginDriver && prefix != "" {
+		mwAuthCheckFunc.Path = filepath.Join(prefix, mwAuthCheckFunc.Path)
+		fixFuncPath(prefix, mwPreFuncs)
+		fixFuncPath(prefix, mwPostFuncs)
+		fixFuncPath(prefix, mwPostAuthCheckFuncs)
+		// TODO: add mwResponseFuncs here when Golang response custom MW support implemented
 	}
 
 	if spec.EnableBatchRequestSupport {
