@@ -3,8 +3,6 @@ package gateway
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/go-redis/redis"
-	uuid "github.com/satori/go.uuid"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -13,6 +11,9 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/go-redis/redis"
+	uuid "github.com/satori/go.uuid"
 
 	"fmt"
 
