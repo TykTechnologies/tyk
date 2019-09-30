@@ -33,6 +33,7 @@ type GenericRedisClient interface {
 	Del(keys ...string) *redis.IntCmd
 	Scan(cursor uint64, match string, count int64) *redis.ScanCmd
 	RPush(key string, values ...interface{}) *redis.IntCmd
+	FlushAll() *redis.StatusCmd
 
 	// Set Commands
 	SMembers(key string) *redis.StringSliceCmd
@@ -575,12 +576,12 @@ func (r *RedisCluster) DeleteKey(keyName string) bool {
 // DeleteAllKeys will remove all keys from the database.
 func (r *RedisCluster) DeleteAllKeys() bool {
 	r.ensureConnection()
-	n, err := r.singleton().Do("FLUSHALL")
+	n, err := r.singleton().FlushAll().Result()
 	if err != nil {
 		log.WithError(err).Error("Error trying to delete keys")
 	}
 
-	if n.(string) == "OK" {
+	if n == "OK" {
 		return true
 	}
 
