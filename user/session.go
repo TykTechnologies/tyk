@@ -149,6 +149,26 @@ func (s *SessionState) SetPolicies(ids ...string) {
 	s.ApplyPolicies = ids
 }
 
+// PoliciesEqualTo compares and returns true if passed slice if IDs contains only current ApplyPolicies
+func (s *SessionState) PoliciesEqualTo(ids []string) bool {
+	if len(s.ApplyPolicies) != len(ids) {
+		return false
+	}
+
+	polIDMap := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		polIDMap[id] = true
+	}
+
+	for _, curID := range s.ApplyPolicies {
+		if !polIDMap[curID] {
+			return false
+		}
+	}
+
+	return true
+}
+
 // GetQuotaLimitByAPIID return quota max, quota remaining, quota renewal rate and quota renews for the given session
 func (s *SessionState) GetQuotaLimitByAPIID(apiID string) (int64, int64, int64, int64) {
 	if access, ok := s.AccessRights[apiID]; ok && access.Limit != nil {
