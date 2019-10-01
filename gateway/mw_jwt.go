@@ -298,12 +298,14 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 
 	session, exists := k.CheckSessionAndIdentityForValidKey(sessionID, r)
 	isDefaultPol := false
+	basePolicyID := ""
+	foundPolicy := false
 	if !exists {
 		// Create it
 		k.Logger().Debug("Key does not exist, creating")
 
 		// We need a base policy as a template, either get it from the token itself OR a proxy client ID within Tyk
-		basePolicyID, foundPolicy := k.getBasePolicyID(r, claims)
+		basePolicyID, foundPolicy = k.getBasePolicyID(r, claims)
 		if !foundPolicy {
 			if len(k.Spec.JWTDefaultPolicies) == 0 {
 				k.reportLoginFailure(baseFieldData, r)
@@ -331,33 +333,6 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			return errors.New("failed to create key: " + err.Error()), http.StatusInternalServerError
 		}
 
-		// apply policies from scope if scope-to-policy mapping is specified for this API
-		if len(k.Spec.JWTScopeToPolicyMapping) != 0 {
-			scopeClaimName := k.Spec.JWTScopeClaimName
-			if scopeClaimName == "" {
-				scopeClaimName = "scope"
-			}
-
-			if scope := getScopeFromClaim(claims, scopeClaimName); scope != nil {
-				polIDs := []string{
-					basePolicyID, // add base policy as a first one
-				}
-
-				// add all policies matched from scope-policy mapping
-				mappedPolIDs := mapScopeToPolicies(k.Spec.JWTScopeToPolicyMapping, scope)
-
-				polIDs = append(polIDs, mappedPolIDs...)
-				session.SetPolicies(polIDs...)
-
-				// multiple policies assigned to a key, check if it is applicable
-				if err := k.ApplyPolicies(&session); err != nil {
-					k.reportLoginFailure(baseFieldData, r)
-					k.Logger().WithError(err).Error("Could not several policies from scope-claim mapping to JWT to session")
-					return errors.New("key not authorized: could not apply several policies"), http.StatusForbidden
-				}
-			}
-		}
-
 		if err != nil {
 			k.reportLoginFailure(baseFieldData, r)
 			k.Logger().Error("Could not find a valid policy to apply to this token!")
@@ -379,19 +354,19 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		k.Logger().Debug("Policy applied to key")
 	} else {
 		// extract policy ID from JWT token
-		policyID, foundPolicy := k.getBasePolicyID(r, claims)
+		basePolicyID, foundPolicy = k.getBasePolicyID(r, claims)
 		if !foundPolicy {
 			if len(k.Spec.JWTDefaultPolicies) == 0 {
 				k.reportLoginFailure(baseFieldData, r)
 				return errors.New("key not authorized: no matching policy found"), http.StatusForbidden
 			} else {
 				isDefaultPol = true
-				policyID = k.Spec.JWTDefaultPolicies[0]
+				basePolicyID = k.Spec.JWTDefaultPolicies[0]
 			}
 		}
 		// check if we received a valid policy ID in claim
 		policiesMu.RLock()
-		policy, ok := policiesByID[policyID]
+		policy, ok := policiesByID[basePolicyID]
 		policiesMu.RUnlock()
 		if !ok {
 			k.reportLoginFailure(baseFieldData, r)
@@ -412,7 +387,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			// check a policy is removed/added from/to default policies
 
 			for _, pol := range session.PolicyIDs() {
-				if !contains(k.Spec.JWTDefaultPolicies, pol) && policyID != pol {
+				if !contains(k.Spec.JWTDefaultPolicies, pol) && basePolicyID != pol {
 					defaultPolicyListChanged = true
 				}
 			}
@@ -424,7 +399,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			}
 		}
 
-		if !contains(pols, policyID) || defaultPolicyListChanged {
+		if !contains(pols, basePolicyID) || defaultPolicyListChanged {
 			if policy.OrgID != k.Spec.OrgID {
 				k.reportLoginFailure(baseFieldData, r)
 				k.Logger().Error("Policy ID found is invalid (wrong ownership)!")
@@ -432,7 +407,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			}
 			// apply new policy to session and update session
 			updateSession = true
-			session.SetPolicies(policyID)
+			session.SetPolicies(basePolicyID)
 
 			if isDefaultPol {
 				for _, pol := range k.Spec.JWTDefaultPolicies {
@@ -454,6 +429,39 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			if int64(f)-session.Expires > 0 {
 				session.Expires = int64(f)
 				updateSession = true
+			}
+		}
+	}
+
+	// apply policies from scope if scope-to-policy mapping is specified for this API
+	if len(k.Spec.JWTScopeToPolicyMapping) != 0 {
+		scopeClaimName := k.Spec.JWTScopeClaimName
+		if scopeClaimName == "" {
+			scopeClaimName = "scope"
+		}
+
+		if scope := getScopeFromClaim(claims, scopeClaimName); scope != nil {
+			polIDs := []string{
+				basePolicyID, // add base policy as a first one
+			}
+
+			// add all policies matched from scope-policy mapping
+			mappedPolIDs := mapScopeToPolicies(k.Spec.JWTScopeToPolicyMapping, scope)
+
+			polIDs = append(polIDs, mappedPolIDs...)
+
+			// check if we need to update session
+			if !updateSession {
+				updateSession = !session.PoliciesEqualTo(polIDs)
+			}
+
+			session.SetPolicies(polIDs...)
+
+			// multiple policies assigned to a key, check if it is applicable
+			if err := k.ApplyPolicies(&session); err != nil {
+				k.reportLoginFailure(baseFieldData, r)
+				k.Logger().WithError(err).Error("Could not several policies from scope-claim mapping to JWT to session")
+				return errors.New("key not authorized: could not apply several policies"), http.StatusForbidden
 			}
 		}
 	}

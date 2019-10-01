@@ -1066,6 +1066,66 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 			},
 		)
 	})
+
+	// try to change scope to policy mapping and request using existing session
+	p3ID := CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			spec3.APIID: {
+				Limit: &user.APILimit{
+					Rate:     500,
+					Per:      30,
+					QuotaMax: -1,
+				},
+			},
+		}
+		p.Partitions = user.PolicyPartitions{
+			PerAPI: true,
+		}
+	})
+
+	spec.JWTScopeToPolicyMapping = map[string]string{
+		"user:read": p3ID,
+	}
+
+	LoadAPI(spec)
+
+	t.Run("Request with changed scope in JWT and key with existing session", func(t *testing.T) {
+		ts.Run(t,
+			test.TestCase{
+				Headers: authHeaders,
+				Path:    "/base",
+				Code:    http.StatusOK,
+			})
+	})
+
+	// check that key has right set of policies assigned - there should be updated list (base one and one from scope)
+	t.Run("Request to check that session has got changed apply_policies value", func(t *testing.T) {
+		ts.Run(
+			t,
+			test.TestCase{
+				Method:    http.MethodGet,
+				Path:      "/tyk/keys/" + sessionID,
+				AdminAuth: true,
+				Code:      http.StatusOK,
+				BodyMatchFunc: func(body []byte) bool {
+					expectedResp := map[interface{}]bool{
+						basePolicyID: true,
+						p3ID:         true,
+					}
+
+					resp := map[string]interface{}{}
+					json.Unmarshal(body, &resp)
+					realResp := map[interface{}]bool{}
+					for _, val := range resp["apply_policies"].([]interface{}) {
+						realResp[val] = true
+					}
+
+					return reflect.DeepEqual(realResp, expectedResp)
+				},
+			},
+		)
+	})
+
 }
 
 func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
