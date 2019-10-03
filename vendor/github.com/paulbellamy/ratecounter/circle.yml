@@ -1,0 +1,21 @@
+dependencies:
+  post:
+    - go get -u github.com/alecthomas/gometalinter
+    - gometalinter --install
+
+test:
+  override:
+    - go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
+    - |
+      gometalinter \
+        --disable-all \
+        --enable=deadcode \
+        --enable=errcheck \
+        --enable=golint \
+        --enable=gosimple \
+        --enable=unconvert \
+        --enable=vet \
+        --enable=vetshadow \
+        ./...
+  post:
+    - bash <(curl -s https://codecov.io/bash)

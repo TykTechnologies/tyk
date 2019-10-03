@@ -239,6 +239,9 @@ func without(list interface{}, omit ...interface{}) []interface{} {
 }
 
 func has(needle interface{}, haystack interface{}) bool {
+	if haystack == nil {
+		return false
+	}
 	tp := reflect.TypeOf(haystack).Kind()
 	switch tp {
 	case reflect.Slice, reflect.Array:
@@ -288,4 +291,21 @@ func slice(list interface{}, indices ...interface{}) interface{} {
 	default:
 		panic(fmt.Sprintf("list should be type of slice or array but %s", tp))
 	}
+}
+
+func concat(lists ...interface{}) interface{} {
+	var res []interface{}
+	for _, list := range lists {
+		tp := reflect.TypeOf(list).Kind()
+		switch tp {
+		case reflect.Slice, reflect.Array:
+			l2 := reflect.ValueOf(list)
+			for i := 0; i < l2.Len(); i++ {
+				res = append(res, l2.Index(i).Interface())
+			}
+		default:
+			panic(fmt.Sprintf("Cannot concat type %s as list", tp))
+		}
+	}
+	return res
 }

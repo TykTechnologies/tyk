@@ -1,6 +1,9 @@
 package maxminddb
 
-import "reflect"
+import (
+	"reflect"
+	"runtime"
+)
 
 type verifier struct {
 	reader *Reader
@@ -15,7 +18,9 @@ func (r *Reader) Verify() error {
 		return err
 	}
 
-	return v.verifyDatabase()
+	err := v.verifyDatabase()
+	runtime.KeepAlive(v.reader)
+	return err
 }
 
 func (v *verifier) verifyMetadata() error {
@@ -134,7 +139,7 @@ func (v *verifier) verifyDataSection(offsets map[uint]bool) error {
 	for offset < bufferLen {
 		var data interface{}
 		rv := reflect.ValueOf(&data)
-		newOffset, err := decoder.decode(offset, rv)
+		newOffset, err := decoder.decode(offset, rv, 0)
 		if err != nil {
 			return newInvalidDatabaseError("received decoding error (%v) at offset of %v", err, offset)
 		}

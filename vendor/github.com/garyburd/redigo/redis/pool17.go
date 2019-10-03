@@ -27,9 +27,9 @@ import "context"
 // If the function completes without error, then the application must close the
 // returned connection.
 func (p *Pool) GetContext(ctx context.Context) (Conn, error) {
-	pc, err := p.get(ctx)
+	c, err := p.get(ctx)
 	if err != nil {
-		return errorConn{err}, err
+		return errorConnection{err}, err
 	}
-	return &activeConn{p: p, pc: pc}, nil
+	return &pooledConnection{p: p, c: c}, nil
 }

@@ -101,7 +101,7 @@ result, _ = vm.Run(`
     sayHello();             // Hello, undefined
 
     result = twoPlus(2.0); // 4
-`) 
+`)
 ```
 
 ### Parser

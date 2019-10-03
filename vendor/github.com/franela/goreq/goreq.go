@@ -25,27 +25,28 @@ type itimeout interface {
 	Timeout() bool
 }
 type Request struct {
-	headers           []headerTuple
-	cookies           []*http.Cookie
-	Method            string
-	Uri               string
-	Body              interface{}
-	QueryString       interface{}
-	Timeout           time.Duration
-	ContentType       string
-	Accept            string
-	Host              string
-	UserAgent         string
-	Insecure          bool
-	MaxRedirects      int
-	RedirectHeaders   bool
-	Proxy             string
-	Compression       *compression
-	BasicAuthUsername string
-	BasicAuthPassword string
-	CookieJar         http.CookieJar
-	ShowDebug         bool
-	OnBeforeRequest   func(goreq *Request, httpreq *http.Request)
+	headers             []headerTuple
+	cookies             []*http.Cookie
+	Method              string
+	Uri                 string
+	Body                interface{}
+	QueryString         interface{}
+	Timeout             time.Duration
+	ContentType         string
+	Accept              string
+	Host                string
+	UserAgent           string
+	Insecure            bool
+	MaxRedirects        int
+	RedirectHeaders     bool
+	Proxy               string
+	proxyConnectHeaders []headerTuple
+	Compression         *compression
+	BasicAuthUsername   string
+	BasicAuthPassword   string
+	CookieJar           http.CookieJar
+	ShowDebug           bool
+	OnBeforeRequest     func(goreq *Request, httpreq *http.Request)
 }
 
 type compression struct {
@@ -270,7 +271,18 @@ func (r *Request) AddCookie(c *http.Cookie) {
 func (r Request) WithCookie(c *http.Cookie) Request {
 	r.AddCookie(c)
 	return r
+}
 
+func (r *Request) AddProxyConnectHeader(name string, value string) {
+	if r.proxyConnectHeaders == nil {
+		r.proxyConnectHeaders = []headerTuple{}
+	}
+	r.proxyConnectHeaders = append(r.proxyConnectHeaders, headerTuple{name: name, value: value})
+}
+
+func (r Request) WithProxyConnectHeader(name string, value string) Request {
+	r.AddProxyConnectHeader(name, value)
+	return r
 }
 
 func (r Request) Do() (*Response, error) {
@@ -297,12 +309,24 @@ func (r Request) Do() (*Response, error) {
 			return nil, &Error{Err: err}
 		}
 
+		proxyHeader := make(http.Header)
+		if r.proxyConnectHeaders != nil {
+			for _, header := range r.proxyConnectHeaders {
+				proxyHeader.Add(header.name, header.value)
+			}
+		}
+
 		//If jar is specified new client needs to be built
 		if proxyTransport == nil || client.Jar != nil {
-			proxyTransport = &http.Transport{Dial: DefaultDialer.Dial, Proxy: http.ProxyURL(proxyUrl)}
+			proxyTransport = &http.Transport{
+				Dial:               DefaultDialer.Dial,
+				Proxy:              http.ProxyURL(proxyUrl),
+				ProxyConnectHeader: proxyHeader,
+			}
 			proxyClient = &http.Client{Transport: proxyTransport, Jar: client.Jar}
 		} else if proxyTransport, ok := proxyTransport.(*http.Transport); ok {
 			proxyTransport.Proxy = http.ProxyURL(proxyUrl)
+			proxyTransport.ProxyConnectHeader = proxyHeader
 		}
 		transport = proxyTransport
 		client = proxyClient

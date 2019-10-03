@@ -1,7 +1,9 @@
 package newrelic
 
-// DatastoreProduct encourages consistent metrics across New Relic agents.  You
-// may create your own if your datastore is not listed below.
+// DatastoreProduct is used to identify your datastore type in New Relic.  It
+// is used in the DatastoreSegment Product field.  See
+// https://github.com/newrelic/go-agent/blob/master/datastore.go for the full
+// list of available DatastoreProducts.
 type DatastoreProduct string
 
 // Datastore names used across New Relic agents:
@@ -16,6 +18,7 @@ const (
 	DatastoreMongoDB                        = "MongoDB"
 	DatastoreMySQL                          = "MySQL"
 	DatastoreMSSQL                          = "MSSQL"
+	DatastoreNeptune                        = "Neptune"
 	DatastoreOracle                         = "Oracle"
 	DatastorePostgres                       = "Postgres"
 	DatastoreRedis                          = "Redis"
@@ -24,4 +27,5 @@ const (
 	DatastoreCouchDB                        = "CouchDB"
 	DatastoreRiak                           = "Riak"
 	DatastoreVoltDB                         = "VoltDB"
+	DatastoreDynamoDB                       = "DynamoDB"
 )

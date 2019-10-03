@@ -21,11 +21,14 @@ var metadataStartMarker = []byte("\xAB\xCD\xEFMaxMind.com")
 // Reader holds the data corresponding to the MaxMind DB file. Its only public
 // field is Metadata, which contains the metadata from the MaxMind DB file.
 type Reader struct {
-	hasMappedFile bool
-	buffer        []byte
-	decoder       decoder
-	Metadata      Metadata
-	ipv4Start     uint
+	hasMappedFile     bool
+	buffer            []byte
+	nodeReader        nodeReader
+	decoder           decoder
+	Metadata          Metadata
+	ipv4Start         uint
+	ipv4StartBitDepth int
+	nodeOffsetMult    uint
 }
 
 // Metadata holds the metadata decoded from the MaxMind DB file. In particular
@@ -59,7 +62,7 @@ func FromBytes(buffer []byte) (*Reader, error) {
 	var metadata Metadata
 
 	rvMetdata := reflect.ValueOf(&metadata)
-	_, err := metadataDecoder.decode(0, rvMetdata)
+	_, err := metadataDecoder.decode(0, rvMetdata, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -74,44 +77,87 @@ func FromBytes(buffer []byte) (*Reader, error) {
 		buffer[searchTreeSize+dataSectionSeparatorSize : metadataStart-len(metadataStartMarker)],
 	}
 
-	reader := &Reader{
-		buffer:    buffer,
-		decoder:   d,
-		Metadata:  metadata,
-		ipv4Start: 0,
+	nodeBuffer := buffer[:searchTreeSize]
+	var nodeReader nodeReader
+	switch metadata.RecordSize {
+	case 24:
+		nodeReader = nodeReader24{buffer: nodeBuffer}
+	case 28:
+		nodeReader = nodeReader28{buffer: nodeBuffer}
+	case 32:
+		nodeReader = nodeReader32{buffer: nodeBuffer}
+	default:
+		return nil, newInvalidDatabaseError("unknown record size: %d", metadata.RecordSize)
 	}
 
-	reader.ipv4Start, err = reader.startNode()
+	reader := &Reader{
+		buffer:         buffer,
+		nodeReader:     nodeReader,
+		decoder:        d,
+		Metadata:       metadata,
+		ipv4Start:      0,
+		nodeOffsetMult: metadata.RecordSize / 4,
+	}
+
+	reader.setIPv4Start()
 
 	return reader, err
 }
 
-func (r *Reader) startNode() (uint, error) {
+func (r *Reader) setIPv4Start() {
 	if r.Metadata.IPVersion != 6 {
-		return 0, nil
+		return
 	}
 
 	nodeCount := r.Metadata.NodeCount
 
 	node := uint(0)
-	var err error
-	for i := 0; i < 96 && node < nodeCount; i++ {
-		node, err = r.readNode(node, 0)
-		if err != nil {
-			return 0, err
-		}
+	i := 0
+	for ; i < 96 && node < nodeCount; i++ {
+		node = r.nodeReader.readLeft(node * r.nodeOffsetMult)
 	}
-	return node, err
+	r.ipv4Start = node
+	r.ipv4StartBitDepth = i
 }
 
-// Lookup takes an IP address as a net.IP structure and a pointer to the
-// result value to Decode into.
-func (r *Reader) Lookup(ipAddress net.IP, result interface{}) error {
-	pointer, err := r.lookupPointer(ipAddress)
+// Lookup retrieves the database record for ip and stores it in the value
+// pointed to by result. If result is nil or not a pointer, an error is
+// returned. If the data in the database record cannot be stored in result
+// because of type differences, an UnmarshalTypeError is returned. If the
+// database is invalid or otherwise cannot be read, an InvalidDatabaseError
+// is returned.
+func (r *Reader) Lookup(ip net.IP, result interface{}) error {
+	if r.buffer == nil {
+		return errors.New("cannot call Lookup on a closed database")
+	}
+	pointer, _, _, err := r.lookupPointer(ip)
 	if pointer == 0 || err != nil {
 		return err
 	}
 	return r.retrieveData(pointer, result)
+}
+
+// LookupNetwork retrieves the database record for ip and stores it in the
+// value pointed to by result. The network returned is the network associated
+// with the data record in the database. The ok return value indicates whether
+// the database contained a record for the ip.
+//
+// If result is nil or not a pointer, an error is returned. If the data in the
+// database record cannot be stored in result because of type differences, an
+// UnmarshalTypeError is returned. If the database is invalid or otherwise
+// cannot be read, an InvalidDatabaseError is returned.
+func (r *Reader) LookupNetwork(ip net.IP, result interface{}) (network *net.IPNet, ok bool, err error) {
+	if r.buffer == nil {
+		return nil, false, errors.New("cannot call Lookup on a closed database")
+	}
+	pointer, prefixLength, ip, err := r.lookupPointer(ip)
+
+	network = r.cidr(ip, prefixLength)
+	if pointer == 0 || err != nil {
+		return network, false, err
+	}
+
+	return network, true, r.retrieveData(pointer, result)
 }
 
 // LookupOffset maps an argument net.IP to a corresponding record offset in the
@@ -119,12 +165,33 @@ func (r *Reader) Lookup(ipAddress net.IP, result interface{}) error {
 // otherwise be extracted by passing the returned offset to Decode. LookupOffset
 // is an advanced API, which exists to provide clients with a means to cache
 // previously-decoded records.
-func (r *Reader) LookupOffset(ipAddress net.IP) (uintptr, error) {
-	pointer, err := r.lookupPointer(ipAddress)
+func (r *Reader) LookupOffset(ip net.IP) (uintptr, error) {
+	if r.buffer == nil {
+		return 0, errors.New("cannot call LookupOffset on a closed database")
+	}
+	pointer, _, _, err := r.lookupPointer(ip)
 	if pointer == 0 || err != nil {
 		return NotFound, err
 	}
 	return r.resolveDataPointer(pointer)
+}
+
+func (r *Reader) cidr(ip net.IP, prefixLength int) *net.IPNet {
+	// This is necessary as the node that the IPv4 start is at may
+	// be at a bit depth that is less that 96, i.e., ipv4Start points
+	// to a leaf node. For instance, if a record was inserted at ::/8,
+	// the ipv4Start would point directly at the leaf node for the
+	// record and would have a bit depth of 8. This would not happen
+	// with databases currently distributed by MaxMind as all of them
+	// have an IPv4 subtree that is greater than a single node.
+	if r.Metadata.IPVersion == 6 &&
+		len(ip) == net.IPv4len &&
+		r.ipv4StartBitDepth != 96 {
+		return &net.IPNet{IP: net.ParseIP("::"), Mask: net.CIDRMask(r.ipv4StartBitDepth, 128)}
+	}
+
+	mask := net.CIDRMask(prefixLength, len(ip)*8)
+	return &net.IPNet{IP: ip.Mask(mask), Mask: mask}
 }
 
 // Decode the record at |offset| into |result|. The result value pointed to
@@ -144,34 +211,36 @@ func (r *Reader) LookupOffset(ipAddress net.IP) (uintptr, error) {
 // single representative record for that country. This uintptr behavior allows
 // clients to leverage this normalization in their own sub-record caching.
 func (r *Reader) Decode(offset uintptr, result interface{}) error {
+	if r.buffer == nil {
+		return errors.New("cannot call Decode on a closed database")
+	}
+	return r.decode(offset, result)
+}
+
+func (r *Reader) decode(offset uintptr, result interface{}) error {
 	rv := reflect.ValueOf(result)
 	if rv.Kind() != reflect.Ptr || rv.IsNil() {
 		return errors.New("result param must be a pointer")
 	}
 
-	_, err := r.decoder.decode(uint(offset), reflect.ValueOf(result))
+	_, err := r.decoder.decode(uint(offset), rv, 0)
 	return err
 }
 
-func (r *Reader) lookupPointer(ipAddress net.IP) (uint, error) {
-	if ipAddress == nil {
-		return 0, errors.New("ipAddress passed to Lookup cannot be nil")
+func (r *Reader) lookupPointer(ip net.IP) (uint, int, net.IP, error) {
+	if ip == nil {
+		return 0, 0, ip, errors.New("IP passed to Lookup cannot be nil")
 	}
 
-	ipV4Address := ipAddress.To4()
+	ipV4Address := ip.To4()
 	if ipV4Address != nil {
-		ipAddress = ipV4Address
+		ip = ipV4Address
 	}
-	if len(ipAddress) == 16 && r.Metadata.IPVersion == 4 {
-		return 0, fmt.Errorf("error looking up '%s': you attempted to look up an IPv6 address in an IPv4-only database", ipAddress.String())
+	if len(ip) == 16 && r.Metadata.IPVersion == 4 {
+		return 0, 0, ip, fmt.Errorf("error looking up '%s': you attempted to look up an IPv6 address in an IPv4-only database", ip.String())
 	}
 
-	return r.findAddressInTree(ipAddress)
-}
-
-func (r *Reader) findAddressInTree(ipAddress net.IP) (uint, error) {
-
-	bitCount := uint(len(ipAddress) * 8)
+	bitCount := uint(len(ip) * 8)
 
 	var node uint
 	if bitCount == 32 {
@@ -180,52 +249,25 @@ func (r *Reader) findAddressInTree(ipAddress net.IP) (uint, error) {
 
 	nodeCount := r.Metadata.NodeCount
 
-	for i := uint(0); i < bitCount && node < nodeCount; i++ {
-		bit := uint(1) & (uint(ipAddress[i>>3]) >> (7 - (i % 8)))
+	i := uint(0)
+	for ; i < bitCount && node < nodeCount; i++ {
+		bit := uint(1) & (uint(ip[i>>3]) >> (7 - (i % 8)))
 
-		var err error
-		node, err = r.readNode(node, bit)
-		if err != nil {
-			return 0, err
+		offset := node * r.nodeOffsetMult
+		if bit == 0 {
+			node = r.nodeReader.readLeft(offset)
+		} else {
+			node = r.nodeReader.readRight(offset)
 		}
 	}
 	if node == nodeCount {
 		// Record is empty
-		return 0, nil
+		return 0, int(i), ip, nil
 	} else if node > nodeCount {
-		return node, nil
+		return node, int(i), ip, nil
 	}
 
-	return 0, newInvalidDatabaseError("invalid node in search tree")
-}
-
-func (r *Reader) readNode(nodeNumber uint, index uint) (uint, error) {
-	RecordSize := r.Metadata.RecordSize
-
-	baseOffset := nodeNumber * RecordSize / 4
-
-	var nodeBytes []byte
-	var prefix uint64
-	switch RecordSize {
-	case 24:
-		offset := baseOffset + index*3
-		nodeBytes = r.buffer[offset : offset+3]
-	case 28:
-		prefix = uint64(r.buffer[baseOffset+3])
-		if index != 0 {
-			prefix &= 0x0F
-		} else {
-			prefix = (0xF0 & prefix) >> 4
-		}
-		offset := baseOffset + index*4
-		nodeBytes = r.buffer[offset : offset+3]
-	case 32:
-		offset := baseOffset + index*4
-		nodeBytes = r.buffer[offset : offset+4]
-	default:
-		return 0, newInvalidDatabaseError("unknown record size: %d", RecordSize)
-	}
-	return uint(uintFromBytes(prefix, nodeBytes)), nil
+	return 0, int(i), ip, newInvalidDatabaseError("invalid node in search tree")
 }
 
 func (r *Reader) retrieveData(pointer uint, result interface{}) error {
@@ -233,7 +275,7 @@ func (r *Reader) retrieveData(pointer uint, result interface{}) error {
 	if err != nil {
 		return err
 	}
-	return r.Decode(offset, result)
+	return r.decode(offset, result)
 }
 
 func (r *Reader) resolveDataPointer(pointer uint) (uintptr, error) {

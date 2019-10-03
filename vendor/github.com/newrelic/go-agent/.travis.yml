@@ -1,0 +1,58 @@
+language: go
+go_import_path: github.com/newrelic/go-agent
+
+matrix:
+  include:
+  - go: "1.3"
+  - go: "1.4"
+  - go: "1.5"
+  - go: "1.6"
+  - go: "1.7"
+  - go: "1.8"
+  - go: "1.9"
+  - go: "1.10"
+  - go: "1.11"
+  - go: "1.12"
+  - go: "1.13"
+  - go: "1.13"
+    env: INTEGRATION=_integrations/nrawssdk
+  - go: "1.13"
+    env: INTEGRATION=_integrations/nrecho
+  - go: "1.13"
+    env: INTEGRATION=_integrations/nrgin/v1
+  - go: "1.13"
+    env: INTEGRATION=_integrations/nrgorilla/v1
+  - go: "1.13"
+    env: INTEGRATION=_integrations/nrlogrus
+  - go: "1.13"
+    env: INTEGRATION=_integrations/nrlogxi/v1
+  - go: "1.13"
+    env: INTEGRATION=_integrations/nrpkgerrors
+  - go: "1.13"
+    env: INTEGRATION=_integrations/nrlambda
+  - go: "1.13"
+    env: INTEGRATION=_integrations/nrmysql
+  - go: "1.13"
+    env: INTEGRATION=_integrations/nrpq
+  - go: "1.13"
+    env: INTEGRATION=_integrations/nrsqlite3
+  - go: "1.13"
+    env: INTEGRATION=_integrations/nrgrpc
+  - go: "1.13"
+    env: INTEGRATION=_integrations/nrmicro
+  - go: "1.13"
+    env: INTEGRATION=_integrations/nrnats
+  - go: "1.13"
+    env: INTEGRATION=_integrations/nrstan
+  - go: "1.13"
+    env: INTEGRATION=_integrations/logcontext
+  - go: "1.13"
+    env: INTEGRATION=_integrations/nrzap
+  - go: "1.13"
+    env: INTEGRATION=_integrations/nrhttprouter
+
+# Skip the install step. Don't `go get` dependencies.
+install: true
+
+script:
+  - bash build-script.sh

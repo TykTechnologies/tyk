@@ -1,5 +1,122 @@
 # Changelog
 
+## Release 2.21.0 (2019-09-18)
+
+### Added
+
+- #122: Added encryptAES/decryptAES functions (thanks @n0madic)
+- #128: Added toDecimal support (thanks @Dean-Coakley)
+- #169: Added list contcat (thanks @astorath)
+- #174: Added deepEqual function (thanks @bonifaido)
+- #170: Added url parse and join functions (thanks @astorath)
+
+### Changed
+
+- #171: Updated glide config for Google UUID to v1 and to add ranges to semver and testify
+
+### Fixed
+
+- #172: Fix semver wildcard example (thanks @piepmatz)
+- #175: Fix dateInZone doc example (thanks @s3than)
+
+## Release 2.20.0 (2019-06-18)
+
+### Added
+
+- #164: Adding function to get unix epoch for a time (@mattfarina)
+- #166: Adding tests for date_in_zone (@mattfarina)
+
+### Changed
+
+- #144: Fix function comments based on best practices from Effective Go (@CodeLingoTeam)
+- #150: Handles pointer type for time.Time in "htmlDate" (@mapreal19)
+- #161, #157, #160,  #153, #158, #156,  #155,  #159, #152 documentation updates (@badeadan)
+
+### Fixed
+
+## Release 2.19.0 (2019-03-02)
+
+IMPORTANT: This release reverts a change from 2.18.0
+
+In the previous release (2.18), we prematurely merged a partial change to the crypto functions that led to creating two sets of crypto functions (I blame @technosophos -- since that's me). This release rolls back that change, and does what was originally intended: It alters the existing crypto functions to use secure random.
+
+We debated whether this classifies as a change worthy of major revision, but given the proximity to the last release, we have decided that treating 2.18 as a faulty release is the correct course of action. We apologize for any inconvenience.
+
+### Changed
+
+- Fix substr panic 35fb796 (Alexey igrychev)
+- Remove extra period 1eb7729 (Matthew Lorimor)
+- Make random string functions use crypto by default 6ceff26 (Matthew Lorimor)
+- README edits/fixes/suggestions 08fe136 (Lauri Apple)
+
+
+## Release 2.18.0 (2019-02-12)
+
+### Added
+
+- Added mergeOverwrite function
+- cryptographic functions that use secure random (see fe1de12)
+
+### Changed
+
+- Improve documentation of regexMatch function, resolves #139 90b89ce (Jan Tagscherer)
+- Handle has for nil list 9c10885 (Daniel Cohen)
+- Document behaviour of mergeOverwrite fe0dbe9 (Lukas Rieder)
+- doc: adds missing documentation. 4b871e6 (Fernandez Ludovic)
+- Replace outdated goutils imports 01893d2 (Matthew Lorimor)
+- Surface crypto secure random strings from goutils fe1de12 (Matthew Lorimor)
+- Handle untyped nil values as paramters to string functions 2b2ec8f (Morten Torkildsen)
+
+### Fixed
+
+- Fix dict merge issue and provide mergeOverwrite .dst .src1 to overwrite from src -> dst 4c59c12 (Lukas Rieder)
+- Fix substr var names and comments d581f80 (Dean Coakley)
+- Fix substr documentation 2737203 (Dean Coakley)
+
+## Release 2.17.1 (2019-01-03)
+
+### Fixed
+
+The 2.17.0 release did not have a version pinned for xstrings, which caused compilation failures when xstrings < 1.2 was used. This adds the correct version string to glide.yaml.
+
+## Release 2.17.0 (2019-01-03)
+
+### Added
+
+- adds alder32sum function and test 6908fc2 (marshallford)
+- Added kebabcase function ca331a1 (Ilyes512)
+
+### Changed
+
+- Update goutils to 1.1.0 4e1125d (Matt Butcher)
+
+### Fixed
+
+- Fix 'has' documentation e3f2a85 (dean-coakley)
+- docs(dict): fix typo in pick example dc424f9 (Dustin Specker)
+- fixes spelling errors... not sure how that happened 4cf188a (marshallford)
+
+## Release 2.16.0 (2018-08-13)
+
+### Added
+
+- add splitn function fccb0b0 (Helgi Þorbjörnsson)
+- Add slice func df28ca7 (gongdo)
+- Generate serial number a3bdffd (Cody Coons)
+- Extract values of dict with values function df39312 (Lawrence Jones)
+
+### Changed
+
+- Modify panic message for list.slice ae38335 (gongdo)
+- Minor improvement in code quality - Removed an unreachable piece of code at defaults.go#L26:6 - Resolve formatting issues. 5834241 (Abhishek Kashyap)
+- Remove duplicated documentation 1d97af1 (Matthew Fisher)
+- Test on go 1.11 49df809 (Helgi Þormar Þorbjörnsson)
+
+### Fixed
+
+- Fix file permissions c5f40b5 (gongdo)
+- Fix example for buildCustomCert 7779e0d (Tin Lam)
+
 ## Release 2.15.0 (2018-04-02)
 
 ### Added

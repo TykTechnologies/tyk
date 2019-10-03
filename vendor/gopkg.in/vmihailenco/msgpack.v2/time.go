@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"time"
+
+	"gopkg.in/vmihailenco/msgpack.v2/codes"
 )
 
 var timeType = reflect.TypeOf((*time.Time)(nil)).Elem()
@@ -13,7 +15,7 @@ func init() {
 }
 
 func (e *Encoder) EncodeTime(tm time.Time) error {
-	if err := e.w.WriteByte(0x92); err != nil {
+	if err := e.w.WriteByte(codes.FixedArrayLow | 2); err != nil {
 		return err
 	}
 	if err := e.EncodeInt64(tm.Unix()); err != nil {
@@ -23,7 +25,7 @@ func (e *Encoder) EncodeTime(tm time.Time) error {
 }
 
 func (d *Decoder) DecodeTime() (time.Time, error) {
-	b, err := d.r.ReadByte()
+	b, err := d.readByte()
 	if err != nil {
 		return time.Time{}, err
 	}

@@ -3,6 +3,8 @@ package newrelic
 import (
 	"errors"
 	"fmt"
+	"io"
+	"math"
 	"net/http"
 	"os"
 	"strings"
@@ -14,13 +16,11 @@ import (
 )
 
 var (
-	debugLogging = os.Getenv("NEW_RELIC_DEBUG_LOGGING")
-	redirectHost = func() string {
-		if s := os.Getenv("NEW_RELIC_HOST"); "" != s {
-			return s
-		}
-		return "collector.newrelic.com"
-	}()
+	// NEW_RELIC_DEBUG_LOGGING can be set to anything to enable additional
+	// debug logging: the agent will log every transaction's data at info
+	// level.
+	envDebugLogging = "NEW_RELIC_DEBUG_LOGGING"
+	debugLogging    = os.Getenv(envDebugLogging)
 )
 
 type dataConsumer interface {
@@ -33,10 +33,13 @@ type appData struct {
 }
 
 type app struct {
+	Logger
 	config      Config
-	attrConfig  *internal.AttributeConfig
 	rpmControls internal.RpmControls
 	testHarvest *internal.Harvest
+
+	// placeholderRun is used when the application is not connected.
+	placeholderRun *appRun
 
 	// initiateShutdown is used to tell the processor to shutdown.
 	initiateShutdown chan struct{}
@@ -54,150 +57,146 @@ type app struct {
 	// Sends to these channels should not occur without a <-shutdownStarted
 	// select option to prevent deadlock.
 	dataChan           chan appData
-	collectorErrorChan chan error
-	connectChan        chan *internal.AppRun
-
-	harvestTicker *time.Ticker
+	collectorErrorChan chan internal.RPMResponse
+	connectChan        chan *appRun
 
 	// This mutex protects both `run` and `err`, both of which should only
 	// be accessed using getState and setState.
 	sync.RWMutex
 	// run is non-nil when the app is successfully connected.  It is
 	// immutable.
-	run *internal.AppRun
+	run *appRun
 	// err is non-nil if the application will never be connected again
 	// (disconnect, license exception, shutdown).
 	err error
+
+	serverless *internal.ServerlessHarvest
 }
 
-var (
-	placeholderRun = &internal.AppRun{
-		ConnectReply: internal.ConnectReplyDefaults(),
-	}
-)
+func (app *app) doHarvest(h *internal.Harvest, harvestStart time.Time, run *appRun) {
+	h.CreateFinalMetrics(run.Reply)
 
-func isFatalHarvestError(e error) bool {
-	return internal.IsDisconnect(e) ||
-		internal.IsLicenseException(e) ||
-		internal.IsRestartException(e)
-}
+	payloads := h.Payloads(app.config.DistributedTracer.Enabled)
+	for _, p := range payloads {
+		cmd := p.EndpointMethod()
+		data, err := p.Data(run.Reply.RunID.String(), harvestStart)
 
-func shouldSaveFailedHarvest(e error) bool {
-	if e == internal.ErrPayloadTooLarge || e == internal.ErrUnsupportedMedia {
-		return false
-	}
-	return true
-}
-
-func (app *app) doHarvest(h *internal.Harvest, harvestStart time.Time, run *internal.AppRun) {
-	h.CreateFinalMetrics()
-	h.Metrics = h.Metrics.ApplyRules(run.MetricRules)
-
-	payloads := h.Payloads()
-	for cmd, p := range payloads {
-
-		data, err := p.Data(run.RunID.String(), harvestStart)
-
-		if nil == data && nil == err {
-			continue
-		}
-
-		if nil == err {
-			call := internal.RpmCmd{
-				Collector: run.Collector,
-				RunID:     run.RunID.String(),
-				Name:      cmd,
-				Data:      data,
-			}
-
-			// The reply from harvest calls is always unused.
-			_, err = internal.CollectorRequest(call, app.rpmControls)
-		}
-
-		if nil == err {
-			continue
-		}
-
-		if isFatalHarvestError(err) {
-			select {
-			case app.collectorErrorChan <- err:
-			case <-app.shutdownStarted:
-			}
-			return
-		}
-
-		app.config.Logger.Warn("harvest failure", map[string]interface{}{
-			"cmd":   cmd,
-			"error": err.Error(),
-		})
-
-		if shouldSaveFailedHarvest(err) {
-			app.Consume(run.RunID, p)
-		}
-	}
-}
-
-func connectAttempt(app *app) (*internal.AppRun, error) {
-	js, e := configConnectJSON(app.config)
-	if nil != e {
-		return nil, e
-	}
-	return internal.ConnectAttempt(js, redirectHost, app.rpmControls)
-}
-
-func (app *app) connectRoutine() {
-	for {
-		run, err := connectAttempt(app)
-		if nil == err {
-			select {
-			case app.connectChan <- run:
-			case <-app.shutdownStarted:
-			}
-			return
-		}
-
-		if internal.IsDisconnect(err) || internal.IsLicenseException(err) {
-			select {
-			case app.collectorErrorChan <- err:
-			case <-app.shutdownStarted:
-			}
-			return
-		}
-
-		app.config.Logger.Warn("application connect failure", map[string]interface{}{
-			"error": err.Error(),
-		})
-
-		time.Sleep(internal.ConnectBackoff)
-	}
-}
-
-func debug(data internal.Harvestable, lg Logger) {
-	now := time.Now()
-	h := internal.NewHarvest(now)
-	data.MergeIntoHarvest(h)
-	ps := h.Payloads()
-	for cmd, p := range ps {
-		d, err := p.Data("agent run id", now)
-		if nil == d && nil == err {
-			continue
-		}
 		if nil != err {
-			lg.Debug("integration", map[string]interface{}{
+			app.Warn("unable to create harvest data", map[string]interface{}{
 				"cmd":   cmd,
 				"error": err.Error(),
 			})
 			continue
 		}
-		lg.Debug("integration", map[string]interface{}{
+		if nil == data {
+			continue
+		}
+
+		call := internal.RpmCmd{
+			Collector:         run.Reply.Collector,
+			RunID:             run.Reply.RunID.String(),
+			Name:              cmd,
+			Data:              data,
+			RequestHeadersMap: run.Reply.RequestHeadersMap,
+			MaxPayloadSize:    run.Reply.MaxPayloadSizeInBytes,
+		}
+
+		resp := internal.CollectorRequest(call, app.rpmControls)
+
+		if resp.IsDisconnect() || resp.IsRestartException() {
+			select {
+			case app.collectorErrorChan <- resp:
+			case <-app.shutdownStarted:
+			}
+			return
+		}
+
+		if nil != resp.Err {
+			app.Warn("harvest failure", map[string]interface{}{
+				"cmd":         cmd,
+				"error":       resp.Err.Error(),
+				"retain_data": resp.ShouldSaveHarvestData(),
+			})
+		}
+
+		if resp.ShouldSaveHarvestData() {
+			app.Consume(run.Reply.RunID, p)
+		}
+	}
+}
+
+func (app *app) connectRoutine() {
+	connectAttempt := 0
+	for {
+		reply, resp := internal.ConnectAttempt(config{app.config},
+			app.config.SecurityPoliciesToken, app.config.HighSecurity, app.rpmControls)
+
+		if reply != nil {
+			select {
+			case app.connectChan <- newAppRun(app.config, reply):
+			case <-app.shutdownStarted:
+			}
+			return
+		}
+
+		if resp.IsDisconnect() {
+			select {
+			case app.collectorErrorChan <- resp:
+			case <-app.shutdownStarted:
+			}
+			return
+		}
+
+		if nil != resp.Err {
+			app.Warn("application connect failure", map[string]interface{}{
+				"error": resp.Err.Error(),
+			})
+		}
+
+		backoff := getConnectBackoffTime(connectAttempt)
+		time.Sleep(time.Duration(backoff) * time.Second)
+		connectAttempt++
+	}
+}
+
+// Connect backoff time follows the sequence defined at
+// https://source.datanerd.us/agents/agent-specs/blob/master/Collector-Response-Handling.md#retries-and-backoffs
+func getConnectBackoffTime(attempt int) int {
+	connectBackoffTimes := [...]int{15, 15, 30, 60, 120, 300}
+	l := len(connectBackoffTimes)
+	if (attempt < 0) || (attempt >= l) {
+		return connectBackoffTimes[l-1]
+	}
+	return connectBackoffTimes[attempt]
+}
+
+func debug(data internal.Harvestable, lg Logger) {
+	now := time.Now()
+	h := internal.NewHarvest(now, nil)
+	data.MergeIntoHarvest(h)
+	ps := h.Payloads(false)
+	for _, p := range ps {
+		cmd := p.EndpointMethod()
+		d, err := p.Data("agent run id", now)
+		if nil == d && nil == err {
+			continue
+		}
+		if nil != err {
+			lg.Info("integration", map[string]interface{}{
+				"cmd":   cmd,
+				"error": err.Error(),
+			})
+			continue
+		}
+		lg.Info("integration", map[string]interface{}{
 			"cmd":  cmd,
 			"data": internal.JSONString(d),
 		})
 	}
 }
 
-func processConnectMessages(run *internal.AppRun, lg Logger) {
-	for _, msg := range run.Messages {
+func processConnectMessages(run *appRun, lg Logger) {
+	for _, msg := range run.Reply.Messages {
 		event := "collector message"
 		cn := map[string]interface{}{"msg": msg.Message}
 
@@ -218,18 +217,22 @@ func (app *app) process() {
 	// Both the harvest and the run are non-nil when the app is connected,
 	// and nil otherwise.
 	var h *internal.Harvest
-	var run *internal.AppRun
+	var run *appRun
+
+	harvestTicker := time.NewTicker(time.Second)
+	defer harvestTicker.Stop()
 
 	for {
 		select {
-		case <-app.harvestTicker.C:
+		case <-harvestTicker.C:
 			if nil != run {
 				now := time.Now()
-				go app.doHarvest(h, now, run)
-				h = internal.NewHarvest(now)
+				if ready := h.Ready(now, run.Reply); nil != ready {
+					go app.doHarvest(ready, now, run)
+				}
 			}
 		case d := <-app.dataChan:
-			if nil != run && run.RunID == d.id {
+			if nil != run && run.Reply.RunID == d.id {
 				d.data.MergeIntoHarvest(h)
 			}
 		case <-app.initiateShutdown:
@@ -238,13 +241,12 @@ func (app *app) process() {
 			// Remove the run before merging any final data to
 			// ensure a bounded number of receives from dataChan.
 			app.setState(nil, errors.New("application shut down"))
-			app.harvestTicker.Stop()
 
 			if nil != run {
 				for done := false; !done; {
 					select {
 					case d := <-app.dataChan:
-						if run.RunID == d.id {
+						if run.Reply.RunID == d.id {
 							d.data.MergeIntoHarvest(h)
 						}
 					default:
@@ -256,44 +258,40 @@ func (app *app) process() {
 
 			close(app.shutdownComplete)
 			return
-		case err := <-app.collectorErrorChan:
+		case resp := <-app.collectorErrorChan:
 			run = nil
 			h = nil
 			app.setState(nil, nil)
 
-			switch {
-			case internal.IsDisconnect(err):
-				app.setState(nil, err)
-				app.config.Logger.Error("application disconnected by New Relic", map[string]interface{}{
+			if resp.IsDisconnect() {
+				app.setState(nil, resp.Err)
+				app.Error("application disconnected", map[string]interface{}{
 					"app": app.config.AppName,
 				})
-			case internal.IsLicenseException(err):
-				app.setState(nil, err)
-				app.config.Logger.Error("invalid license", map[string]interface{}{
-					"app":     app.config.AppName,
-					"license": app.config.License,
-				})
-			case internal.IsRestartException(err):
-				app.config.Logger.Info("application restarted", map[string]interface{}{
+			} else if resp.IsRestartException() {
+				app.Info("application restarted", map[string]interface{}{
 					"app": app.config.AppName,
 				})
 				go app.connectRoutine()
 			}
 		case run = <-app.connectChan:
-			h = internal.NewHarvest(time.Now())
+			h = internal.NewHarvest(time.Now(), run.Reply)
 			app.setState(run, nil)
 
-			app.config.Logger.Info("application connected", map[string]interface{}{
+			app.Info("application connected", map[string]interface{}{
 				"app": app.config.AppName,
-				"run": run.RunID.String(),
+				"run": run.Reply.RunID.String(),
 			})
-			processConnectMessages(run, app.config.Logger)
+			processConnectMessages(run, app)
 		}
 	}
 }
 
 func (app *app) Shutdown(timeout time.Duration) {
 	if !app.config.Enabled {
+		return
+	}
+	if app.config.ServerlessMode.Enabled {
 		return
 	}
 
@@ -310,28 +308,20 @@ func (app *app) Shutdown(timeout time.Duration) {
 	}
 	t.Stop()
 
-	app.config.Logger.Info("application shutdown", map[string]interface{}{
+	app.Info("application shutdown", map[string]interface{}{
 		"app": app.config.AppName,
 	})
 }
 
-func convertAttributeDestinationConfig(c AttributeDestinationConfig) internal.AttributeDestinationConfig {
-	return internal.AttributeDestinationConfig{
-		Enabled: c.Enabled,
-		Include: c.Include,
-		Exclude: c.Exclude,
-	}
-}
-
 func runSampler(app *app, period time.Duration) {
-	previous := internal.GetSample(time.Now(), app.config.Logger)
+	previous := internal.GetSample(time.Now(), app)
 	t := time.NewTicker(period)
 	for {
 		select {
 		case now := <-t.C:
-			current := internal.GetSample(now, app.config.Logger)
+			current := internal.GetSample(now, app)
 			run, _ := app.getState()
-			app.Consume(run.RunID, internal.GetStats(internal.Samples{
+			app.Consume(run.Reply.RunID, internal.GetStats(internal.Samples{
 				Previous: previous,
 				Current:  current,
 			}))
@@ -347,6 +337,9 @@ func (app *app) WaitForConnection(timeout time.Duration) error {
 	if !app.config.Enabled {
 		return nil
 	}
+	if app.config.ServerlessMode.Enabled {
+		return nil
+	}
 	deadline := time.Now().Add(timeout)
 	pollPeriod := 50 * time.Millisecond
 
@@ -355,7 +348,7 @@ func (app *app) WaitForConnection(timeout time.Duration) error {
 		if nil != err {
 			return err
 		}
-		if run.RunID != "" {
+		if run.Reply.RunID != "" {
 			return nil
 		}
 		if time.Now().After(deadline) {
@@ -374,13 +367,9 @@ func newApp(c Config) (Application, error) {
 		c.Logger = logger.ShimLogger{}
 	}
 	app := &app{
-		config: c,
-		attrConfig: internal.CreateAttributeConfig(internal.AttributeConfigInput{
-			Attributes:        convertAttributeDestinationConfig(c.Attributes),
-			ErrorCollector:    convertAttributeDestinationConfig(c.ErrorCollector.Attributes),
-			TransactionEvents: convertAttributeDestinationConfig(c.TransactionEvents.Attributes),
-			TransactionTracer: convertAttributeDestinationConfig(c.TransactionTracer.Attributes),
-		}),
+		Logger:         c.Logger,
+		config:         c,
+		placeholderRun: newAppRun(c, internal.ConnectReplyDefaults()),
 
 		// This channel must be buffered since Shutdown makes a
 		// non-blocking send attempt.
@@ -388,11 +377,10 @@ func newApp(c Config) (Application, error) {
 
 		shutdownStarted:    make(chan struct{}),
 		shutdownComplete:   make(chan struct{}),
-		connectChan:        make(chan *internal.AppRun, 1),
-		collectorErrorChan: make(chan error, 1),
+		connectChan:        make(chan *appRun, 1),
+		collectorErrorChan: make(chan internal.RPMResponse, 1),
 		dataChan:           make(chan appData, internal.AppDataChanSize),
 		rpmControls: internal.RpmControls{
-			UseTLS:  c.UseTLS,
 			License: c.License,
 			Client: &http.Client{
 				Transport: c.Transport,
@@ -403,63 +391,55 @@ func newApp(c Config) (Application, error) {
 		},
 	}
 
-	app.config.Logger.Info("application created", map[string]interface{}{
+	app.Info("application created", map[string]interface{}{
 		"app":     app.config.AppName,
 		"version": Version,
 		"enabled": app.config.Enabled,
 	})
 
-	if !app.config.Enabled {
-		return app, nil
-	}
-
-	app.harvestTicker = time.NewTicker(internal.HarvestPeriod)
-
-	go app.process()
-	go app.connectRoutine()
-
-	if app.config.RuntimeSampler.Enabled {
-		go runSampler(app, internal.RuntimeSamplerPeriod)
+	if app.config.Enabled {
+		if app.config.ServerlessMode.Enabled {
+			reply := newServerlessConnectReply(c)
+			app.run = newAppRun(c, reply)
+			app.serverless = internal.NewServerlessHarvest(c.Logger, Version, os.Getenv)
+		} else {
+			go app.process()
+			go app.connectRoutine()
+			if app.config.RuntimeSampler.Enabled {
+				go runSampler(app, internal.RuntimeSamplerPeriod)
+			}
+		}
 	}
 
 	return app, nil
 }
 
-type expectApp interface {
-	internal.Expect
-	Application
-}
+var (
+	_ internal.HarvestTestinger = &app{}
+	_ internal.Expect           = &app{}
+)
 
-func newTestApp(replyfn func(*internal.ConnectReply), cfg Config) (expectApp, error) {
-	cfg.Enabled = false
-	application, err := newApp(cfg)
-	if nil != err {
-		return nil, err
-	}
-	app := application.(*app)
+func (app *app) HarvestTesting(replyfn func(*internal.ConnectReply)) {
 	if nil != replyfn {
 		reply := internal.ConnectReplyDefaults()
 		replyfn(reply)
-		app.setState(&internal.AppRun{ConnectReply: reply}, nil)
+		app.placeholderRun = newAppRun(app.config, reply)
 	}
-
-	app.testHarvest = internal.NewHarvest(time.Now())
-
-	return app, nil
+	app.testHarvest = internal.NewHarvest(time.Now(), nil)
 }
 
-func (app *app) getState() (*internal.AppRun, error) {
+func (app *app) getState() (*appRun, error) {
 	app.RLock()
 	defer app.RUnlock()
 
 	run := app.run
 	if nil == run {
-		run = placeholderRun
+		run = app.placeholderRun
 	}
 	return run, app.err
 }
 
-func (app *app) setState(run *internal.AppRun, err error) {
+func (app *app) setState(run *appRun, err error) {
 	app.Lock()
 	defer app.Unlock()
 
@@ -470,13 +450,17 @@ func (app *app) setState(run *internal.AppRun, err error) {
 // StartTransaction implements newrelic.Application's StartTransaction.
 func (app *app) StartTransaction(name string, w http.ResponseWriter, r *http.Request) Transaction {
 	run, _ := app.getState()
-	return upgradeTxn(newTxn(txnInput{
-		Config:     app.config,
-		Reply:      run.ConnectReply,
-		W:          w,
-		Consumer:   app,
-		attrConfig: app.attrConfig,
-	}, r, name))
+	txn := upgradeTxn(newTxn(txnInput{
+		app:      app,
+		appRun:   run,
+		writer:   w,
+		Consumer: app,
+	}, name))
+
+	if nil != r {
+		txn.SetWebRequest(NewWebRequest(r))
+	}
+	return txn
 }
 
 var (
@@ -501,19 +485,62 @@ func (app *app) RecordCustomEvent(eventType string, params map[string]interface{
 	}
 
 	run, _ := app.getState()
-	if !run.CollectCustomEvents {
+	if !run.Reply.CollectCustomEvents {
 		return errCustomEventsRemoteDisabled
 	}
 
-	app.Consume(run.RunID, event)
+	if !run.Reply.SecurityPolicies.CustomEvents.Enabled() {
+		return errSecurityPolicy
+	}
+
+	app.Consume(run.Reply.RunID, event)
 
 	return nil
 }
 
+var (
+	errMetricInf        = errors.New("invalid metric value: inf")
+	errMetricNaN        = errors.New("invalid metric value: NaN")
+	errMetricNameEmpty  = errors.New("missing metric name")
+	errMetricServerless = errors.New("custom metrics are not currently supported in serverless mode")
+)
+
+// RecordCustomMetric implements newrelic.Application's RecordCustomMetric.
+func (app *app) RecordCustomMetric(name string, value float64) error {
+	if app.config.ServerlessMode.Enabled {
+		return errMetricServerless
+	}
+	if math.IsNaN(value) {
+		return errMetricNaN
+	}
+	if math.IsInf(value, 0) {
+		return errMetricInf
+	}
+	if "" == name {
+		return errMetricNameEmpty
+	}
+	run, _ := app.getState()
+	app.Consume(run.Reply.RunID, internal.CustomMetric{
+		RawInputName: name,
+		Value:        value,
+	})
+	return nil
+}
+
+var (
+	_ internal.ServerlessWriter = &app{}
+)
+
+func (app *app) ServerlessWrite(arn string, writer io.Writer) {
+	app.serverless.Write(arn, writer)
+}
+
 func (app *app) Consume(id internal.AgentRunID, data internal.Harvestable) {
 	if "" != debugLogging {
-		debug(data, app.config.Logger)
+		debug(data, app)
 	}
+
+	app.serverless.Consume(data)
 
 	if nil != app.testHarvest {
 		data.MergeIntoHarvest(app.testHarvest)
@@ -544,6 +571,11 @@ func (app *app) ExpectErrorEvents(t internal.Validator, want []internal.WantEven
 	internal.ExpectErrorEvents(t, app.testHarvest.ErrorEvents, want)
 }
 
+func (app *app) ExpectSpanEvents(t internal.Validator, want []internal.WantEvent) {
+	t = internal.ExtendValidator(t, "spans events")
+	internal.ExpectSpanEvents(t, app.testHarvest.SpanEvents, want)
+}
+
 func (app *app) ExpectTxnEvents(t internal.Validator, want []internal.WantEvent) {
 	t = internal.ExtendValidator(t, "txn events")
 	internal.ExpectTxnEvents(t, app.testHarvest.TxnEvents, want)
@@ -552,6 +584,16 @@ func (app *app) ExpectTxnEvents(t internal.Validator, want []internal.WantEvent)
 func (app *app) ExpectMetrics(t internal.Validator, want []internal.WantMetric) {
 	t = internal.ExtendValidator(t, "metrics")
 	internal.ExpectMetrics(t, app.testHarvest.Metrics, want)
+}
+
+func (app *app) ExpectMetricsPresent(t internal.Validator, want []internal.WantMetric) {
+	t = internal.ExtendValidator(t, "metrics")
+	internal.ExpectMetricsPresent(t, app.testHarvest.Metrics, want)
+}
+
+func (app *app) ExpectTxnMetrics(t internal.Validator, want internal.WantTxn) {
+	t = internal.ExtendValidator(t, "metrics")
+	internal.ExpectTxnMetrics(t, app.testHarvest.Metrics, want)
 }
 
 func (app *app) ExpectTxnTraces(t internal.Validator, want []internal.WantTxnTrace) {

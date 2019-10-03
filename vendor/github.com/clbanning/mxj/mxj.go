@@ -124,8 +124,5 @@ func (ml mapList) Swap(i, j int) {
 }
 
 func (ml mapList) Less(i, j int) bool {
-	if ml[i][0] > ml[j][0] {
-		return false
-	}
-	return true
+	return ml[i][0] <= ml[j][0]
 }

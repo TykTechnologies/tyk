@@ -80,7 +80,6 @@ type dialOptions struct {
 	dial         func(network, addr string) (net.Conn, error)
 	db           int
 	password     string
-	clientName   string
 	useTLS       bool
 	skipVerify   bool
 	tlsConfig    *tls.Config
@@ -139,14 +138,6 @@ func DialDatabase(db int) DialOption {
 func DialPassword(password string) DialOption {
 	return DialOption{func(do *dialOptions) {
 		do.password = password
-	}}
-}
-
-// DialClientName specifies a client name to be used
-// by the Redis server connection.
-func DialClientName(name string) DialOption {
-	return DialOption{func(do *dialOptions) {
-		do.clientName = name
 	}}
 }
 
@@ -228,13 +219,6 @@ func Dial(network, address string, options ...DialOption) (Conn, error) {
 
 	if do.password != "" {
 		if _, err := c.Do("AUTH", do.password); err != nil {
-			netConn.Close()
-			return nil, err
-		}
-	}
-
-	if do.clientName != "" {
-		if _, err := c.Do("CLIENT", "SETNAME", do.clientName); err != nil {
 			netConn.Close()
 			return nil, err
 		}
@@ -443,21 +427,10 @@ func (pe protocolError) Error() string {
 	return fmt.Sprintf("redigo: %s (possible server error or unsupported concurrent read by application)", string(pe))
 }
 
-// readLine reads a line of input from the RESP stream.
 func (c *conn) readLine() ([]byte, error) {
-	// To avoid allocations, attempt to read the line using ReadSlice. This
-	// call typically succeeds. The known case where the call fails is when
-	// reading the output from the MONITOR command.
 	p, err := c.br.ReadSlice('\n')
 	if err == bufio.ErrBufferFull {
-		// The line does not fit in the bufio.Reader's buffer. Fall back to
-		// allocating a buffer for the line.
-		buf := append([]byte{}, p...)
-		for err == bufio.ErrBufferFull {
-			p, err = c.br.ReadSlice('\n')
-			buf = append(buf, p...)
-		}
-		p = buf
+		return nil, protocolError("long response line")
 	}
 	if err != nil {
 		return nil, err

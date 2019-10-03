@@ -2,7 +2,10 @@
 
 package maxminddb
 
-import "os"
+import (
+	"os"
+	"runtime"
+)
 
 // Open takes a string path to a MaxMind DB file and returns a Reader
 // structure or an error. The database file is opened using a memory map,
@@ -41,16 +44,20 @@ func Open(file string) (*Reader, error) {
 	}
 
 	reader.hasMappedFile = true
+	runtime.SetFinalizer(reader, (*Reader).Close)
 	return reader, err
 }
 
 // Close unmaps the database file from virtual memory and returns the
 // resources to the system. If called on a Reader opened using FromBytes
 // or Open on Google App Engine, this method does nothing.
-func (r *Reader) Close() (err error) {
+func (r *Reader) Close() error {
+	var err error
 	if r.hasMappedFile {
-		err = munmap(r.buffer)
+		runtime.SetFinalizer(r, nil)
 		r.hasMappedFile = false
+		err = munmap(r.buffer)
 	}
+	r.buffer = nil
 	return err
 }
