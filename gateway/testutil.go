@@ -814,6 +814,15 @@ func BuildAndLoadAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 	return LoadAPI(BuildAPI(apiGens...)...)
 }
 
+func CloneAPI(a *APISpec) *APISpec {
+	new := &APISpec{}
+	*new = *a
+	new.APIDefinition = &apidef.APIDefinition{}
+	*new.APIDefinition = *a.APIDefinition
+
+	return new
+}
+
 // Taken from https://medium.com/@mlowicki/http-s-proxy-in-golang-in-less-than-100-lines-of-code-6a51c2f2c38c
 type httpProxyHandler struct {
 	proto    string
