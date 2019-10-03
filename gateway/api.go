@@ -1580,7 +1580,7 @@ func updateOauthClient(keyName, apiID string, r *http.Request) (interface{}, int
 		ClientSecret:      client.GetSecret(),                 // DO NOT update
 		ClientRedirectURI: updateClientData.ClientRedirectURI, // update
 		PolicyID:          updateClientData.PolicyID,          // update
-		MetaData:          client.GetUserData(),               // DO NOT update
+		MetaData:          updateClientData.MetaData,          // update
 		Description:       updateClientData.Description,       // update
 	}
 
