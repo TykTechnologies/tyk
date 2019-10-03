@@ -19,45 +19,6 @@ import (
 
 // ------------------- REDIS CLUSTER STORAGE MANAGER -------------------------------
 
-type GenericRedisClient interface {
-	Do(args ...interface{}) *redis.Cmd
-
-	Get(key string) *redis.StringCmd
-	MGet(keys ...string) *redis.SliceCmd
-	TTL(key string) *redis.DurationCmd
-	Expire(key string, expiration time.Duration) *redis.BoolCmd
-	Set(key string, value interface{}, expiration time.Duration) *redis.StatusCmd
-	Incr(key string) *redis.IntCmd
-	Decr(key string) *redis.IntCmd
-	Keys(pattern string) *redis.StringSliceCmd
-	Del(keys ...string) *redis.IntCmd
-	Scan(cursor uint64, match string, count int64) *redis.ScanCmd
-	RPush(key string, values ...interface{}) *redis.IntCmd
-	FlushAll() *redis.StatusCmd
-
-	// Set Commands
-	SMembers(key string) *redis.StringSliceCmd
-	SAdd(key string, members ...interface{}) *redis.IntCmd
-	SRem(key string, members ...interface{}) *redis.IntCmd
-	SIsMember(key string, member interface{}) *redis.BoolCmd
-
-	// Ordered Set commands
-	ZAdd(key string, members ...*redis.Z) *redis.IntCmd
-	ZRangeByScoreWithScores(key string, opt *redis.ZRangeBy) *redis.ZSliceCmd
-	ZRemRangeByScore(key, min, max string) *redis.IntCmd
-
-	// PubSub commands
-	Subscribe(channels ...string) *redis.PubSub
-	Publish(channel string, message interface{}) *redis.IntCmd
-
-	// Pipeline
-	Pipelined(fn func(redis.Pipeliner) error) ([]redis.Cmder, error)
-	Pipeline() redis.Pipeliner
-
-	// Transactions
-	TxPipelined(fn func(redis.Pipeliner) error) ([]redis.Cmder, error)
-}
-
 const (
 	waitStorageRetriesNum      = 5
 	waitStorageRetriesInterval = 1 * time.Second
@@ -68,8 +29,8 @@ const (
 var (
 	redisSingletonMu sync.RWMutex
 
-	redisClusterSingleton      GenericRedisClient
-	redisCacheClusterSingleton GenericRedisClient
+	redisClusterSingleton      redis.UniversalClient
+	redisCacheClusterSingleton redis.UniversalClient
 )
 
 // RedisCluster is a storage manager that uses the redis database.
@@ -135,7 +96,7 @@ func IsConnected() bool {
 	return true
 }
 
-func NewRedisClusterPool(isCache bool) GenericRedisClient {
+func NewRedisClusterPool(isCache bool) redis.UniversalClient {
 	// redisSingletonMu is locked and we know the singleton is nil
 	cfg := config.Global().Storage
 	if isCache && config.Global().EnableSeperateCacheStore {
@@ -176,7 +137,6 @@ func NewRedisClusterPool(isCache bool) GenericRedisClient {
 		seedHosts = append(seedHosts, addr)
 	}
 
-	var client GenericRedisClient
 	var tlsConfig *tls.Config
 
 	if cfg.UseSSL {
@@ -185,30 +145,21 @@ func NewRedisClusterPool(isCache bool) GenericRedisClient {
 		}
 	}
 
-	if cfg.EnableCluster {
-		client = redis.NewClusterClient(&redis.ClusterOptions{
-			Addrs:        seedHosts,
-			Password:     cfg.Password,
-			DialTimeout:  timeout,
-			ReadTimeout:  timeout,
-			WriteTimeout: timeout,
-			IdleTimeout:  240 * time.Second,
-			PoolSize:     poolSize,
-			TLSConfig:    tlsConfig,
-		})
-	} else {
-		client = redis.NewClient(&redis.Options{
-			Addr:         seedHosts[0],
-			Password:     cfg.Password,
-			DB:           cfg.Database,
-			DialTimeout:  timeout,
-			ReadTimeout:  timeout,
-			WriteTimeout: timeout,
-			IdleTimeout:  240 * time.Second,
-			PoolSize:     poolSize,
-			TLSConfig:    tlsConfig,
-		})
+	if !cfg.EnableCluster {
+		seedHosts = seedHosts[:1]
 	}
+
+	client := redis.NewUniversalClient(&redis.UniversalOptions{
+		Addrs:        seedHosts,
+		Password:     cfg.Password,
+		DB:           cfg.Database,
+		DialTimeout:  timeout,
+		ReadTimeout:  timeout,
+		WriteTimeout: timeout,
+		IdleTimeout:  240 * timeout,
+		PoolSize:     poolSize,
+		TLSConfig:    tlsConfig,
+	})
 
 	return client
 }
@@ -237,7 +188,7 @@ func (r *RedisCluster) Connect() bool {
 	return true
 }
 
-func (r *RedisCluster) singleton() GenericRedisClient {
+func (r *RedisCluster) singleton() redis.UniversalClient {
 	redisSingletonMu.RLock()
 	defer redisSingletonMu.RUnlock()
 
