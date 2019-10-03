@@ -374,6 +374,7 @@ func (self *_parser) parseThrowStatement() ast.Statement {
 	}
 
 	node := &ast.ThrowStatement{
+		Throw:    self.idx,
 		Argument: self.parseExpression(),
 	}
 	if self.mode&StoreComments != 0 {
@@ -748,6 +749,7 @@ func (self *_parser) parseIfStatement() ast.Statement {
 
 	self.expect(token.LEFT_PARENTHESIS)
 	node := &ast.IfStatement{
+		If:   self.idx,
 		Test: self.parseExpression(),
 	}
 	self.expect(token.RIGHT_PARENTHESIS)

@@ -31,11 +31,11 @@ import (
 
 func _newContext(runtime *_runtime) {
 @{[ join "\n", $self->newContext() ]}
-}    
+}
 
 func newConsoleObject(runtime *_runtime) *_object {
 @{[ join "\n", $self->newConsoleObject() ]}
-}    
+}
 _END_
 
 for (qw/int int8 int16 int32 int64 uint uint8 uint16 uint32 uint64 float32 float64/) {
@@ -730,7 +730,7 @@ sub propertyOrder {
 sub globalObject {
     my $self = shift;
     my $name = shift;
-    
+
     my $propertyMap = "";
     if (@_) {
         $propertyMap = join "\n", $self->propertyMap(@_);
@@ -754,7 +754,7 @@ sub globalFunction {
     my $self = shift;
     my $name = shift;
     my $length = shift;
-    
+
     my $builtin = "builtin${name}";
     my $builtinNew = "builtinNew${name}";
     my $prototype = "runtime.global.${name}Prototype";
@@ -874,7 +874,7 @@ sub newFunction {
     property: @{[ join "\n", $self->propertyMap(@propertyMap) ]},
     $propertyOrder
     value: @{[ $self->nativeFunctionOf($name, $func) ]},
-} 
+}
 _END_
     );
 
@@ -896,7 +896,7 @@ sub newObject {
     extensible: true,
     property: $propertyMap,
     $propertyOrder,
-} 
+}
 _END_
 }
 
@@ -922,7 +922,7 @@ sub newPrototypeObject {
     property: $propertyMap,
     $propertyOrder,
     $value
-} 
+}
 _END_
 }
 

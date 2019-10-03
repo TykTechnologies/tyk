@@ -394,10 +394,14 @@ func comparePrePart(s, o string) int {
 	}
 
 	// When comparing strings "99" is greater than "103". To handle
-	// cases like this we need to detect numbers and compare them.
+	// cases like this we need to detect numbers and compare them. According
+	// to the semver spec, numbers are always positive. If there is a - at the
+	// start like -99 this is to be evaluated as an alphanum. numbers always
+	// have precedence over alphanum. Parsing as Uints because negative numbers
+	// are ignored.
 
-	oi, n1 := strconv.ParseInt(o, 10, 64)
-	si, n2 := strconv.ParseInt(s, 10, 64)
+	oi, n1 := strconv.ParseUint(o, 10, 64)
+	si, n2 := strconv.ParseUint(s, 10, 64)
 
 	// The case where both are strings compare the strings
 	if n1 != nil && n2 != nil {

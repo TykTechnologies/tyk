@@ -65,13 +65,30 @@ func (cs Constraints) Check(v *Version) bool {
 func (cs Constraints) Validate(v *Version) (bool, []error) {
 	// loop over the ORs and check the inner ANDs
 	var e []error
+
+	// Capture the prerelease message only once. When it happens the first time
+	// this var is marked
+	var prerelesase bool
 	for _, o := range cs.constraints {
 		joy := true
 		for _, c := range o {
-			if !c.check(v) {
-				em := fmt.Errorf(c.msg, v, c.orig)
-				e = append(e, em)
+			// Before running the check handle the case there the version is
+			// a prerelease and the check is not searching for prereleases.
+			if c.con.pre == "" && v.pre != "" {
+				if !prerelesase {
+					em := fmt.Errorf("%s is a prerelease version and the constraint is only looking for release versions", v)
+					e = append(e, em)
+					prerelesase = true
+				}
 				joy = false
+
+			} else {
+
+				if !c.check(v) {
+					em := fmt.Errorf(c.msg, v, c.orig)
+					e = append(e, em)
+					joy = false
+				}
 			}
 		}
 

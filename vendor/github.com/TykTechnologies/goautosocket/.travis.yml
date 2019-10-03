@@ -1,0 +1,7 @@
+language: go
+go:
+    - 1.4
+    - 1.4.1
+    - 1.4.2
+script:
+    - go test -v -race

@@ -13,6 +13,8 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+
+	"github.com/pkg/errors"
 )
 
 // https://docs.getsentry.com/hosted/clientdev/interfaces/#failure-interfaces
@@ -49,6 +51,37 @@ type StacktraceFrame struct {
 	InApp        bool     `json:"in_app"`
 }
 
+// Try to get stacktrace from err as an interface of github.com/pkg/errors, or else NewStacktrace()
+func GetOrNewStacktrace(err error, skip int, context int, appPackagePrefixes []string) *Stacktrace {
+	stacktracer, errHasStacktrace := err.(interface {
+		StackTrace() errors.StackTrace
+	})
+	if errHasStacktrace {
+		var frames []*StacktraceFrame
+		for _, f := range stacktracer.StackTrace() {
+			pc := uintptr(f) - 1
+			fn := runtime.FuncForPC(pc)
+			var fName string
+			var file string
+			var line int
+			if fn != nil {
+				file, line = fn.FileLine(pc)
+				fName = fn.Name()
+			} else {
+				file = "unknown"
+				fName = "unknown"
+			}
+			frame := NewStacktraceFrame(pc, fName, file, line, context, appPackagePrefixes)
+			if frame != nil {
+				frames = append([]*StacktraceFrame{frame}, frames...)
+			}
+		}
+		return &Stacktrace{Frames: frames}
+	} else {
+		return NewStacktrace(skip+1, context, appPackagePrefixes)
+	}
+}
+
 // Intialize and populate a new stacktrace, skipping skip frames.
 //
 // context is the number of surrounding lines that should be included for context.
@@ -59,14 +92,27 @@ type StacktraceFrame struct {
 // be considered "in app".
 func NewStacktrace(skip int, context int, appPackagePrefixes []string) *Stacktrace {
 	var frames []*StacktraceFrame
-	for i := 1 + skip; ; i++ {
-		pc, file, line, ok := runtime.Caller(i)
-		if !ok {
-			break
+
+	callerPcs := make([]uintptr, 100)
+	numCallers := runtime.Callers(skip+2, callerPcs)
+
+	// If there are no callers, the entire stacktrace is nil
+	if numCallers == 0 {
+		return nil
+	}
+
+	callersFrames := runtime.CallersFrames(callerPcs)
+
+	for {
+		fr, more := callersFrames.Next()
+		if fr.Func != nil {
+			frame := NewStacktraceFrame(fr.PC, fr.Function, fr.File, fr.Line, context, appPackagePrefixes)
+			if frame != nil {
+				frames = append(frames, frame)
+			}
 		}
-		frame := NewStacktraceFrame(pc, file, line, context, appPackagePrefixes)
-		if frame != nil {
-			frames = append(frames, frame)
+		if !more {
+			break
 		}
 	}
 	// If there are no frames, the entire stacktrace is nil
@@ -92,9 +138,9 @@ func NewStacktrace(skip int, context int, appPackagePrefixes []string) *Stacktra
 //
 // appPackagePrefixes is a list of prefixes used to check whether a package should
 // be considered "in app".
-func NewStacktraceFrame(pc uintptr, file string, line, context int, appPackagePrefixes []string) *StacktraceFrame {
+func NewStacktraceFrame(pc uintptr, fName, file string, line, context int, appPackagePrefixes []string) *StacktraceFrame {
 	frame := &StacktraceFrame{AbsolutePath: file, Filename: trimPath(file), Lineno: line, InApp: false}
-	frame.Module, frame.Function = functionName(pc)
+	frame.Module, frame.Function = functionName(fName)
 
 	// `runtime.goexit` is effectively a placeholder that comes from
 	// runtime/asm_amd64.s and is meaningless.
@@ -113,7 +159,7 @@ func NewStacktraceFrame(pc uintptr, file string, line, context int, appPackagePr
 	}
 
 	if context > 0 {
-		contextLines, lineIdx := fileContext(file, line, context)
+		contextLines, lineIdx := sourceCodeLoader.Load(file, line, context)
 		if len(contextLines) > 0 {
 			for i, line := range contextLines {
 				switch {
@@ -127,7 +173,7 @@ func NewStacktraceFrame(pc uintptr, file string, line, context int, appPackagePr
 			}
 		}
 	} else if context == -1 {
-		contextLine, _ := fileContext(file, line, 0)
+		contextLine, _ := sourceCodeLoader.Load(file, line, 0)
 		if len(contextLine) > 0 {
 			frame.ContextLine = string(contextLine[0])
 		}
@@ -136,12 +182,8 @@ func NewStacktraceFrame(pc uintptr, file string, line, context int, appPackagePr
 }
 
 // Retrieve the name of the package and function containing the PC.
-func functionName(pc uintptr) (pack string, name string) {
-	fn := runtime.FuncForPC(pc)
-	if fn == nil {
-		return
-	}
-	name = fn.Name()
+func functionName(fName string) (pack string, name string) {
+	name = fName
 	// We get this:
 	//	runtime/debug.*T·ptrmethod
 	// and want this:
@@ -155,21 +197,43 @@ func functionName(pc uintptr) (pack string, name string) {
 	return
 }
 
-var fileCacheLock sync.Mutex
-var fileCache = make(map[string][][]byte)
+type SourceCodeLoader interface {
+	Load(filename string, line, context int) ([][]byte, int)
+}
 
-func fileContext(filename string, line, context int) ([][]byte, int) {
-	fileCacheLock.Lock()
-	defer fileCacheLock.Unlock()
-	lines, ok := fileCache[filename]
+var sourceCodeLoader SourceCodeLoader = &fsLoader{cache: make(map[string][][]byte)}
+
+func SetSourceCodeLoader(loader SourceCodeLoader) {
+	sourceCodeLoader = loader
+}
+
+type fsLoader struct {
+	mu    sync.Mutex
+	cache map[string][][]byte
+}
+
+func (fs *fsLoader) Load(filename string, line, context int) ([][]byte, int) {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+	lines, ok := fs.cache[filename]
 	if !ok {
 		data, err := ioutil.ReadFile(filename)
 		if err != nil {
+			// cache errors as nil slice: code below handles it correctly
+			// otherwise when missing the source or running as a different user, we try
+			// reading the file on each error which is unnecessary
+			fs.cache[filename] = nil
 			return nil, 0
 		}
 		lines = bytes.Split(data, []byte{'\n'})
-		fileCache[filename] = lines
+		fs.cache[filename] = lines
 	}
+
+	if lines == nil {
+		// cached error from ReadFile: return no lines
+		return nil, 0
+	}
+
 	line-- // stack trace lines are 1-indexed
 	start := line - context
 	var idx int

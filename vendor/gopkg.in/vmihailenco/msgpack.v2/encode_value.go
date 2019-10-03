@@ -38,31 +38,30 @@ func init() {
 }
 
 func getEncoder(typ reflect.Type) encoderFunc {
-	enc := _getEncoder(typ)
-	if id := extTypeId(typ); id != -1 {
-		return makeExtEncoder(id, enc)
+	if encoder, ok := typEncMap[typ]; ok {
+		return encoder
 	}
-	return enc
-}
-
-func _getEncoder(typ reflect.Type) encoderFunc {
-	kind := typ.Kind()
 
 	if typ.Implements(customEncoderType) {
 		return encodeCustomValue
 	}
-
-	// Addressable struct field value.
-	if kind != reflect.Ptr && reflect.PtrTo(typ).Implements(customEncoderType) {
-		return encodeCustomValuePtr
-	}
-
 	if typ.Implements(marshalerType) {
 		return marshalValue
 	}
-	if encoder, ok := typEncMap[typ]; ok {
-		return encoder
+
+	kind := typ.Kind()
+
+	// Addressable struct field value.
+	if kind != reflect.Ptr {
+		ptr := reflect.PtrTo(typ)
+		if ptr.Implements(customEncoderType) {
+			return encodeCustomValuePtr
+		}
+		if ptr.Implements(marshalerType) {
+			return marshalValuePtr
+		}
 	}
+
 	if typ == errorType {
 		return encodeErrorValue
 	}
@@ -79,11 +78,11 @@ func _getEncoder(typ reflect.Type) encoderFunc {
 			return encodeByteArrayValue
 		}
 	case reflect.Map:
-		if typ.Key().Kind() == reflect.String {
-			switch typ.Elem().Kind() {
-			case reflect.String:
+		if typ.Key() == stringType {
+			switch typ.Elem() {
+			case stringType:
 				return encodeMapStringStringValue
-			case reflect.Interface:
+			case interfaceType:
 				return encodeMapStringInterfaceValue
 			}
 		}
@@ -116,11 +115,26 @@ func encodeCustomValue(e *Encoder, v reflect.Value) error {
 			return e.EncodeNil()
 		}
 	}
+
 	encoder := v.Interface().(CustomEncoder)
 	return encoder.EncodeMsgpack(e)
 }
 
+func marshalValuePtr(e *Encoder, v reflect.Value) error {
+	if !v.CanAddr() {
+		return fmt.Errorf("msgpack: Encode(non-addressable %T)", v.Interface())
+	}
+	return marshalValue(e, v.Addr())
+}
+
 func marshalValue(e *Encoder, v reflect.Value) error {
+	switch v.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice:
+		if v.IsNil() {
+			return e.EncodeNil()
+		}
+	}
+
 	marshaler := v.Interface().(Marshaler)
 	b, err := marshaler.MarshalMsgpack()
 	if err != nil {

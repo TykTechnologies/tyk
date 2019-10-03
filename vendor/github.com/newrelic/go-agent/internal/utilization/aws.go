@@ -1,121 +1,89 @@
 package utilization
 
 import (
+	"encoding/json"
 	"fmt"
-	"io"
+	"io/ioutil"
 	"net/http"
-	"time"
 )
 
 const (
-	maxResponseLengthBytes = 255
-
-	// AWS data gathering requires making three web requests, therefore this
-	// timeout is in keeping with the spec's total timeout of 1 second.
-	individualConnectionTimeout = 300 * time.Millisecond
+	awsHostname     = "169.254.169.254"
+	awsEndpointPath = "/2016-09-02/dynamic/instance-identity/document"
+	awsEndpoint     = "http://" + awsHostname + awsEndpointPath
 )
 
-const (
-	awsHost = "169.254.169.254"
-
-	typeEndpointPath = "/2008-02-01/meta-data/instance-type"
-	idEndpointPath   = "/2008-02-01/meta-data/instance-id"
-	zoneEndpointPath = "/2008-02-01/meta-data/placement/availability-zone"
-
-	typeEndpoint = "http://" + awsHost + typeEndpointPath
-	idEndpoint   = "http://" + awsHost + idEndpointPath
-	zoneEndpoint = "http://" + awsHost + zoneEndpointPath
-)
-
-// awsValidationError represents a response from an AWS endpoint that doesn't
-// match the format expectations.
-type awsValidationError struct {
-	e error
+type aws struct {
+	InstanceID       string `json:"instanceId,omitempty"`
+	InstanceType     string `json:"instanceType,omitempty"`
+	AvailabilityZone string `json:"availabilityZone,omitempty"`
 }
 
-func (a awsValidationError) Error() string {
-	return a.e.Error()
-}
-
-func isAWSValidationError(e error) bool {
-	_, is := e.(awsValidationError)
-	return is
-}
-
-func getAWS() (*vendor, error) {
-	return getEndpoints(&http.Client{
-		Timeout: individualConnectionTimeout,
-	})
-}
-
-func getEndpoints(client *http.Client) (*vendor, error) {
-	v := &vendor{}
-	var err error
-
-	v.ID, err = getAndValidate(client, idEndpoint)
+func gatherAWS(util *Data, client *http.Client) error {
+	aws, err := getAWS(client)
 	if err != nil {
-		return nil, err
+		// Only return the error here if it is unexpected to prevent
+		// warning customers who aren't running AWS about a timeout.
+		if _, ok := err.(unexpectedAWSErr); ok {
+			return err
+		}
+		return nil
 	}
-	v.Type, err = getAndValidate(client, typeEndpoint)
-	if err != nil {
-		return nil, err
-	}
-	v.Zone, err = getAndValidate(client, zoneEndpoint)
-	if err != nil {
-		return nil, err
-	}
+	util.Vendors.AWS = aws
 
-	return v, nil
+	return nil
 }
 
-func getAndValidate(client *http.Client, endpoint string) (string, error) {
-	response, err := client.Get(endpoint)
+type unexpectedAWSErr struct{ e error }
+
+func (e unexpectedAWSErr) Error() string {
+	return fmt.Sprintf("unexpected AWS error: %v", e.e)
+}
+
+func getAWS(client *http.Client) (*aws, error) {
+	response, err := client.Get(awsEndpoint)
 	if err != nil {
-		return "", err
+		// No unexpectedAWSErr here: A timeout is usually going to
+		// happen.
+		return nil, err
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != 200 {
-		return "", fmt.Errorf("unexpected response code %d", response.StatusCode)
+		return nil, unexpectedAWSErr{e: fmt.Errorf("response code %d", response.StatusCode)}
 	}
 
-	b := make([]byte, maxResponseLengthBytes+1)
-	num, err := response.Body.Read(b)
-	if err != nil && err != io.EOF {
-		return "", err
+	data, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return nil, unexpectedAWSErr{e: err}
+	}
+	a := &aws{}
+	if err := json.Unmarshal(data, a); err != nil {
+		return nil, unexpectedAWSErr{e: err}
 	}
 
-	if num > maxResponseLengthBytes {
-		return "", awsValidationError{
-			fmt.Errorf("maximum length %d exceeded", maxResponseLengthBytes),
-		}
+	if err := a.validate(); err != nil {
+		return nil, unexpectedAWSErr{e: err}
 	}
 
-	responseText := string(b[:num])
-
-	for _, r := range responseText {
-		if !isAcceptableRune(r) {
-			return "", awsValidationError{
-				fmt.Errorf("invalid character %x", r),
-			}
-		}
-	}
-
-	return responseText, nil
+	return a, nil
 }
 
-// See:
-// https://source.datanerd.us/agents/agent-specs/blob/master/Utilization.md#normalizing-aws-data
-func isAcceptableRune(r rune) bool {
-	switch r {
-	case 0xFFFD:
-		return false
-	case '_', ' ', '/', '.', '-':
-		return true
-	default:
-		return r > 0x7f ||
-			('0' <= r && r <= '9') ||
-			('a' <= r && r <= 'z') ||
-			('A' <= r && r <= 'Z')
+func (a *aws) validate() (err error) {
+	a.InstanceID, err = normalizeValue(a.InstanceID)
+	if err != nil {
+		return fmt.Errorf("invalid instance ID: %v", err)
 	}
+
+	a.InstanceType, err = normalizeValue(a.InstanceType)
+	if err != nil {
+		return fmt.Errorf("invalid instance type: %v", err)
+	}
+
+	a.AvailabilityZone, err = normalizeValue(a.AvailabilityZone)
+	if err != nil {
+		return fmt.Errorf("invalid availability zone: %v", err)
+	}
+
+	return
 }

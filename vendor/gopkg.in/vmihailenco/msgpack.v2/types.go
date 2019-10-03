@@ -96,6 +96,7 @@ type fields struct {
 	List  []*field
 	Table map[string]*field
 
+	asArray   bool
 	omitEmpty bool
 }
 
@@ -136,18 +137,29 @@ func getFields(typ reflect.Type) *fields {
 	numField := typ.NumField()
 	fs := newFields(numField)
 
+	var omitEmpty bool
 	for i := 0; i < numField; i++ {
 		f := typ.Field(i)
-		if f.PkgPath != "" && !f.Anonymous {
-			continue
-		}
 
-		name, opts := parseTag(f.Tag.Get("msgpack"))
+		name, opt := parseTag(f.Tag.Get("msgpack"))
 		if name == "-" {
 			continue
 		}
 
-		if opts.Contains("inline") {
+		if f.Name == "_msgpack" {
+			if opt.Contains("asArray") {
+				fs.asArray = true
+			}
+			if opt.Contains("omitempty") {
+				omitEmpty = true
+			}
+		}
+
+		if f.PkgPath != "" && !f.Anonymous {
+			continue
+		}
+
+		if opt.Contains("inline") {
 			inlineFields(fs, f)
 			continue
 		}
@@ -158,7 +170,7 @@ func getFields(typ reflect.Type) *fields {
 		field := field{
 			name:      name,
 			index:     f.Index,
-			omitEmpty: opts.Contains("omitempty"),
+			omitEmpty: omitEmpty || opt.Contains("omitempty"),
 			encoder:   getEncoder(f.Type),
 			decoder:   getDecoder(f.Type),
 		}

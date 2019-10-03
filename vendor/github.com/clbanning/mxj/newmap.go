@@ -1,5 +1,5 @@
 // mxj - A collection of map[string]interface{} and associated XML and JSON utilities.
-// Copyright 2012-2014 Charles Banning. All rights reserved.
+// Copyright 2012-2014, 2018 Charles Banning. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file
 
@@ -32,8 +32,9 @@ import (
 //		- if 'oldKey' does not exist in the current Map, it is not written to the new Map.
 //		  "null" is not supported unless it is the current Map.
 //		- see newmap_test.go for several syntax examples
+// 	- mv.NewMap() == mxj.New()
 //
-//	NOTE: mv.NewMap() == mxj.New().
+//	NOTE: "examples/partial.go" shows how to create arbitrary sub-docs of an XML doc.
 func (mv Map) NewMap(keypairs ...string) (Map, error) {
 	n := make(map[string]interface{}, 0)
 	if len(keypairs) == 0 {

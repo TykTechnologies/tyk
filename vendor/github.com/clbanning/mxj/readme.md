@@ -21,6 +21,9 @@ For over a year I've wanted to refactor the XML-to-map[string]interface{} decode
 
 <h4>Notices</h4>
 
+	2018.04.18: mv.Xml/mv.XmlIndent encodes non-map[string]interface{} map values - map[string]string, map[int]uint, etc.
+	2018.03.29: mv.Gob/NewMapGob support gob encoding/decoding of Maps.
+	2018.03.26: Added mxj/x2j-wrapper sub-package for migrating from legacy x2j package.
 	2017.02.22: LeafNode paths can use ".N" syntax rather than "[N]" for list member indexing.
 	2017.02.10: SetFieldSeparator changes field separator for args in UpdateValuesForPath, ValuesFor... methods.
 	2017.02.06: Support XMPP stream processing - HandleXMPPStreamTag().
@@ -47,16 +50,16 @@ For over a year I've wanted to refactor the XML-to-map[string]interface{} decode
 <h4>Basic Unmarshal XML to map[string]interface{}</h4>
 <pre>type Map map[string]interface{}</pre>
 
-Create a `Map` value, 'm', from any `map[string]interface{}` value, 'v':
+Create a `Map` value, 'mv', from any `map[string]interface{}` value, 'v':
 <pre>mv := Map(v)</pre>
 
-Unmarshal / marshal XML as a `Map` value, 'm':
+Unmarshal / marshal XML as a `Map` value, 'mv':
 <pre>mv, err := NewMapXml(xmlValue) // unmarshal
 xmlValue, err := mv.Xml()      // marshal</pre>
 
-Unmarshal XML from an `io.Reader` as a `Map` value, 'm':
-<pre>mv, err := NewMapReader(xmlReader)         // repeated calls, as with an os.File Reader, will process stream
-mv, raw, err := NewMapReaderRaw(xmlReader) // 'raw' is the raw XML that was decoded</pre>
+Unmarshal XML from an `io.Reader` as a `Map` value, 'mv':
+<pre>mv, err := NewMapXmlReader(xmlReader)         // repeated calls, as with an os.File Reader, will process stream
+mv, raw, err := NewMapXmlReaderRaw(xmlReader) // 'raw' is the raw XML that was decoded</pre>
 
 Marshal `Map` value, 'mv', to an XML Writer (`io.Writer`):
 <pre>err := mv.XmlWriter(xmlWriter)
@@ -81,8 +84,8 @@ err := mv.Struct(structPointer)</pre>
 
 <h4>Extract / modify Map values</h4>
 To work with XML tag values, JSON or Map key values or structure field values, decode the XML, JSON
-or structure to a `Map` value, 'm', or cast a `map[string]interface{}` value to a `Map` value, 'm', then:
-<pre>paths := m.PathsForKey(key)
+or structure to a `Map` value, 'mv', or cast a `map[string]interface{}` value to a `Map` value, 'mv', then:
+<pre>paths := mv.PathsForKey(key)
 path := mv.PathForKeyShortest(key)
 values, err := mv.ValuesForKey(key, subkeys)
 values, err := mv.ValuesForPath(path, subkeys)
@@ -95,6 +98,7 @@ leafvalues := mv.LeafValues()</pre>
 A new `Map` with whatever keys are desired can be created from the current `Map` and then encoded in XML
 or JSON. (Note: keys can use dot-notation.)
 <pre>newMap, err := mv.NewMap("oldKey_1:newKey_1", "oldKey_2:newKey_2", ..., "oldKey_N:newKey_N")
+newMap, err := mv.NewMap("oldKey1", "oldKey3", "oldKey5") // a subset of 'mv'; see "examples/partial.go"
 newXml, err := newMap.Xml()   // for example
 newJson, err := newMap.Json() // ditto</pre>
 
@@ -143,7 +147,7 @@ Both
    - ALSO: there is no guarantee that the encoded XML doc will be the same as the decoded one.  (Go
            randomizes the walk through map[string]interface{} values.) If you plan to re-encode the
            Map value to XML and want the same sequencing of elements look at NewMapXmlSeq() and
-           m.XmlSeq() - these try to preserve the element sequencing but with added complexity when
+           mv.XmlSeq() - these try to preserve the element sequencing but with added complexity when
            working with the Map representation.
 
 <h4>Running "go test"</h4>

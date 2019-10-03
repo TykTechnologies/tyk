@@ -19,3 +19,7 @@ func parseFloat(b *[]byte) (float64, error) {
 func bytesToString(b *[]byte) string {
 	return string(*b)
 }
+
+func StringToBytes(s string) []byte {
+	return []byte(s)
+}

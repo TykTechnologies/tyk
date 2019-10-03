@@ -3,7 +3,6 @@ package internal
 import (
 	"bytes"
 	"container/heap"
-	"encoding/json"
 	"sort"
 	"time"
 
@@ -14,61 +13,20 @@ import (
 
 type traceNodeHeap []traceNode
 
-// traceNodeParams is used for trace node parameters.  A struct is used in place
-// of a map[string]interface{} to facilitate testing and reduce JSON Marshal
-// overhead.  If too many fields get added here, it probably makes sense to
-// start using a map.  This struct is not embedded into traceNode to minimize
-// the size of traceNode:  Not all nodes will have parameters.
 type traceNodeParams struct {
-	StackTrace      StackTrace
-	CleanURL        string
-	Database        string
-	Host            string
-	PortPathOrID    string
-	Query           string
-	queryParameters queryParameters
-}
-
-func (p *traceNodeParams) WriteJSON(buf *bytes.Buffer) {
-	w := jsonFieldsWriter{buf: buf}
-	buf.WriteByte('{')
-	if nil != p.StackTrace {
-		w.writerField("backtrace", p.StackTrace)
-	}
-	if "" != p.CleanURL {
-		w.stringField("uri", p.CleanURL)
-	}
-	if "" != p.Database {
-		w.stringField("database_name", p.Database)
-	}
-	if "" != p.Host {
-		w.stringField("host", p.Host)
-	}
-	if "" != p.PortPathOrID {
-		w.stringField("port_path_or_id", p.PortPathOrID)
-	}
-	if "" != p.Query {
-		w.stringField("query", p.Query)
-	}
-	if nil != p.queryParameters {
-		w.writerField("query_parameters", p.queryParameters)
-	}
-	buf.WriteByte('}')
-}
-
-// MarshalJSON is used for testing.
-func (p *traceNodeParams) MarshalJSON() ([]byte, error) {
-	buf := &bytes.Buffer{}
-	p.WriteJSON(buf)
-	return buf.Bytes(), nil
+	attributes              map[SpanAttribute]jsonWriter
+	StackTrace              StackTrace
+	TransactionGUID         string
+	exclusiveDurationMillis *float64
 }
 
 type traceNode struct {
 	start    segmentTime
 	stop     segmentTime
+	threadID uint64
 	duration time.Duration
-	params   *traceNodeParams
-	name     string
+	traceNodeParams
+	name string
 }
 
 func (h traceNodeHeap) Len() int           { return len(h) }
@@ -88,50 +46,48 @@ type TxnTrace struct {
 	maxNodes            int
 }
 
+// getMaxNodes allows the maximum number of nodes to be overwritten for unit
+// tests.
+func (trace *TxnTrace) getMaxNodes() int {
+	if 0 != trace.maxNodes {
+		return trace.maxNodes
+	}
+	return maxTxnTraceNodes
+}
+
 // considerNode exists to prevent unnecessary calls to witnessNode: constructing
 // the metric name and params map requires allocations.
 func (trace *TxnTrace) considerNode(end segmentEnd) bool {
 	return trace.Enabled && (end.duration >= trace.SegmentThreshold)
 }
 
-func (trace *TxnTrace) witnessNode(end segmentEnd, name string, params *traceNodeParams) {
+func (trace *TxnTrace) witnessNode(end segmentEnd, name string, attrs spanAttributeMap, externalGUID string) {
 	node := traceNode{
 		start:    end.start,
 		stop:     end.stop,
 		duration: end.duration,
+		threadID: end.threadID,
 		name:     name,
-		params:   params,
 	}
+	node.attributes = attrs
+	node.TransactionGUID = externalGUID
 	if !trace.considerNode(end) {
 		return
 	}
 	if trace.nodes == nil {
-		max := trace.maxNodes
-		if 0 == max {
-			max = maxTxnTraceNodes
-		}
-		trace.nodes = make(traceNodeHeap, 0, max)
+		trace.nodes = make(traceNodeHeap, 0, startingTxnTraceNodes)
 	}
 	if end.exclusive >= trace.StackTraceThreshold {
-		if node.params == nil {
-			p := new(traceNodeParams)
-			node.params = p
-		}
-		// skip the following stack frames:
-		//   this method
-		//   function in tracing.go      (EndBasicSegment, EndExternalSegment, EndDatastoreSegment)
-		//   function in internal_txn.go (endSegment, endExternal, endDatastore)
-		//   segment end method
-		skip := 4
-		node.params.StackTrace = GetStackTrace(skip)
+		node.StackTrace = GetStackTrace()
 	}
-	if len(trace.nodes) < cap(trace.nodes) {
+	if max := trace.getMaxNodes(); len(trace.nodes) < max {
 		trace.nodes = append(trace.nodes, node)
-		if len(trace.nodes) == cap(trace.nodes) {
+		if len(trace.nodes) == max {
 			heap.Init(trace.nodes)
 		}
 		return
 	}
+
 	if node.duration <= trace.nodes[0].duration {
 		return
 	}
@@ -150,7 +106,7 @@ type nodeDetails struct {
 	name          string
 	relativeStart time.Duration
 	relativeStop  time.Duration
-	params        *traceNodeParams
+	traceNodeParams
 }
 
 func printNodeStart(buf *bytes.Buffer, n nodeDetails) {
@@ -166,30 +122,57 @@ func printNodeStart(buf *bytes.Buffer, n nodeDetails) {
 	buf.WriteByte(',')
 	jsonx.AppendString(buf, n.name)
 	buf.WriteByte(',')
-	if nil == n.params {
-		buf.WriteString("{}")
-	} else {
-		n.params.WriteJSON(buf)
+
+	w := jsonFieldsWriter{buf: buf}
+	buf.WriteByte('{')
+	if nil != n.StackTrace {
+		w.writerField("backtrace", n.StackTrace)
 	}
+	if nil != n.exclusiveDurationMillis {
+		w.floatField("exclusive_duration_millis", *n.exclusiveDurationMillis)
+	}
+	if "" != n.TransactionGUID {
+		w.stringField("transaction_guid", n.TransactionGUID)
+	}
+	for k, v := range n.attributes {
+		w.writerField(k.String(), v)
+	}
+	buf.WriteByte('}')
+
 	buf.WriteByte(',')
 	buf.WriteByte('[')
 }
 
-func printChildren(buf *bytes.Buffer, traceStart time.Time, nodes sortedTraceNodes, next int, stop segmentStamp) int {
+func printChildren(buf *bytes.Buffer, traceStart time.Time, nodes sortedTraceNodes, next int, stop *segmentStamp, threadID uint64) int {
 	firstChild := true
-	for next < len(nodes) && nodes[next].start.Stamp < stop {
+	for {
+		if next >= len(nodes) {
+			// No more children to print.
+			break
+		}
+		if nodes[next].threadID != threadID {
+			// The next node is not of the same thread.  Due to the
+			// node sorting, all nodes of the same thread should be
+			// together.
+			break
+		}
+		if stop != nil && nodes[next].start.Stamp >= *stop {
+			// Make sure this node is a child of the parent that is
+			// being printed.
+			break
+		}
 		if firstChild {
 			firstChild = false
 		} else {
 			buf.WriteByte(',')
 		}
 		printNodeStart(buf, nodeDetails{
-			name:          nodes[next].name,
-			relativeStart: nodes[next].start.Time.Sub(traceStart),
-			relativeStop:  nodes[next].stop.Time.Sub(traceStart),
-			params:        nodes[next].params,
+			name:            nodes[next].name,
+			relativeStart:   nodes[next].start.Time.Sub(traceStart),
+			relativeStop:    nodes[next].stop.Time.Sub(traceStart),
+			traceNodeParams: nodes[next].traceNodeParams,
 		})
-		next = printChildren(buf, traceStart, nodes, next+1, nodes[next].stop.Stamp)
+		next = printChildren(buf, traceStart, nodes, next+1, &nodes[next].stop.Stamp, threadID)
 		buf.WriteString("]]")
 
 	}
@@ -198,15 +181,28 @@ func printChildren(buf *bytes.Buffer, traceStart time.Time, nodes sortedTraceNod
 
 type sortedTraceNodes []*traceNode
 
-func (s sortedTraceNodes) Len() int           { return len(s) }
-func (s sortedTraceNodes) Less(i, j int) bool { return s[i].start.Stamp < s[j].start.Stamp }
-func (s sortedTraceNodes) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+func (s sortedTraceNodes) Len() int { return len(s) }
+func (s sortedTraceNodes) Less(i, j int) bool {
+	// threadID is the first sort key and start.Stamp is the second key.
+	if s[i].threadID == s[j].threadID {
+		return s[i].start.Stamp < s[j].start.Stamp
+	}
+	return s[i].threadID < s[j].threadID
+}
+func (s sortedTraceNodes) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
-// MarshalJSON prepares the trace in the JSON expected by the collector.
+// MarshalJSON is used for testing.
+//
+// TODO: Eliminate this entirely by using harvestTraces.Data().
 func (trace *HarvestTrace) MarshalJSON() ([]byte, error) {
-	estimate := 100 * len(trace.Trace.nodes)
-	buf := bytes.NewBuffer(make([]byte, 0, estimate))
+	buf := bytes.NewBuffer(make([]byte, 0, 100+100*trace.Trace.nodes.Len()))
 
+	trace.writeJSON(buf)
+
+	return buf.Bytes(), nil
+}
+
+func (trace *HarvestTrace) writeJSON(buf *bytes.Buffer) {
 	nodes := make(sortedTraceNodes, len(trace.Trace.nodes))
 	for i := 0; i < len(nodes); i++ {
 		nodes[i] = &trace.Trace.nodes[i]
@@ -221,7 +217,11 @@ func (trace *HarvestTrace) MarshalJSON() ([]byte, error) {
 	buf.WriteByte(',')
 	jsonx.AppendString(buf, trace.FinalName)
 	buf.WriteByte(',')
-	jsonx.AppendString(buf, trace.CleanURL)
+	if uri, _ := trace.Attrs.GetAgentValue(attributeRequestURI, destTxnTrace); "" != uri {
+		jsonx.AppendString(buf, uri)
+	} else {
+		buf.WriteString("null")
+	}
 	buf.WriteByte(',')
 
 	buf.WriteByte('[') // begin trace data
@@ -241,15 +241,29 @@ func (trace *HarvestTrace) MarshalJSON() ([]byte, error) {
 		relativeStop:  trace.Duration,
 	})
 
-	printNodeStart(buf, nodeDetails{ // begin inner root
+	// exclusive_duration_millis field is added to fix the transaction trace
+	// summary tab.  If exclusive_duration_millis is not provided, the UIs
+	// will calculate exclusive time, which doesn't work for this root node
+	// since all async goroutines are children of this root.
+	exclusiveDurationMillis := trace.Duration.Seconds() * 1000.0
+	details := nodeDetails{ // begin inner root
 		name:          trace.FinalName,
 		relativeStart: 0,
 		relativeStop:  trace.Duration,
-	})
+	}
+	details.exclusiveDurationMillis = &exclusiveDurationMillis
+	printNodeStart(buf, details)
 
-	if len(nodes) > 0 {
-		lastStopStamp := nodes[len(nodes)-1].stop.Stamp + 1
-		printChildren(buf, trace.Start, nodes, 0, lastStopStamp)
+	for next := 0; next < len(nodes); {
+		if next > 0 {
+			buf.WriteByte(',')
+		}
+		// We put each thread's nodes into the root node instead of the
+		// node that spawned the thread. This approach is simple and
+		// works when the segment which spawned a thread has been pruned
+		// from the trace.  Each call to printChildren prints one
+		// thread.
+		next = printChildren(buf, trace.Start, nodes, next, nil, nodes[next].threadID)
 	}
 
 	buf.WriteString("]]") // end outer root
@@ -261,9 +275,10 @@ func (trace *HarvestTrace) MarshalJSON() ([]byte, error) {
 	agentAttributesJSON(trace.Attrs, buf, destTxnTrace)
 	buf.WriteByte(',')
 	buf.WriteString(`"userAttributes":`)
-	userAttributesJSON(trace.Attrs, buf, destTxnTrace)
+	userAttributesJSON(trace.Attrs, buf, destTxnTrace, nil)
 	buf.WriteByte(',')
-	buf.WriteString(`"intrinsics":{}`) // TODO intrinsics
+	buf.WriteString(`"intrinsics":`)
+	intrinsicsJSON(&trace.TxnEvent, buf)
 	buf.WriteByte('}')
 
 	// If the trace string pool is used, end another array here.
@@ -271,7 +286,11 @@ func (trace *HarvestTrace) MarshalJSON() ([]byte, error) {
 	buf.WriteByte(']') // end trace data
 
 	buf.WriteByte(',')
-	buf.WriteString(`""`)    // GUID is not yet supported
+	if trace.CrossProcess.Used() && trace.CrossProcess.GUID != "" {
+		jsonx.AppendString(buf, trace.CrossProcess.GUID)
+	} else {
+		buf.WriteString(`""`)
+	}
 	buf.WriteByte(',')       //
 	buf.WriteString(`null`)  // reserved for future use
 	buf.WriteByte(',')       //
@@ -279,40 +298,150 @@ func (trace *HarvestTrace) MarshalJSON() ([]byte, error) {
 	buf.WriteByte(',')       //
 	buf.WriteString(`null`)  // X-Ray sessions not supported
 	buf.WriteByte(',')       //
-	buf.WriteString(`""`)    // SyntheticsResourceID is not yet supported
+
+	// Synthetics are supported:
+	if trace.CrossProcess.IsSynthetics() {
+		jsonx.AppendString(buf, trace.CrossProcess.Synthetics.ResourceID)
+	} else {
+		buf.WriteString(`""`)
+	}
 
 	buf.WriteByte(']') // end trace
+}
 
-	return buf.Bytes(), nil
+type txnTraceHeap []*HarvestTrace
 
+func (h *txnTraceHeap) isEmpty() bool {
+	return 0 == len(*h)
+}
+
+func newTxnTraceHeap(max int) *txnTraceHeap {
+	h := make(txnTraceHeap, 0, max)
+	heap.Init(&h)
+	return &h
+}
+
+// Implement sort.Interface.
+func (h txnTraceHeap) Len() int           { return len(h) }
+func (h txnTraceHeap) Less(i, j int) bool { return h[i].Duration < h[j].Duration }
+func (h txnTraceHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+
+// Implement heap.Interface.
+func (h *txnTraceHeap) Push(x interface{}) { *h = append(*h, x.(*HarvestTrace)) }
+
+func (h *txnTraceHeap) Pop() interface{} {
+	old := *h
+	n := len(old)
+	x := old[n-1]
+	*h = old[0 : n-1]
+	return x
+}
+
+func (h *txnTraceHeap) isKeeper(t *HarvestTrace) bool {
+	if len(*h) < cap(*h) {
+		return true
+	}
+	return t.Duration >= (*h)[0].Duration
+}
+
+func (h *txnTraceHeap) addTxnTrace(t *HarvestTrace) {
+	if len(*h) < cap(*h) {
+		heap.Push(h, t)
+		return
+	}
+
+	if t.Duration <= (*h)[0].Duration {
+		return
+	}
+	heap.Pop(h)
+	heap.Push(h, t)
 }
 
 type harvestTraces struct {
-	trace *HarvestTrace
+	regular    *txnTraceHeap
+	synthetics *txnTraceHeap
 }
 
 func newHarvestTraces() *harvestTraces {
-	return &harvestTraces{}
+	return &harvestTraces{
+		regular:    newTxnTraceHeap(maxRegularTraces),
+		synthetics: newTxnTraceHeap(maxSyntheticsTraces),
+	}
+}
+
+func (traces *harvestTraces) Len() int {
+	return traces.regular.Len() + traces.synthetics.Len()
 }
 
 func (traces *harvestTraces) Witness(trace HarvestTrace) {
-	if nil == traces.trace || traces.trace.Duration < trace.Duration {
+	traceHeap := traces.regular
+	if trace.CrossProcess.IsSynthetics() {
+		traceHeap = traces.synthetics
+	}
+
+	if traceHeap.isKeeper(&trace) {
 		cpy := new(HarvestTrace)
 		*cpy = trace
-		traces.trace = cpy
+		traceHeap.addTxnTrace(cpy)
 	}
 }
 
 func (traces *harvestTraces) Data(agentRunID string, harvestStart time.Time) ([]byte, error) {
-	if nil == traces.trace {
+	if traces.Len() == 0 {
 		return nil, nil
 	}
-	return json.Marshal([]interface{}{
-		agentRunID,
-		[]interface{}{
-			traces.trace,
-		},
-	})
+
+	// This estimate is used to guess the size of the buffer.  No worries if
+	// the estimate is small since the buffer will be lengthened as
+	// necessary.  This is just about minimizing reallocations.
+	estimate := 512
+	for _, t := range *traces.regular {
+		estimate += 100 * t.Trace.nodes.Len()
+	}
+	for _, t := range *traces.synthetics {
+		estimate += 100 * t.Trace.nodes.Len()
+	}
+
+	buf := bytes.NewBuffer(make([]byte, 0, estimate))
+	buf.WriteByte('[')
+	jsonx.AppendString(buf, agentRunID)
+	buf.WriteByte(',')
+	buf.WriteByte('[')
+
+	// use a function to add traces to the buffer to avoid duplicating comma
+	// logic in both loops
+	firstTrace := true
+	addTrace := func(trace *HarvestTrace) {
+		if firstTrace {
+			firstTrace = false
+		} else {
+			buf.WriteByte(',')
+		}
+		trace.writeJSON(buf)
+	}
+
+	for _, trace := range *traces.regular {
+		addTrace(trace)
+	}
+	for _, trace := range *traces.synthetics {
+		addTrace(trace)
+	}
+	buf.WriteByte(']')
+	buf.WriteByte(']')
+
+	return buf.Bytes(), nil
+}
+
+func (traces *harvestTraces) slice() []*HarvestTrace {
+	out := make([]*HarvestTrace, 0, traces.Len())
+	out = append(out, (*traces.regular)...)
+	out = append(out, (*traces.synthetics)...)
+
+	return out
 }
 
 func (traces *harvestTraces) MergeIntoHarvest(h *Harvest) {}
+
+func (traces *harvestTraces) EndpointMethod() string {
+	return cmdTxnTraces
+}

@@ -45,6 +45,12 @@ type Span interface {
 	// span.Flush).
 	Finish()
 
+	// Finish the Span with duration and send to Reporter. If DelaySend option was used at
+	// Span creation time, FinishedWithDuration will not send the Span to the Reporter. It then
+	// becomes the user's responsibility to get the Span reported (by using
+	// span.Flush).
+	FinishedWithDuration(duration time.Duration)
+
 	// Flush the Span to the Reporter (regardless of being finished or not).
 	// This can be used if the DelaySend SpanOption was set or when dealing with
 	// one-way RPC tracing where duration might not be measured.

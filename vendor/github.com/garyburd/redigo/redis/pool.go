@@ -29,8 +29,8 @@ import (
 )
 
 var (
-	_ ConnWithTimeout = (*activeConn)(nil)
-	_ ConnWithTimeout = (*errorConn)(nil)
+	_ ConnWithTimeout = (*pooledConnection)(nil)
+	_ ConnWithTimeout = (*errorConnection)(nil)
 )
 
 var nowFunc = time.Now // for testing
@@ -150,10 +150,6 @@ type Pool struct {
 	// for a connection to be returned to the pool before returning.
 	Wait bool
 
-	// Close connections older than this duration. If the value is zero, then
-	// the pool does not close connections based on age.
-	MaxConnLifetime time.Duration
-
 	chInitialized uint32 // set to 1 when field ch is initialized
 
 	mu     sync.Mutex    // mu protects the following fields
@@ -176,11 +172,11 @@ func NewPool(newFn func() (Conn, error), maxIdle int) *Pool {
 // getting an underlying connection, then the connection Err, Do, Send, Flush
 // and Receive methods return that error.
 func (p *Pool) Get() Conn {
-	pc, err := p.get(nil)
+	c, err := p.get(nil)
 	if err != nil {
-		return errorConn{err}
+		return errorConnection{err}
 	}
-	return &activeConn{p: p, pc: pc}
+	return &pooledConnection{p: p, c: c}
 }
 
 // PoolStats contains pool statistics.
@@ -230,15 +226,15 @@ func (p *Pool) Close() error {
 	}
 	p.closed = true
 	p.active -= p.idle.count
-	pc := p.idle.front
+	ic := p.idle.front
 	p.idle.count = 0
 	p.idle.front, p.idle.back = nil, nil
 	if p.ch != nil {
 		close(p.ch)
 	}
 	p.mu.Unlock()
-	for ; pc != nil; pc = pc.next {
-		pc.c.Close()
+	for ; ic != nil; ic = ic.next {
+		ic.c.Close()
 	}
 	return nil
 }
@@ -269,7 +265,7 @@ func (p *Pool) lazyInit() {
 func (p *Pool) get(ctx interface {
 	Done() <-chan struct{}
 	Err() error
-}) (*poolConn, error) {
+}) (Conn, error) {
 
 	// Handle limit for p.Wait == true.
 	if p.Wait && p.MaxActive > 0 {
@@ -291,10 +287,10 @@ func (p *Pool) get(ctx interface {
 	if p.IdleTimeout > 0 {
 		n := p.idle.count
 		for i := 0; i < n && p.idle.back != nil && p.idle.back.t.Add(p.IdleTimeout).Before(nowFunc()); i++ {
-			pc := p.idle.back
+			c := p.idle.back.c
 			p.idle.popBack()
 			p.mu.Unlock()
-			pc.c.Close()
+			c.Close()
 			p.mu.Lock()
 			p.active--
 		}
@@ -302,14 +298,13 @@ func (p *Pool) get(ctx interface {
 
 	// Get idle connection from the front of idle list.
 	for p.idle.front != nil {
-		pc := p.idle.front
+		ic := p.idle.front
 		p.idle.popFront()
 		p.mu.Unlock()
-		if (p.TestOnBorrow == nil || p.TestOnBorrow(pc.c, pc.t) == nil) &&
-			(p.MaxConnLifetime == 0 || nowFunc().Sub(pc.created) < p.MaxConnLifetime) {
-			return pc, nil
+		if p.TestOnBorrow == nil || p.TestOnBorrow(ic.c, ic.t) == nil {
+			return ic.c, nil
 		}
-		pc.c.Close()
+		ic.c.Close()
 		p.mu.Lock()
 		p.active--
 	}
@@ -338,25 +333,24 @@ func (p *Pool) get(ctx interface {
 		}
 		p.mu.Unlock()
 	}
-	return &poolConn{c: c, created: nowFunc()}, err
+	return c, err
 }
 
-func (p *Pool) put(pc *poolConn, forceClose bool) error {
+func (p *Pool) put(c Conn, forceClose bool) error {
 	p.mu.Lock()
 	if !p.closed && !forceClose {
-		pc.t = nowFunc()
-		p.idle.pushFront(pc)
+		p.idle.pushFront(&idleConn{t: nowFunc(), c: c})
 		if p.idle.count > p.MaxIdle {
-			pc = p.idle.back
+			c = p.idle.back.c
 			p.idle.popBack()
 		} else {
-			pc = nil
+			c = nil
 		}
 	}
 
-	if pc != nil {
+	if c != nil {
 		p.mu.Unlock()
-		pc.c.Close()
+		c.Close()
 		p.mu.Lock()
 		p.active--
 	}
@@ -368,9 +362,9 @@ func (p *Pool) put(pc *poolConn, forceClose bool) error {
 	return nil
 }
 
-type activeConn struct {
+type pooledConnection struct {
 	p     *Pool
-	pc    *poolConn
+	c     Conn
 	state int
 }
 
@@ -391,107 +385,79 @@ func initSentinel() {
 	}
 }
 
-func (ac *activeConn) Close() error {
-	pc := ac.pc
-	if pc == nil {
+func (pc *pooledConnection) Close() error {
+	c := pc.c
+	if _, ok := c.(errorConnection); ok {
 		return nil
 	}
-	ac.pc = nil
+	pc.c = errorConnection{errConnClosed}
 
-	if ac.state&internal.MultiState != 0 {
-		pc.c.Send("DISCARD")
-		ac.state &^= (internal.MultiState | internal.WatchState)
-	} else if ac.state&internal.WatchState != 0 {
-		pc.c.Send("UNWATCH")
-		ac.state &^= internal.WatchState
+	if pc.state&internal.MultiState != 0 {
+		c.Send("DISCARD")
+		pc.state &^= (internal.MultiState | internal.WatchState)
+	} else if pc.state&internal.WatchState != 0 {
+		c.Send("UNWATCH")
+		pc.state &^= internal.WatchState
 	}
-	if ac.state&internal.SubscribeState != 0 {
-		pc.c.Send("UNSUBSCRIBE")
-		pc.c.Send("PUNSUBSCRIBE")
+	if pc.state&internal.SubscribeState != 0 {
+		c.Send("UNSUBSCRIBE")
+		c.Send("PUNSUBSCRIBE")
 		// To detect the end of the message stream, ask the server to echo
 		// a sentinel value and read until we see that value.
 		sentinelOnce.Do(initSentinel)
-		pc.c.Send("ECHO", sentinel)
-		pc.c.Flush()
+		c.Send("ECHO", sentinel)
+		c.Flush()
 		for {
-			p, err := pc.c.Receive()
+			p, err := c.Receive()
 			if err != nil {
 				break
 			}
 			if p, ok := p.([]byte); ok && bytes.Equal(p, sentinel) {
-				ac.state &^= internal.SubscribeState
+				pc.state &^= internal.SubscribeState
 				break
 			}
 		}
 	}
-	pc.c.Do("")
-	ac.p.put(pc, ac.state != 0 || pc.c.Err() != nil)
+	c.Do("")
+	pc.p.put(c, pc.state != 0 || c.Err() != nil)
 	return nil
 }
 
-func (ac *activeConn) Err() error {
-	pc := ac.pc
-	if pc == nil {
-		return errConnClosed
-	}
+func (pc *pooledConnection) Err() error {
 	return pc.c.Err()
 }
 
-func (ac *activeConn) Do(commandName string, args ...interface{}) (reply interface{}, err error) {
-	pc := ac.pc
-	if pc == nil {
-		return nil, errConnClosed
-	}
+func (pc *pooledConnection) Do(commandName string, args ...interface{}) (reply interface{}, err error) {
 	ci := internal.LookupCommandInfo(commandName)
-	ac.state = (ac.state | ci.Set) &^ ci.Clear
+	pc.state = (pc.state | ci.Set) &^ ci.Clear
 	return pc.c.Do(commandName, args...)
 }
 
-func (ac *activeConn) DoWithTimeout(timeout time.Duration, commandName string, args ...interface{}) (reply interface{}, err error) {
-	pc := ac.pc
-	if pc == nil {
-		return nil, errConnClosed
-	}
+func (pc *pooledConnection) DoWithTimeout(timeout time.Duration, commandName string, args ...interface{}) (reply interface{}, err error) {
 	cwt, ok := pc.c.(ConnWithTimeout)
 	if !ok {
 		return nil, errTimeoutNotSupported
 	}
 	ci := internal.LookupCommandInfo(commandName)
-	ac.state = (ac.state | ci.Set) &^ ci.Clear
+	pc.state = (pc.state | ci.Set) &^ ci.Clear
 	return cwt.DoWithTimeout(timeout, commandName, args...)
 }
 
-func (ac *activeConn) Send(commandName string, args ...interface{}) error {
-	pc := ac.pc
-	if pc == nil {
-		return errConnClosed
-	}
+func (pc *pooledConnection) Send(commandName string, args ...interface{}) error {
 	ci := internal.LookupCommandInfo(commandName)
-	ac.state = (ac.state | ci.Set) &^ ci.Clear
+	pc.state = (pc.state | ci.Set) &^ ci.Clear
 	return pc.c.Send(commandName, args...)
 }
 
-func (ac *activeConn) Flush() error {
-	pc := ac.pc
-	if pc == nil {
-		return errConnClosed
-	}
+func (pc *pooledConnection) Flush() error {
 	return pc.c.Flush()
 }
 
-func (ac *activeConn) Receive() (reply interface{}, err error) {
-	pc := ac.pc
-	if pc == nil {
-		return nil, errConnClosed
-	}
+func (pc *pooledConnection) Receive() (reply interface{}, err error) {
 	return pc.c.Receive()
 }
 
-func (ac *activeConn) ReceiveWithTimeout(timeout time.Duration) (reply interface{}, err error) {
-	pc := ac.pc
-	if pc == nil {
-		return nil, errConnClosed
-	}
+func (pc *pooledConnection) ReceiveWithTimeout(timeout time.Duration) (reply interface{}, err error) {
 	cwt, ok := pc.c.(ConnWithTimeout)
 	if !ok {
 		return nil, errTimeoutNotSupported
@@ -499,64 +465,63 @@ func (ac *activeConn) ReceiveWithTimeout(timeout time.Duration) (reply interface
 	return cwt.ReceiveWithTimeout(timeout)
 }
 
-type errorConn struct{ err error }
+type errorConnection struct{ err error }
 
-func (ec errorConn) Do(string, ...interface{}) (interface{}, error) { return nil, ec.err }
-func (ec errorConn) DoWithTimeout(time.Duration, string, ...interface{}) (interface{}, error) {
+func (ec errorConnection) Do(string, ...interface{}) (interface{}, error) { return nil, ec.err }
+func (ec errorConnection) DoWithTimeout(time.Duration, string, ...interface{}) (interface{}, error) {
 	return nil, ec.err
 }
-func (ec errorConn) Send(string, ...interface{}) error                     { return ec.err }
-func (ec errorConn) Err() error                                            { return ec.err }
-func (ec errorConn) Close() error                                          { return nil }
-func (ec errorConn) Flush() error                                          { return ec.err }
-func (ec errorConn) Receive() (interface{}, error)                         { return nil, ec.err }
-func (ec errorConn) ReceiveWithTimeout(time.Duration) (interface{}, error) { return nil, ec.err }
+func (ec errorConnection) Send(string, ...interface{}) error                     { return ec.err }
+func (ec errorConnection) Err() error                                            { return ec.err }
+func (ec errorConnection) Close() error                                          { return nil }
+func (ec errorConnection) Flush() error                                          { return ec.err }
+func (ec errorConnection) Receive() (interface{}, error)                         { return nil, ec.err }
+func (ec errorConnection) ReceiveWithTimeout(time.Duration) (interface{}, error) { return nil, ec.err }
 
 type idleList struct {
 	count       int
-	front, back *poolConn
+	front, back *idleConn
 }
 
-type poolConn struct {
+type idleConn struct {
 	c          Conn
 	t          time.Time
-	created    time.Time
-	next, prev *poolConn
+	next, prev *idleConn
 }
 
-func (l *idleList) pushFront(pc *poolConn) {
-	pc.next = l.front
-	pc.prev = nil
+func (l *idleList) pushFront(ic *idleConn) {
+	ic.next = l.front
+	ic.prev = nil
 	if l.count == 0 {
-		l.back = pc
+		l.back = ic
 	} else {
-		l.front.prev = pc
+		l.front.prev = ic
 	}
-	l.front = pc
+	l.front = ic
 	l.count++
 	return
 }
 
 func (l *idleList) popFront() {
-	pc := l.front
+	ic := l.front
 	l.count--
 	if l.count == 0 {
 		l.front, l.back = nil, nil
 	} else {
-		pc.next.prev = nil
-		l.front = pc.next
+		ic.next.prev = nil
+		l.front = ic.next
 	}
-	pc.next, pc.prev = nil, nil
+	ic.next, ic.prev = nil, nil
 }
 
 func (l *idleList) popBack() {
-	pc := l.back
+	ic := l.back
 	l.count--
 	if l.count == 0 {
 		l.front, l.back = nil, nil
 	} else {
-		pc.prev.next = nil
-		l.back = pc.prev
+		ic.prev.next = nil
+		l.back = ic.prev
 	}
-	pc.next, pc.prev = nil, nil
+	ic.next, ic.prev = nil, nil
 }

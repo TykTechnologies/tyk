@@ -7,17 +7,8 @@ import (
 	"github.com/newrelic/go-agent/internal/jsonx"
 )
 
-// eventStamp allows for uniform random sampling of events.  When an event is
-// created it is given an eventStamp.  Whenever an event pool is full and events
-// need to be dropped, the events with the lowest stamps are dropped.
-type eventStamp float32
-
-func eventStampCmp(a, b eventStamp) bool {
-	return a < b
-}
-
 type analyticsEvent struct {
-	stamp eventStamp
+	priority Priority
 	jsonWriter
 }
 
@@ -33,7 +24,7 @@ func (events *analyticsEvents) NumSeen() float64  { return float64(events.numSee
 func (events *analyticsEvents) NumSaved() float64 { return float64(len(events.events)) }
 
 func (h analyticsEventHeap) Len() int           { return len(h) }
-func (h analyticsEventHeap) Less(i, j int) bool { return eventStampCmp(h[i].stamp, h[j].stamp) }
+func (h analyticsEventHeap) Less(i, j int) bool { return h[i].priority.isLowerPriority(h[j].priority) }
 func (h analyticsEventHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
 
 // Push and Pop are unused: only heap.Init and heap.Fix are used.
@@ -48,8 +39,17 @@ func newAnalyticsEvents(max int) *analyticsEvents {
 	}
 }
 
+func (events *analyticsEvents) capacity() int {
+	return cap(events.events)
+}
+
 func (events *analyticsEvents) addEvent(e analyticsEvent) {
 	events.numSeen++
+
+	if events.capacity() == 0 {
+		// Configurable event harvest limits may be zero.
+		return
+	}
 
 	if len(events.events) < cap(events.events) {
 		events.events = append(events.events, e)
@@ -62,7 +62,7 @@ func (events *analyticsEvents) addEvent(e analyticsEvent) {
 		return
 	}
 
-	if eventStampCmp(e.stamp, events.events[0].stamp) {
+	if e.priority.isLowerPriority((events.events)[0].priority) {
 		return
 	}
 
@@ -89,7 +89,7 @@ func (events *analyticsEvents) Merge(other *analyticsEvents) {
 }
 
 func (events *analyticsEvents) CollectorJSON(agentRunID string) ([]byte, error) {
-	if 0 == events.numSeen {
+	if 0 == len(events.events) {
 		return nil, nil
 	}
 
@@ -119,4 +119,27 @@ func (events *analyticsEvents) CollectorJSON(agentRunID string) ([]byte, error) 
 
 	return buf.Bytes(), nil
 
+}
+
+// split splits the events into two.  NOTE! The two event pools are not valid
+// priority queues, and should only be used to create JSON, not for adding any
+// events.
+func (events *analyticsEvents) split() (*analyticsEvents, *analyticsEvents) {
+	// numSeen is conserved: e1.numSeen + e2.numSeen == events.numSeen.
+	e1 := &analyticsEvents{
+		numSeen:        len(events.events) / 2,
+		events:         make([]analyticsEvent, len(events.events)/2),
+		failedHarvests: events.failedHarvests,
+	}
+	e2 := &analyticsEvents{
+		numSeen:        events.numSeen - e1.numSeen,
+		events:         make([]analyticsEvent, len(events.events)-len(e1.events)),
+		failedHarvests: events.failedHarvests,
+	}
+	// Note that slicing is not used to ensure that length == capacity for
+	// e1.events and e2.events.
+	copy(e1.events, events.events)
+	copy(e2.events, events.events[len(events.events)/2:])
+
+	return e1, e2
 }

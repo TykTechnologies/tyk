@@ -7,16 +7,22 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
+	"regexp"
+	"strconv"
+	"time"
 
 	"github.com/newrelic/go-agent/internal/logger"
 )
 
 const (
-	procotolVersion = "14"
+	// ProcotolVersion is the protocol version used to communicate with NR
+	// backend.
+	ProcotolVersion = 17
 	userAgentPrefix = "NewRelic-Go-Agent/"
 
 	// Methods used in collector communication.
-	cmdRedirect     = "get_redirect_host"
+	cmdPreconnect   = "preconnect"
 	cmdConnect      = "connect"
 	cmdMetrics      = "metric_data"
 	cmdCustomEvents = "custom_event_data"
@@ -25,35 +31,79 @@ const (
 	cmdErrorData    = "error_data"
 	cmdTxnTraces    = "transaction_sample_data"
 	cmdSlowSQLs     = "sql_trace_data"
-)
-
-var (
-	// ErrPayloadTooLarge is created in response to receiving a 413 response
-	// code.
-	ErrPayloadTooLarge = errors.New("payload too large")
-	// ErrUnauthorized is created in response to receiving a 401 response code.
-	ErrUnauthorized = errors.New("unauthorized")
-	// ErrUnsupportedMedia is created in response to receiving a 415
-	// response code.
-	ErrUnsupportedMedia = errors.New("unsupported media")
+	cmdSpanEvents   = "span_event_data"
 )
 
 // RpmCmd contains fields specific to an individual call made to RPM.
 type RpmCmd struct {
-	Name      string
-	Collector string
-	RunID     string
-	Data      []byte
+	Name              string
+	Collector         string
+	RunID             string
+	Data              []byte
+	RequestHeadersMap map[string]string
+	MaxPayloadSize    int
 }
 
 // RpmControls contains fields which will be the same for all calls made
 // by the same application.
 type RpmControls struct {
-	UseTLS       bool
 	License      string
 	Client       *http.Client
 	Logger       logger.Logger
 	AgentVersion string
+}
+
+// RPMResponse contains a NR endpoint response.
+//
+// Agent Behavior Summary:
+//
+// on connect/preconnect:
+//     410 means shutdown
+//     200, 202 mean success (start run)
+//     all other response codes and errors mean try after backoff
+//
+// on harvest:
+//     410 means shutdown
+//     401, 409 mean restart run
+//     408, 429, 500, 503 mean save data for next harvest
+//     all other response codes and errors discard the data and continue the current harvest
+type RPMResponse struct {
+	statusCode int
+	body       []byte
+	// Err indicates whether or not the call was successful: newRPMResponse
+	// should be used to avoid mismatch between statusCode and Err.
+	Err                      error
+	disconnectSecurityPolicy bool
+}
+
+func newRPMResponse(statusCode int) RPMResponse {
+	var err error
+	if statusCode != 200 && statusCode != 202 {
+		err = fmt.Errorf("response code: %d", statusCode)
+	}
+	return RPMResponse{statusCode: statusCode, Err: err}
+}
+
+// IsDisconnect indicates that the agent should disconnect.
+func (resp RPMResponse) IsDisconnect() bool {
+	return resp.statusCode == 410 || resp.disconnectSecurityPolicy
+}
+
+// IsRestartException indicates that the agent should restart.
+func (resp RPMResponse) IsRestartException() bool {
+	return resp.statusCode == 401 ||
+		resp.statusCode == 409
+}
+
+// ShouldSaveHarvestData indicates that the agent should save the data and try
+// to send it in the next harvest.
+func (resp RPMResponse) ShouldSaveHarvestData() bool {
+	switch resp.statusCode {
+	case 408, 429, 500, 503:
+		return true
+	default:
+		return false
+	}
 }
 
 func rpmURL(cmd RpmCmd, cs RpmControls) string {
@@ -61,16 +111,11 @@ func rpmURL(cmd RpmCmd, cs RpmControls) string {
 
 	u.Host = cmd.Collector
 	u.Path = "agent_listener/invoke_raw_method"
-
-	if cs.UseTLS {
-		u.Scheme = "https"
-	} else {
-		u.Scheme = "http"
-	}
+	u.Scheme = "https"
 
 	query := url.Values{}
 	query.Set("marshal_format", "json")
-	query.Set("protocol_version", procotolVersion)
+	query.Set("protocol_version", strconv.Itoa(ProcotolVersion))
 	query.Set("method", cmd.Name)
 	query.Set("license_key", cs.License)
 
@@ -82,66 +127,54 @@ func rpmURL(cmd RpmCmd, cs RpmControls) string {
 	return u.String()
 }
 
-type unexpectedStatusCodeErr struct {
-	code int
-}
-
-func (e unexpectedStatusCodeErr) Error() string {
-	return fmt.Sprintf("unexpected HTTP status code: %d", e.code)
-}
-
-func collectorRequestInternal(url string, data []byte, cs RpmControls) ([]byte, error) {
-	deflated, err := compress(data)
+func collectorRequestInternal(url string, cmd RpmCmd, cs RpmControls) RPMResponse {
+	compressed, err := compress(cmd.Data)
 	if nil != err {
-		return nil, err
+		return RPMResponse{Err: err}
 	}
 
-	req, err := http.NewRequest("POST", url, deflated)
+	if l := compressed.Len(); l > cmd.MaxPayloadSize {
+		return RPMResponse{Err: fmt.Errorf("Payload size for %s too large: %d greater than %d", cmd.Name, l, cmd.MaxPayloadSize)}
+	}
+
+	req, err := http.NewRequest("POST", url, compressed)
 	if nil != err {
-		return nil, err
+		return RPMResponse{Err: err}
 	}
 
 	req.Header.Add("Accept-Encoding", "identity, deflate")
 	req.Header.Add("Content-Type", "application/octet-stream")
 	req.Header.Add("User-Agent", userAgentPrefix+cs.AgentVersion)
-	req.Header.Add("Content-Encoding", "deflate")
+	req.Header.Add("Content-Encoding", "gzip")
+	for k, v := range cmd.RequestHeadersMap {
+		req.Header.Add(k, v)
+	}
 
 	resp, err := cs.Client.Do(req)
 	if err != nil {
-		return nil, err
+		return RPMResponse{Err: err}
 	}
 
 	defer resp.Body.Close()
 
-	switch resp.StatusCode {
-	case 200:
-		// Nothing to do.
-	case 401:
-		return nil, ErrUnauthorized
-	case 413:
-		return nil, ErrPayloadTooLarge
-	case 415:
-		return nil, ErrUnsupportedMedia
-	default:
-		// If the response code is not 200, then the collector may not return
-		// valid JSON.
-		return nil, unexpectedStatusCodeErr{code: resp.StatusCode}
-	}
+	r := newRPMResponse(resp.StatusCode)
 
 	// Read the entire response, rather than using resp.Body as input to json.NewDecoder to
 	// avoid the issue described here:
 	// https://github.com/google/go-github/pull/317
 	// https://ahmetalpbalkan.com/blog/golang-json-decoder-pitfalls/
 	// Also, collector JSON responses are expected to be quite small.
-	b, err := ioutil.ReadAll(resp.Body)
-	if nil != err {
-		return nil, err
+	body, err := ioutil.ReadAll(resp.Body)
+	if nil == r.Err {
+		r.Err = err
 	}
-	return parseResponse(b)
+	r.body = body
+
+	return r
 }
 
 // CollectorRequest makes a request to New Relic.
-func CollectorRequest(cmd RpmCmd, cs RpmControls) ([]byte, error) {
+func CollectorRequest(cmd RpmCmd, cs RpmControls) RPMResponse {
 	url := rpmURL(cmd, cs)
 
 	if cs.Logger.DebugEnabled() {
@@ -152,123 +185,149 @@ func CollectorRequest(cmd RpmCmd, cs RpmControls) ([]byte, error) {
 		})
 	}
 
-	resp, err := collectorRequestInternal(url, cmd.Data, cs)
-	if err != nil {
-		cs.Logger.Debug("rpm failure", map[string]interface{}{
-			"command": cmd.Name,
-			"url":     url,
-			"error":   err.Error(),
-		})
-	}
+	resp := collectorRequestInternal(url, cmd, cs)
 
 	if cs.Logger.DebugEnabled() {
-		cs.Logger.Debug("rpm response", map[string]interface{}{
-			"command":  cmd.Name,
-			"url":      url,
-			"response": JSONString(resp),
-		})
+		if err := resp.Err; err != nil {
+			cs.Logger.Debug("rpm failure", map[string]interface{}{
+				"command":  cmd.Name,
+				"url":      url,
+				"response": string(resp.body), // Body might not be JSON on failure.
+				"error":    err.Error(),
+			})
+		} else {
+			cs.Logger.Debug("rpm response", map[string]interface{}{
+				"command":  cmd.Name,
+				"url":      url,
+				"response": JSONString(resp.body),
+			})
+		}
 	}
 
-	return resp, err
-}
-
-type rpmException struct {
-	Message   string `json:"message"`
-	ErrorType string `json:"error_type"`
-}
-
-func (e *rpmException) Error() string {
-	return fmt.Sprintf("%s: %s", e.ErrorType, e.Message)
-}
-
-func hasType(e error, expected string) bool {
-	rpmErr, ok := e.(*rpmException)
-	if !ok {
-		return false
-	}
-	return rpmErr.ErrorType == expected
-
+	return resp
 }
 
 const (
-	forceRestartType   = "NewRelic::Agent::ForceRestartException"
-	disconnectType     = "NewRelic::Agent::ForceDisconnectException"
-	licenseInvalidType = "NewRelic::Agent::LicenseException"
-	runtimeType        = "RuntimeError"
+	// NEW_RELIC_HOST can be used to override the New Relic endpoint.  This
+	// is useful for testing.
+	envHost = "NEW_RELIC_HOST"
 )
 
-// IsRestartException indicates if the error was a restart exception.
-func IsRestartException(e error) bool { return hasType(e, forceRestartType) }
+var (
+	preconnectHostOverride       = os.Getenv(envHost)
+	preconnectHostDefault        = "collector.newrelic.com"
+	preconnectRegionLicenseRegex = regexp.MustCompile(`(^.+?)x`)
+)
 
-// IsLicenseException indicates if the error was an invalid exception.
-func IsLicenseException(e error) bool { return hasType(e, licenseInvalidType) }
-
-// IsRuntime indicates if the error was a runtime exception.
-func IsRuntime(e error) bool { return hasType(e, runtimeType) }
-
-// IsDisconnect indicates if the error was a disconnect exception.
-func IsDisconnect(e error) bool { return hasType(e, disconnectType) }
-
-func parseResponse(b []byte) ([]byte, error) {
-	var r struct {
-		ReturnValue json.RawMessage `json:"return_value"`
-		Exception   *rpmException   `json:"exception"`
+func calculatePreconnectHost(license, overrideHost string) string {
+	if "" != overrideHost {
+		return overrideHost
 	}
-
-	err := json.Unmarshal(b, &r)
-	if nil != err {
-		return nil, err
+	m := preconnectRegionLicenseRegex.FindStringSubmatch(license)
+	if len(m) > 1 {
+		return "collector." + m[1] + ".nr-data.net"
 	}
-
-	if nil != r.Exception {
-		return nil, r.Exception
-	}
-
-	return r.ReturnValue, nil
+	return preconnectHostDefault
 }
 
+// ConnectJSONCreator allows the creation of the connect payload JSON to be
+// deferred until the SecurityPolicies are acquired and vetted.
+type ConnectJSONCreator interface {
+	CreateConnectJSON(*SecurityPolicies) ([]byte, error)
+}
+
+type preconnectRequest struct {
+	SecurityPoliciesToken string `json:"security_policies_token,omitempty"`
+	HighSecurity          bool   `json:"high_security"`
+}
+
+var (
+	errMissingAgentRunID = errors.New("connect reply missing agent run id")
+)
+
 // ConnectAttempt tries to connect an application.
-func ConnectAttempt(js []byte, redirectHost string, cs RpmControls) (*AppRun, error) {
+func ConnectAttempt(config ConnectJSONCreator, securityPoliciesToken string, highSecurity bool, cs RpmControls) (*ConnectReply, RPMResponse) {
+	preconnectData, err := json.Marshal([]preconnectRequest{{
+		SecurityPoliciesToken: securityPoliciesToken,
+		HighSecurity:          highSecurity,
+	}})
+	if nil != err {
+		return nil, RPMResponse{Err: fmt.Errorf("unable to marshal preconnect data: %v", err)}
+	}
+
 	call := RpmCmd{
-		Name:      cmdRedirect,
-		Collector: redirectHost,
-		Data:      []byte("[]"),
+		Name:           cmdPreconnect,
+		Collector:      calculatePreconnectHost(cs.License, preconnectHostOverride),
+		Data:           preconnectData,
+		MaxPayloadSize: maxPayloadSizeInBytes,
 	}
 
-	out, err := CollectorRequest(call, cs)
+	resp := CollectorRequest(call, cs)
+	if nil != resp.Err {
+		return nil, resp
+	}
+
+	var preconnect struct {
+		Preconnect PreconnectReply `json:"return_value"`
+	}
+	err = json.Unmarshal(resp.body, &preconnect)
 	if nil != err {
-		// err is intentionally unmodified:  We do not want to change
-		// the type of these collector errors.
-		return nil, err
+		// Certain security policy errors must be treated as a disconnect.
+		return nil, RPMResponse{
+			Err:                      fmt.Errorf("unable to process preconnect reply: %v", err),
+			disconnectSecurityPolicy: isDisconnectSecurityPolicyError(err),
+		}
 	}
 
-	var host string
-	err = json.Unmarshal(out, &host)
+	js, err := config.CreateConnectJSON(preconnect.Preconnect.SecurityPolicies.PointerIfPopulated())
 	if nil != err {
-		return nil, fmt.Errorf("unable to parse redirect reply: %v", err)
+		return nil, RPMResponse{Err: fmt.Errorf("unable to create connect data: %v", err)}
 	}
 
-	call.Collector = host
+	call.Collector = preconnect.Preconnect.Collector
 	call.Data = js
 	call.Name = cmdConnect
 
-	rawReply, err := CollectorRequest(call, cs)
-	if nil != err {
-		// err is intentionally unmodified:  We do not want to change
-		// the type of these collector errors.
-		return nil, err
+	resp = CollectorRequest(call, cs)
+	if nil != resp.Err {
+		return nil, resp
 	}
 
-	reply := ConnectReplyDefaults()
-	err = json.Unmarshal(rawReply, reply)
+	reply, err := constructConnectReply(resp.body, preconnect.Preconnect)
 	if nil != err {
-		return nil, fmt.Errorf("unable to parse connect reply: %v", err)
+		return nil, RPMResponse{Err: err}
 	}
+
 	// Note:  This should never happen.  It would mean the collector
 	// response is malformed.  This exists merely as extra defensiveness.
 	if "" == reply.RunID {
-		return nil, errors.New("connect reply missing agent run id")
+		return nil, RPMResponse{Err: errMissingAgentRunID}
 	}
 
-	return &AppRun{reply, host}, nil
+	return reply, resp
+}
+
+func constructConnectReply(body []byte, preconnect PreconnectReply) (*ConnectReply, error) {
+	var reply struct {
+		Reply *ConnectReply `json:"return_value"`
+	}
+	reply.Reply = ConnectReplyDefaults()
+	err := json.Unmarshal(body, &reply)
+	if nil != err {
+		return nil, fmt.Errorf("unable to parse connect reply: %v", err)
+	}
+
+	reply.Reply.PreconnectReply = preconnect
+
+	reply.Reply.AdaptiveSampler = NewAdaptiveSampler(
+		time.Duration(reply.Reply.SamplingTargetPeriodInSeconds)*time.Second,
+		reply.Reply.SamplingTarget,
+		time.Now())
+	reply.Reply.rulesCache = newRulesCache(txnNameCacheLimit)
+
+	if reply.Reply.EventData.EventReportPeriodMs <= 0 {
+		reply.Reply.EventData.EventReportPeriodMs = defaultConfigurableEventHarvestMs
+	}
+
+	return reply.Reply, nil
 }

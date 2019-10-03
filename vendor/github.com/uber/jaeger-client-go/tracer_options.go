@@ -126,6 +126,12 @@ func (tracerOptions) Gen128Bit(gen128Bit bool) TracerOption {
 	}
 }
 
+func (tracerOptions) NoDebugFlagOnForcedSampling(noDebugFlagOnForcedSampling bool) TracerOption {
+	return func(tracer *Tracer) {
+		tracer.options.noDebugFlagOnForcedSampling = noDebugFlagOnForcedSampling
+	}
+}
+
 func (tracerOptions) HighTraceIDGenerator(highTraceIDGenerator func() uint64) TracerOption {
 	return func(tracer *Tracer) {
 		tracer.options.highTraceIDGenerator = highTraceIDGenerator

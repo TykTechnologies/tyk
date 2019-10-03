@@ -46,42 +46,31 @@ func (n *Networks) Next() bool {
 		node := n.nodes[len(n.nodes)-1]
 		n.nodes = n.nodes[:len(n.nodes)-1]
 
-		for {
-			if node.pointer < n.reader.Metadata.NodeCount {
-				ipRight := make(net.IP, len(node.ip))
-				copy(ipRight, node.ip)
-				if len(ipRight) <= int(node.bit>>3) {
-					n.err = newInvalidDatabaseError(
-						"invalid search tree at %v/%v", ipRight, node.bit)
-					return false
-				}
-				ipRight[node.bit>>3] |= 1 << uint(7-(node.bit%8))
-
-				rightPointer, err := n.reader.readNode(node.pointer, 1)
-				if err != nil {
-					n.err = err
-					return false
-				}
-
-				node.bit++
-				n.nodes = append(n.nodes, netNode{
-					pointer: rightPointer,
-					ip:      ipRight,
-					bit:     node.bit,
-				})
-
-				node.pointer, err = n.reader.readNode(node.pointer, 0)
-				if err != nil {
-					n.err = err
-					return false
-				}
-
-			} else if node.pointer > n.reader.Metadata.NodeCount {
+		for node.pointer != n.reader.Metadata.NodeCount {
+			if node.pointer > n.reader.Metadata.NodeCount {
 				n.lastNode = node
 				return true
-			} else {
-				break
 			}
+			ipRight := make(net.IP, len(node.ip))
+			copy(ipRight, node.ip)
+			if len(ipRight) <= int(node.bit>>3) {
+				n.err = newInvalidDatabaseError(
+					"invalid search tree at %v/%v", ipRight, node.bit)
+				return false
+			}
+			ipRight[node.bit>>3] |= 1 << (7 - (node.bit % 8))
+
+			offset := node.pointer * n.reader.nodeOffsetMult
+			rightPointer := n.reader.nodeReader.readRight(offset)
+
+			node.bit++
+			n.nodes = append(n.nodes, netNode{
+				pointer: rightPointer,
+				ip:      ipRight,
+				bit:     node.bit,
+			})
+
+			node.pointer = n.reader.nodeReader.readLeft(offset)
 		}
 	}
 

@@ -3,6 +3,7 @@
 package jsonparser
 
 import (
+	"reflect"
 	"strconv"
 	"unsafe"
 )
@@ -28,4 +29,14 @@ func parseFloat(b *[]byte) (float64, error) {
 // See: https://github.com/golang/go/issues/2632
 func bytesToString(b *[]byte) string {
 	return *(*string)(unsafe.Pointer(b))
+}
+
+func StringToBytes(s string) []byte {
+	sh := (*reflect.StringHeader)(unsafe.Pointer(&s))
+	bh := reflect.SliceHeader{
+		Data: sh.Data,
+		Len:  sh.Len,
+		Cap:  sh.Len,
+	}
+	return *(*[]byte)(unsafe.Pointer(&bh))
 }
