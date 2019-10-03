@@ -12,6 +12,7 @@ import (
 
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/lonelycode/go-uuid/uuid"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -879,6 +880,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 	defer ts.Close()
 
 	basePolicyID := CreatePolicy(func(p *user.Policy) {
+		p.ID = "base"
 		p.AccessRights = map[string]user.AccessDefinition{
 			"base-api": {
 				Limit: &user.APILimit{
@@ -893,21 +895,21 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		}
 	})
 
-	spec1 := BuildAPI(func(spec *APISpec) {
-		spec.APIID = "api1"
-		spec.UseKeylessAccess = false
-		spec.EnableJWT = true
-		spec.JWTSigningMethod = RSASign
-		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
-		spec.JWTIdentityBaseField = "user_id"
-		spec.JWTPolicyFieldName = "policy_id"
-		spec.Proxy.ListenPath = "/api1"
-		spec.OrgID = "default"
-	})[0]
+	defaultPolicyID := CreatePolicy(func(p *user.Policy) {
+		p.ID = "default"
+		p.AccessRights = map[string]user.AccessDefinition{
+			"base-api": {
+				Limit: &user.APILimit{
+					QuotaMax: -1,
+				},
+			},
+		}
+	})
 
 	p1ID := CreatePolicy(func(p *user.Policy) {
+		p.ID = "p1"
 		p.AccessRights = map[string]user.AccessDefinition{
-			spec1.APIID: {
+			"api1": {
 				Limit: &user.APILimit{
 					Rate:     100,
 					Per:      60,
@@ -920,21 +922,10 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		}
 	})
 
-	spec2 := BuildAPI(func(spec *APISpec) {
-		spec.APIID = "api2"
-		spec.UseKeylessAccess = false
-		spec.EnableJWT = true
-		spec.JWTSigningMethod = RSASign
-		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
-		spec.JWTIdentityBaseField = "user_id"
-		spec.JWTPolicyFieldName = "policy_id"
-		spec.Proxy.ListenPath = "/api2"
-		spec.OrgID = "default"
-	})[0]
-
 	p2ID := CreatePolicy(func(p *user.Policy) {
+		p.ID = "p2"
 		p.AccessRights = map[string]user.AccessDefinition{
-			spec2.APIID: {
+			"api2": {
 				Limit: &user.APILimit{
 					Rate:     500,
 					Per:      30,
@@ -947,19 +938,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		}
 	})
 
-	spec3 := BuildAPI(func(spec *APISpec) {
-		spec.APIID = "api3"
-		spec.UseKeylessAccess = false
-		spec.EnableJWT = true
-		spec.JWTSigningMethod = RSASign
-		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
-		spec.JWTIdentityBaseField = "user_id"
-		spec.JWTPolicyFieldName = "policy_id"
-		spec.Proxy.ListenPath = "/api3"
-		spec.OrgID = "default"
-	})[0]
-
-	spec := BuildAPI(func(spec *APISpec) {
+	base := BuildAPI(func(spec *APISpec) {
 		spec.APIID = "base-api"
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
@@ -967,6 +946,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
 		spec.JWTIdentityBaseField = "user_id"
 		spec.JWTPolicyFieldName = "policy_id"
+		spec.JWTDefaultPolicies = []string{defaultPolicyID}
 		spec.Proxy.ListenPath = "/base"
 		spec.JWTScopeToPolicyMapping = map[string]string{
 			"user:read":  p1ID,
@@ -975,21 +955,64 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		spec.OrgID = "default"
 	})[0]
 
-	LoadAPI(spec, spec1, spec2, spec3)
+	spec1 := CloneAPI(base)
+	spec1.APIID = "api1"
+	spec1.Proxy.ListenPath = "/api1"
+
+	spec2 := CloneAPI(base)
+	spec2.APIID = "api2"
+	spec2.Proxy.ListenPath = "/api2"
+
+	spec3 := CloneAPI(base)
+	spec3.APIID = "api3"
+	spec3.Proxy.ListenPath = "/api3"
+
+	LoadAPI(base, spec1, spec2, spec3)
 
 	userID := "user-" + uuid.New()
+	user2ID := "user-" + uuid.New()
+	user3ID := "user-" + uuid.New()
 
 	jwtToken := CreateJWKToken(func(t *jwt.Token) {
-		t.Header["kid"] = "12345"
-		t.Claims.(jwt.MapClaims)["foo"] = "bar"
 		t.Claims.(jwt.MapClaims)["user_id"] = userID
 		t.Claims.(jwt.MapClaims)["policy_id"] = basePolicyID
-		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 		t.Claims.(jwt.MapClaims)["scope"] = "user:read user:write"
+		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
+	})
+
+	jwtTokenWithoutBasePol := CreateJWKToken(func(t *jwt.Token) {
+		t.Claims.(jwt.MapClaims)["user_id"] = user2ID
+		t.Claims.(jwt.MapClaims)["scope"] = "user:read user:write"
+		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
+	})
+
+	jwtTokenWithoutBasePolAndScopes := CreateJWKToken(func(t *jwt.Token) {
+		t.Claims.(jwt.MapClaims)["user_id"] = user3ID
+		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	})
 
 	authHeaders := map[string]string{"authorization": jwtToken}
-	t.Run("Request with scope in JWT to create a key session", func(t *testing.T) {
+	t.Run("Create JWT session with base and scopes", func(t *testing.T) {
+		ts.Run(t,
+			test.TestCase{
+				Headers: authHeaders,
+				Path:    "/base",
+				Code:    http.StatusOK,
+			})
+	})
+
+	authHeaders = map[string]string{"authorization": jwtTokenWithoutBasePol}
+	t.Run("Create JWT session without base and with scopes", func(t *testing.T) {
+		ts.Run(t,
+			test.TestCase{
+				Headers: authHeaders,
+				Path:    "/api1",
+				Code:    http.StatusOK,
+			})
+	})
+
+	authHeaders = map[string]string{"authorization": jwtTokenWithoutBasePolAndScopes}
+	t.Run("Create JWT session without base and without scopes", func(t *testing.T) {
 		ts.Run(t,
 			test.TestCase{
 				Headers: authHeaders,
@@ -1000,7 +1023,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 
 	// check that key has right set of policies assigned - there should be all three - base one and two from scope
 	sessionID := generateToken("default", fmt.Sprintf("%x", md5.Sum([]byte(userID))))
-	t.Run("Request to check that session has got correct apply_policies value", func(t *testing.T) {
+	t.Run("Request to check that session has got both based and scope policies", func(t *testing.T) {
 		ts.Run(
 			t,
 			test.TestCase{
@@ -1008,26 +1031,64 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 				Path:      "/tyk/keys/" + sessionID,
 				AdminAuth: true,
 				Code:      http.StatusOK,
-				BodyMatchFunc: func(body []byte) bool {
-					expectedResp := map[interface{}]bool{
-						basePolicyID: true,
-						p1ID:         true,
-						p2ID:         true,
-					}
+				BodyMatchFunc: func(data []byte) bool {
+					sessionData := user.SessionState{}
+					json.Unmarshal(data, &sessionData)
 
-					resp := map[string]interface{}{}
-					json.Unmarshal(body, &resp)
-					realResp := map[interface{}]bool{}
-					for _, val := range resp["apply_policies"].([]interface{}) {
-						realResp[val] = true
-					}
+					assert.Equal(t, sessionData.ApplyPolicies, []string{basePolicyID, p1ID, p2ID})
 
-					return reflect.DeepEqual(realResp, expectedResp)
+					return true
 				},
 			},
 		)
 	})
 
+	// check that key has right set of policies assigned - there should be all three - base one and two from scope
+	sessionID = generateToken("default", fmt.Sprintf("%x", md5.Sum([]byte(user2ID))))
+	t.Run("If scopes present no default policy should be used", func(t *testing.T) {
+		ts.Run(
+			t,
+			test.TestCase{
+				Method:    http.MethodGet,
+				Path:      "/tyk/keys/" + sessionID,
+				AdminAuth: true,
+				Code:      http.StatusOK,
+				BodyMatchFunc: func(data []byte) bool {
+					sessionData := user.SessionState{}
+					json.Unmarshal(data, &sessionData)
+
+					assert.Equal(t, sessionData.ApplyPolicies, []string{p1ID, p2ID})
+
+					return true
+				},
+			},
+		)
+	})
+
+	// check that key has right set of policies assigned - there should be all three - base one and two from scope
+	sessionID = generateToken("default", fmt.Sprintf("%x", md5.Sum([]byte(user3ID))))
+	t.Run("Default policy should be applied if no scopes found", func(t *testing.T) {
+		ts.Run(
+			t,
+			test.TestCase{
+				Method:    http.MethodGet,
+				Path:      "/tyk/keys/" + sessionID,
+				AdminAuth: true,
+				Code:      http.StatusOK,
+				BodyMatchFunc: func(data []byte) bool {
+					sessionData := user.SessionState{}
+					json.Unmarshal(data, &sessionData)
+
+					assert.Equal(t, sessionData.ApplyPolicies, []string{defaultPolicyID})
+
+					return true
+				},
+			},
+		)
+	})
+
+	authHeaders = map[string]string{"authorization": jwtToken}
+	sessionID = generateToken("default", fmt.Sprintf("%x", md5.Sum([]byte(userID))))
 	// try to access api1 using JWT issued via base-api
 	t.Run("Request to api1", func(t *testing.T) {
 		ts.Run(
@@ -1069,6 +1130,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 
 	// try to change scope to policy mapping and request using existing session
 	p3ID := CreatePolicy(func(p *user.Policy) {
+		p.ID = "p3"
 		p.AccessRights = map[string]user.AccessDefinition{
 			spec3.APIID: {
 				Limit: &user.APILimit{
@@ -1083,11 +1145,11 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		}
 	})
 
-	spec.JWTScopeToPolicyMapping = map[string]string{
+	base.JWTScopeToPolicyMapping = map[string]string{
 		"user:read": p3ID,
 	}
 
-	LoadAPI(spec)
+	LoadAPI(base)
 
 	t.Run("Request with changed scope in JWT and key with existing session", func(t *testing.T) {
 		ts.Run(t,
@@ -1107,20 +1169,13 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 				Path:      "/tyk/keys/" + sessionID,
 				AdminAuth: true,
 				Code:      http.StatusOK,
-				BodyMatchFunc: func(body []byte) bool {
-					expectedResp := map[interface{}]bool{
-						basePolicyID: true,
-						p3ID:         true,
-					}
+				BodyMatchFunc: func(data []byte) bool {
+					sessionData := user.SessionState{}
+					json.Unmarshal(data, &sessionData)
 
-					resp := map[string]interface{}{}
-					json.Unmarshal(body, &resp)
-					realResp := map[interface{}]bool{}
-					for _, val := range resp["apply_policies"].([]interface{}) {
-						realResp[val] = true
-					}
+					assert.Equal(t, sessionData.ApplyPolicies, []string{basePolicyID, p3ID})
 
-					return reflect.DeepEqual(realResp, expectedResp)
+					return true
 				},
 			},
 		)

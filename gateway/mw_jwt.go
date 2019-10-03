@@ -445,6 +445,11 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 				basePolicyID, // add base policy as a first one
 			}
 
+			// // If specified, scopes should not use default policy
+			if isDefaultPol {
+				polIDs = []string{}
+			}
+
 			// add all policies matched from scope-policy mapping
 			mappedPolIDs := mapScopeToPolicies(k.Spec.JWTScopeToPolicyMapping, scope)
 
