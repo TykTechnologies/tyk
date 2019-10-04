@@ -16,10 +16,10 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 )
-import "fmt"
 
 var (
 	supportedDrivers = []apidef.MiddlewareDriver{apidef.PythonDriver, apidef.LuaDriver, apidef.GrpcDriver}
