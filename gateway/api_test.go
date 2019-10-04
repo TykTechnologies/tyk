@@ -1412,25 +1412,24 @@ func TestRotateClientSecretHandler(t *testing.T) {
 		bodyMatch    string
 		bodyNotMatch string
 	}{
-		"Use current secret if secret is not provided": {
-			req: NewClientRequest{
-				ClientID: "12345",
-				APIID:    "test",
-				PolicyID: "p1",
-			},
-			code:         http.StatusOK,
-			bodyMatch:    fmt.Sprintf(`"secret":"%s"`, client.ClientSecret),
-			bodyNotMatch: "",
-		},
-		"Secret can be updated": {
+		"If secret is provided, it should still be auto generated": {
 			req: NewClientRequest{
 				ClientID:     "12345",
 				APIID:        "test",
 				PolicyID:     "p1",
 				ClientSecret: "super-new-secret",
 			},
-			code:      http.StatusOK,
-			bodyMatch: `"secret":"super-new-secret"`,
+			code:         http.StatusOK,
+			bodyNotMatch: `"secret":"super-new-secret"`,
+		},
+		"Secret can be rotated": {
+			req: NewClientRequest{
+				ClientID: "12345",
+				APIID:    "test",
+				PolicyID: "p1",
+			},
+			code:         http.StatusOK,
+			bodyNotMatch: fmt.Sprintf(`"secret":%s`, client.ClientSecret),
 		},
 	}
 
