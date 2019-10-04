@@ -6,13 +6,13 @@ The API is synchronous and simple to use. Jobs are allocated to a worker when on
 
 https://godoc.org/github.com/Jeffail/tunny
 
-##How to install:
+## How to install:
 
 ```bash
 go get github.com/jeffail/tunny
 ```
 
-##How to use:
+## How to use:
 
 The most obvious use for a goroutine pool would be limiting heavy jobs to the number of CPUs available. In the example below we limit the work from arbitrary numbers of HTTP request goroutines through our pool.
 
@@ -68,7 +68,7 @@ Tunny supports timeouts. You can replace the `SendWork` call above to the follow
 		}
 ```
 
-##Can I send a closure instead of data?
+## Can I send a closure instead of data?
 
 Yes, the arguments passed to the worker are boxed as interface{}, so this can actually be a func, you can implement this yourself, or if you're not bothered about return values you can use:
 
@@ -89,7 +89,7 @@ if err != nil {
 }
 ```
 
-##How do I give my workers state?
+## How do I give my workers state?
 
 Tunny workers implement the `TunnyWorkers` interface, simply implement this interface to have your own objects (and state) act as your workers.
 
@@ -167,7 +167,7 @@ The TunnyReady method allows you to use your state to determine whether or not a
 
 It is recommended that you do not block TunnyReady() whilst you wait for some condition to change, since this can prevent the pool from closing the worker goroutines. Currently, TunnyReady is called at 5 millisecond intervals until you answer true or the pool is closed.
 
-##I need more control
+## I need more control
 
 You crazy fool, let's take this up to the next level. You can optionally implement `TunnyExtendedWorker` for more control.
 
@@ -186,7 +186,7 @@ type TunnyExtendedWorker interface {
 }
 ```
 
-##Can a worker detect when a timeout occurs?
+## Can a worker detect when a timeout occurs?
 
 Yes, you can also implement the `TunnyInterruptable` interface.
 
@@ -204,25 +204,25 @@ type TunnyInterruptable interface {
 
 This method will be called in the event that a timeout occurs whilst waiting for the result. `TunnyInterrupt` is called from a newly spawned goroutine, so you'll need to create your own mechanism for stopping your worker mid-way through a job.
 
-##Can SendWork be called asynchronously?
+## Can SendWork be called asynchronously?
 
 There are the helper functions SendWorkAsync and SendWorkTimedAsync, that are the same as their respective sync calls with an optional second argument func(interface{}, error), this is the call made when a result is returned and can be nil if there is no need for the closure.
 
 However, if you find yourself in a situation where the sync return is not necessary then chances are you don't actually need Tunny at all. Golang is all about making concurrent programming simple by nature, and using Tunny for implementing simple async worker calls defeats the great work of the language spec and adds overhead that isn't necessary.
 
-##Behaviours and caveats:
+## Behaviours and caveats:
 
-###- Workers request jobs on an ad-hoc basis
+### - Workers request jobs on an ad-hoc basis
 
 When there is a backlog of jobs waiting to be serviced, and all workers are occupied, a job will not be assigned to a worker until it is already prepared for its next job. This means workers do not develop their own individual queues. Instead, the backlog is shared by the entire pool.
 
 This means an individual worker is able to halt, or spend exceptional lengths of time on a single request without hindering the flow of any other requests, provided there are other active workers in the pool.
 
-###- A job can be dropped before work is begun
+### - A job can be dropped before work is begun
 
 Tunny has support for specified timeouts at the work request level, if this timeout is triggered whilst waiting for a worker to become available then the request is dropped entirely and no effort is wasted on the abandoned request.
 
-###- Backlogged jobs are FIFO, for now
+### - Backlogged jobs are FIFO, for now
 
 When a job arrives and all workers are occupied the waiting thread will lock at a select block whilst waiting to be assigned a worker. In practice this seems to create a FIFO queue, implying that this is how the implementation of Golang has dealt with select blocks, channels and multiple reading goroutines.
 
