@@ -149,8 +149,6 @@ func apisByIDLen() int {
 
 var redisPurgeOnce sync.Once
 var rpcPurgeOnce sync.Once
-var purgeTicker = time.Tick(time.Second)
-var rpcPurgeTicker = time.Tick(10 * time.Second)
 
 // Create all globals and init connection handlers
 func setupGlobals(ctx context.Context) {
@@ -193,7 +191,7 @@ func setupGlobals(ctx context.Context) {
 		redisPurgeOnce.Do(func() {
 			store := storage.RedisCluster{KeyPrefix: "analytics-"}
 			redisPurger := RedisPurger{Store: &store}
-			go redisPurger.PurgeLoop(purgeTicker)
+			go redisPurger.PurgeLoop(ctx)
 		})
 
 		if config.Global().AnalyticsConfig.Type == "rpc" {
@@ -205,7 +203,7 @@ func setupGlobals(ctx context.Context) {
 					Store: &store,
 				}
 				purger.Connect()
-				go purger.PurgeLoop(rpcPurgeTicker)
+				go purger.PurgeLoop(ctx)
 			})
 		}
 		go flushNetworkAnalytics(ctx)

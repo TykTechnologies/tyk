@@ -4,6 +4,7 @@ go 1.12
 
 require (
 	github.com/Jeffail/gabs v1.4.0
+	github.com/Jeffail/tunny v0.0.0-20171107125207-452a8e97d6a3
 	github.com/Masterminds/goutils v1.1.0 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/TykTechnologies/again v0.0.0-20190805133618-6ad301e7eaed
@@ -43,7 +44,6 @@ require (
 	github.com/hashicorp/terraform v0.12.9
 	github.com/huandu/xstrings v1.2.0 // indirect
 	github.com/imdario/mergo v0.3.7 // indirect
-	github.com/jeffail/tunny v0.0.0-20161022001056-c757dde1c296
 	github.com/justinas/alice v0.0.0-20171023064455-03f45bd4b7da
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/lonelycode/go-uuid v0.0.0-20141202165402-ed3ca8a15a93

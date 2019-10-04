@@ -19,8 +19,7 @@ addons:
 
 matrix:
   include:
-    - go: 1.10.x
-    - go: 1.11.x
+    - go: 1.12.x
       env: LATEST_GO=true # run linters and report coverage
 
 
@@ -28,11 +27,9 @@ services:
   - redis-server
 
 install:
-  - go get
-  - go install ./...
-    # As of 1.9, ./... no longer includes ./vendor/...
-  - go install ./vendor/{golang.org/x/tools/cmd/goimports,github.com/wadey/gocovmerge,github.com/mattn/goveralls}
-  - go get github.com/go-swagger/go-swagger/cmd/swagger
+  - go get golang.org/x/tools/cmd/goimports
+  - go get github.com/wadey/gocovmerge
+  - go get github.com/mattn/goveralls
 
 script:
   - pip3 install setuptools
@@ -48,7 +45,6 @@ script:
   - go build -tags 'coprocess python'
   - go build -tags 'coprocess lua'
   - go build -tags 'coprocess grpc'
-  - ./bin/ci-swagger.sh
   - ./bin/ci-test.sh
   - if [[ $LATEST_GO ]]; then goveralls -coverprofile=<(gocovmerge *.cov); fi
   - ./bin/ci-benchmark.sh

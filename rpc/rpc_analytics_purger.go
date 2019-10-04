@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
@@ -87,10 +88,15 @@ func (r *Purger) Connect() {
 
 // PurgeLoop starts the loop that will pull data out of the in-memory
 // store and into RPC.
-func (r Purger) PurgeLoop(ticker <-chan time.Time) {
+func (r Purger) PurgeLoop(ctx context.Context) {
+	tick := time.NewTicker(10 * time.Second)
 	for {
-		<-ticker
-		r.PurgeCache()
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+			r.PurgeCache()
+		}
 	}
 }
 
