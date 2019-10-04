@@ -28,7 +28,6 @@ services:
   - redis-server
 
 install:
-  - go install ./...
   - go install golang.org/x/tools/cmd/goimports
   - go install github.com/wadey/gocovmerge
   - go install github.com/mattn/goveralls
