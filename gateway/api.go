@@ -1531,8 +1531,69 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, http.StatusOK, clientData)
 }
 
+func rotateOauthClient(keyName, apiID string) (interface{}, int) {
+	// check API
+	apiSpec := getApiSpec(apiID)
+	if apiSpec == nil {
+		return apiError("API doesn't exist"), http.StatusNotFound
+	}
+
+	// get existing version of oauth-client
+	storageID := oauthClientStorageID(keyName)
+	client, err := apiSpec.OAuthManager.OsinServer.Storage.GetExtendedClientNoPrefix(storageID)
+	if err != nil {
+		return apiError("OAuth Client ID not found"), http.StatusNotFound
+	}
+
+	// update client
+	updatedClient := OAuthClient{
+		ClientID:          client.GetId(),
+		ClientSecret:      base64.StdEncoding.EncodeToString([]byte(uuid.NewV4().String())),
+		ClientRedirectURI: client.GetRedirectUri(),
+		PolicyID:          client.GetPolicyID(),
+		MetaData:          client.GetUserData(),
+		Description:       client.GetDescription(),
+	}
+
+	err = apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, &updatedClient, true)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"apiID":  apiID,
+			"status": "fail",
+			"err":    err,
+		}).Error("Failed to update OAuth client")
+		return apiError("Failure in storing client data"), http.StatusInternalServerError
+	}
+
+	// invalidate tokens if we had a new policy
+	if prevPolicy := client.GetPolicyID(); prevPolicy != "" && prevPolicy != updatedClient.PolicyID {
+		tokenList, err := apiSpec.OAuthManager.OsinServer.Storage.GetClientTokens(updatedClient.ClientID)
+		if err != nil {
+			log.WithError(err).Warning("Could not get list of tokens for updated OAuth client")
+		}
+		for _, token := range tokenList {
+			if err := apiSpec.OAuthManager.OsinServer.Storage.RemoveAccess(token.Token); err != nil {
+				log.WithError(err).Warning("Could not remove token for updated OAuth client policy")
+			}
+		}
+	}
+
+	// convert to outbound format
+	replyData := NewClientRequest{
+		ClientID:          client.GetId(),
+		ClientSecret:      updatedClient.ClientSecret,
+		ClientRedirectURI: client.GetRedirectUri(),
+		PolicyID:          client.GetPolicyID(),
+		MetaData:          client.GetUserData(),
+		Description:       client.GetDescription(),
+	}
+
+	return replyData, http.StatusOK
+}
+
 // Update Client
-func updateOauthClient(keyName, apiID string, forceSecretUpdate bool, r *http.Request) (interface{}, int) {
+func updateOauthClient(keyName, apiID string, r *http.Request) (interface{}, int) {
 	// read payload
 	var updateClientData NewClientRequest
 	if err := json.NewDecoder(r.Body).Decode(&updateClientData); err != nil {
@@ -1574,17 +1635,10 @@ func updateOauthClient(keyName, apiID string, forceSecretUpdate bool, r *http.Re
 		return apiError("OAuth Client ID not found"), http.StatusNotFound
 	}
 
-	var secret = client.GetSecret()
-
-	if forceSecretUpdate {
-		secret = base64.StdEncoding.EncodeToString([]byte(uuid.NewV4().String()))
-	}
-
 	// update client
 	updatedClient := OAuthClient{
 		ClientID:          client.GetId(),
 		ClientRedirectURI: updateClientData.ClientRedirectURI, // update
-		ClientSecret:      secret,
 		PolicyID:          updateClientData.PolicyID,          // update
 		MetaData:          updateClientData.MetaData,          // update
 		Description:       updateClientData.Description,       // update
@@ -1699,7 +1753,7 @@ func rotateOauthClientHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
 	keyName := mux.Vars(r)["keyName"]
 
-	obj, code := updateOauthClient(keyName, apiID, true, r)
+	obj, code := rotateOauthClient(keyName, apiID)
 
 	doJSONWrite(w, code, obj)
 }
@@ -1721,7 +1775,7 @@ func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	case http.MethodPut:
 		// Update client
-		obj, code = updateOauthClient(keyName, apiID, false, r)
+		obj, code = updateOauthClient(keyName, apiID, r)
 	case http.MethodDelete:
 		// Remove a key
 		obj, code = handleDeleteOAuthClient(keyName, apiID)
