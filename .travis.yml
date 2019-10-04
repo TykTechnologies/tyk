@@ -28,9 +28,9 @@ services:
   - redis-server
 
 install:
-  - go install golang.org/x/tools/cmd/goimports
-  - go install github.com/wadey/gocovmerge
-  - go install github.com/mattn/goveralls
+  - go get golang.org/x/tools/cmd/goimports
+  - go get github.com/wadey/gocovmerge
+  - go get github.com/mattn/goveralls
 
 script:
   - pip3 install setuptools
