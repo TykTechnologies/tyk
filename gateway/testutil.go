@@ -96,8 +96,6 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 	globalConf.EnableBundleDownloader = true
 	globalConf.BundleBaseURL = testHttpBundles
 	globalConf.MiddlewarePath = testMiddlewarePath
-	purgeTicker = make(chan time.Time)
-	rpcPurgeTicker = make(chan time.Time)
 	// force ipv4 for now, to work around the docker bug affecting
 	// Go 1.8 and ealier
 	globalConf.ListenAddress = "127.0.0.1"
