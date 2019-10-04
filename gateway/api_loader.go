@@ -611,7 +611,33 @@ func loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStor
 	router.Handle(chainObj.ListenOn, chainObj.ThisHandler)
 }
 
-func loadTCPService(spec *APISpec, muxer *proxyMux) {
+func loadTCPService(spec *APISpec, gs *generalStores, muxer *proxyMux) {
+	// Initialise the auth and session managers (use Redis for now)
+	authStore := gs.redisStore
+	orgStore := gs.redisOrgStore
+	switch spec.AuthProvider.StorageEngine {
+	case LDAPStorageEngine:
+		storageEngine := LDAPStorageHandler{}
+		storageEngine.LoadConfFromMeta(spec.AuthProvider.Meta)
+		authStore = &storageEngine
+	case RPCStorageEngine:
+		authStore = gs.rpcAuthStore
+		orgStore = gs.rpcOrgStore
+		spec.GlobalConfig.EnforceOrgDataAge = true
+		globalConf := config.Global()
+		globalConf.EnforceOrgDataAge = true
+		config.SetGlobal(globalConf)
+	}
+
+	sessionStore := gs.redisStore
+	switch spec.SessionProvider.StorageEngine {
+	case RPCStorageEngine:
+		sessionStore = gs.rpcAuthStore
+	}
+
+	// Health checkers are initialised per spec so that each API handler has it's own connection and redis storage pool
+	spec.Init(authStore, sessionStore, gs.healthStore, orgStore)
+
 	muxer.addTCPService(spec, nil)
 }
 
@@ -658,7 +684,7 @@ func loadApps(specs []*APISpec) {
 		case "", "http", "https":
 			loadHTTPService(spec, apisByListen, &gs, muxer)
 		case "tcp", "tls":
-			loadTCPService(spec, muxer)
+			loadTCPService(spec, &gs, muxer)
 		}
 	}
 
