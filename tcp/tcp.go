@@ -205,26 +205,26 @@ func (p *Proxy) handleConn(conn net.Conn) error {
 		conn.Close()
 		return err
 	}
-	u, uErr := url.Parse(config.target)
-	if uErr != nil {
-		u, uErr = url.Parse("tcp://" + config.target)
-
-		if uErr != nil {
-			conn.Close()
-			return uErr
-		}
-	}
+	u, _ := url.Parse(config.target)
+	//if uErr != nil {
+	//	u, uErr = url.Parse("tcp://" + config.target)
+	//
+	//	if uErr != nil {
+	//		conn.Close()
+	//		return uErr
+	//	}
+	//}
 
 	// connects to target server
 	var rconn net.Conn
 	switch u.Scheme {
-	case "tcp":
+	case "tcp", "http":
 		if p.Dial != nil {
 			rconn, err = p.Dial("tcp", u.Host)
 		} else {
 			rconn, err = net.Dial("tcp", u.Host)
 		}
-	case "tls":
+	case "tls", "https":
 		if p.DialTLS != nil {
 			rconn, err = p.DialTLS("tcp", u.Host)
 		} else {
