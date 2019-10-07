@@ -38,7 +38,7 @@ func (n *NetworkStats) Flush() NetworkStats {
 }
 
 type Latency struct {
-	Total    time.Duration
+	Total    int64
 	Upstream time.Duration
 }
 
@@ -62,7 +62,7 @@ type AnalyticsRecord struct {
 	APIID         string
 	OrgID         string
 	OauthID       string
-	RequestTime   int64
+	RequestTime   Latency
 	RawRequest    string // Base64 encoded request data (if detailed recording turned on)
 	RawResponse   string // ^ same but for response
 	IPAddress     string

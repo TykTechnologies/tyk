@@ -225,7 +225,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, resp
 			s.Spec.APIID,
 			s.Spec.OrgID,
 			oauthClientID,
-			timing,
+			Latency{Total: timing},
 			rawRequest,
 			rawResponse,
 			ip,
