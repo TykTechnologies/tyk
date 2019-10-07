@@ -1562,9 +1562,6 @@ func updateOauthClient(keyName, apiID string, r *http.Request) (interface{}, int
 			return apiError("Policy access rights doesn't contain API this OAuth client belongs to"),
 				http.StatusBadRequest
 		}
-		if len(policy.AccessRights) != 1 {
-			return apiError("Policy access rights should contain only one API"), http.StatusBadRequest
-		}
 	}
 
 	// get existing version of oauth-client
