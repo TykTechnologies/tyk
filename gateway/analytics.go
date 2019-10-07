@@ -39,7 +39,7 @@ func (n *NetworkStats) Flush() NetworkStats {
 
 type Latency struct {
 	Total    int64
-	Upstream time.Duration
+	Upstream int64
 }
 
 // AnalyticsRecord encodes the details of a request

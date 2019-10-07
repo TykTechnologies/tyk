@@ -319,7 +319,10 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if resp.Response != nil {
-		latency := Latency{Total: int64(millisec), Upstream: resp.UpstreamLatency}
+		latency := Latency{
+			Total:    int64(millisec),
+			Upstream: int64(DurationToMillisecond(resp.UpstreamLatency)),
+		}
 		s.RecordHit(r, latency, resp.Response.StatusCode, resp.Response)
 	}
 	log.Debug("Done proxy")
@@ -356,7 +359,10 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if inRes.Response != nil {
-		latency := Latency{Total: int64(millisec), Upstream: inRes.UpstreamLatency}
+		latency := Latency{
+			Total: int64(millisec), 
+			Upstream: int64(DurationToMillisecond(inRes.UpstreamLatency)),
+		}
 		s.RecordHit(r, latency, inRes.Response.StatusCode, inRes.Response)
 	}
 
