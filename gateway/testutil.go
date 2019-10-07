@@ -814,7 +814,6 @@ func BuildAndLoadAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 
 func CloneAPI(a *APISpec) *APISpec {
 	new := &APISpec{}
-	*new = *a
 	new.APIDefinition = &apidef.APIDefinition{}
 	*new.APIDefinition = *a.APIDefinition
 
