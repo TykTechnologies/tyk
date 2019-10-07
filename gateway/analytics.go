@@ -62,7 +62,8 @@ type AnalyticsRecord struct {
 	APIID         string
 	OrgID         string
 	OauthID       string
-	RequestTime   Latency
+	RequestTime   int64
+	Latency       Latency
 	RawRequest    string // Base64 encoded request data (if detailed recording turned on)
 	RawResponse   string // ^ same but for response
 	IPAddress     string

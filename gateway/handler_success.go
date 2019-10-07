@@ -225,6 +225,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 			s.Spec.APIID,
 			s.Spec.OrgID,
 			oauthClientID,
+			timing.Total,
 			timing,
 			rawRequest,
 			rawResponse,
@@ -319,7 +320,8 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if resp.Response != nil {
-		s.RecordHit(r, Latency{Total: int64(millisec)}, resp.Response.StatusCode, resp.Response)
+		latency := Latency{Total: int64(millisec), Upstream: resp.UpstreamLatency}
+		s.RecordHit(r, latency, resp.Response.StatusCode, resp.Response)
 	}
 	log.Debug("Done proxy")
 	return nil
@@ -356,7 +358,8 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if inRes.Response != nil {
-		s.RecordHit(r, Latency{Total: int64(millisec)}, inRes.Response.StatusCode, inRes.Response)
+		latency := Latency{Total: int64(millisec), Upstream: inRes.UpstreamLatency}
+		s.RecordHit(r, latency, inRes.Response.StatusCode, inRes.Response)
 	}
 
 	return inRes.Response
