@@ -366,7 +366,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			ReadSeeker: strings.NewReader(returnObject.Request.ReturnOverrides.ResponseError),
 		}
 		res.ContentLength = int64(len(returnObject.Request.ReturnOverrides.ResponseError))
-		m.successHandler.RecordHit(r, int64(ms), int(returnObject.Request.ReturnOverrides.ResponseCode), res)
+		m.successHandler.RecordHit(r, Latency{Total: int64(ms)}, int(returnObject.Request.ReturnOverrides.ResponseCode), res)
 		return nil, mwStatusRespond
 	}
 

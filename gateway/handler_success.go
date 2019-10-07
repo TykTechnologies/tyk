@@ -128,7 +128,7 @@ func getSessionTags(session *user.SessionState) []string {
 	return tags
 }
 
-func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, responseCopy *http.Response) {
+func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, responseCopy *http.Response) {
 
 	if s.Spec.DoNotTrack {
 		return
@@ -225,7 +225,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, resp
 			s.Spec.APIID,
 			s.Spec.OrgID,
 			oauthClientID,
-			Latency{Total: timing},
+			timing,
 			rawRequest,
 			rawResponse,
 			ip,
@@ -260,7 +260,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, resp
 	}
 
 	// Report in health check
-	reportHealthValue(s.Spec, RequestLog, strconv.FormatInt(timing, 10))
+	reportHealthValue(s.Spec, RequestLog, strconv.FormatInt(timing.Total, 10))
 
 	if memProfFile != nil {
 		pprof.WriteHeapProfile(memProfFile)
@@ -319,7 +319,7 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if resp.Response != nil {
-		s.RecordHit(r, int64(millisec), resp.Response.StatusCode, resp.Response)
+		s.RecordHit(r, Latency{Total: int64(millisec)}, resp.Response.StatusCode, resp.Response)
 	}
 	log.Debug("Done proxy")
 	return nil
@@ -356,7 +356,7 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if inRes.Response != nil {
-		s.RecordHit(r, int64(millisec), inRes.Response.StatusCode, inRes.Response)
+		s.RecordHit(r, Latency{Total: int64(millisec)}, inRes.Response.StatusCode, inRes.Response)
 	}
 
 	return inRes.Response
