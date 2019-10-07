@@ -397,20 +397,18 @@ var hopHeaders = []string{
 	"Upgrade",
 }
 
-func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) *http.Response {
+func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) ProxyResponse {
 	resp := p.WrappedServeHTTP(rw, req, recordDetail(req, config.Global()))
 
 	// make response body to be nopCloser and re-readable before serve it through chain of middlewares
-	nopCloseResponseBody(resp)
+	nopCloseResponseBody(resp.Response)
 
 	return resp
 }
 
-func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Request) *http.Response {
+func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Request) ProxyResponse {
 	resp := p.WrappedServeHTTP(rw, req, true)
-
-	nopCloseResponseBody(resp)
-
+	nopCloseResponseBody(resp.Response)
 	return resp
 }
 
@@ -565,7 +563,7 @@ func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p
 	return transport
 }
 
-func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) *http.Response {
+func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) ProxyResponse {
 	if trace.IsEnabled() {
 		span, ctx := trace.Span(req.Context(), req.URL.Path)
 		defer span.Finish()
@@ -717,21 +715,26 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	// do request round trip
 	var res *http.Response
 	var err error
+	var upstreamLatency time.Duration
 	if breakerEnforced {
 		if !breakerConf.CB.Ready() {
 			log.Debug("ON REQUEST: Circuit Breaker is in OPEN state")
 			p.ErrorHandler.HandleError(rw, logreq, "Service temporarily unavailable.", 503, true)
-			return nil
+			return ProxyResponse{}
 		}
 		log.Debug("ON REQUEST: Circuit Breaker is in CLOSED or HALF-OPEN state")
+		begin := time.Now()
 		res, err = roundTripper.RoundTrip(outreq)
+		upstreamLatency = time.Since(begin)
 		if err != nil || res.StatusCode == http.StatusInternalServerError {
 			breakerConf.CB.Fail()
 		} else {
 			breakerConf.CB.Success()
 		}
 	} else {
+		begin := time.Now()
 		res, err = roundTripper.RoundTrip(outreq)
+		upstreamLatency = time.Since(begin)
 	}
 
 	if err != nil {
@@ -762,26 +765,26 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 					ServiceCache.Delete(p.TykAPISpec.APIID)
 				}
 			}
-			return nil
+			return ProxyResponse{UpstreamLatency: upstreamLatency}
 		}
 
 		if strings.Contains(err.Error(), "context canceled") {
 			p.ErrorHandler.HandleError(rw, logreq, "Client closed request", 499, true)
-			return nil
+			return ProxyResponse{UpstreamLatency: upstreamLatency}
 		}
 
 		if strings.Contains(err.Error(), "no such host") {
 			p.ErrorHandler.HandleError(rw, logreq, "Upstream host lookup failed", http.StatusInternalServerError, true)
-			return nil
+			return ProxyResponse{UpstreamLatency: upstreamLatency}
 		}
 
 		p.ErrorHandler.HandleError(rw, logreq, "There was a problem proxying the request", http.StatusInternalServerError, true)
-		return nil
+		return ProxyResponse{UpstreamLatency: upstreamLatency}
 
 	}
 
 	if IsWebsocket(req) {
-		return nil
+		return ProxyResponse{UpstreamLatency: upstreamLatency}
 	}
 
 	ses := new(user.SessionState)
@@ -795,7 +798,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	// For reference see "HandleError" in coprocess.go
 	abortRequest, err := handleResponseChain(p.TykAPISpec.ResponseChain, rw, res, req, ses)
 	if abortRequest {
-		return nil
+		return ProxyResponse{UpstreamLatency: upstreamLatency}
 	}
 
 	if err != nil {
@@ -824,7 +827,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	inres.StatusCode = res.StatusCode
 	inres.ContentLength = res.ContentLength
 	p.HandleResponse(rw, res, ses)
-	return inres
+	return ProxyResponse{UpstreamLatency: upstreamLatency, Response: inres}
 }
 
 func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response, ses *user.SessionState) error {

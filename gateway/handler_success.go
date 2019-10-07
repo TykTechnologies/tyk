@@ -36,9 +36,16 @@ var (
 	UtilCache = cache.New(time.Hour, 10*time.Minute)
 )
 
+type ProxyResponse struct {
+	Response *http.Response
+	// UpstreamLatency the time it takes to do roundtrip to upstream. Total time
+	// taken for the gateway to receive response from upstream host.
+	UpstreamLatency time.Duration
+}
+
 type ReturningHttpHandler interface {
-	ServeHTTP(http.ResponseWriter, *http.Request) *http.Response
-	ServeHTTPForCache(http.ResponseWriter, *http.Request) *http.Response
+	ServeHTTP(http.ResponseWriter, *http.Request) ProxyResponse
+	ServeHTTPForCache(http.ResponseWriter, *http.Request) ProxyResponse
 	CopyResponse(io.Writer, io.Reader)
 }
 
@@ -311,8 +318,8 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	millisec := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001
 	log.Debug("Upstream request took (ms): ", millisec)
 
-	if resp != nil {
-		s.RecordHit(r, int64(millisec), resp.StatusCode, resp)
+	if resp.Response != nil {
+		s.RecordHit(r, int64(millisec), resp.Response.StatusCode, resp.Response)
 	}
 	log.Debug("Done proxy")
 	return nil
@@ -348,9 +355,9 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 	millisec := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001
 	log.Debug("Upstream request took (ms): ", millisec)
 
-	if inRes != nil {
-		s.RecordHit(r, int64(millisec), inRes.StatusCode, inRes)
+	if inRes.Response != nil {
+		s.RecordHit(r, int64(millisec), inRes.Response.StatusCode, inRes.Response)
 	}
 
-	return inRes
+	return inRes.Response
 }
