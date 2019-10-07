@@ -330,3 +330,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 		}
 	}
 }
+
+func DurationToMillisecond(d time.Duration) float64 {
+	return float64(d) / 1e6
+}

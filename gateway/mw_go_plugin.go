@@ -135,10 +135,9 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 	// call Go-plugin function
 	t1 := time.Now()
 	m.handler(rw, r)
-	t2 := time.Now()
 
 	// calculate latency
-	ms := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001
+	ms := DurationToMillisecond(time.Since(t1))
 	m.logger.WithField("ms", ms).Debug("Go-plugin request processing took")
 
 	// check if response was sent

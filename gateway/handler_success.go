@@ -314,9 +314,8 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 
 	t1 := time.Now()
 	resp := s.Proxy.ServeHTTP(w, r)
-	t2 := time.Now()
 
-	millisec := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001
+	millisec := DurationToMillisecond(time.Since(t1))
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if resp.Response != nil {
@@ -350,11 +349,10 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 
 	t1 := time.Now()
 	inRes := s.Proxy.ServeHTTPForCache(w, r)
-	t2 := time.Now()
+	millisec := DurationToMillisecond(time.Since(t1))
 
 	addVersionHeader(w, r, s.Spec.GlobalConfig)
 
-	millisec := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if inRes.Response != nil {

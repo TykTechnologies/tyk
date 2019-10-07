@@ -297,9 +297,7 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 		report.ResponseCode = response.StatusCode
 	}
 
-	t2 := time.Now()
-
-	millisec := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001
+	millisec := DurationToMillisecond(time.Since(t1))
 	report.Latency = millisec
 	if report.IsTCPError {
 		h.errorChan <- report
