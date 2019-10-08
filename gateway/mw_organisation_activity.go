@@ -129,7 +129,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession use
 	case sessionFailNone:
 		// all good, keep org active
 	case sessionFailQuota:
-		logger.Warning("Organisation quota has been exceeded.")
+		logger.Warning("Organisation quota has been exceeded.", k.Spec.OrgID)
 
 		// Fire a quota exceeded event
 		k.FireEvent(
@@ -146,7 +146,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession use
 
 		return errors.New("This organisation quota has been exceeded, please contact your API administrator"), http.StatusForbidden
 	case sessionFailRateLimit:
-		logger.Warning("Organisation rate limit has been exceeded.")
+		logger.Warning("Organisation rate limit has been exceeded.", k.Spec.OrgID)
 
 		// Fire a rate limit exceeded event
 		k.FireEvent(
