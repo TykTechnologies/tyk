@@ -362,7 +362,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 							for ai, au := range r.AllowedURLs {
 								if u.URL == au.URL {
 									found = true
-									rights[k].AllowedURLs[ai].Methods = append(r.AllowedURLs[ai].Methods, u.Methods...)
+									r.AllowedURLs[ai].Methods = append(au.Methods, u.Methods...)
 								}
 							}
 
@@ -370,7 +370,6 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 								r.AllowedURLs = append(r.AllowedURLs, v.AllowedURLs...)
 							}
 						}
-						r.AllowedURLs = append(r.AllowedURLs, v.AllowedURLs...)
 
 						ar = &r
 					}

@@ -224,6 +224,27 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				"e": {},
 			},
 		},
+		"per-path1": {
+			ID: "per_path_1",
+			AccessRights: map[string]user.AccessDefinition{"a": {
+				AllowedURLs: []user.AccessSpec{
+					{URL: "/user", Methods: []string{"GET"}},
+				},
+			}, "b": {
+				AllowedURLs: []user.AccessSpec{
+					{URL: "/", Methods: []string{"PUT"}},
+				},
+			}},
+		},
+		"per-path2": {
+			ID: "per_path_2",
+			AccessRights: map[string]user.AccessDefinition{"a": {
+				AllowedURLs: []user.AccessSpec{
+					{URL: "/user", Methods: []string{"GET", "POST"}},
+					{URL: "/companies", Methods: []string{"GET", "POST"}},
+				},
+			}},
+		},
 	}
 	policiesMu.RUnlock()
 	bmid := &BaseMiddleware{Spec: &APISpec{
@@ -448,6 +469,29 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 							Per:              10,
 						},
 						AllowanceScope: "d",
+					},
+				}
+
+				assert.Equal(t, want, s.AccessRights)
+			},
+		},
+		{
+			name:     "Merge per path rules for the same API",
+			policies: []string{"per-path2", "per-path1"},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				want := map[string]user.AccessDefinition{
+					"a": {
+						AllowedURLs: []user.AccessSpec{
+							{URL: "/user", Methods: []string{"GET", "POST", "GET"}},
+							{URL: "/companies", Methods: []string{"GET", "POST"}},
+						},
+						Limit: &user.APILimit{},
+					},
+					"b": {
+						AllowedURLs: []user.AccessSpec{
+							{URL: "/", Methods: []string{"PUT"}},
+						},
+						Limit: &user.APILimit{},
 					},
 				}
 
