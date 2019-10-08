@@ -194,7 +194,7 @@ func TestSyncAPISpecsRPCFailure(t *testing.T) {
 	rpc := startRPCMock(dispatcher)
 	defer stopRPCMock(rpc)
 
-	count, _ := syncAPISpecs()
+	count, _ := syncAPISpecs(defaultAPISpecLoader)
 	if count != 0 {
 		t.Error("Should return empty value for malformed rpc response", apiSpecs)
 	}
@@ -239,7 +239,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 			{Path: "/sample", Headers: authHeaders, Code: 200},
 		}...)
 
-		count, _ := syncAPISpecs()
+		count, _ := syncAPISpecs(defaultAPISpecLoader)
 		if count != 1 {
 			t.Error("Should return array with one spec", apiSpecs)
 		}
@@ -312,7 +312,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 			{Path: "/sample", Headers: notCachedAuth, Code: 200},
 		}...)
 
-		if count, _ := syncAPISpecs(); count != 2 {
+		if count, _ := syncAPISpecs(defaultAPISpecLoader); count != 2 {
 			t.Error("Should fetch latest specs", count)
 		}
 

@@ -111,6 +111,11 @@ const (
 	StatusInternal                 RequestStatus = "Internal path"
 )
 
+var _ SpecLoader = APIDefinitionLoader{}
+
+// ServiceNonce is a nonce used when interacting with the dashboard service
+var ServiceNonce string
+
 // URLSpec represents a flattened specification for URLs, used to check if a proxy URL
 // path is on any of the white, black or ignored lists. This is generated as part of the
 // configuration init
@@ -233,12 +238,14 @@ func (s *APISpec) validateHTTP() error {
 	return nil
 }
 
-// APIDefinitionLoader will load an Api definition from a storage
-// system.
+// APIDefinitionLoader implements SpecLoader that can load specs from diffrent
+// sources.
 type APIDefinitionLoader struct{}
 
-// Nonce to use when interacting with the dashboard service
-var ServiceNonce string
+// SpecLoader is an interface for loading api specs
+type SpecLoader interface {
+	LoadSpec(config.Config) ([]*APISpec, error)
+}
 
 // MakeSpec will generate a flattened URLSpec from and APIDefinitions' VersionInfo data. paths are
 // keyed to the Api version name, which is determined during routing to speed up lookups
@@ -329,7 +336,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 }
 
 // FromDashboardService will connect and download ApiDefintions from a Tyk Dashboard instance.
-func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*APISpec, error) {
+func (a APIDefinitionLoader) FromDashboardService(dbOptions config.DBAppConfOptionsConfig, endpoint, secret string) ([]*APISpec, error) {
 	// Get the definitions
 	log.Debug("Calling: ", endpoint)
 	newRequest, err := http.NewRequest("GET", endpoint, nil)
@@ -377,11 +384,11 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*A
 	// Extract tagged entries only
 	apiDefs := make([]*apidef.APIDefinition, 0)
 
-	if config.Global().DBAppConfOptions.NodeIsSegmented {
+	if dbOptions.NodeIsSegmented {
 		tagList := make(map[string]bool, len(config.Global().DBAppConfOptions.Tags))
 		toLoad := make(map[string]*apidef.APIDefinition)
 
-		for _, mt := range config.Global().DBAppConfOptions.Tags {
+		for _, mt := range dbOptions.Tags {
 			tagList[mt] = true
 		}
 
@@ -416,8 +423,20 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*A
 	return specs, nil
 }
 
-// FromCloud will connect and download ApiDefintions from a Mongo DB instance.
-func (a APIDefinitionLoader) FromRPC(orgId string) ([]*APISpec, error) {
+func (a APIDefinitionLoader) LoadSpec(cfg config.Config) ([]*APISpec, error) {
+	if cfg.UseDBAppConfigs {
+		mainLog.Debug("Downloading API Configurations from Dashboard Service")
+		connStr := buildConnStr("/system/apis")
+		return a.FromDashboardService(cfg.DBAppConfOptions, connStr, cfg.NodeSecret)
+	} else if cfg.SlaveOptions.UseRPC {
+		mainLog.Debug("Using RPC Configuration")
+		return a.FromRPC(cfg.SlaveOptions.RPCKey, cfg.DBAppConfOptions)
+	}
+	return a.FromDir(cfg.AppPath)
+}
+
+// FromRPC will connect and download ApiDefintions from a Mongo DB instance.
+func (a APIDefinitionLoader) FromRPC(orgID string, dbOptions config.DBAppConfOptionsConfig) ([]*APISpec, error) {
 	if rpc.IsEmergencyMode() {
 		return LoadDefinitionsFromRPCBackup()
 	}
@@ -429,12 +448,12 @@ func (a APIDefinitionLoader) FromRPC(orgId string) ([]*APISpec, error) {
 
 	// enable segments
 	var tags []string
-	if config.Global().DBAppConfOptions.NodeIsSegmented {
-		log.Info("Segmented node, loading: ", config.Global().DBAppConfOptions.Tags)
-		tags = config.Global().DBAppConfOptions.Tags
+	if dbOptions.NodeIsSegmented {
+		log.Info("Segmented node, loading: ", dbOptions.Tags)
+		tags = dbOptions.Tags
 	}
 
-	apiCollection := store.GetApiDefinitions(orgId, tags)
+	apiCollection := store.GetApiDefinitions(orgID, tags)
 
 	//store.Disconnect()
 
@@ -485,10 +504,13 @@ func (a APIDefinitionLoader) ParseDefinition(r io.Reader) *apidef.APIDefinition 
 
 // FromDir will load APIDefinitions from a directory on the filesystem. Definitions need
 // to be the JSON representation of APIDefinition object
-func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
+func (a APIDefinitionLoader) FromDir(dir string) ([]*APISpec, error) {
 	var specs []*APISpec
 	// Grab json files from directory
-	paths, _ := filepath.Glob(filepath.Join(dir, "*.json"))
+	paths, err := filepath.Glob(filepath.Join(dir, "*.json"))
+	if err != nil {
+		return nil, err
+	}
 	for _, path := range paths {
 		log.Info("Loading API Specification from ", path)
 		f, err := os.Open(path)
@@ -501,7 +523,7 @@ func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 		spec := a.MakeSpec(def, nil)
 		specs = append(specs, spec)
 	}
-	return specs
+	return specs, nil
 }
 
 func (a APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo) ([]URLSpec, bool) {

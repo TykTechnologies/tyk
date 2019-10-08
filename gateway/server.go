@@ -98,7 +98,8 @@ var (
 		"/etc/tyk/tyk.conf",
 	}
 
-	dnsCacheManager dnscache.IDnsCacheManager
+	dnsCacheManager      dnscache.IDnsCacheManager
+	defaultAPISpecLoader = APIDefinitionLoader{}
 )
 
 const (
@@ -264,34 +265,16 @@ func buildConnStr(resource string) string {
 	return config.Global().DBAppConfOptions.ConnectionString + resource
 }
 
-func syncAPISpecs() (int, error) {
-	loader := APIDefinitionLoader{}
+// syncAPISpecs calls LoadSpec from loader and uptates the global active specs
+// to reflect the new apispecs.
+func syncAPISpecs(loader SpecLoader) (int, error) {
 	apisMu.Lock()
 	defer apisMu.Unlock()
-	var s []*APISpec
-	if config.Global().UseDBAppConfigs {
-		connStr := buildConnStr("/system/apis")
-		tmpSpecs, err := loader.FromDashboardService(connStr, config.Global().NodeSecret)
-		if err != nil {
-			log.Error("failed to load API specs: ", err)
-			return 0, err
-		}
-
-		s = tmpSpecs
-
-		mainLog.Debug("Downloading API Configurations from Dashboard Service")
-	} else if config.Global().SlaveOptions.UseRPC {
-		mainLog.Debug("Using RPC Configuration")
-
-		var err error
-		s, err = loader.FromRPC(config.Global().SlaveOptions.RPCKey)
-		if err != nil {
-			return 0, err
-		}
-	} else {
-		s = loader.FromDir(config.Global().AppPath)
+	s, err := loader.LoadSpec(config.Global())
+	if err != nil {
+		mainLog.Error("Failed to load spec  error:", err)
+		return 0, err
 	}
-
 	mainLog.Printf("Detected %v APIs", len(s))
 
 	if config.Global().AuthOverride.ForceAuthProvider {
@@ -687,7 +670,7 @@ func DoReload() {
 	}
 
 	// load the specs
-	if count, err := syncAPISpecs(); err != nil {
+	if count, err := syncAPISpecs(defaultAPISpecLoader); err != nil {
 		mainLog.Error("Error during syncing apis:", err.Error())
 		return
 	} else {

@@ -50,8 +50,7 @@ func LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 		return nil, errors.New("[RPC] --> Failed to get node backup (" + checkKey + "): " + err.Error())
 	}
 
-	a := APIDefinitionLoader{}
-	return a.processRPCDefinitions(apiListAsString)
+	return defaultAPISpecLoader.processRPCDefinitions(apiListAsString)
 }
 
 func saveRPCDefinitionsBackup(list string) error {
