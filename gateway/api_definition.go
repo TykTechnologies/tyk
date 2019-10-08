@@ -238,7 +238,7 @@ func (s *APISpec) validateHTTP() error {
 	return nil
 }
 
-// APIDefinitionLoader implements SpecLoader that can load specs from diffrent
+// APIDefinitionLoader implements SpecLoader that can load specs from different
 // sources.
 type APIDefinitionLoader struct{}
 
