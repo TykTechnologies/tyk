@@ -360,7 +360,7 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 
 	if inRes.Response != nil {
 		latency := Latency{
-			Total: int64(millisec), 
+			Total:    int64(millisec),
 			Upstream: int64(DurationToMillisecond(inRes.UpstreamLatency)),
 		}
 		s.RecordHit(r, latency, inRes.Response.StatusCode, inRes.Response)
