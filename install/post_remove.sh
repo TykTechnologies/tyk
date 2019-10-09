@@ -11,12 +11,14 @@ if [ -f "/lib/systemd/system/tyk-gateway.service" ]; then
 	echo "Found Systemd"
 	echo "Stopping the service"
 	systemctl stop tyk-gateway.service
-	systemctl stop tyk-gateway-python.service
-	systemctl stop tyk-gateway-lua.service
+        # Removed lua and python in 2.9, keeping so upgrades work
+        # and for compatibility.
+	systemctl stop tyk-gateway-python.service || true
+	systemctl stop tyk-gateway-lua.service || true
 	echo "Removing the service"
-	rm /lib/systemd/system/tyk-gateway.service
-	rm /lib/systemd/system/tyk-gateway-python.service
-	rm /lib/systemd/system/tyk-gateway-lua.service
+	rm -f /lib/systemd/system/tyk-gateway.service
+	rm -f /lib/systemd/system/tyk-gateway-python.service
+	rm -f /lib/systemd/system/tyk-gateway-lua.service
 	systemctl --system daemon-reload
 fi
 
@@ -24,32 +26,32 @@ if [ -f "/etc/init/tyk-gateway.conf" ]; then
 	echo "Found upstart"
 	echo "Stopping the service"
 	stop tyk-gateway
-	stop tyk-gateway-python
-	stop tyk-gateway-lua
+	stop tyk-gateway-python || true
+	stop tyk-gateway-lua || true
 	echo "Removing the service"
-	rm /etc/init/tyk-gateway.conf
-	rm /etc/init/tyk-gateway-python.conf
-	rm /etc/init/tyk-gateway-lua.conf
+	rm -f /etc/init/tyk-gateway.conf
+	rm -f /etc/init/tyk-gateway-python.conf
+	rm -f /etc/init/tyk-gateway-lua.conf
 fi
 
 if [ -f "/etc/init.d/tyk-gateway" ]; then
 	echo "Found Sysv1"
 	/etc/init.d/tyk-gateway stop
-	/etc/init.d/tyk-gateway-python stop
-	/etc/init.d/tyk-gateway-lua stop
-	rm /etc/init.d/tyk-gateway
-	rm /etc/init.d/tyk-gateway-python
-	rm /etc/init.d/tyk-gateway-lua
+	/etc/init.d/tyk-gateway-python stop || true
+	/etc/init.d/tyk-gateway-lua stop || true
+	rm -f /etc/init.d/tyk-gateway
+	rm -f /etc/init.d/tyk-gateway-python
+	rm -f /etc/init.d/tyk-gateway-lua
 fi
 
 if [ -f "/etc/rc.d/init.d/tyk-gateway" ]; then
 	echo "Found Sysv2"
 	echo "Stopping the service"
 	/etc/rc.d/init.d/tyk-gateway stop
-	/etc/rc.d/init.d/tyk-gateway-python stop
-	/etc/rc.d/init.d/tyk-gateway-lua stop
+	/etc/rc.d/init.d/tyk-gateway-python stop || true
+	/etc/rc.d/init.d/tyk-gateway-lua stop || true
 	echo "Removing the service"
-	rm /etc/rc.d/init.d/tyk-gateway
-	rm /etc/rc.d/init.d/tyk-gateway-python
-	rm /etc/rc.d/init.d/tyk-gateway-lua
+	rm -f /etc/rc.d/init.d/tyk-gateway
+	rm -f /etc/rc.d/init.d/tyk-gateway-python
+	rm -f /etc/rc.d/init.d/tyk-gateway-lua
 fi
