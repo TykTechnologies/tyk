@@ -37,6 +37,11 @@ func (n *NetworkStats) Flush() NetworkStats {
 	return s
 }
 
+type Latency struct {
+	Total    int64
+	Upstream int64
+}
+
 // AnalyticsRecord encodes the details of a request
 type AnalyticsRecord struct {
 	Method        string
@@ -58,6 +63,7 @@ type AnalyticsRecord struct {
 	OrgID         string
 	OauthID       string
 	RequestTime   int64
+	Latency       Latency
 	RawRequest    string // Base64 encoded request data (if detailed recording turned on)
 	RawResponse   string // ^ same but for response
 	IPAddress     string
@@ -323,4 +329,8 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 			lastSentTs = time.Now()
 		}
 	}
+}
+
+func DurationToMillisecond(d time.Duration) float64 {
+	return float64(d) / 1e6
 }

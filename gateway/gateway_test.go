@@ -556,6 +556,68 @@ func TestAnalytics(t *testing.T) {
 		}
 	})
 
+	t.Run("Detailed analytics with latency", func(t *testing.T) {
+		defer func() {
+			config.SetGlobal(base)
+		}()
+		globalConf := config.Global()
+		globalConf.AnalyticsConfig.EnableDetailedRecording = true
+		config.SetGlobal(globalConf)
+		ls := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// We are delaying the response by 2 ms. This is important because anytime
+			// less than 0 eg  0.2 ms will be round off to 0 which is not good to check if we have
+			// latency correctly set.
+			time.Sleep(2 * time.Millisecond)
+		}))
+		defer ls.Close()
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = false
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = ls.URL
+		})
+
+		key := CreateSession()
+
+		authHeaders := map[string]string{
+			"authorization": key,
+		}
+
+		ts.Run(t, test.TestCase{
+			Path: "/", Headers: authHeaders, Code: 200,
+		})
+
+		// let records to to be sent
+		time.Sleep(recordsBufferFlushInterval + 50)
+
+		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		if len(results) != 1 {
+			t.Error("Should return 1 record: ", len(results))
+		}
+
+		var record AnalyticsRecord
+		msgpack.Unmarshal(results[0].([]byte), &record)
+		if record.ResponseCode != 200 {
+			t.Error("Analytics record do not match", record)
+		}
+
+		if record.RawRequest == "" {
+			t.Error("Detailed request info not found", record)
+		}
+
+		if record.RawResponse == "" {
+			t.Error("Detailed response info not found", record)
+		}
+		if record.Latency.Total == 0 {
+			t.Error("expected total latency to be set")
+		}
+		if record.Latency.Upstream == 0 {
+			t.Error("expected upstream latency to be set")
+		}
+		if record.Latency.Total != record.RequestTime {
+			t.Errorf("expected %d got %d", record.RequestTime, record.Latency.Total)
+		}
+	})
+
 	t.Run("Detailed analytics with cache", func(t *testing.T) {
 		defer func() {
 			config.SetGlobal(base)

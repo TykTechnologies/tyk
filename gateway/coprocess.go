@@ -296,7 +296,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	t1 := time.Now()
 	returnObject, err := coProcessor.Dispatch(object)
-	t2 := time.Now()
+	ms := DurationToMillisecond(time.Since(t1))
 
 	if err != nil {
 		logger.WithError(err).Error("Dispatch error")
@@ -307,7 +307,6 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
-	ms := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001
 	m.logger.WithField("ms", ms).Debug("gRPC request processing took")
 
 	coProcessor.ObjectPostProcess(returnObject, r)
@@ -366,7 +365,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			ReadSeeker: strings.NewReader(returnObject.Request.ReturnOverrides.ResponseError),
 		}
 		res.ContentLength = int64(len(returnObject.Request.ReturnOverrides.ResponseError))
-		m.successHandler.RecordHit(r, int64(ms), int(returnObject.Request.ReturnOverrides.ResponseCode), res)
+		m.successHandler.RecordHit(r, Latency{Total: int64(ms)}, int(returnObject.Request.ReturnOverrides.ResponseCode), res)
 		return nil, mwStatusRespond
 	}
 
