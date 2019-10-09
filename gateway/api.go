@@ -390,8 +390,20 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 		}
 	}
 
-	if err := doAddOrUpdate(keyName, &newSession, suppressReset, isHashed); err != nil {
-		return apiError("Failed to create key, ensure security settings are correct."), http.StatusInternalServerError
+	if r.Method == http.MethodPost || storage.TokenOrg(keyName) != "" {
+		// use new key format if key gets created or updating key with new format
+		if err := doAddOrUpdate(keyName, &newSession, suppressReset, isHashed); err != nil {
+			return apiError("Failed to create key, ensure security settings are correct."), http.StatusInternalServerError
+		}
+	} else {
+		// update legacy key format one
+		if err := doAddOrUpdate(keyName, &newSession, suppressReset, isHashed); err != nil {
+			return apiError("Failed to create key, ensure security settings are correct."), http.StatusInternalServerError
+		}
+		// update new format key
+		if err := doAddOrUpdate(generateToken(newSession.OrgID, keyName), &newSession, suppressReset, isHashed); err != nil {
+			return apiError("Failed to create key, ensure security settings are correct."), http.StatusInternalServerError
+		}
 	}
 
 	action := "modified"
