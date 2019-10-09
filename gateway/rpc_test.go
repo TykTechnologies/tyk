@@ -316,7 +316,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 			t.Error("Should fetch latest specs", count)
 		}
 
-		if count, _ := syncPolicies(); count != 2 {
+		if count, _ := syncPolicies(defaultPolicyLoader); count != 2 {
 			t.Error("Should fetch latest policies", count)
 		}
 	})

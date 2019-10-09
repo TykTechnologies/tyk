@@ -40,8 +40,11 @@ func TestLoadPoliciesFromDashboardReLogin(t *testing.T) {
 
 	allowExplicitPolicyID := config.Global().Policies.AllowExplicitPolicyID
 
-	policyMap := LoadPoliciesFromDashboard(ts.URL, "", allowExplicitPolicyID)
+	policyMap, err := LoadPoliciesFromDashboard(ts.URL, "", allowExplicitPolicyID)
 
+	if err == nil {
+		t.Error("Should be nil because got back 403 from Dashboard")
+	}
 	if policyMap != nil {
 		t.Error("Should be nil because got back 403 from Dashboard")
 	}

@@ -98,7 +98,8 @@ var (
 		"/etc/tyk/tyk.conf",
 	}
 
-	dnsCacheManager dnscache.IDnsCacheManager
+	dnsCacheManager     dnscache.IDnsCacheManager
+	defaultPolicyLoader = BasePolicyLoader{}
 )
 
 const (
@@ -317,44 +318,25 @@ func syncAPISpecs() (int, error) {
 	return len(apiSpecs), nil
 }
 
-func syncPolicies() (count int, err error) {
-	var pols map[string]user.Policy
-
+func syncPolicies(loader PolicyLoader) (count int, err error) {
 	mainLog.Info("Loading policies")
-
-	switch config.Global().Policies.PolicySource {
-	case "service":
-		if config.Global().Policies.PolicyConnectionString == "" {
-			mainLog.Fatal("No connection string or node ID present. Failing.")
-		}
-		connStr := config.Global().Policies.PolicyConnectionString
-		connStr = connStr + "/system/policies"
-
-		mainLog.Info("Using Policies from Dashboard Service")
-
-		pols = LoadPoliciesFromDashboard(connStr, config.Global().NodeSecret, config.Global().Policies.AllowExplicitPolicyID)
-	case "rpc":
-		mainLog.Debug("Using Policies from RPC")
-		pols, err = LoadPoliciesFromRPC(config.Global().SlaveOptions.RPCKey)
-	default:
-		// this is the only case now where we need a policy record name
-		if config.Global().Policies.PolicyRecordName == "" {
-			mainLog.Debug("No policy record name defined, skipping...")
+	pols, err := loader.LoadPolicy(config.Global())
+	if err != nil {
+		mainLog.Error(err)
+		if err == ErrNoPolicyName {
 			return 0, nil
 		}
-		pols = LoadPoliciesFromFile(config.Global().Policies.PolicyRecordName)
+		return 0, err
 	}
 	mainLog.Infof("Policies found (%d total):", len(pols))
 	for id := range pols {
 		mainLog.Infof(" - %s", id)
 	}
-
 	policiesMu.Lock()
 	defer policiesMu.Unlock()
 	if len(pols) > 0 {
 		policiesByID = pols
 	}
-
 	return len(pols), err
 }
 
@@ -681,7 +663,7 @@ func DoReload() {
 	}
 
 	// Load the API Policies
-	if _, err := syncPolicies(); err != nil {
+	if _, err := syncPolicies(defaultPolicyLoader); err != nil {
 		mainLog.Error("Error during syncing policies:", err.Error())
 		return
 	}

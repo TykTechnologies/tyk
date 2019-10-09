@@ -3,17 +3,21 @@ package gateway
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"time"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/user"
 )
+
+var _ PolicyLoader = BasePolicyLoader{}
 
 type DBAccessDefinition struct {
 	APIName     string            `json:"apiname"`
@@ -48,32 +52,60 @@ func (d *DBPolicy) ToRegularPolicy() user.Policy {
 	return policy
 }
 
-func LoadPoliciesFromFile(filePath string) map[string]user.Policy {
+// PolicyLoader is an interface for loading policies into the gateway.
+type PolicyLoader interface {
+	LoadPolicy(config.Config) (map[string]user.Policy, error)
+}
+
+// BasePolicyLoader implements PolicyLoader with the ability to load policies
+// from different sources based on configuration settings.
+type BasePolicyLoader struct{}
+
+var ErrNoPolicyName = errors.New("No policy record name defined")
+
+func (BasePolicyLoader) LoadPolicy(cfg config.Config) (map[string]user.Policy, error) {
+	switch cfg.Policies.PolicySource {
+	case "service":
+		if cfg.Policies.PolicyConnectionString == "" {
+			mainLog.Fatal("No connection string or node ID present. Failing.")
+		}
+		connStr := config.Global().Policies.PolicyConnectionString
+		connStr = connStr + "/system/policies"
+
+		mainLog.Info("Using Policies from Dashboard Service")
+
+		return LoadPoliciesFromDashboard(connStr, cfg.NodeSecret, cfg.Policies.AllowExplicitPolicyID)
+	case "rpc":
+		return LoadPoliciesFromRPC(config.Global().SlaveOptions.RPCKey)
+	default:
+		if cfg.Policies.PolicyRecordName == "" {
+			return nil, ErrNoPolicyName
+		}
+		return LoadPoliciesFromFile(config.Global().Policies.PolicyRecordName)
+	}
+}
+
+func LoadPoliciesFromFile(filePath string) (map[string]user.Policy, error) {
 	f, err := os.Open(filePath)
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "policy",
-		}).Error("Couldn't open policy file: ", err)
-		return nil
+		return nil, fmt.Errorf("policy: Couldn't open policy file: %v", err)
 	}
 	defer f.Close()
 
 	var policies map[string]user.Policy
 	if err := json.NewDecoder(f).Decode(&policies); err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "policy",
-		}).Error("Couldn't unmarshal policies: ", err)
+		return nil, fmt.Errorf("policy: Couldn't unmarshal policies: %v", err)
 	}
-	return policies
+	return policies, nil
 }
 
 // LoadPoliciesFromDashboard will connect and download Policies from a Tyk Dashboard instance.
-func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[string]user.Policy {
+func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) (map[string]user.Policy, error) {
 
 	// Get the definitions
 	newRequest, err := http.NewRequest("GET", endpoint, nil)
 	if err != nil {
-		log.Error("Failed to create request: ", err)
+		return nil, fmt.Errorf("Failed to create request: %v", err)
 	}
 
 	newRequest.Header.Set("authorization", secret)
@@ -91,16 +123,14 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 	}).Info("Calling dashboard service for policy list")
 	resp, err := c.Do(newRequest)
 	if err != nil {
-		log.Error("Policy request failed: ", err)
-		return nil
+		return nil, fmt.Errorf("Policy request failed:: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusForbidden {
 		body, _ := ioutil.ReadAll(resp.Body)
-		log.Error("Policy request login failure, Response was: ", string(body))
 		reLogin()
-		return nil
+		return nil, fmt.Errorf("Policy request login failure, Response was:: %s", string(body))
 	}
 
 	// Extract Policies
@@ -109,8 +139,7 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 		Nonce   string
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		log.Error("Failed to decode policy body: ", err)
-		return nil
+		return nil, fmt.Errorf("Failed to decode policy body: %v", err)
 	}
 
 	ServiceNonce = list.Nonce
@@ -138,7 +167,7 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 		policies[id] = p.ToRegularPolicy()
 	}
 
-	return policies
+	return policies, nil
 }
 
 func parsePoliciesFromRPC(list string) (map[string]user.Policy, error) {
