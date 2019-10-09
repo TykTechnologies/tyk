@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"sort"
 	"testing"
 	"time"
 
@@ -1056,9 +1057,10 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 				BodyMatchFunc: func(data []byte) bool {
 					sessionData := user.SessionState{}
 					json.Unmarshal(data, &sessionData)
-
-					assert.Equal(t, sessionData.ApplyPolicies, []string{p1ID, p2ID})
-
+					expect := []string{p1ID, p2ID}
+					sort.Strings(sessionData.ApplyPolicies)
+					sort.Strings(expect)
+					assert.Equal(t, sessionData.ApplyPolicies, expect)
 					return true
 				},
 			},
