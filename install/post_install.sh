@@ -34,7 +34,6 @@ if [ -d "$SYSV1" ]; then
 	echo "Found SysV1"
 	[ -f /etc/default/tyk-gateway ] || cp $DIR/inits/sysv/default/tyk-gateway /etc/default/
 	[ -f /etc/default/tyk-gateway-python ] || cp $DIR/inits/sysv/default/tyk-gateway-python /etc/default/
-	[ -f /etc/default/tyk-gateway-lua ] || cp $DIR/inits/sysv/default/tyk-gateway-lua /etc/default/
 	cp $DIR/inits/sysv/init.d/tyk-gateway /etc/init.d/tyk-gateway
 	cp $DIR/inits/sysv/init.d/tyk-gateway-python /etc/init.d/tyk-gateway-python
 	exit
@@ -44,7 +43,6 @@ if [ -d "$SYSV2" ]; then
 	echo "Found Sysv2"
 	[ -f /etc/default/tyk-gateway ] || cp $DIR/inits/sysv/default/tyk-gateway /etc/default/
 	[ -f /etc/default/tyk-gateway-python ] || cp $DIR/inits/sysv/default/tyk-gateway-python /etc/default/
-	[ -f /etc/default/tyk-gateway-lua ] || cp $DIR/inits/sysv/default/tyk-gateway-lua /etc/default/
 	cp $DIR/inits/sysv/init.d/tyk-gateway /etc/rc.d/init.d/tyk-gateway
 	cp $DIR/inits/sysv/init.d/tyk-gateway-python /etc/rc.d/init.d/tyk-gateway-python
 	exit

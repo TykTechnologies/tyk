@@ -19,7 +19,7 @@ PATH=/sbin:/usr/sbin:/bin:/usr/bin
 export PATH
 
 name=tyk-gateway-python
-program=/opt/tyk-gateway/tyk-python
+program=/opt/tyk-gateway/tyk
 args='--conf /opt/tyk-gateway/tyk.conf'
 pidfile="/var/run/tyk-gateway.pid"
 
