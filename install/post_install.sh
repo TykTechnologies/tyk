@@ -11,7 +11,6 @@ if [ -d "$SYSTEMD" ] && systemctl status > /dev/null 2> /dev/null; then
 	echo "Found Systemd"
 	[ -f /etc/default/tyk-gateway ] || cp $DIR/inits/systemd/default/tyk-gateway /etc/default/
 	cp $DIR/inits/systemd/system/tyk-gateway.service /lib/systemd/system/
-	cp $DIR/inits/systemd/system/tyk-gateway-lua.service /lib/systemd/system/tyk-gateway-lua.service
 	cp $DIR/inits/systemd/system/tyk-gateway-python.service /lib/systemd/system/tyk-gateway-python.service
 	systemctl --system daemon-reload
 	exit
@@ -22,12 +21,10 @@ if [ -d "$UPSTART" ]; then
 	if [[ "$(initctl version)" =~ .*upstart[[:space:]]1\..* ]]; then
 		echo "Found upstart 1.x+"
 		cp $DIR/inits/upstart/init/1.x/tyk-gateway.conf /etc/init/
-		cp $DIR/inits/upstart/init/1.x/tyk-gateway-lua.conf /etc/init/
 		cp $DIR/inits/upstart/init/1.x/tyk-gateway-python.conf /etc/init/
 	else
 		echo "Found upstart 0.x"
 		cp $DIR/inits/upstart/init/0.x/tyk-gateway.conf /etc/init/
-		cp $DIR/inits/upstart/init/0.x/tyk-gateway-lua.conf /etc/init/
 		cp $DIR/inits/upstart/init/0.x/tyk-gateway-python.conf /etc/init/
 	fi
 	exit
@@ -39,7 +36,6 @@ if [ -d "$SYSV1" ]; then
 	[ -f /etc/default/tyk-gateway-python ] || cp $DIR/inits/sysv/default/tyk-gateway-python /etc/default/
 	[ -f /etc/default/tyk-gateway-lua ] || cp $DIR/inits/sysv/default/tyk-gateway-lua /etc/default/
 	cp $DIR/inits/sysv/init.d/tyk-gateway /etc/init.d/tyk-gateway
-	cp $DIR/inits/sysv/init.d/tyk-gateway-lua /etc/init.d/tyk-gateway-lua
 	cp $DIR/inits/sysv/init.d/tyk-gateway-python /etc/init.d/tyk-gateway-python
 	exit
 fi
@@ -50,7 +46,6 @@ if [ -d "$SYSV2" ]; then
 	[ -f /etc/default/tyk-gateway-python ] || cp $DIR/inits/sysv/default/tyk-gateway-python /etc/default/
 	[ -f /etc/default/tyk-gateway-lua ] || cp $DIR/inits/sysv/default/tyk-gateway-lua /etc/default/
 	cp $DIR/inits/sysv/init.d/tyk-gateway /etc/rc.d/init.d/tyk-gateway
-	cp $DIR/inits/sysv/init.d/tyk-gateway-lua /etc/rc.d/init.d/tyk-gateway-lua
 	cp $DIR/inits/sysv/init.d/tyk-gateway-python /etc/rc.d/init.d/tyk-gateway-python
 	exit
 fi
