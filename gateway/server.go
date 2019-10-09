@@ -283,6 +283,13 @@ func syncAPISpecs() (int, error) {
 		if err != nil {
 			return 0, err
 		}
+	} else if config.Global().UseRedisDBAppConfig {
+		mainLog.Debug("Using Redis Configuration")
+		var err error
+		apiSpecs, err = loader.FromRedis(config.Global().RedisDBAppConfOptions)
+		if err != nil {
+			return 0, err
+		}
 	} else {
 		apiSpecs = loader.FromDir(config.Global().AppPath)
 	}
@@ -403,6 +410,13 @@ func loadAPIEndpoints(muxer *mux.Router) {
 	r.HandleFunc("/reload/group", groupResetHandler).Methods("GET")
 	r.HandleFunc("/reload", resetHandler(nil)).Methods("GET")
 	r.HandleFunc("/hotreload", hotReloadHandler).Methods("GET")
+
+	if config.Global().UseRedisDBAppConfig == true {
+		r.HandleFunc("/api", apiLoader).Methods("GET", "POST")
+		r.HandleFunc("/api/{service}", apiLoader).Methods("DELETE")
+		r.HandleFunc("/api/{service}/{apiName}", apiLoader).Methods("GET", "DELETE")
+		r.HandleFunc("/key/refresh", apiLoader).Methods("POST")
+	}
 
 	if !isRPCMode() {
 		r.HandleFunc("/org/keys", orgHandler).Methods("GET")
