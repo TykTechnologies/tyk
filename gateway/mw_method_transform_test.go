@@ -8,7 +8,7 @@ import (
 )
 
 func TestMethodTransform(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 
 	t.Run("Using URL rewrite", func(t *testing.T) {
@@ -24,9 +24,9 @@ func TestMethodTransform(t *testing.T) {
 		urlRewrite.MatchPattern = "/get(.*)"
 		urlRewrite.RewriteTo = "/post$1"
 
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
-			updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.UseExtendedPaths = true
 				v.ExtendedPaths.MethodTransforms = append(v.ExtendedPaths.MethodTransforms, methodTransform)
 				v.ExtendedPaths.URLRewrite = append(v.ExtendedPaths.URLRewrite, urlRewrite)
@@ -46,13 +46,13 @@ func TestMethodTransform(t *testing.T) {
 		methodTransform.Method = "GET"
 		methodTransform.ToMethod = "POST"
 
-		buildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.CacheOptions = apidef.CacheOptions{
 				CacheTimeout: 120,
 				EnableCache:  true,
 			}
 			spec.Proxy.ListenPath = "/"
-			updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.UseExtendedPaths = true
 				v.ExtendedPaths.Cached = []string{"/testing"}
 				v.ExtendedPaths.MethodTransforms = append(v.ExtendedPaths.MethodTransforms, methodTransform)

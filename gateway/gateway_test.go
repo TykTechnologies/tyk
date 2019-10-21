@@ -1112,12 +1112,12 @@ func TestCacheAllSafeRequests(t *testing.T) {
 }
 
 func TestCacheWithAdvanceUrlRewrite(t *testing.T) {
-	ts := newTykTestServer()
+	ts := StartTest()
 	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-"}
 	defer cache.DeleteScanMatch("*")
 
-	buildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		version := spec.VersionData.Versions["v1"]
 		json.Unmarshal([]byte(`{
                 "use_extended_paths": true,
