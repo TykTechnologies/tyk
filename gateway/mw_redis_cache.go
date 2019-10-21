@@ -211,7 +211,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 				r.Method = newMethod
 				ctxSetTransformRequestMethod(r, "")
 			}
-			reqVal = m.sh.ServeHTTPWithCache(w, r)
+			resVal = m.sh.ServeHTTPWithCache(w, r)
 		}
 
 		cacheThisRequest := true
