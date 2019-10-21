@@ -18,7 +18,6 @@ import (
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
-	cache "github.com/pmylund/go-cache"
 )
 
 // Enums for keys to be stored in a session context - this is how gorilla expects
