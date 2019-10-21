@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -140,7 +139,9 @@ type CustomMiddleware struct {
 }
 
 func apiLoader(w http.ResponseWriter, r *http.Request) {
+	log.Info("Requesting mutex")
 	m.Lock()
+	defer m.Unlock()
 	{
 		service := mux.Vars(r)["service"]
 		apiName := mux.Vars(r)["apiName"]
@@ -183,7 +184,7 @@ func apiLoader(w http.ResponseWriter, r *http.Request) {
 
 		doJSONWrite(w, code, obj)
 	}
-	m.Unlock()
+	log.Info("Releasing mutex")
 }
 
 func updateKeys(e Event) (interface{}, int) {
@@ -202,7 +203,9 @@ func updateKeys(e Event) (interface{}, int) {
 
 func addOrUpdateApi(r *http.Request) (interface{}, int) {
 	log.Info("Updating/Adding API to redis")
+	log.Info("Request connection from redis pool")
 	c := RedisPool.Get()
+	log.Info("Acquired connection from redis pool")
 	defer c.Close()
 
 	if config.Global().UseDBAppConfigs {
@@ -487,8 +490,8 @@ func addOrDeleteJWTKey(e Event) error {
 			} else if count < 3 {
 				log.Warn("Could not verify JWT API Token.. retry")
 			} else {
-				log.Error("Could not add JWT token")
-				return errors.New("Error in updating JWT key")
+				log.Error("Could not add JWT token", jwtMeta.JWTAPIKeyPath)
+				break
 			}
 		}
 	}
