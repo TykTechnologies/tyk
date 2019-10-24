@@ -39,6 +39,10 @@ func (k *AuthKey) setContextVars(r *http.Request, token string) {
 }
 
 func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
+		return nil, http.StatusOK
+	}
+
 	config := k.Spec.Auth
 
 	key := r.Header.Get(config.AuthHeaderName)
