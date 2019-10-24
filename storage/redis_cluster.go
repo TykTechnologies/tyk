@@ -330,17 +330,6 @@ func (r *RedisCluster) SetRawKey(keyName, session string, timeout int64) error {
 	return nil
 }
 
-// Decrement will decrement a key in redis
-func (r *RedisCluster) Decrement(keyName string) {
-	keyName = r.fixKey(keyName)
-	log.Debug("Decrementing key: ", keyName)
-	r.ensureConnection()
-	err := r.singleton().Send("DECR", keyName)
-	if err != nil {
-		log.Error("Error trying to decrement value:", err)
-	}
-}
-
 // IncrementWithExpire will increment a key in redis
 func (r *RedisCluster) IncrememntWithExpire(keyName string, expire int64) int64 {
 	log.Debug("Incrementing raw key: ", keyName)
@@ -403,30 +392,6 @@ func (r *RedisCluster) GetKeysAndValuesWithFilter(filter string) map[string]stri
 	values, err := redis.Strings(valueObj, err)
 	if err != nil {
 		log.Error("Error trying to get filtered client keys: ", err)
-		return nil
-	}
-
-	m := make(map[string]string)
-	for i, v := range keys {
-		m[r.cleanKey(v)] = values[i]
-	}
-	return m
-}
-
-// GetKeysAndValues will return all keys and their values - not to be used lightly
-func (r *RedisCluster) GetKeysAndValues() map[string]string {
-	r.ensureConnection()
-	searchStr := r.KeyPrefix + "*"
-	sessionsInterface, err := r.singleton().Do("KEYS", searchStr)
-	if err != nil {
-		log.Error("Error trying to get all keys: ", err)
-		return nil
-	}
-	keys, _ := redis.Strings(sessionsInterface, err)
-	valueObj, err := r.singleton().Do("MGET", sessionsInterface.([]interface{})...)
-	values, err := redis.Strings(valueObj, err)
-	if err != nil {
-		log.Error("Error trying to get all keys: ", err)
 		return nil
 	}
 
@@ -514,27 +479,6 @@ func (r *RedisCluster) DeleteScanMatch(pattern string) bool {
 			}
 		}
 		log.Info("Deleted: ", len(keys), " records")
-	} else {
-		log.Debug("RedisCluster called DEL - Nothing to delete")
-	}
-
-	return true
-}
-
-// DeleteKeys will remove a group of keys in bulk
-func (r *RedisCluster) DeleteKeys(keys []string) bool {
-	r.ensureConnection()
-	if len(keys) > 0 {
-		asInterface := make([]interface{}, len(keys))
-		for i, v := range keys {
-			asInterface[i] = interface{}(r.fixKey(v))
-		}
-
-		log.Debug("Deleting: ", asInterface)
-		_, err := r.singleton().Do("DEL", asInterface...)
-		if err != nil {
-			log.Error("Error trying to delete keys: ", err)
-		}
 	} else {
 		log.Debug("RedisCluster called DEL - Nothing to delete")
 	}

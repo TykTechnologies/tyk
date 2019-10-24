@@ -37,10 +37,7 @@ type Handler interface {
 	DeleteAllKeys() bool
 	DeleteRawKey(string) bool
 	Connect() bool
-	GetKeysAndValues() map[string]string
 	GetKeysAndValuesWithFilter(string) map[string]string
-	DeleteKeys([]string) bool
-	Decrement(string)
 	IncrememntWithExpire(string, int64) int64
 	SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{})
 	GetRollingWindow(key string, per int64, pipeline bool) (int, []interface{})
