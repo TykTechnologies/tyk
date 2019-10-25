@@ -503,12 +503,27 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 	})
 
 	t.Run("Cert known", func(t *testing.T) {
-		CreateSession(func(s *user.SessionState) {
+		_, key := ts.CreateSession(func(s *user.SessionState) {
 			s.Certificate = clientCertID
 			s.AccessRights = map[string]user.AccessDefinition{"test": {
 				APIID: "test", Versions: []string{"v1"},
 			}}
 		})
+
+		if key == "" {
+			t.Fatal("Should create key based on certificate")
+		}
+
+		_, key = ts.CreateSession(func(s *user.SessionState) {
+			s.Certificate = clientCertID
+			s.AccessRights = map[string]user.AccessDefinition{"test": {
+				APIID: "test", Versions: []string{"v1"},
+			}}
+		})
+
+		if key != "" {
+			t.Fatal("Should not allow create key based on the same certificate")
+		}
 
 		ts.Run(t, test.TestCase{Path: "/", Code: 200, Client: client})
 	})

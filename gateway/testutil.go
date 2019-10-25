@@ -689,10 +689,13 @@ func (s *Test) CreateSession(sGen ...func(s *user.SessionState)) (*user.SessionS
 		sGen[0](session)
 	}
 
+	client := getTLSClient(nil, nil)
+
 	resp, err := s.Do(test.TestCase{
 		Method:    http.MethodPost,
 		Path:      "/tyk/keys/create",
 		Data:      session,
+		Client:    client,
 		AdminAuth: true,
 	})
 
