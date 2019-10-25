@@ -12,9 +12,7 @@ env:
 addons:
   apt:
     packages:
-    - python3.5
     - python3-pip
-    - python3.5-dev
     - libluajit-5.1-dev
 
 matrix:
@@ -42,9 +40,7 @@ script:
   - curl -sL https://deb.nodesource.com/setup_11.x | sudo -E bash -
   - sudo -E apt-get -yq --no-install-suggests --no-install-recommends $(travis_apt_get_options) install nodejs
   - sudo npm install -g api-spec-converter --unsafe-perm=true --allow-root
-  - go build -tags 'coprocess python'
   - go build -tags 'coprocess lua'
-  - go build -tags 'coprocess grpc'
   - ./bin/ci-test.sh
   - if [[ $LATEST_GO ]]; then goveralls -coverprofile=<(gocovmerge *.cov); fi
   - ./bin/ci-benchmark.sh
