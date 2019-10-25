@@ -1239,6 +1239,11 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 	if newSession.Certificate != "" {
 		newKey = generateToken(newSession.OrgID, newSession.Certificate)
+		_, ok := FallbackKeySesionManager.SessionDetail(newKey, false)
+		if ok {
+			doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - Key with given certificate already found:"+newKey))
+			return
+		}
 	}
 
 	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))

@@ -71,7 +71,7 @@ func TestHTTP2_TLS(t *testing.T) {
 	})
 
 	// HTTP/2 client
-	http2Client := getTLSClient(&clientCert, serverCertPem)
+	http2Client := GetTLSClient(&clientCert, serverCertPem)
 	http2.ConfigureTransport(http2Client.Transport.(*http.Transport))
 
 	ts.Run(t, test.TestCase{Client: http2Client, Path: "", Code: 200, Proto: "HTTP/2.0", BodyMatch: "Hello, I am an HTTP/2 Server"})
@@ -215,7 +215,7 @@ func TestGRPC_BasicAuthentication(t *testing.T) {
 
 	address := strings.TrimPrefix(ts.URL, "https://")
 	name := "Furkan"
-	client := getTLSClient(nil, nil)
+	client := GetTLSClient(nil, nil)
 
 	// To create key
 	ts.Run(t, []test.TestCase{
@@ -270,7 +270,7 @@ func TestGRPC_TokenBasedAuthentication(t *testing.T) {
 
 	address := strings.TrimPrefix(ts.URL, "https://")
 	name := "Furkan"
-	client := getTLSClient(nil, nil)
+	client := GetTLSClient(nil, nil)
 
 	// To create key
 	resp, _ := ts.Run(t, []test.TestCase{

@@ -5,18 +5,16 @@ import (
 	"bytes"
 	"compress/gzip"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"net/http/httptest"
-
-	"golang.org/x/net/context"
-
 	"io"
 	"io/ioutil"
 	"math/rand"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -26,15 +24,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/cli"
-
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/garyburd/redigo/redis"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	uuid "github.com/satori/go.uuid"
+	"golang.org/x/net/context"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
@@ -683,16 +681,41 @@ func (s *Test) RunExt(t testing.TB, testCases ...test.TestCase) {
 	}
 }
 
+func GetTLSClient(cert *tls.Certificate, caCert []byte) *http.Client {
+	// Setup HTTPS client
+	tlsConfig := &tls.Config{}
+
+	if cert != nil {
+		tlsConfig.Certificates = []tls.Certificate{*cert}
+	}
+
+	if len(caCert) > 0 {
+		caCertPool := x509.NewCertPool()
+		caCertPool.AppendCertsFromPEM(caCert)
+		tlsConfig.RootCAs = caCertPool
+		tlsConfig.BuildNameToCertificate()
+	} else {
+		tlsConfig.InsecureSkipVerify = true
+	}
+
+	transport := &http.Transport{TLSClientConfig: tlsConfig}
+
+	return &http.Client{Transport: transport}
+}
+
 func (s *Test) CreateSession(sGen ...func(s *user.SessionState)) (*user.SessionState, string) {
 	session := CreateStandardSession()
 	if len(sGen) > 0 {
 		sGen[0](session)
 	}
 
+	client := GetTLSClient(nil, nil)
+
 	resp, err := s.Do(test.TestCase{
 		Method:    http.MethodPost,
 		Path:      "/tyk/keys/create",
 		Data:      session,
+		Client:    client,
 		AdminAuth: true,
 	})
 
