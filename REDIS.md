@@ -165,3 +165,21 @@ type Host interface {
 ```
 
 Replacing this with an in memory cache should be straight forward, although `AppendToSet` will require to have some kind of set data structure.
+
+
+# Cache store
+
+This is used by `RedisCacheMiddleware` to cache responses.
+
+I have reduced the api to,
+
+```go
+type Cache interface {
+	GetKey(string) (string, error)
+	SetKey(string, string, int64) error
+	DeleteKey(string) bool
+	Connect() bool
+}
+```
+
+Replacing this is also not complicated as it is just basic key/value store.

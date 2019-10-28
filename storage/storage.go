@@ -130,6 +130,13 @@ type Handler interface {
 	RemoveSortedSetRange(string, string, string) error
 }
 
+type Cache interface {
+	GetKey(string) (string, error)
+	SetKey(string, string, int64) error
+	DeleteKey(string) bool
+	Connect() bool
+}
+
 type Host interface {
 	GetKey(string) (string, error)      // Returned string is expected to be a JSON object (user.SessionState)
 	SetKey(string, string, int64) error // Second input string is expected to be a JSON object (user.SessionState)
