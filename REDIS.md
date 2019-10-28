@@ -52,11 +52,12 @@ This is  used for session storage, used by `DefaultSessionManager` which is used
 I have reduced the required api to
 
 ```go
+
 type Session interface {
-	GetKey(string) (string, error)
+	GetKey(string) (string, error) // Returned string is expected to be a JSON object (user.SessionState)
 	GetMultiKey([]string) ([]string, error)
 	GetRawKey(string) (string, error)
-	SetKey(string, string, int64) error
+	SetKey(string, string, int64) error // Second input string is expected to be a JSON object (user.SessionState)
 	SetRawKey(string, string, int64) error
 	GetKeys(string) []string
 	DeleteKey(string) bool
@@ -65,11 +66,10 @@ type Session interface {
 	IncrememntWithExpire(string, int64) int64
 	SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{})
 	GetRollingWindow(key string, per int64, pipeline bool) (int, []interface{})
-    GetKeyPrefix() string
-	DeleteAllKeys() bool // This is only used in tests
+	GetKeyPrefix() string
+	DeleteAllKeys() bool
 }
 ```
-
 Used by
 - `FallbackKeySesionManager`
 - `APISpec.AuthManager`
@@ -137,11 +137,12 @@ This is used by `HostCheckerManager` to cache hosts when checking api host uptim
 I have reduced the api to,
 
 ```go
+
 type Host interface {
 	GetKey(string) (string, error)
 	SetKey(string, string, int64) error
 	DeleteKey(string) bool
-    Connect() bool
+	Connect() bool
 	// AppendToSet currently stores data direct to redis which is picked up by
 	// tyk-pum because this is analytics data about host uptime.
 	AppendToSet(string, string)
