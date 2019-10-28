@@ -130,10 +130,14 @@ type Handler interface {
 	RemoveSortedSetRange(string, string, string) error
 }
 
-type AnalyticsHandler interface {
+type Host interface {
+	GetKey(string) (string, error)      // Returned string is expected to be a JSON object (user.SessionState)
+	SetKey(string, string, int64) error // Second input string is expected to be a JSON object (user.SessionState)
+	DeleteKey(string) bool
 	Connect() bool
-	AppendToSetPipelined(string, [][]byte)
-	GetAndDeleteSet(string) []interface{}
+	// AppendToSet currently stores data direct to redis which is picked up by
+	// tyk-pum because this is analytics data about host uptime.
+	AppendToSet(string, string)
 }
 
 const defaultHashAlgorithm = "murmur64"

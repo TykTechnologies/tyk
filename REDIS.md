@@ -144,3 +144,24 @@ type WebHook interface {
 ```
 
 This is very easy to replace as any in memory cache with support for expiration will do.
+
+
+# Host store
+
+This is used by `HostCheckerManager` to cache hosts when checking api host uptime.
+
+I have reduced the api to,
+
+```go
+type Host interface {
+	GetKey(string) (string, error)
+	SetKey(string, string, int64) error
+	DeleteKey(string) bool
+    Connect() bool
+	// AppendToSet currently stores data direct to redis which is picked up by
+	// tyk-pum because this is analytics data about host uptime.
+	AppendToSet(string, string)
+}
+```
+
+Replacing this with an in memory cache should be straight forward, although `AppendToSet` will require to have some kind of set data structure.

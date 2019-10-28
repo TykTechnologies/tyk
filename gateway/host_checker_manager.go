@@ -23,7 +23,7 @@ var GlobalHostChecker HostCheckerManager
 
 type HostCheckerManager struct {
 	Id                string
-	store             storage.Handler
+	store             storage.Host
 	checkerMu         sync.Mutex
 	checker           *HostUptimeChecker
 	stopLoop          bool
@@ -73,7 +73,7 @@ const (
 	UptimeAnalytics_KEYNAME = "tyk-uptime-analytics"
 )
 
-func (hc *HostCheckerManager) Init(store storage.Handler) {
+func (hc *HostCheckerManager) Init(store storage.Host) {
 	hc.store = store
 	hc.unhealthyHostList = make(map[string]bool)
 	hc.resetsInitiated = make(map[string]bool)
@@ -515,7 +515,7 @@ func (hc *HostCheckerManager) RecordUptimeAnalytics(report HostHealthReport) err
 	return nil
 }
 
-func InitHostCheckManager(ctx context.Context, store storage.Handler) {
+func InitHostCheckManager(ctx context.Context, store storage.Host) {
 	// Already initialized
 	if GlobalHostChecker.Id != "" {
 		return
