@@ -165,30 +165,30 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	}
 
 	// Initialise the auth and session managers (use Redis for now)
-	authStore := gs.redisStore
-	orgStore := gs.redisOrgStore
+	authStore := gs.base
+	orgStore := gs.org
 	switch spec.AuthProvider.StorageEngine {
 	case LDAPStorageEngine:
 		storageEngine := LDAPStorageHandler{}
 		storageEngine.LoadConfFromMeta(spec.AuthProvider.Meta)
 		authStore = &storageEngine
 	case RPCStorageEngine:
-		authStore = gs.rpcAuthStore
-		orgStore = gs.rpcOrgStore
+		authStore = gs.rpcAuth
+		orgStore = gs.rpcOrg
 		spec.GlobalConfig.EnforceOrgDataAge = true
 		globalConf := config.Global()
 		globalConf.EnforceOrgDataAge = true
 		config.SetGlobal(globalConf)
 	}
 
-	sessionStore := gs.redisStore
+	sessionStore := gs.base
 	switch spec.SessionProvider.StorageEngine {
 	case RPCStorageEngine:
-		sessionStore = gs.rpcAuthStore
+		sessionStore = gs.rpcAuth
 	}
 
 	// Health checkers are initialised per spec so that each API handler has it's own connection and redis storage pool
-	spec.Init(authStore, sessionStore, gs.healthStore, orgStore)
+	spec.Init(authStore, sessionStore, gs.health, orgStore)
 
 	// Set up all the JSVM middleware
 	var mwAuthCheckFunc apidef.MiddlewareDefinition
@@ -613,36 +613,40 @@ func loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStor
 
 func loadTCPService(spec *APISpec, gs *generalStores, muxer *proxyMux) {
 	// Initialise the auth and session managers (use Redis for now)
-	authStore := gs.redisStore
-	orgStore := gs.redisOrgStore
+	authStore := gs.base
+	orgStore := gs.org
 	switch spec.AuthProvider.StorageEngine {
 	case LDAPStorageEngine:
 		storageEngine := LDAPStorageHandler{}
 		storageEngine.LoadConfFromMeta(spec.AuthProvider.Meta)
 		authStore = &storageEngine
 	case RPCStorageEngine:
-		authStore = gs.rpcAuthStore
-		orgStore = gs.rpcOrgStore
+		authStore = gs.rpcAuth
+		orgStore = gs.rpcOrg
 		spec.GlobalConfig.EnforceOrgDataAge = true
 		globalConf := config.Global()
 		globalConf.EnforceOrgDataAge = true
 		config.SetGlobal(globalConf)
 	}
 
-	sessionStore := gs.redisStore
+	sessionStore := gs.base
 	switch spec.SessionProvider.StorageEngine {
 	case RPCStorageEngine:
-		sessionStore = gs.rpcAuthStore
+		sessionStore = gs.rpcAuth
 	}
 
 	// Health checkers are initialised per spec so that each API handler has it's own connection and redis storage pool
-	spec.Init(authStore, sessionStore, gs.healthStore, orgStore)
+	spec.Init(authStore, sessionStore, gs.health, orgStore)
 
 	muxer.addTCPService(spec, nil)
 }
 
 type generalStores struct {
-	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore storage.Handler
+	base    storage.Handler
+	org     storage.Handler
+	health  storage.Handler
+	rpcAuth storage.Handler
+	rpcOrg  storage.Handler
 }
 
 // Create the individual API (app) specs based on live configurations and assign middleware
