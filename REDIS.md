@@ -67,6 +67,7 @@ type Session interface {
 	IncrememntWithExpire(string, int64) int64
 	SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{})
 	GetRollingWindow(key string, per int64, pipeline bool) (int, []interface{})
-	GetKeyPrefix() string
+    GetKeyPrefix() string
+	DeleteAllKeys() bool // This is only used in tests
 }
 ```

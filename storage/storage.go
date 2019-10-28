@@ -69,6 +69,7 @@ type Session interface {
 	SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{})
 	GetRollingWindow(key string, per int64, pipeline bool) (int, []interface{})
 	GetKeyPrefix() string
+	DeleteAllKeys() bool
 }
 
 type Health interface {
