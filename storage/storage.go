@@ -55,6 +55,12 @@ type Base interface {
 	RemoveSortedSetRange(string, string, string) error
 }
 
+type Health interface {
+	Connect() bool
+	SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{})
+	GetRollingWindow(key string, per int64, pipeline bool) (int, []interface{})
+}
+
 // Handler is a standard interface to a storage backend, used by
 // AuthorisationManager to read and write key values to the backend
 type Handler interface {

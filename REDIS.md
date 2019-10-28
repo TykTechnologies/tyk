@@ -19,7 +19,7 @@ There are four different stores used. The stores are differentiated with key pre
 
 ## Base store
 
-Base store stores values under the `apiKey-` prefix.
+Base store stores values under the `apiKey-` key prefix.
 
 Used by
 - `FallbackKeySesionManager`
@@ -27,3 +27,21 @@ Used by
 - `APISpec.SessionManager` as the default storage when `APISpec.SessionProvider.StorageEngine` is not specified to `RPCStorageEngine`
 
 Both of about api's uses this store as key/value store so its possible to be replaced.
+
+# Health
+
+Health store stores values under the `apihealth.` key prefix. I have reduced the required api to to
+the following interface.
+
+```go
+type Health interface {
+	Connect() bool
+	SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{})
+	GetRollingWindow(key string, per int64, pipeline bool) (int, []interface{})
+}
+```
+
+`SetRollingWindow` and `GetRollingWindow` have little documentation, need more research on the possibility of
+having native implementation of that.
+
+This is used by `DefaultHealthChecker`
