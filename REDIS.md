@@ -1,3 +1,10 @@
+These are notes/thoughts on state of redis usage in the gateway. This will be changing
+as I uncover new details. The goal is to have a clear picture on the path to make
+redis optional for the gateway to operate.
+
+Feel free to update/comment if there is anything missing or any suggestion.
+
+
 # Redis in the gateway
 
 This is a summary of redis usage in the gateway and my proposal on how to decouple
