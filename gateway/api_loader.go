@@ -642,7 +642,7 @@ func loadTCPService(spec *APISpec, gs *generalStores, muxer *proxyMux) {
 }
 
 type generalStores struct {
-	base    storage.Handler
+	base    storage.Base
 	org     storage.Handler
 	health  storage.Handler
 	rpcAuth storage.Handler
