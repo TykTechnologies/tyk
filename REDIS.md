@@ -17,14 +17,33 @@ There are four different stores used. The stores are differentiated with key pre
 - `rpcOrg` : prefix `orgkey.`
 
 
-## Base store
+## Session store
 
-Base store stores values under the `apiKey-` key prefix.
+I have reduced the api to
+
+```go
+type Session interface {
+	GetKey(string) (string, error) // Returned string is expected to be a JSON object (user.SessionState)
+	GetMultiKey([]string) ([]string, error)
+	GetRawKey(string) (string, error)
+	SetKey(string, string, int64) error // Second input string is expected to be a JSON object (user.SessionState)
+	SetRawKey(string, string, int64) error
+	GetKeys(string) []string
+	DeleteKey(string) bool
+	DeleteRawKey(string) bool
+	Connect() bool
+	IncrememntWithExpire(string, int64) int64
+	SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{})
+	GetRollingWindow(key string, per int64, pipeline bool) (int, []interface{})
+	GetKeyPrefix() string
+	DeleteAllKeys() bool
+}
+```
 
 Used by
 - `FallbackKeySesionManager`
-- `APISpec.AuthManager` as the default store when `APISpec.AuthProvider.StorageEngine` is not provided.
-- `APISpec.SessionManager` as the default storage when `APISpec.SessionProvider.StorageEngine` is not specified to `RPCStorageEngine`
+- `APISpec.AuthManager`
+- `APISpec.SessionManager`
 
 Both of about api's uses this store as key/value store so its possible to be replaced.
 
