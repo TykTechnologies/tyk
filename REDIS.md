@@ -183,3 +183,30 @@ type Cache interface {
 ```
 
 Replacing this is also not complicated as it is just basic key/value store.
+
+# Oauth store
+
+This is used by `RedisOsinStorageInterface` for managing tokens.
+
+I have reduced the api interface to,
+
+```go
+type Oauth interface {
+	GetKey(string) (string, error)
+	GetRawKey(string) (string, error)
+	SetKey(string, string, int64) error
+	SetRawKey(string, string, int64) error
+	DeleteKey(string) bool
+	Connect() bool
+	GetKeysAndValuesWithFilter(string) map[string]string
+	GetSet(string) (map[string]string, error)
+	AddToSet(string, string)
+	RemoveFromSet(string, string)
+	AddToSortedSet(string, string, float64)
+	GetSortedSetRange(string, string, string) ([]string, []float64, error)
+	RemoveSortedSetRange(string, string, string) error
+}
+```
+
+Replacing this will require much work, as we need to have efficient/ high performance sets
+implementation also, the cache should support expirations.

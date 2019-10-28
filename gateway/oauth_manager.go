@@ -477,7 +477,7 @@ func TykOsinNewServer(config *osin.ServerConfig, storage ExtendedOsinStorageInte
 // TODO: Refactor this to move prefix handling into a checker method, then it can be an unexported setting in the struct.
 // RedisOsinStorageInterface implements osin.Storage interface to use Tyk's own storage mechanism
 type RedisOsinStorageInterface struct {
-	store          storage.Handler
+	store          storage.Oauth
 	sessionManager SessionHandler
 	orgID          string
 }
