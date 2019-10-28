@@ -642,11 +642,11 @@ func loadTCPService(spec *APISpec, gs *generalStores, muxer *proxyMux) {
 }
 
 type generalStores struct {
-	base    storage.Base
-	org     storage.Handler
+	base    storage.Session
+	org     storage.Session
 	health  storage.Health
-	rpcAuth storage.Handler
-	rpcOrg  storage.Handler
+	rpcAuth storage.Session
+	rpcOrg  storage.Session
 }
 
 // Create the individual API (app) specs based on live configurations and assign middleware
