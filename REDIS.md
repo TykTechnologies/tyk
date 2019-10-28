@@ -210,3 +210,8 @@ type Oauth interface {
 
 Replacing this will require much work, as we need to have efficient/ high performance sets
 implementation also, the cache should support expirations.
+
+
+# High performance cache libraries
+
+- [x] [github.com/dgraph-io/ristretto](https://github.com/dgraph-io/ristretto)
