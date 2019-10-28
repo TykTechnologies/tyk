@@ -55,6 +55,22 @@ type Base interface {
 	RemoveSortedSetRange(string, string, string) error
 }
 
+type Session interface {
+	GetKey(string) (string, error) // Returned string is expected to be a JSON object (user.SessionState)
+	GetMultiKey([]string) ([]string, error)
+	GetRawKey(string) (string, error)
+	SetKey(string, string, int64) error // Second input string is expected to be a JSON object (user.SessionState)
+	SetRawKey(string, string, int64) error
+	GetKeys(string) []string
+	DeleteKey(string) bool
+	DeleteRawKey(string) bool
+	Connect() bool
+	IncrememntWithExpire(string, int64) int64
+	SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{})
+	GetRollingWindow(key string, per int64, pipeline bool) (int, []interface{})
+	GetKeyPrefix() string
+}
+
 type Health interface {
 	Connect() bool
 	SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{})

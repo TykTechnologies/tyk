@@ -45,3 +45,28 @@ type Health interface {
 having native implementation of that.
 
 This is used by `DefaultHealthChecker`
+
+# Session
+
+This is  used for session storage, used by `DefaultSessionManager` which is used both as
+`APISpec.SessionManager` and `APISpec.OrgSessionManager`.
+
+I have reduced the required api to
+
+```go
+type Session interface {
+	GetKey(string) (string, error)
+	GetMultiKey([]string) ([]string, error)
+	GetRawKey(string) (string, error)
+	SetKey(string, string, int64) error
+	SetRawKey(string, string, int64) error
+	GetKeys(string) []string
+	DeleteKey(string) bool
+	DeleteRawKey(string) bool
+	Connect() bool
+	IncrememntWithExpire(string, int64) int64
+	SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{})
+	GetRollingWindow(key string, per int64, pipeline bool) (int, []interface{})
+	GetKeyPrefix() string
+}
+```
