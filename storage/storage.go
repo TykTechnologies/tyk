@@ -89,6 +89,13 @@ type Analytics interface {
 	GetAndDeleteSet(string) []interface{} //used in tests
 }
 
+// WebHook used to cache webhook events checksum.
+type WebHook interface {
+	GetKey(string) (string, error)
+	SetKey(key string, value string, expires int64) error
+	Connect() bool
+}
+
 // Handler is a standard interface to a storage backend, used by
 // AuthorisationManager to read and write key values to the backend
 type Handler interface {
