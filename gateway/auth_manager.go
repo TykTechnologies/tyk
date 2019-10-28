@@ -21,7 +21,7 @@ import (
 // is valid in any way (e.g. cryptographic signing etc.). Returns
 // a user.SessionState object (deserialised JSON)
 type AuthorisationHandler interface {
-	Init(storage.Base)
+	Init(storage.Auth)
 	KeyAuthorised(string) (user.SessionState, bool)
 	KeyExpired(*user.SessionState) bool
 }
@@ -111,7 +111,7 @@ func (s *sessionUpdater) updateWorker() {
 // DefaultAuthorisationManager implements AuthorisationHandler,
 // requires a storage.Handler to interact with key store
 type DefaultAuthorisationManager struct {
-	store storage.Base
+	store storage.Auth
 }
 
 type DefaultSessionManager struct {
@@ -128,7 +128,7 @@ type SessionUpdate struct {
 	ttl      int64
 }
 
-func (b *DefaultAuthorisationManager) Init(store storage.Base) {
+func (b *DefaultAuthorisationManager) Init(store storage.Auth) {
 	b.store = store
 	b.store.Connect()
 }

@@ -71,3 +71,15 @@ type Session interface {
 	DeleteAllKeys() bool // This is only used in tests
 }
 ```
+
+
+# Auth store
+
+This is more of an interface for retrieving api session. I have reduced the api to
+
+```go
+type Auth interface {
+	GetKey(string) (string, error) // Returned string is expected to be a JSON object (user.SessionState)
+	Connect() bool
+}
+```

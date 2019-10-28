@@ -22,6 +22,11 @@ var log = logger.Get()
 // ErrKeyNotFound is a standard error for when a key is not found in the storage engine
 var ErrKeyNotFound = errors.New("key not found")
 
+type Auth interface {
+	GetKey(string) (string, error) // Returned string is expected to be a JSON object (user.SessionState)
+	Connect() bool
+}
+
 type Base interface {
 	GetKey(string) (string, error) // Returned string is expected to be a JSON object (user.SessionState)
 	GetMultiKey([]string) ([]string, error)
