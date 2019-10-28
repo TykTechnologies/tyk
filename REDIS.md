@@ -83,3 +83,28 @@ type Auth interface {
 	Connect() bool
 }
 ```
+
+
+# Analytics store
+
+All analytics are sent to redis. This store exposes an api for storing analytics values.
+It is used by `RedisAnalyticsHandler`.
+
+I have reduced the api to
+
+```go
+type Analytics interface {
+	Connect() bool
+	AppendToSetPipelined(string, []string)
+	GetAndDeleteSet(string) []interface{} //used in tests
+}
+``
+
+There are several options for to replace the current setup. Because this sends
+to redis which is then scrapped by tyk-pump and stored to mongo.
+
+Options include
+
+- collect but discard the analytics data.
+- support specifying and endpoint that analytics data will be pushed to in interval
+- send directly to mongo. This will need to refactor `tyk-pump` taking out aggregate calculations into a separate library that will be shared.

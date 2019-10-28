@@ -83,6 +83,12 @@ type Health interface {
 	GetRollingWindow(key string, per int64, pipeline bool) (int, []interface{})
 }
 
+type Analytics interface {
+	Connect() bool
+	AppendToSetPipelined(string, []string)
+	GetAndDeleteSet(string) []interface{} //used in tests
+}
+
 // Handler is a standard interface to a storage backend, used by
 // AuthorisationManager to read and write key values to the backend
 type Handler interface {

@@ -178,7 +178,7 @@ func (a *AnalyticsRecord) SetExpiry(expiresInSeconds int64) {
 // RedisAnalyticsHandler will record analytics data to a redis back end
 // as defined in the Config object
 type RedisAnalyticsHandler struct {
-	Store            storage.AnalyticsHandler
+	Store            storage.Analytics
 	Clean            Purger
 	GeoIPDB          *maxminddb.Reader
 	globalConf       config.Config
