@@ -2,7 +2,7 @@
 : ${ORGDIR:="/src/github.com/TykTechnologies"}
 : ${SOURCEBINPATH:="${ORGDIR}/tyk"}
 : ${DEBVERS:="ubuntu/trusty ubuntu/xenial ubuntu/bionic debian/jessie debian/stretch debian/buster"}
-: ${RPMVERS:="el/6 el7"}
+: ${RPMVERS:="el/6 el/7"}
 : ${PKGNAME:="tyk-gateway"}
 
 echo "Set version number"
