@@ -1,76 +1,82 @@
 package gateway
 
 import (
-	"bytes"
 	"crypto/tls"
-	"encoding/json"
-	"errors"
-	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/dashboard"
 )
 
-var dashLog = log.WithField("prefix", "dashboard")
+var (
+	dashLog          = log.WithField("prefix", "dashboard")
+	dashboardTimeout = 5 * time.Second
 
-type NodeResponseOK struct {
-	Status  string
-	Message map[string]string
-	Nonce   string
-}
+	// Nonce to use when interacting with the dashboard service
+	ServiceNonce string
+	nonceMutex   sync.RWMutex
+)
 
 type DashboardServiceSender interface {
-	Init() error
 	Register() error
 	DeRegister() error
-	StartBeating() error
+	StartBeating()
 	StopBeating()
 	NotifyDashboardOfEvent(interface{}) error
+	FetchApiSpecs(nonce string) (*dashboard.TaggedApis, error)
 }
 
-type HTTPDashboardHandler struct {
-	RegistrationEndpoint    string
-	DeRegistrationEndpoint  string
-	HeartBeatEndpoint       string
-	KeyQuotaTriggerEndpoint string
+func UpdateNonce(nonce string) {
+	nonceMutex.Lock()
+	defer nonceMutex.Unlock()
 
-	Secret string
-
-	heartBeatStopSentinel bool
+	ServiceNonce = nonce
 }
 
-func initialiseClient(timeout time.Duration) (client *http.Client) {
-	client = &http.Client{Timeout: timeout}
+func GetNonce() string {
+	nonceMutex.RLock()
+	defer nonceMutex.RUnlock()
 
-	cfg := config.Global()
-	if !cfg.HttpServerOptions.UseSSL && !strings.HasPrefix(cfg.DBAppConfOptions.ConnectionString, "https") {
+	return ServiceNonce
+}
+
+func dashboardServiceInit() {
+	secret := config.Global().NodeSecret
+	if secret == "" {
+		dashLog.Fatal("Node secret is not set, required for dashboard connection")
+	}
+
+	if DashService == nil {
+		DashService = dashboard.NewHandler(
+			DashboardHttpClient(dashboardTimeout),
+			log.WithField("prefix", "dashboard"),
+			hostDetails.Hostname,
+			GetNodeID(),
+			secret,
+			DashboardConnectionString(),
+			GetNonce,
+			UpdateNonce,
+			SetNodeID,
+		)
+	}
+}
+
+func handleDashboardRegistration() {
+	if !config.Global().UseDBAppConfigs {
 		return
 	}
 
-	// Setup HTTPS client
-	tlsConfig := &tls.Config{
-		InsecureSkipVerify: cfg.HttpServerOptions.SSLInsecureSkipVerify,
+	dashboardServiceInit()
+
+	if err := DashService.Register(); err != nil {
+		dashLog.Fatal("Registration failed: ", err)
 	}
 
-	cert := cfg.Security.Certificates.Dashboard
-	if strings.TrimSpace(cert) != "" {
-		certs := CertificateManager.List([]string{cert}, certs.CertificatePrivate)
-
-		if len(certs) != 0 && certs[0] != nil {
-			tlsConfig.Certificates = []tls.Certificate{*certs[0]}
-			log.Info("Mutual tls for dashboard was enabled")
-		} else {
-			log.Infof("No dashboard certificate with id: %v was found", cert)
-		}
-	}
-
-	client.Transport = &http.Transport{TLSClientConfig: tlsConfig}
-
-	return
+	go DashService.StartBeating()
 }
 
 func reLogin() {
@@ -96,188 +102,47 @@ func reLogin() {
 	reloadURLStructure(nil)
 }
 
-func (h *HTTPDashboardHandler) Init() error {
-	h.RegistrationEndpoint = buildConnStr("/register/node")
-	h.DeRegistrationEndpoint = buildConnStr("/system/node")
-	h.HeartBeatEndpoint = buildConnStr("/register/ping")
-	h.KeyQuotaTriggerEndpoint = buildConnStr("/system/key/quota_trigger")
-
-	if h.Secret = config.Global().NodeSecret; h.Secret == "" {
-		dashLog.Fatal("Node secret is not set, required for dashboard connection")
-	}
-	return nil
-}
-
-// NotifyDashboardOfEvent acts as a form of event which informs the
-// dashboard of a key which has reached a certain usage quota
-func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
-	meta, ok := event.(EventTriggerExceededMeta)
-	if !ok {
-		return errors.New("event type is currently not supported as a notification to the dashboard")
+func DashboardConnectionString() string {
+	if config.Global().DBAppConfOptions.ConnectionString == "" && config.Global().DisableDashboardZeroConf {
+		dashLog.Fatal("Connection string is empty, failing.")
 	}
 
-	var b bytes.Buffer
-	if err := json.NewEncoder(&b).Encode(meta); err != nil {
-		log.Errorf("Could not decode event metadata :%v", err)
-		return err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, h.KeyQuotaTriggerEndpoint, &b)
-	if err != nil {
-		log.Errorf("Could not create request.. %v", err)
-		return err
-	}
-
-	req.Header.Set("authorization", h.Secret)
-	req.Header.Set(headers.XTykNodeID, GetNodeID())
-	req.Header.Set(headers.XTykNonce, ServiceNonce)
-
-	c := initialiseClient(5 * time.Second)
-
-	resp, err := c.Do(req)
-	if err != nil {
-		log.Errorf("Request failed with error %v", err)
-		return err
-	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		err := fmt.Errorf("Unexpected status code while trying to notify dashboard of a key limit quota trigger.. Got %d", resp.StatusCode)
-		log.Error(err)
-		return err
-	}
-
-	val := NodeResponseOK{}
-	if err := json.NewDecoder(resp.Body).Decode(&val); err != nil {
-		return err
-	}
-
-	ServiceNonce = val.Nonce
-
-	return nil
-}
-
-func (h *HTTPDashboardHandler) Register() error {
-	dashLog.Info("Registering gateway node with Dashboard")
-	req := h.newRequest(h.RegistrationEndpoint)
-	c := initialiseClient(5 * time.Second)
-	resp, err := c.Do(req)
-	if err != nil {
-		dashLog.Errorf("Request failed with error %v; retrying in 5s", err)
-		time.Sleep(time.Second * 5)
-		return h.Register()
-	} else if resp != nil && resp.StatusCode != 200 {
-		dashLog.Errorf("Response failed with code %d; retrying in 5s", resp.StatusCode)
-		time.Sleep(time.Second * 5)
-		return h.Register()
-	}
-
-	defer resp.Body.Close()
-	val := NodeResponseOK{}
-	if err := json.NewDecoder(resp.Body).Decode(&val); err != nil {
-		return err
-	}
-
-	// Set the NodeID
-	var found bool
-	nodeID, found := val.Message["NodeID"]
-	SetNodeID(nodeID)
-	if !found {
-		dashLog.Error("Failed to register node, retrying in 5s")
-		time.Sleep(time.Second * 5)
-		return h.Register()
-	}
-
-	dashLog.WithField("id", GetNodeID()).Info("Node Registered")
-
-	// Set the nonce
-	ServiceNonce = val.Nonce
-	dashLog.Debug("Registration Finished: Nonce Set: ", ServiceNonce)
-
-	return nil
-}
-
-func (h *HTTPDashboardHandler) StartBeating() error {
-	req := h.newRequest(h.HeartBeatEndpoint)
-	client := initialiseClient(5 * time.Second)
-
-	for !h.heartBeatStopSentinel {
-		if err := h.sendHeartBeat(req, client); err != nil {
-			dashLog.Warning(err)
+	if !config.Global().DisableDashboardZeroConf && config.Global().DBAppConfOptions.ConnectionString == "" {
+		dashLog.Info("Waiting for zeroconf signal...")
+		for config.Global().DBAppConfOptions.ConnectionString == "" {
+			time.Sleep(1 * time.Second)
 		}
-		time.Sleep(time.Second * 2)
 	}
 
-	dashLog.Info("Stopped Heartbeat")
-	h.heartBeatStopSentinel = false
-	return nil
+	return config.Global().DBAppConfOptions.ConnectionString
 }
 
-func (h *HTTPDashboardHandler) StopBeating() {
-	h.heartBeatStopSentinel = true
-}
+func DashboardHttpClient(timeout time.Duration) (client *http.Client) {
+	client = &http.Client{Timeout: timeout}
 
-func (h *HTTPDashboardHandler) newRequest(endpoint string) *http.Request {
-	req, err := http.NewRequest("GET", endpoint, nil)
-	if err != nil {
-		panic(err)
-	}
-	req.Header.Set("authorization", h.Secret)
-	req.Header.Set(headers.XTykHostname, hostDetails.Hostname)
-	return req
-}
-
-func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Client) error {
-	req.Header.Set(headers.XTykNodeID, GetNodeID())
-	req.Header.Set(headers.XTykNonce, ServiceNonce)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return errors.New("dashboard is down? Heartbeat is failing")
+	cfg := config.Global()
+	if !cfg.HttpServerOptions.UseSSL && !strings.HasPrefix(cfg.DBAppConfOptions.ConnectionString, "https") {
+		return
 	}
 
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return errors.New("dashboard is down? Heartbeat non-200 response")
-	}
-	val := NodeResponseOK{}
-	if err := json.NewDecoder(resp.Body).Decode(&val); err != nil {
-		return err
+	// Setup HTTPS client
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: cfg.HttpServerOptions.SSLInsecureSkipVerify,
 	}
 
-	// Set the nonce
-	ServiceNonce = val.Nonce
-	//log.Debug("Heartbeat Finished: Nonce Set: ", ServiceNonce)
+	cert := cfg.Security.Certificates.Dashboard
+	if strings.TrimSpace(cert) != "" {
+		certsList := CertificateManager.List([]string{cert}, certs.CertificatePrivate)
 
-	return nil
-}
-
-func (h *HTTPDashboardHandler) DeRegister() error {
-	req := h.newRequest(h.DeRegistrationEndpoint)
-
-	req.Header.Set(headers.XTykNodeID, GetNodeID())
-	req.Header.Set(headers.XTykNonce, ServiceNonce)
-
-	c := initialiseClient(5 * time.Second)
-	resp, err := c.Do(req)
-
-	if err != nil {
-		return fmt.Errorf("deregister request failed with error %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("deregister request failed with status %v", resp.StatusCode)
+		if len(certsList) != 0 && certsList[0] != nil {
+			tlsConfig.Certificates = []tls.Certificate{*certsList[0]}
+			dashLog.Info("Mutual tls for dashboard was enabled")
+		} else {
+			dashLog.Infof("No dashboard certificate with id: %v was found", cert)
+		}
 	}
 
-	val := NodeResponseOK{}
-	if err := json.NewDecoder(resp.Body).Decode(&val); err != nil {
-		return err
-	}
+	client.Transport = &http.Transport{TLSClientConfig: tlsConfig}
 
-	// Set the nonce
-	ServiceNonce = val.Nonce
-	dashLog.Info("De-registered.")
-
-	return nil
+	return
 }

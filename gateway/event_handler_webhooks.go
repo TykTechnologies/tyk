@@ -259,8 +259,12 @@ func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 		}
 	}
 
-	if w.dashboardService != nil && em.Type == EventTriggerExceeded {
-		w.dashboardService.NotifyDashboardOfEvent(em.Meta)
+	if w.dashboardService != nil {
+		if em.Type == EventTriggerExceeded {
+			w.dashboardService.NotifyDashboardOfEvent(em.Meta)
+		} else {
+			log.Error("event type is currently not supported as a notification to the dashboard")
+		}
 	}
 
 	w.setHookFired(reqChecksum)

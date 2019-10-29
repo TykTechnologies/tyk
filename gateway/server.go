@@ -248,30 +248,13 @@ func setupGlobals(ctx context.Context) {
 	}
 }
 
-func buildConnStr(resource string) string {
-
-	if config.Global().DBAppConfOptions.ConnectionString == "" && config.Global().DisableDashboardZeroConf {
-		mainLog.Fatal("Connection string is empty, failing.")
-	}
-
-	if !config.Global().DisableDashboardZeroConf && config.Global().DBAppConfOptions.ConnectionString == "" {
-		mainLog.Info("Waiting for zeroconf signal...")
-		for config.Global().DBAppConfOptions.ConnectionString == "" {
-			time.Sleep(1 * time.Second)
-		}
-	}
-
-	return config.Global().DBAppConfOptions.ConnectionString + resource
-}
-
 func syncAPISpecs() (int, error) {
 	loader := APIDefinitionLoader{}
 	apisMu.Lock()
 	defer apisMu.Unlock()
 	var s []*APISpec
 	if config.Global().UseDBAppConfigs {
-		connStr := buildConnStr("/system/apis")
-		tmpSpecs, err := loader.FromDashboardService(connStr, config.Global().NodeSecret)
+		tmpSpecs, err := loader.FromDashboardService()
 		if err != nil {
 			log.Error("failed to load API specs: ", err)
 			return 0, err
@@ -1180,28 +1163,6 @@ func start() {
 	// interval counts from the start of one reload to the next.
 	go reloadLoop(time.Tick(time.Second))
 	go reloadQueueLoop()
-}
-
-func dashboardServiceInit() {
-	if DashService == nil {
-		DashService = &HTTPDashboardHandler{}
-		DashService.Init()
-	}
-}
-
-func handleDashboardRegistration() {
-	if !config.Global().UseDBAppConfigs {
-		return
-	}
-
-	dashboardServiceInit()
-
-	// connStr := buildConnStr("/register/node")
-	if err := DashService.Register(); err != nil {
-		dashLog.Fatal("Registration failed: ", err)
-	}
-
-	go DashService.StartBeating()
 }
 
 var drlOnce sync.Once

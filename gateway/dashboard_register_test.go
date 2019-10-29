@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/dashboard"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/garyburd/redigo/redis"
 )
@@ -19,7 +20,7 @@ func TestDeRegisterWithMutualTLS(t *testing.T) {
 	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
 
 	// Setup mutual TLS protected dashboard
-	dashboard := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	d := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/system/node" {
 			w.Write([]byte(`{"Status": "OK", "Nonce": "1", "Message": {"NodeID": "1"}}`))
 		} else {
@@ -28,14 +29,14 @@ func TestDeRegisterWithMutualTLS(t *testing.T) {
 	}))
 	pool := x509.NewCertPool()
 	pool.AddCert(clientCert.Leaf)
-	dashboard.TLS = &tls.Config{
+	d.TLS = &tls.Config{
 		ClientAuth:         tls.RequireAndVerifyClientCert,
 		ClientCAs:          pool,
 		InsecureSkipVerify: true,
 	}
 
-	dashboard.StartTLS()
-	defer dashboard.Close()
+	d.StartTLS()
+	defer d.Close()
 
 	certID, _ := CertificateManager.Add(combinedClientPEM, "")
 	defer CertificateManager.Delete(certID)
@@ -43,7 +44,7 @@ func TestDeRegisterWithMutualTLS(t *testing.T) {
 	getConfig := func(certID string) config.Config {
 		cfg := config.Global()
 		cfg.UseDBAppConfigs = true
-		cfg.DBAppConfOptions.ConnectionString = dashboard.URL
+		cfg.DBAppConfOptions.ConnectionString = d.URL
 		cfg.Security.Certificates.Dashboard = certID
 		cfg.NodeSecret = "somesecret"
 		// cfg.HttpServerOptions.UseSSL = true
@@ -51,14 +52,25 @@ func TestDeRegisterWithMutualTLS(t *testing.T) {
 		return cfg
 	}
 
-	var dashService DashboardServiceSender = &HTTPDashboardHandler{}
+	getDashboardHandler := func() DashboardServiceSender {
+		return dashboard.NewHandler(
+			DashboardHttpClient(dashboardTimeout),
+			log.WithField("prefix", "dashboard"),
+			hostDetails.Hostname,
+			GetNodeID(),
+			"somesecret",
+			DashboardConnectionString(),
+			GetNonce,
+			UpdateNonce,
+			SetNodeID,
+		)
+	}
 
 	t.Run("Without dashboard certificate", func(t *testing.T) {
 		config.SetGlobal(getConfig(""))
 		defer ResetTestConfig()
 
-		dashService.Init()
-		if err := dashService.DeRegister(); err == nil {
+		if err := getDashboardHandler().DeRegister(); err == nil {
 			t.Error("Should reject without certificate")
 		}
 	})
@@ -67,8 +79,7 @@ func TestDeRegisterWithMutualTLS(t *testing.T) {
 		config.SetGlobal(getConfig(certID))
 		defer ResetTestConfig()
 
-		dashService.Init()
-		if err := dashService.DeRegister(); err != nil {
+		if err := getDashboardHandler().DeRegister(); err != nil {
 			t.Error("Should succeed with certificate")
 		}
 	})

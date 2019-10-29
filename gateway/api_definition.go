@@ -4,9 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -21,7 +19,6 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/rpc"
 
 	circuit "github.com/rubyist/circuitbreaker"
@@ -237,9 +234,6 @@ func (s *APISpec) validateHTTP() error {
 // system.
 type APIDefinitionLoader struct{}
 
-// Nonce to use when interacting with the dashboard service
-var ServiceNonce string
-
 // MakeSpec will generate a flattened URLSpec from and APIDefinitions' VersionInfo data. paths are
 // keyed to the Api version name, which is determined during routing to speed up lookups
 func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.Entry) *APISpec {
@@ -329,49 +323,12 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 }
 
 // FromDashboardService will connect and download ApiDefintions from a Tyk Dashboard instance.
-func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*APISpec, error) {
+func (a APIDefinitionLoader) FromDashboardService() ([]*APISpec, error) {
 	// Get the definitions
-	log.Debug("Calling: ", endpoint)
-	newRequest, err := http.NewRequest("GET", endpoint, nil)
+	list, err := DashService.FetchApiSpecs(ServiceNonce)
 	if err != nil {
-		log.Error("Failed to create request: ", err)
-	}
-
-	newRequest.Header.Set("authorization", secret)
-	log.Debug("Using: NodeID: ", GetNodeID())
-	newRequest.Header.Set(headers.XTykNodeID, GetNodeID())
-
-	newRequest.Header.Set(headers.XTykNonce, ServiceNonce)
-
-	c := initialiseClient(120 * time.Second)
-	resp, err := c.Do(newRequest)
-	if err != nil {
+		defer reLogin()
 		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusForbidden {
-		body, _ := ioutil.ReadAll(resp.Body)
-		reLogin()
-		return nil, fmt.Errorf("login failure, Response was: %v", string(body))
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := ioutil.ReadAll(resp.Body)
-		reLogin()
-		return nil, fmt.Errorf("dashboard API error, response was: %v", string(body))
-	}
-
-	// Extract tagged APIs#
-	var list struct {
-		Message []struct {
-			ApiDefinition *apidef.APIDefinition `bson:"api_definition" json:"api_definition"`
-		}
-		Nonce string
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		body, _ := ioutil.ReadAll(resp.Body)
-		return nil, fmt.Errorf("failed to decode body: %v body was: %v", err, string(body))
 	}
 
 	// Extract tagged entries only
