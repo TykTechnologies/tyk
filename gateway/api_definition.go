@@ -327,7 +327,9 @@ func (a APIDefinitionLoader) FromDashboardService() ([]*APISpec, error) {
 	// Get the definitions
 	list, err := DashService.FetchApiSpecs(ServiceNonce)
 	if err != nil {
-		defer reLogin()
+		if !strings.Contains(err.Error(), "failed to decode body") {
+			defer reLogin()
+		}
 		return nil, err
 	}
 

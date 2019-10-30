@@ -52,20 +52,6 @@ func TestDeRegisterWithMutualTLS(t *testing.T) {
 		return cfg
 	}
 
-	getDashboardHandler := func() DashboardServiceSender {
-		return dashboard.NewHandler(
-			DashboardHttpClient(dashboardTimeout),
-			log.WithField("prefix", "dashboard"),
-			hostDetails.Hostname,
-			GetNodeID(),
-			"somesecret",
-			DashboardConnectionString(),
-			GetNonce,
-			UpdateNonce,
-			SetNodeID,
-		)
-	}
-
 	t.Run("Without dashboard certificate", func(t *testing.T) {
 		config.SetGlobal(getConfig(""))
 		defer ResetTestConfig()
@@ -106,9 +92,9 @@ func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 	globalConf.DBAppConfOptions.ConnectionString = ts.URL
 	globalConf.NodeSecret = "somesecret"
 	config.SetGlobal(globalConf)
-	dashboardServiceInit()
-
 	defer ResetTestConfig()
+
+	DashService = getDashboardHandler()
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -158,9 +144,11 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 	globalConf.UseDBAppConfigs = true
 	globalConf.AllowInsecureConfigs = true
 	globalConf.DBAppConfOptions.ConnectionString = ts.URL
+	globalConf.NodeSecret = "somesecret"
 	config.SetGlobal(globalConf)
-
 	defer ResetTestConfig()
+
+	DashService = getDashboardHandler()
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -199,4 +187,18 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 		t.Error("second call should return array with one spec", apisByID)
 	}
 	apisMu.RUnlock()
+}
+
+func getDashboardHandler() DashboardServiceSender {
+	return dashboard.NewHandler(
+		DashboardHttpClient(dashboardTimeout),
+		log.WithField("prefix", "dashboard"),
+		hostDetails.Hostname,
+		GetNodeID(),
+		"somesecret",
+		DashboardConnectionString(),
+		GetNonce,
+		UpdateNonce,
+		SetNodeID,
+	)
 }
