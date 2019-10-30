@@ -3,8 +3,8 @@ package main
 import (
 	"archive/zip"
 	"bytes"
-	"context"
 	"compress/gzip"
+	"context"
 	"crypto/tls"
 	"encoding/binary"
 	"encoding/json"
