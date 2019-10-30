@@ -298,6 +298,7 @@ type Config struct {
 	DisableRegexpCache                bool                                  `json:"disable_regexp_cache"`
 	RegexpCacheExpire                 int32                                 `json:"regexp_cache_expire"`
 	HealthCheckEndpointName           string                                `json:"health_check_endpoint_name"`
+	SSLForceCommonNameCheck           bool                                  `json:"ssl_force_common_name_check"`
 }
 
 // GetEventTriggers returns event triggers. There was a typo in the json tag.

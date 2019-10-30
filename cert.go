@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -130,6 +131,40 @@ func verifyPeerCertificatePinnedCheck(spec *APISpec, tlsConfig *tls.Config) func
 
 		return errors.New("Certificate public key pinning error. Public keys do not match.")
 	}
+}
+
+func verifyPeerCertificateCommonNameCheck(host string, tlsConfig *tls.Config) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+	tlsConfig.InsecureSkipVerify = true
+
+	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+
+		if len(rawCerts) == 0 {
+			return fmt.Errorf("no certificate to verify")
+		}
+
+		pool := x509.NewCertPool()
+		for _, rawCert := range rawCerts {
+			cert, err := x509.ParseCertificate(rawCert)
+			if err != nil {
+				return fmt.Errorf("Failed to parse certificate: %v", err)
+			}
+			pool.AddCert(cert)
+		}
+
+		cert, _ := x509.ParseCertificate(rawCerts[0])
+
+		opts := x509.VerifyOptions{Roots: pool}
+		if _, err := cert.Verify(opts); err != nil {
+			return fmt.Errorf("Certificate validation failed:  %v", err)
+		}
+
+		if cert.Subject.CommonName != host {
+			return fmt.Errorf("certificate had CN %q, expected %q", cert.Subject.CommonName, host)
+		}
+
+		return nil
+	}
+
 }
 
 func dialTLSPinnedCheck(spec *APISpec, tc *tls.Config) func(network, addr string) (net.Conn, error) {

@@ -15,6 +15,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -473,6 +474,26 @@ func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Re
 		transport.TLSClientConfig.VerifyPeerCertificate = verifyPeerCertificatePinnedCheck(p.TykAPISpec, transport.TLSClientConfig)
 	} else {
 		transport.DialTLS = dialTLSPinnedCheck(p.TykAPISpec, transport.TLSClientConfig)
+	}
+
+	if p.TykAPISpec.GlobalConfig.SSLForceCommonNameCheck || p.TykAPISpec.Proxy.Transport.SSLForceCommonNameCheck {
+		host, _, _ := net.SplitHostPort(req.Host)
+
+		if transport.TLSClientConfig.VerifyPeerCertificate == nil {
+			transport.TLSClientConfig.VerifyPeerCertificate = verifyPeerCertificateCommonNameCheck(host, transport.TLSClientConfig)
+		} else {
+			// if verifyPeerCertificate is already set, run both the functions
+			pinnedCertCheck := transport.TLSClientConfig.VerifyPeerCertificate
+			customCertCheck := func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+				if err := pinnedCertCheck(rawCerts, verifiedChains); err != nil {
+					return err
+				}
+
+				return verifyPeerCertificateCommonNameCheck(host, transport.TLSClientConfig)(rawCerts, verifiedChains)
+			}
+
+			transport.TLSClientConfig.VerifyPeerCertificate = customCertCheck
+		}
 	}
 
 	if p.TykAPISpec.GlobalConfig.ProxySSLMinVersion > 0 {

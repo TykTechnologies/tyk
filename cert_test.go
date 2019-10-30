@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
 	"io/ioutil"
@@ -15,6 +16,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -468,6 +470,58 @@ func TestUpstreamMutualTLS(t *testing.T) {
 
 		// Should pass with valid upstream certificate
 		ts.Run(t, test.TestCase{Code: 200})
+	})
+
+}
+
+func TestSSLForceCommonName(t *testing.T) {
+	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	}))
+
+	// generate certificate Common Name as valid hostname and SAN as non-empty value
+	_, _, _, cert := genCertificate(&x509.Certificate{
+		EmailAddresses: []string{"test@test.com"},
+		Subject:        pkix.Name{CommonName: "localhost"},
+	})
+
+	upstream.TLS = &tls.Config{
+		Certificates: []tls.Certificate{cert},
+	}
+
+	upstream.StartTLS()
+	defer upstream.Close()
+
+	// test case to ensure that Golang doesn't check against CommonName if SAN is non empty
+	t.Run("Force Common Name Check is Disabled", func(t *testing.T) {
+		ts := newTykTestServer()
+		defer ts.Close()
+
+		upstream.URL = strings.Replace(upstream.URL, "127.0.0.1", "localhost", 1)
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+		})
+		ts.Run(t, test.TestCase{Code: 500, Domain: "localhost", BodyMatch: "There was a problem proxying the request"})
+		//ts.Run(t, test.TestCase{ErrorMatch: "There was a problem proxying the request", Domain: "localhost"})
+
+	})
+
+	t.Run("Force Common Name Check is Enabled", func(t *testing.T) {
+		globalConf := config.Global()
+		globalConf.SSLForceCommonNameCheck = true
+		config.SetGlobal(globalConf)
+		defer resetTestConfig()
+
+		ts := newTykTestServer()
+		defer ts.Close()
+
+		upstream.URL = strings.Replace(upstream.URL, "127.0.0.1", "localhost", 1)
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+		})
+
+		ts.Run(t, test.TestCase{Code: 200, Domain: "localhost"})
 	})
 }
 
