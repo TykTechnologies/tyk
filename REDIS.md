@@ -205,6 +205,6 @@ implementation also, the cache should support expirations.
 # TODO (tasks)
 
 - [ ] Implement high quality sorted set that accepts string keys.
-This is important because we in rolling windows functions we rely on redis sorted
+This is important because on rolling windows functions we rely on redis sorted
 list feature with commands like `ZREMRANGEBYSCORE` and `ZRANGE` .There is already
 a go implementation with `int64` keys, I will contribute on it [github.com/XanthusL/zset](https://github.com/XanthusL/zset)
