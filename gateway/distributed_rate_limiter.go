@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
@@ -12,32 +13,42 @@ import (
 
 var DRLManager = &drl.DRL{}
 
-func setupDRL() {
+// This initializes the global Distributed rate limiter manager.
+func setupDRL(ctx context.Context) {
 	drlManager := &drl.DRL{}
+	// There is a a goroutine which runs forever that is started within the Init
+	// method.
+	// TODO(gernest):
+	// Update github.com/TykTechnologies/drl to allow DRL.Init to accept
+	// context.Context that way the loop can be safely terminated.
 	drlManager.Init()
 	drlManager.ThisServerID = GetNodeID() + "|" + hostDetails.Hostname
 	log.Debug("DRL: Setting node ID: ", drlManager.ThisServerID)
 	DRLManager = drlManager
 }
 
-func startRateLimitNotifications() {
+func startRateLimitNotifications(ctx context.Context) {
 	notificationFreq := config.Global().DRLNotificationFrequency
 	if notificationFreq == 0 {
 		notificationFreq = 2
 	}
+	t := time.NewTicker(time.Duration(notificationFreq) * time.Second)
+	defer t.Stop()
 
-	go func() {
-		log.Info("Starting gateway rate limiter notifications...")
-		for {
+	log.Info("Starting gateway rate limiter notifications...")
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
 			if GetNodeID() != "" {
 				NotifyCurrentServerStatus()
 			} else {
 				log.Warning("Node not registered yet, skipping DRL Notification")
 			}
 
-			time.Sleep(time.Duration(notificationFreq) * time.Second)
 		}
-	}()
+	}
 }
 
 func getTagHash() string {

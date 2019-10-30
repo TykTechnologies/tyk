@@ -587,9 +587,9 @@ func (s *Test) Start() {
 
 	setupPortsWhitelist()
 
-	startServer()
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cacnel = cancel
+	startServer(ctx)
 	setupGlobals(ctx)
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.Global().SupressDefaultOrgStore {

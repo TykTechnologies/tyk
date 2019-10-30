@@ -1084,7 +1084,7 @@ func Start() {
 
 	// TODO: replace goagain with something that support multiple listeners
 	// Example: https://gravitational.com/blog/golang-ssh-bastion-graceful-restarts/
-	startServer()
+	startServer(ctx)
 
 	if again.Child() {
 		// This is a child process, we need to murder the parent now
@@ -1206,7 +1206,7 @@ func handleDashboardRegistration() {
 
 var drlOnce sync.Once
 
-func startDRL() {
+func startDRL(ctx context.Context) {
 	switch {
 	case config.Global().ManagementNode:
 		return
@@ -1214,8 +1214,8 @@ func startDRL() {
 		return
 	}
 	mainLog.Info("Initialising distributed rate limiter")
-	setupDRL()
-	startRateLimitNotifications()
+	setupDRL(ctx)
+	go startRateLimitNotifications(ctx)
 }
 
 func setupPortsWhitelist() {
@@ -1242,7 +1242,7 @@ func setupPortsWhitelist() {
 	config.SetGlobal(globalConf)
 }
 
-func startServer() {
+func startServer(ctx context.Context) {
 	// Ensure that Control listener and default http listener running on first start
 	muxer := &proxyMux{}
 
@@ -1260,7 +1260,9 @@ func startServer() {
 	handleDashboardRegistration()
 
 	// at this point NodeID is ready to use by DRL
-	drlOnce.Do(startDRL)
+	drlOnce.Do(func() {
+		startDRL(ctx)
+	})
 
 	mainLog.Infof("Tyk Gateway started (%s)", VERSION)
 	address := config.Global().ListenAddress
