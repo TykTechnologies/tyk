@@ -104,7 +104,9 @@ func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 	globalConf.UseDBAppConfigs = true
 	globalConf.AllowInsecureConfigs = true
 	globalConf.DBAppConfOptions.ConnectionString = ts.URL
+	globalConf.NodeSecret = "somesecret"
 	config.SetGlobal(globalConf)
+	dashboardServiceInit()
 
 	defer ResetTestConfig()
 
