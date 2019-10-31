@@ -2087,7 +2087,7 @@ func ctxGetOrigRequestURL(r *http.Request) *url.URL {
 	return nil
 }
 
-func ctxSetUrlRewriteTarget(r *http.Request, url *url.URL) {
+func ctxSetURLRewriteTarget(r *http.Request, url *url.URL) {
 	setCtxValue(r, ctx.UrlRewriteTarget, url)
 }
 

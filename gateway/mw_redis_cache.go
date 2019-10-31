@@ -205,7 +205,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 			log.Debug("Not virtual, passing")
 			if newURL := ctxGetUrlRewriteTarget(r); newURL != nil {
 				r.URL = newURL
-				ctxSetUrlRewriteTarget(r, nil)
+				ctxSetURLRewriteTarget(r, nil)
 			}
 			if newMethod := ctxGetTransformRequestMethod(r); newMethod != "" {
 				r.Method = newMethod

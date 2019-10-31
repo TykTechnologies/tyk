@@ -388,7 +388,7 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	} else {
 		//Setting new path here breaks request middleware
 		//New path is set in DummyProxyHandler/Cache middleware
-		ctxSetUrlRewriteTarget(r, newURL)
+		ctxSetURLRewriteTarget(r, newURL)
 	}
 	return nil, http.StatusOK
 }
