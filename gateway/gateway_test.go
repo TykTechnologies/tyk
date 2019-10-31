@@ -1157,13 +1157,13 @@ func TestCacheWithAdvanceUrlRewrite(t *testing.T) {
 	randomheaders := map[string]string{"something": "abcd"}
 
 	ts.Run(t, []test.TestCase{
-		{Method: "GET", Path: "/test", Headers: matchHeaders, HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
-		{Method: "GET", Path: "/test", Headers: matchHeaders, HeadersMatch: headerCache},
+		{Method: http.MethodGet, Path: "/test", Headers: matchHeaders, HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodGet, Path: "/test", Headers: matchHeaders, HeadersMatch: headerCache},
 		//Even if trigger condition failed, as response is cached
 		// will still get redirected response
-		{Method: "GET", Path: "/test", Headers: randomheaders, HeadersMatch: headerCache, BodyMatch: `"Url":"/newpath"`},
-		{Method: "POST", Path: "/test", HeadersNotMatch: headerCache},
-		{Method: "GET", Path: "/test", HeadersMatch: headerCache},
+		{Method: http.MethodGet, Path: "/test", Headers: randomheaders, HeadersMatch: headerCache, BodyMatch: `"Url":"/newpath"`},
+		{Method: http.MethodGet, Path: "/test", HeadersNotMatch: headerCache},
+		{Method: http.MethodGet, Path: "/test", HeadersMatch: headerCache},
 	}...)
 }
 
