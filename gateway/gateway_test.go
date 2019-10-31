@@ -1119,31 +1119,30 @@ func TestCacheWithAdvanceUrlRewrite(t *testing.T) {
 
 	BuildAndLoadAPI(func(spec *APISpec) {
 		version := spec.VersionData.Versions["v1"]
-		json.Unmarshal([]byte(`{
-                "use_extended_paths": true,
-                "extended_paths": {
-                    "url_rewrites": [{
-                        "path": "/test",
-                        "method": "GET",
-                        "match_pattern": "/test(.*)",
-                        "triggers": [
-                          {
-                            "on": "all",
-                            "options": {
-                              "header_matches": {
-                                "rewritePath": "newpath"
-                              }
-                            },
-                            "rewrite_to": "/newpath"
-                          }
-                        ]
-                    }],
-		    "cache":[
-			"/test"
-		    ]
-                }
-            }`), &version)
-
+		version.UseExtendedPaths = true
+		version.ExtendedPaths = apidef.ExtendedPathsSet{
+			URLRewrite: []apidef.URLRewriteMeta{
+				{
+					Path:         "/test",
+					Method:       http.MethodGet,
+					MatchPattern: "/test(.*)",
+					Triggers: []apidef.RoutingTrigger{
+						{
+							On: "all",
+							Options: apidef.RoutingTriggerOptions{
+								HeaderMatches: map[string]apidef.StringRegexMap{
+									"rewritePath": apidef.StringRegexMap{
+										MatchPattern: "newpath",
+									},
+								},
+							},
+							RewriteTo: "/newpath",
+						},
+					},
+				},
+			},
+			Cached: []string{"/test"},
+		}
 		spec.CacheOptions = apidef.CacheOptions{
 			CacheTimeout: 120,
 			EnableCache:  true,
@@ -1162,7 +1161,7 @@ func TestCacheWithAdvanceUrlRewrite(t *testing.T) {
 		//Even if trigger condition failed, as response is cached
 		// will still get redirected response
 		{Method: http.MethodGet, Path: "/test", Headers: randomheaders, HeadersMatch: headerCache, BodyMatch: `"Url":"/newpath"`},
-		{Method: http.MethodGet, Path: "/test", HeadersNotMatch: headerCache},
+		{Method: http.MethodPost, Path: "/test", HeadersNotMatch: headerCache},
 		{Method: http.MethodGet, Path: "/test", HeadersMatch: headerCache},
 	}...)
 }
