@@ -203,7 +203,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		} else {
 			// This passes through and will write the value to the writer, but spit out a copy for the cache
 			log.Debug("Not virtual, passing")
-			if newURL := ctxGetUrlRewriteTarget(r); newURL != nil {
+			if newURL := ctxGetURLRewriteTarget(r); newURL != nil {
 				r.URL = newURL
 				ctxSetURLRewriteTarget(r, nil)
 			}

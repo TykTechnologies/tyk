@@ -2091,7 +2091,7 @@ func ctxSetURLRewriteTarget(r *http.Request, url *url.URL) {
 	setCtxValue(r, ctx.UrlRewriteTarget, url)
 }
 
-func ctxGetUrlRewriteTarget(r *http.Request) *url.URL {
+func ctxGetURLRewriteTarget(r *http.Request) *url.URL {
 	if v := r.Context().Value(ctx.UrlRewriteTarget); v != nil {
 		if urlVal, ok := v.(*url.URL); ok {
 			return urlVal
