@@ -1180,12 +1180,13 @@ func TestCachePostRequest(t *testing.T) {
 		}
 
 		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
-			json.Unmarshal([]byte(`[{
-						"method":"POST",
-						"path":"/",
-						"cache_key_regex":"\"id\":[^,]*"
-					}
-                                ]`), &v.ExtendedPaths.AdvanceCacheConfig)
+			v.ExtendedPaths.AdvanceCacheConfig = []apidef.CacheMeta{
+				{
+					Method:        http.MethodPost,
+					Path:          "/",
+					CacheKeyRegex: "\"id\":[^,]*",
+				},
+			}
 		})
 
 		spec.Proxy.ListenPath = "/"
@@ -1194,12 +1195,12 @@ func TestCachePostRequest(t *testing.T) {
 	headerCache := map[string]string{"x-tyk-cached-response": "1"}
 
 	ts.Run(t, []test.TestCase{
-		{Method: "POST", Path: "/", Data: "{\"id\":\"1\",\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
-		{Method: "POST", Path: "/", Data: "{\"id\":\"1\",\"name\":\"test\"}", HeadersMatch: headerCache, Delay: 10 * time.Millisecond},
-		{Method: "POST", Path: "/", Data: "{\"id\":\"2\",\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodPost, Path: "/", Data: "{\"id\":\"1\",\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodPost, Path: "/", Data: "{\"id\":\"1\",\"name\":\"test\"}", HeadersMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodPost, Path: "/", Data: "{\"id\":\"2\",\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
 		// if regex match returns nil, then request body is ignored while generating cache key
-		{Method: "POST", Path: "/", Data: "{\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
-		{Method: "POST", Path: "/", Data: "{\"name\":\"test2\"}", HeadersMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodPost, Path: "/", Data: "{\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodPost, Path: "/", Data: "{\"name\":\"test2\"}", HeadersMatch: headerCache, Delay: 10 * time.Millisecond},
 	}...)
 }
 
