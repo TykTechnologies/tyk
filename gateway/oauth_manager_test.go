@@ -323,7 +323,7 @@ func TestAuthCodeRedirectInvalidMultipleURL(t *testing.T) {
 			Data:    param.Encode(),
 			Headers: headers,
 			Method:  http.MethodPost,
-			Code:    http.StatusForbidden,
+			Code:    http.StatusBadRequest,
 		})
 	})
 }
@@ -955,7 +955,7 @@ func TestOAuthAPIRefreshInvalidate(t *testing.T) {
 			Data:    param.Encode(),
 			Headers: headers,
 			Method:  http.MethodPost,
-			Code:    http.StatusForbidden,
+			Code:    http.StatusBadRequest,
 		})
 	})
 }
@@ -1092,7 +1092,7 @@ func TestTokenEndpointHeaders(t *testing.T) {
 			Path:         "/APIID/oauth/token/",
 			Data:         param.Encode(),
 			Method:       http.MethodPost,
-			Code:         http.StatusForbidden,
+			Code:         http.StatusBadRequest,
 			HeadersMatch: securityAndCacheHeaders,
 		}}...)
 }

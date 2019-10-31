@@ -385,6 +385,7 @@ type Config struct {
 	OauthTokenExpire              int32                `json:"oauth_token_expire"`
 	OauthTokenExpiredRetainPeriod int32                `json:"oauth_token_expired_retain_period"`
 	OauthRedirectUriSeparator     string               `json:"oauth_redirect_uri_separator"`
+	OauthErrorStatusCode          int                  `json:"oauth_error_status_code"`
 	EnableKeyLogging              bool                 `json:"enable_key_logging"`
 
 	// Proxy analytics configuration
