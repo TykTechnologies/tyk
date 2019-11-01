@@ -362,12 +362,13 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		if returnObject.Session == nil || token == "" {
 			authHeaderValue := r.Header.Get(m.Spec.Auth.AuthHeaderName)
 			AuthFailed(m, r, authHeaderValue)
-			return errors.New(http.StatusText(http.StatusForbidden)), http.StatusForbidden
+			return errors.New(http.StatusText(http.StatusUnauthorized)), http.StatusUnauthorized
 		}
 
 		returnedSession := TykSessionState(returnObject.Session)
 
 		if err := m.ApplyPolicies(returnedSession); err != nil {
+			AuthFailed(m, r, r.Header.Get(m.Spec.Auth.AuthHeaderName))
 			return errors.New(http.StatusText(http.StatusForbidden)), http.StatusForbidden
 		}
 
