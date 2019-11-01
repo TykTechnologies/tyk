@@ -59,6 +59,7 @@ type Handler interface {
 type AnalyticsHandler interface {
 	Connect() bool
 	AppendToSetPipelined(string, [][]byte)
+	GetAndDeleteSet(string) []interface{}
 }
 
 const defaultHashAlgorithm = "murmur64"
