@@ -362,10 +362,14 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		if returnObject.Session == nil || token == "" {
 			authHeaderValue := r.Header.Get(m.Spec.Auth.AuthHeaderName)
 			AuthFailed(m, r, authHeaderValue)
-			return errors.New("Key not authorised"), 403
+			return errors.New(http.StatusText(http.StatusForbidden)), http.StatusForbidden
 		}
 
 		returnedSession := TykSessionState(returnObject.Session)
+
+		if err := m.ApplyPolicies(returnedSession); err != nil {
+			return errors.New(http.StatusText(http.StatusForbidden)), http.StatusForbidden
+		}
 
 		// If the returned object contains metadata, add them to the session:
 		for k, v := range returnObject.Metadata {
