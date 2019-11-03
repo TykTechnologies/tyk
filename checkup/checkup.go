@@ -46,7 +46,8 @@ func legacyRateLimiters(c config.Config) {
 
 func allowInsecureConfigs(c config.Config) {
 	if c.AllowInsecureConfigs {
-		log.Warning("Insecure configuration allowed: allow_insecure_configs: true")
+		log.WithField("config.allow_insecure_configs", true).
+			Warning("Insecure configuration allowed")
 	}
 }
 
@@ -77,11 +78,13 @@ func cpus() {
 
 func defaultSecrets(c config.Config) {
 	if c.Secret == defaultConfigs.Secret {
-		log.Warningf("Default secret `%s` should be changed for production.", defaultConfigs.Secret)
+		log.WithField("config.secret", defaultConfigs.Secret).
+			Warning("Default secret should be changed for production.")
 	}
 
 	if c.NodeSecret == defaultConfigs.NodeSecret {
-		log.Warningf("Default node_secret `%s` should be changed for production.", defaultConfigs.NodeSecret)
+		log.WithField("config.node_secret", defaultConfigs.NodeSecret).
+			Warning("Default node_secret should be changed for production.")
 	}
 }
 
@@ -91,12 +94,14 @@ func defaultAnalytics(c config.Config) {
 	}
 
 	if c.AnalyticsConfig.PoolSize == 0 {
-		log.Warningf("AnalyticsConfig.PoolSize unset. Defaulting to number of available CPUs (%d)", runtime.NumCPU())
+		log.WithField("runtime.NumCPU", runtime.NumCPU()).
+			Warning("AnalyticsConfig.PoolSize unset. Defaulting to number of available CPUs")
 		c.AnalyticsConfig.PoolSize = runtime.NumCPU()
 	}
 
 	if c.AnalyticsConfig.RecordsBufferSize < minRecordsBufferSize {
-		log.Warningf("AnalyticsConfig.RecordsBufferSize < minimum (%d) - Overriding", minRecordsBufferSize)
+		log.WithField("minRecordsBufferSize", minRecordsBufferSize).
+			Warning("AnalyticsConfig.RecordsBufferSize < minimum - Overriding")
 		c.AnalyticsConfig.RecordsBufferSize = minRecordsBufferSize
 	}
 
