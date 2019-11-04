@@ -51,7 +51,7 @@ func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWrite
 		return nil, http.StatusOK
 	}
 
-	token := getAuthHeaderValue(hm, r)
+	token, _ := getAuthToken(hm, r)
 	if token == "" {
 		return hm.authorizationError(r)
 	}
@@ -68,7 +68,8 @@ func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWrite
 	}
 
 	// Generate a signature string
-	signatureString, err := generateSignatureStringFromRequest(r, fieldValues.Headers)
+	signatureString, err := generateHMACSignatureStringFromRequest(hm, r, fieldValues.Headers)
+
 	if err != nil {
 		logger.WithError(err).WithField("signature_string", signatureString).Error("Signature string generation failed")
 		return hm.authorizationError(r)
@@ -180,7 +181,7 @@ func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWrite
 	}
 
 	// Check clock skew
-	_, dateVal := getDateHeader(r)
+	_, dateVal := getDateHeader(hm, r)
 	if !hm.checkClockSkew(dateVal) {
 		logger.Error("Clock skew outside of acceptable bounds")
 		return hm.authorizationError(r)
@@ -232,8 +233,8 @@ func (hm *HTTPSignatureValidationMiddleware) setContextVars(r *http.Request, tok
 
 func (hm *HTTPSignatureValidationMiddleware) authorizationError(r *http.Request) (error, int) {
 	hm.Logger().Info("Authorization field missing or malformed")
-
-	AuthFailed(hm, r, getAuthHeaderValue(hm, r))
+	token, _ := getAuthToken(hm, r)
+	AuthFailed(hm, r, token)
 
 	return errors.New("Authorization field missing, malformed or invalid"), http.StatusBadRequest
 }
@@ -309,11 +310,11 @@ func (hm *HTTPSignatureValidationMiddleware) getRSACertificateIdAndSessionForKey
 	return session.RSACertificateId, session, nil
 }
 
-func getDateHeader(r *http.Request) (string, string) {
+func getDateHeader(m TykMiddleware, r *http.Request) (string, string) {
 	auxHeaderVal := r.Header.Get(altHeaderSpec)
 	// Prefer aux if present
 	if auxHeaderVal != "" {
-		token := getAuthHeaderValue(&HMACMiddleware{}, r)
+		token, _ := getAuthToken(m, r)
 		log.WithFields(logrus.Fields{
 			"prefix":      "hmac",
 			"auth_header": token,
@@ -408,8 +409,7 @@ func getFieldValues(authHeader string) (*HMACFieldValues, error) {
 }
 
 // "Signature keyId="9876",algorithm="hmac-sha1",headers="x-test x-test-2",signature="queryEscape(base64(sig))"")
-
-func generateSignatureStringFromRequest(r *http.Request, headers []string) (string, error) {
+func generateHMACSignatureStringFromRequest(m TykMiddleware, r *http.Request, headers []string) (string, error) {
 	signatureString := ""
 	for i, header := range headers {
 		loweredHeader := strings.TrimSpace(strings.ToLower(header))
@@ -420,7 +420,7 @@ func generateSignatureStringFromRequest(r *http.Request, headers []string) (stri
 			// exception for dates and .Net oddness
 			headerVal := r.Header.Get(loweredHeader)
 			if loweredHeader == "date" {
-				loweredHeader, headerVal = getDateHeader(r)
+				loweredHeader, headerVal = getDateHeader(m, r)
 			}
 			headerField := strings.TrimSpace(loweredHeader) + ": " + strings.TrimSpace(headerVal)
 			signatureString += headerField

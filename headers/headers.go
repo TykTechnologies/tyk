@@ -17,15 +17,6 @@ const (
 )
 
 const (
-	AuthJWT     = "Auth-JWT"
-	AuthKey     = "Auth-Key"
-	AuthHMAC    = "Auth-HMAC"
-	AuthOAuth2  = "Auth-OAuth2"
-	AuthBasic   = "Auth-Basic"
-	AuthDefault = "Authorization"
-)
-
-const (
 	TykHookshot     = "Tyk-Hookshot"
 	ApplicationJSON = "application/json"
 	ApplicationXML  = "application/xml"

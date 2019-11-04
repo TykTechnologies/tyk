@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/TykTechnologies/tyk/headers"
 	"net/http"
 	"strings"
 	"time"
@@ -515,72 +514,21 @@ func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Toke
 	return nil, http.StatusOK
 }
 
-func getAuthHeaderName(middleware interface{}) (authHeaderName string) {
-	switch middleware.(type) {
-	case *JWTMiddleware:
-		authHeaderName = headers.AuthJWT
-	case *AuthKey:
-		authHeaderName = headers.AuthKey
-	case *HMACMiddleware:
-		authHeaderName = headers.AuthHMAC
-	case *Oauth2KeyExists:
-		authHeaderName = headers.AuthOAuth2
-	case *BasicAuthKeyIsValid:
-		authHeaderName = headers.AuthBasic
-	default:
-		authHeaderName = headers.AuthDefault
-	}
-
-	return
-}
-
-func getAuthHeaderValue(middleware interface{}, r *http.Request) (headerValue string) {
-	customHeaderName := getAuthHeaderName(middleware)
-
-	if headerValue = r.Header.Get(customHeaderName); headerValue != "" {
-		return
-	}
-
-	headerValue = r.Header.Get(headers.AuthDefault)
-	return
-}
-
 func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
 		return nil, http.StatusOK
 	}
 
 	logger := k.Logger()
-	config := k.Spec.Auth
 	var tykId string
 
-	authHeaderName := config.AuthHeaderName
-	rawJWT := r.Header.Get(authHeaderName)
-	customHeaderValue := getAuthHeaderValue(k, r)
-	if rawJWT == "" && customHeaderValue != "" {
-		rawJWT = customHeaderValue
-		authHeaderName = getAuthHeaderName(k)
-	}
-
-	if config.UseParam {
-		// Set hte header name
-		rawJWT = r.URL.Query().Get(authHeaderName)
-	}
-
-	if config.UseCookie {
-		authCookie, err := r.Cookie(authHeaderName)
-		if err != nil {
-			rawJWT = ""
-		} else {
-			rawJWT = authCookie.Value
-		}
-	}
+	rawJWT, config := getAuthToken(k, r)
 
 	if rawJWT == "" {
 		// No header value, fail
 		logger.Info("Attempted access with malformed header, no JWT auth header found.")
 
-		log.Debug("Looked in: ", authHeaderName)
+		log.Debug("Looked in: ", config.AuthHeaderName)
 		log.Debug("Raw data was: ", rawJWT)
 		log.Debug("Headers are: ", r.Header)
 
