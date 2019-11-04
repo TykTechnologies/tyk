@@ -245,6 +245,9 @@ const Schema = `{
                 "auth_header_name"
             ]
         },
+		"auth_configs":{
+			"type": ["object", "null"]
+		},
         "definition": {
             "type": ["object", "null"],
             "id": "http://jsonschema.net/definition",
