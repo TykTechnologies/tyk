@@ -21,7 +21,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -52,7 +51,7 @@ func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWrite
 		return nil, http.StatusOK
 	}
 
-	token := r.Header.Get("Authorization")
+	token := getAuthHeaderValue(hm, r)
 	if token == "" {
 		return hm.authorizationError(r)
 	}
@@ -234,7 +233,7 @@ func (hm *HTTPSignatureValidationMiddleware) setContextVars(r *http.Request, tok
 func (hm *HTTPSignatureValidationMiddleware) authorizationError(r *http.Request) (error, int) {
 	hm.Logger().Info("Authorization field missing or malformed")
 
-	AuthFailed(hm, r, r.Header.Get(headers.Authorization))
+	AuthFailed(hm, r, getAuthHeaderValue(hm, r))
 
 	return errors.New("Authorization field missing, malformed or invalid"), http.StatusBadRequest
 }
@@ -314,7 +313,7 @@ func getDateHeader(r *http.Request) (string, string) {
 	auxHeaderVal := r.Header.Get(altHeaderSpec)
 	// Prefer aux if present
 	if auxHeaderVal != "" {
-		token := r.Header.Get(headers.Authorization)
+		token := getAuthHeaderValue(&HMACMiddleware{}, r)
 		log.WithFields(logrus.Fields{
 			"prefix":      "hmac",
 			"auth_header": token,

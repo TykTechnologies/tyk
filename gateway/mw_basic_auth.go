@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	cache "github.com/pmylund/go-cache"
+	"github.com/pmylund/go-cache"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/sync/singleflight"
@@ -80,7 +80,7 @@ func (k *BasicAuthKeyIsValid) requestForBasicAuth(w http.ResponseWriter, msg str
 }
 
 func (k *BasicAuthKeyIsValid) basicAuthHeaderCredentials(w http.ResponseWriter, r *http.Request) (username, password string, err error, code int) {
-	token := r.Header.Get(headers.Authorization)
+	token := getAuthHeaderValue(k, r)
 	logger := k.Logger().WithField("key", obfuscateKey(token))
 	if token == "" {
 		// No header value, fail

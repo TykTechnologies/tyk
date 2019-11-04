@@ -45,12 +45,18 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 
 	config := k.Spec.Auth
 
-	key := r.Header.Get(config.AuthHeaderName)
+	authHeaderName := config.AuthHeaderName
+	key := r.Header.Get(authHeaderName)
+	customHeaderValue := getAuthHeaderValue(k, r)
+	if key == "" && customHeaderValue != "" {
+		key = customHeaderValue
+		authHeaderName = getAuthHeaderName(k)
+	}
 
 	paramName := config.ParamName
 	if config.UseParam || paramName != "" {
 		if paramName == "" {
-			paramName = config.AuthHeaderName
+			paramName = authHeaderName
 		}
 
 		paramValue := r.URL.Query().Get(paramName)
@@ -64,7 +70,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 	cookieName := config.CookieName
 	if config.UseCookie || cookieName != "" {
 		if cookieName == "" {
-			cookieName = config.AuthHeaderName
+			cookieName = authHeaderName
 		}
 
 		authCookie, err := r.Cookie(cookieName)
