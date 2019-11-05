@@ -365,6 +365,7 @@ func testHttpHandler() *mux.Router {
 	// use gorilla's mux as it allows to cancel URI cleaning
 	// (it is not configurable in standard http mux)
 	r := mux.NewRouter()
+
 	r.HandleFunc("/get", handleMethod("GET"))
 	r.HandleFunc("/post", handleMethod("POST"))
 	r.HandleFunc("/ws", wsHandler)
@@ -379,6 +380,10 @@ func testHttpHandler() *mux.Router {
 		gz.Close()
 	})
 	r.HandleFunc("/bundles/{rest:.*}", bundleHandleFunc)
+	r.HandleFunc("/errors/{status}", func(w http.ResponseWriter, r *http.Request) {
+		statusCode, _ := strconv.Atoi(mux.Vars(r)["status"])
+		httpError(w, statusCode)
+	})
 	r.HandleFunc("/{rest:.*}", handleMethod(""))
 
 	return r

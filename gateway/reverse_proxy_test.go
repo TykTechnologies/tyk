@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -345,6 +346,38 @@ func TestWrappedServeHTTP(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodGet, "/", nil)
 	proxy.WrappedServeHTTP(recorder, req, false)
+}
+
+func TestCircuitBreaker5xxs(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+
+	t.Run("Extended Paths", func(t *testing.T) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				json.Unmarshal([]byte(`[
+					{
+						"path": "error",
+						"method": "GET",
+						"threshold_percent": 0.1,
+						"samples": 3,
+						"return_to_service_after": 6000
+					}
+  			 	]`), &v.ExtendedPaths.CircuitBreaker)
+			})
+			spec.Proxy.ListenPath = "/"
+			spec.CircuitBreakerEnabled = true
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/errors/500", Code: http.StatusInternalServerError},
+			{Path: "/errors/501", Code: http.StatusNotImplemented},
+			{Path: "/errors/502", Code: http.StatusBadGateway},
+			{Path: "/errors/500", Code: http.StatusServiceUnavailable},
+			{Path: "/errors/501", Code: http.StatusServiceUnavailable},
+			{Path: "/errors/502", Code: http.StatusServiceUnavailable},
+		}...)
+	})
 }
 
 func TestSingleJoiningSlash(t *testing.T) {
