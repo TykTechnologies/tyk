@@ -51,6 +51,7 @@ type OpenTracer struct {
 	log      Logger
 	enabled  atomic.Value
 	config   Config
+	init     InitFunc
 }
 
 type Config struct {
@@ -161,13 +162,20 @@ func (o *OpenTracer) SetLogger(log Logger) {
 	o.mu.Unlock()
 }
 
+func (o *OpenTracer) SetInit(fn InitFunc) {
+	o.init = fn
+}
+
 // AddTracer initializes a tracer based on the configuration stored in o for the
 // given service name and caches. This does donthing when there is already a
 // tracer for the given service.
 func (o *OpenTracer) AddTracer(service string) error {
 	_, ok := o.GetOk(service)
 	if !ok {
-		tr, err := Init(o.config.Name, service, o.config.Opts, o.log)
+		if o.init == nil {
+			o.init = Init
+		}
+		tr, err := o.init(o.config.Name, service, o.config.Opts, o.log)
 		if err != nil {
 			if o.log != nil {
 				o.log.Errorf("%v", err)
@@ -189,6 +197,10 @@ func AddTracer(service string) error {
 
 func SetLogger(log Logger) {
 	manager.SetLogger(log)
+}
+
+func SetInit(fn InitFunc) {
+	manager.SetInit(fn)
 }
 
 func (o *OpenTracer) SetupTracing(name string, opts map[string]interface{}) {
