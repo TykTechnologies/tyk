@@ -362,8 +362,8 @@ func TestCircuitBreaker5xxs(t *testing.T){
                             "threshold_percent": 0.1,
                             "samples": 3,
                             "return_to_service_after": 6000
-				}]`), &v.ExtendedPaths.CircuitBreaker)
-
+					}
+  			 ]`), &v.ExtendedPaths.CircuitBreaker)
 			})
 			spec.Proxy.ListenPath = "/"
 
@@ -395,7 +395,8 @@ func TestCircuitBreaker4xxs(t *testing.T){
                             "threshold_percent": 0.1,
                             "samples": 3,
                             "return_to_service_after": 6000
-				}]`), &v.ExtendedPaths.CircuitBreaker)
+					}
+				]`), &v.ExtendedPaths.CircuitBreaker)
 
 			})
 			spec.Proxy.ListenPath = "/"
