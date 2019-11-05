@@ -73,7 +73,7 @@ func (o *OpenTracer) Get(service string) Tracer {
 	o.mu.RUnlock()
 	if !ok {
 		if o.log != nil {
-			o.log.Info(service, "not found")
+			o.log.Infof("[trace] Failed to get tracer for %q error: not found", service)
 		}
 		return NoopTracer{}
 	}
