@@ -410,6 +410,9 @@ type Config struct {
 	// Cisco - Redis DB Api Store
 	UseRedisDBAppConfig   bool                        `json:"use_redis_db_app_configs"`
 	RedisDBAppConfOptions RedisDBAppConfOptionsConfig `json:"redis_db_app_conf_options"`
+
+	// Cisco - Read timeout
+	DynamicAPIConnTimeout int `json:"dynamic_api_timeout_milli_sec"`
 }
 
 // GetEventTriggers returns event triggers. There was a typo in the json tag.
