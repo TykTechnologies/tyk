@@ -592,7 +592,8 @@ func (a APIDefinitionLoader) filterSprigFuncs() template.FuncMap {
 
 func (a APIDefinitionLoader) loadFileTemplate(path string) (*template.Template, error) {
 	log.Debug("-- Loading template: ", path)
-	return apidef.Template.New("").Funcs(a.filterSprigFuncs()).ParseFiles(path)
+  tmpName := filepath.Base(path)
+	return apidef.Template.New(tmpName).Funcs(a.filterSprigFuncs()).ParseFiles(path)
 }
 
 func (a APIDefinitionLoader) loadBlobTemplate(blob string) (*template.Template, error) {
