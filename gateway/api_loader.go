@@ -685,11 +685,11 @@ func loadApps(specs []*APISpec) {
 		case "", "http", "https":
 			if shouldTrace {
 				// opentracing works only with http services.
-				err := trace.AddTracer(spec.Name)
+				err := trace.AddTracer("", spec.Name)
 				if err != nil {
-					mainLog.Errorf("Failed to initialize tracer for %s error:%v", spec.Name, err)
+					mainLog.Errorf("Failed to initialize tracer for %q error:%v", spec.Name, err)
 				} else {
-					mainLog.Infof("Intialized opentracer  api=%s", spec.Name)
+					mainLog.Infof("Intialized tracer  api_name=%q", spec.Name)
 				}
 			}
 			loadHTTPService(spec, apisByListen, &gs, muxer)

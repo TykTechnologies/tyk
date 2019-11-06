@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"sync/atomic"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/trace"
@@ -19,9 +20,9 @@ func TestOpenTracing(t *testing.T) {
 	})
 
 	t.Run("ensure services are initialized", func(ts *testing.T) {
-		var s string
+		var s atomic.Value
 		trace.SetInit(func(name string, service string, opts map[string]interface{}, logger trace.Logger) (trace.Tracer, error) {
-			s = service
+			s.Store(service)
 			return trace.NoopTracer{}, nil
 		})
 		name := "trace"
@@ -31,8 +32,12 @@ func TestOpenTracing(t *testing.T) {
 				spec.UseOauth2 = true
 			},
 		)
-		if name != s {
-			ts.Errorf("expected %s got %s", name, s)
+		var n string
+		if v := s.Load(); v != nil {
+			n = v.(string)
+		}
+		if name != n {
+			ts.Errorf("expected %s got %s", name, n)
 		}
 	})
 }
