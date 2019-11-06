@@ -88,6 +88,7 @@ func Close() error {
 	for _, v := range s {
 		services.Delete(v)
 	}
+	Disable()
 	return nil
 }
 
