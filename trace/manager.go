@@ -18,7 +18,6 @@ var ErrManagerDisabled = errors.New("trace: trace is diabled")
 var manager = &sync.Map{}
 var services = &sync.Map{}
 var enabled atomic.Value
-var mu sync.RWMutex
 var logger Logger = StdLogger{}
 var initializer = Init
 
