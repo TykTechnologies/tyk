@@ -726,7 +726,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		begin := time.Now()
 		res, err = roundTripper.RoundTrip(outreq)
 		upstreamLatency = time.Since(begin)
-		if err != nil || res.StatusCode == http.StatusInternalServerError {
+		if err != nil || res.StatusCode/100 == 5 {
 			breakerConf.CB.Fail()
 		} else {
 			breakerConf.CB.Success()
