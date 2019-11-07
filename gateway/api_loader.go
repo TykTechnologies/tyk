@@ -39,7 +39,7 @@ func prepareStorage() generalStores {
 	gs.healthStore = &storage.RedisCluster{KeyPrefix: "apihealth."}
 	gs.rpcAuthStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
 	gs.rpcOrgStore = &RPCStorageHandler{KeyPrefix: "orgkey."}
-	FallbackKeySesionManager.Init(gs.redisStore)
+	GlobalSessionManager.Init(gs.redisStore)
 	return gs
 }
 

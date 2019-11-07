@@ -214,9 +214,9 @@ func (t BaseMiddleware) Config() (interface{}, error) {
 	return nil, nil
 }
 
-func (t BaseMiddleware) OrgSession(key string) (user.SessionState, bool) {
+func (t BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
 	// Try and get the session from the session store
-	session, found := t.Spec.OrgSessionManager.SessionDetail(key, false)
+	session, found := t.Spec.OrgSessionManager.SessionDetail(orgID, orgID, false)
 	if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
 		// If exists, assume it has been authorized and pass on
 		// We cache org expiry data
@@ -224,7 +224,7 @@ func (t BaseMiddleware) OrgSession(key string) (user.SessionState, bool) {
 		ExpiryCache.Set(session.OrgID, session.DataExpires, cache.DefaultExpiration)
 	}
 
-	session.SetKeyHash(storage.HashKey(key))
+	session.SetKeyHash(storage.HashKey(orgID))
 	return session, found
 }
 
@@ -266,7 +266,7 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 	}
 
 	lifetime := session.Lifetime(t.Spec.SessionLifetime)
-	if err := t.Spec.SessionManager.UpdateSession(token, session, lifetime, false); err != nil {
+	if err := GlobalSessionManager.UpdateSession(token, session, lifetime, false); err != nil {
 		t.Logger().WithError(err).Error("Can't update session")
 		return false
 	}
@@ -569,7 +569,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 
 	// Check session store
 	t.Logger().Debug("Querying keystore")
-	session, found := t.Spec.SessionManager.SessionDetail(key, false)
+	session, found := GlobalSessionManager.SessionDetail(t.Spec.OrgID, key, false)
 	if found {
 		session.SetKeyHash(cacheKey)
 		// If exists, assume it has been authorized and pass on

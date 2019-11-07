@@ -414,7 +414,7 @@ func CreateSession(sGen ...func(s *user.SessionState)) string {
 		key = generateToken("default", session.Certificate)
 	}
 
-	FallbackKeySesionManager.UpdateSession(storage.HashKey(key), session, 60, config.Global().HashKeys)
+	GlobalSessionManager.UpdateSession(storage.HashKey(key), session, 60, config.Global().HashKeys)
 	return key
 }
 
@@ -530,16 +530,6 @@ func CreateDefinitionFromString(defStr string) *APISpec {
 	loader := APIDefinitionLoader{}
 	def := loader.ParseDefinition(strings.NewReader(defStr))
 	spec := loader.MakeSpec(def, nil)
-	return spec
-}
-
-func CreateSpecTest(t testing.TB, def string) *APISpec {
-	spec := CreateDefinitionFromString(def)
-	tname := t.Name()
-	redisStore := &storage.RedisCluster{KeyPrefix: tname + "-apikey."}
-	healthStore := &storage.RedisCluster{KeyPrefix: tname + "-apihealth."}
-	orgStore := &storage.RedisCluster{KeyPrefix: tname + "-orgKey."}
-	spec.Init(redisStore, redisStore, healthStore, orgStore)
 	return spec
 }
 

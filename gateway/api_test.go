@@ -17,7 +17,6 @@ import (
 
 	"fmt"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
@@ -42,14 +41,10 @@ const apiTestDef = `{
 	}
 }`
 
-func loadSampleAPI(t *testing.T, def string) {
-	spec := CreateSpecTest(t, def)
+func loadSampleAPI(def string) (spec *APISpec) {
+	spec = CreateDefinitionFromString(def)
 	loadApps([]*APISpec{spec})
-}
-
-type testAPIDefinition struct {
-	apidef.APIDefinition
-	ID string `json:"id"`
+	return
 }
 
 func TestHealthCheckEndpoint(t *testing.T) {
@@ -247,7 +242,7 @@ func TestKeyHandler(t *testing.T) {
 			},
 		}...)
 
-		FallbackKeySesionManager.Store().DeleteAllKeys()
+		GlobalSessionManager.Store().DeleteAllKeys()
 	})
 
 	_, knownKey := ts.CreateSession(func(s *user.SessionState) {
@@ -372,7 +367,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
 		}...)
 
-		sessionState, found := FallbackKeySesionManager.SessionDetail(key, false)
+		sessionState, found := GlobalSessionManager.SessionDetail("default", key, false)
 		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 2 {
 			t.Fatal("Adding policy to the list failed")
 		}
@@ -387,7 +382,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
 		}...)
 
-		sessionState, found := FallbackKeySesionManager.SessionDetail(key, false)
+		sessionState, found := GlobalSessionManager.SessionDetail("default", key, false)
 		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 0 {
 			t.Fatal("Removing policy from the list failed")
 		}
@@ -402,7 +397,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 				{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
 			}...)
 
-			sessionState, found := FallbackKeySesionManager.SessionDetail(key, false)
+			sessionState, found := GlobalSessionManager.SessionDetail(session.OrgID, key, false)
 
 			sort.Strings(sessionState.Tags)
 			sort.Strings(expected)
@@ -1174,7 +1169,7 @@ func TestGroupResetHandler(t *testing.T) {
 	apisByID = make(map[string]*APISpec)
 	apisMu.Unlock()
 
-	loadSampleAPI(t, apiTestDef)
+	loadSampleAPI(apiTestDef)
 
 	recorder := httptest.NewRecorder()
 

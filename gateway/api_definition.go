@@ -162,7 +162,6 @@ type APISpec struct {
 	WhiteListEnabled         map[string]bool
 	target                   *url.URL
 	AuthManager              AuthorisationHandler
-	SessionManager           SessionHandler
 	OAuthManager             *OAuthManager
 	OrgSessionManager        SessionHandler
 	EventPaths               map[apidef.TykEvent][]config.TykEventHandler
@@ -273,9 +272,6 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 	// Add any new session managers or auth handlers here
 	spec.AuthManager = &DefaultAuthorisationManager{}
 
-	spec.SessionManager = &DefaultSessionManager{
-		orgID: spec.OrgID,
-	}
 	spec.OrgSessionManager = &DefaultSessionManager{
 		orgID: spec.OrgID,
 	}
@@ -949,13 +945,11 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 
 func (a *APISpec) Init(authStore, sessionStore, healthStore, orgStore storage.Handler) {
 	a.AuthManager.Init(authStore)
-	a.SessionManager.Init(sessionStore)
 	a.Health.Init(healthStore)
 	a.OrgSessionManager.Init(orgStore)
 }
 
 func (a *APISpec) StopSessionManagerPool() {
-	a.SessionManager.Stop()
 	a.OrgSessionManager.Stop()
 }
 

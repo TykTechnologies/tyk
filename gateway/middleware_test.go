@@ -17,7 +17,7 @@ var sess = user.SessionState{
 	DataExpires: 110,
 }
 
-func (mockStore) SessionDetail(keyName string, hashed bool) (user.SessionState, bool) {
+func (mockStore) SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool) {
 	return sess, true
 }
 

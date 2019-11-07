@@ -51,23 +51,23 @@ import (
 )
 
 var (
-	log                      = logger.Get()
-	mainLog                  = log.WithField("prefix", "main")
-	pubSubLog                = log.WithField("prefix", "pub-sub")
-	rawLog                   = logger.GetRaw()
-	templates                *template.Template
-	analytics                RedisAnalyticsHandler
-	GlobalEventsJSVM         JSVM
-	memProfFile              *os.File
-	MainNotifier             RedisNotifier
-	DefaultOrgStore          DefaultSessionManager
-	DefaultQuotaStore        DefaultSessionManager
-	FallbackKeySesionManager = SessionHandler(&DefaultSessionManager{})
-	MonitoringHandler        config.TykEventHandler
-	RPCListener              RPCStorageHandler
-	DashService              DashboardServiceSender
-	CertificateManager       *certs.CertificateManager
-	NewRelicApplication      newrelic.Application
+	log                  = logger.Get()
+	mainLog              = log.WithField("prefix", "main")
+	pubSubLog            = log.WithField("prefix", "pub-sub")
+	rawLog               = logger.GetRaw()
+	templates            *template.Template
+	analytics            RedisAnalyticsHandler
+	GlobalEventsJSVM     JSVM
+	memProfFile          *os.File
+	MainNotifier         RedisNotifier
+	DefaultOrgStore      DefaultSessionManager
+	DefaultQuotaStore    DefaultSessionManager
+	GlobalSessionManager = SessionHandler(&DefaultSessionManager{})
+	MonitoringHandler    config.TykEventHandler
+	RPCListener          RPCStorageHandler
+	DashService          DashboardServiceSender
+	CertificateManager   *certs.CertificateManager
+	NewRelicApplication  newrelic.Application
 
 	apisMu   sync.RWMutex
 	apiSpecs []*APISpec
@@ -172,7 +172,7 @@ func setupGlobals(ctx context.Context) {
 	InitHostCheckManager(ctx, &healthCheckStore)
 
 	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
-	FallbackKeySesionManager.Init(&redisStore)
+	GlobalSessionManager.Init(&redisStore)
 
 	versionStore := storage.RedisCluster{KeyPrefix: "version-check-"}
 	versionStore.Connect()
@@ -493,7 +493,7 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 	prefix := generateOAuthPrefix(spec.APIID)
 	storageManager := getGlobalStorageHandler(prefix, false)
 	storageManager.Connect()
-	osinStorage := &RedisOsinStorageInterface{storageManager, spec.SessionManager} //TODO: Needs storage manager from APISpec
+	osinStorage := &RedisOsinStorageInterface{storageManager, GlobalSessionManager, spec.OrgID}
 
 	osinServer := TykOsinNewServer(serverConfig, osinStorage)
 
