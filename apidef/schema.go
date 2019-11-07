@@ -312,7 +312,7 @@ const Schema = `{
                             "type": "string"
                         },
                         "ssl_force_common_name_check": {
-                            "type": "bool"
+                            "type": "boolean"
                         }
                     }
                 }
