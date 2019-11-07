@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/garyburd/redigo/redis"
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 
 	"fmt"
 
@@ -242,7 +242,7 @@ func TestKeyHandler(t *testing.T) {
 			},
 		}...)
 
-		FallbackKeySesionManager.Store().DeleteAllKeys()
+		GlobalSessionManager.Store().DeleteAllKeys()
 	})
 
 	_, knownKey := ts.CreateSession(func(s *user.SessionState) {
@@ -397,7 +397,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 				{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
 			}...)
 
-			sessionState, found := FallbackKeySesionManager.SessionDetail(key, false)
+			sessionState, found := GlobalSessionManager.SessionDetail(session.OrgID, key, false)
 
 			sort.Strings(sessionState.Tags)
 			sort.Strings(expected)

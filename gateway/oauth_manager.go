@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/lonelycode/osin"
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 	"golang.org/x/crypto/bcrypt"
 
 	"strconv"
