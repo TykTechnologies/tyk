@@ -14,9 +14,17 @@ import (
 	opentracing "github.com/opentracing/opentracing-go"
 )
 
+// ErrManagerDisabled is returned when trying to use global trace manager when
+// it is disabled.
 var ErrManagerDisabled = errors.New("trace: trace is diabled")
+
+// This stores a map of opentracer configurations.
 var manager = &sync.Map{}
+
+// This stores a map of service name to  initialized Tracer implementation.
 var services = &sync.Map{}
+
+// Stores status of tracing.
 var enabled atomic.Value
 var logger Logger = StdLogger{}
 var initializer = Init
