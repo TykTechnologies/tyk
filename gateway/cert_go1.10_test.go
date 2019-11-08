@@ -38,10 +38,11 @@ func TestPublicKeyPinning(t *testing.T) {
 	defer upstream.Close()
 
 	t.Run("Pub key match", func(t *testing.T) {
-		globalConf := config.Global()
-		// For host using pinning, it should ignore standard verification in all cases, e.g setting variable below does nothing
-		globalConf.ProxySSLInsecureSkipVerify = false
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			// For host using pinning, it should ignore standard verification in all cases, e.g setting variable below does nothing
+			c.ProxySSLInsecureSkipVerify = false
+		})
+
 		defer ResetTestConfig()
 
 		ts := StartTest()
@@ -70,9 +71,10 @@ func TestPublicKeyPinning(t *testing.T) {
 	})
 
 	t.Run("Global setting", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.Security.PinnedPublicKeys = map[string]string{"127.0.0.1": "wrong"}
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.Security.PinnedPublicKeys = map[string]string{"127.0.0.1": "wrong"}
+		})
+
 		defer ResetTestConfig()
 
 		ts := StartTest()
@@ -92,9 +94,10 @@ func TestPublicKeyPinning(t *testing.T) {
 			Certificates: []tls.Certificate{proxyCert},
 		})
 
-		globalConf := config.Global()
-		globalConf.ProxySSLInsecureSkipVerify = true
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.ProxySSLInsecureSkipVerify = true
+		})
+
 		defer ResetTestConfig()
 
 		defer proxy.Stop()
@@ -126,13 +129,13 @@ func TestProxyTransport(t *testing.T) {
 
 	//matching ciphers
 	t.Run("Global: Cipher match", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.ProxySSLInsecureSkipVerify = true
-		// force creating new transport on each reque
-		globalConf.MaxConnTime = -1
+		config.SetGlobal(func(c *config.Config) {
+			c.ProxySSLInsecureSkipVerify = true
+			// force creating new transport on each reque
+			c.MaxConnTime = -1
+			c.ProxySSLCipherSuites = []string{"TLS_RSA_WITH_AES_128_CBC_SHA"}
+		})
 
-		globalConf.ProxySSLCipherSuites = []string{"TLS_RSA_WITH_AES_128_CBC_SHA"}
-		config.SetGlobal(globalConf)
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
@@ -141,13 +144,13 @@ func TestProxyTransport(t *testing.T) {
 	})
 
 	t.Run("Global: Cipher not match", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.ProxySSLInsecureSkipVerify = true
-		// force creating new transport on each reque
-		globalConf.MaxConnTime = -1
+		config.SetGlobal(func(c *config.Config) {
+			c.ProxySSLInsecureSkipVerify = true
+			// force creating new transport on each reque
+			c.MaxConnTime = -1
+			c.ProxySSLCipherSuites = []string{"TLS_RSA_WITH_RC4_128_SHA"}
+		})
 
-		globalConf.ProxySSLCipherSuites = []string{"TLS_RSA_WITH_RC4_128_SHA"}
-		config.SetGlobal(globalConf)
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
@@ -156,13 +159,13 @@ func TestProxyTransport(t *testing.T) {
 	})
 
 	t.Run("API: Cipher override", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.ProxySSLInsecureSkipVerify = true
-		// force creating new transport on each reque
-		globalConf.MaxConnTime = -1
+		config.SetGlobal(func(c *config.Config) {
+			c.ProxySSLInsecureSkipVerify = true
+			// force creating new transport on each reque
+			c.MaxConnTime = -1
+			c.ProxySSLCipherSuites = []string{"TLS_RSA_WITH_RC4_128_SHA"}
+		})
 
-		globalConf.ProxySSLCipherSuites = []string{"TLS_RSA_WITH_RC4_128_SHA"}
-		config.SetGlobal(globalConf)
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
@@ -173,13 +176,13 @@ func TestProxyTransport(t *testing.T) {
 	})
 
 	t.Run("API: MinTLS not match", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.ProxySSLInsecureSkipVerify = true
-		// force creating new transport on each reque
-		globalConf.MaxConnTime = -1
+		config.SetGlobal(func(c *config.Config) {
+			c.ProxySSLInsecureSkipVerify = true
+			// force creating new transport on each reque
+			c.MaxConnTime = -1
+			c.ProxySSLMinVersion = 772
+		})
 
-		globalConf.ProxySSLMinVersion = 772
-		config.SetGlobal(globalConf)
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
@@ -190,13 +193,13 @@ func TestProxyTransport(t *testing.T) {
 	})
 
 	t.Run("API: Invalid proxy", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.ProxySSLInsecureSkipVerify = true
-		// force creating new transport on each reque
-		globalConf.MaxConnTime = -1
+		config.SetGlobal(func(c *config.Config) {
+			c.ProxySSLInsecureSkipVerify = true
+			// force creating new transport on each reque
+			c.MaxConnTime = -1
+			c.ProxySSLMinVersion = 771
+		})
 
-		globalConf.ProxySSLMinVersion = 771
-		config.SetGlobal(globalConf)
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
@@ -209,13 +212,12 @@ func TestProxyTransport(t *testing.T) {
 	})
 
 	t.Run("API: Valid proxy", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.ProxySSLInsecureSkipVerify = true
-		// force creating new transport on each reque
-		globalConf.MaxConnTime = -1
-
-		globalConf.ProxySSLMinVersion = 771
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.ProxySSLInsecureSkipVerify = true
+			// force creating new transport on each reque
+			c.MaxConnTime = -1
+			c.ProxySSLMinVersion = 771
+		})
 
 		_, _, _, proxyCert := genServerCertificate()
 		proxy := initProxy("https", &tls.Config{

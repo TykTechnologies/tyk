@@ -181,7 +181,9 @@ func setupGlobals(ctx context.Context) {
 	if config.Global().EnableAnalytics && analytics.Store == nil {
 		globalConf := config.Global()
 		globalConf.LoadIgnoredIPs()
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			*c = globalConf
+		})
 		mainLog.Debug("Setting up analytics DB connection")
 
 		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-"}
@@ -230,10 +232,11 @@ func setupGlobals(ctx context.Context) {
 		}
 	}
 
-	if globalConfig := config.Global(); globalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
+	if config.Global().AnalyticsConfig.NormaliseUrls.Enabled {
 		mainLog.Info("Setting up analytics normaliser")
-		globalConfig.AnalyticsConfig.NormaliseUrls.CompiledPatternSet = initNormalisationPatterns()
-		config.SetGlobal(globalConfig)
+		config.SetGlobal(func(c *config.Config) {
+			c.AnalyticsConfig.NormaliseUrls.CompiledPatternSet = initNormalisationPatterns()
+		})
 	}
 
 	certificateSecret := config.Global().Secret
@@ -881,9 +884,13 @@ func initialiseSystem(ctx context.Context) error {
 		}
 		// It's necessary to set global conf before and after calling afterConfSetup as global conf
 		// is being used by dependencies of the even handler init and then conf is modified again.
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			*c = globalConf
+		})
 		afterConfSetup(&globalConf)
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			*c = globalConf
+		})
 	}
 
 	if os.Getenv("TYK_LOGLEVEL") == "" && !*cli.DebugMode {
@@ -912,15 +919,14 @@ func initialiseSystem(ctx context.Context) error {
 
 	setupGlobals(ctx)
 
-	globalConf := config.Global()
-
 	if *cli.Port != "" {
 		portNum, err := strconv.Atoi(*cli.Port)
 		if err != nil {
 			mainLog.Error("Port specified in flags must be a number: ", err)
 		} else {
-			globalConf.ListenPort = portNum
-			config.SetGlobal(globalConf)
+			config.SetGlobal(func(c *config.Config) {
+				c.ListenPort = portNum
+			})
 		}
 	}
 
@@ -933,13 +939,16 @@ func initialiseSystem(ctx context.Context) error {
 	if err := pidfile.Write(); err != nil {
 		mainLog.Error("Failed to write PIDFile: ", err)
 	}
+	globalConf := config.Global()
 
 	if globalConf.UseDBAppConfigs && globalConf.Policies.PolicySource != config.DefaultDashPolicySource {
-		globalConf.Policies.PolicySource = config.DefaultDashPolicySource
-		globalConf.Policies.PolicyConnectionString = globalConf.DBAppConfOptions.ConnectionString
-		if globalConf.Policies.PolicyRecordName == "" {
-			globalConf.Policies.PolicyRecordName = config.DefaultDashPolicyRecordName
-		}
+		config.SetGlobal(func(c *config.Config) {
+			c.Policies.PolicySource = config.DefaultDashPolicySource
+			c.Policies.PolicyConnectionString = globalConf.DBAppConfOptions.ConnectionString
+			if globalConf.Policies.PolicyRecordName == "" {
+				c.Policies.PolicyRecordName = config.DefaultDashPolicyRecordName
+			}
+		})
 	}
 
 	getHostDetails()
@@ -1238,8 +1247,10 @@ func setupPortsWhitelist() {
 		ls.Ports = append(ls.Ports, globalConf.ControlAPIPort)
 	}
 	w[protocol] = ls
-	globalConf.PortWhiteList = w
-	config.SetGlobal(globalConf)
+
+	config.SetGlobal(func(c *config.Config) {
+		c.PortWhiteList = w
+	})
 }
 
 func startServer() {

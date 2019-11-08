@@ -11,9 +11,9 @@ import (
 func TestRedisCacheMiddleware_WithCompressedResponse(t *testing.T) {
 	const path = "/compressed"
 
-	globalConf := config.Global()
-	globalConf.AnalyticsConfig.EnableDetailedRecording = true
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.AnalyticsConfig.EnableDetailedRecording = true
+	})
 
 	ts := StartTest()
 	defer ts.Close()

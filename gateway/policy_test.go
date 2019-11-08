@@ -28,15 +28,14 @@ func TestLoadPoliciesFromDashboardReLogin(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	globalConf := config.Global()
-	oldUseDBAppConfigs := globalConf.UseDBAppConfigs
-	globalConf.UseDBAppConfigs = false
-	config.SetGlobal(globalConf)
+	oldUseDBAppConfigs := config.Global().UseDBAppConfigs
+	config.SetGlobal(func(c *config.Config) {
+		c.UseDBAppConfigs = false
+	})
 
-	defer func() {
-		globalConf.UseDBAppConfigs = oldUseDBAppConfigs
-		config.SetGlobal(globalConf)
-	}()
+	defer config.SetGlobal(func(c *config.Config) {
+		c.UseDBAppConfigs = oldUseDBAppConfigs
+	})
 
 	allowExplicitPolicyID := config.Global().Policies.AllowExplicitPolicyID
 

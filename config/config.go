@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"sync"
 	"sync/atomic"
 
 	"github.com/kelseyhightower/envconfig"
@@ -21,9 +20,8 @@ import (
 type IPsHandleStrategy string
 
 var (
-	log      = logger.Get()
-	global   atomic.Value
-	globalMu sync.Mutex
+	log     = logger.Get()
+	gateway atomic.Value
 
 	Default = Config{
 		ListenPort:     8080,
@@ -483,17 +481,17 @@ type TykEventHandler interface {
 }
 
 func init() {
-	SetGlobal(Config{})
+	gateway.Store(Config{})
+}
+
+func SetGlobal(fn func(c *Config)) {
+	conf := Global()
+	fn(&conf)
+	gateway.Store(conf)
 }
 
 func Global() Config {
-	return global.Load().(Config)
-}
-
-func SetGlobal(conf Config) {
-	globalMu.Lock()
-	defer globalMu.Unlock()
-	global.Store(conf)
+	return gateway.Load().(Config)
 }
 
 func WriteConf(path string, conf *Config) error {

@@ -99,21 +99,19 @@ func requestThrottlingTest(limiter string, testLevel string) func(t *testing.T) 
 		ts := StartTest()
 		defer ts.Close()
 
-		globalCfg := config.Global()
-
-		switch limiter {
-		case "InMemoryRateLimiter":
-			DRLManager.SetCurrentTokenValue(1)
-			DRLManager.RequestTokenValue = 1
-		case "SentinelRateLimiter":
-			globalCfg.EnableSentinelRateLimiter = true
-		case "RedisRollingRateLimiter":
-			globalCfg.EnableRedisRollingLimiter = true
-		default:
-			t.Fatal("There is no such a rate limiter:", limiter)
-		}
-
-		config.SetGlobal(globalCfg)
+		config.SetGlobal(func(c *config.Config) {
+			switch limiter {
+			case "InMemoryRateLimiter":
+				DRLManager.SetCurrentTokenValue(1)
+				DRLManager.RequestTokenValue = 1
+			case "SentinelRateLimiter":
+				c.EnableSentinelRateLimiter = true
+			case "RedisRollingRateLimiter":
+				c.EnableRedisRollingLimiter = true
+			default:
+				t.Fatal("There is no such a rate limiter:", limiter)
+			}
+		})
 
 		var per, rate, throttleInterval float64
 		var throttleRetryLimit int

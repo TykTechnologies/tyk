@@ -36,10 +36,10 @@ func testPrepareProcessRequestQuotaLimit(tb testing.TB, ts *Test, data map[strin
 
 func TestProcessRequestLiveQuotaLimit(t *testing.T) {
 	// setup global config
-	globalConf := config.Global()
-	globalConf.EnforceOrgQuotas = true
-	globalConf.ExperimentalProcessOrgOffThread = false
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.EnforceOrgQuotas = true
+		c.ExperimentalProcessOrgOffThread = false
+	})
 
 	// run test server
 	ts := StartTest()
@@ -83,10 +83,10 @@ func BenchmarkProcessRequestLiveQuotaLimit(b *testing.B) {
 	b.ReportAllocs()
 
 	// setup global config
-	globalConf := config.Global()
-	globalConf.EnforceOrgQuotas = true
-	globalConf.ExperimentalProcessOrgOffThread = false
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.EnforceOrgQuotas = true
+		c.ExperimentalProcessOrgOffThread = false
+	})
 
 	defer ResetTestConfig()
 
@@ -118,10 +118,11 @@ func TestProcessRequestOffThreadQuotaLimit(t *testing.T) {
 	defer ts.Close()
 
 	// setup global config
-	globalConf := config.Global()
-	globalConf.EnforceOrgQuotas = true
-	globalConf.ExperimentalProcessOrgOffThread = true
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.EnforceOrgQuotas = true
+		c.ExperimentalProcessOrgOffThread = true
+	})
+
 	defer ResetTestConfig()
 
 	// load API
@@ -185,10 +186,10 @@ func BenchmarkProcessRequestOffThreadQuotaLimit(b *testing.B) {
 	b.ReportAllocs()
 
 	// setup global config
-	globalConf := config.Global()
-	globalConf.EnforceOrgQuotas = true
-	globalConf.ExperimentalProcessOrgOffThread = true
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.EnforceOrgQuotas = true
+		c.ExperimentalProcessOrgOffThread = true
+	})
 
 	defer ResetTestConfig()
 
@@ -216,11 +217,12 @@ func BenchmarkProcessRequestOffThreadQuotaLimit(b *testing.B) {
 
 func TestProcessRequestLiveRedisRollingLimiter(t *testing.T) {
 	// setup global config
-	globalConf := config.Global()
-	globalConf.EnforceOrgQuotas = true
-	globalConf.EnableRedisRollingLimiter = true
-	globalConf.ExperimentalProcessOrgOffThread = false
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.EnforceOrgQuotas = true
+		c.EnableRedisRollingLimiter = true
+		c.ExperimentalProcessOrgOffThread = false
+	})
+
 	defer ResetTestConfig()
 
 	// run test server
@@ -272,11 +274,11 @@ func BenchmarkProcessRequestLiveRedisRollingLimiter(b *testing.B) {
 	b.ReportAllocs()
 
 	// setup global config
-	globalConf := config.Global()
-	globalConf.EnforceOrgQuotas = true
-	globalConf.EnableRedisRollingLimiter = true
-	globalConf.ExperimentalProcessOrgOffThread = false
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.EnforceOrgQuotas = true
+		c.EnableRedisRollingLimiter = true
+		c.ExperimentalProcessOrgOffThread = false
+	})
 
 	defer ResetTestConfig()
 
@@ -304,11 +306,12 @@ func BenchmarkProcessRequestLiveRedisRollingLimiter(b *testing.B) {
 
 func TestProcessRequestOffThreadRedisRollingLimiter(t *testing.T) {
 	// setup global config
-	globalConf := config.Global()
-	globalConf.EnforceOrgQuotas = true
-	globalConf.EnableRedisRollingLimiter = true
-	globalConf.ExperimentalProcessOrgOffThread = true
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.EnforceOrgQuotas = true
+		c.EnableRedisRollingLimiter = true
+		c.ExperimentalProcessOrgOffThread = true
+	})
+
 	defer ResetTestConfig()
 
 	// run test server
@@ -360,11 +363,11 @@ func BenchmarkProcessRequestOffThreadRedisRollingLimiter(b *testing.B) {
 	b.ReportAllocs()
 
 	// setup global config
-	globalConf := config.Global()
-	globalConf.EnforceOrgQuotas = true
-	globalConf.EnableRedisRollingLimiter = true
-	globalConf.ExperimentalProcessOrgOffThread = true
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.EnforceOrgQuotas = true
+		c.EnableRedisRollingLimiter = true
+		c.ExperimentalProcessOrgOffThread = true
+	})
 
 	// run test server
 	ts := StartTest()

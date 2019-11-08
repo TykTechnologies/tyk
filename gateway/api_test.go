@@ -48,9 +48,10 @@ func loadSampleAPI(def string) (spec *APISpec) {
 }
 
 func TestHealthCheckEndpoint(t *testing.T) {
-	globalConf := config.Global()
-	globalConf.HealthCheck.EnableHealthChecks = true
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.HealthCheck.EnableHealthChecks = true
+	})
+
 	defer ResetTestConfig()
 
 	ts := StartTest()
@@ -274,9 +275,10 @@ func TestKeyHandler(t *testing.T) {
 			{Method: "GET", Path: "/tyk/keys/?api_id=unknown", AdminAuth: true, Code: 200, BodyMatch: knownKey},
 		}...)
 
-		globalConf := config.Global()
-		globalConf.HashKeyFunction = ""
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.HashKeyFunction = ""
+		})
+
 		_, keyWithoutHash := ts.CreateSession(func(s *user.SessionState) {
 			s.AccessRights = map[string]user.AccessDefinition{"test": {
 				APIID: "test", Versions: []string{"v1"},
@@ -431,12 +433,13 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 }
 
 func TestHashKeyHandler(t *testing.T) {
-	globalConf := config.Global()
-	// make it to use hashes for Redis keys
-	globalConf.HashKeys = true
-	// enable hashed keys listing
-	globalConf.EnableHashedKeysListing = true
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		// make it to use hashes for Redis keys
+		c.HashKeys = true
+		// enable hashed keys listing
+		c.EnableHashedKeysListing = true
+	})
+
 	defer ResetTestConfig()
 
 	hashTests := []struct {
@@ -453,8 +456,9 @@ func TestHashKeyHandler(t *testing.T) {
 	}
 
 	for _, tc := range hashTests {
-		globalConf.HashKeyFunction = tc.hashFunction
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.HashKeyFunction = tc.hashFunction
+		})
 
 		t.Run(fmt.Sprintf("%sHash fn: %s", tc.desc, tc.hashFunction), func(t *testing.T) {
 			testHashKeyHandlerHelper(t, tc.expectedHashSize)
@@ -466,13 +470,13 @@ func TestHashKeyHandler(t *testing.T) {
 }
 
 func TestHashKeyHandlerLegacyWithHashFunc(t *testing.T) {
-	globalConf := config.Global()
+	config.SetGlobal(func(c *config.Config) {
+		c.HashKeys = true
+		c.EnableHashedKeysListing = true
+		// settings to create BA session with legacy key format
+		c.HashKeyFunction = ""
+	})
 
-	globalConf.HashKeys = true
-	globalConf.EnableHashedKeysListing = true
-	// settings to create BA session with legacy key format
-	globalConf.HashKeyFunction = ""
-	config.SetGlobal(globalConf)
 	defer ResetTestConfig()
 
 	ts := StartTest()
@@ -498,8 +502,9 @@ func TestHashKeyHandlerLegacyWithHashFunc(t *testing.T) {
 	}...)
 
 	// set custom hashing function and check if we still can get BA session with legacy key format
-	globalConf.HashKeyFunction = storage.HashMurmur64
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.HashKeyFunction = storage.HashMurmur64
+	})
 
 	ts.Run(t, []test.TestCase{
 		{
@@ -675,12 +680,12 @@ func testHashFuncAndBAHelper(t *testing.T) {
 }
 
 func TestHashKeyListingDisabled(t *testing.T) {
-	globalConf := config.Global()
-	// make it to use hashes for Redis keys
-	globalConf.HashKeys = true
-	// disable hashed keys listing
-	globalConf.EnableHashedKeysListing = false
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		// make it to use hashes for Redis keys
+		c.HashKeys = true
+		// disable hashed keys listing
+		c.EnableHashedKeysListing = false
+	})
 
 	defer ResetTestConfig()
 
@@ -795,10 +800,10 @@ func TestHashKeyListingDisabled(t *testing.T) {
 }
 
 func TestKeyHandler_HashingDisabled(t *testing.T) {
-	globalConf := config.Global()
-	// make it to NOT use hashes for Redis keys
-	globalConf.HashKeys = false
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		// make it to NOT use hashes for Redis keys
+		c.HashKeys = false
+	})
 
 	defer ResetTestConfig()
 
@@ -1286,9 +1291,9 @@ func TestContextSession(t *testing.T) {
 }
 
 func TestApiLoaderLongestPathFirst(t *testing.T) {
-	globalConf := config.Global()
-	globalConf.EnableCustomDomains = true
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.EnableCustomDomains = true
+	})
 
 	defer ResetTestConfig()
 

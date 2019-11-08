@@ -140,9 +140,9 @@ func TestVirtualEndpointBatch(t *testing.T) {
 
 	upstreamHost := strings.TrimPrefix(upstream.URL, "https://")
 
-	globalConf := config.Global()
-	globalConf.Security.Certificates.Upstream = map[string]string{upstreamHost: clientCertID}
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.Security.Certificates.Upstream = map[string]string{upstreamHost: clientCertID}
+	})
 
 	defer ResetTestConfig()
 
@@ -167,17 +167,17 @@ func TestVirtualEndpointBatch(t *testing.T) {
 	})
 
 	t.Run("Skip verification", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.ProxySSLInsecureSkipVerify = true
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.ProxySSLInsecureSkipVerify = true
+		})
 
 		ts.Run(t, test.TestCase{Path: "/virt", Code: 202})
 	})
 
 	t.Run("Verification required", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.ProxySSLInsecureSkipVerify = false
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.ProxySSLInsecureSkipVerify = false
+		})
 
 		ts.Run(t, test.TestCase{Path: "/virt", Code: 500})
 	})

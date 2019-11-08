@@ -13,9 +13,9 @@ import (
 
 func TestAuthenticationAfterDeleteKey(t *testing.T) {
 	assert := func(hashKeys bool) {
-		globalConf := config.Global()
-		globalConf.HashKeys = hashKeys
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.HashKeys = hashKeys
+		})
 
 		ts := StartTest()
 		defer ts.Close()
@@ -53,9 +53,9 @@ func TestAuthenticationAfterDeleteKey(t *testing.T) {
 
 func TestAuthenticationAfterUpdateKey(t *testing.T) {
 	assert := func(hashKeys bool) {
-		globalConf := config.Global()
-		globalConf.HashKeys = hashKeys
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.HashKeys = hashKeys
+		})
 
 		ts := StartTest()
 		defer ts.Close()

@@ -383,11 +383,11 @@ func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 	apisByID = make(map[string]*APISpec)
 	apisMu.Unlock()
 
-	globalConf := config.Global()
-	globalConf.UseDBAppConfigs = true
-	globalConf.AllowInsecureConfigs = true
-	globalConf.DBAppConfOptions.ConnectionString = ts.URL
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.UseDBAppConfigs = true
+		c.AllowInsecureConfigs = true
+		c.DBAppConfOptions.ConnectionString = ts.URL
+	})
 
 	defer ResetTestConfig()
 
@@ -688,11 +688,11 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 	apisByID = make(map[string]*APISpec)
 	apisMu.Unlock()
 
-	globalConf := config.Global()
-	globalConf.UseDBAppConfigs = true
-	globalConf.AllowInsecureConfigs = true
-	globalConf.DBAppConfOptions.ConnectionString = ts.URL
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.UseDBAppConfigs = true
+		c.AllowInsecureConfigs = true
+		c.DBAppConfOptions.ConnectionString = ts.URL
+	})
 
 	defer ResetTestConfig()
 

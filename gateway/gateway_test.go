@@ -146,9 +146,9 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 	defer ResetTestConfig()
 
 	t.Run("With escaping, default", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.HttpServerOptions.SkipTargetPathEscaping = false
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.HttpServerOptions.SkipTargetPathEscaping = false
+		})
 
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
@@ -161,9 +161,9 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 	})
 
 	t.Run("Without escaping", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.HttpServerOptions.SkipTargetPathEscaping = true
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.HttpServerOptions.SkipTargetPathEscaping = true
+		})
 
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
@@ -176,9 +176,9 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 	})
 
 	t.Run("With escaping, listen path and target URL are set, StripListenPath is OFF", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.HttpServerOptions.SkipTargetPathEscaping = false
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.HttpServerOptions.SkipTargetPathEscaping = false
+		})
 
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = false
@@ -193,9 +193,9 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 	})
 
 	t.Run("Without escaping, listen path and target URL are set, StripListenPath is OFF", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.HttpServerOptions.SkipTargetPathEscaping = true
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.HttpServerOptions.SkipTargetPathEscaping = true
+		})
 
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = false
@@ -210,9 +210,9 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 	})
 
 	t.Run("With escaping, listen path and target URL are set, StripListenPath is ON", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.HttpServerOptions.SkipTargetPathEscaping = false
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.HttpServerOptions.SkipTargetPathEscaping = false
+		})
 
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = true
@@ -227,9 +227,9 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 	})
 
 	t.Run("Without escaping, listen path and target URL are set, StripListenPath is ON", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.HttpServerOptions.SkipTargetPathEscaping = true
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.HttpServerOptions.SkipTargetPathEscaping = true
+		})
 
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = true
@@ -245,10 +245,11 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 }
 
 func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
-	globalConf := config.Global()
-	globalConf.HttpServerOptions.OverrideDefaults = true
-	globalConf.HttpServerOptions.SkipURLCleaning = true
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.HttpServerOptions.OverrideDefaults = true
+		c.HttpServerOptions.SkipURLCleaning = true
+	})
+
 	defer ResetTestConfig()
 
 	// here we expect that test gateway will be sending to test upstream requests with not cleaned URI
@@ -262,9 +263,9 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 	defer ts.Close()
 
 	t.Run("With escaping, default", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.HttpServerOptions.SkipTargetPathEscaping = false
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.HttpServerOptions.SkipTargetPathEscaping = false
+		})
 
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
@@ -276,9 +277,9 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 	})
 
 	t.Run("Without escaping, default", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.HttpServerOptions.SkipTargetPathEscaping = true
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.HttpServerOptions.SkipTargetPathEscaping = true
+		})
 
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
@@ -290,9 +291,9 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 	})
 
 	t.Run("With escaping, listen path and target URL are set, StripListenPath is OFF", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.HttpServerOptions.SkipTargetPathEscaping = false
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.HttpServerOptions.SkipTargetPathEscaping = false
+		})
 
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = false
@@ -308,9 +309,9 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 	})
 
 	t.Run("Without escaping, listen path and target URL are set, StripListenPath is OFF", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.HttpServerOptions.SkipTargetPathEscaping = true
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.HttpServerOptions.SkipTargetPathEscaping = true
+		})
 
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = false
@@ -326,9 +327,9 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 	})
 
 	t.Run("With escaping, listen path and target URL are set, StripListenPath is ON", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.HttpServerOptions.SkipTargetPathEscaping = false
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.HttpServerOptions.SkipTargetPathEscaping = false
+		})
 
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = true
@@ -344,9 +345,9 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 	})
 
 	t.Run("Without escaping, listen path and target URL are set, StripListenPath is ON", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.HttpServerOptions.SkipTargetPathEscaping = true
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.HttpServerOptions.SkipTargetPathEscaping = true
+		})
 
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = true
@@ -447,6 +448,8 @@ func TestQuota(t *testing.T) {
 }
 
 func TestAnalytics(t *testing.T) {
+	defer ResetTestConfig()
+
 	ts := StartTest(TestConfig{
 		Delay: 20 * time.Millisecond,
 	})
@@ -511,12 +514,13 @@ func TestAnalytics(t *testing.T) {
 	})
 
 	t.Run("Detailed analytics", func(t *testing.T) {
-		defer func() {
-			config.SetGlobal(base)
-		}()
-		globalConf := config.Global()
-		globalConf.AnalyticsConfig.EnableDetailedRecording = true
-		config.SetGlobal(globalConf)
+		defer config.SetGlobal(func(c *config.Config) {
+			*c = base
+		})
+
+		config.SetGlobal(func(c *config.Config) {
+			c.AnalyticsConfig.EnableDetailedRecording = true
+		})
 
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
@@ -558,11 +562,14 @@ func TestAnalytics(t *testing.T) {
 
 	t.Run("Detailed analytics with latency", func(t *testing.T) {
 		defer func() {
-			config.SetGlobal(base)
+			config.SetGlobal(func(c *config.Config) {
+				*c = base
+			})
 		}()
-		globalConf := config.Global()
-		globalConf.AnalyticsConfig.EnableDetailedRecording = true
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.AnalyticsConfig.EnableDetailedRecording = true
+		})
+
 		ls := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// We are delaying the response by 2 ms. This is important because anytime
 			// less than 0 eg  0.2 ms will be round off to 0 which is not good to check if we have
@@ -619,12 +626,10 @@ func TestAnalytics(t *testing.T) {
 	})
 
 	t.Run("Detailed analytics with cache", func(t *testing.T) {
-		defer func() {
-			config.SetGlobal(base)
-		}()
-		globalConf := config.Global()
-		globalConf.AnalyticsConfig.EnableDetailedRecording = true
-		config.SetGlobal(globalConf)
+		defer ResetTestConfig()
+		config.SetGlobal(func(c *config.Config) {
+			c.AnalyticsConfig.EnableDetailedRecording = true
+		})
 
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
@@ -766,9 +771,10 @@ func TestHttpPprof(t *testing.T) {
 
 func TestManagementNodeRedisEvents(t *testing.T) {
 	defer ResetTestConfig()
-	globalConf := config.Global()
-	globalConf.ManagementNode = false
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.ManagementNode = false
+	})
+
 	msg := redis.Message{
 		Data: []byte(`{"Command": "NoticeGatewayDRLNotification"}`),
 	}
@@ -778,8 +784,11 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 		}
 	}
 	handleRedisEvent(msg, shouldHandle, nil)
-	globalConf.ManagementNode = true
-	config.SetGlobal(globalConf)
+
+	config.SetGlobal(func(c *config.Config) {
+		c.ManagementNode = true
+	})
+
 	notHandle := func(got NotificationCommand) {
 		t.Fatalf("should have not handled redis event")
 	}
@@ -804,10 +813,11 @@ func TestReloadGoroutineLeakWithAsyncWrites(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
 
-	globalConf := config.Global()
-	globalConf.UseAsyncSessionWrite = true
-	globalConf.EnableJSVM = false
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.UseAsyncSessionWrite = true
+		c.EnableJSVM = false
+	})
+
 	defer ResetTestConfig()
 
 	specs := BuildAndLoadAPI(func(spec *APISpec) {
@@ -831,9 +841,10 @@ func TestReloadGoroutineLeakWithCircuitBreaker(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
 
-	globalConf := config.Global()
-	globalConf.EnableJSVM = false
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.EnableJSVM = false
+	})
+
 	defer ResetTestConfig()
 
 	specs := BuildAndLoadAPI(func(spec *APISpec) {
@@ -956,10 +967,10 @@ func TestProxyUserAgent(t *testing.T) {
 }
 
 func TestSkipUrlCleaning(t *testing.T) {
-	globalConf := config.Global()
-	globalConf.HttpServerOptions.OverrideDefaults = true
-	globalConf.HttpServerOptions.SkipURLCleaning = true
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.HttpServerOptions.OverrideDefaults = true
+		c.HttpServerOptions.SkipURLCleaning = true
+	})
 	defer ResetTestConfig()
 
 	ts := StartTest()
@@ -1012,9 +1023,10 @@ func TestMultiTargetProxy(t *testing.T) {
 
 func TestCustomDomain(t *testing.T) {
 	t.Run("With custom domain support", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.EnableCustomDomains = true
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.EnableCustomDomains = true
+		})
+
 		defer ResetTestConfig()
 
 		ts := StartTest()
@@ -1208,9 +1220,10 @@ func TestCacheEtag(t *testing.T) {
 // }
 
 func TestWebsocketsSeveralOpenClose(t *testing.T) {
-	globalConf := config.Global()
-	globalConf.HttpServerOptions.EnableWebSockets = true
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.HttpServerOptions.EnableWebSockets = true
+	})
+
 	defer ResetTestConfig()
 
 	ts := StartTest()
@@ -1306,9 +1319,10 @@ func TestWebsocketsSeveralOpenClose(t *testing.T) {
 }
 
 func TestWebsocketsAndHTTPEndpointMatch(t *testing.T) {
-	globalConf := config.Global()
-	globalConf.HttpServerOptions.EnableWebSockets = true
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.HttpServerOptions.EnableWebSockets = true
+	})
+
 	defer ResetTestConfig()
 
 	ts := StartTest()
@@ -1446,9 +1460,9 @@ func TestKeepAliveConns(t *testing.T) {
 
 	t.Run("Should use same connection", func(t *testing.T) {
 		// set keep alive option
-		globalConf := config.Global()
-		globalConf.ProxyCloseConnections = false
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.ProxyCloseConnections = false
+		})
 
 		// Allow 1 connection with 3 reads
 		upstream := createTestUptream(t, 1, 3)
@@ -1467,9 +1481,9 @@ func TestKeepAliveConns(t *testing.T) {
 	})
 
 	t.Run("Should use separate connection", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.ProxyCloseConnections = true
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.ProxyCloseConnections = true
+		})
 
 		// Allow 3 connections with 1 read
 		upstream := createTestUptream(t, 3, 1)
@@ -1488,10 +1502,10 @@ func TestKeepAliveConns(t *testing.T) {
 	})
 
 	t.Run("Should respect max_conn_time", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.ProxyCloseConnections = false
-		globalConf.MaxConnTime = 1
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.ProxyCloseConnections = false
+			c.MaxConnTime = 1
+		})
 
 		// Allow 2 connection with 2 reads
 		upstream := createTestUptream(t, 2, 2)
@@ -1524,10 +1538,10 @@ func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
 
-	globalCfg := config.Global()
-	globalCfg.EnableNonTransactionalRateLimiter = false
-	globalCfg.EnableSentinelRateLimiter = true
-	config.SetGlobal(globalCfg)
+	config.SetGlobal(func(c *config.Config) {
+		c.EnableNonTransactionalRateLimiter = false
+		c.EnableSentinelRateLimiter = true
+	})
 
 	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.APIID += "_" + time.Now().String()
@@ -1589,9 +1603,9 @@ func TestBrokenClients(t *testing.T) {
 	defer ts.Close()
 	defer ResetTestConfig()
 
-	globalConf := config.Global()
-	globalConf.ProxyDefaultTimeout = 1
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.ProxyDefaultTimeout = 1
+	})
 
 	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = true

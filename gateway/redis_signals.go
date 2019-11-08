@@ -252,17 +252,22 @@ func handleDashboardZeroConfMessage(payload string) {
 	setHostname := false
 
 	if globalConf.DBAppConfOptions.ConnectionString == "" {
-		globalConf.DBAppConfOptions.ConnectionString = hostname
+		config.SetGlobal(func(c *config.Config) {
+			c.DBAppConfOptions.ConnectionString = hostname
+		})
+
 		setHostname = true
 	}
 
 	if globalConf.Policies.PolicyConnectionString == "" {
-		globalConf.Policies.PolicyConnectionString = hostname
+		config.SetGlobal(func(c *config.Config) {
+			c.Policies.PolicyConnectionString = hostname
+		})
+
 		setHostname = true
 	}
 
 	if setHostname {
-		config.SetGlobal(globalConf)
 		pubSubLog.Info("Hostname set with dashboard zeroconf signal")
 	}
 }

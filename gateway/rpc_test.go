@@ -21,15 +21,16 @@ func startRPCMock(dispatcher *gorpc.Dispatcher) *gorpc.Server {
 
 	rpc.GlobalRPCCallTimeout = 100 * time.Millisecond
 
-	globalConf := config.Global()
-	globalConf.SlaveOptions.UseRPC = true
-	globalConf.SlaveOptions.RPCKey = "test_org"
-	globalConf.SlaveOptions.APIKey = "test"
-	globalConf.Policies.PolicySource = "rpc"
-	globalConf.SlaveOptions.CallTimeout = 1
-	globalConf.SlaveOptions.RPCPoolSize = 2
-	globalConf.AuthOverride.ForceAuthProvider = true
-	globalConf.AuthOverride.AuthProvider.StorageEngine = "rpc"
+	config.SetGlobal(func(c *config.Config) {
+		c.SlaveOptions.UseRPC = true
+		c.SlaveOptions.RPCKey = "test_org"
+		c.SlaveOptions.APIKey = "test"
+		c.Policies.PolicySource = "rpc"
+		c.SlaveOptions.CallTimeout = 1
+		c.SlaveOptions.RPCPoolSize = 2
+		c.AuthOverride.ForceAuthProvider = true
+		c.AuthOverride.AuthProvider.StorageEngine = "rpc"
+	})
 
 	server := gorpc.NewTCPServer("127.0.0.1:0", dispatcher.NewHandlerFunc())
 	list := &customListener{}
@@ -39,22 +40,23 @@ func startRPCMock(dispatcher *gorpc.Dispatcher) *gorpc.Server {
 	if err := server.Start(); err != nil {
 		panic(err)
 	}
-	globalConf.SlaveOptions.ConnectionString = list.L.Addr().String()
 
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.SlaveOptions.ConnectionString = list.L.Addr().String()
+	})
 
 	return server
 }
 
 func stopRPCMock(server *gorpc.Server) {
-	globalConf := config.Global()
-	globalConf.SlaveOptions.ConnectionString = ""
-	globalConf.SlaveOptions.RPCKey = ""
-	globalConf.SlaveOptions.APIKey = ""
-	globalConf.SlaveOptions.UseRPC = false
-	globalConf.Policies.PolicySource = ""
-	globalConf.AuthOverride.ForceAuthProvider = false
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.SlaveOptions.ConnectionString = ""
+		c.SlaveOptions.RPCKey = ""
+		c.SlaveOptions.APIKey = ""
+		c.SlaveOptions.UseRPC = false
+		c.Policies.PolicySource = ""
+		c.AuthOverride.ForceAuthProvider = false
+	})
 
 	if server != nil {
 		server.Listener.Close()
@@ -247,13 +249,13 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 
 	t.Run("RPC down, cold start, load backup", func(t *testing.T) {
 		// Point rpc to non existent address
-		globalConf := config.Global()
-		globalConf.SlaveOptions.ConnectionString = testHttpFailure
-		globalConf.SlaveOptions.UseRPC = true
-		globalConf.SlaveOptions.RPCKey = "test_org"
-		globalConf.SlaveOptions.APIKey = "test"
-		globalConf.Policies.PolicySource = "rpc"
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.SlaveOptions.ConnectionString = testHttpFailure
+			c.SlaveOptions.UseRPC = true
+			c.SlaveOptions.RPCKey = "test_org"
+			c.SlaveOptions.APIKey = "test"
+			c.Policies.PolicySource = "rpc"
+		})
 
 		// RPC layer is down
 		ts := StartTest()

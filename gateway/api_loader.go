@@ -176,9 +176,9 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		authStore = gs.rpcAuthStore
 		orgStore = gs.rpcOrgStore
 		spec.GlobalConfig.EnforceOrgDataAge = true
-		globalConf := config.Global()
-		globalConf.EnforceOrgDataAge = true
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.EnforceOrgDataAge = true
+		})
 	}
 
 	sessionStore := gs.redisStore
@@ -624,9 +624,9 @@ func loadTCPService(spec *APISpec, gs *generalStores, muxer *proxyMux) {
 		authStore = gs.rpcAuthStore
 		orgStore = gs.rpcOrgStore
 		spec.GlobalConfig.EnforceOrgDataAge = true
-		globalConf := config.Global()
-		globalConf.EnforceOrgDataAge = true
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.EnforceOrgDataAge = true
+		})
 	}
 
 	sessionStore := gs.redisStore

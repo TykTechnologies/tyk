@@ -118,17 +118,19 @@ func setupTestReverseProxyDnsCache(cfg *configTestReverseProxyDnsCache) func() {
 	dnsCacheManager.InitDNSCaching(
 		time.Duration(cfg.dnsConfig.TTL)*time.Second, time.Duration(cfg.dnsConfig.CheckInterval)*time.Second)
 
-	globalConf := config.Global()
-	enableWebSockets := globalConf.HttpServerOptions.EnableWebSockets
+	enableWebSockets := config.Global().HttpServerOptions.EnableWebSockets
 
-	globalConf.HttpServerOptions.EnableWebSockets = true
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.HttpServerOptions.EnableWebSockets = true
+	})
 
 	return func() {
 		pullDomains()
 		dnsCacheManager.DisposeCache()
-		globalConf.HttpServerOptions.EnableWebSockets = enableWebSockets
-		config.SetGlobal(globalConf)
+
+		config.SetGlobal(func(c *config.Config) {
+			c.HttpServerOptions.EnableWebSockets = enableWebSockets
+		})
 	}
 }
 

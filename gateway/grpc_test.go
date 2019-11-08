@@ -52,13 +52,14 @@ func TestHTTP2_TLS(t *testing.T) {
 	defer upstream.Close()
 
 	// Tyk
-	globalConf := config.Global()
-	globalConf.ProxySSLInsecureSkipVerify = true
-	globalConf.ProxyEnableHttp2 = true
-	globalConf.HttpServerOptions.EnableHttp2 = true
-	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
-	globalConf.HttpServerOptions.UseSSL = true
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.ProxySSLInsecureSkipVerify = true
+		c.ProxyEnableHttp2 = true
+		c.HttpServerOptions.EnableHttp2 = true
+		c.HttpServerOptions.SSLCertificates = []string{certID}
+		c.HttpServerOptions.UseSSL = true
+	})
+
 	defer ResetTestConfig()
 
 	ts := StartTest()
@@ -89,13 +90,14 @@ func TestGRPC_TLS(t *testing.T) {
 	defer s.GracefulStop()
 
 	// Tyk
-	globalConf := config.Global()
-	globalConf.ProxySSLInsecureSkipVerify = true
-	globalConf.ProxyEnableHttp2 = true
-	globalConf.HttpServerOptions.EnableHttp2 = true
-	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
-	globalConf.HttpServerOptions.UseSSL = true
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.ProxySSLInsecureSkipVerify = true
+		c.ProxyEnableHttp2 = true
+		c.HttpServerOptions.EnableHttp2 = true
+		c.HttpServerOptions.SSLCertificates = []string{certID}
+		c.HttpServerOptions.UseSSL = true
+	})
+
 	defer ResetTestConfig()
 
 	ts := StartTest()
@@ -141,13 +143,14 @@ func TestGRPC_MutualTLS(t *testing.T) {
 	defer s.GracefulStop()
 
 	// Tyk
-	globalConf := config.Global()
-	globalConf.ProxySSLInsecureSkipVerify = true
-	globalConf.ProxyEnableHttp2 = true
-	globalConf.HttpServerOptions.EnableHttp2 = true
-	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
-	globalConf.HttpServerOptions.UseSSL = true
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.ProxySSLInsecureSkipVerify = true
+		c.ProxyEnableHttp2 = true
+		c.HttpServerOptions.EnableHttp2 = true
+		c.HttpServerOptions.SSLCertificates = []string{certID}
+		c.HttpServerOptions.UseSSL = true
+	})
+
 	defer ResetTestConfig()
 
 	ts := StartTest()
@@ -188,13 +191,14 @@ func TestGRPC_BasicAuthentication(t *testing.T) {
 	defer s.GracefulStop()
 
 	// Tyk
-	globalConf := config.Global()
-	globalConf.ProxySSLInsecureSkipVerify = true
-	globalConf.ProxyEnableHttp2 = true
-	globalConf.HttpServerOptions.EnableHttp2 = true
-	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
-	globalConf.HttpServerOptions.UseSSL = true
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.ProxySSLInsecureSkipVerify = true
+		c.ProxyEnableHttp2 = true
+		c.HttpServerOptions.EnableHttp2 = true
+		c.HttpServerOptions.SSLCertificates = []string{certID}
+		c.HttpServerOptions.UseSSL = true
+	})
+
 	defer ResetTestConfig()
 
 	ts := StartTest()
@@ -245,13 +249,14 @@ func TestGRPC_TokenBasedAuthentication(t *testing.T) {
 	defer s.GracefulStop()
 
 	// Tyk
-	globalConf := config.Global()
-	globalConf.ProxySSLInsecureSkipVerify = true
-	globalConf.ProxyEnableHttp2 = true
-	globalConf.HttpServerOptions.EnableHttp2 = true
-	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
-	globalConf.HttpServerOptions.UseSSL = true
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.ProxySSLInsecureSkipVerify = true
+		c.ProxyEnableHttp2 = true
+		c.HttpServerOptions.EnableHttp2 = true
+		c.HttpServerOptions.SSLCertificates = []string{certID}
+		c.HttpServerOptions.UseSSL = true
+	})
+
 	defer ResetTestConfig()
 
 	ts := StartTest()

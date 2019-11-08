@@ -33,9 +33,9 @@ func TestMurmur3CharBug(t *testing.T) {
 	}
 
 	t.Run("Without hashing", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.HashKeys = false
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.HashKeys = false
+		})
 
 		LoadAPI(api)
 
@@ -49,10 +49,10 @@ func TestMurmur3CharBug(t *testing.T) {
 	})
 
 	t.Run("murmur32 hashing, legacy", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.HashKeys = true
-		globalConf.HashKeyFunction = ""
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.HashKeys = true
+			c.HashKeyFunction = ""
+		})
 
 		LoadAPI(api)
 
@@ -66,10 +66,10 @@ func TestMurmur3CharBug(t *testing.T) {
 	})
 
 	t.Run("murmur32 hashing, json keys", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.HashKeys = true
-		globalConf.HashKeyFunction = "murmur32"
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.HashKeys = true
+			c.HashKeyFunction = "murmur32"
+		})
 
 		LoadAPI(api)
 
@@ -84,10 +84,10 @@ func TestMurmur3CharBug(t *testing.T) {
 	})
 
 	t.Run("murmur64 hashing", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.HashKeys = true
-		globalConf.HashKeyFunction = "murmur64"
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.HashKeys = true
+			c.HashKeyFunction = "murmur64"
+		})
 
 		LoadAPI(api)
 

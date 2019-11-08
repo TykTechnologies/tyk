@@ -122,7 +122,9 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 	CoProcessInit()
 	afterConfSetup(&globalConf)
 	defaultTestConfig = globalConf
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		*c = globalConf
+	})
 	if err := emptyRedis(); err != nil {
 		panic(err)
 	}
@@ -144,7 +146,9 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 }
 
 func ResetTestConfig() {
-	config.SetGlobal(defaultTestConfig)
+	config.SetGlobal(func(c *config.Config) {
+		*c = defaultTestConfig
+	})
 }
 
 func emptyRedis() error {
@@ -234,25 +238,25 @@ func controlProxy() *proxy {
 }
 
 func EnablePort(port int, protocol string) {
-	c := config.Global()
-	if c.PortWhiteList == nil {
-		c.PortWhiteList = map[string]config.PortWhiteList{
-			protocol: {
-				Ports: []int{port},
-			},
-		}
-	} else {
-		m, ok := c.PortWhiteList[protocol]
-		if !ok {
-			m = config.PortWhiteList{
-				Ports: []int{port},
+	config.SetGlobal(func(c *config.Config) {
+		if c.PortWhiteList == nil {
+			c.PortWhiteList = map[string]config.PortWhiteList{
+				protocol: {
+					Ports: []int{port},
+				},
 			}
 		} else {
-			m.Ports = append(m.Ports, port)
+			m, ok := c.PortWhiteList[protocol]
+			if !ok {
+				m = config.PortWhiteList{
+					Ports: []int{port},
+				}
+			} else {
+				m.Ports = append(m.Ports, port)
+			}
+			c.PortWhiteList[protocol] = m
 		}
-		c.PortWhiteList[protocol] = m
-	}
-	config.SetGlobal(c)
+	})
 }
 
 func getMainRouter(m *proxyMux) *mux.Router {
@@ -567,18 +571,18 @@ func (s *Test) Start() {
 	l, _ := net.Listen("tcp", "127.0.0.1:0")
 	_, port, _ := net.SplitHostPort(l.Addr().String())
 	l.Close()
-	globalConf := config.Global()
-	globalConf.ListenPort, _ = strconv.Atoi(port)
+	config.SetGlobal(func(c *config.Config) {
+		c.ListenPort, _ = strconv.Atoi(port)
 
-	if s.config.sepatateControlAPI {
-		l, _ := net.Listen("tcp", "127.0.0.1:0")
+		if s.config.sepatateControlAPI {
+			l, _ := net.Listen("tcp", "127.0.0.1:0")
 
-		_, port, _ = net.SplitHostPort(l.Addr().String())
-		l.Close()
-		globalConf.ControlAPIPort, _ = strconv.Atoi(port)
-	}
-	globalConf.CoProcessOptions = s.config.CoprocessConfig
-	config.SetGlobal(globalConf)
+			_, port, _ = net.SplitHostPort(l.Addr().String())
+			l.Close()
+			c.ControlAPIPort, _ = strconv.Atoi(port)
+		}
+		c.CoProcessOptions = s.config.CoprocessConfig
+	})
 
 	setupPortsWhitelist()
 
@@ -592,7 +596,7 @@ func (s *Test) Start() {
 		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
 	}
 
-	s.GlobalConfig = globalConf
+	s.GlobalConfig = config.Global()
 
 	scheme := "http://"
 	if s.GlobalConfig.HttpServerOptions.UseSSL {
@@ -637,9 +641,9 @@ func (s *Test) Close() {
 	}
 	defaultProxyMux.swap(&proxyMux{})
 	if s.config.sepatateControlAPI {
-		globalConf := config.Global()
-		globalConf.ControlAPIPort = 0
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.ControlAPIPort = 0
+		})
 	}
 }
 
@@ -795,15 +799,16 @@ func BuildAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 }
 
 func LoadAPI(specs ...*APISpec) (out []*APISpec) {
-	globalConf := config.Global()
-	oldPath := globalConf.AppPath
-	globalConf.AppPath, _ = ioutil.TempDir("", "apps")
-	config.SetGlobal(globalConf)
+	oldPath := config.Global().AppPath
+	config.SetGlobal(func(c *config.Config) {
+		c.AppPath, _ = ioutil.TempDir("", "apps")
+	})
+
 	defer func() {
-		globalConf := config.Global()
-		os.RemoveAll(globalConf.AppPath)
-		globalConf.AppPath = oldPath
-		config.SetGlobal(globalConf)
+		os.RemoveAll(config.Global().AppPath)
+		config.SetGlobal(func(c *config.Config) {
+			c.AppPath = oldPath
+		})
 	}()
 
 	for i, spec := range specs {

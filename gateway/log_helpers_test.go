@@ -113,10 +113,12 @@ func TestGetLogEntryForRequest(t *testing.T) {
 			}),
 		},
 	}
-	globalConf := config.Global()
+
 	for _, test := range testData {
-		globalConf.EnableKeyLogging = test.EnableKeyLogging
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.EnableKeyLogging = test.EnableKeyLogging
+		})
+
 		logEntry := getLogEntryForRequest(nil, testReq, test.Key, test.Data)
 		if logEntry.Data["path"] != test.Result.Data["path"] {
 			t.Error("Expected 'path':", test.Result.Data["path"], "Got:", logEntry.Data["path"])

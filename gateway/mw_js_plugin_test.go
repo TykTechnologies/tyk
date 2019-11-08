@@ -335,14 +335,16 @@ testJSVMCore.NewProcessRequest(function(request, session, config) {
 	if _, err := io.WriteString(tfile, `var globalVar = "globalValue"`); err != nil {
 		t.Fatal(err)
 	}
-	globalConf := config.Global()
-	old := globalConf.TykJSPath
-	globalConf.TykJSPath = tfile.Name()
-	config.SetGlobal(globalConf)
-	defer func() {
-		globalConf.TykJSPath = old
-		config.SetGlobal(globalConf)
-	}()
+
+	old := config.Global().TykJSPath
+	config.SetGlobal(func(c *config.Config) {
+		c.TykJSPath = tfile.Name()
+	})
+
+	defer config.SetGlobal(func(c *config.Config) {
+		c.TykJSPath = old
+	})
+
 	jsvm := JSVM{}
 	jsvm.Init(nil, logrus.NewEntry(log))
 	if _, err := jsvm.VM.Run(js); err != nil {
@@ -481,10 +483,10 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 
 	t.Run("Endpoint with skip cleaning", func(t *testing.T) {
 		ts.Close()
-		globalConf := config.Global()
-		globalConf.HttpServerOptions.SkipURLCleaning = true
-		globalConf.HttpServerOptions.OverrideDefaults = true
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			c.HttpServerOptions.SkipURLCleaning = true
+			c.HttpServerOptions.OverrideDefaults = true
+		})
 
 		prevSkipClean := defaultTestConfig.HttpServerOptions.OverrideDefaults &&
 			defaultTestConfig.HttpServerOptions.SkipURLCleaning

@@ -255,9 +255,10 @@ func TestAuthCodeRedirect(t *testing.T) {
 
 func TestAuthCodeRedirectMultipleURL(t *testing.T) {
 	// Enable multiple Redirect URIs
-	globalConf := config.Global()
-	globalConf.OauthRedirectUriSeparator = ","
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.OauthRedirectUriSeparator = ","
+	})
+
 	defer ResetTestConfig()
 
 	ts := StartTest()
@@ -296,9 +297,10 @@ func TestAuthCodeRedirectMultipleURL(t *testing.T) {
 
 func TestAuthCodeRedirectInvalidMultipleURL(t *testing.T) {
 	// Disable multiple Redirect URIs
-	globalConf := config.Global()
-	globalConf.OauthRedirectUriSeparator = ""
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.OauthRedirectUriSeparator = ""
+	})
+
 	defer ResetTestConfig()
 
 	ts := StartTest()
@@ -564,13 +566,12 @@ func getAuthCode(t *testing.T, ts *Test) map[string]string {
 
 func TestGetPaginatedClientTokens(t *testing.T) {
 	testPagination := func(pageParam int, expectedPageNumber int, tokenRequestCount int, expectedRes int) {
-		globalConf := config.Global()
-		// set tokens to be expired after 100 seconds
-		globalConf.OauthTokenExpire = 100
-		// cleanup tokens older than 300 seconds
-		globalConf.OauthTokenExpiredRetainPeriod = 300
-
-		config.SetGlobal(globalConf)
+		config.SetGlobal(func(c *config.Config) {
+			// set tokens to be expired after 100 seconds
+			c.OauthTokenExpire = 100
+			// cleanup tokens older than 300 seconds
+			c.OauthTokenExpiredRetainPeriod = 300
+		})
 
 		defer ResetTestConfig()
 
@@ -681,15 +682,13 @@ func TestGetClientTokens(t *testing.T) {
 }
 
 func testGetClientTokens(t *testing.T, hashed bool) {
-	globalConf := config.Global()
-	// set tokens to be expired after 1 second
-	globalConf.OauthTokenExpire = 1
-	// cleanup tokens older than 3 seconds
-	globalConf.OauthTokenExpiredRetainPeriod = 3
-
-	globalConf.HashKeys = hashed
-
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		// set tokens to be expired after 1 second
+		c.OauthTokenExpire = 1
+		// cleanup tokens older than 3 seconds
+		c.OauthTokenExpiredRetainPeriod = 3
+		c.HashKeys = hashed
+	})
 
 	defer ResetTestConfig()
 

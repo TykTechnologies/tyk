@@ -28,12 +28,12 @@ func TestGeoIPLookup(t *testing.T) {
 
 func TestURLReplacer(t *testing.T) {
 	defer ResetTestConfig()
-	globalConf := config.Global()
-	globalConf.AnalyticsConfig.NormaliseUrls.Enabled = true
-	globalConf.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs = true
-	globalConf.AnalyticsConfig.NormaliseUrls.NormaliseNumbers = true
-	globalConf.AnalyticsConfig.NormaliseUrls.Custom = []string{"ihatethisstring"}
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.AnalyticsConfig.NormaliseUrls.Enabled = true
+		c.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs = true
+		c.AnalyticsConfig.NormaliseUrls.NormaliseNumbers = true
+		c.AnalyticsConfig.NormaliseUrls.Custom = []string{"ihatethisstring"}
+	})
 
 	recordUUID1 := AnalyticsRecord{Path: "/15873a748894492162c402d67e92283b/search"}
 	recordUUID2 := AnalyticsRecord{Path: "/CA761232-ED42-11CE-BACD-00AA0057B223/search"}
@@ -42,8 +42,11 @@ func TestURLReplacer(t *testing.T) {
 	recordID1 := AnalyticsRecord{Path: "/widgets/123456/getParams"}
 	recordCust := AnalyticsRecord{Path: "/widgets/123456/getParams/ihatethisstring"}
 
-	globalConf.AnalyticsConfig.NormaliseUrls.CompiledPatternSet = initNormalisationPatterns()
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.AnalyticsConfig.NormaliseUrls.CompiledPatternSet = initNormalisationPatterns()
+	})
+
+	globalConf := config.Global()
 
 	recordUUID1.NormalisePath(&globalConf)
 	recordUUID2.NormalisePath(&globalConf)
@@ -89,13 +92,13 @@ func BenchmarkURLReplacer(b *testing.B) {
 
 	defer ResetTestConfig()
 
-	globalConf := config.Global()
-	globalConf.AnalyticsConfig.NormaliseUrls.Enabled = true
-	globalConf.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs = true
-	globalConf.AnalyticsConfig.NormaliseUrls.NormaliseNumbers = true
-	globalConf.AnalyticsConfig.NormaliseUrls.Custom = []string{"ihatethisstring"}
-	globalConf.AnalyticsConfig.NormaliseUrls.CompiledPatternSet = initNormalisationPatterns()
-	config.SetGlobal(globalConf)
+	config.SetGlobal(func(c *config.Config) {
+		c.AnalyticsConfig.NormaliseUrls.Enabled = true
+		c.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs = true
+		c.AnalyticsConfig.NormaliseUrls.NormaliseNumbers = true
+		c.AnalyticsConfig.NormaliseUrls.Custom = []string{"ihatethisstring"}
+		c.AnalyticsConfig.NormaliseUrls.CompiledPatternSet = initNormalisationPatterns()
+	})
 
 	for i := 0; i < b.N; i++ {
 		recordUUID1 := AnalyticsRecord{Path: "/15873a748894492162c402d67e92283b/search"}
@@ -104,6 +107,8 @@ func BenchmarkURLReplacer(b *testing.B) {
 		recordUUID4 := AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
 		recordID1 := AnalyticsRecord{Path: "/widgets/123456/getParams"}
 		recordCust := AnalyticsRecord{Path: "/widgets/123456/getParams/ihatethisstring"}
+
+		globalConf := config.Global()
 
 		recordUUID1.NormalisePath(&globalConf)
 		recordUUID2.NormalisePath(&globalConf)
