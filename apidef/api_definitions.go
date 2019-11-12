@@ -81,6 +81,7 @@ type EndpointMethodMeta struct {
 
 type EndPointMeta struct {
 	Path          string                        `bson:"path" json:"path"`
+	IgnoreCase    bool                          `bson:"ignore_case" json:"ignore_case"`
 	MethodActions map[string]EndpointMethodMeta `bson:"method_actions" json:"method_actions"`
 }
 
