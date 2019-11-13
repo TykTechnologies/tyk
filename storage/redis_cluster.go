@@ -614,7 +614,7 @@ func (r *RedisCluster) GetAndDeleteSet(keyName string) []interface{} {
 
 	vals := redVal[0].([]interface{})
 
-	log.Debug("Unpacked vals: ", vals)
+	log.Debug("Unpacked vals: ", len(vals))
 
 	return vals
 }
