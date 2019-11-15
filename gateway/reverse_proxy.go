@@ -290,6 +290,12 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		Director:      director,
 		TykAPISpec:    spec,
 		FlushInterval: time.Duration(spec.GlobalConfig.HttpServerOptions.FlushInterval) * time.Millisecond,
+		sp: sync.Pool{
+			New: func() interface{} {
+				buffer := make([]byte, 32*1024)
+				return &buffer
+			},
+		},
 	}
 	proxy.ErrorHandler.BaseMiddleware = BaseMiddleware{Spec: spec, Proxy: proxy}
 	return proxy
@@ -321,6 +327,8 @@ type ReverseProxy struct {
 
 	TykAPISpec   *APISpec
 	ErrorHandler ErrorHandler
+
+	sp sync.Pool
 }
 
 func defaultTransport(dialerTimeout float64) *http.Transport {
@@ -913,16 +921,17 @@ func (p *ReverseProxy) CopyResponse(dst io.Writer, src io.Reader) {
 		}
 	}
 
-	p.copyBuffer(dst, src, nil)
+	p.copyBuffer(dst, src)
 }
 
-func (p *ReverseProxy) copyBuffer(dst io.Writer, src io.Reader, buf []byte) (int64, error) {
-	if len(buf) == 0 {
-		buf = make([]byte, 32*1024)
-	}
+func (p *ReverseProxy) copyBuffer(dst io.Writer, src io.Reader) (int64, error) {
+
+	buf := p.sp.Get().(*[]byte)
+	defer p.sp.Put(buf)
+
 	var written int64
 	for {
-		nr, rerr := src.Read(buf)
+		nr, rerr := src.Read(*buf)
 		if rerr != nil && rerr != io.EOF && rerr != context.Canceled {
 			log.WithFields(logrus.Fields{
 				"prefix": "proxy",
@@ -931,7 +940,7 @@ func (p *ReverseProxy) copyBuffer(dst io.Writer, src io.Reader, buf []byte) (int
 			}).Error("http: proxy error during body copy: ", rerr)
 		}
 		if nr > 0 {
-			nw, werr := dst.Write(buf[:nr])
+			nw, werr := dst.Write((*buf)[:nr])
 			if nw > 0 {
 				written += int64(nw)
 			}
