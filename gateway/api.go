@@ -2194,3 +2194,14 @@ func ctxTraceEnabled(r *http.Request) bool {
 func ctxSetTrace(r *http.Request) {
 	setCtxValue(r, ctx.Trace, true)
 }
+
+func ctxSetRequestStatus(r *http.Request, stat RequestStatus) {
+	setCtxValue(r, ctx.RequestStatus, stat)
+}
+
+func ctxGetRequestStatus(r *http.Request) (stat RequestStatus) {
+	if v := r.Context().Value(ctx.RequestStatus); v != nil {
+		stat = v.(RequestStatus)
+	}
+	return
+}
