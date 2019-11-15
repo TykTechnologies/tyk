@@ -18,20 +18,6 @@ import (
 	"sync"
 	"time"
 
-	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
-	"github.com/evalphobia/logrus_sentry"
-	"github.com/facebookgo/pidfile"
-	graylogHook "github.com/gemnasium/logrus-graylog-hook"
-	"github.com/gorilla/mux"
-	"github.com/justinas/alice"
-	"github.com/lonelycode/osin"
-	newrelic "github.com/newrelic/go-agent"
-	"github.com/rs/cors"
-	uuid "github.com/satori/go.uuid"
-	"github.com/sirupsen/logrus"
-	logrus_syslog "github.com/sirupsen/logrus/hooks/syslog"
-	"rsc.io/letsencrypt"
-
 	"github.com/TykTechnologies/again"
 	gas "github.com/TykTechnologies/goautosocket"
 	"github.com/TykTechnologies/gorpc"
@@ -48,6 +34,19 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
+	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
+	"github.com/evalphobia/logrus_sentry"
+	"github.com/facebookgo/pidfile"
+	graylogHook "github.com/gemnasium/logrus-graylog-hook"
+	"github.com/gorilla/mux"
+	"github.com/justinas/alice"
+	"github.com/lonelycode/osin"
+	newrelic "github.com/newrelic/go-agent"
+	"github.com/rs/cors"
+	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
+	logrus_syslog "github.com/sirupsen/logrus/hooks/syslog"
+	"rsc.io/letsencrypt"
 )
 
 var (
@@ -152,9 +151,10 @@ var rpcPurgeOnce sync.Once
 
 // Create all globals and init connection handlers
 func setupGlobals(ctx context.Context) {
-
 	reloadMu.Lock()
 	defer reloadMu.Unlock()
+
+	checkup.Run(config.Global())
 
 	dnsCacheManager = dnscache.NewDnsCacheManager(config.Global().DnsCache.MultipleIPsHandleStrategy)
 	if config.Global().DnsCache.Enabled {
@@ -1048,7 +1048,6 @@ func Start() {
 	if err != nil {
 		mainLog.Errorf("Initializing again %s", err)
 	}
-	checkup.Run(config.Global())
 	if tr := config.Global().Tracer; tr.Enabled {
 		trace.SetupTracing(tr.Name, tr.Options)
 		trace.SetLogger(mainLog)

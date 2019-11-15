@@ -629,21 +629,19 @@ func (r *RedisCluster) AppendToSet(keyName, value string) {
 	}
 }
 
-func (r *RedisCluster) AppendToSetPipelined(key string, values []string) {
+func (r *RedisCluster) AppendToSetPipelined(key string, values [][]byte) {
 	if len(values) == 0 {
 		return
 	}
 
-	fixedKey := r.fixKey(key)
-
 	// prepare pipeline data
 	pipeLine := make([]rediscluster.ClusterTransaction, len(values))
-	for index, val := range values {
-		pipeLine[index] = rediscluster.ClusterTransaction{
+	for i := range values {
+		pipeLine[i] = rediscluster.ClusterTransaction{
 			Cmd: "RPUSH",
 			Args: []interface{}{
-				fixedKey,
-				val,
+				r.fixKey(key),
+				values[i],
 			},
 		}
 	}
