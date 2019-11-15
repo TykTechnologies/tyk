@@ -485,7 +485,13 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 	clientAccessPath := spec.Proxy.ListenPath + "oauth/token{_:/?}"
 
 	serverConfig := osin.NewServerConfig()
-	serverConfig.ErrorStatusCode = http.StatusForbidden
+
+	if config.Global().OauthErrorStatusCode != 0 {
+		serverConfig.ErrorStatusCode = config.Global().OauthErrorStatusCode
+	} else {
+		serverConfig.ErrorStatusCode = http.StatusForbidden
+	}
+
 	serverConfig.AllowedAccessTypes = spec.Oauth2Meta.AllowedAccessTypes
 	serverConfig.AllowedAuthorizeTypes = spec.Oauth2Meta.AllowedAuthorizeTypes
 	serverConfig.RedirectUriSeparator = config.Global().OauthRedirectUriSeparator
