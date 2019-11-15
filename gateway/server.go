@@ -489,7 +489,7 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 	if config.Global().OauthErrorStatusCode != 0 {
 		serverConfig.ErrorStatusCode = config.Global().OauthErrorStatusCode
 	} else {
-		serverConfig.ErrorStatusCode = http.StatusBadRequest
+		serverConfig.ErrorStatusCode = http.StatusForbidden
 	}
 
 	serverConfig.AllowedAccessTypes = spec.Oauth2Meta.AllowedAccessTypes
