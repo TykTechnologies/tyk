@@ -373,7 +373,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	if m.Spec.EnableCoProcessAuth && m.HookType == coprocess.HookType_CustomKeyCheck {
 		// The CP middleware didn't setup a session:
 		if returnObject.Session == nil || token == "" {
-			authHeaderValue := r.Header.Get(m.Spec.Auth.AuthHeaderName)
+			authHeaderValue,_ := getAuthToken(m, r)
 			AuthFailed(m, r, authHeaderValue)
 			return errors.New("Key not authorised"), 403
 		}
