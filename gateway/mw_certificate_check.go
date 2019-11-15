@@ -18,6 +18,10 @@ func (m *CertificateCheckMW) EnabledForSpec() bool {
 }
 
 func (m *CertificateCheckMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
+		return nil, http.StatusOK
+	}
+
 	if m.Spec.UseMutualTLSAuth {
 		certIDs := append(m.Spec.ClientCertificates, m.Spec.GlobalConfig.Security.Certificates.API...)
 

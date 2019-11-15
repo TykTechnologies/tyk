@@ -29,6 +29,8 @@ const (
 	ThrottleLevelLimit
 	Trace
 	CheckLoopLimits
+	Definition
+	RequestStatus
 )
 
 func setContext(r *http.Request, ctx context.Context) {

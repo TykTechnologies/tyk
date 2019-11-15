@@ -303,12 +303,12 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		}
 	}
 
+	mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &RateCheckMW{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid})
-	mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid})
 	mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid})

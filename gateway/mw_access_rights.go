@@ -18,6 +18,10 @@ func (a *AccessRightsCheck) Name() string {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (a *AccessRightsCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
+		return nil, http.StatusOK
+	}
+
 	accessingVersion := a.Spec.getVersionFromRequest(r)
 	if accessingVersion == "" {
 		if a.Spec.VersionData.DefaultVersion != "" {
