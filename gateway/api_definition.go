@@ -135,6 +135,7 @@ type URLSpec struct {
 	DoNotTrackEndpoint        apidef.TrackEndpointMeta
 	ValidatePathMeta          apidef.ValidatePathMeta
 	Internal                  apidef.InternalMeta
+	IgnoreCase                bool
 }
 
 type EndPointCacheMeta struct {
@@ -516,6 +517,10 @@ func (a APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo) ([]U
 func (a APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, specType URLStatus) {
 	apiLangIDsRegex := regexp.MustCompile(`{([^}]*)}`)
 	asRegexStr := apiLangIDsRegex.ReplaceAllString(stringSpec, `([^/]*)`)
+	// Case insensitive match
+	if newSpec.IgnoreCase {
+		asRegexStr = "(?i)" + asRegexStr
+	}
 	asRegex, _ := regexp.Compile(asRegexStr)
 	newSpec.Status = specType
 	newSpec.Spec = asRegex
@@ -541,7 +546,7 @@ func (a APIDefinitionLoader) compileExtendedPathSpec(paths []apidef.EndPointMeta
 	urlSpec := []URLSpec{}
 
 	for _, stringSpec := range paths {
-		newSpec := URLSpec{}
+		newSpec := URLSpec{IgnoreCase: stringSpec.IgnoreCase}
 		a.generateRegex(stringSpec.Path, &newSpec, specType)
 
 		// Extend with method actions
