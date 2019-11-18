@@ -103,7 +103,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	case sessionFailRateLimit:
 		err, errCode := k.handleRateLimitFailure(r, token)
 		if throttleRetryLimit > 0 {
-			for true {
+			for {
 				ctxIncThrottleLevel(r, throttleRetryLimit)
 				time.Sleep(time.Duration(throttleInterval * float64(time.Second)))
 
@@ -118,14 +118,14 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 					k.Spec.APIID,
 					true,
 				)
-				if reason == sessionFailNone {
-					return k.ProcessRequest(w, r, nil)
-				}
 
 				if ctxThrottleLevel(r) > throttleRetryLimit {
 					break
 				}
 
+				if reason == sessionFailNone {
+					return k.ProcessRequest(w, r, nil)
+				}
 			}
 		}
 		return err, errCode
