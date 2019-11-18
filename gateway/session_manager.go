@@ -93,14 +93,6 @@ const (
 	sessionFailQuota
 )
 
-type rlAlgo uint
-
-const (
-	drlAlgo rlAlgo = iota
-	sentinelAlgo
-	redisAlgo
-)
-
 func (l *SessionLimiter) limitSentinel(
 	currentSession *user.SessionState,
 	key string,
