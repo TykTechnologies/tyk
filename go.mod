@@ -8,17 +8,14 @@ require (
 	github.com/Masterminds/goutils v1.1.0 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/TykTechnologies/again v0.0.0-20190805133618-6ad301e7eaed
-	github.com/TykTechnologies/concurrent-map v0.0.0-20160908201409-7de59d53fd5c // indirect
 	github.com/TykTechnologies/drl v0.0.0-20190905191955-cc541aa8e3e1
 	github.com/TykTechnologies/goautosocket v0.0.0-20190430121222-97bfa5e7e481
 	github.com/TykTechnologies/gojsonschema v0.0.0-20170222154038-dcb3e4bb7990
 	github.com/TykTechnologies/gorpc v0.0.0-20190515174534-b9c10befc5f4
 	github.com/TykTechnologies/goverify v0.0.0-20160822133757-7ccc57452ade
 	github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c
-	github.com/TykTechnologies/logrus v0.11.0 // indirect
 	github.com/TykTechnologies/murmur3 v0.0.0-20180602122059-1915e687e465
 	github.com/TykTechnologies/openid2go v0.0.0-20160817213554-aab5ce1231ab
-	github.com/TykTechnologies/redigocluster v0.0.0-20190313170440-9814972a6f69
 	github.com/bshuster-repo/logrus-logstash-hook v0.4.1
 	github.com/buger/jsonparser v0.0.0-20181115193947-bf1c66bbce23
 	github.com/cenk/backoff v2.2.1+incompatible // indirect
@@ -33,12 +30,11 @@ require (
 	github.com/facebookgo/pidfile v0.0.0-20150612191647-f242e2999868
 	github.com/franela/goblin v0.0.0-20181003173013-ead4ad1d2727 // indirect
 	github.com/franela/goreq v0.0.0-20171204163338-bcd34c9993f8
-	github.com/garyburd/redigo v1.6.0
 	github.com/gemnasium/logrus-graylog-hook v2.0.7+incompatible
 	github.com/getsentry/raven-go v0.2.0 // indirect
+	github.com/go-redis/redis v6.15.6+incompatible
 	github.com/gocraft/health v0.0.0-20170925182251-8675af27fef0
 	github.com/golang/protobuf v1.3.2
-	github.com/gomodule/redigo v2.0.0+incompatible // indirect
 	github.com/gorilla/mux v1.7.3
 	github.com/gorilla/websocket v1.4.1
 	github.com/hashicorp/terraform v0.12.9
