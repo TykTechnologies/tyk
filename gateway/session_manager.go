@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"fmt"
 	"net/http"
 	"time"
 
@@ -162,9 +161,6 @@ func (l *SessionLimiter) limitDRL(
 	if rate < uint(DRLManager.CurrentTokenValue()) {
 		rate = uint(DRLManager.CurrentTokenValue())
 	}
-	fmt.Println("==========> ", currRate, per,
-		rate, currRate*float64(DRLManager.RequestTokenValue), DRLManager.CurrentTokenValue(),
-	)
 	userBucket, err := l.bucketStore.Create(bucketKey, rate, time.Duration(per)*time.Second)
 	if err != nil {
 		log.Error("Failed to create bucket!")
@@ -229,8 +225,15 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 				return sessionFailRateLimit
 			}
 		} else {
-			if l.limitDRL(currentSession, key, rateScope, apiLimit, dryRun) {
-				return sessionFailRateLimit
+			n := float64(DRLManager.Servers.Count())
+			if n < apiLimit.Rate {
+				if l.limitRedis(currentSession, key, rateScope, store, globalConf, apiLimit, dryRun) {
+					return sessionFailRateLimit
+				}
+			} else {
+				if l.limitDRL(currentSession, key, rateScope, apiLimit, dryRun) {
+					return sessionFailRateLimit
+				}
 			}
 		}
 	}
