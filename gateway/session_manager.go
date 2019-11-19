@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/TykTechnologies/leakybucket"
@@ -153,30 +154,23 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 				l.bucketStore = memorycache.New()
 			}
 
-			bucketKey := key + ":" + rateScope + currentSession.LastUpdated
-			currRate := apiLimit.Rate
+			bucketKey := key + ":" + rateScope
+			currRate := int(apiLimit.Rate)
 			per := apiLimit.Per
 
-			// DRL will always overflow with more servers on low rates
-			rate := uint(currRate * float64(DRLManager.RequestTokenValue))
-			if rate < uint(DRLManager.CurrentTokenValue()) {
-				rate = uint(DRLManager.CurrentTokenValue())
-			}
-
-			userBucket, err := l.bucketStore.Create(bucketKey, rate, time.Duration(per)*time.Second)
-			if err != nil {
-				log.Error("Failed to create bucket!")
-				return sessionFailRateLimit
-			}
-
 			if dryRun {
+				s, _ := store.GetKey(bucketKey)
+				i, _ := strconv.Atoi(s)
+				exp, _ := store.GetExp(bucketKey)
+
 				// if userBucket is empty and not expired.
-				if userBucket.Remaining() == 0 && time.Now().Before(userBucket.Reset()) {
+				if currRate-i == 0 && time.Now().Before(time.Unix(exp, 0)) {
 					return sessionFailRateLimit
 				}
 			} else {
-				_, errF := userBucket.Add(uint(DRLManager.CurrentTokenValue()))
-				if errF != nil {
+				res := store.IncrememntWithExpire(bucketKey, int64(time.Duration(per)))
+
+				if res > int64(currRate) {
 					return sessionFailRateLimit
 				}
 			}
