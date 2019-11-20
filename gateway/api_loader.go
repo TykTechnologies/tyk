@@ -673,6 +673,7 @@ func loadApps(specs []*APISpec) {
 		muxer.setRouter(globalConf.ControlAPIPort, "", router)
 	}
 	gs := prepareStorage()
+	shouldTrace := trace.IsEnabled()
 	for _, spec := range specs {
 		if spec.ListenPort != spec.GlobalConfig.ListenPort {
 			mainLog.Info("API bind on custom port:", spec.ListenPort)
@@ -682,6 +683,15 @@ func loadApps(specs []*APISpec) {
 
 		switch spec.Protocol {
 		case "", "http", "https":
+			if shouldTrace {
+				// opentracing works only with http services.
+				err := trace.AddTracer("", spec.Name)
+				if err != nil {
+					mainLog.Errorf("Failed to initialize tracer for %q error:%v", spec.Name, err)
+				} else {
+					mainLog.Infof("Intialized tracer  api_name=%q", spec.Name)
+				}
+			}
 			loadHTTPService(spec, apisByListen, &gs, muxer)
 		case "tcp", "tls":
 			loadTCPService(spec, &gs, muxer)
