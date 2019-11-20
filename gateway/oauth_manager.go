@@ -184,6 +184,7 @@ func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Reque
 	resp := o.Manager.HandleAccess(r)
 	msg := o.generateOAuthOutputFromOsinResponse(resp)
 	if resp.IsError {
+		log.Error("[OAuth] OAuth response marked as error: ", resp.StatusText)
 		// Something went wrong, write out the error details and kill the response
 		w.WriteHeader(resp.ErrorStatusCode)
 		w.Write(msg)
