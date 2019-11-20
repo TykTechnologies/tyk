@@ -932,7 +932,9 @@ func policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 func handleUpdateHashedKey(keyName string, applyPolicies []string) (interface{}, int) {
 	var orgID string
 	if len(applyPolicies) != 0 {
+		policiesMu.RLock()
 		orgID = policiesByID[applyPolicies[0]].OrgID
+		policiesMu.RUnlock()
 	}
 
 	sess, ok := GlobalSessionManager.SessionDetail(orgID, keyName, true)
