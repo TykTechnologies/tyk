@@ -537,14 +537,6 @@ func (r *RPCStorageHandler) AppendToSet(keyName, value string) {
 	}
 }
 
-func (r *RPCStorageHandler) AppendToSetPipelined(key string, values []string) {
-	// just falls back to AppendToSet
-	// TODO: introduce new RPC method for pipelined operation
-	for _, val := range values {
-		r.AppendToSet(key, val)
-	}
-}
-
 // SetScrollingWindow is used in the rate limiter to handle rate limits fairly.
 func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, val string, pipeline bool) (int, []interface{}) {
 	start := time.Now() // get current time

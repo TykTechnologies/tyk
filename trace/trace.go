@@ -8,6 +8,9 @@ import (
 	opentracing "github.com/opentracing/opentracing-go"
 )
 
+// InitFunc this is a function for initializing a Tracer
+type InitFunc func(name string, service string, opts map[string]interface{}, logger Logger) (Tracer, error)
+
 type Tracer interface {
 	Name() string
 	opentracing.Tracer

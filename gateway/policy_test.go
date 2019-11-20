@@ -248,8 +248,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 	}
 	policiesMu.RUnlock()
 	bmid := &BaseMiddleware{Spec: &APISpec{
-		APIDefinition:  &apidef.APIDefinition{},
-		SessionManager: &dummySessionManager{},
+		APIDefinition: &apidef.APIDefinition{},
 	}}
 	tests := []testApplyPoliciesData{
 		{

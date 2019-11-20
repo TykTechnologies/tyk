@@ -48,6 +48,10 @@ func (hm *HTTPSignatureValidationMiddleware) Init() {
 }
 
 func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
+		return nil, http.StatusOK
+	}
+
 	token := r.Header.Get("Authorization")
 	if token == "" {
 		return hm.authorizationError(r)

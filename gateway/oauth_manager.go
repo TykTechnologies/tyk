@@ -342,7 +342,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			if foundKey {
 				log.Info("Found old token, revoking: ", oldToken)
 
-				o.API.SessionManager.RemoveSession(oldToken, false)
+				GlobalSessionManager.RemoveSession(o.API.OrgID, oldToken, false)
 			}
 		}
 
@@ -379,7 +379,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			keyName := generateToken(o.API.OrgID, username)
 
 			log.Debug("Updating user:", keyName)
-			err := o.API.SessionManager.UpdateSession(keyName, session, session.Lifetime(o.API.SessionLifetime), false)
+			err := GlobalSessionManager.UpdateSession(keyName, session, session.Lifetime(o.API.SessionLifetime), false)
 			if err != nil {
 				log.Error(err)
 			}
@@ -476,6 +476,7 @@ func TykOsinNewServer(config *osin.ServerConfig, storage ExtendedOsinStorageInte
 type RedisOsinStorageInterface struct {
 	store          storage.Handler
 	sessionManager SessionHandler
+	orgID          string
 }
 
 func (r *RedisOsinStorageInterface) Clone() osin.Storage {
@@ -872,7 +873,7 @@ func (r *RedisOsinStorageInterface) RemoveAccess(token string) error {
 	r.store.DeleteKey(key)
 
 	// remove the access token from central storage too
-	r.sessionManager.RemoveSession(token, false)
+	r.sessionManager.RemoveSession(r.orgID, token, false)
 
 	return nil
 }

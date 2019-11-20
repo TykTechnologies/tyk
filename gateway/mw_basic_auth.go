@@ -153,6 +153,10 @@ func (k *BasicAuthKeyIsValid) basicAuthBodyCredentials(w http.ResponseWriter, r 
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
+		return nil, http.StatusOK
+	}
+
 	username, password, err, code := k.basicAuthHeaderCredentials(w, r)
 	token := r.Header.Get(headers.Authorization)
 	if err != nil {

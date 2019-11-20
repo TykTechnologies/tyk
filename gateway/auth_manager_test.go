@@ -72,7 +72,7 @@ func TestAuthenticationAfterUpdateKey(t *testing.T) {
 			APIID: api.APIID,
 		}}
 
-		FallbackKeySesionManager.UpdateSession(storage.HashKey(key), session, 0, config.Global().HashKeys)
+		GlobalSessionManager.UpdateSession(storage.HashKey(key), session, 0, config.Global().HashKeys)
 
 		authHeader := map[string]string{
 			"authorization": key,
@@ -86,7 +86,7 @@ func TestAuthenticationAfterUpdateKey(t *testing.T) {
 			APIID: "dummy",
 		}}
 
-		FallbackKeySesionManager.UpdateSession(storage.HashKey(key), session, 0, config.Global().HashKeys)
+		GlobalSessionManager.UpdateSession(storage.HashKey(key), session, 0, config.Global().HashKeys)
 
 		ts.Run(t, []test.TestCase{
 			{Path: "/get", Headers: authHeader, Code: http.StatusForbidden},

@@ -325,6 +325,59 @@ func TestIgnored(t *testing.T) {
 			{Path: "/", Code: 401},
 		}...)
 	})
+
+	t.Run("With URL rewrite", func(t *testing.T) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{{
+					Path:         "/ignored",
+					Method:       "GET",
+					MatchPattern: "/ignored",
+					RewriteTo:    "/get",
+				}}
+				v.ExtendedPaths.Ignored = []apidef.EndPointMeta{
+					{
+						Path: "ignored",
+						MethodActions: map[string]apidef.EndpointMethodMeta{
+							http.MethodGet: {
+								Action: apidef.NoAction,
+								Code:   http.StatusOK,
+							},
+						},
+					},
+				}
+				v.UseExtendedPaths = true
+			})
+
+			spec.UseKeylessAccess = false
+			spec.Proxy.ListenPath = "/"
+		})
+
+		_, _ = ts.Run(t, []test.TestCase{
+			// URL rewrite should work with ignore
+			{Path: "/ignored", BodyMatch: `"URI":"/get"`, Code: http.StatusOK},
+			{Path: "/", Code: http.StatusUnauthorized},
+		}...)
+	})
+
+	t.Run("Case Sensitivity", func(t *testing.T) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.ExtendedPaths.Ignored = []apidef.EndPointMeta{{Path: "/Foo", IgnoreCase: false}, {Path: "/bar", IgnoreCase: true}}
+				v.UseExtendedPaths = true
+			})
+
+			spec.UseKeylessAccess = false
+			spec.Proxy.ListenPath = "/"
+		})
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/foo", Code: http.StatusUnauthorized},
+			{Path: "/Foo", Code: http.StatusOK},
+			{Path: "/bar", Code: http.StatusOK},
+			{Path: "/Bar", Code: http.StatusOK},
+		}...)
+	})
 }
 
 func TestWhitelistMethodWithAdditionalMiddleware(t *testing.T) {

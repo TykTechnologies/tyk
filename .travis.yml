@@ -18,8 +18,6 @@ addons:
 matrix:
   include:
     - go: 1.12.x
-      env: LATEST_GO=true # run linters and report coverage
-
 
 services:
   - redis-server
@@ -41,6 +39,6 @@ script:
   - sudo -E apt-get -yq --no-install-suggests --no-install-recommends $(travis_apt_get_options) install nodejs
   - sudo npm install -g api-spec-converter --unsafe-perm=true --allow-root
   - go build -tags 'coprocess lua'
-  - ./bin/ci-test.sh
+  - ./bin/ci-tests.sh
   - if [[ $LATEST_GO ]]; then goveralls -coverprofile=<(gocovmerge *.cov); fi
   - ./bin/ci-benchmark.sh

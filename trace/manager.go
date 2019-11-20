@@ -3,6 +3,8 @@ package trace
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"sync"
@@ -12,11 +14,20 @@ import (
 	opentracing "github.com/opentracing/opentracing-go"
 )
 
+// ErrManagerDisabled is returned when trying to use global trace manager when
+// it is disabled.
 var ErrManagerDisabled = errors.New("trace: trace is diabled")
 
-// we use a global manager to avoid manual management as for our use case we
-// only deal with on tracing server at a time.
-var manager = NewManager(nil)
+// This stores a map of opentracer configurations.
+var manager = &sync.Map{}
+
+// This stores a map of service name to  initialized Tracer implementation.
+var services = &sync.Map{}
+
+// Stores status of tracing.
+var enabled atomic.Value
+var logger Logger = StdLogger{}
+var initializer = Init
 
 // serviceID key used to store the service name in request context.Context.
 type serviceID = struct{}
@@ -43,14 +54,21 @@ type Logger interface {
 	Infof(format string, args ...interface{})
 }
 
-// OpenTracer manages initializing,storage and retrieving on multiple tracers
-// based on service names.
-type OpenTracer struct {
-	mu       sync.RWMutex
-	services map[string]Tracer
-	log      Logger
-	enabled  atomic.Value
-	config   Config
+type StdLogger struct{}
+
+func (StdLogger) Errorf(format string, args ...interface{}) {
+	log.Println("[ERROR] trace: ", fmt.Sprintf(format, args...))
+}
+func (StdLogger) Infof(format string, args ...interface{}) {
+	log.Println("[INFO] trace: ", fmt.Sprintf(format, args...))
+}
+
+func (StdLogger) Info(args ...interface{}) {
+	log.Println("[INFO] trace: ", fmt.Sprint(args...))
+}
+
+func (StdLogger) Error(args ...interface{}) {
+	log.Println("[ERROR] trace: ", fmt.Sprint(args...))
 }
 
 type Config struct {
@@ -58,147 +76,81 @@ type Config struct {
 	Opts map[string]interface{}
 }
 
-// NewManager returns a new opentrace manager. If log is not nil it will be used
-// to log errors and info by the manager.
-func NewManager(log Logger) *OpenTracer {
-	return &OpenTracer{log: log, services: make(map[string]Tracer)}
-}
-
-// Get returns a tracer for a given service, it returns a NoopTracer if there is
-// no tracer for the service found.
-func (o *OpenTracer) Get(service string) Tracer {
-	o.mu.RLock()
-	t, ok := o.services[service]
-	o.mu.RUnlock()
-	if !ok {
-		if o.log != nil {
-			o.log.Info(service, "not found")
-		}
-		return NoopTracer{}
-	}
-	return t
-}
-
 // Get returns a tracer stored on the global trace manager.
 func Get(service string) Tracer {
-	return manager.Get(service)
-}
-
-// GetOk like Get but instead of returning NoopTracer for missing tracer it
-// returns nil and false when the service tracer wasn't found.
-func (o *OpenTracer) GetOk(service string) (Tracer, bool) {
-	o.mu.RLock()
-	t, ok := o.services[service]
-	o.mu.RUnlock()
-	return t, ok
-}
-
-// Set saves tr using service as key on o.
-func (o *OpenTracer) Set(service string, tr Tracer) {
-	o.mu.Lock()
-	o.services[service] = tr
-	o.mu.Unlock()
-}
-
-// Close calls Close on the active tracer.
-func (o *OpenTracer) Close() error {
-	o.mu.RLock()
-	for _, v := range o.services {
-		if err := v.Close(); err != nil {
-			return err
-		}
+	if t, ok := services.Load(service); ok {
+		return t.(Tracer)
 	}
-	o.mu.RUnlock()
-	o.mu.Lock()
-	o.services = make(map[string]Tracer)
-	o.mu.Unlock()
-	return nil
+	return NoopTracer{}
 }
 
 // Close calls Close on the global tace manager.
 func Close() error {
-	return manager.Close()
-}
-
-// IsEnabled returns true if the manager is enabled.
-func (o *OpenTracer) IsEnabled() bool {
-	ok := o.enabled.Load()
-	if ok != nil {
-		return ok.(bool)
+	var s []string
+	services.Range(func(k, v interface{}) bool {
+		s = append(s, k.(string))
+		v.(Tracer).Close()
+		return true
+	})
+	for _, v := range s {
+		services.Delete(v)
 	}
-	return false
+	Disable()
+	return nil
 }
 
 // IsEnabled returns true if the global trace manager is enabled.
 func IsEnabled() bool {
-	return manager.IsEnabled()
-}
-
-// Enable sets o to enabled state.
-func (o *OpenTracer) Enable() {
-	o.enabled.Store(true)
+	if v := enabled.Load(); v != nil {
+		return v.(bool)
+	}
+	return false
 }
 
 // Enable sets the global manager to enabled.
 func Enable() {
-	manager.Enable()
-}
-
-// Disable sets o to disabled state.
-func (o *OpenTracer) Disable() {
-	o.enabled.Store(false)
+	enabled.Store(true)
 }
 
 // Disable disables the global trace manager.
 func Disable() {
-	manager.Disable()
+	enabled.Store(false)
 }
 
-// SetLogger sets log as the default logger for o.
-func (o *OpenTracer) SetLogger(log Logger) {
-	o.mu.Lock()
-	o.log = log
-	o.mu.Unlock()
-}
-
-// AddTracer initializes a tracer based on the configuration stored in o for the
-// given service name and caches. This does donthing when there is already a
-// tracer for the given service.
-func (o *OpenTracer) AddTracer(service string) error {
-	_, ok := o.GetOk(service)
-	if !ok {
-		tr, err := Init(o.config.Name, service, o.config.Opts, o.log)
-		if err != nil {
-			if o.log != nil {
-				o.log.Errorf("%v", err)
+// AddTracer initialize a tracer for the service.
+func AddTracer(tracer, service string) error {
+	if !IsEnabled() {
+		return ErrManagerDisabled
+	}
+	if _, ok := services.Load(service); !ok {
+		if v, ok := manager.Load(tracer); ok {
+			c := v.(Config)
+			tr, err := initializer(c.Name, service, c.Opts, StdLogger{})
+			if err != nil {
+				return err
 			}
-			return err
+			services.Store(service, tr)
 		}
-		o.Set(service, tr)
 	}
 	return nil
 }
 
-// AddTracer initialize a tracer for the service.
-func AddTracer(service string) error {
-	if !manager.IsEnabled() {
-		return ErrManagerDisabled
-	}
-	return manager.AddTracer(service)
-}
-
 func SetLogger(log Logger) {
-	manager.SetLogger(log)
+	logger = log
 }
 
-func (o *OpenTracer) SetupTracing(name string, opts map[string]interface{}) {
-	o.config.Name = name
-	o.config.Opts = opts
+func SetInit(fn InitFunc) {
+	initializer = fn
 }
 
 func SetupTracing(name string, opts map[string]interface{}) {
-	manager.SetupTracing(name, opts)
-	manager.Enable()
+	// We are using empty string as key since we only work with one opentracer at a
+	// time hence the default.
+	manager.Store("", Config{
+		Name: name,
+		Opts: opts,
+	})
+	enabled.Store(true)
 }
 
 func Root(service string, r *http.Request) (opentracing.Span, *http.Request) {
