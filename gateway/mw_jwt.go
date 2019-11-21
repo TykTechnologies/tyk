@@ -514,30 +514,20 @@ func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Toke
 	return nil, http.StatusOK
 }
 
+// getAuthType overrides BaseMiddleware.getAuthType.
+func (k *JWTMiddleware) getAuthType() string {
+	return "jwt"
+}
+
 func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
 		return nil, http.StatusOK
 	}
 
 	logger := k.Logger()
-	config := k.Spec.Auth
 	var tykId string
 
-	// Get the token
-	rawJWT := r.Header.Get(config.AuthHeaderName)
-	if config.UseParam {
-		// Set hte header name
-		rawJWT = r.URL.Query().Get(config.AuthHeaderName)
-	}
-
-	if config.UseCookie {
-		authCookie, err := r.Cookie(config.AuthHeaderName)
-		if err != nil {
-			rawJWT = ""
-		} else {
-			rawJWT = authCookie.Value
-		}
-	}
+	rawJWT, config := k.getAuthToken(k.getAuthType(), r)
 
 	if rawJWT == "" {
 		// No header value, fail

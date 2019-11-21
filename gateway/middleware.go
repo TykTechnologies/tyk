@@ -622,6 +622,53 @@ func (t BaseMiddleware) FireEvent(name apidef.TykEvent, meta interface{}) {
 	fireEvent(name, meta, t.Spec.EventPaths)
 }
 
+func (b BaseMiddleware) getAuthType() string {
+	return ""
+}
+
+func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, apidef.AuthConfig) {
+	config, ok := b.Base().Spec.AuthConfigs[authType]
+	// Auth is deprecated.
+	if !ok {
+		config = b.Base().Spec.Auth
+	}
+
+	key := r.Header.Get(config.AuthHeaderName)
+
+	paramName := config.ParamName
+	if config.UseParam || paramName != "" {
+		if paramName == "" {
+			paramName = config.AuthHeaderName
+		}
+
+		paramValue := r.URL.Query().Get(paramName)
+
+		// Only use the paramValue if it has an actual value
+		if paramValue != "" {
+			key = paramValue
+		}
+	}
+
+	cookieName := config.CookieName
+	if config.UseCookie || cookieName != "" {
+		if cookieName == "" {
+			cookieName = config.AuthHeaderName
+		}
+
+		authCookie, err := r.Cookie(cookieName)
+		cookieValue := ""
+		if err == nil {
+			cookieValue = authCookie.Value
+		}
+
+		if cookieValue != "" {
+			key = cookieValue
+		}
+	}
+
+	return key, config
+}
+
 type TykResponseHandler interface {
 	Init(interface{}, *APISpec) error
 	Name() string

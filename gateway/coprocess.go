@@ -373,7 +373,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	if m.Spec.EnableCoProcessAuth && m.HookType == coprocess.HookType_CustomKeyCheck {
 		// The CP middleware didn't setup a session:
 		if returnObject.Session == nil || token == "" {
-			authHeaderValue := r.Header.Get(m.Spec.Auth.AuthHeaderName)
+			authHeaderValue, _ := m.getAuthToken(m.getAuthType(), r)
 			AuthFailed(m, r, authHeaderValue)
 			return errors.New("Key not authorised"), 403
 		}
@@ -411,6 +411,11 @@ func (h *CustomMiddlewareResponseHook) Init(mwDef interface{}, spec *APISpec) er
 		MiddlewareDriver: spec.CustomMiddleware.Driver,
 	}
 	return nil
+}
+
+// getAuthType overrides BaseMiddleware.getAuthType.
+func (m *CoProcessMiddleware) getAuthType() string {
+	return "coprocess"
 }
 
 func (h *CustomMiddlewareResponseHook) Name() string {

@@ -21,7 +21,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -47,12 +46,17 @@ func (hm *HTTPSignatureValidationMiddleware) Init() {
 	hm.lowercasePattern = regexp.MustCompile(`%[a-f0-9][a-f0-9]`)
 }
 
+// getAuthType overrides BaseMiddleware.getAuthType.
+func (hm *HTTPSignatureValidationMiddleware) getAuthType() string {
+	return "hmac"
+}
+
 func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
 		return nil, http.StatusOK
 	}
 
-	token := r.Header.Get("Authorization")
+	token, _ := hm.getAuthToken(hm.getAuthType(), r)
 	if token == "" {
 		return hm.authorizationError(r)
 	}
@@ -69,7 +73,8 @@ func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWrite
 	}
 
 	// Generate a signature string
-	signatureString, err := generateSignatureStringFromRequest(r, fieldValues.Headers)
+	signatureString, err := generateHMACSignatureStringFromRequest(r, fieldValues.Headers)
+
 	if err != nil {
 		logger.WithError(err).WithField("signature_string", signatureString).Error("Signature string generation failed")
 		return hm.authorizationError(r)
@@ -233,8 +238,8 @@ func (hm *HTTPSignatureValidationMiddleware) setContextVars(r *http.Request, tok
 
 func (hm *HTTPSignatureValidationMiddleware) authorizationError(r *http.Request) (error, int) {
 	hm.Logger().Info("Authorization field missing or malformed")
-
-	AuthFailed(hm, r, r.Header.Get(headers.Authorization))
+	token, _ := hm.getAuthToken(hm.getAuthType(), r)
+	AuthFailed(hm, r, token)
 
 	return errors.New("Authorization field missing, malformed or invalid"), http.StatusBadRequest
 }
@@ -314,10 +319,8 @@ func getDateHeader(r *http.Request) (string, string) {
 	auxHeaderVal := r.Header.Get(altHeaderSpec)
 	// Prefer aux if present
 	if auxHeaderVal != "" {
-		token := r.Header.Get(headers.Authorization)
 		log.WithFields(logrus.Fields{
-			"prefix":      "hmac",
-			"auth_header": token,
+			"prefix": "hmac",
 		}).Warning("Using auxiliary header for this request")
 		return strings.ToLower(altHeaderSpec), auxHeaderVal
 	}
@@ -409,8 +412,7 @@ func getFieldValues(authHeader string) (*HMACFieldValues, error) {
 }
 
 // "Signature keyId="9876",algorithm="hmac-sha1",headers="x-test x-test-2",signature="queryEscape(base64(sig))"")
-
-func generateSignatureStringFromRequest(r *http.Request, headers []string) (string, error) {
+func generateHMACSignatureStringFromRequest(r *http.Request, headers []string) (string, error) {
 	signatureString := ""
 	for i, header := range headers {
 		loweredHeader := strings.TrimSpace(strings.ToLower(header))
