@@ -331,6 +331,42 @@ func (c *CertificateManager) ListPublicKeys(keyIDs []string) (out []string) {
 	return out
 }
 
+// Returns list of fingerprints
+func (c *CertificateManager) ListRawPublicKey(keyID string) (out interface{}) {
+	var rawKey []byte
+	var err error
+
+	if isSHA256(keyID) {
+		var val string
+		val, err = c.storage.GetKey("raw-" + keyID)
+		if err != nil {
+			c.logger.Warn("Can't retrieve public key from Redis:", keyID, err)
+			return nil
+		}
+		rawKey = []byte(val)
+	} else {
+		rawKey, err = ioutil.ReadFile(keyID)
+		if err != nil {
+			c.logger.Error("Error while reading public key from file:", keyID, err)
+			return nil
+		}
+	}
+
+	block, _ := pem.Decode(rawKey)
+	if block == nil {
+		c.logger.Error("Can't parse public key:", keyID)
+		return nil
+	}
+
+	out, err = x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		c.logger.Error("Error while parsing public key:", keyID, err)
+		return nil
+	}
+
+	return out
+}
+
 func (c *CertificateManager) ListAllIds(prefix string) (out []string) {
 	keys := c.storage.GetKeys("raw-" + prefix + "*")
 

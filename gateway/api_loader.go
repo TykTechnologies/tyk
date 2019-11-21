@@ -323,7 +323,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 			logger.Info("Checking security policy: Basic")
 		}
 
-		if mwAppendEnabled(&authArray, &HMACMiddleware{BaseMiddleware: baseMid}) {
+		if mwAppendEnabled(&authArray, &HTTPSignatureValidationMiddleware{BaseMiddleware: baseMid}) {
 			logger.Info("Checking security policy: HMAC")
 		}
 

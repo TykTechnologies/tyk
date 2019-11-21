@@ -540,14 +540,10 @@ func CreateDefinitionFromString(defStr string) *APISpec {
 	return spec
 }
 
-func CreateSpecTest(t testing.TB, def string) *APISpec {
-	spec := CreateDefinitionFromString(def)
-	tname := t.Name()
-	redisStore := &storage.RedisCluster{KeyPrefix: tname + "-apikey."}
-	healthStore := &storage.RedisCluster{KeyPrefix: tname + "-apihealth."}
-	orgStore := &storage.RedisCluster{KeyPrefix: tname + "-orgKey."}
-	spec.Init(redisStore, redisStore, healthStore, orgStore)
-	return spec
+func LoadSampleAPI(def string) (spec *APISpec) {
+	spec = CreateDefinitionFromString(def)
+	loadApps([]*APISpec{spec})
+	return
 }
 
 func firstVals(vals map[string][]string) map[string]string {

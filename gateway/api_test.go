@@ -17,7 +17,6 @@ import (
 
 	"fmt"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
@@ -41,16 +40,6 @@ const apiTestDef = `{
 		"target_url": "` + TestHttpAny + `"
 	}
 }`
-
-func loadSampleAPI(t *testing.T, def string) {
-	spec := CreateSpecTest(t, def)
-	loadApps([]*APISpec{spec})
-}
-
-type testAPIDefinition struct {
-	apidef.APIDefinition
-	ID string `json:"id"`
-}
 
 func TestHealthCheckEndpoint(t *testing.T) {
 	globalConf := config.Global()
@@ -1174,7 +1163,7 @@ func TestGroupResetHandler(t *testing.T) {
 	apisByID = make(map[string]*APISpec)
 	apisMu.Unlock()
 
-	loadSampleAPI(t, apiTestDef)
+	LoadSampleAPI(apiTestDef)
 
 	recorder := httptest.NewRecorder()
 

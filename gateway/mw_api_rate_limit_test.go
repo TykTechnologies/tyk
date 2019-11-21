@@ -64,7 +64,7 @@ func getGlobalRLAuthKeyChain(spec *APISpec) http.Handler {
 }
 
 func TestRLOpen(t *testing.T) {
-	spec := CreateSpecTest(t, openRLDefSmall)
+	spec := LoadSampleAPI(openRLDefSmall)
 
 	req := TestReq(t, "GET", "/rl_test/", nil)
 
@@ -210,7 +210,7 @@ func TestRequestThrottling(t *testing.T) {
 }
 
 func TestRLClosed(t *testing.T) {
-	spec := CreateSpecTest(t, closedRLDefSmall)
+	spec := LoadSampleAPI(closedRLDefSmall)
 
 	req := TestReq(t, "GET", "/rl_closed_test/", nil)
 
@@ -245,7 +245,7 @@ func TestRLClosed(t *testing.T) {
 }
 
 func TestRLOpenWithReload(t *testing.T) {
-	spec := CreateSpecTest(t, openRLDefSmall)
+	spec := LoadSampleAPI(openRLDefSmall)
 
 	req := TestReq(t, "GET", "/rl_test/", nil)
 

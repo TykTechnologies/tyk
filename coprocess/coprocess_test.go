@@ -53,7 +53,7 @@ func TestCoProcessDispatch(t *testing.T) {
 }
 
 func TestCoProcessDispatchEvent(t *testing.T) {
-	spec := gateway.CreateSpecTest(t, basicCoProcessDef)
+	spec := gateway.LoadSampleAPI(basicCoProcessDef)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := gateway.TykNewSingleHostReverseProxy(remote, spec)
 	baseMid := gateway.BaseMiddleware{Spec: spec, Proxy: proxy}
@@ -144,7 +144,7 @@ func buildCoProcessChain(spec *gateway.APISpec, hookName string, hookType coproc
 }
 
 func TestCoProcessMiddleware(t *testing.T) {
-	spec := gateway.CreateSpecTest(t, basicCoProcessDef)
+	spec := gateway.LoadSampleAPI(basicCoProcessDef)
 
 	chain := buildCoProcessChain(spec, "hook_test", coprocess.HookType_Pre, apidef.MiddlewareDriver("python"))
 
@@ -160,7 +160,7 @@ func TestCoProcessMiddleware(t *testing.T) {
 }
 
 func TestCoProcessObjectPostProcess(t *testing.T) {
-	spec := gateway.CreateSpecTest(t, basicCoProcessDef)
+	spec := gateway.LoadSampleAPI(basicCoProcessDef)
 
 	chain := buildCoProcessChain(spec, "hook_test_object_postprocess", coprocess.HookType_Pre, apidef.MiddlewareDriver("python"))
 
@@ -214,7 +214,7 @@ func TestCoProcessObjectPostProcess(t *testing.T) {
 
 func TestCoProcessAuth(t *testing.T) {
 	t.Log("CP AUTH")
-	spec := gateway.CreateSpecTest(t, protectedCoProcessDef)
+	spec := gateway.LoadSampleAPI(protectedCoProcessDef)
 
 	chain := buildCoProcessChain(spec, "hook_test_bad_auth", coprocess.HookType_CustomKeyCheck, apidef.MiddlewareDriver("python"))
 
@@ -235,7 +235,7 @@ func TestCoProcessAuth(t *testing.T) {
 }
 
 func TestCoProcessReturnOverrides(t *testing.T) {
-	spec := gateway.CreateSpecTest(t, basicCoProcessDef)
+	spec := gateway.LoadSampleAPI(t, basicCoProcessDef)
 	chain := buildCoProcessChain(spec, "hook_test_return_overrides", coprocess.HookType_Pre, apidef.MiddlewareDriver("python"))
 	session := gateway.CreateStandardSession()
 	spec.SessionManager.UpdateSession("abc", session, 60, false)
@@ -255,7 +255,7 @@ func TestCoProcessReturnOverrides(t *testing.T) {
 }
 
 func TestCoProcessReturnOverridesErrorMessage(t *testing.T) {
-	spec := gateway.CreateSpecTest(t, basicCoProcessDef)
+	spec := gateway.LoadSampleAPI(basicCoProcessDef)
 	chain := buildCoProcessChain(spec, "hook_test_return_overrides_error", coprocess.HookType_Pre, apidef.MiddlewareDriver("python"))
 	session := gateway.CreateStandardSession()
 	spec.SessionManager.UpdateSession("abc", session, 60, false)

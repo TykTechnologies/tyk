@@ -213,8 +213,9 @@ func getAuthKeyChain(spec *APISpec) http.Handler {
 	return chain
 }
 
-func testPrepareAuthKeySession(tb testing.TB, apiDef string, isBench bool) (string, *APISpec) {
-	spec := CreateSpecTest(tb, apiDef)
+func testPrepareAuthKeySession(apiDef string, isBench bool) (string, *APISpec) {
+	spec := LoadSampleAPI(apiDef)
+
 	session := createAuthKeyAuthSession(isBench)
 	customToken := ""
 	if isBench {
@@ -228,7 +229,7 @@ func testPrepareAuthKeySession(tb testing.TB, apiDef string, isBench bool) (stri
 }
 
 func TestBearerTokenAuthKeySession(t *testing.T) {
-	customToken, spec := testPrepareAuthKeySession(t, authKeyDef, false)
+	customToken, spec := testPrepareAuthKeySession(authKeyDef, false)
 
 	recorder := httptest.NewRecorder()
 	req := TestReq(t, "GET", "/auth_key_test/", nil)
@@ -247,7 +248,7 @@ func TestBearerTokenAuthKeySession(t *testing.T) {
 func BenchmarkBearerTokenAuthKeySession(b *testing.B) {
 	b.ReportAllocs()
 
-	customToken, spec := testPrepareAuthKeySession(b, authKeyDef, true)
+	customToken, spec := testPrepareAuthKeySession(authKeyDef, true)
 
 	recorder := httptest.NewRecorder()
 	req := TestReq(b, "GET", "/auth_key_test/", nil)
@@ -282,7 +283,7 @@ const authKeyDef = `{
 }`
 
 func TestMultiAuthBackwardsCompatibleSession(t *testing.T) {
-	customToken, spec := testPrepareAuthKeySession(t, multiAuthBackwardsCompatible, false)
+	customToken, spec := testPrepareAuthKeySession(multiAuthBackwardsCompatible, false)
 
 	recorder := httptest.NewRecorder()
 	req := TestReq(t, "GET", fmt.Sprintf("/auth_key_test/?token=%s", customToken), nil)
@@ -299,7 +300,7 @@ func TestMultiAuthBackwardsCompatibleSession(t *testing.T) {
 func BenchmarkMultiAuthBackwardsCompatibleSession(b *testing.B) {
 	b.ReportAllocs()
 
-	customToken, spec := testPrepareAuthKeySession(b, multiAuthBackwardsCompatible, true)
+	customToken, spec := testPrepareAuthKeySession(multiAuthBackwardsCompatible, true)
 
 	recorder := httptest.NewRecorder()
 	req := TestReq(b, "GET", fmt.Sprintf("/auth_key_test/?token=%s", customToken), nil)
@@ -335,7 +336,7 @@ const multiAuthBackwardsCompatible = `{
 }`
 
 func TestMultiAuthSession(t *testing.T) {
-	spec := CreateSpecTest(t, multiAuthDef)
+	spec := LoadSampleAPI(multiAuthDef)
 	session := createAuthKeyAuthSession(false)
 	customToken := "54321111"
 	// AuthKey sessions are stored by {token}
