@@ -122,7 +122,7 @@ func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
 }
 
 func testPrepareHMACAuthSessionPass(tb testing.TB, hashFn func() hash.Hash, eventWG *sync.WaitGroup, withHeader bool, isBench bool) (string, *APISpec, *http.Request, string) {
-	spec := loadSampleAPI(hmacAuthDef)
+	spec := LoadSampleAPI(hmacAuthDef)
 
 	session := createHMACAuthSession()
 
@@ -176,7 +176,7 @@ func testPrepareHMACAuthSessionPass(tb testing.TB, hashFn func() hash.Hash, even
 }
 
 func testPrepareRSAAuthSessionPass(tb testing.TB, eventWG *sync.WaitGroup, privateKey *rsa.PrivateKey, pubCertId string, withHeader bool, isBench bool) (string, *APISpec, *http.Request, string) {
-	spec := CreateSpecTest(tb, hmacAuthDef)
+	spec := LoadSampleAPI(hmacAuthDef)
 	session := createRSAAuthSession(pubCertId)
 
 	// Should not receive an AuthFailure event
@@ -194,7 +194,7 @@ func testPrepareRSAAuthSessionPass(tb testing.TB, eventWG *sync.WaitGroup, priva
 		sessionKey = "9876"
 	}
 
-	spec.SessionManager.UpdateSession(sessionKey, session, 60, false)
+	GlobalSessionManager.UpdateSession(sessionKey, session, 60, false)
 
 	req := TestReq(tb, "GET", "/", nil)
 
@@ -294,7 +294,7 @@ func BenchmarkHMACAuthSessionPass(b *testing.B) {
 }
 
 func TestHMACAuthSessionAuxDateHeader(t *testing.T) {
-	spec := loadSampleAPI(hmacAuthDef)
+	spec := LoadSampleAPI(hmacAuthDef)
 
 	session := createHMACAuthSession()
 
@@ -347,7 +347,7 @@ func TestHMACAuthSessionAuxDateHeader(t *testing.T) {
 }
 
 func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
-	spec := loadSampleAPI(hmacAuthDef)
+	spec := LoadSampleAPI(hmacAuthDef)
 	session := createHMACAuthSession()
 
 	// Should receive an AuthFailure event
@@ -399,7 +399,7 @@ func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
 }
 
 func TestHMACAuthSessionKeyMissing(t *testing.T) {
-	spec := loadSampleAPI(hmacAuthDef)
+	spec := LoadSampleAPI(hmacAuthDef)
 	session := createHMACAuthSession()
 
 	// Should receive an AuthFailure event
@@ -451,7 +451,7 @@ func TestHMACAuthSessionKeyMissing(t *testing.T) {
 }
 
 func TestHMACAuthSessionMalformedHeader(t *testing.T) {
-	spec := loadSampleAPI(hmacAuthDef)
+	spec := LoadSampleAPI(hmacAuthDef)
 	session := createHMACAuthSession()
 
 	// Should receive an AuthFailure event
@@ -561,7 +561,7 @@ func replaceUpperCase(originalSignature string, lowercaseList []string) string {
 }
 
 func TestHMACAuthSessionPassWithHeaderFieldLowerCase(t *testing.T) {
-	spec := loadSampleAPI(hmacAuthDef)
+	spec := LoadSampleAPI(hmacAuthDef)
 	session := createHMACAuthSession()
 
 	// Should not receive an AuthFailure event
@@ -707,7 +707,7 @@ func TestRSAAuthSessionKeyMissing(t *testing.T) {
 	pubID, _ := CertificateManager.Add(pubPem, "")
 	defer CertificateManager.Delete(pubID)
 
-	spec := CreateSpecTest(t, hmacAuthDef)
+	spec := LoadSampleAPI(hmacAuthDef)
 
 	// Should receive an AuthFailure event
 	var eventWG sync.WaitGroup

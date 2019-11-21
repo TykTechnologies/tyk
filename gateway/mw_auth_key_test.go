@@ -214,7 +214,7 @@ func getAuthKeyChain(spec *APISpec) http.Handler {
 }
 
 func testPrepareAuthKeySession(apiDef string, isBench bool) (string, *APISpec) {
-	spec := loadSampleAPI(apiDef)
+	spec := LoadSampleAPI(apiDef)
 
 	session := createAuthKeyAuthSession(isBench)
 	customToken := ""
@@ -336,7 +336,7 @@ const multiAuthBackwardsCompatible = `{
 }`
 
 func TestMultiAuthSession(t *testing.T) {
-	spec := loadSampleAPI(multiAuthDef)
+	spec := LoadSampleAPI(multiAuthDef)
 	session := createAuthKeyAuthSession(false)
 	customToken := "54321111"
 	// AuthKey sessions are stored by {token}

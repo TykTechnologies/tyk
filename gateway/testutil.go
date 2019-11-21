@@ -538,6 +538,12 @@ func CreateDefinitionFromString(defStr string) *APISpec {
 	return spec
 }
 
+func LoadSampleAPI(def string) (spec *APISpec) {
+	spec = CreateDefinitionFromString(def)
+	loadApps([]*APISpec{spec})
+	return
+}
+
 func firstVals(vals map[string][]string) map[string]string {
 	m := make(map[string]string, len(vals))
 	for k, vs := range vals {
