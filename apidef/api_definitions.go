@@ -366,8 +366,9 @@ type APIDefinition struct {
 		AllowedAuthorizeTypes  []osin.AuthorizeRequestType `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
 		AuthorizeLoginRedirect string                      `bson:"auth_login_redirect" json:"auth_login_redirect"`
 	} `bson:"oauth_meta" json:"oauth_meta"`
-	Auth         Auth `bson:"auth" json:"auth"`
-	UseBasicAuth bool `bson:"use_basic_auth" json:"use_basic_auth"`
+	Auth         AuthConfig            `bson:"auth" json:"auth"` // Deprecated: Use AuthConfigs instead.
+	AuthConfigs  map[string]AuthConfig `bson:"auth_configs" json:"auth_configs"`
+	UseBasicAuth bool                  `bson:"use_basic_auth" json:"use_basic_auth"`
 	BasicAuth    struct {
 		DisableCaching     bool   `bson:"disable_caching" json:"disable_caching"`
 		CacheTTL           int    `bson:"cache_ttl" json:"cache_ttl"`
@@ -478,7 +479,7 @@ type APIDefinition struct {
 	StripAuthData     bool                   `bson:"strip_auth_data" json:"strip_auth_data"`
 }
 
-type Auth struct {
+type AuthConfig struct {
 	UseParam          bool            `mapstructure:"use_param" bson:"use_param" json:"use_param"`
 	ParamName         string          `mapstructure:"param_name" bson:"param_name" json:"param_name"`
 	UseCookie         bool            `mapstructure:"use_cookie" bson:"use_cookie" json:"use_cookie"`

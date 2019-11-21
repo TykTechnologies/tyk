@@ -11,7 +11,7 @@ import (
 )
 
 type TestAuth struct {
-	apidef.Auth
+	apidef.AuthConfig
 	HeaderKey  string
 	QueryParam string
 }
@@ -30,9 +30,9 @@ func randStringBytes(n int) string {
 
 func testPrepareStripAuthStripFromHeaders() ([]string, []TestAuth) {
 	testCases := []TestAuth{
-		{Auth: apidef.Auth{AuthHeaderName: "Authorization"}, HeaderKey: "Authorization"},
-		{Auth: apidef.Auth{AuthHeaderName: ""}, HeaderKey: "Authorization"},
-		{Auth: apidef.Auth{AuthHeaderName: "MyAuth"}, HeaderKey: "MyAuth"},
+		{AuthConfig: apidef.AuthConfig{AuthHeaderName: "Authorization"}, HeaderKey: "Authorization"},
+		{AuthConfig: apidef.AuthConfig{AuthHeaderName: ""}, HeaderKey: "Authorization"},
+		{AuthConfig: apidef.AuthConfig{AuthHeaderName: "MyAuth"}, HeaderKey: "MyAuth"},
 	}
 
 	miscHeaders := []string{
@@ -53,7 +53,7 @@ func TestStripAuth_stripFromHeaders(t *testing.T) {
 
 			sa := StripAuth{}
 			sa.Spec = &APISpec{APIDefinition: &apidef.APIDefinition{}}
-			sa.Spec.Auth = tc.Auth
+			sa.Spec.Auth = tc.AuthConfig
 
 			req, err := http.NewRequest("GET", "http://example.com", nil)
 			if err != nil {
@@ -92,7 +92,7 @@ func TestStripAuth_stripFromHeaders(t *testing.T) {
 		}
 		sa := StripAuth{}
 		sa.Spec = &APISpec{APIDefinition: &apidef.APIDefinition{}}
-		sa.Spec.Auth = apidef.Auth{}
+		sa.Spec.Auth = apidef.AuthConfig{}
 		key := "Cookie"
 		stripFromCookieTest(t, req, key, sa, "Authorization=AUTHORIZATION", "")
 		stripFromCookieTest(t, req, key, sa, "Authorization=AUTHORIZATION;Dummy=DUMMY", "Dummy=DUMMY")
@@ -100,7 +100,7 @@ func TestStripAuth_stripFromHeaders(t *testing.T) {
 		stripFromCookieTest(t, req, key, sa, "Dummy=DUMMY;Authorization=AUTHORIZATION;Dummy2=DUMMY2", "Dummy=DUMMY;Dummy2=DUMMY2")
 
 		key = "NonDefaultName"
-		sa.Spec.Auth = apidef.Auth{CookieName: key}
+		sa.Spec.Auth = apidef.AuthConfig{CookieName: key}
 		stripFromCookieTest(t, req, key, sa, "Dummy=DUMMY;Authorization=AUTHORIZATION;Dummy2=DUMMY2", "Dummy=DUMMY;Dummy2=DUMMY2")
 	})
 }
@@ -125,7 +125,7 @@ func BenchmarkStripAuth_stripFromHeaders(b *testing.B) {
 		for _, tc := range testCases {
 			sa := StripAuth{}
 			sa.Spec = &APISpec{APIDefinition: &apidef.APIDefinition{}}
-			sa.Spec.Auth = tc.Auth
+			sa.Spec.Auth = tc.AuthConfig
 
 			req, err := http.NewRequest("GET", "http://example.com", nil)
 			if err != nil {
@@ -150,13 +150,13 @@ func BenchmarkStripAuth_stripFromHeaders(b *testing.B) {
 func testPrepareStripAuthStripFromParams() ([]string, []TestAuth) {
 	testCases := []TestAuth{
 		// ParamName set, use it
-		{Auth: apidef.Auth{UseParam: true, ParamName: "password1"}, QueryParam: "password1"},
+		{AuthConfig: apidef.AuthConfig{UseParam: true, ParamName: "password1"}, QueryParam: "password1"},
 		// ParamName not set, use AuthHeaderName
-		{Auth: apidef.Auth{UseParam: true, ParamName: "", AuthHeaderName: "auth1"}, QueryParam: "auth1"},
+		{AuthConfig: apidef.AuthConfig{UseParam: true, ParamName: "", AuthHeaderName: "auth1"}, QueryParam: "auth1"},
 		// ParamName takes precedence over AuthHeaderName
-		{Auth: apidef.Auth{UseParam: true, ParamName: "auth2", AuthHeaderName: "auth3"}, QueryParam: "auth2"},
+		{AuthConfig: apidef.AuthConfig{UseParam: true, ParamName: "auth2", AuthHeaderName: "auth3"}, QueryParam: "auth2"},
 		// Both not set, use Authorization
-		{Auth: apidef.Auth{UseParam: true, ParamName: "", AuthHeaderName: ""}, QueryParam: "Authorization"},
+		{AuthConfig: apidef.AuthConfig{UseParam: true, ParamName: "", AuthHeaderName: ""}, QueryParam: "Authorization"},
 	}
 
 	miscQueryStrings := []string{
@@ -177,7 +177,7 @@ func TestStripAuth_stripFromParams(t *testing.T) {
 
 			sa := StripAuth{}
 			sa.Spec = &APISpec{APIDefinition: &apidef.APIDefinition{}}
-			sa.Spec.Auth = tc.Auth
+			sa.Spec.Auth = tc.AuthConfig
 
 			rawUrl := "http://example.com/abc"
 
@@ -220,7 +220,7 @@ func BenchmarkStripAuth_stripFromParams(b *testing.B) {
 		for _, tc := range testCases {
 			sa := StripAuth{}
 			sa.Spec = &APISpec{APIDefinition: &apidef.APIDefinition{}}
-			sa.Spec.Auth = tc.Auth
+			sa.Spec.Auth = tc.AuthConfig
 
 			req, err := http.NewRequest("GET", "http://example.com/abc", nil)
 			if err != nil {

@@ -50,7 +50,7 @@ func buildTestOAuthSpec(apiGens ...func(spec *APISpec)) *APISpec {
 	return BuildAPI(func(spec *APISpec) {
 		spec.APIID = "999999"
 		spec.OrgID = "default"
-		spec.Auth = apidef.Auth{
+		spec.Auth = apidef.AuthConfig{
 			AuthHeaderName: "authorization",
 		}
 		spec.UseKeylessAccess = false
