@@ -23,8 +23,8 @@ const multiAuthDev = `{
 	"use_standard_auth": true,
 	"base_identity_provided_by": "auth_token",
 	"auth_configs": {
-		"BasicAuthKeyIsValid": {"auth_header_name": "Authorization"},
-		"AuthKey": {"auth_header_name": "x-standard-auth"}
+		"basic": {"auth_header_name": "Authorization"},
+		"authToken": {"auth_header_name": "x-standard-auth"}
 	},
 	"version_data": {
 		"not_versioned": true,

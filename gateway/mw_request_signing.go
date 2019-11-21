@@ -101,7 +101,7 @@ func (s *RequestSigning) ProcessRequest(w http.ResponseWriter, r *http.Request, 
 	}
 
 	headers := generateHeaderList(r, s.Spec.RequestSigning.HeaderList)
-	signatureString, err := generateHMACSignatureStringFromRequest(s, r, headers)
+	signatureString, err := generateHMACSignatureStringFromRequest(r, headers)
 	if err != nil {
 		log.Error(err)
 		return err, http.StatusInternalServerError

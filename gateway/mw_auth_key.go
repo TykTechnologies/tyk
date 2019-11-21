@@ -38,47 +38,9 @@ func (k *AuthKey) setContextVars(r *http.Request, token string) {
 	}
 }
 
-func getAuthToken(m TykMiddleware, r *http.Request) (string, apidef.AuthConfig) {
-	config, ok := m.Base().Spec.AuthConfigs[m.Name()]
-	// Auth is deprecated.
-	if !ok {
-		config = m.Base().Spec.Auth
-	}
-
-	key := r.Header.Get(config.AuthHeaderName)
-
-	paramName := config.ParamName
-	if config.UseParam || paramName != "" {
-		if paramName == "" {
-			paramName = config.AuthHeaderName
-		}
-
-		paramValue := r.URL.Query().Get(paramName)
-
-		// Only use the paramValue if it has an actual value
-		if paramValue != "" {
-			key = paramValue
-		}
-	}
-
-	cookieName := config.CookieName
-	if config.UseCookie || cookieName != "" {
-		if cookieName == "" {
-			cookieName = config.AuthHeaderName
-		}
-
-		authCookie, err := r.Cookie(cookieName)
-		cookieValue := ""
-		if err == nil {
-			cookieValue = authCookie.Value
-		}
-
-		if cookieValue != "" {
-			key = cookieValue
-		}
-	}
-
-	return key, config
+// getAuthType overrides BaseMiddleware.getAuthType.
+func (k *AuthKey) getAuthType() string {
+	return "authToken"
 }
 
 func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
@@ -86,7 +48,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 		return nil, http.StatusOK
 	}
 
-	key, config := getAuthToken(k, r)
+	key, config := k.getAuthToken(k.getAuthType(), r)
 
 	// If key not provided in header or cookie and client certificate is provided, try to find certificate based key
 	if config.UseCertificate && key == "" && r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {

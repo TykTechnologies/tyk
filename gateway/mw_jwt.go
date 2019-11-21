@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
-	"github.com/pmylund/go-cache"
+	jwt "github.com/dgrijalva/jwt-go"
+	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/user"
@@ -514,6 +514,11 @@ func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Toke
 	return nil, http.StatusOK
 }
 
+// getAuthType overrides BaseMiddleware.getAuthType.
+func (k *JWTMiddleware) getAuthType() string {
+	return "jwt"
+}
+
 func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
 		return nil, http.StatusOK
@@ -522,7 +527,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 	logger := k.Logger()
 	var tykId string
 
-	rawJWT, config := getAuthToken(k, r)
+	rawJWT, config := k.getAuthToken(k.getAuthType(), r)
 
 	if rawJWT == "" {
 		// No header value, fail
