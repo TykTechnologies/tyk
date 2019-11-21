@@ -1,7 +1,9 @@
 package gateway
 
 import (
+	"crypto"
 	"crypto/hmac"
+	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
@@ -27,25 +29,25 @@ import (
 const dateHeaderSpec = "Date"
 const altHeaderSpec = "x-aux-date"
 
-// HMACMiddleware will check if the request has a signature, and if the request is allowed through
-type HMACMiddleware struct {
+// HTTPSignatureValidationMiddleware will check if the request has a signature, and if the request is allowed through
+type HTTPSignatureValidationMiddleware struct {
 	BaseMiddleware
 	lowercasePattern *regexp.Regexp
 }
 
-func (hm *HMACMiddleware) Name() string {
-	return "HMAC"
+func (hm *HTTPSignatureValidationMiddleware) Name() string {
+	return "HTTPSignatureValidationMiddleware"
 }
 
-func (k *HMACMiddleware) EnabledForSpec() bool {
+func (k *HTTPSignatureValidationMiddleware) EnabledForSpec() bool {
 	return k.Spec.EnableSignatureChecking
 }
 
-func (hm *HMACMiddleware) Init() {
+func (hm *HTTPSignatureValidationMiddleware) Init() {
 	hm.lowercasePattern = regexp.MustCompile(`%[a-f0-9][a-f0-9]`)
 }
 
-func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
 		return nil, http.StatusOK
 	}
@@ -67,18 +69,9 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	}
 
 	// Generate a signature string
-	signatureString, err := generateHMACSignatureStringFromRequest(r, fieldValues.Headers)
+	signatureString, err := generateSignatureStringFromRequest(r, fieldValues.Headers)
 	if err != nil {
 		logger.WithError(err).WithField("signature_string", signatureString).Error("Signature string generation failed")
-		return hm.authorizationError(r)
-	}
-
-	// Get a session for the Key ID
-	secret, session, err := hm.getSecretAndSessionForKeyID(r, fieldValues.KeyID)
-	if err != nil {
-		logger.WithError(err).WithFields(logrus.Fields{
-			"keyID": fieldValues.KeyID,
-		}).Error("No HMAC secret for this key")
 		return hm.authorizationError(r)
 	}
 
@@ -96,31 +89,95 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		}
 	}
 
-	// Create a signed string with the secret
-	encodedSignature := generateEncodedSignature(signatureString, secret, fieldValues.Algorthm)
+	var secret string
+	var rsaKey *rsa.PublicKey
+	var session user.SessionState
 
-	// Compare
-	matchPass := encodedSignature == fieldValues.Signature
+	if strings.HasPrefix(fieldValues.Algorthm, "rsa") {
+		var certificateId string
 
-	// Check for lower case encoding (.Net issues, again)
-	if !matchPass {
-		isLower, lowerList := hm.hasLowerCaseEscaped(fieldValues.Signature)
-		if isLower {
-			logger.Debug("--- Detected lower case encoding! ---")
-			upperedSignature := hm.replaceWithUpperCase(fieldValues.Signature, lowerList)
-			if encodedSignature == upperedSignature {
-				matchPass = true
-				encodedSignature = upperedSignature
-			}
+		certificateId, session, err = hm.getRSACertificateIdAndSessionForKeyID(r, fieldValues.KeyID)
+		if err != nil {
+			logger.WithError(err).WithFields(logrus.Fields{
+				"keyID": fieldValues.KeyID,
+			}).Error("Failed to fetch session/public key")
+			return hm.authorizationError(r)
+		}
+
+		publicKey := CertificateManager.ListRawPublicKey(certificateId)
+		if publicKey == nil {
+			log.Error("Certificate not found")
+			return errors.New("Certificate not found"), http.StatusInternalServerError
+		}
+		var ok bool
+		rsaKey, ok = publicKey.(*rsa.PublicKey)
+		if !ok {
+			log.Error("Certificate doesn't contain RSA Public key")
+			return errors.New("Certificate doesn't contain RSA Public key"), http.StatusInternalServerError
+		}
+	} else {
+		// Get a session for the Key ID
+		secret, session, err = hm.getSecretAndSessionForKeyID(r, fieldValues.KeyID)
+		if err != nil {
+			logger.WithError(err).WithFields(logrus.Fields{
+				"keyID": fieldValues.KeyID,
+			}).Error("No HMAC secret for this key")
+			return hm.authorizationError(r)
 		}
 	}
+	var matchPass bool
 
-	if !matchPass {
-		logger.WithFields(logrus.Fields{
-			"expected": encodedSignature,
-			"got":      fieldValues.Signature,
-		}).Error("Signature string does not match!")
-		return hm.authorizationError(r)
+	if strings.HasPrefix(fieldValues.Algorthm, "rsa") {
+		matchPass, err = validateRSAEncodedSignature(signatureString, rsaKey, fieldValues.Algorthm, fieldValues.Signature)
+		if err != nil {
+			logger.WithError(err).Error("Signature validation failed.")
+		}
+
+		if !matchPass {
+			isLower, lowerList := hm.hasLowerCaseEscaped(fieldValues.Signature)
+			if isLower {
+				logger.Debug("--- Detected lower case encoding! ---")
+				upperedSignature := hm.replaceWithUpperCase(fieldValues.Signature, lowerList)
+				matchPass, err = validateRSAEncodedSignature(signatureString, rsaKey, fieldValues.Algorthm, upperedSignature)
+				if err != nil {
+					logger.WithError(err).Error("Signature validation failed.")
+				}
+			}
+		}
+
+		if !matchPass {
+			logger.WithFields(logrus.Fields{
+				"got": fieldValues.Signature,
+			}).Error("Signature string does not match!")
+			return hm.authorizationError(r)
+		}
+	} else {
+		// Create a signed string with the secret
+		encodedSignature := generateHMACEncodedSignature(signatureString, secret, fieldValues.Algorthm)
+
+		// Compare
+		matchPass = encodedSignature == fieldValues.Signature
+
+		// Check for lower case encoding (.Net issues, again)
+		if !matchPass {
+			isLower, lowerList := hm.hasLowerCaseEscaped(fieldValues.Signature)
+			if isLower {
+				logger.Debug("--- Detected lower case encoding! ---")
+				upperedSignature := hm.replaceWithUpperCase(fieldValues.Signature, lowerList)
+				if encodedSignature == upperedSignature {
+					matchPass = true
+					encodedSignature = upperedSignature
+				}
+			}
+		}
+
+		if !matchPass {
+			logger.WithFields(logrus.Fields{
+				"expected": encodedSignature,
+				"got":      fieldValues.Signature,
+			}).Error("Signature string does not match!")
+			return hm.authorizationError(r)
+		}
 	}
 
 	// Check clock skew
@@ -147,12 +204,12 @@ func stripSignature(token string) string {
 	return strings.TrimSpace(token)
 }
 
-func (hm *HMACMiddleware) hasLowerCaseEscaped(signature string) (bool, []string) {
+func (hm *HTTPSignatureValidationMiddleware) hasLowerCaseEscaped(signature string) (bool, []string) {
 	foundList := hm.lowercasePattern.FindAllString(signature, -1)
 	return len(foundList) > 0, foundList
 }
 
-func (hm *HMACMiddleware) replaceWithUpperCase(originalSignature string, lowercaseList []string) string {
+func (hm *HTTPSignatureValidationMiddleware) replaceWithUpperCase(originalSignature string, lowercaseList []string) string {
 	newSignature := originalSignature
 	for _, lStr := range lowercaseList {
 		asUpper := strings.ToUpper(lStr)
@@ -162,7 +219,7 @@ func (hm *HMACMiddleware) replaceWithUpperCase(originalSignature string, lowerca
 	return newSignature
 }
 
-func (hm *HMACMiddleware) setContextVars(r *http.Request, token string) {
+func (hm *HTTPSignatureValidationMiddleware) setContextVars(r *http.Request, token string) {
 	if !hm.Spec.EnableContextVars {
 		return
 	}
@@ -174,7 +231,7 @@ func (hm *HMACMiddleware) setContextVars(r *http.Request, token string) {
 	}
 }
 
-func (hm *HMACMiddleware) authorizationError(r *http.Request) (error, int) {
+func (hm *HTTPSignatureValidationMiddleware) authorizationError(r *http.Request) (error, int) {
 	hm.Logger().Info("Authorization field missing or malformed")
 
 	AuthFailed(hm, r, r.Header.Get(headers.Authorization))
@@ -182,7 +239,7 @@ func (hm *HMACMiddleware) authorizationError(r *http.Request) (error, int) {
 	return errors.New("Authorization field missing, malformed or invalid"), http.StatusBadRequest
 }
 
-func (hm HMACMiddleware) checkClockSkew(dateHeaderValue string) bool {
+func (hm HTTPSignatureValidationMiddleware) checkClockSkew(dateHeaderValue string) bool {
 	// Reference layout for parsing time: "Mon Jan 2 15:04:05 MST 2006"
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
 	// Fall back to a numeric timezone, since some environments don't provide a timezone name code
@@ -224,19 +281,33 @@ type HMACFieldValues struct {
 	Signature string
 }
 
-func (hm *HMACMiddleware) getSecretAndSessionForKeyID(r *http.Request, keyId string) (string, user.SessionState, error) {
+func (hm *HTTPSignatureValidationMiddleware) getSecretAndSessionForKeyID(r *http.Request, keyId string) (string, user.SessionState, error) {
 	session, keyExists := hm.CheckSessionAndIdentityForValidKey(keyId, r)
 	if !keyExists {
 		return "", session, errors.New("Key ID does not exist")
 	}
 
-	if session.HmacSecret == "" || !session.HMACEnabled {
+	if session.HmacSecret == "" || !session.HMACEnabled && !session.EnableHTTPSignatureValidation {
 		hm.Logger().Info("API Requires HMAC signature, session missing HMACSecret or HMAC not enabled for key")
 
 		return "", session, errors.New("This key ID is invalid")
 	}
 
 	return session.HmacSecret, session, nil
+}
+
+func (hm *HTTPSignatureValidationMiddleware) getRSACertificateIdAndSessionForKeyID(r *http.Request, keyId string) (string, user.SessionState, error) {
+	session, keyExists := hm.CheckSessionAndIdentityForValidKey(keyId, r)
+	if !keyExists {
+		return "", session, errors.New("Key ID does not exist")
+	}
+
+	if session.RSACertificateId == "" || !session.EnableHTTPSignatureValidation {
+		hm.Logger().Info("API Requires RSA signature, session missing RSA Certificate Id or RSA not enabled for key")
+		return "", session, errors.New("This key ID is invalid")
+	}
+
+	return session.RSACertificateId, session, nil
 }
 
 func getDateHeader(r *http.Request) (string, string) {
@@ -339,7 +410,7 @@ func getFieldValues(authHeader string) (*HMACFieldValues, error) {
 
 // "Signature keyId="9876",algorithm="hmac-sha1",headers="x-test x-test-2",signature="queryEscape(base64(sig))"")
 
-func generateHMACSignatureStringFromRequest(r *http.Request, headers []string) (string, error) {
+func generateSignatureStringFromRequest(r *http.Request, headers []string) (string, error) {
 	signatureString := ""
 	for i, header := range headers {
 		loweredHeader := strings.TrimSpace(strings.ToLower(header))
@@ -364,7 +435,7 @@ func generateHMACSignatureStringFromRequest(r *http.Request, headers []string) (
 	return signatureString, nil
 }
 
-func generateEncodedSignature(signatureString, secret string, algorithm string) string {
+func generateHMACEncodedSignature(signatureString, secret string, algorithm string) string {
 	key := []byte(secret)
 
 	var hashFunction func() hash.Hash
@@ -384,4 +455,33 @@ func generateEncodedSignature(signatureString, secret string, algorithm string) 
 	h.Write([]byte(signatureString))
 	encodedString := base64.StdEncoding.EncodeToString(h.Sum(nil))
 	return url.QueryEscape(encodedString)
+}
+
+func validateRSAEncodedSignature(signatureString string, publicKey *rsa.PublicKey, algorithm string, signature string) (bool, error) {
+	var hashFunction hash.Hash
+	var hashType crypto.Hash
+
+	switch algorithm {
+	case "rsa-sha256":
+		hashFunction = sha256.New()
+		hashType = crypto.SHA256
+	default:
+		hashFunction = sha256.New()
+		hashType = crypto.SHA256
+	}
+	hashFunction.Write([]byte(signatureString))
+	hashed := hashFunction.Sum(nil)
+
+	decodedSignature, err := base64.StdEncoding.DecodeString(signature)
+	if err != nil {
+		log.Error("Error while base64 decoding signature:", err)
+		return false, err
+	}
+	err = rsa.VerifyPKCS1v15(publicKey, hashType, hashed, decodedSignature)
+	if err != nil {
+		log.Error("Signature match failed:", err)
+		return false, err
+	}
+
+	return true, nil
 }

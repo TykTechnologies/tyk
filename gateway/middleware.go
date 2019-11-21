@@ -448,6 +448,10 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 			if !session.HMACEnabled {
 				session.HMACEnabled = policy.HMACEnabled
 			}
+
+			if !session.EnableHTTPSignatureValidation {
+				session.EnableHTTPSignatureValidation = policy.EnableHTTPSignatureValidation
+			}
 		}
 
 		// Required for all

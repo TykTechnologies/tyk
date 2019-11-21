@@ -88,7 +88,7 @@ func getMultiAuthStandardAndBasicAuthChain(spec *APISpec) http.Handler {
 }
 
 func testPrepareMultiSessionBA(t testing.TB, isBench bool) (*APISpec, *http.Request) {
-	spec := loadSampleAPI(multiAuthDev)
+	spec := LoadSampleAPI(multiAuthDev)
 
 	// Create BA
 	baSession := createMultiBasicAuthSession(isBench)
@@ -153,7 +153,7 @@ func BenchmarkMultiSession_BA_Standard_OK(b *testing.B) {
 }
 
 func TestMultiSession_BA_Standard_Identity(t *testing.T) {
-	spec := loadSampleAPI(multiAuthDev)
+	spec := LoadSampleAPI(multiAuthDev)
 
 	// Create BA
 	baSession := createMultiBasicAuthSession(false)
@@ -190,7 +190,7 @@ func TestMultiSession_BA_Standard_Identity(t *testing.T) {
 }
 
 func TestMultiSession_BA_Standard_FAILBA(t *testing.T) {
-	spec := loadSampleAPI(multiAuthDev)
+	spec := LoadSampleAPI(multiAuthDev)
 
 	// Create BA
 	baSession := createMultiBasicAuthSession(false)
@@ -222,7 +222,7 @@ func TestMultiSession_BA_Standard_FAILBA(t *testing.T) {
 }
 
 func TestMultiSession_BA_Standard_FAILAuth(t *testing.T) {
-	spec := loadSampleAPI(multiAuthDev)
+	spec := LoadSampleAPI(multiAuthDev)
 
 	// Create BA
 	baSession := createMultiBasicAuthSession(false)

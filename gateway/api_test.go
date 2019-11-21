@@ -41,12 +41,6 @@ const apiTestDef = `{
 	}
 }`
 
-func loadSampleAPI(def string) (spec *APISpec) {
-	spec = CreateDefinitionFromString(def)
-	loadApps([]*APISpec{spec})
-	return
-}
-
 func TestHealthCheckEndpoint(t *testing.T) {
 	globalConf := config.Global()
 	globalConf.HealthCheck.EnableHealthChecks = true
@@ -1169,7 +1163,7 @@ func TestGroupResetHandler(t *testing.T) {
 	apisByID = make(map[string]*APISpec)
 	apisMu.Unlock()
 
-	loadSampleAPI(apiTestDef)
+	LoadSampleAPI(apiTestDef)
 
 	recorder := httptest.NewRecorder()
 

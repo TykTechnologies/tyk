@@ -77,13 +77,15 @@ type SessionState struct {
 	JWTData struct {
 		Secret string `json:"secret" msg:"secret"`
 	} `json:"jwt_data" msg:"jwt_data"`
-	HMACEnabled   bool     `json:"hmac_enabled" msg:"hmac_enabled"`
-	HmacSecret    string   `json:"hmac_string" msg:"hmac_string"`
-	IsInactive    bool     `json:"is_inactive" msg:"is_inactive"`
-	ApplyPolicyID string   `json:"apply_policy_id" msg:"apply_policy_id"`
-	ApplyPolicies []string `json:"apply_policies" msg:"apply_policies"`
-	DataExpires   int64    `json:"data_expires" msg:"data_expires"`
-	Monitor       struct {
+	HMACEnabled                   bool     `json:"hmac_enabled" msg:"hmac_enabled"`
+	EnableHTTPSignatureValidation bool     `json:"enable_http_signature_validation" msg:"enable_http_signature_validation"`
+	HmacSecret                    string   `json:"hmac_string" msg:"hmac_string"`
+	RSACertificateId              string   `json:"rsa_certificate_id" msg:"rsa_certificate_id"`
+	IsInactive                    bool     `json:"is_inactive" msg:"is_inactive"`
+	ApplyPolicyID                 string   `json:"apply_policy_id" msg:"apply_policy_id"`
+	ApplyPolicies                 []string `json:"apply_policies" msg:"apply_policies"`
+	DataExpires                   int64    `json:"data_expires" msg:"data_expires"`
+	Monitor                       struct {
 		TriggerLimits []float64 `json:"trigger_limits" msg:"trigger_limits"`
 	} `json:"monitor" msg:"monitor"`
 	EnableDetailedRecording bool                   `json:"enable_detail_recording" msg:"enable_detail_recording"`
