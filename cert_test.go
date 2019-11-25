@@ -475,6 +475,7 @@ func TestUpstreamMutualTLS(t *testing.T) {
 }
 
 func TestSSLForceCommonName(t *testing.T) {
+	t.Skip()
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	}))
 
