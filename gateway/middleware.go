@@ -55,7 +55,8 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 			tr.Name(),
 		)
 		defer span.Finish()
-		return tr.TykMiddleware.ProcessRequest(w, r.WithContext(ctx), conf)
+		setContext(r, ctx)
+		return tr.TykMiddleware.ProcessRequest(w, r, conf)
 	}
 	return tr.TykMiddleware.ProcessRequest(w, r, conf)
 }
