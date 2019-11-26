@@ -78,12 +78,12 @@ func TestBaseMiddleware_getAuthType(t *testing.T) {
 	oauth := &Oauth2KeyExists{BaseMiddleware: baseMid}
 
 	// test getAuthType
-	assert.Equal(t, "authToken", authKey.getAuthType())
-	assert.Equal(t, "basic", basic.getAuthType())
-	assert.Equal(t, "coprocess", coprocess.getAuthType())
-	assert.Equal(t, "hmac", hmac.getAuthType())
-	assert.Equal(t, "jwt", jwt.getAuthType())
-	assert.Equal(t, "oauth", oauth.getAuthType())
+	assert.Equal(t, authTokenType, authKey.getAuthType())
+	assert.Equal(t, basicType, basic.getAuthType())
+	assert.Equal(t, coprocessType, coprocess.getAuthType())
+	assert.Equal(t, hmacType, hmac.getAuthType())
+	assert.Equal(t, jwtType, jwt.getAuthType())
+	assert.Equal(t, oauthType, oauth.getAuthType())
 
 	// test getAuthToken
 	getToken := func(authType string, getAuthToken func(authType string, r *http.Request) (string, apidef.AuthConfig)) string {

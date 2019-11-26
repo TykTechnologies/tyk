@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/TykTechnologies/tyk/headers"
+
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
 	newrelic "github.com/newrelic/go-agent"
@@ -27,6 +29,13 @@ import (
 )
 
 const mwStatusRespond = 666
+
+const authTokenType = "authToken"
+const jwtType = "jwt"
+const hmacType = "hmac"
+const basicType = "basic"
+const coprocessType = "coprocess"
+const oauthType = "oauth"
 
 var (
 	GlobalRate            = ratecounter.NewRateCounter(1 * time.Second)
@@ -629,9 +638,13 @@ func (b BaseMiddleware) getAuthType() string {
 
 func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, apidef.AuthConfig) {
 	config, ok := b.Base().Spec.AuthConfigs[authType]
-	// Auth is deprecated.
-	if !ok {
+	// Auth is deprecated. To maintain backward compatibility authToken and jwt cases are added.
+	if !ok && (authType == authTokenType || authType == jwtType) {
 		config = b.Base().Spec.Auth
+	}
+
+	if config.AuthHeaderName == "" {
+		config.AuthHeaderName = headers.Authorization
 	}
 
 	key := r.Header.Get(config.AuthHeaderName)
