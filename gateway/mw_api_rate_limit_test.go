@@ -7,11 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/justinas/alice"
-	uuid "github.com/satori/go.uuid"
-
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
+	uuid "github.com/satori/go.uuid"
+
+	"github.com/justinas/alice"
+
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -205,6 +206,7 @@ func TestRequestThrottling(t *testing.T) {
 		t.Run("SentinelRateLimiter", requestThrottlingTest("SentinelRateLimiter", "APILevel"))
 		t.Run("RedisRollingRateLimiter", requestThrottlingTest("RedisRollingRateLimiter", "APILevel"))
 	})
+
 }
 
 func TestRLClosed(t *testing.T) {
