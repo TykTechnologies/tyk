@@ -499,8 +499,9 @@ type SignatureConfig struct {
 }
 
 type GlobalRateLimit struct {
-	Rate float64 `bson:"rate" json:"rate"`
-	Per  float64 `bson:"per" json:"per"`
+	Rate         float64 `bson:"rate" json:"rate"`
+	Per          float64 `bson:"per" json:"per"`
+	DRLThreshold float64 `bson:"drl_threshold" json:"drl_threshold"`
 }
 
 type BundleManifest struct {
