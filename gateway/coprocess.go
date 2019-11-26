@@ -415,7 +415,7 @@ func (h *CustomMiddlewareResponseHook) Init(mwDef interface{}, spec *APISpec) er
 
 // getAuthType overrides BaseMiddleware.getAuthType.
 func (m *CoProcessMiddleware) getAuthType() string {
-	return "coprocess"
+	return coprocessType
 }
 
 func (h *CustomMiddlewareResponseHook) Name() string {

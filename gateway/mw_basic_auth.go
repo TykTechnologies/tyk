@@ -81,7 +81,7 @@ func (k *BasicAuthKeyIsValid) requestForBasicAuth(w http.ResponseWriter, msg str
 
 // getAuthType overrides BaseMiddleware.getAuthType.
 func (k *BasicAuthKeyIsValid) getAuthType() string {
-	return "basic"
+	return basicType
 }
 
 func (k *BasicAuthKeyIsValid) basicAuthHeaderCredentials(w http.ResponseWriter, r *http.Request) (username, password string, err error, code int) {

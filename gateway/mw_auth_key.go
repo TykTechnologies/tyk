@@ -40,7 +40,7 @@ func (k *AuthKey) setContextVars(r *http.Request, token string) {
 
 // getAuthType overrides BaseMiddleware.getAuthType.
 func (k *AuthKey) getAuthType() string {
-	return "authToken"
+	return authTokenType
 }
 
 func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
