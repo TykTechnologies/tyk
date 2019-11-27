@@ -346,10 +346,11 @@ type Config struct {
 	AuthOverride   AuthOverrideConf   `json:"auth_override"`
 
 	// Rate Limiting Strategy
-	EnableNonTransactionalRateLimiter bool `json:"enable_non_transactional_rate_limiter"`
-	EnableSentinelRateLimiter         bool `json:"enable_sentinel_rate_limiter"`
-	EnableRedisRollingLimiter         bool `json:"enable_redis_rolling_limiter"`
-	DRLNotificationFrequency          int  `json:"drl_notification_frequency"`
+	EnableNonTransactionalRateLimiter bool    `json:"enable_non_transactional_rate_limiter"`
+	EnableSentinelRateLimiter         bool    `json:"enable_sentinel_rate_limiter"`
+	EnableRedisRollingLimiter         bool    `json:"enable_redis_rolling_limiter"`
+	DRLNotificationFrequency          int     `json:"drl_notification_frequency"`
+	DRLThreshold                      float64 `json:"drl_threshold"`
 
 	// Organization configurations
 	EnforceOrgDataAge               bool          `json:"enforce_org_data_age"`

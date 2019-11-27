@@ -177,7 +177,7 @@ func (l *SessionLimiter) limitDRL(
 // sessionFailReason if session limits have been exceeded.
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages
 // Per 10 seconds
-func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.SessionState, key string, store storage.Handler, enableRL, enableQ bool, drlThreshold float64, globalConf *config.Config, apiID string, dryRun bool) sessionFailReason {
+func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.SessionState, key string, store storage.Handler, enableRL, enableQ bool, globalConf *config.Config, apiID string, dryRun bool) sessionFailReason {
 	// check for limit on API level (set to session by ApplyPolicies)
 	var apiLimit *user.APILimit
 	var allowanceScope string
@@ -222,7 +222,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 				n = float64(DRLManager.Servers.Count())
 			}
 			rate := apiLimit.Rate / apiLimit.Per
-			c := drlThreshold
+			c := globalConf.DRLThreshold
 			if c == 0 {
 				// defaults to 5
 				c = 5
