@@ -272,6 +272,7 @@ type Config struct {
 	PublicKeyPath                     string                                `json:"public_key_path"`
 	CloseIdleConnections              bool                                  `json:"close_idle_connections"`
 	DRLNotificationFrequency          int                                   `json:"drl_notification_frequency"`
+	DRLThreshold                      float64                               `json:"drl_threshold"`
 	GlobalSessionLifetime             int64                                 `bson:"global_session_lifetime" json:"global_session_lifetime"`
 	ForceGlobalSessionLifetime        bool                                  `bson:"force_global_session_lifetime" json:"force_global_session_lifetime"`
 	BundleBaseURL                     string                                `bson:"bundle_base_url" json:"bundle_base_url"`

@@ -93,6 +93,101 @@ const (
 	sessionFailQuota
 )
 
+func (l *SessionLimiter) limitSentinel(
+	currentSession *user.SessionState,
+	key string,
+	apiID string,
+	store storage.Handler,
+	globalConf *config.Config,
+	apiLimit *user.APILimit,
+	dryRun bool,
+) bool {
+	rateLimiterKey := RateLimitKeyPrefix + currentSession.KeyHash()
+	rateLimiterSentinelKey := RateLimitKeyPrefix + currentSession.KeyHash() + ".BLOCKED"
+	if apiLimit != nil {
+		rateLimiterKey = RateLimitKeyPrefix + apiID + "-" + currentSession.KeyHash()
+		rateLimiterSentinelKey = RateLimitKeyPrefix + apiID + "-" + currentSession.KeyHash() + ".BLOCKED"
+	}
+
+	go l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun)
+
+	// Check sentinel
+	_, sentinelActive := store.GetRawKey(rateLimiterSentinelKey)
+	return sentinelActive == nil
+}
+func (l *SessionLimiter) limitRedis(
+	currentSession *user.SessionState,
+	key string,
+	apiID string,
+	store storage.Handler,
+	globalConf *config.Config,
+	apiLimit *user.APILimit,
+	dryRun bool,
+) bool {
+	rateLimiterKey := RateLimitKeyPrefix + currentSession.KeyHash()
+	rateLimiterSentinelKey := RateLimitKeyPrefix + currentSession.KeyHash() + ".BLOCKED"
+	if apiLimit != nil {
+		rateLimiterKey = RateLimitKeyPrefix + apiID + "-" + currentSession.KeyHash()
+		rateLimiterSentinelKey = RateLimitKeyPrefix + apiID + "-" + currentSession.KeyHash() + ".BLOCKED"
+	}
+
+	if l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun) {
+		return true
+	}
+	return false
+}
+func (l *SessionLimiter) limitDRL(
+	currentSession *user.SessionState,
+	key string,
+	apiID string,
+	apiLimit *user.APILimit,
+	dryRun bool,
+) bool {
+	// In-memory limiter
+	if l.bucketStore == nil {
+		l.bucketStore = memorycache.New()
+	}
+
+	// If a token has been updated, we must ensure we don't use
+	// an old bucket an let the cache deal with it
+	bucketKey := ""
+	var currRate float64
+	var per float64
+	if apiLimit == nil {
+		bucketKey = key + ":" + currentSession.LastUpdated
+		currRate = currentSession.Rate
+		per = currentSession.Per
+	} else { // respect limit on API level
+		bucketKey = apiID + ":" + key + ":" + currentSession.LastUpdated
+		currRate = apiLimit.Rate
+		per = apiLimit.Per
+	}
+
+	// DRL will always overflow with more servers on low rates
+	rate := uint(currRate * float64(DRLManager.RequestTokenValue))
+	if rate < uint(DRLManager.CurrentTokenValue) {
+		rate = uint(DRLManager.CurrentTokenValue)
+	}
+
+	userBucket, err := l.bucketStore.Create(bucketKey, rate, time.Duration(per)*time.Second)
+	if err != nil {
+		log.Error("Failed to create bucket!")
+		return true
+	}
+	if dryRun {
+		// if userBucket is empty and not expired.
+		if userBucket.Remaining() == 0 && time.Now().Before(userBucket.Reset()) {
+			return true
+		}
+	} else {
+		_, errF := userBucket.Add(uint(DRLManager.CurrentTokenValue))
+		if errF != nil {
+			return true
+		}
+	}
+	return false
+}
+
 // ForwardMessage will enforce rate limiting, returning a non-zero
 // sessionFailReason if session limits have been exceeded.
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages
@@ -111,73 +206,34 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 		}
 
 		if globalConf.EnableSentinelRateLimiter {
-			rateLimiterKey := RateLimitKeyPrefix + currentSession.KeyHash()
-			rateLimiterSentinelKey := RateLimitKeyPrefix + currentSession.KeyHash() + ".BLOCKED"
-			if apiLimit != nil {
-				rateLimiterKey = RateLimitKeyPrefix + apiID + "-" + currentSession.KeyHash()
-				rateLimiterSentinelKey = RateLimitKeyPrefix + apiID + "-" + currentSession.KeyHash() + ".BLOCKED"
-			}
-
-			go l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun)
-
-			// Check sentinel
-			_, sentinelActive := store.GetRawKey(rateLimiterSentinelKey)
-			if sentinelActive == nil {
-				// Sentinel is set, fail
+			if l.limitSentinel(currentSession, key, apiID, store, globalConf, apiLimit, dryRun) {
 				return sessionFailRateLimit
 			}
-		} else if globalConf.EnableRedisRollingLimiter {
-			rateLimiterKey := RateLimitKeyPrefix + currentSession.KeyHash()
-			rateLimiterSentinelKey := RateLimitKeyPrefix + currentSession.KeyHash() + ".BLOCKED"
-			if apiLimit != nil {
-				rateLimiterKey = RateLimitKeyPrefix + apiID + "-" + currentSession.KeyHash()
-				rateLimiterSentinelKey = RateLimitKeyPrefix + apiID + "-" + currentSession.KeyHash() + ".BLOCKED"
-			}
 
-			if l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun) {
+		} else if globalConf.EnableRedisRollingLimiter {
+			if l.limitRedis(currentSession, key, apiID, store, globalConf, apiLimit, dryRun) {
 				return sessionFailRateLimit
 			}
 		} else {
-			// In-memory limiter
-			if l.bucketStore == nil {
-				l.bucketStore = memorycache.New()
+			var n float64
+			if DRLManager.Servers != nil {
+				n = float64(DRLManager.Servers.Count())
+			}
+			rate := apiLimit.Rate / apiLimit.Per
+			c := globalConf.DRLThreshold
+			if c == 0 {
+				// defaults to 5
+				c = 5
 			}
 
-			// If a token has been updated, we must ensure we don't use
-			// an old bucket an let the cache deal with it
-			bucketKey := ""
-			var currRate float64
-			var per float64
-			if apiLimit == nil {
-				bucketKey = key + ":" + currentSession.LastUpdated
-				currRate = currentSession.Rate
-				per = currentSession.Per
-			} else { // respect limit on API level
-				bucketKey = apiID + ":" + key + ":" + currentSession.LastUpdated
-				currRate = apiLimit.Rate
-				per = apiLimit.Per
-			}
-
-			// DRL will always overflow with more servers on low rates
-			rate := uint(currRate * float64(DRLManager.RequestTokenValue))
-			if rate < uint(DRLManager.CurrentTokenValue) {
-				rate = uint(DRLManager.CurrentTokenValue)
-			}
-
-			userBucket, err := l.bucketStore.Create(bucketKey, rate, time.Duration(per)*time.Second)
-			if err != nil {
-				log.Error("Failed to create bucket!")
-				return sessionFailRateLimit
-			}
-
-			if dryRun {
-				// if userBucket is empty and not expired.
-				if userBucket.Remaining() == 0 && time.Now().Before(userBucket.Reset()) {
+			if n <= 1 || n*c > rate {
+				// If we have 1 server, there is no need to strain redis at all the leaky
+				// bucket algorithm will suffice.
+				if l.limitDRL(currentSession, key, apiID, apiLimit, dryRun) {
 					return sessionFailRateLimit
 				}
 			} else {
-				_, errF := userBucket.Add(uint(DRLManager.CurrentTokenValue))
-				if errF != nil {
+				if l.limitRedis(currentSession, key, apiID, store, globalConf, apiLimit, dryRun) {
 					return sessionFailRateLimit
 				}
 			}
