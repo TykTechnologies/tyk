@@ -235,35 +235,44 @@ func (r *RedisCluster) GetKey(keyName string) (string, error) {
 	return value, nil
 }
 
-// GetMultiKey gets multiple keys from the database
-func (r *RedisCluster) GetMultiKey(keyNames []string) ([]string, error) {
+func (r *RedisCluster) fetchValueOfKeys(keys []interface{}) ([]string, error) {
 	r.ensureConnection()
-	cluster := r.singleton()
-
-	fixedKeyNames := make([]interface{}, len(keyNames))
-	for index, val := range keyNames {
-		fixedKeyNames[index] = r.fixKey(val)
-	}
-
 	var result []string
 
 	if config.Global().Storage.EnableCluster {
-		for _, k := range fixedKeyNames {
-			value, err := redis.String(cluster.Do("GET", k))
+		for _, k := range keys {
+			value, err := redis.String(r.singleton().Do("GET", k))
 			if err != nil && err != redis.ErrNil {
-				log.Debug("Error trying to get value:", err)
-				return nil, ErrKeyNotFound
+				return nil, err
 			}
 
 			result = append(result, value)
 		}
 	} else {
 		var err error
-		result, err = redis.Strings(cluster.Do("MGET", fixedKeyNames...))
+
+		result, err = redis.Strings(r.singleton().Do("MGET", keys))
 		if err != nil {
-			log.WithError(err).Debug("Error trying to get value")
-			return nil, ErrKeyNotFound
+			return nil, err
 		}
+	}
+
+	return result, nil
+}
+
+// GetMultiKey gets multiple keys from the database
+func (r *RedisCluster) GetMultiKey(keyNames []string) ([]string, error) {
+	r.ensureConnection()
+
+	fixedKeyNames := make([]interface{}, len(keyNames))
+	for index, val := range keyNames {
+		fixedKeyNames[index] = r.fixKey(val)
+	}
+
+	result, err := r.fetchValueOfKeys(fixedKeyNames)
+	if err != nil {
+		log.Debug("Error trying to get value:", err)
+		return nil, ErrKeyNotFound
 	}
 
 	for _, v := range result {
@@ -417,25 +426,10 @@ func (r *RedisCluster) GetKeysAndValuesWithFilter(filter string) map[string]stri
 		return nil
 	}
 
-	var values []string
-
-	if config.Global().Storage.EnableCluster {
-		for _, k := range keys {
-			value, err := redis.String(r.singleton().Do("GET", k))
-			if err != nil && err != redis.ErrNil {
-				log.Error("Error trying to get filtered client keys: ", err)
-				return nil
-			}
-
-			values = append(values, value)
-		}
-	} else {
-		valueObj, err := r.singleton().Do("MGET", sessionsInterface.([]interface{})...)
-		values, err = redis.Strings(valueObj, err)
-		if err != nil {
-			log.Error("Error trying to get filtered client keys: ", err)
-			return nil
-		}
+	values, err := r.fetchValueOfKeys(sessionsInterface.([]interface{}))
+	if err != nil {
+		log.Error("Error trying to get filtered client keys: ", err)
+		return nil
 	}
 
 	m := make(map[string]string)
@@ -456,24 +450,10 @@ func (r *RedisCluster) GetKeysAndValues() map[string]string {
 	}
 	keys, _ := redis.Strings(sessionsInterface, err)
 
-	var values []string
-	if config.Global().Storage.EnableCluster {
-		for _, k := range keys {
-			value, err := redis.String(r.singleton().Do("GET", k))
-			if err != nil && err != redis.ErrNil {
-				log.Error("Error trying to get all keys: ", err)
-				return nil
-			}
-
-			values = append(values, value)
-		}
-	} else {
-		valueObj, err := r.singleton().Do("MGET", sessionsInterface.([]interface{})...)
-		values, err = redis.Strings(valueObj, err)
-		if err != nil {
-			log.Error("Error trying to get all keys: ", err)
-			return nil
-		}
+	values, err := r.fetchValueOfKeys(sessionsInterface.([]interface{}))
+	if err != nil {
+		log.Error("Error trying to get all keys: ", err)
+		return nil
 	}
 
 	m := make(map[string]string)
