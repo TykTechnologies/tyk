@@ -235,26 +235,52 @@ func (r *RedisCluster) GetKey(keyName string) (string, error) {
 	return value, nil
 }
 
+func (r *RedisCluster) fetchValueOfKeys(keys []interface{}) ([]string, error) {
+	r.ensureConnection()
+	var result []string
+
+	if config.Global().Storage.EnableCluster {
+		for _, k := range keys {
+			value, err := redis.String(r.singleton().Do("GET", k))
+			if err != nil && err != redis.ErrNil {
+				return nil, err
+			}
+
+			result = append(result, value)
+		}
+	} else {
+		var err error
+
+		result, err = redis.Strings(r.singleton().Do("MGET", keys))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return result, nil
+}
+
 // GetMultiKey gets multiple keys from the database
 func (r *RedisCluster) GetMultiKey(keyNames []string) ([]string, error) {
 	r.ensureConnection()
-	cluster := r.singleton()
 
 	fixedKeyNames := make([]interface{}, len(keyNames))
 	for index, val := range keyNames {
 		fixedKeyNames[index] = r.fixKey(val)
 	}
 
-	value, err := redis.Strings(cluster.Do("MGET", fixedKeyNames...))
+	result, err := r.fetchValueOfKeys(fixedKeyNames)
 	if err != nil {
-		log.WithError(err).Debug("Error trying to get value")
+		log.Debug("Error trying to get value:", err)
 		return nil, ErrKeyNotFound
 	}
-	for _, v := range value {
+
+	for _, v := range result {
 		if v != "" {
-			return value, nil
+			return result, nil
 		}
 	}
+
 	return nil, ErrKeyNotFound
 }
 
@@ -399,8 +425,8 @@ func (r *RedisCluster) GetKeysAndValuesWithFilter(filter string) map[string]stri
 	if len(keys) == 0 {
 		return nil
 	}
-	valueObj, err := r.singleton().Do("MGET", sessionsInterface.([]interface{})...)
-	values, err := redis.Strings(valueObj, err)
+
+	values, err := r.fetchValueOfKeys(sessionsInterface.([]interface{}))
 	if err != nil {
 		log.Error("Error trying to get filtered client keys: ", err)
 		return nil
@@ -423,8 +449,8 @@ func (r *RedisCluster) GetKeysAndValues() map[string]string {
 		return nil
 	}
 	keys, _ := redis.Strings(sessionsInterface, err)
-	valueObj, err := r.singleton().Do("MGET", sessionsInterface.([]interface{})...)
-	values, err := redis.Strings(valueObj, err)
+
+	values, err := r.fetchValueOfKeys(sessionsInterface.([]interface{}))
 	if err != nil {
 		log.Error("Error trying to get all keys: ", err)
 		return nil
