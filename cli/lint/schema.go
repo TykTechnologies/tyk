@@ -224,6 +224,9 @@ const confSchema = `{
 	"drl_notification_frequency": {
 		"type": "integer"
 	},
+	"drl_threshold": {
+		"type": "number"
+	},
 	"enable_analytics": {
 		"type": "boolean"
 	},

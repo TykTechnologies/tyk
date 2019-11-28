@@ -219,7 +219,18 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			if DRLManager.Servers != nil {
 				n = float64(DRLManager.Servers.Count())
 			}
-			rate := apiLimit.Rate / apiLimit.Per
+			var rate float64
+			if apiLimit == nil {
+				rate = currentSession.Rate
+				if currentSession.Per != 0 {
+					rate /= currentSession.Per
+				}
+			} else {
+				rate = apiLimit.Rate
+				if apiLimit.Per != 0 {
+					rate /= apiLimit.Per
+				}
+			}
 			c := globalConf.DRLThreshold
 			if c == 0 {
 				// defaults to 5
