@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 	"time"
 
@@ -253,7 +252,6 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 	}
 
 	if enableQ {
-		fmt.Println("===========>")
 		if globalConf.LegacyEnableAllowanceCountdown {
 			currentSession.Allowance--
 		}
