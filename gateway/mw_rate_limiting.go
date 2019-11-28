@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/TykTechnologies/tyk/request"
 )
 
@@ -118,6 +120,11 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 					k.Spec.APIID,
 					true,
 				)
+
+				log.WithFields(logrus.Fields{
+					"middleware": "RateLimitAndQuotaCheck",
+					"func":       "ProcessRequest",
+				}).Debugf("after dry-run (reason: '%s')", reason)
 
 				if ctxThrottleLevel(r) > throttleRetryLimit {
 					break
