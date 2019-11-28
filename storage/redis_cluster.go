@@ -251,7 +251,7 @@ func (r *RedisCluster) fetchValueOfKeys(keys []interface{}) ([]string, error) {
 	} else {
 		var err error
 
-		result, err = redis.Strings(r.singleton().Do("MGET", keys))
+		result, err = redis.Strings(r.singleton().Do("MGET", keys...))
 		if err != nil {
 			return nil, err
 		}
