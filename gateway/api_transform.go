@@ -823,10 +823,15 @@ func getPlatform(SysConfPath string) (string, error) {
 	var ret = "aci"
 	data := make(map[interface{}]interface{})
 	SysConfData, err := ioutil.ReadFile(SysConfPath)
+	if err != nil {
+		log.Error("Error reading platform type", err)
+		ret = "any"
+	}
 
 	err = yaml.Unmarshal(SysConfData, &data)
 	if err != nil {
-		return "", err
+		log.Error("Error reading platform type", err)
+		ret = "any"
 	}
 
 	if val, found := data["mode"]; found {
