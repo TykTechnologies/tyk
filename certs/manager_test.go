@@ -128,7 +128,7 @@ func TestAddCertificate(t *testing.T) {
 	}{
 		{[]byte(""), "", "Failed to decode certificate. It should be PEM encoded."},
 		{[]byte("-----BEGIN PRIVATE KEY-----\nYQ==\n-----END PRIVATE KEY-----"), "", "Failed to decode certificate. It should be PEM encoded."},
-		{[]byte("-----BEGIN CERTIFICATE-----\nYQ==\n-----END CERTIFICATE-----"), "", "Error while parsing certificate: asn1: syntax error"},
+		{[]byte("-----BEGIN CERTIFICATE-----\nYQ==\n-----END CERTIFICATE-----"), "", "asn1: syntax error"},
 		{certPem, certID, ""},
 		{combinedPemWrongPrivate, "", "tls: private key does not match public key"},
 		{combinedPem, cert2ID, ""},

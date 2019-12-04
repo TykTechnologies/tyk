@@ -406,6 +406,18 @@ func (c *CertificateManager) Add(certData []byte, orgID string) (string, error) 
 			keyRaw = block.Bytes
 			keyPEM = pem.EncodeToMemory(block)
 		} else if block.Type == "CERTIFICATE" {
+
+			cert, err := x509.ParseCertificate(block.Bytes)
+			if err != nil {
+				c.logger.Error(err)
+				return "", err
+			}
+
+			if cert.NotAfter.Before(time.Now()) {
+				c.logger.Error(errors.New("certificate is expired"))
+				return "", errors.New("certificate is expired")
+			}
+
 			certBlocks = append(certBlocks, pem.EncodeToMemory(block))
 		} else if block.Type == "PUBLIC KEY" {
 			publicKeyPem = pem.EncodeToMemory(block)
