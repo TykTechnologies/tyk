@@ -773,17 +773,9 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		}
 
 		if proxyURL, _ := httpTransport.Proxy(req); proxyURL != nil {
-			var tlsConfig *tls.Config
-
-			tlsConfig = httpTransport.TLSClientConfig
+			tlsConfig := httpTransport.TLSClientConfig
 			host, _, _ := net.SplitHostPort(outreq.Host)
 			setCommonNameVerifyPeerCertificate(p.TykAPISpec, tlsConfig, host)
-
-			if outReqIsWebsocket {
-				roundTripper.(*WSDialer).Transport = httpTransport
-			} else {
-				roundTripper = httpTransport
-			}
 		}
 
 	}
