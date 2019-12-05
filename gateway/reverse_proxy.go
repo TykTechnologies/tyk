@@ -15,6 +15,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -563,6 +565,53 @@ func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p
 	return transport
 }
 
+func setCommonNameVerifyPeerCertificate(spec *APISpec, tlsConfig *tls.Config, hostName string) {
+	tlsConfig.InsecureSkipVerify = true
+
+	// if verifyPeerCertificate was set previously, make sure it is also executed
+	prevFunc := tlsConfig.VerifyPeerCertificate
+	tlsConfig.VerifyPeerCertificate = func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+		if prevFunc != nil {
+			err := prevFunc(rawCerts, verifiedChains)
+			if err != nil {
+				return err
+			}
+		}
+
+		// followed https://github.com/golang/go/issues/21971#issuecomment-332693931
+		certs := make([]*x509.Certificate, len(rawCerts))
+		for i, asn1Data := range rawCerts {
+			cert, err := x509.ParseCertificate(asn1Data)
+			if err != nil {
+				return errors.New("failed to parse certificate from server: " + err.Error())
+			}
+			certs[i] = cert
+		}
+
+		if !spec.Proxy.Transport.SSLInsecureSkipVerify && !config.Global().ProxySSLInsecureSkipVerify {
+			opts := x509.VerifyOptions{
+				Roots:         tlsConfig.RootCAs,
+				CurrentTime:   time.Now(),
+				DNSName:       "", // <- skip hostname verification
+				Intermediates: x509.NewCertPool(),
+			}
+
+			for i, cert := range certs {
+				if i == 0 {
+					continue
+				}
+				opts.Intermediates.AddCert(cert)
+			}
+			_, err := certs[0].Verify(opts)
+			if err != nil {
+				return err
+			}
+		}
+
+		return validateCommonName(hostName, certs[0])
+	}
+}
+
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) ProxyResponse {
 	if trace.IsEnabled() {
 		span, ctx := trace.Span(req.Context(), req.URL.Path)
@@ -711,6 +760,33 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		roundTripper.(*http.Transport).TLSClientConfig.Certificates = tlsCertificates
 	}
 	p.TykAPISpec.Unlock()
+
+	if p.TykAPISpec.Proxy.Transport.SSLForceCommonNameCheck || config.Global().SSLForceCommonNameCheck {
+		// if proxy is enabled, add CommonName verification in verifyPeerCertificate
+		// DialTLS is not executed if proxy is used
+		var httpTransport *http.Transport
+
+		if outReqIsWebsocket {
+			httpTransport = roundTripper.(*WSDialer).Transport
+		} else {
+			httpTransport = roundTripper.(*http.Transport)
+		}
+
+		if proxyURL, _ := httpTransport.Proxy(req); proxyURL != nil {
+			var tlsConfig *tls.Config
+
+			tlsConfig = httpTransport.TLSClientConfig
+			host, _, _ := net.SplitHostPort(outreq.Host)
+			setCommonNameVerifyPeerCertificate(p.TykAPISpec, tlsConfig, host)
+
+			if outReqIsWebsocket {
+				roundTripper.(*WSDialer).Transport = httpTransport
+			} else {
+				roundTripper = httpTransport
+			}
+		}
+
+	}
 
 	// do request round trip
 	var res *http.Response

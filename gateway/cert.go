@@ -161,12 +161,11 @@ func validatePublicKeys(host string, conn *tls.Conn, spec *APISpec) bool {
 	return isValid
 }
 
-func validateCommonName(host string, conn *tls.Conn) error {
+func validateCommonName(host string, cert *x509.Certificate) error {
 	certLog.Debug("Checking certificate CommonName for host :", host)
 
-	state := conn.ConnectionState()
-	if state.PeerCertificates[0].Subject.CommonName != host {
-		return errors.New("certificate had CN " + state.PeerCertificates[0].Subject.CommonName + "expected " + host)
+	if cert.Subject.CommonName != host {
+		return errors.New("certificate had CN " + cert.Subject.CommonName + "expected " + host)
 	}
 
 	return nil
@@ -206,7 +205,9 @@ func customDialTLSCheck(spec *APISpec, tc *tls.Config) func(network, addr string
 		}
 
 		if checkCommonName {
-			err := validateCommonName(host, c)
+			state := c.ConnectionState()
+			leafCert := state.PeerCertificates[0]
+			err := validateCommonName(host, leafCert)
 			if err != nil {
 				return nil, err
 			}
