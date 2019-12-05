@@ -51,9 +51,9 @@ const Schema = `{
         "use_standard_auth": {
             "type": "boolean"
         },
-		"use_go_plugin_auth": {
-			"type": "boolean"
-		},
+        "use_go_plugin_auth": {
+            "type": "boolean"
+        },
         "enable_coprocess_auth": {
             "type": "boolean"
         },
@@ -75,7 +75,7 @@ const Schema = `{
         "jwt_policy_field_name": {
             "type": "string"
         },
-		"jwt_default_policies": {
+        "jwt_default_policies": {
             "type": ["array", "null"]
         },
         "jwt_signing_method": {
@@ -322,6 +322,9 @@ const Schema = `{
                         },
                         "proxy_url": {
                             "type": "string"
+                        },
+                        "ssl_force_common_name_check": {
+                            "type": "boolean"
                         }
                     }
                 }
@@ -407,7 +410,7 @@ const Schema = `{
                 }
             }
         },
-	"request_signing": {
+    "request_signing": {
           "type": ["object", "null"],
            "properties": {
                 "is_enabled": {
@@ -416,16 +419,16 @@ const Schema = `{
                 "secret": {
                     "type": "string"
                 },
-		"key_id": {
+        "key_id": {
                     "type": "string"
                 },
-		"algorithm": {
+        "algorithm": {
                     "type": "string"
                 }
             },
-	    "required": [
-	    	"is_enabled"
-	    ]
+        "required": [
+            "is_enabled"
+        ]
         }
     },
     "required": [

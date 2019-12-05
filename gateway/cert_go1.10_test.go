@@ -5,9 +5,15 @@ package gateway
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
+	"fmt"
+
+	//	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/certs"
@@ -15,17 +21,27 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
-func TestPublicKeyPinning(t *testing.T) {
-	_, _, _, serverCert := genServerCertificate()
+func uploadCertPublicKey(serverCert tls.Certificate) (string, error) {
 	x509Cert, _ := x509.ParseCertificate(serverCert.Certificate[0])
 	pubDer, _ := x509.MarshalPKIXPublicKey(x509Cert.PublicKey)
 	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDer})
 	pubID, _ := CertificateManager.Add(pubPem, "")
-	defer CertificateManager.Delete(pubID)
 
 	if pubID != certs.HexSHA256(pubDer) {
-		t.Error("Certmanager returned wrong pub key fingerprint:", certs.HexSHA256(pubDer), pubID)
+		errStr := fmt.Sprintf("certmanager returned wrong pub key fingerprint: %s %s", certs.HexSHA256(pubDer), pubID)
+		return "", errors.New(errStr)
 	}
+
+	return pubID, nil
+}
+
+func TestPublicKeyPinning(t *testing.T) {
+	_, _, _, serverCert := genServerCertificate()
+	pubID, err := uploadCertPublicKey(serverCert)
+	if err != nil {
+		t.Error(err)
+	}
+	defer CertificateManager.Delete(pubID)
 
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	}))
@@ -110,6 +126,75 @@ func TestPublicKeyPinning(t *testing.T) {
 		})
 
 		ts.Run(t, test.TestCase{Code: 500})
+	})
+
+	t.Run("Enable Common Name check", func(t *testing.T) {
+		// start upstream server
+		_, _, _, serverCert := genCertificate(&x509.Certificate{
+			EmailAddresses: []string{"test@test.com"},
+			Subject:        pkix.Name{CommonName: "localhost"},
+		})
+		serverPubID, err := uploadCertPublicKey(serverCert)
+		if err != nil {
+			t.Error(err)
+		}
+		defer CertificateManager.Delete(serverPubID)
+
+		upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		}))
+		upstream.TLS = &tls.Config{
+			InsecureSkipVerify: true,
+			Certificates:       []tls.Certificate{serverCert},
+		}
+
+		upstream.StartTLS()
+		defer upstream.Close()
+
+		// start proxy
+		_, _, _, proxyCert := genCertificate(&x509.Certificate{
+			Subject: pkix.Name{CommonName: "local1.host"},
+		})
+		proxyPubID, err := uploadCertPublicKey(proxyCert)
+		if err != nil {
+			t.Error(err)
+		}
+		defer CertificateManager.Delete(proxyPubID)
+
+		proxy := initProxy("http", &tls.Config{
+			Certificates: []tls.Certificate{proxyCert},
+		})
+		defer proxy.Stop()
+
+		globalConf := config.Global()
+		globalConf.SSLForceCommonNameCheck = true
+		globalConf.ProxySSLInsecureSkipVerify = true
+		config.SetGlobal(globalConf)
+		defer ResetTestConfig()
+
+		ts := StartTest()
+		defer ts.Close()
+
+		pubKeys := fmt.Sprintf("%s,%s", serverPubID, proxyPubID)
+		upstream.URL = strings.Replace(upstream.URL, "127.0.0.1", "localhost", 1)
+		proxy.URL = strings.Replace(proxy.URL, "127.0.0.1", "local1.host", 1)
+
+		BuildAndLoadAPI([]func(spec *APISpec){func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/valid"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.Proxy.Transport.ProxyURL = proxy.URL
+			spec.PinnedPublicKeys = map[string]string{"*": pubKeys}
+		},
+			func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/invalid"
+				spec.Proxy.TargetURL = upstream.URL
+				spec.Proxy.Transport.ProxyURL = proxy.URL
+				spec.PinnedPublicKeys = map[string]string{"*": "wrong"}
+			}}...)
+
+		ts.Run(t, []test.TestCase{
+			{Code: 200, Path: "/valid"},
+			{Code: 500, Path: "/invalid"},
+		}...)
 	})
 }
 

@@ -387,6 +387,7 @@ type Config struct {
 	OauthRedirectUriSeparator     string               `json:"oauth_redirect_uri_separator"`
 	OauthErrorStatusCode          int                  `json:"oauth_error_status_code"`
 	EnableKeyLogging              bool                 `json:"enable_key_logging"`
+	SSLForceCommonNameCheck       bool                 `json:"ssl_force_common_name_check"`
 
 	// Proxy analytics configuration
 	EnableAnalytics bool                  `json:"enable_analytics"`
