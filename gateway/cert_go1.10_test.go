@@ -9,6 +9,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+
 	//	"net"
 	"net/http"
 	"net/http/httptest"
@@ -151,7 +152,7 @@ func TestPublicKeyPinning(t *testing.T) {
 
 		// start proxy
 		_, _, _, proxyCert := genCertificate(&x509.Certificate{
-			Subject: pkix.Name{CommonName: "localhost"},
+			Subject: pkix.Name{CommonName: "local1.host"},
 		})
 		proxyPubID, err := uploadCertPublicKey(proxyCert)
 		if err != nil {
@@ -159,7 +160,7 @@ func TestPublicKeyPinning(t *testing.T) {
 		}
 		defer CertificateManager.Delete(proxyPubID)
 
-		proxy := initProxy("https", &tls.Config{
+		proxy := initProxy("http", &tls.Config{
 			Certificates: []tls.Certificate{proxyCert},
 		})
 		defer proxy.Stop()
@@ -175,7 +176,7 @@ func TestPublicKeyPinning(t *testing.T) {
 
 		pubKeys := fmt.Sprintf("%s,%s", serverPubID, proxyPubID)
 		upstream.URL = strings.Replace(upstream.URL, "127.0.0.1", "localhost", 1)
-		proxy.URL = strings.Replace(proxy.URL, "127.0.0.1", "localhost", 1)
+		proxy.URL = strings.Replace(proxy.URL, "127.0.0.1", "local1.host", 1)
 
 		BuildAndLoadAPI([]func(spec *APISpec){func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/valid"
