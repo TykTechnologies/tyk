@@ -1026,6 +1026,9 @@
     },
     "enable_http_profiler": {
       "type": "boolean"
+    },
+    "ssl_force_common_name_check":{
+	    "type":"boolean"
     }
   }
 }

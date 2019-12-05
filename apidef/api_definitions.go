@@ -432,10 +432,11 @@ type APIDefinition struct {
 		CheckHostAgainstUptimeTests bool                          `bson:"check_host_against_uptime_tests" json:"check_host_against_uptime_tests"`
 		ServiceDiscovery            ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
 		Transport                   struct {
-			SSLInsecureSkipVerify bool     `bson:"ssl_insecure_skip_verify" json:"ssl_insecure_skip_verify"`
-			SSLCipherSuites       []string `bson:"ssl_ciphers" json:"ssl_ciphers"`
-			SSLMinVersion         uint16   `bson:"ssl_min_version" json:"ssl_min_version"`
-			ProxyURL              string   `bson:"proxy_url" json:"proxy_url"`
+			SSLInsecureSkipVerify   bool     `bson:"ssl_insecure_skip_verify" json:"ssl_insecure_skip_verify"`
+			SSLCipherSuites         []string `bson:"ssl_ciphers" json:"ssl_ciphers"`
+			SSLMinVersion           uint16   `bson:"ssl_min_version" json:"ssl_min_version"`
+			SSLForceCommonNameCheck bool     `json:"ssl_force_common_name_check"`
+			ProxyURL                string   `bson:"proxy_url" json:"proxy_url"`
 		} `bson:"transport" json:"transport"`
 	} `bson:"proxy" json:"proxy"`
 	DisableRateLimit          bool                   `bson:"disable_rate_limit" json:"disable_rate_limit"`
