@@ -49,7 +49,7 @@ func (b *BatchRequestHandler) doRequest(req *http.Request, relURL string) BatchR
 
 	tr.TLSClientConfig.InsecureSkipVerify = config.Global().ProxySSLInsecureSkipVerify
 
-	tr.DialTLS = dialTLSPinnedCheck(b.API, tr.TLSClientConfig)
+	tr.DialTLS = customDialTLSCheck(b.API, tr.TLSClientConfig)
 
 	tr.Proxy = proxyFromAPI(b.API)
 

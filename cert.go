@@ -132,8 +132,57 @@ func verifyPeerCertificatePinnedCheck(spec *APISpec, tlsConfig *tls.Config) func
 	}
 }
 
-func dialTLSPinnedCheck(spec *APISpec, tc *tls.Config) func(network, addr string) (net.Conn, error) {
-	if (spec == nil || len(spec.PinnedPublicKeys) == 0) && len(config.Global().Security.PinnedPublicKeys) == 0 {
+func validatePublicKeys(host string, conn *tls.Conn, spec *APISpec) bool {
+	certLog.Debug("Checking certificate public key for host:", host)
+
+	whitelist := getPinnedPublicKeys(host, spec)
+	if len(whitelist) == 0 {
+		return true
+	}
+
+	isValid := false
+
+	state := conn.ConnectionState()
+	for _, peercert := range state.PeerCertificates {
+		der, err := x509.MarshalPKIXPublicKey(peercert.PublicKey)
+		if err != nil {
+			continue
+		}
+		fingerprint := certs.HexSHA256(der)
+
+		for _, w := range whitelist {
+			if w == fingerprint {
+				isValid = true
+				break
+			}
+		}
+	}
+
+	return isValid
+}
+
+func validateCommonName(host string, cert *x509.Certificate) error {
+	certLog.Debug("Checking certificate CommonName for host :", host)
+
+	if cert.Subject.CommonName != host {
+		return errors.New("certificate had CN " + cert.Subject.CommonName + "expected " + host)
+	}
+
+	return nil
+}
+
+func customDialTLSCheck(spec *APISpec, tc *tls.Config) func(network, addr string) (net.Conn, error) {
+	var checkPinnedKeys, checkCommonName bool
+
+	if (spec != nil && len(spec.PinnedPublicKeys) != 0) || len(config.Global().Security.PinnedPublicKeys) != 0 {
+		checkPinnedKeys = true
+	}
+
+	if (spec != nil && spec.Proxy.Transport.SSLForceCommonNameCheck) || config.Global().SSLForceCommonNameCheck {
+		checkCommonName = true
+	}
+
+	if !checkCommonName && !checkPinnedKeys {
 		return nil
 	}
 
@@ -147,29 +196,24 @@ func dialTLSPinnedCheck(spec *APISpec, tc *tls.Config) func(network, addr string
 		}
 
 		host, _, _ := net.SplitHostPort(addr)
-		whitelist := getPinnedPublicKeys(host, spec)
-		if len(whitelist) == 0 {
-			return c, nil
+
+		if checkPinnedKeys {
+			isValid := validatePublicKeys(host, c, spec)
+			if !isValid {
+				return nil, errors.New("https://" + host + " certificate public key pinning error. Public keys do not match.")
+			}
 		}
 
-		certLog.Debug("Checking certificate public key for host:", host)
-
-		state := c.ConnectionState()
-		for _, peercert := range state.PeerCertificates {
-			der, err := x509.MarshalPKIXPublicKey(peercert.PublicKey)
+		if checkCommonName {
+			state := c.ConnectionState()
+			leafCert := state.PeerCertificates[0]
+			err := validateCommonName(host, leafCert)
 			if err != nil {
-				continue
-			}
-			fingerprint := certs.HexSHA256(der)
-
-			for _, w := range whitelist {
-				if w == fingerprint {
-					return c, nil
-				}
+				return nil, err
 			}
 		}
 
-		return nil, errors.New("https://" + host + " certificate public key pinning error. Public keys do not match.")
+		return c, nil
 	}
 }
 
