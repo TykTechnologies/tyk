@@ -573,6 +573,10 @@ func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p
 	if proxyURL, _ := transport.Proxy(req); proxyURL != nil {
 		p.logger.Debug("Detected proxy: " + proxyURL.String())
 		transport.TLSClientConfig.VerifyPeerCertificate = verifyPeerCertificatePinnedCheck(p.TykAPISpec, transport.TLSClientConfig)
+
+		if transport.TLSClientConfig.VerifyPeerCertificate != nil {
+			p.logger.Debug("Certificate pinning check is enabled")
+		}
 	} else {
 		transport.DialTLS = customDialTLSCheck(p.TykAPISpec, transport.TLSClientConfig)
 	}
