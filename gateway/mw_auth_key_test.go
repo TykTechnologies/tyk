@@ -198,7 +198,7 @@ func createAuthKeyAuthSession(isBench bool) *user.SessionState {
 
 func getAuthKeyChain(spec *APISpec) http.Handler {
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
-	proxy := TykNewSingleHostReverseProxy(remote, spec)
+	proxy := TykNewSingleHostReverseProxy(remote, spec, nil)
 	proxyHandler := ProxyHandler(proxy, spec)
 	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy}
 	chain := alice.New(mwList(
