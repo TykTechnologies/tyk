@@ -31,7 +31,9 @@ func TestCopyHeader_NoDuplicateCORSHeaders(t *testing.T) {
 		h.Set("Location", "https://tyk.io")
 
 		if withCORS {
-			h.Set("Access-Control-Allow-Origin", "tyk.io")
+			for _, v := range corsHeaders {
+				h.Set(v, "tyk.io")
+			}
 		}
 
 		return h
@@ -48,12 +50,15 @@ func TestCopyHeader_NoDuplicateCORSHeaders(t *testing.T) {
 	for _, v := range tests {
 		copyHeader(v.dst, v.src)
 
-		val := v.dst["Access-Control-Allow-Origin"]
-		if n := len(val); n != 1 {
-			t.Fatalf("%s found %d times", "Access-Control-Allow-Origin", n)
-		}
-	}
+		for _, vv := range corsHeaders {
+			val := v.dst[vv]
+			if n := len(val); n != 1 {
+				t.Fatalf("%s found %d times", vv, n)
+			}
 
+		}
+
+	}
 }
 
 func TestReverseProxyRetainHost(t *testing.T) {
