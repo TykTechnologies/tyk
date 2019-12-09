@@ -595,7 +595,7 @@ func TestAnalytics(t *testing.T) {
 		}
 
 		var record AnalyticsRecord
-		msgpack.Unmarshal(results[0].([]byte), &record)
+		msgpack.Unmarshal([]byte(results[0].(string)), &record)
 		if record.ResponseCode != 200 {
 			t.Error("Analytics record do not match", record)
 		}
