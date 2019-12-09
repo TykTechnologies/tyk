@@ -826,7 +826,7 @@ func (r *RedisCluster) SetRollingWindow(keyName string, per int64, value_overrid
 			element.Member = strconv.Itoa(int(now.UnixNano()))
 		}
 
-		pipe.ZAdd(keyName, &element)
+		pipe.ZAdd(keyName, element)
 		pipe.Expire(keyName, time.Duration(per)*time.Second)
 
 		return nil
@@ -923,7 +923,7 @@ func (r *RedisCluster) AddToSortedSet(keyName, value string, score float64) {
 
 	r.ensureConnection()
 	member := redis.Z{Score: score, Member: value}
-	if err := r.singleton().ZAdd(fixedKey, &member).Err(); err != nil {
+	if err := r.singleton().ZAdd(fixedKey, member).Err(); err != nil {
 		log.WithFields(logEntry).WithError(err).Error("ZADD command failed")
 	}
 }
@@ -940,7 +940,7 @@ func (r *RedisCluster) GetSortedSetRange(keyName, scoreFrom, scoreTo string) ([]
 	log.WithFields(logEntry).Debug("Getting sorted set range")
 
 	args := redis.ZRangeBy{Min: scoreFrom, Max: scoreTo}
-	values, err := r.singleton().ZRangeByScoreWithScores(fixedKey, &args).Result()
+	values, err := r.singleton().ZRangeByScoreWithScores(fixedKey, args).Result()
 	if err != nil {
 		log.WithFields(logEntry).WithError(err).Error("ZRANGEBYSCORE command failed")
 		return nil, nil, err
