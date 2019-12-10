@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/garyburd/redigo/redis"
+	"github.com/go-redis/redis"
 	"github.com/gorilla/websocket"
 	proxyproto "github.com/pires/go-proxyproto"
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
@@ -478,7 +478,7 @@ func TestAnalytics(t *testing.T) {
 		}
 
 		var record AnalyticsRecord
-		msgpack.Unmarshal(results[0].([]byte), &record)
+		msgpack.Unmarshal([]byte(results[0].(string)), &record)
 		if record.ResponseCode != 401 {
 			t.Error("Analytics record do not match: ", record)
 		}
@@ -504,7 +504,7 @@ func TestAnalytics(t *testing.T) {
 		}
 
 		var record AnalyticsRecord
-		msgpack.Unmarshal(results[0].([]byte), &record)
+		msgpack.Unmarshal([]byte(results[0].(string)), &record)
 		if record.ResponseCode != 200 {
 			t.Error("Analytics record do not match", record)
 		}
@@ -542,7 +542,7 @@ func TestAnalytics(t *testing.T) {
 		}
 
 		var record AnalyticsRecord
-		msgpack.Unmarshal(results[0].([]byte), &record)
+		msgpack.Unmarshal([]byte(results[0].(string)), &record)
 		if record.ResponseCode != 200 {
 			t.Error("Analytics record do not match", record)
 		}
@@ -595,7 +595,7 @@ func TestAnalytics(t *testing.T) {
 		}
 
 		var record AnalyticsRecord
-		msgpack.Unmarshal(results[0].([]byte), &record)
+		msgpack.Unmarshal([]byte(results[0].(string)), &record)
 		if record.ResponseCode != 200 {
 			t.Error("Analytics record do not match", record)
 		}
@@ -657,7 +657,7 @@ func TestAnalytics(t *testing.T) {
 
 		// Take second cached request
 		var record AnalyticsRecord
-		msgpack.Unmarshal(results[1].([]byte), &record)
+		msgpack.Unmarshal([]byte(results[1].(string)), &record)
 		if record.ResponseCode != 200 {
 			t.Error("Analytics record do not match", record)
 		}
@@ -770,14 +770,14 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 	globalConf.ManagementNode = false
 	config.SetGlobal(globalConf)
 	msg := redis.Message{
-		Data: []byte(`{"Command": "NoticeGatewayDRLNotification"}`),
+		Payload: `{"Command": "NoticeGatewayDRLNotification"}`,
 	}
 	shouldHandle := func(got NotificationCommand) {
 		if want := NoticeGatewayDRLNotification; got != want {
 			t.Fatalf("want %q, got %q", want, got)
 		}
 	}
-	handleRedisEvent(msg, shouldHandle, nil)
+	handleRedisEvent(&msg, shouldHandle, nil)
 	globalConf.ManagementNode = true
 	config.SetGlobal(globalConf)
 	notHandle := func(got NotificationCommand) {
@@ -1624,7 +1624,7 @@ func TestBrokenClients(t *testing.T) {
 		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
 
 		var record AnalyticsRecord
-		msgpack.Unmarshal(results[0].([]byte), &record)
+		msgpack.Unmarshal([]byte(results[0].(string)), &record)
 		if record.ResponseCode != 499 {
 			t.Fatal("Analytics record do not match:", record)
 		}
