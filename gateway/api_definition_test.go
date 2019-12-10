@@ -10,12 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/garyburd/redigo/redis"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
+	"github.com/go-redis/redis"
 )
 
 func TestURLRewrites(t *testing.T) {
@@ -446,13 +445,13 @@ func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 
 	var wg sync.WaitGroup
 	wg.Add(1)
-	msg := redis.Message{Data: []byte(`{"Command": "ApiUpdated"}`)}
+	msg := redis.Message{Payload: `{"Command": "ApiUpdated"}`}
 	handled := func(got NotificationCommand) {
 		if want := NoticeApiUpdated; got != want {
 			t.Fatalf("want %q, got %q", want, got)
 		}
 	}
-	handleRedisEvent(msg, handled, wg.Done)
+	handleRedisEvent(&msg, handled, wg.Done)
 
 	// Since we already know that reload is queued
 	ReloadTick <- time.Time{}
@@ -751,13 +750,13 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 
 	var wg sync.WaitGroup
 	wg.Add(1)
-	msg := redis.Message{Data: []byte(`{"Command": "ApiUpdated"}`)}
+	msg := redis.Message{Payload: `{"Command": "ApiUpdated"}`}
 	handled := func(got NotificationCommand) {
 		if want := NoticeApiUpdated; got != want {
 			t.Fatalf("want %q, got %q", want, got)
 		}
 	}
-	handleRedisEvent(msg, handled, wg.Done)
+	handleRedisEvent(&msg, handled, wg.Done)
 
 	// Since we already know that reload is queued
 	ReloadTick <- time.Time{}
@@ -774,7 +773,7 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 
 	var wg2 sync.WaitGroup
 	wg2.Add(1)
-	handleRedisEvent(msg, handled, wg2.Done)
+	handleRedisEvent(&msg, handled, wg2.Done)
 
 	// Since we already know that reload is queued
 	ReloadTick <- time.Time{}
