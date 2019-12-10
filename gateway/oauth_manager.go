@@ -114,11 +114,14 @@ func (o *OAuthHandlers) generateOAuthOutputFromOsinResponse(osinResponse *osin.R
 		osinResponse.Output["redirect_to"] = redirect
 	}
 
-	respData, err := json.Marshal(&osinResponse.Output)
+	buffer := &bytes.Buffer{}
+	encoder := json.NewEncoder(buffer)
+	encoder.SetEscapeHTML(false)
+	err = encoder.Encode(&osinResponse.Output)
 	if err != nil {
 		return nil
 	}
-	return respData
+	return buffer.Bytes()
 }
 
 func (o *OAuthHandlers) notifyClientOfNewOauth(notification NewOAuthNotification) {
