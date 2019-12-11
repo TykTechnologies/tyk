@@ -1023,18 +1023,18 @@
     },
     "ssl_force_common_name_check":{
 	    "type":"boolean"
-    }
-  },
-  "liveness_check": {
-    "type": ["object", "null"],
-    "additionalProperties": false,
-    "properties": {
-      "enabled": {
-        "type": "boolean"
+    },
+    "liveness_check": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
       },
       "port": {
-        "type": "integer"
+         "type": "integer"
       }
     }
+   }
   }
 }
