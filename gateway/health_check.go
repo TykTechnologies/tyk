@@ -69,7 +69,7 @@ func initHealthCheck(ctx context.Context) {
 		setCurrentHealthCheckInfo(make(map[string]HealthCheckItem, 3))
 
 		go func(ctx context.Context) {
-			ticker := time.NewTicker(time.Second * 30)
+			ticker := time.NewTicker(time.Second * 10)
 
 			for {
 				select {
