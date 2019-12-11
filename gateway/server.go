@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"fmt"
 	"html/template"
 	"io/ioutil"
 	stdlog "log"
@@ -453,6 +454,33 @@ func loadAPIEndpoints(muxer *mux.Router) {
 	r.HandleFunc("/oauth/clients/{apiID}", oAuthClientHandler).Methods("GET", "DELETE")
 	r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", oAuthClientHandler).Methods("GET", "DELETE")
 	r.HandleFunc("/oauth/clients/{apiID}/{keyName}/tokens", oAuthClientTokensHandler).Methods("GET")
+
+	if config.Global().LivenessCheck.Enabled {
+
+		if config.Global().LivenessCheck.Port <= 0 {
+
+			r.HandleFunc("/status", liveCheckHandler)
+
+		} else {
+
+			l, err := net.Listen("tcp", fmt.Sprintf("%s:%d", config.Global().ListenAddress, config.Global().LivenessCheck.Port))
+			if err != nil {
+				mainLog.Errorf("an error occurred while creating the liveness check router.... %v", err)
+			} else {
+
+				livenessRouter := mux.NewRouter()
+				livenessRouter.Handle("/tyk/status", checkIsAPIOwner(http.HandlerFunc(liveCheckHandler)))
+
+				srv := &http.Server{
+					ReadTimeout:  time.Second * 5,
+					WriteTimeout: time.Second * 5,
+					Handler:      livenessRouter,
+				}
+
+				go srv.Serve(l)
+			}
+		}
+	}
 
 	mainLog.Debug("Loaded API Endpoints")
 }

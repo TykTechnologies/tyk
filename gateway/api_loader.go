@@ -2,14 +2,12 @@ package gateway
 
 import (
 	"fmt"
-	"net"
 	"net/http"
 	"net/url"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
@@ -701,37 +699,6 @@ func loadApps(specs []*APISpec) {
 	}
 
 	defaultProxyMux.swap(muxer)
-
-	if config.Global().LivenessCheck.Enabled {
-		handler := checkIsAPIOwner(http.HandlerFunc(liveCheck))
-
-		if config.Global().LivenessCheck.Port <= 0 {
-			// var port = globalConf.ControlAPIPort
-			// if port == 0 {
-			// 	port = global.ListenPort
-			// }
-
-			// muxer.router(port, "")
-
-			// router.Handle("/status", handler)
-		} else {
-			l, err := net.Listen("tcp", fmt.Sprintf("%s:%d", config.Global().ListenAddress, config.Global().LivenessCheck.Port))
-			if err != nil {
-				mainLog.Errorf("an error occurred while creating the liveness check router.... %v", err)
-			} else {
-				livenessRouter := mux.NewRouter()
-				livenessRouter.Handle("/tyk/status", handler)
-
-				srv := &http.Server{
-					ReadTimeout:  time.Second * 5,
-					WriteTimeout: time.Second * 5,
-					Handler:      livenessRouter,
-				}
-
-				go srv.Serve(l)
-			}
-		}
-	}
 
 	// Swap in the new register
 	apisMu.Lock()
