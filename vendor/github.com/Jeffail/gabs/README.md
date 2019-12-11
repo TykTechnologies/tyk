@@ -1,24 +1,23 @@
 ![Gabs](gabs_logo.png "Gabs")
 
-Gabs is a small utility for dealing with dynamic or unknown JSON structures in golang. It's pretty much just a helpful wrapper around the golang json.Marshal/json.Unmarshal behaviour and map[string]interface{} objects. It does nothing spectacular except for being fabulous.
+Gabs is a small utility for dealing with dynamic or unknown JSON structures in
+golang. It's pretty much just a helpful wrapper around the golang
+`json.Marshal/json.Unmarshal` behaviour and `map[string]interface{}` objects.
+It does nothing spectacular except for being fabulous.
 
 https://godoc.org/github.com/Jeffail/gabs
 
-##How to install:
+## Install
 
-```bash
+``` bash
 go get github.com/Jeffail/gabs
 ```
 
-##How to use
+## Use
 
-###Parsing and searching JSON
+### Parsing and searching JSON
 
-```go
-...
-
-import "github.com/Jeffail/gabs"
-
+``` go
 jsonParsed, err := gabs.ParseJSON([]byte(`{
 	"outter":{
 		"inner":{
@@ -26,7 +25,10 @@ jsonParsed, err := gabs.ParseJSON([]byte(`{
 			"value2":22
 		},
 		"alsoInner":{
-			"value1":20
+			"value1":20,
+			"array1":[
+				30, 40
+			]
 		}
 	}
 }`))
@@ -40,26 +42,26 @@ value, ok = jsonParsed.Path("outter.inner.value1").Data().(float64)
 value, ok = jsonParsed.Search("outter", "inner", "value1").Data().(float64)
 // value == 10.0, ok == true
 
+gObj, err := jsonParsed.JSONPointer("/outter/alsoInner/array1/1")
+if err != nil {
+	panic(err)
+}
+value, ok = gObj.Data().(float64)
+// value == 40.0, ok == true
+
 value, ok = jsonParsed.Path("does.not.exist").Data().(float64)
 // value == 0.0, ok == false
 
 exists := jsonParsed.Exists("outter", "inner", "value1")
 // exists == true
 
-exists := jsonParsed.Exists("does", "not", "exist")
-// exists == false
-
 exists := jsonParsed.ExistsP("does.not.exist")
 // exists == false
-
-...
 ```
 
-###Iterating objects
+### Iterating objects
 
-```go
-...
-
+``` go
 jsonParsed, _ := gabs.ParseJSON([]byte(`{"object":{ "first": 1, "second": 2, "third": 3 }}`))
 
 // S is shorthand for Search
@@ -67,24 +69,25 @@ children, _ := jsonParsed.S("object").ChildrenMap()
 for key, child := range children {
 	fmt.Printf("key: %v, value: %v\n", key, child.Data().(string))
 }
-
-...
 ```
 
-###Iterating arrays
+### Iterating arrays
 
-```go
-...
-
-jsonParsed, _ := gabs.ParseJSON([]byte(`{"array":[ "first", "second", "third" ]}`))
+``` go
+jsonParsed, err := gabs.ParseJSON([]byte(`{"array":[ "first", "second", "third" ]}`))
+if err != nil {
+	panic(err)
+}
 
 // S is shorthand for Search
-children, _ := jsonParsed.S("array").Children()
+children, err := jsonParsed.S("array").Children()
+if err != nil {
+	panic(err)
+}
+
 for _, child := range children {
 	fmt.Println(child.Data().(string))
 }
-
-...
 ```
 
 Will print:
@@ -95,19 +98,21 @@ second
 third
 ```
 
-Children() will return all children of an array in order. This also works on objects, however, the children will be returned in a random order.
+Children() will return all children of an array in order. This also works on
+objects, however, the children will be returned in a random order.
 
-###Searching through arrays
+### Searching through arrays
 
-If your JSON structure contains arrays you can still search the fields of the objects within the array, this returns a JSON array containing the results for each element.
+If your JSON structure contains arrays you can still search the fields of the
+objects within the array, this returns a JSON array containing the results for
+each element.
 
-```go
-...
-
-jsonParsed, _ := gabs.ParseJSON([]byte(`{"array":[ {"value":1}, {"value":2}, {"value":3} ]}`))
+``` go
+jsonParsed, err := gabs.ParseJSON([]byte(`{"array":[ {"value":1}, {"value":2}, {"value":3} ]}`))
+if err != nil {
+	panic(err)
+}
 fmt.Println(jsonParsed.Path("array.value").String())
-
-...
 ```
 
 Will print:
@@ -116,11 +121,9 @@ Will print:
 [1,2,3]
 ```
 
-###Generating JSON
+### Generating JSON
 
-```go
-...
-
+``` go
 jsonObj := gabs.New()
 // or gabs.Consume(jsonObject) to work on an existing map[string]interface{}
 
@@ -129,8 +132,6 @@ jsonObj.SetP(20, "outter.inner.value2")
 jsonObj.Set(30, "outter", "inner2", "value3")
 
 fmt.Println(jsonObj.String())
-
-...
 ```
 
 Will print:
@@ -141,12 +142,8 @@ Will print:
 
 To pretty-print:
 
-```go
-...
-
+``` go
 fmt.Println(jsonObj.StringIndent("", "  "))
-
-...
 ```
 
 Will print:
@@ -165,11 +162,9 @@ Will print:
 }
 ```
 
-###Generating Arrays
+### Generating Arrays
 
-```go
-...
-
+``` go
 jsonObj := gabs.New()
 
 jsonObj.Array("foo", "array")
@@ -180,8 +175,6 @@ jsonObj.ArrayAppend(20, "foo", "array")
 jsonObj.ArrayAppend(30, "foo", "array")
 
 fmt.Println(jsonObj.String())
-
-...
 ```
 
 Will print:
@@ -192,9 +185,7 @@ Will print:
 
 Working with arrays by index:
 
-```go
-...
-
+``` go
 jsonObj := gabs.New()
 
 // Create an array with the length of 3
@@ -211,8 +202,6 @@ jsonObj.S("foo").Index(2).SetIndex(2, 1)
 jsonObj.S("foo").Index(2).SetIndex(3, 2)
 
 fmt.Println(jsonObj.String())
-
-...
 ```
 
 Will print:
@@ -221,14 +210,12 @@ Will print:
 {"foo":["test1","test2",[1,2,3]]}
 ```
 
-###Converting back to JSON
+### Converting back to JSON
 
 This is the easiest part:
 
-```go
-...
-
-jsonParsedObj := gabs.ParseJSON([]byte(`{
+``` go
+jsonParsedObj, _ := gabs.ParseJSON([]byte(`{
 	"outter":{
 		"values":{
 			"first":10,
@@ -240,15 +227,11 @@ jsonParsedObj := gabs.ParseJSON([]byte(`{
 
 jsonOutput := jsonParsedObj.String()
 // Becomes `{"outter":{"values":{"first":10,"second":11}},"outter2":"hello world"}`
-
-...
 ```
 
 And to serialize a specific segment is as simple as:
 
-```go
-...
-
+``` go
 jsonParsedObj := gabs.ParseJSON([]byte(`{
 	"outter":{
 		"values":{
@@ -261,15 +244,38 @@ jsonParsedObj := gabs.ParseJSON([]byte(`{
 
 jsonOutput := jsonParsedObj.Search("outter").String()
 // Becomes `{"values":{"first":10,"second":11}}`
-
-...
 ```
 
-### Parsing Numbers
+### Merge two containers
 
-Gabs uses the `json` package under the bonnet, which by default will parse all number values into `float64`. If you need to parse `Int` values then you should use a `json.Decoder` (https://golang.org/pkg/encoding/json/#Decoder):
+You can merge a JSON structure into an existing one, where collisions will be
+converted into a JSON array.
 
-```go
+``` go
+jsonParsed1, _ := ParseJSON([]byte(`{"outter": {"value1": "one"}}`))
+jsonParsed2, _ := ParseJSON([]byte(`{"outter": {"inner": {"value3": "three"}}, "outter2": {"value2": "two"}}`))
+
+jsonParsed1.Merge(jsonParsed2)
+// Becomes `{"outter":{"inner":{"value3":"three"},"value1":"one"},"outter2":{"value2":"two"}}`
+```
+
+Arrays are merged:
+
+``` go
+jsonParsed1, _ := ParseJSON([]byte(`{"array": ["one"]}`))
+jsonParsed2, _ := ParseJSON([]byte(`{"array": ["two"]}`))
+
+jsonParsed1.Merge(jsonParsed2)
+// Becomes `{"array":["one", "two"]}`
+```
+
+### Parsing Numbers
+
+Gabs uses the `json` package under the bonnet, which by default will parse all
+number values into `float64`. If you need to parse `Int` values then you should
+use a `json.Decoder` (https://golang.org/pkg/encoding/json/#Decoder):
+
+``` go
 sample := []byte(`{"test":{"int":10, "float":6.66}}`)
 dec := json.NewDecoder(bytes.NewReader(sample))
 dec.UseNumber()

@@ -9,7 +9,7 @@ This is the same CA bundle that ships with the
 Golang specific port of [certifi](https://github.com/kennethreitz/certifi). The
 CA bundle is derived from Mozilla's canonical set.
 
-## Usage
+## Usage
 
 You can use the `gocertifi` package as follows:
 

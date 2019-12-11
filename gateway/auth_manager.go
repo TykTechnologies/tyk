@@ -31,8 +31,8 @@ type AuthorisationHandler interface {
 type SessionHandler interface {
 	Init(store storage.Handler)
 	UpdateSession(keyName string, session *user.SessionState, resetTTLTo int64, hashed bool) error
-	RemoveSession(keyName string, hashed bool) bool
-	SessionDetail(keyName string, hashed bool) (user.SessionState, bool)
+	RemoveSession(orgID string, keyName string, hashed bool) bool
+	SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool)
 	Sessions(filter string) []string
 	Store() storage.Handler
 	ResetQuota(string, *user.SessionState, bool)
@@ -202,8 +202,8 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 	go b.store.DeleteRawKey(rawKey)
 	//go b.store.SetKey(rawKey, "0", session.QuotaRenewalRate)
 
-	for apiID := range session.AccessRights {
-		rawKey = QuotaKeyPrefix + apiID + "-" + keyName
+	for _, acl := range session.AccessRights {
+		rawKey = QuotaKeyPrefix + acl.AllowanceScope + "-" + keyName
 		go b.store.DeleteRawKey(rawKey)
 	}
 }
@@ -263,7 +263,7 @@ func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.Sess
 }
 
 // RemoveSession removes session from storage
-func (b *DefaultSessionManager) RemoveSession(keyName string, hashed bool) bool {
+func (b *DefaultSessionManager) RemoveSession(orgID string, keyName string, hashed bool) bool {
 	defer b.clearCacheForKey(keyName, hashed)
 
 	if hashed {
@@ -271,13 +271,13 @@ func (b *DefaultSessionManager) RemoveSession(keyName string, hashed bool) bool 
 	} else {
 		// support both old and new key hashing
 		res1 := b.store.DeleteKey(keyName)
-		res2 := b.store.DeleteKey(generateToken(b.orgID, keyName))
+		res2 := b.store.DeleteKey(generateToken(orgID, keyName))
 		return res1 || res2
 	}
 }
 
 // SessionDetail returns the session detail using the storage engine (either in memory or Redis)
-func (b *DefaultSessionManager) SessionDetail(keyName string, hashed bool) (user.SessionState, bool) {
+func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool) {
 	var jsonKeyVal string
 	var err error
 	var session user.SessionState
@@ -286,12 +286,12 @@ func (b *DefaultSessionManager) SessionDetail(keyName string, hashed bool) (user
 	if hashed {
 		jsonKeyVal, err = b.store.GetRawKey(b.store.GetKeyPrefix() + keyName)
 	} else {
-		if storage.TokenOrg(keyName) != b.orgID {
+		if storage.TokenOrg(keyName) != orgID {
 			// try to get legacy and new format key at once
 			var jsonKeyValList []string
 			jsonKeyValList, err = b.store.GetMultiKey(
 				[]string{
-					generateToken(b.orgID, keyName),
+					generateToken(orgID, keyName),
 					keyName,
 				},
 			)

@@ -9,55 +9,26 @@ import (
 
 	"github.com/TykTechnologies/tyk/rpc"
 
-	"github.com/garyburd/redigo/redis"
-
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/go-redis/redis"
 
 	"github.com/sirupsen/logrus"
 )
-
-type InboundData struct {
-	KeyName      string
-	Value        string
-	SessionState string
-	Timeout      int64
-	Per          int64
-	Expire       int64
-}
-
-type DefRequest struct {
-	OrgId string
-	Tags  []string
-}
-
-type KeysValuesPair struct {
-	Keys   []string
-	Values []string
-}
-
-type GroupLoginRequest struct {
-	UserKey string
-	GroupID string
-}
-
-type GroupKeySpaceRequest struct {
-	OrgID   string
-	GroupID string
-}
 
 var (
 	dispatcherFuncs = map[string]interface{}{
 		"Login": func(clientAddr, userKey string) bool {
 			return false
 		},
-		"LoginWithGroup": func(clientAddr string, groupData *GroupLoginRequest) bool {
+		"LoginWithGroup": func(clientAddr string, groupData *apidef.GroupLoginRequest) bool {
 			return false
 		},
 		"GetKey": func(keyName string) (string, error) {
 			return "", nil
 		},
-		"SetKey": func(ibd *InboundData) error {
+		"SetKey": func(ibd *apidef.InboundData) error {
 			return nil
 		},
 		"GetExp": func(keyName string) (int64, error) {
@@ -72,10 +43,10 @@ var (
 		"DeleteRawKey": func(keyName string) (bool, error) {
 			return true, nil
 		},
-		"GetKeysAndValues": func(searchString string) (*KeysValuesPair, error) {
+		"GetKeysAndValues": func(searchString string) (*apidef.KeysValuesPair, error) {
 			return nil, nil
 		},
-		"GetKeysAndValuesWithFilter": func(searchString string) (*KeysValuesPair, error) {
+		"GetKeysAndValuesWithFilter": func(searchString string) (*apidef.KeysValuesPair, error) {
 			return nil, nil
 		},
 		"DeleteKeys": func(keys []string) (bool, error) {
@@ -84,16 +55,16 @@ var (
 		"Decrement": func(keyName string) error {
 			return nil
 		},
-		"IncrememntWithExpire": func(ibd *InboundData) (int64, error) {
+		"IncrememntWithExpire": func(ibd *apidef.InboundData) (int64, error) {
 			return 0, nil
 		},
-		"AppendToSet": func(ibd *InboundData) error {
+		"AppendToSet": func(ibd *apidef.InboundData) error {
 			return nil
 		},
-		"SetRollingWindow": func(ibd *InboundData) (int, error) {
+		"SetRollingWindow": func(ibd *apidef.InboundData) (int, error) {
 			return 0, nil
 		},
-		"GetApiDefinitions": func(dr *DefRequest) (string, error) {
+		"GetApiDefinitions": func(dr *apidef.DefRequest) (string, error) {
 			return "", nil
 		},
 		"GetPolicies": func(orgId string) (string, error) {
@@ -108,7 +79,7 @@ var (
 		"GetKeySpaceUpdate": func(clientAddr, orgId string) ([]string, error) {
 			return nil, nil
 		},
-		"GetGroupKeySpaceUpdate": func(clientAddr string, groupData *GroupKeySpaceRequest) ([]string, error) {
+		"GetGroupKeySpaceUpdate": func(clientAddr string, groupData *apidef.GroupKeySpaceRequest) ([]string, error) {
 			return nil, nil
 		},
 		"Ping": func() bool {
@@ -146,7 +117,7 @@ func (r *RPCStorageHandler) Connect() bool {
 		r.SuppressRegister,
 		dispatcherFuncs,
 		func(userKey string, groupID string) interface{} {
-			return GroupLoginRequest{
+			return apidef.GroupLoginRequest{
 				UserKey: userKey,
 				GroupID: groupID,
 			}
@@ -231,7 +202,13 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 }
 
 func (r *RPCStorageHandler) GetMultiKey(keyNames []string) ([]string, error) {
-	log.Warning("RPCStorageHandler.GetMultiKey - Not implemented")
+	for _, key := range keyNames {
+		if value, err := r.GetKey(key); err != nil {
+			return nil, err
+		} else {
+			return []string{value}, nil
+		}
+	}
 
 	return nil, nil
 }
@@ -268,7 +245,7 @@ func (r *RPCStorageHandler) SetExp(keyName string, timeout int64) error {
 // SetKey will create (or update) a key value in the store
 func (r *RPCStorageHandler) SetKey(keyName, session string, timeout int64) error {
 	start := time.Now() // get current time
-	ibd := InboundData{
+	ibd := apidef.InboundData{
 		KeyName:      r.fixKey(keyName),
 		SessionState: session,
 		Timeout:      timeout,
@@ -331,7 +308,7 @@ func (r *RPCStorageHandler) Decrement(keyName string) {
 // IncrementWithExpire will increment a key in redis
 func (r *RPCStorageHandler) IncrememntWithExpire(keyName string, expire int64) int64 {
 
-	ibd := InboundData{
+	ibd := apidef.InboundData{
 		KeyName: keyName,
 		Expire:  expire,
 	}
@@ -396,8 +373,8 @@ func (r *RPCStorageHandler) GetKeysAndValuesWithFilter(filter string) map[string
 
 	returnValues := make(map[string]string)
 
-	for i, v := range kvPair.(*KeysValuesPair).Keys {
-		returnValues[r.cleanKey(v)] = kvPair.(*KeysValuesPair).Values[i]
+	for i, v := range kvPair.(*apidef.KeysValuesPair).Keys {
+		returnValues[r.cleanKey(v)] = kvPair.(*apidef.KeysValuesPair).Values[i]
 	}
 
 	return returnValues
@@ -422,8 +399,8 @@ func (r *RPCStorageHandler) GetKeysAndValues() map[string]string {
 	}
 
 	returnValues := make(map[string]string)
-	for i, v := range kvPair.(*KeysValuesPair).Keys {
-		returnValues[r.cleanKey(v)] = kvPair.(*KeysValuesPair).Values[i]
+	for i, v := range kvPair.(*apidef.KeysValuesPair).Keys {
+		returnValues[r.cleanKey(v)] = kvPair.(*apidef.KeysValuesPair).Values[i]
 	}
 
 	return returnValues
@@ -455,6 +432,11 @@ func (r *RPCStorageHandler) DeleteKey(keyName string) bool {
 	}
 
 	return ok == true
+}
+
+func (r *RPCStorageHandler) DeleteAllKeys() bool {
+	log.Warning("Not implementated")
+	return false
 }
 
 // DeleteKey will remove a key from the database without prefixing, assumes user knows what they are doing
@@ -515,7 +497,7 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 }
 
 // StartPubSubHandler will listen for a signal and run the callback with the message
-func (r *RPCStorageHandler) StartPubSubHandler(channel string, callback func(redis.Message)) error {
+func (r *RPCStorageHandler) StartPubSubHandler(channel string, callback func(*redis.Message)) error {
 	log.Warning("RPCStorageHandler.StartPubSubHandler - NO PUBSUB DEFINED")
 	return nil
 }
@@ -531,7 +513,7 @@ func (r *RPCStorageHandler) GetAndDeleteSet(keyName string) []interface{} {
 }
 
 func (r *RPCStorageHandler) AppendToSet(keyName, value string) {
-	ibd := InboundData{
+	ibd := apidef.InboundData{
 		KeyName: keyName,
 		Value:   value,
 	}
@@ -554,18 +536,10 @@ func (r *RPCStorageHandler) AppendToSet(keyName, value string) {
 	}
 }
 
-func (r *RPCStorageHandler) AppendToSetPipelined(key string, values []string) {
-	// just falls back to AppendToSet
-	// TODO: introduce new RPC method for pipelined operation
-	for _, val := range values {
-		r.AppendToSet(key, val)
-	}
-}
-
 // SetScrollingWindow is used in the rate limiter to handle rate limits fairly.
 func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, val string, pipeline bool) (int, []interface{}) {
 	start := time.Now() // get current time
-	ibd := InboundData{
+	ibd := apidef.InboundData{
 		KeyName: keyName,
 		Per:     per,
 		Expire:  -1,
@@ -629,7 +603,7 @@ func (r RPCStorageHandler) IsAccessError(err error) bool {
 
 // GetAPIDefinitions will pull API definitions from the RPC server
 func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) string {
-	dr := DefRequest{
+	dr := apidef.DefRequest{
 		OrgId: orgId,
 		Tags:  tags,
 	}
@@ -778,7 +752,7 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 		reqData["orgId"] = orgId
 	} else {
 		funcName = "GetGroupKeySpaceUpdate"
-		req = GroupKeySpaceRequest{
+		req = apidef.GroupKeySpaceRequest{
 			OrgID:   orgId,
 			GroupID: groupID,
 		}

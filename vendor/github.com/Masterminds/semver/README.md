@@ -147,6 +147,7 @@ The caret (`^`) comparison operator is for major level changes. This is useful
 when comparisons of API versions as a major change is API breaking. For example,
 
 * `^1.2.3` is equivalent to `>= 1.2.3, < 2.0.0`
+* `^0.0.1` is equivalent to `>= 0.0.1, < 1.0.0`
 * `^1.2.x` is equivalent to `>= 1.2.0, < 2.0.0`
 * `^2.3` is equivalent to `>= 2.3, < 3`
 * `^2.x` is equivalent to `>= 2.0.0, < 3`
@@ -179,6 +180,13 @@ version didn't meet the constraint is returned. For example,
         // "1.3 is less than 1.4"
     }
 ```
+
+# Fuzzing
+
+ [dvyukov/go-fuzz](https://github.com/dvyukov/go-fuzz) is used for fuzzing.
+
+1. `go-fuzz-build`
+2. `go-fuzz -workdir=fuzz`
 
 # Contribute
 

@@ -12,26 +12,20 @@ env:
 addons:
   apt:
     packages:
-    - python3.5
     - python3-pip
     - libluajit-5.1-dev
 
 matrix:
   include:
-    - go: 1.10.x
-    - go: 1.11.x
-      env: LATEST_GO=true # run linters and report coverage
-
+    - go: 1.12.x
 
 services:
   - redis-server
 
 install:
-  - go get
-  - go install ./...
-    # As of 1.9, ./... no longer includes ./vendor/...
-  - go install ./vendor/{golang.org/x/tools/cmd/goimports,github.com/wadey/gocovmerge,github.com/mattn/goveralls}
-  - go get github.com/go-swagger/go-swagger/cmd/swagger
+  - go get golang.org/x/tools/cmd/goimports
+  - go get github.com/wadey/gocovmerge
+  - go get github.com/mattn/goveralls
 
 script:
   - pip3 install setuptools
@@ -44,10 +38,7 @@ script:
   - curl -sL https://deb.nodesource.com/setup_11.x | sudo -E bash -
   - sudo -E apt-get -yq --no-install-suggests --no-install-recommends $(travis_apt_get_options) install nodejs
   - sudo npm install -g api-spec-converter --unsafe-perm=true --allow-root
-  - go build -tags 'coprocess python'
   - go build -tags 'coprocess lua'
-  - go build -tags 'coprocess grpc'
-  - ./bin/ci-swagger.sh
-  - ./bin/ci-test.sh
+  - ./bin/ci-tests.sh
   - if [[ $LATEST_GO ]]; then goveralls -coverprofile=<(gocovmerge *.cov); fi
   - ./bin/ci-benchmark.sh

@@ -1,6 +1,3 @@
-// +build coprocess
-// +build grpc
-
 package grpc
 
 import (
@@ -127,7 +124,7 @@ func loadTestGRPCAPIs() {
 	gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 		spec.APIID = "1"
 		spec.OrgID = gateway.MockOrgID
-		spec.Auth = apidef.Auth{
+		spec.Auth = apidef.AuthConfig{
 			AuthHeaderName: "authorization",
 		}
 		spec.UseKeylessAccess = false
@@ -154,7 +151,7 @@ func loadTestGRPCAPIs() {
 	}, func(spec *gateway.APISpec) {
 		spec.APIID = "2"
 		spec.OrgID = gateway.MockOrgID
-		spec.Auth = apidef.Auth{
+		spec.Auth = apidef.AuthConfig{
 			AuthHeaderName: "authorization",
 		}
 		spec.UseKeylessAccess = true
@@ -181,7 +178,7 @@ func loadTestGRPCAPIs() {
 	}, func(spec *gateway.APISpec) {
 		spec.APIID = "3"
 		spec.OrgID = "default"
-		spec.Auth = apidef.Auth{
+		spec.Auth = apidef.AuthConfig{
 			AuthHeaderName: "authorization",
 		}
 		spec.UseKeylessAccess = false
@@ -209,7 +206,7 @@ func loadTestGRPCAPIs() {
 		func(spec *gateway.APISpec) {
 			spec.APIID = "4"
 			spec.OrgID = "default"
-			spec.Auth = apidef.Auth{
+			spec.Auth = apidef.AuthConfig{
 				AuthHeaderName: "authorization",
 			}
 			spec.UseKeylessAccess = false

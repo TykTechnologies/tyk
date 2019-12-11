@@ -224,24 +224,31 @@ type answers struct {
 	cancel         func()
 }
 
-func (a *answers) onFail(_ HostHealthReport) {
+func (a *answers) onFail(_ context.Context, _ HostHealthReport) {
 	defer a.cancel()
 	a.mu.Lock()
 	a.fail = true
 	a.mu.Unlock()
 }
 
-func (a *answers) onPing(_ HostHealthReport) {
+func (a *answers) onPing(_ context.Context, _ HostHealthReport) {
 	defer a.cancel()
 	a.mu.Lock()
 	a.ping = true
 	a.mu.Unlock()
 }
-func (a *answers) onUp(_ HostHealthReport) {
+func (a *answers) onUp(_ context.Context, _ HostHealthReport) {
 	defer a.cancel()
 	a.mu.Lock()
 	a.up = true
 	a.mu.Unlock()
+}
+func (a *answers) cb() HostCheckCallBacks {
+	return HostCheckCallBacks{
+		Up:   a.onUp,
+		Ping: a.onPing,
+		Fail: a.onFail,
+	}
 }
 
 func TestTestCheckerTCPHosts_correct_answers(t *testing.T) {
@@ -287,12 +294,10 @@ func TestTestCheckerTCPHosts_correct_answers(t *testing.T) {
 	hs.Init(1, 1, 0, map[string]HostData{
 		l.Addr().String(): data,
 	},
-		ans.onFail,
-		ans.onUp,
-		ans.onPing,
+		ans.cb(),
 	)
 	hs.sampleTriggerLimit = 1
-	go hs.Start()
+	go hs.Start(ctx)
 	<-ctx.Done()
 	hs.Stop()
 	setTestMode(true)
@@ -345,14 +350,11 @@ func TestTestCheckerTCPHosts_correct_answers_proxy_protocol(t *testing.T) {
 	hs.Init(1, 1, 0, map[string]HostData{
 		l.Addr().String(): data,
 	},
-		ans.onFail,
-		ans.onUp,
-		ans.onPing,
+		ans.cb(),
 	)
 	hs.sampleTriggerLimit = 1
-	go hs.Start()
+	go hs.Start(ctx)
 	<-ctx.Done()
-	hs.Stop()
 	setTestMode(true)
 	if !(ans.ping && !ans.fail && !ans.up) {
 		t.Errorf("expected the host to be up : field:%v up:%v pinged:%v", ans.fail, ans.up, ans.ping)
@@ -397,17 +399,16 @@ func TestTestCheckerTCPHosts_correct_wrong_answers(t *testing.T) {
 	hs.Init(1, 1, 0, map[string]HostData{
 		l.Addr().String(): data,
 	},
-		func(HostHealthReport) {
-			failed = true
-			cancel()
+		HostCheckCallBacks{
+			Fail: func(_ context.Context, _ HostHealthReport) {
+				failed = true
+				cancel()
+			},
 		},
-		func(HostHealthReport) {},
-		func(HostHealthReport) {},
 	)
 	hs.sampleTriggerLimit = 1
-	go hs.Start()
+	go hs.Start(ctx)
 	<-ctx.Done()
-	hs.Stop()
 	setTestMode(true)
 	if !failed {
 		t.Error("expected the host check to fai")

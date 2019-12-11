@@ -1,5 +1,3 @@
-// +build coprocess
-
 package gateway
 
 import (
@@ -44,7 +42,8 @@ func (l *CoProcessEventHandler) Init(handlerConf interface{}) error {
 }
 
 func (l *CoProcessEventHandler) HandleEvent(em config.EventMessage) {
-	if GlobalDispatcher == nil {
+	dispatcher := loadedDrivers[l.Spec.CustomMiddleware.Driver]
+	if dispatcher == nil {
 		return
 	}
 	eventWrapper := CoProcessEventWrapper{
@@ -59,5 +58,5 @@ func (l *CoProcessEventHandler) HandleEvent(em config.EventMessage) {
 		log.Error("Failed to encode event data: ", err)
 		return
 	}
-	GlobalDispatcher.DispatchEvent(msgAsJSON)
+	dispatcher.DispatchEvent(msgAsJSON)
 }

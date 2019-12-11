@@ -1,6 +1,7 @@
 package sprig
 
 import (
+	"fmt"
 	"math"
 	"reflect"
 	"strconv"
@@ -156,4 +157,13 @@ func round(a interface{}, p int, r_opt ...float64) float64 {
 		round = math.Floor(digit)
 	}
 	return round / pow
+}
+
+// converts unix octal to decimal
+func toDecimal(v interface{}) int64 {
+	result, err := strconv.ParseInt(fmt.Sprint(v), 8, 64)
+	if err != nil {
+		return 0
+	}
+	return result
 }

@@ -49,6 +49,32 @@
           "type": "string"
         }
       }
+    },
+    "PortWhiteList": {
+      "type": [
+        "object"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "ranges": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "from": {
+              "type": "integer"
+            },
+            "to": {
+              "type": "integer"
+            }
+          }
+        },
+        "ports": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        }
+      }
     }
   },
   "properties": {
@@ -188,6 +214,9 @@
           "type": "boolean"
         },
         "python_path_prefix": {
+          "type": "string"
+        },
+        "python_version": {
           "type": "string"
         }
       }
@@ -530,6 +559,9 @@
     "oauth_token_expired_retain_period": {
       "type": "integer"
     },
+    "oauth_error_status_code": {
+      "type": "integer"
+    },
     "optimisations_use_async_session_write": {
       "type": "boolean"
     },
@@ -561,17 +593,27 @@
         }
       }
     },
-    "disabled_ports": {
-      "type": ["array", "null"],
-      "items": {
-        "type": ["object"],
-        "properties": {
-          "protocol": {
-            "type": "string"
-          },
-          "port": {
-            "type": "number"
-          }
+    "disable_ports_whitelist": {
+      "type": "boolean"
+    },
+    "ports_whitelist": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "http": {
+          "$ref": "#/definitions/PortWhiteList"
+        },
+        "https": {
+          "$ref": "#/definitions/PortWhiteList"
+        },
+        "tcp": {
+          "$ref": "#/definitions/PortWhiteList"
+        },
+        "tls": {
+          "$ref": "#/definitions/PortWhiteList"
         }
       }
     },
@@ -820,6 +862,9 @@
     },
     "enable_http_profiler": {
       "type": "boolean"
+    },
+    "ssl_force_common_name_check":{
+	    "type":"boolean"
     }
   },
   "liveness_check": {

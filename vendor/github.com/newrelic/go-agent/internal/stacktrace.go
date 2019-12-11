@@ -4,70 +4,84 @@ import (
 	"bytes"
 	"path"
 	"runtime"
+	"strings"
 )
 
 // StackTrace is a stack trace.
 type StackTrace []uintptr
 
 // GetStackTrace returns a new StackTrace.
-func GetStackTrace(skipFrames int) StackTrace {
-	skip := 2 // skips runtime.Callers and this function
-	skip += skipFrames
-
+func GetStackTrace() StackTrace {
+	skip := 1 // skip runtime.Callers
 	callers := make([]uintptr, maxStackTraceFrames)
 	written := runtime.Callers(skip, callers)
-	return StackTrace(callers[0:written])
+	return callers[:written]
 }
 
-func pcToFunc(pc uintptr) (*runtime.Func, uintptr) {
-	// The Golang runtime package documentation says "To look up the file
-	// and line number of the call itself, use pc[i]-1. As an exception to
-	// this rule, if pc[i-1] corresponds to the function runtime.sigpanic,
-	// then pc[i] is the program counter of a faulting instruction and
-	// should be used without any subtraction."
-	//
-	// TODO: Fully understand when this subtraction is necessary.
-	place := pc - 1
-	return runtime.FuncForPC(place), place
+type stacktraceFrame struct {
+	Name string
+	File string
+	Line int64
 }
 
-func topCallerNameBase(st StackTrace) string {
-	f, _ := pcToFunc(st[0])
-	if nil == f {
-		return ""
+func (f stacktraceFrame) formattedName() string {
+	if strings.HasPrefix(f.Name, "go.") {
+		// This indicates an anonymous struct. eg.
+		// "go.(*struct { github.com/newrelic/go-agent.threadWithExtras }).NoticeError"
+		return f.Name
 	}
-	return path.Base(f.Name())
+	return path.Base(f.Name)
+}
+
+func (f stacktraceFrame) isAgent() bool {
+	// Note this is not a contains conditional rather than a prefix
+	// conditional to handle anonymous functions like:
+	// "go.(*struct { github.com/newrelic/go-agent.threadWithExtras }).NoticeError"
+	return strings.Contains(f.Name, "github.com/newrelic/go-agent/internal.") ||
+		strings.Contains(f.Name, "github.com/newrelic/go-agent.")
+}
+
+func (f stacktraceFrame) WriteJSON(buf *bytes.Buffer) {
+	buf.WriteByte('{')
+	w := jsonFieldsWriter{buf: buf}
+	if f.Name != "" {
+		w.stringField("name", f.formattedName())
+	}
+	if f.File != "" {
+		w.stringField("filepath", f.File)
+	}
+	if f.Line != 0 {
+		w.intField("line", f.Line)
+	}
+	buf.WriteByte('}')
+}
+
+func writeFrames(buf *bytes.Buffer, frames []stacktraceFrame) {
+	// Remove top agent frames.
+	for len(frames) > 0 && frames[0].isAgent() {
+		frames = frames[1:]
+	}
+	// Truncate excessively long stack traces (they may be provided by the
+	// customer).
+	if len(frames) > maxStackTraceFrames {
+		frames = frames[0:maxStackTraceFrames]
+	}
+
+	buf.WriteByte('[')
+	for idx, frame := range frames {
+		if idx > 0 {
+			buf.WriteByte(',')
+		}
+		frame.WriteJSON(buf)
+	}
+	buf.WriteByte(']')
 }
 
 // WriteJSON adds the stack trace to the buffer in the JSON form expected by the
 // collector.
 func (st StackTrace) WriteJSON(buf *bytes.Buffer) {
-	buf.WriteByte('[')
-	for i, pc := range st {
-		// Stack traces may be provided by the customer, and therefore
-		// may be excessively long.  The truncation is done here to
-		// facilitate testing.
-		if i >= maxStackTraceFrames {
-			break
-		}
-		if i > 0 {
-			buf.WriteByte(',')
-		}
-		// Implements the format documented here:
-		// https://source.datanerd.us/agents/agent-specs/blob/master/Stack-Traces.md
-		buf.WriteByte('{')
-		if f, place := pcToFunc(pc); nil != f {
-			name := path.Base(f.Name())
-			file, line := f.FileLine(place)
-
-			w := jsonFieldsWriter{buf: buf}
-			w.stringField("filepath", file)
-			w.stringField("name", name)
-			w.intField("line", int64(line))
-		}
-		buf.WriteByte('}')
-	}
-	buf.WriteByte(']')
+	frames := st.frames()
+	writeFrames(buf, frames)
 }
 
 // MarshalJSON prepares JSON in the format expected by the collector.

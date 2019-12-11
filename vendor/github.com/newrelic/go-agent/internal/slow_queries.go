@@ -11,24 +11,23 @@ import (
 
 type queryParameters map[string]interface{}
 
-func vetQueryParameters(params map[string]interface{}) queryParameters {
+func vetQueryParameters(params map[string]interface{}) (queryParameters, error) {
 	if nil == params {
-		return nil
+		return nil, nil
 	}
 	// Copying the parameters into a new map is safer than modifying the map
 	// from the customer.
 	vetted := make(map[string]interface{})
+	var retErr error
 	for key, val := range params {
-		if err := validAttributeKey(key); nil != err {
-			continue
-		}
-		val = truncateStringValueIfLongInterface(val)
-		if err := valueIsValid(val); nil != err {
+		val, err := ValidateUserAttribute(key, val)
+		if nil != err {
+			retErr = err
 			continue
 		}
 		vetted[key] = val
 	}
-	return queryParameters(vetted)
+	return queryParameters(vetted), retErr
 }
 
 func (q queryParameters) WriteJSON(buf *bytes.Buffer) {
@@ -55,10 +54,7 @@ type slowQueryInstance struct {
 	DatabaseName       string
 	StackTrace         StackTrace
 
-	// Fields populated when merging into the harvest:
-
-	TxnName string
-	TxnURL  string
+	TxnEvent
 }
 
 // Aggregation is performed to avoid reporting multiple slow queries with same
@@ -109,11 +105,10 @@ func newSlowQueries(max int) *slowQueries {
 }
 
 // Merge is used to merge slow queries from the transaction into the harvest.
-func (slows *slowQueries) Merge(other *slowQueries, txnName, txnURL string) {
+func (slows *slowQueries) Merge(other *slowQueries, txnEvent TxnEvent) {
 	for _, s := range other.priorityQueue {
 		cp := *s
-		cp.TxnName = txnName
-		cp.TxnURL = txnURL
+		cp.TxnEvent = txnEvent
 		slows.observe(cp)
 	}
 }
@@ -182,9 +177,14 @@ func makeSlowQueryID(query string) uint32 {
 
 func (slow *slowQuery) WriteJSON(buf *bytes.Buffer) {
 	buf.WriteByte('[')
-	jsonx.AppendString(buf, slow.TxnName)
+	jsonx.AppendString(buf, slow.TxnEvent.FinalName)
 	buf.WriteByte(',')
-	jsonx.AppendString(buf, slow.TxnURL)
+	// Include request.uri if it is included in any destination.
+	// TODO: Change this to the transaction trace segment destination
+	// once transaction trace segment attribute configuration has been
+	// added.
+	uri, _ := slow.TxnEvent.Attrs.GetAgentValue(attributeRequestURI, DestAll)
+	jsonx.AppendString(buf, uri)
 	buf.WriteByte(',')
 	jsonx.AppendInt(buf, int64(makeSlowQueryID(slow.ParameterizedQuery)))
 	buf.WriteByte(',')
@@ -217,6 +217,9 @@ func (slow *slowQuery) WriteJSON(buf *bytes.Buffer) {
 	if nil != slow.QueryParameters {
 		w.writerField("query_parameters", slow.QueryParameters)
 	}
+
+	sharedBetterCATIntrinsics(&slow.TxnEvent, &w)
+
 	buf.WriteByte('}')
 	buf.WriteByte(']')
 }
@@ -251,4 +254,8 @@ func (slows *slowQueries) Data(agentRunID string, harvestStart time.Time) ([]byt
 }
 
 func (slows *slowQueries) MergeIntoHarvest(newHarvest *Harvest) {
+}
+
+func (slows *slowQueries) EndpointMethod() string {
+	return cmdSlowSQLs
 }

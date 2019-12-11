@@ -36,19 +36,27 @@ func TxnErrorFromPanic(now time.Time, v interface{}) ErrorData {
 
 // TxnErrorFromResponseCode creates a new TxnError from an http response code.
 func TxnErrorFromResponseCode(now time.Time, code int) ErrorData {
+	codeStr := strconv.Itoa(code)
+	msg := http.StatusText(code)
+	if msg == "" {
+		// Use a generic message if the code was not an http code
+		// to support gRPC.
+		msg = "response code " + codeStr
+	}
 	return ErrorData{
 		When:  now,
-		Msg:   http.StatusText(code),
-		Klass: strconv.Itoa(code),
+		Msg:   msg,
+		Klass: codeStr,
 	}
 }
 
 // ErrorData contains the information about a recorded error.
 type ErrorData struct {
-	When  time.Time
-	Stack StackTrace
-	Msg   string
-	Klass string
+	When            time.Time
+	Stack           StackTrace
+	ExtraAttributes map[string]interface{}
+	Msg             string
+	Klass           string
 }
 
 // TxnError combines error data with information about a transaction.  TxnError is used for
@@ -97,22 +105,16 @@ func (h *tracedError) WriteJSON(buf *bytes.Buffer) {
 	buf.WriteByte(',')
 	buf.WriteString(`"userAttributes"`)
 	buf.WriteByte(':')
-	userAttributesJSON(h.Attrs, buf, destError)
+	userAttributesJSON(h.Attrs, buf, destError, h.ErrorData.ExtraAttributes)
 	buf.WriteByte(',')
 	buf.WriteString(`"intrinsics"`)
 	buf.WriteByte(':')
-	buf.WriteString("{}")
+	intrinsicsJSON(&h.TxnEvent, buf)
 	if nil != h.Stack {
 		buf.WriteByte(',')
 		buf.WriteString(`"stack_trace"`)
 		buf.WriteByte(':')
 		h.Stack.WriteJSON(buf)
-	}
-	if h.CleanURL != "" {
-		buf.WriteByte(',')
-		buf.WriteString(`"request_uri"`)
-		buf.WriteByte(':')
-		jsonx.AppendString(buf, h.CleanURL)
 	}
 	buf.WriteByte('}')
 
@@ -167,3 +169,7 @@ func (errors harvestErrors) Data(agentRunID string, harvestStart time.Time) ([]b
 }
 
 func (errors harvestErrors) MergeIntoHarvest(h *Harvest) {}
+
+func (errors harvestErrors) EndpointMethod() string {
+	return cmdErrorData
+}

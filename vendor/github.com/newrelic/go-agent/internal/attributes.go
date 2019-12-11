@@ -2,34 +2,117 @@ package internal
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
 )
 
+// AgentAttributeID uniquely identifies each agent attribute.
+type AgentAttributeID int
+
 // New agent attributes must be added in the following places:
 // * Constants here.
 // * Top level attributes.go file.
-// * agentAttributes
-// * agentAttributeDests
-// * calculateAgentAttributeDests
-// * writeAgentAttributes
+// * agentAttributeInfo
 const (
-	responseCode          = "httpResponseCode"
-	requestMethod         = "request.method"
-	requestAccept         = "request.headers.accept"
-	requestContentType    = "request.headers.contentType"
-	requestContentLength  = "request.headers.contentLength"
-	requestHost           = "request.headers.host"
-	responseContentType   = "response.headers.contentType"
-	responseContentLength = "response.headers.contentLength"
-	hostDisplayName       = "host.displayName"
-	requestUserAgent      = "request.headers.User-Agent"
-	requestReferer        = "request.headers.referer"
+	AttributeHostDisplayName AgentAttributeID = iota
+	attributeRequestMethod
+	attributeRequestAcceptHeader
+	attributeRequestContentType
+	attributeRequestContentLength
+	attributeRequestHeadersHost
+	attributeRequestHeadersUserAgent
+	attributeRequestHeadersReferer
+	attributeRequestURI
+	attributeResponseHeadersContentType
+	attributeResponseHeadersContentLength
+	attributeResponseCode
+	AttributeAWSRequestID
+	AttributeAWSLambdaARN
+	AttributeAWSLambdaColdStart
+	AttributeAWSLambdaEventSourceARN
 )
+
+// SpanAttribute is an attribute put in span events.
+type SpanAttribute string
+
+// AddAgentSpanAttributer should be implemented by the Transaction.
+type AddAgentSpanAttributer interface {
+	AddAgentSpanAttribute(key SpanAttribute, val string)
+}
+
+// AddAgentSpanAttribute allows instrumentation packages to add span attributes.
+func AddAgentSpanAttribute(txn interface{}, key SpanAttribute, val string) {
+	if aa, ok := txn.(AddAgentSpanAttributer); ok {
+		aa.AddAgentSpanAttribute(key, val)
+	}
+}
+
+// These span event string constants must match the contents of the top level
+// attributes.go file.
+const (
+	spanAttributeDBStatement  SpanAttribute = "db.statement"
+	spanAttributeDBInstance   SpanAttribute = "db.instance"
+	spanAttributeDBCollection SpanAttribute = "db.collection"
+	spanAttributePeerAddress  SpanAttribute = "peer.address"
+	spanAttributePeerHostname SpanAttribute = "peer.hostname"
+	spanAttributeHTTPURL      SpanAttribute = "http.url"
+	spanAttributeHTTPMethod   SpanAttribute = "http.method"
+	// query parameters only appear in segments, not span events, but is
+	// listed as span attributes to simplify code.
+	spanAttributeQueryParameters SpanAttribute = "query_parameters"
+	// These span attributes are added by aws sdk instrumentation.
+	// https://source.datanerd.us/agents/agent-specs/blob/master/implementation_guides/aws-sdk.md#span-and-segment-attributes
+	SpanAttributeAWSOperation SpanAttribute = "aws.operation"
+	SpanAttributeAWSRequestID SpanAttribute = "aws.requestId"
+	SpanAttributeAWSRegion    SpanAttribute = "aws.region"
+)
+
+func (sa SpanAttribute) String() string { return string(sa) }
+
+var (
+	usualDests         = DestAll &^ destBrowser
+	tracesDests        = destTxnTrace | destError
+	agentAttributeInfo = map[AgentAttributeID]struct {
+		name         string
+		defaultDests destinationSet
+	}{
+		AttributeHostDisplayName:              {name: "host.displayName", defaultDests: usualDests},
+		attributeRequestMethod:                {name: "request.method", defaultDests: usualDests},
+		attributeRequestAcceptHeader:          {name: "request.headers.accept", defaultDests: usualDests},
+		attributeRequestContentType:           {name: "request.headers.contentType", defaultDests: usualDests},
+		attributeRequestContentLength:         {name: "request.headers.contentLength", defaultDests: usualDests},
+		attributeRequestHeadersHost:           {name: "request.headers.host", defaultDests: usualDests},
+		attributeRequestHeadersUserAgent:      {name: "request.headers.User-Agent", defaultDests: tracesDests},
+		attributeRequestHeadersReferer:        {name: "request.headers.referer", defaultDests: tracesDests},
+		attributeRequestURI:                   {name: "request.uri", defaultDests: usualDests},
+		attributeResponseHeadersContentType:   {name: "response.headers.contentType", defaultDests: usualDests},
+		attributeResponseHeadersContentLength: {name: "response.headers.contentLength", defaultDests: usualDests},
+		attributeResponseCode:                 {name: "httpResponseCode", defaultDests: usualDests},
+		AttributeAWSRequestID:                 {name: "aws.requestId", defaultDests: usualDests},
+		AttributeAWSLambdaARN:                 {name: "aws.lambda.arn", defaultDests: usualDests},
+		AttributeAWSLambdaColdStart:           {name: "aws.lambda.coldStart", defaultDests: usualDests},
+		AttributeAWSLambdaEventSourceARN:      {name: "aws.lambda.eventSource.arn", defaultDests: usualDests},
+	}
+	spanAttributes = []SpanAttribute{
+		spanAttributeDBStatement,
+		spanAttributeDBInstance,
+		spanAttributeDBCollection,
+		spanAttributePeerAddress,
+		spanAttributePeerHostname,
+		spanAttributeHTTPURL,
+		spanAttributeHTTPMethod,
+		spanAttributeQueryParameters,
+		SpanAttributeAWSOperation,
+		SpanAttributeAWSRequestID,
+		SpanAttributeAWSRegion,
+	}
+)
+
+func (id AgentAttributeID) name() string { return agentAttributeInfo[id].name }
 
 // https://source.datanerd.us/agents/agent-specs/blob/master/Agent-Attributes-PORTED.md
 
@@ -48,12 +131,14 @@ const (
 	destError
 	destTxnTrace
 	destBrowser
+	destSpan
+	destSegment
 )
 
 const (
 	destNone destinationSet = 0
 	// DestAll contains all destinations.
-	DestAll destinationSet = destTxnEvent | destTxnTrace | destError | destBrowser
+	DestAll destinationSet = destTxnEvent | destTxnTrace | destError | destBrowser | destSpan | destSegment
 )
 
 const (
@@ -71,8 +156,7 @@ func (m byMatch) Len() int           { return len(m) }
 func (m byMatch) Swap(i, j int)      { m[i], m[j] = m[j], m[i] }
 func (m byMatch) Less(i, j int) bool { return m[i].match < m[j].match }
 
-// AttributeConfig is created at application creation and shared between all
-// transactions.
+// AttributeConfig is created at connect and shared between all transactions.
 type AttributeConfig struct {
 	disabledDestinations destinationSet
 	exactMatchModifiers  map[string]*attributeModifier
@@ -80,7 +164,8 @@ type AttributeConfig struct {
 	// lexicographical order.  Modifiers appearing later have precedence
 	// over modifiers appearing earlier.
 	wildcardModifiers []*attributeModifier
-	agentDests        agentAttributeDests
+	agentDests        map[AgentAttributeID]destinationSet
+	spanDests         map[SpanAttribute]destinationSet
 }
 
 type includeExclude struct {
@@ -150,12 +235,14 @@ func addModifier(c *AttributeConfig, match string, d includeExclude) {
 	}
 }
 
-func processDest(c *AttributeConfig, dc *AttributeDestinationConfig, d destinationSet) {
+func processDest(c *AttributeConfig, includeEnabled bool, dc *AttributeDestinationConfig, d destinationSet) {
 	if !dc.Enabled {
 		c.disabledDestinations |= d
 	}
-	for _, match := range dc.Include {
-		addModifier(c, match, includeExclude{include: d})
+	if includeEnabled {
+		for _, match := range dc.Include {
+			addModifier(c, match, includeExclude{include: d})
+		}
 	}
 	for _, match := range dc.Exclude {
 		addModifier(c, match, includeExclude{exclude: d})
@@ -168,8 +255,10 @@ type AttributeConfigInput struct {
 	Attributes        AttributeDestinationConfig
 	ErrorCollector    AttributeDestinationConfig
 	TransactionEvents AttributeDestinationConfig
-	browserMonitoring AttributeDestinationConfig
+	BrowserMonitoring AttributeDestinationConfig
 	TransactionTracer AttributeDestinationConfig
+	SpanEvents        AttributeDestinationConfig
+	TraceSegments     AttributeDestinationConfig
 }
 
 var (
@@ -178,25 +267,37 @@ var (
 		ErrorCollector:    AttributeDestinationConfig{Enabled: true},
 		TransactionEvents: AttributeDestinationConfig{Enabled: true},
 		TransactionTracer: AttributeDestinationConfig{Enabled: true},
+		BrowserMonitoring: AttributeDestinationConfig{Enabled: true},
+		SpanEvents:        AttributeDestinationConfig{Enabled: true},
+		TraceSegments:     AttributeDestinationConfig{Enabled: true},
 	}
 )
 
 // CreateAttributeConfig creates a new AttributeConfig.
-func CreateAttributeConfig(input AttributeConfigInput) *AttributeConfig {
+func CreateAttributeConfig(input AttributeConfigInput, includeEnabled bool) *AttributeConfig {
 	c := &AttributeConfig{
 		exactMatchModifiers: make(map[string]*attributeModifier),
 		wildcardModifiers:   make([]*attributeModifier, 0, 64),
 	}
 
-	processDest(c, &input.Attributes, DestAll)
-	processDest(c, &input.ErrorCollector, destError)
-	processDest(c, &input.TransactionEvents, destTxnEvent)
-	processDest(c, &input.TransactionTracer, destTxnTrace)
-	processDest(c, &input.browserMonitoring, destBrowser)
+	processDest(c, includeEnabled, &input.Attributes, DestAll)
+	processDest(c, includeEnabled, &input.ErrorCollector, destError)
+	processDest(c, includeEnabled, &input.TransactionEvents, destTxnEvent)
+	processDest(c, includeEnabled, &input.TransactionTracer, destTxnTrace)
+	processDest(c, includeEnabled, &input.BrowserMonitoring, destBrowser)
+	processDest(c, includeEnabled, &input.SpanEvents, destSpan)
+	processDest(c, includeEnabled, &input.TraceSegments, destSegment)
 
 	sort.Sort(byMatch(c.wildcardModifiers))
 
-	c.agentDests = calculateAgentAttributeDests(c)
+	c.agentDests = make(map[AgentAttributeID]destinationSet)
+	for id, info := range agentAttributeInfo {
+		c.agentDests[id] = applyAttributeConfig(c, info.name, info.defaultDests)
+	}
+	c.spanDests = make(map[SpanAttribute]destinationSet, len(spanAttributes))
+	for _, id := range spanAttributes {
+		c.spanDests[id] = applyAttributeConfig(c, id.String(), destSpan|destSegment)
+	}
 
 	return c
 }
@@ -206,6 +307,53 @@ type userAttribute struct {
 	dests destinationSet
 }
 
+type agentAttributeValue struct {
+	stringVal string
+	otherVal  interface{}
+}
+
+type agentAttributes map[AgentAttributeID]agentAttributeValue
+
+func (a *Attributes) filterSpanAttributes(s map[SpanAttribute]jsonWriter, d destinationSet) map[SpanAttribute]jsonWriter {
+	if nil != a {
+		for key := range s {
+			if a.config.spanDests[key]&d == 0 {
+				delete(s, key)
+			}
+		}
+	}
+	return s
+}
+
+// GetAgentValue is used to access agent attributes.  This function returns ("",
+// nil) if the attribute doesn't exist or it doesn't match the destinations
+// provided.
+func (a *Attributes) GetAgentValue(id AgentAttributeID, d destinationSet) (string, interface{}) {
+	if nil == a || 0 == a.config.agentDests[id]&d {
+		return "", nil
+	}
+	v, _ := a.Agent[id]
+	return v.stringVal, v.otherVal
+}
+
+// AddAgentAttributer allows instrumentation to add agent attributes without
+// exposing a Transaction method.
+type AddAgentAttributer interface {
+	AddAgentAttribute(id AgentAttributeID, stringVal string, otherVal interface{})
+}
+
+// Add is used to add agent attributes.  Only one of stringVal and
+// otherVal should be populated.  Since most agent attribute values are strings,
+// stringVal exists to avoid allocations.
+func (attr agentAttributes) Add(id AgentAttributeID, stringVal string, otherVal interface{}) {
+	if "" != stringVal || otherVal != nil {
+		attr[id] = agentAttributeValue{
+			stringVal: truncateStringValueIfLong(stringVal),
+			otherVal:  otherVal,
+		}
+	}
+}
+
 // Attributes are key value pairs attached to the various collected data types.
 type Attributes struct {
 	config *AttributeConfig
@@ -213,118 +361,22 @@ type Attributes struct {
 	Agent  agentAttributes
 }
 
-type agentAttributes struct {
-	HostDisplayName              string
-	RequestMethod                string
-	RequestAcceptHeader          string
-	RequestContentType           string
-	RequestContentLength         int
-	RequestHeadersHost           string
-	RequestHeadersUserAgent      string
-	RequestHeadersReferer        string
-	ResponseHeadersContentType   string
-	ResponseHeadersContentLength int
-	ResponseCode                 string
-}
-
-type agentAttributeDests struct {
-	HostDisplayName              destinationSet
-	RequestMethod                destinationSet
-	RequestAcceptHeader          destinationSet
-	RequestContentType           destinationSet
-	RequestContentLength         destinationSet
-	RequestHeadersHost           destinationSet
-	RequestHeadersUserAgent      destinationSet
-	RequestHeadersReferer        destinationSet
-	ResponseHeadersContentType   destinationSet
-	ResponseHeadersContentLength destinationSet
-	ResponseCode                 destinationSet
-}
-
-func calculateAgentAttributeDests(c *AttributeConfig) agentAttributeDests {
-	usual := DestAll &^ destBrowser
-	traces := destTxnTrace | destError
-	return agentAttributeDests{
-		HostDisplayName:              applyAttributeConfig(c, hostDisplayName, usual),
-		RequestMethod:                applyAttributeConfig(c, requestMethod, usual),
-		RequestAcceptHeader:          applyAttributeConfig(c, requestAccept, usual),
-		RequestContentType:           applyAttributeConfig(c, requestContentType, usual),
-		RequestContentLength:         applyAttributeConfig(c, requestContentLength, usual),
-		RequestHeadersHost:           applyAttributeConfig(c, requestHost, usual),
-		RequestHeadersUserAgent:      applyAttributeConfig(c, requestUserAgent, traces),
-		RequestHeadersReferer:        applyAttributeConfig(c, requestReferer, traces),
-		ResponseHeadersContentType:   applyAttributeConfig(c, responseContentType, usual),
-		ResponseHeadersContentLength: applyAttributeConfig(c, responseContentLength, usual),
-		ResponseCode:                 applyAttributeConfig(c, responseCode, usual),
-	}
-}
-
-type agentAttributeWriter struct {
-	jsonFieldsWriter
-	d destinationSet
-}
-
-func (w *agentAttributeWriter) writeString(name string, val string, d destinationSet) {
-	if "" != val && 0 != w.d&d {
-		w.stringField(name, truncateStringValueIfLong(val))
-	}
-}
-
-func (w *agentAttributeWriter) writeInt(name string, val int, d destinationSet) {
-	if val >= 0 && 0 != w.d&d {
-		w.intField(name, int64(val))
-	}
-}
-
-func writeAgentAttributes(buf *bytes.Buffer, d destinationSet, values agentAttributes, dests agentAttributeDests) {
-	w := &agentAttributeWriter{
-		jsonFieldsWriter: jsonFieldsWriter{buf: buf},
-		d:                d,
-	}
-	buf.WriteByte('{')
-	w.writeString(hostDisplayName, values.HostDisplayName, dests.HostDisplayName)
-	w.writeString(requestMethod, values.RequestMethod, dests.RequestMethod)
-	w.writeString(requestAccept, values.RequestAcceptHeader, dests.RequestAcceptHeader)
-	w.writeString(requestContentType, values.RequestContentType, dests.RequestContentType)
-	w.writeInt(requestContentLength, values.RequestContentLength, dests.RequestContentLength)
-	w.writeString(requestHost, values.RequestHeadersHost, dests.RequestHeadersHost)
-	w.writeString(requestUserAgent, values.RequestHeadersUserAgent, dests.RequestHeadersUserAgent)
-	w.writeString(requestReferer, values.RequestHeadersReferer, dests.RequestHeadersReferer)
-	w.writeString(responseContentType, values.ResponseHeadersContentType, dests.ResponseHeadersContentType)
-	w.writeInt(responseContentLength, values.ResponseHeadersContentLength, dests.ResponseHeadersContentLength)
-	w.writeString(responseCode, values.ResponseCode, dests.ResponseCode)
-	buf.WriteByte('}')
-}
-
 // NewAttributes creates a new Attributes.
 func NewAttributes(config *AttributeConfig) *Attributes {
 	return &Attributes{
 		config: config,
-		Agent: agentAttributes{
-			RequestContentLength:         -1,
-			ResponseHeadersContentLength: -1,
-		},
+		Agent:  make(agentAttributes),
 	}
 }
 
-// ErrInvalidAttribute is returned when the value is not valid.
-type ErrInvalidAttribute struct{ typeString string }
-
-func (e ErrInvalidAttribute) Error() string {
-	return fmt.Sprintf("attribute value type %s is invalid", e.typeString)
+// ErrInvalidAttributeType is returned when the value is not valid.
+type ErrInvalidAttributeType struct {
+	key string
+	val interface{}
 }
 
-func valueIsValid(val interface{}) error {
-	switch val.(type) {
-	case string, bool, nil,
-		uint8, uint16, uint32, uint64, int8, int16, int32, int64,
-		float32, float64, uint, int, uintptr:
-		return nil
-	default:
-		return ErrInvalidAttribute{
-			typeString: fmt.Sprintf("%T", val),
-		}
-	}
+func (e ErrInvalidAttributeType) Error() string {
+	return fmt.Sprintf("attribute '%s' value of type %T is invalid", e.key, e.val)
 }
 
 type invalidAttributeKeyErr struct{ key string }
@@ -341,16 +393,6 @@ func (e userAttributeLimitErr) Error() string {
 		attributeUserLimit)
 }
 
-func validAttributeKey(key string) error {
-	// Attributes whose keys are excessively long are dropped rather than
-	// truncated to avoid worrying about the application of configuration to
-	// truncated values or performing the truncation after configuration.
-	if len(key) > attributeKeyLengthLimit {
-		return invalidAttributeKeyErr{key: key}
-	}
-	return nil
-}
-
 func truncateStringValueIfLong(val string) string {
 	if len(val) > attributeValueLengthLimit {
 		return StringLengthByteLimit(val, attributeValueLengthLimit)
@@ -358,20 +400,36 @@ func truncateStringValueIfLong(val string) string {
 	return val
 }
 
-func truncateStringValueIfLongInterface(val interface{}) interface{} {
+// ValidateUserAttribute validates a user attribute.
+func ValidateUserAttribute(key string, val interface{}) (interface{}, error) {
 	if str, ok := val.(string); ok {
 		val = interface{}(truncateStringValueIfLong(str))
 	}
-	return val
+
+	switch val.(type) {
+	case string, bool,
+		uint8, uint16, uint32, uint64, int8, int16, int32, int64,
+		float32, float64, uint, int, uintptr:
+	default:
+		return nil, ErrInvalidAttributeType{
+			key: key,
+			val: val,
+		}
+	}
+
+	// Attributes whose keys are excessively long are dropped rather than
+	// truncated to avoid worrying about the application of configuration to
+	// truncated values or performing the truncation after configuration.
+	if len(key) > attributeKeyLengthLimit {
+		return nil, invalidAttributeKeyErr{key: key}
+	}
+	return val, nil
 }
 
 // AddUserAttribute adds a user attribute.
 func AddUserAttribute(a *Attributes, key string, val interface{}, d destinationSet) error {
-	val = truncateStringValueIfLongInterface(val)
-	if err := valueIsValid(val); nil != err {
-		return err
-	}
-	if err := validAttributeKey(key); nil != err {
+	val, err := ValidateUserAttribute(key, val)
+	if nil != err {
 		return err
 	}
 	dests := applyAttributeConfig(a.config, key, d)
@@ -396,8 +454,6 @@ func AddUserAttribute(a *Attributes, key string, val interface{}, d destinationS
 
 func writeAttributeValueJSON(w *jsonFieldsWriter, key string, val interface{}) {
 	switch v := val.(type) {
-	case nil:
-		w.rawField(key, `null`)
 	case string:
 		w.stringField(key, v)
 	case bool:
@@ -442,15 +498,36 @@ func agentAttributesJSON(a *Attributes, buf *bytes.Buffer, d destinationSet) {
 		buf.WriteString("{}")
 		return
 	}
-	writeAgentAttributes(buf, d, a.Agent, a.config.agentDests)
+	w := jsonFieldsWriter{buf: buf}
+	buf.WriteByte('{')
+	for id, val := range a.Agent {
+		if 0 != a.config.agentDests[id]&d {
+			if val.stringVal != "" {
+				w.stringField(id.name(), val.stringVal)
+			} else {
+				writeAttributeValueJSON(&w, id.name(), val.otherVal)
+			}
+		}
+	}
+	buf.WriteByte('}')
+
 }
 
-func userAttributesJSON(a *Attributes, buf *bytes.Buffer, d destinationSet) {
+func userAttributesJSON(a *Attributes, buf *bytes.Buffer, d destinationSet, extraAttributes map[string]interface{}) {
 	buf.WriteByte('{')
 	if nil != a {
 		w := jsonFieldsWriter{buf: buf}
+		for key, val := range extraAttributes {
+			outputDest := applyAttributeConfig(a.config, key, d)
+			if 0 != outputDest&d {
+				writeAttributeValueJSON(&w, key, val)
+			}
+		}
 		for name, atr := range a.user {
 			if 0 != atr.dests&d {
+				if _, found := extraAttributes[name]; found {
+					continue
+				}
 				writeAttributeValueJSON(&w, name, atr.value)
 			}
 		}
@@ -458,57 +535,33 @@ func userAttributesJSON(a *Attributes, buf *bytes.Buffer, d destinationSet) {
 	buf.WriteByte('}')
 }
 
-func userAttributesStringJSON(a *Attributes, d destinationSet) JSONString {
-	if nil == a {
-		return JSONString("{}")
-	}
+// userAttributesStringJSON is only used for testing.
+func userAttributesStringJSON(a *Attributes, d destinationSet, extraAttributes map[string]interface{}) string {
 	estimate := len(a.user) * 128
 	buf := bytes.NewBuffer(make([]byte, 0, estimate))
-	userAttributesJSON(a, buf, d)
-	bs := buf.Bytes()
-	return JSONString(bs)
-}
-
-func agentAttributesStringJSON(a *Attributes, d destinationSet) JSONString {
-	if nil == a {
-		return JSONString("{}")
-	}
-	estimate := 1024
-	buf := bytes.NewBuffer(make([]byte, 0, estimate))
-	agentAttributesJSON(a, buf, d)
-	return JSONString(buf.Bytes())
-}
-
-func getUserAttributes(a *Attributes, d destinationSet) map[string]interface{} {
-	v := make(map[string]interface{})
-	json.Unmarshal([]byte(userAttributesStringJSON(a, d)), &v)
-	return v
-}
-
-func getAgentAttributes(a *Attributes, d destinationSet) map[string]interface{} {
-	v := make(map[string]interface{})
-	json.Unmarshal([]byte(agentAttributesStringJSON(a, d)), &v)
-	return v
+	userAttributesJSON(a, buf, d, extraAttributes)
+	return buf.String()
 }
 
 // RequestAgentAttributes gathers agent attributes out of the request.
-func RequestAgentAttributes(a *Attributes, r *http.Request) {
-	a.Agent.RequestMethod = r.Method
+func RequestAgentAttributes(a *Attributes, method string, h http.Header, u *url.URL) {
+	a.Agent.Add(attributeRequestMethod, method, nil)
 
-	h := r.Header
+	if nil != u {
+		a.Agent.Add(attributeRequestURI, SafeURL(u), nil)
+	}
+
 	if nil == h {
 		return
 	}
-	a.Agent.RequestAcceptHeader = h.Get("Accept")
-	a.Agent.RequestContentType = h.Get("Content-Type")
-	a.Agent.RequestHeadersHost = h.Get("Host")
-	a.Agent.RequestHeadersUserAgent = h.Get("User-Agent")
-	a.Agent.RequestHeadersReferer = SafeURLFromString(h.Get("Referer"))
+	a.Agent.Add(attributeRequestAcceptHeader, h.Get("Accept"), nil)
+	a.Agent.Add(attributeRequestContentType, h.Get("Content-Type"), nil)
+	a.Agent.Add(attributeRequestHeadersHost, h.Get("Host"), nil)
+	a.Agent.Add(attributeRequestHeadersUserAgent, h.Get("User-Agent"), nil)
+	a.Agent.Add(attributeRequestHeadersReferer, SafeURLFromString(h.Get("Referer")), nil)
 
-	if cl := h.Get("Content-Length"); "" != cl {
-		if x, err := strconv.Atoi(cl); nil == err {
-			a.Agent.RequestContentLength = x
-		}
+	if l := GetContentLengthFromHeader(h); l >= 0 {
+		a.Agent.Add(attributeRequestContentLength, "", l)
 	}
 }
 
@@ -517,11 +570,10 @@ func ResponseHeaderAttributes(a *Attributes, h http.Header) {
 	if nil == h {
 		return
 	}
-	a.Agent.ResponseHeadersContentType = h.Get("Content-Type")
-	if val := h.Get("Content-Length"); "" != val {
-		if x, err := strconv.Atoi(val); nil == err {
-			a.Agent.ResponseHeadersContentLength = x
-		}
+	a.Agent.Add(attributeResponseHeadersContentType, h.Get("Content-Type"), nil)
+
+	if l := GetContentLengthFromHeader(h); l >= 0 {
+		a.Agent.Add(attributeResponseHeadersContentLength, "", l)
 	}
 }
 
@@ -541,8 +593,9 @@ var (
 
 // ResponseCodeAttribute sets the response code agent attribute.
 func ResponseCodeAttribute(a *Attributes, code int) {
-	a.Agent.ResponseCode = statusCodeLookup[code]
-	if a.Agent.ResponseCode == "" {
-		a.Agent.ResponseCode = strconv.Itoa(code)
+	rc := statusCodeLookup[code]
+	if rc == "" {
+		rc = strconv.Itoa(code)
 	}
+	a.Agent.Add(attributeResponseCode, rc, nil)
 }

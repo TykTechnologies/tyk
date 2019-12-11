@@ -11,6 +11,7 @@ import (
 	"github.com/TykTechnologies/tyk/cli"
 
 	"github.com/TykTechnologies/gorpc"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/test"
@@ -124,7 +125,7 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 	// Test RPC
 	callCount := 0
 	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *DefRequest) (string, error) {
+	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *apidef.DefRequest) (string, error) {
 		if callCount == 0 {
 			callCount += 1
 			return `[]`, nil
@@ -183,7 +184,7 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 func TestSyncAPISpecsRPCFailure(t *testing.T) {
 	// Test RPC
 	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *DefRequest) (string, error) {
+	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *apidef.DefRequest) (string, error) {
 		return "malformed json", nil
 	})
 	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
@@ -202,7 +203,7 @@ func TestSyncAPISpecsRPCFailure(t *testing.T) {
 func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 	// Test RPC
 	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *DefRequest) (string, error) {
+	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *apidef.DefRequest) (string, error) {
 		return jsonMarshalString(BuildAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
 		})), nil
@@ -281,7 +282,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		rpc.ResetEmergencyMode()
 
 		dispatcher := gorpc.NewDispatcher()
-		dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *DefRequest) (string, error) {
+		dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *apidef.DefRequest) (string, error) {
 			return jsonMarshalString(BuildAPI(
 				func(spec *APISpec) { spec.UseKeylessAccess = false },
 				func(spec *APISpec) { spec.UseKeylessAccess = false },

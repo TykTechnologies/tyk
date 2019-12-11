@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
@@ -87,10 +88,15 @@ func (r *Purger) Connect() {
 
 // PurgeLoop starts the loop that will pull data out of the in-memory
 // store and into RPC.
-func (r Purger) PurgeLoop(ticker <-chan time.Time) {
+func (r Purger) PurgeLoop(ctx context.Context) {
+	tick := time.NewTicker(10 * time.Second)
 	for {
-		<-ticker
-		r.PurgeCache()
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+			r.PurgeCache()
+		}
 	}
 }
 
@@ -113,7 +119,7 @@ func (r *Purger) PurgeCache() {
 
 	for i, v := range analyticsValues {
 		decoded := AnalyticsRecord{}
-		if err := msgpack.Unmarshal(v.([]byte), &decoded); err != nil {
+		if err := msgpack.Unmarshal([]byte(v.(string)), &decoded); err != nil {
 			Log.WithError(err).Error("Couldn't unmarshal analytics data")
 		} else {
 			Log.WithField("decoded", decoded).Debug("Decoded Record")

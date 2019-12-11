@@ -1,6 +1,3 @@
-// +build coprocess
-// +build python
-
 package python
 
 import (
@@ -8,6 +5,8 @@ import (
 	"context"
 	"mime/multipart"
 	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -16,6 +15,13 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
+
+var pkgPath string
+
+func init() {
+	_, filename, _, _ := runtime.Caller(0)
+	pkgPath = filepath.Dir(filename) + "./../../"
+}
 
 var pythonBundleWithAuthCheck = map[string]string{
 	"manifest.json": `
@@ -166,7 +172,8 @@ func TestMain(m *testing.M) {
 func TestPythonBundles(t *testing.T) {
 	ts := gateway.StartTest(gateway.TestConfig{
 		CoprocessConfig: config.CoProcessConfig{
-			EnableCoProcess: true,
+			EnableCoProcess:  true,
+			PythonPathPrefix: pkgPath,
 		}})
 	defer ts.Close()
 

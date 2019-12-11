@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/garyburd/redigo/redis"
+	"github.com/go-redis/redis"
 
 	"github.com/TykTechnologies/goverify"
 	"github.com/TykTechnologies/tyk/config"
@@ -59,12 +59,12 @@ func startPubSubLoop() {
 }
 
 func handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded func()) {
-	message, ok := v.(redis.Message)
+	message, ok := v.(*redis.Message)
 	if !ok {
 		return
 	}
 	notif := Notification{}
-	if err := json.Unmarshal(message.Data, &notif); err != nil {
+	if err := json.Unmarshal([]byte(message.Payload), &notif); err != nil {
 		pubSubLog.Error("Unmarshalling message body failed, malformed: ", err)
 		return
 	}

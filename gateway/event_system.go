@@ -121,8 +121,9 @@ func EventHandlerByName(handlerConf apidef.EventHandlerTriggerConfig, spec *APIS
 		}
 	case EH_CoProcessHandler:
 		if spec != nil {
-			if GlobalDispatcher == nil {
-				return nil, errors.New("no CP available")
+			dispatcher := loadedDrivers[spec.CustomMiddleware.Driver]
+			if dispatcher == nil {
+				return nil, errors.New("no plugin driver is available")
 			}
 			h := &CoProcessEventHandler{}
 			h.Spec = spec

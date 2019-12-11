@@ -1,9 +1,7 @@
 package gateway
 
 import (
-	"crypto/md5"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -43,7 +41,7 @@ func prepareStorage() generalStores {
 	gs.healthStore = &storage.RedisCluster{KeyPrefix: "apihealth."}
 	gs.rpcAuthStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
 	gs.rpcOrgStore = &RPCStorageHandler{KeyPrefix: "orgkey."}
-	FallbackKeySesionManager.Init(gs.redisStore)
+	GlobalSessionManager.Init(gs.redisStore)
 	return gs
 }
 
@@ -94,6 +92,12 @@ func countApisByListenHash(specs []*APISpec) map[string]int {
 	return count
 }
 
+func fixFuncPath(pathPrefix string, funcs []apidef.MiddlewareDefinition) {
+	for index := range funcs {
+		funcs[index].Path = filepath.Join(pathPrefix, funcs[index].Path)
+	}
+}
+
 func processSpec(spec *APISpec, apisByListen map[string]int,
 	gs *generalStores, subrouter *mux.Router, logger *logrus.Entry) *ChainObject {
 
@@ -109,8 +113,6 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	var coprocessLog = logger.WithFields(logrus.Fields{
 		"prefix": "coprocess",
 	})
-
-	logger.Info("Loading API")
 
 	if len(spec.TagHeaders) > 0 {
 		// Ensure all headers marked for tagging are lowercase
@@ -202,13 +204,9 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	var prefix string
 	if spec.CustomMiddlewareBundle != "" {
 		if err := loadBundle(spec); err != nil {
-			logger.Error("Couldn't load bundle")
+			logger.WithError(err).Error("Couldn't load bundle")
 		}
-		tykBundlePath := filepath.Join(config.Global().MiddlewarePath, "bundles")
-		bundleNameHash := md5.New()
-		io.WriteString(bundleNameHash, spec.CustomMiddlewareBundle)
-		bundlePath := fmt.Sprintf("%s_%x", spec.APIID, bundleNameHash.Sum(nil))
-		prefix = filepath.Join(tykBundlePath, bundlePath)
+		prefix = getBundleDestPath(spec)
 	}
 
 	logger.Debug("Initializing API")
@@ -217,6 +215,15 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwResponseFuncs, mwDriver = loadCustomMiddleware(spec)
 	if config.Global().EnableJSVM && mwDriver == apidef.OttoDriver {
 		spec.JSVM.LoadJSPaths(mwPaths, prefix)
+	}
+
+	//  if bundle was used - fix paths for goplugin-type custom middle-wares
+	if mwDriver == apidef.GoPluginDriver && prefix != "" {
+		mwAuthCheckFunc.Path = filepath.Join(prefix, mwAuthCheckFunc.Path)
+		fixFuncPath(prefix, mwPreFuncs)
+		fixFuncPath(prefix, mwPostFuncs)
+		fixFuncPath(prefix, mwPostAuthCheckFuncs)
+		// TODO: add mwResponseFuncs here when Golang response custom MW support implemented
 	}
 
 	if spec.EnableBatchRequestSupport {
@@ -298,12 +305,12 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		}
 	}
 
+	mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &RateCheckMW{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid})
-	mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid})
 	mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid})
@@ -318,7 +325,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 			logger.Info("Checking security policy: Basic")
 		}
 
-		if mwAppendEnabled(&authArray, &HMACMiddleware{BaseMiddleware: baseMid}) {
+		if mwAppendEnabled(&authArray, &HTTPSignatureValidationMiddleware{BaseMiddleware: baseMid}) {
 			logger.Info("Checking security policy: HMAC")
 		}
 
@@ -330,7 +337,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 			logger.Info("Checking security policy: OpenID")
 		}
 
-		coprocessAuth := EnableCoProcess && mwDriver != apidef.OttoDriver && spec.EnableCoProcessAuth
+		coprocessAuth := mwDriver != apidef.OttoDriver && spec.EnableCoProcessAuth
 		ottoAuth := !coprocessAuth && mwDriver == apidef.OttoDriver && spec.EnableCoProcessAuth
 		gopluginAuth := !coprocessAuth && !ottoAuth && mwDriver == apidef.GoPluginDriver && spec.UseGoPluginAuth
 
@@ -577,6 +584,7 @@ func loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStor
 	router := muxer.router(port, spec.Protocol)
 	if router == nil {
 		router = mux.NewRouter()
+		muxer.setRouter(port, spec.Protocol, router)
 	}
 
 	hostname := config.Global().HostName
@@ -603,11 +611,35 @@ func loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStor
 	}
 
 	router.Handle(chainObj.ListenOn, chainObj.ThisHandler)
-
-	muxer.setRouter(port, spec.Protocol, router)
 }
 
-func loadTCPService(spec *APISpec, muxer *proxyMux) {
+func loadTCPService(spec *APISpec, gs *generalStores, muxer *proxyMux) {
+	// Initialise the auth and session managers (use Redis for now)
+	authStore := gs.redisStore
+	orgStore := gs.redisOrgStore
+	switch spec.AuthProvider.StorageEngine {
+	case LDAPStorageEngine:
+		storageEngine := LDAPStorageHandler{}
+		storageEngine.LoadConfFromMeta(spec.AuthProvider.Meta)
+		authStore = &storageEngine
+	case RPCStorageEngine:
+		authStore = gs.rpcAuthStore
+		orgStore = gs.rpcOrgStore
+		spec.GlobalConfig.EnforceOrgDataAge = true
+		globalConf := config.Global()
+		globalConf.EnforceOrgDataAge = true
+		config.SetGlobal(globalConf)
+	}
+
+	sessionStore := gs.redisStore
+	switch spec.SessionProvider.StorageEngine {
+	case RPCStorageEngine:
+		sessionStore = gs.rpcAuthStore
+	}
+
+	// Health checkers are initialised per spec so that each API handler has it's own connection and redis storage pool
+	spec.Init(authStore, sessionStore, gs.healthStore, orgStore)
+
 	muxer.addTCPService(spec, nil)
 }
 
@@ -643,6 +675,7 @@ func loadApps(specs []*APISpec) {
 		muxer.setRouter(globalConf.ControlAPIPort, "", router)
 	}
 	gs := prepareStorage()
+	shouldTrace := trace.IsEnabled()
 	for _, spec := range specs {
 		if spec.ListenPort != spec.GlobalConfig.ListenPort {
 			mainLog.Info("API bind on custom port:", spec.ListenPort)
@@ -652,9 +685,18 @@ func loadApps(specs []*APISpec) {
 
 		switch spec.Protocol {
 		case "", "http", "https":
+			if shouldTrace {
+				// opentracing works only with http services.
+				err := trace.AddTracer("", spec.Name)
+				if err != nil {
+					mainLog.Errorf("Failed to initialize tracer for %q error:%v", spec.Name, err)
+				} else {
+					mainLog.Infof("Intialized tracer  api_name=%q", spec.Name)
+				}
+			}
 			loadHTTPService(spec, apisByListen, &gs, muxer)
 		case "tcp", "tls":
-			loadTCPService(spec, muxer)
+			loadTCPService(spec, &gs, muxer)
 		}
 	}
 
@@ -688,6 +730,12 @@ func loadApps(specs []*APISpec) {
 
 	// Swap in the new register
 	apisMu.Lock()
+
+	// release current specs resources before overwriting map
+	for _, curSpec := range apisByID {
+		curSpec.Release()
+	}
+
 	apisByID = tmpSpecRegister
 	apisMu.Unlock()
 

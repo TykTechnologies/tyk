@@ -12,9 +12,6 @@ import (
 )
 
 var (
-	// ErrDockerUnsupported is returned if Docker is not supported on the
-	// platform.
-	ErrDockerUnsupported = errors.New("Docker unsupported on this platform")
 	// ErrDockerNotFound is returned if a Docker ID is not found in
 	// /proc/self/cgroup
 	ErrDockerNotFound = errors.New("Docker ID not found")
@@ -23,7 +20,7 @@ var (
 // DockerID attempts to detect Docker.
 func DockerID() (string, error) {
 	if "linux" != runtime.GOOS {
-		return "", ErrDockerUnsupported
+		return "", ErrFeatureUnsupported
 	}
 
 	f, err := os.Open("/proc/self/cgroup")
@@ -36,8 +33,10 @@ func DockerID() (string, error) {
 }
 
 var (
+	// The DockerID must be a 64-character lowercase hex string
+	// be greedy and match anything 64-characters or longer to spot invalid IDs
 	dockerIDLength   = 64
-	dockerIDRegexRaw = fmt.Sprintf("^[0-9a-f]{%d}$", dockerIDLength)
+	dockerIDRegexRaw = fmt.Sprintf("[0-9a-f]{%d,}", dockerIDLength)
 	dockerIDRegex    = regexp.MustCompile(dockerIDRegexRaw)
 )
 
@@ -49,6 +48,8 @@ func parseDockerID(r io.Reader) (string, error) {
 	//
 	// Example
 	//   5:cpuacct,cpu,cpuset:/daemons
+
+	var id string
 
 	for scanner := bufio.NewScanner(r); scanner.Scan(); {
 		line := scanner.Bytes()
@@ -63,27 +64,7 @@ func parseDockerID(r io.Reader) (string, error) {
 			continue
 		}
 
-		// We're only interested in Docker generated cgroups.
-		// Reference Implementation:
-		// case cpu_cgroup
-		// # docker native driver w/out systemd (fs)
-		// when %r{^/docker/([0-9a-f]+)$}                      then $1
-		// # docker native driver with systemd
-		// when %r{^/system\.slice/docker-([0-9a-f]+)\.scope$} then $1
-		// # docker lxc driver
-		// when %r{^/lxc/([0-9a-f]+)$}                         then $1
-		//
-		var id string
-		if bytes.HasPrefix(cols[2], []byte("/docker/")) {
-			id = string(cols[2][len("/docker/"):])
-		} else if bytes.HasPrefix(cols[2], []byte("/lxc/")) {
-			id = string(cols[2][len("/lxc/"):])
-		} else if bytes.HasPrefix(cols[2], []byte("/system.slice/docker-")) &&
-			bytes.HasSuffix(cols[2], []byte(".scope")) {
-			id = string(cols[2][len("/system.slice/docker-") : len(cols[2])-len(".scope")])
-		} else {
-			continue
-		}
+		id = dockerIDRegex.FindString(string(cols[2]))
 
 		if err := validateDockerID(id); err != nil {
 			// We can stop searching at this point, the CPU
@@ -114,10 +95,19 @@ func isCPUCol(col []byte) bool {
 	return false
 }
 
+func isHex(r rune) bool {
+	return ('0' <= r && r <= '9') || ('a' <= r && r <= 'f')
+}
+
 func validateDockerID(id string) error {
-	if !dockerIDRegex.MatchString(id) {
-		return fmt.Errorf("%s does not match %s",
-			id, dockerIDRegexRaw)
+	if len(id) != 64 {
+		return fmt.Errorf("%s is not %d characters long", id, dockerIDLength)
+	}
+
+	for _, c := range id {
+		if !isHex(c) {
+			return fmt.Errorf("Character: %c is not hex in string %s", c, id)
+		}
 	}
 
 	return nil

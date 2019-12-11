@@ -34,7 +34,7 @@ type APILimit struct {
 	QuotaRenews        int64   `json:"quota_renews" msg:"quota_renews"`
 	QuotaRemaining     int64   `json:"quota_remaining" msg:"quota_remaining"`
 	QuotaRenewalRate   int64   `json:"quota_renewal_rate" msg:"quota_renewal_rate"`
-	SetByPolicy        bool    `json:"set_by_policy" msg:"set_by_policy"`
+	SetBy              string  `json:"-" msg:"-"`
 }
 
 // AccessDefinition defines which versions of an API a key has access to
@@ -77,13 +77,15 @@ type SessionState struct {
 	JWTData struct {
 		Secret string `json:"secret" msg:"secret"`
 	} `json:"jwt_data" msg:"jwt_data"`
-	HMACEnabled   bool     `json:"hmac_enabled" msg:"hmac_enabled"`
-	HmacSecret    string   `json:"hmac_string" msg:"hmac_string"`
-	IsInactive    bool     `json:"is_inactive" msg:"is_inactive"`
-	ApplyPolicyID string   `json:"apply_policy_id" msg:"apply_policy_id"`
-	ApplyPolicies []string `json:"apply_policies" msg:"apply_policies"`
-	DataExpires   int64    `json:"data_expires" msg:"data_expires"`
-	Monitor       struct {
+	HMACEnabled                   bool     `json:"hmac_enabled" msg:"hmac_enabled"`
+	EnableHTTPSignatureValidation bool     `json:"enable_http_signature_validation" msg:"enable_http_signature_validation"`
+	HmacSecret                    string   `json:"hmac_string" msg:"hmac_string"`
+	RSACertificateId              string   `json:"rsa_certificate_id" msg:"rsa_certificate_id"`
+	IsInactive                    bool     `json:"is_inactive" msg:"is_inactive"`
+	ApplyPolicyID                 string   `json:"apply_policy_id" msg:"apply_policy_id"`
+	ApplyPolicies                 []string `json:"apply_policies" msg:"apply_policies"`
+	DataExpires                   int64    `json:"data_expires" msg:"data_expires"`
+	Monitor                       struct {
 		TriggerLimits []float64 `json:"trigger_limits" msg:"trigger_limits"`
 	} `json:"monitor" msg:"monitor"`
 	EnableDetailedRecording bool                   `json:"enable_detail_recording" msg:"enable_detail_recording"`
@@ -147,6 +149,26 @@ func (s *SessionState) PolicyIDs() []string {
 func (s *SessionState) SetPolicies(ids ...string) {
 	s.ApplyPolicyID = ""
 	s.ApplyPolicies = ids
+}
+
+// PoliciesEqualTo compares and returns true if passed slice if IDs contains only current ApplyPolicies
+func (s *SessionState) PoliciesEqualTo(ids []string) bool {
+	if len(s.ApplyPolicies) != len(ids) {
+		return false
+	}
+
+	polIDMap := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		polIDMap[id] = true
+	}
+
+	for _, curID := range s.ApplyPolicies {
+		if !polIDMap[curID] {
+			return false
+		}
+	}
+
+	return true
 }
 
 // GetQuotaLimitByAPIID return quota max, quota remaining, quota renewal rate and quota renews for the given session

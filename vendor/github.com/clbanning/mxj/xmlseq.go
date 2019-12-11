@@ -813,10 +813,7 @@ func (e elemListSeq) Less(i, j int) bool {
 		jseq = 9999999
 	}
 
-	if iseq > jseq {
-		return false
-	}
-	return true
+	return iseq <= jseq
 }
 
 // =============== https://groups.google.com/forum/#!topic/golang-nuts/lHPOHD-8qio

@@ -50,7 +50,7 @@ func buildTestOAuthSpec(apiGens ...func(spec *APISpec)) *APISpec {
 	return BuildAPI(func(spec *APISpec) {
 		spec.APIID = "999999"
 		spec.OrgID = "default"
-		spec.Auth = apidef.Auth{
+		spec.Auth = apidef.AuthConfig{
 			AuthHeaderName: "authorization",
 		}
 		spec.UseKeylessAccess = false
@@ -378,14 +378,15 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 			"Content-Type": "application/x-www-form-urlencoded",
 		}
 
-		ts.Run(t, test.TestCase{
+		_, _ = ts.Run(t, test.TestCase{
 			Path:      "/APIID/tyk/oauth/authorize-client/",
 			AdminAuth: true,
 			Data:      param.Encode(),
 			Headers:   headers,
 			Method:    http.MethodPost,
 			Code:      http.StatusOK,
-			BodyMatch: `"access_token"`,
+			BodyMatch: `{"access_token":".*","expires_in":3600,"redirect_to":"http://client.oauth.com` +
+				`#access_token=.*=&expires_in=3600&token_type=bearer","token_type":"bearer"}`,
 		})
 	})
 }

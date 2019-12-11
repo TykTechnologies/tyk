@@ -143,6 +143,11 @@ func (l *LDAPStorageHandler) DeleteKey(cn string) bool {
 	return l.notifyReadOnly()
 }
 
+func (r *LDAPStorageHandler) DeleteAllKeys() bool {
+	log.Warning("Not implementated")
+	return false
+}
+
 func (l *LDAPStorageHandler) DeleteRawKey(cn string) bool {
 	return l.notifyReadOnly()
 }
@@ -185,10 +190,6 @@ func (l LDAPStorageHandler) AddToSet(keyName, value string) {
 }
 
 func (l LDAPStorageHandler) AppendToSet(keyName, value string) {
-	log.Error("Not implemented")
-}
-
-func (r *LDAPStorageHandler) AppendToSetPipelined(key string, values []string) {
 	log.Error("Not implemented")
 }
 

@@ -34,6 +34,7 @@ type Handler interface {
 	GetExp(string) (int64, error) // Returns expiry of a key
 	GetKeys(string) []string
 	DeleteKey(string) bool
+	DeleteAllKeys() bool
 	DeleteRawKey(string) bool
 	Connect() bool
 	GetKeysAndValues() map[string]string
@@ -46,7 +47,6 @@ type Handler interface {
 	GetSet(string) (map[string]string, error)
 	AddToSet(string, string)
 	AppendToSet(string, string)
-	AppendToSetPipelined(string, []string)
 	GetAndDeleteSet(string) []interface{}
 	RemoveFromSet(string, string)
 	DeleteScanMatch(string) bool
@@ -54,6 +54,12 @@ type Handler interface {
 	AddToSortedSet(string, string, float64)
 	GetSortedSetRange(string, string, string) ([]string, []float64, error)
 	RemoveSortedSetRange(string, string, string) error
+}
+
+type AnalyticsHandler interface {
+	Connect() bool
+	AppendToSetPipelined(string, [][]byte)
+	GetAndDeleteSet(string) []interface{}
 }
 
 const defaultHashAlgorithm = "murmur64"

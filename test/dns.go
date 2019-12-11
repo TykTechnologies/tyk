@@ -18,9 +18,9 @@ import (
 var (
 	muDefaultResolver  sync.RWMutex
 	DomainsToAddresses = map[string][]string{
-		"host1.local.": {"127.0.0.1"},
-		"host2.local.": {"127.0.0.1"},
-		"host3.local.": {"127.0.0.1"},
+		"host1.": {"127.0.0.1"},
+		"host2.": {"127.0.0.1"},
+		"host3.": {"127.0.0.1"},
 	}
 	DomainsToIgnore = []string{
 		"redis.",
@@ -74,8 +74,15 @@ func (d *dnsMockHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 			}
 		}
 
-		addresses, ok := d.domainsToAddresses[domain]
-		if !ok {
+		var addresses []string
+
+		for d, ips := range d.domainsToAddresses {
+			if strings.HasPrefix(domain, d) {
+				addresses = ips
+			}
+		}
+
+		if len(addresses) == 0 {
 			// ^ 				start of line
 			// localhost\.		match literally
 			// ()* 				match between 0 and unlimited times

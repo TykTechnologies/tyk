@@ -1,20 +1,22 @@
 package gateway
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
+	"sort"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/garyburd/redigo/redis"
+	"github.com/go-redis/redis"
 	uuid "github.com/satori/go.uuid"
 
 	"fmt"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
@@ -38,16 +40,6 @@ const apiTestDef = `{
 		"target_url": "` + TestHttpAny + `"
 	}
 }`
-
-func loadSampleAPI(t *testing.T, def string) {
-	spec := CreateSpecTest(t, def)
-	loadApps([]*APISpec{spec})
-}
-
-type testAPIDefinition struct {
-	apidef.APIDefinition
-	ID string `json:"id"`
-}
 
 func TestHealthCheckEndpoint(t *testing.T) {
 	globalConf := config.Global()
@@ -132,6 +124,8 @@ func TestKeyHandler(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
 
+	defer ResetTestConfig()
+
 	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.Auth.UseParam = true
@@ -161,6 +155,8 @@ func TestKeyHandler(t *testing.T) {
 	}
 	policiesMu.Unlock()
 	withPolicy := CreateStandardSession()
+	withoutPolicyJSON, _ := json.Marshal(withPolicy)
+
 	withPolicy.ApplyPolicies = []string{
 		"abc_policy",
 	}
@@ -189,9 +185,16 @@ func TestKeyHandler(t *testing.T) {
 			{
 				Method:    "POST",
 				Path:      "/tyk/keys/create",
-				Data:      string(withPolicyJSON),
+				Data:      string(withoutPolicyJSON),
 				AdminAuth: true,
 				Code:      400,
+			},
+			{
+				Method:    "POST",
+				Path:      "/tyk/keys/create",
+				Data:      string(withPolicyJSON),
+				AdminAuth: true,
+				Code:      200,
 			},
 			{
 				Method:    "POST",
@@ -232,9 +235,22 @@ func TestKeyHandler(t *testing.T) {
 				BodyMatch: `"quota_remaining":4`,
 			},
 		}...)
+
+		GlobalSessionManager.Store().DeleteAllKeys()
 	})
 
-	knownKey := CreateSession()
+	_, knownKey := ts.CreateSession(func(s *user.SessionState) {
+		s.AccessRights = map[string]user.AccessDefinition{"test": {
+			APIID: "test", Versions: []string{"v1"},
+		}}
+	})
+
+	_, unknownOrgKey := ts.CreateSession(func(s *user.SessionState) {
+		s.OrgID = "dummy"
+		s.AccessRights = map[string]user.AccessDefinition{"test": {
+			APIID: "test", Versions: []string{"v1"},
+		}}
+	})
 
 	t.Run("Get key", func(t *testing.T) {
 		ts.Run(t, []test.TestCase{
@@ -251,6 +267,40 @@ func TestKeyHandler(t *testing.T) {
 			{Method: "GET", Path: "/tyk/keys/?api_id=test", AdminAuth: true, Code: 200, BodyMatch: knownKey},
 			{Method: "GET", Path: "/tyk/keys/?api_id=unknown", AdminAuth: true, Code: 200, BodyMatch: knownKey},
 		}...)
+
+		globalConf := config.Global()
+		globalConf.HashKeyFunction = ""
+		config.SetGlobal(globalConf)
+		_, keyWithoutHash := ts.CreateSession(func(s *user.SessionState) {
+			s.AccessRights = map[string]user.AccessDefinition{"test": {
+				APIID: "test", Versions: []string{"v1"},
+			}}
+		})
+
+		assert := func(response *http.Response, expected []string) {
+			var keys apiAllKeys
+			_ = json.NewDecoder(response.Body).Decode(&keys)
+			actual := keys.APIKeys
+
+			sort.Strings(expected)
+			sort.Strings(actual)
+
+			if !reflect.DeepEqual(expected, actual) {
+				t.Errorf("Expected %v, actual %v", expected, actual)
+			}
+		}
+
+		t.Run(`filter=""`, func(t *testing.T) {
+			resp, _ := ts.Run(t, test.TestCase{Method: "GET", Path: "/tyk/keys/", AdminAuth: true, Code: 200, BodyMatch: knownKey})
+			expected := []string{knownKey, unknownOrgKey, keyWithoutHash}
+			assert(resp, expected)
+		})
+
+		t.Run(`filter=orgID`, func(t *testing.T) {
+			resp, _ := ts.Run(t, test.TestCase{Method: "GET", Path: "/tyk/keys/?filter=" + "default", AdminAuth: true, Code: 200, BodyMatch: knownKey})
+			expected := []string{knownKey, keyWithoutHash}
+			assert(resp, expected)
+		})
 	})
 
 	t.Run("Update key", func(t *testing.T) {
@@ -286,14 +336,17 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 
 	pID := CreatePolicy(func(p *user.Policy) {
 		p.Partitions.RateLimit = true
+		p.Tags = []string{"p1-tag"}
 	})
 
 	pID2 := CreatePolicy(func(p *user.Policy) {
 		p.Partitions.Quota = true
+		p.Tags = []string{"p2-tag"}
 	})
 
 	session, key := ts.CreateSession(func(s *user.SessionState) {
 		s.ApplyPolicies = []string{pID}
+		s.Tags = []string{"key-tag1", "key-tag2"}
 		s.AccessRights = map[string]user.AccessDefinition{testAPIID: {
 			APIID: testAPIID, Versions: []string{"v1"},
 		}}
@@ -308,7 +361,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
 		}...)
 
-		sessionState, found := FallbackKeySesionManager.SessionDetail(key, false)
+		sessionState, found := GlobalSessionManager.SessionDetail("default", key, false)
 		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 2 {
 			t.Fatal("Adding policy to the list failed")
 		}
@@ -323,10 +376,51 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
 		}...)
 
-		sessionState, found := FallbackKeySesionManager.SessionDetail(key, false)
+		sessionState, found := GlobalSessionManager.SessionDetail("default", key, false)
 		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 0 {
 			t.Fatal("Removing policy from the list failed")
 		}
+	})
+
+	t.Run("Tag on key level", func(t *testing.T) {
+		assert := func(session *user.SessionState, expected []string) {
+			sessionData, _ := json.Marshal(session)
+			path := fmt.Sprintf("/tyk/keys/%s", key)
+
+			_, _ = ts.Run(t, []test.TestCase{
+				{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
+			}...)
+
+			sessionState, found := GlobalSessionManager.SessionDetail(session.OrgID, key, false)
+
+			sort.Strings(sessionState.Tags)
+			sort.Strings(expected)
+
+			if !found || !reflect.DeepEqual(expected, sessionState.Tags) {
+				t.Fatalf("Expected %v, returned %v", expected, sessionState.Tags)
+			}
+		}
+
+		t.Run("Add", func(t *testing.T) {
+			expected := []string{"p1-tag", "p2-tag", "key-tag1", "key-tag2"}
+			session.ApplyPolicies = []string{pID, pID2}
+			assert(session, expected)
+		})
+
+		t.Run("Make unique", func(t *testing.T) {
+			expected := []string{"p1-tag", "p2-tag", "key-tag1", "key-tag2"}
+			session.ApplyPolicies = []string{pID, pID2}
+			session.Tags = append(session.Tags, "p1-tag", "key-tag1")
+			assert(session, expected)
+		})
+
+		t.Run("Remove", func(t *testing.T) {
+			expected := []string{"p1-tag", "p2-tag", "key-tag2"}
+			session.ApplyPolicies = []string{pID, pID2}
+			session.Tags = []string{"key-tag2"}
+			assert(session, expected)
+		})
+
 	})
 }
 
@@ -694,7 +788,7 @@ func TestHashKeyListingDisabled(t *testing.T) {
 	})
 }
 
-func TestHashKeyHandlerHashingDisabled(t *testing.T) {
+func TestKeyHandler_HashingDisabled(t *testing.T) {
 	globalConf := config.Global()
 	// make it to NOT use hashes for Redis keys
 	globalConf.HashKeys = false
@@ -713,11 +807,12 @@ func TestHashKeyHandlerHashingDisabled(t *testing.T) {
 	}}
 	withAccessJSON, _ := json.Marshal(withAccess)
 
-	myKey := "my_key_id"
-	myKeyHash := storage.HashKey(generateToken("default", myKey))
+	myKeyID := "my_key_id"
+	token := generateToken("default", myKeyID)
+	myKeyHash := storage.HashKey(token)
 
 	t.Run("Create, get and delete key with key hashing", func(t *testing.T) {
-		ts.Run(t, []test.TestCase{
+		_, _ = ts.Run(t, []test.TestCase{
 			// create key
 			{
 				Method:       "POST",
@@ -735,21 +830,20 @@ func TestHashKeyHandlerHashingDisabled(t *testing.T) {
 				Code:         200,
 				BodyNotMatch: `"key_hash"`,
 			},
-			// create key with custom value
+			// create key with custom key ID
 			{
 				Method:       "POST",
-				Path:         "/tyk/keys/" + myKey,
+				Path:         "/tyk/keys/" + myKeyID,
 				Data:         string(withAccessJSON),
 				AdminAuth:    true,
 				Code:         200,
-				BodyMatch:    fmt.Sprintf(`"key":"%s"`, myKey),
+				BodyMatch:    fmt.Sprintf(`"key":"%s"`, token),
 				BodyNotMatch: fmt.Sprintf(`"key_hash":"%s"`, myKeyHash),
 			},
-			// get one key by key name
+			// get one key by generated token
 			{
 				Method:    "GET",
-				Path:      "/tyk/keys/" + myKey,
-				Data:      string(withAccessJSON),
+				Path:      "/tyk/keys/" + token,
 				AdminAuth: true,
 				Code:      200,
 			},
@@ -757,7 +851,6 @@ func TestHashKeyHandlerHashingDisabled(t *testing.T) {
 			{
 				Method:    "GET",
 				Path:      "/tyk/keys/" + myKeyHash + "?hashed=true",
-				Data:      string(withAccessJSON),
 				AdminAuth: true,
 				Code:      400,
 			},
@@ -765,7 +858,6 @@ func TestHashKeyHandlerHashingDisabled(t *testing.T) {
 			{
 				Method:    "GET",
 				Path:      "/tyk/keys/" + myKeyHash + "?hashed=true&api_id=test",
-				Data:      string(withAccessJSON),
 				AdminAuth: true,
 				Code:      400,
 			},
@@ -773,7 +865,6 @@ func TestHashKeyHandlerHashingDisabled(t *testing.T) {
 			{
 				Method:    "DELETE",
 				Path:      "/tyk/keys/" + myKeyHash + "?hashed=true&api_id=test",
-				Data:      string(withAccessJSON),
 				AdminAuth: true,
 				Code:      200,
 			},
@@ -811,9 +902,9 @@ func TestGetOAuthClients(t *testing.T) {
 
 	ts.Run(t, []test.TestCase{
 		{Path: "/tyk/oauth/clients/unknown", AdminAuth: true, Code: 404},
-		{Path: "/tyk/oauth/clients/test", AdminAuth: true, Code: 200, BodyMatch: `[]`},
+		{Path: "/tyk/oauth/clients/test", AdminAuth: true, Code: 200, BodyMatch: `\[\]`},
 		{Method: "POST", Path: "/tyk/oauth/clients/create", AdminAuth: true, Data: string(validOauthRequest), Code: 200},
-		{Path: "/tyk/oauth/clients/test", AdminAuth: true, Code: 200, BodyMatch: `[{"client_id":"test"`},
+		{Path: "/tyk/oauth/clients/test", AdminAuth: true, Code: 200, BodyMatch: `\[{"client_id":"test"`},
 	}...)
 }
 
@@ -928,6 +1019,116 @@ func TestCreateOAuthClient(t *testing.T) {
 	}
 }
 
+func TestUpdateOauthClientHandler(t *testing.T) {
+
+	ts := StartTest()
+	defer ts.Close()
+
+	BuildAndLoadAPI(
+		func(spec *APISpec) {
+			spec.UseOauth2 = true
+		},
+		func(spec *APISpec) {
+			spec.APIID = "non_oauth_api"
+			spec.UseOauth2 = false
+		},
+	)
+
+	CreatePolicy(func(p *user.Policy) {
+		p.ID = "p1"
+		p.AccessRights = map[string]user.AccessDefinition{
+			"test": {
+				APIID: "test",
+			},
+		}
+	})
+	CreatePolicy(func(p *user.Policy) {
+		p.ID = "p2"
+		p.AccessRights = map[string]user.AccessDefinition{
+			"test": {
+				APIID: "test",
+			},
+			"abc": {
+				APIID: "abc",
+			},
+		}
+	})
+
+	var b bytes.Buffer
+
+	json.NewEncoder(&b).Encode(NewClientRequest{
+		ClientID: "12345",
+		APIID:    "test",
+		PolicyID: "p1",
+	})
+
+	ts.Run(
+		t,
+		test.TestCase{
+			Method:    http.MethodPost,
+			Path:      "/tyk/oauth/clients/create",
+			AdminAuth: true,
+			Data:      b.String(),
+			Code:      http.StatusOK,
+			BodyMatch: `"client_id":"12345"`,
+		},
+	)
+
+	tests := map[string]struct {
+		req          NewClientRequest
+		code         int
+		bodyMatch    string
+		bodyNotMatch string
+	}{
+		"Update description": {
+			req: NewClientRequest{
+				ClientID:    "12345",
+				APIID:       "test",
+				PolicyID:    "p1",
+				Description: "Updated field",
+			},
+			code:         http.StatusOK,
+			bodyMatch:    `"description":"Updated field"`,
+			bodyNotMatch: "",
+		},
+		"Secret cannot be updated": {
+			req: NewClientRequest{
+				ClientID:     "12345",
+				APIID:        "test",
+				PolicyID:     "p1",
+				Description:  "Updated field",
+				ClientSecret: "super-new-secret",
+			},
+			code:         http.StatusOK,
+			bodyNotMatch: `"secret":"super-new-secret"`,
+			bodyMatch:    "",
+		},
+	}
+
+	for testName, testData := range tests {
+		t.Run(testName, func(t *testing.T) {
+			requestData, _ := json.Marshal(testData.req)
+			testCase := test.TestCase{
+				Method:    http.MethodPut,
+				Path:      "/tyk/oauth/clients/test/12345",
+				AdminAuth: true,
+				Data:      string(requestData),
+				Code:      testData.code,
+			}
+
+			if testData.bodyMatch != "" {
+				testCase.BodyMatch = testData.bodyMatch
+			}
+
+			if testData.bodyNotMatch != "" {
+				testCase.BodyNotMatch = testData.bodyNotMatch
+			}
+
+			ts.Run(t, testCase)
+		})
+	}
+}
+
 func TestGroupResetHandler(t *testing.T) {
 	didSubscribe := make(chan bool)
 	didReload := make(chan bool)
@@ -937,11 +1138,11 @@ func TestGroupResetHandler(t *testing.T) {
 	go func() {
 		err := cacheStore.StartPubSubHandler(RedisPubSubChannel, func(v interface{}) {
 			switch x := v.(type) {
-			case redis.Subscription:
+			case *redis.Subscription:
 				didSubscribe <- true
-			case redis.Message:
+			case *redis.Message:
 				notf := Notification{}
-				if err := json.Unmarshal(x.Data, &notf); err != nil {
+				if err := json.Unmarshal([]byte(x.Payload), &notf); err != nil {
 					t.Fatal(err)
 				}
 				if notf.Command == NoticeGroupReload {
@@ -962,7 +1163,7 @@ func TestGroupResetHandler(t *testing.T) {
 	apisByID = make(map[string]*APISpec)
 	apisMu.Unlock()
 
-	loadSampleAPI(t, apiTestDef)
+	LoadSampleAPI(apiTestDef)
 
 	recorder := httptest.NewRecorder()
 

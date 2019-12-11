@@ -2,12 +2,12 @@ package internal
 
 import (
 	"bytes"
-	"compress/zlib"
+	"compress/gzip"
 )
 
 func compress(b []byte) (*bytes.Buffer, error) {
 	var buf bytes.Buffer
-	w := zlib.NewWriter(&buf)
+	w := gzip.NewWriter(&buf)
 	_, err := w.Write(b)
 	w.Close()
 

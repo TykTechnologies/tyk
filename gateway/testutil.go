@@ -5,18 +5,16 @@ import (
 	"bytes"
 	"compress/gzip"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"net/http/httptest"
-
-	"golang.org/x/net/context"
-
 	"io"
 	"io/ioutil"
 	"math/rand"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -26,15 +24,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/cli"
-
 	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/garyburd/redigo/redis"
+	"github.com/go-redis/redis"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	uuid "github.com/satori/go.uuid"
+	"golang.org/x/net/context"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
@@ -87,17 +85,15 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 	rootPath := filepath.Dir(gatewayPath)
 	globalConf.AnalyticsConfig.GeoIPDBLocation = filepath.Join(rootPath, "testdata", "MaxMind-DB-test-ipv4-24.mmdb")
 	globalConf.EnableJSVM = true
+	globalConf.HashKeyFunction = storage.HashMurmur64
 	globalConf.Monitor.EnableTriggerMonitors = true
 	globalConf.AnalyticsConfig.NormaliseUrls.Enabled = true
 	globalConf.AllowInsecureConfigs = true
 	// Enable coprocess and bundle downloader:
 	globalConf.CoProcessOptions.EnableCoProcess = true
-	globalConf.CoProcessOptions.PythonPathPrefix = "../../"
 	globalConf.EnableBundleDownloader = true
 	globalConf.BundleBaseURL = testHttpBundles
 	globalConf.MiddlewarePath = testMiddlewarePath
-	purgeTicker = make(chan time.Time)
-	rpcPurgeTicker = make(chan time.Time)
 	// force ipv4 for now, to work around the docker bug affecting
 	// Go 1.8 and ealier
 	globalConf.ListenAddress = "127.0.0.1"
@@ -153,16 +149,13 @@ func ResetTestConfig() {
 
 func emptyRedis() error {
 	addr := config.Global().Storage.Host + ":" + strconv.Itoa(config.Global().Storage.Port)
-	c, err := redis.Dial("tcp", addr)
-	if err != nil {
-		return fmt.Errorf("could not connect to redis: %v", err)
-	}
+	c := redis.NewClient(&redis.Options{Addr: addr})
 	defer c.Close()
 	dbName := strconv.Itoa(config.Global().Storage.Database)
-	if _, err := c.Do("SELECT", dbName); err != nil {
+	if err := c.Do("SELECT", dbName).Err(); err != nil {
 		return err
 	}
-	_, err = c.Do("FLUSHDB")
+	err := c.FlushDB().Err()
 	return err
 }
 
@@ -235,6 +228,28 @@ func controlProxy() *proxy {
 		return p
 	}
 	return mainProxy()
+}
+
+func EnablePort(port int, protocol string) {
+	c := config.Global()
+	if c.PortWhiteList == nil {
+		c.PortWhiteList = map[string]config.PortWhiteList{
+			protocol: {
+				Ports: []int{port},
+			},
+		}
+	} else {
+		m, ok := c.PortWhiteList[protocol]
+		if !ok {
+			m = config.PortWhiteList{
+				Ports: []int{port},
+			}
+		} else {
+			m.Ports = append(m.Ports, port)
+		}
+		c.PortWhiteList[protocol] = m
+	}
+	config.SetGlobal(c)
 }
 
 func getMainRouter(m *proxyMux) *mux.Router {
@@ -347,6 +362,7 @@ func testHttpHandler() *mux.Router {
 	// use gorilla's mux as it allows to cancel URI cleaning
 	// (it is not configurable in standard http mux)
 	r := mux.NewRouter()
+
 	r.HandleFunc("/get", handleMethod("GET"))
 	r.HandleFunc("/post", handleMethod("POST"))
 	r.HandleFunc("/ws", wsHandler)
@@ -361,6 +377,10 @@ func testHttpHandler() *mux.Router {
 		gz.Close()
 	})
 	r.HandleFunc("/bundles/{rest:.*}", bundleHandleFunc)
+	r.HandleFunc("/errors/{status}", func(w http.ResponseWriter, r *http.Request) {
+		statusCode, _ := strconv.Atoi(mux.Vars(r)["status"])
+		httpError(w, statusCode)
+	})
 	r.HandleFunc("/{rest:.*}", handleMethod(""))
 
 	return r
@@ -396,7 +416,7 @@ func CreateSession(sGen ...func(s *user.SessionState)) string {
 		key = generateToken("default", session.Certificate)
 	}
 
-	FallbackKeySesionManager.UpdateSession(storage.HashKey(key), session, 60, config.Global().HashKeys)
+	GlobalSessionManager.UpdateSession(storage.HashKey(key), session, 60, config.Global().HashKeys)
 	return key
 }
 
@@ -515,14 +535,10 @@ func CreateDefinitionFromString(defStr string) *APISpec {
 	return spec
 }
 
-func CreateSpecTest(t testing.TB, def string) *APISpec {
-	spec := CreateDefinitionFromString(def)
-	tname := t.Name()
-	redisStore := &storage.RedisCluster{KeyPrefix: tname + "-apikey."}
-	healthStore := &storage.RedisCluster{KeyPrefix: tname + "-apihealth."}
-	orgStore := &storage.RedisCluster{KeyPrefix: tname + "-orgKey."}
-	spec.Init(redisStore, redisStore, healthStore, orgStore)
-	return spec
+func LoadSampleAPI(def string) (spec *APISpec) {
+	spec = CreateDefinitionFromString(def)
+	loadApps([]*APISpec{spec})
+	return
 }
 
 func firstVals(vals map[string][]string) map[string]string {
@@ -566,6 +582,8 @@ func (s *Test) Start() {
 	}
 	globalConf.CoProcessOptions = s.config.CoprocessConfig
 	config.SetGlobal(globalConf)
+
+	setupPortsWhitelist()
 
 	startServer()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -661,16 +679,41 @@ func (s *Test) RunExt(t testing.TB, testCases ...test.TestCase) {
 	}
 }
 
+func GetTLSClient(cert *tls.Certificate, caCert []byte) *http.Client {
+	// Setup HTTPS client
+	tlsConfig := &tls.Config{}
+
+	if cert != nil {
+		tlsConfig.Certificates = []tls.Certificate{*cert}
+	}
+
+	if len(caCert) > 0 {
+		caCertPool := x509.NewCertPool()
+		caCertPool.AppendCertsFromPEM(caCert)
+		tlsConfig.RootCAs = caCertPool
+		tlsConfig.BuildNameToCertificate()
+	} else {
+		tlsConfig.InsecureSkipVerify = true
+	}
+
+	transport := &http.Transport{TLSClientConfig: tlsConfig}
+
+	return &http.Client{Transport: transport}
+}
+
 func (s *Test) CreateSession(sGen ...func(s *user.SessionState)) (*user.SessionState, string) {
 	session := CreateStandardSession()
 	if len(sGen) > 0 {
 		sGen[0](session)
 	}
 
+	client := GetTLSClient(nil, nil)
+
 	resp, err := s.Do(test.TestCase{
 		Method:    http.MethodPost,
 		Path:      "/tyk/keys/create",
 		Data:      session,
+		Client:    client,
 		AdminAuth: true,
 	})
 
@@ -790,6 +833,14 @@ func BuildAndLoadAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 	return LoadAPI(BuildAPI(apiGens...)...)
 }
 
+func CloneAPI(a *APISpec) *APISpec {
+	new := &APISpec{}
+	new.APIDefinition = &apidef.APIDefinition{}
+	*new.APIDefinition = *a.APIDefinition
+
+	return new
+}
+
 // Taken from https://medium.com/@mlowicki/http-s-proxy-in-golang-in-less-than-100-lines-of-code-6a51c2f2c38c
 type httpProxyHandler struct {
 	proto    string
@@ -836,6 +887,7 @@ func (p *httpProxyHandler) handleHTTP(w http.ResponseWriter, req *http.Request) 
 }
 
 func (p *httpProxyHandler) Stop() error {
+	ResetTestConfig()
 	return p.server.Close()
 }
 

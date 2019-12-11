@@ -14,7 +14,7 @@ func (d *Decoder) skipN(n int) error {
 }
 
 func (d *Decoder) uint8() (uint8, error) {
-	c, err := d.r.ReadByte()
+	c, err := d.readByte()
 	if err != nil {
 		return 0, err
 	}
@@ -58,7 +58,7 @@ func (d *Decoder) uint64() (uint64, error) {
 }
 
 func (d *Decoder) DecodeUint64() (uint64, error) {
-	c, err := d.r.ReadByte()
+	c, err := d.readByte()
 	if err != nil {
 		return 0, err
 	}
@@ -98,7 +98,7 @@ func (d *Decoder) uint(c byte) (uint64, error) {
 }
 
 func (d *Decoder) DecodeInt64() (int64, error) {
-	c, err := d.r.ReadByte()
+	c, err := d.readByte()
 	if err != nil {
 		return 0, err
 	}
@@ -139,7 +139,7 @@ func (d *Decoder) int(c byte) (int64, error) {
 }
 
 func (d *Decoder) DecodeFloat32() (float32, error) {
-	c, err := d.r.ReadByte()
+	c, err := d.readByte()
 	if err != nil {
 		return 0, err
 	}
@@ -147,18 +147,23 @@ func (d *Decoder) DecodeFloat32() (float32, error) {
 }
 
 func (d *Decoder) float32(c byte) (float32, error) {
-	if c != codes.Float {
+	if c == codes.Float {
+		n, err := d.uint32()
+		if err != nil {
+			return 0, err
+		}
+		return math.Float32frombits(n), nil
+	}
+
+	n, err := d.int(c)
+	if err != nil {
 		return 0, fmt.Errorf("msgpack: invalid code %x decoding float32", c)
 	}
-	b, err := d.uint32()
-	if err != nil {
-		return 0, err
-	}
-	return math.Float32frombits(b), nil
+	return float32(n), nil
 }
 
 func (d *Decoder) DecodeFloat64() (float64, error) {
-	c, err := d.r.ReadByte()
+	c, err := d.readByte()
 	if err != nil {
 		return 0, err
 	}
@@ -166,18 +171,26 @@ func (d *Decoder) DecodeFloat64() (float64, error) {
 }
 
 func (d *Decoder) float64(c byte) (float64, error) {
-	if c == codes.Float {
+	switch c {
+	case codes.Float:
 		n, err := d.float32(c)
-		return float64(n), err
+		if err != nil {
+			return 0, err
+		}
+		return float64(n), nil
+	case codes.Double:
+		n, err := d.uint64()
+		if err != nil {
+			return 0, err
+		}
+		return math.Float64frombits(n), nil
 	}
-	if c != codes.Double {
-		return 0, fmt.Errorf("msgpack: invalid code %x decoding float64", c)
-	}
-	b, err := d.uint64()
+
+	n, err := d.int(c)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("msgpack: invalid code %x decoding float32", c)
 	}
-	return math.Float64frombits(b), nil
+	return float64(n), nil
 }
 
 func (d *Decoder) DecodeUint() (uint, error) {
