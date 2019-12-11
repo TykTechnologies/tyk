@@ -139,7 +139,7 @@ func gatherHealthChecks() {
 	setCurrentHealthCheckInfo(allInfos)
 }
 
-func liveCheck(w http.ResponseWriter, r *http.Request) {
+func liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		doJSONWrite(w, http.StatusMethodNotAllowed, apiError(http.StatusText(http.StatusMethodNotAllowed)))
 		return
@@ -162,11 +162,20 @@ func liveCheck(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if failCount == len(checks) {
-		res.Status = Fail
-	} else {
-		res.Status = Warn
+	var status HealthCheckStatus
+
+	switch failCount {
+	case 0:
+		status = Pass
+
+	case len(checks):
+		status = Fail
+
+	default:
+		status = Warn
 	}
+
+	res.Status = status
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(res)
