@@ -476,7 +476,7 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 			spec.Proxy.ListenPath = "/api"
 		})
 
-		ts.Run(t, test.TestCase{Path: "/sample", BodyMatch: "/api/get?param1=dummy", Code: 200})
+		ts.Run(t, test.TestCase{Path: "/sample", BodyMatch: `/api/get\?param1=dummy`, Code: 200})
 	})
 
 	t.Run("Endpoint with skip cleaning", func(t *testing.T) {
@@ -505,7 +505,7 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 			spec.Proxy.ListenPath = "/api"
 		})
 
-		ts.Run(t, test.TestCase{Path: "/sample/99999-XXXX+%2F%2F+dog+9+fff%C3%A9o+party", BodyMatch: "URI\":\"/sample/99999-XXXX+%2F%2F+dog+9+fff%C3%A9o+party", Code: 200})
+		ts.Run(t, test.TestCase{Path: "/sample/99999-XXXX+%2F%2F+dog+9+fff%C3%A9o+party", BodyMatch: `URI":"/sample/99999-XXXX\+%2F%2F\+dog\+9\+fff%C3%A9o\+party"`, Code: 200})
 	})
 }
 

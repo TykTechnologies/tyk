@@ -65,8 +65,8 @@ func TestURLRewrites(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/rewrite1?show_env=1", Code: http.StatusOK, BodyMatch: `"URI":"/get?show_env=2"`},
-			{Path: "/rewrite", Code: http.StatusOK, BodyMatch: `"URI":"/get?just_rewrite"`},
+			{Path: "/rewrite1?show_env=1", Code: http.StatusOK, BodyMatch: `"URI":"/get\?show_env=2"`},
+			{Path: "/rewrite", Code: http.StatusOK, BodyMatch: `"URI":"/get\?just_rewrite"`},
 		}...)
 	})
 }
