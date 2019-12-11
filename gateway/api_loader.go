@@ -703,7 +703,6 @@ func loadApps(specs []*APISpec) {
 	defaultProxyMux.swap(muxer)
 
 	if config.Global().LivenessCheck.Enabled {
-		initHealthCheck()
 		handler := checkIsAPIOwner(http.HandlerFunc(liveCheck))
 
 		if config.Global().LivenessCheck.Port <= 0 {

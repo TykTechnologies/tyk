@@ -1,10 +1,16 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"sync"
 	"sync/atomic"
+	"time"
+
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
+	"github.com/sirupsen/logrus"
 )
 
 type (
@@ -28,25 +34,25 @@ var (
 	healthCheckLock sync.Mutex
 )
 
-func setCurrentHealthCheckInfo(h []HealthCheckItem) {
+func setCurrentHealthCheckInfo(h map[string]HealthCheckItem) {
 	healthCheckLock.Lock()
 	healthCheckInfo.Store(h)
 	healthCheckLock.Unlock()
 }
 
-func getHealthCheckInfo() []HealthCheckItem {
+func getHealthCheckInfo() map[string]HealthCheckItem {
 	healthCheckLock.Lock()
-	ret := healthCheckInfo.Load().([]HealthCheckItem)
+	ret := healthCheckInfo.Load().(map[string]HealthCheckItem)
 	healthCheckLock.Unlock()
 	return ret
 }
 
 type HealthCheckResponse struct {
-	Status      HealthCheckStatus `json:"status"`
-	Version     string            `json:"version,omitempty"`
-	Output      string            `json:"output,omitempty"`
-	Description string            `json:"description,omitempty"`
-	Details     []HealthCheckItem `json:"details,omitempty"`
+	Status      HealthCheckStatus          `json:"status"`
+	Version     string                     `json:"version,omitempty"`
+	Output      string                     `json:"output,omitempty"`
+	Description string                     `json:"description,omitempty"`
+	Details     map[string]HealthCheckItem `json:"details,omitempty"`
 }
 
 type HealthCheckItem struct {
@@ -57,8 +63,80 @@ type HealthCheckItem struct {
 	Time          string            `json:"time"`
 }
 
-func initHealthCheck() {
-	setCurrentHealthCheckInfo([]HealthCheckItem{})
+func initHealthCheck(ctx context.Context) {
+	if config.Global().LivenessCheck.Enabled {
+
+		setCurrentHealthCheckInfo(make(map[string]HealthCheckItem, 3))
+
+		go func(ctx context.Context) {
+			ticker := time.NewTicker(time.Second * 30)
+
+			for {
+				select {
+				case <-ctx.Done():
+
+					ticker.Stop()
+					mainLog.WithFields(logrus.Fields{
+						"prefix": "health-check",
+					}).Debug("Stopping Health checks for all components")
+					return
+
+				case <-ticker.C:
+					gatherHealthChecks()
+				}
+			}
+		}(ctx)
+	}
+}
+
+func gatherHealthChecks() {
+
+	allInfos := make(map[string]HealthCheckItem, 3)
+
+	redisStore := storage.RedisCluster{KeyPrefix: "livenesscheck-"}
+
+	key := "tyk-liveness-probe"
+
+	var checkItem = HealthCheckItem{
+		Status:        Pass,
+		ComponentType: Datastore,
+		Time:          time.Now().Format(time.RFC3339),
+	}
+
+	err := redisStore.SetRawKey(key, key, 10)
+	if err != nil {
+		mainLog.WithField("liveness-check", true).WithError(err).Error("Redis health check failed")
+		checkItem.Output = err.Error()
+		checkItem.Status = Fail
+	}
+
+	allInfos["redis"] = checkItem
+
+	if config.Global().UseDBAppConfigs {
+		if err = DashService.Ping(); err != nil {
+			mainLog.WithField("liveness-check", true).Error(err)
+			checkItem.Output = err.Error()
+			checkItem.Status = Fail
+		}
+
+		checkItem.ComponentType = System
+		allInfos["dashboard"] = checkItem
+	}
+
+	if config.Global().Policies.PolicySource == "rpc" {
+		rpcStore := RPCStorageHandler{KeyPrefix: "livenesscheck-"}
+
+		if !rpcStore.Connect() {
+			checkItem.Output = err.Error()
+			checkItem.Status = Fail
+		}
+
+		checkItem.ComponentType = System
+
+		allInfos["rpc"] = checkItem
+	}
+
+	setCurrentHealthCheckInfo(allInfos)
 }
 
 func liveCheck(w http.ResponseWriter, r *http.Request) {
@@ -67,40 +145,27 @@ func liveCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// redisStore := storage.RedisCluster{KeyPrefix: "livenesscheck-"}
-
-	// key := "tyk-liveness-probe"
-
-	// err := redisStore.SetRawKey(key, key, 10)
-	// if err != nil {
-	// 	mainLog.WithField("liveness-check", true).Error(err)
-	// 	doJSONWrite(w, http.StatusServiceUnavailable, apiError("Gateway is not connected to Redis. An error occurred while writing key to Redis"))
-	// 	return
-	// }
-
-	// redisStore.DeleteRawKey(key)
-
-	// if config.Global().UseDBAppConfigs {
-	// 	if err = DashService.Ping(); err != nil {
-	// 		doJSONWrite(w, http.StatusServiceUnavailable, apiError("Dashboard is down. Gateway cannot connect to the dashboard"))
-	// 		return
-	// 	}
-	// }
-
-	// if config.Global().Policies.PolicySource == "rpc" {
-	// 	rpcStore := RPCStorageHandler{KeyPrefix: "livenesscheck-"}
-
-	// 	if !rpcStore.Connect() {
-	// 		doJSONWrite(w, http.StatusServiceUnavailable, apiError("RPC connection is down!!!"))
-	// 		return
-	// 	}
-	// }
+	checks := getHealthCheckInfo()
 
 	res := HealthCheckResponse{
 		Status:      Pass,
 		Version:     VERSION,
 		Description: "Tyk GW",
-		Details:     getHealthCheckInfo(),
+		Details:     checks,
+	}
+
+	var failCount int
+
+	for _, v := range checks {
+		if v.Status == Fail {
+			failCount++
+		}
+	}
+
+	if failCount == len(checks) {
+		res.Status = Fail
+	} else {
+		res.Status = Warn
 	}
 
 	w.WriteHeader(http.StatusOK)
