@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -24,27 +23,6 @@ type HealthChecker interface {
 	Init(storage.Handler)
 	ApiHealthValues() (HealthCheckValues, error)
 	StoreCounterVal(HealthPrefix, string)
-}
-
-type HealthCheckStatus string
-
-const (
-	Pass HealthCheckStatus = "pass"
-	Fail                   = "fail"
-	Warn                   = "warn"
-)
-
-type HealthCheckResponse struct {
-	Status  HealthCheckStatus `json:"status"`
-	Version string            `json:"version"`
-	Checks  []HealthCheckItem `json:"checks"`
-}
-
-type HealthCheckItem struct {
-	Status        HealthCheckStatus
-	Output        string
-	ComponentType string
-	Time          string
 }
 
 type HealthCheckValues struct {
@@ -154,43 +132,4 @@ func (h *DefaultHealthChecker) ApiHealthValues() (HealthCheckValues, error) {
 	}
 	values.AvgUpstreamLatency = roundValue(float64(runningTotal / len(vals)))
 	return values, nil
-}
-
-func liveCheck(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		doJSONWrite(w, http.StatusMethodNotAllowed, apiError(http.StatusText(http.StatusMethodNotAllowed)))
-		return
-	}
-
-	redisStore := storage.RedisCluster{KeyPrefix: "livenesscheck-"}
-
-	key := "tyk-liveness-probe"
-
-	err := redisStore.SetRawKey(key, key, 10)
-	if err != nil {
-		mainLog.WithField("liveness-check", true).Error(err)
-		doJSONWrite(w, http.StatusServiceUnavailable, apiError("Gateway is not connected to Redis. An error occurred while writing key to Redis"))
-		return
-	}
-
-	redisStore.DeleteRawKey(key)
-
-	if config.Global().UseDBAppConfigs {
-		if err = DashService.Ping(); err != nil {
-			doJSONWrite(w, http.StatusServiceUnavailable, apiError("Dashboard is down. Gateway cannot connect to the dashboard"))
-			return
-		}
-	}
-
-	if config.Global().Policies.PolicySource == "rpc" {
-		rpcStore := RPCStorageHandler{KeyPrefix: "livenesscheck-"}
-
-		if !rpcStore.Connect() {
-			doJSONWrite(w, http.StatusServiceUnavailable, apiError("RPC connection is down!!!"))
-			return
-		}
-	}
-
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`Gateway is alive!!!!`))
 }

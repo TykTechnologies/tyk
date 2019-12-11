@@ -703,19 +703,25 @@ func loadApps(specs []*APISpec) {
 	defaultProxyMux.swap(muxer)
 
 	if config.Global().LivenessCheck.Enabled {
+		initHealthCheck()
 		handler := checkIsAPIOwner(http.HandlerFunc(liveCheck))
 
 		if config.Global().LivenessCheck.Port <= 0 {
-			// If not port was defined, mount the liveness check on
-			// the main router
-			// muxer.Handle("/status", handler)
+			// var port = globalConf.ControlAPIPort
+			// if port == 0 {
+			// 	port = global.ListenPort
+			// }
+
+			// muxer.router(port, "")
+
+			// router.Handle("/status", handler)
 		} else {
 			l, err := net.Listen("tcp", fmt.Sprintf("%s:%d", config.Global().ListenAddress, config.Global().LivenessCheck.Port))
 			if err != nil {
 				mainLog.Errorf("an error occurred while creating the liveness check router.... %v", err)
 			} else {
 				livenessRouter := mux.NewRouter()
-				livenessRouter.Handle("/status", handler)
+				livenessRouter.Handle("/tyk/status", handler)
 
 				srv := &http.Server{
 					ReadTimeout:  time.Second * 5,
