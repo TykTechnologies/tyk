@@ -8,6 +8,7 @@ Google::Protobuf::DescriptorPool.generated_pool.build do
     optional :response_code, :int32, 1
     optional :response_error, :string, 2
     map :headers, :string, :string, 3
+    optional :disable_json_error, :bool, 4
   end
 end
 
