@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -27,7 +28,7 @@ type TestCase struct {
 	FormParams      map[string]string `json:",omitempty"`
 	Cookies         []*http.Cookie    `json:",omitempty"`
 	Delay           time.Duration     `json:",omitempty"`
-	BodyMatch       string            `json:",omitempty"`
+	BodyMatch       string            `json:",omitempty"` // regex
 	BodyMatchFunc   func([]byte) bool `json:",omitempty"`
 	BodyNotMatch    string            `json:",omitempty"`
 	HeadersMatch    map[string]string `json:",omitempty"`
@@ -50,8 +51,10 @@ func AssertResponse(resp *http.Response, tc *TestCase) error {
 		return fmt.Errorf("Expected status code `%d` got `%d. %s`", tc.Code, resp.StatusCode, string(body))
 	}
 
-	if tc.BodyMatch != "" && !bytes.Contains(body, []byte(tc.BodyMatch)) {
-		return fmt.Errorf("Response body does not contain `%s`. %s", tc.BodyMatch, string(body))
+	if tc.BodyMatch != "" {
+		if bodyMatch := regexp.MustCompile(tc.BodyMatch); !bodyMatch.MatchString(string(body)) {
+			return fmt.Errorf("Response body does not match with regex `%s`. %s", tc.BodyMatch, string(body))
+		}
 	}
 
 	if tc.BodyNotMatch != "" && bytes.Contains(body, []byte(tc.BodyNotMatch)) {

@@ -155,8 +155,8 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/(abc,xyz)?arg=val", BodyMatch: `"Url":"/%28abc,xyz%29?arg=val`},
-			{Path: "/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/%28abc,xyz%29?arg=val`},
+			{Path: "/(abc,xyz)?arg=val", BodyMatch: `"Url":"/%28abc,xyz%29\?arg=val`},
+			{Path: "/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/%28abc,xyz%29\?arg=val`},
 		}...)
 	})
 
@@ -170,8 +170,8 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/(abc,xyz)?arg=val", BodyMatch: `"Url":"/(abc,xyz)?arg=val"`},
-			{Path: "/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/%28abc,xyz%29?arg=val"`},
+			{Path: "/(abc,xyz)?arg=val", BodyMatch: `"Url":"/\(abc,xyz\)\?arg=val"`},
+			{Path: "/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/%28abc,xyz%29\?arg=val"`},
 		}...)
 	})
 
@@ -187,8 +187,8 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29?arg=val"`},
-			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29?arg=val"`},
+			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29\?arg=val"`},
+			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29\?arg=val"`},
 		}...)
 	})
 
@@ -204,8 +204,8 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/(abc,xyz)?arg=val"`},
-			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29?arg=val"`},
+			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/\(abc,xyz\)\?arg=val"`},
+			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29\?arg=val"`},
 		}...)
 	})
 
@@ -221,8 +221,8 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29?arg=val"`},
-			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29?arg=val"`},
+			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29\?arg=val"`},
+			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29\?arg=val"`},
 		}...)
 	})
 
@@ -238,8 +238,8 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/(abc,xyz)?arg=val"`},
-			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29?arg=val"`},
+			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/\(abc,xyz\)\?arg=val"`},
+			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29\?arg=val"`},
 		}...)
 	})
 }
@@ -271,7 +271,7 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/abc/xyz/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/abc/xyz/http%3A%2F%2Ftest.com?arg=val`},
+			{Path: "/abc/xyz/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/abc/xyz/http%3A%2F%2Ftest.com\?arg=val`},
 		}...)
 	})
 
@@ -285,7 +285,7 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/abc/xyz/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/abc/xyz/http%3A%2F%2Ftest.com?arg=val`},
+			{Path: "/abc/xyz/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/abc/xyz/http%3A%2F%2Ftest.com\?arg=val`},
 		}...)
 	})
 
@@ -301,9 +301,9 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29?arg=val"`},
-			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29?arg=val"`},
-			{Path: "/listen_me/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/http%3A%2F%2Ftest.com?arg=val`},
+			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29\?arg=val"`},
+			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29\?arg=val"`},
+			{Path: "/listen_me/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/http%3A%2F%2Ftest.com\?arg=val`},
 		}...)
 	})
 
@@ -319,9 +319,9 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/(abc,xyz)?arg=val"`},
-			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29?arg=val"`},
-			{Path: "/listen_me/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/http%3A%2F%2Ftest.com?arg=val`},
+			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/\(abc,xyz\)\?arg=val"`},
+			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29\?arg=val"`},
+			{Path: "/listen_me/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/http%3A%2F%2Ftest.com\?arg=val`},
 		}...)
 	})
 
@@ -337,9 +337,9 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29?arg=val"`},
-			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29?arg=val"`},
-			{Path: "/listen_me/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/sent_to_me/http%3A%2F%2Ftest.com?arg=val`},
+			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29\?arg=val"`},
+			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29\?arg=val"`},
+			{Path: "/listen_me/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/sent_to_me/http%3A%2F%2Ftest.com\?arg=val`},
 		}...)
 	})
 
@@ -355,9 +355,9 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/(abc,xyz)?arg=val"`},
-			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29?arg=val"`},
-			{Path: "/listen_me/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/sent_to_me/http%3A%2F%2Ftest.com?arg=val`},
+			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/\(abc,xyz\)\?arg=val"`},
+			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29\?arg=val"`},
+			{Path: "/listen_me/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/sent_to_me/http%3A%2F%2Ftest.com\?arg=val`},
 		}...)
 	})
 
@@ -677,7 +677,7 @@ func TestListener(t *testing.T) {
 	// Specs will be reseted when we do `StartTest`
 	specs := BuildAndLoadAPI()
 	specJSON, _ := json.Marshal(specs[0].APIDefinition)
-	listJSON := fmt.Sprintf("[%s]", string(specJSON))
+	listJSON := fmt.Sprintf(`\[%s\]`, string(specJSON))
 
 	ts := StartTest()
 	defer ts.Close()
@@ -689,11 +689,11 @@ func TestListener(t *testing.T) {
 
 		{Method: "GET", Path: "/sample", Code: 404},
 		{Method: "GET", Path: "/tyk/apis/", Code: 403},
-		{Method: "GET", Path: "/tyk/apis/", AdminAuth: true, Code: 200, BodyMatch: "[]"},
+		{Method: "GET", Path: "/tyk/apis/", AdminAuth: true, Code: 200, BodyMatch: `\[\]`},
 		{Method: "GET", Path: "/tyk/apis", Code: 403},
 		{Method: "GET", Path: "/tyk/apis", AdminAuth: true, Code: 200},
 		{Method: "POST", Path: "/tyk/apis", Data: sampleAPI, AdminAuth: true, Code: 200},
-		{Method: "GET", Path: "/tyk/apis/", AdminAuth: true, Code: 200, BodyMatch: "[]"},
+		{Method: "GET", Path: "/tyk/apis/", AdminAuth: true, Code: 200, BodyMatch: `\[\]`},
 		{Method: "POST", Path: "/tyk/apis/mismatch", AdminAuth: true, Code: 400},
 		{Method: "GET", Path: "/tyk/apis/test", AdminAuth: true, Code: 404},
 		// API definitions not reloaded yet
