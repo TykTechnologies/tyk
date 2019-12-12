@@ -406,27 +406,47 @@ func (r *RedisCluster) GetKeys(filter string) []string {
 	}
 	searchStr := r.KeyPrefix + filterHash + "*"
 	log.Debug("[STORE] Getting list by: ", searchStr)
-	sessions := make([]string, 0)
 
-	fnFetchKeys := func(client *redis.Client) error {
+	fnFetchKeys := func(client *redis.Client) ([]string, error) {
+		values := make([]string, 0)
+
 		iter := client.Scan(0, searchStr, 0).Iterator()
 		for iter.Next() {
-			sessions = append(sessions, iter.Val())
+			values = append(values, iter.Val())
 		}
 
 		if err := iter.Err(); err != nil {
-			return err
+			return nil, err
 		}
 
-		return nil
+		return values, nil
 	}
 
 	var err error
+	sessions := make([]string, 0)
+
 	switch v := client.(type) {
 	case *redis.ClusterClient:
-		err = v.ForEachMaster(fnFetchKeys)
+		ch := make(chan []string)
+
+		go func() {
+			err = v.ForEachMaster(func(client *redis.Client) error {
+				values, err := fnFetchKeys(client)
+				if err != nil {
+					return err
+				}
+
+				ch <- values
+				return nil
+			})
+		}()
+
+		close(ch)
+		for res := range ch {
+			sessions = append(sessions, res...)
+		}
 	case *redis.Client:
-		err = fnFetchKeys(v)
+		sessions, err = fnFetchKeys(v)
 	}
 
 	if err != nil {
@@ -556,28 +576,45 @@ func (r *RedisCluster) DeleteScanMatch(pattern string) bool {
 	client := r.singleton()
 	log.Debug("Deleting: ", pattern)
 
-	// this will store the keys of each iteration
-	var keys []string
+	fnScan := func(client *redis.Client) ([]string, error) {
+		values := make([]string, 0)
 
-	fnScan := func(client *redis.Client) error {
 		iter := client.Scan(0, pattern, 0).Iterator()
 		for iter.Next() {
-			keys = append(keys, iter.Val())
+			values = append(values, iter.Val())
 		}
 
 		if err := iter.Err(); err != nil {
-			return err
+			return nil, err
 		}
 
-		return nil
+		return values, nil
 	}
 
 	var err error
+	var keys []string
+
 	switch v := client.(type) {
 	case *redis.ClusterClient:
-		err = v.ForEachMaster(fnScan)
+		ch := make(chan []string)
+		go func() {
+			err = v.ForEachMaster(func(client *redis.Client) error {
+				values, err := fnScan(client)
+				if err != nil {
+					return err
+				}
+
+				ch <- values
+				return nil
+			})
+		}()
+		close(ch)
+
+		for vals := range ch {
+			keys = append(keys, vals...)
+		}
 	case *redis.Client:
-		err = fnScan(v)
+		keys, err = fnScan(v)
 	}
 
 	if err != nil {
