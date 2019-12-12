@@ -39,7 +39,7 @@ func prepareStorage() generalStores {
 	gs.healthStore = &storage.RedisCluster{KeyPrefix: "apihealth."}
 	gs.rpcAuthStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
 	gs.rpcOrgStore = &RPCStorageHandler{KeyPrefix: "orgkey."}
-	FallbackKeySesionManager.Init(gs.redisStore)
+	GlobalSessionManager.Init(gs.redisStore)
 	return gs
 }
 
@@ -303,12 +303,12 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		}
 	}
 
+	mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &RateCheckMW{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid})
-	mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid})
 	mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid})
@@ -323,7 +323,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 			logger.Info("Checking security policy: Basic")
 		}
 
-		if mwAppendEnabled(&authArray, &HMACMiddleware{BaseMiddleware: baseMid}) {
+		if mwAppendEnabled(&authArray, &HTTPSignatureValidationMiddleware{BaseMiddleware: baseMid}) {
 			logger.Info("Checking security policy: HMAC")
 		}
 
@@ -673,6 +673,7 @@ func loadApps(specs []*APISpec) {
 		muxer.setRouter(globalConf.ControlAPIPort, "", router)
 	}
 	gs := prepareStorage()
+	shouldTrace := trace.IsEnabled()
 	for _, spec := range specs {
 		if spec.ListenPort != spec.GlobalConfig.ListenPort {
 			mainLog.Info("API bind on custom port:", spec.ListenPort)
@@ -682,6 +683,15 @@ func loadApps(specs []*APISpec) {
 
 		switch spec.Protocol {
 		case "", "http", "https":
+			if shouldTrace {
+				// opentracing works only with http services.
+				err := trace.AddTracer("", spec.Name)
+				if err != nil {
+					mainLog.Errorf("Failed to initialize tracer for %q error:%v", spec.Name, err)
+				} else {
+					mainLog.Infof("Intialized tracer  api_name=%q", spec.Name)
+				}
+			}
 			loadHTTPService(spec, apisByListen, &gs, muxer)
 		case "tcp", "tls":
 			loadTCPService(spec, &gs, muxer)
@@ -692,6 +702,12 @@ func loadApps(specs []*APISpec) {
 
 	// Swap in the new register
 	apisMu.Lock()
+
+	// release current specs resources before overwriting map
+	for _, curSpec := range apisByID {
+		curSpec.Release()
+	}
+
 	apisByID = tmpSpecRegister
 	apisMu.Unlock()
 

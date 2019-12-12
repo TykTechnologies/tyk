@@ -8,8 +8,6 @@ github.com/Masterminds/goutils
 github.com/Masterminds/semver
 # github.com/TykTechnologies/again v0.0.0-20190805133618-6ad301e7eaed
 github.com/TykTechnologies/again
-# github.com/TykTechnologies/concurrent-map v0.0.0-20160908201409-7de59d53fd5c
-github.com/TykTechnologies/concurrent-map
 # github.com/TykTechnologies/drl v0.0.0-20190905191955-cc541aa8e3e1
 github.com/TykTechnologies/drl
 # github.com/TykTechnologies/goautosocket v0.0.0-20190430121222-97bfa5e7e481
@@ -23,14 +21,10 @@ github.com/TykTechnologies/goverify
 # github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c
 github.com/TykTechnologies/leakybucket
 github.com/TykTechnologies/leakybucket/memorycache
-# github.com/TykTechnologies/logrus v0.11.0
-github.com/TykTechnologies/logrus
 # github.com/TykTechnologies/murmur3 v0.0.0-20180602122059-1915e687e465
 github.com/TykTechnologies/murmur3
 # github.com/TykTechnologies/openid2go v0.0.0-20160817213554-aab5ce1231ab
 github.com/TykTechnologies/openid2go/openid
-# github.com/TykTechnologies/redigocluster v0.0.0-20190313170440-9814972a6f69
-github.com/TykTechnologies/redigocluster/rediscluster
 # github.com/agext/levenshtein v1.2.2
 github.com/agext/levenshtein
 # github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc
@@ -64,13 +58,18 @@ github.com/facebookgo/clock
 github.com/facebookgo/pidfile
 # github.com/franela/goreq v0.0.0-20171204163338-bcd34c9993f8
 github.com/franela/goreq
-# github.com/garyburd/redigo v1.6.0
-github.com/garyburd/redigo/redis
-github.com/garyburd/redigo/internal
 # github.com/gemnasium/logrus-graylog-hook v2.0.7+incompatible
 github.com/gemnasium/logrus-graylog-hook
 # github.com/getsentry/raven-go v0.2.0
 github.com/getsentry/raven-go
+# github.com/go-redis/redis v6.15.6+incompatible
+github.com/go-redis/redis
+github.com/go-redis/redis/internal
+github.com/go-redis/redis/internal/consistenthash
+github.com/go-redis/redis/internal/hashtag
+github.com/go-redis/redis/internal/pool
+github.com/go-redis/redis/internal/proto
+github.com/go-redis/redis/internal/util
 # github.com/gocraft/health v0.0.0-20170925182251-8675af27fef0
 github.com/gocraft/health
 github.com/gocraft/health/stack
@@ -80,9 +79,6 @@ github.com/golang/protobuf/ptypes
 github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes/duration
 github.com/golang/protobuf/ptypes/timestamp
-# github.com/gomodule/redigo v2.0.0+incompatible
-github.com/gomodule/redigo/redis
-github.com/gomodule/redigo/internal
 # github.com/google/uuid v1.1.1
 github.com/google/uuid
 # github.com/gorilla/mux v1.7.3

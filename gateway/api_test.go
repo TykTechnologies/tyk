@@ -12,12 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/garyburd/redigo/redis"
+	"github.com/go-redis/redis"
 	uuid "github.com/satori/go.uuid"
 
 	"fmt"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
@@ -41,16 +40,6 @@ const apiTestDef = `{
 		"target_url": "` + TestHttpAny + `"
 	}
 }`
-
-func loadSampleAPI(t *testing.T, def string) {
-	spec := CreateSpecTest(t, def)
-	loadApps([]*APISpec{spec})
-}
-
-type testAPIDefinition struct {
-	apidef.APIDefinition
-	ID string `json:"id"`
-}
 
 func TestHealthCheckEndpoint(t *testing.T) {
 	globalConf := config.Global()
@@ -247,7 +236,7 @@ func TestKeyHandler(t *testing.T) {
 			},
 		}...)
 
-		FallbackKeySesionManager.Store().DeleteAllKeys()
+		GlobalSessionManager.Store().DeleteAllKeys()
 	})
 
 	_, knownKey := ts.CreateSession(func(s *user.SessionState) {
@@ -372,7 +361,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
 		}...)
 
-		sessionState, found := FallbackKeySesionManager.SessionDetail(key, false)
+		sessionState, found := GlobalSessionManager.SessionDetail("default", key, false)
 		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 2 {
 			t.Fatal("Adding policy to the list failed")
 		}
@@ -387,7 +376,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
 		}...)
 
-		sessionState, found := FallbackKeySesionManager.SessionDetail(key, false)
+		sessionState, found := GlobalSessionManager.SessionDetail("default", key, false)
 		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 0 {
 			t.Fatal("Removing policy from the list failed")
 		}
@@ -402,7 +391,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 				{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
 			}...)
 
-			sessionState, found := FallbackKeySesionManager.SessionDetail(key, false)
+			sessionState, found := GlobalSessionManager.SessionDetail(session.OrgID, key, false)
 
 			sort.Strings(sessionState.Tags)
 			sort.Strings(expected)
@@ -913,9 +902,9 @@ func TestGetOAuthClients(t *testing.T) {
 
 	ts.Run(t, []test.TestCase{
 		{Path: "/tyk/oauth/clients/unknown", AdminAuth: true, Code: 404},
-		{Path: "/tyk/oauth/clients/test", AdminAuth: true, Code: 200, BodyMatch: `[]`},
+		{Path: "/tyk/oauth/clients/test", AdminAuth: true, Code: 200, BodyMatch: `\[\]`},
 		{Method: "POST", Path: "/tyk/oauth/clients/create", AdminAuth: true, Data: string(validOauthRequest), Code: 200},
-		{Path: "/tyk/oauth/clients/test", AdminAuth: true, Code: 200, BodyMatch: `[{"client_id":"test"`},
+		{Path: "/tyk/oauth/clients/test", AdminAuth: true, Code: 200, BodyMatch: `\[{"client_id":"test"`},
 	}...)
 }
 
@@ -1149,11 +1138,11 @@ func TestGroupResetHandler(t *testing.T) {
 	go func() {
 		err := cacheStore.StartPubSubHandler(RedisPubSubChannel, func(v interface{}) {
 			switch x := v.(type) {
-			case redis.Subscription:
+			case *redis.Subscription:
 				didSubscribe <- true
-			case redis.Message:
+			case *redis.Message:
 				notf := Notification{}
-				if err := json.Unmarshal(x.Data, &notf); err != nil {
+				if err := json.Unmarshal([]byte(x.Payload), &notf); err != nil {
 					t.Fatal(err)
 				}
 				if notf.Command == NoticeGroupReload {
@@ -1174,7 +1163,7 @@ func TestGroupResetHandler(t *testing.T) {
 	apisByID = make(map[string]*APISpec)
 	apisMu.Unlock()
 
-	loadSampleAPI(t, apiTestDef)
+	LoadSampleAPI(apiTestDef)
 
 	recorder := httptest.NewRecorder()
 

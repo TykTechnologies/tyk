@@ -193,10 +193,6 @@ func (l LDAPStorageHandler) AppendToSet(keyName, value string) {
 	log.Error("Not implemented")
 }
 
-func (r *LDAPStorageHandler) AppendToSetPipelined(key string, values []string) {
-	log.Error("Not implemented")
-}
-
 func (l LDAPStorageHandler) RemoveFromSet(keyName, value string) {
 	log.Error("Not implemented")
 }

@@ -18,20 +18,6 @@ import (
 	"sync"
 	"time"
 
-	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
-	"github.com/evalphobia/logrus_sentry"
-	"github.com/facebookgo/pidfile"
-	graylogHook "github.com/gemnasium/logrus-graylog-hook"
-	"github.com/gorilla/mux"
-	"github.com/justinas/alice"
-	"github.com/lonelycode/osin"
-	newrelic "github.com/newrelic/go-agent"
-	"github.com/rs/cors"
-	uuid "github.com/satori/go.uuid"
-	"github.com/sirupsen/logrus"
-	logrus_syslog "github.com/sirupsen/logrus/hooks/syslog"
-	"rsc.io/letsencrypt"
-
 	"github.com/TykTechnologies/again"
 	gas "github.com/TykTechnologies/goautosocket"
 	"github.com/TykTechnologies/gorpc"
@@ -48,26 +34,39 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
+	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
+	"github.com/evalphobia/logrus_sentry"
+	"github.com/facebookgo/pidfile"
+	graylogHook "github.com/gemnasium/logrus-graylog-hook"
+	"github.com/gorilla/mux"
+	"github.com/justinas/alice"
+	"github.com/lonelycode/osin"
+	newrelic "github.com/newrelic/go-agent"
+	"github.com/rs/cors"
+	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
+	logrus_syslog "github.com/sirupsen/logrus/hooks/syslog"
+	"rsc.io/letsencrypt"
 )
 
 var (
-	log                      = logger.Get()
-	mainLog                  = log.WithField("prefix", "main")
-	pubSubLog                = log.WithField("prefix", "pub-sub")
-	rawLog                   = logger.GetRaw()
-	templates                *template.Template
-	analytics                RedisAnalyticsHandler
-	GlobalEventsJSVM         JSVM
-	memProfFile              *os.File
-	MainNotifier             RedisNotifier
-	DefaultOrgStore          DefaultSessionManager
-	DefaultQuotaStore        DefaultSessionManager
-	FallbackKeySesionManager = SessionHandler(&DefaultSessionManager{})
-	MonitoringHandler        config.TykEventHandler
-	RPCListener              RPCStorageHandler
-	DashService              DashboardServiceSender
-	CertificateManager       *certs.CertificateManager
-	NewRelicApplication      newrelic.Application
+	log                  = logger.Get()
+	mainLog              = log.WithField("prefix", "main")
+	pubSubLog            = log.WithField("prefix", "pub-sub")
+	rawLog               = logger.GetRaw()
+	templates            *template.Template
+	analytics            RedisAnalyticsHandler
+	GlobalEventsJSVM     JSVM
+	memProfFile          *os.File
+	MainNotifier         RedisNotifier
+	DefaultOrgStore      DefaultSessionManager
+	DefaultQuotaStore    DefaultSessionManager
+	GlobalSessionManager = SessionHandler(&DefaultSessionManager{})
+	MonitoringHandler    config.TykEventHandler
+	RPCListener          RPCStorageHandler
+	DashService          DashboardServiceSender
+	CertificateManager   *certs.CertificateManager
+	NewRelicApplication  newrelic.Application
 
 	apisMu   sync.RWMutex
 	apiSpecs []*APISpec
@@ -152,9 +151,10 @@ var rpcPurgeOnce sync.Once
 
 // Create all globals and init connection handlers
 func setupGlobals(ctx context.Context) {
-
 	reloadMu.Lock()
 	defer reloadMu.Unlock()
+
+	checkup.Run(config.Global())
 
 	dnsCacheManager = dnscache.NewDnsCacheManager(config.Global().DnsCache.MultipleIPsHandleStrategy)
 	if config.Global().DnsCache.Enabled {
@@ -172,7 +172,7 @@ func setupGlobals(ctx context.Context) {
 	InitHostCheckManager(ctx, &healthCheckStore)
 
 	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
-	FallbackKeySesionManager.Init(&redisStore)
+	GlobalSessionManager.Init(&redisStore)
 
 	versionStore := storage.RedisCluster{KeyPrefix: "version-check-"}
 	versionStore.Connect()
@@ -486,7 +486,13 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 	clientAccessPath := spec.Proxy.ListenPath + "oauth/token{_:/?}"
 
 	serverConfig := osin.NewServerConfig()
-	serverConfig.ErrorStatusCode = http.StatusForbidden
+
+	if config.Global().OauthErrorStatusCode != 0 {
+		serverConfig.ErrorStatusCode = config.Global().OauthErrorStatusCode
+	} else {
+		serverConfig.ErrorStatusCode = http.StatusForbidden
+	}
+
 	serverConfig.AllowedAccessTypes = spec.Oauth2Meta.AllowedAccessTypes
 	serverConfig.AllowedAuthorizeTypes = spec.Oauth2Meta.AllowedAuthorizeTypes
 	serverConfig.RedirectUriSeparator = config.Global().OauthRedirectUriSeparator
@@ -494,7 +500,7 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 	prefix := generateOAuthPrefix(spec.APIID)
 	storageManager := getGlobalStorageHandler(prefix, false)
 	storageManager.Connect()
-	osinStorage := &RedisOsinStorageInterface{storageManager, spec.SessionManager} //TODO: Needs storage manager from APISpec
+	osinStorage := &RedisOsinStorageInterface{storageManager, GlobalSessionManager, spec.OrgID}
 
 	osinServer := TykOsinNewServer(serverConfig, osinStorage)
 
@@ -1043,7 +1049,6 @@ func Start() {
 	if err != nil {
 		mainLog.Errorf("Initializing again %s", err)
 	}
-	checkup.Run(config.Global())
 	if tr := config.Global().Tracer; tr.Enabled {
 		trace.SetupTracing(tr.Name, tr.Options)
 		trace.SetLogger(mainLog)

@@ -38,41 +38,17 @@ func (k *AuthKey) setContextVars(r *http.Request, token string) {
 	}
 }
 
+// getAuthType overrides BaseMiddleware.getAuthType.
+func (k *AuthKey) getAuthType() string {
+	return authTokenType
+}
+
 func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	config := k.Spec.Auth
-
-	key := r.Header.Get(config.AuthHeaderName)
-
-	paramName := config.ParamName
-	if config.UseParam || paramName != "" {
-		if paramName == "" {
-			paramName = config.AuthHeaderName
-		}
-
-		paramValue := r.URL.Query().Get(paramName)
-
-		// Only use the paramValue if it has an actual value
-		if paramValue != "" {
-			key = paramValue
-		}
+	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
+		return nil, http.StatusOK
 	}
 
-	cookieName := config.CookieName
-	if config.UseCookie || cookieName != "" {
-		if cookieName == "" {
-			cookieName = config.AuthHeaderName
-		}
-
-		authCookie, err := r.Cookie(cookieName)
-		cookieValue := ""
-		if err == nil {
-			cookieValue = authCookie.Value
-		}
-
-		if cookieValue != "" {
-			key = cookieValue
-		}
-	}
+	key, config := k.getAuthToken(k.getAuthType(), r)
 
 	// If key not provided in header or cookie and client certificate is provided, try to find certificate based key
 	if config.UseCertificate && key == "" && r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {

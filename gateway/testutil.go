@@ -5,18 +5,16 @@ import (
 	"bytes"
 	"compress/gzip"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"net/http/httptest"
-
-	"golang.org/x/net/context"
-
 	"io"
 	"io/ioutil"
 	"math/rand"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -26,15 +24,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/cli"
-
 	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/garyburd/redigo/redis"
+	"github.com/go-redis/redis"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	uuid "github.com/satori/go.uuid"
+	"golang.org/x/net/context"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
@@ -151,16 +149,13 @@ func ResetTestConfig() {
 
 func emptyRedis() error {
 	addr := config.Global().Storage.Host + ":" + strconv.Itoa(config.Global().Storage.Port)
-	c, err := redis.Dial("tcp", addr)
-	if err != nil {
-		return fmt.Errorf("could not connect to redis: %v", err)
-	}
+	c := redis.NewClient(&redis.Options{Addr: addr})
 	defer c.Close()
 	dbName := strconv.Itoa(config.Global().Storage.Database)
-	if _, err := c.Do("SELECT", dbName); err != nil {
+	if err := c.Do("SELECT", dbName).Err(); err != nil {
 		return err
 	}
-	_, err = c.Do("FLUSHDB")
+	err := c.FlushDB().Err()
 	return err
 }
 
@@ -367,6 +362,7 @@ func testHttpHandler() *mux.Router {
 	// use gorilla's mux as it allows to cancel URI cleaning
 	// (it is not configurable in standard http mux)
 	r := mux.NewRouter()
+
 	r.HandleFunc("/get", handleMethod("GET"))
 	r.HandleFunc("/post", handleMethod("POST"))
 	r.HandleFunc("/ws", wsHandler)
@@ -381,6 +377,10 @@ func testHttpHandler() *mux.Router {
 		gz.Close()
 	})
 	r.HandleFunc("/bundles/{rest:.*}", bundleHandleFunc)
+	r.HandleFunc("/errors/{status}", func(w http.ResponseWriter, r *http.Request) {
+		statusCode, _ := strconv.Atoi(mux.Vars(r)["status"])
+		httpError(w, statusCode)
+	})
 	r.HandleFunc("/{rest:.*}", handleMethod(""))
 
 	return r
@@ -416,7 +416,7 @@ func CreateSession(sGen ...func(s *user.SessionState)) string {
 		key = generateToken("default", session.Certificate)
 	}
 
-	FallbackKeySesionManager.UpdateSession(storage.HashKey(key), session, 60, config.Global().HashKeys)
+	GlobalSessionManager.UpdateSession(storage.HashKey(key), session, 60, config.Global().HashKeys)
 	return key
 }
 
@@ -535,14 +535,10 @@ func CreateDefinitionFromString(defStr string) *APISpec {
 	return spec
 }
 
-func CreateSpecTest(t testing.TB, def string) *APISpec {
-	spec := CreateDefinitionFromString(def)
-	tname := t.Name()
-	redisStore := &storage.RedisCluster{KeyPrefix: tname + "-apikey."}
-	healthStore := &storage.RedisCluster{KeyPrefix: tname + "-apihealth."}
-	orgStore := &storage.RedisCluster{KeyPrefix: tname + "-orgKey."}
-	spec.Init(redisStore, redisStore, healthStore, orgStore)
-	return spec
+func LoadSampleAPI(def string) (spec *APISpec) {
+	spec = CreateDefinitionFromString(def)
+	loadApps([]*APISpec{spec})
+	return
 }
 
 func firstVals(vals map[string][]string) map[string]string {
@@ -683,16 +679,41 @@ func (s *Test) RunExt(t testing.TB, testCases ...test.TestCase) {
 	}
 }
 
+func GetTLSClient(cert *tls.Certificate, caCert []byte) *http.Client {
+	// Setup HTTPS client
+	tlsConfig := &tls.Config{}
+
+	if cert != nil {
+		tlsConfig.Certificates = []tls.Certificate{*cert}
+	}
+
+	if len(caCert) > 0 {
+		caCertPool := x509.NewCertPool()
+		caCertPool.AppendCertsFromPEM(caCert)
+		tlsConfig.RootCAs = caCertPool
+		tlsConfig.BuildNameToCertificate()
+	} else {
+		tlsConfig.InsecureSkipVerify = true
+	}
+
+	transport := &http.Transport{TLSClientConfig: tlsConfig}
+
+	return &http.Client{Transport: transport}
+}
+
 func (s *Test) CreateSession(sGen ...func(s *user.SessionState)) (*user.SessionState, string) {
 	session := CreateStandardSession()
 	if len(sGen) > 0 {
 		sGen[0](session)
 	}
 
+	client := GetTLSClient(nil, nil)
+
 	resp, err := s.Do(test.TestCase{
 		Method:    http.MethodPost,
 		Path:      "/tyk/keys/create",
 		Data:      session,
+		Client:    client,
 		AdminAuth: true,
 	})
 
@@ -814,7 +835,6 @@ func BuildAndLoadAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 
 func CloneAPI(a *APISpec) *APISpec {
 	new := &APISpec{}
-	*new = *a
 	new.APIDefinition = &apidef.APIDefinition{}
 	*new.APIDefinition = *a.APIDefinition
 

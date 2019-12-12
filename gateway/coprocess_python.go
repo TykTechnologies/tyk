@@ -152,7 +152,8 @@ func (d *PythonDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, baseP
 func PythonInit() error {
 	ver, err := python.FindPythonConfig(config.Global().CoProcessOptions.PythonVersion)
 	if err != nil {
-		return fmt.Errorf("Python version '%s' doesn't exist", ver)
+		log.WithError(err).Errorf("Python version '%s' doesn't exist", ver)
+		return fmt.Errorf("python version '%s' doesn't exist", ver)
 	}
 	err = python.Init()
 	if err != nil {

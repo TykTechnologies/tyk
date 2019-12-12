@@ -320,7 +320,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	// Record analytics
 	if !m.Spec.DoNotTrack {
-		m.sh.RecordHit(r, 0, newRes.StatusCode, newRes)
+		m.sh.RecordHit(r, Latency{}, newRes.StatusCode, newRes)
 	}
 
 	// Stop any further execution

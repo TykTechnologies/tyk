@@ -504,7 +504,7 @@ func (j *JSVM) LoadTykJSApi() {
 			tr.TLSClientConfig.InsecureSkipVerify = true
 		}
 
-		tr.DialTLS = dialTLSPinnedCheck(j.Spec, tr.TLSClientConfig)
+		tr.DialTLS = customDialTLSCheck(j.Spec, tr.TLSClientConfig)
 
 		tr.Proxy = proxyFromAPI(j.Spec)
 

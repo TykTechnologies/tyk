@@ -24,8 +24,6 @@ github.com/Shopify/sarama v1.19.0/go.mod h1:FVkBWblsNy7DGZRfXLU0O9RCGt5g3g3yEuWX
 github.com/Shopify/toxiproxy v2.1.4+incompatible/go.mod h1:OXgGpZ6Cli1/URJOF1DMxUHB2q5Ap20/P/eIdh4G0pI=
 github.com/TykTechnologies/again v0.0.0-20190805133618-6ad301e7eaed h1:/h52kySW055ZF4boJc9tcuQhR909ubCiMN64EMBEu8Q=
 github.com/TykTechnologies/again v0.0.0-20190805133618-6ad301e7eaed/go.mod h1:OUrgdjjCoYX2GZY9Vathb4ExCO9WuPtU1piuOpNw19Q=
-github.com/TykTechnologies/concurrent-map v0.0.0-20160908201409-7de59d53fd5c h1:3Z9f8SxMEDsUTRILrSG7NzkF8d0zRzfNm6Cy7GsbFC8=
-github.com/TykTechnologies/concurrent-map v0.0.0-20160908201409-7de59d53fd5c/go.mod h1:8hNDL3WHhlNtAoBLaP7Ux1DlVdJJkUum5LgDS2Hn5RQ=
 github.com/TykTechnologies/drl v0.0.0-20190905191955-cc541aa8e3e1 h1:LimXJxKH+ovz0NrcU3Ue/cYhzN4xu5sJsID0RwjSd1k=
 github.com/TykTechnologies/drl v0.0.0-20190905191955-cc541aa8e3e1/go.mod h1:dLW6S3KuurRuyluxy33i57uYuTB1s/u+L8mCT0fqb98=
 github.com/TykTechnologies/goautosocket v0.0.0-20190430121222-97bfa5e7e481 h1:fPcSnu5/IBgyqf73GHA99QuwMDbfWH+L4BEX9EZ5kUo=
@@ -38,14 +36,10 @@ github.com/TykTechnologies/goverify v0.0.0-20160822133757-7ccc57452ade h1:tFUV86
 github.com/TykTechnologies/goverify v0.0.0-20160822133757-7ccc57452ade/go.mod h1:mkS8jKcz8otdfEXhJs1QQ/DKoIY1NFFsRPKS0RwQENI=
 github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c h1:j6fd0Fz1R4oSWOmcooGjrdahqrML+btQ+PfEJw8SzbA=
 github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c/go.mod h1:GnHUbsQx+ysI10osPhUdTmsxcE7ef64cVp38Fdyd7e0=
-github.com/TykTechnologies/logrus v0.11.0 h1:+1gLYGHvkJGpF6qP0y4/Pz97jLrVph8wMp2wRyzddBc=
-github.com/TykTechnologies/logrus v0.11.0/go.mod h1:EcLfVrQ+2zJYW2OpH1cCKVm7kXMsvHCAietI9LJek/Y=
 github.com/TykTechnologies/murmur3 v0.0.0-20180602122059-1915e687e465 h1:A2gBjoX8aF0G3GHEpHyj2f0ixuPkCgcGqmPdKHSkW+0=
 github.com/TykTechnologies/murmur3 v0.0.0-20180602122059-1915e687e465/go.mod h1:sqH/SPFr11m9cahie7ulBuBX9TOhfBX1sp+qf9jh3Vg=
 github.com/TykTechnologies/openid2go v0.0.0-20160817213554-aab5ce1231ab h1:mDQXuVURkWTbTPlxOWom6c68xdWzp6HQeWAEqv4l7Vo=
 github.com/TykTechnologies/openid2go v0.0.0-20160817213554-aab5ce1231ab/go.mod h1:rGlqNE4CvxZIeiHp0mgrw+/jdGSjJzkZ0n78hhHMdfM=
-github.com/TykTechnologies/redigocluster v0.0.0-20190313170440-9814972a6f69 h1:SF8Lk50a7kbaucxyMdpQacqobDyFgYhxFXpieYl9tWs=
-github.com/TykTechnologies/redigocluster v0.0.0-20190313170440-9814972a6f69/go.mod h1:btoJXasEtcQApdUNdS8ckiuo+JIq9KHS8QbTnkZpdPY=
 github.com/Unknwon/com v0.0.0-20151008135407-28b053d5a292/go.mod h1:KYCjqMOeHpNuTOiFQU6WEcTG7poCJrUs0YgyHNtn1no=
 github.com/abdullin/seq v0.0.0-20160510034733-d5467c17e7af/go.mod h1:5Jv4cbFiHJMsVxt52+i0Ha45fjshj6wxYr1r19tB9bw=
 github.com/agext/levenshtein v1.2.1/go.mod h1:JEDfjyjHDjOF/1e4FlBE/PkbqA9OfWu2ki2W0IB5558=
@@ -134,8 +128,6 @@ github.com/franela/goreq v0.0.0-20171204163338-bcd34c9993f8 h1:a9ENSRDFBUPkJ5lCg
 github.com/franela/goreq v0.0.0-20171204163338-bcd34c9993f8/go.mod h1:ZhphrRTfi2rbfLwlschooIH4+wKKDR4Pdxhh+TRoA20=
 github.com/fsnotify/fsnotify v1.4.7 h1:IXs+QLmnXW2CcXuY+8Mzv/fWEsPGWxqefPtCP5CnV9I=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
-github.com/garyburd/redigo v1.6.0 h1:0VruCpn7yAIIu7pWVClQC8wxCJEcG3nyzpMSHKi1PQc=
-github.com/garyburd/redigo v1.6.0/go.mod h1:NR3MbYisc3/PwhQ00EMzDiPmrwpPxAn5GI05/YaO1SY=
 github.com/gemnasium/logrus-graylog-hook v2.0.7+incompatible h1:lgnKqRfXdYPljf5yj0SOYSH+i29U8E3KKzdOIWsHZno=
 github.com/gemnasium/logrus-graylog-hook v2.0.7+incompatible/go.mod h1:85jwR23cg8rapnMQj96B9pX4XzmkXMNAPVfnnUNP8Dk=
 github.com/getsentry/raven-go v0.2.0 h1:no+xWJRb5ZI7eE8TWgIq1jLulQiIoLG0IfYxv5JYMGs=
@@ -143,6 +135,8 @@ github.com/getsentry/raven-go v0.2.0/go.mod h1:KungGk8q33+aIAZUIVWZDr2OfAEBsO49P
 github.com/ghodss/yaml v1.0.0/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
 github.com/go-kit/kit v0.8.0/go.mod h1:xBxKIO96dXMWWy0MnWVtmwkA9/13aqxPnvrjFYMA2as=
 github.com/go-logfmt/logfmt v0.3.0/go.mod h1:Qt1PoO58o5twSAckw1HlFXLmHsOX5/0LbT9GBnD5lWE=
+github.com/go-redis/redis v6.15.6+incompatible h1:H9evprGPLI8+ci7fxQx6WNZHJSb7be8FqJQRhdQZ5Sg=
+github.com/go-redis/redis v6.15.6+incompatible/go.mod h1:NAIEuMOZ/fxfXJIrKDQDz8wamY7mA7PouImQ2Jvg6kA=
 github.com/go-stack/stack v1.8.0/go.mod h1:v0f6uXyyMGvRgIKkXu+yp6POWl0qKG85gN/melR3HDY=
 github.com/go-test/deep v1.0.3 h1:ZrJSEWsXzPOxaZnFteGEfooLba+ju3FYIbOrS+rQd68=
 github.com/go-test/deep v1.0.3/go.mod h1:wGDj63lr65AM2AQyKZd/NYHGb0R+1RLqB8NKt3aSFNA=
@@ -163,8 +157,6 @@ github.com/golang/protobuf v1.3.1/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5y
 github.com/golang/protobuf v1.3.2 h1:6nsPYzhq5kReh6QImI3k5qWzO4PEbvbIW2cwSfR/6xs=
 github.com/golang/protobuf v1.3.2/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
 github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db/go.mod h1:/XxbfmMg8lxefKM7IXC3fBNl/7bRcc72aCRzEWrmP2Q=
-github.com/gomodule/redigo v2.0.0+incompatible h1:K/R+8tc58AaqLkqG2Ol3Qk+DR/TlNuhuh457pBFPtt0=
-github.com/gomodule/redigo v2.0.0+incompatible/go.mod h1:B4C85qUVwatsJoIUNIfCRsp7qO0iAmpGFZ4EELWSbC4=
 github.com/google/btree v0.0.0-20180813153112-4030bb1f1f0c/go.mod h1:lNA+9X1NB3Zf8V7Ke586lFgjr2dZNuvo3lPJSGZ5JPQ=
 github.com/google/btree v1.0.0/go.mod h1:lNA+9X1NB3Zf8V7Ke586lFgjr2dZNuvo3lPJSGZ5JPQ=
 github.com/google/go-cmp v0.2.0/go.mod h1:oXzfMopK8JAjlY9xF4vHSVASa0yLyX7SntLO5aqRK0M=

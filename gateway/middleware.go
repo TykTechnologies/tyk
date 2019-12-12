@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/TykTechnologies/tyk/headers"
+
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
 	newrelic "github.com/newrelic/go-agent"
@@ -27,6 +29,13 @@ import (
 )
 
 const mwStatusRespond = 666
+
+const authTokenType = "authToken"
+const jwtType = "jwt"
+const hmacType = "hmac"
+const basicType = "basic"
+const coprocessType = "coprocess"
+const oauthType = "oauth"
 
 var (
 	GlobalRate            = ratecounter.NewRateCounter(1 * time.Second)
@@ -55,7 +64,8 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 			tr.Name(),
 		)
 		defer span.Finish()
-		return tr.TykMiddleware.ProcessRequest(w, r.WithContext(ctx), conf)
+		setContext(r, ctx)
+		return tr.TykMiddleware.ProcessRequest(w, r, conf)
 	}
 	return tr.TykMiddleware.ProcessRequest(w, r, conf)
 }
@@ -214,9 +224,9 @@ func (t BaseMiddleware) Config() (interface{}, error) {
 	return nil, nil
 }
 
-func (t BaseMiddleware) OrgSession(key string) (user.SessionState, bool) {
+func (t BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
 	// Try and get the session from the session store
-	session, found := t.Spec.OrgSessionManager.SessionDetail(key, false)
+	session, found := t.Spec.OrgSessionManager.SessionDetail(orgID, orgID, false)
 	if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
 		// If exists, assume it has been authorized and pass on
 		// We cache org expiry data
@@ -224,7 +234,7 @@ func (t BaseMiddleware) OrgSession(key string) (user.SessionState, bool) {
 		ExpiryCache.Set(session.OrgID, session.DataExpires, cache.DefaultExpiration)
 	}
 
-	session.SetKeyHash(storage.HashKey(key))
+	session.SetKeyHash(storage.HashKey(orgID))
 	return session, found
 }
 
@@ -266,7 +276,7 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 	}
 
 	lifetime := session.Lifetime(t.Spec.SessionLifetime)
-	if err := t.Spec.SessionManager.UpdateSession(token, session, lifetime, false); err != nil {
+	if err := GlobalSessionManager.UpdateSession(token, session, lifetime, false); err != nil {
 		t.Logger().WithError(err).Error("Can't update session")
 		return false
 	}
@@ -374,7 +384,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 							for ai, au := range r.AllowedURLs {
 								if u.URL == au.URL {
 									found = true
-									rights[k].AllowedURLs[ai].Methods = append(r.AllowedURLs[ai].Methods, u.Methods...)
+									r.AllowedURLs[ai].Methods = append(au.Methods, u.Methods...)
 								}
 							}
 
@@ -382,7 +392,6 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 								r.AllowedURLs = append(r.AllowedURLs, v.AllowedURLs...)
 							}
 						}
-						r.AllowedURLs = append(r.AllowedURLs, v.AllowedURLs...)
 
 						ar = &r
 					}
@@ -448,6 +457,10 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 			if !session.HMACEnabled {
 				session.HMACEnabled = policy.HMACEnabled
+			}
+
+			if !session.EnableHTTPSignatureValidation {
+				session.EnableHTTPSignatureValidation = policy.EnableHTTPSignatureValidation
 			}
 		}
 
@@ -570,7 +583,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 
 	// Check session store
 	t.Logger().Debug("Querying keystore")
-	session, found := t.Spec.SessionManager.SessionDetail(key, false)
+	session, found := GlobalSessionManager.SessionDetail(t.Spec.OrgID, key, false)
 	if found {
 		session.SetKeyHash(cacheKey)
 		// If exists, assume it has been authorized and pass on
@@ -617,6 +630,57 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 // FireEvent is added to the BaseMiddleware object so it is available across the entire stack
 func (t BaseMiddleware) FireEvent(name apidef.TykEvent, meta interface{}) {
 	fireEvent(name, meta, t.Spec.EventPaths)
+}
+
+func (b BaseMiddleware) getAuthType() string {
+	return ""
+}
+
+func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, apidef.AuthConfig) {
+	config, ok := b.Base().Spec.AuthConfigs[authType]
+	// Auth is deprecated. To maintain backward compatibility authToken and jwt cases are added.
+	if !ok && (authType == authTokenType || authType == jwtType) {
+		config = b.Base().Spec.Auth
+	}
+
+	if config.AuthHeaderName == "" {
+		config.AuthHeaderName = headers.Authorization
+	}
+
+	key := r.Header.Get(config.AuthHeaderName)
+
+	paramName := config.ParamName
+	if config.UseParam || paramName != "" {
+		if paramName == "" {
+			paramName = config.AuthHeaderName
+		}
+
+		paramValue := r.URL.Query().Get(paramName)
+
+		// Only use the paramValue if it has an actual value
+		if paramValue != "" {
+			key = paramValue
+		}
+	}
+
+	cookieName := config.CookieName
+	if config.UseCookie || cookieName != "" {
+		if cookieName == "" {
+			cookieName = config.AuthHeaderName
+		}
+
+		authCookie, err := r.Cookie(cookieName)
+		cookieValue := ""
+		if err == nil {
+			cookieValue = authCookie.Value
+		}
+
+		if cookieValue != "" {
+			key = cookieValue
+		}
+	}
+
+	return key, config
 }
 
 type TykResponseHandler interface {

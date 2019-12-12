@@ -668,6 +668,9 @@
     "oauth_token_expired_retain_period": {
       "type": "integer"
     },
+    "oauth_error_status_code": {
+      "type": "integer"
+    },
     "optimisations_use_async_session_write": {
       "type": "boolean"
     },
@@ -1017,6 +1020,9 @@
     },
     "enable_http_profiler": {
       "type": "boolean"
+    },
+    "ssl_force_common_name_check":{
+	    "type":"boolean"
     }
   }
 }

@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -21,7 +22,6 @@ import (
 
 const (
 	defaultTimeout             = 10
-	defaultWorkerPoolSize      = 50
 	defaultSampletTriggerLimit = 3
 )
 
@@ -29,8 +29,8 @@ var (
 	HostCheckerClient = &http.Client{
 		Timeout: 500 * time.Millisecond,
 	}
-
-	hostCheckTicker = make(chan struct{})
+	defaultWorkerPoolSize = runtime.NumCPU()
+	hostCheckTicker       = make(chan struct{})
 )
 
 type HostData struct {
@@ -297,9 +297,7 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 		report.ResponseCode = response.StatusCode
 	}
 
-	t2 := time.Now()
-
-	millisec := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001
+	millisec := DurationToMillisecond(time.Since(t1))
 	report.Latency = millisec
 	if report.IsTCPError {
 		h.errorChan <- report

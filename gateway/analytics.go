@@ -37,6 +37,11 @@ func (n *NetworkStats) Flush() NetworkStats {
 	return s
 }
 
+type Latency struct {
+	Total    int64
+	Upstream int64
+}
+
 // AnalyticsRecord encodes the details of a request
 type AnalyticsRecord struct {
 	Method        string
@@ -58,6 +63,7 @@ type AnalyticsRecord struct {
 	OrgID         string
 	OauthID       string
 	RequestTime   int64
+	Latency       Latency
 	RawRequest    string // Base64 encoded request data (if detailed recording turned on)
 	RawResponse   string // ^ same but for response
 	IPAddress     string
@@ -88,7 +94,6 @@ type GeoData struct {
 const analyticsKeyName = "tyk-system-analytics"
 
 const (
-	minRecordsBufferSize             = 1000
 	recordsBufferFlushInterval       = 200 * time.Millisecond
 	recordsBufferForcedFlushInterval = 1 * time.Second
 )
@@ -173,7 +178,7 @@ func (a *AnalyticsRecord) SetExpiry(expiresInSeconds int64) {
 // RedisAnalyticsHandler will record analytics data to a redis back end
 // as defined in the Config object
 type RedisAnalyticsHandler struct {
-	Store            storage.Handler
+	Store            storage.AnalyticsHandler
 	Clean            Purger
 	GeoIPDB          *maxminddb.Reader
 	globalConf       config.Config
@@ -196,18 +201,8 @@ func (r *RedisAnalyticsHandler) Init(globalConf config.Config) {
 
 	analytics.Store.Connect()
 
-	ps := r.globalConf.AnalyticsConfig.PoolSize
-	if ps == 0 {
-		ps = 50
-	}
-	log.WithField("ps", ps).Debug("Analytics pool workers number")
-
-	recordsBufferSize := r.globalConf.AnalyticsConfig.RecordsBufferSize
-	if recordsBufferSize < minRecordsBufferSize {
-		recordsBufferSize = minRecordsBufferSize // force it to this value
-	}
-	log.WithField("recordsBufferSize", recordsBufferSize).Debug("Analytics total buffer (channel) size")
-
+	ps := config.Global().AnalyticsConfig.PoolSize
+	recordsBufferSize := config.Global().AnalyticsConfig.RecordsBufferSize
 	r.workerBufferSize = recordsBufferSize / uint64(ps)
 	log.WithField("workerBufferSize", r.workerBufferSize).Debug("Analytics pool worker buffer size")
 
@@ -251,7 +246,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 
 	// this is buffer to send one pipelined command to redis
 	// use r.recordsBufferSize as cap to reduce slice re-allocations
-	recordsBuffer := make([]string, 0, r.workerBufferSize)
+	recordsBuffer := make([][]byte, 0, r.workerBufferSize)
 
 	// read records from channel and process
 	lastSentTs := time.Now()
@@ -304,7 +299,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 			if encoded, err := msgpack.Marshal(record); err != nil {
 				log.WithError(err).Error("Error encoding analytics data")
 			} else {
-				recordsBuffer = append(recordsBuffer, string(encoded))
+				recordsBuffer = append(recordsBuffer, encoded)
 			}
 
 			// identify that buffer is ready to be sent
@@ -319,8 +314,12 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 		// send data to Redis and reset buffer
 		if len(recordsBuffer) > 0 && (readyToSend || time.Since(lastSentTs) >= recordsBufferForcedFlushInterval) {
 			r.Store.AppendToSetPipelined(analyticsKeyName, recordsBuffer)
-			recordsBuffer = make([]string, 0, r.workerBufferSize)
+			recordsBuffer = recordsBuffer[:0]
 			lastSentTs = time.Now()
 		}
 	}
+}
+
+func DurationToMillisecond(d time.Duration) float64 {
+	return float64(d) / 1e6
 }

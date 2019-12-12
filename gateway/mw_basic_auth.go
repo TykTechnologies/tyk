@@ -79,8 +79,13 @@ func (k *BasicAuthKeyIsValid) requestForBasicAuth(w http.ResponseWriter, msg str
 	return errors.New(msg), http.StatusUnauthorized
 }
 
+// getAuthType overrides BaseMiddleware.getAuthType.
+func (k *BasicAuthKeyIsValid) getAuthType() string {
+	return basicType
+}
+
 func (k *BasicAuthKeyIsValid) basicAuthHeaderCredentials(w http.ResponseWriter, r *http.Request) (username, password string, err error, code int) {
-	token := r.Header.Get(headers.Authorization)
+	token, _ := k.getAuthToken(k.getAuthType(), r)
 	logger := k.Logger().WithField("key", obfuscateKey(token))
 	if token == "" {
 		// No header value, fail
@@ -153,6 +158,10 @@ func (k *BasicAuthKeyIsValid) basicAuthBodyCredentials(w http.ResponseWriter, r 
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
+		return nil, http.StatusOK
+	}
+
 	username, password, err, code := k.basicAuthHeaderCredentials(w, r)
 	token := r.Header.Get(headers.Authorization)
 	if err != nil {

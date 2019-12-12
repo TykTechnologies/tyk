@@ -171,6 +171,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			e.Spec.OrgID,
 			oauthClientID,
 			0,
+			Latency{},
 			rawRequest,
 			rawResponse,
 			ip,
