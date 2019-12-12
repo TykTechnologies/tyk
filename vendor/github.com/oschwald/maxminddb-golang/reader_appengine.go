@@ -20,7 +20,9 @@ func Open(file string) (*Reader, error) {
 
 // Close unmaps the database file from virtual memory and returns the
 // resources to the system. If called on a Reader opened using FromBytes
-// or Open on Google App Engine, this method does nothing.
+// or Open on Google App Engine, this method sets the underlying buffer
+// to nil, returning the resources to the system.
 func (r *Reader) Close() error {
+	r.buffer = nil
 	return nil
 }

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math"
 	"strconv"
-	"strings"
 )
 
 // Errors
@@ -18,6 +17,7 @@ var (
 	MalformedArrayError        = errors.New("Value is array, but can't find closing ']' symbol")
 	MalformedObjectError       = errors.New("Value looks like object, but can't find closing '}' symbol")
 	MalformedValueError        = errors.New("Value looks like Number/Boolean/None, but can't find its end: ',' or '}' symbol")
+	OverflowIntegerError       = errors.New("Value is number, but overflowed while parsing")
 	MalformedStringEscapeError = errors.New("Encountered an invalid escape sequence in a string")
 )
 
@@ -34,6 +34,89 @@ func tokenEnd(data []byte) int {
 	}
 
 	return len(data)
+}
+
+func findTokenStart(data []byte, token byte) int {
+	for i := len(data) - 1; i >= 0; i-- {
+		switch data[i] {
+		case token:
+			return i
+		case '[', '{':
+			return 0
+		}
+	}
+
+	return 0
+}
+
+func findKeyStart(data []byte, key string) (int, error) {
+	i := 0
+	ln := len(data)
+	if ln > 0 && (data[0] == '{' || data[0] == '[') {
+		i = 1
+	}
+	var stackbuf [unescapeStackBufSize]byte // stack-allocated array for allocation-free unescaping of small strings
+
+	if ku, err := Unescape(StringToBytes(key), stackbuf[:]); err == nil {
+		key = bytesToString(&ku)
+	}
+
+	for i < ln {
+		switch data[i] {
+		case '"':
+			i++
+			keyBegin := i
+
+			strEnd, keyEscaped := stringEnd(data[i:])
+			if strEnd == -1 {
+				break
+			}
+			i += strEnd
+			keyEnd := i - 1
+
+			valueOffset := nextToken(data[i:])
+			if valueOffset == -1 {
+				break
+			}
+
+			i += valueOffset
+
+			// if string is a key, and key level match
+			k := data[keyBegin:keyEnd]
+			// for unescape: if there are no escape sequences, this is cheap; if there are, it is a
+			// bit more expensive, but causes no allocations unless len(key) > unescapeStackBufSize
+			if keyEscaped {
+				if ku, err := Unescape(k, stackbuf[:]); err != nil {
+					break
+				} else {
+					k = ku
+				}
+			}
+
+			if data[i] == ':' && len(key) == len(k) && bytesToString(&k) == key {
+				return keyBegin - 1, nil
+			}
+
+		case '[':
+			i = blockEnd(data[i:], data[i], ']') + i
+		case '{':
+			i = blockEnd(data[i:], data[i], '}') + i
+		}
+		i++
+	}
+
+	return -1, KeyPathNotFoundError
+}
+
+func tokenStart(data []byte) int {
+	for i := len(data) - 1; i >= 0; i-- {
+		switch data[i] {
+		case '\n', '\r', '\t', ',', '{', '[':
+			return i
+		}
+	}
+
+	return 0
 }
 
 // Find position of next character which is not whitespace
@@ -131,6 +214,7 @@ func searchKeys(data []byte, keys ...string) int {
 	i := 0
 	ln := len(data)
 	lk := len(keys)
+	lastMatched := true
 
 	if lk == 0 {
 		return 0
@@ -158,8 +242,12 @@ func searchKeys(data []byte, keys ...string) int {
 
 			i += valueOffset
 
-			// if string is a key, and key level match
-			if data[i] == ':' && keyLevel == level-1 {
+			// if string is a key
+			if data[i] == ':' {
+				if level < 1 {
+					return -1
+				}
+
 				key := data[keyBegin:keyEnd]
 
 				// for unescape: if there are no escape sequences, this is cheap; if there are, it is a
@@ -174,17 +262,32 @@ func searchKeys(data []byte, keys ...string) int {
 				}
 
 				if equalStr(&keyUnesc, keys[level-1]) {
-					keyLevel++
-					// If we found all keys in path
-					if keyLevel == lk {
-						return i + 1
+					lastMatched = true
+
+					// if key level match
+					if keyLevel == level-1 {
+						keyLevel++
+						// If we found all keys in path
+						if keyLevel == lk {
+							return i + 1
+						}
 					}
+				} else {
+					lastMatched = false
 				}
 			} else {
 				i--
 			}
 		case '{':
-			level++
+
+			// in case parent key is matched then only we will increase the level otherwise can directly
+			// can move to the end of this block
+			if !lastMatched {
+				end := blockEnd(data[i:], '{', '}')
+				i += end - 1
+			} else{
+				level++
+			}
 		case '}':
 			level--
 			if level == keyLevel {
@@ -200,14 +303,15 @@ func searchKeys(data []byte, keys ...string) int {
 				var curIdx int
 				var valueFound []byte
 				var valueOffset int
+				var curI = i
 				ArrayEach(data[i:], func(value []byte, dataType ValueType, offset int, err error) {
 					if curIdx == aIdx {
 						valueFound = value
 						valueOffset = offset
-                                                if dataType == String {
+						if dataType == String {
 							valueOffset = valueOffset - 2
-							valueFound = data[i + valueOffset:i + valueOffset + len(value) + 2]
-                                                }
+							valueFound = data[curI+valueOffset : curI+valueOffset+len(value)+2]
+						}
 					}
 					curIdx += 1
 				})
@@ -314,11 +418,11 @@ func EachKey(data []byte, cb func(int, []byte, ValueType, error), paths ...[]str
 
 				if maxPath >= level {
 					if level < 1 {
-						cb(-1, []byte{}, Unknown, MalformedJsonError)
+						cb(-1, nil, Unknown, MalformedJsonError)
 						return -1
 					}
-					pathsBuf[level-1] = bytesToString(&keyUnesc)
 
+					pathsBuf[level-1] = bytesToString(&keyUnesc)
 					for pi, p := range paths {
 						if len(p) != level || pathFlags&bitwiseFlags[pi+1] != 0 || !equalStr(&keyUnesc, p[level-1]) || !sameTree(p, pathsBuf[:level]) {
 							continue
@@ -338,8 +442,11 @@ func EachKey(data []byte, cb func(int, []byte, ValueType, error), paths ...[]str
 						}
 
 						if pathsMatched == len(paths) {
-							return i
+							break
 						}
+					}
+					if pathsMatched == len(paths) {
+						return i
 					}
 				}
 
@@ -353,9 +460,11 @@ func EachKey(data []byte, cb func(int, []byte, ValueType, error), paths ...[]str
 					}
 				}
 
-				switch data[i] {
-				case '{', '}', '[', '"':
-					i--
+				if i < ln {
+					switch data[i] {
+					case '{', '}', '[', '"':
+						i--
+					}
 				}
 			} else {
 				i--
@@ -369,7 +478,7 @@ func EachKey(data []byte, cb func(int, []byte, ValueType, error), paths ...[]str
 			var pIdxFlags int64
 
 			if level < 0 {
-				cb(-1, []byte{}, Unknown, MalformedJsonError)
+				cb(-1, nil, Unknown, MalformedJsonError)
 				return -1
 			}
 
@@ -477,26 +586,126 @@ var (
 
 func createInsertComponent(keys []string, setValue []byte, comma, object bool) []byte {
 	var buffer bytes.Buffer
+	isIndex := string(keys[0][0]) == "["
 	if comma {
 		buffer.WriteString(",")
 	}
-	if object {
-		buffer.WriteString("{")
-	}
-	buffer.WriteString("\"")
-	buffer.WriteString(keys[0])
-	buffer.WriteString("\":")
-	for i := 1; i < len(keys); i++ {
-		buffer.WriteString("{\"")
-		buffer.WriteString(keys[i])
+	if isIndex {
+		buffer.WriteString("[")
+	} else {
+		if object {
+			buffer.WriteString("{")
+		}
+		buffer.WriteString("\"")
+		buffer.WriteString(keys[0])
 		buffer.WriteString("\":")
 	}
+
+	for i := 1; i < len(keys); i++ {
+		if string(keys[i][0]) == "[" {
+			buffer.WriteString("[")
+		} else {
+			buffer.WriteString("{\"")
+			buffer.WriteString(keys[i])
+			buffer.WriteString("\":")
+		}
+	}
 	buffer.Write(setValue)
-	buffer.WriteString(strings.Repeat("}", len(keys)-1))
-	if object {
+	for i := len(keys) - 1; i > 0; i-- {
+		if string(keys[i][0]) == "[" {
+			buffer.WriteString("]")
+		} else {
+			buffer.WriteString("}")
+		}
+	}
+	if isIndex {
+		buffer.WriteString("]")
+	}
+	if object && !isIndex {
 		buffer.WriteString("}")
 	}
 	return buffer.Bytes()
+}
+
+/*
+
+Del - Receives existing data structure, path to delete.
+
+Returns:
+`data` - return modified data
+
+*/
+func Delete(data []byte, keys ...string) []byte {
+	lk := len(keys)
+	if lk == 0 {
+		return data[:0]
+	}
+
+	array := false
+	if len(keys[lk-1]) > 0 && string(keys[lk-1][0]) == "[" {
+		array = true
+	}
+
+	var startOffset, keyOffset int
+	endOffset := len(data)
+	var err error
+	if !array {
+		if len(keys) > 1 {
+			_, _, startOffset, endOffset, err = internalGet(data, keys[:lk-1]...)
+			if err == KeyPathNotFoundError {
+				// problem parsing the data
+				return data
+			}
+		}
+
+		keyOffset, err = findKeyStart(data[startOffset:endOffset], keys[lk-1])
+		if err == KeyPathNotFoundError {
+			// problem parsing the data
+			return data
+		}
+		keyOffset += startOffset
+		_, _, _, subEndOffset, _ := internalGet(data[startOffset:endOffset], keys[lk-1])
+		endOffset = startOffset + subEndOffset
+		tokEnd := tokenEnd(data[endOffset:])
+		tokStart := findTokenStart(data[:keyOffset], ","[0])
+
+		if data[endOffset+tokEnd] == ","[0] {
+			endOffset += tokEnd + 1
+		} else if data[endOffset+tokEnd] == " "[0] && len(data) > endOffset+tokEnd+1 && data[endOffset+tokEnd+1] == ","[0] {
+			endOffset += tokEnd + 2
+		} else if data[endOffset+tokEnd] == "}"[0] && data[tokStart] == ","[0] {
+			keyOffset = tokStart
+		}
+	} else {
+		_, _, keyOffset, endOffset, err = internalGet(data, keys...)
+		if err == KeyPathNotFoundError {
+			// problem parsing the data
+			return data
+		}
+
+		tokEnd := tokenEnd(data[endOffset:])
+		tokStart := findTokenStart(data[:keyOffset], ","[0])
+
+		if data[endOffset+tokEnd] == ","[0] {
+			endOffset += tokEnd + 1
+		} else if data[endOffset+tokEnd] == "]"[0] && data[tokStart] == ","[0] {
+			keyOffset = tokStart
+		}
+	}
+
+	// We need to remove remaining trailing comma if we delete las element in the object
+	prevTok := lastToken(data[:keyOffset])
+	remainedValue := data[endOffset:]
+
+	var newOffset int
+	if nextToken(remainedValue) > -1 && remainedValue[nextToken(remainedValue)] == '}' && data[prevTok] == ',' {
+		newOffset = prevTok
+	} else {
+		newOffset = prevTok + 1
+	}
+
+	data = append(data[:newOffset], data[endOffset:]...)
+	return data
 }
 
 /*
@@ -518,7 +727,7 @@ func Set(data []byte, setValue []byte, keys ...string) (value []byte, err error)
 	if err != nil {
 		if err != KeyPathNotFoundError {
 			// problem parsing the data
-			return []byte{}, err
+			return nil, err
 		}
 		// full path doesnt exist
 		// does any subpath exist?
@@ -553,10 +762,10 @@ func Set(data []byte, setValue []byte, keys ...string) (value []byte, err error)
 		depthOffset := endOffset
 		if depth != 0 {
 			// if subpath is a non-empty object, add to it
-			if data[startOffset] == '{' && data[startOffset+1+nextToken(data[startOffset+1:])]!='}' {
+			if data[startOffset] == '{' && data[startOffset+1+nextToken(data[startOffset+1:])] != '}' {
 				depthOffset--
 				startOffset = depthOffset
-			// otherwise, over-write it with a new object
+				// otherwise, over-write it with a new object
 			} else {
 				comma = false
 				object = true
@@ -589,7 +798,7 @@ func getType(data []byte, offset int) ([]byte, ValueType, int, error) {
 		if idx, _ := stringEnd(data[offset+1:]); idx != -1 {
 			endOffset += idx + 1
 		} else {
-			return []byte{}, dataType, offset, MalformedStringError
+			return nil, dataType, offset, MalformedStringError
 		}
 	} else if data[offset] == '[' { // if array value
 		dataType = Array
@@ -597,7 +806,7 @@ func getType(data []byte, offset int) ([]byte, ValueType, int, error) {
 		endOffset = blockEnd(data[offset:], '[', ']')
 
 		if endOffset == -1 {
-			return []byte{}, dataType, offset, MalformedArrayError
+			return nil, dataType, offset, MalformedArrayError
 		}
 
 		endOffset += offset
@@ -607,7 +816,7 @@ func getType(data []byte, offset int) ([]byte, ValueType, int, error) {
 		endOffset = blockEnd(data[offset:], '{', '}')
 
 		if endOffset == -1 {
-			return []byte{}, dataType, offset, MalformedObjectError
+			return nil, dataType, offset, MalformedObjectError
 		}
 
 		endOffset += offset
@@ -665,14 +874,14 @@ func Get(data []byte, keys ...string) (value []byte, dataType ValueType, offset 
 func internalGet(data []byte, keys ...string) (value []byte, dataType ValueType, offset, endOffset int, err error) {
 	if len(keys) > 0 {
 		if offset = searchKeys(data, keys...); offset == -1 {
-			return []byte{}, NotExist, -1, -1, KeyPathNotFoundError
+			return nil, NotExist, -1, -1, KeyPathNotFoundError
 		}
 	}
 
 	// Go to closest value
 	nO := nextToken(data[offset:])
 	if nO == -1 {
-		return []byte{}, NotExist, offset, -1, MalformedJsonError
+		return nil, NotExist, offset, -1, MalformedJsonError
 	}
 
 	offset += nO
@@ -991,7 +1200,10 @@ func ParseFloat(b []byte) (float64, error) {
 
 // ParseInt parses a Number ValueType into a Go int64
 func ParseInt(b []byte) (int64, error) {
-	if v, ok := parseInt(b); !ok {
+	if v, ok, overflow := parseInt(b); !ok {
+		if overflow {
+			return 0, OverflowIntegerError
+		}
 		return 0, MalformedValueError
 	} else {
 		return v, nil

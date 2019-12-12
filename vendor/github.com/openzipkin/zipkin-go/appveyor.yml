@@ -10,9 +10,6 @@ environment:
   GOFLAGS: -mod=readonly
 
 install:
-  - choco install rabbitmq --ignoredependencies -y
-  - echo %PATH%
-  - echo %GOPATH%
   - set PATH=%GOPATH%\bin;c:\go\bin;%PATH%
   - go version
   - go env

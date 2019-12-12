@@ -27,12 +27,8 @@ func New() UUID {
 //  equivalent to the odds of creating a few tens of trillions of UUIDs in a
 //  year and having one duplicate.
 func NewRandom() (UUID, error) {
-	return NewRandomFromReader(rander)
-}
-
-func NewRandomFromReader(r io.Reader) (UUID, error) {
 	var uuid UUID
-	_, err := io.ReadFull(r, uuid[:])
+	_, err := io.ReadFull(rander, uuid[:])
 	if err != nil {
 		return Nil, err
 	}
@@ -40,4 +36,3 @@ func NewRandomFromReader(r io.Reader) (UUID, error) {
 	uuid[8] = (uuid[8] & 0x3f) | 0x80 // Variant is 10
 	return uuid, nil
 }
-

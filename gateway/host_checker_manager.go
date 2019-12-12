@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -80,13 +81,10 @@ func (hc *HostCheckerManager) Init(store storage.Handler) {
 	hc.GenerateCheckerId()
 }
 
-func (hc *HostCheckerManager) Start() {
+func (hc *HostCheckerManager) Start(ctx context.Context) {
 	// Start loop to check if we are active instance
 	if hc.Id != "" {
-		go hc.CheckActivePollerLoop()
-		if config.Global().UptimeTests.Config.EnableUptimeAnalytics {
-			go hc.UptimePurgeLoop()
-		}
+		go hc.CheckActivePollerLoop(ctx)
 	}
 }
 
@@ -94,16 +92,38 @@ func (hc *HostCheckerManager) GenerateCheckerId() {
 	hc.Id = uuid.NewV4().String()
 }
 
-func (hc *HostCheckerManager) CheckActivePollerLoop() {
-	for !hc.stopLoop {
-		// If I'm polling, lets start the loop
+// CheckActivePollerLoop manages the state of the HostCheckerManager UptimeTest
+// polling loop, this will start the checking loop if it hasnt been started yet.
+//
+// The check happens in a 10 seconds interval.
+func (hc *HostCheckerManager) CheckActivePollerLoop(ctx context.Context) {
+	hc.checkPollerLoop(ctx)
+	tick := time.NewTicker(10 * time.Second)
+	defer func() {
+		tick.Stop()
+		log.WithFields(logrus.Fields{
+			"prefix": "host-check-mgr",
+		}).Debug("Stopping uptime tests")
+	}()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+			hc.checkPollerLoop(ctx)
+		}
+	}
+}
+
+func (hc *HostCheckerManager) checkPollerLoop(ctx context.Context) {
+	if !hc.stopLoop {
 		if hc.AmIPolling() {
 			if !hc.pollerStarted {
 				log.WithFields(logrus.Fields{
 					"prefix": "host-check-mgr",
 				}).Info("Starting Poller")
 				hc.pollerStarted = true
-				hc.StartPoller()
+				hc.StartPoller(ctx)
 			}
 		} else {
 			log.WithFields(logrus.Fields{
@@ -114,15 +134,8 @@ func (hc *HostCheckerManager) CheckActivePollerLoop() {
 				hc.pollerStarted = false
 			}
 		}
-
-		time.Sleep(10 * time.Second)
 	}
-	log.WithFields(logrus.Fields{
-		"prefix": "host-check-mgr",
-	}).Debug("Stopping uptime tests")
 }
-
-func (hc *HostCheckerManager) UptimePurgeLoop() {}
 
 func (hc *HostCheckerManager) AmIPolling() bool {
 	if hc.store == nil {
@@ -158,7 +171,7 @@ func (hc *HostCheckerManager) AmIPolling() bool {
 	return false
 }
 
-func (hc *HostCheckerManager) StartPoller() {
+func (hc *HostCheckerManager) StartPoller(ctx context.Context) {
 
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
@@ -174,15 +187,18 @@ func (hc *HostCheckerManager) StartPoller() {
 		config.Global().UptimeTests.Config.FailureTriggerSampleSize,
 		config.Global().UptimeTests.Config.TimeWait,
 		hc.currentHostList,
-		hc.OnHostDown,   // On failure
-		hc.OnHostBackUp, // On success
-		hc.OnHostReport) // All reports
+		HostCheckCallBacks{
+			Up:   hc.OnHostBackUp,
+			Fail: hc.OnHostDown,
+			Ping: hc.OnHostReport,
+		},
+	)
 
 	// Start the check loop
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
 	}).Debug("---> Starting checker")
-	hc.checker.Start()
+	hc.checker.Start(ctx)
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
 	}).Debug("---> Checker started.")
@@ -201,13 +217,13 @@ func (hc *HostCheckerManager) getHostKey(report HostHealthReport) string {
 	return PoolerHostSentinelKeyPrefix + report.MetaData[UnHealthyHostMetaDataHostKey]
 }
 
-func (hc *HostCheckerManager) OnHostReport(report HostHealthReport) {
+func (hc *HostCheckerManager) OnHostReport(ctx context.Context, report HostHealthReport) {
 	if config.Global().UptimeTests.Config.EnableUptimeAnalytics {
 		go hc.RecordUptimeAnalytics(report)
 	}
 }
 
-func (hc *HostCheckerManager) OnHostDown(report HostHealthReport) {
+func (hc *HostCheckerManager) OnHostDown(ctx context.Context, report HostHealthReport) {
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
 	}).Debug("Update key: ", hc.getHostKey(report))
@@ -250,7 +266,7 @@ func (hc *HostCheckerManager) OnHostDown(report HostHealthReport) {
 	}
 }
 
-func (hc *HostCheckerManager) OnHostBackUp(report HostHealthReport) {
+func (hc *HostCheckerManager) OnHostBackUp(ctx context.Context, report HostHealthReport) {
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
 	}).Debug("Delete key: ", hc.getHostKey(report))
@@ -499,7 +515,7 @@ func (hc *HostCheckerManager) RecordUptimeAnalytics(report HostHealthReport) err
 	return nil
 }
 
-func InitHostCheckManager(store storage.Handler) {
+func InitHostCheckManager(ctx context.Context, store storage.Handler) {
 	// Already initialized
 	if GlobalHostChecker.Id != "" {
 		return
@@ -507,7 +523,7 @@ func InitHostCheckManager(store storage.Handler) {
 
 	GlobalHostChecker = HostCheckerManager{}
 	GlobalHostChecker.Init(store)
-	GlobalHostChecker.Start()
+	GlobalHostChecker.Start(ctx)
 }
 
 func SetCheckerHostList() {

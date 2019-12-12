@@ -10,9 +10,9 @@ class MiddlewareLoader():
       # Inspect the stack and verify if the "import" call is local (direct call from middleware code) or not:
       is_local = False
       for fr in stack:
-        if fr.function != "<module>":
+        if fr[3] != "<module>":
           continue
-        if self.base_path not in fr.filename:
+        if self.base_path not in fr[1]:
           break
         is_local = True
       return is_local

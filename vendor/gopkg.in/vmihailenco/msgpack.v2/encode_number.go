@@ -34,7 +34,7 @@ func (e *Encoder) EncodeUint64(v uint64) error {
 		return e.write2(codes.Uint16, v)
 	}
 	if v <= math.MaxUint32 {
-		return e.write4(codes.Uint32, v)
+		return e.write4(codes.Uint32, uint32(v))
 	}
 	return e.write8(codes.Uint64, v)
 }
@@ -69,13 +69,13 @@ func (e *Encoder) EncodeInt64(v int64) error {
 		return e.write2(codes.Int16, uint64(v))
 	}
 	if v >= math.MinInt32 {
-		return e.write4(codes.Int32, uint64(v))
+		return e.write4(codes.Int32, uint32(v))
 	}
 	return e.write8(codes.Int64, uint64(v))
 }
 
 func (e *Encoder) EncodeFloat32(n float32) error {
-	return e.write4(codes.Float, uint64(math.Float32bits(n)))
+	return e.write4(codes.Float, math.Float32bits(n))
 }
 
 func (e *Encoder) EncodeFloat64(n float64) error {
@@ -97,7 +97,7 @@ func (e *Encoder) write2(code byte, n uint64) error {
 	return e.write(e.buf)
 }
 
-func (e *Encoder) write4(code byte, n uint64) error {
+func (e *Encoder) write4(code byte, n uint32) error {
 	e.buf = e.buf[:5]
 	e.buf[0] = code
 	e.buf[1] = byte(n >> 24)

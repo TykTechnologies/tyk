@@ -216,6 +216,7 @@ type CoProcessConfig struct {
 	EnableCoProcess     bool   `json:"enable_coprocess"`
 	CoProcessGRPCServer string `json:"coprocess_grpc_server"`
 	PythonPathPrefix    string `json:"python_path_prefix"`
+	PythonVersion       string `json:"python_version"`
 }
 
 type CertificatesConfig struct {
@@ -260,6 +261,38 @@ type ServicePort struct {
 	Port     int    `json:"port"`
 }
 
+// PortWhiteList defines ports that will be allowed by the gateway.
+type PortWhiteList struct {
+	Ranges []PortRange `json:"ranges,omitempty"`
+	Ports  []int       `json:"ports,omitempty"`
+}
+
+// Match returns true if port is acceptable from the PortWhiteList.
+func (p PortWhiteList) Match(port int) bool {
+	for _, v := range p.Ports {
+		if port == v {
+			return true
+		}
+	}
+	for _, r := range p.Ranges {
+		if r.Match(port) {
+			return true
+		}
+	}
+	return false
+}
+
+// PortRange defines a range of ports inclusively.
+type PortRange struct {
+	From int `json:"from"`
+	To   int `json:"to"`
+}
+
+// Match returns true if port is within the range
+func (r PortRange) Match(port int) bool {
+	return r.From <= port && r.To >= port
+}
+
 // Config is the configuration object used by tyk to set up various parameters.
 type Config struct {
 	// OriginalPath is the path to the config file that was read. If
@@ -293,7 +326,11 @@ type Config struct {
 	EnableAPISegregation    bool           `json:"enable_api_segregation"`
 	TemplatePath            string         `json:"template_path"`
 	Policies                PoliciesConfig `json:"policies"`
-	DisabledPorts           []ServicePort  `json:"disabled_ports"`
+	DisablePortWhiteList    bool           `json:"disable_ports_whitelist"`
+	// Defines the ports that will be available for the api services to bind to.
+	// This is a map of protocol to PortWhiteList. This allows per protocol
+	// configurations.
+	PortWhiteList map[string]PortWhiteList `json:"ports_whitelist"`
 
 	// CE Configurations
 	AppPath string `json:"app_path"`
@@ -349,7 +386,9 @@ type Config struct {
 	OauthTokenExpire              int32                `json:"oauth_token_expire"`
 	OauthTokenExpiredRetainPeriod int32                `json:"oauth_token_expired_retain_period"`
 	OauthRedirectUriSeparator     string               `json:"oauth_redirect_uri_separator"`
+	OauthErrorStatusCode          int                  `json:"oauth_error_status_code"`
 	EnableKeyLogging              bool                 `json:"enable_key_logging"`
+	SSLForceCommonNameCheck       bool                 `json:"ssl_force_common_name_check"`
 
 	// Proxy analytics configuration
 	EnableAnalytics bool                  `json:"enable_analytics"`

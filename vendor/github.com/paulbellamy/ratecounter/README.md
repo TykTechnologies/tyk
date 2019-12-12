@@ -1,5 +1,10 @@
 # ratecounter
 
+[![CircleCI](https://circleci.com/gh/paulbellamy/ratecounter.svg?style=svg)](https://circleci.com/gh/paulbellamy/ratecounter)
+[![Go Report Card](https://goreportcard.com/badge/github.com/paulbellamy/ratecounter)](https://goreportcard.com/report/github.com/paulbellamy/ratecounter)
+[![GoDoc](https://godoc.org/github.com/paulbellamy/ratecounter?status.svg)](https://godoc.org/github.com/paulbellamy/ratecounter)
+[![codecov](https://codecov.io/gh/paulbellamy/ratecounter/branch/master/graph/badge.svg)](https://codecov.io/gh/paulbellamy/ratecounter)
+
 A Thread-Safe RateCounter implementation in Golang
 
 ## Usage
@@ -12,7 +17,7 @@ Package ratecounter provides a thread-safe rate-counter, for tracking
 counts in an interval
 
 Useful for implementing counters and stats of 'requests-per-second' (for
-example).
+example):
 
 ```go
 // We're recording marks-per-1second
@@ -32,35 +37,25 @@ counter := ratecounter.NewRateCounter(60 * time.Second)
 counter.Rate() / 60
 ```
 
+Also you can track average value of some metric in an interval.
+
+Useful for implementing counters and stats of 'average-execution-time' (for
+example):
+
+```go
+// We're recording average execution time of some heavy operation in the last minute.
+counter := ratecounter.NewAvgRateCounter(60 * time.Second)
+// Start timer.
+startTime := time.Now()
+// Execute heavy operation.
+heavyOperation()
+// Record elapsed time.
+counter.Incr(time.Since(startTime).Nanoseconds())
+// Get the current average execution time.
+counter.Rate()
+```
+
 ## Documentation
 
-```
-type Counter struct {
-    // contains filtered or unexported fields
-}
-    A Counter is a thread-safe counter implementation
+Check latest documentation on [go doc](https://godoc.org/github.com/paulbellamy/ratecounter).
 
-func NewCounter() *Counter
-    NewCounter is used to construct a new Counter object
-
-func (c *Counter) Incr(val int64)
-    Increment the counter by some value
-
-func (c *Counter) Value() int64
-    Return the counter's current value
-
-type RateCounter struct {
-    // contains filtered or unexported fields
-}
-    A RateCounter is a thread-safe counter which returns the number of times
-    'Mark' has been called in the last interval
-
-func NewRateCounter(intrvl time.Duration) *RateCounter
-    Constructs a new RateCounter, for the interval provided
-
-func (r *RateCounter) Mark()
-    Add 1 event into the RateCounter
-
-func (r *RateCounter) Rate() int64
-    Return the current number of events in the last interval
-```

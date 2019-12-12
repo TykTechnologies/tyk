@@ -81,6 +81,7 @@ type EndpointMethodMeta struct {
 
 type EndPointMeta struct {
 	Path          string                        `bson:"path" json:"path"`
+	IgnoreCase    bool                          `bson:"ignore_case" json:"ignore_case"`
 	MethodActions map[string]EndpointMethodMeta `bson:"method_actions" json:"method_actions"`
 }
 
@@ -226,7 +227,7 @@ type ExtendedPathsSet struct {
 	TrackEndpoints          []TrackEndpointMeta   `bson:"track_endpoints" json:"track_endpoints,omitempty"`
 	DoNotTrackEndpoints     []TrackEndpointMeta   `bson:"do_not_track_endpoints" json:"do_not_track_endpoints,omitempty"`
 	ValidateJSON            []ValidatePathMeta    `bson:"validate_json" json:"validate_json,omitempty"`
-	Internal                []InternalMeta        `bson:"internal" json:"internal"`
+	Internal                []InternalMeta        `bson:"internal" json:"internal,omitempty"`
 }
 
 type VersionInfo struct {
@@ -365,8 +366,9 @@ type APIDefinition struct {
 		AllowedAuthorizeTypes  []osin.AuthorizeRequestType `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
 		AuthorizeLoginRedirect string                      `bson:"auth_login_redirect" json:"auth_login_redirect"`
 	} `bson:"oauth_meta" json:"oauth_meta"`
-	Auth         Auth `bson:"auth" json:"auth"`
-	UseBasicAuth bool `bson:"use_basic_auth" json:"use_basic_auth"`
+	Auth         AuthConfig            `bson:"auth" json:"auth"` // Deprecated: Use AuthConfigs instead.
+	AuthConfigs  map[string]AuthConfig `bson:"auth_configs" json:"auth_configs"`
+	UseBasicAuth bool                  `bson:"use_basic_auth" json:"use_basic_auth"`
 	BasicAuth    struct {
 		DisableCaching     bool   `bson:"disable_caching" json:"disable_caching"`
 		CacheTTL           int    `bson:"cache_ttl" json:"cache_ttl"`
@@ -430,10 +432,11 @@ type APIDefinition struct {
 		CheckHostAgainstUptimeTests bool                          `bson:"check_host_against_uptime_tests" json:"check_host_against_uptime_tests"`
 		ServiceDiscovery            ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
 		Transport                   struct {
-			SSLInsecureSkipVerify bool     `bson:"ssl_insecure_skip_verify" json:"ssl_insecure_skip_verify"`
-			SSLCipherSuites       []string `bson:"ssl_ciphers" json:"ssl_ciphers"`
-			SSLMinVersion         uint16   `bson:"ssl_min_version" json:"ssl_min_version"`
-			ProxyURL              string   `bson:"proxy_url" json:"proxy_url"`
+			SSLInsecureSkipVerify   bool     `bson:"ssl_insecure_skip_verify" json:"ssl_insecure_skip_verify"`
+			SSLCipherSuites         []string `bson:"ssl_ciphers" json:"ssl_ciphers"`
+			SSLMinVersion           uint16   `bson:"ssl_min_version" json:"ssl_min_version"`
+			SSLForceCommonNameCheck bool     `json:"ssl_force_common_name_check"`
+			ProxyURL                string   `bson:"proxy_url" json:"proxy_url"`
 		} `bson:"transport" json:"transport"`
 	} `bson:"proxy" json:"proxy"`
 	DisableRateLimit          bool                   `bson:"disable_rate_limit" json:"disable_rate_limit"`
@@ -477,7 +480,7 @@ type APIDefinition struct {
 	StripAuthData     bool                   `bson:"strip_auth_data" json:"strip_auth_data"`
 }
 
-type Auth struct {
+type AuthConfig struct {
 	UseParam          bool            `mapstructure:"use_param" bson:"use_param" json:"use_param"`
 	ParamName         string          `mapstructure:"param_name" bson:"param_name" json:"param_name"`
 	UseCookie         bool            `mapstructure:"use_cookie" bson:"use_cookie" json:"use_cookie"`
@@ -510,10 +513,12 @@ type BundleManifest struct {
 }
 
 type RequestSigningMeta struct {
-	IsEnabled bool   `bson:"is_enabled" json:"is_enabled"`
-	Secret    string `bson:"secret" json:"secret"`
-	KeyId     string `bson:"key_id" json:"key_id"`
-	Algorithm string `bson:"algorithm" json:"algorithm"`
+	IsEnabled     bool     `bson:"is_enabled" json:"is_enabled"`
+	Secret        string   `bson:"secret" json:"secret"`
+	KeyId         string   `bson:"key_id" json:"key_id"`
+	Algorithm     string   `bson:"algorithm" json:"algorithm"`
+	HeaderList    []string `bson:"header_list" json:"header_list"`
+	CertificateId string   `bson:"certificate_id" json:"certificate_id"`
 }
 
 // Clean will URL encode map[string]struct variables for saving

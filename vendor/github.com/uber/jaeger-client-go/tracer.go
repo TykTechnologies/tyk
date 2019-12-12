@@ -47,10 +47,11 @@ type Tracer struct {
 	randomNumber func() uint64
 
 	options struct {
-		gen128Bit            bool // whether to generate 128bit trace IDs
-		zipkinSharedRPCSpan  bool
-		highTraceIDGenerator func() uint64 // custom high trace ID generator
-		maxTagValueLength    int
+		gen128Bit                   bool // whether to generate 128bit trace IDs
+		zipkinSharedRPCSpan         bool
+		highTraceIDGenerator        func() uint64 // custom high trace ID generator
+		maxTagValueLength           int
+		noDebugFlagOnForcedSampling bool
 		// more options to come
 	}
 	// allocator of Span objects
@@ -145,7 +146,15 @@ func NewTracer(
 	if hostname, err := os.Hostname(); err == nil {
 		t.tags = append(t.tags, Tag{key: TracerHostnameTagKey, value: hostname})
 	}
-	if ip, err := utils.HostIP(); err == nil {
+	if ipval, ok := t.getTag(TracerIPTagKey); ok {
+		ipv4, err := utils.ParseIPToUint32(ipval.(string))
+		if err != nil {
+			t.hostIPv4 = 0
+			t.logger.Error("Unable to convert the externally provided ip to uint32: " + err.Error())
+		} else {
+			t.hostIPv4 = ipv4
+		}
+	} else if ip, err := utils.HostIP(); err == nil {
 		t.tags = append(t.tags, Tag{key: TracerIPTagKey, value: ip.String()})
 		t.hostIPv4 = utils.PackIPAsUint32(ip)
 	} else {
@@ -214,20 +223,30 @@ func (t *Tracer) startSpanWithOptions(
 	var references []Reference
 	var parent SpanContext
 	var hasParent bool // need this because `parent` is a value, not reference
+	var ctx SpanContext
+	var isSelfRef bool
 	for _, ref := range options.References {
-		ctx, ok := ref.ReferencedContext.(SpanContext)
+		ctxRef, ok := ref.ReferencedContext.(SpanContext)
 		if !ok {
 			t.logger.Error(fmt.Sprintf(
 				"Reference contains invalid type of SpanReference: %s",
 				reflect.ValueOf(ref.ReferencedContext)))
 			continue
 		}
-		if !isValidReference(ctx) {
+		if !isValidReference(ctxRef) {
 			continue
 		}
-		references = append(references, Reference{Type: ref.Type, Context: ctx})
+
+		if ref.Type == selfRefType {
+			isSelfRef = true
+			ctx = ctxRef
+			continue
+		}
+
+		references = append(references, Reference{Type: ref.Type, Context: ctxRef})
+
 		if !hasParent {
-			parent = ctx
+			parent = ctxRef
 			hasParent = ref.Type == opentracing.ChildOfRef
 		}
 	}
@@ -243,42 +262,43 @@ func (t *Tracer) startSpanWithOptions(
 	}
 
 	var samplerTags []Tag
-	var ctx SpanContext
 	newTrace := false
-	if !hasParent || !parent.IsValid() {
-		newTrace = true
-		ctx.traceID.Low = t.randomID()
-		if t.options.gen128Bit {
-			ctx.traceID.High = t.options.highTraceIDGenerator()
-		}
-		ctx.spanID = SpanID(ctx.traceID.Low)
-		ctx.parentID = 0
-		ctx.flags = byte(0)
-		if hasParent && parent.isDebugIDContainerOnly() && t.isDebugAllowed(operationName) {
-			ctx.flags |= (flagSampled | flagDebug)
-			samplerTags = []Tag{{key: JaegerDebugHeader, value: parent.debugID}}
-		} else if sampled, tags := t.sampler.IsSampled(ctx.traceID, operationName); sampled {
-			ctx.flags |= flagSampled
-			samplerTags = tags
-		}
-	} else {
-		ctx.traceID = parent.traceID
-		if rpcServer && t.options.zipkinSharedRPCSpan {
-			// Support Zipkin's one-span-per-RPC model
-			ctx.spanID = parent.spanID
-			ctx.parentID = parent.parentID
+	if !isSelfRef {
+		if !hasParent || !parent.IsValid() {
+			newTrace = true
+			ctx.traceID.Low = t.randomID()
+			if t.options.gen128Bit {
+				ctx.traceID.High = t.options.highTraceIDGenerator()
+			}
+			ctx.spanID = SpanID(ctx.traceID.Low)
+			ctx.parentID = 0
+			ctx.flags = byte(0)
+			if hasParent && parent.isDebugIDContainerOnly() && t.isDebugAllowed(operationName) {
+				ctx.flags |= (flagSampled | flagDebug)
+				samplerTags = []Tag{{key: JaegerDebugHeader, value: parent.debugID}}
+			} else if sampled, tags := t.sampler.IsSampled(ctx.traceID, operationName); sampled {
+				ctx.flags |= flagSampled
+				samplerTags = tags
+			}
 		} else {
-			ctx.spanID = SpanID(t.randomID())
-			ctx.parentID = parent.spanID
+			ctx.traceID = parent.traceID
+			if rpcServer && t.options.zipkinSharedRPCSpan {
+				// Support Zipkin's one-span-per-RPC model
+				ctx.spanID = parent.spanID
+				ctx.parentID = parent.parentID
+			} else {
+				ctx.spanID = SpanID(t.randomID())
+				ctx.parentID = parent.spanID
+			}
+			ctx.flags = parent.flags
 		}
-		ctx.flags = parent.flags
-	}
-	if hasParent {
-		// copy baggage items
-		if l := len(parent.baggage); l > 0 {
-			ctx.baggage = make(map[string]string, len(parent.baggage))
-			for k, v := range parent.baggage {
-				ctx.baggage[k] = v
+		if hasParent {
+			// copy baggage items
+			if l := len(parent.baggage); l > 0 {
+				ctx.baggage = make(map[string]string, len(parent.baggage))
+				for k, v := range parent.baggage {
+					ctx.baggage[k] = v
+				}
 			}
 		}
 	}
@@ -345,6 +365,16 @@ func (t *Tracer) Tags() []opentracing.Tag {
 		tags[i] = opentracing.Tag{Key: tag.key, Value: tag.value}
 	}
 	return tags
+}
+
+// getTag returns the value of specific tag, if not exists, return nil.
+func (t *Tracer) getTag(key string) (interface{}, bool) {
+	for _, tag := range t.tags {
+		if tag.key == key {
+			return tag.value, true
+		}
+	}
+	return nil, false
 }
 
 // newSpan returns an instance of a clean Span object.
@@ -434,4 +464,14 @@ func (t *Tracer) setBaggage(sp *Span, key, value string) {
 // (NB) span must hold the lock before making this call
 func (t *Tracer) isDebugAllowed(operation string) bool {
 	return t.debugThrottler.IsAllowed(operation)
+}
+
+// SelfRef creates an opentracing compliant SpanReference from a jaeger
+// SpanContext. This is a factory function in order to encapsulate jaeger specific
+// types.
+func SelfRef(ctx SpanContext) opentracing.SpanReference {
+	return opentracing.SpanReference{
+		Type:              selfRefType,
+		ReferencedContext: ctx,
+	}
 }

@@ -1,4 +1,4 @@
-# Graylog Hook for [Logrus](https://github.com/sirupsen/logrus) <img src="http://i.imgur.com/hTeVwmJ.png" width="40" height="40" alt=":walrus:" class="emoji" title=":walrus:" />&nbsp;[![Build Status](https://travis-ci.org/gemnasium/logrus-graylog-hook.svg?branch=master)](https://travis-ci.org/gemnasium/logrus-graylog-hook)&nbsp;[![godoc reference](https://godoc.org/github.com/gemnasium/logrus-graylog-hook?status.svg)](https://godoc.org/github.com/gemnasium/logrus-graylog-hook)
+# Graylog Hook for [Logrus](https://github.com/sirupsen/logrus) <img src="http://i.imgur.com/hTeVwmJ.png" width="40" height="40" alt=":walrus:" class="emoji" title=":walrus:" />&nbsp;[![Build Status](https://travis-ci.org/gemnasium/logrus-graylog-hook.svg?branch=master)](https://travis-ci.org/gemnasium/logrus-graylog-hook)&nbsp;[![godoc reference](https://godoc.org/github.com/gemnasium/logrus-graylog-hook?status.svg)](https://godoc.org/gopkg.in/gemnasium/logrus-graylog-hook.v2)
 
 Use this hook to send your logs to [Graylog](http://graylog2.org) server over UDP.
 The hook is non-blocking: even if UDP is used to send messages, the extra work
@@ -17,8 +17,9 @@ The hook must be configured with:
 package main
 
 import (
+    "log/syslog"
     log "github.com/sirupsen/logrus"
-    "github.com/gemnasium/logrus-graylog-hook/v3"
+    "gopkg.in/gemnasium/logrus-graylog-hook.v2"
     )
 
 func main() {
@@ -34,8 +35,9 @@ func main() {
 package main
 
 import (
+    "log/syslog"
     log "github.com/sirupsen/logrus"
-    "github.com/gemnasium/logrus-graylog-hook/v3"
+    "gopkg.in/gemnasium/logrus-graylog-hook.v2"
     )
 
 func main() {

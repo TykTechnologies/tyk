@@ -1,7 +1,30 @@
-# Sentry Hook for Logrus <img src="http://i.imgur.com/hTeVwmJ.png" width="40" height="40" alt=":walrus:" class="emoji" title=":walrus:" />
+Sentry Hook for Logrus <img src="http://i.imgur.com/hTeVwmJ.png" width="40" height="40" alt=":walrus:" class="emoji" title=":walrus:" />
+----
 
+[![GoDoc][1]][2]  [![Release][5]][6] [![Build Status][7]][8] [![Coverage Status][9]][10] [![Go Report Card][13]][14] [![Code Climate][19]][20] [![BCH compliance][21]][22]
 
-[![Build Status](https://travis-ci.org/evalphobia/logrus_sentry.svg?branch=master)](https://travis-ci.org/evalphobia/logrus_sentry)  [![Coverage Status](https://coveralls.io/repos/evalphobia/logrus_sentry/badge.svg?branch=master&service=github)](https://coveralls.io/github/evalphobia/logrus_sentry?branch=master) [![GoDoc](https://godoc.org/github.com/evalphobia/logrus_sentry?status.svg)](https://godoc.org/github.com/evalphobia/logrus_sentry)
+[1]: https://godoc.org/github.com/evalphobia/logrus_sentry?status.svg
+[2]: https://godoc.org/github.com/evalphobia/logrus_sentry
+[4]: LICENSE.md
+[5]: https://img.shields.io/github/release/evalphobia/logrus_sentry.svg
+[6]: https://github.com/evalphobia/logrus_sentry/releases/latest
+[7]: https://travis-ci.org/evalphobia/logrus_sentry.svg?branch=master
+[8]: https://travis-ci.org/evalphobia/logrus_sentry
+[9]: https://coveralls.io/repos/evalphobia/logrus_sentry/badge.svg?branch=master&service=github
+[10]: https://coveralls.io/github/evalphobia/logrus_sentry?branch=master
+[11]: https://codecov.io/github/evalphobia/logrus_sentry/coverage.svg?branch=master
+[12]: https://codecov.io/github/evalphobia/logrus_sentry?branch=master
+[13]: https://goreportcard.com/badge/github.com/evalphobia/logrus_sentry
+[14]: https://goreportcard.com/report/github.com/evalphobia/logrus_sentry
+[15]: https://img.shields.io/github/downloads/evalphobia/logrus_sentry/total.svg?maxAge=1800
+[16]: https://github.com/evalphobia/logrus_sentry/releases
+[17]: https://img.shields.io/github/stars/evalphobia/logrus_sentry.svg
+[18]: https://github.com/evalphobia/logrus_sentry/stargazers
+[19]: https://codeclimate.com/github/evalphobia/logrus_sentry/badges/gpa.svg
+[20]: https://codeclimate.com/github/evalphobia/logrus_sentry
+[21]: https://bettercodehub.com/edge/badge/evalphobia/logrus_sentry?branch=master
+[22]: https://bettercodehub.com/
+
 
 [Sentry](https://getsentry.com) provides both self-hosted and hosted
 solutions for exception tracking.
@@ -137,3 +160,4 @@ Other configuration options are:
 - `StacktraceConfiguration.Skip` how many stack frames to skip before stacktrace starts recording.
 - `StacktraceConfiguration.Context` the number of lines to include around a stack frame for context.
 - `StacktraceConfiguration.InAppPrefixes` the prefixes that will be matched against the stack frame to identify it as in_app
+- `StacktraceConfiguration.IncludeErrorBreadcrumb` whether to create a breadcrumb with the full text of error

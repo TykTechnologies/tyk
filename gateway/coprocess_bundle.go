@@ -97,9 +97,23 @@ func (b *Bundle) Verify() error {
 func (b *Bundle) AddToSpec() {
 	b.Spec.CustomMiddleware = b.Manifest.CustomMiddleware
 
-	// Call HandleMiddlewareCache only when using rich plugins:
-	if GlobalDispatcher != nil && b.Spec.CustomMiddleware.Driver != apidef.OttoDriver {
-		GlobalDispatcher.HandleMiddlewareCache(&b.Manifest, b.Path)
+	// Load Python interpreter if the
+	if loadedDrivers[b.Spec.CustomMiddleware.Driver] == nil && b.Spec.CustomMiddleware.Driver == apidef.PythonDriver {
+		var err error
+		loadedDrivers[apidef.PythonDriver], err = NewPythonDispatcher()
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "coprocess",
+			}).WithError(err).Error("Couldn't load Python dispatcher")
+			return
+		}
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess",
+		}).Info("Python dispatcher was initialized")
+	}
+	dispatcher := loadedDrivers[b.Spec.CustomMiddleware.Driver]
+	if dispatcher != nil {
+		dispatcher.HandleMiddlewareCache(&b.Manifest, b.Path)
 	}
 }
 
@@ -264,6 +278,14 @@ func loadBundleManifest(bundle *Bundle, spec *APISpec, skipVerification bool) er
 	return nil
 }
 
+func getBundleDestPath(spec *APISpec) string {
+	tykBundlePath := filepath.Join(config.Global().MiddlewarePath, "bundles")
+	bundleNameHash := md5.New()
+	io.WriteString(bundleNameHash, spec.CustomMiddlewareBundle)
+	bundlePath := fmt.Sprintf("%s_%x", spec.APIID, bundleNameHash.Sum(nil))
+	return filepath.Join(tykBundlePath, bundlePath)
+}
+
 // loadBundle wraps the load and save steps, it will return if an error occurs at any point.
 func loadBundle(spec *APISpec) error {
 	// Skip if no custom middleware bundle name is set.
@@ -276,13 +298,10 @@ func loadBundle(spec *APISpec) error {
 		return bundleError(spec, nil, "No bundle base URL set, skipping bundle")
 	}
 
-	tykBundlePath := filepath.Join(config.Global().MiddlewarePath, "bundles")
-	// Skip if the bundle destination path already exists.
-	bundleNameHash := md5.New()
-	io.WriteString(bundleNameHash, spec.CustomMiddlewareBundle)
-	bundlePath := fmt.Sprintf("%s_%x", spec.APIID, bundleNameHash.Sum(nil))
-	destPath := filepath.Join(tykBundlePath, bundlePath)
+	// get bundle destination on disk
+	destPath := getBundleDestPath(spec)
 
+	// Skip if the bundle destination path already exists.
 	// The bundle exists, load and return:
 	if _, err := os.Stat(destPath); err == nil {
 		log.WithFields(logrus.Fields{

@@ -28,6 +28,7 @@ func (w byteWriter) WriteString(s string) (int, error) {
 	return w.Write([]byte(s))
 }
 
+// Marshal returns the MessagePack encoding of v.
 func Marshal(v ...interface{}) ([]byte, error) {
 	var buf bytes.Buffer
 	err := NewEncoder(&buf).Encode(v...)
@@ -38,7 +39,8 @@ type Encoder struct {
 	w   writer
 	buf []byte
 
-	sortMapKeys bool
+	sortMapKeys   bool
+	structAsArray bool
 }
 
 func NewEncoder(w io.Writer) *Encoder {
@@ -58,6 +60,12 @@ func NewEncoder(w io.Writer) *Encoder {
 //   - map[string]interface{}
 func (e *Encoder) SortMapKeys(v bool) *Encoder {
 	e.sortMapKeys = v
+	return e
+}
+
+// StructAsArray causes the Encoder to encode Go structs as MessagePack arrays.
+func (e *Encoder) StructAsArray(v bool) *Encoder {
+	e.structAsArray = v
 	return e
 }
 
@@ -92,21 +100,10 @@ func (e *Encoder) encode(v interface{}) error {
 		return e.EncodeFloat32(v)
 	case float64:
 		return e.EncodeFloat64(v)
-	case []string:
-		return e.encodeStringSlice(v)
 	case time.Duration:
 		return e.EncodeInt64(int64(v))
 	case time.Time:
 		return e.EncodeTime(v)
-	case Marshaler:
-		b, err := v.MarshalMsgpack()
-		if err != nil {
-			return err
-		}
-		_, err = e.w.Write(b)
-		return err
-	case CustomEncoder:
-		return v.EncodeMsgpack(e)
 	}
 	return e.EncodeValue(reflect.ValueOf(v))
 }
@@ -128,12 +125,9 @@ func (e *Encoder) EncodeBool(value bool) error {
 }
 
 func (e *Encoder) write(b []byte) error {
-	n, err := e.w.Write(b)
+	_, err := e.w.Write(b)
 	if err != nil {
 		return err
-	}
-	if n < len(b) {
-		return io.ErrShortWrite
 	}
 	return nil
 }

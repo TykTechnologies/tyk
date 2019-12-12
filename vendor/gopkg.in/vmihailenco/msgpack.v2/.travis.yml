@@ -1,0 +1,16 @@
+sudo: false
+language: go
+
+go:
+  - 1.7
+  - 1.8
+  - tip
+
+matrix:
+  allow_failures:
+    - go: tip
+
+install:
+  - go get gopkg.in/check.v1
+  - mkdir -p $HOME/gopath/src/gopkg.in/vmihailenco
+  - mv `pwd` $HOME/gopath/src/gopkg.in/vmihailenco/msgpack.v2

@@ -1,24 +1,30 @@
-# MessagePack encoding for Golang [![Build Status](https://travis-ci.org/vmihailenco/msgpack.svg?branch=v2)](https://travis-ci.org/vmihailenco/msgpack)
+# MessagePack encoding for Golang
+
+[![Build Status](https://travis-ci.org/vmihailenco/msgpack.svg?branch=v2)](https://travis-ci.org/vmihailenco/msgpack)
+[![GoDoc](https://godoc.org/github.com/vmihailenco/msgpack?status.svg)](https://godoc.org/github.com/vmihailenco/msgpack)
 
 Supports:
 - Primitives, arrays, maps, structs, time.Time and interface{}.
 - Appengine *datastore.Key and datastore.Cursor.
-- [CustomEncoder](http://godoc.org/gopkg.in/vmihailenco/msgpack.v2#example-CustomEncoder)/CustomDecoder interfaces for custom encoding.
-- [Extensions](http://godoc.org/gopkg.in/vmihailenco/msgpack.v2#example-RegisterExt) to encode type information.
-- Fields renaming using `msgpack:"my_field_name"`.
-- Structs inlining using `msgpack:",inline"`.
-- Omitempty flag using `msgpack:",omitempty"`.
+- [CustomEncoder](https://godoc.org/gopkg.in/vmihailenco/msgpack.v2#example-CustomEncoder)/CustomDecoder interfaces for custom encoding.
+- [Extensions](https://godoc.org/gopkg.in/vmihailenco/msgpack.v2#example-RegisterExt) to encode type information.
+- Renaming fields via `msgpack:"my_field_name"`.
+- Inlining struct fields via `msgpack:",inline"`.
+- Omitting empty fields via `msgpack:",omitempty"`.
 - [Map keys sorting](https://godoc.org/gopkg.in/vmihailenco/msgpack.v2#Encoder.SortMapKeys).
-- [Msgpack query](https://godoc.org/gopkg.in/vmihailenco/msgpack.v2#example-Decoder-Query) - simple but very efficient.
+- Encoding/decoding all [structs as arrays](https://godoc.org/gopkg.in/vmihailenco/msgpack.v2#Encoder.StructAsArray) or [individual structs](https://godoc.org/gopkg.in/vmihailenco/msgpack.v2#example-Marshal--AsArray).
+- Simple but very fast and efficient [queries](https://godoc.org/gopkg.in/vmihailenco/msgpack.v2#example-Decoder-Query).
 
-API docs: http://godoc.org/gopkg.in/vmihailenco/msgpack.v2.
-Examples: http://godoc.org/gopkg.in/vmihailenco/msgpack.v2#pkg-examples.
+API docs: https://godoc.org/gopkg.in/vmihailenco/msgpack.v2.
+Examples: https://godoc.org/gopkg.in/vmihailenco/msgpack.v2#pkg-examples.
 
 ## Installation
 
 Install:
 
-    go get gopkg.in/vmihailenco/msgpack.v2
+```shell
+go get gopkg.in/vmihailenco/msgpack.v2
+```
 
 ## Quickstart
 
@@ -55,4 +61,9 @@ BenchmarkStructGOB-4                  	   10000	    104331 ns/op	   14664 B/op	 
 
 ## Howto
 
-Please go through [examples](http://godoc.org/gopkg.in/vmihailenco/msgpack.v2#pkg-examples) to get an idea how to use this package.
+Please go through [examples](https://godoc.org/gopkg.in/vmihailenco/msgpack.v2#pkg-examples) to get an idea how to use this package.
+
+## See also
+
+- [Golang PostgreSQL ORM](https://github.com/go-pg/pg)
+- [Golang message task queue](https://github.com/go-msgqueue/msgqueue)

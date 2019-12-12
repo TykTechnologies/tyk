@@ -1,6 +1,3 @@
-// +build coprocess
-// +build python
-
 package python
 
 import (
@@ -86,15 +83,15 @@ counter = 0
 
 @Hook
 def MyAuthHook(request, session, metadata, spec):
-	global counter
-	counter = counter + 1
-	auth_param = parse.parse_qs(request.object.body)["auth"]
-	if auth_param and auth_param[0] == 'valid_token' and counter < 2:
-		session.rate = 1000.0
-		session.per = 1.0
-		session.id_extractor_deadline = int(time.time()) + 60
-		metadata["token"] = "valid_token"
-	return request, session, metadata
+    global counter
+    counter = counter + 1
+    auth_param = parse.parse_qs(request.object.body)["auth"]
+    if auth_param and auth_param[0] == 'valid_token' and counter < 2:
+        session.rate = 1000.0
+        session.per = 1.0
+        session.id_extractor_deadline = int(time.time()) + 60
+        metadata["token"] = "valid_token"
+    return request, session, metadata
 `,
 }
 
@@ -150,7 +147,8 @@ def MyAuthHook(request, session, metadata, spec):
 func TestValueExtractorHeaderSource(t *testing.T) {
 	ts := gateway.StartTest(gateway.TestConfig{
 		CoprocessConfig: config.CoProcessConfig{
-			EnableCoProcess: true,
+			EnableCoProcess:  true,
+			PythonPathPrefix: pkgPath,
 		},
 		Delay: 10 * time.Millisecond,
 	})

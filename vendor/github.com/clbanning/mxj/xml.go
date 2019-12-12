@@ -15,6 +15,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -278,6 +279,23 @@ func HandleXMPPStreamTag(b ...bool) {
 	}
 }
 
+// 21jan18 - decode all values as map["#text":value] (issue #56)
+var decodeSimpleValuesAsMap bool
+
+// DecodeSimpleValuesAsMap forces all values to be decoded as map["#text":<value>].
+// If called with no argument, the decoding is toggled on/off.
+//
+// By default the NewMapXml functions decode simple values without attributes as
+// map[<tag>:<value>]. This function causes simple values without attributes to be
+// decoded the same as simple values with attributes - map[<tag>:map["#text":<value>]].
+func DecodeSimpleValuesAsMap(b ...bool) {
+	if len(b) == 0 {
+		decodeSimpleValuesAsMap = !decodeSimpleValuesAsMap
+	} else if len(b) == 1 {
+		decodeSimpleValuesAsMap = b[0]
+	}
+}
+
 // xmlToMapParser (2015.11.12) - load a 'clean' XML doc into a map[string]interface{} directly.
 // A refactoring of xmlToTreeParser(), markDuplicate() and treeToMap() - here, all-in-one.
 // We've removed the intermediate *node tree with the allocation and subsequent rescanning.
@@ -418,7 +436,7 @@ func xmlToMapParser(skey string, a []xml.Attr, p *xml.Decoder, r bool) (map[stri
 			// clean up possible noise
 			tt := strings.Trim(string(t.(xml.CharData)), "\t\r\b\n ")
 			if len(tt) > 0 {
-				if len(na) > 0 {
+				if len(na) > 0 || decodeSimpleValuesAsMap {
 					na["#text"] = cast(tt, r)
 				} else if skey != "" {
 					n[skey] = cast(tt, r)
@@ -452,23 +470,27 @@ func cast(s string, r bool) interface{} {
 		if !castNanInf {
 			switch strings.ToLower(s) {
 			case "nan", "inf", "-inf":
-				return interface{}(s)
+				return s
 			}
 		}
 
 		// handle numeric strings ahead of boolean
 		if f, err := strconv.ParseFloat(s, 64); err == nil {
-			return interface{}(f)
+			return f
 		}
-		// ParseBool treats "1"==true & "0"==false
-		// but be more strick - only allow TRUE, True, true, FALSE, False, false
-		if s != "t" && s != "T" && s != "f" && s != "F" {
-			if b, err := strconv.ParseBool(s); err == nil {
-				return interface{}(b)
+		// ParseBool treats "1"==true & "0"==false, we've already scanned those
+		// values as float64. See if value has 't' or 'f' as initial screen to
+		// minimize calls to ParseBool; also, see if len(s) < 6.
+		if len(s) > 0 && len(s) < 6 {
+			switch s[:1] {
+			case "t", "T", "f", "F":
+				if b, err := strconv.ParseBool(s); err == nil {
+					return b
+				}
 			}
 		}
 	}
-	return interface{}(s)
+	return s
 }
 
 // ------------------ END: NewMapXml & NewMapXmlReader -------------------------
@@ -807,6 +829,22 @@ func mapToXmlIndent(doIndent bool, s *string, key string, value interface{}, pp 
 	var elen int
 	p := &pretty{pp.indent, pp.cnt, pp.padding, pp.mapDepth, pp.start}
 
+	// per issue #48, 18apr18 - try and coerce maps to map[string]interface{}
+	// Don't need for mapToXmlSeqIndent, since maps there are decoded by NewMapXmlSeq().
+	if reflect.ValueOf(value).Kind() == reflect.Map {
+		switch value.(type) {
+		case map[string]interface{}:
+		default:
+			val := make(map[string]interface{})
+			vv := reflect.ValueOf(value)
+			keys := vv.MapKeys()
+			for _, k := range keys {
+				val[fmt.Sprint(k)] = vv.MapIndex(k).Interface()
+			}
+			value = val
+		}
+	}
+
 	switch value.(type) {
 	// special handling of []interface{} values when len(value) == 0
 	case map[string]interface{}, []byte, string, float64, bool, int, int32, int64, float32, json.Number:
@@ -870,6 +908,18 @@ func mapToXmlIndent(doIndent bool, s *string, key string, value interface{}, pp 
 
 		// simple element? Note: '#text" is an invalid XML tag.
 		if v, ok := vv["#text"]; ok && n+1 == lenvv {
+			switch v.(type) {
+			case string:
+				if xmlEscapeChars {
+					v = escapeChars(v.(string))
+				} else {
+					v = v.(string)
+				}
+			case []byte:
+				if xmlEscapeChars {
+					v = escapeChars(string(v.([]byte)))
+				}
+			}
 			*s += ">" + fmt.Sprintf("%v", v)
 			endTag = true
 			elen = 1
@@ -956,7 +1006,7 @@ func mapToXmlIndent(doIndent bool, s *string, key string, value interface{}, pp 
 		// would be encountered if mv generated from NewMapXml, NewMapJson.
 		// Could be encountered in AnyXml(), so we'll let it stay, though
 		// it should be merged with case []interface{}, above.
-		//quick fix for []string type 
+		//quick fix for []string type
 		//[]string should be treated exaclty as []interface{}
 		if len(value.([]string)) == 0 {
 			if doIndent {
@@ -1071,10 +1121,7 @@ func (a attrList) Swap(i, j int) {
 }
 
 func (a attrList) Less(i, j int) bool {
-	if a[i][0] > a[j][0] {
-		return false
-	}
-	return true
+	return a[i][0] <= a[j][0]
 }
 
 type elemList [][2]interface{}
@@ -1088,8 +1135,5 @@ func (e elemList) Swap(i, j int) {
 }
 
 func (e elemList) Less(i, j int) bool {
-	if e[i][0].(string) > e[j][0].(string) {
-		return false
-	}
-	return true
+	return e[i][0].(string) <= e[j][0].(string)
 }

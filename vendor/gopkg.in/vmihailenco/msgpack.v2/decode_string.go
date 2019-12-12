@@ -2,7 +2,6 @@ package msgpack
 
 import (
 	"fmt"
-	"io"
 	"reflect"
 
 	"gopkg.in/vmihailenco/msgpack.v2/codes"
@@ -29,7 +28,7 @@ func (d *Decoder) bytesLen(c byte) (int, error) {
 }
 
 func (d *Decoder) DecodeString() (string, error) {
-	c, err := d.r.ReadByte()
+	c, err := d.readByte()
 	if err != nil {
 		return "", err
 	}
@@ -58,7 +57,7 @@ func decodeStringValue(d *Decoder, v reflect.Value) error {
 }
 
 func (d *Decoder) DecodeBytesLen() (int, error) {
-	c, err := d.r.ReadByte()
+	c, err := d.readByte()
 	if err != nil {
 		return 0, err
 	}
@@ -66,7 +65,7 @@ func (d *Decoder) DecodeBytesLen() (int, error) {
 }
 
 func (d *Decoder) DecodeBytes() ([]byte, error) {
-	c, err := d.r.ReadByte()
+	c, err := d.readByte()
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +84,7 @@ func (d *Decoder) bytes(c byte, b []byte) ([]byte, error) {
 }
 
 func (d *Decoder) bytesNoCopy() ([]byte, error) {
-	c, err := d.r.ReadByte()
+	c, err := d.readByte()
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +99,7 @@ func (d *Decoder) bytesNoCopy() ([]byte, error) {
 }
 
 func (d *Decoder) decodeBytesPtr(ptr *[]byte) error {
-	c, err := d.r.ReadByte()
+	c, err := d.readByte()
 	if err != nil {
 		return err
 	}
@@ -133,7 +132,7 @@ func (d *Decoder) skipBytes(c byte) error {
 }
 
 func decodeBytesValue(d *Decoder, v reflect.Value) error {
-	c, err := d.r.ReadByte()
+	c, err := d.readByte()
 	if err != nil {
 		return err
 	}
@@ -148,7 +147,7 @@ func decodeBytesValue(d *Decoder, v reflect.Value) error {
 }
 
 func decodeByteArrayValue(d *Decoder, v reflect.Value) error {
-	c, err := d.r.ReadByte()
+	c, err := d.readByte()
 	if err != nil {
 		return err
 	}
@@ -165,6 +164,5 @@ func decodeByteArrayValue(d *Decoder, v reflect.Value) error {
 	}
 
 	b := v.Slice(0, n).Bytes()
-	_, err = io.ReadFull(d.r, b)
-	return err
+	return d.readFull(b)
 }

@@ -1,12 +1,12 @@
 // mxj - A collection of map[string]interface{} and associated XML and JSON utilities.
-// Copyright 2012-2015 Charles Banning. All rights reserved.
+// Copyright 2012-2015, 2018 Charles Banning. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file
 
 /*
-Marshal/Unmarshal XML to/from JSON and map[string]interface{} values, and extract/modify values from maps by key or key-path, including wildcards.
+Marshal/Unmarshal XML to/from map[string]interface{} values (and JSON); extract/modify values from maps by key or key-path, including wildcards.
 
-mxj supplants the legacy x2j and j2x packages. If you want the old syntax, use mxj/x2j or mxj/j2x packages.
+mxj supplants the legacy x2j and j2x packages. The subpackage x2j-wrapper is provided to facilitate migrating from the x2j package.  The x2j and j2x subpackages provide similar functionality of the old packages but are not function-name compatible with them.
 
 Note: this library was designed for processing ad hoc anonymous messages.  Bulk processing large data sets may be much more efficiently performed using the encoding/xml or encoding/json packages from Go's standard library directly.
 
@@ -14,6 +14,9 @@ Related Packages:
 	checkxml: github.com/clbanning/checkxml provides functions for validating XML data.
 
 Notes:
+	2018.04.18: mv.Xml/mv.XmlIndent encodes non-map[string]interface{} map values - map[string]string, map[int]uint, etc.
+	2018.03.29: mv.Gob/NewMapGob support gob encoding/decoding of Maps.
+	2018.03.26: Added mxj/x2j-wrapper sub-package for migrating from legacy x2j package.
 	2017.02.22: LeafNode paths can use ".N" syntax rather than "[N]" for list member indexing.
 	2017.02.21: github.com/clbanning/checkxml provides functions for validating XML data.
 	2017.02.10: SetFieldSeparator changes field separator for args in UpdateValuesForPath, ValuesFor... methods.
@@ -34,18 +37,18 @@ SUMMARY
 
    type Map map[string]interface{}
 
-   Create a Map value, 'm', from any map[string]interface{} value, 'v':
+   Create a Map value, 'mv', from any map[string]interface{} value, 'v':
       mv := Map(v)
 
-   Unmarshal / marshal XML as a Map value, 'm':
+   Unmarshal / marshal XML as a Map value, 'mv':
       mv, err := NewMapXml(xmlValue) // unmarshal
-      xmlValue, err := m.Xml()      // marshal
+      xmlValue, err := mv.Xml()      // marshal
 
-   Unmarshal XML from an io.Reader as a Map value, 'm':
-      mv, err := NewMapReader(xmlReader)         // repeated calls, as with an os.File Reader, will process stream
-      mv, raw, err := NewMapReaderRaw(xmlReader) // 'raw' is the raw XML that was decoded
+   Unmarshal XML from an io.Reader as a Map value, 'mv':
+      mv, err := NewMapXmlReader(xmlReader)         // repeated calls, as with an os.File Reader, will process stream
+      mv, raw, err := NewMapXmlReaderRaw(xmlReader) // 'raw' is the raw XML that was decoded
 
-   Marshal Map value, 'm', to an XML Writer (io.Writer):
+   Marshal Map value, 'mv', to an XML Writer (io.Writer):
       err := mv.XmlWriter(xmlWriter)
       raw, err := mv.XmlWriterRaw(xmlWriter) // 'raw' is the raw XML that was written on xmlWriter
 
@@ -67,7 +70,7 @@ SUMMARY
       err := mv.Struct(structPointer)
 
    To work with XML tag values, JSON or Map key values or structure field values, decode the XML, JSON
-   or structure to a Map value, 'm', or cast a map[string]interface{} value to a Map value, 'm', then:
+   or structure to a Map value, 'mv', or cast a map[string]interface{} value to a Map value, 'mv', then:
       paths := mv.PathsForKey(key)
       path := mv.PathForKeyShortest(key)
       values, err := mv.ValuesForKey(key, subkeys)
@@ -81,6 +84,7 @@ SUMMARY
    A new Map with whatever keys are desired can be created from the current Map and then encoded in XML
    or JSON. (Note: keys can use dot-notation. 'oldKey' can also use wildcards and indexed arrays.)
       newMap, err := mv.NewMap("oldKey_1:newKey_1", "oldKey_2:newKey_2", ..., "oldKey_N:newKey_N")
+      newMap, err := mv.NewMap("oldKey1", "oldKey3", "oldKey5") // a subset of 'mv'; see "examples/partial.go"
       newXml, err := newMap.Xml()   // for example
       newJson, err := newMap.Json() // ditto
 
@@ -123,7 +127,7 @@ XML ENCODING CONVENTIONS
    - ALSO: there is no guarantee that the encoded XML doc will be the same as the decoded one.  (Go
            randomizes the walk through map[string]interface{} values.) If you plan to re-encode the
            Map value to XML and want the same sequencing of elements look at NewMapXmlSeq() and
-           m.XmlSeq() - these try to preserve the element sequencing but with added complexity when
+           mv.XmlSeq() - these try to preserve the element sequencing but with added complexity when
            working with the Map representation.
 
 */

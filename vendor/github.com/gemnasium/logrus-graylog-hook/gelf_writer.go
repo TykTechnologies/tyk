@@ -30,10 +30,6 @@ type Writer struct {
 	Facility         string // defaults to current process name
 	CompressionLevel int    // one of the consts from compress/flate
 	CompressionType  CompressType
-
-	zw                 writerCloserResetter
-	zwCompressionLevel int
-	zwCompressionType  CompressType
 }
 
 // What compression type the writer should use when sending messages
@@ -170,7 +166,7 @@ func (w *Writer) writeChunked(zBytes []byte) (err error) {
 }
 
 type bufferedWriter struct {
-	buffer io.Writer
+	buffer *bytes.Buffer
 }
 
 func (bw bufferedWriter) Write(p []byte) (n int, err error) {
@@ -179,15 +175,6 @@ func (bw bufferedWriter) Write(p []byte) (n int, err error) {
 
 func (bw bufferedWriter) Close() error {
 	return nil
-}
-
-func (bw *bufferedWriter) Reset(w io.Writer) {
-	bw.buffer = w
-}
-
-type writerCloserResetter interface {
-	io.WriteCloser
-	Reset(w io.Writer)
 }
 
 // WriteMessage sends the specified message to the GELF server
@@ -201,38 +188,25 @@ func (w *Writer) WriteMessage(m *Message) (err error) {
 	}
 
 	var zBuf bytes.Buffer
-
-	// . If compression settings have changed, a new writer is required.
-	if w.zwCompressionType != w.CompressionType || w.zwCompressionLevel != w.CompressionLevel {
-		w.zw = nil
-	}
-
+	var zw io.WriteCloser
 	switch w.CompressionType {
 	case CompressGzip:
-		if w.zw == nil {
-			w.zw, err = gzip.NewWriterLevel(&zBuf, w.CompressionLevel)
-		}
+		zw, err = gzip.NewWriterLevel(&zBuf, w.CompressionLevel)
 	case CompressZlib:
-		if w.zw == nil {
-			w.zw, err = zlib.NewWriterLevel(&zBuf, w.CompressionLevel)
-		}
+		zw, err = zlib.NewWriterLevel(&zBuf, w.CompressionLevel)
 	case NoCompress:
-		w.zw = &bufferedWriter{}
+		zw = bufferedWriter{buffer: &zBuf}
 	default:
 		panic(fmt.Sprintf("unknown compression type %d",
 			w.CompressionType))
 	}
-
 	if err != nil {
 		return
 	}
-
-	w.zw.Reset(&zBuf)
-
-	if _, err = w.zw.Write(mBytes); err != nil {
+	if _, err = zw.Write(mBytes); err != nil {
 		return
 	}
-	w.zw.Close()
+	zw.Close()
 
 	zBytes := zBuf.Bytes()
 	if numChunks(zBytes) > 1 {
@@ -266,6 +240,9 @@ func (w *Writer) Warning(m string) (err error)
 // the server specified in New().
 func (w *Writer) Write(p []byte) (n int, err error) {
 
+	// 1 for the function that called us.
+	file, line := getCallerIgnoringLogMulti(1)
+
 	// remove trailing and leading whitespace
 	p = bytes.TrimSpace(p)
 
@@ -288,6 +265,8 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 		TimeUnix: float64(time.Now().UnixNano()/1000000) / 1000.,
 		Level:    6, // info
 		Facility: w.Facility,
+		File:     file,
+		Line:     line,
 		Extra:    map[string]interface{}{},
 	}
 

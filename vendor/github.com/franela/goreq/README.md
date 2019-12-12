@@ -324,7 +324,7 @@ res.Body.FromJsonTo(&item)
 ## Sending/Receiving Compressed Payloads
 GoReq supports gzip, deflate and zlib compression of requests' body and transparent decompression of responses provided they have a correct `Content-Encoding` header.
 
-#####Using gzip compression:
+##### Using gzip compression:
 ```go
 res, err := goreq.Request{
     Method: "POST",
@@ -333,7 +333,7 @@ res, err := goreq.Request{
     Compression: goreq.Gzip(),
 }.Do()
 ```
-#####Using deflate/zlib compression:
+##### Using deflate/zlib compression:
 ```go
 res, err := goreq.Request{
     Method: "POST",
@@ -342,7 +342,7 @@ res, err := goreq.Request{
     Compression: goreq.Deflate(),
 }.Do()
 ```
-#####Using compressed responses:
+##### Using compressed responses:
 If servers replies a correct and matching `Content-Encoding` header (gzip requires `Content-Encoding: gzip` and deflate `Content-Encoding: deflate`) goreq transparently decompresses the response so the previous example should always work:
 ```go
 type Item struct {

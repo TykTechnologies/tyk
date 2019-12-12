@@ -179,6 +179,10 @@ func ecThumbprintInput(curve elliptic.Curve, x, y *big.Int) (string, error) {
 		return "", err
 	}
 
+	if len(x.Bytes()) > coordLength || len(y.Bytes()) > coordLength {
+		return "", errors.New("square/go-jose: invalid elliptic key (too large)")
+	}
+
 	return fmt.Sprintf(ecThumbprintTemplate, crv,
 		newFixedSizeBuffer(x.Bytes(), coordLength).base64(),
 		newFixedSizeBuffer(y.Bytes(), coordLength).base64()), nil

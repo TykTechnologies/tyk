@@ -31,6 +31,7 @@
 package circuit
 
 import (
+	"context"
 	"errors"
 	"sync"
 	"sync/atomic"
@@ -103,10 +104,11 @@ type Breaker struct {
 	// Clock is used for controlling time in tests.
 	Clock clock.Clock
 
+	_              [4]byte // pad to fix golang issue #599
 	consecFailures int64
-	counts         *window
 	lastFailure    int64 // stored as nanoseconds since the Unix epoch
 	halfOpens      int64
+	counts         *window
 	nextBackOff    time.Duration
 	tripped        int32
 	broken         int32
@@ -329,6 +331,12 @@ func (cb *Breaker) Ready() bool {
 // whenever the function returns an error. If the called function takes longer
 // than timeout to run, a failure will be recorded.
 func (cb *Breaker) Call(circuit func() error, timeout time.Duration) error {
+	return cb.CallContext(context.Background(), circuit, timeout)
+}
+
+// CallContext is same as Call but if the ctx is canceled after the circuit returned an error,
+// the error will not be marked as a failure because the call was canceled intentionally.
+func (cb *Breaker) CallContext(ctx context.Context, circuit func() error, timeout time.Duration) error {
 	var err error
 
 	if !cb.Ready() {
@@ -353,7 +361,9 @@ func (cb *Breaker) Call(circuit func() error, timeout time.Duration) error {
 	}
 
 	if err != nil {
-		cb.Fail()
+		if ctx.Err() != context.Canceled {
+			cb.Fail()
+		}
 		return err
 	}
 

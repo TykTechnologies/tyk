@@ -25,13 +25,14 @@ func (m *MultiTargetProxy) proxyForRequest(r *http.Request) *ReverseProxy {
 	return m.defaultProxy
 }
 
-func (m *MultiTargetProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.Response {
+func (m *MultiTargetProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) ProxyResponse {
 	log.WithFields(logrus.Fields{
 		"prefix": "multi-target",
 	}).Debug("Serving Multi-target...")
 	return m.proxyForRequest(r).ServeHTTP(w, r)
 }
-func (m *MultiTargetProxy) ServeHTTPForCache(w http.ResponseWriter, r *http.Request) *http.Response {
+
+func (m *MultiTargetProxy) ServeHTTPForCache(w http.ResponseWriter, r *http.Request) ProxyResponse {
 	return m.proxyForRequest(r).ServeHTTPForCache(w, r)
 }
 

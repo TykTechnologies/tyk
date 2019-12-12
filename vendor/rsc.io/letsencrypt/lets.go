@@ -8,6 +8,30 @@
 // that can prove control over the given domain's DNS records or
 // the servers pointed at by those records.
 //
+// Warning
+//
+// Like any other random code you find on the internet, this package should
+// not be relied upon in important, production systems without thorough testing
+// to ensure that it meets your needs.
+//
+// In the long term you should be using
+// https://golang.org/x/crypto/acme/autocert instead of this package.
+// Send improvements there, not here.
+//
+// This is a package that I wrote for my own personal web sites (swtch.com, rsc.io)
+// in a hurry when my paid-for SSL certificate was expiring. It has no tests,
+// has barely been used, and there is some anecdotal evidence that it does
+// not properly renew certificates in a timely fashion, so servers that run for
+// more than 3 months may run into trouble.
+// I don't run this code anymore: to simplify maintenance, I moved the sites
+// off of Ubuntu VMs and onto Google App Engine, configured with inexpensive
+// long-term certificates purchased from cheapsslsecurity.com.
+//
+// This package was interesting primarily as an example of how simple the API
+// for using LetsEncrypt.org could be made, in contrast to the low-level
+// implementations that existed at the time. In that respect, it helped inform
+// the design of the golang.org/x/crypto/acme/autocert package.
+//
 // Quick Start
 //
 // A complete HTTP/HTTPS web server using TLS certificates from LetsEncrypt.org,
@@ -144,7 +168,7 @@
 // serving HTTPS redirects to HTTP clients is provided by m.Serve, as used in
 // the original example above.
 //
-package letsencrypt
+package letsencrypt // import "rsc.io/letsencrypt"
 
 import (
 	"crypto"
@@ -428,7 +452,9 @@ func (m *Manager) register(email string, prompt func(string) bool) error {
 // Consequently, the state should be kept private.
 func (m *Manager) Marshal() string {
 	m.init()
+	m.mu.Lock()
 	js, err := json.MarshalIndent(&m.state, "", "\t")
+	m.mu.Unlock()
 	if err != nil {
 		panic("unexpected json.Marshal failure")
 	}
@@ -450,7 +476,9 @@ func (m *Manager) Unmarshal(enc string) error {
 		}
 		st.key = key
 	}
+	m.mu.Lock()
 	m.state = st
+	m.mu.Unlock()
 	for host, cert := range m.state.Certs {
 		c, err := cert.toTLS()
 		if err != nil {
@@ -643,7 +671,7 @@ func (m *Manager) verify(host string) (cert *tls.Certificate, refreshTime time.T
 	}
 	c.SetChallengeProvider(acme.TLSSNI01, tlsProvider{m})
 	c.ExcludeChallenges([]acme.Challenge{acme.HTTP01})
-	acmeCert, errmap := c.ObtainCertificate([]string{host}, true, nil)
+	acmeCert, errmap := c.ObtainCertificate([]string{host}, true, nil, false)
 	if len(errmap) > 0 {
 		if debug {
 			log.Printf("ObtainCertificate %v => %v", host, errmap)
@@ -660,7 +688,6 @@ func (m *Manager) verify(host string) (cert *tls.Certificate, refreshTime time.T
 		if debug {
 			log.Printf("ObtainCertificate %v toTLS failure: %v", host, err)
 		}
-		err = err
 		return
 	}
 	if refreshTime, err = certRefreshTime(cert); err != nil {
@@ -700,7 +727,7 @@ type tlsProvider struct {
 }
 
 func (p tlsProvider) Present(domain, token, keyAuth string) error {
-	cert, dom, err := acme.TLSSNI01ChallengeCertDomain(keyAuth)
+	cert, dom, err := acme.TLSSNI01ChallengeCert(keyAuth)
 	if err != nil {
 		return err
 	}
@@ -713,7 +740,7 @@ func (p tlsProvider) Present(domain, token, keyAuth string) error {
 }
 
 func (p tlsProvider) CleanUp(domain, token, keyAuth string) error {
-	_, dom, err := acme.TLSSNI01ChallengeCertDomain(keyAuth)
+	_, dom, err := acme.TLSSNI01ChallengeCert(keyAuth)
 	if err != nil {
 		return err
 	}

@@ -1,32 +1,35 @@
 package internal
 
 import (
-	"math/rand"
 	"time"
 )
 
 type customEvents struct {
-	events *analyticsEvents
+	*analyticsEvents
 }
 
 func newCustomEvents(max int) *customEvents {
 	return &customEvents{
-		events: newAnalyticsEvents(max),
+		analyticsEvents: newAnalyticsEvents(max),
 	}
 }
 
 func (cs *customEvents) Add(e *CustomEvent) {
-	stamp := eventStamp(rand.Float32())
-	cs.events.addEvent(analyticsEvent{stamp, e})
+	// For the Go Agent, customEvents are added to the application, not the transaction.
+	// As a result, customEvents do not inherit their priority from the transaction, though
+	// they are still sampled according to priority sampling.
+	priority := NewPriority()
+	cs.addEvent(analyticsEvent{priority, e})
 }
 
 func (cs *customEvents) MergeIntoHarvest(h *Harvest) {
-	h.CustomEvents.events.mergeFailed(cs.events)
+	h.CustomEvents.mergeFailed(cs.analyticsEvents)
 }
 
 func (cs *customEvents) Data(agentRunID string, harvestStart time.Time) ([]byte, error) {
-	return cs.events.CollectorJSON(agentRunID)
+	return cs.CollectorJSON(agentRunID)
 }
 
-func (cs *customEvents) numSeen() float64  { return cs.events.NumSeen() }
-func (cs *customEvents) numSaved() float64 { return cs.events.NumSaved() }
+func (cs *customEvents) EndpointMethod() string {
+	return cmdCustomEvents
+}

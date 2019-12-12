@@ -64,8 +64,7 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 	}
 
 	if stat == StatusOkAndIgnore {
-		v.sh.ServeHTTP(w, r)
-		return nil, mwStatusRespond
+		ctxSetRequestStatus(r, stat)
 	}
 
 	return nil, http.StatusOK

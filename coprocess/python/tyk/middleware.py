@@ -43,6 +43,7 @@ class TykMiddleware:
             self.cleanup()
         except Exception as e:
             tyk.log_error("Middleware initialization error: {0}".format(e))
+            pass
 
     def register_handlers(self):
         new_handlers = {}

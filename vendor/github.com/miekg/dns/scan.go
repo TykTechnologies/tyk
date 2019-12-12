@@ -577,6 +577,7 @@ func zlexer(s *scan, c chan lex) {
 								return
 							}
 							l.value = zRrtpe
+							rrtype = true
 							l.torc = t
 						}
 					}
@@ -600,7 +601,7 @@ func zlexer(s *scan, c chan lex) {
 				c <- l
 			}
 			stri = 0
-			// I reverse space stuff here
+
 			if !space && !commt {
 				l.value = zBlank
 				l.token = " "
