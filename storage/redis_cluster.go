@@ -447,9 +447,9 @@ func (r *RedisCluster) GetKeys(filter string) []string {
 				ch <- values
 				return nil
 			})
+			close(ch)
 		}()
 
-		close(ch)
 		for res := range ch {
 			sessions = append(sessions, res...)
 		}
@@ -615,8 +615,8 @@ func (r *RedisCluster) DeleteScanMatch(pattern string) bool {
 				ch <- values
 				return nil
 			})
+			close(ch)
 		}()
-		close(ch)
 
 		for vals := range ch {
 			keys = append(keys, vals...)
