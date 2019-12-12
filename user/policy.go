@@ -22,6 +22,7 @@ type Policy struct {
 	KeyExpiresIn                  int64                       `bson:"key_expires_in" json:"key_expires_in"`
 	Partitions                    PolicyPartitions            `bson:"partitions" json:"partitions"`
 	LastUpdated                   string                      `bson:"last_updated" json:"last_updated"`
+	MetaData                      map[string]interface{}      `bson:"meta_data" json:"meta_data"`
 }
 
 type PolicyPartitions struct {
