@@ -343,10 +343,18 @@ func (r *RedisCluster) SetKey(keyName, session string, timeout int64) error {
 	log.Debug("[STORE] Setting key: ", r.fixKey(keyName))
 
 	r.ensureConnection()
-	err := r.singleton().Set(r.fixKey(keyName), session, time.Duration(timeout)*time.Second).Err()
+	err := r.singleton().Set(r.fixKey(keyName), session, 0).Err()
 	if err != nil {
 		log.Error("Error trying to set value: ", err)
 		return err
+	}
+
+	if timeout > 0 {
+		err := r.singleton().Expire(r.fixKey(keyName), time.Duration(timeout)*time.Second).Err()
+		if err != nil {
+			log.Error("Error trying to set expiry:", err)
+			return err
+		}
 	}
 
 	return nil
@@ -439,9 +447,9 @@ func (r *RedisCluster) GetKeys(filter string) []string {
 				ch <- values
 				return nil
 			})
+			close(ch)
 		}()
 
-		close(ch)
 		for res := range ch {
 			sessions = append(sessions, res...)
 		}
@@ -607,8 +615,8 @@ func (r *RedisCluster) DeleteScanMatch(pattern string) bool {
 				ch <- values
 				return nil
 			})
+			close(ch)
 		}()
-		close(ch)
 
 		for vals := range ch {
 			keys = append(keys, vals...)
