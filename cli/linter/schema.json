@@ -257,6 +257,12 @@
         },
         "python_version": {
           "type": "string"
+        },
+        "grpc_recv_max_size": {
+          "type": "integer"
+        },
+        "grpc_send_max_size": {
+          "type": "integer"
         }
       }
     },
