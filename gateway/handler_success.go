@@ -166,7 +166,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 		rawRequest := ""
 		rawResponse := ""
 
-		if recordDetail(r, s.Spec.GlobalConfig) {
+		if recordDetail(r, s.Spec) {
 			// Get the wire format representation
 			var wireFormatReq bytes.Buffer
 			r.Write(&wireFormatReq)
@@ -268,17 +268,28 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 	}
 }
 
-func recordDetail(r *http.Request, globalConf config.Config) bool {
+func recordDetail(r *http.Request, spec *APISpec) bool {
+	if spec.EnableDetailedRecording {
+		return true
+	}
+
+	session := ctxGetSession(r)
+	if session != nil {
+		if session.EnableDetailedRecording {
+			return true
+		}
+	}
+
 	// Are we even checking?
-	if !globalConf.EnforceOrgDataDetailLogging {
-		return globalConf.AnalyticsConfig.EnableDetailedRecording
+	if !spec.GlobalConfig.EnforceOrgDataDetailLogging {
+		return spec.GlobalConfig.AnalyticsConfig.EnableDetailedRecording
 	}
 
 	// We are, so get session data
 	ses := r.Context().Value(ctx.OrgSessionContext)
 	if ses == nil {
 		// no session found, use global config
-		return globalConf.AnalyticsConfig.EnableDetailedRecording
+		return spec.GlobalConfig.AnalyticsConfig.EnableDetailedRecording
 	}
 
 	// Session found
