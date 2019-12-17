@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -80,22 +79,11 @@ func (h *DefaultHealthChecker) getAvgCount(prefix HealthPrefix) float64 {
 	searchStr := h.CreateKeyName(prefix)
 	log.Debug("Searching for: ", searchStr)
 
-	count, _ := h.storage.SetRollingWindow(searchStr, config.Global().HealthCheck.HealthCheckValueTimeout, "-1", false)
-	log.Debug("Count is: ", count)
-	divisor := float64(config.Global().HealthCheck.HealthCheckValueTimeout)
-	if divisor == 0 {
-		log.Warning("The Health Check sample timeout is set to 0, samples will never be deleted!!!")
-		divisor = 60.0
+	avg, err := h.storage.CalculateHealthAVG(searchStr, config.Global().HealthCheck.HealthCheckValueTimeout, "-1", false)
+	if err != nil {
+		log.Error(err)
 	}
-	if count > 0 {
-		return roundValue((float64(count) - 1) / divisor)
-	}
-
-	return 0.00
-}
-
-func roundValue(untruncated float64) float64 {
-	return float64(int(untruncated*100)) / 100
+	return avg
 }
 
 func (h *DefaultHealthChecker) ApiHealthValues() (HealthCheckValues, error) {
@@ -109,27 +97,11 @@ func (h *DefaultHealthChecker) ApiHealthValues() (HealthCheckValues, error) {
 
 	// Get the micro latency graph, an average upstream latency
 	searchStr := h.APIID + "." + string(RequestLog)
-	log.Debug("Searching KV for: ", searchStr)
-	_, vals := h.storage.SetRollingWindow(searchStr, config.Global().HealthCheck.HealthCheckValueTimeout, "-1", false)
-	log.Debug("Found: ", vals)
-	if len(vals) == 0 {
-		return values, nil
+	log.Info("Searching KV for: ", searchStr)
+	c, err := h.storage.CalculateHealthMicroAVG(searchStr, config.Global().HealthCheck.HealthCheckValueTimeout, "-1", false)
+	if err != nil {
+		log.Error(err)
 	}
-	var runningTotal int
-	for _, v := range vals {
-		s := string(v.([]byte))
-		log.Debug("V is: ", s)
-		splitValues := strings.Split(s, ".")
-		if len(splitValues) > 1 {
-			vInt, err := strconv.Atoi(splitValues[1])
-			if err != nil {
-				log.Error("Couldn't convert tracked latency value to Int, vl is: ", err)
-			} else {
-				runningTotal += vInt
-			}
-		}
-
-	}
-	values.AvgUpstreamLatency = roundValue(float64(runningTotal / len(vals)))
+	values.AvgUpstreamLatency = c
 	return values, nil
 }

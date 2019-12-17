@@ -113,8 +113,9 @@ type Session interface {
 
 type Health interface {
 	Connect() bool
+	CalculateHealthAVG(keyName string, per int64, valueOverride string, pipeline bool) (float64, error)
+	CalculateHealthMicroAVG(keyName string, per int64, valueOverride string, pipeline bool) (float64, error)
 	SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{})
-	GetRollingWindow(key string, per int64, pipeline bool) (int, []interface{})
 }
 
 type Analytics interface {

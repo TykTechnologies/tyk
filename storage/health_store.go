@@ -20,5 +20,6 @@ func (h *HealthStore) Connect() {
 }
 
 func (h *HealthStore) SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{}) {
+
 	return 0, nil
 }

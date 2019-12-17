@@ -1022,6 +1022,43 @@ func (r *RedisCluster) SetRollingWindow(keyName string, per int64, value_overrid
 	return intVal, result
 }
 
+func (r *RedisCluster) CalculateHealthAVG(keyName string, per int64, valueOverride string, pipeline bool) (float64, error) {
+	count, _ := r.SetRollingWindow(keyName, per, valueOverride, pipeline)
+	divisor := float64(config.Global().HealthCheck.HealthCheckValueTimeout)
+	if divisor == 0 {
+		divisor = 60.0
+	}
+	if count > 0 {
+		return roundValue((float64(count) - 1) / divisor), nil
+	}
+	return 0, nil
+}
+
+func (r *RedisCluster) CalculateHealthMicroAVG(keyName string, per int64, valueOverride string, pipeline bool) (float64, error) {
+	_, vals := r.SetRollingWindow(keyName, per, valueOverride, pipeline)
+	if len(vals) == 0 {
+		return 0, nil
+	}
+	var runningTotal int
+	for _, v := range vals {
+		s := string(v.([]byte))
+		splitValues := strings.Split(s, ".")
+		if len(splitValues) > 1 {
+			vInt, err := strconv.Atoi(splitValues[1])
+			if err != nil {
+				return 0, err
+			}
+			runningTotal += vInt
+		}
+
+	}
+	return roundValue(float64(runningTotal / len(vals))), nil
+}
+
+func roundValue(untruncated float64) float64 {
+	return float64(int(untruncated*100)) / 100
+}
+
 func (r RedisCluster) GetRollingWindow(keyName string, per int64, pipeline bool) (int, []interface{}) {
 	r.ensureConnection()
 	now := time.Now()
