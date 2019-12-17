@@ -269,7 +269,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 }
 
 func recordDetail(r *http.Request, spec *APISpec) bool {
-	if spec.EnableDetailedAnalytics {
+	if spec.EnableDetailedRecording {
 		return true
 	}
 
