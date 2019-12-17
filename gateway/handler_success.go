@@ -273,6 +273,11 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 		return true
 	}
 
+	session := ctxGetSession(r)
+	if session != nil {
+		return session.EnableDetailedRecording
+	}
+
 	// Are we even checking?
 	if !spec.GlobalConfig.EnforceOrgDataDetailLogging {
 		return spec.GlobalConfig.AnalyticsConfig.EnableDetailedRecording
