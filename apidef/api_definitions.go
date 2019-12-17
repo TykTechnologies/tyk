@@ -478,7 +478,7 @@ type APIDefinition struct {
 	TagHeaders              []string               `bson:"tag_headers" json:"tag_headers"`
 	GlobalRateLimit         GlobalRateLimit        `bson:"global_rate_limit" json:"global_rate_limit"`
 	StripAuthData           bool                   `bson:"strip_auth_data" json:"strip_auth_data"`
-	EnableDetailedAnalytics bool                   `bson:"enable_detailed_analytics" json:"enable_detailed_analytics"`
+	EnableDetailedAnalytics bool                   `bson:"enable_detailed_recording" json:"enable_detailed_recording"`
 }
 
 type AuthConfig struct {
