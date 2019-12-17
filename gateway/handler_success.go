@@ -275,7 +275,9 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 
 	session := ctxGetSession(r)
 	if session != nil {
-		return session.EnableDetailedRecording
+		if session.EnableDetailedRecording {
+			return true
+		}
 	}
 
 	// Are we even checking?
