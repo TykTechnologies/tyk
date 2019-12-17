@@ -56,6 +56,147 @@ type Handler interface {
 	RemoveSortedSetRange(string, string, string) error
 }
 
+type Auth interface {
+	GetKey(string) (string, error) // Returned string is expected to be a JSON object (user.SessionState)
+	Connect() bool
+}
+
+type Base interface {
+	GetKey(string) (string, error) // Returned string is expected to be a JSON object (user.SessionState)
+	GetMultiKey([]string) ([]string, error)
+	GetRawKey(string) (string, error)
+	SetKey(string, string, int64) error // Second input string is expected to be a JSON object (user.SessionState)
+	SetRawKey(string, string, int64) error
+	SetExp(string, int64) error   // Set key expiration
+	GetExp(string) (int64, error) // Returns expiry of a key
+	GetKeys(string) []string
+	DeleteKey(string) bool
+	DeleteAllKeys() bool
+	DeleteRawKey(string) bool
+	Connect() bool
+	GetKeysAndValues() map[string]string
+	GetKeysAndValuesWithFilter(string) map[string]string
+	DeleteKeys([]string) bool
+	Decrement(string)
+	IncrememntWithExpire(string, int64) int64
+	SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{})
+	GetRollingWindow(key string, per int64, pipeline bool) (int, []interface{})
+	GetSet(string) (map[string]string, error)
+	AddToSet(string, string)
+	AppendToSet(string, string)
+	AppendToSetPipelined(string, []string)
+	GetAndDeleteSet(string) []interface{}
+	RemoveFromSet(string, string)
+	DeleteScanMatch(string) bool
+	GetKeyPrefix() string
+	AddToSortedSet(string, string, float64)
+	GetSortedSetRange(string, string, string) ([]string, []float64, error)
+	RemoveSortedSetRange(string, string, string) error
+}
+
+type Session interface {
+	GetKey(string) (string, error) // Returned string is expected to be a JSON object (user.SessionState)
+	GetMultiKey([]string) ([]string, error)
+	GetRawKey(string) (string, error)
+	SetKey(string, string, int64) error // Second input string is expected to be a JSON object (user.SessionState)
+	SetRawKey(string, string, int64) error
+	GetKeys(string) []string
+	DeleteKey(string) bool
+	DeleteRawKey(string) bool
+	Connect() bool
+	IncrememntWithExpire(string, int64) int64
+	SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{})
+	GetRollingWindow(key string, per int64, pipeline bool) (int, []interface{})
+	GetKeyPrefix() string
+	DeleteAllKeys() bool
+}
+
+type Health interface {
+	Connect() bool
+	SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{})
+	GetRollingWindow(key string, per int64, pipeline bool) (int, []interface{})
+}
+
+type Analytics interface {
+	Connect() bool
+	AppendToSetPipelined(string, []string)
+	GetAndDeleteSet(string) []interface{} //used in tests
+}
+
+// WebHook used to cache webhook events checksum.
+type WebHook interface {
+	GetKey(string) (string, error)
+	SetKey(key string, value string, expires int64) error
+	Connect() bool
+}
+
+// Handler is a standard interface to a storage backend, used by
+// AuthorisationManager to read and write key values to the backend
+type Hand interface {
+	GetKey(string) (string, error) // Returned string is expected to be a JSON object (user.SessionState)
+	GetMultiKey([]string) ([]string, error)
+	GetRawKey(string) (string, error)
+	SetKey(string, string, int64) error // Second input string is expected to be a JSON object (user.SessionState)
+	SetRawKey(string, string, int64) error
+	SetExp(string, int64) error   // Set key expiration
+	GetExp(string) (int64, error) // Returns expiry of a key
+	GetKeys(string) []string
+	DeleteKey(string) bool
+	DeleteAllKeys() bool
+	DeleteRawKey(string) bool
+	Connect() bool
+	GetKeysAndValues() map[string]string
+	GetKeysAndValuesWithFilter(string) map[string]string
+	DeleteKeys([]string) bool
+	Decrement(string)
+	IncrememntWithExpire(string, int64) int64
+	SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{})
+	GetRollingWindow(key string, per int64, pipeline bool) (int, []interface{})
+	GetSet(string) (map[string]string, error)
+	AddToSet(string, string)
+	AppendToSet(string, string)
+	GetAndDeleteSet(string) []interface{}
+	RemoveFromSet(string, string)
+	DeleteScanMatch(string) bool
+	GetKeyPrefix() string
+	AddToSortedSet(string, string, float64)
+	GetSortedSetRange(string, string, string) ([]string, []float64, error)
+	RemoveSortedSetRange(string, string, string) error
+}
+
+type Oauth interface {
+	GetKey(string) (string, error)
+	GetRawKey(string) (string, error)
+	SetKey(string, string, int64) error
+	SetRawKey(string, string, int64) error
+	DeleteKey(string) bool
+	Connect() bool
+	GetKeysAndValuesWithFilter(string) map[string]string
+	GetSet(string) (map[string]string, error)
+	AddToSet(string, string)
+	RemoveFromSet(string, string)
+	AddToSortedSet(string, string, float64)
+	GetSortedSetRange(string, string, string) ([]string, []float64, error)
+	RemoveSortedSetRange(string, string, string) error
+}
+
+type Cache interface {
+	GetKey(string) (string, error)
+	SetKey(string, string, int64) error
+	DeleteKey(string) bool
+	Connect() bool
+}
+
+type Host interface {
+	GetKey(string) (string, error)
+	SetKey(string, string, int64) error
+	DeleteKey(string) bool
+	Connect() bool
+	// AppendToSet currently stores data direct to redis which is picked up by
+	// tyk-pum because this is analytics data about host uptime.
+	AppendToSet(string, string)
+}
+
 type AnalyticsHandler interface {
 	Connect() bool
 	AppendToSetPipelined(string, [][]byte)

@@ -37,7 +37,7 @@ type SessionLimiter struct {
 
 func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string,
 	currentSession *user.SessionState,
-	store storage.Handler,
+	store storage.Session,
 	globalConf *config.Config,
 	apiLimit *user.APILimit, dryRun bool) bool {
 
@@ -98,7 +98,7 @@ func (l *SessionLimiter) limitSentinel(
 	currentSession *user.SessionState,
 	key string,
 	rateScope string,
-	store storage.Handler,
+	store storage.Session,
 	globalConf *config.Config,
 	apiLimit *user.APILimit,
 	dryRun bool,
@@ -120,7 +120,7 @@ func (l *SessionLimiter) limitRedis(
 	currentSession *user.SessionState,
 	key string,
 	rateScope string,
-	store storage.Handler,
+	store storage.Session,
 	globalConf *config.Config,
 	apiLimit *user.APILimit,
 	dryRun bool,
@@ -191,7 +191,7 @@ func (sfr sessionFailReason) String() string {
 // sessionFailReason if session limits have been exceeded.
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages
 // Per 10 seconds
-func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.SessionState, key string, store storage.Handler, enableRL, enableQ bool, globalConf *config.Config, apiID string, dryRun bool) sessionFailReason {
+func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.SessionState, key string, store storage.Session, enableRL, enableQ bool, globalConf *config.Config, apiID string, dryRun bool) sessionFailReason {
 	// check for limit on API level (set to session by ApplyPolicies)
 	var apiLimit *user.APILimit
 	var allowanceScope string
@@ -270,7 +270,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 
 }
 
-func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *user.SessionState, scope string, limit *user.APILimit, store storage.Handler) bool {
+func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *user.SessionState, scope string, limit *user.APILimit, store storage.Session) bool {
 	// Unlimited?
 	if limit.QuotaMax == -1 || limit.QuotaMax == 0 {
 		// No quota set
