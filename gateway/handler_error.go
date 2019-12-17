@@ -132,7 +132,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 		rawRequest := ""
 		rawResponse := ""
-		if recordDetail(r, e.Spec.GlobalConfig) {
+		if recordDetail(r, e.Spec) {
 			// Get the wire format representation
 			var wireFormatReq bytes.Buffer
 			r.Write(&wireFormatReq)
