@@ -262,9 +262,11 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 				req.URL.RawPath = singleJoiningSlash(targetToUse.Path, req.URL.RawPath, spec.Proxy.DisableStripSlash)
 			}
 		}
+
 		if !spec.Proxy.PreserveHostHeader {
 			req.Host = targetToUse.Host
 		}
+
 		if targetQuery == "" || req.URL.RawQuery == "" {
 			req.URL.RawQuery = targetQuery + req.URL.RawQuery
 		} else {
@@ -561,11 +563,6 @@ func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p
 
 	transport.DisableKeepAlives = p.TykAPISpec.GlobalConfig.ProxyCloseConnections
 
-	if IsWebsocket(req) {
-		wsTransport := &WSDialer{transport, rw, p.TLSClientConfig}
-		return wsTransport
-	}
-
 	if config.Global().ProxyEnableHttp2 {
 		http2.ConfigureTransport(transport)
 	}
@@ -627,47 +624,27 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		ext.SpanKindRPCClient.Set(span)
 		req = req.WithContext(ctx)
 	}
-	outReqIsWebsocket := IsWebsocket(req)
+
 	var roundTripper http.RoundTripper
 
 	p.TykAPISpec.Lock()
-	if !outReqIsWebsocket { // check if it is a regular HTTP request
-		// create HTTP transport
-		createTransport := p.TykAPISpec.HTTPTransport == nil
 
-		// Check if timeouts are set for this endpoint
-		if !createTransport && config.Global().MaxConnTime != 0 {
-			createTransport = time.Since(p.TykAPISpec.HTTPTransportCreated) > time.Duration(config.Global().MaxConnTime)*time.Second
-		}
+	// create HTTP transport
+	createTransport := p.TykAPISpec.HTTPTransport == nil
 
-		if createTransport {
-			_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
-			p.TykAPISpec.HTTPTransport = httpTransport(timeout, rw, req, p)
-			p.TykAPISpec.HTTPTransportCreated = time.Now()
-		}
-
-		roundTripper = p.TykAPISpec.HTTPTransport
-	} else { // this is NEW WS-connection upgrade request
-		// create WS transport
-		createTransport := p.TykAPISpec.WSTransport == nil
-
-		// Check if timeouts are set for this endpoint
-		if !createTransport && config.Global().MaxConnTime != 0 {
-			createTransport = time.Since(p.TykAPISpec.WSTransportCreated) > time.Duration(config.Global().MaxConnTime)*time.Second
-		}
-
-		if createTransport {
-			_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
-			p.TykAPISpec.WSTransport = httpTransport(timeout, rw, req, p)
-			p.TykAPISpec.WSTransportCreated = time.Now()
-		}
-
-		// overwrite transport's ResponseWriter from previous upgrade request
-		// as it was already hijacked and now is being used for other connection
-		p.TykAPISpec.WSTransport.(*WSDialer).RW = rw
-
-		roundTripper = p.TykAPISpec.WSTransport
+	// Check if timeouts are set for this endpoint
+	if !createTransport && config.Global().MaxConnTime != 0 {
+		createTransport = time.Since(p.TykAPISpec.HTTPTransportCreated) > time.Duration(config.Global().MaxConnTime)*time.Second
 	}
+
+	if createTransport {
+		_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
+		p.TykAPISpec.HTTPTransport = httpTransport(timeout, rw, req, p)
+		p.TykAPISpec.HTTPTransportCreated = time.Now()
+	}
+
+	roundTripper = p.TykAPISpec.HTTPTransport
+
 	p.TykAPISpec.Unlock()
 
 	reqCtx := req.Context()
@@ -697,7 +674,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	setContext(outreq, context.Background())
 	setContext(logreq, context.Background())
 
-	log.Debug("UPSTREAM REQUEST URL: ", req.URL)
+	log.Debug("UPSTREAM REQUEST URL: ", req.URL, " ", req.Host)
 
 	// We need to double set the context for the outbound request to reprocess the target
 	if p.TykAPISpec.URLRewriteEnabled && req.Context().Value(ctx.RetainHost) == true {
@@ -718,33 +695,38 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	p.Director(outreq)
 	outreq.Close = false
 
-	log.Debug("Outbound Request: ", outreq.URL.String())
+	log.Debug("Outbound Request: ", outreq.URL.String(), " ", outreq.Host)
 
-	// Do not modify outbound request headers if they are WS
-	if !outReqIsWebsocket {
-		// Remove hop-by-hop headers listed in the "Connection" header.
-		// See RFC 2616, section 14.10.
-		if c := outreq.Header.Get("Connection"); c != "" {
-			for _, f := range strings.Split(c, ",") {
-				if f = strings.TrimSpace(f); f != "" {
-					outreq.Header.Del(f)
-				}
+	outReqUpgrade, reqUpType := IsUpgrade(req)
+
+	// See RFC 2616, section 14.10.
+	if c := outreq.Header.Get("Connection"); c != "" {
+		for _, f := range strings.Split(c, ",") {
+			if f = strings.TrimSpace(f); f != "" {
+				outreq.Header.Del(f)
 			}
 		}
-		// Remove other hop-by-hop headers to the backend. Especially
-		// important is "Connection" because we want a persistent
-		// connection, regardless of what the client sent to us.
-		for _, h := range hopHeaders {
-			hv := outreq.Header.Get(h)
-			if hv == "" {
-				continue
-			}
-			if h == "Te" && hv == "trailers" {
-				continue
-			}
-			outreq.Header.Del(h)
-			logreq.Header.Del(h)
+	}
+	// Remove other hop-by-hop headers to the backend. Especially
+	// important is "Connection" because we want a persistent
+	// connection, regardless of what the client sent to us.
+	for _, h := range hopHeaders {
+		hv := outreq.Header.Get(h)
+		if hv == "" {
+			continue
 		}
+		if h == "Te" && hv == "trailers" {
+			continue
+		}
+		outreq.Header.Del(h)
+		logreq.Header.Del(h)
+	}
+
+	if outReqUpgrade {
+		outreq.Header.Set("Connection", "Upgrade")
+		logreq.Header.Set("Connection", "Upgrade")
+		outreq.Header.Set("Upgrade", reqUpType)
+		logreq.Header.Set("Upgrade", reqUpType)
 	}
 
 	addrs := requestIPHops(req)
@@ -762,23 +744,13 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	p.TykAPISpec.Lock()
-	if outReqIsWebsocket {
-		roundTripper.(*WSDialer).TLSClientConfig.Certificates = tlsCertificates
-	} else {
-		roundTripper.(*http.Transport).TLSClientConfig.Certificates = tlsCertificates
-	}
+	roundTripper.(*http.Transport).TLSClientConfig.Certificates = tlsCertificates
 	p.TykAPISpec.Unlock()
 
 	if p.TykAPISpec.Proxy.Transport.SSLForceCommonNameCheck || config.Global().SSLForceCommonNameCheck {
 		// if proxy is enabled, add CommonName verification in verifyPeerCertificate
 		// DialTLS is not executed if proxy is used
-		var httpTransport *http.Transport
-
-		if outReqIsWebsocket {
-			httpTransport = roundTripper.(*WSDialer).Transport
-		} else {
-			httpTransport = roundTripper.(*http.Transport)
-		}
+		httpTransport := roundTripper.(*http.Transport)
 
 		if proxyURL, _ := httpTransport.Proxy(req); proxyURL != nil {
 			tlsConfig := httpTransport.TLSClientConfig
@@ -859,7 +831,11 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	}
 
-	if IsWebsocket(req) {
+	// Deal with 101 Switching Protocols responses: (WebSocket, h2c, etc)
+	if upgrade, _ := IsUpgrade(req); upgrade {
+		if err := p.handleUpgradeResponse(rw, outreq, res); err != nil {
+			p.ErrorHandler.HandleError(rw, logreq, err.Error(), http.StatusInternalServerError, true)
+		}
 		return ProxyResponse{UpstreamLatency: upstreamLatency}
 	}
 
@@ -1025,6 +1001,56 @@ func (p *ReverseProxy) copyBuffer(dst io.Writer, src io.Reader) (int64, error) {
 	}
 }
 
+func (p *ReverseProxy) handleUpgradeResponse(rw http.ResponseWriter, req *http.Request, res *http.Response) error {
+	copyHeader(res.Header, rw.Header())
+
+	hj, ok := rw.(http.Hijacker)
+	if !ok {
+		return fmt.Errorf("can't switch protocols using non-Hijacker ResponseWriter type %T", rw)
+	}
+	log.Error(res.StatusCode, res.Header.Get("Upgrade"), res.Header["Connection"])
+	backConn, ok := res.Body.(io.ReadWriteCloser)
+	if !ok {
+		return fmt.Errorf("internal error: 101 switching protocols response with non-writable body")
+	}
+	defer backConn.Close()
+	conn, brw, err := hj.Hijack()
+	if err != nil {
+		return fmt.Errorf("Hijack failed on protocol switch: %v", err)
+	}
+	defer conn.Close()
+	res.Body = nil // so res.Write only writes the headers; we have res.Body in backConn above
+	if err := res.Write(brw); err != nil {
+		return fmt.Errorf("response write: %v", err)
+	}
+	if err := brw.Flush(); err != nil {
+		return fmt.Errorf("response flush: %v", err)
+	}
+	errc := make(chan error, 1)
+	spc := switchProtocolCopier{user: conn, backend: backConn}
+	go spc.copyToBackend(errc)
+	go spc.copyFromBackend(errc)
+	<-errc
+
+	return nil
+}
+
+// switchProtocolCopier exists so goroutines proxying data back and
+// forth have nice names in stacks.
+type switchProtocolCopier struct {
+	user, backend io.ReadWriter
+}
+
+func (c switchProtocolCopier) copyFromBackend(errc chan<- error) {
+	_, err := io.Copy(c.user, c.backend)
+	errc <- err
+}
+
+func (c switchProtocolCopier) copyToBackend(errc chan<- error) {
+	_, err := io.Copy(c.backend, c.user)
+	errc <- err
+}
+
 type writeFlusher interface {
 	io.Writer
 	http.Flusher
@@ -1145,4 +1171,27 @@ func nopCloseResponseBody(r *http.Response) {
 	}
 
 	copyResponse(r)
+}
+
+func IsUpgrade(req *http.Request) (bool, string) {
+	if !config.Global().HttpServerOptions.EnableWebSockets {
+		return false, ""
+	}
+
+	contentType := strings.ToLower(strings.TrimSpace(req.Header.Get(headers.Accept)))
+	if contentType == "text/event-stream" {
+		return true, ""
+	}
+
+	connection := strings.ToLower(strings.TrimSpace(req.Header.Get(headers.Connection)))
+	if connection != "upgrade" {
+		return false, ""
+	}
+
+	upgrade := strings.ToLower(strings.TrimSpace(req.Header.Get("Upgrade")))
+	if upgrade != "" {
+		return true, upgrade
+	}
+
+	return false, ""
 }
