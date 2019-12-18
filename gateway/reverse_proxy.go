@@ -288,6 +288,13 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 			// this should force URL to do escaping
 			req.URL.RawPath = ""
 		}
+
+		switch req.URL.Scheme {
+		case "ws":
+			req.URL.Scheme = "http"
+		case "wss":
+			req.URL.Scheme = "https"
+		}
 	}
 
 	proxy := &ReverseProxy{
