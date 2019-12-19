@@ -281,7 +281,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 
 	// Create and init the virtual Machine
 	if config.Global().EnableJSVM {
-		mwPaths, _, _, _, _, _, mwDriver := loadCustomMiddleware(spec)
+		mwPaths, _, _, _, _, _, _ := loadCustomMiddleware(spec)
 
 		hasVirtualEndpoint := false
 
@@ -292,7 +292,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 			}
 		}
 
-		if (len(mwPaths) > 0 && mwDriver == apidef.OttoDriver) || hasVirtualEndpoint {
+		if spec.CustomMiddlewareBundle != "" || len(mwPaths) > 0 || hasVirtualEndpoint {
 			spec.JSVM.Init(spec, logger)
 		}
 	}
