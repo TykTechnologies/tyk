@@ -281,7 +281,20 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 
 	// Create and init the virtual Machine
 	if config.Global().EnableJSVM {
-		spec.JSVM.Init(spec, logger)
+		mwPaths, _, _, _, _, _, _ := loadCustomMiddleware(spec)
+
+		hasVirtualEndpoint := false
+
+		for _, version := range spec.VersionData.Versions {
+			if len(version.ExtendedPaths.Virtual) > 0 {
+				hasVirtualEndpoint = true
+				break
+			}
+		}
+
+		if spec.CustomMiddlewareBundle != "" || len(mwPaths) > 0 || hasVirtualEndpoint {
+			spec.JSVM.Init(spec, logger)
+		}
 	}
 
 	// Set up Event Handlers
