@@ -442,7 +442,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 				{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
 			}...)
 
-			sessionState, found := GlobalSessionManager.SessionDetail(session.OrgID, key, false)
+			sessionState, found := FallbackKeySesionManager.SessionDetail(key, false)
 
 			if !found || !reflect.DeepEqual(expected, sessionState.MetaData) {
 				t.Fatalf("Expected %v, returned %v", expected, sessionState.MetaData)
