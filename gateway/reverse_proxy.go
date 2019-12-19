@@ -838,12 +838,13 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	}
 
+	upgrade, _ := IsUpgrade(req)
 	// Deal with 101 Switching Protocols responses: (WebSocket, h2c, etc)
-	if upgrade, _ := IsUpgrade(req); upgrade {
+	if upgrade {
 		if err := p.handleUpgradeResponse(rw, outreq, res); err != nil {
 			p.ErrorHandler.HandleError(rw, logreq, err.Error(), http.StatusInternalServerError, true)
+			return ProxyResponse{UpstreamLatency: upstreamLatency}
 		}
-		return ProxyResponse{UpstreamLatency: upstreamLatency}
 	}
 
 	ses := new(user.SessionState)
@@ -868,18 +869,20 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	if withCache {
 		*inres = *res // includes shallow copies of maps, but okay
 
-		defer res.Body.Close()
+		if !upgrade {
+			defer res.Body.Close()
 
-		// Buffer body data
-		var bodyBuffer bytes.Buffer
-		bodyBuffer2 := new(bytes.Buffer)
+			// Buffer body data
+			var bodyBuffer bytes.Buffer
+			bodyBuffer2 := new(bytes.Buffer)
 
-		p.CopyResponse(&bodyBuffer, res.Body)
-		*bodyBuffer2 = bodyBuffer
+			p.CopyResponse(&bodyBuffer, res.Body)
+			*bodyBuffer2 = bodyBuffer
 
-		// Create new ReadClosers so we can split output
-		res.Body = ioutil.NopCloser(&bodyBuffer)
-		inres.Body = ioutil.NopCloser(bodyBuffer2)
+			// Create new ReadClosers so we can split output
+			res.Body = ioutil.NopCloser(&bodyBuffer)
+			inres.Body = ioutil.NopCloser(bodyBuffer2)
+		}
 	}
 
 	// We should at least copy the status code in
@@ -1015,7 +1018,6 @@ func (p *ReverseProxy) handleUpgradeResponse(rw http.ResponseWriter, req *http.R
 	if !ok {
 		return fmt.Errorf("can't switch protocols using non-Hijacker ResponseWriter type %T", rw)
 	}
-	log.Error(res.StatusCode, res.Header.Get("Upgrade"), res.Header["Connection"])
 	backConn, ok := res.Body.(io.ReadWriteCloser)
 	if !ok {
 		return fmt.Errorf("internal error: 101 switching protocols response with non-writable body")
@@ -1038,6 +1040,8 @@ func (p *ReverseProxy) handleUpgradeResponse(rw http.ResponseWriter, req *http.R
 	go spc.copyToBackend(errc)
 	go spc.copyFromBackend(errc)
 	<-errc
+
+	res.Body = ioutil.NopCloser(strings.NewReader(""))
 
 	return nil
 }
