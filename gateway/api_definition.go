@@ -24,9 +24,9 @@ import (
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/rpc"
 
-	circuit "github.com/rubyist/circuitbreaker"
 	"github.com/sirupsen/logrus"
 
+	circuit "github.com/TykTechnologies/circuitbreaker"
 	"github.com/TykTechnologies/gojsonschema"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -185,24 +185,17 @@ type APISpec struct {
 
 	middlewareChain *ChainObject
 
-	shouldRelease bool
-	network       NetworkStats
+	network NetworkStats
 }
 
 // Release re;leases all resources associated with API spec
 func (s *APISpec) Release() {
-	// mark spec as to be released
-	s.shouldRelease = true
-
 	// release circuit breaker resources
 	for _, path := range s.RxPaths {
 		for _, urlSpec := range path {
 			if urlSpec.CircuitBreaker.CB != nil {
-				// this will force CB-event reading routing to exit
-				urlSpec.CircuitBreaker.CB.Reset()
-
-				// TODO: close all circuit breaker's event receivers
-				// which should let event reading Go-routines to exit (need to change circuitbreaker package)
+				// this will force CB-event reading Go-routine and subscriber Go-routine to exit
+				urlSpec.CircuitBreaker.CB.Stop()
 			}
 		}
 	}
@@ -784,12 +777,6 @@ func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circui
 					})
 
 				case circuit.BreakerReset:
-					// check if this spec is set to release resources
-					if spec.shouldRelease {
-						// time to stop this Go-routine
-						return
-					}
-
 					spec.FireEvent(EventBreakerTriggered, EventCurcuitBreakerMeta{
 						EventMetaDefault: EventMetaDefault{Message: "Breaker Reset"},
 						CircuitEvent:     e,
@@ -797,6 +784,9 @@ func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circui
 						APIID:            spec.APIID,
 					})
 
+				case circuit.BreakerStop:
+					// time to stop this Go-routine
+					return
 				}
 			}
 		}(stringSpec.Path, apiSpec, newSpec.CircuitBreaker.CB)

@@ -49,13 +49,16 @@ const (
 	BreakerTripped BreakerEvent = iota
 
 	// BreakerReset is sent when a breaker resets
-	BreakerReset BreakerEvent = iota
+	BreakerReset
 
 	// BreakerFail is sent when Fail() is called
-	BreakerFail BreakerEvent = iota
+	BreakerFail
 
 	// BreakerReady is sent when the breaker enters the half open state and is ready to retry
-	BreakerReady BreakerEvent = iota
+	BreakerReady
+
+	// stops breaker's subscribers
+	BreakerStop
 )
 
 // ListenerEvent includes a reference to the circuit breaker and the event.
@@ -112,6 +115,7 @@ type Breaker struct {
 	nextBackOff    time.Duration
 	tripped        int32
 	broken         int32
+	stopped        int32
 	eventReceivers []chan BreakerEvent
 	listeners      []chan ListenerEvent
 	backoffLock    sync.Mutex
@@ -198,6 +202,10 @@ func (cb *Breaker) Subscribe() <-chan BreakerEvent {
 		for v := range eventReader {
 			select {
 			case output <- v:
+				// stop subscriber Go-routine if CB was asked to stop
+				if v == BreakerStop {
+					return
+				}
 			default:
 				<-output
 				output <- v
@@ -262,6 +270,12 @@ func (cb *Breaker) Tripped() bool {
 func (cb *Breaker) Break() {
 	atomic.StoreInt32(&cb.broken, 1)
 	cb.Trip()
+}
+
+// Stop stops all go-routines to process events
+func (cb *Breaker) Stop() {
+	atomic.StoreInt32(&cb.stopped, 1)
+	cb.sendEvent(BreakerStop)
 }
 
 // Failures returns the number of failures for this circuit breaker.

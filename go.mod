@@ -8,6 +8,8 @@ require (
 	github.com/Masterminds/goutils v1.1.0 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/TykTechnologies/again v0.0.0-20190805133618-6ad301e7eaed
+	github.com/TykTechnologies/circuitbreaker v2.2.2+incompatible
+	github.com/TykTechnologies/concurrent-map v0.0.0-20160908201409-7de59d53fd5c // indirect
 	github.com/TykTechnologies/drl v0.0.0-20190905191955-cc541aa8e3e1
 	github.com/TykTechnologies/goautosocket v0.0.0-20190430121222-97bfa5e7e481
 	github.com/TykTechnologies/gojsonschema v0.0.0-20170222154038-dcb3e4bb7990
@@ -60,7 +62,6 @@ require (
 	github.com/pmylund/go-cache v2.1.0+incompatible
 	github.com/robertkrimen/otto v0.0.0-20180617131154-15f95af6e78d
 	github.com/rs/cors v1.7.0
-	github.com/rubyist/circuitbreaker v2.2.1+incompatible
 	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.4.2
 	github.com/square/go-jose v0.0.0-20161027010314-63d7cfa0284d // indirect

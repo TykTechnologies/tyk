@@ -956,7 +956,7 @@ func TestReloadGoroutineLeakWithCircuitBreaker(t *testing.T) {
 
 	after := runtime.NumGoroutine()
 
-	if before < after-1 { // -1 because there is one will be running until we fix circuitbreaker Subscribe() method
+	if before < after {
 		t.Errorf("Goroutine leak, was: %d, after reload: %d", before, after)
 	}
 }

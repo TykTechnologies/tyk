@@ -8,6 +8,10 @@ github.com/Masterminds/goutils
 github.com/Masterminds/semver
 # github.com/TykTechnologies/again v0.0.0-20190805133618-6ad301e7eaed
 github.com/TykTechnologies/again
+# github.com/TykTechnologies/circuitbreaker v2.2.2+incompatible
+github.com/TykTechnologies/circuitbreaker
+# github.com/TykTechnologies/concurrent-map v0.0.0-20160908201409-7de59d53fd5c
+github.com/TykTechnologies/concurrent-map
 # github.com/TykTechnologies/drl v0.0.0-20190905191955-cc541aa8e3e1
 github.com/TykTechnologies/drl
 # github.com/TykTechnologies/goautosocket v0.0.0-20190430121222-97bfa5e7e481
@@ -175,8 +179,6 @@ github.com/robertkrimen/otto/registry
 github.com/robertkrimen/otto/token
 # github.com/rs/cors v1.7.0
 github.com/rs/cors
-# github.com/rubyist/circuitbreaker v2.2.1+incompatible
-github.com/rubyist/circuitbreaker
 # github.com/satori/go.uuid v1.2.0
 github.com/satori/go.uuid
 # github.com/sirupsen/logrus v1.4.2
