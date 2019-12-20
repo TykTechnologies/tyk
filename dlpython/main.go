@@ -52,6 +52,9 @@ func FindPythonConfig(customVersion string) (selectedVersion string, err error) 
 	pythonConfigBinaries := map[float64]string{}
 
 	for _, p := range strings.Split(paths, ":") {
+		if !strings.HasSuffix(p, "/bin") {
+			continue
+		}
 		files, err := ioutil.ReadDir(p)
 		if err != nil {
 			continue
@@ -128,6 +131,7 @@ func FindPythonConfig(customVersion string) (selectedVersion string, err error) 
 func getLibraryPathFromCfg() error {
 	out, err := exec.Command(pythonConfigPath, "--ldflags").Output()
 	if err != nil {
+		logger.Errorf("Error while executing command for python config path: %s", pythonConfigPath)
 		return err
 	}
 	outString := string(out)

@@ -49,7 +49,7 @@ func TestBatch(t *testing.T) {
 	})
 
 	ts.Run(t, []test.TestCase{
-		{Method: "POST", Path: "/v1/tyk/batch/", Data: `{"requests":[]}`, Code: 200, BodyMatch: "[]"},
+		{Method: "POST", Path: "/v1/tyk/batch/", Data: `{"requests":[]}`, Code: 200, BodyMatch: `\[\]`},
 		{Method: "POST", Path: "/v1/tyk/batch/", Data: "malformed", Code: 400},
 		{Method: "POST", Path: "/v1/tyk/batch/", Data: testBatchRequest, Code: 200},
 	}...)

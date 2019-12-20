@@ -1,3 +1,3 @@
 package gateway
 
-const VERSION = "v2.9.1"
+const VERSION = "v2.9.2"

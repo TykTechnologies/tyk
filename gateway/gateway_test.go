@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/garyburd/redigo/redis"
+	"github.com/go-redis/redis"
 	"github.com/gorilla/websocket"
 	proxyproto "github.com/pires/go-proxyproto"
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
@@ -155,8 +155,8 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/(abc,xyz)?arg=val", BodyMatch: `"Url":"/%28abc,xyz%29?arg=val`},
-			{Path: "/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/%28abc,xyz%29?arg=val`},
+			{Path: "/(abc,xyz)?arg=val", BodyMatch: `"Url":"/%28abc,xyz%29\?arg=val`},
+			{Path: "/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/%28abc,xyz%29\?arg=val`},
 		}...)
 	})
 
@@ -170,8 +170,8 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/(abc,xyz)?arg=val", BodyMatch: `"Url":"/(abc,xyz)?arg=val"`},
-			{Path: "/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/%28abc,xyz%29?arg=val"`},
+			{Path: "/(abc,xyz)?arg=val", BodyMatch: `"Url":"/\(abc,xyz\)\?arg=val"`},
+			{Path: "/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/%28abc,xyz%29\?arg=val"`},
 		}...)
 	})
 
@@ -187,8 +187,8 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29?arg=val"`},
-			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29?arg=val"`},
+			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29\?arg=val"`},
+			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29\?arg=val"`},
 		}...)
 	})
 
@@ -204,8 +204,8 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/(abc,xyz)?arg=val"`},
-			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29?arg=val"`},
+			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/\(abc,xyz\)\?arg=val"`},
+			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29\?arg=val"`},
 		}...)
 	})
 
@@ -221,8 +221,8 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29?arg=val"`},
-			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29?arg=val"`},
+			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29\?arg=val"`},
+			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29\?arg=val"`},
 		}...)
 	})
 
@@ -238,8 +238,8 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/(abc,xyz)?arg=val"`},
-			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29?arg=val"`},
+			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/\(abc,xyz\)\?arg=val"`},
+			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29\?arg=val"`},
 		}...)
 	})
 }
@@ -271,7 +271,7 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/abc/xyz/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/abc/xyz/http%3A%2F%2Ftest.com?arg=val`},
+			{Path: "/abc/xyz/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/abc/xyz/http%3A%2F%2Ftest.com\?arg=val`},
 		}...)
 	})
 
@@ -285,7 +285,7 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/abc/xyz/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/abc/xyz/http%3A%2F%2Ftest.com?arg=val`},
+			{Path: "/abc/xyz/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/abc/xyz/http%3A%2F%2Ftest.com\?arg=val`},
 		}...)
 	})
 
@@ -301,9 +301,9 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29?arg=val"`},
-			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29?arg=val"`},
-			{Path: "/listen_me/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/http%3A%2F%2Ftest.com?arg=val`},
+			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29\?arg=val"`},
+			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29\?arg=val"`},
+			{Path: "/listen_me/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/http%3A%2F%2Ftest.com\?arg=val`},
 		}...)
 	})
 
@@ -319,9 +319,9 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/(abc,xyz)?arg=val"`},
-			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29?arg=val"`},
-			{Path: "/listen_me/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/http%3A%2F%2Ftest.com?arg=val`},
+			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/\(abc,xyz\)\?arg=val"`},
+			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29\?arg=val"`},
+			{Path: "/listen_me/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/http%3A%2F%2Ftest.com\?arg=val`},
 		}...)
 	})
 
@@ -337,9 +337,9 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29?arg=val"`},
-			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29?arg=val"`},
-			{Path: "/listen_me/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/sent_to_me/http%3A%2F%2Ftest.com?arg=val`},
+			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29\?arg=val"`},
+			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29\?arg=val"`},
+			{Path: "/listen_me/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/sent_to_me/http%3A%2F%2Ftest.com\?arg=val`},
 		}...)
 	})
 
@@ -355,9 +355,9 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/(abc,xyz)?arg=val"`},
-			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29?arg=val"`},
-			{Path: "/listen_me/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/sent_to_me/http%3A%2F%2Ftest.com?arg=val`},
+			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/\(abc,xyz\)\?arg=val"`},
+			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29\?arg=val"`},
+			{Path: "/listen_me/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/sent_to_me/http%3A%2F%2Ftest.com\?arg=val`},
 		}...)
 	})
 
@@ -478,7 +478,7 @@ func TestAnalytics(t *testing.T) {
 		}
 
 		var record AnalyticsRecord
-		msgpack.Unmarshal(results[0].([]byte), &record)
+		msgpack.Unmarshal([]byte(results[0].(string)), &record)
 		if record.ResponseCode != 401 {
 			t.Error("Analytics record do not match: ", record)
 		}
@@ -504,12 +504,107 @@ func TestAnalytics(t *testing.T) {
 		}
 
 		var record AnalyticsRecord
-		msgpack.Unmarshal(results[0].([]byte), &record)
+		msgpack.Unmarshal([]byte(results[0].(string)), &record)
 		if record.ResponseCode != 200 {
 			t.Error("Analytics record do not match", record)
 		}
 	})
 
+	t.Run("Detailed analytics with api spec config enabled", func(t *testing.T) {
+		defer func() {
+			config.SetGlobal(base)
+		}()
+		globalConf := config.Global()
+		globalConf.AnalyticsConfig.EnableDetailedRecording = false
+		config.SetGlobal(globalConf)
+
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = false
+			spec.Proxy.ListenPath = "/"
+			spec.EnableDetailedRecording = true
+		})
+
+		key := CreateSession()
+
+		authHeaders := map[string]string{
+			"authorization": key,
+		}
+
+		ts.Run(t, test.TestCase{
+			Path: "/", Headers: authHeaders, Code: 200,
+		})
+
+		// let records to to be sent
+		time.Sleep(recordsBufferFlushInterval + 50)
+
+		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		if len(results) != 1 {
+			t.Error("Should return 1 record: ", len(results))
+		}
+
+		var record AnalyticsRecord
+		msgpack.Unmarshal([]byte(results[0].(string)), &record)
+		if record.ResponseCode != 200 {
+			t.Error("Analytics record do not match", record)
+		}
+
+		if record.RawRequest == "" {
+			t.Error("Detailed request info not found", record)
+		}
+
+		if record.RawResponse == "" {
+			t.Error("Detailed response info not found", record)
+		}
+	})
+
+	t.Run("Detailed analytics with only key flag set", func(t *testing.T) {
+		defer func() {
+			config.SetGlobal(base)
+		}()
+		globalConf := config.Global()
+		globalConf.AnalyticsConfig.EnableDetailedRecording = false
+		config.SetGlobal(globalConf)
+
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = false
+			spec.Proxy.ListenPath = "/"
+			spec.EnableDetailedRecording = false
+		})
+
+		key := CreateSession(func(sess *user.SessionState) {
+			sess.EnableDetailedRecording = true
+		})
+
+		authHeaders := map[string]string{
+			"authorization": key,
+		}
+
+		ts.Run(t, test.TestCase{
+			Path: "/", Headers: authHeaders, Code: 200,
+		})
+
+		// let records to to be sent
+		time.Sleep(recordsBufferFlushInterval + 50)
+
+		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		if len(results) != 1 {
+			t.Error("Should return 1 record: ", len(results))
+		}
+
+		var record AnalyticsRecord
+		msgpack.Unmarshal([]byte(results[0].(string)), &record)
+		if record.ResponseCode != 200 {
+			t.Error("Analytics record do not match", record)
+		}
+
+		if record.RawRequest == "" {
+			t.Error("Detailed request info not found", record)
+		}
+
+		if record.RawResponse == "" {
+			t.Error("Detailed response info not found", record)
+		}
+	})
 	t.Run("Detailed analytics", func(t *testing.T) {
 		defer func() {
 			config.SetGlobal(base)
@@ -542,7 +637,7 @@ func TestAnalytics(t *testing.T) {
 		}
 
 		var record AnalyticsRecord
-		msgpack.Unmarshal(results[0].([]byte), &record)
+		msgpack.Unmarshal([]byte(results[0].(string)), &record)
 		if record.ResponseCode != 200 {
 			t.Error("Analytics record do not match", record)
 		}
@@ -595,7 +690,7 @@ func TestAnalytics(t *testing.T) {
 		}
 
 		var record AnalyticsRecord
-		msgpack.Unmarshal(results[0].([]byte), &record)
+		msgpack.Unmarshal([]byte(results[0].(string)), &record)
 		if record.ResponseCode != 200 {
 			t.Error("Analytics record do not match", record)
 		}
@@ -657,7 +752,7 @@ func TestAnalytics(t *testing.T) {
 
 		// Take second cached request
 		var record AnalyticsRecord
-		msgpack.Unmarshal(results[1].([]byte), &record)
+		msgpack.Unmarshal([]byte(results[1].(string)), &record)
 		if record.ResponseCode != 200 {
 			t.Error("Analytics record do not match", record)
 		}
@@ -677,7 +772,7 @@ func TestListener(t *testing.T) {
 	// Specs will be reseted when we do `StartTest`
 	specs := BuildAndLoadAPI()
 	specJSON, _ := json.Marshal(specs[0].APIDefinition)
-	listJSON := fmt.Sprintf("[%s]", string(specJSON))
+	listJSON := fmt.Sprintf(`\[%s\]`, string(specJSON))
 
 	ts := StartTest()
 	defer ts.Close()
@@ -689,11 +784,11 @@ func TestListener(t *testing.T) {
 
 		{Method: "GET", Path: "/sample", Code: 404},
 		{Method: "GET", Path: "/tyk/apis/", Code: 403},
-		{Method: "GET", Path: "/tyk/apis/", AdminAuth: true, Code: 200, BodyMatch: "[]"},
+		{Method: "GET", Path: "/tyk/apis/", AdminAuth: true, Code: 200, BodyMatch: `\[\]`},
 		{Method: "GET", Path: "/tyk/apis", Code: 403},
 		{Method: "GET", Path: "/tyk/apis", AdminAuth: true, Code: 200},
 		{Method: "POST", Path: "/tyk/apis", Data: sampleAPI, AdminAuth: true, Code: 200},
-		{Method: "GET", Path: "/tyk/apis/", AdminAuth: true, Code: 200, BodyMatch: "[]"},
+		{Method: "GET", Path: "/tyk/apis/", AdminAuth: true, Code: 200, BodyMatch: `\[\]`},
 		{Method: "POST", Path: "/tyk/apis/mismatch", AdminAuth: true, Code: 400},
 		{Method: "GET", Path: "/tyk/apis/test", AdminAuth: true, Code: 404},
 		// API definitions not reloaded yet
@@ -770,14 +865,14 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 	globalConf.ManagementNode = false
 	config.SetGlobal(globalConf)
 	msg := redis.Message{
-		Data: []byte(`{"Command": "NoticeGatewayDRLNotification"}`),
+		Payload: `{"Command": "NoticeGatewayDRLNotification"}`,
 	}
 	shouldHandle := func(got NotificationCommand) {
 		if want := NoticeGatewayDRLNotification; got != want {
 			t.Fatalf("want %q, got %q", want, got)
 		}
 	}
-	handleRedisEvent(msg, shouldHandle, nil)
+	handleRedisEvent(&msg, shouldHandle, nil)
 	globalConf.ManagementNode = true
 	config.SetGlobal(globalConf)
 	notHandle := func(got NotificationCommand) {
@@ -1545,13 +1640,13 @@ func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
 		s.Rate = 1
 		s.Per = 60
 	})
-	defer FallbackKeySesionManager.RemoveSession(sess1token, false)
+	defer GlobalSessionManager.RemoveSession("default", sess1token, false)
 
 	sess2token := CreateSession(func(s *user.SessionState) {
 		s.Rate = 1
 		s.Per = 60
 	})
-	defer FallbackKeySesionManager.RemoveSession(sess2token, false)
+	defer GlobalSessionManager.RemoveSession("default", sess2token, false)
 
 	ts.Run(t, []test.TestCase{
 		{Headers: map[string]string{"Authorization": sess1token}, Code: http.StatusOK, Path: "/", Delay: 100 * time.Millisecond},
@@ -1624,7 +1719,7 @@ func TestBrokenClients(t *testing.T) {
 		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
 
 		var record AnalyticsRecord
-		msgpack.Unmarshal(results[0].([]byte), &record)
+		msgpack.Unmarshal([]byte(results[0].(string)), &record)
 		if record.ResponseCode != 499 {
 			t.Fatal("Analytics record do not match:", record)
 		}
