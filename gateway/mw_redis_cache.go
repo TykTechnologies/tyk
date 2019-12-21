@@ -48,11 +48,12 @@ func (m *RedisCacheMiddleware) EnabledForSpec() bool {
 	return m.Spec.CacheOptions.EnableCache
 }
 
-func (m *RedisCacheMiddleware) CreateCheckSum(req *http.Request, keyName string, regex string) (string, error) {
+func (m *RedisCacheMiddleware) CreateCheckSum(req *http.Request, keyName string, regex string, additionalKeyFromHeaders string) (string, error) {
 	h := md5.New()
 	io.WriteString(h, req.Method)
 	io.WriteString(h, "-")
 	io.WriteString(h, req.URL.String())
+	io.WriteString(h, "-"+additionalKeyFromHeaders)
 	if req.Method == http.MethodPost {
 		if req.Body != nil {
 			bodyBytes, err := ioutil.ReadAll(req.Body)
@@ -175,7 +176,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	var errCreatingChecksum bool
 	var retBlob string
-	key, err := m.CreateCheckSum(r, token, cacheKeyRegex)
+	key, err := m.CreateCheckSum(r, token, cacheKeyRegex, m.getCacheKeyFromHeaders(r))
 	if err != nil {
 		log.Debug("Error creating checksum. Skipping cache check")
 		errCreatingChecksum = true
@@ -325,4 +326,12 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	// Stop any further execution
 	return nil, mwStatusRespond
+}
+
+func (m *RedisCacheMiddleware) getCacheKeyFromHeaders(r *http.Request) (key string) {
+	key = ""
+	for _, header := range m.Spec.CacheOptions.CacheByHeaders {
+		key += header + "-" + r.Header.Get(header)
+	}
+	return
 }

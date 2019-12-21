@@ -1206,17 +1206,60 @@ func TestCacheAllSafeRequests(t *testing.T) {
 	}...)
 }
 
+func TestCacheAllSafeRequestsWithCachedHeaders(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+	cache := storage.RedisCluster{KeyPrefix: "cache-"}
+	defer cache.DeleteScanMatch("*")
+	authorization := "authorization"
+	tenant := "tenant-id"
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.CacheOptions = apidef.CacheOptions{
+			CacheTimeout:         120,
+			EnableCache:          true,
+			CacheAllSafeRequests: true,
+			CacheByHeaders:       []string{authorization, tenant},
+		}
+		spec.UseKeylessAccess = true
+		spec.Proxy.ListenPath = "/"
+	})
+
+	headerCache := map[string]string{"x-tyk-cached-response": "1"}
+	sess1token := CreateSession(func(s *user.SessionState) {
+		s.Rate = 1
+		s.Per = 60
+	})
+	sess2token := CreateSession(func(s *user.SessionState) {
+		s.Rate = 1
+		s.Per = 60
+	})
+
+	ts.Run(t, []test.TestCase{
+		{Method: "GET", Path: "/", Headers: map[string]string{authorization: sess1token}, HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: "GET", Path: "/", Headers: map[string]string{authorization: sess1token}, HeadersMatch: headerCache},
+		{Method: "GET", Path: "/", Headers: map[string]string{authorization: sess2token}, HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: "GET", Path: "/", Headers: map[string]string{tenant: "Some UUID"}, HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: "GET", Path: "/", Headers: map[string]string{tenant: "Some UUID"}, HeadersMatch: headerCache},
+		{Method: "GET", Path: "/", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: "GET", Path: "/", HeadersMatch: headerCache},
+		{Method: "GET", Path: "/", Headers: map[string]string{tenant: "Some UUID", authorization: sess2token}, HeadersNotMatch: headerCache},
+	}...)
+}
+
 func TestCachePostRequest(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-"}
 	defer cache.DeleteScanMatch("*")
+	tenant := "tenant-id"
 
 	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.CacheOptions = apidef.CacheOptions{
 			CacheTimeout:         120,
 			EnableCache:          true,
 			CacheAllSafeRequests: false,
+			CacheByHeaders:       []string{tenant},
 		}
 
 		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
@@ -1240,6 +1283,8 @@ func TestCachePostRequest(t *testing.T) {
 		// if regex match returns nil, then request body is ignored while generating cache key
 		{Method: "POST", Path: "/", Data: "{\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
 		{Method: "POST", Path: "/", Data: "{\"name\":\"test2\"}", HeadersMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: "POST", Path: "/", Data: "{\"name\":\"test2\"}", Headers: map[string]string{tenant: "someUUID"}, HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: "POST", Path: "/", Data: "{\"name\":\"test2\"}", Headers: map[string]string{tenant: "someUUID"}, HeadersMatch: headerCache},
 	}...)
 }
 
