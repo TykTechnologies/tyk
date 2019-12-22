@@ -408,7 +408,7 @@ var hopHeaders = []string{
 }
 
 func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) ProxyResponse {
-	resp := p.WrappedServeHTTP(rw, req, recordDetail(req, config.Global()))
+	resp := p.WrappedServeHTTP(rw, req, recordDetail(req, p.TykAPISpec))
 
 	// make response body to be nopCloser and re-readable before serve it through chain of middlewares
 	nopCloseResponseBody(resp.Response)

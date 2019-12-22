@@ -257,6 +257,12 @@
         },
         "python_version": {
           "type": "string"
+        },
+        "grpc_recv_max_size": {
+          "type": "integer"
+        },
+        "grpc_send_max_size": {
+          "type": "integer"
         }
       }
     },
@@ -295,6 +301,9 @@
     },
     "drl_notification_frequency": {
       "type": "integer"
+    },
+    "drl_threshold": {
+      "type": "number"
     },
     "enable_analytics": {
       "type": "boolean"

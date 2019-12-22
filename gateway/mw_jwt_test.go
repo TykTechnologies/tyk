@@ -1036,8 +1036,11 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 					sessionData := user.SessionState{}
 					json.Unmarshal(data, &sessionData)
 
-					assert.Equal(t, sessionData.ApplyPolicies, []string{basePolicyID, p1ID, p2ID})
+					expect := []string{basePolicyID, p1ID, p2ID}
+					sort.Strings(sessionData.ApplyPolicies)
+					sort.Strings(expect)
 
+					assert.Equal(t, sessionData.ApplyPolicies, expect)
 					return true
 				},
 			},
