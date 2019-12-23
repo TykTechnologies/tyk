@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"hash"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -51,42 +52,55 @@ func (m *RedisCacheMiddleware) EnabledForSpec() bool {
 func (m *RedisCacheMiddleware) CreateCheckSum(req *http.Request, keyName string, regex string, additionalKeyFromHeaders string) (string, error) {
 	h := md5.New()
 	io.WriteString(h, req.Method)
-	io.WriteString(h, "-")
-	io.WriteString(h, req.URL.String())
-	io.WriteString(h, "-"+additionalKeyFromHeaders)
-	if req.Method == http.MethodPost {
-		if req.Body != nil {
-			bodyBytes, err := ioutil.ReadAll(req.Body)
+	io.WriteString(h, "-"+req.URL.String())
+	if additionalKeyFromHeaders != "nil" {
+		io.WriteString(h, "-"+additionalKeyFromHeaders)
+	}
 
-			if err != nil {
-				return "", err
-			}
-
-			defer req.Body.Close()
-			req.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
-
-			m := murmur3.New128()
-			if regex == "" {
-				io.WriteString(h, "-")
-				m.Write(bodyBytes)
-				io.WriteString(h, hex.EncodeToString(m.Sum(nil)))
-			} else {
-				r, err := regexp.Compile(regex)
-				if err != nil {
-					return "", err
-				}
-				match := r.Find(bodyBytes)
-				if match != nil {
-					io.WriteString(h, "-")
-					m.Write(match)
-					io.WriteString(h, hex.EncodeToString(m.Sum(nil)))
-				}
-			}
-		}
+	if e := addBodyHash(req, regex, h); e != nil {
+		return "", e
 	}
 
 	reqChecksum := hex.EncodeToString(h.Sum(nil))
 	return m.Spec.APIID + keyName + reqChecksum, nil
+}
+
+func addBodyHash(req *http.Request, regex string, h hash.Hash) error {
+	if !isBodyHashRequired(req) {
+		return nil
+	}
+
+	defer req.Body.Close()
+	bodyBytes, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		return err
+	}
+
+	req.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
+	mur := murmur3.New128()
+	if regex == "" {
+		mur.Write(bodyBytes)
+		io.WriteString(h, "-"+hex.EncodeToString(mur.Sum(nil)))
+		return nil
+	}
+	r, err := regexp.Compile(regex)
+	if err != nil {
+		return err
+	}
+
+	if match := r.Find(bodyBytes); match != nil {
+		mur.Write(match)
+		io.WriteString(h, "-"+hex.EncodeToString(mur.Sum(nil)))
+	}
+	return nil
+}
+
+func isBodyHashRequired(request *http.Request) bool {
+	return request.Body != nil &&
+		(request.Method == http.MethodPost ||
+			request.Method == http.MethodPut ||
+			request.Method == http.MethodPatch)
+
 }
 
 func (m *RedisCacheMiddleware) getTimeTTL(cacheTTL int64) string {
@@ -138,26 +152,22 @@ func (m *RedisCacheMiddleware) decodePayload(payload string) (string, string, er
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	// Only allow idempotent (safe) methods
-	if r.Method != "GET" && r.Method != "HEAD" && r.Method != "OPTIONS" && r.Method != "POST" {
-		return nil, http.StatusOK
-	}
-
 	var stat RequestStatus
 	var cacheKeyRegex string
+	var cacheMeta *EndPointCacheMeta
 
 	_, versionPaths, _, _ := m.Spec.Version(r)
 	isVirtual, _ := m.Spec.CheckSpecMatchesStatus(r, versionPaths, VirtualPath)
 
 	// Lets see if we can throw a sledgehammer at this
-	if m.Spec.CacheOptions.CacheAllSafeRequests && r.Method != "POST" {
+	if m.Spec.CacheOptions.CacheAllSafeRequests && isSafeMethod(r.Method) {
 		stat = StatusCached
 	}
 	if stat != StatusCached {
 		// New request checker, more targeted, less likely to fail
 		found, meta := m.Spec.CheckSpecMatchesStatus(r, versionPaths, Cached)
 		if found {
-			cacheMeta := meta.(*EndPointCacheMeta)
+			cacheMeta = meta.(*EndPointCacheMeta)
 			stat = StatusCached
 			cacheKeyRegex = cacheMeta.CacheKeyRegex
 		}
@@ -215,18 +225,24 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 			return nil, http.StatusOK
 		}
 
+		cacheOnlyResponseCodes := m.Spec.CacheOptions.CacheOnlyResponseCodes
+		// override api main CacheOnlyResponseCodes by endpoint specific if provided
+		if cacheMeta != nil &&
+			cacheMeta.CacheOnlyResponseCodes != nil &&
+			len(cacheMeta.CacheOnlyResponseCodes) > 0 {
+			cacheOnlyResponseCodes = cacheMeta.CacheOnlyResponseCodes
+		}
+
 		// make sure the status codes match if specified
-		if len(m.Spec.CacheOptions.CacheOnlyResponseCodes) > 0 {
+		if len(cacheOnlyResponseCodes) > 0 {
 			foundCode := false
-			for _, code := range m.Spec.CacheOptions.CacheOnlyResponseCodes {
+			for _, code := range cacheOnlyResponseCodes {
 				if code == resVal.StatusCode {
 					foundCode = true
 					break
 				}
 			}
-			if !foundCode {
-				cacheThisRequest = false
-			}
+			cacheThisRequest = foundCode
 		}
 
 		// Are we using upstream cache control?
@@ -326,6 +342,10 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	// Stop any further execution
 	return nil, mwStatusRespond
+}
+
+func isSafeMethod(method string) bool {
+	return method == http.MethodGet || method == http.MethodHead || method == http.MethodOptions
 }
 
 func (m *RedisCacheMiddleware) getCacheKeyFromHeaders(r *http.Request) (key string) {

@@ -86,9 +86,10 @@ type EndPointMeta struct {
 }
 
 type CacheMeta struct {
-	Method        string `bson:"method" json:"method"`
-	Path          string `bson:"path" json:"path"`
-	CacheKeyRegex string `bson:"cache_key_regex" json:"cache_key_regex"`
+	Method                 string `bson:"method" json:"method"`
+	Path                   string `bson:"path" json:"path"`
+	CacheKeyRegex          string `bson:"cache_key_regex" json:"cache_key_regex"`
+	CacheOnlyResponseCodes []int  `bson:"cache_response_codes" json:"cache_response_codes"`
 }
 
 type RequestInputType string
