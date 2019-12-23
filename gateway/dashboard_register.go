@@ -149,6 +149,7 @@ func (h *HTTPDashboardHandler) Register() error {
 	req := h.newRequest(h.RegistrationEndpoint)
 	c := initialiseClient(5 * time.Second)
 	resp, err := c.Do(req)
+	defer resp.Body.Close()
 
 	if err != nil {
 		dashLog.Errorf("Request failed with error %v; retrying in 5s", err)
@@ -160,7 +161,6 @@ func (h *HTTPDashboardHandler) Register() error {
 		return h.Register()
 	}
 
-	defer resp.Body.Close()
 	val := NodeResponseOK{}
 	if err := json.NewDecoder(resp.Body).Decode(&val); err != nil {
 		return err
@@ -169,14 +169,14 @@ func (h *HTTPDashboardHandler) Register() error {
 	// Set the NodeID
 	var found bool
 	nodeID, found := val.Message["NodeID"]
-	SetNodeID(nodeID)
 	if !found {
 		dashLog.Error("Failed to register node, retrying in 5s")
 		time.Sleep(time.Second * 5)
 		return h.Register()
 	}
 
-	dashLog.WithField("id", GetNodeID()).Info("Node Registered")
+	SetNodeID(nodeID)
+	dashLog.WithField("id", nodeID).Info("Node Registered")
 
 	// Set the nonce
 	ServiceNonce = val.Nonce
