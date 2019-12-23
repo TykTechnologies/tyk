@@ -44,6 +44,14 @@ import (
 
 const defaultUserAgent = "Tyk/" + VERSION
 
+var corsHeaders = []string{
+	"Access-Control-Allow-Origin",
+	"Access-Control-Expose-Headers",
+	"Access-Control-Max-Age",
+	"Access-Control-Allow-Credentials",
+	"Access-Control-Allow-Methods",
+	"Access-Control-Allow-Headers"}
+
 var ServiceCache *cache.Cache
 var sdMu sync.RWMutex
 
@@ -371,10 +379,18 @@ func singleJoiningSlash(a, b string, disableStripSlash bool) string {
 	return a
 }
 
-func copyHeader(dst, src http.Header) {
-	if val := dst.Get(http.CanonicalHeaderKey("Access-Control-Allow-Origin")); len(val) > 0 {
-		src.Del("Access-Control-Allow-Origin")
+func removeDuplicateCORSHeader(dst, src http.Header) {
+	for _, v := range corsHeaders {
+		keyName := http.CanonicalHeaderKey(v)
+		if val := dst.Get(keyName); val != "" {
+			src.Del(keyName)
+		}
 	}
+}
+
+func copyHeader(dst, src http.Header) {
+
+	removeDuplicateCORSHeader(dst, src)
 
 	for k, vv := range src {
 		for _, v := range vv {
