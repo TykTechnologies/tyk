@@ -80,7 +80,8 @@ type StorageOptionsConf struct {
 	Type                  string            `json:"type"`
 	Host                  string            `json:"host"`
 	Port                  int               `json:"port"`
-	Hosts                 map[string]string `json:"hosts"`
+	Hosts                 map[string]string `json:"hosts"` // Deprecated: Addrs instead.
+	Addrs                 []string          `json:"addrs"`
 	Username              string            `json:"username"`
 	Password              string            `json:"password"`
 	Database              int               `json:"database"`
