@@ -32,6 +32,12 @@
             "null"
           ]
         },
+        "addrs": {
+          "type": [
+            "array",
+            "null"
+          ]
+        },
         "optimisation_max_active": {
           "type": "integer"
         },

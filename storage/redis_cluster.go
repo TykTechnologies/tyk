@@ -111,10 +111,6 @@ func NewRedisClusterPool(isCache bool) redis.UniversalClient {
 		poolSize = cfg.MaxActive
 	}
 
-	if cfg.EnableCluster {
-		log.Info("--> Using clustered mode")
-	}
-
 	timeout := 5 * time.Second
 
 	if cfg.Timeout > 0 {
@@ -127,9 +123,13 @@ func NewRedisClusterPool(isCache bool) redis.UniversalClient {
 
 	var seedHosts []string
 
-	for h, p := range cfg.Hosts {
-		addr := h + ":" + p
-		seedHosts = append(seedHosts, addr)
+	if len(cfg.Addrs) != 0 {
+		seedHosts = cfg.Addrs
+	} else {
+		for h, p := range cfg.Hosts {
+			addr := h + ":" + p
+			seedHosts = append(seedHosts, addr)
+		}
 	}
 
 	if len(seedHosts) == 0 {
@@ -145,11 +145,8 @@ func NewRedisClusterPool(isCache bool) redis.UniversalClient {
 		}
 	}
 
-	if !cfg.EnableCluster {
-		seedHosts = seedHosts[:1]
-	}
-
-	client := redis.NewUniversalClient(&redis.UniversalOptions{
+	var client redis.UniversalClient
+	opts := &RedisOpts{
 		Addrs:        seedHosts,
 		Password:     cfg.Password,
 		DB:           cfg.Database,
@@ -159,9 +156,88 @@ func NewRedisClusterPool(isCache bool) redis.UniversalClient {
 		IdleTimeout:  240 * timeout,
 		PoolSize:     poolSize,
 		TLSConfig:    tlsConfig,
-	})
+	}
+
+	if cfg.EnableCluster {
+		log.Info("--> [REDIS] Using clustered mode")
+		client = redis.NewClusterClient(opts.cluster())
+	} else {
+		log.Info("--> [REDIS] Using single node mode")
+		client = redis.NewClient(opts.simple())
+	}
 
 	return client
+}
+
+// RedisOpts is the overriden type of redis.UniversalOptions. simple() and cluster() functions are not public
+// in redis library. Therefore, they are redefined in here to use in creation of new redis cluster logic.
+// We don't want to use redis.NewUniversalClient() logic.
+type RedisOpts redis.UniversalOptions
+
+func (o *RedisOpts) cluster() *redis.ClusterOptions {
+	if len(o.Addrs) == 0 {
+		o.Addrs = []string{"127.0.0.1:6379"}
+	}
+
+	return &redis.ClusterOptions{
+		Addrs:     o.Addrs,
+		OnConnect: o.OnConnect,
+
+		Password: o.Password,
+
+		MaxRedirects:   o.MaxRedirects,
+		ReadOnly:       o.ReadOnly,
+		RouteByLatency: o.RouteByLatency,
+		RouteRandomly:  o.RouteRandomly,
+
+		MaxRetries:      o.MaxRetries,
+		MinRetryBackoff: o.MinRetryBackoff,
+		MaxRetryBackoff: o.MaxRetryBackoff,
+
+		DialTimeout:        o.DialTimeout,
+		ReadTimeout:        o.ReadTimeout,
+		WriteTimeout:       o.WriteTimeout,
+		PoolSize:           o.PoolSize,
+		MinIdleConns:       o.MinIdleConns,
+		MaxConnAge:         o.MaxConnAge,
+		PoolTimeout:        o.PoolTimeout,
+		IdleTimeout:        o.IdleTimeout,
+		IdleCheckFrequency: o.IdleCheckFrequency,
+
+		TLSConfig: o.TLSConfig,
+	}
+}
+
+func (o *RedisOpts) simple() *redis.Options {
+	addr := "127.0.0.1:6379"
+	if len(o.Addrs) > 0 {
+		addr = o.Addrs[0]
+	}
+
+	return &redis.Options{
+		Addr:      addr,
+		OnConnect: o.OnConnect,
+
+		DB:       o.DB,
+		Password: o.Password,
+
+		MaxRetries:      o.MaxRetries,
+		MinRetryBackoff: o.MinRetryBackoff,
+		MaxRetryBackoff: o.MaxRetryBackoff,
+
+		DialTimeout:  o.DialTimeout,
+		ReadTimeout:  o.ReadTimeout,
+		WriteTimeout: o.WriteTimeout,
+
+		PoolSize:           o.PoolSize,
+		MinIdleConns:       o.MinIdleConns,
+		MaxConnAge:         o.MaxConnAge,
+		PoolTimeout:        o.PoolTimeout,
+		IdleTimeout:        o.IdleTimeout,
+		IdleCheckFrequency: o.IdleCheckFrequency,
+
+		TLSConfig: o.TLSConfig,
+	}
 }
 
 // Connect will establish a connection to the r.singleton()
