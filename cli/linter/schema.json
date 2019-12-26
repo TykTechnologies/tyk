@@ -32,6 +32,12 @@
             "null"
           ]
         },
+        "addrs": {
+          "type": [
+            "array",
+            "null"
+          ]
+        },
         "optimisation_max_active": {
           "type": "integer"
         },
@@ -1030,8 +1036,8 @@
     "enable_http_profiler": {
       "type": "boolean"
     },
-    "ssl_force_common_name_check":{
-	    "type":"boolean"
+    "ssl_force_common_name_check": {
+      "type": "boolean"
     }
   }
 }
