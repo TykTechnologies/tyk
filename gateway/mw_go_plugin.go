@@ -9,6 +9,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/goplugin"
 )
 
@@ -129,11 +130,15 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 	// wrap ResponseWriter to check if response was sent
 	rw := &customResponseWriter{
 		ResponseWriter: w,
-		copyData:       recordDetail(r, m.Spec.GlobalConfig),
+		copyData:       recordDetail(r, m.Spec),
 	}
 
 	// call Go-plugin function
 	t1 := time.Now()
+
+	// Inject definition into request context:
+	ctx.SetDefinition(r, m.Spec.APIDefinition)
+
 	m.handler(rw, r)
 
 	// calculate latency

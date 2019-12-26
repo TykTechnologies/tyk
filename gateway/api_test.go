@@ -12,12 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/garyburd/redigo/redis"
+	"github.com/go-redis/redis"
 	uuid "github.com/satori/go.uuid"
 
 	"fmt"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
@@ -41,16 +40,6 @@ const apiTestDef = `{
 		"target_url": "` + TestHttpAny + `"
 	}
 }`
-
-func loadSampleAPI(t *testing.T, def string) {
-	spec := CreateSpecTest(t, def)
-	loadApps([]*APISpec{spec})
-}
-
-type testAPIDefinition struct {
-	apidef.APIDefinition
-	ID string `json:"id"`
-}
 
 func TestHealthCheckEndpoint(t *testing.T) {
 	globalConf := config.Global()
@@ -247,7 +236,7 @@ func TestKeyHandler(t *testing.T) {
 			},
 		}...)
 
-		FallbackKeySesionManager.Store().DeleteAllKeys()
+		GlobalSessionManager.Store().DeleteAllKeys()
 	})
 
 	_, knownKey := ts.CreateSession(func(s *user.SessionState) {
@@ -348,16 +337,26 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 	pID := CreatePolicy(func(p *user.Policy) {
 		p.Partitions.RateLimit = true
 		p.Tags = []string{"p1-tag"}
+		p.MetaData = map[string]interface{}{
+			"p1-meta": "p1-value",
+		}
 	})
 
 	pID2 := CreatePolicy(func(p *user.Policy) {
 		p.Partitions.Quota = true
 		p.Tags = []string{"p2-tag"}
+		p.MetaData = map[string]interface{}{
+			"p2-meta": "p2-value",
+		}
 	})
 
 	session, key := ts.CreateSession(func(s *user.SessionState) {
 		s.ApplyPolicies = []string{pID}
 		s.Tags = []string{"key-tag1", "key-tag2"}
+		s.MetaData = map[string]interface{}{
+			"key-meta1": "key-value1",
+			"key-meta2": "key-value2",
+		}
 		s.AccessRights = map[string]user.AccessDefinition{testAPIID: {
 			APIID: testAPIID, Versions: []string{"v1"},
 		}}
@@ -372,7 +371,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
 		}...)
 
-		sessionState, found := FallbackKeySesionManager.SessionDetail(key, false)
+		sessionState, found := GlobalSessionManager.SessionDetail("default", key, false)
 		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 2 {
 			t.Fatal("Adding policy to the list failed")
 		}
@@ -387,14 +386,14 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
 		}...)
 
-		sessionState, found := FallbackKeySesionManager.SessionDetail(key, false)
+		sessionState, found := GlobalSessionManager.SessionDetail("default", key, false)
 		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 0 {
 			t.Fatal("Removing policy from the list failed")
 		}
 	})
 
-	t.Run("Tag on key level", func(t *testing.T) {
-		assert := func(session *user.SessionState, expected []string) {
+	t.Run("Tags on key level", func(t *testing.T) {
+		assertTags := func(session *user.SessionState, expected []string) {
 			sessionData, _ := json.Marshal(session)
 			path := fmt.Sprintf("/tyk/keys/%s", key)
 
@@ -402,7 +401,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 				{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
 			}...)
 
-			sessionState, found := FallbackKeySesionManager.SessionDetail(key, false)
+			sessionState, found := GlobalSessionManager.SessionDetail(session.OrgID, key, false)
 
 			sort.Strings(sessionState.Tags)
 			sort.Strings(expected)
@@ -415,23 +414,75 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 		t.Run("Add", func(t *testing.T) {
 			expected := []string{"p1-tag", "p2-tag", "key-tag1", "key-tag2"}
 			session.ApplyPolicies = []string{pID, pID2}
-			assert(session, expected)
+			assertTags(session, expected)
 		})
 
 		t.Run("Make unique", func(t *testing.T) {
 			expected := []string{"p1-tag", "p2-tag", "key-tag1", "key-tag2"}
 			session.ApplyPolicies = []string{pID, pID2}
 			session.Tags = append(session.Tags, "p1-tag", "key-tag1")
-			assert(session, expected)
+			assertTags(session, expected)
 		})
 
 		t.Run("Remove", func(t *testing.T) {
 			expected := []string{"p1-tag", "p2-tag", "key-tag2"}
 			session.ApplyPolicies = []string{pID, pID2}
 			session.Tags = []string{"key-tag2"}
-			assert(session, expected)
+			assertTags(session, expected)
 		})
 
+	})
+
+	t.Run("MetaData on key level", func(t *testing.T) {
+		assertMetaData := func(session *user.SessionState, expected map[string]interface{}) {
+			sessionData, _ := json.Marshal(session)
+			path := fmt.Sprintf("/tyk/keys/%s", key)
+
+			_, _ = ts.Run(t, []test.TestCase{
+				{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
+			}...)
+
+			sessionState, found := GlobalSessionManager.SessionDetail(session.OrgID, key, false)
+
+			if !found || !reflect.DeepEqual(expected, sessionState.MetaData) {
+				t.Fatalf("Expected %v, returned %v", expected, sessionState.MetaData)
+			}
+		}
+
+		t.Run("Add", func(t *testing.T) {
+			expected := map[string]interface{}{
+				"p1-meta":   "p1-value",
+				"p2-meta":   "p2-value",
+				"key-meta1": "key-value1",
+				"key-meta2": "key-value2",
+			}
+			session.ApplyPolicies = []string{pID, pID2}
+			assertMetaData(session, expected)
+		})
+
+		t.Run("Make unique", func(t *testing.T) {
+			expected := map[string]interface{}{
+				"p1-meta":   "p1-value",
+				"p2-meta":   "p2-value",
+				"key-meta1": "key-value1",
+				"key-meta2": "key-value2",
+			}
+			session.ApplyPolicies = []string{pID, pID2}
+			assertMetaData(session, expected)
+		})
+
+		t.Run("Remove", func(t *testing.T) {
+			expected := map[string]interface{}{
+				"p1-meta":   "p1-value",
+				"p2-meta":   "p2-value",
+				"key-meta2": "key-value2",
+			}
+			session.ApplyPolicies = []string{pID, pID2}
+			session.MetaData = map[string]interface{}{
+				"key-meta2": "key-value2",
+			}
+			assertMetaData(session, expected)
+		})
 	})
 }
 
@@ -913,9 +964,9 @@ func TestGetOAuthClients(t *testing.T) {
 
 	ts.Run(t, []test.TestCase{
 		{Path: "/tyk/oauth/clients/unknown", AdminAuth: true, Code: 404},
-		{Path: "/tyk/oauth/clients/test", AdminAuth: true, Code: 200, BodyMatch: `[]`},
+		{Path: "/tyk/oauth/clients/test", AdminAuth: true, Code: 200, BodyMatch: `\[\]`},
 		{Method: "POST", Path: "/tyk/oauth/clients/create", AdminAuth: true, Data: string(validOauthRequest), Code: 200},
-		{Path: "/tyk/oauth/clients/test", AdminAuth: true, Code: 200, BodyMatch: `[{"client_id":"test"`},
+		{Path: "/tyk/oauth/clients/test", AdminAuth: true, Code: 200, BodyMatch: `\[{"client_id":"test"`},
 	}...)
 }
 
@@ -1149,11 +1200,11 @@ func TestGroupResetHandler(t *testing.T) {
 	go func() {
 		err := cacheStore.StartPubSubHandler(RedisPubSubChannel, func(v interface{}) {
 			switch x := v.(type) {
-			case redis.Subscription:
+			case *redis.Subscription:
 				didSubscribe <- true
-			case redis.Message:
+			case *redis.Message:
 				notf := Notification{}
-				if err := json.Unmarshal(x.Data, &notf); err != nil {
+				if err := json.Unmarshal([]byte(x.Payload), &notf); err != nil {
 					t.Fatal(err)
 				}
 				if notf.Command == NoticeGroupReload {
@@ -1174,7 +1225,7 @@ func TestGroupResetHandler(t *testing.T) {
 	apisByID = make(map[string]*APISpec)
 	apisMu.Unlock()
 
-	loadSampleAPI(t, apiTestDef)
+	LoadSampleAPI(apiTestDef)
 
 	recorder := httptest.NewRecorder()
 

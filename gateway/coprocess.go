@@ -326,29 +326,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		token = returnObject.Session.Metadata["token"]
 	}
 
-	// The CP middleware indicates this is a bad auth:
-	if returnObject.Request.ReturnOverrides.ResponseCode > 400 {
-		logger.WithField("key", obfuscateKey(token)).Info("Attempted access with invalid key")
-
-		for h, v := range returnObject.Request.ReturnOverrides.Headers {
-			w.Header().Set(h, v)
-		}
-
-		// Fire Authfailed Event
-		AuthFailed(m, r, token)
-
-		// Report in health check
-		reportHealthValue(m.Spec, KeyFailure, "1")
-
-		errorMsg := "Key not authorised"
-		if returnObject.Request.ReturnOverrides.ResponseError != "" {
-			errorMsg = returnObject.Request.ReturnOverrides.ResponseError
-		}
-
-		return errors.New(errorMsg), int(returnObject.Request.ReturnOverrides.ResponseCode)
-	}
-
-	if returnObject.Request.ReturnOverrides.ResponseCode > 0 {
+	if returnObject.Request.ReturnOverrides.ResponseCode > 0 || returnObject.Request.ReturnOverrides.DisableJsonError {
 		for h, v := range returnObject.Request.ReturnOverrides.Headers {
 			w.Header().Set(h, v)
 		}
@@ -369,11 +347,33 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		return nil, mwStatusRespond
 	}
 
+	// The CP middleware indicates this is a bad auth:
+	if returnObject.Request.ReturnOverrides.ResponseCode > 400 && !returnObject.Request.ReturnOverrides.DisableJsonError {
+		logger.WithField("key", obfuscateKey(token)).Info("Attempted access with invalid key")
+
+		for h, v := range returnObject.Request.ReturnOverrides.Headers {
+			w.Header().Set(h, v)
+		}
+
+		// Fire Authfailed Event
+		AuthFailed(m, r, token)
+
+		// Report in health check
+		reportHealthValue(m.Spec, KeyFailure, "1")
+
+		errorMsg := "Key not authorised"
+		if returnObject.Request.ReturnOverrides.ResponseError != "" {
+			errorMsg = returnObject.Request.ReturnOverrides.ResponseError
+		}
+
+		return errors.New(errorMsg), int(returnObject.Request.ReturnOverrides.ResponseCode)
+	}
+
 	// Is this a CP authentication middleware?
 	if m.Spec.EnableCoProcessAuth && m.HookType == coprocess.HookType_CustomKeyCheck {
 		// The CP middleware didn't setup a session:
 		if returnObject.Session == nil || token == "" {
-			authHeaderValue := r.Header.Get(m.Spec.Auth.AuthHeaderName)
+			authHeaderValue, _ := m.getAuthToken(m.getAuthType(), r)
 			AuthFailed(m, r, authHeaderValue)
 			return errors.New("Key not authorised"), 403
 		}
@@ -411,6 +411,11 @@ func (h *CustomMiddlewareResponseHook) Init(mwDef interface{}, spec *APISpec) er
 		MiddlewareDriver: spec.CustomMiddleware.Driver,
 	}
 	return nil
+}
+
+// getAuthType overrides BaseMiddleware.getAuthType.
+func (m *CoProcessMiddleware) getAuthType() string {
+	return coprocessType
 }
 
 func (h *CustomMiddlewareResponseHook) Name() string {

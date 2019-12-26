@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -30,7 +31,9 @@ func TestCopyHeader_NoDuplicateCORSHeaders(t *testing.T) {
 		h.Set("Location", "https://tyk.io")
 
 		if withCORS {
-			h.Set("Access-Control-Allow-Origin", "tyk.io")
+			for _, v := range corsHeaders {
+				h.Set(v, "tyk.io")
+			}
 		}
 
 		return h
@@ -47,12 +50,15 @@ func TestCopyHeader_NoDuplicateCORSHeaders(t *testing.T) {
 	for _, v := range tests {
 		copyHeader(v.dst, v.src)
 
-		val := v.dst["Access-Control-Allow-Origin"]
-		if n := len(val); n != 1 {
-			t.Fatalf("%s found %d times", "Access-Control-Allow-Origin", n)
-		}
-	}
+		for _, vv := range corsHeaders {
+			val := v.dst[vv]
+			if n := len(val); n != 1 {
+				t.Fatalf("%s found %d times", vv, n)
+			}
 
+		}
+
+	}
 }
 
 func TestReverseProxyRetainHost(t *testing.T) {
@@ -347,6 +353,38 @@ func TestWrappedServeHTTP(t *testing.T) {
 	proxy.WrappedServeHTTP(recorder, req, false)
 }
 
+func TestCircuitBreaker5xxs(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+
+	t.Run("Extended Paths", func(t *testing.T) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				json.Unmarshal([]byte(`[
+					{
+						"path": "error",
+						"method": "GET",
+						"threshold_percent": 0.1,
+						"samples": 3,
+						"return_to_service_after": 6000
+					}
+  			 	]`), &v.ExtendedPaths.CircuitBreaker)
+			})
+			spec.Proxy.ListenPath = "/"
+			spec.CircuitBreakerEnabled = true
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/errors/500", Code: http.StatusInternalServerError},
+			{Path: "/errors/501", Code: http.StatusNotImplemented},
+			{Path: "/errors/502", Code: http.StatusBadGateway},
+			{Path: "/errors/500", Code: http.StatusServiceUnavailable},
+			{Path: "/errors/501", Code: http.StatusServiceUnavailable},
+			{Path: "/errors/502", Code: http.StatusServiceUnavailable},
+		}...)
+	})
+}
+
 func TestSingleJoiningSlash(t *testing.T) {
 	testsFalse := []struct {
 		a, b, want string
@@ -523,7 +561,7 @@ func TestCheckHeaderInRemoveList(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			spec := CreateSpecTest(t, specOutput.String())
+			spec := LoadSampleAPI(specOutput.String())
 			actual := rp.CheckHeaderInRemoveList(tc.header, spec, r)
 			if actual != tc.expected {
 				t.Fatalf("want %t, got %t", tc.expected, actual)

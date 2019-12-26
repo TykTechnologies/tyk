@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/headers"
 )
 
 const (
@@ -28,11 +27,20 @@ func (k *Oauth2KeyExists) EnabledForSpec() bool {
 	return k.Spec.UseOauth2
 }
 
+// getAuthType overrides BaseMiddleware.getAuthType.
+func (k *Oauth2KeyExists) getAuthType() string {
+	return oauthType
+}
+
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
+		return nil, http.StatusOK
+	}
+
 	logger := k.Logger()
 	// We're using OAuth, start checking for access keys
-	token := r.Header.Get(headers.Authorization)
+	token, _ := k.getAuthToken(k.getAuthType(), r)
 	parts := strings.Split(token, " ")
 
 	if len(parts) < 2 {

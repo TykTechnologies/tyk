@@ -24,9 +24,9 @@ import (
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/rpc"
 
-	circuit "github.com/rubyist/circuitbreaker"
 	"github.com/sirupsen/logrus"
 
+	circuit "github.com/TykTechnologies/circuitbreaker"
 	"github.com/TykTechnologies/gojsonschema"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -135,6 +135,7 @@ type URLSpec struct {
 	DoNotTrackEndpoint        apidef.TrackEndpointMeta
 	ValidatePathMeta          apidef.ValidatePathMeta
 	Internal                  apidef.InternalMeta
+	IgnoreCase                bool
 }
 
 type EndPointCacheMeta struct {
@@ -162,7 +163,6 @@ type APISpec struct {
 	WhiteListEnabled         map[string]bool
 	target                   *url.URL
 	AuthManager              AuthorisationHandler
-	SessionManager           SessionHandler
 	OAuthManager             *OAuthManager
 	OrgSessionManager        SessionHandler
 	EventPaths               map[apidef.TykEvent][]config.TykEventHandler
@@ -185,24 +185,17 @@ type APISpec struct {
 
 	middlewareChain *ChainObject
 
-	shouldRelease bool
-	network       NetworkStats
+	network NetworkStats
 }
 
 // Release re;leases all resources associated with API spec
 func (s *APISpec) Release() {
-	// mark spec as to be released
-	s.shouldRelease = true
-
 	// release circuit breaker resources
 	for _, path := range s.RxPaths {
 		for _, urlSpec := range path {
 			if urlSpec.CircuitBreaker.CB != nil {
-				// this will force CB-event reading routing to exit
-				urlSpec.CircuitBreaker.CB.Reset()
-
-				// TODO: close all circuit breaker's event receivers
-				// which should let event reading Go-routines to exit (need to change circuitbreaker package)
+				// this will force CB-event reading Go-routine and subscriber Go-routine to exit
+				urlSpec.CircuitBreaker.CB.Stop()
 			}
 		}
 	}
@@ -273,9 +266,6 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 	// Add any new session managers or auth handlers here
 	spec.AuthManager = &DefaultAuthorisationManager{}
 
-	spec.SessionManager = &DefaultSessionManager{
-		orgID: spec.OrgID,
-	}
 	spec.OrgSessionManager = &DefaultSessionManager{
 		orgID: spec.OrgID,
 	}
@@ -284,7 +274,20 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 
 	// Create and init the virtual Machine
 	if config.Global().EnableJSVM {
-		spec.JSVM.Init(spec, logger)
+		mwPaths, _, _, _, _, _, _ := loadCustomMiddleware(spec)
+
+		hasVirtualEndpoint := false
+
+		for _, version := range spec.VersionData.Versions {
+			if len(version.ExtendedPaths.Virtual) > 0 {
+				hasVirtualEndpoint = true
+				break
+			}
+		}
+
+		if spec.CustomMiddlewareBundle != "" || len(mwPaths) > 0 || hasVirtualEndpoint {
+			spec.JSVM.Init(spec, logger)
+		}
 	}
 
 	// Set up Event Handlers
@@ -520,6 +523,10 @@ func (a APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo) ([]U
 func (a APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, specType URLStatus) {
 	apiLangIDsRegex := regexp.MustCompile(`{([^}]*)}`)
 	asRegexStr := apiLangIDsRegex.ReplaceAllString(stringSpec, `([^/]*)`)
+	// Case insensitive match
+	if newSpec.IgnoreCase {
+		asRegexStr = "(?i)" + asRegexStr
+	}
 	asRegex, _ := regexp.Compile(asRegexStr)
 	newSpec.Status = specType
 	newSpec.Spec = asRegex
@@ -545,7 +552,7 @@ func (a APIDefinitionLoader) compileExtendedPathSpec(paths []apidef.EndPointMeta
 	urlSpec := []URLSpec{}
 
 	for _, stringSpec := range paths {
-		newSpec := URLSpec{}
+		newSpec := URLSpec{IgnoreCase: stringSpec.IgnoreCase}
 		a.generateRegex(stringSpec.Path, &newSpec, specType)
 
 		// Extend with method actions
@@ -770,12 +777,6 @@ func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circui
 					})
 
 				case circuit.BreakerReset:
-					// check if this spec is set to release resources
-					if spec.shouldRelease {
-						// time to stop this Go-routine
-						return
-					}
-
 					spec.FireEvent(EventBreakerTriggered, EventCurcuitBreakerMeta{
 						EventMetaDefault: EventMetaDefault{Message: "Breaker Reset"},
 						CircuitEvent:     e,
@@ -783,6 +784,9 @@ func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circui
 						APIID:            spec.APIID,
 					})
 
+				case circuit.BreakerStop:
+					// time to stop this Go-routine
+					return
 				}
 			}
 		}(stringSpec.Path, apiSpec, newSpec.CircuitBreaker.CB)
@@ -949,13 +953,11 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 
 func (a *APISpec) Init(authStore, sessionStore, healthStore, orgStore storage.Handler) {
 	a.AuthManager.Init(authStore)
-	a.SessionManager.Init(sessionStore)
 	a.Health.Init(healthStore)
 	a.OrgSessionManager.Init(orgStore)
 }
 
 func (a *APISpec) StopSessionManagerPool() {
-	a.SessionManager.Stop()
 	a.OrgSessionManager.Stop()
 }
 
@@ -1011,14 +1013,14 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 // URLAllowedAndIgnored checks if a url is allowed and ignored.
 func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, whiteListStatus bool) (RequestStatus, interface{}) {
 	// Check if ignored
-	for _, v := range rxPaths {
-		if !v.Spec.MatchString(r.URL.Path) {
+	for i := range rxPaths {
+		if !rxPaths[i].Spec.MatchString(r.URL.Path) {
 			continue
 		}
 
-		if v.MethodActions != nil {
+		if rxPaths[i].MethodActions != nil {
 			// We are using an extended path set, check for the method
-			methodMeta, matchMethodOk := v.MethodActions[r.Method]
+			methodMeta, matchMethodOk := rxPaths[i].MethodActions[r.Method]
 			if !matchMethodOk {
 				continue
 			}
@@ -1028,7 +1030,7 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 			switch methodMeta.Action {
 			case apidef.NoAction:
 				// NoAction status means we're not treating this request in any special or exceptional way
-				return a.getURLStatus(v.Status), nil
+				return a.getURLStatus(rxPaths[i].Status), nil
 			case apidef.Reply:
 				return StatusRedirectFlowByReply, &methodMeta
 			default:
@@ -1037,38 +1039,38 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 			}
 		}
 
-		if r.Method == v.Internal.Method && v.Status == Internal && !ctxLoopingEnabled(r) {
+		if r.Method == rxPaths[i].Internal.Method && rxPaths[i].Status == Internal && !ctxLoopingEnabled(r) {
 			return EndPointNotAllowed, nil
 		}
 
 		if whiteListStatus {
 			// We have a whitelist, nothing gets through unless specifically defined
-			switch v.Status {
+			switch rxPaths[i].Status {
 			case WhiteList, BlackList, Ignored:
 			default:
-				if v.Status == Internal && r.Method == v.Internal.Method && ctxLoopingEnabled(r) {
-					return a.getURLStatus(v.Status), nil
+				if rxPaths[i].Status == Internal && r.Method == rxPaths[i].Internal.Method && ctxLoopingEnabled(r) {
+					return a.getURLStatus(rxPaths[i].Status), nil
 				} else {
 					return EndPointNotAllowed, nil
 				}
 			}
 		}
 
-		if v.TransformAction.Template != nil {
-			return a.getURLStatus(v.Status), &v.TransformAction
+		if rxPaths[i].TransformAction.Template != nil {
+			return a.getURLStatus(rxPaths[i].Status), &rxPaths[i].TransformAction
 		}
 
-		if v.TransformJQAction.Filter != "" {
-			return a.getURLStatus(v.Status), &v.TransformJQAction
+		if rxPaths[i].TransformJQAction.Filter != "" {
+			return a.getURLStatus(rxPaths[i].Status), &rxPaths[i].TransformJQAction
 		}
 
 		// TODO: Fix, Not a great detection method
-		if len(v.InjectHeaders.Path) > 0 {
-			return a.getURLStatus(v.Status), &v.InjectHeaders
+		if len(rxPaths[i].InjectHeaders.Path) > 0 {
+			return a.getURLStatus(rxPaths[i].Status), &rxPaths[i].InjectHeaders
 		}
 
 		// Using a legacy path, handle it raw.
-		return a.getURLStatus(v.Status), nil
+		return a.getURLStatus(rxPaths[i].Status), nil
 	}
 
 	// Nothing matched - should we still let it through?
@@ -1107,84 +1109,84 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 	}
 
 	// Check if ignored
-	for _, v := range rxPaths {
-		if mode != v.Status {
+	for i := range rxPaths {
+		if mode != rxPaths[i].Status {
 			continue
 		}
-		if !v.Spec.MatchString(matchPath) {
+		if !rxPaths[i].Spec.MatchString(matchPath) {
 			continue
 		}
 
-		switch v.Status {
+		switch rxPaths[i].Status {
 		case Ignored, BlackList, WhiteList:
 			return true, nil
 		case Cached:
-			if method == v.CacheConfig.Method || (v.CacheConfig.Method == SAFE_METHODS && (method == "GET" || method == "HEADERS" || method == "OPTIONS")) {
-				return true, &v.CacheConfig
+			if method == rxPaths[i].CacheConfig.Method || (rxPaths[i].CacheConfig.Method == SAFE_METHODS && (method == "GET" || method == "HEADERS" || method == "OPTIONS")) {
+				return true, &rxPaths[i].CacheConfig
 			}
 		case Transformed:
-			if method == v.TransformAction.Method {
-				return true, &v.TransformAction
+			if method == rxPaths[i].TransformAction.Method {
+				return true, &rxPaths[i].TransformAction
 			}
 		case TransformedJQ:
-			if method == v.TransformJQAction.Method {
-				return true, &v.TransformJQAction
+			if method == rxPaths[i].TransformJQAction.Method {
+				return true, &rxPaths[i].TransformJQAction
 			}
 		case HeaderInjected:
-			if method == v.InjectHeaders.Method {
-				return true, &v.InjectHeaders
+			if method == rxPaths[i].InjectHeaders.Method {
+				return true, &rxPaths[i].InjectHeaders
 			}
 		case HeaderInjectedResponse:
-			if method == v.InjectHeadersResponse.Method {
-				return true, &v.InjectHeadersResponse
+			if method == rxPaths[i].InjectHeadersResponse.Method {
+				return true, &rxPaths[i].InjectHeadersResponse
 			}
 		case TransformedResponse:
-			if method == v.TransformResponseAction.Method {
-				return true, &v.TransformResponseAction
+			if method == rxPaths[i].TransformResponseAction.Method {
+				return true, &rxPaths[i].TransformResponseAction
 			}
 		case TransformedJQResponse:
-			if method == v.TransformJQResponseAction.Method {
-				return true, &v.TransformJQResponseAction
+			if method == rxPaths[i].TransformJQResponseAction.Method {
+				return true, &rxPaths[i].TransformJQResponseAction
 			}
 		case HardTimeout:
-			if r.Method == v.HardTimeout.Method {
-				return true, &v.HardTimeout.TimeOut
+			if r.Method == rxPaths[i].HardTimeout.Method {
+				return true, &rxPaths[i].HardTimeout.TimeOut
 			}
 		case CircuitBreaker:
-			if method == v.CircuitBreaker.Method {
-				return true, &v.CircuitBreaker
+			if method == rxPaths[i].CircuitBreaker.Method {
+				return true, &rxPaths[i].CircuitBreaker
 			}
 		case URLRewrite:
-			if method == v.URLRewrite.Method {
-				return true, v.URLRewrite
+			if method == rxPaths[i].URLRewrite.Method {
+				return true, rxPaths[i].URLRewrite
 			}
 		case VirtualPath:
-			if method == v.VirtualPathSpec.Method {
-				return true, &v.VirtualPathSpec
+			if method == rxPaths[i].VirtualPathSpec.Method {
+				return true, &rxPaths[i].VirtualPathSpec
 			}
 		case RequestSizeLimit:
-			if method == v.RequestSize.Method {
-				return true, &v.RequestSize
+			if method == rxPaths[i].RequestSize.Method {
+				return true, &rxPaths[i].RequestSize
 			}
 		case MethodTransformed:
-			if method == v.MethodTransform.Method {
-				return true, &v.MethodTransform
+			if method == rxPaths[i].MethodTransform.Method {
+				return true, &rxPaths[i].MethodTransform
 			}
 		case RequestTracked:
-			if method == v.TrackEndpoint.Method {
-				return true, &v.TrackEndpoint
+			if method == rxPaths[i].TrackEndpoint.Method {
+				return true, &rxPaths[i].TrackEndpoint
 			}
 		case RequestNotTracked:
-			if method == v.DoNotTrackEndpoint.Method {
-				return true, &v.DoNotTrackEndpoint
+			if method == rxPaths[i].DoNotTrackEndpoint.Method {
+				return true, &rxPaths[i].DoNotTrackEndpoint
 			}
 		case ValidateJSONRequest:
-			if method == v.ValidatePathMeta.Method {
-				return true, &v.ValidatePathMeta
+			if method == rxPaths[i].ValidatePathMeta.Method {
+				return true, &rxPaths[i].ValidatePathMeta
 			}
 		case Internal:
-			if method == v.Internal.Method {
-				return true, &v.Internal
+			if method == rxPaths[i].Internal.Method {
+				return true, &rxPaths[i].Internal
 			}
 		}
 	}
@@ -1199,10 +1201,8 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 	switch a.VersionDefinition.Location {
 	case headerLocation:
 		return r.Header.Get(a.VersionDefinition.Key)
-
 	case urlParamLocation:
 		return r.URL.Query().Get(a.VersionDefinition.Key)
-
 	case urlLocation:
 		uPath := a.StripListenPath(r, r.URL.Path)
 		uPath = strings.TrimPrefix(uPath, "/"+a.Slug)

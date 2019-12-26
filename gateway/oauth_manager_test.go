@@ -50,7 +50,7 @@ func buildTestOAuthSpec(apiGens ...func(spec *APISpec)) *APISpec {
 	return BuildAPI(func(spec *APISpec) {
 		spec.APIID = "999999"
 		spec.OrgID = "default"
-		spec.Auth = apidef.Auth{
+		spec.Auth = apidef.AuthConfig{
 			AuthHeaderName: "authorization",
 		}
 		spec.UseKeylessAccess = false
@@ -228,6 +228,9 @@ func TestAuthCodeRedirect(t *testing.T) {
 
 	client := &http.Client{
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if !strings.Contains(req.URL.String(), "state=random-state-value") {
+				t.Fatal("Redirect URL doesn't contain state parameter")
+			}
 			return http.ErrUseLastResponse
 		},
 	}
@@ -237,18 +240,13 @@ func TestAuthCodeRedirect(t *testing.T) {
 		param.Set("response_type", "code")
 		param.Set("redirect_uri", authRedirectUri)
 		param.Set("client_id", authClientID)
+		param.Set("state", "random-state-value")
 
-		headers := map[string]string{
-			"Content-Type": "application/x-www-form-urlencoded",
-		}
-
-		ts.Run(t, test.TestCase{
-			Path:    "/APIID/oauth/authorize/",
-			Data:    param.Encode(),
-			Headers: headers,
-			Method:  http.MethodPost,
-			Client:  client,
-			Code:    http.StatusTemporaryRedirect,
+		_, _ = ts.Run(t, test.TestCase{
+			Path:   "/APIID/oauth/authorize/?" + param.Encode(),
+			Method: http.MethodGet,
+			Client: client,
+			Code:   http.StatusTemporaryRedirect,
 		})
 	})
 }
@@ -378,14 +376,15 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 			"Content-Type": "application/x-www-form-urlencoded",
 		}
 
-		ts.Run(t, test.TestCase{
+		_, _ = ts.Run(t, test.TestCase{
 			Path:      "/APIID/tyk/oauth/authorize-client/",
 			AdminAuth: true,
 			Data:      param.Encode(),
 			Headers:   headers,
 			Method:    http.MethodPost,
 			Code:      http.StatusOK,
-			BodyMatch: `"access_token"`,
+			BodyMatch: `{"access_token":".*","expires_in":3600,"redirect_to":"http://client.oauth.com` +
+				`#access_token=.*=&expires_in=3600&token_type=bearer","token_type":"bearer"}`,
 		})
 	})
 }

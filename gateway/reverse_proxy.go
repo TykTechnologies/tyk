@@ -15,6 +15,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -41,6 +43,14 @@ import (
 )
 
 const defaultUserAgent = "Tyk/" + VERSION
+
+var corsHeaders = []string{
+	"Access-Control-Allow-Origin",
+	"Access-Control-Expose-Headers",
+	"Access-Control-Max-Age",
+	"Access-Control-Allow-Credentials",
+	"Access-Control-Allow-Methods",
+	"Access-Control-Allow-Headers"}
 
 var ServiceCache *cache.Cache
 var sdMu sync.RWMutex
@@ -290,6 +300,12 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		Director:      director,
 		TykAPISpec:    spec,
 		FlushInterval: time.Duration(spec.GlobalConfig.HttpServerOptions.FlushInterval) * time.Millisecond,
+		sp: sync.Pool{
+			New: func() interface{} {
+				buffer := make([]byte, 32*1024)
+				return &buffer
+			},
+		},
 	}
 	proxy.ErrorHandler.BaseMiddleware = BaseMiddleware{Spec: spec, Proxy: proxy}
 	return proxy
@@ -321,6 +337,8 @@ type ReverseProxy struct {
 
 	TykAPISpec   *APISpec
 	ErrorHandler ErrorHandler
+
+	sp sync.Pool
 }
 
 func defaultTransport(dialerTimeout float64) *http.Transport {
@@ -361,10 +379,18 @@ func singleJoiningSlash(a, b string, disableStripSlash bool) string {
 	return a
 }
 
-func copyHeader(dst, src http.Header) {
-	if val := dst.Get(http.CanonicalHeaderKey("Access-Control-Allow-Origin")); len(val) > 0 {
-		src.Del("Access-Control-Allow-Origin")
+func removeDuplicateCORSHeader(dst, src http.Header) {
+	for _, v := range corsHeaders {
+		keyName := http.CanonicalHeaderKey(v)
+		if val := dst.Get(keyName); val != "" {
+			src.Del(keyName)
+		}
 	}
+}
+
+func copyHeader(dst, src http.Header) {
+
+	removeDuplicateCORSHeader(dst, src)
 
 	for k, vv := range src {
 		for _, v := range vv {
@@ -398,7 +424,7 @@ var hopHeaders = []string{
 }
 
 func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) ProxyResponse {
-	resp := p.WrappedServeHTTP(rw, req, recordDetail(req, config.Global()))
+	resp := p.WrappedServeHTTP(rw, req, recordDetail(req, p.TykAPISpec))
 
 	// make response body to be nopCloser and re-readable before serve it through chain of middlewares
 	nopCloseResponseBody(resp.Response)
@@ -526,7 +552,7 @@ func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p
 	if proxyURL, _ := transport.Proxy(req); proxyURL != nil {
 		transport.TLSClientConfig.VerifyPeerCertificate = verifyPeerCertificatePinnedCheck(p.TykAPISpec, transport.TLSClientConfig)
 	} else {
-		transport.DialTLS = dialTLSPinnedCheck(p.TykAPISpec, transport.TLSClientConfig)
+		transport.DialTLS = customDialTLSCheck(p.TykAPISpec, transport.TLSClientConfig)
 	}
 
 	if p.TykAPISpec.GlobalConfig.ProxySSLMinVersion > 0 {
@@ -561,6 +587,53 @@ func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p
 	}
 
 	return transport
+}
+
+func setCommonNameVerifyPeerCertificate(spec *APISpec, tlsConfig *tls.Config, hostName string) {
+	tlsConfig.InsecureSkipVerify = true
+
+	// if verifyPeerCertificate was set previously, make sure it is also executed
+	prevFunc := tlsConfig.VerifyPeerCertificate
+	tlsConfig.VerifyPeerCertificate = func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+		if prevFunc != nil {
+			err := prevFunc(rawCerts, verifiedChains)
+			if err != nil {
+				return err
+			}
+		}
+
+		// followed https://github.com/golang/go/issues/21971#issuecomment-332693931
+		certs := make([]*x509.Certificate, len(rawCerts))
+		for i, asn1Data := range rawCerts {
+			cert, err := x509.ParseCertificate(asn1Data)
+			if err != nil {
+				return errors.New("failed to parse certificate from server: " + err.Error())
+			}
+			certs[i] = cert
+		}
+
+		if !spec.Proxy.Transport.SSLInsecureSkipVerify && !config.Global().ProxySSLInsecureSkipVerify {
+			opts := x509.VerifyOptions{
+				Roots:         tlsConfig.RootCAs,
+				CurrentTime:   time.Now(),
+				DNSName:       "", // <- skip hostname verification
+				Intermediates: x509.NewCertPool(),
+			}
+
+			for i, cert := range certs {
+				if i == 0 {
+					continue
+				}
+				opts.Intermediates.AddCert(cert)
+			}
+			_, err := certs[0].Verify(opts)
+			if err != nil {
+				return err
+			}
+		}
+
+		return validateCommonName(hostName, certs[0])
+	}
 }
 
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) ProxyResponse {
@@ -712,6 +785,25 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 	p.TykAPISpec.Unlock()
 
+	if p.TykAPISpec.Proxy.Transport.SSLForceCommonNameCheck || config.Global().SSLForceCommonNameCheck {
+		// if proxy is enabled, add CommonName verification in verifyPeerCertificate
+		// DialTLS is not executed if proxy is used
+		var httpTransport *http.Transport
+
+		if outReqIsWebsocket {
+			httpTransport = roundTripper.(*WSDialer).Transport
+		} else {
+			httpTransport = roundTripper.(*http.Transport)
+		}
+
+		if proxyURL, _ := httpTransport.Proxy(req); proxyURL != nil {
+			tlsConfig := httpTransport.TLSClientConfig
+			host, _, _ := net.SplitHostPort(outreq.Host)
+			setCommonNameVerifyPeerCertificate(p.TykAPISpec, tlsConfig, host)
+		}
+
+	}
+
 	// do request round trip
 	var res *http.Response
 	var err error
@@ -726,7 +818,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		begin := time.Now()
 		res, err = roundTripper.RoundTrip(outreq)
 		upstreamLatency = time.Since(begin)
-		if err != nil || res.StatusCode == http.StatusInternalServerError {
+		if err != nil || res.StatusCode/100 == 5 {
 			breakerConf.CB.Fail()
 		} else {
 			breakerConf.CB.Success()
@@ -913,16 +1005,17 @@ func (p *ReverseProxy) CopyResponse(dst io.Writer, src io.Reader) {
 		}
 	}
 
-	p.copyBuffer(dst, src, nil)
+	p.copyBuffer(dst, src)
 }
 
-func (p *ReverseProxy) copyBuffer(dst io.Writer, src io.Reader, buf []byte) (int64, error) {
-	if len(buf) == 0 {
-		buf = make([]byte, 32*1024)
-	}
+func (p *ReverseProxy) copyBuffer(dst io.Writer, src io.Reader) (int64, error) {
+
+	buf := p.sp.Get().(*[]byte)
+	defer p.sp.Put(buf)
+
 	var written int64
 	for {
-		nr, rerr := src.Read(buf)
+		nr, rerr := src.Read(*buf)
 		if rerr != nil && rerr != io.EOF && rerr != context.Canceled {
 			log.WithFields(logrus.Fields{
 				"prefix": "proxy",
@@ -931,7 +1024,7 @@ func (p *ReverseProxy) copyBuffer(dst io.Writer, src io.Reader, buf []byte) (int
 			}).Error("http: proxy error during body copy: ", rerr)
 		}
 		if nr > 0 {
-			nw, werr := dst.Write(buf[:nr])
+			nw, werr := dst.Write((*buf)[:nr])
 			if nw > 0 {
 				written += int64(nw)
 			}
