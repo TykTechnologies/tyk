@@ -10,8 +10,6 @@ github.com/Masterminds/semver
 github.com/TykTechnologies/again
 # github.com/TykTechnologies/circuitbreaker v2.2.2+incompatible
 github.com/TykTechnologies/circuitbreaker
-# github.com/TykTechnologies/concurrent-map v0.0.0-20160908201409-7de59d53fd5c
-github.com/TykTechnologies/concurrent-map
 # github.com/TykTechnologies/drl v0.0.0-20190905191955-cc541aa8e3e1
 github.com/TykTechnologies/drl
 # github.com/TykTechnologies/goautosocket v0.0.0-20190430121222-97bfa5e7e481
@@ -29,15 +27,11 @@ github.com/TykTechnologies/leakybucket/memorycache
 github.com/TykTechnologies/murmur3
 # github.com/TykTechnologies/openid2go v0.0.0-20160817213554-aab5ce1231ab
 github.com/TykTechnologies/openid2go/openid
-# github.com/agext/levenshtein v1.2.2
-github.com/agext/levenshtein
-# github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc
+# github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751
 github.com/alecthomas/template
 github.com/alecthomas/template/parse
-# github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf
+# github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d
 github.com/alecthomas/units
-# github.com/apparentlymart/go-textseg v1.0.0
-github.com/apparentlymart/go-textseg/textseg
 # github.com/bshuster-repo/logrus-logstash-hook v0.4.1
 github.com/bshuster-repo/logrus-logstash-hook
 # github.com/buger/jsonparser v0.0.0-20181115193947-bf1c66bbce23
@@ -89,22 +83,6 @@ github.com/google/uuid
 github.com/gorilla/mux
 # github.com/gorilla/websocket v1.4.1
 github.com/gorilla/websocket
-# github.com/hashicorp/errwrap v1.0.0
-github.com/hashicorp/errwrap
-# github.com/hashicorp/go-multierror v1.0.0
-github.com/hashicorp/go-multierror
-# github.com/hashicorp/hcl2 v0.0.0-20190821123243-0c888d1241f6
-github.com/hashicorp/hcl2/hcl
-github.com/hashicorp/hcl2/hcl/hclsyntax
-github.com/hashicorp/hcl2/hcldec
-# github.com/hashicorp/hil v0.0.0-20190212112733-ab17b08d6590
-github.com/hashicorp/hil/ast
-# github.com/hashicorp/terraform v0.12.9
-github.com/hashicorp/terraform/flatmap
-github.com/hashicorp/terraform/configs/hcl2shim
-github.com/hashicorp/terraform/configs/configschema
-github.com/hashicorp/terraform/helper/didyoumean
-github.com/hashicorp/terraform/tfdiags
 # github.com/huandu/xstrings v1.2.0
 github.com/huandu/xstrings
 # github.com/imdario/mergo v0.3.7
@@ -119,9 +97,9 @@ github.com/konsorten/go-windows-terminal-sequences
 github.com/lonelycode/go-uuid/uuid
 # github.com/lonelycode/osin v0.0.0-20160423095202-da239c9dacb6
 github.com/lonelycode/osin
-# github.com/mattn/go-colorable v0.1.1
+# github.com/mattn/go-colorable v0.1.4
 github.com/mattn/go-colorable
-# github.com/mattn/go-isatty v0.0.5
+# github.com/mattn/go-isatty v0.0.8
 github.com/mattn/go-isatty
 # github.com/mavricknz/asn1-ber v0.0.0-20151103223136-b9df1c2f4213
 github.com/mavricknz/asn1-ber
@@ -131,8 +109,6 @@ github.com/mavricknz/ldap
 github.com/mgutz/ansi
 # github.com/miekg/dns v1.0.8
 github.com/miekg/dns
-# github.com/mitchellh/go-wordwrap v1.0.0
-github.com/mitchellh/go-wordwrap
 # github.com/mitchellh/mapstructure v1.1.2
 github.com/mitchellh/mapstructure
 # github.com/newrelic/go-agent v2.13.0+incompatible
@@ -220,14 +196,6 @@ github.com/xeipuuv/gojsonreference
 github.com/xeipuuv/gojsonschema
 # github.com/xenolf/lego v0.3.2-0.20170618175828-28ead50ff1ca
 github.com/xenolf/lego/acme
-# github.com/zclconf/go-cty v1.0.1-0.20190708163926-19588f92a98f
-github.com/zclconf/go-cty/cty
-github.com/zclconf/go-cty/cty/convert
-github.com/zclconf/go-cty/cty/function
-github.com/zclconf/go-cty/cty/set
-github.com/zclconf/go-cty/cty/function/stdlib
-github.com/zclconf/go-cty/cty/gocty
-github.com/zclconf/go-cty/cty/json
 # golang.org/x/crypto v0.0.0-20190923035154-9ee001bba392
 golang.org/x/crypto/bcrypt
 golang.org/x/crypto/blowfish
@@ -237,7 +205,7 @@ golang.org/x/crypto/ed25519
 golang.org/x/crypto/pbkdf2
 golang.org/x/crypto/ocsp
 golang.org/x/crypto/ed25519/internal/edwards25519
-# golang.org/x/net v0.0.0-20190923162816-aa69164e4478
+# golang.org/x/net v0.0.0-20191009170851-d66e71096ffb
 golang.org/x/net/context
 golang.org/x/net/html/charset
 golang.org/x/net/http2
@@ -280,7 +248,7 @@ golang.org/x/text/runes
 golang.org/x/text/internal/language
 golang.org/x/text/internal/language/compact
 golang.org/x/text/internal/tag
-# golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
+# golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 golang.org/x/time/rate
 # google.golang.org/appengine v1.6.1
 google.golang.org/appengine/datastore
