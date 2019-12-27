@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/TykTechnologies/tyk/request"
 )
 
@@ -103,7 +105,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	case sessionFailRateLimit:
 		err, errCode := k.handleRateLimitFailure(r, token)
 		if throttleRetryLimit > 0 {
-			for true {
+			for {
 				ctxIncThrottleLevel(r, throttleRetryLimit)
 				time.Sleep(time.Duration(throttleInterval * float64(time.Second)))
 
@@ -118,14 +120,19 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 					k.Spec.APIID,
 					true,
 				)
-				if reason == sessionFailNone {
-					return k.ProcessRequest(w, r, nil)
-				}
+
+				log.WithFields(logrus.Fields{
+					"middleware": "RateLimitAndQuotaCheck",
+					"func":       "ProcessRequest",
+				}).Debugf("after dry-run (reason: '%s')", reason)
 
 				if ctxThrottleLevel(r) > throttleRetryLimit {
 					break
 				}
 
+				if reason == sessionFailNone {
+					return k.ProcessRequest(w, r, nil)
+				}
 			}
 		}
 		return err, errCode

@@ -220,6 +220,9 @@ const Schema = `{
         "session_lifetime": {
             "type": "number"
         },
+        "enable_detailed_recording": {
+            "type": "boolean"
+        },
         "enable_signature_checking": {
             "type": "boolean"
         },

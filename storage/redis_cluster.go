@@ -111,10 +111,6 @@ func NewRedisClusterPool(isCache bool) redis.UniversalClient {
 		poolSize = cfg.MaxActive
 	}
 
-	if cfg.EnableCluster {
-		log.Info("--> Using clustered mode")
-	}
-
 	timeout := 5 * time.Second
 
 	if cfg.Timeout > 0 {
@@ -127,9 +123,13 @@ func NewRedisClusterPool(isCache bool) redis.UniversalClient {
 
 	var seedHosts []string
 
-	for h, p := range cfg.Hosts {
-		addr := h + ":" + p
-		seedHosts = append(seedHosts, addr)
+	if len(cfg.Addrs) != 0 {
+		seedHosts = cfg.Addrs
+	} else {
+		for h, p := range cfg.Hosts {
+			addr := h + ":" + p
+			seedHosts = append(seedHosts, addr)
+		}
 	}
 
 	if len(seedHosts) == 0 {
@@ -145,12 +145,10 @@ func NewRedisClusterPool(isCache bool) redis.UniversalClient {
 		}
 	}
 
-	if !cfg.EnableCluster {
-		seedHosts = seedHosts[:1]
-	}
-
-	client := redis.NewUniversalClient(&redis.UniversalOptions{
+	var client redis.UniversalClient
+	opts := &RedisOpts{
 		Addrs:        seedHosts,
+		MasterName:   cfg.MasterName,
 		Password:     cfg.Password,
 		DB:           cfg.Database,
 		DialTimeout:  timeout,
@@ -159,9 +157,123 @@ func NewRedisClusterPool(isCache bool) redis.UniversalClient {
 		IdleTimeout:  240 * timeout,
 		PoolSize:     poolSize,
 		TLSConfig:    tlsConfig,
-	})
+	}
+
+	if opts.MasterName != "" {
+		log.Info("--> [REDIS] Creating sentinel-backed failover client")
+		client = redis.NewFailoverClient(opts.failover())
+	} else if cfg.EnableCluster {
+		log.Info("--> [REDIS] Creating cluster client")
+		client = redis.NewClusterClient(opts.cluster())
+	} else {
+		log.Info("--> [REDIS] Creating single-node client")
+		client = redis.NewClient(opts.simple())
+	}
 
 	return client
+}
+
+// RedisOpts is the overriden type of redis.UniversalOptions. simple() and cluster() functions are not public
+// in redis library. Therefore, they are redefined in here to use in creation of new redis cluster logic.
+// We don't want to use redis.NewUniversalClient() logic.
+type RedisOpts redis.UniversalOptions
+
+func (o *RedisOpts) cluster() *redis.ClusterOptions {
+	if len(o.Addrs) == 0 {
+		o.Addrs = []string{"127.0.0.1:6379"}
+	}
+
+	return &redis.ClusterOptions{
+		Addrs:     o.Addrs,
+		OnConnect: o.OnConnect,
+
+		Password: o.Password,
+
+		MaxRedirects:   o.MaxRedirects,
+		ReadOnly:       o.ReadOnly,
+		RouteByLatency: o.RouteByLatency,
+		RouteRandomly:  o.RouteRandomly,
+
+		MaxRetries:      o.MaxRetries,
+		MinRetryBackoff: o.MinRetryBackoff,
+		MaxRetryBackoff: o.MaxRetryBackoff,
+
+		DialTimeout:        o.DialTimeout,
+		ReadTimeout:        o.ReadTimeout,
+		WriteTimeout:       o.WriteTimeout,
+		PoolSize:           o.PoolSize,
+		MinIdleConns:       o.MinIdleConns,
+		MaxConnAge:         o.MaxConnAge,
+		PoolTimeout:        o.PoolTimeout,
+		IdleTimeout:        o.IdleTimeout,
+		IdleCheckFrequency: o.IdleCheckFrequency,
+
+		TLSConfig: o.TLSConfig,
+	}
+}
+
+func (o *RedisOpts) simple() *redis.Options {
+	addr := "127.0.0.1:6379"
+	if len(o.Addrs) > 0 {
+		addr = o.Addrs[0]
+	}
+
+	return &redis.Options{
+		Addr:      addr,
+		OnConnect: o.OnConnect,
+
+		DB:       o.DB,
+		Password: o.Password,
+
+		MaxRetries:      o.MaxRetries,
+		MinRetryBackoff: o.MinRetryBackoff,
+		MaxRetryBackoff: o.MaxRetryBackoff,
+
+		DialTimeout:  o.DialTimeout,
+		ReadTimeout:  o.ReadTimeout,
+		WriteTimeout: o.WriteTimeout,
+
+		PoolSize:           o.PoolSize,
+		MinIdleConns:       o.MinIdleConns,
+		MaxConnAge:         o.MaxConnAge,
+		PoolTimeout:        o.PoolTimeout,
+		IdleTimeout:        o.IdleTimeout,
+		IdleCheckFrequency: o.IdleCheckFrequency,
+
+		TLSConfig: o.TLSConfig,
+	}
+}
+
+func (o *RedisOpts) failover() *redis.FailoverOptions {
+	if len(o.Addrs) == 0 {
+		o.Addrs = []string{"127.0.0.1:6379"}
+	}
+
+	return &redis.FailoverOptions{
+		SentinelAddrs: o.Addrs,
+		MasterName:    o.MasterName,
+		OnConnect:     o.OnConnect,
+
+		DB:       o.DB,
+		Password: o.Password,
+
+		MaxRetries:      o.MaxRetries,
+		MinRetryBackoff: o.MinRetryBackoff,
+		MaxRetryBackoff: o.MaxRetryBackoff,
+
+		DialTimeout:  o.DialTimeout,
+		ReadTimeout:  o.ReadTimeout,
+		WriteTimeout: o.WriteTimeout,
+
+		PoolSize:           o.PoolSize,
+		MinIdleConns:       o.MinIdleConns,
+		MaxConnAge:         o.MaxConnAge,
+		PoolTimeout:        o.PoolTimeout,
+		IdleTimeout:        o.IdleTimeout,
+		IdleCheckFrequency: o.IdleCheckFrequency,
+
+		TLSConfig: o.TLSConfig,
+	}
 }
 
 // Connect will establish a connection to the r.singleton()
@@ -233,8 +345,8 @@ func (r *RedisCluster) ensureConnection() {
 // GetKey will retrieve a key from the database
 func (r *RedisCluster) GetKey(keyName string) (string, error) {
 	r.ensureConnection()
-	log.Debug("[STORE] Getting WAS: ", keyName)
-	log.Debug("[STORE] Getting: ", r.fixKey(keyName))
+	// log.Debug("[STORE] Getting WAS: ", keyName)
+	// log.Debug("[STORE] Getting: ", r.fixKey(keyName))
 	cluster := r.singleton()
 
 	value, err := cluster.Get(r.fixKey(keyName)).Result()
@@ -318,7 +430,7 @@ func (r *RedisCluster) GetRawKey(keyName string) (string, error) {
 }
 
 func (r *RedisCluster) GetExp(keyName string) (int64, error) {
-	log.Debug("Getting exp for key: ", r.fixKey(keyName))
+	//	log.Debug("Getting exp for key: ", r.fixKey(keyName))
 	r.ensureConnection()
 
 	value, err := r.singleton().TTL(r.fixKey(keyName)).Result()
@@ -339,8 +451,8 @@ func (r *RedisCluster) SetExp(keyName string, timeout int64) error {
 
 // SetKey will create (or update) a key value in the store
 func (r *RedisCluster) SetKey(keyName, session string, timeout int64) error {
-	log.Debug("[STORE] SET Raw key is: ", keyName)
-	log.Debug("[STORE] Setting key: ", r.fixKey(keyName))
+	//log.Debug("[STORE] SET Raw key is: ", keyName)
+	//log.Debug("[STORE] Setting key: ", r.fixKey(keyName))
 
 	r.ensureConnection()
 	err := r.singleton().Set(r.fixKey(keyName), session, 0).Err()
@@ -373,7 +485,7 @@ func (r *RedisCluster) SetRawKey(keyName, session string, timeout int64) error {
 // Decrement will decrement a key in redis
 func (r *RedisCluster) Decrement(keyName string) {
 	keyName = r.fixKey(keyName)
-	log.Debug("Decrementing key: ", keyName)
+	// log.Debug("Decrementing key: ", keyName)
 	r.ensureConnection()
 	err := r.singleton().Decr(keyName).Err()
 	if err != nil {
@@ -383,12 +495,13 @@ func (r *RedisCluster) Decrement(keyName string) {
 
 // IncrementWithExpire will increment a key in redis
 func (r *RedisCluster) IncrememntWithExpire(keyName string, expire int64) int64 {
-	log.Debug("Incrementing raw key: ", keyName)
+	// log.Debug("Incrementing raw key: ", keyName)
 	r.ensureConnection()
 
 	// This function uses a raw key, so we shouldn't call fixKey
 	fixedKey := keyName
 	val, err := r.singleton().Incr(fixedKey).Result()
+
 	if err != nil {
 		log.Error("Error trying to increment value:", err)
 	} else {

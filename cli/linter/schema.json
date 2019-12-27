@@ -32,6 +32,15 @@
             "null"
           ]
         },
+        "addrs": {
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "master_name": {
+          "type": "string"
+        },
         "optimisation_max_active": {
           "type": "integer"
         },
@@ -257,6 +266,12 @@
         },
         "python_version": {
           "type": "string"
+        },
+        "grpc_recv_max_size": {
+          "type": "integer"
+        },
+        "grpc_send_max_size": {
+          "type": "integer"
         }
       }
     },
@@ -1024,8 +1039,8 @@
     "enable_http_profiler": {
       "type": "boolean"
     },
-    "ssl_force_common_name_check":{
-	    "type":"boolean"
+    "ssl_force_common_name_check": {
+      "type": "boolean"
     }
   }
 }

@@ -80,7 +80,9 @@ type StorageOptionsConf struct {
 	Type                  string            `json:"type"`
 	Host                  string            `json:"host"`
 	Port                  int               `json:"port"`
-	Hosts                 map[string]string `json:"hosts"`
+	Hosts                 map[string]string `json:"hosts"` // Deprecated: Addrs instead.
+	Addrs                 []string          `json:"addrs"`
+	MasterName            string            `json:"master_name"`
 	Username              string            `json:"username"`
 	Password              string            `json:"password"`
 	Database              int               `json:"database"`
@@ -214,6 +216,8 @@ type ServiceDiscoveryConf struct {
 type CoProcessConfig struct {
 	EnableCoProcess     bool   `json:"enable_coprocess"`
 	CoProcessGRPCServer string `json:"coprocess_grpc_server"`
+	GRPCRecvMaxSize     int    `json:"grpc_recv_max_size"`
+	GRPCSendMaxSize     int    `json:"grpc_send_max_size"`
 	PythonPathPrefix    string `json:"python_path_prefix"`
 	PythonVersion       string `json:"python_version"`
 }

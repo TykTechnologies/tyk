@@ -130,7 +130,7 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 	// wrap ResponseWriter to check if response was sent
 	rw := &customResponseWriter{
 		ResponseWriter: w,
-		copyData:       recordDetail(r, m.Spec.GlobalConfig),
+		copyData:       recordDetail(r, m.Spec),
 	}
 
 	// call Go-plugin function
