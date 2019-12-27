@@ -182,7 +182,7 @@ var (
 // the target request will be for /base/dir. This version modifies the
 // stdlib version by also setting the host to the target, this allows
 // us to work with heroku and other such providers
-func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy {
+func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, logger *logrus.Entry) *ReverseProxy {
 	onceStartAllHostsDown.Do(func() {
 		handler := func(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "all hosts are down", http.StatusServiceUnavailable)
@@ -296,10 +296,17 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		}
 	}
 
+	if logger == nil {
+		logger = logrus.NewEntry(log)
+	}
+
+	logger = logger.WithField("mw", "ReverseProxy")
+
 	proxy := &ReverseProxy{
 		Director:      director,
 		TykAPISpec:    spec,
 		FlushInterval: time.Duration(spec.GlobalConfig.HttpServerOptions.FlushInterval) * time.Millisecond,
+		logger:        logger,
 		sp: sync.Pool{
 			New: func() interface{} {
 				buffer := make([]byte, 32*1024)
@@ -338,7 +345,8 @@ type ReverseProxy struct {
 	TykAPISpec   *APISpec
 	ErrorHandler ErrorHandler
 
-	sp sync.Pool
+	logger *logrus.Entry
+	sp     sync.Pool
 }
 
 func defaultTransport(dialerTimeout float64) *http.Transport {
@@ -424,7 +432,13 @@ var hopHeaders = []string{
 }
 
 func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) ProxyResponse {
+	startTime := time.Now()
+	p.logger.WithField("ts", startTime.UnixNano()).Debug("Started")
+
 	resp := p.WrappedServeHTTP(rw, req, recordDetail(req, p.TykAPISpec))
+
+	finishTime := time.Since(startTime)
+	p.logger.WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
 
 	// make response body to be nopCloser and re-readable before serve it through chain of middlewares
 	nopCloseResponseBody(resp.Response)
@@ -433,8 +447,15 @@ func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) Prox
 }
 
 func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Request) ProxyResponse {
+	startTime := time.Now()
+	p.logger.WithField("ts", startTime.UnixNano()).Debug("Started")
+
 	resp := p.WrappedServeHTTP(rw, req, true)
 	nopCloseResponseBody(resp.Response)
+
+	finishTime := time.Since(startTime)
+	p.logger.WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
+
 	return resp
 }
 
@@ -447,7 +468,7 @@ func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request
 	found, meta := spec.CheckSpecMatchesStatus(req, versionPaths, HardTimeout)
 	if found {
 		intMeta := meta.(*int)
-		log.Debug("HARD TIMEOUT ENFORCED: ", *intMeta)
+		p.logger.Debug("HARD TIMEOUT ENFORCED: ", *intMeta)
 		return true, float64(*intMeta)
 	}
 
@@ -484,7 +505,7 @@ func (p *ReverseProxy) CheckCircuitBreakerEnforced(spec *APISpec, req *http.Requ
 	found, meta := spec.CheckSpecMatchesStatus(req, versionPaths, CircuitBreaker)
 	if found {
 		exMeta := meta.(*ExtendedCircuitBreakerMeta)
-		log.Debug("CB Enforced for path: ", *exMeta)
+		p.logger.Debug("CB Enforced for path: ", *exMeta)
 		return true, exMeta
 	}
 
@@ -550,7 +571,12 @@ func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p
 	// When request routed through the proxy `DialTLS` is not used, and only VerifyPeerCertificate is supported
 	// The reason behind two separate checks is that `DialTLS` supports specifying public keys per hostname, and `VerifyPeerCertificate` only global ones, e.g. `*`
 	if proxyURL, _ := transport.Proxy(req); proxyURL != nil {
+		p.logger.Debug("Detected proxy: " + proxyURL.String())
 		transport.TLSClientConfig.VerifyPeerCertificate = verifyPeerCertificatePinnedCheck(p.TykAPISpec, transport.TLSClientConfig)
+
+		if transport.TLSClientConfig.VerifyPeerCertificate != nil {
+			p.logger.Debug("Certificate pinning check is enabled")
+		}
 	} else {
 		transport.DialTLS = customDialTLSCheck(p.TykAPISpec, transport.TLSClientConfig)
 	}
@@ -589,7 +615,7 @@ func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p
 	return transport
 }
 
-func setCommonNameVerifyPeerCertificate(spec *APISpec, tlsConfig *tls.Config, hostName string) {
+func (p *ReverseProxy) setCommonNameVerifyPeerCertificate(tlsConfig *tls.Config, hostName string) {
 	tlsConfig.InsecureSkipVerify = true
 
 	// if verifyPeerCertificate was set previously, make sure it is also executed
@@ -598,6 +624,7 @@ func setCommonNameVerifyPeerCertificate(spec *APISpec, tlsConfig *tls.Config, ho
 		if prevFunc != nil {
 			err := prevFunc(rawCerts, verifiedChains)
 			if err != nil {
+				p.logger.Error("Failed to verify server certificate: " + err.Error())
 				return err
 			}
 		}
@@ -612,7 +639,7 @@ func setCommonNameVerifyPeerCertificate(spec *APISpec, tlsConfig *tls.Config, ho
 			certs[i] = cert
 		}
 
-		if !spec.Proxy.Transport.SSLInsecureSkipVerify && !config.Global().ProxySSLInsecureSkipVerify {
+		if !p.TykAPISpec.Proxy.Transport.SSLInsecureSkipVerify && !config.Global().ProxySSLInsecureSkipVerify {
 			opts := x509.VerifyOptions{
 				Roots:         tlsConfig.RootCAs,
 				CurrentTime:   time.Now(),
@@ -628,6 +655,7 @@ func setCommonNameVerifyPeerCertificate(spec *APISpec, tlsConfig *tls.Config, ho
 			}
 			_, err := certs[0].Verify(opts)
 			if err != nil {
+				p.logger.Error("Failed to verify server certificate: " + err.Error())
 				return err
 			}
 		}
@@ -660,6 +688,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
 			p.TykAPISpec.HTTPTransport = httpTransport(timeout, rw, req, p)
 			p.TykAPISpec.HTTPTransportCreated = time.Now()
+
+			p.logger.Debug("Creating new HTTP transport")
 		}
 
 		roundTripper = p.TykAPISpec.HTTPTransport
@@ -676,6 +706,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
 			p.TykAPISpec.WSTransport = httpTransport(timeout, rw, req, p)
 			p.TykAPISpec.WSTransportCreated = time.Now()
+
+			p.logger.Debug("Creating new WS transport")
 		}
 
 		// overwrite transport's ResponseWriter from previous upgrade request
@@ -713,11 +745,11 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	setContext(outreq, context.Background())
 	setContext(logreq, context.Background())
 
-	log.Debug("UPSTREAM REQUEST URL: ", req.URL)
+	p.logger.Debug("Upstream request URL: ", req.URL)
 
 	// We need to double set the context for the outbound request to reprocess the target
 	if p.TykAPISpec.URLRewriteEnabled && req.Context().Value(ctx.RetainHost) == true {
-		log.Debug("Detected host rewrite, notifying director")
+		p.logger.Debug("Detected host rewrite, notifying director")
 		setCtxValue(outreq, ctx.RetainHost, true)
 	}
 
@@ -734,7 +766,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	p.Director(outreq)
 	outreq.Close = false
 
-	log.Debug("Outbound Request: ", outreq.URL.String())
+	p.logger.Debug("Outbound request URL: ", outreq.URL.String())
 
 	// Do not modify outbound request headers if they are WS
 	if !outReqIsWebsocket {
@@ -774,6 +806,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	// set up TLS certificates for upstream if needed
 	var tlsCertificates []tls.Certificate
 	if cert := getUpstreamCertificate(outreq.Host, p.TykAPISpec); cert != nil {
+		p.logger.Debug("Found upstream mutual TLS certificate")
 		tlsCertificates = []tls.Certificate{*cert}
 	}
 
@@ -796,10 +829,13 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			httpTransport = roundTripper.(*http.Transport)
 		}
 
+		p.logger.Debug("Using forced SSL CN check")
+
 		if proxyURL, _ := httpTransport.Proxy(req); proxyURL != nil {
+			p.logger.Debug("Detected proxy: " + proxyURL.String())
 			tlsConfig := httpTransport.TLSClientConfig
 			host, _, _ := net.SplitHostPort(outreq.Host)
-			setCommonNameVerifyPeerCertificate(p.TykAPISpec, tlsConfig, host)
+			p.setCommonNameVerifyPeerCertificate(tlsConfig, host)
 		}
 
 	}
@@ -810,11 +846,11 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	var upstreamLatency time.Duration
 	if breakerEnforced {
 		if !breakerConf.CB.Ready() {
-			log.Debug("ON REQUEST: Circuit Breaker is in OPEN state")
+			p.logger.Debug("ON REQUEST: Circuit Breaker is in OPEN state")
 			p.ErrorHandler.HandleError(rw, logreq, "Service temporarily unavailable.", 503, true)
 			return ProxyResponse{}
 		}
-		log.Debug("ON REQUEST: Circuit Breaker is in CLOSED or HALF-OPEN state")
+		p.logger.Debug("ON REQUEST: Circuit Breaker is in CLOSED or HALF-OPEN state")
 		begin := time.Now()
 		res, err = roundTripper.RoundTrip(outreq)
 		upstreamLatency = time.Since(begin)
@@ -838,7 +874,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			alias = session.Alias
 		}
 
-		log.WithFields(logrus.Fields{
+		p.logger.WithFields(logrus.Fields{
 			"prefix":      "proxy",
 			"user_ip":     addrs,
 			"server_name": outreq.Host,
@@ -853,7 +889,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 			if p.TykAPISpec.Proxy.ServiceDiscovery.UseDiscoveryService {
 				if ServiceCache != nil {
-					log.Debug("[PROXY] [SERVICE DISCOVERY] Upstream host failed, refreshing host list")
+					p.logger.Debug("[PROXY] [SERVICE DISCOVERY] Upstream host failed, refreshing host list")
 					ServiceCache.Delete(p.TykAPISpec.APIID)
 				}
 			}
@@ -894,7 +930,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	if err != nil {
-		log.Error("Response chain failed! ", err)
+		p.logger.Error("Response chain failed! ", err)
 	}
 
 	inres := new(http.Response)
@@ -1017,7 +1053,7 @@ func (p *ReverseProxy) copyBuffer(dst io.Writer, src io.Reader) (int64, error) {
 	for {
 		nr, rerr := src.Read(*buf)
 		if rerr != nil && rerr != io.EOF && rerr != context.Canceled {
-			log.WithFields(logrus.Fields{
+			p.logger.WithFields(logrus.Fields{
 				"prefix": "proxy",
 				"org_id": p.TykAPISpec.OrgID,
 				"api_id": p.TykAPISpec.APIID,
