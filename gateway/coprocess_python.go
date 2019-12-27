@@ -28,7 +28,7 @@ import (
 var (
 	dispatcherClass    unsafe.Pointer
 	dispatcherInstance unsafe.Pointer
-	mwCacheLock        = sync.Mutex{}
+	pythonLock         = sync.Mutex{}
 )
 
 // PythonDispatcher implements a coprocess.Dispatcher
@@ -44,19 +44,26 @@ func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object
 		return nil, err
 	}
 
+	pythonLock.Lock()
 	// Find the dispatch_hook:
 	dispatchHookFunc, err := python.PyObjectGetAttr(dispatcherInstance, "dispatch_hook")
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "python",
-		}).Error(err)
+		}).Fatal(err)
+		python.PyErr_Print()
+		pythonLock.Unlock()
+		return nil, err
 	}
 
 	objectBytes, err := python.PyBytesFromString(objectMsg)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "python",
-		}).Error(err)
+		}).Fatal(err)
+		python.PyErr_Print()
+		pythonLock.Unlock()
+		return nil, err
 	}
 
 	args, err := python.PyTupleNew(1)
@@ -64,6 +71,9 @@ func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object
 		log.WithFields(logrus.Fields{
 			"prefix": "python",
 		}).Fatal(err)
+		python.PyErr_Print()
+		pythonLock.Unlock()
+		return nil, err
 	}
 
 	python.PyTupleSetItem(args, 0, objectBytes)
@@ -72,6 +82,8 @@ func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object
 		log.WithFields(logrus.Fields{
 			"prefix": "python",
 		}).Error(err)
+		python.PyErr_Print()
+		pythonLock.Unlock()
 		return nil, err
 	}
 
@@ -80,6 +92,8 @@ func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object
 		log.WithFields(logrus.Fields{
 			"prefix": "python",
 		}).Error(err)
+		python.PyErr_Print()
+		pythonLock.Unlock()
 		return nil, err
 	}
 
@@ -88,6 +102,8 @@ func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object
 		log.WithFields(logrus.Fields{
 			"prefix": "python",
 		}).Error(err)
+		python.PyErr_Print()
+		pythonLock.Unlock()
 		return nil, err
 	}
 
@@ -96,8 +112,11 @@ func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object
 		log.WithFields(logrus.Fields{
 			"prefix": "python",
 		}).Error(err)
+		python.PyErr_Print()
+		pythonLock.Unlock()
 		return nil, err
 	}
+	pythonLock.Unlock()
 
 	newObject := &coprocess.Object{}
 	err = proto.Unmarshal(newObjectBytes, newObject)
@@ -127,25 +146,32 @@ func (d *PythonDispatcher) Reload() {
 
 // HandleMiddlewareCache isn't used by Python.
 func (d *PythonDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, basePath string) {
-	go func() {
-		mwCacheLock.Lock()
-		defer mwCacheLock.Unlock()
-		dispatcherLoadBundle, err := python.PyObjectGetAttr(dispatcherInstance, "load_bundle")
-		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "python",
-			}).Error(err)
-		}
+	pythonLock.Lock()
+	defer pythonLock.Unlock()
+	dispatcherLoadBundle, err := python.PyObjectGetAttr(dispatcherInstance, "load_bundle")
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "python",
+		}).Error(err)
+		return
+	}
 
-		args, err := python.PyTupleNew(1)
-		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "python",
-			}).Error(err)
-		}
-		python.PyTupleSetItem(args, 0, basePath)
-		python.PyObjectCallObject(dispatcherLoadBundle, args)
-	}()
+	args, err := python.PyTupleNew(1)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "python",
+		}).Error(err)
+		python.PyErr_Print()
+		return
+	}
+	python.PyTupleSetItem(args, 0, basePath)
+	_, err = python.PyObjectCallObject(dispatcherLoadBundle, args)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "python",
+		}).Error(err)
+		python.PyErr_Print()
+	}
 }
 
 // PythonInit initializes the Python interpreter.
@@ -168,35 +194,53 @@ func PythonInit() error {
 }
 
 // PythonLoadDispatcher creates reference to the dispatcher class.
-func PythonLoadDispatcher() {
+func PythonLoadDispatcher() error {
+	pythonLock.Lock()
+	defer pythonLock.Unlock()
 	moduleDict, err := python.LoadModuleDict("dispatcher")
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
 		}).Fatalf("Couldn't initialize Python dispatcher")
+		python.PyErr_Print()
+		return err
 	}
 	dispatcherClass, err = python.GetItem(moduleDict, "TykDispatcher")
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
 		}).Fatalf("Couldn't initialize Python dispatcher")
+		python.PyErr_Print()
+		return err
 	}
+	return nil
 }
 
 // PythonNewDispatcher creates an instance of TykDispatcher.
 func PythonNewDispatcher(bundleRootPath string) (coprocess.Dispatcher, error) {
+	pythonLock.Lock()
+	defer pythonLock.Unlock()
 	args, err := python.PyTupleNew(1)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "python",
 		}).Fatal(err)
+		return nil, err
 	}
-	python.PyTupleSetItem(args, 0, bundleRootPath)
+	if err := python.PyTupleSetItem(args, 0, bundleRootPath); err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "python",
+		}).Error(err)
+		python.PyErr_Print()
+		return nil, err
+	}
 	dispatcherInstance, err = python.PyObjectCallObject(dispatcherClass, args)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "python",
-		}).Fatal(err)
+		}).Error(err)
+		python.PyErr_Print()
+		return nil, err
 	}
 	dispatcher := &PythonDispatcher{}
 	return dispatcher, nil
@@ -250,7 +294,10 @@ func NewPythonDispatcher() (dispatcher coprocess.Dispatcher, err error) {
 			initDone <- err
 			return
 		}
-		PythonLoadDispatcher()
+		if err := PythonLoadDispatcher(); err != nil {
+			initDone <- err
+			return
+		}
 		dispatcher, err = PythonNewDispatcher(bundleRootPath)
 		if err != nil {
 			log.WithFields(logrus.Fields{
