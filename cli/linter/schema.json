@@ -38,6 +38,9 @@
             "null"
           ]
         },
+        "master_name": {
+          "type": "string"
+        },
         "optimisation_max_active": {
           "type": "integer"
         },
