@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -92,6 +93,19 @@ const (
 	sessionFailRateLimit
 	sessionFailQuota
 )
+
+func (sfr sessionFailReason) String() string {
+	switch sfr {
+	case sessionFailNone:
+		return "sessionFailNone"
+	case sessionFailRateLimit:
+		return "sessionFailRateLimit"
+	case sessionFailQuota:
+		return "sessionFailQuota"
+	default:
+		return fmt.Sprintf("%d", uint(sfr))
+	}
+}
 
 // ForwardMessage will enforce rate limiting, returning a non-zero
 // sessionFailReason if session limits have been exceeded.
