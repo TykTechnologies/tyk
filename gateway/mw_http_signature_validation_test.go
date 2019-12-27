@@ -80,7 +80,7 @@ func createRSAAuthSession(pubCertId string) *user.SessionState {
 
 func getHMACAuthChain(spec *APISpec) http.Handler {
 	remote, _ := url.Parse(TestHttpAny)
-	proxy := TykNewSingleHostReverseProxy(remote, spec)
+	proxy := TykNewSingleHostReverseProxy(remote, spec, nil)
 	proxyHandler := ProxyHandler(proxy, spec)
 	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy}
 	chain := alice.New(mwList(

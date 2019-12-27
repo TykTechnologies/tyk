@@ -88,7 +88,7 @@ func onServerStatusReceivedHandler(payload string) {
 		return
 	}
 
-	log.Debug("Received DRL data: ", serverData)
+	// log.Debug("Received DRL data: ", serverData)
 
 	if DRLManager.Ready {
 		if err := DRLManager.AddOrUpdateServer(serverData); err != nil {
@@ -97,7 +97,7 @@ func onServerStatusReceivedHandler(payload string) {
 				Debug("AddOrUpdateServer error. Seems like you running multiple segmented Tyk groups in same Redis.")
 			return
 		}
-		log.Debug(DRLManager.Report())
+		// log.Debug(DRLManager.Report())
 	} else {
 		log.Warning("DRL not ready, skipping this notification")
 	}

@@ -153,8 +153,8 @@ func (r *RPCStorageHandler) cleanKey(keyName string) string {
 // GetKey will retrieve a key from the database
 func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 	start := time.Now() // get current time
-	log.Debug("[STORE] Getting WAS: ", keyName)
-	log.Debug("[STORE] Getting: ", r.fixKey(keyName))
+	//	log.Debug("[STORE] Getting WAS: ", keyName)
+	//  log.Debug("[STORE] Getting: ", r.fixKey(keyName))
 
 	value, err := r.GetRawKey(r.fixKey(keyName))
 

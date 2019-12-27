@@ -33,7 +33,7 @@ func createRLSession() *user.SessionState {
 
 func getRLOpenChain(spec *APISpec) http.Handler {
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
-	proxy := TykNewSingleHostReverseProxy(remote, spec)
+	proxy := TykNewSingleHostReverseProxy(remote, spec, nil)
 	proxyHandler := ProxyHandler(proxy, spec)
 	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy}
 	chain := alice.New(mwList(
@@ -47,7 +47,7 @@ func getRLOpenChain(spec *APISpec) http.Handler {
 
 func getGlobalRLAuthKeyChain(spec *APISpec) http.Handler {
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
-	proxy := TykNewSingleHostReverseProxy(remote, spec)
+	proxy := TykNewSingleHostReverseProxy(remote, spec, nil)
 	proxyHandler := ProxyHandler(proxy, spec)
 	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy}
 	chain := alice.New(mwList(
