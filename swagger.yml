@@ -2148,6 +2148,8 @@ components:
           x-go-name: PathPartMatches
         payload_matches:
           $ref: '#/components/schemas/StringRegexMap'
+        domain_matches:
+          $ref: '#/components/schemas/StringRegexMap'
         query_val_matches:
           additionalProperties:
             $ref: '#/components/schemas/StringRegexMap'

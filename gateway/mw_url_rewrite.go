@@ -54,55 +54,47 @@ func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 		}
 
 		for tn, triggerOpts := range meta.Triggers {
-			checkAny := false
 			setCount := 0
-			if triggerOpts.On == apidef.Any {
-				checkAny = true
-			}
+			checkAny := triggerOpts.On == apidef.Any
 
 			// Check headers
-			if len(triggerOpts.Options.HeaderMatches) > 0 {
-				if checkHeaderTrigger(r, triggerOpts.Options.HeaderMatches, checkAny, tn) {
-					setCount += 1
-					if checkAny {
-						rewriteToPath = triggerOpts.RewriteTo
-						break
-					}
+			if len(triggerOpts.Options.HeaderMatches) > 0 &&
+				checkHeaderTrigger(r, triggerOpts.Options.HeaderMatches, checkAny, tn) {
+				setCount += 1
+				if checkAny {
+					rewriteToPath = triggerOpts.RewriteTo
+					break
 				}
 			}
 
 			// Check query string
-			if len(triggerOpts.Options.QueryValMatches) > 0 {
-				if checkQueryString(r, triggerOpts.Options.QueryValMatches, checkAny, tn) {
-					setCount += 1
-					if checkAny {
-						rewriteToPath = triggerOpts.RewriteTo
-						break
-					}
+			if len(triggerOpts.Options.QueryValMatches) > 0 &&
+				checkQueryString(r, triggerOpts.Options.QueryValMatches, checkAny, tn) {
+				setCount += 1
+				if checkAny {
+					rewriteToPath = triggerOpts.RewriteTo
+					break
 				}
 			}
 
 			// Check path parts
-			if len(triggerOpts.Options.PathPartMatches) > 0 {
-				if checkPathParts(r, triggerOpts.Options.PathPartMatches, checkAny, tn) {
-					setCount += 1
-					if checkAny {
-						rewriteToPath = triggerOpts.RewriteTo
-						break
-					}
+			if len(triggerOpts.Options.PathPartMatches) > 0 &&
+				checkPathParts(r, triggerOpts.Options.PathPartMatches, checkAny, tn) {
+				setCount += 1
+				if checkAny {
+					rewriteToPath = triggerOpts.RewriteTo
+					break
 				}
 			}
 
 			// Check session meta
-			if session := ctxGetSession(r); session != nil {
-				if len(triggerOpts.Options.SessionMetaMatches) > 0 {
-					if checkSessionTrigger(r, session, triggerOpts.Options.SessionMetaMatches, checkAny, tn) {
-						setCount += 1
-						if checkAny {
-							rewriteToPath = triggerOpts.RewriteTo
-							break
-						}
-					}
+			if session := ctxGetSession(r); session != nil &&
+				len(triggerOpts.Options.SessionMetaMatches) > 0 &&
+				checkSessionTrigger(r, session, triggerOpts.Options.SessionMetaMatches, checkAny, tn) {
+				setCount += 1
+				if checkAny {
+					rewriteToPath = triggerOpts.RewriteTo
+					break
 				}
 			}
 
@@ -119,12 +111,23 @@ func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 
 			// Check payload
 			if triggerOpts.Options.PayloadMatches.MatchPattern != "" {
-				if checkPayload(r, triggerOpts.Options.PayloadMatches, tn) {
+				bodyBytes, _ := ioutil.ReadAll(r.Body)
+				r.Body.Close()
+				if checkAndAddMatchToContext(triggerOpts.Options.PayloadMatches, string(bodyBytes), "payload", tn, r) {
 					setCount += 1
 					if checkAny {
 						rewriteToPath = triggerOpts.RewriteTo
 						break
 					}
+				}
+			}
+
+			if triggerOpts.Options.DomainMatches.MatchPattern != "" &&
+				checkAndAddMatchToContext(triggerOpts.Options.DomainMatches, r.Host, "domain", tn, r) {
+				setCount += 1
+				if checkAny {
+					rewriteToPath = triggerOpts.RewriteTo
+					break
 				}
 			}
 
@@ -147,6 +150,9 @@ func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 					total += 1
 				}
 				if triggerOpts.Options.PayloadMatches.MatchPattern != "" {
+					total += 1
+				}
+				if triggerOpts.Options.DomainMatches.MatchPattern != "" {
 					total += 1
 				}
 				if total == setCount {
@@ -309,6 +315,9 @@ func (m *URLRewriteMiddleware) InitTriggerRx() {
 				}
 				if tr.Options.PayloadMatches.MatchPattern != "" {
 					tr.Options.PayloadMatches.Init()
+				}
+				if tr.Options.DomainMatches.MatchPattern != "" {
+					tr.Options.DomainMatches.Init()
 				}
 
 				rewrite.Triggers[trKey] = tr
@@ -534,28 +543,25 @@ func checkContextTrigger(r *http.Request, options map[string]apidef.StringRegexM
 	return false
 }
 
-func checkPayload(r *http.Request, options apidef.StringRegexMap, triggernum int) bool {
-	contextData := ctxGetData(r)
-	bodyBytes, _ := ioutil.ReadAll(r.Body)
-
-	matched, matches := options.FindAllStringSubmatch(string(bodyBytes), -1)
-
-	if matched {
-		kn := buildTriggerKey(triggernum, "payload")
-		if len(matches) == 0 {
-			return true
-		}
-		contextData[kn] = matches[0][0]
-
-		for i, match := range matches {
-			if len(match) > 0 {
-				addMatchToContextData(contextData, match, triggernum, "payload", i)
-			}
-		}
-		return true
+func checkAndAddMatchToContext(options apidef.StringRegexMap, stringToQuery string, triggerName string, triggerNum int, r *http.Request) bool {
+	matched, matches := options.FindAllStringSubmatch(stringToQuery, -1)
+	if !matched {
+		return false
 	}
 
-	return false
+	kn := buildTriggerKey(triggerNum, triggerName)
+	if len(matches) == 0 {
+		return true
+	}
+	contextData := ctxGetData(r)
+	contextData[kn] = matches[0][0]
+
+	for i, match := range matches {
+		if len(match) > 0 {
+			addMatchToContextData(contextData, match, triggerNum, triggerName, i)
+		}
+	}
+	return true
 }
 
 func addMatchToContextData(cd map[string]interface{}, match []string, trNum int, trName string, indices ...int) {

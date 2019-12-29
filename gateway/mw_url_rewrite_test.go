@@ -846,6 +846,29 @@ func TestRewriterTriggers(t *testing.T) {
 				r,
 			}
 		},
+		// One test of the Domain RoutingTrigger should be enough because the Domain and the Payload RoutingTriggers are using the same code and Payload RoutingTrigger is well covered
+		func() TestDef {
+			r, _ := http.NewRequest(http.MethodGet, "http://barxxx.baryyy.com/test/pl/rewrite", nil)
+
+			hOpt := apidef.StringRegexMap{MatchPattern: "bar(\\w*)"}
+			hOpt.Init()
+
+			return TestDef{
+				"Domain Multiple Match Groups",
+				"/test/pl/rewrite", "/change/to/me/ignore",
+				"/test/pl/rewrite", "/change/to/me/xxx/yyy",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.Any,
+						Options: apidef.RoutingTriggerOptions{
+							DomainMatches: hOpt,
+						},
+						RewriteTo: "/change/to/me/$tyk_context.trigger-0-domain-0-0/$tyk_context.trigger-0-domain-1-0",
+					},
+				},
+				r,
+			}
+		},
 		func() TestDef {
 			r, _ := http.NewRequest("GET", "/test/foobar/rewrite", nil)
 			hOpt := apidef.StringRegexMap{MatchPattern: "foo(\\w+)"}
@@ -1109,6 +1132,9 @@ func TestInitTriggerRx(t *testing.T) {
 		PayloadMatches: apidef.StringRegexMap{
 			MatchPattern: "^ghi.*",
 		},
+		DomainMatches: apidef.StringRegexMap{
+			MatchPattern: "^jkl.*",
+		},
 	}
 
 	extendedPathsSet := apidef.ExtendedPathsSet{
@@ -1174,6 +1200,21 @@ func TestInitTriggerRx(t *testing.T) {
 		PayloadMatches
 	if payloadMatch.Check("ghi") == "" {
 		t.Errorf("Expected PayloadMatches initalized and matched, received no match")
+	}
+
+	// assert DomainMatches
+	domainMatch := testRewriteMW.
+		Spec.
+		APIDefinition.
+		VersionData.
+		Versions["Default"].
+		ExtendedPaths.
+		URLRewrite[0].
+		Triggers[0].
+		Options.
+		DomainMatches
+	if domainMatch.Check("jkl") == "" {
+		t.Errorf("Expected DomainMatches initalized and matched, received no match")
 	}
 }
 

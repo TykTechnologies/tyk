@@ -140,6 +140,45 @@ func TestStripPathWithURLRewrite(t *testing.T) {
 	})
 }
 
+// Extract the domain using the domain_matches and use it to create new path
+func TestURLRewritesDomainMatcher(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+
+	t.Run("Extended Paths with url_rewrites", func(t *testing.T) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				json.Unmarshal([]byte(`[
+						{
+                            "path": "/",
+                            "method": "GET",
+                            "match_pattern": "/",
+                            "rewrite_to": "",
+                            "triggers": [
+                                {
+                                    "on": "all",
+                                    "options": {
+                                        "domain_matches": {
+										"match_rx": "((.*):.*)",
+										"reverse": false
+										}
+                                    },
+                                    "rewrite_to": "/$tyk_context.trigger-0-domain-0-1/new_url"
+                                }
+                            ],
+                            "MatchRegexp": null
+                        }
+				]`), &v.ExtendedPaths.URLRewrite)
+			})
+			spec.Proxy.ListenPath = "/"
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/any_path", Code: http.StatusOK, BodyMatch: `"URI":"/127.0.0.1/new_url"`},
+		}...)
+	})
+}
+
 func TestSkipTargetPassEscapingOff(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
