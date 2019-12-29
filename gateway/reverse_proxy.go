@@ -692,8 +692,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
 		p.TykAPISpec.HTTPTransport = httpTransport(timeout, rw, req, p)
 		p.TykAPISpec.HTTPTransportCreated = time.Now()
-    
-    p.logger.Debug("Creating new transport")
+
+		p.logger.Debug("Creating new transport")
 	}
 
 	roundTripper = p.TykAPISpec.HTTPTransport
