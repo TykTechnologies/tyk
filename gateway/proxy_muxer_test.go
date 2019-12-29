@@ -182,34 +182,34 @@ func TestCheckPortWhiteList(t *testing.T) {
 	}{
 		{"gw port empty protocol", "", base.ListenPort, true, nil},
 		{"gw port http protocol", "http", base.ListenPort, false, map[string]config.PortWhiteList{
-			"http": config.PortWhiteList{
+			"http": {
 				Ports: []int{base.ListenPort},
 			},
 		}},
 		{"unknown tls", "tls", base.ListenPort, true, nil},
 		{"unknown tcp", "tls", base.ListenPort, true, nil},
 		{"whitelisted tcp", "tcp", base.ListenPort, false, map[string]config.PortWhiteList{
-			"tcp": config.PortWhiteList{
+			"tcp": {
 				Ports: []int{base.ListenPort},
 			},
 		}},
 		{"whitelisted tls", "tls", base.ListenPort, false, map[string]config.PortWhiteList{
-			"tls": config.PortWhiteList{
+			"tls": {
 				Ports: []int{base.ListenPort},
 			},
 		}},
 		{"black listed tcp", "tcp", base.ListenPort, true, map[string]config.PortWhiteList{
-			"tls": config.PortWhiteList{
+			"tls": {
 				Ports: []int{base.ListenPort},
 			},
 		}},
 		{"blacklisted tls", "tls", base.ListenPort, true, map[string]config.PortWhiteList{
-			"tcp": config.PortWhiteList{
+			"tcp": {
 				Ports: []int{base.ListenPort},
 			},
 		}},
 		{"whitelisted tls range", "tls", base.ListenPort, false, map[string]config.PortWhiteList{
-			"tls": config.PortWhiteList{
+			"tls": {
 				Ranges: []config.PortRange{
 					{
 						From: base.ListenPort - 1,
@@ -219,7 +219,7 @@ func TestCheckPortWhiteList(t *testing.T) {
 			},
 		}},
 		{"whitelisted tcp range", "tcp", base.ListenPort, false, map[string]config.PortWhiteList{
-			"tcp": config.PortWhiteList{
+			"tcp": {
 				Ranges: []config.PortRange{
 					{
 						From: base.ListenPort - 1,
@@ -229,7 +229,7 @@ func TestCheckPortWhiteList(t *testing.T) {
 			},
 		}},
 		{"whitelisted http range", "http", 8090, false, map[string]config.PortWhiteList{
-			"http": config.PortWhiteList{
+			"http": {
 				Ranges: []config.PortRange{
 					{
 						From: 8000,
