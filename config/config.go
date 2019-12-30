@@ -128,7 +128,6 @@ type HealthCheckConfig struct {
 
 type LivenessCheckConfig struct {
 	Enabled bool `json:"enabled"`
-	Port    int  `json:"port"`
 }
 
 type DnsCacheConfig struct {
