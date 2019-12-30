@@ -10,8 +10,10 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
+type Key uint
+
 const (
-	SessionData = iota
+	SessionData Key = iota
 	UpdateSession
 	AuthToken
 	HashedAuthToken
@@ -31,6 +33,8 @@ const (
 	ThrottleLevelLimit
 	Trace
 	CheckLoopLimits
+	UrlRewriteTarget
+	TransformedRequestMethod
 	Definition
 	RequestStatus
 )
