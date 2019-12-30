@@ -2061,6 +2061,20 @@ func ctxGetOrigRequestURL(r *http.Request) *url.URL {
 	return nil
 }
 
+func ctxSetURLRewriteTarget(r *http.Request, url *url.URL) {
+	setCtxValue(r, ctx.UrlRewriteTarget, url)
+}
+
+func ctxGetURLRewriteTarget(r *http.Request) *url.URL {
+	if v := r.Context().Value(ctx.UrlRewriteTarget); v != nil {
+		if urlVal, ok := v.(*url.URL); ok {
+			return urlVal
+		}
+	}
+
+	return nil
+}
+
 func ctxSetUrlRewritePath(r *http.Request, path string) {
 	setCtxValue(r, ctx.UrlRewritePath, path)
 }
@@ -2098,6 +2112,19 @@ func ctxSetRequestMethod(r *http.Request, path string) {
 
 func ctxGetRequestMethod(r *http.Request) string {
 	if v := r.Context().Value(ctx.RequestMethod); v != nil {
+		if strVal, ok := v.(string); ok {
+			return strVal
+		}
+	}
+	return r.Method
+}
+
+func ctxSetTransformRequestMethod(r *http.Request, path string) {
+	setCtxValue(r, ctx.TransformedRequestMethod, path)
+}
+
+func ctxGetTransformRequestMethod(r *http.Request) string {
+	if v := r.Context().Value(ctx.TransformedRequestMethod); v != nil {
 		if strVal, ok := v.(string); ok {
 			return strVal
 		}
