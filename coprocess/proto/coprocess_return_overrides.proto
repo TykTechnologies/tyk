@@ -6,4 +6,5 @@ message ReturnOverrides {
   int32 response_code = 1;
   string response_error = 2;
   map<string, string> headers = 3;
+  bool disable_json_error = 4;
 }

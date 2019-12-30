@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='coprocess',
   syntax='proto3',
   serialized_options=None,
-  serialized_pb=_b('\n coprocess_return_overrides.proto\x12\tcoprocess\"\xaa\x01\n\x0fReturnOverrides\x12\x15\n\rresponse_code\x18\x01 \x01(\x05\x12\x16\n\x0eresponse_error\x18\x02 \x01(\t\x12\x38\n\x07headers\x18\x03 \x03(\x0b\x32\'.coprocess.ReturnOverrides.HeadersEntry\x1a.\n\x0cHeadersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x62\x06proto3')
+  serialized_pb=_b('\n coprocess_return_overrides.proto\x12\tcoprocess\"\xc6\x01\n\x0fReturnOverrides\x12\x15\n\rresponse_code\x18\x01 \x01(\x05\x12\x16\n\x0eresponse_error\x18\x02 \x01(\t\x12\x38\n\x07headers\x18\x03 \x03(\x0b\x32\'.coprocess.ReturnOverrides.HeadersEntry\x12\x1a\n\x12\x64isable_json_error\x18\x04 \x01(\x08\x1a.\n\x0cHeadersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x62\x06proto3')
 )
 
 
@@ -58,8 +58,8 @@ _RETURNOVERRIDES_HEADERSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=172,
-  serialized_end=218,
+  serialized_start=200,
+  serialized_end=246,
 )
 
 _RETURNOVERRIDES = _descriptor.Descriptor(
@@ -90,6 +90,13 @@ _RETURNOVERRIDES = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='disable_json_error', full_name='coprocess.ReturnOverrides.disable_json_error', index=3,
+      number=4, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
@@ -103,7 +110,7 @@ _RETURNOVERRIDES = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=48,
-  serialized_end=218,
+  serialized_end=246,
 )
 
 _RETURNOVERRIDES_HEADERSENTRY.containing_type = _RETURNOVERRIDES

@@ -357,6 +357,8 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		return nil, http.StatusOK
 	}
 
+	//Used for looping feature
+	//To get host and query parameters
 	ctxSetOrigRequestURL(r, r.URL)
 
 	log.Debug("Rewriter active")
@@ -384,7 +386,9 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	if err != nil {
 		log.Error("URL Rewrite failed, could not parse: ", p)
 	} else {
-		r.URL = newURL
+		//Setting new path here breaks request middleware
+		//New path is set in DummyProxyHandler/Cache middleware
+		ctxSetURLRewriteTarget(r, newURL)
 	}
 	return nil, http.StatusOK
 }

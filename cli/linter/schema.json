@@ -32,6 +32,15 @@
             "null"
           ]
         },
+        "addrs": {
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "master_name": {
+          "type": "string"
+        },
         "optimisation_max_active": {
           "type": "integer"
         },
@@ -1043,7 +1052,6 @@
       "port": {
          "type": "integer"
       }
-    }
    }
   }
 }
