@@ -1,16 +1,16 @@
 package gateway
 
 import (
-	"bytes"
 	"crypto/x509"
 	"encoding/pem"
-	"github.com/justinas/alice"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/justinas/alice"
 
 	"github.com/TykTechnologies/tyk/user"
 )
