@@ -327,11 +327,18 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 		}
 
 		for _, spec := range apiSpecs {
+			// If there is mutual TLS already found, in previous loop cycle
+			// And if there is another API on the same domain, we have a conflict
+			// We can't uniquely identify by domain API anymore
+			// So we going just ask certificate and fallback to HTTP level check
+			if newConfig.ClientAuth == tls.RequireAndVerifyClientCert && spec.Domain != "" && spec.Domain == hello.ServerName {
+				newConfig.ClientAuth = tls.RequestClientCert
+				break
+			}
 			if spec.UseMutualTLSAuth && spec.Domain != "" && spec.Domain == hello.ServerName {
 				newConfig.ClientAuth = tls.RequireAndVerifyClientCert
 				certIDs := append(spec.ClientCertificates, config.Global().Security.Certificates.API...)
 				newConfig.ClientCAs = CertificateManager.CertPool(certIDs)
-				break
 			}
 		}
 

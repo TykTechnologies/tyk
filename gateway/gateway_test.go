@@ -510,6 +510,101 @@ func TestAnalytics(t *testing.T) {
 		}
 	})
 
+	t.Run("Detailed analytics with api spec config enabled", func(t *testing.T) {
+		defer func() {
+			config.SetGlobal(base)
+		}()
+		globalConf := config.Global()
+		globalConf.AnalyticsConfig.EnableDetailedRecording = false
+		config.SetGlobal(globalConf)
+
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = false
+			spec.Proxy.ListenPath = "/"
+			spec.EnableDetailedRecording = true
+		})
+
+		key := CreateSession()
+
+		authHeaders := map[string]string{
+			"authorization": key,
+		}
+
+		ts.Run(t, test.TestCase{
+			Path: "/", Headers: authHeaders, Code: 200,
+		})
+
+		// let records to to be sent
+		time.Sleep(recordsBufferFlushInterval + 50)
+
+		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		if len(results) != 1 {
+			t.Error("Should return 1 record: ", len(results))
+		}
+
+		var record AnalyticsRecord
+		msgpack.Unmarshal([]byte(results[0].(string)), &record)
+		if record.ResponseCode != 200 {
+			t.Error("Analytics record do not match", record)
+		}
+
+		if record.RawRequest == "" {
+			t.Error("Detailed request info not found", record)
+		}
+
+		if record.RawResponse == "" {
+			t.Error("Detailed response info not found", record)
+		}
+	})
+
+	t.Run("Detailed analytics with only key flag set", func(t *testing.T) {
+		defer func() {
+			config.SetGlobal(base)
+		}()
+		globalConf := config.Global()
+		globalConf.AnalyticsConfig.EnableDetailedRecording = false
+		config.SetGlobal(globalConf)
+
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = false
+			spec.Proxy.ListenPath = "/"
+			spec.EnableDetailedRecording = false
+		})
+
+		key := CreateSession(func(sess *user.SessionState) {
+			sess.EnableDetailedRecording = true
+		})
+
+		authHeaders := map[string]string{
+			"authorization": key,
+		}
+
+		ts.Run(t, test.TestCase{
+			Path: "/", Headers: authHeaders, Code: 200,
+		})
+
+		// let records to to be sent
+		time.Sleep(recordsBufferFlushInterval + 50)
+
+		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		if len(results) != 1 {
+			t.Error("Should return 1 record: ", len(results))
+		}
+
+		var record AnalyticsRecord
+		msgpack.Unmarshal([]byte(results[0].(string)), &record)
+		if record.ResponseCode != 200 {
+			t.Error("Analytics record do not match", record)
+		}
+
+		if record.RawRequest == "" {
+			t.Error("Detailed request info not found", record)
+		}
+
+		if record.RawResponse == "" {
+			t.Error("Detailed response info not found", record)
+		}
+	})
 	t.Run("Detailed analytics", func(t *testing.T) {
 		defer func() {
 			config.SetGlobal(base)
@@ -861,7 +956,7 @@ func TestReloadGoroutineLeakWithCircuitBreaker(t *testing.T) {
 
 	after := runtime.NumGoroutine()
 
-	if before < after-1 { // -1 because there is one will be running until we fix circuitbreaker Subscribe() method
+	if before < after {
 		t.Errorf("Goroutine leak, was: %d, after reload: %d", before, after)
 	}
 }
@@ -1111,6 +1206,61 @@ func TestCacheAllSafeRequests(t *testing.T) {
 	}...)
 }
 
+func TestCacheWithAdvanceUrlRewrite(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+	cache := storage.RedisCluster{KeyPrefix: "cache-"}
+	defer cache.DeleteScanMatch("*")
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		version := spec.VersionData.Versions["v1"]
+		version.UseExtendedPaths = true
+		version.ExtendedPaths = apidef.ExtendedPathsSet{
+			URLRewrite: []apidef.URLRewriteMeta{
+				{
+					Path:         "/test",
+					Method:       http.MethodGet,
+					MatchPattern: "/test(.*)",
+					Triggers: []apidef.RoutingTrigger{
+						{
+							On: "all",
+							Options: apidef.RoutingTriggerOptions{
+								HeaderMatches: map[string]apidef.StringRegexMap{
+									"rewritePath": apidef.StringRegexMap{
+										MatchPattern: "newpath",
+									},
+								},
+							},
+							RewriteTo: "/newpath",
+						},
+					},
+				},
+			},
+			Cached: []string{"/test"},
+		}
+		spec.CacheOptions = apidef.CacheOptions{
+			CacheTimeout: 120,
+			EnableCache:  true,
+		}
+		spec.Proxy.ListenPath = "/"
+		spec.VersionData.Versions["v1"] = version
+	})
+
+	headerCache := map[string]string{"x-tyk-cached-response": "1"}
+	matchHeaders := map[string]string{"rewritePath": "newpath"}
+	randomheaders := map[string]string{"something": "abcd"}
+
+	ts.Run(t, []test.TestCase{
+		{Method: http.MethodGet, Path: "/test", Headers: matchHeaders, HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodGet, Path: "/test", Headers: matchHeaders, HeadersMatch: headerCache},
+		//Even if trigger condition failed, as response is cached
+		// will still get redirected response
+		{Method: http.MethodGet, Path: "/test", Headers: randomheaders, HeadersMatch: headerCache, BodyMatch: `"Url":"/newpath"`},
+		{Method: http.MethodPost, Path: "/test", HeadersNotMatch: headerCache},
+		{Method: http.MethodGet, Path: "/test", HeadersMatch: headerCache},
+	}...)
+}
+
 func TestCachePostRequest(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
@@ -1125,12 +1275,13 @@ func TestCachePostRequest(t *testing.T) {
 		}
 
 		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
-			json.Unmarshal([]byte(`[{
-						"method":"POST",
-						"path":"/",
-						"cache_key_regex":"\"id\":[^,]*"
-					}
-                                ]`), &v.ExtendedPaths.AdvanceCacheConfig)
+			v.ExtendedPaths.AdvanceCacheConfig = []apidef.CacheMeta{
+				{
+					Method:        http.MethodPost,
+					Path:          "/",
+					CacheKeyRegex: "\"id\":[^,]*",
+				},
+			}
 		})
 
 		spec.Proxy.ListenPath = "/"
@@ -1139,12 +1290,12 @@ func TestCachePostRequest(t *testing.T) {
 	headerCache := map[string]string{"x-tyk-cached-response": "1"}
 
 	ts.Run(t, []test.TestCase{
-		{Method: "POST", Path: "/", Data: "{\"id\":\"1\",\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
-		{Method: "POST", Path: "/", Data: "{\"id\":\"1\",\"name\":\"test\"}", HeadersMatch: headerCache, Delay: 10 * time.Millisecond},
-		{Method: "POST", Path: "/", Data: "{\"id\":\"2\",\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodPost, Path: "/", Data: "{\"id\":\"1\",\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodPost, Path: "/", Data: "{\"id\":\"1\",\"name\":\"test\"}", HeadersMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodPost, Path: "/", Data: "{\"id\":\"2\",\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
 		// if regex match returns nil, then request body is ignored while generating cache key
-		{Method: "POST", Path: "/", Data: "{\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
-		{Method: "POST", Path: "/", Data: "{\"name\":\"test2\"}", HeadersMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodPost, Path: "/", Data: "{\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodPost, Path: "/", Data: "{\"name\":\"test2\"}", HeadersMatch: headerCache, Delay: 10 * time.Millisecond},
 	}...)
 }
 

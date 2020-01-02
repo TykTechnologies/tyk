@@ -41,21 +41,25 @@ type HTTPDashboardHandler struct {
 	heartBeatStopSentinel bool
 }
 
-func initialiseClient(timeout time.Duration) *http.Client {
-	client := &http.Client{
-		Timeout: timeout,
-	}
+var dashClient *http.Client
 
-	if config.Global().HttpServerOptions.UseSSL {
-		// Setup HTTPS client
-		tlsConfig := &tls.Config{
-			InsecureSkipVerify: config.Global().HttpServerOptions.SSLInsecureSkipVerify,
+func initialiseClient(timeout time.Duration) *http.Client {
+	if dashClient == nil {
+		dashClient = &http.Client{
+			Timeout: timeout,
 		}
 
-		client.Transport = &http.Transport{TLSClientConfig: tlsConfig}
+		if config.Global().HttpServerOptions.UseSSL {
+			// Setup HTTPS client
+			tlsConfig := &tls.Config{
+				InsecureSkipVerify: config.Global().HttpServerOptions.SSLInsecureSkipVerify,
+			}
+
+			dashClient.Transport = &http.Transport{TLSClientConfig: tlsConfig}
+		}
 	}
 
-	return client
+	return dashClient
 }
 
 func reLogin() {

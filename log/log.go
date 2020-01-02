@@ -4,7 +4,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/hashicorp/terraform/flatmap"
 	"github.com/sirupsen/logrus"
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 )
@@ -25,7 +24,7 @@ func LoadTranslations(thing map[string]interface{}) {
 	formatter.TimestampFormat = `Jan 02 15:04:05`
 	formatter.FullTimestamp = true
 	log.Formatter = &TranslationFormatter{formatter}
-	translations = flatmap.Flatten(thing)
+	translations, _ = Flatten(thing)
 }
 
 type TranslationFormatter struct {

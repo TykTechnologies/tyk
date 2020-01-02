@@ -256,9 +256,9 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	var proxy ReturningHttpHandler
 	if enableVersionOverrides {
 		logger.Info("Multi target enabled")
-		proxy = NewMultiTargetProxy(spec)
+		proxy = NewMultiTargetProxy(spec, logger)
 	} else {
-		proxy = TykNewSingleHostReverseProxy(spec.target, spec)
+		proxy = TykNewSingleHostReverseProxy(spec.target, spec, logger)
 	}
 
 	// Create the response processors, pass all the loaded custom middleware response functions:
@@ -406,7 +406,6 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid})
-	mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: &cacheStore})
 	mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &RequestSigning{BaseMiddleware: baseMid})
 
@@ -427,7 +426,9 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 			chainArray = append(chainArray, createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
 		}
 	}
-
+	//Do not add middlewares after cache middleware.
+	//It will not get executed
+	mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: &cacheStore})
 	chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid}})
 
 	if !spec.UseKeylessAccess {
@@ -494,6 +495,14 @@ type DummyProxyHandler struct {
 }
 
 func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if newURL := ctxGetURLRewriteTarget(r); newURL != nil {
+		r.URL = newURL
+		ctxSetURLRewriteTarget(r, nil)
+	}
+	if newMethod := ctxGetTransformRequestMethod(r); newMethod != "" {
+		r.Method = newMethod
+		ctxSetTransformRequestMethod(r, "")
+	}
 	if found, err := isLoop(r); found {
 		if err != nil {
 			handler := ErrorHandler{*d.SH.Base()}

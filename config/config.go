@@ -81,7 +81,9 @@ type StorageOptionsConf struct {
 	Type                  string            `json:"type"`
 	Host                  string            `json:"host"`
 	Port                  int               `json:"port"`
-	Hosts                 map[string]string `json:"hosts"`
+	Hosts                 map[string]string `json:"hosts"` // Deprecated: Addrs instead.
+	Addrs                 []string          `json:"addrs"`
+	MasterName            string            `json:"master_name"`
 	Username              string            `json:"username"`
 	Password              string            `json:"password"`
 	Database              int               `json:"database"`
@@ -215,6 +217,8 @@ type ServiceDiscoveryConf struct {
 type CoProcessConfig struct {
 	EnableCoProcess     bool   `json:"enable_coprocess"`
 	CoProcessGRPCServer string `json:"coprocess_grpc_server"`
+	GRPCRecvMaxSize     int    `json:"grpc_recv_max_size"`
+	GRPCSendMaxSize     int    `json:"grpc_send_max_size"`
 	PythonPathPrefix    string `json:"python_path_prefix"`
 	PythonVersion       string `json:"python_version"`
 }
@@ -347,10 +351,11 @@ type Config struct {
 	AuthOverride   AuthOverrideConf   `json:"auth_override"`
 
 	// Rate Limiting Strategy
-	EnableNonTransactionalRateLimiter bool `json:"enable_non_transactional_rate_limiter"`
-	EnableSentinelRateLimiter         bool `json:"enable_sentinel_rate_limiter"`
-	EnableRedisRollingLimiter         bool `json:"enable_redis_rolling_limiter"`
-	DRLNotificationFrequency          int  `json:"drl_notification_frequency"`
+	EnableNonTransactionalRateLimiter bool    `json:"enable_non_transactional_rate_limiter"`
+	EnableSentinelRateLimiter         bool    `json:"enable_sentinel_rate_limiter"`
+	EnableRedisRollingLimiter         bool    `json:"enable_redis_rolling_limiter"`
+	DRLNotificationFrequency          int     `json:"drl_notification_frequency"`
+	DRLThreshold                      float64 `json:"drl_threshold"`
 
 	// Organization configurations
 	EnforceOrgDataAge               bool          `json:"enforce_org_data_age"`

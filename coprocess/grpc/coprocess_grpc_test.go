@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io/ioutil"
+	"math/rand"
 	"mime/multipart"
 	"net"
 	"net/http"
@@ -24,8 +25,9 @@ import (
 )
 
 const (
-	grpcListenAddr = ":9999"
-	grpcListenPath = "tcp://127.0.0.1:9999"
+	grpcListenAddr  = ":9999"
+	grpcListenPath  = "tcp://127.0.0.1:9999"
+	grpcTestMaxSize = 100000000
 
 	testHeaderName  = "Testheader"
 	testHeaderValue = "testvalue"
@@ -115,7 +117,10 @@ func (d *dispatcher) DispatchEvent(ctx context.Context, event *coprocess.Event) 
 }
 
 func newTestGRPCServer() (s *grpc.Server) {
-	s = grpc.NewServer()
+	s = grpc.NewServer(
+		grpc.MaxRecvMsgSize(grpcTestMaxSize),
+		grpc.MaxSendMsgSize(grpcTestMaxSize),
+	)
 	coprocess.RegisterDispatcherServer(s, &dispatcher{})
 	return s
 }
@@ -244,6 +249,8 @@ func startTykWithGRPC() (*gateway.Test, *grpc.Server) {
 	cfg := config.CoProcessConfig{
 		EnableCoProcess:     true,
 		CoProcessGRPCServer: grpcListenPath,
+		GRPCRecvMaxSize:     grpcTestMaxSize,
+		GRPCSendMaxSize:     grpcTestMaxSize,
 	}
 	ts := gateway.StartTest(gateway.TestConfig{CoprocessConfig: cfg})
 
@@ -347,6 +354,27 @@ func TestGRPCDispatch(t *testing.T) {
 		})
 	})
 
+	t.Run("Post Hook with allowed message length", func(t *testing.T) {
+		s := randStringBytes(20000000)
+		ts.Run(t, test.TestCase{
+			Path:    "/grpc-test-api-3/",
+			Method:  http.MethodGet,
+			Code:    http.StatusOK,
+			Headers: headers,
+			Data:    s,
+		})
+	})
+
+	t.Run("Post Hook with with unallowed message length", func(t *testing.T) {
+		s := randStringBytes(150000000)
+		ts.Run(t, test.TestCase{
+			Path:    "/grpc-test-api-3/",
+			Method:  http.MethodGet,
+			Code:    http.StatusInternalServerError,
+			Headers: headers,
+			Data:    s,
+		})
+	})
 }
 
 func BenchmarkGRPCDispatch(b *testing.B) {
@@ -369,4 +397,16 @@ func BenchmarkGRPCDispatch(b *testing.B) {
 			})
 		}
 	})
+}
+
+const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+func randStringBytes(n int) string {
+	b := make([]byte, n)
+
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+
+	return string(b)
 }
