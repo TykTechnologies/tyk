@@ -473,7 +473,7 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 		if access.Limit == nil {
 			continue
 		}
-		if access.Limit.QuotaMax == -1 {
+		if access.Limit.QuotaMax == -1 || access.Limit.QuotaMax == 0 {
 			continue
 		}
 
