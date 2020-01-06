@@ -87,8 +87,18 @@ type Health interface {
 
 type Analytics interface {
 	Connect() bool
-	AppendToSetPipelined(string, []string)
+	AppendToSetPipelined(string, [][]byte)
 	GetAndDeleteSet(string) []interface{} //used in tests
+	GetExp(string) (int64, error)         // Returns expiry of a key
+	SetExp(string, int64) error           // Set key expiration
+}
+
+type KV interface {
+	GetKey(string) (string, error)
+	SetKey(string, string, int64) error
+	GetKeys(string) []string
+	DeleteKey(string) bool
+	DeleteScanMatch(string) bool
 }
 
 // WebHook used to cache webhook events checksum.

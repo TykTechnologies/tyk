@@ -31,7 +31,7 @@ const (
 // RedisCacheMiddleware is a caching middleware that will pull data from Redis instead of the upstream proxy
 type RedisCacheMiddleware struct {
 	BaseMiddleware
-	CacheStore   storage.Handler
+	CacheStore   storage.Cache
 	sh           SuccessHandler
 	singleFlight singleflight.Group
 }

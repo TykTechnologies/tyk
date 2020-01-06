@@ -18,28 +18,19 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/storage"
 	cache "github.com/pmylund/go-cache"
 	"github.com/sirupsen/logrus"
 )
 
-// StorageHandler is a standard interface to a storage backend,
-// used by AuthorisationManager to read and write key values to the backend
-type StorageHandler interface {
-	GetKey(string) (string, error)
-	SetKey(string, string, int64) error
-	GetKeys(string) []string
-	DeleteKey(string) bool
-	DeleteScanMatch(string) bool
-}
-
 type CertificateManager struct {
-	storage StorageHandler
+	storage storage.KV
 	logger  *logrus.Entry
 	cache   *cache.Cache
 	secret  string
 }
 
-func NewCertificateManager(storage StorageHandler, secret string, logger *logrus.Logger) *CertificateManager {
+func NewCertificateManager(storage storage.KV, secret string, logger *logrus.Logger) *CertificateManager {
 	if logger == nil {
 		logger = logrus.New()
 	}

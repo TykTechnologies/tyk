@@ -16,7 +16,7 @@ type Purger interface {
 }
 
 type RedisPurger struct {
-	Store storage.Handler
+	Store storage.Analytics
 }
 
 func (r RedisPurger) PurgeLoop(ctx context.Context) {
