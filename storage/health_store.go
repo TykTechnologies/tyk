@@ -16,6 +16,7 @@ func NewHalthStore(duration int) *HealthStore {
 		bucketDuration: duration,
 		buckets:        duration,
 		policies:       new(sync.Map),
+		now:            time.Now,
 	}
 }
 
@@ -24,6 +25,7 @@ type HealthStore struct {
 	policies       *sync.Map
 	bucketDuration int
 	buckets        int
+	now            func() time.Time
 }
 
 func (h *HealthStore) get(key string) *rolling.TimePolicy {
@@ -44,6 +46,9 @@ func (h *HealthStore) Connect() bool {
 	if h.buckets == 0 {
 		h.buckets = h.bucketDuration
 	}
+	if h.now == nil {
+		h.now = time.Now
+	}
 	return true
 }
 
@@ -56,7 +61,7 @@ func (h *HealthStore) Connect() bool {
 // was modelled with redis in mind). The second returned value is always nil, so
 // be careful.
 func (h *HealthStore) SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{}) {
-	count := appendToPolicy(h.get(key), val)
+	count := appendToPolicy(h.get(key), val, h.now)
 	return int(count), nil
 }
 
@@ -68,7 +73,7 @@ func (h *HealthStore) SetRollingWindow(key string, per int64, val string, pipeli
 // because meaning metric here is average which we can already calculate.
 func (h *HealthStore) CalculateHealthAVG(keyName string, per int64, valueOverride string, pipeline bool) (float64, error) {
 	p := h.get(keyName)
-	count := appendToPolicy(p, valueOverride)
+	count := appendToPolicy(p, valueOverride, h.now)
 	if count > 0 {
 		return roundValue((count - 1) / float64(h.bucketDuration)), nil
 	}
@@ -79,7 +84,7 @@ func (h *HealthStore) CalculateHealthAVG(keyName string, per int64, valueOverrid
 // window divided by their total count.
 func (h *HealthStore) CalculateHealthMicroAVG(keyName string, per int64, valueOverride string, pipeline bool) (float64, error) {
 	p := h.get(keyName)
-	appendToPolicy(p, valueOverride)
+	appendToPolicy(p, valueOverride, h.now)
 	avg := p.Reduce(rolling.Avg)
 	if avg > 0 {
 		return roundValue(avg), nil
@@ -87,12 +92,12 @@ func (h *HealthStore) CalculateHealthMicroAVG(keyName string, per int64, valueOv
 	return avg, nil
 }
 
-func appendToPolicy(p *rolling.TimePolicy, val string) float64 {
+func appendToPolicy(p *rolling.TimePolicy, val string, now func() time.Time) float64 {
 	var el float64
 	if val != "-1" {
 		el, _ = strconv.ParseFloat(val, 64)
 	} else {
-		el = float64(time.Now().UnixNano())
+		el = float64(now().UnixNano())
 	}
 	p.Append(el)
 	return p.Reduce(rolling.Count)
