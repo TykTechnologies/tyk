@@ -1041,7 +1041,7 @@ func (r *RedisCluster) CalculateHealthMicroAVG(keyName string, per int64, valueO
 	}
 	var runningTotal int
 	for _, v := range vals {
-		s := string(v.([]byte))
+		s := v.(string)
 		splitValues := strings.Split(s, ".")
 		if len(splitValues) > 1 {
 			vInt, err := strconv.Atoi(splitValues[1])
