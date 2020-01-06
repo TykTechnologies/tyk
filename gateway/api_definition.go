@@ -346,7 +346,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*A
 
 	newRequest.Header.Set(headers.XTykNonce, ServiceNonce)
 
-	c := initialiseClient(120 * time.Second)
+	c := initialiseClient()
 	resp, err := c.Do(newRequest)
 	if err != nil {
 		return nil, err
