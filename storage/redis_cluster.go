@@ -359,10 +359,11 @@ func (r *RedisCluster) GetKey(keyName string) (string, error) {
 }
 
 // GetMultiKey gets multiple keys from the database
-func (r *RedisCluster) GetMultiKey(keyNames []string) ([]string, error) {
+func (r *RedisCluster) GetMultiKey(keys []string) ([]string, error) {
 	r.ensureConnection()
 	cluster := r.singleton()
-
+	keyNames := make([]string, len(keys))
+	copy(keyNames, keys)
 	for index, val := range keyNames {
 		keyNames[index] = r.fixKey(val)
 	}
