@@ -38,6 +38,7 @@ type RedisCluster struct {
 	KeyPrefix string
 	HashKeys  bool
 	IsCache   bool
+	now       func() time.Time
 }
 
 func clusterConnectionIsOpen(cluster *RedisCluster) bool {
@@ -327,6 +328,9 @@ func (r *RedisCluster) cleanKey(keyName string) string {
 }
 
 func (r *RedisCluster) ensureConnection() {
+	if r.now == nil {
+		r.now = time.Now
+	}
 	if r.singleton() != nil {
 		// already connected
 		return
@@ -963,7 +967,7 @@ func (r *RedisCluster) SetRollingWindow(keyName string, per int64, value_overrid
 	log.Debug("Incrementing raw key: ", keyName)
 	r.ensureConnection()
 	log.Debug("keyName is: ", keyName)
-	now := time.Now()
+	now := r.now()
 	log.Debug("Now is:", now)
 	onePeriodAgo := now.Add(time.Duration(-1*per) * time.Second)
 	log.Debug("Then is: ", onePeriodAgo)
@@ -1061,7 +1065,7 @@ func roundValue(untruncated float64) float64 {
 
 func (r RedisCluster) GetRollingWindow(keyName string, per int64, pipeline bool) (int, []interface{}) {
 	r.ensureConnection()
-	now := time.Now()
+	now := r.now()
 	onePeriodAgo := now.Add(time.Duration(-1*per) * time.Second)
 
 	client := r.singleton()
