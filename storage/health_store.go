@@ -4,8 +4,6 @@ import (
 	"strconv"
 	"sync"
 	"time"
-
-	"github.com/asecurityteam/rolling"
 )
 
 var _ Health = (*HealthStore)(nil)
@@ -16,8 +14,12 @@ func NewHalthStore(duration int) *HealthStore {
 		bucketDuration: duration,
 		buckets:        duration,
 		policies:       new(sync.Map),
-		now:            time.Now,
+		now:            nanoTime,
 	}
+}
+
+func nanoTime() int64 {
+	return time.Now().UnixNano()
 }
 
 // HealthStore implements Health interface, this stores values in memory.
@@ -25,14 +27,14 @@ type HealthStore struct {
 	policies       *sync.Map
 	bucketDuration int
 	buckets        int
-	now            func() time.Time
+	now            func() int64
 }
 
-func (h *HealthStore) get(key string) *rolling.TimePolicy {
+func (h *HealthStore) get(key string) *TimePolicy {
 	if v, ok := h.policies.Load(key); ok {
-		return v.(*rolling.TimePolicy)
+		return v.(*TimePolicy)
 	}
-	p := rolling.NewTimePolicy(rolling.NewWindow(h.buckets), time.Duration(h.bucketDuration)*time.Second)
+	p := NewTimePolicy(make([][]int64, h.buckets), time.Duration(h.bucketDuration)*time.Second)
 	h.policies.Store(key, p)
 	return p
 }
@@ -47,7 +49,7 @@ func (h *HealthStore) Connect() bool {
 		h.buckets = h.bucketDuration
 	}
 	if h.now == nil {
-		h.now = time.Now
+		h.now = nanoTime
 	}
 	return true
 }
@@ -61,7 +63,16 @@ func (h *HealthStore) Connect() bool {
 // was modelled with redis in mind). The second returned value is always nil, so
 // be careful.
 func (h *HealthStore) SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{}) {
-	count := appendToPolicy(h.get(key), val, h.now)
+	p := h.get(key)
+	count := p.Reduce(countFunc)
+	var el int64
+	if val != "-1" {
+		el, _ = strconv.ParseInt(val, 10, 64)
+	} else {
+		el = h.now()
+	}
+
+	p.Append(el)
 	return int(count), nil
 }
 
@@ -71,34 +82,59 @@ func (h *HealthStore) SetRollingWindow(key string, per int64, val string, pipeli
 // NOTE:(gernest)  There is no documentation on the redis code. I am just trying
 // to replicate similar results here , I have no clue on why are we doing this,
 // because meaning metric here is average which we can already calculate.
-func (h *HealthStore) CalculateHealthAVG(keyName string, per int64, valueOverride string, pipeline bool) (float64, error) {
+func (h *HealthStore) CalculateHealthAVG(keyName string, per int64, val string, pipeline bool) (float64, error) {
 	p := h.get(keyName)
-	count := appendToPolicy(p, valueOverride, h.now)
+	count := float64(p.Reduce(countFunc))
+	var el int64
+	if val != "-1" {
+		el, _ = strconv.ParseInt(val, 10, 64)
+	} else {
+		el = h.now()
+	}
+	p.Append(el)
+	divisor := healthCountsDivisor()
 	if count > 0 {
-		return roundValue((count - 1) / float64(h.bucketDuration)), nil
+		return roundValue((float64(count) - 1) / divisor), nil
 	}
 	return count, nil
 }
 
+func countFunc(w [][]int64) int64 {
+	var result int64
+	for _, bucket := range w {
+		for range bucket {
+			result = result + 1
+		}
+	}
+	return result
+}
+
 // CalculateHealthMicroAVG returns the average by summing all values added in the
 // window divided by their total count.
-func (h *HealthStore) CalculateHealthMicroAVG(keyName string, per int64, valueOverride string, pipeline bool) (float64, error) {
+func (h *HealthStore) CalculateHealthMicroAVG(keyName string, per int64, val string, pipeline bool) (float64, error) {
 	p := h.get(keyName)
-	appendToPolicy(p, valueOverride, h.now)
-	avg := p.Reduce(rolling.Avg)
+
+	a := p.Reduce(func(w [][]int64) int64 {
+		var count int64
+		var total int64
+		for _, bucket := range w {
+			for _, p := range bucket {
+				total += p
+				count++
+			}
+		}
+		return total / count
+	})
+	avg := roundValue(float64(a))
+	var el int64
+	if val != "-1" {
+		el, _ = strconv.ParseInt(val, 10, 64)
+	} else {
+		el = h.now()
+	}
+	p.Append(el)
 	if avg > 0 {
 		return roundValue(avg), nil
 	}
 	return avg, nil
-}
-
-func appendToPolicy(p *rolling.TimePolicy, val string, now func() time.Time) float64 {
-	var el float64
-	if val != "-1" {
-		el, _ = strconv.ParseFloat(val, 64)
-	} else {
-		el = float64(now().UnixNano())
-	}
-	p.Append(el)
-	return p.Reduce(rolling.Count)
 }

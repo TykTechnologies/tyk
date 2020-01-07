@@ -327,6 +327,14 @@ func (r *RedisCluster) cleanKey(keyName string) string {
 	return strings.Replace(keyName, r.KeyPrefix, "", 1)
 }
 
+func healthCountsDivisor() float64 {
+	v := float64(config.Global().HealthCheck.HealthCheckValueTimeout)
+	if v != 0 {
+		return v
+	}
+	return 60.0
+}
+
 func (r *RedisCluster) ensureConnection() {
 	if r.now == nil {
 		r.now = time.Now
@@ -1028,10 +1036,8 @@ func (r *RedisCluster) SetRollingWindow(keyName string, per int64, value_overrid
 
 func (r *RedisCluster) CalculateHealthAVG(keyName string, per int64, valueOverride string, pipeline bool) (float64, error) {
 	count, _ := r.SetRollingWindow(keyName, per, valueOverride, pipeline)
-	divisor := float64(config.Global().HealthCheck.HealthCheckValueTimeout)
-	if divisor == 0 {
-		divisor = 60.0
-	}
+	divisor := healthCountsDivisor()
+
 	if count > 0 {
 		return roundValue((float64(count) - 1) / divisor), nil
 	}
@@ -1046,15 +1052,14 @@ func (r *RedisCluster) CalculateHealthMicroAVG(keyName string, per int64, valueO
 	var runningTotal int
 	for _, v := range vals {
 		s := v.(string)
-		splitValues := strings.Split(s, ".")
-		if len(splitValues) > 1 {
-			vInt, err := strconv.Atoi(splitValues[1])
-			if err != nil {
-				return 0, err
-			}
-			runningTotal += vInt
+		if strings.IndexByte(s, '.') != -1 {
+			s = strings.Split(s, ".")[1]
 		}
-
+		vInt, err := strconv.Atoi(s)
+		if err != nil {
+			return 0, err
+		}
+		runningTotal += vInt
 	}
 	return roundValue(float64(runningTotal / len(vals))), nil
 }
