@@ -3,6 +3,8 @@ package storage
 import "testing"
 
 func TestRedisClusterGetMultiKey(t *testing.T) {
+	t.Skip()
+
 	keys := []string{"first", "second"}
 	r := RedisCluster{KeyPrefix: "test-cluster"}
 	for _, v := range keys {
