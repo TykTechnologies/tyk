@@ -19,7 +19,6 @@ require (
 	github.com/TykTechnologies/openid2go v0.0.0-20160817213554-aab5ce1231ab
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
 	github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d // indirect
-	github.com/asecurityteam/rolling v2.0.4+incompatible
 	github.com/bshuster-repo/logrus-logstash-hook v0.4.1
 	github.com/buger/jsonparser v0.0.0-20181115193947-bf1c66bbce23
 	github.com/cenk/backoff v2.2.1+incompatible // indirect
