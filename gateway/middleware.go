@@ -300,7 +300,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	didQuota, didRateLimit, didACL := make(map[string]bool), make(map[string]bool), make(map[string]bool)
 	policies := session.PolicyIDs()
 
-	for i, polID := range policies {
+	for _, polID := range policies {
 		policiesMu.RLock()
 		policy, ok := policiesByID[polID]
 		policiesMu.RUnlock()
@@ -464,12 +464,8 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 			}
 		}
 
-		// Required for all
-		if i == 0 { // if any is true, key is inactive
-			session.IsInactive = policy.IsInactive
-		} else if policy.IsInactive {
-			session.IsInactive = true
-		}
+		session.IsInactive = session.IsInactive || policy.IsInactive
+
 		for _, tag := range policy.Tags {
 			tags[tag] = true
 		}
