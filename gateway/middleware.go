@@ -370,6 +370,11 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 				if v.Limit == nil {
 					v.Limit = &user.APILimit{}
+					v.Limit.Rate = -1;
+					v.Limit.Per = -1;
+					v.Limit.QuotaMax = -1;
+					v.Limit.ThrottleInterval = -1;
+					v.Limit.ThrottleRetryLimit = -1;
 				}
 
 				if !usePartitions || policy.Partitions.Acl {
