@@ -76,10 +76,6 @@ func (h *HealthStore) SetRollingWindow(key string, per int64, val string, pipeli
 
 // CalculateHealthAVG returns the average by counting all items in the buckets
 // window divided by their window size.
-//
-// NOTE:(gernest)  There is no documentation on the redis code. I am just trying
-// to replicate similar results here , I have no clue on why are we doing this,
-// because meaning metric here is average which we can already calculate.
 func (h *HealthStore) CalculateHealthAVG(keyName string, per int64, val string, pipeline bool) (float64, error) {
 	p := h.get(keyName)
 	k, v := h.kv(val)
