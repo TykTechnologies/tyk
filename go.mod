@@ -25,6 +25,7 @@ require (
 	github.com/certifi/gocertifi v0.0.0-20190905060710-a5e0173ced67 // indirect
 	github.com/clbanning/mxj v1.8.4
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
+	github.com/dgraph-io/badger/v2 v2.0.1
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/emanoelxavier/openid2go v0.0.0-20190718021401-6345b638bfc9 // indirect
 	github.com/evalphobia/logrus_sentry v0.8.2
@@ -49,7 +50,6 @@ require (
 	github.com/imdario/mergo v0.3.7 // indirect
 	github.com/justinas/alice v0.0.0-20171023064455-03f45bd4b7da
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/kr/pretty v0.1.0 // indirect
 	github.com/lonelycode/go-uuid v0.0.0-20141202165402-ed3ca8a15a93
 	github.com/lonelycode/osin v0.0.0-20160423095202-da239c9dacb6
 	github.com/mattn/go-colorable v0.1.4 // indirect
@@ -92,7 +92,6 @@ require (
 	google.golang.org/grpc v1.23.1
 	gopkg.in/Masterminds/sprig.v2 v2.21.0
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
-	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 	gopkg.in/sourcemap.v1 v1.0.5 // indirect
 	gopkg.in/square/go-jose.v1 v1.1.2 // indirect
