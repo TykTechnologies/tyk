@@ -2,6 +2,7 @@ package storage
 
 import (
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -9,12 +10,13 @@ import (
 var _ Health = (*HealthStore)(nil)
 
 // NewHalthStore returns a new HealthStore instance with duration in seconds
-func NewHalthStore(duration int) *HealthStore {
+func NewHalthStore(duration int64) *HealthStore {
 	return &HealthStore{
 		bucketDuration: duration,
 		buckets:        duration,
 		policies:       new(sync.Map),
-		now:            nanoTime,
+		now:            time.Now,
+		divisor:        healthCountsDivisor,
 	}
 }
 
@@ -25,16 +27,17 @@ func nanoTime() int64 {
 // HealthStore implements Health interface, this stores values in memory.
 type HealthStore struct {
 	policies       *sync.Map
-	bucketDuration int
-	buckets        int
-	now            func() int64
+	bucketDuration int64
+	buckets        int64
+	now            func() time.Time
+	divisor        func() float64
 }
 
-func (h *HealthStore) get(key string) *TimePolicy {
+func (h *HealthStore) get(key string) *slidingSortedSet {
 	if v, ok := h.policies.Load(key); ok {
-		return v.(*TimePolicy)
+		return v.(*slidingSortedSet)
 	}
-	p := NewTimePolicy(make([][]int64, h.buckets), time.Duration(h.bucketDuration)*time.Second)
+	p := newTimeSet(time.Duration(h.bucketDuration)*time.Second, h.now)
 	h.policies.Store(key, p)
 	return p
 }
@@ -49,7 +52,10 @@ func (h *HealthStore) Connect() bool {
 		h.buckets = h.bucketDuration
 	}
 	if h.now == nil {
-		h.now = nanoTime
+		h.now = time.Now
+	}
+	if h.divisor == nil {
+		h.divisor = healthCountsDivisor
 	}
 	return true
 }
@@ -64,16 +70,18 @@ func (h *HealthStore) Connect() bool {
 // be careful.
 func (h *HealthStore) SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{}) {
 	p := h.get(key)
-	count := p.Reduce(countFunc)
-	var el int64
+	var k, v int64
 	if val != "-1" {
-		el, _ = strconv.ParseInt(val, 10, 64)
+		p := strings.Split(val, ".")
+		if len(p) > 0 {
+			k, _ = strconv.ParseInt(p[0], 10, 64)
+			v, _ = strconv.ParseInt(p[1], 10, 64)
+		}
 	} else {
-		el = h.now()
+		k = h.now().UnixNano()
+		v = k
 	}
-
-	p.Append(el)
-	return int(count), nil
+	return p.Set(k, v)
 }
 
 // CalculateHealthAVG returns the average by counting all items in the buckets
@@ -84,19 +92,23 @@ func (h *HealthStore) SetRollingWindow(key string, per int64, val string, pipeli
 // because meaning metric here is average which we can already calculate.
 func (h *HealthStore) CalculateHealthAVG(keyName string, per int64, val string, pipeline bool) (float64, error) {
 	p := h.get(keyName)
-	count := float64(p.Reduce(countFunc))
-	var el int64
+	var k, v int64
 	if val != "-1" {
-		el, _ = strconv.ParseInt(val, 10, 64)
+		p := strings.Split(val, ".")
+		if len(p) > 0 {
+			k, _ = strconv.ParseInt(p[0], 10, 64)
+			v, _ = strconv.ParseInt(p[1], 10, 64)
+		}
 	} else {
-		el = h.now()
+		k = h.now().UnixNano()
+		v = k
 	}
-	p.Append(el)
-	divisor := healthCountsDivisor()
+	count, _ := p.Set(k, v)
+	divisor := h.divisor()
 	if count > 0 {
 		return roundValue((float64(count) - 1) / divisor), nil
 	}
-	return count, nil
+	return 0, nil
 }
 
 func countFunc(w [][]int64) int64 {
@@ -114,27 +126,27 @@ func countFunc(w [][]int64) int64 {
 func (h *HealthStore) CalculateHealthMicroAVG(keyName string, per int64, val string, pipeline bool) (float64, error) {
 	p := h.get(keyName)
 
-	a := p.Reduce(func(w [][]int64) int64 {
-		var count int64
-		var total int64
-		for _, bucket := range w {
-			for _, p := range bucket {
-				total += p
-				count++
-			}
-		}
-		return total / count
-	})
-	avg := roundValue(float64(a))
-	var el int64
+	var k, v int64
 	if val != "-1" {
-		el, _ = strconv.ParseInt(val, 10, 64)
+		p := strings.Split(val, ".")
+		if len(p) > 0 {
+			k, _ = strconv.ParseInt(p[0], 10, 64)
+			v, _ = strconv.ParseInt(p[1], 10, 64)
+
+		}
 	} else {
-		el = h.now()
+		k = h.now().UnixNano()
+		v = k
 	}
-	p.Append(el)
-	if avg > 0 {
-		return roundValue(avg), nil
+	_, vals := p.Set(k, v)
+	var runningTotal int64
+	for _, v := range vals {
+
+		vInt := v.(int64)
+		runningTotal += vInt
 	}
-	return avg, nil
+	if len(vals) > 0 {
+		return roundValue(float64(runningTotal / int64(len(vals)))), nil
+	}
+	return 0, nil
 }

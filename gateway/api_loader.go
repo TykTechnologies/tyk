@@ -37,6 +37,9 @@ func prepareStorage() generalStores {
 	gs.base = &storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
 	gs.org = &storage.RedisCluster{KeyPrefix: "orgkey."}
 	gs.health = &storage.RedisCluster{KeyPrefix: "apihealth."}
+	// TODO: (gernest) Add a configuration option on choosing using in memory
+	// healthstore or redis
+	// gs.health = storage.NewHalthStore(config.Global().HealthCheck.HealthCheckValueTimeout)
 	gs.rpcAuth = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
 	gs.rpcOrg = &RPCStorageHandler{KeyPrefix: "orgkey."}
 	GlobalSessionManager.Init(gs.base)
