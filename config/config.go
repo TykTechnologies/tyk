@@ -297,6 +297,19 @@ func (r PortRange) Match(port int) bool {
 	return r.From <= port && r.To >= port
 }
 
+// KVStore this defines options for native key/value store used by tyk. By
+// default tyk uses redis as key value store but there are many occassion where
+// redis is ot really necessary.
+//
+// This defines options to use with badger which is a high performance
+// persistent key/value
+type KVStore struct {
+	// The directory where data files will be stored. If this field is empty all
+	// data will be lost after the process exits. This will need to be set to avoid
+	// losing data.
+	Dir string `json:"dir"`
+}
+
 // Config is the configuration object used by tyk to set up various parameters.
 type Config struct {
 	// OriginalPath is the path to the config file that was read. If
@@ -340,10 +353,13 @@ type Config struct {
 	AppPath string `json:"app_path"`
 
 	// Dashboard Configurations
-	UseDBAppConfigs          bool                   `json:"use_db_app_configs"`
-	DBAppConfOptions         DBAppConfOptionsConfig `json:"db_app_conf_options"`
-	Storage                  StorageOptionsConf     `json:"storage"`
-	DisableDashboardZeroConf bool                   `json:"disable_dashboard_zeroconf"`
+	UseDBAppConfigs  bool                   `json:"use_db_app_configs"`
+	DBAppConfOptions DBAppConfOptionsConfig `json:"db_app_conf_options"`
+	Storage          StorageOptionsConf     `json:"storage"`
+	// When this field is set to true tyk will try to use local storage options
+	// when necessary to avoid relying on redis.
+	EnableLocalStorage       bool `json:"enable_local_storage"`
+	DisableDashboardZeroConf bool `json:"disable_dashboard_zeroconf"`
 
 	// Slave Configurations
 	SlaveOptions   SlaveOptionsConfig `json:"slave_options"`
