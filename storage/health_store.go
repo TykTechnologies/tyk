@@ -66,8 +66,7 @@ func (h *HealthStore) Connect() bool {
 // When val is "-1" value is set to time.Now().UnixNano()
 //
 // per and pipeline are not used they are here to satisfy the interface(which
-// was modelled with redis in mind). The second returned value is always nil, so
-// be careful.
+// was modelled with redis in mind).
 func (h *HealthStore) SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{}) {
 	p := h.get(key)
 	k, v := h.kv(val)
