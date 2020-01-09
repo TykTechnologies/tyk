@@ -70,17 +70,7 @@ func (h *HealthStore) Connect() bool {
 // be careful.
 func (h *HealthStore) SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{}) {
 	p := h.get(key)
-	var k, v int64
-	if val != "-1" {
-		p := strings.Split(val, ".")
-		if len(p) > 0 {
-			k, _ = strconv.ParseInt(p[0], 10, 64)
-			v, _ = strconv.ParseInt(p[1], 10, 64)
-		}
-	} else {
-		k = h.now().UnixNano()
-		v = k
-	}
+	k, v := h.kv(val)
 	return p.Set(k, v)
 }
 
@@ -92,9 +82,18 @@ func (h *HealthStore) SetRollingWindow(key string, per int64, val string, pipeli
 // because meaning metric here is average which we can already calculate.
 func (h *HealthStore) CalculateHealthAVG(keyName string, per int64, val string, pipeline bool) (float64, error) {
 	p := h.get(keyName)
-	var k, v int64
-	if val != "-1" {
-		p := strings.Split(val, ".")
+	k, v := h.kv(val)
+	count, _ := p.Set(k, v)
+	divisor := h.divisor()
+	if count > 0 {
+		return roundValue((float64(count) - 1) / divisor), nil
+	}
+	return 0, nil
+}
+
+func (h *HealthStore) kv(valueOveride string) (k, v int64) {
+	if valueOveride != "-1" {
+		p := strings.Split(valueOveride, ".")
 		if len(p) > 0 {
 			k, _ = strconv.ParseInt(p[0], 10, 64)
 			v, _ = strconv.ParseInt(p[1], 10, 64)
@@ -103,12 +102,7 @@ func (h *HealthStore) CalculateHealthAVG(keyName string, per int64, val string, 
 		k = h.now().UnixNano()
 		v = k
 	}
-	count, _ := p.Set(k, v)
-	divisor := h.divisor()
-	if count > 0 {
-		return roundValue((float64(count) - 1) / divisor), nil
-	}
-	return 0, nil
+	return
 }
 
 func countFunc(w [][]int64) int64 {
@@ -125,19 +119,7 @@ func countFunc(w [][]int64) int64 {
 // window divided by their total count.
 func (h *HealthStore) CalculateHealthMicroAVG(keyName string, per int64, val string, pipeline bool) (float64, error) {
 	p := h.get(keyName)
-
-	var k, v int64
-	if val != "-1" {
-		p := strings.Split(val, ".")
-		if len(p) > 0 {
-			k, _ = strconv.ParseInt(p[0], 10, 64)
-			v, _ = strconv.ParseInt(p[1], 10, 64)
-
-		}
-	} else {
-		k = h.now().UnixNano()
-		v = k
-	}
+	k, v := h.kv(val)
 	_, vals := p.Set(k, v)
 	var runningTotal int64
 	for _, v := range vals {
