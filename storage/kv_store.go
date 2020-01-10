@@ -300,6 +300,7 @@ func (kv *KVStore) AddToSortedSet(key, value string, score float64) {
 }
 
 func (kv *KVStore) GetSortedSetRange(key, scoreFrom, scoreTo string) (keys []string, scores []float64, err error) {
+	key = kv.fixKey(key)
 	if ss, ok := kv.sorted.Load(key); ok {
 		var from, to float64
 		var fromZero, toAll bool
@@ -335,4 +336,46 @@ func (kv *KVStore) GetSortedSetRange(key, scoreFrom, scoreTo string) (keys []str
 		return
 	}
 	return nil, nil, badger.ErrKeyNotFound
+}
+
+func (kv *KVStore) RemoveSortedSetRange(key, scoreFrom, scoreTo string) (err error) {
+	key = kv.fixKey(key)
+	if ss, ok := kv.sorted.Load(key); ok {
+		var from, to float64
+		var fromZero, toAll bool
+		if scoreFrom == "-inf" {
+			fromZero = true
+		} else {
+			from, err = strconv.ParseFloat(scoreFrom, 64)
+			if err != nil {
+				return
+			}
+		}
+		if scoreTo == "+inf" {
+			toAll = true
+		} else {
+			to, err = strconv.ParseFloat(scoreFrom, 64)
+			if err != nil {
+				return
+			}
+		}
+		var e *skiplist.Element
+		s := ss.(*skiplist.SkipList)
+		e = s.Front()
+		if !fromZero {
+			for e != nil && e.Key() < from {
+				e = e.Next()
+			}
+		}
+		var scores []float64
+		for e != nil && e.Key() >= from && (toAll || e.Key() < to) {
+			scores = append(scores, e.Key())
+			e = e.Next()
+		}
+		for _, v := range scores {
+			s.Remove(v)
+		}
+		return nil
+	}
+	return badger.ErrKeyNotFound
 }
