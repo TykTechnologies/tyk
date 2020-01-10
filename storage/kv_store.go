@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	skiplist "github.com/sean-public/fast-skiplist"
 	"gopkg.in/fatih/set.v0"
 )
 
@@ -18,6 +19,7 @@ type KVStore struct {
 	KeyPrefix string
 	HashKeys  bool
 	sets      *sync.Map
+	sorted    *sync.Map
 	windows   *sync.Map
 	now       func() time.Time
 	divisor   func() float64
@@ -55,6 +57,7 @@ func NewKVStore(dir string) (*KVStore, error) {
 	return &KVStore{
 		db:      db,
 		sets:    new(sync.Map),
+		sorted:  new(sync.Map),
 		windows: new(sync.Map),
 		now:     time.Now,
 		divisor: healthCountsDivisor,
@@ -62,14 +65,22 @@ func NewKVStore(dir string) (*KVStore, error) {
 }
 
 func (kv *KVStore) SetKey(key, value string, timeout int64) error {
+	return kv.SetRawKey(kv.fixKey(key), value, timeout)
+}
+
+func (kv *KVStore) SetRawKey(key, value string, timeout int64) error {
 	return kv.db.Update(func(txn *badger.Txn) error {
-		return txn.Set([]byte(kv.fixKey(key)), []byte(value))
+		return txn.Set([]byte(key), []byte(value))
 	})
 }
 
 func (kv *KVStore) GetKey(key string) (value string, err error) {
+	return kv.GetRawKey(kv.fixKey(key))
+}
+
+func (kv *KVStore) GetRawKey(key string) (value string, err error) {
 	err = kv.db.View(func(txn *badger.Txn) error {
-		it, ierr := txn.Get([]byte(kv.fixKey(key)))
+		it, ierr := txn.Get([]byte(key))
 		if ierr != nil {
 			return ierr
 		}
@@ -176,6 +187,19 @@ func (kv *KVStore) GetKeyPrefix() string {
 	return kv.KeyPrefix
 }
 
+func (kv *KVStore) GetSet(key string) (map[string]string, error) {
+	key = kv.fixKey(key)
+	if s, ok := kv.sets.Load(key); ok {
+		ss := s.(*set.Set)
+		m := make(map[string]string)
+		for k, v := range ss.List() {
+			m[strconv.Itoa(k)] = v.(string)
+		}
+		return m, nil
+	}
+	return nil, badger.ErrKeyNotFound
+}
+
 func (kv *KVStore) AddToSet(key, value string) {
 	key = kv.fixKey(key)
 	if s, ok := kv.sets.Load(key); ok {
@@ -263,4 +287,52 @@ func (kv *KVStore) CalculateHealthMicroAVG(keyName string, per int64, val string
 		return roundValue(float64(runningTotal / int64(len(vals)))), nil
 	}
 	return 0, nil
+}
+
+func (kv *KVStore) AddToSortedSet(key, value string, score float64) {
+	key = kv.fixKey(key)
+	if sl, ok := kv.sorted.Load(key); ok {
+		sl.(*skiplist.SkipList).Set(score, value)
+	} else {
+		ss := skiplist.New()
+		ss.Set(score, value)
+	}
+}
+
+func (kv *KVStore) GetSortedSetRange(key, scoreFrom, scoreTo string) (keys []string, scores []float64, err error) {
+	if ss, ok := kv.sorted.Load(key); ok {
+		var from, to float64
+		var fromZero, toAll bool
+		if scoreFrom == "-inf" {
+			fromZero = true
+		} else {
+			from, err = strconv.ParseFloat(scoreFrom, 64)
+			if err != nil {
+				return
+			}
+		}
+		if scoreTo == "+inf" {
+			toAll = true
+		} else {
+			to, err = strconv.ParseFloat(scoreFrom, 64)
+			if err != nil {
+				return
+			}
+		}
+		var e *skiplist.Element
+		s := ss.(*skiplist.SkipList)
+		e = s.Front()
+		if !fromZero {
+			for e != nil && e.Key() < from {
+				e = e.Next()
+			}
+		}
+		for e != nil && e.Key() >= from && (toAll || e.Key() < to) {
+			keys = append(keys, e.Value().(string))
+			scores = append(scores, e.Key())
+			e = e.Next()
+		}
+		return
+	}
+	return nil, nil, badger.ErrKeyNotFound
 }
