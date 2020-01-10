@@ -99,8 +99,6 @@ type KV interface {
 	GetKeys(string) []string
 	DeleteKey(string) bool
 	DeleteScanMatch(string) bool
-	SetExp(string, int64) error   // Set key expiration
-	GetExp(string) (int64, error) // Returns expiry of a key
 }
 
 // Manager is an interface for managing multiple data stores used by tyk

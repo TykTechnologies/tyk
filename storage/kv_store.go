@@ -148,3 +148,11 @@ func (kv *KVStore) GetExp(key string) (exp int64, err error) {
 	})
 	return
 }
+
+func (kv *KVStore) DeleteAllKeys() error {
+	return kv.db.DropAll()
+}
+
+func (kv *KVStore) GetKeyPrefix() string {
+	return kv.KeyPrefix
+}
