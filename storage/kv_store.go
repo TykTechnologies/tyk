@@ -256,7 +256,6 @@ func (kv *KVStore) CalculateHealthMicroAVG(keyName string, per int64, val string
 	_, vals := p.Set(kv.kv(val))
 	var runningTotal int64
 	for _, v := range vals {
-
 		vInt := v.(int64)
 		runningTotal += vInt
 	}
