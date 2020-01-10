@@ -172,5 +172,21 @@ func (kv *KVStore) AddToSet(key, value string) {
 		ss.Add(value)
 		kv.sets.Store(key, ss)
 	}
+}
 
+func (kv *KVStore) RemoveFromSet(key, value string) {
+	key = kv.fixKey(key)
+	if s, ok := kv.sets.Load(key); ok {
+		ss := s.(*set.Set)
+		ss.Remove(value)
+	}
+}
+
+func (kv *KVStore) IsMemberOfSet(key, value string) bool {
+	key = kv.fixKey(key)
+	if s, ok := kv.sets.Load(key); ok {
+		ss := s.(*set.Set)
+		return ss.Has(value)
+	}
+	return false
 }
