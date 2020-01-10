@@ -44,10 +44,10 @@ type HTTPDashboardHandler struct {
 
 var dashClient *http.Client
 
-func initialiseClient(timeout time.Duration) *http.Client {
+func initialiseClient() *http.Client {
 	if dashClient == nil {
 		dashClient = &http.Client{
-			Timeout: timeout,
+			Timeout: 30 * time.Second,
 		}
 
 		if config.Global().HttpServerOptions.UseSSL {
@@ -123,7 +123,7 @@ func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 	req.Header.Set(headers.XTykNodeID, GetNodeID())
 	req.Header.Set(headers.XTykNonce, ServiceNonce)
 
-	c := initialiseClient(5 * time.Second)
+	c := initialiseClient()
 
 	resp, err := c.Do(req)
 	if err != nil {
@@ -152,7 +152,7 @@ func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 func (h *HTTPDashboardHandler) Register() error {
 	dashLog.Info("Registering gateway node with Dashboard")
 	req := h.newRequest(h.RegistrationEndpoint)
-	c := initialiseClient(5 * time.Second)
+	c := initialiseClient()
 	resp, err := c.Do(req)
 
 	if err != nil {
@@ -193,14 +193,14 @@ func (h *HTTPDashboardHandler) Register() error {
 func (h *HTTPDashboardHandler) Ping() error {
 	return h.sendHeartBeat(
 		h.newRequest(h.HeartBeatEndpoint),
-		initialiseClient(time.Second*5))
+		initialiseClient())
 }
 
 func (h *HTTPDashboardHandler) StartBeating() error {
 
 	req := h.newRequest(h.HeartBeatEndpoint)
 
-	client := initialiseClient(5 * time.Second)
+	client := initialiseClient()
 
 	for !h.heartBeatStopSentinel {
 		if err := h.sendHeartBeat(req, client); err != nil {
@@ -259,7 +259,7 @@ func (h *HTTPDashboardHandler) DeRegister() error {
 	req.Header.Set(headers.XTykNodeID, GetNodeID())
 	req.Header.Set(headers.XTykNonce, ServiceNonce)
 
-	c := initialiseClient(5 * time.Second)
+	c := initialiseClient()
 	resp, err := c.Do(req)
 
 	if err != nil {

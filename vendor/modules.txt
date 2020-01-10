@@ -32,6 +32,8 @@ github.com/alecthomas/template
 github.com/alecthomas/template/parse
 # github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d
 github.com/alecthomas/units
+# github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da
+github.com/armon/go-metrics
 # github.com/bshuster-repo/logrus-logstash-hook v0.4.1
 github.com/bshuster-repo/logrus-logstash-hook
 # github.com/buger/jsonparser v0.0.0-20181115193947-bf1c66bbce23
@@ -77,12 +79,53 @@ github.com/golang/protobuf/ptypes
 github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes/duration
 github.com/golang/protobuf/ptypes/timestamp
+# github.com/golang/snappy v0.0.1
+github.com/golang/snappy
 # github.com/google/uuid v1.1.1
 github.com/google/uuid
 # github.com/gorilla/mux v1.7.3
 github.com/gorilla/mux
 # github.com/gorilla/websocket v1.4.1
 github.com/gorilla/websocket
+# github.com/hashicorp/consul/api v1.3.0
+github.com/hashicorp/consul/api
+# github.com/hashicorp/errwrap v1.0.0
+github.com/hashicorp/errwrap
+# github.com/hashicorp/go-cleanhttp v0.5.1
+github.com/hashicorp/go-cleanhttp
+# github.com/hashicorp/go-immutable-radix v1.0.0
+github.com/hashicorp/go-immutable-radix
+# github.com/hashicorp/go-multierror v1.0.0
+github.com/hashicorp/go-multierror
+# github.com/hashicorp/go-retryablehttp v0.5.4
+github.com/hashicorp/go-retryablehttp
+# github.com/hashicorp/go-rootcerts v1.0.1
+github.com/hashicorp/go-rootcerts
+# github.com/hashicorp/go-sockaddr v1.0.2
+github.com/hashicorp/go-sockaddr
+# github.com/hashicorp/golang-lru v0.5.1
+github.com/hashicorp/golang-lru/simplelru
+# github.com/hashicorp/hcl v1.0.0
+github.com/hashicorp/hcl
+github.com/hashicorp/hcl/hcl/ast
+github.com/hashicorp/hcl/hcl/parser
+github.com/hashicorp/hcl/hcl/scanner
+github.com/hashicorp/hcl/hcl/strconv
+github.com/hashicorp/hcl/hcl/token
+github.com/hashicorp/hcl/json/parser
+github.com/hashicorp/hcl/json/scanner
+github.com/hashicorp/hcl/json/token
+# github.com/hashicorp/serf v0.8.2
+github.com/hashicorp/serf/coordinate
+# github.com/hashicorp/vault/api v1.0.4
+github.com/hashicorp/vault/api
+# github.com/hashicorp/vault/sdk v0.1.13
+github.com/hashicorp/vault/sdk/helper/compressutil
+github.com/hashicorp/vault/sdk/helper/consts
+github.com/hashicorp/vault/sdk/helper/hclutil
+github.com/hashicorp/vault/sdk/helper/jsonutil
+github.com/hashicorp/vault/sdk/helper/parseutil
+github.com/hashicorp/vault/sdk/helper/strutil
 # github.com/huandu/xstrings v1.2.0
 github.com/huandu/xstrings
 # github.com/imdario/mergo v0.3.7
@@ -107,35 +150,40 @@ github.com/mavricknz/asn1-ber
 github.com/mavricknz/ldap
 # github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b
 github.com/mgutz/ansi
-# github.com/miekg/dns v1.0.8
+# github.com/miekg/dns v1.0.14
 github.com/miekg/dns
+# github.com/mitchellh/go-homedir v1.1.0
+github.com/mitchellh/go-homedir
 # github.com/mitchellh/mapstructure v1.1.2
 github.com/mitchellh/mapstructure
 # github.com/newrelic/go-agent v2.13.0+incompatible
 github.com/newrelic/go-agent
 github.com/newrelic/go-agent/_integrations/nrgorilla/v1
 github.com/newrelic/go-agent/internal
-github.com/newrelic/go-agent/internal/logger
-github.com/newrelic/go-agent/internal/utilization
 github.com/newrelic/go-agent/internal/cat
 github.com/newrelic/go-agent/internal/jsonx
+github.com/newrelic/go-agent/internal/logger
 github.com/newrelic/go-agent/internal/sysinfo
+github.com/newrelic/go-agent/internal/utilization
 # github.com/opentracing/opentracing-go v1.1.0
 github.com/opentracing/opentracing-go
 github.com/opentracing/opentracing-go/ext
 github.com/opentracing/opentracing-go/log
 # github.com/openzipkin/zipkin-go v0.2.2
 github.com/openzipkin/zipkin-go
+github.com/openzipkin/zipkin-go/idgenerator
 github.com/openzipkin/zipkin-go/model
+github.com/openzipkin/zipkin-go/propagation
 github.com/openzipkin/zipkin-go/propagation/b3
 github.com/openzipkin/zipkin-go/reporter
 github.com/openzipkin/zipkin-go/reporter/http
-github.com/openzipkin/zipkin-go/idgenerator
-github.com/openzipkin/zipkin-go/propagation
 # github.com/oschwald/maxminddb-golang v1.5.0
 github.com/oschwald/maxminddb-golang
 # github.com/paulbellamy/ratecounter v0.2.0
 github.com/paulbellamy/ratecounter
+# github.com/pierrec/lz4 v2.0.5+incompatible
+github.com/pierrec/lz4
+github.com/pierrec/lz4/internal/xxh32
 # github.com/pires/go-proxyproto v0.0.0-20190615163442-2c19fd512994
 github.com/pires/go-proxyproto
 # github.com/pkg/errors v0.8.1
@@ -146,15 +194,17 @@ github.com/pmezard/go-difflib/difflib
 github.com/pmylund/go-cache
 # github.com/robertkrimen/otto v0.0.0-20180617131154-15f95af6e78d
 github.com/robertkrimen/otto
-github.com/robertkrimen/otto/underscore
 github.com/robertkrimen/otto/ast
 github.com/robertkrimen/otto/dbg
 github.com/robertkrimen/otto/file
 github.com/robertkrimen/otto/parser
 github.com/robertkrimen/otto/registry
 github.com/robertkrimen/otto/token
+github.com/robertkrimen/otto/underscore
 # github.com/rs/cors v1.7.0
 github.com/rs/cors
+# github.com/ryanuber/go-glob v1.0.0
+github.com/ryanuber/go-glob
 # github.com/satori/go.uuid v1.2.0
 github.com/satori/go.uuid
 # github.com/sirupsen/logrus v1.4.2
@@ -167,23 +217,23 @@ github.com/square/go-jose/json
 # github.com/stretchr/testify v1.4.0
 github.com/stretchr/testify/assert
 # github.com/uber/jaeger-client-go v2.19.0+incompatible
-github.com/uber/jaeger-client-go/config
 github.com/uber/jaeger-client-go
-github.com/uber/jaeger-client-go/internal/baggage/remote
-github.com/uber/jaeger-client-go/internal/throttler/remote
-github.com/uber/jaeger-client-go/rpcmetrics
-github.com/uber/jaeger-client-go/transport
+github.com/uber/jaeger-client-go/config
 github.com/uber/jaeger-client-go/internal/baggage
+github.com/uber/jaeger-client-go/internal/baggage/remote
 github.com/uber/jaeger-client-go/internal/spanlog
 github.com/uber/jaeger-client-go/internal/throttler
+github.com/uber/jaeger-client-go/internal/throttler/remote
 github.com/uber/jaeger-client-go/log
+github.com/uber/jaeger-client-go/rpcmetrics
 github.com/uber/jaeger-client-go/thrift
+github.com/uber/jaeger-client-go/thrift-gen/agent
+github.com/uber/jaeger-client-go/thrift-gen/baggage
 github.com/uber/jaeger-client-go/thrift-gen/jaeger
 github.com/uber/jaeger-client-go/thrift-gen/sampling
 github.com/uber/jaeger-client-go/thrift-gen/zipkincore
+github.com/uber/jaeger-client-go/transport
 github.com/uber/jaeger-client-go/utils
-github.com/uber/jaeger-client-go/thrift-gen/baggage
-github.com/uber/jaeger-client-go/thrift-gen/agent
 # github.com/uber/jaeger-lib v2.2.0+incompatible
 github.com/uber/jaeger-lib/metrics
 # github.com/x-cray/logrus-prefixed-formatter v0.5.2
@@ -199,29 +249,29 @@ github.com/xenolf/lego/acme
 # golang.org/x/crypto v0.0.0-20190923035154-9ee001bba392
 golang.org/x/crypto/bcrypt
 golang.org/x/crypto/blowfish
+golang.org/x/crypto/ed25519
+golang.org/x/crypto/ed25519/internal/edwards25519
+golang.org/x/crypto/ocsp
+golang.org/x/crypto/pbkdf2
 golang.org/x/crypto/scrypt
 golang.org/x/crypto/ssh/terminal
-golang.org/x/crypto/ed25519
-golang.org/x/crypto/pbkdf2
-golang.org/x/crypto/ocsp
-golang.org/x/crypto/ed25519/internal/edwards25519
 # golang.org/x/net v0.0.0-20191009170851-d66e71096ffb
+golang.org/x/net/bpf
 golang.org/x/net/context
-golang.org/x/net/html/charset
-golang.org/x/net/http2
-golang.org/x/net/trace
 golang.org/x/net/html
+golang.org/x/net/html/atom
+golang.org/x/net/html/charset
 golang.org/x/net/http/httpguts
+golang.org/x/net/http2
 golang.org/x/net/http2/hpack
 golang.org/x/net/idna
-golang.org/x/net/ipv4
-golang.org/x/net/ipv6
-golang.org/x/net/internal/timeseries
-golang.org/x/net/html/atom
-golang.org/x/net/publicsuffix
-golang.org/x/net/bpf
 golang.org/x/net/internal/iana
 golang.org/x/net/internal/socket
+golang.org/x/net/internal/timeseries
+golang.org/x/net/ipv4
+golang.org/x/net/ipv6
+golang.org/x/net/publicsuffix
+golang.org/x/net/trace
 # golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 golang.org/x/sync/singleflight
 # golang.org/x/sys v0.0.0-20190922100055-0a153f010e69
@@ -231,48 +281,52 @@ golang.org/x/sys/windows
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
 golang.org/x/text/encoding/htmlindex
-golang.org/x/text/transform
-golang.org/x/text/encoding/internal/identifier
 golang.org/x/text/encoding/internal
+golang.org/x/text/encoding/internal/identifier
 golang.org/x/text/encoding/japanese
 golang.org/x/text/encoding/korean
 golang.org/x/text/encoding/simplifiedchinese
 golang.org/x/text/encoding/traditionalchinese
 golang.org/x/text/encoding/unicode
-golang.org/x/text/language
-golang.org/x/text/secure/bidirule
-golang.org/x/text/unicode/bidi
-golang.org/x/text/unicode/norm
-golang.org/x/text/internal/utf8internal
-golang.org/x/text/runes
 golang.org/x/text/internal/language
 golang.org/x/text/internal/language/compact
 golang.org/x/text/internal/tag
+golang.org/x/text/internal/utf8internal
+golang.org/x/text/language
+golang.org/x/text/runes
+golang.org/x/text/secure/bidirule
+golang.org/x/text/transform
+golang.org/x/text/unicode/bidi
+golang.org/x/text/unicode/norm
 # golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 golang.org/x/time/rate
 # google.golang.org/appengine v1.6.1
-google.golang.org/appengine/datastore
 google.golang.org/appengine
+google.golang.org/appengine/datastore
 google.golang.org/appengine/datastore/internal/cloudkey
-google.golang.org/appengine/internal
-google.golang.org/appengine/internal/datastore
-google.golang.org/appengine/internal/app_identity
-google.golang.org/appengine/internal/modules
 google.golang.org/appengine/datastore/internal/cloudpb
+google.golang.org/appengine/internal
+google.golang.org/appengine/internal/app_identity
 google.golang.org/appengine/internal/base
+google.golang.org/appengine/internal/datastore
 google.golang.org/appengine/internal/log
+google.golang.org/appengine/internal/modules
 google.golang.org/appengine/internal/remote_api
 # google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55
 google.golang.org/genproto/googleapis/rpc/status
 # google.golang.org/grpc v1.23.1
 google.golang.org/grpc
 google.golang.org/grpc/balancer
+google.golang.org/grpc/balancer/base
 google.golang.org/grpc/balancer/roundrobin
+google.golang.org/grpc/binarylog/grpc_binarylog_v1
 google.golang.org/grpc/codes
 google.golang.org/grpc/connectivity
 google.golang.org/grpc/credentials
+google.golang.org/grpc/credentials/internal
 google.golang.org/grpc/encoding
 google.golang.org/grpc/encoding/proto
+google.golang.org/grpc/examples/helloworld/helloworld
 google.golang.org/grpc/grpclog
 google.golang.org/grpc/internal
 google.golang.org/grpc/internal/backoff
@@ -282,6 +336,7 @@ google.golang.org/grpc/internal/channelz
 google.golang.org/grpc/internal/envconfig
 google.golang.org/grpc/internal/grpcrand
 google.golang.org/grpc/internal/grpcsync
+google.golang.org/grpc/internal/syscall
 google.golang.org/grpc/internal/transport
 google.golang.org/grpc/keepalive
 google.golang.org/grpc/metadata
@@ -294,11 +349,6 @@ google.golang.org/grpc/serviceconfig
 google.golang.org/grpc/stats
 google.golang.org/grpc/status
 google.golang.org/grpc/tap
-google.golang.org/grpc/examples/helloworld/helloworld
-google.golang.org/grpc/balancer/base
-google.golang.org/grpc/credentials/internal
-google.golang.org/grpc/binarylog/grpc_binarylog_v1
-google.golang.org/grpc/internal/syscall
 # gopkg.in/Masterminds/sprig.v2 v2.21.0
 gopkg.in/Masterminds/sprig.v2
 # gopkg.in/alecthomas/kingpin.v2 v2.2.6
@@ -313,6 +363,11 @@ gopkg.in/sourcemap.v1/base64vlq
 gopkg.in/square/go-jose.v1
 gopkg.in/square/go-jose.v1/cipher
 gopkg.in/square/go-jose.v1/json
+# gopkg.in/square/go-jose.v2 v2.3.1
+gopkg.in/square/go-jose.v2
+gopkg.in/square/go-jose.v2/cipher
+gopkg.in/square/go-jose.v2/json
+gopkg.in/square/go-jose.v2/jwt
 # gopkg.in/vmihailenco/msgpack.v2 v2.9.1
 gopkg.in/vmihailenco/msgpack.v2
 gopkg.in/vmihailenco/msgpack.v2/codes

@@ -19,7 +19,7 @@ func TestRedisClusterGetMultiKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	v, err := r.GetMultiKey(keys)
+	v, err := r.GetMultiKey([]string{"first", "second"})
 	if err != nil {
 		t.Fatal(err)
 	}

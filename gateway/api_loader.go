@@ -57,6 +57,10 @@ func skipSpecBecauseInvalid(spec *APISpec, logger *logrus.Entry) bool {
 		}
 	}
 
+	if val, err := kvStore(spec.Proxy.TargetURL); err == nil {
+		spec.Proxy.TargetURL = val
+	}
+
 	_, err := url.Parse(spec.Proxy.TargetURL)
 	if err != nil {
 		logger.Error("couldn't parse target URL: ", err)
@@ -136,6 +140,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	pathModified := false
 	for {
 		hash := generateDomainPath(spec.Domain, spec.Proxy.ListenPath)
+
 		if apisByListen[hash] < 2 {
 			// not a duplicate
 			break
@@ -686,6 +691,10 @@ func loadApps(specs []*APISpec) {
 	for _, spec := range specs {
 		if spec.ListenPort != spec.GlobalConfig.ListenPort {
 			mainLog.Info("API bind on custom port:", spec.ListenPort)
+		}
+
+		if converted, err := kvStore(spec.Proxy.ListenPath); err == nil {
+			spec.Proxy.ListenPath = converted
 		}
 
 		tmpSpecRegister[spec.APIID] = spec
