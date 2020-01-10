@@ -1,8 +1,12 @@
 package storage
 
-import "github.com/dgraph-io/badger/v2"
+import (
+	"sync"
+	"time"
 
-import "time"
+	"github.com/dgraph-io/badger/v2"
+	"gopkg.in/fatih/set.v0"
+)
 
 var _ KV = (*KVStore)(nil)
 
@@ -10,6 +14,7 @@ type KVStore struct {
 	db        *badger.DB
 	KeyPrefix string
 	HashKeys  bool
+	sets      *sync.Map
 }
 
 func (kv *KVStore) fixKey(key string) string {
@@ -39,7 +44,7 @@ func NewKVStore(dir string) (*KVStore, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &KVStore{db: db}, nil
+	return &KVStore{db: db, sets: new(sync.Map)}, nil
 }
 
 func (kv *KVStore) SetKey(key, value string, timeout int64) error {
@@ -155,4 +160,17 @@ func (kv *KVStore) DeleteAllKeys() error {
 
 func (kv *KVStore) GetKeyPrefix() string {
 	return kv.KeyPrefix
+}
+
+func (kv *KVStore) AddToSet(key, value string) {
+	key = kv.fixKey(key)
+	if s, ok := kv.sets.Load(key); ok {
+		ss := s.(*set.Set)
+		ss.Add(value)
+	} else {
+		ss := new(set.Set)
+		ss.Add(value)
+		kv.sets.Store(key, ss)
+	}
+
 }
