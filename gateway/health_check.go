@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -64,29 +65,32 @@ type HealthCheckItem struct {
 }
 
 func initHealthCheck(ctx context.Context) {
-	if config.Global().LivenessCheck.Enabled {
+	setCurrentHealthCheckInfo(make(map[string]HealthCheckItem, 3))
 
-		setCurrentHealthCheckInfo(make(map[string]HealthCheckItem, 3))
+	go func(ctx context.Context) {
+		var n = config.Global().LivenessCheck.CheckDuration
 
-		go func(ctx context.Context) {
-			ticker := time.NewTicker(time.Second * 10)
+		if n == 0 {
+			n = 10
+		}
 
-			for {
-				select {
-				case <-ctx.Done():
+		ticker := time.NewTicker(time.Second * n)
 
-					ticker.Stop()
-					mainLog.WithFields(logrus.Fields{
-						"prefix": "health-check",
-					}).Debug("Stopping Health checks for all components")
-					return
+		for {
+			select {
+			case <-ctx.Done():
 
-				case <-ticker.C:
-					gatherHealthChecks()
-				}
+				ticker.Stop()
+				mainLog.WithFields(logrus.Fields{
+					"prefix": "health-check",
+				}).Debug("Stopping Health checks for all components")
+				return
+
+			case <-ticker.C:
+				gatherHealthChecks()
 			}
-		}(ctx)
-	}
+		}
+	}(ctx)
 }
 
 func gatherHealthChecks() {
@@ -97,44 +101,83 @@ func gatherHealthChecks() {
 
 	key := "tyk-liveness-probe"
 
-	var checkItem = HealthCheckItem{
-		Status:        Pass,
-		ComponentType: Datastore,
-		Time:          time.Now().Format(time.RFC3339),
-	}
+	var wg sync.WaitGroup
 
-	err := redisStore.SetRawKey(key, key, 10)
-	if err != nil {
-		mainLog.WithField("liveness-check", true).WithError(err).Error("Redis health check failed")
-		checkItem.Output = err.Error()
-		checkItem.Status = Fail
-	}
+	go func() {
 
-	allInfos["redis"] = checkItem
+		wg.Add(1)
 
-	if config.Global().UseDBAppConfigs {
-		if err = DashService.Ping(); err != nil {
-			mainLog.WithField("liveness-check", true).Error(err)
+		defer wg.Done()
+
+		var checkItem = HealthCheckItem{
+			Status:        Pass,
+			ComponentType: Datastore,
+			Time:          time.Now().Format(time.RFC3339),
+		}
+
+		err := redisStore.SetRawKey(key, key, 10)
+		if err != nil {
+			mainLog.WithField("liveness-check", true).WithError(err).Error("Redis health check failed")
 			checkItem.Output = err.Error()
 			checkItem.Status = Fail
 		}
 
-		checkItem.ComponentType = System
-		allInfos["dashboard"] = checkItem
+		fmt.Println("Here")
+		allInfos["redis"] = checkItem
+	}()
+
+	if config.Global().UseDBAppConfigs {
+
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			var checkItem = HealthCheckItem{
+				Status:        Pass,
+				ComponentType: Datastore,
+				Time:          time.Now().Format(time.RFC3339),
+			}
+
+			if err := DashService.Ping(); err != nil {
+				mainLog.WithField("liveness-check", true).Error(err)
+				checkItem.Output = err.Error()
+				checkItem.Status = Fail
+			}
+
+			fmt.Println("Here")
+			checkItem.ComponentType = System
+			allInfos["dashboard"] = checkItem
+		}()
 	}
 
 	if config.Global().Policies.PolicySource == "rpc" {
-		rpcStore := RPCStorageHandler{KeyPrefix: "livenesscheck-"}
 
-		if !rpcStore.Connect() {
-			checkItem.Output = err.Error()
-			checkItem.Status = Fail
-		}
+		wg.Add(1)
 
-		checkItem.ComponentType = System
+		go func() {
+			defer wg.Done()
 
-		allInfos["rpc"] = checkItem
+			var checkItem = HealthCheckItem{
+				Status:        Pass,
+				ComponentType: Datastore,
+				Time:          time.Now().Format(time.RFC3339),
+			}
+
+			rpcStore := RPCStorageHandler{KeyPrefix: "livenesscheck-"}
+
+			if !rpcStore.Connect() {
+				checkItem.Output = "Could not connect to RPC"
+				checkItem.Status = Fail
+			}
+
+			checkItem.ComponentType = System
+
+			allInfos["rpc"] = checkItem
+		}()
 	}
+
+	wg.Wait()
 
 	setCurrentHealthCheckInfo(allInfos)
 }

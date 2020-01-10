@@ -128,7 +128,7 @@ type HealthCheckConfig struct {
 }
 
 type LivenessCheckConfig struct {
-	Enabled bool `json:"enabled"`
+	CheckDuration time.Duration `json:"check_duration"`
 }
 
 type DnsCacheConfig struct {
