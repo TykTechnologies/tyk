@@ -3,7 +3,6 @@ package gateway
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -122,7 +121,6 @@ func gatherHealthChecks() {
 			checkItem.Status = Fail
 		}
 
-		fmt.Println("Here")
 		allInfos["redis"] = checkItem
 	}()
 
@@ -145,7 +143,6 @@ func gatherHealthChecks() {
 				checkItem.Status = Fail
 			}
 
-			fmt.Println("Here")
 			checkItem.ComponentType = System
 			allInfos["dashboard"] = checkItem
 		}()
