@@ -119,7 +119,7 @@ func (r *Purger) PurgeCache() {
 
 	for i, v := range analyticsValues {
 		decoded := AnalyticsRecord{}
-		if err := msgpack.Unmarshal(v.([]byte), &decoded); err != nil {
+		if err := msgpack.Unmarshal([]byte(v.(string)), &decoded); err != nil {
 			Log.WithError(err).Error("Couldn't unmarshal analytics data")
 		} else {
 			Log.WithField("decoded", decoded).Debug("Decoded Record")

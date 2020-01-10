@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"time"
 
-	circuit "github.com/rubyist/circuitbreaker"
 	"github.com/sirupsen/logrus"
 
+	circuit "github.com/TykTechnologies/circuitbreaker"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 )

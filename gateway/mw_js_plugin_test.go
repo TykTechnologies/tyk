@@ -476,7 +476,7 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 			spec.Proxy.ListenPath = "/api"
 		})
 
-		ts.Run(t, test.TestCase{Path: "/sample", BodyMatch: "/api/get?param1=dummy", Code: 200})
+		ts.Run(t, test.TestCase{Path: "/sample", BodyMatch: `/api/get\?param1=dummy`, Code: 200})
 	})
 
 	t.Run("Endpoint with skip cleaning", func(t *testing.T) {
@@ -505,7 +505,7 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 			spec.Proxy.ListenPath = "/api"
 		})
 
-		ts.Run(t, test.TestCase{Path: "/sample/99999-XXXX+%2F%2F+dog+9+fff%C3%A9o+party", BodyMatch: "URI\":\"/sample/99999-XXXX+%2F%2F+dog+9+fff%C3%A9o+party", Code: 200})
+		ts.Run(t, test.TestCase{Path: "/sample/99999-XXXX+%2F%2F+dog+9+fff%C3%A9o+party", BodyMatch: `URI":"/sample/99999-XXXX\+%2F%2F\+dog\+9\+fff%C3%A9o\+party"`, Code: 200})
 	})
 }
 
@@ -567,5 +567,118 @@ func TestJSVMBase64(t *testing.T) {
 		if s := v.String(); s != jwtPayload {
 			t.Fatalf("wanted '%s', got '%s'", jwtPayload, s)
 		}
+	})
+}
+
+func TestJSVMStagesRequest(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+
+	pre := `var pre = new TykJS.TykMiddleware.NewMiddleware({});
+
+pre.NewProcessRequest(function(request, session) {
+    // You can log to Tyk console output by calloing the built-in log() function:
+    log("Running sample  PRE PROCESSOR JSVM middleware")
+    
+    // Set headers in an outbound request
+    request.SetHeaders["Pre"] = "foobar";
+    // Add or delete request parmeters, these are encoded for the request as needed.
+    request.AddParams["pre"] = "foobar";
+    
+    // You MUST return both the request and session metadata    
+    return pre.ReturnData(request, {"pre": "foobar"});
+});`
+
+	post := `var post = new TykJS.TykMiddleware.NewMiddleware({});
+
+post.NewProcessRequest(function(request, session) {
+    // You can log to Tyk console output by calloing the built-in log() function:
+    log("Running sample  POST PROCESSOR JSVM middleware")
+    
+    // Set headers in an outbound request
+    request.SetHeaders["Post"] = "foobar";
+    // Add or delete request parmeters, these are encoded for the request as needed.
+    request.AddParams["post"] = "foobar";
+    
+    // You MUST return both the request and session metadata    
+    return post.ReturnData(request, {"post": "foobar"});
+});`
+
+	t.Run("Bundles", func(t *testing.T) {
+		bundle := RegisterBundle("jsvm_stages", map[string]string{
+			"manifest.json": `
+		{
+		    "file_list": [],
+		    "custom_middleware": {
+		        "driver": "otto",
+		        "pre": [{
+		            "name": "pre",
+		            "path": "pre.js"
+		        }],
+				"post": [{
+		            "name": "post",
+		            "path": "post.js"
+		        }]
+		    }
+		}
+	`,
+			"pre.js":  pre,
+			"post.js": post,
+		})
+
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/test"
+			spec.CustomMiddlewareBundle = bundle
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/test", Code: 200, BodyMatch: `"Pre":"foobar"`},
+			{Path: "/test", Code: 200, BodyMatch: `"Post":"foobar"`},
+		}...)
+	})
+
+	t.Run("Files", func(t *testing.T) {
+		// Object names are forced to be "pre" and "post"
+		RegisterJSFileMiddleware("jsvm_file_test", map[string]string{
+			"pre/pre.js":   pre,
+			"post/post.js": post,
+		})
+
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = "jsvm_file_test"
+			spec.Proxy.ListenPath = "/test"
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/test", Code: 200, BodyMatch: `"Pre":"foobar"`},
+			{Path: "/test", Code: 200, BodyMatch: `"Post":"foobar"`},
+		}...)
+	})
+
+	t.Run("API definition", func(t *testing.T) {
+		// Write to non APIID folder
+		RegisterJSFileMiddleware("jsvm_api", map[string]string{
+			"pre.js":  pre,
+			"post.js": post,
+		})
+
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/test"
+			spec.CustomMiddleware = apidef.MiddlewareSection{
+				Pre: []apidef.MiddlewareDefinition{{
+					Name: "pre",
+					Path: config.Global().MiddlewarePath + "/jsvm_api/pre.js",
+				}},
+				Post: []apidef.MiddlewareDefinition{{
+					Name: "post",
+					Path: config.Global().MiddlewarePath + "/jsvm_api/post.js",
+				}},
+			}
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/test", Code: 200, BodyMatch: `"Pre":"foobar"`},
+			{Path: "/test", Code: 200, BodyMatch: `"Post":"foobar"`},
+		}...)
 	})
 }

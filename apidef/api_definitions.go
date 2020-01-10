@@ -432,10 +432,11 @@ type APIDefinition struct {
 		CheckHostAgainstUptimeTests bool                          `bson:"check_host_against_uptime_tests" json:"check_host_against_uptime_tests"`
 		ServiceDiscovery            ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
 		Transport                   struct {
-			SSLInsecureSkipVerify bool     `bson:"ssl_insecure_skip_verify" json:"ssl_insecure_skip_verify"`
-			SSLCipherSuites       []string `bson:"ssl_ciphers" json:"ssl_ciphers"`
-			SSLMinVersion         uint16   `bson:"ssl_min_version" json:"ssl_min_version"`
-			ProxyURL              string   `bson:"proxy_url" json:"proxy_url"`
+			SSLInsecureSkipVerify   bool     `bson:"ssl_insecure_skip_verify" json:"ssl_insecure_skip_verify"`
+			SSLCipherSuites         []string `bson:"ssl_ciphers" json:"ssl_ciphers"`
+			SSLMinVersion           uint16   `bson:"ssl_min_version" json:"ssl_min_version"`
+			SSLForceCommonNameCheck bool     `json:"ssl_force_common_name_check"`
+			ProxyURL                string   `bson:"proxy_url" json:"proxy_url"`
 		} `bson:"transport" json:"transport"`
 	} `bson:"proxy" json:"proxy"`
 	DisableRateLimit          bool                   `bson:"disable_rate_limit" json:"disable_rate_limit"`
@@ -468,15 +469,16 @@ type APIDefinition struct {
 		OptionsPassthrough bool     `bson:"options_passthrough" json:"options_passthrough"`
 		Debug              bool     `bson:"debug" json:"debug"`
 	} `bson:"CORS" json:"CORS"`
-	Domain            string                 `bson:"domain" json:"domain"`
-	Certificates      []string               `bson:"certificates" json:"certificates"`
-	DoNotTrack        bool                   `bson:"do_not_track" json:"do_not_track"`
-	Tags              []string               `bson:"tags" json:"tags"`
-	EnableContextVars bool                   `bson:"enable_context_vars" json:"enable_context_vars"`
-	ConfigData        map[string]interface{} `bson:"config_data" json:"config_data"`
-	TagHeaders        []string               `bson:"tag_headers" json:"tag_headers"`
-	GlobalRateLimit   GlobalRateLimit        `bson:"global_rate_limit" json:"global_rate_limit"`
-	StripAuthData     bool                   `bson:"strip_auth_data" json:"strip_auth_data"`
+	Domain                  string                 `bson:"domain" json:"domain"`
+	Certificates            []string               `bson:"certificates" json:"certificates"`
+	DoNotTrack              bool                   `bson:"do_not_track" json:"do_not_track"`
+	Tags                    []string               `bson:"tags" json:"tags"`
+	EnableContextVars       bool                   `bson:"enable_context_vars" json:"enable_context_vars"`
+	ConfigData              map[string]interface{} `bson:"config_data" json:"config_data"`
+	TagHeaders              []string               `bson:"tag_headers" json:"tag_headers"`
+	GlobalRateLimit         GlobalRateLimit        `bson:"global_rate_limit" json:"global_rate_limit"`
+	StripAuthData           bool                   `bson:"strip_auth_data" json:"strip_auth_data"`
+	EnableDetailedRecording bool                   `bson:"enable_detailed_recording" json:"enable_detailed_recording"`
 }
 
 type AuthConfig struct {

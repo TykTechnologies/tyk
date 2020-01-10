@@ -208,7 +208,7 @@ func TestReverseProxyAllDown(t *testing.T) {
 	eventWG.Wait()
 
 	remote, _ := url.Parse(TestHttpAny)
-	proxy := TykNewSingleHostReverseProxy(remote, spec)
+	proxy := TykNewSingleHostReverseProxy(remote, spec, nil)
 
 	req := TestReq(t, "GET", "/", nil)
 	rec := httptest.NewRecorder()

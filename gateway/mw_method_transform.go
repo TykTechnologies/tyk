@@ -40,7 +40,7 @@ func (t *TransformMethod) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 	switch strings.ToUpper(mmeta.ToMethod) {
 	case "GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH":
-		r.Method = toMethod
+		ctxSetTransformRequestMethod(r, toMethod)
 	default:
 		return errors.New("Method not allowed"), http.StatusMethodNotAllowed
 	}

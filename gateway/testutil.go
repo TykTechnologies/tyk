@@ -25,7 +25,7 @@ import (
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/garyburd/redigo/redis"
+	"github.com/go-redis/redis"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	uuid "github.com/satori/go.uuid"
@@ -149,16 +149,13 @@ func ResetTestConfig() {
 
 func emptyRedis() error {
 	addr := config.Global().Storage.Host + ":" + strconv.Itoa(config.Global().Storage.Port)
-	c, err := redis.Dial("tcp", addr)
-	if err != nil {
-		return fmt.Errorf("could not connect to redis: %v", err)
-	}
+	c := redis.NewClient(&redis.Options{Addr: addr})
 	defer c.Close()
 	dbName := strconv.Itoa(config.Global().Storage.Database)
-	if _, err := c.Do("SELECT", dbName); err != nil {
+	if err := c.Do("SELECT", dbName).Err(); err != nil {
 		return err
 	}
-	_, err = c.Do("FLUSHDB")
+	err := c.FlushDB().Err()
 	return err
 }
 
@@ -194,6 +191,15 @@ func RegisterBundle(name string, files map[string]string) string {
 	testBundles[bundleID] = files
 
 	return bundleID
+}
+
+func RegisterJSFileMiddleware(apiid string, files map[string]string) {
+	os.MkdirAll(config.Global().MiddlewarePath+"/"+apiid+"/post", 0755)
+	os.MkdirAll(config.Global().MiddlewarePath+"/"+apiid+"/pre", 0755)
+
+	for file, content := range files {
+		ioutil.WriteFile(config.Global().MiddlewarePath+"/"+apiid+"/"+file, []byte(content), 0755)
+	}
 }
 
 func bundleHandleFunc(w http.ResponseWriter, r *http.Request) {
@@ -985,3 +991,14 @@ YGivtXBGXk1hlVYlje1RB+W6RQuDAegI5h8vl8pYJS9JQH0wjatsDaE=
 `
 
 const jwtSecret = "9879879878787878"
+const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+func randStringBytes(n int) string {
+	b := make([]byte, n)
+
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+
+	return string(b)
+}

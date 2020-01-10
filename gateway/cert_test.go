@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
 	"io/ioutil"
@@ -15,6 +16,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -325,67 +327,83 @@ func TestAPIMutualTLS(t *testing.T) {
 	})
 
 	t.Run("Multiple APIs on same domain", func(t *testing.T) {
-		clientCertID, _ := CertificateManager.Add(clientCertPem, "")
-		defer CertificateManager.Delete(clientCertID)
+		testSameDomain := func(t *testing.T, domain string) {
+			clientCertID, _ := CertificateManager.Add(clientCertPem, "")
+			defer CertificateManager.Delete(clientCertID)
 
-		loadAPIS := func(certs ...string) {
-			BuildAndLoadAPI(
-				func(spec *APISpec) {
-					spec.Proxy.ListenPath = "/with_mutual"
-					spec.UseMutualTLSAuth = true
-					spec.ClientCertificates = certs
-				},
-				func(spec *APISpec) {
-					spec.Proxy.ListenPath = "/without_mutual"
-				},
-			)
+			loadAPIS := func(certs ...string) {
+				BuildAndLoadAPI(
+					func(spec *APISpec) {
+						spec.Proxy.ListenPath = "/with_mutual"
+						spec.UseMutualTLSAuth = true
+						spec.ClientCertificates = certs
+						spec.Domain = domain
+					},
+					func(spec *APISpec) {
+						spec.Proxy.ListenPath = "/without_mutual"
+						spec.Domain = domain
+					},
+				)
+			}
+
+			t.Run("Without certificate", func(t *testing.T) {
+				clientWithoutCert := GetTLSClient(nil, nil)
+
+				loadAPIS()
+
+				certNotMatchErr := "Client TLS certificate is required"
+				ts.Run(t, []test.TestCase{
+					{
+						Path:      "/with_mutual",
+						Client:    clientWithoutCert,
+						Domain:    domain,
+						Code:      403,
+						BodyMatch: `"error": "` + certNotMatchErr,
+					},
+					{
+						Path:   "/without_mutual",
+						Client: clientWithoutCert,
+						Domain: domain,
+						Code:   200,
+					},
+				}...)
+			})
+
+			t.Run("Client certificate not match", func(t *testing.T) {
+				client := GetTLSClient(&clientCert, serverCertPem)
+
+				loadAPIS()
+
+				certNotAllowedErr := `Certificate with SHA256 ` + certs.HexSHA256(clientCert.Certificate[0]) + ` not allowed`
+
+				ts.Run(t, test.TestCase{
+					Path:      "/with_mutual",
+					Client:    client,
+					Domain:    domain,
+					Code:      403,
+					BodyMatch: `"error": "` + certNotAllowedErr,
+				})
+			})
+
+			t.Run("Client certificate match", func(t *testing.T) {
+				loadAPIS(clientCertID)
+				client := GetTLSClient(&clientCert, serverCertPem)
+
+				ts.Run(t, test.TestCase{
+					Path:   "/with_mutual",
+					Domain: domain,
+					Client: client,
+					Code:   200,
+				})
+			})
 		}
 
-		t.Run("Without certificate", func(t *testing.T) {
-			clientWithoutCert := GetTLSClient(nil, nil)
-
-			loadAPIS()
-
-			certNotMatchErr := "Client TLS certificate is required"
-			ts.Run(t, []test.TestCase{
-				{
-					Path:      "/with_mutual",
-					Client:    clientWithoutCert,
-					Code:      403,
-					BodyMatch: `"error": "` + certNotMatchErr,
-				},
-				{
-					Path:   "/without_mutual",
-					Client: clientWithoutCert,
-					Code:   200,
-				},
-			}...)
+		t.Run("Empty domain", func(t *testing.T) {
+			testSameDomain(t, "")
 		})
 
-		t.Run("Client certificate not match", func(t *testing.T) {
-			client := GetTLSClient(&clientCert, serverCertPem)
-
-			loadAPIS()
-
-			certNotAllowedErr := `Certificate with SHA256 ` + certs.HexSHA256(clientCert.Certificate[0]) + ` not allowed`
-
-			ts.Run(t, test.TestCase{
-				Path:      "/with_mutual",
-				Client:    client,
-				Code:      403,
-				BodyMatch: `"error": "` + certNotAllowedErr,
-			})
-		})
-
-		t.Run("Client certificate match", func(t *testing.T) {
-			loadAPIS(clientCertID)
-			client := GetTLSClient(&clientCert, serverCertPem)
-
-			ts.Run(t, test.TestCase{
-				Path:   "/with_mutual",
-				Client: client,
-				Code:   200,
-			})
+		t.Run("Custom domain", func(t *testing.T) {
+			testSameDomain(t, "localhost")
 		})
 	})
 }
@@ -445,6 +463,56 @@ func TestUpstreamMutualTLS(t *testing.T) {
 		})
 
 		// Should pass with valid upstream certificate
+		ts.Run(t, test.TestCase{Code: 200})
+	})
+
+}
+
+func TestSSLForceCommonName(t *testing.T) {
+	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	}))
+
+	// generate certificate Common Name as valid hostname and SAN as non-empty value
+	_, _, _, cert := genCertificate(&x509.Certificate{
+		EmailAddresses: []string{"test@test.com"},
+		Subject:        pkix.Name{CommonName: "host1.local"},
+	})
+
+	upstream.TLS = &tls.Config{
+		Certificates: []tls.Certificate{cert},
+	}
+
+	upstream.StartTLS()
+	defer upstream.Close()
+
+	// test case to ensure that Golang doesn't check against CommonName if SAN is non empty
+	t.Run("Force Common Name Check is Disabled", func(t *testing.T) {
+		ts := StartTest()
+		defer ts.Close()
+
+		targetURL := strings.Replace(upstream.URL, "127.0.0.1", "localhost", 1)
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = targetURL
+		})
+		ts.Run(t, test.TestCase{Code: 500, BodyMatch: "There was a problem proxying the request"})
+	})
+
+	t.Run("Force Common Name Check is Enabled", func(t *testing.T) {
+		globalConf := config.Global()
+		globalConf.SSLForceCommonNameCheck = true
+		config.SetGlobal(globalConf)
+		defer ResetTestConfig()
+
+		ts := StartTest()
+		defer ts.Close()
+
+		targetURL := strings.Replace(upstream.URL, "127.0.0.1", "host1.local", 1)
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = targetURL
+		})
+
 		ts.Run(t, test.TestCase{Code: 200})
 	})
 }
@@ -586,7 +654,7 @@ func TestCertificateHandlerTLS(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 			{Method: "GET", Path: "/tyk/certs/" + clientCertID, AdminAuth: true, Code: 200, BodyMatch: clientCertMeta},
 			{Method: "GET", Path: "/tyk/certs/" + serverCertID, AdminAuth: true, Code: 200, BodyMatch: serverCertMeta},
-			{Method: "GET", Path: "/tyk/certs/" + serverCertID + "," + clientCertID, AdminAuth: true, Code: 200, BodyMatch: "[" + serverCertMeta},
+			{Method: "GET", Path: "/tyk/certs/" + serverCertID + "," + clientCertID, AdminAuth: true, Code: 200, BodyMatch: `\[` + serverCertMeta},
 			{Method: "GET", Path: "/tyk/certs/" + serverCertID + "," + clientCertID, AdminAuth: true, Code: 200, BodyMatch: clientCertMeta},
 		}...)
 	})

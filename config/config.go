@@ -10,12 +10,13 @@ import (
 	"runtime"
 	"sync"
 	"sync/atomic"
-
-	"github.com/kelseyhightower/envconfig"
+	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
+	consul "github.com/hashicorp/consul/api"
+	"github.com/kelseyhightower/envconfig"
 )
 
 type IPsHandleStrategy string
@@ -80,7 +81,9 @@ type StorageOptionsConf struct {
 	Type                  string            `json:"type"`
 	Host                  string            `json:"host"`
 	Port                  int               `json:"port"`
-	Hosts                 map[string]string `json:"hosts"`
+	Hosts                 map[string]string `json:"hosts"` // Deprecated: Addrs instead.
+	Addrs                 []string          `json:"addrs"`
+	MasterName            string            `json:"master_name"`
 	Username              string            `json:"username"`
 	Password              string            `json:"password"`
 	Database              int               `json:"database"`
@@ -214,6 +217,8 @@ type ServiceDiscoveryConf struct {
 type CoProcessConfig struct {
 	EnableCoProcess     bool   `json:"enable_coprocess"`
 	CoProcessGRPCServer string `json:"coprocess_grpc_server"`
+	GRPCRecvMaxSize     int    `json:"grpc_recv_max_size"`
+	GRPCSendMaxSize     int    `json:"grpc_send_max_size"`
 	PythonPathPrefix    string `json:"python_path_prefix"`
 	PythonVersion       string `json:"python_version"`
 }
@@ -346,10 +351,11 @@ type Config struct {
 	AuthOverride   AuthOverrideConf   `json:"auth_override"`
 
 	// Rate Limiting Strategy
-	EnableNonTransactionalRateLimiter bool `json:"enable_non_transactional_rate_limiter"`
-	EnableSentinelRateLimiter         bool `json:"enable_sentinel_rate_limiter"`
-	EnableRedisRollingLimiter         bool `json:"enable_redis_rolling_limiter"`
-	DRLNotificationFrequency          int  `json:"drl_notification_frequency"`
+	EnableNonTransactionalRateLimiter bool    `json:"enable_non_transactional_rate_limiter"`
+	EnableSentinelRateLimiter         bool    `json:"enable_sentinel_rate_limiter"`
+	EnableRedisRollingLimiter         bool    `json:"enable_redis_rolling_limiter"`
+	DRLNotificationFrequency          int     `json:"drl_notification_frequency"`
+	DRLThreshold                      float64 `json:"drl_threshold"`
 
 	// Organization configurations
 	EnforceOrgDataAge               bool          `json:"enforce_org_data_age"`
@@ -387,6 +393,7 @@ type Config struct {
 	OauthRedirectUriSeparator     string               `json:"oauth_redirect_uri_separator"`
 	OauthErrorStatusCode          int                  `json:"oauth_error_status_code"`
 	EnableKeyLogging              bool                 `json:"enable_key_logging"`
+	SSLForceCommonNameCheck       bool                 `json:"ssl_force_common_name_check"`
 
 	// Proxy analytics configuration
 	EnableAnalytics bool                  `json:"enable_analytics"`
@@ -443,6 +450,70 @@ type Config struct {
 	GlobalSessionLifetime          int64 `bson:"global_session_lifetime" json:"global_session_lifetime"`
 	ForceGlobalSessionLifetime     bool  `bson:"force_global_session_lifetime" json:"force_global_session_lifetime"`
 	HideGeneratorHeader            bool  `json:"hide_generator_header"`
+	KV                             struct {
+		Consul ConsulConfig `json:"consul"`
+		Vault  VaultConfig  `json:"vault"`
+	} `json:"kv"`
+
+	// Secrets are key-value pairs that can be accessed in the dashboard via "secrets://"
+	Secrets map[string]string `json:"secrets"`
+}
+
+// VaultConfig is used to configure the creation of a client
+// This is a stripped down version of the Config struct in vault's API client
+type VaultConfig struct {
+
+	// Address is the address of the Vault server. This should be a complete
+	// URL such as "http://vault.example.com".
+	Address string `json:"address"`
+
+	// AgentAddress is the address of the local Vault agent. This should be a
+	// complete URL such as "http://vault.example.com".
+	AgentAddress string `json:"agent_address"`
+
+	// MaxRetries controls the maximum number of times to retry when a vault
+	// serer occurs
+	MaxRetries int `json:"max_retries"`
+
+	Timeout time.Duration `json:"timeout"`
+
+	// Token is the vault root token
+	Token string `json:"token"`
+
+	// KVVersion is the version number of Vault. Usually defaults to 2
+	KVVersion int `json:"kv_version"`
+}
+
+// ConsulConfig is used to configure the creation of a client
+// This is a stripped down version of the Config struct in consul's API client
+type ConsulConfig struct {
+	// Address is the address of the Consul server
+	Address string `json:"address"`
+
+	// Scheme is the URI scheme for the Consul server
+	Scheme string `json:"scheme"`
+
+	// Datacenter to use. If not provided, the default agent datacenter is used.
+	Datacenter string `json:"datacenter"`
+
+	// HttpAuth is the auth info to use for http access.
+	HttpAuth struct {
+		// Username to use for HTTP Basic Authentication
+		Username string `json:"username"`
+
+		// Password to use for HTTP Basic Authentication
+		Password string `json:"password"`
+	} `json:"http_auth"`
+
+	// WaitTime limits how long a Watch will block. If not provided,
+	// the agent default values will be used.
+	WaitTime time.Duration `json:"wait_time"`
+
+	// Token is used to provide a per-request ACL token
+	// which overrides the agent's default token.
+	Token string `json:"token"`
+
+	TLSConfig consul.TLSConfig `json:"tls_config"`
 }
 
 // GetEventTriggers returns event triggers. There was a typo in the json tag.

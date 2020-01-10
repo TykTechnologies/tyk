@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math"
 	"net/http"
 	"net/url"
@@ -114,11 +115,14 @@ func (o *OAuthHandlers) generateOAuthOutputFromOsinResponse(osinResponse *osin.R
 		osinResponse.Output["redirect_to"] = redirect
 	}
 
-	respData, err := json.Marshal(&osinResponse.Output)
+	buffer := &bytes.Buffer{}
+	encoder := json.NewEncoder(buffer)
+	encoder.SetEscapeHTML(false)
+	err = encoder.Encode(&osinResponse.Output)
 	if err != nil {
 		return nil
 	}
-	return respData
+	return buffer.Bytes()
 }
 
 func (o *OAuthHandlers) notifyClientOfNewOauth(notification NewOAuthNotification) {
@@ -158,15 +162,8 @@ func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *htt
 		return
 	}
 	if r.Method == "GET" {
-		var buffer bytes.Buffer
-		buffer.WriteString(o.Manager.API.Oauth2Meta.AuthorizeLoginRedirect)
-		buffer.WriteString("?client_id=")
-		buffer.WriteString(r.FormValue("client_id"))
-		buffer.WriteString("&redirect_uri=")
-		buffer.WriteString(r.FormValue("redirect_uri"))
-		buffer.WriteString("&response_type=")
-		buffer.WriteString(r.FormValue("response_type"))
-		w.Header().Add("Location", buffer.String())
+		loginURL := fmt.Sprintf("%s?%s", o.Manager.API.Oauth2Meta.AuthorizeLoginRedirect, r.URL.RawQuery)
+		w.Header().Add("Location", loginURL)
 	} else {
 		w.Header().Add("Location", o.Manager.API.Oauth2Meta.AuthorizeLoginRedirect)
 	}

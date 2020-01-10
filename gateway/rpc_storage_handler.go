@@ -9,11 +9,10 @@ import (
 
 	"github.com/TykTechnologies/tyk/rpc"
 
-	"github.com/garyburd/redigo/redis"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/go-redis/redis"
 
 	"github.com/sirupsen/logrus"
 )
@@ -154,8 +153,8 @@ func (r *RPCStorageHandler) cleanKey(keyName string) string {
 // GetKey will retrieve a key from the database
 func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 	start := time.Now() // get current time
-	log.Debug("[STORE] Getting WAS: ", keyName)
-	log.Debug("[STORE] Getting: ", r.fixKey(keyName))
+	//	log.Debug("[STORE] Getting WAS: ", keyName)
+	//  log.Debug("[STORE] Getting: ", r.fixKey(keyName))
 
 	value, err := r.GetRawKey(r.fixKey(keyName))
 
@@ -498,7 +497,7 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 }
 
 // StartPubSubHandler will listen for a signal and run the callback with the message
-func (r *RPCStorageHandler) StartPubSubHandler(channel string, callback func(redis.Message)) error {
+func (r *RPCStorageHandler) StartPubSubHandler(channel string, callback func(*redis.Message)) error {
 	log.Warning("RPCStorageHandler.StartPubSubHandler - NO PUBSUB DEFINED")
 	return nil
 }

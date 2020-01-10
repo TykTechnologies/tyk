@@ -41,21 +41,25 @@ type HTTPDashboardHandler struct {
 	heartBeatStopSentinel bool
 }
 
-func initialiseClient(timeout time.Duration) *http.Client {
-	client := &http.Client{
-		Timeout: timeout,
-	}
+var dashClient *http.Client
 
-	if config.Global().HttpServerOptions.UseSSL {
-		// Setup HTTPS client
-		tlsConfig := &tls.Config{
-			InsecureSkipVerify: config.Global().HttpServerOptions.SSLInsecureSkipVerify,
+func initialiseClient() *http.Client {
+	if dashClient == nil {
+		dashClient = &http.Client{
+			Timeout: 30 * time.Second,
 		}
 
-		client.Transport = &http.Transport{TLSClientConfig: tlsConfig}
+		if config.Global().HttpServerOptions.UseSSL {
+			// Setup HTTPS client
+			tlsConfig := &tls.Config{
+				InsecureSkipVerify: config.Global().HttpServerOptions.SSLInsecureSkipVerify,
+			}
+
+			dashClient.Transport = &http.Transport{TLSClientConfig: tlsConfig}
+		}
 	}
 
-	return client
+	return dashClient
 }
 
 func reLogin() {
@@ -118,7 +122,7 @@ func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 	req.Header.Set(headers.XTykNodeID, GetNodeID())
 	req.Header.Set(headers.XTykNonce, ServiceNonce)
 
-	c := initialiseClient(5 * time.Second)
+	c := initialiseClient()
 
 	resp, err := c.Do(req)
 	if err != nil {
@@ -147,7 +151,7 @@ func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 func (h *HTTPDashboardHandler) Register() error {
 	dashLog.Info("Registering gateway node with Dashboard")
 	req := h.newRequest(h.RegistrationEndpoint)
-	c := initialiseClient(5 * time.Second)
+	c := initialiseClient()
 	resp, err := c.Do(req)
 
 	if err != nil {
@@ -189,7 +193,7 @@ func (h *HTTPDashboardHandler) StartBeating() error {
 
 	req := h.newRequest(h.HeartBeatEndpoint)
 
-	client := initialiseClient(5 * time.Second)
+	client := initialiseClient()
 
 	for !h.heartBeatStopSentinel {
 		if err := h.sendHeartBeat(req, client); err != nil {
@@ -248,7 +252,7 @@ func (h *HTTPDashboardHandler) DeRegister() error {
 	req.Header.Set(headers.XTykNodeID, GetNodeID())
 	req.Header.Set(headers.XTykNonce, ServiceNonce)
 
-	c := initialiseClient(5 * time.Second)
+	c := initialiseClient()
 	resp, err := c.Do(req)
 
 	if err != nil {

@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/TykTechnologies/tyk/rpc"
 
@@ -84,7 +83,7 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 	log.WithFields(logrus.Fields{
 		"prefix": "policy",
 	}).Info("Mutex lock acquired... calling")
-	c := initialiseClient(10 * time.Second)
+	c := initialiseClient()
 
 	log.WithFields(logrus.Fields{
 		"prefix": "policy",
