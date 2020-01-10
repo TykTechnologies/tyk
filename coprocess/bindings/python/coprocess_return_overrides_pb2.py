@@ -7,7 +7,6 @@ from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
 from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
-from google.protobuf import descriptor_pb2
 # @@protoc_insertion_point(imports)
 
 _sym_db = _symbol_database.Default()
@@ -19,7 +18,8 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='coprocess_return_overrides.proto',
   package='coprocess',
   syntax='proto3',
-  serialized_pb=_b('\n coprocess_return_overrides.proto\x12\tcoprocess\"\xaa\x01\n\x0fReturnOverrides\x12\x15\n\rresponse_code\x18\x01 \x01(\x05\x12\x16\n\x0eresponse_error\x18\x02 \x01(\t\x12\x38\n\x07headers\x18\x03 \x03(\x0b\x32\'.coprocess.ReturnOverrides.HeadersEntry\x1a.\n\x0cHeadersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x62\x06proto3')
+  serialized_options=None,
+  serialized_pb=_b('\n coprocess_return_overrides.proto\x12\tcoprocess\"\xc6\x01\n\x0fReturnOverrides\x12\x15\n\rresponse_code\x18\x01 \x01(\x05\x12\x16\n\x0eresponse_error\x18\x02 \x01(\t\x12\x38\n\x07headers\x18\x03 \x03(\x0b\x32\'.coprocess.ReturnOverrides.HeadersEntry\x12\x1a\n\x12\x64isable_json_error\x18\x04 \x01(\x08\x1a.\n\x0cHeadersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x62\x06proto3')
 )
 
 
@@ -38,28 +38,28 @@ _RETURNOVERRIDES_HEADERSENTRY = _descriptor.Descriptor(
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='value', full_name='coprocess.ReturnOverrides.HeadersEntry.value', index=1,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  options=_descriptor._ParseOptions(descriptor_pb2.MessageOptions(), _b('8\001')),
+  serialized_options=_b('8\001'),
   is_extendable=False,
   syntax='proto3',
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=172,
-  serialized_end=218,
+  serialized_start=200,
+  serialized_end=246,
 )
 
 _RETURNOVERRIDES = _descriptor.Descriptor(
@@ -75,35 +75,42 @@ _RETURNOVERRIDES = _descriptor.Descriptor(
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='response_error', full_name='coprocess.ReturnOverrides.response_error', index=1,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='headers', full_name='coprocess.ReturnOverrides.headers', index=2,
       number=3, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='disable_json_error', full_name='coprocess.ReturnOverrides.disable_json_error', index=3,
+      number=4, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
   nested_types=[_RETURNOVERRIDES_HEADERSENTRY, ],
   enum_types=[
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
   syntax='proto3',
   extension_ranges=[],
   oneofs=[
   ],
   serialized_start=48,
-  serialized_end=218,
+  serialized_end=246,
 )
 
 _RETURNOVERRIDES_HEADERSENTRY.containing_type = _RETURNOVERRIDES
@@ -127,6 +134,5 @@ _sym_db.RegisterMessage(ReturnOverrides)
 _sym_db.RegisterMessage(ReturnOverrides.HeadersEntry)
 
 
-_RETURNOVERRIDES_HEADERSENTRY.has_options = True
-_RETURNOVERRIDES_HEADERSENTRY._options = _descriptor._ParseOptions(descriptor_pb2.MessageOptions(), _b('8\001'))
+_RETURNOVERRIDES_HEADERSENTRY._options = None
 # @@protoc_insertion_point(module_scope)
