@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -9,13 +11,19 @@ import (
 )
 
 var _ KV = (*KVStore)(nil)
+var _ Health = (*KVStore)(nil)
 
 type KVStore struct {
 	db        *badger.DB
 	KeyPrefix string
 	HashKeys  bool
 	sets      *sync.Map
+	windows   *sync.Map
+	now       func() time.Time
+	divisor   func() float64
 }
+
+func (kv *KVStore) Connect() bool { return true }
 
 func (kv *KVStore) fixKey(key string) string {
 	if kv.KeyPrefix == "" && !kv.HashKeys {
@@ -44,7 +52,13 @@ func NewKVStore(dir string) (*KVStore, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &KVStore{db: db, sets: new(sync.Map)}, nil
+	return &KVStore{
+		db:      db,
+		sets:    new(sync.Map),
+		windows: new(sync.Map),
+		now:     time.Now,
+		divisor: healthCountsDivisor,
+	}, nil
 }
 
 func (kv *KVStore) SetKey(key, value string, timeout int64) error {
@@ -189,4 +203,65 @@ func (kv *KVStore) IsMemberOfSet(key, value string) bool {
 		return ss.Has(value)
 	}
 	return false
+}
+
+func (kv *KVStore) SetRollingWindow(key string, per int64, value string, pipeline bool) (int, []interface{}) {
+	key = kv.fixKey(key)
+	return kv.getWindow(key, per).Set(kv.kv(value))
+}
+
+func (kv *KVStore) getWindow(key string, per int64) *slidingSortedSet {
+	if w, ok := kv.windows.Load(key); ok {
+		if p, ok := w.(*sync.Map).Load(per); ok {
+			return p.(*slidingSortedSet)
+		}
+		p := newTimeSet(time.Duration(per)*time.Second, kv.now)
+		w.(*sync.Map).Store(per, p)
+		return p
+	}
+	w := new(sync.Map)
+	kv.windows.Store(key, w)
+	p := newTimeSet(time.Duration(per)*time.Second, kv.now)
+	w.Store(per, p)
+	return p
+}
+
+func (kv *KVStore) kv(valueOveride string) (k, v int64) {
+	if valueOveride != "-1" {
+		p := strings.Split(valueOveride, ".")
+		if len(p) > 0 {
+			k, _ = strconv.ParseInt(p[0], 10, 64)
+			v, _ = strconv.ParseInt(p[1], 10, 64)
+		}
+	} else {
+		k = kv.now().UnixNano()
+		v = k
+	}
+	return
+}
+
+func (kv *KVStore) CalculateHealthAVG(keyName string, per int64, val string, pipeline bool) (float64, error) {
+	p := kv.getWindow(keyName, per)
+	count, _ := p.Set(kv.kv(val))
+	divisor := kv.divisor()
+	if count > 0 {
+		return roundValue((float64(count) - 1) / divisor), nil
+	}
+	return 0, nil
+}
+
+func (kv *KVStore) CalculateHealthMicroAVG(keyName string, per int64, val string, pipeline bool) (float64, error) {
+	keyName = kv.fixKey(keyName)
+	p := kv.getWindow(keyName, per)
+	_, vals := p.Set(kv.kv(val))
+	var runningTotal int64
+	for _, v := range vals {
+
+		vInt := v.(int64)
+		runningTotal += vInt
+	}
+	if len(vals) > 0 {
+		return roundValue(float64(runningTotal / int64(len(vals)))), nil
+	}
+	return 0, nil
 }
