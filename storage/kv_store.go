@@ -2,6 +2,8 @@ package storage
 
 import "github.com/dgraph-io/badger/v2"
 
+import "time"
+
 var _ KV = (*KVStore)(nil)
 
 type KVStore struct {
@@ -120,4 +122,29 @@ func (kv *KVStore) DeleteScanMatch(pattern string) bool {
 
 func (kv *KVStore) Close() error {
 	return kv.db.Close()
+}
+
+func (kv *KVStore) SetExp(key string, exp int64) error {
+	return kv.db.Update(func(txn *badger.Txn) error {
+		i, err := txn.Get([]byte(key))
+		if err != nil {
+			return err
+		}
+		v := make([]byte, i.ValueSize())
+		i.ValueCopy(v)
+		e := badger.NewEntry([]byte(key), v)
+		return txn.SetEntry(e.WithTTL(time.Duration(exp) * time.Second))
+	})
+}
+
+func (kv *KVStore) GetExp(key string) (exp int64, err error) {
+	err = kv.db.View(func(txn *badger.Txn) error {
+		e, err := txn.Get([]byte(key))
+		if err != nil {
+			return err
+		}
+		exp = int64(e.ExpiresAt())
+		return nil
+	})
+	return
 }
