@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"fmt"
 	"html/template"
 	"io/ioutil"
 	stdlog "log"
@@ -32,6 +33,7 @@ import (
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/storage/kv"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
@@ -98,6 +100,9 @@ var (
 	}
 
 	dnsCacheManager dnscache.IDnsCacheManager
+
+	consulKVStore kv.Store
+	vaultKVStore  kv.Store
 )
 
 const (
@@ -976,6 +981,109 @@ func afterConfSetup(conf *config.Config) {
 
 	if conf.HealthCheckEndpointName == "" {
 		conf.HealthCheckEndpointName = "hello"
+	}
+
+	var err error
+
+	conf.Secret, err = kvStore(conf.Secret)
+	if err != nil {
+		log.Fatalf("could not retrieve the secret key.. %v", err)
+	}
+
+	conf.NodeSecret, err = kvStore(conf.NodeSecret)
+	if err != nil {
+		log.Fatalf("could not retrieve the NodeSecret key.. %v", err)
+	}
+
+	conf.Storage.Password, err = kvStore(conf.Storage.Password)
+	if err != nil {
+		log.Fatalf("Could not retrieve redis password... %v", err)
+	}
+
+	conf.CacheStorage.Password, err = kvStore(conf.CacheStorage.Password)
+	if err != nil {
+		log.Fatalf("Could not retrieve cache storage password... %v", err)
+	}
+
+	conf.Security.PrivateCertificateEncodingSecret, err = kvStore(conf.Security.PrivateCertificateEncodingSecret)
+	if err != nil {
+		log.Fatalf("Could not retrieve the private certificate encoding secret... %v", err)
+	}
+
+	if conf.UseDBAppConfigs {
+		conf.DBAppConfOptions.ConnectionString, err = kvStore(conf.DBAppConfOptions.ConnectionString)
+		if err != nil {
+			log.Fatalf("Could not fetch dashboard connection string.. %v", err)
+		}
+	}
+
+	if conf.Policies.PolicySource == "service" {
+		conf.Policies.PolicyConnectionString, err = kvStore(conf.Policies.PolicyConnectionString)
+		if err != nil {
+			log.Fatalf("Could not fetch policy connection string... %v", err)
+		}
+	}
+}
+
+func kvStore(value string) (string, error) {
+
+	if strings.HasPrefix(value, "secrets://") {
+		key := strings.TrimPrefix(value, "secrets://")
+		log.Debugf("Retrieving %s from secret store in config", key)
+		val, ok := config.Global().Secrets[key]
+		if !ok {
+			return "", fmt.Errorf("secrets does not exist in config.. %s not found", key)
+		}
+
+		return val, nil
+	}
+
+	if strings.HasPrefix(value, "env://") {
+		key := strings.TrimPrefix(value, "env://")
+		log.Debugf("Retrieving %s from environment", key)
+		return os.Getenv(fmt.Sprintf("TYK_SECRET_%s", strings.ToUpper(key))), nil
+	}
+
+	if strings.HasPrefix(value, "consul://") {
+		key := strings.TrimPrefix(value, "consul://")
+		log.Debugf("Retrieving %s from consul", key)
+		setUpConsul()
+		return consulKVStore.Get(key)
+	}
+
+	if strings.HasPrefix(value, "vault://") {
+		key := strings.TrimPrefix(value, "vault://")
+		log.Debugf("Retrieving %s from vault", key)
+		setUpVault()
+		return vaultKVStore.Get(key)
+	}
+
+	return value, nil
+}
+
+func setUpVault() {
+	if vaultKVStore != nil {
+		return
+	}
+
+	var err error
+
+	vaultKVStore, err = kv.NewVault(config.Global().KV.Vault)
+	if err != nil {
+		log.Fatalf("an error occurred while setting up vault... %v", err)
+	}
+}
+
+func setUpConsul() {
+	if consulKVStore != nil {
+		return
+	}
+
+	var err error
+
+	consulKVStore, err = kv.NewConsul(config.Global().KV.Consul)
+	if err != nil {
+		log.Fatalf("an error occurred while setting up consul... %v", err)
 	}
 }
 

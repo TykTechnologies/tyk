@@ -10,12 +10,13 @@ import (
 	"runtime"
 	"sync"
 	"sync/atomic"
-
-	"github.com/kelseyhightower/envconfig"
+	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
+	consul "github.com/hashicorp/consul/api"
+	"github.com/kelseyhightower/envconfig"
 )
 
 type IPsHandleStrategy string
@@ -449,6 +450,70 @@ type Config struct {
 	GlobalSessionLifetime          int64 `bson:"global_session_lifetime" json:"global_session_lifetime"`
 	ForceGlobalSessionLifetime     bool  `bson:"force_global_session_lifetime" json:"force_global_session_lifetime"`
 	HideGeneratorHeader            bool  `json:"hide_generator_header"`
+	KV                             struct {
+		Consul ConsulConfig `json:"consul"`
+		Vault  VaultConfig  `json:"vault"`
+	} `json:"kv"`
+
+	// Secrets are key-value pairs that can be accessed in the dashboard via "secrets://"
+	Secrets map[string]string `json:"secrets"`
+}
+
+// VaultConfig is used to configure the creation of a client
+// This is a stripped down version of the Config struct in vault's API client
+type VaultConfig struct {
+
+	// Address is the address of the Vault server. This should be a complete
+	// URL such as "http://vault.example.com".
+	Address string `json:"address"`
+
+	// AgentAddress is the address of the local Vault agent. This should be a
+	// complete URL such as "http://vault.example.com".
+	AgentAddress string `json:"agent_address"`
+
+	// MaxRetries controls the maximum number of times to retry when a vault
+	// serer occurs
+	MaxRetries int `json:"max_retries"`
+
+	Timeout time.Duration `json:"timeout"`
+
+	// Token is the vault root token
+	Token string `json:"token"`
+
+	// KVVersion is the version number of Vault. Usually defaults to 2
+	KVVersion int `json:"kv_version"`
+}
+
+// ConsulConfig is used to configure the creation of a client
+// This is a stripped down version of the Config struct in consul's API client
+type ConsulConfig struct {
+	// Address is the address of the Consul server
+	Address string `json:"address"`
+
+	// Scheme is the URI scheme for the Consul server
+	Scheme string `json:"scheme"`
+
+	// Datacenter to use. If not provided, the default agent datacenter is used.
+	Datacenter string `json:"datacenter"`
+
+	// HttpAuth is the auth info to use for http access.
+	HttpAuth struct {
+		// Username to use for HTTP Basic Authentication
+		Username string `json:"username"`
+
+		// Password to use for HTTP Basic Authentication
+		Password string `json:"password"`
+	} `json:"http_auth"`
+
+	// WaitTime limits how long a Watch will block. If not provided,
+	// the agent default values will be used.
+	WaitTime time.Duration `json:"wait_time"`
+
+	// Token is used to provide a per-request ACL token
+	// which overrides the agent's default token.
+	Token string `json:"token"`
+
+	TLSConfig consul.TLSConfig `json:"tls_config"`
 }
 
 // GetEventTriggers returns event triggers. There was a typo in the json tag.

@@ -38,9 +38,13 @@ require (
 	github.com/go-redis/redis v6.15.6+incompatible
 	github.com/gocraft/health v0.0.0-20170925182251-8675af27fef0
 	github.com/golang/protobuf v1.3.2
+	github.com/google/btree v1.0.0 // indirect
 	github.com/google/uuid v1.1.1 // indirect
 	github.com/gorilla/mux v1.7.3
 	github.com/gorilla/websocket v1.4.1
+	github.com/hashicorp/consul/api v1.3.0
+	github.com/hashicorp/go-msgpack v0.5.4 // indirect
+	github.com/hashicorp/vault/api v1.0.4
 	github.com/huandu/xstrings v1.2.0 // indirect
 	github.com/imdario/mergo v0.3.7 // indirect
 	github.com/justinas/alice v0.0.0-20171023064455-03f45bd4b7da
@@ -52,7 +56,7 @@ require (
 	github.com/mavricknz/asn1-ber v0.0.0-20151103223136-b9df1c2f4213 // indirect
 	github.com/mavricknz/ldap v0.0.0-20160227184754-f5a958005e43
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
-	github.com/miekg/dns v1.0.8
+	github.com/miekg/dns v1.0.14
 	github.com/mitchellh/mapstructure v1.1.2
 	github.com/newrelic/go-agent v2.13.0+incompatible
 	github.com/opentracing/opentracing-go v1.1.0
@@ -91,7 +95,6 @@ require (
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 	gopkg.in/sourcemap.v1 v1.0.5 // indirect
 	gopkg.in/square/go-jose.v1 v1.1.2 // indirect
-	gopkg.in/square/go-jose.v2 v2.3.1 // indirect
 	gopkg.in/vmihailenco/msgpack.v2 v2.9.1
 	gopkg.in/xmlpath.v2 v2.0.0-20150820204837-860cbeca3ebc
 	gopkg.in/yaml.v2 v2.2.2
