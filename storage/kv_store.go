@@ -13,6 +13,7 @@ import (
 
 var _ KV = (*KVStore)(nil)
 var _ Health = (*KVStore)(nil)
+var _ Oauth = (*KVStore)(nil)
 
 type KVStore struct {
 	db        *badger.DB
@@ -90,6 +91,26 @@ func (kv *KVStore) GetRawKey(key string) (value string, err error) {
 		})
 	})
 	return
+}
+
+func (kv *KVStore) GetKeysAndValuesWithFilter(pattern string) map[string]string {
+	prefix := kv.patternToPrefix(pattern)
+	m := make(map[string]string)
+	kv.db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchValues = false
+		it := txn.NewIterator(opts)
+		defer it.Close()
+		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+			item := it.Item()
+			key := string(item.Key())
+			item.Value(func(val []byte) error {
+				m[key] = string(val)
+				return nil
+			})
+		}
+		return nil
+	})
 }
 
 func (kv *KVStore) GetKeys(pattern string) (keys []string) {
