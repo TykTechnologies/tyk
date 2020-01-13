@@ -35,3 +35,16 @@ func (t *slidingSortedSet) Set(key, value int64) (count int, elements []interfac
 	t.st.Set(float64(key), value)
 	return len(elements), elements
 }
+
+func (t *slidingSortedSet) Get() (count int, elements []interface{}) {
+	now := t.now()
+	ago := float64(now.Add(-1 * t.duration).UnixNano())
+	for e := t.st.Front(); e != nil; e = e.Next() {
+		if e.Key() < ago {
+			t.st.Remove(e.Key())
+		} else {
+			elements = append(elements, e.Value())
+		}
+	}
+	return len(elements), elements
+}

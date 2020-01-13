@@ -17,6 +17,9 @@ var _ Oauth = (*KVStore)(nil)
 var _ Cache = (*KVStore)(nil)
 var _ Host = (*KVStore)(nil)
 var _ AnalyticsHandler = (*KVStore)(nil)
+var _ Analytics = (*KVStore)(nil)
+var _ Auth = (*KVStore)(nil)
+var _ Handler = (*KVStore)(nil)
 
 type KVStore struct {
 	db        *badger.DB
@@ -86,6 +89,99 @@ func (kv *KVStore) AppendToSet(key, value string) {
 		kv.lists.Store(key, []string{value})
 	}
 }
+func (kv *KVStore) Decrement(key string) {
+	key = kv.fixKey(key)
+	kv.db.Update(func(txn *badger.Txn) error {
+		it, err := txn.Get([]byte(key))
+		if err != nil {
+			if err == badger.ErrKeyNotFound {
+				return txn.Set([]byte(key), []byte(strconv.FormatInt(-1, 10)))
+			}
+			return err
+		}
+		var v int64
+		err = it.Value(func(val []byte) error {
+			v, err = strconv.ParseInt(string(val), 10, 64)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		v--
+		return txn.Set([]byte(key), []byte(strconv.FormatInt(v, 10)))
+	})
+}
+
+func (kv *KVStore) IncrememntWithExpire(key string, expire int64) (result int64) {
+	key = kv.fixKey(key)
+	kv.db.Update(func(txn *badger.Txn) error {
+		it, err := txn.Get([]byte(key))
+		if err != nil {
+			if err == badger.ErrKeyNotFound {
+				result = 1
+				e := badger.NewEntry([]byte(key), []byte(strconv.FormatInt(result, 10)))
+				return txn.SetEntry(e.WithTTL(time.Duration(expire) * time.Second))
+			}
+			return err
+		}
+		var v int64
+		err = it.Value(func(val []byte) error {
+			v, err = strconv.ParseInt(string(val), 10, 64)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		v++
+		result = v
+		e := badger.NewEntry([]byte(key), []byte(strconv.FormatInt(result, 10)))
+		return txn.SetEntry(e.WithTTL(time.Duration(expire) * time.Second))
+	})
+	return
+}
+
+func (kv *KVStore) DeleteKeys(keys []string) bool {
+	return kv.db.Update(func(txn *badger.Txn) error {
+		for _, key := range keys {
+			if err := txn.Delete([]byte(kv.fixKey(key))); err != nil {
+				return err
+			}
+		}
+		return nil
+	}) == nil
+}
+
+func (kv *KVStore) GetMultiKey(keys []string) (values []string, err error) {
+	err = kv.db.View(func(txn *badger.Txn) error {
+		for _, key := range keys {
+			it, err := txn.Get([]byte(kv.fixKey(key)))
+			if err != nil {
+				return err
+			}
+			err = it.Value(func(val []byte) error {
+				values = append(values, string(val))
+				return nil
+			})
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return
+}
+
+func (kv *KVStore) DeleteRawKey(key string) bool {
+	return kv.db.Update(func(txn *badger.Txn) error {
+		return txn.Delete([]byte(key))
+	}) == nil
+}
 
 // AppendToSetPipelined this is a noop
 func (kv *KVStore) AppendToSetPipelined(key string, values [][]byte) {
@@ -117,6 +213,10 @@ func (kv *KVStore) GetAndDeleteSet(key string) []interface{} {
 		return lv
 	}
 	return nil
+}
+
+func (kv *KVStore) GetKeysAndValues() map[string]string {
+	return kv.GetKeysAndValuesWithFilter("")
 }
 
 func (kv *KVStore) SetRawKey(key, value string, timeout int64) error {
@@ -161,6 +261,7 @@ func (kv *KVStore) GetKeysAndValuesWithFilter(pattern string) map[string]string 
 		}
 		return nil
 	})
+	return m
 }
 
 func (kv *KVStore) GetKeys(pattern string) (keys []string) {
@@ -250,8 +351,8 @@ func (kv *KVStore) GetExp(key string) (exp int64, err error) {
 	return
 }
 
-func (kv *KVStore) DeleteAllKeys() error {
-	return kv.db.DropAll()
+func (kv *KVStore) DeleteAllKeys() bool {
+	return kv.db.DropAll() == nil
 }
 
 func (kv *KVStore) GetKeyPrefix() string {
@@ -303,6 +404,11 @@ func (kv *KVStore) IsMemberOfSet(key, value string) bool {
 func (kv *KVStore) SetRollingWindow(key string, per int64, value string, pipeline bool) (int, []interface{}) {
 	key = kv.fixKey(key)
 	return kv.getWindow(key, per).Set(kv.kv(value))
+}
+
+func (kv *KVStore) GetRollingWindow(key string, per int64, pipeline bool) (int, []interface{}) {
+	key = kv.fixKey(key)
+	return kv.getWindow(key, per).Get()
 }
 
 func (kv *KVStore) getWindow(key string, per int64) *slidingSortedSet {
