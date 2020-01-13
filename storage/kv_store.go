@@ -109,12 +109,9 @@ func (kv *KVStore) hashKey(key string) string {
 	return HashStr(key)
 }
 
-func NewKVStore(dir string) (*KVStore, error) {
-	opts := badger.DefaultOptions(dir)
-	if dir == "" {
-		// We still use badger but in memory now
-		opts.InMemory = true
-	}
+func NewKVStore() (*KVStore, error) {
+	opts := badger.DefaultOptions("")
+	opts.InMemory = true
 	db, err := badger.Open(opts)
 	if err != nil {
 		return nil, err
