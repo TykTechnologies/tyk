@@ -14,12 +14,16 @@ import (
 var _ KV = (*KVStore)(nil)
 var _ Health = (*KVStore)(nil)
 var _ Oauth = (*KVStore)(nil)
+var _ Cache = (*KVStore)(nil)
+var _ Host = (*KVStore)(nil)
+var _ AnalyticsHandler = (*KVStore)(nil)
 
 type KVStore struct {
 	db        *badger.DB
 	KeyPrefix string
 	HashKeys  bool
 	sets      *sync.Map
+	lists     *sync.Map
 	sorted    *sync.Map
 	windows   *sync.Map
 	now       func() time.Time
@@ -58,6 +62,7 @@ func NewKVStore(dir string) (*KVStore, error) {
 	return &KVStore{
 		db:      db,
 		sets:    new(sync.Map),
+		lists:   new(sync.Map),
 		sorted:  new(sync.Map),
 		windows: new(sync.Map),
 		now:     time.Now,
@@ -67,6 +72,51 @@ func NewKVStore(dir string) (*KVStore, error) {
 
 func (kv *KVStore) SetKey(key, value string, timeout int64) error {
 	return kv.SetRawKey(kv.fixKey(key), value, timeout)
+}
+
+// AppendToSet this is wrongly named as we aren't really operating on a set.
+// Operations are done on alist
+func (kv *KVStore) AppendToSet(key, value string) {
+	key = kv.fixKey(key)
+	if ls, ok := kv.lists.Load(key); ok {
+		lv := ls.([]string)
+		lv = append(lv, value)
+		kv.lists.Store(key, lv)
+	} else {
+		kv.lists.Store(key, []string{value})
+	}
+}
+
+// AppendToSetPipelined this is a noop
+func (kv *KVStore) AppendToSetPipelined(key string, values [][]byte) {
+	if ls, ok := kv.lists.Load(key); ok {
+		lv := ls.([]string)
+		for _, v := range values {
+			lv = append(lv, string(v))
+		}
+		kv.lists.Store(key, lv)
+	} else {
+		var lv []string
+		for _, v := range values {
+			lv = append(lv, string(v))
+		}
+		kv.lists.Store(key, lv)
+	}
+}
+
+// GetAndDeleteSet this is also used by analytics handler meaning it is
+// operating on a list data structure rather than on a set.
+func (kv *KVStore) GetAndDeleteSet(key string) []interface{} {
+	key = kv.fixKey(key)
+	if ls, ok := kv.lists.Load(key); ok {
+		var lv []interface{}
+		for _, v := range ls.([]string) {
+			lv = append(lv, v)
+		}
+		kv.lists.Delete(key)
+		return lv
+	}
+	return nil
 }
 
 func (kv *KVStore) SetRawKey(key, value string, timeout int64) error {
