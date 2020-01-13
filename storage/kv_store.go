@@ -20,6 +20,7 @@ var _ AnalyticsHandler = (*KVStore)(nil)
 var _ Analytics = (*KVStore)(nil)
 var _ Auth = (*KVStore)(nil)
 var _ Handler = (*KVStore)(nil)
+var _ Manager = (*KVStore)(nil)
 
 type KVStore struct {
 	db        *badger.DB
@@ -31,6 +32,19 @@ type KVStore struct {
 	windows   *sync.Map
 	now       func() time.Time
 	divisor   func() float64
+}
+
+func (kv *KVStore) GetStore(keyPredix string, hashKey bool) Handler {
+	return &KVStore{
+		KeyPrefix: keyPredix,
+		HashKeys:  hashKey,
+		sets:      kv.sets,
+		lists:     kv.lists,
+		sorted:    kv.sorted,
+		windows:   kv.windows,
+		now:       kv.now,
+		divisor:   kv.divisor,
+	}
 }
 
 func (kv *KVStore) Connect() bool { return true }
@@ -323,7 +337,15 @@ func (kv *KVStore) DeleteScanMatch(pattern string) bool {
 }
 
 func (kv *KVStore) Close() error {
+	kv.clearMaps()
 	return kv.db.Close()
+}
+
+func (kv *KVStore) clearMaps() {
+	kv.sets = new(sync.Map)
+	kv.lists = new(sync.Map)
+	kv.sorted = new(sync.Map)
+	kv.windows = new(sync.Map)
 }
 
 func (kv *KVStore) SetExp(key string, exp int64) error {

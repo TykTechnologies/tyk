@@ -101,9 +101,8 @@ type KV interface {
 	DeleteScanMatch(string) bool
 }
 
-// Manager is an interface for managing multiple data stores used by tyk
 type Manager interface {
-	GetStore(prefix string, hasKeys bool) KV
+	GetStore(prefix string, hasKeys bool) Handler
 	Close() error
 }
 
