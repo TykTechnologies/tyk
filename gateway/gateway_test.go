@@ -832,6 +832,17 @@ func TestControlListener(t *testing.T) {
 	ts.RunExt(t, tests...)
 	DoReload()
 	ts.RunExt(t, tests...)
+
+	// Moved here because DoReload overrides it
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/user-api"
+		spec.UseKeylessAccess = true
+	})
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{Path: "/user-api", Code: http.StatusOK},
+		{Path: "/user-api", ControlRequest: true, Code: http.StatusNotFound},
+	}...)
 }
 
 func TestHttpPprof(t *testing.T) {
