@@ -96,6 +96,7 @@ type APIDefinition struct {
 	PythonMiddlewareConfigData PythonMiddlewareConfigData `json:"python_middleware_config_data"`
 	GolangMiddlewareConfigData GolangMiddlewareConfigData `json:"golang_middleware_config_data"`
 	URLRewrites                []URLRewrites              `json:"url_rewrites"`
+	RemoveHeaders              []string                   `json:"remove_headers"`
 }
 
 // JWTDefinitions to store JWTDefinition
@@ -326,6 +327,13 @@ func addOrUpdateApi(r *http.Request) (interface{}, int) {
 					})["Default"].(map[string]interface {
 					})["extended_paths"].(map[string]interface {
 					})["url_rewrites"] = api.URLRewrites
+				}
+
+				if len(api.RemoveHeaders) > 0 {
+					temp["version_data"].(map[string]interface {
+					})["versions"].(map[string]interface {
+					})["Default"].(map[string]interface {
+					})["global_headers_remove"] = api.RemoveHeaders
 				}
 
 				// Inject middleware
