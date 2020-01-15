@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"fmt"
-	"math/rand"
 	"net/http"
 	"net/url"
 	"testing"
@@ -14,18 +13,6 @@ type TestAuth struct {
 	apidef.AuthConfig
 	HeaderKey  string
 	QueryParam string
-}
-
-const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
-func randStringBytes(n int) string {
-	b := make([]byte, n)
-
-	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
-	}
-
-	return string(b)
 }
 
 func testPrepareStripAuthStripFromHeaders() ([]string, []TestAuth) {

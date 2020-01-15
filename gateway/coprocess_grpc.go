@@ -72,13 +72,30 @@ func (d *GRPCDispatcher) Reload() {}
 // HandleMiddlewareCache isn't used by gRPC.
 func (d *GRPCDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, basePath string) {}
 
+func grpcCallOpts() grpc.DialOption {
+	recvSize := config.Global().CoProcessOptions.GRPCRecvMaxSize
+	sendSize := config.Global().CoProcessOptions.GRPCSendMaxSize
+	var opts []grpc.CallOption
+	if recvSize > 0 {
+		opts = append(opts, grpc.MaxCallRecvMsgSize(recvSize))
+	}
+	if sendSize > 0 {
+		opts = append(opts, grpc.MaxCallRecvMsgSize(sendSize))
+	}
+	return grpc.WithDefaultCallOptions(opts...)
+}
+
 // NewGRPCDispatcher wraps all the actions needed for this CP.
 func NewGRPCDispatcher() (coprocess.Dispatcher, error) {
 	if config.Global().CoProcessOptions.CoProcessGRPCServer == "" {
 		return nil, errors.New("No gRPC URL is set")
 	}
 	var err error
-	grpcConnection, err = grpc.Dial("", grpc.WithInsecure(), grpc.WithDialer(dialer))
+	grpcConnection, err = grpc.Dial("",
+		grpcCallOpts(),
+		grpc.WithInsecure(),
+		grpc.WithDialer(dialer),
+	)
 	grpcClient = coprocess.NewDispatcherClient(grpcConnection)
 
 	if err != nil {
