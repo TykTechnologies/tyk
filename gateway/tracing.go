@@ -23,6 +23,8 @@ type traceHttpRequest struct {
 
 func (tr *traceHttpRequest) toRequest() *http.Request {
 	r := httptest.NewRequest(tr.Method, tr.Path, strings.NewReader(tr.Body))
+	// It sets example.com by default. Setting it to empty will not show a value because it is not necessary.
+	r.Host = ""
 	r.Header = tr.Headers
 	ctxSetTrace(r)
 
