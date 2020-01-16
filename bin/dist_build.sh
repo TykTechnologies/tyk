@@ -50,6 +50,9 @@ mv tyk-cli_linux_* $cliTmpDir/
 echo "Starting Tyk build"
 cd $SOURCEBINPATH
 
+echo "Moving vendor dir to GOPATH"
+mv vendor ${GOPATH}/src/
+
 echo "Blitzing TGZ dirs"
 for arch in ${!ARCHTGZDIRS[@]}
 do
