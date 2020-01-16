@@ -303,6 +303,6 @@ func TestHandle404(t *testing.T) {
 
 	_, _ = g.Run(t, []test.TestCase{
 		{Path: "/existing", Code: http.StatusOK},
-		{Path: "/nonexisting", Code: http.StatusNotFound, BodyMatch: "404 page not found"},
+		{Path: "/nonexisting", Code: http.StatusNotFound, BodyMatch: http.StatusText(http.StatusNotFound)},
 	}...)
 }
