@@ -1,5 +1,5 @@
 #!/bin/bash
-: ${ORGDIR:="/src/github.com/TykTechnologies"}
+: ${ORGDIR:="/go/src/github.com/TykTechnologies"}
 : ${SOURCEBINPATH:="${ORGDIR}/tyk"}
 : ${SIGNKEY:="729EA673"}
 : ${BUILDPKGS:="1"}
