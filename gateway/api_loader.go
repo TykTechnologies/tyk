@@ -683,6 +683,7 @@ func loadApps(specs []*APISpec) {
 
 	muxer := &proxyMux{}
 	router := mux.NewRouter()
+	router.NotFoundHandler = http.HandlerFunc(muxer.handle404)
 	loadAPIEndpoints(router)
 	muxer.setRouter(port, "", router)
 
