@@ -763,6 +763,7 @@ const sampleAPI = `{
         "auth_header_name": "authorization"
 	},
     "version_data": {
+		"default_version": "Default",
         "not_versioned": true,
         "versions": {
             "v1": {
