@@ -96,6 +96,8 @@ type APIDefinition struct {
 	PythonMiddlewareConfigData PythonMiddlewareConfigData `json:"python_middleware_config_data"`
 	GolangMiddlewareConfigData GolangMiddlewareConfigData `json:"golang_middleware_config_data"`
 	URLRewrites                []URLRewrites              `json:"url_rewrites"`
+	RemoveHeaders              []string                   `json:"remove_headers"`
+	AuthCookieName             string                     `json:"auth_cookie_name"`
 }
 
 // JWTDefinitions to store JWTDefinition
@@ -326,6 +328,21 @@ func addOrUpdateApi(r *http.Request) (interface{}, int) {
 					})["Default"].(map[string]interface {
 					})["extended_paths"].(map[string]interface {
 					})["url_rewrites"] = api.URLRewrites
+				}
+
+				if len(api.RemoveHeaders) > 0 {
+					temp["version_data"].(map[string]interface {
+					})["versions"].(map[string]interface {
+					})["Default"].(map[string]interface {
+					})["global_headers_remove"] = api.RemoveHeaders
+				}
+
+				if len(api.AuthCookieName) != 0 {
+					temp["auth"].(map[string]interface {
+					})["cookie_name"] = api.AuthCookieName
+
+					temp["auth"].(map[string]interface {
+					})["auth_header_name"] = api.AuthCookieName
 				}
 
 				// Inject middleware
@@ -823,10 +840,15 @@ func getPlatform(SysConfPath string) (string, error) {
 	var ret = "aci"
 	data := make(map[interface{}]interface{})
 	SysConfData, err := ioutil.ReadFile(SysConfPath)
+	if err != nil {
+		log.Error("Error reading platform type", err)
+		ret = "any"
+	}
 
 	err = yaml.Unmarshal(SysConfData, &data)
 	if err != nil {
-		return "", err
+		log.Error("Error reading platform type", err)
+		ret = "any"
 	}
 
 	if val, found := data["mode"]; found {
