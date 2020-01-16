@@ -244,7 +244,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 	enableVersionOverrides := false
 	for _, versionData := range spec.VersionData.Versions {
-		if versionData.OverrideTarget != "" {
+		if versionData.OverrideTarget != "" && !spec.VersionData.NotVersioned {
 			enableVersionOverrides = true
 			break
 		}
