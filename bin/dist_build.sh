@@ -50,7 +50,7 @@ echo "Starting Tyk build"
 cd $SOURCEBINPATH
 
 echo "Moving vendor dir to GOPATH"
-mv vendor ${GOPATH}/src/
+yes | cp -r vendor ${GOPATH}/src/ && rm -rf vendor
 
 echo "Blitzing TGZ dirs"
 for arch in ${!ARCHTGZDIRS[@]}
