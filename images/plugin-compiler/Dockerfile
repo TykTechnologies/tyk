@@ -3,6 +3,7 @@ LABEL io.tyk.vendor="Tyk" \
       version="1.0" \
       description="Image for plugin development"
 
+ENV GOPATH=/go
 ARG TYK_GW_TAG
 ENV TYK_GW_PATH=${GOPATH}/src/github.com/TykTechnologies/tyk
 
@@ -11,7 +12,8 @@ COPY data/build.sh /build.sh
 RUN chmod +x /build.sh
 
 RUN curl -sL "https://api.github.com/repos/TykTechnologies/tyk/tarball/${TYK_GW_TAG}" | \
-    tar -C $TYK_GW_PATH --strip-components=1 -xzf -
+    tar -C $TYK_GW_PATH --strip-components=1 -xzf - 
+RUN yes | cp -r $TYK_GW_PATH/vendor $GOPATH/src && rm -rf $TYK_GW_PATH/vendor
 
 ENTRYPOINT ["/build.sh"]
 

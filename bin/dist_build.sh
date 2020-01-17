@@ -1,5 +1,5 @@
 #!/bin/bash
-: ${ORGDIR:="/src/github.com/TykTechnologies"}
+: ${ORGDIR:="/go/src/github.com/TykTechnologies"}
 : ${SOURCEBINPATH:="${ORGDIR}/tyk"}
 : ${SIGNKEY:="729EA673"}
 : ${BUILDPKGS:="1"}
@@ -41,7 +41,6 @@ cd $ORGDIR
 cd $cliDIR
 git checkout master
 git pull
-go get -v ./...
 gox -osarch="linux/arm64 linux/amd64 linux/386"
 
 echo "Copying CLI Build files"
@@ -49,6 +48,9 @@ mv tyk-cli_linux_* $cliTmpDir/
 
 echo "Starting Tyk build"
 cd $SOURCEBINPATH
+
+echo "Moving vendor dir to GOPATH"
+yes | cp -r vendor ${GOPATH}/src/ && rm -rf vendor
 
 echo "Blitzing TGZ dirs"
 for arch in ${!ARCHTGZDIRS[@]}
