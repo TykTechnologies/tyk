@@ -63,7 +63,7 @@ func fileDescriptors() {
 	if err == nil && rlimit.Cur < minFileDescriptors {
 		log.Warningf("File descriptor limit %d too low for production use. Min %d recommended.\n"+
 			"\tThis could have a significant negative impact on performance.\n"+
-			"\tPlease refer to https://tyk.io/docs/deploy-tyk-premise-production/#file-handles for further guidance.", rlimit.Cur, minFileDescriptors)
+			"\tPlease refer to https://tyk.io/docs/deploy-tyk-premise-production/#file-handles--file-descriptors for further guidance.", rlimit.Cur, minFileDescriptors)
 	}
 }
 
