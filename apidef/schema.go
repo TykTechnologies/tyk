@@ -243,10 +243,7 @@ const Schema = `{
                 "use_certificate": {
                     "type": "boolean"
                 }
-            },
-            "required": [
-                "auth_header_name"
-            ]
+            }
         },
 		"auth_configs":{
 			"type": ["object", "null"]
