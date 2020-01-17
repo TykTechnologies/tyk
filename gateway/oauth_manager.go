@@ -9,6 +9,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/lonelycode/osin"
@@ -690,6 +691,15 @@ func (r *RedisOsinStorageInterface) SetClient(id string, client osin.Client, ign
 	log.Debug("Storing copy in set")
 
 	keyForSet := prefixClientset + prefixClient // Org ID
+
+	// In set, there is no option for update so the existing client should be removed before adding new one.
+	set, _ := r.store.GetSet(keyForSet)
+	for _, v := range set {
+		if strings.Contains(v, client.GetId()) {
+			r.store.RemoveFromSet(keyForSet, v)
+		}
+	}
+
 	r.store.AddToSet(keyForSet, string(clientDataJSON))
 	return nil
 }
