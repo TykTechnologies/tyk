@@ -429,6 +429,7 @@ type Config struct {
 	UseSyslog               bool           `json:"use_syslog"`
 	UseGraylog              bool           `json:"use_graylog"`
 	UseLogstash             bool           `json:"use_logstash"`
+	Track404Logs            bool           `json:"track_404_logs"`
 	GraylogNetworkAddr      string         `json:"graylog_network_addr"`
 	LogstashNetworkAddr     string         `json:"logstash_network_addr"`
 	SyslogTransport         string         `json:"syslog_transport"`
@@ -462,7 +463,6 @@ type Config struct {
 // VaultConfig is used to configure the creation of a client
 // This is a stripped down version of the Config struct in vault's API client
 type VaultConfig struct {
-
 	// Address is the address of the Vault server. This should be a complete
 	// URL such as "http://vault.example.com".
 	Address string `json:"address"`
