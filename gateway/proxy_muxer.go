@@ -15,8 +15,8 @@ import (
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/tcp"
-	proxyproto "github.com/pires/go-proxyproto"
-	cache "github.com/pmylund/go-cache"
+	"github.com/pires/go-proxyproto"
+	"github.com/pmylund/go-cache"
 
 	"golang.org/x/net/http2"
 
@@ -149,9 +149,10 @@ func (m *proxyMux) setRouter(port int, protocol string, router *mux.Router) {
 }
 
 func (m *proxyMux) handle404(w http.ResponseWriter, r *http.Request) {
-	if !config.Global().Disable404Logs {
+	if config.Global().Track404Logs {
 		requestMeta := fmt.Sprintf("%s %s %s", r.Method, r.URL.Path, r.Proto)
-		log.WithField("request", requestMeta).Error(http.StatusText(http.StatusNotFound))
+		log.WithField("request", requestMeta).WithField("origin", r.RemoteAddr).
+			Error(http.StatusText(http.StatusNotFound))
 	}
 
 	w.WriteHeader(http.StatusNotFound)

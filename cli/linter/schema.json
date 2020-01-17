@@ -785,7 +785,7 @@
     "use_logstash": {
       "type": "boolean"
     },
-    "disable_404_logs": {
+    "track_404_logs": {
       "type": "boolean"
     },
     "use_redis_log": {

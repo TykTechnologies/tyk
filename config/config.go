@@ -429,7 +429,7 @@ type Config struct {
 	UseSyslog               bool           `json:"use_syslog"`
 	UseGraylog              bool           `json:"use_graylog"`
 	UseLogstash             bool           `json:"use_logstash"`
-	Disable404Logs          bool           `json:"disable_404_logs"`
+	Track404Logs            bool           `json:"track_404_logs"`
 	GraylogNetworkAddr      string         `json:"graylog_network_addr"`
 	LogstashNetworkAddr     string         `json:"logstash_network_addr"`
 	SyslogTransport         string         `json:"syslog_transport"`
