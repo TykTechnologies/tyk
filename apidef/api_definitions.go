@@ -556,6 +556,11 @@ func (a *APIDefinition) EncodeForDB() {
 			a.VersionData.Versions[i].ExtendedPaths.ValidateJSON[j] = oldSchema
 		}
 	}
+
+	// Auth is deprecated so this code tries to maintain backward compatibility
+	if a.Auth.AuthHeaderName == "" {
+		a.Auth = a.AuthConfigs["authToken"]
+	}
 }
 
 func (a *APIDefinition) DecodeFromDB() {
@@ -606,6 +611,18 @@ func (a *APIDefinition) DecodeFromDB() {
 			a.VersionData.Versions[i].ExtendedPaths.ValidateJSON[j] = oldSchema
 		}
 	}
+
+	// Auth is deprecated so this code tries to maintain backward compatibility
+	makeCompatible := func(authType string) {
+		_, ok := a.AuthConfigs[authType]
+
+		if !ok {
+			a.AuthConfigs[authType] = a.Auth
+		}
+	}
+
+	makeCompatible("authToken")
+	makeCompatible("jwt")
 }
 
 func (s *StringRegexMap) Check(value string) (match string) {
