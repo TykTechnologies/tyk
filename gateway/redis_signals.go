@@ -178,12 +178,40 @@ func isPayloadSignatureValid(notification Notification) bool {
 
 // RedisNotifier will use redis pub/sub channels to send notifications
 type RedisNotifier struct {
-	store   *storage.RedisCluster
-	channel string
+	store          *storage.RedisCluster
+	channel        string
+	privateKeyPath string
+	signer         goverify.Signer
+}
+
+func (r *RedisNotifier) signNotification(notification *Notification) {
+	if r.privateKeyPath != "" {
+		if r.signer == nil {
+			signer, err := goverify.LoadPrivateKeyFromFile(r.privateKeyPath)
+			if err != nil {
+				log.Error("Notification signer: Failed loading private key from path: ", err)
+				return
+			}
+			r.signer = signer
+		}
+	}
+
+	if r.signer != nil {
+		signed, err := r.signer.Sign([]byte(notification.Payload))
+		if err != nil {
+			log.Errorf("could not sign request: %v", err)
+			return
+		}
+		notification.Signature = base64.StdEncoding.EncodeToString(signed)
+	}
 }
 
 // Notify will send a notification to a channel
 func (r *RedisNotifier) Notify(notif interface{}) bool {
+	if n, ok := notif.(Notification); ok {
+		r.signNotification(&n)
+		notif = n
+	}
 
 	toSend, err := json.Marshal(notif)
 

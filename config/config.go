@@ -313,6 +313,7 @@ type Config struct {
 	NodeSecret                string                  `json:"node_secret"`
 	PIDFileLocation           string                  `json:"pid_file_location"`
 	AllowInsecureConfigs      bool                    `json:"allow_insecure_configs"`
+	PrivateKeyPath            string                  `json:"private_key_path"`
 	PublicKeyPath             string                  `json:"public_key_path"`
 	AllowRemoteConfig         bool                    `bson:"allow_remote_config" json:"allow_remote_config"`
 	Security                  SecurityConfig          `json:"security"`

@@ -224,7 +224,7 @@ func setupGlobals(ctx context.Context) {
 	mainLog.Debug("Notifier will not work in hybrid mode")
 	mainNotifierStore := &storage.RedisCluster{}
 	mainNotifierStore.Connect()
-	MainNotifier = RedisNotifier{mainNotifierStore, RedisPubSubChannel}
+	MainNotifier = RedisNotifier{store: mainNotifierStore, channel: RedisPubSubChannel, privateKeyPath: config.Global().PrivateKeyPath}
 
 	if config.Global().Monitor.EnableTriggerMonitors {
 		h := &WebHookHandler{}
