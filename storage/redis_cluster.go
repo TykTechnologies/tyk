@@ -54,7 +54,7 @@ func singleton(cache bool) redis.UniversalClient {
 	return nil
 }
 
-func connectSingleTon(cache bool) bool {
+func connectSingleton(cache bool) bool {
 	d := singleton(cache) == nil
 	if d {
 		log.Debug("Connecting to redis cluster")
@@ -77,6 +77,12 @@ type RedisCluster struct {
 }
 
 func clusterConnectionIsOpen(cluster *RedisCluster) bool {
+	v := redisUp.Load()
+	redisUp.Store(true)
+	if v == nil {
+		v = false
+	}
+	defer redisUp.Store(v)
 	testKey := "redis-test-" + uuid.NewV4().String()
 	// set test key
 	if err := cluster.SetKey(testKey, "test", 1); err != nil {
@@ -104,10 +110,12 @@ again:
 			return
 		case <-tick.C:
 			for _, v := range c {
-				if !connectSingleTon(v.IsCache) {
+				if !connectSingleton(v.IsCache) {
+					redisUp.Store(false)
 					goto again
 				}
 				if !clusterConnectionIsOpen(&v) {
+					redisUp.Store(false)
 					goto again
 				}
 			}
@@ -441,7 +449,7 @@ func (r *RedisCluster) GetExp(keyName string) (int64, error) {
 }
 
 func (r *RedisCluster) SetExp(keyName string, timeout int64) error {
-	if err:=r.up();err!=nil{
+	if err := r.up(); err != nil {
 		return err
 	}
 	err := r.singleton().Expire(r.fixKey(keyName), time.Duration(timeout)*time.Second).Err()
