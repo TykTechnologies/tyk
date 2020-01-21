@@ -391,7 +391,8 @@ func controlAPICheckClientCertificate(certLevel string, next http.Handler) http.
 	})
 }
 
-func loadAPIEndpoints(muxer *mux.Router) {
+// loadControlAPIEndpoints loads the endpoints used for controlling the Gateway.
+func loadControlAPIEndpoints(muxer *mux.Router) {
 	hostname := config.Global().HostName
 	if config.Global().ControlAPIHostname != "" {
 		hostname = config.Global().ControlAPIHostname
@@ -1361,7 +1362,7 @@ func startServer() {
 	muxer := &proxyMux{}
 
 	router := mux.NewRouter()
-	loadAPIEndpoints(router)
+	loadControlAPIEndpoints(router)
 	muxer.setRouter(config.Global().ControlAPIPort, "", router)
 
 	if muxer.router(config.Global().ListenPort, "") == nil {

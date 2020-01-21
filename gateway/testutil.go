@@ -129,7 +129,7 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 	cli.Init(VERSION, confPaths)
 	initialiseSystem(ctx)
 	// Small part of start()
-	loadAPIEndpoints(mainRouter())
+	loadControlAPIEndpoints(mainRouter())
 	if analytics.GeoIPDB == nil {
 		panic("GeoIPDB was not initialized")
 	}
