@@ -1302,7 +1302,7 @@ func BenchmarkApiReload(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		loadAPIEndpoints(nil)
+		loadControlAPIEndpoints(nil)
 		loadApps(specs)
 	}
 }
