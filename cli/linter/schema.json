@@ -653,6 +653,10 @@
         "type": "string"
       }
     },
+    "private_key_path": {
+      "type": "string",
+      "format": "path"
+    },
     "public_key_path": {
       "type": "string",
       "format": "path"
