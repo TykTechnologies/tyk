@@ -77,19 +77,12 @@ type RedisCluster struct {
 }
 
 func clusterConnectionIsOpen(cluster *RedisCluster) bool {
-	v := redisUp.Load()
-	redisUp.Store(true)
-	if v == nil {
-		v = false
-	}
-	defer redisUp.Store(v)
+	c := singleton(cluster.IsCache)
 	testKey := "redis-test-" + uuid.NewV4().String()
-	// set test key
-	if err := cluster.SetKey(testKey, "test", 1); err != nil {
+	if err := c.Set(testKey, "test", time.Second).Err(); err != nil {
 		return false
 	}
-	// get test key
-	if _, err := cluster.GetKey(testKey); err != nil {
+	if _, err := c.Get(testKey).Result(); err != nil {
 		return false
 	}
 	return true
