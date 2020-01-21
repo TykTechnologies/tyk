@@ -96,6 +96,18 @@ func ConnectToRedis(ctx context.Context) {
 	c := []RedisCluster{
 		{}, {IsCache: true},
 	}
+	var ok bool
+	for _, v := range c {
+		if !connectSingleton(v.IsCache) {
+			break
+		}
+		if !clusterConnectionIsOpen(&v) {
+			redisUp.Store(false)
+			break
+		}
+		ok = true
+	}
+	redisUp.Store(ok)
 again:
 	for {
 		select {
