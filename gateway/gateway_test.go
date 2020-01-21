@@ -832,6 +832,17 @@ func TestControlListener(t *testing.T) {
 	ts.RunExt(t, tests...)
 	DoReload()
 	ts.RunExt(t, tests...)
+
+	// Moved here because DoReload overrides it
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/user-api"
+		spec.UseKeylessAccess = true
+	})
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{Path: "/user-api", Code: http.StatusOK},
+		{Path: "/user-api", ControlRequest: true, Code: http.StatusNotFound},
+	}...)
 }
 
 func TestHttpPprof(t *testing.T) {
@@ -1247,6 +1258,61 @@ func TestCacheAllSafeRequestsWithCachedHeaders(t *testing.T) {
 	}...)
 }
 
+func TestCacheWithAdvanceUrlRewrite(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+	cache := storage.RedisCluster{KeyPrefix: "cache-"}
+	defer cache.DeleteScanMatch("*")
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		version := spec.VersionData.Versions["v1"]
+		version.UseExtendedPaths = true
+		version.ExtendedPaths = apidef.ExtendedPathsSet{
+			URLRewrite: []apidef.URLRewriteMeta{
+				{
+					Path:         "/test",
+					Method:       http.MethodGet,
+					MatchPattern: "/test(.*)",
+					Triggers: []apidef.RoutingTrigger{
+						{
+							On: "all",
+							Options: apidef.RoutingTriggerOptions{
+								HeaderMatches: map[string]apidef.StringRegexMap{
+									"rewritePath": apidef.StringRegexMap{
+										MatchPattern: "newpath",
+									},
+								},
+							},
+							RewriteTo: "/newpath",
+						},
+					},
+				},
+			},
+			Cached: []string{"/test"},
+		}
+		spec.CacheOptions = apidef.CacheOptions{
+			CacheTimeout: 120,
+			EnableCache:  true,
+		}
+		spec.Proxy.ListenPath = "/"
+		spec.VersionData.Versions["v1"] = version
+	})
+
+	headerCache := map[string]string{"x-tyk-cached-response": "1"}
+	matchHeaders := map[string]string{"rewritePath": "newpath"}
+	randomheaders := map[string]string{"something": "abcd"}
+
+	ts.Run(t, []test.TestCase{
+		{Method: http.MethodGet, Path: "/test", Headers: matchHeaders, HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodGet, Path: "/test", Headers: matchHeaders, HeadersMatch: headerCache},
+		//Even if trigger condition failed, as response is cached
+		// will still get redirected response
+		{Method: http.MethodGet, Path: "/test", Headers: randomheaders, HeadersMatch: headerCache, BodyMatch: `"Url":"/newpath"`},
+		{Method: http.MethodPost, Path: "/test", HeadersNotMatch: headerCache},
+		{Method: http.MethodGet, Path: "/test", HeadersMatch: headerCache},
+	}...)
+}
+
 func TestCachePostRequest(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
@@ -1263,12 +1329,13 @@ func TestCachePostRequest(t *testing.T) {
 		}
 
 		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
-			json.Unmarshal([]byte(`[{
-						"method":"POST",
-						"path":"/",
-						"cache_key_regex":"\"id\":[^,]*"
-					}
-                                ]`), &v.ExtendedPaths.AdvanceCacheConfig)
+			v.ExtendedPaths.AdvanceCacheConfig = []apidef.CacheMeta{
+				{
+					Method:        http.MethodPost,
+					Path:          "/",
+					CacheKeyRegex: "\"id\":[^,]*",
+				},
+			}
 		})
 
 		spec.Proxy.ListenPath = "/"
@@ -1277,14 +1344,14 @@ func TestCachePostRequest(t *testing.T) {
 	headerCache := map[string]string{"x-tyk-cached-response": "1"}
 
 	ts.Run(t, []test.TestCase{
-		{Method: "POST", Path: "/", Data: "{\"id\":\"1\",\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
-		{Method: "POST", Path: "/", Data: "{\"id\":\"1\",\"name\":\"test\"}", HeadersMatch: headerCache, Delay: 10 * time.Millisecond},
-		{Method: "POST", Path: "/", Data: "{\"id\":\"2\",\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodPost, Path: "/", Data: "{\"id\":\"1\",\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodPost, Path: "/", Data: "{\"id\":\"1\",\"name\":\"test\"}", HeadersMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodPost, Path: "/", Data: "{\"id\":\"2\",\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
 		// if regex match returns nil, then request body is ignored while generating cache key
-		{Method: "POST", Path: "/", Data: "{\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
-		{Method: "POST", Path: "/", Data: "{\"name\":\"test2\"}", HeadersMatch: headerCache, Delay: 10 * time.Millisecond},
-		{Method: "POST", Path: "/", Data: "{\"name\":\"test2\"}", Headers: map[string]string{tenant: "someUUID"}, HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
-		{Method: "POST", Path: "/", Data: "{\"name\":\"test2\"}", Headers: map[string]string{tenant: "someUUID"}, HeadersMatch: headerCache},
+		{Method: http.MethodPost, Path: "/", Data: "{\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodPost, Path: "/", Data: "{\"name\":\"test2\"}", HeadersMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodPost, Path: "/", Data: "{\"name\":\"test2\"}", Headers: map[string]string{tenant: "someUUID"}, HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodPost, Path: "/", Data: "{\"name\":\"test2\"}", Headers: map[string]string{tenant: "someUUID"}, HeadersMatch: headerCache},
 	}...)
 }
 

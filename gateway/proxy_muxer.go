@@ -148,6 +148,17 @@ func (m *proxyMux) setRouter(port int, protocol string, router *mux.Router) {
 	}
 }
 
+func (m *proxyMux) handle404(w http.ResponseWriter, r *http.Request) {
+	if config.Global().Track404Logs {
+		requestMeta := fmt.Sprintf("%s %s %s", r.Method, r.URL.Path, r.Proto)
+		log.WithField("request", requestMeta).WithField("origin", r.RemoteAddr).
+			Error(http.StatusText(http.StatusNotFound))
+	}
+
+	w.WriteHeader(http.StatusNotFound)
+	_, _ = fmt.Fprint(w, http.StatusText(http.StatusNotFound))
+}
+
 func (m *proxyMux) addTCPService(spec *APISpec, modifier *tcp.Modifier) {
 	hostname := spec.GlobalConfig.HostName
 	if spec.GlobalConfig.EnableCustomDomains {

@@ -1,8 +1,8 @@
 #!/bin/bash
-: ${ORGDIR:="/src/github.com/TykTechnologies"}
+: ${ORGDIR:="/go/src/github.com/TykTechnologies"}
 : ${SOURCEBINPATH:="${ORGDIR}/tyk"}
 : ${DEBVERS:="ubuntu/trusty ubuntu/xenial ubuntu/bionic debian/jessie debian/stretch debian/buster"}
-: ${RPMVERS:="el/6 el/7"}
+: ${RPMVERS:="el/6 el/7 el/8"}
 : ${PKGNAME:="tyk-gateway"}
 
 echo "Set version number"

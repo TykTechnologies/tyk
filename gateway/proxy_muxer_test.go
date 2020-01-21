@@ -12,6 +12,8 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/test"
+
 	"github.com/TykTechnologies/tyk/config"
 )
 
@@ -182,34 +184,34 @@ func TestCheckPortWhiteList(t *testing.T) {
 	}{
 		{"gw port empty protocol", "", base.ListenPort, true, nil},
 		{"gw port http protocol", "http", base.ListenPort, false, map[string]config.PortWhiteList{
-			"http": config.PortWhiteList{
+			"http": {
 				Ports: []int{base.ListenPort},
 			},
 		}},
 		{"unknown tls", "tls", base.ListenPort, true, nil},
 		{"unknown tcp", "tls", base.ListenPort, true, nil},
 		{"whitelisted tcp", "tcp", base.ListenPort, false, map[string]config.PortWhiteList{
-			"tcp": config.PortWhiteList{
+			"tcp": {
 				Ports: []int{base.ListenPort},
 			},
 		}},
 		{"whitelisted tls", "tls", base.ListenPort, false, map[string]config.PortWhiteList{
-			"tls": config.PortWhiteList{
+			"tls": {
 				Ports: []int{base.ListenPort},
 			},
 		}},
 		{"black listed tcp", "tcp", base.ListenPort, true, map[string]config.PortWhiteList{
-			"tls": config.PortWhiteList{
+			"tls": {
 				Ports: []int{base.ListenPort},
 			},
 		}},
 		{"blacklisted tls", "tls", base.ListenPort, true, map[string]config.PortWhiteList{
-			"tcp": config.PortWhiteList{
+			"tcp": {
 				Ports: []int{base.ListenPort},
 			},
 		}},
 		{"whitelisted tls range", "tls", base.ListenPort, false, map[string]config.PortWhiteList{
-			"tls": config.PortWhiteList{
+			"tls": {
 				Ranges: []config.PortRange{
 					{
 						From: base.ListenPort - 1,
@@ -219,7 +221,7 @@ func TestCheckPortWhiteList(t *testing.T) {
 			},
 		}},
 		{"whitelisted tcp range", "tcp", base.ListenPort, false, map[string]config.PortWhiteList{
-			"tcp": config.PortWhiteList{
+			"tcp": {
 				Ranges: []config.PortRange{
 					{
 						From: base.ListenPort - 1,
@@ -229,7 +231,7 @@ func TestCheckPortWhiteList(t *testing.T) {
 			},
 		}},
 		{"whitelisted http range", "http", 8090, false, map[string]config.PortWhiteList{
-			"http": config.PortWhiteList{
+			"http": {
 				Ranges: []config.PortRange{
 					{
 						From: 8000,
@@ -288,4 +290,19 @@ func TestHTTP_custom_ports(t *testing.T) {
 	if bs != echo {
 		t.Errorf("expected %s to %s", echo, bs)
 	}
+}
+
+func TestHandle404(t *testing.T) {
+	g := StartTest()
+	defer g.Close()
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/existing"
+		spec.UseKeylessAccess = true
+	})
+
+	_, _ = g.Run(t, []test.TestCase{
+		{Path: "/existing", Code: http.StatusOK},
+		{Path: "/nonexisting", Code: http.StatusNotFound, BodyMatch: http.StatusText(http.StatusNotFound)},
+	}...)
 }

@@ -158,3 +158,29 @@ func BenchmarkVersioning(b *testing.B) {
 		}...)
 	}
 }
+
+func TestNotVersioned(t *testing.T) {
+	g := StartTest()
+	defer g.Close()
+
+	api := BuildAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.VersionData.NotVersioned = false
+		spec.VersionData.Versions["Default"] = apidef.VersionInfo{
+			Name:           "Default",
+			OverrideTarget: "www.example.com",
+		}
+	})[0]
+
+	t.Run("Versioning enabled, override target URL", func(t *testing.T) {
+		LoadAPI(api)
+		_, _ = g.Run(t, test.TestCase{Code: http.StatusInternalServerError})
+	})
+
+	t.Run("Versioning disabled, use original target URL", func(t *testing.T) {
+		api.VersionData.NotVersioned = true
+		LoadAPI(api)
+
+		_, _ = g.Run(t, test.TestCase{Code: http.StatusOK})
+	})
+}

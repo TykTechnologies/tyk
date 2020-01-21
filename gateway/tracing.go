@@ -23,6 +23,8 @@ type traceHttpRequest struct {
 
 func (tr *traceHttpRequest) toRequest() *http.Request {
 	r := httptest.NewRequest(tr.Method, tr.Path, strings.NewReader(tr.Body))
+	// It sets example.com by default. Setting it to empty will not show a value because it is not necessary.
+	r.Host = ""
 	r.Header = tr.Headers
 	ctxSetTrace(r)
 
@@ -117,7 +119,8 @@ func traceHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	wr := httptest.NewRecorder()
-	chainObj.ThisHandler.ServeHTTP(wr, traceReq.Request.toRequest())
+	tr := traceReq.Request.toRequest()
+	chainObj.ThisHandler.ServeHTTP(wr, tr)
 
 	var response string
 	if dump, err := httputil.DumpResponse(wr.Result(), true); err == nil {
@@ -126,5 +129,14 @@ func traceHandler(w http.ResponseWriter, r *http.Request) {
 		response = err.Error()
 	}
 
-	doJSONWrite(w, http.StatusOK, traceResponse{Message: "ok", Response: response, Logs: logStorage.String()})
+	var request string
+	if dump, err := httputil.DumpRequest(tr, true); err == nil {
+		request = string(dump)
+	} else {
+		request = err.Error()
+	}
+
+	requestDump := "====== Request ======\n" + request + "\n====== Response ======\n" + response
+
+	doJSONWrite(w, http.StatusOK, traceResponse{Message: "ok", Response: requestDump, Logs: logStorage.String()})
 }

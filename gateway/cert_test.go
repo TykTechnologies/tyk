@@ -327,67 +327,83 @@ func TestAPIMutualTLS(t *testing.T) {
 	})
 
 	t.Run("Multiple APIs on same domain", func(t *testing.T) {
-		clientCertID, _ := CertificateManager.Add(clientCertPem, "")
-		defer CertificateManager.Delete(clientCertID)
+		testSameDomain := func(t *testing.T, domain string) {
+			clientCertID, _ := CertificateManager.Add(clientCertPem, "")
+			defer CertificateManager.Delete(clientCertID)
 
-		loadAPIS := func(certs ...string) {
-			BuildAndLoadAPI(
-				func(spec *APISpec) {
-					spec.Proxy.ListenPath = "/with_mutual"
-					spec.UseMutualTLSAuth = true
-					spec.ClientCertificates = certs
-				},
-				func(spec *APISpec) {
-					spec.Proxy.ListenPath = "/without_mutual"
-				},
-			)
+			loadAPIS := func(certs ...string) {
+				BuildAndLoadAPI(
+					func(spec *APISpec) {
+						spec.Proxy.ListenPath = "/with_mutual"
+						spec.UseMutualTLSAuth = true
+						spec.ClientCertificates = certs
+						spec.Domain = domain
+					},
+					func(spec *APISpec) {
+						spec.Proxy.ListenPath = "/without_mutual"
+						spec.Domain = domain
+					},
+				)
+			}
+
+			t.Run("Without certificate", func(t *testing.T) {
+				clientWithoutCert := GetTLSClient(nil, nil)
+
+				loadAPIS()
+
+				certNotMatchErr := "Client TLS certificate is required"
+				ts.Run(t, []test.TestCase{
+					{
+						Path:      "/with_mutual",
+						Client:    clientWithoutCert,
+						Domain:    domain,
+						Code:      403,
+						BodyMatch: `"error": "` + certNotMatchErr,
+					},
+					{
+						Path:   "/without_mutual",
+						Client: clientWithoutCert,
+						Domain: domain,
+						Code:   200,
+					},
+				}...)
+			})
+
+			t.Run("Client certificate not match", func(t *testing.T) {
+				client := GetTLSClient(&clientCert, serverCertPem)
+
+				loadAPIS()
+
+				certNotAllowedErr := `Certificate with SHA256 ` + certs.HexSHA256(clientCert.Certificate[0]) + ` not allowed`
+
+				ts.Run(t, test.TestCase{
+					Path:      "/with_mutual",
+					Client:    client,
+					Domain:    domain,
+					Code:      403,
+					BodyMatch: `"error": "` + certNotAllowedErr,
+				})
+			})
+
+			t.Run("Client certificate match", func(t *testing.T) {
+				loadAPIS(clientCertID)
+				client := GetTLSClient(&clientCert, serverCertPem)
+
+				ts.Run(t, test.TestCase{
+					Path:   "/with_mutual",
+					Domain: domain,
+					Client: client,
+					Code:   200,
+				})
+			})
 		}
 
-		t.Run("Without certificate", func(t *testing.T) {
-			clientWithoutCert := GetTLSClient(nil, nil)
-
-			loadAPIS()
-
-			certNotMatchErr := "Client TLS certificate is required"
-			ts.Run(t, []test.TestCase{
-				{
-					Path:      "/with_mutual",
-					Client:    clientWithoutCert,
-					Code:      403,
-					BodyMatch: `"error": "` + certNotMatchErr,
-				},
-				{
-					Path:   "/without_mutual",
-					Client: clientWithoutCert,
-					Code:   200,
-				},
-			}...)
+		t.Run("Empty domain", func(t *testing.T) {
+			testSameDomain(t, "")
 		})
 
-		t.Run("Client certificate not match", func(t *testing.T) {
-			client := GetTLSClient(&clientCert, serverCertPem)
-
-			loadAPIS()
-
-			certNotAllowedErr := `Certificate with SHA256 ` + certs.HexSHA256(clientCert.Certificate[0]) + ` not allowed`
-
-			ts.Run(t, test.TestCase{
-				Path:      "/with_mutual",
-				Client:    client,
-				Code:      403,
-				BodyMatch: `"error": "` + certNotAllowedErr,
-			})
-		})
-
-		t.Run("Client certificate match", func(t *testing.T) {
-			loadAPIS(clientCertID)
-			client := GetTLSClient(&clientCert, serverCertPem)
-
-			ts.Run(t, test.TestCase{
-				Path:   "/with_mutual",
-				Client: client,
-				Code:   200,
-			})
+		t.Run("Custom domain", func(t *testing.T) {
+			testSameDomain(t, "localhost")
 		})
 	})
 }

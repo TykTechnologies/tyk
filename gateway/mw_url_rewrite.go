@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/textproto"
 	"net/url"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/user"
@@ -21,13 +23,21 @@ import (
 const (
 	metaLabel        = "$tyk_meta."
 	contextLabel     = "$tyk_context."
+	consulLabel      = "$secret_consul."
+	vaultLabel       = "$secret_vault."
+	envLabel         = "$secret_env."
+	secretsConfLabel = "$secret_conf."
 	triggerKeyPrefix = "trigger"
 	triggerKeySep    = "-"
 )
 
 var dollarMatch = regexp.MustCompile(`\$\d+`)
 var contextMatch = regexp.MustCompile(`\$tyk_context.([A-Za-z0-9_\-\.]+)`)
+var consulMatch = regexp.MustCompile(`\$secret_consul.([A-Za-z0-9\/\-\.]+)`)
+var vaultMatch = regexp.MustCompile(`\$secret_vault.([A-Za-z0-9\/\-\.]+)`)
+var envValueMatch = regexp.MustCompile(`\$secret_env.([A-Za-z0-9_\-\.]+)`)
 var metaMatch = regexp.MustCompile(`\$tyk_meta.([A-Za-z0-9_\-\.]+)`)
+var secretsConfMatch = regexp.MustCompile(`\$secret_conf.([A-Za-z0-9[.\-\_]+)`)
 
 func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 	path := r.URL.String()
@@ -191,6 +201,31 @@ func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 }
 
 func replaceTykVariables(r *http.Request, in string, escape bool) string {
+
+	if strings.Contains(in, secretsConfLabel) {
+		contextData := ctxGetData(r)
+		vars := secretsConfMatch.FindAllString(in, -1)
+		in = replaceVariables(in, vars, contextData, secretsConfLabel, escape)
+	}
+
+	if strings.Contains(in, envLabel) {
+		contextData := ctxGetData(r)
+		vars := envValueMatch.FindAllString(in, -1)
+		in = replaceVariables(in, vars, contextData, envLabel, escape)
+	}
+
+	if strings.Contains(in, vaultLabel) {
+		contextData := ctxGetData(r)
+		vars := vaultMatch.FindAllString(in, -1)
+		in = replaceVariables(in, vars, contextData, vaultLabel, escape)
+	}
+
+	if strings.Contains(in, consulLabel) {
+		contextData := ctxGetData(r)
+		vars := consulMatch.FindAllString(in, -1)
+		in = replaceVariables(in, vars, contextData, consulLabel, escape)
+	}
+
 	if strings.Contains(in, contextLabel) {
 		contextData := ctxGetData(r)
 		vars := contextMatch.FindAllString(in, -1)
@@ -213,23 +248,101 @@ func replaceTykVariables(r *http.Request, in string, escape bool) string {
 func replaceVariables(in string, vars []string, vals map[string]interface{}, label string, escape bool) string {
 	for _, v := range vars {
 		key := strings.Replace(v, label, "", 1)
-		val, ok := vals[key]
-		if ok {
-			valStr := valToStr(val)
-			// If contains url with domain
-			if escape && !strings.HasPrefix(valStr, "http") {
-				valStr = url.QueryEscape(valStr)
+
+		switch label {
+
+		case secretsConfLabel:
+
+			secrets := config.Global().Secrets
+
+			val, ok := secrets[key]
+			if !ok || val == "" {
+				in = strings.Replace(in, val, "", -1)
+				log.WithFields(logrus.Fields{
+					"key":       key,
+					"value":     val,
+					"in string": in,
+				}).Debug("Replaced with an empty string")
+
+				continue
 			}
-			in = strings.Replace(in, v, valStr, -1)
-		} else {
-			in = strings.Replace(in, v, "", -1)
-			log.WithFields(logrus.Fields{
-				"key":       key,
-				"value":     v,
-				"in string": in,
-			}).Debug("Replaced with an empty string")
+
+			in = strings.Replace(in, v, val, -1)
+
+		case envLabel:
+
+			val := os.Getenv(fmt.Sprintf("TYK_SECRET_%s", strings.ToUpper(key)))
+			if val == "" {
+				in = strings.Replace(in, v, "", -1)
+				log.WithFields(logrus.Fields{
+					"key":       key,
+					"value":     v,
+					"in string": in,
+				}).Debug("Replaced with an empty string")
+
+				continue
+			}
+
+			in = strings.Replace(in, v, val, -1)
+
+		case vaultLabel:
+
+			setUpVault()
+
+			val, err := vaultKVStore.Get(key)
+			if err != nil {
+				in = strings.Replace(in, v, "", -1)
+				log.WithFields(logrus.Fields{
+					"key":       key,
+					"value":     v,
+					"in string": in,
+				}).Debug("Replaced with an empty string")
+
+				continue
+			}
+
+			in = strings.Replace(in, v, val, -1)
+
+		case consulLabel:
+
+			setUpConsul()
+
+			val, err := consulKVStore.Get(key)
+			if err != nil {
+				in = strings.Replace(in, v, "", -1)
+				log.WithFields(logrus.Fields{
+					"key":       key,
+					"value":     v,
+					"in string": in,
+				}).Debug("Replaced with an empty string")
+
+				continue
+			}
+
+			in = strings.Replace(in, v, val, -1)
+
+		default:
+
+			val, ok := vals[key]
+			if ok {
+				valStr := valToStr(val)
+				// If contains url with domain
+				if escape && !strings.HasPrefix(valStr, "http") {
+					valStr = url.QueryEscape(valStr)
+				}
+				in = strings.Replace(in, v, valStr, -1)
+			} else {
+				in = strings.Replace(in, v, "", -1)
+				log.WithFields(logrus.Fields{
+					"key":       key,
+					"value":     v,
+					"in string": in,
+				}).Debug("Replaced with an empty string")
+			}
+
 		}
 	}
+
 	return in
 }
 
@@ -357,6 +470,8 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		return nil, http.StatusOK
 	}
 
+	//Used for looping feature
+	//To get host and query parameters
 	ctxSetOrigRequestURL(r, r.URL)
 
 	log.Debug("Rewriter active")
@@ -384,7 +499,9 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	if err != nil {
 		log.Error("URL Rewrite failed, could not parse: ", p)
 	} else {
-		r.URL = newURL
+		//Setting new path here breaks request middleware
+		//New path is set in DummyProxyHandler/Cache middleware
+		ctxSetURLRewriteTarget(r, newURL)
 	}
 	return nil, http.StatusOK
 }

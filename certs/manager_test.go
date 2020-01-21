@@ -75,7 +75,7 @@ func newManager() *CertificateManager {
 	return NewCertificateManager(newDummyStorage(), "test", nil)
 }
 
-func genCertificate(template *x509.Certificate) ([]byte, []byte) {
+func genCertificate(template *x509.Certificate, isExpired bool) ([]byte, []byte) {
 	priv, _ := rsa.GenerateKey(rand.Reader, 2048)
 
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
@@ -83,7 +83,13 @@ func genCertificate(template *x509.Certificate) ([]byte, []byte) {
 	template.SerialNumber = serialNumber
 	template.BasicConstraintsValid = true
 	template.NotBefore = time.Now()
-	template.NotAfter = time.Now().Add(time.Hour)
+
+	var notAfter time.Duration = time.Hour
+	if isExpired {
+		notAfter = -1 * time.Hour
+	}
+
+	template.NotAfter = time.Now().Add(notAfter)
 
 	derBytes, _ := x509.CreateCertificate(rand.Reader, template, template, &priv.PublicKey, priv)
 
@@ -94,9 +100,9 @@ func genCertificate(template *x509.Certificate) ([]byte, []byte) {
 	return certPem.Bytes(), keyPem.Bytes()
 }
 
-func genCertificateFromCommonName(cn string) ([]byte, []byte) {
+func genCertificateFromCommonName(cn string, isExpired bool) ([]byte, []byte) {
 	tmpl := &x509.Certificate{Subject: pkix.Name{CommonName: cn}}
-	return genCertificate(tmpl)
+	return genCertificate(tmpl, isExpired)
 }
 
 func leafSubjectName(cert *tls.Certificate) string {
@@ -106,8 +112,9 @@ func leafSubjectName(cert *tls.Certificate) string {
 func TestAddCertificate(t *testing.T) {
 	m := newManager()
 
-	certPem, keyPem := genCertificateFromCommonName("test")
-	cert2Pem, key2Pem := genCertificateFromCommonName("test2")
+	expiredCertPem, _ := genCertificateFromCommonName("expired", true)
+	certPem, keyPem := genCertificateFromCommonName("test", false)
+	cert2Pem, key2Pem := genCertificateFromCommonName("test2", false)
 	combinedPem := append(cert2Pem, key2Pem...)
 	combinedPemWrongPrivate := append(cert2Pem, keyPem...)
 	priv, _ := rsa.GenerateKey(rand.Reader, 512)
@@ -128,12 +135,13 @@ func TestAddCertificate(t *testing.T) {
 	}{
 		{[]byte(""), "", "Failed to decode certificate. It should be PEM encoded."},
 		{[]byte("-----BEGIN PRIVATE KEY-----\nYQ==\n-----END PRIVATE KEY-----"), "", "Failed to decode certificate. It should be PEM encoded."},
-		{[]byte("-----BEGIN CERTIFICATE-----\nYQ==\n-----END CERTIFICATE-----"), "", "Error while parsing certificate: asn1: syntax error"},
+		{[]byte("-----BEGIN CERTIFICATE-----\nYQ==\n-----END CERTIFICATE-----"), "", "asn1: syntax error"},
 		{certPem, certID, ""},
 		{combinedPemWrongPrivate, "", "tls: private key does not match public key"},
 		{combinedPem, cert2ID, ""},
 		{combinedPem, "", "Certificate with " + cert2ID + " id already exists"},
 		{pubPem, pubID, ""},
+		{expiredCertPem, "", "certificate is expired"},
 	}
 
 	for _, tc := range tests {
@@ -166,14 +174,14 @@ func TestCertificateStorage(t *testing.T) {
 		os.RemoveAll(dir)
 	}()
 
-	certPem, _ := genCertificateFromCommonName("file")
+	certPem, _ := genCertificateFromCommonName("file", false)
 	certPath := filepath.Join(dir, "cert.pem")
 	ioutil.WriteFile(certPath, certPem, 0666)
 
-	privateCertPEM, keyCertPEM := genCertificateFromCommonName("private")
+	privateCertPEM, keyCertPEM := genCertificateFromCommonName("private", false)
 	privateCertID, _ := m.Add(append(privateCertPEM, keyCertPEM...), "")
 
-	storageCert, _ := genCertificateFromCommonName("dummy")
+	storageCert, _ := genCertificateFromCommonName("dummy", false)
 	storageCertID, _ := m.Add(storageCert, "")
 
 	priv, _ := rsa.GenerateKey(rand.Reader, 2048)

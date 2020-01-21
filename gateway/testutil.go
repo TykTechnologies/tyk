@@ -193,6 +193,15 @@ func RegisterBundle(name string, files map[string]string) string {
 	return bundleID
 }
 
+func RegisterJSFileMiddleware(apiid string, files map[string]string) {
+	os.MkdirAll(config.Global().MiddlewarePath+"/"+apiid+"/post", 0755)
+	os.MkdirAll(config.Global().MiddlewarePath+"/"+apiid+"/pre", 0755)
+
+	for file, content := range files {
+		ioutil.WriteFile(config.Global().MiddlewarePath+"/"+apiid+"/"+file, []byte(content), 0755)
+	}
+}
+
 func bundleHandleFunc(w http.ResponseWriter, r *http.Request) {
 	testBundleMu.Lock()
 	defer testBundleMu.Unlock()
@@ -754,6 +763,7 @@ const sampleAPI = `{
         "auth_header_name": "authorization"
 	},
     "version_data": {
+		"default_version": "Default",
         "not_versioned": true,
         "versions": {
             "v1": {

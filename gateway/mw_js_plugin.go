@@ -28,7 +28,9 @@ import (
 type ReturnOverrides struct {
 	ResponseCode    int
 	ResponseError   string
+	ResponseBody    string
 	ResponseHeaders map[string]string
+	OverrideError   bool
 }
 
 // MiniRequestObject is marshalled to JSON string and passed into JSON middleware
@@ -251,14 +253,23 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	logger.Debug("JSVM middleware execution took: (ns) ", time.Now().UnixNano()-t1)
 
-	if newRequestData.Request.ReturnOverrides.ResponseCode >= http.StatusBadRequest {
-		return errors.New(newRequestData.Request.ReturnOverrides.ResponseError), newRequestData.Request.ReturnOverrides.ResponseCode
+	if newRequestData.Request.ReturnOverrides.ResponseError != "" {
+		newRequestData.Request.ReturnOverrides.ResponseBody = newRequestData.Request.ReturnOverrides.ResponseError
+	}
+
+	if newRequestData.Request.ReturnOverrides.ResponseCode >= http.StatusBadRequest && !newRequestData.Request.ReturnOverrides.OverrideError {
+
+		for header, value := range newRequestData.Request.ReturnOverrides.ResponseHeaders {
+			w.Header().Set(header, value)
+		}
+
+		return errors.New(newRequestData.Request.ReturnOverrides.ResponseBody), newRequestData.Request.ReturnOverrides.ResponseCode
 	}
 
 	if newRequestData.Request.ReturnOverrides.ResponseCode != 0 {
 		responseObject := VMResponseObject{
 			Response: ResponseObject{
-				Body:    newRequestData.Request.ReturnOverrides.ResponseError,
+				Body:    newRequestData.Request.ReturnOverrides.ResponseBody,
 				Code:    newRequestData.Request.ReturnOverrides.ResponseCode,
 				Headers: newRequestData.Request.ReturnOverrides.ResponseHeaders,
 			},
