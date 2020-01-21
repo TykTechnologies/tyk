@@ -39,9 +39,7 @@ require (
 	github.com/golang/protobuf v1.3.2
 	github.com/gorilla/mux v1.7.3
 	github.com/gorilla/websocket v1.4.1
-	github.com/hashicorp/consul v0.0.0-20171026175957-610f3c86a089
 	github.com/hashicorp/terraform v0.12.9
-	github.com/hashicorp/vault v0.10.4
 	github.com/huandu/xstrings v1.2.0 // indirect
 	github.com/imdario/mergo v0.3.7 // indirect
 	github.com/justinas/alice v0.0.0-20171023064455-03f45bd4b7da
@@ -64,7 +62,6 @@ require (
 	github.com/pmylund/go-cache v2.1.0+incompatible
 	github.com/robertkrimen/otto v0.0.0-20180617131154-15f95af6e78d
 	github.com/rs/cors v1.7.0
-	github.com/ryanuber/go-glob v1.0.0 // indirect
 	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.4.2
 	github.com/square/go-jose v0.0.0-20161027010314-63d7cfa0284d // indirect
