@@ -326,29 +326,12 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		token = returnObject.Session.Metadata["token"]
 	}
 
-	if returnObject.Request.ReturnOverrides.ResponseCode > 0 || returnObject.Request.ReturnOverrides.DisableJsonError {
-		for h, v := range returnObject.Request.ReturnOverrides.Headers {
-			w.Header().Set(h, v)
-		}
-		w.WriteHeader(int(returnObject.Request.ReturnOverrides.ResponseCode))
-		w.Write([]byte(returnObject.Request.ReturnOverrides.ResponseError))
-
-		// Record analytics data:
-		res := new(http.Response)
-		res.Proto = "HTTP/1.0"
-		res.ProtoMajor = 1
-		res.ProtoMinor = 0
-		res.StatusCode = int(returnObject.Request.ReturnOverrides.ResponseCode)
-		res.Body = nopCloser{
-			ReadSeeker: strings.NewReader(returnObject.Request.ReturnOverrides.ResponseError),
-		}
-		res.ContentLength = int64(len(returnObject.Request.ReturnOverrides.ResponseError))
-		m.successHandler.RecordHit(r, Latency{Total: int64(ms)}, int(returnObject.Request.ReturnOverrides.ResponseCode), res)
-		return nil, mwStatusRespond
+	if returnObject.Request.ReturnOverrides.ResponseError != "" {
+		returnObject.Request.ReturnOverrides.ResponseBody = returnObject.Request.ReturnOverrides.ResponseError
 	}
 
 	// The CP middleware indicates this is a bad auth:
-	if returnObject.Request.ReturnOverrides.ResponseCode > 400 && !returnObject.Request.ReturnOverrides.DisableJsonError {
+	if returnObject.Request.ReturnOverrides.ResponseCode >= http.StatusBadRequest && !returnObject.Request.ReturnOverrides.OverrideError {
 		logger.WithField("key", obfuscateKey(token)).Info("Attempted access with invalid key")
 
 		for h, v := range returnObject.Request.ReturnOverrides.Headers {
@@ -362,11 +345,32 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		reportHealthValue(m.Spec, KeyFailure, "1")
 
 		errorMsg := "Key not authorised"
-		if returnObject.Request.ReturnOverrides.ResponseError != "" {
-			errorMsg = returnObject.Request.ReturnOverrides.ResponseError
+		if returnObject.Request.ReturnOverrides.ResponseBody != "" {
+			errorMsg = returnObject.Request.ReturnOverrides.ResponseBody
 		}
 
 		return errors.New(errorMsg), int(returnObject.Request.ReturnOverrides.ResponseCode)
+	}
+
+	if returnObject.Request.ReturnOverrides.ResponseCode > 0 {
+		for h, v := range returnObject.Request.ReturnOverrides.Headers {
+			w.Header().Set(h, v)
+		}
+		w.WriteHeader(int(returnObject.Request.ReturnOverrides.ResponseCode))
+		w.Write([]byte(returnObject.Request.ReturnOverrides.ResponseBody))
+
+		// Record analytics data:
+		res := new(http.Response)
+		res.Proto = "HTTP/1.0"
+		res.ProtoMajor = 1
+		res.ProtoMinor = 0
+		res.StatusCode = int(returnObject.Request.ReturnOverrides.ResponseCode)
+		res.Body = nopCloser{
+			ReadSeeker: strings.NewReader(returnObject.Request.ReturnOverrides.ResponseBody),
+		}
+		res.ContentLength = int64(len(returnObject.Request.ReturnOverrides.ResponseBody))
+		m.successHandler.RecordHit(r, Latency{Total: int64(ms)}, int(returnObject.Request.ReturnOverrides.ResponseCode), res)
+		return nil, mwStatusRespond
 	}
 
 	// Is this a CP authentication middleware?

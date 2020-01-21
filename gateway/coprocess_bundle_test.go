@@ -6,12 +6,24 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
+	"time"
+
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/test"
 )
 
 var (
 	testBundlesPath = filepath.Join(testMiddlewarePath, "bundles")
 )
+
+var pkgPath string
+
+func init() {
+	_, filename, _, _ := runtime.Caller(0)
+	pkgPath = filepath.Dir(filename) + "./.."
+}
 
 var grpcBundleWithAuthCheck = map[string]string{
 	"manifest.json": `
@@ -65,5 +77,115 @@ func TestBundleLoader(t *testing.T) {
 		if string(spec.CustomMiddleware.Driver) != "grpc" {
 			t.Fatalf("Driver doesn't match: got %s, expected %s\n", spec.CustomMiddleware.Driver, "grpc")
 		}
+	})
+}
+
+var overrideResponsePython = map[string]string{
+	"manifest.json": `
+		{
+		    "file_list": [
+		        "middleware.py"
+		    ],
+		    "custom_middleware": {
+		        "driver": "python",
+		        "pre": [{
+		            "name": "MyRequestHook"
+		        }]
+		    }
+		}
+	`,
+	"middleware.py": `
+from tyk.decorators import *
+from gateway import TykGateway as tyk
+
+@Hook
+def MyRequestHook(request, response, session, metadata, spec):
+	request.object.return_overrides.headers['X-Foo'] = 'Bar'
+	request.object.return_overrides.response_code = int(request.object.params["status"])
+
+	if request.object.params["response_body"] == "true":
+		request.object.return_overrides.response_body = "foobar"
+	else:
+		request.object.return_overrides.response_error = "{\"foo\": \"bar\"}"
+
+	if request.object.params["override"]:
+		request.object.return_overrides.override_error = True
+
+	return request, session
+`,
+}
+
+var overrideResponseJSVM = map[string]string{
+	"manifest.json": `
+{
+    "file_list": [],
+    "custom_middleware": {
+        "driver": "otto",
+        "pre": [{
+            "name": "pre",
+            "path": "pre.js"
+        }]
+    }
+}
+`,
+	"pre.js": `
+var pre = new TykJS.TykMiddleware.NewMiddleware({});
+
+pre.NewProcessRequest(function(request, session) {
+	if (request.Params["response_body"]) {
+		request.ReturnOverrides.ResponseBody = 'foobar'
+	} else {
+		request.ReturnOverrides.ResponseError = '{"foo": "bar"}'
+	}
+
+	request.ReturnOverrides.ResponseCode = parseInt(request.Params["status"])
+	request.ReturnOverrides.ResponseHeaders = {"X-Foo": "Bar"}
+
+	if (request.Params["override"]) {
+		request.ReturnOverrides.OverrideError = true
+	}
+	return pre.ReturnData(request, {});
+});
+`,
+}
+
+func TestResponseOverride(t *testing.T) {
+	ts := StartTest(TestConfig{
+		CoprocessConfig: config.CoProcessConfig{
+			EnableCoProcess:  true,
+			PythonPathPrefix: pkgPath,
+		}})
+	defer ts.Close()
+
+	customHeader := map[string]string{"X-Foo": "Bar"}
+	customError := `{"foo": "bar"}`
+	customBody := `foobar`
+
+	testOverride := func(t *testing.T, bundle string) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/test/"
+			spec.UseKeylessAccess = true
+			spec.CustomMiddlewareBundle = bundle
+		})
+
+		time.Sleep(1 * time.Second)
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/test/?status=200", Code: 200, BodyMatch: customError, HeadersMatch: customHeader},
+			{Path: "/test/?status=200&response_body=true", Code: 200, BodyMatch: customBody, HeadersMatch: customHeader},
+			{Path: "/test/?status=400", Code: 400, BodyMatch: `"error": "`, HeadersMatch: customHeader},
+			{Path: "/test/?status=400&response_body=true", Code: 400, BodyMatch: `"error": "foobar"`, HeadersMatch: customHeader},
+			{Path: "/test/?status=401", Code: 401, BodyMatch: `"error": "`, HeadersMatch: customHeader},
+			{Path: "/test/?status=400&override=true", Code: 400, BodyMatch: customError, HeadersMatch: customHeader},
+			{Path: "/test/?status=400&override=true&response_body=true", Code: 400, BodyMatch: customBody, HeadersMatch: customHeader},
+			{Path: "/test/?status=401&override=true", Code: 401, BodyMatch: customError, HeadersMatch: customHeader},
+		}...)
+	}
+	t.Run("Python", func(t *testing.T) {
+		testOverride(t, RegisterBundle("python_override", overrideResponsePython))
+	})
+
+	t.Run("JSVM", func(t *testing.T) {
+		testOverride(t, RegisterBundle("jsvm_override", overrideResponseJSVM))
 	})
 }
