@@ -441,6 +441,9 @@ func (r *RedisCluster) GetExp(keyName string) (int64, error) {
 }
 
 func (r *RedisCluster) SetExp(keyName string, timeout int64) error {
+	if err:=r.up();err!=nil{
+		return err
+	}
 	err := r.singleton().Expire(r.fixKey(keyName), time.Duration(timeout)*time.Second).Err()
 	if err != nil {
 		log.Error("Could not EXPIRE key: ", err)
