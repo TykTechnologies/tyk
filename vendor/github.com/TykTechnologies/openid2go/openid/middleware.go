@@ -10,7 +10,7 @@ import (
 // This type should be instantiated at the application startup time.
 type Configuration struct {
 	tokenValidator jwtTokenValidator
-	idTokenGetter  GetIDTokenFunc
+	IDTokenGetter  GetIDTokenFunc
 	errorHandler   ErrorHandlerFunc
 }
 
@@ -93,10 +93,10 @@ func AuthenticateOIDWithUser(c *Configuration, rw http.ResponseWriter, req *http
 
 func authenticate(c *Configuration, rw http.ResponseWriter, req *http.Request) (t *jwt.Token, halt bool) {
 	var tg GetIDTokenFunc
-	if c.idTokenGetter == nil {
+	if c.IDTokenGetter == nil {
 		tg = getIDTokenAuthorizationHeader
 	} else {
-		tg = c.idTokenGetter
+		tg = c.IDTokenGetter
 	}
 
 	var eh ErrorHandlerFunc
