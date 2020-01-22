@@ -614,6 +614,10 @@ func (a *APIDefinition) DecodeFromDB() {
 
 	// Auth is deprecated so this code tries to maintain backward compatibility
 	makeCompatible := func(authType string) {
+		if a.AuthConfigs == nil {
+			a.AuthConfigs = make(map[string]AuthConfig)
+		}
+
 		_, ok := a.AuthConfigs[authType]
 
 		if !ok {
