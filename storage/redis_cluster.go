@@ -59,10 +59,10 @@ func connectSingleton(cache bool) bool {
 	if d {
 		log.Debug("Connecting to redis cluster")
 		if cache {
-			singleCachePool.Store(NewRedisClusterPool(true))
+			singleCachePool.Store(NewRedisClusterPool(cache))
 			return true
 		}
-		singlePool.Store(NewRedisClusterPool(true))
+		singlePool.Store(NewRedisClusterPool(cache))
 		return true
 	}
 	log.Debug("Storage Engine already initialised...")
