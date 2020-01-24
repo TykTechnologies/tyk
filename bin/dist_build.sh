@@ -1,4 +1,7 @@
 #!/bin/bash
+
+set -ex
+
 : ${ORGDIR:="/go/src/github.com/TykTechnologies"}
 : ${SOURCEBINPATH:="${ORGDIR}/tyk"}
 : ${SIGNKEY:="729EA673"}
@@ -18,7 +21,6 @@ fi
 echo "Prepare the release directories"
 
 export SOURCEBIN=tyk
-export CLIBIN=tyk-cli
 
 declare -A ARCHTGZDIRS
 ARCHTGZDIRS=(
@@ -27,25 +29,7 @@ ARCHTGZDIRS=(
     [arm64]=$BUILDDIR/arm/tgz/tyk.linux.arm64-$VERSION
 )
 
-cliDIR=$ORGDIR/tyk-cli
-cliTmpDir=$SOURCEBINPATH/temp/cli
 DESCRIPTION="Tyk Open Source API Gateway written in Go"
-
-echo "Clearing CLI temp folder"
-rm -rf $cliTmpDir
-mkdir -p $cliTmpDir
-
-echo "Preparing CLI Build"
-cd $ORGDIR
-[ -d $cliDIR ] || git clone https://github.com/TykTechnologies/tyk-cli.git
-cd $cliDIR
-git checkout master
-git pull
-gox -osarch="linux/arm64 linux/amd64 linux/386"
-
-echo "Copying CLI Build files"
-mv tyk-cli_linux_* $cliTmpDir/
-
 echo "Starting Tyk build"
 cd $SOURCEBINPATH
 
@@ -94,7 +78,6 @@ do
     archDir=${ARCHTGZDIRS[$arch]}
     [ $archDir != $TEMPLATEDIR ] && cp -R $TEMPLATEDIR/* $archDir
     mv tyk_linux_${arch/i386/386} $archDir/$SOURCEBIN
-    cp $cliTmpDir/tyk-cli_linux_${arch/i386/386} $archDir/utils/$CLIBIN
 done
 
 echo "Compressing"
