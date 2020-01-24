@@ -65,7 +65,6 @@ func connectSingleton(cache bool) bool {
 		singlePool.Store(NewRedisClusterPool(cache))
 		return true
 	}
-	log.Debug("Storage Engine already initialised...")
 	return true
 }
 
