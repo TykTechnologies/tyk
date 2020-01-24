@@ -11,7 +11,7 @@ import (
 	"crypto/tls"
 
 	"github.com/go-redis/redis"
-	uuid "github.com/satori/go.uuid"
+	"github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -117,10 +117,6 @@ func NewRedisClusterPool(isCache bool) redis.UniversalClient {
 		timeout = time.Duration(cfg.Timeout) * time.Second
 	}
 
-	if cfg.Port == 0 {
-		cfg.Port = defaultRedisPort
-	}
-
 	var seedHosts []string
 
 	if len(cfg.Addrs) != 0 {
@@ -132,7 +128,7 @@ func NewRedisClusterPool(isCache bool) redis.UniversalClient {
 		}
 	}
 
-	if len(seedHosts) == 0 {
+	if len(seedHosts) == 0 && cfg.Port != 0 {
 		addr := cfg.Host + ":" + strconv.Itoa(cfg.Port)
 		seedHosts = append(seedHosts, addr)
 	}
@@ -246,7 +242,7 @@ func (o *RedisOpts) simple() *redis.Options {
 
 func (o *RedisOpts) failover() *redis.FailoverOptions {
 	if len(o.Addrs) == 0 {
-		o.Addrs = []string{"127.0.0.1:6379"}
+		o.Addrs = []string{"127.0.0.1:26379"}
 	}
 
 	return &redis.FailoverOptions{
