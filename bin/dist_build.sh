@@ -1,4 +1,7 @@
 #!/bin/bash
+
+set -ex
+
 : ${ORGDIR:="/go/src/github.com/TykTechnologies"}
 : ${SOURCEBINPATH:="${ORGDIR}/tyk"}
 : ${SIGNKEY:="729EA673"}
