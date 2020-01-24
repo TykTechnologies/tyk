@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"crypto/tls"
 	"io/ioutil"
 	"net/http"
 	"strconv"
@@ -9,6 +10,7 @@ import (
 	"github.com/Jeffail/gabs"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 const arrayName = "tyk_array"
@@ -46,13 +48,28 @@ func (s *ServiceDiscovery) Init(spec *apidef.ServiceDiscoveryConfiguration) {
 
 func (s *ServiceDiscovery) getServiceData(name string) (string, error) {
 	log.Debug("Getting ", name)
-	resp, err := http.Get(name)
+
+	req, err := http.NewRequest(http.MethodGet, name, nil)
+	if err != nil {
+		log.Error("Could not create request: ", err)
+		return "", err
+	}
+
+	req.Header.Set("Connection", "close")
+	HostCheckerClient.Transport = &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: config.Global().ProxySSLInsecureSkipVerify,
+		},
+	}
+
+	response, err := HostCheckerClient.Do(req)
 	if err != nil {
 		return "", err
 	}
 
-	defer resp.Body.Close()
-	contents, err := ioutil.ReadAll(resp.Body)
+	defer response.Body.Close()
+
+	contents, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return "", err
 	}
@@ -272,5 +289,4 @@ func (s *ServiceDiscovery) Target(serviceURL string) (*apidef.HostList, error) {
 	}
 
 	return s.ProcessRawData(rawData)
-
 }

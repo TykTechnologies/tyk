@@ -2,15 +2,14 @@ package gateway
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/url"
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -399,12 +398,14 @@ func (hc *HostCheckerManager) ListFromService(apiID string) ([]HostData, error) 
 
 	// The returned data is a string, so lets unmarshal it:
 	checkTargets := make([]apidef.HostCheckObject, 0)
-	data0, _ := data.GetIndex(0)
-	if err := json.Unmarshal([]byte(data0), &checkTargets); err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "host-check-mgr",
-		}).Error("[HOST CHECKER MANAGER] Decoder failed: ", err)
-		return nil, err
+
+	hosts := data.All()
+
+	for _, host := range hosts {
+		h := apidef.HostCheckObject{
+			CheckURL: host,
+		}
+		checkTargets = append(checkTargets, h)
 	}
 
 	hostData := make([]HostData, len(checkTargets))
@@ -514,9 +515,9 @@ func SetCheckerHostList() {
 	apisMu.RLock()
 	for _, spec := range apisByID {
 		if spec.UptimeTests.Config.ServiceDiscovery.UseDiscoveryService {
-			hostList, err := GlobalHostChecker.ListFromService(spec.APIID)
+			newHostDoc, err := GlobalHostChecker.ListFromService(spec.APIID)
 			if err == nil {
-				hostList = append(hostList, hostList...)
+				hostList = append(hostList, newHostDoc...)
 				for _, t := range hostList {
 					log.WithFields(logrus.Fields{
 						"prefix": "host-check-mgr",
@@ -546,6 +547,10 @@ func SetCheckerHostList() {
 		}
 	}
 	apisMu.RUnlock()
+
+	log.WithFields(logrus.Fields{
+		"prefix": "host-check-mgr",
+	}).Info("Final Host Uptime Tracking List", hostList)
 
 	GlobalHostChecker.UpdateTrackingList(hostList)
 }
