@@ -319,6 +319,9 @@ func syncAPISpecs() (int, error) {
 		filter = append(filter, v)
 	}
 	apiSpecs = filter
+
+	tlsConfigCache.Flush()
+
 	return len(apiSpecs), nil
 }
 
