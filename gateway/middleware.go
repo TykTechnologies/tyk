@@ -36,6 +36,7 @@ const hmacType = "hmac"
 const basicType = "basic"
 const coprocessType = "coprocess"
 const oauthType = "oauth"
+const oidcType = "oidc"
 
 var (
 	GlobalRate            = ratecounter.NewRateCounter(1 * time.Second)

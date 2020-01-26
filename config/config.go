@@ -15,7 +15,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
-	consul "github.com/hashicorp/consul/api"
 	"github.com/kelseyhightower/envconfig"
 )
 
@@ -513,7 +512,19 @@ type ConsulConfig struct {
 	// which overrides the agent's default token.
 	Token string `json:"token"`
 
-	TLSConfig consul.TLSConfig `json:"tls_config"`
+	TLSConfig struct {
+		Address string `json:"address"`
+
+		CAFile string `json:"ca_file"`
+
+		CAPath string `json:"ca_path"`
+
+		CertFile string `json:"cert_file"`
+
+		KeyFile string `json:"key_file"`
+
+		InsecureSkipVerify bool `json:"insecure_skip_verify"`
+	} `json:"tls_config"`
 }
 
 // GetEventTriggers returns event triggers. There was a typo in the json tag.
