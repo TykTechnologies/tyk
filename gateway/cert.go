@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -293,8 +294,10 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 		baseConfig.NameToCertificate[name] = cert
 	}
 
+	listenPortStr := strconv.Itoa(listenPort)
+
 	return func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
-		if config, found := tlsConfigCache.Get(hello.ServerName); found {
+		if config, found := tlsConfigCache.Get(hello.ServerName + listenPortStr); found {
 			return config.(*tls.Config), nil
 		}
 
@@ -368,9 +371,7 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 
 		newConfig.ClientAuth = domainRequireCert[hello.ServerName]
 
-		log.Error("ASDASDASD:", domainRequireCert)
-
-		tlsConfigCache.Set(hello.ServerName, newConfig, cache.DefaultExpiration)
+		tlsConfigCache.Set(hello.ServerName+listenPortStr, newConfig, cache.DefaultExpiration)
 		return newConfig, nil
 	}
 }
