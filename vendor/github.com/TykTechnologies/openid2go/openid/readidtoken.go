@@ -16,6 +16,11 @@ type GetIDTokenFunc func(r *http.Request) (token string, err error)
 // or the format does not match it will return an error.
 func getIDTokenAuthorizationHeader(r *http.Request) (t string, err error) {
 	h := r.Header.Get("Authorization")
+
+	return CheckAndSplitHeader(h)
+}
+
+func CheckAndSplitHeader(h string) (t string, err error) {
 	if h == "" {
 		return h, &ValidationError{Code: ValidationErrorAuthorizationHeaderNotFound, Message: "The 'Authorization' header was not found or was empty.", HTTPStatus: http.StatusBadRequest}
 	}
