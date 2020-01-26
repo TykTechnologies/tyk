@@ -53,7 +53,7 @@ func (m *RedisCacheMiddleware) CreateCheckSum(req *http.Request, keyName string,
 	h := md5.New()
 	io.WriteString(h, req.Method)
 	io.WriteString(h, "-"+req.URL.String())
-	if additionalKeyFromHeaders != "nil" {
+	if additionalKeyFromHeaders != "" {
 		io.WriteString(h, "-"+additionalKeyFromHeaders)
 	}
 
@@ -65,18 +65,16 @@ func (m *RedisCacheMiddleware) CreateCheckSum(req *http.Request, keyName string,
 	return m.Spec.APIID + keyName + reqChecksum, nil
 }
 
-func addBodyHash(req *http.Request, regex string, h hash.Hash) error {
+func addBodyHash(req *http.Request, regex string, h hash.Hash) (err error) {
 	if !isBodyHashRequired(req) {
 		return nil
 	}
 
-	defer req.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(req.Body)
+	bodyBytes, err := readBody(req)
 	if err != nil {
 		return err
 	}
 
-	req.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
 	mur := murmur3.New128()
 	if regex == "" {
 		mur.Write(bodyBytes)
@@ -93,6 +91,26 @@ func addBodyHash(req *http.Request, regex string, h hash.Hash) error {
 		io.WriteString(h, "-"+hex.EncodeToString(mur.Sum(nil)))
 	}
 	return nil
+}
+
+func readBody(req *http.Request) (bodyBytes []byte, err error) {
+	if n, ok := req.Body.(nopCloser); ok {
+		n.Seek(0, io.SeekStart)
+		bodyBytes, err = ioutil.ReadAll(n)
+		if err != nil {
+			return nil, err
+		}
+		n.Seek(0, io.SeekStart) // reset for any next read.
+		return
+	}
+
+	req.Body = copyBody(req.Body)
+	bodyBytes, err = ioutil.ReadAll(req.Body)
+	if err != nil {
+		return nil, err
+	}
+	req.Body.(nopCloser).Seek(0, io.SeekStart) // reset for any next read.
+	return
 }
 
 func isBodyHashRequired(request *http.Request) bool {
@@ -235,9 +253,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 		cacheOnlyResponseCodes := m.Spec.CacheOptions.CacheOnlyResponseCodes
 		// override api main CacheOnlyResponseCodes by endpoint specific if provided
-		if cacheMeta != nil &&
-			cacheMeta.CacheOnlyResponseCodes != nil &&
-			len(cacheMeta.CacheOnlyResponseCodes) > 0 {
+		if cacheMeta != nil && len(cacheMeta.CacheOnlyResponseCodes) > 0 {
 			cacheOnlyResponseCodes = cacheMeta.CacheOnlyResponseCodes
 		}
 

@@ -114,7 +114,6 @@ func Test_addBodyHash(t *testing.T) {
 	requestPutNoBody, _ := http.NewRequest(http.MethodPut, "http://test.com", nil)
 	requestPostWithBody, _ := http.NewRequest(http.MethodPost, "http://test.com", strings.NewReader("some-body"))
 	requestPatchWithBody, _ := http.NewRequest(http.MethodPatch, "http://test.com", strings.NewReader("{\"id\":\"1\",\"name\":\"test\"}"))
-	//requestGetWithBody, _ := http.NewRequest(http.MethodGet,"http://test.com", strings.NewReader("some-body"))
 	type args struct {
 		req   *http.Request
 		regex string

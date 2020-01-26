@@ -1247,14 +1247,14 @@ func TestCacheAllSafeRequestsWithCachedHeaders(t *testing.T) {
 	})
 
 	ts.Run(t, []test.TestCase{
-		{Method: "GET", Path: "/", Headers: map[string]string{authorization: sess1token}, HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
-		{Method: "GET", Path: "/", Headers: map[string]string{authorization: sess1token}, HeadersMatch: headerCache},
-		{Method: "GET", Path: "/", Headers: map[string]string{authorization: sess2token}, HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
-		{Method: "GET", Path: "/", Headers: map[string]string{tenant: "Some UUID"}, HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
-		{Method: "GET", Path: "/", Headers: map[string]string{tenant: "Some UUID"}, HeadersMatch: headerCache},
-		{Method: "GET", Path: "/", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
-		{Method: "GET", Path: "/", HeadersMatch: headerCache},
-		{Method: "GET", Path: "/", Headers: map[string]string{tenant: "Some UUID", authorization: sess2token}, HeadersNotMatch: headerCache},
+		{Method: http.MethodGet, Path: "/", Headers: map[string]string{authorization: sess1token}, HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodGet, Path: "/", Headers: map[string]string{authorization: sess1token}, HeadersMatch: headerCache},
+		{Method: http.MethodGet, Path: "/", Headers: map[string]string{authorization: sess2token}, HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodGet, Path: "/", Headers: map[string]string{tenant: "Some UUID"}, HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodGet, Path: "/", Headers: map[string]string{tenant: "Some UUID"}, HeadersMatch: headerCache},
+		{Method: http.MethodGet, Path: "/", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodGet, Path: "/", HeadersMatch: headerCache},
+		{Method: http.MethodGet, Path: "/", Headers: map[string]string{tenant: "Some UUID", authorization: sess2token}, HeadersNotMatch: headerCache},
 	}...)
 }
 
