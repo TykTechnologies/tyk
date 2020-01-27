@@ -17,7 +17,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
-	"github.com/kelseyhightower/envconfig"
 )
 
 type IPsHandleStrategy string
