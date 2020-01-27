@@ -1041,6 +1041,89 @@
     },
     "ssl_force_common_name_check":{
 	    "type":"boolean"
+    },
+    "kv": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "consul": {
+          "type": ["object", "null"],
+          "properties": {
+            "address": {
+              "type": "string"
+            },
+            "scheme": {
+              "type": "string"
+            },
+            "datacenter": {
+              "type": "string"
+            },
+            "http_auth": {
+              "type": ["object", "null"],
+              "properties": {
+                "username": {
+                  "type": "string"
+                },
+                "password": {
+                  "type": "string"
+                }
+              }
+            },
+            "wait_time": {
+              "type": "integer"
+            },
+            "token": {
+              "type": "string"
+            },
+            "tls_config": {
+              "type": ["object", "null"],
+              "properties": {
+                "address": {
+                  "type": "string"
+                },
+                "ca_file": {
+                  "type": "string"
+                },
+                "cert_file": {
+                  "type": "string"
+                },
+                "key_file": {
+                  "type": "string"
+                },
+                "insecure_skip_verify": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        "vault": {
+          "type": ["object", "null"],
+          "properties": {
+            "address": {
+              "type": "string"
+            },
+            "agent_address": {
+              "type": "string"
+            },
+            "max_retries": {
+              "type": "integer"
+            },
+            "timeout": {
+              "type": "integer"
+            },
+            "token": {
+              "type": "string"
+            },
+            "kv_version": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    },
+    "secrets": {
+      "type": ["object", "null"]
     }
   }
 }
