@@ -31,6 +31,27 @@ var singlePool atomic.Value
 var singleCachePool atomic.Value
 var redisUp atomic.Value
 
+var disableRedis atomic.Value
+
+// ConnState very handy when testsing it allows to dynamically enable/disable talking with
+// redisW
+func ConnState(allow bool) {
+	if !allow {
+		disableRedis.Store(true)
+		redisUp.Store(false)
+		return
+	}
+	redisUp.Store(true)
+	disableRedis.Store(false)
+}
+
+func shouldConnect() bool {
+	if v := disableRedis.Load(); v != nil {
+		return !v.(bool)
+	}
+	return true
+}
+
 func up() bool {
 	v := redisUp.Load()
 	if v != nil {
@@ -113,6 +134,9 @@ again:
 		case <-ctx.Done():
 			return
 		case <-tick.C:
+			if !shouldConnect() {
+				continue
+			}
 			for _, v := range c {
 				if !connectSingleton(v.IsCache) {
 					redisUp.Store(false)
