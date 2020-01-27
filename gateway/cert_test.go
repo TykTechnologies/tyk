@@ -341,13 +341,13 @@ func TestAPIMutualTLS(t *testing.T) {
 			loadAPIS := func(certs ...string) {
 				BuildAndLoadAPI(
 					func(spec *APISpec) {
-						spec.Proxy.ListenPath = "/with_mutual"
-						spec.UseMutualTLSAuth = true
-						spec.ClientCertificates = certs
+						spec.Proxy.ListenPath = "/without_mutual"
 						spec.Domain = domain
 					},
 					func(spec *APISpec) {
-						spec.Proxy.ListenPath = "/without_mutual"
+						spec.Proxy.ListenPath = "/with_mutual"
+						spec.UseMutualTLSAuth = true
+						spec.ClientCertificates = certs
 						spec.Domain = domain
 					},
 				)

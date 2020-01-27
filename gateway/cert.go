@@ -320,15 +320,15 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 
 		domainRequireCert := map[string]tls.ClientAuthType{}
 		for _, spec := range apiSpecs {
-			// If there are multiple APIs on the same domain, and not all of them use mutual TLS auth
-			if domainRequireCert[spec.Domain] != 0 && !spec.UseMutualTLSAuth {
-				domainRequireCert[spec.Domain] = tls.RequestClientCert
-			}
 
-			if spec.UseMutualTLSAuth {
-				// Require verification only if there is a single known domain for TLS auth, otherwise use previous value
+			switch {
+			case spec.UseMutualTLSAuth:
 				if domainRequireCert[spec.Domain] == 0 {
+					// Require verification only if there is a single known domain for TLS auth, otherwise use previous value
 					domainRequireCert[spec.Domain] = tls.RequireAndVerifyClientCert
+				} else if domainRequireCert[spec.Domain] != tls.RequireAndVerifyClientCert {
+					// If we have another API on this domain, which is not mutual tls enabled, just ask for cert
+					domainRequireCert[spec.Domain] = tls.RequestClientCert
 				}
 
 				// If current domain match or empty, whitelist client certificates
@@ -341,12 +341,19 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 						}
 					}
 				}
-			}
-
-			// Dynamic certificate check required, falling back to HTTP level check
-			// TODO: Change to VerifyPeerCertificate hook instead, when possible
-			if spec.Auth.UseCertificate && domainRequireCert[spec.Domain] < tls.RequestClientCert {
-				domainRequireCert[spec.Domain] = tls.RequestClientCert
+			case spec.Auth.UseCertificate:
+				// Dynamic certificate check required, falling back to HTTP level check
+				// TODO: Change to VerifyPeerCertificate hook instead, when possible
+				if domainRequireCert[spec.Domain] < tls.RequestClientCert {
+					domainRequireCert[spec.Domain] = tls.RequestClientCert
+				}
+			default:
+				// For APIs which do not use certificates, indicate that there is API for such domain already
+				if domainRequireCert[spec.Domain] == 0 {
+					domainRequireCert[spec.Domain] = -1
+				} else {
+					domainRequireCert[spec.Domain] = tls.RequestClientCert
+				}
 			}
 
 			// Dynamically add API specific certificates
