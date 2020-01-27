@@ -202,6 +202,7 @@ type RedisNotifier struct {
 func (r *RedisNotifier) Notify(notif interface{}) bool {
 	if n, ok := notif.(Notification); ok {
 		n.Sign()
+		notif = n
 	}
 
 	toSend, err := json.Marshal(notif)
