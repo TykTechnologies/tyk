@@ -83,7 +83,8 @@ func onServerStatusReceivedHandler(payload string) {
 	serverData := drl.Server{}
 	if err := json.Unmarshal([]byte(payload), &serverData); err != nil {
 		log.WithFields(logrus.Fields{
-			"prefix": "pub-sub",
+			"prefix":  "pub-sub",
+			"payload": string(payload),
 		}).Error("Failed unmarshal server data: ", err)
 		return
 	}
