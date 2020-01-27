@@ -33,12 +33,12 @@ var redisUp atomic.Value
 
 var disableRedis atomic.Value
 
-// ConnState very handy when testsing it allows to dynamically enable/disable talking with
+// DisableRedis very handy when testsing it allows to dynamically enable/disable talking with
 // redisW
-func ConnState(allow bool) {
-	if !allow {
-		disableRedis.Store(true)
+func DisableRedis(ok bool) {
+	if ok {
 		redisUp.Store(false)
+		disableRedis.Store(true)
 		return
 	}
 	redisUp.Store(true)
