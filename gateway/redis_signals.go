@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"crypto"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -41,11 +42,11 @@ type Notification struct {
 	Command       NotificationCommand `json:"command"`
 	Payload       string              `json:"payload"`
 	Signature     string              `json:"signature"`
-	SignatureAlgo string              `json:"algorithm"`
+	SignatureAlgo crypto.Hash         `json:"algorithm"`
 }
 
 func (n *Notification) Sign() {
-	n.SignatureAlgo = "secret-sha256"
+	n.SignatureAlgo = crypto.SHA256
 	hash := sha256.Sum256([]byte(string(n.Command) + n.Payload + config.Global().NodeSecret))
 	n.Signature = hex.EncodeToString(hash[:])
 }
@@ -146,7 +147,7 @@ func isPayloadSignatureValid(notification Notification) bool {
 	}
 
 	switch notification.SignatureAlgo {
-	case "secret-sha256":
+	case crypto.SHA256:
 		hash := sha256.Sum256([]byte(string(notification.Command) + notification.Payload + config.Global().NodeSecret))
 		expectedSignature := hex.EncodeToString(hash[:])
 

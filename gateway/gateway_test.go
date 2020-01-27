@@ -880,12 +880,18 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 		msg := redis.Message{
 			Payload: `{"Command": "NoticeGatewayDRLNotification"}`,
 		}
+
+		callbackRun := false
 		shouldHandle := func(got NotificationCommand) {
+			callbackRun = true
 			if want := NoticeGatewayDRLNotification; got != want {
 				t.Fatalf("want %q, got %q", want, got)
 			}
 		}
 		handleRedisEvent(&msg, shouldHandle, nil)
+		if !callbackRun {
+			t.Fatalf("Should run callback")
+		}
 		globalConf.ManagementNode = true
 		config.SetGlobal(globalConf)
 		notHandle := func(got NotificationCommand) {
@@ -908,13 +914,18 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 		payload, _ := json.Marshal(n)
 		msg.Payload = string(payload)
 
+		callbackRun := false
 		shouldHandle := func(got NotificationCommand) {
+			callbackRun = true
 			if want := NoticeGroupReload; got != want {
 				t.Fatalf("want %q, got %q", want, got)
 			}
 		}
 
 		handleRedisEvent(&msg, shouldHandle, nil)
+		if !callbackRun {
+			t.Fatalf("Should run callback")
+		}
 
 		n.Signature = "wrong"
 		payload, _ = json.Marshal(n)
