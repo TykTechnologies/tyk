@@ -172,7 +172,7 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response) (*copro
 }
 
 // ObjectPostProcess does CoProcessObject post-processing (adding/removing headers or params, etc.).
-func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Request) {
+func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Request) (err error) {
 	r.ContentLength = int64(len(object.Request.RawBody))
 	r.Body = ioutil.NopCloser(bytes.NewReader(object.Request.RawBody))
 
@@ -193,8 +193,12 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 		values.Set(p, v)
 	}
 
-	r.URL, _ = url.ParseRequestURI(object.Request.Url)
+	r.URL, err = url.ParseRequestURI(object.Request.Url)
+	if err != nil {
+		return
+	}
 	r.URL.RawQuery = values.Encode()
+	return
 }
 
 // CoProcessInit creates a new CoProcessDispatcher, it will be called when Tyk starts.
@@ -309,7 +313,11 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	m.logger.WithField("ms", ms).Debug("gRPC request processing took")
 
-	coProcessor.ObjectPostProcess(returnObject, r)
+	err = coProcessor.ObjectPostProcess(returnObject, r)
+	if err != nil {
+		logger.WithError(err).Error("Failed to post-process request object")
+		return errors.New("Middleware error"), 500
+	}
 
 	var token string
 	if returnObject.Session != nil {
