@@ -455,6 +455,7 @@ func loadControlAPIEndpoints(muxer *mux.Router) {
 	r.HandleFunc("/debug", traceHandler).Methods("POST")
 
 	r.HandleFunc("/keys", keyHandler).Methods("POST", "PUT", "GET", "DELETE")
+	r.HandleFunc("/keys/preview", previewKeyHandler).Methods("POST")
 	r.HandleFunc("/keys/{keyName:[^/]*}", keyHandler).Methods("POST", "PUT", "GET", "DELETE")
 	r.HandleFunc("/certs", certHandler).Methods("POST", "GET")
 	r.HandleFunc("/certs/{certID:[^/]*}", certHandler).Methods("POST", "GET", "DELETE")
