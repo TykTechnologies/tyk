@@ -117,26 +117,6 @@ func NewRedisClusterPool(isCache bool) redis.UniversalClient {
 		timeout = time.Duration(cfg.Timeout) * time.Second
 	}
 
-	if cfg.Port == 0 {
-		cfg.Port = defaultRedisPort
-	}
-
-	var seedHosts []string
-
-	if len(cfg.Addrs) != 0 {
-		seedHosts = cfg.Addrs
-	} else {
-		for h, p := range cfg.Hosts {
-			addr := h + ":" + p
-			seedHosts = append(seedHosts, addr)
-		}
-	}
-
-	if len(seedHosts) == 0 {
-		addr := cfg.Host + ":" + strconv.Itoa(cfg.Port)
-		seedHosts = append(seedHosts, addr)
-	}
-
 	var tlsConfig *tls.Config
 
 	if cfg.UseSSL {
@@ -147,7 +127,7 @@ func NewRedisClusterPool(isCache bool) redis.UniversalClient {
 
 	var client redis.UniversalClient
 	opts := &RedisOpts{
-		Addrs:        seedHosts,
+		Addrs:        getRedisAddrs(cfg),
 		MasterName:   cfg.MasterName,
 		Password:     cfg.Password,
 		DB:           cfg.Database,
@@ -171,6 +151,24 @@ func NewRedisClusterPool(isCache bool) redis.UniversalClient {
 	}
 
 	return client
+}
+
+func getRedisAddrs(config config.StorageOptionsConf) (addrs []string) {
+	if len(config.Addrs) != 0 {
+		addrs = config.Addrs
+	} else {
+		for h, p := range config.Hosts {
+			addr := h + ":" + p
+			addrs = append(addrs, addr)
+		}
+	}
+
+	if len(addrs) == 0 && config.Port != 0 {
+		addr := config.Host + ":" + strconv.Itoa(config.Port)
+		addrs = append(addrs, addr)
+	}
+
+	return addrs
 }
 
 // RedisOpts is the overriden type of redis.UniversalOptions. simple() and cluster() functions are not public
@@ -246,7 +244,7 @@ func (o *RedisOpts) simple() *redis.Options {
 
 func (o *RedisOpts) failover() *redis.FailoverOptions {
 	if len(o.Addrs) == 0 {
-		o.Addrs = []string{"127.0.0.1:6379"}
+		o.Addrs = []string{"127.0.0.1:26379"}
 	}
 
 	return &redis.FailoverOptions{
