@@ -1,7 +1,10 @@
 package gateway
 
 import (
+	"crypto"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"strconv"
 	"strings"
@@ -36,9 +39,16 @@ const (
 
 // Notification is a type that encodes a message published to a pub sub channel (shared between implementations)
 type Notification struct {
-	Command   NotificationCommand `json:"command"`
-	Payload   string              `json:"payload"`
-	Signature string              `json:"signature"`
+	Command       NotificationCommand `json:"command"`
+	Payload       string              `json:"payload"`
+	Signature     string              `json:"signature"`
+	SignatureAlgo crypto.Hash         `json:"algorithm"`
+}
+
+func (n *Notification) Sign() {
+	n.SignatureAlgo = crypto.SHA256
+	hash := sha256.Sum256([]byte(string(n.Command) + n.Payload + config.Global().NodeSecret))
+	n.Signature = hex.EncodeToString(hash[:])
 }
 
 func startPubSubLoop() {
@@ -132,45 +142,51 @@ var redisInsecureWarn sync.Once
 var notificationVerifier goverify.Verifier
 
 func isPayloadSignatureValid(notification Notification) bool {
-
-	switch notification.Command {
-	case NoticeGatewayDRLNotification, NoticeGatewayLENotification:
-		// Gateway to gateway
+	if config.Global().AllowInsecureConfigs {
 		return true
 	}
 
-	if notification.Signature == "" && config.Global().AllowInsecureConfigs {
-		return true
-	}
+	switch notification.SignatureAlgo {
+	case crypto.SHA256:
+		hash := sha256.Sum256([]byte(string(notification.Command) + notification.Payload + config.Global().NodeSecret))
+		expectedSignature := hex.EncodeToString(hash[:])
 
-	if config.Global().PublicKeyPath != "" && notificationVerifier == nil {
-		var err error
-
-		notificationVerifier, err = goverify.LoadPublicKeyFromFile(config.Global().PublicKeyPath)
-		if err != nil {
-
-			pubSubLog.Error("Notification signer: Failed loading private key from path: ", err)
+		if expectedSignature == notification.Signature {
+			return true
+		} else {
+			pubSubLog.Error("Notification signer: Failed verifying pub sub signature using node_secret: ")
 			return false
 		}
-	}
+	default:
+		if config.Global().PublicKeyPath != "" && notificationVerifier == nil {
+			var err error
 
-	if notificationVerifier != nil {
+			notificationVerifier, err = goverify.LoadPublicKeyFromFile(config.Global().PublicKeyPath)
+			if err != nil {
 
-		signed, err := base64.StdEncoding.DecodeString(notification.Signature)
-		if err != nil {
-
-			pubSubLog.Error("Failed to decode signature: ", err)
-			return false
+				pubSubLog.Error("Notification signer: Failed loading private key from path: ", err)
+				return false
+			}
 		}
 
-		if err := notificationVerifier.Verify([]byte(notification.Payload), signed); err != nil {
+		if notificationVerifier != nil {
 
-			pubSubLog.Error("Could not verify notification: ", err, ": ", notification)
+			signed, err := base64.StdEncoding.DecodeString(notification.Signature)
+			if err != nil {
 
-			return false
+				pubSubLog.Error("Failed to decode signature: ", err)
+				return false
+			}
+
+			if err := notificationVerifier.Verify([]byte(notification.Payload), signed); err != nil {
+
+				pubSubLog.Error("Could not verify notification: ", err, ": ", notification)
+
+				return false
+			}
+
+			return true
 		}
-
-		return true
 	}
 
 	return false
@@ -184,6 +200,10 @@ type RedisNotifier struct {
 
 // Notify will send a notification to a channel
 func (r *RedisNotifier) Notify(notif interface{}) bool {
+	if n, ok := notif.(Notification); ok {
+		n.Sign()
+		notif = n
+	}
 
 	toSend, err := json.Marshal(notif)
 
