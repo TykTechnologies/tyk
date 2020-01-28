@@ -291,8 +291,8 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 	}
 
 	baseConfig.Certificates = serverCerts
-
 	baseConfig.BuildNameToCertificate()
+
 	for name, cert := range certNameMap {
 		baseConfig.NameToCertificate[name] = cert
 	}
@@ -304,10 +304,11 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 			return config.(*tls.Config).Clone(), nil
 		}
 
-		tlsConfigMu.Lock()
-		defer tlsConfigMu.Unlock()
-
 		newConfig := baseConfig.Clone()
+		newConfig.BuildNameToCertificate()
+		for name, cert := range certNameMap {
+			newConfig.NameToCertificate[name] = cert
+		}
 
 		isControlAPI := (listenPort != 0 && config.Global().ControlAPIPort == listenPort) || (config.Global().ControlAPIHostname == hello.ServerName)
 
@@ -326,7 +327,6 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 
 		domainRequireCert := map[string]tls.ClientAuthType{}
 		for _, spec := range apiSpecs {
-
 			switch {
 			case spec.UseMutualTLSAuth:
 				if domainRequireCert[spec.Domain] == 0 {
@@ -384,6 +384,7 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 
 		newConfig.ClientAuth = domainRequireCert[hello.ServerName]
 
+		// Cache the config
 		tlsConfigCache.Set(hello.ServerName+listenPortStr, newConfig, cache.DefaultExpiration)
 		return newConfig, nil
 	}
