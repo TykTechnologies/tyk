@@ -16,7 +16,7 @@ require (
 	github.com/TykTechnologies/goverify v0.0.0-20160822133757-7ccc57452ade
 	github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c
 	github.com/TykTechnologies/murmur3 v0.0.0-20180602122059-1915e687e465
-	github.com/TykTechnologies/openid2go v0.0.0-20160817213554-aab5ce1231ab
+	github.com/TykTechnologies/openid2go v0.0.0-20200122120050-1b642583380a
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
 	github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d // indirect
 	github.com/bshuster-repo/logrus-logstash-hook v0.4.1
@@ -71,7 +71,7 @@ require (
 	github.com/rs/cors v1.7.0
 	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.4.2
-	github.com/square/go-jose v0.0.0-20161027010314-63d7cfa0284d // indirect
+	github.com/square/go-jose v2.4.1+incompatible // indirect
 	github.com/stretchr/testify v1.4.0
 	github.com/uber-go/atomic v1.4.0 // indirect
 	github.com/uber/jaeger-client-go v2.19.0+incompatible

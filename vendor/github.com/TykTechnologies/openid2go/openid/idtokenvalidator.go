@@ -12,8 +12,8 @@ const audiencesClaimName = "aud"
 const subjectClaimName = "sub"
 const keyIDJwtHeaderName = "kid"
 
-type jwtTokenValidator interface {
-	validate(t string) (jt *jwt.Token, err error)
+type JWTTokenValidator interface {
+	Validate(t string) (jt *jwt.Token, err error)
 }
 
 type jwtParserFunc func(string, jwt.Keyfunc) (*jwt.Token, error)
@@ -28,7 +28,7 @@ func newIDTokenValidator(pg GetProvidersFunc, jp jwtParserFunc, kg signingKeyGet
 	return &idTokenValidator{pg, jp, kg}
 }
 
-func (tv *idTokenValidator) validate(t string) (*jwt.Token, error) {
+func (tv *idTokenValidator) Validate(t string) (*jwt.Token, error) {
 	jt, err := tv.jwtParser(t, tv.getSigningKey)
 	if err != nil {
 		if verr, ok := err.(*jwt.ValidationError); ok {

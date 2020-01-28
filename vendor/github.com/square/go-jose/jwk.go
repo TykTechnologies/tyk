@@ -29,11 +29,13 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/square/go-jose/json"
+	"golang.org/x/crypto/ed25519"
+
+	"gopkg.in/square/go-jose.v2/json"
 )
 
-// rawJsonWebKey represents a public or private key in JWK format, used for parsing/serializing.
-type rawJsonWebKey struct {
+// rawJSONWebKey represents a public or private key in JWK format, used for parsing/serializing.
+type rawJSONWebKey struct {
 	Use string      `json:"use,omitempty"`
 	Kty string      `json:"kty,omitempty"`
 	Kid string      `json:"kid,omitempty"`
@@ -58,8 +60,8 @@ type rawJsonWebKey struct {
 	X5c []string `json:"x5c,omitempty"`
 }
 
-// JsonWebKey represents a public or private key in JWK format.
-type JsonWebKey struct {
+// JSONWebKey represents a public or private key in JWK format.
+type JSONWebKey struct {
 	Key          interface{}
 	Certificates []*x509.Certificate
 	KeyID        string
@@ -68,15 +70,19 @@ type JsonWebKey struct {
 }
 
 // MarshalJSON serializes the given key to its JSON representation.
-func (k JsonWebKey) MarshalJSON() ([]byte, error) {
-	var raw *rawJsonWebKey
+func (k JSONWebKey) MarshalJSON() ([]byte, error) {
+	var raw *rawJSONWebKey
 	var err error
 
 	switch key := k.Key.(type) {
+	case ed25519.PublicKey:
+		raw = fromEdPublicKey(key)
 	case *ecdsa.PublicKey:
 		raw, err = fromEcPublicKey(key)
 	case *rsa.PublicKey:
 		raw = fromRsaPublicKey(key)
+	case ed25519.PrivateKey:
+		raw, err = fromEdPrivateKey(key)
 	case *ecdsa.PrivateKey:
 		raw, err = fromEcPrivateKey(key)
 	case *rsa.PrivateKey:
@@ -103,8 +109,8 @@ func (k JsonWebKey) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON reads a key from its JSON representation.
-func (k *JsonWebKey) UnmarshalJSON(data []byte) (err error) {
-	var raw rawJsonWebKey
+func (k *JSONWebKey) UnmarshalJSON(data []byte) (err error) {
+	var raw rawJSONWebKey
 	err = json.Unmarshal(data, &raw)
 	if err != nil {
 		return err
@@ -126,40 +132,43 @@ func (k *JsonWebKey) UnmarshalJSON(data []byte) (err error) {
 		}
 	case "oct":
 		key, err = raw.symmetricKey()
+	case "OKP":
+		if raw.Crv == "Ed25519" && raw.X != nil {
+			if raw.D != nil {
+				key, err = raw.edPrivateKey()
+			} else {
+				key, err = raw.edPublicKey()
+			}
+		} else {
+			err = fmt.Errorf("square/go-jose: unknown curve %s'", raw.Crv)
+		}
 	default:
 		err = fmt.Errorf("square/go-jose: unknown json web key type '%s'", raw.Kty)
 	}
 
 	if err == nil {
-		*k = JsonWebKey{Key: key, KeyID: raw.Kid, Algorithm: raw.Alg, Use: raw.Use}
-	}
+		*k = JSONWebKey{Key: key, KeyID: raw.Kid, Algorithm: raw.Alg, Use: raw.Use}
 
-	k.Certificates = make([]*x509.Certificate, len(raw.X5c))
-	for i, cert := range raw.X5c {
-		raw, err := base64.StdEncoding.DecodeString(cert)
+		k.Certificates, err = parseCertificateChain(raw.X5c)
 		if err != nil {
-			return err
-		}
-		k.Certificates[i], err = x509.ParseCertificate(raw)
-		if err != nil {
-			return err
+			return fmt.Errorf("failed to unmarshal x5c field: %s", err)
 		}
 	}
 
 	return
 }
 
-// JsonWebKeySet represents a JWK Set object.
-type JsonWebKeySet struct {
-	Keys []JsonWebKey `json:"keys"`
+// JSONWebKeySet represents a JWK Set object.
+type JSONWebKeySet struct {
+	Keys []JSONWebKey `json:"keys"`
 }
 
 // Key convenience method returns keys by key ID. Specification states
 // that a JWK Set "SHOULD" use distinct key IDs, but allows for some
 // cases where they are not distinct. Hence method returns a slice
-// of JsonWebKeys.
-func (s *JsonWebKeySet) Key(kid string) []JsonWebKey {
-	var keys []JsonWebKey
+// of JSONWebKeys.
+func (s *JSONWebKeySet) Key(kid string) []JSONWebKey {
+	var keys []JSONWebKey
 	for _, key := range s.Keys {
 		if key.KeyID == kid {
 			keys = append(keys, key)
@@ -171,12 +180,17 @@ func (s *JsonWebKeySet) Key(kid string) []JsonWebKey {
 
 const rsaThumbprintTemplate = `{"e":"%s","kty":"RSA","n":"%s"}`
 const ecThumbprintTemplate = `{"crv":"%s","kty":"EC","x":"%s","y":"%s"}`
+const edThumbprintTemplate = `{"crv":"%s","kty":"OKP",x":"%s"}`
 
 func ecThumbprintInput(curve elliptic.Curve, x, y *big.Int) (string, error) {
 	coordLength := curveSize(curve)
 	crv, err := curveName(curve)
 	if err != nil {
 		return "", err
+	}
+
+	if len(x.Bytes()) > coordLength || len(y.Bytes()) > coordLength {
+		return "", errors.New("square/go-jose: invalid elliptic key (too large)")
 	}
 
 	return fmt.Sprintf(ecThumbprintTemplate, crv,
@@ -190,12 +204,23 @@ func rsaThumbprintInput(n *big.Int, e int) (string, error) {
 		newBuffer(n.Bytes()).base64()), nil
 }
 
+func edThumbprintInput(ed ed25519.PublicKey) (string, error) {
+	crv := "Ed25519"
+	if len(ed) > 32 {
+		return "", errors.New("square/go-jose: invalid elliptic key (too large)")
+	}
+	return fmt.Sprintf(edThumbprintTemplate, crv,
+		newFixedSizeBuffer(ed, 32).base64()), nil
+}
+
 // Thumbprint computes the JWK Thumbprint of a key using the
 // indicated hash algorithm.
-func (k *JsonWebKey) Thumbprint(hash crypto.Hash) ([]byte, error) {
+func (k *JSONWebKey) Thumbprint(hash crypto.Hash) ([]byte, error) {
 	var input string
 	var err error
 	switch key := k.Key.(type) {
+	case ed25519.PublicKey:
+		input, err = edThumbprintInput(key)
 	case *ecdsa.PublicKey:
 		input, err = ecThumbprintInput(key.Curve, key.X, key.Y)
 	case *ecdsa.PrivateKey:
@@ -204,6 +229,8 @@ func (k *JsonWebKey) Thumbprint(hash crypto.Hash) ([]byte, error) {
 		input, err = rsaThumbprintInput(key.N, key.E)
 	case *rsa.PrivateKey:
 		input, err = rsaThumbprintInput(key.N, key.E)
+	case ed25519.PrivateKey:
+		input, err = edThumbprintInput(ed25519.PublicKey(key[32:]))
 	default:
 		return nil, fmt.Errorf("square/go-jose: unknown key type '%s'", reflect.TypeOf(key))
 	}
@@ -218,17 +245,36 @@ func (k *JsonWebKey) Thumbprint(hash crypto.Hash) ([]byte, error) {
 }
 
 // IsPublic returns true if the JWK represents a public key (not symmetric, not private).
-func (k *JsonWebKey) IsPublic() bool {
+func (k *JSONWebKey) IsPublic() bool {
 	switch k.Key.(type) {
-	case *ecdsa.PublicKey, *rsa.PublicKey:
+	case *ecdsa.PublicKey, *rsa.PublicKey, ed25519.PublicKey:
 		return true
 	default:
 		return false
 	}
 }
 
+// Public creates JSONWebKey with corresponding publik key if JWK represents asymmetric private key.
+func (k *JSONWebKey) Public() JSONWebKey {
+	if k.IsPublic() {
+		return *k
+	}
+	ret := *k
+	switch key := k.Key.(type) {
+	case *ecdsa.PrivateKey:
+		ret.Key = key.Public()
+	case *rsa.PrivateKey:
+		ret.Key = key.Public()
+	case ed25519.PrivateKey:
+		ret.Key = key.Public()
+	default:
+		return JSONWebKey{} // returning invalid key
+	}
+	return ret
+}
+
 // Valid checks that the key contains the expected parameters.
-func (k *JsonWebKey) Valid() bool {
+func (k *JSONWebKey) Valid() bool {
 	if k.Key == nil {
 		return false
 	}
@@ -249,13 +295,21 @@ func (k *JsonWebKey) Valid() bool {
 		if key.N == nil || key.E == 0 || key.D == nil || len(key.Primes) < 2 {
 			return false
 		}
+	case ed25519.PublicKey:
+		if len(key) != 32 {
+			return false
+		}
+	case ed25519.PrivateKey:
+		if len(key) != 64 {
+			return false
+		}
 	default:
 		return false
 	}
 	return true
 }
 
-func (key rawJsonWebKey) rsaPublicKey() (*rsa.PublicKey, error) {
+func (key rawJSONWebKey) rsaPublicKey() (*rsa.PublicKey, error) {
 	if key.N == nil || key.E == nil {
 		return nil, fmt.Errorf("square/go-jose: invalid RSA key, missing n/e values")
 	}
@@ -266,15 +320,23 @@ func (key rawJsonWebKey) rsaPublicKey() (*rsa.PublicKey, error) {
 	}, nil
 }
 
-func fromRsaPublicKey(pub *rsa.PublicKey) *rawJsonWebKey {
-	return &rawJsonWebKey{
+func fromEdPublicKey(pub ed25519.PublicKey) *rawJSONWebKey {
+	return &rawJSONWebKey{
+		Kty: "OKP",
+		Crv: "Ed25519",
+		X:   newBuffer(pub),
+	}
+}
+
+func fromRsaPublicKey(pub *rsa.PublicKey) *rawJSONWebKey {
+	return &rawJSONWebKey{
 		Kty: "RSA",
 		N:   newBuffer(pub.N.Bytes()),
 		E:   newBufferFromInt(uint64(pub.E)),
 	}
 }
 
-func (key rawJsonWebKey) ecPublicKey() (*ecdsa.PublicKey, error) {
+func (key rawJSONWebKey) ecPublicKey() (*ecdsa.PublicKey, error) {
 	var curve elliptic.Curve
 	switch key.Crv {
 	case "P-256":
@@ -291,6 +353,17 @@ func (key rawJsonWebKey) ecPublicKey() (*ecdsa.PublicKey, error) {
 		return nil, errors.New("square/go-jose: invalid EC key, missing x/y values")
 	}
 
+	// The length of this octet string MUST be the full size of a coordinate for
+	// the curve specified in the "crv" parameter.
+	// https://tools.ietf.org/html/rfc7518#section-6.2.1.2
+	if curveSize(curve) != len(key.X.data) {
+		return nil, fmt.Errorf("square/go-jose: invalid EC public key, wrong length for x")
+	}
+
+	if curveSize(curve) != len(key.Y.data) {
+		return nil, fmt.Errorf("square/go-jose: invalid EC public key, wrong length for y")
+	}
+
 	x := key.X.bigInt()
 	y := key.Y.bigInt()
 
@@ -305,7 +378,7 @@ func (key rawJsonWebKey) ecPublicKey() (*ecdsa.PublicKey, error) {
 	}, nil
 }
 
-func fromEcPublicKey(pub *ecdsa.PublicKey) (*rawJsonWebKey, error) {
+func fromEcPublicKey(pub *ecdsa.PublicKey) (*rawJSONWebKey, error) {
 	if pub == nil || pub.X == nil || pub.Y == nil {
 		return nil, fmt.Errorf("square/go-jose: invalid EC key (nil, or X/Y missing)")
 	}
@@ -324,7 +397,7 @@ func fromEcPublicKey(pub *ecdsa.PublicKey) (*rawJsonWebKey, error) {
 		return nil, fmt.Errorf("square/go-jose: invalid EC key (X/Y too large)")
 	}
 
-	key := &rawJsonWebKey{
+	key := &rawJSONWebKey{
 		Kty: "EC",
 		Crv: name,
 		X:   newFixedSizeBuffer(xBytes, size),
@@ -334,7 +407,37 @@ func fromEcPublicKey(pub *ecdsa.PublicKey) (*rawJsonWebKey, error) {
 	return key, nil
 }
 
-func (key rawJsonWebKey) rsaPrivateKey() (*rsa.PrivateKey, error) {
+func (key rawJSONWebKey) edPrivateKey() (ed25519.PrivateKey, error) {
+	var missing []string
+	switch {
+	case key.D == nil:
+		missing = append(missing, "D")
+	case key.X == nil:
+		missing = append(missing, "X")
+	}
+
+	if len(missing) > 0 {
+		return nil, fmt.Errorf("square/go-jose: invalid Ed25519 private key, missing %s value(s)", strings.Join(missing, ", "))
+	}
+
+	privateKey := make([]byte, ed25519.PrivateKeySize)
+	copy(privateKey[0:32], key.D.bytes())
+	copy(privateKey[32:], key.X.bytes())
+	rv := ed25519.PrivateKey(privateKey)
+	return rv, nil
+}
+
+func (key rawJSONWebKey) edPublicKey() (ed25519.PublicKey, error) {
+	if key.X == nil {
+		return nil, fmt.Errorf("square/go-jose: invalid Ed key, missing x value")
+	}
+	publicKey := make([]byte, ed25519.PublicKeySize)
+	copy(publicKey[0:32], key.X.bytes())
+	rv := ed25519.PublicKey(publicKey)
+	return rv, nil
+}
+
+func (key rawJSONWebKey) rsaPrivateKey() (*rsa.PrivateKey, error) {
 	var missing []string
 	switch {
 	case key.N == nil:
@@ -379,7 +482,14 @@ func (key rawJsonWebKey) rsaPrivateKey() (*rsa.PrivateKey, error) {
 	return rv, err
 }
 
-func fromRsaPrivateKey(rsa *rsa.PrivateKey) (*rawJsonWebKey, error) {
+func fromEdPrivateKey(ed ed25519.PrivateKey) (*rawJSONWebKey, error) {
+	raw := fromEdPublicKey(ed25519.PublicKey(ed[32:]))
+
+	raw.D = newBuffer(ed[0:32])
+	return raw, nil
+}
+
+func fromRsaPrivateKey(rsa *rsa.PrivateKey) (*rawJSONWebKey, error) {
 	if len(rsa.Primes) != 2 {
 		return nil, ErrUnsupportedKeyType
 	}
@@ -390,10 +500,20 @@ func fromRsaPrivateKey(rsa *rsa.PrivateKey) (*rawJsonWebKey, error) {
 	raw.P = newBuffer(rsa.Primes[0].Bytes())
 	raw.Q = newBuffer(rsa.Primes[1].Bytes())
 
+	if rsa.Precomputed.Dp != nil {
+		raw.Dp = newBuffer(rsa.Precomputed.Dp.Bytes())
+	}
+	if rsa.Precomputed.Dq != nil {
+		raw.Dq = newBuffer(rsa.Precomputed.Dq.Bytes())
+	}
+	if rsa.Precomputed.Qinv != nil {
+		raw.Qi = newBuffer(rsa.Precomputed.Qinv.Bytes())
+	}
+
 	return raw, nil
 }
 
-func (key rawJsonWebKey) ecPrivateKey() (*ecdsa.PrivateKey, error) {
+func (key rawJSONWebKey) ecPrivateKey() (*ecdsa.PrivateKey, error) {
 	var curve elliptic.Curve
 	switch key.Crv {
 	case "P-256":
@@ -408,6 +528,22 @@ func (key rawJsonWebKey) ecPrivateKey() (*ecdsa.PrivateKey, error) {
 
 	if key.X == nil || key.Y == nil || key.D == nil {
 		return nil, fmt.Errorf("square/go-jose: invalid EC private key, missing x/y/d values")
+	}
+
+	// The length of this octet string MUST be the full size of a coordinate for
+	// the curve specified in the "crv" parameter.
+	// https://tools.ietf.org/html/rfc7518#section-6.2.1.2
+	if curveSize(curve) != len(key.X.data) {
+		return nil, fmt.Errorf("square/go-jose: invalid EC private key, wrong length for x")
+	}
+
+	if curveSize(curve) != len(key.Y.data) {
+		return nil, fmt.Errorf("square/go-jose: invalid EC private key, wrong length for y")
+	}
+
+	// https://tools.ietf.org/html/rfc7518#section-6.2.2.1
+	if dSize(curve) != len(key.D.data) {
+		return nil, fmt.Errorf("square/go-jose: invalid EC private key, wrong length for d")
 	}
 
 	x := key.X.bigInt()
@@ -427,7 +563,7 @@ func (key rawJsonWebKey) ecPrivateKey() (*ecdsa.PrivateKey, error) {
 	}, nil
 }
 
-func fromEcPrivateKey(ec *ecdsa.PrivateKey) (*rawJsonWebKey, error) {
+func fromEcPrivateKey(ec *ecdsa.PrivateKey) (*rawJSONWebKey, error) {
 	raw, err := fromEcPublicKey(&ec.PublicKey)
 	if err != nil {
 		return nil, err
@@ -437,19 +573,34 @@ func fromEcPrivateKey(ec *ecdsa.PrivateKey) (*rawJsonWebKey, error) {
 		return nil, fmt.Errorf("square/go-jose: invalid EC private key")
 	}
 
-	raw.D = newBuffer(ec.D.Bytes())
+	raw.D = newFixedSizeBuffer(ec.D.Bytes(), dSize(ec.PublicKey.Curve))
 
 	return raw, nil
 }
 
-func fromSymmetricKey(key []byte) (*rawJsonWebKey, error) {
-	return &rawJsonWebKey{
+// dSize returns the size in octets for the "d" member of an elliptic curve
+// private key.
+// The length of this octet string MUST be ceiling(log-base-2(n)/8)
+// octets (where n is the order of the curve).
+// https://tools.ietf.org/html/rfc7518#section-6.2.2.1
+func dSize(curve elliptic.Curve) int {
+	order := curve.Params().P
+	bitLen := order.BitLen()
+	size := bitLen / 8
+	if bitLen%8 != 0 {
+		size = size + 1
+	}
+	return size
+}
+
+func fromSymmetricKey(key []byte) (*rawJSONWebKey, error) {
+	return &rawJSONWebKey{
 		Kty: "oct",
 		K:   newBuffer(key),
 	}, nil
 }
 
-func (key rawJsonWebKey) symmetricKey() ([]byte, error) {
+func (key rawJSONWebKey) symmetricKey() ([]byte, error) {
 	if key.K == nil {
 		return nil, fmt.Errorf("square/go-jose: invalid OCT (symmetric) key, missing k value")
 	}
