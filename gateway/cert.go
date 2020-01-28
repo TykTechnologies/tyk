@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/TykTechnologies/tyk/certs"
@@ -266,6 +267,8 @@ func dummyGetCertificate(*tls.ClientHelloInfo) (*tls.Certificate, error) {
 
 var tlsConfigCache = cache.New(60*time.Second, 60*time.Minute)
 
+var tlsConfigMu sync.Mutex
+
 func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
 	// Supporting legacy certificate configuration
 	serverCerts := []tls.Certificate{}
@@ -300,6 +303,9 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 		if config, found := tlsConfigCache.Get(hello.ServerName + listenPortStr); found {
 			return config.(*tls.Config), nil
 		}
+
+		tlsConfigMu.Lock()
+		defer tlsConfigMu.Unlock()
 
 		newConfig := baseConfig.Clone()
 
