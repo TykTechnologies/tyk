@@ -301,7 +301,7 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 
 	return func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
 		if config, found := tlsConfigCache.Get(hello.ServerName + listenPortStr); found {
-			return config.(*tls.Config), nil
+			return config.(*tls.Config).Clone(), nil
 		}
 
 		tlsConfigMu.Lock()
