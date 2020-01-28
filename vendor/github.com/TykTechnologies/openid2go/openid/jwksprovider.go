@@ -8,7 +8,7 @@ import (
 )
 
 type jwksGetter interface {
-	getJwkSet(string) (jose.JsonWebKeySet, error)
+	getJwkSet(string) (jose.JSONWebKeySet, error)
 }
 
 type httpJwksProvider struct {
@@ -20,19 +20,19 @@ func newHTTPJwksProvider(gf httpGetFunc, df decodeResponseFunc) *httpJwksProvide
 	return &httpJwksProvider{gf, df}
 }
 
-func (httpProv *httpJwksProvider) getJwkSet(url string) (jose.JsonWebKeySet, error) {
+func (httpProv *httpJwksProvider) getJwkSet(url string) (jose.JSONWebKeySet, error) {
 
-	var jwks jose.JsonWebKeySet
+	var jwks jose.JSONWebKeySet
 	resp, err := httpProv.getJwks(url)
 
 	if err != nil {
-		return jwks, &ValidationError{Code: ValidationErrorGetJwksFailure, Message: fmt.Sprintf("Failure while contacting the jwk endpoint %v.", url), Err: err, HTTPStatus: http.StatusUnauthorized}
+		return jwks, &ValidationError{Code: ValidationErrorGetJwksFailure, Message: fmt.Sprintf("Failure while contacting the jwk endpoint %v: %v", url, err), Err: err, HTTPStatus: http.StatusUnauthorized}
 	}
 
 	defer resp.Body.Close()
 
 	if err := httpProv.decodeJwks(resp.Body, &jwks); err != nil {
-		return jwks, &ValidationError{Code: ValidationErrorDecodeJwksFailure, Message: fmt.Sprintf("Failure while decoding the jwk retrieved from the  endpoint %v.", url), Err: err, HTTPStatus: http.StatusUnauthorized}
+		return jwks, &ValidationError{Code: ValidationErrorDecodeJwksFailure, Message: fmt.Sprintf("Failure while decoding the jwk retrieved from the endpoint %v: %v", url, err), Err: err, HTTPStatus: http.StatusUnauthorized}
 	}
 
 	return jwks, nil

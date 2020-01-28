@@ -23,26 +23,11 @@ import (
 	"encoding/binary"
 	"io"
 	"math/big"
-	"regexp"
 	"strings"
+	"unicode"
 
-	"github.com/square/go-jose/json"
+	"gopkg.in/square/go-jose.v2/json"
 )
-
-var stripWhitespaceRegex = regexp.MustCompile("\\s")
-
-// Url-safe base64 encode that strips padding
-func base64URLEncode(data []byte) string {
-	var result = base64.URLEncoding.EncodeToString(data)
-	return strings.TrimRight(result, "=")
-}
-
-// Url-safe base64 decoder that adds padding
-func base64URLDecode(data string) ([]byte, error) {
-	var missing = (4 - len(data)%4) % 4
-	data += strings.Repeat("=", missing)
-	return base64.URLEncoding.DecodeString(data)
-}
 
 // Helper function to serialize known-good objects.
 // Precondition: value is not a nil pointer.
@@ -70,7 +55,14 @@ func mustSerializeJSON(value interface{}) []byte {
 
 // Strip all newlines and whitespace
 func stripWhitespace(data string) string {
-	return stripWhitespaceRegex.ReplaceAllString(data, "")
+	buf := strings.Builder{}
+	buf.Grow(len(data))
+	for _, r := range data {
+		if !unicode.IsSpace(r) {
+			buf.WriteRune(r)
+		}
+	}
+	return buf.String()
 }
 
 // Perform compression based on algorithm
@@ -162,7 +154,7 @@ func (b *byteBuffer) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	decoded, err := base64URLDecode(encoded)
+	decoded, err := base64.RawURLEncoding.DecodeString(encoded)
 	if err != nil {
 		return err
 	}
@@ -173,7 +165,7 @@ func (b *byteBuffer) UnmarshalJSON(data []byte) error {
 }
 
 func (b *byteBuffer) base64() string {
-	return base64URLEncode(b.data)
+	return base64.RawURLEncoding.EncodeToString(b.data)
 }
 
 func (b *byteBuffer) bytes() []byte {

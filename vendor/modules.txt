@@ -25,7 +25,7 @@ github.com/TykTechnologies/leakybucket
 github.com/TykTechnologies/leakybucket/memorycache
 # github.com/TykTechnologies/murmur3 v0.0.0-20180602122059-1915e687e465
 github.com/TykTechnologies/murmur3
-# github.com/TykTechnologies/openid2go v0.0.0-20160817213554-aab5ce1231ab
+# github.com/TykTechnologies/openid2go v0.0.0-20200122120050-1b642583380a
 github.com/TykTechnologies/openid2go/openid
 # github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751
 github.com/alecthomas/template
@@ -210,10 +210,8 @@ github.com/satori/go.uuid
 # github.com/sirupsen/logrus v1.4.2
 github.com/sirupsen/logrus
 github.com/sirupsen/logrus/hooks/syslog
-# github.com/square/go-jose v0.0.0-20161027010314-63d7cfa0284d
+# github.com/square/go-jose v2.4.1+incompatible
 github.com/square/go-jose
-github.com/square/go-jose/cipher
-github.com/square/go-jose/json
 # github.com/stretchr/testify v1.4.0
 github.com/stretchr/testify/assert
 # github.com/uber/jaeger-client-go v2.19.0+incompatible
