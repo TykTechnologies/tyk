@@ -142,8 +142,13 @@ func (s *RequestSigning) ProcessRequest(w http.ResponseWriter, r *http.Request, 
 	//Append signature
 	authHeader += "signature=\"" + encodedSignature + "\""
 
-	r.Header.Set("Authorization", authHeader)
-	log.Debug("Setting Authorization headers as =", authHeader)
+	if s.Spec.RequestSigning.CustomSignatureHeader != "" {
+		r.Header.Set(s.Spec.RequestSigning.CustomSignatureHeader, authHeader)
+		log.Debugf("Setting %s headers as =%s", s.Spec.RequestSigning.CustomSignatureHeader, authHeader)
+	} else {
+		r.Header.Set("Authorization", authHeader)
+		log.Debug("Setting Authorization headers as =", authHeader)
+	}
 
 	return nil, http.StatusOK
 }
