@@ -825,11 +825,9 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 	serverCertID, _ := CertificateManager.Add(combinedPEM, "")
 	defer CertificateManager.Delete(serverCertID)
 
-	_, _, _, clientCert := genCertificate(&x509.Certificate{})
-	clientCertID := certs.HexSHA256(clientCert.Certificate[0])
-
 	globalConf := config.Global()
 	globalConf.HttpServerOptions.UseSSL = true
+	globalConf.EnableCustomDomains = true
 	globalConf.HttpServerOptions.SSLCertificates = []string{serverCertID}
 	config.SetGlobal(globalConf)
 	defer ResetTestConfig()
@@ -837,44 +835,110 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
 
-	BuildAndLoadAPI(func(spec *APISpec) {
-		spec.UseKeylessAccess = false
-		spec.BaseIdentityProvidedBy = apidef.AuthToken
-		spec.Auth.UseCertificate = true
-		spec.Proxy.ListenPath = "/"
-		spec.OrgID = "default"
-	})
+	t.Run("Without domain", func(t *testing.T) {
+		_, _, _, clientCert := genCertificate(&x509.Certificate{})
+		clientCertID := certs.HexSHA256(clientCert.Certificate[0])
 
-	client := GetTLSClient(&clientCert, nil)
-
-	t.Run("Cert unknown", func(t *testing.T) {
-		ts.Run(t, test.TestCase{Code: 403, Client: client})
-	})
-
-	t.Run("Cert known", func(t *testing.T) {
-		_, key := ts.CreateSession(func(s *user.SessionState) {
-			s.Certificate = clientCertID
-			s.AccessRights = map[string]user.AccessDefinition{"test": {
-				APIID: "test", Versions: []string{"v1"},
-			}}
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = false
+			spec.BaseIdentityProvidedBy = apidef.AuthToken
+			spec.Auth.UseCertificate = true
+			spec.Proxy.ListenPath = "/"
+			spec.OrgID = "default"
 		})
 
-		if key == "" {
-			t.Fatal("Should create key based on certificate")
-		}
+		client := GetTLSClient(&clientCert, nil)
 
-		_, key = ts.CreateSession(func(s *user.SessionState) {
-			s.Certificate = clientCertID
-			s.AccessRights = map[string]user.AccessDefinition{"test": {
-				APIID: "test", Versions: []string{"v1"},
-			}}
+		t.Run("Cert unknown", func(t *testing.T) {
+			ts.Run(t, test.TestCase{Code: 403, Client: client})
 		})
 
-		if key != "" {
-			t.Fatal("Should not allow create key based on the same certificate")
-		}
+		t.Run("Cert known", func(t *testing.T) {
+			_, key := ts.CreateSession(func(s *user.SessionState) {
+				s.Certificate = clientCertID
+				s.AccessRights = map[string]user.AccessDefinition{"test": {
+					APIID: "test", Versions: []string{"v1"},
+				}}
+			})
 
-		ts.Run(t, test.TestCase{Path: "/", Code: 200, Client: client})
+			if key == "" {
+				t.Fatal("Should create key based on certificate")
+			}
+
+			_, key = ts.CreateSession(func(s *user.SessionState) {
+				s.Certificate = clientCertID
+				s.AccessRights = map[string]user.AccessDefinition{"test": {
+					APIID: "test", Versions: []string{"v1"},
+				}}
+			})
+
+			if key != "" {
+				t.Fatal("Should not allow create key based on the same certificate")
+			}
+
+			ts.Run(t, test.TestCase{Path: "/", Code: 200, Client: client})
+
+			// Domain is not set, but we still pass it, it should still work
+			ts.Run(t, test.TestCase{Path: "/", Code: 200, Domain: "localhost", Client: client})
+		})
+	})
+
+	t.Run("With custom domain", func(t *testing.T) {
+		_, _, _, clientCert := genCertificate(&x509.Certificate{})
+		clientCertID := certs.HexSHA256(clientCert.Certificate[0])
+
+		BuildAndLoadAPI(
+			func(spec *APISpec) {
+				spec.UseKeylessAccess = false
+				spec.BaseIdentityProvidedBy = apidef.AuthToken
+				spec.Auth.UseCertificate = true
+				spec.Proxy.ListenPath = "/test1"
+				spec.OrgID = "default"
+				spec.Domain = "localhost"
+			},
+			func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/test2"
+				spec.OrgID = "default"
+			},
+		)
+
+		client := GetTLSClient(&clientCert, nil)
+
+		t.Run("Cert unknown", func(t *testing.T) {
+			ts.Run(t,
+				test.TestCase{Code: 404, Path: "/test1", Client: client},
+				test.TestCase{Code: 403, Path: "/test1", Domain: "localhost", Client: client},
+			)
+		})
+
+		t.Run("Cert known", func(t *testing.T) {
+			_, key := ts.CreateSession(func(s *user.SessionState) {
+				s.Certificate = clientCertID
+				s.AccessRights = map[string]user.AccessDefinition{"test": {
+					APIID: "test", Versions: []string{"v1"},
+				}}
+			})
+
+			if key == "" {
+				t.Fatal("Should create key based on certificate")
+			}
+
+			_, key = ts.CreateSession(func(s *user.SessionState) {
+				s.Certificate = clientCertID
+				s.AccessRights = map[string]user.AccessDefinition{"test": {
+					APIID: "test", Versions: []string{"v1"},
+				}}
+			})
+
+			if key != "" {
+				t.Fatal("Should not allow create key based on the same certificate")
+			}
+
+			ts.Run(t, test.TestCase{Path: "/test1", Code: 404, Client: client})
+
+			// Domain is not set, but we still pass it, it should still work
+			ts.Run(t, test.TestCase{Path: "/test1", Code: 200, Domain: "localhost", Client: client})
+		})
 	})
 }
 

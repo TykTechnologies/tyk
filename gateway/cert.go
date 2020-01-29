@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/TykTechnologies/tyk/certs"
@@ -266,6 +267,8 @@ func dummyGetCertificate(*tls.ClientHelloInfo) (*tls.Certificate, error) {
 
 var tlsConfigCache = cache.New(60*time.Second, 60*time.Minute)
 
+var tlsConfigMu sync.Mutex
+
 func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
 	// Supporting legacy certificate configuration
 	serverCerts := []tls.Certificate{}
@@ -288,8 +291,8 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 	}
 
 	baseConfig.Certificates = serverCerts
-
 	baseConfig.BuildNameToCertificate()
+
 	for name, cert := range certNameMap {
 		baseConfig.NameToCertificate[name] = cert
 	}
@@ -298,10 +301,20 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 
 	return func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
 		if config, found := tlsConfigCache.Get(hello.ServerName + listenPortStr); found {
-			return config.(*tls.Config), nil
+			return config.(*tls.Config).Clone(), nil
 		}
 
 		newConfig := baseConfig.Clone()
+
+		// Avoiding Race
+		newConfig.Certificates = []tls.Certificate{}
+		for _, cert := range baseConfig.Certificates {
+			newConfig.Certificates = append(newConfig.Certificates, cert)
+		}
+		newConfig.BuildNameToCertificate()
+		for name, cert := range certNameMap {
+			newConfig.NameToCertificate[name] = cert
+		}
 
 		isControlAPI := (listenPort != 0 && config.Global().ControlAPIPort == listenPort) || (config.Global().ControlAPIHostname == hello.ServerName)
 
@@ -320,7 +333,6 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 
 		domainRequireCert := map[string]tls.ClientAuthType{}
 		for _, spec := range apiSpecs {
-
 			switch {
 			case spec.UseMutualTLSAuth:
 				if domainRequireCert[spec.Domain] == 0 {
@@ -377,7 +389,11 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 		}
 
 		newConfig.ClientAuth = domainRequireCert[hello.ServerName]
+		if newConfig.ClientAuth == 0 {
+			newConfig.ClientAuth = domainRequireCert[""]
+		}
 
+		// Cache the config
 		tlsConfigCache.Set(hello.ServerName+listenPortStr, newConfig, cache.DefaultExpiration)
 		return newConfig, nil
 	}
