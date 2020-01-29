@@ -298,6 +298,10 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	rights := make(map[string]user.AccessDefinition)
 	tags := make(map[string]bool)
+	if session.MetaData == nil {
+		session.MetaData = make(map[string]interface{})
+	}
+
 	didQuota, didRateLimit, didACL := make(map[string]bool), make(map[string]bool), make(map[string]bool)
 	policies := session.PolicyIDs()
 
