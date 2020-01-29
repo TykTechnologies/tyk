@@ -12,6 +12,8 @@ import (
 
 	"github.com/justinas/alice"
 
+	"github.com/TykTechnologies/tyk/apidef"
+
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -163,6 +165,31 @@ func TestHMACRequestSigning(t *testing.T) {
 			t.Error("Expected status code 400 got ", recorder.Code)
 		}
 	})
+
+	t.Run("Custom Signature header", func(t *testing.T) {
+		algo := "hmac-sha256"
+
+		sessionKey := generateSession(algo, secret)
+		specs := generateSpec(algo, secret, sessionKey, nil)
+		api := specs[0]
+
+		api.AuthConfigs = make(map[string]apidef.AuthConfig)
+		api.AuthConfigs["hmac"] = apidef.AuthConfig{
+			AuthHeaderName: "something",
+		}
+
+		api.RequestSigning.SignatureHeader = "something"
+
+		recorder := httptest.NewRecorder()
+		chain := getMiddlewareChain(api)
+
+		req := TestReq(t, "get", "/test/get", nil)
+		chain.ServeHTTP(recorder, req)
+
+		if recorder.Code != 200 {
+			t.Error("HMAC request signing failed with error:", recorder.Body.String())
+		}
+	})
 }
 
 func TestRSARequestSigning(t *testing.T) {
@@ -255,6 +282,31 @@ func TestRSARequestSigning(t *testing.T) {
 
 		sessionKey := generateSession(algo, pubCertId)
 		specs := generateSpec(algo, privCertId, sessionKey, headerList)
+
+		req := TestReq(t, "get", "/test/get", nil)
+
+		recorder := httptest.NewRecorder()
+		chain := getMiddlewareChain(specs[0])
+		chain.ServeHTTP(recorder, req)
+
+		if recorder.Code != 200 {
+			t.Error("RSA request signing failed with error ", recorder.Body.String())
+		}
+	})
+
+	t.Run("Custom Signature header", func(t *testing.T) {
+		algo := "rsa-sha256"
+
+		sessionKey := generateSession(algo, pubCertId)
+		specs := generateSpec(algo, privCertId, sessionKey, nil)
+
+		api := specs[0]
+		api.AuthConfigs = make(map[string]apidef.AuthConfig)
+		api.AuthConfigs["hmac"] = apidef.AuthConfig{
+			AuthHeaderName: "something",
+		}
+
+		api.RequestSigning.SignatureHeader = "something"
 
 		req := TestReq(t, "get", "/test/get", nil)
 
