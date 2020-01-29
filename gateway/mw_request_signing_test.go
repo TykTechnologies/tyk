@@ -178,7 +178,7 @@ func TestHMACRequestSigning(t *testing.T) {
 			AuthHeaderName: "something",
 		}
 
-		api.RequestSigning.CustomSignatureHeader = "something"
+		api.RequestSigning.SignatureHeader = "something"
 
 		recorder := httptest.NewRecorder()
 		chain := getMiddlewareChain(api)
@@ -306,7 +306,7 @@ func TestRSARequestSigning(t *testing.T) {
 			AuthHeaderName: "something",
 		}
 
-		api.RequestSigning.CustomSignatureHeader = "something"
+		api.RequestSigning.SignatureHeader = "something"
 
 		req := TestReq(t, "get", "/test/get", nil)
 
