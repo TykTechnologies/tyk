@@ -514,12 +514,13 @@ type BundleManifest struct {
 }
 
 type RequestSigningMeta struct {
-	IsEnabled     bool     `bson:"is_enabled" json:"is_enabled"`
-	Secret        string   `bson:"secret" json:"secret"`
-	KeyId         string   `bson:"key_id" json:"key_id"`
-	Algorithm     string   `bson:"algorithm" json:"algorithm"`
-	HeaderList    []string `bson:"header_list" json:"header_list"`
-	CertificateId string   `bson:"certificate_id" json:"certificate_id"`
+	IsEnabled       bool     `bson:"is_enabled" json:"is_enabled"`
+	Secret          string   `bson:"secret" json:"secret"`
+	KeyId           string   `bson:"key_id" json:"key_id"`
+	Algorithm       string   `bson:"algorithm" json:"algorithm"`
+	HeaderList      []string `bson:"header_list" json:"header_list"`
+	CertificateId   string   `bson:"certificate_id" json:"certificate_id"`
+	SignatureHeader string   `bson:"signature_header" json:"signature_header"`
 }
 
 // Clean will URL encode map[string]struct variables for saving
