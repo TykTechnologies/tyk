@@ -98,6 +98,8 @@ type APIDefinition struct {
 	URLRewrites                []URLRewrites              `json:"url_rewrites"`
 	RemoveHeaders              []string                   `json:"remove_headers"`
 	AuthCookieName             string                     `json:"auth_cookie_name"`
+	EnableLoadBalancing        bool                       `json:"enable_load_balancing"`
+	LoadBalancingConfigData    LoadBalancingConfigData    `json:"load_balancing_config_data"`
 }
 
 // JWTDefinitions to store JWTDefinition
@@ -139,6 +141,35 @@ type Post struct {
 type CustomMiddleware struct {
 	Post   []Post `json:"post"`
 	Driver string `json:"driver"`
+}
+
+type HostCheckObject struct {
+	CheckURL string            `json:"url"`
+	Method   string            `json:"method"`
+	Headers  map[string]string `json:"headers"`
+	Body     string            `json:"body"`
+}
+
+type ServiceDiscoveryConfiguration struct {
+	UseDiscoveryService bool   `json:"use_discovery_service"`
+	QueryEndpoint       string `json:"query_endpoint"`
+	UseNestedQuery      bool   `json:"use_nested_query"`
+	ParentDataPath      string `json:"parent_data_path"`
+	DataPath            string `json:"data_path"`
+	PortDataPath        string `json:"port_data_path"`
+	TargetPath          string `json:"target_path"`
+	UseTargetList       bool   `json:"use_target_list"`
+	CacheTimeout        int64  `json:"cache_timeout"`
+	EndpointReturnsList bool   `json:"endpoint_returns_list"`
+}
+
+type LoadBalancingConfigData struct {
+	CheckList []HostCheckObject `json:"check_list"`
+	Config    struct {
+		ExpireUptimeAnalyticsAfter int64                         `json:"expire_utime_after"`
+		ServiceDiscovery           ServiceDiscoveryConfiguration `json:"service_discovery"`
+		RecheckWait                int                           `json:"recheck_wait"`
+	}
 }
 
 func apiLoader(w http.ResponseWriter, r *http.Request) {
@@ -437,6 +468,13 @@ func addOrUpdateApi(r *http.Request) (interface{}, int) {
 
 					certs["*"] = TykUpstreamPem
 					temp["upstream_certificates"] = certs
+				}
+
+				if api.EnableLoadBalancing {
+					temp["uptime_tests"] = api.LoadBalancingConfigData
+					temp["proxy"].(map[string]interface{})["check_host_against_uptime_tests"] = true
+					temp["proxy"].(map[string]interface{})["enable_load_balancing"] = true
+					temp["proxy"].(map[string]interface{})["service_discovery"] = api.LoadBalancingConfigData.Config.ServiceDiscovery
 				}
 
 				//temp has the definition - add it to Redis
