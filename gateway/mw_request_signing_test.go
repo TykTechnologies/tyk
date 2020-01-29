@@ -319,3 +319,41 @@ func TestRSARequestSigning(t *testing.T) {
 		}
 	})
 }
+
+func TestStripListenPath(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+
+	algo := "hmac-sha256"
+	secret := "12345"
+	sessionKey := generateSession(algo, secret)
+	specs := generateSpec(algo, secret, sessionKey, nil)
+
+	t.Run("Off", func(t *testing.T) {
+		req := TestReq(t, "get", "/test/get", nil)
+
+		recorder := httptest.NewRecorder()
+		chain := getMiddlewareChain(specs[0])
+		chain.ServeHTTP(recorder, req)
+
+		if recorder.Code != 200 {
+			t.Error("Expected status code 200 got ", recorder.Code)
+		}
+	})
+
+	t.Run("On", func(t *testing.T) {
+		specs[0].Proxy.StripListenPath = true
+
+		req := TestReq(t, "get", "/test/get", nil)
+
+		recorder := httptest.NewRecorder()
+		chain := getMiddlewareChain(specs[0])
+		chain.ServeHTTP(recorder, req)
+
+		// ensure signature validation middleware doesn't strip path
+		// and request fails
+		if recorder.Code != 400 {
+			t.Error("Expected status code 400 got ", recorder.Code)
+		}
+	})
+}
