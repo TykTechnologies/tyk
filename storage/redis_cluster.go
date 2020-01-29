@@ -334,7 +334,6 @@ func (o *RedisOpts) failover() *redis.FailoverOptions {
 
 // Connect will establish a connection this is always true because we are
 // dynamically using redis
-// TODO:(gernest) remove this
 func (r *RedisCluster) Connect() bool {
 	return true
 }
@@ -529,7 +528,7 @@ func (r *RedisCluster) Decrement(keyName string) {
 	keyName = r.fixKey(keyName)
 	// log.Debug("Decrementing key: ", keyName)
 	if err := r.up(); err != nil {
-		//TODO:(gernest) return err ?
+		log.Debug(err)
 		return
 	}
 	err := r.singleton().Decr(keyName).Err()
@@ -542,7 +541,7 @@ func (r *RedisCluster) Decrement(keyName string) {
 func (r *RedisCluster) IncrememntWithExpire(keyName string, expire int64) int64 {
 	// log.Debug("Incrementing raw key: ", keyName)
 	if err := r.up(); err != nil {
-		//TODO:(gernest) return err ?
+		log.Debug(err)
 		return 0
 	}
 	// This function uses a raw key, so we shouldn't call fixKey
@@ -566,7 +565,7 @@ func (r *RedisCluster) IncrememntWithExpire(keyName string, expire int64) int64 
 // GetKeys will return all keys according to the filter (filter is a prefix - e.g. tyk.keys.*)
 func (r *RedisCluster) GetKeys(filter string) []string {
 	if err := r.up(); err != nil {
-		//TODO:(gernest) return err ?
+		log.Debug(err)
 		return nil
 	}
 	client := r.singleton()
@@ -635,7 +634,7 @@ func (r *RedisCluster) GetKeys(filter string) []string {
 // GetKeysAndValuesWithFilter will return all keys and their values with a filter
 func (r *RedisCluster) GetKeysAndValuesWithFilter(filter string) map[string]string {
 	if err := r.up(); err != nil {
-		//TODO:(gernest) return err ?
+		log.Debug(err)
 		return nil
 	}
 	keys := r.GetKeys(filter)
@@ -708,7 +707,7 @@ func (r *RedisCluster) GetKeysAndValues() map[string]string {
 // DeleteKey will remove a key from the database
 func (r *RedisCluster) DeleteKey(keyName string) bool {
 	if err := r.up(); err != nil {
-		//TODO:(gernest) return err ?
+		log.Debug(err)
 		return false
 	}
 	log.Debug("DEL Key was: ", keyName)
@@ -724,7 +723,7 @@ func (r *RedisCluster) DeleteKey(keyName string) bool {
 // DeleteAllKeys will remove all keys from the database.
 func (r *RedisCluster) DeleteAllKeys() bool {
 	if err := r.up(); err != nil {
-		//TODO:(gernest) return err ?
+		log.Debug(err)
 		return false
 	}
 	n, err := r.singleton().FlushAll().Result()
@@ -742,7 +741,7 @@ func (r *RedisCluster) DeleteAllKeys() bool {
 // DeleteKey will remove a key from the database without prefixing, assumes user knows what they are doing
 func (r *RedisCluster) DeleteRawKey(keyName string) bool {
 	if err := r.up(); err != nil {
-		//TODO:(gernest) return err ?
+		log.Debug(err)
 		return false
 	}
 	n, err := r.singleton().Del(keyName).Result()
@@ -756,7 +755,7 @@ func (r *RedisCluster) DeleteRawKey(keyName string) bool {
 // DeleteKeys will remove a group of keys in bulk
 func (r *RedisCluster) DeleteScanMatch(pattern string) bool {
 	if err := r.up(); err != nil {
-		//TODO:(gernest) return err ?
+		log.Debug(err)
 		return false
 	}
 	client := r.singleton()
@@ -827,7 +826,7 @@ func (r *RedisCluster) DeleteScanMatch(pattern string) bool {
 // DeleteKeys will remove a group of keys in bulk
 func (r *RedisCluster) DeleteKeys(keys []string) bool {
 	if err := r.up(); err != nil {
-		//TODO:(gernest) return err ?
+		log.Debug(err)
 		return false
 	}
 	if len(keys) > 0 {
@@ -913,7 +912,7 @@ func (r *RedisCluster) Publish(channel, message string) error {
 func (r *RedisCluster) GetAndDeleteSet(keyName string) []interface{} {
 	log.Debug("Getting raw key set: ", keyName)
 	if err := r.up(); err != nil {
-		//TODO:(gernest) return err ?
+		log.Debug(err)
 		return nil
 	}
 	log.Debug("keyName is: ", keyName)
@@ -953,7 +952,7 @@ func (r *RedisCluster) AppendToSet(keyName, value string) {
 	log.WithField("keyName", keyName).Debug("Pushing to raw key list")
 	log.WithField("fixedKey", fixedKey).Debug("Appending to fixed key list")
 	if err := r.up(); err != nil {
-		//TODO:(gernest) return err ?
+		log.Debug(err)
 		return
 	}
 	if err := r.singleton().RPush(fixedKey, value).Err(); err != nil {
@@ -968,7 +967,7 @@ func (r *RedisCluster) AppendToSetPipelined(key string, values [][]byte) {
 
 	fixedKey := r.fixKey(key)
 	if err := r.up(); err != nil {
-		//TODO:(gernest) return err ?
+		log.Debug(err)
 		return
 	}
 	client := r.singleton()
@@ -1007,7 +1006,7 @@ func (r *RedisCluster) AddToSet(keyName, value string) {
 	log.Debug("Pushing to raw key set: ", keyName)
 	log.Debug("Pushing to fixed key set: ", r.fixKey(keyName))
 	if err := r.up(); err != nil {
-		//TODO:(gernest) return err ?
+		log.Debug(err)
 		return
 	}
 	err := r.singleton().SAdd(r.fixKey(keyName), value).Err()
@@ -1020,7 +1019,7 @@ func (r *RedisCluster) RemoveFromSet(keyName, value string) {
 	log.Debug("Removing from raw key set: ", keyName)
 	log.Debug("Removing from fixed key set: ", r.fixKey(keyName))
 	if err := r.up(); err != nil {
-		//TODO:(gernest) return err ?
+		log.Debug(err)
 		return
 	}
 	err := r.singleton().SRem(r.fixKey(keyName), value).Err()
@@ -1031,7 +1030,7 @@ func (r *RedisCluster) RemoveFromSet(keyName, value string) {
 
 func (r *RedisCluster) IsMemberOfSet(keyName, value string) bool {
 	if err := r.up(); err != nil {
-		//TODO:(gernest) return err ?
+		log.Debug(err)
 		return false
 	}
 	val, err := r.singleton().SIsMember(r.fixKey(keyName), value).Result()
@@ -1050,7 +1049,7 @@ func (r *RedisCluster) IsMemberOfSet(keyName, value string) bool {
 func (r *RedisCluster) SetRollingWindow(keyName string, per int64, value_override string, pipeline bool) (int, []interface{}) {
 	log.Debug("Incrementing raw key: ", keyName)
 	if err := r.up(); err != nil {
-		//TODO:(gernest) return err ?
+		log.Debug(err)
 		return 0, nil
 	}
 	log.Debug("keyName is: ", keyName)
@@ -1115,7 +1114,7 @@ func (r *RedisCluster) SetRollingWindow(keyName string, per int64, value_overrid
 
 func (r RedisCluster) GetRollingWindow(keyName string, per int64, pipeline bool) (int, []interface{}) {
 	if err := r.up(); err != nil {
-		//TODO:(gernest) return err ?
+		log.Debug(err)
 		return 0, nil
 	}
 	now := time.Now()
@@ -1175,7 +1174,7 @@ func (r *RedisCluster) AddToSortedSet(keyName, value string, score float64) {
 	log.WithFields(logEntry).Debug("Pushing raw key to sorted set")
 
 	if err := r.up(); err != nil {
-		//TODO:(gernest) return err ?
+		log.Debug(err)
 		return
 	}
 	member := redis.Z{Score: score, Member: value}
