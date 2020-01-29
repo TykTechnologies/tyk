@@ -52,7 +52,8 @@ func shouldConnect() bool {
 	return true
 }
 
-func up() bool {
+// Connected returns true if we are connected to redis
+func Connected() bool {
 	v := redisUp.Load()
 	if v != nil {
 		return v.(bool)
@@ -359,7 +360,7 @@ func (r *RedisCluster) cleanKey(keyName string) string {
 }
 
 func (r *RedisCluster) up() error {
-	if !up() {
+	if !Connected() {
 		return ErrRedisIsDown
 	}
 	return nil
