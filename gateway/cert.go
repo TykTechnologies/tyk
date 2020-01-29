@@ -389,6 +389,9 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 		}
 
 		newConfig.ClientAuth = domainRequireCert[hello.ServerName]
+		if newConfig.ClientAuth == 0 {
+			newConfig.ClientAuth = domainRequireCert[""]
+		}
 
 		// Cache the config
 		tlsConfigCache.Set(hello.ServerName+listenPortStr, newConfig, cache.DefaultExpiration)
