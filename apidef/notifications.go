@@ -19,6 +19,10 @@ type NotificationsManager struct {
 
 // SendRequest sends the requested package (as a POST) to the defined
 func (n NotificationsManager) SendRequest(wait bool, count int, notification interface{}) {
+	if n.OAuthKeyChangeURL == "" {
+		return
+	}
+
 	if wait {
 		if count < 3 {
 			time.Sleep(10 * time.Second)
