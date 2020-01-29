@@ -48,7 +48,7 @@ func TestRedisCacheMiddleware_WithCompressedResponse(t *testing.T) {
 		}...)
 	})
 
-	t.Run("with cache dynamic redis redis", func(t *testing.T) {
+	t.Run("with cache and  dynamic redis", func(t *testing.T) {
 		createAPI(true)
 		storage.DisableRedis(true)
 		ts.Run(t, []test.TestCase{
