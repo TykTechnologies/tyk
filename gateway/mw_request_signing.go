@@ -101,7 +101,12 @@ func (s *RequestSigning) ProcessRequest(w http.ResponseWriter, r *http.Request, 
 	}
 
 	headers := generateHeaderList(r, s.Spec.RequestSigning.HeaderList)
-	signatureString, err := generateHMACSignatureStringFromRequest(r, headers)
+
+	path := r.URL.Path
+	if s.Spec.Proxy.StripListenPath {
+		path = s.Spec.StripListenPath(r, r.URL.Path)
+	}
+	signatureString, err := generateHMACSignatureStringFromRequest(r, headers, path)
 	if err != nil {
 		log.Error(err)
 		return err, http.StatusInternalServerError
