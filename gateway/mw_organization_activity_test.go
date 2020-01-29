@@ -10,6 +10,7 @@ import (
 	uuid "github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -23,8 +24,18 @@ func testPrepareProcessRequestQuotaLimit(tb testing.TB, ts *Test, data map[strin
 	})
 
 	data["org_id"] = orgID
-
+	storage.DisableRedis(true)
+	expectBody := `{"status":"error","message":"Error writing to key store storage: Redis is either down or ws not configured"}`
 	// create org key with quota
+	ts.Run(tb, test.TestCase{
+		Path:      "/tyk/org/keys/" + orgID + "?reset_quota=1",
+		AdminAuth: true,
+		Method:    http.MethodPost,
+		Data:      data,
+		Code:      http.StatusInternalServerError,
+		BodyMatch: expectBody,
+	})
+	storage.DisableRedis(false)
 	ts.Run(tb, test.TestCase{
 		Path:      "/tyk/org/keys/" + orgID + "?reset_quota=1",
 		AdminAuth: true,
@@ -44,7 +55,6 @@ func TestProcessRequestLiveQuotaLimit(t *testing.T) {
 	// run test server
 	ts := StartTest()
 	defer ts.Close()
-
 	// load API
 	testPrepareProcessRequestQuotaLimit(
 		t,
@@ -63,6 +73,11 @@ func TestProcessRequestLiveQuotaLimit(t *testing.T) {
 				Code: http.StatusOK,
 			})
 		}
+		storage.DisableRedis(true)
+		ts.Run(t, test.TestCase{
+			Code: http.StatusOK,
+		})
+		storage.DisableRedis(false)
 
 		// next request should fail with 403 as it is out of quota
 		ts.Run(t, test.TestCase{
