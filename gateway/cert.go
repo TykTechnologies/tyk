@@ -305,6 +305,12 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 		}
 
 		newConfig := baseConfig.Clone()
+
+		// Avoiding Race
+		newConfig.Certificates = []tls.Certificate{}
+		for _, cert := range baseConfig.Certificates {
+			newConfig.Certificates = append(newConfig.Certificates, cert)
+		}
 		newConfig.BuildNameToCertificate()
 		for name, cert := range certNameMap {
 			newConfig.NameToCertificate[name] = cert
