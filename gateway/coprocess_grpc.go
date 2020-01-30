@@ -80,7 +80,7 @@ func grpcCallOpts() grpc.DialOption {
 		opts = append(opts, grpc.MaxCallRecvMsgSize(recvSize))
 	}
 	if sendSize > 0 {
-		opts = append(opts, grpc.MaxCallRecvMsgSize(sendSize))
+		opts = append(opts, grpc.MaxCallSendMsgSize(sendSize))
 	}
 	return grpc.WithDefaultCallOptions(opts...)
 }
