@@ -413,6 +413,9 @@ type Config struct {
 
 	// Cisco - Read timeout
 	DynamicAPIConnTimeout int `json:"dynamic_api_timeout_milli_sec"`
+
+	//Cisco - JWT URL Redirect
+	RedirectURL string `json:"redirect_url"`
 }
 
 // GetEventTriggers returns event triggers. There was a typo in the json tag.
