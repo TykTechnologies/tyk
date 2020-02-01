@@ -47,6 +47,7 @@ var (
 	JWTApiKeySpec                = TykRoot + "/token_jwt.json"
 	APITemplateOpenSpec          = TykRoot + "/api_template_open.json"
 	APITemplateJWTSpec           = TykRoot + "/api_template_jwt.json"
+	APIDefinitionRedis           = TykRoot + "/api_definitions.json"
 	DynamicAPIConnTimeout        = 20000
 )
 
@@ -206,13 +207,14 @@ func apiLoader(w http.ResponseWriter, r *http.Request) {
 		}
 	case "DELETE":
 		if apiName != "" && service != "" {
-			log.Info("Deleting API definition for: ", apiID)
-			obj, code = deleteAPIById(apiID)
+			log.Info("Deleting Individual API not supported")
+			//obj, code = deleteAPIById(apiID)
+			obj, code = apiError("Must specify an /service to delete API"), http.StatusBadRequest
 		} else if service != "" && apiName == "" {
 			log.Info("Deleting API definition for service: ", service)
 			obj, code = deleteAPIByService(service)
 		} else {
-			obj, code = apiError("Must specify an /service or service/apiName to delete API"), http.StatusBadRequest
+			obj, code = apiError("Must specify an /service to delete API"), http.StatusBadRequest
 		}
 	}
 
@@ -253,6 +255,7 @@ func addOrUpdateApi(r *http.Request) (interface{}, int) {
 	}
 
 	var ServApis ServiceAPIS
+	var existingApis ServiceAPIS
 
 	// Non blocking read or wait for 20 seconds in idle state
 	buf := make([]byte, 1*1024*1024)
@@ -325,6 +328,22 @@ func addOrUpdateApi(r *http.Request) (interface{}, int) {
 	host, err := getInbandIP(SystemConfigFilePath)
 	if err != nil {
 		return apiError("Could not get inband IP"), http.StatusInternalServerError
+	}
+
+	// Load api_defintions.json file and check if incoming /v1/sites/<site-name> is loaded
+	// if its present in api_definitions.json then override it with incoming definition
+	// if not then add it to api_definitions.json
+	// when KMS loads api_defitions.json it would be no-op if /v1/sites/<site-name> is present
+
+	apiDefinitions, err := ioutil.ReadFile(APIDefinitionRedis)
+	if err != nil {
+		return apiError("Could not read api_definitions.json file"), http.StatusInternalServerError
+	}
+
+	err = json.Unmarshal(apiDefinitions, &existingApis)
+	if err != nil {
+		log.Error("Couldn't decode existing API Definition object: ", err)
+		return apiError("Malformed api_definitions.json"), http.StatusBadRequest
 	}
 
 	for service, apis := range ServApis {
@@ -490,7 +509,19 @@ func addOrUpdateApi(r *http.Request) (interface{}, int) {
 				log.Warn("Platform Missmatch .. skip adding: ", APIID)
 			}
 		}
+
+		//Add API to existingApis structure
+		existingApis[service] = apis
 	}
+
+	// save existingApis to api_definitions.json for persistence across reboot
+	existingApisJSON, _ := json.MarshalIndent(existingApis, "", "  ")
+
+	err = ioutil.WriteFile(APIDefinitionRedis, existingApisJSON, 0644)
+	if err != nil {
+		return apiError("Could not store definitions to api_definitions.json"), http.StatusInternalServerError
+	}
+
 	// Reload All APIS and process the JWT APIs
 	reloadURLStructure(nil)
 
@@ -825,6 +856,8 @@ func deleteAPIById(apiID string) (interface{}, int) {
 }
 
 func deleteAPIByService(service string) (interface{}, int) {
+	var existingApis ServiceAPIS
+
 	//c := RedisPool.Get()
 	c := GetRedisConn()
 
@@ -867,6 +900,28 @@ func deleteAPIByService(service string) (interface{}, int) {
 		Key:    service,
 		Status: "ok",
 		Action: "deleted",
+	}
+
+	// Delete service api entry from api_definitions.json
+	apiDefinitions, err := ioutil.ReadFile(APIDefinitionRedis)
+	if err != nil {
+		return apiError("Could not read api_definitions.json file"), http.StatusInternalServerError
+	}
+
+	err = json.Unmarshal(apiDefinitions, &existingApis)
+	if err != nil {
+		log.Error("Couldn't decode existing API Definition object: ", err)
+		return apiError("Malformed api_definitions.json"), http.StatusBadRequest
+	}
+
+	delete(existingApis, service)
+
+	// save existingApis to api_definitions.json for persistence across reboot
+	existingApisJSON, _ := json.MarshalIndent(existingApis, "", "  ")
+
+	err = ioutil.WriteFile(APIDefinitionRedis, existingApisJSON, 0644)
+	if err != nil {
+		return apiError("Could not store definitions to api_definitions.json"), http.StatusInternalServerError
 	}
 
 	reloadURLStructure(nil)
