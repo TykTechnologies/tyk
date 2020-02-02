@@ -267,6 +267,7 @@ func (m *CoProcessMiddleware) EnabledForSpec() bool {
 func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	logger := m.Logger()
 	logger.Debug("CoProcess Request, HookType: ", m.HookType)
+	originalURL := r.URL
 
 	var extractor IdExtractor
 	if m.Spec.EnableCoProcessAuth && m.Spec.CustomMiddleware.IdExtractor.Extractor != nil {
@@ -315,6 +316,8 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	err = coProcessor.ObjectPostProcess(returnObject, r)
 	if err != nil {
+		// Restore original URL object so that it can be used by ErrorHandler:
+		r.URL = originalURL
 		logger.WithError(err).Error("Failed to post-process request object")
 		return errors.New("Middleware error"), 500
 	}
