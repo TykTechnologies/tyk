@@ -169,7 +169,7 @@ func (m *proxyMux) addTCPService(spec *APISpec, modifier *tcp.Modifier) {
 				DialTLS:         dialWithServiceDiscovery(spec, customDialTLSCheck(spec, tlsConfig)),
 				Dial:            dialWithServiceDiscovery(spec, net.Dial),
 				TLSConfigTarget: tlsConfig,
-				SyncStats:       recordTCPHit(spec.APIID, spec.DoNotTrack),
+				// SyncStats:       recordTCPHit(spec.APIID, spec.DoNotTrack),
 			},
 		}
 		p.tcpProxy.AddDomainHandler(hostname, spec.Proxy.TargetURL, modifier)
