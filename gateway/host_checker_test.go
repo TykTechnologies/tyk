@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"text/template"
 	"time"
@@ -498,30 +499,33 @@ func TestChecker_triggerSampleLimit(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	hs := &HostUptimeChecker{}
-	failed := 0
 	setTestMode(false)
 	limit := 4
-	ping := 0
+	var failed, ping atomic.Value
+	failed.Store(0)
+	ping.Store(0)
 	hs.Init(1, limit, 0, map[string]HostData{
 		l.Addr().String(): data,
 	},
 		HostCheckCallBacks{
 			Ping: func(_ context.Context, _ HostHealthReport) {
-				ping++
+				ping.Store(ping.Load().(int) + 1)
+				if ping.Load().(int) >= limit {
+					cancel()
+				}
 			},
 			Fail: func(_ context.Context, _ HostHealthReport) {
-				failed++
-				cancel()
+				failed.Store(failed.Load().(int) + 1)
 			},
 		},
 	)
 	go hs.Start(ctx)
 	<-ctx.Done()
 	setTestMode(true)
-	if ping != limit {
-		t.Errorf("expected %d got %d", limit, ping)
+	if ping.Load().(int) != limit {
+		t.Errorf("expected %d got %d", limit, ping.Load())
 	}
-	if failed != 1 {
-		t.Errorf("expected host down to be fired once got %d instead", failed)
+	if failed.Load().(int) != 1 {
+		t.Errorf("expected host down to be fired once got %d instead", failed.Load())
 	}
 }
