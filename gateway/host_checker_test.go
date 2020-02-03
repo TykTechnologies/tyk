@@ -486,3 +486,42 @@ func TestProxyWhenHostIsDown(t *testing.T) {
 		}
 	}
 }
+
+func TestChecker_triggerSampleLimit(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	l.Close()
+	data := HostData{
+		CheckURL: "http://" + l.Addr().String(),
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	hs := &HostUptimeChecker{}
+	failed := 0
+	setTestMode(false)
+	limit := 4
+	ping := 0
+	hs.Init(1, limit, 0, map[string]HostData{
+		l.Addr().String(): data,
+	},
+		HostCheckCallBacks{
+			Ping: func(_ context.Context, _ HostHealthReport) {
+				ping++
+			},
+			Fail: func(_ context.Context, _ HostHealthReport) {
+				failed++
+				cancel()
+			},
+		},
+	)
+	go hs.Start(ctx)
+	<-ctx.Done()
+	setTestMode(true)
+	if ping != limit {
+		t.Errorf("expected %d got %d", limit, ping)
+	}
+	if failed != 1 {
+		t.Errorf("expected host down to be fired once got %d instead", failed)
+	}
+}
