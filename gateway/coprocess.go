@@ -276,6 +276,16 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	var returnOverrides ReturnOverrides
 	var sessionID string
 
+	/*
+		id, _ := m.getAuthToken(m.getAuthType(), r)
+		fmt.Println("id=", id)
+		prevSession, exists := m.CheckSessionAndIdentityForValidKey(id, r)
+		if exists {
+			ctxSetSession(r, &prevSession, id, true)
+			return nil, 200
+		}
+	*/
+
 	if m.HookType == coprocess.HookType_CustomKeyCheck && extractor != nil {
 		sessionID, returnOverrides = extractor.ExtractAndCheck(r)
 
@@ -398,7 +408,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}
 
 		if extractor == nil {
-			ctxSetSession(r, returnedSession, token, true)
+			ctxSetSession(r, returnedSession, token, false)
 		} else {
 			ctxSetSession(r, returnedSession, sessionID, true)
 		}
