@@ -9,12 +9,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
 	newrelic "github.com/newrelic/go-agent"
 	"github.com/paulbellamy/ratecounter"
 	cache "github.com/pmylund/go-cache"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -118,6 +118,14 @@ func createMiddleware(actualMW TykMiddleware) func(http.Handler) http.Handler {
 			}
 			err, errCode := mw.ProcessRequest(w, r, mwConf)
 			if err != nil {
+				//redirect on missing or invalid JWT
+				if config.Global().EnableRedirect && mw.Name() == "JWTMiddleware" {
+					var redirectUrl = "https://" + r.Host + config.Global().RedirectURL
+					mw.Logger().WithError(err).WithField("code", errCode).WithField("Redirect URL", redirectUrl).Debug("JWT Error. Redirecting..")
+					http.Redirect(w, r, redirectUrl, http.StatusMovedPermanently)
+					return
+				}
+
 				// GoPluginMiddleware are expected to send response in case of error
 				// but we still want to record error
 				_, isGoPlugin := actualMW.(*GoPluginMiddleware)
