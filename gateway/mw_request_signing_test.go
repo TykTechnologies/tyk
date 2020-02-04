@@ -10,11 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/justinas/alice"
-
 	"github.com/TykTechnologies/tyk/apidef"
-
+	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
+	"github.com/justinas/alice"
 )
 
 var algoList = [4]string{"hmac-sha1", "hmac-sha256", "hmac-sha384", "hmac-sha512"}
@@ -43,8 +42,6 @@ func generateSession(algo, data string) string {
 			s.HmacSecret = data
 			s.HMACEnabled = true
 		}
-
-		s.AccessRights = map[string]user.AccessDefinition{"protected": {APIID: "protected", Versions: []string{"v1"}}}
 	})
 
 	return sessionKey
@@ -93,6 +90,42 @@ func TestHMACRequestSigning(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("Empty secret", func(t *testing.T) {
+		algo := "hmac-sha256"
+		secret := ""
+
+		sessionKey := generateSession(algo, secret)
+		specs := generateSpec(algo, secret, sessionKey, nil)
+
+		recorder := httptest.NewRecorder()
+		chain := getMiddlewareChain(specs[0])
+
+		req := TestReq(t, "get", "/test/get", nil)
+		chain.ServeHTTP(recorder, req)
+
+		if recorder.Code != 500 {
+			t.Error("Expected status code 500 got ", recorder.Code)
+		}
+	})
+
+	t.Run("Invalid secret", func(t *testing.T) {
+		algo := "hmac-sha256"
+		secret := "12345"
+
+		sessionKey := generateSession(algo, secret)
+		specs := generateSpec(algo, "789", sessionKey, nil)
+
+		recorder := httptest.NewRecorder()
+		chain := getMiddlewareChain(specs[0])
+
+		req := TestReq(t, "get", "/test/get", nil)
+		chain.ServeHTTP(recorder, req)
+
+		if recorder.Code != 400 {
+			t.Error("Expected status code 400 got ", recorder.Code)
+		}
+	})
 
 	t.Run("Valid Custom headerList", func(t *testing.T) {
 		algo := "hmac-sha1"
@@ -222,6 +255,36 @@ func TestRSARequestSigning(t *testing.T) {
 		}
 	})
 
+	t.Run("Invalid certificate id", func(t *testing.T) {
+		algo := "rsa-sha256"
+		sessionKey := generateSession(algo, pubCertId)
+		specs := generateSpec(algo, "12345", sessionKey, nil)
+
+		req := TestReq(t, "get", "/test/get", nil)
+		recorder := httptest.NewRecorder()
+		chain := getMiddlewareChain(specs[0])
+		chain.ServeHTTP(recorder, req)
+
+		if recorder.Code != 500 {
+			t.Error("Expected status code 500 got ", recorder.Code)
+		}
+	})
+
+	t.Run("empty certificate id", func(t *testing.T) {
+		algo := "rsa-sha256"
+		sessionKey := generateSession(algo, pubCertId)
+		specs := generateSpec(algo, "", sessionKey, nil)
+
+		req := TestReq(t, "get", "/test/get", nil)
+		recorder := httptest.NewRecorder()
+		chain := getMiddlewareChain(specs[0])
+		chain.ServeHTTP(recorder, req)
+
+		if recorder.Code != 500 {
+			t.Error("Expected status code 500 got ", recorder.Code)
+		}
+	})
+
 	t.Run("Invalid algorithm", func(t *testing.T) {
 		algo := "rsa-123"
 		sessionKey := generateSession(algo, pubCertId)
@@ -318,4 +381,122 @@ func TestRSARequestSigning(t *testing.T) {
 			t.Error("RSA request signing failed with error ", recorder.Body.String())
 		}
 	})
+}
+
+func TestStripListenPath(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+
+	algo := "hmac-sha256"
+	secret := "12345"
+	sessionKey := generateSession(algo, secret)
+	specs := generateSpec(algo, secret, sessionKey, nil)
+
+	t.Run("Off", func(t *testing.T) {
+		req := TestReq(t, "get", "/test/get", nil)
+
+		recorder := httptest.NewRecorder()
+		chain := getMiddlewareChain(specs[0])
+		chain.ServeHTTP(recorder, req)
+
+		if recorder.Code != 200 {
+			t.Error("Expected status code 200 got ", recorder.Code)
+		}
+	})
+
+	t.Run("On", func(t *testing.T) {
+		specs[0].Proxy.StripListenPath = true
+
+		req := TestReq(t, "get", "/test/get", nil)
+
+		recorder := httptest.NewRecorder()
+		chain := getMiddlewareChain(specs[0])
+		chain.ServeHTTP(recorder, req)
+
+		// ensure signature validation middleware doesn't strip path
+		// and request fails
+		if recorder.Code != 400 {
+			t.Error("Expected status code 400 got ", recorder.Code)
+		}
+	})
+}
+
+func TestWithURLRewrite(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+
+	algo := "hmac-sha256"
+	secret := "12345"
+
+	sessionKey := CreateSession(func(session *user.SessionState) {
+		session.EnableHTTPSignatureValidation = true
+		session.HmacSecret = secret
+	})
+
+	apis := BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "protected"
+		spec.Proxy.ListenPath = "/protected"
+		spec.EnableSignatureChecking = true
+	}, func(spec *APISpec) {
+		spec.APIID = "test"
+		spec.Proxy.ListenPath = "/test"
+		spec.Proxy.StripListenPath = true
+		spec.RequestSigning.Secret = secret
+		spec.RequestSigning.KeyId = sessionKey
+		spec.RequestSigning.Algorithm = algo
+	})
+
+	t.Run("looping", func(t *testing.T) {
+		version := apis[1].VersionData.Versions["v1"]
+		version.UseExtendedPaths = true
+		version.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{
+			{
+				Path:         "get",
+				Method:       "GET",
+				MatchPattern: "get",
+				RewriteTo:    "tyk://protected/get",
+			},
+			{
+				Path:         "self",
+				Method:       "GET",
+				MatchPattern: "self",
+				RewriteTo:    "tyk://protected/test/get",
+			},
+		}
+
+		apis[1].VersionData.Versions["v1"] = version
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/test/get", Method: http.MethodGet, Code: http.StatusOK},
+			// ensure listen path is not stripped in case url rewrite
+			{Path: "/test/self", Method: http.MethodGet, Code: http.StatusOK},
+		}...)
+	})
+
+	t.Run("external", func(t *testing.T) {
+		version := apis[1].VersionData.Versions["v1"]
+		version.UseExtendedPaths = true
+		version.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{
+			{
+				Path:         "get",
+				Method:       "GET",
+				MatchPattern: "get",
+				RewriteTo:    ts.URL + "/protected/get",
+			},
+			{
+				Path:         "self",
+				Method:       "GET",
+				MatchPattern: "self",
+				RewriteTo:    ts.URL + "/protected/test/get",
+			},
+		}
+
+		apis[1].VersionData.Versions["v1"] = version
+		ts.Run(t, []test.TestCase{
+			{Path: "/test/get", Method: http.MethodGet, Code: http.StatusOK},
+			// ensure listen path is not stripped in case url rewrite
+			{Path: "/test/self", Method: http.MethodGet, Code: http.StatusOK},
+		}...)
+	})
+
 }

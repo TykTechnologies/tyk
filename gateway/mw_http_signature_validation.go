@@ -73,7 +73,7 @@ func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWrite
 	}
 
 	// Generate a signature string
-	signatureString, err := generateHMACSignatureStringFromRequest(r, fieldValues.Headers)
+	signatureString, err := generateHMACSignatureStringFromRequest(r, fieldValues.Headers, r.URL.Path)
 
 	if err != nil {
 		logger.WithError(err).WithField("signature_string", signatureString).Error("Signature string generation failed")
@@ -158,7 +158,13 @@ func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWrite
 		}
 	} else {
 		// Create a signed string with the secret
-		encodedSignature := generateHMACEncodedSignature(signatureString, secret, fieldValues.Algorthm)
+		encodedSignature, err := generateHMACEncodedSignature(signatureString, secret, fieldValues.Algorthm)
+		if err != nil {
+			logger.WithFields(logrus.Fields{
+				"error": err,
+			}).Error("Failed to validate signature")
+			return hm.authorizationError(r)
+		}
 
 		// Compare
 		matchPass = encodedSignature == fieldValues.Signature
@@ -412,12 +418,12 @@ func getFieldValues(authHeader string) (*HMACFieldValues, error) {
 }
 
 // "Signature keyId="9876",algorithm="hmac-sha1",headers="x-test x-test-2",signature="queryEscape(base64(sig))"")
-func generateHMACSignatureStringFromRequest(r *http.Request, headers []string) (string, error) {
+func generateHMACSignatureStringFromRequest(r *http.Request, headers []string, path string) (string, error) {
 	signatureString := ""
 	for i, header := range headers {
 		loweredHeader := strings.TrimSpace(strings.ToLower(header))
 		if loweredHeader == "(request-target)" {
-			requestHeaderField := "(request-target): " + strings.ToLower(r.Method) + " " + r.URL.Path
+			requestHeaderField := "(request-target): " + strings.ToLower(r.Method) + " " + path
 			signatureString += requestHeaderField
 		} else {
 			// exception for dates and .Net oddness
@@ -437,7 +443,11 @@ func generateHMACSignatureStringFromRequest(r *http.Request, headers []string) (
 	return signatureString, nil
 }
 
-func generateHMACEncodedSignature(signatureString, secret string, algorithm string) string {
+func generateHMACEncodedSignature(signatureString, secret string, algorithm string) (string, error) {
+	if secret == "" {
+		return "", errors.New("Hmac secret is empty")
+	}
+
 	key := []byte(secret)
 
 	var hashFunction func() hash.Hash
@@ -456,7 +466,7 @@ func generateHMACEncodedSignature(signatureString, secret string, algorithm stri
 	h := hmac.New(hashFunction, key)
 	h.Write([]byte(signatureString))
 	encodedString := base64.StdEncoding.EncodeToString(h.Sum(nil))
-	return url.QueryEscape(encodedString)
+	return url.QueryEscape(encodedString), nil
 }
 
 func validateRSAEncodedSignature(signatureString string, publicKey *rsa.PublicKey, algorithm string, signature string) (bool, error) {
