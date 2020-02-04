@@ -9,8 +9,8 @@ import (
 // The Configuration contains the entities needed to perform ID token validation.
 // This type should be instantiated at the application startup time.
 type Configuration struct {
-	tokenValidator jwtTokenValidator
-	idTokenGetter  GetIDTokenFunc
+	tokenValidator JWTTokenValidator
+	IDTokenGetter  GetIDTokenFunc
 	errorHandler   ErrorHandlerFunc
 }
 
@@ -44,6 +44,13 @@ func NewConfiguration(options ...option) (*Configuration, error) {
 func ProvidersGetter(pg GetProvidersFunc) func(*Configuration) error {
 	return func(c *Configuration) error {
 		c.tokenValidator.(*idTokenValidator).provGetter = pg
+		return nil
+	}
+}
+
+func TokenValidator(tv JWTTokenValidator) func(*Configuration) error {
+	return func(c *Configuration) error {
+		c.tokenValidator = tv
 		return nil
 	}
 }
@@ -93,10 +100,10 @@ func AuthenticateOIDWithUser(c *Configuration, rw http.ResponseWriter, req *http
 
 func authenticate(c *Configuration, rw http.ResponseWriter, req *http.Request) (t *jwt.Token, halt bool) {
 	var tg GetIDTokenFunc
-	if c.idTokenGetter == nil {
+	if c.IDTokenGetter == nil {
 		tg = getIDTokenAuthorizationHeader
 	} else {
-		tg = c.idTokenGetter
+		tg = c.IDTokenGetter
 	}
 
 	var eh ErrorHandlerFunc
@@ -112,7 +119,7 @@ func authenticate(c *Configuration, rw http.ResponseWriter, req *http.Request) (
 		return nil, eh(err, rw, req)
 	}
 
-	vt, err := c.tokenValidator.validate(ts)
+	vt, err := c.tokenValidator.Validate(ts)
 
 	if err != nil {
 		return nil, eh(err, rw, req)

@@ -12,6 +12,8 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/test"
+
 	"github.com/TykTechnologies/tyk/config"
 )
 
@@ -288,4 +290,19 @@ func TestHTTP_custom_ports(t *testing.T) {
 	if bs != echo {
 		t.Errorf("expected %s to %s", echo, bs)
 	}
+}
+
+func TestHandle404(t *testing.T) {
+	g := StartTest()
+	defer g.Close()
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/existing"
+		spec.UseKeylessAccess = true
+	})
+
+	_, _ = g.Run(t, []test.TestCase{
+		{Path: "/existing", Code: http.StatusOK},
+		{Path: "/nonexisting", Code: http.StatusNotFound, BodyMatch: http.StatusText(http.StatusNotFound)},
+	}...)
 }

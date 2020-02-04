@@ -36,6 +36,7 @@ const hmacType = "hmac"
 const basicType = "basic"
 const coprocessType = "coprocess"
 const oauthType = "oauth"
+const oidcType = "oidc"
 
 var (
 	GlobalRate            = ratecounter.NewRateCounter(1 * time.Second)
@@ -297,10 +298,14 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	rights := make(map[string]user.AccessDefinition)
 	tags := make(map[string]bool)
+	if session.MetaData == nil {
+		session.MetaData = make(map[string]interface{})
+	}
+
 	didQuota, didRateLimit, didACL := make(map[string]bool), make(map[string]bool), make(map[string]bool)
 	policies := session.PolicyIDs()
 
-	for i, polID := range policies {
+	for _, polID := range policies {
 		policiesMu.RLock()
 		policy, ok := policiesByID[polID]
 		policiesMu.RUnlock()
@@ -464,12 +469,8 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 			}
 		}
 
-		// Required for all
-		if i == 0 { // if any is true, key is inactive
-			session.IsInactive = policy.IsInactive
-		} else if policy.IsInactive {
-			session.IsInactive = true
-		}
+		session.IsInactive = session.IsInactive || policy.IsInactive
+
 		for _, tag := range policy.Tags {
 			tags[tag] = true
 		}

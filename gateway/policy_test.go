@@ -333,6 +333,16 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			}, nil,
 		},
 		{
+			"InactiveWithSession", []string{"tags1", "tags2"},
+			"", func(t *testing.T, s *user.SessionState) {
+				if !s.IsInactive {
+					t.Fatalf("want IsInactive to be true")
+				}
+			}, &user.SessionState{
+				IsInactive: true,
+			},
+		},
+		{
 			"QuotaPart", []string{"quota1"},
 			"", func(t *testing.T, s *user.SessionState) {
 				if s.QuotaMax != 2 {

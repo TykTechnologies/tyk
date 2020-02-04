@@ -180,7 +180,6 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		log.Debug("Error creating checksum. Skipping cache check")
 		errCreatingChecksum = true
 	} else {
-		retBlob, err = m.CacheStore.GetKey(key)
 		v, sfErr, _ := m.singleFlight.Do(key, func() (interface{}, error) {
 			return m.CacheStore.GetKey(key)
 		})

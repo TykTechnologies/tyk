@@ -10,6 +10,8 @@ import (
 
 	proto "github.com/golang/protobuf/proto"
 	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -266,6 +268,17 @@ func (c *dispatcherClient) DispatchEvent(ctx context.Context, in *Event, opts ..
 type DispatcherServer interface {
 	Dispatch(context.Context, *Object) (*Object, error)
 	DispatchEvent(context.Context, *Event) (*EventReply, error)
+}
+
+// UnimplementedDispatcherServer can be embedded to have forward compatible implementations.
+type UnimplementedDispatcherServer struct {
+}
+
+func (*UnimplementedDispatcherServer) Dispatch(ctx context.Context, req *Object) (*Object, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Dispatch not implemented")
+}
+func (*UnimplementedDispatcherServer) DispatchEvent(ctx context.Context, req *Event) (*EventReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DispatchEvent not implemented")
 }
 
 func RegisterDispatcherServer(s *grpc.Server, srv DispatcherServer) {

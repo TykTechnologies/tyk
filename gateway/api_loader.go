@@ -244,7 +244,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 	enableVersionOverrides := false
 	for _, versionData := range spec.VersionData.Versions {
-		if versionData.OverrideTarget != "" {
+		if versionData.OverrideTarget != "" && !spec.VersionData.NotVersioned {
 			enableVersionOverrides = true
 			break
 		}
@@ -674,18 +674,19 @@ func loadApps(specs []*APISpec) {
 	// Create a new handler for each API spec
 	apisByListen := countApisByListenHash(specs)
 
-	muxer := &proxyMux{}
-
 	globalConf := config.Global()
-	r := mux.NewRouter()
-	muxer.setRouter(globalConf.ListenPort, "", r)
-	if globalConf.ControlAPIPort == 0 {
-		loadAPIEndpoints(r)
-	} else {
-		router := mux.NewRouter()
-		loadAPIEndpoints(router)
-		muxer.setRouter(globalConf.ControlAPIPort, "", router)
+	port := globalConf.ListenPort
+
+	if globalConf.ControlAPIPort != 0 {
+		port = globalConf.ControlAPIPort
 	}
+
+	muxer := &proxyMux{}
+	router := mux.NewRouter()
+	router.NotFoundHandler = http.HandlerFunc(muxer.handle404)
+	loadControlAPIEndpoints(router)
+	muxer.setRouter(port, "", router)
+
 	gs := prepareStorage()
 	shouldTrace := trace.IsEnabled()
 	for _, spec := range specs {

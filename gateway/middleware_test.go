@@ -58,6 +58,7 @@ func TestBaseMiddleware_getAuthType(t *testing.T) {
 		"hmac":      {AuthHeaderName: "h4"},
 		"jwt":       {AuthHeaderName: "h5"},
 		"oauth":     {AuthHeaderName: "h6"},
+		"oidc":      {AuthHeaderName: "h7"},
 	}
 
 	baseMid := BaseMiddleware{Spec: spec}
@@ -69,6 +70,7 @@ func TestBaseMiddleware_getAuthType(t *testing.T) {
 	r.Header.Set("h4", "t4")
 	r.Header.Set("h5", "t5")
 	r.Header.Set("h6", "t6")
+	r.Header.Set("h7", "t7")
 
 	authKey := &AuthKey{BaseMiddleware: baseMid}
 	basic := &BasicAuthKeyIsValid{BaseMiddleware: baseMid}
@@ -76,6 +78,7 @@ func TestBaseMiddleware_getAuthType(t *testing.T) {
 	hmac := &HTTPSignatureValidationMiddleware{BaseMiddleware: baseMid}
 	jwt := &JWTMiddleware{BaseMiddleware: baseMid}
 	oauth := &Oauth2KeyExists{BaseMiddleware: baseMid}
+	oidc := &OpenIDMW{BaseMiddleware: baseMid}
 
 	// test getAuthType
 	assert.Equal(t, authTokenType, authKey.getAuthType())
@@ -84,6 +87,7 @@ func TestBaseMiddleware_getAuthType(t *testing.T) {
 	assert.Equal(t, hmacType, hmac.getAuthType())
 	assert.Equal(t, jwtType, jwt.getAuthType())
 	assert.Equal(t, oauthType, oauth.getAuthType())
+	assert.Equal(t, oidcType, oidc.getAuthType())
 
 	// test getAuthToken
 	getToken := func(authType string, getAuthToken func(authType string, r *http.Request) (string, apidef.AuthConfig)) string {
@@ -97,4 +101,5 @@ func TestBaseMiddleware_getAuthType(t *testing.T) {
 	assert.Equal(t, "t4", getToken(hmac.getAuthType(), hmac.getAuthToken))
 	assert.Equal(t, "t5", getToken(jwt.getAuthType(), jwt.getAuthToken))
 	assert.Equal(t, "t6", getToken(oauth.getAuthType(), oauth.getAuthToken))
+	assert.Equal(t, "t7", getToken(oidc.getAuthType(), oidc.getAuthToken))
 }
