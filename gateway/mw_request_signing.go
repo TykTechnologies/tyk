@@ -75,6 +75,20 @@ func generateHeaderList(r *http.Request, headerList []string) []string {
 	return result
 }
 
+func (s *RequestSigning) getRequestPath(r *http.Request) string {
+	path := r.URL.Path
+
+	if newURL := ctxGetURLRewriteTarget(r); newURL != nil {
+		path = newURL.Path
+	} else {
+		if s.Spec.Proxy.StripListenPath {
+			path = s.Spec.StripListenPath(r, r.URL.Path)
+		}
+	}
+
+	return path
+}
+
 func (s *RequestSigning) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	if (s.Spec.RequestSigning.Secret == "" && s.Spec.RequestSigning.CertificateId == "") || s.Spec.RequestSigning.KeyId == "" || s.Spec.RequestSigning.Algorithm == "" {
 		log.Error("Fields required for signing the request are missing")
@@ -102,10 +116,8 @@ func (s *RequestSigning) ProcessRequest(w http.ResponseWriter, r *http.Request, 
 
 	headers := generateHeaderList(r, s.Spec.RequestSigning.HeaderList)
 
-	path := r.URL.Path
-	if s.Spec.Proxy.StripListenPath {
-		path = s.Spec.StripListenPath(r, r.URL.Path)
-	}
+	path := s.getRequestPath(r)
+
 	signatureString, err := generateHMACSignatureStringFromRequest(r, headers, path)
 	if err != nil {
 		log.Error(err)
