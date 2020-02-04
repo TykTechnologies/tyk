@@ -128,8 +128,13 @@ func (s *RequestSigning) ProcessRequest(w http.ResponseWriter, r *http.Request, 
 	var encodedSignature string
 
 	if strings.HasPrefix(s.Spec.RequestSigning.Algorithm, "rsa") {
+		if s.Spec.RequestSigning.CertificateId == "" {
+			log.Error("CertificateID is empty")
+			return errors.New("CertificateID is empty"), http.StatusInternalServerError
+		}
+
 		certList := CertificateManager.List([]string{s.Spec.RequestSigning.CertificateId}, certs.CertificatePrivate)
-		if len(certList) == 0 {
+		if len(certList) == 0 || certList[0] == nil {
 			log.Error("Certificate not found")
 			return errors.New("Certificate not found"), http.StatusInternalServerError
 		}
@@ -145,7 +150,11 @@ func (s *RequestSigning) ProcessRequest(w http.ResponseWriter, r *http.Request, 
 			return err, http.StatusInternalServerError
 		}
 	} else {
-		encodedSignature = generateHMACEncodedSignature(signatureString, s.Spec.RequestSigning.Secret, s.Spec.RequestSigning.Algorithm)
+		var err error
+		encodedSignature, err = generateHMACEncodedSignature(signatureString, s.Spec.RequestSigning.Secret, s.Spec.RequestSigning.Algorithm)
+		if err != nil {
+			return err, http.StatusInternalServerError
+		}
 	}
 
 	//Generate Authorization header
