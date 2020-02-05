@@ -454,20 +454,11 @@ func (r *RedisCluster) SetKey(keyName, session string, timeout int64) error {
 	//log.Debug("[STORE] Setting key: ", r.fixKey(keyName))
 
 	r.ensureConnection()
-	err := r.singleton().Set(r.fixKey(keyName), session, 0).Err()
+	err := r.singleton().Set(r.fixKey(keyName), session, time.Duration(timeout)*time.Second).Err()
 	if err != nil {
 		log.Error("Error trying to set value: ", err)
 		return err
 	}
-
-	if timeout > 0 {
-		err := r.singleton().Expire(r.fixKey(keyName), time.Duration(timeout)*time.Second).Err()
-		if err != nil {
-			log.Error("Error trying to set expiry:", err)
-			return err
-		}
-	}
-
 	return nil
 }
 
