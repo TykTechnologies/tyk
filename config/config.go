@@ -15,7 +15,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
-	consul "github.com/hashicorp/consul/api"
 	"github.com/kelseyhightower/envconfig"
 )
 
@@ -429,6 +428,7 @@ type Config struct {
 	UseSyslog               bool           `json:"use_syslog"`
 	UseGraylog              bool           `json:"use_graylog"`
 	UseLogstash             bool           `json:"use_logstash"`
+	Track404Logs            bool           `json:"track_404_logs"`
 	GraylogNetworkAddr      string         `json:"graylog_network_addr"`
 	LogstashNetworkAddr     string         `json:"logstash_network_addr"`
 	SyslogTransport         string         `json:"syslog_transport"`
@@ -462,7 +462,6 @@ type Config struct {
 // VaultConfig is used to configure the creation of a client
 // This is a stripped down version of the Config struct in vault's API client
 type VaultConfig struct {
-
 	// Address is the address of the Vault server. This should be a complete
 	// URL such as "http://vault.example.com".
 	Address string `json:"address"`
@@ -513,7 +512,19 @@ type ConsulConfig struct {
 	// which overrides the agent's default token.
 	Token string `json:"token"`
 
-	TLSConfig consul.TLSConfig `json:"tls_config"`
+	TLSConfig struct {
+		Address string `json:"address"`
+
+		CAFile string `json:"ca_file"`
+
+		CAPath string `json:"ca_path"`
+
+		CertFile string `json:"cert_file"`
+
+		KeyFile string `json:"key_file"`
+
+		InsecureSkipVerify bool `json:"insecure_skip_verify"`
+	} `json:"tls_config"`
 }
 
 // GetEventTriggers returns event triggers. There was a typo in the json tag.

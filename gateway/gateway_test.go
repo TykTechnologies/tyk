@@ -875,21 +875,71 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 	globalConf := config.Global()
 	globalConf.ManagementNode = false
 	config.SetGlobal(globalConf)
-	msg := redis.Message{
-		Payload: `{"Command": "NoticeGatewayDRLNotification"}`,
-	}
-	shouldHandle := func(got NotificationCommand) {
-		if want := NoticeGatewayDRLNotification; got != want {
-			t.Fatalf("want %q, got %q", want, got)
+
+	t.Run("Without signing:", func(t *testing.T) {
+		msg := redis.Message{
+			Payload: `{"Command": "NoticeGatewayDRLNotification"}`,
 		}
-	}
-	handleRedisEvent(&msg, shouldHandle, nil)
-	globalConf.ManagementNode = true
-	config.SetGlobal(globalConf)
-	notHandle := func(got NotificationCommand) {
-		t.Fatalf("should have not handled redis event")
-	}
-	handleRedisEvent(msg, notHandle, nil)
+
+		callbackRun := false
+		shouldHandle := func(got NotificationCommand) {
+			callbackRun = true
+			if want := NoticeGatewayDRLNotification; got != want {
+				t.Fatalf("want %q, got %q", want, got)
+			}
+		}
+		handleRedisEvent(&msg, shouldHandle, nil)
+		if !callbackRun {
+			t.Fatalf("Should run callback")
+		}
+		globalConf.ManagementNode = true
+		config.SetGlobal(globalConf)
+		notHandle := func(got NotificationCommand) {
+			t.Fatalf("should have not handled redis event")
+		}
+		handleRedisEvent(msg, notHandle, nil)
+	})
+
+	t.Run("With signature", func(t *testing.T) {
+		globalConf := config.Global()
+		globalConf.AllowInsecureConfigs = false
+		config.SetGlobal(globalConf)
+
+		n := Notification{
+			Command: NoticeGroupReload,
+			Payload: string("test"),
+		}
+		n.Sign()
+		msg := redis.Message{}
+		payload, _ := json.Marshal(n)
+		msg.Payload = string(payload)
+
+		callbackRun := false
+		shouldHandle := func(got NotificationCommand) {
+			callbackRun = true
+			if want := NoticeGroupReload; got != want {
+				t.Fatalf("want %q, got %q", want, got)
+			}
+		}
+
+		handleRedisEvent(&msg, shouldHandle, nil)
+		if !callbackRun {
+			t.Fatalf("Should run callback")
+		}
+
+		n.Signature = "wrong"
+		payload, _ = json.Marshal(n)
+		msg.Payload = string(payload)
+
+		valid := false
+		shouldFail := func(got NotificationCommand) {
+			valid = true
+		}
+		handleRedisEvent(&msg, shouldFail, nil)
+		if valid {
+			t.Fatalf("Should fail validation")
+		}
+	})
 }
 
 func TestListenPathTykPrefix(t *testing.T) {
@@ -1237,7 +1287,7 @@ func TestCacheWithAdvanceUrlRewrite(t *testing.T) {
 							On: "all",
 							Options: apidef.RoutingTriggerOptions{
 								HeaderMatches: map[string]apidef.StringRegexMap{
-									"rewritePath": apidef.StringRegexMap{
+									"rewritePath": {
 										MatchPattern: "newpath",
 									},
 								},

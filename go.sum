@@ -30,6 +30,8 @@ github.com/TykTechnologies/murmur3 v0.0.0-20180602122059-1915e687e465 h1:A2gBjoX
 github.com/TykTechnologies/murmur3 v0.0.0-20180602122059-1915e687e465/go.mod h1:sqH/SPFr11m9cahie7ulBuBX9TOhfBX1sp+qf9jh3Vg=
 github.com/TykTechnologies/openid2go v0.0.0-20160817213554-aab5ce1231ab h1:mDQXuVURkWTbTPlxOWom6c68xdWzp6HQeWAEqv4l7Vo=
 github.com/TykTechnologies/openid2go v0.0.0-20160817213554-aab5ce1231ab/go.mod h1:rGlqNE4CvxZIeiHp0mgrw+/jdGSjJzkZ0n78hhHMdfM=
+github.com/TykTechnologies/openid2go v0.0.0-20200122120050-1b642583380a h1:EJ9SLNrXbH0ywWNb/AbnXlBAgJWVBoRO6UpDOzze3H4=
+github.com/TykTechnologies/openid2go v0.0.0-20200122120050-1b642583380a/go.mod h1:rGlqNE4CvxZIeiHp0mgrw+/jdGSjJzkZ0n78hhHMdfM=
 github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 h1:JYp7IbQjafoB+tBA3gMyHYHrpOtNuDiK/uB5uXxq5wM=
 github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
 github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d h1:UQZhZ2O0vMHr2cI+DC1Mbh0TJxzA3RcLoMsFw+aXw7E=
@@ -265,6 +267,8 @@ github.com/sirupsen/logrus v1.4.2 h1:SPIRibHv4MatM3XXNO2BJeFLZwZ2LvZgfQ5+UNI2im4
 github.com/sirupsen/logrus v1.4.2/go.mod h1:tLMulIdttU9McNUspp0xgXVQah82FyeX6MwdIuYE2rE=
 github.com/square/go-jose v0.0.0-20161027010314-63d7cfa0284d h1:QyNGtv0d6JyxKalOUN74OQDAY+Ivrtywpv8mDvnd9sc=
 github.com/square/go-jose v0.0.0-20161027010314-63d7cfa0284d/go.mod h1:7MxpAF/1WTVUu8Am+T5kNy+t0902CaLWM4Z745MkOa8=
+github.com/square/go-jose v2.4.1+incompatible h1:KFYc54wTtgnd3x4B/Y7Zr1s/QaEx2BNzRsB3Hae5LHo=
+github.com/square/go-jose v2.4.1+incompatible/go.mod h1:7MxpAF/1WTVUu8Am+T5kNy+t0902CaLWM4Z745MkOa8=
 github.com/streadway/amqp v0.0.0-20190404075320-75d898a42a94/go.mod h1:AZpEONHx3DKn8O/DFsRAY58/XVQiIPMTMB1SddzLXVw=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.1.1 h1:2vfRuCMp5sSVIDSqO8oNnWJq7mPa6KVP3iPIwFBuy8A=

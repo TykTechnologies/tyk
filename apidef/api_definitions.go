@@ -514,12 +514,13 @@ type BundleManifest struct {
 }
 
 type RequestSigningMeta struct {
-	IsEnabled     bool     `bson:"is_enabled" json:"is_enabled"`
-	Secret        string   `bson:"secret" json:"secret"`
-	KeyId         string   `bson:"key_id" json:"key_id"`
-	Algorithm     string   `bson:"algorithm" json:"algorithm"`
-	HeaderList    []string `bson:"header_list" json:"header_list"`
-	CertificateId string   `bson:"certificate_id" json:"certificate_id"`
+	IsEnabled       bool     `bson:"is_enabled" json:"is_enabled"`
+	Secret          string   `bson:"secret" json:"secret"`
+	KeyId           string   `bson:"key_id" json:"key_id"`
+	Algorithm       string   `bson:"algorithm" json:"algorithm"`
+	HeaderList      []string `bson:"header_list" json:"header_list"`
+	CertificateId   string   `bson:"certificate_id" json:"certificate_id"`
+	SignatureHeader string   `bson:"signature_header" json:"signature_header"`
 }
 
 // Clean will URL encode map[string]struct variables for saving
@@ -555,6 +556,11 @@ func (a *APIDefinition) EncodeForDB() {
 
 			a.VersionData.Versions[i].ExtendedPaths.ValidateJSON[j] = oldSchema
 		}
+	}
+
+	// Auth is deprecated so this code tries to maintain backward compatibility
+	if a.Auth.AuthHeaderName == "" {
+		a.Auth = a.AuthConfigs["authToken"]
 	}
 }
 
@@ -606,6 +612,22 @@ func (a *APIDefinition) DecodeFromDB() {
 			a.VersionData.Versions[i].ExtendedPaths.ValidateJSON[j] = oldSchema
 		}
 	}
+
+	// Auth is deprecated so this code tries to maintain backward compatibility
+	makeCompatible := func(authType string) {
+		if a.AuthConfigs == nil {
+			a.AuthConfigs = make(map[string]AuthConfig)
+		}
+
+		_, ok := a.AuthConfigs[authType]
+
+		if !ok {
+			a.AuthConfigs[authType] = a.Auth
+		}
+	}
+
+	makeCompatible("authToken")
+	makeCompatible("jwt")
 }
 
 func (s *StringRegexMap) Check(value string) (match string) {

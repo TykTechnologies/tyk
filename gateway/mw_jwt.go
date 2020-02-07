@@ -475,12 +475,12 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.JWTClaim, apidef.UnsetAuth:
 		ctxSetSession(r, &session, sessionID, updateSession)
+
+		if updateSession {
+			SessionCache.Set(session.KeyHash(), session, cache.DefaultExpiration)
+		}
 	}
 	ctxSetJWTContextVars(k.Spec, r, token)
-
-	if updateSession {
-		SessionCache.Set(session.KeyHash(), session, cache.DefaultExpiration)
-	}
 
 	return nil, http.StatusOK
 }

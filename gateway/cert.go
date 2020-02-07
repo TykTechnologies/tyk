@@ -7,12 +7,16 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/gorilla/mux"
+	cache "github.com/pmylund/go-cache"
 )
 
 type APICertificateStatusMessage struct {
@@ -261,8 +265,11 @@ func dummyGetCertificate(*tls.ClientHelloInfo) (*tls.Certificate, error) {
 	return nil, nil
 }
 
-func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
+var tlsConfigCache = cache.New(60*time.Second, 60*time.Minute)
 
+var tlsConfigMu sync.Mutex
+
+func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
 	// Supporting legacy certificate configuration
 	serverCerts := []tls.Certificate{}
 	certNameMap := map[string]*tls.Certificate{}
@@ -284,14 +291,30 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 	}
 
 	baseConfig.Certificates = serverCerts
-
 	baseConfig.BuildNameToCertificate()
+
 	for name, cert := range certNameMap {
 		baseConfig.NameToCertificate[name] = cert
 	}
 
+	listenPortStr := strconv.Itoa(listenPort)
+
 	return func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
+		if config, found := tlsConfigCache.Get(hello.ServerName + listenPortStr); found {
+			return config.(*tls.Config).Clone(), nil
+		}
+
 		newConfig := baseConfig.Clone()
+
+		// Avoiding Race
+		newConfig.Certificates = []tls.Certificate{}
+		for _, cert := range baseConfig.Certificates {
+			newConfig.Certificates = append(newConfig.Certificates, cert)
+		}
+		newConfig.BuildNameToCertificate()
+		for name, cert := range certNameMap {
+			newConfig.NameToCertificate[name] = cert
+		}
 
 		isControlAPI := (listenPort != 0 && config.Global().ControlAPIPort == listenPort) || (config.Global().ControlAPIHostname == hello.ServerName)
 
@@ -299,14 +322,53 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 			newConfig.ClientAuth = tls.RequireAndVerifyClientCert
 			newConfig.ClientCAs = CertificateManager.CertPool(config.Global().Security.Certificates.ControlAPI)
 
+			tlsConfigCache.Set(hello.ServerName, newConfig, cache.DefaultExpiration)
 			return newConfig, nil
 		}
 
 		apisMu.RLock()
 		defer apisMu.RUnlock()
 
-		// Dynamically add API specific certificates
+		newConfig.ClientCAs = x509.NewCertPool()
+
+		domainRequireCert := map[string]tls.ClientAuthType{}
 		for _, spec := range apiSpecs {
+			switch {
+			case spec.UseMutualTLSAuth:
+				if domainRequireCert[spec.Domain] == 0 {
+					// Require verification only if there is a single known domain for TLS auth, otherwise use previous value
+					domainRequireCert[spec.Domain] = tls.RequireAndVerifyClientCert
+				} else if domainRequireCert[spec.Domain] != tls.RequireAndVerifyClientCert {
+					// If we have another API on this domain, which is not mutual tls enabled, just ask for cert
+					domainRequireCert[spec.Domain] = tls.RequestClientCert
+				}
+
+				// If current domain match or empty, whitelist client certificates
+				if spec.Domain == "" || spec.Domain == hello.ServerName {
+					certIDs := append(spec.ClientCertificates, config.Global().Security.Certificates.API...)
+
+					for _, cert := range CertificateManager.List(certIDs, certs.CertificatePublic) {
+						if cert != nil {
+							newConfig.ClientCAs.AddCert(cert.Leaf)
+						}
+					}
+				}
+			case spec.Auth.UseCertificate:
+				// Dynamic certificate check required, falling back to HTTP level check
+				// TODO: Change to VerifyPeerCertificate hook instead, when possible
+				if domainRequireCert[spec.Domain] < tls.RequestClientCert {
+					domainRequireCert[spec.Domain] = tls.RequestClientCert
+				}
+			default:
+				// For APIs which do not use certificates, indicate that there is API for such domain already
+				if domainRequireCert[spec.Domain] == 0 {
+					domainRequireCert[spec.Domain] = -1
+				} else {
+					domainRequireCert[spec.Domain] = tls.RequestClientCert
+				}
+			}
+
+			// Dynamically add API specific certificates
 			if len(spec.Certificates) != 0 {
 				for _, cert := range CertificateManager.List(spec.Certificates, certs.CertificatePrivate) {
 					if cert == nil {
@@ -326,33 +388,13 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 			}
 		}
 
-		for _, spec := range apiSpecs {
-			// If there is mutual TLS already found, in previous loop cycle
-			// And if there is another API on the same domain, we have a conflict
-			// We can't uniquely identify by domain API anymore
-			// So we going just ask certificate and fallback to HTTP level check
-			if newConfig.ClientAuth == tls.RequireAndVerifyClientCert && spec.Domain != "" && spec.Domain == hello.ServerName {
-				newConfig.ClientAuth = tls.RequestClientCert
-				break
-			}
-			if spec.UseMutualTLSAuth && spec.Domain != "" && spec.Domain == hello.ServerName {
-				newConfig.ClientAuth = tls.RequireAndVerifyClientCert
-				certIDs := append(spec.ClientCertificates, config.Global().Security.Certificates.API...)
-				newConfig.ClientCAs = CertificateManager.CertPool(certIDs)
-			}
+		newConfig.ClientAuth = domainRequireCert[hello.ServerName]
+		if newConfig.ClientAuth == 0 {
+			newConfig.ClientAuth = domainRequireCert[""]
 		}
 
-		// No mutual tls APIs with matched domain found
-		// Check if one of APIs without domain, require asking client cert
-		if newConfig.ClientAuth == tls.NoClientCert {
-			for _, spec := range apiSpecs {
-				if spec.Auth.UseCertificate || (spec.Domain == "" && spec.UseMutualTLSAuth) {
-					newConfig.ClientAuth = tls.RequestClientCert
-					break
-				}
-			}
-		}
-
+		// Cache the config
+		tlsConfigCache.Set(hello.ServerName+listenPortStr, newConfig, cache.DefaultExpiration)
 		return newConfig, nil
 	}
 }

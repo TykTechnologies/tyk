@@ -129,7 +129,7 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 	cli.Init(VERSION, confPaths)
 	initialiseSystem(ctx)
 	// Small part of start()
-	loadAPIEndpoints(mainRouter())
+	loadControlAPIEndpoints(mainRouter())
 	if analytics.GeoIPDB == nil {
 		panic("GeoIPDB was not initialized")
 	}
@@ -763,6 +763,7 @@ const sampleAPI = `{
         "auth_header_name": "authorization"
 	},
     "version_data": {
+		"default_version": "Default",
         "not_versioned": true,
         "versions": {
             "v1": {
