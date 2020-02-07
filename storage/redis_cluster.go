@@ -1,11 +1,12 @@
 package storage
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strconv"
 	"strings"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	"crypto/tls"
@@ -20,18 +21,74 @@ import (
 // ------------------- REDIS CLUSTER STORAGE MANAGER -------------------------------
 
 const (
-	waitStorageRetriesNum      = 5
-	waitStorageRetriesInterval = 1 * time.Second
-
 	defaultRedisPort = 6379
 )
 
-var (
-	redisSingletonMu sync.RWMutex
+// ErrRedisIsDown is returned when we can't communicate with redis
+var ErrRedisIsDown = errors.New("storage: Redis is either down or ws not configured")
 
-	redisClusterSingleton      redis.UniversalClient
-	redisCacheClusterSingleton redis.UniversalClient
-)
+var singlePool atomic.Value
+var singleCachePool atomic.Value
+var redisUp atomic.Value
+
+var disableRedis atomic.Value
+
+// DisableRedis very handy when testsing it allows to dynamically enable/disable talking with
+// redisW
+func DisableRedis(ok bool) {
+	if ok {
+		redisUp.Store(false)
+		disableRedis.Store(true)
+		return
+	}
+	redisUp.Store(true)
+	disableRedis.Store(false)
+}
+
+func shouldConnect() bool {
+	if v := disableRedis.Load(); v != nil {
+		return !v.(bool)
+	}
+	return true
+}
+
+// Connected returns true if we are connected to redis
+func Connected() bool {
+	v := redisUp.Load()
+	if v != nil {
+		return v.(bool)
+	}
+	return false
+}
+
+func singleton(cache bool) redis.UniversalClient {
+	if cache {
+		v := singleCachePool.Load()
+		if v != nil {
+			return v.(redis.UniversalClient)
+		}
+		return nil
+	}
+	v := singlePool.Load()
+	if v != nil {
+		return v.(redis.UniversalClient)
+	}
+	return nil
+}
+
+func connectSingleton(cache bool) bool {
+	d := singleton(cache) == nil
+	if d {
+		log.Debug("Connecting to redis cluster")
+		if cache {
+			singleCachePool.Store(NewRedisClusterPool(cache))
+			return true
+		}
+		singlePool.Store(NewRedisClusterPool(cache))
+		return true
+	}
+	return true
+}
 
 // RedisCluster is a storage manager that uses the redis database.
 type RedisCluster struct {
@@ -41,59 +98,59 @@ type RedisCluster struct {
 }
 
 func clusterConnectionIsOpen(cluster *RedisCluster) bool {
+	c := singleton(cluster.IsCache)
 	testKey := "redis-test-" + uuid.NewV4().String()
-	// set test key
-	if err := cluster.SetKey(testKey, "test", 1); err != nil {
+	if err := c.Set(testKey, "test", time.Second).Err(); err != nil {
 		return false
 	}
-	// get test key
-	if _, err := cluster.GetKey(testKey); err != nil {
+	if _, err := c.Get(testKey).Result(); err != nil {
 		return false
 	}
 	return true
 }
 
-// IsConnected waits with retries until Redis connection pools are connected
-func IsConnected() bool {
-	// create temporary ones to access singletons
-	testClusters := []*RedisCluster{
-		{},
+// ConnectToRedis starts a go routine that periodically tries to connect to
+// redis.
+func ConnectToRedis(ctx context.Context) {
+	tick := time.NewTicker(time.Second)
+	defer tick.Stop()
+	c := []RedisCluster{
+		{}, {IsCache: true},
 	}
-	if config.Global().EnableSeperateCacheStore {
-		testClusters = append(testClusters, &RedisCluster{IsCache: true})
-	}
-	for _, cluster := range testClusters {
-		cluster.Connect()
-	}
-
-	// wait for connection pools with retries
-	retryNum := 0
-	for {
-		if retryNum == waitStorageRetriesNum {
-			log.Error("Waiting for Redis connection pools failed")
-			return false
-		}
-
-		// check that redis is available
-		var redisIsReady bool
-		for _, cluster := range testClusters {
-			redisIsReady = cluster.singleton() != nil && clusterConnectionIsOpen(cluster)
-			if !redisIsReady {
-				break
-			}
-		}
-		if redisIsReady {
+	var ok bool
+	for _, v := range c {
+		if !connectSingleton(v.IsCache) {
 			break
 		}
-
-		// sleep before next check
-		log.WithField("currRetry", retryNum).Info("Waiting for Redis connection pools to be ready")
-		time.Sleep(waitStorageRetriesInterval)
-		retryNum++
+		if !clusterConnectionIsOpen(&v) {
+			redisUp.Store(false)
+			break
+		}
+		ok = true
 	}
-	log.WithField("currRetry", retryNum).Info("Redis connection pools are ready after number of retires")
-
-	return true
+	redisUp.Store(ok)
+again:
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+			if !shouldConnect() {
+				continue
+			}
+			for _, v := range c {
+				if !connectSingleton(v.IsCache) {
+					redisUp.Store(false)
+					goto again
+				}
+				if !clusterConnectionIsOpen(&v) {
+					redisUp.Store(false)
+					goto again
+				}
+			}
+			redisUp.Store(true)
+		}
+	}
 }
 
 func NewRedisClusterPool(isCache bool) redis.UniversalClient {
@@ -274,38 +331,14 @@ func (o *RedisOpts) failover() *redis.FailoverOptions {
 	}
 }
 
-// Connect will establish a connection to the r.singleton()
+// Connect will establish a connection this is always true because we are
+// dynamically using redis
 func (r *RedisCluster) Connect() bool {
-	redisSingletonMu.Lock()
-	defer redisSingletonMu.Unlock()
-
-	disconnected := redisClusterSingleton == nil
-	if r.IsCache {
-		disconnected = redisCacheClusterSingleton == nil
-	}
-
-	if disconnected {
-		log.Debug("Connecting to redis cluster")
-		if r.IsCache {
-			redisCacheClusterSingleton = NewRedisClusterPool(true)
-			return true
-		}
-		redisClusterSingleton = NewRedisClusterPool(false)
-		return true
-	}
-
-	log.Debug("Storage Engine already initialised...")
 	return true
 }
 
 func (r *RedisCluster) singleton() redis.UniversalClient {
-	redisSingletonMu.RLock()
-	defer redisSingletonMu.RUnlock()
-
-	if r.IsCache {
-		return redisCacheClusterSingleton
-	}
-	return redisClusterSingleton
+	return singleton(r.IsCache)
 }
 
 func (r *RedisCluster) hashKey(in string) string {
@@ -324,25 +357,18 @@ func (r *RedisCluster) cleanKey(keyName string) string {
 	return strings.Replace(keyName, r.KeyPrefix, "", 1)
 }
 
-func (r *RedisCluster) ensureConnection() {
-	if r.singleton() != nil {
-		// already connected
-		return
+func (r *RedisCluster) up() error {
+	if !Connected() {
+		return ErrRedisIsDown
 	}
-	log.Info("Connection dropped, reconnecting...")
-	for {
-		r.Connect()
-		if r.singleton() != nil {
-			// reconnection worked
-			return
-		}
-		log.Info("Reconnecting again...")
-	}
+	return nil
 }
 
 // GetKey will retrieve a key from the database
 func (r *RedisCluster) GetKey(keyName string) (string, error) {
-	r.ensureConnection()
+	if err := r.up(); err != nil {
+		return "", err
+	}
 	// log.Debug("[STORE] Getting WAS: ", keyName)
 	// log.Debug("[STORE] Getting: ", r.fixKey(keyName))
 	cluster := r.singleton()
@@ -358,7 +384,9 @@ func (r *RedisCluster) GetKey(keyName string) (string, error) {
 
 // GetMultiKey gets multiple keys from the database
 func (r *RedisCluster) GetMultiKey(keys []string) ([]string, error) {
-	r.ensureConnection()
+	if err := r.up(); err != nil {
+		return nil, err
+	}
 	cluster := r.singleton()
 	keyNames := make([]string, len(keys))
 	copy(keyNames, keys)
@@ -412,13 +440,17 @@ func (r *RedisCluster) GetMultiKey(keys []string) ([]string, error) {
 }
 
 func (r *RedisCluster) GetKeyTTL(keyName string) (ttl int64, err error) {
-	r.ensureConnection()
+	if err = r.up(); err != nil {
+		return 0, err
+	}
 	duration, err := r.singleton().TTL(r.fixKey(keyName)).Result()
 	return int64(duration.Seconds()), err
 }
 
 func (r *RedisCluster) GetRawKey(keyName string) (string, error) {
-	r.ensureConnection()
+	if err := r.up(); err != nil {
+		return "", err
+	}
 	value, err := r.singleton().Get(keyName).Result()
 	if err != nil {
 		log.Debug("Error trying to get value:", err)
@@ -430,7 +462,9 @@ func (r *RedisCluster) GetRawKey(keyName string) (string, error) {
 
 func (r *RedisCluster) GetExp(keyName string) (int64, error) {
 	//	log.Debug("Getting exp for key: ", r.fixKey(keyName))
-	r.ensureConnection()
+	if err := r.up(); err != nil {
+		return 0, err
+	}
 
 	value, err := r.singleton().TTL(r.fixKey(keyName)).Result()
 	if err != nil {
@@ -441,6 +475,9 @@ func (r *RedisCluster) GetExp(keyName string) (int64, error) {
 }
 
 func (r *RedisCluster) SetExp(keyName string, timeout int64) error {
+	if err := r.up(); err != nil {
+		return err
+	}
 	err := r.singleton().Expire(r.fixKey(keyName), time.Duration(timeout)*time.Second).Err()
 	if err != nil {
 		log.Error("Could not EXPIRE key: ", err)
@@ -453,7 +490,9 @@ func (r *RedisCluster) SetKey(keyName, session string, timeout int64) error {
 	//log.Debug("[STORE] SET Raw key is: ", keyName)
 	//log.Debug("[STORE] Setting key: ", r.fixKey(keyName))
 
-	r.ensureConnection()
+	if err := r.up(); err != nil {
+		return err
+	}
 	err := r.singleton().Set(r.fixKey(keyName), session, time.Duration(timeout)*time.Second).Err()
 	if err != nil {
 		log.Error("Error trying to set value: ", err)
@@ -463,7 +502,9 @@ func (r *RedisCluster) SetKey(keyName, session string, timeout int64) error {
 }
 
 func (r *RedisCluster) SetRawKey(keyName, session string, timeout int64) error {
-	r.ensureConnection()
+	if err := r.up(); err != nil {
+		return err
+	}
 	err := r.singleton().Set(keyName, session, time.Duration(timeout)*time.Second).Err()
 	if err != nil {
 		log.Error("Error trying to set value: ", err)
@@ -476,7 +517,10 @@ func (r *RedisCluster) SetRawKey(keyName, session string, timeout int64) error {
 func (r *RedisCluster) Decrement(keyName string) {
 	keyName = r.fixKey(keyName)
 	// log.Debug("Decrementing key: ", keyName)
-	r.ensureConnection()
+	if err := r.up(); err != nil {
+		log.Debug(err)
+		return
+	}
 	err := r.singleton().Decr(keyName).Err()
 	if err != nil {
 		log.Error("Error trying to decrement value:", err)
@@ -486,8 +530,10 @@ func (r *RedisCluster) Decrement(keyName string) {
 // IncrementWithExpire will increment a key in redis
 func (r *RedisCluster) IncrememntWithExpire(keyName string, expire int64) int64 {
 	// log.Debug("Incrementing raw key: ", keyName)
-	r.ensureConnection()
-
+	if err := r.up(); err != nil {
+		log.Debug(err)
+		return 0
+	}
 	// This function uses a raw key, so we shouldn't call fixKey
 	fixedKey := keyName
 	val, err := r.singleton().Incr(fixedKey).Result()
@@ -508,7 +554,10 @@ func (r *RedisCluster) IncrememntWithExpire(keyName string, expire int64) int64 
 
 // GetKeys will return all keys according to the filter (filter is a prefix - e.g. tyk.keys.*)
 func (r *RedisCluster) GetKeys(filter string) []string {
-	r.ensureConnection()
+	if err := r.up(); err != nil {
+		log.Debug(err)
+		return nil
+	}
 	client := r.singleton()
 
 	filterHash := ""
@@ -574,7 +623,10 @@ func (r *RedisCluster) GetKeys(filter string) []string {
 
 // GetKeysAndValuesWithFilter will return all keys and their values with a filter
 func (r *RedisCluster) GetKeysAndValuesWithFilter(filter string) map[string]string {
-	r.ensureConnection()
+	if err := r.up(); err != nil {
+		log.Debug(err)
+		return nil
+	}
 	keys := r.GetKeys(filter)
 	if keys == nil {
 		log.Error("Error trying to get filtered client keys")
@@ -644,7 +696,10 @@ func (r *RedisCluster) GetKeysAndValues() map[string]string {
 
 // DeleteKey will remove a key from the database
 func (r *RedisCluster) DeleteKey(keyName string) bool {
-	r.ensureConnection()
+	if err := r.up(); err != nil {
+		log.Debug(err)
+		return false
+	}
 	log.Debug("DEL Key was: ", keyName)
 	log.Debug("DEL Key became: ", r.fixKey(keyName))
 	n, err := r.singleton().Del(r.fixKey(keyName)).Result()
@@ -657,7 +712,10 @@ func (r *RedisCluster) DeleteKey(keyName string) bool {
 
 // DeleteAllKeys will remove all keys from the database.
 func (r *RedisCluster) DeleteAllKeys() bool {
-	r.ensureConnection()
+	if err := r.up(); err != nil {
+		log.Debug(err)
+		return false
+	}
 	n, err := r.singleton().FlushAll().Result()
 	if err != nil {
 		log.WithError(err).Error("Error trying to delete keys")
@@ -672,7 +730,10 @@ func (r *RedisCluster) DeleteAllKeys() bool {
 
 // DeleteKey will remove a key from the database without prefixing, assumes user knows what they are doing
 func (r *RedisCluster) DeleteRawKey(keyName string) bool {
-	r.ensureConnection()
+	if err := r.up(); err != nil {
+		log.Debug(err)
+		return false
+	}
 	n, err := r.singleton().Del(keyName).Result()
 	if err != nil {
 		log.WithError(err).Error("Error trying to delete key")
@@ -683,7 +744,10 @@ func (r *RedisCluster) DeleteRawKey(keyName string) bool {
 
 // DeleteKeys will remove a group of keys in bulk
 func (r *RedisCluster) DeleteScanMatch(pattern string) bool {
-	r.ensureConnection()
+	if err := r.up(); err != nil {
+		log.Debug(err)
+		return false
+	}
 	client := r.singleton()
 	log.Debug("Deleting: ", pattern)
 
@@ -751,7 +815,10 @@ func (r *RedisCluster) DeleteScanMatch(pattern string) bool {
 
 // DeleteKeys will remove a group of keys in bulk
 func (r *RedisCluster) DeleteKeys(keys []string) bool {
-	r.ensureConnection()
+	if err := r.up(); err != nil {
+		log.Debug(err)
+		return false
+	}
 	if len(keys) > 0 {
 		for i, v := range keys {
 			keys[i] = r.fixKey(v)
@@ -789,7 +856,9 @@ func (r *RedisCluster) DeleteKeys(keys []string) bool {
 // StartPubSubHandler will listen for a signal and run the callback for
 // every subscription and message event.
 func (r *RedisCluster) StartPubSubHandler(channel string, callback func(interface{})) error {
-	r.ensureConnection()
+	if err := r.up(); err != nil {
+		return err
+	}
 	client := r.singleton()
 	if client == nil {
 		return errors.New("Redis connection failed")
@@ -819,7 +888,9 @@ func (r *RedisCluster) StartPubSubHandler(channel string, callback func(interfac
 }
 
 func (r *RedisCluster) Publish(channel, message string) error {
-	r.ensureConnection()
+	if err := r.up(); err != nil {
+		return err
+	}
 	err := r.singleton().Publish(channel, message).Err()
 	if err != nil {
 		log.Error("Error trying to set value: ", err)
@@ -830,7 +901,10 @@ func (r *RedisCluster) Publish(channel, message string) error {
 
 func (r *RedisCluster) GetAndDeleteSet(keyName string) []interface{} {
 	log.Debug("Getting raw key set: ", keyName)
-	r.ensureConnection()
+	if err := r.up(); err != nil {
+		log.Debug(err)
+		return nil
+	}
 	log.Debug("keyName is: ", keyName)
 	fixedKey := r.fixKey(keyName)
 	log.Debug("Fixed keyname is: ", fixedKey)
@@ -867,8 +941,10 @@ func (r *RedisCluster) AppendToSet(keyName, value string) {
 	fixedKey := r.fixKey(keyName)
 	log.WithField("keyName", keyName).Debug("Pushing to raw key list")
 	log.WithField("fixedKey", fixedKey).Debug("Appending to fixed key list")
-
-	r.ensureConnection()
+	if err := r.up(); err != nil {
+		log.Debug(err)
+		return
+	}
 	if err := r.singleton().RPush(fixedKey, value).Err(); err != nil {
 		log.WithError(err).Error("Error trying to append to set keys")
 	}
@@ -880,7 +956,10 @@ func (r *RedisCluster) AppendToSetPipelined(key string, values [][]byte) {
 	}
 
 	fixedKey := r.fixKey(key)
-	r.ensureConnection()
+	if err := r.up(); err != nil {
+		log.Debug(err)
+		return
+	}
 	client := r.singleton()
 
 	pipe := client.Pipeline()
@@ -896,8 +975,9 @@ func (r *RedisCluster) AppendToSetPipelined(key string, values [][]byte) {
 func (r *RedisCluster) GetSet(keyName string) (map[string]string, error) {
 	log.Debug("Getting from key set: ", keyName)
 	log.Debug("Getting from fixed key set: ", r.fixKey(keyName))
-	r.ensureConnection()
-
+	if err := r.up(); err != nil {
+		return nil, err
+	}
 	val, err := r.singleton().SMembers(r.fixKey(keyName)).Result()
 	if err != nil {
 		log.Error("Error trying to get key set:", err)
@@ -915,7 +995,10 @@ func (r *RedisCluster) GetSet(keyName string) (map[string]string, error) {
 func (r *RedisCluster) AddToSet(keyName, value string) {
 	log.Debug("Pushing to raw key set: ", keyName)
 	log.Debug("Pushing to fixed key set: ", r.fixKey(keyName))
-	r.ensureConnection()
+	if err := r.up(); err != nil {
+		log.Debug(err)
+		return
+	}
 	err := r.singleton().SAdd(r.fixKey(keyName), value).Err()
 	if err != nil {
 		log.Error("Error trying to append keys: ", err)
@@ -925,8 +1008,10 @@ func (r *RedisCluster) AddToSet(keyName, value string) {
 func (r *RedisCluster) RemoveFromSet(keyName, value string) {
 	log.Debug("Removing from raw key set: ", keyName)
 	log.Debug("Removing from fixed key set: ", r.fixKey(keyName))
-	r.ensureConnection()
-
+	if err := r.up(); err != nil {
+		log.Debug(err)
+		return
+	}
 	err := r.singleton().SRem(r.fixKey(keyName), value).Err()
 	if err != nil {
 		log.Error("Error trying to remove keys: ", err)
@@ -934,7 +1019,10 @@ func (r *RedisCluster) RemoveFromSet(keyName, value string) {
 }
 
 func (r *RedisCluster) IsMemberOfSet(keyName, value string) bool {
-	r.ensureConnection()
+	if err := r.up(); err != nil {
+		log.Debug(err)
+		return false
+	}
 	val, err := r.singleton().SIsMember(r.fixKey(keyName), value).Result()
 
 	if err != nil {
@@ -950,7 +1038,10 @@ func (r *RedisCluster) IsMemberOfSet(keyName, value string) bool {
 // SetRollingWindow will append to a sorted set in redis and extract a timed window of values
 func (r *RedisCluster) SetRollingWindow(keyName string, per int64, value_override string, pipeline bool) (int, []interface{}) {
 	log.Debug("Incrementing raw key: ", keyName)
-	r.ensureConnection()
+	if err := r.up(); err != nil {
+		log.Debug(err)
+		return 0, nil
+	}
 	log.Debug("keyName is: ", keyName)
 	now := time.Now()
 	log.Debug("Now is:", now)
@@ -1012,7 +1103,10 @@ func (r *RedisCluster) SetRollingWindow(keyName string, per int64, value_overrid
 }
 
 func (r RedisCluster) GetRollingWindow(keyName string, per int64, pipeline bool) (int, []interface{}) {
-	r.ensureConnection()
+	if err := r.up(); err != nil {
+		log.Debug(err)
+		return 0, nil
+	}
 	now := time.Now()
 	onePeriodAgo := now.Add(time.Duration(-1*per) * time.Second)
 
@@ -1069,7 +1163,10 @@ func (r *RedisCluster) AddToSortedSet(keyName, value string, score float64) {
 	}
 	log.WithFields(logEntry).Debug("Pushing raw key to sorted set")
 
-	r.ensureConnection()
+	if err := r.up(); err != nil {
+		log.Debug(err)
+		return
+	}
 	member := redis.Z{Score: score, Member: value}
 	if err := r.singleton().ZAdd(fixedKey, member).Err(); err != nil {
 		log.WithFields(logEntry).WithError(err).Error("ZADD command failed")
