@@ -1168,12 +1168,7 @@ func Start() {
 		defer trace.Close()
 	}
 	start()
-
-	// Wait while Redis connection pools are ready before start serving traffic
-	if !storage.IsConnected() {
-		mainLog.Fatal("Redis connection pools are not ready. Exiting...")
-	}
-	mainLog.Info("Redis connection pools are ready")
+	go storage.ConnectToRedis(ctx)
 
 	if *cli.MemProfile {
 		mainLog.Debug("Memory profiling active")

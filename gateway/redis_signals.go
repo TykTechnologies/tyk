@@ -60,10 +60,11 @@ func startPubSubLoop() {
 			handleRedisEvent(v, nil, nil)
 		})
 		if err != nil {
-			pubSubLog.WithField("err", err).Error("Connection to Redis failed, reconnect in 10s")
-
+			if err != storage.ErrRedisIsDown {
+				pubSubLog.WithField("err", err).Error("Connection to Redis failed, reconnect in 10s")
+			}
 			time.Sleep(10 * time.Second)
-			pubSubLog.Warning("Reconnecting")
+			pubSubLog.Warning("Reconnecting ", err)
 		}
 	}
 }
@@ -216,8 +217,9 @@ func (r *RedisNotifier) Notify(notif interface{}) bool {
 	// pubSubLog.Debug("Sending notification", notif)
 
 	if err := r.store.Publish(r.channel, string(toSend)); err != nil {
-
-		pubSubLog.Error("Could not send notification: ", err)
+		if err != storage.ErrRedisIsDown {
+			pubSubLog.Error("Could not send notification: ", err)
+		}
 		return false
 	}
 
