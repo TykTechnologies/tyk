@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"net"
+	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"sync"
 	"testing"
 	"text/template"
+	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -412,5 +414,75 @@ func TestTestCheckerTCPHosts_correct_wrong_answers(t *testing.T) {
 	setTestMode(true)
 	if !failed {
 		t.Error("expected the host check to fai")
+	}
+}
+
+func TestProxyWhenHostIsDown(t *testing.T) {
+
+	g := config.Global()
+	g.UptimeTests.Config.FailureTriggerSampleSize = 1
+	g.UptimeTests.Config.TimeWait = 5
+	g.UptimeTests.Config.EnableUptimeAnalytics = true
+	config.SetGlobal(g)
+
+	ts := StartTest()
+	defer ts.Close()
+
+	defer ResetTestConfig()
+	l := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	}))
+	defer l.Close()
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.Proxy.EnableLoadBalancing = true
+		spec.Proxy.Targets = []string{l.URL}
+		spec.Proxy.CheckHostAgainstUptimeTests = true
+		spec.UptimeTests.CheckList = []apidef.HostCheckObject{
+			{CheckURL: l.URL},
+		}
+	})
+	GlobalHostChecker.checkerMu.Lock()
+	GlobalHostChecker.checker.sampleTriggerLimit = 1
+	GlobalHostChecker.checkerMu.Unlock()
+
+	tick := time.NewTicker(time.Millisecond)
+	defer tick.Stop()
+	x := 0
+	get := func() {
+		x++
+		res, err := http.Get(ts.URL + "/")
+		if err == nil {
+			res.Body.Close()
+		}
+		code := http.StatusOK
+		if x > 2 {
+			code = http.StatusServiceUnavailable
+		}
+		if res.StatusCode != code {
+			t.Errorf("%d: expected %d got %d", x, code, res.StatusCode)
+		}
+	}
+	n := 0
+	sentSignal := false
+	for {
+		select {
+		case <-tick.C:
+			if sentSignal {
+				sentSignal = !sentSignal
+				continue
+			}
+			if n == 2 {
+				l.Close()
+				hostCheckTicker <- struct{}{}
+				n++
+				sentSignal = true
+				continue
+			}
+			n++
+			if n == 10 {
+				return
+			}
+			get()
+		}
 	}
 }
