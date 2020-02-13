@@ -34,6 +34,7 @@ func legacyRateLimiters(c config.Config) {
 	if c.ManagementNode {
 		return
 	}
+
 	if c.EnableSentinelRateLimiter || c.EnableRedisRollingLimiter {
 		log.Warning("SentinelRateLimiter & RedisRollingLimiter are deprecated")
 	}
@@ -53,20 +54,25 @@ func healthCheck(c config.Config) {
 
 func fileDescriptors() {
 	rlimit := &syscall.Rlimit{}
+
 	err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, rlimit)
 	if err == nil && rlimit.Cur < minFileDescriptors {
-		log.Warningf("File descriptor limit %d too low for production use. Min %d recommended.\n"+
+		log.Warningf("File descriptor limit %d is too low for production use. A minimum of %d is recommended.\n"+
 			"\tThis could have a significant negative impact on performance.\n"+
-			"\tPlease refer to https://tyk.io/docs/deploy-tyk-premise-production/#file-handles for further guidance.", rlimit.Cur, minFileDescriptors)
+			"\tPlease refer to the following link for further guidance:\n"+
+			"\t\thttps://tyk.io/docs/deploy-tyk-premise-production/#file-handles--file-descriptors",
+			rlimit.Cur, minFileDescriptors)
 	}
 }
 
 func cpus() {
 	cpus := runtime.NumCPU()
 	if cpus < minCPU {
-		log.Warningf("Num CPUs %d too low for production use. Min %d recommended.\n"+
+		log.Warningf("Number of CPUs %d is too low for production use. A minimum of %d is recommended.\n"+
 			"\tThis could have a significant negative impact on performance.\n"+
-			"\tPlease refer to https://tyk.io/docs/deploy-tyk-premise-production/#use-the-right-hardware for further guidance.", cpus, minCPU)
+			"\tPlease refer to the following link for further guidance:\n"+
+			"\t\thttps://tyk.io/docs/deploy-tyk-premise-production/#use-the-right-hardware",
+			cpus, minCPU)
 	}
 }
 
