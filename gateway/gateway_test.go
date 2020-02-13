@@ -1794,6 +1794,23 @@ func TestTracing(t *testing.T) {
 		{Method: "POST", Path: "/tyk/debug", Data: traceRequest{Spec: spec.APIDefinition, Request: &traceHttpRequest{Method: "GET", Path: "/"}}, AdminAuth: true, Code: 200, BodyMatch: `401 Unauthorized`},
 		{Method: "POST", Path: "/tyk/debug", Data: traceRequest{Spec: spec.APIDefinition, Request: &traceHttpRequest{Path: "/", Headers: authHeaders}}, AdminAuth: true, Code: 200, BodyMatch: `200 OK`},
 	}...)
+
+	t.Run("Custom auth header", func(t *testing.T) {
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			authTokenType: {
+				AuthHeaderName: "Custom-Auth-Header",
+			},
+		}
+
+		customAuthHeaders := map[string][]string{"custom-auth-header": {keyID}}
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPost, Path: "/tyk/debug", Data: traceRequest{Spec: spec.APIDefinition,
+				Request: &traceHttpRequest{Path: "/", Headers: authHeaders}}, AdminAuth: true, Code: 200, BodyMatch: `401 Unauthorized`},
+			{Method: http.MethodPost, Path: "/tyk/debug", Data: traceRequest{Spec: spec.APIDefinition,
+				Request: &traceHttpRequest{Path: "/", Headers: customAuthHeaders}}, AdminAuth: true, Code: 200, BodyMatch: `200 OK`},
+		}...)
+	})
 }
 
 func TestBrokenClients(t *testing.T) {
