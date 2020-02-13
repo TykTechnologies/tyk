@@ -546,9 +546,25 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		ctxIncLoopLevel(r, loopLevelLimit)
 		handler.ServeHTTP(w, r)
-	} else {
-		d.SH.ServeHTTP(w, r)
+		return
 	}
+
+	if d.SH.Spec.target.Scheme == "tyk" {
+		if targetAPI := fuzzyFindAPI(d.SH.Spec.target.Host); targetAPI != nil {
+			if targetAPI.middlewareChain != nil {
+				if d.SH.Spec.Proxy.StripListenPath {
+					r.URL.Path = d.SH.Spec.StripListenPath(r, r.URL.Path)
+					r.URL.RawPath = d.SH.Spec.StripListenPath(r, r.URL.RawPath)
+				}
+				targetAPI.middlewareChain.ThisHandler.ServeHTTP(w, r)
+				return
+			}
+		}
+		handler := ErrorHandler{*d.SH.Base()}
+		handler.HandleError(w, r, "Couldn't detect target", http.StatusInternalServerError, true)
+		return
+	}
+	d.SH.ServeHTTP(w, r)
 }
 
 func loadGlobalApps() {
