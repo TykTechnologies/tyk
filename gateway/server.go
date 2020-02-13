@@ -176,6 +176,8 @@ func setupGlobals(ctx context.Context) {
 	healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:"}
 	InitHostCheckManager(ctx, &healthCheckStore)
 
+	initHealthCheck(ctx)
+
 	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
 	GlobalSessionManager.Init(&redisStore)
 

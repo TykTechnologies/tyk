@@ -350,9 +350,7 @@ func (m *proxyMux) swap(new *proxyMux) {
 	if p != nil && p.router != nil {
 		// All APIs processed, now we can healthcheck
 		// Add a root message to check all is OK
-		p.router.HandleFunc("/"+config.Global().HealthCheckEndpointName, func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprint(w, "Hello Tiki")
-		})
+		p.router.HandleFunc("/"+config.Global().HealthCheckEndpointName, liveCheckHandler)
 	}
 	m.serve()
 }
