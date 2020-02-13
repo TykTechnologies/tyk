@@ -40,7 +40,7 @@ go get -t
 export PKG_PATH=$GOPATH/src/github.com/TykTechnologies/tyk
 
 # build Go-plugin used in tests
-go build ${race} -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugins || fatal "building Go-plugin failed"
+# go build ${race} -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugins || fatal "building Go-plugin failed"
 
 for pkg in $PKGS; do
     tags=""
