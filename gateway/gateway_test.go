@@ -1267,6 +1267,47 @@ func TestCacheAllSafeRequests(t *testing.T) {
 	}...)
 }
 
+func TestCacheAllSafeRequestsWithCachedHeaders(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+	cache := storage.RedisCluster{KeyPrefix: "cache-"}
+	defer cache.DeleteScanMatch("*")
+	authorization := "authorization"
+	tenant := "tenant-id"
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.CacheOptions = apidef.CacheOptions{
+			CacheTimeout:         120,
+			EnableCache:          true,
+			CacheAllSafeRequests: true,
+			CacheByHeaders:       []string{authorization, tenant},
+		}
+		spec.UseKeylessAccess = true
+		spec.Proxy.ListenPath = "/"
+	})
+
+	headerCache := map[string]string{"x-tyk-cached-response": "1"}
+	sess1token := CreateSession(func(s *user.SessionState) {
+		s.Rate = 1
+		s.Per = 60
+	})
+	sess2token := CreateSession(func(s *user.SessionState) {
+		s.Rate = 1
+		s.Per = 60
+	})
+
+	ts.Run(t, []test.TestCase{
+		{Method: http.MethodGet, Path: "/", Headers: map[string]string{authorization: sess1token}, HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodGet, Path: "/", Headers: map[string]string{authorization: sess1token}, HeadersMatch: headerCache},
+		{Method: http.MethodGet, Path: "/", Headers: map[string]string{authorization: sess2token}, HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodGet, Path: "/", Headers: map[string]string{tenant: "Some UUID"}, HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodGet, Path: "/", Headers: map[string]string{tenant: "Some UUID"}, HeadersMatch: headerCache},
+		{Method: http.MethodGet, Path: "/", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodGet, Path: "/", HeadersMatch: headerCache},
+		{Method: http.MethodGet, Path: "/", Headers: map[string]string{tenant: "Some UUID", authorization: sess2token}, HeadersNotMatch: headerCache},
+	}...)
+}
+
 func TestCacheWithAdvanceUrlRewrite(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
@@ -1327,12 +1368,14 @@ func TestCachePostRequest(t *testing.T) {
 	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-"}
 	defer cache.DeleteScanMatch("*")
+	tenant := "tenant-id"
 
 	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.CacheOptions = apidef.CacheOptions{
 			CacheTimeout:         120,
 			EnableCache:          true,
 			CacheAllSafeRequests: false,
+			CacheByHeaders:       []string{tenant},
 		}
 
 		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
@@ -1357,6 +1400,130 @@ func TestCachePostRequest(t *testing.T) {
 		// if regex match returns nil, then request body is ignored while generating cache key
 		{Method: http.MethodPost, Path: "/", Data: "{\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
 		{Method: http.MethodPost, Path: "/", Data: "{\"name\":\"test2\"}", HeadersMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodPost, Path: "/", Data: "{\"name\":\"test2\"}", Headers: map[string]string{tenant: "someUUID"}, HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodPost, Path: "/", Data: "{\"name\":\"test2\"}", Headers: map[string]string{tenant: "someUUID"}, HeadersMatch: headerCache},
+	}...)
+}
+
+func TestAdvanceCachePutRequest(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+	cache := storage.RedisCluster{KeyPrefix: "cache-"}
+	defer cache.DeleteScanMatch("*")
+	tenant := "tenant-id"
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.CacheOptions = apidef.CacheOptions{
+			CacheTimeout:           120,
+			EnableCache:            true,
+			CacheAllSafeRequests:   true,
+			CacheOnlyResponseCodes: []int{404}, // should not influence because of AdvanceCacheConfig.CacheOnlyResponseCodes
+			CacheByHeaders:         []string{tenant},
+		}
+		spec.Proxy.ListenPath = "/"
+
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			json.Unmarshal([]byte(`[{
+						"method":"PUT",
+						"path":"/put/",
+						"cache_key_regex":"\"id\":[^,]*",
+						"cache_response_codes":[200]
+					},{
+						"method":"PATCH",
+						"path":"/patch/",
+						"cache_key_regex":"\"id\":[^,]*",
+						"cache_response_codes":[200]
+					},{
+						"method":"DELETE",
+						"path":"/delete/",
+						"cache_response_codes":[200]
+					},{
+						"method":"PUT",
+						"path":"/full-body-hash/",
+						"cache_response_codes":[200],
+						"cache_key_regex":".*"
+					}
+                                ]`), &v.ExtendedPaths.AdvanceCacheConfig)
+		})
+		spec.Proxy.ListenPath = "/"
+	})
+
+	headerCache := map[string]string{"x-tyk-cached-response": "1"}
+
+	ts.Run(t, []test.TestCase{
+		{Method: http.MethodPut, Path: "/put/", Data: "{\"id\":\"1\",\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond}, // 0
+		{Method: http.MethodPut, Path: "/put/", Data: "{\"id\":\"1\",\"name\":\"test\"}", HeadersMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodPut, Path: "/put/", Data: "{\"id\":\"2\",\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		// if regex match returns nil, then request body is ignored while generating cache key
+		{Method: http.MethodPut, Path: "/put/", Data: "{\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodPut, Path: "/put/", Data: "{\"name\":\"test2\"}", HeadersMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodPut, Path: "/put/", Data: "{\"name\":\"test2\"}", Headers: map[string]string{"someheader": "someUUID"}, HeadersMatch: headerCache, Delay: 10 * time.Millisecond},
+		// test when no body and no headers
+		{Method: http.MethodPut, Path: "/put/", HeadersMatch: headerCache},
+		// test CacheByHeaders change - header added
+		{Method: http.MethodPut, Path: "/put/", Data: "{\"name\":\"test2\"}", Headers: map[string]string{tenant: "someUUID"}, HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodPut, Path: "/put/", Data: "{\"name\":\"test2\"}", Headers: map[string]string{tenant: "someUUID"}, HeadersMatch: headerCache},
+
+		// PATCH
+		{Method: http.MethodPatch, Path: "/patch/", Data: "{\"id\":\"1\",\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodPatch, Path: "/patch/", Data: "{\"id\":\"1\",\"name\":\"test\"}", HeadersMatch: headerCache, Delay: 10 * time.Millisecond}, // 10
+		{Method: http.MethodPatch, Path: "/patch/", Data: "{\"id\":\"2\",\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		// if regex match returns nil, then request body is ignored while generating cache key
+		{Method: http.MethodPatch, Path: "/patch/", Data: "{\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodPatch, Path: "/patch/", Data: "{\"name\":\"test2\"}", HeadersMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodPatch, Path: "/patch/", Data: "{\"name\":\"test2\"}", Headers: map[string]string{"someheader": "someUUID"}, HeadersMatch: headerCache, Delay: 10 * time.Millisecond},
+		// test when no body and no headers
+		{Method: http.MethodPatch, Path: "/patch/", HeadersMatch: headerCache},
+		// test CacheByHeaders change - header added
+		{Method: http.MethodPatch, Path: "/patch/", Data: "{\"name\":\"test2\"}", Headers: map[string]string{tenant: "someUUID"}, HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodPatch, Path: "/patch/", Data: "{\"name\":\"test2\"}", Headers: map[string]string{tenant: "someUUID"}, HeadersMatch: headerCache},
+
+		// DELETE
+		{Method: http.MethodDelete, Path: "/delete/", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodDelete, Path: "/delete/", HeadersMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodDelete, Path: "/delete/", Headers: map[string]string{tenant: "someUUID"}, HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond}, // 20
+		{Method: http.MethodDelete, Path: "/delete/", Headers: map[string]string{tenant: "someUUID"}, HeadersMatch: headerCache},
+
+		// Put with full body hash
+		{Method: http.MethodPut, Path: "/full-body-hash/", Data: "{\"id\":\"1\",\"name\":\"test\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodPut, Path: "/full-body-hash/", Data: "{\"id\":\"1\",\"name\":\"test2\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodPut, Path: "/full-body-hash/", Data: "{\"id\":\"2\",\"name\":\"test2\"}", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodPut, Path: "/full-body-hash/", Data: "{\"id\":\"2\",\"name\":\"test2\"}", HeadersMatch: headerCache},
+	}...)
+}
+
+func TestCacheAllSafeRequestsWithAdvancedCacheEndpoint(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+	cache := storage.RedisCluster{KeyPrefix: "cache-"}
+	defer cache.DeleteScanMatch("*")
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.CacheOptions = apidef.CacheOptions{
+			CacheTimeout:           120,
+			EnableCache:            true,
+			CacheAllSafeRequests:   true,
+			CacheOnlyResponseCodes: []int{200}, // should not influence because of AdvanceCacheConfig.CacheOnlyResponseCodes
+		}
+
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			json.Unmarshal([]byte(`[{
+						"method":"PUT",
+						"path":"/",
+						"cache_key_regex":"\"id\":[^,]*",
+						"cache_response_codes":[404]
+					}
+                               ]`), &v.ExtendedPaths.AdvanceCacheConfig)
+		})
+		spec.Proxy.ListenPath = "/"
+	})
+
+	headerCache := map[string]string{"x-tyk-cached-response": "1"}
+
+	ts.Run(t, []test.TestCase{
+		// Make sure CacheAllSafeRequests is working
+		{Method: http.MethodGet, Path: "/", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
+		{Method: http.MethodGet, Path: "/", HeadersMatch: headerCache},
 	}...)
 }
 

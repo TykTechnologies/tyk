@@ -86,9 +86,10 @@ type EndPointMeta struct {
 }
 
 type CacheMeta struct {
-	Method        string `bson:"method" json:"method"`
-	Path          string `bson:"path" json:"path"`
-	CacheKeyRegex string `bson:"cache_key_regex" json:"cache_key_regex"`
+	Method                 string `bson:"method" json:"method"`
+	Path                   string `bson:"path" json:"path"`
+	CacheKeyRegex          string `bson:"cache_key_regex" json:"cache_key_regex"`
+	CacheOnlyResponseCodes []int  `bson:"cache_response_codes" json:"cache_response_codes"`
 }
 
 type RequestInputType string
@@ -293,12 +294,13 @@ type MiddlewareSection struct {
 }
 
 type CacheOptions struct {
-	CacheTimeout               int64  `bson:"cache_timeout" json:"cache_timeout"`
-	EnableCache                bool   `bson:"enable_cache" json:"enable_cache"`
-	CacheAllSafeRequests       bool   `bson:"cache_all_safe_requests" json:"cache_all_safe_requests"`
-	CacheOnlyResponseCodes     []int  `bson:"cache_response_codes" json:"cache_response_codes"`
-	EnableUpstreamCacheControl bool   `bson:"enable_upstream_cache_control" json:"enable_upstream_cache_control"`
-	CacheControlTTLHeader      string `bson:"cache_control_ttl_header" json:"cache_control_ttl_header"`
+	CacheTimeout               int64    `bson:"cache_timeout" json:"cache_timeout"`
+	EnableCache                bool     `bson:"enable_cache" json:"enable_cache"`
+	CacheAllSafeRequests       bool     `bson:"cache_all_safe_requests" json:"cache_all_safe_requests"`
+	CacheOnlyResponseCodes     []int    `bson:"cache_response_codes" json:"cache_response_codes"`
+	EnableUpstreamCacheControl bool     `bson:"enable_upstream_cache_control" json:"enable_upstream_cache_control"`
+	CacheControlTTLHeader      string   `bson:"cache_control_ttl_header" json:"cache_control_ttl_header"`
+	CacheByHeaders             []string `bson:"cache_by_headers" json:"cache_by_headers"`
 }
 
 type ResponseProcessor struct {
