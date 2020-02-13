@@ -881,6 +881,9 @@
     "health_check_endpoint_name": {
       "type": "string"
     },
+    "ssl_force_common_name_check":{
+	    "type":"boolean"
+    },
     "kv": {
       "type": ["object", "null"],
       "additionalProperties": false,
@@ -967,8 +970,14 @@
     "enable_http_profiler": {
       "type": "boolean"
     },
-    "ssl_force_common_name_check": {
-      "type": "boolean"
-    }
+    "liveness_check": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "check_duration": {
+          "type": "integer"
+      }
+   }
   }
+}
 }

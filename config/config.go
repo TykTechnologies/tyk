@@ -126,6 +126,10 @@ type HealthCheckConfig struct {
 	HealthCheckValueTimeout int64 `json:"health_check_value_timeouts"`
 }
 
+type LivenessCheckConfig struct {
+	CheckDuration time.Duration `json:"check_duration"`
+}
+
 type DnsCacheConfig struct {
 	Enabled                   bool              `json:"enabled"`
 	TTL                       int64             `json:"ttl"`
@@ -398,6 +402,7 @@ type Config struct {
 	EnableAnalytics bool                  `json:"enable_analytics"`
 	AnalyticsConfig AnalyticsConfigConfig `json:"analytics_config"`
 
+	LivenessCheck LivenessCheckConfig `json:"liveness_check"`
 	// Cache
 	DnsCache                 DnsCacheConfig        `json:"dns_cache"`
 	DisableRegexpCache       bool                  `json:"disable_regexp_cache"`
