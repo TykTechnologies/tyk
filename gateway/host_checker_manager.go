@@ -27,7 +27,7 @@ type HostCheckerManager struct {
 	checker           *HostUptimeChecker
 	stopLoop          bool
 	pollerStarted     bool
-	unhealthyHostList map[string]bool
+	unhealthyHostList *sync.Map
 	currentHostList   map[string]HostData
 	resetsInitiated   map[string]bool
 }
@@ -74,7 +74,7 @@ const (
 
 func (hc *HostCheckerManager) Init(store storage.Handler) {
 	hc.store = store
-	hc.unhealthyHostList = make(map[string]bool)
+	hc.unhealthyHostList = new(sync.Map)
 	hc.resetsInitiated = make(map[string]bool)
 	// Generate a new ID for ourselves
 	hc.GenerateCheckerId()
@@ -208,11 +208,12 @@ func (hc *HostCheckerManager) OnHostReport(report HostHealthReport) {
 }
 
 func (hc *HostCheckerManager) OnHostDown(report HostHealthReport) {
+	key := hc.getHostKey(report)
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
-	}).Debug("Update key: ", hc.getHostKey(report))
-	hc.store.SetKey(hc.getHostKey(report), "1", int64(hc.checker.checkTimeout*hc.checker.sampleTriggerLimit))
-
+	}).Debug("Update key: ", key)
+	hc.store.SetKey(key, "1", int64(hc.checker.checkTimeout*hc.checker.sampleTriggerLimit))
+	hc.unhealthyHostList.Store(key, 1)
 	spec := getApiSpec(report.MetaData[UnHealthyHostMetaDataAPIKey])
 	if spec == nil {
 		log.WithFields(logrus.Fields{
@@ -251,11 +252,12 @@ func (hc *HostCheckerManager) OnHostDown(report HostHealthReport) {
 }
 
 func (hc *HostCheckerManager) OnHostBackUp(report HostHealthReport) {
+	key := hc.getHostKey(report)
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
-	}).Debug("Delete key: ", hc.getHostKey(report))
-	hc.store.DeleteKey(hc.getHostKey(report))
-
+	}).Debug("Delete key: ", key)
+	hc.store.DeleteKey(key)
+	hc.unhealthyHostList.Delete(key)
 	spec := getApiSpec(report.MetaData[UnHealthyHostMetaDataAPIKey])
 	if spec == nil {
 		log.WithFields(logrus.Fields{
@@ -284,10 +286,9 @@ func (hc *HostCheckerManager) HostDown(urlStr string) bool {
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
 	}).Debug("Key is: ", PoolerHostSentinelKeyPrefix+u.Host)
-	_, err = hc.store.GetKey(PoolerHostSentinelKeyPrefix + u.Host)
-
+	_, ok := hc.unhealthyHostList.Load(PoolerHostSentinelKeyPrefix + u.Host)
 	// Found a key, the host is down
-	return err == nil
+	return ok
 }
 
 func (hc *HostCheckerManager) PrepareTrackingHost(checkObject apidef.HostCheckObject, apiID string) (HostData, error) {
