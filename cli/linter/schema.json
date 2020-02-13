@@ -278,6 +278,9 @@
     "enable_bundle_downloader": {
       "type": "boolean"
     },
+    "bundle_insecure_skip_verify": {
+      "type": "boolean"
+    },
     "enable_custom_domains": {
       "type": "boolean"
     },
