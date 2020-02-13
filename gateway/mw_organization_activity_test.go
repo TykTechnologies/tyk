@@ -181,7 +181,7 @@ func TestProcessRequestOffThreadQuotaLimit(t *testing.T) {
 		// next 10 requests should be OK again
 		ok := false
 		for i = 0; i < 9; i++ {
-			res, _ := ts.Run(t, test.TestCase{})
+			res, _ := ts.Run(t, test.TestCase{Delay: 10 * time.Millisecond})
 			res.Body.Close()
 			if res.StatusCode == http.StatusOK {
 				ok = true
