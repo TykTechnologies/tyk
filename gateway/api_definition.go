@@ -139,8 +139,9 @@ type URLSpec struct {
 }
 
 type EndPointCacheMeta struct {
-	Method        string
-	CacheKeyRegex string
+	Method                 string
+	CacheKeyRegex          string
+	CacheOnlyResponseCodes []int
 }
 
 type TransformSpec struct {
@@ -582,6 +583,7 @@ func (a APIDefinitionLoader) compileCachedPathSpec(oldpaths []string, newpaths [
 		a.generateRegex(spec.Path, &newSpec, Cached)
 		newSpec.CacheConfig.Method = spec.Method
 		newSpec.CacheConfig.CacheKeyRegex = spec.CacheKeyRegex
+		newSpec.CacheConfig.CacheOnlyResponseCodes = spec.CacheOnlyResponseCodes
 		// Extend with method actions
 		urlSpec = append(urlSpec, newSpec)
 	}
@@ -599,7 +601,8 @@ func (a APIDefinitionLoader) filterSprigFuncs() template.FuncMap {
 
 func (a APIDefinitionLoader) loadFileTemplate(path string) (*template.Template, error) {
 	log.Debug("-- Loading template: ", path)
-	return apidef.Template.New("").Funcs(a.filterSprigFuncs()).ParseFiles(path)
+	tmpName := filepath.Base(path)
+	return apidef.Template.New(tmpName).Funcs(a.filterSprigFuncs()).ParseFiles(path)
 }
 
 func (a APIDefinitionLoader) loadBlobTemplate(blob string) (*template.Template, error) {
@@ -1121,7 +1124,7 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 		case Ignored, BlackList, WhiteList:
 			return true, nil
 		case Cached:
-			if method == rxPaths[i].CacheConfig.Method || (rxPaths[i].CacheConfig.Method == SAFE_METHODS && (method == "GET" || method == "HEADERS" || method == "OPTIONS")) {
+			if method == rxPaths[i].CacheConfig.Method || (rxPaths[i].CacheConfig.Method == SAFE_METHODS && isSafeMethod(method)) {
 				return true, &rxPaths[i].CacheConfig
 			}
 		case Transformed:

@@ -75,6 +75,20 @@ func generateHeaderList(r *http.Request, headerList []string) []string {
 	return result
 }
 
+func (s *RequestSigning) getRequestPath(r *http.Request) string {
+	path := r.URL.Path
+
+	if newURL := ctxGetURLRewriteTarget(r); newURL != nil {
+		path = newURL.Path
+	} else {
+		if s.Spec.Proxy.StripListenPath {
+			path = s.Spec.StripListenPath(r, r.URL.Path)
+		}
+	}
+
+	return path
+}
+
 func (s *RequestSigning) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	if (s.Spec.RequestSigning.Secret == "" && s.Spec.RequestSigning.CertificateId == "") || s.Spec.RequestSigning.KeyId == "" || s.Spec.RequestSigning.Algorithm == "" {
 		log.Error("Fields required for signing the request are missing")
@@ -101,7 +115,10 @@ func (s *RequestSigning) ProcessRequest(w http.ResponseWriter, r *http.Request, 
 	}
 
 	headers := generateHeaderList(r, s.Spec.RequestSigning.HeaderList)
-	signatureString, err := generateHMACSignatureStringFromRequest(r, headers)
+
+	path := s.getRequestPath(r)
+
+	signatureString, err := generateHMACSignatureStringFromRequest(r, headers, path)
 	if err != nil {
 		log.Error(err)
 		return err, http.StatusInternalServerError
@@ -111,8 +128,13 @@ func (s *RequestSigning) ProcessRequest(w http.ResponseWriter, r *http.Request, 
 	var encodedSignature string
 
 	if strings.HasPrefix(s.Spec.RequestSigning.Algorithm, "rsa") {
+		if s.Spec.RequestSigning.CertificateId == "" {
+			log.Error("CertificateID is empty")
+			return errors.New("CertificateID is empty"), http.StatusInternalServerError
+		}
+
 		certList := CertificateManager.List([]string{s.Spec.RequestSigning.CertificateId}, certs.CertificatePrivate)
-		if len(certList) == 0 {
+		if len(certList) == 0 || certList[0] == nil {
 			log.Error("Certificate not found")
 			return errors.New("Certificate not found"), http.StatusInternalServerError
 		}
@@ -128,7 +150,11 @@ func (s *RequestSigning) ProcessRequest(w http.ResponseWriter, r *http.Request, 
 			return err, http.StatusInternalServerError
 		}
 	} else {
-		encodedSignature = generateHMACEncodedSignature(signatureString, s.Spec.RequestSigning.Secret, s.Spec.RequestSigning.Algorithm)
+		var err error
+		encodedSignature, err = generateHMACEncodedSignature(signatureString, s.Spec.RequestSigning.Secret, s.Spec.RequestSigning.Algorithm)
+		if err != nil {
+			return err, http.StatusInternalServerError
+		}
 	}
 
 	//Generate Authorization header

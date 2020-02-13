@@ -10,9 +10,12 @@ import (
 	"testing"
 	"time"
 
+	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/justinas/alice"
 	"github.com/lonelycode/go-uuid/uuid"
 
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -254,4 +257,70 @@ func TestMultiSession_BA_Standard_FAILAuth(t *testing.T) {
 	if recorder.Code != 403 {
 		t.Error("Wrong response code received, expected 403: \n", recorder.Code)
 	}
+}
+
+func TestJWTAuthKeyMultiAuth(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+
+	pID := CreatePolicy()
+
+	spec := BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = false
+
+		spec.AuthConfigs = make(map[string]apidef.AuthConfig)
+
+		spec.UseStandardAuth = true
+		authConfig := spec.AuthConfigs["authToken"]
+		authConfig.AuthHeaderName = "Auth-Token"
+		spec.AuthConfigs["authToken"] = authConfig
+		spec.BaseIdentityProvidedBy = apidef.AuthToken
+
+		spec.EnableJWT = true
+		spec.JWTSigningMethod = RSASign
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		jwtConfig := spec.AuthConfigs["jwt"]
+		jwtConfig.AuthHeaderName = "Auth-JWT"
+		spec.AuthConfigs["jwt"] = jwtConfig
+		spec.JWTIdentityBaseField = "user_id"
+		spec.JWTPolicyFieldName = "policy_id"
+		spec.JWTDefaultPolicies = []string{pID}
+
+		spec.Proxy.ListenPath = "/"
+	})[0]
+
+	LoadAPI(spec)
+
+	jwtToken := CreateJWKToken(func(t *jwt.Token) {
+		t.Claims.(jwt.MapClaims)["user_id"] = "user"
+		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
+	})
+
+	key := CreateSession()
+
+	ts.Run(t, []test.TestCase{
+		{
+			Headers: map[string]string{"Auth-JWT": jwtToken, "Auth-Token": key},
+			Code:    http.StatusOK,
+		},
+		{
+			Headers: map[string]string{"Auth-JWT": jwtToken, "Auth-Token": key},
+			Code:    http.StatusOK,
+		},
+		{
+			Headers:   map[string]string{"Auth-JWT": jwtToken},
+			Code:      http.StatusUnauthorized,
+			BodyMatch: "Authorization field missing",
+		},
+		{
+			Headers:   map[string]string{"Auth-Token": key},
+			Code:      http.StatusBadRequest,
+			BodyMatch: "Authorization field missing",
+		},
+		{
+			Headers:   map[string]string{"Auth-JWT": "junk", "Auth-Token": key},
+			Code:      http.StatusForbidden,
+			BodyMatch: "Key not authorized",
+		},
+	}...)
 }

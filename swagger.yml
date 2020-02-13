@@ -1633,6 +1633,12 @@ components:
       x-go-package: github.com/TykTechnologies/tyk/vendor/github.com/lonelycode/osin
     CacheMeta:
       properties:
+        cache_response_codes:
+          items:
+            format: int64
+            type: integer
+          type: array
+          x-go-name: CacheOnlyResponseCodes
         cache_key_regex:
           type: string
           x-go-name: CacheKeyRegex

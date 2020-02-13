@@ -14,6 +14,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/signature_validator"
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -106,7 +107,6 @@ func TestSignatureValidation(t *testing.T) {
 	defer ResetTestConfig()
 	ts := StartTest()
 	defer ts.Close()
-
 	api := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.Proxy.ListenPath = "/"
@@ -138,7 +138,13 @@ func TestSignatureValidation(t *testing.T) {
 		emptySigHeader := map[string]string{
 			"authorization": key,
 		}
-
+		storage.DisableRedis(true)
+		ts.Run(t, []test.TestCase{
+			{Headers: emptySigHeader, Code: http.StatusForbidden},
+			{Headers: invalidSigHeader, Code: http.StatusForbidden},
+			{Headers: validSigHeader, Code: http.StatusForbidden},
+		}...)
+		storage.DisableRedis(false)
 		ts.Run(t, []test.TestCase{
 			{Headers: emptySigHeader, Code: 401},
 			{Headers: invalidSigHeader, Code: 401},
@@ -168,7 +174,12 @@ func TestSignatureValidation(t *testing.T) {
 			"authorization": key,
 			"signature":     "junk",
 		}
-
+		storage.DisableRedis(true)
+		ts.Run(t, []test.TestCase{
+			{Headers: invalidSigHeader, Code: http.StatusForbidden},
+			{Headers: validSigHeader, Code: http.StatusForbidden},
+		}...)
+		storage.DisableRedis(false)
 		ts.Run(t, []test.TestCase{
 			{Headers: invalidSigHeader, Code: 401},
 			{Headers: validSigHeader, Code: 200},
