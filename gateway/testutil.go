@@ -134,6 +134,13 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 		panic("GeoIPDB was not initialized")
 	}
 	go storage.ConnectToRedis(ctx)
+	for {
+		if storage.Connected() {
+			break
+		}
+
+		time.Sleep(10 * time.Millisecond)
+	}
 	go startPubSubLoop()
 	go reloadLoop(ReloadTick)
 	go reloadQueueLoop()
