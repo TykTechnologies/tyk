@@ -195,12 +195,6 @@ func setupGlobals(ctx context.Context) {
 		analytics.Store = &analyticsStore
 		analytics.Init(globalConf)
 
-		redisPurgeOnce.Do(func() {
-			store := storage.RedisCluster{KeyPrefix: "analytics-"}
-			redisPurger := RedisPurger{Store: &store}
-			go redisPurger.PurgeLoop(ctx)
-		})
-
 		if config.Global().AnalyticsConfig.Type == "rpc" {
 			mainLog.Debug("Using RPC cache purge")
 

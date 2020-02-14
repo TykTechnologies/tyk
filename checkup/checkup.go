@@ -113,5 +113,11 @@ func defaultAnalytics(c config.Config) {
 		c.AnalyticsConfig.RecordsBufferSize = minRecordsBufferSize
 	}
 
+	if c.AnalyticsConfig.StorageExpirationTime == 0 {
+		log.WithField("storageExpirationTime", c.AnalyticsConfig.StorageExpirationTime).
+			Warning("AnalyticsConfig.StorageExpirationTime is 0, defaulting to 60s")
+		c.AnalyticsConfig.StorageExpirationTime = 60
+	}
+
 	config.SetGlobal(c)
 }
