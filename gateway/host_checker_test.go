@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"text/template"
 	"time"
@@ -484,5 +485,47 @@ func TestProxyWhenHostIsDown(t *testing.T) {
 			}
 			get()
 		}
+	}
+}
+
+func TestChecker_triggerSampleLimit(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	l.Close()
+	data := HostData{
+		CheckURL: "http://" + l.Addr().String(),
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	hs := &HostUptimeChecker{}
+	setTestMode(false)
+	limit := 4
+	var failed, ping atomic.Value
+	failed.Store(0)
+	ping.Store(0)
+	hs.Init(1, limit, 0, map[string]HostData{
+		l.Addr().String(): data,
+	},
+		HostCheckCallBacks{
+			Ping: func(_ context.Context, _ HostHealthReport) {
+				ping.Store(ping.Load().(int) + 1)
+				if ping.Load().(int) >= limit {
+					cancel()
+				}
+			},
+			Fail: func(_ context.Context, _ HostHealthReport) {
+				failed.Store(failed.Load().(int) + 1)
+			},
+		},
+	)
+	go hs.Start(ctx)
+	<-ctx.Done()
+	setTestMode(true)
+	if ping.Load().(int) != limit {
+		t.Errorf("expected %d got %d", limit, ping.Load())
+	}
+	if failed.Load().(int) != 1 {
+		t.Errorf("expected host down to be fired once got %d instead", failed.Load())
 	}
 }
