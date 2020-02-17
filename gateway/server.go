@@ -73,7 +73,7 @@ var (
 	apisMu          sync.RWMutex
 	apiSpecs        []*APISpec
 	apisByID        = map[string]*APISpec{}
-	apisHandlesByID = map[string]http.Handler{}
+	apisHandlesByID = new(sync.Map)
 
 	keyGen DefaultKeyGenerator
 

@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
@@ -517,15 +518,15 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		var handler http.Handler
 		if r.URL.Hostname() == "self" {
-			if h, found := apisHandlesByID[d.SH.Spec.APIID]; found {
-				handler = h
+			if h, found := apisHandlesByID.Load(d.SH.Spec.APIID); found {
+				handler = h.(http.Handler)
 			}
 		} else {
 			ctxSetVersionInfo(r, nil)
 
 			if targetAPI := fuzzyFindAPI(r.URL.Hostname()); targetAPI != nil {
-				if h, found := apisHandlesByID[targetAPI.APIID]; found {
-					handler = h
+				if h, found := apisHandlesByID.Load(targetAPI.APIID); found {
+					handler = h.(http.Handler)
 				}
 			} else {
 				handler := ErrorHandler{*d.SH.Base()}
@@ -551,12 +552,12 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if d.SH.Spec.target.Scheme == "tyk" {
 		if targetAPI := fuzzyFindAPI(d.SH.Spec.target.Host); targetAPI != nil {
-			if h, found := apisHandlesByID[d.SH.Spec.APIID]; found {
+			if h, found := apisHandlesByID.Load(d.SH.Spec.APIID); found {
 				if d.SH.Spec.Proxy.StripListenPath {
 					r.URL.Path = d.SH.Spec.StripListenPath(r, r.URL.Path)
 					r.URL.RawPath = d.SH.Spec.StripListenPath(r, r.URL.RawPath)
 				}
-				h.ServeHTTP(w, r)
+				h.(http.Handler).ServeHTTP(w, r)
 				return
 			}
 		}
@@ -679,7 +680,7 @@ func loadApps(specs []*APISpec) {
 	mainLog.Info("Loading API configurations.")
 
 	tmpSpecRegister := make(map[string]*APISpec)
-	tmpSpecHandles := make(map[string]http.Handler)
+	tmpSpecHandles := new(sync.Map)
 
 	// sort by listen path from longer to shorter, so that /foo
 	// doesn't break /foo-bar
@@ -727,7 +728,7 @@ func loadApps(specs []*APISpec) {
 					mainLog.Infof("Intialized tracer  api_name=%q", spec.Name)
 				}
 			}
-			tmpSpecHandles[spec.APIID] = loadHTTPService(spec, apisByListen, &gs, muxer)
+			tmpSpecHandles.Store(spec.APIID, loadHTTPService(spec, apisByListen, &gs, muxer))
 		case "tcp", "tls":
 			loadTCPService(spec, &gs, muxer)
 		}
