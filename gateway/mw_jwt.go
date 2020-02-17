@@ -576,13 +576,21 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 			return nil, err
 		}
 
-		if k.Spec.JWTSigningMethod == RSASign {
+		switch k.Spec.JWTSigningMethod {
+		case RSASign:
 			asRSA, err := jwt.ParseRSAPublicKeyFromPEM(val)
 			if err != nil {
 				logger.WithError(err).Error("Failed to decode JWT to RSA type")
 				return nil, err
 			}
 			return asRSA, nil
+		case ECDSASign:
+			asEcdsa, err := jwt.ParseECPublicKeyFromPEM(val)
+			if err != nil {
+				logger.WithError(err).Error("Failed to decode JWT to ECDSA type")
+				return nil, err
+			}
+			return asEcdsa, nil
 		}
 
 		return val, nil
