@@ -102,10 +102,8 @@ func gatherHealthChecks() {
 
 	var wg sync.WaitGroup
 
+	wg.Add(1)
 	go func() {
-
-		wg.Add(1)
-
 		defer wg.Done()
 
 		var checkItem = HealthCheckItem{
@@ -125,7 +123,6 @@ func gatherHealthChecks() {
 	}()
 
 	if config.Global().UseDBAppConfigs {
-
 		wg.Add(1)
 
 		go func() {
