@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -134,7 +135,12 @@ func gatherHealthChecks() {
 				Time:          time.Now().Format(time.RFC3339),
 			}
 
-			if err := DashService.Ping(); err != nil {
+			if DashService == nil {
+				err := errors.New("Dashboard service not initialized")
+				mainLog.WithField("liveness-check", true).Error(err)
+				checkItem.Output = err.Error()
+				checkItem.Status = Fail
+			} else if err := DashService.Ping(); err != nil {
 				mainLog.WithField("liveness-check", true).Error(err)
 				checkItem.Output = err.Error()
 				checkItem.Status = Fail
