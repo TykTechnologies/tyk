@@ -70,9 +70,10 @@ var (
 	CertificateManager   *certs.CertificateManager
 	NewRelicApplication  newrelic.Application
 
-	apisMu   sync.RWMutex
-	apiSpecs []*APISpec
-	apisByID = map[string]*APISpec{}
+	apisMu          sync.RWMutex
+	apiSpecs        []*APISpec
+	apisByID        = map[string]*APISpec{}
+	apisHandlesByID = new(sync.Map)
 
 	keyGen DefaultKeyGenerator
 

@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
@@ -517,15 +518,15 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		var handler http.Handler
 		if r.URL.Hostname() == "self" {
-			if d.SH.Spec.middlewareChain != nil {
-				handler = d.SH.Spec.middlewareChain.ThisHandler
+			if h, found := apisHandlesByID.Load(d.SH.Spec.APIID); found {
+				handler = h.(http.Handler)
 			}
 		} else {
 			ctxSetVersionInfo(r, nil)
 
 			if targetAPI := fuzzyFindAPI(r.URL.Hostname()); targetAPI != nil {
-				if targetAPI.middlewareChain != nil {
-					handler = targetAPI.middlewareChain.ThisHandler
+				if h, found := apisHandlesByID.Load(targetAPI.APIID); found {
+					handler = h.(http.Handler)
 				}
 			} else {
 				handler := ErrorHandler{*d.SH.Base()}
@@ -551,12 +552,12 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if d.SH.Spec.target.Scheme == "tyk" {
 		if targetAPI := fuzzyFindAPI(d.SH.Spec.target.Host); targetAPI != nil {
-			if targetAPI.middlewareChain != nil {
+			if h, found := apisHandlesByID.Load(d.SH.Spec.APIID); found {
 				if d.SH.Spec.Proxy.StripListenPath {
 					r.URL.Path = d.SH.Spec.StripListenPath(r, r.URL.Path)
 					r.URL.RawPath = d.SH.Spec.StripListenPath(r, r.URL.RawPath)
 				}
-				targetAPI.middlewareChain.ThisHandler.ServeHTTP(w, r)
+				h.(http.Handler).ServeHTTP(w, r)
 				return
 			}
 		}
@@ -604,7 +605,7 @@ func fuzzyFindAPI(search string) *APISpec {
 	return nil
 }
 
-func loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStores, muxer *proxyMux) {
+func loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStores, muxer *proxyMux) http.Handler {
 	port := config.Global().ListenPort
 	if spec.ListenPort != 0 {
 		port = spec.ListenPort
@@ -626,12 +627,9 @@ func loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStor
 	}
 
 	chainObj := processSpec(spec, apisByListen, gs, router, logrus.NewEntry(log))
-	apisMu.Lock()
-	spec.middlewareChain = chainObj
-	apisMu.Unlock()
 
 	if chainObj.Skip {
-		return
+		return chainObj.ThisHandler
 	}
 
 	if !chainObj.Open {
@@ -639,6 +637,8 @@ func loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStor
 	}
 
 	router.Handle(chainObj.ListenOn, chainObj.ThisHandler)
+
+	return chainObj.ThisHandler
 }
 
 func loadTCPService(spec *APISpec, gs *generalStores, muxer *proxyMux) {
@@ -680,6 +680,7 @@ func loadApps(specs []*APISpec) {
 	mainLog.Info("Loading API configurations.")
 
 	tmpSpecRegister := make(map[string]*APISpec)
+	tmpSpecHandles := new(sync.Map)
 
 	// sort by listen path from longer to shorter, so that /foo
 	// doesn't break /foo-bar
@@ -727,7 +728,7 @@ func loadApps(specs []*APISpec) {
 					mainLog.Infof("Intialized tracer  api_name=%q", spec.Name)
 				}
 			}
-			loadHTTPService(spec, apisByListen, &gs, muxer)
+			tmpSpecHandles.Store(spec.APIID, loadHTTPService(spec, apisByListen, &gs, muxer))
 		case "tcp", "tls":
 			loadTCPService(spec, &gs, muxer)
 		}
@@ -744,6 +745,8 @@ func loadApps(specs []*APISpec) {
 	}
 
 	apisByID = tmpSpecRegister
+	apisHandlesByID = tmpSpecHandles
+
 	apisMu.Unlock()
 
 	mainLog.Debug("Checker host list")
