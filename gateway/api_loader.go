@@ -552,12 +552,12 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if d.SH.Spec.target.Scheme == "tyk" {
 		if targetAPI := fuzzyFindAPI(d.SH.Spec.target.Host); targetAPI != nil {
-			if targetAPI.middlewareChain != nil {
+			if h, found := apisHandlesByID.Load(d.SH.Spec.APIID); found {
 				if d.SH.Spec.Proxy.StripListenPath {
 					r.URL.Path = d.SH.Spec.StripListenPath(r, r.URL.Path)
 					r.URL.RawPath = d.SH.Spec.StripListenPath(r, r.URL.RawPath)
 				}
-				targetAPI.middlewareChain.ThisHandler.ServeHTTP(w, r)
+				h.(http.Handler).ServeHTTP(w, r)
 				return
 			}
 		}
