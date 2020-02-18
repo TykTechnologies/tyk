@@ -4,7 +4,7 @@ set -ex
 
 : ${ORGDIR:="/go/src/github.com/TykTechnologies"}
 : ${SOURCEBINPATH:="${ORGDIR}/tyk"}
-: ${SIGNKEY:="729EA673"}
+: ${SIGNKEY:="1181A14D7CA3EE36DA45FEEC0C798DFA8CE71CF5"}
 : ${BUILDPKGS:="1"}
 : ${PKGNAME:="tyk-gateway"}
 BUILDTOOLSDIR=$SOURCEBINPATH/build_tools
@@ -15,7 +15,7 @@ echo "Set version number"
 
 if [ $BUILDPKGS == "1" ]; then
     echo "Importing signing key"
-    gpg --list-keys | grep -w $SIGNKEY && echo "Key exists" || gpg --batch --import $BUILDTOOLSDIR/build_key.key
+    gpg --list-keys | grep -w $SIGNKEY && echo "Key exists" || gpg --batch --import $BUILDTOOLSDIR/tyk.io.rpm.signing.key
 fi
 
 echo "Prepare the release directories"
