@@ -390,7 +390,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		if returnObject.Session == nil || token == "" {
 			authHeaderValue, _ := m.getAuthToken(m.getAuthType(), r)
 			AuthFailed(m, r, authHeaderValue)
-			return errors.New(http.StatusText(http.StatusUnauthorized)), http.StatusUnauthorized
+			return errors.New(http.StatusText(http.StatusForbidden)), http.StatusForbidden
 		}
 
 		returnedSession := TykSessionState(returnObject.Session)
@@ -412,7 +412,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
-	return nil, 200
+	return nil, http.StatusOK
 }
 
 type CustomMiddlewareResponseHook struct {
