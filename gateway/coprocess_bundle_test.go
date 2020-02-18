@@ -82,6 +82,7 @@ func TestBundleLoader(t *testing.T) {
 
 func TestBundleFetcher(t *testing.T) {
 	bundleID := "testbundle"
+	defer ResetTestConfig()
 
 	t.Run("Simple bundle base URL", func(t *testing.T) {
 		globalConf := config.Global()
