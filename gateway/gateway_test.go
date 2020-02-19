@@ -2064,3 +2064,29 @@ func TestStripRegex(t *testing.T) {
 		}
 	}
 }
+
+func TestCache_singleErrorResponse(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer srv.Close()
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = true
+		spec.Proxy.ListenPath = "/"
+		spec.Proxy.TargetURL = srv.URL
+		spec.CacheOptions.CacheTimeout = 1
+		spec.CacheOptions.EnableCache = true
+		spec.CacheOptions.CacheAllSafeRequests = true
+	})
+	ts.Run(t,
+		test.TestCase{Method: http.MethodGet, Path: "/", Code: http.StatusOK},
+	)
+	time.Sleep(time.Second)
+	srv.Close()
+	wantBody := `{
+    "error": "There was a problem proxying the request"
+}`
+	ts.Run(t,
+		test.TestCase{Method: http.MethodGet, Path: "/", Code: http.StatusInternalServerError, BodyMatch: wantBody},
+	)
+}

@@ -343,7 +343,7 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 // ServeHTTPWithCache will store the request details in the analytics store if necessary and proxy the request to it's
 // final destination, this is invoked by the ProxyHandler or right at the start of a request chain if the URL
 // Spec states the path is Ignored Itwill also return a response object for the cache
-func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Request) *http.Response {
+func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Request) ProxyResponse {
 
 	versionDef := s.Spec.VersionDefinition
 	if !s.Spec.VersionData.NotVersioned && versionDef.Location == "url" && versionDef.StripPath {
@@ -377,5 +377,5 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 		s.RecordHit(r, latency, inRes.Response.StatusCode, inRes.Response)
 	}
 
-	return inRes.Response
+	return inRes
 }

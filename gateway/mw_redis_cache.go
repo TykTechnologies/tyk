@@ -239,7 +239,8 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 				r.Method = newMethod
 				ctxSetTransformRequestMethod(r, "")
 			}
-			resVal = m.sh.ServeHTTPWithCache(w, r)
+			sr := m.sh.ServeHTTPWithCache(w, r)
+			resVal = sr.Response
 		}
 
 		cacheThisRequest := true
@@ -247,7 +248,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 		if resVal == nil {
 			log.Warning("Upstream request must have failed, response is empty")
-			return nil, http.StatusOK
+			return nil, mwStatusRespond
 		}
 
 		cacheOnlyResponseCodes := m.Spec.CacheOptions.CacheOnlyResponseCodes
