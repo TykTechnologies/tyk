@@ -822,7 +822,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		if !breakerConf.CB.Ready() {
 			p.logger.Debug("ON REQUEST: Circuit Breaker is in OPEN state")
 			p.ErrorHandler.HandleError(rw, logreq, "Service temporarily unavailable.", 503, true)
-			return ProxyResponse{ServedError: true}
+			return ProxyResponse{}
 		}
 		p.logger.Debug("ON REQUEST: Circuit Breaker is in CLOSED or HALF-OPEN state")
 		begin := time.Now()
@@ -866,20 +866,20 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 					ServiceCache.Delete(p.TykAPISpec.APIID)
 				}
 			}
-			return ProxyResponse{UpstreamLatency: upstreamLatency, ServedError: true}
+			return ProxyResponse{UpstreamLatency: upstreamLatency}
 		}
 
 		if strings.Contains(err.Error(), "context canceled") {
 			p.ErrorHandler.HandleError(rw, logreq, "Client closed request", 499, true)
-			return ProxyResponse{UpstreamLatency: upstreamLatency, ServedError: true}
+			return ProxyResponse{UpstreamLatency: upstreamLatency}
 		}
 
 		if strings.Contains(err.Error(), "no such host") {
 			p.ErrorHandler.HandleError(rw, logreq, "Upstream host lookup failed", http.StatusInternalServerError, true)
-			return ProxyResponse{UpstreamLatency: upstreamLatency, ServedError: true}
+			return ProxyResponse{UpstreamLatency: upstreamLatency}
 		}
 		p.ErrorHandler.HandleError(rw, logreq, "There was a problem proxying the request", http.StatusInternalServerError, true)
-		return ProxyResponse{UpstreamLatency: upstreamLatency, ServedError: true}
+		return ProxyResponse{UpstreamLatency: upstreamLatency}
 
 	}
 
@@ -888,7 +888,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	if upgrade {
 		if err := p.handleUpgradeResponse(rw, outreq, res); err != nil {
 			p.ErrorHandler.HandleError(rw, logreq, err.Error(), http.StatusInternalServerError, true)
-			return ProxyResponse{UpstreamLatency: upstreamLatency, ServedError: true}
+			return ProxyResponse{UpstreamLatency: upstreamLatency}
 		}
 	}
 

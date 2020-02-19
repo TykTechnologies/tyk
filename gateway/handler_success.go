@@ -41,8 +41,6 @@ type ProxyResponse struct {
 	// UpstreamLatency the time it takes to do roundtrip to upstream. Total time
 	// taken for the gateway to receive response from upstream host.
 	UpstreamLatency time.Duration
-	// This is true if we called ErrorHandler
-	ServedError bool
 }
 
 type ReturningHttpHandler interface {

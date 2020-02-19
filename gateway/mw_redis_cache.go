@@ -223,7 +223,6 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		// Pass through to proxy AND CACHE RESULT
 
 		var resVal *http.Response
-		var servedError bool
 		if isVirtual {
 			log.Debug("This is a virtual function")
 			vp := VirtualEndpoint{BaseMiddleware: m.BaseMiddleware}
@@ -242,7 +241,6 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 			}
 			sr := m.sh.ServeHTTPWithCache(w, r)
 			resVal = sr.Response
-			servedError = sr.ServedError
 		}
 
 		cacheThisRequest := true
@@ -250,10 +248,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 		if resVal == nil {
 			log.Warning("Upstream request must have failed, response is empty")
-			if servedError {
-				return nil, mwStatusRespond
-			}
-			return nil, http.StatusOK
+			return nil, mwStatusRespond
 		}
 
 		cacheOnlyResponseCodes := m.Spec.CacheOptions.CacheOnlyResponseCodes
