@@ -34,6 +34,7 @@ func ToCamelCase(str string) string {
 		str = str[size:]
 
 		if r0 != '_' {
+			r0 = unicode.ToUpper(r0)
 			break
 		}
 
@@ -41,10 +42,13 @@ func ToCamelCase(str string) string {
 	}
 
 	if len(str) == 0 {
+		// A special case for a string contains only 1 rune.
+		if size != 0 {
+			buf.WriteRune(r0)
+		}
+
 		return buf.String()
 	}
-
-	r0 = unicode.ToUpper(r0)
 
 	for len(str) > 0 {
 		r1 = r0

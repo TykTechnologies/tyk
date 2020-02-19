@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"fmt"
+	"github.com/TykTechnologies/tyk/mixeradapter"
 	"html/template"
 	"io/ioutil"
 	stdlog "log"
@@ -1115,6 +1116,8 @@ func getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 }
 
 func Start() {
+	mixeradapter.Start()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	cli.Init(VERSION, confPaths)

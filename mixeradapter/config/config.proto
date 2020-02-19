@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+// config for tyk
+package adapter.tyk.config;
+
+import "gogoproto/gogo.proto";
+
+option go_package="config";
+
+// config for tyk
+message Params {
+    // Path of the file to save the information about runtime requests.
+    string file_path = 1;
+}
