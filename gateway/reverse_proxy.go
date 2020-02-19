@@ -443,7 +443,6 @@ var hopHeaders = []string{
 func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) ProxyResponse {
 	startTime := time.Now()
 	p.logger.WithField("ts", startTime.UnixNano()).Debug("Started")
-
 	resp := p.WrappedServeHTTP(rw, req, recordDetail(req, p.TykAPISpec))
 
 	finishTime := time.Since(startTime)
@@ -461,7 +460,6 @@ func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Reque
 
 	resp := p.WrappedServeHTTP(rw, req, true)
 	nopCloseResponseBody(resp.Response)
-
 	finishTime := time.Since(startTime)
 	p.logger.WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
 
@@ -675,7 +673,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		ext.SpanKindRPCClient.Set(span)
 		req = req.WithContext(ctx)
 	}
-
 	var roundTripper http.RoundTripper
 
 	p.TykAPISpec.Lock()
@@ -860,7 +857,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			"org_id":      p.TykAPISpec.OrgID,
 			"api_id":      p.TykAPISpec.APIID,
 		}).Error("http: proxy error: ", err)
-
 		if strings.Contains(err.Error(), "timeout awaiting response headers") {
 			p.ErrorHandler.HandleError(rw, logreq, "Upstream service reached hard timeout.", http.StatusGatewayTimeout, true)
 
@@ -882,7 +878,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			p.ErrorHandler.HandleError(rw, logreq, "Upstream host lookup failed", http.StatusInternalServerError, true)
 			return ProxyResponse{UpstreamLatency: upstreamLatency}
 		}
-
 		p.ErrorHandler.HandleError(rw, logreq, "There was a problem proxying the request", http.StatusInternalServerError, true)
 		return ProxyResponse{UpstreamLatency: upstreamLatency}
 
