@@ -3,7 +3,6 @@ package gateway
 import (
 	"context"
 	"fmt"
-	"github.com/TykTechnologies/tyk/mixeradapter"
 	"html/template"
 	"io/ioutil"
 	stdlog "log"
@@ -19,6 +18,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/TykTechnologies/tyk/mixeradapter"
 
 	"github.com/TykTechnologies/again"
 	gas "github.com/TykTechnologies/goautosocket"
@@ -1116,8 +1117,6 @@ func getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 }
 
 func Start() {
-	mixeradapter.Start()
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	cli.Init(VERSION, confPaths)
@@ -1131,6 +1130,10 @@ func Start() {
 
 	if err := initialiseSystem(ctx); err != nil {
 		mainLog.Fatalf("Error initialising system: %v", err)
+	}
+
+	if config.Global().EnableIstioMixerAdapter {
+		mixeradapter.Start()
 	}
 
 	if config.Global().ControlAPIPort == 0 {

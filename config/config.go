@@ -461,7 +461,8 @@ type Config struct {
 	} `json:"kv"`
 
 	// Secrets are key-value pairs that can be accessed in the dashboard via "secrets://"
-	Secrets map[string]string `json:"secrets"`
+	Secrets                 map[string]string `json:"secrets"`
+	EnableIstioMixerAdapter bool              `json:"enable_istio_mixer_adapter"`
 }
 
 // VaultConfig is used to configure the creation of a client
