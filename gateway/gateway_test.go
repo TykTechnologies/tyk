@@ -2087,7 +2087,6 @@ func TestCache_singleErrorResponse(t *testing.T) {
     "error": "There was a problem proxying the request"
 }`
 	ts.Run(t,
-		test.TestCase{Method: http.MethodGet, Path: "/", Code: http.StatusOK, BodyMatch: wantBody},
+		test.TestCase{Method: http.MethodGet, Path: "/", Code: http.StatusInternalServerError, BodyMatch: wantBody},
 	)
-
 }
