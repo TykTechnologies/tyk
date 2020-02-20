@@ -1,6 +1,8 @@
 package gateway
 
 import (
+	"path"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/goverify"
@@ -10,6 +12,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"crypto/md5"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -124,12 +127,23 @@ type BundleGetter interface {
 
 // HTTPBundleGetter is a simple HTTP BundleGetter.
 type HTTPBundleGetter struct {
-	URL string
+	URL                string
+	InsecureSkipVerify bool
+}
+
+// MockBundleGetter is a BundleGetter for testing.
+type MockBundleGetter struct {
+	URL                string
+	InsecureSkipVerify bool
 }
 
 // Get performs an HTTP GET request.
 func (g *HTTPBundleGetter) Get() ([]byte, error) {
-	resp, err := http.Get(g.URL)
+	tr := &(*http.DefaultTransport.(*http.Transport))
+	tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: g.InsecureSkipVerify}
+	client := &http.Client{Transport: tr}
+
+	resp, err := client.Get(g.URL)
 	if err != nil {
 		return nil, err
 	}
@@ -141,6 +155,14 @@ func (g *HTTPBundleGetter) Get() ([]byte, error) {
 
 	defer resp.Body.Close()
 	return ioutil.ReadAll(resp.Body)
+}
+
+// Get mocks an HTTP(S) GET request.
+func (g *MockBundleGetter) Get() ([]byte, error) {
+	if g.InsecureSkipVerify {
+		return []byte("bundle-insecure"), nil
+	}
+	return []byte("bundle"), nil
 }
 
 // BundleSaver is an interface used by bundle saver structures.
@@ -198,22 +220,32 @@ func fetchBundle(spec *APISpec) (bundle Bundle, err error) {
 		return bundle, err
 	}
 
-	bundleURL := config.Global().BundleBaseURL + spec.CustomMiddlewareBundle
-
-	var getter BundleGetter
-
-	u, err := url.Parse(bundleURL)
+	u, err := url.Parse(config.Global().BundleBaseURL)
 	if err != nil {
 		return bundle, err
 	}
+
+	u.Path = path.Join(u.Path, spec.CustomMiddlewareBundle)
+
+	bundleURL := u.String()
+
+	var getter BundleGetter
+
 	switch u.Scheme {
 	case "http":
 		getter = &HTTPBundleGetter{
-			URL: bundleURL,
+			URL:                bundleURL,
+			InsecureSkipVerify: false,
 		}
 	case "https":
 		getter = &HTTPBundleGetter{
-			URL: bundleURL,
+			URL:                bundleURL,
+			InsecureSkipVerify: config.Global().BundleInsecureSkipVerify,
+		}
+	case "mock":
+		getter = &MockBundleGetter{
+			URL:                bundleURL,
+			InsecureSkipVerify: config.Global().BundleInsecureSkipVerify,
 		}
 	default:
 		err = errors.New("Unknown URL scheme")
