@@ -34,6 +34,9 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 		return nil, http.StatusOK
 	}
 
+	// TODO: Implement GraphQL access check here
+	// Once request is parsed, you can save it to the request context, and re-use it later: see `ctxGetSession` and `ctxSetSession` or similar for reference implementation.
+
 	for _, accessSpec := range sessionVersionData.AllowedURLs {
 		logger.Debug("Checking: ", r.URL.Path, " Against:", accessSpec.URL)
 		asRegex, err := regexp.Compile(accessSpec.URL)

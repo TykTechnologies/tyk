@@ -75,6 +75,10 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	session := ctxGetSession(r)
 	token := ctxGetAuthToken(r)
 
+	// TODO: Implement GraphQL rate/quota here
+	// `ForwardMessage` should accept "weight" attribute, and rate/quota functions, instead of incrementing by 1, should increment by weight
+	// Things like maximum complexity check can be implemented here as well
+
 	storeRef := GlobalSessionManager.Store()
 	reason := sessionLimiter.ForwardMessage(
 		r,

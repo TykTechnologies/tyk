@@ -400,6 +400,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		mwAppendEnabled(&chainArray, &RateLimitAndQuotaCheck{baseMid})
 	}
 
+	mwAppendEnabled(&chainArray, &GraphQLMiddleware{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &ValidateJSON{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &TransformMiddleware{baseMid})
