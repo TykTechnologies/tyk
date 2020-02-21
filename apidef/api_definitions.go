@@ -231,6 +231,16 @@ type ExtendedPathsSet struct {
 	Internal                []InternalMeta        `bson:"internal" json:"internal,omitempty"`
 }
 
+type GraphQLDataSourceConfig struct {
+	DataSourceType   string      `bson:"data_source_type" json:"data_source_type"`
+	DataSourceConfig interface{} `bson:"data_source_config" json:"data_source_config"`
+}
+
+type GraphQLConfig struct {
+	Schema             string                    `bson:"schema" json:"schema"`
+	GraphQLDataSources []GraphQLDataSourceConfig `bson:"graphql_data_sources" json:"graphql_data_sources"`
+}
+
 type VersionInfo struct {
 	Name      string    `bson:"name" json:"name"`
 	Expires   string    `bson:"expires" json:"expires"`
@@ -247,6 +257,7 @@ type VersionInfo struct {
 	IgnoreEndpointCase  bool              `bson:"ignore_endpoint_case" json:"ignore_endpoint_case"`
 	GlobalSizeLimit     int64             `bson:"global_size_limit" json:"global_size_limit"`
 	OverrideTarget      string            `bson:"override_target" json:"override_target"`
+	GraphQL             GraphQLConfig     `bson:"graphql" json:"graphql"`
 }
 
 type AuthProviderMeta struct {

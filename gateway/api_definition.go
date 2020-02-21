@@ -185,6 +185,7 @@ type APISpec struct {
 	OrgHasNoSession          bool
 
 	middlewareChain *ChainObject
+	graphQLSchema   interface{}
 
 	network NetworkStats
 }
