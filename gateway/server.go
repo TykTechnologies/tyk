@@ -491,6 +491,8 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 	apiAuthorizePath := spec.Proxy.ListenPath + "tyk/oauth/authorize-client{_:/?}"
 	clientAuthPath := spec.Proxy.ListenPath + "oauth/authorize{_:/?}"
 	clientAccessPath := spec.Proxy.ListenPath + "oauth/token{_:/?}"
+	revokeToken := spec.Proxy.ListenPath + "oauth/revoke"
+	revokeAllTokens := spec.Proxy.ListenPath + "oauth/revoke_all"
 
 	serverConfig := osin.NewServerConfig()
 
@@ -517,7 +519,8 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 	muxer.Handle(apiAuthorizePath, checkIsAPIOwner(allowMethods(oauthHandlers.HandleGenerateAuthCodeData, "POST")))
 	muxer.HandleFunc(clientAuthPath, allowMethods(oauthHandlers.HandleAuthorizePassthrough, "GET", "POST"))
 	muxer.HandleFunc(clientAccessPath, addSecureAndCacheHeaders(allowMethods(oauthHandlers.HandleAccessRequest, "GET", "POST")))
-
+	muxer.HandleFunc(revokeToken,oauthHandlers.HandleRevokeToken)
+	muxer.HandleFunc(revokeAllTokens,oauthHandlers.HandleRevokeAllTokens)
 	return &oauthManager
 }
 

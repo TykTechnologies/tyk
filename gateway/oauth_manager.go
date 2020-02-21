@@ -223,6 +223,66 @@ func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Reque
 	w.Write(msg)
 }
 
+
+const(
+	accessToken = "access_token"
+	refreshToken = "refresh_token"
+)
+
+//in compliance with https://tools.ietf.org/html/rfc7009#section-2.1
+func (o *OAuthHandlers) HandleRevokeToken(w http.ResponseWriter, r *http.Request) {
+
+	err := r.ParseForm()
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	token:= r.PostFormValue("token")
+	tokenType := r.PostFormValue("token_type_hint")
+
+	switch tokenType {
+		case accessToken:
+			o.Manager.OsinServer.Storage.RemoveAccess(token)
+		case refreshToken:
+			o.Manager.OsinServer.Storage.RemoveRefresh(token)
+		default:
+			o.Manager.OsinServer.Storage.RemoveAccess(token)
+			o.Manager.OsinServer.Storage.RemoveRefresh(token)
+	}
+	w.WriteHeader(200)
+}
+
+func (o *OAuthHandlers) HandleRevokeAllTokens(w http.ResponseWriter, r *http.Request) {
+	err := r.ParseForm()
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	clientId := r.PostFormValue("client_id")
+	secret := r.PostFormValue("secret")
+
+	if clientId == "" || secret == ""{
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	//its only access?
+	clientTokens, err := o.Manager.OsinServer.Storage.GetClientTokens(clientId)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	for _, token := range clientTokens {
+		 o.Manager.OsinServer.Storage.RemoveAccess(token.Token)
+		 o.Manager.OsinServer.Storage.RemoveRefresh(token.Token)
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 // OAuthManager handles and wraps osin OAuth2 functions to handle authorise and access requests
 type OAuthManager struct {
 	API        *APISpec
