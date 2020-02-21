@@ -1,0 +1,42 @@
+# handler for adapter tyk
+apiVersion: "config.istio.io/v1alpha2"
+kind: handler
+metadata:
+  name: h1
+  namespace: istio-system
+spec:
+  adapter: tyk
+  connection:
+    address: "host.docker.internal:4242" #replaces at runtime by the test
+  params:
+    file_path: "out.txt"
+---
+
+# instance for template metric
+apiVersion: "config.istio.io/v1alpha2"
+kind: instance
+metadata:
+  name: i1metric
+  namespace: istio-system
+spec:
+  template: metric
+  params:
+    value: request.size | 0
+    dimensions:
+      response_code: response.code
+      response_duration: response.duration
+      client_ip: source.ip | ip("0.0.0.0")
+---
+
+# rule to dispatch to handler h1
+apiVersion: "config.istio.io/v1alpha2"
+kind: rule
+metadata:
+  name: r1
+  namespace: istio-system
+spec:
+  actions:
+    - handler: h1.istio-system
+      instances:
+        - i1metric
+---

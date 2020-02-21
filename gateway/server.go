@@ -19,6 +19,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TykTechnologies/tyk/mixeradapter"
+
 	"github.com/TykTechnologies/again"
 	gas "github.com/TykTechnologies/goautosocket"
 	"github.com/TykTechnologies/gorpc"
@@ -1128,6 +1130,10 @@ func Start() {
 
 	if err := initialiseSystem(ctx); err != nil {
 		mainLog.Fatalf("Error initialising system: %v", err)
+	}
+
+	if config.Global().EnableIstioMixerAdapter {
+		mixeradapter.Start()
 	}
 
 	if config.Global().ControlAPIPort == 0 {
