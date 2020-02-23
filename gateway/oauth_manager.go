@@ -230,6 +230,7 @@ const(
 )
 
 //in compliance with https://tools.ietf.org/html/rfc7009#section-2.1
+//ToDo: set an authentication mechanism
 func (o *OAuthHandlers) HandleRevokeToken(w http.ResponseWriter, r *http.Request) {
 
 	err := r.ParseForm()
@@ -239,18 +240,22 @@ func (o *OAuthHandlers) HandleRevokeToken(w http.ResponseWriter, r *http.Request
 	}
 
 	token:= r.PostFormValue("token")
-	tokenType := r.PostFormValue("token_type_hint")
+	tokenTypeHint := r.PostFormValue("token_type_hint")
 
-	switch tokenType {
-		case accessToken:
-			o.Manager.OsinServer.Storage.RemoveAccess(token)
-		case refreshToken:
-			o.Manager.OsinServer.Storage.RemoveRefresh(token)
-		default:
-			o.Manager.OsinServer.Storage.RemoveAccess(token)
-			o.Manager.OsinServer.Storage.RemoveRefresh(token)
-	}
+	RevokeToken(o.Manager.OsinServer.Storage, token, tokenTypeHint)
 	w.WriteHeader(200)
+}
+
+func RevokeToken(storage ExtendedOsinStorageInterface, token, tokenTypeHint string){
+	switch tokenTypeHint {
+	case accessToken:
+		storage.RemoveAccess(token)
+	case refreshToken:
+		storage.RemoveRefresh(token)
+	default:
+		storage.RemoveAccess(token)
+		storage.RemoveRefresh(token)
+	}
 }
 
 func (o *OAuthHandlers) HandleRevokeAllTokens(w http.ResponseWriter, r *http.Request) {
@@ -268,19 +273,32 @@ func (o *OAuthHandlers) HandleRevokeAllTokens(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	//its only access?
-	clientTokens, err := o.Manager.OsinServer.Storage.GetClientTokens(clientId)
+	status := RevokeAllTokens(o.Manager.OsinServer.Storage, clientId, secret)
+	w.WriteHeader(status)
+}
+
+func RevokeAllTokens(storage ExtendedOsinStorageInterface, clientId, clientSecret string) int {
+	client, err := storage.GetClient(clientId)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
+		return http.StatusNotFound
+	}
+
+	if client.GetSecret() != clientSecret{
+		return http.StatusForbidden
+	}
+
+	//its only access?
+	clientTokens, err := storage.GetClientTokens(clientId)
+	if err != nil {
+		return http.StatusBadRequest
 	}
 
 	for _, token := range clientTokens {
-		 o.Manager.OsinServer.Storage.RemoveAccess(token.Token)
-		 o.Manager.OsinServer.Storage.RemoveRefresh(token.Token)
+		storage.RemoveAccess(token.Token)
+		storage.RemoveRefresh(token.Token)
 	}
 
-	w.WriteHeader(http.StatusOK)
+	return http.StatusOK
 }
 
 // OAuthManager handles and wraps osin OAuth2 functions to handle authorise and access requests

@@ -445,6 +445,9 @@ func loadControlAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}/rotate", rotateOauthClientHandler).Methods("PUT")
 		r.HandleFunc("/oauth/refresh/{keyName}", invalidateOauthRefresh).Methods("DELETE")
 		r.HandleFunc("/cache/{apiID}", invalidateCacheHandler).Methods("DELETE")
+		r.HandleFunc("/oauth/revoke",  RevokeTokenHandler).Methods("POST")
+		r.HandleFunc("/oauth/revoke_all", RevokeAllTokensHandler).Methods("POST")
+
 	} else {
 		mainLog.Info("Node is slaved, REST API minimised")
 	}
