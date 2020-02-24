@@ -28,15 +28,19 @@ import (
 	"github.com/go-redis/redis"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-	uuid "github.com/satori/go.uuid"
+
 	"golang.org/x/net/context"
 
 	"github.com/TykTechnologies/tyk/apidef"
+
 	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
+	_ "github.com/TykTechnologies/tyk/templates" // Don't delete
 	"github.com/TykTechnologies/tyk/test"
+	_ "github.com/TykTechnologies/tyk/testdata" // Don't delete
 	"github.com/TykTechnologies/tyk/user"
+	uuid "github.com/satori/go.uuid"
 )
 
 var (
