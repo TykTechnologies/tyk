@@ -42,7 +42,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/lonelycode/osin"
-	"github.com/natefinch/atomic"
 	newrelic "github.com/newrelic/go-agent"
 	"github.com/rs/cors"
 	uuid "github.com/satori/go.uuid"
@@ -970,7 +969,7 @@ func writePIDFile() error {
 		return err
 	}
 	pid := strconv.Itoa(os.Getpid())
-	return atomic.WriteFile(file, strings.NewReader(pid))
+	return ioutil.WriteFile(file, []byte(pid), 0600)
 }
 
 func readPIDFromFile() (int, error) {

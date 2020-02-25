@@ -56,7 +56,6 @@ require (
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
 	github.com/miekg/dns v1.0.14
 	github.com/mitchellh/mapstructure v1.1.2
-	github.com/natefinch/atomic v0.0.0-20150920032501-a62ce929ffcc
 	github.com/newrelic/go-agent v2.13.0+incompatible
 	github.com/opentracing/opentracing-go v1.1.0
 	github.com/openzipkin/zipkin-go v0.2.2
