@@ -38,7 +38,6 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/evalphobia/logrus_sentry"
-	"github.com/facebookgo/pidfile"
 	graylogHook "github.com/gemnasium/logrus-graylog-hook"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
@@ -943,8 +942,7 @@ func initialiseSystem(ctx context.Context) error {
 
 	mainLog.Info("PIDFile location set to: ", config.Global().PIDFileLocation)
 
-	pidfile.SetPidfilePath(config.Global().PIDFileLocation)
-	if err := pidfile.Write(); err != nil {
+	if err := writePIDFile(); err != nil {
 		mainLog.Error("Failed to write PIDFile: ", err)
 	}
 
@@ -963,6 +961,23 @@ func initialiseSystem(ctx context.Context) error {
 		go StartPeriodicStateBackup(ctx, &LE_MANAGER)
 	}
 	return nil
+}
+
+func writePIDFile() error {
+	file := config.Global().PIDFileLocation
+	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
+		return err
+	}
+	pid := strconv.Itoa(os.Getpid())
+	return ioutil.WriteFile(file, []byte(pid), 0600)
+}
+
+func readPIDFromFile() (int, error) {
+	b, err := ioutil.ReadFile(config.Global().PIDFileLocation)
+	if err != nil {
+		return 0, err
+	}
+	return strconv.Atoi(string(b))
 }
 
 // afterConfSetup takes care of non-sensical config values (such as zero
@@ -1096,7 +1111,7 @@ var hostDetails struct {
 
 func getHostDetails() {
 	var err error
-	if hostDetails.PID, err = pidfile.Read(); err != nil {
+	if hostDetails.PID, err = readPIDFromFile(); err != nil {
 		mainLog.Error("Failed ot get host pid: ", err)
 	}
 	if hostDetails.Hostname, err = os.Hostname(); err != nil {
