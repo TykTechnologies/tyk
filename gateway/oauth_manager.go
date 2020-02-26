@@ -769,11 +769,6 @@ func (r *RedisOsinStorageInterface) RemoveAuthorize(code string) error {
 
 // SaveAccess will save a token and it's access data to redis
 func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) error {
-	authDataJSON, err := json.Marshal(accessData)
-	if err != nil {
-		return err
-	}
-
 	key := prefixAccess + storage.HashKey(accessData.AccessToken)
 	log.Debug("Saving ACCESS key: ", key)
 
@@ -781,17 +776,6 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 	if oauthTokenExpire := config.Global().OauthTokenExpire; oauthTokenExpire != 0 {
 		accessData.ExpiresIn = oauthTokenExpire
 	}
-
-	r.store.SetKey(key, string(authDataJSON), int64(accessData.ExpiresIn))
-
-	// add code to list of tokens for this client
-	sortedListKey := prefixClientTokens + accessData.Client.GetId()
-	log.Debug("Adding ACCESS key to sorted list: ", sortedListKey)
-	r.store.AddToSortedSet(
-		sortedListKey,
-		storage.HashKey(accessData.AccessToken),
-		float64(accessData.CreatedAt.Unix()+int64(accessData.ExpiresIn)), // set score as token expire timestamp
-	)
 
 	// Create a user.SessionState object and register it with the authmanager
 	var newSession user.SessionState
@@ -805,7 +789,31 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 			log.Info("Couldn't decode user.SessionState from UserData, checking policy: ", err)
 			checkPolicy = true
 		}
+
 	}
+
+	if newSession.MetaData != nil {
+		if len(newSession.MetaData) > 0 {
+			client := accessData.Client.(*OAuthClient)
+			client.MetaData = newSession.MetaData
+		}
+	}
+
+	authDataJSON, err := json.Marshal(accessData)
+	if err != nil {
+		return err
+	}
+
+	r.store.SetKey(key, string(authDataJSON), int64(accessData.ExpiresIn))
+
+	// add code to list of tokens for this client
+	sortedListKey := prefixClientTokens + accessData.Client.GetId()
+	log.Debug("Adding ACCESS key to sorted list: ", sortedListKey)
+	r.store.AddToSortedSet(
+		sortedListKey,
+		storage.HashKey(accessData.AccessToken),
+		float64(accessData.CreatedAt.Unix()+int64(accessData.ExpiresIn)), // set score as token expire timestamp
+	)
 
 	if checkPolicy {
 		// defined in JWT middleware
