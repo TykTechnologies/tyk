@@ -46,6 +46,18 @@ const keyRules = `{
 	"quota_renewal_rate": 300
 }`
 
+const keyRulesWithMetadata = `{
+	"last_check": 1402492859,
+	"org_id": "53ac07777cbb8c2d53000002",
+	"rate": 1,
+	"per": 1,
+	"quota_max": -1,
+	"quota_renews": 1399567002,
+	"quota_remaining": 10,
+	"quota_renewal_rate": 300,
+	"meta_data": {"key": "value"}
+}`
+
 func buildTestOAuthSpec(apiGens ...func(spec *APISpec)) *APISpec {
 	return BuildAPI(func(spec *APISpec) {
 		spec.APIID = "999999"
@@ -386,6 +398,75 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 			BodyMatch: `{"access_token":".*","expires_in":3600,"redirect_to":"http://client.oauth.com` +
 				`#access_token=.*=&expires_in=3600&token_type=bearer","token_type":"bearer"}`,
 		})
+	})
+
+	t.Run("Client authorize token request with metadata", func(t *testing.T) {
+		param := make(url.Values)
+		param.Set("response_type", "token")
+		param.Set("redirect_uri", authRedirectUri)
+		param.Set("client_id", authClientID)
+		param.Set("key_rules", keyRulesWithMetadata)
+
+		headers := map[string]string{
+			"Content-Type": "application/x-www-form-urlencoded",
+		}
+
+		resp, err := ts.Run(t, test.TestCase{
+			Path:      "/APIID/tyk/oauth/authorize-client/",
+			AdminAuth: true,
+			Data:      param.Encode(),
+			Headers:   headers,
+			Method:    http.MethodPost,
+			Code:      http.StatusOK,
+			BodyMatch: `{"access_token":".*","expires_in":3600,"redirect_to":"http://client.oauth.com` +
+				`#access_token=.*=&expires_in=3600&token_type=bearer","token_type":"bearer"}`,
+		})
+		if err != nil {
+			t.Error(err)
+		}
+		asData := make(map[string]interface{})
+		if err := json.NewDecoder(resp.Body).Decode(&asData); err != nil {
+			t.Fatal("Decode failed:", err)
+		}
+		token, ok := asData["access_token"].(string)
+		if !ok {
+			t.Fatal("No access token found")
+		}
+		session, ok := spec.AuthManager.KeyAuthorised(token)
+		if !ok {
+			t.Error("Key was not created (Can't find it)!")
+		}
+		if session.MetaData == nil {
+			t.Fatal("Session metadata is nil")
+		}
+		if len(session.MetaData) != 1 {
+			t.Fatal("Unexpected session metadata length")
+		}
+		accessData, err := spec.OAuthManager.OsinServer.Storage.LoadAccess(token)
+		if err != nil {
+			t.Error(err)
+		}
+		client, ok := accessData.Client.(*osin.DefaultClient)
+		if !ok {
+			t.Fatal("Access data doesn't contain an appropriate OAuth client type")
+		}
+		if client.MetaData == nil {
+			t.Fatal("Client doesn't contain metadata")
+		}
+		md, ok := client.MetaData.(map[string]interface{})
+		if !ok {
+			t.Fatal("Client metadata doesn't use the appropriate type")
+		}
+		if len(md) != 1 {
+			t.Fatal("Unexpected client metadata length")
+		}
+		val, ok := md["key"]
+		if !ok {
+			t.Fatal("Metadata key not found")
+		}
+		if strings.Compare(val.(string), "value") != 0 {
+			t.Fatal("Metadata key value doesn't match")
+		}
 	})
 }
 
