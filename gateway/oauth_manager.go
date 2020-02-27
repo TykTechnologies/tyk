@@ -177,16 +177,18 @@ func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *htt
 // OAuth tokens without revealing tokens before they are requested).
 func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set(headers.ContentType, headers.ApplicationJSON)
-
+	log.Info("aqui")
 	// Handle response
 	resp := o.Manager.HandleAccess(r)
 	msg := o.generateOAuthOutputFromOsinResponse(resp)
+
 	if resp.IsError {
 		// Something went wrong, write out the error details and kill the response
 		w.WriteHeader(resp.ErrorStatusCode)
 		w.Write(msg)
 		return
 	}
+
 
 	// Ping endpoint with o_auth key and auth_key
 	authCode := r.FormValue("code")
@@ -232,7 +234,6 @@ const(
 //in compliance with https://tools.ietf.org/html/rfc7009#section-2.1
 //ToDo: set an authentication mechanism
 func (o *OAuthHandlers) HandleRevokeToken(w http.ResponseWriter, r *http.Request) {
-
 	err := r.ParseForm()
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -279,6 +280,7 @@ func (o *OAuthHandlers) HandleRevokeAllTokens(w http.ResponseWriter, r *http.Req
 
 func RevokeAllTokens(storage ExtendedOsinStorageInterface, clientId, clientSecret string) int {
 	client, err := storage.GetClient(clientId)
+	log.Debug("Revoke all tokens")
 	if err != nil {
 		return http.StatusNotFound
 	}
@@ -294,8 +296,14 @@ func RevokeAllTokens(storage ExtendedOsinStorageInterface, clientId, clientSecre
 	}
 
 	for _, token := range clientTokens {
-		storage.RemoveAccess(token.Token)
-		storage.RemoveRefresh(token.Token)
+
+		access, err := storage.LoadAccess(token.Token)
+		log.Debug("loading acces with token:", token.Token)
+		if err == nil {
+			log.Debug("uno no dio error: ", access)
+			storage.RemoveAccess(access.AccessToken)
+			storage.RemoveRefresh(access.RefreshToken)
+		}
 	}
 
 	return http.StatusOK
@@ -361,6 +369,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 		log.Errorf("trying to set url values decoded from json body :%v", err)
 	}
 	var username string
+
 	if ar := o.OsinServer.HandleAccessRequest(resp, r); ar != nil {
 
 		var session *user.SessionState
@@ -460,8 +469,8 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 				log.Error(err)
 			}
 		}
-
 	}
+
 	if resp.IsError && resp.InternalError != nil {
 		log.Error("ERROR: ", resp.InternalError)
 	}
@@ -737,7 +746,7 @@ func (r *RedisOsinStorageInterface) GetClientTokens(id string) ([]OAuthClientTok
 
 	// convert sorted set data and scores into reply struct
 	tokensData := make([]OAuthClientToken, len(tokens))
-	for i := range tokens {
+	for i := range tokens{
 		tokensData[i] = OAuthClientToken{
 			Token:   tokens[i],
 			Expires: int64(scores[i]), // we store expire timestamp as a score
@@ -813,6 +822,8 @@ func (r *RedisOsinStorageInterface) SaveAuthorize(authData *osin.AuthorizeData) 
 	}
 	key := prefixAuth + authData.Code
 	log.Debug("Saving auth code: ", key)
+
+	log.Info("////save key: ", key," with value:", string(authDataJSON))
 	r.store.SetKey(key, string(authDataJSON), int64(authData.ExpiresIn))
 
 	return nil
@@ -851,7 +862,6 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 	if err != nil {
 		return err
 	}
-
 	key := prefixAccess + storage.HashKey(accessData.AccessToken)
 	log.Debug("Saving ACCESS key: ", key)
 
@@ -918,7 +928,6 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 			return err
 		}
 		key := prefixRefresh + accessData.RefreshToken
-		log.Debug("Saving REFRESH key: ", key)
 		refreshExpire := int64(1209600) // 14 days
 		if oauthRefreshExpire := config.Global().OauthRefreshExpire; oauthRefreshExpire != 0 {
 			refreshExpire = oauthRefreshExpire
@@ -959,7 +968,9 @@ func (r *RedisOsinStorageInterface) LoadAccess(token string) (*osin.AccessData, 
 
 // RemoveAccess will remove access data from Redis
 func (r *RedisOsinStorageInterface) RemoveAccess(token string) error {
-	key := prefixAccess + token
+	key := prefixAccess + storage.HashKey(token)
+
+	log.Debug("going to revoke access with key:", key)
 	r.store.DeleteKey(key)
 
 	// remove the access token from central storage too
@@ -992,7 +1003,9 @@ func (r *RedisOsinStorageInterface) LoadRefresh(token string) (*osin.AccessData,
 
 // RemoveRefresh will remove a refresh token from redis
 func (r *RedisOsinStorageInterface) RemoveRefresh(token string) error {
+	log.Debug("FOR REFRESH TO DELETE: ", token)
 	key := prefixRefresh + token
+	log.Debug("is going to remove refresh token with key:",key)
 	r.store.DeleteKey(key)
 	return nil
 }
@@ -1024,7 +1037,6 @@ func (accessTokenGen) GenerateAccessToken(data *osin.AccessData, generaterefresh
 
 		newSession = sessionFromPolicy
 	}
-
 	accesstoken = keyGen.GenerateAuthKey(newSession.OrgID)
 
 	if generaterefresh {

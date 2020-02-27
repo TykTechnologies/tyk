@@ -2047,6 +2047,12 @@ func RevokeTokenHandler(w http.ResponseWriter, r *http.Request){
 		return
 	}
 
+	/*x := RedisOsinStorageInterface{
+		orgID:"",
+		sessionManager:GlobalSessionManager,
+		store: getGlobalStorageHandler("", false),
+	}*/
+
 	RevokeToken(apiSpec.OAuthManager.OsinServer.Storage, token, tokenTypeHint)
 	w.WriteHeader(200)
 }
@@ -2087,6 +2093,14 @@ func RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request){
 		doJSONWrite(w, http.StatusNotFound, apiError(oAuthNotPropagatedErr))
 		return
 	}
+
+	/*
+	x := RedisOsinStorageInterface{
+		orgID:"",
+		sessionManager:GlobalSessionManager,
+		store: getGlobalStorageHandler("", false),
+	}
+	*/
 
 	status := RevokeAllTokens(apiSpec.OAuthManager.OsinServer.Storage, clientId, clientSecret)
 	w.WriteHeader(status)
