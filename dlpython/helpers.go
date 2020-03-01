@@ -139,7 +139,7 @@ func PyObjectGetAttr(o unsafe.Pointer, attr interface{}) (unsafe.Pointer, error)
 // PyBytesFromString wraps PyBytesFromString
 func PyBytesFromString(input []byte) (unsafe.Pointer, error) {
 	data := C.CBytes(input)
-	// defer C.free(unsafe.Pointer(data))
+	defer C.free(unsafe.Pointer(data))
 	ret := PyBytes_FromStringAndSize((*C.char)(data), C.long(len(input)))
 	if ret == nil {
 		return nil, errors.New("PyBytesFromString failed")
@@ -149,17 +149,31 @@ func PyBytesFromString(input []byte) (unsafe.Pointer, error) {
 
 // PyBytesAsString wraps PyBytes_AsString
 func PyBytesAsString(o unsafe.Pointer, l int) ([]byte, error) {
-	cstr := PyBytes_AsString(ToPyObject(o))
+	obj := ToPyObject(o)
+	cstr := PyBytes_AsString(obj)
 	if cstr == nil {
 		return nil, errors.New("PyBytes_AsString as string failed")
 	}
-	// defer C.free(unsafe.Pointer(cstr))
 	str := C.GoBytes(unsafe.Pointer(cstr), C.int(l))
-	return []byte(str), nil
+	b := []byte(str)
+	return b, nil
 }
 
 // PyLongAsLong wraps PyLong_AsLong
 func PyLongAsLong(o unsafe.Pointer) int {
 	l := PyLong_AsLong(ToPyObject(o))
 	return int(l)
+}
+
+func PyIncRef(o unsafe.Pointer) {
+	Py_IncRef(ToPyObject(o))
+}
+
+func PyDecRef(o unsafe.Pointer) {
+	Py_DecRef(ToPyObject(o))
+}
+
+func PyTupleClearFreeList() int {
+	sz := PyTuple_ClearFreeList()
+	return int(sz)
 }

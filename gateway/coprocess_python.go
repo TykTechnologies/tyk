@@ -86,6 +86,8 @@ func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object
 		pythonLock.Unlock()
 		return nil, err
 	}
+	python.PyDecRef(args)
+	python.PyDecRef(dispatchHookFunc)
 
 	newObjectPtr, err := python.PyTupleGetItem(result, 0)
 	if err != nil {
@@ -116,6 +118,7 @@ func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object
 		pythonLock.Unlock()
 		return nil, err
 	}
+	python.PyDecRef(result)
 	pythonLock.Unlock()
 
 	newObject := &coprocess.Object{}
