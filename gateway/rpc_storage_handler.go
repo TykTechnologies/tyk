@@ -811,13 +811,15 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 		if len(splitKeys) > 1 && splitKeys[1] == "resetQuota" {
 			keysToReset[splitKeys[0]] = true
 		}else if len(splitKeys) > 3 {
-			if splitKeys[3] == "oAuthRevokeAllTokens" || splitKeys[3] == "oAuthRevokeToken" || splitKeys[3] == "oAuthRevokeAccessToken"{
+			if  splitKeys[3] == "oAuthRevokeToken" || splitKeys[3] == "oAuthRevokeAccessToken"|| splitKeys[3] == "oAuthRevokeRefreshToken"{
 				TokensToBeRevoked[splitKeys[0]] = key
+			}else if splitKeys[3] == "oAuthRevokeAllTokens" {
+				oauthClientToBeRevoked[splitKeys[0]] = key
 			}
 		}
 	}
 
-	//all tokens client
+	//remove all token's client
 	for clientId, key := range oauthClientToBeRevoked{
 		//key formed as = clientId:clientSecret:apiId:oAuthRevokeAllTokens
 		splitKeys := strings.Split(key,":")
