@@ -289,18 +289,14 @@ func RevokeAllTokens(storage ExtendedOsinStorageInterface, clientId, clientSecre
 		return http.StatusForbidden
 	}
 
-	//its only access?
 	clientTokens, err := storage.GetClientTokens(clientId)
 	if err != nil {
 		return http.StatusBadRequest
 	}
 
 	for _, token := range clientTokens {
-
 		access, err := storage.LoadAccess(token.Token)
-		log.Debug("loading acces with token:", token.Token)
 		if err == nil {
-			log.Debug("uno no dio error: ", access)
 			storage.RemoveAccess(access.AccessToken)
 			storage.RemoveRefresh(access.RefreshToken)
 		}

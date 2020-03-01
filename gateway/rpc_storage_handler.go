@@ -802,12 +802,66 @@ func getSessionAndCreate(keyName string, r *RPCStorageHandler) {
 
 func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 	keysToReset := map[string]bool{}
+	oauthClientToBeRevoked := map[string]string{}
+	TokensToBeRevoked := map[string]string{}
 
 	for _, key := range keys {
+		log.Debug("un cambio de keys:", key)
 		splitKeys := strings.Split(key, ":")
 		if len(splitKeys) > 1 && splitKeys[1] == "resetQuota" {
 			keysToReset[splitKeys[0]] = true
+		}else if len(splitKeys) > 3 {
+			if splitKeys[3] == "oAuthRevokeAllTokens" || splitKeys[3] == "oAuthRevokeToken" || splitKeys[3] == "oAuthRevokeAccessToken"{
+				TokensToBeRevoked[splitKeys[0]] = key
+			}
 		}
+	}
+
+	//all tokens client
+	for clientId, key := range oauthClientToBeRevoked{
+		//key formed as = clientId:clientSecret:apiId:oAuthRevokeAllTokens
+		splitKeys := strings.Split(key,":")
+		clientSecret := splitKeys[1]
+		apiId := splitKeys[3]
+
+		storage, _, err := GetStorageForApi(apiId)
+		if err != nil {
+			continue
+		}
+		clientTokens, err :=storage.GetClientTokens(clientId)
+		if err != nil {
+			for _, token := range clientTokens{
+				key := token.Token
+				SessionCache.Delete(key)
+				RPCGlobalCache.Delete(r.KeyPrefix + key)
+			}
+		}
+
+		RevokeAllTokens(storage,clientId,clientSecret)
+	}
+
+	//single and specific tokens
+	for token, key := range TokensToBeRevoked{
+		//key formed as: token:apiId:tokenActionTypeHint
+		splitKeys := strings.Split(key,":")
+		apiId := splitKeys[1]
+		tokenActionTypeHint := splitKeys[2]
+
+		storage, _, err := GetStorageForApi(apiId)
+		if err != nil {
+			continue
+		}
+
+		var tokenTypeHint string
+		switch tokenActionTypeHint{
+			case "oAuthRevokeAccessToken":
+				tokenTypeHint = "access_token"
+			case "oAuthRevokeRefreshToken":
+				tokenTypeHint = "refresh_token"
+		}
+		RevokeToken(storage,token,tokenTypeHint)
+		SessionCache.Delete(token)
+		RPCGlobalCache.Delete(r.KeyPrefix + token)
 	}
 
 	for _, key := range keys {
@@ -826,6 +880,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 		SessionCache.Delete(key)
 		RPCGlobalCache.Delete(r.KeyPrefix + key)
 	}
+
 	// Notify rest of gateways in cluster to flush cache
 	n := Notification{
 		Command: KeySpaceUpdateNotification,

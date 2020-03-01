@@ -2022,6 +2022,17 @@ func RevokeTokenHandler(w http.ResponseWriter, r *http.Request){
 	token := r.PostFormValue("token")
 	apiID := r.PostFormValue("api_id")
 
+	storage, code, err := GetStorageForApi(apiID)
+	if err != nil {
+		doJSONWrite(w, code, apiError(err.Error()))
+		return
+	}
+
+	RevokeToken(storage, token, tokenTypeHint)
+	w.WriteHeader(200)
+}
+
+func GetStorageForApi(apiID string)(ExtendedOsinStorageInterface,int, error){
 	apiSpec := getApiSpec(apiID)
 	if apiSpec == nil {
 		log.WithFields(logrus.Fields{
@@ -2031,8 +2042,7 @@ func RevokeTokenHandler(w http.ResponseWriter, r *http.Request){
 			"err":    "API not found",
 		}).Error("Failed to retrieve OAuth client list.")
 
-		doJSONWrite(w, http.StatusNotFound, apiError(oAuthClientNotFound))
-		return
+		return nil, http.StatusNotFound, errors.New(oAuthClientNotFound)
 	}
 
 	if apiSpec.OAuthManager == nil {
@@ -2041,20 +2051,12 @@ func RevokeTokenHandler(w http.ResponseWriter, r *http.Request){
 			"apiID":  apiID,
 			"status": "fail",
 			"err":    "API not found",
-		}).Error("Failed to revoke token.")
+		}).Error("Failed to revoke client tokens.")
 
-		doJSONWrite(w, http.StatusNotFound, apiError(oAuthNotPropagatedErr))
-		return
+		return nil, http.StatusNotFound, errors.New(oAuthNotPropagatedErr)
 	}
 
-	/*x := RedisOsinStorageInterface{
-		orgID:"",
-		sessionManager:GlobalSessionManager,
-		store: getGlobalStorageHandler("", false),
-	}*/
-
-	RevokeToken(apiSpec.OAuthManager.OsinServer.Storage, token, tokenTypeHint)
-	w.WriteHeader(200)
+	return apiSpec.OAuthManager.OsinServer.Storage, http.StatusOK, nil
 }
 
 func RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request){
@@ -2068,41 +2070,13 @@ func RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request){
 	clientId := r.PostFormValue("client_id")
 	clientSecret := r.PostFormValue("client_secret")
 	apiID := r.PostFormValue("api_id")
-
-	apiSpec := getApiSpec(apiID)
-	if apiSpec == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"apiID":  apiID,
-			"status": "fail",
-			"err":    "API not found",
-		}).Error("Failed to retrieve OAuth client list.")
-
-		doJSONWrite(w, http.StatusNotFound, apiError(oAuthClientNotFound))
+	storage, code, err := GetStorageForApi(apiID)
+	if err != nil {
+		doJSONWrite(w, code, apiError(err.Error()))
 		return
 	}
 
-	if apiSpec.OAuthManager == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"apiID":  apiID,
-			"status": "fail",
-			"err":    "API not found",
-		}).Error("Failed to revoke client tokens.")
-
-		doJSONWrite(w, http.StatusNotFound, apiError(oAuthNotPropagatedErr))
-		return
-	}
-
-	/*
-	x := RedisOsinStorageInterface{
-		orgID:"",
-		sessionManager:GlobalSessionManager,
-		store: getGlobalStorageHandler("", false),
-	}
-	*/
-
-	status := RevokeAllTokens(apiSpec.OAuthManager.OsinServer.Storage, clientId, clientSecret)
+	status := RevokeAllTokens(storage, clientId, clientSecret)
 	w.WriteHeader(status)
 }
 
