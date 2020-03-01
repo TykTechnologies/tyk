@@ -89,6 +89,18 @@ PyObject* PyImport_Import(PyObject* name) { return PyImport_Import_ptr(name); };
 typedef PyObject* (*PyObject_CallObject_f)(PyObject*, PyObject*);
 PyObject_CallObject_f PyObject_CallObject_ptr;
 PyObject* PyObject_CallObject(PyObject* callable_object, PyObject* args) { return PyObject_CallObject_ptr(callable_object, args); };
+
+typedef void (*Py_IncRef_f)(PyObject*);
+Py_IncRef_f Py_IncRef_ptr;
+void Py_IncRef(PyObject* object) { return Py_IncRef_ptr(object); };
+
+typedef void (*Py_DecRef_f)(PyObject*);
+Py_DecRef_f Py_DecRef_ptr;
+void Py_DecRef(PyObject* object) { return Py_DecRef_ptr(object); };
+
+typedef int (*PyTuple_ClearFreeList_f)();
+PyTuple_ClearFreeList_f PyTuple_ClearFreeList_ptr;
+int PyTuple_ClearFreeList() { return PyTuple_ClearFreeList_ptr(); };
 */
 import "C"
 import (
@@ -179,6 +191,18 @@ func PyObject_CallObject(callable_object *C.PyObject, args *C.PyObject) *C.PyObj
 	return C.PyObject_CallObject(callable_object, args)
 }
 
+func Py_IncRef(object *C.PyObject) {
+	C.Py_IncRef(object)
+}
+
+func Py_DecRef(object *C.PyObject) {
+	C.Py_DecRef(object)
+}
+
+func PyTuple_ClearFreeList() C.int {
+	return C.PyTuple_ClearFreeList()
+}
+
 func mapCalls() error {
 	C.python_lib = C.dlopen(libPath, C.RTLD_NOW|C.RTLD_GLOBAL)
 
@@ -263,6 +287,18 @@ func mapCalls() error {
 	s_PyObject_CallObject := C.CString("PyObject_CallObject")
 	defer C.free(unsafe.Pointer(s_PyObject_CallObject))
 	C.PyObject_CallObject_ptr = C.PyObject_CallObject_f(C.dlsym(C.python_lib, s_PyObject_CallObject))
+
+	s_Py_IncRef := C.CString("Py_IncRef")
+	defer C.free(unsafe.Pointer(s_Py_IncRef))
+	C.Py_IncRef_ptr = C.Py_IncRef_f(C.dlsym(C.python_lib, s_Py_IncRef))
+
+	s_Py_DecRef := C.CString("Py_DecRef")
+	defer C.free(unsafe.Pointer(s_Py_DecRef))
+	C.Py_DecRef_ptr = C.Py_DecRef_f(C.dlsym(C.python_lib, s_Py_DecRef))
+
+	s_PyTuple_ClearFreeList := C.CString("PyTuple_ClearFreeList")
+	defer C.free(unsafe.Pointer(s_PyTuple_ClearFreeList))
+	C.PyTuple_ClearFreeList_ptr = C.PyTuple_ClearFreeList_f(C.dlsym(C.python_lib, s_PyTuple_ClearFreeList))
 
 	dlErr := C.dlerror()
 	if dlErr != nil {
