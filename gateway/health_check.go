@@ -93,13 +93,13 @@ func initHealthCheck(ctx context.Context) {
 	}(ctx)
 }
 
-type SafeHealthCheck struct{
+type SafeHealthCheck struct {
 	info map[string]HealthCheckItem
-	mux sync.Mutex
+	mux  sync.Mutex
 }
 
 func gatherHealthChecks() {
-	allInfos := SafeHealthCheck{info:make(map[string]HealthCheckItem, 3)}
+	allInfos := SafeHealthCheck{info: make(map[string]HealthCheckItem, 3)}
 
 	redisStore := storage.RedisCluster{KeyPrefix: "livenesscheck-"}
 
