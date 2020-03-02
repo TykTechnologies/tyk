@@ -445,7 +445,7 @@ func loadControlAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}/rotate", rotateOauthClientHandler).Methods("PUT")
 		r.HandleFunc("/oauth/refresh/{keyName}", invalidateOauthRefresh).Methods("DELETE")
 		r.HandleFunc("/cache/{apiID}", invalidateCacheHandler).Methods("DELETE")
-		r.HandleFunc("/oauth/revoke",  RevokeTokenHandler).Methods("POST")
+		r.HandleFunc("/oauth/revoke", RevokeTokenHandler).Methods("POST")
 		r.HandleFunc("/oauth/revoke_all", RevokeAllTokensHandler).Methods("POST")
 
 	} else {
@@ -523,8 +523,8 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 	muxer.Handle(apiAuthorizePath, checkIsAPIOwner(allowMethods(oauthHandlers.HandleGenerateAuthCodeData, "POST")))
 	muxer.HandleFunc(clientAuthPath, allowMethods(oauthHandlers.HandleAuthorizePassthrough, "GET", "POST"))
 	muxer.HandleFunc(clientAccessPath, addSecureAndCacheHeaders(allowMethods(oauthHandlers.HandleAccessRequest, "GET", "POST")))
-	muxer.HandleFunc(revokeToken,oauthHandlers.HandleRevokeToken)
-	muxer.HandleFunc(revokeAllTokens,oauthHandlers.HandleRevokeAllTokens)
+	muxer.HandleFunc(revokeToken, oauthHandlers.HandleRevokeToken)
+	muxer.HandleFunc(revokeAllTokens, oauthHandlers.HandleRevokeAllTokens)
 	return &oauthManager
 }
 

@@ -1882,6 +1882,7 @@ func handleDeleteOAuthClient(keyName, apiID string) (interface{}, int) {
 
 const oAuthNotPropagatedErr = "OAuth client list isn't available or hasn't been propagated yet."
 const oAuthClientNotFound = "OAuth client not found"
+
 // List Clients
 func getOauthClients(apiID string) (interface{}, int) {
 	filterID := prefixClient
@@ -2010,7 +2011,7 @@ func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, http.StatusOK, apiOk("cache invalidated"))
 }
 
-func RevokeTokenHandler(w http.ResponseWriter, r *http.Request){
+func RevokeTokenHandler(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 
 	if err != nil {
@@ -2032,7 +2033,7 @@ func RevokeTokenHandler(w http.ResponseWriter, r *http.Request){
 	w.WriteHeader(200)
 }
 
-func GetStorageForApi(apiID string)(ExtendedOsinStorageInterface,int, error){
+func GetStorageForApi(apiID string) (ExtendedOsinStorageInterface, int, error) {
 	apiSpec := getApiSpec(apiID)
 	if apiSpec == nil {
 		log.WithFields(logrus.Fields{
@@ -2059,7 +2060,7 @@ func GetStorageForApi(apiID string)(ExtendedOsinStorageInterface,int, error){
 	return apiSpec.OAuthManager.OsinServer.Storage, http.StatusOK, nil
 }
 
-func RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request){
+func RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 
 	if err != nil {

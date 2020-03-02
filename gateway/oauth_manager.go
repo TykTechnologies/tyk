@@ -189,7 +189,6 @@ func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-
 	// Ping endpoint with o_auth key and auth_key
 	authCode := r.FormValue("code")
 	oldRefreshToken := r.FormValue("refresh_token")
@@ -225,9 +224,8 @@ func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Reque
 	w.Write(msg)
 }
 
-
-const(
-	accessToken = "access_token"
+const (
+	accessToken  = "access_token"
 	refreshToken = "refresh_token"
 )
 
@@ -240,14 +238,14 @@ func (o *OAuthHandlers) HandleRevokeToken(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	token:= r.PostFormValue("token")
+	token := r.PostFormValue("token")
 	tokenTypeHint := r.PostFormValue("token_type_hint")
 
 	RevokeToken(o.Manager.OsinServer.Storage, token, tokenTypeHint)
 	w.WriteHeader(200)
 }
 
-func RevokeToken(storage ExtendedOsinStorageInterface, token, tokenTypeHint string){
+func RevokeToken(storage ExtendedOsinStorageInterface, token, tokenTypeHint string) {
 	switch tokenTypeHint {
 	case accessToken:
 		storage.RemoveAccess(token)
@@ -267,9 +265,9 @@ func (o *OAuthHandlers) HandleRevokeAllTokens(w http.ResponseWriter, r *http.Req
 	}
 
 	clientId := r.PostFormValue("client_id")
-	secret := r.PostFormValue("secret")
+	secret := r.PostFormValue("client_secret")
 
-	if clientId == "" || secret == ""{
+	if clientId == "" || secret == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -285,7 +283,7 @@ func RevokeAllTokens(storage ExtendedOsinStorageInterface, clientId, clientSecre
 		return http.StatusNotFound
 	}
 
-	if client.GetSecret() != clientSecret{
+	if client.GetSecret() != clientSecret {
 		return http.StatusForbidden
 	}
 
@@ -742,7 +740,7 @@ func (r *RedisOsinStorageInterface) GetClientTokens(id string) ([]OAuthClientTok
 
 	// convert sorted set data and scores into reply struct
 	tokensData := make([]OAuthClientToken, len(tokens))
-	for i := range tokens{
+	for i := range tokens {
 		tokensData[i] = OAuthClientToken{
 			Token:   tokens[i],
 			Expires: int64(scores[i]), // we store expire timestamp as a score
@@ -819,7 +817,7 @@ func (r *RedisOsinStorageInterface) SaveAuthorize(authData *osin.AuthorizeData) 
 	key := prefixAuth + authData.Code
 	log.Debug("Saving auth code: ", key)
 
-	log.Info("////save key: ", key," with value:", string(authDataJSON))
+	log.Info("////save key: ", key, " with value:", string(authDataJSON))
 	r.store.SetKey(key, string(authDataJSON), int64(authData.ExpiresIn))
 
 	return nil
@@ -1001,7 +999,7 @@ func (r *RedisOsinStorageInterface) LoadRefresh(token string) (*osin.AccessData,
 func (r *RedisOsinStorageInterface) RemoveRefresh(token string) error {
 	log.Debug("FOR REFRESH TO DELETE: ", token)
 	key := prefixRefresh + token
-	log.Debug("is going to remove refresh token with key:",key)
+	log.Debug("is going to remove refresh token with key:", key)
 	r.store.DeleteKey(key)
 	return nil
 }

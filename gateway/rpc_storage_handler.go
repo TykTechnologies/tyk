@@ -810,19 +810,19 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 		splitKeys := strings.Split(key, ":")
 		if len(splitKeys) > 1 && splitKeys[1] == "resetQuota" {
 			keysToReset[splitKeys[0]] = true
-		}else if len(splitKeys) > 3 {
-			if  splitKeys[3] == "oAuthRevokeToken" || splitKeys[3] == "oAuthRevokeAccessToken"|| splitKeys[3] == "oAuthRevokeRefreshToken"{
+		} else if len(splitKeys) > 3 {
+			if splitKeys[3] == "oAuthRevokeToken" || splitKeys[3] == "oAuthRevokeAccessToken" || splitKeys[3] == "oAuthRevokeRefreshToken" {
 				TokensToBeRevoked[splitKeys[0]] = key
-			}else if splitKeys[3] == "oAuthRevokeAllTokens" {
+			} else if splitKeys[3] == "oAuthRevokeAllTokens" {
 				oauthClientToBeRevoked[splitKeys[0]] = key
 			}
 		}
 	}
 
 	//remove all token's client
-	for clientId, key := range oauthClientToBeRevoked{
+	for clientId, key := range oauthClientToBeRevoked {
 		//key formed as = clientId:clientSecret:apiId:oAuthRevokeAllTokens
-		splitKeys := strings.Split(key,":")
+		splitKeys := strings.Split(key, ":")
 		clientSecret := splitKeys[1]
 		apiId := splitKeys[3]
 
@@ -830,22 +830,22 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 		if err != nil {
 			continue
 		}
-		clientTokens, err :=storage.GetClientTokens(clientId)
+		clientTokens, err := storage.GetClientTokens(clientId)
 		if err != nil {
-			for _, token := range clientTokens{
+			for _, token := range clientTokens {
 				key := token.Token
 				SessionCache.Delete(key)
 				RPCGlobalCache.Delete(r.KeyPrefix + key)
 			}
 		}
 
-		RevokeAllTokens(storage,clientId,clientSecret)
+		RevokeAllTokens(storage, clientId, clientSecret)
 	}
 
 	//single and specific tokens
-	for token, key := range TokensToBeRevoked{
+	for token, key := range TokensToBeRevoked {
 		//key formed as: token:apiId:tokenActionTypeHint
-		splitKeys := strings.Split(key,":")
+		splitKeys := strings.Split(key, ":")
 		apiId := splitKeys[1]
 		tokenActionTypeHint := splitKeys[2]
 
@@ -855,13 +855,13 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 		}
 
 		var tokenTypeHint string
-		switch tokenActionTypeHint{
-			case "oAuthRevokeAccessToken":
-				tokenTypeHint = "access_token"
-			case "oAuthRevokeRefreshToken":
-				tokenTypeHint = "refresh_token"
+		switch tokenActionTypeHint {
+		case "oAuthRevokeAccessToken":
+			tokenTypeHint = "access_token"
+		case "oAuthRevokeRefreshToken":
+			tokenTypeHint = "refresh_token"
 		}
-		RevokeToken(storage,token,tokenTypeHint)
+		RevokeToken(storage, token, tokenTypeHint)
 		SessionCache.Delete(token)
 		RPCGlobalCache.Delete(r.KeyPrefix + token)
 	}
