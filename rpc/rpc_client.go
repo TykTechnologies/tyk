@@ -286,7 +286,6 @@ func GroupLogin() bool {
 
 	if ok == false {
 		Log.Error("RPC Login incorrect")
-		Log.Error("the group used is: ", config.GroupID)
 		rpcEmergencyMode = true
 		go reAttemptLogin(errors.New("Login incorrect"))
 		return false

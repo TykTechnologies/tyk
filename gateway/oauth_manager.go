@@ -177,7 +177,6 @@ func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *htt
 // OAuth tokens without revealing tokens before they are requested).
 func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set(headers.ContentType, headers.ApplicationJSON)
-	log.Info("aqui")
 	// Handle response
 	resp := o.Manager.HandleAccess(r)
 	msg := o.generateOAuthOutputFromOsinResponse(resp)
@@ -817,7 +816,6 @@ func (r *RedisOsinStorageInterface) SaveAuthorize(authData *osin.AuthorizeData) 
 	key := prefixAuth + authData.Code
 	log.Debug("Saving auth code: ", key)
 
-	log.Info("////save key: ", key, " with value:", string(authDataJSON))
 	r.store.SetKey(key, string(authDataJSON), int64(authData.ExpiresIn))
 
 	return nil
@@ -964,7 +962,6 @@ func (r *RedisOsinStorageInterface) LoadAccess(token string) (*osin.AccessData, 
 func (r *RedisOsinStorageInterface) RemoveAccess(token string) error {
 	key := prefixAccess + storage.HashKey(token)
 
-	log.Debug("going to revoke access with key:", key)
 	r.store.DeleteKey(key)
 
 	// remove the access token from central storage too
@@ -997,9 +994,8 @@ func (r *RedisOsinStorageInterface) LoadRefresh(token string) (*osin.AccessData,
 
 // RemoveRefresh will remove a refresh token from redis
 func (r *RedisOsinStorageInterface) RemoveRefresh(token string) error {
-	log.Debug("FOR REFRESH TO DELETE: ", token)
+	log.Debug("is going to revoke refresh token: ", token)
 	key := prefixRefresh + token
-	log.Debug("is going to remove refresh token with key:", key)
 	r.store.DeleteKey(key)
 	return nil
 }
