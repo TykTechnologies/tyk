@@ -827,7 +827,16 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 
 	c, ok := accessData.Client.(*OAuthClient)
 	if ok && c.MetaData != nil {
-		newSession.MetaData = c.MetaData.(map[string]interface{})
+		if newSession.MetaData == nil {
+			newSession.MetaData = make(map[string]interface{})
+		}
+
+		// Allow session inherit and *override* client values
+		for k, v := range c.MetaData.(map[string]interface{}) {
+			if _, found := newSession.MetaData[k]; !found {
+				newSession.MetaData[k] = v
+			}
+		}
 	}
 
 	// Use the default session expiry here as this is OAuth
