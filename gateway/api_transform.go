@@ -514,14 +514,6 @@ func addOrUpdateApi(r *http.Request) (interface{}, int) {
 		existingApis[service] = apis
 	}
 
-	// save existingApis to api_definitions.json for persistence across reboot
-	existingApisJSON, _ := json.MarshalIndent(existingApis, "", "  ")
-
-	err = ioutil.WriteFile(APIDefinitionRedis, existingApisJSON, 0644)
-	if err != nil {
-		return apiError("Could not store definitions to api_definitions.json"), http.StatusInternalServerError
-	}
-
 	// Reload All APIS and process the JWT APIs
 	reloadURLStructure(nil)
 
@@ -915,14 +907,6 @@ func deleteAPIByService(service string) (interface{}, int) {
 	}
 
 	delete(existingApis, service)
-
-	// save existingApis to api_definitions.json for persistence across reboot
-	existingApisJSON, _ := json.MarshalIndent(existingApis, "", "  ")
-
-	err = ioutil.WriteFile(APIDefinitionRedis, existingApisJSON, 0644)
-	if err != nil {
-		return apiError("Could not store definitions to api_definitions.json"), http.StatusInternalServerError
-	}
 
 	reloadURLStructure(nil)
 
