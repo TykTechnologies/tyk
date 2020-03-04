@@ -1,6 +1,6 @@
 FROM golang:1.12
 LABEL io.tyk.vendor="Tyk" \
-      version="1.0" \
+      version="1.1" \
       description="Base image for builds"
 
 ENV GOPATH=/
@@ -12,6 +12,7 @@ RUN apt-get update && apt-get dist-upgrade -y && \
                        curl \
                        jq \
                        rpm \
+                       dpkg-sig \
                        build-essential \
                        libluajit-5.1-2 \
                        libluajit-5.1-dev \
