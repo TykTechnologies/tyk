@@ -1,0 +1,202 @@
+tl;dr
+=====
+
+RHEL does not support signing RPMs with subkeys. This is supposedly
+fixed in RHEL 8. Thus, we use the same key to sign rpms and debs.
+
+These keys DO NOT expire.
+
+Fingerprints:
+Main key                : 12B5D62C28F57592D1575BD51ED14C59E37DAC20
+Signing subkey (deb)    : 9ADE11DA6DD70355E7C1C270543ABE02AC6AC40A
+Signing subkey (unused) : 9A4FA354841E41E39A49A461B34B3EF69DCBD7FE
+
+These fingerprints above should match between this document and your
+keyring. The other numbers in the gpg output will probably not match.
+
+Verification
+============
+% gpg --armor --export team@tyk.io > t.pub
+
+You might have to fetch the pubkey from the keyserver or other trusted
+source if you are outside Tyk.
+
+RPM
+---
+
+Assuming the rpm you want to test is r.rpm:
+% rpm --import t.pub
+% rpm -K r.rpm
+r.rpm: digests signatures OK
+
+Debian
+------
+
+Assuming the deb you want to test is d.deb, import the pubkey.
+
+% gpg --import t.pub
+
+You will have to trust the pubkey ultimately. The other option is to
+sign the pubkey with your ultimately trusted key. If you do not have
+the secret key, the display might look different but the inputs are
+the same.
+
+% gpg --edit-key team@tyk.io
+gpg (GnuPG) 2.2.12; Copyright (C) 2018 Free Software Foundation, Inc.
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+
+Secret key is available.
+
+sec  rsa4096/802F97F6391AC324
+     created: 2020-03-03  expires: never       usage: SCEA
+     trust: full          validity: unknown
+ssb  rsa4096/A892D0365525F5D0
+     created: 2020-03-03  expires: never       usage: S   
+ssb  rsa4096/CA041CD1466FA2F8
+     created: 2020-03-03  expires: never       usage: S   
+[ unknown] (1). Team Tyk (package signing) <team@tyk.io>
+
+gpg> trust
+sec  rsa4096/802F97F6391AC324
+     created: 2020-03-03  expires: never       usage: SCEA
+     trust: full          validity: unknown
+ssb  rsa4096/A892D0365525F5D0
+     created: 2020-03-03  expires: never       usage: S   
+ssb  rsa4096/CA041CD1466FA2F8
+     created: 2020-03-03  expires: never       usage: S   
+[ unknown] (1). Team Tyk (package signing) <team@tyk.io>
+
+Please decide how far you trust this user to correctly verify other users' keys
+(by looking at passports, checking fingerprints from different sources, etc.)
+
+  1 = I don't know or won't say
+  2 = I do NOT trust
+  3 = I trust marginally
+  4 = I trust fully
+  5 = I trust ultimately
+  m = back to the main menu
+
+Your decision? 5
+Do you really want to set this key to ultimate trust? (y/N) y
+
+sec  rsa4096/802F97F6391AC324
+     created: 2020-03-03  expires: never       usage: SCEA
+     trust: ultimate      validity: unknown
+ssb  rsa4096/A892D0365525F5D0
+     created: 2020-03-03  expires: never       usage: S   
+ssb  rsa4096/CA041CD1466FA2F8
+     created: 2020-03-03  expires: never       usage: S   
+[ unknown] (1). Team Tyk (package signing) <team@tyk.io>
+Please note that the shown key validity is not necessarily correct
+unless you restart the program.
+
+
+% gpg --verify d.deb        
+gpg: Signature made Wed 04 Mar 2020 03:05:00 IST
+gpg:                using RSA key F3781522A858A2C43D3BC997CA041CD1466FA2F8
+gpg: Good signature from "Team Tyk (package signing) <team@tyk.io>" [ultimate]
+
+If you do not trust the key ultimately, you will see the following warning.
+
+% gpg --verify d.deb
+gpg: Signature made Wed 04 Mar 2020 03:05:00 IST
+gpg:                using RSA key F3781522A858A2C43D3BC997CA041CD1466FA2F8
+gpg: Good signature from "Team Tyk (package signing) <team@tyk.io>" [unknown]
+gpg: WARNING: This key is not certified with a trusted signature!
+gpg:          There is no indication that the signature belongs to the owner.
+Primary key fingerprint: A924 CCFF B430 E620 F35D  743D 802F 97F6 391A C324
+     Subkey fingerprint: F378 1522 A858 A2C4 3D3B  C997 CA04 1CD1 466F A2F8
+
+How the keys were generated
+===========================
+
+GPG 2.1 and above will not allow you to export private keyrings to
+arbitrary locations. To use batch mode, a temporary directory is
+needed.
+
+% mkdir tyk && chmod 700 tyk; export GNUPGHOME=./tyk
+
+Create the key with one subkey.
+
+% gpg --batch --gen-key pkg-keys.conf
+gpg: keybox '/home/alok/work/tyk/src/rpmsign/./tyk/pubring.kbx' created
+gpg: Generating a Tyk Signing Keys
+gpg: This creates only one subkey due to a limitation in gpg batch processing.
+gpg: Add the other signing key by hand using --edit-keys
+gpg: /home/alok/work/tyk/src/rpmsign/./tyk/trustdb.gpg: trustdb created
+gpg: key 802F97F6391AC324 marked as ultimately trusted
+gpg: directory '/home/alok/work/tyk/src/rpmsign/./tyk/openpgp-revocs.d' created
+gpg: revocation certificate stored as '/home/alok/work/tyk/src/rpmsign/./tyk/openpgp-revocs.d/A924CCFFB430E620F35D743D802F97F6391AC324.rev'
+gpg: Done creating one subkey
+
+Save the fingerprint.
+
+% fpr=$(gpg --list-options show-only-fpr-mbox --list-secret-keys | awk '{print $1}')
+gpg: checking the trustdb
+gpg: marginals needed: 3  completes needed: 1  trust model: pgp
+gpg: depth: 0  valid:   1  signed:   0  trust: 0-, 0q, 0n, 0m, 0f, 1u
+
+Add the second key by hand. Note the fingerprints for usage in signing
+scripts. Attempting to script this by using --quick-key-add will
+result in a 3072 bit key.
+
+% gpg --edit-key $fpr
+gpg (GnuPG) 2.2.12; Copyright (C) 2018 Free Software Foundation, Inc.
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+
+Secret key is available.
+
+sec  rsa4096/802F97F6391AC324
+     created: 2020-03-03  expires: never       usage: SCEA
+     trust: ultimate      validity: ultimate
+ssb  rsa4096/A892D0365525F5D0
+     created: 2020-03-03  expires: never       usage: S   
+[ultimate] (1). Team Tyk (package signing) <team@tyk.io>
+
+gpg> addkey 
+Please select what kind of key you want:
+   (3) DSA (sign only)
+   (4) RSA (sign only)
+   (5) Elgamal (encrypt only)
+   (6) RSA (encrypt only)
+Your selection? 4
+RSA keys may be between 1024 and 4096 bits long.
+What keysize do you want? (3072) 4096
+Requested keysize is 4096 bits
+Please specify how long the key should be valid.
+         0 = key does not expire
+      <n>  = key expires in n days
+      <n>w = key expires in n weeks
+      <n>m = key expires in n months
+      <n>y = key expires in n years
+Key is valid for? (0) 
+Key does not expire at all
+Is this correct? (y/N) y
+Really create? (y/N) y
+We need to generate a lot of random bytes. It is a good idea to perform
+some other action (type on the keyboard, move the mouse, utilise the
+disks) during the prime generation; this gives the random number
+generator a better chance to gain enough entropy.
+
+sec  rsa4096/802F97F6391AC324
+     created: 2020-03-03  expires: never       usage: SCEA
+     trust: ultimate      validity: ultimate
+ssb  rsa4096/A892D0365525F5D0
+     created: 2020-03-03  expires: never       usage: S   
+ssb  rsa4096/CA041CD1466FA2F8
+     created: 2020-03-03  expires: never       usage: S   
+[ultimate] (1). Team Tyk (package signing) <team@tyk.io>
+
+Export the key in ascii form, this file needs to be available to unlock-agent.sh for usage.
+
+% gpg --export-secret-keys --output tyk.io.signing.key
+
+Tar up the temp dir for safekeeping.
+
+References:
+https://tools.ietf.org/html/rfc4880#section-9.1
+https://serverfault.com/a/962553
+https://www.gnupg.org/documentation/manuals/gnupg/Unattended-GPG-key-generation.html#Unattended-GPG-key-generation
+https://www.gnupg.org/gph/en/manual/x334.html
