@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"mime/multipart"
+	"net/http"
 	"os"
 	"testing"
 	"time"
@@ -177,8 +178,8 @@ func TestPythonBundles(t *testing.T) {
 		invalidAuth := map[string]string{"Authorization": "invalid_token"}
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/test-api/", Code: 200, Headers: validAuth},
-			{Path: "/test-api/", Code: 403, Headers: invalidAuth},
+			{Path: "/test-api/", Code: http.StatusOK, Headers: validAuth},
+			{Path: "/test-api/", Code: http.StatusUnauthorized, Headers: invalidAuth},
 		}...)
 	})
 
@@ -204,7 +205,7 @@ func TestPythonBundles(t *testing.T) {
 		auth := map[string]string{"Authorization": keyID}
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/test-api-2/", Code: 200, Headers: auth},
+			{Path: "/test-api-2/", Code: http.StatusOK, Headers: auth},
 		}...)
 	})
 
@@ -244,8 +245,8 @@ func TestPythonBundles(t *testing.T) {
 		}
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/test-api-2/", Code: 200, Data: &buf, Headers: map[string]string{"Content-Type": multipartWriter.FormDataContentType()}},
-			{Path: "/test-api-2/", Code: 200, Data: "{}", Headers: map[string]string{"Content-Type": "application/json"}},
+			{Path: "/test-api-2/", Code: http.StatusOK, Data: &buf, Headers: map[string]string{"Content-Type": multipartWriter.FormDataContentType()}},
+			{Path: "/test-api-2/", Code: http.StatusOK, Data: "{}", Headers: map[string]string{"Content-Type": "application/json"}},
 		}...)
 	})
 }
