@@ -13,6 +13,7 @@ import (
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -30,6 +31,10 @@ type StorageHandler interface {
 	GetKeys(string) []string
 	DeleteKey(string) bool
 	DeleteScanMatch(string) bool
+	GetListRange(string, int64, int64) ([]string, error)
+	RemoveFromList(string, string) error
+	AppendToSet(string, string)
+	Exists(string) (bool, error)
 }
 
 type CertificateManager struct {
@@ -368,10 +373,20 @@ func (c *CertificateManager) ListRawPublicKey(keyID string) (out interface{}) {
 }
 
 func (c *CertificateManager) ListAllIds(prefix string) (out []string) {
-	keys := c.storage.GetKeys("raw-" + prefix + "*")
-
-	for _, key := range keys {
-		out = append(out, strings.TrimPrefix(key, "raw-"))
+	indexKey := prefix + "-index"
+	fmt.Println("prefix::", prefix)
+	exists, _ := c.storage.Exists(indexKey)
+	if !exists {
+		keys := c.storage.GetKeys("raw-" + prefix + "*")
+		for _, key := range keys {
+			c.storage.AppendToSet(indexKey, key)
+			out = append(out, strings.TrimPrefix(key, "raw-"))
+		}
+	} else {
+		keys, _ := c.storage.GetListRange(indexKey, 0, -1)
+		for _, key := range keys {
+			out = append(out, strings.TrimPrefix(key, "raw-"))
+		}
 	}
 
 	return out
@@ -488,10 +503,18 @@ func (c *CertificateManager) Add(certData []byte, orgID string) (string, error) 
 		return "", err
 	}
 
+	c.storage.AppendToSet(orgID+"-index", "raw-"+certID)
+
 	return certID, nil
 }
 
 func (c *CertificateManager) Delete(certID string) {
+
+	if len(certID) >= sha256.Size*2 {
+		orgID := certID[:len(certID)-sha256.Size*2]
+		c.storage.RemoveFromList(orgID+"-index", "raw-"+certID)
+	}
+
 	c.storage.DeleteKey("raw-" + certID)
 	c.cache.Delete(certID)
 }

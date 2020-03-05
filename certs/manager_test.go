@@ -59,6 +59,23 @@ func (s *dummyStorage) DeleteScanMatch(pattern string) bool {
 	return false
 }
 
+func (s *dummyStorage) RemoveFromList(keyName, value string) error {
+
+	return nil
+}
+
+func (s *dummyStorage) GetListRange(keyName string, from, to int64) ([]string, error) {
+	return nil, nil
+}
+
+func (s *dummyStorage) Exists(keyName string) (bool, error) {
+	return false, nil
+}
+
+func (s *dummyStorage) AppendToSet(string, string) {
+
+}
+
 func (s *dummyStorage) GetKeys(pattern string) (keys []string) {
 	if pattern != "*" {
 		return nil
