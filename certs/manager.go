@@ -13,7 +13,6 @@ import (
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -374,7 +373,6 @@ func (c *CertificateManager) ListRawPublicKey(keyID string) (out interface{}) {
 
 func (c *CertificateManager) ListAllIds(prefix string) (out []string) {
 	indexKey := prefix + "-index"
-	fmt.Println("prefix::", prefix)
 	exists, _ := c.storage.Exists(indexKey)
 	if !exists {
 		keys := c.storage.GetKeys("raw-" + prefix + "*")
