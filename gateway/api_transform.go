@@ -86,7 +86,6 @@ type GolangMiddlewareConfigData struct {
 // APIDefinition to store api definition
 type APIDefinition struct {
 	Name                       string                     `json:"name"`
-	Platforms                  []string                   `json:"platforms"`
 	ListenPath                 string                     `json:"listen_path"`
 	TargetURL                  string                     `json:"target_url"`
 	AuthType                   string                     `json:"authtype"`
@@ -320,11 +319,6 @@ func addOrUpdateApi(r *http.Request) (interface{}, int) {
 		return apiError("Internal Error. Try after some time"), http.StatusInternalServerError
 	}
 
-	platform, err := getPlatform(SystemConfigFilePath)
-	if err != nil {
-		return apiError("Could not get platform type"), http.StatusInternalServerError
-	}
-
 	host, err := getInbandIP(SystemConfigFilePath)
 	if err != nil {
 		return apiError("Could not get inband IP"), http.StatusInternalServerError
@@ -351,162 +345,157 @@ func addOrUpdateApi(r *http.Request) (interface{}, int) {
 		for _, api := range apis {
 			var temp map[string]interface{}
 			APIID := service + "-" + api.Name
-			if Contains(api.Platforms, platform) {
-				switch api.AuthType {
-				case "open":
-					json.Unmarshal(OpenAPI, &temp)
-				case "jwt":
-					json.Unmarshal(JWTAPI, &temp)
-				default:
-					return apiError("Unsupported auth type. It should be either open or jwt"), http.StatusBadRequest
-				}
+			switch api.AuthType {
+			case "open":
+				json.Unmarshal(OpenAPI, &temp)
+			case "jwt":
+				json.Unmarshal(JWTAPI, &temp)
+			default:
+				return apiError("Unsupported auth type. It should be either open or jwt"), http.StatusBadRequest
+			}
 
-				temp["name"] = api.Name
-				temp["api_id"] = APIID
-				temp["slug"] = APIID
+			temp["name"] = api.Name
+			temp["api_id"] = APIID
+			temp["slug"] = APIID
 
-				//update target host
-				if api.UpdateTargetHost {
-					api.TargetURL = strings.Replace(api.TargetURL, "localhost", host, 1)
-				}
-				temp["proxy"].(map[string]interface{})["target_url"] = api.TargetURL
+			//update target host
+			if api.UpdateTargetHost {
+				api.TargetURL = strings.Replace(api.TargetURL, "localhost", host, 1)
+			}
+			temp["proxy"].(map[string]interface{})["target_url"] = api.TargetURL
 
-				temp["proxy"].(map[string]interface{})["listen_path"] = api.ListenPath
-				if len(api.URLRewrites) > 0 {
-					temp["version_data"].(map[string]interface {
-					})["versions"].(map[string]interface {
-					})["Default"].(map[string]interface {
-					})["extended_paths"].(map[string]interface {
-					})["url_rewrites"] = api.URLRewrites
-				}
+			temp["proxy"].(map[string]interface{})["listen_path"] = api.ListenPath
+			if len(api.URLRewrites) > 0 {
+				temp["version_data"].(map[string]interface {
+				})["versions"].(map[string]interface {
+				})["Default"].(map[string]interface {
+				})["extended_paths"].(map[string]interface {
+				})["url_rewrites"] = api.URLRewrites
+			}
 
-				if len(api.RemoveHeaders) > 0 {
-					temp["version_data"].(map[string]interface {
-					})["versions"].(map[string]interface {
-					})["Default"].(map[string]interface {
-					})["global_headers_remove"] = api.RemoveHeaders
-				}
+			if len(api.RemoveHeaders) > 0 {
+				temp["version_data"].(map[string]interface {
+				})["versions"].(map[string]interface {
+				})["Default"].(map[string]interface {
+				})["global_headers_remove"] = api.RemoveHeaders
+			}
 
-				if len(api.AuthCookieName) != 0 {
-					temp["auth"].(map[string]interface {
-					})["cookie_name"] = api.AuthCookieName
+			if len(api.AuthCookieName) != 0 {
+				temp["auth"].(map[string]interface {
+				})["cookie_name"] = api.AuthCookieName
 
-					temp["auth"].(map[string]interface {
-					})["auth_header_name"] = api.AuthCookieName
-				}
+				temp["auth"].(map[string]interface {
+				})["auth_header_name"] = api.AuthCookieName
+			}
 
-				// Inject middleware
-				if api.EnablePythonMiddleware {
-					log.Info("Adding custom middleware folder for python ", APIID)
-					temp["custom_middleware_bundle"] = TykMiddlewareBundleName
-					temp["config_data"] = api.PythonMiddlewareConfigData
+			// Inject middleware
+			if api.EnablePythonMiddleware {
+				log.Info("Adding custom middleware folder for python ", APIID)
+				temp["custom_middleware_bundle"] = TykMiddlewareBundleName
+				temp["config_data"] = api.PythonMiddlewareConfigData
 
-					// Create api_hash folder under middleware
-					middlewareBundlePath := strings.Join([]string{
-						TykMiddlewareRoot, "/", TykBundles, "/", APIID, "_", TykMiddlewareBundleNameHash}, "")
+				// Create api_hash folder under middleware
+				middlewareBundlePath := strings.Join([]string{
+					TykMiddlewareRoot, "/", TykBundles, "/", APIID, "_", TykMiddlewareBundleNameHash}, "")
 
-					if _, err := os.Stat(middlewareBundlePath); os.IsNotExist(err) {
-						// make folder and copy manifest and middleware.py to it
-						err := os.MkdirAll(middlewareBundlePath, os.ModePerm)
-						if err != nil {
-							return apiError("Middleware Error"), http.StatusInternalServerError
-						}
-
-						middlewareDestination := strings.Join([]string{middlewareBundlePath, "/", TykMiddlewareFile}, "")
-						middlewareSource := strings.Join([]string{TykMiddlewareSrcFile}, "")
-						_, mErr := copyFile(middlewareSource, middlewareDestination)
-						if mErr != nil {
-							return apiError("Middleware Error"), http.StatusInternalServerError
-						}
-
-						manifestDestination := strings.Join([]string{middlewareBundlePath, "/", TykManifest}, "")
-						manifestSource := strings.Join([]string{TykMiddlewareManifestSrcFile}, "")
-						_, maErr := copyFile(manifestSource, manifestDestination)
-						if maErr != nil {
-							return apiError("Middleware Error"), http.StatusInternalServerError
-						}
-
-						log.Info("Added custom middleware folder for ", APIID)
+				if _, err := os.Stat(middlewareBundlePath); os.IsNotExist(err) {
+					// make folder and copy manifest and middleware.py to it
+					err := os.MkdirAll(middlewareBundlePath, os.ModePerm)
+					if err != nil {
+						return apiError("Middleware Error"), http.StatusInternalServerError
 					}
-				}
 
-				if api.EnableGolangMiddleware {
-					log.Info("Adding custom middleware folder for golang ", APIID)
-					temp["custom_middleware_bundle"] = TykMiddlewareBundleName
-					//golang plugin does not have support for config_data
-
-					// Create api_hash folder under middleware
-					middlewareBundlePath := strings.Join([]string{
-						TykMiddlewareRoot, "/", TykBundles, "/", APIID, "_", TykMiddlewareBundleNameHash}, "")
-
-					middlewareBundlePathInK8S := strings.Join([]string{
-						TykMiddlewareRoot, "/", TykBundles, "/", APIID, "_", TykMiddlewareBundleNameHash}, "")
-
-					if _, err := os.Stat(middlewareBundlePath); os.IsNotExist(err) {
-						// make folder and copy manifest and middleware.py to it
-						err := os.MkdirAll(middlewareBundlePath, os.ModePerm)
-						if err != nil {
-							return apiError("Middleware Error"), http.StatusInternalServerError
-						}
-
-						//Copy shared object ".so" pointed by path to respective bundle folder
-						middlewareDestination := strings.Join([]string{middlewareBundlePath, "/", api.GolangMiddlewareConfigData.Path}, "")
-						middlewareSource := strings.Join([]string{TykRoot, "/", api.GolangMiddlewareConfigData.Path}, "")
-						_, mErr := copyFile(middlewareSource, middlewareDestination)
-						if mErr != nil {
-							return apiError("Middleware Error"), http.StatusInternalServerError
-						}
-
-						//Read sample manifest file and marshel through the structure
-						sharedObjectAbsPathInK8S := strings.Join(
-							[]string{middlewareBundlePathInK8S, "/", api.GolangMiddlewareConfigData.Path}, "")
-
-						gm := GolangManifest{Checksum: "", Signature: ""}
-						post := Post{Name: api.GolangMiddlewareConfigData.Name, Path: sharedObjectAbsPathInK8S, RequireSession: false}
-						gm.CustomMiddleware.Post = append(gm.CustomMiddleware.Post, post)
-						gm.CustomMiddleware.Driver = "goplugin"
-
-						data, gErr := json.MarshalIndent(gm, "", "  ")
-						if gErr != nil {
-							return apiError("Middleware Error"), http.StatusInternalServerError
-						}
-
-						manifestDestination := strings.Join([]string{middlewareBundlePath, "/", TykManifest}, "")
-
-						err = ioutil.WriteFile(manifestDestination, data, 0644)
-						if err != nil {
-							return apiError("Middleware Error"), http.StatusInternalServerError
-						}
-
-						log.Info("Added golang middleware folder for ", APIID)
+					middlewareDestination := strings.Join([]string{middlewareBundlePath, "/", TykMiddlewareFile}, "")
+					middlewareSource := strings.Join([]string{TykMiddlewareSrcFile}, "")
+					_, mErr := copyFile(middlewareSource, middlewareDestination)
+					if mErr != nil {
+						return apiError("Middleware Error"), http.StatusInternalServerError
 					}
+
+					manifestDestination := strings.Join([]string{middlewareBundlePath, "/", TykManifest}, "")
+					manifestSource := strings.Join([]string{TykMiddlewareManifestSrcFile}, "")
+					_, maErr := copyFile(manifestSource, manifestDestination)
+					if maErr != nil {
+						return apiError("Middleware Error"), http.StatusInternalServerError
+					}
+
+					log.Info("Added custom middleware folder for ", APIID)
 				}
+			}
 
-				if api.EnableMTLS {
-					var certs = map[string]string{}
+			if api.EnableGolangMiddleware {
+				log.Info("Adding custom middleware folder for golang ", APIID)
+				temp["custom_middleware_bundle"] = TykMiddlewareBundleName
+				//golang plugin does not have support for config_data
 
-					certs["*"] = TykUpstreamPem
-					temp["upstream_certificates"] = certs
+				// Create api_hash folder under middleware
+				middlewareBundlePath := strings.Join([]string{
+					TykMiddlewareRoot, "/", TykBundles, "/", APIID, "_", TykMiddlewareBundleNameHash}, "")
+
+				middlewareBundlePathInK8S := strings.Join([]string{
+					TykMiddlewareRoot, "/", TykBundles, "/", APIID, "_", TykMiddlewareBundleNameHash}, "")
+
+				if _, err := os.Stat(middlewareBundlePath); os.IsNotExist(err) {
+					// make folder and copy manifest and middleware.py to it
+					err := os.MkdirAll(middlewareBundlePath, os.ModePerm)
+					if err != nil {
+						return apiError("Middleware Error"), http.StatusInternalServerError
+					}
+
+					//Copy shared object ".so" pointed by path to respective bundle folder
+					middlewareDestination := strings.Join([]string{middlewareBundlePath, "/", api.GolangMiddlewareConfigData.Path}, "")
+					middlewareSource := strings.Join([]string{TykRoot, "/", api.GolangMiddlewareConfigData.Path}, "")
+					_, mErr := copyFile(middlewareSource, middlewareDestination)
+					if mErr != nil {
+						return apiError("Middleware Error"), http.StatusInternalServerError
+					}
+
+					//Read sample manifest file and marshel through the structure
+					sharedObjectAbsPathInK8S := strings.Join(
+						[]string{middlewareBundlePathInK8S, "/", api.GolangMiddlewareConfigData.Path}, "")
+
+					gm := GolangManifest{Checksum: "", Signature: ""}
+					post := Post{Name: api.GolangMiddlewareConfigData.Name, Path: sharedObjectAbsPathInK8S, RequireSession: false}
+					gm.CustomMiddleware.Post = append(gm.CustomMiddleware.Post, post)
+					gm.CustomMiddleware.Driver = "goplugin"
+
+					data, gErr := json.MarshalIndent(gm, "", "  ")
+					if gErr != nil {
+						return apiError("Middleware Error"), http.StatusInternalServerError
+					}
+
+					manifestDestination := strings.Join([]string{middlewareBundlePath, "/", TykManifest}, "")
+
+					err = ioutil.WriteFile(manifestDestination, data, 0644)
+					if err != nil {
+						return apiError("Middleware Error"), http.StatusInternalServerError
+					}
+
+					log.Info("Added golang middleware folder for ", APIID)
 				}
+			}
 
-				if api.EnableLoadBalancing {
-					temp["uptime_tests"] = api.LoadBalancingConfigData
-					temp["proxy"].(map[string]interface{})["check_host_against_uptime_tests"] = true
-					temp["proxy"].(map[string]interface{})["enable_load_balancing"] = true
-					temp["proxy"].(map[string]interface{})["service_discovery"] = api.LoadBalancingConfigData.Config.ServiceDiscovery
-				}
+			if api.EnableMTLS {
+				var certs = map[string]string{}
 
-				//temp has the definition - add it to Redis
-				apiJSON, _ := json.Marshal(temp)
+				certs["*"] = TykUpstreamPem
+				temp["upstream_certificates"] = certs
+			}
 
-				//Append service name while adding it to Redis for easy lookup while deleting APIs
-				_, err = c.Do("SET", APIID, apiJSON)
-				if err != nil {
-					return apiError("Could not add api to redis store"), http.StatusInternalServerError
-				}
+			if api.EnableLoadBalancing {
+				temp["uptime_tests"] = api.LoadBalancingConfigData
+				temp["proxy"].(map[string]interface{})["check_host_against_uptime_tests"] = true
+				temp["proxy"].(map[string]interface{})["enable_load_balancing"] = true
+				temp["proxy"].(map[string]interface{})["service_discovery"] = api.LoadBalancingConfigData.Config.ServiceDiscovery
+			}
 
-			} else {
-				log.Warn("Platform Missmatch .. skip adding: ", APIID)
+			//temp has the definition - add it to Redis
+			apiJSON, _ := json.Marshal(temp)
+
+			//Append service name while adding it to Redis for easy lookup while deleting APIs
+			_, err = c.Do("SET", APIID, apiJSON)
+			if err != nil {
+				return apiError("Could not add api to redis store"), http.StatusInternalServerError
 			}
 		}
 
@@ -911,30 +900,6 @@ func deleteAPIByService(service string) (interface{}, int) {
 	reloadURLStructure(nil)
 
 	return response, http.StatusOK
-}
-
-func getPlatform(SysConfPath string) (string, error) {
-	var ret = "aci"
-	data := make(map[interface{}]interface{})
-	SysConfData, err := ioutil.ReadFile(SysConfPath)
-	if err != nil {
-		log.Error("Error reading platform type", err)
-		ret = "any"
-	}
-
-	err = yaml.Unmarshal(SysConfData, &data)
-	if err != nil {
-		log.Error("Error reading platform type", err)
-		ret = "any"
-	}
-
-	if val, found := data["mode"]; found {
-		if val == "standalone" {
-			ret = "mso"
-		}
-	}
-
-	return ret, nil
 }
 
 func getInbandIP(SysConfPath string) (string, error) {
