@@ -1,6 +1,7 @@
 package python
 
 import (
+	"net/http"
 	"net/url"
 	"testing"
 	"time"
@@ -168,9 +169,9 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 		time.Sleep(1 * time.Second)
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/", Headers: map[string]string{"Authorization": "valid_token"}, Code: 200},
-			{Path: "/", Headers: map[string]string{"Authorization": "valid_token"}, Code: 200},
-			{Path: "/", Headers: map[string]string{"Authorization": "invalid_token"}, Code: 403},
+			{Path: "/", Headers: map[string]string{"Authorization": "valid_token"}, Code: http.StatusOK},
+			{Path: "/", Headers: map[string]string{"Authorization": "valid_token"}, Code: http.StatusOK},
+			{Path: "/", Headers: map[string]string{"Authorization": "invalid_token"}, Code: http.StatusForbidden},
 		}...)
 	})
 	t.Run("Form value", func(t *testing.T) {
@@ -184,9 +185,9 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 		formHeaders := map[string]string{"Content-Type": "application/x-www-form-urlencoded"}
 
 		ts.Run(t, []test.TestCase{
-			{Method: "POST", Path: "/", Headers: formHeaders, Data: url.Values{"auth": []string{"valid_token"}}.Encode(), Code: 200},
-			{Method: "POST", Path: "/", Headers: formHeaders, Data: url.Values{"auth": []string{"valid_token"}}.Encode(), Code: 200},
-			{Method: "POST", Path: "/", Headers: formHeaders, Data: url.Values{"auth": []string{"invalid_token"}}.Encode(), Code: 403},
+			{Method: "POST", Path: "/", Headers: formHeaders, Data: url.Values{"auth": []string{"valid_token"}}.Encode(), Code: http.StatusOK},
+			{Method: "POST", Path: "/", Headers: formHeaders, Data: url.Values{"auth": []string{"valid_token"}}.Encode(), Code: http.StatusOK},
+			{Method: "POST", Path: "/", Headers: formHeaders, Data: url.Values{"auth": []string{"invalid_token"}}.Encode(), Code: http.StatusForbidden},
 		}...)
 	})
 	t.Run("Header regex", func(t *testing.T) {
@@ -198,9 +199,9 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 		time.Sleep(1 * time.Second)
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/", Headers: map[string]string{"Authorization": "prefix-12345"}, Code: 200},
-			{Path: "/", Headers: map[string]string{"Authorization": "prefix-12345"}, Code: 200},
-			{Path: "/", Headers: map[string]string{"Authorization": "prefix-123456"}, Code: 403},
+			{Path: "/", Headers: map[string]string{"Authorization": "prefix-12345"}, Code: http.StatusOK},
+			{Path: "/", Headers: map[string]string{"Authorization": "prefix-12345"}, Code: http.StatusOK},
+			{Path: "/", Headers: map[string]string{"Authorization": "prefix-123456"}, Code: http.StatusForbidden},
 		}...)
 	})
 }
