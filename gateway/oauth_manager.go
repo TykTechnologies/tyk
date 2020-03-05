@@ -399,7 +399,7 @@ const (
 	prefixAccess          = "oauth-access."
 	prefixRefresh         = "oauth-refresh."
 	prefixClientset       = "oauth-clientset."
-	prefixClientIndexList = "oauth-client-index-test5."
+	prefixClientIndexList = "oauth-client-index."
 	prefixClientTokens    = "oauth-client-tokens."
 )
 
