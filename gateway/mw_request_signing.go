@@ -83,6 +83,10 @@ func (s *RequestSigning) getRequestPath(r *http.Request) string {
 	} else {
 		if s.Spec.Proxy.StripListenPath {
 			path = s.Spec.StripListenPath(r, r.URL.Path)
+			if path[:1] != "/" {
+				path = "/" + path
+			}
+
 		}
 	}
 
