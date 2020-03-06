@@ -360,7 +360,7 @@ func TestIgnored(t *testing.T) {
 	})
 
 	t.Run("Case Sensitivity", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		spec := BuildAPI(func(spec *APISpec) {
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.ExtendedPaths.Ignored = []apidef.EndPointMeta{{Path: "/Foo", IgnoreCase: false}, {Path: "/bar", IgnoreCase: true}}
 				v.UseExtendedPaths = true
@@ -368,7 +368,9 @@ func TestIgnored(t *testing.T) {
 
 			spec.UseKeylessAccess = false
 			spec.Proxy.ListenPath = "/"
-		})
+		})[0]
+
+		LoadAPI(spec)
 
 		_, _ = ts.Run(t, []test.TestCase{
 			{Path: "/foo", Code: http.StatusUnauthorized},
@@ -376,6 +378,21 @@ func TestIgnored(t *testing.T) {
 			{Path: "/bar", Code: http.StatusOK},
 			{Path: "/Bar", Code: http.StatusOK},
 		}...)
+
+		t.Run("ignore-case globally", func(t *testing.T) {
+			globalConf := config.Global()
+			globalConf.IgnoreEndpointCase = true
+			config.SetGlobal(globalConf)
+
+			LoadAPI(spec)
+
+			_, _ = ts.Run(t, []test.TestCase{
+				{Path: "/foo", Code: http.StatusOK},
+				{Path: "/Foo", Code: http.StatusOK},
+				{Path: "/bar", Code: http.StatusOK},
+				{Path: "/Bar", Code: http.StatusOK},
+			}...)
+		})
 	})
 }
 

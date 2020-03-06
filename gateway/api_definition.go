@@ -525,7 +525,7 @@ func (a APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, 
 	apiLangIDsRegex := regexp.MustCompile(`{([^}]*)}`)
 	asRegexStr := apiLangIDsRegex.ReplaceAllString(stringSpec, `([^/]*)`)
 	// Case insensitive match
-	if newSpec.IgnoreCase {
+	if newSpec.IgnoreCase || config.Global().IgnoreEndpointCase {
 		asRegexStr = "(?i)" + asRegexStr
 	}
 	asRegex, _ := regexp.Compile(asRegexStr)
