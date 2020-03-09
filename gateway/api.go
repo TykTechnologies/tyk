@@ -1883,7 +1883,7 @@ func handleDeleteOAuthClient(keyName, apiID string) (interface{}, int) {
 const oAuthNotPropagatedErr = "OAuth client list isn't available or hasn't been propagated yet."
 const oAuthClientNotFound = "OAuth client not found"
 
-func getApiClients(apiID string)([]ExtendedOsinClientInterface, apiStatusMessage, int){
+func getApiClients(apiID string) ([]ExtendedOsinClientInterface, apiStatusMessage, int) {
 	filterID := prefixClient
 	apiSpec := getApiSpec(apiID)
 	if apiSpec == nil {
@@ -1927,7 +1927,7 @@ func getOauthClients(apiID string) (interface{}, int) {
 	clientData, _, apiStatusCode := getApiClients(apiID)
 
 	if apiStatusCode != 200 {
-		return clientData,apiStatusCode
+		return clientData, apiStatusCode
 	}
 
 	clients := []NewClientRequest{}
@@ -2084,13 +2084,13 @@ func RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request) {
 	clientId := r.PostFormValue("client_id")
 	clientSecret := r.PostFormValue("client_secret")
 
-	if clientId == "" || clientSecret  == ""{
+	if clientId == "" || clientSecret == "" {
 		doJSONWrite(w, http.StatusBadRequest, apiError("client_id and client_secret are required"))
 		return
 	}
 
 	apis := getApisForOauthClientId(clientId)
-	log.Info("apis:",apis)
+	log.Info("apis:", apis)
 
 	if len(apis) == 0 {
 		doJSONWrite(w, http.StatusNotFound, apiError("oauth client doesnt have any api related"))
