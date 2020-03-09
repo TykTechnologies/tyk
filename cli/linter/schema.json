@@ -275,6 +275,9 @@
         }
       }
     },
+    "ignore_endpoint_case": {
+      "type": "boolean"
+    },
     "db_app_conf_options": {
       "type": [
         "object",
