@@ -1883,10 +1883,8 @@ func handleDeleteOAuthClient(keyName, apiID string) (interface{}, int) {
 const oAuthNotPropagatedErr = "OAuth client list isn't available or hasn't been propagated yet."
 const oAuthClientNotFound = "OAuth client not found"
 
-// List Clients
-func getOauthClients(apiID string) (interface{}, int) {
+func getApiClients(apiID string)([]ExtendedOsinClientInterface, apiStatusMessage, int){
 	filterID := prefixClient
-
 	apiSpec := getApiSpec(apiID)
 	if apiSpec == nil {
 		log.WithFields(logrus.Fields{
@@ -1895,8 +1893,7 @@ func getOauthClients(apiID string) (interface{}, int) {
 			"status": "fail",
 			"err":    "API not found",
 		}).Error("Failed to retrieve OAuth client list.")
-
-		return apiError(oAuthClientNotFound), http.StatusNotFound
+		return nil, apiError(oAuthClientNotFound), http.StatusNotFound
 	}
 
 	if apiSpec.OAuthManager == nil {
@@ -1907,7 +1904,7 @@ func getOauthClients(apiID string) (interface{}, int) {
 			"err":    "API not found",
 		}).Error("Failed to retrieve OAuth client list.")
 
-		return apiError(oAuthNotPropagatedErr), http.StatusBadRequest
+		return nil, apiError(oAuthNotPropagatedErr), http.StatusBadRequest
 	}
 
 	clientData, err := apiSpec.OAuthManager.OsinServer.Storage.GetClients(filterID, true)
@@ -1919,8 +1916,20 @@ func getOauthClients(apiID string) (interface{}, int) {
 			"err":    err,
 		}).Error("Failed to report OAuth client list")
 
-		return apiError(oAuthClientNotFound), http.StatusNotFound
+		return nil, apiError(oAuthClientNotFound), http.StatusNotFound
 	}
+	return clientData, apiStatusMessage{}, http.StatusOK
+}
+
+// List Clients
+func getOauthClients(apiID string) (interface{}, int) {
+
+	clientData, _, apiStatusCode := getApiClients(apiID)
+
+	if apiStatusCode != 200 {
+		return clientData,apiStatusCode
+	}
+
 	clients := []NewClientRequest{}
 	for _, osinClient := range clientData {
 		reportableClientData := NewClientRequest{
@@ -2021,15 +2030,19 @@ func RevokeTokenHandler(w http.ResponseWriter, r *http.Request) {
 
 	tokenTypeHint := r.PostFormValue("token_type_hint")
 	token := r.PostFormValue("token")
-	apiID := r.PostFormValue("api_id")
+	clientID := r.PostFormValue("client_id")
 
-	storage, code, err := GetStorageForApi(apiID)
-	if err != nil {
-		doJSONWrite(w, code, apiError(err.Error()))
-		return
+	apis := getApisForOauthClientId(clientID)
+
+	for _, apiID := range apis {
+		storage, code, err := GetStorageForApi(apiID)
+		if err != nil {
+			doJSONWrite(w, code, apiError(err.Error()))
+			return
+		}
+		RevokeToken(storage, token, tokenTypeHint)
 	}
 
-	RevokeToken(storage, token, tokenTypeHint)
 	w.WriteHeader(200)
 }
 
@@ -2062,7 +2075,7 @@ func GetStorageForApi(apiID string) (ExtendedOsinStorageInterface, int, error) {
 
 func RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
-
+	status := http.StatusOK
 	if err != nil {
 		doJSONWrite(w, http.StatusBadRequest, apiError("cannot parse form"))
 		return
@@ -2070,14 +2083,30 @@ func RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request) {
 
 	clientId := r.PostFormValue("client_id")
 	clientSecret := r.PostFormValue("client_secret")
-	apiID := r.PostFormValue("api_id")
-	storage, code, err := GetStorageForApi(apiID)
-	if err != nil {
-		doJSONWrite(w, code, apiError(err.Error()))
+
+	if clientId == "" || clientSecret  == ""{
+		doJSONWrite(w, http.StatusBadRequest, apiError("client_id and client_secret are required"))
 		return
 	}
 
-	status := RevokeAllTokens(storage, clientId, clientSecret)
+	apis := getApisForOauthClientId(clientId)
+	log.Info("apis:",apis)
+
+	if len(apis) == 0 {
+		doJSONWrite(w, http.StatusNotFound, apiError("oauth client doesnt have any api related"))
+		return
+	}
+
+	for _, apiId := range apis {
+		storage, code, err := GetStorageForApi(apiId)
+		if err != nil {
+			doJSONWrite(w, code, apiError(err.Error()))
+			return
+		}
+		status = RevokeAllTokens(storage, clientId, clientSecret)
+	}
+
+	//at this moment, only send the last result
 	w.WriteHeader(status)
 }
 
