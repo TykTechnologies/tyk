@@ -244,6 +244,7 @@ type VersionInfo struct {
 	ExtendedPaths       ExtendedPathsSet  `bson:"extended_paths" json:"extended_paths"`
 	GlobalHeaders       map[string]string `bson:"global_headers" json:"global_headers"`
 	GlobalHeadersRemove []string          `bson:"global_headers_remove" json:"global_headers_remove"`
+	IgnoreEndpointCase  bool              `bson:"ignore_endpoint_case" json:"ignore_endpoint_case"`
 	GlobalSizeLimit     int64             `bson:"global_size_limit" json:"global_size_limit"`
 	OverrideTarget      string            `bson:"override_target" json:"override_target"`
 }
