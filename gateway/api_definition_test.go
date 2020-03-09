@@ -393,6 +393,43 @@ func TestIgnored(t *testing.T) {
 				{Path: "/Bar", Code: http.StatusOK},
 			}...)
 		})
+
+		t.Run("ignore-case in api level", func(t *testing.T) {
+			globalConf := config.Global()
+			globalConf.IgnoreEndpointCase = false
+			config.SetGlobal(globalConf)
+
+			v := spec.VersionData.Versions["v1"]
+			v.IgnoreEndpointCase = true
+			spec.VersionData.Versions["v1"] = v
+
+			LoadAPI(spec)
+
+			_, _ = ts.Run(t, []test.TestCase{
+				{Path: "/foo", Code: http.StatusOK},
+				{Path: "/Foo", Code: http.StatusOK},
+				{Path: "/bar", Code: http.StatusOK},
+				{Path: "/Bar", Code: http.StatusOK},
+			}...)
+		})
+
+		// Check whether everything returns normal
+		globalConf := config.Global()
+		globalConf.IgnoreEndpointCase = false
+		config.SetGlobal(globalConf)
+
+		v := spec.VersionData.Versions["v1"]
+		v.IgnoreEndpointCase = false
+		spec.VersionData.Versions["v1"] = v
+
+		LoadAPI(spec)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/foo", Code: http.StatusUnauthorized},
+			{Path: "/Foo", Code: http.StatusOK},
+			{Path: "/bar", Code: http.StatusOK},
+			{Path: "/Bar", Code: http.StatusOK},
+		}...)
 	})
 }
 
