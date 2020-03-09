@@ -40,7 +40,6 @@ func TestStripAuth_stripFromHeaders(t *testing.T) {
 
 			sa := StripAuth{}
 			sa.Spec = &APISpec{APIDefinition: &apidef.APIDefinition{}}
-			sa.Spec.Auth = tc.AuthConfig
 
 			req, err := http.NewRequest("GET", "http://example.com", nil)
 			if err != nil {
@@ -57,7 +56,7 @@ func TestStripAuth_stripFromHeaders(t *testing.T) {
 				req.Header.Add(h, randStringBytes(5))
 			}
 
-			sa.stripFromHeaders(req)
+			sa.stripFromHeaders(req, &tc.AuthConfig)
 
 			if len(req.Header) != len(miscHeaders) {
 				t.Logf("miscHeaders %d %+v\n", len(miscHeaders), miscHeaders)
@@ -79,7 +78,7 @@ func TestStripAuth_stripFromHeaders(t *testing.T) {
 		}
 		sa := StripAuth{}
 		sa.Spec = &APISpec{APIDefinition: &apidef.APIDefinition{}}
-		sa.Spec.Auth = apidef.AuthConfig{}
+
 		key := "Cookie"
 		stripFromCookieTest(t, req, key, sa, "Authorization=AUTHORIZATION", "")
 		stripFromCookieTest(t, req, key, sa, "Authorization=AUTHORIZATION;Dummy=DUMMY", "Dummy=DUMMY")
@@ -87,14 +86,17 @@ func TestStripAuth_stripFromHeaders(t *testing.T) {
 		stripFromCookieTest(t, req, key, sa, "Dummy=DUMMY;Authorization=AUTHORIZATION;Dummy2=DUMMY2", "Dummy=DUMMY;Dummy2=DUMMY2")
 
 		key = "NonDefaultName"
-		sa.Spec.Auth = apidef.AuthConfig{CookieName: key}
+		sa.Spec.AuthConfigs = map[string]apidef.AuthConfig{
+			authTokenType: {CookieName: key},
+		}
 		stripFromCookieTest(t, req, key, sa, "Dummy=DUMMY;Authorization=AUTHORIZATION;Dummy2=DUMMY2", "Dummy=DUMMY;Dummy2=DUMMY2")
 	})
 }
 
 func stripFromCookieTest(t *testing.T, req *http.Request, key string, sa StripAuth, value string, expected string) {
 	req.Header.Set(key, value)
-	sa.stripFromHeaders(req)
+	config := sa.Spec.AuthConfigs[authTokenType]
+	sa.stripFromHeaders(req, &config)
 
 	actual := req.Header.Get(key)
 
@@ -112,7 +114,6 @@ func BenchmarkStripAuth_stripFromHeaders(b *testing.B) {
 		for _, tc := range testCases {
 			sa := StripAuth{}
 			sa.Spec = &APISpec{APIDefinition: &apidef.APIDefinition{}}
-			sa.Spec.Auth = tc.AuthConfig
 
 			req, err := http.NewRequest("GET", "http://example.com", nil)
 			if err != nil {
@@ -129,7 +130,7 @@ func BenchmarkStripAuth_stripFromHeaders(b *testing.B) {
 				req.Header.Add(h, randStringBytes(5))
 			}
 
-			sa.stripFromHeaders(req)
+			sa.stripFromHeaders(req, &tc.AuthConfig)
 		}
 	}
 }
@@ -164,7 +165,6 @@ func TestStripAuth_stripFromParams(t *testing.T) {
 
 			sa := StripAuth{}
 			sa.Spec = &APISpec{APIDefinition: &apidef.APIDefinition{}}
-			sa.Spec.Auth = tc.AuthConfig
 
 			rawUrl := "http://example.com/abc"
 
@@ -187,7 +187,7 @@ func TestStripAuth_stripFromParams(t *testing.T) {
 				t.Fatal("params not present", tc.QueryParam)
 			}
 
-			sa.stripFromParams(req)
+			sa.stripFromParams(req, &tc.AuthConfig)
 
 			queryStringValues := req.URL.Query()
 
@@ -207,7 +207,6 @@ func BenchmarkStripAuth_stripFromParams(b *testing.B) {
 		for _, tc := range testCases {
 			sa := StripAuth{}
 			sa.Spec = &APISpec{APIDefinition: &apidef.APIDefinition{}}
-			sa.Spec.Auth = tc.AuthConfig
 
 			req, err := http.NewRequest("GET", "http://example.com/abc", nil)
 			if err != nil {
@@ -226,7 +225,7 @@ func BenchmarkStripAuth_stripFromParams(b *testing.B) {
 				b.Fatal("params not present", tc.QueryParam)
 			}
 
-			sa.stripFromParams(req)
+			sa.stripFromParams(req, &tc.AuthConfig)
 		}
 	}
 }

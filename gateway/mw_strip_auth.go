@@ -1,11 +1,12 @@
 package gateway
 
 import (
+	"github.com/sirupsen/logrus"
 	"net/http"
 	"net/url"
 	"strings"
 
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 type StripAuth struct {
@@ -22,24 +23,23 @@ func (sa *StripAuth) EnabledForSpec() bool {
 
 func (sa *StripAuth) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 
-	config := sa.Spec.Auth
+	for typ, config := range sa.Spec.AuthConfigs {
 
-	log.WithFields(logrus.Fields{
-		"prefix": sa.Name(),
-	}).Debugf("sa.Spec.Auth: %+v\n", config)
+		log.WithFields(logrus.Fields{
+			"prefix": sa.Name(),
+		}).Debugf("%s: %+v\n", typ, config)
 
-	if sa.Spec.Auth.UseParam {
-		sa.stripFromParams(r)
+		if config.UseParam {
+			sa.stripFromParams(r, &config)
+		}
+		sa.stripFromHeaders(r, &config)
 	}
-	sa.stripFromHeaders(r)
 
 	return nil, http.StatusOK
 }
 
 // strips auth from query string params
-func (sa *StripAuth) stripFromParams(r *http.Request) {
-
-	config := sa.Spec.Auth
+func (sa *StripAuth) stripFromParams(r *http.Request, config *apidef.AuthConfig) {
 
 	reqUrlPtr, _ := url.Parse(r.URL.String())
 
@@ -61,9 +61,7 @@ func (sa *StripAuth) stripFromParams(r *http.Request) {
 }
 
 // strips auth key from headers
-func (sa *StripAuth) stripFromHeaders(r *http.Request) {
-
-	config := sa.Spec.Auth
+func (sa *StripAuth) stripFromHeaders(r *http.Request, config *apidef.AuthConfig) {
 
 	authHeaderName := "Authorization"
 	if config.AuthHeaderName != "" {
