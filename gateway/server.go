@@ -146,22 +146,22 @@ func getApiSpec(apiID string) *APISpec {
 	return spec
 }
 
-func getApisForOauthClientId(oauthClientId string) []string{
-	apis:= []string{}
+func getApisForOauthClientId(oauthClientId string) []string {
+	apis := []string{}
 	apisIdsCopy := []string{}
 
 	//generate a copy only with ids so we do not attempt to lock twice
 	apisMu.RLock()
-	for apiId,_ := range apisByID{
+	for apiId, _ := range apisByID {
 		apisIdsCopy = append(apisIdsCopy, apiId)
 	}
 	apisMu.RUnlock()
 
-	for index := range apisIdsCopy{
-		clientsData,_, status := getApiClients(apisIdsCopy[index])
+	for index := range apisIdsCopy {
+		clientsData, _, status := getApiClients(apisIdsCopy[index])
 		if status == http.StatusOK {
-			for _,client := range clientsData{
-				if client.GetId() == oauthClientId{
+			for _, client := range clientsData {
+				if client.GetId() == oauthClientId {
 					apis = append(apis, apisIdsCopy[index])
 				}
 			}
