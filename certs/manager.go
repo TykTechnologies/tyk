@@ -501,15 +501,16 @@ func (c *CertificateManager) Add(certData []byte, orgID string) (string, error) 
 		return "", err
 	}
 
-	c.storage.AppendToSet(orgID+"-index", "raw-"+certID)
+	if orgID != "" {
+		c.storage.AppendToSet(orgID+"-index", "raw-"+certID)
+	}
 
 	return certID, nil
 }
 
-func (c *CertificateManager) Delete(certID string) {
+func (c *CertificateManager) Delete(certID string, orgID string) {
 
-	if len(certID) >= sha256.Size*2 {
-		orgID := certID[:len(certID)-sha256.Size*2]
+	if orgID != "" {
 		c.storage.RemoveFromList(orgID+"-index", "raw-"+certID)
 	}
 

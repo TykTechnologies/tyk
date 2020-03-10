@@ -714,26 +714,19 @@ func (r *RedisOsinStorageInterface) SetClient(id string, orgID string, client os
 
 	keyForSet := prefixClientset + prefixClient // Org ID
 
-	log.Debug("Storing key in oauth clients index list")
 	indexKey := prefixClientIndexList + orgID
 	//check if the indexKey exists
 	exists, err := r.store.Exists(indexKey)
 	if err != nil {
 		return err
 	}
-	// if it exists, delete the key to avoid duplicity in the client index list
+	// if it exists, delete it to avoid duplicity in the client index list
 	if exists {
-		keys, _ := r.store.GetListRange(indexKey, 0, -1)
-		for _, v := range keys {
-			if strings.Contains(v, key) {
-				r.store.RemoveFromList(indexKey, v)
-			}
-		}
+		r.store.RemoveFromList(indexKey, key)
 	}
 	// append to oauth client index list
 	r.store.AppendToSet(indexKey, key)
 
-	log.Debug("Storing copy in set")
 	// In set, there is no option for update so the existing client should be removed before adding new one.
 	set, _ := r.store.GetSet(keyForSet)
 	for _, v := range set {

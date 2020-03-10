@@ -41,7 +41,7 @@ func TestPublicKeyPinning(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer CertificateManager.Delete(pubID)
+	defer CertificateManager.Delete(pubID, "")
 
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	}))
@@ -138,7 +138,7 @@ func TestPublicKeyPinning(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		defer CertificateManager.Delete(serverPubID)
+		defer CertificateManager.Delete(serverPubID, "")
 
 		upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		}))
@@ -158,7 +158,7 @@ func TestPublicKeyPinning(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		defer CertificateManager.Delete(proxyPubID)
+		defer CertificateManager.Delete(proxyPubID, "")
 
 		proxy := initProxy("http", &tls.Config{
 			Certificates: []tls.Certificate{proxyCert},
