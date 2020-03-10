@@ -1722,6 +1722,24 @@ func rotateOauthClientHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, code, obj)
 }
 
+func getApisForOauthApp(w http.ResponseWriter, r *http.Request){
+	apis := []string{}
+	appID := mux.Vars(r)["appID"]
+
+	apisMu.RLock()
+	for apiId,api := range apisByID {
+		if api.UseOauth2 {
+			_, err := api.OAuthManager.OsinServer.Storage.GetClient(appID)
+			if err == nil {
+				apis = append(apis, apiId)
+			}
+		}
+	}
+	apisMu.RUnlock()
+
+	doJSONWrite(w, http.StatusOK, apis)
+}
+
 func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
 	keyName := mux.Vars(r)["keyName"]

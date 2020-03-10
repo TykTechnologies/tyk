@@ -571,7 +571,7 @@ func (r *RedisOsinStorageInterface) GetClient(id string) (osin.Client, error) {
 
 	clientJSON, err := r.store.GetKey(key)
 	if err != nil {
-		log.Errorf("Failure retreiving client ID key %q: %v", key, err)
+		log.Errorf("Failure retrieving client ID key %q: %v", key, err)
 		return nil, err
 	}
 

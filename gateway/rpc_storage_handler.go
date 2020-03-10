@@ -809,10 +809,12 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 		splitKeys := strings.Split(key, ":")
 		if len(splitKeys) > 1 && splitKeys[1] == "resetQuota" {
 			keysToReset[splitKeys[0]] = true
-		} else if len(splitKeys) > 3 {
-			if splitKeys[3] == "oAuthRevokeToken" || splitKeys[3] == "oAuthRevokeAccessToken" || splitKeys[3] == "oAuthRevokeRefreshToken" {
+		} else if len(splitKeys) > 2 {
+			log.Info("uno de revocar tokens:", key)
+			action := splitKeys[len(splitKeys)-1]
+			if action == "oAuthRevokeToken" || action == "oAuthRevokeAccessToken" || action == "oAuthRevokeRefreshToken" {
 				TokensToBeRevoked[splitKeys[0]] = key
-			} else if splitKeys[3] == "oAuthRevokeAllTokens" {
+			} else if action == "oAuthRevokeAllTokens" {
 				oauthClientToBeRevoked[splitKeys[0]] = key
 			}
 		}
@@ -843,6 +845,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 
 	//single and specific tokens
 	for token, key := range TokensToBeRevoked {
+		log.Info("revoke single token:", token)
 		//key formed as: token:apiId:tokenActionTypeHint
 		splitKeys := strings.Split(key, ":")
 		apiId := splitKeys[1]
