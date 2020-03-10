@@ -825,9 +825,9 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 		splitKeys := strings.Split(key, ":")
 		apiId := splitKeys[1]
 		tokenActionTypeHint := splitKeys[2]
-		hashedKey := strings.Contains(token,"#hashed")
+		hashedKey := strings.Contains(token, "#hashed")
 
-		if !hashedKey{
+		if !hashedKey {
 			storage, _, err := GetStorageForApi(apiId)
 			if err != nil {
 				continue
@@ -840,8 +840,8 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 				tokenTypeHint = "refresh_token"
 			}
 			RevokeToken(storage, token, tokenTypeHint)
-		}else{
-			token = strings.Split(token,"#")[0]
+		} else {
+			token = strings.Split(token, "#")[0]
 			handleDeleteHashedKey(token, apiId, false)
 		}
 		SessionCache.Delete(token)
