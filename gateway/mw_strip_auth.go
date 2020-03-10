@@ -1,10 +1,11 @@
 package gateway
 
 import (
-	"github.com/sirupsen/logrus"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -23,16 +24,24 @@ func (sa *StripAuth) EnabledForSpec() bool {
 
 func (sa *StripAuth) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 
-	for typ, config := range sa.Spec.AuthConfigs {
-
+	strip := func(typ string, config *apidef.AuthConfig) {
 		log.WithFields(logrus.Fields{
 			"prefix": sa.Name(),
 		}).Debugf("%s: %+v\n", typ, config)
 
 		if config.UseParam {
-			sa.stripFromParams(r, &config)
+			sa.stripFromParams(r, config)
 		}
-		sa.stripFromHeaders(r, &config)
+		sa.stripFromHeaders(r, config)
+	}
+
+	for typ, config := range sa.Spec.AuthConfigs {
+		strip(typ, &config)
+	}
+
+	// For backward compatibility
+	if len(sa.Spec.AuthConfigs) == 0 {
+		strip(authTokenType, &sa.Spec.Auth)
 	}
 
 	return nil, http.StatusOK
