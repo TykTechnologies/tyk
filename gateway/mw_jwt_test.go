@@ -1389,7 +1389,7 @@ func TestParseRSAKeyFromJWK(t *testing.T) {
 	if err == nil {
 		t.Error("expected an error")
 	}
-	r, err := ParseRSAPublicKey(b)
+	_, err = ParseRSAPublicKey(b)
 	if err != nil {
 		t.Error("decoding as default ", err)
 	}
