@@ -802,7 +802,6 @@ func getSessionAndCreate(keyName string, r *RPCStorageHandler) {
 
 func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 	keysToReset := map[string]bool{}
-	oauthClientToBeRevoked := map[string]string{}
 	TokensToBeRevoked := map[string]string{}
 
 	for _, key := range keys {
@@ -810,60 +809,41 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 		if len(splitKeys) > 1 && splitKeys[1] == "resetQuota" {
 			keysToReset[splitKeys[0]] = true
 		} else if len(splitKeys) > 2 {
-			log.Info("uno de revocar tokens:", key)
 			action := splitKeys[len(splitKeys)-1]
 			if action == "oAuthRevokeToken" || action == "oAuthRevokeAccessToken" || action == "oAuthRevokeRefreshToken" {
 				TokensToBeRevoked[splitKeys[0]] = key
-			} else if action == "oAuthRevokeAllTokens" {
-				oauthClientToBeRevoked[splitKeys[0]] = key
 			}
 		}
-	}
-
-	//remove all token's client
-	for clientId, key := range oauthClientToBeRevoked {
-		//key formed as = clientId:clientSecret:apiId:oAuthRevokeAllTokens
-		splitKeys := strings.Split(key, ":")
-		clientSecret := splitKeys[1]
-		apiId := splitKeys[3]
-
-		storage, _, err := GetStorageForApi(apiId)
-		if err != nil {
-			continue
-		}
-		clientTokens, err := storage.GetClientTokens(clientId)
-		if err != nil {
-			for _, token := range clientTokens {
-				key := token.Token
-				SessionCache.Delete(key)
-				RPCGlobalCache.Delete(r.KeyPrefix + key)
-			}
-		}
-
-		RevokeAllTokens(storage, clientId, clientSecret)
 	}
 
 	//single and specific tokens
 	for token, key := range TokensToBeRevoked {
 		log.Info("revoke single token:", token)
 		//key formed as: token:apiId:tokenActionTypeHint
+		//but hashed as: token#hashed:apiId:tokenActionTypeHint
 		splitKeys := strings.Split(key, ":")
 		apiId := splitKeys[1]
 		tokenActionTypeHint := splitKeys[2]
+		hashedKey := strings.Contains(token,"#hashed")
 
-		storage, _, err := GetStorageForApi(apiId)
-		if err != nil {
-			continue
+		if !hashedKey{
+			storage, _, err := GetStorageForApi(apiId)
+			if err != nil {
+				continue
+			}
+			var tokenTypeHint string
+			switch tokenActionTypeHint {
+			case "oAuthRevokeAccessToken":
+				tokenTypeHint = "access_token"
+			case "oAuthRevokeRefreshToken":
+				tokenTypeHint = "refresh_token"
+			}
+			RevokeToken(storage, token, tokenTypeHint)
+		}else{
+			token = strings.Split(token,"#")[0]
+			handleDeleteHashedKey(token, apiId, false)
 		}
 
-		var tokenTypeHint string
-		switch tokenActionTypeHint {
-		case "oAuthRevokeAccessToken":
-			tokenTypeHint = "access_token"
-		case "oAuthRevokeRefreshToken":
-			tokenTypeHint = "refresh_token"
-		}
-		RevokeToken(storage, token, tokenTypeHint)
 		SessionCache.Delete(token)
 		RPCGlobalCache.Delete(r.KeyPrefix + token)
 	}
