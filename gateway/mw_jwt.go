@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"crypto/md5"
-	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
@@ -578,17 +577,17 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 			k.Logger().WithError(err).Error("Couldn't get token")
 			return nil, err
 		}
-
-		if k.Spec.JWTSigningMethod == RSASign {
-			asRSA, err := ParseRSAPublicKey(val)
+		switch k.Spec.JWTSigningMethod {
+		case RSASign, ECDSASign:
+			key, err := ParseRSAPublicKey(val)
 			if err != nil {
-				logger.WithError(err).Error("Failed to decode JWT to RSA type")
+				logger.WithError(err).Error("Failed to decode JWT key")
 				return nil, err
 			}
-			return asRSA, nil
+			return key, nil
+		default:
+			return val, nil
 		}
-
-		return val, nil
 	})
 
 	if err == nil && token.Valid {
@@ -616,9 +615,8 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 	return errors.New("Key not authorized"), http.StatusForbidden
 }
 
-func ParseRSAPublicKey(data []byte) (*rsa.PublicKey, error) {
+func ParseRSAPublicKey(data []byte) (interface{}, error) {
 	input := data
-
 	block, _ := pem.Decode(data)
 	if block != nil {
 		input = block.Bytes
@@ -627,16 +625,14 @@ func ParseRSAPublicKey(data []byte) (*rsa.PublicKey, error) {
 	var err error
 	pub, err = x509.ParsePKIXPublicKey(input)
 	if err != nil {
-		cert, err := x509.ParseCertificate(input)
-		if err != nil {
-			return nil, err
+		cert, err0 := x509.ParseCertificate(input)
+		if err0 != nil {
+			return nil, err0
 		}
 		pub = cert.PublicKey
+		err = nil
 	}
-	if r, ok := pub.(*rsa.PublicKey); ok {
-		return r, nil
-	}
-	return nil, errors.New("Key is not a valid RSA public key")
+	return pub, err
 }
 
 func (k *JWTMiddleware) timeValidateJWTClaims(c jwt.MapClaims) *jwt.ValidationError {
