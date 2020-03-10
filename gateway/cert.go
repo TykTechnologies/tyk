@@ -453,8 +453,8 @@ func certHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	case "DELETE":
-		orgID := ""
-		if len(certID) >= sha256.Size*2 {
+		orgID := r.URL.Query().Get("org_id")
+		if orgID == "" && len(certID) >= sha256.Size*2 {
 			orgID = certID[:len(certID)-sha256.Size*2]
 		}
 		CertificateManager.Delete(certID, orgID)

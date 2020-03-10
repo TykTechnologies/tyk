@@ -380,13 +380,13 @@ func (c *CertificateManager) ListAllIds(prefix string) (out []string) {
 			c.storage.AppendToSet(indexKey, key)
 			out = append(out, strings.TrimPrefix(key, "raw-"))
 		}
+
 	} else {
 		keys, _ := c.storage.GetListRange(indexKey, 0, -1)
 		for _, key := range keys {
 			out = append(out, strings.TrimPrefix(key, "raw-"))
 		}
 	}
-
 	return out
 }
 
