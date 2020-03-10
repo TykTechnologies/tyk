@@ -802,12 +802,14 @@ func getSessionAndCreate(keyName string, r *RPCStorageHandler) {
 
 func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 	keysToReset := map[string]bool{}
+	keysToProcess := []string{}
 	TokensToBeRevoked := map[string]string{}
 
 	for _, key := range keys {
 		splitKeys := strings.Split(key, ":")
 		if len(splitKeys) > 1 && splitKeys[1] == "resetQuota" {
 			keysToReset[splitKeys[0]] = true
+			keysToProcess = append(keysToProcess, key)
 		} else if len(splitKeys) > 2 {
 			action := splitKeys[len(splitKeys)-1]
 			if action == "oAuthRevokeToken" || action == "oAuthRevokeAccessToken" || action == "oAuthRevokeRefreshToken" {
@@ -818,7 +820,6 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 
 	//single and specific tokens
 	for token, key := range TokensToBeRevoked {
-		log.Info("revoke single token:", token)
 		//key formed as: token:apiId:tokenActionTypeHint
 		//but hashed as: token#hashed:apiId:tokenActionTypeHint
 		splitKeys := strings.Split(key, ":")
@@ -843,12 +844,11 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 			token = strings.Split(token,"#")[0]
 			handleDeleteHashedKey(token, apiId, false)
 		}
-
 		SessionCache.Delete(token)
 		RPCGlobalCache.Delete(r.KeyPrefix + token)
 	}
 
-	for _, key := range keys {
+	for _, key := range keysToProcess {
 		splitKeys := strings.Split(key, ":")
 		_, resetQuota := keysToReset[splitKeys[0]]
 		if len(splitKeys) > 1 && splitKeys[1] == "hashed" {
