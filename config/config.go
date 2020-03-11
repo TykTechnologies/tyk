@@ -421,6 +421,7 @@ type Config struct {
 	TykJSPath                string          `json:"tyk_js_path"`
 	MiddlewarePath           string          `json:"middleware_path"`
 	CoProcessOptions         CoProcessConfig `json:"coprocess_options"`
+	IgnoreEndpointCase       bool            `json:"ignore_endpoint_case"`
 
 	// Monitoring, Logging & Profiling
 	LogLevel                string         `json:"log_level"`

@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 type StripAuth struct {
@@ -22,24 +24,31 @@ func (sa *StripAuth) EnabledForSpec() bool {
 
 func (sa *StripAuth) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 
-	config := sa.Spec.Auth
+	strip := func(typ string, config *apidef.AuthConfig) {
+		log.WithFields(logrus.Fields{
+			"prefix": sa.Name(),
+		}).Debugf("%s: %+v\n", typ, config)
 
-	log.WithFields(logrus.Fields{
-		"prefix": sa.Name(),
-	}).Debugf("sa.Spec.Auth: %+v\n", config)
-
-	if sa.Spec.Auth.UseParam {
-		sa.stripFromParams(r)
+		if config.UseParam {
+			sa.stripFromParams(r, config)
+		}
+		sa.stripFromHeaders(r, config)
 	}
-	sa.stripFromHeaders(r)
+
+	for typ, config := range sa.Spec.AuthConfigs {
+		strip(typ, &config)
+	}
+
+	// For backward compatibility
+	if len(sa.Spec.AuthConfigs) == 0 {
+		strip(authTokenType, &sa.Spec.Auth)
+	}
 
 	return nil, http.StatusOK
 }
 
 // strips auth from query string params
-func (sa *StripAuth) stripFromParams(r *http.Request) {
-
-	config := sa.Spec.Auth
+func (sa *StripAuth) stripFromParams(r *http.Request, config *apidef.AuthConfig) {
 
 	reqUrlPtr, _ := url.Parse(r.URL.String())
 
@@ -61,9 +70,7 @@ func (sa *StripAuth) stripFromParams(r *http.Request) {
 }
 
 // strips auth key from headers
-func (sa *StripAuth) stripFromHeaders(r *http.Request) {
-
-	config := sa.Spec.Auth
+func (sa *StripAuth) stripFromHeaders(r *http.Request, config *apidef.AuthConfig) {
 
 	authHeaderName := "Authorization"
 	if config.AuthHeaderName != "" {
