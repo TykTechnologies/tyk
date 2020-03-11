@@ -1722,6 +1722,24 @@ func rotateOauthClientHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, code, obj)
 }
 
+func getApisForOauthApp(w http.ResponseWriter, r *http.Request) {
+	apis := []string{}
+	appID := mux.Vars(r)["appID"]
+
+	apisMu.RLock()
+	for apiId, api := range apisByID {
+		if api.UseOauth2 {
+			_, err := api.OAuthManager.OsinServer.Storage.GetClient(appID)
+			if err == nil {
+				apis = append(apis, apiId)
+			}
+		}
+	}
+	apisMu.RUnlock()
+
+	doJSONWrite(w, http.StatusOK, apis)
+}
+
 func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
 	keyName := mux.Vars(r)["keyName"]
@@ -1881,11 +1899,10 @@ func handleDeleteOAuthClient(keyName, apiID string) (interface{}, int) {
 }
 
 const oAuthNotPropagatedErr = "OAuth client list isn't available or hasn't been propagated yet."
+const oAuthClientNotFound = "OAuth client not found"
 
-// List Clients
-func getOauthClients(apiID string) (interface{}, int) {
+func getApiClients(apiID string) ([]ExtendedOsinClientInterface, apiStatusMessage, int) {
 	filterID := prefixClient
-
 	apiSpec := getApiSpec(apiID)
 	if apiSpec == nil {
 		log.WithFields(logrus.Fields{
@@ -1894,8 +1911,7 @@ func getOauthClients(apiID string) (interface{}, int) {
 			"status": "fail",
 			"err":    "API not found",
 		}).Error("Failed to retrieve OAuth client list.")
-
-		return apiError("OAuth Client ID not found"), http.StatusNotFound
+		return nil, apiError(oAuthClientNotFound), http.StatusNotFound
 	}
 
 	if apiSpec.OAuthManager == nil {
@@ -1906,7 +1922,7 @@ func getOauthClients(apiID string) (interface{}, int) {
 			"err":    "API not found",
 		}).Error("Failed to retrieve OAuth client list.")
 
-		return apiError(oAuthNotPropagatedErr), http.StatusBadRequest
+		return nil, apiError(oAuthNotPropagatedErr), http.StatusBadRequest
 	}
 
 	clientData, err := apiSpec.OAuthManager.OsinServer.Storage.GetClients(filterID, true)
@@ -1918,8 +1934,20 @@ func getOauthClients(apiID string) (interface{}, int) {
 			"err":    err,
 		}).Error("Failed to report OAuth client list")
 
-		return apiError("OAuth slients not found"), http.StatusNotFound
+		return nil, apiError(oAuthClientNotFound), http.StatusNotFound
 	}
+	return clientData, apiStatusMessage{}, http.StatusOK
+}
+
+// List Clients
+func getOauthClients(apiID string) (interface{}, int) {
+
+	clientData, _, apiStatusCode := getApiClients(apiID)
+
+	if apiStatusCode != 200 {
+		return clientData, apiStatusCode
+	}
+
 	clients := []NewClientRequest{}
 	for _, osinClient := range clientData {
 		reportableClientData := NewClientRequest{
@@ -2008,6 +2036,96 @@ func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	doJSONWrite(w, http.StatusOK, apiOk("cache invalidated"))
+}
+
+func RevokeTokenHandler(w http.ResponseWriter, r *http.Request) {
+	err := r.ParseForm()
+
+	if err != nil {
+		doJSONWrite(w, http.StatusBadRequest, apiError("cannot parse form"))
+		return
+	}
+
+	tokenTypeHint := r.PostFormValue("token_type_hint")
+	token := r.PostFormValue("token")
+	clientID := r.PostFormValue("client_id")
+
+	apis := getApisForOauthClientId(clientID)
+
+	for _, apiID := range apis {
+		storage, code, err := GetStorageForApi(apiID)
+		if err != nil {
+			doJSONWrite(w, code, apiError(err.Error()))
+			return
+		}
+		RevokeToken(storage, token, tokenTypeHint)
+	}
+
+	w.WriteHeader(200)
+}
+
+func GetStorageForApi(apiID string) (ExtendedOsinStorageInterface, int, error) {
+	apiSpec := getApiSpec(apiID)
+	if apiSpec == nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"apiID":  apiID,
+			"status": "fail",
+			"err":    "API not found",
+		}).Error("Failed to retrieve OAuth client list.")
+
+		return nil, http.StatusNotFound, errors.New(oAuthClientNotFound)
+	}
+
+	if apiSpec.OAuthManager == nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"apiID":  apiID,
+			"status": "fail",
+			"err":    "API not found",
+		}).Error("Failed to revoke client tokens.")
+
+		return nil, http.StatusNotFound, errors.New(oAuthNotPropagatedErr)
+	}
+
+	return apiSpec.OAuthManager.OsinServer.Storage, http.StatusOK, nil
+}
+
+func RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request) {
+	err := r.ParseForm()
+	status := http.StatusOK
+	if err != nil {
+		doJSONWrite(w, http.StatusBadRequest, apiError("cannot parse form"))
+		return
+	}
+
+	clientId := r.PostFormValue("client_id")
+	clientSecret := r.PostFormValue("client_secret")
+
+	if clientId == "" || clientSecret == "" {
+		doJSONWrite(w, http.StatusBadRequest, apiError("client_id and client_secret are required"))
+		return
+	}
+
+	apis := getApisForOauthClientId(clientId)
+	log.Info("apis:", apis)
+
+	if len(apis) == 0 {
+		doJSONWrite(w, http.StatusNotFound, apiError("oauth client doesnt have any api related"))
+		return
+	}
+
+	for _, apiId := range apis {
+		storage, code, err := GetStorageForApi(apiId)
+		if err != nil {
+			doJSONWrite(w, code, apiError(err.Error()))
+			return
+		}
+		status = RevokeAllTokens(storage, clientId, clientSecret)
+	}
+
+	//at this moment, only send the last result
+	w.WriteHeader(status)
 }
 
 // TODO: Don't modify http.Request values in-place. We must right now

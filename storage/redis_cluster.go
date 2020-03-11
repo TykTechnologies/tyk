@@ -369,8 +369,7 @@ func (r *RedisCluster) GetKey(keyName string) (string, error) {
 	if err := r.up(); err != nil {
 		return "", err
 	}
-	// log.Debug("[STORE] Getting WAS: ", keyName)
-	// log.Debug("[STORE] Getting: ", r.fixKey(keyName))
+
 	cluster := r.singleton()
 
 	value, err := cluster.Get(r.fixKey(keyName)).Result()
