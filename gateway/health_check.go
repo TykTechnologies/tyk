@@ -93,9 +93,13 @@ func initHealthCheck(ctx context.Context) {
 	}(ctx)
 }
 
-func gatherHealthChecks() {
+type SafeHealthCheck struct {
+	info map[string]HealthCheckItem
+	mux  sync.Mutex
+}
 
-	allInfos := make(map[string]HealthCheckItem, 3)
+func gatherHealthChecks() {
+	allInfos := SafeHealthCheck{info: make(map[string]HealthCheckItem, 3)}
 
 	redisStore := storage.RedisCluster{KeyPrefix: "livenesscheck-"}
 
@@ -120,7 +124,9 @@ func gatherHealthChecks() {
 			checkItem.Status = Fail
 		}
 
-		allInfos["redis"] = checkItem
+		allInfos.mux.Lock()
+		allInfos.info["redis"] = checkItem
+		allInfos.mux.Unlock()
 	}()
 
 	if config.Global().UseDBAppConfigs {
@@ -147,7 +153,10 @@ func gatherHealthChecks() {
 			}
 
 			checkItem.ComponentType = System
-			allInfos["dashboard"] = checkItem
+
+			allInfos.mux.Lock()
+			allInfos.info["dashboard"] = checkItem
+			allInfos.mux.Unlock()
 		}()
 	}
 
@@ -173,13 +182,17 @@ func gatherHealthChecks() {
 
 			checkItem.ComponentType = System
 
-			allInfos["rpc"] = checkItem
+			allInfos.mux.Lock()
+			allInfos.info["rpc"] = checkItem
+			allInfos.mux.Unlock()
 		}()
 	}
 
 	wg.Wait()
 
-	setCurrentHealthCheckInfo(allInfos)
+	allInfos.mux.Lock()
+	setCurrentHealthCheckInfo(allInfos.info)
+	allInfos.mux.Unlock()
 }
 
 func liveCheckHandler(w http.ResponseWriter, r *http.Request) {
