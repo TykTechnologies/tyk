@@ -93,12 +93,26 @@ func initHealthCheck(ctx context.Context) {
 	}(ctx)
 }
 
+type allInfos struct {
+	m   map[string]HealthCheckItem
+	mtx sync.Mutex
+}
+
+func InitAllInfos() *allInfos {
+	return &allInfos{
+		m: make(map[string]HealthCheckItem, 3),
+	}
+}
+
+func (ai *allInfos) Set(key string, hci HealthCheckItem) {
+	ai.mtx.Lock()
+	defer ai.mtx.Unlock()
+	ai.m[key] = hci
+}
+
 func gatherHealthChecks() {
-
-	allInfos := make(map[string]HealthCheckItem, 3)
-
+	ai := InitAllInfos()
 	redisStore := storage.RedisCluster{KeyPrefix: "livenesscheck-"}
-
 	key := "tyk-liveness-probe"
 
 	var wg sync.WaitGroup
@@ -120,7 +134,7 @@ func gatherHealthChecks() {
 			checkItem.Status = Fail
 		}
 
-		allInfos["redis"] = checkItem
+		ai.Set("redis", checkItem)
 	}()
 
 	if config.Global().UseDBAppConfigs {
@@ -147,12 +161,11 @@ func gatherHealthChecks() {
 			}
 
 			checkItem.ComponentType = System
-			allInfos["dashboard"] = checkItem
+			ai.Set("dashboard", checkItem)
 		}()
 	}
 
 	if config.Global().Policies.PolicySource == "rpc" {
-
 		wg.Add(1)
 
 		go func() {
@@ -172,14 +185,13 @@ func gatherHealthChecks() {
 			}
 
 			checkItem.ComponentType = System
-
-			allInfos["rpc"] = checkItem
+			ai.Set("rpc", checkItem)
 		}()
 	}
 
 	wg.Wait()
 
-	setCurrentHealthCheckInfo(allInfos)
+	setCurrentHealthCheckInfo(ai.m)
 }
 
 func liveCheckHandler(w http.ResponseWriter, r *http.Request) {
