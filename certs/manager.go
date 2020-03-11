@@ -30,6 +30,10 @@ type StorageHandler interface {
 	GetKeys(string) []string
 	DeleteKey(string) bool
 	DeleteScanMatch(string) bool
+	GetListRange(string, int64, int64) ([]string, error)
+	RemoveFromList(string, string) error
+	AppendToSet(string, string)
+	Exists(string) (bool, error)
 }
 
 type CertificateManager struct {
@@ -368,12 +372,21 @@ func (c *CertificateManager) ListRawPublicKey(keyID string) (out interface{}) {
 }
 
 func (c *CertificateManager) ListAllIds(prefix string) (out []string) {
-	keys := c.storage.GetKeys("raw-" + prefix + "*")
+	indexKey := prefix + "-index"
+	exists, _ := c.storage.Exists(indexKey)
+	if !exists {
+		keys := c.storage.GetKeys("raw-" + prefix + "*")
+		for _, key := range keys {
+			c.storage.AppendToSet(indexKey, key)
+			out = append(out, strings.TrimPrefix(key, "raw-"))
+		}
 
-	for _, key := range keys {
-		out = append(out, strings.TrimPrefix(key, "raw-"))
+	} else {
+		keys, _ := c.storage.GetListRange(indexKey, 0, -1)
+		for _, key := range keys {
+			out = append(out, strings.TrimPrefix(key, "raw-"))
+		}
 	}
-
 	return out
 }
 
@@ -488,10 +501,19 @@ func (c *CertificateManager) Add(certData []byte, orgID string) (string, error) 
 		return "", err
 	}
 
+	if orgID != "" {
+		c.storage.AppendToSet(orgID+"-index", "raw-"+certID)
+	}
+
 	return certID, nil
 }
 
-func (c *CertificateManager) Delete(certID string) {
+func (c *CertificateManager) Delete(certID string, orgID string) {
+
+	if orgID != "" {
+		c.storage.RemoveFromList(orgID+"-index", "raw-"+certID)
+	}
+
 	c.storage.DeleteKey("raw-" + certID)
 	c.cache.Delete(certID)
 }

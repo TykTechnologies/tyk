@@ -46,7 +46,6 @@ type Handler interface {
 	GetRollingWindow(key string, per int64, pipeline bool) (int, []interface{})
 	GetSet(string) (map[string]string, error)
 	AddToSet(string, string)
-	AppendToSet(string, string)
 	GetAndDeleteSet(string) []interface{}
 	RemoveFromSet(string, string)
 	DeleteScanMatch(string) bool
@@ -54,6 +53,10 @@ type Handler interface {
 	AddToSortedSet(string, string, float64)
 	GetSortedSetRange(string, string, string) ([]string, []float64, error)
 	RemoveSortedSetRange(string, string, string) error
+	GetListRange(string, int64, int64) ([]string, error)
+	RemoveFromList(string, string) error
+	AppendToSet(string, string)
+	Exists(string) (bool, error)
 }
 
 type AnalyticsHandler interface {
