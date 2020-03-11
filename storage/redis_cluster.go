@@ -343,8 +343,7 @@ func (r *RedisCluster) ensureConnection() {
 // GetKey will retrieve a key from the database
 func (r *RedisCluster) GetKey(keyName string) (string, error) {
 	r.ensureConnection()
-	// log.Debug("[STORE] Getting WAS: ", keyName)
-	// log.Debug("[STORE] Getting: ", r.fixKey(keyName))
+
 	cluster := r.singleton()
 
 	value, err := cluster.Get(r.fixKey(keyName)).Result()
