@@ -225,3 +225,18 @@ func (l LDAPStorageHandler) RemoveSortedSetRange(keyName, scoreFrom, scoreTo str
 	log.Error("Not implemented")
 	return nil
 }
+
+func (l LDAPStorageHandler) RemoveFromList(keyName, value string) error {
+	log.Error("Not implemented")
+	return nil
+}
+
+func (l *LDAPStorageHandler) GetListRange(keyName string, from, to int64) ([]string, error) {
+	log.Error("Not implemented")
+	return nil, nil
+}
+
+func (l LDAPStorageHandler) Exists(keyName string) (bool, error) {
+	log.Error("Not implemented")
+	return false, nil
+}

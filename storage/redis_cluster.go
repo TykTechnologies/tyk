@@ -949,6 +949,60 @@ func (r *RedisCluster) AppendToSet(keyName, value string) {
 	}
 }
 
+//Exists check if keyName exists
+func (r *RedisCluster) Exists(keyName string) (bool, error) {
+	fixedKey := r.fixKey(keyName)
+	log.WithField("keyName", fixedKey).Debug("Checking if exists")
+
+	exists, err := r.singleton().Exists(fixedKey).Result()
+	if err != nil {
+		log.Error("Error trying to check if key exists: ", err)
+		return false, err
+	}
+	if exists == 1 {
+		return true, nil
+	}
+	return false, nil
+}
+
+// RemoveFromList delete an value from a list idetinfied with the keyName
+func (r *RedisCluster) RemoveFromList(keyName, value string) error {
+	fixedKey := r.fixKey(keyName)
+	logEntry := logrus.Fields{
+		"keyName":  keyName,
+		"fixedKey": fixedKey,
+		"value":    value,
+	}
+	log.WithFields(logEntry).Debug("Removing value from list")
+
+	if err := r.singleton().LRem(fixedKey, 0, value).Err(); err != nil {
+		log.WithFields(logEntry).WithError(err).Error("LREM command failed")
+		return err
+	}
+
+	return nil
+}
+
+// GetListRange gets range of elements of list identified by keyName
+func (r *RedisCluster) GetListRange(keyName string, from, to int64) ([]string, error) {
+	fixedKey := r.fixKey(keyName)
+	logEntry := logrus.Fields{
+		"keyName":  keyName,
+		"fixedKey": fixedKey,
+		"from":     from,
+		"to":       to,
+	}
+	log.WithFields(logEntry).Debug("Getting list range")
+
+	elements, err := r.singleton().LRange(fixedKey, from, to).Result()
+	if err != nil {
+		log.WithFields(logEntry).WithError(err).Error("LRANGE command failed")
+		return nil, err
+	}
+
+	return elements, nil
+}
+
 func (r *RedisCluster) AppendToSetPipelined(key string, values [][]byte) {
 	if len(values) == 0 {
 		return

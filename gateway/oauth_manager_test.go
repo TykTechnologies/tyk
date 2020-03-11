@@ -141,7 +141,7 @@ func createTestOAuthClient(spec *APISpec, clientID string) {
 		PolicyID:          pID,
 		MetaData:          map[string]interface{}{"foo": "bar", "client": "meta"},
 	}
-	spec.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, &testClient, false)
+	spec.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, "org-id-1", &testClient, false)
 }
 
 func TestOauthMultipleAPIs(t *testing.T) {
@@ -153,12 +153,15 @@ func TestOauthMultipleAPIs(t *testing.T) {
 		spec.UseOauth2 = true
 		spec.UseKeylessAccess = false
 		spec.Proxy.ListenPath = "/api1/"
+		spec.OrgID = "org-id-1"
 	})
 	spec2 := buildTestOAuthSpec(func(spec *APISpec) {
 		spec.APIID = "oauth2_copy"
 		spec.UseKeylessAccess = false
 		spec.UseOauth2 = true
 		spec.Proxy.ListenPath = "/api2/"
+		spec.OrgID = "org-id-2"
+
 	})
 
 	apis := LoadAPI(spec, spec2)
@@ -182,8 +185,8 @@ func TestOauthMultipleAPIs(t *testing.T) {
 		ClientRedirectURI: authRedirectUri,
 		PolicyID:          pID,
 	}
-	spec.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, &testClient, false)
-	spec2.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, &testClient, false)
+	spec.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, spec.OrgID, &testClient, false)
+	spec2.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, spec2.OrgID, &testClient, false)
 
 	param := make(url.Values)
 	param.Set("response_type", "token")

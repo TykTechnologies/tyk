@@ -233,13 +233,13 @@ func TestRSARequestSigning(t *testing.T) {
 
 	_, _, combinedPem, cert := genServerCertificate()
 	privCertId, _ := CertificateManager.Add(combinedPem, "")
-	defer CertificateManager.Delete(privCertId)
+	defer CertificateManager.Delete(privCertId, "")
 
 	x509Cert, _ := x509.ParseCertificate(cert.Certificate[0])
 	pubDer, _ := x509.MarshalPKIXPublicKey(x509Cert.PublicKey)
 	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDer})
 	pubCertId, _ := CertificateManager.Add(pubPem, "")
-	defer CertificateManager.Delete(pubCertId)
+	defer CertificateManager.Delete(pubCertId, "")
 
 	name := "Test with rsa-sha256"
 	t.Run(name, func(t *testing.T) {

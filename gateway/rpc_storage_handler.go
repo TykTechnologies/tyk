@@ -896,3 +896,18 @@ func (r *RPCStorageHandler) RemoveSortedSetRange(keyName, scoreFrom, scoreTo str
 	log.Error("RPCStorageHandler.RemoveSortedSetRange - Not implemented")
 	return nil
 }
+
+func (r *RPCStorageHandler) RemoveFromList(keyName, value string) error {
+	log.Error("Not implemented")
+	return nil
+}
+
+func (r *RPCStorageHandler) GetListRange(keyName string, from, to int64) ([]string, error) {
+	log.Error("Not implemented")
+	return nil, nil
+}
+
+func (r *RPCStorageHandler) Exists(keyName string) (bool, error) {
+	log.Error("Not implemented")
+	return false, nil
+}
