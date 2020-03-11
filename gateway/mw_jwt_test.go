@@ -64,6 +64,12 @@ func createJWTSessionWithRSA() *user.SessionState {
 	return session
 }
 
+func createJWTSessionWithECDSA() *user.SessionState {
+	session := createJWTSession()
+	session.JWTData.Secret = jwtECDSAPublicKey
+	return session
+}
+
 func createJWTSessionWithRSAWithPolicy(policyID string) *user.SessionState {
 	session := createJWTSessionWithRSA()
 	session.SetPolicies(policyID)
@@ -100,6 +106,20 @@ func prepareGenericJWTSession(testName string, method string, claimName string, 
 		sessionFunc = createJWTSessionWithRSA
 
 		jwtToken = CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["foo"] = "bar"
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
+
+			if claimName != KID {
+				t.Claims.(jwt.MapClaims)[claimName] = tokenKID
+				t.Header[KID] = "ignore-this-id"
+			} else {
+				t.Header[KID] = tokenKID
+			}
+		})
+	case ECDSASign:
+		sessionFunc = createJWTSessionWithECDSA
+
+		jwtToken = CreateJWKTokenECDSA(func(t *jwt.Token) {
 			t.Claims.(jwt.MapClaims)["foo"] = "bar"
 			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 
@@ -1377,6 +1397,23 @@ func TestJWTSessionRSAWithEncodedJWK(t *testing.T) {
 			Headers: authHeaders, Code: http.StatusOK,
 		})
 	})
+	t.Run("Direct JWK URL with der encoding", func(t *testing.T) {
+		spec.JWTSource = testHttpJWKDER
+		LoadAPI(spec)
+
+		ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+	})
+
+	t.Run("Base64 JWK URL with der encoding", func(t *testing.T) {
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(testHttpJWKDER))
+		LoadAPI(spec)
+
+		ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+	})
 }
 
 func TestParseRSAKeyFromJWK(t *testing.T) {
@@ -1807,7 +1844,7 @@ func TestJWTECDSASign(t *testing.T) {
 	_, jwtToken := prepareGenericJWTSession(t.Name(), ECDSASign, KID, false)
 	defer ResetTestConfig()
 	authHeaders := map[string]string{"authorization": jwtToken}
-	t.Run("Request with valid JWT/ECDSA signature needs a test. currently defaults to HMAC", func(t *testing.T) {
+	t.Run("Request with valid JWT/ECDSA", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers: authHeaders, Code: http.StatusOK,
 		})
