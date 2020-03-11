@@ -175,6 +175,7 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response) (*copro
 func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Request, origURL string, origMethod string) (err error) {
 	r.ContentLength = int64(len(object.Request.RawBody))
 	r.Body = ioutil.NopCloser(bytes.NewReader(object.Request.RawBody))
+	nopCloseRequestBody(r)
 
 	logger := c.Middleware.Logger()
 
