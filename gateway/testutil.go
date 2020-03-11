@@ -522,6 +522,28 @@ func CreateJWKToken(jGen ...func(*jwt.Token)) string {
 	return tokenString
 }
 
+func CreateJWKTokenECDSA(jGen ...func(*jwt.Token)) string {
+	// Create the token
+	token := jwt.New(jwt.GetSigningMethod("ES256"))
+	// Set the token ID
+
+	if len(jGen) > 0 {
+		jGen[0](token)
+	}
+
+	// Sign and get the complete encoded token as a string
+	signKey, err := jwt.ParseECPrivateKeyFromPEM([]byte(jwtECDSAPrivateKey))
+	if err != nil {
+		panic("Couldn't extract private key: " + err.Error())
+	}
+	tokenString, err := token.SignedString(signKey)
+	if err != nil {
+		panic("Couldn't create JWT token: " + err.Error())
+	}
+
+	return tokenString
+}
+
 func createJWKTokenHMAC(jGen ...func(*jwt.Token)) string {
 	// Create the token
 	token := jwt.New(jwt.SigningMethodHS256)
