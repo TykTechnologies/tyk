@@ -35,7 +35,7 @@ var (
 	healthCheckLock sync.Mutex
 )
 
-func setCurrentHealthCheckInfo(h map[string]HealthCheckItem) {
+func setCurrentHealthCheckInfo(h *sync.Map) {
 	healthCheckLock.Lock()
 	healthCheckInfo.Store(h)
 	healthCheckLock.Unlock()
@@ -43,8 +43,25 @@ func setCurrentHealthCheckInfo(h map[string]HealthCheckItem) {
 
 func getHealthCheckInfo() map[string]HealthCheckItem {
 	healthCheckLock.Lock()
-	ret := healthCheckInfo.Load().(map[string]HealthCheckItem)
+	syncMap := healthCheckInfo.Load()
 	healthCheckLock.Unlock()
+
+	sm, ok := syncMap.(sync.Map)
+	if !ok {
+		panic("stored health check info is of incorrect type")
+	}
+
+	ret := make(map[string]HealthCheckItem)
+
+	sm.Range(func(key, value interface{}) bool {
+		k, kOK := key.(string)
+		v, vOK := value.(HealthCheckItem)
+		if !kOK || !vOK {
+			return false
+		}
+		ret[k] = v
+		return true
+	})
 	return ret
 }
 
@@ -65,7 +82,7 @@ type HealthCheckItem struct {
 }
 
 func initHealthCheck(ctx context.Context) {
-	setCurrentHealthCheckInfo(make(map[string]HealthCheckItem, 3))
+	setCurrentHealthCheckInfo(&sync.Map{})
 
 	go func(ctx context.Context) {
 		var n = config.Global().LivenessCheck.CheckDuration
@@ -93,25 +110,8 @@ func initHealthCheck(ctx context.Context) {
 	}(ctx)
 }
 
-type allInfos struct {
-	m   map[string]HealthCheckItem
-	mtx sync.Mutex
-}
-
-func InitAllInfos() *allInfos {
-	return &allInfos{
-		m: make(map[string]HealthCheckItem, 3),
-	}
-}
-
-func (ai *allInfos) Set(key string, hci HealthCheckItem) {
-	ai.mtx.Lock()
-	defer ai.mtx.Unlock()
-	ai.m[key] = hci
-}
-
 func gatherHealthChecks() {
-	ai := InitAllInfos()
+	hcInfo := &sync.Map{}
 	redisStore := storage.RedisCluster{KeyPrefix: "livenesscheck-"}
 	key := "tyk-liveness-probe"
 
@@ -134,7 +134,7 @@ func gatherHealthChecks() {
 			checkItem.Status = Fail
 		}
 
-		ai.Set("redis", checkItem)
+		hcInfo.Store("redis", checkItem)
 	}()
 
 	if config.Global().UseDBAppConfigs {
@@ -161,7 +161,7 @@ func gatherHealthChecks() {
 			}
 
 			checkItem.ComponentType = System
-			ai.Set("dashboard", checkItem)
+			hcInfo.Store("dashboard", checkItem)
 		}()
 	}
 
@@ -185,13 +185,13 @@ func gatherHealthChecks() {
 			}
 
 			checkItem.ComponentType = System
-			ai.Set("rpc", checkItem)
+			hcInfo.Store("rpc", checkItem)
 		}()
 	}
 
 	wg.Wait()
 
-	setCurrentHealthCheckInfo(ai.m)
+	setCurrentHealthCheckInfo(hcInfo)
 }
 
 func liveCheckHandler(w http.ResponseWriter, r *http.Request) {
