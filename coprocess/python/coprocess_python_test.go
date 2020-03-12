@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/gateway"
 	"github.com/TykTechnologies/tyk/test"
@@ -98,6 +99,41 @@ def MyPostHook(request, session, spec):
 `,
 }
 
+var pythonPostRequestTransform = map[string]string{
+	"manifest.json": `
+		{
+		    "file_list": [
+		        "middleware.py"
+		    ],
+		    "custom_middleware": {
+		        "driver": "python",
+		        "post": [{
+		            "name": "MyPostHook"
+		        }]
+		    }
+		}
+	`,
+	"middleware.py": `
+from tyk.decorators import *
+from gateway import TykGateway as tyk
+import json
+
+@Hook
+def MyPostHook(request, session, spec):
+	
+	
+	if request.object.url == "/test2":
+		if request.object.method != "POST":
+			request.object.return_overrides.response_code = 500
+			request.object.return_overrides.response_error = "'invalid method type'"
+			return request, session
+		request.object.url = "tyk://test-api-2/newpath"
+		request.object.method = "GET"
+
+	return request , session
+`,
+}
+
 var pythonBundleWithPreHook = map[string]string{
 	"manifest.json": `
 		{
@@ -182,6 +218,7 @@ func TestPythonBundles(t *testing.T) {
 	postHookBundle := gateway.RegisterBundle("python_with_post_hook", pythonBundleWithPostHook)
 	preHookBundle := gateway.RegisterBundle("python_with_pre_hook", pythonBundleWithPreHook)
 	responseHookBundle := gateway.RegisterBundle("python_with_response_hook", pythonBundleWithResponseHook)
+	postRequestTransformHookBundle := gateway.RegisterBundle("python_post_with_request_transform_hook", pythonPostRequestTransform)
 
 	t.Run("Single-file bundle with authentication hook", func(t *testing.T) {
 		gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
@@ -293,6 +330,47 @@ func TestPythonBundles(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 			{Path: "/test-api-2/", Code: http.StatusOK, Data: &buf, Headers: map[string]string{"Content-Type": multipartWriter.FormDataContentType()}},
 			{Path: "/test-api-2/", Code: http.StatusOK, Data: "{}", Headers: map[string]string{"Content-Type": "application/json"}},
+		}...)
+	})
+
+	t.Run("python post hook with url rewrite and method transform", func(t *testing.T) {
+		gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+			spec.Proxy.ListenPath = "/test-api-1/"
+			spec.UseKeylessAccess = true
+			spec.EnableCoProcessAuth = false
+			spec.CustomMiddlewareBundle = postRequestTransformHookBundle
+
+			v1 := spec.VersionData.Versions["v1"]
+			v1.UseExtendedPaths = true
+			v1.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{{
+				Path:         "/get",
+				Method:       http.MethodGet,
+				MatchPattern: "/get",
+				RewriteTo:    "/test2",
+			}}
+
+			v1.ExtendedPaths.MethodTransforms = []apidef.MethodTransformMeta{{
+				Path:     "/get",
+				Method:   http.MethodGet,
+				ToMethod: http.MethodPost,
+			}}
+
+			spec.VersionData.Versions["v1"] = v1
+
+		}, func(spec *gateway.APISpec) {
+			spec.Name = "test-api-2"
+			spec.Proxy.ListenPath = "/test-api-2/"
+			spec.UseKeylessAccess = true
+			spec.EnableCoProcessAuth = false
+			spec.UseKeylessAccess = true
+		})
+
+		time.Sleep(1 * time.Second)
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/test-api-1/get", Code: http.StatusOK, BodyMatch: "newpath"},
+			{Path: "/test-api-1/get", Code: http.StatusOK, BodyMatch: "GET"},
+			{Path: "/test-api-1/post", Code: http.StatusOK, BodyNotMatch: "newpath"},
 		}...)
 	})
 }
