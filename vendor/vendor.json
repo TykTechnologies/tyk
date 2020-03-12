@@ -665,10 +665,10 @@
 			"revisionTime": "2019-08-07T10:34:36Z"
 		},
 		{
-			"checksumSHA1": "qR3q2rm/H13PX5Twte9x7PK9Td4=",
+			"checksumSHA1": "WDjtjI3JC03ypch+Qh+GrMRQYCg=",
 			"path": "github.com/square/go-jose",
-			"revision": "63d7cfa0284d0bc9bf41d58f802037559c45ce8f",
-			"revisionTime": "2016-10-27T01:03:14Z"
+			"revision": "643bdf8caec0de8a54ec3e8f8601d57992f35510",
+			"revisionTime": "2020-03-09T00:52:03Z"
 		},
 		{
 			"checksumSHA1": "3ZnGXnGyQ8NyD8mttaQgwNgMyJY=",
@@ -681,6 +681,14 @@
 			"path": "github.com/square/go-jose/json",
 			"revision": "63d7cfa0284d0bc9bf41d58f802037559c45ce8f",
 			"revisionTime": "2016-10-27T01:03:14Z"
+		},
+		{
+			"path": "github.com/square/go-jose/v3/cipher",
+			"revision": "643bdf8caec0de8a54ec3e8f8601d57992f35510"
+		},
+		{
+			"path": "github.com/square/go-jose/v3/json",
+			"revision": "643bdf8caec0de8a54ec3e8f8601d57992f35510"
 		},
 		{
 			"checksumSHA1": "QELcZ0cB4PrpjIoeESHQCGDpMsk=",
