@@ -46,6 +46,18 @@ const keyRules = `{
 	"quota_renewal_rate": 300
 }`
 
+const keyRulesWithMetadata = `{
+	"last_check": 1402492859,
+	"org_id": "53ac07777cbb8c2d53000002",
+	"rate": 1,
+	"per": 1,
+	"quota_max": -1,
+	"quota_renews": 1399567002,
+	"quota_remaining": 10,
+	"quota_renewal_rate": 300,
+	"meta_data": {"key": "meta", "foo": "keybar"}
+}`
+
 func buildTestOAuthSpec(apiGens ...func(spec *APISpec)) *APISpec {
 	return BuildAPI(func(spec *APISpec) {
 		spec.APIID = "999999"
@@ -127,8 +139,9 @@ func createTestOAuthClient(spec *APISpec, clientID string) {
 		ClientSecret:      authClientSecret,
 		ClientRedirectURI: redirectURI,
 		PolicyID:          pID,
+		MetaData:          map[string]interface{}{"foo": "bar", "client": "meta"},
 	}
-	spec.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, &testClient, false)
+	spec.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, "org-id-1", &testClient, false)
 }
 
 func TestOauthMultipleAPIs(t *testing.T) {
@@ -140,12 +153,15 @@ func TestOauthMultipleAPIs(t *testing.T) {
 		spec.UseOauth2 = true
 		spec.UseKeylessAccess = false
 		spec.Proxy.ListenPath = "/api1/"
+		spec.OrgID = "org-id-1"
 	})
 	spec2 := buildTestOAuthSpec(func(spec *APISpec) {
 		spec.APIID = "oauth2_copy"
 		spec.UseKeylessAccess = false
 		spec.UseOauth2 = true
 		spec.Proxy.ListenPath = "/api2/"
+		spec.OrgID = "org-id-2"
+
 	})
 
 	apis := LoadAPI(spec, spec2)
@@ -169,8 +185,8 @@ func TestOauthMultipleAPIs(t *testing.T) {
 		ClientRedirectURI: authRedirectUri,
 		PolicyID:          pID,
 	}
-	spec.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, &testClient, false)
-	spec2.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, &testClient, false)
+	spec.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, spec.OrgID, &testClient, false)
+	spec2.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, spec2.OrgID, &testClient, false)
 
 	param := make(url.Values)
 	param.Set("response_type", "token")
@@ -386,6 +402,54 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 			BodyMatch: `{"access_token":".*","expires_in":3600,"redirect_to":"http://client.oauth.com` +
 				`#access_token=.*=&expires_in=3600&token_type=bearer","token_type":"bearer"}`,
 		})
+	})
+
+	t.Run("Client authorize token request with metadata", func(t *testing.T) {
+		param := make(url.Values)
+		param.Set("response_type", "token")
+		param.Set("redirect_uri", authRedirectUri)
+		param.Set("client_id", authClientID)
+		param.Set("key_rules", keyRulesWithMetadata)
+
+		headers := map[string]string{
+			"Content-Type": "application/x-www-form-urlencoded",
+		}
+
+		resp, err := ts.Run(t, test.TestCase{
+			Path:      "/APIID/tyk/oauth/authorize-client/",
+			AdminAuth: true,
+			Data:      param.Encode(),
+			Headers:   headers,
+			Method:    http.MethodPost,
+			Code:      http.StatusOK,
+			BodyMatch: `{"access_token":".*","expires_in":3600,"redirect_to":"http://client.oauth.com` +
+				`#access_token=.*=&expires_in=3600&token_type=bearer","token_type":"bearer"}`,
+		})
+		if err != nil {
+			t.Error(err)
+		}
+		asData := make(map[string]interface{})
+		if err := json.NewDecoder(resp.Body).Decode(&asData); err != nil {
+			t.Fatal("Decode failed:", err)
+		}
+		token, ok := asData["access_token"].(string)
+		if !ok {
+			t.Fatal("No access token found")
+		}
+		session, ok := spec.AuthManager.KeyAuthorised(token)
+		if !ok {
+			t.Error("Key was not created (Can't find it)!")
+		}
+		if session.MetaData == nil {
+			t.Fatal("Session metadata is nil")
+		}
+		if len(session.MetaData) != 3 {
+			t.Fatal("Unexpected session metadata length", session.MetaData)
+		}
+
+		if !reflect.DeepEqual(session.MetaData, map[string]interface{}{"foo": "keybar", "client": "meta", "key": "meta"}) {
+			t.Fatal("Metadata not match:", session.MetaData)
+		}
 	})
 }
 

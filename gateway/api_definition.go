@@ -526,7 +526,7 @@ func (a APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, 
 	apiLangIDsRegex := regexp.MustCompile(`{([^}]*)}`)
 	asRegexStr := apiLangIDsRegex.ReplaceAllString(stringSpec, `([^/]*)`)
 	// Case insensitive match
-	if newSpec.IgnoreCase {
+	if newSpec.IgnoreCase || config.Global().IgnoreEndpointCase {
 		asRegexStr = "(?i)" + asRegexStr
 	}
 	asRegex, _ := regexp.Compile(asRegexStr)
@@ -548,13 +548,13 @@ func (a APIDefinitionLoader) compilePathSpec(paths []string, specType URLStatus)
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileExtendedPathSpec(paths []apidef.EndPointMeta, specType URLStatus) []URLSpec {
+func (a APIDefinitionLoader) compileExtendedPathSpec(ignoreEndpointCase bool, paths []apidef.EndPointMeta, specType URLStatus) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
 
 	for _, stringSpec := range paths {
-		newSpec := URLSpec{IgnoreCase: stringSpec.IgnoreCase}
+		newSpec := URLSpec{IgnoreCase: stringSpec.IgnoreCase || ignoreEndpointCase}
 		a.generateRegex(stringSpec.Path, &newSpec, specType)
 
 		// Extend with method actions
@@ -909,9 +909,9 @@ func (a APIDefinitionLoader) compileInternalPathspathSpec(paths []apidef.Interna
 func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionInfo, apiSpec *APISpec) ([]URLSpec, bool) {
 	// TODO: New compiler here, needs to put data into a different structure
 
-	ignoredPaths := a.compileExtendedPathSpec(apiVersionDef.ExtendedPaths.Ignored, Ignored)
-	blackListPaths := a.compileExtendedPathSpec(apiVersionDef.ExtendedPaths.BlackList, BlackList)
-	whiteListPaths := a.compileExtendedPathSpec(apiVersionDef.ExtendedPaths.WhiteList, WhiteList)
+	ignoredPaths := a.compileExtendedPathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.Ignored, Ignored)
+	blackListPaths := a.compileExtendedPathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.BlackList, BlackList)
+	whiteListPaths := a.compileExtendedPathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.WhiteList, WhiteList)
 	cachedPaths := a.compileCachedPathSpec(apiVersionDef.ExtendedPaths.Cached, apiVersionDef.ExtendedPaths.AdvanceCacheConfig)
 	transformPaths := a.compileTransformPathSpec(apiVersionDef.ExtendedPaths.Transform, Transformed)
 	transformResponsePaths := a.compileTransformPathSpec(apiVersionDef.ExtendedPaths.TransformResponse, TransformedResponse)

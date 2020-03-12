@@ -177,10 +177,10 @@ func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *htt
 // OAuth tokens without revealing tokens before they are requested).
 func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set(headers.ContentType, headers.ApplicationJSON)
-
 	// Handle response
 	resp := o.Manager.HandleAccess(r)
 	msg := o.generateOAuthOutputFromOsinResponse(resp)
+
 	if resp.IsError {
 		// Something went wrong, write out the error details and kill the response
 		w.WriteHeader(resp.ErrorStatusCode)
@@ -221,6 +221,85 @@ func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Reque
 
 	w.WriteHeader(http.StatusOK)
 	w.Write(msg)
+}
+
+const (
+	accessToken  = "access_token"
+	refreshToken = "refresh_token"
+)
+
+//in compliance with https://tools.ietf.org/html/rfc7009#section-2.1
+//ToDo: set an authentication mechanism
+func (o *OAuthHandlers) HandleRevokeToken(w http.ResponseWriter, r *http.Request) {
+	err := r.ParseForm()
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	token := r.PostFormValue("token")
+	tokenTypeHint := r.PostFormValue("token_type_hint")
+
+	RevokeToken(o.Manager.OsinServer.Storage, token, tokenTypeHint)
+	w.WriteHeader(200)
+}
+
+func RevokeToken(storage ExtendedOsinStorageInterface, token, tokenTypeHint string) {
+	switch tokenTypeHint {
+	case accessToken:
+		storage.RemoveAccess(token)
+	case refreshToken:
+		storage.RemoveRefresh(token)
+	default:
+		storage.RemoveAccess(token)
+		storage.RemoveRefresh(token)
+	}
+}
+
+func (o *OAuthHandlers) HandleRevokeAllTokens(w http.ResponseWriter, r *http.Request) {
+	err := r.ParseForm()
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	clientId := r.PostFormValue("client_id")
+	secret := r.PostFormValue("client_secret")
+
+	if clientId == "" || secret == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	status := RevokeAllTokens(o.Manager.OsinServer.Storage, clientId, secret)
+	w.WriteHeader(status)
+}
+
+func RevokeAllTokens(storage ExtendedOsinStorageInterface, clientId, clientSecret string) int {
+	client, err := storage.GetClient(clientId)
+	log.Debug("Revoke all tokens")
+	if err != nil {
+		return http.StatusNotFound
+	}
+
+	if client.GetSecret() != clientSecret {
+		return http.StatusForbidden
+	}
+
+	clientTokens, err := storage.GetClientTokens(clientId)
+	if err != nil {
+		return http.StatusBadRequest
+	}
+
+	for _, token := range clientTokens {
+		access, err := storage.LoadAccess(token.Token)
+		if err == nil {
+			storage.RemoveAccess(access.AccessToken)
+			storage.RemoveRefresh(access.RefreshToken)
+		}
+	}
+
+	return http.StatusOK
 }
 
 // OAuthManager handles and wraps osin OAuth2 functions to handle authorise and access requests
@@ -283,6 +362,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 		log.Errorf("trying to set url values decoded from json body :%v", err)
 	}
 	var username string
+
 	if ar := o.OsinServer.HandleAccessRequest(resp, r); ar != nil {
 
 		var session *user.SessionState
@@ -382,8 +462,8 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 				log.Error(err)
 			}
 		}
-
 	}
+
 	if resp.IsError && resp.InternalError != nil {
 		log.Error("ERROR: ", resp.InternalError)
 	}
@@ -394,13 +474,13 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 // These enums fix the prefix to use when storing various OAuth keys and data, since we
 // delegate everything to the osin framework
 const (
-	prefixAuth      = "oauth-authorize."
-	prefixClient    = "oauth-clientid."
-	prefixAccess    = "oauth-access."
-	prefixRefresh   = "oauth-refresh."
-	prefixClientset = "oauth-clientset."
-
-	prefixClientTokens = "oauth-client-tokens."
+	prefixAuth            = "oauth-authorize."
+	prefixClient          = "oauth-clientid."
+	prefixAccess          = "oauth-access."
+	prefixRefresh         = "oauth-refresh."
+	prefixClientset       = "oauth-clientset."
+	prefixClientIndexList = "oauth-client-index."
+	prefixClientTokens    = "oauth-client-tokens."
 )
 
 // swagger:model
@@ -418,7 +498,7 @@ type ExtendedOsinStorageInterface interface {
 	osin.Storage
 
 	// Create OAuth clients
-	SetClient(id string, client osin.Client, ignorePrefix bool) error
+	SetClient(id string, orgID string, client osin.Client, ignorePrefix bool) error
 
 	// Custom getter to handle prefixing issues in Redis
 	GetClientNoPrefix(id string) (osin.Client, error)
@@ -431,9 +511,9 @@ type ExtendedOsinStorageInterface interface {
 	// Custom getter to handle prefixing issues in Redis
 	GetExtendedClientNoPrefix(id string) (ExtendedOsinClientInterface, error)
 
-	GetClients(filter string, ignorePrefix bool) ([]ExtendedOsinClientInterface, error)
+	GetClients(filter string, orgID string, ignorePrefix bool) ([]ExtendedOsinClientInterface, error)
 
-	DeleteClient(id string, ignorePrefix bool) error
+	DeleteClient(id string, orgID string, ignorePrefix bool) error
 
 	// GetUser retrieves a Basic Access user token type from the key store
 	GetUser(string) (*user.SessionState, error)
@@ -491,7 +571,7 @@ func (r *RedisOsinStorageInterface) GetClient(id string) (osin.Client, error) {
 
 	clientJSON, err := r.store.GetKey(key)
 	if err != nil {
-		log.Errorf("Failure retreiving client ID key %q: %v", key, err)
+		log.Errorf("Failure retrieving client ID key %q: %v", key, err)
 		return nil, err
 	}
 
@@ -545,15 +625,39 @@ func (r *RedisOsinStorageInterface) GetExtendedClientNoPrefix(id string) (Extend
 }
 
 // GetClients will retrieve a list of clients for a prefix
-func (r *RedisOsinStorageInterface) GetClients(filter string, ignorePrefix bool) ([]ExtendedOsinClientInterface, error) {
+func (r *RedisOsinStorageInterface) GetClients(filter string, orgID string, ignorePrefix bool) ([]ExtendedOsinClientInterface, error) {
 	key := prefixClient + filter
 	if ignorePrefix {
 		key = filter
 	}
 
+	indexKey := prefixClientIndexList + orgID
+
 	var clientJSON map[string]string
 	if !config.Global().Storage.EnableCluster {
-		clientJSON = r.store.GetKeysAndValuesWithFilter(key)
+		exists, _ := r.store.Exists(indexKey)
+		if exists {
+			keys, err := r.store.GetListRange(indexKey, 0, -1)
+			if err != nil {
+				log.Error("Couldn't get OAuth client index list: ", err)
+				return nil, err
+			}
+			keyVals, err := r.store.GetMultiKey(keys)
+			if err != nil {
+				log.Error("Couldn't get OAuth client index list values: ", err)
+				return nil, err
+			}
+
+			clientJSON = make(map[string]string)
+			for i, key := range keys {
+				clientJSON[key] = keyVals[i]
+			}
+		} else {
+			clientJSON = r.store.GetKeysAndValuesWithFilter(key)
+			for key := range clientJSON {
+				r.store.AppendToSet(indexKey, key)
+			}
+		}
 	} else {
 		keyForSet := prefixClientset + prefixClient // Org ID
 		var err error
@@ -670,7 +774,7 @@ func (r *RedisOsinStorageInterface) GetClientTokens(id string) ([]OAuthClientTok
 }
 
 // SetClient creates client data
-func (r *RedisOsinStorageInterface) SetClient(id string, client osin.Client, ignorePrefix bool) error {
+func (r *RedisOsinStorageInterface) SetClient(id string, orgID string, client osin.Client, ignorePrefix bool) error {
 	clientDataJSON, err := json.Marshal(client)
 
 	if err != nil {
@@ -688,9 +792,20 @@ func (r *RedisOsinStorageInterface) SetClient(id string, client osin.Client, ign
 
 	r.store.SetKey(key, string(clientDataJSON), 0)
 
-	log.Debug("Storing copy in set")
-
 	keyForSet := prefixClientset + prefixClient // Org ID
+
+	indexKey := prefixClientIndexList + orgID
+	//check if the indexKey exists
+	exists, err := r.store.Exists(indexKey)
+	if err != nil {
+		return err
+	}
+	// if it exists, delete it to avoid duplicity in the client index list
+	if exists {
+		r.store.RemoveFromList(indexKey, key)
+	}
+	// append to oauth client index list
+	r.store.AppendToSet(indexKey, key)
 
 	// In set, there is no option for update so the existing client should be removed before adding new one.
 	set, _ := r.store.GetSet(keyForSet)
@@ -705,7 +820,7 @@ func (r *RedisOsinStorageInterface) SetClient(id string, client osin.Client, ign
 }
 
 // DeleteClient Removes a client from the system
-func (r *RedisOsinStorageInterface) DeleteClient(id string, ignorePrefix bool) error {
+func (r *RedisOsinStorageInterface) DeleteClient(id string, orgID string, ignorePrefix bool) error {
 	key := prefixClient + id
 	if ignorePrefix {
 		key = id
@@ -721,6 +836,10 @@ func (r *RedisOsinStorageInterface) DeleteClient(id string, ignorePrefix bool) e
 
 	r.store.DeleteKey(key)
 
+	indexKey := prefixClientIndexList + orgID
+	// delete from oauth client
+	r.store.RemoveFromList(indexKey, key)
+
 	// delete list of tokens for this client
 	r.store.DeleteKey(prefixClientTokens + id)
 
@@ -735,6 +854,7 @@ func (r *RedisOsinStorageInterface) SaveAuthorize(authData *osin.AuthorizeData) 
 	}
 	key := prefixAuth + authData.Code
 	log.Debug("Saving auth code: ", key)
+
 	r.store.SetKey(key, string(authDataJSON), int64(authData.ExpiresIn))
 
 	return nil
@@ -773,7 +893,6 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 	if err != nil {
 		return err
 	}
-
 	key := prefixAccess + storage.HashKey(accessData.AccessToken)
 	log.Debug("Saving ACCESS key: ", key)
 
@@ -827,7 +946,16 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 
 	c, ok := accessData.Client.(*OAuthClient)
 	if ok && c.MetaData != nil {
-		newSession.MetaData = c.MetaData.(map[string]interface{})
+		if newSession.MetaData == nil {
+			newSession.MetaData = make(map[string]interface{})
+		}
+
+		// Allow session inherit and *override* client values
+		for k, v := range c.MetaData.(map[string]interface{}) {
+			if _, found := newSession.MetaData[k]; !found {
+				newSession.MetaData[k] = v
+			}
+		}
 	}
 
 	// Use the default session expiry here as this is OAuth
@@ -840,7 +968,6 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 			return err
 		}
 		key := prefixRefresh + accessData.RefreshToken
-		log.Debug("Saving REFRESH key: ", key)
 		refreshExpire := int64(1209600) // 14 days
 		if oauthRefreshExpire := config.Global().OauthRefreshExpire; oauthRefreshExpire != 0 {
 			refreshExpire = oauthRefreshExpire
@@ -881,7 +1008,8 @@ func (r *RedisOsinStorageInterface) LoadAccess(token string) (*osin.AccessData, 
 
 // RemoveAccess will remove access data from Redis
 func (r *RedisOsinStorageInterface) RemoveAccess(token string) error {
-	key := prefixAccess + token
+	key := prefixAccess + storage.HashKey(token)
+
 	r.store.DeleteKey(key)
 
 	// remove the access token from central storage too
@@ -914,6 +1042,7 @@ func (r *RedisOsinStorageInterface) LoadRefresh(token string) (*osin.AccessData,
 
 // RemoveRefresh will remove a refresh token from redis
 func (r *RedisOsinStorageInterface) RemoveRefresh(token string) error {
+	log.Debug("is going to revoke refresh token: ", token)
 	key := prefixRefresh + token
 	r.store.DeleteKey(key)
 	return nil
@@ -946,7 +1075,6 @@ func (accessTokenGen) GenerateAccessToken(data *osin.AccessData, generaterefresh
 
 		newSession = sessionFromPolicy
 	}
-
 	accesstoken = keyGen.GenerateAuthKey(newSession.OrgID)
 
 	if generaterefresh {

@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -452,7 +453,11 @@ func certHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	case "DELETE":
-		CertificateManager.Delete(certID)
+		orgID := r.URL.Query().Get("org_id")
+		if orgID == "" && len(certID) >= sha256.Size*2 {
+			orgID = certID[:len(certID)-sha256.Size*2]
+		}
+		CertificateManager.Delete(certID, orgID)
 		doJSONWrite(w, http.StatusOK, &apiStatusMessage{"ok", "removed"})
 	}
 }

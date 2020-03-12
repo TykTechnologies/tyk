@@ -4,8 +4,9 @@ set -ex
 
 : ${ORGDIR:="/go/src/github.com/TykTechnologies"}
 : ${SOURCEBINPATH:="${ORGDIR}/tyk"}
-: ${SIGNKEY:="729EA673"}
+: ${SIGNKEY:="9ADE11DA6DD70355E7C1C270543ABE02AC6AC40A"}
 : ${BUILDPKGS:="1"}
+: ${SIGNPKGS:="1"}
 : ${PKGNAME:="tyk-gateway"}
 BUILDTOOLSDIR=$SOURCEBINPATH/build_tools
 BUILDDIR=$SOURCEBINPATH/build
@@ -14,8 +15,18 @@ echo "Set version number"
 : ${VERSION:=$(perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "$1\.$2\.$3"' version.go)}
 
 if [ $BUILDPKGS == "1" ]; then
+    echo Configuring gpg-agent-config to accept a passphrase
+    mkdir ~/.gnupg && chmod 700 ~/.gnupg
+    cat >> ~/.gnupg/gpg-agent.conf <<EOF
+allow-preset-passphrase
+debug-level expert
+log-file /tmp/gpg-agent.log
+EOF
+    gpg-connect-agent reloadagent /bye
+
     echo "Importing signing key"
-    gpg --list-keys | grep -w $SIGNKEY && echo "Key exists" || gpg --batch --import $BUILDTOOLSDIR/build_key.key
+    gpg --list-keys | grep -w $SIGNKEY && echo "Key exists" || gpg --batch --import $BUILDTOOLSDIR/tyk.io.signing.key
+    bash $BUILDTOOLSDIR/unlock-agent.sh $SIGNKEY
 fi
 
 echo "Prepare the release directories"
@@ -130,7 +141,15 @@ do
     echo "Creating RPM Package for $arch"
     fpm "${FPMCOMMON[@]}" "${FPMRPM[@]}" -C $archDir -a $arch -t rpm "${CONFIGFILES[@]}" ./=/opt/tyk-gateway
 
-    rpmName="$PKGNAME-$VERSION-1.${arch/amd64/x86_64}.rpm"
-    echo "Signing $arch RPM"
-    $BUILDTOOLSDIR/rpm-sign.sh $rpmName
+    if [ $SIGNPKGS == "1" ]; then
+        echo "Signing $arch RPM"
+        rpm --define "%_gpg_name Team Tyk (package signing) <team@tyk.io>" \
+            --define "%__gpg /usr/bin/gpg" \
+            --addsign *.rpm || (cat /tmp/gpg-agent.log; exit 1)
+        echo "Signing $arch DEB"
+        for i in *.deb
+        do
+            dpkg-sig --sign builder -k $SIGNKEY $i || (cat /tmp/gpg-agent.log; exit 1)
+        done
+    fi
 done

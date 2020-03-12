@@ -233,13 +233,13 @@ func TestRSARequestSigning(t *testing.T) {
 
 	_, _, combinedPem, cert := genServerCertificate()
 	privCertId, _ := CertificateManager.Add(combinedPem, "")
-	defer CertificateManager.Delete(privCertId)
+	defer CertificateManager.Delete(privCertId, "")
 
 	x509Cert, _ := x509.ParseCertificate(cert.Certificate[0])
 	pubDer, _ := x509.MarshalPKIXPublicKey(x509Cert.PublicKey)
 	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDer})
 	pubCertId, _ := CertificateManager.Add(pubPem, "")
-	defer CertificateManager.Delete(pubCertId)
+	defer CertificateManager.Delete(pubCertId, "")
 
 	name := "Test with rsa-sha256"
 	t.Run(name, func(t *testing.T) {
@@ -392,9 +392,9 @@ func TestStripListenPath(t *testing.T) {
 	algo := "hmac-sha256"
 	secret := "12345"
 	sessionKey := generateSession(algo, secret)
-	specs := generateSpec(algo, secret, sessionKey, nil)
 
 	t.Run("Off", func(t *testing.T) {
+		specs := generateSpec(algo, secret, sessionKey, nil)
 		req := TestReq(t, "get", "/test/get", nil)
 
 		recorder := httptest.NewRecorder()
@@ -407,19 +407,36 @@ func TestStripListenPath(t *testing.T) {
 	})
 
 	t.Run("On", func(t *testing.T) {
-		specs[0].Proxy.StripListenPath = true
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = "protected"
+			spec.Proxy.ListenPath = "/protected"
+			spec.EnableSignatureChecking = true
+			spec.UseKeylessAccess = false
+			spec.Proxy.StripListenPath = true
+		}, func(spec *APISpec) {
+			spec.APIID = "trailingSlash"
+			spec.Proxy.ListenPath = "/trailingSlash/"
+			spec.Proxy.StripListenPath = true
+			spec.RequestSigning.IsEnabled = true
+			spec.RequestSigning.Secret = secret
+			spec.RequestSigning.KeyId = sessionKey
+			spec.RequestSigning.Algorithm = algo
+			spec.Proxy.TargetURL = ts.URL
+		}, func(spec *APISpec) {
+			spec.APIID = "withoutTrailingSlash"
+			spec.Proxy.ListenPath = "/withoutTrailingSlash"
+			spec.Proxy.StripListenPath = true
+			spec.RequestSigning.IsEnabled = true
+			spec.RequestSigning.Secret = secret
+			spec.RequestSigning.KeyId = sessionKey
+			spec.RequestSigning.Algorithm = algo
+			spec.Proxy.TargetURL = ts.URL
+		})
 
-		req := TestReq(t, "get", "/test/get", nil)
-
-		recorder := httptest.NewRecorder()
-		chain := getMiddlewareChain(specs[0])
-		chain.ServeHTTP(recorder, req)
-
-		// ensure signature validation middleware doesn't strip path
-		// and request fails
-		if recorder.Code != 400 {
-			t.Error("Expected status code 400 got ", recorder.Code)
-		}
+		ts.Run(t, []test.TestCase{
+			{Path: "/trailingSlash/protected/get", Method: http.MethodGet, Code: http.StatusOK},
+			{Path: "/withoutTrailingSlash/protected/get", Method: http.MethodGet, Code: http.StatusOK},
+		}...)
 	})
 }
 
@@ -435,38 +452,40 @@ func TestWithURLRewrite(t *testing.T) {
 		session.HmacSecret = secret
 	})
 
-	apis := BuildAndLoadAPI(func(spec *APISpec) {
-		spec.APIID = "protected"
-		spec.Proxy.ListenPath = "/protected"
-		spec.EnableSignatureChecking = true
-	}, func(spec *APISpec) {
-		spec.APIID = "test"
-		spec.Proxy.ListenPath = "/test"
-		spec.Proxy.StripListenPath = true
-		spec.RequestSigning.Secret = secret
-		spec.RequestSigning.KeyId = sessionKey
-		spec.RequestSigning.Algorithm = algo
-	})
-
 	t.Run("looping", func(t *testing.T) {
-		version := apis[1].VersionData.Versions["v1"]
-		version.UseExtendedPaths = true
-		version.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{
-			{
-				Path:         "get",
-				Method:       "GET",
-				MatchPattern: "get",
-				RewriteTo:    "tyk://protected/get",
-			},
-			{
-				Path:         "self",
-				Method:       "GET",
-				MatchPattern: "self",
-				RewriteTo:    "tyk://protected/test/get",
-			},
-		}
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = "protected"
+			spec.Proxy.ListenPath = "/protected"
+			spec.EnableSignatureChecking = true
+			spec.UseKeylessAccess = false
+		}, func(spec *APISpec) {
+			spec.APIID = "test"
+			spec.Proxy.ListenPath = "/test"
+			spec.Proxy.StripListenPath = true
+			spec.RequestSigning.IsEnabled = true
+			spec.RequestSigning.Secret = secret
+			spec.RequestSigning.KeyId = sessionKey
+			spec.RequestSigning.Algorithm = algo
 
-		apis[1].VersionData.Versions["v1"] = version
+			version := spec.VersionData.Versions["v1"]
+			version.UseExtendedPaths = true
+			version.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{
+				{
+					Path:         "/get",
+					Method:       "GET",
+					MatchPattern: "/get",
+					RewriteTo:    "tyk://protected/get",
+				},
+				{
+					Path:         "/self",
+					Method:       "GET",
+					MatchPattern: "/self",
+					RewriteTo:    "tyk://protected/test/get",
+				},
+			}
+
+			spec.VersionData.Versions["v1"] = version
+		})
 
 		ts.Run(t, []test.TestCase{
 			{Path: "/test/get", Method: http.MethodGet, Code: http.StatusOK},
@@ -476,24 +495,39 @@ func TestWithURLRewrite(t *testing.T) {
 	})
 
 	t.Run("external", func(t *testing.T) {
-		version := apis[1].VersionData.Versions["v1"]
-		version.UseExtendedPaths = true
-		version.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{
-			{
-				Path:         "get",
-				Method:       "GET",
-				MatchPattern: "get",
-				RewriteTo:    ts.URL + "/protected/get",
-			},
-			{
-				Path:         "self",
-				Method:       "GET",
-				MatchPattern: "self",
-				RewriteTo:    ts.URL + "/protected/test/get",
-			},
-		}
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = "protected"
+			spec.Proxy.ListenPath = "/protected"
+			spec.EnableSignatureChecking = true
+		}, func(spec *APISpec) {
+			spec.APIID = "test"
+			spec.Proxy.ListenPath = "/test/"
+			spec.Proxy.StripListenPath = true
+			spec.RequestSigning.IsEnabled = true
+			spec.RequestSigning.Secret = secret
+			spec.RequestSigning.KeyId = sessionKey
+			spec.RequestSigning.Algorithm = algo
 
-		apis[1].VersionData.Versions["v1"] = version
+			version := spec.VersionData.Versions["v1"]
+			version.UseExtendedPaths = true
+			version.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{
+				{
+					Path:         "get",
+					Method:       "GET",
+					MatchPattern: "get",
+					RewriteTo:    ts.URL + "/protected/get",
+				},
+				{
+					Path:         "self",
+					Method:       "GET",
+					MatchPattern: "self",
+					RewriteTo:    ts.URL + "/protected/test/get",
+				},
+			}
+
+			spec.VersionData.Versions["v1"] = version
+		})
+
 		ts.Run(t, []test.TestCase{
 			{Path: "/test/get", Method: http.MethodGet, Code: http.StatusOK},
 			// ensure listen path is not stripped in case url rewrite
