@@ -177,7 +177,7 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 	r.Body = ioutil.NopCloser(bytes.NewReader(object.Request.RawBody))
 	nopCloseRequestBody(r)
 	
-	logger := m.Middleware.Logger()
+	logger := c.Middleware.Logger()
 	
 	for _, dh := range object.Request.DeleteHeaders {
 		r.Header.Del(dh)
