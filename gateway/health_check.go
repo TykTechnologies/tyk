@@ -48,7 +48,7 @@ func getHealthCheckInfo() map[string]HealthCheckItem {
 
 	sm, ok := syncMap.(sync.Map)
 	if !ok {
-		panic("stored health check info is of incorrect type")
+		log.WithField("health-check-info", syncMap).Error("could not load; stored health check info is of incorrect type")
 	}
 
 	ret := make(map[string]HealthCheckItem)
