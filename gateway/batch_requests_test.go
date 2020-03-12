@@ -133,7 +133,7 @@ func TestVirtualEndpointBatch(t *testing.T) {
 	defer upstream.Close()
 
 	clientCertID, _ := CertificateManager.Add(combinedClientPEM, "")
-	defer CertificateManager.Delete(clientCertID)
+	defer CertificateManager.Delete(clientCertID, "")
 
 	virtBatchTest = strings.Replace(virtBatchTest, "{upstream_URL}", upstream.URL, 2)
 	defer upstream.Close()
