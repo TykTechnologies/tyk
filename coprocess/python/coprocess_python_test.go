@@ -49,7 +49,13 @@ def MyAuthHook(request, session, metadata, spec):
     if auth_header == 'valid_token':
         session.rate = 1000.0
         session.per = 1.0
+        session.quota_max = 1
+        session.quota_renewal_rate = 60
         metadata["token"] = "valid_token"
+    elif auth_header == 'policy':
+    	session.apply_policy_id = request.get_header('Policy')
+    	metadata["token"] = "policy"
+
     return request, session, metadata
 
 	`,
@@ -236,7 +242,32 @@ func TestPythonBundles(t *testing.T) {
 
 		ts.Run(t, []test.TestCase{
 			{Path: "/test-api/", Code: http.StatusOK, Headers: validAuth},
-			{Path: "/test-api/", Code: http.StatusUnauthorized, Headers: invalidAuth},
+			{Path: "/test-api/", Code: http.StatusForbidden, Headers: invalidAuth},
+			{Path: "/test-api/", Code: http.StatusForbidden, Headers: validAuth},
+		}...)
+	})
+
+	t.Run("Auth with policy", func(t *testing.T) {
+		gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+			spec.Proxy.ListenPath = "/test-api/"
+			spec.UseKeylessAccess = false
+			spec.EnableCoProcessAuth = true
+			spec.CustomMiddlewareBundle = authCheckBundle
+			spec.VersionData.NotVersioned = true
+		})
+
+		time.Sleep(1 * time.Second)
+
+		pID := gateway.CreatePolicy(func(p *user.Policy) {
+			p.QuotaMax = 1
+			p.QuotaRenewalRate = 60
+		})
+
+		policyAuth := map[string]string{"Authorization": "policy", "Policy": pID}
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/test-api/", Code: http.StatusOK, Headers: policyAuth},
+			{Path: "/test-api/", Code: http.StatusForbidden, Headers: policyAuth},
 		}...)
 	})
 

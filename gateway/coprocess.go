@@ -425,6 +425,10 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	// Is this a CP authentication middleware?
 	if m.Spec.EnableCoProcessAuth && m.HookType == coprocess.HookType_CustomKeyCheck {
+		if extractor == nil {
+			sessionID = token
+		}
+
 		// The CP middleware didn't setup a session:
 		if returnObject.Session == nil || token == "" {
 			authHeaderValue, _ := m.getAuthToken(m.getAuthType(), r)
@@ -444,11 +448,12 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			returnedSession.MetaData[k] = string(v)
 		}
 
-		if extractor == nil {
-			ctxSetSession(r, returnedSession, token, true)
-		} else {
-			ctxSetSession(r, returnedSession, sessionID, true)
+		existingSession, found := GlobalSessionManager.SessionDetail(m.Spec.OrgID, sessionID, false)
+		if found {
+			returnedSession.QuotaRenews = existingSession.QuotaRenews
 		}
+
+		ctxSetSession(r, returnedSession, sessionID, true)
 	}
 
 	return nil, http.StatusOK
