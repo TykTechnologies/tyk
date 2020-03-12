@@ -308,6 +308,7 @@ const (
 	TestHttpGet     = TestHttpAny + "/get"
 	testHttpPost    = TestHttpAny + "/post"
 	testHttpJWK     = TestHttpAny + "/jwk.json"
+	testHttpJWKDER  = TestHttpAny + "/jwk-der.json"
 	testHttpBundles = TestHttpAny + "/bundles/"
 
 	// Nothing should be listening on port 16501 - useful for
@@ -385,6 +386,9 @@ func testHttpHandler() *mux.Router {
 	r.HandleFunc("/jwk.json", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, jwkTestJson)
 	})
+	r.HandleFunc("/jwk-der.json", func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, jwkTestDERJson)
+	})
 	r.HandleFunc("/compressed", func(w http.ResponseWriter, r *http.Request) {
 		response := "This is a compressed response"
 		w.Header().Set("Content-Encoding", "gzip")
@@ -408,6 +412,20 @@ const jwkTestJson = `{
         "kty": "RSA",
         "use": "sig",
         "x5c": ["Ci0tLS0tQkVHSU4gUFVCTElDIEtFWS0tLS0tCk1JSUJJakFOQmdrcWhraUc5dzBCQVFFRkFBT0NBUThBTUlJQkNnS0NBUUVBeXFaNHJ3S0Y4cUNFeFM3a3BZNGMKbkphLzM3Rk1rSk5rYWxaM091c2xMQjBvUkw4VDRjOTRrZEY0YWVOelNGa1NlMm45OUlCSTZTc2w3OXZiZk1aYgordDA2TDBROTRrKy9QMzd4NysvUkpaaWZmNHkxVkdqcm5ybk1JMml1OWw0aUJCUll6Tm1HNmVibHJvRU1NV2xnCms1dHlzSGd4QjU5Q1NOSWNEOWdxazFoeDRuL0ZnT212S3NmUWdXSE5sUFNEVFJjV0dXR2hCMi9YZ05WWUcycE8KbFF4QVBxTGhCSGVxR1RYQmJQZkdGOWNIeml4cHNQcjZHdGJ6UHdoc1EvOGJQeG9KN2hkZm4rcnp6dGtzM2Q2KwpIV1VSY3lOVExSZTBtalhqamVlOVo2K2daK0grZlM0cG5QOXRxVDdJZ1U2ZVBVV1Rwam9pUHRMZXhnc0FhL2N0CmpRSURBUUFCCi0tLS0tRU5EIFBVQkxJQyBLRVktLS0tLQo="],
+        "n": "xofiG8gsnv9-I_g-5OWTLhaZtgAGq1QEsBCPK9lmLqhuonHe8lT-nK1DM49f6J9QgaOjZ3DB50QkhBysnIFNcXFyzaYIPMoccvuHLPgdBawX4WYKm5gficD0WB0XnTt4sqTI5usFpuop9vvW44BwVGhRqMT7c11gA8TSWMBxDI4A5ARc4MuQtfm64oN-JQodSztArwb9wcmH8WrBvSUkR4pyi9MT8W27gqJ2e2Xn8jgGnswNQWOyCTN84PawOYaN-2ORHeIea1g-URln1bofcHN73vZCIrVbE6iA2D7Ybh22AVrCfunekEDEe2GZfLZLejiZiBWG7enJhcrQIzAQGw",
+        "e": "AQAB",
+        "kid": "12345",
+        "x5t": "12345"
+    }]
+}`
+
+// This has public key encoded as PKIX, ASN.1 DER form.
+const jwkTestDERJson = `{
+    "keys": [{
+        "alg": "RS256",
+        "kty": "RSA",
+        "use": "sig",
+        "x5c": ["MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyqZ4rwKF8qCExS7kpY4cnJa/37FMkJNkalZ3OuslLB0oRL8T4c94kdF4aeNzSFkSe2n99IBI6Ssl79vbfMZb+t06L0Q94k+/P37x7+/RJZiff4y1VGjrnrnMI2iu9l4iBBRYzNmG6eblroEMMWlgk5tysHgxB59CSNIcD9gqk1hx4n/FgOmvKsfQgWHNlPSDTRcWGWGhB2/XgNVYG2pOlQxAPqLhBHeqGTXBbPfGF9cHzixpsPr6GtbzPwhsQ/8bPxoJ7hdfn+rzztks3d6+HWURcyNTLRe0mjXjjee9Z6+gZ+H+fS4pnP9tqT7IgU6ePUWTpjoiPtLexgsAa/ctjQIDAQAB"],
         "n": "xofiG8gsnv9-I_g-5OWTLhaZtgAGq1QEsBCPK9lmLqhuonHe8lT-nK1DM49f6J9QgaOjZ3DB50QkhBysnIFNcXFyzaYIPMoccvuHLPgdBawX4WYKm5gficD0WB0XnTt4sqTI5usFpuop9vvW44BwVGhRqMT7c11gA8TSWMBxDI4A5ARc4MuQtfm64oN-JQodSztArwb9wcmH8WrBvSUkR4pyi9MT8W27gqJ2e2Xn8jgGnswNQWOyCTN84PawOYaN-2ORHeIea1g-URln1bofcHN73vZCIrVbE6iA2D7Ybh22AVrCfunekEDEe2GZfLZLejiZiBWG7enJhcrQIzAQGw",
         "e": "AQAB",
         "kid": "12345",
@@ -493,6 +511,28 @@ func CreateJWKToken(jGen ...func(*jwt.Token)) string {
 
 	// Sign and get the complete encoded token as a string
 	signKey, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(jwtRSAPrivKey))
+	if err != nil {
+		panic("Couldn't extract private key: " + err.Error())
+	}
+	tokenString, err := token.SignedString(signKey)
+	if err != nil {
+		panic("Couldn't create JWT token: " + err.Error())
+	}
+
+	return tokenString
+}
+
+func CreateJWKTokenECDSA(jGen ...func(*jwt.Token)) string {
+	// Create the token
+	token := jwt.New(jwt.GetSigningMethod("ES256"))
+	// Set the token ID
+
+	if len(jGen) > 0 {
+		jGen[0](token)
+	}
+
+	// Sign and get the complete encoded token as a string
+	signKey, err := jwt.ParseECPrivateKeyFromPEM([]byte(jwtECDSAPrivateKey))
 	if err != nil {
 		panic("Couldn't extract private key: " + err.Error())
 	}
@@ -997,6 +1037,17 @@ jxHLbCmsDOAsCU/0BlLXg9wMU7n5QKSlfTVGok/PU0rq2FUXQwyKGnellrqODwFQ
 YGivtXBGXk1hlVYlje1RB+W6RQuDAegI5h8vl8pYJS9JQH0wjatsDaE=
 -----END RSA PRIVATE KEY-----
 `
+
+const jwtECDSAPrivateKey = `-----BEGIN PRIVATE KEY-----
+MHcCAQEEIFjaz7TJpBOHmQttPypGRh3rqaXvRpsWE/EWUiLzc6veoAoGCCqGSM49
+AwEHoUQDQgAEDmKdIVHH9D5xkUiMJvo4T9H8yU+QYOIBlX5DYpJFtEvzTs4SsXYC
+tFsPk7c31tOpMuS8aQiLsXR82VMLqQBf1w==
+-----END PRIVATE KEY-----`
+
+const jwtECDSAPublicKey = `-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEDmKdIVHH9D5xkUiMJvo4T9H8yU+Q
+YOIBlX5DYpJFtEvzTs4SsXYCtFsPk7c31tOpMuS8aQiLsXR82VMLqQBf1w==
+-----END PUBLIC KEY-----`
 
 const jwtSecret = "9879879878787878"
 const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
