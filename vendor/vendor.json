@@ -103,10 +103,10 @@
 			"revisionTime": "2018-06-02T12:20:59Z"
 		},
 		{
-			"checksumSHA1": "v64AG0uGiKryWV/kqq5360zw1ts=",
+			"checksumSHA1": "C3np+jWCVLBmfUpRS+J363etC/k=",
 			"path": "github.com/TykTechnologies/openid2go/openid",
-			"revision": "aab5ce1231ab090ca20af7b7b45a86ae34235eef",
-			"revisionTime": "2016-08-17T21:35:54Z"
+			"revision": "00c254a52b19849c450a6235c9c2941a9f9b41f8",
+			"revisionTime": "2020-03-12T16:06:51Z"
 		},
 		{
 			"checksumSHA1": "G694VwuGgNf28O9vhpI132LKy0A=",
