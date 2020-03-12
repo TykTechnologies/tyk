@@ -176,7 +176,9 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 	r.ContentLength = int64(len(object.Request.RawBody))
 	r.Body = ioutil.NopCloser(bytes.NewReader(object.Request.RawBody))
 	nopCloseRequestBody(r)
-
+	
+	logger := m.Middleware.Logger()
+	
 	for _, dh := range object.Request.DeleteHeaders {
 		r.Header.Del(dh)
 	}
@@ -196,13 +198,18 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 
 	parsedURL, err := url.ParseRequestURI(object.Request.Url)
 	if err != nil {
+		logger.Error(err)
 		return
 	}
 
 	rewriteURL := ctxGetURLRewriteTarget(r)
 	if rewriteURL != nil {
 		ctxSetURLRewriteTarget(r, parsedURL)
-		r.URL, _ = url.ParseRequestURI(origURL)
+		r.URL, err = url.ParseRequestURI(origURL)
+		if err != nil {
+			logger.Error(err)
+			return
+		}
 	} else {
 		r.URL = parsedURL
 	}
