@@ -151,7 +151,7 @@ func getApisForOauthClientId(oauthClientId string) []string {
 
 	//generate a copy only with ids so we do not attempt to lock twice
 	apisMu.RLock()
-	for apiId, _ := range apisByID {
+	for apiId := range apisByID {
 		apisIdsCopy = append(apisIdsCopy, apiId)
 	}
 	apisMu.RUnlock()
