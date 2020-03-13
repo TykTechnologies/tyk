@@ -932,6 +932,8 @@ func initialiseSystem(ctx context.Context) error {
 		config.SetGlobal(globalConf)
 	}
 
+	overrideTykErrors()
+
 	if os.Getenv("TYK_LOGLEVEL") == "" && !*cli.DebugMode {
 		level := strings.ToLower(config.Global().LogLevel)
 		switch level {

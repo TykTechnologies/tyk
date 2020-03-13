@@ -2090,3 +2090,76 @@ func TestCache_singleErrorResponse(t *testing.T) {
 		test.TestCase{Method: http.MethodGet, Path: "/", Code: http.StatusInternalServerError, BodyMatch: wantBody},
 	)
 }
+
+func TestOverrideTykErrors(t *testing.T) {
+	assert := func(expectedError string, expectedCode int, actualError error, actualCode int) {
+		if !(expectedError == actualError.Error() && expectedCode == actualCode) {
+			t.Fatal("Override failed")
+		}
+	}
+
+	const message1 = "Message1"
+	const code1 = 1
+	const message2 = "Message2"
+	const code2 = 2
+	const message3 = "Message3"
+	const code3 = 3
+	const message4 = "Message4"
+	const code4 = 4
+
+	globalConf := config.Global()
+	globalConf.TykErrors = map[config.TykErrorType]config.TykError{
+		OAuthAuthorizationFieldMissing: {
+			Message: message1,
+			Code:    code1,
+		},
+		OAuthBearerTokenMalformed: {
+			Message: message2,
+			Code:    code2,
+		},
+		OAuthKeyNotAuthorised: {
+			Message: message3,
+			Code:    code3,
+		},
+		OAuthClientDeleted: {
+			Message: message4,
+			Code:    code4,
+		},
+	}
+	config.SetGlobal(globalConf)
+
+	overrideTykErrors()
+
+	e, i := errorAndStatusCode(OAuthAuthorizationFieldMissing)
+	assert(message1, code1, e, i)
+
+	e, i = errorAndStatusCode(OAuthBearerTokenMalformed)
+	assert(message2, code2, e, i)
+
+	e, i = errorAndStatusCode(OAuthKeyNotAuthorised)
+	assert(message3, code3, e, i)
+
+	e, i = errorAndStatusCode(OAuthClientDeleted)
+	assert(message4, code4, e, i)
+
+	t.Run("Partial override", func(t *testing.T) {
+		globalConf.TykErrors = map[config.TykErrorType]config.TykError{
+			OAuthAuthorizationFieldMissing: {
+				Code: code4,
+			},
+			OAuthBearerTokenMalformed: {
+				Message: message4,
+			},
+		}
+		config.SetGlobal(globalConf)
+
+		overrideTykErrors()
+
+		e, i := errorAndStatusCode(OAuthAuthorizationFieldMissing)
+		assert(message1, code4, e, i)
+
+		e, i = errorAndStatusCode(OAuthBearerTokenMalformed)
+		assert(message4, code2, e, i)
+
+	})
+}

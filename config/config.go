@@ -464,6 +464,16 @@ type Config struct {
 
 	// Secrets are key-value pairs that can be accessed in the dashboard via "secrets://"
 	Secrets map[string]string `json:"secrets"`
+
+	// TykErrors is used to override returned API error codes and messages.
+	TykErrors map[TykErrorType]TykError `bson:"tyk_errors" json:"tyk_errors"`
+}
+
+type TykErrorType string
+
+type TykError struct {
+	Message string `json:"message"`
+	Code    int    `json:"code"`
 }
 
 // VaultConfig is used to configure the creation of a client
