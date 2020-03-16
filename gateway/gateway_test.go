@@ -2091,7 +2091,7 @@ func TestCache_singleErrorResponse(t *testing.T) {
 	)
 }
 
-func TestOverrideTykErrors(t *testing.T) {
+func TestOverrideErrors(t *testing.T) {
 	assert := func(expectedError string, expectedCode int, actualError error, actualCode int) {
 		if !(expectedError == actualError.Error() && expectedCode == actualCode) {
 			t.Fatal("Override failed")
@@ -2106,48 +2106,66 @@ func TestOverrideTykErrors(t *testing.T) {
 	const code3 = 3
 	const message4 = "Message4"
 	const code4 = 4
+	const message5 = "Message5"
+	const code5 = 5
+	const message6 = "Message6"
+	const code6 = 6
 
 	globalConf := config.Global()
-	globalConf.TykErrors = map[config.TykErrorType]config.TykError{
-		OAuthAuthorizationFieldMissing: {
+	globalConf.OverrideErrors = map[string]config.TykError{
+		ErrOAuthAuthorizationFieldMissing: {
 			Message: message1,
 			Code:    code1,
 		},
-		OAuthBearerTokenMalformed: {
+		ErrOAuthBearerTokenMalformed: {
 			Message: message2,
 			Code:    code2,
 		},
-		OAuthKeyNotAuthorised: {
+		ErrOAuthKeyNotAuthorised: {
 			Message: message3,
 			Code:    code3,
 		},
-		OAuthClientDeleted: {
+		ErrOAuthClientDeleted: {
 			Message: message4,
 			Code:    code4,
+		},
+		ErrAuthAuthorizationFieldMissing: {
+			Message: message5,
+			Code:    code5,
+		},
+		ErrAuthNonExistentKey: {
+			Message: message6,
+			Code:    code6,
 		},
 	}
 	config.SetGlobal(globalConf)
 
 	overrideTykErrors()
 
-	e, i := errorAndStatusCode(OAuthAuthorizationFieldMissing)
+	e, i := errorAndStatusCode(ErrOAuthAuthorizationFieldMissing)
 	assert(message1, code1, e, i)
 
-	e, i = errorAndStatusCode(OAuthBearerTokenMalformed)
+	e, i = errorAndStatusCode(ErrOAuthBearerTokenMalformed)
 	assert(message2, code2, e, i)
 
-	e, i = errorAndStatusCode(OAuthKeyNotAuthorised)
+	e, i = errorAndStatusCode(ErrOAuthKeyNotAuthorised)
 	assert(message3, code3, e, i)
 
-	e, i = errorAndStatusCode(OAuthClientDeleted)
+	e, i = errorAndStatusCode(ErrOAuthClientDeleted)
 	assert(message4, code4, e, i)
 
+	e, i = errorAndStatusCode(ErrAuthAuthorizationFieldMissing)
+	assert(message5, code5, e, i)
+
+	e, i = errorAndStatusCode(ErrAuthNonExistentKey)
+	assert(message6, code6, e, i)
+
 	t.Run("Partial override", func(t *testing.T) {
-		globalConf.TykErrors = map[config.TykErrorType]config.TykError{
-			OAuthAuthorizationFieldMissing: {
+		globalConf.OverrideErrors = map[string]config.TykError{
+			ErrOAuthAuthorizationFieldMissing: {
 				Code: code4,
 			},
-			OAuthBearerTokenMalformed: {
+			ErrOAuthBearerTokenMalformed: {
 				Message: message4,
 			},
 		}
@@ -2155,10 +2173,10 @@ func TestOverrideTykErrors(t *testing.T) {
 
 		overrideTykErrors()
 
-		e, i := errorAndStatusCode(OAuthAuthorizationFieldMissing)
+		e, i := errorAndStatusCode(ErrOAuthAuthorizationFieldMissing)
 		assert(message1, code4, e, i)
 
-		e, i = errorAndStatusCode(OAuthBearerTokenMalformed)
+		e, i = errorAndStatusCode(ErrOAuthBearerTokenMalformed)
 		assert(message4, code2, e, i)
 
 	})

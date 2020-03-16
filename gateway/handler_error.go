@@ -23,39 +23,15 @@ const (
 	defaultContentType    = headers.ApplicationJSON
 )
 
-const (
-	OAuthAuthorizationFieldMissing config.TykErrorType = "oauth.auth_field_missing"
-	OAuthBearerTokenMalformed      config.TykErrorType = "oauth.bearer_token_malformed"
-	OAuthKeyNotAuthorised          config.TykErrorType = "oauth.key_not_authorised"
-	OAuthClientDeleted             config.TykErrorType = "oauth.client_deleted"
-)
+var TykErrors = make(map[string]config.TykError)
 
-var TykErrors = map[config.TykErrorType]config.TykError{
-	OAuthAuthorizationFieldMissing: {
-		Message: "Authorization field missing",
-		Code:    http.StatusBadRequest,
-	},
-	OAuthBearerTokenMalformed: {
-		Message: "Bearer token malformed",
-		Code:    http.StatusBadRequest,
-	},
-	OAuthKeyNotAuthorised: {
-		Message: "Key not authorised",
-		Code:    http.StatusForbidden,
-	},
-	OAuthClientDeleted: {
-		Message: "Key not authorised. OAuth client access was revoked",
-		Code:    http.StatusForbidden,
-	},
-}
-
-func errorAndStatusCode(errType config.TykErrorType) (error, int) {
+func errorAndStatusCode(errType string) (error, int) {
 	err := TykErrors[errType]
 	return errors.New(err.Message), err.Code
 }
 
 func overrideTykErrors() {
-	for id, err := range config.Global().TykErrors {
+	for id, err := range config.Global().OverrideErrors {
 
 		overridenErr := TykErrors[id]
 

@@ -528,7 +528,7 @@
       "type": "string",
       "format": "path"
     },
-    "tyk_errors": {
+    "override_errors": {
       "type": ["object", "null"],
       "additionalProperties": false,
       "properties": {
