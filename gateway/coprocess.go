@@ -172,10 +172,12 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response) (*copro
 }
 
 // ObjectPostProcess does CoProcessObject post-processing (adding/removing headers or params, etc.).
-func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Request) (err error) {
+func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Request, origURL string, origMethod string) (err error) {
 	r.ContentLength = int64(len(object.Request.RawBody))
 	r.Body = ioutil.NopCloser(bytes.NewReader(object.Request.RawBody))
 	nopCloseRequestBody(r)
+
+	logger := c.Middleware.Logger()
 
 	for _, dh := range object.Request.DeleteHeaders {
 		r.Header.Del(dh)
@@ -194,11 +196,34 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 		values.Set(p, v)
 	}
 
-	r.URL, err = url.ParseRequestURI(object.Request.Url)
+	parsedURL, err := url.ParseRequestURI(object.Request.Url)
 	if err != nil {
+		logger.Error(err)
 		return
 	}
+
+	rewriteURL := ctxGetURLRewriteTarget(r)
+	if rewriteURL != nil {
+		ctxSetURLRewriteTarget(r, parsedURL)
+		r.URL, err = url.ParseRequestURI(origURL)
+		if err != nil {
+			logger.Error(err)
+			return
+		}
+	} else {
+		r.URL = parsedURL
+	}
+
+	transformMethod := ctxGetTransformRequestMethod(r)
+	if transformMethod != "" {
+		ctxSetTransformRequestMethod(r, object.Request.Method)
+		r.Method = origMethod
+	} else {
+		r.Method = object.Request.Method
+	}
+
 	r.URL.RawQuery = values.Encode()
+
 	return
 }
 
@@ -300,6 +325,19 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		return errors.New("Middleware error"), 500
 	}
 
+	var origURL string
+	if rewriteUrl := ctxGetURLRewriteTarget(r); rewriteUrl != nil {
+		origURL = object.Request.Url
+		object.Request.Url = rewriteUrl.String()
+		object.Request.RequestUri = rewriteUrl.RequestURI()
+	}
+
+	var origMethod string
+	if transformMethod := ctxGetTransformRequestMethod(r); transformMethod != "" {
+		origMethod = r.Method
+		object.Request.Method = transformMethod
+	}
+
 	t1 := time.Now()
 	returnObject, err := coProcessor.Dispatch(object)
 	ms := DurationToMillisecond(time.Since(t1))
@@ -315,7 +353,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	m.logger.WithField("ms", ms).Debug("gRPC request processing took")
 
-	err = coProcessor.ObjectPostProcess(returnObject, r)
+	err = coProcessor.ObjectPostProcess(returnObject, r, origURL, origMethod)
 	if err != nil {
 		// Restore original URL object so that it can be used by ErrorHandler:
 		r.URL = originalURL
@@ -387,6 +425,10 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	// Is this a CP authentication middleware?
 	if m.Spec.EnableCoProcessAuth && m.HookType == coprocess.HookType_CustomKeyCheck {
+		if extractor == nil {
+			sessionID = token
+		}
+
 		// The CP middleware didn't setup a session:
 		if returnObject.Session == nil || token == "" {
 			authHeaderValue, _ := m.getAuthToken(m.getAuthType(), r)
@@ -406,11 +448,12 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			returnedSession.MetaData[k] = string(v)
 		}
 
-		if extractor == nil {
-			ctxSetSession(r, returnedSession, token, true)
-		} else {
-			ctxSetSession(r, returnedSession, sessionID, true)
+		existingSession, found := GlobalSessionManager.SessionDetail(m.Spec.OrgID, sessionID, false)
+		if found {
+			returnedSession.QuotaRenews = existingSession.QuotaRenews
 		}
+
+		ctxSetSession(r, returnedSession, sessionID, true)
 	}
 
 	return nil, http.StatusOK

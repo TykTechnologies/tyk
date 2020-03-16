@@ -528,6 +528,18 @@
       "type": "string",
       "format": "path"
     },
+    "override_messages": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "integer"
+        },
+        "message": {
+          "type": "string"
+        }
+      }
+    },
     "monitor": {
       "type": ["object", "null"],
       "additionalProperties": false,

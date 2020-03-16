@@ -64,6 +64,12 @@ func createJWTSessionWithRSA() *user.SessionState {
 	return session
 }
 
+func createJWTSessionWithECDSA() *user.SessionState {
+	session := createJWTSession()
+	session.JWTData.Secret = jwtECDSAPublicKey
+	return session
+}
+
 func createJWTSessionWithRSAWithPolicy(policyID string) *user.SessionState {
 	session := createJWTSessionWithRSA()
 	session.SetPolicies(policyID)
@@ -100,6 +106,20 @@ func prepareGenericJWTSession(testName string, method string, claimName string, 
 		sessionFunc = createJWTSessionWithRSA
 
 		jwtToken = CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["foo"] = "bar"
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
+
+			if claimName != KID {
+				t.Claims.(jwt.MapClaims)[claimName] = tokenKID
+				t.Header[KID] = "ignore-this-id"
+			} else {
+				t.Header[KID] = tokenKID
+			}
+		})
+	case ECDSASign:
+		sessionFunc = createJWTSessionWithECDSA
+
+		jwtToken = CreateJWKTokenECDSA(func(t *jwt.Token) {
 			t.Claims.(jwt.MapClaims)["foo"] = "bar"
 			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 
@@ -1377,6 +1397,39 @@ func TestJWTSessionRSAWithEncodedJWK(t *testing.T) {
 			Headers: authHeaders, Code: http.StatusOK,
 		})
 	})
+	t.Run("Direct JWK URL with der encoding", func(t *testing.T) {
+		spec.JWTSource = testHttpJWKDER
+		LoadAPI(spec)
+
+		ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+	})
+
+	t.Run("Base64 JWK URL with der encoding", func(t *testing.T) {
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(testHttpJWKDER))
+		LoadAPI(spec)
+
+		ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+	})
+}
+
+func TestParseRSAKeyFromJWK(t *testing.T) {
+	sample := `MIIC9jCCAd6gAwIBAgIJIgAUUdWegHDtMA0GCSqGSIb3DQEBCwUAMCIxIDAeBgNVBAMTF3B1cGlsLXRlc3QuZXUuYXV0aDAuY29tMB4XDTE3MDMxMDE1MTUyMFoXDTMwMTExNzE1MTUyMFowIjEgMB4GA1UEAxMXcHVwaWwtdGVzdC5ldS5hdXRoMC5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDWW+2PEt6nWK7cTxpkiXYTOsAWi+CCGZzDZNtwqIiLDTIkBb+Hrb70hSMRNXjPckw9+FxYC/egluGEmcEidZbj260Qp63xYpvC8XNXrlvovJqvPLk8ETPolVqYNaWM1UoJsqBPIlmFlwVH+ExCjUL37Kay3gwRXTHVRiPfPCZanqWqMu8CbC+pby1sUaiTIW1bE15v5pdgTZUH94uuMfYTdnWY6DSPWKrgwQUxmn3TJN66DynPgRjMaZaCr6FiDItm1gqE74rkbRcE3nZGM3F+fxUNTsSKjvLBBBV9aDCO408zfCycR7J+HSO2bqBxnewYhweOx23U46A0WNKW5raxAgMBAAGjLzAtMAwGA1UdEwQFMAMBAf8wHQYDVR0OBBYEFCR9T3F1LtZa3AX+LjXX9av8m/2kMA0GCSqGSIb3DQEBCwUAA4IBAQBxot91iXDzJfQVaGV+KoCDuJmOrSLTolKbJOxVoilyY72LnIcQOLgHI5JN7X17GnESTsvMC7OiUcC0RYimfrc9pchWairU/Uky6t4XmOLHQsIKjXkqwkNn3vOkRZB9wsveFQpHVLBpBUZLcPYr+8ZQYegueJpW6zSOEkswOM1U+CzERZaY6dkD8nI8TzozQ6ZLV3iypW/gx/lLT8cQb0EMzLNKSOobT+NEnhhtpy1BnfpAwV8rGENYtyUpq2FTa3kQjBCrR5cBt/07yezyeX8Amcdst3PnLaZMn5k+Elj57FKKDRV+L9rYGeceLbKKJ0uSKuhR9LIVrFaa/pzUKekC`
+	b, err := base64.StdEncoding.DecodeString(sample)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = jwt.ParseRSAPublicKeyFromPEM(b)
+	if err == nil {
+		t.Error("expected an error")
+	}
+	_, err = ParseRSAPublicKey(b)
+	if err != nil {
+		t.Error("decoding as default ", err)
+	}
 }
 
 func BenchmarkJWTSessionRSAWithEncodedJWK(b *testing.B) {
@@ -1791,7 +1844,7 @@ func TestJWTECDSASign(t *testing.T) {
 	_, jwtToken := prepareGenericJWTSession(t.Name(), ECDSASign, KID, false)
 	defer ResetTestConfig()
 	authHeaders := map[string]string{"authorization": jwtToken}
-	t.Run("Request with valid JWT/ECDSA signature needs a test. currently defaults to HMAC", func(t *testing.T) {
+	t.Run("Request with valid JWT/ECDSA", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers: authHeaders, Code: http.StatusOK,
 		})

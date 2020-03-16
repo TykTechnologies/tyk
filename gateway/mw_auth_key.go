@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/TykTechnologies/tyk/config"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/request"
@@ -15,6 +17,23 @@ const (
 	defaultSignatureErrorCode    = http.StatusUnauthorized
 	defaultSignatureErrorMessage = "Request signature verification failed"
 )
+
+const (
+	ErrAuthAuthorizationFieldMissing = "auth.auth_field_missing"
+	ErrAuthKeyNotFound               = "auth.key_not_found"
+)
+
+func init() {
+	TykErrors[ErrAuthAuthorizationFieldMissing] = config.TykError{
+		Message: "Authorization field missing",
+		Code:    http.StatusUnauthorized,
+	}
+
+	TykErrors[ErrAuthKeyNotFound] = config.TykError{
+		Message: "Access to this API has been disallowed",
+		Code:    http.StatusForbidden,
+	}
+}
 
 // KeyExists will check if the key being used to access the API is in the request data,
 // and then if the key is in the storage engine
@@ -59,7 +78,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 		// No header value, fail
 		k.Logger().Info("Attempted access with malformed header, no auth header found.")
 
-		return errors.New("Authorization field missing"), http.StatusUnauthorized
+		return errorAndStatusCode(ErrAuthAuthorizationFieldMissing)
 	}
 
 	// Ignore Bearer prefix on token if it exists
@@ -76,7 +95,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 		// Report in health check
 		reportHealthValue(k.Spec, KeyFailure, "1")
 
-		return errors.New("Access to this API has been disallowed"), http.StatusForbidden
+		return errorAndStatusCode(ErrAuthKeyNotFound)
 	}
 
 	// Set session state on context, we will need it later
