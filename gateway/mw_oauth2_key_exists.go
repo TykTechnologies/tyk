@@ -15,10 +15,10 @@ const (
 )
 
 const (
-	ErrOAuthAuthorizationFieldMissing = "oauth.auth_field_missing"
-	ErrOAuthBearerTokenMalformed      = "oauth.bearer_token_malformed"
-	ErrOAuthKeyNotAuthorised          = "oauth.key_not_authorised"
-	ErrOAuthClientDeleted             = "oauth.client_deleted"
+	ErrOAuthAuthorizationFieldMissing   = "oauth.auth_field_missing"
+	ErrOAuthAuthorizationFieldMalformed = "oauth.auth_field_malformed"
+	ErrOAuthKeyNotFound                 = "oauth.key_not_found"
+	ErrOAuthClientDeleted               = "oauth.client_deleted"
 )
 
 func init() {
@@ -27,12 +27,12 @@ func init() {
 		Code:    http.StatusBadRequest,
 	}
 
-	TykErrors[ErrOAuthBearerTokenMalformed] = config.TykError{
+	TykErrors[ErrOAuthAuthorizationFieldMalformed] = config.TykError{
 		Message: "Bearer token malformed",
 		Code:    http.StatusBadRequest,
 	}
 
-	TykErrors[ErrOAuthKeyNotAuthorised] = config.TykError{
+	TykErrors[ErrOAuthKeyNotFound] = config.TykError{
 		Message: "Key not authorised",
 		Code:    http.StatusForbidden,
 	}
@@ -82,7 +82,7 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	if strings.ToLower(parts[0]) != "bearer" {
 		logger.Info("Bearer token malformed")
 
-		return errorAndStatusCode(ErrOAuthBearerTokenMalformed)
+		return errorAndStatusCode(ErrOAuthAuthorizationFieldMalformed)
 	}
 
 	accessToken := parts[1]
@@ -98,7 +98,7 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		// Report in health check
 		reportHealthValue(k.Spec, KeyFailure, "-1")
 
-		return errorAndStatusCode(ErrOAuthKeyNotAuthorised)
+		return errorAndStatusCode(ErrOAuthKeyNotFound)
 	}
 
 	// Make sure OAuth-client is still present

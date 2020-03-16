@@ -20,7 +20,7 @@ const (
 
 const (
 	ErrAuthAuthorizationFieldMissing = "auth.auth_field_missing"
-	ErrAuthNonExistentKey            = "auth.nonexistent_key"
+	ErrAuthKeyNotFound               = "auth.key_not_found"
 )
 
 func init() {
@@ -29,7 +29,7 @@ func init() {
 		Code:    http.StatusUnauthorized,
 	}
 
-	TykErrors[ErrAuthNonExistentKey] = config.TykError{
+	TykErrors[ErrAuthKeyNotFound] = config.TykError{
 		Message: "Access to this API has been disallowed",
 		Code:    http.StatusForbidden,
 	}
@@ -95,7 +95,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 		// Report in health check
 		reportHealthValue(k.Spec, KeyFailure, "1")
 
-		return errorAndStatusCode(ErrAuthNonExistentKey)
+		return errorAndStatusCode(ErrAuthKeyNotFound)
 	}
 
 	// Set session state on context, we will need it later

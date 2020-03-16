@@ -2117,11 +2117,11 @@ func TestOverrideErrors(t *testing.T) {
 			Message: message1,
 			Code:    code1,
 		},
-		ErrOAuthBearerTokenMalformed: {
+		ErrOAuthAuthorizationFieldMalformed: {
 			Message: message2,
 			Code:    code2,
 		},
-		ErrOAuthKeyNotAuthorised: {
+		ErrOAuthKeyNotFound: {
 			Message: message3,
 			Code:    code3,
 		},
@@ -2133,7 +2133,7 @@ func TestOverrideErrors(t *testing.T) {
 			Message: message5,
 			Code:    code5,
 		},
-		ErrAuthNonExistentKey: {
+		ErrAuthKeyNotFound: {
 			Message: message6,
 			Code:    code6,
 		},
@@ -2145,10 +2145,10 @@ func TestOverrideErrors(t *testing.T) {
 	e, i := errorAndStatusCode(ErrOAuthAuthorizationFieldMissing)
 	assert(message1, code1, e, i)
 
-	e, i = errorAndStatusCode(ErrOAuthBearerTokenMalformed)
+	e, i = errorAndStatusCode(ErrOAuthAuthorizationFieldMalformed)
 	assert(message2, code2, e, i)
 
-	e, i = errorAndStatusCode(ErrOAuthKeyNotAuthorised)
+	e, i = errorAndStatusCode(ErrOAuthKeyNotFound)
 	assert(message3, code3, e, i)
 
 	e, i = errorAndStatusCode(ErrOAuthClientDeleted)
@@ -2157,7 +2157,7 @@ func TestOverrideErrors(t *testing.T) {
 	e, i = errorAndStatusCode(ErrAuthAuthorizationFieldMissing)
 	assert(message5, code5, e, i)
 
-	e, i = errorAndStatusCode(ErrAuthNonExistentKey)
+	e, i = errorAndStatusCode(ErrAuthKeyNotFound)
 	assert(message6, code6, e, i)
 
 	t.Run("Partial override", func(t *testing.T) {
@@ -2165,7 +2165,7 @@ func TestOverrideErrors(t *testing.T) {
 			ErrOAuthAuthorizationFieldMissing: {
 				Code: code4,
 			},
-			ErrOAuthBearerTokenMalformed: {
+			ErrOAuthAuthorizationFieldMalformed: {
 				Message: message4,
 			},
 		}
@@ -2176,7 +2176,7 @@ func TestOverrideErrors(t *testing.T) {
 		e, i := errorAndStatusCode(ErrOAuthAuthorizationFieldMissing)
 		assert(message1, code4, e, i)
 
-		e, i = errorAndStatusCode(ErrOAuthBearerTokenMalformed)
+		e, i = errorAndStatusCode(ErrOAuthAuthorizationFieldMalformed)
 		assert(message4, code2, e, i)
 
 	})
