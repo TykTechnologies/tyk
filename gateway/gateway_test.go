@@ -2112,7 +2112,7 @@ func TestOverrideErrors(t *testing.T) {
 	const code6 = 6
 
 	globalConf := config.Global()
-	globalConf.OverrideErrors = map[string]config.TykError{
+	globalConf.OverrideMessages = map[string]config.TykError{
 		ErrOAuthAuthorizationFieldMissing: {
 			Message: message1,
 			Code:    code1,
@@ -2161,7 +2161,7 @@ func TestOverrideErrors(t *testing.T) {
 	assert(message6, code6, e, i)
 
 	t.Run("Partial override", func(t *testing.T) {
-		globalConf.OverrideErrors = map[string]config.TykError{
+		globalConf.OverrideMessages = map[string]config.TykError{
 			ErrOAuthAuthorizationFieldMissing: {
 				Code: code4,
 			},

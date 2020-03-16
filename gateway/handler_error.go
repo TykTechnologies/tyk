@@ -31,7 +31,7 @@ func errorAndStatusCode(errType string) (error, int) {
 }
 
 func overrideTykErrors() {
-	for id, err := range config.Global().OverrideErrors {
+	for id, err := range config.Global().OverrideMessages {
 
 		overridenErr := TykErrors[id]
 

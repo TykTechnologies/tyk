@@ -528,7 +528,7 @@
       "type": "string",
       "format": "path"
     },
-    "override_errors": {
+    "override_messages": {
       "type": ["object", "null"],
       "additionalProperties": false,
       "properties": {
