@@ -2090,3 +2090,94 @@ func TestCache_singleErrorResponse(t *testing.T) {
 		test.TestCase{Method: http.MethodGet, Path: "/", Code: http.StatusInternalServerError, BodyMatch: wantBody},
 	)
 }
+
+func TestOverrideErrors(t *testing.T) {
+	assert := func(expectedError string, expectedCode int, actualError error, actualCode int) {
+		if !(expectedError == actualError.Error() && expectedCode == actualCode) {
+			t.Fatal("Override failed")
+		}
+	}
+
+	const message1 = "Message1"
+	const code1 = 1
+	const message2 = "Message2"
+	const code2 = 2
+	const message3 = "Message3"
+	const code3 = 3
+	const message4 = "Message4"
+	const code4 = 4
+	const message5 = "Message5"
+	const code5 = 5
+	const message6 = "Message6"
+	const code6 = 6
+
+	globalConf := config.Global()
+	globalConf.OverrideMessages = map[string]config.TykError{
+		ErrOAuthAuthorizationFieldMissing: {
+			Message: message1,
+			Code:    code1,
+		},
+		ErrOAuthAuthorizationFieldMalformed: {
+			Message: message2,
+			Code:    code2,
+		},
+		ErrOAuthKeyNotFound: {
+			Message: message3,
+			Code:    code3,
+		},
+		ErrOAuthClientDeleted: {
+			Message: message4,
+			Code:    code4,
+		},
+		ErrAuthAuthorizationFieldMissing: {
+			Message: message5,
+			Code:    code5,
+		},
+		ErrAuthKeyNotFound: {
+			Message: message6,
+			Code:    code6,
+		},
+	}
+	config.SetGlobal(globalConf)
+
+	overrideTykErrors()
+
+	e, i := errorAndStatusCode(ErrOAuthAuthorizationFieldMissing)
+	assert(message1, code1, e, i)
+
+	e, i = errorAndStatusCode(ErrOAuthAuthorizationFieldMalformed)
+	assert(message2, code2, e, i)
+
+	e, i = errorAndStatusCode(ErrOAuthKeyNotFound)
+	assert(message3, code3, e, i)
+
+	e, i = errorAndStatusCode(ErrOAuthClientDeleted)
+	assert(message4, code4, e, i)
+
+	e, i = errorAndStatusCode(ErrAuthAuthorizationFieldMissing)
+	assert(message5, code5, e, i)
+
+	e, i = errorAndStatusCode(ErrAuthKeyNotFound)
+	assert(message6, code6, e, i)
+
+	t.Run("Partial override", func(t *testing.T) {
+		globalConf.OverrideMessages = map[string]config.TykError{
+			ErrOAuthAuthorizationFieldMissing: {
+				Code: code4,
+			},
+			ErrOAuthAuthorizationFieldMalformed: {
+				Message: message4,
+			},
+		}
+		config.SetGlobal(globalConf)
+
+		overrideTykErrors()
+
+		e, i := errorAndStatusCode(ErrOAuthAuthorizationFieldMissing)
+		assert(message1, code4, e, i)
+
+		e, i = errorAndStatusCode(ErrOAuthAuthorizationFieldMalformed)
+		assert(message4, code2, e, i)
+
+	})
+}
