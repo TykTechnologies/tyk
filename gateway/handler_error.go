@@ -3,12 +3,15 @@ package gateway
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"html/template"
 	"net/http"
 	"runtime/pprof"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/request"
@@ -19,6 +22,30 @@ const (
 	defaultTemplateFormat = "json"
 	defaultContentType    = headers.ApplicationJSON
 )
+
+var TykErrors = make(map[string]config.TykError)
+
+func errorAndStatusCode(errType string) (error, int) {
+	err := TykErrors[errType]
+	return errors.New(err.Message), err.Code
+}
+
+func overrideTykErrors() {
+	for id, err := range config.Global().OverrideMessages {
+
+		overridenErr := TykErrors[id]
+
+		if err.Code != 0 {
+			overridenErr.Code = err.Code
+		}
+
+		if err.Message != "" {
+			overridenErr.Message = err.Message
+		}
+
+		TykErrors[id] = overridenErr
+	}
+}
 
 // APIError is generic error object returned if there is something wrong with the request
 type APIError struct {
