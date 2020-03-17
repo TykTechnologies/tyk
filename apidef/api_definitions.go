@@ -481,6 +481,7 @@ type APIDefinition struct {
 	GlobalRateLimit         GlobalRateLimit        `bson:"global_rate_limit" json:"global_rate_limit"`
 	StripAuthData           bool                   `bson:"strip_auth_data" json:"strip_auth_data"`
 	EnableDetailedRecording bool                   `bson:"enable_detailed_recording" json:"enable_detailed_recording"`
+	LastUpdated string                 `bson:"last_updated" json:"last_updated"`
 }
 
 type AuthConfig struct {

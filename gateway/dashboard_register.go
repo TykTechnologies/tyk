@@ -238,6 +238,11 @@ func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Cli
 	}
 
 	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusForbidden {
+		return DashService.Register()
+	}
+
 	if resp.StatusCode != http.StatusOK {
 		return errors.New("dashboard is down? Heartbeat non-200 response")
 	}

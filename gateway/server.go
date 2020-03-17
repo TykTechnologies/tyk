@@ -1,7 +1,9 @@
 package gateway
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -326,6 +328,9 @@ func syncPolicies() (count int, err error) {
 
 	mainLog.Info("Loading policies")
 
+	policiesMu.Lock()
+	defer policiesMu.Unlock()
+
 	switch config.Global().Policies.PolicySource {
 	case "service":
 		if config.Global().Policies.PolicyConnectionString == "" {
@@ -353,13 +358,240 @@ func syncPolicies() (count int, err error) {
 		mainLog.Infof(" - %s", id)
 	}
 
-	policiesMu.Lock()
-	defer policiesMu.Unlock()
 	if len(pols) > 0 {
 		policiesByID = pols
 	}
 
 	return len(pols), err
+}
+
+func syncAll() (policyCount int, apiCount int, err error) {
+	if  config.Global().Policies.PolicySource == "service" && config.Global().Policies.PolicyConnectionString == "" {
+		mainLog.Fatal("No connection string or node ID present. Failing.")
+	}
+	// Try delta reload first:
+	policyCount, apiCount, err = deltaReload()
+	if err == nil {
+		mainLog.Debug("Using delta reload mechanism")
+		return
+	}
+	mainLog.Debug("Using standard reload mechanism")
+	// Sync policies:
+	var pols map[string]user.Policy
+	mainLog.Info("Loading policies")
+	policiesMu.Lock()
+	defer policiesMu.Unlock()
+
+	switch config.Global().Policies.PolicySource {
+	case "service":
+		connStr := config.Global().Policies.PolicyConnectionString
+		connStr = connStr + "/system/policies"
+
+		mainLog.Info("Using Policies from Dashboard Service")
+
+		pols = LoadPoliciesFromDashboard(connStr, config.Global().NodeSecret, config.Global().Policies.AllowExplicitPolicyID)
+	case "rpc":
+		mainLog.Debug("Using Policies from RPC")
+		pols, err = LoadPoliciesFromRPC(config.Global().SlaveOptions.RPCKey)
+	default:
+		// this is the only case now where we need a policy record name
+		if config.Global().Policies.PolicyRecordName == "" {
+			mainLog.Debug("No policy record name defined, skipping...")
+			// return 0, nil
+			return
+		}
+		pols = LoadPoliciesFromFile(config.Global().Policies.PolicyRecordName)
+	}
+	mainLog.Infof("Policies found (%d total):", len(pols))
+	for id := range pols {
+		mainLog.Infof(" - %s", id)
+	}
+
+	if len(pols) > 0 {
+		policiesByID = pols
+	}
+
+	policyCount = len(pols)
+	if err != nil {
+		return
+	}
+
+	// Sync APIs:
+	loader := APIDefinitionLoader{}
+	apisMu.Lock()
+	defer apisMu.Unlock()
+	var s []*APISpec
+	if config.Global().UseDBAppConfigs {
+		connStr := buildConnStr("/system/apis")
+		var tmpSpecs []*APISpec
+		tmpSpecs, err = loader.FromDashboardService(connStr, config.Global().NodeSecret)
+		if err != nil {
+			log.Error("failed to load API specs: ", err)
+			return
+		}
+		s = tmpSpecs
+		mainLog.Debug("Downloading API Configurations from Dashboard Service")
+	} else if config.Global().SlaveOptions.UseRPC {
+		mainLog.Debug("Using RPC Configuration")
+		s, err = loader.FromRPC(config.Global().SlaveOptions.RPCKey)
+		if err != nil {
+			return
+		}
+	} else {
+		s = loader.FromDir(config.Global().AppPath)
+	}
+
+	mainLog.Printf("Detected %v APIs", len(s))
+
+	if config.Global().AuthOverride.ForceAuthProvider {
+		for i := range s {
+			s[i].AuthProvider = config.Global().AuthOverride.AuthProvider
+		}
+	}
+
+	if config.Global().AuthOverride.ForceSessionProvider {
+		for i := range s {
+			s[i].SessionProvider = config.Global().AuthOverride.SessionProvider
+		}
+	}
+	var filter []*APISpec
+	for _, v := range s {
+		if err := v.Validate(); err != nil {
+			mainLog.Infof("Skipping loading spec:%q because it failed validation with error:%v", v.Name, err)
+			continue
+		}
+		filter = append(filter, v)
+	}
+	apiSpecs = filter
+
+	tlsConfigCache.Flush()
+
+	apiCount = len(apiSpecs)
+	return
+}
+
+type ReloadState struct {
+	Policies map[string]int `json:"policies"`
+	APIS     map[string]int `json:"apis"`
+}
+
+type ReloadStateUpdates struct {
+	Policies struct {
+		Updated map[string]user.Policy `json:"updated"`
+		Deleted []string               `json:"deleted"`
+		Created map[string]user.Policy `json:"created"`
+	}
+	APIS struct {
+		Updated map[string]*apidef.APIDefinition `json:"updated"`
+		Deleted []string                         `json:"deleted"`
+		Created map[string]*apidef.APIDefinition `json:"created"`
+	}
+}
+
+func deltaReload() (policyUpdates int, apiUpdates int, err error) {
+	mainLog.Debug("Using delta reload")
+	policyState := make(map[string]int)
+	for policyID, policy := range policiesByID {
+		lastUpdated, _ := strconv.Atoi(policy.LastUpdated)
+		policyState[policyID] = lastUpdated
+	}
+
+	apiState := make(map[string]int)
+	for _, spec := range apiSpecs {
+		lastUpdated, _ := strconv.Atoi(spec.APIDefinition.LastUpdated)
+		apiState[spec.Id.Hex()] = lastUpdated
+	}
+	reloadState := &ReloadState{
+		Policies: policyState,
+		APIS:     apiState,
+	}
+	var reloadStateJSON []byte
+	reloadStateJSON, err = json.Marshal(reloadState)
+	if err != nil {
+		mainLog.Error("Error when syncing:", err.Error())
+		return
+	}
+	endpoint := buildConnStr("/system/delta_reload")
+	var req *http.Request
+	req, err = http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(reloadStateJSON))
+	if err != nil {
+		mainLog.Error("Error when syncing:", err.Error())
+		return
+	}
+	req.Header.Set("authorization", config.Global().NodeSecret)
+	req.Header.Set("x-tyk-nodeid", GetNodeID())
+	req.Header.Set("x-tyk-nonce", ServiceNonce)
+
+	c := initialiseClient()
+	var resp *http.Response
+	resp, err = c.Do(req)
+	if err != nil {
+		mainLog.Error("Sync request failed: ", err)
+		return
+	}
+
+	var list struct {
+		Message ReloadStateUpdates
+		Nonce   string
+	}
+	if err = json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		mainLog.Error("Failed to decode sync message body: ", err.Error())
+		return
+	}
+	ServiceNonce = list.Nonce
+	updates := list.Message
+
+	policyUpdates = len(updates.Policies.Updated) + len(updates.Policies.Deleted) + len(updates.Policies.Created)
+	if policyUpdates > 0 {
+		mainLog.Debug("Successful delta reload call")
+		policiesMu.Lock()
+		mainLog.Info("Loading policies")
+
+		for polID, policy := range updates.Policies.Created {
+			policiesByID[polID] = policy
+		}
+		for polID, policy := range updates.Policies.Updated {
+			policiesByID[polID] = policy
+		}
+		for _, polID := range updates.Policies.Deleted {
+			delete(policiesByID, polID)
+		}
+		policiesMu.Unlock()
+
+		mainLog.Infof("Policies found (%d total):", len(policiesByID))
+		for id := range policiesByID {
+			mainLog.Infof(" - %s", id)
+		}
+		mainLog.Debug("Policy updates applied")
+	} else {
+		mainLog.Debug("No policy updates found")
+	}
+
+	apiUpdates = len(updates.APIS.Updated)+ len(updates.APIS.Deleted)+ len(updates.APIS.Created)
+	if apiUpdates > 0 {
+		mainLog.Info("Loading API definitions")
+		loader := APIDefinitionLoader{}
+		apisMu.Lock()
+		for i, def := range apiSpecs {
+			id := def.Id.Hex()
+			updatedDef, found := updates.APIS.Updated[id]
+			if found {
+				spec := loader.MakeSpec(updatedDef, nil)
+				apiSpecs[i] = spec
+				continue
+			}
+		}
+		for _, def := range updates.APIS.Created {
+			spec := loader.MakeSpec(def, nil)
+			apiSpecs = append(apiSpecs, spec)
+			mainLog.Infof("Loading API %s - %s", spec.Id.Hex(), spec.Name)
+		}
+		apisMu.Unlock()
+		mainLog.Info("API updates retrieved successfully")
+	} else {
+		mainLog.Debug("No API updates found")
+	}
+	return
 }
 
 // stripSlashes removes any trailing slashes from the request's URL
@@ -692,27 +924,24 @@ func DoReload() {
 	if config.Global().EnableJSVM {
 		GlobalEventsJSVM.Init(nil, logrus.NewEntry(log))
 	}
-
-	// Load the API Policies
-	if _, err := syncPolicies(); err != nil {
-		mainLog.Error("Error during syncing policies:", err.Error())
+	var policyCount, apiCount int
+	var err error
+	if policyCount, apiCount, err = syncAll(); err != nil {
+		mainLog.Error("Error during syncing:", err.Error())
 		return
 	}
-
-	// load the specs
-	if count, err := syncAPISpecs(); err != nil {
-		mainLog.Error("Error during syncing apis:", err.Error())
+	// skip re-loading when no updates are reported from the deltaReload call
+	if policyCount == 0 && apiCount == 0 {
+		mainLog.Warning("No recent API or policy updates, not reloading")
 		return
-	} else {
-		// skip re-loading only if dashboard service reported 0 APIs
-		// and current registry had 0 APIs
-		if count == 0 && apisByIDLen() == 0 {
-			mainLog.Warning("No API Definitions found, not reloading")
-			return
-		}
+	}
+	// skip re-loading only if dashboard service reported 0 APIs
+	// and current registry had 0 APIs
+	if apiCount == 0 && apisByIDLen() == 0 {
+		mainLog.Warning("No API Definitions found, not reloading")
+		return
 	}
 	loadGlobalApps()
-
 	mainLog.Info("API reload complete")
 }
 
