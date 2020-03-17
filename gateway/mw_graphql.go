@@ -14,7 +14,7 @@ func (m *GraphQLMiddleware) Name() string {
 
 func (m *GraphQLMiddleware) EnabledForSpec() bool {
 	for _, versionData := range m.Spec.VersionData.Versions {
-		if versionData.GraphQL.Schema != "" {
+		if versionData.GraphQL.GraphQLApi.Schema != "" {
 			return true
 		}
 	}
