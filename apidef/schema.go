@@ -431,8 +431,11 @@ const Schema = `{
         ]
         },
         "graphql": {
-            "type": ["object", "null"],
+            "type": "object",
             "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
                 "api": {
                     "type": "object",
                     "properties": {
@@ -494,8 +497,7 @@ const Schema = `{
                 }
             },
             "required": [
-                "api", 
-                "playground"
+                "enabled"
             ]
         }
     }
