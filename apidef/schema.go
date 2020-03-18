@@ -500,7 +500,7 @@ const Schema = `{
                 "enabled"
             ]
         }
-    }
+    },
     "required": [
         "auth",
         "name",
