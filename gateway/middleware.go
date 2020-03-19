@@ -410,6 +410,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					// -1 is special "unlimited" case
 					if ar.Limit.QuotaMax != -1 && policy.QuotaMax > ar.Limit.QuotaMax {
 						ar.Limit.QuotaMax = policy.QuotaMax
+						session.QuotaMax = policy.QuotaMax
 					}
 
 					if policy.QuotaRenewalRate > ar.Limit.QuotaRenewalRate {
@@ -447,6 +448,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 			// Master policy case
 			if len(policy.AccessRights) == 0 {
+				log.Info("entra aqui al master")
 				if !usePartitions || policy.Partitions.RateLimit {
 					session.Rate = policy.Rate
 					session.Per = policy.Per
@@ -458,6 +460,8 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					session.QuotaMax = policy.QuotaMax
 					session.QuotaRenewalRate = policy.QuotaRenewalRate
 				}
+			}else{
+				log.Info("policy access rights:", policy.AccessRights)
 			}
 
 			if !session.HMACEnabled {
