@@ -450,10 +450,14 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 		existingSession, found := GlobalSessionManager.SessionDetail(m.Spec.OrgID, sessionID, false)
 		if found {
-			returnedSession.QuotaRenews = existingSession.QuotaRenews
+			// Copy metadata:
+			for k, v := range returnedSession.MetaData {
+				existingSession.MetaData[k] = v
+			}
+			ctxSetSession(r, &existingSession, sessionID, true)
+		} else {
+			ctxSetSession(r, returnedSession, sessionID, true)
 		}
-
-		ctxSetSession(r, returnedSession, sessionID, true)
 	}
 
 	return nil, http.StatusOK
