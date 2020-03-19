@@ -242,7 +242,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 				c = 5
 			}
 
-			if n <= 1 || n*c > rate {
+			if n <= 1 || n*c < rate {
 				// If we have 1 server, there is no need to strain redis at all the leaky
 				// bucket algorithm will suffice.
 				if l.limitDRL(currentSession, key, rateScope, apiLimit, dryRun) {
