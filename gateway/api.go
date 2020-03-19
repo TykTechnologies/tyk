@@ -640,6 +640,27 @@ func handleDeleteKey(keyName, apiID string, resetQuota bool) (interface{}, int) 
 	return statusObj, http.StatusOK
 }
 
+// handleDeleteHashedKeyWithLogs is a wrapper for handleDeleteHashedKey with logs
+func handleDeleteHashedKeyWithLogs(keyName, apiID string, resetQuota bool) (interface{}, int) {
+	res, code := handleDeleteHashedKey(keyName, apiID, resetQuota)
+
+	if code != http.StatusOK {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"key":    obfuscateKey(keyName),
+			"status": "fail",
+		}).Error(res)
+	}
+
+	log.WithFields(logrus.Fields{
+		"prefix": "api",
+		"key":    keyName,
+		"status": "ok",
+	}).Info("Deleted hashed key across all APIs.")
+
+	return res, code
+}
+
 func handleDeleteHashedKey(keyName, apiID string, resetQuota bool) (interface{}, int) {
 	orgID := ""
 	if spec := getApiSpec(apiID); spec != nil {
@@ -653,29 +674,13 @@ func handleDeleteHashedKey(keyName, apiID string, resetQuota bool) (interface{},
 		apisMu.RUnlock()
 
 		if !removed {
-			log.WithFields(logrus.Fields{
-				"prefix": "api",
-				"key":    obfuscateKey(keyName),
-				"status": "fail",
-			}).Error("Failed to remove the key")
 			return apiError("Failed to remove the key"), http.StatusBadRequest
 		}
-
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"key":    keyName,
-			"status": "ok",
-		}).Info("Deleted hashed key across all APIs.")
 
 		return nil, http.StatusOK
 	}
 
 	if !GlobalSessionManager.RemoveSession(orgID, keyName, true) {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"key":    obfuscateKey(keyName),
-			"status": "fail",
-		}).Error("Failed to remove the key")
 		return apiError("Failed to remove the key"), http.StatusBadRequest
 	}
 
@@ -688,12 +693,6 @@ func handleDeleteHashedKey(keyName, apiID string, resetQuota bool) (interface{},
 		Status: "ok",
 		Action: "deleted",
 	}
-
-	log.WithFields(logrus.Fields{
-		"prefix": "api",
-		"key":    keyName,
-		"status": "ok",
-	}).Info("Deleted hashed key.")
 
 	return statusObj, http.StatusOK
 }
@@ -892,14 +891,14 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 		if !isHashed {
 			obj, code = handleDeleteKey(keyName, apiID, true)
 		} else {
-			obj, code = handleDeleteHashedKey(keyName, apiID, true)
+			obj, code = handleDeleteHashedKeyWithLogs(keyName, apiID, true)
 		}
 		if code != http.StatusOK && hashKeyFunction != "" {
 			// try to use legacy key format
 			if !isHashed {
 				obj, code = handleDeleteKey(origKeyName, apiID, true)
 			} else {
-				obj, code = handleDeleteHashedKey(origKeyName, apiID, true)
+				obj, code = handleDeleteHashedKeyWithLogs(origKeyName, apiID, true)
 			}
 		}
 	}
