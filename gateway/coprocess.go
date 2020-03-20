@@ -436,7 +436,8 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		for k, v := range returnObject.Metadata {
 			returnedSession.MetaData[k] = string(v)
 		}
-
+		returnedSession.OrgID = m.Spec.OrgID
+		
 		existingSession, found := FallbackKeySesionManager.SessionDetail(sessionID, false)
 		if found {
 			returnedSession.QuotaRenews = existingSession.QuotaRenews
