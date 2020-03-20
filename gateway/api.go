@@ -1858,25 +1858,29 @@ func handleDeleteOAuthClient(keyName, apiID string) (interface{}, int) {
 		return apiError("OAuth Client ID not found"), http.StatusNotFound
 	}
 
-	err := apiSpec.OAuthManager.OsinServer.Storage.DeleteClient(storageID, true)
-	if err != nil {
-		return apiError("Delete failed"), http.StatusInternalServerError
+	if apiSpec.OAuthManager != nil {
+		err := apiSpec.OAuthManager.OsinServer.Storage.DeleteClient(storageID, true)
+		if err != nil {
+			return apiError("Delete failed"), http.StatusInternalServerError
+		}
+
+		statusObj := apiModifyKeySuccess{
+			Key:    keyName,
+			Status: "ok",
+			Action: "deleted",
+		}
+
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"apiID":  apiID,
+			"status": "ok",
+			"client": keyName,
+		}).Info("Deleted OAuth client")
+
+		return statusObj, http.StatusOK
 	}
 
-	statusObj := apiModifyKeySuccess{
-		Key:    keyName,
-		Status: "ok",
-		Action: "deleted",
-	}
-
-	log.WithFields(logrus.Fields{
-		"prefix": "api",
-		"apiID":  apiID,
-		"status": "ok",
-		"client": keyName,
-	}).Info("Deleted OAuth client")
-
-	return statusObj, http.StatusOK
+	return apiError("OAuth Client ID not found"), http.StatusNotFound
 }
 
 const oAuthNotPropagatedErr = "OAuth client list isn't available or hasn't been propagated yet."
