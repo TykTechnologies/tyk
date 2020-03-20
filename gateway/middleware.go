@@ -409,7 +409,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					// -1 is special "unlimited" case
 					if ar.Limit.QuotaMax != -1 && policy.QuotaMax > ar.Limit.QuotaMax {
 						ar.Limit.QuotaMax = policy.QuotaMax
-						//session.QuotaMax = policy.QuotaMax
+						session.QuotaMax = policy.QuotaMax
 					}
 
 					if policy.QuotaRenewalRate > ar.Limit.QuotaRenewalRate {
@@ -443,7 +443,6 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				}
 
 				rights[k] = *ar
-				log.Info("set rights en la posicion:", k, " el valor: ", *ar)
 			}
 
 			// Master policy case

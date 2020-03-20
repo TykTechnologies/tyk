@@ -367,7 +367,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			"QuotaPart with access rights", []string{"quota3"},
 			"", func(t *testing.T, s *user.SessionState) {
 				if s.QuotaMax != 3 {
-					t.Fatalf("Should pick bigger value")
+					t.Fatalf("quota should be the same as policy quota")
 				}
 			}, nil,
 		},
