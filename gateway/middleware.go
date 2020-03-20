@@ -369,7 +369,6 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 			}
 		} else {
 			usePartitions := policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl
-
 			for k, v := range policy.AccessRights {
 				ar := &v
 
@@ -444,6 +443,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				}
 
 				rights[k] = *ar
+				log.Info("set rights en la posicion:", k, " el valor: ", *ar)
 			}
 
 			// Master policy case
