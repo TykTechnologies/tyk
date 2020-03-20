@@ -527,35 +527,35 @@ type RequestSigningMeta struct {
 	SignatureHeader string   `bson:"signature_header" json:"signature_header"`
 }
 
-// GraphQLConfig is the root config object for GraphQL middlewares
+// GraphQLConfig is the root config object for GraphQL middlewares.
 type GraphQLConfig struct {
-	// Enabled indicates if GraphQL should be enabled
+	// Enabled indicates if GraphQL should be enabled.
 	Enabled bool `bson:"enabled" json:"enabled"`
-	// GraphQLAPI is the API specific configuration
+	// GraphQLAPI is the API specific configuration.
 	GraphQLAPI GraphQLAPI `bson:"api" json:"api"`
-	// GraphQLPlayground is the Playground specific configuration
+	// GraphQLPlayground is the Playground specific configuration.
 	GraphQLPlayground GraphQLPlayground `bson:"playground" json:"playground"`
 }
 
-// GraphQLAPI is the configuration for the GraphQL Middleware
+// GraphQLAPI is the configuration for the GraphQL Middleware.
 type GraphQLAPI struct {
-	// Endpoint is, combined with the base path, the route which the GraphQL Middleware reacts to
+	// Endpoint is, combined with the base path, the route which the GraphQL Middleware reacts to.
 	Endpoint string `bson:"endpoint" json:"endpoint"`
-	// Schema is the GraphQL Schema exposed by the GraphQL API/Upstream/Engine
+	// Schema is the GraphQL Schema exposed by the GraphQL API/Upstream/Engine.
 	Schema string `bson:"schema" json:"schema"`
-	// Execution defines the mode and configuration in which the GraphQL middleware should operate
+	// Execution defines the mode and configuration in which the GraphQL middleware should operate.
 	Execution GraphQLExecution `bson:"execution" json:"execution"`
 }
 
-// GraphQLExecution defines the GraphQL Execution Mode as well as its configuration
+// GraphQLExecution defines the GraphQL Execution Mode as well as its configuration.
 type GraphQLExecution struct {
-	// Mode is the mode in which the Middleware should operate
+	// Mode is the mode in which the Middleware should operate.
 	Mode GraphQLExecutionMode `bson:"mode" json:"mode"`
-	// Validation defines the behaviour regarding GraphQL request validation
+	// Validation defines the behaviour regarding GraphQL request validation.
 	Validation GraphQLExecutionValidation `bson:"validation" json:"validation"`
 }
 
-// GraphQLExecutionMode is the mode in which the GraphQL Middleware should operate
+// GraphQLExecutionMode is the mode in which the GraphQL Middleware should operate.
 type GraphQLExecutionMode string
 
 const (
@@ -568,7 +568,7 @@ const (
 	GraphQLExecutionModeExecutionEngine GraphQLExecutionMode = "executionEngine"
 )
 
-// GraphQLExecutionValidation is the config for operation validation
+// GraphQLExecutionValidation is the config for operation validation.
 type GraphQLExecutionValidation struct {
 	// Enabled indicates if the validation should be enabled.
 	Enabled bool `bson:"enabled" json:"enabled"`
@@ -576,7 +576,7 @@ type GraphQLExecutionValidation struct {
 	OnFail GraphQLValidationBehavior `bson:"on_fail" json:"on_fail"`
 }
 
-// GraphQLValidationBehavior represents an enum for the configurable validation behavior
+// GraphQLValidationBehavior represents an enum for the configurable validation behavior.
 type GraphQLValidationBehavior string
 
 const (
@@ -588,7 +588,7 @@ const (
 	GraphQLValidationBehaviorErrorObject GraphQLValidationBehavior = "useErrorObject"
 )
 
-// GraphQLPlayground represents the configuration for the public playground which will be hosted alongside the api
+// GraphQLPlayground represents the configuration for the public playground which will be hosted alongside the api.
 type GraphQLPlayground struct {
 	// Enabled indicates if the playground should be enabled.
 	Enabled bool `bson:"enabled" json:"enabled"`
