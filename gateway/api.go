@@ -1901,8 +1901,10 @@ const oAuthNotPropagatedErr = "OAuth client list isn't available or hasn't been 
 const oAuthClientNotFound = "OAuth client not found"
 
 func getApiClients(apiID string) ([]ExtendedOsinClientInterface, apiStatusMessage, int) {
+	var err error
 	filterID := prefixClient
 	apiSpec := getApiSpec(apiID)
+
 	if apiSpec == nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -1913,28 +1915,21 @@ func getApiClients(apiID string) ([]ExtendedOsinClientInterface, apiStatusMessag
 		return nil, apiError(oAuthClientNotFound), http.StatusNotFound
 	}
 
-	if apiSpec.OAuthManager == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"apiID":  apiID,
-			"status": "fail",
-			"err":    "API not found",
-		}).Error("Failed to retrieve OAuth client list.")
+	clientData := []ExtendedOsinClientInterface{}
+	if apiSpec.UseOauth2 {
+		clientData, err = apiSpec.OAuthManager.OsinServer.Storage.GetClients(filterID, apiSpec.OrgID, true)
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "api",
+				"apiID":  apiID,
+				"status": "fail",
+				"err":    err,
+			}).Error("Failed to report OAuth client list")
 
-		return nil, apiError(oAuthNotPropagatedErr), http.StatusBadRequest
+			return nil, apiError(oAuthClientNotFound), http.StatusNotFound
+		}
 	}
 
-	clientData, err := apiSpec.OAuthManager.OsinServer.Storage.GetClients(filterID, apiSpec.OrgID, true)
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"apiID":  apiID,
-			"status": "fail",
-			"err":    err,
-		}).Error("Failed to report OAuth client list")
-
-		return nil, apiError(oAuthClientNotFound), http.StatusNotFound
-	}
 	return clientData, apiStatusMessage{}, http.StatusOK
 }
 
@@ -2107,8 +2102,6 @@ func RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	apis := getApisForOauthClientId(clientId)
-	log.Info("apis:", apis)
-
 	if len(apis) == 0 {
 		doJSONWrite(w, http.StatusNotFound, apiError("oauth client doesnt have any api related"))
 		return
