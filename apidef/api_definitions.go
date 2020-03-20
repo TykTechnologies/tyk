@@ -531,14 +531,14 @@ type RequestSigningMeta struct {
 type GraphQLConfig struct {
 	// Enabled indicates if GraphQL should be enabled
 	Enabled bool `bson:"enabled" json:"enabled"`
-	// GraphQLApi is the API specific configuration
-	GraphQLApi GraphQLApi `bson:"api" json:"api"`
+	// GraphQLAPI is the API specific configuration
+	GraphQLAPI GraphQLAPI `bson:"api" json:"api"`
 	// GraphQLPlayground is the Playground specific configuration
 	GraphQLPlayground GraphQLPlayground `bson:"playground" json:"playground"`
 }
 
-// GraphQLApi is the configuration for the GraphQL Middleware
-type GraphQLApi struct {
+// GraphQLAPI is the configuration for the GraphQL Middleware
+type GraphQLAPI struct {
 	// Endpoint is, combined with the base path, the route which the GraphQL Middleware reacts to
 	Endpoint string `bson:"endpoint" json:"endpoint"`
 	// Schema is the GraphQL Schema exposed by the GraphQL API/Upstream/Engine
@@ -856,7 +856,7 @@ func DummyAPI() APIDefinition {
 
 	graphql := GraphQLConfig{
 		Enabled: false,
-		GraphQLApi: GraphQLApi{
+		GraphQLAPI: GraphQLAPI{
 			Execution: GraphQLExecution{
 				Mode: GraphQLExecutionModeProxyOnly,
 				Validation: GraphQLExecutionValidation{
