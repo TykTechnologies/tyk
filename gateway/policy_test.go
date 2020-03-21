@@ -245,11 +245,11 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				},
 			}},
 		},
-		"throttle1":{
-			ID: "throttle1",
-			ThrottleRetryLimit:99,
-			ThrottleInterval:9,
-			AccessRights: map[string]user.AccessDefinition{"a": {}},
+		"throttle1": {
+			ID:                 "throttle1",
+			ThrottleRetryLimit: 99,
+			ThrottleInterval:   9,
+			AccessRights:       map[string]user.AccessDefinition{"a": {}},
 		},
 	}
 	policiesMu.RUnlock()
@@ -524,10 +524,10 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 		{
 			"Throttle retry limit from policy", []string{"throttle1"},
 			"", func(t *testing.T, s *user.SessionState) {
-			if s.ThrottleRetryLimit != 99 {
-				t.Fatalf("Throttle interval should be 9 inherited from policy")
-			}
-		}, nil,
+				if s.ThrottleRetryLimit != 99 {
+					t.Fatalf("Throttle interval should be 9 inherited from policy")
+				}
+			}, nil,
 		},
 	}
 
