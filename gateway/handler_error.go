@@ -23,6 +23,8 @@ const (
 	defaultContentType    = headers.ApplicationJSON
 )
 
+var customizableErr = errors.New("customizable error")
+
 var TykErrors = make(map[string]config.TykError)
 
 func errorAndStatusCode(errType string) (error, int) {
@@ -105,10 +107,12 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			w.Header().Add(headers.Connection, "close")
 		}
 
-		// Need to return the correct error code!
-		w.WriteHeader(errCode)
-		apiError := APIError{template.HTML(template.JSEscapeString(errMsg))}
-		tmpl.Execute(w, &apiError)
+		// If error is not customized write error in default way
+		if errMsg != customizableErr.Error() {
+			w.WriteHeader(errCode)
+			apiError := APIError{template.HTML(template.JSEscapeString(errMsg))}
+			tmpl.Execute(w, &apiError)
+		}
 	}
 
 	if memProfFile != nil {
