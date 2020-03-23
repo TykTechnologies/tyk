@@ -527,6 +527,21 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				}
 			},
 		},
+		{
+			name:     "inherit quota and rate from partitioned policies applied in different order",
+			policies: []string{"rate3", "quota1"},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				if s.QuotaMax != 2 {
+					t.Fatalf("quota should be the same as quota policy")
+				}
+				if s.Rate != 4 {
+					t.Fatalf("rate should be the same as rate policy")
+				}
+				if s.Per != 4 {
+					t.Fatalf("Rate per seconds should be the same as rate policy")
+				}
+			},
+		},
 	}
 
 	return bmid, tests

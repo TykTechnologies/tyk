@@ -424,12 +424,12 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 					if ar.Limit.Rate != -1 && policy.Rate > ar.Limit.Rate {
 						ar.Limit.Rate = policy.Rate
-						session.Rate = policy.Rate
+						//session.Rate = policy.Rate
 					}
 
 					if policy.Per > ar.Limit.Per {
 						ar.Limit.Per = policy.Per
-						session.Per = policy.Per
+						//session.Per = policy.Per
 					}
 
 					if policy.ThrottleInterval > ar.Limit.ThrottleInterval {
