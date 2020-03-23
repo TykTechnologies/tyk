@@ -116,6 +116,11 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			Partitions: user.PolicyPartitions{RateLimit: true},
 			Rate:       4,
 		},
+		"rate3": {
+			Partitions: user.PolicyPartitions{RateLimit: true},
+			Rate:       4,
+			Per:        4,
+		},
 		"acl1": {
 			Partitions:   user.PolicyPartitions{Acl: true},
 			AccessRights: map[string]user.AccessDefinition{"a": {}},
@@ -518,6 +523,36 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				}
 
 				assert.Equal(t, want, s.AccessRights)
+			},
+		},
+		{
+			name:     "inherit quota and rate from partitioned policies",
+			policies: []string{"quota1", "rate3"},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				if s.QuotaMax != 2 {
+					t.Fatalf("quota should be the same as quota policy")
+				}
+				if s.Rate != 4 {
+					t.Fatalf("rate should be the same as rate policy")
+				}
+				if s.Per != 4 {
+					t.Fatalf("Rate per seconds should be the same as rate policy")
+				}
+			},
+		},
+		{
+			name:     "inherit quota and rate from partitioned policies applied in different order",
+			policies: []string{"rate3", "quota1"},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				if s.QuotaMax != 2 {
+					t.Fatalf("quota should be the same as quota policy")
+				}
+				if s.Rate != 4 {
+					t.Fatalf("rate should be the same as rate policy")
+				}
+				if s.Per != 4 {
+					t.Fatalf("Rate per seconds should be the same as rate policy")
+				}
 			},
 		},
 	}
