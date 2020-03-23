@@ -369,7 +369,6 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 			}
 		} else {
 			usePartitions := policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl
-
 			for k, v := range policy.AccessRights {
 				ar := &v
 
@@ -410,6 +409,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					// -1 is special "unlimited" case
 					if ar.Limit.QuotaMax != -1 && policy.QuotaMax > ar.Limit.QuotaMax {
 						ar.Limit.QuotaMax = policy.QuotaMax
+						session.QuotaMax = policy.QuotaMax
 					}
 
 					if policy.QuotaRenewalRate > ar.Limit.QuotaRenewalRate {

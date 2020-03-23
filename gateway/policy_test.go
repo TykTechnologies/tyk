@@ -103,6 +103,11 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			Partitions: user.PolicyPartitions{Quota: true},
 			QuotaMax:   3,
 		},
+		"quota3": {
+			QuotaMax:     3,
+			AccessRights: map[string]user.AccessDefinition{"a": {}},
+			Partitions:   user.PolicyPartitions{Quota: true},
+		},
 		"rate1": {
 			Partitions: user.PolicyPartitions{RateLimit: true},
 			Rate:       3,
@@ -355,6 +360,14 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			"", func(t *testing.T, s *user.SessionState) {
 				if s.QuotaMax != 3 {
 					t.Fatalf("Should pick bigger value")
+				}
+			}, nil,
+		},
+		{
+			"QuotaPart with access rights", []string{"quota3"},
+			"", func(t *testing.T, s *user.SessionState) {
+				if s.QuotaMax != 3 {
+					t.Fatalf("quota should be the same as policy quota")
 				}
 			}, nil,
 		},
