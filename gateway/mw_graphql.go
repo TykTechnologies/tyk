@@ -20,8 +20,6 @@ func (m *GraphQLMiddleware) Init() {
 	logger := m.Logger()
 	logger.Info("I'm loaded")
 
-	if m.Spec.graphQLSchema == nil {
-	}
 }
 
 func (m *GraphQLMiddleware) Destructor() {
