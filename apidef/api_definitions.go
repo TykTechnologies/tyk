@@ -231,70 +231,6 @@ type ExtendedPathsSet struct {
 	Internal                []InternalMeta        `bson:"internal" json:"internal,omitempty"`
 }
 
-// GraphQLConfig is the root config object for GraphQL Middlewares
-type GraphQLConfig struct {
-	// BasePath is the base path for the GraphQL API, Subscriptions Endpoint as well as the GraphQLPlayground
-	BasePath   string            `bson:"base_path" json:"base_path"`
-	// GraphQLApi is the API specific configuration
-	GraphQLApi        GraphQLApi        `bson:"graphql_api" json:"graphql_api"`
-	// GraphQLPlayground is the Playground specific configuration
-	GraphQLPlayground GraphQLPlayground `bson:"playground" json:"playground"`
-}
-
-// GraphQLApi is the configuration for the GraphQL Middleware
-type GraphQLApi struct {
-	// Endpoint is, combined with the base path, the route which the GraphQL Middleware reacts to
-	Endpoint      string               `bson:"endpoint" json:"endpoint"`
-	// Schema is the GraphQL Schema exposed by the GraphQL API/Upstream/Engine
-	Schema        string               `bson:"schema" json:"schema"`
-	// Subscriptions is the configuration regarding websocket subscriptions
-	Subscriptions GraphQLSubscriptions `bson:"subscriptions" json:"subscriptions"`
-	// Execution defines the mode and configuration in which the GraphQL middleware should operate
-	Execution     GraphQLExecution `bson:"execution" json:"execution"`
-}
-
-// GraphQLSubscriptions is the configuration for websocket based GraphQL Subscriptions
-type GraphQLSubscriptions struct {
-	// Enabled defines if Subscriptions should be accepted
-	Enabled                               bool   `bson:"enabled" json:"enabled"`
-	// Endpoint is, combined with the base path, the route on which websocket upgrade requests will be accepted
-	Endpoint                              string `bson:"endpoint" json:"endpoint"`
-	// SecureWebsocketProtocolHeaderVariable is the SecWebsocketProtocolHeader variable expected by the websocket client
-	SecureWebsocketProtocolHeaderVariable string `bson:"secure_websocket_protocol_header_variable" json:"secure_websocket_protocol_header_variable"`
-}
-
-// GraphQLExecution defines the GraphQL Execution Mode as well as its configuration
-type GraphQLExecution struct {
-	// Mode is the mode in which the Middleware should operate
-	Mode       GraphQLExecutionMode       `bson:"mode" json:"mode"`
-	// Validation defines the behaviour regarding GraphQL request validation
-	Validation GraphQLExecutionValidation `bson:"validation" json:"validation"`
-	// Config is the GraphQLExecutionMode specific configuration object
-	Config     json.RawMessage            `bson:"config" json:"config"`
-}
-
-// GraphQLExecutionMode is the mode in which the GraphQL Middleware should operate
-type GraphQLExecutionMode int
-
-const (
-	// GraphQLExecutionModeProxyOnly is the mode in which the GraphQL Middleware doesn't evaluate the GraphQL request
-	// In other terms, the GraphQL Middleware will not act as a GraphQL server in itself.
-	// The GraphQL Middleware will (optionally) validate the request and leave the execution up to the upstream.
-	GraphQLExecutionModeProxyOnly GraphQLExecutionMode = iota + 1
-	// GraphQLExecutionModeExecutionEngine is the mode in which the GraphQL Middleware will evaluate every request.
-	// This means the Middleware will act as a independent GraphQL service which might delegate partial execution to upstreams.
-	GraphQLExecutionModeExecutionEngine
-)
-
-type GraphQLExecutionValidation struct {
-	Enabled bool `bson:"enabled" json:"enabled"`
-}
-
-type GraphQLPlayground struct {
-	Enabled bool   `bson:"enabled" json:"enabled"`
-	Path    string `bson:"path" json:"path"`
-}
-
 type VersionInfo struct {
 	Name      string    `bson:"name" json:"name"`
 	Expires   string    `bson:"expires" json:"expires"`
@@ -311,7 +247,6 @@ type VersionInfo struct {
 	IgnoreEndpointCase  bool              `bson:"ignore_endpoint_case" json:"ignore_endpoint_case"`
 	GlobalSizeLimit     int64             `bson:"global_size_limit" json:"global_size_limit"`
 	OverrideTarget      string            `bson:"override_target" json:"override_target"`
-	GraphQL             GraphQLConfig     `bson:"graphql" json:"graphql"`
 }
 
 type AuthProviderMeta struct {
