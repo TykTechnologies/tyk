@@ -13,21 +13,13 @@ func (m *GraphQLMiddleware) Name() string {
 }
 
 func (m *GraphQLMiddleware) EnabledForSpec() bool {
-	for _, versionData := range m.Spec.VersionData.Versions {
-		if versionData.GraphQL.GraphQLApi.Schema != "" {
-			return true
-		}
-	}
-
-	return false
+	return m.Spec.GraphQL.Enabled
 }
 
 func (m *GraphQLMiddleware) Init() {
 	logger := m.Logger()
 	logger.Info("I'm loaded")
 
-	if m.Spec.graphQLSchema == nil {
-	}
 }
 
 func (m *GraphQLMiddleware) Destructor() {
