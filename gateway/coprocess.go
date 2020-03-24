@@ -453,6 +453,8 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		existingSession, found := GlobalSessionManager.SessionDetail(m.Spec.OrgID, sessionID, false)
 		if found {
 			returnedSession.QuotaRenews = existingSession.QuotaRenews
+			returnedSession.QuotaRemaining = existingSession.QuotaRemaining
+			returnedSession.AccessRights = existingSession.AccessRights
 		}
 
 		ctxSetSession(r, returnedSession, sessionID, true)
