@@ -103,6 +103,11 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			Partitions: user.PolicyPartitions{Quota: true},
 			QuotaMax:   3,
 		},
+		"quota3": {
+			QuotaMax:     3,
+			AccessRights: map[string]user.AccessDefinition{"a": {}},
+			Partitions:   user.PolicyPartitions{Quota: true},
+		},
 		"rate1": {
 			Partitions: user.PolicyPartitions{RateLimit: true},
 			Rate:       3,
@@ -110,6 +115,11 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 		"rate2": {
 			Partitions: user.PolicyPartitions{RateLimit: true},
 			Rate:       4,
+		},
+		"rate3": {
+			Partitions: user.PolicyPartitions{RateLimit: true},
+			Rate:       4,
+			Per:        4,
 		},
 		"acl1": {
 			Partitions:   user.PolicyPartitions{Acl: true},
@@ -365,6 +375,14 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			}, nil,
 		},
 		{
+			"QuotaPart with access rights", []string{"quota3"},
+			"", func(t *testing.T, s *user.SessionState) {
+				if s.QuotaMax != 3 {
+					t.Fatalf("quota should be the same as policy quota")
+				}
+			}, nil,
+		},
+		{
 			"RatePart", []string{"rate1"},
 			"", func(t *testing.T, s *user.SessionState) {
 				if s.Rate != 3 {
@@ -528,6 +546,34 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 					t.Fatalf("Throttle interval should be 9 inherited from policy")
 				}
 			}, nil,
+			name:     "inherit quota and rate from partitioned policies",
+			policies: []string{"quota1", "rate3"},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				if s.QuotaMax != 2 {
+					t.Fatalf("quota should be the same as quota policy")
+				}
+				if s.Rate != 4 {
+					t.Fatalf("rate should be the same as rate policy")
+				}
+				if s.Per != 4 {
+					t.Fatalf("Rate per seconds should be the same as rate policy")
+				}
+			},
+		},
+		{
+			name:     "inherit quota and rate from partitioned policies applied in different order",
+			policies: []string{"rate3", "quota1"},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				if s.QuotaMax != 2 {
+					t.Fatalf("quota should be the same as quota policy")
+				}
+				if s.Rate != 4 {
+					t.Fatalf("rate should be the same as rate policy")
+				}
+				if s.Per != 4 {
+					t.Fatalf("Rate per seconds should be the same as rate policy")
+				}
+			},
 		},
 	}
 
