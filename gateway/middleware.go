@@ -355,6 +355,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					accessRights.Limit.SetBy = policy.ID
 					resourceForScope = policy.ID
 				}
+				log.Info("set: ", resourceForScope)
 				accessRights.AllowanceScope = resourceForScope
 				accessRights.Limit.SetBy = resourceForScope
 
