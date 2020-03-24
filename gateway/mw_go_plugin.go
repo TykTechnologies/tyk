@@ -148,7 +148,15 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 	// check if response was sent
 	if rw.responseSent {
 		// check if response code was an error one
-		if rw.statusCodeSent >= http.StatusBadRequest {
+		if rw.statusCodeSent >= http.StatusForbidden {
+
+			m.logger.WithError(err).Error("Authentication error in Go-plugin middleware func")
+
+			m.Base().FireEvent(EventAuthFailure, EventMetaDefault {
+				EventMetaDefault: EventMetaDefault{Message: "Auth Failure", OriginatingRequest: EncodeRequestToEvent(r)},
+			})
+
+		} else if rw.statusCodeSent >= http.StatusBadRequest {
 			// base middleware will report this error to analytics if needed
 			respCode = rw.statusCodeSent
 			err = fmt.Errorf("plugin function sent error response code: %d", rw.statusCodeSent)
