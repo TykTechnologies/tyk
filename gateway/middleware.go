@@ -338,6 +338,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					return err
 				}
 
+				idForScope := apiID
 				// check if we already have limit on API level specified when policy was created
 				if accessRights.Limit == nil || *accessRights.Limit == (user.APILimit{}) {
 					// limit was not specified on API level so we will populate it from policy
@@ -349,15 +350,16 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 						ThrottleInterval:   policy.ThrottleInterval,
 						ThrottleRetryLimit: policy.ThrottleRetryLimit,
 					}
+				} else {
+					idForScope = policy.ID
 				}
+				accessRights.AllowanceScope = idForScope
+				accessRights.Limit.SetBy = idForScope
 
 				// respect current quota renews (on API limit level)
 				if r, ok := session.AccessRights[apiID]; ok && r.Limit != nil {
 					accessRights.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
-
-				accessRights.AllowanceScope = apiID
-				accessRights.Limit.SetBy = apiID
 
 				// overwrite session access right for this API
 				rights[apiID] = accessRights
