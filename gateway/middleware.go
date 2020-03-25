@@ -338,6 +338,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					return err
 				}
 
+				idForScope := apiID
 				// check if we already have limit on API level specified when policy was created
 				if accessRights.Limit == nil || *accessRights.Limit == (user.APILimit{}) {
 					// limit was not specified on API level so we will populate it from policy
@@ -349,15 +350,16 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 						ThrottleInterval:   policy.ThrottleInterval,
 						ThrottleRetryLimit: policy.ThrottleRetryLimit,
 					}
+				} else {
+					idForScope = policy.ID
 				}
+				accessRights.AllowanceScope = idForScope
+				accessRights.Limit.SetBy = idForScope
 
 				// respect current quota renews (on API limit level)
 				if r, ok := session.AccessRights[apiID]; ok && r.Limit != nil {
 					accessRights.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
-
-				accessRights.AllowanceScope = apiID
-				accessRights.Limit.SetBy = apiID
 
 				// overwrite session access right for this API
 				rights[apiID] = accessRights
@@ -369,7 +371,6 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 			}
 		} else {
 			usePartitions := policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl
-
 			for k, v := range policy.AccessRights {
 				ar := &v
 
@@ -410,10 +411,12 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					// -1 is special "unlimited" case
 					if ar.Limit.QuotaMax != -1 && policy.QuotaMax > ar.Limit.QuotaMax {
 						ar.Limit.QuotaMax = policy.QuotaMax
+						session.QuotaMax = policy.QuotaMax
 					}
 
 					if policy.QuotaRenewalRate > ar.Limit.QuotaRenewalRate {
 						ar.Limit.QuotaRenewalRate = policy.QuotaRenewalRate
+						session.QuotaRenewalRate = policy.QuotaRenewalRate
 					}
 				}
 
@@ -422,10 +425,12 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 					if ar.Limit.Rate != -1 && policy.Rate > ar.Limit.Rate {
 						ar.Limit.Rate = policy.Rate
+						session.Rate = policy.Rate
 					}
 
 					if policy.Per > ar.Limit.Per {
 						ar.Limit.Per = policy.Per
+						session.Per = policy.Per
 					}
 
 					if policy.ThrottleInterval > ar.Limit.ThrottleInterval {
@@ -442,7 +447,9 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					ar.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
 
-				rights[k] = *ar
+				if !usePartitions || policy.Partitions.Acl {
+					rights[k] = *ar
+				}
 			}
 
 			// Master policy case
