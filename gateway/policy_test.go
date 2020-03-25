@@ -108,6 +108,11 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			AccessRights: map[string]user.AccessDefinition{"a": {}},
 			Partitions:   user.PolicyPartitions{Quota: true},
 		},
+		"quota4": {
+			QuotaMax:     3,
+			AccessRights: map[string]user.AccessDefinition{"b": {}},
+			Partitions:   user.PolicyPartitions{Quota: true},
+		},
 		"rate1": {
 			Partitions: user.PolicyPartitions{RateLimit: true},
 			Rate:       3,
@@ -374,6 +379,18 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				if s.QuotaMax != 3 {
 					t.Fatalf("quota should be the same as policy quota")
 				}
+			}, nil,
+		},
+		{
+			"QuotaPart with access rights in multi-policy", []string{"quota4", "nonpart1"},
+			"", func(t *testing.T, s *user.SessionState) {
+				if s.QuotaMax != 3 {
+					t.Fatalf("quota should be the same as policy quota")
+				}
+
+				// Don't apply api 'b' coming from quota4 policy
+				want := map[string]user.AccessDefinition{"a": {Limit: &user.APILimit{}}}
+				assert.Equal(t, want, s.AccessRights)
 			}, nil,
 		},
 		{
