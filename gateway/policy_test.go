@@ -486,7 +486,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 							Rate:     300,
 							Per:      1,
 						},
-						AllowanceScope: "d",
+						AllowanceScope: "e",
 					},
 					"d": {
 						Limit: &user.APILimit{
