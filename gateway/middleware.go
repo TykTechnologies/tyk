@@ -352,14 +352,13 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 						ThrottleRetryLimit: policy.ThrottleRetryLimit,
 					}
 				}
+				accessRights.AllowanceScope = idForScope
+				accessRights.Limit.SetBy = idForScope
 
 				// respect current quota renews (on API limit level)
 				if r, ok := session.AccessRights[apiID]; ok && r.Limit != nil {
 					accessRights.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
-
-				accessRights.AllowanceScope = idForScope
-				accessRights.Limit.SetBy = idForScope
 
 				// overwrite session access right for this API
 				rights[apiID] = accessRights

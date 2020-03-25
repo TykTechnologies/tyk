@@ -494,7 +494,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 							Rate:             20,
 							Per:              1,
 						},
-						AllowanceScope: "d",
+						AllowanceScope: "per_api_and_no_other_partitions",
 					},
 					"c": {
 						Limit: &user.APILimit{
@@ -502,7 +502,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 							Rate:     2000,
 							Per:      60,
 						},
-						AllowanceScope: "c",
+						AllowanceScope: "per_api_and_no_other_partitions",
 					},
 				}
 
@@ -544,7 +544,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 							Rate:             200,
 							Per:              10,
 						},
-						AllowanceScope: "d",
+						AllowanceScope: "per_api_with_limit_set_from_policy",
 					},
 				}
 
