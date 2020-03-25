@@ -445,7 +445,9 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					ar.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
 
-				rights[k] = *ar
+				if !usePartitions || policy.Partitions.Acl {
+					rights[k] = *ar
+				}
 			}
 
 			// Master policy case
