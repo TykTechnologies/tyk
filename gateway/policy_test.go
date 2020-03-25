@@ -234,32 +234,6 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				"e": {},
 			},
 		},
-		"two_apis_with_limit_set_from_policy_for_one_of_them": {
-			ID:       "two_apis_with_limit_set_from_policy_for_one_of_them",
-			QuotaMax: -1,
-			Rate:     1000,
-			Per:      60,
-			Partitions: user.PolicyPartitions{
-				PerAPI:    true,
-				Quota:     false,
-				RateLimit: false,
-				Acl:       false,
-			},
-			AccessRights: map[string]user.AccessDefinition{
-				"api_a": {
-					APIID: "api_a",
-					Limit: &user.APILimit{
-						QuotaMax:         5000,
-						QuotaRenewalRate: 3600,
-						Rate:             200,
-						Per:              10,
-					},
-				},
-				"api_b": {
-					APIID: "api_b",
-				},
-			},
-		},
 		"per-path1": {
 			ID: "per_path_1",
 			AccessRights: map[string]user.AccessDefinition{"a": {
@@ -578,33 +552,6 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				}
 				if s.Per != 4 {
 					t.Fatalf("Rate per seconds should be the same as rate policy")
-				}
-			},
-		},
-		{
-			name:     "Allowance scope on key for two apis with limits set to one of them from policy",
-			policies: []string{"two_apis_with_limit_set_from_policy_for_one_of_them"},
-			sessMatch: func(t *testing.T, s *user.SessionState) {
-				if s.AccessRights["api_a"].Limit == nil {
-					t.Fatalf("limit for api a cannot be null")
-				} else {
-					if s.AccessRights["api_a"].Limit.SetBy != "two_apis_with_limit_set_from_policy_for_one_of_them" {
-						t.Fatalf("the value of limit.setBy should be the same as policy ID")
-					}
-					if s.AccessRights["api_a"].AllowanceScope != "two_apis_with_limit_set_from_policy_for_one_of_them" {
-						t.Fatalf("the value of AllowanceScope should be the same as policy ID")
-					}
-				}
-
-				if s.AccessRights["api_b"].Limit == nil {
-					t.Fatalf("limit for api b cannot be null")
-				} else {
-					if s.AccessRights["api_b"].Limit.SetBy != s.AccessRights["api_b"].APIID {
-						t.Fatalf("the value of limit.setBy should be the same as API ID")
-					}
-					if s.AccessRights["api_b"].AllowanceScope != s.AccessRights["api_b"].APIID {
-						t.Fatalf("the value of AllowanceScope should be the same as API ID")
-					}
 				}
 			},
 		},
