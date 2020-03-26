@@ -36,5 +36,12 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
 	}
 
+	var gqlRequest gql.Request
+	err := gql.UnmarshalRequest(r.Body, &gqlRequest)
+	if err != nil {
+		m.Logger().Errorf("Error while unmarshalling GraphQL request: '%s'", err)
+		return err, http.StatusBadRequest
+	}
+
 	return nil, http.StatusOK
 }
