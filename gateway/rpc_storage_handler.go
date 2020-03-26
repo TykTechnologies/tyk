@@ -804,6 +804,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 	keysToReset := map[string]bool{}
 	TokensToBeRevoked := map[string]string{}
 	oauthTokenKeys := map[string]bool{}
+
 	for _, key := range keys {
 		splitKeys := strings.Split(key, ":")
 		if len(splitKeys) > 1 && splitKeys[1] == "resetQuota" {
