@@ -802,7 +802,6 @@ func getSessionAndCreate(keyName string, r *RPCStorageHandler) {
 
 func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 	keysToReset := map[string]bool{}
-	TokensToBeRevoked := map[string]string{}
 	oauthTokenKeys := map[string]bool{}
 
 	for _, key := range keys {
@@ -812,44 +811,30 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 		} else if len(splitKeys) > 2 {
 			action := splitKeys[len(splitKeys)-1]
 			if action == "oAuthRevokeToken" || action == "oAuthRevokeAccessToken" || action == "oAuthRevokeRefreshToken" {
-				TokensToBeRevoked[splitKeys[0]] = key
 				oauthTokenKeys[key] = true
 			}
 		}
 	}
-	//single and specific tokens
-	for token, key := range TokensToBeRevoked {
-		//key formed as: token:apiId:tokenActionTypeHint
-		//but hashed as: token#hashed:apiId:tokenActionTypeHint
-		splitKeys := strings.Split(key, ":")
-		apiId := splitKeys[1]
-		tokenActionTypeHint := splitKeys[2]
-		hashedKey := strings.Contains(token, "#hashed")
-		if !hashedKey {
-			storage, _, err := GetStorageForApi(apiId)
-			if err != nil {
-				continue
-			}
-			var tokenTypeHint string
-			switch tokenActionTypeHint {
-			case "oAuthRevokeAccessToken":
-				tokenTypeHint = "access_token"
-			case "oAuthRevokeRefreshToken":
-				tokenTypeHint = "refresh_token"
-			}
-			RevokeToken(storage, token, tokenTypeHint)
-		} else {
-			token = strings.Split(token, "#")[0]
-			handleDeleteHashedKey(token, apiId, false)
-		}
-		SessionCache.Delete(token)
-		RPCGlobalCache.Delete(r.KeyPrefix + token)
-	}
 
 	for _, key := range keys {
+		splitKeys := strings.Split(key, ":")
 		_, isOauthTokenKey := oauthTokenKeys[key]
-		if !isOauthTokenKey {
-			splitKeys := strings.Split(key, ":")
+
+		if isOauthTokenKey {
+			//key formed as: token:apiId:tokenActionTypeHint
+			//but hashed as: token#hashed:apiId:tokenActionTypeHint
+			token := splitKeys[0]
+
+			//tokenActionTypeHint := splitKeys[2]
+			hashedKey := strings.Contains(token, "#hashed")
+			if !hashedKey {
+				handleDeleteKey(token, "-1", false)
+			} else {
+				token = strings.Split(token, "#")[0]
+				apiId := splitKeys[1]
+				handleDeleteHashedKey(token, apiId, false)
+			}
+		} else {
 			_, resetQuota := keysToReset[splitKeys[0]]
 			if len(splitKeys) > 1 && splitKeys[1] == "hashed" {
 				key = splitKeys[0]
@@ -861,9 +846,9 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 				handleDeleteKey(key, "-1", resetQuota)
 				getSessionAndCreate(splitKeys[0], r)
 			}
-			SessionCache.Delete(key)
-			RPCGlobalCache.Delete(r.KeyPrefix + key)
 		}
+		SessionCache.Delete(key)
+		RPCGlobalCache.Delete(r.KeyPrefix + key)
 	}
 	// Notify rest of gateways in cluster to flush cache
 	n := Notification{
