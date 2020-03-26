@@ -228,6 +228,7 @@ func TestMultiSession_BA_Standard_FAILBA(t *testing.T) {
 }
 
 func TestMultiSession_BA_Standard_FAILAuth(t *testing.T) {
+	ResetTestConfig()
 	spec := LoadSampleAPI(multiAuthDev)
 
 	// Create BA
