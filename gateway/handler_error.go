@@ -35,8 +35,7 @@ func overrideTykErrors() {
 
 		overridenErr := TykErrors[id]
 
-		if err.Code > 100 && err.Code < 999 {
-			//if err.Code != 0{
+		if err.Code != 0 {
 			overridenErr.Code = err.Code
 		}
 

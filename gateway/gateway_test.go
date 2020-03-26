@@ -2112,6 +2112,8 @@ func TestOverrideErrors(t *testing.T) {
 	const code6 = 106
 
 	globalConf := config.Global()
+	defer ResetTestConfig()
+
 	globalConf.OverrideMessages = map[string]config.TykError{
 		ErrOAuthAuthorizationFieldMissing: {
 			Message: message1,
