@@ -2099,17 +2099,17 @@ func TestOverrideErrors(t *testing.T) {
 	}
 
 	const message1 = "Message1"
-	const code1 = 1
+	const code1 = 101
 	const message2 = "Message2"
-	const code2 = 2
+	const code2 = 102
 	const message3 = "Message3"
-	const code3 = 3
+	const code3 = 103
 	const message4 = "Message4"
-	const code4 = 4
+	const code4 = 104
 	const message5 = "Message5"
-	const code5 = 5
+	const code5 = 105
 	const message6 = "Message6"
-	const code6 = 6
+	const code6 = 106
 
 	globalConf := config.Global()
 	globalConf.OverrideMessages = map[string]config.TykError{
