@@ -260,6 +260,12 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				},
 			}},
 		},
+		"throttle1": {
+			ID:                 "throttle1",
+			ThrottleRetryLimit: 99,
+			ThrottleInterval:   9,
+			AccessRights:       map[string]user.AccessDefinition{"a": {}},
+		},
 	}
 	policiesMu.RUnlock()
 	bmid := &BaseMiddleware{Spec: &APISpec{
@@ -541,6 +547,25 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 
 				assert.Equal(t, want, s.AccessRights)
 			},
+		},
+		{
+			"Throttle interval from policy", []string{"throttle1"},
+			"", func(t *testing.T, s *user.SessionState) {
+				if s.ThrottleInterval != 9 {
+					t.Fatalf("Throttle interval should be 9 inherited from policy")
+				}
+			}, nil,
+		},
+		{
+			name:     "Throttle retry limit from policy",
+			policies: []string{"throttle1"},
+			errMatch: "",
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				if s.ThrottleRetryLimit != 99 {
+					t.Fatalf("Throttle interval should be 9 inherited from policy")
+				}
+			},
+			session: nil,
 		},
 		{
 			name:     "inherit quota and rate from partitioned policies",
