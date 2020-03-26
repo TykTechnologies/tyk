@@ -542,7 +542,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 		{
 			name:     "Throttle retry limit from policy",
 			policies: []string{"throttle1"},
-			errMatch:"",
+			errMatch: "",
 			sessMatch: func(t *testing.T, s *user.SessionState) {
 				if s.ThrottleRetryLimit != 99 {
 					t.Fatalf("Throttle interval should be 9 inherited from policy")
