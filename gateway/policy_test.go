@@ -540,12 +540,17 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			}, nil,
 		},
 		{
-			"Throttle retry limit from policy", []string{"throttle1"},
-			"", func(t *testing.T, s *user.SessionState) {
+			name:     "Throttle retry limit from policy",
+			policies: []string{"throttle1"},
+			errMatch:"",
+			sessMatch: func(t *testing.T, s *user.SessionState) {
 				if s.ThrottleRetryLimit != 99 {
 					t.Fatalf("Throttle interval should be 9 inherited from policy")
 				}
-			}, nil,
+			},
+			session: nil,
+		},
+		{
 			name:     "inherit quota and rate from partitioned policies",
 			policies: []string{"quota1", "rate3"},
 			sessMatch: func(t *testing.T, s *user.SessionState) {
