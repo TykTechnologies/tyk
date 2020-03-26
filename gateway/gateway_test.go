@@ -2172,6 +2172,7 @@ func TestOverrideErrors(t *testing.T) {
 			},
 		}
 		config.SetGlobal(globalConf)
+		defer ResetTestConfig()
 
 		overrideTykErrors()
 
