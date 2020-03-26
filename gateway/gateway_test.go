@@ -2092,6 +2092,10 @@ func TestCache_singleErrorResponse(t *testing.T) {
 }
 
 func TestOverrideErrors(t *testing.T) {
+	defer ResetTestConfig()
+	ts := StartTest()
+	defer ts.Close()
+
 	assert := func(expectedError string, expectedCode int, actualError error, actualCode int) {
 		if !(expectedError == actualError.Error() && expectedCode == actualCode) {
 			t.Fatal("Override failed")
@@ -2170,6 +2174,8 @@ func TestOverrideErrors(t *testing.T) {
 				Message: message4,
 			},
 		}
+		defer ResetTestConfig()
+
 		config.SetGlobal(globalConf)
 
 		overrideTykErrors()
