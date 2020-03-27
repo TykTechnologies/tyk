@@ -21,7 +21,7 @@ func TestGraphQL(t *testing.T) {
 		spec.GraphQL.GraphQLAPI.Schema = "query: Query"
 		LoadAPI(spec)
 
-		_, _ = g.Run(t, test.TestCase{BodyMatch: "schema is not created", Code: http.StatusInternalServerError})
+		_, _ = g.Run(t, test.TestCase{BodyMatch: "there was a problem proxying the request", Code: http.StatusInternalServerError})
 	})
 
 	t.Run("Correct schema", func(t *testing.T) {

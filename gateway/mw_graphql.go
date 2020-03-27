@@ -32,7 +32,8 @@ func (m *GraphQLMiddleware) Init() {
 func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 
 	if m.Schema == nil {
-		return errors.New("schema is not created"), http.StatusInternalServerError
+		m.Logger().Error("Schema is not created")
+		return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
 	}
 
 	return nil, http.StatusOK
