@@ -12,7 +12,6 @@ require (
 	github.com/TykTechnologies/gojsonschema v0.0.0-20170222154038-dcb3e4bb7990
 	github.com/TykTechnologies/gorpc v0.0.0-20190515174534-b9c10befc5f4
 	github.com/TykTechnologies/goverify v0.0.0-20160822133757-7ccc57452ade
-	github.com/TykTechnologies/graphql-go-tools v0.0.0-00010101000000-000000000000
 	github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c
 	github.com/TykTechnologies/murmur3 v0.0.0-20180602122059-1915e687e465
 	github.com/TykTechnologies/openid2go v0.0.0-20200312160651-00c254a52b19
@@ -42,6 +41,8 @@ require (
 	github.com/hashicorp/go-msgpack v0.5.4 // indirect
 	github.com/hashicorp/vault/api v1.0.4
 	github.com/huandu/xstrings v1.3.0 // indirect
+	github.com/imdario/mergo v0.3.9 // indirect
+	github.com/jensneuse/graphql-go-tools v0.0.0-00010101000000-000000000000
 	github.com/justinas/alice v0.0.0-20171023064455-03f45bd4b7da
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/lonelycode/go-uuid v0.0.0-20141202165402-ed3ca8a15a93
@@ -93,4 +94,4 @@ require (
 	rsc.io/letsencrypt v0.0.2
 )
 
-replace github.com/TykTechnologies/graphql-go-tools => ../graphql-go-tools // for development purposes
+replace github.com/jensneuse/graphql-go-tools => ../graphql-go-tools // for purposes

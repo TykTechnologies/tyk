@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	gql "github.com/jensneuse/graphql-go-tools/pkg/graphql"
 )
 
 type GraphQLMiddleware struct {
