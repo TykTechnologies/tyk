@@ -431,7 +431,7 @@ const Schema = `{
         ]
         },
         "graphql": {
-            "type": ["object", “null“],
+            "type": ["object", "null"],
             "properties": {
                 "enabled": {
                     "type": "boolean"
