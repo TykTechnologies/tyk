@@ -30,6 +30,19 @@ func errorAndStatusCode(errType string) (error, int) {
 	return errors.New(err.Message), err.Code
 }
 
+func defaultTykErrors() {
+	TykErrors = make(map[string]config.TykError)
+	TykErrors[ErrAuthAuthorizationFieldMissing] = config.TykError{
+		Message: "Authorization field missing",
+		Code:    http.StatusUnauthorized,
+	}
+
+	TykErrors[ErrAuthKeyNotFound] = config.TykError{
+		Message: "Access to this API has been disallowed",
+		Code:    http.StatusForbidden,
+	}
+}
+
 func overrideTykErrors() {
 	for id, err := range config.Global().OverrideMessages {
 
