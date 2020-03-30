@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: Tyk Gateway API
-  version: 2.8.0
+  version: 2.9.4
   description: |-
     The Tyk Gateway REST API is the primary means for integrating your application with the Tyk API Gateway system. This API is very small, and has no granular permissions system. It is intended to be used purely for internal automation and integration.
 
@@ -10,7 +10,6 @@ info:
     The Tyk Gateway API is capable of:
 
     * Managing session objects (key generation)
-    * Managing and listing policies
     * Managing and listing API Definitions (only when not using the Dashboard)
     * Hot reloads / reloading a cluster configuration
     * OAuth client creation (only when not using the Dashboard)
@@ -35,7 +34,7 @@ tags:
       
       <h3>Hashed Keys Environment</h3>
       
-      Listing tokens is only possible if you set `enable_hashed_keys_listing` to `true`. See [Using Hashed Keys Environment Endpoints](https://tyk.io/docs/security/#a-name-key-hashing-a-key-hashing) section for more details.
+      Listing tokens is only possible if you set `enable_hashed_keys_listing` to `true`. See [Using Hashed Keys Environment Endpoints](/docs/basic-config-and-security/security/#a-name-key-hashing-a-key-hashing) section for more details.
       
       - endpoints `POST /tyk/keys/create`, `POST /tyk/keys` and `POST /tyk/keys/{keyName}` return `"key_hash"` for future use.
       - endpoint `GET /tyk/keys` retrieves all (or per API) key hashes. You can disable this endpoint by using the `tyk.conf` setting `enable_hashed_keys_listing` (set to false by default).
@@ -289,7 +288,7 @@ tags:
       
       * `cache_options.cache_all_safe_requests`: Set this to `true` if you want all *safe* requests (GET, HEAD, OPTIONS) to be cached. This is a blanket setting for APIs where caching is required but you don't want to set individual paths up in the definition.
       
-      * `cache_options.enable_upstream_cache_control`: Set this to `true` if you want your application to control the cache options for Tyk (TTL and whether to cache or not). See [Caching](/docs/reduce-latency/caching/) for more details.
+      * `cache_options.enable_upstream_cache_control`: Set this to `true` if you want your application to control the cache options for Tyk (TTL and whether to cache or not). See [Caching](/docs/basic-config-and-security/reduce-latency/caching/) for more details.
       
       * `response_processors`: Response processors need to be specifically defined so they are loaded on API creation, otherwise the middleware will not fire. In order to have the two main response middleware components fire, the following configuration object should be supplied.
       
@@ -737,7 +736,7 @@ paths:
       description: Any OAuth keys must be generated with the help of a client ID. These need to be pre-registered with Tyk before they can be used (in a similar vein to how you would register your app with Twitter before attempting to ask user permissions using their API).
         <br/><br/>
         <h3>Creating OAuth clients with Access to Multiple APIs</h3>
-        New from Tyk Gateway 2.6.0 is the ability to create OAuth clients with access to more than one API. If you provide the api_id it works the same as in previous releases. If you don¿ït provide the api_id the request uses policy access rights and enumerates APIs from their setting in the newly created OAuth-client.
+        New from Tyk Gateway 2.6.0 is the ability to create OAuth clients with access to more than one API. If you provide the api_id it works the same as in previous releases. If you donÂ¿Ã¯t provide the api_id the request uses policy access rights and enumerates APIs from their setting in the newly created OAuth-client.
 
 
       tags:
@@ -763,6 +762,29 @@ paths:
                 client_id: test
                 api_id: id
                 policy_id: policy
+      '/tyk/oauth/clients/{apiID}':
+    put:
+      summary: Update OAuth metadata and Policy ID
+      description: Allows you to update the metadata and Policy ID for an OAuth client.
+      tags:
+        - OAuth
+      operationId: updateoAuthClient
+      parameters:
+        - description: The API ID
+          name: apiID
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OAuth client metadata updated
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NewClientRequest'
   '/tyk/oauth/clients/{apiID}':
     get:
       summary: List oAuth clients
@@ -883,6 +905,66 @@ paths:
               example:
                 - "tok1"
                 - "tok2"
+  '/tyk/oauth/revoke':
+    post:
+      description: revoke a single token
+      summary: revoke token
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                token: 
+                  description: token to be revoked
+                  type: string
+                client_id: 
+                  description: id of oauth client
+                  type: string
+                token_type_hint: 
+                  description: type of token to be revoked, if sent then the accepted values are access_token and refresh_token. String value and optional, of not provided then it will attempt to remove access and refresh tokens that matchs
+                  type: string
+            example:
+              token: eyJvcmciOiI1ZTIwOTFjNGQ0YWVmY2U2MGMwNGZiOTIiLCJpZCI6ImJlMjlhYjVkODc1OTRhZDJhYTBhNjAwNzFlNzE1ZmQxIiwiaCI6Im11cm11cjY0In0=
+              client_id: 411f0800957c4a3e81fe181141dbc22a
+      tags:
+        - OAuth
+      operationId: revokeSingleToken
+      responses:
+        '200':
+          description: Succesful response
+  '/tyk/oauth/revoke_all':
+    post:
+      description: revoke all the tokens for a given oauth client
+      summary: revoke all client's tokens
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                client_id: 
+                  description: id of oauth client
+                  type: string
+                client_secret: 
+                  description: oauth client secret to ensure that its a valid operation
+                  type: string
+            example:
+              client_id: 411f0800957c4a3e81fe181141dbc22a
+              client_secret: N2Y0YjgzMjctMTEwNi00YWExLWJjM2MtYjg1NWZhM2M1NmNj
+      tags:
+        - OAuth
+      operationId: revokeAllTokens
+      responses:
+        '200':
+          description: Succesful response
+        '400':
+          description: Bad request, form malformed or client secret and client id doesn't match
+        '404':
+          description: oauth client doesn't have any api related
+                
   '/tyk/oauth/refresh/{keyName}':
     delete:
       summary: Invalidate OAuth refresh token
@@ -951,11 +1033,34 @@ paths:
               example:
                 code: MWY0ZDRkMzktOTYwNi00NDRiLTk2YmQtOWQxOGQ3Mjc5Yzdk
                 redirect_to: 'http://client-app.com/oauth-redirect/?code=MWY0ZDRkMzktOTYwNi00NDRiLTk2YmQtOWQxOGQ3Mjc5Yzdk'
+    '/tyk/oauth/clients/{apiID}':
+    put:
+      summary: Update OAuth metadata
+      description: Allows you to update the metadata for an OAuth client.
+      tags:
+        - OAuth
+      operationId: listOAuthClients
+      parameters:
+        - description: The API ID
+          name: apiID
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OAuth client metadata updated
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NewClientRequest'
   /tyk/org/keys:
     get:
       summary: List Organisation Keys
       description: |-
-        You can now set rate limits at the organisation level by using the following fields - allowance and rate. These are the number of allowed requests for the specified per value, and need to be set to the same value. If you don¿ït want to have organisation level rate limiting, set ¿írate¿ì or ¿íper¿ì to zero, or don¿ït add them to your request.
+        You can now set rate limits at the organisation level by using the following fields - allowance and rate. These are the number of allowed requests for the specified per value, and need to be set to the same value. If you don't want to have organisation level rate limiting, set 'rate' or 'per' to zero, or don't add them to your request.
       tags:
         - Organisation Quotas
       operationId: listOrgKeys
@@ -975,6 +1080,27 @@ paths:
                 keys:
                   - "key1"
                   - "key2"
+  '/tyk/org/keys/{keyID}':
+    parameters:
+      - description: The Key ID
+        name: keyID
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Get an Organisation Key
+      description: Get session info about specified orgnanisation key. Should return up to date rate limit and quota usage numbers.
+      tags:
+        - Organisation Quotas
+      operationId: getOrgKey
+      responses:
+        '200':
+          description: Key object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionState'
     post:
       summary: Create an organisation key
       description: |-
@@ -1006,33 +1132,12 @@ paths:
                 action: created
                 key: '{...KEY JSON definition...}'
                 status: ok
-  '/tyk/orgs/keys/{keyID}':
-    parameters:
-      - description: The Key ID
-        name: keyID
-        in: path
-        required: true
-        schema:
-          type: string
-    get:
-      summary: Get an Organisation Key
-      description: Get session info about specified orgnanisation key. Should return up to date rate limit and quota usage numbers.
-      tags:
-        - Organisation Quotas
-      operationId: getOrgKey
-      responses:
-        '200':
-          description: Key object
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SessionState'
     put:
       summary: Update Organisation Key
       description: |-
         This work similar to Keys API except that Key ID is always equals Organisation ID
 
-        For Gateway v2.6.0 onwards, you can now set rate limits at the organisation level by using the following fields - allowance and rate. These are the number of allowed requests for the specified per value, and need to be set to the same value. If you don¿ït want to have organisation level rate limiting, set `rate` or `per` to zero, or don¿ït add them to your request.
+        For Gateway v2.6.0 onwards, you can now set rate limits at the organisation level by using the following fields - allowance and rate. These are the number of allowed requests for the specified per value, and need to be set to the same value. If you donÂ¿Ã¯t want to have organisation level rate limiting, set `rate` or `per` to zero, or donÂ¿Ã¯t add them to your request.
       tags:
         - Organisation Quotas
       operationId: updateOrgKey
@@ -1633,12 +1738,6 @@ components:
       x-go-package: github.com/TykTechnologies/tyk/vendor/github.com/lonelycode/osin
     CacheMeta:
       properties:
-        cache_response_codes:
-          items:
-            format: int64
-            type: integer
-          type: array
-          x-go-name: CacheOnlyResponseCodes
         cache_key_regex:
           type: string
           x-go-name: CacheKeyRegex
