@@ -157,6 +157,21 @@ func getSpecForOrg(orgID string) *APISpec {
 	return nil
 }
 
+func getApisIdsForOrg(orgID string) []string{
+	result := []string{}
+
+	showAll := orgID == ""
+	apisMu.RLock()
+	defer apisMu.RUnlock()
+	for _, v := range apisByID {
+		if v.OrgID == orgID || showAll {
+			result = append(result, v.APIID)
+		}
+	}
+
+	return result
+}
+
 func checkAndApplyTrialPeriod(keyName string, newSession *user.SessionState, isHashed bool) {
 	// Check the policies to see if we are forcing an expiry on the key
 	for _, polID := range newSession.PolicyIDs() {
@@ -1968,6 +1983,25 @@ func getOauthClients(apiID string) (interface{}, int) {
 	return clients, http.StatusOK
 }
 
+func getApisForOauthClientId(oauthClientId string, orgId string) []string {
+	apis := []string{}
+
+	apisIdsCopy := getApisIdsForOrg(orgId)
+
+	for index := range apisIdsCopy {
+		clientsData, _, status := getApiClients(apisIdsCopy[index])
+		if status == http.StatusOK {
+			for _, client := range clientsData {
+				if client.GetId() == oauthClientId {
+					apis = append(apis, apisIdsCopy[index])
+				}
+			}
+		}
+	}
+
+	return apis
+}
+
 func healthCheckhandler(w http.ResponseWriter, r *http.Request) {
 	if !config.Global().HealthCheck.EnableHealthChecks {
 		doJSONWrite(w, http.StatusBadRequest, apiError("Health checks are not enabled for this node"))
@@ -2047,8 +2081,9 @@ func RevokeTokenHandler(w http.ResponseWriter, r *http.Request) {
 	tokenTypeHint := r.PostFormValue("token_type_hint")
 	token := r.PostFormValue("token")
 	clientID := r.PostFormValue("client_id")
+	orgID := r.PostFormValue("org_id")
 
-	apis := getApisForOauthClientId(clientID)
+	apis := getApisForOauthClientId(clientID, orgID)
 
 	for _, apiID := range apis {
 		storage, code, err := GetStorageForApi(apiID)
@@ -2099,13 +2134,14 @@ func RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request) {
 
 	clientId := r.PostFormValue("client_id")
 	clientSecret := r.PostFormValue("client_secret")
+	orgId := r.PostFormValue("org_id")
 
 	if clientId == "" || clientSecret == "" {
 		doJSONWrite(w, http.StatusBadRequest, apiError("client_id and client_secret are required"))
 		return
 	}
 
-	apis := getApisForOauthClientId(clientId)
+	apis := getApisForOauthClientId(clientId, orgId)
 	if len(apis) == 0 {
 		doJSONWrite(w, http.StatusNotFound, apiError("oauth client doesnt have any api related"))
 		return
