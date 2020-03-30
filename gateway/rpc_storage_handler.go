@@ -826,6 +826,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 		tokenActionTypeHint := splitKeys[2]
 		hashedKey := strings.Contains(token, "#hashed")
 		if !hashedKey {
+			log.Info("revoke not hashed key: ", key)
 			storage, _, err := GetStorageForApi(apiId)
 			if err != nil {
 				continue
@@ -839,6 +840,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 			}
 			RevokeToken(storage, token, tokenTypeHint)
 		} else {
+			log.Info("revoke hashed key:", key)
 			token = strings.Split(token, "#")[0]
 			handleDeleteHashedKey(token, apiId, false)
 		}
@@ -852,11 +854,13 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 			splitKeys := strings.Split(key, ":")
 			_, resetQuota := keysToReset[splitKeys[0]]
 			if len(splitKeys) > 1 && splitKeys[1] == "hashed" {
+				log.Info("delete hashed key:",key)
 				key = splitKeys[0]
 				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
 				handleDeleteHashedKey(splitKeys[0], "", resetQuota)
 				getSessionAndCreate(splitKeys[0], r)
 			} else {
+				log.Info("delete not hashed key:", key)
 				log.Info("--> removing cached key: ", key)
 				handleDeleteKey(key, "-1", resetQuota)
 				getSessionAndCreate(splitKeys[0], r)

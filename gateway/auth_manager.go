@@ -267,9 +267,12 @@ func (b *DefaultSessionManager) RemoveSession(orgID string, keyName string, hash
 	defer b.clearCacheForKey(keyName, hashed)
 
 	if hashed {
+		log.Info("#hashed, raw key: ",b.store.GetKeyPrefix() + keyName)
 		return b.store.DeleteRawKey(b.store.GetKeyPrefix() + keyName)
 	} else {
 		// support both old and new key hashing
+		log.Info("not shahed: ", keyName)
+		log.Info("also:",generateToken(orgID, keyName))
 		res1 := b.store.DeleteKey(keyName)
 		res2 := b.store.DeleteKey(generateToken(orgID, keyName))
 		return res1 || res2
