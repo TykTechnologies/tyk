@@ -4,11 +4,13 @@ import (
 	"io"
 	"io/ioutil"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/ast"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/astparser"
+	"github.com/jensneuse/graphql-go-tools/pkg/ast"
+	"github.com/jensneuse/graphql-go-tools/pkg/astparser"
+	"github.com/jensneuse/graphql-go-tools/pkg/asttransform"
 )
 
 type Schema struct {
+	rawInput []byte
 	document ast.Document
 }
 
@@ -28,7 +30,7 @@ func NewSchemaFromString(schema string) (*Schema, error) {
 }
 
 func (s *Schema) Document() []byte {
-	return s.document.Input.RawBytes
+	return s.rawInput
 }
 
 func (s *Schema) Validate() (valid bool, errors SchemaValidationErrors) {
@@ -42,7 +44,13 @@ func createSchema(schemaContent []byte) (*Schema, error) {
 		return nil, report
 	}
 
+	err := asttransform.MergeDefinitionWithBaseSchema(&document)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Schema{
+		rawInput: schemaContent,
 		document: document,
 	}, nil
 }
