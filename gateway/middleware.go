@@ -450,7 +450,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					if policy.ThrottleRetryLimit > ar.Limit.ThrottleRetryLimit {
 						ar.Limit.ThrottleRetryLimit = policy.ThrottleRetryLimit
 
-						if policy.ThrottleRetryLimit > session.ThrottleRetryLimit{
+						if policy.ThrottleRetryLimit > session.ThrottleRetryLimit {
 							session.ThrottleRetryLimit = policy.ThrottleRetryLimit
 							throttleWasSetInSession = true
 						}
