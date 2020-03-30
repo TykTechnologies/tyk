@@ -438,11 +438,6 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 		returnedSession := TykSessionState(returnObject.Session)
 
-		if err := m.ApplyPolicies(returnedSession); err != nil {
-			AuthFailed(m, r, r.Header.Get(m.Spec.Auth.AuthHeaderName))
-			return errors.New(http.StatusText(http.StatusForbidden)), http.StatusForbidden
-		}
-
 		// If the returned object contains metadata, add them to the session:
 		for k, v := range returnObject.Metadata {
 			returnedSession.MetaData[k] = string(v)
@@ -453,6 +448,12 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		existingSession, found := GlobalSessionManager.SessionDetail(m.Spec.OrgID, sessionID, false)
 		if found {
 			returnedSession.QuotaRenews = existingSession.QuotaRenews
+			returnedSession.QuotaRemaining = existingSession.QuotaRemaining
+		}
+
+		if err := m.ApplyPolicies(returnedSession); err != nil {
+			AuthFailed(m, r, r.Header.Get(m.Spec.Auth.AuthHeaderName))
+			return errors.New(http.StatusText(http.StatusForbidden)), http.StatusForbidden
 		}
 
 		ctxSetSession(r, returnedSession, sessionID, true)
