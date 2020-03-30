@@ -10,6 +10,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
+	"github.com/sirupsen/logrus"
 )
 
 type PublicSession struct {
@@ -105,7 +106,10 @@ func (l *SessionLimiter) limitSentinel(
 ) bool {
 	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash()
 	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash() + ".BLOCKED"
-
+	log.WithFields(logrus.Fields{
+		"rate_limiter_key":          rateLimiterKey,
+		"rate_limiter_sentinel_key": rateLimiterSentinelKey,
+	}).Debug("Using Redis rate limiter with sentinel")
 	go l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun)
 
 	// Check sentinel
@@ -127,7 +131,10 @@ func (l *SessionLimiter) limitRedis(
 ) bool {
 	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash()
 	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash() + ".BLOCKED"
-
+	log.WithFields(logrus.Fields{
+		"rate_limiter_key":          rateLimiterKey,
+		"rate_limiter_sentinel_key": rateLimiterSentinelKey,
+	}).Debug("Using Redis rate limiter")
 	if l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun) {
 		return true
 	}
@@ -154,6 +161,10 @@ func (l *SessionLimiter) limitDRL(
 	if rate < uint(DRLManager.CurrentTokenValue()) {
 		rate = uint(DRLManager.CurrentTokenValue())
 	}
+	log.WithFields(logrus.Fields{
+		"rate":       rate,
+		"bucket_key": bucketKey,
+	}).Debug("Using Distributed Rate Limiter")
 	userBucket, err := l.bucketStore.Create(bucketKey, rate, time.Duration(per)*time.Second)
 	if err != nil {
 		log.Error("Failed to create bucket!")
