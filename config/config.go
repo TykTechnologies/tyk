@@ -418,6 +418,10 @@ type Config struct {
 	RedirectResetCookie string `json:"redirect_reset_cookie"`
 	EnableRedirect      bool   `json:"enable_redirect"`
 	RedirectURL         string `json:"redirect_url"`
+
+	// Cisco - Force Root CA Check
+	SSLForceRootCACheck bool   `json:"ssl_force_rootca_check"`
+	SSLRootCACert       string `json:"ssl_rootca_cert"`
 }
 
 // GetEventTriggers returns event triggers. There was a typo in the json tag.
