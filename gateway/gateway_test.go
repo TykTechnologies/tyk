@@ -2168,9 +2168,6 @@ func TestOverrideErrors(t *testing.T) {
 	assert(message6, code6, e, i)
 
 	t.Run("Partial override", func(t *testing.T) {
-		defer ResetTestConfig()
-		defer defaultTykErrors()
-
 		testConf.OverrideMessages = map[string]config.TykError{
 			ErrOAuthAuthorizationFieldMissing: {
 				Code: code4,
