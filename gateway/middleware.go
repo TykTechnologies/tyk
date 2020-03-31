@@ -407,7 +407,6 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 				if !usePartitions || policy.Partitions.Quota {
 					didQuota[k] = true
-					quotaMaxWasSetInSession := false
 
 					// -1 is special "unlimited" case
 					if ar.Limit.QuotaMax != -1 && policy.QuotaMax > ar.Limit.QuotaMax {
@@ -427,8 +426,6 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 				if !usePartitions || policy.Partitions.RateLimit {
 					didRateLimit[k] = true
-					rateWasSetInSession := false
-					throttleWasSetInSession := false
 
 					if ar.Limit.Rate != -1 && policy.Rate > ar.Limit.Rate {
 						ar.Limit.Rate = policy.Rate
@@ -446,7 +443,6 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 					if policy.ThrottleRetryLimit > ar.Limit.ThrottleRetryLimit {
 						ar.Limit.ThrottleRetryLimit = policy.ThrottleRetryLimit
-
 						if policy.ThrottleRetryLimit > session.ThrottleRetryLimit {
 							session.ThrottleRetryLimit = policy.ThrottleRetryLimit
 						}
@@ -458,7 +454,6 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 							session.ThrottleInterval = policy.ThrottleInterval
 						}
 					}
-
 				}
 
 				// Respect existing QuotaRenews
