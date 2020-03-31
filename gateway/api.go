@@ -2004,7 +2004,7 @@ func getApisForOauthClientId(oauthClientId string, orgId string) []string {
 			}
 		}
 	}
-	log.Info("apis for that client:", apis)
+
 	return apis
 }
 
