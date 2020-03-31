@@ -2095,9 +2095,6 @@ func TestOverrideErrors(t *testing.T) {
 	defer ResetTestConfig()
 	defer defaultTykErrors()
 
-	ts := StartTest()
-	defer ts.Close()
-
 	assert := func(expectedError string, expectedCode int, actualError error, actualCode int) {
 		if !(expectedError == actualError.Error() && expectedCode == actualCode) {
 			t.Fatal("Override failed")
@@ -2186,7 +2183,6 @@ func TestOverrideErrors(t *testing.T) {
 
 		e, i = errorAndStatusCode(ErrOAuthAuthorizationFieldMalformed)
 		assert(message4, code2, e, i)
-
 	})
 
 }
