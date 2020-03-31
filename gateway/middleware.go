@@ -407,63 +407,53 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 				if !usePartitions || policy.Partitions.Quota {
 					didQuota[k] = true
-					quotaMaxWasSetInSession := false
 
 					// -1 is special "unlimited" case
 					if ar.Limit.QuotaMax != -1 && policy.QuotaMax > ar.Limit.QuotaMax {
 						ar.Limit.QuotaMax = policy.QuotaMax
 						if policy.QuotaMax > session.QuotaMax {
 							session.QuotaMax = policy.QuotaMax
-							quotaMaxWasSetInSession = true
 						}
 					}
 
 					if policy.QuotaRenewalRate > ar.Limit.QuotaRenewalRate {
 						ar.Limit.QuotaRenewalRate = policy.QuotaRenewalRate
-					}
-
-					if quotaMaxWasSetInSession {
-						session.QuotaRenewalRate = policy.QuotaRenewalRate
+						if policy.QuotaRenewalRate > session.QuotaRenewalRate {
+							session.QuotaRenewalRate = policy.QuotaRenewalRate
+						}
 					}
 				}
 
 				if !usePartitions || policy.Partitions.RateLimit {
 					didRateLimit[k] = true
-					rateWasSetInSession := false
-					throttleWasSetInSession := false
 
 					if ar.Limit.Rate != -1 && policy.Rate > ar.Limit.Rate {
 						ar.Limit.Rate = policy.Rate
 						if policy.Rate > session.Rate {
 							session.Rate = policy.Rate
-							rateWasSetInSession = true
 						}
 					}
 
 					if policy.Per > ar.Limit.Per {
 						ar.Limit.Per = policy.Per
-						if rateWasSetInSession {
+						if policy.Per > session.Per {
 							session.Per = policy.Per
 						}
 					}
 
 					if policy.ThrottleRetryLimit > ar.Limit.ThrottleRetryLimit {
 						ar.Limit.ThrottleRetryLimit = policy.ThrottleRetryLimit
-
 						if policy.ThrottleRetryLimit > session.ThrottleRetryLimit {
 							session.ThrottleRetryLimit = policy.ThrottleRetryLimit
-							throttleWasSetInSession = true
 						}
 					}
 
 					if policy.ThrottleInterval > ar.Limit.ThrottleInterval {
 						ar.Limit.ThrottleInterval = policy.ThrottleInterval
+						if policy.ThrottleInterval > session.ThrottleInterval {
+							session.ThrottleInterval = policy.ThrottleInterval
+						}
 					}
-
-					if throttleWasSetInSession {
-						session.ThrottleInterval = policy.ThrottleInterval
-					}
-
 				}
 
 				// Respect existing QuotaRenews
