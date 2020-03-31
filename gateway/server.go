@@ -145,31 +145,6 @@ func getApiSpec(apiID string) *APISpec {
 	return spec
 }
 
-func getApisForOauthClientId(oauthClientId string) []string {
-	apis := []string{}
-	apisIdsCopy := []string{}
-
-	//generate a copy only with ids so we do not attempt to lock twice
-	apisMu.RLock()
-	for apiId := range apisByID {
-		apisIdsCopy = append(apisIdsCopy, apiId)
-	}
-	apisMu.RUnlock()
-
-	for index := range apisIdsCopy {
-		clientsData, _, status := getApiClients(apisIdsCopy[index])
-		if status == http.StatusOK {
-			for _, client := range clientsData {
-				if client.GetId() == oauthClientId {
-					apis = append(apis, apisIdsCopy[index])
-				}
-			}
-		}
-	}
-
-	return apis
-}
-
 func apisByIDLen() int {
 	apisMu.RLock()
 	defer apisMu.RUnlock()
@@ -467,7 +442,7 @@ func loadControlAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/oauth/clients/create", createOauthClient).Methods("POST")
 		r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", oAuthClientHandler).Methods("PUT")
 		r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}/rotate", rotateOauthClientHandler).Methods("PUT")
-		r.HandleFunc("/oauth/clients/apis/{appID}", getApisForOauthApp).Methods("GET")
+		r.HandleFunc("/oauth/clients/apis/{appID}", getApisForOauthApp).Queries("orgID", "{[0-9]*?}").Methods("GET")
 		r.HandleFunc("/oauth/refresh/{keyName}", invalidateOauthRefresh).Methods("DELETE")
 		r.HandleFunc("/cache/{apiID}", invalidateCacheHandler).Methods("DELETE")
 		r.HandleFunc("/oauth/revoke", RevokeTokenHandler).Methods("POST")
@@ -535,7 +510,6 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 	serverConfig.RedirectUriSeparator = config.Global().OauthRedirectUriSeparator
 
 	prefix := generateOAuthPrefix(spec.APIID)
-	log.Info("prefix for oatuh redis:", prefix)
 	storageManager := getGlobalStorageHandler(prefix, false)
 	storageManager.Connect()
 	osinStorage := &RedisOsinStorageInterface{storageManager, GlobalSessionManager, spec.OrgID}
