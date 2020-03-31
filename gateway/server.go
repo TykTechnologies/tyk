@@ -442,7 +442,7 @@ func loadControlAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/oauth/clients/create", createOauthClient).Methods("POST")
 		r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", oAuthClientHandler).Methods("PUT")
 		r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}/rotate", rotateOauthClientHandler).Methods("PUT")
-		r.HandleFunc("/oauth/clients/apis/{orgID}/{appID}", getApisForOauthApp).Methods("GET")
+		r.HandleFunc("/oauth/clients/apis/{appID}", getApisForOauthApp).Queries("orgID", "{[0-9]*?}").Methods("GET")
 		r.HandleFunc("/oauth/refresh/{keyName}", invalidateOauthRefresh).Methods("DELETE")
 		r.HandleFunc("/cache/{apiID}", invalidateCacheHandler).Methods("DELETE")
 		r.HandleFunc("/oauth/revoke", RevokeTokenHandler).Methods("POST")

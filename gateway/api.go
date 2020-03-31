@@ -160,10 +160,11 @@ func getSpecForOrg(orgID string) *APISpec {
 func getApisIdsForOrg(orgID string) []string {
 	result := []string{}
 
+	showAll := orgID == ""
 	apisMu.RLock()
 	defer apisMu.RUnlock()
 	for _, v := range apisByID {
-		if v.OrgID == orgID {
+		if v.OrgID == orgID || showAll {
 			result = append(result, v.APIID)
 		}
 	}
@@ -1738,15 +1739,15 @@ func rotateOauthClientHandler(w http.ResponseWriter, r *http.Request) {
 func getApisForOauthApp(w http.ResponseWriter, r *http.Request) {
 	apis := []string{}
 	appID := mux.Vars(r)["appID"]
-	orgID := mux.Vars(r)["orgID"]
+	orgID := r.FormValue("orgID")
 
 	//get all organization apis
 	apisIds := getApisIdsForOrg(orgID)
 
 	for index := range apisIds {
 		if api := getApiSpec(apisIds[index]); api != nil {
-			if api.UseOauth2{
-				clients,_, code := getApiClients(apisIds[index])
+			if api.UseOauth2 {
+				clients, _, code := getApiClients(apisIds[index])
 				if code == http.StatusOK {
 					for _, client := range clients {
 						if client.GetId() == appID {
