@@ -351,7 +351,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 						ThrottleInterval:   policy.ThrottleInterval,
 						ThrottleRetryLimit: policy.ThrottleRetryLimit,
 					}
-				} 
+				}
 				accessRights.AllowanceScope = idForScope
 				accessRights.Limit.SetBy = idForScope
 
