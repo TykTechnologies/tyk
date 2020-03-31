@@ -157,14 +157,13 @@ func getSpecForOrg(orgID string) *APISpec {
 	return nil
 }
 
-func getApisIdsForOrg(orgID string) []string{
+func getApisIdsForOrg(orgID string) []string {
 	result := []string{}
 
-	showAll := orgID == ""
 	apisMu.RLock()
 	defer apisMu.RUnlock()
 	for _, v := range apisByID {
-		if v.OrgID == orgID || showAll {
+		if v.OrgID == orgID {
 			result = append(result, v.APIID)
 		}
 	}
@@ -1739,17 +1738,25 @@ func rotateOauthClientHandler(w http.ResponseWriter, r *http.Request) {
 func getApisForOauthApp(w http.ResponseWriter, r *http.Request) {
 	apis := []string{}
 	appID := mux.Vars(r)["appID"]
+	orgID := mux.Vars(r)["orgID"]
 
-	apisMu.RLock()
-	for apiId, api := range apisByID {
-		if api.UseOauth2 {
-			_, err := api.OAuthManager.OsinServer.Storage.GetClient(appID)
-			if err == nil {
-				apis = append(apis, apiId)
+	//get all organization apis
+	apisIds := getApisIdsForOrg(orgID)
+
+	for index := range apisIds {
+		if api := getApiSpec(apisIds[index]); api != nil {
+			if api.UseOauth2{
+				clients,_, code := getApiClients(apisIds[index])
+				if code == http.StatusOK {
+					for _, client := range clients {
+						if client.GetId() == appID {
+							apis = append(apis, apisIds[index])
+						}
+					}
+				}
 			}
 		}
 	}
-	apisMu.RUnlock()
 
 	doJSONWrite(w, http.StatusOK, apis)
 }
@@ -1985,20 +1992,19 @@ func getOauthClients(apiID string) (interface{}, int) {
 
 func getApisForOauthClientId(oauthClientId string, orgId string) []string {
 	apis := []string{}
+	orgApis := getApisIdsForOrg(orgId)
 
-	apisIdsCopy := getApisIdsForOrg(orgId)
-
-	for index := range apisIdsCopy {
-		clientsData, _, status := getApiClients(apisIdsCopy[index])
+	for index := range orgApis {
+		clientsData, _, status := getApiClients(orgApis[index])
 		if status == http.StatusOK {
 			for _, client := range clientsData {
 				if client.GetId() == oauthClientId {
-					apis = append(apis, apisIdsCopy[index])
+					apis = append(apis, orgApis[index])
 				}
 			}
 		}
 	}
-
+	log.Info("apis for that client:", apis)
 	return apis
 }
 
@@ -2086,12 +2092,10 @@ func RevokeTokenHandler(w http.ResponseWriter, r *http.Request) {
 	apis := getApisForOauthClientId(clientID, orgID)
 
 	for _, apiID := range apis {
-		storage, code, err := GetStorageForApi(apiID)
-		if err != nil {
-			doJSONWrite(w, code, apiError(err.Error()))
-			return
+		storage, _, err := GetStorageForApi(apiID)
+		if err == nil {
+			RevokeToken(storage, token, tokenTypeHint)
 		}
-		RevokeToken(storage, token, tokenTypeHint)
 	}
 
 	w.WriteHeader(200)
@@ -2148,12 +2152,10 @@ func RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, apiId := range apis {
-		storage, code, err := GetStorageForApi(apiId)
-		if err != nil {
-			doJSONWrite(w, code, apiError(err.Error()))
-			return
+		storage, _, err := GetStorageForApi(apiId)
+		if err == nil {
+			status = RevokeAllTokens(storage, clientId, clientSecret)
 		}
-		status = RevokeAllTokens(storage, clientId, clientSecret)
 	}
 
 	//at this moment, only send the last result
