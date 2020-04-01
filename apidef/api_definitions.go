@@ -421,7 +421,10 @@ type APIDefinition struct {
 			SSLInsecureSkipVerify bool     `bson:"ssl_insecure_skip_verify" json:"ssl_insecure_skip_verify"`
 			SSLCipherSuites       []string `bson:"ssl_ciphers" json:"ssl_ciphers"`
 			SSLMinVersion         uint16   `bson:"ssl_min_version" json:"ssl_min_version"`
-			ProxyURL              string   `bson:"proxy_url" json:"proxy_url"`
+			//Cisco SSL RootCA check
+			SSLForceRootCACheck bool   `bson:"ssl_force_rootca_check" json:"ssl_force_rootca_check"`
+			SSLRootCACert       string `bson:"ssl_rootca_cert" json:"ssl_rootca_cert"`
+			ProxyURL            string `bson:"proxy_url" json:"proxy_url"`
 		} `bson:"transport" json:"transport"`
 	} `bson:"proxy" json:"proxy"`
 	DisableRateLimit          bool                   `bson:"disable_rate_limit" json:"disable_rate_limit"`

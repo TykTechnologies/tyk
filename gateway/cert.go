@@ -132,6 +132,16 @@ func verifyPeerCertificatePinnedCheck(spec *APISpec, tlsConfig *tls.Config) func
 	}
 }
 
+func validateCommonName(host string, cert *x509.Certificate) error {
+	certLog.Debug("Checking certificate CommonName for host :", host)
+
+	if cert.Subject.CommonName != host {
+		return errors.New("certificate had CN " + cert.Subject.CommonName + "expected " + host)
+	}
+
+	return nil
+}
+
 func dialTLSPinnedCheck(spec *APISpec, tc *tls.Config) func(network, addr string) (net.Conn, error) {
 	if (spec == nil || len(spec.PinnedPublicKeys) == 0) && len(config.Global().Security.PinnedPublicKeys) == 0 {
 		return nil

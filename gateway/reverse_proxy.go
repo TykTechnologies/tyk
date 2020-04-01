@@ -15,6 +15,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -525,6 +527,74 @@ func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p
 	return transport
 }
 
+func (p *ReverseProxy) verifyRootCA(tlsConfig *tls.Config, host string) {
+	tlsConfig.InsecureSkipVerify = true
+
+	// if verifyPeerCertificate was set previously, make sure it is also executed
+	//prevFunc := tlsConfig.VerifyPeerCertificate
+	tlsConfig.VerifyPeerCertificate = func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+		// if prevFunc != nil {
+		// 	err := prevFunc(rawCerts, verifiedChains)
+		// 	if err != nil {
+		// 		log.Error("Failed to verify server certificate: " + err.Error())
+		// 		return err
+		// 	}
+		// }
+		// followed https://github.com/golang/go/issues/21971#issuecomment-332693931
+		certs := make([]*x509.Certificate, len(rawCerts))
+		for i, asn1Data := range rawCerts {
+			cert, err := x509.ParseCertificate(asn1Data)
+			if err != nil {
+				return errors.New("failed to parse certificate from server: " + err.Error())
+			}
+			certs[i] = cert
+		}
+
+		if p.TykAPISpec.Proxy.Transport.SSLForceRootCACheck && config.Global().SSLForceRootCACheck {
+			roots := x509.NewCertPool()
+			//Read RootCA and Validate
+			rootCert := p.TykAPISpec.Proxy.Transport.SSLRootCACert
+
+			if rootCert == "" {
+				rootCert = config.Global().SSLRootCACert
+			}
+			log.Debug("rootca path: " + rootCert)
+			rootCA, err := ioutil.ReadFile(rootCert)
+			if err != nil {
+				return errors.New("invalid rootca  " + rootCert)
+			}
+
+			ok := roots.AppendCertsFromPEM([]byte(rootCA))
+			if !ok {
+				return errors.New("invalid rootca - Counld not decode rootCA: " + rootCert)
+			}
+
+			tlsConfig.RootCAs = roots
+		}
+
+		opts := x509.VerifyOptions{
+			Roots:         tlsConfig.RootCAs,
+			CurrentTime:   time.Now(),
+			DNSName:       "", // <- skip hostname verification
+			Intermediates: x509.NewCertPool(),
+		}
+
+		for i, cert := range certs {
+			if i == 0 {
+				continue
+			}
+			opts.Intermediates.AddCert(cert)
+		}
+		_, err := certs[0].Verify(opts)
+		if err != nil {
+			log.Error("Failed to verify server certificate: " + err.Error())
+			return err
+		}
+
+		return nil
+	}
+}
+
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) *http.Response {
 	if trace.IsEnabled() {
 		span, ctx := trace.Span(req.Context(), req.URL.Path)
@@ -674,6 +744,18 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 	p.TykAPISpec.Unlock()
 
+	//Validate RootCA
+	if p.TykAPISpec.Proxy.Transport.SSLForceRootCACheck && config.Global().SSLForceRootCACheck {
+		// DialTLS is not executed if proxy is used
+		httpTransport := roundTripper.(*http.Transport)
+
+		log.Debug("Using forced SSL RootCA check")
+		tlsConfig := httpTransport.TLSClientConfig
+		host, _, _ := net.SplitHostPort(outreq.Host)
+
+		p.verifyRootCA(tlsConfig, host)
+	}
+	log.Debug("Root Varification Done")
 	// do request round trip
 	var res *http.Response
 	var err error
@@ -732,6 +814,16 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 		if strings.Contains(err.Error(), "no such host") {
 			p.ErrorHandler.HandleError(rw, logreq, "Upstream host lookup failed", http.StatusInternalServerError, true)
+			return nil
+		}
+
+		if strings.Contains(err.Error(), "x509: certificate signed by unknown authority") {
+			p.ErrorHandler.HandleError(rw, logreq, "x509: certificate signed by unknown authority", http.StatusInternalServerError, true)
+			return nil
+		}
+
+		if strings.Contains(err.Error(), "invalid rootca") {
+			p.ErrorHandler.HandleError(rw, logreq, "invalid root certificate", http.StatusInternalServerError, true)
 			return nil
 		}
 
