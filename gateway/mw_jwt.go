@@ -582,7 +582,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 			key, err := ParseRSAPublicKey(val)
 			if err != nil {
 				logger.WithError(err).Error("Failed to decode JWT key")
-				return nil, err
+				return nil, errors.New("Failed to decode JWT key")
 			}
 			return key, nil
 		default:
