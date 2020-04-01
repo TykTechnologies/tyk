@@ -2081,6 +2081,9 @@ func TestCache_singleErrorResponse(t *testing.T) {
 }
 
 func TestOverrideErrors(t *testing.T) {
+	defer ResetTestConfig()
+	defer defaultTykErrors()
+
 	assert := func(expectedError string, expectedCode int, actualError error, actualCode int) {
 		if !(expectedError == actualError.Error() && expectedCode == actualCode) {
 			t.Fatal("Override failed")
@@ -2088,20 +2091,20 @@ func TestOverrideErrors(t *testing.T) {
 	}
 
 	const message1 = "Message1"
-	const code1 = 1
+	const code1 = 901
 	const message2 = "Message2"
-	const code2 = 2
+	const code2 = 902
 	const message3 = "Message3"
-	const code3 = 3
+	const code3 = 903
 	const message4 = "Message4"
-	const code4 = 4
+	const code4 = 904
 	const message5 = "Message5"
-	const code5 = 5
+	const code5 = 905
 	const message6 = "Message6"
-	const code6 = 6
+	const code6 = 906
 
-	globalConf := config.Global()
-	globalConf.OverrideMessages = map[string]config.TykError{
+	testConf := config.Global()
+	testConf.OverrideMessages = map[string]config.TykError{
 		ErrOAuthAuthorizationFieldMissing: {
 			Message: message1,
 			Code:    code1,
@@ -2127,7 +2130,7 @@ func TestOverrideErrors(t *testing.T) {
 			Code:    code6,
 		},
 	}
-	config.SetGlobal(globalConf)
+	config.SetGlobal(testConf)
 
 	overrideTykErrors()
 
@@ -2150,7 +2153,7 @@ func TestOverrideErrors(t *testing.T) {
 	assert(message6, code6, e, i)
 
 	t.Run("Partial override", func(t *testing.T) {
-		globalConf.OverrideMessages = map[string]config.TykError{
+		testConf.OverrideMessages = map[string]config.TykError{
 			ErrOAuthAuthorizationFieldMissing: {
 				Code: code4,
 			},
@@ -2158,7 +2161,7 @@ func TestOverrideErrors(t *testing.T) {
 				Message: message4,
 			},
 		}
-		config.SetGlobal(globalConf)
+		config.SetGlobal(testConf)
 
 		overrideTykErrors()
 
