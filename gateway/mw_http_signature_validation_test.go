@@ -647,7 +647,7 @@ func TestRSAAuthSessionPass(t *testing.T) {
 	pubDer, _ := x509.MarshalPKIXPublicKey(x509Cert.PublicKey)
 	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDer})
 	pubID, _ := CertificateManager.Add(pubPem, "")
-	defer CertificateManager.Delete(pubID)
+	defer CertificateManager.Delete(pubID, "")
 
 	// Should not receive an AuthFailure event
 	var eventWG sync.WaitGroup
@@ -679,7 +679,7 @@ func BenchmarkRSAAuthSessionPass(b *testing.B) {
 	pubDer, _ := x509.MarshalPKIXPublicKey(x509Cert.PublicKey)
 	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDer})
 	pubID, _ := CertificateManager.Add(pubPem, "")
-	defer CertificateManager.Delete(pubID)
+	defer CertificateManager.Delete(pubID, "")
 
 	var eventWG sync.WaitGroup
 	eventWG.Add(b.N)
@@ -705,7 +705,7 @@ func TestRSAAuthSessionKeyMissing(t *testing.T) {
 	pubDer, _ := x509.MarshalPKIXPublicKey(x509Cert.PublicKey)
 	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDer})
 	pubID, _ := CertificateManager.Add(pubPem, "")
-	defer CertificateManager.Delete(pubID)
+	defer CertificateManager.Delete(pubID, "")
 
 	spec := LoadSampleAPI(hmacAuthDef)
 

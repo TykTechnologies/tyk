@@ -34,7 +34,7 @@ func TestHTTP2_TLS(t *testing.T) {
 	_, _, _, clientCert := genCertificate(&x509.Certificate{})
 	serverCertPem, _, combinedPEM, _ := genServerCertificate()
 	certID, _ := CertificateManager.Add(combinedPEM, "")
-	defer CertificateManager.Delete(certID)
+	defer CertificateManager.Delete(certID, "")
 
 	// Upstream server supporting HTTP/2
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -82,7 +82,7 @@ func TestGRPC_TLS(t *testing.T) {
 
 	_, _, combinedPEM, _ := genServerCertificate()
 	certID, _ := CertificateManager.Add(combinedPEM, "")
-	defer CertificateManager.Delete(certID)
+	defer CertificateManager.Delete(certID, "")
 
 	// gRPC server
 	s := startGRPCServer(t, nil)
@@ -131,10 +131,10 @@ func TestGRPC_MutualTLS(t *testing.T) {
 	serverCertPem, _, combinedPEM, _ := genServerCertificate()
 
 	certID, _ := CertificateManager.Add(combinedPEM, "") // For tyk to know downstream
-	defer CertificateManager.Delete(certID)
+	defer CertificateManager.Delete(certID, "")
 
 	clientCertID, _ := CertificateManager.Add(combinedClientPEM, "") // For upstream to know tyk
-	defer CertificateManager.Delete(clientCertID)
+	defer CertificateManager.Delete(clientCertID, "")
 
 	// Protected gRPC server
 	s := startGRPCServer(t, clientCert.Leaf)
@@ -181,7 +181,7 @@ func TestGRPC_BasicAuthentication(t *testing.T) {
 	defer ResetTestConfig()
 	_, _, combinedPEM, _ := genServerCertificate()
 	certID, _ := CertificateManager.Add(combinedPEM, "")
-	defer CertificateManager.Delete(certID)
+	defer CertificateManager.Delete(certID, "")
 
 	// gRPC server
 	s := startGRPCServer(t, nil)
@@ -238,7 +238,7 @@ func TestGRPC_TokenBasedAuthentication(t *testing.T) {
 	defer ResetTestConfig()
 	_, _, combinedPEM, _ := genServerCertificate()
 	certID, _ := CertificateManager.Add(combinedPEM, "")
-	defer CertificateManager.Delete(certID)
+	defer CertificateManager.Delete(certID, "")
 
 	// gRPC server
 	s := startGRPCServer(t, nil)

@@ -1478,7 +1478,7 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, &newClient, true)
+		err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, apiSpec.OrgID, &newClient, true)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "api",
@@ -1522,7 +1522,7 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 			// set oauth client if it is oauth API
 			if apiSpec.UseOauth2 {
 				oauth2 = true
-				err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, &newClient, true)
+				err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, apiSpec.OrgID, &newClient, true)
 				if err != nil {
 					log.WithFields(logrus.Fields{
 						"prefix": "api",
@@ -1615,7 +1615,7 @@ func updateOauthClient(keyName, apiID string, r *http.Request) (interface{}, int
 		Description:       updateClientData.Description,       // update
 	}
 
-	err = apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, &updatedClient, true)
+	err = apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, apiSpec.OrgID, &updatedClient, true)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -1883,7 +1883,7 @@ func handleDeleteOAuthClient(keyName, apiID string) (interface{}, int) {
 	}
 
 	if apiSpec.OAuthManager != nil {
-		err := apiSpec.OAuthManager.OsinServer.Storage.DeleteClient(storageID, true)
+		err := apiSpec.OAuthManager.OsinServer.Storage.DeleteClient(storageID, apiSpec.OrgID, true)
 		if err != nil {
 			return apiError("Delete failed"), http.StatusInternalServerError
 		}
@@ -1927,7 +1927,7 @@ func getApiClients(apiID string) ([]ExtendedOsinClientInterface, apiStatusMessag
 
 	clientData := []ExtendedOsinClientInterface{}
 	if apiSpec.UseOauth2 {
-		clientData, err = apiSpec.OAuthManager.OsinServer.Storage.GetClients(filterID, true)
+		clientData, err := apiSpec.OAuthManager.OsinServer.Storage.GetClients(filterID, apiSpec.OrgID, true)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "api",
