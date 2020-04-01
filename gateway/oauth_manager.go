@@ -296,6 +296,7 @@ func RevokeAllTokens(storage ExtendedOsinStorageInterface, clientId, clientSecre
 		if err == nil {
 			storage.RemoveAccess(access.AccessToken)
 			storage.RemoveRefresh(access.RefreshToken)
+
 		}
 	}
 
@@ -992,7 +993,7 @@ func (r *RedisOsinStorageInterface) LoadAccess(token string) (*osin.AccessData, 
 		accessJSON, err = r.store.GetKey(key)
 
 		if err != nil {
-			log.Error("Failure retreiving access token by key: ", err)
+			log.Error("Failure retrieving access token by key: ", err)
 			return nil, err
 		}
 	}
@@ -1008,10 +1009,20 @@ func (r *RedisOsinStorageInterface) LoadAccess(token string) (*osin.AccessData, 
 
 // RemoveAccess will remove access data from Redis
 func (r *RedisOsinStorageInterface) RemoveAccess(token string) error {
-	key := prefixAccess + storage.HashKey(token)
 
+	access, err := r.LoadAccess(token)
+	key := prefixClientTokens + access.Client.GetId()
+	if err == nil {
+		//remove from set oauth.client-tokens
+		log.Info("removing token from oauth client tokens list")
+		limit := strconv.FormatFloat(float64(access.ExpireAt().Unix()), 'f', 0, 64)
+		r.store.RemoveSortedSetRange(key,limit,limit)
+	}else{
+		log.Warning("Cannot load access token:", token)
+	}
+
+	key = prefixAccess + storage.HashKey(token)
 	r.store.DeleteKey(key)
-
 	// remove the access token from central storage too
 	r.sessionManager.RemoveSession(r.orgID, token, false)
 

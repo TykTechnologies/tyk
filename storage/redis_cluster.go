@@ -1222,6 +1222,7 @@ func (r *RedisCluster) AddToSortedSet(keyName, value string, score float64) {
 	logEntry := logrus.Fields{
 		"keyName":  keyName,
 		"fixedKey": fixedKey,
+		"value": value,
 	}
 	log.WithFields(logEntry).Debug("Pushing raw key to sorted set")
 
