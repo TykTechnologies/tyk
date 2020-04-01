@@ -1927,7 +1927,7 @@ func getApiClients(apiID string) ([]ExtendedOsinClientInterface, apiStatusMessag
 
 	clientData := []ExtendedOsinClientInterface{}
 	if apiSpec.UseOauth2 {
-		clientData, err := apiSpec.OAuthManager.OsinServer.Storage.GetClients(filterID, apiSpec.OrgID, true)
+		clientData, err = apiSpec.OAuthManager.OsinServer.Storage.GetClients(filterID, apiSpec.OrgID, true)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "api",
