@@ -19,12 +19,14 @@ import (
 )
 
 type dummyStorage struct {
-	data map[string]string
+	data      map[string]string
+	indexList map[string][]string
 }
 
 func newDummyStorage() *dummyStorage {
 	return &dummyStorage{
-		data: make(map[string]string),
+		data:      make(map[string]string),
+		indexList: make(map[string][]string),
 	}
 }
 
@@ -57,6 +59,45 @@ func (s *dummyStorage) DeleteScanMatch(pattern string) bool {
 	}
 
 	return false
+}
+
+func (s *dummyStorage) RemoveFromList(keyName, value string) error {
+	for key, keyList := range s.indexList {
+		if key == keyName {
+			new := keyList[:]
+			newL := 0
+			for _, e := range new {
+				if e == value {
+					continue
+				}
+
+				new[newL] = e
+				newL++
+			}
+			new = new[:newL]
+			s.indexList[key] = new
+		}
+	}
+
+	return nil
+}
+
+func (s *dummyStorage) GetListRange(keyName string, from, to int64) ([]string, error) {
+	for key := range s.indexList {
+		if key == keyName {
+			return s.indexList[key], nil
+		}
+	}
+	return []string{}, nil
+}
+
+func (s *dummyStorage) Exists(keyName string) (bool, error) {
+	_, exist := s.indexList[keyName]
+	return exist, nil
+}
+
+func (s *dummyStorage) AppendToSet(keyName string, value string) {
+	s.indexList[keyName] = append(s.indexList[keyName], value)
 }
 
 func (s *dummyStorage) GetKeys(pattern string) (keys []string) {
@@ -243,4 +284,24 @@ func TestCertificateStorage(t *testing.T) {
 			t.Error("Wrong cert", leafSubjectName(certs[0]))
 		}
 	})
+}
+
+func TestStorageIndex(t *testing.T) {
+	m := newManager()
+	storageCert, _ := genCertificateFromCommonName("dummy", false)
+	storage := m.storage.(*dummyStorage)
+
+	if len(storage.indexList) != 0 {
+		t.Error("Storage index list should have 0 certificates and indexes after creation")
+	}
+
+	certID, _ := m.Add(storageCert, "orgid-1")
+	if len(storage.indexList["orgid-1-index"]) != 1 {
+		t.Error("Storage index list should have 1 certificates after adding a certificate")
+	}
+
+	m.Delete(certID, "orgid-1")
+	if len(storage.indexList["orgid-1-index"]) != 0 {
+		t.Error("Storage index list should have 0 certificates after deleting a certificate")
+	}
 }
