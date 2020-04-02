@@ -802,6 +802,7 @@ func getSessionAndCreate(keyName string, r *RPCStorageHandler) {
 
 func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 	keysToReset := map[string]bool{}
+
 	oauthTokenKeys := map[string]bool{}
 
 	for _, key := range keys {
