@@ -100,6 +100,7 @@ type APIDefinition struct {
 	AuthCookieName             string                     `json:"auth_cookie_name"`
 	EnableLoadBalancing        bool                       `json:"enable_load_balancing"`
 	LoadBalancingConfigData    LoadBalancingConfigData    `json:"load_balancing_config_data"`
+	SSLForceRootCACheck        bool                       `json:"ssl_force_rootca_check"`
 }
 
 // JWTDefinitions to store JWTDefinition
@@ -488,6 +489,11 @@ func addOrUpdateApi(r *http.Request) (interface{}, int) {
 				temp["proxy"].(map[string]interface{})["enable_load_balancing"] = true
 				temp["proxy"].(map[string]interface{})["service_discovery"] = api.LoadBalancingConfigData.Config.ServiceDiscovery
 			}
+
+			//Set ssl_force_rootca_check that was received from apigwmgr
+			temp["proxy"].(map[string]interface {
+			})["transport"].(map[string]interface {
+			})["ssl_force_rootca_check"] = api.SSLForceRootCACheck
 
 			//temp has the definition - add it to Redis
 			apiJSON, _ := json.Marshal(temp)
