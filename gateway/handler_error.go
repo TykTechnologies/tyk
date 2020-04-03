@@ -82,6 +82,7 @@ func overrideTykErrors() {
 
 // APIError is generic error object returned if there is something wrong with the request
 type APIError struct {
+	Status  int
 	Message template.HTML
 }
 
@@ -140,7 +141,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 		// Need to return the correct error code!
 		w.WriteHeader(errCode)
-		apiError := APIError{template.HTML(template.JSEscapeString(errMsg))}
+		apiError := APIError{Status: errCode, Message: template.HTML(template.JSEscapeString(errMsg))}
 		tmpl.Execute(w, &apiError)
 	}
 
