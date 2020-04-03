@@ -457,9 +457,9 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 			for api := range returnedSession.AccessRights {
 				if _, found := existingSession.AccessRights[api]; found {
-					if returnedSession.AccessRights[api].Limit != nil && returnedSession.AccessRights[api].Limit != nil {
-						returnedSession.AccessRights[api].Limit.QuotaRenews = returnedSession.AccessRights[api].Limit.QuotaRenews
-						returnedSession.AccessRights[api].Limit.QuotaRemaining = returnedSession.AccessRights[api].Limit.QuotaRemaining
+					if returnedSession.AccessRights[api].Limit != nil {
+						returnedSession.AccessRights[api].Limit.QuotaRenews = existingSession.AccessRights[api].Limit.QuotaRenews
+						returnedSession.AccessRights[api].Limit.QuotaRemaining = existingSession.AccessRights[api].Limit.QuotaRemaining
 					}
 				}
 			}
