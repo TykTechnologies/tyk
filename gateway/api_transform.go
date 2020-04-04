@@ -75,6 +75,8 @@ type PythonMiddlewareConfigData struct {
 	InjectK8sAuthHeader bool   `json:"inject_k8s_auth_header"`
 	InjectJwtHeader     bool   `json:"inject_jwt_headers"`
 	K8sAuthTokenPath    string `json:"k8s_auth_token_path"`
+	InjectSecureToken   bool   `json:"inject_secure_token"`
+	SecureTokenPath     string `json:"secure_token_path"`
 }
 
 // Golang Middleware config data
