@@ -10,15 +10,14 @@ import (
 	"unicode/utf8"
 )
 
-// ToCamelCase can convert all lower case characters behind underscores
-// to upper case character.
-// Underscore character will be removed in result except following cases.
-//     * More than 1 underscore.
-//           "a__b" => "A_B"
-//     * At the beginning of string.
-//           "_a" => "_A"
-//     * At the end of string.
-//           "ab_" => "Ab_"
+// ToCamelCase is to convert words separated by space, underscore and hyphen to camel case.
+//
+// Some samples.
+//     "some_words"      => "SomeWords"
+//     "http_server"     => "HttpServer"
+//     "no_https"        => "NoHttps"
+//     "_complex__case_" => "_Complex_Case_"
+//     "some words"      => "SomeWords"
 func ToCamelCase(str string) string {
 	if len(str) == 0 {
 		return ""
@@ -28,12 +27,13 @@ func ToCamelCase(str string) string {
 	var r0, r1 rune
 	var size int
 
-	// leading '_' will appear in output.
+	// leading connector will appear in output.
 	for len(str) > 0 {
 		r0, size = utf8.DecodeRuneInString(str)
 		str = str[size:]
 
-		if r0 != '_' {
+		if !isConnector(r0) {
+			r0 = unicode.ToUpper(r0)
 			break
 		}
 
@@ -41,28 +41,28 @@ func ToCamelCase(str string) string {
 	}
 
 	if len(str) == 0 {
+		// A special case for a string contains only 1 rune.
+		if size != 0 {
+			buf.WriteRune(r0)
+		}
+
 		return buf.String()
 	}
-
-	r0 = unicode.ToUpper(r0)
 
 	for len(str) > 0 {
 		r1 = r0
 		r0, size = utf8.DecodeRuneInString(str)
 		str = str[size:]
 
-		if r1 == '_' && r0 == '_' {
+		if isConnector(r0) && isConnector(r1) {
 			buf.WriteRune(r1)
 			continue
 		}
 
-		if r1 == '_' {
+		if isConnector(r1) {
 			r0 = unicode.ToUpper(r0)
 		} else {
 			r0 = unicode.ToLower(r0)
-		}
-
-		if r1 != '_' {
 			buf.WriteRune(r1)
 		}
 	}
@@ -160,7 +160,7 @@ func camelCaseToLowerCase(str string, connector rune) string {
 				}
 
 				if !unicode.IsUpper(r0) {
-					if r0 == '_' || r0 == ' ' || r0 == '-' {
+					if isConnector(r0) {
 						r0 = connector
 
 						buf.WriteRune(unicode.ToLower(r1))
@@ -194,7 +194,7 @@ func camelCaseToLowerCase(str string, connector rune) string {
 			buf.WriteRune(r0)
 
 		default:
-			if r0 == ' ' || r0 == '-' || r0 == '_' {
+			if isConnector(r0) {
 				r0 = connector
 			}
 
@@ -203,6 +203,10 @@ func camelCaseToLowerCase(str string, connector rune) string {
 	}
 
 	return buf.String()
+}
+
+func isConnector(r rune) bool {
+	return r == '-' || r == '_' || unicode.IsSpace(r)
 }
 
 // SwapCase will swap characters case from upper to lower or lower to upper.

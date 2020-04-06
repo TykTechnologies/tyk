@@ -42,6 +42,8 @@ github.com/buger/jsonparser
 github.com/cenk/backoff
 # github.com/certifi/gocertifi v0.0.0-20190905060710-a5e0173ced67
 github.com/certifi/gocertifi
+# github.com/cespare/xxhash v1.1.0
+github.com/cespare/xxhash
 # github.com/clbanning/mxj v1.8.4
 github.com/clbanning/mxj
 # github.com/davecgh/go-spew v1.1.1
@@ -122,15 +124,31 @@ github.com/hashicorp/vault/sdk/helper/jsonutil
 github.com/hashicorp/vault/sdk/helper/parseutil
 github.com/hashicorp/vault/sdk/helper/compressutil
 github.com/hashicorp/vault/sdk/helper/strutil
-# github.com/huandu/xstrings v1.2.0
+# github.com/huandu/xstrings v1.3.0
 github.com/huandu/xstrings
-# github.com/imdario/mergo v0.3.7
+# github.com/imdario/mergo v0.3.9
 github.com/imdario/mergo
+# github.com/jensneuse/graphql-go-tools v0.0.0-00010101000000-000000000000 => ../graphql-go-tools
+github.com/jensneuse/graphql-go-tools/pkg/graphql
+github.com/jensneuse/graphql-go-tools/pkg/ast
+github.com/jensneuse/graphql-go-tools/pkg/astparser
+github.com/jensneuse/graphql-go-tools/pkg/asttransform
+github.com/jensneuse/graphql-go-tools/pkg/astvalidation
+github.com/jensneuse/graphql-go-tools/pkg/operationreport
+github.com/jensneuse/graphql-go-tools/internal/pkg/unsafebytes
+github.com/jensneuse/graphql-go-tools/pkg/lexer/literal
+github.com/jensneuse/graphql-go-tools/pkg/lexer/position
+github.com/jensneuse/graphql-go-tools/pkg/lexer/runes
+github.com/jensneuse/graphql-go-tools/pkg/lexer
+github.com/jensneuse/graphql-go-tools/pkg/lexer/identkeyword
+github.com/jensneuse/graphql-go-tools/pkg/lexer/keyword
+github.com/jensneuse/graphql-go-tools/pkg/lexer/token
+github.com/jensneuse/graphql-go-tools/pkg/astvisitor
 # github.com/justinas/alice v0.0.0-20171023064455-03f45bd4b7da
 github.com/justinas/alice
 # github.com/kelseyhightower/envconfig v1.4.0
 github.com/kelseyhightower/envconfig
-# github.com/konsorten/go-windows-terminal-sequences v1.0.1
+# github.com/konsorten/go-windows-terminal-sequences v1.0.2
 github.com/konsorten/go-windows-terminal-sequences
 # github.com/lonelycode/go-uuid v0.0.0-20141202165402-ed3ca8a15a93
 github.com/lonelycode/go-uuid/uuid
@@ -208,7 +226,7 @@ github.com/sirupsen/logrus
 github.com/sirupsen/logrus/hooks/syslog
 # github.com/square/go-jose v2.4.1+incompatible
 github.com/square/go-jose
-# github.com/stretchr/testify v1.4.0
+# github.com/stretchr/testify v1.5.1
 github.com/stretchr/testify/assert
 # github.com/uber/jaeger-client-go v2.19.0+incompatible
 github.com/uber/jaeger-client-go/config
@@ -240,7 +258,7 @@ github.com/xeipuuv/gojsonreference
 github.com/xeipuuv/gojsonschema
 # github.com/xenolf/lego v0.3.2-0.20170618175828-28ead50ff1ca
 github.com/xenolf/lego/acme
-# golang.org/x/crypto v0.0.0-20190923035154-9ee001bba392
+# golang.org/x/crypto v0.0.0-20191227163750-53104e6ec876
 golang.org/x/crypto/bcrypt
 golang.org/x/crypto/blowfish
 golang.org/x/crypto/scrypt
@@ -268,7 +286,7 @@ golang.org/x/net/internal/iana
 golang.org/x/net/internal/socket
 # golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 golang.org/x/sync/singleflight
-# golang.org/x/sys v0.0.0-20190922100055-0a153f010e69
+# golang.org/x/sys v0.0.0-20200113162924-86b910548bc1
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 # golang.org/x/text v0.3.2
@@ -367,7 +385,7 @@ gopkg.in/vmihailenco/msgpack.v2
 gopkg.in/vmihailenco/msgpack.v2/codes
 # gopkg.in/xmlpath.v2 v2.0.0-20150820204837-860cbeca3ebc
 gopkg.in/xmlpath.v2
-# gopkg.in/yaml.v2 v2.2.2
+# gopkg.in/yaml.v2 v2.2.8
 gopkg.in/yaml.v2
 # rsc.io/letsencrypt v0.0.2
 rsc.io/letsencrypt

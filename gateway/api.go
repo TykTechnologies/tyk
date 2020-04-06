@@ -1876,8 +1876,8 @@ func handleDeleteOAuthClient(keyName, apiID string) (interface{}, int) {
 		return apiError("OAuth Client ID not found"), http.StatusNotFound
 	}
 
-	if apiSpec.OAuthManager != nil{
-		err := apiSpec.OAuthManager.OsinServer.Storage.DeleteClient(storageID,apiSpec.OrgID, true)
+	if apiSpec.OAuthManager != nil {
+		err := apiSpec.OAuthManager.OsinServer.Storage.DeleteClient(storageID, apiSpec.OrgID, true)
 		if err != nil {
 			return apiError("Delete failed"), http.StatusInternalServerError
 		}
