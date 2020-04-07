@@ -23,7 +23,7 @@ const (
 	defaultContentType    = headers.ApplicationJSON
 )
 
-var customizableErr = errors.New("customizable error")
+var errCustomBodyResponse = errors.New("errCustomBodyResponse")
 
 var TykErrors = make(map[string]config.TykError)
 
@@ -108,7 +108,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		}
 
 		// If error is not customized write error in default way
-		if errMsg != customizableErr.Error() {
+		if errMsg != errCustomBodyResponse.Error() {
 			w.WriteHeader(errCode)
 			apiError := APIError{template.HTML(template.JSEscapeString(errMsg))}
 			tmpl.Execute(w, &apiError)

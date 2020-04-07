@@ -56,7 +56,7 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = result.Errors.WriteResponse(w)
 		m.Logger().Errorf("Error while validating GraphQL request: '%s'", result.Errors)
-		return customizableErr, http.StatusBadRequest
+		return errCustomBodyResponse, http.StatusBadRequest
 	}
 
 	return nil, http.StatusOK
