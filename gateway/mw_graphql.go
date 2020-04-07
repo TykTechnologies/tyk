@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/TykTechnologies/tyk/headers"
+
 	gql "github.com/jensneuse/graphql-go-tools/pkg/graphql"
 )
 
@@ -41,6 +43,20 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		m.Logger().Errorf("Error while unmarshalling GraphQL request: '%s'", err)
 		return err, http.StatusBadRequest
+	}
+
+	result, err := gqlRequest.ValidateForSchema(m.Schema)
+	if err != nil {
+		m.Logger().Errorf("Error while validating GraphQL request: '%s'", err)
+		return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
+	}
+
+	if result.Errors != nil && result.Errors.Count() > 0 {
+		w.Header().Set(headers.ContentType, headers.ApplicationJSON)
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = result.Errors.WriteResponse(w)
+		m.Logger().Errorf("Error while validating GraphQL request: '%s'", result.Errors)
+		return errCustomBodyResponse, http.StatusBadRequest
 	}
 
 	return nil, http.StatusOK
