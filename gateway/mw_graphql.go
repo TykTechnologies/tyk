@@ -46,19 +46,33 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	defer ctxSetGraphQLRequest(r, &gqlRequest)
 
-	result, err := gqlRequest.ValidateForSchema(m.Spec.graphqlSchema)
+	normalizationResult, err := gqlRequest.Normalize(m.Spec.graphqlSchema)
+	if err != nil {
+		m.Logger().Errorf("Error while normalizing GraphQL request: '%s'", err)
+		return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
+	}
+
+	if normalizationResult.Errors != nil && normalizationResult.Errors.Count() > 0 {
+		return m.writeGraphQLError(w, normalizationResult.Errors)
+	}
+
+	validationResult, err := gqlRequest.ValidateForSchema(m.Spec.graphqlSchema)
 	if err != nil {
 		m.Logger().Errorf("Error while validating GraphQL request: '%s'", err)
 		return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
 	}
 
-	if result.Errors != nil && result.Errors.Count() > 0 {
-		w.Header().Set(headers.ContentType, headers.ApplicationJSON)
-		w.WriteHeader(http.StatusBadRequest)
-		_, _ = result.Errors.WriteResponse(w)
-		m.Logger().Errorf("Error while validating GraphQL request: '%s'", result.Errors)
-		return errCustomBodyResponse, http.StatusBadRequest
+	if validationResult.Errors != nil && validationResult.Errors.Count() > 0 {
+		return m.writeGraphQLError(w, validationResult.Errors)
 	}
 
 	return nil, http.StatusOK
+}
+
+func (m *GraphQLMiddleware) writeGraphQLError(w http.ResponseWriter, errors gql.Errors) (error, int) {
+	w.Header().Set(headers.ContentType, headers.ApplicationJSON)
+	w.WriteHeader(http.StatusBadRequest)
+	_, _ = errors.WriteResponse(w)
+	m.Logger().Errorf("Error while validating GraphQL request: '%s'", errors)
+	return errCustomBodyResponse, http.StatusBadRequest
 }
