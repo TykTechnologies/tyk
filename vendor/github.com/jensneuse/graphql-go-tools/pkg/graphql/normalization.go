@@ -4,19 +4,19 @@ import (
 	"github.com/jensneuse/graphql-go-tools/pkg/operationreport"
 )
 
-type ValidationResult struct {
-	Valid  bool
-	Errors Errors
+type NormalizationResult struct {
+	Successful bool
+	Errors     Errors
 }
 
-func operationValidationResultFromReport(report operationreport.Report) (ValidationResult, error) {
-	result := ValidationResult{
-		Valid:  false,
-		Errors: nil,
+func normalizationResultFromReport(report operationreport.Report) (NormalizationResult, error) {
+	result := NormalizationResult{
+		Successful: false,
+		Errors:     nil,
 	}
 
 	if !report.HasErrors() {
-		result.Valid = true
+		result.Successful = true
 		return result, nil
 	}
 

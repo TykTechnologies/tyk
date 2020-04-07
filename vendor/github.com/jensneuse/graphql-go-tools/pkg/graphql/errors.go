@@ -3,6 +3,8 @@ package graphql
 import (
 	"fmt"
 	"io"
+
+	"github.com/jensneuse/graphql-go-tools/pkg/operationreport"
 )
 
 type Errors interface {
@@ -12,6 +14,24 @@ type Errors interface {
 }
 
 type OperationValidationErrors []OperationValidationError
+
+func operationValidationErrorsFromOperationReport(report operationreport.Report) (errors OperationValidationErrors) {
+	if len(report.ExternalErrors) == 0 {
+		return nil
+	}
+
+	for _, externalError := range report.ExternalErrors {
+		validationError := OperationValidationError{
+			Message: externalError.Message,
+			// TODO: add path
+			// TODO: add location
+		}
+
+		errors = append(errors, validationError)
+	}
+
+	return errors
+}
 
 func (o OperationValidationErrors) Error() string {
 	return fmt.Sprintf("operation contains %d error(s)", len(o))
