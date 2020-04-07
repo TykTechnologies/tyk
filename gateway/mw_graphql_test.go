@@ -29,15 +29,29 @@ func TestGraphQL(t *testing.T) {
 	spec.GraphQL.GraphQLAPI.Schema = "schema { query: Query } type Query { hello: String }"
 	LoadAPI(spec)
 
-	t.Run("Empty request should return error", func(t *testing.T) {
+	t.Run("Empty request shouldn't be unmarshalled", func(t *testing.T) {
 		emptyRequest := ``
 
 		_, _ = g.Run(t, test.TestCase{Data: emptyRequest, BodyMatch: gql.ErrEmptyRequest.Error(), Code: http.StatusBadRequest})
 	})
 
-	t.Run("Non-empty request should be successfully unmarshalled", func(t *testing.T) {
-		nonEmptyRequest := `{"operation_name": "Hello", "variables": "", "query": "query Hello { hello }"}`
+	t.Run("Invalid query should fail", func(t *testing.T) {
+		request := gql.Request{
+			OperationName: "Goodbye",
+			Variables:     nil,
+			Query:         "query Goodbye { goodbye }",
+		}
 
-		_, _ = g.Run(t, test.TestCase{Data: nonEmptyRequest, BodyMatch: "hello", Code: http.StatusOK})
+		_, _ = g.Run(t, test.TestCase{Data: request, Code: http.StatusBadRequest})
+	})
+
+	t.Run("Valid query should successfully work", func(t *testing.T) {
+		request := gql.Request{
+			OperationName: "Hello",
+			Variables:     nil,
+			Query:         "query Hello { hello }",
+		}
+
+		_, _ = g.Run(t, test.TestCase{Data: request, BodyMatch: "hello", Code: http.StatusOK})
 	})
 }
