@@ -16,6 +16,7 @@ type Policy struct {
 	QuotaRenewalRate              int64                            `bson:"quota_renewal_rate" json:"quota_renewal_rate"`
 	ThrottleInterval              float64                          `bson:"throttle_interval" json:"throttle_interval"`
 	ThrottleRetryLimit            int                              `bson:"throttle_retry_limit" json:"throttle_retry_limit"`
+	MaxQueryDepth                 int                              `bson:"max_query_depth" json:"max_query_depth"`
 	AccessRights                  map[string]AccessDefinition      `bson:"access_rights" json:"access_rights"`
 	HMACEnabled                   bool                             `bson:"hmac_enabled" json:"hmac_enabled"`
 	EnableHTTPSignatureValidation bool                             `json:"enable_http_signature_validation" msg:"enable_http_signature_validation"`
@@ -30,8 +31,9 @@ type Policy struct {
 }
 
 type PolicyPartitions struct {
-	Quota     bool `bson:"quota" json:"quota"`
-	RateLimit bool `bson:"rate_limit" json:"rate_limit"`
-	Acl       bool `bson:"acl" json:"acl"`
-	PerAPI    bool `bson:"per_api" json:"per_api"`
+	Quota      bool `bson:"quota" json:"quota"`
+	RateLimit  bool `bson:"rate_limit" json:"rate_limit"`
+	Complexity bool `bson:"complexity" json:"complexity"`
+	Acl        bool `bson:"acl" json:"acl"`
+	PerAPI     bool `bson:"per_api" json:"per_api"`
 }
