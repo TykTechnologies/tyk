@@ -70,7 +70,7 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
 	}
 
-	if session.MaxQueryDepth != -1 && complexityRes.Depth > session.MaxQueryDepth {
+	if session.MaxQueryDepth != disabledQueryDepth && complexityRes.Depth > session.MaxQueryDepth {
 		m.Logger().Errorf("Complexity of the request is higher than the allowed limit '%d'", session.MaxQueryDepth)
 		return errors.New("depth limit exceeded"), http.StatusForbidden
 	}

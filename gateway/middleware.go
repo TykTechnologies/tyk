@@ -38,6 +38,8 @@ const coprocessType = "coprocess"
 const oauthType = "oauth"
 const oidcType = "oidc"
 
+const disabledQueryDepth = -1
+
 var (
 	GlobalRate            = ratecounter.NewRateCounter(1 * time.Second)
 	orgSessionExpiryCache singleflight.Group
@@ -441,7 +443,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 				if !usePartitions || policy.Partitions.Complexity {
 					didComplexity[k] = true
-					if ar.Limit.MaxQueryDepth != -1 && policy.MaxQueryDepth > ar.Limit.MaxQueryDepth {
+					if ar.Limit.MaxQueryDepth != disabledQueryDepth && policy.MaxQueryDepth > ar.Limit.MaxQueryDepth {
 						ar.Limit.MaxQueryDepth = policy.MaxQueryDepth
 					}
 				}
