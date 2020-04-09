@@ -59,5 +59,21 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return errCustomBodyResponse, http.StatusBadRequest
 	}
 
+	session := ctxGetSession(r)
+	if session == nil {
+		return nil, http.StatusOK
+	}
+
+	complexityRes, err := gqlRequest.CalculateComplexity(gql.DefaultComplexityCalculator, m.Schema)
+	if err != nil {
+		m.Logger().Errorf("Error while calculating complexity of GraphQL request: '%s'", err)
+		return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
+	}
+
+	if session.MaxQueryDepth != disabledQueryDepth && complexityRes.Depth > session.MaxQueryDepth {
+		m.Logger().Errorf("Complexity of the request is higher than the allowed limit '%d'", session.MaxQueryDepth)
+		return errors.New("depth limit exceeded"), http.StatusForbidden
+	}
+
 	return nil, http.StatusOK
 }
