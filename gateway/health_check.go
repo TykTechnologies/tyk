@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/sirupsen/logrus"
 )
@@ -233,6 +234,7 @@ func liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 
 	res.Status = status
 
+	w.Header().Set("Content-Type", headers.ApplicationJSON)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(res)
 }
