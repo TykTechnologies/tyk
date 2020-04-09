@@ -374,16 +374,17 @@ func (c *CertificateManager) ListRawPublicKey(keyID string) (out interface{}) {
 func (c *CertificateManager) ListAllIds(prefix string) (out []string) {
 	indexKey := prefix + "-index"
 	exists, _ := c.storage.Exists(indexKey)
-	if !exists {
-		keys := c.storage.GetKeys("raw-" + prefix + "*")
-		for _, key := range keys {
-			c.storage.AppendToSet(indexKey, key)
-			out = append(out, strings.TrimPrefix(key, "raw-"))
-		}
-
-	} else {
+	if exists && prefix != "" {
 		keys, _ := c.storage.GetListRange(indexKey, 0, -1)
 		for _, key := range keys {
+			out = append(out, strings.TrimPrefix(key, "raw-"))
+		}
+	} else {
+		keys := c.storage.GetKeys("raw-" + prefix + "*")
+		for _, key := range keys {
+			if prefix != "" {
+				c.storage.AppendToSet(indexKey, key)
+			}
 			out = append(out, strings.TrimPrefix(key, "raw-"))
 		}
 	}

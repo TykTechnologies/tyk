@@ -103,6 +103,16 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			Partitions: user.PolicyPartitions{Quota: true},
 			QuotaMax:   3,
 		},
+		"quota3": {
+			QuotaMax:     3,
+			AccessRights: map[string]user.AccessDefinition{"a": {}},
+			Partitions:   user.PolicyPartitions{Quota: true},
+		},
+		"quota4": {
+			QuotaMax:     3,
+			AccessRights: map[string]user.AccessDefinition{"b": {}},
+			Partitions:   user.PolicyPartitions{Quota: true},
+		},
 		"rate1": {
 			Partitions: user.PolicyPartitions{RateLimit: true},
 			Rate:       3,
@@ -110,6 +120,11 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 		"rate2": {
 			Partitions: user.PolicyPartitions{RateLimit: true},
 			Rate:       4,
+		},
+		"rate3": {
+			Partitions: user.PolicyPartitions{RateLimit: true},
+			Rate:       4,
+			Per:        4,
 		},
 		"acl1": {
 			Partitions:   user.PolicyPartitions{Acl: true},
@@ -253,6 +268,12 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				},
 			}},
 		},
+		"throttle1": {
+			ID:                 "throttle1",
+			ThrottleRetryLimit: 99,
+			ThrottleInterval:   9,
+			AccessRights:       map[string]user.AccessDefinition{"a": {}},
+		},
 	}
 	policiesMu.RUnlock()
 	bmid := &BaseMiddleware{Spec: &APISpec{
@@ -364,6 +385,26 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				if s.QuotaMax != 3 {
 					t.Fatalf("Should pick bigger value")
 				}
+			}, nil,
+		},
+		{
+			"QuotaPart with access rights", []string{"quota3"},
+			"", func(t *testing.T, s *user.SessionState) {
+				if s.QuotaMax != 3 {
+					t.Fatalf("quota should be the same as policy quota")
+				}
+			}, nil,
+		},
+		{
+			"QuotaPart with access rights in multi-policy", []string{"quota4", "nonpart1"},
+			"", func(t *testing.T, s *user.SessionState) {
+				if s.QuotaMax != 3 {
+					t.Fatalf("quota should be the same as policy quota")
+				}
+
+				// Don't apply api 'b' coming from quota4 policy
+				want := map[string]user.AccessDefinition{"a": {Limit: &user.APILimit{}}}
+				assert.Equal(t, want, s.AccessRights)
 			}, nil,
 		},
 		{
@@ -492,7 +533,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 							Rate:     300,
 							Per:      1,
 						},
-						AllowanceScope: "e",
+						AllowanceScope: "per_api_with_limit_set_from_policy",
 					},
 					"d": {
 						Limit: &user.APILimit{
@@ -529,6 +570,55 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				}
 
 				assert.Equal(t, want, s.AccessRights)
+			},
+		},
+		{
+			"Throttle interval from policy", []string{"throttle1"},
+			"", func(t *testing.T, s *user.SessionState) {
+				if s.ThrottleInterval != 9 {
+					t.Fatalf("Throttle interval should be 9 inherited from policy")
+				}
+			}, nil,
+		},
+		{
+			name:     "Throttle retry limit from policy",
+			policies: []string{"throttle1"},
+			errMatch: "",
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				if s.ThrottleRetryLimit != 99 {
+					t.Fatalf("Throttle interval should be 9 inherited from policy")
+				}
+			},
+			session: nil,
+		},
+		{
+			name:     "inherit quota and rate from partitioned policies",
+			policies: []string{"quota1", "rate3"},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				if s.QuotaMax != 2 {
+					t.Fatalf("quota should be the same as quota policy")
+				}
+				if s.Rate != 4 {
+					t.Fatalf("rate should be the same as rate policy")
+				}
+				if s.Per != 4 {
+					t.Fatalf("Rate per seconds should be the same as rate policy")
+				}
+			},
+		},
+		{
+			name:     "inherit quota and rate from partitioned policies applied in different order",
+			policies: []string{"rate3", "quota1"},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				if s.QuotaMax != 2 {
+					t.Fatalf("quota should be the same as quota policy")
+				}
+				if s.Rate != 4 {
+					t.Fatalf("rate should be the same as rate policy")
+				}
+				if s.Per != 4 {
+					t.Fatalf("Rate per seconds should be the same as rate policy")
+				}
 			},
 		},
 	}

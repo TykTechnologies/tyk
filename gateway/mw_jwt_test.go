@@ -1893,7 +1893,7 @@ func TestJWTRSAInvalidPublickKey(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers:   authHeaders,
 			Code:      http.StatusForbidden,
-			BodyMatch: "Key not authorized:Invalid Key: Key must be PEM encoded PKCS1 or PKCS8 private key",
+			BodyMatch: "Failed to decode JWT key",
 		})
 	})
 }

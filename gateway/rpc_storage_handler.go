@@ -802,22 +802,21 @@ func getSessionAndCreate(keyName string, r *RPCStorageHandler) {
 
 func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 	keysToReset := map[string]bool{}
-	keysToProcess := []string{}
 	TokensToBeRevoked := map[string]string{}
+	oauthTokenKeys := map[string]bool{}
 
 	for _, key := range keys {
 		splitKeys := strings.Split(key, ":")
 		if len(splitKeys) > 1 && splitKeys[1] == "resetQuota" {
 			keysToReset[splitKeys[0]] = true
-			keysToProcess = append(keysToProcess, key)
 		} else if len(splitKeys) > 2 {
 			action := splitKeys[len(splitKeys)-1]
 			if action == "oAuthRevokeToken" || action == "oAuthRevokeAccessToken" || action == "oAuthRevokeRefreshToken" {
 				TokensToBeRevoked[splitKeys[0]] = key
+				oauthTokenKeys[key] = true
 			}
 		}
 	}
-
 	//single and specific tokens
 	for token, key := range TokensToBeRevoked {
 		//key formed as: token:apiId:tokenActionTypeHint
@@ -826,7 +825,6 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 		apiId := splitKeys[1]
 		tokenActionTypeHint := splitKeys[2]
 		hashedKey := strings.Contains(token, "#hashed")
-
 		if !hashedKey {
 			storage, _, err := GetStorageForApi(apiId)
 			if err != nil {
@@ -848,23 +846,25 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 		RPCGlobalCache.Delete(r.KeyPrefix + token)
 	}
 
-	for _, key := range keysToProcess {
-		splitKeys := strings.Split(key, ":")
-		_, resetQuota := keysToReset[splitKeys[0]]
-		if len(splitKeys) > 1 && splitKeys[1] == "hashed" {
-			key = splitKeys[0]
-			log.Info("--> removing cached (hashed) key: ", splitKeys[0])
-			handleDeleteHashedKey(splitKeys[0], "", resetQuota)
-			getSessionAndCreate(splitKeys[0], r)
-		} else {
-			log.Info("--> removing cached key: ", key)
-			handleDeleteKey(key, "-1", resetQuota)
-			getSessionAndCreate(splitKeys[0], r)
+	for _, key := range keys {
+		_, isOauthTokenKey := oauthTokenKeys[key]
+		if !isOauthTokenKey {
+			splitKeys := strings.Split(key, ":")
+			_, resetQuota := keysToReset[splitKeys[0]]
+			if len(splitKeys) > 1 && splitKeys[1] == "hashed" {
+				key = splitKeys[0]
+				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
+				handleDeleteHashedKey(splitKeys[0], "", resetQuota)
+				getSessionAndCreate(splitKeys[0], r)
+			} else {
+				log.Info("--> removing cached key: ", key)
+				handleDeleteKey(key, "-1", resetQuota)
+				getSessionAndCreate(splitKeys[0], r)
+			}
+			SessionCache.Delete(key)
+			RPCGlobalCache.Delete(r.KeyPrefix + key)
 		}
-		SessionCache.Delete(key)
-		RPCGlobalCache.Delete(r.KeyPrefix + key)
 	}
-
 	// Notify rest of gateways in cluster to flush cache
 	n := Notification{
 		Command: KeySpaceUpdateNotification,

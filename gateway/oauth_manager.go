@@ -1008,13 +1008,22 @@ func (r *RedisOsinStorageInterface) LoadAccess(token string) (*osin.AccessData, 
 
 // RemoveAccess will remove access data from Redis
 func (r *RedisOsinStorageInterface) RemoveAccess(token string) error {
+
+	access, err := r.LoadAccess(token)
+	if err == nil {
+		key := prefixClientTokens + access.Client.GetId()
+		//remove from set oauth.client-tokens
+		log.Info("removing token from oauth client tokens list")
+		limit := strconv.FormatFloat(float64(access.ExpireAt().Unix()), 'f', 0, 64)
+		r.store.RemoveSortedSetRange(key, limit, limit)
+	} else {
+		log.Warning("Cannot load access token:", token)
+	}
+
 	key := prefixAccess + storage.HashKey(token)
-
 	r.store.DeleteKey(key)
-
 	// remove the access token from central storage too
 	r.sessionManager.RemoveSession(r.orgID, token, false)
-
 	return nil
 }
 

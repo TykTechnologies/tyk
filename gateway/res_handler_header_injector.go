@@ -33,7 +33,7 @@ func (h *HeaderInjector) HandleError(rw http.ResponseWriter, req *http.Request) 
 func (h *HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
 	// TODO: This should only target specific paths
 
-	_, versionPaths, _, _ := h.Spec.Version(req)
+	vInfo, versionPaths, _, _ := h.Spec.Version(req)
 	found, meta := h.Spec.CheckSpecMatchesStatus(req, versionPaths, HeaderInjectedResponse)
 	if found {
 		hmeta := meta.(*apidef.HeaderInjectionMeta)
@@ -45,7 +45,18 @@ func (h *HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Respon
 		}
 	}
 
-	// Global header options
+	// Manage global response header options with versionInfo
+	for _, key := range vInfo.GlobalResponseHeadersRemove {
+		log.Debug("Removing: ", key)
+		res.Header.Del(key)
+	}
+
+	for key, val := range vInfo.GlobalResponseHeaders {
+		log.Debug("Adding: ", key)
+		res.Header.Set(key, replaceTykVariables(req, val, false))
+	}
+
+	// Manage global response header options with response_processors
 	for _, n := range h.config.RemoveHeaders {
 		res.Header.Del(n)
 	}

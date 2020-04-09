@@ -340,9 +340,11 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					return err
 				}
 
+				idForScope := apiID
 				// check if we already have limit on API level specified when policy was created
 				if accessRights.Limit == nil || *accessRights.Limit == (user.APILimit{}) {
 					// limit was not specified on API level so we will populate it from policy
+					idForScope = policy.ID
 					accessRights.Limit = &user.APILimit{
 						QuotaMax:           policy.QuotaMax,
 						QuotaRenewalRate:   policy.QuotaRenewalRate,
@@ -353,14 +355,13 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 						MaxQueryDepth:      policy.MaxQueryDepth,
 					}
 				}
+				accessRights.AllowanceScope = idForScope
+				accessRights.Limit.SetBy = idForScope
 
 				// respect current quota renews (on API limit level)
 				if r, ok := session.AccessRights[apiID]; ok && r.Limit != nil {
 					accessRights.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
-
-				accessRights.AllowanceScope = apiID
-				accessRights.Limit.SetBy = apiID
 
 				// overwrite session access right for this API
 				rights[apiID] = accessRights
@@ -414,10 +415,16 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					// -1 is special "unlimited" case
 					if ar.Limit.QuotaMax != -1 && policy.QuotaMax > ar.Limit.QuotaMax {
 						ar.Limit.QuotaMax = policy.QuotaMax
+						if policy.QuotaMax > session.QuotaMax {
+							session.QuotaMax = policy.QuotaMax
+						}
 					}
 
 					if policy.QuotaRenewalRate > ar.Limit.QuotaRenewalRate {
 						ar.Limit.QuotaRenewalRate = policy.QuotaRenewalRate
+						if policy.QuotaRenewalRate > session.QuotaRenewalRate {
+							session.QuotaRenewalRate = policy.QuotaRenewalRate
+						}
 					}
 				}
 
@@ -426,18 +433,30 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 					if ar.Limit.Rate != -1 && policy.Rate > ar.Limit.Rate {
 						ar.Limit.Rate = policy.Rate
+						if policy.Rate > session.Rate {
+							session.Rate = policy.Rate
+						}
 					}
 
 					if policy.Per > ar.Limit.Per {
 						ar.Limit.Per = policy.Per
-					}
-
-					if policy.ThrottleInterval > ar.Limit.ThrottleInterval {
-						ar.Limit.ThrottleInterval = policy.ThrottleInterval
+						if policy.Per > session.Per {
+							session.Per = policy.Per
+						}
 					}
 
 					if policy.ThrottleRetryLimit > ar.Limit.ThrottleRetryLimit {
 						ar.Limit.ThrottleRetryLimit = policy.ThrottleRetryLimit
+						if policy.ThrottleRetryLimit > session.ThrottleRetryLimit {
+							session.ThrottleRetryLimit = policy.ThrottleRetryLimit
+						}
+					}
+
+					if policy.ThrottleInterval > ar.Limit.ThrottleInterval {
+						ar.Limit.ThrottleInterval = policy.ThrottleInterval
+						if policy.ThrottleInterval > session.ThrottleInterval {
+							session.ThrottleInterval = policy.ThrottleInterval
+						}
 					}
 				}
 
@@ -453,7 +472,9 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					ar.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
 
-				rights[k] = *ar
+				if !usePartitions || policy.Partitions.Acl {
+					rights[k] = *ar
+				}
 			}
 
 			// Master policy case

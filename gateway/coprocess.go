@@ -438,11 +438,6 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 		returnedSession := TykSessionState(returnObject.Session)
 
-		if err := m.ApplyPolicies(returnedSession); err != nil {
-			AuthFailed(m, r, r.Header.Get(m.Spec.Auth.AuthHeaderName))
-			return errors.New(http.StatusText(http.StatusForbidden)), http.StatusForbidden
-		}
-
 		// If the returned object contains metadata, add them to the session:
 		for k, v := range returnObject.Metadata {
 			returnedSession.MetaData[k] = string(v)
@@ -450,9 +445,30 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 		returnedSession.OrgID = m.Spec.OrgID
 
+		if err := m.ApplyPolicies(returnedSession); err != nil {
+			AuthFailed(m, r, r.Header.Get(m.Spec.Auth.AuthHeaderName))
+			return errors.New(http.StatusText(http.StatusForbidden)), http.StatusForbidden
+		}
+
 		existingSession, found := GlobalSessionManager.SessionDetail(m.Spec.OrgID, sessionID, false)
 		if found {
 			returnedSession.QuotaRenews = existingSession.QuotaRenews
+			returnedSession.QuotaRemaining = existingSession.QuotaRemaining
+
+			for api := range returnedSession.AccessRights {
+				if _, found := existingSession.AccessRights[api]; found {
+					if returnedSession.AccessRights[api].Limit != nil {
+						returnedSession.AccessRights[api].Limit.QuotaRenews = existingSession.AccessRights[api].Limit.QuotaRenews
+						returnedSession.AccessRights[api].Limit.QuotaRemaining = existingSession.AccessRights[api].Limit.QuotaRemaining
+					}
+				}
+			}
+		}
+
+		// Apply it second time to fix the quota
+		if err := m.ApplyPolicies(returnedSession); err != nil {
+			AuthFailed(m, r, r.Header.Get(m.Spec.Auth.AuthHeaderName))
+			return errors.New(http.StatusText(http.StatusForbidden)), http.StatusForbidden
 		}
 
 		ctxSetSession(r, returnedSession, sessionID, true)
