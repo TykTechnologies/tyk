@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
+	"github.com/jensneuse/graphql-go-tools/pkg/astnormalization"
 	"github.com/jensneuse/graphql-go-tools/pkg/astparser"
 	"github.com/jensneuse/graphql-go-tools/pkg/astvalidation"
 	"github.com/jensneuse/graphql-go-tools/pkg/operationreport"
@@ -22,7 +23,9 @@ type Request struct {
 	Variables     json.RawMessage `json:"variables"`
 	Query         string          `json:"query"`
 
-	document ast.Document
+	document     ast.Document
+	isParsed     bool
+	isNormalized bool
 }
 
 func UnmarshalRequest(reader io.Reader, request *Request) error {
@@ -43,8 +46,7 @@ func (r *Request) ValidateForSchema(schema *Schema) (result ValidationResult, er
 		return ValidationResult{Valid: false, Errors: nil}, ErrNilSchema
 	}
 
-	var report operationreport.Report
-	r.document, report = astparser.ParseGraphqlDocumentString(r.Query)
+	report := r.parseQueryOnce()
 	if report.HasErrors() {
 		return operationValidationResultFromReport(report)
 	}
@@ -54,14 +56,58 @@ func (r *Request) ValidateForSchema(schema *Schema) (result ValidationResult, er
 	return operationValidationResultFromReport(report)
 }
 
-func (r *Request) Normalize(schema *Schema) error {
-	return nil
+func (r *Request) Normalize(schema *Schema) (result NormalizationResult, err error) {
+	if schema == nil {
+		return NormalizationResult{Successful: false, Errors: nil}, ErrNilSchema
+	}
+
+	report := r.parseQueryOnce()
+	if report.HasErrors() {
+		return normalizationResultFromReport(report)
+	}
+
+	normalizer := astnormalization.NewNormalizer(true)
+	normalizer.NormalizeOperation(&r.document, &schema.document, &report)
+	if report.HasErrors() {
+		return normalizationResultFromReport(report)
+	}
+
+	r.isNormalized = true
+	return NormalizationResult{Successful: true, Errors: nil}, nil
 }
 
-func (r Request) CalculateComplexity(complexityCalculator ComplexityCalculator) int {
-	return 1
+func (r *Request) CalculateComplexity(complexityCalculator ComplexityCalculator, schema *Schema) (ComplexityResult, error) {
+	if schema == nil {
+		return ComplexityResult{}, ErrNilSchema
+	}
+
+	report := r.parseQueryOnce()
+	if report.HasErrors() {
+		return complexityResult(0, 0, 0, report)
+	}
+
+	return complexityCalculator.Calculate(&r.document, &schema.document)
 }
 
 func (r Request) Print(writer io.Writer) (n int, err error) {
-	return writer.Write(nil)
+	report := r.parseQueryOnce()
+	if report.HasErrors() {
+		return 0, report
+	}
+
+	return writer.Write(r.document.Input.RawBytes)
+}
+
+func (r *Request) IsNormalized() bool {
+	return r.isNormalized
+}
+
+func (r *Request) parseQueryOnce() (report operationreport.Report) {
+	if r.isParsed {
+		return report
+	}
+
+	r.isParsed = true
+	r.document, report = astparser.ParseGraphqlDocumentString(r.Query)
+	return report
 }

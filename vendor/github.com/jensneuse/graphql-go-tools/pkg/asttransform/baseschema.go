@@ -35,10 +35,13 @@ func handleSchema(definition *ast.Document) error {
 			switch {
 			case bytes.Equal(typeName, []byte("Query")):
 				operationType = ast.OperationTypeQuery
+				definition.Index.QueryTypeName = []byte("Query")
 			case bytes.Equal(typeName, []byte("Mutation")):
 				operationType = ast.OperationTypeMutation
+				definition.Index.MutationTypeName = []byte("Mutation")
 			case bytes.Equal(typeName, []byte("Subscription")):
 				operationType = ast.OperationTypeSubscription
+				definition.Index.SubscriptionTypeName = []byte("Subscription")
 			default:
 				continue
 			}
