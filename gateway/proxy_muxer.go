@@ -222,7 +222,7 @@ func flushNetworkAnalytics(ctx context.Context) {
 					OrgID:        spec.OrgID,
 				}
 				record.SetExpiry(spec.ExpireAnalyticsAfter)
-				analytics.RecordHit(&record)
+				//analytics.RecordHit(&record)
 			}
 			apisMu.RUnlock()
 		}

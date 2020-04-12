@@ -5,11 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/protobuf/ptypes/timestamp"
-
 	"github.com/TykTechnologies/tyk/config"
-	tyk_analytics "github.com/TykTechnologies/tyk/gateway/analytics_pb"
-	"github.com/golang/protobuf/proto"
+	pb "github.com/TykTechnologies/tyk/gateway/proto"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"gopkg.in/vmihailenco/msgpack.v2"
 )
 
@@ -227,7 +226,7 @@ var fakeRecord = AnalyticsRecord{
 	ExpireAt:    time.Time{},
 }
 
-var fakeRecordProto = tyk_analytics.AnalyticsRecord{
+var fakeRecordProto = pb.AnalyticsRecord{
 	Method:        http.MethodGet,
 	Host:          "httpbin.org",
 	Path:          "/get",
@@ -240,35 +239,35 @@ var fakeRecordProto = tyk_analytics.AnalyticsRecord{
 	Hour:          1,
 	ResponseCode:  200,
 	APIKey:        "myhash",
-	TimeStamp:     &timestamp.Timestamp{Seconds: int64(time.Now().Second())},
+	TimeStamp:     &timestamppb.Timestamp{Seconds: int64(time.Now().Second())},
 	APIVersion:    "v1",
 	APIName:       "httpbin",
 	APIID:         "httpbin",
 	OrgID:         "none",
 	RequestTime:   3,
-	Latency: &tyk_analytics.AnalyticsRecord_Latency{
+	Latency: &pb.AnalyticsRecord_Latency{
 		Total:    10,
 		Upstream: 8,
 	},
 	RawRequest:  "",
 	RawResponse: "",
 	IPAddress:   "127.0.0.1",
-	Geo:         &tyk_analytics.AnalyticsRecord_GeoData{},
-	Network:     &tyk_analytics.AnalyticsRecord_NetworkStats{},
+	Geo:         &pb.AnalyticsRecord_GeoData{},
+	Network:     &pb.AnalyticsRecord_NetworkStats{},
 	Tags:        nil,
 	Alias:       "",
 	TrackPath:   false,
-	ExpireAt:    &timestamp.Timestamp{},
+	ExpireAt:    &timestamppb.Timestamp{},
 }
 
-func BenchmarkMsgpackMarshal(b *testing.B) {
+func BenchmarkAnalyticsMsgpackMarshal(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		_, _ = msgpack.Marshal(fakeRecord)
 	}
 }
 
-func BenchmarkGogoProtobuf(b *testing.B) {
+func BenchmarkAnalyticsProtoMarshal(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {

@@ -8,12 +8,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	maxminddb "github.com/oschwald/maxminddb-golang"
-	msgpack "gopkg.in/vmihailenco/msgpack.v2"
+	"google.golang.org/protobuf/proto"
+
+	pb "github.com/TykTechnologies/tyk/gateway/proto"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/storage"
+	maxminddb "github.com/oschwald/maxminddb-golang"
 )
 
 type NetworkStats struct {
@@ -181,7 +183,7 @@ type RedisAnalyticsHandler struct {
 	Store            storage.AnalyticsHandler
 	GeoIPDB          *maxminddb.Reader
 	globalConf       config.Config
-	recordsChan      chan *AnalyticsRecord
+	recordsChan      chan *pb.AnalyticsRecord
 	workerBufferSize uint64
 	shouldStop       uint32
 	poolWg           sync.WaitGroup
@@ -205,7 +207,7 @@ func (r *RedisAnalyticsHandler) Init(globalConf config.Config) {
 	r.workerBufferSize = recordsBufferSize / uint64(ps)
 	log.WithField("workerBufferSize", r.workerBufferSize).Debug("Analytics pool worker buffer size")
 
-	r.recordsChan = make(chan *AnalyticsRecord, recordsBufferSize)
+	r.recordsChan = make(chan *pb.AnalyticsRecord, recordsBufferSize)
 
 	// start worker pool
 	atomic.SwapUint32(&r.shouldStop, 0)
@@ -227,7 +229,7 @@ func (r *RedisAnalyticsHandler) Stop() {
 }
 
 // RecordHit will store an AnalyticsRecord in Redis
-func (r *RedisAnalyticsHandler) RecordHit(record *AnalyticsRecord) error {
+func (r *RedisAnalyticsHandler) RecordHit(record *pb.AnalyticsRecord) error {
 	// check if we should stop sending records 1st
 	if atomic.LoadUint32(&r.shouldStop) > 0 {
 		return nil
@@ -295,7 +297,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 				record.RawPath = "/" + record.RawPath
 			}
 
-			if encoded, err := msgpack.Marshal(record); err != nil {
+			if encoded, err := proto.Marshal(record); err != nil {
 				log.WithError(err).Error("Error encoding analytics data")
 			} else {
 				recordsBuffer = append(recordsBuffer, encoded)

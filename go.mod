@@ -87,7 +87,7 @@ require (
 	google.golang.org/appengine v1.6.1 // indirect
 	google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55 // indirect
 	google.golang.org/grpc v1.23.1
-	google.golang.org/protobuf v1.20.1 // indirect
+	google.golang.org/protobuf v1.20.1
 	gopkg.in/Masterminds/sprig.v2 v2.21.0
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
