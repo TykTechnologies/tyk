@@ -492,7 +492,7 @@ func generateOAuthPrefix(apiID string) string {
 // Create API-specific OAuth handlers and respective auth servers
 func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 	var pathSeparator string
-	if config.Global().SlaveOptions.BindToSlugsInsteadOfListenPaths {
+	if !strings.HasSuffix(spec.Proxy.ListenPath, "/") {
 		pathSeparator = "/"
 	}
 
