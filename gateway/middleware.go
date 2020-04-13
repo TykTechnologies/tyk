@@ -407,10 +407,9 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				if !usePartitions || policy.Partitions.Quota {
 					didQuota[k] = true
 
-					// -1 is special "unlimited" case
-					if ar.Limit.QuotaMax != -1 && policy.QuotaMax > ar.Limit.QuotaMax {
+					if greaterThanInt64(policy.QuotaMax, ar.Limit.QuotaMax) {
 						ar.Limit.QuotaMax = policy.QuotaMax
-						if policy.QuotaMax > session.QuotaMax {
+						if greaterThanInt64(policy.QuotaMax, session.QuotaMax) {
 							session.QuotaMax = policy.QuotaMax
 						}
 					}
@@ -426,9 +425,9 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				if !usePartitions || policy.Partitions.RateLimit {
 					didRateLimit[k] = true
 
-					if ar.Limit.Rate != -1 && policy.Rate > ar.Limit.Rate {
+					if greaterThanFloat64(policy.Rate, ar.Limit.Rate) {
 						ar.Limit.Rate = policy.Rate
-						if policy.Rate > session.Rate {
+						if greaterThanFloat64(policy.Rate, session.Rate) {
 							session.Rate = policy.Rate
 						}
 					}
