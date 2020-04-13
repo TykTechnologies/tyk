@@ -462,8 +462,12 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 				if !usePartitions || policy.Partitions.Complexity {
 					didComplexity[k] = true
-					if ar.Limit.MaxQueryDepth != disabledQueryDepth && policy.MaxQueryDepth > ar.Limit.MaxQueryDepth {
+
+					if ar.Limit.MaxQueryDepth != disabledQueryDepth && (policy.MaxQueryDepth == -1 || policy.MaxQueryDepth > ar.Limit.MaxQueryDepth) {
 						ar.Limit.MaxQueryDepth = policy.MaxQueryDepth
+						if policy.MaxQueryDepth == -1 || policy.MaxQueryDepth > session.MaxQueryDepth {
+							session.MaxQueryDepth = policy.MaxQueryDepth
+						}
 					}
 				}
 
