@@ -292,7 +292,6 @@ func RevokeAllTokens(storage ExtendedOsinStorageInterface, clientId, clientSecre
 	}
 
 	for _, token := range clientTokens {
-
 		access, err := storage.LoadAccess(token.Token)
 		if err == nil {
 			storage.RemoveAccess(access.AccessToken)
@@ -428,7 +427,6 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 		o.OsinServer.FinishAccessRequest(resp, r, ar)
 		new_token, foundNewToken := resp.Output["access_token"]
 		if username != "" && foundNewToken {
-
 			log.Debug("Updating token data in key")
 			if session.OauthKeys == nil {
 				session.OauthKeys = make(map[string]string)
@@ -1086,8 +1084,6 @@ func (accessTokenGen) GenerateAccessToken(data *osin.AccessData, generaterefresh
 	}
 
 	accesstoken = keyGen.GenerateAuthKey(newSession.OrgID)
-	log.Info("El access token:", accesstoken)
-	log.Info("hashed: ", storage.HashKey(accesstoken))
 	if generaterefresh {
 		u6 := uuid.NewV4()
 		refreshtoken = base64.StdEncoding.EncodeToString([]byte(u6.String()))
