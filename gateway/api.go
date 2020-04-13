@@ -712,6 +712,18 @@ func handleDeleteHashedKey(keyName, apiID string, resetQuota bool) (interface{},
 	return statusObj, http.StatusOK
 }
 
+func handleGlobalAddToSortedSet(keyName, value string, score float64) {
+	GlobalSessionManager.Store().AddToSortedSet(keyName, value, score)
+}
+
+func handleGetSortedSetRange(keyName, scoreFrom, scoreTo string) ([]string, []float64, error) {
+	return GlobalSessionManager.Store().GetSortedSetRange(keyName, scoreFrom, scoreTo)
+}
+
+func handleRemoveSortedSetRange(keyName, scoreFrom, scoreTo string) error {
+	return GlobalSessionManager.Store().RemoveSortedSetRange(keyName, scoreFrom, scoreTo)
+}
+
 func handleGetAPIList() (interface{}, int) {
 	apisMu.RLock()
 	defer apisMu.RUnlock()
