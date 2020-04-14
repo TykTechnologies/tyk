@@ -493,7 +493,7 @@ func generateOAuthPrefix(apiID string) string {
 func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 	var pathSeparator string
 	if !strings.HasSuffix(spec.Proxy.ListenPath, "/") {
-		pathSeparator = ""
+		pathSeparator = "/"
 	}
 
 	apiAuthorizePath := spec.Proxy.ListenPath + pathSeparator + "tyk/oauth/authorize-client{_:/?}"
