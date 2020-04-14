@@ -95,6 +95,11 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			Partitions: user.PolicyPartitions{Quota: true},
 			IsInactive: true,
 		},
+		"unlimited-quota": {
+			Partitions:   user.PolicyPartitions{Quota: true},
+			AccessRights: map[string]user.AccessDefinition{"a": {}},
+			QuotaMax:     -1,
+		},
 		"quota1": {
 			Partitions: user.PolicyPartitions{Quota: true},
 			QuotaMax:   2,
@@ -112,6 +117,11 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			QuotaMax:     3,
 			AccessRights: map[string]user.AccessDefinition{"b": {}},
 			Partitions:   user.PolicyPartitions{Quota: true},
+		},
+		"unlimited-rate": {
+			Partitions:   user.PolicyPartitions{RateLimit: true},
+			AccessRights: map[string]user.AccessDefinition{"a": {}},
+			Rate:         -1,
 		},
 		"rate1": {
 			Partitions: user.PolicyPartitions{RateLimit: true},
@@ -377,6 +387,14 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			},
 		},
 		{
+			"QuotaPart with unlimited", []string{"unlimited-quota"},
+			"", func(t *testing.T, s *user.SessionState) {
+				if s.QuotaMax != -1 {
+					t.Fatalf("want unlimited quota to be -1")
+				}
+			}, nil,
+		},
+		{
 			"QuotaPart", []string{"quota1"},
 			"", func(t *testing.T, s *user.SessionState) {
 				if s.QuotaMax != 2 {
@@ -410,6 +428,14 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				// Don't apply api 'b' coming from quota4 policy
 				want := map[string]user.AccessDefinition{"a": {Limit: &user.APILimit{}}}
 				assert.Equal(t, want, s.AccessRights)
+			}, nil,
+		},
+		{
+			"RatePart with unlimited", []string{"unlimited-rate"},
+			"", func(t *testing.T, s *user.SessionState) {
+				if s.Rate != -1 {
+					t.Fatalf("want unlimited rate to be -1")
+				}
 			}, nil,
 		},
 		{

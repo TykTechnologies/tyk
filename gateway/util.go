@@ -28,3 +28,45 @@ func contains(s []string, i string) bool {
 	}
 	return false
 }
+
+// greaterThanFloat64 checks whether first float64 value is bigger than second float64 value.
+// -1 means infinite and the biggest value.
+func greaterThanFloat64(first, second float64) bool {
+	if first == -1 {
+		return true
+	}
+
+	if second == -1 {
+		return false
+	}
+
+	return first > second
+}
+
+// greaterThanInt64 checks whether first int64 value is bigger than second int64 value.
+// -1 means infinite and the biggest value.
+func greaterThanInt64(first, second int64) bool {
+	if first == -1 {
+		return true
+	}
+
+	if second == -1 {
+		return false
+	}
+
+	return first > second
+}
+
+// greaterThanInt checks whether first int value is bigger than second int value.
+// -1 means infinite and the biggest value.
+func greaterThanInt(first, second int) bool {
+	if first == -1 {
+		return true
+	}
+
+	if second == -1 {
+		return false
+	}
+
+	return first > second
+}
