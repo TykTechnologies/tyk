@@ -62,10 +62,3 @@ Tyk is released under the MPL v2.0; please see [LICENSE.md](LICENSE.md) for a fu
 ### Contributing
 
 For more information about contributing PRs and issues, see [CONTRIBUTING.md](CONTRIBUTING.md).
-
-### Roadmap
-
-To coordinate development and be completely transparent as to where the project is going, the version roadmap for the next version, as well as proposed features
-and adopted proposals can be viewed on our public [Tyk Roadmap Repository](https://github.com/TykTechnologies/tyk-roadmap).
-
-Any proposals can be made in the Github issue tracker. Proposals that are adopted will be placed into roadmap.
