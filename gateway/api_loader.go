@@ -442,7 +442,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		mwAppendEnabled(&simpleArray, &KeyExpired{baseMid})
 		mwAppendEnabled(&simpleArray, &AccessRightsCheck{baseMid})
 
-		rateLimitPath := spec.Proxy.ListenPath + "/tyk/rate-limits/"
+		rateLimitPath := spec.Proxy.ListenPath + "tyk/rate-limits/"
 
 		logger.Debug("Rate limit endpoint is: ", rateLimitPath)
 
