@@ -431,10 +431,13 @@ func (a APIDefinitionLoader) FromRedis(db config.RedisDBAppConfOptionsConfig) ([
 		log.Error("Couldn't get api definition from redis db: ", err)
 	}
 	for _, v := range apiKeys {
-		apiDefinition, _ := redis.String(c.Do("GET", v))
-		def := a.ParseDefinition(strings.NewReader(apiDefinition))
-		spec := a.MakeSpec(def, nil)
-		specs = append(specs, spec)
+		//Skip loading JWT-KEY keys
+		if !strings.HasPrefix(v, "JWT-KEY-") {
+			apiDefinition, _ := redis.String(c.Do("GET", v))
+			def := a.ParseDefinition(strings.NewReader(apiDefinition))
+			spec := a.MakeSpec(def, nil)
+			specs = append(specs, spec)
+		}
 	}
 	return specs, nil
 }

@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -12,11 +14,13 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"sync"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/garyburd/redigo/redis"
 	"github.com/gorilla/mux"
@@ -26,20 +30,28 @@ import (
 
 //nolint
 var (
-	TykHTTPPort                  = "4430"
-	TykJWTAPIKeyEndpoint         = "/tyk/keys/"
-	TykMiddlewareBundleNameHash  = "c343271e0935000c0ea41f8d9822015c"
-	TykBundles                   = "bundles"
-	TykMiddlewareBundleName      = "bundle.zip"
-	TykMiddlewareFile            = "middleware.py"
-	TykManifest                  = "manifest.json"
-	TykRoot                      = "/data/tyk-gateway/"
-	TykCACert                    = "/certs/cacerts.crt"
-	TykServerCrt                 = "/certs/server.crt"
-	TykServerKey                 = "/certs/server.key"
-	TykUpstreamPem               = "/certs/upstream.pem"
-	SystemConfigFilePath         = "/data/config/systemconfig.yaml"
-	TykMiddlewareRoot            = "/data/tyk-gateway/middleware/"
+	TykJWTAPIKeyEndpoint        = "/tyk/keys/"
+	TykMiddlewareBundleNameHash = "c343271e0935000c0ea41f8d9822015c"
+	TykBundles                  = "bundles"
+	TykMiddlewareBundleName     = "bundle.zip"
+	TykMiddlewareFile           = "middleware.py"
+	TykManifest                 = "manifest.json"
+
+	TykRoot  = "/data/tyk-gateway/"
+	CertRoot = "/certs/"
+	CfgRoot  = "/data/config/"
+
+	//Local Dev Vars
+	// TykRoot  = "/local/nuchat/tyk-workspace"
+	// CertRoot = "/local/nuchat/tyk-workspace/certs/"
+	// CfgRoot  = "/local/nuchat/tyk-workspace/data/config"
+
+	TykCACert                    = CertRoot + "cacerts.crt"
+	TykServerCrt                 = CertRoot + "server.crt"
+	TykServerKey                 = CertRoot + "server.key"
+	TykUpstreamPem               = CertRoot + "upstream.pem"
+	SystemConfigFilePath         = CfgRoot + "systemconfig.yaml"
+	TykMiddlewareRoot            = TykRoot + "/middleware/"
 	TykMiddlewareSrcFile         = TykRoot + TykMiddlewareFile
 	TykMiddlewareManifestSrcFile = TykRoot + TykManifest
 	JWTDefinitionsSpec           = TykRoot + "/jwt_definition.json"
@@ -49,6 +61,7 @@ var (
 	APITemplateJWTSpec           = TykRoot + "/api_template_jwt.json"
 	APIDefinitionRedis           = TykRoot + "/api_definitions.json"
 	DynamicAPIConnTimeout        = 20000
+	JWTKeyPrefix                 = "JWT-KEY-"
 )
 
 type Event int
@@ -103,22 +116,23 @@ type APIDefinition struct {
 	EnableLoadBalancing        bool                       `json:"enable_load_balancing"`
 	LoadBalancingConfigData    LoadBalancingConfigData    `json:"load_balancing_config_data"`
 	SSLForceRootCACheck        bool                       `json:"ssl_force_rootca_check"`
+	AppName                    string                     `json:"app_name"`
 }
 
 // JWTDefinitions to store JWTDefinition
 type JWTDefinition struct {
-	Name             string `json:"name"`
-	JWTPublicKeyPath string `json:"jwt_public_key_path"`
-	JWTAPIKeyPath    string `json:"jwt_api_key_path"`
-	JWTMinKeyLength  int    `json:"jwt_min_key_length"`
+	AppName      string   `json:"app_name"`
+	AppNameList  []string `json:"app_name_list"`
+	JWTPublicKey string   `json:"jwt_public_key"`
+	JWTAPIKey    string   `json:"jwt_api_key"`
 }
 
 type ServiceAPIS map[string][]APIDefinition
 
-// JWTDefinitions to store JWTDefinitions
-type JWTDefinitions struct {
-	JWTDefinitions []JWTDefinition `json:"jwt_definitions"`
-}
+// // JWTDefinitions to store JWTDefinitions
+// type JWTDefinitions struct {
+// 	JWTDefinitions []JWTDefinition `json:"jwt_definitions"`
+// }
 
 // TokenAccessRights to store token api access rights
 type TokenAccessRights struct {
@@ -175,6 +189,83 @@ type LoadBalancingConfigData struct {
 	}
 }
 
+func keyLoader(w http.ResponseWriter, r *http.Request) {
+	log.Info("Requesting mutex")
+	m.Lock()
+	defer m.Unlock()
+
+	var obj interface{}
+	var code int
+
+	appName := mux.Vars(r)["appName"]
+	keyID := mux.Vars(r)["kid"]
+
+	switch r.Method {
+	//All JWT Keys comes from db 2
+	case "GET":
+		if keyID != "" && appName != "" {
+			log.Debug(fmt.Sprintf("Requesting JWT Key %s for app %s", appName, keyID))
+			obj, code = handleGetKey(appName, keyID)
+		} else if appName != "" && keyID == "" {
+			log.Debug("Requesting JWT Keys list for app ", appName)
+			obj, code = handleGetKey(appName, "")
+		} else {
+			log.Debug("Requesting JWT Keys list for all Apps")
+			obj, code = handleGetKey("", "")
+		}
+	case "POST":
+		if strings.Contains(r.URL.Path, "/key/refresh") && appName != "" {
+			obj, code = refreshKeys(appName)
+		} else {
+			obj, code = updateKeys(r)
+		}
+	case "DELETE":
+		if keyID != "" && appName != "" {
+			log.Info(fmt.Sprintf("Deleting JWT Key %s for appName %s", keyID, appName))
+			obj, code = deleteJWTKey(keyID, appName)
+		} else {
+			obj, code = apiError("Delete Usage: /tyk/key/<appName>/<kid>"), http.StatusBadRequest
+		}
+	}
+
+	doJSONWrite(w, code, obj)
+
+	log.Info("Releasing mutex")
+}
+
+func handleGetKey(appName string, kid string) (interface{}, int) {
+	c := GetRedisConn()
+	defer c.Close()
+
+	var jwtKey map[string]interface{}
+
+	if kid != "" {
+		data, err := redis.String(c.Do("GET", JWTKeyPrefix+appName+"-"+kid))
+		if err != nil {
+			log.Error("Error reading JWT key from Redis", err)
+			return apiError("key not found"), http.StatusInternalServerError
+		}
+		_ = json.Unmarshal([]byte(data), &jwtKey)
+		return jwtKey, http.StatusOK
+	} else if appName != "" && kid == "" {
+		//Get all key matching JWTKeyPrefix-appName
+		keys, err := redis.Strings(c.Do("KEYS", JWTKeyPrefix+appName+"-"+"*"))
+		if err != nil {
+			log.Error("Could not get JWT list for app from Redis", appName, err)
+			return apiError("could not get jwt key list"), http.StatusInternalServerError
+		}
+		return keys, http.StatusOK
+	} else if appName == "" && kid == "" {
+		keys, err := redis.Strings(c.Do("KEYS", JWTKeyPrefix+"*"))
+		if err != nil {
+			log.Error("Could not get JWT list from Redis", err)
+			return apiError("could not get jwt key list"), http.StatusInternalServerError
+		}
+		return keys, http.StatusOK
+	}
+	return jwtKey, http.StatusOK
+}
+
 func apiLoader(w http.ResponseWriter, r *http.Request) {
 	log.Info("Requesting mutex")
 	m.Lock()
@@ -182,6 +273,7 @@ func apiLoader(w http.ResponseWriter, r *http.Request) {
 
 	service := mux.Vars(r)["service"]
 	apiName := mux.Vars(r)["apiName"]
+
 	apiID := service + "-" + apiName
 
 	var obj interface{}
@@ -198,10 +290,7 @@ func apiLoader(w http.ResponseWriter, r *http.Request) {
 			obj, code = handleGetAPIList()
 		}
 	case "POST":
-		if r.URL.Path == "/key/refresh" {
-			log.Debug("Key refresh")
-			obj, code = updateKeys(ADD)
-		} else if apiName == "" && service == "" {
+		if apiName == "" && service == "" {
 			log.Debug("Creating new definition")
 			obj, code = addOrUpdateApi(r)
 		} else {
@@ -210,7 +299,6 @@ func apiLoader(w http.ResponseWriter, r *http.Request) {
 	case "DELETE":
 		if apiName != "" && service != "" {
 			log.Info("Deleting Individual API not supported")
-			//obj, code = deleteAPIById(apiID)
 			obj, code = apiError("Must specify an /service to delete API"), http.StatusBadRequest
 		} else if service != "" && apiName == "" {
 			log.Info("Deleting API definition for service: ", service)
@@ -225,8 +313,114 @@ func apiLoader(w http.ResponseWriter, r *http.Request) {
 	log.Info("Releasing mutex")
 }
 
-func updateKeys(e Event) (interface{}, int) {
-	err := addOrDeleteJWTKey(ADD)
+func deleteJWTKey(keyID string, appName string) (interface{}, int) {
+	var tykConf map[string]interface{}
+
+	tykConfData, err := ioutil.ReadFile(TykConfFilePath)
+	if err != nil {
+		log.Error("Error reading TyK conf", err)
+		return apiError("could not get authorization token"), http.StatusInternalServerError
+	}
+
+	err = json.Unmarshal(tykConfData, &tykConf)
+	if err != nil {
+		log.Error("Error decoding TyK conf", err)
+		return apiError("authorization token decode error"), http.StatusInternalServerError
+	}
+	c := GetRedisConn()
+	defer c.Close()
+	jwtKey := JWTKeyPrefix + appName + "-" + keyID
+
+	if ok, _ := redis.Bool(c.Do("EXISTS", jwtKey)); ok {
+		_, err = c.Do("DEL", jwtKey)
+		if err != nil {
+			log.Error(fmt.Sprintf("Error deleting Key %s from Redis %v", jwtKey, err))
+			return apiError("Error deleting Key"), http.StatusInternalServerError
+		}
+	} else {
+		return apiError("Key not found"), http.StatusInternalServerError
+	}
+
+	// Delete JWT API
+	//JWTApiKey := strings.TrimPrefix(jwtKey, JWTKeyPrefix)
+	// JWTApiKey = keyID
+	endPoint := getTykEndpoint("localhost", TykJWTAPIKeyEndpoint) + keyID
+	client, ret := GetHTTPClient()
+	if ret == false {
+		return apiError("http client error. could not delete jwt key"), http.StatusInternalServerError
+	}
+
+	req, err := retryablehttp.NewRequest("DELETE", endPoint, nil)
+	if err != nil {
+		log.Error("Error creating jwt api key DELETE request", err)
+		return apiError("Error deleting JWT Key"), http.StatusInternalServerError
+	}
+
+	req.Header.Add("X-Tyk-Authorization", tykConf["secret"].(string))
+	//Suppress quota reset
+	q := req.URL.Query()
+	q.Add("suppress_reset", "1")
+	req.URL.RawQuery = q.Encode()
+
+	log.Info("Deleting JWT Token:", string(keyID))
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Error("Error in jwt api key DELETE", err)
+		return apiError("http client error. could not delete jwt key"), http.StatusInternalServerError
+	}
+	defer resp.Body.Close()
+
+	_, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Error("Error reading response body", err)
+		return apiError("http client error. could not delete jwt key"), http.StatusInternalServerError
+	}
+
+	if resp.StatusCode == 200 {
+		log.Info("Deleted JWT API Token")
+	} else {
+		log.Error("error deleting JWT key")
+		return apiError("http client error. could not delete jwt key"), http.StatusInternalServerError
+	}
+
+	response := apiModifyKeySuccess{
+		Status: "ok",
+		Action: "deleted",
+	}
+
+	return response, http.StatusOK
+}
+
+//On Posting JWT Key
+func updateKeys(r *http.Request) (interface{}, int) {
+	//Add key to Redis and call addOrUpdateJWTKey
+	var jwtDef JWTDefinition
+	//Receive JWT payload
+	data, err := receivePayload(r)
+	if err != nil {
+		return apiError(err.Error()), http.StatusBadRequest
+	}
+
+	err = json.Unmarshal(data, &jwtDef)
+	if err != nil {
+		log.Error("Couldn't decode new JWT Definition object: ", err)
+		return apiError("Malformed request"), http.StatusBadRequest
+	}
+
+	c := GetRedisConn()
+	defer c.Close()
+
+	//Store JWT to Redis DB
+	key := JWTKeyPrefix + jwtDef.AppName + "-" + jwtDef.JWTAPIKey
+
+	jwtJSON, _ := json.Marshal(jwtDef)
+
+	_, err = c.Do("SET", key, jwtJSON)
+	if err != nil {
+		return apiError("Could not add jwt key to redis store"), http.StatusInternalServerError
+	}
+
+	err = addOrUpdateJWTKey(jwtDef)
 	if err != nil {
 		return apiError("Could not update api key"), http.StatusInternalServerError
 	}
@@ -239,7 +433,47 @@ func updateKeys(e Event) (interface{}, int) {
 	return response, http.StatusOK
 }
 
-func addOrUpdateApi(r *http.Request) (interface{}, int) {
+func refreshKeys(appName string) (interface{}, int) {
+	c := GetRedisConn()
+	defer c.Close()
+
+	//Get All JWT keys belonging to appName and call addOrUpdateJWTKey
+	keys, err := redis.Strings(c.Do("KEYS", JWTKeyPrefix+appName+"-"+"*"))
+	if err != nil {
+		log.Error("Could not get Key list from Redis", err)
+		return apiError("Could not get Key list"), http.StatusInternalServerError
+	}
+
+	log.Debug(fmt.Sprintf("Refresh Key List %v ", keys))
+
+	for _, key := range keys {
+		jwtDef := JWTDefinition{}
+		jwtKeyData, err := redis.String(c.Do("GET", key))
+		if err != nil {
+			log.Error("Error reading API from Redis", err)
+			return apiError("Error reading API from Redis"), http.StatusInternalServerError
+		}
+
+		if err := json.NewDecoder(strings.NewReader(jwtKeyData)).Decode(&jwtDef); err != nil {
+			return apiError("Could not decode api definition"), http.StatusInternalServerError
+		}
+
+		err = addOrUpdateJWTKey(jwtDef)
+		if err != nil {
+			log.Error("Could not update JWT Key", err)
+			return apiError("Could not update api key"), http.StatusInternalServerError
+		}
+	}
+
+	response := apiModifyKeySuccess{
+		Status: "ok",
+		Action: "updated",
+	}
+
+	return response, http.StatusOK
+}
+
+func receivePayload(r *http.Request) ([]byte, error) {
 	connTimeout := DynamicAPIConnTimeout
 	log.Info("Updating/Adding API to redis")
 	c := GetRedisConn()
@@ -247,7 +481,7 @@ func addOrUpdateApi(r *http.Request) (interface{}, int) {
 
 	if config.Global().UseDBAppConfigs {
 		log.Error("Rejected new API Definition due to UseDBAppConfigs = true")
-		return apiError("Due to enabled use_db_app_configs, please use the Dashboard API"), http.StatusInternalServerError
+		return nil, errors.New("Due to enabled use_db_app_configs, please use the Dashboard API")
 	}
 
 	if config.Global().DynamicAPIConnTimeout == 0 {
@@ -256,10 +490,6 @@ func addOrUpdateApi(r *http.Request) (interface{}, int) {
 		connTimeout = config.Global().DynamicAPIConnTimeout
 	}
 
-	var ServApis ServiceAPIS
-	var existingApis ServiceAPIS
-
-	// Non blocking read or wait for 20 seconds in idle state
 	buf := make([]byte, 1*1024*1024)
 	var data []byte
 	count := 0
@@ -276,7 +506,7 @@ func addOrUpdateApi(r *http.Request) (interface{}, int) {
 
 		if err != nil {
 			log.Error("Error reading payload", err)
-			return apiError("Request malformed"), http.StatusInternalServerError
+			return nil, errors.New("Request malformed")
 		}
 
 		t := time.Now()
@@ -284,13 +514,30 @@ func addOrUpdateApi(r *http.Request) (interface{}, int) {
 
 		if elapsed.Nanoseconds()/1000000 > int64(connTimeout) {
 			log.Error("request timed out")
-			return apiError("Request timedout"), http.StatusInternalServerError
+			return nil, errors.New("request timeout")
 		}
 		time.Sleep(2 * time.Millisecond)
 	}
 	log.Debug("Received data length : ", count)
+	return data, nil
+}
 
-	err := json.Unmarshal(data, &ServApis)
+func addOrUpdateApi(r *http.Request) (interface{}, int) {
+	log.Info("Updating/Adding API to redis")
+	c := GetRedisConn()
+	defer c.Close()
+
+	var ServApis ServiceAPIS
+	var existingApis ServiceAPIS
+	var appName string
+
+	//Non-blocking read
+	data, err := receivePayload(r)
+	if err != nil {
+		return apiError(err.Error()), http.StatusBadRequest
+	}
+
+	err = json.Unmarshal(data, &ServApis)
 	if err != nil {
 		log.Error("Couldn't decode new API Definition object: ", err)
 		return apiError("Request malformed"), http.StatusBadRequest
@@ -360,6 +607,10 @@ func addOrUpdateApi(r *http.Request) (interface{}, int) {
 			temp["name"] = api.Name
 			temp["api_id"] = APIID
 			temp["slug"] = APIID
+			temp["app_name"] = api.AppName
+
+			//set appName
+			appName = api.AppName
 
 			//update target host
 			if api.UpdateTargetHost {
@@ -515,7 +766,8 @@ func addOrUpdateApi(r *http.Request) (interface{}, int) {
 	reloadURLStructure(nil)
 
 	//read all existing JWT enabled apis, add new api_id and update the JWT token
-	err = addOrDeleteJWTKey(ADD)
+
+	err = addOrDeleteJWTKey(ADD, appName)
 	if err != nil {
 		return apiError("Could not add JWT key"), http.StatusInternalServerError
 	}
@@ -534,52 +786,10 @@ func addOrUpdateApi(r *http.Request) (interface{}, int) {
 	return response, http.StatusOK
 }
 
-func addOrDeleteJWTKey(e Event) error {
+//to Add and Update a JWT Key
+func addOrUpdateJWTKey(jwtDef JWTDefinition) error {
 	var JWTAPIMap = make(map[string]string)
-	//c := RedisPool.Get()
-	c := GetRedisConn()
-	defer c.Close()
-
-	apis, err := redis.Strings(c.Do("KEYS", "*"))
-	if err != nil {
-		log.Error("Could not get API list from Redis", err)
-		return err
-	}
-
-	for _, api := range apis {
-		data, err := redis.String(c.Do("GET", api))
-		if err != nil {
-			log.Error("Error reading API from Redis", err)
-			return err
-		}
-
-		var jsonApi map[string]interface{}
-		err = json.Unmarshal([]byte(data), &jsonApi)
-
-		if jsonApi["enable_jwt"] == true {
-			apiID := jsonApi["api_id"].(string)
-			name := jsonApi["name"].(string)
-			JWTAPIMap[apiID] = name
-		}
-	}
-	log.Debug("JWT API Map", JWTAPIMap)
-
-	// If there are other JWT API enabled APIs
-	//Add JWT KEY - go over JWT Definition, add and update all Keys
-	var jwtDefinitions JWTDefinitions
 	var tykConf map[string]interface{}
-
-	data, err := ioutil.ReadFile(JWTDefinitionsSpec)
-	if err != nil {
-		log.Error("Error reading JWT Spec", err)
-		return err
-	}
-
-	err = json.Unmarshal(data, &jwtDefinitions)
-	if err != nil {
-		log.Error("Error decoding JWT Spec", err)
-		return err
-	}
 
 	tykConfData, err := ioutil.ReadFile(TykConfFilePath)
 	if err != nil {
@@ -593,18 +803,159 @@ func addOrDeleteJWTKey(e Event) error {
 		return err
 	}
 
-	for _, jwtMeta := range jwtDefinitions.JWTDefinitions {
+	c := GetRedisConn()
+	defer c.Close()
+
+	apis, err := redis.Strings(c.Do("KEYS", "*"))
+	if err != nil {
+		log.Error("Could not get API list from Redis", err)
+		return err
+	}
+
+	for _, api := range apis {
+		//Skip all keys with JWT-KEY- prefix
+		if !strings.HasPrefix(api, JWTKeyPrefix) {
+			log.Debug("Processing api %s", api)
+			data, err := redis.String(c.Do("GET", api))
+			if err != nil {
+				log.Error("Error reading API from Redis", err)
+				return err
+			}
+
+			var jsonApi map[string]interface{}
+			err = json.Unmarshal([]byte(data), &jsonApi)
+
+			//create JWT MAP of API belonging to appName
+			//check if appNamelist contains jsonApi["app_name"]
+			appName := fmt.Sprintf("%v", jsonApi["app_name"])
+			if Contains(jwtDef.AppNameList, appName) && jsonApi["enable_jwt"] == true {
+				apiID := jsonApi["api_id"].(string)
+				name := jsonApi["name"].(string)
+				JWTAPIMap[apiID] = name
+			}
+		}
+	}
+	log.Debug(fmt.Sprintf("App Name - %s  ---- JWT API Map %v ", appName, JWTAPIMap))
+
+	//Base64 decode JWT key
+	jwtPublicKey, err := base64.StdEncoding.DecodeString(jwtDef.JWTPublicKey)
+	if err != nil {
+		return err
+	}
+
+	log.Debug(fmt.Sprintf("JWT Public Key %s", jwtPublicKey))
+	count := 0
+	for {
+		//time.Sleep(2 * time.Second)
+		ret := processJWTApiKey(tykConf, JWTAPIMap, jwtPublicKey, jwtDef.JWTAPIKey, "localhost", ADD)
+		count++
+		if ret == true {
+			break
+		} else if count < 3 {
+			log.Warn("Could not verify JWT API Token.. retry")
+		} else {
+			log.Error("Could not add JWT token", jwtDef.JWTAPIKey)
+			break
+		}
+	}
+
+	return nil
+}
+
+//TODO - appName becomes the list
+func addOrDeleteJWTKey(e Event, appName string) error {
+	var JWTAPIMap = make(map[string]string)
+	var tykConf map[string]interface{}
+
+	tykConfData, err := ioutil.ReadFile(TykConfFilePath)
+	if err != nil {
+		log.Error("Error reading TyK conf", err)
+		return err
+	}
+
+	err = json.Unmarshal(tykConfData, &tykConf)
+	if err != nil {
+		log.Error("Error decoding TyK conf", err)
+		return err
+	}
+
+	c := GetRedisConn()
+	defer c.Close()
+
+	//Get All JWT KEYS
+	//Check if appName is in app_name_list
+	//   if present recreate the JWT MAP and upload the key with new map
+	//   repeat this for all matching keys
+
+	keys, err := redis.Strings(c.Do("KEYS", JWTKeyPrefix+"*"))
+	if err != nil {
+		log.Error("Could not get jwt key list from Redis", err)
+		return err
+	}
+
+	// Go Over all JWT Keys
+	for _, key := range keys {
+		jwtDef := JWTDefinition{}
+		jwtKeyData, err := redis.String(c.Do("GET", key))
+		if err != nil {
+			log.Error("Error reading Key from Redis", err)
+			return err
+		}
+		if err := json.NewDecoder(strings.NewReader(jwtKeyData)).Decode(&jwtDef); err != nil {
+			return err
+		}
+
+		//Check if appName is in app_name_list
+		if Contains(jwtDef.AppNameList, appName) {
+			//Create API MAP and update the key
+			apis, err := redis.Strings(c.Do("KEYS", "*"))
+			if err != nil {
+				log.Error("Could not get API list from Redis", err)
+				return err
+			}
+
+			for _, api := range apis {
+				//Skip all keys with JWT-KEY- prefix
+				if !strings.HasPrefix(api, JWTKeyPrefix) {
+					log.Debug("Processing api %s", api)
+					data, err := redis.String(c.Do("GET", api))
+					if err != nil {
+						log.Error("Error reading API from Redis", err)
+						return err
+					}
+
+					var jsonApi map[string]interface{}
+					err = json.Unmarshal([]byte(data), &jsonApi)
+
+					//create JWT MAP of API belonging to appName
+					aName := fmt.Sprintf("%v", jsonApi["app_name"])
+					if Contains(jwtDef.AppNameList, aName) && jsonApi["enable_jwt"] == true {
+						apiID := jsonApi["api_id"].(string)
+						name := jsonApi["name"].(string)
+						JWTAPIMap[apiID] = name
+					}
+				}
+			}
+		}
+		//Update Key
+		log.Debug(fmt.Sprintf("App Name - %s  ---- JWT API Map %v ", appName, JWTAPIMap))
+		log.Debug(fmt.Sprintf("updating JWT key %s", jwtDef.JWTAPIKey))
+		//Base64 decode JWT key
+		jwtKey, err := base64.StdEncoding.DecodeString(jwtDef.JWTPublicKey)
+		if err != nil {
+			return err
+		}
 		count := 0
 		for {
-			time.Sleep(2 * time.Second)
-			ret := processJWTApiKey(tykConf, JWTAPIMap, jwtMeta.JWTPublicKeyPath, jwtMeta.JWTAPIKeyPath, "localhost", e)
+			//time.Sleep(2 * time.Second)
+			ret := processJWTApiKey(tykConf, JWTAPIMap, jwtKey, jwtDef.JWTAPIKey, "localhost", e)
 			count++
 			if ret == true {
 				break
 			} else if count < 3 {
 				log.Warn("Could not verify JWT API Token.. retry")
 			} else {
-				log.Error("Could not add JWT token", jwtMeta.JWTAPIKeyPath)
+				log.Error("Could not add JWT token", jwtDef.JWTAPIKey)
 				break
 			}
 		}
@@ -613,28 +964,13 @@ func addOrDeleteJWTKey(e Event) error {
 }
 
 func processJWTApiKey(tykConf map[string]interface{},
-	jwtAPIMap map[string]string, jwtPublicKeyPath string, jwtAPIKeyPath string,
+	JWTAPIMap map[string]string, JWTPublicKey []byte, JWTApiKey string,
 	host string, e Event) bool {
 
 	var APIList = make(map[string]TokenAccessRights)
 	var template map[string]interface{}
 
-	//Read JWT Public key
-	JWTPublicKey, err := ioutil.ReadFile(jwtPublicKeyPath)
-	if err != nil {
-		log.Error("Error Reading jwt public key")
-		return false
-	}
-
-	//Read JWT API Key
-	//TODO - Add retry flow if key is missing
-	JWTApiKey, err := ioutil.ReadFile(jwtAPIKeyPath)
-	if err != nil {
-		log.Error("Error Reading jwt private key")
-		return false
-	}
-
-	for key, value := range jwtAPIMap {
+	for key, value := range JWTAPIMap {
 		c := TokenAccessRights{APIID: key, APIName: value, Versions: []string{"Default"}, AllowedURLS: []string{}, Limit: nil}
 		APIList[key] = c
 	}
@@ -664,7 +1000,7 @@ func processJWTApiKey(tykConf map[string]interface{},
 	var endPoint = getTykEndpoint(host, TykJWTAPIKeyEndpoint) + JWTKey
 
 	// Update JWT key if adding new JWT API or deleting an JWT api from exsiting list
-	if (e == ADD && len(jwtAPIMap) > 0) || (e == DELETE && len(jwtAPIMap) > 0) {
+	if (e == ADD && len(JWTAPIMap) > 0) || (e == DELETE && len(JWTAPIMap) > 0) {
 		req, err := retryablehttp.NewRequest("POST", endPoint, bytes.NewReader(outputJSON))
 		if err != nil {
 			log.Error("Error creating jwt api key POST request", err)
@@ -703,7 +1039,18 @@ func processJWTApiKey(tykConf map[string]interface{},
 			log.Error("Error Creating JWT API Token")
 			return false
 		}
-	} else if e == DELETE && len(jwtAPIMap) == 0 {
+	} else if e == DELETE && len(JWTAPIMap) == 0 {
+		//Keep the key with no api map
+		c := GetRedisConn()
+		defer c.Close()
+
+		jwtKey := JWTKeyPrefix + appName + "-" + JWTApiKey
+		_, err = c.Do("DEL", jwtKey)
+		if err != nil {
+			log.Error("Error deleting JWT key ", jwtKey)
+			return false
+		}
+
 		// Delete JWT API
 		req, err := retryablehttp.NewRequest("DELETE", endPoint, bytes.NewReader(outputJSON))
 		if err != nil {
@@ -815,7 +1162,7 @@ func deleteAPIById(apiID string) (interface{}, int) {
 	defer c.Close()
 
 	// Load API Definition from Redis DB
-	_, err := redis.String(c.Do("GET", apiID))
+	apiData, err := redis.String(c.Do("GET", apiID))
 	if err != nil {
 		log.Warning("API does not exists ", err)
 		return apiError("Api does not exists"), http.StatusInternalServerError
@@ -837,7 +1184,13 @@ func deleteAPIById(apiID string) (interface{}, int) {
 	}
 
 	//remove api id from all JWT keys
-	err = addOrDeleteJWTKey(DELETE)
+	//TODO - Read appName from apiData and pass it to
+	apiDef := &apidef.APIDefinition{}
+	if err := json.NewDecoder(strings.NewReader(apiData)).Decode(apiDef); err != nil {
+		return apiError("Could not decode api definition"), http.StatusInternalServerError
+	}
+
+	err = addOrDeleteJWTKey(DELETE, apiDef.AppName)
 	if err != nil {
 		log.Error("Error updating JWT keys", err)
 		return apiError("Error updating JWT keys"), http.StatusInternalServerError
@@ -856,8 +1209,8 @@ func deleteAPIById(apiID string) (interface{}, int) {
 
 func deleteAPIByService(service string) (interface{}, int) {
 	var existingApis ServiceAPIS
+	var apiData string
 
-	//c := RedisPool.Get()
 	c := GetRedisConn()
 
 	log.Info("Deleting API from redis for service: ", service)
@@ -871,8 +1224,16 @@ func deleteAPIByService(service string) (interface{}, int) {
 		return apiError("Api does not exists"), http.StatusInternalServerError
 	}
 
-	for _, apiID := range keys {
+	for pos, apiID := range keys {
+		if pos == 0 {
+			apiData, err = redis.String(c.Do("GET", apiID))
+			if err != nil {
+				log.Warning("Error getting API data ", err)
+				return apiError("Delete failed"), http.StatusInternalServerError
+			}
+		}
 		// Load API Definition from Redis DB
+		log.Warning("Deleting API ", apiID)
 		_, err = c.Do("DEL", apiID)
 		if err != nil {
 			log.Warning("Error deleting API ", err)
@@ -889,7 +1250,12 @@ func deleteAPIByService(service string) (interface{}, int) {
 	}
 
 	//remove api id from all JWT keys
-	err = addOrDeleteJWTKey(DELETE)
+	//TODO - Read appName from api sepc and pass it
+	apiDef := &apidef.APIDefinition{}
+	if err := json.NewDecoder(strings.NewReader(apiData)).Decode(apiDef); err != nil {
+		return apiError("Could not decode api definition"), http.StatusInternalServerError
+	}
+	err = addOrDeleteJWTKey(DELETE, apiDef.AppName)
 	if err != nil {
 		log.Error("Error updating JWT keys", err)
 		return apiError("Error updating JWT keys"), http.StatusInternalServerError
@@ -1003,7 +1369,7 @@ func copyFile(src, dst string) (int64, error) {
 func getTykEndpoint(host string, path string) string {
 	url := url.URL{
 		Scheme: "https",
-		Host:   host + ":" + TykHTTPPort,
+		Host:   host + ":" + strconv.Itoa(config.Global().ControlAPIPort),
 		Path:   path,
 	}
 	return url.String()

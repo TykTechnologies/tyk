@@ -24,6 +24,7 @@ func GetRedisConn() redis.Conn {
 
 	return c
 }
+
 func newPool() *redis.Pool {
 	return &redis.Pool{
 		MaxIdle:   80,
