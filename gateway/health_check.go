@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/TykTechnologies/tyk/rpc"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -173,9 +174,7 @@ func gatherHealthChecks() {
 				Time:          time.Now().Format(time.RFC3339),
 			}
 
-			rpcStore := RPCStorageHandler{KeyPrefix: "livenesscheck-"}
-
-			if !rpcStore.Connect() {
+			if !rpc.GroupLogin() {
 				checkItem.Output = "Could not connect to RPC"
 				checkItem.Status = Fail
 			}

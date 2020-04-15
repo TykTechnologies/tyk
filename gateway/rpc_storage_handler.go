@@ -721,7 +721,7 @@ func (r *RPCStorageHandler) StartRPCKeepaliveWatcher() {
 		if err := r.SetKey("0000", "0000", 10); err != nil {
 			log.WithError(err).WithFields(logrus.Fields{
 				"prefix": "RPC Conn Mgr",
-			}).Info("Can't connect to RPC layer")
+			}).Warning("Can't connect to RPC layer")
 
 			if r.IsAccessError(err) {
 				if rpc.Login() {
