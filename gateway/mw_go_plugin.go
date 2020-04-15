@@ -151,10 +151,12 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 		if rw.statusCodeSent >= http.StatusForbidden {
 
 			m.logger.WithError(err).Error("Authentication error in Go-plugin middleware func")
-
-			m.Base().FireEvent(EventAuthFailure, EventMetaDefault {
-				EventMetaDefault: EventMetaDefault{Message: "Auth Failure", OriginatingRequest: EncodeRequestToEvent(r)},
-			})
+			m.Base().FireEvent(EventAuthFailure, EventKeyFailureMeta{
+		                EventMetaDefault: EventMetaDefault{Message: "Auth Failure", OriginatingRequest: EncodeRequestToEvent(r)},
+		                Path: r.URL.Path,
+		                Origin: request.RealIP(r),
+		                Key: "n/a",
+	                })
 			respCode = rw.statusCodeSent
 			err = fmt.Errorf("plugin function sent auth failed response code: %d", rw.statusCodeSent)
 
