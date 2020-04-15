@@ -175,7 +175,7 @@ func gatherHealthChecks() {
 				Time:          time.Now().Format(time.RFC3339),
 			}
 
-			if !rpc.GroupLogin() {
+			if !rpc.Login() {
 				checkItem.Output = "Could not connect to RPC"
 				checkItem.Status = Fail
 			}
