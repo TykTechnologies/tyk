@@ -2116,7 +2116,7 @@ func RevokeTokenHandler(w http.ResponseWriter, r *http.Request) {
 			RevokeToken(storage, token, tokenTypeHint)
 		}
 	}
-	doJSONWrite(w, http.StatusOK, "token revoked successfully")
+	doJSONWrite(w, http.StatusOK, apiOk("token revoked successfully"))
 }
 
 func GetStorageForApi(apiID string) (ExtendedOsinStorageInterface, int, error) {
@@ -2182,7 +2182,7 @@ func RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	doJSONWrite(w, http.StatusOK, "tokens revoked successfully")
+	doJSONWrite(w, http.StatusOK, apiOk("tokens revoked successfully"))
 }
 
 // TODO: Don't modify http.Request values in-place. We must right now

@@ -246,7 +246,7 @@ func (o *OAuthHandlers) HandleRevokeToken(w http.ResponseWriter, r *http.Request
 	}
 
 	RevokeToken(o.Manager.OsinServer.Storage, token, tokenTypeHint)
-	doJSONWrite(w, http.StatusOK, "token revoked successfully")
+	doJSONWrite(w, http.StatusOK, apiOk("token revoked successfully"))
 }
 
 func RevokeToken(storage ExtendedOsinStorageInterface, token, tokenTypeHint string) {
@@ -287,7 +287,7 @@ func (o *OAuthHandlers) HandleRevokeAllTokens(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	doJSONWrite(w, http.StatusOK, "tokens revoked successfully")
+	doJSONWrite(w, http.StatusOK, apiOk("tokens revoked successfully"))
 }
 
 func RevokeAllTokens(storage ExtendedOsinStorageInterface, clientId, clientSecret string) (int, error) {
