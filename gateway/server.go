@@ -491,11 +491,16 @@ func generateOAuthPrefix(apiID string) string {
 
 // Create API-specific OAuth handlers and respective auth servers
 func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
-	apiAuthorizePath := spec.Proxy.ListenPath + "tyk/oauth/authorize-client{_:/?}"
-	clientAuthPath := spec.Proxy.ListenPath + "oauth/authorize{_:/?}"
-	clientAccessPath := spec.Proxy.ListenPath + "oauth/token{_:/?}"
-	revokeToken := spec.Proxy.ListenPath + "oauth/revoke"
-	revokeAllTokens := spec.Proxy.ListenPath + "oauth/revoke_all"
+	var pathSeparator string
+	if !strings.HasSuffix(spec.Proxy.ListenPath, "/") {
+		pathSeparator = "/"
+	}
+
+	apiAuthorizePath := spec.Proxy.ListenPath + pathSeparator + "tyk/oauth/authorize-client{_:/?}"
+	clientAuthPath := spec.Proxy.ListenPath + pathSeparator + "oauth/authorize{_:/?}"
+	clientAccessPath := spec.Proxy.ListenPath + pathSeparator + "oauth/token{_:/?}"
+	revokeToken := spec.Proxy.ListenPath + pathSeparator + "oauth/revoke"
+	revokeAllTokens := spec.Proxy.ListenPath + pathSeparator + "oauth/revoke_all"
 
 	serverConfig := osin.NewServerConfig()
 
