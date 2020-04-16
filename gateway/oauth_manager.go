@@ -419,14 +419,12 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			oldToken, foundKey := session.OauthKeys[ar.Client.GetId()]
 			if foundKey {
 				log.Info("Found old token, revoking: ", oldToken)
-
 				GlobalSessionManager.RemoveSession(o.API.OrgID, oldToken, false)
 			}
 		}
 
 		log.Debug("[OAuth] Finishing access request ")
 		o.OsinServer.FinishAccessRequest(resp, r, ar)
-
 		new_token, foundNewToken := resp.Output["access_token"]
 		if username != "" && foundNewToken {
 			log.Debug("Updating token data in key")
@@ -1084,8 +1082,8 @@ func (accessTokenGen) GenerateAccessToken(data *osin.AccessData, generaterefresh
 
 		newSession = sessionFromPolicy
 	}
-	accesstoken = keyGen.GenerateAuthKey(newSession.OrgID)
 
+	accesstoken = keyGen.GenerateAuthKey(newSession.OrgID)
 	if generaterefresh {
 		u6 := uuid.NewV4()
 		refreshtoken = base64.StdEncoding.EncodeToString([]byte(u6.String()))
