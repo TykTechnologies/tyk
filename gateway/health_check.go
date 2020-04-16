@@ -9,6 +9,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/TykTechnologies/tyk/rpc"
+
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/sirupsen/logrus"
@@ -173,9 +175,7 @@ func gatherHealthChecks() {
 				Time:          time.Now().Format(time.RFC3339),
 			}
 
-			rpcStore := RPCStorageHandler{KeyPrefix: "livenesscheck-"}
-
-			if !rpcStore.Connect() {
+			if !rpc.Login() {
 				checkItem.Output = "Could not connect to RPC"
 				checkItem.Status = Fail
 			}
