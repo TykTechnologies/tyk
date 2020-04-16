@@ -233,15 +233,20 @@ const (
 func (o *OAuthHandlers) HandleRevokeToken(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		doJSONWrite(w, http.StatusBadRequest, apiError("error parsing form. Form malformed"))
 		return
 	}
 
 	token := r.PostFormValue("token")
 	tokenTypeHint := r.PostFormValue("token_type_hint")
 
+	if token == "" {
+		doJSONWrite(w, http.StatusBadRequest, apiError(oauthTokenEmpty))
+		return
+	}
+
 	RevokeToken(o.Manager.OsinServer.Storage, token, tokenTypeHint)
-	w.WriteHeader(200)
+	doJSONWrite(w, http.StatusOK, apiOk("token revoked successfully"))
 }
 
 func RevokeToken(storage ExtendedOsinStorageInterface, token, tokenTypeHint string) {
@@ -259,36 +264,46 @@ func RevokeToken(storage ExtendedOsinStorageInterface, token, tokenTypeHint stri
 func (o *OAuthHandlers) HandleRevokeAllTokens(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		doJSONWrite(w, http.StatusBadRequest, apiError("error parsing form. Form malformed"))
 		return
 	}
 
 	clientId := r.PostFormValue("client_id")
 	secret := r.PostFormValue("client_secret")
 
-	if clientId == "" || secret == "" {
-		w.WriteHeader(http.StatusBadRequest)
+	if clientId == "" {
+		doJSONWrite(w, http.StatusUnauthorized, apiError(oauthClientIdEmpty))
 		return
 	}
 
-	status := RevokeAllTokens(o.Manager.OsinServer.Storage, clientId, secret)
-	w.WriteHeader(status)
+	if secret == "" {
+		doJSONWrite(w, http.StatusUnauthorized, apiError(oauthClientSecretEmpty))
+		return
+	}
+
+	status, err := RevokeAllTokens(o.Manager.OsinServer.Storage, clientId, secret)
+	if err != nil {
+		doJSONWrite(w, status, apiError(err.Error()))
+		return
+	}
+
+	doJSONWrite(w, http.StatusOK, apiOk("tokens revoked successfully"))
 }
 
-func RevokeAllTokens(storage ExtendedOsinStorageInterface, clientId, clientSecret string) int {
+func RevokeAllTokens(storage ExtendedOsinStorageInterface, clientId, clientSecret string) (int, error) {
 	client, err := storage.GetClient(clientId)
 	log.Debug("Revoke all tokens")
 	if err != nil {
-		return http.StatusNotFound
+		return http.StatusNotFound, errors.New("error getting oauth client")
 	}
 
 	if client.GetSecret() != clientSecret {
-		return http.StatusForbidden
+		return http.StatusUnauthorized, errors.New(oauthClientSecretWrong)
 	}
 
 	clientTokens, err := storage.GetClientTokens(clientId)
 	if err != nil {
-		return http.StatusBadRequest
+		return http.StatusBadRequest, errors.New("cannot retrieve client tokens")
 	}
 
 	for _, token := range clientTokens {
@@ -299,7 +314,7 @@ func RevokeAllTokens(storage ExtendedOsinStorageInterface, clientId, clientSecre
 		}
 	}
 
-	return http.StatusOK
+	return http.StatusOK, nil
 }
 
 // OAuthManager handles and wraps osin OAuth2 functions to handle authorise and access requests
