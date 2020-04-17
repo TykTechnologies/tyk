@@ -2191,7 +2191,8 @@ func RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request) {
 	for _, apiId := range apis {
 		storage, _, err := GetStorageForApi(apiId)
 		if err == nil {
-			_, tokens, _ = RevokeAllTokens(storage, clientId, clientSecret)
+			_, tokensRevoked, _ := RevokeAllTokens(storage, clientId, clientSecret)
+			tokens = append(tokens, tokensRevoked...)
 		}
 	}
 

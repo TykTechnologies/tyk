@@ -307,8 +307,7 @@ func RevokeAllTokens(storage ExtendedOsinStorageInterface, clientId, clientSecre
 		return http.StatusBadRequest, resp, errors.New("cannot retrieve client tokens")
 	}
 
-	log.Debug("Tokens found:", len(clientTokens))
-
+	log.Debug("Tokens found to be revoked:", len(clientTokens))
 	for _, token := range clientTokens {
 		access, err := storage.LoadAccess(token.Token)
 		if err == nil {
@@ -909,7 +908,6 @@ func (r *RedisOsinStorageInterface) LoadAuthorize(code string) (*osin.AuthorizeD
 func (r *RedisOsinStorageInterface) RemoveAuthorize(code string) error {
 	key := prefixAuth + code
 	r.store.DeleteKey(key)
-
 	return nil
 }
 
