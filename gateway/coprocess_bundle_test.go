@@ -148,7 +148,7 @@ from tyk.decorators import *
 from gateway import TykGateway as tyk
 
 @Hook
-def MyRequestHook(request, response, session, metadata, spec):
+def MyRequestHook(request, session, spec):
 	request.object.return_overrides.headers['X-Foo'] = 'Bar'
 	request.object.return_overrides.response_code = int(request.object.params["status"])
 
