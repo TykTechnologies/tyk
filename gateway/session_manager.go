@@ -217,7 +217,8 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 		}
 	}
 
-	if enableRL {
+	// If rate is -1 or 0, it means unlimited and no need for rate limiting.
+	if enableRL && apiLimit.Rate > 0 {
 		rateScope := ""
 		if allowanceScope != "" {
 			rateScope = allowanceScope + "-"
