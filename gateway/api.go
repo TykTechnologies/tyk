@@ -750,15 +750,17 @@ func handleDeleteHashedKey(keyName, apiID string, resetQuota bool) (interface{},
 }
 
 func handleGlobalAddToSortedSet(keyName, value string, score float64) {
-	GlobalSessionManager.Store().AddToSortedSet(keyName, value, score)
+	log.Debug("handleRemoveSortedSetRange --> not implemented")
 }
 
 func handleGetSortedSetRange(keyName, scoreFrom, scoreTo string) ([]string, []float64, error) {
-	return GlobalSessionManager.Store().GetSortedSetRange(keyName, scoreFrom, scoreTo)
+	log.Debug("handleRemoveSortedSetRange --> not implemented")
+	return nil, nil, nil
 }
 
 func handleRemoveSortedSetRange(keyName, scoreFrom, scoreTo string) error {
-	return GlobalSessionManager.Store().RemoveSortedSetRange(keyName, scoreFrom, scoreTo)
+	log.Debug("handleRemoveSortedSetRange --> not implemented")
+	return nil
 }
 
 func handleGetAPIList() (interface{}, int) {
