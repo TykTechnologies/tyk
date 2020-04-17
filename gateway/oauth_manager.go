@@ -281,11 +281,17 @@ func (o *OAuthHandlers) HandleRevokeAllTokens(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	status, _, err := RevokeAllTokens(o.Manager.OsinServer.Storage, clientId, secret)
+	status, tokens, err := RevokeAllTokens(o.Manager.OsinServer.Storage, clientId, secret)
 	if err != nil {
 		doJSONWrite(w, status, apiError(err.Error()))
 		return
 	}
+
+	n := Notification{
+		Command: KeySpaceUpdateNotification,
+		Payload: strings.Join(tokens, ","),
+	}
+	MainNotifier.Notify(n)
 
 	doJSONWrite(w, http.StatusOK, apiOk("tokens revoked successfully"))
 }
