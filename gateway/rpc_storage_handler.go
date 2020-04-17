@@ -830,7 +830,8 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 		if err != nil {
 			continue
 		}
-		RevokeAllTokens(storage, clientId, clientSecret)
+		_, tokens, _ := RevokeAllTokens(storage, clientId, clientSecret)
+		keys = append(keys, tokens...)
 	}
 
 	//single and specific tokens

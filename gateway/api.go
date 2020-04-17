@@ -2187,12 +2187,20 @@ func RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	tokens := []string{}
 	for _, apiId := range apis {
 		storage, _, err := GetStorageForApi(apiId)
 		if err == nil {
-			RevokeAllTokens(storage, clientId, clientSecret)
+			_, tokensRevoked, _ := RevokeAllTokens(storage, clientId, clientSecret)
+			tokens = append(tokens, tokensRevoked...)
 		}
 	}
+
+	n := Notification{
+		Command: KeySpaceUpdateNotification,
+		Payload: strings.Join(tokens, ","),
+	}
+	MainNotifier.Notify(n)
 
 	doJSONWrite(w, http.StatusOK, apiOk("tokens revoked successfully"))
 }
