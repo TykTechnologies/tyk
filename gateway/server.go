@@ -512,8 +512,7 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 	prefix := generateOAuthPrefix(spec.APIID)
 	storageManager := getGlobalStorageHandler(prefix, false)
 	storageManager.Connect()
-	osinStorage := &RedisOsinStorageInterface{storageManager, spec.SessionManager} //TODO: Needs storage manager from APISpec
-
+	osinStorage := &RedisOsinStorageInterface{storageManager, spec.SessionManager, &storage.RedisCluster{KeyPrefix: prefix, HashKeys: false}, spec.OrgID}
 	osinServer := TykOsinNewServer(serverConfig, osinStorage)
 
 	oauthManager := OAuthManager{spec, osinServer}
