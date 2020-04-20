@@ -94,15 +94,9 @@ const (
 	sessionFailQuota
 )
 
-func (l *SessionLimiter) limitSentinel(
-	currentSession *user.SessionState,
-	key string,
-	rateScope string,
-	store storage.Handler,
-	globalConf *config.Config,
-	apiLimit *user.APILimit,
-	dryRun bool,
-) bool {
+func (l *SessionLimiter) limitSentinel(currentSession *user.SessionState, key string, rateScope string, store storage.Handler,
+	globalConf *config.Config, apiLimit *user.APILimit, dryRun bool) bool {
+
 	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash()
 	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash() + ".BLOCKED"
 
@@ -116,15 +110,10 @@ func (l *SessionLimiter) limitSentinel(
 	}
 	return false
 }
-func (l *SessionLimiter) limitRedis(
-	currentSession *user.SessionState,
-	key string,
-	rateScope string,
-	store storage.Handler,
-	globalConf *config.Config,
-	apiLimit *user.APILimit,
-	dryRun bool,
-) bool {
+
+func (l *SessionLimiter) limitRedis(currentSession *user.SessionState, key string, rateScope string, store storage.Handler,
+	globalConf *config.Config, apiLimit *user.APILimit, dryRun bool) bool {
+
 	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash()
 	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash() + ".BLOCKED"
 
@@ -133,13 +122,10 @@ func (l *SessionLimiter) limitRedis(
 	}
 	return false
 }
-func (l *SessionLimiter) limitDRL(
-	currentSession *user.SessionState,
-	key string,
-	rateScope string,
-	apiLimit *user.APILimit,
-	dryRun bool,
-) bool {
+
+func (l *SessionLimiter) limitDRL(currentSession *user.SessionState, key string, rateScope string,
+	apiLimit *user.APILimit, dryRun bool) bool {
+
 	// In-memory limiter
 	if l.bucketStore == nil {
 		l.bucketStore = memorycache.New()
