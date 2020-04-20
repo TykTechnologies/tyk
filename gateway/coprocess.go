@@ -15,10 +15,10 @@ import (
 	"github.com/TykTechnologies/tyk/coprocess"
 
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 )
-import "fmt"
 
 var (
 	supportedDrivers = []apidef.MiddlewareDriver{apidef.PythonDriver, apidef.LuaDriver, apidef.GrpcDriver}
@@ -433,16 +433,13 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}
 		returnedSession.OrgID = m.Spec.OrgID
 
-<<<<<<< HEAD
-=======
 		if err := m.ApplyPolicies(returnedSession); err != nil {
 			AuthFailed(m, r, r.Header.Get(m.Spec.Auth.AuthHeaderName))
 			return errors.New(http.StatusText(http.StatusForbidden)), http.StatusForbidden
 		}
 
->>>>>>> f6f9580dd0f5683e35744ed5a47db83f19aa8e0d
 		existingSession, found := FallbackKeySesionManager.SessionDetail(sessionID, false)
-		
+
 		if found {
 			returnedSession.QuotaRenews = existingSession.QuotaRenews
 			returnedSession.QuotaRemaining = existingSession.QuotaRemaining
