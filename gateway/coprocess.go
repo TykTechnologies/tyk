@@ -433,12 +433,31 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}
 		returnedSession.OrgID = m.Spec.OrgID
 
+<<<<<<< HEAD
+=======
+		if err := m.ApplyPolicies(returnedSession); err != nil {
+			AuthFailed(m, r, r.Header.Get(m.Spec.Auth.AuthHeaderName))
+			return errors.New(http.StatusText(http.StatusForbidden)), http.StatusForbidden
+		}
+
+>>>>>>> f6f9580dd0f5683e35744ed5a47db83f19aa8e0d
 		existingSession, found := FallbackKeySesionManager.SessionDetail(sessionID, false)
+		
 		if found {
 			returnedSession.QuotaRenews = existingSession.QuotaRenews
 			returnedSession.QuotaRemaining = existingSession.QuotaRemaining
+
+			for api := range returnedSession.AccessRights {
+				if _, found := existingSession.AccessRights[api]; found {
+					if returnedSession.AccessRights[api].Limit != nil {
+						returnedSession.AccessRights[api].Limit.QuotaRenews = existingSession.AccessRights[api].Limit.QuotaRenews
+						returnedSession.AccessRights[api].Limit.QuotaRemaining = existingSession.AccessRights[api].Limit.QuotaRemaining
+					}
+				}
+			}
 		}
 
+		// Apply it second time to fix the quota
 		if err := m.ApplyPolicies(returnedSession); err != nil {
 			AuthFailed(m, r, r.Header.Get(m.Spec.Auth.AuthHeaderName))
 			return errors.New(http.StatusText(http.StatusForbidden)), http.StatusForbidden

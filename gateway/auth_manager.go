@@ -295,6 +295,7 @@ func (b *DefaultSessionManager) SessionDetail(keyName string, hashed bool) (user
 					keyName,
 				},
 			)
+
 			// pick the 1st non empty from the returned list
 			for _, val := range jsonKeyValList {
 				if val != "" {
