@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/square/go-jose/v3/json"
+	"gopkg.in/square/go-jose.v2/json"
 )
 
 // Encrypter represents an encrypter which produces an encrypted JWE object.
@@ -141,6 +141,8 @@ func NewEncrypter(enc ContentEncryption, rcpt Recipient, opts *EncrypterOptions)
 		keyID, rawKey = encryptionKey.KeyID, encryptionKey.Key
 	case *JSONWebKey:
 		keyID, rawKey = encryptionKey.KeyID, encryptionKey.Key
+	case OpaqueKeyEncrypter:
+		keyID, rawKey = encryptionKey.KeyID(), encryptionKey
 	default:
 		rawKey = encryptionKey
 	}
@@ -199,7 +201,7 @@ func NewMultiEncrypter(enc ContentEncryption, rcpts []Recipient, opts *Encrypter
 	if cipher == nil {
 		return nil, ErrUnsupportedAlgorithm
 	}
-	if len(rcpts) == 0 {
+	if rcpts == nil || len(rcpts) == 0 {
 		return nil, fmt.Errorf("square/go-jose: recipients is nil or empty")
 	}
 
@@ -267,9 +269,11 @@ func makeJWERecipient(alg KeyAlgorithm, encryptionKey interface{}) (recipientKey
 		recipient, err := makeJWERecipient(alg, encryptionKey.Key)
 		recipient.keyID = encryptionKey.KeyID
 		return recipient, err
-	default:
-		return recipientKeyInfo{}, ErrUnsupportedKeyType
 	}
+	if encrypter, ok := encryptionKey.(OpaqueKeyEncrypter); ok {
+		return newOpaqueKeyEncrypter(alg, encrypter)
+	}
+	return recipientKeyInfo{}, ErrUnsupportedKeyType
 }
 
 // newDecrypter creates an appropriate decrypter based on the key type
@@ -295,9 +299,11 @@ func newDecrypter(decryptionKey interface{}) (keyDecrypter, error) {
 		return newDecrypter(decryptionKey.Key)
 	case *JSONWebKey:
 		return newDecrypter(decryptionKey.Key)
-	default:
-		return nil, ErrUnsupportedKeyType
 	}
+	if okd, ok := decryptionKey.(OpaqueKeyDecrypter); ok {
+		return &opaqueKeyDecrypter{decrypter: okd}, nil
+	}
+	return nil, ErrUnsupportedKeyType
 }
 
 // Implementation of encrypt method producing a JWE object.
@@ -517,13 +523,13 @@ func (obj JSONWebEncryption) DecryptMulti(decryptionKey interface{}) (int, Heade
 		}
 	}
 
-	if plaintext == nil {
+	if plaintext == nil || err != nil {
 		return -1, Header{}, nil, ErrCryptoFailure
 	}
 
 	// The "zip" header parameter may only be present in the protected header.
 	if comp := obj.protected.getCompression(); comp != "" {
-		plaintext, _ = decompress(comp, plaintext)
+		plaintext, err = decompress(comp, plaintext)
 	}
 
 	sanitized, err := headers.sanitized()

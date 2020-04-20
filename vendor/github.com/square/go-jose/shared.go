@@ -23,7 +23,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/square/go-jose/v3/json"
+	"gopkg.in/square/go-jose.v2/json"
 )
 
 // KeyAlgorithm represents a key management algorithm.
@@ -133,8 +133,8 @@ const (
 type HeaderKey string
 
 const (
-	HeaderType        = "typ" // string
-	HeaderContentType = "cty" // string
+	HeaderType        HeaderKey = "typ" // string
+	HeaderContentType           = "cty" // string
 
 	// These are set by go-jose and shouldn't need to be set by consumers of the
 	// library.
@@ -452,8 +452,8 @@ func parseCertificateChain(chain []string) ([]*x509.Certificate, error) {
 	return out, nil
 }
 
-func (parsed rawHeader) isSet(k HeaderKey) bool {
-	dvr := parsed[k]
+func (dst rawHeader) isSet(k HeaderKey) bool {
+	dvr := dst[k]
 	if dvr == nil {
 		return false
 	}
@@ -472,17 +472,17 @@ func (parsed rawHeader) isSet(k HeaderKey) bool {
 }
 
 // Merge headers from src into dst, giving precedence to headers from l.
-func (parsed rawHeader) merge(src *rawHeader) {
+func (dst rawHeader) merge(src *rawHeader) {
 	if src == nil {
 		return
 	}
 
 	for k, v := range *src {
-		if parsed.isSet(k) {
+		if dst.isSet(k) {
 			continue
 		}
 
-		parsed[k] = v
+		dst[k] = v
 	}
 }
 

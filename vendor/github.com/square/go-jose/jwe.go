@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/square/go-jose/v3/json"
+	"gopkg.in/square/go-jose.v2/json"
 )
 
 // rawJSONWebEncryption represents a raw JWE JSON object. Used for parsing/serializing.
@@ -86,12 +86,11 @@ func (obj JSONWebEncryption) mergedHeaders(recipient *recipientInfo) rawHeader {
 func (obj JSONWebEncryption) computeAuthData() []byte {
 	var protected string
 
-	switch {
-	case obj.original != nil && obj.original.Protected != nil:
+	if obj.original != nil && obj.original.Protected != nil {
 		protected = obj.original.Protected.base64()
-	case obj.protected != nil:
+	} else if obj.protected != nil {
 		protected = base64.RawURLEncoding.EncodeToString(mustSerializeJSON((obj.protected)))
-	default:
+	} else {
 		protected = ""
 	}
 
@@ -104,7 +103,7 @@ func (obj JSONWebEncryption) computeAuthData() []byte {
 	return output
 }
 
-// ParseEncrypted parses an encrypted message in compact or JWE JSON Serialization format.
+// ParseEncrypted parses an encrypted message in compact or full serialization format.
 func ParseEncrypted(input string) (*JSONWebEncryption, error) {
 	input = stripWhitespace(input)
 	if strings.HasPrefix(input, "{") {

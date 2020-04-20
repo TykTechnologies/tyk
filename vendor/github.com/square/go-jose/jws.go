@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/square/go-jose/v3/json"
+	"gopkg.in/square/go-jose.v2/json"
 )
 
 // rawJSONWebSignature represents a raw JWS JSON object. Used for parsing/serializing.
@@ -75,7 +75,7 @@ type Signature struct {
 	original  *rawSignatureInfo
 }
 
-// ParseSigned parses a signed message in compact or JWS JSON Serialization format.
+// ParseSigned parses a signed message in compact or full serialization format.
 func ParseSigned(signature string) (*JSONWebSignature, error) {
 	signature = stripWhitespace(signature)
 	if strings.HasPrefix(signature, "{") {

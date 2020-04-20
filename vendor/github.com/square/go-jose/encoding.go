@@ -26,7 +26,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/square/go-jose/v3/json"
+	"gopkg.in/square/go-jose.v2/json"
 )
 
 // Helper function to serialize known-good objects.
@@ -57,13 +57,11 @@ func mustSerializeJSON(value interface{}) []byte {
 func stripWhitespace(data string) string {
 	buf := strings.Builder{}
 	buf.Grow(len(data))
-
 	for _, r := range data {
 		if !unicode.IsSpace(r) {
 			buf.WriteRune(r)
 		}
 	}
-
 	return buf.String()
 }
 
