@@ -6,9 +6,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"time"
-
 	"github.com/sirupsen/logrus"
-
+        "github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/goplugin"
 )
