@@ -199,6 +199,70 @@ func requestThrottlingTest(limiter string, testLevel string) func(t *testing.T) 
 	}
 }
 
+func TestDeveloperRequestThrottling(t *testing.T) {
+	defer ResetTestConfig()
+	ts := StartTest()
+	defer ts.Close()
+	globalCfg := config.Global()
+	globalCfg.EnableRedisRollingLimiter = true
+	config.SetGlobal(globalCfg)
+	var per, rate float64
+	var throttleRetryLimit int
+	per = 5
+	rate = 1
+	throttleRetryLimit = 3
+
+	spec := BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Name = "test"
+		spec.APIID = "test"
+		spec.OrgID = "default"
+		spec.UseKeylessAccess = false
+		spec.Proxy.ListenPath = "/"
+	})[0]
+
+	policyID := CreatePolicy(func(p *user.Policy) {
+		p.OrgID = "default"
+
+		p.AccessRights = map[string]user.AccessDefinition{
+			spec.APIID: {
+				APIName: spec.APIDefinition.Name,
+				APIID:   spec.APIID,
+			},
+		}
+		p.Per = per
+		p.Rate = rate
+
+		p.ThrottleInterval = 1
+		p.ThrottleRetryLimit = throttleRetryLimit
+	})
+
+	md := make(map[string]interface{})
+	md[keyDataDeveloperID] = "5f1937ad4ea4611eefb8ede6"
+
+	key1 := CreateSession(func(s *user.SessionState) {
+		s.ApplyPolicies = []string{policyID}
+		s.SetMetaData(md)
+	})
+
+	key2 := CreateSession(func(s *user.SessionState) {
+		s.ApplyPolicies = []string{policyID}
+		s.SetMetaData(md)
+	})
+
+	key3 := CreateSession(func(s *user.SessionState) {
+		s.ApplyPolicies = []string{policyID}
+		md[keyDataDeveloperID] = "5f1937ad4ea4611eefb8ede2"
+		s.SetMetaData(md)
+	})
+
+	ts.Run(t, []test.TestCase{
+		{Path: "/", Headers: map[string]string{"authorization": key1}, Code: 200, Delay: 100 * time.Millisecond},
+		{Path: "/", Headers: map[string]string{"authorization": key2}, Code: 429},
+		{Path: "/", Headers: map[string]string{"authorization": key3}, Code: 200, Delay: 100 * time.Millisecond},
+		{Path: "/", Headers: map[string]string{"authorization": key3}, Code: 429},
+	}...)
+}
+
 func TestRequestThrottling(t *testing.T) {
 	t.Run("PolicyLevel", func(t *testing.T) {
 		t.Run("InMemoryRateLimiter", requestThrottlingTest("InMemoryRateLimiter", "PolicyLevel"))
