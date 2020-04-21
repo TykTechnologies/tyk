@@ -439,7 +439,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}
 
 		existingSession, found := FallbackKeySesionManager.SessionDetail(sessionID, false)
-		
+
 		if found {
 			returnedSession.QuotaRenews = existingSession.QuotaRenews
 			returnedSession.QuotaRemaining = existingSession.QuotaRemaining

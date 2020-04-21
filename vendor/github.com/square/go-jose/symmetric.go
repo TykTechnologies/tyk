@@ -31,11 +31,10 @@ import (
 	"io"
 
 	"golang.org/x/crypto/pbkdf2"
-
-	josecipher "github.com/square/go-jose/v3/cipher"
+	"gopkg.in/square/go-jose.v2/cipher"
 )
 
-// RandReader is a cryptographically secure random number generator (stubbed out in tests).
+// Random reader (stubbed out in tests)
 var RandReader = rand.Reader
 
 const (
@@ -279,14 +278,8 @@ func (ctx *symmetricKeyCipher) encryptKey(cek []byte, alg KeyAlgorithm) (recipie
 		}
 
 		header := &rawHeader{}
-
-		if err = header.set(headerIV, newBuffer(parts.iv)); err != nil {
-			return recipientInfo{}, err
-		}
-
-		if err = header.set(headerTag, newBuffer(parts.tag)); err != nil {
-			return recipientInfo{}, err
-		}
+		header.set(headerIV, newBuffer(parts.iv))
+		header.set(headerTag, newBuffer(parts.tag))
 
 		return recipientInfo{
 			header:       header,
@@ -339,14 +332,8 @@ func (ctx *symmetricKeyCipher) encryptKey(cek []byte, alg KeyAlgorithm) (recipie
 		}
 
 		header := &rawHeader{}
-
-		if err = header.set(headerP2C, ctx.p2c); err != nil {
-			return recipientInfo{}, err
-		}
-
-		if err = header.set(headerP2S, newBuffer(ctx.p2s)); err != nil {
-			return recipientInfo{}, err
-		}
+		header.set(headerP2C, ctx.p2c)
+		header.set(headerP2S, newBuffer(ctx.p2s))
 
 		return recipientInfo{
 			encryptedKey: jek,
