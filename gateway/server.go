@@ -461,7 +461,6 @@ func loadControlAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}/rotate", rotateOauthClientHandler).Methods("PUT")
 		r.HandleFunc("/oauth/clients/apis/{appID}", getApisForOauthApp).Queries("orgID", "{[0-9]*?}").Methods("GET")
 		r.HandleFunc("/oauth/refresh/{keyName}", invalidateOauthRefresh).Methods("DELETE")
-		r.HandleFunc("/cache/{apiID}", invalidateCacheHandler).Methods("DELETE")
 		r.HandleFunc("/oauth/revoke", RevokeTokenHandler).Methods("POST")
 		r.HandleFunc("/oauth/revoke_all", RevokeAllTokensHandler).Methods("POST")
 
@@ -470,7 +469,7 @@ func loadControlAPIEndpoints(muxer *mux.Router) {
 	}
 
 	r.HandleFunc("/debug", traceHandler).Methods("POST")
-
+	r.HandleFunc("/cache/{apiID}", invalidateCacheHandler).Methods("DELETE")
 	r.HandleFunc("/keys", keyHandler).Methods("POST", "PUT", "GET", "DELETE")
 	r.HandleFunc("/keys/preview", previewKeyHandler).Methods("POST")
 	r.HandleFunc("/keys/{keyName:[^/]*}", keyHandler).Methods("POST", "PUT", "GET", "DELETE")
