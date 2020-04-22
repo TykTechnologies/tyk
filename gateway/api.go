@@ -344,6 +344,8 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 			return apiError("Key is not found"), http.StatusNotFound
 		}
 
+		//remain the creation date
+		newSession.DateCreated = originalKey.DateCreated
 		// don't change fields related to quota and rate limiting if was passed as "suppress_reset=1"
 		if suppressReset {
 			// save existing quota_renews and last_updated if suppress_reset was passed
