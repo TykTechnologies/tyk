@@ -373,6 +373,11 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 		keyName = generateToken(newSession.OrgID, keyName)
 	}
 
+	//set the original expiry if the content in payload is a past time
+	if time.Now().After(time.Unix(newSession.Expires, 0)) && newSession.Expires > 1 {
+		newSession.Expires = originalKey.Expires
+	}
+
 	// Update our session object (create it)
 	if newSession.BasicAuthData.Password != "" {
 		// If we are using a basic auth user, then we need to make the keyname explicit against the OrgId in order to differentiate it
