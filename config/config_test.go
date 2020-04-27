@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/kelseyhightower/envconfig"
 )
 
 func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
@@ -183,4 +185,31 @@ func TestConfig_GetEventTriggers(t *testing.T) {
 		assert(t, both, "current")
 	})
 
+}
+
+const DefaultListFormat = `This application is configured via the environment. The following environment
+variables can be used:
+
+key | type
+----|--------
+{{range . -}}
+{{usage_key .}} | {{usage_type .}}
+{{end}}
+`
+
+func TestEnvConfig(t *testing.T) {
+	var buf bytes.Buffer
+
+	err := envconfig.Usagef("TYK_GW", &Config{}, &buf, DefaultListFormat)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// ioutil.WriteFile("config_env_vars.md", buf.Bytes(), 0600)
+	f, err := ioutil.ReadFile("config_env_vars.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(buf.Bytes(), f) {
+		t.Errorf("mismatch environment variables")
+	}
 }
