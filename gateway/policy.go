@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/jensneuse/graphql-go-tools/pkg/graphql/fields"
+	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/rpc"
 
@@ -22,7 +22,7 @@ type DBAccessDefinition struct {
 	APIID           string            `json:"apiid"`
 	Versions        []string          `json:"versions"`
 	AllowedURLs     []user.AccessSpec `bson:"allowed_urls" json:"allowed_urls"` // mapped string MUST be a valid regex
-	RestrictedTypes []fields.Type     `json:"restricted_types"`
+	RestrictedTypes []graphql.Type    `json:"restricted_types"`
 	Limit           *user.APILimit    `json:"limit"`
 }
 
