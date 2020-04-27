@@ -10,12 +10,14 @@ import (
 	"github.com/jensneuse/graphql-go-tools/pkg/astnormalization"
 	"github.com/jensneuse/graphql-go-tools/pkg/astparser"
 	"github.com/jensneuse/graphql-go-tools/pkg/astvalidation"
+	"github.com/jensneuse/graphql-go-tools/pkg/graphql/fields"
 	"github.com/jensneuse/graphql-go-tools/pkg/operationreport"
 )
 
 var (
 	ErrEmptyRequest = errors.New("the provided request is empty")
 	ErrNilSchema    = errors.New("the provided schema is nil")
+	ErrEmptySchema  = errors.New("the provided schema is empty")
 )
 
 type Request struct {
@@ -100,6 +102,20 @@ func (r Request) Print(writer io.Writer) (n int, err error) {
 
 func (r *Request) IsNormalized() bool {
 	return r.isNormalized
+}
+
+func (r *Request) ValidateRestrictedFields(schema *Schema, restrictedFields []fields.Type) (RequestFieldsValidationResult, error) {
+	if schema == nil {
+		return RequestFieldsValidationResult{Valid: false}, ErrNilSchema
+	}
+
+	report := r.parseQueryOnce()
+	if report.HasErrors() {
+		return fieldsValidationResult(report, false, "", "")
+	}
+
+	var fieldsValidator RequestFieldsValidator = fieldsValidator{}
+	return fieldsValidator.Validate(&r.document, &schema.document, restrictedFields)
 }
 
 func (r *Request) parseQueryOnce() (report operationreport.Report) {

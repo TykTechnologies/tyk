@@ -1209,6 +1209,34 @@ type SchemaDefinition struct {
 	RootOperationTypeDefinitions RootOperationTypeDefinitionList // e.g. query: Query, mutation: Mutation, subscription: Subscription
 }
 
+func (s *SchemaDefinition) AddRootOperationTypeDefinitionRefs(refs ...int) {
+	s.RootOperationTypeDefinitions.Refs = append(s.RootOperationTypeDefinitions.Refs, refs...)
+}
+
+func (d *Document) HasSchemaDefinition() bool {
+	for i := range d.RootNodes {
+		if d.RootNodes[i].Kind == NodeKindSchemaDefinition {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (d *Document) AddSchemaDefinitionRootNode(schemaDefinition SchemaDefinition) {
+	ref := d.AddSchemaDefinition(schemaDefinition)
+	schemaNode := Node{
+		Kind: NodeKindSchemaDefinition,
+		Ref:  ref,
+	}
+	d.RootNodes = append([]Node{schemaNode}, d.RootNodes...)
+}
+
+func (d *Document) AddSchemaDefinition(schemaDefinition SchemaDefinition) (ref int) {
+	d.SchemaDefinitions = append(d.SchemaDefinitions, schemaDefinition)
+	return len(d.SchemaDefinitions) - 1
+}
+
 func (d *Document) NodeDirectives(node Node) []int {
 	switch node.Kind {
 	case NodeKindField:
@@ -1313,6 +1341,33 @@ func (d *Document) RootOperationTypeDefinitionIsLastInSchemaDefinition(ref int, 
 	}
 }
 
+func (d *Document) CreateRootOperationTypeDefinition(operationType OperationType, rootNodeIndex int) (ref int) {
+	switch operationType {
+	case OperationTypeQuery:
+		d.Index.QueryTypeName = []byte("Query")
+	case OperationTypeMutation:
+		d.Index.MutationTypeName = []byte("Mutation")
+	case OperationTypeSubscription:
+		d.Index.SubscriptionTypeName = []byte("Subscription")
+	default:
+		return
+	}
+
+	nameRef := d.ObjectTypeDefinitionNameRef(d.RootNodes[rootNodeIndex].Ref)
+	return d.AddRootOperationTypeDefinition(RootOperationTypeDefinition{
+		OperationType: operationType,
+		NamedType: Type{
+			TypeKind: TypeKindNamed,
+			Name:     nameRef,
+		},
+	})
+}
+
+func (d *Document) AddRootOperationTypeDefinition(rootOperationTypeDefinition RootOperationTypeDefinition) (ref int) {
+	d.RootOperationTypeDefinitions = append(d.RootOperationTypeDefinitions, rootOperationTypeDefinition)
+	return len(d.RootOperationTypeDefinitions) - 1
+}
+
 type Directive struct {
 	At           position.Position  // @
 	Name         ByteSliceReference // e.g. include
@@ -1408,6 +1463,11 @@ func (d *Document) FieldDefinitionResolverTypeName(enclosingType Node) ByteSlice
 		}
 	}
 	return d.NodeNameBytes(enclosingType)
+}
+
+func (d *Document) AddFieldDefinition(fieldDefinition FieldDefinition) (ref int) {
+	d.FieldDefinitions = append(d.FieldDefinitions, fieldDefinition)
+	return len(d.FieldDefinitions) - 1
 }
 
 type InputValueDefinitionList struct {
@@ -1779,6 +1839,16 @@ func (d *Document) ObjectTypeDescriptionNameString(ref int) string {
 	return unsafebytes.BytesToString(d.ObjectTypeDescriptionNameBytes(ref))
 }
 
+func (d *Document) ObjectTypeDefinitionHasField(ref int, fieldName []byte) bool {
+	for _, fieldDefinitionRef := range d.ObjectTypeDefinitions[ref].FieldsDefinition.Refs {
+		currentFieldName := d.FieldDefinitionNameBytes(fieldDefinitionRef)
+		if currentFieldName.Equals(fieldName) {
+			return true
+		}
+	}
+	return false
+}
+
 type TypeList struct {
 	Refs []int // Type
 }
@@ -1894,6 +1964,11 @@ func (d *Document) InputValueDefinitionHasDirective(ref int, directiveName ByteS
 	return false
 }
 
+func (d *Document) AddInputValueDefinition(inputValueDefinition InputValueDefinition) (ref int) {
+	d.InputValueDefinitions = append(d.InputValueDefinitions, inputValueDefinition)
+	return len(d.InputValueDefinitions) - 1
+}
+
 type Type struct {
 	TypeKind TypeKind           // one of Named,List,NonNull
 	Name     ByteSliceReference // e.g. String (only on NamedType)
@@ -1945,6 +2020,24 @@ func (d *Document) PrintTypeBytes(ref int, buf []byte) ([]byte, error) {
 	b := bytes.NewBuffer(buf)
 	err := d.PrintType(ref, b)
 	return b.Bytes(), err
+}
+
+func (d *Document) AddNamedType(name []byte) (ref int) {
+	nameRef := d.Input.AppendInputBytes(name)
+	d.Types = append(d.Types, Type{
+		TypeKind: TypeKindNamed,
+		Name:     nameRef,
+	})
+	return len(d.Types) - 1
+}
+
+func (d *Document) AddNonNullNamedType(name []byte) (ref int) {
+	namedRef := d.AddNamedType(name)
+	d.Types = append(d.Types, Type{
+		TypeKind: TypeKindNonNull,
+		OfType:   namedRef,
+	})
+	return len(d.Types) - 1
 }
 
 type DefaultValue struct {
