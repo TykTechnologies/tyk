@@ -5,15 +5,13 @@ import (
 	"errors"
 	"net"
 	"strconv"
-	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
+	"github.com/cenkalti/backoff/v4"
 	"github.com/gocraft/health"
 	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/gorpc"
 )
@@ -46,8 +44,7 @@ var (
 	killed   bool
 	id       string
 
-	rpcLoginMu     sync.Mutex
-	reLoginRunning uint32
+	rpcLoginMu sync.Mutex
 
 	rpcConnectMu sync.Mutex
 )
@@ -231,34 +228,20 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 	return true
 }
 
-func reAttemptLogin(err error) bool {
-	if atomic.LoadUint32(&reLoginRunning) == 1 {
-		return false
-	}
-	atomic.StoreUint32(&reLoginRunning, 1)
-
-	rpcLoginMu.Lock()
-	if rpcLoadCount == 0 && !rpcEmergencyModeLoaded {
-		Log.Warning("[RPC Store] --> Detected cold start, attempting to load from cache")
-		Log.Warning("[RPC Store] ----> Found APIs... beginning emergency load")
-		rpcEmergencyModeLoaded = true
-		if emergencyModeLoadedCallback != nil {
-			go emergencyModeLoadedCallback()
+func Login() bool {
+	if !loginWithRetries() {
+		rpcLoginMu.Lock()
+		if rpcLoadCount == 0 && !rpcEmergencyModeLoaded {
+			Log.Warning("[RPC Store] --> Detected cold start, attempting to load from cache")
+			Log.Warning("[RPC Store] ----> Found APIs... beginning emergency load")
+			rpcEmergencyModeLoaded = true
+			if emergencyModeLoadedCallback != nil {
+				go emergencyModeLoadedCallback()
+			}
 		}
+		rpcLoginMu.Unlock()
 	}
-	rpcLoginMu.Unlock()
-
-	time.Sleep(time.Second * 3)
-	atomic.StoreUint32(&reLoginRunning, 0)
-
-	if strings.Contains(err.Error(), "Cannot obtain response during timeout") {
-		reConnect()
-		return false
-	}
-
-	Log.Warning("[RPC Store] Login failed, waiting 3s to re-attempt")
-
-	return Login()
+	return true
 }
 
 func GroupLogin() bool {
@@ -266,7 +249,11 @@ func GroupLogin() bool {
 		Log.Error("GroupLogin call back is not set")
 		return false
 	}
+	b := backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 3)
+	return backoff.Retry(recoverOp(groupLogin), b) == nil
+}
 
+func groupLogin() error {
 	groupLoginData := getGroupLoginCallback(config.APIKey, config.GroupID)
 	ok, err := FuncClientSingleton("LoginWithGroup", groupLoginData)
 	if err != nil {
@@ -279,71 +266,71 @@ func GroupLogin() bool {
 				"GroupID": config.GroupID,
 			},
 		)
-		rpcEmergencyMode = true
-		go reAttemptLogin(err)
-		return false
+		return err
 	}
-
 	if ok == false {
 		Log.Error("RPC Login incorrect")
-		rpcEmergencyMode = true
-		go reAttemptLogin(errors.New("Login incorrect"))
-		return false
+		return errLogFailed
 	}
 	Log.Debug("[RPC Store] Group Login complete")
 	rpcLoadCount++
-
-	// Recovery
-	if rpcEmergencyMode {
-		rpcEmergencyMode = false
-		rpcEmergencyModeLoaded = false
-		if emergencyModeCallback != nil {
-			emergencyModeCallback()
-		}
-	}
-
-	return true
+	return nil
 }
 
-func Login() bool {
+var errLogFailed = errors.New("Login incorrect")
+
+func login() error {
+	k, err := FuncClientSingleton("Login", config.APIKey)
+	if err != nil {
+		Log.WithError(err).Error("RPC Login failed")
+		EmitErrorEvent(FuncClientSingletonCall, "Login", err)
+		return err
+	}
+	ok := k.(bool)
+	if !ok {
+		Log.Error("RPC Login incorrect")
+		return errLogFailed
+	}
+	Log.Debug("[RPC Store] Login complete")
+	rpcLoadCount++
+	return nil
+}
+
+func loginWithRetries() bool {
 	Log.Debug("[RPC Store] Login initiated")
 
 	if len(config.APIKey) == 0 {
 		Log.Fatal("No API Key set!")
 	}
-
 	// If we have a group ID, lets login as a group
 	if config.GroupID != "" {
 		return GroupLogin()
 	}
+	b := backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 3)
+	return backoff.Retry(recoverOp(login), b) == nil
+}
 
-	ok, err := FuncClientSingleton("Login", config.APIKey)
-	if err != nil {
-		Log.WithError(err).Error("RPC Login failed")
-		EmitErrorEvent(FuncClientSingletonCall, "Login", err)
-		rpcEmergencyMode = true
-		go reAttemptLogin(err)
-		return false
-	}
-
-	if ok == false {
-		Log.Error("RPC Login incorrect")
-		rpcEmergencyMode = true
-		go reAttemptLogin(errors.New("Login incorrect"))
-		return false
-	}
-	Log.Debug("[RPC Store] Login complete")
-	rpcLoadCount++
-
-	if rpcEmergencyMode {
-		rpcEmergencyMode = false
-		rpcEmergencyModeLoaded = false
-		if emergencyModeCallback != nil {
-			emergencyModeCallback()
+func recoverOp(fn func() error) func() error {
+	n := 0
+	return func() error {
+		err := fn()
+		if err != nil {
+			if n == 0 {
+				// we failed at our first call so we are in emergency mode now
+				rpcEmergencyMode = true
+			}
+			n++
+			return err
 		}
+		if rpcEmergencyMode {
+			rpcEmergencyMode = false
+			rpcEmergencyModeLoaded = false
+			if emergencyModeCallback != nil {
+				emergencyModeCallback()
+			}
+		}
+		return nil
 	}
-
-	return true
 }
 
 func FuncClientSingleton(funcName string, request interface{}) (interface{}, error) {
