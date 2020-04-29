@@ -3,13 +3,13 @@ package gateway
 import (
 	"bytes"
 	"fmt"
+	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/goplugin"
+	"github.com/TykTechnologies/tyk/request"
+	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
 	"time"
-	"github.com/sirupsen/logrus"
-        "github.com/TykTechnologies/tyk/request"
-	"github.com/TykTechnologies/tyk/ctx"
-	"github.com/TykTechnologies/tyk/goplugin"
 )
 
 // customResponseWriter is a wrapper around standard http.ResponseWriter
@@ -151,11 +151,11 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 
 			m.logger.WithError(err).Error("Authentication error in Go-plugin middleware func")
 			m.Base().FireEvent(EventAuthFailure, EventKeyFailureMeta{
-		                EventMetaDefault: EventMetaDefault{Message: "Auth Failure", OriginatingRequest: EncodeRequestToEvent(r)},
-		                Path: r.URL.Path,
-		                Origin: request.RealIP(r),
-		                Key: "n/a",
-	                })
+				EventMetaDefault: EventMetaDefault{Message: "Auth Failure", OriginatingRequest: EncodeRequestToEvent(r)},
+				Path:             r.URL.Path,
+				Origin:           request.RealIP(r),
+				Key:              "n/a",
+			})
 			respCode = rw.statusCodeSent
 			err = fmt.Errorf("plugin function sent auth failed response code: %d", rw.statusCodeSent)
 
