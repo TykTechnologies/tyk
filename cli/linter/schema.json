@@ -735,6 +735,9 @@
         },
         "rpc_pool_size": {
           "type": "integer"
+        },
+        "seconds_to_check_key_space_changes": {
+          "type": "integer"
         }
       }
     },
