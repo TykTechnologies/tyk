@@ -707,7 +707,7 @@ func (r *RPCStorageHandler) StartRPCLoopCheck(orgId string) {
 	log.Info("[RPC] Starting keyspace poller")
 
 	for {
-		seconds := config.Global().SlaveOptions.SecondsToCheckKeySpaceChanges
+		seconds := config.Global().SlaveOptions.KeySpaceSyncInterval
 		r.CheckForKeyspaceChanges(orgId)
 		time.Sleep(time.Duration(seconds) * time.Second)
 	}

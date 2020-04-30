@@ -1004,8 +1004,8 @@ func afterConfSetup(conf *config.Config) {
 		conf.SlaveOptions.PingTimeout = 60
 	}
 
-	if conf.SlaveOptions.SecondsToCheckKeySpaceChanges == 0 {
-		conf.SlaveOptions.SecondsToCheckKeySpaceChanges = 10
+	if conf.SlaveOptions.KeySpaceSyncInterval == 0 {
+		conf.SlaveOptions.KeySpaceSyncInterval = 10
 	}
 
 	rpc.GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)

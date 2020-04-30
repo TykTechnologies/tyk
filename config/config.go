@@ -167,7 +167,7 @@ type SlaveOptionsConfig struct {
 	CallTimeout                     int    `json:"call_timeout"`
 	PingTimeout                     int    `json:"ping_timeout"`
 	RPCPoolSize                     int    `json:"rpc_pool_size"`
-	SecondsToCheckKeySpaceChanges   int    `json:"seconds_to_check_key_space_changes"`
+	KeySpaceSyncInterval            int    `json:"key_space_sync_interval"`
 }
 
 type LocalSessionCacheConf struct {
