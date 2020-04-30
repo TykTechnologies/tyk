@@ -737,7 +737,7 @@
           "type": "integer"
         },
         "key_space_sync_interval": {
-          "type": "float"
+          "type": "number"
         }
       }
     },
