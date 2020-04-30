@@ -3,7 +3,6 @@ variables can be used:
 
 key | json | type 
 ----|------|----
-TYK_GW_ORIGINALPATH | - |String
 TYK_GW_HOSTNAME | hostname |String
 TYK_GW_LISTENADDRESS | listen_address |String
 TYK_GW_LISTENPORT | listen_port |Integer

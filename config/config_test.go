@@ -244,7 +244,9 @@ variables can be used:
 key | json | type 
 ----|------|----
 {{range . -}}
+{{- if eq .Name "OriginalPath" |not -}}
 {{.Key}} | {{tag .Tags "json"}} |{{usage_type .Field}}
+{{end -}}
 {{end}}
 `
 
