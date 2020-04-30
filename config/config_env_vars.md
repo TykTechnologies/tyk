@@ -30,7 +30,7 @@ TYK_GW_HTTPSERVEROPTIONS_USELE_SSL | use_ssl_le |True or False
 TYK_GW_HTTPSERVEROPTIONS_ENABLEHTTP2 | enable_http2 |True or False
 TYK_GW_HTTPSERVEROPTIONS_SSLINSECURESKIPVERIFY | ssl_insecure_skip_verify |True or False
 TYK_GW_HTTPSERVEROPTIONS_ENABLEWEBSOCKETS | enable_websockets |True or False
-TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES | certificates |Comma-separated list of config.CertData
+TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES | certificates |Comma-separated list of 
 TYK_GW_HTTPSERVEROPTIONS_SSLCERTIFICATES | ssl_certificates |Comma-separated list of String
 TYK_GW_HTTPSERVEROPTIONS_SERVERNAME | server_name |String
 TYK_GW_HTTPSERVEROPTIONS_MINVERSION | min_version |Unsigned Integer
@@ -53,7 +53,7 @@ TYK_GW_POLICIES_POLICYCONNECTIONSTRING | policy_connection_string |String
 TYK_GW_POLICIES_POLICYRECORDNAME | policy_record_name |String
 TYK_GW_POLICIES_ALLOWEXPLICITPOLICYID | allow_explicit_policy_id |True or False
 TYK_GW_DISABLEPORTWHITELIST | disable_ports_whitelist |True or False
-TYK_GW_PORTWHITELIST | ports_whitelist |Comma-separated list of String:config.PortWhiteList pairs
+TYK_GW_PORTWHITELIST | ports_whitelist |Comma-separated list of String: pairs
 TYK_GW_APPPATH | app_path |String
 TYK_GW_USEDBAPPCONFIGS | use_db_app_configs |True or False
 TYK_GW_DBAPPCONFOPTIONS_CONNECTIONSTRING | connection_string |String
@@ -156,7 +156,7 @@ TYK_GW_ANALYTICSCONFIG_NORMALISEURLS_NORMALISENUMBERS | normalise_numbers |True 
 TYK_GW_ANALYTICSCONFIG_NORMALISEURLS_CUSTOM | custom_patterns |Comma-separated list of String
 TYK_GW_ANALYTICSCONFIG_NORMALISEURLS_COMPILEDPATTERNSET_UUIDS_FROMCACHE |  |True or False
 TYK_GW_ANALYTICSCONFIG_NORMALISEURLS_COMPILEDPATTERNSET_IDS_FROMCACHE |  |True or False
-TYK_GW_ANALYTICSCONFIG_NORMALISEURLS_COMPILEDPATTERNSET_CUSTOM |  |Comma-separated list of regexp.Regexp
+TYK_GW_ANALYTICSCONFIG_NORMALISEURLS_COMPILEDPATTERNSET_CUSTOM |  |Comma-separated list of 
 TYK_GW_ANALYTICSCONFIG_POOLSIZE | pool_size |Integer
 TYK_GW_ANALYTICSCONFIG_RECORDSBUFFERSIZE | records_buffer_size |Unsigned Integer
 TYK_GW_ANALYTICSCONFIG_STORAGEEXPIRATIONTIME | storage_expiration_time |Integer
@@ -222,7 +222,7 @@ TYK_GW_LOGSTASHTRANSPORT | logstash_transport |String
 TYK_GW_SYSLOGNETWORKADDR | syslog_network_addr |String
 TYK_GW_STATSDCONNECTIONSTRING | statsd_connection_string |String
 TYK_GW_STATSDPREFIX | statsd_prefix |String
-TYK_GW_EVENTHANDLERS_EVENTS | events |Comma-separated list of TykEvent:Comma-separated list of apidef.EventHandlerTriggerConfig pairs
+TYK_GW_EVENTHANDLERS_EVENTS | events |Comma-separated list of TykEvent:Comma-separated list of  pairs
 TYK_GW_EVENTTRIGGERS | event_trigers_defunct |Comma-separated list of TykEvent:Comma-separated list of config.TykEventHandler pairs
 TYK_GW_EVENTTRIGGERSDEFUNCT | event_triggers_defunct |Comma-separated list of TykEvent:Comma-separated list of config.TykEventHandler pairs
 TYK_GW_SESSIONUPDATEPOOLSIZE | session_update_pool_size |Integer
@@ -252,5 +252,5 @@ TYK_GW_KV_VAULT_TIMEOUT | timeout |Duration
 TYK_GW_KV_VAULT_TOKEN | token |String
 TYK_GW_KV_VAULT_KVVERSION | kv_version |Integer
 TYK_GW_SECRETS | secrets |Comma-separated list of String:String pairs
-TYK_GW_OVERRIDEMESSAGES | override_messages |Comma-separated list of String:config.TykError pairs
+TYK_GW_OVERRIDEMESSAGES | override_messages |Comma-separated list of String: pairs
 

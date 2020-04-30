@@ -9,7 +9,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-	"text/template"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/kelseyhightower/envconfig"
@@ -188,56 +187,6 @@ func TestConfig_GetEventTriggers(t *testing.T) {
 
 }
 
-// toTypeDescription converts Go types into a human readable description
-func toTypeDescription(t reflect.Type) string {
-	switch t.Kind() {
-	case reflect.Array, reflect.Slice:
-		if t.Elem().Kind() == reflect.Uint8 {
-			return "String"
-		}
-		return fmt.Sprintf("Comma-separated list of %s", toTypeDescription(t.Elem()))
-	case reflect.Map:
-		return fmt.Sprintf(
-			"Comma-separated list of %s:%s pairs",
-			toTypeDescription(t.Key()),
-			toTypeDescription(t.Elem()),
-		)
-	case reflect.Ptr:
-		return toTypeDescription(t.Elem())
-	case reflect.String:
-		name := t.Name()
-		if name != "" && name != "string" {
-			return name
-		}
-		return "String"
-	case reflect.Bool:
-		name := t.Name()
-		if name != "" && name != "bool" {
-			return name
-		}
-		return "True or False"
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		name := t.Name()
-		if name != "" && !strings.HasPrefix(name, "int") {
-			return name
-		}
-		return "Integer"
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		name := t.Name()
-		if name != "" && !strings.HasPrefix(name, "uint") {
-			return name
-		}
-		return "Unsigned Integer"
-	case reflect.Float32, reflect.Float64:
-		name := t.Name()
-		if name != "" && !strings.HasPrefix(name, "float") {
-			return name
-		}
-		return "Float"
-	}
-	return fmt.Sprintf("%+v", t)
-}
-
 const DefaultListFormat = `This application is configured via the environment. The following environment
 variables can be used:
 
@@ -245,21 +194,14 @@ key | json | type
 ----|------|----
 {{range . -}}
 {{- if eq .Name "OriginalPath" |not -}}
-{{.Key}} | {{tag .Tags "json"}} |{{usage_type .Field}}
+{{.Key}} | {{ .Tags.Get "json"}} |{{usage_type .}}
 {{end -}}
 {{end}}
 `
 
 func TestEnvConfig(t *testing.T) {
 	var buf bytes.Buffer
-	fm := template.FuncMap{
-		"tag": func(tag reflect.StructTag, name string) string {
-			return tag.Get(name)
-		},
-		"usage_type": func(v reflect.Value) string { return toTypeDescription(v.Type()) },
-	}
-	ts := template.Must(template.New("env").Funcs(fm).Parse(DefaultListFormat))
-	err := envconfig.Usaget("TYK_GW", &Config{}, &buf, ts)
+	err := envconfig.Usagef("TYK_GW", &Config{}, &buf, DefaultListFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
