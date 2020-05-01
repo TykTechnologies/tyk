@@ -8,6 +8,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"net/http"
 	"strings"
 	"time"
@@ -195,7 +196,7 @@ func (k *JWTMiddleware) getBasePolicyID(r *http.Request, claims jwt.MapClaims) (
 	} else if k.Spec.JWTClientIDBaseField != "" {
 		clientID, clientIDFound := claims[k.Spec.JWTClientIDBaseField].(string)
 		if !clientIDFound {
-			k.Logger().Error("Could not identify a policy to apply to this token from field")
+			k.Logger().WithField("claim", k.Spec.JWTClientIDBaseField).Error("Could not identify a policy to apply to this token from field")
 			return
 		}
 
@@ -337,7 +338,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 
 		if err != nil {
 			k.reportLoginFailure(baseFieldData, r)
-			k.Logger().Error("Could not find a valid policy to apply to this token!")
+			k.Logger().WithField("error", err).Error("Could not find a valid policy to apply to this token!")
 			return errors.New("key not authorized: no matching policy"), http.StatusForbidden
 		}
 
@@ -360,6 +361,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		if !foundPolicy {
 			if len(k.Spec.JWTDefaultPolicies) == 0 {
 				k.reportLoginFailure(baseFieldData, r)
+				k.Logger().WithField("sessionID", sessionID).Error("Found Session key but could not find matching policy or default policy.")
 				return errors.New("key not authorized: no matching policy found"), http.StatusForbidden
 			} else {
 				isDefaultPol = true
@@ -404,7 +406,8 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		if !contains(pols, basePolicyID) || defaultPolicyListChanged {
 			if policy.OrgID != k.Spec.OrgID {
 				k.reportLoginFailure(baseFieldData, r)
-				k.Logger().Error("Policy ID found is invalid (wrong ownership)!")
+				k.Logger().WithFields(logrus.Fields{"policy OrgID": policy.OrgID, "API OrgID": k.Spec.OrgID}).
+					Error("Policy ID found is invalid (wrong ownership)!")
 				return errors.New("key not authorized: no matching policy"), http.StatusForbidden
 			}
 			// apply new policy to session and update session
@@ -693,14 +696,16 @@ func generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.Se
 	policiesMu.RUnlock()
 	session := user.SessionState{}
 	if !ok {
+		log.WithField("PolicyID", policyID).Error("Policy was not found")
 		return session, errors.New("Policy not found")
 	}
 	// Check ownership, policy org owner must be the same as API,
-	// otherwise youcould overwrite a session key with a policy from a different org!
+	// otherwise you could overwrite a session key with a policy from a different org!
 
 	if enforceOrg {
 		if policy.OrgID != orgID {
-			log.Error("Attempting to apply policy from different organisation to key, skipping")
+			log.WithFields(logrus.Fields{"Input PolicyID": policyID, "API orgID": orgID, "Policy OrgID": policy.OrgID}).
+				Error("Attempting to apply policy from different organisation to key, skipping")
 			return session, errors.New("Key not authorized: no matching policy")
 		}
 	} else {

@@ -36,10 +36,7 @@ func getLogEntryForRequest(logger *logrus.Entry, r *http.Request, key string, da
 	}
 	// add key to log if configured to do so
 	if key != "" {
-		fields["key"] = key
-		if !config.Global().EnableKeyLogging {
-			fields["key"] = obfuscateKey(key)
-		}
+		fields["key"] = obfuscateKey(key)
 	}
 	// add to log additional fields if any passed
 	for key, val := range data {
