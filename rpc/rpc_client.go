@@ -296,12 +296,16 @@ func Login() bool {
 }
 
 func GroupLogin() bool {
+	return doGroupLogin(groupLogin)
+}
+
+func doGroupLogin(login func() error) bool {
 	if getGroupLoginCallback == nil {
 		Log.Error("GroupLogin call back is not set")
 		return false
 	}
 	b := backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 3)
-	return backoff.Retry(recoverOp(groupLogin), b) == nil
+	return backoff.Retry(recoverOp(login), b) == nil
 }
 
 func groupLogin() error {
@@ -361,6 +365,24 @@ func loginWithRetries() bool {
 	return backoff.Retry(recoverOp(login), b) == nil
 }
 
+// doLoginWithRetries uses login as a login function by calling it with retries
+// until it succeeds of ultimately fail.
+//
+// if config.GroupID is set then group will be used to perform group login.
+func doLoginWithRetries(login, group func() error) bool {
+	Log.Debug("[RPC Store] Login initiated")
+
+	if len(config.APIKey) == 0 {
+		Log.Fatal("No API Key set!")
+	}
+	// If we have a group ID, lets login as a group
+	if config.GroupID != "" {
+		return doGroupLogin(group)
+	}
+	b := backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 3)
+	return backoff.Retry(recoverOp(login), b) == nil
+}
+
 func recoverOp(fn func() error) func() error {
 	n := 0
 	return func() error {
@@ -402,10 +424,6 @@ func onConnectFunc(conn net.Conn) (net.Conn, string, error) {
 func Disconnect() bool {
 	clientIsConnected = false
 	return true
-}
-
-func reConnect() {
-	// no-op, let the gorpc client handle it.
 }
 
 func register() {
