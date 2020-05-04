@@ -6,6 +6,7 @@ import (
 	"net"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
@@ -35,11 +36,6 @@ var (
 	emergencyModeCallback       func()
 	emergencyModeLoadedCallback func()
 
-	// rpcLoadCount is a counter to check if this is a cold boot
-	rpcLoadCount           int
-	rpcEmergencyMode       bool
-	rpcEmergencyModeLoaded bool
-
 	killChan = make(chan int)
 	killed   bool
 	id       string
@@ -48,6 +44,63 @@ var (
 
 	rpcConnectMu sync.Mutex
 )
+
+var values rpcOpts
+
+type rpcOpts struct {
+	// This tracks how many times have successfully logged. If this is 0 then we
+	// are in cold start.
+	loadCounts          atomic.Value
+	emergencyMode       atomic.Value
+	emergencyModeLoaded atomic.Value
+}
+
+func (r *rpcOpts) Reset() {
+	r.loadCounts.Store(0)
+	r.emergencyMode.Store(false)
+	r.emergencyModeLoaded.Store(false)
+}
+
+func (r *rpcOpts) SetLoadCounts(n int) {
+	r.loadCounts.Store(n)
+}
+
+func (r *rpcOpts) IncrLoadCounts(n int) {
+	if v := r.loadCounts.Load(); v != nil {
+		r.loadCounts.Store(v.(int) + n)
+	} else {
+		r.loadCounts.Store(n)
+	}
+}
+
+func (r *rpcOpts) GetLoadCounts() int {
+	if v := r.loadCounts.Load(); v != nil {
+		return v.(int)
+	}
+	return 0
+}
+
+func (r *rpcOpts) SetEmergencyMode(n bool) {
+	r.emergencyMode.Store(n)
+}
+
+func (r *rpcOpts) GetEmergencyMode() bool {
+	if v := r.emergencyMode.Load(); v != nil {
+		return v.(bool)
+	}
+	return false
+}
+
+func (r *rpcOpts) SetEmergencyModeLoaded(n bool) {
+	r.emergencyModeLoaded.Store(n)
+}
+
+func (r *rpcOpts) GetEmergencyModeLoaded() bool {
+	if v := r.emergencyModeLoaded.Load(); v != nil {
+		return v.(bool)
+	}
+	return false
+}
 
 const (
 	ClientSingletonCall     = "gorpcClientCall"
@@ -67,11 +120,11 @@ type Config struct {
 }
 
 func IsEmergencyMode() bool {
-	return rpcEmergencyMode
+	return values.GetEmergencyMode()
 }
 
 func LoadCount() int {
-	return rpcLoadCount
+	return values.GetLoadCounts()
 }
 
 func Reset() {
@@ -79,14 +132,12 @@ func Reset() {
 	clientIsConnected = false
 	clientSingleton = nil
 	funcClientSingleton = nil
-	rpcLoadCount = 0
-	rpcEmergencyMode = false
-	rpcEmergencyModeLoaded = false
+	values.Reset()
 }
 
 func ResetEmergencyMode() {
-	rpcEmergencyModeLoaded = false
-	rpcEmergencyMode = false
+	values.SetEmergencyMode(false)
+	values.SetEmergencyModeLoaded(false)
 }
 
 func EmitErrorEvent(jobName string, funcName string, err error) {
@@ -137,7 +188,7 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 	}
 
 	if clientSingleton != nil {
-		return rpcEmergencyMode != true
+		return !values.GetEmergencyMode()
 	}
 
 	// RPC Client is unset
@@ -231,10 +282,10 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 func Login() bool {
 	if !loginWithRetries() {
 		rpcLoginMu.Lock()
-		if rpcLoadCount == 0 && !rpcEmergencyModeLoaded {
+		if values.GetLoadCounts() == 0 && !values.GetEmergencyModeLoaded() {
 			Log.Warning("[RPC Store] --> Detected cold start, attempting to load from cache")
 			Log.Warning("[RPC Store] ----> Found APIs... beginning emergency load")
-			rpcEmergencyModeLoaded = true
+			values.SetEmergencyModeLoaded(true)
 			if emergencyModeLoadedCallback != nil {
 				go emergencyModeLoadedCallback()
 			}
@@ -273,7 +324,7 @@ func groupLogin() error {
 		return errLogFailed
 	}
 	Log.Debug("[RPC Store] Group Login complete")
-	rpcLoadCount++
+	values.IncrLoadCounts(1)
 	return nil
 }
 
@@ -292,7 +343,7 @@ func login() error {
 		return errLogFailed
 	}
 	Log.Debug("[RPC Store] Login complete")
-	rpcLoadCount++
+	values.IncrLoadCounts(1)
 	return nil
 }
 
@@ -317,14 +368,14 @@ func recoverOp(fn func() error) func() error {
 		if err != nil {
 			if n == 0 {
 				// we failed at our first call so we are in emergency mode now
-				rpcEmergencyMode = true
+				values.SetEmergencyMode(true)
 			}
 			n++
 			return err
 		}
-		if rpcEmergencyMode {
-			rpcEmergencyMode = false
-			rpcEmergencyModeLoaded = false
+		if values.GetEmergencyMode() {
+			values.SetEmergencyMode(false)
+			values.SetEmergencyModeLoaded(false)
 			if emergencyModeCallback != nil {
 				emergencyModeCallback()
 			}
