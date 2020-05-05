@@ -66,7 +66,6 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
 		return nil, http.StatusOK
 	}
-
 	// Skip rate limiting and quotas for looping
 	if !ctxCheckLimits(r) {
 		return nil, http.StatusOK
