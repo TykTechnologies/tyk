@@ -6,6 +6,8 @@ import (
 	"encoding/xml"
 	"text/template"
 
+	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
+
 	"github.com/clbanning/mxj"
 
 	"github.com/lonelycode/osin"
@@ -545,6 +547,8 @@ type GraphQLAPI struct {
 	Endpoint string `bson:"endpoint" json:"endpoint"`
 	// Schema is the GraphQL Schema exposed by the GraphQL API/Upstream/Engine.
 	Schema string `bson:"schema" json:"schema"`
+	// TypeFieldConfigurations is a rule set of data source and mapping of a schema field.
+	TypeFieldConfigurations []datasource.TypeFieldConfiguration `bson:"type_field_configurations" json:"type_field_configurations"`
 	// Execution defines the mode and configuration in which the GraphQL middleware should operate.
 	Execution GraphQLExecution `bson:"execution" json:"execution"`
 }
