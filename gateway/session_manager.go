@@ -273,6 +273,7 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 	quotaRenewalRate := limit.QuotaRenewalRate
 	quotaRenews := limit.QuotaRenews
 	quotaMax := limit.QuotaMax
+
 	log.Debug("[QUOTA] Quota limiter key is: ", rawKey)
 	log.Debug("Renewing with TTL: ", quotaRenewalRate)
 	// INCR the key (If it equals 1 - set EXPIRE)
