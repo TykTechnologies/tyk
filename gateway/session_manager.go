@@ -264,10 +264,6 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 		return false
 	}
 
-	/*if limit.QuotaRenewalRate == 0 && limit.QuotaRemaining == 0 {
-		return true
-	}*/
-
 	quotaScope := ""
 	if scope != "" {
 		quotaScope = scope + "-"
@@ -277,20 +273,13 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 	quotaRenewalRate := limit.QuotaRenewalRate
 	quotaRenews := limit.QuotaRenews
 	quotaMax := limit.QuotaMax
-	log.Info("remaining:", limit.QuotaRemaining)
-	log.Info("quota renews:", quotaRenews)
-	log.Info("quota renewal rate:", quotaRenewalRate)
 	log.Debug("[QUOTA] Quota limiter key is: ", rawKey)
 	log.Debug("Renewing with TTL: ", quotaRenewalRate)
 	// INCR the key (If it equals 1 - set EXPIRE)
 	qInt := store.IncrememntWithExpire(rawKey, quotaRenewalRate)
 
-	log.Info("quota max:", quotaMax)
-
 	// if the returned val is >= quota: block
-	log.Info("qInt:", qInt)
 	if qInt-1 >= quotaMax {
-		log.Info("result es:", qInt-1, " mayor o igual que:", quotaMax)
 		renewalDate := time.Unix(quotaRenews, 0)
 		log.Debug("Renewal Date is: ", renewalDate)
 		log.Debug("As epoch: ", quotaRenews)
@@ -324,7 +313,6 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 	if remaining < 0 {
 		remaining = 0
 	}
-	log.Info("remaining:", remaining)
 
 	for k, v := range currentSession.AccessRights {
 		if v.Limit == nil {
