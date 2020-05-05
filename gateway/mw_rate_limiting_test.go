@@ -67,14 +67,10 @@ func TestRateLimit_Unlimited(t *testing.T) {
 	DRLManager.RequestTokenValue = 0
 }
 
-/*
 func TestNeverRenewQuota(t *testing.T) {
 
 	g := StartTest()
 	defer g.Close()
-
-	DRLManager.SetCurrentTokenValue(1)
-	DRLManager.RequestTokenValue = 1
 
 	api := BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Name = "api to test quota never renews"
@@ -106,4 +102,3 @@ func TestNeverRenewQuota(t *testing.T) {
 	}...)
 
 }
-*/
