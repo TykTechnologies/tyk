@@ -67,6 +67,7 @@ func TestRateLimit_Unlimited(t *testing.T) {
 	DRLManager.RequestTokenValue = 0
 }
 
+/*
 func TestNeverRenewQuota(t *testing.T) {
 
 	g := StartTest()
@@ -105,3 +106,4 @@ func TestNeverRenewQuota(t *testing.T) {
 	}...)
 
 }
+*/
