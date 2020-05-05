@@ -338,7 +338,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 
 		if err != nil {
 			k.reportLoginFailure(baseFieldData, r)
-			k.Logger().WithField("error", err).Error("Could not find a valid policy to apply to this token!")
+			k.Logger().WithError(err).Error("could not find a valid policy to apply to this token")
 			return errors.New("key not authorized: no matching policy"), http.StatusForbidden
 		}
 
