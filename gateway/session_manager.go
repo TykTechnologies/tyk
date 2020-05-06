@@ -278,7 +278,6 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 	log.Debug("Renewing with TTL: ", quotaRenewalRate)
 	// INCR the key (If it equals 1 - set EXPIRE)
 	qInt := store.IncrememntWithExpire(rawKey, quotaRenewalRate)
-
 	// if the returned val is >= quota: block
 	if qInt-1 >= quotaMax {
 		renewalDate := time.Unix(quotaRenews, 0)
@@ -288,7 +287,8 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 		log.Debug("Now:", time.Now())
 		if time.Now().After(renewalDate) {
 			//for renew quota = never, once we get the quota max we must not allow using it again
-			if limit.QuotaRenewalRate == 0 {
+
+			if quotaRenewalRate <= 0 {
 				return true
 			}
 			// The renewal date is in the past, we should update the quota!
