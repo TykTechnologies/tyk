@@ -154,19 +154,20 @@ type WebHookHandlerConf struct {
 }
 
 type SlaveOptionsConfig struct {
-	UseRPC                          bool   `json:"use_rpc"`
-	UseSSL                          bool   `json:"use_ssl"`
-	SSLInsecureSkipVerify           bool   `json:"ssl_insecure_skip_verify"`
-	ConnectionString                string `json:"connection_string"`
-	RPCKey                          string `json:"rpc_key"`
-	APIKey                          string `json:"api_key"`
-	EnableRPCCache                  bool   `json:"enable_rpc_cache"`
-	BindToSlugsInsteadOfListenPaths bool   `json:"bind_to_slugs"`
-	DisableKeySpaceSync             bool   `json:"disable_keyspace_sync"`
-	GroupID                         string `json:"group_id"`
-	CallTimeout                     int    `json:"call_timeout"`
-	PingTimeout                     int    `json:"ping_timeout"`
-	RPCPoolSize                     int    `json:"rpc_pool_size"`
+	UseRPC                          bool    `json:"use_rpc"`
+	UseSSL                          bool    `json:"use_ssl"`
+	SSLInsecureSkipVerify           bool    `json:"ssl_insecure_skip_verify"`
+	ConnectionString                string  `json:"connection_string"`
+	RPCKey                          string  `json:"rpc_key"`
+	APIKey                          string  `json:"api_key"`
+	EnableRPCCache                  bool    `json:"enable_rpc_cache"`
+	BindToSlugsInsteadOfListenPaths bool    `json:"bind_to_slugs"`
+	DisableKeySpaceSync             bool    `json:"disable_keyspace_sync"`
+	GroupID                         string  `json:"group_id"`
+	CallTimeout                     int     `json:"call_timeout"`
+	PingTimeout                     int     `json:"ping_timeout"`
+	RPCPoolSize                     int     `json:"rpc_pool_size"`
+	KeySpaceSyncInterval            float32 `json:"key_space_sync_interval"`
 }
 
 type LocalSessionCacheConf struct {
