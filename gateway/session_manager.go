@@ -287,6 +287,7 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 		log.Debug("Now:", time.Now())
 		if time.Now().After(renewalDate) {
 			//for renew quota = never, once we get the quota max we must not allow using it again
+
 			if quotaRenewalRate <= 0 {
 				return true
 			}
