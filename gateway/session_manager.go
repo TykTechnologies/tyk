@@ -287,6 +287,10 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 		log.Debug("Session: ", currentSession)
 		log.Debug("Now:", time.Now())
 		if time.Now().After(renewalDate) {
+			//for renew quota = never, once we get the quota max we must not allow using it again
+			if limit.QuotaRenewalRate == 0 {
+				return true
+			}
 			// The renewal date is in the past, we should update the quota!
 			// Also, this fixes legacy issues where there is no TTL on quota buckets
 			log.Debug("Incorrect key expiry setting detected, correcting")

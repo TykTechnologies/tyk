@@ -66,3 +66,39 @@ func TestRateLimit_Unlimited(t *testing.T) {
 	DRLManager.SetCurrentTokenValue(0)
 	DRLManager.RequestTokenValue = 0
 }
+
+func TestNeverRenewQuota(t *testing.T) {
+
+	g := StartTest()
+	defer g.Close()
+
+	api := BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Name = "api to test quota never renews"
+		spec.APIID = "api to test quota never renews"
+		spec.Proxy.ListenPath = "/"
+		spec.UseKeylessAccess = false
+	})[0]
+
+	_, key := g.CreateSession(func(s *user.SessionState) {
+		s.AccessRights = map[string]user.AccessDefinition{
+			api.APIID: {
+				APIName: api.Name,
+				APIID:   api.APIID,
+				Limit: &user.APILimit{
+					QuotaRenewalRate: 0,
+					QuotaMax:         1,
+				},
+			},
+		}
+	})
+
+	authHeader := map[string]string{
+		headers.Authorization: key,
+	}
+
+	_, _ = g.Run(t, []test.TestCase{
+		{Headers: authHeader, Code: http.StatusOK},
+		{Headers: authHeader, Code: http.StatusForbidden},
+	}...)
+
+}
