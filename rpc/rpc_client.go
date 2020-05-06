@@ -13,6 +13,7 @@ import (
 	"github.com/gocraft/health"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/gorpc"
 )
@@ -44,6 +45,9 @@ var (
 
 	rpcConnectMu sync.Mutex
 )
+
+// rpc.Login is callend may places we only need one in flight at a time.
+var loginFlight singleflight.Group
 
 var values rpcOpts
 
@@ -279,7 +283,21 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 	return true
 }
 
+// Login tries to login to the rpc sever. Returns true if it succeeds and false
+// if it fails.
 func Login() bool {
+	// I know this is extreme but rpc.Login() appears about 17 times and teh
+	// methods appears to be sometimes called in goroutines.
+	//
+	// Unless someone audits to ensure all of where this appears the parent calls
+	// are not concurrent, this is a much safer solution.
+	v, _, _ := loginFlight.Do("Login", func() (interface{}, error) {
+		return loginBase(), nil
+	})
+	return v.(bool)
+}
+
+func loginBase() bool {
 	if !doLoginWithRetries(login, groupLogin, hasAPIKey, isGroup) {
 		rpcLoginMu.Lock()
 		if values.GetLoadCounts() == 0 && !values.GetEmergencyModeLoaded() {
