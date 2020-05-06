@@ -7,7 +7,7 @@ func TestRecoveryFromEmregencyMode(t *testing.T) {
 		t.Fatal("expected not to be in emergency mode before initiating login attempt")
 	}
 	hasAPIKey := func() bool { return true }
-	// gript login has the same recovery api so we don't need to test for it.
+	// group login has the same recovery api so we don't need to test for it.
 	isGroup := func() bool { return false }
 
 	ok := doLoginWithRetries(func() error {
