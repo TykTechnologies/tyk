@@ -21,9 +21,6 @@ func TestRecoveryFromEmregencyMode(t *testing.T) {
 	if !IsEmergencyMode() {
 		t.Fatal("expected to be in emergency mode")
 	}
-	if true {
-		return
-	}
 	// Lets succeed after second retry
 	x := 0
 	ok = doLoginWithRetries(func() error {
