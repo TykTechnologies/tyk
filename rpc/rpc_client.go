@@ -280,7 +280,7 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 }
 
 func Login() bool {
-	if !loginWithRetries() {
+	if !doLoginWithRetries(login, groupLogin, hasAPIKey, isGroup) {
 		rpcLoginMu.Lock()
 		if values.GetLoadCounts() == 0 && !values.GetEmergencyModeLoaded() {
 			Log.Warning("[RPC Store] --> Detected cold start, attempting to load from cache")
@@ -351,32 +351,30 @@ func login() error {
 	return nil
 }
 
-func loginWithRetries() bool {
-	Log.Debug("[RPC Store] Login initiated")
+func hasAPIKey() bool {
+	return len(config.APIKey) != 0
+}
 
-	if len(config.APIKey) == 0 {
-		Log.Fatal("No API Key set!")
-	}
-	// If we have a group ID, lets login as a group
-	if config.GroupID != "" {
-		return GroupLogin()
-	}
-	b := backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 3)
-	return backoff.Retry(recoverOp(login), b) == nil
+func isGroup() bool {
+	return config.GroupID != ""
 }
 
 // doLoginWithRetries uses login as a login function by calling it with retries
-// until it succeeds of ultimately fail.
+// until it succeeds or ultimately fail.
 //
-// if config.GroupID is set then group will be used to perform group login.
-func doLoginWithRetries(login, group func() error) bool {
+// hasAPIKey is called to check whether config.APIKey is set if this function
+// returns false we exit the process.
+//
+// isGroup returns true if the config.GroupID is set. If this returns true then
+// we perform group login.
+func doLoginWithRetries(login, group func() error, hasAPIKey, isGroup func() bool) bool {
 	Log.Debug("[RPC Store] Login initiated")
 
-	if len(config.APIKey) == 0 {
+	if !hasAPIKey() {
 		Log.Fatal("No API Key set!")
 	}
 	// If we have a group ID, lets login as a group
-	if config.GroupID != "" {
+	if isGroup() {
 		return doGroupLogin(group)
 	}
 	b := backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 3)
