@@ -3,13 +3,14 @@ package gateway
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"time"
+
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/goplugin"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/sirupsen/logrus"
-	"io/ioutil"
-	"net/http"
-	"time"
 )
 
 // customResponseWriter is a wrapper around standard http.ResponseWriter
