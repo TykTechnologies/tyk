@@ -3,6 +3,7 @@ package gateway
 import (
 	"bytes"
 	"fmt"
+	"github.com/TykTechnologies/tyk/user"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -80,6 +81,7 @@ type GoPluginMiddleware struct {
 	Path           string // path to .so file
 	SymbolName     string // function symbol to look up
 	handler        http.HandlerFunc
+	resHandler func(w http.ResponseWriter, r *http.Request, res *http.Response)
 	logger         *logrus.Entry
 	successHandler *SuccessHandler // to record analytics
 }
@@ -110,6 +112,13 @@ func (m *GoPluginMiddleware) EnabledForSpec() bool {
 	m.successHandler = &SuccessHandler{BaseMiddleware: m.BaseMiddleware}
 
 	return true
+}
+
+func (m *GoPluginMiddleware) InitResponseHandler() {
+	var err error
+	if m.resHandler, err = goplugin.GetResponseHandler(m.Path, m.SymbolName); err != nil {
+		m.logger.WithError(err).Error("Could not load Go-plugin")
+	}
 }
 
 func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (err error, respCode int) {
@@ -165,4 +174,31 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 	}
 
 	return
+}
+
+func(m *GoPluginMiddleware) ProcessResponse(w http.ResponseWriter, r *http.Request, res *http.Response) {
+}
+
+type GoPluginResponseHook struct {
+	mw *GoPluginMiddleware
+}
+
+func (h *GoPluginResponseHook) Init(mwDef interface{}, spec *APISpec) error {
+	h.mw, _ = mwDef.(*GoPluginMiddleware)
+	h.mw.InitResponseHandler()
+	return nil
+}
+
+
+func (h *GoPluginResponseHook) Name() string {
+	return "GoPluginResponseHook"
+}
+
+func (h *GoPluginResponseHook) HandleError(rw http.ResponseWriter, req *http.Request) {
+}
+
+// TODO: handle error and session object
+func (h *GoPluginResponseHook) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
+	h.mw.resHandler(rw, req, res)
+	return nil
 }

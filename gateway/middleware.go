@@ -726,6 +726,8 @@ func responseProcessorByName(name string) TykResponseHandler {
 		return &HeaderTransform{}
 	case "custom_mw_res_hook":
 		return &CustomMiddlewareResponseHook{}
+	case "goplugin_res_hook":
+		return &GoPluginResponseHook{}
 	}
 	return nil
 }
@@ -733,7 +735,11 @@ func responseProcessorByName(name string) TykResponseHandler {
 func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) (abortRequest bool, err error) {
 	traceIsEnabled := trace.IsEnabled()
 	for _, rh := range chain {
-		if err := handleResponse(rh, rw, res, req, ses, traceIsEnabled); err != nil {
+		err := handleResponse(rh, rw, res, req, ses, traceIsEnabled)
+		if rh.Name() == "GoPluginResponseHook" {
+			return true, err
+		}
+		if err != nil {
 			// Abort the request if this handler is a response middleware hook:
 			if rh.Name() == "CustomMiddlewareResponseHook" {
 				rh.HandleError(rw, req)

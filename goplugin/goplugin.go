@@ -29,3 +29,25 @@ func GetHandler(path string, symbol string) (http.HandlerFunc, error) {
 
 	return pluginHandler, nil
 }
+
+func GetResponseHandler(path string, symbol string) (func(w http.ResponseWriter, r *http.Request, res *http.Response), error) {
+	// try to load plugin
+	loadedPlugin, err := plugin.Open(path)
+	if err != nil {
+		return nil, err
+	}
+
+	// try to lookup function symbol
+	funcSymbol, err := loadedPlugin.Lookup(symbol)
+	if err != nil {
+		return nil, err
+	}
+
+	// try to cast symbol to real func
+	pluginHandler, ok := funcSymbol.(func(http.ResponseWriter, *http.Request, *http.Response))
+	if !ok {
+		return nil, errors.New("could not cast function symbol to func(http.ResponseWriter, *http.Request, *http.Response)")
+	}
+
+	return pluginHandler, nil
+}
