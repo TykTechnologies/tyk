@@ -3,26 +3,24 @@ package graphql
 import (
 	"fmt"
 
-	"github.com/jensneuse/graphql-go-tools/pkg/ast"
-	"github.com/jensneuse/graphql-go-tools/pkg/graphql/fields"
 	"github.com/jensneuse/graphql-go-tools/pkg/operationreport"
 )
 
 type RequestFieldsValidator interface {
-	Validate(operation, definition *ast.Document, restrictions []fields.Type) (RequestFieldsValidationResult, error)
+	Validate(request *Request, schema *Schema, restrictions []Type) (RequestFieldsValidationResult, error)
 }
 
 type fieldsValidator struct {
 }
 
-func (d fieldsValidator) Validate(operation, definition *ast.Document, restrictions []fields.Type) (RequestFieldsValidationResult, error) {
+func (d fieldsValidator) Validate(request *Request, schema *Schema, restrictions []Type) (RequestFieldsValidationResult, error) {
 	report := operationreport.Report{}
 	if len(restrictions) == 0 {
 		return fieldsValidationResult(report, true, "", "")
 	}
 
-	requestedTypes := make(fields.RequestTypes)
-	fields.NewGenerator().Generate(operation, definition, &report, requestedTypes)
+	requestedTypes := make(RequestTypes)
+	NewExtractor().ExtractFieldsFromRequest(request, schema, &report, requestedTypes)
 
 	for _, restrictedType := range restrictions {
 		requestedFields, hasRestrictedType := requestedTypes[restrictedType.Name]

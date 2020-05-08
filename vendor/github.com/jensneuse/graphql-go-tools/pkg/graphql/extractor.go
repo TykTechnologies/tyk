@@ -1,4 +1,4 @@
-package fields
+package graphql
 
 import (
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
@@ -6,12 +6,12 @@ import (
 	"github.com/jensneuse/graphql-go-tools/pkg/operationreport"
 )
 
-type Generator struct {
+type Extractor struct {
 	walker  *astvisitor.Walker
 	visitor *requestVisitor
 }
 
-func NewGenerator() *Generator {
+func NewExtractor() *Extractor {
 	walker := astvisitor.NewWalker(48)
 	visitor := requestVisitor{
 		Walker: &walker,
@@ -19,17 +19,28 @@ func NewGenerator() *Generator {
 
 	walker.RegisterEnterFieldVisitor(&visitor)
 
-	return &Generator{
+	return &Extractor{
 		walker:  &walker,
 		visitor: &visitor,
 	}
 }
 
-func (g *Generator) Generate(operation, definition *ast.Document, report *operationreport.Report, data RequestTypes) {
-	g.visitor.data = data
-	g.visitor.operation = operation
-	g.visitor.definition = definition
-	g.walker.Walk(operation, definition, report)
+func (e *Extractor) ExtractFieldsFromRequest(request *Request, schema *Schema, report *operationreport.Report, data RequestTypes) {
+	if !request.IsNormalized() {
+		result, err := request.Normalize(schema)
+		if err != nil {
+			report.AddInternalError(err)
+		}
+
+		if !result.Successful {
+			report.AddInternalError(result.Errors)
+		}
+	}
+
+	e.visitor.data = data
+	e.visitor.operation = &request.document
+	e.visitor.definition = &schema.document
+	e.walker.Walk(&request.document, &schema.document, report)
 }
 
 type requestVisitor struct {

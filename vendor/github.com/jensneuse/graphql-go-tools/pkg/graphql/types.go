@@ -1,4 +1,4 @@
-package fields
+package graphql
 
 type (
 	Type struct {

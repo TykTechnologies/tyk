@@ -10,7 +10,6 @@ import (
 	"github.com/jensneuse/graphql-go-tools/pkg/astnormalization"
 	"github.com/jensneuse/graphql-go-tools/pkg/astparser"
 	"github.com/jensneuse/graphql-go-tools/pkg/astvalidation"
-	"github.com/jensneuse/graphql-go-tools/pkg/graphql/fields"
 	"github.com/jensneuse/graphql-go-tools/pkg/operationreport"
 )
 
@@ -104,7 +103,7 @@ func (r *Request) IsNormalized() bool {
 	return r.isNormalized
 }
 
-func (r *Request) ValidateRestrictedFields(schema *Schema, restrictedFields []fields.Type) (RequestFieldsValidationResult, error) {
+func (r *Request) ValidateRestrictedFields(schema *Schema, restrictedFields []Type) (RequestFieldsValidationResult, error) {
 	if schema == nil {
 		return RequestFieldsValidationResult{Valid: false}, ErrNilSchema
 	}
@@ -115,7 +114,7 @@ func (r *Request) ValidateRestrictedFields(schema *Schema, restrictedFields []fi
 	}
 
 	var fieldsValidator RequestFieldsValidator = fieldsValidator{}
-	return fieldsValidator.Validate(&r.document, &schema.document, restrictedFields)
+	return fieldsValidator.Validate(r, schema, restrictedFields)
 }
 
 func (r *Request) parseQueryOnce() (report operationreport.Report) {
