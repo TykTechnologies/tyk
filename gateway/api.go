@@ -53,6 +53,8 @@ import (
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
+
+	gql "github.com/jensneuse/graphql-go-tools/pkg/graphql"
 )
 
 // apiModifyKeySuccess represents when a Key modification was successful
@@ -2334,6 +2336,19 @@ func ctxGetTransformRequestMethod(r *http.Request) string {
 		}
 	}
 	return r.Method
+}
+
+func ctxSetGraphQLRequest(r *http.Request, gqlRequest *gql.Request) {
+	setCtxValue(r, ctx.GraphQLRequest, gqlRequest)
+}
+
+func ctxGetGraphQLRequest(r *http.Request) (gqlRequest *gql.Request) {
+	if v := r.Context().Value(ctx.GraphQLRequest); v != nil {
+		if gqlRequest, ok := v.(*gql.Request); ok {
+			return gqlRequest
+		}
+	}
+	return nil
 }
 
 func ctxGetDefaultVersion(r *http.Request) bool {

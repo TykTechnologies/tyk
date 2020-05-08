@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/TykTechnologies/tyk/headers"
+
 	"github.com/TykTechnologies/tyk/regexp"
 )
 
@@ -30,34 +32,56 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 		return nil, http.StatusOK
 	}
 
-	if len(sessionVersionData.AllowedURLs) == 0 {
-		return nil, http.StatusOK
-	}
-
-	// TODO: Implement GraphQL access check here
-	// Once request is parsed, you can save it to the request context, and re-use it later: see `ctxGetSession` and `ctxSetSession` or similar for reference implementation.
-
-	for _, accessSpec := range sessionVersionData.AllowedURLs {
-		logger.Debug("Checking: ", r.URL.Path, " Against:", accessSpec.URL)
-		asRegex, err := regexp.Compile(accessSpec.URL)
-		if err != nil {
-			logger.WithError(err).Error("Regex error")
+	if m.Spec.GraphQL.Enabled {
+		if len(sessionVersionData.RestrictedTypes) == 0 {
 			return nil, http.StatusOK
 		}
 
-		match := asRegex.MatchString(r.URL.Path)
-		if match {
-			logger.Debug("Match!")
-			for _, method := range accessSpec.Methods {
-				if method == r.Method {
-					return nil, http.StatusOK
+		gqlRequest := ctxGetGraphQLRequest(r)
+
+		result, err := gqlRequest.ValidateRestrictedFields(m.Spec.graphqlSchema, sessionVersionData.RestrictedTypes)
+		if err != nil {
+			m.Logger().Errorf("Error during GraphQL request restricted fields validation: '%s'", err)
+			return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
+		}
+
+		if !result.Valid || (result.Errors != nil && result.Errors.Count() > 0) {
+			w.Header().Set(headers.ContentType, headers.ApplicationJSON)
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = result.Errors.WriteResponse(w)
+			m.Logger().Errorf("Error during GraphQL request restricted fields validation: '%s'", result.Errors)
+			return errCustomBodyResponse, http.StatusBadRequest
+		}
+
+		return nil, http.StatusOK
+
+	} else {
+		if len(sessionVersionData.AllowedURLs) == 0 {
+			return nil, http.StatusOK
+		}
+
+		for _, accessSpec := range sessionVersionData.AllowedURLs {
+			logger.Debug("Checking: ", r.URL.Path, " Against:", accessSpec.URL)
+			asRegex, err := regexp.Compile(accessSpec.URL)
+			if err != nil {
+				logger.WithError(err).Error("Regex error")
+				return nil, http.StatusOK
+			}
+
+			match := asRegex.MatchString(r.URL.Path)
+			if match {
+				logger.Debug("Match!")
+				for _, method := range accessSpec.Methods {
+					if method == r.Method {
+						return nil, http.StatusOK
+					}
 				}
 			}
 		}
+
+		logger.Info("Attempted access to unauthorised endpoint (Granular).")
+
+		return errors.New("Access to this resource has been disallowed"), http.StatusForbidden
+
 	}
-
-	logger.Info("Attempted access to unauthorised endpoint (Granular).")
-
-	return errors.New("Access to this resource has been disallowed"), http.StatusForbidden
-
 }

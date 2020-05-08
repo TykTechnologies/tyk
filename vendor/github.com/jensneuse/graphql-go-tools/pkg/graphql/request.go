@@ -16,6 +16,7 @@ import (
 var (
 	ErrEmptyRequest = errors.New("the provided request is empty")
 	ErrNilSchema    = errors.New("the provided schema is nil")
+	ErrEmptySchema  = errors.New("the provided schema is empty")
 )
 
 type Request struct {
@@ -100,6 +101,20 @@ func (r Request) Print(writer io.Writer) (n int, err error) {
 
 func (r *Request) IsNormalized() bool {
 	return r.isNormalized
+}
+
+func (r *Request) ValidateRestrictedFields(schema *Schema, restrictedFields []Type) (RequestFieldsValidationResult, error) {
+	if schema == nil {
+		return RequestFieldsValidationResult{Valid: false}, ErrNilSchema
+	}
+
+	report := r.parseQueryOnce()
+	if report.HasErrors() {
+		return fieldsValidationResult(report, false, "", "")
+	}
+
+	var fieldsValidator RequestFieldsValidator = fieldsValidator{}
+	return fieldsValidator.Validate(r, schema, restrictedFields)
 }
 
 func (r *Request) parseQueryOnce() (report operationreport.Report) {

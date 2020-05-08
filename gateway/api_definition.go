@@ -17,6 +17,8 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+
 	sprig "gopkg.in/Masterminds/sprig.v2"
 
 	"github.com/gorilla/mux"
@@ -187,6 +189,8 @@ type APISpec struct {
 	middlewareChain *ChainObject
 
 	network NetworkStats
+
+	graphqlSchema *graphql.Schema
 }
 
 // Release re;leases all resources associated with API spec
