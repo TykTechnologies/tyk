@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/jensneuse/graphql-go-tools/pkg/playground"
+
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/sirupsen/logrus"
@@ -676,6 +678,29 @@ type generalStores struct {
 	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore storage.Handler
 }
 
+func loadGraphQLPlayground(router *mux.Router) {
+	const (
+		graphqlEndpoint     = "http://tyk-gateway:8181"
+		playgroundURLPrefix = "/playground"
+	)
+
+	p := playground.New(playground.Config{
+		PathPrefix:                      playgroundURLPrefix,
+		PlaygroundPath:                  "",
+		GraphqlEndpointPath:             graphqlEndpoint,
+		GraphQLSubscriptionEndpointPath: graphqlEndpoint,
+	})
+
+	handlers, err := p.Handlers()
+	if err != nil {
+		log.WithError(err).Fatal("Could not setup graphql playground handlers")
+	}
+
+	for _, cfg := range handlers {
+		router.HandleFunc(cfg.Path, cfg.Handler)
+	}
+}
+
 // Create the individual API (app) specs based on live configurations and assign middleware
 func loadApps(specs []*APISpec) {
 	mainLog.Info("Loading API configurations.")
@@ -703,6 +728,9 @@ func loadApps(specs []*APISpec) {
 	router := mux.NewRouter()
 	router.NotFoundHandler = http.HandlerFunc(muxer.handle404)
 	loadControlAPIEndpoints(router)
+
+	loadGraphQLPlayground(router)
+
 	muxer.setRouter(port, "", router)
 
 	gs := prepareStorage()

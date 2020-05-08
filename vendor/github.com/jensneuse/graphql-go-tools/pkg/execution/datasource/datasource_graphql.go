@@ -4,18 +4,19 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"strings"
+
 	"github.com/buger/jsonparser"
 	log "github.com/jensneuse/abstractlogger"
+
 	"github.com/jensneuse/graphql-go-tools/internal/pkg/unsafebytes"
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/astimport"
 	"github.com/jensneuse/graphql-go-tools/pkg/astprinter"
 	"github.com/jensneuse/graphql-go-tools/pkg/lexer/literal"
-	"io"
-	"io/ioutil"
-	"net/http"
-	"strings"
-	"time"
 )
 
 type GraphqlRequest struct {
@@ -40,13 +41,24 @@ type GraphQLDataSourcePlanner struct {
 	nodes                   []ast.Node
 	resolveDocument         *ast.Document
 	dataSourceConfiguration GraphQLDataSourceConfig
+	client                  *http.Client
 }
 
-type GraphQLDataSourcePlannerFactoryFactory struct{}
+type GraphQLDataSourcePlannerFactoryFactory struct {
+	Client *http.Client
+}
+
+func (g *GraphQLDataSourcePlannerFactoryFactory) httpClient() *http.Client {
+	if g.Client != nil {
+		return g.Client
+	}
+	return DefaultHttpClient()
+}
 
 func (g GraphQLDataSourcePlannerFactoryFactory) Initialize(base BasePlanner, configReader io.Reader) (PlannerFactory, error) {
 	factory := &GraphQLDataSourcePlannerFactory{
-		base: base,
+		base:   base,
+		client: g.httpClient(),
 	}
 	err := json.NewDecoder(configReader).Decode(&factory.config)
 	return factory, err
@@ -55,6 +67,7 @@ func (g GraphQLDataSourcePlannerFactoryFactory) Initialize(base BasePlanner, con
 type GraphQLDataSourcePlannerFactory struct {
 	base   BasePlanner
 	config GraphQLDataSourceConfig
+	client *http.Client
 }
 
 func (g *GraphQLDataSourcePlannerFactory) DataSourcePlanner() Planner {
@@ -63,6 +76,7 @@ func (g *GraphQLDataSourcePlannerFactory) DataSourcePlanner() Planner {
 		importer:                &astimport.Importer{},
 		dataSourceConfiguration: g.config,
 		resolveDocument:         &ast.Document{},
+		client:                  g.client,
 	}
 }
 
@@ -265,12 +279,14 @@ func (g *GraphQLDataSourcePlanner) Plan(args []Argument) (DataSource, []Argument
 		}
 	}
 	return &GraphQLDataSource{
-		Log: g.Log,
+		Log:    g.Log,
+		Client: g.client,
 	}, g.Args
 }
 
 type GraphQLDataSource struct {
-	Log log.Logger
+	Log    log.Logger
+	Client *http.Client
 }
 
 func (g *GraphQLDataSource) Resolve(ctx context.Context, args ResolverArgs, out io.Writer) (n int, err error) {
@@ -332,14 +348,6 @@ func (g *GraphQLDataSource) Resolve(ctx context.Context, args ResolverArgs, out 
 		log.ByteString("data", gqlRequestData),
 	)
 
-	client := http.Client{
-		Timeout: time.Second * 10,
-		Transport: &http.Transport{
-			MaxIdleConnsPerHost: 1024,
-			TLSHandshakeTimeout: 0 * time.Second,
-		},
-	}
-
 	request, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(gqlRequestData))
 	if err != nil {
 		g.Log.Error("GraphQLDataSource.http.NewRequest",
@@ -351,7 +359,7 @@ func (g *GraphQLDataSource) Resolve(ctx context.Context, args ResolverArgs, out 
 	request.Header.Add("Content-Type", "application/json")
 	request.Header.Add("Accept", "application/json")
 
-	res, err := client.Do(request)
+	res, err := g.Client.Do(request)
 	if err != nil {
 		g.Log.Error("GraphQLDataSource.Client.Do",
 			log.Error(err),

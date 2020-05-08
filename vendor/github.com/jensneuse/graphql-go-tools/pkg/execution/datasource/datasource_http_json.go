@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/buger/jsonparser"
 	log "github.com/jensneuse/abstractlogger"
@@ -43,16 +42,6 @@ type HttpJsonDataSourceConfig struct {
 	StatusCodeTypeNameMappings []StatusCodeTypeNameMapping
 }
 
-func DefaultHttpClient() *http.Client {
-	return &http.Client{
-		Timeout: time.Second * 10,
-		Transport: &http.Transport{
-			MaxIdleConnsPerHost: 1024,
-			TLSHandshakeTimeout: 0 * time.Second,
-		},
-	}
-}
-
 type StatusCodeTypeNameMapping struct {
 	StatusCode int
 	TypeName   string
@@ -64,12 +53,12 @@ type HttpJsonDataSourceConfigHeader struct {
 }
 
 type HttpJsonDataSourcePlannerFactoryFactory struct {
-	client *http.Client
+	Client *http.Client
 }
 
 func (h *HttpJsonDataSourcePlannerFactoryFactory) httpClient() *http.Client {
-	if h.client != nil {
-		return h.client
+	if h.Client != nil {
+		return h.Client
 	}
 	return DefaultHttpClient()
 }
