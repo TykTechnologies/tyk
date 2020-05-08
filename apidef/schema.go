@@ -450,7 +450,7 @@ const Schema = `{
                             "properties": {
                                 "mode": {
                                     "type": "string",
-                                    "enum": ["proxyOnly"]
+                                    "enum": ["proxyOnly", "executionEngine"]
                                 },
                                 "validation": {
                                     "type": "object",
