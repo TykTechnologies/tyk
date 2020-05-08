@@ -64,12 +64,12 @@ type HttpJsonDataSourceConfigHeader struct {
 }
 
 type HttpJsonDataSourcePlannerFactoryFactory struct {
-	client *http.Client
+	Client *http.Client
 }
 
 func (h *HttpJsonDataSourcePlannerFactoryFactory) httpClient() *http.Client {
-	if h.client != nil {
-		return h.client
+	if h.Client != nil {
+		return h.Client
 	}
 	return DefaultHttpClient()
 }

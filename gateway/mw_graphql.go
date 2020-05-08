@@ -4,9 +4,19 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/jensneuse/abstractlogger"
+	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
+	"github.com/sirupsen/logrus"
+
 	"github.com/TykTechnologies/tyk/headers"
 
 	gql "github.com/jensneuse/graphql-go-tools/pkg/graphql"
+)
+
+const (
+	HTTPJSONDataSource = "HTTPJSONDataSource"
+	GraphQLDataSource  = "GraphQLDataSource"
 )
 
 type GraphQLMiddleware struct {
@@ -28,7 +38,36 @@ func (m *GraphQLMiddleware) Init() {
 		log.Errorf("Error while creating schema from API definition: %v", err)
 	}
 
-	m.Schema = schema
+	if m.Spec.GraphQL.GraphQLAPI.Execution.Mode == apidef.GraphQLExecutionModeExecutionEngine {
+
+		absLogger := abstractlogger.NewLogrusLogger(log, absLoggerLevel(log.Level))
+		m.Schema = schema
+		plannerConfig := datasource.PlannerConfiguration{
+			TypeFieldConfigurations: m.Spec.GraphQL.GraphQLAPI.TypeFieldConfigurations,
+		}
+
+		engine, err := gql.NewExecutionEngine(absLogger, schema, plannerConfig)
+		if err != nil {
+			log.Errorf("GraphQL execution engine couldn't created: %v", err)
+			return
+		}
+
+		executionClient := &http.Client{}
+
+		httpJSONOptions := gql.DataSourceHttpJsonOptions{
+			HttpClient: executionClient,
+		}
+
+		graphQLOptions := gql.DataSourceGraphqlOptions{
+			HttpClient: executionClient,
+		}
+
+		err = engine.AddHttpJsonDataSourceWithOptions(HTTPJSONDataSource, httpJSONOptions)
+		err = engine.AddGraphqlDataSourceWithOptions(GraphQLDataSource, graphQLOptions)
+
+		m.Spec.GraphQLExecutor.Engine = engine
+		m.Spec.GraphQLExecutor.Client = httpJSONOptions.HttpClient
+	}
 }
 
 func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
@@ -76,4 +115,16 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	}
 
 	return nil, http.StatusOK
+}
+
+func absLoggerLevel(level logrus.Level) abstractlogger.Level {
+	switch level {
+	case logrus.ErrorLevel:
+		return abstractlogger.ErrorLevel
+	case logrus.WarnLevel:
+		return abstractlogger.WarnLevel
+	case logrus.DebugLevel:
+		return abstractlogger.DebugLevel
+	}
+	return abstractlogger.InfoLevel
 }
