@@ -55,33 +55,33 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 
 		return nil, http.StatusOK
 
-	} else {
-		if len(sessionVersionData.AllowedURLs) == 0 {
+	}
+
+	if len(sessionVersionData.AllowedURLs) == 0 {
+		return nil, http.StatusOK
+	}
+
+	for _, accessSpec := range sessionVersionData.AllowedURLs {
+		logger.Debug("Checking: ", r.URL.Path, " Against:", accessSpec.URL)
+		asRegex, err := regexp.Compile(accessSpec.URL)
+		if err != nil {
+			logger.WithError(err).Error("Regex error")
 			return nil, http.StatusOK
 		}
 
-		for _, accessSpec := range sessionVersionData.AllowedURLs {
-			logger.Debug("Checking: ", r.URL.Path, " Against:", accessSpec.URL)
-			asRegex, err := regexp.Compile(accessSpec.URL)
-			if err != nil {
-				logger.WithError(err).Error("Regex error")
-				return nil, http.StatusOK
-			}
-
-			match := asRegex.MatchString(r.URL.Path)
-			if match {
-				logger.Debug("Match!")
-				for _, method := range accessSpec.Methods {
-					if method == r.Method {
-						return nil, http.StatusOK
-					}
+		match := asRegex.MatchString(r.URL.Path)
+		if match {
+			logger.Debug("Match!")
+			for _, method := range accessSpec.Methods {
+				if method == r.Method {
+					return nil, http.StatusOK
 				}
 			}
 		}
-
-		logger.Info("Attempted access to unauthorised endpoint (Granular).")
-
-		return errors.New("Access to this resource has been disallowed"), http.StatusForbidden
-
 	}
+
+	logger.Info("Attempted access to unauthorised endpoint (Granular).")
+
+	return errors.New("Access to this resource has been disallowed"), http.StatusForbidden
+
 }
