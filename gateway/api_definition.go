@@ -17,9 +17,9 @@ import (
 	"text/template"
 	"time"
 
-	"gopkg.in/Masterminds/sprig.v2"
+	sprig "gopkg.in/Masterminds/sprig.v2"
 
-	"github.com/TykTechnologies/circuitbreaker"
+	circuit "github.com/TykTechnologies/circuitbreaker"
 	"github.com/gorilla/mux"
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 	"github.com/sirupsen/logrus"

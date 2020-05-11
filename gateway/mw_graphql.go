@@ -101,8 +101,7 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	defer ctxSetGraphQLRequest(r, &gqlRequest)
 
-<<<<<<< HEAD
-	normalizationResult, err := gqlRequest.Normalize(m.Spec.graphqlSchema)
+	normalizationResult, err := gqlRequest.Normalize(m.Spec.GraphQLExecutor.Schema)
 	if err != nil {
 		m.Logger().Errorf("Error while normalizing GraphQL request: '%s'", err)
 		return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
@@ -112,10 +111,7 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return m.writeGraphQLError(w, normalizationResult.Errors)
 	}
 
-	validationResult, err := gqlRequest.ValidateForSchema(m.Spec.graphqlSchema)
-=======
-	result, err := gqlRequest.ValidateForSchema(m.Spec.GraphQLExecutor.Schema)
->>>>>>> Implement GraphQL execution engine
+	validationResult, err := gqlRequest.ValidateForSchema(m.Spec.GraphQLExecutor.Schema)
 	if err != nil {
 		m.Logger().Errorf("Error while validating GraphQL request: '%s'", err)
 		return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
@@ -128,14 +124,14 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	return nil, http.StatusOK
 }
 
-<<<<<<< HEAD
 func (m *GraphQLMiddleware) writeGraphQLError(w http.ResponseWriter, errors gql.Errors) (error, int) {
 	w.Header().Set(headers.ContentType, headers.ApplicationJSON)
 	w.WriteHeader(http.StatusBadRequest)
 	_, _ = errors.WriteResponse(w)
 	m.Logger().Errorf("Error while validating GraphQL request: '%s'", errors)
 	return errCustomBodyResponse, http.StatusBadRequest
-=======
+}
+
 func absLoggerLevel(level logrus.Level) abstractlogger.Level {
 	switch level {
 	case logrus.ErrorLevel:
@@ -146,5 +142,4 @@ func absLoggerLevel(level logrus.Level) abstractlogger.Level {
 		return abstractlogger.DebugLevel
 	}
 	return abstractlogger.InfoLevel
->>>>>>> Implement GraphQL execution engine
 }
