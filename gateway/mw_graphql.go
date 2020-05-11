@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -41,9 +42,22 @@ func (m *GraphQLMiddleware) Init() {
 
 	if m.Spec.GraphQL.GraphQLAPI.Execution.Mode == apidef.GraphQLExecutionModeExecutionEngine {
 
+		typeFieldConfigurations := m.Spec.GraphQL.GraphQLAPI.TypeFieldConfigurations
+		typeFieldConfigurations = append(typeFieldConfigurations, datasource.TypeFieldConfiguration{
+			TypeName:  "query",
+			FieldName: "__schema",
+			DataSource: datasource.SourceConfig{
+				Name: "SchemaDataSource",
+				Config: func() json.RawMessage {
+					res, _ := json.Marshal(datasource.SchemaDataSourcePlannerConfig{})
+					return res
+				}(),
+			},
+		})
+
 		absLogger := abstractlogger.NewLogrusLogger(log, absLoggerLevel(log.Level))
 		plannerConfig := datasource.PlannerConfiguration{
-			TypeFieldConfigurations: m.Spec.GraphQL.GraphQLAPI.TypeFieldConfigurations,
+			TypeFieldConfigurations: typeFieldConfigurations,
 		}
 
 		engine, err := gql.NewExecutionEngine(absLogger, schema, plannerConfig)
@@ -64,6 +78,7 @@ func (m *GraphQLMiddleware) Init() {
 
 		err = engine.AddHttpJsonDataSourceWithOptions(HTTPJSONDataSource, httpJSONOptions)
 		err = engine.AddGraphqlDataSourceWithOptions(GraphQLDataSource, graphQLOptions)
+		err = engine.AddDataSource("SchemaDataSource", datasource.SchemaDataSourcePlannerFactoryFactory{})
 
 		m.Spec.GraphQLExecutor.Engine = engine
 		m.Spec.GraphQLExecutor.Client = httpJSONOptions.HttpClient
