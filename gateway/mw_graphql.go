@@ -11,7 +11,6 @@ import (
 
 type GraphQLMiddleware struct {
 	BaseMiddleware
-	Schema *gql.Schema
 }
 
 func (m *GraphQLMiddleware) Name() string {
@@ -28,12 +27,12 @@ func (m *GraphQLMiddleware) Init() {
 		log.Errorf("Error while creating schema from API definition: %v", err)
 	}
 
-	m.Schema = schema
+	m.Spec.graphqlSchema = schema
 }
 
 func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 
-	if m.Schema == nil {
+	if m.Spec.graphqlSchema == nil {
 		m.Logger().Error("Schema is not created")
 		return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
 	}
@@ -45,7 +44,9 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return err, http.StatusBadRequest
 	}
 
-	result, err := gqlRequest.ValidateForSchema(m.Schema)
+	defer ctxSetGraphQLRequest(r, &gqlRequest)
+
+	result, err := gqlRequest.ValidateForSchema(m.Spec.graphqlSchema)
 	if err != nil {
 		m.Logger().Errorf("Error while validating GraphQL request: '%s'", err)
 		return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
@@ -57,22 +58,6 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		_, _ = result.Errors.WriteResponse(w)
 		m.Logger().Errorf("Error while validating GraphQL request: '%s'", result.Errors)
 		return errCustomBodyResponse, http.StatusBadRequest
-	}
-
-	session := ctxGetSession(r)
-	if session == nil {
-		return nil, http.StatusOK
-	}
-
-	complexityRes, err := gqlRequest.CalculateComplexity(gql.DefaultComplexityCalculator, m.Schema)
-	if err != nil {
-		m.Logger().Errorf("Error while calculating complexity of GraphQL request: '%s'", err)
-		return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
-	}
-
-	if session.MaxQueryDepth != disabledQueryDepth && complexityRes.Depth > session.MaxQueryDepth {
-		m.Logger().Errorf("Complexity of the request is higher than the allowed limit '%d'", session.MaxQueryDepth)
-		return errors.New("depth limit exceeded"), http.StatusForbidden
 	}
 
 	return nil, http.StatusOK

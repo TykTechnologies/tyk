@@ -8,6 +8,8 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/request"
+
+	gql "github.com/jensneuse/graphql-go-tools/pkg/graphql"
 )
 
 var sessionLimiter = SessionLimiter{}
@@ -75,9 +77,20 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	session := ctxGetSession(r)
 	token := ctxGetAuthToken(r)
 
-	// TODO: Implement GraphQL rate/quota here
-	// `ForwardMessage` should accept "weight" attribute, and rate/quota functions, instead of incrementing by 1, should increment by weight
-	// Things like maximum complexity check can be implemented here as well
+	if k.Spec.GraphQL.Enabled && session.MaxQueryDepth != disabledQueryDepth {
+		gqlRequest := ctxGetGraphQLRequest(r)
+
+		complexityRes, err := gqlRequest.CalculateComplexity(gql.DefaultComplexityCalculator, k.Spec.graphqlSchema)
+		if err != nil {
+			k.Logger().Errorf("Error while calculating complexity of GraphQL request: '%s'", err)
+			return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
+		}
+
+		if complexityRes.Depth > session.MaxQueryDepth {
+			k.Logger().Errorf("Complexity of the request is higher than the allowed limit '%d'", session.MaxQueryDepth)
+			return errors.New("depth limit exceeded"), http.StatusForbidden
+		}
+	}
 
 	storeRef := GlobalSessionManager.Store()
 	reason := sessionLimiter.ForwardMessage(

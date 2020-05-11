@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+
 	"github.com/TykTechnologies/tyk/config"
 	logger "github.com/TykTechnologies/tyk/log"
 )
@@ -40,11 +42,12 @@ type APILimit struct {
 
 // AccessDefinition defines which versions of an API a key has access to
 type AccessDefinition struct {
-	APIName     string       `json:"api_name" msg:"api_name"`
-	APIID       string       `json:"api_id" msg:"api_id"`
-	Versions    []string     `json:"versions" msg:"versions"`
-	AllowedURLs []AccessSpec `bson:"allowed_urls" json:"allowed_urls" msg:"allowed_urls"` // mapped string MUST be a valid regex
-	Limit       *APILimit    `json:"limit" msg:"limit"`
+	APIName         string         `json:"api_name" msg:"api_name"`
+	APIID           string         `json:"api_id" msg:"api_id"`
+	Versions        []string       `json:"versions" msg:"versions"`
+	AllowedURLs     []AccessSpec   `bson:"allowed_urls" json:"allowed_urls" msg:"allowed_urls"` // mapped string MUST be a valid regex
+	RestrictedTypes []graphql.Type `json:"restricted_types" msg:"restricted_types"`
+	Limit           *APILimit      `json:"limit" msg:"limit"`
 
 	AllowanceScope string `json:"allowance_scope" msg:"allowance_scope"`
 }

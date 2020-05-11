@@ -17,20 +17,19 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/gorilla/mux"
+	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+	"github.com/sirupsen/logrus"
 	sprig "gopkg.in/Masterminds/sprig.v2"
 
-	"github.com/gorilla/mux"
-
-	"github.com/TykTechnologies/tyk/headers"
-	"github.com/TykTechnologies/tyk/rpc"
-
-	"github.com/sirupsen/logrus"
-
 	circuit "github.com/TykTechnologies/circuitbreaker"
+
 	"github.com/TykTechnologies/gojsonschema"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/regexp"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -187,6 +186,8 @@ type APISpec struct {
 	middlewareChain *ChainObject
 
 	network NetworkStats
+
+	graphqlSchema *graphql.Schema
 }
 
 // Release re;leases all resources associated with API spec
