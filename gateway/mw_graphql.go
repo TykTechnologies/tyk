@@ -18,6 +18,7 @@ import (
 const (
 	HTTPJSONDataSource = "HTTPJSONDataSource"
 	GraphQLDataSource  = "GraphQLDataSource"
+	SchemaDataSource   = "SchemaDataSource"
 )
 
 type GraphQLMiddleware struct {
@@ -47,7 +48,7 @@ func (m *GraphQLMiddleware) Init() {
 			TypeName:  "query",
 			FieldName: "__schema",
 			DataSource: datasource.SourceConfig{
-				Name: "SchemaDataSource",
+				Name: SchemaDataSource,
 				Config: func() json.RawMessage {
 					res, _ := json.Marshal(datasource.SchemaDataSourcePlannerConfig{})
 					return res
@@ -78,7 +79,7 @@ func (m *GraphQLMiddleware) Init() {
 
 		err = engine.AddHttpJsonDataSourceWithOptions(HTTPJSONDataSource, httpJSONOptions)
 		err = engine.AddGraphqlDataSourceWithOptions(GraphQLDataSource, graphQLOptions)
-		err = engine.AddDataSource("SchemaDataSource", datasource.SchemaDataSourcePlannerFactoryFactory{})
+		err = engine.AddDataSource(SchemaDataSource, datasource.SchemaDataSourcePlannerFactoryFactory{})
 
 		m.Spec.GraphQLExecutor.Engine = engine
 		m.Spec.GraphQLExecutor.Client = httpJSONOptions.HttpClient
