@@ -48,6 +48,16 @@ func TestGraphQL(t *testing.T) {
 		_, _ = g.Run(t, test.TestCase{Data: request, Code: http.StatusBadRequest})
 	})
 
+	t.Run("Introspection query should successfully work", func(t *testing.T) {
+		request := gql.Request{
+			OperationName: "IntrospectionQuery",
+			Variables:     nil,
+			Query:         gqlIntrospectionQuery,
+		}
+
+		_, _ = g.Run(t, test.TestCase{Data: request, BodyMatch: "__schema", Code: http.StatusOK})
+	})
+
 	spec.UseKeylessAccess = false
 	LoadAPI(spec)
 
@@ -111,16 +121,6 @@ func TestGraphQL(t *testing.T) {
 		_ = GlobalSessionManager.UpdateSession(directKey, directSession, 0, false)
 
 		_, _ = g.Run(t, test.TestCase{Headers: authHeaderWithDirectKey, Data: request, BodyMatch: "hello", Code: http.StatusOK})
-	})
-
-	t.Run("Introspection query should successfully work", func(t *testing.T) {
-		request := gql.Request{
-			OperationName: "IntrospectionQuery",
-			Variables:     nil,
-			Query:         gqlIntrospectionQuery,
-		}
-
-		_, _ = g.Run(t, test.TestCase{Data: request, BodyMatch: "__schema", Code: http.StatusOK})
 	})
 }
 
