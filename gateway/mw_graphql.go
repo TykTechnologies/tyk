@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -143,4 +144,37 @@ func absLoggerLevel(level logrus.Level) abstractlogger.Level {
 		return abstractlogger.DebugLevel
 	}
 	return abstractlogger.InfoLevel
+}
+
+type GraphQLResponseWriter struct {
+	response *http.Response
+}
+
+func NewGraphQLResponseWriter() *GraphQLResponseWriter {
+	return &GraphQLResponseWriter{
+		response: &http.Response{
+			Header: http.Header{
+				"Content-Type": []string{"application/json"},
+			},
+			StatusCode: http.StatusOK,
+		},
+	}
+}
+
+func (g *GraphQLResponseWriter) GetHTTPResponse() *http.Response {
+	return g.response
+}
+
+func (g *GraphQLResponseWriter) Header() http.Header {
+	return g.response.Header
+}
+
+func (g *GraphQLResponseWriter) WriteHeader(statusCode int) {
+	g.response.StatusCode = statusCode
+}
+
+func (g *GraphQLResponseWriter) Write(p []byte) (n int, err error) {
+	buf := bytes.NewBuffer(p)
+	err = g.response.Write(buf)
+	return buf.Len(), err
 }

@@ -837,9 +837,10 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			}
 
 			p.TykAPISpec.GraphQLExecutor.Client.Transport = roundTripper
-			var result *graphql.ExecutionResult
-			result, err = p.TykAPISpec.GraphQLExecutor.Engine.ExecuteWithOptions(context.Background(), gqlRequest, graphql.ExecutionOptions{ExtraArguments: nil})
-			res = result.GetAsHTTPResponse()
+
+			gqlResponseWriter := NewGraphQLResponseWriter()
+			err = p.TykAPISpec.GraphQLExecutor.Engine.ExecuteWithOptions(context.Background(), gqlRequest, gqlResponseWriter, graphql.ExecutionOptions{ExtraArguments: nil})
+			res = gqlResponseWriter.GetHTTPResponse()
 
 		} else {
 			res, err = roundTripper.RoundTrip(outreq)
