@@ -77,9 +77,22 @@ func (m *GraphQLMiddleware) Init() {
 			HttpClient: executionClient,
 		}
 
+		errMsgFormat := "%s couldn't be added"
+
 		err = engine.AddHttpJsonDataSourceWithOptions(HTTPJSONDataSource, httpJSONOptions)
+		if err != nil {
+			m.Logger().WithError(err).Errorf(errMsgFormat, HTTPJSONDataSource)
+		}
+
 		err = engine.AddGraphqlDataSourceWithOptions(GraphQLDataSource, graphQLOptions)
+		if err != nil {
+			m.Logger().WithError(err).Errorf(errMsgFormat, GraphQLDataSource)
+		}
+
 		err = engine.AddDataSource(SchemaDataSource, datasource.SchemaDataSourcePlannerFactoryFactory{})
+		if err != nil {
+			m.Logger().WithError(err).Errorf(errMsgFormat, SchemaDataSource)
+		}
 
 		m.Spec.GraphQLExecutor.Engine = engine
 		m.Spec.GraphQLExecutor.Client = httpJSONOptions.HttpClient
