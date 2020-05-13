@@ -232,6 +232,10 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		// TODO: add mwResponseFuncs here when Golang response custom MW support implemented
 	}
 
+	if spec.GraphQL.GraphQLPlayground.Enabled {
+		loadGraphQLPlayground(spec, subrouter)
+	}
+
 	if spec.EnableBatchRequestSupport {
 		addBatchEndpoint(spec, subrouter)
 	}
@@ -678,22 +682,17 @@ type generalStores struct {
 	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore storage.Handler
 }
 
-func loadGraphQLPlayground(router *mux.Router) {
-	const (
-		graphqlEndpoint     = "http://tyk-gateway:8181"
-		playgroundURLPrefix = "/playground"
-	)
-
+func loadGraphQLPlayground(spec *APISpec, router *mux.Router) {
 	p := playground.New(playground.Config{
-		PathPrefix:                      playgroundURLPrefix,
-		PlaygroundPath:                  "",
-		GraphqlEndpointPath:             graphqlEndpoint,
-		GraphQLSubscriptionEndpointPath: graphqlEndpoint,
+		PathPrefix:                      spec.Proxy.ListenPath,
+		PlaygroundPath:                  spec.GraphQL.GraphQLPlayground.Path,
+		GraphqlEndpointPath:             spec.Proxy.ListenPath,
+		GraphQLSubscriptionEndpointPath: spec.Proxy.ListenPath,
 	})
 
 	handlers, err := p.Handlers()
 	if err != nil {
-		log.WithError(err).Fatal("Could not setup graphql playground handlers")
+		log.WithError(err).Error("Could not setup graphql playground handlers")
 	}
 
 	for _, cfg := range handlers {
@@ -728,8 +727,6 @@ func loadApps(specs []*APISpec) {
 	router := mux.NewRouter()
 	router.NotFoundHandler = http.HandlerFunc(muxer.handle404)
 	loadControlAPIEndpoints(router)
-
-	loadGraphQLPlayground(router)
 
 	muxer.setRouter(port, "", router)
 
