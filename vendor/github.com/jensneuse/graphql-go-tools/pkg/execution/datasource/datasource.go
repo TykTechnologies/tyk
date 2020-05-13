@@ -4,13 +4,34 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
+	"net/http"
+	"strings"
+	"time"
+
 	"github.com/jensneuse/abstractlogger"
+
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/astparser"
 	"github.com/jensneuse/graphql-go-tools/pkg/asttransform"
 	"github.com/jensneuse/graphql-go-tools/pkg/astvisitor"
-	"io"
 )
+
+var defaultHttpClient *http.Client
+
+func DefaultHttpClient() *http.Client {
+	if defaultHttpClient == nil {
+		defaultHttpClient = &http.Client{
+			Timeout: time.Second * 10,
+			Transport: &http.Transport{
+				MaxIdleConnsPerHost: 1024,
+				TLSHandshakeTimeout: 0 * time.Second,
+			},
+		}
+	}
+
+	return defaultHttpClient
+}
 
 type ResolverArgs interface {
 	ByKey(key []byte) []byte
@@ -131,7 +152,7 @@ type MappingConfiguration struct {
 
 func (p *PlannerConfiguration) DataSourcePlannerFactoryForTypeField(typeName, fieldName string) PlannerFactory {
 	for i := range p.TypeFieldConfigurations {
-		if p.TypeFieldConfigurations[i].TypeName == typeName && p.TypeFieldConfigurations[i].FieldName == fieldName {
+		if strings.EqualFold(p.TypeFieldConfigurations[i].TypeName, typeName) && strings.EqualFold(p.TypeFieldConfigurations[i].FieldName, fieldName) {
 			return p.TypeFieldConfigurations[i].DataSourcePlannerFactory
 		}
 	}
@@ -140,7 +161,7 @@ func (p *PlannerConfiguration) DataSourcePlannerFactoryForTypeField(typeName, fi
 
 func (p *PlannerConfiguration) MappingForTypeField(typeName, fieldName string) *MappingConfiguration {
 	for i := range p.TypeFieldConfigurations {
-		if p.TypeFieldConfigurations[i].TypeName == typeName && p.TypeFieldConfigurations[i].FieldName == fieldName {
+		if strings.EqualFold(p.TypeFieldConfigurations[i].TypeName, typeName) && strings.EqualFold(p.TypeFieldConfigurations[i].FieldName, fieldName) {
 			return p.TypeFieldConfigurations[i].Mapping
 		}
 	}

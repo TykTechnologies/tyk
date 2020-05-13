@@ -17,12 +17,12 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/gorilla/mux"
-	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
-	"github.com/sirupsen/logrus"
 	sprig "gopkg.in/Masterminds/sprig.v2"
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
+	"github.com/gorilla/mux"
+	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/gojsonschema"
 	"github.com/TykTechnologies/tyk/apidef"
@@ -187,7 +187,11 @@ type APISpec struct {
 
 	network NetworkStats
 
-	graphqlSchema *graphql.Schema
+	GraphQLExecutor struct {
+		Engine *graphql.ExecutionEngine
+		Client *http.Client
+		Schema *graphql.Schema
+	}
 }
 
 // Release re;leases all resources associated with API spec

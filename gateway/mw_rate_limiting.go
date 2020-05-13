@@ -80,7 +80,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	if k.Spec.GraphQL.Enabled && session.MaxQueryDepth != disabledQueryDepth {
 		gqlRequest := ctxGetGraphQLRequest(r)
 
-		complexityRes, err := gqlRequest.CalculateComplexity(gql.DefaultComplexityCalculator, k.Spec.graphqlSchema)
+		complexityRes, err := gqlRequest.CalculateComplexity(gql.DefaultComplexityCalculator, k.Spec.GraphQLExecutor.Schema)
 		if err != nil {
 			k.Logger().Errorf("Error while calculating complexity of GraphQL request: '%s'", err)
 			return errors.New("there was a problem proxying the request"), http.StatusInternalServerError

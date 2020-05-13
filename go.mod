@@ -42,6 +42,7 @@ require (
 	github.com/hashicorp/vault/api v1.0.4
 	github.com/huandu/xstrings v1.3.0 // indirect
 	github.com/imdario/mergo v0.3.9 // indirect
+	github.com/jensneuse/abstractlogger v0.0.4
 	github.com/jensneuse/graphql-go-tools v0.0.0-00010101000000-000000000000
 	github.com/justinas/alice v0.0.0-20171023064455-03f45bd4b7da
 	github.com/kelseyhightower/envconfig v1.4.0
@@ -94,4 +95,4 @@ require (
 	rsc.io/letsencrypt v0.0.2
 )
 
-replace github.com/jensneuse/graphql-go-tools => github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20200508092300-7e500b3b80c9
+replace github.com/jensneuse/graphql-go-tools => github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20200513152805-383f2f46f323

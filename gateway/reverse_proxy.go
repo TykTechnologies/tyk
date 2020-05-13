@@ -28,6 +28,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
@@ -818,6 +820,34 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	var res *http.Response
 	var err error
 	var upstreamLatency time.Duration
+
+	sendRequestToUpstream := func() {
+		begin := time.Now()
+		if p.TykAPISpec.GraphQL.GraphQLAPI.Execution.Mode == apidef.GraphQLExecutionModeExecutionEngine {
+
+			if p.TykAPISpec.GraphQLExecutor.Engine == nil {
+				err = errors.New("execution engine is nil")
+				return
+			}
+
+			gqlRequest := ctxGetGraphQLRequest(outreq)
+			if gqlRequest == nil {
+				err = errors.New("graphql request is nil")
+				return
+			}
+
+			p.TykAPISpec.GraphQLExecutor.Client.Transport = roundTripper
+			var result *graphql.ExecutionResult
+			result, err = p.TykAPISpec.GraphQLExecutor.Engine.Execute(context.Background(), gqlRequest, graphql.ExecutionOptions{ExtraArguments: gqlRequest.Variables})
+			res = result.GetAsHTTPResponse()
+
+		} else {
+			res, err = roundTripper.RoundTrip(outreq)
+		}
+
+		upstreamLatency = time.Since(begin)
+	}
+
 	if breakerEnforced {
 		if !breakerConf.CB.Ready() {
 			p.logger.Debug("ON REQUEST: Circuit Breaker is in OPEN state")
@@ -825,18 +855,14 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			return ProxyResponse{}
 		}
 		p.logger.Debug("ON REQUEST: Circuit Breaker is in CLOSED or HALF-OPEN state")
-		begin := time.Now()
-		res, err = roundTripper.RoundTrip(outreq)
-		upstreamLatency = time.Since(begin)
+		sendRequestToUpstream()
 		if err != nil || res.StatusCode/100 == 5 {
 			breakerConf.CB.Fail()
 		} else {
 			breakerConf.CB.Success()
 		}
 	} else {
-		begin := time.Now()
-		res, err = roundTripper.RoundTrip(outreq)
-		upstreamLatency = time.Since(begin)
+		sendRequestToUpstream()
 	}
 
 	if err != nil {

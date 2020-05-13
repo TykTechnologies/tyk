@@ -75,6 +75,13 @@ github.com/go-redis/redis/internal/hashtag
 github.com/go-redis/redis/internal/pool
 github.com/go-redis/redis/internal/proto
 github.com/go-redis/redis/internal/util
+# github.com/gobuffalo/envy v1.7.0
+github.com/gobuffalo/envy
+# github.com/gobuffalo/packd v0.3.0
+github.com/gobuffalo/packd
+github.com/gobuffalo/packd/internal/takeon/github.com/markbates/errx
+# github.com/gobuffalo/packr v1.30.1
+github.com/gobuffalo/packr
 # github.com/gocraft/health v0.0.0-20170925182251-8675af27fef0
 github.com/gocraft/health
 github.com/gocraft/health/stack
@@ -137,9 +144,12 @@ github.com/huandu/xstrings
 github.com/imdario/mergo
 # github.com/jensneuse/abstractlogger v0.0.4
 github.com/jensneuse/abstractlogger
-# github.com/jensneuse/graphql-go-tools v0.0.0-00010101000000-000000000000 => github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20200508092300-7e500b3b80c9
+# github.com/jensneuse/byte-template v0.0.0-20200214152254-4f3cf06e5c68
+github.com/jensneuse/byte-template
+# github.com/jensneuse/graphql-go-tools v0.0.0-00010101000000-000000000000 => github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20200513152805-383f2f46f323
 github.com/jensneuse/graphql-go-tools/pkg/execution/datasource
 github.com/jensneuse/graphql-go-tools/pkg/graphql
+github.com/jensneuse/graphql-go-tools/pkg/playground
 github.com/jensneuse/graphql-go-tools/internal/pkg/unsafebytes
 github.com/jensneuse/graphql-go-tools/pkg/ast
 github.com/jensneuse/graphql-go-tools/pkg/astimport
@@ -152,6 +162,7 @@ github.com/jensneuse/graphql-go-tools/pkg/lexer/literal
 github.com/jensneuse/graphql-go-tools/pkg/operationreport
 github.com/jensneuse/graphql-go-tools/pkg/astnormalization
 github.com/jensneuse/graphql-go-tools/pkg/astvalidation
+github.com/jensneuse/graphql-go-tools/pkg/execution
 github.com/jensneuse/graphql-go-tools/pkg/middleware/operation_complexity
 github.com/jensneuse/graphql-go-tools/pkg/lexer/position
 github.com/jensneuse/graphql-go-tools/pkg/lexer/runes
@@ -159,9 +170,12 @@ github.com/jensneuse/graphql-go-tools/pkg/lexer
 github.com/jensneuse/graphql-go-tools/pkg/lexer/identkeyword
 github.com/jensneuse/graphql-go-tools/pkg/lexer/keyword
 github.com/jensneuse/graphql-go-tools/pkg/lexer/token
+github.com/jensneuse/graphql-go-tools/pkg/escape
 # github.com/jensneuse/pipeline v0.0.0-20200117120358-9fb4de085cd6
 github.com/jensneuse/pipeline/pkg/pipe
 github.com/jensneuse/pipeline/pkg/step
+# github.com/joho/godotenv v1.3.0
+github.com/joho/godotenv
 # github.com/justinas/alice v0.0.0-20171023064455-03f45bd4b7da
 github.com/justinas/alice
 # github.com/kelseyhightower/envconfig v1.4.0
@@ -247,6 +261,10 @@ github.com/robertkrimen/otto/file
 github.com/robertkrimen/otto/parser
 github.com/robertkrimen/otto/registry
 github.com/robertkrimen/otto/token
+# github.com/rogpeppe/go-internal v1.3.0
+github.com/rogpeppe/go-internal/modfile
+github.com/rogpeppe/go-internal/module
+github.com/rogpeppe/go-internal/semver
 # github.com/rs/cors v1.7.0
 github.com/rs/cors
 # github.com/ryanuber/go-glob v1.0.0
