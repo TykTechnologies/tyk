@@ -45,7 +45,7 @@ func (m *GraphQLMiddleware) Init() {
 
 		typeFieldConfigurations := m.Spec.GraphQL.GraphQLAPI.TypeFieldConfigurations
 		typeFieldConfigurations = append(typeFieldConfigurations, datasource.TypeFieldConfiguration{
-			TypeName:  "query",
+			TypeName:  "Query",
 			FieldName: "__schema",
 			DataSource: datasource.SourceConfig{
 				Name: SchemaDataSource,
