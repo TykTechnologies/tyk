@@ -1,11 +1,9 @@
 package graphql
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/jensneuse/abstractlogger"
@@ -81,27 +79,27 @@ func (e *ExecutionEngine) AddDataSource(name string, plannerFactoryFactory datas
 	return e.basePlanner.RegisterDataSourcePlannerFactory(name, plannerFactoryFactory)
 }
 
-func (e *ExecutionEngine) Execute(ctx context.Context, operation *Request, writer io.Writer) (*ExecutionResult, error) {
-	return e.ExecuteWithOptions(ctx, operation, ExecutionOptions{})
+func (e *ExecutionEngine) Execute(ctx context.Context, operation *Request, writer io.Writer) error {
+	return e.ExecuteWithOptions(ctx, operation, writer, ExecutionOptions{})
 }
 
-func (e *ExecutionEngine) ExecuteWithOptions(ctx context.Context, operation *Request, options ExecutionOptions) (*ExecutionResult, error) {
+func (e *ExecutionEngine) ExecuteWithOptions(ctx context.Context, operation *Request, writer io.Writer, options ExecutionOptions) error {
 	var report operationreport.Report
 	if !operation.IsNormalized() {
 		normalizationResult, err := operation.Normalize(e.schema)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		if !normalizationResult.Successful {
-			return nil, normalizationResult.Errors
+			return normalizationResult.Errors
 		}
 	}
 
 	planner := execution.NewPlanner(e.basePlanner)
 	plan := planner.Plan(&operation.document, e.basePlanner.Definition, &report)
 	if report.HasErrors() {
-		return nil, report
+		return report
 	}
 
 	variables, extraArguments := execution.VariablesFromJson(operation.Variables, options.ExtraArguments)
@@ -111,29 +109,5 @@ func (e *ExecutionEngine) ExecuteWithOptions(ctx context.Context, operation *Req
 		ExtraArguments: extraArguments,
 	}
 
-	var buf bytes.Buffer
-	return &ExecutionResult{&buf}, e.executor.Execute(executionContext, plan, &buf)
-}
-
-type ExecutionResult struct {
-	buf *bytes.Buffer
-}
-
-func (r *ExecutionResult) Buffer() *bytes.Buffer {
-	return r.buf
-}
-
-func (r *ExecutionResult) GetAsHTTPResponse() (res *http.Response) {
-	if r.buf == nil {
-		return
-	}
-
-	res = &http.Response{}
-	res.Body = ioutil.NopCloser(r.buf)
-	res.Header = make(http.Header)
-	res.StatusCode = 200
-
-	res.Header.Set("Content-Type", "application/json")
-
-	return
+	return e.executor.Execute(executionContext, plan, writer)
 }
