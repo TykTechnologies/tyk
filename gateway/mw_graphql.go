@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io/ioutil"
 	"net/http"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/jensneuse/abstractlogger"
 	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/headers"
 
 	gql "github.com/jensneuse/graphql-go-tools/pkg/graphql"
@@ -148,6 +149,7 @@ func absLoggerLevel(level logrus.Level) abstractlogger.Level {
 
 type GraphQLResponseWriter struct {
 	response *http.Response
+	buf      *bytes.Buffer
 }
 
 func NewGraphQLResponseWriter() *GraphQLResponseWriter {
@@ -158,10 +160,12 @@ func NewGraphQLResponseWriter() *GraphQLResponseWriter {
 			},
 			StatusCode: http.StatusOK,
 		},
+		buf: &bytes.Buffer{},
 	}
 }
 
 func (g *GraphQLResponseWriter) GetHTTPResponse() *http.Response {
+	g.response.Body = ioutil.NopCloser(g.buf)
 	return g.response
 }
 
@@ -174,7 +178,5 @@ func (g *GraphQLResponseWriter) WriteHeader(statusCode int) {
 }
 
 func (g *GraphQLResponseWriter) Write(p []byte) (n int, err error) {
-	buf := bytes.NewBuffer(p)
-	err = g.response.Write(buf)
-	return buf.Len(), err
+	return g.buf.Write(p)
 }
