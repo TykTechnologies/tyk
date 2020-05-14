@@ -11,6 +11,9 @@ import (
 	"strings"
 	"time"
 
+	pb "github.com/TykTechnologies/tyk/gateway/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/TykTechnologies/tyk/headers"
@@ -178,6 +181,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		}
 
 		oauthClientID := ""
+		_ = oauthClientID // TODO: add this to proto
 		session := ctxGetSession(r)
 		tags := make([]string, 0, estimateTagsCapacity(session, e.Spec))
 		if session != nil {
@@ -211,41 +215,44 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			host = e.Spec.target.Host
 		}
 
-		record := AnalyticsRecord{
-			r.Method,
-			host,
-			trackedPath,
-			r.URL.Path,
-			r.ContentLength,
-			r.Header.Get(headers.UserAgent),
-			t.Day(),
-			t.Month(),
-			t.Year(),
-			t.Hour(),
-			errCode,
-			token,
-			t,
-			version,
-			e.Spec.Name,
-			e.Spec.APIID,
-			e.Spec.OrgID,
-			oauthClientID,
-			0,
-			Latency{},
-			rawRequest,
-			rawResponse,
-			ip,
-			GeoData{},
-			NetworkStats{},
-			tags,
-			alias,
-			trackEP,
-			t,
+		record := &pb.AnalyticsRecord{
+			Method:        r.Method,
+			Host:          host,
+			Path:          trackedPath,
+			RawPath:       r.URL.Path,
+			ContentLength: r.ContentLength,
+			UserAgent:     r.Header.Get(headers.UserAgent),
+			Day:           int32(t.Day()),
+			Month:         int32(t.Month()),
+			Year:          int32(t.Year()),
+			Hour:          int32(t.Hour()),
+			ResponseCode:  int32(errCode),
+			APIKey:        token,
+			TimeStamp:     &timestamppb.Timestamp{Seconds: time.Now().Unix()},
+			APIVersion:    version,
+			APIName:       e.Spec.Name,
+			APIID:         e.Spec.APIID,
+			OrgID:         e.Spec.OrgID,
+			//oauthClientID,
+			RequestTime: 0,
+			Latency:     &pb.AnalyticsRecord_Latency{},
+			RawRequest:  rawRequest,
+			RawResponse: rawResponse,
+			IPAddress:   ip,
+			Geo:         &pb.AnalyticsRecord_GeoData{},
+			Network:     &pb.AnalyticsRecord_NetworkStats{},
+			Tags:        tags,
+			Alias:       alias,
+			TrackPath:   trackEP,
+			ExpireAt:    &timestamppb.Timestamp{Seconds: t.Unix()},
 		}
 
-		if e.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
-			record.GetGeo(ip)
-		}
+		// TODO fix this
+		//legacyRecord := &AnalyticsRecord{}
+		//
+		//if e.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
+		//	legacyRecord.GetGeo(ip)
+		//}
 
 		expiresAfter := e.Spec.ExpireAnalyticsAfter
 		if e.Spec.GlobalConfig.EnforceOrgDataAge {
@@ -254,15 +261,40 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			if orgExpireDataTime > 0 {
 				expiresAfter = orgExpireDataTime
 			}
-
 		}
 
-		record.SetExpiry(expiresAfter)
-		if e.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
-			record.NormalisePath(&e.Spec.GlobalConfig)
-		}
+		calcExpiry := func(expiresAfter int64) time.Time {
+			expiry := time.Duration(expiresAfter) * time.Second
+			if expiresAfter == 0 {
+				// Expiry is set to 100 years
+				expiry = (24 * time.Hour) * (365 * 100)
+			}
 
-		analytics.RecordHit(&record)
+			t := time.Now()
+			t2 := t.Add(expiry)
+			return t2
+		}
+		record.ExpireAt = &timestamppb.Timestamp{Seconds: calcExpiry(expiresAfter).Unix()}
+		//record.SetExpiry(expiresAfter)
+
+		// TODO: fix this
+		//normalizePath := func(path string) {
+		//	if config.Global().AnalyticsConfig.NormaliseUrls.NormaliseUUIDs {
+		//		path = config.Global().AnalyticsConfig.NormaliseUrls.CompiledPatternSet.UUIDs.ReplaceAllString(path, "{uuid}")
+		//	}
+		//	if config.Global().AnalyticsConfig.NormaliseUrls.NormaliseNumbers {
+		//		path = config.Global().AnalyticsConfig.NormaliseUrls.CompiledPatternSet.IDs.ReplaceAllString(path, "/{id}")
+		//	}
+		//	for _, r := range config.Global().AnalyticsConfig.NormaliseUrls.CompiledPatternSet.Custom {
+		//		path = r.config.Global()(a.Path, "{var}")
+		//	}
+		//}
+		//
+		//if e.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
+		//	record.NormalisePath(&e.Spec.GlobalConfig)
+		//}
+
+		analytics.RecordHit(record)
 	}
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")

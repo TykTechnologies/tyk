@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+package pb;
+
+message AnalyticsRecord_Latency {
+    int64 Total = 1;
+    int64 Upstream = 2;
+}
+
+message GeoData_Country {
+    string ISOCode = 1;
+}
+
+message GeoData_City {
+    map<string, string> Names = 1;
+}
+
+message GeoData_Location {
+    double Latitude = 1;
+    double Longitude = 2;
+    string TimeZone = 3;
+}
+
+message AnalyticsRecord_GeoData {
+    GeoData_Country Country = 1;
+    GeoData_City City = 2;
+    GeoData_Location Location = 3;
+}
+
+message AnalyticsRecord_NetworkStats {
+    int64 OpenConnections = 1;
+    int64 ClosedConnections = 2;
+    int64 BytesIn = 3;
+    int64 BytesOut = 4;
+}
+
+message AnalyticsRecord {
+    string Host = 1;
+    string Method = 2;
+    string Path = 3;
+    string RawPath = 4;
+    int64 ContentLength = 5;
+    string UserAgent = 6;
+    int32 Day = 7;
+    int32 Month = 8;
+    int32 Year = 9;
+    int32 Hour = 10;
+    int32 ResponseCode = 11;
+    string APIKey = 12;
+    google.protobuf.Timestamp TimeStamp = 13;
+    string APIVersion = 14;
+    string APIName = 15;
+    string APIID = 16;
+    string OrgID = 17;
+    int64 RequestTime = 18;
+    AnalyticsRecord_Latency Latency = 19;
+    string RawRequest = 20;
+    string RawResponse = 21;
+    string IPAddress = 22;
+    AnalyticsRecord_GeoData Geo = 23;
+    AnalyticsRecord_NetworkStats Network = 24;
+    repeated string Tags = 25;
+    string Alias = 26;
+    bool TrackPath = 27;
+    google.protobuf.Timestamp ExpireAt = 28;
+}

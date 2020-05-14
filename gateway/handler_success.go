@@ -11,6 +11,9 @@ import (
 	"strings"
 	"time"
 
+	pb "github.com/TykTechnologies/tyk/gateway/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -150,6 +153,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 
 		// If OAuth, we need to grab it from the session, which may or may not exist
 		oauthClientID := ""
+		_ = oauthClientID // TODO: fix this
 		var alias string
 		session := ctxGetSession(r)
 		tags := make([]string, 0, estimateTagsCapacity(session, s.Spec))
@@ -206,41 +210,74 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 			host = s.Spec.target.Host
 		}
 
-		record := AnalyticsRecord{
-			r.Method,
-			host,
-			trackedPath,
-			r.URL.Path,
-			r.ContentLength,
-			r.Header.Get(headers.UserAgent),
-			t.Day(),
-			t.Month(),
-			t.Year(),
-			t.Hour(),
-			code,
-			token,
-			t,
-			version,
-			s.Spec.Name,
-			s.Spec.APIID,
-			s.Spec.OrgID,
-			oauthClientID,
-			timing.Total,
-			timing,
-			rawRequest,
-			rawResponse,
-			ip,
-			GeoData{},
-			NetworkStats{},
-			tags,
-			alias,
-			trackEP,
-			t,
+		//legacyRecord := AnalyticsRecord{
+		//	r.Method,
+		//	host,
+		//	trackedPath,
+		//	r.URL.Path,
+		//	r.ContentLength,
+		//	r.Header.Get(headers.UserAgent),
+		//	t.Day(),
+		//	t.Month(),
+		//	t.Year(),
+		//	t.Hour(),
+		//	code,
+		//	token,
+		//	t,
+		//	version,
+		//	s.Spec.Name,
+		//	s.Spec.APIID,
+		//	s.Spec.OrgID,
+		//	oauthClientID,
+		//	timing.Total,
+		//	timing,
+		//	rawRequest,
+		//	rawResponse,
+		//	ip,
+		//	GeoData{},
+		//	NetworkStats{},
+		//	tags,
+		//	alias,
+		//	trackEP,
+		//	t,
+		//}
+
+		record := &pb.AnalyticsRecord{
+			Method:        r.Method,
+			Host:          host,
+			Path:          trackedPath,
+			RawPath:       r.URL.Path,
+			ContentLength: r.ContentLength,
+			UserAgent:     r.Header.Get(headers.UserAgent),
+			Day:           int32(t.Day()),
+			Month:         int32(t.Month()),
+			Year:          int32(t.Year()),
+			Hour:          int32(t.Hour()),
+			ResponseCode:  int32(code),
+			APIKey:        token,
+			TimeStamp:     &timestamppb.Timestamp{Seconds: time.Now().Unix()},
+			APIVersion:    version,
+			APIName:       s.Spec.Name,
+			APIID:         s.Spec.APIID,
+			OrgID:         s.Spec.OrgID,
+			//oauthClientID,
+			RequestTime: 0,
+			Latency:     &pb.AnalyticsRecord_Latency{},
+			RawRequest:  rawRequest,
+			RawResponse: rawResponse,
+			IPAddress:   ip,
+			Geo:         &pb.AnalyticsRecord_GeoData{},
+			Network:     &pb.AnalyticsRecord_NetworkStats{},
+			Tags:        tags,
+			Alias:       alias,
+			TrackPath:   trackEP,
+			ExpireAt:    &timestamppb.Timestamp{Seconds: t.Unix()},
 		}
 
-		if s.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
-			record.GetGeo(ip)
-		}
+		// TODO: fix this
+		//if s.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
+		//	record.GetGeo(ip)
+		//}
 
 		expiresAfter := s.Spec.ExpireAnalyticsAfter
 		if s.Spec.GlobalConfig.EnforceOrgDataAge {
@@ -251,13 +288,24 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 			}
 		}
 
-		record.SetExpiry(expiresAfter)
+		calcExpiry := func(expiresAfter int64) time.Time {
+			expiry := time.Duration(expiresAfter) * time.Second
+			if expiresAfter == 0 {
+				// Expiry is set to 100 years
+				expiry = (24 * time.Hour) * (365 * 100)
+			}
 
-		if s.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
-			record.NormalisePath(&s.Spec.GlobalConfig)
+			t := time.Now()
+			t2 := t.Add(expiry)
+			return t2
 		}
+		record.ExpireAt = &timestamppb.Timestamp{Seconds: calcExpiry(expiresAfter).Unix()}
 
-		analytics.RecordHit(&record)
+		// TODO: fix this
+		//if s.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
+		//	record.NormalisePath(&s.Spec.GlobalConfig)
+		//}
+		analytics.RecordHit(record)
 	}
 
 	// Report in health check

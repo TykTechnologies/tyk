@@ -1,9 +1,15 @@
 package gateway
 
 import (
+	"net/http"
 	"testing"
+	"time"
 
 	"github.com/TykTechnologies/tyk/config"
+	pb "github.com/TykTechnologies/tyk/gateway/proto"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
+	"gopkg.in/vmihailenco/msgpack.v2"
 )
 
 func TestGeoIPLookup(t *testing.T) {
@@ -182,5 +188,89 @@ func BenchmarkTagHeaders(b *testing.B) {
 		if len(newExistingTags) == 2 {
 			b.Fatal("Existing tags have not been expanded")
 		}
+	}
+}
+
+var fakeRecord = AnalyticsRecord{
+	Method:        http.MethodGet,
+	Host:          "httpbin.org",
+	Path:          "/get",
+	RawPath:       "/get",
+	ContentLength: 0,
+	UserAgent:     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/32.0.1664.3 Safari/537.36",
+	Day:           7,
+	Month:         6,
+	Year:          1982,
+	Hour:          1,
+	ResponseCode:  200,
+	APIKey:        "myhash",
+	TimeStamp:     time.Now(),
+	APIVersion:    "v1",
+	APIName:       "httpbin",
+	APIID:         "httpbin",
+	OrgID:         "none",
+	OauthID:       "",
+	RequestTime:   3,
+	Latency: Latency{
+		Total:    10,
+		Upstream: 8,
+	},
+	RawRequest:  "",
+	RawResponse: "",
+	IPAddress:   "127.0.0.1",
+	Geo:         GeoData{},
+	Network:     NetworkStats{},
+	Tags:        nil,
+	Alias:       "",
+	TrackPath:   false,
+	ExpireAt:    time.Time{},
+}
+
+var fakeRecordProto = pb.AnalyticsRecord{
+	Method:        http.MethodGet,
+	Host:          "httpbin.org",
+	Path:          "/get",
+	RawPath:       "/get",
+	ContentLength: 0,
+	UserAgent:     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/32.0.1664.3 Safari/537.36",
+	Day:           7,
+	Month:         6,
+	Year:          1982,
+	Hour:          1,
+	ResponseCode:  200,
+	APIKey:        "myhash",
+	TimeStamp:     &timestamppb.Timestamp{Seconds: int64(time.Now().Second())},
+	APIVersion:    "v1",
+	APIName:       "httpbin",
+	APIID:         "httpbin",
+	OrgID:         "none",
+	RequestTime:   3,
+	Latency: &pb.AnalyticsRecord_Latency{
+		Total:    10,
+		Upstream: 8,
+	},
+	RawRequest:  "",
+	RawResponse: "",
+	IPAddress:   "127.0.0.1",
+	Geo:         &pb.AnalyticsRecord_GeoData{},
+	Network:     &pb.AnalyticsRecord_NetworkStats{},
+	Tags:        nil,
+	Alias:       "",
+	TrackPath:   false,
+	ExpireAt:    &timestamppb.Timestamp{},
+}
+
+func BenchmarkAnalyticsMsgpackMarshal(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, _ = msgpack.Marshal(fakeRecord)
+	}
+}
+
+func BenchmarkAnalyticsProtoMarshal(b *testing.B) {
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		_, _ = proto.Marshal(&fakeRecordProto)
 	}
 }
