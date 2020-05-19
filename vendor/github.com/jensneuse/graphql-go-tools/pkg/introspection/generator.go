@@ -1,12 +1,14 @@
 package introspection
 
 import (
+	"strings"
+
 	"github.com/cespare/xxhash"
+
 	"github.com/jensneuse/graphql-go-tools/internal/pkg/unsafebytes"
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/astvisitor"
 	"github.com/jensneuse/graphql-go-tools/pkg/operationreport"
-	"strings"
 )
 
 type Generator struct {
@@ -268,7 +270,7 @@ func (i *introspectionVisitor) LeaveDirectiveDefinition(ref int) {
 }
 
 func (i *introspectionVisitor) EnterDirectiveLocation(location ast.DirectiveLocation) {
-	i.currentDirective.Locations = append(i.currentDirective.Locations, i.definition.DirectiveLocationString(location))
+	i.currentDirective.Locations = append(i.currentDirective.Locations, location.LiteralString())
 }
 
 func (i *introspectionVisitor) LeaveDirectiveLocation(location ast.DirectiveLocation) {

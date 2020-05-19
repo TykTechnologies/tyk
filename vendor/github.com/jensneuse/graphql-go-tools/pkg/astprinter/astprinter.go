@@ -3,10 +3,11 @@ package astprinter
 
 import (
 	"bytes"
+	"io"
+
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/astvisitor"
 	"github.com/jensneuse/graphql-go-tools/pkg/lexer/literal"
-	"io"
 )
 
 // Print takes a document as well as a definition (optional) and prints it to the io.Writer.

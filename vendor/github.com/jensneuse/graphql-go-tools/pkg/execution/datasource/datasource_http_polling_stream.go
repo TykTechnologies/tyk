@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	log "github.com/jensneuse/abstractlogger"
-	"github.com/jensneuse/graphql-go-tools/pkg/lexer/literal"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -13,6 +11,10 @@ import (
 	"sync"
 	"text/template"
 	"time"
+
+	log "github.com/jensneuse/abstractlogger"
+
+	"github.com/jensneuse/graphql-go-tools/pkg/lexer/literal"
 )
 
 type HttpPollingStreamDataSourceConfiguration struct {

@@ -3,7 +3,9 @@ package astvisitor
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/cespare/xxhash"
+
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/lexer/literal"
 	"github.com/jensneuse/graphql-go-tools/pkg/operationreport"
@@ -19,29 +21,29 @@ var (
 type Walker struct {
 	// Ancestors is the slice of Nodes to the current Node in a callback
 	// don't keep a reference to this slice, always copy it if you want to work with it after the callback returned
-	Ancestors               []ast.Node
+	Ancestors []ast.Node
 	// Path is the slice of PathItems leading to the current Node
 	// don't keep a reference to this slice, always copy it if you want to work with it after the callback returned
-	Path                    ast.Path
+	Path ast.Path
 	// EnclosingTypeDefinition is the TypeDefinition Node of the parent object of the current callback
 	// e.g. if the current callback is a Field the EnclosingTypeDefinition will be the TypeDefinition of the parent object of such Field
 	EnclosingTypeDefinition ast.Node
 	// SelectionsBefore is the slice of references to selections before the current selection
 	// This is only valid when inside a SelectionSet
-	SelectionsBefore        []int
+	SelectionsBefore []int
 	// SelectionsAfter is the slice of references to selections before the current selection
 	// This is only valid when inside a SelectionSet
-	SelectionsAfter         []int
+	SelectionsAfter []int
 	// Report is the object to collect errors when walking the AST
-	Report                  *operationreport.Report
-	document                *ast.Document
-	definition              *ast.Document
-	visitors                visitors
-	Depth                   int
-	typeDefinitions         []ast.Node
-	stop                    bool
-	skip                    bool
-	revisit                 bool
+	Report          *operationreport.Report
+	document        *ast.Document
+	definition      *ast.Document
+	visitors        visitors
+	Depth           int
+	typeDefinitions []ast.Node
+	stop            bool
+	skip            bool
+	revisit         bool
 }
 
 // NewWalker returns a fully initialized Walker
@@ -1273,7 +1275,7 @@ func (w *Walker) appendAncestor(ref int, kind ast.NodeKind) {
 		fields := w.definition.NodeFieldDefinitions(w.typeDefinitions[len(w.typeDefinitions)-1])
 		for _, i := range fields {
 			if bytes.Equal(fieldName, w.definition.FieldDefinitionNameBytes(i)) {
-				typeName = w.definition.ResolveTypeName(w.definition.FieldDefinitionType(i))
+				typeName = w.definition.ResolveTypeNameBytes(w.definition.FieldDefinitionType(i))
 				break
 			}
 		}

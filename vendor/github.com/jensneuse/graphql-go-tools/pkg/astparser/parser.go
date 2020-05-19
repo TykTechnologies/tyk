@@ -3,7 +3,10 @@ package astparser
 
 import (
 	"fmt"
+	"runtime"
+
 	"github.com/cespare/xxhash"
+
 	"github.com/jensneuse/graphql-go-tools/internal/pkg/unsafebytes"
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/lexer"
@@ -12,7 +15,6 @@ import (
 	"github.com/jensneuse/graphql-go-tools/pkg/lexer/position"
 	"github.com/jensneuse/graphql-go-tools/pkg/lexer/token"
 	"github.com/jensneuse/graphql-go-tools/pkg/operationreport"
-	"runtime"
 )
 
 // ParseGraphqlDocumentString takes a raw GraphQL document in string format and parses it into an AST.

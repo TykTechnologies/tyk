@@ -171,7 +171,7 @@ func (h *HttpJsonDataSourcePlanner) LeaveField(ref int) {
 	var err error
 	fieldDefinitionTypeNode := h.Definition.FieldDefinitionTypeNode(definition)
 	fieldDefinitionType := h.Definition.FieldDefinitionType(definition)
-	fieldDefinitionTypeName := h.Definition.ResolveTypeName(fieldDefinitionType)
+	fieldDefinitionTypeName := h.Definition.ResolveTypeNameBytes(fieldDefinitionType)
 	quotedFieldDefinitionTypeName := append(literal.QUOTE, append(fieldDefinitionTypeName, literal.QUOTE...)...)
 	switch fieldDefinitionTypeNode.Kind {
 	case ast.NodeKindScalarTypeDefinition:

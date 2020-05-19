@@ -2,15 +2,17 @@ package execution
 
 import (
 	"bytes"
+	"io"
+	"os"
+
+	"github.com/jensneuse/pipeline/pkg/pipe"
+
 	"github.com/jensneuse/graphql-go-tools/internal/pkg/unsafebytes"
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/astvisitor"
 	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/lexer/literal"
 	"github.com/jensneuse/graphql-go-tools/pkg/operationreport"
-	"github.com/jensneuse/pipeline/pkg/pipe"
-	"io"
-	"os"
 )
 
 type Planner struct {
@@ -109,7 +111,7 @@ func (p *planningVisitor) EnterField(ref int) {
 	plannerFactory := p.base.Config.DataSourcePlannerFactoryForTypeField(typeName, fieldName)
 	if plannerFactory != nil {
 		planner := plannerFactory.DataSourcePlanner()
-		planner.Configure(p.operation,p.definition,p.Walker)
+		planner.Configure(p.operation, p.definition, p.Walker)
 		p.planners = append(p.planners, dataSourcePlannerRef{
 			path:     p.Path,
 			fieldRef: ref,
@@ -296,7 +298,7 @@ func (p *planningVisitor) LeaveSelectionSet(ref int) {
 }
 
 func (p *planningVisitor) jsonValueType(valueType int) JSONValueType {
-	typeName := p.definition.ResolveTypeName(valueType)
+	typeName := p.definition.ResolveTypeNameBytes(valueType)
 	switch {
 	case bytes.Equal(typeName, literal.INT):
 		return IntegerValueType

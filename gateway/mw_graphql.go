@@ -19,6 +19,7 @@ const (
 	HTTPJSONDataSource = "HTTPJSONDataSource"
 	GraphQLDataSource  = "GraphQLDataSource"
 	SchemaDataSource   = "SchemaDataSource"
+	InternalDataSource = "InternalDataSource"
 )
 
 type GraphQLMiddleware struct {
@@ -92,6 +93,11 @@ func (m *GraphQLMiddleware) Init() {
 		err = engine.AddDataSource(SchemaDataSource, datasource.SchemaDataSourcePlannerFactoryFactory{})
 		if err != nil {
 			m.Logger().WithError(err).Errorf(errMsgFormat, SchemaDataSource)
+		}
+
+		err = engine.AddDataSource(InternalDataSource, &TykInternalDataSourcePlannerFactoryFactory{logger: log})
+		if err != nil {
+			m.Logger().WithError(err).Errorf(errMsgFormat, InternalDataSource)
 		}
 
 		m.Spec.GraphQLExecutor.Engine = engine

@@ -554,7 +554,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if d.SH.Spec.target.Scheme == "tyk" {
-		handler, found := findInternalHttpHandlerForTarget(d.SH.Spec.target)
+		handler, found := findInternalHttpHandlerByNameOrID(d.SH.Spec.target.Host)
 		if !found {
 			handler := ErrorHandler{*d.SH.Base()}
 			handler.HandleError(w, r, "Couldn't detect target", http.StatusInternalServerError, true)
@@ -568,8 +568,8 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	d.SH.ServeHTTP(w, r)
 }
 
-func findInternalHttpHandlerForTarget(target *url.URL) (handler http.Handler, ok bool) {
-	targetAPI := fuzzyFindAPI(target.Host)
+func findInternalHttpHandlerByNameOrID(apiNameOrID string) (handler http.Handler, ok bool) {
+	targetAPI := fuzzyFindAPI(apiNameOrID)
 	if targetAPI == nil {
 		return nil, false
 	}
