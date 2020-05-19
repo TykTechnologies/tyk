@@ -555,7 +555,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if d.SH.Spec.target.Scheme == "tyk" {
 		if targetAPI := fuzzyFindAPI(d.SH.Spec.target.Host); targetAPI != nil {
-			if h, found := apisHandlesByID.Load(d.SH.Spec.APIID); found {
+			if h, found := apisHandlesByID.Load(targetAPI.APIID); found {
 				if d.SH.Spec.Proxy.StripListenPath {
 					r.URL.Path = d.SH.Spec.StripListenPath(r, r.URL.Path)
 					r.URL.RawPath = d.SH.Spec.StripListenPath(r, r.URL.RawPath)

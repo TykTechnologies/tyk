@@ -707,8 +707,9 @@ func (r *RPCStorageHandler) StartRPCLoopCheck(orgId string) {
 	log.Info("[RPC] Starting keyspace poller")
 
 	for {
+		seconds := config.Global().SlaveOptions.KeySpaceSyncInterval
 		r.CheckForKeyspaceChanges(orgId)
-		time.Sleep(10 * time.Second)
+		time.Sleep(time.Duration(seconds) * time.Second)
 	}
 }
 
@@ -721,7 +722,7 @@ func (r *RPCStorageHandler) StartRPCKeepaliveWatcher() {
 		if err := r.SetKey("0000", "0000", 10); err != nil {
 			log.WithError(err).WithFields(logrus.Fields{
 				"prefix": "RPC Conn Mgr",
-			}).Info("Can't connect to RPC layer")
+			}).Warning("Can't connect to RPC layer")
 
 			if r.IsAccessError(err) {
 				if rpc.Login() {
@@ -803,6 +804,7 @@ func getSessionAndCreate(keyName string, r *RPCStorageHandler) {
 func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 	keysToReset := map[string]bool{}
 	TokensToBeRevoked := map[string]string{}
+	ClientsToBeRevoked := map[string]string{}
 	oauthTokenKeys := map[string]bool{}
 
 	for _, key := range keys {
@@ -814,9 +816,25 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 			if action == "oAuthRevokeToken" || action == "oAuthRevokeAccessToken" || action == "oAuthRevokeRefreshToken" {
 				TokensToBeRevoked[splitKeys[0]] = key
 				oauthTokenKeys[key] = true
+			} else if action == "revoke_all_tokens" {
+				ClientsToBeRevoked[splitKeys[1]] = key
+				oauthTokenKeys[key] = true
 			}
 		}
 	}
+
+	for clientId, key := range ClientsToBeRevoked {
+		splitKeys := strings.Split(key, ":")
+		apiId := splitKeys[0]
+		clientSecret := splitKeys[2]
+		storage, _, err := GetStorageForApi(apiId)
+		if err != nil {
+			continue
+		}
+		_, tokens, _ := RevokeAllTokens(storage, clientId, clientSecret)
+		keys = append(keys, tokens...)
+	}
+
 	//single and specific tokens
 	for token, key := range TokensToBeRevoked {
 		//key formed as: token:apiId:tokenActionTypeHint
@@ -884,17 +902,15 @@ func (r *RPCStorageHandler) GetKeyPrefix() string {
 }
 
 func (r *RPCStorageHandler) AddToSortedSet(keyName, value string, score float64) {
-	log.Error("RPCStorageHandler.AddToSortedSet - Not implemented")
+	handleGlobalAddToSortedSet(keyName, value, score)
 }
 
 func (r *RPCStorageHandler) GetSortedSetRange(keyName, scoreFrom, scoreTo string) ([]string, []float64, error) {
-	log.Error("RPCStorageHandler.GetSortedSetRange - Not implemented")
-	return nil, nil, nil
+	return handleGetSortedSetRange(keyName, scoreFrom, scoreTo)
 }
 
 func (r *RPCStorageHandler) RemoveSortedSetRange(keyName, scoreFrom, scoreTo string) error {
-	log.Error("RPCStorageHandler.RemoveSortedSetRange - Not implemented")
-	return nil
+	return handleRemoveSortedSetRange(keyName, scoreFrom, scoreTo)
 }
 
 func (r *RPCStorageHandler) RemoveFromList(keyName, value string) error {

@@ -444,7 +444,6 @@ func loadControlAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}/rotate", rotateOauthClientHandler).Methods("PUT")
 		r.HandleFunc("/oauth/clients/apis/{appID}", getApisForOauthApp).Queries("orgID", "{[0-9]*?}").Methods("GET")
 		r.HandleFunc("/oauth/refresh/{keyName}", invalidateOauthRefresh).Methods("DELETE")
-		r.HandleFunc("/cache/{apiID}", invalidateCacheHandler).Methods("DELETE")
 		r.HandleFunc("/oauth/revoke", RevokeTokenHandler).Methods("POST")
 		r.HandleFunc("/oauth/revoke_all", RevokeAllTokensHandler).Methods("POST")
 
@@ -453,7 +452,7 @@ func loadControlAPIEndpoints(muxer *mux.Router) {
 	}
 
 	r.HandleFunc("/debug", traceHandler).Methods("POST")
-
+	r.HandleFunc("/cache/{apiID}", invalidateCacheHandler).Methods("DELETE")
 	r.HandleFunc("/keys", keyHandler).Methods("POST", "PUT", "GET", "DELETE")
 	r.HandleFunc("/keys/preview", previewKeyHandler).Methods("POST")
 	r.HandleFunc("/keys/{keyName:[^/]*}", keyHandler).Methods("POST", "PUT", "GET", "DELETE")
@@ -491,11 +490,16 @@ func generateOAuthPrefix(apiID string) string {
 
 // Create API-specific OAuth handlers and respective auth servers
 func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
-	apiAuthorizePath := spec.Proxy.ListenPath + "tyk/oauth/authorize-client{_:/?}"
-	clientAuthPath := spec.Proxy.ListenPath + "oauth/authorize{_:/?}"
-	clientAccessPath := spec.Proxy.ListenPath + "oauth/token{_:/?}"
-	revokeToken := spec.Proxy.ListenPath + "oauth/revoke"
-	revokeAllTokens := spec.Proxy.ListenPath + "oauth/revoke_all"
+	var pathSeparator string
+	if !strings.HasSuffix(spec.Proxy.ListenPath, "/") {
+		pathSeparator = "/"
+	}
+
+	apiAuthorizePath := spec.Proxy.ListenPath + pathSeparator + "tyk/oauth/authorize-client{_:/?}"
+	clientAuthPath := spec.Proxy.ListenPath + pathSeparator + "oauth/authorize{_:/?}"
+	clientAccessPath := spec.Proxy.ListenPath + pathSeparator + "oauth/token{_:/?}"
+	revokeToken := spec.Proxy.ListenPath + pathSeparator + "oauth/revoke"
+	revokeAllTokens := spec.Proxy.ListenPath + pathSeparator + "oauth/revoke_all"
 
 	serverConfig := osin.NewServerConfig()
 
@@ -512,7 +516,7 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 	prefix := generateOAuthPrefix(spec.APIID)
 	storageManager := getGlobalStorageHandler(prefix, false)
 	storageManager.Connect()
-	osinStorage := &RedisOsinStorageInterface{storageManager, GlobalSessionManager, spec.OrgID}
+	osinStorage := &RedisOsinStorageInterface{storageManager, GlobalSessionManager, &storage.RedisCluster{KeyPrefix: prefix, HashKeys: false}, spec.OrgID}
 
 	osinServer := TykOsinNewServer(serverConfig, osinStorage)
 
@@ -998,6 +1002,10 @@ func afterConfSetup(conf *config.Config) {
 
 	if conf.SlaveOptions.PingTimeout == 0 {
 		conf.SlaveOptions.PingTimeout = 60
+	}
+
+	if conf.SlaveOptions.KeySpaceSyncInterval == 0 {
+		conf.SlaveOptions.KeySpaceSyncInterval = 10
 	}
 
 	rpc.GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)
