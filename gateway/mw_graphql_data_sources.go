@@ -88,7 +88,7 @@ func (t *TykInternalDataSourcePlanner) Plan(args []datasource.Argument) (datasou
 }
 
 func (t *TykInternalDataSourcePlanner) Configure(operation, definition *ast.Document, walker *astvisitor.Walker) {
-
+	t.BasePlanner.Configure(operation, definition, walker)
 }
 
 func (t *TykInternalDataSourcePlanner) EnterInlineFragment(ref int) {
