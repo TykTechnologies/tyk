@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -20,57 +21,41 @@ import (
 	"github.com/tidwall/sjson"
 )
 
-type TykInternalDataSourceConfig struct {
-	LoopingURL                 string
-	Method                     *string
-	StatusCodeTypeNameMappings []datasource.StatusCodeTypeNameMapping
-}
-
 type TykInternalDataSourcePlannerFactoryFactory struct {
 	logger *logrus.Logger
 }
 
 func (t *TykInternalDataSourcePlannerFactoryFactory) Initialize(base datasource.BasePlanner, configReader io.Reader) (datasource.PlannerFactory, error) {
-	var config TykInternalDataSourceConfig
-	err := json.NewDecoder(configReader).Decode(&config)
+	factory := &TykInternalDataSourcePlannerFactory{
+		base:   base,
+		logger: t.logger,
+	}
+
+	err := json.NewDecoder(configReader).Decode(&factory.config)
 	if err != nil {
 		return nil, err
 	}
 
-	loopingURL, err := url.Parse(config.LoopingURL)
+	apiNameOrID, err := url.Parse(factory.config.Host)
 	if err != nil {
 		return nil, err
 	}
 
-	return &TykInternalDataSourcePlannerFactory{
-		base:       base,
-		config:     config,
-		loopingURL: loopingURL,
-		logger:     t.logger,
-	}, nil
+	factory.config.Host = apiNameOrID.Host
+
+	return factory, err
 }
 
 type TykInternalDataSourcePlannerFactory struct {
-	base       datasource.BasePlanner
-	config     TykInternalDataSourceConfig
-	loopingURL *url.URL
-	logger     *logrus.Logger
+	base   datasource.BasePlanner
+	config datasource.HttpJsonDataSourceConfig
+	logger *logrus.Logger
 }
 
 func (t *TykInternalDataSourcePlannerFactory) DataSourcePlanner() datasource.Planner {
-	httpJSONDataSourceConfig := datasource.HttpJsonDataSourceConfig{
-		Host:                       t.loopingURL.Host,
-		URL:                        t.loopingURL.Path,
-		Method:                     t.config.Method,
-		Body:                       nil,
-		Headers:                    nil,
-		DefaultTypeName:            nil,
-		StatusCodeTypeNameMappings: t.config.StatusCodeTypeNameMappings,
-	}
-
 	return &TykInternalDataSourcePlanner{
 		BasePlanner:      t.base,
-		dataSourceConfig: httpJSONDataSourceConfig,
+		dataSourceConfig: t.config,
 		logger:           t.logger,
 	}
 }
@@ -249,8 +234,18 @@ func (t *TykInternalDataSource) Resolve(ctx context.Context, args datasource.Res
 
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, request)
+	resp := recorder.Result()
 
 	var data []byte
+
+	if resp != nil {
+		data, err = ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.logger.WithError(err).Error("could not read data source response")
+			return
+		}
+	}
+
 	statusCode := strconv.Itoa(recorder.Code)
 	statusCodeTypeName := gjson.GetBytes(typeNameArg, statusCode)
 	if statusCodeTypeName.Exists() {
