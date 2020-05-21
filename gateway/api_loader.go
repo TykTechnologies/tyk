@@ -711,7 +711,19 @@ func loadApps(specs []*APISpec) {
 			mainLog.Info("API bind on custom port:", spec.ListenPort)
 		}
 
-		if converted, err := kvStore(spec.Proxy.ListenPath); err == nil {
+		// Handle case where listen path is inputted as "/consul://oops"
+		// This makes sure kv checks for consul://oops. If
+		// `/consul://oops` is passed instead, it will be returned as is
+		// because there isn't a store associated with "/consul://" but
+		// "consul://"
+		var val = strings.TrimPrefix(spec.Proxy.ListenPath, "/")
+		if converted, err := kvStore(val); err == nil {
+			// Check if "/" is a prefix in the value stored in the
+			// KV store. If it isn't, add it.
+			if !strings.HasPrefix(converted, "/") {
+				converted = "/" + converted
+			}
+
 			spec.Proxy.ListenPath = converted
 		}
 
