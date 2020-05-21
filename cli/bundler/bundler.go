@@ -173,7 +173,7 @@ func (b *Bundler) validateManifest(manifest *apidef.BundleManifest) (err error) 
 	}
 
 	// The custom middleware block must specify at least one hook:
-	definedHooks := len(manifest.CustomMiddleware.Pre) + len(manifest.CustomMiddleware.Post) + len(manifest.CustomMiddleware.PostKeyAuth)
+	definedHooks := len(manifest.CustomMiddleware.Pre) + len(manifest.CustomMiddleware.Post) + len(manifest.CustomMiddleware.PostKeyAuth) + len(manifest.CustomMiddleware.Response)
 
 	// We should count the auth check middleware (single), if it's present:
 	if manifest.CustomMiddleware.AuthCheck.Name != "" {
