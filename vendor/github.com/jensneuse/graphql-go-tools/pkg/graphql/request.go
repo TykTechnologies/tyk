@@ -29,17 +29,17 @@ type Request struct {
 	isNormalized bool
 }
 
-func UnmarshalRequest(reader io.Reader, request *Request) error {
+func UnmarshalRequest(reader io.Reader, request *Request) ([]byte, error) {
 	requestBytes, err := ioutil.ReadAll(reader)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if len(requestBytes) == 0 {
-		return ErrEmptyRequest
+		return nil, ErrEmptyRequest
 	}
 
-	return json.Unmarshal(requestBytes, &request)
+	return requestBytes, json.Unmarshal(requestBytes, &request)
 }
 
 func (r *Request) ValidateForSchema(schema *Schema) (result ValidationResult, err error) {

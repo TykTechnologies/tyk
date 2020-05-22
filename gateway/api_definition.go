@@ -176,7 +176,7 @@ type APISpec struct {
 	LastGoodHostList         *apidef.HostList
 	HasRun                   bool
 	ServiceRefreshInProgress bool
-	HTTPTransport            http.RoundTripper
+	HTTPTransport            *TykRoundTripper
 	HTTPTransportCreated     time.Time
 	WSTransport              http.RoundTripper
 	WSTransportCreated       time.Time

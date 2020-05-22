@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strconv"
 	"strings"
@@ -564,7 +565,7 @@ func tlsClientConfig(s *APISpec) *tls.Config {
 	return config
 }
 
-func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p *ReverseProxy) http.RoundTripper {
+func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p *ReverseProxy) *TykRoundTripper {
 	transport := defaultTransport(timeOut) // modifies a newly created transport
 	transport.TLSClientConfig = &tls.Config{}
 	transport.Proxy = proxyFromAPI(p.TykAPISpec)
@@ -616,7 +617,7 @@ func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p
 		http2.ConfigureTransport(transport)
 	}
 
-	return transport
+	return &TykRoundTripper{transport}
 }
 
 func (p *ReverseProxy) setCommonNameVerifyPeerCertificate(tlsConfig *tls.Config, hostName string) {
@@ -668,6 +669,28 @@ func (p *ReverseProxy) setCommonNameVerifyPeerCertificate(tlsConfig *tls.Config,
 	}
 }
 
+type TykRoundTripper struct {
+	transport *http.Transport
+}
+
+func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
+	if r.URL.Scheme == "tyk" {
+		handler, found := findInternalHttpHandlerByNameOrID(r.Host)
+		if !found {
+			log.WithField("APINameORID", r.Host).Error("Couldn't detect target")
+			return nil, errors.New("handler could")
+		}
+
+		r.URL.Scheme = ""
+
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, r)
+		return recorder.Result(), nil
+	}
+
+	return rt.transport.RoundTrip(r)
+}
+
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) ProxyResponse {
 	if trace.IsEnabled() {
 		span, ctx := trace.Span(req.Context(), req.URL.Path)
@@ -675,7 +698,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		ext.SpanKindRPCClient.Set(span)
 		req = req.WithContext(ctx)
 	}
-	var roundTripper http.RoundTripper
+	var roundTripper *TykRoundTripper
 
 	p.TykAPISpec.Lock()
 
@@ -797,13 +820,13 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	p.TykAPISpec.Lock()
-	roundTripper.(*http.Transport).TLSClientConfig.Certificates = tlsCertificates
+	roundTripper.transport.TLSClientConfig.Certificates = tlsCertificates
 	p.TykAPISpec.Unlock()
 
 	if p.TykAPISpec.Proxy.Transport.SSLForceCommonNameCheck || config.Global().SSLForceCommonNameCheck {
 		// if proxy is enabled, add CommonName verification in verifyPeerCertificate
 		// DialTLS is not executed if proxy is used
-		httpTransport := roundTripper.(*http.Transport)
+		httpTransport := roundTripper.transport
 
 		p.logger.Debug("Using forced SSL CN check")
 

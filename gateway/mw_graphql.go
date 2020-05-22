@@ -1,8 +1,10 @@
 package gateway
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"io/ioutil"
 	"net/http"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -107,11 +109,13 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	}
 
 	var gqlRequest gql.Request
-	err := gql.UnmarshalRequest(r.Body, &gqlRequest)
+	reqBytes, err := gql.UnmarshalRequest(r.Body, &gqlRequest)
 	if err != nil {
 		m.Logger().Errorf("Error while unmarshalling GraphQL request: '%s'", err)
 		return err, http.StatusBadRequest
 	}
+
+	r.Body = ioutil.NopCloser(bytes.NewBuffer(reqBytes))
 
 	defer ctxSetGraphQLRequest(r, &gqlRequest)
 

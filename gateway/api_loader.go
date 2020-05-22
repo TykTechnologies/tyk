@@ -558,21 +558,41 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if d.SH.Spec.target.Scheme == "tyk" {
-		if targetAPI := fuzzyFindAPI(d.SH.Spec.target.Host); targetAPI != nil {
-			if h, found := apisHandlesByID.Load(targetAPI.APIID); found {
-				if d.SH.Spec.Proxy.StripListenPath {
-					r.URL.Path = d.SH.Spec.StripListenPath(r, r.URL.Path)
-					r.URL.RawPath = d.SH.Spec.StripListenPath(r, r.URL.RawPath)
-				}
-				h.(http.Handler).ServeHTTP(w, r)
-				return
-			}
+		handler, found := findInternalHttpHandlerByNameOrID(d.SH.Spec.target.Host)
+		if !found {
+			handler := ErrorHandler{*d.SH.Base()}
+			handler.HandleError(w, r, "Couldn't detect target", http.StatusInternalServerError, true)
+			return
 		}
-		handler := ErrorHandler{*d.SH.Base()}
-		handler.HandleError(w, r, "Couldn't detect target", http.StatusInternalServerError, true)
+
+		sanitizeProxyPaths(d.SH.Spec, r)
+		handler.ServeHTTP(w, r)
 		return
 	}
 	d.SH.ServeHTTP(w, r)
+}
+
+func findInternalHttpHandlerByNameOrID(apiNameOrID string) (handler http.Handler, ok bool) {
+	targetAPI := fuzzyFindAPI(apiNameOrID)
+	if targetAPI == nil {
+		return nil, false
+	}
+
+	h, found := apisHandlesByID.Load(targetAPI.APIID)
+	if !found {
+		return nil, false
+	}
+
+	return h.(http.Handler), true
+}
+
+func sanitizeProxyPaths(apiSpec *APISpec, request *http.Request) {
+	if !apiSpec.Proxy.StripListenPath {
+		return
+	}
+
+	request.URL.Path = apiSpec.StripListenPath(request, request.URL.Path)
+	request.URL.RawPath = apiSpec.StripListenPath(request, request.URL.RawPath)
 }
 
 func loadGlobalApps() {
