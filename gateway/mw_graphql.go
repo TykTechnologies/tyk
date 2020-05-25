@@ -18,9 +18,11 @@ import (
 )
 
 const (
-	HTTPJSONDataSource = "HTTPJSONDataSource"
-	GraphQLDataSource  = "GraphQLDataSource"
-	SchemaDataSource   = "SchemaDataSource"
+	HTTPJSONDataSource   = "HTTPJSONDataSource"
+	GraphQLDataSource    = "GraphQLDataSource"
+	SchemaDataSource     = "SchemaDataSource"
+	TykRESTDataSource    = "TykRESTDataSource"
+	TykGraphQLDataSource = "TykGraphQLDataSource"
 )
 
 type GraphQLMiddleware struct {
@@ -86,7 +88,17 @@ func (m *GraphQLMiddleware) Init() {
 			m.Logger().WithError(err).Errorf(errMsgFormat, HTTPJSONDataSource)
 		}
 
+		err = engine.AddHttpJsonDataSourceWithOptions(TykRESTDataSource, httpJSONOptions)
+		if err != nil {
+			m.Logger().WithError(err).Errorf(errMsgFormat, HTTPJSONDataSource)
+		}
+
 		err = engine.AddGraphqlDataSourceWithOptions(GraphQLDataSource, graphQLOptions)
+		if err != nil {
+			m.Logger().WithError(err).Errorf(errMsgFormat, GraphQLDataSource)
+		}
+
+		err = engine.AddGraphqlDataSourceWithOptions(TykGraphQLDataSource, graphQLOptions)
 		if err != nil {
 			m.Logger().WithError(err).Errorf(errMsgFormat, GraphQLDataSource)
 		}
