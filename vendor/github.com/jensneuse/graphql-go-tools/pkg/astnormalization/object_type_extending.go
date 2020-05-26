@@ -2,6 +2,7 @@ package astnormalization
 
 import (
 	"github.com/cespare/xxhash"
+
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/astvisitor"
 )

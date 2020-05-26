@@ -5,6 +5,7 @@ package astimport
 
 import (
 	"fmt"
+
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 )
 
@@ -34,49 +35,69 @@ func (i *Importer) ImportType(ref int, from, to *ast.Document) int {
 
 func (i *Importer) ImportValue(fromValue ast.Value, from, to *ast.Document) (value ast.Value) {
 	value.Kind = fromValue.Kind
+
 	switch fromValue.Kind {
 	case ast.ValueKindFloat:
-		to.FloatValues = append(to.FloatValues, ast.FloatValue{
-			Raw:      to.Input.AppendInputBytes(from.FloatValueRaw(fromValue.Ref)),
-			Negative: from.FloatValueIsNegative(fromValue.Ref),
-		})
-		value.Ref = len(to.FloatValues) - 1
-		return
+		value.Ref = to.ImportFloatValue(
+			from.FloatValueRaw(fromValue.Ref),
+			from.FloatValueIsNegative(fromValue.Ref))
+
 	case ast.ValueKindInteger:
-		to.FloatValues = append(to.FloatValues, ast.FloatValue{
-			Raw:      to.Input.AppendInputBytes(from.IntValueRaw(fromValue.Ref)),
-			Negative: from.IntValueIsNegative(fromValue.Ref),
-		})
-		value.Ref = len(to.IntValues) - 1
-		return
+		value.Ref = to.ImportIntValue(
+			from.IntValueRaw(fromValue.Ref),
+			from.IntValueIsNegative(fromValue.Ref))
+
 	case ast.ValueKindBoolean:
 		value.Ref = fromValue.Ref
-		return
+
 	case ast.ValueKindString:
-		to.StringValues = append(to.StringValues, ast.StringValue{
-			BlockString: from.StringValueIsBlockString(fromValue.Ref),
-			Content:     to.Input.AppendInputBytes(from.StringValueContentBytes(fromValue.Ref)),
-		})
-		return
+		value.Ref = to.ImportStringValue(
+			from.StringValueContentBytes(fromValue.Ref),
+			from.StringValueIsBlockString(fromValue.Ref))
+
 	case ast.ValueKindNull:
-		return
+		// empty case
+
 	case ast.ValueKindEnum:
-		to.EnumValues = append(to.EnumValues, ast.EnumValue{
-			Name: to.Input.AppendInputBytes(from.EnumValueNameBytes(fromValue.Ref)),
-		})
-		value.Ref = len(to.EnumValues) - 1
-		return
+		value.Ref = to.ImportEnumValue(from.EnumValueNameBytes(fromValue.Ref))
+
 	case ast.ValueKindVariable:
-		to.VariableValues = append(to.VariableValues, ast.VariableValue{
-			Name: to.Input.AppendInputBytes(from.VariableValueNameBytes(fromValue.Ref)),
-		})
-		value.Ref = len(to.VariableValues) - 1
-		return
+		value.Ref = to.ImportVariableValue(from.VariableValueNameBytes(fromValue.Ref))
+
+	case ast.ValueKindList:
+		value.Ref = to.ImportListValue(i.ImportListValues(fromValue.Ref, from, to))
+
+	case ast.ValueKindObject:
+		value.Ref = to.ImportObjectValue(i.ImportObjectFields(fromValue.Ref, from, to))
+
 	default:
 		value.Kind = ast.ValueKindUnknown
-		fmt.Printf("astimport.Importer.ImportValue: not implemented fro ValueKind: %s\n", fromValue.Kind)
-		return
+		fmt.Printf("astimport.Importer.ImportValue: not implemented for ValueKind: %s\n", fromValue.Kind)
 	}
+	return
+}
+
+func (i *Importer) ImportObjectFields(ref int, from, to *ast.Document) (refs []int) {
+	objValue := from.ObjectValues[ref]
+
+	for _, fieldRef := range objValue.Refs {
+		objectField := from.ObjectFields[fieldRef]
+
+		refs = append(refs, to.ImportObjectField(
+			from.ObjectFieldNameBytes(fieldRef),
+			i.ImportValue(objectField.Value, from, to)))
+	}
+	return
+}
+
+func (i *Importer) ImportListValues(ref int, from, to *ast.Document) (refs []int) {
+	listValue := from.ListValues[ref]
+
+	for _, valueRef := range listValue.Refs {
+		value := i.ImportValue(from.Values[valueRef], from, to)
+		refs = append(refs, to.AddValue(value))
+	}
+	return
 }
 
 func (i *Importer) ImportArgument(ref int, from, to *ast.Document) int {

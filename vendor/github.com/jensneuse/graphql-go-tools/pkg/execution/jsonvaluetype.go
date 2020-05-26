@@ -4,10 +4,11 @@ package execution
 import (
 	"bytes"
 	"fmt"
+	"io"
+
 	"github.com/jensneuse/graphql-go-tools/internal/pkg/unsafebytes"
 	"github.com/jensneuse/graphql-go-tools/pkg/escape"
 	"github.com/jensneuse/graphql-go-tools/pkg/lexer/literal"
-	"io"
 )
 
 type JSONValueType int

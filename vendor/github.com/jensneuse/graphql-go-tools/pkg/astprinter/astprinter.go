@@ -3,10 +3,11 @@ package astprinter
 
 import (
 	"bytes"
+	"io"
+
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/astvisitor"
 	"github.com/jensneuse/graphql-go-tools/pkg/lexer/literal"
-	"io"
 )
 
 // Print takes a document as well as a definition (optional) and prints it to the io.Writer.
@@ -122,12 +123,22 @@ func (p *printVisitor) must(err error) {
 }
 
 func (p *printVisitor) EnterDirective(ref int) {
+	if p.document.DirectiveIsFirst(ref, p.Ancestors[len(p.Ancestors)-1]) {
+		switch p.Ancestors[len(p.Ancestors)-1].Kind {
+		case ast.NodeKindFieldDefinition:
+			p.writeFieldType(p.Ancestors[len(p.Ancestors)-1].Ref)
+			p.write(literal.SPACE)
+		case ast.NodeKindEnumValueDefinition,
+			ast.NodeKindInputValueDefinition:
+			p.write(literal.SPACE)
+		}
+	}
+
 	p.write(literal.AT)
 	p.write(p.document.DirectiveNameBytes(ref))
 }
 
 func (p *printVisitor) LeaveDirective(ref int) {
-
 	if !p.document.DirectiveIsLast(ref, p.Ancestors[len(p.Ancestors)-1]) {
 		p.write(literal.SPACE)
 		return
@@ -158,7 +169,10 @@ func (p *printVisitor) LeaveDirective(ref int) {
 		ast.NodeKindUnionTypeDefinition,
 		ast.NodeKindUnionTypeExtension,
 		ast.NodeKindEnumTypeDefinition,
-		ast.NodeKindEnumTypeExtension:
+		ast.NodeKindEnumTypeExtension,
+		ast.NodeKindEnumValueDefinition,
+		ast.NodeKindFieldDefinition,
+		ast.NodeKindInputValueDefinition:
 		return
 	default:
 		p.write(literal.SPACE)
@@ -432,9 +446,10 @@ func (p *printVisitor) EnterFieldDefinition(ref int) {
 }
 
 func (p *printVisitor) LeaveFieldDefinition(ref int) {
-	p.write(literal.COLON)
-	p.write(literal.SPACE)
-	p.must(p.document.PrintType(p.document.FieldDefinitionType(ref), p.out))
+	if !p.document.FieldDefinitionHasDirectives(ref) {
+		p.writeFieldType(ref)
+	}
+
 	if p.document.FieldDefinitionIsLast(ref, p.Ancestors[len(p.Ancestors)-1]) {
 		if p.indent != nil {
 			p.write(literal.LINETERMINATOR)
@@ -490,7 +505,16 @@ func (p *printVisitor) LeaveInputValueDefinition(ref int) {
 		}
 		p.write(p.inputValueDefinitionCloser)
 	} else {
-		p.write(literal.SPACE)
+		if len(p.Ancestors) > 0 {
+			// check enclosing type kind
+			if p.Ancestors[len(p.Ancestors)-1].Kind == ast.NodeKindFieldDefinition {
+				p.write(literal.COMMA)
+				p.write(literal.SPACE)
+			} else if len(p.indent) == 0 {
+				// add space between arguments when printing without indents
+				p.write(literal.SPACE)
+			}
+		}
 	}
 }
 
@@ -982,4 +1006,10 @@ func (p *printVisitor) EnterDocument(operation, definition *ast.Document) {
 
 func (p *printVisitor) LeaveDocument(operation, definition *ast.Document) {
 
+}
+
+func (p *printVisitor) writeFieldType(ref int) {
+	p.write(literal.COLON)
+	p.write(literal.SPACE)
+	p.must(p.document.PrintType(p.document.FieldDefinitionType(ref), p.out))
 }

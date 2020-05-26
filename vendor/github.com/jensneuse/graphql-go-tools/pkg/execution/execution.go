@@ -6,18 +6,20 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
+	"strconv"
+	"sync"
+
 	"github.com/buger/jsonparser"
 	"github.com/cespare/xxhash"
-	"github.com/jensneuse/byte-template"
+	byte_template "github.com/jensneuse/byte-template"
+	"github.com/tidwall/gjson"
+
 	"github.com/jensneuse/graphql-go-tools/internal/pkg/unsafebytes"
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/lexer/literal"
 	"github.com/jensneuse/graphql-go-tools/pkg/lexer/runes"
-	"github.com/tidwall/gjson"
-	"io"
-	"strconv"
-	"sync"
 )
 
 type Executor struct {
@@ -87,7 +89,7 @@ func (e *Executor) resolveNode(node Node, data []byte, path string, prefetch *sy
 			}
 		}
 		if shouldFetch && node.Fetch != nil { // execute the fetch on the object
-			_,err := node.Fetch.Fetch(e.context, data, e, path, &e.buffers)
+			_, err := node.Fetch.Fetch(e.context, data, e, path, &e.buffers)
 			if err != nil {
 				e.err = err
 			}
@@ -445,7 +447,7 @@ func (p *ParallelFetch) Fetch(ctx Context, data []byte, argsResolver ArgsResolve
 	for i := 0; i < len(p.Fetches); i++ {
 		p.wg.Add(1)
 		go func(fetch Fetch, ctx Context, data []byte, argsResolver ArgsResolver) {
-			_,_ = fetch.Fetch(ctx, data, argsResolver, suffix, buffers) // TODO: handle results
+			_, _ = fetch.Fetch(ctx, data, argsResolver, suffix, buffers) // TODO: handle results
 			p.wg.Done()
 		}(p.Fetches[i], ctx, data, argsResolver)
 	}

@@ -34,9 +34,9 @@ const _DirectiveLocation_name = "DirectiveLocationUnknownExecutableDirectiveLoca
 
 var _DirectiveLocation_index = [...]uint16{0, 24, 56, 91, 130, 162, 207, 248, 289, 334, 367, 400, 433, 475, 520, 556, 588, 619, 655, 693, 740}
 
-func (i DirectiveLocation) String() string {
-	if i < 0 || i >= DirectiveLocation(len(_DirectiveLocation_index)-1) {
-		return "DirectiveLocation(" + strconv.FormatInt(int64(i), 10) + ")"
+func (d DirectiveLocation) String() string {
+	if d < 0 || d >= DirectiveLocation(len(_DirectiveLocation_index)-1) {
+		return "DirectiveLocation(" + strconv.FormatInt(int64(d), 10) + ")"
 	}
-	return _DirectiveLocation_name[_DirectiveLocation_index[i]:_DirectiveLocation_index[i+1]]
+	return _DirectiveLocation_name[_DirectiveLocation_index[d]:_DirectiveLocation_index[d+1]]
 }

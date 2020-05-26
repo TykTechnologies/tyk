@@ -3,9 +3,10 @@ package datasource
 import (
 	"context"
 	"encoding/json"
+	"io"
+
 	"github.com/jensneuse/graphql-go-tools/pkg/introspection"
 	"github.com/jensneuse/graphql-go-tools/pkg/operationreport"
-	"io"
 )
 
 type SchemaDataSourcePlannerConfig struct {
