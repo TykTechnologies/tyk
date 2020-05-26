@@ -1081,44 +1081,56 @@ func kvStore(value string) (string, error) {
 	if strings.HasPrefix(value, "consul://") {
 		key := strings.TrimPrefix(value, "consul://")
 		log.Debugf("Retrieving %s from consul", key)
-		setUpConsul()
+		if err := setUpConsul(); err != nil {
+			// Return value as is. If consul cannot be set up
+			return value, nil
+		}
+
 		return consulKVStore.Get(key)
 	}
 
 	if strings.HasPrefix(value, "vault://") {
 		key := strings.TrimPrefix(value, "vault://")
 		log.Debugf("Retrieving %s from vault", key)
-		setUpVault()
+		if err := setUpVault(); err != nil {
+			// Return value as is If vault cannot be set up
+			return value, nil
+		}
+
 		return vaultKVStore.Get(key)
 	}
 
 	return value, nil
 }
 
-func setUpVault() {
+func setUpVault() error {
 	if vaultKVStore != nil {
-		return
+		return nil
 	}
 
 	var err error
 
 	vaultKVStore, err = kv.NewVault(config.Global().KV.Vault)
 	if err != nil {
-		log.Fatalf("an error occurred while setting up vault... %v", err)
+		log.Debugf("an error occurred while setting up vault... %v", err)
 	}
+
+	return err
 }
 
-func setUpConsul() {
+func setUpConsul() error {
 	if consulKVStore != nil {
-		return
+		return nil
 	}
 
 	var err error
 
 	consulKVStore, err = kv.NewConsul(config.Global().KV.Consul)
 	if err != nil {
-		log.Fatalf("an error occurred while setting up consul... %v", err)
+		log.Debugf("an error occurred while setting up consul.. %v", err)
 	}
+
+	return err
 }
 
 var hostDetails struct {
