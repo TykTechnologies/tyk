@@ -20,6 +20,7 @@ require (
 	github.com/bshuster-repo/logrus-logstash-hook v0.4.1
 	github.com/buger/jsonparser v0.0.0-20181115193947-bf1c66bbce23
 	github.com/cenk/backoff v2.2.1+incompatible // indirect
+	github.com/cenkalti/backoff/v4 v4.0.2
 	github.com/certifi/gocertifi v0.0.0-20190905060710-a5e0173ced67 // indirect
 	github.com/clbanning/mxj v1.8.4
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
