@@ -391,6 +391,13 @@ func (g *GraphQLDataSource) Resolve(ctx context.Context, args ResolverArgs, out 
 		return n, err
 	}
 
+	defer func() {
+		err := res.Body.Close()
+		if err != nil {
+			g.Log.Error("GraphQLDataSource.Resolve.Response.Body.Close", log.Error(err))
+		}
+	}()
+
 	data = bytes.ReplaceAll(data, literal.BACKSLASH, nil)
 	data, _, _, err = jsonparser.Get(data, "data")
 	if err != nil {

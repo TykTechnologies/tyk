@@ -72,6 +72,12 @@ type dataSourcePlannerRef struct {
 
 func (p *planningVisitor) EnterDocument(operation, definition *ast.Document) {
 	p.operation, p.definition, p.base.Definition = operation, definition, definition
+
+	if len(operation.OperationDefinitions) == 0 {
+		p.Walker.StopWithExternalErr(operationreport.ErrDocumentDoesntContainExecutableOperation())
+		return
+	}
+
 	obj := &Object{}
 	p.rootNode = &Object{
 		operationType: operation.OperationDefinitions[0].OperationType,
