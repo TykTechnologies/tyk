@@ -3,12 +3,14 @@ package datasource
 import (
 	"context"
 	"encoding/json"
-	mqtt "github.com/eclipse/paho.mqtt.golang"
-	log "github.com/jensneuse/abstractlogger"
-	"github.com/jensneuse/graphql-go-tools/pkg/lexer/literal"
 	"io"
 	"sync"
 	"time"
+
+	mqtt "github.com/eclipse/paho.mqtt.golang"
+	log "github.com/jensneuse/abstractlogger"
+
+	"github.com/jensneuse/graphql-go-tools/pkg/lexer/literal"
 )
 
 type MQTTDataSourceConfig struct {

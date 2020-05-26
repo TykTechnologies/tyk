@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -244,4 +245,21 @@ type ListArgument struct {
 
 func (l ListArgument) ArgName() []byte {
 	return l.Name
+}
+
+func isWhitelistedScheme(scheme string, whitelistedSchemes []string, defaultSchemes []string) bool {
+	schemes := append(whitelistedSchemes, defaultSchemes...)
+	for _, whitelistedScheme := range schemes {
+		if scheme == whitelistedScheme {
+			return true
+		}
+	}
+
+	return false
+}
+
+func parseURLBytes(hostArg, urlArg []byte) (parsedURL *url.URL, rawURL string, err error) {
+	rawURL = string(hostArg) + string(urlArg)
+	parsedURL, err = url.Parse(rawURL)
+	return parsedURL, rawURL, err
 }

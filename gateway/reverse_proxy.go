@@ -617,7 +617,7 @@ func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p
 		http2.ConfigureTransport(transport)
 	}
 
-	return &TykRoundTripper{transport}
+	return &TykRoundTripper{transport, p.logger}
 }
 
 func (p *ReverseProxy) setCommonNameVerifyPeerCertificate(tlsConfig *tls.Config, hostName string) {
@@ -671,18 +671,20 @@ func (p *ReverseProxy) setCommonNameVerifyPeerCertificate(tlsConfig *tls.Config,
 
 type TykRoundTripper struct {
 	transport *http.Transport
+	logger    *logrus.Entry
 }
 
 func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	if r.URL.Scheme == "tyk" {
 		handler, found := findInternalHttpHandlerByNameOrID(r.Host)
 		if !found {
-			log.WithField("APINameORID", r.Host).Error("Couldn't detect target")
+			rt.logger.WithField("looping_url", "tyk://"+r.Host).Error("Couldn't detect target")
 			return nil, errors.New("handler could")
 		}
 
 		r.URL.Scheme = ""
 
+		rt.logger.WithField("looping_url", "tyk://"+r.Host).Debug("Executing request on internal route")
 		recorder := httptest.NewRecorder()
 		handler.ServeHTTP(recorder, r)
 		return recorder.Result(), nil

@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	log "github.com/jensneuse/abstractlogger"
-	"github.com/jensneuse/graphql-go-tools/pkg/lexer/literal"
-	"github.com/jensneuse/pipeline/pkg/pipe"
 	"io"
 	"io/ioutil"
+
+	log "github.com/jensneuse/abstractlogger"
+	"github.com/jensneuse/pipeline/pkg/pipe"
+
+	"github.com/jensneuse/graphql-go-tools/pkg/lexer/literal"
 )
 
 type PipelineDataSourceConfig struct {
@@ -68,7 +70,7 @@ func (h *PipelineDataSourcePlanner) Plan(args []Argument) (DataSource, []Argumen
 		h.Log.Error("PipelineDataSourcePlanner.pipe.FromConfig", log.Error(err))
 	}
 
-	return &source, append(h.Args,args...)
+	return &source, append(h.Args, args...)
 }
 
 func (h *PipelineDataSourcePlanner) EnterInlineFragment(ref int) {
