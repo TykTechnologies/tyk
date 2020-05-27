@@ -317,6 +317,13 @@ func (r *HttpJsonDataSource) Resolve(ctx context.Context, args ResolverArgs, out
 		return
 	}
 
+	defer func() {
+		err := res.Body.Close()
+		if err != nil {
+			r.Log.Error("HttpJsonDataSource.Resolve.Response.Body.Close", log.Error(err))
+		}
+	}()
+
 	statusCode := strconv.Itoa(res.StatusCode)
 	statusCodeTypeName := gjson.GetBytes(typeNameArg, statusCode)
 	if statusCodeTypeName.Exists() {
