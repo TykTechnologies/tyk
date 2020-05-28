@@ -99,6 +99,7 @@ func (e *ExecutionEngine) AddDataSource(name string, plannerFactoryFactory datas
 
 func (e *ExecutionEngine) ExecuteWithWriter(ctx context.Context, operation *Request, writer io.Writer, options ExecutionOptions) error {
 	var report operationreport.Report
+
 	if !operation.IsNormalized() {
 		normalizationResult, err := operation.Normalize(e.schema)
 		if err != nil {
