@@ -23,13 +23,13 @@ func TestGraphQL(t *testing.T) {
 	})[0]
 
 	t.Run("Bad schema", func(t *testing.T) {
-		spec.GraphQL.GraphQLAPI.Schema = "query: Query"
+		spec.GraphQL.Schema = "query: Query"
 		LoadAPI(spec)
 
 		_, _ = g.Run(t, test.TestCase{BodyMatch: "there was a problem proxying the request", Code: http.StatusInternalServerError})
 	})
 
-	spec.GraphQL.GraphQLAPI.Schema = "schema { query: Query } type Query { hello: word } type word { numOfLetters: Int }"
+	spec.GraphQL.Schema = "schema { query: Query } type Query { hello: word } type word { numOfLetters: Int }"
 	LoadAPI(spec)
 
 	t.Run("Empty request shouldn't be unmarshalled", func(t *testing.T) {
