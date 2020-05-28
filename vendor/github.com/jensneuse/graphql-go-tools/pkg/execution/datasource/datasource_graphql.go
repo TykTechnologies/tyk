@@ -32,11 +32,11 @@ type GraphqlRequest struct {
 // GraphQLDataSourceConfig is the configuration for the GraphQL DataSource
 type GraphQLDataSourceConfig struct {
 	// Host is the hostname of the upstream
-	Host string `json:"host"`
+	Host string
 	// URL is the url of the upstream
-	URL string `json:"url"`
+	URL string
 	// Method is the http.Method of the upstream, defaults to POST (optional)
-	Method *string `json:"method"`
+	Method *string
 }
 
 type GraphQLDataSourcePlanner struct {
