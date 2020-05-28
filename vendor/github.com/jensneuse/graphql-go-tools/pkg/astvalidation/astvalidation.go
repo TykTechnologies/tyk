@@ -6,7 +6,9 @@ package astvalidation
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/cespare/xxhash"
+
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/astvisitor"
 	"github.com/jensneuse/graphql-go-tools/pkg/lexer/literal"
@@ -199,7 +201,7 @@ func (f *fieldDefined) ValidateUnionField(ref int, enclosingTypeDefinition ast.N
 
 func (f *fieldDefined) ValidateInterfaceObjectTypeField(ref int, enclosingTypeDefinition ast.Node) {
 	fieldName := f.operation.FieldNameBytes(ref)
-	if bytes.Equal(fieldName,literal.TYPENAME){
+	if bytes.Equal(fieldName, literal.TYPENAME) {
 		return
 	}
 	typeName := f.definition.NodeNameBytes(enclosingTypeDefinition)
@@ -326,7 +328,7 @@ func (f *fieldSelectionMergingVisitor) EnterOperationDefinition(ref int) {
 
 func (f *fieldSelectionMergingVisitor) EnterField(ref int) {
 	fieldName := f.operation.FieldNameBytes(ref)
-	if bytes.Equal(fieldName,literal.TYPENAME){
+	if bytes.Equal(fieldName, literal.TYPENAME) {
 		return
 	}
 	objectName := f.operation.FieldObjectNameBytes(ref)
@@ -570,7 +572,9 @@ func (v *validArgumentsVisitor) stringValueSatisfiesInputValueDefinition(value a
 	if inputType.TypeKind != ast.TypeKindNamed {
 		return false
 	}
-	if !bytes.Equal(v.definition.Input.ByteSlice(inputType.Name), literal.STRING) {
+
+	inputTypeName := v.definition.Input.ByteSlice(inputType.Name)
+	if !bytes.Equal(inputTypeName, literal.STRING) && !bytes.Equal(inputTypeName, literal.ID) {
 		return false
 	}
 	return true
@@ -611,7 +615,7 @@ func (v *validArgumentsVisitor) nullValueSatisfiesInputValueDefinition(inputValu
 
 func (v *validArgumentsVisitor) enumValueSatisfiesInputValueDefinition(enumValue, inputValueDefinition int) bool {
 
-	definitionTypeName := v.definition.ResolveTypeName(v.definition.InputValueDefinitions[inputValueDefinition].Type)
+	definitionTypeName := v.definition.ResolveTypeNameBytes(v.definition.InputValueDefinitions[inputValueDefinition].Type)
 	node, exists := v.definition.Index.Nodes[xxhash.Sum64(definitionTypeName)]
 	if !exists {
 		return false
@@ -748,7 +752,7 @@ func (v *valuesVisitor) valueSatisfiesInputValueDefinitionType(value ast.Value, 
 		}
 		return v.valueSatisfiesInputValueDefinitionType(value, v.definition.Types[definitionTypeRef].OfType)
 	case ast.TypeKindNamed:
-		node, exists := v.definition.Index.Nodes[xxhash.Sum64(v.definition.ResolveTypeName(definitionTypeRef))]
+		node, exists := v.definition.Index.Nodes[xxhash.Sum64(v.definition.ResolveTypeNameBytes(definitionTypeRef))]
 		if !exists {
 			return false
 		}
@@ -867,18 +871,16 @@ func (v *valuesVisitor) objectValueSatisfiesInputValueDefinition(objectValue, in
 }
 
 func (v *valuesVisitor) valueSatisfiesScalar(value ast.Value, scalar int) bool {
-	scalarName := v.definition.ScalarTypeDefinitionNameBytes(scalar)
-	switch value.Kind {
-	case ast.ValueKindString:
-		return bytes.Equal(scalarName, literal.STRING)
-	case ast.ValueKindBoolean:
-		return bytes.Equal(scalarName, literal.BOOLEAN)
-	case ast.ValueKindInteger:
-		return bytes.Equal(scalarName, literal.INT) || bytes.Equal(scalarName, literal.FLOAT)
-	case ast.ValueKindFloat:
-		return bytes.Equal(scalarName, literal.FLOAT)
+	scalarName := v.definition.ScalarTypeDefinitionNameString(scalar)
+	switch scalarName {
+	case "Boolean":
+		return value.Kind == ast.ValueKindBoolean
+	case "Int":
+		return value.Kind == ast.ValueKindInteger
+	case "Float":
+		return value.Kind == ast.ValueKindFloat || value.Kind == ast.ValueKindInteger
 	default:
-		return false
+		return value.Kind == ast.ValueKindString
 	}
 }
 
@@ -1254,7 +1256,7 @@ func (v *variablesAreInputTypesVisitor) EnterDocument(operation, definition *ast
 
 func (v *variablesAreInputTypesVisitor) EnterVariableDefinition(ref int) {
 
-	typeName := v.operation.ResolveTypeName(v.operation.VariableDefinitions[ref].Type)
+	typeName := v.operation.ResolveTypeNameBytes(v.operation.VariableDefinitions[ref].Type)
 	typeDefinitionNode := v.definition.Index.Nodes[xxhash.Sum64(typeName)]
 	switch typeDefinitionNode.Kind {
 	case ast.NodeKindInputObjectTypeDefinition, ast.NodeKindScalarTypeDefinition, ast.NodeKindEnumTypeDefinition:

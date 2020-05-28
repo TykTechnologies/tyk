@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"sync"
 
 	"github.com/jensneuse/abstractlogger"
 
@@ -16,11 +17,13 @@ import (
 )
 
 type DataSourceHttpJsonOptions struct {
-	HttpClient *http.Client
+	HttpClient         *http.Client
+	WhitelistedSchemes []string
 }
 
 type DataSourceGraphqlOptions struct {
-	HttpClient *http.Client
+	HttpClient         *http.Client
+	WhitelistedSchemes []string
 }
 
 type ExecutionOptions struct {
@@ -28,24 +31,29 @@ type ExecutionOptions struct {
 }
 
 type ExecutionEngine struct {
-	logger      abstractlogger.Logger
-	basePlanner *datasource.BasePlanner
-	executor    *execution.Executor
-	schema      *Schema
+	logger       abstractlogger.Logger
+	basePlanner  *datasource.BasePlanner
+	executorPool *sync.Pool
+	schema       *Schema
 }
 
 func NewExecutionEngine(logger abstractlogger.Logger, schema *Schema, plannerConfig datasource.PlannerConfiguration) (*ExecutionEngine, error) {
-	executor := execution.NewExecutor(nil)
+	executorPool := sync.Pool{
+		New: func() interface{} {
+			return execution.NewExecutor(nil)
+		},
+	}
+
 	basePlanner, err := datasource.NewBaseDataSourcePlanner(schema.rawInput, plannerConfig, logger)
 	if err != nil {
 		return nil, err
 	}
 
 	return &ExecutionEngine{
-		logger:      logger,
-		basePlanner: basePlanner,
-		executor:    executor,
-		schema:      schema,
+		logger:       logger,
+		basePlanner:  basePlanner,
+		executorPool: &executorPool,
+		schema:       schema,
 	}, nil
 }
 
@@ -60,6 +68,10 @@ func (e *ExecutionEngine) AddHttpJsonDataSourceWithOptions(name string, options 
 		httpJsonFactoryFactory.Client = options.HttpClient
 	}
 
+	if len(options.WhitelistedSchemes) > 0 {
+		httpJsonFactoryFactory.WhitelistedSchemes = options.WhitelistedSchemes
+	}
+
 	return e.AddDataSource(name, httpJsonFactoryFactory)
 }
 
@@ -72,6 +84,10 @@ func (e *ExecutionEngine) AddGraphqlDataSourceWithOptions(name string, options D
 
 	if options.HttpClient != nil {
 		graphqlFactoryFactory.Client = options.HttpClient
+	}
+
+	if len(options.WhitelistedSchemes) > 0 {
+		graphqlFactoryFactory.WhitelistedSchemes = options.WhitelistedSchemes
 	}
 
 	return e.AddDataSource(name, graphqlFactoryFactory)
@@ -107,7 +123,9 @@ func (e *ExecutionEngine) ExecuteWithWriter(ctx context.Context, operation *Requ
 		ExtraArguments: extraArguments,
 	}
 
-	return e.executor.Execute(executionContext, plan, writer)
+	poolExecutor := e.executorPool.Get().(*execution.Executor)
+	defer e.executorPool.Put(poolExecutor)
+	return poolExecutor.Execute(executionContext, plan, writer)
 }
 
 func (e *ExecutionEngine) Execute(ctx context.Context, operation *Request, options ExecutionOptions) (*ExecutionResult, error) {

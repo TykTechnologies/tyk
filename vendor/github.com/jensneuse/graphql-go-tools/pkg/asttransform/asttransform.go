@@ -11,8 +11,9 @@
 package asttransform
 
 import (
-	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"sort"
+
+	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 )
 
 type (

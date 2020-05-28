@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"strings"
 
 	"github.com/buger/jsonparser"
 	log "github.com/jensneuse/abstractlogger"
@@ -19,6 +18,11 @@ import (
 	"github.com/jensneuse/graphql-go-tools/pkg/lexer/literal"
 )
 
+var graphqlSchemes = []string{
+	"https",
+	"http",
+}
+
 type GraphqlRequest struct {
 	OperationName string          `json:"operation_name"`
 	Variables     json.RawMessage `json:"variables"`
@@ -28,11 +32,11 @@ type GraphqlRequest struct {
 // GraphQLDataSourceConfig is the configuration for the GraphQL DataSource
 type GraphQLDataSourceConfig struct {
 	// Host is the hostname of the upstream
-	Host string
+	Host string `json:"host"`
 	// URL is the url of the upstream
-	URL string
+	URL string `json:"url"`
 	// Method is the http.Method of the upstream, defaults to POST (optional)
-	Method *string
+	Method *string `json:"method"`
 }
 
 type GraphQLDataSourcePlanner struct {
@@ -42,10 +46,12 @@ type GraphQLDataSourcePlanner struct {
 	resolveDocument         *ast.Document
 	dataSourceConfiguration GraphQLDataSourceConfig
 	client                  *http.Client
+	whitelistedSchemes      []string
 }
 
 type GraphQLDataSourcePlannerFactoryFactory struct {
-	Client *http.Client
+	Client             *http.Client
+	WhitelistedSchemes []string
 }
 
 func (g *GraphQLDataSourcePlannerFactoryFactory) httpClient() *http.Client {
@@ -57,17 +63,19 @@ func (g *GraphQLDataSourcePlannerFactoryFactory) httpClient() *http.Client {
 
 func (g GraphQLDataSourcePlannerFactoryFactory) Initialize(base BasePlanner, configReader io.Reader) (PlannerFactory, error) {
 	factory := &GraphQLDataSourcePlannerFactory{
-		base:   base,
-		client: g.httpClient(),
+		base:               base,
+		client:             g.httpClient(),
+		whitelistedSchemes: g.WhitelistedSchemes,
 	}
 	err := json.NewDecoder(configReader).Decode(&factory.config)
 	return factory, err
 }
 
 type GraphQLDataSourcePlannerFactory struct {
-	base   BasePlanner
-	config GraphQLDataSourceConfig
-	client *http.Client
+	base               BasePlanner
+	config             GraphQLDataSourceConfig
+	client             *http.Client
+	whitelistedSchemes []string
 }
 
 func (g *GraphQLDataSourcePlannerFactory) DataSourcePlanner() Planner {
@@ -77,6 +85,7 @@ func (g *GraphQLDataSourcePlannerFactory) DataSourcePlanner() Planner {
 		dataSourceConfiguration: g.config,
 		resolveDocument:         &ast.Document{},
 		client:                  g.client,
+		whitelistedSchemes:      g.whitelistedSchemes,
 	}
 }
 
@@ -279,14 +288,16 @@ func (g *GraphQLDataSourcePlanner) Plan(args []Argument) (DataSource, []Argument
 		}
 	}
 	return &GraphQLDataSource{
-		Log:    g.Log,
-		Client: g.client,
+		Log:                g.Log,
+		Client:             g.client,
+		WhitelistedSchemes: g.whitelistedSchemes,
 	}, g.Args
 }
 
 type GraphQLDataSource struct {
-	Log    log.Logger
-	Client *http.Client
+	Log                log.Logger
+	Client             *http.Client
+	WhitelistedSchemes []string
 }
 
 func (g *GraphQLDataSource) Resolve(ctx context.Context, args ResolverArgs, out io.Writer) (n int, err error) {
@@ -304,9 +315,14 @@ func (g *GraphQLDataSource) Resolve(ctx context.Context, args ResolverArgs, out 
 		return
 	}
 
-	url := string(hostArg) + string(urlArg)
-	if !strings.HasPrefix(url, "https://") && !strings.HasPrefix(url, "http://") {
-		url = "https://" + url
+	parsedURL, rawURL, err := parseURLBytes(hostArg, urlArg)
+	if err != nil {
+		g.Log.Error("GraphQLDataSource.RawURL could not be parsed", log.String("rawURL", rawURL))
+		return
+	}
+
+	if len(parsedURL.Scheme) == 0 || !isWhitelistedScheme(parsedURL.Scheme, g.WhitelistedSchemes, graphqlSchemes) {
+		parsedURL.Scheme = graphqlSchemes[0]
 	}
 
 	variables := map[string]interface{}{}
@@ -344,11 +360,12 @@ func (g *GraphQLDataSource) Resolve(ctx context.Context, args ResolverArgs, out 
 	}
 
 	g.Log.Debug("GraphQLDataSource.request",
-		log.String("url", url),
+		log.String("rawURL", rawURL),
+		log.String("parsedURL", parsedURL.String()),
 		log.ByteString("data", gqlRequestData),
 	)
 
-	request, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(gqlRequestData))
+	request, err := http.NewRequest(http.MethodPost, parsedURL.String(), bytes.NewBuffer(gqlRequestData))
 	if err != nil {
 		g.Log.Error("GraphQLDataSource.http.NewRequest",
 			log.Error(err),
@@ -373,6 +390,13 @@ func (g *GraphQLDataSource) Resolve(ctx context.Context, args ResolverArgs, out 
 		)
 		return n, err
 	}
+
+	defer func() {
+		err := res.Body.Close()
+		if err != nil {
+			g.Log.Error("GraphQLDataSource.Resolve.Response.Body.Close", log.Error(err))
+		}
+	}()
 
 	data = bytes.ReplaceAll(data, literal.BACKSLASH, nil)
 	data, _, _, err = jsonparser.Get(data, "data")

@@ -1,12 +1,19 @@
 package introspection
 
 import (
+	"strings"
+
 	"github.com/cespare/xxhash"
+
 	"github.com/jensneuse/graphql-go-tools/internal/pkg/unsafebytes"
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/astvisitor"
 	"github.com/jensneuse/graphql-go-tools/pkg/operationreport"
-	"strings"
+)
+
+const (
+	DeprecatedDirectiveName  = "deprecated"
+	DeprecationReasonArgName = "reason"
 )
 
 type Generator struct {
@@ -86,6 +93,14 @@ func (i *introspectionVisitor) EnterFieldDefinition(ref int) {
 	i.currentField.Name = i.definition.FieldDefinitionNameString(ref)
 	i.currentField.Description = i.definition.FieldDefinitionDescriptionString(ref)
 	i.currentField.Type = i.TypeRef(i.definition.FieldDefinitionType(ref))
+
+	if i.definition.FieldDefinitionHasDirectives(ref) {
+		directiveRef, exists := i.definition.FieldDefinitionDirectiveByName(ref, []byte(DeprecatedDirectiveName))
+		if exists {
+			i.currentField.IsDeprecated = true
+			i.currentField.DeprecationReason = i.deprecationReason(directiveRef)
+		}
+	}
 }
 
 func (i *introspectionVisitor) LeaveFieldDefinition(ref int) {
@@ -96,7 +111,6 @@ func (i *introspectionVisitor) LeaveFieldDefinition(ref int) {
 }
 
 func (i *introspectionVisitor) EnterInputValueDefinition(ref int) {
-
 	var defaultValue *string
 	if i.definition.InputValueDefinitionHasDefaultValue(ref) {
 		value := i.definition.InputValueDefinitionDefaultValue(ref)
@@ -135,6 +149,17 @@ func (i *introspectionVisitor) EnterInterfaceTypeDefinition(ref int) {
 	i.currentType.Kind = INTERFACE
 	i.currentType.Name = i.definition.InterfaceTypeDefinitionNameString(ref)
 	i.currentType.Description = i.definition.InterfaceTypeDefinitionDescriptionString(ref)
+
+	interfaceNameBytes := i.definition.InterfaceTypeDefinitionNameBytes(ref)
+	for objectTypeDefRef := range i.definition.ObjectTypeDefinitions {
+		if i.definition.ObjectTypeDefinitionImplementsInterface(objectTypeDefRef, interfaceNameBytes) {
+			objectName := i.definition.ObjectTypeDefinitionNameString(objectTypeDefRef)
+			i.currentType.PossibleTypes = append(i.currentType.PossibleTypes, TypeRef{
+				Kind: OBJECT,
+				Name: &objectName,
+			})
+		}
+	}
 }
 
 func (i *introspectionVisitor) LeaveInterfaceTypeDefinition(ref int) {
@@ -156,6 +181,7 @@ func (i *introspectionVisitor) EnterScalarTypeDefinition(ref int) {
 	typeDefinition := NewFullType()
 	typeDefinition.Kind = SCALAR
 	typeDefinition.Name = i.definition.ScalarTypeDefinitionNameString(ref)
+	typeDefinition.Description = i.definition.ScalarTypeDefinitionDescriptionString(ref)
 	i.data.Schema.Types = append(i.data.Schema.Types, typeDefinition)
 }
 
@@ -232,10 +258,20 @@ func (i *introspectionVisitor) EnterEnumValueDefinition(ref int) {
 }
 
 func (i *introspectionVisitor) LeaveEnumValueDefinition(ref int) {
-	i.currentType.EnumValues = append(i.currentType.EnumValues, EnumValue{
+	enumValue := EnumValue{
 		Name:        i.definition.EnumValueDefinitionNameString(ref),
 		Description: i.definition.EnumValueDefinitionDescriptionString(ref),
-	})
+	}
+
+	if i.definition.EnumValueDefinitionHasDirectives(ref) {
+		directiveRef, exists := i.definition.EnumValueDefinitionDirectiveByName(ref, []byte(DeprecatedDirectiveName))
+		if exists {
+			enumValue.IsDeprecated = true
+			enumValue.DeprecationReason = i.deprecationReason(directiveRef)
+		}
+	}
+
+	i.currentType.EnumValues = append(i.currentType.EnumValues, enumValue)
 }
 
 func (i *introspectionVisitor) EnterInputObjectTypeDefinition(ref int) {
@@ -268,7 +304,7 @@ func (i *introspectionVisitor) LeaveDirectiveDefinition(ref int) {
 }
 
 func (i *introspectionVisitor) EnterDirectiveLocation(location ast.DirectiveLocation) {
-	i.currentDirective.Locations = append(i.currentDirective.Locations, i.definition.DirectiveLocationString(location))
+	i.currentDirective.Locations = append(i.currentDirective.Locations, location.LiteralString())
 }
 
 func (i *introspectionVisitor) LeaveDirectiveLocation(location ast.DirectiveLocation) {
@@ -424,4 +460,19 @@ func (i *introspectionVisitor) TypeRef(typeRef int) TypeRef {
 	default:
 		return TypeRef{}
 	}
+}
+
+func (i *introspectionVisitor) deprecationReason(directiveRef int) (reason *string) {
+	argValue, exists := i.definition.DirectiveArgumentValueByName(directiveRef, []byte(DeprecationReasonArgName))
+	if exists {
+		reasonContent := i.definition.ValueContentString(argValue)
+		return &reasonContent
+	}
+
+	defaultValue := i.definition.DirectiveDefinitionArgumentDefaultValueString(DeprecatedDirectiveName, DeprecationReasonArgName)
+	if defaultValue != "" {
+		return &defaultValue
+	}
+
+	return
 }

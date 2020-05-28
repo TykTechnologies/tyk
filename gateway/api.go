@@ -346,6 +346,8 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 			return apiError("Key is not found"), http.StatusNotFound
 		}
 
+		//remain the creation date
+		newSession.DateCreated = originalKey.DateCreated
 		// don't change fields related to quota and rate limiting if was passed as "suppress_reset=1"
 		if suppressReset {
 			// save existing quota_renews and last_updated if suppress_reset was passed
@@ -371,6 +373,11 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 	} else {
 		newSession.DateCreated = time.Now()
 		keyName = generateToken(newSession.OrgID, keyName)
+	}
+
+	//set the original expiry if the content in payload is a past time
+	if time.Now().After(time.Unix(newSession.Expires, 0)) && newSession.Expires > 1 {
+		newSession.Expires = originalKey.Expires
 	}
 
 	// Update our session object (create it)
@@ -712,6 +719,18 @@ func handleDeleteHashedKey(keyName, apiID string, resetQuota bool) (interface{},
 	}
 
 	return statusObj, http.StatusOK
+}
+
+func handleGlobalAddToSortedSet(keyName, value string, score float64) {
+	GlobalSessionManager.Store().AddToSortedSet(keyName, value, score)
+}
+
+func handleGetSortedSetRange(keyName, scoreFrom, scoreTo string) ([]string, []float64, error) {
+	return GlobalSessionManager.Store().GetSortedSetRange(keyName, scoreFrom, scoreTo)
+}
+
+func handleRemoveSortedSetRange(keyName, scoreFrom, scoreTo string) error {
+	return GlobalSessionManager.Store().RemoveSortedSetRange(keyName, scoreFrom, scoreTo)
 }
 
 func handleGetAPIList() (interface{}, int) {
@@ -1928,6 +1947,10 @@ func handleDeleteOAuthClient(keyName, apiID string) (interface{}, int) {
 
 const oAuthNotPropagatedErr = "OAuth client list isn't available or hasn't been propagated yet."
 const oAuthClientNotFound = "OAuth client not found"
+const oauthClientIdEmpty = "client_id is required"
+const oauthClientSecretEmpty = "client_secret is required"
+const oauthClientSecretWrong = "client secret is wrong"
+const oauthTokenEmpty = "token is required"
 
 func getApiClients(apiID string) ([]ExtendedOsinClientInterface, apiStatusMessage, int) {
 	var err error
@@ -2083,7 +2106,7 @@ func RevokeTokenHandler(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 
 	if err != nil {
-		doJSONWrite(w, http.StatusBadRequest, apiError("cannot parse form"))
+		doJSONWrite(w, http.StatusBadRequest, apiError("cannot parse form. Form malformed"))
 		return
 	}
 
@@ -2092,7 +2115,21 @@ func RevokeTokenHandler(w http.ResponseWriter, r *http.Request) {
 	clientID := r.PostFormValue("client_id")
 	orgID := r.PostFormValue("org_id")
 
+	if token == "" {
+		doJSONWrite(w, http.StatusBadRequest, apiError(oauthTokenEmpty))
+		return
+	}
+
+	if clientID == "" {
+		doJSONWrite(w, http.StatusBadRequest, apiError(oauthClientIdEmpty))
+		return
+	}
+
 	apis := getApisForOauthClientId(clientID, orgID)
+	if len(apis) == 0 {
+		doJSONWrite(w, http.StatusBadRequest, apiError("oauth client doesn't exist"))
+		return
+	}
 
 	for _, apiID := range apis {
 		storage, _, err := GetStorageForApi(apiID)
@@ -2100,8 +2137,7 @@ func RevokeTokenHandler(w http.ResponseWriter, r *http.Request) {
 			RevokeToken(storage, token, tokenTypeHint)
 		}
 	}
-
-	w.WriteHeader(200)
+	doJSONWrite(w, http.StatusOK, apiOk("token revoked successfully"))
 }
 
 func GetStorageForApi(apiID string) (ExtendedOsinStorageInterface, int, error) {
@@ -2133,9 +2169,9 @@ func GetStorageForApi(apiID string) (ExtendedOsinStorageInterface, int, error) {
 
 func RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
-	status := http.StatusOK
+
 	if err != nil {
-		doJSONWrite(w, http.StatusBadRequest, apiError("cannot parse form"))
+		doJSONWrite(w, http.StatusBadRequest, apiError("cannot parse form. Form malformed"))
 		return
 	}
 
@@ -2143,26 +2179,39 @@ func RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request) {
 	clientSecret := r.PostFormValue("client_secret")
 	orgId := r.PostFormValue("org_id")
 
-	if clientId == "" || clientSecret == "" {
-		doJSONWrite(w, http.StatusBadRequest, apiError("client_id and client_secret are required"))
+	if clientId == "" {
+		doJSONWrite(w, http.StatusUnauthorized, apiError(oauthClientIdEmpty))
+		return
+	}
+
+	if clientSecret == "" {
+		doJSONWrite(w, http.StatusUnauthorized, apiError(oauthClientSecretEmpty))
 		return
 	}
 
 	apis := getApisForOauthClientId(clientId, orgId)
 	if len(apis) == 0 {
-		doJSONWrite(w, http.StatusNotFound, apiError("oauth client doesnt have any api related"))
+		//if api is 0 is because the client wasn't found
+		doJSONWrite(w, http.StatusNotFound, apiError("oauth client doesn't exist"))
 		return
 	}
 
+	tokens := []string{}
 	for _, apiId := range apis {
 		storage, _, err := GetStorageForApi(apiId)
 		if err == nil {
-			status = RevokeAllTokens(storage, clientId, clientSecret)
+			_, tokensRevoked, _ := RevokeAllTokens(storage, clientId, clientSecret)
+			tokens = append(tokens, tokensRevoked...)
 		}
 	}
 
-	//at this moment, only send the last result
-	w.WriteHeader(status)
+	n := Notification{
+		Command: KeySpaceUpdateNotification,
+		Payload: strings.Join(tokens, ","),
+	}
+	MainNotifier.Notify(n)
+
+	doJSONWrite(w, http.StatusOK, apiOk("tokens revoked successfully"))
 }
 
 // TODO: Don't modify http.Request values in-place. We must right now

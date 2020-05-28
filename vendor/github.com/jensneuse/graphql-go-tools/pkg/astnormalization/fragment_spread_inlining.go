@@ -3,6 +3,7 @@ package astnormalization
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/asttransform"
 	"github.com/jensneuse/graphql-go-tools/pkg/astvisitor"

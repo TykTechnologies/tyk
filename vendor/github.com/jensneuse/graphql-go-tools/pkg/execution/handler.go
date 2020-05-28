@@ -4,9 +4,11 @@ package execution
 
 import (
 	"encoding/json"
+
 	"github.com/buger/jsonparser"
 	"github.com/cespare/xxhash"
-	"github.com/jensneuse/byte-template"
+	byte_template "github.com/jensneuse/byte-template"
+
 	"github.com/jensneuse/graphql-go-tools/pkg/astnormalization"
 	"github.com/jensneuse/graphql-go-tools/pkg/astparser"
 	"github.com/jensneuse/graphql-go-tools/pkg/astvalidation"

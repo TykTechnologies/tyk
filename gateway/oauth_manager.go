@@ -233,15 +233,20 @@ const (
 func (o *OAuthHandlers) HandleRevokeToken(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		doJSONWrite(w, http.StatusBadRequest, apiError("error parsing form. Form malformed"))
 		return
 	}
 
 	token := r.PostFormValue("token")
 	tokenTypeHint := r.PostFormValue("token_type_hint")
 
+	if token == "" {
+		doJSONWrite(w, http.StatusBadRequest, apiError(oauthTokenEmpty))
+		return
+	}
+
 	RevokeToken(o.Manager.OsinServer.Storage, token, tokenTypeHint)
-	w.WriteHeader(200)
+	doJSONWrite(w, http.StatusOK, apiOk("token revoked successfully"))
 }
 
 func RevokeToken(storage ExtendedOsinStorageInterface, token, tokenTypeHint string) {
@@ -259,47 +264,68 @@ func RevokeToken(storage ExtendedOsinStorageInterface, token, tokenTypeHint stri
 func (o *OAuthHandlers) HandleRevokeAllTokens(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		doJSONWrite(w, http.StatusBadRequest, apiError("error parsing form. Form malformed"))
 		return
 	}
 
 	clientId := r.PostFormValue("client_id")
 	secret := r.PostFormValue("client_secret")
 
-	if clientId == "" || secret == "" {
-		w.WriteHeader(http.StatusBadRequest)
+	if clientId == "" {
+		doJSONWrite(w, http.StatusUnauthorized, apiError(oauthClientIdEmpty))
 		return
 	}
 
-	status := RevokeAllTokens(o.Manager.OsinServer.Storage, clientId, secret)
-	w.WriteHeader(status)
+	if secret == "" {
+		doJSONWrite(w, http.StatusUnauthorized, apiError(oauthClientSecretEmpty))
+		return
+	}
+
+	status, tokens, err := RevokeAllTokens(o.Manager.OsinServer.Storage, clientId, secret)
+	if err != nil {
+		doJSONWrite(w, status, apiError(err.Error()))
+		return
+	}
+
+	n := Notification{
+		Command: KeySpaceUpdateNotification,
+		Payload: strings.Join(tokens, ","),
+	}
+	MainNotifier.Notify(n)
+
+	doJSONWrite(w, http.StatusOK, apiOk("tokens revoked successfully"))
 }
 
-func RevokeAllTokens(storage ExtendedOsinStorageInterface, clientId, clientSecret string) int {
+func RevokeAllTokens(storage ExtendedOsinStorageInterface, clientId, clientSecret string) (int, []string, error) {
+	resp := []string{}
 	client, err := storage.GetClient(clientId)
 	log.Debug("Revoke all tokens")
 	if err != nil {
-		return http.StatusNotFound
+		return http.StatusNotFound, resp, errors.New("error getting oauth client")
 	}
 
 	if client.GetSecret() != clientSecret {
-		return http.StatusForbidden
+		return http.StatusUnauthorized, resp, errors.New(oauthClientSecretWrong)
 	}
 
 	clientTokens, err := storage.GetClientTokens(clientId)
 	if err != nil {
-		return http.StatusBadRequest
+		return http.StatusBadRequest, resp, errors.New("cannot retrieve client tokens")
 	}
 
+	log.Debug("Tokens found to be revoked:", len(clientTokens))
 	for _, token := range clientTokens {
 		access, err := storage.LoadAccess(token.Token)
 		if err == nil {
+			resp = append(resp, access.AccessToken)
 			storage.RemoveAccess(access.AccessToken)
 			storage.RemoveRefresh(access.RefreshToken)
+		} else {
+			log.Debug("error loading access:", err.Error())
 		}
 	}
 
-	return http.StatusOK
+	return http.StatusOK, resp, nil
 }
 
 // OAuthManager handles and wraps osin OAuth2 functions to handle authorise and access requests
@@ -419,14 +445,12 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			oldToken, foundKey := session.OauthKeys[ar.Client.GetId()]
 			if foundKey {
 				log.Info("Found old token, revoking: ", oldToken)
-
 				GlobalSessionManager.RemoveSession(o.API.OrgID, oldToken, false)
 			}
 		}
 
 		log.Debug("[OAuth] Finishing access request ")
 		o.OsinServer.FinishAccessRequest(resp, r, ar)
-
 		new_token, foundNewToken := resp.Output["access_token"]
 		if username != "" && foundNewToken {
 			log.Debug("Updating token data in key")
@@ -554,6 +578,7 @@ func TykOsinNewServer(config *osin.ServerConfig, storage ExtendedOsinStorageInte
 type RedisOsinStorageInterface struct {
 	store          storage.Handler
 	sessionManager SessionHandler
+	redisStore     storage.Handler
 	orgID          string
 }
 
@@ -746,7 +771,7 @@ func (r *RedisOsinStorageInterface) GetClientTokens(id string) ([]OAuthClientTok
 
 	log.Info("Getting client tokens sorted list:", key)
 
-	tokens, scores, err := r.store.GetSortedSetRange(key, startScore, "+inf")
+	tokens, scores, err := r.redisStore.GetSortedSetRange(key, startScore, "+inf")
 	if err != nil {
 		return nil, err
 	}
@@ -754,7 +779,7 @@ func (r *RedisOsinStorageInterface) GetClientTokens(id string) ([]OAuthClientTok
 	// clean up expired tokens in sorted set (remove all tokens with score up to current timestamp minus retention)
 	if config.Global().OauthTokenExpiredRetainPeriod > 0 {
 		cleanupStartScore := strconv.FormatInt(nowTs-int64(config.Global().OauthTokenExpiredRetainPeriod), 10)
-		go r.store.RemoveSortedSetRange(key, "-inf", cleanupStartScore)
+		go r.redisStore.RemoveSortedSetRange(key, "-inf", cleanupStartScore)
 	}
 
 	if len(tokens) == 0 {
@@ -828,9 +853,9 @@ func (r *RedisOsinStorageInterface) DeleteClient(id string, orgID string, ignore
 
 	// Get the raw vals:
 	clientJSON, err := r.store.GetKey(key)
+	keyForSet := prefixClientset + prefixClient // Org ID
 	if err == nil {
 		log.Debug("Removing from set")
-		keyForSet := prefixClientset + prefixClient // Org ID
 		r.store.RemoveFromSet(keyForSet, clientJSON)
 	}
 
@@ -842,6 +867,11 @@ func (r *RedisOsinStorageInterface) DeleteClient(id string, orgID string, ignore
 
 	// delete list of tokens for this client
 	r.store.DeleteKey(prefixClientTokens + id)
+	if config.Global().SlaveOptions.UseRPC {
+		r.redisStore.RemoveFromList(indexKey, key)
+		r.redisStore.DeleteKey(prefixClientTokens + id)
+		r.redisStore.RemoveFromSet(keyForSet, clientJSON)
+	}
 
 	return nil
 }
@@ -906,7 +936,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 	// add code to list of tokens for this client
 	sortedListKey := prefixClientTokens + accessData.Client.GetId()
 	log.Debug("Adding ACCESS key to sorted list: ", sortedListKey)
-	r.store.AddToSortedSet(
+	r.redisStore.AddToSortedSet(
 		sortedListKey,
 		storage.HashKey(accessData.AccessToken),
 		float64(accessData.CreatedAt.Unix()+int64(accessData.ExpiresIn)), // set score as token expire timestamp
@@ -1015,7 +1045,7 @@ func (r *RedisOsinStorageInterface) RemoveAccess(token string) error {
 		//remove from set oauth.client-tokens
 		log.Info("removing token from oauth client tokens list")
 		limit := strconv.FormatFloat(float64(access.ExpireAt().Unix()), 'f', 0, 64)
-		r.store.RemoveSortedSetRange(key, limit, limit)
+		r.redisStore.RemoveSortedSetRange(key, limit, limit)
 	} else {
 		log.Warning("Cannot load access token:", token)
 	}
@@ -1084,8 +1114,8 @@ func (accessTokenGen) GenerateAccessToken(data *osin.AccessData, generaterefresh
 
 		newSession = sessionFromPolicy
 	}
-	accesstoken = keyGen.GenerateAuthKey(newSession.OrgID)
 
+	accesstoken = keyGen.GenerateAuthKey(newSession.OrgID)
 	if generaterefresh {
 		u6 := uuid.NewV4()
 		refreshtoken = base64.StdEncoding.EncodeToString([]byte(u6.String()))

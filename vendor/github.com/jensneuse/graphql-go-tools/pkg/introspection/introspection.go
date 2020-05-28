@@ -19,6 +19,19 @@ type Schema struct {
 	Directives       []Directive `json:"directives"`
 }
 
+func (s *Schema) TypeNames() (query, mutation, subscription string) {
+	if s.QueryType != nil {
+		query = s.QueryType.Name
+	}
+	if s.MutationType != nil {
+		mutation = s.MutationType.Name
+	}
+	if s.SubscriptionType != nil {
+		subscription = s.SubscriptionType.Name
+	}
+	return
+}
+
 func NewSchema() Schema {
 	return Schema{
 		Types:      make([]FullType, 0),
@@ -31,14 +44,19 @@ type TypeName struct {
 }
 
 type FullType struct {
-	Kind          __TypeKind   `json:"kind"`
-	Name          string       `json:"name"`
-	Description   string       `json:"description"`
-	Fields        []Field      `json:"fields"`
-	InputFields   []InputValue `json:"inputFields"`
-	Interfaces    []TypeRef    `json:"interfaces"`
-	EnumValues    []EnumValue  `json:"enumValues"`
-	PossibleTypes []TypeRef    `json:"possibleTypes"`
+	Kind        __TypeKind `json:"kind"`
+	Name        string     `json:"name"`
+	Description string     `json:"description"`
+	// not empty for __TypeKind OBJECT and INTERFACE only
+	Fields []Field `json:"fields"`
+	// not empty for __TypeKind INPUT_OBJECT only
+	InputFields []InputValue `json:"inputFields"`
+	// not empty for __TypeKind OBJECT only
+	Interfaces []TypeRef `json:"interfaces"`
+	// not empty for __TypeKind ENUM only
+	EnumValues []EnumValue `json:"enumValues"`
+	// not empty for __TypeKind INTERFACE and UNION only
+	PossibleTypes []TypeRef `json:"possibleTypes"`
 }
 
 func NewFullType() FullType {
@@ -93,12 +111,12 @@ type TypeRef struct {
 }
 
 type Field struct {
-	Name        string       `json:"name"`
-	Description string       `json:"description"`
-	Args        []InputValue `json:"args"`
-	Type        TypeRef      `json:"type"`
-	//IsDeprecated      *bool        `json:"isDeprecated"`
-	//DeprecationReason string       `json:"deprecationReason"`
+	Name              string       `json:"name"`
+	Description       string       `json:"description"`
+	Args              []InputValue `json:"args"`
+	Type              TypeRef      `json:"type"`
+	IsDeprecated      bool         `json:"isDeprecated"`
+	DeprecationReason *string      `json:"deprecationReason"`
 }
 
 func NewField() Field {
@@ -108,10 +126,10 @@ func NewField() Field {
 }
 
 type EnumValue struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	//IsDeprecated      *bool   `json:"isDeprecated"`
-	//DeprecationReason *string `json:"deprecationReason"`
+	Name              string  `json:"name"`
+	Description       string  `json:"description"`
+	IsDeprecated      bool    `json:"isDeprecated"`
+	DeprecationReason *string `json:"deprecationReason"`
 }
 
 type InputValue struct {

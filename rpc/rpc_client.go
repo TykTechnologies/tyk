@@ -5,15 +5,15 @@ import (
 	"errors"
 	"net"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
+	"github.com/cenkalti/backoff/v4"
 	"github.com/gocraft/health"
 	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/gorpc"
 )
@@ -37,20 +37,74 @@ var (
 	emergencyModeCallback       func()
 	emergencyModeLoadedCallback func()
 
-	// rpcLoadCount is a counter to check if this is a cold boot
-	rpcLoadCount           int
-	rpcEmergencyMode       bool
-	rpcEmergencyModeLoaded bool
-
 	killChan = make(chan int)
 	killed   bool
 	id       string
 
-	rpcLoginMu     sync.Mutex
-	reLoginRunning uint32
+	rpcLoginMu sync.Mutex
 
 	rpcConnectMu sync.Mutex
 )
+
+// rpc.Login is callend may places we only need one in flight at a time.
+var loginFlight singleflight.Group
+
+var values rpcOpts
+
+type rpcOpts struct {
+	// This tracks how many times have successfully logged. If this is 0 then we
+	// are in cold start.
+	loadCounts          atomic.Value
+	emergencyMode       atomic.Value
+	emergencyModeLoaded atomic.Value
+}
+
+func (r *rpcOpts) Reset() {
+	r.loadCounts.Store(0)
+	r.emergencyMode.Store(false)
+	r.emergencyModeLoaded.Store(false)
+}
+
+func (r *rpcOpts) SetLoadCounts(n int) {
+	r.loadCounts.Store(n)
+}
+
+func (r *rpcOpts) IncrLoadCounts(n int) {
+	if v := r.loadCounts.Load(); v != nil {
+		r.loadCounts.Store(v.(int) + n)
+	} else {
+		r.loadCounts.Store(n)
+	}
+}
+
+func (r *rpcOpts) GetLoadCounts() int {
+	if v := r.loadCounts.Load(); v != nil {
+		return v.(int)
+	}
+	return 0
+}
+
+func (r *rpcOpts) SetEmergencyMode(n bool) {
+	r.emergencyMode.Store(n)
+}
+
+func (r *rpcOpts) GetEmergencyMode() bool {
+	if v := r.emergencyMode.Load(); v != nil {
+		return v.(bool)
+	}
+	return false
+}
+
+func (r *rpcOpts) SetEmergencyModeLoaded(n bool) {
+	r.emergencyModeLoaded.Store(n)
+}
+
+func (r *rpcOpts) GetEmergencyModeLoaded() bool {
+	if v := r.emergencyModeLoaded.Load(); v != nil {
+		return v.(bool)
+	}
+	return false
+}
 
 const (
 	ClientSingletonCall     = "gorpcClientCall"
@@ -70,11 +124,11 @@ type Config struct {
 }
 
 func IsEmergencyMode() bool {
-	return rpcEmergencyMode
+	return values.GetEmergencyMode()
 }
 
 func LoadCount() int {
-	return rpcLoadCount
+	return values.GetLoadCounts()
 }
 
 func Reset() {
@@ -82,14 +136,12 @@ func Reset() {
 	clientIsConnected = false
 	clientSingleton = nil
 	funcClientSingleton = nil
-	rpcLoadCount = 0
-	rpcEmergencyMode = false
-	rpcEmergencyModeLoaded = false
+	values.Reset()
 }
 
 func ResetEmergencyMode() {
-	rpcEmergencyModeLoaded = false
-	rpcEmergencyMode = false
+	values.SetEmergencyMode(false)
+	values.SetEmergencyModeLoaded(false)
 }
 
 func EmitErrorEvent(jobName string, funcName string, err error) {
@@ -140,7 +192,7 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 	}
 
 	if clientSingleton != nil {
-		return rpcEmergencyMode != true
+		return !values.GetEmergencyMode()
 	}
 
 	// RPC Client is unset
@@ -231,42 +283,50 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 	return true
 }
 
-func reAttemptLogin(err error) bool {
-	if atomic.LoadUint32(&reLoginRunning) == 1 {
-		return false
-	}
-	atomic.StoreUint32(&reLoginRunning, 1)
+// Login tries to login to the rpc sever. Returns true if it succeeds and false
+// if it fails.
+func Login() bool {
+	// I know this is extreme but rpc.Login() appears about 17 times and the
+	// methods appears to be sometimes called in goroutines.
+	//
+	// Unless someone audits to ensure all of where this appears the parent calls
+	// are not concurrent, this is a much safer solution.
+	v, _, _ := loginFlight.Do("Login", func() (interface{}, error) {
+		return loginBase(), nil
+	})
+	return v.(bool)
+}
 
-	rpcLoginMu.Lock()
-	if rpcLoadCount == 0 && !rpcEmergencyModeLoaded {
-		Log.Warning("[RPC Store] --> Detected cold start, attempting to load from cache")
-		Log.Warning("[RPC Store] ----> Found APIs... beginning emergency load")
-		rpcEmergencyModeLoaded = true
-		if emergencyModeLoadedCallback != nil {
-			go emergencyModeLoadedCallback()
+func loginBase() bool {
+	if !doLoginWithRetries(login, groupLogin, hasAPIKey, isGroup) {
+		rpcLoginMu.Lock()
+		if values.GetLoadCounts() == 0 && !values.GetEmergencyModeLoaded() {
+			Log.Warning("[RPC Store] --> Detected cold start, attempting to load from cache")
+			Log.Warning("[RPC Store] ----> Found APIs... beginning emergency load")
+			values.SetEmergencyModeLoaded(true)
+			if emergencyModeLoadedCallback != nil {
+				go emergencyModeLoadedCallback()
+			}
 		}
+		rpcLoginMu.Unlock()
 	}
-	rpcLoginMu.Unlock()
-
-	time.Sleep(time.Second * 3)
-	atomic.StoreUint32(&reLoginRunning, 0)
-
-	if strings.Contains(err.Error(), "Cannot obtain response during timeout") {
-		reConnect()
-		return false
-	}
-
-	Log.Warning("[RPC Store] Login failed, waiting 3s to re-attempt")
-
-	return Login()
+	return true
 }
 
 func GroupLogin() bool {
+	return doGroupLogin(groupLogin)
+}
+
+func doGroupLogin(login func() error) bool {
 	if getGroupLoginCallback == nil {
 		Log.Error("GroupLogin call back is not set")
 		return false
 	}
+	b := backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 3)
+	return backoff.Retry(recoverOp(login), b) == nil
+}
 
+func groupLogin() error {
 	groupLoginData := getGroupLoginCallback(config.APIKey, config.GroupID)
 	ok, err := FuncClientSingleton("LoginWithGroup", groupLoginData)
 	if err != nil {
@@ -279,71 +339,87 @@ func GroupLogin() bool {
 				"GroupID": config.GroupID,
 			},
 		)
-		rpcEmergencyMode = true
-		go reAttemptLogin(err)
-		return false
+		return err
 	}
-
 	if ok == false {
 		Log.Error("RPC Login incorrect")
-		rpcEmergencyMode = true
-		go reAttemptLogin(errors.New("Login incorrect"))
-		return false
+		return errLogFailed
 	}
 	Log.Debug("[RPC Store] Group Login complete")
-	rpcLoadCount++
-
-	// Recovery
-	if rpcEmergencyMode {
-		rpcEmergencyMode = false
-		rpcEmergencyModeLoaded = false
-		if emergencyModeCallback != nil {
-			emergencyModeCallback()
-		}
-	}
-
-	return true
+	values.IncrLoadCounts(1)
+	return nil
 }
 
-func Login() bool {
-	Log.Debug("[RPC Store] Login initiated")
+var errLogFailed = errors.New("Login incorrect")
 
-	if len(config.APIKey) == 0 {
-		Log.Fatal("No API Key set!")
-	}
-
-	// If we have a group ID, lets login as a group
-	if config.GroupID != "" {
-		return GroupLogin()
-	}
-
-	ok, err := FuncClientSingleton("Login", config.APIKey)
+func login() error {
+	k, err := FuncClientSingleton("Login", config.APIKey)
 	if err != nil {
 		Log.WithError(err).Error("RPC Login failed")
 		EmitErrorEvent(FuncClientSingletonCall, "Login", err)
-		rpcEmergencyMode = true
-		go reAttemptLogin(err)
-		return false
+		return err
 	}
-
-	if ok == false {
+	ok := k.(bool)
+	if !ok {
 		Log.Error("RPC Login incorrect")
-		rpcEmergencyMode = true
-		go reAttemptLogin(errors.New("Login incorrect"))
-		return false
+		return errLogFailed
 	}
 	Log.Debug("[RPC Store] Login complete")
-	rpcLoadCount++
+	values.IncrLoadCounts(1)
+	return nil
+}
 
-	if rpcEmergencyMode {
-		rpcEmergencyMode = false
-		rpcEmergencyModeLoaded = false
-		if emergencyModeCallback != nil {
-			emergencyModeCallback()
-		}
+func hasAPIKey() bool {
+	return len(config.APIKey) != 0
+}
+
+func isGroup() bool {
+	return config.GroupID != ""
+}
+
+// doLoginWithRetries uses login as a login function by calling it with retries
+// until it succeeds or ultimately fail.
+//
+// hasAPIKey is called to check whether config.APIKey is set if this function
+// returns false we exit the process.
+//
+// isGroup returns true if the config.GroupID is set. If this returns true then
+// we perform group login.
+func doLoginWithRetries(login, group func() error, hasAPIKey, isGroup func() bool) bool {
+	Log.Debug("[RPC Store] Login initiated")
+
+	if !hasAPIKey() {
+		Log.Fatal("No API Key set!")
 	}
+	// If we have a group ID, lets login as a group
+	if isGroup() {
+		return doGroupLogin(group)
+	}
+	b := backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 3)
+	return backoff.Retry(recoverOp(login), b) == nil
+}
 
-	return true
+func recoverOp(fn func() error) func() error {
+	n := 0
+	return func() error {
+		err := fn()
+		if err != nil {
+			if n == 0 {
+				// we failed at our first call so we are in emergency mode now
+				values.SetEmergencyMode(true)
+			}
+			n++
+			return err
+		}
+		if values.GetEmergencyMode() {
+			values.SetEmergencyMode(false)
+			values.SetEmergencyModeLoaded(false)
+			if emergencyModeCallback != nil {
+				emergencyModeCallback()
+			}
+		}
+		return nil
+	}
 }
 
 func FuncClientSingleton(funcName string, request interface{}) (interface{}, error) {
@@ -364,10 +440,6 @@ func onConnectFunc(conn net.Conn) (net.Conn, string, error) {
 func Disconnect() bool {
 	clientIsConnected = false
 	return true
-}
-
-func reConnect() {
-	// no-op, let the gorpc client handle it.
 }
 
 func register() {

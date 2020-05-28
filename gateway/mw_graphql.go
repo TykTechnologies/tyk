@@ -1,24 +1,28 @@
 package gateway
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"io/ioutil"
 	"net/http"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/jensneuse/abstractlogger"
 	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/headers"
 
 	gql "github.com/jensneuse/graphql-go-tools/pkg/graphql"
 )
 
 const (
-	HTTPJSONDataSource = "HTTPJSONDataSource"
-	GraphQLDataSource  = "GraphQLDataSource"
-	SchemaDataSource   = "SchemaDataSource"
+	HTTPJSONDataSource   = "HTTPJSONDataSource"
+	GraphQLDataSource    = "GraphQLDataSource"
+	SchemaDataSource     = "SchemaDataSource"
+	TykRESTDataSource    = "TykRESTDataSource"
+	TykGraphQLDataSource = "TykGraphQLDataSource"
 )
 
 type GraphQLMiddleware struct {
@@ -70,11 +74,13 @@ func (m *GraphQLMiddleware) Init() {
 		executionClient := &http.Client{}
 
 		httpJSONOptions := gql.DataSourceHttpJsonOptions{
-			HttpClient: executionClient,
+			HttpClient:         executionClient,
+			WhitelistedSchemes: []string{"tyk"},
 		}
 
 		graphQLOptions := gql.DataSourceGraphqlOptions{
-			HttpClient: executionClient,
+			HttpClient:         executionClient,
+			WhitelistedSchemes: []string{"tyk"},
 		}
 
 		errMsgFormat := "%s couldn't be added"
@@ -84,7 +90,17 @@ func (m *GraphQLMiddleware) Init() {
 			m.Logger().WithError(err).Errorf(errMsgFormat, HTTPJSONDataSource)
 		}
 
+		err = engine.AddHttpJsonDataSourceWithOptions(TykRESTDataSource, httpJSONOptions)
+		if err != nil {
+			m.Logger().WithError(err).Errorf(errMsgFormat, HTTPJSONDataSource)
+		}
+
 		err = engine.AddGraphqlDataSourceWithOptions(GraphQLDataSource, graphQLOptions)
+		if err != nil {
+			m.Logger().WithError(err).Errorf(errMsgFormat, GraphQLDataSource)
+		}
+
+		err = engine.AddGraphqlDataSourceWithOptions(TykGraphQLDataSource, graphQLOptions)
 		if err != nil {
 			m.Logger().WithError(err).Errorf(errMsgFormat, GraphQLDataSource)
 		}
@@ -106,13 +122,19 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
 	}
 
+	bodyBytes, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		m.Logger().Errorf("Could not read body data: '%s'", err)
+	}
+
 	var gqlRequest gql.Request
-	err := gql.UnmarshalRequest(r.Body, &gqlRequest)
+	err = gql.UnmarshalRequest(bytes.NewReader(bodyBytes), &gqlRequest)
 	if err != nil {
 		m.Logger().Errorf("Error while unmarshalling GraphQL request: '%s'", err)
 		return err, http.StatusBadRequest
 	}
 
+	r.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
 	defer ctxSetGraphQLRequest(r, &gqlRequest)
 
 	normalizationResult, err := gqlRequest.Normalize(m.Spec.GraphQLExecutor.Schema)

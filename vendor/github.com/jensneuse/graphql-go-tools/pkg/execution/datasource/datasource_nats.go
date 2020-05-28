@@ -3,12 +3,14 @@ package datasource
 import (
 	"context"
 	"encoding/json"
-	log "github.com/jensneuse/abstractlogger"
-	"github.com/jensneuse/graphql-go-tools/pkg/lexer/literal"
-	"github.com/nats-io/nats.go"
 	"io"
 	"sync"
 	"time"
+
+	log "github.com/jensneuse/abstractlogger"
+	"github.com/nats-io/nats.go"
+
+	"github.com/jensneuse/graphql-go-tools/pkg/lexer/literal"
 )
 
 type NatsDataSourceConfig struct {

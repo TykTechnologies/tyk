@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -129,11 +130,11 @@ type PlannerConfiguration struct {
 }
 
 type TypeFieldConfiguration struct {
-	TypeName                 string
-	FieldName                string
-	Mapping                  *MappingConfiguration
-	DataSource               SourceConfig `json:"data_source"`
-	DataSourcePlannerFactory PlannerFactory
+	TypeName                 string                `json:"type_name"`
+	FieldName                string                `json:"field_name"`
+	Mapping                  *MappingConfiguration `json:"mapping"`
+	DataSource               SourceConfig          `json:"data_source"`
+	DataSourcePlannerFactory PlannerFactory        `json:"-"`
 }
 
 type SourceConfig struct {
@@ -142,12 +143,12 @@ type SourceConfig struct {
 	Name string `json:"kind"`
 	// Config is the DataSource specific configuration object
 	// Each Planner needs to make sure to parse their Config Object correctly
-	Config json.RawMessage `json:"dataSourceConfig"`
+	Config json.RawMessage `json:"data_source_config"`
 }
 
 type MappingConfiguration struct {
-	Disabled bool
-	Path     string
+	Disabled bool   `json:"disabled"`
+	Path     string `json:"path"`
 }
 
 func (p *PlannerConfiguration) DataSourcePlannerFactoryForTypeField(typeName, fieldName string) PlannerFactory {
@@ -244,4 +245,21 @@ type ListArgument struct {
 
 func (l ListArgument) ArgName() []byte {
 	return l.Name
+}
+
+func isWhitelistedScheme(scheme string, whitelistedSchemes []string, defaultSchemes []string) bool {
+	schemes := append(whitelistedSchemes, defaultSchemes...)
+	for _, whitelistedScheme := range schemes {
+		if scheme == whitelistedScheme {
+			return true
+		}
+	}
+
+	return false
+}
+
+func parseURLBytes(hostArg, urlArg []byte) (parsedURL *url.URL, rawURL string, err error) {
+	rawURL = string(hostArg) + string(urlArg)
+	parsedURL, err = url.Parse(rawURL)
+	return parsedURL, rawURL, err
 }

@@ -9,51 +9,57 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/buger/jsonparser"
 	log "github.com/jensneuse/abstractlogger"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 
+	"github.com/jensneuse/graphql-go-tools/internal/pkg/unsafebytes"
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/lexer/literal"
 )
 
+var httpJsonSchemes = []string{
+	"https",
+	"http",
+}
+
 // HttpJsonDataSourceConfig is the configuration object for the HttpJsonDataSource
 type HttpJsonDataSourceConfig struct {
 	// Host is the hostname of the upstream
-	Host string
+	Host string `json:"host"`
 	// URL is the url of the upstream
-	URL string
+	URL string `json:"url"`
 	// Method is the http.Method, e.g. GET, POST, UPDATE, DELETE
 	// default is GET
-	Method *string
+	Method *string `json:"method"`
 	// Body is the http body to send
 	// default is null/nil (no body)
-	Body *string
+	Body *string `json:"body"`
 	// Headers defines the header mappings
-	Headers []HttpJsonDataSourceConfigHeader
+	Headers []HttpJsonDataSourceConfigHeader `json:"headers"`
 	// DefaultTypeName is the optional variable to define a default type name for the response object
 	// This is useful in case the response might be a Union or Interface type which uses StatusCodeTypeNameMappings
-	DefaultTypeName *string
+	DefaultTypeName *string `json:"default_type_name"`
 	// StatusCodeTypeNameMappings is a slice of mappings from http.StatusCode to GraphQL TypeName
 	// This can be used when the TypeName depends on the http.StatusCode
-	StatusCodeTypeNameMappings []StatusCodeTypeNameMapping
+	StatusCodeTypeNameMappings []StatusCodeTypeNameMapping `json:"status_code_type_name_mappings"`
 }
 
 type StatusCodeTypeNameMapping struct {
-	StatusCode int
-	TypeName   string
+	StatusCode int    `json:"status_code"`
+	TypeName   string `json:"type_name"`
 }
 
 type HttpJsonDataSourceConfigHeader struct {
-	Key   string
-	Value string
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }
 
 type HttpJsonDataSourcePlannerFactoryFactory struct {
-	Client *http.Client
+	Client             *http.Client
+	WhitelistedSchemes []string
 }
 
 func (h *HttpJsonDataSourcePlannerFactoryFactory) httpClient() *http.Client {
@@ -65,37 +71,42 @@ func (h *HttpJsonDataSourcePlannerFactoryFactory) httpClient() *http.Client {
 
 func (h *HttpJsonDataSourcePlannerFactoryFactory) Initialize(base BasePlanner, configReader io.Reader) (PlannerFactory, error) {
 	factory := &HttpJsonDataSourcePlannerFactory{
-		base:   base,
-		client: h.httpClient(),
+		base:               base,
+		client:             h.httpClient(),
+		whitelistedSchemes: h.WhitelistedSchemes,
 	}
 	err := json.NewDecoder(configReader).Decode(&factory.config)
 	return factory, err
 }
 
 type HttpJsonDataSourcePlannerFactory struct {
-	base   BasePlanner
-	config HttpJsonDataSourceConfig
-	client *http.Client
+	base               BasePlanner
+	config             HttpJsonDataSourceConfig
+	client             *http.Client
+	whitelistedSchemes []string
 }
 
 func (h *HttpJsonDataSourcePlannerFactory) DataSourcePlanner() Planner {
 	return &HttpJsonDataSourcePlanner{
-		BasePlanner:      h.base,
-		dataSourceConfig: h.config,
-		client:           h.client,
+		BasePlanner:        h.base,
+		dataSourceConfig:   h.config,
+		client:             h.client,
+		whitelistedSchemes: h.whitelistedSchemes,
 	}
 }
 
 type HttpJsonDataSourcePlanner struct {
 	BasePlanner
-	dataSourceConfig HttpJsonDataSourceConfig
-	client           *http.Client
+	dataSourceConfig   HttpJsonDataSourceConfig
+	client             *http.Client
+	whitelistedSchemes []string
 }
 
 func (h *HttpJsonDataSourcePlanner) Plan(args []Argument) (DataSource, []Argument) {
 	return &HttpJsonDataSource{
-		Log:    h.Log,
-		Client: h.client,
+		Log:                h.Log,
+		Client:             h.client,
+		WhitelistedSchemes: h.whitelistedSchemes,
 	}, append(h.Args, args...)
 }
 
@@ -171,7 +182,7 @@ func (h *HttpJsonDataSourcePlanner) LeaveField(ref int) {
 	var err error
 	fieldDefinitionTypeNode := h.Definition.FieldDefinitionTypeNode(definition)
 	fieldDefinitionType := h.Definition.FieldDefinitionType(definition)
-	fieldDefinitionTypeName := h.Definition.ResolveTypeName(fieldDefinitionType)
+	fieldDefinitionTypeName := h.Definition.ResolveTypeNameBytes(fieldDefinitionType)
 	quotedFieldDefinitionTypeName := append(literal.QUOTE, append(fieldDefinitionTypeName, literal.QUOTE...)...)
 	switch fieldDefinitionTypeNode.Kind {
 	case ast.NodeKindScalarTypeDefinition:
@@ -205,8 +216,9 @@ func (h *HttpJsonDataSourcePlanner) LeaveField(ref int) {
 }
 
 type HttpJsonDataSource struct {
-	Log    log.Logger
-	Client *http.Client
+	Log                log.Logger
+	Client             *http.Client
+	WhitelistedSchemes []string
 }
 
 func (r *HttpJsonDataSource) Resolve(ctx context.Context, args ResolverArgs, out io.Writer) (n int, err error) {
@@ -248,9 +260,14 @@ func (r *HttpJsonDataSource) Resolve(ctx context.Context, args ResolverArgs, out
 		httpMethod = http.MethodPatch
 	}
 
-	url := string(hostArg) + string(urlArg)
-	if !strings.HasPrefix(url, "https://") && !strings.HasPrefix(url, "http://") {
-		url = "https://" + url
+	parsedURL, rawURL, err := parseURLBytes(hostArg, urlArg)
+	if err != nil {
+		r.Log.Error("HttpJsonDataSource.RawURL could not be parsed", log.String("rawURL", rawURL))
+		return
+	}
+
+	if len(parsedURL.Scheme) == 0 || !isWhitelistedScheme(parsedURL.Scheme, r.WhitelistedSchemes, httpJsonSchemes) {
+		parsedURL.Scheme = httpJsonSchemes[0]
 	}
 
 	header := make(http.Header)
@@ -265,7 +282,8 @@ func (r *HttpJsonDataSource) Resolve(ctx context.Context, args ResolverArgs, out
 	}
 
 	r.Log.Debug("HttpJsonDataSource.Resolve",
-		log.String("url", url),
+		log.String("rawURL", rawURL),
+		log.String("parsedURL", parsedURL.String()),
 	)
 
 	var bodyReader io.Reader
@@ -274,7 +292,7 @@ func (r *HttpJsonDataSource) Resolve(ctx context.Context, args ResolverArgs, out
 		bodyReader = bytes.NewReader(bodyArg)
 	}
 
-	request, err := http.NewRequest(httpMethod, url, bodyReader)
+	request, err := http.NewRequest(httpMethod, parsedURL.String(), bodyReader)
 	if err != nil {
 		r.Log.Error("HttpJsonDataSource.Resolve.NewRequest",
 			log.Error(err),
@@ -300,20 +318,46 @@ func (r *HttpJsonDataSource) Resolve(ctx context.Context, args ResolverArgs, out
 		return
 	}
 
+	defer func() {
+		err := res.Body.Close()
+		if err != nil {
+			r.Log.Error("HttpJsonDataSource.Resolve.Response.Body.Close", log.Error(err))
+		}
+	}()
+
 	statusCode := strconv.Itoa(res.StatusCode)
 	statusCodeTypeName := gjson.GetBytes(typeNameArg, statusCode)
+	defaultTypeName := gjson.GetBytes(typeNameArg, "defaultTypeName")
+	var result *gjson.Result
 	if statusCodeTypeName.Exists() {
-		data, err = sjson.SetRawBytes(data, "__typename", []byte(statusCodeTypeName.Raw))
-		if err != nil {
-			r.Log.Error("HttpJsonDataSource.Resolve.setStatusCodeTypeName",
-				log.Error(err),
-			)
-			return
-		}
-	} else {
-		defaultTypeName := gjson.GetBytes(typeNameArg, "defaultTypeName")
-		if defaultTypeName.Exists() {
-			data, err = sjson.SetRawBytes(data, "__typename", []byte(defaultTypeName.Raw))
+		result = &statusCodeTypeName
+	}
+	if result == nil && defaultTypeName.Exists() {
+		result = &defaultTypeName
+	}
+
+	if result != nil {
+		parsed := gjson.ParseBytes(data)
+		if parsed.IsArray() {
+			arrayData := []byte(`[]`)
+			items := parsed.Array()
+			for i := range items {
+				item, err := sjson.SetRaw(items[i].Raw, "__typename", result.Raw)
+				if err != nil {
+					r.Log.Error("HttpJsonDataSource.Resolve.array.setDefaultTypeName",
+						log.Error(err),
+					)
+				}
+				arrayData, err = sjson.SetRawBytes(arrayData, "-1", unsafebytes.StringToBytes(item))
+				if err != nil {
+					r.Log.Error("HttpJsonDataSource.Resolve.array.setArrayItem",
+						log.Error(err),
+					)
+				}
+			}
+			data = arrayData
+		} else {
+			data, err = sjson.SetRawBytes(data, "__typename", []byte(result.Raw))
 			if err != nil {
 				r.Log.Error("HttpJsonDataSource.Resolve.setDefaultTypeName",
 					log.Error(err),

@@ -2,6 +2,7 @@ package astnormalization
 
 import (
 	"bytes"
+
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/astvisitor"
 )
