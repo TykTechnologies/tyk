@@ -17,6 +17,11 @@ type Location struct {
 	Column uint32 `json:"column"`
 }
 
+func ErrDocumentDoesntContainExecutableOperation() (err ExternalError){
+	err.Message = "document doesn't contain any executable operation"
+	return
+}
+
 func ErrFieldUndefinedOnType(fieldName, typeName ast.ByteSlice) (err ExternalError) {
 	err.Message = fmt.Sprintf("field: %s not defined on type: %s", fieldName, typeName)
 	return err

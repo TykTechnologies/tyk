@@ -22,6 +22,7 @@ func DefaultOperationValidator() *OperationValidator {
 		walker: astvisitor.NewWalker(48),
 	}
 
+	validator.RegisterRule(DocumentContainsExecutableOperation())
 	validator.RegisterRule(OperationNameUniqueness())
 	validator.RegisterRule(LoneAnonymousOperation())
 	validator.RegisterRule(SubscriptionSingleRootField())
@@ -78,6 +79,33 @@ func (o *OperationValidator) Validate(operation, definition *ast.Document, repor
 		return Invalid
 	}
 	return Valid
+}
+
+// DocumentContainsExecutableOperation validates if the document actually contains an executable Operation
+func DocumentContainsExecutableOperation() Rule {
+	return func(walker *astvisitor.Walker) {
+		visitor := &documentContainsExecutableOperation{
+			Walker: walker,
+		}
+		walker.RegisterEnterDocumentVisitor(visitor)
+	}
+}
+
+type documentContainsExecutableOperation struct {
+	*astvisitor.Walker
+}
+
+func (d *documentContainsExecutableOperation) EnterDocument(operation, definition *ast.Document) {
+	if len(operation.RootNodes) == 0 {
+		d.StopWithExternalErr(operationreport.ErrDocumentDoesntContainExecutableOperation())
+		return
+	}
+	for i := range operation.RootNodes {
+		if operation.RootNodes[i].Kind == ast.NodeKindOperationDefinition {
+			return
+		}
+	}
+	d.StopWithExternalErr(operationreport.ErrDocumentDoesntContainExecutableOperation())
 }
 
 // OperationNameUniqueness validates if all operation names are unique
