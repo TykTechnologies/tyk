@@ -15,6 +15,7 @@ import (
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 
+	"github.com/jensneuse/graphql-go-tools/internal/pkg/unsafebytes"
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/lexer/literal"
 )
@@ -27,33 +28,33 @@ var httpJsonSchemes = []string{
 // HttpJsonDataSourceConfig is the configuration object for the HttpJsonDataSource
 type HttpJsonDataSourceConfig struct {
 	// Host is the hostname of the upstream
-	Host string
+	Host string `json:"host"`
 	// URL is the url of the upstream
-	URL string
+	URL string `json:"url"`
 	// Method is the http.Method, e.g. GET, POST, UPDATE, DELETE
 	// default is GET
-	Method *string
+	Method *string `json:"method"`
 	// Body is the http body to send
 	// default is null/nil (no body)
-	Body *string
+	Body *string `json:"body"`
 	// Headers defines the header mappings
-	Headers []HttpJsonDataSourceConfigHeader
+	Headers []HttpJsonDataSourceConfigHeader `json:"headers"`
 	// DefaultTypeName is the optional variable to define a default type name for the response object
 	// This is useful in case the response might be a Union or Interface type which uses StatusCodeTypeNameMappings
-	DefaultTypeName *string
+	DefaultTypeName *string `json:"default_type_name"`
 	// StatusCodeTypeNameMappings is a slice of mappings from http.StatusCode to GraphQL TypeName
 	// This can be used when the TypeName depends on the http.StatusCode
-	StatusCodeTypeNameMappings []StatusCodeTypeNameMapping
+	StatusCodeTypeNameMappings []StatusCodeTypeNameMapping `json:"status_code_type_name_mappings"`
 }
 
 type StatusCodeTypeNameMapping struct {
-	StatusCode int
-	TypeName   string
+	StatusCode int    `json:"status_code"`
+	TypeName   string `json:"type_name"`
 }
 
 type HttpJsonDataSourceConfigHeader struct {
-	Key   string
-	Value string
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }
 
 type HttpJsonDataSourcePlannerFactoryFactory struct {
@@ -326,18 +327,37 @@ func (r *HttpJsonDataSource) Resolve(ctx context.Context, args ResolverArgs, out
 
 	statusCode := strconv.Itoa(res.StatusCode)
 	statusCodeTypeName := gjson.GetBytes(typeNameArg, statusCode)
+	defaultTypeName := gjson.GetBytes(typeNameArg, "defaultTypeName")
+	var result *gjson.Result
 	if statusCodeTypeName.Exists() {
-		data, err = sjson.SetRawBytes(data, "__typename", []byte(statusCodeTypeName.Raw))
-		if err != nil {
-			r.Log.Error("HttpJsonDataSource.Resolve.setStatusCodeTypeName",
-				log.Error(err),
-			)
-			return
-		}
-	} else {
-		defaultTypeName := gjson.GetBytes(typeNameArg, "defaultTypeName")
-		if defaultTypeName.Exists() {
-			data, err = sjson.SetRawBytes(data, "__typename", []byte(defaultTypeName.Raw))
+		result = &statusCodeTypeName
+	}
+	if result == nil && defaultTypeName.Exists() {
+		result = &defaultTypeName
+	}
+
+	if result != nil {
+		parsed := gjson.ParseBytes(data)
+		if parsed.IsArray() {
+			arrayData := []byte(`[]`)
+			items := parsed.Array()
+			for i := range items {
+				item, err := sjson.SetRaw(items[i].Raw, "__typename", result.Raw)
+				if err != nil {
+					r.Log.Error("HttpJsonDataSource.Resolve.array.setDefaultTypeName",
+						log.Error(err),
+					)
+				}
+				arrayData, err = sjson.SetRawBytes(arrayData, "-1", unsafebytes.StringToBytes(item))
+				if err != nil {
+					r.Log.Error("HttpJsonDataSource.Resolve.array.setArrayItem",
+						log.Error(err),
+					)
+				}
+			}
+			data = arrayData
+		} else {
+			data, err = sjson.SetRawBytes(data, "__typename", []byte(result.Raw))
 			if err != nil {
 				r.Log.Error("HttpJsonDataSource.Resolve.setDefaultTypeName",
 					log.Error(err),

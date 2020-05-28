@@ -572,7 +572,9 @@ func (v *validArgumentsVisitor) stringValueSatisfiesInputValueDefinition(value a
 	if inputType.TypeKind != ast.TypeKindNamed {
 		return false
 	}
-	if !bytes.Equal(v.definition.Input.ByteSlice(inputType.Name), literal.STRING) {
+
+	inputTypeName := v.definition.Input.ByteSlice(inputType.Name)
+	if !bytes.Equal(inputTypeName, literal.STRING) && !bytes.Equal(inputTypeName, literal.ID) {
 		return false
 	}
 	return true
@@ -869,18 +871,16 @@ func (v *valuesVisitor) objectValueSatisfiesInputValueDefinition(objectValue, in
 }
 
 func (v *valuesVisitor) valueSatisfiesScalar(value ast.Value, scalar int) bool {
-	scalarName := v.definition.ScalarTypeDefinitionNameBytes(scalar)
-	switch value.Kind {
-	case ast.ValueKindString:
-		return bytes.Equal(scalarName, literal.STRING)
-	case ast.ValueKindBoolean:
-		return bytes.Equal(scalarName, literal.BOOLEAN)
-	case ast.ValueKindInteger:
-		return bytes.Equal(scalarName, literal.INT) || bytes.Equal(scalarName, literal.FLOAT)
-	case ast.ValueKindFloat:
-		return bytes.Equal(scalarName, literal.FLOAT)
+	scalarName := v.definition.ScalarTypeDefinitionNameString(scalar)
+	switch scalarName {
+	case "Boolean":
+		return value.Kind == ast.ValueKindBoolean
+	case "Int":
+		return value.Kind == ast.ValueKindInteger
+	case "Float":
+		return value.Kind == ast.ValueKindFloat || value.Kind == ast.ValueKindInteger
 	default:
-		return false
+		return value.Kind == ast.ValueKindString
 	}
 }
 
