@@ -38,16 +38,16 @@ func (m *GraphQLMiddleware) EnabledForSpec() bool {
 }
 
 func (m *GraphQLMiddleware) Init() {
-	schema, err := gql.NewSchemaFromString(m.Spec.GraphQL.Schema)
+	schema, err := gql.NewSchemaFromString(m.Spec.GraphQL.GraphQLAPI.Schema)
 	if err != nil {
 		log.Errorf("Error while creating schema from API definition: %v", err)
 	}
 
 	m.Spec.GraphQLExecutor.Schema = schema
 
-	if m.Spec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeExecutionEngine {
+	if m.Spec.GraphQL.GraphQLAPI.Execution.Mode == apidef.GraphQLExecutionModeExecutionEngine {
 
-		typeFieldConfigurations := m.Spec.GraphQL.TypeFieldConfigurations
+		typeFieldConfigurations := m.Spec.GraphQL.GraphQLAPI.TypeFieldConfigurations
 		typeFieldConfigurations = append(typeFieldConfigurations, datasource.TypeFieldConfiguration{
 			TypeName:  "Query",
 			FieldName: "__schema",
