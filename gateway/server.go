@@ -1072,12 +1072,6 @@ func kvStore(value string) (string, error) {
 		return val, nil
 	}
 
-	if strings.HasPrefix(value, "env://") {
-		key := strings.TrimPrefix(value, "env://")
-		log.Debugf("Retrieving %s from environment", key)
-		return os.Getenv(fmt.Sprintf("TYK_SECRET_%s", strings.ToUpper(key))), nil
-	}
-
 	if strings.HasPrefix(value, "consul://") {
 		key := strings.TrimPrefix(value, "consul://")
 		log.Debugf("Retrieving %s from consul", key)
