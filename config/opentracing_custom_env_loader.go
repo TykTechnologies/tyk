@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/kelseyhightower/envconfig"
+	jaeger "github.com/uber/jaeger-client-go/config"
 )
 
 // ZipkinConfig configuration options used to initialize openzipkin opentracing
@@ -56,6 +57,16 @@ func DecodeJSON(dest, src interface{}) error {
 }
 
 // loadZipkin tries to lad zipkin configuration from environment variables.
+//
+// list of zipkin configuration env variables
+//
+// TYK_GW_TRACER_OPTIONS_REPORTER_URL
+// TYK_GW_TRACER_OPTIONS_REPORTER_BATCHSIZE
+// TYK_GW_TRACER_OPTIONS_REPORTER_MAXBACKLOG
+// TYK_GW_TRACER_OPTIONS_SAMPLER_NAME
+// TYK_GW_TRACER_OPTIONS_SAMPLER_RATE
+// TYK_GW_TRACER_OPTIONS_SAMPLER_SALT
+// TYK_GW_TRACER_OPTIONS_SAMPLER_MOD
 func loadZipkin(prefix string, c *Config) error {
 	if c.Tracer.Name != "zipkin" || c.Tracer.Options == nil {
 		return nil
@@ -71,6 +82,57 @@ func loadZipkin(prefix string, c *Config) error {
 	}
 	o := make(map[string]interface{})
 	if err := DecodeJSON(&o, zip); err != nil {
+		return err
+	}
+	c.Tracer.Options = o
+	return nil
+}
+
+// loads jaeger configuration from environment variables.
+//
+// List of jaeger configuration env vars
+//
+// TYK_GW_TRACER_OPTIONS_SERVICENAME
+// TYK_GW_TRACER_OPTIONS_DISABLED
+// TYK_GW_TRACER_OPTIONS_RPCMETRICS
+// TYK_GW_TRACER_OPTIONS_TAGS
+// TYK_GW_TRACER_OPTIONS_SAMPLER_TYPE
+// TYK_GW_TRACER_OPTIONS_SAMPLER_PARAM
+// TYK_GW_TRACER_OPTIONS_SAMPLER_SAMPLINGSERVERURL
+// TYK_GW_TRACER_OPTIONS_SAMPLER_MAXOPERATIONS
+// TYK_GW_TRACER_OPTIONS_SAMPLER_SAMPLINGREFRESHINTERVAL
+// TYK_GW_TRACER_OPTIONS_REPORTER_QUEUESIZE
+// TYK_GW_TRACER_OPTIONS_REPORTER_BUFFERFLUSHINTERVAL
+// TYK_GW_TRACER_OPTIONS_REPORTER_LOGSPANS
+// TYK_GW_TRACER_OPTIONS_REPORTER_LOCALAGENTHOSTPORT
+// TYK_GW_TRACER_OPTIONS_REPORTER_COLLECTORENDPOINT
+// TYK_GW_TRACER_OPTIONS_REPORTER_USER
+// TYK_GW_TRACER_OPTIONS_REPORTER_PASSWORD
+// TYK_GW_TRACER_OPTIONS_HEADERS_JAEGERDEBUGHEADER
+// TYK_GW_TRACER_OPTIONS_HEADERS_JAEGERBAGGAGEHEADER
+// TYK_GW_TRACER_OPTIONS_HEADERS_TRACECONTEXTHEADERNAME
+// TYK_GW_TRACER_OPTIONS_HEADERS_TRACEBAGGAGEHEADERPREFIX
+// TYK_GW_TRACER_OPTIONS_BAGGAGERESTRICTIONS_DENYBAGGAGEONINITIALIZATIONFAILURE
+// TYK_GW_TRACER_OPTIONS_BAGGAGERESTRICTIONS_HOSTPORT
+// TYK_GW_TRACER_OPTIONS_BAGGAGERESTRICTIONS_REFRESHINTERVAL
+// TYK_GW_TRACER_OPTIONS_THROTTLER_HOSTPORT
+// TYK_GW_TRACER_OPTIONS_THROTTLER_REFRESHINTERVAL
+// TYK_GW_TRACER_OPTIONS_THROTTLER_SYNCHRONOUSINITIALIZATION
+func loadJaeger(prefix string, c *Config) error {
+	if c.Tracer.Name != "jaeger" || c.Tracer.Options == nil {
+		return nil
+	}
+	var j jaeger.Configuration
+	if err := DecodeJSON(&j, c.Tracer.Options); err != nil {
+		return err
+	}
+	qualifyPrefix := prefix + "_TRACER_OPTIONS"
+	err := envconfig.Process(qualifyPrefix, &j)
+	if err != nil {
+		return err
+	}
+	o := make(map[string]interface{})
+	if err := DecodeJSON(&o, j); err != nil {
 		return err
 	}
 	c.Tracer.Options = o
