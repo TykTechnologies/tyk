@@ -22,11 +22,14 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -562,7 +565,7 @@ func tlsClientConfig(s *APISpec) *tls.Config {
 	return config
 }
 
-func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p *ReverseProxy) http.RoundTripper {
+func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p *ReverseProxy) *TykRoundTripper {
 	transport := defaultTransport(timeOut) // modifies a newly created transport
 	transport.TLSClientConfig = &tls.Config{}
 	transport.Proxy = proxyFromAPI(p.TykAPISpec)
@@ -614,7 +617,7 @@ func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p
 		http2.ConfigureTransport(transport)
 	}
 
-	return transport
+	return &TykRoundTripper{transport, p.logger}
 }
 
 func (p *ReverseProxy) setCommonNameVerifyPeerCertificate(tlsConfig *tls.Config, hostName string) {
@@ -666,6 +669,30 @@ func (p *ReverseProxy) setCommonNameVerifyPeerCertificate(tlsConfig *tls.Config,
 	}
 }
 
+type TykRoundTripper struct {
+	transport *http.Transport
+	logger    *logrus.Entry
+}
+
+func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
+	if r.URL.Scheme == "tyk" {
+		handler, found := findInternalHttpHandlerByNameOrID(r.Host)
+		if !found {
+			rt.logger.WithField("looping_url", "tyk://"+r.Host).Error("Couldn't detect target")
+			return nil, errors.New("handler could")
+		}
+
+		r.URL.Scheme = ""
+
+		rt.logger.WithField("looping_url", "tyk://"+r.Host).Debug("Executing request on internal route")
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, r)
+		return recorder.Result(), nil
+	}
+
+	return rt.transport.RoundTrip(r)
+}
+
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) ProxyResponse {
 	if trace.IsEnabled() {
 		span, ctx := trace.Span(req.Context(), req.URL.Path)
@@ -673,7 +700,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		ext.SpanKindRPCClient.Set(span)
 		req = req.WithContext(ctx)
 	}
-	var roundTripper http.RoundTripper
+	var roundTripper *TykRoundTripper
 
 	p.TykAPISpec.Lock()
 
@@ -795,13 +822,13 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	p.TykAPISpec.Lock()
-	roundTripper.(*http.Transport).TLSClientConfig.Certificates = tlsCertificates
+	roundTripper.transport.TLSClientConfig.Certificates = tlsCertificates
 	p.TykAPISpec.Unlock()
 
 	if p.TykAPISpec.Proxy.Transport.SSLForceCommonNameCheck || config.Global().SSLForceCommonNameCheck {
 		// if proxy is enabled, add CommonName verification in verifyPeerCertificate
 		// DialTLS is not executed if proxy is used
-		httpTransport := roundTripper.(*http.Transport)
+		httpTransport := roundTripper.transport
 
 		p.logger.Debug("Using forced SSL CN check")
 
@@ -818,6 +845,34 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	var res *http.Response
 	var err error
 	var upstreamLatency time.Duration
+
+	sendRequestToUpstream := func() {
+		begin := time.Now()
+		if p.TykAPISpec.GraphQL.GraphQLAPI.Execution.Mode == apidef.GraphQLExecutionModeExecutionEngine {
+
+			if p.TykAPISpec.GraphQLExecutor.Engine == nil {
+				err = errors.New("execution engine is nil")
+				return
+			}
+
+			gqlRequest := ctxGetGraphQLRequest(outreq)
+			if gqlRequest == nil {
+				err = errors.New("graphql request is nil")
+				return
+			}
+
+			p.TykAPISpec.GraphQLExecutor.Client.Transport = roundTripper
+			var result *graphql.ExecutionResult
+			result, err = p.TykAPISpec.GraphQLExecutor.Engine.Execute(context.Background(), gqlRequest, graphql.ExecutionOptions{ExtraArguments: gqlRequest.Variables})
+			res = result.GetAsHTTPResponse()
+
+		} else {
+			res, err = roundTripper.RoundTrip(outreq)
+		}
+
+		upstreamLatency = time.Since(begin)
+	}
+
 	if breakerEnforced {
 		if !breakerConf.CB.Ready() {
 			p.logger.Debug("ON REQUEST: Circuit Breaker is in OPEN state")
@@ -825,18 +880,14 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			return ProxyResponse{}
 		}
 		p.logger.Debug("ON REQUEST: Circuit Breaker is in CLOSED or HALF-OPEN state")
-		begin := time.Now()
-		res, err = roundTripper.RoundTrip(outreq)
-		upstreamLatency = time.Since(begin)
+		sendRequestToUpstream()
 		if err != nil || res.StatusCode/100 == 5 {
 			breakerConf.CB.Fail()
 		} else {
 			breakerConf.CB.Success()
 		}
 	} else {
-		begin := time.Now()
-		res, err = roundTripper.RoundTrip(outreq)
-		upstreamLatency = time.Since(begin)
+		sendRequestToUpstream()
 	}
 
 	if err != nil {

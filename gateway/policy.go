@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/sirupsen/logrus"
@@ -15,20 +17,22 @@ import (
 )
 
 type DBAccessDefinition struct {
-	APIName     string            `json:"apiname"`
-	APIID       string            `json:"apiid"`
-	Versions    []string          `json:"versions"`
-	AllowedURLs []user.AccessSpec `bson:"allowed_urls" json:"allowed_urls"` // mapped string MUST be a valid regex
-	Limit       *user.APILimit    `json:"limit"`
+	APIName         string            `json:"apiname"`
+	APIID           string            `json:"apiid"`
+	Versions        []string          `json:"versions"`
+	AllowedURLs     []user.AccessSpec `bson:"allowed_urls" json:"allowed_urls"` // mapped string MUST be a valid regex
+	RestrictedTypes []graphql.Type    `json:"restricted_types"`
+	Limit           *user.APILimit    `json:"limit"`
 }
 
 func (d *DBAccessDefinition) ToRegularAD() user.AccessDefinition {
 	return user.AccessDefinition{
-		APIName:     d.APIName,
-		APIID:       d.APIID,
-		Versions:    d.Versions,
-		AllowedURLs: d.AllowedURLs,
-		Limit:       d.Limit,
+		APIName:         d.APIName,
+		APIID:           d.APIID,
+		Versions:        d.Versions,
+		AllowedURLs:     d.AllowedURLs,
+		RestrictedTypes: d.RestrictedTypes,
+		Limit:           d.Limit,
 	}
 }
 

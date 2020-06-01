@@ -6,6 +6,8 @@ import (
 	"encoding/xml"
 	"text/template"
 
+	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
+
 	"github.com/clbanning/mxj"
 
 	"github.com/lonelycode/osin"
@@ -484,6 +486,7 @@ type APIDefinition struct {
 	GlobalRateLimit         GlobalRateLimit        `bson:"global_rate_limit" json:"global_rate_limit"`
 	StripAuthData           bool                   `bson:"strip_auth_data" json:"strip_auth_data"`
 	EnableDetailedRecording bool                   `bson:"enable_detailed_recording" json:"enable_detailed_recording"`
+	GraphQL                 GraphQLConfig          `bson:"graphql" json:"graphql"`
 }
 
 type AuthConfig struct {
@@ -526,6 +529,77 @@ type RequestSigningMeta struct {
 	HeaderList      []string `bson:"header_list" json:"header_list"`
 	CertificateId   string   `bson:"certificate_id" json:"certificate_id"`
 	SignatureHeader string   `bson:"signature_header" json:"signature_header"`
+}
+
+// GraphQLConfig is the root config object for GraphQL middlewares.
+type GraphQLConfig struct {
+	// Enabled indicates if GraphQL should be enabled.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// GraphQLAPI is the API specific configuration.
+	GraphQLAPI GraphQLAPI `bson:"api" json:"api"`
+	// GraphQLPlayground is the Playground specific configuration.
+	GraphQLPlayground GraphQLPlayground `bson:"playground" json:"playground"`
+}
+
+// GraphQLAPI is the configuration for the GraphQL Middleware.
+type GraphQLAPI struct {
+	// Endpoint is, combined with the base path, the route which the GraphQL Middleware reacts to.
+	Endpoint string `bson:"endpoint" json:"endpoint"`
+	// Schema is the GraphQL Schema exposed by the GraphQL API/Upstream/Engine.
+	Schema string `bson:"schema" json:"schema"`
+	// TypeFieldConfigurations is a rule set of data source and mapping of a schema field.
+	TypeFieldConfigurations []datasource.TypeFieldConfiguration `bson:"type_field_configurations" json:"type_field_configurations"`
+	// Execution defines the mode and configuration in which the GraphQL middleware should operate.
+	Execution GraphQLExecution `bson:"execution" json:"execution"`
+}
+
+// GraphQLExecution defines the GraphQL Execution Mode as well as its configuration.
+type GraphQLExecution struct {
+	// Mode is the mode in which the Middleware should operate.
+	Mode GraphQLExecutionMode `bson:"mode" json:"mode"`
+	// Validation defines the behaviour regarding GraphQL request validation.
+	Validation GraphQLExecutionValidation `bson:"validation" json:"validation"`
+}
+
+// GraphQLExecutionMode is the mode in which the GraphQL Middleware should operate.
+type GraphQLExecutionMode string
+
+const (
+	// GraphQLExecutionModeProxyOnly is the mode in which the GraphQL Middleware doesn't evaluate the GraphQL request
+	// In other terms, the GraphQL Middleware will not act as a GraphQL server in itself.
+	// The GraphQL Middleware will (optionally) validate the request and leave the execution up to the upstream.
+	GraphQLExecutionModeProxyOnly GraphQLExecutionMode = "proxyOnly"
+	// GraphQLExecutionModeExecutionEngine is the mode in which the GraphQL Middleware will evaluate every request.
+	// This means the Middleware will act as a independent GraphQL service which might delegate partial execution to upstreams.
+	GraphQLExecutionModeExecutionEngine GraphQLExecutionMode = "executionEngine"
+)
+
+// GraphQLExecutionValidation is the config for operation validation.
+type GraphQLExecutionValidation struct {
+	// Enabled indicates if the validation should be enabled.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// OnFail determines the gateway behavior when a validation fails.
+	OnFail GraphQLValidationBehavior `bson:"on_fail" json:"on_fail"`
+}
+
+// GraphQLValidationBehavior represents an enum for the configurable validation behavior.
+type GraphQLValidationBehavior string
+
+const (
+	// GraphQLValidationBehaviorStatusCode400 represents the behavior that the response will be a 400 Bad Request
+	// on a failing operation validation.
+	GraphQLValidationBehaviorStatusCode400 GraphQLValidationBehavior = "httpStatusCode400"
+	// GraphQLValidationBehaviorErrorObject represents the behavior that the response will contain a graphql error
+	// object with the paths on which the validation failed.
+	GraphQLValidationBehaviorErrorObject GraphQLValidationBehavior = "useErrorObject"
+)
+
+// GraphQLPlayground represents the configuration for the public playground which will be hosted alongside the api.
+type GraphQLPlayground struct {
+	// Enabled indicates if the playground should be enabled.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Path sets the path on which the playground will be hosted if enabled.
+	Path string `bson:"path" json:"path"`
 }
 
 // Clean will URL encode map[string]struct variables for saving
@@ -786,6 +860,18 @@ func DummyAPI() APIDefinition {
 		},
 	}
 
+	graphql := GraphQLConfig{
+		Enabled: false,
+		GraphQLAPI: GraphQLAPI{
+			Execution: GraphQLExecution{
+				Mode: GraphQLExecutionModeProxyOnly,
+				Validation: GraphQLExecutionValidation{
+					OnFail: GraphQLValidationBehaviorStatusCode400,
+				},
+			},
+		},
+	}
+
 	return APIDefinition{
 		VersionData:             versionData,
 		ConfigData:              map[string]interface{}{},
@@ -807,7 +893,8 @@ func DummyAPI() APIDefinition {
 				ExtractorConfig: map[string]interface{}{},
 			},
 		},
-		Tags: []string{},
+		Tags:    []string{},
+		GraphQL: graphql,
 	}
 }
 
