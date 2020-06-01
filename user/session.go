@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+
 	"github.com/TykTechnologies/tyk/config"
 	logger "github.com/TykTechnologies/tyk/log"
 )
@@ -30,6 +32,7 @@ type APILimit struct {
 	Per                float64 `json:"per" msg:"per"`
 	ThrottleInterval   float64 `json:"throttle_interval" msg:"throttle_interval"`
 	ThrottleRetryLimit int     `json:"throttle_retry_limit" msg:"throttle_retry_limit"`
+	MaxQueryDepth      int     `json:"max_query_depth" msg:"max_query_depth"`
 	QuotaMax           int64   `json:"quota_max" msg:"quota_max"`
 	QuotaRenews        int64   `json:"quota_renews" msg:"quota_renews"`
 	QuotaRemaining     int64   `json:"quota_remaining" msg:"quota_remaining"`
@@ -39,11 +42,12 @@ type APILimit struct {
 
 // AccessDefinition defines which versions of an API a key has access to
 type AccessDefinition struct {
-	APIName     string       `json:"api_name" msg:"api_name"`
-	APIID       string       `json:"api_id" msg:"api_id"`
-	Versions    []string     `json:"versions" msg:"versions"`
-	AllowedURLs []AccessSpec `bson:"allowed_urls" json:"allowed_urls" msg:"allowed_urls"` // mapped string MUST be a valid regex
-	Limit       *APILimit    `json:"limit" msg:"limit"`
+	APIName         string         `json:"api_name" msg:"api_name"`
+	APIID           string         `json:"api_id" msg:"api_id"`
+	Versions        []string       `json:"versions" msg:"versions"`
+	AllowedURLs     []AccessSpec   `bson:"allowed_urls" json:"allowed_urls" msg:"allowed_urls"` // mapped string MUST be a valid regex
+	RestrictedTypes []graphql.Type `json:"restricted_types" msg:"restricted_types"`
+	Limit           *APILimit      `json:"limit" msg:"limit"`
 
 	AllowanceScope string `json:"allowance_scope" msg:"allowance_scope"`
 }
@@ -59,6 +63,7 @@ type SessionState struct {
 	Per                float64                     `json:"per" msg:"per"`
 	ThrottleInterval   float64                     `json:"throttle_interval" msg:"throttle_interval"`
 	ThrottleRetryLimit int                         `json:"throttle_retry_limit" msg:"throttle_retry_limit"`
+	MaxQueryDepth      int                         `json:"max_query_depth" msg:"max_query_depth"`
 	DateCreated        time.Time                   `json:"date_created" msg:"date_created"`
 	Expires            int64                       `json:"expires" msg:"expires"`
 	QuotaMax           int64                       `json:"quota_max" msg:"quota_max"`

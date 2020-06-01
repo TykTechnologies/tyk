@@ -56,3 +56,17 @@ func greaterThanInt64(first, second int64) bool {
 
 	return first > second
 }
+
+// greaterThanInt checks whether first int value is bigger than second int value.
+// -1 means infinite and the biggest value.
+func greaterThanInt(first, second int) bool {
+	if first == -1 {
+		return true
+	}
+
+	if second == -1 {
+		return false
+	}
+
+	return first > second
+}

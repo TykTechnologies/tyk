@@ -715,6 +715,7 @@ func generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.Se
 	session.Per = policy.Per
 	session.ThrottleInterval = policy.ThrottleInterval
 	session.ThrottleRetryLimit = policy.ThrottleRetryLimit
+	session.MaxQueryDepth = policy.MaxQueryDepth
 	session.QuotaMax = policy.QuotaMax
 	session.QuotaRenewalRate = policy.QuotaRenewalRate
 	session.AccessRights = make(map[string]user.AccessDefinition)

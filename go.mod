@@ -5,8 +5,6 @@ go 1.12
 require (
 	github.com/Jeffail/gabs v1.4.0
 	github.com/Jeffail/tunny v0.0.0-20171107125207-452a8e97d6a3
-	github.com/Masterminds/goutils v1.1.0 // indirect
-	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/TykTechnologies/again v0.0.0-20190805133618-6ad301e7eaed
 	github.com/TykTechnologies/circuitbreaker v2.2.2+incompatible
 	github.com/TykTechnologies/drl v0.0.0-20190905191955-cc541aa8e3e1
@@ -38,17 +36,17 @@ require (
 	github.com/gocraft/health v0.0.0-20170925182251-8675af27fef0
 	github.com/golang/protobuf v1.3.2
 	github.com/google/btree v1.0.0 // indirect
-	github.com/google/uuid v1.1.1 // indirect
 	github.com/gorilla/mux v1.7.3
 	github.com/gorilla/websocket v1.4.1
 	github.com/hashicorp/consul/api v1.3.0
 	github.com/hashicorp/go-msgpack v0.5.4 // indirect
 	github.com/hashicorp/vault/api v1.0.4
-	github.com/huandu/xstrings v1.2.0 // indirect
-	github.com/imdario/mergo v0.3.7 // indirect
+	github.com/huandu/xstrings v1.3.0 // indirect
+	github.com/imdario/mergo v0.3.9 // indirect
+	github.com/jensneuse/abstractlogger v0.0.4
+	github.com/jensneuse/graphql-go-tools v0.0.0-00010101000000-000000000000
 	github.com/justinas/alice v0.0.0-20171023064455-03f45bd4b7da
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/kr/pretty v0.1.0 // indirect
 	github.com/lonelycode/go-uuid v0.0.0-20141202165402-ed3ca8a15a93
 	github.com/lonelycode/osin v0.0.0-20160423095202-da239c9dacb6
 	github.com/mattn/go-colorable v0.1.4 // indirect
@@ -71,7 +69,7 @@ require (
 	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.4.2
 	github.com/square/go-jose v2.4.1+incompatible // indirect
-	github.com/stretchr/testify v1.4.0
+	github.com/stretchr/testify v1.5.1
 	github.com/uber-go/atomic v1.4.0 // indirect
 	github.com/uber/jaeger-client-go v2.19.0+incompatible
 	github.com/uber/jaeger-lib v2.2.0+incompatible // indirect
@@ -80,8 +78,7 @@ require (
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/xeipuuv/gojsonschema v0.0.0-20171025060643-212d8a0df7ac
 	github.com/xenolf/lego v0.3.2-0.20170618175828-28ead50ff1ca // indirect
-	go.uber.org/atomic v1.3.2 // indirect
-	golang.org/x/crypto v0.0.0-20190923035154-9ee001bba392
+	golang.org/x/crypto v0.0.0-20191227163750-53104e6ec876
 	golang.org/x/net v0.0.0-20191009170851-d66e71096ffb
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect
@@ -90,12 +87,13 @@ require (
 	google.golang.org/grpc v1.23.1
 	gopkg.in/Masterminds/sprig.v2 v2.21.0
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
-	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 	gopkg.in/sourcemap.v1 v1.0.5 // indirect
 	gopkg.in/square/go-jose.v1 v1.1.2 // indirect
 	gopkg.in/vmihailenco/msgpack.v2 v2.9.1
 	gopkg.in/xmlpath.v2 v2.0.0-20150820204837-860cbeca3ebc
-	gopkg.in/yaml.v2 v2.2.2
+	gopkg.in/yaml.v2 v2.2.8
 	rsc.io/letsencrypt v0.0.2
 )
+
+replace github.com/jensneuse/graphql-go-tools => github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20200528133353-0bf0656ae3ea

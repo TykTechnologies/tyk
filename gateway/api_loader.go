@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/jensneuse/graphql-go-tools/pkg/playground"
+
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/sirupsen/logrus"
@@ -230,6 +232,10 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		// TODO: add mwResponseFuncs here when Golang response custom MW support implemented
 	}
 
+	if spec.GraphQL.GraphQLPlayground.Enabled {
+		loadGraphQLPlayground(spec, subrouter)
+	}
+
 	if spec.EnableBatchRequestSupport {
 		addBatchEndpoint(spec, subrouter)
 	}
@@ -318,6 +324,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid})
 	mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid})
+	mwAppendEnabled(&chainArray, &GraphQLMiddleware{BaseMiddleware: baseMid})
 
 	if !spec.UseKeylessAccess {
 		// Select the keying method to use for setting session states
@@ -551,21 +558,41 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if d.SH.Spec.target.Scheme == "tyk" {
-		if targetAPI := fuzzyFindAPI(d.SH.Spec.target.Host); targetAPI != nil {
-			if h, found := apisHandlesByID.Load(targetAPI.APIID); found {
-				if d.SH.Spec.Proxy.StripListenPath {
-					r.URL.Path = d.SH.Spec.StripListenPath(r, r.URL.Path)
-					r.URL.RawPath = d.SH.Spec.StripListenPath(r, r.URL.RawPath)
-				}
-				h.(http.Handler).ServeHTTP(w, r)
-				return
-			}
+		handler, found := findInternalHttpHandlerByNameOrID(d.SH.Spec.target.Host)
+		if !found {
+			handler := ErrorHandler{*d.SH.Base()}
+			handler.HandleError(w, r, "Couldn't detect target", http.StatusInternalServerError, true)
+			return
 		}
-		handler := ErrorHandler{*d.SH.Base()}
-		handler.HandleError(w, r, "Couldn't detect target", http.StatusInternalServerError, true)
+
+		sanitizeProxyPaths(d.SH.Spec, r)
+		handler.ServeHTTP(w, r)
 		return
 	}
 	d.SH.ServeHTTP(w, r)
+}
+
+func findInternalHttpHandlerByNameOrID(apiNameOrID string) (handler http.Handler, ok bool) {
+	targetAPI := fuzzyFindAPI(apiNameOrID)
+	if targetAPI == nil {
+		return nil, false
+	}
+
+	h, found := apisHandlesByID.Load(targetAPI.APIID)
+	if !found {
+		return nil, false
+	}
+
+	return h.(http.Handler), true
+}
+
+func sanitizeProxyPaths(apiSpec *APISpec, request *http.Request) {
+	if !apiSpec.Proxy.StripListenPath {
+		return
+	}
+
+	request.URL.Path = apiSpec.StripListenPath(request, request.URL.Path)
+	request.URL.RawPath = apiSpec.StripListenPath(request, request.URL.RawPath)
 }
 
 func loadGlobalApps() {
@@ -675,6 +702,24 @@ type generalStores struct {
 	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore storage.Handler
 }
 
+func loadGraphQLPlayground(spec *APISpec, router *mux.Router) {
+	p := playground.New(playground.Config{
+		PathPrefix:                      spec.Proxy.ListenPath,
+		PlaygroundPath:                  spec.GraphQL.GraphQLPlayground.Path,
+		GraphqlEndpointPath:             spec.Proxy.ListenPath,
+		GraphQLSubscriptionEndpointPath: spec.Proxy.ListenPath,
+	})
+
+	handlers, err := p.Handlers()
+	if err != nil {
+		log.WithError(err).Error("Could not setup graphql playground handlers")
+	}
+
+	for _, cfg := range handlers {
+		router.HandleFunc(cfg.Path, cfg.Handler)
+	}
+}
+
 // Create the individual API (app) specs based on live configurations and assign middleware
 func loadApps(specs []*APISpec) {
 	mainLog.Info("Loading API configurations.")
@@ -702,6 +747,7 @@ func loadApps(specs []*APISpec) {
 	router := mux.NewRouter()
 	router.NotFoundHandler = http.HandlerFunc(muxer.handle404)
 	loadControlAPIEndpoints(router)
+
 	muxer.setRouter(port, "", router)
 
 	gs := prepareStorage()
