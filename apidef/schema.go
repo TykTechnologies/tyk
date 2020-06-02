@@ -429,6 +429,76 @@ const Schema = `{
         "required": [
             "is_enabled"
         ]
+        },
+        "graphql": {
+            "type": ["object", "null"],
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "api": {
+                    "type": "object",
+                    "properties": {
+                        "endpoint": {
+                            "type": "string"
+                        },
+                        "schema": {
+                            "type": "string"
+                        },
+                        "execution": {
+                            "type": "object",
+                            "properties": {
+                                "mode": {
+                                    "type": "string",
+                                    "enum": ["proxyOnly", "executionEngine"]
+                                },
+                                "validation": {
+                                    "type": "object",
+                                    "properties": {
+                                        "enabled": {
+                                            "type": "boolean"
+                                        },
+                                        "on_fail": {
+                                            "type": "string",
+                                            "enum": ["httpStatusCode400", "useErrorObject"]
+                                        }
+                                    },
+                                    "required": [
+                                        "enabled", 
+                                        "on_fail"
+                                    ]
+                                }
+                            },
+                            "required": [
+                                "mode", 
+                                "validation"
+                            ]
+                        } 
+                    },
+                    "required": [
+                        "endpoint", 
+                        "schema", 
+                        "execution"
+                    ]
+                },
+                "playground": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean"
+                        },
+                        "path": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "enabled"
+                    ]
+                }
+            },
+            "required": [
+                "enabled"
+            ]
         }
     },
     "required": [

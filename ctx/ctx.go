@@ -37,6 +37,7 @@ const (
 	TransformedRequestMethod
 	Definition
 	RequestStatus
+	GraphQLRequest
 )
 
 func setContext(r *http.Request, ctx context.Context) {

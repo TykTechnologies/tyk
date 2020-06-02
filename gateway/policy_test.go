@@ -147,6 +147,19 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 		"acl3": {
 			AccessRights: map[string]user.AccessDefinition{"c": {}},
 		},
+		"unlimitedComplexity": {
+			Partitions:    user.PolicyPartitions{Complexity: true},
+			AccessRights:  map[string]user.AccessDefinition{"a": {}},
+			MaxQueryDepth: -1,
+		},
+		"complexity1": {
+			Partitions:    user.PolicyPartitions{Complexity: true},
+			MaxQueryDepth: 2,
+		},
+		"complexity2": {
+			Partitions:    user.PolicyPartitions{Complexity: true},
+			MaxQueryDepth: 3,
+		},
 		"per_api_and_partitions": {
 			ID: "per_api_and_partitions",
 			Partitions: user.PolicyPartitions{
@@ -437,6 +450,30 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			"RateParts", []string{"rate1", "rate2"},
 			"", func(t *testing.T, s *user.SessionState) {
 				if s.Rate != 4 {
+					t.Fatalf("Should pick bigger value")
+				}
+			}, nil,
+		},
+		{
+			"ComplexityPart with unlimited", []string{"unlimitedComplexity"},
+			"", func(t *testing.T, s *user.SessionState) {
+				if s.MaxQueryDepth != -1 {
+					t.Fatalf("unlimitied query depth should be -1")
+				}
+			}, nil,
+		},
+		{
+			"ComplexityPart", []string{"complexity1"},
+			"", func(t *testing.T, s *user.SessionState) {
+				if s.MaxQueryDepth != 2 {
+					t.Fatalf("want MaxQueryDepth to be 2")
+				}
+			}, nil,
+		},
+		{
+			"ComplexityParts", []string{"complexity1", "complexity2"},
+			"", func(t *testing.T, s *user.SessionState) {
+				if s.MaxQueryDepth != 3 {
 					t.Fatalf("Should pick bigger value")
 				}
 			}, nil,
