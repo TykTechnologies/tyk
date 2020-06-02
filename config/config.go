@@ -658,6 +658,9 @@ func Load(paths []string, conf *Config) error {
 	if err := envconfig.Process(envPrefix, conf); err != nil {
 		return fmt.Errorf("failed to process config env vars: %v", err)
 	}
+	if err := processCustom(envPrefix, conf, loadZipkin, loadJaeger); err != nil {
+		return fmt.Errorf("failed to process config custom loader: %v", err)
+	}
 	return nil
 }
 
@@ -674,4 +677,17 @@ func (c *Config) StoreAnalytics(ip string) bool {
 	}
 
 	return !c.AnalyticsConfig.ignoredIPsCompiled[ip]
+}
+
+// processCustom these are custom functions for loadign config values. They will
+// be called in the order they are passed. Any function that returns an error
+// then that error will be returned and no further processing will be
+// happenning.
+func processCustom(prefix string, c *Config, custom ...func(prefix string, c *Config) error) error {
+	for _, fn := range custom {
+		if err := fn(prefix, c); err != nil {
+			return err
+		}
+	}
+	return nil
 }
