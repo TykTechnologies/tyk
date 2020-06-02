@@ -431,75 +431,83 @@ const Schema = `{
         ]
         },
         "graphql": {
-            "type": ["object", "null"],
-            "properties": {
-                "enabled": {
-                    "type": "boolean"
-                },
-                "api": {
-                    "type": "object",
-                    "properties": {
-                        "endpoint": {
-                            "type": "string"
-                        },
-                        "schema": {
-                            "type": "string"
-                        },
-                        "execution": {
-                            "type": "object",
-                            "properties": {
-                                "mode": {
-                                    "type": "string",
-                                    "enum": ["proxyOnly", "executionEngine"]
-                                },
-                                "validation": {
-                                    "type": "object",
-                                    "properties": {
-                                        "enabled": {
-                                            "type": "boolean"
-                                        },
-                                        "on_fail": {
-                                            "type": "string",
-                                            "enum": ["httpStatusCode400", "useErrorObject"]
-                                        }
-                                    },
-                                    "required": [
-                                        "enabled", 
-                                        "on_fail"
-                                    ]
-                                }
-                            },
-                            "required": [
-                                "mode", 
-                                "validation"
-                            ]
-                        } 
-                    },
-                    "required": [
-                        "endpoint", 
-                        "schema", 
-                        "execution"
-                    ]
-                },
-                "playground": {
-                    "type": "object",
-                    "properties": {
-                        "enabled": {
-                            "type": "boolean"
-                        },
-                        "path": {
-                            "type": "string"
-                        }
-                    },
-                    "required": [
-                        "enabled"
-                    ]
-                }
-            },
-            "required": [
-                "enabled"
-            ]
-        }
+			"type": ["object", "null"],
+			"properties": {
+				"enabled": {
+					"type": "boolean"
+				},
+				"execution_mode": {
+					"type": "string",
+					"enum": [
+						"proxyOnly",
+						"executionEngine"
+					]
+				},
+				"schema": {
+					"type": "string"
+				},
+				"type_field_configurations": {
+					"type": ["array", "null"],
+					"properties": {
+						"type_name": {
+							"type": "string"
+						},
+						"field_name": {
+							"type": "string"
+						},
+						"mapping": {
+							"type": ["object", "null"],
+							"properties": {
+								"disabled": {
+									"type": "boolean"
+								},
+								"path": {
+									"type": "string"
+								}
+							},
+							"required": [
+								"disabled"
+							]
+						},
+						"data_source": {
+							"type": ["object", "null"],
+							"properties": {
+								"kind": {
+									"type": "boolean"
+								},
+								"data_source_config": {
+									"type": ["object", "null"]
+								}
+							},
+							"required": [
+								"kind"
+							]
+						}
+					},
+					"required": [
+						"type_name",
+						"field_name"
+					]
+				},
+				"playground": {
+					"type": ["object", "null"],
+					"properties": {
+						"enabled": {
+							"type": "boolean"
+						},
+						"path": {
+							"type": "string"
+						}
+					},
+					"required": [
+						"enabled"
+					]
+				}
+			},
+			"required": [
+				"enabled"
+			]
+		}
     },
     "required": [
         "auth",
