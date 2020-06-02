@@ -177,7 +177,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				},
 			}},
 		},
-		/*"per_api_and_some_partitions": {
+		"per_api_and_some_partitions": {
 			ID: "per_api_and_some_partitions",
 			Partitions: user.PolicyPartitions{
 				PerAPI:    true,
@@ -193,7 +193,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 					Per:              1,
 				},
 			}},
-		},*/
+		},
 		"per_api_and_no_other_partitions": {
 			ID: "per_api_and_no_other_partitions",
 			Partitions: user.PolicyPartitions{
