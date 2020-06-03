@@ -130,11 +130,11 @@ type PlannerConfiguration struct {
 }
 
 type TypeFieldConfiguration struct {
-	TypeName                 string
-	FieldName                string
-	Mapping                  *MappingConfiguration
-	DataSource               SourceConfig `json:"data_source"`
-	DataSourcePlannerFactory PlannerFactory
+	TypeName                 string                `json:"type_name"`
+	FieldName                string                `json:"field_name"`
+	Mapping                  *MappingConfiguration `json:"mapping"`
+	DataSource               SourceConfig          `json:"data_source"`
+	DataSourcePlannerFactory PlannerFactory        `json:"-"`
 }
 
 type SourceConfig struct {
@@ -143,12 +143,12 @@ type SourceConfig struct {
 	Name string `json:"kind"`
 	// Config is the DataSource specific configuration object
 	// Each Planner needs to make sure to parse their Config Object correctly
-	Config json.RawMessage `json:"dataSourceConfig"`
+	Config json.RawMessage `json:"data_source_config"`
 }
 
 type MappingConfiguration struct {
-	Disabled bool
-	Path     string
+	Disabled bool   `json:"disabled"`
+	Path     string `json:"path"`
 }
 
 func (p *PlannerConfiguration) DataSourcePlannerFactoryForTypeField(typeName, fieldName string) PlannerFactory {
