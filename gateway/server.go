@@ -797,11 +797,23 @@ func reloadURLStructure(done func()) {
 func setupLogger() {
 	if config.Global().UseSentry {
 		mainLog.Debug("Enabling Sentry support")
-		hook, err := logrus_sentry.NewSentryHook(config.Global().SentryCode, []logrus.Level{
-			logrus.PanicLevel,
-			logrus.FatalLevel,
-			logrus.ErrorLevel,
-		})
+
+		logLevel := []logrus.Level{}
+
+		if config.Global().SentryLogLevel == "" {
+			logLevel = []logrus.Level{
+				logrus.PanicLevel,
+				logrus.FatalLevel,
+				logrus.ErrorLevel,
+			}
+		} else if config.Global().SentryLogLevel == "panic" {
+			logLevel = []logrus.Level{
+				logrus.PanicLevel,
+				logrus.FatalLevel,
+			}
+		}
+
+		hook, err := logrus_sentry.NewSentryHook(config.Global().SentryCode, logLevel)
 
 		hook.Timeout = 0
 

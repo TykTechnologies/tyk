@@ -432,6 +432,7 @@ type Config struct {
 	HTTPProfile             bool           `json:"enable_http_profiler"`
 	UseRedisLog             bool           `json:"use_redis_log"`
 	SentryCode              string         `json:"sentry_code"`
+	SentryLogLevel          string         `json:"sentry_log_level"`
 	UseSentry               bool           `json:"use_sentry"`
 	UseSyslog               bool           `json:"use_syslog"`
 	UseGraylog              bool           `json:"use_graylog"`
