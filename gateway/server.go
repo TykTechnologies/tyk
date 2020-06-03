@@ -179,11 +179,11 @@ func setupGlobals(ctx context.Context) {
 	initHealthCheck(ctx)
 
 	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
-	GlobalSessionManager.Init(&redisStore)
+	GlobalSessionManager.Init(ctx, &redisStore)
 
 	versionStore := storage.RedisCluster{KeyPrefix: "version-check-"}
-	versionStore.Connect()
-	_ = versionStore.SetKey("gateway", VERSION, 0)
+	versionStore.Connect(ctx)
+	_ = versionStore.SetKey(ctx, "gateway", VERSION, 0)
 
 	if config.Global().EnableAnalytics && analytics.Store == nil {
 		globalConf := config.Global()
@@ -193,7 +193,7 @@ func setupGlobals(ctx context.Context) {
 
 		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-"}
 		analytics.Store = &analyticsStore
-		analytics.Init(globalConf)
+		analytics.Init(ctx, globalConf)
 
 		if config.Global().AnalyticsConfig.Type == "rpc" {
 			mainLog.Debug("Using RPC cache purge")
@@ -219,12 +219,12 @@ func setupGlobals(ctx context.Context) {
 	// Get the notifier ready
 	mainLog.Debug("Notifier will not work in hybrid mode")
 	mainNotifierStore := &storage.RedisCluster{}
-	mainNotifierStore.Connect()
+	mainNotifierStore.Connect(ctx)
 	MainNotifier = RedisNotifier{mainNotifierStore, RedisPubSubChannel}
 
 	if config.Global().Monitor.EnableTriggerMonitors {
 		h := &WebHookHandler{}
-		if err := h.Init(config.Global().Monitor.Config); err != nil {
+		if err := h.Init(ctx, config.Global().Monitor.Config); err != nil {
 			mainLog.Error("Failed to initialise monitor! ", err)
 		} else {
 			MonitoringHandler = h
@@ -265,14 +265,14 @@ func buildConnStr(resource string) string {
 	return config.Global().DBAppConfOptions.ConnectionString + resource
 }
 
-func syncAPISpecs() (int, error) {
+func syncAPISpecs(ctx context.Context) (int, error) {
 	loader := APIDefinitionLoader{}
 	apisMu.Lock()
 	defer apisMu.Unlock()
 	var s []*APISpec
 	if config.Global().UseDBAppConfigs {
 		connStr := buildConnStr("/system/apis")
-		tmpSpecs, err := loader.FromDashboardService(connStr, config.Global().NodeSecret)
+		tmpSpecs, err := loader.FromDashboardService(ctx, connStr, config.Global().NodeSecret)
 		if err != nil {
 			log.Error("failed to load API specs: ", err)
 			return 0, err
@@ -285,12 +285,12 @@ func syncAPISpecs() (int, error) {
 		mainLog.Debug("Using RPC Configuration")
 
 		var err error
-		s, err = loader.FromRPC(config.Global().SlaveOptions.RPCKey)
+		s, err = loader.FromRPC(ctx, config.Global().SlaveOptions.RPCKey)
 		if err != nil {
 			return 0, err
 		}
 	} else {
-		s = loader.FromDir(config.Global().AppPath)
+		s = loader.FromDir(ctx, config.Global().AppPath)
 	}
 
 	mainLog.Printf("Detected %v APIs", len(s))
@@ -321,7 +321,7 @@ func syncAPISpecs() (int, error) {
 	return len(apiSpecs), nil
 }
 
-func syncPolicies() (count int, err error) {
+func syncPolicies(ctx context.Context) (count int, err error) {
 	var pols map[string]user.Policy
 
 	mainLog.Info("Loading policies")
@@ -336,10 +336,10 @@ func syncPolicies() (count int, err error) {
 
 		mainLog.Info("Using Policies from Dashboard Service")
 
-		pols = LoadPoliciesFromDashboard(connStr, config.Global().NodeSecret, config.Global().Policies.AllowExplicitPolicyID)
+		pols = LoadPoliciesFromDashboard(ctx, connStr, config.Global().NodeSecret, config.Global().Policies.AllowExplicitPolicyID)
 	case "rpc":
 		mainLog.Debug("Using Policies from RPC")
-		pols, err = LoadPoliciesFromRPC(config.Global().SlaveOptions.RPCKey)
+		pols, err = LoadPoliciesFromRPC(ctx, config.Global().SlaveOptions.RPCKey)
 	default:
 		// this is the only case now where we need a policy record name
 		if config.Global().Policies.PolicyRecordName == "" {
@@ -380,7 +380,7 @@ func stripSlashes(next http.Handler) http.Handler {
 func controlAPICheckClientCertificate(certLevel string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if config.Global().Security.ControlAPIUseMutualTLS {
-			if err := CertificateManager.ValidateRequestCertificate(config.Global().Security.Certificates.ControlAPI, r); err != nil {
+			if err := CertificateManager.ValidateRequestCertificate(r.Context(), config.Global().Security.Certificates.ControlAPI, r); err != nil {
 				doJSONWrite(w, http.StatusForbidden, apiError(err.Error()))
 				return
 			}
@@ -489,7 +489,7 @@ func generateOAuthPrefix(apiID string) string {
 }
 
 // Create API-specific OAuth handlers and respective auth servers
-func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
+func addOAuthHandlers(ctx context.Context, spec *APISpec, muxer *mux.Router) *OAuthManager {
 	var pathSeparator string
 	if !strings.HasSuffix(spec.Proxy.ListenPath, "/") {
 		pathSeparator = "/"
@@ -515,7 +515,7 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 
 	prefix := generateOAuthPrefix(spec.APIID)
 	storageManager := getGlobalStorageHandler(prefix, false)
-	storageManager.Connect()
+	storageManager.Connect(ctx)
 	osinStorage := &RedisOsinStorageInterface{storageManager, GlobalSessionManager, &storage.RedisCluster{KeyPrefix: prefix, HashKeys: false}, spec.OrgID}
 
 	osinServer := TykOsinNewServer(serverConfig, osinStorage)
@@ -687,31 +687,41 @@ func isRPCMode() bool {
 		config.Global().AuthOverride.AuthProvider.StorageEngine == RPCStorageEngine
 }
 
-func rpcReloadLoop(rpcKey string) {
+// rpcReloadLoop periodically check for rpc signal to reload. By default it
+// checks every second.
+func rpcReloadLoop(ctx context.Context, rpcKey string) {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
 	for {
-		RPCListener.CheckForReload(rpcKey)
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			nctx, _ := context.WithDeadline(ctx, time.Now().Add(time.Second))
+			RPCListener.CheckForReload(nctx, rpcKey)
+		}
 	}
 }
 
 var reloadMu sync.Mutex
 
-func DoReload() {
+func DoReload(ctx context.Context) {
 	reloadMu.Lock()
 	defer reloadMu.Unlock()
 
 	// Initialize/reset the JSVM
 	if config.Global().EnableJSVM {
-		GlobalEventsJSVM.Init(nil, logrus.NewEntry(log))
+		GlobalEventsJSVM.Init(ctx, nil, logrus.NewEntry(log))
 	}
 
 	// Load the API Policies
-	if _, err := syncPolicies(); err != nil {
+	if _, err := syncPolicies(ctx); err != nil {
 		mainLog.Error("Error during syncing policies:", err.Error())
 		return
 	}
 
 	// load the specs
-	if count, err := syncAPISpecs(); err != nil {
+	if count, err := syncAPISpecs(ctx); err != nil {
 		mainLog.Error("Error during syncing apis:", err.Error())
 		return
 	} else {
@@ -722,7 +732,7 @@ func DoReload() {
 			return
 		}
 	}
-	loadGlobalApps()
+	loadGlobalApps(ctx)
 
 	mainLog.Info("API reload complete")
 }
@@ -736,11 +746,11 @@ func DoReload() {
 var startReloadChan = make(chan struct{}, 1)
 var reloadDoneChan = make(chan struct{}, 1)
 
-func reloadLoop(tick <-chan time.Time) {
+func reloadLoop(ctx context.Context, tick <-chan time.Time) {
 	<-tick
 	for range startReloadChan {
 		mainLog.Info("reload: initiating")
-		DoReload()
+		DoReload(ctx)
 		mainLog.Info("reload: complete")
 
 		mainLog.Info("Initiating coprocess reload")
@@ -755,11 +765,13 @@ func reloadLoop(tick <-chan time.Time) {
 // buffered, as reloadQueueLoop should pick these up immediately.
 var reloadQueue = make(chan func())
 
-func reloadQueueLoop() {
+func reloadQueueLoop(ctx context.Context) {
 	reloading := false
 	var fns []func()
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case <-reloadDoneChan:
 			for _, fn := range fns {
 				fn()
@@ -918,7 +930,7 @@ func initialiseSystem(ctx context.Context) error {
 		// It's necessary to set global conf before and after calling afterConfSetup as global conf
 		// is being used by dependencies of the even handler init and then conf is modified again.
 		config.SetGlobal(globalConf)
-		afterConfSetup(&globalConf)
+		afterConfSetup(ctx, &globalConf)
 		config.SetGlobal(globalConf)
 	}
 
@@ -1007,7 +1019,7 @@ func readPIDFromFile() (int, error) {
 
 // afterConfSetup takes care of non-sensical config values (such as zero
 // timeouts) and sets up a few globals that depend on the config.
-func afterConfSetup(conf *config.Config) {
+func afterConfSetup(ctx context.Context, conf *config.Config) {
 	if conf.SlaveOptions.CallTimeout == 0 {
 		conf.SlaveOptions.CallTimeout = 30
 	}
@@ -1022,7 +1034,7 @@ func afterConfSetup(conf *config.Config) {
 
 	rpc.GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)
 	rpc.GlobalRPCCallTimeout = time.Second * time.Duration(conf.SlaveOptions.CallTimeout)
-	initGenericEventHandlers(conf)
+	initGenericEventHandlers(ctx, conf)
 	regexp.ResetCache(time.Second*time.Duration(conf.RegexpCacheExpire), !conf.DisableRegexpCache)
 
 	if conf.HealthCheckEndpointName == "" {
@@ -1203,7 +1215,7 @@ func Start() {
 
 		if config.Global().UseDBAppConfigs {
 			mainLog.Info("Stopping heartbeat")
-			DashService.StopBeating()
+			DashService.StopBeating(ctx)
 			mainLog.Info("Waiting to de-register")
 			time.Sleep(10 * time.Second)
 
@@ -1220,7 +1232,7 @@ func Start() {
 		trace.SetLogger(mainLog)
 		defer trace.Close()
 	}
-	start()
+	start(ctx)
 	go storage.ConnectToRedis(ctx)
 
 	if *cli.MemProfile {
@@ -1251,7 +1263,7 @@ func Start() {
 
 	// TODO: replace goagain with something that support multiple listeners
 	// Example: https://gravitational.com/blog/golang-ssh-bastion-graceful-restarts/
-	startServer()
+	startServer(ctx)
 
 	if again.Child() {
 		// This is a child process, we need to murder the parent now
@@ -1271,9 +1283,9 @@ func Start() {
 
 	// if using async session writes stop workers
 	if config.Global().UseAsyncSessionWrite {
-		DefaultOrgStore.Stop()
+		DefaultOrgStore.Stop(ctx)
 		for i := range apiSpecs {
-			apiSpecs[i].StopSessionManagerPool()
+			apiSpecs[i].StopSessionManagerPool(ctx)
 		}
 
 	}
@@ -1283,9 +1295,9 @@ func Start() {
 
 	if config.Global().UseDBAppConfigs {
 		mainLog.Info("Stopping heartbeat...")
-		DashService.StopBeating()
+		DashService.StopBeating(ctx)
 		time.Sleep(2 * time.Second)
-		DashService.DeRegister()
+		DashService.DeRegister(ctx)
 	}
 
 	mainLog.Info("Terminating.")
@@ -1316,18 +1328,18 @@ func writeProfiles() {
 	}
 }
 
-func start() {
+func start(ctx context.Context) {
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.Global().SupressDefaultOrgStore {
 		mainLog.Debug("Initialising default org store")
-		DefaultOrgStore.Init(getGlobalStorageHandler("orgkey.", false))
+		DefaultOrgStore.Init(ctx, getGlobalStorageHandler("orgkey.", false))
 		//DefaultQuotaStore.Init(getGlobalStorageHandler(CloudHandler, "orgkey.", false))
-		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
+		DefaultQuotaStore.Init(ctx, getGlobalStorageHandler("orgkey.", false))
 	}
 
 	// Start listening for reload messages
 	if !config.Global().SuppressRedisSignalReload {
-		go startPubSubLoop()
+		go startPubSubLoop(ctx)
 	}
 
 	if slaveOptions := config.Global().SlaveOptions; slaveOptions.UseRPC {
@@ -1337,43 +1349,43 @@ func start() {
 			SuppressRegister: true,
 		}
 
-		RPCListener.Connect()
-		go rpcReloadLoop(slaveOptions.RPCKey)
-		go RPCListener.StartRPCKeepaliveWatcher()
-		go RPCListener.StartRPCLoopCheck(slaveOptions.RPCKey)
+		RPCListener.Connect(ctx)
+		go rpcReloadLoop(ctx, slaveOptions.RPCKey)
+		go RPCListener.StartRPCKeepaliveWatcher(ctx)
+		go RPCListener.StartRPCLoopCheck(ctx, slaveOptions.RPCKey)
 	}
 
 	// 1s is the minimum amount of time between hot reloads. The
 	// interval counts from the start of one reload to the next.
-	go reloadLoop(time.Tick(time.Second))
-	go reloadQueueLoop()
+	go reloadLoop(ctx, time.Tick(time.Second))
+	go reloadQueueLoop(ctx)
 }
 
-func dashboardServiceInit() {
+func dashboardServiceInit(ctx context.Context) {
 	if DashService == nil {
 		DashService = &HTTPDashboardHandler{}
-		DashService.Init()
+		DashService.Init(ctx)
 	}
 }
 
-func handleDashboardRegistration() {
+func handleDashboardRegistration(ctx context.Context) {
 	if !config.Global().UseDBAppConfigs {
 		return
 	}
 
-	dashboardServiceInit()
+	dashboardServiceInit(ctx)
 
 	// connStr := buildConnStr("/register/node")
-	if err := DashService.Register(); err != nil {
+	if err := DashService.Register(ctx); err != nil {
 		dashLog.Fatal("Registration failed: ", err)
 	}
 
-	go DashService.StartBeating()
+	go DashService.StartBeating(ctx)
 }
 
 var drlOnce sync.Once
 
-func startDRL() {
+func startDRL(ctx context.Context) {
 	switch {
 	case config.Global().ManagementNode:
 		return
@@ -1382,7 +1394,7 @@ func startDRL() {
 	}
 	mainLog.Info("Initialising distributed rate limiter")
 	setupDRL()
-	startRateLimitNotifications()
+	startRateLimitNotifications(ctx)
 }
 
 func setupPortsWhitelist() {
@@ -1409,7 +1421,7 @@ func setupPortsWhitelist() {
 	config.SetGlobal(globalConf)
 }
 
-func startServer() {
+func startServer(ctx context.Context) {
 	// Ensure that Control listener and default http listener running on first start
 	muxer := &proxyMux{}
 
@@ -1421,13 +1433,15 @@ func startServer() {
 		muxer.setRouter(config.Global().ListenPort, "", mux.NewRouter())
 	}
 
-	defaultProxyMux.swap(muxer)
+	defaultProxyMux.swap(ctx, muxer)
 
 	// handle dashboard registration and nonces if available
-	handleDashboardRegistration()
+	handleDashboardRegistration(ctx)
 
 	// at this point NodeID is ready to use by DRL
-	drlOnce.Do(startDRL)
+	drlOnce.Do(func() {
+		startDRL(ctx)
+	})
 
 	mainLog.Infof("Tyk Gateway started (%s)", VERSION)
 	address := config.Global().ListenAddress
@@ -1438,6 +1452,6 @@ func startServer() {
 	mainLog.Info("--> Listening on port: ", config.Global().ListenPort)
 	mainLog.Info("--> PID: ", hostDetails.PID)
 	if !rpc.IsEmergencyMode() {
-		DoReload()
+		DoReload(ctx)
 	}
 }

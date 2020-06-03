@@ -582,13 +582,13 @@ func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p
 	// The reason behind two separate checks is that `DialTLS` supports specifying public keys per hostname, and `VerifyPeerCertificate` only global ones, e.g. `*`
 	if proxyURL, _ := transport.Proxy(req); proxyURL != nil {
 		p.logger.Debug("Detected proxy: " + proxyURL.String())
-		transport.TLSClientConfig.VerifyPeerCertificate = verifyPeerCertificatePinnedCheck(p.TykAPISpec, transport.TLSClientConfig)
+		transport.TLSClientConfig.VerifyPeerCertificate = verifyPeerCertificatePinnedCheck(req.Context(), p.TykAPISpec, transport.TLSClientConfig)
 
 		if transport.TLSClientConfig.VerifyPeerCertificate != nil {
 			p.logger.Debug("Certificate pinning check is enabled")
 		}
 	} else {
-		transport.DialTLS = customDialTLSCheck(p.TykAPISpec, transport.TLSClientConfig)
+		transport.DialTLS = customDialTLSCheck(req.Context(), p.TykAPISpec, transport.TLSClientConfig)
 	}
 
 	if p.TykAPISpec.GlobalConfig.ProxySSLMinVersion > 0 {
@@ -816,7 +816,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	// set up TLS certificates for upstream if needed
 	var tlsCertificates []tls.Certificate
-	if cert := getUpstreamCertificate(outreq.Host, p.TykAPISpec); cert != nil {
+	if cert := getUpstreamCertificate(req.Context(), outreq.Host, p.TykAPISpec); cert != nil {
 		p.logger.Debug("Found upstream mutual TLS certificate")
 		tlsCertificates = []tls.Certificate{*cert}
 	}

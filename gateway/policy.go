@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io/ioutil"
@@ -71,7 +72,7 @@ func LoadPoliciesFromFile(filePath string) map[string]user.Policy {
 }
 
 // LoadPoliciesFromDashboard will connect and download Policies from a Tyk Dashboard instance.
-func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[string]user.Policy {
+func LoadPoliciesFromDashboard(ctx context.Context, endpoint, secret string, allowExplicit bool) map[string]user.Policy {
 
 	// Get the definitions
 	newRequest, err := http.NewRequest("GET", endpoint, nil)
@@ -87,7 +88,7 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 	log.WithFields(logrus.Fields{
 		"prefix": "policy",
 	}).Info("Mutex lock acquired... calling")
-	c := initialiseClient()
+	c := initialiseClient(ctx)
 
 	log.WithFields(logrus.Fields{
 		"prefix": "policy",
@@ -102,7 +103,7 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 	if resp.StatusCode == http.StatusForbidden {
 		body, _ := ioutil.ReadAll(resp.Body)
 		log.Error("Policy request login failure, Response was: ", string(body))
-		reLogin()
+		reLogin(ctx)
 		return nil
 	}
 
@@ -161,13 +162,13 @@ func parsePoliciesFromRPC(list string) (map[string]user.Policy, error) {
 	return policies, nil
 }
 
-func LoadPoliciesFromRPC(orgId string) (map[string]user.Policy, error) {
+func LoadPoliciesFromRPC(ctx context.Context, orgId string) (map[string]user.Policy, error) {
 	if rpc.IsEmergencyMode() {
-		return LoadPoliciesFromRPCBackup()
+		return LoadPoliciesFromRPCBackup(ctx)
 	}
 
 	store := &RPCStorageHandler{}
-	if !store.Connect() {
+	if !store.Connect(ctx) {
 		return nil, errors.New("Policies backup: Failed connecting to database")
 	}
 
@@ -182,7 +183,7 @@ func LoadPoliciesFromRPC(orgId string) (map[string]user.Policy, error) {
 		return nil, err
 	}
 
-	if err := saveRPCPoliciesBackup(rpcPolicies); err != nil {
+	if err := saveRPCPoliciesBackup(ctx, rpcPolicies); err != nil {
 		return nil, err
 	}
 

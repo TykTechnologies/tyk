@@ -90,7 +90,7 @@ func initHealthCheck(ctx context.Context) {
 				return
 
 			case <-ticker.C:
-				gatherHealthChecks()
+				gatherHealthChecks(ctx)
 			}
 		}
 	}(ctx)
@@ -101,7 +101,7 @@ type SafeHealthCheck struct {
 	mux  sync.Mutex
 }
 
-func gatherHealthChecks() {
+func gatherHealthChecks(ctx context.Context) {
 	allInfos := SafeHealthCheck{info: make(map[string]HealthCheckItem, 3)}
 
 	redisStore := storage.RedisCluster{KeyPrefix: "livenesscheck-"}
@@ -120,7 +120,7 @@ func gatherHealthChecks() {
 			Time:          time.Now().Format(time.RFC3339),
 		}
 
-		err := redisStore.SetRawKey(key, key, 10)
+		err := redisStore.SetRawKey(ctx, key, key, 10)
 		if err != nil {
 			mainLog.WithField("liveness-check", true).WithError(err).Error("Redis health check failed")
 			checkItem.Output = err.Error()
@@ -149,7 +149,7 @@ func gatherHealthChecks() {
 				mainLog.WithField("liveness-check", true).Error(err)
 				checkItem.Output = err.Error()
 				checkItem.Status = Fail
-			} else if err := DashService.Ping(); err != nil {
+			} else if err := DashService.Ping(ctx); err != nil {
 				mainLog.WithField("liveness-check", true).Error(err)
 				checkItem.Output = err.Error()
 				checkItem.Status = Fail

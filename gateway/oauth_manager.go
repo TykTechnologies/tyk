@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -281,7 +282,7 @@ func (o *OAuthHandlers) HandleRevokeAllTokens(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	status, tokens, err := RevokeAllTokens(o.Manager.OsinServer.Storage, clientId, secret)
+	status, tokens, err := RevokeAllTokens(r.Context(), o.Manager.OsinServer.Storage, clientId, secret)
 	if err != nil {
 		doJSONWrite(w, status, apiError(err.Error()))
 		return
@@ -291,12 +292,12 @@ func (o *OAuthHandlers) HandleRevokeAllTokens(w http.ResponseWriter, r *http.Req
 		Command: KeySpaceUpdateNotification,
 		Payload: strings.Join(tokens, ","),
 	}
-	MainNotifier.Notify(n)
+	MainNotifier.Notify(r.Context(), n)
 
 	doJSONWrite(w, http.StatusOK, apiOk("tokens revoked successfully"))
 }
 
-func RevokeAllTokens(storage ExtendedOsinStorageInterface, clientId, clientSecret string) (int, []string, error) {
+func RevokeAllTokens(ctx context.Context, storage ExtendedOsinStorageInterface, clientId, clientSecret string) (int, []string, error) {
 	resp := []string{}
 	client, err := storage.GetClient(clientId)
 	log.Debug("Revoke all tokens")
@@ -308,7 +309,7 @@ func RevokeAllTokens(storage ExtendedOsinStorageInterface, clientId, clientSecre
 		return http.StatusUnauthorized, resp, errors.New(oauthClientSecretWrong)
 	}
 
-	clientTokens, err := storage.GetClientTokens(clientId)
+	clientTokens, err := storage.GetClientTokens(ctx, clientId)
 	if err != nil {
 		return http.StatusBadRequest, resp, errors.New("cannot retrieve client tokens")
 	}
@@ -399,7 +400,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			log.Debug("Getting: ", searchKey)
 
 			var err error
-			session, err = o.OsinServer.Storage.GetUser(searchKey)
+			session, err = o.OsinServer.Storage.GetUser(r.Context(), searchKey)
 			if err != nil {
 				log.Warning("Attempted access with non-existent user (OAuth password flow).")
 			} else {
@@ -445,7 +446,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			oldToken, foundKey := session.OauthKeys[ar.Client.GetId()]
 			if foundKey {
 				log.Info("Found old token, revoking: ", oldToken)
-				GlobalSessionManager.RemoveSession(o.API.OrgID, oldToken, false)
+				GlobalSessionManager.RemoveSession(r.Context(), o.API.OrgID, oldToken, false)
 			}
 		}
 
@@ -481,7 +482,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			keyName := generateToken(o.API.OrgID, username)
 
 			log.Debug("Updating user:", keyName)
-			err := GlobalSessionManager.UpdateSession(keyName, session, session.Lifetime(o.API.SessionLifetime), false)
+			err := GlobalSessionManager.UpdateSession(r.Context(), keyName, session, session.Lifetime(o.API.SessionLifetime), false)
 			if err != nil {
 				log.Error(err)
 			}
@@ -522,28 +523,28 @@ type ExtendedOsinStorageInterface interface {
 	osin.Storage
 
 	// Create OAuth clients
-	SetClient(id string, orgID string, client osin.Client, ignorePrefix bool) error
+	SetClient(ctx context.Context, id string, orgID string, client osin.Client, ignorePrefix bool) error
 
 	// Custom getter to handle prefixing issues in Redis
-	GetClientNoPrefix(id string) (osin.Client, error)
+	GetClientNoPrefix(ctx context.Context, id string) (osin.Client, error)
 
-	GetClientTokens(id string) ([]OAuthClientToken, error)
-	GetPaginatedClientTokens(id string, page int) ([]OAuthClientToken, int, error)
+	GetClientTokens(ctx context.Context, id string) ([]OAuthClientToken, error)
+	GetPaginatedClientTokens(ctx context.Context, id string, page int) ([]OAuthClientToken, int, error)
 
-	GetExtendedClient(id string) (ExtendedOsinClientInterface, error)
+	GetExtendedClient(ctx context.Context, id string) (ExtendedOsinClientInterface, error)
 
 	// Custom getter to handle prefixing issues in Redis
-	GetExtendedClientNoPrefix(id string) (ExtendedOsinClientInterface, error)
+	GetExtendedClientNoPrefix(ctx context.Context, id string) (ExtendedOsinClientInterface, error)
 
-	GetClients(filter string, orgID string, ignorePrefix bool) ([]ExtendedOsinClientInterface, error)
+	GetClients(ctx context.Context, filter string, orgID string, ignorePrefix bool) ([]ExtendedOsinClientInterface, error)
 
-	DeleteClient(id string, orgID string, ignorePrefix bool) error
+	DeleteClient(ctx context.Context, id string, orgID string, ignorePrefix bool) error
 
 	// GetUser retrieves a Basic Access user token type from the key store
-	GetUser(string) (*user.SessionState, error)
+	GetUser(context.Context, string) (*user.SessionState, error)
 
 	// SetUser updates a Basic Access user token type in the key store
-	SetUser(string, *user.SessionState, int64) error
+	SetUser(context.Context, string, *user.SessionState, int64) error
 }
 
 // TykOsinServer subclasses osin.Server so we can add the SetClient method without wrecking the lbrary
@@ -594,7 +595,7 @@ func (r *RedisOsinStorageInterface) GetClient(id string) (osin.Client, error) {
 
 	log.Info("Getting client ID:", id)
 
-	clientJSON, err := r.store.GetKey(key)
+	clientJSON, err := r.store.GetKey(context.TODO(), key)
 	if err != nil {
 		log.Errorf("Failure retrieving client ID key %q: %v", key, err)
 		return nil, err
@@ -610,11 +611,11 @@ func (r *RedisOsinStorageInterface) GetClient(id string) (osin.Client, error) {
 
 // GetClientNoPrefix will retrieve client data, but not assign a prefix - this is an unfortunate hack,
 // but we don't want to change the signature in Osin for GetClient to support the odd Redis prefixing
-func (r *RedisOsinStorageInterface) GetClientNoPrefix(id string) (osin.Client, error) {
+func (r *RedisOsinStorageInterface) GetClientNoPrefix(ctx context.Context, id string) (osin.Client, error) {
 
 	key := id
 
-	clientJSON, err := r.store.GetKey(key)
+	clientJSON, err := r.store.GetKey(ctx, key)
 
 	if err != nil {
 		log.Error("Failure retrieving client ID key: ", err)
@@ -629,7 +630,7 @@ func (r *RedisOsinStorageInterface) GetClientNoPrefix(id string) (osin.Client, e
 	return client, nil
 }
 
-func (r *RedisOsinStorageInterface) GetExtendedClient(id string) (ExtendedOsinClientInterface, error) {
+func (r *RedisOsinStorageInterface) GetExtendedClient(ctx context.Context, id string) (ExtendedOsinClientInterface, error) {
 	osinClient, err := r.GetClient(id)
 	if err != nil {
 		log.WithError(err).Error("Failure retrieving client ID key")
@@ -640,8 +641,8 @@ func (r *RedisOsinStorageInterface) GetExtendedClient(id string) (ExtendedOsinCl
 }
 
 // GetExtendedClientNoPrefix custom getter to handle prefixing issues in Redis,
-func (r *RedisOsinStorageInterface) GetExtendedClientNoPrefix(id string) (ExtendedOsinClientInterface, error) {
-	osinClient, err := r.GetClientNoPrefix(id)
+func (r *RedisOsinStorageInterface) GetExtendedClientNoPrefix(ctx context.Context, id string) (ExtendedOsinClientInterface, error) {
+	osinClient, err := r.GetClientNoPrefix(ctx, id)
 	if err != nil {
 		log.WithError(err).Error("Failure retrieving client ID key")
 		return nil, err
@@ -650,7 +651,7 @@ func (r *RedisOsinStorageInterface) GetExtendedClientNoPrefix(id string) (Extend
 }
 
 // GetClients will retrieve a list of clients for a prefix
-func (r *RedisOsinStorageInterface) GetClients(filter string, orgID string, ignorePrefix bool) ([]ExtendedOsinClientInterface, error) {
+func (r *RedisOsinStorageInterface) GetClients(ctx context.Context, filter string, orgID string, ignorePrefix bool) ([]ExtendedOsinClientInterface, error) {
 	key := prefixClient + filter
 	if ignorePrefix {
 		key = filter
@@ -660,14 +661,14 @@ func (r *RedisOsinStorageInterface) GetClients(filter string, orgID string, igno
 
 	var clientJSON map[string]string
 	if !config.Global().Storage.EnableCluster {
-		exists, _ := r.store.Exists(indexKey)
+		exists, _ := r.store.Exists(ctx, indexKey)
 		if exists {
-			keys, err := r.store.GetListRange(indexKey, 0, -1)
+			keys, err := r.store.GetListRange(ctx, indexKey, 0, -1)
 			if err != nil {
 				log.Error("Couldn't get OAuth client index list: ", err)
 				return nil, err
 			}
-			keyVals, err := r.store.GetMultiKey(keys)
+			keyVals, err := r.store.GetMultiKey(ctx, keys)
 			if err != nil {
 				log.Error("Couldn't get OAuth client index list values: ", err)
 				return nil, err
@@ -678,15 +679,15 @@ func (r *RedisOsinStorageInterface) GetClients(filter string, orgID string, igno
 				clientJSON[key] = keyVals[i]
 			}
 		} else {
-			clientJSON = r.store.GetKeysAndValuesWithFilter(key)
+			clientJSON = r.store.GetKeysAndValuesWithFilter(ctx, key)
 			for key := range clientJSON {
-				r.store.AppendToSet(indexKey, key)
+				r.store.AppendToSet(ctx, indexKey, key)
 			}
 		}
 	} else {
 		keyForSet := prefixClientset + prefixClient // Org ID
 		var err error
-		if clientJSON, err = r.store.GetSet(keyForSet); err != nil {
+		if clientJSON, err = r.store.GetSet(ctx, keyForSet); err != nil {
 			return nil, err
 		}
 	}
@@ -707,7 +708,7 @@ func (r *RedisOsinStorageInterface) GetClients(filter string, orgID string, igno
 // GetPaginatedClientTokens returns all tokens associated with the given id.
 // It returns the tokens, the total number of pages of the tokens after
 // pagination and an error if any
-func (r *RedisOsinStorageInterface) GetPaginatedClientTokens(id string, page int) ([]OAuthClientToken, int, error) {
+func (r *RedisOsinStorageInterface) GetPaginatedClientTokens(ctx context.Context, id string, page int) ([]OAuthClientToken, int, error) {
 	key := prefixClientTokens + id
 
 	// use current timestamp as a start score so all expired tokens won't be picked
@@ -716,7 +717,7 @@ func (r *RedisOsinStorageInterface) GetPaginatedClientTokens(id string, page int
 
 	log.Info("Getting client tokens sorted list:", key)
 
-	tokens, scores, err := r.store.GetSortedSetRange(key, startScore, "+inf")
+	tokens, scores, err := r.store.GetSortedSetRange(ctx, key, startScore, "+inf")
 	if err != nil {
 		return nil, 0, err
 	}
@@ -724,7 +725,11 @@ func (r *RedisOsinStorageInterface) GetPaginatedClientTokens(id string, page int
 	// clean up expired tokens in sorted set (remove all tokens with score up to current timestamp minus retention)
 	if config.Global().OauthTokenExpiredRetainPeriod > 0 {
 		cleanupStartScore := strconv.FormatInt(nowTs-int64(config.Global().OauthTokenExpiredRetainPeriod), 10)
-		go r.store.RemoveSortedSetRange(key, "-inf", cleanupStartScore)
+		// we aren't doing this in a separate goroutine to allow consistent state of
+		// the storage. There is no practical benefit performance wise.
+		//
+		// We ensure this is completed within context ctx.
+		r.store.RemoveSortedSetRange(ctx, key, "-inf", cleanupStartScore)
 	}
 
 	itemsPerPage := 100
@@ -762,7 +767,7 @@ func (r *RedisOsinStorageInterface) GetPaginatedClientTokens(id string, page int
 	return tokensData, totalPages, nil
 }
 
-func (r *RedisOsinStorageInterface) GetClientTokens(id string) ([]OAuthClientToken, error) {
+func (r *RedisOsinStorageInterface) GetClientTokens(ctx context.Context, id string) ([]OAuthClientToken, error) {
 	key := prefixClientTokens + id
 
 	// use current timestamp as a start score so all expired tokens won't be picked
@@ -771,7 +776,7 @@ func (r *RedisOsinStorageInterface) GetClientTokens(id string) ([]OAuthClientTok
 
 	log.Info("Getting client tokens sorted list:", key)
 
-	tokens, scores, err := r.redisStore.GetSortedSetRange(key, startScore, "+inf")
+	tokens, scores, err := r.redisStore.GetSortedSetRange(ctx, key, startScore, "+inf")
 	if err != nil {
 		return nil, err
 	}
@@ -779,7 +784,7 @@ func (r *RedisOsinStorageInterface) GetClientTokens(id string) ([]OAuthClientTok
 	// clean up expired tokens in sorted set (remove all tokens with score up to current timestamp minus retention)
 	if config.Global().OauthTokenExpiredRetainPeriod > 0 {
 		cleanupStartScore := strconv.FormatInt(nowTs-int64(config.Global().OauthTokenExpiredRetainPeriod), 10)
-		go r.redisStore.RemoveSortedSetRange(key, "-inf", cleanupStartScore)
+		r.redisStore.RemoveSortedSetRange(ctx, key, "-inf", cleanupStartScore)
 	}
 
 	if len(tokens) == 0 {
@@ -799,7 +804,7 @@ func (r *RedisOsinStorageInterface) GetClientTokens(id string) ([]OAuthClientTok
 }
 
 // SetClient creates client data
-func (r *RedisOsinStorageInterface) SetClient(id string, orgID string, client osin.Client, ignorePrefix bool) error {
+func (r *RedisOsinStorageInterface) SetClient(ctx context.Context, id string, orgID string, client osin.Client, ignorePrefix bool) error {
 	clientDataJSON, err := json.Marshal(client)
 
 	if err != nil {
@@ -815,62 +820,62 @@ func (r *RedisOsinStorageInterface) SetClient(id string, orgID string, client os
 
 	log.Debug("CREATING: ", key)
 
-	r.store.SetKey(key, string(clientDataJSON), 0)
+	r.store.SetKey(ctx, key, string(clientDataJSON), 0)
 
 	keyForSet := prefixClientset + prefixClient // Org ID
 
 	indexKey := prefixClientIndexList + orgID
 	//check if the indexKey exists
-	exists, err := r.store.Exists(indexKey)
+	exists, err := r.store.Exists(ctx, indexKey)
 	if err != nil {
 		return err
 	}
 	// if it exists, delete it to avoid duplicity in the client index list
 	if exists {
-		r.store.RemoveFromList(indexKey, key)
+		r.store.RemoveFromList(ctx, indexKey, key)
 	}
 	// append to oauth client index list
-	r.store.AppendToSet(indexKey, key)
+	r.store.AppendToSet(ctx, indexKey, key)
 
 	// In set, there is no option for update so the existing client should be removed before adding new one.
-	set, _ := r.store.GetSet(keyForSet)
+	set, _ := r.store.GetSet(ctx, keyForSet)
 	for _, v := range set {
 		if strings.Contains(v, client.GetId()) {
-			r.store.RemoveFromSet(keyForSet, v)
+			r.store.RemoveFromSet(ctx, keyForSet, v)
 		}
 	}
 
-	r.store.AddToSet(keyForSet, string(clientDataJSON))
+	r.store.AddToSet(ctx, keyForSet, string(clientDataJSON))
 	return nil
 }
 
 // DeleteClient Removes a client from the system
-func (r *RedisOsinStorageInterface) DeleteClient(id string, orgID string, ignorePrefix bool) error {
+func (r *RedisOsinStorageInterface) DeleteClient(ctx context.Context, id string, orgID string, ignorePrefix bool) error {
 	key := prefixClient + id
 	if ignorePrefix {
 		key = id
 	}
 
 	// Get the raw vals:
-	clientJSON, err := r.store.GetKey(key)
+	clientJSON, err := r.store.GetKey(ctx, key)
 	keyForSet := prefixClientset + prefixClient // Org ID
 	if err == nil {
 		log.Debug("Removing from set")
-		r.store.RemoveFromSet(keyForSet, clientJSON)
+		r.store.RemoveFromSet(ctx, keyForSet, clientJSON)
 	}
 
-	r.store.DeleteKey(key)
+	r.store.DeleteKey(ctx, key)
 
 	indexKey := prefixClientIndexList + orgID
 	// delete from oauth client
-	r.store.RemoveFromList(indexKey, key)
+	r.store.RemoveFromList(ctx, indexKey, key)
 
 	// delete list of tokens for this client
-	r.store.DeleteKey(prefixClientTokens + id)
+	r.store.DeleteKey(ctx, prefixClientTokens+id)
 	if config.Global().SlaveOptions.UseRPC {
-		r.redisStore.RemoveFromList(indexKey, key)
-		r.redisStore.DeleteKey(prefixClientTokens + id)
-		r.redisStore.RemoveFromSet(keyForSet, clientJSON)
+		r.redisStore.RemoveFromList(ctx, indexKey, key)
+		r.redisStore.DeleteKey(ctx, prefixClientTokens+id)
+		r.redisStore.RemoveFromSet(ctx, keyForSet, clientJSON)
 	}
 
 	return nil
@@ -885,7 +890,7 @@ func (r *RedisOsinStorageInterface) SaveAuthorize(authData *osin.AuthorizeData) 
 	key := prefixAuth + authData.Code
 	log.Debug("Saving auth code: ", key)
 
-	r.store.SetKey(key, string(authDataJSON), int64(authData.ExpiresIn))
+	r.store.SetKey(context.TODO(), key, string(authDataJSON), int64(authData.ExpiresIn))
 
 	return nil
 }
@@ -894,7 +899,7 @@ func (r *RedisOsinStorageInterface) SaveAuthorize(authData *osin.AuthorizeData) 
 func (r *RedisOsinStorageInterface) LoadAuthorize(code string) (*osin.AuthorizeData, error) {
 	key := prefixAuth + code
 	log.Debug("Loading auth code: ", key)
-	authJSON, err := r.store.GetKey(key)
+	authJSON, err := r.store.GetKey(context.TODO(), key)
 
 	if err != nil {
 		log.Error("Failure retreiving auth code key: ", err)
@@ -913,7 +918,7 @@ func (r *RedisOsinStorageInterface) LoadAuthorize(code string) (*osin.AuthorizeD
 // RemoveAuthorize removes authorisation keys from redis
 func (r *RedisOsinStorageInterface) RemoveAuthorize(code string) error {
 	key := prefixAuth + code
-	r.store.DeleteKey(key)
+	r.store.DeleteKey(context.TODO(), key)
 	return nil
 }
 
@@ -931,12 +936,12 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 		accessData.ExpiresIn = oauthTokenExpire
 	}
 
-	r.store.SetKey(key, string(authDataJSON), int64(accessData.ExpiresIn))
+	r.store.SetKey(context.TODO(), key, string(authDataJSON), int64(accessData.ExpiresIn))
 
 	// add code to list of tokens for this client
 	sortedListKey := prefixClientTokens + accessData.Client.GetId()
 	log.Debug("Adding ACCESS key to sorted list: ", sortedListKey)
-	r.redisStore.AddToSortedSet(
+	r.redisStore.AddToSortedSet(context.TODO(),
 		sortedListKey,
 		storage.HashKey(accessData.AccessToken),
 		float64(accessData.CreatedAt.Unix()+int64(accessData.ExpiresIn)), // set score as token expire timestamp
@@ -989,7 +994,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 	}
 
 	// Use the default session expiry here as this is OAuth
-	r.sessionManager.UpdateSession(accessData.AccessToken, &newSession, int64(accessData.ExpiresIn), false)
+	r.sessionManager.UpdateSession(context.TODO(), accessData.AccessToken, &newSession, int64(accessData.ExpiresIn), false)
 
 	// Store the refresh token too
 	if accessData.RefreshToken != "" {
@@ -1002,7 +1007,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 		if oauthRefreshExpire := config.Global().OauthRefreshExpire; oauthRefreshExpire != 0 {
 			refreshExpire = oauthRefreshExpire
 		}
-		r.store.SetKey(key, string(accessDataJSON), refreshExpire)
+		r.store.SetKey(context.TODO(), key, string(accessDataJSON), refreshExpire)
 		log.Debug("STORING ACCESS DATA: ", string(accessDataJSON))
 		return nil
 	}
@@ -1014,12 +1019,12 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 func (r *RedisOsinStorageInterface) LoadAccess(token string) (*osin.AccessData, error) {
 	key := prefixAccess + storage.HashKey(token)
 	log.Debug("Loading ACCESS key: ", key)
-	accessJSON, err := r.store.GetKey(key)
+	accessJSON, err := r.store.GetKey(context.TODO(), key)
 
 	if err != nil {
 		// Fallback to unhashed value for backward compatibility
 		key = prefixAccess + token
-		accessJSON, err = r.store.GetKey(key)
+		accessJSON, err = r.store.GetKey(context.TODO(), key)
 
 		if err != nil {
 			log.Error("Failure retreiving access token by key: ", err)
@@ -1045,15 +1050,15 @@ func (r *RedisOsinStorageInterface) RemoveAccess(token string) error {
 		//remove from set oauth.client-tokens
 		log.Info("removing token from oauth client tokens list")
 		limit := strconv.FormatFloat(float64(access.ExpireAt().Unix()), 'f', 0, 64)
-		r.redisStore.RemoveSortedSetRange(key, limit, limit)
+		r.redisStore.RemoveSortedSetRange(context.TODO(), key, limit, limit)
 	} else {
 		log.Warning("Cannot load access token:", token)
 	}
 
 	key := prefixAccess + storage.HashKey(token)
-	r.store.DeleteKey(key)
+	r.store.DeleteKey(context.TODO(), key)
 	// remove the access token from central storage too
-	r.sessionManager.RemoveSession(r.orgID, token, false)
+	r.sessionManager.RemoveSession(context.TODO(), r.orgID, token, false)
 	return nil
 }
 
@@ -1061,7 +1066,7 @@ func (r *RedisOsinStorageInterface) RemoveAccess(token string) error {
 func (r *RedisOsinStorageInterface) LoadRefresh(token string) (*osin.AccessData, error) {
 	key := prefixRefresh + token
 	log.Debug("Loading REFRESH key: ", key)
-	accessJSON, err := r.store.GetKey(key)
+	accessJSON, err := r.store.GetKey(context.TODO(), key)
 
 	if err != nil {
 		log.Error("Failure retreiving access token by key: ", err)
@@ -1083,7 +1088,7 @@ func (r *RedisOsinStorageInterface) LoadRefresh(token string) (*osin.AccessData,
 func (r *RedisOsinStorageInterface) RemoveRefresh(token string) error {
 	log.Debug("is going to revoke refresh token: ", token)
 	key := prefixRefresh + token
-	r.store.DeleteKey(key)
+	r.store.DeleteKey(context.TODO(), key)
 	return nil
 }
 
@@ -1124,10 +1129,10 @@ func (accessTokenGen) GenerateAccessToken(data *osin.AccessData, generaterefresh
 }
 
 // LoadRefresh will load access data from Redis
-func (r *RedisOsinStorageInterface) GetUser(username string) (*user.SessionState, error) {
+func (r *RedisOsinStorageInterface) GetUser(ctx context.Context, username string) (*user.SessionState, error) {
 	key := username
 	log.Debug("Loading User key: ", key)
-	accessJSON, err := r.store.GetRawKey(key)
+	accessJSON, err := r.store.GetRawKey(ctx, key)
 
 	if err != nil {
 		log.Error("Failure retreiving access token by key: ", err)
@@ -1145,14 +1150,14 @@ func (r *RedisOsinStorageInterface) GetUser(username string) (*user.SessionState
 	return &session, nil
 }
 
-func (r *RedisOsinStorageInterface) SetUser(username string, session *user.SessionState, timeout int64) error {
+func (r *RedisOsinStorageInterface) SetUser(ctx context.Context, username string, session *user.SessionState, timeout int64) error {
 	key := username
 	authDataJSON, err := json.Marshal(session)
 	if err != nil {
 		return err
 	}
 
-	if err := r.store.SetRawKey(key, string(authDataJSON), timeout); err != nil {
+	if err := r.store.SetRawKey(ctx, key, string(authDataJSON), timeout); err != nil {
 		log.Error("Failure setting user token by key: ", err)
 		return err
 	}

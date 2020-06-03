@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
@@ -20,7 +21,11 @@ func setupDRL() {
 	DRLManager = drlManager
 }
 
-func startRateLimitNotifications() {
+// startRateLimitNotifications starts a a loop that sends rate limiter state
+// notifications.
+// Notifications are sent only when this not has been registered. The interval
+// is in seconds .By default 2 seconds interval is used.
+func startRateLimitNotifications(ctx context.Context) {
 	notificationFreq := config.Global().DRLNotificationFrequency
 	if notificationFreq == 0 {
 		notificationFreq = 2
@@ -28,14 +33,19 @@ func startRateLimitNotifications() {
 
 	go func() {
 		log.Info("Starting gateway rate limiter notifications...")
+		ticker := time.NewTicker(time.Duration(notificationFreq) * time.Second)
+		defer ticker.Stop()
 		for {
-			if GetNodeID() != "" {
-				NotifyCurrentServerStatus()
-			} else {
-				log.Warning("Node not registered yet, skipping DRL Notification")
+			select {
+			case <-ctx.Done():
+				log.Info("Exiting gateway rate limiter notification loop")
+			case <-ticker.C:
+				if GetNodeID() != "" {
+					NotifyCurrentServerStatus(ctx)
+				} else {
+					log.Warning("Node not registered yet, skipping DRL Notification")
+				}
 			}
-
-			time.Sleep(time.Duration(notificationFreq) * time.Second)
 		}
 	}()
 }
@@ -48,7 +58,7 @@ func getTagHash() string {
 	return th
 }
 
-func NotifyCurrentServerStatus() {
+func NotifyCurrentServerStatus(ctx context.Context) {
 	if !DRLManager.Ready {
 		return
 	}
@@ -76,7 +86,7 @@ func NotifyCurrentServerStatus() {
 		Payload: string(asJson),
 	}
 
-	MainNotifier.Notify(n)
+	MainNotifier.Notify(ctx, n)
 }
 
 func onServerStatusReceivedHandler(payload string) {

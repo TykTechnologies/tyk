@@ -49,7 +49,7 @@ func (i *IPWhiteListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 	// Fire Authfailed Event
 	AuthFailed(i, r, remoteIP.String())
 	// Report in health check
-	reportHealthValue(i.Spec, KeyFailure, "-1")
+	reportHealthValue(r.Context(), i.Spec, KeyFailure, "-1")
 
 	// Not matched, fail
 	return errors.New("access from this IP has been disallowed"), http.StatusForbidden

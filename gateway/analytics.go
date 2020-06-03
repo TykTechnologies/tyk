@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strings"
@@ -187,7 +188,7 @@ type RedisAnalyticsHandler struct {
 	poolWg           sync.WaitGroup
 }
 
-func (r *RedisAnalyticsHandler) Init(globalConf config.Config) {
+func (r *RedisAnalyticsHandler) Init(ctx context.Context, globalConf config.Config) {
 	r.globalConf = globalConf
 
 	if r.globalConf.AnalyticsConfig.EnableGeoIP {
@@ -198,7 +199,7 @@ func (r *RedisAnalyticsHandler) Init(globalConf config.Config) {
 		}
 	}
 
-	analytics.Store.Connect()
+	analytics.Store.Connect(ctx)
 
 	ps := config.Global().AnalyticsConfig.PoolSize
 	recordsBufferSize := config.Global().AnalyticsConfig.RecordsBufferSize
@@ -211,7 +212,7 @@ func (r *RedisAnalyticsHandler) Init(globalConf config.Config) {
 	atomic.SwapUint32(&r.shouldStop, 0)
 	for i := 0; i < ps; i++ {
 		r.poolWg.Add(1)
-		go r.recordWorker()
+		go r.recordWorker(ctx)
 	}
 }
 
@@ -240,7 +241,7 @@ func (r *RedisAnalyticsHandler) RecordHit(record *AnalyticsRecord) error {
 	return nil
 }
 
-func (r *RedisAnalyticsHandler) recordWorker() {
+func (r *RedisAnalyticsHandler) recordWorker(ctx context.Context) {
 	defer r.poolWg.Done()
 
 	// this is buffer to send one pipelined command to redis
@@ -252,12 +253,13 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 	for {
 		readyToSend := false
 		select {
-
+		case <-ctx.Done():
+			return
 		case record, ok := <-r.recordsChan:
 			// check if channel was closed and it is time to exit from worker
 			if !ok {
 				// send what is left in buffer
-				r.Store.AppendToSetPipelined(analyticsKeyName, recordsBuffer)
+				r.Store.AppendToSetPipelined(ctx, analyticsKeyName, recordsBuffer)
 				return
 			}
 
@@ -312,7 +314,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 
 		// send data to Redis and reset buffer
 		if len(recordsBuffer) > 0 && (readyToSend || time.Since(lastSentTs) >= recordsBufferForcedFlushInterval) {
-			r.Store.AppendToSetPipelined(analyticsKeyName, recordsBuffer)
+			r.Store.AppendToSetPipelined(ctx, analyticsKeyName, recordsBuffer)
 			recordsBuffer = recordsBuffer[:0]
 			lastSentTs = time.Now()
 		}

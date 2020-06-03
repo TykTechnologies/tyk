@@ -43,13 +43,13 @@ type BatchRequestHandler struct {
 func (b *BatchRequestHandler) doRequest(req *http.Request, relURL string) BatchReplyUnit {
 	tr := &http.Transport{TLSClientConfig: &tls.Config{}}
 
-	if cert := getUpstreamCertificate(req.Host, b.API); cert != nil {
+	if cert := getUpstreamCertificate(req.Context(), req.Host, b.API); cert != nil {
 		tr.TLSClientConfig.Certificates = []tls.Certificate{*cert}
 	}
 
 	tr.TLSClientConfig.InsecureSkipVerify = config.Global().ProxySSLInsecureSkipVerify
 
-	tr.DialTLS = customDialTLSCheck(b.API, tr.TLSClientConfig)
+	tr.DialTLS = customDialTLSCheck(req.Context(), b.API, tr.TLSClientConfig)
 
 	tr.Proxy = proxyFromAPI(b.API)
 

@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
@@ -61,7 +62,7 @@ func (w *WebHookHandler) createConfigObject(handlerConf interface{}) (config.Web
 }
 
 // Init enables the init of event handler instances when they are created on ApiSpec creation
-func (w *WebHookHandler) Init(handlerConf interface{}) error {
+func (w *WebHookHandler) Init(ctx context.Context, handlerConf interface{}) error {
 	var err error
 	w.conf, err = w.createConfigObject(handlerConf)
 	if err != nil {
@@ -72,7 +73,7 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 	}
 
 	w.store = &storage.RedisCluster{KeyPrefix: "webhook.cache."}
-	w.store.Connect()
+	w.store.Connect(ctx)
 
 	// Pre-load template on init
 	if w.conf.TemplatePath != "" {
@@ -118,7 +119,7 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 	}
 
 	if config.Global().UseDBAppConfigs {
-		dashboardServiceInit()
+		dashboardServiceInit(ctx)
 		w.dashboardService = DashService
 	}
 
@@ -126,8 +127,8 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 }
 
 // hookFired checks if an event has been fired within the EventTimeout setting
-func (w *WebHookHandler) WasHookFired(checksum string) bool {
-	if _, err := w.store.GetKey(checksum); err != nil {
+func (w *WebHookHandler) WasHookFired(ctx context.Context, checksum string) bool {
+	if _, err := w.store.GetKey(ctx, checksum); err != nil {
 		// Key not found, so hook is in limit
 		log.WithFields(logrus.Fields{
 			"prefix": "webhooks",
@@ -139,11 +140,11 @@ func (w *WebHookHandler) WasHookFired(checksum string) bool {
 }
 
 // setHookFired will create an expiring key for the checksum of the event
-func (w *WebHookHandler) setHookFired(checksum string) {
+func (w *WebHookHandler) setHookFired(ctx context.Context, checksum string) {
 	log.WithFields(logrus.Fields{
 		"prefix": "webhooks",
 	}).Debug("Setting Webhook Checksum: ", checksum)
-	w.store.SetKey(checksum, "1", w.conf.EventTimeout)
+	w.store.SetKey(ctx, checksum, "1", w.conf.EventTimeout)
 }
 
 func (w *WebHookHandler) getRequestMethod(m string) WebHookRequestMethod {
@@ -210,7 +211,7 @@ func (w *WebHookHandler) CreateBody(em config.EventMessage) (string, error) {
 }
 
 // HandleEvent will be fired when the event handler instance is found in an APISpec EventPaths object during a request chain
-func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
+func (w *WebHookHandler) HandleEvent(ctx context.Context, em config.EventMessage) {
 
 	// Inject event message into template, render to string
 	reqBody, _ := w.CreateBody(em)
@@ -225,7 +226,7 @@ func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 	reqChecksum, _ := w.Checksum(reqBody)
 
 	// Check request velocity for this hook (wasHookFired())
-	if w.WasHookFired(reqChecksum) {
+	if w.WasHookFired(ctx, reqChecksum) {
 		return
 	}
 
@@ -260,8 +261,8 @@ func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 	}
 
 	if w.dashboardService != nil && em.Type == EventTriggerExceeded {
-		w.dashboardService.NotifyDashboardOfEvent(em.Meta)
+		w.dashboardService.NotifyDashboardOfEvent(ctx, em.Meta)
 	}
 
-	w.setHookFired(reqChecksum)
+	w.setHookFired(ctx, reqChecksum)
 }

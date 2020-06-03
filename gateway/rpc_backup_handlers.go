@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -30,12 +31,12 @@ func getTagListAsString() string {
 	return tagList
 }
 
-func LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
+func LoadDefinitionsFromRPCBackup(ctx context.Context) ([]*APISpec, error) {
 	tagList := getTagListAsString()
 	checkKey := BackupApiKeyBase + tagList
 
 	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix}
-	connected := store.Connect()
+	connected := store.Connect(ctx)
 	log.Info("[RPC] --> Loading API definitions from backup")
 
 	if !connected {
@@ -43,7 +44,7 @@ func LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 	}
 
 	secret := rightPad2Len(config.Global().Secret, "=", 32)
-	cryptoText, err := store.GetKey(checkKey)
+	cryptoText, err := store.GetKey(ctx, checkKey)
 	apiListAsString := decrypt([]byte(secret), cryptoText)
 
 	if err != nil {
@@ -51,10 +52,10 @@ func LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 	}
 
 	a := APIDefinitionLoader{}
-	return a.processRPCDefinitions(apiListAsString)
+	return a.processRPCDefinitions(ctx, apiListAsString)
 }
 
-func saveRPCDefinitionsBackup(list string) error {
+func saveRPCDefinitionsBackup(ctx context.Context, list string) error {
 	if !json.Valid([]byte(list)) {
 		return errors.New("--> RPC Backup save failure: wrong format, skipping.")
 	}
@@ -65,7 +66,7 @@ func saveRPCDefinitionsBackup(list string) error {
 	log.Info("--> Connecting to DB")
 
 	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix}
-	connected := store.Connect()
+	connected := store.Connect(ctx)
 
 	log.Info("--> Connected to DB")
 
@@ -75,7 +76,7 @@ func saveRPCDefinitionsBackup(list string) error {
 
 	secret := rightPad2Len(config.Global().Secret, "=", 32)
 	cryptoText := encrypt([]byte(secret), list)
-	err := store.SetKey(BackupApiKeyBase+tagList, cryptoText, -1)
+	err := store.SetKey(ctx, BackupApiKeyBase+tagList, cryptoText, -1)
 	if err != nil {
 		return errors.New("Failed to store node backup: " + err.Error())
 	}
@@ -83,13 +84,13 @@ func saveRPCDefinitionsBackup(list string) error {
 	return nil
 }
 
-func LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
+func LoadPoliciesFromRPCBackup(ctx context.Context) (map[string]user.Policy, error) {
 	tagList := getTagListAsString()
 	checkKey := BackupPolicyKeyBase + tagList
 
 	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix}
 
-	connected := store.Connect()
+	connected := store.Connect(ctx)
 	log.Info("[RPC] Loading Policies from backup")
 
 	if !connected {
@@ -97,7 +98,7 @@ func LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
 	}
 
 	secret := rightPad2Len(config.Global().Secret, "=", 32)
-	cryptoText, err := store.GetKey(checkKey)
+	cryptoText, err := store.GetKey(ctx, checkKey)
 	listAsString := decrypt([]byte(secret), cryptoText)
 
 	if err != nil {
@@ -114,7 +115,7 @@ func LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
 	}
 }
 
-func saveRPCPoliciesBackup(list string) error {
+func saveRPCPoliciesBackup(ctx context.Context, list string) error {
 	if !json.Valid([]byte(list)) {
 		return errors.New("--> RPC Backup save failure: wrong format, skipping.")
 	}
@@ -125,7 +126,7 @@ func saveRPCPoliciesBackup(list string) error {
 	log.Info("--> Connecting to DB")
 
 	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix}
-	connected := store.Connect()
+	connected := store.Connect(ctx)
 
 	log.Info("--> Connected to DB")
 
@@ -135,7 +136,7 @@ func saveRPCPoliciesBackup(list string) error {
 
 	secret := rightPad2Len(config.Global().Secret, "=", 32)
 	cryptoText := encrypt([]byte(secret), list)
-	err := store.SetKey(BackupPolicyKeyBase+tagList, cryptoText, -1)
+	err := store.SetKey(ctx, BackupPolicyKeyBase+tagList, cryptoText, -1)
 	if err != nil {
 		return errors.New("Failed to store node backup: " + err.Error())
 	}

@@ -244,7 +244,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 
 		expiresAfter := s.Spec.ExpireAnalyticsAfter
 		if s.Spec.GlobalConfig.EnforceOrgDataAge {
-			orgExpireDataTime := s.OrgSessionExpiry(s.Spec.OrgID)
+			orgExpireDataTime := s.OrgSessionExpiry(r.Context(), s.Spec.OrgID)
 
 			if orgExpireDataTime > 0 {
 				expiresAfter = orgExpireDataTime
@@ -261,7 +261,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 	}
 
 	// Report in health check
-	reportHealthValue(s.Spec, RequestLog, strconv.FormatInt(timing.Total, 10))
+	reportHealthValue(r.Context(), s.Spec, RequestLog, strconv.FormatInt(timing.Total, 10))
 
 	if memProfFile != nil {
 		pprof.WriteHeapProfile(memProfFile)

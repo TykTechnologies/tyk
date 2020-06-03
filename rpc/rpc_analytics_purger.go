@@ -95,13 +95,13 @@ func (r Purger) PurgeLoop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-tick.C:
-			r.PurgeCache()
+			r.PurgeCache(ctx)
 		}
 	}
 }
 
 // PurgeCache will pull the data from the in-memory store and drop it into the specified MongoDB collection
-func (r *Purger) PurgeCache() {
+func (r *Purger) PurgeCache(ctx context.Context) {
 	if !clientIsConnected {
 		Log.Error("RPC client is not connected, use Connect method 1st")
 	}
@@ -111,7 +111,7 @@ func (r *Purger) PurgeCache() {
 		return
 	}
 
-	analyticsValues := r.Store.GetAndDeleteSet(analyticsKeyName)
+	analyticsValues := r.Store.GetAndDeleteSet(ctx, analyticsKeyName)
 	if len(analyticsValues) == 0 {
 		return
 	}

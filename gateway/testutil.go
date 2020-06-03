@@ -25,7 +25,7 @@ import (
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 
@@ -124,10 +124,10 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 	defer testServer.Shutdown(context.Background())
 
 	CoProcessInit()
-	afterConfSetup(&globalConf)
+	afterConfSetup(ctx, &globalConf)
 	defaultTestConfig = globalConf
 	config.SetGlobal(globalConf)
-	if err := emptyRedis(); err != nil {
+	if err := emptyRedis(ctx); err != nil {
 		panic(err)
 	}
 	cli.Init(VERSION, confPaths)
@@ -145,9 +145,9 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 
 		time.Sleep(10 * time.Millisecond)
 	}
-	go startPubSubLoop()
-	go reloadLoop(ReloadTick)
-	go reloadQueueLoop()
+	go startPubSubLoop(ctx)
+	go reloadLoop(ctx, ReloadTick)
+	go reloadQueueLoop(ctx)
 	go reloadSimulation()
 	exitCode := m.Run()
 	os.RemoveAll(config.Global().AppPath)
@@ -158,15 +158,15 @@ func ResetTestConfig() {
 	config.SetGlobal(defaultTestConfig)
 }
 
-func emptyRedis() error {
+func emptyRedis(ctx context.Context) error {
 	addr := config.Global().Storage.Host + ":" + strconv.Itoa(config.Global().Storage.Port)
 	c := redis.NewClient(&redis.Options{Addr: addr})
 	defer c.Close()
 	dbName := strconv.Itoa(config.Global().Storage.Database)
-	if err := c.Do("SELECT", dbName).Err(); err != nil {
+	if err := c.Do(ctx, "SELECT", dbName).Err(); err != nil {
 		return err
 	}
-	err := c.FlushDB().Err()
+	err := c.FlushDB(ctx).Err()
 	return err
 }
 
@@ -454,7 +454,7 @@ func CreateSession(sGen ...func(s *user.SessionState)) string {
 		key = generateToken("default", session.Certificate)
 	}
 
-	GlobalSessionManager.UpdateSession(storage.HashKey(key), session, 60, config.Global().HashKeys)
+	GlobalSessionManager.UpdateSession(context.TODO(), storage.HashKey(key), session, 60, config.Global().HashKeys)
 	return key
 }
 
@@ -591,13 +591,13 @@ func TestReq(t testing.TB, method, urlStr string, body interface{}) *http.Reques
 func CreateDefinitionFromString(defStr string) *APISpec {
 	loader := APIDefinitionLoader{}
 	def := loader.ParseDefinition(strings.NewReader(defStr))
-	spec := loader.MakeSpec(def, nil)
+	spec := loader.MakeSpec(context.TODO(), def, nil)
 	return spec
 }
 
 func LoadSampleAPI(def string) (spec *APISpec) {
 	spec = CreateDefinitionFromString(def)
-	loadApps([]*APISpec{spec})
+	loadApps(context.TODO(), []*APISpec{spec})
 	return
 }
 
@@ -623,7 +623,7 @@ type Test struct {
 	testRunner   *test.HTTPTestRunner
 	GlobalConfig config.Config
 	config       TestConfig
-	cacnel       func()
+	cancel       func()
 }
 
 func (s *Test) Start() {
@@ -644,15 +644,14 @@ func (s *Test) Start() {
 	config.SetGlobal(globalConf)
 
 	setupPortsWhitelist()
-
-	startServer()
 	ctx, cancel := context.WithCancel(context.Background())
-	s.cacnel = cancel
+	s.cancel = cancel
+	startServer(ctx)
 	setupGlobals(ctx)
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.Global().SupressDefaultOrgStore {
-		DefaultOrgStore.Init(getGlobalStorageHandler("orgkey.", false))
-		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
+		DefaultOrgStore.Init(ctx, getGlobalStorageHandler("orgkey.", false))
+		DefaultQuotaStore.Init(ctx, getGlobalStorageHandler("orgkey.", false))
 	}
 
 	s.GlobalConfig = globalConf
@@ -695,10 +694,10 @@ func (s *Test) Do(tc test.TestCase) (*http.Response, error) {
 }
 
 func (s *Test) Close() {
-	if s.cacnel != nil {
-		s.cacnel()
+	if s.cancel != nil {
+		s.cancel()
 	}
-	defaultProxyMux.swap(&proxyMux{})
+	defaultProxyMux.swap(context.TODO(), &proxyMux{})
 	if s.config.sepatateControlAPI {
 		globalConf := config.Global()
 		globalConf.ControlAPIPort = 0
@@ -789,7 +788,7 @@ func (s *Test) CreateSession(sGen ...func(s *user.SessionState)) (*user.SessionS
 		return nil, ""
 	}
 
-	createdSession, _ := GlobalSessionManager.SessionDetail(session.OrgID, keySuccess.Key, false)
+	createdSession, _ := GlobalSessionManager.SessionDetail(context.TODO(), session.OrgID, keySuccess.Key, false)
 
 	return &createdSession, keySuccess.Key
 }
@@ -883,7 +882,7 @@ func LoadAPI(specs ...*APISpec) (out []*APISpec) {
 		}
 	}
 
-	DoReload()
+	DoReload(context.TODO())
 
 	for _, spec := range specs {
 		out = append(out, getApiSpec(spec.APIID))

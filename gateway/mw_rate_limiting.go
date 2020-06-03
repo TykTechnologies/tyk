@@ -33,7 +33,7 @@ func (k *RateLimitAndQuotaCheck) handleRateLimitFailure(r *http.Request, token s
 	k.Logger().WithField("key", obfuscateKey(token)).Info("Key rate limit exceeded.")
 
 	// Fire a rate limit exceeded event
-	k.FireEvent(EventRateLimitExceeded, EventKeyFailureMeta{
+	k.FireEvent(r.Context(), EventRateLimitExceeded, EventKeyFailureMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Key Rate Limit Exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
 		Path:             r.URL.Path,
 		Origin:           request.RealIP(r),
@@ -41,7 +41,7 @@ func (k *RateLimitAndQuotaCheck) handleRateLimitFailure(r *http.Request, token s
 	})
 
 	// Report in health check
-	reportHealthValue(k.Spec, Throttle, "-1")
+	reportHealthValue(r.Context(), k.Spec, Throttle, "-1")
 
 	return errors.New("Rate limit exceeded"), http.StatusTooManyRequests
 }
@@ -50,7 +50,7 @@ func (k *RateLimitAndQuotaCheck) handleQuotaFailure(r *http.Request, token strin
 	k.Logger().WithField("key", obfuscateKey(token)).Info("Key quota limit exceeded.")
 
 	// Fire a quota exceeded event
-	k.FireEvent(EventQuotaExceeded, EventKeyFailureMeta{
+	k.FireEvent(r.Context(), EventQuotaExceeded, EventKeyFailureMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Key Quota Limit Exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
 		Path:             r.URL.Path,
 		Origin:           request.RealIP(r),
@@ -58,7 +58,7 @@ func (k *RateLimitAndQuotaCheck) handleQuotaFailure(r *http.Request, token strin
 	})
 
 	// Report in health check
-	reportHealthValue(k.Spec, QuotaViolation, "-1")
+	reportHealthValue(r.Context(), k.Spec, QuotaViolation, "-1")
 
 	return errors.New("Quota exceeded"), http.StatusForbidden
 }
@@ -162,7 +162,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	}
 	// Run the trigger monitor
 	if k.Spec.GlobalConfig.Monitor.MonitorUserKeys {
-		sessionMonitor.Check(session, token)
+		sessionMonitor.Check(r.Context(), session, token)
 	}
 
 	// Request is valid, carry on

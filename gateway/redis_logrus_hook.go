@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -43,7 +44,7 @@ func (hook *redisChannelHook) Fire(entry *logrus.Entry) error {
 		Timestamp: time.Now(),
 	}
 
-	go hook.notifier.Notify(n)
+	go hook.notifier.Notify(context.TODO(), n)
 	return nil
 }
 

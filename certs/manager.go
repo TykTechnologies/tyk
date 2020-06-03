@@ -2,6 +2,7 @@ package certs
 
 import (
 	"bytes"
+	"context"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/rand"
@@ -25,15 +26,15 @@ import (
 // StorageHandler is a standard interface to a storage backend,
 // used by AuthorisationManager to read and write key values to the backend
 type StorageHandler interface {
-	GetKey(string) (string, error)
-	SetKey(string, string, int64) error
-	GetKeys(string) []string
-	DeleteKey(string) bool
-	DeleteScanMatch(string) bool
-	GetListRange(string, int64, int64) ([]string, error)
-	RemoveFromList(string, string) error
-	AppendToSet(string, string)
-	Exists(string) (bool, error)
+	GetKey(context.Context, string) (string, error)
+	SetKey(context.Context, string, string, int64) error
+	GetKeys(context.Context, string) []string
+	DeleteKey(context.Context, string) bool
+	DeleteScanMatch(context.Context, string) bool
+	GetListRange(context.Context, string, int64, int64) ([]string, error)
+	RemoveFromList(context.Context, string, string) error
+	AppendToSet(context.Context, string, string)
+	Exists(context.Context, string) (bool, error)
 }
 
 type CertificateManager struct {
@@ -242,7 +243,7 @@ func ExtractCertificateMeta(cert *tls.Certificate, certID string) *CertificateMe
 	}
 }
 
-func (c *CertificateManager) List(certIDs []string, mode CertificateType) (out []*tls.Certificate) {
+func (c *CertificateManager) List(ctx context.Context, certIDs []string, mode CertificateType) (out []*tls.Certificate) {
 	var cert *tls.Certificate
 	var rawCert []byte
 	var err error
@@ -257,7 +258,7 @@ func (c *CertificateManager) List(certIDs []string, mode CertificateType) (out [
 
 		if isSHA256(id) {
 			var val string
-			val, err = c.storage.GetKey("raw-" + id)
+			val, err = c.storage.GetKey(ctx, "raw-"+id)
 			if err != nil {
 				c.logger.Warn("Can't retrieve certificate from Redis:", id, err)
 				out = append(out, nil)
@@ -292,7 +293,7 @@ func (c *CertificateManager) List(certIDs []string, mode CertificateType) (out [
 }
 
 // Returns list of fingerprints
-func (c *CertificateManager) ListPublicKeys(keyIDs []string) (out []string) {
+func (c *CertificateManager) ListPublicKeys(ctx context.Context, keyIDs []string) (out []string) {
 	var rawKey []byte
 	var err error
 
@@ -304,7 +305,7 @@ func (c *CertificateManager) ListPublicKeys(keyIDs []string) (out []string) {
 
 		if isSHA256(id) {
 			var val string
-			val, err = c.storage.GetKey("raw-" + id)
+			val, err = c.storage.GetKey(ctx, "raw-"+id)
 			if err != nil {
 				c.logger.Warn("Can't retrieve public key from Redis:", id, err)
 				out = append(out, "")
@@ -336,13 +337,13 @@ func (c *CertificateManager) ListPublicKeys(keyIDs []string) (out []string) {
 }
 
 // Returns list of fingerprints
-func (c *CertificateManager) ListRawPublicKey(keyID string) (out interface{}) {
+func (c *CertificateManager) ListRawPublicKey(ctx context.Context, keyID string) (out interface{}) {
 	var rawKey []byte
 	var err error
 
 	if isSHA256(keyID) {
 		var val string
-		val, err = c.storage.GetKey("raw-" + keyID)
+		val, err = c.storage.GetKey(ctx, "raw-"+keyID)
 		if err != nil {
 			c.logger.Warn("Can't retrieve public key from Redis:", keyID, err)
 			return nil
@@ -371,19 +372,19 @@ func (c *CertificateManager) ListRawPublicKey(keyID string) (out interface{}) {
 	return out
 }
 
-func (c *CertificateManager) ListAllIds(prefix string) (out []string) {
+func (c *CertificateManager) ListAllIds(ctx context.Context, prefix string) (out []string) {
 	indexKey := prefix + "-index"
-	exists, _ := c.storage.Exists(indexKey)
+	exists, _ := c.storage.Exists(ctx, indexKey)
 	if exists && prefix != "" {
-		keys, _ := c.storage.GetListRange(indexKey, 0, -1)
+		keys, _ := c.storage.GetListRange(ctx, indexKey, 0, -1)
 		for _, key := range keys {
 			out = append(out, strings.TrimPrefix(key, "raw-"))
 		}
 	} else {
-		keys := c.storage.GetKeys("raw-" + prefix + "*")
+		keys := c.storage.GetKeys(ctx, "raw-"+prefix+"*")
 		for _, key := range keys {
 			if prefix != "" {
-				c.storage.AppendToSet(indexKey, key)
+				c.storage.AppendToSet(ctx, indexKey, key)
 			}
 			out = append(out, strings.TrimPrefix(key, "raw-"))
 		}
@@ -391,11 +392,11 @@ func (c *CertificateManager) ListAllIds(prefix string) (out []string) {
 	return out
 }
 
-func (c *CertificateManager) GetRaw(certID string) (string, error) {
-	return c.storage.GetKey("raw-" + certID)
+func (c *CertificateManager) GetRaw(ctx context.Context, certID string) (string, error) {
+	return c.storage.GetKey(ctx, "raw-"+certID)
 }
 
-func (c *CertificateManager) Add(certData []byte, orgID string) (string, error) {
+func (c *CertificateManager) Add(ctx context.Context, certData []byte, orgID string) (string, error) {
 	var certBlocks [][]byte
 	var keyPEM, keyRaw []byte
 	var publicKeyPem []byte
@@ -493,36 +494,36 @@ func (c *CertificateManager) Add(certData []byte, orgID string) (string, error) 
 		certID = orgID + HexSHA256(cert.Raw)
 	}
 
-	if cert, err := c.storage.GetKey("raw-" + certID); err == nil && cert != "" {
+	if cert, err := c.storage.GetKey(ctx, "raw-"+certID); err == nil && cert != "" {
 		return "", errors.New("Certificate with " + certID + " id already exists")
 	}
 
-	if err := c.storage.SetKey("raw-"+certID, string(certChainPEM), 0); err != nil {
+	if err := c.storage.SetKey(ctx, "raw-"+certID, string(certChainPEM), 0); err != nil {
 		c.logger.Error(err)
 		return "", err
 	}
 
 	if orgID != "" {
-		c.storage.AppendToSet(orgID+"-index", "raw-"+certID)
+		c.storage.AppendToSet(ctx, orgID+"-index", "raw-"+certID)
 	}
 
 	return certID, nil
 }
 
-func (c *CertificateManager) Delete(certID string, orgID string) {
+func (c *CertificateManager) Delete(ctx context.Context, certID string, orgID string) {
 
 	if orgID != "" {
-		c.storage.RemoveFromList(orgID+"-index", "raw-"+certID)
+		c.storage.RemoveFromList(ctx, orgID+"-index", "raw-"+certID)
 	}
 
-	c.storage.DeleteKey("raw-" + certID)
+	c.storage.DeleteKey(ctx, "raw-"+certID)
 	c.cache.Delete(certID)
 }
 
-func (c *CertificateManager) CertPool(certIDs []string) *x509.CertPool {
+func (c *CertificateManager) CertPool(ctx context.Context, certIDs []string) *x509.CertPool {
 	pool := x509.NewCertPool()
 
-	for _, cert := range c.List(certIDs, CertificatePublic) {
+	for _, cert := range c.List(ctx, certIDs, CertificatePublic) {
 		if cert != nil {
 			pool.AddCert(cert.Leaf)
 		}
@@ -531,7 +532,7 @@ func (c *CertificateManager) CertPool(certIDs []string) *x509.CertPool {
 	return pool
 }
 
-func (c *CertificateManager) ValidateRequestCertificate(certIDs []string, r *http.Request) error {
+func (c *CertificateManager) ValidateRequestCertificate(ctx context.Context, certIDs []string, r *http.Request) error {
 	if r.TLS == nil {
 		return errors.New("TLS not enabled")
 	}
@@ -543,7 +544,7 @@ func (c *CertificateManager) ValidateRequestCertificate(certIDs []string, r *htt
 	leaf := r.TLS.PeerCertificates[0]
 
 	certID := HexSHA256(leaf.Raw)
-	for _, cert := range c.List(certIDs, CertificatePublic) {
+	for _, cert := range c.List(ctx, certIDs, CertificatePublic) {
 		// Extensions[0] contains cache of certificate SHA256
 		if cert == nil || string(cert.Leaf.Extensions[0].Value) == certID {
 			return nil
@@ -557,6 +558,6 @@ func (c *CertificateManager) FlushCache() {
 	c.cache.Flush()
 }
 
-func (c *CertificateManager) flushStorage() {
-	c.storage.DeleteScanMatch("*")
+func (c *CertificateManager) flushStorage(ctx context.Context) {
+	c.storage.DeleteScanMatch(ctx, "*")
 }

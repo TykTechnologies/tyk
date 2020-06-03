@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -581,8 +582,8 @@ type EventMessage struct {
 
 // TykEventHandler defines an event handler, e.g. LogMessageEventHandler will handle an event by logging it to stdout.
 type TykEventHandler interface {
-	Init(interface{}) error
-	HandleEvent(EventMessage)
+	Init(context.Context, interface{}) error
+	HandleEvent(context.Context, EventMessage)
 }
 
 func init() {

@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"os"
@@ -139,7 +140,7 @@ func getExistingConfig() (map[string]interface{}, error) {
 	return sanitizeConfig(microConfig), nil
 }
 
-func handleSendMiniConfig(payload string) {
+func handleSendMiniConfig(ctx context.Context, payload string) {
 	// Decode the configuration from the payload
 	configPayload := GetConfigPayload{}
 	err := json.Unmarshal([]byte(payload), &configPayload)
@@ -186,7 +187,7 @@ func handleSendMiniConfig(payload string) {
 		Payload: string(payloadAsJSON),
 	}
 
-	MainNotifier.Notify(asNotification)
+	MainNotifier.Notify(ctx, asNotification)
 	log.WithFields(logrus.Fields{
 		"prefix": "pub-sub",
 	}).Debug("Configuration request responded.")

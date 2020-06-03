@@ -117,7 +117,7 @@ func (hc *HostCheckerManager) CheckActivePollerLoop(ctx context.Context) {
 
 func (hc *HostCheckerManager) checkPollerLoop(ctx context.Context) {
 	if !hc.stopLoop {
-		if hc.AmIPolling() {
+		if hc.AmIPolling(ctx) {
 			if !hc.pollerStarted {
 				log.WithFields(logrus.Fields{
 					"prefix": "host-check-mgr",
@@ -137,19 +137,19 @@ func (hc *HostCheckerManager) checkPollerLoop(ctx context.Context) {
 	}
 }
 
-func (hc *HostCheckerManager) AmIPolling() bool {
+func (hc *HostCheckerManager) AmIPolling(ctx context.Context) bool {
 	if hc.store == nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
 		}).Error("No storage instance set for uptime tests! Disabling poller...")
 		return false
 	}
-	activeInstance, err := hc.store.GetKey(PollerCacheKey)
+	activeInstance, err := hc.store.GetKey(ctx, PollerCacheKey)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
 		}).Debug("No Primary instance found, assuming control")
-		hc.store.SetKey(PollerCacheKey, hc.Id, 15)
+		hc.store.SetKey(ctx, PollerCacheKey, hc.Id, 15)
 		return true
 	}
 
@@ -157,7 +157,7 @@ func (hc *HostCheckerManager) AmIPolling() bool {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
 		}).Debug("Primary instance set, I am master")
-		hc.store.SetKey(PollerCacheKey, hc.Id, 15) // Reset TTL
+		hc.store.SetKey(ctx, PollerCacheKey, hc.Id, 15) // Reset TTL
 		return true
 	}
 
@@ -219,7 +219,7 @@ func (hc *HostCheckerManager) getHostKey(report HostHealthReport) string {
 
 func (hc *HostCheckerManager) OnHostReport(ctx context.Context, report HostHealthReport) {
 	if config.Global().UptimeTests.Config.EnableUptimeAnalytics {
-		go hc.RecordUptimeAnalytics(report)
+		go hc.RecordUptimeAnalytics(ctx, report)
 	}
 }
 
@@ -228,7 +228,7 @@ func (hc *HostCheckerManager) OnHostDown(ctx context.Context, report HostHealthR
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
 	}).Debug("Update key: ", key)
-	hc.store.SetKey(key, "1", int64(hc.checker.checkTimeout*hc.checker.sampleTriggerLimit))
+	hc.store.SetKey(ctx, key, "1", int64(hc.checker.checkTimeout*hc.checker.sampleTriggerLimit))
 	hc.unhealthyHostList.Store(key, 1)
 	spec := getApiSpec(report.MetaData[UnHealthyHostMetaDataAPIKey])
 	if spec == nil {
@@ -238,7 +238,7 @@ func (hc *HostCheckerManager) OnHostDown(ctx context.Context, report HostHealthR
 		return
 	}
 
-	spec.FireEvent(EventHOSTDOWN, EventHostStatusMeta{
+	spec.FireEvent(ctx, EventHOSTDOWN, EventHostStatusMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Uptime test failed"},
 		HostInfo:         report,
 	})
@@ -272,7 +272,7 @@ func (hc *HostCheckerManager) OnHostBackUp(ctx context.Context, report HostHealt
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
 	}).Debug("Delete key: ", key)
-	hc.store.DeleteKey(key)
+	hc.store.DeleteKey(ctx, key)
 	hc.unhealthyHostList.Delete(key)
 	spec := getApiSpec(report.MetaData[UnHealthyHostMetaDataAPIKey])
 	if spec == nil {
@@ -281,7 +281,7 @@ func (hc *HostCheckerManager) OnHostBackUp(ctx context.Context, report HostHealt
 		}).Warning("[HOST CHECKER MANAGER] Event can't fire for API that doesn't exist")
 		return
 	}
-	spec.FireEvent(EventHOSTUP, EventHostStatusMeta{
+	spec.FireEvent(ctx, EventHOSTUP, EventHostStatusMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Uptime test succeeded"},
 		HostInfo:         report,
 	})
@@ -461,7 +461,7 @@ func (hc *HostCheckerManager) DoServiceDiscoveryListUpdateForID(apiID string) {
 }
 
 // RecordHit will store an AnalyticsRecord in Redis
-func (hc *HostCheckerManager) RecordUptimeAnalytics(report HostHealthReport) error {
+func (hc *HostCheckerManager) RecordUptimeAnalytics(ctx context.Context, report HostHealthReport) error {
 	// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
 
 	spec := getApiSpec(report.MetaData[UnHealthyHostMetaDataAPIKey])
@@ -512,7 +512,7 @@ func (hc *HostCheckerManager) RecordUptimeAnalytics(report HostHealthReport) err
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
 	}).Debug("Recording uptime stat")
-	hc.store.AppendToSet(UptimeAnalytics_KEYNAME, string(encoded))
+	hc.store.AppendToSet(ctx, UptimeAnalytics_KEYNAME, string(encoded))
 	return nil
 }
 

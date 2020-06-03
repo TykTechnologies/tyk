@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"time"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -13,7 +14,7 @@ func (Monitor) Enabled() bool {
 	return config.Global().Monitor.EnableTriggerMonitors
 }
 
-func (Monitor) Fire(sessionData *user.SessionState, key string, triggerLimit, usagePercentage float64) {
+func (Monitor) Fire(ctx context.Context, sessionData *user.SessionState, key string, triggerLimit, usagePercentage float64) {
 	em := config.EventMessage{
 		Type: EventTriggerExceeded,
 		Meta: EventTriggerExceededMeta{
@@ -26,15 +27,15 @@ func (Monitor) Fire(sessionData *user.SessionState, key string, triggerLimit, us
 		TimeStamp: time.Now().String(),
 	}
 
-	go MonitoringHandler.HandleEvent(em)
+	go MonitoringHandler.HandleEvent(ctx, em)
 }
 
-func (m Monitor) Check(sessionData *user.SessionState, key string) {
+func (m Monitor) Check(ctx context.Context, sessionData *user.SessionState, key string) {
 	if !m.Enabled() {
 		return
 	}
 
-	if m.checkLimit(sessionData, key, sessionData.QuotaMax, sessionData.QuotaRemaining, sessionData.QuotaRenews) {
+	if m.checkLimit(ctx, sessionData, key, sessionData.QuotaMax, sessionData.QuotaRemaining, sessionData.QuotaRenews) {
 		return
 	}
 
@@ -43,13 +44,13 @@ func (m Monitor) Check(sessionData *user.SessionState, key string) {
 			continue
 		}
 
-		if m.checkLimit(sessionData, key, ac.Limit.QuotaMax, ac.Limit.QuotaRemaining, ac.Limit.QuotaRenews) {
+		if m.checkLimit(ctx, sessionData, key, ac.Limit.QuotaMax, ac.Limit.QuotaRemaining, ac.Limit.QuotaRenews) {
 			return
 		}
 	}
 }
 
-func (m Monitor) checkLimit(sessionData *user.SessionState, key string, quotaMax, quotaRemaining, quotaRenews int64) bool {
+func (m Monitor) checkLimit(ctx context.Context, sessionData *user.SessionState, key string, quotaMax, quotaRemaining, quotaRenews int64) bool {
 	if quotaMax <= 0 {
 		return false
 	}
@@ -71,14 +72,14 @@ func (m Monitor) checkLimit(sessionData *user.SessionState, key string, quotaMax
 
 	if config.Global().Monitor.GlobalTriggerLimit > 0.0 && usagePerc >= config.Global().Monitor.GlobalTriggerLimit {
 		log.Info("Firing...")
-		m.Fire(sessionData, key, config.Global().Monitor.GlobalTriggerLimit, usagePerc)
+		m.Fire(ctx, sessionData, key, config.Global().Monitor.GlobalTriggerLimit, usagePerc)
 		return true
 	}
 
 	for _, triggerLimit := range sessionData.Monitor.TriggerLimits {
 		if usagePerc >= triggerLimit && triggerLimit != config.Global().Monitor.GlobalTriggerLimit {
 			log.Info("Firing...")
-			m.Fire(sessionData, key, triggerLimit, usagePerc)
+			m.Fire(ctx, sessionData, key, triggerLimit, usagePerc)
 			return true
 		}
 	}

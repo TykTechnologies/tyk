@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -23,7 +24,7 @@ type CoProcessEventWrapper struct {
 	SpecJSON *json.RawMessage    `json:"spec"`
 }
 
-func (l *CoProcessEventHandler) Init(handlerConf interface{}) error {
+func (l *CoProcessEventHandler) Init(ctx context.Context, handlerConf interface{}) error {
 	l.methodName = handlerConf.(map[string]interface{})["name"].(string)
 
 	// Set the VM globals
@@ -41,7 +42,7 @@ func (l *CoProcessEventHandler) Init(handlerConf interface{}) error {
 	return nil
 }
 
-func (l *CoProcessEventHandler) HandleEvent(em config.EventMessage) {
+func (l *CoProcessEventHandler) HandleEvent(ctx context.Context, em config.EventMessage) {
 	dispatcher := loadedDrivers[l.Spec.CustomMiddleware.Driver]
 	if dispatcher == nil {
 		return

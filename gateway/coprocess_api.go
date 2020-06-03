@@ -3,6 +3,8 @@ package gateway
 import "C"
 
 import (
+	"context"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -22,7 +24,7 @@ func TykStoreData(CKey, CValue *C.char, CTTL C.int) {
 	ttl := int64(CTTL)
 
 	store := storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix}
-	store.SetKey(key, value, ttl)
+	store.SetKey(context.TODO(), key, value, ttl)
 }
 
 // TykGetData is a CoProcess API function for fetching data.
@@ -32,7 +34,7 @@ func TykGetData(CKey *C.char) *C.char {
 
 	store := storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix}
 	// TODO: return error
-	val, _ := store.GetKey(key)
+	val, _ := store.GetKey(context.TODO(), key)
 	return C.CString(val)
 }
 
@@ -42,7 +44,7 @@ func TykTriggerEvent(CEventName, CPayload *C.char) {
 	eventName := C.GoString(CEventName)
 	payload := C.GoString(CPayload)
 
-	FireSystemEvent(apidef.TykEvent(eventName), EventMetaDefault{
+	FireSystemEvent(context.TODO(), apidef.TykEvent(eventName), EventMetaDefault{
 		Message: payload,
 	})
 }

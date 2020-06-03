@@ -85,7 +85,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 	key = stripBearer(key)
 
 	// Check if API key valid
-	session, keyExists := k.CheckSessionAndIdentityForValidKey(key, r)
+	session, keyExists := k.CheckSessionAndIdentityForValidKey(r.Context(), key, r)
 	if !keyExists {
 		k.Logger().WithField("key", obfuscateKey(key)).Info("Attempted access with non-existent key.")
 
@@ -93,7 +93,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 		AuthFailed(k, r, key)
 
 		// Report in health check
-		reportHealthValue(k.Spec, KeyFailure, "1")
+		reportHealthValue(r.Context(), k.Spec, KeyFailure, "1")
 
 		return errorAndStatusCode(ErrAuthKeyNotFound)
 	}
@@ -161,7 +161,7 @@ func stripBearer(token string) string {
 }
 
 func AuthFailed(m TykMiddleware, r *http.Request, token string) {
-	m.Base().FireEvent(EventAuthFailure, EventKeyFailureMeta{
+	m.Base().FireEvent(r.Context(), EventAuthFailure, EventKeyFailureMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Auth Failure", OriginatingRequest: EncodeRequestToEvent(r)},
 		Path:             r.URL.Path,
 		Origin:           request.RealIP(r),

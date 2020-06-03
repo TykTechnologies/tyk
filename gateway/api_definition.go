@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -241,7 +242,7 @@ var ServiceNonce string
 
 // MakeSpec will generate a flattened URLSpec from and APIDefinitions' VersionInfo data. paths are
 // keyed to the Api version name, which is determined during routing to speed up lookups
-func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.Entry) *APISpec {
+func (a APIDefinitionLoader) MakeSpec(ctx context.Context, def *apidef.APIDefinition, logger *logrus.Entry) *APISpec {
 	spec := &APISpec{}
 
 	if logger == nil {
@@ -292,7 +293,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 		}
 
 		if spec.CustomMiddlewareBundle != "" || len(mwPaths) > 0 || hasVirtualEndpoint {
-			spec.JSVM.Init(spec, logger)
+			spec.JSVM.Init(ctx, spec, logger)
 		}
 	}
 
@@ -305,7 +306,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 		logger.Debug("FOUND EVENTS TO INIT")
 		for _, handlerConf := range eventHandlerConfs {
 			logger.Debug("CREATING EVENT HANDLERS")
-			eventHandlerInstance, err := EventHandlerByName(handlerConf, spec)
+			eventHandlerInstance, err := EventHandlerByName(ctx, handlerConf, spec)
 
 			if err != nil {
 				logger.Error("Failed to init event handler: ", err)
@@ -325,7 +326,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 
 		// If we have transitioned to extended path specifications, we should use these now
 		if v.UseExtendedPaths {
-			pathSpecs, whiteListSpecs = a.getExtendedPathSpecs(v, spec)
+			pathSpecs, whiteListSpecs = a.getExtendedPathSpecs(ctx, v, spec)
 		} else {
 			logger.Warning("Legacy path detected! Upgrade to extended.")
 			pathSpecs, whiteListSpecs = a.getPathSpecs(v)
@@ -338,7 +339,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 }
 
 // FromDashboardService will connect and download ApiDefintions from a Tyk Dashboard instance.
-func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*APISpec, error) {
+func (a APIDefinitionLoader) FromDashboardService(ctx context.Context, endpoint, secret string) ([]*APISpec, error) {
 	// Get the definitions
 	log.Debug("Calling: ", endpoint)
 	newRequest, err := http.NewRequest("GET", endpoint, nil)
@@ -352,7 +353,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*A
 
 	newRequest.Header.Set(headers.XTykNonce, ServiceNonce)
 
-	c := initialiseClient()
+	c := initialiseClient(ctx)
 	resp, err := c.Do(newRequest)
 	if err != nil {
 		return nil, err
@@ -361,13 +362,13 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*A
 
 	if resp.StatusCode == http.StatusForbidden {
 		body, _ := ioutil.ReadAll(resp.Body)
-		reLogin()
+		reLogin(ctx)
 		return nil, fmt.Errorf("login failure, Response was: %v", string(body))
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := ioutil.ReadAll(resp.Body)
-		reLogin()
+		reLogin(ctx)
 		return nil, fmt.Errorf("dashboard API error, response was: %v", string(body))
 	}
 
@@ -414,7 +415,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*A
 	// Process
 	var specs []*APISpec
 	for _, def := range apiDefs {
-		spec := a.MakeSpec(def, nil)
+		spec := a.MakeSpec(ctx, def, nil)
 		specs = append(specs, spec)
 	}
 
@@ -426,13 +427,13 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*A
 }
 
 // FromCloud will connect and download ApiDefintions from a Mongo DB instance.
-func (a APIDefinitionLoader) FromRPC(orgId string) ([]*APISpec, error) {
+func (a APIDefinitionLoader) FromRPC(ctx context.Context, orgId string) ([]*APISpec, error) {
 	if rpc.IsEmergencyMode() {
-		return LoadDefinitionsFromRPCBackup()
+		return LoadDefinitionsFromRPCBackup(ctx)
 	}
 
 	store := RPCStorageHandler{}
-	if !store.Connect() {
+	if !store.Connect(ctx) {
 		return nil, errors.New("Can't connect RPC layer")
 	}
 
@@ -448,15 +449,15 @@ func (a APIDefinitionLoader) FromRPC(orgId string) ([]*APISpec, error) {
 	//store.Disconnect()
 
 	if rpc.LoadCount() > 0 {
-		if err := saveRPCDefinitionsBackup(apiCollection); err != nil {
+		if err := saveRPCDefinitionsBackup(ctx, apiCollection); err != nil {
 			return nil, err
 		}
 	}
 
-	return a.processRPCDefinitions(apiCollection)
+	return a.processRPCDefinitions(ctx, apiCollection)
 }
 
-func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string) ([]*APISpec, error) {
+func (a APIDefinitionLoader) processRPCDefinitions(ctx context.Context, apiCollection string) ([]*APISpec, error) {
 
 	var apiDefs []*apidef.APIDefinition
 	if err := json.Unmarshal([]byte(apiCollection), &apiDefs); err != nil {
@@ -477,7 +478,7 @@ func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string) ([]*API
 			def.Proxy.ListenPath = newListenPath
 		}
 
-		spec := a.MakeSpec(def, nil)
+		spec := a.MakeSpec(ctx, def, nil)
 		specs = append(specs, spec)
 	}
 
@@ -494,7 +495,7 @@ func (a APIDefinitionLoader) ParseDefinition(r io.Reader) *apidef.APIDefinition 
 
 // FromDir will load APIDefinitions from a directory on the filesystem. Definitions need
 // to be the JSON representation of APIDefinition object
-func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
+func (a APIDefinitionLoader) FromDir(ctx context.Context, dir string) []*APISpec {
 	var specs []*APISpec
 	// Grab json files from directory
 	paths, _ := filepath.Glob(filepath.Join(dir, "*.json"))
@@ -507,7 +508,7 @@ func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 		}
 		def := a.ParseDefinition(f)
 		f.Close()
-		spec := a.MakeSpec(def, nil)
+		spec := a.MakeSpec(ctx, def, nil)
 		specs = append(specs, spec)
 	}
 	return specs
@@ -737,7 +738,7 @@ func (a APIDefinitionLoader) compileRequestSizePathSpec(paths []apidef.RequestSi
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.CircuitBreakerMeta, stat URLStatus, apiSpec *APISpec) []URLSpec {
+func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(ctx context.Context, paths []apidef.CircuitBreakerMeta, stat URLStatus, apiSpec *APISpec) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
@@ -777,7 +778,7 @@ func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circui
 						}
 					}
 
-					spec.FireEvent(EventBreakerTriggered, EventCurcuitBreakerMeta{
+					spec.FireEvent(ctx, EventBreakerTriggered, EventCurcuitBreakerMeta{
 						EventMetaDefault: EventMetaDefault{Message: "Breaker Tripped"},
 						CircuitEvent:     e,
 						Path:             path,
@@ -785,7 +786,7 @@ func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circui
 					})
 
 				case circuit.BreakerReset:
-					spec.FireEvent(EventBreakerTriggered, EventCurcuitBreakerMeta{
+					spec.FireEvent(ctx, EventBreakerTriggered, EventCurcuitBreakerMeta{
 						EventMetaDefault: EventMetaDefault{Message: "Breaker Reset"},
 						CircuitEvent:     e,
 						Path:             path,
@@ -910,7 +911,7 @@ func (a APIDefinitionLoader) compileInternalPathspathSpec(paths []apidef.Interna
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionInfo, apiSpec *APISpec) ([]URLSpec, bool) {
+func (a APIDefinitionLoader) getExtendedPathSpecs(ctx context.Context, apiVersionDef apidef.VersionInfo, apiSpec *APISpec) ([]URLSpec, bool) {
 	// TODO: New compiler here, needs to put data into a different structure
 
 	ignoredPaths := a.compileExtendedPathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.Ignored, Ignored)
@@ -924,7 +925,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	headerTransformPaths := a.compileInjectedHeaderSpec(apiVersionDef.ExtendedPaths.TransformHeader, HeaderInjected)
 	headerTransformPathsOnResponse := a.compileInjectedHeaderSpec(apiVersionDef.ExtendedPaths.TransformResponseHeader, HeaderInjectedResponse)
 	hardTimeouts := a.compileTimeoutPathSpec(apiVersionDef.ExtendedPaths.HardTimeouts, HardTimeout)
-	circuitBreakers := a.compileCircuitBreakerPathSpec(apiVersionDef.ExtendedPaths.CircuitBreaker, CircuitBreaker, apiSpec)
+	circuitBreakers := a.compileCircuitBreakerPathSpec(ctx, apiVersionDef.ExtendedPaths.CircuitBreaker, CircuitBreaker, apiSpec)
 	urlRewrites := a.compileURLRewritesPathSpec(apiVersionDef.ExtendedPaths.URLRewrite, URLRewrite)
 	virtualPaths := a.compileVirtualPathspathSpec(apiVersionDef.ExtendedPaths.Virtual, VirtualPath, apiSpec)
 	requestSizes := a.compileRequestSizePathSpec(apiVersionDef.ExtendedPaths.SizeLimit, RequestSizeLimit)
@@ -959,14 +960,14 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	return combinedPath, len(whiteListPaths) > 0
 }
 
-func (a *APISpec) Init(authStore, sessionStore, healthStore, orgStore storage.Handler) {
-	a.AuthManager.Init(authStore)
-	a.Health.Init(healthStore)
-	a.OrgSessionManager.Init(orgStore)
+func (a *APISpec) Init(ctx context.Context, authStore, sessionStore, healthStore, orgStore storage.Handler) {
+	a.AuthManager.Init(ctx, authStore)
+	a.Health.Init(ctx, healthStore)
+	a.OrgSessionManager.Init(ctx, orgStore)
 }
 
-func (a *APISpec) StopSessionManagerPool() {
-	a.OrgSessionManager.Stop()
+func (a *APISpec) StopSessionManagerPool(ctx context.Context) {
+	a.OrgSessionManager.Stop(ctx)
 }
 
 func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {

@@ -192,7 +192,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 		}
 	}
 
-	session, exists := k.CheckSessionAndIdentityForValidKey(sessionID, r)
+	session, exists := k.CheckSessionAndIdentityForValidKey(r.Context(), sessionID, r)
 	if !exists {
 		// Create it
 		logger.Debug("Key does not exist, creating")
@@ -246,5 +246,5 @@ func (k *OpenIDMW) reportLoginFailure(tykId string, r *http.Request) {
 	AuthFailed(k, r, tykId)
 
 	// Report in health check
-	reportHealthValue(k.Spec, KeyFailure, "1")
+	reportHealthValue(r.Context(), k.Spec, KeyFailure, "1")
 }

@@ -110,13 +110,13 @@ func traceHandler(w http.ResponseWriter, r *http.Request) {
 	logger.Level = logrus.DebugLevel
 	logger.Out = &logStorage
 
-	gs := prepareStorage()
+	gs := prepareStorage(r.Context())
 	subrouter := mux.NewRouter()
 
 	loader := &APIDefinitionLoader{}
-	spec := loader.MakeSpec(traceReq.Spec, logrus.NewEntry(logger))
+	spec := loader.MakeSpec(r.Context(), traceReq.Spec, logrus.NewEntry(logger))
 
-	chainObj := processSpec(spec, nil, &gs, subrouter, logrus.NewEntry(logger))
+	chainObj := processSpec(r.Context(), spec, nil, &gs, subrouter, logrus.NewEntry(logger))
 	spec.middlewareChain = chainObj
 
 	if chainObj.ThisHandler == nil {
