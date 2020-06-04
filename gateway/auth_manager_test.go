@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
@@ -52,6 +53,8 @@ func TestAuthenticationAfterDeleteKey(t *testing.T) {
 }
 
 func TestAuthenticationAfterUpdateKey(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	assert := func(hashKeys bool) {
 		globalConf := config.Global()
 		globalConf.HashKeys = hashKeys
@@ -72,7 +75,7 @@ func TestAuthenticationAfterUpdateKey(t *testing.T) {
 			APIID: api.APIID,
 		}}
 
-		GlobalSessionManager.UpdateSession(storage.HashKey(key), session, 0, config.Global().HashKeys)
+		GlobalSessionManager.UpdateSession(ctx, storage.HashKey(key), session, 0, config.Global().HashKeys)
 
 		authHeader := map[string]string{
 			"authorization": key,
@@ -86,7 +89,7 @@ func TestAuthenticationAfterUpdateKey(t *testing.T) {
 			APIID: "dummy",
 		}}
 
-		GlobalSessionManager.UpdateSession(storage.HashKey(key), session, 0, config.Global().HashKeys)
+		GlobalSessionManager.UpdateSession(ctx, storage.HashKey(key), session, 0, config.Global().HashKeys)
 
 		ts.Run(t, []test.TestCase{
 			{Path: "/get", Headers: authHeader, Code: http.StatusForbidden},

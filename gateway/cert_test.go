@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -144,11 +145,11 @@ func TestGatewayTLS(t *testing.T) {
 	})
 
 	t.Run("Redis certificate", func(t *testing.T) {
-		certID, err := CertificateManager.Add(combinedPEM, "")
+		certID, err := CertificateManager.Add(context.TODO(), combinedPEM, "")
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer CertificateManager.Delete(certID, "")
+		defer CertificateManager.Delete(context.TODO(), certID, "")
 
 		globalConf := config.Global()
 		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
@@ -194,8 +195,8 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 	clientWithoutCert := GetTLSClient(nil, nil)
 
 	t.Run("Separate domain", func(t *testing.T) {
-		certID, _ := CertificateManager.Add(combinedPEM, "")
-		defer CertificateManager.Delete(certID, "")
+		certID, _ := CertificateManager.Add(context.TODO(), combinedPEM, "")
+		defer CertificateManager.Delete(context.TODO(), certID, "")
 
 		globalConf := config.Global()
 		globalConf.ControlAPIHostname = "localhost"

@@ -624,6 +624,11 @@ type Test struct {
 	GlobalConfig config.Config
 	config       TestConfig
 	cancel       func()
+	ctx          context.Context
+}
+
+func (s *Test) Context() context.Context {
+	return s.ctx
 }
 
 func (s *Test) Start() {
