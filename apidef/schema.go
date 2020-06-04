@@ -437,12 +437,11 @@ const Schema = `{
 					"type": "boolean"
 				},
 				"execution_mode": {
-					"type": ["string", "null"],
+					"type": "string",
 					"enum": [
 						"proxyOnly",
 						"executionEngine",
-						"",
-						null
+						""
 					]
 				},
 				"schema": {
