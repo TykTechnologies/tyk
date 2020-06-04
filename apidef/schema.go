@@ -440,7 +440,8 @@ const Schema = `{
 					"type": "string",
 					"enum": [
 						"proxyOnly",
-						"executionEngine"
+						"executionEngine",
+						""
 					]
 				},
 				"schema": {
