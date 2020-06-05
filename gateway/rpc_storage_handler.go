@@ -155,9 +155,7 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 	start := time.Now() // get current time
 	//	log.Debug("[STORE] Getting WAS: ", keyName)
 	//  log.Debug("[STORE] Getting: ", r.fixKey(keyName))
-	//keyName = "apikey-5a2a87663e744b79"
-	log.Info("will get:",r.fixKey(keyName)," raw key:", keyName)
-//	keyName ="apikey-1aa2e4c33beaa89e"
+
 	value, err := r.GetRawKey(r.fixKey(keyName))
 
 	elapsed := time.Since(start)
@@ -165,8 +163,6 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 
 	return value, err
 }
-
-
 
 func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 	// Check the cache first

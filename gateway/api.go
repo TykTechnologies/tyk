@@ -385,7 +385,6 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 
 	// Update our session object (create it)
 	if newSession.BasicAuthData.Password != "" {
-		log.Info("new session basic auth data password is not empty")
 		// If we are using a basic auth user, then we need to make the keyname explicit against the OrgId in order to differentiate it
 		// Only if it's NEW
 		switch r.Method {
@@ -404,7 +403,6 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 	}
 
 	if r.Method == http.MethodPost || storage.TokenOrg(keyName) != "" {
-		log.Info("storage token org:", keyName)
 		// use new key format if key gets created or updating key with new format
 		if err := doAddOrUpdate(keyName, &newSession, suppressReset, isHashed); err != nil {
 			return apiError("Failed to create key, ensure security settings are correct."), http.StatusInternalServerError
