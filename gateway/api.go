@@ -372,10 +372,7 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 		}
 	} else {
 		newSession.DateCreated = time.Now()
-		//do not generate token if keyName was provided (refer to custom-keys)
-		if keyName == "" {
-			keyName = generateToken(newSession.OrgID, keyName)
-		}
+		keyName = generateToken(newSession.OrgID, keyName)
 	}
 
 	//set the original expiry if the content in payload is a past time
