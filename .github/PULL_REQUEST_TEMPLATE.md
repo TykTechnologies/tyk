@@ -34,6 +34,7 @@ the code, etc. -->
       *your branch* off *our latest `master`*.
 - [ ] My change requires a change to the documentation.
   - [ ] If you've changed APIs, describe what needs to be updated in the documentation.
+  - [ ] If new config option added, ensure that it can be set via ENV variable
 - [ ] I have updated the documentation accordingly.
 - [ ] Modules and vendor dependencies have been updated; run `go mod tidy && go mod vendor`
 - [ ] When updating library version must provide reason/explanation for this update.
