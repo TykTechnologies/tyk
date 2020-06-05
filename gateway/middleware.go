@@ -690,9 +690,9 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 
 		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.SessionLifetime))
 		ctxScheduleSessionUpdate(r)
-	}else if storage.TokenOrg(key) != t.Spec.OrgID {
-			// attempt to retrieve it as customKey
-			session, found = t.Spec.AuthManager.KeyAuthorised(generateToken(t.Spec.OrgID, key))
+	} else if storage.TokenOrg(key) != t.Spec.OrgID {
+		// attempt to retrieve it as customKey
+		session, found = t.Spec.AuthManager.KeyAuthorised(generateToken(t.Spec.OrgID, key))
 	}
 
 	return session, found
