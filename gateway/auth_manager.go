@@ -135,6 +135,7 @@ func (b *DefaultAuthorisationManager) Init(store storage.Handler) {
 
 // KeyAuthorised checks if key exists and can be read into a user.SessionState object
 func (b *DefaultAuthorisationManager) KeyAuthorised(keyName string) (user.SessionState, bool) {
+	log.Info("aqui maniiitoooo")
 	jsonKeyVal, err := b.store.GetKey(keyName)
 	var newSession user.SessionState
 	if err != nil {
