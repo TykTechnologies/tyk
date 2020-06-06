@@ -673,6 +673,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 	// 2. If not there, get it from the AuthorizationHandler
 	session, found = t.Spec.AuthManager.KeyAuthorised(key)
 	if !found && storage.TokenOrg(key) != t.Spec.OrgID {
+		//treat it as a custom key
 		key = generateToken(t.Spec.OrgID, key)
 		cacheKey = key
 		if t.Spec.GlobalConfig.HashKeys {
