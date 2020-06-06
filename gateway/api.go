@@ -458,6 +458,8 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 
 	var session user.SessionState
 	var ok bool
+	orgID = "5e2091c4d4aefce60c04fb92"
+	log.Info("orgId:", orgID, "  APIID:", apiID," byhash:",byHash)
 	session, ok = GlobalSessionManager.SessionDetail(orgID, sessionKey, byHash)
 
 	if !ok {
@@ -896,8 +898,12 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		if keyName != "" {
 			// Return single key detail
+			log.Info("try to get:", keyName, " is hashed:", isHashed)
 			obj, code = handleGetDetail(keyName, apiID, isHashed)
+			log.Info("has key function:", hashKeyFunction)
 			if code != http.StatusOK && hashKeyFunction != "" {
+				log.Info("entraaaa")
+				log.Info("try to get:", origKeyName, " is hashed:", isHashed)
 				// try to use legacy key format
 				obj, code = handleGetDetail(origKeyName, apiID, isHashed)
 			}

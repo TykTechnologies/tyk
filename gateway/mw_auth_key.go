@@ -2,15 +2,13 @@ package gateway
 
 import (
 	"errors"
-	"net/http"
-	"strings"
-
-	"github.com/TykTechnologies/tyk/config"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/signature_validator"
+	"net/http"
+	"strings"
 )
 
 const (
@@ -105,7 +103,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 		k.setContextVars(r, key)
 	}
 
-	return k.validateSignature(r, key)
+	return  k.validateSignature(r, key)
 }
 
 func (k *AuthKey) validateSignature(r *http.Request, key string) (error, int) {
