@@ -672,13 +672,24 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 	t.Logger().Debug("Querying authstore")
 	// 2. If not there, get it from the AuthorizationHandler
 	session, found = t.Spec.AuthManager.KeyAuthorised(key)
+	if !found && storage.TokenOrg(key) != t.Spec.OrgID {
+		key = generateToken(t.Spec.OrgID, key)
+		cacheKey = key
+		if t.Spec.GlobalConfig.HashKeys {
+			cacheKey = storage.HashStr(key)
+		}
+		session, found = t.Spec.AuthManager.KeyAuthorised(key)
+	}
+
 	if found {
+		log.Info("cached key:", cacheKey)
 		session.SetKeyHash(cacheKey)
 		// If not in Session, and got it from AuthHandler, create a session with a new TTL
 		t.Logger().Info("Recreating session for key: ", obfuscateKey(key))
 
 		// cache it
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
+			log.Info("so cache it?")
 			go SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
 		}
 
@@ -690,9 +701,6 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 
 		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.SessionLifetime))
 		ctxScheduleSessionUpdate(r)
-	} else if storage.TokenOrg(key) != t.Spec.OrgID {
-		// attempt to retrieve it as customKey
-		session, found = t.Spec.AuthManager.KeyAuthorised(generateToken(t.Spec.OrgID, key))
 	}
 
 	return session, found
