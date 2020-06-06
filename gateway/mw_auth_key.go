@@ -103,7 +103,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 		k.setContextVars(r, key)
 	}
 
-	return  k.validateSignature(r, key)
+	return k.validateSignature(r, key)
 }
 
 func (k *AuthKey) validateSignature(r *http.Request, key string) (error, int) {
