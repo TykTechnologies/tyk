@@ -87,7 +87,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 		}
 
 		if complexityRes.Depth > session.MaxQueryDepth {
-			k.Logger().Errorf("Complexity of the request is higher than the allowed limit '%d'", session.MaxQueryDepth)
+			k.Logger().Debugf("Complexity of the request is higher than the allowed limit '%d'", session.MaxQueryDepth)
 			return errors.New("depth limit exceeded"), http.StatusForbidden
 		}
 	}
