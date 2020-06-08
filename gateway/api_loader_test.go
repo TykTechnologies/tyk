@@ -6,6 +6,8 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/TykTechnologies/tyk/test"
 
 	"github.com/TykTechnologies/tyk/trace"
@@ -80,4 +82,15 @@ func TestInternalAPIUsage(t *testing.T) {
 			{Path: "/normal-api", Code: http.StatusOK},
 		}...)
 	})
+}
+
+func TestFuzzyFindAPI(t *testing.T) {
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Name = "IgnoreCase"
+		spec.APIID = "123456"
+		spec.Proxy.ListenPath = "/"
+	})
+
+	spec := fuzzyFindAPI("ignoreCase")
+	assert.Equal(t, "123456", spec.APIID)
 }
