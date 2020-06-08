@@ -34,38 +34,50 @@ func (m Monitor) Check(sessionData *user.SessionState, key string) {
 		return
 	}
 
+	if m.checkLimit(sessionData, key, sessionData.QuotaMax, sessionData.QuotaRemaining, sessionData.QuotaRenews) {
+		return
+	}
+
 	for _, ac := range sessionData.AccessRights {
-		if ac.Limit.QuotaMax <= 0 {
-			continue
-		}
-
-		remainder := ac.Limit.QuotaMax - ac.Limit.QuotaRemaining
-		usagePerc := (float64(remainder) / float64(ac.Limit.QuotaMax)) * 100.0
-
-		log.Debug("Perc is: ", usagePerc)
-		renewalDate := time.Unix(ac.Limit.QuotaRenews, 0)
-
-		log.Debug("Now is: ", time.Now())
-		log.Debug("Renewal is: ", renewalDate)
-		if time.Now().After(renewalDate) {
-			// Make sure that renewal is still in the future, If renewal is in the past,
-			// then the quota can expire and will auto-renew
-			log.Debug("Renewal date is in the past, skipping")
+		if m.checkLimit(sessionData, key, ac.Limit.QuotaMax, ac.Limit.QuotaRemaining, ac.Limit.QuotaRenews) {
 			return
-		}
-
-		if config.Global().Monitor.GlobalTriggerLimit > 0.0 && usagePerc >= config.Global().Monitor.GlobalTriggerLimit {
-			log.Info("Firing...")
-			m.Fire(sessionData, key, config.Global().Monitor.GlobalTriggerLimit, usagePerc)
-			return
-		}
-
-		for _, triggerLimit := range sessionData.Monitor.TriggerLimits {
-			if usagePerc >= triggerLimit && triggerLimit != config.Global().Monitor.GlobalTriggerLimit {
-				log.Info("Firing...")
-				m.Fire(sessionData, key, triggerLimit, usagePerc)
-				return
-			}
 		}
 	}
+}
+
+func (m Monitor) checkLimit(sessionData *user.SessionState, key string, quotaMax, quotaRemaining, quotaRenews int64) bool {
+	if quotaMax <= 0 {
+		return false
+	}
+
+	remainder := quotaMax - quotaRemaining
+	usagePerc := (float64(remainder) / float64(quotaMax)) * 100.0
+
+	log.Debug("Perc is: ", usagePerc)
+	renewalDate := time.Unix(quotaRenews, 0)
+
+	log.Debug("Now is: ", time.Now())
+	log.Debug("Renewal is: ", renewalDate)
+	if time.Now().After(renewalDate) {
+		// Make sure that renewal is still in the future, If renewal is in the past,
+		// then the quota can expire and will auto-renew
+		log.Debug("Renewal date is in the past, skipping")
+		return false
+	}
+
+	if config.Global().Monitor.GlobalTriggerLimit > 0.0 && usagePerc >= config.Global().Monitor.GlobalTriggerLimit {
+		log.Info("Firing...")
+		m.Fire(sessionData, key, config.Global().Monitor.GlobalTriggerLimit, usagePerc)
+		return true
+	}
+
+	for _, triggerLimit := range sessionData.Monitor.TriggerLimits {
+		if usagePerc >= triggerLimit && triggerLimit != config.Global().Monitor.GlobalTriggerLimit {
+			log.Info("Firing...")
+			m.Fire(sessionData, key, triggerLimit, usagePerc)
+			return true
+		}
+	}
+
+	return false
 }
