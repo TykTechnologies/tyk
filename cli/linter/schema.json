@@ -684,6 +684,9 @@
     "sentry_code": {
       "type": "string"
     },
+    "sentry_log_level": {
+      "type": "string"
+    },
     "service_discovery": {
       "type": ["object", "null"],
       "additionalProperties": false,
