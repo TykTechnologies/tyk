@@ -30,35 +30,42 @@ func (Monitor) Fire(sessionData *user.SessionState, key string, triggerLimit, us
 }
 
 func (m Monitor) Check(sessionData *user.SessionState, key string) {
-	if !m.Enabled() || sessionData.QuotaMax == -1 {
+	if !m.Enabled() {
 		return
 	}
 
-	remainder := sessionData.QuotaMax - sessionData.QuotaRemaining
-	usagePerc := (float64(remainder) / float64(sessionData.QuotaMax)) * 100.0
+	for _, ac := range sessionData.AccessRights {
+		if ac.Limit.QuotaMax <= 0 {
+			continue
+		}
 
-	log.Debug("Perc is: ", usagePerc)
-	renewalDate := time.Unix(sessionData.QuotaRenews, 0)
+		remainder := ac.Limit.QuotaMax - ac.Limit.QuotaRemaining
+		usagePerc := (float64(remainder) / float64(ac.Limit.QuotaMax)) * 100.0
 
-	log.Debug("Now is: ", time.Now())
-	log.Debug("Renewal is: ", renewalDate)
-	if time.Now().After(renewalDate) {
-		// Make sure that renewal is still in the future, If renewal is in the past,
-		// then the quota can expire and will auto-renew
-		log.Debug("Renewal date is in the past, skipping")
-		return
-	}
+		log.Debug("Perc is: ", usagePerc)
+		renewalDate := time.Unix(ac.Limit.QuotaRenews, 0)
 
-	if config.Global().Monitor.GlobalTriggerLimit > 0.0 && usagePerc >= config.Global().Monitor.GlobalTriggerLimit {
-		log.Info("Firing...")
-		m.Fire(sessionData, key, config.Global().Monitor.GlobalTriggerLimit, usagePerc)
-	}
+		log.Debug("Now is: ", time.Now())
+		log.Debug("Renewal is: ", renewalDate)
+		if time.Now().After(renewalDate) {
+			// Make sure that renewal is still in the future, If renewal is in the past,
+			// then the quota can expire and will auto-renew
+			log.Debug("Renewal date is in the past, skipping")
+			return
+		}
 
-	for _, triggerLimit := range sessionData.Monitor.TriggerLimits {
-		if usagePerc >= triggerLimit && triggerLimit != config.Global().Monitor.GlobalTriggerLimit {
+		if config.Global().Monitor.GlobalTriggerLimit > 0.0 && usagePerc >= config.Global().Monitor.GlobalTriggerLimit {
 			log.Info("Firing...")
-			m.Fire(sessionData, key, triggerLimit, usagePerc)
-			break
+			m.Fire(sessionData, key, config.Global().Monitor.GlobalTriggerLimit, usagePerc)
+			return
+		}
+
+		for _, triggerLimit := range sessionData.Monitor.TriggerLimits {
+			if usagePerc >= triggerLimit && triggerLimit != config.Global().Monitor.GlobalTriggerLimit {
+				log.Info("Firing...")
+				m.Fire(sessionData, key, triggerLimit, usagePerc)
+				return
+			}
 		}
 	}
 }
