@@ -49,7 +49,7 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 			w.Header().Set(headers.ContentType, headers.ApplicationJSON)
 			w.WriteHeader(http.StatusBadRequest)
 			_, _ = result.Errors.WriteResponse(w)
-			m.Logger().Errorf("Error during GraphQL request restricted fields validation: '%s'", result.Errors)
+			m.Logger().Debugf("Error during GraphQL request restricted fields validation: '%s'", result.Errors)
 			return errCustomBodyResponse, http.StatusBadRequest
 		}
 

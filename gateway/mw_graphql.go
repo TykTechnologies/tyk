@@ -130,7 +130,7 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	var gqlRequest gql.Request
 	err = gql.UnmarshalRequest(bytes.NewReader(bodyBytes), &gqlRequest)
 	if err != nil {
-		m.Logger().Errorf("Error while unmarshalling GraphQL request: '%s'", err)
+		m.Logger().Debugf("Error while unmarshalling GraphQL request: '%s'", err)
 		return err, http.StatusBadRequest
 	}
 
