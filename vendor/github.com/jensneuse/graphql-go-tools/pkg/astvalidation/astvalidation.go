@@ -659,7 +659,7 @@ func (v *validArgumentsVisitor) enumValueSatisfiesInputValueDefinition(enumValue
 
 func (v *validArgumentsVisitor) variableValueSatisfiesInputValueDefinition(variableValue, inputValueDefinition int) bool {
 	variableName := v.operation.VariableValueNameBytes(variableValue)
-	variableDefinition, exists := v.operation.VariableDefinitionByName(variableName)
+	variableDefinition, exists := v.operation.VariableDefinitionByNameAndOperation(v.Ancestors[0].Ref, variableName)
 	if !exists {
 		return false
 	}
@@ -742,7 +742,7 @@ func (v *valuesVisitor) EnterArgument(ref int) {
 	value := v.operation.ArgumentValue(ref)
 	if value.Kind == ast.ValueKindVariable {
 		variableName := v.operation.VariableValueNameBytes(value.Ref)
-		variableDefinition, exists := v.operation.VariableDefinitionByName(variableName)
+		variableDefinition, exists := v.operation.VariableDefinitionByNameAndOperation(v.Ancestors[0].Ref, variableName)
 		if !exists {
 			operationName := v.operation.NodeNameBytes(v.Ancestors[0])
 			v.StopWithExternalErr(operationreport.ErrVariableNotDefinedOnOperation(variableName, operationName))

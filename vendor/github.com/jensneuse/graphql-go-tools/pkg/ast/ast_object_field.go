@@ -3,6 +3,7 @@ package ast
 import (
 	"bytes"
 
+	"github.com/jensneuse/graphql-go-tools/internal/pkg/unsafebytes"
 	"github.com/jensneuse/graphql-go-tools/pkg/lexer/position"
 )
 
@@ -21,6 +22,10 @@ func (d *Document) ObjectField(ref int) ObjectField {
 
 func (d *Document) ObjectFieldNameBytes(ref int) ByteSlice {
 	return d.Input.ByteSlice(d.ObjectFields[ref].Name)
+}
+
+func (d *Document) ObjectFieldNameString(ref int) string {
+	return unsafebytes.BytesToString(d.Input.ByteSlice(d.ObjectFields[ref].Name))
 }
 
 func (d *Document) ObjectFieldValue(ref int) Value {

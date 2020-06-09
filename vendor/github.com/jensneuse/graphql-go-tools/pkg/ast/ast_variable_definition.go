@@ -28,8 +28,11 @@ func (d *Document) VariableDefinitionNameBytes(ref int) ByteSlice {
 	return d.VariableValueNameBytes(d.VariableDefinitions[ref].VariableValue.Ref)
 }
 
-func (d *Document) VariableDefinitionByName(name ByteSlice) (definition int, exists bool) {
-	for i := range d.VariableDefinitions {
+func (d *Document) VariableDefinitionByNameAndOperation(operationDefinition int, name ByteSlice) (definition int, exists bool) {
+	if !d.OperationDefinitions[operationDefinition].HasVariableDefinitions {
+		return -1, false
+	}
+	for _, i := range d.OperationDefinitions[operationDefinition].VariableDefinitions.Refs {
 		definitionName := d.VariableValueNameBytes(d.VariableDefinitions[i].VariableValue.Ref)
 		if bytes.Equal(name, definitionName) {
 			return i, true
@@ -39,9 +42,23 @@ func (d *Document) VariableDefinitionByName(name ByteSlice) (definition int, exi
 }
 
 func (d *Document) VariableDefinitionsBefore(variableDefinition int) bool {
-	return variableDefinition != 0
+	for i := range d.OperationDefinitions {
+		for j, k := range d.OperationDefinitions[i].VariableDefinitions.Refs {
+			if k == variableDefinition {
+				return j != 0
+			}
+		}
+	}
+	return false
 }
 
 func (d *Document) VariableDefinitionsAfter(variableDefinition int) bool {
-	return len(d.VariableDefinitions) != 1 && variableDefinition != len(d.VariableDefinitions)-1
+	for i := range d.OperationDefinitions {
+		for j, k := range d.OperationDefinitions[i].VariableDefinitions.Refs {
+			if k == variableDefinition {
+				return j != len(d.OperationDefinitions[i].VariableDefinitions.Refs)-1
+			}
+		}
+	}
+	return false
 }

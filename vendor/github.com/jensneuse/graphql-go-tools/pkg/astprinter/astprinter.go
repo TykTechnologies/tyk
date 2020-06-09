@@ -252,11 +252,10 @@ func (p *printVisitor) EnterOperationDefinition(ref int) {
 			p.write(literal.SPACE)
 		}
 	}
-
 }
 
 func (p *printVisitor) LeaveOperationDefinition(ref int) {
-	if !p.document.OperationDefinitionIsLastRootNode(ref) {
+	if !p.document.NodeIsLastRootNode(ast.Node{Kind: ast.NodeKindOperationDefinition, Ref: ref}) {
 		if p.indent != nil {
 			p.write(literal.LINETERMINATOR)
 			p.write(literal.LINETERMINATOR)
