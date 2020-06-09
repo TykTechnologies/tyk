@@ -17,7 +17,7 @@ type Location struct {
 	Column uint32 `json:"column"`
 }
 
-func ErrDocumentDoesntContainExecutableOperation() (err ExternalError){
+func ErrDocumentDoesntContainExecutableOperation() (err ExternalError) {
 	err.Message = "document doesn't contain any executable operation"
 	return
 }
@@ -39,6 +39,16 @@ func ErrOperationNameMustBeUnique(operationName ast.ByteSlice) (err ExternalErro
 
 func ErrAnonymousOperationMustBeTheOnlyOperationInDocument() (err ExternalError) {
 	err.Message = "anonymous operation name the only operation in a graphql document"
+	return err
+}
+
+func ErrRequiredOperationNameIsMissing() (err ExternalError) {
+	err.Message = "operation name is required when providing multiple operations"
+	return err
+}
+
+func ErrOperationWithProvidedOperationNameNotFound(operationName string) (err ExternalError) {
+	err.Message = fmt.Sprintf("cannot find an operation with name: %s", operationName)
 	return err
 }
 

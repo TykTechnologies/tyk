@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/tidwall/sjson"
+
+	"github.com/jensneuse/graphql-go-tools/internal/pkg/quotes"
 	"github.com/jensneuse/graphql-go-tools/internal/pkg/unsafebytes"
 	"github.com/jensneuse/graphql-go-tools/pkg/lexer/literal"
 )
@@ -45,6 +48,64 @@ func (d *Document) ValueContentBytes(value Value) ByteSlice {
 
 func (d *Document) ValueContentString(value Value) string {
 	return unsafebytes.BytesToString(d.ValueContentBytes(value))
+}
+
+func (d *Document) ValueToJSON(value Value) ([]byte, error) {
+	switch value.Kind {
+	case ValueKindNull:
+		return literal.NULL, nil
+	case ValueKindEnum:
+		return quotes.WrapBytes(d.EnumValueNameBytes(value.Ref)), nil
+	case ValueKindInteger:
+		intValueBytes := d.IntValueRaw(value.Ref)
+		if d.IntValueIsNegative(value.Ref) {
+			return append(literal.SUB, intValueBytes...), nil
+		}
+		return intValueBytes, nil
+	case ValueKindFloat:
+		floatValueBytes := d.FloatValueRaw(value.Ref)
+		if d.FloatValueIsNegative(value.Ref) {
+			return append(literal.SUB, floatValueBytes...), nil
+		}
+		return floatValueBytes, nil
+	case ValueKindBoolean:
+		if value.Ref == 0 {
+			return literal.FALSE, nil
+		}
+		return literal.TRUE, nil
+	case ValueKindString:
+		return quotes.WrapBytes(d.StringValueContentBytes(value.Ref)), nil
+	case ValueKindList:
+		out := []byte("[]")
+		for _, i := range d.ListValues[value.Ref].Refs {
+			item, err := d.ValueToJSON(d.Values[i])
+			if err != nil {
+				return nil, err
+			}
+			out, err = sjson.SetRawBytes(out, "-1", item)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return out, nil
+	case ValueKindObject:
+		out := []byte("{}")
+		for i := len(d.ObjectValues[value.Ref].Refs) - 1; i >= 0; i-- {
+			ref := d.ObjectValues[value.Ref].Refs[i]
+			fieldNameString := d.ObjectFieldNameString(ref)
+			fieldValueBytes, err := d.ValueToJSON(d.ObjectFieldValue(ref))
+			if err != nil {
+				return nil, err
+			}
+			out, err = sjson.SetRawBytes(out, fieldNameString, fieldValueBytes)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return out, nil
+	default:
+		return nil, fmt.Errorf("ValueToJSON: not implemented for kind: %s", value.Kind.String())
+	}
 }
 
 // nolint
