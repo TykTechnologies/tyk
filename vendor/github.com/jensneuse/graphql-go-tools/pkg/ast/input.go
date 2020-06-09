@@ -18,11 +18,14 @@ type Input struct {
 	InputPosition int
 	// TextPosition is the current position within the text (line and character information about the current Tokens)
 	TextPosition position.Position
+	// Variables are the json encoded variables of the operation
+	Variables []byte
 }
 
 // Reset empties the Input
 func (i *Input) Reset() {
 	i.RawBytes = i.RawBytes[:0]
+	i.Variables = i.Variables[:0]
 	i.InputPosition = 0
 	i.TextPosition.Reset()
 }

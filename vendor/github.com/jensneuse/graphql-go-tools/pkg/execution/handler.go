@@ -71,13 +71,13 @@ func (h *Handler) Handle(requestData, extraVariables []byte) (executor *Executor
 		err = report
 		return
 	}
-	normalizer := astnormalization.NewNormalizer(true)
+	normalizer := astnormalization.NewNormalizer(true,true)
 	normalizer.NormalizeOperation(&operationDocument, h.base.Definition, &report)
 	if report.HasErrors() {
 		err = report
 		return
 	}
-	plan := planner.Plan(&operationDocument, h.base.Definition, &report)
+	plan := planner.Plan(&operationDocument, h.base.Definition, graphqlRequest.OperationName, &report)
 	if report.HasErrors() {
 		err = report
 		return
