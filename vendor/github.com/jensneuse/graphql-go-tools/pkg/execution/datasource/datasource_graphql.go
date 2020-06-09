@@ -31,8 +31,6 @@ type GraphqlRequest struct {
 
 // GraphQLDataSourceConfig is the configuration for the GraphQL DataSource
 type GraphQLDataSourceConfig struct {
-	// Host is the hostname of the upstream
-	Host string `json:"host"`
 	// URL is the url of the upstream
 	URL string `json:"url"`
 	// Method is the http.Method of the upstream, defaults to POST (optional)
@@ -254,10 +252,6 @@ func (g *GraphQLDataSourcePlanner) LeaveField(ref int) {
 		return
 	}
 	g.Args = append(g.Args, &StaticVariableArgument{
-		Name:  literal.HOST,
-		Value: []byte(g.dataSourceConfiguration.Host),
-	})
-	g.Args = append(g.Args, &StaticVariableArgument{
 		Name:  literal.URL,
 		Value: []byte(g.dataSourceConfiguration.URL),
 	})
@@ -301,8 +295,6 @@ type GraphQLDataSource struct {
 }
 
 func (g *GraphQLDataSource) Resolve(ctx context.Context, args ResolverArgs, out io.Writer) (n int, err error) {
-
-	hostArg := args.ByKey(literal.HOST)
 	urlArg := args.ByKey(literal.URL)
 	queryArg := args.ByKey(literal.QUERY)
 
@@ -310,12 +302,12 @@ func (g *GraphQLDataSource) Resolve(ctx context.Context, args ResolverArgs, out 
 		log.Strings("resolvedArgs", args.Dump()),
 	)
 
-	if hostArg == nil || urlArg == nil || queryArg == nil {
+	if urlArg == nil || queryArg == nil {
 		g.Log.Error("GraphQLDataSource.Args invalid")
 		return
 	}
 
-	parsedURL, rawURL, err := parseURLBytes(hostArg, urlArg)
+	parsedURL, rawURL, err := parseURLBytes(urlArg)
 	if err != nil {
 		g.Log.Error("GraphQLDataSource.RawURL could not be parsed", log.String("rawURL", rawURL))
 		return
@@ -329,7 +321,6 @@ func (g *GraphQLDataSource) Resolve(ctx context.Context, args ResolverArgs, out 
 	keys := args.Keys()
 	for i := 0; i < len(keys); i++ {
 		switch {
-		case bytes.Equal(keys[i], literal.HOST):
 		case bytes.Equal(keys[i], literal.URL):
 		case bytes.Equal(keys[i], literal.QUERY):
 		default:

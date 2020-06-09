@@ -310,7 +310,13 @@ func (d *Document) NodeIsLastRootNode(node Node) bool {
 	if len(d.RootNodes) == 0 {
 		return false
 	}
-	return d.RootNodes[len(d.RootNodes)-1] == node
+	for i := len(d.RootNodes) - 1; i >= 0; i-- {
+		if d.RootNodes[i].Kind == NodeKindUnknown {
+			continue
+		}
+		return d.RootNodes[i] == node
+	}
+	return false
 }
 
 func (d *Document) RemoveNodeFromNode(remove, from Node) {

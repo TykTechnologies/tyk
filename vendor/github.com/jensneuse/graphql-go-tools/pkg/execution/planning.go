@@ -36,13 +36,14 @@ func NewPlanner(base *datasource.BasePlanner) *Planner {
 		base:   base,
 	}
 
-	walker.RegisterEnterDocumentVisitor(&visitor)
+	walker.RegisterDocumentVisitor(&visitor)
 	walker.RegisterEnterFieldVisitor(&visitor)
 	walker.RegisterLeaveFieldVisitor(&visitor)
 	walker.RegisterEnterSelectionSetVisitor(&visitor)
 	walker.RegisterLeaveSelectionSetVisitor(&visitor)
 	walker.RegisterEnterInlineFragmentVisitor(&visitor)
 	walker.RegisterLeaveInlineFragmentVisitor(&visitor)
+	walker.RegisterEnterOperationVisitor(&visitor)
 
 	return &Planner{
 		walker:  &walker,
@@ -50,7 +51,8 @@ func NewPlanner(base *datasource.BasePlanner) *Planner {
 	}
 }
 
-func (p *Planner) Plan(operation, definition *ast.Document, report *operationreport.Report) RootNode {
+func (p *Planner) Plan(operation, definition *ast.Document, operationName string, report *operationreport.Report) RootNode {
+	p.visitor.operationName = operationName
 	p.walker.Walk(operation, definition, report)
 	return p.visitor.rootNode
 }
@@ -62,6 +64,9 @@ type planningVisitor struct {
 	rootNode              RootNode
 	currentNode           []Node
 	planners              []dataSourcePlannerRef
+	operationName         string
+	foundOperation        bool
+	isSingleOperation     bool
 }
 
 type dataSourcePlannerRef struct {
@@ -72,15 +77,36 @@ type dataSourcePlannerRef struct {
 
 func (p *planningVisitor) EnterDocument(operation, definition *ast.Document) {
 	p.operation, p.definition, p.base.Definition = operation, definition, definition
+	p.foundOperation = false
+	p.isSingleOperation = p.countOperationDefinitionsInRootNodes() == 1
 
 	if len(operation.OperationDefinitions) == 0 {
 		p.Walker.StopWithExternalErr(operationreport.ErrDocumentDoesntContainExecutableOperation())
 		return
 	}
 
+	p.currentNode = p.currentNode[:0]
+}
+
+func (p *planningVisitor) LeaveDocument(operation, definition *ast.Document) {
+	if !p.isSingleOperation && len(p.operationName) == 0 {
+		p.Report.AddExternalError(operationreport.ErrRequiredOperationNameIsMissing())
+	} else if !p.foundOperation {
+		p.Report.AddExternalError(operationreport.ErrOperationWithProvidedOperationNameNotFound(p.operationName))
+	}
+}
+
+func (p *planningVisitor) EnterOperationDefinition(ref int) {
+	operationName := p.operation.OperationDefinitionNameString(ref)
+	if !p.isSingleOperation && operationName != p.operationName {
+		p.SkipNode()
+		return
+	}
+
+	p.foundOperation = true
 	obj := &Object{}
 	p.rootNode = &Object{
-		operationType: operation.OperationDefinitions[0].OperationType,
+		operationType: p.operation.OperationDefinitions[ref].OperationType,
 		Fields: []Field{
 			{
 				Name:  literal.DATA,
@@ -88,7 +114,6 @@ func (p *planningVisitor) EnterDocument(operation, definition *ast.Document) {
 			},
 		},
 	}
-	p.currentNode = p.currentNode[:0]
 	p.currentNode = append(p.currentNode, obj)
 }
 
@@ -387,4 +412,14 @@ func (p *planningVisitor) pipelineTransformation(directive int) *PipelineTransfo
 	return &PipelineTransformation{
 		pipeline: pipeline,
 	}
+}
+
+func (p *planningVisitor) countOperationDefinitionsInRootNodes() (count int) {
+	for i := range p.operation.RootNodes {
+		if p.operation.RootNodes[i].Kind == ast.NodeKindOperationDefinition {
+			count++
+		}
+	}
+
+	return count
 }

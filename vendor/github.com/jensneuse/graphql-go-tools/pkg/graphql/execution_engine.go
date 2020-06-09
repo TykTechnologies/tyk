@@ -112,7 +112,7 @@ func (e *ExecutionEngine) ExecuteWithWriter(ctx context.Context, operation *Requ
 	}
 
 	planner := execution.NewPlanner(e.basePlanner)
-	plan := planner.Plan(&operation.document, e.basePlanner.Definition, &report)
+	plan := planner.Plan(&operation.document, e.basePlanner.Definition, operation.OperationName, &report)
 	if report.HasErrors() {
 		return report
 	}

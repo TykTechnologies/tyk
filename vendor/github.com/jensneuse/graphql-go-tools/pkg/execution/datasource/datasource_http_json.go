@@ -27,8 +27,6 @@ var httpJsonSchemes = []string{
 
 // HttpJsonDataSourceConfig is the configuration object for the HttpJsonDataSource
 type HttpJsonDataSourceConfig struct {
-	// Host is the hostname of the upstream
-	Host string `json:"host"`
 	// URL is the url of the upstream
 	URL string `json:"url"`
 	// Method is the http.Method, e.g. GET, POST, UPDATE, DELETE
@@ -139,10 +137,6 @@ func (h *HttpJsonDataSourcePlanner) LeaveField(ref int) {
 		return
 	}
 	h.Args = append(h.Args, &StaticVariableArgument{
-		Name:  literal.HOST,
-		Value: []byte(h.dataSourceConfig.Host),
-	})
-	h.Args = append(h.Args, &StaticVariableArgument{
 		Name:  literal.URL,
 		Value: []byte(h.dataSourceConfig.URL),
 	})
@@ -222,8 +216,6 @@ type HttpJsonDataSource struct {
 }
 
 func (r *HttpJsonDataSource) Resolve(ctx context.Context, args ResolverArgs, out io.Writer) (n int, err error) {
-
-	hostArg := args.ByKey(literal.HOST)
 	urlArg := args.ByKey(literal.URL)
 	methodArg := args.ByKey(literal.METHOD)
 	bodyArg := args.ByKey(literal.BODY)
@@ -235,9 +227,6 @@ func (r *HttpJsonDataSource) Resolve(ctx context.Context, args ResolverArgs, out
 	)
 
 	switch {
-	case hostArg == nil:
-		r.Log.Error(fmt.Sprintf("arg '%s' must not be nil", string(literal.HOST)))
-		return
 	case urlArg == nil:
 		r.Log.Error(fmt.Sprintf("arg '%s' must not be nil", string(literal.URL)))
 		return
@@ -260,7 +249,7 @@ func (r *HttpJsonDataSource) Resolve(ctx context.Context, args ResolverArgs, out
 		httpMethod = http.MethodPatch
 	}
 
-	parsedURL, rawURL, err := parseURLBytes(hostArg, urlArg)
+	parsedURL, rawURL, err := parseURLBytes(urlArg)
 	if err != nil {
 		r.Log.Error("HttpJsonDataSource.RawURL could not be parsed", log.String("rawURL", rawURL))
 		return

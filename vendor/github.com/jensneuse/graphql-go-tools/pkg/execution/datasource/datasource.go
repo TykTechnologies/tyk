@@ -258,8 +258,8 @@ func isWhitelistedScheme(scheme string, whitelistedSchemes []string, defaultSche
 	return false
 }
 
-func parseURLBytes(hostArg, urlArg []byte) (parsedURL *url.URL, rawURL string, err error) {
-	rawURL = string(hostArg) + string(urlArg)
+func parseURLBytes(urlArg []byte) (parsedURL *url.URL, rawURL string, err error) {
+	rawURL = string(urlArg)
 	parsedURL, err = url.Parse(rawURL)
 	return parsedURL, rawURL, err
 }

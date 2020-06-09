@@ -1,6 +1,8 @@
 package ast
 
 import (
+	"math"
+
 	"github.com/jensneuse/graphql-go-tools/internal/pkg/unsafebytes"
 	"github.com/jensneuse/graphql-go-tools/pkg/lexer/position"
 )
@@ -34,15 +36,6 @@ func (d *Document) OperationDefinitionNameString(ref int) string {
 	return unsafebytes.BytesToString(d.Input.ByteSlice(d.OperationDefinitions[ref].Name))
 }
 
-func (d *Document) OperationDefinitionIsLastRootNode(ref int) bool {
-	for i := range d.RootNodes {
-		if d.RootNodes[i].Kind == NodeKindOperationDefinition && d.RootNodes[i].Ref == ref {
-			return len(d.RootNodes)-1 == i
-		}
-	}
-	return false
-}
-
 func (d *Document) AddOperationDefinitionToRootNodes(definition OperationDefinition) Node {
 	d.OperationDefinitions = append(d.OperationDefinitions, definition)
 	node := Node{Kind: NodeKindOperationDefinition, Ref: len(d.OperationDefinitions) - 1}
@@ -66,4 +59,24 @@ func (d *Document) AddVariableDefinitionToOperationDefinition(operationDefinitio
 	ref := len(d.VariableDefinitions) - 1
 	d.OperationDefinitions[operationDefinitionRef].VariableDefinitions.Refs =
 		append(d.OperationDefinitions[operationDefinitionRef].VariableDefinitions.Refs, ref)
+}
+
+const (
+	alphabet = `abcdefghijklmnopqrstuvwxyz`
+)
+
+func (d *Document) GenerateUnusedVariableDefinitionName(operationDefinition int) []byte {
+	for i := 1;i<math.MaxInt64;i++{
+		out := make([]byte,i)
+		for j := range alphabet {
+			for k := 0;k<i;k++{
+				out[k] = alphabet[j]
+			}
+			_,exists := d.VariableDefinitionByNameAndOperation(operationDefinition,out)
+			if !exists {
+				return out
+			}
+		}
+	}
+	return nil
 }
