@@ -39,6 +39,10 @@ func (m Monitor) Check(sessionData *user.SessionState, key string) {
 	}
 
 	for _, ac := range sessionData.AccessRights {
+		if ac.Limit == nil {
+			continue
+		}
+
 		if m.checkLimit(sessionData, key, ac.Limit.QuotaMax, ac.Limit.QuotaRemaining, ac.Limit.QuotaRenews) {
 			return
 		}
