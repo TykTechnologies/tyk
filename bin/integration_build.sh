@@ -5,7 +5,7 @@ set -ex
 : ${SIGNKEY:="12B5D62C28F57592D1575BD51ED14C59E37DAC20"}
 : ${BUILDPKGS:="1"}
 : ${ARCH:=amd64}
-
+: ${PKG_PREFIX:=tyk}
 if [ $BUILDPKGS == "1" ]; then
     echo Configuring gpg-agent-config to accept a passphrase
     mkdir ~/.gnupg && chmod 700 ~/.gnupg
@@ -52,19 +52,19 @@ echo "Building Tyk binaries"
 go build -tags 'goplugin' -mod=vendor && mv tyk ${bdir}
 
 echo "Making tarball"
-tar -C $bdir -pczf tyk-${ARCH}-${VERSION}.tar.gz .
+tar -C $bdir -pczf ${PKG_PREFIX}-${ARCH}-${VERSION}.tar.gz .
 
 # Nothing more to do if we're not going to build packages
 [ $BUILDPKGS != "1" ] && exit 0
 
 CONFIGFILES=(
-    --config-files /opt/tyk-gateway/apps
-    --config-files /opt/tyk-gateway/templates
-    --config-files /opt/tyk-gateway/middleware
-    --config-files /opt/tyk-gateway/event_handlers
-    --config-files /opt/tyk-gateway/js
-    --config-files /opt/tyk-gateway/policies
-    --config-files /opt/tyk-gateway/tyk.conf
+    --config-files /opt/${PKG_PREFIX}/apps
+    --config-files /opt/${PKG_PREFIX}/templates
+    --config-files /opt/${PKG_PREFIX}/middleware
+    --config-files /opt/${PKG_PREFIX}/event_handlers
+    --config-files /opt/${PKG_PREFIX}/js
+    --config-files /opt/${PKG_PREFIX}/policies
+    --config-files /opt/${PKG_PREFIX}/tyk.conf
 )
 FPMCOMMON=(
     --name "$PKGNAME"
@@ -86,9 +86,9 @@ FPMRPM=(
 
 cd $bdir
 echo "Creating DEB Package for $ARCH"
-fpm "${FPMCOMMON[@]}" -a $ARCH -t deb "${CONFIGFILES[@]}" ./=/opt/tyk-gateway
+fpm "${FPMCOMMON[@]}" -a $ARCH -t deb "${CONFIGFILES[@]}" ./=/opt/${PKG_PREFIX}
 echo "Creating RPM Package for $ARCH"
-fpm "${FPMCOMMON[@]}" "${FPMRPM[@]}" -a $ARCH -t rpm "${CONFIGFILES[@]}" ./=/opt/tyk-gateway
+fpm "${FPMCOMMON[@]}" "${FPMRPM[@]}" -a $ARCH -t rpm "${CONFIGFILES[@]}" ./=/opt/${PKG_PREFIX}
 
 if [ $BUILDPKGS == "1" ]; then
     echo "Signing $ARCH RPM"

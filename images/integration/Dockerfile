@@ -1,8 +1,10 @@
 FROM debian:buster-slim
 
+ARG conf_file=/conf/tyk/tyk.conf
+
 ADD gateway.tar.gz /opt/tyk-gateway
 
-VOLUME ["/opt/tyk-gateway/conf"]
+VOLUME ["/conf"]
 WORKDIR /opt/tyk-gateway
 
-ENTRYPOINT ["/opt/tyk-gateway/tyk", "--conf=/opt/tyk-gateway/conf/tyk.conf"]
+ENTRYPOINT ["/opt/tyk-gateway/tyk", "--conf=${conf_file}"]
