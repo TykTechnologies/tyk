@@ -774,6 +774,18 @@ func handleAddOrUpdateApi(apiID string, r *http.Request) (interface{}, int) {
 		return apiError("Request APIID does not match that in Definition! For Updtae operations these must match."), http.StatusBadRequest
 	}
 
+	if newDef.GraphQL.Enabled {
+		if err := newDef.GraphQL.ValidateSchema(); err != nil {
+			log.Error("Graphql schema is invalid")
+			return apiError(err.Error()), http.StatusBadRequest
+		}
+
+		if err := newDef.GraphQL.ValidateTypeFieldConfigurations(); err != nil {
+			log.Error("Graphql type field configurations is invalid")
+			return apiError(err.Error()), http.StatusBadRequest
+		}
+	}
+
 	// Create a filename
 	defFilePath := filepath.Join(config.Global().AppPath, newDef.APIID+".json")
 
