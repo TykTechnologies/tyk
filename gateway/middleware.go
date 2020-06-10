@@ -684,7 +684,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 	}
 
 	if found {
-		// update value of originalKey, as for custom-keys it might get updated (for custom keys cases)
+		// update value of originalKey, as for custom-keys it might get updated (the key is generated again using alias)
 		*originalKey = key
 
 		session.SetKeyHash(cacheKey)
