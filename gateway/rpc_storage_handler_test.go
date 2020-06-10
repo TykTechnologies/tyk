@@ -6,7 +6,7 @@ import (
 )
 
 const apiKeySpaceChangesTestDef = `{
-	"api_id": "apiKeySpaceChangesTestDefID",
+	"api_id": "api-for-key-space-changes",
 	"definition": {
 		"location": "header",
 		"key": "version"
@@ -24,11 +24,31 @@ const apiKeySpaceChangesTestDef = `{
 }`
 
 func TestProcessKeySpaceChanges(t *testing.T){
-	r := RPCStorageHandler{}
+
+	//we got to set myApi.OAuthManager.OsinServer.Storage
+	myApi := LoadAPI(buildTestOAuthSpec())[0]
+
+	t.Log(GetStorageForApi(myApi.APIID))
+	//init rpc listener
+	//put some data there
+	//check that is modified as intended
+	//changes shoould be:
+	// 1- for api keys
+	// 2- for oauth
+	// handle uses cases where its a hashed token
+	// I have to create an api for oauth with storage and al the stuffs
+	rpcListener  := RPCStorageHandler{
+		KeyPrefix:        "rpc.listener.",
+		SuppressRegister: true,
+	}
+
+	//rpcListener.ProcessKeySpaceChanges()
+
+
 	//GlobalSessionManager = SessionHandler(&DefaultSessionManager{})
 	GlobalSessionManager.Store().DeleteAllKeys()
 	//GlobalSessionManager.Store().se
-	LoadSampleAPI(apiKeySpaceChangesTestDef)
+
 
 	//register some apis with api spec orgid
 
@@ -39,17 +59,22 @@ func TestProcessKeySpaceChanges(t *testing.T){
 	dispatcher.AddFunc("GetKey", func(clientAddr, key string) (string, error) {
 		return jsonMarshalString(CreateStandardSession()), nil
 	})
-
+/*
+   handleDeleteHashedKey
+   GetStorageForApi
+   RevokeToken
+   getSessionAndCreate
+*/
 	rpc := startRPCMock(dispatcher)
 	defer stopRPCMock(rpc)
 
 	data := map[string]string{
 		"3fe3b6f861398968#hashed:apiKeySpaceChangesTestDefID:oAuthRevokeToken" : "3fe3b6f861398968",//works
 		"eyJvcmciOiI1ZTIwOTFjNGQ0YWVmY2U2MGMwNGZiOTIiLCJpZCI6ImE4NGMwMzk0MzE4OTQ5Y2FiMTJiYjRhMWJkZjQ4ZWU0IiwiaCI6Im11cm11cjY0In0=:apiKeySpaceChangesTestDefID:oAuthRevokeToken":"eyJvcmciOiI1ZTIwOTFjNGQ0YWVmY2U2MGMwNGZiOTIiLCJpZCI6ImE4NGMwMzk0MzE4OTQ5Y2FiMTJiYjRhMWJkZjQ4ZWU0IiwiaCI6Im11cm11cjY0In0=",
-		//"eyJvcmciOiI1ZTIwOTFjNGQ0YWVmY2U2MGMwNGZiOTIiLCJpZCI6ImQ4MDc4NGM3YTIzYTRkYTE4NzVlMmIwMzZiMGJjYmE5IiwiaCI6Im11cm11cjY0In0=:apiKeySpaceChangesTestDefID:oAuthRevokeAccessToken":"eyJvcmciOiI1ZTIwOTFjNGQ0YWVmY2U2MGMwNGZiOTIiLCJpZCI6ImQ4MDc4NGM3YTIzYTRkYTE4NzVlMmIwMzZiMGJjYmE5IiwiaCI6Im11cm11cjY0In0=",
-		//"MTBlNGI3NDEtNzAzNS00YzgyLWJmMTYtODYxNDgwNjQzN2U3:apiKeySpaceChangesTestDefID:oAuthRevokeRefreshToken":"MTBlNGI3NDEtNzAzNS00YzgyLWJmMTYtODYxNDgwNjQzN2U3",
-		//"eyJvcmciOiI1ZTIwOTFjNGQ0YWVmY2U2MGMwNGZiOTIiLCJpZCI6IjViM2JhOTc0YTYxMjQ5Yzc5YmVhMTNmMWY3M2YyMTI0IiwiaCI6Im11cm11cjY0In0=:resetQuota":"eyJvcmciOiI1ZTIwOTFjNGQ0YWVmY2U2MGMwNGZiOTIiLCJpZCI6IjViM2JhOTc0YTYxMjQ5Yzc5YmVhMTNmMWY3M2YyMTI0IiwiaCI6Im11cm11cjY0In0=",
-		//"eyJvcmciOiI1ZTIwOTFjNGQ0YWVmY2U2MGMwNGZiOTIiLCJpZCI6IjViM2JhOTc0YTYxMjQ5Yzc5YmVhMTNmMWY3M2YyMTI0IiwiaCI6Im11cm11cjY0In0=":"eyJvcmciOiI1ZTIwOTFjNGQ0YWVmY2U2MGMwNGZiOTIiLCJpZCI6IjViM2JhOTc0YTYxMjQ5Yzc5YmVhMTNmMWY3M2YyMTI0IiwiaCI6Im11cm11cjY0In0=",
+		"eyJvcmciOiI1ZTIwOTFjNGQ0YWVmY2U2MGMwNGZiOTIiLCJpZCI6ImQ4MDc4NGM3YTIzYTRkYTE4NzVlMmIwMzZiMGJjYmE5IiwiaCI6Im11cm11cjY0In0=:apiKeySpaceChangesTestDefID:oAuthRevokeAccessToken":"eyJvcmciOiI1ZTIwOTFjNGQ0YWVmY2U2MGMwNGZiOTIiLCJpZCI6ImQ4MDc4NGM3YTIzYTRkYTE4NzVlMmIwMzZiMGJjYmE5IiwiaCI6Im11cm11cjY0In0=",
+		"MTBlNGI3NDEtNzAzNS00YzgyLWJmMTYtODYxNDgwNjQzN2U3:apiKeySpaceChangesTestDefID:oAuthRevokeRefreshToken":"MTBlNGI3NDEtNzAzNS00YzgyLWJmMTYtODYxNDgwNjQzN2U3",
+		"eyJvcmciOiI1ZTIwOTFjNGQ0YWVmY2U2MGMwNGZiOTIiLCJpZCI6IjViM2JhOTc0YTYxMjQ5Yzc5YmVhMTNmMWY3M2YyMTI0IiwiaCI6Im11cm11cjY0In0=:resetQuota":"eyJvcmciOiI1ZTIwOTFjNGQ0YWVmY2U2MGMwNGZiOTIiLCJpZCI6IjViM2JhOTc0YTYxMjQ5Yzc5YmVhMTNmMWY3M2YyMTI0IiwiaCI6Im11cm11cjY0In0=",
+		"eyJvcmciOiI1ZTIwOTFjNGQ0YWVmY2U2MGMwNGZiOTIiLCJpZCI6IjViM2JhOTc0YTYxMjQ5Yzc5YmVhMTNmMWY3M2YyMTI0IiwiaCI6Im11cm11cjY0In0=":"eyJvcmciOiI1ZTIwOTFjNGQ0YWVmY2U2MGMwNGZiOTIiLCJpZCI6IjViM2JhOTc0YTYxMjQ5Yzc5YmVhMTNmMWY3M2YyMTI0IiwiaCI6Im11cm11cjY0In0=",
 	}
 
 	keys := []string{}
@@ -69,14 +94,13 @@ func TestProcessKeySpaceChanges(t *testing.T){
 	//r.ProcessKeySpaceChanges(keys)
 
 	for k,v := range data{
-		r.ProcessKeySpaceChanges([]string{k})
+		rpcListener.ProcessKeySpaceChanges([]string{k})
 		_, err := GlobalSessionManager.Store().GetKey(v)
 
 		t.Log("============")
 		if err == nil {
-			t.Error(" key session not removed: ", err.Error())
+			t.Error(" key session not removed ")
 		}else{
-
 			if err.Error() == "key not found" {
 				t.Log("key removed correctly")
 			}
