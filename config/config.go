@@ -469,6 +469,9 @@ type Config struct {
 
 	// OverrideMessages is used to override returned API error codes and messages.
 	OverrideMessages map[string]TykError `bson:"override_messages" json:"override_messages"`
+
+	// Cloud flag shows that gateway runs in Tyk-cloud.
+	Cloud bool `json:"cloud"`
 }
 
 type TykError struct {
