@@ -372,7 +372,6 @@ func (m *proxyMux) serve() {
 		if p.started {
 			continue
 		}
-
 		switch p.protocol {
 		case "tcp", "tls":
 			mainLog.Warning("Starting TCP server on:", p.listener.Addr().String())
@@ -403,6 +402,7 @@ func (m *proxyMux) serve() {
 			}
 
 			go p.httpServer.Serve(p.listener)
+
 		}
 
 		p.started = true

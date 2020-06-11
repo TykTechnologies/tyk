@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"google.golang.org/grpc/metadata"
+
 	"golang.org/x/net/http2/h2c"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -27,9 +29,12 @@ import (
 )
 
 // For gRPC, we should be sure that HTTP/2 works with Tyk in H2C configuration also for insecure grpc over http.
-func TestHTTP2_Plaintext(t *testing.T) {
+func TestHTTP2_h2C(t *testing.T) {
 	defer ResetTestConfig()
+	var port = 6666
 
+	EnablePort(port, "h2c")
+	var echo = "Hello, I am an HTTP/2 Server"
 	expected := "HTTP/2.0"
 	serv := &http2.Server{}
 	// Upstream server supporting HTTP/2
@@ -39,7 +44,7 @@ func TestHTTP2_Plaintext(t *testing.T) {
 			t.Fatalf("Tyk-Upstream connection protocol is expected %s, actual %s", expected, actual)
 		}
 
-		fmt.Fprintln(w, "Hello, I am an HTTP/2 Server")
+		w.Write([]byte(echo))
 
 	}), serv))
 	upstream.Start()
@@ -47,21 +52,19 @@ func TestHTTP2_Plaintext(t *testing.T) {
 
 	// Tyk
 	globalConf := config.Global()
-	//globalConf.ProxyEnableHttp2 = true
 	globalConf.ProxyEnableH2c = true
-	//globalConf.HttpServerOptions.EnableHttp2 = true
 	globalConf.HttpServerOptions.EnableH2c = true
 	config.SetGlobal(globalConf)
 	defer ResetTestConfig()
 
 	ts := StartTest()
 	defer ts.Close()
-
 	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/h2c"
 		spec.UseKeylessAccess = true
-		//spec.Proxy.TargetURL = strings.Replace(upstream.URL, "http", "h2c", 1)
 		spec.Proxy.TargetURL = upstream.URL
+		spec.Protocol = "h2c"
+		spec.ListenPort = port
 	})
 	client := &http.Client{
 		Transport: &http2.Transport{
@@ -73,13 +76,69 @@ func TestHTTP2_Plaintext(t *testing.T) {
 		},
 	}
 
-	resp, err := client.Get(upstream.URL)
+	s := fmt.Sprintf("http://localhost:%d", port)
+	w, err := client.Get(s)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
-	fmt.Println(resp.Proto)
+	defer w.Body.Close()
+	b, err := ioutil.ReadAll(w.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bs := string(b)
+	if bs != "Hello, I am an HTTP/2 Server" {
+		t.Errorf("expected %s to %s", echo, bs)
+	}
 
-	ts.Run(t, test.TestCase{Client: client, Path: "/h2c", Code: 200, Proto: "HTTP/2.0", BodyMatch: "Hello, I am an HTTP/2 Server"})
+	if w.ProtoMajor != 2 {
+		t.Error("expected %i to %i", 2, w.ProtoMajor)
+	}
+
+}
+
+func TestGRPC_H2C(t *testing.T) {
+	defer ResetTestConfig()
+
+	var port = 6666
+	EnablePort(port, "h2c")
+	// gRPC server
+	s := startGRPCServerH2C(t)
+	defer s.GracefulStop()
+
+	// Tyk
+	globalConf := config.Global()
+	globalConf.ProxySSLInsecureSkipVerify = true
+	globalConf.ProxyEnableH2c = true
+	globalConf.HttpServerOptions.EnableH2c = true
+	config.SetGlobal(globalConf)
+	defer ResetTestConfig()
+
+	ts := StartTest()
+	defer ts.Close()
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.UseKeylessAccess = true
+		spec.Proxy.TargetURL = "http://localhost:50051"
+		spec.ListenPort = port
+		spec.Protocol = "h2c"
+
+	})
+
+	address := strings.TrimPrefix(ts.URL, "http://")
+	name := "Josh"
+
+	// gRPC client
+	r := sayHelloWithGRPCClientH2C(t, address, name)
+
+	// Test result
+	expected := "Hello " + name
+	actual := r.Message
+
+	if expected != actual {
+		t.Fatalf("Expected %s, actual %s", expected, actual)
+	}
 }
 
 // For gRPC, we should be sure that HTTP/2 works with Tyk.
@@ -364,6 +423,27 @@ func (s *server) SayHello(ctx context.Context, in *pb.HelloRequest) (*pb.HelloRe
 	return &pb.HelloReply{Message: "Hello " + in.Name}, nil
 }
 
+func startGRPCServerH2C(t *testing.T) *grpc.Server {
+	// Server
+	lis, err := net.Listen("tcp", ":50051")
+	if err != nil {
+		t.Fatalf("failed to listen: %v", err)
+	}
+
+	s := grpc.NewServer()
+
+	pb.RegisterGreeterServer(s, &server{})
+
+	go func() {
+		err := s.Serve(lis)
+		if err != nil {
+			t.Fatalf("failed to serve: %v", err)
+		}
+	}()
+
+	return s
+}
+
 func startGRPCServer(t *testing.T, clientCert *x509.Certificate) *grpc.Server {
 	// Server
 	lis, err := net.Listen("tcp", ":50051")
@@ -410,6 +490,25 @@ func startGRPCServer(t *testing.T, clientCert *x509.Certificate) *grpc.Server {
 	}()
 
 	return s
+}
+
+func sayHelloWithGRPCClientH2C(t *testing.T, address string, name string) *pb.HelloReply {
+	conn, err := grpc.Dial(address, grpc.WithInsecure())
+	if err != nil {
+		t.Fatalf("did not connect: %v", err)
+	}
+	defer conn.Close()
+	c := pb.NewGreeterClient(conn)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var header metadata.MD
+	r, err := c.SayHello(ctx, &pb.HelloRequest{Name: name}, grpc.Header(&header))
+	if err != nil {
+		t.Fatalf("could not greet: %v", err)
+	}
+
+	return r
 }
 
 func sayHelloWithGRPCClient(t *testing.T, cert *tls.Certificate, caCert []byte, basicAuth bool, token string, address string, name string) *pb.HelloReply {
