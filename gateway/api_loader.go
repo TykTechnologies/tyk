@@ -703,11 +703,16 @@ type generalStores struct {
 }
 
 func loadGraphQLPlayground(spec *APISpec, router *mux.Router) {
+	path := spec.Proxy.ListenPath
+	if config.Global().Cloud {
+		path = fmt.Sprintf("/%s/", spec.Slug)
+	}
+
 	p := playground.New(playground.Config{
-		PathPrefix:                      spec.Proxy.ListenPath,
+		PathPrefix:                      path,
 		PlaygroundPath:                  spec.GraphQL.GraphQLPlayground.Path,
-		GraphqlEndpointPath:             spec.Proxy.ListenPath,
-		GraphQLSubscriptionEndpointPath: spec.Proxy.ListenPath,
+		GraphqlEndpointPath:             path,
+		GraphQLSubscriptionEndpointPath: path,
 	})
 
 	handlers, err := p.Handlers()
