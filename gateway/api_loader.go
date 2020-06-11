@@ -54,10 +54,10 @@ func skipSpecBecauseInvalid(spec *APISpec, logger *logrus.Entry) bool {
 
 	switch spec.Protocol {
 	case "", "http", "https":
-		//if spec.Proxy.ListenPath == "" {
-		//	logger.Error("Listen path is empty")
-		//	return true
-		//}
+		if spec.Proxy.ListenPath == "" {
+			logger.Error("Listen path is empty")
+			return true
+		}
 		if strings.Contains(spec.Proxy.ListenPath, " ") {
 			logger.Error("Listen path contains spaces, is invalid")
 			return true
@@ -566,18 +566,18 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//if d.SH.Spec.target.Scheme == "tyk" {
-	//	handler, found := findInternalHttpHandlerByNameOrID(d.SH.Spec.target.Host)
-	//	if !found {
-	//		handler := ErrorHandler{*d.SH.Base()}
-	//		handler.HandleError(w, r, "Couldn't detect target", http.StatusInternalServerError, true)
-	//		return
-	//	}
-	//
-	//	sanitizeProxyPaths(d.SH.Spec, r)
-	//	handler.ServeHTTP(w, r)
-	//	return
-	//}
+	if d.SH.Spec.target.Scheme == "tyk" {
+		handler, found := findInternalHttpHandlerByNameOrID(d.SH.Spec.target.Host)
+		if !found {
+			handler := ErrorHandler{*d.SH.Base()}
+			handler.HandleError(w, r, "Couldn't detect target", http.StatusInternalServerError, true)
+			return
+		}
+
+		sanitizeProxyPaths(d.SH.Spec, r)
+		handler.ServeHTTP(w, r)
+		return
+	}
 	d.SH.ServeHTTP(w, r)
 }
 
