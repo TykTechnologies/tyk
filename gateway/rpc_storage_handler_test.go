@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/lonelycode/osin"
 	"github.com/magiconair/properties/assert"
 	"testing"
 )
@@ -33,7 +34,6 @@ const apiKeySpaceChangesTestDef = `{
 			Revoke refresh token
 		hashed
 			Revoke access token
-			Revoke refresh token
 	Keys:
 		Remove key
 		Update key
@@ -45,6 +45,8 @@ const apiKeySpaceChangesTestDef = `{
 const (
 	RevokeOauthHashedToken = "RevokeOauthHashedToken"
 	RevokeOauthToken = "RevokeOauthToken"
+	RevokeOauthRefreshToken = "RevokeOauthRefreshToken"
+	RevokeOauthRefreshHashedToken = "RevokeOauthRefreshHashedToken"
 )
 
 func buildStringEvent(eventType, token, apiId string) string {
@@ -54,6 +56,12 @@ func buildStringEvent(eventType, token, apiId string) string {
 		token =  storage.HashStr(token)
 		return fmt.Sprintf("%s#hashed:%s:oAuthRevokeToken", token,apiId)
 	case RevokeOauthToken:
+		// string is as= {the-token}=:{api-id}:oAuthRevokeToken
+		return fmt.Sprintf("%s:%s:oAuthRevokeToken", token,apiId)
+	case RevokeOauthRefreshToken:
+		// string is as= {the-token}=:{api-id}:oAuthRevokeToken
+		return fmt.Sprintf("%s:%s:oAuthRevokeRefreshToken", token,apiId)
+	case RevokeOauthRefreshHashedToken:
 		// string is as= {the-token}=:{api-id}:oAuthRevokeToken
 		return fmt.Sprintf("%s:%s:oAuthRevokeToken", token,apiId)
 	}
@@ -88,6 +96,12 @@ func TestProcessKeySpaceChangesForOauth(t *testing.T){
 			Hashed:      true,
 			GetToken:    getAccessToken,
 		},
+		{
+			TestName:    RevokeOauthRefreshToken,
+			Event:       RevokeOauthRefreshToken,
+			Hashed:      false,
+			GetToken:    getRefreshToken,
+		},
 	}
 
 	for _, tc := range cases{
@@ -106,24 +120,51 @@ func TestProcessKeySpaceChangesForOauth(t *testing.T){
 			}
 
 			myApi := loadTestOAuthSpec()
-			createTestOAuthClient(myApi, authClientID)
-
+			oauthClient := createTestOAuthClient(myApi, authClientID)
 			tokenData := getToken(t, ts)
 			token := tc.GetToken(tokenData)
 
-			GlobalSessionManager.Store().DeleteAllKeys()
-			GlobalSessionManager.Store().SetKey(token,token,100)
+			var getKeyFromStore func(string) (string, error)
+			if tc.Event == RevokeOauthRefreshToken {
+				//Refresh token are threated in a different way due that they reside in a different level and we cannot access them directly
+				client := new(OAuthClient)
+				client.MetaData = oauthClient.MetaData
+				client.Description = oauthClient.Description
+				client.ClientSecret = oauthClient.GetSecret()
+				client.PolicyID = oauthClient.PolicyID
+				client.ClientRedirectURI = oauthClient.ClientRedirectURI
 
-			_, err := GlobalSessionManager.Store().GetKey(token)
-			if err != nil {
-				t.Error("Key should be pre-loaded in store in order that the test perform the revoke action. Please check")
+				storage := myApi.OAuthManager.OsinServer.Storage
+				ret := &osin.AccessData{
+					AccessToken:tokenData.AccessToken,
+					RefreshToken:tokenData.RefreshToken,
+					Client:client,
+				}
+				storage.SaveAccess(ret)
+
+				getKeyFromStore = func(token string) (string,error){
+					accessData, err := storage.LoadRefresh(token)
+					var refresh string
+					if accessData != nil {
+						refresh = accessData.RefreshToken
+					}
+					return refresh,err
+				}
+			}else{
+				getKeyFromStore = GlobalSessionManager.Store().GetKey
+				GlobalSessionManager.Store().DeleteAllKeys()
+				GlobalSessionManager.Store().SetKey(token,token,100)
+				_, err := GlobalSessionManager.Store().GetKey(token)
+				if err != nil {
+					t.Error("Key should be pre-loaded in store in order that the test perform the revoke action. Please check")
+				}
 			}
 
 			stringEvent := buildStringEvent(tc.Event,token,myApi.APIID)
 			rpcListener.ProcessKeySpaceChanges([]string{stringEvent})
-			_, err = GlobalSessionManager.Store().GetKey(token)
+			found, err := getKeyFromStore(token)
 			if err == nil {
-				t.Error(" key not removed. event:",stringEvent)
+				t.Error(" key not removed. event:",stringEvent," found:", found)
 			}else{
 				assert.Equal(t,err.Error(),"key not found","expected error msg is 'key not found'")
 			}
