@@ -2,11 +2,12 @@ package gateway
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/lonelycode/osin"
 	"github.com/magiconair/properties/assert"
-	"testing"
 )
 
 const apiKeySpaceChangesTestDef = `{
