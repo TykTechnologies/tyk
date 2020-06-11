@@ -183,6 +183,7 @@ type HttpServerOptionsConfig struct {
 	UseSSL                 bool       `json:"use_ssl"`
 	UseLE_SSL              bool       `json:"use_ssl_le"`
 	EnableHttp2            bool       `json:"enable_http2"`
+	EnableH2c              bool       `json:"enable_h2c"`
 	SSLInsecureSkipVerify  bool       `json:"ssl_insecure_skip_verify"`
 	EnableWebSockets       bool       `json:"enable_websockets"`
 	Certificates           []CertData `json:"certificates"`
@@ -385,6 +386,7 @@ type Config struct {
 	ServiceDiscovery              ServiceDiscoveryConf `json:"service_discovery"`
 	ProxySSLInsecureSkipVerify    bool                 `json:"proxy_ssl_insecure_skip_verify"`
 	ProxyEnableHttp2              bool                 `json:"proxy_enable_http2"`
+	ProxyEnableH2c                bool                 `json:"proxy_enable_h2c"`
 	ProxySSLMinVersion            uint16               `json:"proxy_ssl_min_version"`
 	ProxySSLCipherSuites          []string             `json:"proxy_ssl_ciphers"`
 	ProxyDefaultTimeout           float64              `json:"proxy_default_timeout"`

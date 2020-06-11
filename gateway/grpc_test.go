@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/net/http2/h2c"
+
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -23,6 +25,62 @@ import (
 	"google.golang.org/grpc/credentials"
 	pb "google.golang.org/grpc/examples/helloworld/helloworld"
 )
+
+// For gRPC, we should be sure that HTTP/2 works with Tyk in H2C configuration also for insecure grpc over http.
+func TestHTTP2_Plaintext(t *testing.T) {
+	defer ResetTestConfig()
+
+	expected := "HTTP/2.0"
+	serv := &http2.Server{}
+	// Upstream server supporting HTTP/2
+	upstream := httptest.NewUnstartedServer(h2c.NewHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		actual := r.Proto
+		if expected != actual {
+			t.Fatalf("Tyk-Upstream connection protocol is expected %s, actual %s", expected, actual)
+		}
+
+		fmt.Fprintln(w, "Hello, I am an HTTP/2 Server")
+
+	}), serv))
+	upstream.Start()
+	defer upstream.Close()
+
+	// Tyk
+	globalConf := config.Global()
+	//globalConf.ProxyEnableHttp2 = true
+	globalConf.ProxyEnableH2c = true
+	//globalConf.HttpServerOptions.EnableHttp2 = true
+	globalConf.HttpServerOptions.EnableH2c = true
+	config.SetGlobal(globalConf)
+	defer ResetTestConfig()
+
+	ts := StartTest()
+	defer ts.Close()
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/h2c"
+		spec.UseKeylessAccess = true
+		//spec.Proxy.TargetURL = strings.Replace(upstream.URL, "http", "h2c", 1)
+		spec.Proxy.TargetURL = upstream.URL
+	})
+	client := &http.Client{
+		Transport: &http2.Transport{
+			AllowHTTP: true,
+			// Pretend we are dialing a TLS endpoint. (Note, we ignore the passed tls.Config)
+			DialTLS: func(network, addr string, cfg *tls.Config) (net.Conn, error) {
+				return net.Dial(network, addr)
+			},
+		},
+	}
+
+	resp, err := client.Get(upstream.URL)
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Println(resp.Proto)
+
+	ts.Run(t, test.TestCase{Client: client, Path: "/h2c", Code: 200, Proto: "HTTP/2.0", BodyMatch: "Hello, I am an HTTP/2 Server"})
+}
 
 // For gRPC, we should be sure that HTTP/2 works with Tyk.
 func TestHTTP2_TLS(t *testing.T) {
