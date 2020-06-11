@@ -2,7 +2,8 @@ package gateway
 
 import (
 	"fmt"
-	"github.com/TykTechnologies/gorpc"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/magiconair/properties/assert"
 	"testing"
 )
@@ -50,6 +51,7 @@ func buildStringEvent(eventType, token, apiId string) string {
 	switch eventType {
 	case RevokeOauthHashedToken:
 		// string is as= {the-hashed-token}#hashed:{api-id}:oAuthRevokeToken
+		token =  storage.HashStr(token)
 		return fmt.Sprintf("%s#hashed:%s:oAuthRevokeToken", token,apiId)
 	case RevokeOauthToken:
 		// string is as= {the-token}=:{api-id}:oAuthRevokeToken
@@ -58,111 +60,75 @@ func buildStringEvent(eventType, token, apiId string) string {
 	return ""
 }
 
+func getAccessToken(td tokenData) string {
+	return td.AccessToken
+}
+
+func getRefreshToken(td tokenData) string {
+	return td.RefreshToken
+}
+
 func TestProcessKeySpaceChangesForOauth(t *testing.T){
-	ts := StartTest()
-	defer ts.Close()
-
-	rpcListener  := RPCStorageHandler{
-		KeyPrefix:        "rpc.listener.",
-		SuppressRegister: true,
-		HashKeys:         false,
-	}
-
-	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("GetKey", func(clientAddr, key string) (string, error) {
-		return jsonMarshalString(CreateStandardSession()), nil
-	})
 
 	cases := []struct {
 		TestName string
-		Api *APISpec
 		Event string
-		RpcListener RPCStorageHandler
 		Hashed bool
-		token string
+		GetToken func(td tokenData)string
 	}{
 		{
-			TestName:    "test1",
-			Api:         nil,
-			Event:       "",
-			RpcListener: RPCStorageHandler{},
-			Hashed: false,
-			token: getToken(t, ts).AccessToken
+			TestName:    RevokeOauthToken,
+			Event:       RevokeOauthToken,
+			Hashed:      false,
+			GetToken:    getAccessToken,
+		},
+		{
+			TestName:    RevokeOauthHashedToken,
+			Event:       RevokeOauthHashedToken,
+			Hashed:      true,
+			GetToken:    getAccessToken,
 		},
 	}
 
 	for _, tc := range cases{
 		t.Run(tc.TestName, func(t *testing.T) {
+			ts := StartTest()
+			defer ts.Close()
+
+			globalConf := config.Global()
+			globalConf.HashKeys = tc.Hashed
+			config.SetGlobal(globalConf)
+
 			rpcListener  := RPCStorageHandler{
 				KeyPrefix:        "rpc.listener.",
 				SuppressRegister: true,
 				HashKeys:         tc.Hashed,
 			}
-			//we got to set myApi.OAuthManager.OsinServer.Storage
+
 			myApi := loadTestOAuthSpec()
 			createTestOAuthClient(myApi, authClientID)
 
-			GlobalSessionManager.Store().DeleteAllKeys()
-			GlobalSessionManager.Store().SetKey(tc.token,tc.token,100)
+			tokenData := getToken(t, ts)
+			token := tc.GetToken(tokenData)
 
-			ss, err := GlobalSessionManager.Store().GetKey(v)
+			GlobalSessionManager.Store().DeleteAllKeys()
+			GlobalSessionManager.Store().SetKey(token,token,100)
+
+			_, err := GlobalSessionManager.Store().GetKey(token)
 			if err != nil {
 				t.Error("Key should be pre-loaded in store in order that the test perform the revoke action. Please check")
 			}
 
-			stringEvent := buildStringEvent(tc.Event,tc.token,myApi.APIID)
+			stringEvent := buildStringEvent(tc.Event,token,myApi.APIID)
 			rpcListener.ProcessKeySpaceChanges([]string{stringEvent})
-			keyFound, err := GlobalSessionManager.Store().GetKey(tc.token)
+			_, err = GlobalSessionManager.Store().GetKey(token)
 			if err == nil {
-				t.Error(" key session not removed ",keyFound,tc.Event)
+				t.Error(" key not removed. event:",stringEvent)
 			}else{
 				assert.Equal(t,err.Error(),"key not found","expected error msg is 'key not found'")
 			}
 		})
 	}
-	//we got to set myApi.OAuthManager.OsinServer.Storage
-	myApi := loadTestOAuthSpec()
-	createTestOAuthClient(myApi, authClientID)
-
-	// Step 1 create token
-	tokenData := getToken(t, ts)
-//	t.Log(GetStorageForApi(myApi.APIID))
-	//init rpc listener
-	//put some data there
-	//check that is modified as intended
-	//changes should be:
-	// 1- for api keys
-	// 2- for oauth
-	// handle uses cases where its a hashed token
-	// I have to create an api for oauth with storage and al the stuffs
-
-//	rpc := startRPCMock(dispatcher)
-	//defer stopRPCMock(rpc)
-
-	//clear so we have it brand new
-	GlobalSessionManager.Store().DeleteAllKeys()
-	GlobalSessionManager.Store().SetKey(tokenData.AccessToken,tokenData.AccessToken,100)
-
-	data := map[string]string{
-		buildStringEvent(RevokeOauthHashedToken,tokenData.AccessToken,myApi.APIID):tokenData.AccessToken,
-	}
-
-	for k,v := range data{
-		//ensure that before revoke, we have the key in storage
-		ss, err := GlobalSessionManager.Store().GetKey(v)
-		if err != nil {
-			t.Error("Key should be pre-loaded in store in order that the test perform the revoke action. Please check")
-		}
-
-		rpcListener.ProcessKeySpaceChanges([]string{k})
-		keyFound, err := GlobalSessionManager.Store().GetKey(v)
-		if err == nil {
-			t.Error(" key session not removed ",keyFound,v)
-		}else{
-			assert.Equal(t,err.Error(),"key not found","expected error msg is 'key not found'")
-		}
-	}
-
 }
 
 /*
