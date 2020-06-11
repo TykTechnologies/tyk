@@ -704,10 +704,8 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	}
 
 	if rt.h2ctransport != nil {
-		fmt.Println("H2C ROUNDTRIP")
 		return rt.h2ctransport.RoundTrip(r)
 	}
-	fmt.Println("REGULAR ROUNDTRIP")
 	return rt.transport.RoundTrip(r)
 }
 
