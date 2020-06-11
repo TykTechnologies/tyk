@@ -855,7 +855,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 			splitKeys := strings.Split(key, ":")
 			_, resetQuota := keysToReset[splitKeys[0]]
 			if len(splitKeys) > 1 && splitKeys[1] == "hashed" {
-				log.Info("delete hashed key:",key)
+				log.Info("delete hashed key:", key)
 				key = splitKeys[0]
 				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
 				handleDeleteHashedKey(splitKeys[0], "", resetQuota)

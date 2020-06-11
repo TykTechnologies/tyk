@@ -43,9 +43,9 @@ const apiKeySpaceChangesTestDef = `{
 */
 
 const (
-	RevokeOauthHashedToken = "RevokeOauthHashedToken"
-	RevokeOauthToken = "RevokeOauthToken"
-	RevokeOauthRefreshToken = "RevokeOauthRefreshToken"
+	RevokeOauthHashedToken        = "RevokeOauthHashedToken"
+	RevokeOauthToken              = "RevokeOauthToken"
+	RevokeOauthRefreshToken       = "RevokeOauthRefreshToken"
 	RevokeOauthRefreshHashedToken = "RevokeOauthRefreshHashedToken"
 )
 
@@ -53,17 +53,17 @@ func buildStringEvent(eventType, token, apiId string) string {
 	switch eventType {
 	case RevokeOauthHashedToken:
 		// string is as= {the-hashed-token}#hashed:{api-id}:oAuthRevokeToken
-		token =  storage.HashStr(token)
-		return fmt.Sprintf("%s#hashed:%s:oAuthRevokeToken", token,apiId)
+		token = storage.HashStr(token)
+		return fmt.Sprintf("%s#hashed:%s:oAuthRevokeToken", token, apiId)
 	case RevokeOauthToken:
 		// string is as= {the-token}=:{api-id}:oAuthRevokeToken
-		return fmt.Sprintf("%s:%s:oAuthRevokeToken", token,apiId)
+		return fmt.Sprintf("%s:%s:oAuthRevokeToken", token, apiId)
 	case RevokeOauthRefreshToken:
 		// string is as= {the-token}=:{api-id}:oAuthRevokeToken
-		return fmt.Sprintf("%s:%s:oAuthRevokeRefreshToken", token,apiId)
+		return fmt.Sprintf("%s:%s:oAuthRevokeRefreshToken", token, apiId)
 	case RevokeOauthRefreshHashedToken:
 		// string is as= {the-token}=:{api-id}:oAuthRevokeToken
-		return fmt.Sprintf("%s:%s:oAuthRevokeToken", token,apiId)
+		return fmt.Sprintf("%s:%s:oAuthRevokeToken", token, apiId)
 	}
 	return ""
 }
@@ -76,35 +76,35 @@ func getRefreshToken(td tokenData) string {
 	return td.RefreshToken
 }
 
-func TestProcessKeySpaceChangesForOauth(t *testing.T){
+func TestProcessKeySpaceChangesForOauth(t *testing.T) {
 
 	cases := []struct {
 		TestName string
-		Event string
-		Hashed bool
-		GetToken func(td tokenData)string
+		Event    string
+		Hashed   bool
+		GetToken func(td tokenData) string
 	}{
 		{
-			TestName:    RevokeOauthToken,
-			Event:       RevokeOauthToken,
-			Hashed:      false,
-			GetToken:    getAccessToken,
+			TestName: RevokeOauthToken,
+			Event:    RevokeOauthToken,
+			Hashed:   false,
+			GetToken: getAccessToken,
 		},
 		{
-			TestName:    RevokeOauthHashedToken,
-			Event:       RevokeOauthHashedToken,
-			Hashed:      true,
-			GetToken:    getAccessToken,
+			TestName: RevokeOauthHashedToken,
+			Event:    RevokeOauthHashedToken,
+			Hashed:   true,
+			GetToken: getAccessToken,
 		},
 		{
-			TestName:    RevokeOauthRefreshToken,
-			Event:       RevokeOauthRefreshToken,
-			Hashed:      false,
-			GetToken:    getRefreshToken,
+			TestName: RevokeOauthRefreshToken,
+			Event:    RevokeOauthRefreshToken,
+			Hashed:   false,
+			GetToken: getRefreshToken,
 		},
 	}
 
-	for _, tc := range cases{
+	for _, tc := range cases {
 		t.Run(tc.TestName, func(t *testing.T) {
 			ts := StartTest()
 			defer ts.Close()
@@ -113,7 +113,7 @@ func TestProcessKeySpaceChangesForOauth(t *testing.T){
 			globalConf.HashKeys = tc.Hashed
 			config.SetGlobal(globalConf)
 
-			rpcListener  := RPCStorageHandler{
+			rpcListener := RPCStorageHandler{
 				KeyPrefix:        "rpc.listener.",
 				SuppressRegister: true,
 				HashKeys:         tc.Hashed,
@@ -136,37 +136,37 @@ func TestProcessKeySpaceChangesForOauth(t *testing.T){
 
 				storage := myApi.OAuthManager.OsinServer.Storage
 				ret := &osin.AccessData{
-					AccessToken:tokenData.AccessToken,
-					RefreshToken:tokenData.RefreshToken,
-					Client:client,
+					AccessToken:  tokenData.AccessToken,
+					RefreshToken: tokenData.RefreshToken,
+					Client:       client,
 				}
 				storage.SaveAccess(ret)
 
-				getKeyFromStore = func(token string) (string,error){
+				getKeyFromStore = func(token string) (string, error) {
 					accessData, err := storage.LoadRefresh(token)
 					var refresh string
 					if accessData != nil {
 						refresh = accessData.RefreshToken
 					}
-					return refresh,err
+					return refresh, err
 				}
-			}else{
+			} else {
 				getKeyFromStore = GlobalSessionManager.Store().GetKey
 				GlobalSessionManager.Store().DeleteAllKeys()
-				GlobalSessionManager.Store().SetKey(token,token,100)
+				GlobalSessionManager.Store().SetKey(token, token, 100)
 				_, err := GlobalSessionManager.Store().GetKey(token)
 				if err != nil {
 					t.Error("Key should be pre-loaded in store in order that the test perform the revoke action. Please check")
 				}
 			}
 
-			stringEvent := buildStringEvent(tc.Event,token,myApi.APIID)
+			stringEvent := buildStringEvent(tc.Event, token, myApi.APIID)
 			rpcListener.ProcessKeySpaceChanges([]string{stringEvent})
 			found, err := getKeyFromStore(token)
 			if err == nil {
-				t.Error(" key not removed. event:",stringEvent," found:", found)
-			}else{
-				assert.Equal(t,err.Error(),"key not found","expected error msg is 'key not found'")
+				t.Error(" key not removed. event:", stringEvent, " found:", found)
+			} else {
+				assert.Equal(t, err.Error(), "key not found", "expected error msg is 'key not found'")
 			}
 		})
 	}
