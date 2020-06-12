@@ -126,11 +126,10 @@ func TestGRPC_H2C(t *testing.T) {
 
 	})
 
-	address := strings.TrimPrefix(ts.URL, "http://")
 	name := "Josh"
 
 	// gRPC client
-	r := sayHelloWithGRPCClientH2C(t, address, name)
+	r := sayHelloWithGRPCClientH2C(t, "localhost:6666", name)
 
 	// Test result
 	expected := "Hello " + name

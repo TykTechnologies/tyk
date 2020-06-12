@@ -442,11 +442,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	//It will not get executed
 	mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: &cacheStore})
 
-	if spec.GlobalConfig.HttpServerOptions.EnableH2c {
-		chain = alice.New(chainArray...).Then(h2c.NewHandler(&DummyProxyHandler{SH: SuccessHandler{baseMid}}, &http2.Server{}))
-	} else {
-		chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid}})
-	}
+	chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid}})
 
 	if !spec.UseKeylessAccess {
 		var simpleArray []alice.Constructor
