@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"net/http"
 	"path"
+	"strings"
 
 	"github.com/gobuffalo/packr"
 )
@@ -82,12 +83,15 @@ type Playground struct {
 
 // New creates a Playground for given Config
 func New(config Config) *Playground {
+	prepareURL := func(file string) string {
+		return strings.TrimPrefix(path.Join(config.PlaygroundPath, file), "/")
+	}
 
 	data := playgroundTemplateData{
-		CssURL:                  path.Join("/", config.PathPrefix, cssFile),
-		JsURL:                   path.Join("/", config.PathPrefix, jsFile),
-		FavIconURL:              path.Join("/", config.PathPrefix, faviconFile),
-		LogoURL:                 path.Join("/", config.PathPrefix, logoFile),
+		CssURL:                  prepareURL(cssFile),
+		JsURL:                   prepareURL(jsFile),
+		FavIconURL:              prepareURL(faviconFile),
+		LogoURL:                 prepareURL(logoFile),
 		EndpointURL:             config.GraphqlEndpointPath,
 		SubscriptionEndpointURL: config.GraphQLSubscriptionEndpointPath,
 	}
@@ -95,22 +99,22 @@ func New(config Config) *Playground {
 	files := []fileConfig{
 		{
 			name:        cssFile,
-			url:         data.CssURL,
+			url:         path.Join(config.PathPrefix, config.PlaygroundPath, cssFile),
 			contentType: contentTypeTextCSS,
 		},
 		{
 			name:        jsFile,
-			url:         data.JsURL,
+			url:         path.Join(config.PathPrefix, config.PlaygroundPath, jsFile),
 			contentType: contentTypeTextJavascript,
 		},
 		{
 			name:        faviconFile,
-			url:         data.FavIconURL,
+			url:         path.Join(config.PathPrefix, config.PlaygroundPath, faviconFile),
 			contentType: contentTypeImagePNG,
 		},
 		{
 			name:        logoFile,
-			url:         data.LogoURL,
+			url:         path.Join(config.PathPrefix, config.PlaygroundPath, logoFile),
 			contentType: contentTypeImagePNG,
 		},
 	}
@@ -151,6 +155,10 @@ func (p *Playground) configurePlaygroundHandler(handlers *Handlers) (err error) 
 	}
 
 	playgroundURL := path.Join(p.cfg.PathPrefix, p.cfg.PlaygroundPath)
+	if strings.HasSuffix(p.cfg.PlaygroundPath, "/") || (p.cfg.PlaygroundPath == "" && strings.HasSuffix(p.cfg.PathPrefix, "/")) {
+		playgroundURL += "/"
+	}
+	
 	handlers.add(playgroundURL, func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Add(contentTypeHeader, contentTypeTextHTML)
 
