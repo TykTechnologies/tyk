@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"fmt"
+	"github.com/TykTechnologies/tyk/coprocess"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -47,7 +48,9 @@ const (
 	RevokeOauthHashedToken        = "RevokeOauthHashedToken"
 	RevokeOauthToken              = "RevokeOauthToken"
 	RevokeOauthRefreshToken       = "RevokeOauthRefreshToken"
-	RevokeOauthRefreshHashedToken = "RevokeOauthRefreshHashedToken"
+	RevokeOauthRefreshHashedToken = "RevokeOauthRefreshHashedToken" // we do  not support hashed refresh tokens yet
+
+	DefaultOrg = "default-org-id"
 )
 
 func buildStringEvent(eventType, token, apiId string) string {
@@ -173,27 +176,34 @@ func TestProcessKeySpaceChangesForOauth(t *testing.T) {
 	}
 }
 
+func TestProcessKeySpaceChangedForKeys(t *testing.T){
+	//generate key
+	//load key in store (hsahed or not)
+	//
+	keyName := generateToken(DefaultOrg, "")
+	isHashed := true
+	sess := coprocess.SessionState{
+		Rate:                    0,
+		Per:                     0,
+		Expires:                 0,
+		QuotaMax:                0,
+		QuotaRemaining:          99,
+		QuotaRenewalRate:        10000,
+		AccessRights:            nil,
+		OrgId:                   DefaultOrg,
+	}
+
+	obj, code := handleAddOrUpdate(keyName, r, isHashed)
+
+}
+
 /*
 DATA
 
-Oauth tokens already hashed
-3fe3b6f861398968#hashed:5dab7b83c1d6482446afe5258302be7e:oAuthRevokeToken
-735390b0f9ca79f9#hashed:5dab7b83c1d6482446afe5258302be7e:oAuthRevokeToken
-7f51284ecf769dd4#hashed:5dab7b83c1d6482446afe5258302be7e:oAuthRevokeToken
+eyJvcmciOiI1ZTIwOTFjNGQ0YWVmY2U2MGMwNGZiOTIiLCJpZCI6IjU5YzljZDU2NTM4ODQxOWU4MWM5MDA5MTdhMWY3NjU0IiwiaCI6Im11cm11cjY0In0=:hashed
+eyJvcmciOiI1ZTIwOTFjNGQ0YWVmY2U2MGMwNGZiOTIiLCJpZCI6IjU5YzljZDU2NTM4ODQxOWU4MWM5MDA5MTdhMWY3NjU0IiwiaCI6Im11cm11cjY0In0=:resetQuota
 
-Oauth token not hashed
-eyJvcmciOiI1ZTIwOTFjNGQ0YWVmY2U2MGMwNGZiOTIiLCJpZCI6ImE4NGMwMzk0MzE4OTQ5Y2FiMTJiYjRhMWJkZjQ4ZWU0IiwiaCI6Im11cm11cjY0In0=:5dab7b83c1d6482446afe5258302be7e:oAuthRevokeToken
-
-Revoke not hashed access token
-eyJvcmciOiI1ZTIwOTFjNGQ0YWVmY2U2MGMwNGZiOTIiLCJpZCI6ImQ4MDc4NGM3YTIzYTRkYTE4NzVlMmIwMzZiMGJjYmE5IiwiaCI6Im11cm11cjY0In0=:5dab7b83c1d6482446afe5258302be7e:oAuthRevokeAccessToken
-
-Revoke not hashed refresh token
-MTBlNGI3NDEtNzAzNS00YzgyLWJmMTYtODYxNDgwNjQzN2U3:5dab7b83c1d6482446afe5258302be7e:oAuthRevokeRefreshToken
-
-TOKENS
-
-eyJvcmciOiI1ZTIwOTFjNGQ0YWVmY2U2MGMwNGZiOTIiLCJpZCI6IjViM2JhOTc0YTYxMjQ5Yzc5YmVhMTNmMWY3M2YyMTI0IiwiaCI6Im11cm11cjY0In0=:resetQuota
-eyJvcmciOiI1ZTIwOTFjNGQ0YWVmY2U2MGMwNGZiOTIiLCJpZCI6IjViM2JhOTc0YTYxMjQ5Yzc5YmVhMTNmMWY3M2YyMTI0IiwiaCI6Im11cm11cjY0In0=
-
+Key:9de89dd831ee800f:hashed
+Key:9de89dd831ee800f:resetQuota
 
 */

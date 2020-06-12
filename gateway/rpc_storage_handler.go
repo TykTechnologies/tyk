@@ -806,7 +806,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 	oauthTokenKeys := map[string]bool{}
 
 	for _, key := range keys {
-		log.Info("Key:", key)
+		log.Debug("The Mr Key:", key)
 		splitKeys := strings.Split(key, ":")
 		if len(splitKeys) > 1 && splitKeys[1] == "resetQuota" {
 			keysToReset[splitKeys[0]] = true
@@ -858,6 +858,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 				log.Info("delete hashed key:", key)
 				key = splitKeys[0]
 				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
+				log.Info("reset quota:", resetQuota)
 				handleDeleteHashedKey(splitKeys[0], "", resetQuota)
 				getSessionAndCreate(splitKeys[0], r)
 			} else {
