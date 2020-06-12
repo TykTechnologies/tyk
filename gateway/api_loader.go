@@ -703,16 +703,21 @@ type generalStores struct {
 }
 
 func loadGraphQLPlayground(spec *APISpec, router *mux.Router) {
-	path := spec.Proxy.ListenPath
+	// endpoint is the endpoint of the url which playground makes request to.
+	endpoint := spec.Proxy.ListenPath
+
+	// If tyk-cloud is enabled, listen path will be api id and slug is mapped to listen path in nginx config.
+	// So, requests should be sent to slug endpoint, nginx will route them to internal gateway's listen path.
 	if config.Global().Cloud {
-		path = fmt.Sprintf("/%s/", spec.Slug)
+		endpoint = fmt.Sprintf("/%s/", spec.Slug)
 	}
 
 	p := playground.New(playground.Config{
-		PathPrefix:                      path,
+		// PathPrefix is the path on the router where playground handler is loaded.
+		PathPrefix:                      spec.Proxy.ListenPath,
 		PlaygroundPath:                  spec.GraphQL.GraphQLPlayground.Path,
-		GraphqlEndpointPath:             path,
-		GraphQLSubscriptionEndpointPath: path,
+		GraphqlEndpointPath:             endpoint,
+		GraphQLSubscriptionEndpointPath: endpoint,
 	})
 
 	handlers, err := p.Handlers()

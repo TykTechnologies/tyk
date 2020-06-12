@@ -6,6 +6,8 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/config"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/test"
@@ -93,4 +95,62 @@ func TestFuzzyFindAPI(t *testing.T) {
 
 	spec := fuzzyFindAPI("ignoreCase")
 	assert.Equal(t, "123456", spec.APIID)
+}
+
+func TestGraphQLPlayground(t *testing.T) {
+	g := StartTest()
+	defer g.Close()
+
+	defer ResetTestConfig()
+
+	const apiName = "graphql-api"
+
+	api := BuildAPI(func(spec *APISpec) {
+		spec.APIID = "APIID"
+		spec.Proxy.ListenPath = fmt.Sprintf("/%s/", apiName)
+		spec.GraphQL.Enabled = true
+		spec.GraphQL.GraphQLPlayground.Enabled = true
+	})[0]
+
+	for _, env := range []string{"on-premise", "cloud"} {
+		if env == "cloud" {
+			api.Proxy.ListenPath = fmt.Sprintf("/%s/", api.APIID)
+			api.Slug = apiName
+			globalConf := config.Global()
+			globalConf.Cloud = true
+			config.SetGlobal(globalConf)
+		}
+
+		t.Run(env, func(t *testing.T) {
+			t.Run("path is empty", func(t *testing.T) {
+				api.GraphQL.GraphQLPlayground.Path = ""
+				LoadAPI(api)
+				_, _ = g.Run(t, []test.TestCase{
+					{Path: api.Proxy.ListenPath, BodyMatch: `<link rel="stylesheet" href="playground.css" />`},
+					{Path: api.Proxy.ListenPath, BodyMatch: `endpoint: "\\/` + apiName + `\\/"`},
+					{Path: api.Proxy.ListenPath + "playground.css", BodyMatch: "body{margin:0;padding:0;font-family:.*"},
+				}...)
+			})
+
+			t.Run("path is /", func(t *testing.T) {
+				api.GraphQL.GraphQLPlayground.Path = "/"
+				LoadAPI(api)
+				_, _ = g.Run(t, []test.TestCase{
+					{Path: api.Proxy.ListenPath, BodyMatch: `<link rel="stylesheet" href="playground.css" />`},
+					{Path: api.Proxy.ListenPath, BodyMatch: `endpoint: "\\/` + apiName + `\\/"`},
+					{Path: api.Proxy.ListenPath + "playground.css", BodyMatch: "body{margin:0;padding:0;font-family:.*"},
+				}...)
+			})
+
+			t.Run("path is /playground", func(t *testing.T) {
+				api.GraphQL.GraphQLPlayground.Path = "/playground"
+				LoadAPI(api)
+				_, _ = g.Run(t, []test.TestCase{
+					{Path: api.Proxy.ListenPath + "playground", BodyMatch: `<link rel="stylesheet" href="playground/playground.css" />`},
+					{Path: api.Proxy.ListenPath + "playground", BodyMatch: `endpoint: "\\/` + apiName + `\\/"`},
+					{Path: api.Proxy.ListenPath + "playground/playground.css", BodyMatch: "body{margin:0;padding:0;font-family:.*"},
+				}...)
+			})
+		})
+	}
 }
