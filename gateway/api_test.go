@@ -124,8 +124,6 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 func TestKeyHandler(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	defer ResetTestConfig()
 
@@ -239,7 +237,7 @@ func TestKeyHandler(t *testing.T) {
 			},
 		}...)
 
-		GlobalSessionManager.Store().DeleteAllKeys(ctx)
+		GlobalSessionManager.Store().DeleteAllKeys(ts.Context())
 	})
 
 	_, knownKey := ts.CreateSession(func(s *user.SessionState) {
