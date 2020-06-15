@@ -1199,8 +1199,8 @@ func TestGroupResetHandler(t *testing.T) {
 	cacheStore := storage.RedisCluster{}
 	ctx, cancel := context.WithCancel(context.Background())
 	cacheStore.Connect(ctx)
-	defer cancel()
-
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
 		err := cacheStore.StartPubSubHandler(ctx, RedisPubSubChannel, func(v interface{}) {
 			switch x := v.(type) {
@@ -1221,6 +1221,7 @@ func TestGroupResetHandler(t *testing.T) {
 			t.Fail()
 			close(didReload)
 		}
+		wg.Done()
 	}()
 
 	uri := "/tyk/reload/group"
@@ -1254,6 +1255,9 @@ func TestGroupResetHandler(t *testing.T) {
 	// type of notifications may be received during tests, as this
 	// is the cluster channel:
 	<-didReload
+	cancel()
+	// make sure the goroutine exits within this test
+	wg.Wait()
 }
 
 func TestHotReloadSingle(t *testing.T) {

@@ -754,13 +754,13 @@ func reloadLoop(ctx context.Context, tick <-chan time.Time) {
 		mainLog.Info("Initiating coprocess reload")
 		DoCoprocessReload()
 		reloadDoneChan <- struct{}{}
+		<-tick
 	}
+	<-tick
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-tick:
-			reload()
 		case <-startReloadChan:
 			reload()
 		}
