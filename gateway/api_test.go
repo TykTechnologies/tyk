@@ -1218,7 +1218,9 @@ func TestGroupResetHandler(t *testing.T) {
 		})
 		if err != nil {
 			t.Log(err)
-			t.Fail()
+			if err != context.Canceled {
+				t.Fail()
+			}
 			close(didReload)
 		}
 		wg.Done()
