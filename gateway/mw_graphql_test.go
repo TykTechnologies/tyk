@@ -118,7 +118,7 @@ func TestGraphQL(t *testing.T) {
 		}
 
 		directSession.MaxQueryDepth = 2
-		_ = GlobalSessionManager.UpdateSession(directKey, directSession, 0, false)
+		_ = GlobalSessionManager.UpdateSession(g.Context(), directKey, directSession, 0, false)
 
 		_, _ = g.Run(t, test.TestCase{Headers: authHeaderWithDirectKey, Data: request, BodyMatch: "hello", Code: http.StatusOK})
 	})

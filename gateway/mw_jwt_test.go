@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"crypto/md5"
 	"encoding/base64"
 	"encoding/json"
@@ -143,7 +144,7 @@ func prepareGenericJWTSession(testName string, method string, claimName string, 
 			spec.JWTIdentityBaseField = claimName
 		}
 	})[0]
-	GlobalSessionManager.UpdateSession(tokenKID, sessionFunc(), 60, false)
+	GlobalSessionManager.UpdateSession(context.TODO(), tokenKID, sessionFunc(), 60, false)
 
 	return spec, jwtToken
 
@@ -470,8 +471,8 @@ func prepareJWTSessionRSAWithRawSourceOnWithClientID(isBench bool) string {
 	}
 	session := createJWTSessionWithRSAWithPolicy(policyID)
 
-	GlobalSessionManager.ResetQuota(tokenID, session, false)
-	GlobalSessionManager.UpdateSession(tokenID, session, 60, false)
+	GlobalSessionManager.ResetQuota(context.TODO(), tokenID, session, false)
+	GlobalSessionManager.UpdateSession(context.TODO(), tokenID, session, 60, false)
 
 	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
@@ -1670,7 +1671,7 @@ func TestJWTDefaultPolicies(t *testing.T) {
 	sessionID := generateToken(spec.OrgID, keyID)
 
 	assert := func(t *testing.T, expected []string) {
-		session, _ := GlobalSessionManager.SessionDetail(spec.OrgID, sessionID, false)
+		session, _ := GlobalSessionManager.SessionDetail(context.TODO(), spec.OrgID, sessionID, false)
 		actual := session.PolicyIDs()
 		if !reflect.DeepEqual(expected, actual) {
 			t.Fatalf("Expected %v, actaul %v", expected, actual)

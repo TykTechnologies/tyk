@@ -747,17 +747,23 @@ var startReloadChan = make(chan struct{}, 1)
 var reloadDoneChan = make(chan struct{}, 1)
 
 func reloadLoop(ctx context.Context, tick <-chan time.Time) {
-	<-tick
-	for range startReloadChan {
+	reload := func() {
 		mainLog.Info("reload: initiating")
 		DoReload(ctx)
 		mainLog.Info("reload: complete")
-
 		mainLog.Info("Initiating coprocess reload")
 		DoCoprocessReload()
-
 		reloadDoneChan <- struct{}{}
-		<-tick
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick:
+			reload()
+		case <-startReloadChan:
+			reload()
+		}
 	}
 }
 

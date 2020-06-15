@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -40,7 +41,7 @@ func TestLoadPoliciesFromDashboardReLogin(t *testing.T) {
 
 	allowExplicitPolicyID := config.Global().Policies.AllowExplicitPolicyID
 
-	policyMap := LoadPoliciesFromDashboard(ts.URL, "", allowExplicitPolicyID)
+	policyMap := LoadPoliciesFromDashboard(context.TODO(), ts.URL, "", allowExplicitPolicyID)
 
 	if policyMap != nil {
 		t.Error("Should be nil because got back 403 from Dashboard")

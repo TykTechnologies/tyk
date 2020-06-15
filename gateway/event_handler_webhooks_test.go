@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -19,7 +20,7 @@ func createGetHandler() *WebHookHandler {
 		HeaderList:   map[string]string{"x-tyk-test": "TEST"},
 	}
 	ev := &WebHookHandler{}
-	if err := ev.Init(eventHandlerConf); err != nil {
+	if err := ev.Init(context.TODO(), eventHandlerConf); err != nil {
 		panic(err)
 	}
 	return ev
@@ -27,7 +28,7 @@ func createGetHandler() *WebHookHandler {
 
 func TestNewValid(t *testing.T) {
 	h := &WebHookHandler{}
-	err := h.Init(map[string]interface{}{
+	err := h.Init(context.TODO(), map[string]interface{}{
 		"method":        "POST",
 		"target_path":   testHttpPost,
 		"template_path": "../templates/default_webhook.json",
@@ -41,7 +42,7 @@ func TestNewValid(t *testing.T) {
 
 func TestNewInvalid(t *testing.T) {
 	h := &WebHookHandler{}
-	err := h.Init(map[string]interface{}{
+	err := h.Init(context.TODO(), map[string]interface{}{
 		"method":        123,
 		"target_path":   testHttpPost,
 		"template_path": "../templates/default_webhook.json",
@@ -138,9 +139,9 @@ func TestGet(t *testing.T) {
 	body, _ := eventHandler.CreateBody(eventMessage)
 
 	checksum, _ := eventHandler.Checksum(body)
-	eventHandler.HandleEvent(eventMessage)
+	eventHandler.HandleEvent(context.TODO(), eventMessage)
 
-	if wasFired := eventHandler.WasHookFired(checksum); !wasFired {
+	if wasFired := eventHandler.WasHookFired(context.TODO(), checksum); !wasFired {
 		t.Error("Checksum should have matched, event did not fire!")
 	}
 
@@ -156,7 +157,7 @@ func TestPost(t *testing.T) {
 	}
 
 	eventHandler := &WebHookHandler{}
-	if err := eventHandler.Init(eventHandlerConf); err != nil {
+	if err := eventHandler.Init(context.TODO(), eventHandlerConf); err != nil {
 		t.Fatal(err)
 	}
 
@@ -173,9 +174,9 @@ func TestPost(t *testing.T) {
 	body, _ := eventHandler.CreateBody(eventMessage)
 
 	checksum, _ := eventHandler.Checksum(body)
-	eventHandler.HandleEvent(eventMessage)
+	eventHandler.HandleEvent(context.TODO(), eventMessage)
 
-	if wasFired := eventHandler.WasHookFired(checksum); !wasFired {
+	if wasFired := eventHandler.WasHookFired(context.TODO(), checksum); !wasFired {
 		t.Error("Checksum should have matched, event did not fire!")
 	}
 }
@@ -207,7 +208,7 @@ func TestNewCustomTemplate(t *testing.T) {
 				}()
 			}
 			h := &WebHookHandler{}
-			err := h.Init(map[string]interface{}{
+			err := h.Init(context.TODO(), map[string]interface{}{
 				"target_path":   testHttpPost,
 				"template_path": tc.templatePath,
 			})
@@ -249,7 +250,7 @@ func TestWebhookContentTypeHeader(t *testing.T) {
 			}
 
 			hook := &WebHookHandler{}
-			if err := hook.Init(conf); err != nil {
+			if err := hook.Init(context.TODO(), conf); err != nil {
 				t.Fatal("Webhook Init failed with err ", err)
 			}
 

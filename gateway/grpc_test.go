@@ -33,8 +33,8 @@ func TestHTTP2_TLS(t *testing.T) {
 	// Certificates
 	_, _, _, clientCert := genCertificate(&x509.Certificate{})
 	serverCertPem, _, combinedPEM, _ := genServerCertificate()
-	certID, _ := CertificateManager.Add(combinedPEM, "")
-	defer CertificateManager.Delete(certID, "")
+	certID, _ := CertificateManager.Add(context.TODO(), combinedPEM, "")
+	defer CertificateManager.Delete(context.TODO(), certID, "")
 
 	// Upstream server supporting HTTP/2
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -81,8 +81,8 @@ func TestGRPC_TLS(t *testing.T) {
 	defer ResetTestConfig()
 
 	_, _, combinedPEM, _ := genServerCertificate()
-	certID, _ := CertificateManager.Add(combinedPEM, "")
-	defer CertificateManager.Delete(certID, "")
+	certID, _ := CertificateManager.Add(context.TODO(), combinedPEM, "")
+	defer CertificateManager.Delete(context.TODO(), certID, "")
 
 	// gRPC server
 	s := startGRPCServer(t, nil)
@@ -130,11 +130,11 @@ func TestGRPC_MutualTLS(t *testing.T) {
 	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
 	serverCertPem, _, combinedPEM, _ := genServerCertificate()
 
-	certID, _ := CertificateManager.Add(combinedPEM, "") // For tyk to know downstream
-	defer CertificateManager.Delete(certID, "")
+	certID, _ := CertificateManager.Add(context.TODO(), combinedPEM, "") // For tyk to know downstream
+	defer CertificateManager.Delete(context.TODO(), certID, "")
 
-	clientCertID, _ := CertificateManager.Add(combinedClientPEM, "") // For upstream to know tyk
-	defer CertificateManager.Delete(clientCertID, "")
+	clientCertID, _ := CertificateManager.Add(context.TODO(), combinedClientPEM, "") // For upstream to know tyk
+	defer CertificateManager.Delete(context.TODO(), clientCertID, "")
 
 	// Protected gRPC server
 	s := startGRPCServer(t, clientCert.Leaf)
@@ -180,8 +180,8 @@ func TestGRPC_MutualTLS(t *testing.T) {
 func TestGRPC_BasicAuthentication(t *testing.T) {
 	defer ResetTestConfig()
 	_, _, combinedPEM, _ := genServerCertificate()
-	certID, _ := CertificateManager.Add(combinedPEM, "")
-	defer CertificateManager.Delete(certID, "")
+	certID, _ := CertificateManager.Add(context.TODO(), combinedPEM, "")
+	defer CertificateManager.Delete(context.TODO(), certID, "")
 
 	// gRPC server
 	s := startGRPCServer(t, nil)
@@ -237,8 +237,8 @@ func TestGRPC_BasicAuthentication(t *testing.T) {
 func TestGRPC_TokenBasedAuthentication(t *testing.T) {
 	defer ResetTestConfig()
 	_, _, combinedPEM, _ := genServerCertificate()
-	certID, _ := CertificateManager.Add(combinedPEM, "")
-	defer CertificateManager.Delete(certID, "")
+	certID, _ := CertificateManager.Add(context.TODO(), combinedPEM, "")
+	defer CertificateManager.Delete(context.TODO(), certID, "")
 
 	// gRPC server
 	s := startGRPCServer(t, nil)

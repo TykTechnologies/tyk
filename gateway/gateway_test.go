@@ -461,7 +461,7 @@ func TestAnalytics(t *testing.T) {
 	// Cleanup before test
 	// let records to to be sent
 	time.Sleep(recordsBufferFlushInterval + 50)
-	analytics.Store.GetAndDeleteSet(analyticsKeyName)
+	analytics.Store.GetAndDeleteSet(ts.Context(), analyticsKeyName)
 
 	t.Run("Log errors", func(t *testing.T) {
 		ts.Run(t, []test.TestCase{
@@ -472,7 +472,7 @@ func TestAnalytics(t *testing.T) {
 		// let records to to be sent
 		time.Sleep(recordsBufferFlushInterval + 50)
 
-		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		results := analytics.Store.GetAndDeleteSet(ts.Context(), analyticsKeyName)
 		if len(results) != 2 {
 			t.Error("Should return 2 record", len(results))
 		}
@@ -498,7 +498,7 @@ func TestAnalytics(t *testing.T) {
 		// let records to to be sent
 		time.Sleep(recordsBufferFlushInterval + 50)
 
-		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		results := analytics.Store.GetAndDeleteSet(ts.Context(), analyticsKeyName)
 		if len(results) != 1 {
 			t.Error("Should return 1 record: ", len(results))
 		}
@@ -537,7 +537,7 @@ func TestAnalytics(t *testing.T) {
 		// let records to to be sent
 		time.Sleep(recordsBufferFlushInterval + 50)
 
-		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		results := analytics.Store.GetAndDeleteSet(ts.Context(), analyticsKeyName)
 		if len(results) != 1 {
 			t.Error("Should return 1 record: ", len(results))
 		}
@@ -586,7 +586,7 @@ func TestAnalytics(t *testing.T) {
 		// let records to to be sent
 		time.Sleep(recordsBufferFlushInterval + 50)
 
-		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		results := analytics.Store.GetAndDeleteSet(ts.Context(), analyticsKeyName)
 		if len(results) != 1 {
 			t.Error("Should return 1 record: ", len(results))
 		}
@@ -631,7 +631,7 @@ func TestAnalytics(t *testing.T) {
 		// let records to to be sent
 		time.Sleep(recordsBufferFlushInterval + 50)
 
-		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		results := analytics.Store.GetAndDeleteSet(ts.Context(), analyticsKeyName)
 		if len(results) != 1 {
 			t.Error("Should return 1 record: ", len(results))
 		}
@@ -684,7 +684,7 @@ func TestAnalytics(t *testing.T) {
 		// let records to to be sent
 		time.Sleep(recordsBufferFlushInterval + 50)
 
-		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		results := analytics.Store.GetAndDeleteSet(ts.Context(), analyticsKeyName)
 		if len(results) != 1 {
 			t.Error("Should return 1 record: ", len(results))
 		}
@@ -745,7 +745,7 @@ func TestAnalytics(t *testing.T) {
 		// let records to to be sent
 		time.Sleep(recordsBufferFlushInterval + 50)
 
-		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		results := analytics.Store.GetAndDeleteSet(ts.Context(), analyticsKeyName)
 		if len(results) != 2 {
 			t.Fatal("Should return 1 record: ", len(results))
 		}
@@ -830,7 +830,7 @@ func TestControlListener(t *testing.T) {
 	}
 
 	ts.RunExt(t, tests...)
-	DoReload()
+	DoReload(ts.Context())
 	ts.RunExt(t, tests...)
 
 	// Moved here because DoReload overrides it
@@ -888,7 +888,7 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 				t.Fatalf("want %q, got %q", want, got)
 			}
 		}
-		handleRedisEvent(&msg, shouldHandle, nil)
+		handleRedisEvent(context.TODO(), &msg, shouldHandle, nil)
 		if !callbackRun {
 			t.Fatalf("Should run callback")
 		}
@@ -897,7 +897,7 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 		notHandle := func(got NotificationCommand) {
 			t.Fatalf("should have not handled redis event")
 		}
-		handleRedisEvent(msg, notHandle, nil)
+		handleRedisEvent(context.TODO(), msg, notHandle, nil)
 	})
 
 	t.Run("With signature", func(t *testing.T) {
@@ -922,7 +922,7 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 			}
 		}
 
-		handleRedisEvent(&msg, shouldHandle, nil)
+		handleRedisEvent(context.TODO(), &msg, shouldHandle, nil)
 		if !callbackRun {
 			t.Fatalf("Should run callback")
 		}
@@ -935,7 +935,7 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 		shouldFail := func(got NotificationCommand) {
 			valid = true
 		}
-		handleRedisEvent(&msg, shouldFail, nil)
+		handleRedisEvent(context.TODO(), &msg, shouldFail, nil)
 		if valid {
 			t.Fatalf("Should fail validation")
 		}
@@ -1245,7 +1245,7 @@ func TestCacheAllSafeRequests(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-"}
-	defer cache.DeleteScanMatch("*")
+	defer cache.DeleteScanMatch(ts.Context(), "*")
 
 	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.CacheOptions = apidef.CacheOptions{
@@ -1271,7 +1271,7 @@ func TestCacheAllSafeRequestsWithCachedHeaders(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-"}
-	defer cache.DeleteScanMatch("*")
+	defer cache.DeleteScanMatch(ts.Context(), "*")
 	authorization := "authorization"
 	tenant := "tenant-id"
 
@@ -1312,7 +1312,7 @@ func TestCacheWithAdvanceUrlRewrite(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-"}
-	defer cache.DeleteScanMatch("*")
+	defer cache.DeleteScanMatch(ts.Context(), "*")
 
 	BuildAndLoadAPI(func(spec *APISpec) {
 		version := spec.VersionData.Versions["v1"]
@@ -1367,7 +1367,7 @@ func TestCachePostRequest(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-"}
-	defer cache.DeleteScanMatch("*")
+	defer cache.DeleteScanMatch(ts.Context(), "*")
 	tenant := "tenant-id"
 
 	BuildAndLoadAPI(func(spec *APISpec) {
@@ -1409,7 +1409,7 @@ func TestAdvanceCachePutRequest(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-"}
-	defer cache.DeleteScanMatch("*")
+	defer cache.DeleteScanMatch(ts.Context(), "*")
 	tenant := "tenant-id"
 
 	BuildAndLoadAPI(func(spec *APISpec) {
@@ -1496,7 +1496,7 @@ func TestCacheAllSafeRequestsWithAdvancedCacheEndpoint(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-"}
-	defer cache.DeleteScanMatch("*")
+	defer cache.DeleteScanMatch(ts.Context(), "*")
 
 	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.CacheOptions = apidef.CacheOptions{
@@ -1531,7 +1531,7 @@ func TestCacheEtag(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-"}
-	defer cache.DeleteScanMatch("*")
+	defer cache.DeleteScanMatch(ts.Context(), "*")
 
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Etag", "12345")
@@ -1924,13 +1924,13 @@ func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
 		s.Rate = 1
 		s.Per = 60
 	})
-	defer GlobalSessionManager.RemoveSession("default", sess1token, false)
+	defer GlobalSessionManager.RemoveSession(ts.Context(), "default", sess1token, false)
 
 	sess2token := CreateSession(func(s *user.SessionState) {
 		s.Rate = 1
 		s.Per = 60
 	})
-	defer GlobalSessionManager.RemoveSession("default", sess2token, false)
+	defer GlobalSessionManager.RemoveSession(ts.Context(), "default", sess2token, false)
 
 	ts.Run(t, []test.TestCase{
 		{Headers: map[string]string{"Authorization": sess1token}, Code: http.StatusOK, Path: "/", Delay: 100 * time.Millisecond},
@@ -1944,7 +1944,7 @@ func TestTracing(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
 
-	prepareStorage()
+	prepareStorage(ts.Context())
 	spec := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 	})[0]
@@ -2009,7 +2009,7 @@ func TestBrokenClients(t *testing.T) {
 
 	t.Run("Invalid client: close without read", func(t *testing.T) {
 		time.Sleep(recordsBufferFlushInterval + 50*time.Millisecond)
-		analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		analytics.Store.GetAndDeleteSet(ts.Context(), analyticsKeyName)
 
 		conn, _ := net.DialTimeout("tcp", mainProxy().listener.Addr().String(), 0)
 		conn.Write([]byte("GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"))
@@ -2017,7 +2017,7 @@ func TestBrokenClients(t *testing.T) {
 		//conn.Read(buf)
 
 		time.Sleep(recordsBufferFlushInterval + 50*time.Millisecond)
-		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		results := analytics.Store.GetAndDeleteSet(ts.Context(), analyticsKeyName)
 
 		var record AnalyticsRecord
 		msgpack.Unmarshal([]byte(results[0].(string)), &record)

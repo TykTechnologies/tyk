@@ -2,6 +2,7 @@ package certs
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -30,7 +31,7 @@ func newDummyStorage() *dummyStorage {
 	}
 }
 
-func (s *dummyStorage) GetKey(key string) (string, error) {
+func (s *dummyStorage) GetKey(ctx context.Context, key string) (string, error) {
 	if value, ok := s.data[key]; ok {
 		return value, nil
 	}
@@ -38,12 +39,12 @@ func (s *dummyStorage) GetKey(key string) (string, error) {
 	return "", errors.New("Not found")
 }
 
-func (s *dummyStorage) SetKey(key, value string, exp int64) error {
+func (s *dummyStorage) SetKey(ctx context.Context, key, value string, exp int64) error {
 	s.data[key] = value
 	return nil
 }
 
-func (s *dummyStorage) DeleteKey(key string) bool {
+func (s *dummyStorage) DeleteKey(ctx context.Context, key string) bool {
 	if _, ok := s.data[key]; !ok {
 		return false
 	}
@@ -52,7 +53,7 @@ func (s *dummyStorage) DeleteKey(key string) bool {
 	return true
 }
 
-func (s *dummyStorage) DeleteScanMatch(pattern string) bool {
+func (s *dummyStorage) DeleteScanMatch(ctx context.Context, pattern string) bool {
 	if pattern == "*" {
 		s.data = make(map[string]string)
 		return true
@@ -61,7 +62,7 @@ func (s *dummyStorage) DeleteScanMatch(pattern string) bool {
 	return false
 }
 
-func (s *dummyStorage) RemoveFromList(keyName, value string) error {
+func (s *dummyStorage) RemoveFromList(ctx context.Context, keyName, value string) error {
 	for key, keyList := range s.indexList {
 		if key == keyName {
 			new := keyList[:]
@@ -82,7 +83,7 @@ func (s *dummyStorage) RemoveFromList(keyName, value string) error {
 	return nil
 }
 
-func (s *dummyStorage) GetListRange(keyName string, from, to int64) ([]string, error) {
+func (s *dummyStorage) GetListRange(ctx context.Context, keyName string, from, to int64) ([]string, error) {
 	for key := range s.indexList {
 		if key == keyName {
 			return s.indexList[key], nil
@@ -91,16 +92,16 @@ func (s *dummyStorage) GetListRange(keyName string, from, to int64) ([]string, e
 	return []string{}, nil
 }
 
-func (s *dummyStorage) Exists(keyName string) (bool, error) {
+func (s *dummyStorage) Exists(ctx context.Context, keyName string) (bool, error) {
 	_, exist := s.indexList[keyName]
 	return exist, nil
 }
 
-func (s *dummyStorage) AppendToSet(keyName string, value string) {
+func (s *dummyStorage) AppendToSet(ctx context.Context, keyName string, value string) {
 	s.indexList[keyName] = append(s.indexList[keyName], value)
 }
 
-func (s *dummyStorage) GetKeys(pattern string) (keys []string) {
+func (s *dummyStorage) GetKeys(ctx context.Context, pattern string) (keys []string) {
 	if pattern != "*" {
 		return nil
 	}
@@ -152,7 +153,6 @@ func leafSubjectName(cert *tls.Certificate) string {
 
 func TestAddCertificate(t *testing.T) {
 	m := newManager()
-
 	expiredCertPem, _ := genCertificateFromCommonName("expired", true)
 	certPem, keyPem := genCertificateFromCommonName("test", false)
 	cert2Pem, key2Pem := genCertificateFromCommonName("test2", false)
@@ -186,7 +186,7 @@ func TestAddCertificate(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		cid, err := m.Add(tc.data, "")
+		cid, err := m.Add(context.TODO(), tc.data, "")
 		if tc.err != "" {
 			if err == nil {
 				t.Error("Should error with", tc.err)
@@ -220,18 +220,18 @@ func TestCertificateStorage(t *testing.T) {
 	ioutil.WriteFile(certPath, certPem, 0666)
 
 	privateCertPEM, keyCertPEM := genCertificateFromCommonName("private", false)
-	privateCertID, _ := m.Add(append(privateCertPEM, keyCertPEM...), "")
+	privateCertID, _ := m.Add(context.TODO(), append(privateCertPEM, keyCertPEM...), "")
 
 	storageCert, _ := genCertificateFromCommonName("dummy", false)
-	storageCertID, _ := m.Add(storageCert, "")
+	storageCertID, _ := m.Add(context.TODO(), storageCert, "")
 
 	priv, _ := rsa.GenerateKey(rand.Reader, 2048)
 	privDer, _ := x509.MarshalPKIXPublicKey(&priv.PublicKey)
 	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: privDer})
-	publicKeyID, _ := m.Add(pubPem, "")
+	publicKeyID, _ := m.Add(context.TODO(), pubPem, "")
 
 	t.Run("File certificates", func(t *testing.T) {
-		certs := m.List([]string{certPath, "wrong"}, CertificatePublic)
+		certs := m.List(context.TODO(), []string{certPath, "wrong"}, CertificatePublic)
 		if len(certs) != 2 {
 			t.Fatal("Should contain 1 cert", len(certs))
 		}
@@ -246,7 +246,7 @@ func TestCertificateStorage(t *testing.T) {
 	})
 
 	t.Run("Remote storage certficates", func(t *testing.T) {
-		certs := m.List([]string{certPath, storageCertID, privateCertID}, CertificatePublic)
+		certs := m.List(context.TODO(), []string{certPath, storageCertID, privateCertID}, CertificatePublic)
 
 		if len(certs) != 2 {
 			t.Fatal("Should contain 2 cert", len(certs))
@@ -262,7 +262,7 @@ func TestCertificateStorage(t *testing.T) {
 	})
 
 	t.Run("Private certficates", func(t *testing.T) {
-		certs := m.List([]string{certPath, storageCertID, privateCertID}, CertificatePrivate)
+		certs := m.List(context.TODO(), []string{certPath, storageCertID, privateCertID}, CertificatePrivate)
 
 		if len(certs) != 1 {
 			t.Error("Should return only private certificate")
@@ -274,7 +274,7 @@ func TestCertificateStorage(t *testing.T) {
 	})
 
 	t.Run("Public keys", func(t *testing.T) {
-		certs := m.List([]string{publicKeyID}, CertificateAny)
+		certs := m.List(context.TODO(), []string{publicKeyID}, CertificateAny)
 
 		if len(certs) != 1 {
 			t.Error("Should return only private certificate")
@@ -295,12 +295,12 @@ func TestStorageIndex(t *testing.T) {
 		t.Error("Storage index list should have 0 certificates and indexes after creation")
 	}
 
-	certID, _ := m.Add(storageCert, "orgid-1")
+	certID, _ := m.Add(context.TODO(), storageCert, "orgid-1")
 	if len(storage.indexList["orgid-1-index"]) != 1 {
 		t.Error("Storage index list should have 1 certificates after adding a certificate")
 	}
 
-	m.Delete(certID, "orgid-1")
+	m.Delete(context.TODO(), certID, "orgid-1")
 	if len(storage.indexList["orgid-1-index"]) != 0 {
 		t.Error("Storage index list should have 0 certificates after deleting a certificate")
 	}

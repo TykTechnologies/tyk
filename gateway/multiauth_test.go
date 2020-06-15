@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"net/http"
@@ -107,7 +108,7 @@ func testPrepareMultiSessionBA(t testing.TB, isBench bool) (*APISpec, *http.Requ
 	password := "TEST"
 	keyName := generateToken("default", username)
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	GlobalSessionManager.UpdateSession(keyName, baSession, 60, false)
+	GlobalSessionManager.UpdateSession(context.TODO(), keyName, baSession, 60, false)
 
 	// Create key
 	session := createMultiAuthKeyAuthSession(isBench)
@@ -118,7 +119,7 @@ func testPrepareMultiSessionBA(t testing.TB, isBench bool) (*APISpec, *http.Requ
 		customToken = "84573485734587384888723487243"
 	}
 	// AuthKey sessions are stored by {token}
-	GlobalSessionManager.UpdateSession(customToken, session, 60, false)
+	GlobalSessionManager.UpdateSession(context.TODO(), customToken, session, 60, false)
 
 	toEncode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(toEncode))
@@ -166,13 +167,13 @@ func TestMultiSession_BA_Standard_Identity(t *testing.T) {
 	username := "0987876"
 	password := "TEST"
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	GlobalSessionManager.UpdateSession("default0987876", baSession, 60, false)
+	GlobalSessionManager.UpdateSession(context.TODO(), "default0987876", baSession, 60, false)
 
 	// Create key
 	session := createMultiAuthKeyAuthSession(false)
 	customToken := "84573485734587384888723487243"
 	// AuthKey sessions are stored by {token}
-	GlobalSessionManager.UpdateSession(customToken, session, 60, false)
+	GlobalSessionManager.UpdateSession(context.TODO(), customToken, session, 60, false)
 
 	to_encode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
@@ -203,13 +204,13 @@ func TestMultiSession_BA_Standard_FAILBA(t *testing.T) {
 	username := "0987876"
 	password := "WRONG"
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	GlobalSessionManager.UpdateSession("default0987876", baSession, 60, false)
+	GlobalSessionManager.UpdateSession(context.TODO(), "default0987876", baSession, 60, false)
 
 	// Create key
 	session := createMultiAuthKeyAuthSession(false)
 	customToken := "84573485734587384888723487243"
 	// AuthKey sessions are stored by {token}
-	GlobalSessionManager.UpdateSession(customToken, session, 60, false)
+	GlobalSessionManager.UpdateSession(context.TODO(), customToken, session, 60, false)
 
 	to_encode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
@@ -235,13 +236,13 @@ func TestMultiSession_BA_Standard_FAILAuth(t *testing.T) {
 	username := "0987876"
 	password := "TEST"
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	GlobalSessionManager.UpdateSession("default0987876", baSession, 60, false)
+	GlobalSessionManager.UpdateSession(context.TODO(), "default0987876", baSession, 60, false)
 
 	// Create key
 	session := createMultiAuthKeyAuthSession(false)
 	customToken := "84573485734587384888723487243"
 	// AuthKey sessions are stored by {token}
-	GlobalSessionManager.UpdateSession(customToken, session, 60, false)
+	GlobalSessionManager.UpdateSession(context.TODO(), customToken, session, 60, false)
 
 	to_encode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))

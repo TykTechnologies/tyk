@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
@@ -21,7 +22,7 @@ var sess = user.SessionState{
 	DataExpires: 110,
 }
 
-func (mockStore) SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool) {
+func (mockStore) SessionDetail(ctx context.Context, orgID string, keyName string, hashed bool) (user.SessionState, bool) {
 	return sess, true
 }
 
@@ -38,12 +39,12 @@ func TestBaseMiddleware_OrgSessionExpiry(t *testing.T) {
 	v := int64(100)
 	ExpiryCache.Set(sess.OrgID, v, cache.DefaultExpiration)
 
-	got := m.OrgSessionExpiry(sess.OrgID)
+	got := m.OrgSessionExpiry(context.TODO(), sess.OrgID)
 	if got != v {
 		t.Errorf("expected %d got %d", v, got)
 	}
 	ExpiryCache.Delete(sess.OrgID)
-	got = m.OrgSessionExpiry(sess.OrgID)
+	got = m.OrgSessionExpiry(context.TODO(), sess.OrgID)
 	if got != sess.DataExpires {
 		t.Errorf("expected %d got %d", sess.DataExpires, got)
 	}

@@ -373,7 +373,6 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 		_, _ = ts.Run(t, []test.TestCase{
 			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
 		}...)
-
 		sessionState, found := GlobalSessionManager.SessionDetail(ts.Context(), "default", key, false)
 		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 2 {
 			t.Fatal("Adding policy to the list failed")

@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -221,7 +222,7 @@ func TestRLClosed(t *testing.T) {
 	session := createRLSession()
 	customToken := uuid.NewV4().String()
 	// AuthKey sessions are stored by {token}
-	GlobalSessionManager.UpdateSession(customToken, session, 60, false)
+	GlobalSessionManager.UpdateSession(context.TODO(), customToken, session, 60, false)
 	req.Header.Set("authorization", "Bearer "+customToken)
 
 	DRLManager.SetCurrentTokenValue(1)

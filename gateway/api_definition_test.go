@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net"
@@ -505,7 +506,7 @@ func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 			t.Fatalf("want %q, got %q", want, got)
 		}
 	}
-	handleRedisEvent(&msg, handled, wg.Done)
+	handleRedisEvent(context.TODO(), &msg, handled, wg.Done)
 
 	// Since we already know that reload is queued
 	ReloadTick <- time.Time{}
@@ -810,7 +811,7 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 			t.Fatalf("want %q, got %q", want, got)
 		}
 	}
-	handleRedisEvent(&msg, handled, wg.Done)
+	handleRedisEvent(context.TODO(), &msg, handled, wg.Done)
 
 	// Since we already know that reload is queued
 	ReloadTick <- time.Time{}
@@ -827,7 +828,7 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 
 	var wg2 sync.WaitGroup
 	wg2.Add(1)
-	handleRedisEvent(&msg, handled, wg2.Done)
+	handleRedisEvent(context.TODO(), &msg, handled, wg2.Done)
 
 	// Since we already know that reload is queued
 	ReloadTick <- time.Time{}

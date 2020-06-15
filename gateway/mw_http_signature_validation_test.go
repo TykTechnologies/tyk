@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"crypto"
 	"crypto/hmac"
 	"crypto/rand"
@@ -96,15 +97,15 @@ func getHMACAuthChain(spec *APISpec) http.Handler {
 }
 
 type testAuthFailEventHandler struct {
-	cb func(config.EventMessage)
+	cb func(context.Context, config.EventMessage)
 }
 
-func (w *testAuthFailEventHandler) Init(handlerConf interface{}) error {
+func (w *testAuthFailEventHandler) Init(ctx context.Context, handlerConf interface{}) error {
 	return nil
 }
 
-func (w *testAuthFailEventHandler) HandleEvent(em config.EventMessage) {
-	w.cb(em)
+func (w *testAuthFailEventHandler) HandleEvent(ctx context.Context, em config.EventMessage) {
+	w.cb(ctx, em)
 }
 
 func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
@@ -127,7 +128,7 @@ func testPrepareHMACAuthSessionPass(tb testing.TB, hashFn func() hash.Hash, even
 	session := createHMACAuthSession()
 
 	// Should not receive an AuthFailure event
-	cb := func(em config.EventMessage) {
+	cb := func(context.Context, config.EventMessage) {
 		eventWG.Done()
 	}
 	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
@@ -141,7 +142,7 @@ func testPrepareHMACAuthSessionPass(tb testing.TB, hashFn func() hash.Hash, even
 		sessionKey = "9876"
 	}
 
-	GlobalSessionManager.UpdateSession(sessionKey, session, 60, false)
+	GlobalSessionManager.UpdateSession(context.TODO(), sessionKey, session, 60, false)
 
 	req := TestReq(tb, "GET", "/", nil)
 
@@ -180,7 +181,7 @@ func testPrepareRSAAuthSessionPass(tb testing.TB, eventWG *sync.WaitGroup, priva
 	session := createRSAAuthSession(pubCertId)
 
 	// Should not receive an AuthFailure event
-	cb := func(em config.EventMessage) {
+	cb := func(_ context.Context, em config.EventMessage) {
 		eventWG.Done()
 	}
 	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
@@ -194,7 +195,7 @@ func testPrepareRSAAuthSessionPass(tb testing.TB, eventWG *sync.WaitGroup, priva
 		sessionKey = "9876"
 	}
 
-	GlobalSessionManager.UpdateSession(sessionKey, session, 60, false)
+	GlobalSessionManager.UpdateSession(context.TODO(), sessionKey, session, 60, false)
 
 	req := TestReq(tb, "GET", "/", nil)
 
@@ -301,7 +302,7 @@ func TestHMACAuthSessionAuxDateHeader(t *testing.T) {
 	// Should not receive an AuthFailure event
 	var eventWG sync.WaitGroup
 	eventWG.Add(1)
-	cb := func(em config.EventMessage) {
+	cb := func(_ context.Context, em config.EventMessage) {
 		eventWG.Done()
 	}
 	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
@@ -309,7 +310,7 @@ func TestHMACAuthSessionAuxDateHeader(t *testing.T) {
 	}
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	GlobalSessionManager.UpdateSession("9876", session, 60, false)
+	GlobalSessionManager.UpdateSession(context.TODO(), "9876", session, 60, false)
 
 	recorder := httptest.NewRecorder()
 	req := TestReq(t, "GET", "/", nil)
@@ -353,7 +354,7 @@ func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
 	// Should receive an AuthFailure event
 	var eventWG sync.WaitGroup
 	eventWG.Add(1)
-	cb := func(em config.EventMessage) {
+	cb := func(_ context.Context, em config.EventMessage) {
 		eventWG.Done()
 	}
 	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
@@ -361,7 +362,7 @@ func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
 	}
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	GlobalSessionManager.UpdateSession("9876", session, 60, false)
+	GlobalSessionManager.UpdateSession(context.TODO(), "9876", session, 60, false)
 
 	recorder := httptest.NewRecorder()
 	req := TestReq(t, "GET", "/", nil)
@@ -405,7 +406,7 @@ func TestHMACAuthSessionKeyMissing(t *testing.T) {
 	// Should receive an AuthFailure event
 	var eventWG sync.WaitGroup
 	eventWG.Add(1)
-	cb := func(em config.EventMessage) {
+	cb := func(_ context.Context, em config.EventMessage) {
 		eventWG.Done()
 	}
 	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
@@ -413,7 +414,7 @@ func TestHMACAuthSessionKeyMissing(t *testing.T) {
 	}
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	GlobalSessionManager.UpdateSession("9876", session, 60, false)
+	GlobalSessionManager.UpdateSession(context.TODO(), "9876", session, 60, false)
 
 	recorder := httptest.NewRecorder()
 	req := TestReq(t, "GET", "/", nil)
@@ -457,7 +458,7 @@ func TestHMACAuthSessionMalformedHeader(t *testing.T) {
 	// Should receive an AuthFailure event
 	var eventWG sync.WaitGroup
 	eventWG.Add(1)
-	cb := func(em config.EventMessage) {
+	cb := func(_ context.Context, em config.EventMessage) {
 		eventWG.Done()
 	}
 	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
@@ -465,7 +466,7 @@ func TestHMACAuthSessionMalformedHeader(t *testing.T) {
 	}
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	GlobalSessionManager.UpdateSession("9876", session, 60, false)
+	GlobalSessionManager.UpdateSession(context.TODO(), "9876", session, 60, false)
 
 	recorder := httptest.NewRecorder()
 	req := TestReq(t, "GET", "/", nil)
@@ -567,7 +568,7 @@ func TestHMACAuthSessionPassWithHeaderFieldLowerCase(t *testing.T) {
 	// Should not receive an AuthFailure event
 	var eventWG sync.WaitGroup
 	eventWG.Add(1)
-	cb := func(em config.EventMessage) {
+	cb := func(_ context.Context, em config.EventMessage) {
 		eventWG.Done()
 	}
 	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
@@ -575,7 +576,7 @@ func TestHMACAuthSessionPassWithHeaderFieldLowerCase(t *testing.T) {
 	}
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	GlobalSessionManager.UpdateSession("9876", session, 60, false)
+	GlobalSessionManager.UpdateSession(context.TODO(), "9876", session, 60, false)
 
 	recorder := httptest.NewRecorder()
 	req := TestReq(t, "GET", "/", nil)
@@ -646,8 +647,8 @@ func TestRSAAuthSessionPass(t *testing.T) {
 	x509Cert, _ := x509.ParseCertificate(serverCert.Certificate[0])
 	pubDer, _ := x509.MarshalPKIXPublicKey(x509Cert.PublicKey)
 	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDer})
-	pubID, _ := CertificateManager.Add(pubPem, "")
-	defer CertificateManager.Delete(pubID, "")
+	pubID, _ := CertificateManager.Add(context.TODO(), pubPem, "")
+	defer CertificateManager.Delete(context.TODO(), pubID, "")
 
 	// Should not receive an AuthFailure event
 	var eventWG sync.WaitGroup
@@ -678,8 +679,8 @@ func BenchmarkRSAAuthSessionPass(b *testing.B) {
 	x509Cert, _ := x509.ParseCertificate(serverCert.Certificate[0])
 	pubDer, _ := x509.MarshalPKIXPublicKey(x509Cert.PublicKey)
 	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDer})
-	pubID, _ := CertificateManager.Add(pubPem, "")
-	defer CertificateManager.Delete(pubID, "")
+	pubID, _ := CertificateManager.Add(context.TODO(), pubPem, "")
+	defer CertificateManager.Delete(context.TODO(), pubID, "")
 
 	var eventWG sync.WaitGroup
 	eventWG.Add(b.N)
@@ -704,15 +705,15 @@ func TestRSAAuthSessionKeyMissing(t *testing.T) {
 	x509Cert, _ := x509.ParseCertificate(serverCert.Certificate[0])
 	pubDer, _ := x509.MarshalPKIXPublicKey(x509Cert.PublicKey)
 	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDer})
-	pubID, _ := CertificateManager.Add(pubPem, "")
-	defer CertificateManager.Delete(pubID, "")
+	pubID, _ := CertificateManager.Add(context.TODO(), pubPem, "")
+	defer CertificateManager.Delete(context.TODO(), pubID, "")
 
 	spec := LoadSampleAPI(hmacAuthDef)
 
 	// Should receive an AuthFailure event
 	var eventWG sync.WaitGroup
 	eventWG.Add(1)
-	cb := func(em config.EventMessage) {
+	cb := func(_ context.Context, em config.EventMessage) {
 		eventWG.Done()
 	}
 	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
