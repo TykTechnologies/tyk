@@ -1,10 +1,8 @@
 package gateway
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/jensneuse/abstractlogger"
@@ -122,19 +120,13 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
 	}
 
-	bodyBytes, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		m.Logger().Errorf("Could not read body data: '%s'", err)
-	}
-
 	var gqlRequest gql.Request
-	err = gql.UnmarshalRequest(bytes.NewReader(bodyBytes), &gqlRequest)
+	err := gql.UnmarshalRequest(r.Body, &gqlRequest)
 	if err != nil {
 		m.Logger().Debugf("Error while unmarshalling GraphQL request: '%s'", err)
 		return err, http.StatusBadRequest
 	}
 
-	r.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
 	defer ctxSetGraphQLRequest(r, &gqlRequest)
 
 	normalizationResult, err := gqlRequest.Normalize(m.Spec.GraphQLExecutor.Schema)
