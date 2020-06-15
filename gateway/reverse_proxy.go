@@ -686,6 +686,8 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 
 		rt.logger.WithField("looping_url", "tyk://"+r.Host).Debug("Executing request on internal route")
 		recorder := httptest.NewRecorder()
+
+		nopCloseRequestBody(r)
 		handler.ServeHTTP(recorder, r)
 		return recorder.Result(), nil
 	}
