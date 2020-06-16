@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/big"
@@ -26,6 +27,20 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
+
+func uploadCertPublicKey(serverCert tls.Certificate) (string, error) {
+	x509Cert, _ := x509.ParseCertificate(serverCert.Certificate[0])
+	pubDer, _ := x509.MarshalPKIXPublicKey(x509Cert.PublicKey)
+	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDer})
+	pubID, _ := CertificateManager.Add(pubPem, "")
+
+	if pubID != certs.HexSHA256(pubDer) {
+		errStr := fmt.Sprintf("certmanager returned wrong pub key fingerprint: %s %s", certs.HexSHA256(pubDer), pubID)
+		return "", errors.New(errStr)
+	}
+
+	return pubID, nil
+}
 
 func genCertificate(template *x509.Certificate) ([]byte, []byte, []byte, tls.Certificate) {
 	priv, _ := rsa.GenerateKey(rand.Reader, 1024)
