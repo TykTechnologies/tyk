@@ -5,6 +5,8 @@ package gateway
 
 import (
 	"crypto/tls"
+	"io/ioutil"
+	"os"
 
 	//	"net"
 	"net/http"
@@ -136,5 +138,89 @@ func TestProxyTransport(t *testing.T) {
 			TLSNextProto: make(map[string]func(authority string, c *tls.Conn) http.RoundTripper),
 		}
 		ts.Run(t, test.TestCase{Path: "/", Code: 200, Client: client})
+	})
+}
+
+func TestGatewayTLS_TestGatewayTLS_without_certs_old(t *testing.T) {
+	dir, _ := ioutil.TempDir("", "certs")
+	defer os.RemoveAll(dir)
+	client := GetTLSClient(nil, nil)
+
+	globalConf := config.Global()
+	globalConf.HttpServerOptions.UseSSL = true
+	config.SetGlobal(globalConf)
+	defer ResetTestConfig()
+
+	ts := StartTest()
+	defer ts.Close()
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+	})
+
+	ts.Run(t, test.TestCase{ErrorMatch: internalTLSErr, Client: client})
+}
+
+func TestAPICertificate_unknown_old(t *testing.T) {
+	_, _, combinedPEM, _ := genServerCertificate()
+	serverCertID, _ := CertificateManager.Add(combinedPEM, "")
+	defer CertificateManager.Delete(serverCertID, "")
+
+	globalConf := config.Global()
+	globalConf.HttpServerOptions.UseSSL = true
+	globalConf.HttpServerOptions.SSLCertificates = []string{}
+	config.SetGlobal(globalConf)
+	defer ResetTestConfig()
+
+	ts := StartTest()
+	defer ts.Close()
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = true
+		spec.Proxy.ListenPath = "/"
+	})
+	ts.Run(t, test.TestCase{ErrorMatch: internalTLSErr})
+}
+
+func TestCipherSuites(t *testing.T) {
+	//configure server so we can useSSL and utilize the logic, but skip verification in the clients
+	_, _, combinedPEM, _ := genServerCertificate()
+	serverCertID, _ := CertificateManager.Add(combinedPEM, "")
+	defer CertificateManager.Delete(serverCertID, "")
+
+	globalConf := config.Global()
+	globalConf.HttpServerOptions.UseSSL = true
+	globalConf.HttpServerOptions.Ciphers = []string{"TLS_RSA_WITH_RC4_128_SHA", "TLS_RSA_WITH_3DES_EDE_CBC_SHA", "TLS_RSA_WITH_AES_128_CBC_SHA"}
+	globalConf.HttpServerOptions.SSLCertificates = []string{serverCertID}
+	config.SetGlobal(globalConf)
+	defer ResetTestConfig()
+
+	ts := StartTest()
+	defer ts.Close()
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+	})
+
+	//matching ciphers
+	t.Run("Cipher match", func(t *testing.T) {
+
+		client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{
+			CipherSuites:       getCipherAliases([]string{"TLS_RSA_WITH_RC4_128_SHA", "TLS_RSA_WITH_3DES_EDE_CBC_SHA", "TLS_RSA_WITH_AES_128_CBC_SHA"}),
+			InsecureSkipVerify: true,
+		}}}
+
+		// If there is an internal TLS error it will fail test
+		ts.Run(t, test.TestCase{Client: client, Path: "/"})
+	})
+
+	t.Run("Cipher non-match", func(t *testing.T) {
+
+		client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{
+			CipherSuites:       getCipherAliases([]string{"TLS_RSA_WITH_AES_256_CBC_SHA"}), // not matching ciphers
+			InsecureSkipVerify: true,
+		}}}
+
+		ts.Run(t, test.TestCase{Client: client, Path: "/", ErrorMatch: "tls: handshake failure"})
 	})
 }

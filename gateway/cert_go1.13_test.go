@@ -4,6 +4,8 @@ package gateway
 
 import (
 	"crypto/tls"
+	"io/ioutil"
+	"os"
 
 	//	"net"
 	"net/http"
@@ -70,4 +72,45 @@ func TestProxyTransport_tlsv3(t *testing.T) {
 		}
 		ts.Run(t, test.TestCase{Path: "/", Code: 200, Client: client})
 	})
+}
+
+func TestGatewayTLS_without_certs(t *testing.T) {
+	dir, _ := ioutil.TempDir("", "certs")
+	defer os.RemoveAll(dir)
+	client := GetTLSClient(nil, nil)
+
+	globalConf := config.Global()
+	globalConf.HttpServerOptions.UseSSL = true
+	config.SetGlobal(globalConf)
+	defer ResetTestConfig()
+
+	ts := StartTest()
+	defer ts.Close()
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+	})
+
+	ts.Run(t, test.TestCase{ErrorMatch: "tls: unrecognized name", Client: client})
+}
+
+func TestAPICertificate_unknown(t *testing.T) {
+	_, _, combinedPEM, _ := genServerCertificate()
+	serverCertID, _ := CertificateManager.Add(combinedPEM, "")
+	defer CertificateManager.Delete(serverCertID, "")
+
+	globalConf := config.Global()
+	globalConf.HttpServerOptions.UseSSL = true
+	globalConf.HttpServerOptions.SSLCertificates = []string{}
+	config.SetGlobal(globalConf)
+	defer ResetTestConfig()
+
+	ts := StartTest()
+	defer ts.Close()
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = true
+		spec.Proxy.ListenPath = "/"
+	})
+	ts.Run(t, test.TestCase{ErrorMatch: unrecognizedName})
 }
