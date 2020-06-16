@@ -77,7 +77,7 @@ import (
 // In case you're using OperationNormalizer in a hot path you shouldn't be using this function.
 // Create a new OperationNormalizer using NewNormalizer() instead and re-use it.
 func NormalizeOperation(operation, definition *ast.Document, report *operationreport.Report) {
-	normalizer := NewNormalizer(false,false)
+	normalizer := NewNormalizer(false, false)
 	normalizer.NormalizeOperation(operation, definition, report)
 }
 
@@ -94,7 +94,7 @@ type OperationNormalizer struct {
 func NewNormalizer(removeFragmentDefinitions, extractVariables bool) *OperationNormalizer {
 	normalizer := &OperationNormalizer{
 		removeFragmentDefinitions: removeFragmentDefinitions,
-		extractVariables: extractVariables,
+		extractVariables:          extractVariables,
 	}
 	normalizer.setupWalkers()
 	return normalizer
@@ -124,5 +124,8 @@ func (o *OperationNormalizer) setupWalkers() {
 func (o *OperationNormalizer) NormalizeOperation(operation, definition *ast.Document, report *operationreport.Report) {
 	for i := range o.walkers {
 		o.walkers[i].Walk(operation, definition, report)
+		if report.HasErrors() {
+			return
+		}
 	}
 }

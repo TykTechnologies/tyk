@@ -158,7 +158,7 @@ func (p *Playground) configurePlaygroundHandler(handlers *Handlers) (err error) 
 	if strings.HasSuffix(p.cfg.PlaygroundPath, "/") || (p.cfg.PlaygroundPath == "" && strings.HasSuffix(p.cfg.PathPrefix, "/")) {
 		playgroundURL += "/"
 	}
-	
+
 	handlers.add(playgroundURL, func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Add(contentTypeHeader, contentTypeTextHTML)
 
