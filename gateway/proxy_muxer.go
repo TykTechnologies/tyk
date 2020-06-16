@@ -159,7 +159,7 @@ func (m *proxyMux) handle404(w http.ResponseWriter, r *http.Request) {
 	_, _ = fmt.Fprint(w, http.StatusText(http.StatusNotFound))
 }
 
-func (m *proxyMux) addTCPService(spec *APISpec, modifier *tcp.Modifier) {
+func (m *proxyMux) addTCPService(ctx context.Context, spec *APISpec, modifier *tcp.Modifier) {
 	hostname := spec.GlobalConfig.HostName
 	if spec.GlobalConfig.EnableCustomDomains {
 		hostname = spec.Domain
@@ -177,7 +177,7 @@ func (m *proxyMux) addTCPService(spec *APISpec, modifier *tcp.Modifier) {
 			protocol:         spec.Protocol,
 			useProxyProtocol: spec.EnableProxyProtocol,
 			tcpProxy: &tcp.Proxy{
-				DialTLS:         dialWithServiceDiscovery(spec, customDialTLSCheck(spec, tlsConfig)),
+				DialTLS:         dialWithServiceDiscovery(spec, customDialTLSCheck(ctx, spec, tlsConfig)),
 				Dial:            dialWithServiceDiscovery(spec, net.Dial),
 				TLSConfigTarget: tlsConfig,
 				// SyncStats:       recordTCPHit(spec.APIID, spec.DoNotTrack),
@@ -304,7 +304,7 @@ func dialWithServiceDiscovery(spec *APISpec, dial dialFn) dialFn {
 	}
 }
 
-func (m *proxyMux) swap(new *proxyMux) {
+func (m *proxyMux) swap(ctx context.Context, new *proxyMux) {
 	m.Lock()
 	defer m.Unlock()
 	listenAddress := config.Global().ListenAddress
@@ -352,13 +352,13 @@ func (m *proxyMux) swap(new *proxyMux) {
 		// Add a root message to check all is OK
 		p.router.HandleFunc("/"+config.Global().HealthCheckEndpointName, liveCheckHandler)
 	}
-	m.serve()
+	m.serve(ctx)
 }
 
-func (m *proxyMux) serve() {
+func (m *proxyMux) serve(ctx context.Context) {
 	for _, p := range m.proxies {
 		if p.listener == nil {
-			listener, err := m.generateListener(p.port, p.protocol)
+			listener, err := m.generateListener(ctx, p.port, p.protocol)
 			if err != nil {
 				mainLog.WithError(err).Error("Can't start listener")
 				continue
@@ -393,6 +393,7 @@ func (m *proxyMux) serve() {
 			addr := config.Global().ListenAddress + ":" + strconv.Itoa(p.port)
 			p.httpServer = &http.Server{
 				Addr:         addr,
+				BaseContext:  func(_ net.Listener) context.Context { return ctx },
 				ReadTimeout:  readTimeout,
 				WriteTimeout: writeTimeout,
 				Handler:      &handleWrapper{p.router},
@@ -424,7 +425,7 @@ func CheckPortWhiteList(w map[string]config.PortWhiteList, listenPort int, proto
 	return fmt.Errorf("%s:%d trying to open disabled port", protocol, listenPort)
 }
 
-func (m *proxyMux) generateListener(listenPort int, protocol string) (l net.Listener, err error) {
+func (m *proxyMux) generateListener(ctx context.Context, listenPort int, protocol string) (l net.Listener, err error) {
 	listenAddress := config.Global().ListenAddress
 	if !config.Global().DisablePortWhiteList {
 		if err := CheckPortWhiteList(config.Global().PortWhiteList, listenPort, protocol); err != nil {
@@ -454,7 +455,7 @@ func (m *proxyMux) generateListener(listenPort int, protocol string) (l net.List
 			tlsConfig.NextProtos = append(tlsConfig.NextProtos, http2.NextProtoTLS)
 		}
 
-		tlsConfig.GetConfigForClient = getTLSConfigForClient(&tlsConfig, listenPort)
+		tlsConfig.GetConfigForClient = getTLSConfigForClient(ctx, &tlsConfig, listenPort)
 		l, err = tls.Listen("tcp", targetPort, &tlsConfig)
 	default:
 		mainLog.WithField("port", targetPort).Infof("--> Standard listener (%s)", protocol)

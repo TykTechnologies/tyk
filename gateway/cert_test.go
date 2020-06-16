@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -144,11 +145,11 @@ func TestGatewayTLS(t *testing.T) {
 	})
 
 	t.Run("Redis certificate", func(t *testing.T) {
-		certID, err := CertificateManager.Add(combinedPEM, "")
+		certID, err := CertificateManager.Add(context.TODO(), combinedPEM, "")
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer CertificateManager.Delete(certID, "")
+		defer CertificateManager.Delete(context.TODO(), certID, "")
 
 		globalConf := config.Global()
 		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
@@ -194,8 +195,8 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 	clientWithoutCert := GetTLSClient(nil, nil)
 
 	t.Run("Separate domain", func(t *testing.T) {
-		certID, _ := CertificateManager.Add(combinedPEM, "")
-		defer CertificateManager.Delete(certID, "")
+		certID, _ := CertificateManager.Add(context.TODO(), combinedPEM, "")
+		defer CertificateManager.Delete(context.TODO(), certID, "")
 
 		globalConf := config.Global()
 		globalConf.ControlAPIHostname = "localhost"
@@ -225,8 +226,8 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 			{ControlRequest: true, ErrorMatch: badcertErr, Client: clientWithCert},
 		}...)
 
-		clientCertID, _ := CertificateManager.Add(clientCertPem, "")
-		defer CertificateManager.Delete(clientCertID, "")
+		clientCertID, _ := CertificateManager.Add(ts.Context(), clientCertPem, "")
+		defer CertificateManager.Delete(ts.Context(), clientCertID, "")
 
 		globalConf = config.Global()
 		globalConf.Security.Certificates.ControlAPI = []string{clientCertID}
@@ -242,8 +243,8 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 func TestAPIMutualTLS(t *testing.T) {
 	// Configure server
 	serverCertPem, _, combinedPEM, _ := genServerCertificate()
-	certID, _ := CertificateManager.Add(combinedPEM, "")
-	defer CertificateManager.Delete(certID, "")
+	certID, _ := CertificateManager.Add(context.TODO(), combinedPEM, "")
+	defer CertificateManager.Delete(context.TODO(), certID, "")
 
 	globalConf := config.Global()
 	globalConf.EnableCustomDomains = true
@@ -290,7 +291,7 @@ func TestAPIMutualTLS(t *testing.T) {
 
 		t.Run("Client certificate match", func(t *testing.T) {
 			client := GetTLSClient(&clientCert, serverCertPem)
-			clientCertID, _ := CertificateManager.Add(clientCertPem, "")
+			clientCertID, _ := CertificateManager.Add(ts.Context(), clientCertPem, "")
 
 			BuildAndLoadAPI(func(spec *APISpec) {
 				spec.Domain = "localhost"
@@ -303,7 +304,7 @@ func TestAPIMutualTLS(t *testing.T) {
 				Code: 200, Client: client, Domain: "localhost",
 			})
 
-			CertificateManager.Delete(clientCertID, "")
+			CertificateManager.Delete(ts.Context(), clientCertID, "")
 			CertificateManager.FlushCache()
 			tlsConfigCache.Flush()
 
@@ -317,8 +318,8 @@ func TestAPIMutualTLS(t *testing.T) {
 			client := GetTLSClient(&clientCert, serverCertPem)
 
 			clientCertPem2, _, _, _ := genCertificate(&x509.Certificate{})
-			clientCertID2, _ := CertificateManager.Add(clientCertPem2, "")
-			defer CertificateManager.Delete(clientCertID2, "")
+			clientCertID2, _ := CertificateManager.Add(ts.Context(), clientCertPem2, "")
+			defer CertificateManager.Delete(ts.Context(), clientCertID2, "")
 
 			BuildAndLoadAPI(func(spec *APISpec) {
 				spec.Domain = "localhost"
@@ -335,8 +336,8 @@ func TestAPIMutualTLS(t *testing.T) {
 
 	t.Run("Multiple APIs on same domain", func(t *testing.T) {
 		testSameDomain := func(t *testing.T, domain string) {
-			clientCertID, _ := CertificateManager.Add(clientCertPem, "")
-			defer CertificateManager.Delete(clientCertID, "")
+			clientCertID, _ := CertificateManager.Add(ts.Context(), clientCertPem, "")
+			defer CertificateManager.Delete(ts.Context(), clientCertID, "")
 
 			loadAPIS := func(certs ...string) {
 				BuildAndLoadAPI(
@@ -415,11 +416,11 @@ func TestAPIMutualTLS(t *testing.T) {
 
 	t.Run("Multiple APIs with Mutual TLS on the same domain", func(t *testing.T) {
 		testSameDomain := func(t *testing.T, domain string) {
-			clientCertID, _ := CertificateManager.Add(clientCertPem, "")
-			defer CertificateManager.Delete(clientCertID, "")
+			clientCertID, _ := CertificateManager.Add(ts.Context(), clientCertPem, "")
+			defer CertificateManager.Delete(ts.Context(), clientCertID, "")
 
-			clientCertID2, _ := CertificateManager.Add(clientCertPem2, "")
-			defer CertificateManager.Delete(clientCertID2, "")
+			clientCertID2, _ := CertificateManager.Add(ts.Context(), clientCertPem2, "")
+			defer CertificateManager.Delete(ts.Context(), clientCertID2, "")
 
 			loadAPIS := func(certs []string, certs2 []string) {
 				BuildAndLoadAPI(
@@ -528,8 +529,8 @@ func TestAPIMutualTLS(t *testing.T) {
 
 	t.Run("Multiple APIs, mutual on custom", func(t *testing.T) {
 		testSameDomain := func(t *testing.T, domain string) {
-			clientCertID, _ := CertificateManager.Add(clientCertPem, "")
-			defer CertificateManager.Delete(clientCertID, "")
+			clientCertID, _ := CertificateManager.Add(ts.Context(), clientCertPem, "")
+			defer CertificateManager.Delete(ts.Context(), clientCertID, "")
 
 			loadAPIS := func(certs ...string) {
 				BuildAndLoadAPI(
@@ -622,8 +623,8 @@ func TestAPIMutualTLS(t *testing.T) {
 
 	t.Run("Multiple APIs, mutual on empty", func(t *testing.T) {
 		testSameDomain := func(t *testing.T, domain string) {
-			clientCertID, _ := CertificateManager.Add(clientCertPem, "")
-			defer CertificateManager.Delete(clientCertID, "")
+			clientCertID, _ := CertificateManager.Add(ts.Context(), clientCertPem, "")
+			defer CertificateManager.Delete(ts.Context(), clientCertID, "")
 
 			loadAPIS := func(certs ...string) {
 				BuildAndLoadAPI(
@@ -752,8 +753,8 @@ func TestUpstreamMutualTLS(t *testing.T) {
 		ts := StartTest()
 		defer ts.Close()
 
-		clientCertID, _ := CertificateManager.Add(combinedClientPEM, "")
-		defer CertificateManager.Delete(clientCertID, "")
+		clientCertID, _ := CertificateManager.Add(ts.Context(), combinedClientPEM, "")
+		defer CertificateManager.Delete(ts.Context(), clientCertID, "")
 
 		pool.AddCert(clientCert.Leaf)
 
@@ -822,8 +823,8 @@ func TestSSLForceCommonName(t *testing.T) {
 
 func TestKeyWithCertificateTLS(t *testing.T) {
 	_, _, combinedPEM, _ := genServerCertificate()
-	serverCertID, _ := CertificateManager.Add(combinedPEM, "")
-	defer CertificateManager.Delete(serverCertID, "")
+	serverCertID, _ := CertificateManager.Add(context.TODO(), combinedPEM, "")
+	defer CertificateManager.Delete(context.TODO(), serverCertID, "")
 
 	globalConf := config.Global()
 	globalConf.HttpServerOptions.UseSSL = true
@@ -944,8 +945,8 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 
 func TestAPICertificate(t *testing.T) {
 	_, _, combinedPEM, _ := genServerCertificate()
-	serverCertID, _ := CertificateManager.Add(combinedPEM, "")
-	defer CertificateManager.Delete(serverCertID, "")
+	serverCertID, _ := CertificateManager.Add(context.TODO(), combinedPEM, "")
+	defer CertificateManager.Delete(context.TODO(), serverCertID, "")
 
 	globalConf := config.Global()
 	globalConf.HttpServerOptions.UseSSL = true
@@ -1038,8 +1039,8 @@ func TestCertificateHandlerTLS(t *testing.T) {
 func TestCipherSuites(t *testing.T) {
 	//configure server so we can useSSL and utilize the logic, but skip verification in the clients
 	_, _, combinedPEM, _ := genServerCertificate()
-	serverCertID, _ := CertificateManager.Add(combinedPEM, "")
-	defer CertificateManager.Delete(serverCertID, "")
+	serverCertID, _ := CertificateManager.Add(context.TODO(), combinedPEM, "")
+	defer CertificateManager.Delete(context.TODO(), serverCertID, "")
 
 	globalConf := config.Global()
 	globalConf.HttpServerOptions.UseSSL = true

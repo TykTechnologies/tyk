@@ -47,7 +47,7 @@ func (k *RateLimitForAPI) handleRateLimitFailure(r *http.Request, token string) 
 	k.Logger().WithField("key", obfuscateKey(token)).Info("API rate limit exceeded.")
 
 	// Fire a rate limit exceeded event
-	k.FireEvent(EventRateLimitExceeded, EventKeyFailureMeta{
+	k.FireEvent(r.Context(), EventRateLimitExceeded, EventKeyFailureMeta{
 		EventMetaDefault: EventMetaDefault{Message: "API Rate Limit Exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
 		Path:             r.URL.Path,
 		Origin:           request.RealIP(r),
@@ -55,7 +55,7 @@ func (k *RateLimitForAPI) handleRateLimitFailure(r *http.Request, token string) 
 	})
 
 	// Report in health check
-	reportHealthValue(k.Spec, Throttle, "-1")
+	reportHealthValue(r.Context(), k.Spec, Throttle, "-1")
 
 	return errors.New("API Rate limit exceeded"), http.StatusTooManyRequests
 }

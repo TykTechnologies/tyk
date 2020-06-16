@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"strings"
@@ -21,22 +22,22 @@ import (
 // is valid in any way (e.g. cryptographic signing etc.). Returns
 // a user.SessionState object (deserialised JSON)
 type AuthorisationHandler interface {
-	Init(storage.Handler)
-	KeyAuthorised(string) (user.SessionState, bool)
-	KeyExpired(*user.SessionState) bool
+	Init(context.Context, storage.Handler)
+	KeyAuthorised(context.Context, string) (user.SessionState, bool)
+	KeyExpired(context.Context, *user.SessionState) bool
 }
 
 // SessionHandler handles all update/create/access session functions and deals exclusively with
 // user.SessionState objects, not identity
 type SessionHandler interface {
-	Init(store storage.Handler)
-	UpdateSession(keyName string, session *user.SessionState, resetTTLTo int64, hashed bool) error
-	RemoveSession(orgID string, keyName string, hashed bool) bool
-	SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool)
-	Sessions(filter string) []string
+	Init(ctx context.Context, store storage.Handler)
+	UpdateSession(ctx context.Context, keyName string, session *user.SessionState, resetTTLTo int64, hashed bool) error
+	RemoveSession(ctx context.Context, orgID string, keyName string, hashed bool) bool
+	SessionDetail(ctx context.Context, orgID string, keyName string, hashed bool) (user.SessionState, bool)
+	Sessions(ctx context.Context, filter string) []string
 	Store() storage.Handler
-	ResetQuota(string, *user.SessionState, bool)
-	Stop()
+	ResetQuota(context.Context, string, *user.SessionState, bool)
+	Stop(ctx context.Context)
 }
 
 const sessionPoolDefaultSize = 50
@@ -57,7 +58,7 @@ func init() {
 	defaultSessionUpdater = &sessionUpdater{}
 }
 
-func (s *sessionUpdater) Init(store storage.Handler) {
+func (s *sessionUpdater) Init(ctx context.Context, store storage.Handler) {
 	s.once.Do(func() {
 		s.store = store
 		// check pool size in config and set to 50 if unset
@@ -75,15 +76,15 @@ func (s *sessionUpdater) Init(store storage.Handler) {
 
 		s.updateChan = make(chan *SessionUpdate, s.bufferSize)
 
-		s.keyPrefix = s.store.GetKeyPrefix()
+		s.keyPrefix = s.store.GetKeyPrefix(ctx)
 
 		for i := 0; i < s.poolSize; i++ {
-			go s.updateWorker()
+			go s.updateWorker(ctx)
 		}
 	})
 }
 
-func (s *sessionUpdater) updateWorker() {
+func (s *sessionUpdater) updateWorker(ctx context.Context) {
 	for u := range s.updateChan {
 		v, err := json.Marshal(u.session)
 		if err != nil {
@@ -93,7 +94,7 @@ func (s *sessionUpdater) updateWorker() {
 
 		if u.isHashed {
 			u.keyVal = s.keyPrefix + u.keyVal
-			err := s.store.SetRawKey(u.keyVal, string(v), u.ttl)
+			err := s.store.SetRawKey(ctx, u.keyVal, string(v), u.ttl)
 			if err != nil {
 				log.WithError(err).Error("Error updating hashed key")
 			}
@@ -101,7 +102,7 @@ func (s *sessionUpdater) updateWorker() {
 
 		}
 
-		err = s.store.SetKey(u.keyVal, string(v), u.ttl)
+		err = s.store.SetKey(ctx, u.keyVal, string(v), u.ttl)
 		if err != nil {
 			log.WithError(err).Error("Error updating key")
 		}
@@ -128,14 +129,14 @@ type SessionUpdate struct {
 	ttl      int64
 }
 
-func (b *DefaultAuthorisationManager) Init(store storage.Handler) {
+func (b *DefaultAuthorisationManager) Init(ctx context.Context, store storage.Handler) {
 	b.store = store
-	b.store.Connect()
+	b.store.Connect(ctx)
 }
 
 // KeyAuthorised checks if key exists and can be read into a user.SessionState object
-func (b *DefaultAuthorisationManager) KeyAuthorised(keyName string) (user.SessionState, bool) {
-	jsonKeyVal, err := b.store.GetKey(keyName)
+func (b *DefaultAuthorisationManager) KeyAuthorised(ctx context.Context, keyName string) (user.SessionState, bool) {
+	jsonKeyVal, err := b.store.GetKey(ctx, keyName)
 	var newSession user.SessionState
 	if err != nil {
 		log.WithFields(logrus.Fields{
@@ -155,17 +156,17 @@ func (b *DefaultAuthorisationManager) KeyAuthorised(keyName string) (user.Sessio
 }
 
 // KeyExpired checks if a key has expired, if the value of user.SessionState.Expires is 0, it will be ignored
-func (b *DefaultAuthorisationManager) KeyExpired(newSession *user.SessionState) bool {
+func (b *DefaultAuthorisationManager) KeyExpired(ctx context.Context, newSession *user.SessionState) bool {
 	if newSession.Expires >= 1 {
 		return time.Now().After(time.Unix(newSession.Expires, 0))
 	}
 	return false
 }
 
-func (b *DefaultSessionManager) Init(store storage.Handler) {
+func (b *DefaultSessionManager) Init(ctx context.Context, store storage.Handler) {
 	b.asyncWrites = config.Global().UseAsyncSessionWrite
 	b.store = store
-	b.store.Connect()
+	b.store.Connect(ctx)
 
 	// for RPC we don't need to setup async session writes
 	switch store.(type) {
@@ -174,7 +175,7 @@ func (b *DefaultSessionManager) Init(store storage.Handler) {
 	}
 
 	if b.asyncWrites {
-		defaultSessionUpdater.Init(store)
+		defaultSessionUpdater.Init(ctx, store)
 	}
 }
 
@@ -182,7 +183,7 @@ func (b *DefaultSessionManager) Store() storage.Handler {
 	return b.store
 }
 
-func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.SessionState, isHashed bool) {
+func (b *DefaultSessionManager) ResetQuota(ctx context.Context, keyName string, session *user.SessionState, isHashed bool) {
 	origKeyName := keyName
 	if !isHashed {
 		keyName = storage.HashKey(keyName)
@@ -196,19 +197,22 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 	}).Info("Reset quota for key.")
 
 	rateLimiterSentinelKey := RateLimitKeyPrefix + keyName + ".BLOCKED"
+	// We are deliberatelycalling redis directly instead of the separate goroutine.
+	// This piece is important we need to have deterministic expectations.
+
 	// Clear the rate limiter
-	go b.store.DeleteRawKey(rateLimiterSentinelKey)
+	b.store.DeleteRawKey(ctx, rateLimiterSentinelKey)
 	// Fix the raw key
-	go b.store.DeleteRawKey(rawKey)
+	b.store.DeleteRawKey(ctx, rawKey)
 	//go b.store.SetKey(rawKey, "0", session.QuotaRenewalRate)
 
 	for _, acl := range session.AccessRights {
 		rawKey = QuotaKeyPrefix + acl.AllowanceScope + "-" + keyName
-		go b.store.DeleteRawKey(rawKey)
+		b.store.DeleteRawKey(ctx, rawKey)
 	}
 }
 
-func (b *DefaultSessionManager) clearCacheForKey(keyName string, hashed bool) {
+func (b *DefaultSessionManager) clearCacheForKey(ctx context.Context, keyName string, hashed bool) {
 	cacheKey := keyName
 	if !hashed {
 		cacheKey = storage.HashKey(keyName)
@@ -222,13 +226,13 @@ func (b *DefaultSessionManager) clearCacheForKey(keyName string, hashed bool) {
 		Command: KeySpaceUpdateNotification,
 		Payload: cacheKey,
 	}
-	MainNotifier.Notify(n)
+	MainNotifier.Notify(ctx, n)
 }
 
 // UpdateSession updates the session state in the storage engine
-func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.SessionState,
+func (b *DefaultSessionManager) UpdateSession(ctx context.Context, keyName string, session *user.SessionState,
 	resetTTLTo int64, hashed bool) error {
-	defer b.clearCacheForKey(keyName, hashed)
+	defer b.clearCacheForKey(ctx, keyName, hashed)
 
 	// async update and return if needed
 	if b.asyncWrites {
@@ -253,43 +257,43 @@ func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.Sess
 
 	// sync update
 	if hashed {
-		keyName = b.store.GetKeyPrefix() + keyName
-		err = b.store.SetRawKey(keyName, string(v), resetTTLTo)
+		keyName = b.store.GetKeyPrefix(ctx) + keyName
+		err = b.store.SetRawKey(ctx, keyName, string(v), resetTTLTo)
 	} else {
-		err = b.store.SetKey(keyName, string(v), resetTTLTo)
+		err = b.store.SetKey(ctx, keyName, string(v), resetTTLTo)
 	}
 
 	return err
 }
 
 // RemoveSession removes session from storage
-func (b *DefaultSessionManager) RemoveSession(orgID string, keyName string, hashed bool) bool {
-	defer b.clearCacheForKey(keyName, hashed)
+func (b *DefaultSessionManager) RemoveSession(ctx context.Context, orgID string, keyName string, hashed bool) bool {
+	defer b.clearCacheForKey(ctx, keyName, hashed)
 
 	if hashed {
-		return b.store.DeleteRawKey(b.store.GetKeyPrefix() + keyName)
+		return b.store.DeleteRawKey(ctx, b.store.GetKeyPrefix(ctx)+keyName)
 	} else {
 		// support both old and new key hashing
-		res1 := b.store.DeleteKey(keyName)
-		res2 := b.store.DeleteKey(generateToken(orgID, keyName))
+		res1 := b.store.DeleteKey(ctx, keyName)
+		res2 := b.store.DeleteKey(ctx, generateToken(orgID, keyName))
 		return res1 || res2
 	}
 }
 
 // SessionDetail returns the session detail using the storage engine (either in memory or Redis)
-func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool) {
+func (b *DefaultSessionManager) SessionDetail(ctx context.Context, orgID string, keyName string, hashed bool) (user.SessionState, bool) {
 	var jsonKeyVal string
 	var err error
 	var session user.SessionState
 
 	// get session by key
 	if hashed {
-		jsonKeyVal, err = b.store.GetRawKey(b.store.GetKeyPrefix() + keyName)
+		jsonKeyVal, err = b.store.GetRawKey(ctx, b.store.GetKeyPrefix(ctx)+keyName)
 	} else {
 		if storage.TokenOrg(keyName) != orgID {
 			// try to get legacy and new format key at once
 			var jsonKeyValList []string
-			jsonKeyValList, err = b.store.GetMultiKey(
+			jsonKeyValList, err = b.store.GetMultiKey(ctx,
 				[]string{
 					generateToken(orgID, keyName),
 					keyName,
@@ -305,7 +309,7 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 			}
 		} else {
 			// key is not an imported one
-			jsonKeyVal, err = b.store.GetKey(keyName)
+			jsonKeyVal, err = b.store.GetKey(ctx, keyName)
 		}
 	}
 
@@ -326,11 +330,11 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 	return session, true
 }
 
-func (b *DefaultSessionManager) Stop() {}
+func (b *DefaultSessionManager) Stop(ctx context.Context) {}
 
 // Sessions returns all sessions in the key store that match a filter key (a prefix)
-func (b *DefaultSessionManager) Sessions(filter string) []string {
-	return b.store.GetKeys(filter)
+func (b *DefaultSessionManager) Sessions(ctx context.Context, filter string) []string {
+	return b.store.GetKeys(ctx, filter)
 }
 
 type DefaultKeyGenerator struct{}

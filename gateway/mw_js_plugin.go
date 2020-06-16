@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -310,7 +311,7 @@ const defaultJSVMTimeout = 5
 
 // Init creates the JSVM with the core library and sets up a default
 // timeout.
-func (j *JSVM) Init(spec *APISpec, logger *logrus.Entry) {
+func (j *JSVM) Init(ctx context.Context, spec *APISpec, logger *logrus.Entry) {
 	vm := otto.New()
 	logger = logger.WithField("prefix", "jsvm")
 
@@ -337,7 +338,7 @@ func (j *JSVM) Init(spec *APISpec, logger *logrus.Entry) {
 	j.Spec = spec
 
 	// Add environment API
-	j.LoadTykJSApi()
+	j.LoadTykJSApi(ctx)
 
 	if jsvmTimeout := config.Global().JSVMTimeout; jsvmTimeout <= 0 {
 		j.Timeout = time.Duration(defaultJSVMTimeout) * time.Second
@@ -390,7 +391,7 @@ type TykJSHttpResponse struct {
 	HeadersComp map[string][]string `json:"headers"`
 }
 
-func (j *JSVM) LoadTykJSApi() {
+func (j *JSVM) LoadTykJSApi(ctx context.Context) {
 	// Enable a log
 	j.VM.Set("log", func(call otto.FunctionCall) otto.Value {
 		j.Log.WithFields(logrus.Fields{
@@ -503,7 +504,7 @@ func (j *JSVM) LoadTykJSApi() {
 		r.Close = true
 
 		tr := &http.Transport{TLSClientConfig: &tls.Config{}}
-		if cert := getUpstreamCertificate(r.Host, j.Spec); cert != nil {
+		if cert := getUpstreamCertificate(r.Context(), r.Host, j.Spec); cert != nil {
 			tr.TLSClientConfig.Certificates = []tls.Certificate{*cert}
 		}
 
@@ -515,7 +516,7 @@ func (j *JSVM) LoadTykJSApi() {
 			tr.TLSClientConfig.InsecureSkipVerify = true
 		}
 
-		tr.DialTLS = customDialTLSCheck(j.Spec, tr.TLSClientConfig)
+		tr.DialTLS = customDialTLSCheck(ctx, j.Spec, tr.TLSClientConfig)
 
 		tr.Proxy = proxyFromAPI(j.Spec)
 
@@ -553,7 +554,7 @@ func (j *JSVM) LoadTykJSApi() {
 		apiKey := call.Argument(0).String()
 		apiId := call.Argument(1).String()
 
-		obj, _ := handleGetDetail(apiKey, apiId, false)
+		obj, _ := handleGetDetail(ctx, apiKey, apiId, false)
 		bs, _ := json.Marshal(obj)
 
 		returnVal, err := j.VM.ToValue(string(bs))
@@ -577,7 +578,7 @@ func (j *JSVM) LoadTykJSApi() {
 			return otto.Value{}
 		}
 
-		doAddOrUpdate(apiKey, &newSession, suppressReset == "1", false)
+		doAddOrUpdate(ctx, apiKey, &newSession, suppressReset == "1", false)
 
 		return otto.Value{}
 	})

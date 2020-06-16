@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -44,7 +45,7 @@ func prepareSpecWithEvents(logger *logrus.Logger) (spec *APISpec) {
 	spec.EventPaths = make(map[apidef.TykEvent][]config.TykEventHandler)
 	for eventName, eventHandlerConfs := range def.EventHandlers.Events {
 		for _, handlerConf := range eventHandlerConfs {
-			eventHandlerInstance, err := EventHandlerByName(handlerConf, spec)
+			eventHandlerInstance, err := EventHandlerByName(context.TODO(), handlerConf, spec)
 
 			if err != nil {
 				log.Error("Failed to init event handler: ", err)
@@ -102,7 +103,7 @@ func TestEventHandlerByName(t *testing.T) {
 	spec := prepareSpecWithEvents(nil)
 	for _, handlerType := range handlerTypes {
 		handlerConfig := prepareEventHandlerConfig(handlerType)
-		_, err := EventHandlerByName(handlerConfig, spec)
+		_, err := EventHandlerByName(context.TODO(), handlerConfig, spec)
 
 		// CP is disabled on standard builds:
 		if handlerType == EH_CoProcessHandler {
@@ -131,7 +132,7 @@ func TestLogMessageEventHandler(t *testing.T) {
 		TimeStamp: time.Now().Local().String(),
 	}
 	lookup := "testprefix:AuthFailure"
-	handler.HandleEvent(em)
+	handler.HandleEvent(context.TODO(), em)
 	if !strings.Contains(buf.String(), lookup) {
 		t.Fatal("Couldn't find log message")
 	}
@@ -139,7 +140,7 @@ func TestLogMessageEventHandler(t *testing.T) {
 
 func TestInitGenericEventHandlers(t *testing.T) {
 	conf := prepareEventsConf()
-	initGenericEventHandlers(conf)
+	initGenericEventHandlers(context.TODO(), conf)
 	triggers := conf.GetEventTriggers()
 	if len(triggers) != 2 {
 		t.Fatal("EventTriggers length doesn't match")
@@ -157,10 +158,11 @@ func TestInitGenericEventHandlers(t *testing.T) {
 }
 
 func BenchmarkInitGenericEventHandlers(b *testing.B) {
+	//TODO:(gernest) remove this. There is nothing worthy benchmarking here.
 	b.ReportAllocs()
 
 	conf := prepareEventsConf()
 	for i := 0; i < b.N; i++ {
-		initGenericEventHandlers(conf)
+		initGenericEventHandlers(context.TODO(), conf)
 	}
 }

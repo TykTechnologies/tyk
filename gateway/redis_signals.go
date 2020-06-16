@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"crypto"
 	"crypto/sha256"
 	"encoding/base64"
@@ -9,9 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v8"
 
 	"github.com/TykTechnologies/goverify"
 	"github.com/TykTechnologies/tyk/config"
@@ -51,25 +51,41 @@ func (n *Notification) Sign() {
 	n.Signature = hex.EncodeToString(hash[:])
 }
 
-func startPubSubLoop() {
+func startPubSubLoop(ctx context.Context) {
 	cacheStore := storage.RedisCluster{}
-	cacheStore.Connect()
-	// On message, synchronise
+	cacheStore.Connect(ctx)
+	initialized := true
+	listening := false
 	for {
-		err := cacheStore.StartPubSubHandler(RedisPubSubChannel, func(v interface{}) {
-			handleRedisEvent(v, nil, nil)
-		})
-		if err != nil {
-			if err != storage.ErrRedisIsDown {
-				pubSubLog.WithField("err", err).Error("Connection to Redis failed, reconnect in 10s")
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			if listening && !storage.Connected() {
+				listening = false
 			}
-			time.Sleep(10 * time.Second)
-			pubSubLog.Warning("Reconnecting ", err)
+			if !initialized || !listening {
+				err := cacheStore.StartPubSubHandler(ctx, RedisPubSubChannel, func(v interface{}) {
+					handleRedisEvent(ctx, v, nil, nil)
+				})
+				if err != nil {
+					listening = false
+					if err != storage.ErrRedisIsDown {
+						pubSubLog.WithField("err", err).Error("Connection to Redis failed, reconnect in 10s")
+					}
+					pubSubLog.Warning("Reconnecting ", err)
+					continue
+				}
+				if !initialized {
+					initialized = true
+				}
+				listening = true
+			}
 		}
 	}
 }
 
-func handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded func()) {
+func handleRedisEvent(ctx context.Context, v interface{}, handled func(NotificationCommand), reloaded func()) {
 	message, ok := v.(*redis.Message)
 	if !ok {
 		return
@@ -98,7 +114,7 @@ func handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded
 	case NoticeConfigUpdate:
 		handleNewConfiguration(notif.Payload)
 	case NoticeDashboardConfigRequest:
-		handleSendMiniConfig(notif.Payload)
+		handleSendMiniConfig(ctx, notif.Payload)
 	case NoticeGatewayDRLNotification:
 		if config.Global().ManagementNode {
 			// DRL is not initialized, going through would
@@ -108,7 +124,7 @@ func handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded
 		}
 		onServerStatusReceivedHandler(notif.Payload)
 	case NoticeGatewayLENotification:
-		onLESSLStatusReceivedHandler(notif.Payload)
+		onLESSLStatusReceivedHandler(ctx, notif.Payload)
 	case NoticeApiUpdated, NoticeApiRemoved, NoticeApiAdded, NoticePolicyChanged, NoticeGroupReload:
 		pubSubLog.Info("Reloading endpoints")
 		reloadURLStructure(reloaded)
@@ -200,7 +216,7 @@ type RedisNotifier struct {
 }
 
 // Notify will send a notification to a channel
-func (r *RedisNotifier) Notify(notif interface{}) bool {
+func (r *RedisNotifier) Notify(ctx context.Context, notif interface{}) bool {
 	if n, ok := notif.(Notification); ok {
 		n.Sign()
 		notif = n
@@ -216,7 +232,7 @@ func (r *RedisNotifier) Notify(notif interface{}) bool {
 
 	// pubSubLog.Debug("Sending notification", notif)
 
-	if err := r.store.Publish(r.channel, string(toSend)); err != nil {
+	if err := r.store.Publish(ctx, r.channel, string(toSend)); err != nil {
 		if err != storage.ErrRedisIsDown {
 			pubSubLog.Error("Could not send notification: ", err)
 		}

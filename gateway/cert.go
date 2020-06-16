@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
@@ -57,7 +58,7 @@ var cipherSuites = map[string]uint16{
 
 var certLog = log.WithField("prefix", "certs")
 
-func getUpstreamCertificate(host string, spec *APISpec) (cert *tls.Certificate) {
+func getUpstreamCertificate(ctx context.Context, host string, spec *APISpec) (cert *tls.Certificate) {
 	var certID string
 
 	certMaps := []map[string]string{config.Global().Security.Certificates.Upstream}
@@ -93,7 +94,7 @@ func getUpstreamCertificate(host string, spec *APISpec) (cert *tls.Certificate) 
 		return nil
 	}
 
-	certs := CertificateManager.List([]string{certID}, certs.CertificatePrivate)
+	certs := CertificateManager.List(ctx, []string{certID}, certs.CertificatePrivate)
 
 	if len(certs) == 0 {
 		return nil
@@ -102,14 +103,14 @@ func getUpstreamCertificate(host string, spec *APISpec) (cert *tls.Certificate) 
 	return certs[0]
 }
 
-func verifyPeerCertificatePinnedCheck(spec *APISpec, tlsConfig *tls.Config) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+func verifyPeerCertificatePinnedCheck(ctx context.Context, spec *APISpec, tlsConfig *tls.Config) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 	if (spec == nil || len(spec.PinnedPublicKeys) == 0) && len(config.Global().Security.PinnedPublicKeys) == 0 {
 		return nil
 	}
 
 	tlsConfig.InsecureSkipVerify = true
 
-	whitelist := getPinnedPublicKeys("*", spec)
+	whitelist := getPinnedPublicKeys(ctx, "*", spec)
 	if len(whitelist) == 0 {
 		return nil
 	}
@@ -137,10 +138,10 @@ func verifyPeerCertificatePinnedCheck(spec *APISpec, tlsConfig *tls.Config) func
 	}
 }
 
-func validatePublicKeys(host string, conn *tls.Conn, spec *APISpec) bool {
+func validatePublicKeys(ctx context.Context, host string, conn *tls.Conn, spec *APISpec) bool {
 	certLog.Debug("Checking certificate public key for host:", host)
 
-	whitelist := getPinnedPublicKeys(host, spec)
+	whitelist := getPinnedPublicKeys(ctx, host, spec)
 	if len(whitelist) == 0 {
 		return true
 	}
@@ -176,7 +177,7 @@ func validateCommonName(host string, cert *x509.Certificate) error {
 	return nil
 }
 
-func customDialTLSCheck(spec *APISpec, tc *tls.Config) func(network, addr string) (net.Conn, error) {
+func customDialTLSCheck(ctx context.Context, spec *APISpec, tc *tls.Config) func(network, addr string) (net.Conn, error) {
 	var checkPinnedKeys, checkCommonName bool
 
 	if (spec != nil && len(spec.PinnedPublicKeys) != 0) || len(config.Global().Security.PinnedPublicKeys) != 0 {
@@ -203,7 +204,7 @@ func customDialTLSCheck(spec *APISpec, tc *tls.Config) func(network, addr string
 		host, _, _ := net.SplitHostPort(addr)
 
 		if checkPinnedKeys {
-			isValid := validatePublicKeys(host, c, spec)
+			isValid := validatePublicKeys(ctx, host, c, spec)
 			if !isValid {
 				return nil, errors.New("https://" + host + " certificate public key pinning error. Public keys do not match.")
 			}
@@ -222,7 +223,7 @@ func customDialTLSCheck(spec *APISpec, tc *tls.Config) func(network, addr string
 	}
 }
 
-func getPinnedPublicKeys(host string, spec *APISpec) (fingerprint []string) {
+func getPinnedPublicKeys(ctx context.Context, host string, spec *APISpec) (fingerprint []string) {
 	var keyIDs string
 
 	pinMaps := []map[string]string{config.Global().Security.PinnedPublicKeys}
@@ -258,7 +259,7 @@ func getPinnedPublicKeys(host string, spec *APISpec) (fingerprint []string) {
 		return nil
 	}
 
-	return CertificateManager.ListPublicKeys(strings.Split(keyIDs, ","))
+	return CertificateManager.ListPublicKeys(ctx, strings.Split(keyIDs, ","))
 }
 
 // dummyGetCertificate needed because TLSConfig require setting Certificates array or GetCertificate function from start, even if it get overriden by `getTLSConfigForClient`
@@ -270,7 +271,7 @@ var tlsConfigCache = cache.New(60*time.Second, 60*time.Minute)
 
 var tlsConfigMu sync.Mutex
 
-func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
+func getTLSConfigForClient(ctx context.Context, baseConfig *tls.Config, listenPort int) func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
 	// Supporting legacy certificate configuration
 	serverCerts := []tls.Certificate{}
 	certNameMap := map[string]*tls.Certificate{}
@@ -285,7 +286,7 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 		certNameMap[certData.Name] = &cert
 	}
 
-	for _, cert := range CertificateManager.List(config.Global().HttpServerOptions.SSLCertificates, certs.CertificatePrivate) {
+	for _, cert := range CertificateManager.List(ctx, config.Global().HttpServerOptions.SSLCertificates, certs.CertificatePrivate) {
 		if cert != nil {
 			serverCerts = append(serverCerts, *cert)
 		}
@@ -321,7 +322,7 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 
 		if isControlAPI && config.Global().Security.ControlAPIUseMutualTLS {
 			newConfig.ClientAuth = tls.RequireAndVerifyClientCert
-			newConfig.ClientCAs = CertificateManager.CertPool(config.Global().Security.Certificates.ControlAPI)
+			newConfig.ClientCAs = CertificateManager.CertPool(ctx, config.Global().Security.Certificates.ControlAPI)
 
 			tlsConfigCache.Set(hello.ServerName, newConfig, cache.DefaultExpiration)
 			return newConfig, nil
@@ -348,7 +349,7 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 				if spec.Domain == "" || spec.Domain == hello.ServerName {
 					certIDs := append(spec.ClientCertificates, config.Global().Security.Certificates.API...)
 
-					for _, cert := range CertificateManager.List(certIDs, certs.CertificatePublic) {
+					for _, cert := range CertificateManager.List(ctx, certIDs, certs.CertificatePublic) {
 						if cert != nil {
 							newConfig.ClientCAs.AddCert(cert.Leaf)
 						}
@@ -371,7 +372,7 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 
 			// Dynamically add API specific certificates
 			if len(spec.Certificates) != 0 {
-				for _, cert := range CertificateManager.List(spec.Certificates, certs.CertificatePrivate) {
+				for _, cert := range CertificateManager.List(ctx, spec.Certificates, certs.CertificatePrivate) {
 					if cert == nil {
 						continue
 					}
@@ -413,7 +414,7 @@ func certHandler(w http.ResponseWriter, r *http.Request) {
 
 		orgID := r.URL.Query().Get("org_id")
 		var certID string
-		if certID, err = CertificateManager.Add(content, orgID); err != nil {
+		if certID, err = CertificateManager.Add(r.Context(), content, orgID); err != nil {
 			doJSONWrite(w, http.StatusForbidden, apiError(err.Error()))
 			return
 		}
@@ -423,13 +424,13 @@ func certHandler(w http.ResponseWriter, r *http.Request) {
 		if certID == "" {
 			orgID := r.URL.Query().Get("org_id")
 
-			certIds := CertificateManager.ListAllIds(orgID)
+			certIds := CertificateManager.ListAllIds(r.Context(), orgID)
 			doJSONWrite(w, http.StatusOK, &APIAllCertificates{certIds})
 			return
 		}
 
 		certIDs := strings.Split(certID, ",")
-		certificates := CertificateManager.List(certIDs, certs.CertificateAny)
+		certificates := CertificateManager.List(r.Context(), certIDs, certs.CertificateAny)
 
 		if len(certIDs) == 1 {
 			if certificates[0] == nil {
@@ -457,7 +458,7 @@ func certHandler(w http.ResponseWriter, r *http.Request) {
 		if orgID == "" && len(certID) >= sha256.Size*2 {
 			orgID = certID[:len(certID)-sha256.Size*2]
 		}
-		CertificateManager.Delete(certID, orgID)
+		CertificateManager.Delete(r.Context(), certID, orgID)
 		doJSONWrite(w, http.StatusOK, &apiStatusMessage{"ok", "removed"})
 	}
 }

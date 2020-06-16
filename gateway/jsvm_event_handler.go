@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -22,7 +23,7 @@ type JSVMEventHandler struct {
 }
 
 // New enables the intitialisation of event handler instances when they are created on ApiSpec creation
-func (l *JSVMEventHandler) Init(handlerConf interface{}) error {
+func (l *JSVMEventHandler) Init(ctx context.Context, handlerConf interface{}) error {
 	l.methodName = handlerConf.(map[string]interface{})["name"].(string)
 
 	// Set the VM globals
@@ -41,7 +42,7 @@ func (l *JSVMEventHandler) Init(handlerConf interface{}) error {
 }
 
 // HandleEvent will be fired when the event handler instance is found in an APISpec EventPaths object during a request chain
-func (l *JSVMEventHandler) HandleEvent(em config.EventMessage) {
+func (l *JSVMEventHandler) HandleEvent(ctx context.Context, em config.EventMessage) {
 	// JSON-encode the event data object
 	msgAsJSON, err := json.Marshal(em)
 	if err != nil {

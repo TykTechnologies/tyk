@@ -41,7 +41,7 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 	requestValid, stat, meta := v.Spec.RequestValid(r)
 	if !requestValid {
 		// Fire a versioning failure event
-		v.FireEvent(EventVersionFailure, EventVersionFailureMeta{
+		v.FireEvent(r.Context(), EventVersionFailure, EventVersionFailureMeta{
 			EventMetaDefault: EventMetaDefault{
 				Message:            "Attempted access to disallowed version / path.",
 				OriginatingRequest: EncodeRequestToEvent(r),

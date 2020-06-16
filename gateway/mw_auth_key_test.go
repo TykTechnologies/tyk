@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"net/http"
@@ -235,7 +236,7 @@ func testPrepareAuthKeySession(apiDef string, isBench bool) (string, *APISpec) {
 		customToken = "54321111"
 	}
 	// AuthKey sessions are stored by {token}
-	GlobalSessionManager.UpdateSession(customToken, session, 60, false)
+	GlobalSessionManager.UpdateSession(context.TODO(), customToken, session, 60, false)
 	return customToken, spec
 }
 
@@ -351,7 +352,7 @@ func TestMultiAuthSession(t *testing.T) {
 	session := createAuthKeyAuthSession(false)
 	customToken := "54321111"
 	// AuthKey sessions are stored by {token}
-	GlobalSessionManager.UpdateSession(customToken, session, 60, false)
+	GlobalSessionManager.UpdateSession(context.TODO(), customToken, session, 60, false)
 
 	// Set the url param
 	recorder := httptest.NewRecorder()

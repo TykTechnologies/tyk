@@ -210,7 +210,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		errCreatingChecksum = true
 	} else {
 		v, sfErr, _ := m.singleFlight.Do(key, func() (interface{}, error) {
-			return m.CacheStore.GetKey(key)
+			return m.CacheStore.GetKey(r.Context(), key)
 		})
 		retBlob = v.(string)
 		err = sfErr
@@ -303,7 +303,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 			log.Debug("Cache TTL is:", cacheTTL)
 			ts := m.getTimeTTL(cacheTTL)
 			toStore := m.encodePayload(wireFormatReq.String(), ts)
-			go m.CacheStore.SetKey(key, toStore, cacheTTL)
+			go m.CacheStore.SetKey(r.Context(), key, toStore, cacheTTL)
 		}
 
 		return nil, mwStatusRespond
@@ -312,12 +312,12 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	cachedData, timestamp, err := m.decodePayload(retBlob)
 	if err != nil {
 		// Tere was an issue with this cache entry - lets remove it:
-		m.CacheStore.DeleteKey(key)
+		m.CacheStore.DeleteKey(r.Context(), key)
 		return nil, http.StatusOK
 	}
 
 	if m.isTimeStampExpired(timestamp) || len(cachedData) == 0 {
-		m.CacheStore.DeleteKey(key)
+		m.CacheStore.DeleteKey(r.Context(), key)
 		return nil, http.StatusOK
 	}
 

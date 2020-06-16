@@ -32,7 +32,7 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 	if session.IsInactive {
 		logger.Info("Attempted access from inactive key.")
 		// Fire a key expired event
-		k.FireEvent(EventKeyExpired, EventKeyFailureMeta{
+		k.FireEvent(r.Context(), EventKeyExpired, EventKeyFailureMeta{
 			EventMetaDefault: EventMetaDefault{Message: "Attempted access from inactive key.", OriginatingRequest: EncodeRequestToEvent(r)},
 			Path:             r.URL.Path,
 			Origin:           request.RealIP(r),
@@ -40,24 +40,24 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 		})
 
 		// Report in health check
-		reportHealthValue(k.Spec, KeyFailure, "-1")
+		reportHealthValue(r.Context(), k.Spec, KeyFailure, "-1")
 
 		return errors.New("Key is inactive, please renew"), http.StatusForbidden
 	}
 
-	if !k.Spec.AuthManager.KeyExpired(session) {
+	if !k.Spec.AuthManager.KeyExpired(r.Context(), session) {
 		return nil, http.StatusOK
 	}
 	logger.Info("Attempted access from expired key.")
 
-	k.FireEvent(EventKeyExpired, EventKeyFailureMeta{
+	k.FireEvent(r.Context(), EventKeyExpired, EventKeyFailureMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Attempted access from expired key.", OriginatingRequest: EncodeRequestToEvent(r)},
 		Path:             r.URL.Path,
 		Origin:           request.RealIP(r),
 		Key:              token,
 	})
 	// Report in health check
-	reportHealthValue(k.Spec, KeyFailure, "-1")
+	reportHealthValue(r.Context(), k.Spec, KeyFailure, "-1")
 
 	return errors.New("Key has expired, please renew"), http.StatusUnauthorized
 }

@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
@@ -116,6 +117,8 @@ var virtBatchTest = `function batchTest (request, session, config) {
 func TestVirtualEndpointBatch(t *testing.T) {
 	_, _, combinedClientPEM, clientCert := genCertificate(&x509.Certificate{})
 	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	}))
@@ -132,8 +135,8 @@ func TestVirtualEndpointBatch(t *testing.T) {
 	upstream.StartTLS()
 	defer upstream.Close()
 
-	clientCertID, _ := CertificateManager.Add(combinedClientPEM, "")
-	defer CertificateManager.Delete(clientCertID, "")
+	clientCertID, _ := CertificateManager.Add(ctx, combinedClientPEM, "")
+	defer CertificateManager.Delete(ctx, clientCertID, "")
 
 	virtBatchTest = strings.Replace(virtBatchTest, "{upstream_URL}", upstream.URL, 2)
 	defer upstream.Close()

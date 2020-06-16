@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -22,13 +23,13 @@ type NodeResponseOK struct {
 }
 
 type DashboardServiceSender interface {
-	Init() error
-	Register() error
-	DeRegister() error
-	StartBeating() error
-	StopBeating()
-	Ping() error
-	NotifyDashboardOfEvent(interface{}) error
+	Init(context.Context) error
+	Register(context.Context) error
+	DeRegister(context.Context) error
+	StartBeating(context.Context) error
+	StopBeating(context.Context)
+	Ping(context.Context) error
+	NotifyDashboardOfEvent(context.Context, interface{}) error
 }
 
 type HTTPDashboardHandler struct {
@@ -44,7 +45,7 @@ type HTTPDashboardHandler struct {
 
 var dashClient *http.Client
 
-func initialiseClient() *http.Client {
+func initialiseClient(ctx context.Context) *http.Client {
 	if dashClient == nil {
 		dashClient = &http.Client{
 			Timeout: 30 * time.Second,
@@ -63,30 +64,30 @@ func initialiseClient() *http.Client {
 	return dashClient
 }
 
-func reLogin() {
+func reLogin(ctx context.Context) {
 	if !config.Global().UseDBAppConfigs {
 		return
 	}
 
 	dashLog.Info("Registering node (again).")
-	DashService.StopBeating()
-	if err := DashService.DeRegister(); err != nil {
+	DashService.StopBeating(ctx)
+	if err := DashService.DeRegister(ctx); err != nil {
 		dashLog.Error("Could not deregister: ", err)
 	}
 
 	time.Sleep(5 * time.Second)
 
-	if err := DashService.Register(); err != nil {
+	if err := DashService.Register(ctx); err != nil {
 		dashLog.Error("Could not register: ", err)
 	} else {
-		go DashService.StartBeating()
+		go DashService.StartBeating(ctx)
 	}
 
 	dashLog.Info("Recovering configurations, reloading...")
 	reloadURLStructure(nil)
 }
 
-func (h *HTTPDashboardHandler) Init() error {
+func (h *HTTPDashboardHandler) Init(ctx context.Context) error {
 	h.RegistrationEndpoint = buildConnStr("/register/node")
 	h.DeRegistrationEndpoint = buildConnStr("/system/node")
 	h.HeartBeatEndpoint = buildConnStr("/register/ping")
@@ -100,7 +101,7 @@ func (h *HTTPDashboardHandler) Init() error {
 
 // NotifyDashboardOfEvent acts as a form of event which informs the
 // dashboard of a key which has reached a certain usage quota
-func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
+func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(ctx context.Context, event interface{}) error {
 
 	meta, ok := event.(EventTriggerExceededMeta)
 	if !ok {
@@ -123,7 +124,7 @@ func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 	req.Header.Set(headers.XTykNodeID, GetNodeID())
 	req.Header.Set(headers.XTykNonce, ServiceNonce)
 
-	c := initialiseClient()
+	c := initialiseClient(ctx)
 
 	resp, err := c.Do(req)
 	if err != nil {
@@ -149,20 +150,20 @@ func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 	return nil
 }
 
-func (h *HTTPDashboardHandler) Register() error {
+func (h *HTTPDashboardHandler) Register(ctx context.Context) error {
 	dashLog.Info("Registering gateway node with Dashboard")
 	req := h.newRequest(h.RegistrationEndpoint)
-	c := initialiseClient()
+	c := initialiseClient(ctx)
 	resp, err := c.Do(req)
 
 	if err != nil {
 		dashLog.Errorf("Request failed with error %v; retrying in 5s", err)
 		time.Sleep(time.Second * 5)
-		return h.Register()
+		return h.Register(ctx)
 	} else if resp != nil && resp.StatusCode != 200 {
 		dashLog.Errorf("Response failed with code %d; retrying in 5s", resp.StatusCode)
 		time.Sleep(time.Second * 5)
-		return h.Register()
+		return h.Register(ctx)
 	}
 
 	defer resp.Body.Close()
@@ -178,7 +179,7 @@ func (h *HTTPDashboardHandler) Register() error {
 	if !found {
 		dashLog.Error("Failed to register node, retrying in 5s")
 		time.Sleep(time.Second * 5)
-		return h.Register()
+		return h.Register(ctx)
 	}
 
 	dashLog.WithField("id", GetNodeID()).Info("Node Registered")
@@ -190,17 +191,17 @@ func (h *HTTPDashboardHandler) Register() error {
 	return nil
 }
 
-func (h *HTTPDashboardHandler) Ping() error {
+func (h *HTTPDashboardHandler) Ping(ctx context.Context) error {
 	return h.sendHeartBeat(
 		h.newRequest(h.HeartBeatEndpoint),
-		initialiseClient())
+		initialiseClient(ctx))
 }
 
-func (h *HTTPDashboardHandler) StartBeating() error {
+func (h *HTTPDashboardHandler) StartBeating(ctx context.Context) error {
 
 	req := h.newRequest(h.HeartBeatEndpoint)
 
-	client := initialiseClient()
+	client := initialiseClient(ctx)
 
 	for !h.heartBeatStopSentinel {
 		if err := h.sendHeartBeat(req, client); err != nil {
@@ -214,7 +215,7 @@ func (h *HTTPDashboardHandler) StartBeating() error {
 	return nil
 }
 
-func (h *HTTPDashboardHandler) StopBeating() {
+func (h *HTTPDashboardHandler) StopBeating(ctx context.Context) {
 	h.heartBeatStopSentinel = true
 }
 
@@ -240,7 +241,7 @@ func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Cli
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusForbidden {
-		return DashService.Register()
+		return DashService.Register(req.Context())
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -258,13 +259,13 @@ func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Cli
 	return nil
 }
 
-func (h *HTTPDashboardHandler) DeRegister() error {
+func (h *HTTPDashboardHandler) DeRegister(ctx context.Context) error {
 	req := h.newRequest(h.DeRegistrationEndpoint)
 
 	req.Header.Set(headers.XTykNodeID, GetNodeID())
 	req.Header.Set(headers.XTykNonce, ServiceNonce)
 
-	c := initialiseClient()
+	c := initialiseClient(ctx)
 	resp, err := c.Do(req)
 
 	if err != nil {

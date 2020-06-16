@@ -132,6 +132,9 @@ func Error(err error) Field {
 }
 
 // Object adds an object-valued key:value pair to a Span.LogFields() record
+// Please pass in an immutable object, otherwise there may be concurrency issues.
+// Such as passing in the map, log.Object may result in "fatal error: concurrent map iteration and map write".
+// Because span is sent asynchronously, it is possible that this map will also be modified.
 func Object(key string, obj interface{}) Field {
 	return Field{
 		key:          key,

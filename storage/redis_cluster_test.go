@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -8,22 +9,22 @@ import (
 
 func TestRedisClusterGetMultiKey(t *testing.T) {
 	t.Skip()
-
+	ctx := context.Background()
 	keys := []string{"first", "second"}
 	r := RedisCluster{KeyPrefix: "test-cluster"}
 	for _, v := range keys {
-		r.DeleteKey(v)
+		r.DeleteKey(ctx, v)
 	}
-	_, err := r.GetMultiKey(keys)
+	_, err := r.GetMultiKey(ctx, keys)
 	if err != ErrKeyNotFound {
 		t.Errorf("expected %v got %v", ErrKeyNotFound, err)
 	}
-	err = r.SetKey(keys[0], keys[0], 0)
+	err = r.SetKey(ctx, keys[0], keys[0], 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	v, err := r.GetMultiKey([]string{"first", "second"})
+	v, err := r.GetMultiKey(ctx, []string{"first", "second"})
 	if err != nil {
 		t.Fatal(err)
 	}

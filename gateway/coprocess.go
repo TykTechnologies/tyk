@@ -392,7 +392,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		AuthFailed(m, r, token)
 
 		// Report in health check
-		reportHealthValue(m.Spec, KeyFailure, "1")
+		reportHealthValue(r.Context(), m.Spec, KeyFailure, "1")
 
 		errorMsg := "Key not authorised"
 		if returnObject.Request.ReturnOverrides.ResponseBody != "" {
@@ -450,7 +450,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			return errors.New(http.StatusText(http.StatusForbidden)), http.StatusForbidden
 		}
 
-		existingSession, found := GlobalSessionManager.SessionDetail(m.Spec.OrgID, sessionID, false)
+		existingSession, found := GlobalSessionManager.SessionDetail(r.Context(), m.Spec.OrgID, sessionID, false)
 		if found {
 			returnedSession.QuotaRenews = existingSession.QuotaRenews
 			returnedSession.QuotaRemaining = existingSession.QuotaRemaining

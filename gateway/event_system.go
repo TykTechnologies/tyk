@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"errors"
 	"net/http"
@@ -97,23 +98,23 @@ func EncodeRequestToEvent(r *http.Request) string {
 }
 
 // EventHandlerByName is a convenience function to get event handler instances from an API Definition
-func EventHandlerByName(handlerConf apidef.EventHandlerTriggerConfig, spec *APISpec) (config.TykEventHandler, error) {
+func EventHandlerByName(ctx context.Context, handlerConf apidef.EventHandlerTriggerConfig, spec *APISpec) (config.TykEventHandler, error) {
 
 	conf := handlerConf.HandlerMeta
 	switch handlerConf.Handler {
 	case EH_LogHandler:
 		h := &LogMessageEventHandler{}
-		err := h.Init(conf)
+		err := h.Init(ctx, conf)
 		return h, err
 	case EH_WebHook:
 		h := &WebHookHandler{}
-		err := h.Init(conf)
+		err := h.Init(ctx, conf)
 		return h, err
 	case EH_JSVMHandler:
 		// Load the globals and file here
 		if spec != nil {
 			h := &JSVMEventHandler{Spec: spec}
-			err := h.Init(conf)
+			err := h.Init(ctx, conf)
 			if err == nil {
 				GlobalEventsJSVM.LoadJSPaths([]string{conf["path"].(string)}, "")
 			}
@@ -127,7 +128,7 @@ func EventHandlerByName(handlerConf apidef.EventHandlerTriggerConfig, spec *APIS
 			}
 			h := &CoProcessEventHandler{}
 			h.Spec = spec
-			err := h.Init(conf)
+			err := h.Init(ctx, conf)
 			return h, err
 		}
 	}
@@ -135,7 +136,7 @@ func EventHandlerByName(handlerConf apidef.EventHandlerTriggerConfig, spec *APIS
 	return nil, errors.New("Handler not found")
 }
 
-func fireEvent(name apidef.TykEvent, meta interface{}, handlers map[apidef.TykEvent][]config.TykEventHandler) {
+func fireEvent(ctx context.Context, name apidef.TykEvent, meta interface{}, handlers map[apidef.TykEvent][]config.TykEventHandler) {
 	log.Debug("EVENT FIRED: ", name)
 	if handlers, e := handlers[name]; e {
 		log.Debugf("FOUND %d EVENT HANDLERS", len(handlers))
@@ -146,17 +147,17 @@ func fireEvent(name apidef.TykEvent, meta interface{}, handlers map[apidef.TykEv
 		}
 		for _, handler := range handlers {
 			log.Debug("FIRING HANDLER: ", handler)
-			go handler.HandleEvent(eventMessage)
+			go handler.HandleEvent(ctx, eventMessage)
 		}
 	}
 }
 
-func (s *APISpec) FireEvent(name apidef.TykEvent, meta interface{}) {
-	fireEvent(name, meta, s.EventPaths)
+func (s *APISpec) FireEvent(ctx context.Context, name apidef.TykEvent, meta interface{}) {
+	fireEvent(ctx, name, meta, s.EventPaths)
 }
 
-func FireSystemEvent(name apidef.TykEvent, meta interface{}) {
-	fireEvent(name, meta, config.Global().GetEventTriggers())
+func FireSystemEvent(ctx context.Context, name apidef.TykEvent, meta interface{}) {
+	fireEvent(ctx, name, meta, config.Global().GetEventTriggers())
 }
 
 // LogMessageEventHandler is a sample Event Handler
@@ -166,7 +167,7 @@ type LogMessageEventHandler struct {
 }
 
 // New enables the intitialisation of event handler instances when they are created on ApiSpec creation
-func (l *LogMessageEventHandler) Init(handlerConf interface{}) error {
+func (l *LogMessageEventHandler) Init(ctx context.Context, handlerConf interface{}) error {
 	conf := handlerConf.(map[string]interface{})
 	l.prefix = conf["prefix"].(string)
 	l.logger = log
@@ -180,7 +181,7 @@ func (l *LogMessageEventHandler) Init(handlerConf interface{}) error {
 }
 
 // HandleEvent will be fired when the event handler instance is found in an APISpec EventPaths object during a request chain
-func (l *LogMessageEventHandler) HandleEvent(em config.EventMessage) {
+func (l *LogMessageEventHandler) HandleEvent(ctx context.Context, em config.EventMessage) {
 	logMsg := l.prefix + ":" + string(em.Type)
 
 	// We can handle specific event types easily
@@ -197,13 +198,13 @@ func (l *LogMessageEventHandler) HandleEvent(em config.EventMessage) {
 	l.logger.Warning(logMsg)
 }
 
-func initGenericEventHandlers(conf *config.Config) {
+func initGenericEventHandlers(ctx context.Context, conf *config.Config) {
 	handlers := make(map[apidef.TykEvent][]config.TykEventHandler)
 	for eventName, eventHandlerConfs := range conf.EventHandlers.Events {
 		log.Debug("FOUND EVENTS TO INIT")
 		for _, handlerConf := range eventHandlerConfs {
 			log.Debug("CREATING EVENT HANDLERS")
-			eventHandlerInstance, err := EventHandlerByName(handlerConf, nil)
+			eventHandlerInstance, err := EventHandlerByName(ctx, handlerConf, nil)
 
 			if err != nil {
 				log.Error("Failed to init event handler: ", err)

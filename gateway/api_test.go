@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -12,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v8"
 	uuid "github.com/satori/go.uuid"
 
 	"fmt"
@@ -236,7 +237,7 @@ func TestKeyHandler(t *testing.T) {
 			},
 		}...)
 
-		GlobalSessionManager.Store().DeleteAllKeys()
+		GlobalSessionManager.Store().DeleteAllKeys(ts.Context())
 	})
 
 	_, knownKey := ts.CreateSession(func(s *user.SessionState) {
@@ -370,8 +371,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 		_, _ = ts.Run(t, []test.TestCase{
 			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
 		}...)
-
-		sessionState, found := GlobalSessionManager.SessionDetail("default", key, false)
+		sessionState, found := GlobalSessionManager.SessionDetail(ts.Context(), "default", key, false)
 		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 2 {
 			t.Fatal("Adding policy to the list failed")
 		}
@@ -386,7 +386,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
 		}...)
 
-		sessionState, found := GlobalSessionManager.SessionDetail("default", key, false)
+		sessionState, found := GlobalSessionManager.SessionDetail(ts.Context(), "default", key, false)
 		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 0 {
 			t.Fatal("Removing policy from the list failed")
 		}
@@ -401,7 +401,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 				{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
 			}...)
 
-			sessionState, found := GlobalSessionManager.SessionDetail(session.OrgID, key, false)
+			sessionState, found := GlobalSessionManager.SessionDetail(ts.Context(), session.OrgID, key, false)
 
 			sort.Strings(sessionState.Tags)
 			sort.Strings(expected)
@@ -442,7 +442,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 				{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
 			}...)
 
-			sessionState, found := GlobalSessionManager.SessionDetail(session.OrgID, key, false)
+			sessionState, found := GlobalSessionManager.SessionDetail(ts.Context(), session.OrgID, key, false)
 
 			if !found || !reflect.DeepEqual(expected, sessionState.MetaData) {
 				t.Fatalf("Expected %v, returned %v", expected, sessionState.MetaData)
@@ -1195,10 +1195,12 @@ func TestGroupResetHandler(t *testing.T) {
 	didSubscribe := make(chan bool)
 	didReload := make(chan bool)
 	cacheStore := storage.RedisCluster{}
-	cacheStore.Connect()
-
+	ctx, cancel := context.WithCancel(context.Background())
+	cacheStore.Connect(ctx)
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
-		err := cacheStore.StartPubSubHandler(RedisPubSubChannel, func(v interface{}) {
+		err := cacheStore.StartPubSubHandler(ctx, RedisPubSubChannel, func(v interface{}) {
 			switch x := v.(type) {
 			case *redis.Subscription:
 				didSubscribe <- true
@@ -1214,9 +1216,12 @@ func TestGroupResetHandler(t *testing.T) {
 		})
 		if err != nil {
 			t.Log(err)
-			t.Fail()
+			if err != context.Canceled {
+				t.Fail()
+			}
 			close(didReload)
 		}
+		wg.Done()
 	}()
 
 	uri := "/tyk/reload/group"
@@ -1250,6 +1255,9 @@ func TestGroupResetHandler(t *testing.T) {
 	// type of notifications may be received during tests, as this
 	// is the cluster channel:
 	<-didReload
+	cancel()
+	// make sure the goroutine exits within this test
+	wg.Wait()
 }
 
 func TestHotReloadSingle(t *testing.T) {
@@ -1303,7 +1311,7 @@ func BenchmarkApiReload(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		loadControlAPIEndpoints(nil)
-		loadApps(specs)
+		loadApps(context.TODO(), specs)
 	}
 }
 

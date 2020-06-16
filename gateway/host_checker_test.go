@@ -52,15 +52,15 @@ const sampleUptimeTestAPI = `{
 }`
 
 type testEventHandler struct {
-	cb func(config.EventMessage)
+	cb func(context.Context, config.EventMessage)
 }
 
-func (w *testEventHandler) Init(handlerConf interface{}) error {
+func (w *testEventHandler) Init(ctx context.Context, handlerConf interface{}) error {
 	return nil
 }
 
-func (w *testEventHandler) HandleEvent(em config.EventMessage) {
-	w.cb(em)
+func (w *testEventHandler) HandleEvent(ctx context.Context, em config.EventMessage) {
+	w.cb(ctx, em)
 }
 
 func TestHostChecker(t *testing.T) {
@@ -85,7 +85,7 @@ func TestHostChecker(t *testing.T) {
 	var eventWG sync.WaitGroup
 	// Should receive one HostDown event
 	eventWG.Add(1)
-	cb := func(em config.EventMessage) {
+	cb := func(context.Context, config.EventMessage) {
 		eventWG.Done()
 	}
 
@@ -155,7 +155,7 @@ func TestHostChecker(t *testing.T) {
 	}
 
 	redisStore := GlobalHostChecker.store.(*storage.RedisCluster)
-	if ttl, _ := redisStore.GetKeyTTL(PoolerHostSentinelKeyPrefix + testHttpFailure); int(ttl) != GlobalHostChecker.checker.checkTimeout*GlobalHostChecker.checker.sampleTriggerLimit {
+	if ttl, _ := redisStore.GetKeyTTL(context.TODO(), PoolerHostSentinelKeyPrefix+testHttpFailure); int(ttl) != GlobalHostChecker.checker.checkTimeout*GlobalHostChecker.checker.sampleTriggerLimit {
 		t.Error("HostDown expiration key should be checkTimeout + 1", ttl)
 	}
 	GlobalHostChecker.checkerMu.Unlock()
@@ -183,7 +183,7 @@ func TestReverseProxyAllDown(t *testing.T) {
 	var eventWG sync.WaitGroup
 	// Should receive one HostDown event
 	eventWG.Add(1)
-	cb := func(em config.EventMessage) {
+	cb := func(ctx context.Context, em config.EventMessage) {
 		eventWG.Done()
 	}
 	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{

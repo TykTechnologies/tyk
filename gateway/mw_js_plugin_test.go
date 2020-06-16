@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"io/ioutil"
 	"net/http/httptest"
@@ -29,7 +30,7 @@ func TestJSVMLogs(t *testing.T) {
 	log.Formatter = new(prefixed.TextFormatter)
 
 	jsvm := JSVM{}
-	jsvm.Init(nil, logrus.NewEntry(log))
+	jsvm.Init(context.TODO(), nil, logrus.NewEntry(log))
 
 	jsvm.RawLog = logrus.New()
 	jsvm.RawLog.Out = &buf
@@ -83,7 +84,7 @@ func TestJSVMBody(t *testing.T) {
 	body := "foô \uffff \u0000 \xff bàr"
 	req := httptest.NewRequest("GET", "/foo", strings.NewReader(body))
 	jsvm := JSVM{}
-	jsvm.Init(nil, logrus.NewEntry(log))
+	jsvm.Init(context.TODO(), nil, logrus.NewEntry(log))
 
 	const js = `
 var leakMid = new TykJS.TykMiddleware.NewMiddleware({})
@@ -120,7 +121,7 @@ func TestJSVMSessionMetadataUpdate(t *testing.T) {
 	}
 	req := httptest.NewRequest("GET", "/foo", nil)
 	jsvm := JSVM{}
-	jsvm.Init(nil, logrus.NewEntry(log))
+	jsvm.Init(context.TODO(), nil, logrus.NewEntry(log))
 
 	s := &user.SessionState{MetaData: make(map[string]interface{})}
 	s.MetaData["same"] = "same"
@@ -165,7 +166,7 @@ func TestJSVMProcessTimeout(t *testing.T) {
 	}
 	req := httptest.NewRequest("GET", "/foo", strings.NewReader("body"))
 	jsvm := JSVM{}
-	jsvm.Init(nil, logrus.NewEntry(log))
+	jsvm.Init(context.TODO(), nil, logrus.NewEntry(log))
 	jsvm.Timeout = time.Millisecond
 
 	// this js plugin just loops forever, keeping Otto at 100% CPU
@@ -213,7 +214,7 @@ testJSVMData.NewProcessRequest(function(request, session, spec) {
 		Pre:                 true,
 	}
 	jsvm := JSVM{}
-	jsvm.Init(nil, logrus.NewEntry(log))
+	jsvm.Init(context.TODO(), nil, logrus.NewEntry(log))
 	if _, err := jsvm.VM.Run(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
 	}
@@ -256,7 +257,7 @@ testJSVMCore.NewProcessRequest(function(request, session, config) {
 		config.SetGlobal(globalConf)
 	}()
 	jsvm := JSVM{}
-	jsvm.Init(nil, logrus.NewEntry(log))
+	jsvm.Init(context.TODO(), nil, logrus.NewEntry(log))
 	if _, err := jsvm.VM.Run(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
 	}
@@ -280,7 +281,7 @@ func TestJSVMRequestScheme(t *testing.T) {
 	}
 	req := httptest.NewRequest("GET", "/foo", nil)
 	jsvm := JSVM{}
-	jsvm.Init(nil, logrus.NewEntry(log))
+	jsvm.Init(context.TODO(), nil, logrus.NewEntry(log))
 
 	const js = `
 var leakMid = new TykJS.TykMiddleware.NewMiddleware({})
@@ -423,7 +424,7 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 
 func TestJSVMBase64(t *testing.T) {
 	jsvm := JSVM{}
-	jsvm.Init(nil, logrus.NewEntry(log))
+	jsvm.Init(context.TODO(), nil, logrus.NewEntry(log))
 
 	inputString := "teststring"
 	inputB64 := "dGVzdHN0cmluZw=="

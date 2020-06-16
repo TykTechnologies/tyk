@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -35,7 +36,7 @@ type SessionLimiter struct {
 	bucketStore leakybucket.Storage
 }
 
-func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string,
+func (l *SessionLimiter) doRollingWindowWrite(ctx context.Context, key, rateLimiterKey, rateLimiterSentinelKey string,
 	currentSession *user.SessionState,
 	store storage.Handler,
 	globalConf *config.Config,
@@ -57,9 +58,9 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 
 	var ratePerPeriodNow int
 	if dryRun {
-		ratePerPeriodNow, _ = store.GetRollingWindow(rateLimiterKey, int64(per), pipeline)
+		ratePerPeriodNow, _ = store.GetRollingWindow(ctx, rateLimiterKey, int64(per), pipeline)
 	} else {
-		ratePerPeriodNow, _ = store.SetRollingWindow(rateLimiterKey, int64(per), "-1", pipeline)
+		ratePerPeriodNow, _ = store.SetRollingWindow(ctx, rateLimiterKey, int64(per), "-1", pipeline)
 	}
 
 	//log.Info("Num Requests: ", ratePerPeriodNow)
@@ -77,7 +78,7 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 		// Set a sentinel value with expire
 		if globalConf.EnableSentinelRateLimiter {
 			if !dryRun {
-				store.SetRawKey(rateLimiterSentinelKey, "1", int64(per))
+				store.SetRawKey(ctx, rateLimiterSentinelKey, "1", int64(per))
 			}
 		}
 		return true
@@ -94,16 +95,16 @@ const (
 	sessionFailQuota
 )
 
-func (l *SessionLimiter) limitSentinel(currentSession *user.SessionState, key string, rateScope string, store storage.Handler,
+func (l *SessionLimiter) limitSentinel(ctx context.Context, currentSession *user.SessionState, key string, rateScope string, store storage.Handler,
 	globalConf *config.Config, apiLimit *user.APILimit, dryRun bool) bool {
 
 	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash()
 	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash() + ".BLOCKED"
 
-	go l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun)
+	go l.doRollingWindowWrite(ctx, key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun)
 
 	// Check sentinel
-	_, sentinelActive := store.GetRawKey(rateLimiterSentinelKey)
+	_, sentinelActive := store.GetRawKey(ctx, rateLimiterSentinelKey)
 	if sentinelActive == nil {
 		// Sentinel is set, fail
 		return true
@@ -111,13 +112,13 @@ func (l *SessionLimiter) limitSentinel(currentSession *user.SessionState, key st
 	return false
 }
 
-func (l *SessionLimiter) limitRedis(currentSession *user.SessionState, key string, rateScope string, store storage.Handler,
+func (l *SessionLimiter) limitRedis(ctx context.Context, currentSession *user.SessionState, key string, rateScope string, store storage.Handler,
 	globalConf *config.Config, apiLimit *user.APILimit, dryRun bool) bool {
 
 	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash()
 	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash() + ".BLOCKED"
 
-	if l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun) {
+	if l.doRollingWindowWrite(ctx, key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun) {
 		return true
 	}
 	return false
@@ -210,11 +211,11 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			rateScope = allowanceScope + "-"
 		}
 		if globalConf.EnableSentinelRateLimiter {
-			if l.limitSentinel(currentSession, key, rateScope, store, globalConf, apiLimit, dryRun) {
+			if l.limitSentinel(r.Context(), currentSession, key, rateScope, store, globalConf, apiLimit, dryRun) {
 				return sessionFailRateLimit
 			}
 		} else if globalConf.EnableRedisRollingLimiter {
-			if l.limitRedis(currentSession, key, rateScope, store, globalConf, apiLimit, dryRun) {
+			if l.limitRedis(r.Context(), currentSession, key, rateScope, store, globalConf, apiLimit, dryRun) {
 				return sessionFailRateLimit
 			}
 		} else {
@@ -236,7 +237,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 					return sessionFailRateLimit
 				}
 			} else {
-				if l.limitRedis(currentSession, key, rateScope, store, globalConf, apiLimit, dryRun) {
+				if l.limitRedis(r.Context(), currentSession, key, rateScope, store, globalConf, apiLimit, dryRun) {
 					return sessionFailRateLimit
 				}
 			}
@@ -277,7 +278,7 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 	log.Debug("[QUOTA] Quota limiter key is: ", rawKey)
 	log.Debug("Renewing with TTL: ", quotaRenewalRate)
 	// INCR the key (If it equals 1 - set EXPIRE)
-	qInt := store.IncrememntWithExpire(rawKey, quotaRenewalRate)
+	qInt := store.IncrememntWithExpire(r.Context(), rawKey, quotaRenewalRate)
 	// if the returned val is >= quota: block
 	if qInt-1 >= quotaMax {
 		renewalDate := time.Unix(quotaRenews, 0)
@@ -294,7 +295,7 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 			// The renewal date is in the past, we should update the quota!
 			// Also, this fixes legacy issues where there is no TTL on quota buckets
 			log.Debug("Incorrect key expiry setting detected, correcting")
-			go store.DeleteRawKey(rawKey)
+			go store.DeleteRawKey(r.Context(), rawKey)
 			qInt = 1
 		} else {
 			// Renewal date is in the future and the quota is exceeded

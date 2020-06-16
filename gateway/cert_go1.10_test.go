@@ -3,6 +3,7 @@
 package gateway
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -25,7 +26,7 @@ func uploadCertPublicKey(serverCert tls.Certificate) (string, error) {
 	x509Cert, _ := x509.ParseCertificate(serverCert.Certificate[0])
 	pubDer, _ := x509.MarshalPKIXPublicKey(x509Cert.PublicKey)
 	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDer})
-	pubID, _ := CertificateManager.Add(pubPem, "")
+	pubID, _ := CertificateManager.Add(context.TODO(), pubPem, "")
 
 	if pubID != certs.HexSHA256(pubDer) {
 		errStr := fmt.Sprintf("certmanager returned wrong pub key fingerprint: %s %s", certs.HexSHA256(pubDer), pubID)
@@ -41,7 +42,9 @@ func TestPublicKeyPinning(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer CertificateManager.Delete(pubID, "")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	defer CertificateManager.Delete(ctx, pubID, "")
 
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	}))
@@ -138,7 +141,7 @@ func TestPublicKeyPinning(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		defer CertificateManager.Delete(serverPubID, "")
+		defer CertificateManager.Delete(ctx, serverPubID, "")
 
 		upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		}))
@@ -158,7 +161,7 @@ func TestPublicKeyPinning(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		defer CertificateManager.Delete(proxyPubID, "")
+		defer CertificateManager.Delete(ctx, proxyPubID, "")
 
 		proxy := initProxy("http", &tls.Config{
 			Certificates: []tls.Certificate{proxyCert},

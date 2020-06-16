@@ -1,11 +1,15 @@
 package gateway
 
 import (
+	"context"
 	"errors"
 	"strings"
 
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/mavricknz/ldap"
 )
+
+var _ storage.Handler = (*LDAPStorageHandler)(nil)
 
 // LDAPStorageHandler implements storage.Handler, this is a read-only implementation to access keys from an LDAP service
 type LDAPStorageHandler struct {
@@ -36,7 +40,7 @@ func (l *LDAPStorageHandler) LoadConfFromMeta(meta map[string]interface{}) {
 
 }
 
-func (l *LDAPStorageHandler) Connect() bool {
+func (l *LDAPStorageHandler) Connect(_ context.Context) bool {
 	conn := ldap.NewLDAPConnection(l.LDAPServer, l.LDAPPort)
 	if err := conn.Connect(); err != nil {
 		log.Error("LDAP server connection failed: ", err)
@@ -47,7 +51,7 @@ func (l *LDAPStorageHandler) Connect() bool {
 	return true
 }
 
-func (l *LDAPStorageHandler) GetKey(filter string) (string, error) {
+func (l *LDAPStorageHandler) GetKey(ctx context.Context, filter string) (string, error) {
 	log.Debug("Searching for filter: ", filter)
 
 	useFilter := strings.Replace(l.SearchString, "TYKKEYID", filter, 1)
@@ -89,78 +93,78 @@ func (l *LDAPStorageHandler) GetKey(filter string) (string, error) {
 	return "", nil
 }
 
-func (r *LDAPStorageHandler) GetMultiKey(keyNames []string) ([]string, error) {
+func (r *LDAPStorageHandler) GetMultiKey(ctx context.Context, keyNames []string) ([]string, error) {
 	log.Warning("Not implementated")
 
 	return nil, nil
 }
 
-func (l *LDAPStorageHandler) GetRawKey(filter string) (string, error) {
+func (l *LDAPStorageHandler) GetRawKey(ctx context.Context, filter string) (string, error) {
 	log.Warning("Not implementated")
 
 	return "", nil
 }
 
-func (l *LDAPStorageHandler) SetExp(cn string, exp int64) error {
+func (l *LDAPStorageHandler) SetExp(ctx context.Context, cn string, exp int64) error {
 	log.Warning("Not implementated")
 	return nil
 }
 
-func (l *LDAPStorageHandler) GetExp(cn string) (int64, error) {
+func (l *LDAPStorageHandler) GetExp(ctx context.Context, cn string) (int64, error) {
 	log.Warning("Not implementated")
 	return 0, nil
 }
 
-func (l *LDAPStorageHandler) GetKeys(filter string) []string {
+func (l *LDAPStorageHandler) GetKeys(ctx context.Context, filter string) []string {
 	log.Warning("Not implementated")
 	s := []string{}
 
 	return s
 }
-func (l *LDAPStorageHandler) GetKeysAndValues() map[string]string {
+func (l *LDAPStorageHandler) GetKeysAndValues(ctx context.Context) map[string]string {
 	log.Warning("Not implementated")
 
 	s := map[string]string{}
 	return s
 }
-func (l *LDAPStorageHandler) GetKeysAndValuesWithFilter(filter string) map[string]string {
+func (l *LDAPStorageHandler) GetKeysAndValuesWithFilter(ctx context.Context, filter string) map[string]string {
 	log.Warning("Not implementated")
 	s := map[string]string{}
 	return s
 }
 
-func (l *LDAPStorageHandler) SetKey(cn, session string, timeout int64) error {
+func (l *LDAPStorageHandler) SetKey(ctx context.Context, cn, session string, timeout int64) error {
 	l.notifyReadOnly()
 	return nil
 }
 
-func (l *LDAPStorageHandler) SetRawKey(cn, session string, timeout int64) error {
+func (l *LDAPStorageHandler) SetRawKey(ctx context.Context, cn, session string, timeout int64) error {
 	l.notifyReadOnly()
 	return nil
 }
 
-func (l *LDAPStorageHandler) DeleteKey(cn string) bool {
+func (l *LDAPStorageHandler) DeleteKey(ctx context.Context, cn string) bool {
 	return l.notifyReadOnly()
 }
 
-func (r *LDAPStorageHandler) DeleteAllKeys() bool {
+func (r *LDAPStorageHandler) DeleteAllKeys(ctx context.Context) bool {
 	log.Warning("Not implementated")
 	return false
 }
 
-func (l *LDAPStorageHandler) DeleteRawKey(cn string) bool {
+func (l *LDAPStorageHandler) DeleteRawKey(ctx context.Context, cn string) bool {
 	return l.notifyReadOnly()
 }
 
-func (l *LDAPStorageHandler) DeleteKeys(keys []string) bool {
+func (l *LDAPStorageHandler) DeleteKeys(ctx context.Context, keys []string) bool {
 	return l.notifyReadOnly()
 }
 
-func (l *LDAPStorageHandler) Decrement(keyName string) {
+func (l *LDAPStorageHandler) Decrement(ctx context.Context, keyName string) {
 	l.notifyReadOnly()
 }
 
-func (l *LDAPStorageHandler) IncrememntWithExpire(keyName string, timeout int64) int64 {
+func (l *LDAPStorageHandler) IncrememntWithExpire(ctx context.Context, keyName string, timeout int64) int64 {
 	l.notifyReadOnly()
 	return 999
 }
@@ -170,73 +174,73 @@ func (l *LDAPStorageHandler) notifyReadOnly() bool {
 	return false
 }
 
-func (l *LDAPStorageHandler) SetRollingWindow(keyName string, per int64, val string, pipeline bool) (int, []interface{}) {
+func (l *LDAPStorageHandler) SetRollingWindow(ctx context.Context, keyName string, per int64, val string, pipeline bool) (int, []interface{}) {
 	log.Warning("Not Implemented!")
 	return 0, nil
 }
 
-func (l *LDAPStorageHandler) GetRollingWindow(keyName string, per int64, pipeline bool) (int, []interface{}) {
+func (l *LDAPStorageHandler) GetRollingWindow(ctx context.Context, keyName string, per int64, pipeline bool) (int, []interface{}) {
 	log.Warning("Not Implemented!")
 	return 0, nil
 }
 
-func (l LDAPStorageHandler) GetSet(keyName string) (map[string]string, error) {
+func (l LDAPStorageHandler) GetSet(ctx context.Context, keyName string) (map[string]string, error) {
 	log.Error("Not implemented")
 	return nil, nil
 }
 
-func (l LDAPStorageHandler) AddToSet(keyName, value string) {
+func (l LDAPStorageHandler) AddToSet(ctx context.Context, keyName, value string) {
 	log.Error("Not implemented")
 }
 
-func (l LDAPStorageHandler) AppendToSet(keyName, value string) {
+func (l LDAPStorageHandler) AppendToSet(ctx context.Context, keyName, value string) {
 	log.Error("Not implemented")
 }
 
-func (l LDAPStorageHandler) RemoveFromSet(keyName, value string) {
+func (l LDAPStorageHandler) RemoveFromSet(ctx context.Context, keyName, value string) {
 	log.Error("Not implemented")
 }
 
-func (l LDAPStorageHandler) GetAndDeleteSet(keyName string) []interface{} {
+func (l LDAPStorageHandler) GetAndDeleteSet(ctx context.Context, keyName string) []interface{} {
 	log.Error("Not implemented")
 	return nil
 }
 
-func (l LDAPStorageHandler) DeleteScanMatch(pattern string) bool {
+func (l LDAPStorageHandler) DeleteScanMatch(ctx context.Context, pattern string) bool {
 	log.Error("Not implemented")
 	return false
 }
 
-func (l LDAPStorageHandler) GetKeyPrefix() string {
+func (l LDAPStorageHandler) GetKeyPrefix(ctx context.Context) string {
 	log.Error("Not implemented")
 	return ""
 }
 
-func (l LDAPStorageHandler) AddToSortedSet(keyName, value string, score float64) {
+func (l LDAPStorageHandler) AddToSortedSet(ctx context.Context, keyName, value string, score float64) {
 	log.Error("Not implemented")
 }
 
-func (l LDAPStorageHandler) GetSortedSetRange(keyName, scoreFrom, scoreTo string) ([]string, []float64, error) {
+func (l LDAPStorageHandler) GetSortedSetRange(ctx context.Context, keyName, scoreFrom, scoreTo string) ([]string, []float64, error) {
 	log.Error("Not implemented")
 	return nil, nil, nil
 }
 
-func (l LDAPStorageHandler) RemoveSortedSetRange(keyName, scoreFrom, scoreTo string) error {
+func (l LDAPStorageHandler) RemoveSortedSetRange(ctx context.Context, keyName, scoreFrom, scoreTo string) error {
 	log.Error("Not implemented")
 	return nil
 }
 
-func (l LDAPStorageHandler) RemoveFromList(keyName, value string) error {
+func (l LDAPStorageHandler) RemoveFromList(ctx context.Context, keyName, value string) error {
 	log.Error("Not implemented")
 	return nil
 }
 
-func (l *LDAPStorageHandler) GetListRange(keyName string, from, to int64) ([]string, error) {
+func (l *LDAPStorageHandler) GetListRange(ctx context.Context, keyName string, from, to int64) ([]string, error) {
 	log.Error("Not implemented")
 	return nil, nil
 }
 
-func (l LDAPStorageHandler) Exists(keyName string) (bool, error) {
+func (l LDAPStorageHandler) Exists(ctx context.Context, keyName string) (bool, error) {
 	log.Error("Not implemented")
 	return false, nil
 }

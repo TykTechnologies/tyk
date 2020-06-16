@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -25,46 +26,46 @@ var ErrKeyNotFound = errors.New("key not found")
 // Handler is a standard interface to a storage backend, used by
 // AuthorisationManager to read and write key values to the backend
 type Handler interface {
-	GetKey(string) (string, error) // Returned string is expected to be a JSON object (user.SessionState)
-	GetMultiKey([]string) ([]string, error)
-	GetRawKey(string) (string, error)
-	SetKey(string, string, int64) error // Second input string is expected to be a JSON object (user.SessionState)
-	SetRawKey(string, string, int64) error
-	SetExp(string, int64) error   // Set key expiration
-	GetExp(string) (int64, error) // Returns expiry of a key
-	GetKeys(string) []string
-	DeleteKey(string) bool
-	DeleteAllKeys() bool
-	DeleteRawKey(string) bool
-	Connect() bool
-	GetKeysAndValues() map[string]string
-	GetKeysAndValuesWithFilter(string) map[string]string
-	DeleteKeys([]string) bool
-	Decrement(string)
-	IncrememntWithExpire(string, int64) int64
-	SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{})
-	GetRollingWindow(key string, per int64, pipeline bool) (int, []interface{})
-	GetSet(string) (map[string]string, error)
-	AddToSet(string, string)
-	GetAndDeleteSet(string) []interface{}
-	RemoveFromSet(string, string)
-	DeleteScanMatch(string) bool
-	GetKeyPrefix() string
-	AddToSortedSet(string, string, float64)
-	GetSortedSetRange(string, string, string) ([]string, []float64, error)
-	RemoveSortedSetRange(string, string, string) error
-	GetListRange(string, int64, int64) ([]string, error)
-	RemoveFromList(string, string) error
-	AppendToSet(string, string)
-	Exists(string) (bool, error)
+	GetKey(context.Context, string) (string, error) // Returned string is expected to be a JSON object (user.SessionState)
+	GetMultiKey(context.Context, []string) ([]string, error)
+	GetRawKey(context.Context, string) (string, error)
+	SetKey(context.Context, string, string, int64) error // Second input string is expected to be a JSON object (user.SessionState)
+	SetRawKey(context.Context, string, string, int64) error
+	SetExp(context.Context, string, int64) error   // Set key expiration
+	GetExp(context.Context, string) (int64, error) // Returns expiry of a key
+	GetKeys(context.Context, string) []string
+	DeleteKey(context.Context, string) bool
+	DeleteAllKeys(context.Context) bool
+	DeleteRawKey(context.Context, string) bool
+	Connect(context.Context) bool
+	GetKeysAndValues(context.Context) map[string]string
+	GetKeysAndValuesWithFilter(context.Context, string) map[string]string
+	DeleteKeys(context.Context, []string) bool
+	Decrement(context.Context, string)
+	IncrememntWithExpire(context.Context, string, int64) int64
+	SetRollingWindow(ctx context.Context, key string, per int64, val string, pipeline bool) (int, []interface{})
+	GetRollingWindow(ctx context.Context, key string, per int64, pipeline bool) (int, []interface{})
+	GetSet(context.Context, string) (map[string]string, error)
+	AddToSet(context.Context, string, string)
+	GetAndDeleteSet(context.Context, string) []interface{}
+	RemoveFromSet(context.Context, string, string)
+	DeleteScanMatch(context.Context, string) bool
+	GetKeyPrefix(context.Context) string
+	AddToSortedSet(context.Context, string, string, float64)
+	GetSortedSetRange(context.Context, string, string, string) ([]string, []float64, error)
+	RemoveSortedSetRange(context.Context, string, string, string) error
+	GetListRange(context.Context, string, int64, int64) ([]string, error)
+	RemoveFromList(context.Context, string, string) error
+	AppendToSet(context.Context, string, string)
+	Exists(context.Context, string) (bool, error)
 }
 
 type AnalyticsHandler interface {
-	Connect() bool
-	AppendToSetPipelined(string, [][]byte)
-	GetAndDeleteSet(string) []interface{}
-	SetExp(string, int64) error   // Set key expiration
-	GetExp(string) (int64, error) // Returns expiry of a key
+	Connect(context.Context) bool
+	AppendToSetPipelined(context.Context, string, [][]byte)
+	GetAndDeleteSet(context.Context, string) []interface{}
+	SetExp(context.Context, string, int64) error   // Set key expiration
+	GetExp(context.Context, string) (int64, error) // Returns expiry of a key
 }
 
 const defaultHashAlgorithm = "murmur64"

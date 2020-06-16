@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -35,14 +36,14 @@ type ChainObject struct {
 	Subrouter      *mux.Router
 }
 
-func prepareStorage() generalStores {
+func prepareStorage(ctx context.Context) generalStores {
 	var gs generalStores
 	gs.redisStore = &storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
 	gs.redisOrgStore = &storage.RedisCluster{KeyPrefix: "orgkey."}
 	gs.healthStore = &storage.RedisCluster{KeyPrefix: "apihealth."}
 	gs.rpcAuthStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
 	gs.rpcOrgStore = &RPCStorageHandler{KeyPrefix: "orgkey."}
-	GlobalSessionManager.Init(gs.redisStore)
+	GlobalSessionManager.Init(ctx, gs.redisStore)
 	return gs
 }
 
@@ -103,7 +104,7 @@ func fixFuncPath(pathPrefix string, funcs []apidef.MiddlewareDefinition) {
 	}
 }
 
-func processSpec(spec *APISpec, apisByListen map[string]int,
+func processSpec(ctx context.Context, spec *APISpec, apisByListen map[string]int,
 	gs *generalStores, subrouter *mux.Router, logger *logrus.Entry) *ChainObject {
 
 	var chainDef ChainObject
@@ -196,7 +197,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	}
 
 	// Health checkers are initialised per spec so that each API handler has it's own connection and redis storage pool
-	spec.Init(authStore, sessionStore, gs.healthStore, orgStore)
+	spec.Init(ctx, authStore, sessionStore, gs.healthStore, orgStore)
 
 	// Set up all the JSVM middleware
 	var mwAuthCheckFunc apidef.MiddlewareDefinition
@@ -242,7 +243,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 	if spec.UseOauth2 {
 		logger.Debug("Loading OAuth Manager")
-		oauthManager := addOAuthHandlers(spec, subrouter)
+		oauthManager := addOAuthHandlers(ctx, spec, subrouter)
 		logger.Debug("-- Added OAuth Handlers")
 
 		spec.OAuthManager = oauthManager
@@ -284,7 +285,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 	keyPrefix := "cache-" + spec.APIID
 	cacheStore := storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true}
-	cacheStore.Connect()
+	cacheStore.Connect(ctx)
 
 	var chain http.Handler
 	var chainArray []alice.Constructor
@@ -595,14 +596,14 @@ func sanitizeProxyPaths(apiSpec *APISpec, request *http.Request) {
 	request.URL.RawPath = apiSpec.StripListenPath(request, request.URL.RawPath)
 }
 
-func loadGlobalApps() {
+func loadGlobalApps(ctx context.Context) {
 	// we need to make a full copy of the slice, as loadApps will
 	// use in-place to sort the apis.
 	apisMu.RLock()
 	specs := make([]*APISpec, len(apiSpecs))
 	copy(specs, apiSpecs)
 	apisMu.RUnlock()
-	loadApps(specs)
+	loadApps(ctx, specs)
 }
 
 func trimCategories(name string) string {
@@ -632,7 +633,7 @@ func fuzzyFindAPI(search string) *APISpec {
 	return nil
 }
 
-func loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStores, muxer *proxyMux) http.Handler {
+func loadHTTPService(ctx context.Context, spec *APISpec, apisByListen map[string]int, gs *generalStores, muxer *proxyMux) http.Handler {
 	port := config.Global().ListenPort
 	if spec.ListenPort != 0 {
 		port = spec.ListenPort
@@ -653,7 +654,7 @@ func loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStor
 		router = router.Host(hostname).Subrouter()
 	}
 
-	chainObj := processSpec(spec, apisByListen, gs, router, logrus.NewEntry(log))
+	chainObj := processSpec(ctx, spec, apisByListen, gs, router, logrus.NewEntry(log))
 
 	if chainObj.Skip {
 		return chainObj.ThisHandler
@@ -668,7 +669,7 @@ func loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStor
 	return chainObj.ThisHandler
 }
 
-func loadTCPService(spec *APISpec, gs *generalStores, muxer *proxyMux) {
+func loadTCPService(ctx context.Context, spec *APISpec, gs *generalStores, muxer *proxyMux) {
 	// Initialise the auth and session managers (use Redis for now)
 	authStore := gs.redisStore
 	orgStore := gs.redisOrgStore
@@ -693,9 +694,9 @@ func loadTCPService(spec *APISpec, gs *generalStores, muxer *proxyMux) {
 	}
 
 	// Health checkers are initialised per spec so that each API handler has it's own connection and redis storage pool
-	spec.Init(authStore, sessionStore, gs.healthStore, orgStore)
+	spec.Init(ctx, authStore, sessionStore, gs.healthStore, orgStore)
 
-	muxer.addTCPService(spec, nil)
+	muxer.addTCPService(ctx, spec, nil)
 }
 
 type generalStores struct {
@@ -731,7 +732,7 @@ func loadGraphQLPlayground(spec *APISpec, router *mux.Router) {
 }
 
 // Create the individual API (app) specs based on live configurations and assign middleware
-func loadApps(specs []*APISpec) {
+func loadApps(ctx context.Context, specs []*APISpec) {
 	mainLog.Info("Loading API configurations.")
 
 	tmpSpecRegister := make(map[string]*APISpec)
@@ -760,7 +761,7 @@ func loadApps(specs []*APISpec) {
 
 	muxer.setRouter(port, "", router)
 
-	gs := prepareStorage()
+	gs := prepareStorage(ctx)
 	shouldTrace := trace.IsEnabled()
 	for _, spec := range specs {
 		if spec.ListenPort != spec.GlobalConfig.ListenPort {
@@ -784,13 +785,13 @@ func loadApps(specs []*APISpec) {
 					mainLog.Infof("Intialized tracer  api_name=%q", spec.Name)
 				}
 			}
-			tmpSpecHandles.Store(spec.APIID, loadHTTPService(spec, apisByListen, &gs, muxer))
+			tmpSpecHandles.Store(spec.APIID, loadHTTPService(ctx, spec, apisByListen, &gs, muxer))
 		case "tcp", "tls":
-			loadTCPService(spec, &gs, muxer)
+			loadTCPService(ctx, spec, &gs, muxer)
 		}
 	}
 
-	defaultProxyMux.swap(muxer)
+	defaultProxyMux.swap(ctx, muxer)
 
 	// Swap in the new register
 	apisMu.Lock()

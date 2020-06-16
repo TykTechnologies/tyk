@@ -14,13 +14,13 @@ import (
 
 const LEKeyPrefix = "le_ssl:"
 
-func StoreLEState(m *letsencrypt.Manager) {
+func StoreLEState(ctx context.Context, m *letsencrypt.Manager) {
 	log.Debug("Storing SSL backup")
 
 	log.Debug("[SSL] --> Connecting to DB")
 
 	store := storage.RedisCluster{KeyPrefix: LEKeyPrefix}
-	connected := store.Connect()
+	connected := store.Connect(ctx)
 
 	log.Debug("--> Connected to DB")
 
@@ -33,18 +33,18 @@ func StoreLEState(m *letsencrypt.Manager) {
 	secret := rightPad2Len(config.Global().Secret, "=", 32)
 	cryptoText := encrypt([]byte(secret), state)
 
-	if err := store.SetKey("cache", cryptoText, -1); err != nil {
+	if err := store.SetKey(ctx, "cache", cryptoText, -1); err != nil {
 		log.Error("[SSL] --> Failed to store SSL backup: ", err)
 		return
 	}
 }
 
-func GetLEState(m *letsencrypt.Manager) {
+func GetLEState(ctx context.Context, m *letsencrypt.Manager) {
 	checkKey := "cache"
 
 	store := storage.RedisCluster{KeyPrefix: LEKeyPrefix}
 
-	connected := store.Connect()
+	connected := store.Connect(ctx)
 	log.Debug("[SSL] --> Connected to DB")
 
 	if !connected {
@@ -52,7 +52,7 @@ func GetLEState(m *letsencrypt.Manager) {
 		return
 	}
 
-	cryptoText, err := store.GetKey(checkKey)
+	cryptoText, err := store.GetKey(ctx, checkKey)
 	if err != nil {
 		log.Warning("[SSL] --> No SSL backup: ", err)
 		return
@@ -69,7 +69,7 @@ type LE_ServerInfo struct {
 	ID       string
 }
 
-func onLESSLStatusReceivedHandler(payload string) {
+func onLESSLStatusReceivedHandler(ctx context.Context, payload string) {
 	serverData := LE_ServerInfo{}
 	if err := json.Unmarshal([]byte(payload), &serverData); err != nil {
 		log.WithFields(logrus.Fields{
@@ -83,7 +83,7 @@ func onLESSLStatusReceivedHandler(payload string) {
 	// not great
 	if serverData.ID != GetNodeID() {
 		log.Info("Received Redis LE change notification!")
-		GetLEState(&LE_MANAGER)
+		GetLEState(ctx, &LE_MANAGER)
 	}
 
 	log.Info("Received Redis LE change notification from myself, ignoring")
@@ -98,7 +98,7 @@ func StartPeriodicStateBackup(ctx context.Context, m *letsencrypt.Manager) {
 		case <-m.Watch():
 			if LE_FIRSTRUN {
 				log.Info("[SSL] State change detected, storing")
-				StoreLEState(m)
+				StoreLEState(ctx, m)
 			}
 			LE_FIRSTRUN = true
 		}

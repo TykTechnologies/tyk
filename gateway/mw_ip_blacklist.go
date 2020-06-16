@@ -54,6 +54,6 @@ func (i *IPBlackListMiddleware) handleError(r *http.Request, blacklistedIP strin
 	// Fire Authfailed Event
 	AuthFailed(i, r, blacklistedIP)
 	// Report in health check
-	reportHealthValue(i.Spec, KeyFailure, "-1")
+	reportHealthValue(r.Context(), i.Spec, KeyFailure, "-1")
 	return errors.New("access from this IP has been disallowed"), http.StatusForbidden
 }

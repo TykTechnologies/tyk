@@ -3,6 +3,7 @@
 package gateway
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -165,7 +166,7 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 		exp = []int{4, 6, 8, 8, 4}
 	}
 	for _, e := range exp {
-		DoReload()
+		DoReload(ts.Context())
 
 		rtCnt := 0
 		mainRouter().Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
@@ -194,7 +195,7 @@ func TestSyncAPISpecsRPCFailure(t *testing.T) {
 	rpc := startRPCMock(dispatcher)
 	defer stopRPCMock(rpc)
 
-	count, _ := syncAPISpecs()
+	count, _ := syncAPISpecs(context.TODO())
 	if count != 0 {
 		t.Error("Should return empty value for malformed rpc response", apiSpecs)
 	}
@@ -224,12 +225,12 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		ts := StartTest()
 		defer ts.Close()
 
-		apiBackup, _ := LoadDefinitionsFromRPCBackup()
+		apiBackup, _ := LoadDefinitionsFromRPCBackup(ts.Context())
 		if len(apiBackup) != 1 {
 			t.Fatal("Should have APIs in backup")
 		}
 
-		policyBackup, _ := LoadPoliciesFromRPCBackup()
+		policyBackup, _ := LoadPoliciesFromRPCBackup(ts.Context())
 		if len(policyBackup) != 1 {
 			t.Fatal("Should have Policies in backup")
 		}
@@ -239,7 +240,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 			{Path: "/sample", Headers: authHeaders, Code: 200},
 		}...)
 
-		count, _ := syncAPISpecs()
+		count, _ := syncAPISpecs(ts.Context())
 		if count != 1 {
 			t.Error("Should return array with one spec", apiSpecs)
 		}
@@ -312,11 +313,11 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 			{Path: "/sample", Headers: notCachedAuth, Code: 200},
 		}...)
 
-		if count, _ := syncAPISpecs(); count != 2 {
+		if count, _ := syncAPISpecs(ts.Context()); count != 2 {
 			t.Error("Should fetch latest specs", count)
 		}
-
-		if count, _ := syncPolicies(); count != 2 {
+		// TODO:(gernest) remove this duplicate
+		if count, _ := syncPolicies(ts.Context()); count != 2 {
 			t.Error("Should fetch latest policies", count)
 		}
 	})

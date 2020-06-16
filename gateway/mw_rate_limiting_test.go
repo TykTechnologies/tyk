@@ -44,7 +44,7 @@ func TestRateLimit_Unlimited(t *testing.T) {
 	t.Run("-1 rate means unlimited", func(t *testing.T) {
 		session.Rate = -1
 
-		_ = GlobalSessionManager.UpdateSession(key, session, 60, false)
+		_ = GlobalSessionManager.UpdateSession(g.Context(), key, session, 60, false)
 
 		_, _ = g.Run(t, []test.TestCase{
 			{Headers: authHeader, Code: http.StatusOK},
@@ -55,7 +55,7 @@ func TestRateLimit_Unlimited(t *testing.T) {
 	t.Run("0 rate means unlimited", func(t *testing.T) {
 		session.Rate = 0
 
-		_ = GlobalSessionManager.UpdateSession(key, session, 60, false)
+		_ = GlobalSessionManager.UpdateSession(g.Context(), key, session, 60, false)
 
 		_, _ = g.Run(t, []test.TestCase{
 			{Headers: authHeader, Code: http.StatusOK},

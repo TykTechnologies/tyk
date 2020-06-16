@@ -57,7 +57,7 @@ var (
 	SamplingPriority = uint16TagName("sampling.priority")
 
 	//////////////////////////////////////////////////////////////////////
-	// Peer tags. These tags can be emitted by either client-side of
+	// Peer tags. These tags can be emitted by either client-side or
 	// server-side to describe the other side/service in a peer-to-peer
 	// communications, like an RPC call.
 	//////////////////////////////////////////////////////////////////////

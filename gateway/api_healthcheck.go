@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"strconv"
 	"strings"
 	"time"
@@ -20,9 +21,9 @@ const (
 )
 
 type HealthChecker interface {
-	Init(storage.Handler)
-	ApiHealthValues() (HealthCheckValues, error)
-	StoreCounterVal(HealthPrefix, string)
+	Init(context.Context, storage.Handler)
+	ApiHealthValues(context.Context) (HealthCheckValues, error)
+	StoreCounterVal(context.Context, HealthPrefix, string)
 }
 
 type HealthCheckValues struct {
@@ -38,32 +39,32 @@ type DefaultHealthChecker struct {
 	APIID   string
 }
 
-func (h *DefaultHealthChecker) Init(storeType storage.Handler) {
+func (h *DefaultHealthChecker) Init(ctx context.Context, storeType storage.Handler) {
 	if !config.Global().HealthCheck.EnableHealthChecks {
 		return
 	}
 
 	log.Info("Initializing HealthChecker")
 	h.storage = storeType
-	h.storage.Connect()
+	h.storage.Connect(ctx)
 }
 
-func (h *DefaultHealthChecker) CreateKeyName(subKey HealthPrefix) string {
+func (h *DefaultHealthChecker) CreateKeyName(ctx context.Context, subKey HealthPrefix) string {
 	// Key should be API-ID.SubKey.123456789
 	return h.APIID + "." + string(subKey)
 }
 
 // reportHealthValue is a shortcut we can use throughout the app to push a health check value
-func reportHealthValue(spec *APISpec, counter HealthPrefix, value string) {
+func reportHealthValue(ctx context.Context, spec *APISpec, counter HealthPrefix, value string) {
 	if !spec.GlobalConfig.HealthCheck.EnableHealthChecks {
 		return
 	}
 
-	spec.Health.StoreCounterVal(counter, value)
+	spec.Health.StoreCounterVal(ctx, counter, value)
 }
 
-func (h *DefaultHealthChecker) StoreCounterVal(counterType HealthPrefix, value string) {
-	searchStr := h.CreateKeyName(counterType)
+func (h *DefaultHealthChecker) StoreCounterVal(ctx context.Context, counterType HealthPrefix, value string) {
+	searchStr := h.CreateKeyName(ctx, counterType)
 	log.Debug("Adding Healthcheck to: ", searchStr)
 	log.Debug("Val is: ", value)
 	//go h.storage.SetKey(searchStr, value, config.Global.HealthCheck.HealthCheckValueTimeout)
@@ -73,14 +74,14 @@ func (h *DefaultHealthChecker) StoreCounterVal(counterType HealthPrefix, value s
 		value = now_string + "." + value
 		log.Debug("Set value to: ", value)
 	}
-	go h.storage.SetRollingWindow(searchStr, config.Global().HealthCheck.HealthCheckValueTimeout, value, false)
+	go h.storage.SetRollingWindow(ctx, searchStr, config.Global().HealthCheck.HealthCheckValueTimeout, value, false)
 }
 
-func (h *DefaultHealthChecker) getAvgCount(prefix HealthPrefix) float64 {
-	searchStr := h.CreateKeyName(prefix)
+func (h *DefaultHealthChecker) getAvgCount(ctx context.Context, prefix HealthPrefix) float64 {
+	searchStr := h.CreateKeyName(ctx, prefix)
 	log.Debug("Searching for: ", searchStr)
 
-	count, _ := h.storage.SetRollingWindow(searchStr, config.Global().HealthCheck.HealthCheckValueTimeout, "-1", false)
+	count, _ := h.storage.SetRollingWindow(ctx, searchStr, config.Global().HealthCheck.HealthCheckValueTimeout, "-1", false)
 	log.Debug("Count is: ", count)
 	divisor := float64(config.Global().HealthCheck.HealthCheckValueTimeout)
 	if divisor == 0 {
@@ -98,19 +99,19 @@ func roundValue(untruncated float64) float64 {
 	return float64(int(untruncated*100)) / 100
 }
 
-func (h *DefaultHealthChecker) ApiHealthValues() (HealthCheckValues, error) {
+func (h *DefaultHealthChecker) ApiHealthValues(ctx context.Context) (HealthCheckValues, error) {
 	values := HealthCheckValues{}
 
 	// Get the counted / average values
-	values.ThrottledRequestsPS = h.getAvgCount(Throttle)
-	values.QuotaViolationsPS = h.getAvgCount(QuotaViolation)
-	values.KeyFailuresPS = h.getAvgCount(KeyFailure)
-	values.AvgRequestsPS = h.getAvgCount(RequestLog)
+	values.ThrottledRequestsPS = h.getAvgCount(ctx, Throttle)
+	values.QuotaViolationsPS = h.getAvgCount(ctx, QuotaViolation)
+	values.KeyFailuresPS = h.getAvgCount(ctx, KeyFailure)
+	values.AvgRequestsPS = h.getAvgCount(ctx, RequestLog)
 
 	// Get the micro latency graph, an average upstream latency
 	searchStr := h.APIID + "." + string(RequestLog)
 	log.Debug("Searching KV for: ", searchStr)
-	_, vals := h.storage.SetRollingWindow(searchStr, config.Global().HealthCheck.HealthCheckValueTimeout, "-1", false)
+	_, vals := h.storage.SetRollingWindow(ctx, searchStr, config.Global().HealthCheck.HealthCheckValueTimeout, "-1", false)
 	log.Debug("Found: ", vals)
 	if len(vals) == 0 {
 		return values, nil

@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"strconv"
 	"strings"
 	"time"
@@ -12,7 +13,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v8"
 
 	"github.com/sirupsen/logrus"
 )
@@ -88,6 +89,8 @@ var (
 	}
 )
 
+var _ storage.Handler = (*RPCStorageHandler)(nil)
+
 // RPCStorageHandler is a storage manager that uses the redis database.
 type RPCStorageHandler struct {
 	KeyPrefix        string
@@ -98,7 +101,7 @@ type RPCStorageHandler struct {
 var RPCGlobalCache = cache.New(30*time.Second, 15*time.Second)
 
 // Connect will establish a connection to the RPC
-func (r *RPCStorageHandler) Connect() bool {
+func (r *RPCStorageHandler) Connect(ctx context.Context) bool {
 	slaveOptions := config.Global().SlaveOptions
 	rpcConfig := rpc.Config{
 		UseSSL:                slaveOptions.UseSSL,
@@ -125,7 +128,9 @@ func (r *RPCStorageHandler) Connect() bool {
 		func() {
 			reloadURLStructure(nil)
 		},
-		DoReload,
+		func() {
+			DoReload(ctx)
+		},
 	)
 }
 
@@ -151,12 +156,12 @@ func (r *RPCStorageHandler) cleanKey(keyName string) string {
 }
 
 // GetKey will retrieve a key from the database
-func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
+func (r *RPCStorageHandler) GetKey(ctx context.Context, keyName string) (string, error) {
 	start := time.Now() // get current time
 	//	log.Debug("[STORE] Getting WAS: ", keyName)
 	//  log.Debug("[STORE] Getting: ", r.fixKey(keyName))
 
-	value, err := r.GetRawKey(r.fixKey(keyName))
+	value, err := r.GetRawKey(ctx, r.fixKey(keyName))
 
 	elapsed := time.Since(start)
 	log.Debug("GetKey took ", elapsed)
@@ -164,7 +169,7 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 	return value, err
 }
 
-func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
+func (r *RPCStorageHandler) GetRawKey(ctx context.Context, keyName string) (string, error) {
 	// Check the cache first
 	if config.Global().SlaveOptions.EnableRPCCache {
 		log.Debug("Using cache for: ", keyName)
@@ -187,7 +192,7 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 		)
 		if r.IsAccessError(err) {
 			if rpc.Login() {
-				return r.GetRawKey(keyName)
+				return r.GetRawKey(ctx, keyName)
 			}
 		}
 		log.Debug("Error trying to get value:", err)
@@ -201,12 +206,12 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 	return value.(string), nil
 }
 
-func (r *RPCStorageHandler) GetMultiKey(keyNames []string) ([]string, error) {
+func (r *RPCStorageHandler) GetMultiKey(ctx context.Context, keyNames []string) ([]string, error) {
 	var err error
 	var value string
 
 	for _, key := range keyNames {
-		value, err = r.GetKey(key)
+		value, err = r.GetKey(ctx, key)
 		if err == nil {
 			return []string{value}, nil
 		}
@@ -215,7 +220,7 @@ func (r *RPCStorageHandler) GetMultiKey(keyNames []string) ([]string, error) {
 	return nil, err
 }
 
-func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
+func (r *RPCStorageHandler) GetExp(ctx context.Context, keyName string) (int64, error) {
 	log.Debug("GetExp called")
 	value, err := rpc.FuncClientSingleton("GetExp", r.fixKey(keyName))
 	if err != nil {
@@ -230,7 +235,7 @@ func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
 		)
 		if r.IsAccessError(err) {
 			if rpc.Login() {
-				return r.GetExp(keyName)
+				return r.GetExp(ctx, keyName)
 			}
 		}
 		log.Error("Error trying to get TTL: ", err)
@@ -239,13 +244,13 @@ func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
 	return value.(int64), nil
 }
 
-func (r *RPCStorageHandler) SetExp(keyName string, timeout int64) error {
+func (r *RPCStorageHandler) SetExp(ctx context.Context, keyName string, timeout int64) error {
 	log.Error("RPCStorageHandler.SetExp - Not Implemented")
 	return nil
 }
 
 // SetKey will create (or update) a key value in the store
-func (r *RPCStorageHandler) SetKey(keyName, session string, timeout int64) error {
+func (r *RPCStorageHandler) SetKey(ctx context.Context, keyName, session string, timeout int64) error {
 	start := time.Now() // get current time
 	ibd := apidef.InboundData{
 		KeyName:      r.fixKey(keyName),
@@ -267,7 +272,7 @@ func (r *RPCStorageHandler) SetKey(keyName, session string, timeout int64) error
 
 		if r.IsAccessError(err) {
 			if rpc.Login() {
-				return r.SetKey(keyName, session, timeout)
+				return r.SetKey(ctx, keyName, session, timeout)
 			}
 		}
 
@@ -281,12 +286,12 @@ func (r *RPCStorageHandler) SetKey(keyName, session string, timeout int64) error
 
 }
 
-func (r *RPCStorageHandler) SetRawKey(keyName, session string, timeout int64) error {
+func (r *RPCStorageHandler) SetRawKey(ctx context.Context, keyName, session string, timeout int64) error {
 	return nil
 }
 
 // Decrement will decrement a key in redis
-func (r *RPCStorageHandler) Decrement(keyName string) {
+func (r *RPCStorageHandler) Decrement(ctx context.Context, keyName string) {
 	log.Warning("Decrement called")
 	_, err := rpc.FuncClientSingleton("Decrement", keyName)
 	if err != nil {
@@ -301,14 +306,14 @@ func (r *RPCStorageHandler) Decrement(keyName string) {
 	}
 	if r.IsAccessError(err) {
 		if rpc.Login() {
-			r.Decrement(keyName)
+			r.Decrement(ctx, keyName)
 			return
 		}
 	}
 }
 
 // IncrementWithExpire will increment a key in redis
-func (r *RPCStorageHandler) IncrememntWithExpire(keyName string, expire int64) int64 {
+func (r *RPCStorageHandler) IncrememntWithExpire(ctx context.Context, keyName string, expire int64) int64 {
 
 	ibd := apidef.InboundData{
 		KeyName: keyName,
@@ -328,7 +333,7 @@ func (r *RPCStorageHandler) IncrememntWithExpire(keyName string, expire int64) i
 	}
 	if r.IsAccessError(err) {
 		if rpc.Login() {
-			return r.IncrememntWithExpire(keyName, expire)
+			return r.IncrememntWithExpire(ctx, keyName, expire)
 		}
 	}
 
@@ -342,13 +347,13 @@ func (r *RPCStorageHandler) IncrememntWithExpire(keyName string, expire int64) i
 }
 
 // GetKeys will return all keys according to the filter (filter is a prefix - e.g. tyk.keys.*)
-func (r *RPCStorageHandler) GetKeys(filter string) []string {
+func (r *RPCStorageHandler) GetKeys(ctx context.Context, filter string) []string {
 	log.Error("RPCStorageHandler.GetKeys - Not Implemented")
 	return nil
 }
 
 // GetKeysAndValuesWithFilter will return all keys and their values with a filter
-func (r *RPCStorageHandler) GetKeysAndValuesWithFilter(filter string) map[string]string {
+func (r *RPCStorageHandler) GetKeysAndValuesWithFilter(ctx context.Context, filter string) map[string]string {
 
 	searchStr := r.KeyPrefix + r.hashKey(filter) + "*"
 	log.Debug("[STORE] Getting list by: ", searchStr)
@@ -366,7 +371,7 @@ func (r *RPCStorageHandler) GetKeysAndValuesWithFilter(filter string) map[string
 
 		if r.IsAccessError(err) {
 			if rpc.Login() {
-				return r.GetKeysAndValuesWithFilter(filter)
+				return r.GetKeysAndValuesWithFilter(ctx, filter)
 			}
 		}
 
@@ -383,7 +388,7 @@ func (r *RPCStorageHandler) GetKeysAndValuesWithFilter(filter string) map[string
 }
 
 // GetKeysAndValues will return all keys and their values - not to be used lightly
-func (r *RPCStorageHandler) GetKeysAndValues() map[string]string {
+func (r *RPCStorageHandler) GetKeysAndValues(ctx context.Context) map[string]string {
 
 	searchStr := r.KeyPrefix + "*"
 
@@ -393,7 +398,7 @@ func (r *RPCStorageHandler) GetKeysAndValues() map[string]string {
 
 		if r.IsAccessError(err) {
 			if rpc.Login() {
-				return r.GetKeysAndValues()
+				return r.GetKeysAndValues(ctx)
 			}
 		}
 
@@ -410,7 +415,7 @@ func (r *RPCStorageHandler) GetKeysAndValues() map[string]string {
 }
 
 // DeleteKey will remove a key from the database
-func (r *RPCStorageHandler) DeleteKey(keyName string) bool {
+func (r *RPCStorageHandler) DeleteKey(ctx context.Context, keyName string) bool {
 
 	log.Debug("DEL Key was: ", keyName)
 	log.Debug("DEL Key became: ", r.fixKey(keyName))
@@ -428,7 +433,7 @@ func (r *RPCStorageHandler) DeleteKey(keyName string) bool {
 
 		if r.IsAccessError(err) {
 			if rpc.Login() {
-				return r.DeleteKey(keyName)
+				return r.DeleteKey(ctx, keyName)
 			}
 		}
 	}
@@ -436,13 +441,13 @@ func (r *RPCStorageHandler) DeleteKey(keyName string) bool {
 	return ok == true
 }
 
-func (r *RPCStorageHandler) DeleteAllKeys() bool {
+func (r *RPCStorageHandler) DeleteAllKeys(ctx context.Context) bool {
 	log.Warning("Not implementated")
 	return false
 }
 
 // DeleteKey will remove a key from the database without prefixing, assumes user knows what they are doing
-func (r *RPCStorageHandler) DeleteRawKey(keyName string) bool {
+func (r *RPCStorageHandler) DeleteRawKey(ctx context.Context, keyName string) bool {
 	ok, err := rpc.FuncClientSingleton("DeleteRawKey", keyName)
 	if err != nil {
 		rpc.EmitErrorEventKv(
@@ -456,7 +461,7 @@ func (r *RPCStorageHandler) DeleteRawKey(keyName string) bool {
 
 		if r.IsAccessError(err) {
 			if rpc.Login() {
-				return r.DeleteRawKey(keyName)
+				return r.DeleteRawKey(ctx, keyName)
 			}
 		}
 	}
@@ -465,7 +470,7 @@ func (r *RPCStorageHandler) DeleteRawKey(keyName string) bool {
 }
 
 // DeleteKeys will remove a group of keys in bulk
-func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
+func (r *RPCStorageHandler) DeleteKeys(ctx context.Context, keys []string) bool {
 	if len(keys) > 0 {
 		asInterface := make([]string, len(keys))
 		for i, v := range keys {
@@ -487,7 +492,7 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 
 			if r.IsAccessError(err) {
 				if rpc.Login() {
-					return r.DeleteKeys(keys)
+					return r.DeleteKeys(ctx, keys)
 				}
 			}
 		}
@@ -499,22 +504,22 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 }
 
 // StartPubSubHandler will listen for a signal and run the callback with the message
-func (r *RPCStorageHandler) StartPubSubHandler(channel string, callback func(*redis.Message)) error {
+func (r *RPCStorageHandler) StartPubSubHandler(ctx context.Context, channel string, callback func(*redis.Message)) error {
 	log.Warning("RPCStorageHandler.StartPubSubHandler - NO PUBSUB DEFINED")
 	return nil
 }
 
-func (r *RPCStorageHandler) Publish(channel, message string) error {
+func (r *RPCStorageHandler) Publish(ctx context.Context, channel, message string) error {
 	log.Warning("RPCStorageHandler.Publish - NO PUBSUB DEFINED")
 	return nil
 }
 
-func (r *RPCStorageHandler) GetAndDeleteSet(keyName string) []interface{} {
+func (r *RPCStorageHandler) GetAndDeleteSet(ctx context.Context, keyName string) []interface{} {
 	log.Error("RPCStorageHandler.GetAndDeleteSet - Not implemented, please disable your purger")
 	return nil
 }
 
-func (r *RPCStorageHandler) AppendToSet(keyName, value string) {
+func (r *RPCStorageHandler) AppendToSet(ctx context.Context, keyName, value string) {
 	ibd := apidef.InboundData{
 		KeyName: keyName,
 		Value:   value,
@@ -533,13 +538,13 @@ func (r *RPCStorageHandler) AppendToSet(keyName, value string) {
 	}
 	if r.IsAccessError(err) {
 		if rpc.Login() {
-			r.AppendToSet(keyName, value)
+			r.AppendToSet(ctx, keyName, value)
 		}
 	}
 }
 
 // SetScrollingWindow is used in the rate limiter to handle rate limits fairly.
-func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, val string, pipeline bool) (int, []interface{}) {
+func (r *RPCStorageHandler) SetRollingWindow(ctx context.Context, keyName string, per int64, val string, pipeline bool) (int, []interface{}) {
 	start := time.Now() // get current time
 	ibd := apidef.InboundData{
 		KeyName: keyName,
@@ -561,7 +566,7 @@ func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, val stri
 
 		if r.IsAccessError(err) {
 			if rpc.Login() {
-				return r.SetRollingWindow(keyName, per, val, false)
+				return r.SetRollingWindow(ctx, keyName, per, val, false)
 			}
 		}
 	}
@@ -578,21 +583,21 @@ func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, val stri
 
 }
 
-func (r *RPCStorageHandler) GetRollingWindow(keyName string, per int64, pipeline bool) (int, []interface{}) {
+func (r *RPCStorageHandler) GetRollingWindow(ctx context.Context, keyName string, per int64, pipeline bool) (int, []interface{}) {
 	log.Warning("Not Implemented!")
 	return 0, nil
 }
 
-func (r RPCStorageHandler) GetSet(keyName string) (map[string]string, error) {
+func (r RPCStorageHandler) GetSet(ctx context.Context, keyName string) (map[string]string, error) {
 	log.Error("RPCStorageHandler.GetSet - Not implemented")
 	return nil, nil
 }
 
-func (r RPCStorageHandler) AddToSet(keyName, value string) {
+func (r RPCStorageHandler) AddToSet(ctx context.Context, keyName, value string) {
 	log.Error("RPCStorageHandler.AddToSet - Not implemented")
 }
 
-func (r RPCStorageHandler) RemoveFromSet(keyName, value string) {
+func (r RPCStorageHandler) RemoveFromSet(ctx context.Context, keyName, value string) {
 	log.Error("RPCStorageHandler.RemoveFromSet - Not implemented")
 }
 
@@ -668,7 +673,7 @@ func (r *RPCStorageHandler) GetPolicies(orgId string) string {
 }
 
 // CheckForReload will start a long poll
-func (r *RPCStorageHandler) CheckForReload(orgId string) {
+func (r *RPCStorageHandler) CheckForReload(ctx context.Context, orgId string) {
 	log.Debug("[RPC STORE] Check Reload called...")
 	reload, err := rpc.FuncClientSingleton("CheckReload", orgId)
 	if err != nil {
@@ -683,64 +688,80 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) {
 		if r.IsAccessError(err) {
 			log.Warning("[RPC STORE] CheckReload: Not logged in")
 			if rpc.Login() {
-				r.CheckForReload(orgId)
+				// This is a recursive call that may/maynot terminate. Make it a good
+				// practice to start this with a deadline.
+				//
+				// We check if the ctx is done(due to cancellation or meeting deadline.) and
+				// exit right away
+				if err := ctx.Err(); err != nil {
+					log.Warning("[RPC STORE] RPC Reload Checker context has error: ", err)
+					return
+				}
+				r.CheckForReload(ctx, orgId)
 			}
 		} else if !strings.Contains(err.Error(), "Cannot obtain response during") {
 			log.Warning("[RPC STORE] RPC Reload Checker encountered unexpected error: ", err)
 		}
 
-		time.Sleep(1 * time.Second)
 	} else if reload == true {
 		// Do the reload!
-		log.Warning("[RPC STORE] Received Reload instruction!")
-		go func() {
-			MainNotifier.Notify(Notification{Command: NoticeGroupReload})
-		}()
+		log.Warning("[RPC STORkE] Received Reload instruction!")
+		MainNotifier.Notify(ctx, Notification{Command: NoticeGroupReload})
 	}
 }
 
-func (r *RPCStorageHandler) StartRPCLoopCheck(orgId string) {
+func (r *RPCStorageHandler) StartRPCLoopCheck(ctx context.Context, orgId string) {
 	if config.Global().SlaveOptions.DisableKeySpaceSync {
 		return
 	}
 
 	log.Info("[RPC] Starting keyspace poller")
-
+	seconds := config.Global().SlaveOptions.KeySpaceSyncInterval
+	ticker := time.NewTicker(time.Duration(seconds) * time.Second)
+	ticker.Stop()
 	for {
-		seconds := config.Global().SlaveOptions.KeySpaceSyncInterval
-		r.CheckForKeyspaceChanges(orgId)
-		time.Sleep(time.Duration(seconds) * time.Second)
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			r.CheckForKeyspaceChanges(ctx, orgId)
+		}
 	}
 }
 
-func (r *RPCStorageHandler) StartRPCKeepaliveWatcher() {
+func (r *RPCStorageHandler) StartRPCKeepaliveWatcher(ctx context.Context) {
 	log.WithFields(logrus.Fields{
 		"prefix": "RPC Conn Mgr",
 	}).Info("[RPC Conn Mgr] Starting keepalive watcher...")
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
 	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if err := r.SetKey(ctx, "0000", "0000", 10); err != nil {
+				log.WithError(err).WithFields(logrus.Fields{
+					"prefix": "RPC Conn Mgr",
+				}).Warning("Can't connect to RPC layer")
 
-		if err := r.SetKey("0000", "0000", 10); err != nil {
-			log.WithError(err).WithFields(logrus.Fields{
-				"prefix": "RPC Conn Mgr",
-			}).Warning("Can't connect to RPC layer")
+				if r.IsAccessError(err) {
+					if rpc.Login() {
+						continue
+					}
+				}
 
-			if r.IsAccessError(err) {
-				if rpc.Login() {
+				if strings.Contains(err.Error(), "Cannot obtain response during timeout") {
 					continue
 				}
 			}
 
-			if strings.Contains(err.Error(), "Cannot obtain response during timeout") {
-				continue
-			}
 		}
-
-		time.Sleep(10 * time.Second)
 	}
 }
 
 // CheckForKeyspaceChanges will poll for keysace changes
-func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
+func (r *RPCStorageHandler) CheckForKeyspaceChanges(ctx context.Context, orgId string) {
 	log.Debug("Checking for keyspace changes...")
 
 	var keys interface{}
@@ -773,7 +794,7 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 		)
 		if r.IsAccessError(err) {
 			if rpc.Login() {
-				r.CheckForKeyspaceChanges(orgId)
+				r.CheckForKeyspaceChanges(ctx, orgId)
 			}
 		}
 		log.Warning("Keyspace warning: ", err)
@@ -787,21 +808,22 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 
 	if len(keys.([]string)) > 0 {
 		log.Info("Keyspace changes detected, updating local cache")
-		go r.ProcessKeySpaceChanges(keys.([]string))
+		//FIXME:(gernest) don't ru this in separate goroutines
+		go r.ProcessKeySpaceChanges(ctx, keys.([]string))
 	}
 }
 
-func getSessionAndCreate(keyName string, r *RPCStorageHandler) {
+func getSessionAndCreate(ctx context.Context, keyName string, r *RPCStorageHandler) {
 	newKeyName := "apikey-" + storage.HashStr(keyName)
-	sessionString, err := r.GetRawKey(keyName)
+	sessionString, err := r.GetRawKey(ctx, keyName)
 	if err != nil {
 		log.Error("Key not found in master - skipping")
 	} else {
-		handleAddKey(keyName, newKeyName[7:], sessionString, "-1")
+		handleAddKey(ctx, keyName, newKeyName[7:], sessionString, "-1")
 	}
 }
 
-func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
+func (r *RPCStorageHandler) ProcessKeySpaceChanges(ctx context.Context, keys []string) {
 	keysToReset := map[string]bool{}
 	TokensToBeRevoked := map[string]string{}
 	ClientsToBeRevoked := map[string]string{}
@@ -831,7 +853,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 		if err != nil {
 			continue
 		}
-		_, tokens, _ := RevokeAllTokens(storage, clientId, clientSecret)
+		_, tokens, _ := RevokeAllTokens(ctx, storage, clientId, clientSecret)
 		keys = append(keys, tokens...)
 	}
 
@@ -858,7 +880,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 			RevokeToken(storage, token, tokenTypeHint)
 		} else {
 			token = strings.Split(token, "#")[0]
-			handleDeleteHashedKey(token, apiId, false)
+			handleDeleteHashedKey(ctx, token, apiId, false)
 		}
 		SessionCache.Delete(token)
 		RPCGlobalCache.Delete(r.KeyPrefix + token)
@@ -872,12 +894,12 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 			if len(splitKeys) > 1 && splitKeys[1] == "hashed" {
 				key = splitKeys[0]
 				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
-				handleDeleteHashedKey(splitKeys[0], "", resetQuota)
-				getSessionAndCreate(splitKeys[0], r)
+				handleDeleteHashedKey(ctx, splitKeys[0], "", resetQuota)
+				getSessionAndCreate(ctx, splitKeys[0], r)
 			} else {
 				log.Info("--> removing cached key: ", key)
-				handleDeleteKey(key, "-1", resetQuota)
-				getSessionAndCreate(splitKeys[0], r)
+				handleDeleteKey(ctx, key, "-1", resetQuota)
+				getSessionAndCreate(ctx, splitKeys[0], r)
 			}
 			SessionCache.Delete(key)
 			RPCGlobalCache.Delete(r.KeyPrefix + key)
@@ -888,42 +910,42 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 		Command: KeySpaceUpdateNotification,
 		Payload: strings.Join(keys, ","),
 	}
-	MainNotifier.Notify(n)
+	MainNotifier.Notify(ctx, n)
 }
 
-func (r *RPCStorageHandler) DeleteScanMatch(pattern string) bool {
+func (r *RPCStorageHandler) DeleteScanMatch(ctx context.Context, pattern string) bool {
 	log.Error("RPCStorageHandler.DeleteScanMatch - Not implemented")
 	return false
 }
 
-func (r *RPCStorageHandler) GetKeyPrefix() string {
+func (r *RPCStorageHandler) GetKeyPrefix(ctx context.Context) string {
 	log.Error("RPCStorageHandler.GetKeyPrefix - Not implemented")
 	return ""
 }
 
-func (r *RPCStorageHandler) AddToSortedSet(keyName, value string, score float64) {
-	handleGlobalAddToSortedSet(keyName, value, score)
+func (r *RPCStorageHandler) AddToSortedSet(ctx context.Context, keyName, value string, score float64) {
+	handleGlobalAddToSortedSet(ctx, keyName, value, score)
 }
 
-func (r *RPCStorageHandler) GetSortedSetRange(keyName, scoreFrom, scoreTo string) ([]string, []float64, error) {
-	return handleGetSortedSetRange(keyName, scoreFrom, scoreTo)
+func (r *RPCStorageHandler) GetSortedSetRange(ctx context.Context, keyName, scoreFrom, scoreTo string) ([]string, []float64, error) {
+	return handleGetSortedSetRange(ctx, keyName, scoreFrom, scoreTo)
 }
 
-func (r *RPCStorageHandler) RemoveSortedSetRange(keyName, scoreFrom, scoreTo string) error {
-	return handleRemoveSortedSetRange(keyName, scoreFrom, scoreTo)
+func (r *RPCStorageHandler) RemoveSortedSetRange(ctx context.Context, keyName, scoreFrom, scoreTo string) error {
+	return handleRemoveSortedSetRange(ctx, keyName, scoreFrom, scoreTo)
 }
 
-func (r *RPCStorageHandler) RemoveFromList(keyName, value string) error {
+func (r *RPCStorageHandler) RemoveFromList(ctx context.Context, keyName, value string) error {
 	log.Error("Not implemented")
 	return nil
 }
 
-func (r *RPCStorageHandler) GetListRange(keyName string, from, to int64) ([]string, error) {
+func (r *RPCStorageHandler) GetListRange(ctx context.Context, keyName string, from, to int64) ([]string, error) {
 	log.Error("Not implemented")
 	return nil, nil
 }
 
-func (r *RPCStorageHandler) Exists(keyName string) (bool, error) {
+func (r *RPCStorageHandler) Exists(ctx context.Context, keyName string) (bool, error) {
 	log.Error("Not implemented")
 	return false, nil
 }

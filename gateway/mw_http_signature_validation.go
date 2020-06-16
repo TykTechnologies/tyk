@@ -109,7 +109,7 @@ func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWrite
 			return hm.authorizationError(r)
 		}
 
-		publicKey := CertificateManager.ListRawPublicKey(certificateId)
+		publicKey := CertificateManager.ListRawPublicKey(r.Context(), certificateId)
 		if publicKey == nil {
 			log.Error("Certificate not found")
 			return errors.New("Certificate not found"), http.StatusInternalServerError
@@ -293,7 +293,7 @@ type HMACFieldValues struct {
 }
 
 func (hm *HTTPSignatureValidationMiddleware) getSecretAndSessionForKeyID(r *http.Request, keyId string) (string, user.SessionState, error) {
-	session, keyExists := hm.CheckSessionAndIdentityForValidKey(keyId, r)
+	session, keyExists := hm.CheckSessionAndIdentityForValidKey(r.Context(), keyId, r)
 	if !keyExists {
 		return "", session, errors.New("Key ID does not exist")
 	}
@@ -308,7 +308,7 @@ func (hm *HTTPSignatureValidationMiddleware) getSecretAndSessionForKeyID(r *http
 }
 
 func (hm *HTTPSignatureValidationMiddleware) getRSACertificateIdAndSessionForKeyID(r *http.Request, keyId string) (string, user.SessionState, error) {
-	session, keyExists := hm.CheckSessionAndIdentityForValidKey(keyId, r)
+	session, keyExists := hm.CheckSessionAndIdentityForValidKey(r.Context(), keyId, r)
 	if !keyExists {
 		return "", session, errors.New("Key ID does not exist")
 	}

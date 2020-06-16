@@ -74,7 +74,7 @@ func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	// try to get from Redis
 	if !found {
 		// not found in in-app cache, let's read from Redis
-		orgSession, found = k.OrgSession(k.Spec.OrgID)
+		orgSession, found = k.OrgSession(r.Context(), k.Spec.OrgID)
 		if !found {
 			// prevent reads from in-app cache and from Redis for next runs
 			k.setOrgHasNoSession(true)
@@ -116,7 +116,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession use
 
 	sessionLifeTime := orgSession.Lifetime(k.Spec.SessionLifetime)
 
-	if err := k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, &orgSession, sessionLifeTime, false); err == nil {
+	if err := k.Spec.OrgSessionManager.UpdateSession(r.Context(), k.Spec.OrgID, &orgSession, sessionLifeTime, false); err == nil {
 		// update in-app cache if needed
 		if !k.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
 			SessionCache.Set(k.Spec.OrgID, orgSession, time.Second*time.Duration(sessionLifeTime))
@@ -132,7 +132,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession use
 		logger.Warning("Organisation quota has been exceeded.", k.Spec.OrgID)
 
 		// Fire a quota exceeded event
-		k.FireEvent(
+		k.FireEvent(r.Context(),
 			EventOrgQuotaExceeded,
 			EventKeyFailureMeta{
 				EventMetaDefault: EventMetaDefault{
@@ -149,7 +149,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession use
 		logger.Warning("Organisation rate limit has been exceeded.", k.Spec.OrgID)
 
 		// Fire a rate limit exceeded event
-		k.FireEvent(
+		k.FireEvent(r.Context(),
 			EventOrgRateLimitExceeded,
 			EventKeyFailureMeta{
 				EventMetaDefault: EventMetaDefault{
@@ -166,7 +166,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession use
 
 	if k.Spec.GlobalConfig.Monitor.MonitorOrgKeys {
 		// Run the trigger monitor
-		k.mon.Check(&orgSession, "")
+		k.mon.Check(r.Context(), &orgSession, "")
 	}
 
 	// Lets keep a reference of the org
@@ -247,7 +247,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 
 	sessionLifeTime := session.Lifetime(k.Spec.SessionLifetime)
 
-	if err := k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, session, sessionLifeTime, false); err == nil {
+	if err := k.Spec.OrgSessionManager.UpdateSession(r.Context(), k.Spec.OrgID, session, sessionLifeTime, false); err == nil {
 		// update in-app cache if needed
 		if !k.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
 			SessionCache.Set(k.Spec.OrgID, *session, time.Second*time.Duration(sessionLifeTime))
@@ -266,7 +266,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 		logEntry.Warning("Organisation quota has been exceeded.")
 
 		// Fire a quota exceeded event
-		k.FireEvent(
+		k.FireEvent(r.Context(),
 			EventOrgQuotaExceeded,
 			EventKeyFailureMeta{
 				EventMetaDefault: EventMetaDefault{
@@ -283,7 +283,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 		logEntry.Warning("Organisation rate limit has been exceeded.")
 
 		// Fire a rate limit exceeded event
-		k.FireEvent(
+		k.FireEvent(r.Context(),
 			EventOrgRateLimitExceeded,
 			EventKeyFailureMeta{
 				EventMetaDefault: EventMetaDefault{
@@ -298,7 +298,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 
 	if k.Spec.GlobalConfig.Monitor.MonitorOrgKeys {
 		// Run the trigger monitor
-		k.mon.Check(session, "")
+		k.mon.Check(r.Context(), session, "")
 	}
 
 	if isExceeded {

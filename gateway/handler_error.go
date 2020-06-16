@@ -253,7 +253,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 		expiresAfter := e.Spec.ExpireAnalyticsAfter
 		if e.Spec.GlobalConfig.EnforceOrgDataAge {
-			orgExpireDataTime := e.OrgSessionExpiry(e.Spec.OrgID)
+			orgExpireDataTime := e.OrgSessionExpiry(r.Context(), e.Spec.OrgID)
 
 			if orgExpireDataTime > 0 {
 				expiresAfter = orgExpireDataTime
@@ -269,7 +269,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		analytics.RecordHit(&record)
 	}
 	// Report in health check
-	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
+	reportHealthValue(r.Context(), e.Spec, BlockedRequestLog, "-1")
 
 	if memProfFile != nil {
 		pprof.WriteHeapProfile(memProfFile)

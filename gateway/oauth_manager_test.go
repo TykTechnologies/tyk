@@ -6,6 +6,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/url"
 	"reflect"
@@ -141,7 +142,7 @@ func createTestOAuthClient(spec *APISpec, clientID string) {
 		PolicyID:          pID,
 		MetaData:          map[string]interface{}{"foo": "bar", "client": "meta"},
 	}
-	spec.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, "org-id-1", &testClient, false)
+	spec.OAuthManager.OsinServer.Storage.SetClient(context.TODO(), testClient.ClientID, "org-id-1", &testClient, false)
 }
 
 func TestOauthMultipleAPIs(t *testing.T) {
@@ -185,8 +186,8 @@ func TestOauthMultipleAPIs(t *testing.T) {
 		ClientRedirectURI: authRedirectUri,
 		PolicyID:          pID,
 	}
-	spec.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, spec.OrgID, &testClient, false)
-	spec2.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, spec2.OrgID, &testClient, false)
+	spec.OAuthManager.OsinServer.Storage.SetClient(ts.Context(), testClient.ClientID, spec.OrgID, &testClient, false)
+	spec2.OAuthManager.OsinServer.Storage.SetClient(ts.Context(), testClient.ClientID, spec2.OrgID, &testClient, false)
 
 	param := make(url.Values)
 	param.Set("response_type", "token")
@@ -436,7 +437,7 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 		if !ok {
 			t.Fatal("No access token found")
 		}
-		session, ok := spec.AuthManager.KeyAuthorised(token)
+		session, ok := spec.AuthManager.KeyAuthorised(ts.Context(), token)
 		if !ok {
 			t.Error("Key was not created (Can't find it)!")
 		}
@@ -587,7 +588,7 @@ func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 		}
 
 		// Verify the token is correct
-		session, ok := spec.AuthManager.KeyAuthorised(token)
+		session, ok := spec.AuthManager.KeyAuthorised(ts.Context(), token)
 		if !ok {
 			t.Error("Key was not created (Can't find it)!")
 		}
