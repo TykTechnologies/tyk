@@ -56,6 +56,7 @@ Google::Protobuf::DescriptorPool.generated_pool.build do
       optional :session_lifetime, :int64, 28
       repeated :apply_policies, :string, 29
       optional :certificate, :string, 30
+      optional :max_query_depth, :int64, 31
     end
   end
 end

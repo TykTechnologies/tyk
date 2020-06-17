@@ -71,4 +71,6 @@ message SessionState {
   repeated string apply_policies = 29;
 
   string certificate = 30;
+
+  int64 max_query_depth = 31;
 }
