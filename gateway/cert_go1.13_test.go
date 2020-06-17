@@ -112,5 +112,5 @@ func TestAPICertificate_unknown(t *testing.T) {
 		spec.UseKeylessAccess = true
 		spec.Proxy.ListenPath = "/"
 	})
-	ts.Run(t, test.TestCase{ErrorMatch: unrecognizedName})
+	ts.Run(t, test.TestCase{ErrorMatch: internalTLSErr})
 }
