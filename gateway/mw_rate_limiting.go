@@ -77,7 +77,8 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	session := ctxGetSession(r)
 	token := ctxGetAuthToken(r)
 
-	if k.Spec.GraphQL.Enabled && session.MaxQueryDepth != disabledQueryDepth {
+	// If MaxQueryDepth is -1 or 0, it means unlimited and no need for depth limiting.
+	if k.Spec.GraphQL.Enabled && session.MaxQueryDepth > 0 {
 		gqlRequest := ctxGetGraphQLRequest(r)
 
 		complexityRes, err := gqlRequest.CalculateComplexity(gql.DefaultComplexityCalculator, k.Spec.GraphQLExecutor.Schema)
