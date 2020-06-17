@@ -504,6 +504,7 @@ func TestChecker_triggerSampleLimit(t *testing.T) {
 	var failed, ping atomic.Value
 	failed.Store(0)
 	ping.Store(0)
+	done := make(chan struct{})
 	hs.Init(1, limit, 1, map[string]HostData{
 		l.Addr().String(): data,
 	},
@@ -513,15 +514,22 @@ func TestChecker_triggerSampleLimit(t *testing.T) {
 			},
 			Fail: func(_ context.Context, _ HostHealthReport) {
 				failed.Store(failed.Load().(int) + 1)
-				cancel()
+				done <- struct{}{}
 			},
 		},
 	)
 	go hs.Start(ctx)
-	<-ctx.Done()
+	x := time.NewTimer(10 * time.Second)
+	defer x.Stop()
+	select {
+	case <-done:
+	case <-x.C:
+		t.Error("Timeout while waiting for a limit trigger")
+	}
+	cancel()
 	setTestMode(true)
-	if ping.Load().(int) != limit {
-		t.Errorf("expected %d got %d", limit, ping.Load())
+	if ping.Load().(int) < limit {
+		t.Errorf("expected (%d >= %d)", limit, ping.Load())
 	}
 	if failed.Load().(int) != 1 {
 		t.Errorf("expected host down to be fired once got %d instead", failed.Load())
