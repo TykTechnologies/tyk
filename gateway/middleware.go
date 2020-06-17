@@ -38,8 +38,6 @@ const coprocessType = "coprocess"
 const oauthType = "oauth"
 const oidcType = "oidc"
 
-const disabledQueryDepth = -1
-
 var (
 	GlobalRate            = ratecounter.NewRateCounter(1 * time.Second)
 	orgSessionExpiryCache singleflight.Group
