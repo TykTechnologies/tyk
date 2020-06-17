@@ -49,6 +49,7 @@ def MyAuthHook(request, session, metadata, spec):
   if auth_header == 'valid_token':
     session.rate = 1000.0
     session.per = 1.0
+    session.max_query_depth = 1
     session.quota_max = 1
     session.quota_renewal_rate = 60
     metadata["token"] = "valid_token"
