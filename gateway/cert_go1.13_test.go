@@ -74,7 +74,7 @@ func TestProxyTransport_tlsv3(t *testing.T) {
 	})
 }
 
-func TestGatewayTLS_without_certs(t *testing.T) {
+func TestGatewayTLS_without_certs_new(t *testing.T) {
 	dir, _ := ioutil.TempDir("", "certs")
 	defer os.RemoveAll(dir)
 	client := GetTLSClient(nil, nil)
@@ -91,7 +91,7 @@ func TestGatewayTLS_without_certs(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 	})
 
-	ts.Run(t, test.TestCase{ErrorMatch: "tls: unrecognized name", Client: client})
+	ts.Run(t, test.TestCase{ErrorMatch: unrecognizedName, Client: client})
 }
 
 func TestAPICertificate_unknown(t *testing.T) {
