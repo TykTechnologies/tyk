@@ -156,7 +156,7 @@ func (m *GraphQLMiddleware) writeGraphQLError(w http.ResponseWriter, errors gql.
 	w.Header().Set(headers.ContentType, headers.ApplicationJSON)
 	w.WriteHeader(http.StatusBadRequest)
 	_, _ = errors.WriteResponse(w)
-	m.Logger().Errorf("Error while validating GraphQL request: '%s'", errors)
+	m.Logger().Debugf("Error while validating GraphQL request: '%s'", errors)
 	return errCustomBodyResponse, http.StatusBadRequest
 }
 
