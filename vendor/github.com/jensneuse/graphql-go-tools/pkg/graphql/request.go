@@ -7,9 +7,7 @@ import (
 	"io/ioutil"
 
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
-	"github.com/jensneuse/graphql-go-tools/pkg/astnormalization"
 	"github.com/jensneuse/graphql-go-tools/pkg/astparser"
-	"github.com/jensneuse/graphql-go-tools/pkg/astvalidation"
 	"github.com/jensneuse/graphql-go-tools/pkg/operationreport"
 )
 
@@ -42,46 +40,6 @@ func UnmarshalRequest(reader io.Reader, request *Request) error {
 	return json.Unmarshal(requestBytes, &request)
 }
 
-func (r *Request) ValidateForSchema(schema *Schema) (result ValidationResult, err error) {
-	if schema == nil {
-		return ValidationResult{Valid: false, Errors: nil}, ErrNilSchema
-	}
-
-	report := r.parseQueryOnce()
-	if report.HasErrors() {
-		return operationValidationResultFromReport(report)
-	}
-
-	validator := astvalidation.DefaultOperationValidator()
-	validator.Validate(&r.document, &schema.document, &report)
-	return operationValidationResultFromReport(report)
-}
-
-func (r *Request) Normalize(schema *Schema) (result NormalizationResult, err error) {
-	if schema == nil {
-		return NormalizationResult{Successful: false, Errors: nil}, ErrNilSchema
-	}
-
-	report := r.parseQueryOnce()
-	if report.HasErrors() {
-		return normalizationResultFromReport(report)
-	}
-
-	r.document.Input.Variables = r.Variables
-
-	normalizer := astnormalization.NewNormalizer(true, true)
-	normalizer.NormalizeOperation(&r.document, &schema.document, &report)
-	if report.HasErrors() {
-		return normalizationResultFromReport(report)
-	}
-
-	r.isNormalized = true
-
-	r.Variables = r.document.Input.Variables
-
-	return NormalizationResult{Successful: true, Errors: nil}, nil
-}
-
 func (r *Request) CalculateComplexity(complexityCalculator ComplexityCalculator, schema *Schema) (ComplexityResult, error) {
 	if schema == nil {
 		return ComplexityResult{}, ErrNilSchema
@@ -106,20 +64,6 @@ func (r Request) Print(writer io.Writer) (n int, err error) {
 
 func (r *Request) IsNormalized() bool {
 	return r.isNormalized
-}
-
-func (r *Request) ValidateRestrictedFields(schema *Schema, restrictedFields []Type) (RequestFieldsValidationResult, error) {
-	if schema == nil {
-		return RequestFieldsValidationResult{Valid: false}, ErrNilSchema
-	}
-
-	report := r.parseQueryOnce()
-	if report.HasErrors() {
-		return fieldsValidationResult(report, false, "", "")
-	}
-
-	var fieldsValidator RequestFieldsValidator = fieldsValidator{}
-	return fieldsValidator.Validate(r, schema, restrictedFields)
 }
 
 func (r *Request) parseQueryOnce() (report operationreport.Report) {
