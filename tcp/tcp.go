@@ -224,14 +224,14 @@ func (p *Proxy) handleConn(conn net.Conn) error {
 		} else {
 			rconn, err = net.Dial("tcp", u.Host)
 		}
-	case "tls":
+	case "tls", "https":
 		if p.DialTLS != nil {
 			rconn, err = p.DialTLS("tcp", u.Host)
 		} else {
 			rconn, err = tls.Dial("tcp", u.Host, p.TLSConfigTarget)
 		}
 	default:
-		err = errors.New("Unsupported protocol. Should be empty, `tcp` or `tls`")
+		err = errors.New("Unsupported protocol. Should be empty, `tcp`, `tls` or `https`)
 	}
 	if err != nil {
 		conn.Close()
