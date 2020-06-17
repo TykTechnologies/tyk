@@ -986,15 +986,6 @@ func TestAPICertificate(t *testing.T) {
 
 		ts.Run(t, test.TestCase{Code: 200, Client: client})
 	})
-
-	t.Run("Cert unknown", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
-			spec.UseKeylessAccess = true
-			spec.Proxy.ListenPath = "/"
-		})
-
-		ts.Run(t, test.TestCase{ErrorMatch: unrecognizedName})
-	})
 }
 
 func TestCertificateHandlerTLS(t *testing.T) {
