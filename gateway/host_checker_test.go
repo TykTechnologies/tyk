@@ -504,18 +504,16 @@ func TestChecker_triggerSampleLimit(t *testing.T) {
 	var failed, ping atomic.Value
 	failed.Store(0)
 	ping.Store(0)
-	hs.Init(1, limit, 0, map[string]HostData{
+	hs.Init(1, limit, 1, map[string]HostData{
 		l.Addr().String(): data,
 	},
 		HostCheckCallBacks{
 			Ping: func(_ context.Context, _ HostHealthReport) {
 				ping.Store(ping.Load().(int) + 1)
-				if ping.Load().(int) >= limit {
-					cancel()
-				}
 			},
 			Fail: func(_ context.Context, _ HostHealthReport) {
 				failed.Store(failed.Load().(int) + 1)
+				cancel()
 			},
 		},
 	)
