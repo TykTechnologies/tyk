@@ -46,17 +46,19 @@ func (m *GraphQLMiddleware) Init() {
 	if m.Spec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeExecutionEngine {
 
 		typeFieldConfigurations := m.Spec.GraphQL.TypeFieldConfigurations
-		typeFieldConfigurations = append(typeFieldConfigurations, datasource.TypeFieldConfiguration{
-			TypeName:  "Query",
-			FieldName: "__schema",
-			DataSource: datasource.SourceConfig{
-				Name: SchemaDataSource,
-				Config: func() json.RawMessage {
-					res, _ := json.Marshal(datasource.SchemaDataSourcePlannerConfig{})
-					return res
-				}(),
-			},
-		})
+		if schema.HasQueryType() {
+			typeFieldConfigurations = append(typeFieldConfigurations, datasource.TypeFieldConfiguration{
+				TypeName:  schema.QueryTypeName(),
+				FieldName: "__schema",
+				DataSource: datasource.SourceConfig{
+					Name: SchemaDataSource,
+					Config: func() json.RawMessage {
+						res, _ := json.Marshal(datasource.SchemaDataSourcePlannerConfig{})
+						return res
+					}(),
+				},
+			})
+		}
 
 		absLogger := abstractlogger.NewLogrusLogger(log, absLoggerLevel(log.Level))
 		plannerConfig := datasource.PlannerConfiguration{

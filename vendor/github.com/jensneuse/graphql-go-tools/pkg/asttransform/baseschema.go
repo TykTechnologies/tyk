@@ -119,7 +119,7 @@ func addTypeField(definition *ast.Document) (ref int) {
 }
 
 func findQueryNode(definition *ast.Document) (queryNode ast.Node, ok bool) {
-	queryNode, ok = definition.Index.Nodes[xxhash.Sum64String("Query")]
+	queryNode, ok = definition.Index.Nodes[xxhash.Sum64(definition.Index.QueryTypeName)]
 	return queryNode, ok
 }
 

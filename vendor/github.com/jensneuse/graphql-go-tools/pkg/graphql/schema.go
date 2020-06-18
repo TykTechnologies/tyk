@@ -33,6 +33,42 @@ func (s *Schema) Document() []byte {
 	return s.rawInput
 }
 
+func (s *Schema) HasQueryType() bool {
+	return len(s.document.Index.QueryTypeName) > 0
+}
+
+func (s *Schema) QueryTypeName() string {
+	if !s.HasQueryType() {
+		return ""
+	}
+
+	return string(s.document.Index.QueryTypeName)
+}
+
+func (s *Schema) HasMutationType() bool {
+	return len(s.document.Index.MutationTypeName) > 0
+}
+
+func (s *Schema) MutationTypeName() string {
+	if !s.HasMutationType() {
+		return ""
+	}
+
+	return string(s.document.Index.MutationTypeName)
+}
+
+func (s *Schema) HasSubscriptionType() bool {
+	return len(s.document.Index.SubscriptionTypeName) > 0
+}
+
+func (s *Schema) SubscriptionTypeName() string {
+	if !s.HasSubscriptionType() {
+		return ""
+	}
+
+	return string(s.document.Index.SubscriptionTypeName)
+}
+
 func (s *Schema) Validate() (valid bool, errors SchemaValidationErrors) {
 	// TODO: Needs to be implemented in the core of the library
 	return true, nil

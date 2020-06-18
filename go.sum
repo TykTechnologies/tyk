@@ -29,18 +29,8 @@ github.com/TykTechnologies/gorpc v0.0.0-20190515174534-b9c10befc5f4 h1:hTjM5Uubg
 github.com/TykTechnologies/gorpc v0.0.0-20190515174534-b9c10befc5f4/go.mod h1:vqhQRhIHefD4jdFo55j+m0vD5NMjx2liq/ubnshQpaY=
 github.com/TykTechnologies/goverify v0.0.0-20160822133757-7ccc57452ade h1:tFUV86NDnfMY4Au+EJHGJx0Rton8xdOLEh1aT+j6XBk=
 github.com/TykTechnologies/goverify v0.0.0-20160822133757-7ccc57452ade/go.mod h1:mkS8jKcz8otdfEXhJs1QQ/DKoIY1NFFsRPKS0RwQENI=
-github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20200609094341-b397239f1a12 h1:qCl+yfvZYiXR6TDSw7VqHKvmmYs7sz3wc85jsSJ0ffM=
-github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20200609094341-b397239f1a12/go.mod h1:dpvMd3O2N2I2xO1GaEyAXwaffT85RxOHS5buWymLW60=
-github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20200611141704-b336a2eefc78 h1:aHnx8kPmFZ4t8WrlPZ/ruLRNnN6jYa+J/S6ACIjzgCw=
-github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20200611141704-b336a2eefc78/go.mod h1:dpvMd3O2N2I2xO1GaEyAXwaffT85RxOHS5buWymLW60=
-github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20200612160717-c15b373c8e11 h1:ZFX0l6KdeNjX8uM9KVyu0HO+V7Tw7/Sr5g3oout2EjM=
-github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20200612160717-c15b373c8e11/go.mod h1:dpvMd3O2N2I2xO1GaEyAXwaffT85RxOHS5buWymLW60=
-github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20200612173734-37b3f4fa6f65 h1:4O17j/XeCAgx1QOD9E9deYh+5iIy1tHU4h3l0hvUBv0=
-github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20200612173734-37b3f4fa6f65/go.mod h1:dpvMd3O2N2I2xO1GaEyAXwaffT85RxOHS5buWymLW60=
-github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20200616123551-00044c0de321 h1:lnXpKPeMm8NaRUPyLuJN8NEoEDG5QP5KkfSqTx6lEdQ=
-github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20200616123551-00044c0de321/go.mod h1:dpvMd3O2N2I2xO1GaEyAXwaffT85RxOHS5buWymLW60=
-github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20200616123817-84812fb569a0 h1:wd6NmFKqUfJOPBJeoeCeOPCoq8MugKUm+ty31wwESRM=
-github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20200616123817-84812fb569a0/go.mod h1:dpvMd3O2N2I2xO1GaEyAXwaffT85RxOHS5buWymLW60=
+github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20200617142628-350db8ba611d h1:sjRX5Uak0+M5luFzGKtQEocuOE3ppJxn/nBg+FWBo7A=
+github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20200617142628-350db8ba611d/go.mod h1:dpvMd3O2N2I2xO1GaEyAXwaffT85RxOHS5buWymLW60=
 github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c h1:j6fd0Fz1R4oSWOmcooGjrdahqrML+btQ+PfEJw8SzbA=
 github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c/go.mod h1:GnHUbsQx+ysI10osPhUdTmsxcE7ef64cVp38Fdyd7e0=
 github.com/TykTechnologies/murmur3 v0.0.0-20180602122059-1915e687e465 h1:A2gBjoX8aF0G3GHEpHyj2f0ixuPkCgcGqmPdKHSkW+0=
@@ -149,6 +139,7 @@ github.com/golang/snappy v0.0.1/go.mod h1:/XxbfmMg8lxefKM7IXC3fBNl/7bRcc72aCRzEW
 github.com/google/btree v0.0.0-20180813153112-4030bb1f1f0c/go.mod h1:lNA+9X1NB3Zf8V7Ke586lFgjr2dZNuvo3lPJSGZ5JPQ=
 github.com/google/btree v1.0.0 h1:0udJVsspx3VBr5FwtLhQQtuAsVc79tTq0ocGIPAU6qo=
 github.com/google/btree v1.0.0/go.mod h1:lNA+9X1NB3Zf8V7Ke586lFgjr2dZNuvo3lPJSGZ5JPQ=
+github.com/google/go-cmp v0.2.0 h1:+dTQ8DZQJz0Mb/HjFlkptS1FeQ4cWSnN941F8aEG4SQ=
 github.com/google/go-cmp v0.2.0/go.mod h1:oXzfMopK8JAjlY9xF4vHSVASa0yLyX7SntLO5aqRK0M=
 github.com/google/renameio v0.1.0/go.mod h1:KWCgfxg9yswjAJkECMjeO8J8rahYeXnNhOm40UhjYkI=
 github.com/google/uuid v1.1.1 h1:Gkbcsh/GbpXz7lPftLA3P6TYMwjCLYm83jiFQZF/3gY=
@@ -494,8 +485,6 @@ google.golang.org/grpc v1.19.0/go.mod h1:mqu4LbDTu4XGKhr4mRzUsmM4RtVoemTSY81AxZi
 google.golang.org/grpc v1.20.0/go.mod h1:chYK+tFQF0nDUGJgXMSgLCQk3phJEuONr2DCgLDdAQM=
 google.golang.org/grpc v1.22.0/go.mod h1:Y5yQAOtifL1yxbo5wqy6BxZv8vAUGQwXBOALyacEbxg=
 google.golang.org/grpc v1.23.0/go.mod h1:Y5yQAOtifL1yxbo5wqy6BxZv8vAUGQwXBOALyacEbxg=
-google.golang.org/grpc v1.23.1 h1:q4XQuHFC6I28BKZpo6IYyb3mNO+l7lSOxRuYTCiDfXk=
-google.golang.org/grpc v1.23.1/go.mod h1:Y5yQAOtifL1yxbo5wqy6BxZv8vAUGQwXBOALyacEbxg=
 google.golang.org/grpc v1.25.1/go.mod h1:c3i+UQWmh7LiEpx4sFZnkU36qjEYZ0imhYfXVyQciAY=
 google.golang.org/grpc v1.29.1 h1:EC2SB8S04d2r73uptxphDSUG+kTKVgjRPF+N3xpxRB4=
 google.golang.org/grpc v1.29.1/go.mod h1:itym6AZVZYACWQqET3MqgPpjcuV5QH3BxFS3IjizoKk=
