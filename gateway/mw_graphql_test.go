@@ -29,6 +29,19 @@ func TestGraphQL(t *testing.T) {
 		_, _ = g.Run(t, test.TestCase{BodyMatch: "there was a problem proxying the request", Code: http.StatusInternalServerError})
 	})
 
+	spec.GraphQL.Schema = "schema { query: query_root } type query_root { hello: word } type word { numOfLetters: Int }"
+	LoadAPI(spec)
+
+	t.Run("Introspection query with custom query type should successfully work", func(t *testing.T) {
+		request := gql.Request{
+			OperationName: "IntrospectionQuery",
+			Variables:     nil,
+			Query:         gqlIntrospectionQuery,
+		}
+
+		_, _ = g.Run(t, test.TestCase{Data: request, BodyMatch: "__schema", Code: http.StatusOK})
+	})
+
 	spec.GraphQL.Schema = "schema { query: Query } type Query { hello: word } type word { numOfLetters: Int }"
 	LoadAPI(spec)
 
