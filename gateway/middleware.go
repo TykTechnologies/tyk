@@ -230,7 +230,7 @@ func (t BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
 	var session user.SessionState
 	var found bool
 
-	if !rpc.IsEmergencyMode(){
+	if !rpc.IsEmergencyMode() {
 		// Try and get the session from the session store
 		session, found = t.Spec.OrgSessionManager.SessionDetail(orgID, orgID, false)
 		if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
