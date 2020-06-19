@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/tyk/rpc"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -226,16 +227,22 @@ func (t BaseMiddleware) Config() (interface{}, error) {
 }
 
 func (t BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
-	// Try and get the session from the session store
-	session, found := t.Spec.OrgSessionManager.SessionDetail(orgID, orgID, false)
-	if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
-		// If exists, assume it has been authorized and pass on
-		// We cache org expiry data
-		t.Logger().Debug("Setting data expiry: ", session.OrgID)
-		ExpiryCache.Set(session.OrgID, session.DataExpires, cache.DefaultExpiration)
+	var session user.SessionState
+	var found bool
+
+	if !rpc.IsEmergencyMode(){
+		// Try and get the session from the session store
+		session, found = t.Spec.OrgSessionManager.SessionDetail(orgID, orgID, false)
+		if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
+			// If exists, assume it has been authorized and pass on
+			// We cache org expiry data
+			t.Logger().Debug("Setting data expiry: ", session.OrgID)
+			ExpiryCache.Set(session.OrgID, session.DataExpires, cache.DefaultExpiration)
+		}
+
+		session.SetKeyHash(storage.HashKey(orgID))
 	}
 
-	session.SetKeyHash(storage.HashKey(orgID))
 	return session, found
 }
 
