@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/TykTechnologies/tyk/rpc"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/TykTechnologies/tyk/headers"
 
