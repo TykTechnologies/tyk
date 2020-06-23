@@ -94,15 +94,9 @@ const (
 	sessionFailQuota
 )
 
-func (l *SessionLimiter) limitSentinel(
-	currentSession *user.SessionState,
-	key string,
-	rateScope string,
-	store storage.Handler,
-	globalConf *config.Config,
-	apiLimit *user.APILimit,
-	dryRun bool,
-) bool {
+func (l *SessionLimiter) limitSentinel(currentSession *user.SessionState, key string, rateScope string, store storage.Handler,
+	globalConf *config.Config, apiLimit *user.APILimit, dryRun bool) bool {
+
 	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash()
 	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash() + ".BLOCKED"
 
@@ -116,15 +110,10 @@ func (l *SessionLimiter) limitSentinel(
 	}
 	return false
 }
-func (l *SessionLimiter) limitRedis(
-	currentSession *user.SessionState,
-	key string,
-	rateScope string,
-	store storage.Handler,
-	globalConf *config.Config,
-	apiLimit *user.APILimit,
-	dryRun bool,
-) bool {
+
+func (l *SessionLimiter) limitRedis(currentSession *user.SessionState, key string, rateScope string, store storage.Handler,
+	globalConf *config.Config, apiLimit *user.APILimit, dryRun bool) bool {
+
 	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash()
 	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash() + ".BLOCKED"
 
@@ -133,13 +122,10 @@ func (l *SessionLimiter) limitRedis(
 	}
 	return false
 }
-func (l *SessionLimiter) limitDRL(
-	currentSession *user.SessionState,
-	key string,
-	rateScope string,
-	apiLimit *user.APILimit,
-	dryRun bool,
-) bool {
+
+func (l *SessionLimiter) limitDRL(currentSession *user.SessionState, key string, rateScope string,
+	apiLimit *user.APILimit, dryRun bool) bool {
+
 	// In-memory limiter
 	if l.bucketStore == nil {
 		l.bucketStore = memorycache.New()
@@ -217,7 +203,8 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 		}
 	}
 
-	if enableRL {
+	// If rate is -1 or 0, it means unlimited and no need for rate limiting.
+	if enableRL && apiLimit.Rate > 0 {
 		rateScope := ""
 		if allowanceScope != "" {
 			rateScope = allowanceScope + "-"
@@ -291,7 +278,6 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 	log.Debug("Renewing with TTL: ", quotaRenewalRate)
 	// INCR the key (If it equals 1 - set EXPIRE)
 	qInt := store.IncrememntWithExpire(rawKey, quotaRenewalRate)
-
 	// if the returned val is >= quota: block
 	if qInt-1 >= quotaMax {
 		renewalDate := time.Unix(quotaRenews, 0)
@@ -300,6 +286,11 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 		log.Debug("Session: ", currentSession)
 		log.Debug("Now:", time.Now())
 		if time.Now().After(renewalDate) {
+			//for renew quota = never, once we get the quota max we must not allow using it again
+
+			if quotaRenewalRate <= 0 {
+				return true
+			}
 			// The renewal date is in the past, we should update the quota!
 			// Also, this fixes legacy issues where there is no TTL on quota buckets
 			log.Debug("Incorrect key expiry setting detected, correcting")

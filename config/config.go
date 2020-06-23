@@ -154,19 +154,20 @@ type WebHookHandlerConf struct {
 }
 
 type SlaveOptionsConfig struct {
-	UseRPC                          bool   `json:"use_rpc"`
-	UseSSL                          bool   `json:"use_ssl"`
-	SSLInsecureSkipVerify           bool   `json:"ssl_insecure_skip_verify"`
-	ConnectionString                string `json:"connection_string"`
-	RPCKey                          string `json:"rpc_key"`
-	APIKey                          string `json:"api_key"`
-	EnableRPCCache                  bool   `json:"enable_rpc_cache"`
-	BindToSlugsInsteadOfListenPaths bool   `json:"bind_to_slugs"`
-	DisableKeySpaceSync             bool   `json:"disable_keyspace_sync"`
-	GroupID                         string `json:"group_id"`
-	CallTimeout                     int    `json:"call_timeout"`
-	PingTimeout                     int    `json:"ping_timeout"`
-	RPCPoolSize                     int    `json:"rpc_pool_size"`
+	UseRPC                          bool    `json:"use_rpc"`
+	UseSSL                          bool    `json:"use_ssl"`
+	SSLInsecureSkipVerify           bool    `json:"ssl_insecure_skip_verify"`
+	ConnectionString                string  `json:"connection_string"`
+	RPCKey                          string  `json:"rpc_key"`
+	APIKey                          string  `json:"api_key"`
+	EnableRPCCache                  bool    `json:"enable_rpc_cache"`
+	BindToSlugsInsteadOfListenPaths bool    `json:"bind_to_slugs"`
+	DisableKeySpaceSync             bool    `json:"disable_keyspace_sync"`
+	GroupID                         string  `json:"group_id"`
+	CallTimeout                     int     `json:"call_timeout"`
+	PingTimeout                     int     `json:"ping_timeout"`
+	RPCPoolSize                     int     `json:"rpc_pool_size"`
+	KeySpaceSyncInterval            float32 `json:"key_space_sync_interval"`
 }
 
 type LocalSessionCacheConf struct {
@@ -431,6 +432,7 @@ type Config struct {
 	HTTPProfile             bool           `json:"enable_http_profiler"`
 	UseRedisLog             bool           `json:"use_redis_log"`
 	SentryCode              string         `json:"sentry_code"`
+	SentryLogLevel          string         `json:"sentry_log_level"`
 	UseSentry               bool           `json:"use_sentry"`
 	UseSyslog               bool           `json:"use_syslog"`
 	UseGraylog              bool           `json:"use_graylog"`
@@ -467,6 +469,9 @@ type Config struct {
 
 	// OverrideMessages is used to override returned API error codes and messages.
 	OverrideMessages map[string]TykError `bson:"override_messages" json:"override_messages"`
+
+	// Cloud flag shows that gateway runs in Tyk-cloud.
+	Cloud bool `json:"cloud"`
 }
 
 type TykError struct {
@@ -657,6 +662,9 @@ func Load(paths []string, conf *Config) error {
 	if err := envconfig.Process(envPrefix, conf); err != nil {
 		return fmt.Errorf("failed to process config env vars: %v", err)
 	}
+	if err := processCustom(envPrefix, conf, loadZipkin, loadJaeger); err != nil {
+		return fmt.Errorf("failed to process config custom loader: %v", err)
+	}
 	return nil
 }
 
@@ -673,4 +681,17 @@ func (c *Config) StoreAnalytics(ip string) bool {
 	}
 
 	return !c.AnalyticsConfig.ignoredIPsCompiled[ip]
+}
+
+// processCustom these are custom functions for loadign config values. They will
+// be called in the order they are passed. Any function that returns an error
+// then that error will be returned and no further processing will be
+// happenning.
+func processCustom(prefix string, c *Config, custom ...func(prefix string, c *Config) error) error {
+	for _, fn := range custom {
+		if err := fn(prefix, c); err != nil {
+			return err
+		}
+	}
+	return nil
 }

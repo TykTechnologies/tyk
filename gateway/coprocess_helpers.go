@@ -65,6 +65,7 @@ func TykSessionState(session *coprocess.SessionState) *user.SessionState {
 		Allowance:               session.Allowance,
 		Rate:                    session.Rate,
 		Per:                     session.Per,
+		MaxQueryDepth:           int(session.MaxQueryDepth),
 		Expires:                 session.Expires,
 		QuotaMax:                session.QuotaMax,
 		QuotaRenews:             session.QuotaRenews,

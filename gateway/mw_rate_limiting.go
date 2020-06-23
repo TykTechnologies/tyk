@@ -8,6 +8,8 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/request"
+
+	gql "github.com/jensneuse/graphql-go-tools/pkg/graphql"
 )
 
 var sessionLimiter = SessionLimiter{}
@@ -74,6 +76,22 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 
 	session := ctxGetSession(r)
 	token := ctxGetAuthToken(r)
+
+	// If MaxQueryDepth is -1 or 0, it means unlimited and no need for depth limiting.
+	if k.Spec.GraphQL.Enabled && session.MaxQueryDepth > 0 {
+		gqlRequest := ctxGetGraphQLRequest(r)
+
+		complexityRes, err := gqlRequest.CalculateComplexity(gql.DefaultComplexityCalculator, k.Spec.GraphQLExecutor.Schema)
+		if err != nil {
+			k.Logger().Errorf("Error while calculating complexity of GraphQL request: '%s'", err)
+			return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
+		}
+
+		if complexityRes.Depth > session.MaxQueryDepth {
+			k.Logger().Debugf("Complexity of the request is higher than the allowed limit '%d'", session.MaxQueryDepth)
+			return errors.New("depth limit exceeded"), http.StatusForbidden
+		}
+	}
 
 	storeRef := GlobalSessionManager.Store()
 	reason := sessionLimiter.ForwardMessage(

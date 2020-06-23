@@ -145,31 +145,6 @@ func getApiSpec(apiID string) *APISpec {
 	return spec
 }
 
-func getApisForOauthClientId(oauthClientId string) []string {
-	apis := []string{}
-	apisIdsCopy := []string{}
-
-	//generate a copy only with ids so we do not attempt to lock twice
-	apisMu.RLock()
-	for apiId := range apisByID {
-		apisIdsCopy = append(apisIdsCopy, apiId)
-	}
-	apisMu.RUnlock()
-
-	for index := range apisIdsCopy {
-		clientsData, _, status := getApiClients(apisIdsCopy[index])
-		if status == http.StatusOK {
-			for _, client := range clientsData {
-				if client.GetId() == oauthClientId {
-					apis = append(apis, apisIdsCopy[index])
-				}
-			}
-		}
-	}
-
-	return apis
-}
-
 func apisByIDLen() int {
 	apisMu.RLock()
 	defer apisMu.RUnlock()
@@ -467,9 +442,8 @@ func loadControlAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/oauth/clients/create", createOauthClient).Methods("POST")
 		r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", oAuthClientHandler).Methods("PUT")
 		r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}/rotate", rotateOauthClientHandler).Methods("PUT")
-		r.HandleFunc("/oauth/clients/apis/{appID}", getApisForOauthApp).Methods("GET")
+		r.HandleFunc("/oauth/clients/apis/{appID}", getApisForOauthApp).Queries("orgID", "{[0-9]*?}").Methods("GET")
 		r.HandleFunc("/oauth/refresh/{keyName}", invalidateOauthRefresh).Methods("DELETE")
-		r.HandleFunc("/cache/{apiID}", invalidateCacheHandler).Methods("DELETE")
 		r.HandleFunc("/oauth/revoke", RevokeTokenHandler).Methods("POST")
 		r.HandleFunc("/oauth/revoke_all", RevokeAllTokensHandler).Methods("POST")
 
@@ -478,7 +452,7 @@ func loadControlAPIEndpoints(muxer *mux.Router) {
 	}
 
 	r.HandleFunc("/debug", traceHandler).Methods("POST")
-
+	r.HandleFunc("/cache/{apiID}", invalidateCacheHandler).Methods("DELETE")
 	r.HandleFunc("/keys", keyHandler).Methods("POST", "PUT", "GET", "DELETE")
 	r.HandleFunc("/keys/preview", previewKeyHandler).Methods("POST")
 	r.HandleFunc("/keys/{keyName:[^/]*}", keyHandler).Methods("POST", "PUT", "GET", "DELETE")
@@ -516,11 +490,16 @@ func generateOAuthPrefix(apiID string) string {
 
 // Create API-specific OAuth handlers and respective auth servers
 func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
-	apiAuthorizePath := spec.Proxy.ListenPath + "tyk/oauth/authorize-client{_:/?}"
-	clientAuthPath := spec.Proxy.ListenPath + "oauth/authorize{_:/?}"
-	clientAccessPath := spec.Proxy.ListenPath + "oauth/token{_:/?}"
-	revokeToken := spec.Proxy.ListenPath + "oauth/revoke"
-	revokeAllTokens := spec.Proxy.ListenPath + "oauth/revoke_all"
+	var pathSeparator string
+	if !strings.HasSuffix(spec.Proxy.ListenPath, "/") {
+		pathSeparator = "/"
+	}
+
+	apiAuthorizePath := spec.Proxy.ListenPath + pathSeparator + "tyk/oauth/authorize-client{_:/?}"
+	clientAuthPath := spec.Proxy.ListenPath + pathSeparator + "oauth/authorize{_:/?}"
+	clientAccessPath := spec.Proxy.ListenPath + pathSeparator + "oauth/token{_:/?}"
+	revokeToken := spec.Proxy.ListenPath + pathSeparator + "oauth/revoke"
+	revokeAllTokens := spec.Proxy.ListenPath + pathSeparator + "oauth/revoke_all"
 
 	serverConfig := osin.NewServerConfig()
 
@@ -535,10 +514,9 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 	serverConfig.RedirectUriSeparator = config.Global().OauthRedirectUriSeparator
 
 	prefix := generateOAuthPrefix(spec.APIID)
-	log.Info("prefix for oatuh redis:", prefix)
 	storageManager := getGlobalStorageHandler(prefix, false)
 	storageManager.Connect()
-	osinStorage := &RedisOsinStorageInterface{storageManager, GlobalSessionManager, spec.OrgID}
+	osinStorage := &RedisOsinStorageInterface{storageManager, GlobalSessionManager, &storage.RedisCluster{KeyPrefix: prefix, HashKeys: false}, spec.OrgID}
 
 	osinServer := TykOsinNewServer(serverConfig, osinStorage)
 
@@ -819,11 +797,23 @@ func reloadURLStructure(done func()) {
 func setupLogger() {
 	if config.Global().UseSentry {
 		mainLog.Debug("Enabling Sentry support")
-		hook, err := logrus_sentry.NewSentryHook(config.Global().SentryCode, []logrus.Level{
-			logrus.PanicLevel,
-			logrus.FatalLevel,
-			logrus.ErrorLevel,
-		})
+
+		logLevel := []logrus.Level{}
+
+		if config.Global().SentryLogLevel == "" {
+			logLevel = []logrus.Level{
+				logrus.PanicLevel,
+				logrus.FatalLevel,
+				logrus.ErrorLevel,
+			}
+		} else if config.Global().SentryLogLevel == "panic" {
+			logLevel = []logrus.Level{
+				logrus.PanicLevel,
+				logrus.FatalLevel,
+			}
+		}
+
+		hook, err := logrus_sentry.NewSentryHook(config.Global().SentryCode, logLevel)
 
 		hook.Timeout = 0
 
@@ -1026,6 +1016,10 @@ func afterConfSetup(conf *config.Config) {
 		conf.SlaveOptions.PingTimeout = 60
 	}
 
+	if conf.SlaveOptions.KeySpaceSyncInterval == 0 {
+		conf.SlaveOptions.KeySpaceSyncInterval = 10
+	}
+
 	rpc.GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)
 	rpc.GlobalRPCCallTimeout = time.Second * time.Duration(conf.SlaveOptions.CallTimeout)
 	initGenericEventHandlers(conf)
@@ -1099,44 +1093,56 @@ func kvStore(value string) (string, error) {
 	if strings.HasPrefix(value, "consul://") {
 		key := strings.TrimPrefix(value, "consul://")
 		log.Debugf("Retrieving %s from consul", key)
-		setUpConsul()
+		if err := setUpConsul(); err != nil {
+			// Return value as is. If consul cannot be set up
+			return value, nil
+		}
+
 		return consulKVStore.Get(key)
 	}
 
 	if strings.HasPrefix(value, "vault://") {
 		key := strings.TrimPrefix(value, "vault://")
 		log.Debugf("Retrieving %s from vault", key)
-		setUpVault()
+		if err := setUpVault(); err != nil {
+			// Return value as is If vault cannot be set up
+			return value, nil
+		}
+
 		return vaultKVStore.Get(key)
 	}
 
 	return value, nil
 }
 
-func setUpVault() {
+func setUpVault() error {
 	if vaultKVStore != nil {
-		return
+		return nil
 	}
 
 	var err error
 
 	vaultKVStore, err = kv.NewVault(config.Global().KV.Vault)
 	if err != nil {
-		log.Fatalf("an error occurred while setting up vault... %v", err)
+		log.Debugf("an error occurred while setting up vault... %v", err)
 	}
+
+	return err
 }
 
-func setUpConsul() {
+func setUpConsul() error {
 	if consulKVStore != nil {
-		return
+		return nil
 	}
 
 	var err error
 
 	consulKVStore, err = kv.NewConsul(config.Global().KV.Consul)
 	if err != nil {
-		log.Fatalf("an error occurred while setting up consul... %v", err)
+		log.Debugf("an error occurred while setting up consul.. %v", err)
 	}
+
+	return err
 }
 
 var hostDetails struct {

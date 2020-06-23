@@ -582,7 +582,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 			key, err := ParseRSAPublicKey(val)
 			if err != nil {
 				logger.WithError(err).Error("Failed to decode JWT key")
-				return nil, err
+				return nil, errors.New("Failed to decode JWT key")
 			}
 			return key, nil
 		default:
@@ -715,6 +715,7 @@ func generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.Se
 	session.Per = policy.Per
 	session.ThrottleInterval = policy.ThrottleInterval
 	session.ThrottleRetryLimit = policy.ThrottleRetryLimit
+	session.MaxQueryDepth = policy.MaxQueryDepth
 	session.QuotaMax = policy.QuotaMax
 	session.QuotaRenewalRate = policy.QuotaRenewalRate
 	session.AccessRights = make(map[string]user.AccessDefinition)

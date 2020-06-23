@@ -1,8 +1,16 @@
 package gateway
 
 import (
+	"fmt"
+	"net/http"
 	"sync/atomic"
 	"testing"
+
+	"github.com/TykTechnologies/tyk/config"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/test"
 
 	"github.com/TykTechnologies/tyk/trace"
 )
@@ -40,4 +48,109 @@ func TestOpenTracing(t *testing.T) {
 			ts.Errorf("expected %s got %s", name, n)
 		}
 	})
+}
+
+func TestInternalAPIUsage(t *testing.T) {
+	g := StartTest()
+	defer g.Close()
+
+	internal := BuildAPI(func(spec *APISpec) {
+		spec.Name = "internal"
+		spec.APIID = "test1"
+		spec.Proxy.ListenPath = "/"
+	})[0]
+
+	normal := BuildAPI(func(spec *APISpec) {
+		spec.Name = "normal"
+		spec.APIID = "test2"
+		spec.Proxy.TargetURL = fmt.Sprintf("tyk://%s", internal.Name)
+		spec.Proxy.ListenPath = "/normal-api"
+	})[0]
+
+	LoadAPI(internal, normal)
+
+	t.Run("with name", func(t *testing.T) {
+		_, _ = g.Run(t, []test.TestCase{
+			{Path: "/normal-api", Code: http.StatusOK},
+		}...)
+	})
+
+	t.Run("with api id", func(t *testing.T) {
+		normal.Proxy.TargetURL = fmt.Sprintf("tyk://%s", internal.APIID)
+
+		LoadAPI(internal, normal)
+
+		_, _ = g.Run(t, []test.TestCase{
+			{Path: "/normal-api", Code: http.StatusOK},
+		}...)
+	})
+}
+
+func TestFuzzyFindAPI(t *testing.T) {
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Name = "IgnoreCase"
+		spec.APIID = "123456"
+		spec.Proxy.ListenPath = "/"
+	})
+
+	spec := fuzzyFindAPI("ignoreCase")
+	assert.Equal(t, "123456", spec.APIID)
+}
+
+func TestGraphQLPlayground(t *testing.T) {
+	g := StartTest()
+	defer g.Close()
+
+	defer ResetTestConfig()
+
+	const apiName = "graphql-api"
+
+	api := BuildAPI(func(spec *APISpec) {
+		spec.APIID = "APIID"
+		spec.Proxy.ListenPath = fmt.Sprintf("/%s/", apiName)
+		spec.GraphQL.Enabled = true
+		spec.GraphQL.GraphQLPlayground.Enabled = true
+	})[0]
+
+	for _, env := range []string{"on-premise", "cloud"} {
+		if env == "cloud" {
+			api.Proxy.ListenPath = fmt.Sprintf("/%s/", api.APIID)
+			api.Slug = apiName
+			globalConf := config.Global()
+			globalConf.Cloud = true
+			config.SetGlobal(globalConf)
+		}
+
+		t.Run(env, func(t *testing.T) {
+			t.Run("path is empty", func(t *testing.T) {
+				api.GraphQL.GraphQLPlayground.Path = ""
+				LoadAPI(api)
+				_, _ = g.Run(t, []test.TestCase{
+					{Path: api.Proxy.ListenPath, BodyMatch: `<link rel="stylesheet" href="playground.css" />`},
+					{Path: api.Proxy.ListenPath, BodyMatch: `endpoint: "\\/` + apiName + `\\/"`},
+					{Path: api.Proxy.ListenPath + "playground.css", BodyMatch: "body{margin:0;padding:0;font-family:.*"},
+				}...)
+			})
+
+			t.Run("path is /", func(t *testing.T) {
+				api.GraphQL.GraphQLPlayground.Path = "/"
+				LoadAPI(api)
+				_, _ = g.Run(t, []test.TestCase{
+					{Path: api.Proxy.ListenPath, BodyMatch: `<link rel="stylesheet" href="playground.css" />`},
+					{Path: api.Proxy.ListenPath, BodyMatch: `endpoint: "\\/` + apiName + `\\/"`},
+					{Path: api.Proxy.ListenPath + "playground.css", BodyMatch: "body{margin:0;padding:0;font-family:.*"},
+				}...)
+			})
+
+			t.Run("path is /playground", func(t *testing.T) {
+				api.GraphQL.GraphQLPlayground.Path = "/playground"
+				LoadAPI(api)
+				_, _ = g.Run(t, []test.TestCase{
+					{Path: api.Proxy.ListenPath + "playground", BodyMatch: `<link rel="stylesheet" href="playground/playground.css" />`},
+					{Path: api.Proxy.ListenPath + "playground", BodyMatch: `endpoint: "\\/` + apiName + `\\/"`},
+					{Path: api.Proxy.ListenPath + "playground/playground.css", BodyMatch: "body{margin:0;padding:0;font-family:.*"},
+				}...)
+			})
+		})
+	}
 }

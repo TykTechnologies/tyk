@@ -23,11 +23,46 @@ const (
 	defaultContentType    = headers.ApplicationJSON
 )
 
+var errCustomBodyResponse = errors.New("errCustomBodyResponse")
+
 var TykErrors = make(map[string]config.TykError)
 
 func errorAndStatusCode(errType string) (error, int) {
 	err := TykErrors[errType]
 	return errors.New(err.Message), err.Code
+}
+
+func defaultTykErrors() {
+	TykErrors = make(map[string]config.TykError)
+	TykErrors[ErrAuthAuthorizationFieldMissing] = config.TykError{
+		Message: "Authorization field missing",
+		Code:    http.StatusUnauthorized,
+	}
+
+	TykErrors[ErrAuthKeyNotFound] = config.TykError{
+		Message: "Access to this API has been disallowed",
+		Code:    http.StatusForbidden,
+	}
+
+	TykErrors[ErrOAuthAuthorizationFieldMissing] = config.TykError{
+		Message: "Authorization field missing",
+		Code:    http.StatusBadRequest,
+	}
+
+	TykErrors[ErrOAuthAuthorizationFieldMalformed] = config.TykError{
+		Message: "Bearer token malformed",
+		Code:    http.StatusBadRequest,
+	}
+
+	TykErrors[ErrOAuthKeyNotFound] = config.TykError{
+		Message: "Key not authorised",
+		Code:    http.StatusForbidden,
+	}
+
+	TykErrors[ErrOAuthClientDeleted] = config.TykError{
+		Message: "Key not authorised. OAuth client access was revoked",
+		Code:    http.StatusForbidden,
+	}
 }
 
 func overrideTykErrors() {
@@ -105,10 +140,12 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			w.Header().Add(headers.Connection, "close")
 		}
 
-		// Need to return the correct error code!
-		w.WriteHeader(errCode)
-		apiError := APIError{template.HTML(template.JSEscapeString(errMsg))}
-		tmpl.Execute(w, &apiError)
+		// If error is not customized write error in default way
+		if errMsg != errCustomBodyResponse.Error() {
+			w.WriteHeader(errCode)
+			apiError := APIError{template.HTML(template.JSEscapeString(errMsg))}
+			tmpl.Execute(w, &apiError)
+		}
 	}
 
 	if memProfFile != nil {

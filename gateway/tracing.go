@@ -126,6 +126,7 @@ func traceHandler(w http.ResponseWriter, r *http.Request) {
 
 	wr := httptest.NewRecorder()
 	tr := traceReq.Request.toRequest()
+	nopCloseRequestBody(tr)
 	chainObj.ThisHandler.ServeHTTP(wr, tr)
 
 	var response string

@@ -302,7 +302,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		session.MetaData = make(map[string]interface{})
 	}
 
-	didQuota, didRateLimit, didACL := make(map[string]bool), make(map[string]bool), make(map[string]bool)
+	didQuota, didRateLimit, didACL, didComplexity := make(map[string]bool), make(map[string]bool), make(map[string]bool), make(map[string]bool)
 	policies := session.PolicyIDs()
 
 	for _, polID := range policies {
@@ -323,7 +323,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		}
 
 		if policy.Partitions.PerAPI &&
-			(policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl) {
+			(policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl || policy.Partitions.Complexity) {
 			err := fmt.Errorf("cannot apply policy %s which has per_api and any of partitions set", policy.ID)
 			log.Error(err)
 			return err
@@ -332,7 +332,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		if policy.Partitions.PerAPI {
 			for apiID, accessRights := range policy.AccessRights {
 				// new logic when you can specify quota or rate in more than one policy but for different APIs
-				if didQuota[apiID] || didRateLimit[apiID] || didACL[apiID] { // no other partitions allowed
+				if didQuota[apiID] || didRateLimit[apiID] || didACL[apiID] || didComplexity[apiID] { // no other partitions allowed
 					err := fmt.Errorf("cannot apply multiple policies when some have per_api set and some are partitioned")
 					log.Error(err)
 					return err
@@ -342,6 +342,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				// check if we already have limit on API level specified when policy was created
 				if accessRights.Limit == nil || *accessRights.Limit == (user.APILimit{}) {
 					// limit was not specified on API level so we will populate it from policy
+					idForScope = policy.ID
 					accessRights.Limit = &user.APILimit{
 						QuotaMax:           policy.QuotaMax,
 						QuotaRenewalRate:   policy.QuotaRenewalRate,
@@ -349,9 +350,8 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 						Per:                policy.Per,
 						ThrottleInterval:   policy.ThrottleInterval,
 						ThrottleRetryLimit: policy.ThrottleRetryLimit,
+						MaxQueryDepth:      policy.MaxQueryDepth,
 					}
-				} else {
-					idForScope = policy.ID
 				}
 				accessRights.AllowanceScope = idForScope
 				accessRights.Limit.SetBy = idForScope
@@ -368,9 +368,11 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				didACL[apiID] = true
 				didQuota[apiID] = true
 				didRateLimit[apiID] = true
+				didComplexity[apiID] = true
 			}
 		} else {
-			usePartitions := policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl
+			usePartitions := policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl || policy.Partitions.Complexity
+
 			for k, v := range policy.AccessRights {
 				ar := &v
 
@@ -399,6 +401,20 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 							}
 						}
 
+						for _, t := range v.RestrictedTypes {
+							found := false
+							for ri, rt := range r.RestrictedTypes {
+								if t.Name == rt.Name {
+									found = true
+									r.RestrictedTypes[ri].Fields = append(rt.Fields, t.Fields...)
+								}
+							}
+
+							if !found {
+								r.RestrictedTypes = append(r.RestrictedTypes, v.RestrictedTypes...)
+							}
+						}
+
 						ar = &r
 					}
 
@@ -407,38 +423,64 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 				if !usePartitions || policy.Partitions.Quota {
 					didQuota[k] = true
+					if greaterThanInt64(policy.QuotaMax, ar.Limit.QuotaMax) {
 
-					// -1 is special "unlimited" case
-					if ar.Limit.QuotaMax != -1 && policy.QuotaMax > ar.Limit.QuotaMax {
 						ar.Limit.QuotaMax = policy.QuotaMax
-						session.QuotaMax = policy.QuotaMax
+						//if partition for quota is set the we must use this value in the global information of the key
+						if greaterThanInt64(policy.QuotaMax, session.QuotaMax) || policy.Partitions.Quota {
+							session.QuotaMax = policy.QuotaMax
+						}
 					}
 
 					if policy.QuotaRenewalRate > ar.Limit.QuotaRenewalRate {
 						ar.Limit.QuotaRenewalRate = policy.QuotaRenewalRate
-						session.QuotaRenewalRate = policy.QuotaRenewalRate
+						if policy.QuotaRenewalRate > session.QuotaRenewalRate {
+							session.QuotaRenewalRate = policy.QuotaRenewalRate
+						}
 					}
 				}
 
 				if !usePartitions || policy.Partitions.RateLimit {
 					didRateLimit[k] = true
 
-					if ar.Limit.Rate != -1 && policy.Rate > ar.Limit.Rate {
+					if greaterThanFloat64(policy.Rate, ar.Limit.Rate) {
 						ar.Limit.Rate = policy.Rate
-						session.Rate = policy.Rate
+						//if policy.Partitions.RateLimit then we must set this value in the global data of the key
+						if greaterThanFloat64(policy.Rate, session.Rate) || policy.Partitions.RateLimit {
+							session.Rate = policy.Rate
+						}
 					}
 
 					if policy.Per > ar.Limit.Per {
 						ar.Limit.Per = policy.Per
-						session.Per = policy.Per
-					}
-
-					if policy.ThrottleInterval > ar.Limit.ThrottleInterval {
-						ar.Limit.ThrottleInterval = policy.ThrottleInterval
+						if policy.Per > session.Per {
+							session.Per = policy.Per
+						}
 					}
 
 					if policy.ThrottleRetryLimit > ar.Limit.ThrottleRetryLimit {
 						ar.Limit.ThrottleRetryLimit = policy.ThrottleRetryLimit
+						if policy.ThrottleRetryLimit > session.ThrottleRetryLimit {
+							session.ThrottleRetryLimit = policy.ThrottleRetryLimit
+						}
+					}
+
+					if policy.ThrottleInterval > ar.Limit.ThrottleInterval {
+						ar.Limit.ThrottleInterval = policy.ThrottleInterval
+						if policy.ThrottleInterval > session.ThrottleInterval {
+							session.ThrottleInterval = policy.ThrottleInterval
+						}
+					}
+				}
+
+				if !usePartitions || policy.Partitions.Complexity {
+					didComplexity[k] = true
+
+					if greaterThanInt(policy.MaxQueryDepth, ar.Limit.MaxQueryDepth) {
+						ar.Limit.MaxQueryDepth = policy.MaxQueryDepth
+						if greaterThanInt(policy.MaxQueryDepth, session.MaxQueryDepth) {
+							session.MaxQueryDepth = policy.MaxQueryDepth
+						}
 					}
 				}
 
@@ -459,6 +501,10 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					session.Per = policy.Per
 					session.ThrottleInterval = policy.ThrottleInterval
 					session.ThrottleRetryLimit = policy.ThrottleRetryLimit
+				}
+
+				if !usePartitions || policy.Partitions.Complexity {
+					session.MaxQueryDepth = policy.MaxQueryDepth
 				}
 
 				if !usePartitions || policy.Partitions.Quota {
@@ -517,6 +563,10 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 			v.Limit.ThrottleRetryLimit = session.ThrottleRetryLimit
 		}
 
+		if !didComplexity[k] {
+			v.Limit.MaxQueryDepth = session.MaxQueryDepth
+		}
+
 		if !didQuota[k] {
 			v.Limit.QuotaMax = session.QuotaMax
 			v.Limit.QuotaRenewalRate = session.QuotaRenewalRate
@@ -536,7 +586,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	}
 
 	// If we have policies defining rules for one single API, update session root vars (legacy)
-	if len(didQuota) == 1 && len(didRateLimit) == 1 {
+	if len(didQuota) == 1 && len(didRateLimit) == 1 && len(didComplexity) == 1 {
 		for _, v := range rights {
 			if len(didRateLimit) == 1 {
 				session.Rate = v.Limit.Rate
@@ -547,6 +597,10 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				session.QuotaMax = v.Limit.QuotaMax
 				session.QuotaRenews = v.Limit.QuotaRenews
 				session.QuotaRenewalRate = v.Limit.QuotaRenewalRate
+			}
+
+			if len(didComplexity) == 1 {
+				session.MaxQueryDepth = v.Limit.MaxQueryDepth
 			}
 		}
 	}

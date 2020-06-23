@@ -789,7 +789,9 @@ func (s *Test) CreateSession(sGen ...func(s *user.SessionState)) (*user.SessionS
 		return nil, ""
 	}
 
-	return session, keySuccess.Key
+	createdSession, _ := GlobalSessionManager.SessionDetail(session.OrgID, keySuccess.Key, false)
+
+	return &createdSession, keySuccess.Key
 }
 
 func StartTest(config ...TestConfig) *Test {

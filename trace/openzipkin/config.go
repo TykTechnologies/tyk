@@ -1,31 +1,14 @@
 package openzipkin
 
-import "encoding/json"
+import (
+	"github.com/TykTechnologies/tyk/config"
+)
 
-type Config struct {
-	Reporter Reporter `json:"reporter"`
-	Sampler  Sampler  `json:"sampler"`
-}
-
-type Reporter struct {
-	URL        string `json:"url"`
-	BatchSize  int    `json:"batch_size"`
-	MaxBacklog int    `json:"max_backlog"`
-}
-
-type Sampler struct {
-	Name string  `json:"name"`
-	Rate float64 `json:"rate"`
-	Salt int64   `json:"salt"`
-	Mod  uint64  `json:"mod"`
-}
-
-func Load(opts map[string]interface{}) (*Config, error) {
-	b, err := json.Marshal(opts)
-	if err != nil {
+// Load retusn a zipkin configuration from the opts.
+func Load(opts map[string]interface{}) (*config.ZipkinConfig, error) {
+	var c config.ZipkinConfig
+	if err := config.DecodeJSON(&c, opts); err != nil {
 		return nil, err
 	}
-	var c Config
-	err = json.Unmarshal(b, &c)
 	return &c, nil
 }

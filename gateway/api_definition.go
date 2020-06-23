@@ -19,18 +19,17 @@ import (
 
 	sprig "gopkg.in/Masterminds/sprig.v2"
 
+	circuit "github.com/TykTechnologies/circuitbreaker"
 	"github.com/gorilla/mux"
-
-	"github.com/TykTechnologies/tyk/headers"
-	"github.com/TykTechnologies/tyk/rpc"
-
+	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 	"github.com/sirupsen/logrus"
 
-	circuit "github.com/TykTechnologies/circuitbreaker"
 	"github.com/TykTechnologies/gojsonschema"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/regexp"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -177,7 +176,7 @@ type APISpec struct {
 	LastGoodHostList         *apidef.HostList
 	HasRun                   bool
 	ServiceRefreshInProgress bool
-	HTTPTransport            http.RoundTripper
+	HTTPTransport            *TykRoundTripper
 	HTTPTransportCreated     time.Time
 	WSTransport              http.RoundTripper
 	WSTransportCreated       time.Time
@@ -187,6 +186,12 @@ type APISpec struct {
 	middlewareChain *ChainObject
 
 	network NetworkStats
+
+	GraphQLExecutor struct {
+		Engine *graphql.ExecutionEngine
+		Client *http.Client
+		Schema *graphql.Schema
+	}
 }
 
 // Release re;leases all resources associated with API spec
