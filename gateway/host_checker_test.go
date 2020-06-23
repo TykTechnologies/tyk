@@ -511,6 +511,9 @@ func TestChecker_triggerSampleLimit(t *testing.T) {
 		HostCheckCallBacks{
 			Ping: func(_ context.Context, _ HostHealthReport) {
 				ping.Store(ping.Load().(int) + 1)
+				if ping.Load().(int) >= limit {
+					cancel()
+				}
 			},
 			Fail: func(_ context.Context, _ HostHealthReport) {
 				failed.Store(failed.Load().(int) + 1)
@@ -523,10 +526,16 @@ func TestChecker_triggerSampleLimit(t *testing.T) {
 	defer x.Stop()
 	select {
 	case <-done:
-		cancel()
 	case <-x.C:
 		cancel()
 		t.Fatal("Timeout while waiting for a limit trigger")
+	}
+	x.Reset(10 * time.Second)
+	select {
+	case <-ctx.Done():
+	case <-x.C:
+		cancel()
+		t.Fatal("Timeout while waiting for a limit trigger to exceed")
 	}
 	setTestMode(true)
 	if ping.Load().(int) < limit {
