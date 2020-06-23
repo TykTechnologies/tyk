@@ -91,7 +91,7 @@ func TestGatewayTLS_without_certs_new(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 	})
 
-	ts.Run(t, test.TestCase{ErrorMatch: internalTLSErr, Client: client})
+	ts.Run(t, test.TestCase{ErrorMatch: unrecognizedName, Client: client})
 }
 
 func TestAPICertificate_unknown(t *testing.T) {
@@ -112,5 +112,5 @@ func TestAPICertificate_unknown(t *testing.T) {
 		spec.UseKeylessAccess = true
 		spec.Proxy.ListenPath = "/"
 	})
-	ts.Run(t, test.TestCase{ErrorMatch: internalTLSErr})
+	ts.Run(t, test.TestCase{ErrorMatch: unrecognizedName})
 }
