@@ -6,9 +6,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"strconv"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/buger/jsonparser"
 	"github.com/cespare/xxhash"
@@ -49,6 +51,7 @@ func (e *Executor) Execute(ctx Context, node RootNode, w io.Writer) error {
 	e.context = ctx
 	e.out = w
 	e.err = nil
+
 	var path string
 	switch node.OperationType() {
 	case ast.OperationTypeQuery:
@@ -276,11 +279,22 @@ func (e *Executor) ResolveArgs(args []datasource.Argument, data []byte) Resolved
 					return w.Write(resolved[j].Value)
 				}
 				key = bytes.TrimPrefix(key, literal.DOT)
+
 				result := gjson.GetBytes(resolved[j].Value, unsafebytes.BytesToString(key))
+
 				if result.Type == gjson.String {
-					return w.Write(unsafebytes.StringToBytes(result.Str))
+					resultBytes := unsafebytes.StringToBytes(result.Str)
+					if isJSONObjectAsBytes(resultBytes) {
+						resultBytes = bytes.ReplaceAll(resultBytes, []byte(`"`), []byte(`\"`))
+					} else if byteSliceContainsQuotes(resultBytes) {
+						resultBytes = bytes.ReplaceAll(resultBytes, []byte(`"`), []byte(`\"`))
+					}
+
+					return w.Write(resultBytes)
 				}
-				return w.Write(unsafebytes.StringToBytes(result.Raw))
+
+				rawResultBytes := unsafebytes.StringToBytes(result.Raw)
+				return w.Write(rawResultBytes)
 			}
 			_, _ = w.Write(literal.LBRACE)
 			_, _ = w.Write(literal.LBRACE)
@@ -586,4 +600,19 @@ func (_ ListFilterFirstN) Kind() ListFilterKind {
 type DataSourceInvocation struct {
 	Args       []datasource.Argument
 	DataSource datasource.DataSource
+}
+
+func isJSONObjectAsBytes(input []byte) bool {
+	trimmedInput := bytes.Trim(input, " ")
+	firstRune, _ := utf8.DecodeRune(trimmedInput)
+	lastRune, _ := utf8.DecodeLastRune(trimmedInput)
+	return fmt.Sprintf("%c", firstRune) == "{" && fmt.Sprintf("%c", lastRune) == "}"
+}
+
+func byteSliceContainsEscapedQuotes(input []byte) bool {
+	return bytes.Contains(input, []byte(`\"`))
+}
+
+func byteSliceContainsQuotes(input []byte) bool {
+	return bytes.Contains(input, []byte(`"`))
 }
