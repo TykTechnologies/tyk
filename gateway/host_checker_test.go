@@ -523,10 +523,11 @@ func TestChecker_triggerSampleLimit(t *testing.T) {
 	defer x.Stop()
 	select {
 	case <-done:
+		cancel()
 	case <-x.C:
-		t.Error("Timeout while waiting for a limit trigger")
+		cancel()
+		t.Fatal("Timeout while waiting for a limit trigger")
 	}
-	cancel()
 	setTestMode(true)
 	if ping.Load().(int) < limit {
 		t.Errorf("expected (%d >= %d)", limit, ping.Load())
