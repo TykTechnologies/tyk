@@ -277,7 +277,8 @@ func (r *HttpJsonDataSource) Resolve(ctx context.Context, args ResolverArgs, out
 
 	var bodyReader io.Reader
 	if len(bodyArg) != 0 {
-		bodyArg = bytes.ReplaceAll(bodyArg, literal.BACKSLASH, nil)
+		bodyArg = bytes.ReplaceAll(bodyArg, []byte(`\"`), []byte(`\\"`))
+		bodyArg = bytes.ReplaceAll(bodyArg, []byte(`\"`), []byte(`"`))
 		bodyReader = bytes.NewReader(bodyArg)
 	}
 
