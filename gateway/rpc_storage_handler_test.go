@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"fmt"
-	"github.com/TykTechnologies/tyk/coprocess"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -10,39 +9,6 @@ import (
 	"github.com/lonelycode/osin"
 	"github.com/stretchr/testify/assert"
 )
-
-const apiKeySpaceChangesTestDef = `{
-	"api_id": "api-for-key-space-changes",
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
-	"auth": {"auth_header_name": "authorization"},
-	"version_data": {
-		"versions": {
-			"v1": {"name": "v1"}
-		}
-	},
-	"proxy": {
-		"listen_path": "/v1",
-		"target_url": "` + TestHttpAny + `"
-	}
-}`
-
-/*
-	Oauth:
-		Unhashed
-			Revoke access token
-			Revoke refresh token
-		hashed
-			Revoke access token
-	Keys:
-		Remove key
-		Update key
-		UpdateKey with Quota reset
-
-
-*/
 
 const (
 	RevokeOauthHashedToken        = "RevokeOauthHashedToken"
@@ -160,7 +126,7 @@ func TestProcessKeySpaceChangesForOauth(t *testing.T) {
 				GlobalSessionManager.Store().SetKey(token, token, 100)
 				_, err := GlobalSessionManager.Store().GetKey(token)
 				if err != nil {
-					t.Error("Key should be pre-loaded in store in order that the test perform the revoke action. Please check")
+					t.Error("Key should be pre-loaded in store previously so the test can perform the revoke action.")
 				}
 			}
 
@@ -175,35 +141,3 @@ func TestProcessKeySpaceChangesForOauth(t *testing.T) {
 		})
 	}
 }
-
-func TestProcessKeySpaceChangedForKeys(t *testing.T){
-	//generate key
-	//load key in store (hsahed or not)
-	//
-	keyName := generateToken(DefaultOrg, "")
-	isHashed := true
-	sess := coprocess.SessionState{
-		Rate:                    0,
-		Per:                     0,
-		Expires:                 0,
-		QuotaMax:                0,
-		QuotaRemaining:          99,
-		QuotaRenewalRate:        10000,
-		AccessRights:            nil,
-		OrgId:                   DefaultOrg,
-	}
-
-	obj, code := handleAddOrUpdate(keyName, r, isHashed)
-
-}
-
-/*
-DATA
-
-eyJvcmciOiI1ZTIwOTFjNGQ0YWVmY2U2MGMwNGZiOTIiLCJpZCI6IjU5YzljZDU2NTM4ODQxOWU4MWM5MDA5MTdhMWY3NjU0IiwiaCI6Im11cm11cjY0In0=:hashed
-eyJvcmciOiI1ZTIwOTFjNGQ0YWVmY2U2MGMwNGZiOTIiLCJpZCI6IjU5YzljZDU2NTM4ODQxOWU4MWM5MDA5MTdhMWY3NjU0IiwiaCI6Im11cm11cjY0In0=:resetQuota
-
-Key:9de89dd831ee800f:hashed
-Key:9de89dd831ee800f:resetQuota
-
-*/
