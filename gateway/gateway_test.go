@@ -572,7 +572,7 @@ func TestAnalytics(t *testing.T) {
 		})
 
 		key := CreateSession(func(sess *user.SessionState) {
-			sess.EnableDetailedRecording = true
+			sess.EnableDetailRecording = true
 		})
 
 		authHeaders := map[string]string{
