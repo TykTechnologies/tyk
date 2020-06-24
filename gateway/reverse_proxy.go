@@ -850,7 +850,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	sendRequestToUpstream := func() {
 		begin := time.Now()
-		if p.TykAPISpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeExecutionEngine {
+		if p.TykAPISpec.GraphQL.Enabled && p.TykAPISpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeExecutionEngine {
 
 			if p.TykAPISpec.GraphQLExecutor.Engine == nil {
 				err = errors.New("execution engine is nil")
