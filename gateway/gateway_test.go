@@ -770,9 +770,7 @@ func TestAnalytics(t *testing.T) {
 func TestListener(t *testing.T) {
 	// Trick to get spec JSON, without loading API
 	// Specs will be reseted when we do `StartTest`
-	specs := BuildAndLoadAPI()
-	specJSON, _ := json.Marshal(specs[0].APIDefinition)
-	listJSON := fmt.Sprintf(`\[%s\]`, string(specJSON))
+	BuildAndLoadAPI()
 
 	ts := StartTest()
 	defer ts.Close()
@@ -794,8 +792,8 @@ func TestListener(t *testing.T) {
 		// API definitions not reloaded yet
 		{Method: "GET", Path: "/sample", Code: 404},
 		{Method: "GET", Path: "/tyk/reload/?block=true", AdminAuth: true, Code: 200},
-		{Method: "GET", Path: "/tyk/apis/test", AdminAuth: true, Code: 200, BodyMatch: string(specJSON)},
-		{Method: "GET", Path: "/tyk/apis/", AdminAuth: true, Code: 200, BodyMatch: listJSON},
+		{Method: "GET", Path: "/tyk/apis/test", AdminAuth: true, Code: 200, BodyMatch: `^{.*"api_id":"test".*}`},
+		{Method: "GET", Path: "/tyk/apis/", AdminAuth: true, Code: 200, BodyMatch: `^\[.*"api_id":"test".*\]`},
 		{Method: "GET", Path: "/sample", Code: 200},
 		{Method: "GET", Path: "/samplefoo", Code: 200},
 		{Method: "GET", Path: "/sample/", Code: 200},
