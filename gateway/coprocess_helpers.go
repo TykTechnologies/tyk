@@ -172,7 +172,7 @@ func ProtoSessionState(session *user.SessionState) *coprocess.SessionState {
 		DataExpires:             session.DataExpires,
 		Monitor:                 monitor,
 		Metadata:                metadata,
-		EnableDetailedRecording: session.EnableDetailedRecording,
+		EnableDetailedRecording: session.EnableDetailRecording || session.EnableDetailedRecording,
 		Tags:                    session.Tags,
 		Alias:                   session.Alias,
 		LastUpdated:             session.LastUpdated,
