@@ -275,7 +275,7 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 
 	session := ctxGetSession(r)
 	if session != nil {
-		if session.EnableDetailedRecording {
+		if session.EnableDetailedRecording || session.EnableDetailRecording {
 			return true
 		}
 	}
@@ -293,7 +293,8 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 	}
 
 	// Session found
-	return ses.(user.SessionState).EnableDetailedRecording
+	sess := ses.(user.SessionState)
+	return sess.EnableDetailRecording || sess.EnableDetailedRecording
 }
 
 // ServeHTTP will store the request details in the analytics store if necessary and proxy the request to it's
