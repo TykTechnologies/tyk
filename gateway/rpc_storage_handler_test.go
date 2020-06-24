@@ -26,13 +26,13 @@ func buildStringEvent(eventType, token, apiId string) string {
 		token = storage.HashStr(token)
 		return fmt.Sprintf("%s#hashed:%s:oAuthRevokeToken", token, apiId)
 	case RevokeOauthToken:
-		// string is as= {the-token}=:{api-id}:oAuthRevokeToken
+		// string is as= {the-token}:{api-id}:oAuthRevokeToken
 		return fmt.Sprintf("%s:%s:oAuthRevokeToken", token, apiId)
 	case RevokeOauthRefreshToken:
-		// string is as= {the-token}=:{api-id}:oAuthRevokeToken
+		// string is as= {the-token}:{api-id}:oAuthRevokeToken
 		return fmt.Sprintf("%s:%s:oAuthRevokeRefreshToken", token, apiId)
 	case RevokeOauthRefreshHashedToken:
-		// string is as= {the-token}=:{api-id}:oAuthRevokeToken
+		// string is as= {the-token}:{api-id}:oAuthRevokeToken
 		return fmt.Sprintf("%s:%s:oAuthRevokeToken", token, apiId)
 	}
 	return ""
@@ -126,7 +126,7 @@ func TestProcessKeySpaceChangesForOauth(t *testing.T) {
 				GlobalSessionManager.Store().SetKey(token, token, 100)
 				_, err := GlobalSessionManager.Store().GetKey(token)
 				if err != nil {
-					t.Error("Key should be pre-loaded in store previously so the test can perform the revoke action.")
+					t.Fatal("Key should be pre-loaded in store previously so the test can perform the revoke action.")
 				}
 			}
 
