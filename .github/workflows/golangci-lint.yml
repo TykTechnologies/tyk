@@ -1,4 +1,5 @@
 name: golangci-lint
+
 on:
   push:
     tags:
@@ -6,6 +7,7 @@ on:
     branches:
       - master
   pull_request:
+
 jobs:
   golangci:
     name: lint
@@ -16,7 +18,7 @@ jobs:
         uses: golangci/golangci-lint-action@v1
         with:
           # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
-          version: v1.26
+          version: v1.27
           
           # Optional: working directory, useful for monorepos
           # working-directory: somedir
