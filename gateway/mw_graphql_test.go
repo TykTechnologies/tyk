@@ -150,7 +150,7 @@ func TestGraphQL(t *testing.T) {
 	})
 }
 
-func TestComposedGraphQLAPI(t *testing.T) {
+func TestGraphQL_ComposedAPI(t *testing.T) {
 	g := StartTest()
 	defer g.Close()
 
