@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/apidef"
+
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/user"
 
@@ -20,6 +22,7 @@ func TestGraphQL(t *testing.T) {
 		spec.UseKeylessAccess = true
 		spec.Proxy.ListenPath = "/"
 		spec.GraphQL.Enabled = true
+		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
 	})[0]
 
 	t.Run("Bad schema", func(t *testing.T) {
@@ -145,6 +148,44 @@ func TestGraphQL(t *testing.T) {
 
 		_, _ = g.Run(t, test.TestCase{Headers: authHeaderWithDirectKey, Data: request, BodyMatch: "hello", Code: http.StatusOK})
 	})
+}
+
+func TestComposedGraphQLAPI(t *testing.T) {
+	g := StartTest()
+	defer g.Close()
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = true
+		spec.Proxy.ListenPath = "/"
+		spec.GraphQL.Enabled = true
+		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+	})
+
+	countries1 := gql.Request{
+		Query: "query Query { countries { name } }",
+	}
+
+	countries2 := gql.Request{
+		Query: "query Query { countries { name code } }",
+	}
+
+	people1 := gql.Request{
+		Query: "query Query { people { name } }",
+	}
+
+	people2 := gql.Request{
+		Query: "query Query { people { country name } }",
+	}
+
+	_, _ = g.Run(t, []test.TestCase{
+		// GraphQL Data Source
+		{Data: countries1, BodyMatch: `"countries":.*{"name":"Turkey"},{"name":"Russia"}.*`, Code: http.StatusOK},
+		{Data: countries2, BodyMatch: `"countries":.*{"name":"Turkey","code":"TR"},{"name":"Russia","code":"RU"}.*`, Code: http.StatusOK},
+
+		// REST Data Source
+		{Data: people1, BodyMatch: `"people":.*{"name":"Furkan"},{"name":"Leo"}.*`, Code: http.StatusOK},
+		{Data: people2, BodyMatch: `"people":.*{"country":"Turkey","name":"Furkan"},{"country":"Russia","name":"Leo"}.*`, Code: http.StatusOK},
+	}...)
 }
 
 const gqlIntrospectionQuery = `query IntrospectionQuery {
