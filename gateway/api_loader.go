@@ -11,9 +11,6 @@ import (
 	"strings"
 	"sync"
 
-	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/h2c"
-
 	"github.com/jensneuse/graphql-go-tools/pkg/playground"
 
 	"github.com/gorilla/mux"
@@ -669,7 +666,6 @@ func loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStor
 	}
 
 	router.Handle(chainObj.ListenOn, chainObj.ThisHandler)
-
 	return chainObj.ThisHandler
 }
 

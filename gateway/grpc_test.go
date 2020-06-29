@@ -60,7 +60,7 @@ func TestHTTP2_h2C(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
 	BuildAndLoadAPI(func(spec *APISpec) {
-		spec.Proxy.ListenPath = "/h2c"
+		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = true
 		spec.Proxy.TargetURL = upstream.URL
 		spec.Protocol = "h2c"

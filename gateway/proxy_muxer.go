@@ -19,6 +19,7 @@ import (
 	cache "github.com/pmylund/go-cache"
 
 	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
@@ -304,6 +305,10 @@ func dialWithServiceDiscovery(spec *APISpec, dial dialFn) dialFn {
 	}
 }
 
+type W2c struct {
+	http.Handler
+}
+
 func (m *proxyMux) swap(new *proxyMux) {
 	m.Lock()
 	defer m.Unlock()
@@ -376,7 +381,7 @@ func (m *proxyMux) serve() {
 		case "tcp", "tls":
 			mainLog.Warning("Starting TCP server on:", p.listener.Addr().String())
 			go p.tcpProxy.Serve(p.getListener())
-		case "http", "https":
+		case "http", "https", "h2c":
 			mainLog.Warning("Starting HTTP server on:", p.listener.Addr().String())
 			readTimeout := 120 * time.Second
 			writeTimeout := 120 * time.Second
@@ -388,15 +393,20 @@ func (m *proxyMux) serve() {
 			if config.Global().HttpServerOptions.WriteTimeout > 0 {
 				writeTimeout = time.Duration(config.Global().HttpServerOptions.WriteTimeout) * time.Second
 			}
-
+			var h http.Handler
+			h = &handleWrapper{p.router}
+			if p.protocol == "h2c" {
+				// wrapping handler in h2c. This ensures all features including tracing work
+				// in h2c services.
+				h = h2c.NewHandler(h, &http2.Server{})
+			}
 			addr := config.Global().ListenAddress + ":" + strconv.Itoa(p.port)
 			p.httpServer = &http.Server{
 				Addr:         addr,
 				ReadTimeout:  readTimeout,
 				WriteTimeout: writeTimeout,
-				Handler:      &handleWrapper{p.router},
+				Handler:      h,
 			}
-
 			if config.Global().CloseConnections {
 				p.httpServer.SetKeepAlivesEnabled(false)
 			}
