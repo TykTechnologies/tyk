@@ -308,12 +308,14 @@ const (
 	testHttpListen = "127.0.0.1:16500"
 	// Accepts any http requests on /, only allows GET on /get, etc.
 	// All return a JSON with request info.
-	TestHttpAny     = "http://" + testHttpListen
-	TestHttpGet     = TestHttpAny + "/get"
-	testHttpPost    = TestHttpAny + "/post"
-	testHttpJWK     = TestHttpAny + "/jwk.json"
-	testHttpJWKDER  = TestHttpAny + "/jwk-der.json"
-	testHttpBundles = TestHttpAny + "/bundles/"
+	TestHttpAny           = "http://" + testHttpListen
+	TestHttpGet           = TestHttpAny + "/get"
+	testHttpPost          = TestHttpAny + "/post"
+	testGraphQLDataSource = TestHttpAny + "/graphql-data-source"
+	testRESTDataSource    = TestHttpAny + "/rest-data-source"
+	testHttpJWK           = TestHttpAny + "/jwk.json"
+	testHttpJWKDER        = TestHttpAny + "/jwk-der.json"
+	testHttpBundles       = TestHttpAny + "/bundles/"
 
 	// Nothing should be listening on port 16501 - useful for
 	// testing TCP and HTTP failures.
@@ -386,6 +388,8 @@ func testHttpHandler() *mux.Router {
 
 	r.HandleFunc("/get", handleMethod("GET"))
 	r.HandleFunc("/post", handleMethod("POST"))
+	r.HandleFunc("/graphql-data-source", graphqlDataSourceHandler)
+	r.HandleFunc("/rest-data-source", restDataSourceHandler)
 	r.HandleFunc("/ws", wsHandler)
 	r.HandleFunc("/jwk.json", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, jwkTestJson)
@@ -408,6 +412,52 @@ func testHttpHandler() *mux.Router {
 	r.HandleFunc("/{rest:.*}", handleMethod(""))
 
 	return r
+}
+
+func graphqlDataSourceHandler(w http.ResponseWriter, r *http.Request) {
+	_, _ = w.Write([]byte(`{
+			"data": {
+				"countries": [
+					{	
+						"code": "TR",
+						"name": "Turkey"	
+					},
+					{
+						"code": "RU",
+						"name": "Russia"
+					},
+					{
+						"code": "GB",
+						"name": "United Kingdom"
+					},
+					{
+						"code": "DE",
+						"name": "Germany"
+					}
+				]
+			}
+		}`))
+}
+
+func restDataSourceHandler(w http.ResponseWriter, r *http.Request) {
+	_, _ = w.Write([]byte(`[
+			{
+				"name": "Furkan",
+				"country": "Turkey"
+			},
+			{
+				"name": "Leo",
+				"country": "Russia"
+			},
+			{
+				"name": "Josh",
+				"country": "UK"
+			},
+			{
+				"name": "Patric",
+				"country": "Germany"
+			}
+		]`))
 }
 
 const jwkTestJson = `{
@@ -828,7 +878,67 @@ const sampleAPI = `{
     "proxy": {
         "listen_path": "/sample",
         "target_url": "` + TestHttpAny + `"
+    },
+	"graphql": {
+      "enabled": false,
+      "execution_mode": "executionEngine",
+      "schema": "` + testComposedSchema + `",
+      "type_field_configurations": [
+        ` + testGraphQLDataSourceConfiguration + `,
+        ` + testRESTDataSourceConfiguration + `
+      ],
+      "playground": {
+        "enabled": false,
+        "path": "/playground"
+      }
     }
+}`
+
+const testComposedSchema = "type Query {people: [Person] countries: [Country]} type Person {name: String country: String} " +
+	"type Country {code: String name: String}"
+
+const testGraphQLDataSourceConfiguration = `
+{
+  "type_name": "Query",
+  "field_name": "countries",
+  "mapping": {
+	"disabled": false,
+	"path": "countries"
+  },
+  "data_source": {
+	"kind": "GraphQLDataSource",
+	"data_source_config": {
+	  "url": "` + testGraphQLDataSource + `",
+	  "method": "POST"
+	}
+  }
+}
+`
+
+const testRESTDataSourceConfiguration = `
+{
+ "type_name": "Query",
+ "field_name": "people",
+  "mapping": {
+	"disabled": false,
+	"path": ""
+  },
+  "data_source": {
+    "kind": "HTTPJSONDataSource",
+	"data_source_config": {
+	  "url": "` + testRESTDataSource + `",
+	  "method": "GET",
+	  "body": "",
+	  "headers": [],
+	  "default_type_name": "People",
+	  "status_code_type_name_mappings": [
+		{
+		  "status_code": 200,
+		  "type_name": ""
+		}
+	  ]
+	}
+  }
 }`
 
 func UpdateAPIVersion(spec *APISpec, name string, verGen func(version *apidef.VersionInfo)) {
