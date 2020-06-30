@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
+
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/go-redis/redis"
 	"github.com/gorilla/mux"
@@ -940,6 +942,42 @@ const testRESTDataSourceConfiguration = `
 	}
   }
 }`
+
+func generateRESTDataSource(gen ...func(restDataSource *datasource.HttpJsonDataSourceConfig)) json.RawMessage {
+	typeFieldConfiguration := datasource.TypeFieldConfiguration{}
+	if err := json.Unmarshal([]byte(testRESTDataSourceConfiguration), &typeFieldConfiguration); err != nil {
+		panic(err)
+	}
+
+	restDataSource := datasource.HttpJsonDataSourceConfig{}
+	_ = json.Unmarshal(typeFieldConfiguration.DataSource.Config, &restDataSource)
+
+	if len(gen) > 0 {
+		gen[0](&restDataSource)
+	}
+
+	rawData, _ := json.Marshal(restDataSource)
+
+	return rawData
+}
+
+func generateGraphQLDataSource(gen ...func(graphQLDataSource *datasource.GraphQLDataSourceConfig)) json.RawMessage {
+	typeFieldConfiguration := datasource.TypeFieldConfiguration{}
+	if err := json.Unmarshal([]byte(testGraphQLDataSourceConfiguration), &typeFieldConfiguration); err != nil {
+		panic(err)
+	}
+
+	graphQLDataSource := datasource.GraphQLDataSourceConfig{}
+	_ = json.Unmarshal(typeFieldConfiguration.DataSource.Config, &graphQLDataSource)
+
+	if len(gen) > 0 {
+		gen[0](&graphQLDataSource)
+	}
+
+	rawData, _ := json.Marshal(graphQLDataSource)
+
+	return rawData
+}
 
 func UpdateAPIVersion(spec *APISpec, name string, verGen func(version *apidef.VersionInfo)) {
 	version := spec.VersionData.Versions[name]
