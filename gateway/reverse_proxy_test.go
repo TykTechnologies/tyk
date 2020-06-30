@@ -13,6 +13,9 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
+	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
@@ -675,6 +678,55 @@ func TestNopCloseResponseBody(t *testing.T) {
 			t.Error("3rd read, body's data is not as expectd")
 		}
 	}
+}
+
+func TestGraphQL_InternalDataSource(t *testing.T) {
+	g := StartTest()
+	defer g.Close()
+
+	tykGraphQL := BuildAPI(func(spec *APISpec) {
+		spec.Name = "tyk-graphql"
+		spec.APIID = "test1"
+		spec.Proxy.TargetURL = testGraphQLDataSource
+		spec.Proxy.ListenPath = "/tyk-graphql"
+	})[0]
+
+	tykREST := BuildAPI(func(spec *APISpec) {
+		spec.Name = "tyk-rest"
+		spec.APIID = "test2"
+		spec.Proxy.TargetURL = testRESTDataSource
+		spec.Proxy.ListenPath = "/tyk-rest"
+	})[0]
+
+	composedAPI := BuildAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.APIID = "test3"
+		spec.GraphQL.Enabled = true
+		spec.GraphQL.TypeFieldConfigurations[0].DataSource.Config = generateGraphQLDataSource(func(graphQLDataSource *datasource.GraphQLDataSourceConfig) {
+			graphQLDataSource.URL = fmt.Sprintf("tyk://%s", tykGraphQL.Name)
+		})
+		spec.GraphQL.TypeFieldConfigurations[1].DataSource.Config = generateRESTDataSource(func(restDataSource *datasource.HttpJsonDataSourceConfig) {
+			restDataSource.URL = fmt.Sprintf("tyk://%s", tykREST.Name)
+		})
+	})[0]
+
+	LoadAPI(tykGraphQL, tykREST, composedAPI)
+
+	countries := graphql.Request{
+		Query: "query Query { countries { name } }",
+	}
+
+	people := graphql.Request{
+		Query: "query Query { people { name } }",
+	}
+
+	_, _ = g.Run(t, []test.TestCase{
+		// GraphQL Data Source
+		{Data: countries, BodyMatch: `"countries":.*{"name":"Turkey"},{"name":"Russia"}.*`, Code: http.StatusOK},
+
+		// REST Data Source
+		{Data: people, BodyMatch: `"people":.*{"name":"Furkan"},{"name":"Leo"}.*`, Code: http.StatusOK},
+	}...)
 }
 
 func BenchmarkRequestIPHops(b *testing.B) {
