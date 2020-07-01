@@ -76,13 +76,13 @@ func generateHeaderList(r *http.Request, headerList []string) []string {
 }
 
 func (s *RequestSigning) getRequestPath(r *http.Request) string {
-	path := r.URL.Path
+	path := r.URL.RequestURI()
 
 	if newURL := ctxGetURLRewriteTarget(r); newURL != nil {
-		path = newURL.Path
+		path = newURL.RequestURI()
 	} else {
 		if s.Spec.Proxy.StripListenPath {
-			path = s.Spec.StripListenPath(r, r.URL.Path)
+			path = s.Spec.StripListenPath(r, path)
 			if path[:1] != "/" {
 				path = "/" + path
 			}
