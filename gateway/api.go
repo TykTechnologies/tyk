@@ -2504,7 +2504,7 @@ func ctxGetRequestStatus(r *http.Request) (stat RequestStatus) {
 	return
 }
 
-func createOauthClientSecret() string {
+var createOauthClientSecret = func() string {
 	secret := uuid.NewV4()
 	return base64.StdEncoding.EncodeToString([]byte(secret.String()))
 }

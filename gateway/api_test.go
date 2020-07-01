@@ -1082,9 +1082,18 @@ func TestCreateOAuthClient(t *testing.T) {
 }
 
 func TestUpdateOauthClientHandler(t *testing.T) {
-
 	ts := StartTest()
 	defer ts.Close()
+
+	backupSecretCreator := createOauthClientSecret
+	defer func() {
+		createOauthClientSecret = backupSecretCreator
+	}()
+
+	hardcodedSecret := "MY_HARDCODED_SECRET"
+	createOauthClientSecret = func() string {
+		return hardcodedSecret
+	}
 
 	BuildAndLoadAPI(
 		func(spec *APISpec) {
@@ -1119,9 +1128,10 @@ func TestUpdateOauthClientHandler(t *testing.T) {
 	var b bytes.Buffer
 
 	json.NewEncoder(&b).Encode(NewClientRequest{
-		ClientID: "12345",
-		APIID:    "test",
-		PolicyID: "p1",
+		ClientID:    "12345",
+		APIID:       "test",
+		PolicyID:    "p1",
+		Description: "MyOriginalDescription",
 	})
 
 	ts.Run(
@@ -1153,6 +1163,17 @@ func TestUpdateOauthClientHandler(t *testing.T) {
 			bodyMatch:    `"description":"Updated field"`,
 			bodyNotMatch: "",
 		},
+		"Secret remains the same": {
+			req: NewClientRequest{
+				ClientID:    "12345",
+				APIID:       "test",
+				PolicyID:    "p2",
+				Description: "MyOriginalDescription",
+			},
+			code:         http.StatusOK,
+			bodyMatch:    fmt.Sprintf(`"secret":"%s"`, hardcodedSecret),
+			bodyNotMatch: "",
+		},
 		"Secret cannot be updated": {
 			req: NewClientRequest{
 				ClientID:     "12345",
@@ -1163,7 +1184,7 @@ func TestUpdateOauthClientHandler(t *testing.T) {
 			},
 			code:         http.StatusOK,
 			bodyNotMatch: `"secret":"super-new-secret"`,
-			bodyMatch:    "",
+			bodyMatch:    fmt.Sprintf(`"secret":"%s"`, hardcodedSecret),
 		},
 	}
 
