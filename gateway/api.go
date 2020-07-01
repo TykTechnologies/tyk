@@ -1647,6 +1647,7 @@ func updateOauthClient(keyName, apiID string, r *http.Request) (interface{}, int
 	// update client
 	updatedClient := OAuthClient{
 		ClientID:          client.GetId(),
+		ClientSecret:      client.GetSecret(),
 		ClientRedirectURI: updateClientData.ClientRedirectURI, // update
 		PolicyID:          updateClientData.PolicyID,          // update
 		MetaData:          updateClientData.MetaData,          // update
@@ -2503,7 +2504,7 @@ func ctxGetRequestStatus(r *http.Request) (stat RequestStatus) {
 	return
 }
 
-func createOauthClientSecret() string {
+var createOauthClientSecret = func() string {
 	secret := uuid.NewV4()
 	return base64.StdEncoding.EncodeToString([]byte(secret.String()))
 }
