@@ -340,14 +340,16 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 	// get original session in case of update and preserve fields that SHOULD NOT be updated
 	originalKey := user.SessionState{}
 	if r.Method == http.MethodPut {
-		originalKey, found := GlobalSessionManager.SessionDetail(newSession.OrgID, keyName, isHashed)
+		key, found := GlobalSessionManager.SessionDetail(newSession.OrgID, keyName, isHashed)
 		if !found {
 			log.Error("Could not find key when updating")
 			return apiError("Key is not found"), http.StatusNotFound
 		}
+		originalKey = key
 
-		//remain the creation date
+		// preserve the creation date
 		newSession.DateCreated = originalKey.DateCreated
+
 		// don't change fields related to quota and rate limiting if was passed as "suppress_reset=1"
 		if suppressReset {
 			// save existing quota_renews and last_updated if suppress_reset was passed
@@ -397,6 +399,10 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 				setSessionPassword(&newSession)
 			}
 		}
+	} else if originalKey.BasicAuthData.Password != "" {
+		// preserve basic auth data
+		newSession.BasicAuthData.Hash = originalKey.BasicAuthData.Hash
+		newSession.BasicAuthData.Password = originalKey.BasicAuthData.Password
 	}
 
 	if r.Method == http.MethodPost || storage.TokenOrg(keyName) != "" {
