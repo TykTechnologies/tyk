@@ -235,6 +235,7 @@ func liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 	res.Status = status
 
 	w.Header().Set("Content-Type", headers.ApplicationJSON)
+	addMascotHeaders(w)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(res)
 }
