@@ -662,7 +662,7 @@ func firstVals(vals map[string][]string) map[string]string {
 }
 
 type TestConfig struct {
-	sepatateControlAPI bool
+	separateControlAPI bool
 	Delay              time.Duration
 	HotReload          bool
 	overrideDefaults   bool
@@ -675,7 +675,7 @@ type Test struct {
 	testRunner   *test.HTTPTestRunner
 	GlobalConfig config.Config
 	config       TestConfig
-	cacnel       func()
+	cancel       func()
 }
 
 func (s *Test) Start() {
@@ -685,7 +685,7 @@ func (s *Test) Start() {
 	globalConf := config.Global()
 	globalConf.ListenPort, _ = strconv.Atoi(port)
 
-	if s.config.sepatateControlAPI {
+	if s.config.separateControlAPI {
 		l, _ := net.Listen("tcp", "127.0.0.1:0")
 
 		_, port, _ = net.SplitHostPort(l.Addr().String())
@@ -699,7 +699,7 @@ func (s *Test) Start() {
 
 	startServer()
 	ctx, cancel := context.WithCancel(context.Background())
-	s.cacnel = cancel
+	s.cancel = cancel
 	setupGlobals(ctx)
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.Global().SupressDefaultOrgStore {
@@ -719,7 +719,7 @@ func (s *Test) Start() {
 		RequestBuilder: func(tc *test.TestCase) (*http.Request, error) {
 			tc.BaseURL = s.URL
 			if tc.ControlRequest {
-				if s.config.sepatateControlAPI {
+				if s.config.separateControlAPI {
 					tc.BaseURL = scheme + controlProxy().listener.Addr().String()
 				} else if s.GlobalConfig.ControlAPIHostname != "" {
 					tc.Domain = s.GlobalConfig.ControlAPIHostname
@@ -747,11 +747,11 @@ func (s *Test) Do(tc test.TestCase) (*http.Response, error) {
 }
 
 func (s *Test) Close() {
-	if s.cacnel != nil {
-		s.cacnel()
+	if s.cancel != nil {
+		s.cancel()
 	}
 	defaultProxyMux.swap(&proxyMux{})
-	if s.config.sepatateControlAPI {
+	if s.config.separateControlAPI {
 		globalConf := config.Global()
 		globalConf.ControlAPIPort = 0
 		config.SetGlobal(globalConf)
