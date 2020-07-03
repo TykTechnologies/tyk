@@ -24,17 +24,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
-
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/go-redis/redis"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-
+	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
+	uuid "github.com/satori/go.uuid"
 	"golang.org/x/net/context"
 
 	"github.com/TykTechnologies/tyk/apidef"
-
 	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
@@ -42,7 +40,6 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 	_ "github.com/TykTechnologies/tyk/testdata" // Don't delete
 	"github.com/TykTechnologies/tyk/user"
-	uuid "github.com/satori/go.uuid"
 )
 
 var (
@@ -420,9 +417,9 @@ func graphqlDataSourceHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(`{
 			"data": {
 				"countries": [
-					{	
+					{
 						"code": "TR",
-						"name": "Turkey"	
+						"name": "Turkey"
 					},
 					{
 						"code": "RU",
