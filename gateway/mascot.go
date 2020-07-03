@@ -4,17 +4,22 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 )
 
 const mascotHeaderKeyFormat = "X-Mascot-%03d"
 
-func addMascotHeaders(w http.ResponseWriter) {
-	xMascot := strings.Split(mascot, "\n")
+var oneMascot sync.Once
 
-	for i := 0; i < len(xMascot); i++ {
-		key := fmt.Sprintf(mascotHeaderKeyFormat, i)
-		w.Header().Set(key, xMascot[i])
-	}
+func addMascotHeaders(w http.ResponseWriter) {
+	oneMascot.Do(func() {
+		xMascot := strings.Split(mascot, "\n")
+
+		for i := 0; i < len(xMascot); i++ {
+			key := fmt.Sprintf(mascotHeaderKeyFormat, i)
+			w.Header().Set(key, xMascot[i])
+		}
+	})
 }
 
 const mascot = `
