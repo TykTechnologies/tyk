@@ -748,6 +748,7 @@ func (s *Test) Close() {
 		s.cancel()
 	}
 	defaultProxyMux.swap(&proxyMux{})
+
 	if s.config.separateControlAPI {
 		globalConf := config.Global()
 		globalConf.ControlAPIPort = 0

@@ -14,11 +14,12 @@ func TestMascotShowsUpOnceOnly(t *testing.T) {
 	defer ts.Close()
 
 	for i := 0; i < 7; i++ {
-		resp, _ := ts.Run(t, test.TestCase{ //nolint:errcheck // Errors are checked internally
+		resp, _ := ts.Run(t, test.TestCase{
 			Method: http.MethodGet,
 			Path:   "/" + ts.GlobalConfig.HealthCheckEndpointName,
 			Code:   http.StatusOK,
 		})
+		defer resp.Body.Close()
 
 		if i == 0 {
 			// In any given test run, this might not be the very first request to the test gateway's health check endpoint.
