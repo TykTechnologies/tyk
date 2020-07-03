@@ -13,7 +13,6 @@ func TestMascotShowsUpOnceOnly(t *testing.T) {
 	ts := gateway.StartTest()
 	defer ts.Close()
 
-RequestLoop:
 	for i := 0; i < 7; i++ {
 		resp, _ := ts.Run(t, test.TestCase{ //nolint:errcheck // Errors are checked internally
 			Method: http.MethodGet,
@@ -22,13 +21,9 @@ RequestLoop:
 		})
 
 		if i == 0 {
-			for key := range resp.Header {
-				if strings.Contains(strings.ToLower(key), "mascot") {
-					continue RequestLoop
-				}
-			}
-
-			t.Fatalf("mascot headers should appear in first health check call only")
+			// In any given test run, this might not be the very first request to the test gateway's health check endpoint.
+			// Asserting here leads to flakiness.
+			continue
 		}
 
 		for key := range resp.Header {
