@@ -59,7 +59,19 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 	if dryRun {
 		ratePerPeriodNow, _ = store.GetRollingWindow(rateLimiterKey, int64(per), pipeline)
 	} else {
-		ratePerPeriodNow, _ = store.SetRollingWindow(rateLimiterKey, int64(per), "-1", pipeline)
+		if redis, ok := store.(*storage.RedisCluster); ok {
+			ctx, err := redis.GetRateLimit(rateLimiterKey, storage.Rate{
+				Period: time.Duration(per) * time.Second,
+				Limit:  int64(rate),
+			})
+			if err != nil {
+				log.WithError(err).Error("Failed to get rate limit from redis")
+				return true
+			}
+			return ctx.Reached
+		} else {
+			return false
+		}
 	}
 
 	//log.Info("Num Requests: ", ratePerPeriodNow)
