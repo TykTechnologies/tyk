@@ -30,9 +30,9 @@ func (sa *StripAuth) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 		}).Debugf("%s: %+v\n", typ, config)
 
 		if config.UseParam {
-			sa.stripFromParams(r, config)
+			StripOrHideFromParams(r, config, false)
 		}
-		sa.stripFromHeaders(r, config)
+		StripOrHideFromHeaders(r, config, false)
 	}
 
 	for typ, config := range sa.Spec.AuthConfigs {
@@ -48,7 +48,7 @@ func (sa *StripAuth) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 }
 
 // strips auth from query string params
-func (sa *StripAuth) stripFromParams(r *http.Request, config *apidef.AuthConfig) {
+func StripOrHideFromParams(r *http.Request, config *apidef.AuthConfig, hide bool) {
 
 	reqUrlPtr, _ := url.Parse(r.URL.String())
 
@@ -62,7 +62,13 @@ func (sa *StripAuth) stripFromParams(r *http.Request, config *apidef.AuthConfig)
 
 	queryStringValues := reqUrlPtr.Query()
 
-	queryStringValues.Del(authParamName)
+	if hide {
+		obfuscatedKey := ObfuscateData(queryStringValues.Get(authParamName))
+		queryStringValues.Set(authParamName, obfuscatedKey)
+	} else {
+		queryStringValues.Del(authParamName)
+	}
+
 
 	reqUrlPtr.RawQuery = queryStringValues.Encode()
 
@@ -70,14 +76,20 @@ func (sa *StripAuth) stripFromParams(r *http.Request, config *apidef.AuthConfig)
 }
 
 // strips auth key from headers
-func (sa *StripAuth) stripFromHeaders(r *http.Request, config *apidef.AuthConfig) {
+// hide would obfuscate the key rather than delete it
+func StripOrHideFromHeaders(r *http.Request, config *apidef.AuthConfig, hide bool) {
 
 	authHeaderName := "Authorization"
 	if config.AuthHeaderName != "" {
 		authHeaderName = config.AuthHeaderName
 	}
 
-	r.Header.Del(authHeaderName)
+	if hide {
+		obfuscatedKey := ObfuscateData(r.Header.Get(authHeaderName))
+		r.Header.Set(authHeaderName, obfuscatedKey)
+	} else {
+		r.Header.Del(authHeaderName)
+	}
 
 	// Strip Authorization from Cookie Header
 	cookieName := "Cookie"
@@ -90,11 +102,22 @@ func (sa *StripAuth) stripFromHeaders(r *http.Request, config *apidef.AuthConfig
 	cookies := strings.Split(r.Header.Get(cookieName), ";")
 	for i, c := range cookies {
 		if strings.HasPrefix(c, authHeaderName) {
-			cookies = append(cookies[:i], cookies[i+1:]...)
-			cookieValue = strings.Join(cookies, ";")
-			r.Header.Set(cookieName, cookieValue)
+			if hide {
+				cookies[i] = ObfuscateData(cookies[i])
+			} else {
+				cookies = append(cookies[:i], cookies[i+1:]...)
+				cookieValue = strings.Join(cookies, ";")
+				r.Header.Set(cookieName, cookieValue)
+			}
 			break
 		}
-
 	}
+}
+
+func ObfuscateData(data string) string {
+	if len(data) > 4 {
+		data = "****" + data[len(data)-4:]
+		return data
+	}
+	return "----"
 }

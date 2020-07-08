@@ -3,6 +3,8 @@ package gateway
 import (
 	"bytes"
 	"encoding/base64"
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/sirupsen/logrus"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -168,6 +170,25 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 
 		if recordDetail(r, s.Spec) {
 			// Get the wire format representation
+
+			obfuscate := true
+			strip := func(typ string, config *apidef.AuthConfig) {
+				log.WithFields(logrus.Fields{
+					"prefix": "SuccessHandler",
+				}).Debugf("%s: %+v\n", typ, config)
+
+				if config.UseParam {
+					StripOrHideFromParams(r, config, true)
+				}
+				StripOrHideFromHeaders(r, config, true)
+			}
+
+			if (obfuscate) {
+				for typ, config := range s.Spec.AuthConfigs {
+					strip(typ, &config)
+				}
+			}
+
 			var wireFormatReq bytes.Buffer
 			r.Write(&wireFormatReq)
 			rawRequest = base64.StdEncoding.EncodeToString(wireFormatReq.Bytes())
