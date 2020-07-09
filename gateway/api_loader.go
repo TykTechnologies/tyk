@@ -772,7 +772,6 @@ func loadApps(specs []*APISpec) {
 				}
 			}()
 
-			panic("asda")
 			if spec.ListenPort != spec.GlobalConfig.ListenPort {
 				mainLog.Info("API bind on custom port:", spec.ListenPort)
 			}
