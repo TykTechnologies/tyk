@@ -1,12 +1,11 @@
 package gateway
 
 import (
-	"net/http"
-	"testing"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	cache "github.com/pmylund/go-cache"
 	"github.com/stretchr/testify/assert"
+	"net/http"
+	"testing"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"
@@ -47,6 +46,39 @@ func TestBaseMiddleware_OrgSessionExpiry(t *testing.T) {
 	if got != sess.DataExpires {
 		t.Errorf("expected %d got %d", sess.DataExpires, got)
 	}
+}
+
+func TestOrgSessionWithRPCDown(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+
+	//we need rpc down
+	globalConf := config.Global()
+	globalConf.SlaveOptions.ConnectionString = testHttpFailure
+	globalConf.SlaveOptions.UseRPC = true
+	globalConf.SlaveOptions.RPCKey = "test_org"
+	globalConf.SlaveOptions.APIKey = "test"
+	globalConf.Policies.PolicySource = "rpc"
+	config.SetGlobal(globalConf)
+
+	m := BaseMiddleware{
+		Spec: &APISpec{
+			GlobalConfig: config.Config{
+				EnforceOrgDataAge: true,
+			},
+			OrgSessionManager: mockStore{},
+		},
+		logger: mainLog,
+	}
+	// reload so we force to fall in emergency mode
+	DoReload()
+
+	_,found := m.OrgSession(sess.OrgID)
+	if found{
+		t.Fatal("org  session should be null:")
+	}
+	stopRPCMock(nil)
+
 }
 
 func TestBaseMiddleware_getAuthType(t *testing.T) {
