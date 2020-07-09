@@ -763,31 +763,40 @@ func loadApps(specs []*APISpec) {
 	gs := prepareStorage()
 	shouldTrace := trace.IsEnabled()
 	for _, spec := range specs {
-		if spec.ListenPort != spec.GlobalConfig.ListenPort {
-			mainLog.Info("API bind on custom port:", spec.ListenPort)
-		}
-
-		if converted, err := kvStore(spec.Proxy.ListenPath); err == nil {
-			spec.Proxy.ListenPath = converted
-		}
-
-		tmpSpecRegister[spec.APIID] = spec
-
-		switch spec.Protocol {
-		case "", "http", "https":
-			if shouldTrace {
-				// opentracing works only with http services.
-				err := trace.AddTracer("", spec.Name)
-				if err != nil {
-					mainLog.Errorf("Failed to initialize tracer for %q error:%v", spec.Name, err)
-				} else {
-					mainLog.Infof("Intialized tracer  api_name=%q", spec.Name)
+		func() {
+			defer func() {
+				// recover from panic if one occured. Set err to nil otherwise.
+				if err := recover(); err != nil {
+					log.Error("Panic while loading an API:", spec, err)
 				}
+			}()
+
+			if spec.ListenPort != spec.GlobalConfig.ListenPort {
+				mainLog.Info("API bind on custom port:", spec.ListenPort)
 			}
-			tmpSpecHandles.Store(spec.APIID, loadHTTPService(spec, apisByListen, &gs, muxer))
-		case "tcp", "tls":
-			loadTCPService(spec, &gs, muxer)
-		}
+
+			if converted, err := kvStore(spec.Proxy.ListenPath); err == nil {
+				spec.Proxy.ListenPath = converted
+			}
+
+			tmpSpecRegister[spec.APIID] = spec
+
+			switch spec.Protocol {
+			case "", "http", "https":
+				if shouldTrace {
+					// opentracing works only with http services.
+					err := trace.AddTracer("", spec.Name)
+					if err != nil {
+						mainLog.Errorf("Failed to initialize tracer for %q error:%v", spec.Name, err)
+					} else {
+						mainLog.Infof("Intialized tracer  api_name=%q", spec.Name)
+					}
+				}
+				tmpSpecHandles.Store(spec.APIID, loadHTTPService(spec, apisByListen, &gs, muxer))
+			case "tcp", "tls":
+				loadTCPService(spec, &gs, muxer)
+			}
+		}()
 	}
 
 	defaultProxyMux.swap(muxer)
