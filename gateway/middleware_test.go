@@ -73,8 +73,8 @@ func TestOrgSessionWithRPCDown(t *testing.T) {
 	// reload so we force to fall in emergency mode
 	DoReload()
 
-	_,found := m.OrgSession(sess.OrgID)
-	if found{
+	_, found := m.OrgSession(sess.OrgID)
+	if found {
 		t.Fatal("org  session should be null:")
 	}
 	stopRPCMock(nil)
