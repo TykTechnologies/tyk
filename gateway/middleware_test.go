@@ -1,11 +1,12 @@
 package gateway
 
 import (
+	"net/http"
+	"testing"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	cache "github.com/pmylund/go-cache"
 	"github.com/stretchr/testify/assert"
-	"net/http"
-	"testing"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"
