@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -767,7 +768,7 @@ func loadApps(specs []*APISpec) {
 			defer func() {
 				// recover from panic if one occured. Set err to nil otherwise.
 				if err := recover(); err != nil {
-					log.Error("Panic while loading an API:", spec, err)
+					log.Errorf("Panic while loading an API: %v, panic: %v, stacktrace: %v", spec, err, string(debug.Stack()))
 				}
 			}()
 
