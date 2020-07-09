@@ -78,8 +78,6 @@ func TestOrgSessionWithRPCDown(t *testing.T) {
 	if found {
 		t.Fatal("org  session should be null:")
 	}
-	stopRPCMock(nil)
-
 }
 
 func TestBaseMiddleware_getAuthType(t *testing.T) {
