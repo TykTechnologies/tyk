@@ -53,48 +53,24 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 
 	log.Debug("[RATELIMIT] Inbound raw key is: ", key)
 	log.Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
-	pipeline := globalConf.EnableNonTransactionalRateLimiter
-
-	var ratePerPeriodNow int
-	if dryRun {
-		ratePerPeriodNow, _ = store.GetRollingWindow(rateLimiterKey, int64(per), pipeline)
-	} else {
-		if redis, ok := store.(*storage.RedisCluster); ok {
-			ctx, err := redis.GetRateLimit(rateLimiterKey, storage.Rate{
-				Period: time.Duration(per) * time.Second,
-				Limit:  int64(rate),
-			})
-			if err != nil {
-				log.WithError(err).Error("Failed to get rate limit from redis")
-				return true
-			}
-			return ctx.Reached
-		} else {
+	if redis, ok := store.(*storage.RedisCluster); ok {
+		ctx, err := redis.GetRateLimit(rateLimiterKey, storage.Rate{
+			Period: time.Duration(per) * time.Second,
+			Limit:  int64(rate),
+		})
+		if err != nil {
+			log.WithError(err).Error("Failed to get rate limit from redis")
 			return false
 		}
-	}
-
-	//log.Info("Num Requests: ", ratePerPeriodNow)
-
-	// Subtract by 1 because of the delayed add in the window
-	subtractor := 1
-	if globalConf.EnableSentinelRateLimiter {
-		// and another subtraction because of the preemptive limit
-		subtractor = 2
-	}
-	// The test TestRateLimitForAPIAndRateLimitAndQuotaCheck
-	// will only work with ththese two lines here
-	//log.Info("break: ", (int(currentSession.Rate) - subtractor))
-	if ratePerPeriodNow > int(rate)-subtractor {
-		// Set a sentinel value with expire
-		if globalConf.EnableSentinelRateLimiter {
-			if !dryRun {
-				store.SetRawKey(rateLimiterSentinelKey, "1", int64(per))
+		if ctx.Reached {
+			if globalConf.EnableSentinelRateLimiter {
+				if !dryRun {
+					store.SetRawKey(rateLimiterSentinelKey, "1", int64(per))
+				}
 			}
 		}
-		return true
+		return ctx.Reached
 	}
-
 	return false
 }
 
