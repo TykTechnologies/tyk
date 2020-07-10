@@ -1,0 +1,17 @@
+version: '3'
+services:
+    tyk-gateway:
+        environment:
+          - TYK_LOGLEVEL=debug
+        image: tykio/tyk-gateway:${GW_VERSION}
+        ports:
+            - "8080:8080"
+        volumes:
+            - ${PWD}/apps:/opt/tyk-gateway/apps
+            - ${PWD}/tyk.conf:/opt/tyk-gateway/tyk.conf
+            - ${PWD}/plugins:/opt/tyk-gateway/middleware
+        depends_on:
+            - redis
+              
+    redis:
+        image: redis
