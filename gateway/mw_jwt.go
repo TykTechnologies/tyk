@@ -1,13 +1,20 @@
 package gateway
 
 import (
+	"bufio"
+	"bytes"
 	"crypto/md5"
+	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"github.com/square/go-jose"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
@@ -73,12 +80,42 @@ func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) ([]byte, erro
 			k.Logger().WithError(err).Error("Failed to get resource URL")
 			return nil, err
 		}
+		// temporary buffer
+		b := bytes.NewBuffer(make([]byte, 0))
+		// TeeReader returns a Reader that writes to b what it reads from resp.Body.
+		reader := io.TeeReader(resp.Body, b)
+		bodyBytes, err := ioutil.ReadAll(reader)
+		if err != nil {
+			k.Logger().WithError(err).Error("Failed to get bodyBytes")
+			return nil, err
+		}
+		defer resp.Body.Close()
+		resp.Body = ioutil.NopCloser(b)
+
+		// store body in jsonWebKeySetJOSE
+		jsonWebKeySetJOSE := &jose.JSONWebKeySet{}
+		json.Unmarshal(bodyBytes, jsonWebKeySetJOSE)
+
 		defer resp.Body.Close()
 
 		// Decode it
 		if err := json.NewDecoder(resp.Body).Decode(&jwkSet); err != nil {
 			k.Logger().WithError(err).Error("Failed to decode body JWK")
 			return nil, err
+		}
+
+		for _, val := range jwkSet.Keys {
+			if val.KID != kid || strings.ToLower(val.Kty) != strings.ToLower(keyType) {
+				continue
+			}
+			if len(val.X5c) == 0 {
+				keysWithX5c, err := addX5c(jsonWebKeySetJOSE, kid)
+				if err != nil {
+					k.Logger().WithError(err).Error("Failed to get x5c")
+					return nil, err
+				}
+				jwkSet.Keys = keysWithX5c
+			}
 		}
 
 		// Cache it
@@ -108,6 +145,64 @@ func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) ([]byte, erro
 
 	return nil, errors.New("No matching KID could be found")
 }
+
+func addX5c(in *jose.JSONWebKeySet, kid string) ([]JWK, error) {
+	var keys []JWK
+	for _, v := range in.Keys {
+
+		if v.KeyID != kid {
+			continue
+		}
+
+		switch key := v.Key.(type) {
+		case *rsa.PublicKey:
+			// throw away non signing public key
+			if v.Use != "sig" {
+				continue
+			}
+
+			x509Bytes, _ := x509.MarshalPKIXPublicKey(key)
+
+			block := &pem.Block{
+				Bytes: x509Bytes,
+			}
+
+			buf := new(bytes.Buffer)
+			if err := pem.Encode(buf, block); err != nil {
+				continue
+			}
+
+			rawB64 := ""
+			s := bufio.NewScanner(buf)
+			for s.Scan() {
+				rawB64 += s.Text()
+			}
+
+			// strip headers
+			rawB64 = rawB64[16 : len(rawB64)-14]
+
+			// make a big enough byte slice
+			e := make([]byte, 8)
+			// fill it
+			binary.BigEndian.PutUint64(e, uint64(key.E))
+			// trim buffer of null values
+			e = bytes.TrimLeft(e, "\x00")
+
+			keys = append(keys, JWK{
+				KID: v.KeyID,
+				Kty: "RSA",
+				Alg: v.Algorithm,
+				Use: v.Use,
+				N:   strings.TrimRight(base64.URLEncoding.EncodeToString(key.N.Bytes()), "="),
+				E:   strings.TrimRight(base64.URLEncoding.EncodeToString(e), "="),
+				X5c: []string{rawB64},
+			})
+		}
+	}
+
+	return keys, nil
+}
+
 
 func (k *JWTMiddleware) getIdentityFromToken(token *jwt.Token) (string, error) {
 	// Check which claim is used for the id - kid or sub header
@@ -733,3 +828,4 @@ func generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.Se
 
 	return session, nil
 }
+
