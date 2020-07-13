@@ -157,9 +157,9 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			apiError := APIError{template.HTML(template.JSEscapeString(errMsg))}
 			var log bytes.Buffer
 
-			rsp := io.MultiWriter(w,&log)
+			rsp := io.MultiWriter(w, &log)
 			tmpl.Execute(rsp, &apiError)
-			response.Body  = ioutil.NopCloser(bytes.NewBufferString(log.String()))
+			response.Body = ioutil.NopCloser(bytes.NewBufferString(log.String()))
 		}
 	}
 
@@ -179,7 +179,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	if e.Spec.GlobalConfig.StoreAnalytics(ip) {
 
 		t := time.Now()
-
 
 		addVersionHeader(w, r, e.Spec.GlobalConfig)
 
