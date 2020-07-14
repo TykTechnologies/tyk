@@ -8,12 +8,14 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
 	cache "github.com/pmylund/go-cache"
+	"github.com/square/go-jose"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/user"
@@ -41,29 +43,24 @@ func (k *JWTMiddleware) EnabledForSpec() bool {
 
 var JWKCache *cache.Cache
 
-type JWK struct {
-	Alg string   `json:"alg"`
-	Kty string   `json:"kty"`
-	Use string   `json:"use"`
-	X5c []string `json:"x5c"`
-	N   string   `json:"n"`
-	E   string   `json:"e"`
-	KID string   `json:"kid"`
-	X5t string   `json:"x5t"`
+func parseJWK(buf []byte) (*jose.JSONWebKeySet, error) {
+	var j jose.JSONWebKeySet
+	err := json.Unmarshal(buf, &j)
+	if err != nil {
+		return nil, err
+	}
+	return &j, nil
 }
 
-type JWKs struct {
-	Keys []JWK `json:"keys"`
-}
-
-func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) ([]byte, error) {
+func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) (interface{}, error) {
 	// Implement a cache
 	if JWKCache == nil {
 		k.Logger().Debug("Creating JWK Cache")
 		JWKCache = cache.New(240*time.Second, 30*time.Second)
 	}
 
-	var jwkSet JWKs
+	var jwkSet *jose.JSONWebKeySet
+
 	cachedJWK, found := JWKCache.Get(k.Spec.APIID)
 	if !found {
 		// Get the JWK
@@ -74,9 +71,12 @@ func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) ([]byte, erro
 			return nil, err
 		}
 		defer resp.Body.Close()
-
-		// Decode it
-		if err := json.NewDecoder(resp.Body).Decode(&jwkSet); err != nil {
+		buf, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			k.Logger().WithError(err).Error("Failed to get read response body")
+			return nil, err
+		}
+		if jwkSet, err = parseJWK(buf); err != nil {
 			k.Logger().WithError(err).Error("Failed to decode body JWK")
 			return nil, err
 		}
@@ -85,27 +85,12 @@ func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) ([]byte, erro
 		k.Logger().Debug("Caching JWK")
 		JWKCache.Set(k.Spec.APIID, jwkSet, cache.DefaultExpiration)
 	} else {
-		jwkSet = cachedJWK.(JWKs)
+		jwkSet = cachedJWK.(*jose.JSONWebKeySet)
 	}
-
 	k.Logger().Debug("Checking JWKs...")
-	for _, val := range jwkSet.Keys {
-		if val.KID != kid || strings.ToLower(val.Kty) != strings.ToLower(keyType) {
-			continue
-		}
-		if len(val.X5c) > 0 {
-			// Use the first cert only
-			decodedCert, err := base64.StdEncoding.DecodeString(val.X5c[0])
-			if err != nil {
-				return nil, err
-			}
-			k.Logger().Debug("Found cert! Replying...")
-			k.Logger().Debug("Cert was: ", string(decodedCert))
-			return decodedCert, nil
-		}
-		return nil, errors.New("no certificates in JWK")
+	if keys := jwkSet.Key(kid); len(keys) > 0 {
+		return keys[0].Key, nil
 	}
-
 	return nil, errors.New("No matching KID could be found")
 }
 
@@ -123,18 +108,13 @@ func (k *JWTMiddleware) getIdentityFromToken(token *jwt.Token) (string, error) {
 	return tykId, err
 }
 
-func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.Token) ([]byte, error) {
+func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.Token) (interface{}, error) {
 	config := k.Spec.APIDefinition
 	// Check for central JWT source
 	if config.JWTSource != "" {
 		// Is it a URL?
 		if httpScheme.MatchString(config.JWTSource) {
-			secret, err := k.getSecretFromURL(config.JWTSource, token.Header[KID].(string), k.Spec.JWTSigningMethod)
-			if err != nil {
-				return nil, err
-			}
-
-			return secret, nil
+			return k.getSecretFromURL(config.JWTSource, token.Header[KID].(string), k.Spec.JWTSigningMethod)
 		}
 
 		// If not, return the actual value
@@ -593,12 +573,20 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		}
 		switch k.Spec.JWTSigningMethod {
 		case RSASign, ECDSASign:
-			key, err := ParseRSAPublicKey(val)
-			if err != nil {
-				logger.WithError(err).Error("Failed to decode JWT key")
-				return nil, errors.New("Failed to decode JWT key")
+			switch e := val.(type) {
+			case []byte:
+				key, err := ParseRSAPublicKey(e)
+				if err != nil {
+					logger.WithError(err).Error("Failed to decode JWT key")
+					return nil, errors.New("Failed to decode JWT key")
+				}
+				return key, nil
+			default:
+				// We have already parsed the correct key so we just return it here.No need
+				// for checks because they already happened somewhere ele.
+				return e, nil
 			}
-			return key, nil
+
 		default:
 			return val, nil
 		}
