@@ -10,6 +10,7 @@ import (
 	log "github.com/jensneuse/abstractlogger"
 	"github.com/jensneuse/pipeline/pkg/pipe"
 
+	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/lexer/literal"
 )
 
@@ -73,6 +74,10 @@ func (h *PipelineDataSourcePlanner) Plan(args []Argument) (DataSource, []Argumen
 	return &source, append(h.Args, args...)
 }
 
+func (h *PipelineDataSourcePlanner) EnterDocument(operation, definition *ast.Document) {
+
+}
+
 func (h *PipelineDataSourcePlanner) EnterInlineFragment(ref int) {
 
 }
@@ -91,6 +96,10 @@ func (h *PipelineDataSourcePlanner) LeaveSelectionSet(ref int) {
 
 func (h *PipelineDataSourcePlanner) EnterField(ref int) {
 	h.RootField.SetIfNotDefined(ref)
+}
+
+func (h *PipelineDataSourcePlanner) EnterArgument(ref int) {
+
 }
 
 func (h *PipelineDataSourcePlanner) LeaveField(ref int) {

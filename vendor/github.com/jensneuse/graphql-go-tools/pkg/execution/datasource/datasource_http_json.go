@@ -108,6 +108,10 @@ func (h *HttpJsonDataSourcePlanner) Plan(args []Argument) (DataSource, []Argumen
 	}, append(h.Args, args...)
 }
 
+func (h *HttpJsonDataSourcePlanner) EnterDocument(operation, definition *ast.Document) {
+
+}
+
 func (h *HttpJsonDataSourcePlanner) EnterInlineFragment(ref int) {
 
 }
@@ -127,6 +131,8 @@ func (h *HttpJsonDataSourcePlanner) LeaveSelectionSet(ref int) {
 func (h *HttpJsonDataSourcePlanner) EnterField(ref int) {
 	h.RootField.SetIfNotDefined(ref)
 }
+
+func (h *HttpJsonDataSourcePlanner) EnterArgument(ref int) {}
 
 func (h *HttpJsonDataSourcePlanner) LeaveField(ref int) {
 	if !h.RootField.IsDefinedAndEquals(ref) {
@@ -277,8 +283,6 @@ func (r *HttpJsonDataSource) Resolve(ctx context.Context, args ResolverArgs, out
 
 	var bodyReader io.Reader
 	if len(bodyArg) != 0 {
-		bodyArg = bytes.ReplaceAll(bodyArg, []byte(`\"`), []byte(`\\"`))
-		bodyArg = bytes.ReplaceAll(bodyArg, []byte(`\"`), []byte(`"`))
 		bodyReader = bytes.NewReader(bodyArg)
 	}
 

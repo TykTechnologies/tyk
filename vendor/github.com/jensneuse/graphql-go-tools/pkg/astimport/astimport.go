@@ -139,7 +139,7 @@ func (i *Importer) ImportVariableDefinition(ref int, from, to *ast.Document) int
 
 func (i *Importer) ImportVariableDefinitions(refs []int, from, to *ast.Document) []int {
 	definitions := make([]int, len(refs))
-	for j, k := range definitions {
+	for j, k := range refs {
 		definitions[j] = i.ImportVariableDefinition(k, from, to)
 	}
 	return definitions
