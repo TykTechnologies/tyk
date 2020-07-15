@@ -539,6 +539,8 @@ type GraphQLConfig struct {
 	ExecutionMode GraphQLExecutionMode `bson:"execution_mode" json:"execution_mode"`
 	// Schema is the GraphQL Schema exposed by the GraphQL API/Upstream/Engine.
 	Schema string `bson:"schema" json:"schema"`
+	// LastSchemaUpdate contains the date and time of the last triggered schema update to the upstream
+	LastSchemaUpdate *time.Time `bson:"last_schema_update" json:"last_schema_update,omitempty"`
 	// TypeFieldConfigurations is a rule set of data source and mapping of a schema field.
 	TypeFieldConfigurations []datasource.TypeFieldConfiguration `bson:"type_field_configurations" json:"type_field_configurations"`
 	// GraphQLPlayground is the Playground specific configuration.
@@ -825,8 +827,9 @@ func DummyAPI() APIDefinition {
 	}
 
 	graphql := GraphQLConfig{
-		Enabled:       false,
-		ExecutionMode: GraphQLExecutionModeProxyOnly,
+		Enabled:          false,
+		ExecutionMode:    GraphQLExecutionModeProxyOnly,
+		LastSchemaUpdate: nil,
 	}
 
 	return APIDefinition{
