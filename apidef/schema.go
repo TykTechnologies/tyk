@@ -447,6 +447,10 @@ const Schema = `{
 				"schema": {
 					"type": "string"
 				},
+				"last_schema_update": {
+					"type": "string",
+					"format": "date-time"
+				},
 				"type_field_configurations": {
 					"type": ["array", "null"],
 					"properties": {
