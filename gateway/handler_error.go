@@ -159,7 +159,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 			rsp := io.MultiWriter(w, &log)
 			tmpl.Execute(rsp, &apiError)
-			response.Body = ioutil.NopCloser(bytes.NewBufferString(log.String()))
+			response.Body = ioutil.NopCloser(&log)
 		}
 	}
 
