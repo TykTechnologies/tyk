@@ -29,3 +29,5 @@ more details.
 ## Hot reloading
 Using `/tyk/reload/group` will _not_ update the plugin if you have
 compiled a fresh version and used the same pathname.
+
+To reload a plugin, you will have to restart the gateway process.
