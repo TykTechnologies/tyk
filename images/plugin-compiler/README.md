@@ -19,9 +19,12 @@ You will find a myplugin.so in the current directory which is the file
 that goes into the API definition
 
 ## Plugin aliasing
-Due to the way that `dl_open(3)` works, the filename needs to change
-for `libdl` to recognise that the plugin has been updated. Else, the
-cached value from `ld.so.cache` will be used.
+Plugins are loaded via `dl_open(3)` and the shared library cache,
+`ld.so.cache` will be used. Therefore,even if a plugin's content
+changes but the filename does not, the cached plugin will be used.
+
+See the manpages for `dl_open(3)` and `ld.so(8)` on your platform for
+more details.
 
 ## Hot reloading
 Using `/tyk/reload/group` will _not_ update the plugin if you have
