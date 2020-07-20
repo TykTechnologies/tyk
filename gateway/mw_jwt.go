@@ -456,6 +456,11 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			mappedPolIDs := mapScopeToPolicies(k.Spec.JWTScopeToPolicyMapping, scope)
 
 			polIDs = append(polIDs, mappedPolIDs...)
+			if len(polIDs) == 0 {
+				k.reportLoginFailure(baseFieldData, r)
+				k.Logger().Error("no matching policy found in scope claim")
+				return errors.New("key not authorized: no matching policy found in scope claim"), http.StatusForbidden
+			}
 
 			// check if we need to update session
 			if !updateSession {
