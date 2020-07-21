@@ -166,7 +166,7 @@ func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.T
 
 	// Couldn't base64 decode the kid, so lets try it raw
 	k.Logger().Debug("Getting key: ", tykId)
-	session, rawKeyExists := k.CheckSessionAndIdentityForValidKey(tykId, r)
+	session, rawKeyExists := k.CheckSessionAndIdentityForValidKey(&tykId, r)
 	if !rawKeyExists {
 		return nil, errors.New("token invalid, key not found")
 	}
@@ -200,7 +200,7 @@ func (k *JWTMiddleware) getBasePolicyID(r *http.Request, claims jwt.MapClaims) (
 		}
 
 		// Check for a regular token that matches this client ID
-		clientSession, exists := k.CheckSessionAndIdentityForValidKey(clientID, r)
+		clientSession, exists := k.CheckSessionAndIdentityForValidKey(&clientID, r)
 		if !exists {
 			return
 		}
@@ -298,7 +298,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 
 	k.Logger().Debug("JWT Temporary session ID is: ", sessionID)
 
-	session, exists := k.CheckSessionAndIdentityForValidKey(sessionID, r)
+	session, exists := k.CheckSessionAndIdentityForValidKey(&sessionID, r)
 	isDefaultPol := false
 	basePolicyID := ""
 	foundPolicy := false
@@ -504,7 +504,7 @@ func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Toke
 	}
 
 	k.Logger().Debug("Using raw key ID: ", tykId)
-	session, exists := k.CheckSessionAndIdentityForValidKey(tykId, r)
+	session, exists := k.CheckSessionAndIdentityForValidKey(&tykId, r)
 	if !exists {
 		k.reportLoginFailure(tykId, r)
 		return errors.New("Key not authorized"), http.StatusForbidden

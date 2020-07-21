@@ -89,7 +89,7 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	logger = logger.WithField("key", obfuscateKey(accessToken))
 
 	// get session for the given oauth token
-	session, keyExists := k.CheckSessionAndIdentityForValidKey(accessToken, r)
+	session, keyExists := k.CheckSessionAndIdentityForValidKey(&accessToken, r)
 	if !keyExists {
 		logger.Warning("Attempted access with non-existent key.")
 
