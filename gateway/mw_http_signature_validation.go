@@ -293,7 +293,7 @@ type HMACFieldValues struct {
 }
 
 func (hm *HTTPSignatureValidationMiddleware) getSecretAndSessionForKeyID(r *http.Request, keyId string) (string, user.SessionState, error) {
-	session, keyExists := hm.CheckSessionAndIdentityForValidKey(keyId, r)
+	session, keyExists := hm.CheckSessionAndIdentityForValidKey(&keyId, r)
 	if !keyExists {
 		return "", session, errors.New("Key ID does not exist")
 	}
@@ -308,7 +308,7 @@ func (hm *HTTPSignatureValidationMiddleware) getSecretAndSessionForKeyID(r *http
 }
 
 func (hm *HTTPSignatureValidationMiddleware) getRSACertificateIdAndSessionForKeyID(r *http.Request, keyId string) (string, user.SessionState, error) {
-	session, keyExists := hm.CheckSessionAndIdentityForValidKey(keyId, r)
+	session, keyExists := hm.CheckSessionAndIdentityForValidKey(&keyId, r)
 	if !keyExists {
 		return "", session, errors.New("Key ID does not exist")
 	}

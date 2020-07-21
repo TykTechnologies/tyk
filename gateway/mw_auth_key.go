@@ -5,10 +5,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/TykTechnologies/tyk/config"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/signature_validator"
 )
@@ -85,7 +84,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 	key = stripBearer(key)
 
 	// Check if API key valid
-	session, keyExists := k.CheckSessionAndIdentityForValidKey(key, r)
+	session, keyExists := k.CheckSessionAndIdentityForValidKey(&key, r)
 	if !keyExists {
 		k.Logger().WithField("key", obfuscateKey(key)).Info("Attempted access with non-existent key.")
 

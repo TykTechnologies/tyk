@@ -192,7 +192,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 		}
 	}
 
-	session, exists := k.CheckSessionAndIdentityForValidKey(sessionID, r)
+	session, exists := k.CheckSessionAndIdentityForValidKey(&sessionID, r)
 	if !exists {
 		// Create it
 		logger.Debug("Key does not exist, creating")
