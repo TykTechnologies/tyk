@@ -155,7 +155,6 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 	start := time.Now() // get current time
 	//	log.Debug("[STORE] Getting WAS: ", keyName)
 	//  log.Debug("[STORE] Getting: ", r.fixKey(keyName))
-
 	value, err := r.GetRawKey(r.fixKey(keyName))
 
 	elapsed := time.Since(start)

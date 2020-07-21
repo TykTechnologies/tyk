@@ -615,7 +615,8 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
 // the Auth Handler, if not found it will fail
-func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.Request) (user.SessionState, bool) {
+func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, r *http.Request) (user.SessionState, bool) {
+	key := *originalKey
 	minLength := t.Spec.GlobalConfig.MinTokenLength
 	if minLength == 0 {
 		// See https://github.com/TykTechnologies/tyk/issues/1681
@@ -670,7 +671,20 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 	t.Logger().Debug("Querying authstore")
 	// 2. If not there, get it from the AuthorizationHandler
 	session, found = t.Spec.AuthManager.KeyAuthorised(key)
+	if !found && storage.TokenOrg(key) != t.Spec.OrgID {
+		//treat it as a custom key
+		key = generateToken(t.Spec.OrgID, key)
+		cacheKey = key
+		if t.Spec.GlobalConfig.HashKeys {
+			cacheKey = storage.HashStr(cacheKey)
+		}
+		session, found = t.Spec.AuthManager.KeyAuthorised(key)
+	}
+
 	if found {
+		// update value of originalKey, as for custom-keys it might get updated (the key is generated again using alias)
+		*originalKey = key
+
 		session.SetKeyHash(cacheKey)
 		// If not in Session, and got it from AuthHandler, create a session with a new TTL
 		t.Logger().Info("Recreating session for key: ", obfuscateKey(key))
