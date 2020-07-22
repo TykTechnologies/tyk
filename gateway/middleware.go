@@ -402,16 +402,10 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 						}
 
 						for _, t := range v.RestrictedTypes {
-							found := false
 							for ri, rt := range r.RestrictedTypes {
 								if t.Name == rt.Name {
-									found = true
-									r.RestrictedTypes[ri].Fields = append(rt.Fields, t.Fields...)
+									r.RestrictedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
 								}
-							}
-
-							if !found {
-								r.RestrictedTypes = append(r.RestrictedTypes, v.RestrictedTypes...)
 							}
 						}
 
