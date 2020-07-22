@@ -411,13 +411,27 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 			return apiError("Failed to create key, ensure security settings are correct."), http.StatusInternalServerError
 		}
 	} else {
-		// update legacy key format one
-		if err := doAddOrUpdate(keyName, &newSession, suppressReset, isHashed); err != nil {
-			return apiError("Failed to create key, ensure security settings are correct."), http.StatusInternalServerError
-		}
-		// update new format key
-		if err := doAddOrUpdate(generateToken(newSession.OrgID, keyName), &newSession, suppressReset, isHashed); err != nil {
-			return apiError("Failed to create key, ensure security settings are correct."), http.StatusInternalServerError
+log.Info("KeyName:", keyName)
+		newFormatKey := generateToken(newSession.OrgID, keyName)
+		log.Info("New key format:", newFormatKey)
+
+		// su busco el new formate key si lo encuentra, si busco por custom no
+		s, err := GlobalSessionManager.Store().GetKey(newFormatKey)
+	//	s, err := GlobalSessionManager.SessionDetail(newSession.OrgID, newFormatKey, isHashed)
+	//	log.Info("key:", keyName, " alias:", s)
+	//	log.Printf("Session: %+v", s)
+		log.Info("s:",s,"   error:",err)
+
+		if err != nil {
+			// update legacy key format one
+			if err := doAddOrUpdate(keyName, &newSession, suppressReset, isHashed); err != nil {
+				return apiError("Failed to create key, ensure security settings are correct."), http.StatusInternalServerError
+			}
+		}else{
+			// update new format key for custom keys
+			if err := doAddOrUpdate(newFormatKey, &newSession, suppressReset, isHashed); err != nil {
+				return apiError("Failed to create key, ensure security settings are correct."), http.StatusInternalServerError
+			}
 		}
 	}
 

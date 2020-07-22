@@ -337,8 +337,9 @@ type DefaultKeyGenerator struct{}
 
 func generateToken(orgID, keyID string) string {
 	keyID = strings.TrimPrefix(keyID, orgID)
+	log.Info("Key ID:", keyID)
 	token, err := storage.GenerateToken(orgID, keyID, config.Global().HashKeyFunction)
-
+log.Info("hashed:", token)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "auth-mgr",
