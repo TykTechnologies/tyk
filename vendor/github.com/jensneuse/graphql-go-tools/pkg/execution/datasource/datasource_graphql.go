@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"github.com/buger/jsonparser"
+	"github.com/cespare/xxhash"
 	log "github.com/jensneuse/abstractlogger"
 
 	"github.com/jensneuse/graphql-go-tools/internal/pkg/unsafebytes"
@@ -24,7 +25,7 @@ var graphqlSchemes = []string{
 }
 
 type GraphqlRequest struct {
-	OperationName string          `json:"operation_name"`
+	OperationName string          `json:"operationName"`
 	Variables     json.RawMessage `json:"variables"`
 	Query         string          `json:"query"`
 }
@@ -39,17 +40,21 @@ type GraphQLDataSourceConfig struct {
 
 type GraphQLDataSourcePlanner struct {
 	BasePlanner
-	importer                *astimport.Importer
-	nodes                   []ast.Node
-	resolveDocument         *ast.Document
-	dataSourceConfiguration GraphQLDataSourceConfig
-	client                  *http.Client
-	whitelistedSchemes      []string
+	importer                     *astimport.Importer
+	nodes                        []ast.Node
+	resolveDocument              *ast.Document
+	dataSourceConfiguration      GraphQLDataSourceConfig
+	client                       *http.Client
+	whitelistedSchemes           []string
+	whitelistedVariableRefs      []int
+	whitelistedVariableNameHashs map[uint64]bool
+	hooks                        Hooks
 }
 
 type GraphQLDataSourcePlannerFactoryFactory struct {
 	Client             *http.Client
 	WhitelistedSchemes []string
+	Hooks              Hooks
 }
 
 func (g *GraphQLDataSourcePlannerFactoryFactory) httpClient() *http.Client {
@@ -64,6 +69,7 @@ func (g GraphQLDataSourcePlannerFactoryFactory) Initialize(base BasePlanner, con
 		base:               base,
 		client:             g.httpClient(),
 		whitelistedSchemes: g.WhitelistedSchemes,
+		hooks:              g.Hooks,
 	}
 	err := json.NewDecoder(configReader).Decode(&factory.config)
 	return factory, err
@@ -74,17 +80,25 @@ type GraphQLDataSourcePlannerFactory struct {
 	config             GraphQLDataSourceConfig
 	client             *http.Client
 	whitelistedSchemes []string
+	hooks              Hooks
 }
 
 func (g *GraphQLDataSourcePlannerFactory) DataSourcePlanner() Planner {
 	return &GraphQLDataSourcePlanner{
-		BasePlanner:             g.base,
-		importer:                &astimport.Importer{},
-		dataSourceConfiguration: g.config,
-		resolveDocument:         &ast.Document{},
-		client:                  g.client,
-		whitelistedSchemes:      g.whitelistedSchemes,
+		BasePlanner:                  g.base,
+		importer:                     &astimport.Importer{},
+		dataSourceConfiguration:      g.config,
+		resolveDocument:              &ast.Document{},
+		client:                       g.client,
+		whitelistedSchemes:           g.whitelistedSchemes,
+		whitelistedVariableRefs:      []int{},
+		whitelistedVariableNameHashs: map[uint64]bool{},
+		hooks:                        g.hooks,
 	}
+}
+
+func (g *GraphQLDataSourcePlanner) EnterDocument(operation, definition *ast.Document) {
+	g.whitelistedVariableRefs = g.whitelistedVariableRefs[:0]
 }
 
 func (g *GraphQLDataSourcePlanner) EnterInlineFragment(ref int) {
@@ -153,6 +167,17 @@ func (g *GraphQLDataSourcePlanner) EnterField(ref int) {
 		typeName := g.Definition.NodeNameString(g.Walker.EnclosingTypeDefinition)
 		fieldNameStr := g.Operation.FieldNameString(ref)
 		fieldName := g.Operation.FieldNameBytes(ref)
+
+		g.Args = append(g.Args, &StaticVariableArgument{
+			Name:  RootTypeName,
+			Value: []byte(typeName),
+		})
+
+		g.Args = append(g.Args, &StaticVariableArgument{
+			Name:  RootFieldName,
+			Value: fieldName,
+		})
+
 		mapping := g.Config.MappingForTypeField(typeName, fieldNameStr)
 		if mapping != nil && !mapping.Disabled {
 			fieldName = unsafebytes.StringToBytes(mapping.Path)
@@ -184,20 +209,11 @@ func (g *GraphQLDataSourcePlanner) EnterField(ref int) {
 		}
 		g.resolveDocument.SelectionSets = append(g.resolveDocument.SelectionSets, set)
 		setRef := len(g.resolveDocument.SelectionSets) - 1
-		hasVariableDefinitions := len(g.Operation.OperationDefinitions[g.Walker.Ancestors[0].Ref].VariableDefinitions.Refs) != 0
-		var variableDefinitionsRefs []int
-		if hasVariableDefinitions {
-			variableDefinitionsRefs = g.importer.ImportVariableDefinitions(g.Operation.OperationDefinitions[g.Walker.Ancestors[0].Ref].VariableDefinitions.Refs, g.Operation, g.resolveDocument)
-		}
 		operationDefinition := ast.OperationDefinition{
 			Name:          g.resolveDocument.Input.AppendInputBytes([]byte("o")),
 			OperationType: g.Operation.OperationDefinitions[g.Walker.Ancestors[0].Ref].OperationType,
 			SelectionSet:  setRef,
 			HasSelections: true,
-			VariableDefinitions: ast.VariableDefinitionList{
-				Refs: variableDefinitionsRefs,
-			},
-			HasVariableDefinitions: hasVariableDefinitions,
 		}
 		g.resolveDocument.OperationDefinitions = append(g.resolveDocument.OperationDefinitions, operationDefinition)
 		operationDefinitionRef := len(g.resolveDocument.OperationDefinitions) - 1
@@ -238,6 +254,22 @@ func (g *GraphQLDataSourcePlanner) EnterField(ref int) {
 	}
 }
 
+func (g *GraphQLDataSourcePlanner) EnterArgument(ref int) {
+	variableValue := g.Operation.ArgumentValue(ref)
+	if variableValue.Kind != ast.ValueKindVariable {
+		return
+	}
+
+	variableName := g.Operation.VariableValueNameBytes(variableValue.Ref)
+	definitionRef, exists := g.Operation.VariableDefinitionByNameAndOperation(g.nodes[0].Ref, variableName)
+	if !exists {
+		return
+	}
+
+	g.whitelistedVariableRefs = append(g.whitelistedVariableRefs, definitionRef)
+	g.whitelistedVariableNameHashs[xxhash.Sum64(variableName)] = true
+}
+
 func (g *GraphQLDataSourcePlanner) LeaveField(ref int) {
 	defer func() {
 		g.nodes = g.nodes[:len(g.nodes)-1]
@@ -245,6 +277,20 @@ func (g *GraphQLDataSourcePlanner) LeaveField(ref int) {
 	if g.RootField.ref != ref {
 		return
 	}
+
+	hasVariableDefinitions := len(g.Operation.OperationDefinitions[g.Walker.Ancestors[0].Ref].VariableDefinitions.Refs) != 0
+	var variableDefinitionsRefs []int
+	if hasVariableDefinitions {
+		operationVariableDefinitions := g.Operation.OperationDefinitions[g.Walker.Ancestors[0].Ref].VariableDefinitions.Refs
+		definitions := make([]int, len(operationVariableDefinitions))
+		copy(definitions, operationVariableDefinitions)
+		definitions = ast.FilterIntSliceByWhitelist(definitions, g.whitelistedVariableRefs)
+
+		variableDefinitionsRefs = g.importer.ImportVariableDefinitions(definitions, g.Operation, g.resolveDocument)
+		g.resolveDocument.OperationDefinitions[0].HasVariableDefinitions = len(definitions) != 0
+		g.resolveDocument.OperationDefinitions[0].VariableDefinitions.Refs = variableDefinitionsRefs
+	}
+
 	buff := bytes.Buffer{}
 	err := astprinter.Print(g.resolveDocument, nil, &buff)
 	if err != nil {
@@ -277,7 +323,13 @@ func (g *GraphQLDataSourcePlanner) Plan(args []Argument) (DataSource, []Argument
 		if arg, ok := args[i].(*ContextVariableArgument); ok {
 			if bytes.HasPrefix(arg.Name, literal.DOT_ARGUMENTS_DOT) {
 				arg.Name = bytes.TrimPrefix(arg.Name, literal.DOT_ARGUMENTS_DOT)
-				g.Args = append(g.Args, arg)
+
+				if g.whitelistedVariableNameHashs[xxhash.Sum64(arg.Name)] {
+					g.Args = append(g.Args, arg)
+				} else if g.whitelistedVariableNameHashs[xxhash.Sum64(arg.VariableName)] {
+					arg.Name = arg.VariableName
+					g.Args = append(g.Args, arg)
+				}
 			}
 		}
 	}
@@ -285,6 +337,7 @@ func (g *GraphQLDataSourcePlanner) Plan(args []Argument) (DataSource, []Argument
 		Log:                g.Log,
 		Client:             g.client,
 		WhitelistedSchemes: g.whitelistedSchemes,
+		Hooks:              g.hooks,
 	}, g.Args
 }
 
@@ -292,11 +345,18 @@ type GraphQLDataSource struct {
 	Log                log.Logger
 	Client             *http.Client
 	WhitelistedSchemes []string
+	Hooks              Hooks
 }
 
 func (g *GraphQLDataSource) Resolve(ctx context.Context, args ResolverArgs, out io.Writer) (n int, err error) {
 	urlArg := args.ByKey(literal.URL)
 	queryArg := args.ByKey(literal.QUERY)
+	rootTypeName := args.ByKey(RootTypeName)
+	rootFieldName := args.ByKey(RootFieldName)
+	hookContext := HookContext{
+		TypeName:  string(rootTypeName),
+		FieldName: string(rootFieldName),
+	}
 
 	g.Log.Debug("GraphQLDataSource.Resolve.Args",
 		log.Strings("resolvedArgs", args.Dump()),
@@ -323,6 +383,8 @@ func (g *GraphQLDataSource) Resolve(ctx context.Context, args ResolverArgs, out 
 		switch {
 		case bytes.Equal(keys[i], literal.URL):
 		case bytes.Equal(keys[i], literal.QUERY):
+		case bytes.Equal(keys[i], RootTypeName):
+		case bytes.Equal(keys[i], RootFieldName):
 		default:
 			variables[string(keys[i])] = string(args.ByKey(keys[i]))
 		}
@@ -367,6 +429,10 @@ func (g *GraphQLDataSource) Resolve(ctx context.Context, args ResolverArgs, out 
 	request.Header.Add("Content-Type", "application/json")
 	request.Header.Add("Accept", "application/json")
 
+	if g.Hooks.PreSendHttpHook != nil {
+		g.Hooks.PreSendHttpHook.Execute(hookContext, request)
+	}
+
 	res, err := g.Client.Do(request)
 	if err != nil {
 		g.Log.Error("GraphQLDataSource.Client.Do",
@@ -380,6 +446,10 @@ func (g *GraphQLDataSource) Resolve(ctx context.Context, args ResolverArgs, out 
 			log.Error(err),
 		)
 		return n, err
+	}
+
+	if g.Hooks.PostReceiveHttpHook != nil {
+		g.Hooks.PostReceiveHttpHook.Execute(hookContext, res, data)
 	}
 
 	defer func() {
