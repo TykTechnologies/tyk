@@ -25,6 +25,7 @@ const (
 
 type GraphQLMiddleware struct {
 	BaseMiddleware
+	TracingEnabled bool
 }
 
 func (m *GraphQLMiddleware) Name() string {
@@ -73,14 +74,21 @@ func (m *GraphQLMiddleware) Init() {
 
 		executionClient := &http.Client{}
 
+		hooks := &datasource.Hooks{
+			PreSendHttpHook:     preSendHttpHook{m},
+			PostReceiveHttpHook: postReceiveHttpHook{m},
+		}
+
 		httpJSONOptions := gql.DataSourceHttpJsonOptions{
 			HttpClient:         executionClient,
 			WhitelistedSchemes: []string{"tyk"},
+			Hooks:              hooks,
 		}
 
 		graphQLOptions := gql.DataSourceGraphqlOptions{
 			HttpClient:         executionClient,
 			WhitelistedSchemes: []string{"tyk"},
+			Hooks:              hooks,
 		}
 
 		errMsgFormat := "%s couldn't be added"
@@ -172,4 +180,43 @@ func absLoggerLevel(level logrus.Level) abstractlogger.Level {
 		return abstractlogger.DebugLevel
 	}
 	return abstractlogger.InfoLevel
+}
+
+type preSendHttpHook struct {
+	m *GraphQLMiddleware
+}
+
+func (p preSendHttpHook) Execute(ctx datasource.HookContext, req *http.Request) {
+	if !p.m.TracingEnabled {
+		return
+	}
+
+	p.m.BaseMiddleware.Logger().
+		WithFields(
+			logrus.Fields{
+				"typename":  ctx.TypeName,
+				"fieldname": ctx.FieldName,
+				// "request":   req,
+			},
+		).Debug("preSendHttpHook executed")
+}
+
+type postReceiveHttpHook struct {
+	m *GraphQLMiddleware
+}
+
+func (p postReceiveHttpHook) Execute(ctx datasource.HookContext, resp *http.Response, body []byte) {
+	if !p.m.TracingEnabled {
+		return
+	}
+
+	p.m.BaseMiddleware.Logger().
+		WithFields(
+			logrus.Fields{
+				"typename":      ctx.TypeName,
+				"fieldname":     ctx.FieldName,
+				"response_body": string(body),
+				// "response":      resp,
+			},
+		).Debug("postReceiveHttpHook executed")
 }
