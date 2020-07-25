@@ -411,12 +411,17 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 			return apiError("Failed to create key, ensure security settings are correct."), http.StatusInternalServerError
 		}
 	} else {
-		// update legacy key format one
-		if err := doAddOrUpdate(keyName, &newSession, suppressReset, isHashed); err != nil {
-			return apiError("Failed to create key, ensure security settings are correct."), http.StatusInternalServerError
+
+		newFormatKey := generateToken(newSession.OrgID, keyName)
+		// search as a custom key
+		_, err := GlobalSessionManager.Store().GetKey(newFormatKey)
+
+		if err == nil {
+			// update new format key for custom keys, as it was found then its a customKey
+			keyName = newFormatKey
 		}
-		// update new format key
-		if err := doAddOrUpdate(generateToken(newSession.OrgID, keyName), &newSession, suppressReset, isHashed); err != nil {
+
+		if err := doAddOrUpdate(keyName, &newSession, suppressReset, isHashed); err != nil {
 			return apiError("Failed to create key, ensure security settings are correct."), http.StatusInternalServerError
 		}
 	}
