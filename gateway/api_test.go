@@ -486,6 +486,61 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 	})
 }
 
+func TestKeyHandler_CheckKeysNotDuplicateOnUpdate(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = false
+		spec.Auth.UseParam = true
+	})
+
+	cases := []struct {
+		Name        string
+		IsCustomKey bool
+		KeyName     string
+	}{
+		{
+			Name:        "duplicity on update custom key",
+			IsCustomKey: true,
+			KeyName:     "my_custom_key",
+		},
+		{
+			Name:        "duplicity on update regular key",
+			IsCustomKey: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.Name, func(t *testing.T) {
+			GlobalSessionManager.Store().DeleteAllKeys()
+			session := CreateStandardSession()
+			session.AccessRights = map[string]user.AccessDefinition{"test": {
+				APIID: "test", Versions: []string{"v1"},
+			}}
+
+			keyName := tc.KeyName
+			if !tc.IsCustomKey {
+				keyName = generateToken(session.OrgID, "")
+			}
+
+			if err := doAddOrUpdate(keyName, session, false, true); err != nil {
+				t.Error("Failed to create key, ensure security settings are correct:" + err.Error())
+			}
+
+			requestByte, _ := json.Marshal(session)
+			r := httptest.NewRequest(http.MethodPut, "/tyk/keys/"+keyName, bytes.NewReader(requestByte))
+			handleAddOrUpdate(keyName, r, true)
+
+			sessions := GlobalSessionManager.Sessions("")
+			if len(sessions) != 1 {
+				t.Errorf("Sessions stored in global manager should be 1. But got: %v", len(sessions))
+			}
+
+		})
+	}
+}
+
 func TestHashKeyHandler(t *testing.T) {
 	globalConf := config.Global()
 	// make it to use hashes for Redis keys
