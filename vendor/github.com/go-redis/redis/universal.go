@@ -41,9 +41,9 @@ type UniversalOptions struct {
 	RouteByLatency bool
 	RouteRandomly  bool
 
-	// The sentinel master name.
+	// The sentinel main name.
 	// Only failover clients.
-	MasterName string
+	MainName string
 }
 
 func (o *UniversalOptions) cluster() *ClusterOptions {
@@ -87,7 +87,7 @@ func (o *UniversalOptions) failover() *FailoverOptions {
 
 	return &FailoverOptions{
 		SentinelAddrs: o.Addrs,
-		MasterName:    o.MasterName,
+		MainName:    o.MainName,
 		OnConnect:     o.OnConnect,
 
 		DB:       o.DB,
@@ -167,11 +167,11 @@ var _ UniversalClient = (*ClusterClient)(nil)
 // NewUniversalClient returns a new multi client. The type of client returned depends
 // on the following three conditions:
 //
-// 1. if a MasterName is passed a sentinel-backed FailoverClient will be returned
+// 1. if a MainName is passed a sentinel-backed FailoverClient will be returned
 // 2. if the number of Addrs is two or more, a ClusterClient will be returned
 // 3. otherwise, a single-node redis Client will be returned.
 func NewUniversalClient(opts *UniversalOptions) UniversalClient {
-	if opts.MasterName != "" {
+	if opts.MainName != "" {
 		return NewFailoverClient(opts.failover())
 	} else if len(opts.Addrs) > 1 {
 		return NewClusterClient(opts.cluster())

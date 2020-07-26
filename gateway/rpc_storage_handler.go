@@ -99,17 +99,17 @@ var RPCGlobalCache = cache.New(30*time.Second, 15*time.Second)
 
 // Connect will establish a connection to the RPC
 func (r *RPCStorageHandler) Connect() bool {
-	slaveOptions := config.Global().SlaveOptions
+	subordinateOptions := config.Global().SubordinateOptions
 	rpcConfig := rpc.Config{
-		UseSSL:                slaveOptions.UseSSL,
-		SSLInsecureSkipVerify: slaveOptions.SSLInsecureSkipVerify,
-		ConnectionString:      slaveOptions.ConnectionString,
-		RPCKey:                slaveOptions.RPCKey,
-		APIKey:                slaveOptions.APIKey,
-		GroupID:               slaveOptions.GroupID,
-		CallTimeout:           slaveOptions.CallTimeout,
-		PingTimeout:           slaveOptions.PingTimeout,
-		RPCPoolSize:           slaveOptions.RPCPoolSize,
+		UseSSL:                subordinateOptions.UseSSL,
+		SSLInsecureSkipVerify: subordinateOptions.SSLInsecureSkipVerify,
+		ConnectionString:      subordinateOptions.ConnectionString,
+		RPCKey:                subordinateOptions.RPCKey,
+		APIKey:                subordinateOptions.APIKey,
+		GroupID:               subordinateOptions.GroupID,
+		CallTimeout:           subordinateOptions.CallTimeout,
+		PingTimeout:           subordinateOptions.PingTimeout,
+		RPCPoolSize:           subordinateOptions.RPCPoolSize,
 	}
 
 	return rpc.Connect(
@@ -165,7 +165,7 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 
 func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 	// Check the cache first
-	if config.Global().SlaveOptions.EnableRPCCache {
+	if config.Global().SubordinateOptions.EnableRPCCache {
 		log.Debug("Using cache for: ", keyName)
 		cachedVal, found := RPCGlobalCache.Get(keyName)
 		log.Debug("--> Found? ", found)
@@ -192,7 +192,7 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 		log.Debug("Error trying to get value:", err)
 		return "", storage.ErrKeyNotFound
 	}
-	if config.Global().SlaveOptions.EnableRPCCache {
+	if config.Global().SubordinateOptions.EnableRPCCache {
 		// Cache key
 		RPCGlobalCache.Set(keyName, value, cache.DefaultExpiration)
 	}
@@ -699,14 +699,14 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) {
 }
 
 func (r *RPCStorageHandler) StartRPCLoopCheck(orgId string) {
-	if config.Global().SlaveOptions.DisableKeySpaceSync {
+	if config.Global().SubordinateOptions.DisableKeySpaceSync {
 		return
 	}
 
 	log.Info("[RPC] Starting keyspace poller")
 
 	for {
-		seconds := config.Global().SlaveOptions.KeySpaceSyncInterval
+		seconds := config.Global().SubordinateOptions.KeySpaceSyncInterval
 		r.CheckForKeyspaceChanges(orgId)
 		time.Sleep(time.Duration(seconds) * time.Second)
 	}
@@ -748,7 +748,7 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 	var req interface{}
 
 	reqData := map[string]string{}
-	if groupID := config.Global().SlaveOptions.GroupID; groupID == "" {
+	if groupID := config.Global().SubordinateOptions.GroupID; groupID == "" {
 		funcName = "GetKeySpaceUpdate"
 		req = orgId
 		reqData["orgId"] = orgId
@@ -794,7 +794,7 @@ func getSessionAndCreate(keyName string, r *RPCStorageHandler) {
 	newKeyName := "apikey-" + storage.HashStr(keyName)
 	sessionString, err := r.GetRawKey(keyName)
 	if err != nil {
-		log.Error("Key not found in master - skipping")
+		log.Error("Key not found in main - skipping")
 	} else {
 		handleAddKey(keyName, newKeyName[7:], sessionString, "-1")
 	}

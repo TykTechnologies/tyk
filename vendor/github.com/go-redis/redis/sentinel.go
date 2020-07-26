@@ -17,8 +17,8 @@ import (
 // FailoverOptions are used to configure a failover client and should
 // be passed to NewFailoverClient.
 type FailoverOptions struct {
-	// The master name.
-	MasterName string
+	// The main name.
+	MainName string
 	// A seed list of host:port addresses of sentinel nodes.
 	SentinelAddrs []string
 
@@ -79,7 +79,7 @@ func NewFailoverClient(failoverOpt *FailoverOptions) *Client {
 	opt.init()
 
 	failover := &sentinelFailover{
-		masterName:    failoverOpt.MasterName,
+		mainName:    failoverOpt.MainName,
 		sentinelAddrs: failoverOpt.SentinelAddrs,
 
 		opt: opt,
@@ -150,8 +150,8 @@ func (c *SentinelClient) PSubscribe(channels ...string) *PubSub {
 	return pubsub
 }
 
-func (c *SentinelClient) GetMasterAddrByName(name string) *StringSliceCmd {
-	cmd := NewStringSliceCmd("sentinel", "get-master-addr-by-name", name)
+func (c *SentinelClient) GetMainAddrByName(name string) *StringSliceCmd {
+	cmd := NewStringSliceCmd("sentinel", "get-main-addr-by-name", name)
 	c.Process(cmd)
 	return cmd
 }
@@ -162,7 +162,7 @@ func (c *SentinelClient) Sentinels(name string) *SliceCmd {
 	return cmd
 }
 
-// Failover forces a failover as if the master was not reachable, and without
+// Failover forces a failover as if the main was not reachable, and without
 // asking for agreement to other Sentinels.
 func (c *SentinelClient) Failover(name string) *StatusCmd {
 	cmd := NewStatusCmd("sentinel", "failover", name)
@@ -170,10 +170,10 @@ func (c *SentinelClient) Failover(name string) *StatusCmd {
 	return cmd
 }
 
-// Reset resets all the masters with matching name. The pattern argument is a
-// glob-style pattern. The reset process clears any previous state in a master
-// (including a failover in progress), and removes every slave and sentinel
-// already discovered and associated with the master.
+// Reset resets all the mains with matching name. The pattern argument is a
+// glob-style pattern. The reset process clears any previous state in a main
+// (including a failover in progress), and removes every subordinate and sentinel
+// already discovered and associated with the main.
 func (c *SentinelClient) Reset(pattern string) *IntCmd {
 	cmd := NewIntCmd("sentinel", "reset", pattern)
 	c.Process(cmd)
@@ -188,9 +188,9 @@ func (c *SentinelClient) FlushConfig() *StatusCmd {
 	return cmd
 }
 
-// Master shows the state and info of the specified master.
-func (c *SentinelClient) Master(name string) *StringStringMapCmd {
-	cmd := NewStringStringMapCmd("sentinel", "master", name)
+// Main shows the state and info of the specified main.
+func (c *SentinelClient) Main(name string) *StringStringMapCmd {
+	cmd := NewStringStringMapCmd("sentinel", "main", name)
 	c.Process(cmd)
 	return cmd
 }
@@ -204,8 +204,8 @@ type sentinelFailover struct {
 	poolOnce sync.Once
 
 	mu          sync.RWMutex
-	masterName  string
-	_masterAddr string
+	mainName  string
+	_mainAddr string
 	sentinel    *SentinelClient
 	pubsub      *PubSub
 }
@@ -228,25 +228,25 @@ func (c *sentinelFailover) Pool() *pool.ConnPool {
 }
 
 func (c *sentinelFailover) dial() (net.Conn, error) {
-	addr, err := c.MasterAddr()
+	addr, err := c.MainAddr()
 	if err != nil {
 		return nil, err
 	}
 	return net.DialTimeout("tcp", addr, c.opt.DialTimeout)
 }
 
-func (c *sentinelFailover) MasterAddr() (string, error) {
-	addr, err := c.masterAddr()
+func (c *sentinelFailover) MainAddr() (string, error) {
+	addr, err := c.mainAddr()
 	if err != nil {
 		return "", err
 	}
-	c.switchMaster(addr)
+	c.switchMain(addr)
 	return addr, nil
 }
 
-func (c *sentinelFailover) masterAddr() (string, error) {
+func (c *sentinelFailover) mainAddr() (string, error) {
 	c.mu.RLock()
-	addr := c.getMasterAddr()
+	addr := c.getMainAddr()
 	c.mu.RUnlock()
 	if addr != "" {
 		return addr, nil
@@ -255,7 +255,7 @@ func (c *sentinelFailover) masterAddr() (string, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	addr = c.getMasterAddr()
+	addr = c.getMainAddr()
 	if addr != "" {
 		return addr, nil
 	}
@@ -282,10 +282,10 @@ func (c *sentinelFailover) masterAddr() (string, error) {
 			TLSConfig: c.opt.TLSConfig,
 		})
 
-		masterAddr, err := sentinel.GetMasterAddrByName(c.masterName).Result()
+		mainAddr, err := sentinel.GetMainAddrByName(c.mainName).Result()
 		if err != nil {
-			internal.Logf("sentinel: GetMasterAddrByName master=%q failed: %s",
-				c.masterName, err)
+			internal.Logf("sentinel: GetMainAddrByName main=%q failed: %s",
+				c.mainName, err)
 			_ = sentinel.Close()
 			continue
 		}
@@ -294,54 +294,54 @@ func (c *sentinelFailover) masterAddr() (string, error) {
 		c.sentinelAddrs[0], c.sentinelAddrs[i] = c.sentinelAddrs[i], c.sentinelAddrs[0]
 		c.setSentinel(sentinel)
 
-		addr := net.JoinHostPort(masterAddr[0], masterAddr[1])
+		addr := net.JoinHostPort(mainAddr[0], mainAddr[1])
 		return addr, nil
 	}
 
 	return "", errors.New("redis: all sentinels are unreachable")
 }
 
-func (c *sentinelFailover) getMasterAddr() string {
+func (c *sentinelFailover) getMainAddr() string {
 	sentinel := c.sentinel
 
 	if sentinel == nil {
 		return ""
 	}
 
-	addr, err := sentinel.GetMasterAddrByName(c.masterName).Result()
+	addr, err := sentinel.GetMainAddrByName(c.mainName).Result()
 	if err != nil {
-		internal.Logf("sentinel: GetMasterAddrByName name=%q failed: %s",
-			c.masterName, err)
+		internal.Logf("sentinel: GetMainAddrByName name=%q failed: %s",
+			c.mainName, err)
 		return ""
 	}
 
 	return net.JoinHostPort(addr[0], addr[1])
 }
 
-func (c *sentinelFailover) switchMaster(addr string) {
+func (c *sentinelFailover) switchMain(addr string) {
 	c.mu.RLock()
-	masterAddr := c._masterAddr
+	mainAddr := c._mainAddr
 	c.mu.RUnlock()
-	if masterAddr == addr {
+	if mainAddr == addr {
 		return
 	}
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	internal.Logf("sentinel: new master=%q addr=%q",
-		c.masterName, addr)
+	internal.Logf("sentinel: new main=%q addr=%q",
+		c.mainName, addr)
 	_ = c.Pool().Filter(func(cn *pool.Conn) bool {
 		return cn.RemoteAddr().String() != addr
 	})
-	c._masterAddr = addr
+	c._mainAddr = addr
 }
 
 func (c *sentinelFailover) setSentinel(sentinel *SentinelClient) {
 	c.discoverSentinels(sentinel)
 	c.sentinel = sentinel
 
-	c.pubsub = sentinel.Subscribe("+switch-master")
+	c.pubsub = sentinel.Subscribe("+switch-main")
 	go c.listen(c.pubsub)
 }
 
@@ -364,9 +364,9 @@ func (c *sentinelFailover) closeSentinel() error {
 }
 
 func (c *sentinelFailover) discoverSentinels(sentinel *SentinelClient) {
-	sentinels, err := sentinel.Sentinels(c.masterName).Result()
+	sentinels, err := sentinel.Sentinels(c.mainName).Result()
 	if err != nil {
-		internal.Logf("sentinel: Sentinels master=%q failed: %s", c.masterName, err)
+		internal.Logf("sentinel: Sentinels main=%q failed: %s", c.mainName, err)
 		return
 	}
 	for _, sentinel := range sentinels {
@@ -376,8 +376,8 @@ func (c *sentinelFailover) discoverSentinels(sentinel *SentinelClient) {
 			if key == "name" {
 				sentinelAddr := vals[i+1].(string)
 				if !contains(c.sentinelAddrs, sentinelAddr) {
-					internal.Logf("sentinel: discovered new sentinel=%q for master=%q",
-						sentinelAddr, c.masterName)
+					internal.Logf("sentinel: discovered new sentinel=%q for main=%q",
+						sentinelAddr, c.mainName)
 					c.sentinelAddrs = append(c.sentinelAddrs, sentinelAddr)
 				}
 			}
@@ -393,14 +393,14 @@ func (c *sentinelFailover) listen(pubsub *PubSub) {
 			break
 		}
 
-		if msg.Channel == "+switch-master" {
+		if msg.Channel == "+switch-main" {
 			parts := strings.Split(msg.Payload, " ")
-			if parts[0] != c.masterName {
-				internal.Logf("sentinel: ignore addr for master=%q", parts[0])
+			if parts[0] != c.mainName {
+				internal.Logf("sentinel: ignore addr for main=%q", parts[0])
 				continue
 			}
 			addr := net.JoinHostPort(parts[3], parts[4])
-			c.switchMaster(addr)
+			c.switchMain(addr)
 		}
 	}
 }

@@ -32,18 +32,18 @@ type ClusterOptions struct {
 	// Default is 8 retries.
 	MaxRedirects int
 
-	// Enables read-only commands on slave nodes.
+	// Enables read-only commands on subordinate nodes.
 	ReadOnly bool
-	// Allows routing read-only commands to the closest master or slave node.
+	// Allows routing read-only commands to the closest main or subordinate node.
 	// It automatically enables ReadOnly.
 	RouteByLatency bool
-	// Allows routing read-only commands to the random master or slave node.
+	// Allows routing read-only commands to the random main or subordinate node.
 	// It automatically enables ReadOnly.
 	RouteRandomly bool
 
 	// Optional function that returns cluster slots information.
 	// It is useful to manually create cluster of standalone Redis servers
-	// and load-balance read/write operations between master and slaves.
+	// and load-balance read/write operations between main and subordinates.
 	// It can use service like ZooKeeper to maintain configuration information
 	// and Cluster.ReloadState to manually trigger state reloading.
 	ClusterSlots func() ([]ClusterSlot, error)
@@ -413,8 +413,8 @@ func (p clusterSlotSlice) Swap(i, j int) {
 
 type clusterState struct {
 	nodes   *clusterNodes
-	Masters []*clusterNode
-	Slaves  []*clusterNode
+	Mains []*clusterNode
+	Subordinates  []*clusterNode
 
 	slots []*clusterSlot
 
@@ -454,9 +454,9 @@ func newClusterState(
 			nodes = append(nodes, node)
 
 			if i == 0 {
-				c.Masters = appendUniqueNode(c.Masters, node)
+				c.Mains = appendUniqueNode(c.Mains, node)
 			} else {
-				c.Slaves = appendUniqueNode(c.Slaves, node)
+				c.Subordinates = appendUniqueNode(c.Subordinates, node)
 			}
 		}
 
@@ -503,7 +503,7 @@ func isLoopback(host string) bool {
 	return ip.IsLoopback()
 }
 
-func (c *clusterState) slotMasterNode(slot int) (*clusterNode, error) {
+func (c *clusterState) slotMainNode(slot int) (*clusterNode, error) {
 	nodes := c.slotNodes(slot)
 	if len(nodes) > 0 {
 		return nodes[0], nil
@@ -511,7 +511,7 @@ func (c *clusterState) slotMasterNode(slot int) (*clusterNode, error) {
 	return c.nodes.Random()
 }
 
-func (c *clusterState) slotSlaveNode(slot int) (*clusterNode, error) {
+func (c *clusterState) slotSubordinateNode(slot int) (*clusterNode, error) {
 	nodes := c.slotNodes(slot)
 	switch len(nodes) {
 	case 0:
@@ -519,21 +519,21 @@ func (c *clusterState) slotSlaveNode(slot int) (*clusterNode, error) {
 	case 1:
 		return nodes[0], nil
 	case 2:
-		if slave := nodes[1]; !slave.Loading() {
-			return slave, nil
+		if subordinate := nodes[1]; !subordinate.Loading() {
+			return subordinate, nil
 		}
 		return nodes[0], nil
 	default:
-		var slave *clusterNode
+		var subordinate *clusterNode
 		for i := 0; i < 10; i++ {
 			n := rand.Intn(len(nodes)-1) + 1
-			slave = nodes[n]
-			if !slave.Loading() {
-				return slave, nil
+			subordinate = nodes[n]
+			if !subordinate.Loading() {
+				return subordinate, nil
 			}
 		}
 
-		// All slaves are loading - use master.
+		// All subordinates are loading - use main.
 		return nodes[0], nil
 	}
 }
@@ -801,15 +801,15 @@ func (c *ClusterClient) cmdSlotAndNode(cmd Cmder) (int, *clusterNode, error) {
 			return slot, node, nil
 		}
 
-		node, err := state.slotSlaveNode(slot)
+		node, err := state.slotSubordinateNode(slot)
 		return slot, node, err
 	}
 
-	node, err := state.slotMasterNode(slot)
+	node, err := state.slotMainNode(slot)
 	return slot, node, err
 }
 
-func (c *ClusterClient) slotMasterNode(slot int) (*clusterNode, error) {
+func (c *ClusterClient) slotMainNode(slot int) (*clusterNode, error) {
 	state, err := c.state.Get()
 	if err != nil {
 		return nil, err
@@ -835,7 +835,7 @@ func (c *ClusterClient) Watch(fn func(*Tx) error, keys ...string) error {
 		}
 	}
 
-	node, err := c.slotMasterNode(slot)
+	node, err := c.slotMainNode(slot)
 	if err != nil {
 		return err
 	}
@@ -863,7 +863,7 @@ func (c *ClusterClient) Watch(fn func(*Tx) error, keys ...string) error {
 		}
 
 		if err == pool.ErrClosed || internal.IsReadOnlyError(err) {
-			node, err = c.slotMasterNode(slot)
+			node, err = c.slotMainNode(slot)
 			if err != nil {
 				return err
 			}
@@ -942,7 +942,7 @@ func (c *ClusterClient) defaultProcess(cmd Cmder) error {
 			c.state.LazyReload()
 		}
 
-		// If slave is loading - pick another node.
+		// If subordinate is loading - pick another node.
 		if c.opt.ReadOnly && internal.IsLoadingError(err) {
 			node.MarkAsLoading()
 			node = nil
@@ -985,9 +985,9 @@ func (c *ClusterClient) defaultProcess(cmd Cmder) error {
 	return cmd.Err()
 }
 
-// ForEachMaster concurrently calls the fn on each master node in the cluster.
+// ForEachMain concurrently calls the fn on each main node in the cluster.
 // It returns the first error if any.
-func (c *ClusterClient) ForEachMaster(fn func(client *Client) error) error {
+func (c *ClusterClient) ForEachMain(fn func(client *Client) error) error {
 	state, err := c.state.ReloadOrGet()
 	if err != nil {
 		return err
@@ -995,7 +995,7 @@ func (c *ClusterClient) ForEachMaster(fn func(client *Client) error) error {
 
 	var wg sync.WaitGroup
 	errCh := make(chan error, 1)
-	for _, master := range state.Masters {
+	for _, main := range state.Mains {
 		wg.Add(1)
 		go func(node *clusterNode) {
 			defer wg.Done()
@@ -1006,7 +1006,7 @@ func (c *ClusterClient) ForEachMaster(fn func(client *Client) error) error {
 				default:
 				}
 			}
-		}(master)
+		}(main)
 	}
 	wg.Wait()
 
@@ -1018,9 +1018,9 @@ func (c *ClusterClient) ForEachMaster(fn func(client *Client) error) error {
 	}
 }
 
-// ForEachSlave concurrently calls the fn on each slave node in the cluster.
+// ForEachSubordinate concurrently calls the fn on each subordinate node in the cluster.
 // It returns the first error if any.
-func (c *ClusterClient) ForEachSlave(fn func(client *Client) error) error {
+func (c *ClusterClient) ForEachSubordinate(fn func(client *Client) error) error {
 	state, err := c.state.ReloadOrGet()
 	if err != nil {
 		return err
@@ -1028,7 +1028,7 @@ func (c *ClusterClient) ForEachSlave(fn func(client *Client) error) error {
 
 	var wg sync.WaitGroup
 	errCh := make(chan error, 1)
-	for _, slave := range state.Slaves {
+	for _, subordinate := range state.Subordinates {
 		wg.Add(1)
 		go func(node *clusterNode) {
 			defer wg.Done()
@@ -1039,7 +1039,7 @@ func (c *ClusterClient) ForEachSlave(fn func(client *Client) error) error {
 				default:
 				}
 			}
-		}(slave)
+		}(subordinate)
 	}
 	wg.Wait()
 
@@ -1072,11 +1072,11 @@ func (c *ClusterClient) ForEachNode(fn func(client *Client) error) error {
 		}
 	}
 
-	for _, node := range state.Masters {
+	for _, node := range state.Mains {
 		wg.Add(1)
 		go worker(node)
 	}
-	for _, node := range state.Slaves {
+	for _, node := range state.Subordinates {
 		wg.Add(1)
 		go worker(node)
 	}
@@ -1099,7 +1099,7 @@ func (c *ClusterClient) PoolStats() *PoolStats {
 		return &acc
 	}
 
-	for _, node := range state.Masters {
+	for _, node := range state.Mains {
 		s := node.Client.connPool.Stats()
 		acc.Hits += s.Hits
 		acc.Misses += s.Misses
@@ -1110,7 +1110,7 @@ func (c *ClusterClient) PoolStats() *PoolStats {
 		acc.StaleConns += s.StaleConns
 	}
 
-	for _, node := range state.Slaves {
+	for _, node := range state.Subordinates {
 		s := node.Client.connPool.Stats()
 		acc.Hits += s.Hits
 		acc.Misses += s.Misses
@@ -1273,7 +1273,7 @@ func (c *ClusterClient) mapCmdsByNode(cmds []Cmder, cmdsMap *cmdsMap) error {
 			_, node, err = c.cmdSlotAndNode(cmd)
 		} else {
 			slot := c.cmdSlot(cmd)
-			node, err = state.slotMasterNode(slot)
+			node, err = state.slotMainNode(slot)
 		}
 		if err != nil {
 			return err
@@ -1398,7 +1398,7 @@ func (c *ClusterClient) defaultProcessTxPipeline(cmds []Cmder) error {
 
 	cmdsMap := c.mapCmdsBySlot(cmds)
 	for slot, cmds := range cmdsMap {
-		node, err := state.slotMasterNode(slot)
+		node, err := state.slotMainNode(slot)
 		if err != nil {
 			setCmdsErr(cmds, err)
 			continue
@@ -1541,7 +1541,7 @@ func (c *ClusterClient) pubSub() *PubSub {
 			var err error
 			if len(channels) > 0 {
 				slot := hashtag.Slot(channels[0])
-				node, err = c.slotMasterNode(slot)
+				node, err = c.slotMainNode(slot)
 			} else {
 				node, err = c.nodes.Random()
 			}

@@ -82,7 +82,7 @@ type StorageOptionsConf struct {
 	Port                  int               `json:"port"`
 	Hosts                 map[string]string `json:"hosts"` // Deprecated: Addrs instead.
 	Addrs                 []string          `json:"addrs"`
-	MasterName            string            `json:"master_name"`
+	MainName            string            `json:"main_name"`
 	Username              string            `json:"username"`
 	Password              string            `json:"password"`
 	Database              int               `json:"database"`
@@ -153,7 +153,7 @@ type WebHookHandlerConf struct {
 	EventTimeout int64             `bson:"event_timeout" json:"event_timeout"`
 }
 
-type SlaveOptionsConfig struct {
+type SubordinateOptionsConfig struct {
 	UseRPC                          bool    `json:"use_rpc"`
 	UseSSL                          bool    `json:"use_ssl"`
 	SSLInsecureSkipVerify           bool    `json:"ssl_insecure_skip_verify"`
@@ -349,8 +349,8 @@ type Config struct {
 	Storage                  StorageOptionsConf     `json:"storage"`
 	DisableDashboardZeroConf bool                   `json:"disable_dashboard_zeroconf"`
 
-	// Slave Configurations
-	SlaveOptions   SlaveOptionsConfig `json:"slave_options"`
+	// Subordinate Configurations
+	SubordinateOptions   SubordinateOptionsConfig `json:"subordinate_options"`
 	ManagementNode bool               `json:"management_node"`
 	AuthOverride   AuthOverrideConf   `json:"auth_override"`
 
@@ -375,10 +375,10 @@ type Config struct {
 	CloseIdleConnections bool  `json:"close_idle_connections"`
 	CloseConnections     bool  `json:"close_connections"`
 	EnableCustomDomains  bool  `json:"enable_custom_domains"`
-	// If AllowMasterKeys is set to true, session objects (key definitions) that do not have explicit access rights set
+	// If AllowMainKeys is set to true, session objects (key definitions) that do not have explicit access rights set
 	// will be allowed by Tyk. This means that keys that are created have access to ALL APIs, which in many cases is
 	// unwanted behaviour unless you are sure about what you are doing.
-	AllowMasterKeys bool `json:"allow_master_keys"`
+	AllowMainKeys bool `json:"allow_main_keys"`
 
 	// Gateway-Service Configuration
 	ServiceDiscovery              ServiceDiscoveryConf `json:"service_discovery"`

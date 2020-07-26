@@ -29,10 +29,10 @@ type Transfer struct {
 // in the Transfer.Conn:
 //
 //	d := net.Dialer{LocalAddr: transfer_source}
-//	con, err := d.Dial("tcp", master)
+//	con, err := d.Dial("tcp", main)
 //	dnscon := &dns.Conn{Conn:con}
 //	transfer = &dns.Transfer{Conn: dnscon}
-//	channel, err := transfer.In(message, master)
+//	channel, err := transfer.In(message, main)
 //
 func (t *Transfer) In(q *Msg, a string) (env chan *Envelope, err error) {
 	timeout := dnsTimeout

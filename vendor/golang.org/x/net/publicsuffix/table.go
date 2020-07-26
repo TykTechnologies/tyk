@@ -440,7 +440,7 @@ const text = "9guacuiababia-goracleaningroks-theatree164-baltimore-og-romsdali" 
 	"ahamaxn--osyro-wuaxn--otu796dxn--p1acfermobilyxn--p1ais-very-goo" +
 	"dyearxn--pbt977cnpyatigorskodjeffersonxn--pgbs0dhlxn--porsgu-sta" +
 	"26ferraraxn--pssu33lxn--pssy2uxn--q9jyb4cnsantoandreamhostersanu" +
-	"kis-a-cubicle-slavellinodearthachiojiyaitakanabeautysvardoesntex" +
+	"kis-a-cubicle-subordinatellinodearthachiojiyaitakanabeautysvardoesntex" +
 	"isteingeekashibatakasugais-a-democratozsdeltaiwanairforcebetsuik" +
 	"idsmynasushiobarackmazerbaijan-mayendoftheinternetflixilovecolle" +
 	"gefantasyleaguernseyxn--qcka1pmckinseyxn--qqqt11mishimatsumaebas" +

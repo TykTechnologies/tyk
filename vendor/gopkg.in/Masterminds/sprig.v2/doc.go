@@ -14,6 +14,6 @@ Note that you should add the function map before you parse any template files.
 	appear in the standard library. This is to make it easier to pipe
 	arguments into functions.
 
-See http://masterminds.github.io/sprig/ for more detailed documentation on each of the available functions.
+See http://mainminds.github.io/sprig/ for more detailed documentation on each of the available functions.
 */
 package sprig

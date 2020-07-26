@@ -920,12 +920,12 @@ func (a *Agent) UpdateACLAgentToken(token string, q *WriteOptions) (*WriteMeta, 
 	return a.updateToken("acl_agent_token", token, q)
 }
 
-// UpdateACLAgentMasterToken updates the agent's "acl_agent_master_token". See
+// UpdateACLAgentMainToken updates the agent's "acl_agent_main_token". See
 // updateToken for more details.
 //
-// DEPRECATED (ACL-Legacy-Compat) - Prefer UpdateAgentMasterACLToken for v1.4.3 and above
-func (a *Agent) UpdateACLAgentMasterToken(token string, q *WriteOptions) (*WriteMeta, error) {
-	return a.updateToken("acl_agent_master_token", token, q)
+// DEPRECATED (ACL-Legacy-Compat) - Prefer UpdateAgentMainACLToken for v1.4.3 and above
+func (a *Agent) UpdateACLAgentMainToken(token string, q *WriteOptions) (*WriteMeta, error) {
+	return a.updateToken("acl_agent_main_token", token, q)
 }
 
 // UpdateACLReplicationToken updates the agent's "acl_replication_token". See
@@ -948,10 +948,10 @@ func (a *Agent) UpdateAgentACLToken(token string, q *WriteOptions) (*WriteMeta, 
 	return a.updateTokenFallback("agent", "acl_agent_token", token, q)
 }
 
-// UpdateAgentMasterACLToken updates the agent's "agent_master" token. See updateToken
+// UpdateAgentMainACLToken updates the agent's "agent_main" token. See updateToken
 // for more details
-func (a *Agent) UpdateAgentMasterACLToken(token string, q *WriteOptions) (*WriteMeta, error) {
-	return a.updateTokenFallback("agent_master", "acl_agent_master_token", token, q)
+func (a *Agent) UpdateAgentMainACLToken(token string, q *WriteOptions) (*WriteMeta, error) {
+	return a.updateTokenFallback("agent_main", "acl_agent_main_token", token, q)
 }
 
 // UpdateReplicationACLToken updates the agent's "replication" token. See updateToken

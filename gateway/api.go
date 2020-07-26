@@ -266,9 +266,9 @@ func doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool
 		}
 	} else {
 		// nothing defined, add key to ALL
-		if !config.Global().AllowMasterKeys {
-			log.Error("Master keys disallowed in configuration, key not added.")
-			return errors.New("Master keys not allowed")
+		if !config.Global().AllowMainKeys {
+			log.Error("Main keys disallowed in configuration, key not added.")
+			return errors.New("Main keys not allowed")
 		}
 		log.Warning("No API Access Rights set, adding key to ALL.")
 		apisMu.RLock()
@@ -606,7 +606,7 @@ func handleAddKey(keyName, hashedName, sessionString, apiID string) {
 		"prefix": "RPC",
 		"key":    obfuscateKey(keyName),
 		"status": "ok",
-	}).Info("Updated hashed key in slave storage.")
+	}).Info("Updated hashed key in subordinate storage.")
 }
 
 func handleDeleteKey(keyName, apiID string, resetQuota bool) (interface{}, int) {
@@ -1300,7 +1300,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	} else {
-		if config.Global().AllowMasterKeys {
+		if config.Global().AllowMainKeys {
 			// nothing defined, add key to ALL
 			log.WithFields(logrus.Fields{
 				"prefix":      "api",
@@ -1332,14 +1332,14 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			log.WithFields(logrus.Fields{
 				"prefix":      "api",
 				"status":      "error",
-				"err":         "master keys disabled",
+				"err":         "main keys disabled",
 				"org_id":      newSession.OrgID,
 				"api_id":      "--",
 				"user_id":     "system",
 				"user_ip":     requestIPHops(r),
 				"path":        "--",
 				"server_name": "system",
-			}).Error("Master keys disallowed in configuration, key not added.")
+			}).Error("Main keys disallowed in configuration, key not added.")
 
 			doJSONWrite(w, http.StatusBadRequest, apiError("Failed to create key, keys must have at least one Access Rights record set."))
 			return
