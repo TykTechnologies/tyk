@@ -28,7 +28,7 @@ func NewHandler(base *datasource.BasePlanner, templateDirectives []byte_template
 }
 
 type GraphqlRequest struct {
-	OperationName string          `json:"operation_name"`
+	OperationName string          `json:"operationName"`
 	Variables     json.RawMessage `json:"variables"`
 	Query         string          `json:"query"`
 }
@@ -71,7 +71,7 @@ func (h *Handler) Handle(requestData, extraVariables []byte) (executor *Executor
 		err = report
 		return
 	}
-	normalizer := astnormalization.NewNormalizer(true,true)
+	normalizer := astnormalization.NewNormalizer(true, true)
 	normalizer.NormalizeOperation(&operationDocument, h.base.Definition, &report)
 	if report.HasErrors() {
 		err = report

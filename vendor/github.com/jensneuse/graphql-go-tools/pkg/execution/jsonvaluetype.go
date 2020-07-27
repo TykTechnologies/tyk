@@ -5,9 +5,9 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"strconv"
 
 	"github.com/jensneuse/graphql-go-tools/internal/pkg/unsafebytes"
-	"github.com/jensneuse/graphql-go-tools/pkg/escape"
 	"github.com/jensneuse/graphql-go-tools/pkg/lexer/literal"
 )
 
@@ -38,9 +38,7 @@ func (i JSONValueType) writeValue(value, escapeBuf []byte, out io.Writer) (n int
 
 	switch i {
 	case StringValueType:
-		n, err = i.write(n, err, out, literal.QUOTE)
-		n, err = i.write(n, err, out, escape.Bytes(value, escapeBuf))
-		return i.write(n, err, out, literal.QUOTE)
+		return i.write(n, err, out, []byte(strconv.Quote(string(value))))
 	case IntegerValueType:
 		if !unsafebytes.BytesIsValidInt64(value) {
 			return n, ErrJSONValueTypeValueIncompatible{
