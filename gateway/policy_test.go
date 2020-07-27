@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+
 	"github.com/lonelycode/go-uuid/uuid"
 	"github.com/stretchr/testify/assert"
 
@@ -282,6 +284,26 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 					{URL: "/companies", Methods: []string{"GET", "POST"}},
 				},
 			}},
+		},
+		"restricted-types1": {
+			ID: "restricted_types_1",
+			AccessRights: map[string]user.AccessDefinition{
+				"a": {
+					RestrictedTypes: []graphql.Type{
+						{Name: "Country", Fields: []string{"code", "name"}},
+						{Name: "Person", Fields: []string{"name", "height"}},
+					},
+				}},
+		},
+		"restricted-types2": {
+			ID: "restricted_types_2",
+			AccessRights: map[string]user.AccessDefinition{
+				"a": {
+					RestrictedTypes: []graphql.Type{
+						{Name: "Country", Fields: []string{"code", "phone"}},
+						{Name: "Person", Fields: []string{"name", "mass"}},
+					},
+				}},
 		},
 		"throttle1": {
 			ID:                 "throttle1",
@@ -603,6 +625,23 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 					"b": {
 						AllowedURLs: []user.AccessSpec{
 							{URL: "/", Methods: []string{"PUT"}},
+						},
+						Limit: &user.APILimit{},
+					},
+				}
+
+				assert.Equal(t, want, s.AccessRights)
+			},
+		},
+		{
+			name:     "Merge restricted fields for the same GraphQL API",
+			policies: []string{"restricted-types1", "restricted-types2"},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				want := map[string]user.AccessDefinition{
+					"a": { // It should get intersection of restricted types.
+						RestrictedTypes: []graphql.Type{
+							{Name: "Country", Fields: []string{"code"}},
+							{Name: "Person", Fields: []string{"name"}},
 						},
 						Limit: &user.APILimit{},
 					},
