@@ -552,6 +552,12 @@ func TestRequestSigning_getRequestPath(t *testing.T) {
 	t.Run("StripListenPath=true", func(t *testing.T) {
 		api.Proxy.StripListenPath = true
 		assert.Equal(t, "/get?param1=value1", rs.getRequestPath(req))
+
+		t.Run("path is empty", func(t *testing.T) {
+			reqWithEmptyPath, _ := http.NewRequest(http.MethodGet, "http://example.com/test/", nil)
+			assert.Equal(t, "/", rs.getRequestPath(reqWithEmptyPath))
+		})
+
 		api.Proxy.StripListenPath = false
 	})
 
