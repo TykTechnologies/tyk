@@ -415,7 +415,7 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 
 		newFormatKey := generateToken(newSession.OrgID, keyName)
 		// search as a custom key
-		_, err := GlobalSessionManager.Store().GetKey(newFormatKey)
+		_, err := FallbackKeySesionManager.Store().GetKey(newFormatKey)
 
 		if err == nil {
 			// update new format key for custom keys, as it was found then its a customKey
