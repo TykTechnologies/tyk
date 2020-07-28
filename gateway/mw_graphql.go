@@ -25,7 +25,6 @@ const (
 
 type GraphQLMiddleware struct {
 	BaseMiddleware
-	TracingEnabled bool
 }
 
 func (m *GraphQLMiddleware) Name() string {
@@ -187,10 +186,6 @@ type preSendHttpHook struct {
 }
 
 func (p preSendHttpHook) Execute(ctx datasource.HookContext, req *http.Request) {
-	if !p.m.TracingEnabled {
-		return
-	}
-
 	p.m.BaseMiddleware.Logger().
 		WithFields(
 			logrus.Fields{
@@ -206,10 +201,6 @@ type postReceiveHttpHook struct {
 }
 
 func (p postReceiveHttpHook) Execute(ctx datasource.HookContext, resp *http.Response, body []byte) {
-	if !p.m.TracingEnabled {
-		return
-	}
-
 	p.m.BaseMiddleware.Logger().
 		WithFields(
 			logrus.Fields{
@@ -217,6 +208,7 @@ func (p postReceiveHttpHook) Execute(ctx datasource.HookContext, resp *http.Resp
 				"fieldname":     ctx.FieldName,
 				"response_body": string(body),
 				// "response":      resp,
+				// status code
 			},
 		).Debug("postReceiveHttpHook executed")
 }
