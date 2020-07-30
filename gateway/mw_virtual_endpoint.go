@@ -256,9 +256,9 @@ func forceResponse(w http.ResponseWriter,
 	newResponse.Header = make(map[string][]string)
 
 	requestTime := time.Now().UTC().Format(http.TimeFormat)
-
+	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
 	for header, value := range newResponseData.Response.Headers {
-		newResponse.Header.Set(header, value)
+		setCustomHeader(newResponse.Header, header, value, ignoreCanonical)
 	}
 
 	newResponse.ContentLength = int64(len(responseMessage))
@@ -340,7 +340,7 @@ func handleForcedResponse(rw http.ResponseWriter, res *http.Response, ses *user.
 		res.Header.Set(headers.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
 	}
 
-	copyHeader(rw.Header(), res.Header)
+	copyHeader(rw.Header(), res.Header, config.Global().IgnoreCanonicalMIMEHeaderKey)
 
 	rw.WriteHeader(res.StatusCode)
 	io.Copy(rw, res.Body)
