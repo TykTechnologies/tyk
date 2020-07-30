@@ -51,7 +51,7 @@ func TestCopyHeader_NoDuplicateCORSHeaders(t *testing.T) {
 	}
 
 	for _, v := range tests {
-		copyHeader(v.dst, v.src)
+		copyHeader(v.dst, v.src, false)
 
 		for _, vv := range corsHeaders {
 			val := v.dst[vv]

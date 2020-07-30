@@ -414,16 +414,17 @@ type Config struct {
 	CacheStorage             StorageOptionsConf    `json:"cache_storage"`
 
 	// Middleware/Plugin Configuration
-	EnableBundleDownloader   bool            `bson:"enable_bundle_downloader" json:"enable_bundle_downloader"`
-	BundleBaseURL            string          `bson:"bundle_base_url" json:"bundle_base_url"`
-	BundleInsecureSkipVerify bool            `bson:"bundle_insecure_skip_verify" json:"bundle_insecure_skip_verify"`
-	EnableJSVM               bool            `json:"enable_jsvm"`
-	JSVMTimeout              int             `json:"jsvm_timeout"`
-	DisableVirtualPathBlobs  bool            `json:"disable_virtual_path_blobs"`
-	TykJSPath                string          `json:"tyk_js_path"`
-	MiddlewarePath           string          `json:"middleware_path"`
-	CoProcessOptions         CoProcessConfig `json:"coprocess_options"`
-	IgnoreEndpointCase       bool            `json:"ignore_endpoint_case"`
+	EnableBundleDownloader       bool            `bson:"enable_bundle_downloader" json:"enable_bundle_downloader"`
+	BundleBaseURL                string          `bson:"bundle_base_url" json:"bundle_base_url"`
+	BundleInsecureSkipVerify     bool            `bson:"bundle_insecure_skip_verify" json:"bundle_insecure_skip_verify"`
+	EnableJSVM                   bool            `json:"enable_jsvm"`
+	JSVMTimeout                  int             `json:"jsvm_timeout"`
+	DisableVirtualPathBlobs      bool            `json:"disable_virtual_path_blobs"`
+	TykJSPath                    string          `json:"tyk_js_path"`
+	MiddlewarePath               string          `json:"middleware_path"`
+	CoProcessOptions             CoProcessConfig `json:"coprocess_options"`
+	IgnoreEndpointCase           bool            `json:"ignore_endpoint_case"`
+	IgnoreCanonicalMIMEHeaderKey bool            `json:"ignore_canonical_mime_header_key"`
 
 	// Monitoring, Logging & Profiling
 	LogLevel                string         `json:"log_level"`
