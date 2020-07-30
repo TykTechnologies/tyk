@@ -183,9 +183,9 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 	for _, dh := range object.Request.DeleteHeaders {
 		r.Header.Del(dh)
 	}
-
+	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
 	for h, v := range object.Request.SetHeaders {
-		r.Header.Set(h, v)
+		setCustomHeader(r.Header, h, v, ignoreCanonical)
 	}
 
 	updatedValues := r.URL.Query()
@@ -539,8 +539,9 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 	}
 
 	// Set headers:
+	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
 	for k, v := range retObject.Response.Headers {
-		res.Header.Set(k, v)
+		setCustomHeader(res.Header, k, v, ignoreCanonical)
 	}
 
 	// Set response body:
