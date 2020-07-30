@@ -84,11 +84,15 @@ func ServeFile(ctx *RequestCtx, path string) {
 	})
 	if len(path) == 0 || path[0] != '/' {
 		// extend relative path to absolute path
+		hasTrailingSlash := len(path) > 0 && path[len(path)-1] == '/'
 		var err error
 		if path, err = filepath.Abs(path); err != nil {
 			ctx.Logger().Printf("cannot resolve path %q to absolute file path: %s", path, err)
 			ctx.Error("Internal Server Error", StatusInternalServerError)
 			return
+		}
+		if hasTrailingSlash {
+			path += "/"
 		}
 	}
 	ctx.Request.SetRequestURI(path)
@@ -684,6 +688,7 @@ func (h *fsHandler) handleRequest(ctx *RequestCtx) {
 	} else {
 		path = ctx.Path()
 	}
+	hasTrailingSlash := len(path) > 0 && path[len(path)-1] == '/'
 	path = stripTrailingSlashes(path)
 
 	if n := bytes.IndexByte(path, 0); n >= 0 {
@@ -729,6 +734,10 @@ func (h *fsHandler) handleRequest(ctx *RequestCtx) {
 			ff, err = h.openFSFile(filePath, mustCompress)
 		}
 		if err == errDirIndexRequired {
+			if !hasTrailingSlash {
+				ctx.RedirectBytes(append(path, '/'), StatusFound)
+				return
+			}
 			ff, err = h.openIndexFile(ctx, filePath, mustCompress)
 			if err != nil {
 				ctx.Logger().Printf("cannot open dir index %q: %s", filePath, err)
@@ -1132,7 +1141,10 @@ func (h *fsHandler) openFSFile(filePath string, mustCompress bool) (*fsFile, err
 			return nil, fmt.Errorf("cannot obtain info for original file %q: %s", filePathOriginal, err)
 		}
 
-		if fileInfoOriginal.ModTime() != fileInfo.ModTime() {
+		// Only re-create the compressed file if there was more than a second between the mod times.
+		// On MacOS the gzip seems to truncate the nanoseconds in the mod time causing the original file
+		// to look newer than the gzipped file.
+		if fileInfoOriginal.ModTime().Sub(fileInfo.ModTime()) >= time.Second {
 			// The compressed file became stale. Re-create it.
 			f.Close()
 			os.Remove(filePath)
