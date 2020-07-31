@@ -189,9 +189,9 @@ func (p preSendHttpHook) Execute(ctx datasource.HookContext, req *http.Request) 
 	p.m.BaseMiddleware.Logger().
 		WithFields(
 			logrus.Fields{
-				"typename":  ctx.TypeName,
-				"fieldname": ctx.FieldName,
-				// "request":   req,
+				"typename":     ctx.TypeName,
+				"fieldname":    ctx.FieldName,
+				"upstream_url": req.URL.String(),
 			},
 		).Debug("preSendHttpHook executed")
 }
