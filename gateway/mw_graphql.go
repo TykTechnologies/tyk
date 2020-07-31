@@ -193,7 +193,7 @@ func (p preSendHttpHook) Execute(ctx datasource.HookContext, req *http.Request) 
 				"fieldname":    ctx.FieldName,
 				"upstream_url": req.URL.String(),
 			},
-		).Debug("preSendHttpHook executed")
+		).Debugf("%s.%s: preSendHttpHook executed", ctx.TypeName, ctx.FieldName)
 }
 
 type postReceiveHttpHook struct {
@@ -207,8 +207,7 @@ func (p postReceiveHttpHook) Execute(ctx datasource.HookContext, resp *http.Resp
 				"typename":      ctx.TypeName,
 				"fieldname":     ctx.FieldName,
 				"response_body": string(body),
-				// "response":      resp,
-				// status code
+				"status_code":   resp.StatusCode,
 			},
-		).Debug("postReceiveHttpHook executed")
+		).Debugf("%s.%s: postReceiveHttpHook executed", ctx.TypeName, ctx.FieldName)
 }
