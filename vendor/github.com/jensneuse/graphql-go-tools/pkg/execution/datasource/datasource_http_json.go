@@ -58,6 +58,7 @@ type HttpJsonDataSourceConfigHeader struct {
 type HttpJsonDataSourcePlannerFactoryFactory struct {
 	Client             *http.Client
 	WhitelistedSchemes []string
+	Hooks              Hooks
 }
 
 func (h *HttpJsonDataSourcePlannerFactoryFactory) httpClient() *http.Client {
@@ -72,6 +73,7 @@ func (h *HttpJsonDataSourcePlannerFactoryFactory) Initialize(base BasePlanner, c
 		base:               base,
 		client:             h.httpClient(),
 		whitelistedSchemes: h.WhitelistedSchemes,
+		hooks:              h.Hooks,
 	}
 	err := json.NewDecoder(configReader).Decode(&factory.config)
 	return factory, err
@@ -82,6 +84,7 @@ type HttpJsonDataSourcePlannerFactory struct {
 	config             HttpJsonDataSourceConfig
 	client             *http.Client
 	whitelistedSchemes []string
+	hooks              Hooks
 }
 
 func (h *HttpJsonDataSourcePlannerFactory) DataSourcePlanner() Planner {
@@ -90,6 +93,7 @@ func (h *HttpJsonDataSourcePlannerFactory) DataSourcePlanner() Planner {
 		dataSourceConfig:   h.config,
 		client:             h.client,
 		whitelistedSchemes: h.whitelistedSchemes,
+		hooks:              h.hooks,
 	}
 }
 
@@ -98,6 +102,7 @@ type HttpJsonDataSourcePlanner struct {
 	dataSourceConfig   HttpJsonDataSourceConfig
 	client             *http.Client
 	whitelistedSchemes []string
+	hooks              Hooks
 }
 
 func (h *HttpJsonDataSourcePlanner) Plan(args []Argument) (DataSource, []Argument) {
@@ -105,6 +110,7 @@ func (h *HttpJsonDataSourcePlanner) Plan(args []Argument) (DataSource, []Argumen
 		Log:                h.Log,
 		Client:             h.client,
 		WhitelistedSchemes: h.whitelistedSchemes,
+		Hooks:              h.hooks,
 	}, append(h.Args, args...)
 }
 
@@ -129,7 +135,22 @@ func (h *HttpJsonDataSourcePlanner) LeaveSelectionSet(ref int) {
 }
 
 func (h *HttpJsonDataSourcePlanner) EnterField(ref int) {
-	h.RootField.SetIfNotDefined(ref)
+	if !h.RootField.isDefined {
+		h.RootField.SetIfNotDefined(ref)
+
+		typeName := h.Definition.NodeNameBytes(h.Walker.EnclosingTypeDefinition)
+		fieldName := h.Operation.FieldNameBytes(ref)
+
+		h.Args = append(h.Args, &StaticVariableArgument{
+			Name:  RootTypeName,
+			Value: typeName,
+		})
+
+		h.Args = append(h.Args, &StaticVariableArgument{
+			Name:  RootFieldName,
+			Value: fieldName,
+		})
+	}
 }
 
 func (h *HttpJsonDataSourcePlanner) EnterArgument(ref int) {}
@@ -219,6 +240,7 @@ type HttpJsonDataSource struct {
 	Log                log.Logger
 	Client             *http.Client
 	WhitelistedSchemes []string
+	Hooks              Hooks
 }
 
 func (r *HttpJsonDataSource) Resolve(ctx context.Context, args ResolverArgs, out io.Writer) (n int, err error) {
@@ -227,6 +249,12 @@ func (r *HttpJsonDataSource) Resolve(ctx context.Context, args ResolverArgs, out
 	bodyArg := args.ByKey(literal.BODY)
 	headersArg := args.ByKey(literal.HEADERS)
 	typeNameArg := args.ByKey(literal.TYPENAME)
+	rootTypeName := args.ByKey(RootTypeName)
+	rootFieldName := args.ByKey(RootFieldName)
+	hookContext := HookContext{
+		TypeName:  string(rootTypeName),
+		FieldName: string(rootFieldName),
+	}
 
 	r.Log.Debug("HttpJsonDataSource.Resolve.Args",
 		log.Strings("resolvedArgs", args.Dump()),
@@ -296,6 +324,10 @@ func (r *HttpJsonDataSource) Resolve(ctx context.Context, args ResolverArgs, out
 
 	request.Header = header
 
+	if r.Hooks.PreSendHttpHook != nil {
+		r.Hooks.PreSendHttpHook.Execute(hookContext, request)
+	}
+
 	res, err := r.Client.Do(request)
 	if err != nil {
 		r.Log.Error("HttpJsonDataSource.Resolve.Client.Do",
@@ -310,6 +342,10 @@ func (r *HttpJsonDataSource) Resolve(ctx context.Context, args ResolverArgs, out
 			log.Error(err),
 		)
 		return
+	}
+
+	if r.Hooks.PostReceiveHttpHook != nil {
+		r.Hooks.PostReceiveHttpHook.Execute(hookContext, res, data)
 	}
 
 	defer func() {
