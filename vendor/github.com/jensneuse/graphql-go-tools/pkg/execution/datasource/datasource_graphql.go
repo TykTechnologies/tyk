@@ -33,9 +33,9 @@ type GraphqlRequest struct {
 // GraphQLDataSourceConfig is the configuration for the GraphQL DataSource
 type GraphQLDataSourceConfig struct {
 	// URL is the url of the upstream
-	URL string `json:"url"`
+	URL string `bson:"url" json:"url"`
 	// Method is the http.Method of the upstream, defaults to POST (optional)
-	Method *string `json:"method"`
+	Method *string `bson:"method" json:"method"`
 }
 
 type GraphQLDataSourcePlanner struct {
