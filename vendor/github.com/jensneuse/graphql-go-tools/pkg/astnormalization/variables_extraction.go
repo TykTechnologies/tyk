@@ -1,6 +1,8 @@
 package astnormalization
 
 import (
+	"bytes"
+
 	"github.com/tidwall/sjson"
 
 	"github.com/jensneuse/graphql-go-tools/internal/pkg/unsafebytes"
@@ -9,21 +11,37 @@ import (
 	"github.com/jensneuse/graphql-go-tools/pkg/astvisitor"
 )
 
-func extractVariables(walker *astvisitor.Walker) {
+func extractVariables(walker *astvisitor.Walker) *variablesExtractionVisitor {
 	visitor := &variablesExtractionVisitor{
 		Walker: walker,
 	}
 	walker.RegisterEnterDocumentVisitor(visitor)
 	walker.RegisterEnterArgumentVisitor(visitor)
+	walker.RegisterEnterOperationVisitor(visitor)
+	return visitor
 }
 
 type variablesExtractionVisitor struct {
 	*astvisitor.Walker
 	operation, definition *ast.Document
 	importer              astimport.Importer
+	operationName         []byte
+	skip                  bool
+}
+
+func (v *variablesExtractionVisitor) EnterOperationDefinition(ref int) {
+	if len(v.operationName) == 0 {
+		v.skip = false
+		return
+	}
+	operationName := v.operation.OperationDefinitionNameBytes(ref)
+	v.skip = !bytes.Equal(operationName, v.operationName)
 }
 
 func (v *variablesExtractionVisitor) EnterArgument(ref int) {
+	if v.skip {
+		return
+	}
 	if v.operation.Arguments[ref].Value.Kind == ast.ValueKindVariable {
 		return
 	}
