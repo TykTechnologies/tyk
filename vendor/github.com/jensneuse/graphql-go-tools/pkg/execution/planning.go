@@ -38,6 +38,7 @@ func NewPlanner(base *datasource.BasePlanner) *Planner {
 
 	walker.RegisterDocumentVisitor(&visitor)
 	walker.RegisterEnterFieldVisitor(&visitor)
+	walker.RegisterEnterArgumentVisitor(&visitor)
 	walker.RegisterLeaveFieldVisitor(&visitor)
 	walker.RegisterEnterSelectionSetVisitor(&visitor)
 	walker.RegisterLeaveSelectionSetVisitor(&visitor)
@@ -86,6 +87,9 @@ func (p *planningVisitor) EnterDocument(operation, definition *ast.Document) {
 	}
 
 	p.currentNode = p.currentNode[:0]
+	if len(p.planners) != 0 {
+		p.planners[len(p.planners)-1].planner.EnterDocument(operation, definition)
+	}
 }
 
 func (p *planningVisitor) LeaveDocument(operation, definition *ast.Document) {
@@ -230,6 +234,12 @@ func (p *planningVisitor) EnterField(ref int) {
 		})
 
 		p.currentNode = append(p.currentNode, value)
+	}
+}
+
+func (p *planningVisitor) EnterArgument(ref int) {
+	if len(p.planners) != 0 {
+		p.planners[len(p.planners)-1].planner.EnterArgument(ref)
 	}
 }
 

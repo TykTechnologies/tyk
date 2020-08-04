@@ -18,6 +18,9 @@ import (
 	"github.com/jensneuse/graphql-go-tools/pkg/astvisitor"
 )
 
+var RootTypeName = []byte("root_type_name")
+var RootFieldName = []byte("root_field_name")
+
 var defaultHttpClient *http.Client
 
 func DefaultHttpClient() *http.Client {
@@ -64,11 +67,13 @@ type CorePlanner interface {
 }
 
 type PlannerVisitors interface {
+	astvisitor.EnterDocumentVisitor
 	astvisitor.EnterInlineFragmentVisitor
 	astvisitor.LeaveInlineFragmentVisitor
 	astvisitor.EnterSelectionSetVisitor
 	astvisitor.LeaveSelectionSetVisitor
 	astvisitor.EnterFieldVisitor
+	astvisitor.EnterArgumentVisitor
 	astvisitor.LeaveFieldVisitor
 }
 
@@ -190,12 +195,14 @@ type visitingDataSourcePlanner struct {
 	CorePlanner
 }
 
-func (_ visitingDataSourcePlanner) EnterInlineFragment(ref int) {}
-func (_ visitingDataSourcePlanner) LeaveInlineFragment(ref int) {}
-func (_ visitingDataSourcePlanner) EnterSelectionSet(ref int)   {}
-func (_ visitingDataSourcePlanner) LeaveSelectionSet(ref int)   {}
-func (_ visitingDataSourcePlanner) EnterField(ref int)          {}
-func (_ visitingDataSourcePlanner) LeaveField(ref int)          {}
+func (_ visitingDataSourcePlanner) EnterDocument(operation, definition *ast.Document) {}
+func (_ visitingDataSourcePlanner) EnterInlineFragment(ref int)                       {}
+func (_ visitingDataSourcePlanner) LeaveInlineFragment(ref int)                       {}
+func (_ visitingDataSourcePlanner) EnterSelectionSet(ref int)                         {}
+func (_ visitingDataSourcePlanner) LeaveSelectionSet(ref int)                         {}
+func (_ visitingDataSourcePlanner) EnterField(ref int)                                {}
+func (_ visitingDataSourcePlanner) EnterArgument(ref int)                             {}
+func (_ visitingDataSourcePlanner) LeaveField(ref int)                                {}
 
 func SimpleDataSourcePlanner(core CorePlanner) Planner {
 	return &visitingDataSourcePlanner{
