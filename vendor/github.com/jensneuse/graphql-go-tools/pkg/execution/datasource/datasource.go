@@ -3,7 +3,6 @@ package datasource
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"io"
 	"net/http"
 	"net/url"
@@ -148,7 +147,7 @@ type SourceConfig struct {
 	Name string `bson:"kind" json:"kind"`
 	// Config is the DataSource specific configuration object
 	// Each Planner needs to make sure to parse their Config Object correctly
-	Config json.RawMessage `bson:"data_source_config" json:"data_source_config"`
+	Config []byte `bson:"data_source_config" json:"data_source_config"`
 }
 
 type MappingConfiguration struct {
