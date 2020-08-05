@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 	"sync"
 	"unicode/utf8"
 
@@ -283,13 +284,7 @@ func (e *Executor) ResolveArgs(args []datasource.Argument, data []byte) Resolved
 				result := gjson.GetBytes(resolved[j].Value, unsafebytes.BytesToString(key))
 
 				if result.Type == gjson.String {
-					resultBytes := unsafebytes.StringToBytes(result.Str)
-					if isJSONObjectAsBytes(resultBytes) {
-						resultBytes = bytes.ReplaceAll(resultBytes, []byte(`"`), []byte(`\"`))
-					} else if byteSliceContainsQuotes(resultBytes) {
-						resultBytes = bytes.ReplaceAll(resultBytes, []byte(`"`), []byte(`\"`))
-					}
-
+					resultBytes := unsafebytes.StringToBytes(strings.Trim(strconv.Quote(result.Str), `"`))
 					return w.Write(resultBytes)
 				}
 

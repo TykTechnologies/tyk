@@ -27,8 +27,18 @@ func ErrFieldUndefinedOnType(fieldName, typeName ast.ByteSlice) (err ExternalErr
 	return err
 }
 
+func ErrFieldNameMustBeUniqueOnType(fieldName, typeName ast.ByteSlice) (err ExternalError) {
+	err.Message = fmt.Sprintf("field '%s.%s' can only be defined once", typeName, fieldName)
+	return err
+}
+
 func ErrTypeUndefined(typeName ast.ByteSlice) (err ExternalError) {
 	err.Message = fmt.Sprintf("type not defined: %s", typeName)
+	return err
+}
+
+func ErrTypeNameMustBeUnique(typeName ast.ByteSlice) (err ExternalError) {
+	err.Message = fmt.Sprintf("there can be only one type named '%s'", typeName)
 	return err
 }
 
@@ -190,5 +200,25 @@ func ErrDirectiveNotAllowedOnNode(directiveName, nodeKindName ast.ByteSlice) (er
 
 func ErrDirectiveMustBeUniquePerLocation(directiveName ast.ByteSlice) (err ExternalError) {
 	err.Message = fmt.Sprintf("directive: %s must be unique per location", directiveName)
+	return err
+}
+
+func ErrOnlyOneQueryTypeAllowed() (err ExternalError) {
+	err.Message = "there can be only one query type in schema"
+	return err
+}
+
+func ErrOnlyOneMutationTypeAllowed() (err ExternalError) {
+	err.Message = "there can be only one mutation type in schema"
+	return err
+}
+
+func ErrOnlyOneSubscriptionTypeAllowed() (err ExternalError) {
+	err.Message = "there can be only one subscription type in schema"
+	return err
+}
+
+func ErrEnumValueNameMustBeUnique(enumName, enumValueName ast.ByteSlice) (err ExternalError) {
+	err.Message = fmt.Sprintf("enum value '%s.%s' can only be defined once", enumName, enumValueName)
 	return err
 }
