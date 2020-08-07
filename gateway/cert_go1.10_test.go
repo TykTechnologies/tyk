@@ -1,202 +1,21 @@
 // +build go1.10
+// +build !go1.13
 
 package gateway
 
 import (
 	"crypto/tls"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
-	"errors"
-	"fmt"
+	"io/ioutil"
+	"os"
 
 	//	"net"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 )
-
-func uploadCertPublicKey(serverCert tls.Certificate) (string, error) {
-	x509Cert, _ := x509.ParseCertificate(serverCert.Certificate[0])
-	pubDer, _ := x509.MarshalPKIXPublicKey(x509Cert.PublicKey)
-	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDer})
-	pubID, _ := CertificateManager.Add(pubPem, "")
-
-	if pubID != certs.HexSHA256(pubDer) {
-		errStr := fmt.Sprintf("certmanager returned wrong pub key fingerprint: %s %s", certs.HexSHA256(pubDer), pubID)
-		return "", errors.New(errStr)
-	}
-
-	return pubID, nil
-}
-
-func TestPublicKeyPinning(t *testing.T) {
-	_, _, _, serverCert := genServerCertificate()
-	pubID, err := uploadCertPublicKey(serverCert)
-	if err != nil {
-		t.Error(err)
-	}
-	defer CertificateManager.Delete(pubID, "")
-
-	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	}))
-	upstream.TLS = &tls.Config{
-		InsecureSkipVerify: true,
-		Certificates:       []tls.Certificate{serverCert},
-	}
-
-	upstream.StartTLS()
-	defer upstream.Close()
-
-	t.Run("Pub key match", func(t *testing.T) {
-		globalConf := config.Global()
-		// For host using pinning, it should ignore standard verification in all cases, e.g setting variable below does nothing
-		globalConf.ProxySSLInsecureSkipVerify = false
-		config.SetGlobal(globalConf)
-		defer ResetTestConfig()
-
-		ts := StartTest()
-		defer ts.Close()
-
-		BuildAndLoadAPI(func(spec *APISpec) {
-			spec.Proxy.ListenPath = "/"
-			spec.PinnedPublicKeys = map[string]string{"127.0.0.1": pubID}
-			spec.Proxy.TargetURL = upstream.URL
-		})
-
-		ts.Run(t, test.TestCase{Code: 200})
-	})
-
-	t.Run("Pub key not match", func(t *testing.T) {
-		ts := StartTest()
-		defer ts.Close()
-
-		BuildAndLoadAPI(func(spec *APISpec) {
-			spec.Proxy.ListenPath = "/"
-			spec.PinnedPublicKeys = map[string]string{"127.0.0.1": "wrong"}
-			spec.Proxy.TargetURL = upstream.URL
-		})
-
-		ts.Run(t, test.TestCase{Code: 500})
-	})
-
-	t.Run("Global setting", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.Security.PinnedPublicKeys = map[string]string{"127.0.0.1": "wrong"}
-		config.SetGlobal(globalConf)
-		defer ResetTestConfig()
-
-		ts := StartTest()
-		defer ts.Close()
-
-		BuildAndLoadAPI(func(spec *APISpec) {
-			spec.Proxy.ListenPath = "/"
-			spec.Proxy.TargetURL = upstream.URL
-		})
-
-		ts.Run(t, test.TestCase{Code: 500})
-	})
-
-	t.Run("Though proxy", func(t *testing.T) {
-		_, _, _, proxyCert := genServerCertificate()
-		proxy := initProxy("https", &tls.Config{
-			Certificates: []tls.Certificate{proxyCert},
-		})
-
-		globalConf := config.Global()
-		globalConf.ProxySSLInsecureSkipVerify = true
-		config.SetGlobal(globalConf)
-		defer ResetTestConfig()
-
-		defer proxy.Stop()
-
-		ts := StartTest()
-		defer ts.Close()
-
-		BuildAndLoadAPI(func(spec *APISpec) {
-			spec.Proxy.ListenPath = "/"
-			spec.Proxy.TargetURL = upstream.URL
-			spec.Proxy.Transport.ProxyURL = proxy.URL
-			spec.PinnedPublicKeys = map[string]string{"*": "wrong"}
-		})
-
-		ts.Run(t, test.TestCase{Code: 500})
-	})
-
-	t.Run("Enable Common Name check", func(t *testing.T) {
-		// start upstream server
-		_, _, _, serverCert := genCertificate(&x509.Certificate{
-			EmailAddresses: []string{"test@test.com"},
-			Subject:        pkix.Name{CommonName: "localhost"},
-		})
-		serverPubID, err := uploadCertPublicKey(serverCert)
-		if err != nil {
-			t.Error(err)
-		}
-		defer CertificateManager.Delete(serverPubID, "")
-
-		upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		}))
-		upstream.TLS = &tls.Config{
-			InsecureSkipVerify: true,
-			Certificates:       []tls.Certificate{serverCert},
-		}
-
-		upstream.StartTLS()
-		defer upstream.Close()
-
-		// start proxy
-		_, _, _, proxyCert := genCertificate(&x509.Certificate{
-			Subject: pkix.Name{CommonName: "local1.host"},
-		})
-		proxyPubID, err := uploadCertPublicKey(proxyCert)
-		if err != nil {
-			t.Error(err)
-		}
-		defer CertificateManager.Delete(proxyPubID, "")
-
-		proxy := initProxy("http", &tls.Config{
-			Certificates: []tls.Certificate{proxyCert},
-		})
-		defer proxy.Stop()
-
-		globalConf := config.Global()
-		globalConf.SSLForceCommonNameCheck = true
-		globalConf.ProxySSLInsecureSkipVerify = true
-		config.SetGlobal(globalConf)
-		defer ResetTestConfig()
-
-		ts := StartTest()
-		defer ts.Close()
-
-		pubKeys := fmt.Sprintf("%s,%s", serverPubID, proxyPubID)
-		upstream.URL = strings.Replace(upstream.URL, "127.0.0.1", "localhost", 1)
-		proxy.URL = strings.Replace(proxy.URL, "127.0.0.1", "local1.host", 1)
-
-		BuildAndLoadAPI([]func(spec *APISpec){func(spec *APISpec) {
-			spec.Proxy.ListenPath = "/valid"
-			spec.Proxy.TargetURL = upstream.URL
-			spec.Proxy.Transport.ProxyURL = proxy.URL
-			spec.PinnedPublicKeys = map[string]string{"*": pubKeys}
-		},
-			func(spec *APISpec) {
-				spec.Proxy.ListenPath = "/invalid"
-				spec.Proxy.TargetURL = upstream.URL
-				spec.Proxy.Transport.ProxyURL = proxy.URL
-				spec.PinnedPublicKeys = map[string]string{"*": "wrong"}
-			}}...)
-
-		ts.Run(t, []test.TestCase{
-			{Code: 200, Path: "/valid"},
-			{Code: 500, Path: "/invalid"},
-		}...)
-	})
-}
 
 func TestProxyTransport(t *testing.T) {
 	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -319,5 +138,89 @@ func TestProxyTransport(t *testing.T) {
 			TLSNextProto: make(map[string]func(authority string, c *tls.Conn) http.RoundTripper),
 		}
 		ts.Run(t, test.TestCase{Path: "/", Code: 200, Client: client})
+	})
+}
+
+func TestGatewayTLS_TestGatewayTLS_without_certs_old(t *testing.T) {
+	dir, _ := ioutil.TempDir("", "certs")
+	defer os.RemoveAll(dir)
+	client := GetTLSClient(nil, nil)
+
+	globalConf := config.Global()
+	globalConf.HttpServerOptions.UseSSL = true
+	config.SetGlobal(globalConf)
+	defer ResetTestConfig()
+
+	ts := StartTest()
+	defer ts.Close()
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+	})
+
+	ts.Run(t, test.TestCase{ErrorMatch: internalTLSErr, Client: client})
+}
+
+func TestAPICertificate_unknown_old(t *testing.T) {
+	_, _, combinedPEM, _ := genServerCertificate()
+	serverCertID, _ := CertificateManager.Add(combinedPEM, "")
+	defer CertificateManager.Delete(serverCertID, "")
+
+	globalConf := config.Global()
+	globalConf.HttpServerOptions.UseSSL = true
+	globalConf.HttpServerOptions.SSLCertificates = []string{}
+	config.SetGlobal(globalConf)
+	defer ResetTestConfig()
+
+	ts := StartTest()
+	defer ts.Close()
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = true
+		spec.Proxy.ListenPath = "/"
+	})
+	ts.Run(t, test.TestCase{ErrorMatch: internalTLSErr})
+}
+
+func TestCipherSuites(t *testing.T) {
+	//configure server so we can useSSL and utilize the logic, but skip verification in the clients
+	_, _, combinedPEM, _ := genServerCertificate()
+	serverCertID, _ := CertificateManager.Add(combinedPEM, "")
+	defer CertificateManager.Delete(serverCertID, "")
+
+	globalConf := config.Global()
+	globalConf.HttpServerOptions.UseSSL = true
+	globalConf.HttpServerOptions.Ciphers = []string{"TLS_RSA_WITH_RC4_128_SHA", "TLS_RSA_WITH_3DES_EDE_CBC_SHA", "TLS_RSA_WITH_AES_128_CBC_SHA"}
+	globalConf.HttpServerOptions.SSLCertificates = []string{serverCertID}
+	config.SetGlobal(globalConf)
+	defer ResetTestConfig()
+
+	ts := StartTest()
+	defer ts.Close()
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+	})
+
+	//matching ciphers
+	t.Run("Cipher match", func(t *testing.T) {
+
+		client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{
+			CipherSuites:       getCipherAliases([]string{"TLS_RSA_WITH_RC4_128_SHA", "TLS_RSA_WITH_3DES_EDE_CBC_SHA", "TLS_RSA_WITH_AES_128_CBC_SHA"}),
+			InsecureSkipVerify: true,
+		}}}
+
+		// If there is an internal TLS error it will fail test
+		ts.Run(t, test.TestCase{Client: client, Path: "/"})
+	})
+
+	t.Run("Cipher non-match", func(t *testing.T) {
+
+		client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{
+			CipherSuites:       getCipherAliases([]string{"TLS_RSA_WITH_AES_256_CBC_SHA"}), // not matching ciphers
+			InsecureSkipVerify: true,
+		}}}
+
+		ts.Run(t, test.TestCase{Client: client, Path: "/", ErrorMatch: "tls: handshake failure"})
 	})
 }

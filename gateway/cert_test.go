@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/big"
@@ -27,8 +28,22 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
+func uploadCertPublicKey(serverCert tls.Certificate) (string, error) {
+	x509Cert, _ := x509.ParseCertificate(serverCert.Certificate[0])
+	pubDer, _ := x509.MarshalPKIXPublicKey(x509Cert.PublicKey)
+	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDer})
+	pubID, _ := CertificateManager.Add(pubPem, "")
+
+	if pubID != certs.HexSHA256(pubDer) {
+		errStr := fmt.Sprintf("certmanager returned wrong pub key fingerprint: %s %s", certs.HexSHA256(pubDer), pubID)
+		return "", errors.New(errStr)
+	}
+
+	return pubID, nil
+}
+
 func genCertificate(template *x509.Certificate) ([]byte, []byte, []byte, tls.Certificate) {
-	priv, _ := rsa.GenerateKey(rand.Reader, 512)
+	priv, _ := rsa.GenerateKey(rand.Reader, 1024)
 
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, _ := rand.Int(rand.Reader, serialNumberLimit)
@@ -60,9 +75,10 @@ func genServerCertificate() ([]byte, []byte, []byte, tls.Certificate) {
 }
 
 const (
-	internalTLSErr  = "tls: internal error"
-	badcertErr      = "tls: bad certificate"
-	certNotMatchErr = "Client TLS certificate is required"
+	internalTLSErr   = "tls: internal error"
+	unrecognizedName = "tls: unrecognized name"
+	badcertErr       = "tls: bad certificate"
+	certNotMatchErr  = "Client TLS certificate is required"
 )
 
 func TestGatewayTLS(t *testing.T) {
@@ -75,6 +91,7 @@ func TestGatewayTLS(t *testing.T) {
 	client := GetTLSClient(nil, nil)
 
 	t.Run("Without certificates", func(t *testing.T) {
+		t.Skip()
 		globalConf := config.Global()
 		globalConf.HttpServerOptions.UseSSL = true
 		config.SetGlobal(globalConf)
@@ -969,15 +986,6 @@ func TestAPICertificate(t *testing.T) {
 
 		ts.Run(t, test.TestCase{Code: 200, Client: client})
 	})
-
-	t.Run("Cert unknown", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
-			spec.UseKeylessAccess = true
-			spec.Proxy.ListenPath = "/"
-		})
-
-		ts.Run(t, test.TestCase{ErrorMatch: "tls: internal error"})
-	})
 }
 
 func TestCertificateHandlerTLS(t *testing.T) {
@@ -1032,48 +1040,5 @@ func TestCertificateHandlerTLS(t *testing.T) {
 			{Method: "DELETE", Path: "/tyk/certs/" + clientCertID, AdminAuth: true, Code: 200},
 			{Method: "GET", Path: "/tyk/certs", AdminAuth: true, Code: 200, BodyMatch: `{"certs":null}`},
 		}...)
-	})
-}
-
-func TestCipherSuites(t *testing.T) {
-	//configure server so we can useSSL and utilize the logic, but skip verification in the clients
-	_, _, combinedPEM, _ := genServerCertificate()
-	serverCertID, _ := CertificateManager.Add(combinedPEM, "")
-	defer CertificateManager.Delete(serverCertID, "")
-
-	globalConf := config.Global()
-	globalConf.HttpServerOptions.UseSSL = true
-	globalConf.HttpServerOptions.Ciphers = []string{"TLS_RSA_WITH_RC4_128_SHA", "TLS_RSA_WITH_3DES_EDE_CBC_SHA", "TLS_RSA_WITH_AES_128_CBC_SHA"}
-	globalConf.HttpServerOptions.SSLCertificates = []string{serverCertID}
-	config.SetGlobal(globalConf)
-	defer ResetTestConfig()
-
-	ts := StartTest()
-	defer ts.Close()
-
-	BuildAndLoadAPI(func(spec *APISpec) {
-		spec.Proxy.ListenPath = "/"
-	})
-
-	//matching ciphers
-	t.Run("Cipher match", func(t *testing.T) {
-
-		client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{
-			CipherSuites:       getCipherAliases([]string{"TLS_RSA_WITH_RC4_128_SHA", "TLS_RSA_WITH_3DES_EDE_CBC_SHA", "TLS_RSA_WITH_AES_128_CBC_SHA"}),
-			InsecureSkipVerify: true,
-		}}}
-
-		// If there is an internal TLS error it will fail test
-		ts.Run(t, test.TestCase{Client: client, Path: "/"})
-	})
-
-	t.Run("Cipher non-match", func(t *testing.T) {
-
-		client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{
-			CipherSuites:       getCipherAliases([]string{"TLS_RSA_WITH_AES_256_CBC_SHA"}), // not matching ciphers
-			InsecureSkipVerify: true,
-		}}}
-
-		ts.Run(t, test.TestCase{Client: client, Path: "/", ErrorMatch: "tls: handshake failure"})
 	})
 }

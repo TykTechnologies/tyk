@@ -227,6 +227,7 @@ type HTTPTestRunner struct {
 }
 
 func (r HTTPTestRunner) Run(t testing.TB, testCases ...TestCase) (*http.Response, error) {
+	t.Helper()
 	var lastResponse *http.Response
 	var lastError error
 
