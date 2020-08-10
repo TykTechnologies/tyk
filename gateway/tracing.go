@@ -21,10 +21,11 @@ type traceHttpRequest struct {
 	Headers http.Header `json:"headers"`
 }
 
-func (tr *traceHttpRequest) toRequest() *http.Request {
-	r := httptest.NewRequest(tr.Method, tr.Path, strings.NewReader(tr.Body))
-	// It sets example.com by default. Setting it to empty will not show a value because it is not necessary.
-	r.Host = ""
+func (tr *traceHttpRequest) toRequest() (*http.Request, error) {
+	r, err := http.NewRequest(tr.Method, tr.Path, strings.NewReader(tr.Body))
+	if err != nil {
+		return nil, err
+	}
 
 	for key, values := range tr.Headers {
 		for _, v := range values {
@@ -34,7 +35,7 @@ func (tr *traceHttpRequest) toRequest() *http.Request {
 
 	ctxSetTrace(r)
 
-	return r
+	return r, nil
 }
 
 // TraceRequest is for tracing an HTTP request
@@ -125,7 +126,11 @@ func traceHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	wr := httptest.NewRecorder()
-	tr := traceReq.Request.toRequest()
+	tr, err := traceReq.Request.toRequest()
+	if err != nil {
+		doJSONWrite(w, http.StatusInternalServerError, apiError("Unexpected failure: "+err.Error()))
+		return
+	}
 	nopCloseRequestBody(tr)
 	chainObj.ThisHandler.ServeHTTP(wr, tr)
 
