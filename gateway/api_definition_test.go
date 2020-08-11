@@ -1,14 +1,20 @@
 package gateway
 
 import (
+	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"sync"
 	"testing"
+	"text/template"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -840,4 +846,42 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 	}
 	apisMu.RUnlock()
 
+}
+
+func TestAPIDefinitionLoader_Template(t *testing.T) {
+	const testTemplatePath = "../templates/transform_test.tmpl"
+
+	l := APIDefinitionLoader{}
+
+	executeAndAssert := func(t *testing.T, template *template.Template) {
+		var bodyBuffer bytes.Buffer
+		err := template.Execute(&bodyBuffer, map[string]string{
+			"value1": "value-1",
+			"value2": "value-2",
+		})
+		assert.NoError(t, err)
+
+		var res map[string]string
+		_ = json.Unmarshal(bodyBuffer.Bytes(), &res)
+
+		assert.Equal(t, "value-1", res["value2"])
+		assert.Equal(t, "value-2", res["value1"])
+	}
+
+	t.Run("loadFileTemplate", func(t *testing.T) {
+		temp, err := l.loadFileTemplate(testTemplatePath)
+		assert.NoError(t, err)
+
+		executeAndAssert(t, temp)
+	})
+
+	t.Run("loadBlobTemplate", func(t *testing.T) {
+		templateInBytes, _ := ioutil.ReadFile(testTemplatePath)
+		tempBase64 := base64.StdEncoding.EncodeToString(templateInBytes)
+
+		temp, err := l.loadBlobTemplate(tempBase64)
+		assert.NoError(t, err)
+
+		executeAndAssert(t, temp)
+	})
 }
