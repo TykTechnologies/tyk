@@ -148,8 +148,8 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 		time.Sleep(10 * time.Millisecond)
 	}
 	go startPubSubLoop()
-	go reloadLoop(ReloadTick)
-	go reloadQueueLoop()
+	go reloadLoop(ctx, ReloadTick)
+	go reloadQueueLoop(ctx)
 	go reloadSimulation()
 	exitCode := m.Run()
 	os.RemoveAll(config.Global().AppPath)
