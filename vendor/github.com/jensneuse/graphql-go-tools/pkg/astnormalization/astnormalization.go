@@ -81,13 +81,21 @@ func NormalizeOperation(operation, definition *ast.Document, report *operationre
 	normalizer.NormalizeOperation(operation, definition, report)
 }
 
+func NormalizeNamedOperation(operation, definition *ast.Document, operationName []byte, report *operationreport.Report) {
+	normalizer := NewNormalizer(true, true)
+	normalizer.NormalizeNamedOperation(operation, definition, operationName, report)
+}
+
 type registerNormalizeFunc func(walker *astvisitor.Walker)
+
+type registerNormalizeVariablesFunc func(walker *astvisitor.Walker) *variablesExtractionVisitor
 
 // OperationNormalizer walks a given AST and applies all registered rules
 type OperationNormalizer struct {
 	walkers                   []*astvisitor.Walker
 	removeFragmentDefinitions bool
 	extractVariables          bool
+	variablesExtraction       *variablesExtractionVisitor
 }
 
 // NewNormalizer creates a new OperationNormalizer and sets up all default rules
@@ -111,7 +119,7 @@ func (o *OperationNormalizer) setupWalkers() {
 	mergeFieldSelections(&other)
 	deduplicateFields(&other)
 	if o.extractVariables {
-		extractVariables(&other)
+		o.variablesExtraction = extractVariables(&other)
 	}
 	if o.removeFragmentDefinitions {
 		removeFragmentDefinitions(&other)
@@ -122,6 +130,19 @@ func (o *OperationNormalizer) setupWalkers() {
 
 // NormalizeOperation applies all registered rules to the AST
 func (o *OperationNormalizer) NormalizeOperation(operation, definition *ast.Document, report *operationreport.Report) {
+	for i := range o.walkers {
+		o.walkers[i].Walk(operation, definition, report)
+		if report.HasErrors() {
+			return
+		}
+	}
+}
+
+// NormalizeNamedOperation applies all registered rules to one specific named operation in the AST
+func (o *OperationNormalizer) NormalizeNamedOperation(operation, definition *ast.Document, operationName []byte, report *operationreport.Report) {
+	if o.variablesExtraction != nil {
+		o.variablesExtraction.operationName = operationName
+	}
 	for i := range o.walkers {
 		o.walkers[i].Walk(operation, definition, report)
 		if report.HasErrors() {
