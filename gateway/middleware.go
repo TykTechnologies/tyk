@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TykTechnologies/tyk/rpc"
+
 	"github.com/TykTechnologies/tyk/headers"
 
 	"github.com/gocraft/health"
@@ -227,8 +229,15 @@ func (t BaseMiddleware) Config() (interface{}, error) {
 }
 
 func (t BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
+	var session user.SessionState
+	var found bool
+
+	if rpc.IsEmergencyMode() {
+		return session, false
+	}
+
 	// Try and get the session from the session store
-	session, found := t.Spec.OrgSessionManager.SessionDetail(orgID, orgID, false)
+	session, found = t.Spec.OrgSessionManager.SessionDetail(orgID, orgID, false)
 	if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
 		// If exists, assume it has been authorized and pass on
 		// We cache org expiry data
@@ -237,6 +246,7 @@ func (t BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
 	}
 
 	session.SetKeyHash(storage.HashKey(orgID))
+
 	return session, found
 }
 
