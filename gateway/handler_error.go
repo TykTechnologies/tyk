@@ -143,7 +143,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		// If error is not customized write error in default way
 		if errMsg != errCustomBodyResponse.Error() {
 			w.WriteHeader(errCode)
-			apiError := APIError{template.HTML(template.JSEscapeString(errMsg))}
+			apiError := APIError{template.HTML(errMsg)}
 			tmpl.Execute(w, &apiError)
 		}
 	}
