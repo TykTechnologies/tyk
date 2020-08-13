@@ -350,7 +350,7 @@ func syncPolicies() (count int, err error) {
 	}
 	mainLog.Infof("Policies found (%d total):", len(pols))
 	for id := range pols {
-		mainLog.Debug(" - %s", id)
+		mainLog.Debugf(" - %s", id)
 	}
 
 	policiesMu.Lock()
