@@ -324,6 +324,7 @@ func loginBase() bool {
 			}
 		}
 		rpcLoginMu.Unlock()
+		return false
 	}
 	return true
 }

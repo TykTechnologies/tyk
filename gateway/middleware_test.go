@@ -49,6 +49,37 @@ func TestBaseMiddleware_OrgSessionExpiry(t *testing.T) {
 	}
 }
 
+func TestOrgSessionWithRPCDown(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+
+	//we need rpc down
+	globalConf := config.Global()
+	globalConf.SlaveOptions.ConnectionString = testHttpFailure
+	globalConf.SlaveOptions.UseRPC = true
+	globalConf.SlaveOptions.RPCKey = "test_org"
+	globalConf.SlaveOptions.APIKey = "test"
+	globalConf.Policies.PolicySource = "rpc"
+	config.SetGlobal(globalConf)
+
+	m := BaseMiddleware{
+		Spec: &APISpec{
+			GlobalConfig: config.Config{
+				EnforceOrgDataAge: true,
+			},
+			OrgSessionManager: mockStore{},
+		},
+		logger: mainLog,
+	}
+	// reload so we force to fall in emergency mode
+	DoReload()
+
+	_, found := m.OrgSession(sess.OrgID)
+	if found {
+		t.Fatal("org  session should be null:")
+	}
+}
+
 func TestBaseMiddleware_getAuthType(t *testing.T) {
 	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
 	spec.AuthConfigs = map[string]apidef.AuthConfig{
