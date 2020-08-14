@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/xml"
+	"net/http"
 	"text/template"
 
 	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
@@ -465,28 +466,18 @@ type APIDefinition struct {
 	DontSetQuotasOnCreate     bool                   `mapstructure:"dont_set_quota_on_create" bson:"dont_set_quota_on_create" json:"dont_set_quota_on_create"`
 	ExpireAnalyticsAfter      int64                  `mapstructure:"expire_analytics_after" bson:"expire_analytics_after" json:"expire_analytics_after"` // must have an expireAt TTL index set (http://docs.mongodb.org/manual/tutorial/expire-data/)
 	ResponseProcessors        []ResponseProcessor    `bson:"response_processors" json:"response_processors"`
-	CORS                      struct {
-		Enable             bool     `bson:"enable" json:"enable"`
-		AllowedOrigins     []string `bson:"allowed_origins" json:"allowed_origins"`
-		AllowedMethods     []string `bson:"allowed_methods" json:"allowed_methods"`
-		AllowedHeaders     []string `bson:"allowed_headers" json:"allowed_headers"`
-		ExposedHeaders     []string `bson:"exposed_headers" json:"exposed_headers"`
-		AllowCredentials   bool     `bson:"allow_credentials" json:"allow_credentials"`
-		MaxAge             int      `bson:"max_age" json:"max_age"`
-		OptionsPassthrough bool     `bson:"options_passthrough" json:"options_passthrough"`
-		Debug              bool     `bson:"debug" json:"debug"`
-	} `bson:"CORS" json:"CORS"`
-	Domain                  string                 `bson:"domain" json:"domain"`
-	Certificates            []string               `bson:"certificates" json:"certificates"`
-	DoNotTrack              bool                   `bson:"do_not_track" json:"do_not_track"`
-	Tags                    []string               `bson:"tags" json:"tags"`
-	EnableContextVars       bool                   `bson:"enable_context_vars" json:"enable_context_vars"`
-	ConfigData              map[string]interface{} `bson:"config_data" json:"config_data"`
-	TagHeaders              []string               `bson:"tag_headers" json:"tag_headers"`
-	GlobalRateLimit         GlobalRateLimit        `bson:"global_rate_limit" json:"global_rate_limit"`
-	StripAuthData           bool                   `bson:"strip_auth_data" json:"strip_auth_data"`
-	EnableDetailedRecording bool                   `bson:"enable_detailed_recording" json:"enable_detailed_recording"`
-	GraphQL                 GraphQLConfig          `bson:"graphql" json:"graphql"`
+	CORS                      CORSConfig             `bson:"CORS" json:"CORS"`
+	Domain                    string                 `bson:"domain" json:"domain"`
+	Certificates              []string               `bson:"certificates" json:"certificates"`
+	DoNotTrack                bool                   `bson:"do_not_track" json:"do_not_track"`
+	Tags                      []string               `bson:"tags" json:"tags"`
+	EnableContextVars         bool                   `bson:"enable_context_vars" json:"enable_context_vars"`
+	ConfigData                map[string]interface{} `bson:"config_data" json:"config_data"`
+	TagHeaders                []string               `bson:"tag_headers" json:"tag_headers"`
+	GlobalRateLimit           GlobalRateLimit        `bson:"global_rate_limit" json:"global_rate_limit"`
+	StripAuthData             bool                   `bson:"strip_auth_data" json:"strip_auth_data"`
+	EnableDetailedRecording   bool                   `bson:"enable_detailed_recording" json:"enable_detailed_recording"`
+	GraphQL                   GraphQLConfig          `bson:"graphql" json:"graphql"`
 }
 
 type AuthConfig struct {
@@ -529,6 +520,18 @@ type RequestSigningMeta struct {
 	HeaderList      []string `bson:"header_list" json:"header_list"`
 	CertificateId   string   `bson:"certificate_id" json:"certificate_id"`
 	SignatureHeader string   `bson:"signature_header" json:"signature_header"`
+}
+
+type CORSConfig struct {
+	Enable             bool     `bson:"enable" json:"enable"`
+	AllowedOrigins     []string `bson:"allowed_origins" json:"allowed_origins"`
+	AllowedMethods     []string `bson:"allowed_methods" json:"allowed_methods"`
+	AllowedHeaders     []string `bson:"allowed_headers" json:"allowed_headers"`
+	ExposedHeaders     []string `bson:"exposed_headers" json:"exposed_headers"`
+	AllowCredentials   bool     `bson:"allow_credentials" json:"allow_credentials"`
+	MaxAge             int      `bson:"max_age" json:"max_age"`
+	OptionsPassthrough bool     `bson:"options_passthrough" json:"options_passthrough"`
+	Debug              bool     `bson:"debug" json:"debug"`
 }
 
 // GraphQLConfig is the root config object for a GraphQL API.
@@ -826,6 +829,13 @@ func DummyAPI() APIDefinition {
 		},
 	}
 
+	defaultCORSConfig := CORSConfig{
+		Enable:         false,
+		AllowedOrigins: []string{"*"},
+		AllowedMethods: []string{http.MethodGet, http.MethodPost, http.MethodHead},
+		AllowedHeaders: []string{"Origin", "Accept", "Content-Type", "X-Requested-With", "Authorization"},
+	}
+
 	graphql := GraphQLConfig{
 		Enabled:          false,
 		ExecutionMode:    GraphQLExecutionModeProxyOnly,
@@ -853,6 +863,7 @@ func DummyAPI() APIDefinition {
 				ExtractorConfig: map[string]interface{}{},
 			},
 		},
+		CORS:    defaultCORSConfig,
 		Tags:    []string{},
 		GraphQL: graphql,
 	}
