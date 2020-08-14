@@ -1185,6 +1185,24 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 			})
 	})
 
+	t.Run("Request with a wrong scope in JWT and then correct scope", func(t *testing.T) {
+
+		jwtTokenWrongScope := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["user_id"] = userID
+			t.Claims.(jwt.MapClaims)["scope"] = "nonexisting"
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
+		})
+
+		authHeadersWithWrongScope := map[string]string{"authorization": jwtTokenWrongScope}
+
+		_, _ = ts.Run(t, []test.TestCase{
+			// Make consecutively to check whether caching becomes a problem
+			{Path: "/base", Headers: authHeadersWithWrongScope, BodyMatch: "no matching policy found in scope claim", Code: http.StatusForbidden},
+			{Path: "/base", Headers: authHeaders, Code: http.StatusOK},
+			{Path: "/base", Headers: authHeadersWithWrongScope, BodyMatch: "no matching policy found in scope claim", Code: http.StatusForbidden},
+		}...)
+	})
+
 	// check that key has right set of policies assigned - there should be updated list (base one and one from scope)
 	t.Run("Request to check that session has got changed apply_policies value", func(t *testing.T) {
 		ts.Run(
