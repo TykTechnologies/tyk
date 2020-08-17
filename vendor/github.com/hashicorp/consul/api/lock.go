@@ -156,7 +156,7 @@ func (l *Lock) Lock(stopCh <-chan struct{}) (<-chan struct{}, error) {
 		// If we fail to acquire the lock, cleanup the session
 		defer func() {
 			if !l.isHeld {
-				close(l.g)
+				close(l.sessionRenew)
 				l.sessionRenew = nil
 			}
 		}()
