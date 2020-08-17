@@ -427,25 +427,7 @@ type APIDefinition struct {
 			RecheckWait                int                           `bson:"recheck_wait" json:"recheck_wait"`
 		} `bson:"config" json:"config"`
 	} `bson:"uptime_tests" json:"uptime_tests"`
-	Proxy struct {
-		PreserveHostHeader          bool                          `bson:"preserve_host_header" json:"preserve_host_header"`
-		ListenPath                  string                        `bson:"listen_path" json:"listen_path"`
-		TargetURL                   string                        `bson:"target_url" json:"target_url"`
-		DisableStripSlash           bool                          `bson:"disable_strip_slash" json:"disable_strip_slash"`
-		StripListenPath             bool                          `bson:"strip_listen_path" json:"strip_listen_path"`
-		EnableLoadBalancing         bool                          `bson:"enable_load_balancing" json:"enable_load_balancing"`
-		Targets                     []string                      `bson:"target_list" json:"target_list"`
-		StructuredTargetList        *HostList                     `bson:"-" json:"-"`
-		CheckHostAgainstUptimeTests bool                          `bson:"check_host_against_uptime_tests" json:"check_host_against_uptime_tests"`
-		ServiceDiscovery            ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
-		Transport                   struct {
-			SSLInsecureSkipVerify   bool     `bson:"ssl_insecure_skip_verify" json:"ssl_insecure_skip_verify"`
-			SSLCipherSuites         []string `bson:"ssl_ciphers" json:"ssl_ciphers"`
-			SSLMinVersion           uint16   `bson:"ssl_min_version" json:"ssl_min_version"`
-			SSLForceCommonNameCheck bool     `json:"ssl_force_common_name_check"`
-			ProxyURL                string   `bson:"proxy_url" json:"proxy_url"`
-		} `bson:"transport" json:"transport"`
-	} `bson:"proxy" json:"proxy"`
+	Proxy                     ProxyConfig            `bson:"proxy" json:"proxy"`
 	DisableRateLimit          bool                   `bson:"disable_rate_limit" json:"disable_rate_limit"`
 	DisableQuota              bool                   `bson:"disable_quota" json:"disable_quota"`
 	CustomMiddleware          MiddlewareSection      `bson:"custom_middleware" json:"custom_middleware"`
@@ -529,6 +511,26 @@ type RequestSigningMeta struct {
 	HeaderList      []string `bson:"header_list" json:"header_list"`
 	CertificateId   string   `bson:"certificate_id" json:"certificate_id"`
 	SignatureHeader string   `bson:"signature_header" json:"signature_header"`
+}
+
+type ProxyConfig struct {
+	PreserveHostHeader          bool                          `bson:"preserve_host_header" json:"preserve_host_header"`
+	ListenPath                  string                        `bson:"listen_path" json:"listen_path"`
+	TargetURL                   string                        `bson:"target_url" json:"target_url"`
+	DisableStripSlash           bool                          `bson:"disable_strip_slash" json:"disable_strip_slash"`
+	StripListenPath             bool                          `bson:"strip_listen_path" json:"strip_listen_path"`
+	EnableLoadBalancing         bool                          `bson:"enable_load_balancing" json:"enable_load_balancing"`
+	Targets                     []string                      `bson:"target_list" json:"target_list"`
+	StructuredTargetList        *HostList                     `bson:"-" json:"-"`
+	CheckHostAgainstUptimeTests bool                          `bson:"check_host_against_uptime_tests" json:"check_host_against_uptime_tests"`
+	ServiceDiscovery            ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
+	Transport                   struct {
+		SSLInsecureSkipVerify   bool     `bson:"ssl_insecure_skip_verify" json:"ssl_insecure_skip_verify"`
+		SSLCipherSuites         []string `bson:"ssl_ciphers" json:"ssl_ciphers"`
+		SSLMinVersion           uint16   `bson:"ssl_min_version" json:"ssl_min_version"`
+		SSLForceCommonNameCheck bool     `json:"ssl_force_common_name_check"`
+		ProxyURL                string   `bson:"proxy_url" json:"proxy_url"`
+	} `bson:"transport" json:"transport"`
 }
 
 // GraphQLConfig is the root config object for a GraphQL API.
@@ -852,6 +854,9 @@ func DummyAPI() APIDefinition {
 			IdExtractor: MiddlewareIdExtractor{
 				ExtractorConfig: map[string]interface{}{},
 			},
+		},
+		Proxy: ProxyConfig{
+			DisableStripSlash: true,
 		},
 		Tags:    []string{},
 		GraphQL: graphql,
