@@ -512,7 +512,7 @@ func CreateSession(sGen ...func(s *user.SessionState)) string {
 
 func CreateStandardSession() *user.SessionState {
 	session := new(user.SessionState)
-	session.SetRate( 10000)
+	session.SetRate(10000)
 	session.SetAllowance(session.GetRate())
 	session.SetLastCheck(time.Now().Unix())
 	session.SetPer(60)

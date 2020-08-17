@@ -71,36 +71,36 @@ type Monitor struct {
 //
 // swagger:model
 type SessionState struct {
-	Mutex sync.RWMutex
-	LastCheck          int64                       `json:"last_check" msg:"last_check"`
-	Allowance          float64                     `json:"allowance" msg:"allowance"`
-	Rate               float64                     `json:"rate" msg:"rate"`
-	Per                float64                     `json:"per" msg:"per"`
-	ThrottleInterval   float64                     `json:"throttle_interval" msg:"throttle_interval"`
-	ThrottleRetryLimit int                         `json:"throttle_retry_limit" msg:"throttle_retry_limit"`
-	MaxQueryDepth      int                         `json:"max_query_depth" msg:"max_query_depth"`
-	DateCreated        time.Time                   `json:"date_created" msg:"date_created"`
-	Expires            int64                       `json:"expires" msg:"expires"`
-	QuotaMax           int64                       `json:"quota_max" msg:"quota_max"`
-	QuotaRenews        int64                       `json:"quota_renews" msg:"quota_renews"`
-	QuotaRemaining     int64                       `json:"quota_remaining" msg:"quota_remaining"`
-	QuotaRenewalRate   int64                       `json:"quota_renewal_rate" msg:"quota_renewal_rate"`
-	AccessRights       map[string]AccessDefinition `json:"access_rights" msg:"access_rights"`
-	OrgID              string                      `json:"org_id" msg:"org_id"`
-	OauthClientID      string                      `json:"oauth_client_id" msg:"oauth_client_id"`
-	OauthKeys          map[string]string           `json:"oauth_keys" msg:"oauth_keys"`
-	Certificate        string                      `json:"certificate" msg:"certificate"`
-	BasicAuthData      BasicAuthData			   `json:"basic_auth_data" msg:"basic_auth_data"`
-	JWTData  		   JWTData					   `json:"jwt_data" msg:"jwt_data"`
-	HMACEnabled                   bool     `json:"hmac_enabled" msg:"hmac_enabled"`
-	EnableHTTPSignatureValidation bool     `json:"enable_http_signature_validation" msg:"enable_http_signature_validation"`
-	HmacSecret                    string   `json:"hmac_string" msg:"hmac_string"`
-	RSACertificateId              string   `json:"rsa_certificate_id" msg:"rsa_certificate_id"`
-	IsInactive                    bool     `json:"is_inactive" msg:"is_inactive"`
-	ApplyPolicyID                 string   `json:"apply_policy_id" msg:"apply_policy_id"`
-	ApplyPolicies                 []string `json:"apply_policies" msg:"apply_policies"`
-	DataExpires                   int64    `json:"data_expires" msg:"data_expires"`
-	Monitor                       Monitor  `json:"monitor" msg:"monitor"`
+	Mutex                         sync.RWMutex
+	LastCheck                     int64                       `json:"last_check" msg:"last_check"`
+	Allowance                     float64                     `json:"allowance" msg:"allowance"`
+	Rate                          float64                     `json:"rate" msg:"rate"`
+	Per                           float64                     `json:"per" msg:"per"`
+	ThrottleInterval              float64                     `json:"throttle_interval" msg:"throttle_interval"`
+	ThrottleRetryLimit            int                         `json:"throttle_retry_limit" msg:"throttle_retry_limit"`
+	MaxQueryDepth                 int                         `json:"max_query_depth" msg:"max_query_depth"`
+	DateCreated                   time.Time                   `json:"date_created" msg:"date_created"`
+	Expires                       int64                       `json:"expires" msg:"expires"`
+	QuotaMax                      int64                       `json:"quota_max" msg:"quota_max"`
+	QuotaRenews                   int64                       `json:"quota_renews" msg:"quota_renews"`
+	QuotaRemaining                int64                       `json:"quota_remaining" msg:"quota_remaining"`
+	QuotaRenewalRate              int64                       `json:"quota_renewal_rate" msg:"quota_renewal_rate"`
+	AccessRights                  map[string]AccessDefinition `json:"access_rights" msg:"access_rights"`
+	OrgID                         string                      `json:"org_id" msg:"org_id"`
+	OauthClientID                 string                      `json:"oauth_client_id" msg:"oauth_client_id"`
+	OauthKeys                     map[string]string           `json:"oauth_keys" msg:"oauth_keys"`
+	Certificate                   string                      `json:"certificate" msg:"certificate"`
+	BasicAuthData                 BasicAuthData               `json:"basic_auth_data" msg:"basic_auth_data"`
+	JWTData                       JWTData                     `json:"jwt_data" msg:"jwt_data"`
+	HMACEnabled                   bool                        `json:"hmac_enabled" msg:"hmac_enabled"`
+	EnableHTTPSignatureValidation bool                        `json:"enable_http_signature_validation" msg:"enable_http_signature_validation"`
+	HmacSecret                    string                      `json:"hmac_string" msg:"hmac_string"`
+	RSACertificateId              string                      `json:"rsa_certificate_id" msg:"rsa_certificate_id"`
+	IsInactive                    bool                        `json:"is_inactive" msg:"is_inactive"`
+	ApplyPolicyID                 string                      `json:"apply_policy_id" msg:"apply_policy_id"`
+	ApplyPolicies                 []string                    `json:"apply_policies" msg:"apply_policies"`
+	DataExpires                   int64                       `json:"data_expires" msg:"data_expires"`
+	Monitor                       Monitor                     `json:"monitor" msg:"monitor"`
 	// Deprecated: EnableDetailRecording is deprecated. Use EnableDetailedRecording
 	// going forward instead
 	EnableDetailRecording   bool                   `json:"enable_detail_recording" msg:"enable_detail_recording"`
@@ -115,7 +115,6 @@ type SessionState struct {
 	// Used to store token hash
 	keyHash string
 }
-
 
 func (s *SessionState) SetLastCheck(lastCheck int64) {
 	s.Mutex.Lock()
@@ -243,13 +242,13 @@ func (s *SessionState) SetBasicAuthData(data BasicAuthData) {
 	s.Mutex.Unlock()
 }
 
-func (s *SessionState) SetBasicAuthDataPassword(password string){
+func (s *SessionState) SetBasicAuthDataPassword(password string) {
 	s.Mutex.Lock()
 	s.BasicAuthData.Password = password
 	s.Mutex.Unlock()
 }
 
-func (s *SessionState) SetBasicAuthDataHash(hash HashType){
+func (s *SessionState) SetBasicAuthDataHash(hash HashType) {
 	s.Mutex.Lock()
 	s.BasicAuthData.Hash = hash
 	s.Mutex.Unlock()
@@ -402,159 +401,158 @@ func (s *SessionState) Lifetime(fallback int64) int64 {
 	return 0
 }
 
-func (s *SessionState) GetLastCheck ()(lastCheck int64){
+func (s *SessionState) GetLastCheck() (lastCheck int64) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.LastCheck
 }
 
-func (s *SessionState) GetAllowance()(allowance float64){
+func (s *SessionState) GetAllowance() (allowance float64) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.Allowance
 }
 
-func (s *SessionState) GetRate()(rate float64){
+func (s *SessionState) GetRate() (rate float64) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.Rate
 }
 
-func (s *SessionState) GetPer()(per float64){
+func (s *SessionState) GetPer() (per float64) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.Per
 }
 
-func (s *SessionState) GetThrottleInterval()(throttleInterval float64){
+func (s *SessionState) GetThrottleInterval() (throttleInterval float64) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.ThrottleInterval
 }
 
-func (s *SessionState) GetThrottleRetryLimit()(throttleRetryLimit int){
+func (s *SessionState) GetThrottleRetryLimit() (throttleRetryLimit int) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.ThrottleRetryLimit
 }
 
-func (s *SessionState) GetMaxQueryDepth()(maxQueryDepth int){
+func (s *SessionState) GetMaxQueryDepth() (maxQueryDepth int) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.MaxQueryDepth
 }
 
-func (s *SessionState) GetDateCreated()(dateCreated time.Time){
+func (s *SessionState) GetDateCreated() (dateCreated time.Time) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.DateCreated
 }
 
-func (s *SessionState) GetExpires()(expires int64){
+func (s *SessionState) GetExpires() (expires int64) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.Expires
 }
 
-func (s *SessionState) GetQuotaMax()(quotaMax int64){
+func (s *SessionState) GetQuotaMax() (quotaMax int64) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.QuotaMax
 }
 
-func (s *SessionState) GetQuotaRenews()(quotaRenews int64){
+func (s *SessionState) GetQuotaRenews() (quotaRenews int64) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.QuotaRenews
 }
 
-func (s *SessionState) GetQuotaRemaining()(quotaRemaining int64){
+func (s *SessionState) GetQuotaRemaining() (quotaRemaining int64) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.QuotaRemaining
 }
 
-func (s *SessionState) GetQuotaRenewalRate()(renewalRate int64){
+func (s *SessionState) GetQuotaRenewalRate() (renewalRate int64) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.QuotaRenewalRate
 }
 
-func (s *SessionState) GetAccessRights()(AccessRights map[string]AccessDefinition){
+func (s *SessionState) GetAccessRights() (AccessRights map[string]AccessDefinition) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.AccessRights
 }
 
-func (s *SessionState) GetAccessRightByAPIID(key string)(AccessRight AccessDefinition,found bool){
+func (s *SessionState) GetAccessRightByAPIID(key string) (AccessRight AccessDefinition, found bool) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	accessRight, found := s.AccessRights[key]
 	return accessRight, found
 }
 
-
-func (s *SessionState) GetOrgID()(orgId string){
+func (s *SessionState) GetOrgID() (orgId string) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.OrgID
 }
 
-func (s *SessionState) GetOauthClientID()(oauthClientID string){
+func (s *SessionState) GetOauthClientID() (oauthClientID string) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.OauthClientID
 }
 
-func (s *SessionState) GetOauthKeys()(oauthKeys map[string]string){
+func (s *SessionState) GetOauthKeys() (oauthKeys map[string]string) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.OauthKeys
 }
 
-func (s *SessionState) GetCertificate()(certificate string){
+func (s *SessionState) GetCertificate() (certificate string) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.Certificate
 }
 
-func (s *SessionState) GetBasicAuthData()(basicAuthData BasicAuthData){
+func (s *SessionState) GetBasicAuthData() (basicAuthData BasicAuthData) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.BasicAuthData
 }
 
-func (s *SessionState) GetJWTData()(jwtData JWTData){
+func (s *SessionState) GetJWTData() (jwtData JWTData) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.JWTData
 }
 
-func (s *SessionState) GetHMACEnabled()(hmacEnabled bool){
+func (s *SessionState) GetHMACEnabled() (hmacEnabled bool) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.HMACEnabled
 }
 
-func (s *SessionState) GetEnableHTTPSignatureValidation()(enableHTTPSignatureValidation bool){
+func (s *SessionState) GetEnableHTTPSignatureValidation() (enableHTTPSignatureValidation bool) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.EnableHTTPSignatureValidation
 }
 
-func (s *SessionState) GetHmacSecret()(hmacSecret string){
+func (s *SessionState) GetHmacSecret() (hmacSecret string) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.HmacSecret
 }
 
-func (s *SessionState) GetRSACertificateId()(rsaCertificateId string){
+func (s *SessionState) GetRSACertificateId() (rsaCertificateId string) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.RSACertificateId
 }
 
-func (s *SessionState) GetIsInactive()(isInactive bool){
+func (s *SessionState) GetIsInactive() (isInactive bool) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.IsInactive
@@ -576,81 +574,81 @@ func (s *SessionState) GetPolicyIDs() []string {
 	return nil
 }
 
-func (s *SessionState) GetApplyPolicies()(policies []string){
+func (s *SessionState) GetApplyPolicies() (policies []string) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.ApplyPolicies
 }
 
-func (s *SessionState) GetApplyPolicyID()(policy string){
+func (s *SessionState) GetApplyPolicyID() (policy string) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.ApplyPolicyID
 }
 
-func (s *SessionState) GetDataExpires()(dataExpires int64){
+func (s *SessionState) GetDataExpires() (dataExpires int64) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.DataExpires
 }
 
-func (s *SessionState) GetMonitor()(monitor Monitor){
+func (s *SessionState) GetMonitor() (monitor Monitor) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.Monitor
 }
 
 // Deprecated: EnableDetailedRecording is deprecated
-func (s *SessionState) GetEnableDetailRecording()(enableDetailRecording bool){
+func (s *SessionState) GetEnableDetailRecording() (enableDetailRecording bool) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.EnableDetailRecording
 }
 
-func (s *SessionState) GetEnableDetailedRecording()(enableDetailedRecording bool){
+func (s *SessionState) GetEnableDetailedRecording() (enableDetailedRecording bool) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.EnableDetailedRecording
 }
 
-func (s *SessionState) GetMetaData()(metaData map[string]interface{}){
+func (s *SessionState) GetMetaData() (metaData map[string]interface{}) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.MetaData
 }
 
-func (s *SessionState) GetMetaDataByKey(key string)(metaData interface{}, found bool){
+func (s *SessionState) GetMetaDataByKey(key string) (metaData interface{}, found bool) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	value, ok := s.MetaData[key]
 	return value, ok
 }
 
-func (s *SessionState) GetTags()(tags []string){
+func (s *SessionState) GetTags() (tags []string) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.Tags
 }
 
-func (s *SessionState) GetAlias()(alias string){
+func (s *SessionState) GetAlias() (alias string) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.Alias
 }
 
-func (s *SessionState) GetLastUpdated()(lastUpdated string){
+func (s *SessionState) GetLastUpdated() (lastUpdated string) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.LastUpdated
 }
 
-func (s *SessionState) GetIdExtractorDeadline()(idExtractorDeadline int64){
+func (s *SessionState) GetIdExtractorDeadline() (idExtractorDeadline int64) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.IdExtractorDeadline
 }
 
-func (s *SessionState) GetSessionLifetime()(sessionLifeTime int64){
+func (s *SessionState) GetSessionLifetime() (sessionLifeTime int64) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.SessionLifetime
@@ -659,7 +657,7 @@ func (s *SessionState) GetSessionLifetime()(sessionLifeTime int64){
 func (s *SessionState) MD5Hash() string {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
-	return fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf( "%+v", s))))
+	return fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%+v", s))))
 }
 
 func (s *SessionState) GetKeyHash() string {

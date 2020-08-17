@@ -47,7 +47,7 @@ func createNonThrottledSession() *user.SessionState {
 	session.SetQuotaRenewalRate(300) // 5 minutes
 	session.SetQuotaRenews(time.Now().Unix())
 	session.SetQuotaRemaining(10)
-	session.SetQuotaMax( 10)
+	session.SetQuotaMax(10)
 	session.SetAlias("TEST-ALIAS")
 	return session
 }
@@ -1286,8 +1286,8 @@ func TestCacheAllSafeRequestsWithCachedHeaders(t *testing.T) {
 
 	headerCache := map[string]string{"x-tyk-cached-response": "1"}
 	sess1token := CreateSession(func(s *user.SessionState) {
-		s.SetRate( 1)
-		s.SetPer( 60)
+		s.SetRate(1)
+		s.SetPer(60)
 	})
 	sess2token := CreateSession(func(s *user.SessionState) {
 		s.SetRate(1)

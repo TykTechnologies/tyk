@@ -440,7 +440,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 		// If the returned object contains metadata, add them to the session:
 		for k, v := range returnObject.Metadata {
-			returnedSession.AppendMetaData(k,string(v))
+			returnedSession.AppendMetaData(k, string(v))
 		}
 
 		returnedSession.SetOrgID(m.Spec.OrgID)

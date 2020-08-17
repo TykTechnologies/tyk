@@ -245,7 +245,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 
 	if enableQ {
 		if globalConf.LegacyEnableAllowanceCountdown {
-			currentSession.SetAllowance(currentSession.GetAllowance()-1)
+			currentSession.SetAllowance(currentSession.GetAllowance() - 1)
 		}
 
 		if l.RedisQuotaExceeded(r, currentSession, allowanceScope, apiLimit, store) {

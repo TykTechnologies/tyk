@@ -54,7 +54,7 @@ func createHMACAuthSession() *user.SessionState {
 	session.SetAllowance(session.GetRate())
 	session.SetLastCheck(time.Now().Unix())
 	session.SetPer(1.0)
-	session.SetQuotaRenewalRate(300 )// 5 minutes
+	session.SetQuotaRenewalRate(300) // 5 minutes
 	session.SetQuotaRenews(time.Now().Unix() + 20)
 	session.SetQuotaRemaining(1)
 	session.SetQuotaMax(-1)

@@ -413,7 +413,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 
 				if session.GetBasicAuthData().Hash == user.HashPlainText &&
 					session.GetBasicAuthData().Password == password {
-						passMatch = true
+					passMatch = true
 				}
 
 				if passMatch {
