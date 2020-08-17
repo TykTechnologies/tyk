@@ -52,7 +52,7 @@ func MyPluginPostKeyAuth(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rw.Header().Add(headers.XSessionAlias, session.Alias)
+	rw.Header().Add(headers.XSessionAlias, session.GetAlias())
 }
 
 // MyPluginPost prepares and sends reply, will be used as "post" custom MW

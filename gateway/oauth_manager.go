@@ -404,32 +404,32 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 				log.Warning("Attempted access with non-existent user (OAuth password flow).")
 			} else {
 				var passMatch bool
-				if session.BasicAuthData.Hash == user.HashBCrypt {
-					err := bcrypt.CompareHashAndPassword([]byte(session.BasicAuthData.Password), []byte(password))
+				if session.GetBasicAuthData().Hash == user.HashBCrypt {
+					err := bcrypt.CompareHashAndPassword([]byte(session.GetBasicAuthData().Password), []byte(password))
 					if err == nil {
 						passMatch = true
 					}
 				}
 
-				if session.BasicAuthData.Hash == user.HashPlainText &&
-					session.BasicAuthData.Password == password {
-					passMatch = true
+				if session.GetBasicAuthData().Hash == user.HashPlainText &&
+					session.GetBasicAuthData().Password == password {
+						passMatch = true
 				}
 
 				if passMatch {
 					log.Info("Here we are")
 					ar.Authorized = true
 					// not ideal, but we need to copy the session state across
-					pw := session.BasicAuthData.Password
-					hs := session.BasicAuthData.Hash
+					pw := session.GetBasicAuthData().Password
+					hs := session.GetBasicAuthData().Hash
 
-					session.BasicAuthData.Password = ""
-					session.BasicAuthData.Hash = ""
+					session.SetBasicAuthDataPassword("")
+					session.SetBasicAuthDataHash("")
 					asString, _ := json.Marshal(session)
 					ar.UserData = string(asString)
 
-					session.BasicAuthData.Password = pw
-					session.BasicAuthData.Hash = hs
+					session.SetBasicAuthDataPassword(pw)
+					session.SetBasicAuthDataHash(hs)
 
 					//log.Warning("Old Keys: ", session.OauthKeys)
 				}
@@ -440,9 +440,9 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 		}
 
 		// Does the user have an old OAuth token for this client?
-		if session != nil && session.OauthKeys != nil {
+		if session != nil && session.GetOauthKeys() != nil {
 			log.Debug("There's keys here bill...")
-			oldToken, foundKey := session.OauthKeys[ar.Client.GetId()]
+			oldToken, foundKey := session.GetOauthKeys()[ar.Client.GetId()]
 			if foundKey {
 				log.Info("Found old token, revoking: ", oldToken)
 				GlobalSessionManager.RemoveSession(o.API.OrgID, oldToken, false)
@@ -454,12 +454,12 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 		new_token, foundNewToken := resp.Output["access_token"]
 		if username != "" && foundNewToken {
 			log.Debug("Updating token data in key")
-			if session.OauthKeys == nil {
-				session.OauthKeys = make(map[string]string)
+			if session.GetOauthKeys() == nil {
+				session.SetOauthKeys(make(map[string]string))
 			}
 			session.OauthKeys[ar.Client.GetId()] = new_token.(string)
 			log.Debug("New token: ", new_token.(string))
-			log.Debug("Keys: ", session.OauthKeys)
+			log.Debug("Keys: ", session.GetOauthKeys())
 
 			// add oauth-client user_fields to session's meta
 			if userData := ar.Client.GetUserData(); userData != nil {
@@ -470,10 +470,10 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 						Error("Could not set session meta_data from oauth-client fields, type mismatch")
 				} else {
 					// set session alias to developer email as we do it for regular API keys created for developer
-					if devEmail, found := session.MetaData[keyDataDeveloperEmail].(string); found {
-						session.Alias = devEmail
+					if devEmail, found := session.GetMetaData()[keyDataDeveloperEmail].(string); found {
+						session.SetAlias(devEmail)
 						// we don't need it in meta-data as we set it to alias
-						delete(session.MetaData, keyDataDeveloperEmail)
+						session.RemoveMetaData(keyDataDeveloperEmail)
 					}
 				}
 			}
@@ -976,13 +976,13 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 
 	c, ok := accessData.Client.(*OAuthClient)
 	if ok && c.MetaData != nil {
-		if newSession.MetaData == nil {
-			newSession.MetaData = make(map[string]interface{})
+		if newSession.GetMetaData() == nil {
+			newSession.SetMetaData(make(map[string]interface{}))
 		}
 
 		// Allow session inherit and *override* client values
 		for k, v := range c.MetaData.(map[string]interface{}) {
-			if _, found := newSession.MetaData[k]; !found {
+			if _, found := newSession.GetMetaDataByKey(k); !found {
 				newSession.MetaData[k] = v
 			}
 		}
@@ -1115,7 +1115,7 @@ func (accessTokenGen) GenerateAccessToken(data *osin.AccessData, generaterefresh
 		newSession = sessionFromPolicy
 	}
 
-	accesstoken = keyGen.GenerateAuthKey(newSession.OrgID)
+	accesstoken = keyGen.GenerateAuthKey(newSession.GetOrgID())
 	if generaterefresh {
 		u6 := uuid.NewV4()
 		refreshtoken = base64.StdEncoding.EncodeToString([]byte(u6.String()))

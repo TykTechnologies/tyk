@@ -46,15 +46,15 @@ jQIDAQAB!!!!
 
 func createJWTSession() *user.SessionState {
 	session := new(user.SessionState)
-	session.Rate = 1000000.0
-	session.Allowance = session.Rate
-	session.LastCheck = time.Now().Unix() - 10
-	session.Per = 1.0
-	session.QuotaRenewalRate = 300 // 5 minutes
-	session.QuotaRenews = time.Now().Unix() + 20
-	session.QuotaRemaining = 1
-	session.QuotaMax = -1
-	session.JWTData.Secret = jwtSecret
+	session.SetRate(1000000.0)
+	session.SetAllowance(session.GetRate())
+	session.SetLastCheck(time.Now().Unix() - 10)
+	session.SetPer(1.0)
+	session.SetQuotaRenewalRate(300) // 5 minutes
+	session.SetQuotaRenews(time.Now().Unix() + 20)
+	session.SetQuotaRemaining(1)
+	session.SetQuotaMax(-1)
+	session.SetJWTData(user.JWTData{Secret: jwtSecret})
 	return session
 }
 

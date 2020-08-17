@@ -351,7 +351,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 	})
 
 	session, key := ts.CreateSession(func(s *user.SessionState) {
-		s.ApplyPolicies = []string{pID}
+		s.SetApplyPolicies([]string{pID})
 		s.Tags = []string{"key-tag1", "key-tag2"}
 		s.MetaData = map[string]interface{}{
 			"key-meta1": "key-value1",
@@ -363,7 +363,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 	})
 
 	t.Run("Add policy not enforcing acl", func(t *testing.T) {
-		session.ApplyPolicies = append(session.ApplyPolicies, pID2)
+		session.SetApplyPolicies(append(session.GetApplyPolicies(), pID2))
 		sessionData, _ := json.Marshal(session)
 		path := fmt.Sprintf("/tyk/keys/%s", key)
 
@@ -372,13 +372,14 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 		}...)
 
 		sessionState, found := GlobalSessionManager.SessionDetail("default", key, false)
-		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 2 {
+		accessRight, _ := sessionState.GetAccessRightByAPIID(testAPIID)
+		if !found || accessRight.APIID != testAPIID || len(sessionState.GetApplyPolicies()) != 2 {
 			t.Fatal("Adding policy to the list failed")
 		}
 	})
 
 	t.Run("Remove policy not enforcing acl", func(t *testing.T) {
-		session.ApplyPolicies = []string{}
+		session.SetApplyPolicies([]string{})
 		sessionData, _ := json.Marshal(session)
 		path := fmt.Sprintf("/tyk/keys/%s", key)
 
@@ -387,7 +388,8 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 		}...)
 
 		sessionState, found := GlobalSessionManager.SessionDetail("default", key, false)
-		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 0 {
+		accessRight, _ := sessionState.GetAccessRightByAPIID(testAPIID)
+		if !found || accessRight.APIID != testAPIID || len(sessionState.GetApplyPolicies()) != 0 {
 			t.Fatal("Removing policy from the list failed")
 		}
 	})
@@ -401,7 +403,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 				{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
 			}...)
 
-			sessionState, found := GlobalSessionManager.SessionDetail(session.OrgID, key, false)
+			sessionState, found := GlobalSessionManager.SessionDetail(session.GetOrgID(), key, false)
 
 			sort.Strings(sessionState.Tags)
 			sort.Strings(expected)
@@ -413,21 +415,21 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 
 		t.Run("Add", func(t *testing.T) {
 			expected := []string{"p1-tag", "p2-tag", "key-tag1", "key-tag2"}
-			session.ApplyPolicies = []string{pID, pID2}
+			session.SetApplyPolicies([]string{pID, pID2})
 			assertTags(session, expected)
 		})
 
 		t.Run("Make unique", func(t *testing.T) {
 			expected := []string{"p1-tag", "p2-tag", "key-tag1", "key-tag2"}
-			session.ApplyPolicies = []string{pID, pID2}
-			session.Tags = append(session.Tags, "p1-tag", "key-tag1")
+			session.SetApplyPolicies([]string{pID, pID2})
+			session.SetTags(append(session.GetTags(), "p1-tag", "key-tag1"))
 			assertTags(session, expected)
 		})
 
 		t.Run("Remove", func(t *testing.T) {
 			expected := []string{"p1-tag", "p2-tag", "key-tag2"}
-			session.ApplyPolicies = []string{pID, pID2}
-			session.Tags = []string{"key-tag2"}
+			session.SetApplyPolicies([]string{pID, pID2})
+			session.SetTags([]string{"key-tag2"})
 			assertTags(session, expected)
 		})
 
@@ -442,10 +444,10 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 				{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
 			}...)
 
-			sessionState, found := GlobalSessionManager.SessionDetail(session.OrgID, key, false)
+			sessionState, found := GlobalSessionManager.SessionDetail(session.GetOrgID(), key, false)
 
-			if !found || !reflect.DeepEqual(expected, sessionState.MetaData) {
-				t.Fatalf("Expected %v, returned %v", expected, sessionState.MetaData)
+			if !found || !reflect.DeepEqual(expected, sessionState.GetMetaData()) {
+				t.Fatalf("Expected %v, returned %v", expected, sessionState.GetMetaData())
 			}
 		}
 
@@ -456,7 +458,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 				"key-meta1": "key-value1",
 				"key-meta2": "key-value2",
 			}
-			session.ApplyPolicies = []string{pID, pID2}
+			session.SetApplyPolicies([]string{pID, pID2})
 			assertMetaData(session, expected)
 		})
 
@@ -467,7 +469,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 				"key-meta1": "key-value1",
 				"key-meta2": "key-value2",
 			}
-			session.ApplyPolicies = []string{pID, pID2}
+			session.SetApplyPolicies([]string{pID, pID2})
 			assertMetaData(session, expected)
 		})
 
@@ -477,10 +479,10 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 				"p2-meta":   "p2-value",
 				"key-meta2": "key-value2",
 			}
-			session.ApplyPolicies = []string{pID, pID2}
-			session.MetaData = map[string]interface{}{
+			session.SetApplyPolicies([]string{pID, pID2})
+			session.SetMetaData(map[string]interface{}{
 				"key-meta2": "key-value2",
-			}
+			})
 			assertMetaData(session, expected)
 		})
 	})
@@ -521,7 +523,7 @@ func TestKeyHandler_CheckKeysNotDuplicateOnUpdate(t *testing.T) {
 
 			keyName := tc.KeyName
 			if !tc.IsCustomKey {
-				keyName = generateToken(session.OrgID, "")
+				keyName = generateToken(session.GetOrgID(), "")
 			}
 
 			if err := doAddOrUpdate(keyName, session, false, true); err != nil {

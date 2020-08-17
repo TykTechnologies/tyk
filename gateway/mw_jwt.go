@@ -170,7 +170,7 @@ func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.T
 	if !rawKeyExists {
 		return nil, errors.New("token invalid, key not found")
 	}
-	return []byte(session.JWTData.Secret), nil
+	return []byte(session.GetJWTData().Secret), nil
 }
 
 func (k *JWTMiddleware) getPolicyIDFromToken(claims jwt.MapClaims) (string, bool) {
@@ -205,7 +205,7 @@ func (k *JWTMiddleware) getBasePolicyID(r *http.Request, claims jwt.MapClaims) (
 			return
 		}
 
-		pols := clientSession.PolicyIDs()
+		pols := clientSession.GetPolicyIDs()
 		if len(pols) < 1 {
 			return
 		}
@@ -325,8 +325,8 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		// If base policy is one of the defaults, apply other ones as well
 		if isDefaultPol {
 			for _, pol := range k.Spec.JWTDefaultPolicies {
-				if !contains(session.ApplyPolicies, pol) {
-					session.ApplyPolicies = append(session.ApplyPolicies, pol)
+				if !contains(session.GetApplyPolicies(), pol) {
+					session.SetApplyPolicies(append(session.GetApplyPolicies(), pol))
 				}
 			}
 		}
@@ -343,13 +343,13 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 
 		//override session expiry with JWT if longer lived
 		if f, ok := claims["exp"].(float64); ok {
-			if int64(f)-session.Expires > 0 {
-				session.Expires = int64(f)
+			if int64(f)-session.GetExpires() > 0 {
+				session.SetExpires(int64(f))
 			}
 		}
 
-		session.MetaData = map[string]interface{}{"TykJWTSessionID": sessionID}
-		session.Alias = baseFieldData
+		session.SetMetaData(map[string]interface{}{"TykJWTSessionID": sessionID})
+		session.SetAlias(baseFieldData)
 
 		// Update the session in the session manager in case it gets called again
 		updateSession = true
@@ -376,7 +376,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			return errors.New("key not authorized: no matching policy"), http.StatusForbidden
 		}
 		// check if token for this session was switched to another valid policy
-		pols := session.PolicyIDs()
+		pols := session.GetPolicyIDs()
 		if len(pols) == 0 {
 			k.reportLoginFailure(baseFieldData, r)
 			k.Logger().Error("No policies for the found session. Failing Request.")
@@ -388,14 +388,14 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		if isDefaultPol {
 			// check a policy is removed/added from/to default policies
 
-			for _, pol := range session.PolicyIDs() {
+			for _, pol := range session.GetPolicyIDs() {
 				if !contains(k.Spec.JWTDefaultPolicies, pol) && basePolicyID != pol {
 					defaultPolicyListChanged = true
 				}
 			}
 
 			for _, defPol := range k.Spec.JWTDefaultPolicies {
-				if !contains(session.PolicyIDs(), defPol) {
+				if !contains(session.GetPolicyIDs(), defPol) {
 					defaultPolicyListChanged = true
 				}
 			}
@@ -413,8 +413,8 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 
 			if isDefaultPol {
 				for _, pol := range k.Spec.JWTDefaultPolicies {
-					if !contains(session.ApplyPolicies, pol) {
-						session.ApplyPolicies = append(session.ApplyPolicies, pol)
+					if !contains(session.GetApplyPolicies(), pol) {
+						session.SetApplyPolicies(append(session.GetApplyPolicies(), pol))
 					}
 				}
 			}
@@ -428,8 +428,8 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 
 		//override session expiry with JWT if longer lived
 		if f, ok := claims["exp"].(float64); ok {
-			if int64(f)-session.Expires > 0 {
-				session.Expires = int64(f)
+			if int64(f)-session.GetExpires() > 0 {
+				session.SetExpires(int64(f))
 				updateSession = true
 			}
 		}
@@ -479,7 +479,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		ctxSetSession(r, &session, sessionID, updateSession)
 
 		if updateSession {
-			SessionCache.Set(session.KeyHash(), session, cache.DefaultExpiration)
+			SessionCache.Set(session.GetKeyHash(), session, cache.DefaultExpiration)
 		}
 	}
 	ctxSetJWTContextVars(k.Spec, r, token)

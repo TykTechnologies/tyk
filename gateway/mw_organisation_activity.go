@@ -95,7 +95,7 @@ func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Requ
 func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession user.SessionState) (error, int) {
 	logger := k.Logger()
 
-	if orgSession.IsInactive {
+	if orgSession.GetIsInactive() {
 		logger.Warning("Organisation access is disabled.")
 
 		return errors.New("this organisation access has been disabled, please contact your API administrator"), http.StatusForbidden
@@ -107,7 +107,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession use
 		&orgSession,
 		k.Spec.OrgID,
 		k.Spec.OrgSessionManager.Store(),
-		orgSession.Per > 0 && orgSession.Rate > 0,
+		orgSession.GetPer() > 0 && orgSession.GetRate() > 0,
 		true,
 		&k.Spec.GlobalConfig,
 		k.Spec.APIID,
@@ -226,7 +226,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 
 	// Is it active?
 	logEntry := getExplicitLogEntryForRequest(k.Logger(), path, IP, k.Spec.OrgID, nil)
-	if session.IsInactive {
+	if session.GetIsInactive() {
 		logEntry.Warning("Organisation access is disabled.")
 		orgChan <- false
 		return
@@ -238,7 +238,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 		session,
 		k.Spec.OrgID,
 		k.Spec.OrgSessionManager.Store(),
-		session.Per > 0 && session.Rate > 0,
+		session.GetPer() > 0 && session.GetRate() > 0,
 		true,
 		&k.Spec.GlobalConfig,
 		k.Spec.APIID,

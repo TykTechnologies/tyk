@@ -450,8 +450,8 @@ func TestWithURLRewrite(t *testing.T) {
 	secret := "12345"
 
 	sessionKey := CreateSession(func(session *user.SessionState) {
-		session.EnableHTTPSignatureValidation = true
-		session.HmacSecret = secret
+		session.SetEnableHTTPSignatureValidation(true)
+		session.SetHmacSecret(secret)
 	})
 
 	t.Run("looping", func(t *testing.T) {

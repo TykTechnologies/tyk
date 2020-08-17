@@ -298,13 +298,13 @@ func (hm *HTTPSignatureValidationMiddleware) getSecretAndSessionForKeyID(r *http
 		return "", session, errors.New("Key ID does not exist")
 	}
 
-	if session.HmacSecret == "" || !session.HMACEnabled && !session.EnableHTTPSignatureValidation {
+	if session.GetHmacSecret() == "" || !session.GetHMACEnabled() && !session.GetEnableHTTPSignatureValidation() {
 		hm.Logger().Info("API Requires HMAC signature, session missing HMACSecret or HMAC not enabled for key")
 
 		return "", session, errors.New("This key ID is invalid")
 	}
 
-	return session.HmacSecret, session, nil
+	return session.GetHmacSecret(), session, nil
 }
 
 func (hm *HTTPSignatureValidationMiddleware) getRSACertificateIdAndSessionForKeyID(r *http.Request, keyId string) (string, user.SessionState, error) {
@@ -313,12 +313,12 @@ func (hm *HTTPSignatureValidationMiddleware) getRSACertificateIdAndSessionForKey
 		return "", session, errors.New("Key ID does not exist")
 	}
 
-	if session.RSACertificateId == "" || !session.EnableHTTPSignatureValidation {
+	if session.GetRSACertificateId() == "" || !session.GetEnableHTTPSignatureValidation() {
 		hm.Logger().Info("API Requires RSA signature, session missing RSA Certificate Id or RSA not enabled for key")
 		return "", session, errors.New("This key ID is invalid")
 	}
 
-	return session.RSACertificateId, session, nil
+	return session.GetRSACertificateId(), session, nil
 }
 
 func getDateHeader(r *http.Request) (string, string) {

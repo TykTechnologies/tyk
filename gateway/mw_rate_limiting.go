@@ -78,7 +78,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	token := ctxGetAuthToken(r)
 
 	// If MaxQueryDepth is -1 or 0, it means unlimited and no need for depth limiting.
-	if k.Spec.GraphQL.Enabled && session.MaxQueryDepth > 0 {
+	if k.Spec.GraphQL.Enabled && session.GetMaxQueryDepth() > 0 {
 		gqlRequest := ctxGetGraphQLRequest(r)
 
 		complexityRes, err := gqlRequest.CalculateComplexity(gql.DefaultComplexityCalculator, k.Spec.GraphQLExecutor.Schema)
@@ -87,8 +87,8 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 			return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
 		}
 
-		if complexityRes.Depth > session.MaxQueryDepth {
-			k.Logger().Debugf("Complexity of the request is higher than the allowed limit '%d'", session.MaxQueryDepth)
+		if complexityRes.Depth > session.GetMaxQueryDepth() {
+			k.Logger().Debugf("Complexity of the request is higher than the allowed limit '%d'", session.GetMaxQueryDepth())
 			return errors.New("depth limit exceeded"), http.StatusForbidden
 		}
 	}
@@ -106,11 +106,11 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 		false,
 	)
 
-	throttleRetryLimit := session.ThrottleRetryLimit
-	throttleInterval := session.ThrottleInterval
+	throttleRetryLimit := session.GetThrottleRetryLimit()
+	throttleInterval := session.GetThrottleInterval()
 
 	if len(session.AccessRights) > 0 {
-		if rights, ok := session.AccessRights[k.Spec.APIID]; ok {
+		if rights, ok := session.GetAccessRightByAPIID(k.Spec.APIID); ok {
 			if rights.Limit != nil {
 				throttleInterval = rights.Limit.ThrottleInterval
 				throttleRetryLimit = rights.Limit.ThrottleRetryLimit

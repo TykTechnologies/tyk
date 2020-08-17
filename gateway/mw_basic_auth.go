@@ -197,14 +197,14 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
-	switch session.BasicAuthData.Hash {
+	switch session.GetBasicAuthData().Hash {
 	case user.HashBCrypt:
-		if err := k.compareHashAndPassword(session.BasicAuthData.Password, password, logger); err != nil {
+		if err := k.compareHashAndPassword(session.GetBasicAuthData().Password, password, logger); err != nil {
 			logger.Warn("Attempted access with existing user, failed password check.")
 			return k.handleAuthFail(w, r, token)
 		}
 	case user.HashPlainText:
-		if session.BasicAuthData.Password != password {
+		if session.GetBasicAuthData().Password != password {
 			logger.Warn("Attempted access with existing user, failed password check.")
 			return k.handleAuthFail(w, r, token)
 		}

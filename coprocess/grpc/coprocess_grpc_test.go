@@ -73,7 +73,7 @@ func (d *dispatcher) Dispatch(ctx context.Context, object *coprocess.Object) (*c
 			return d.grpcError(object, "Request content type should be either JSON or multipart")
 		}
 	case "testPostHook1":
-		testKeyValue, ok := object.Session.Metadata["testkey"]
+		testKeyValue, ok := object.Session.GetMetadata()["testkey"]
 		if !ok {
 			return d.grpcError(object, "'testkey' not found in session metadata")
 		}
@@ -88,7 +88,7 @@ func (d *dispatcher) Dispatch(ctx context.Context, object *coprocess.Object) (*c
 		if nestedKeyValue != "nestedvalue" {
 			return d.grpcError(object, "'nestedvalue' value doesn't match")
 		}
-		testKey2Value, ok := object.Session.Metadata["testkey2"]
+		testKey2Value, ok := object.Session.GetMetadata()["testkey2"]
 		if !ok {
 			return d.grpcError(object, "'testkey' not found in session metadata")
 		}
@@ -96,9 +96,9 @@ func (d *dispatcher) Dispatch(ctx context.Context, object *coprocess.Object) (*c
 			return d.grpcError(object, "'testkey2' value doesn't match")
 		}
 
-		// Check for compatibility (object.Metadata should contain the same keys as object.Session.Metadata)
+		// Check for compatibility (object.Metadata should contain the same keys as object.Session.GetMetadata())
 		for k, v := range object.Metadata {
-			sessionKeyValue, ok := object.Session.Metadata[k]
+			sessionKeyValue, ok := object.Session.GetMetadata()[k]
 			if !ok {
 				return d.grpcError(object, k+" not found in object.Session.Metadata")
 			}

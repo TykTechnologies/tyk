@@ -102,14 +102,14 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	}
 
 	// Make sure OAuth-client is still present
-	oauthClientDeletedKey := "oauth-del-" + k.Spec.APIID + session.OauthClientID
+	oauthClientDeletedKey := "oauth-del-" + k.Spec.APIID + session.GetOauthClientID()
 	oauthClientDeleted := false
 	// check if that oauth client was deleted with using  memory cache first
 	if val, found := UtilCache.Get(oauthClientDeletedKey); found {
 		oauthClientDeleted = val.(bool)
 	} else {
 		// if not cached in memory then hit Redis to get oauth-client from there
-		if _, err := k.Spec.OAuthManager.OsinServer.Storage.GetClient(session.OauthClientID); err != nil {
+		if _, err := k.Spec.OAuthManager.OsinServer.Storage.GetClient(session.GetOauthClientID()); err != nil {
 			// set this oauth client as deleted in memory cache for the next N sec
 			UtilCache.Set(oauthClientDeletedKey, true, checkOAuthClientDeletedInetrval)
 			oauthClientDeleted = true
@@ -119,7 +119,7 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		}
 	}
 	if oauthClientDeleted {
-		logger.WithField("oauthClientID", session.OauthClientID).Warning("Attempted access for deleted OAuth client.")
+		logger.WithField("oauthClientID", session.GetOauthClientID()).Warning("Attempted access for deleted OAuth client.")
 		return errorAndStatusCode(ErrOAuthClientDeleted)
 	}
 

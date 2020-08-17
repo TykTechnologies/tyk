@@ -227,8 +227,8 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	// Save the sesison data (if modified)
 	if vmeta.UseSession {
 		newMeta := mapStrsToIfaces(newResponseData.SessionMeta)
-		if !reflect.DeepEqual(session.MetaData, newMeta) {
-			session.MetaData = newMeta
+		if !reflect.DeepEqual(session.GetMetaData(), newMeta) {
+			session.SetMetaData(newMeta)
 			ctxSetSession(r, session, "", true)
 		}
 	}

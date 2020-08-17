@@ -51,7 +51,7 @@ func TestGraphQL_RestrictedTypes(t *testing.T) {
 	})
 
 	_, policyAppliedKey := g.CreateSession(func(s *user.SessionState) {
-		s.ApplyPolicies = []string{pID}
+		s.SetApplyPolicies([]string{pID})
 	})
 
 	q1 := graphql.Request{

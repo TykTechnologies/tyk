@@ -89,12 +89,12 @@ func addVersionHeader(w http.ResponseWriter, r *http.Request, globalConf config.
 func estimateTagsCapacity(session *user.SessionState, apiSpec *APISpec) int {
 	size := 5 // that number of tags expected to be added at least before we record hit
 	if session != nil {
-		size += len(session.Tags)
+		size += len(session.GetTags())
 
-		size += len(session.ApplyPolicies)
+		size += len(session.GetApplyPolicies())
 
-		if session.MetaData != nil {
-			if _, ok := session.MetaData[keyDataDeveloperID]; ok {
+		if session.GetMetaData() != nil {
+			if _, ok := session.GetMetaDataByKey(keyDataDeveloperID); ok {
 				size += 1
 			}
 		}
@@ -110,20 +110,20 @@ func estimateTagsCapacity(session *user.SessionState, apiSpec *APISpec) int {
 }
 
 func getSessionTags(session *user.SessionState) []string {
-	tags := make([]string, 0, len(session.Tags)+len(session.ApplyPolicies)+1)
+	tags := make([]string, 0, len(session.GetTags())+len(session.GetApplyPolicies())+1)
 
 	// add policy IDs
-	for _, polID := range session.ApplyPolicies {
+	for _, polID := range session.GetApplyPolicies() {
 		tags = append(tags, "pol-"+polID)
 	}
 
-	if session.MetaData != nil {
-		if developerID, ok := session.MetaData[keyDataDeveloperID].(string); ok {
+	if session.GetMetaData() != nil {
+		if developerID, ok := session.GetMetaData()[keyDataDeveloperID].(string); ok {
 			tags = append(tags, "dev-"+developerID)
 		}
 	}
 
-	tags = append(tags, session.Tags...)
+	tags = append(tags, session.GetTags()...)
 
 	return tags
 }
@@ -154,9 +154,9 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 		session := ctxGetSession(r)
 		tags := make([]string, 0, estimateTagsCapacity(session, s.Spec))
 		if session != nil {
-			oauthClientID = session.OauthClientID
+			oauthClientID = session.GetOauthClientID()
 			tags = append(tags, getSessionTags(session)...)
-			alias = session.Alias
+			alias = session.GetAlias()
 		}
 
 		if len(s.Spec.TagHeaders) > 0 {
@@ -275,7 +275,7 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 
 	session := ctxGetSession(r)
 	if session != nil {
-		if session.EnableDetailedRecording || session.EnableDetailRecording {
+		if session.GetEnableDetailedRecording() || session.GetEnableDetailRecording() {
 			return true
 		}
 	}
@@ -294,7 +294,7 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 
 	// Session found
 	sess := ses.(user.SessionState)
-	return sess.EnableDetailRecording || sess.EnableDetailedRecording
+	return sess.GetEnableDetailRecording() || sess.GetEnableDetailedRecording()
 }
 
 // ServeHTTP will store the request details in the analytics store if necessary and proxy the request to it's

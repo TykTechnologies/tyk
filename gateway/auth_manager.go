@@ -156,8 +156,8 @@ func (b *DefaultAuthorisationManager) KeyAuthorised(keyName string) (user.Sessio
 
 // KeyExpired checks if a key has expired, if the value of user.SessionState.Expires is 0, it will be ignored
 func (b *DefaultAuthorisationManager) KeyExpired(newSession *user.SessionState) bool {
-	if newSession.Expires >= 1 {
-		return time.Now().After(time.Unix(newSession.Expires, 0))
+	if newSession.GetExpires() >= 1 {
+		return time.Now().After(time.Unix(newSession.GetExpires(), 0))
 	}
 	return false
 }
@@ -202,7 +202,7 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 	go b.store.DeleteRawKey(rawKey)
 	//go b.store.SetKey(rawKey, "0", session.QuotaRenewalRate)
 
-	for _, acl := range session.AccessRights {
+	for _, acl := range session.GetAccessRights() {
 		rawKey = QuotaKeyPrefix + acl.AllowanceScope + "-" + keyName
 		go b.store.DeleteRawKey(rawKey)
 	}

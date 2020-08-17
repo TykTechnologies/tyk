@@ -502,8 +502,8 @@ func CreateSession(sGen ...func(s *user.SessionState)) string {
 	if len(sGen) > 0 {
 		sGen[0](session)
 	}
-	if session.Certificate != "" {
-		key = generateToken("default", session.Certificate)
+	if session.GetCertificate() != "" {
+		key = generateToken("default", session.GetCertificate())
 	}
 
 	GlobalSessionManager.UpdateSession(storage.HashKey(key), session, 60, config.Global().HashKeys)
@@ -512,18 +512,18 @@ func CreateSession(sGen ...func(s *user.SessionState)) string {
 
 func CreateStandardSession() *user.SessionState {
 	session := new(user.SessionState)
-	session.Rate = 10000
-	session.Allowance = session.Rate
-	session.LastCheck = time.Now().Unix()
-	session.Per = 60
-	session.Expires = -1
-	session.QuotaRenewalRate = 300 // 5 minutes
-	session.QuotaRenews = time.Now().Unix() + 20
-	session.QuotaRemaining = 10
-	session.QuotaMax = -1
-	session.Tags = []string{}
-	session.MetaData = make(map[string]interface{})
-	session.OrgID = "default"
+	session.SetRate( 10000)
+	session.SetAllowance(session.GetRate())
+	session.SetLastCheck(time.Now().Unix())
+	session.SetPer(60)
+	session.SetExpires(-1)
+	session.SetQuotaRenewalRate(300) // 5 minutes
+	session.SetQuotaRenews(time.Now().Unix() + 20)
+	session.SetQuotaRemaining(10)
+	session.SetQuotaMax(-1)
+	session.SetTags([]string{})
+	session.SetMetaData(make(map[string]interface{}))
+	session.SetOrgID("default")
 	return session
 }
 
@@ -841,7 +841,7 @@ func (s *Test) CreateSession(sGen ...func(s *user.SessionState)) (*user.SessionS
 		return nil, ""
 	}
 
-	createdSession, _ := GlobalSessionManager.SessionDetail(session.OrgID, keySuccess.Key, false)
+	createdSession, _ := GlobalSessionManager.SessionDetail(session.GetOrgID(), keySuccess.Key, false)
 
 	return &createdSession, keySuccess.Key
 }

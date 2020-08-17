@@ -190,20 +190,20 @@ func TestSignatureValidation(t *testing.T) {
 func createAuthKeyAuthSession(isBench bool) *user.SessionState {
 	session := new(user.SessionState)
 	// essentially non-throttled
-	session.Rate = 100.0
-	session.Allowance = session.Rate
-	session.LastCheck = time.Now().Unix()
-	session.Per = 1.0
-	session.QuotaRenewalRate = 300 // 5 minutes
-	session.QuotaRenews = time.Now().Unix()
+	session.SetRate(100.0)
+	session.SetAllowance(session.GetRate())
+	session.SetLastCheck(time.Now().Unix())
+	session.SetPer(1.0)
+	session.SetQuotaRenewalRate(300) // 5 minutes
+	session.SetQuotaRenews(time.Now().Unix())
 	if isBench {
-		session.QuotaRemaining = 100000000
-		session.QuotaMax = 100000000
+		session.SetQuotaRemaining(100000000)
+		session.SetQuotaMax(100000000)
 	} else {
-		session.QuotaRemaining = 10
-		session.QuotaMax = 10
+		session.SetQuotaRemaining(10)
+		session.SetQuotaMax(10)
 	}
-	session.AccessRights = map[string]user.AccessDefinition{"31": {APIName: "Tyk Auth Key Test", APIID: "31", Versions: []string{"default"}}}
+	session.SetAccessRights(map[string]user.AccessDefinition{"31": {APIName: "Tyk Auth Key Test", APIID: "31", Versions: []string{"default"}}})
 	return session
 }
 

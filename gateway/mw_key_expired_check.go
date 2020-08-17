@@ -29,7 +29,7 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 	}
 
 	token := ctxGetAuthToken(r)
-	if session.IsInactive {
+	if session.GetIsInactive() {
 		logger.Info("Attempted access from inactive key.")
 		// Fire a key expired event
 		k.FireEvent(EventKeyExpired, EventKeyFailureMeta{

@@ -33,15 +33,15 @@ func TykSessionState(session *coprocess.SessionState) *user.SessionState {
 		Password string        `json:"password" msg:"password"`
 		Hash     user.HashType `json:"hash_type" msg:"hash_type"`
 	}
-	if session.BasicAuthData != nil {
-		basicAuthData.Password = session.BasicAuthData.Password
-		basicAuthData.Hash = user.HashType(session.BasicAuthData.Hash)
+	if session.GetBasicAuthData() != nil {
+		basicAuthData.Password = session.GetBasicAuthData().Password
+		basicAuthData.Hash = user.HashType(session.GetBasicAuthData().Hash)
 	}
 
 	var jwtData struct {
 		Secret string `json:"secret" msg:"secret"`
 	}
-	if session.JwtData != nil {
+	if session.GetJwtData() != nil {
 		jwtData.Secret = session.JwtData.Secret
 	}
 
@@ -61,46 +61,46 @@ func TykSessionState(session *coprocess.SessionState) *user.SessionState {
 	}
 
 	return &user.SessionState{
-		LastCheck:               session.LastCheck,
-		Allowance:               session.Allowance,
-		Rate:                    session.Rate,
-		Per:                     session.Per,
-		MaxQueryDepth:           int(session.MaxQueryDepth),
-		Expires:                 session.Expires,
-		QuotaMax:                session.QuotaMax,
-		QuotaRenews:             session.QuotaRenews,
-		QuotaRemaining:          session.QuotaRemaining,
-		QuotaRenewalRate:        session.QuotaRenewalRate,
+		LastCheck:               session.GetLastCheck(),
+		Allowance:               session.GetAllowance(),
+		Rate:                    session.GetRate(),
+		Per:                     session.GetPer(),
+		MaxQueryDepth:           int(session.GetMaxQueryDepth()),
+		Expires:                 session.GetExpires(),
+		QuotaMax:                session.GetQuotaMax(),
+		QuotaRenews:             session.GetQuotaRenews(),
+		QuotaRemaining:          session.GetQuotaRemaining(),
+		QuotaRenewalRate:        session.GetQuotaRenewalRate(),
 		AccessRights:            accessDefinitions,
-		OrgID:                   session.OrgId,
-		OauthClientID:           session.OauthClientId,
-		OauthKeys:               session.OauthKeys,
-		Certificate:             session.Certificate,
+		OrgID:                   session.GetOrgId(),
+		OauthClientID:           session.GetOauthClientId(),
+		OauthKeys:               session.GetOauthKeys(),
+		Certificate:             session.GetCertificate(),
 		BasicAuthData:           basicAuthData,
 		JWTData:                 jwtData,
-		HMACEnabled:             session.HmacEnabled,
-		HmacSecret:              session.HmacSecret,
-		IsInactive:              session.IsInactive,
-		ApplyPolicyID:           session.ApplyPolicyId,
-		ApplyPolicies:           session.ApplyPolicies,
-		DataExpires:             session.DataExpires,
+		HMACEnabled:             session.GetHmacEnabled(),
+		HmacSecret:              session.GetHmacSecret(),
+		IsInactive:              session.GetIsInactive(),
+		ApplyPolicyID:           session.GetApplyPolicyId(),
+		ApplyPolicies:           session.GetApplyPolicies(),
+		DataExpires:             session.GetDataExpires(),
 		MetaData:                metadata,
 		Monitor:                 monitor,
-		EnableDetailedRecording: session.EnableDetailedRecording,
-		Tags:                    session.Tags,
-		Alias:                   session.Alias,
-		LastUpdated:             session.LastUpdated,
-		IdExtractorDeadline:     session.IdExtractorDeadline,
-		SessionLifetime:         session.SessionLifetime,
+		EnableDetailedRecording: session.GetEnableDetailedRecording(),
+		Tags:                    session.GetTags(),
+		Alias:                   session.GetAlias(),
+		LastUpdated:             session.GetLastUpdated(),
+		IdExtractorDeadline:     session.GetIdExtractorDeadline(),
+		SessionLifetime:         session.GetSessionLifetime(),
 	}
 }
 
 // ProtoSessionState takes a standard SessionState and outputs a SessionState object compatible with Protocol Buffers.
 func ProtoSessionState(session *user.SessionState) *coprocess.SessionState {
 
-	accessDefinitions := make(map[string]*coprocess.AccessDefinition, len(session.AccessRights))
+	accessDefinitions := make(map[string]*coprocess.AccessDefinition, len(session.GetAccessRights()))
 
-	for key, accessDefinition := range session.AccessRights {
+	for key, accessDefinition := range session.GetAccessRights() {
 		var allowedUrls []*coprocess.AccessSpec
 		for _, allowedURL := range accessDefinition.AllowedURLs {
 			accessSpec := &coprocess.AccessSpec{
@@ -119,19 +119,19 @@ func ProtoSessionState(session *user.SessionState) *coprocess.SessionState {
 	}
 
 	basicAuthData := &coprocess.BasicAuthData{
-		Password: session.BasicAuthData.Password,
-		Hash:     string(session.BasicAuthData.Hash),
+		Password: session.GetBasicAuthData().Password,
+		Hash:     string(session.GetBasicAuthData().Hash),
 	}
 	jwtData := &coprocess.JWTData{
-		Secret: session.JWTData.Secret,
+		Secret: session.GetJWTData().Secret,
 	}
 	monitor := &coprocess.Monitor{
-		TriggerLimits: session.Monitor.TriggerLimits,
+		TriggerLimits: session.GetMonitor().TriggerLimits,
 	}
 
 	metadata := make(map[string]string)
-	if len(session.MetaData) > 0 {
-		for k, v := range session.MetaData {
+	if len(session.GetMetaData()) > 0 {
+		for k, v := range session.GetMetaData() {
 			switch v.(type) {
 			case string:
 				metadata[k] = v.(string)
@@ -149,35 +149,35 @@ func ProtoSessionState(session *user.SessionState) *coprocess.SessionState {
 	}
 
 	return &coprocess.SessionState{
-		LastCheck:               session.LastCheck,
-		Allowance:               session.Allowance,
-		Rate:                    session.Rate,
-		Per:                     session.Per,
-		Expires:                 session.Expires,
-		QuotaMax:                session.QuotaMax,
-		QuotaRenews:             session.QuotaRenews,
-		QuotaRemaining:          session.QuotaRemaining,
-		QuotaRenewalRate:        session.QuotaRenewalRate,
+		LastCheck:               session.GetLastCheck(),
+		Allowance:               session.GetAllowance(),
+		Rate:                    session.GetRate(),
+		Per:                     session.GetPer(),
+		Expires:                 session.GetExpires(),
+		QuotaMax:                session.GetQuotaMax(),
+		QuotaRenews:             session.GetQuotaRenews(),
+		QuotaRemaining:          session.GetQuotaRemaining(),
+		QuotaRenewalRate:        session.GetQuotaRenewalRate(),
 		AccessRights:            accessDefinitions,
-		OrgId:                   session.OrgID,
-		OauthClientId:           session.OauthClientID,
-		OauthKeys:               session.OauthKeys,
+		OrgId:                   session.GetOrgID(),
+		OauthClientId:           session.GetOauthClientID(),
+		OauthKeys:               session.GetOauthKeys(),
 		BasicAuthData:           basicAuthData,
 		JwtData:                 jwtData,
-		HmacEnabled:             session.HMACEnabled,
-		HmacSecret:              session.HmacSecret,
-		IsInactive:              session.IsInactive,
-		ApplyPolicyId:           session.ApplyPolicyID,
-		ApplyPolicies:           session.ApplyPolicies,
-		DataExpires:             session.DataExpires,
+		HmacEnabled:             session.GetHMACEnabled(),
+		HmacSecret:              session.GetHmacSecret(),
+		IsInactive:              session.GetIsInactive(),
+		ApplyPolicyId:           session.GetApplyPolicyID(),
+		ApplyPolicies:           session.GetApplyPolicies(),
+		DataExpires:             session.GetDataExpires(),
 		Monitor:                 monitor,
 		Metadata:                metadata,
-		EnableDetailedRecording: session.EnableDetailRecording || session.EnableDetailedRecording,
-		Tags:                    session.Tags,
-		Alias:                   session.Alias,
-		LastUpdated:             session.LastUpdated,
-		IdExtractorDeadline:     session.IdExtractorDeadline,
-		SessionLifetime:         session.SessionLifetime,
+		EnableDetailedRecording: session.GetEnableDetailRecording() || session.GetEnableDetailedRecording(),
+		Tags:                    session.GetTags(),
+		Alias:                   session.GetAlias(),
+		LastUpdated:             session.GetLastUpdated(),
+		IdExtractorDeadline:     session.GetIdExtractorDeadline(),
+		SessionLifetime:         session.GetSessionLifetime(),
 	}
 }
 
