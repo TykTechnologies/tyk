@@ -2017,3 +2017,46 @@ func TestJWTExpOverride(t *testing.T) {
 	})
 
 }
+
+func TestPolicyOfANotherOrgJWTHMAC(t *testing.T) {
+	const apiID = "testapid"
+	const identitySource = "user_id"
+	const policyFieldName = "policy_id"
+
+	ts := StartTest()
+	defer ts.Close()
+
+	// OrgID: "default",
+	policyOfOrgDefault := CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			apiID: {},
+		}
+	})
+
+	// OrgID: "NotDefault"
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.APIID = apiID
+		spec.OrgID = "NotDefault"
+		spec.UseKeylessAccess = false
+		spec.EnableJWT = true
+		spec.JWTSigningMethod = RSASign
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTIdentityBaseField = identitySource
+		spec.Proxy.ListenPath = "/"
+	})[0]
+
+	t.Run("Policy field name empty", func(t *testing.T) {
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)[identitySource] = "dummy"
+			t.Claims.(jwt.MapClaims)[policyFieldName] = policyOfOrgDefault
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+
+		// Default
+		LoadAPI(spec)
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusForbidden,
+		})
+	})
+}
