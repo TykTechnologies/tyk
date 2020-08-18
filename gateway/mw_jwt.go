@@ -176,12 +176,12 @@ func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.T
 func (k *JWTMiddleware) getPolicyIDFromToken(claims jwt.MapClaims) (string, bool) {
 	policyID, foundPolicy := claims[k.Spec.JWTPolicyFieldName].(string)
 	if !foundPolicy {
-		k.Logger().Error("Could not identify a policy to apply to this token from field")
+		k.Logger().Debugf("Could not identify a policy to apply to this token from field: %s", k.Spec.JWTPolicyFieldName)
 		return "", false
 	}
 
 	if policyID == "" {
-		k.Logger().Error("Policy field has empty value")
+		k.Logger().Errorf("Policy field %s has empty value", k.Spec.JWTPolicyFieldName)
 		return "", false
 	}
 
@@ -195,7 +195,7 @@ func (k *JWTMiddleware) getBasePolicyID(r *http.Request, claims jwt.MapClaims) (
 	} else if k.Spec.JWTClientIDBaseField != "" {
 		clientID, clientIDFound := claims[k.Spec.JWTClientIDBaseField].(string)
 		if !clientIDFound {
-			k.Logger().Error("Could not identify a policy to apply to this token from field")
+			k.Logger().Debug("Could not identify a policy to apply to this token from field")
 			return
 		}
 
@@ -270,6 +270,9 @@ func mapScopeToPolicies(mapping map[string]string, scope []string) []string {
 	for _, scopeItem := range scope {
 		if policyID, ok := mapping[scopeItem]; ok {
 			policiesToApply[policyID] = true
+			log.Debugf("Found a matching policy for scope item: %s", scopeItem)
+		} else {
+			log.Errorf("Couldn't find a matching policy for scope item: %s", scopeItem)
 		}
 	}
 	for id := range policiesToApply {
@@ -454,6 +457,11 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 
 			// add all policies matched from scope-policy mapping
 			mappedPolIDs := mapScopeToPolicies(k.Spec.JWTScopeToPolicyMapping, scope)
+			if len(mappedPolIDs) > 0 {
+				k.Logger().Debugf("Identified policy(s) to apply to this token from scope claim: %s", scopeClaimName)
+			} else {
+				k.Logger().Errorf("Couldn't identify policy(s) to apply to this token from scope claim: %s", scopeClaimName)
+			}
 
 			polIDs = append(polIDs, mappedPolIDs...)
 			if len(polIDs) == 0 {
