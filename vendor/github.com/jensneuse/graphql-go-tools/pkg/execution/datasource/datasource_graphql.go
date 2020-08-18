@@ -48,6 +48,7 @@ type GraphQLDataSourcePlanner struct {
 	whitelistedSchemes           []string
 	whitelistedVariableRefs      []int
 	whitelistedVariableNameHashs map[uint64]bool
+	hooks                        Hooks
 }
 
 type GraphQLDataSourcePlannerFactoryFactory struct {
