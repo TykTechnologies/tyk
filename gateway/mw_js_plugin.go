@@ -210,7 +210,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		r.Body = ioutil.NopCloser(bytes.NewReader(newRequestData.Request.Body))
 	}
 
-	r.URL, err = url.ParseRequestURI(newRequestData.Request.URL)
+	r.URL, err = url.Parse(newRequestData.Request.URL)
 	if err != nil {
 		return nil, http.StatusOK
 	}
@@ -226,21 +226,25 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	// Delete and set request parameters
 	values := r.URL.Query()
+	updatedValues := r.URL.Query()
+
 	for _, k := range newRequestData.Request.DeleteParams {
-		values.Del(k)
+		updatedValues.Del(k)
 	}
 
 	for p, v := range newRequestData.Request.AddParams {
-		values.Set(p, v)
+		updatedValues.Set(p, v)
 	}
 
 	for p, v := range newRequestData.Request.ExtendedParams {
 		for _, val := range v {
-			values.Add(p, val)
+			updatedValues.Add(p, val)
 		}
 	}
 
-	r.URL.RawQuery = values.Encode()
+	if !reflect.DeepEqual(values, updatedValues) {
+		r.URL.RawQuery = values.Encode()
+	}
 
 	// Save the session data (if modified)
 	if !d.Pre && d.UseSession {
