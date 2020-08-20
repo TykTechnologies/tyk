@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/url"
+	"reflect"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -187,13 +188,13 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 		r.Header.Set(h, v)
 	}
 
-	values := r.URL.Query()
+	updatedValues := r.URL.Query()
 	for _, k := range object.Request.DeleteParams {
-		values.Del(k)
+		updatedValues.Del(k)
 	}
 
 	for p, v := range object.Request.AddParams {
-		values.Set(p, v)
+		updatedValues.Set(p, v)
 	}
 
 	parsedURL, err := url.ParseRequestURI(object.Request.Url)
@@ -222,7 +223,9 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 		r.Method = object.Request.Method
 	}
 
-	r.URL.RawQuery = values.Encode()
+	if !reflect.DeepEqual(r.URL.Query(), updatedValues) {
+		r.URL.RawQuery = updatedValues.Encode()
+	}
 
 	return
 }
