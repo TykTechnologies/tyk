@@ -16,6 +16,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type dummyStorage struct {
@@ -245,23 +247,19 @@ func TestCertificateStorage(t *testing.T) {
 		}
 	})
 
-	t.Run("Remote storage certficates", func(t *testing.T) {
+	t.Run("Remote storage certificates", func(t *testing.T) {
 		certs := m.List([]string{certPath, storageCertID, privateCertID}, CertificatePublic)
 
-		if len(certs) != 2 {
-			t.Fatal("Should contain 2 cert", len(certs))
+		if len(certs) != 3 {
+			t.Fatal("Should contain 3 certs but", len(certs))
 		}
 
-		if leafSubjectName(certs[0]) != "file" {
-			t.Error("Wrong cert order", leafSubjectName(certs[0]))
-		}
-
-		if leafSubjectName(certs[1]) != "dummy" {
-			t.Error("Wrong cert order", leafSubjectName(certs[1]))
-		}
+		assert.Equal(t, "file", leafSubjectName(certs[0]))
+		assert.Equal(t, "dummy", leafSubjectName(certs[1]))
+		assert.Equal(t, "private", leafSubjectName(certs[2]))
 	})
 
-	t.Run("Private certficates", func(t *testing.T) {
+	t.Run("Private certificates", func(t *testing.T) {
 		certs := m.List([]string{certPath, storageCertID, privateCertID}, CertificatePrivate)
 
 		if len(certs) != 1 {
@@ -274,7 +272,7 @@ func TestCertificateStorage(t *testing.T) {
 	})
 
 	t.Run("Public keys", func(t *testing.T) {
-		certs := m.List([]string{publicKeyID}, CertificateAny)
+		certs := m.List([]string{publicKeyID}, CertificatePublic)
 
 		if len(certs) != 1 {
 			t.Error("Should return only private certificate")
