@@ -27,12 +27,10 @@ var (
 	clientSingleton     *gorpc.Client
 	clientSingletonMu   sync.Mutex
 	funcClientSingleton *gorpc.DispatcherClient
-	clientIsConnected   bool
 
 	dispatcher = gorpc.NewDispatcher()
 	addedFuncs = make(map[string]bool)
 
-	config                      Config
 	getGroupLoginCallback       func(string, string) interface{}
 	emergencyModeCallback       func()
 	emergencyModeLoadedCallback func()
@@ -57,12 +55,29 @@ type rpcOpts struct {
 	loadCounts          atomic.Value
 	emergencyMode       atomic.Value
 	emergencyModeLoaded atomic.Value
+	config              atomic.Value
+	clientIsConnected   atomic.Value
+}
+
+func (r rpcOpts) ClientIsConnected() bool {
+	if v := r.clientIsConnected.Load(); v != nil {
+		return v.(bool)
+	}
+	return false
+}
+
+func (r rpcOpts) Config() Config {
+	if v := r.config.Load(); v != nil {
+		return v.(Config)
+	}
+	return Config{}
 }
 
 func (r *rpcOpts) Reset() {
 	r.loadCounts.Store(0)
 	r.emergencyMode.Store(false)
 	r.emergencyModeLoaded.Store(false)
+	r.clientIsConnected.Store(false)
 }
 
 func (r *rpcOpts) SetLoadCounts(n int) {
@@ -133,7 +148,6 @@ func LoadCount() int {
 
 func Reset() {
 	clientSingleton.Stop()
-	clientIsConnected = false
 	clientSingleton = nil
 	funcClientSingleton = nil
 	values.Reset()
@@ -181,12 +195,12 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 	rpcConnectMu.Lock()
 	defer rpcConnectMu.Unlock()
 
-	config = connConfig
+	values.config.Store(connConfig)
 	getGroupLoginCallback = getGroupLoginFunc
 	emergencyModeCallback = emergencyModeFunc
 	emergencyModeLoadedCallback = emergencyModeLoadedFunc
 
-	if clientIsConnected {
+	if values.ClientIsConnected() {
 		Log.Debug("Using RPC singleton for connection")
 		return true
 	}
@@ -206,14 +220,14 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 		panic("connID is too long")
 	}
 
-	if config.UseSSL {
+	if values.Config().UseSSL {
 		clientCfg := &tls.Config{
-			InsecureSkipVerify: config.SSLInsecureSkipVerify,
+			InsecureSkipVerify: values.Config().SSLInsecureSkipVerify,
 		}
 
-		clientSingleton = gorpc.NewTLSClient(config.ConnectionString, clientCfg)
+		clientSingleton = gorpc.NewTLSClient(values.Config().ConnectionString, clientCfg)
 	} else {
-		clientSingleton = gorpc.NewTCPClient(config.ConnectionString)
+		clientSingleton = gorpc.NewTCPClient(values.Config().ConnectionString)
 	}
 
 	if Log.Level != logrus.DebugLevel {
@@ -222,7 +236,7 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 
 	clientSingleton.OnConnect = onConnectFunc
 
-	clientSingleton.Conns = config.RPCPoolSize
+	clientSingleton.Conns = values.Config().RPCPoolSize
 	if clientSingleton.Conns == 0 {
 		clientSingleton.Conns = 20
 	}
@@ -233,11 +247,11 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 			KeepAlive: 30 * time.Second,
 		}
 
-		useSSL := config.UseSSL
+		useSSL := values.Config().UseSSL
 
 		if useSSL {
 			cfg := &tls.Config{
-				InsecureSkipVerify: config.SSLInsecureSkipVerify,
+				InsecureSkipVerify: values.Config().SSLInsecureSkipVerify,
 			}
 
 			conn, err = tls.DialWithDialer(dialer, "tcp", addr, cfg)
@@ -328,7 +342,7 @@ func doGroupLogin(login func() error) bool {
 }
 
 func groupLogin() error {
-	groupLoginData := getGroupLoginCallback(config.APIKey, config.GroupID)
+	groupLoginData := getGroupLoginCallback(values.Config().APIKey, values.Config().GroupID)
 	ok, err := FuncClientSingleton("LoginWithGroup", groupLoginData)
 	if err != nil {
 		Log.WithError(err).Error("RPC Login failed")
@@ -337,7 +351,7 @@ func groupLogin() error {
 			"LoginWithGroup",
 			err,
 			map[string]string{
-				"GroupID": config.GroupID,
+				"GroupID": values.Config().GroupID,
 			},
 		)
 		return err
@@ -354,7 +368,7 @@ func groupLogin() error {
 var errLogFailed = errors.New("Login incorrect")
 
 func login() error {
-	k, err := FuncClientSingleton("Login", config.APIKey)
+	k, err := FuncClientSingleton("Login", values.Config().APIKey)
 	if err != nil {
 		Log.WithError(err).Error("RPC Login failed")
 		EmitErrorEvent(FuncClientSingletonCall, "Login", err)
@@ -371,11 +385,11 @@ func login() error {
 }
 
 func hasAPIKey() bool {
-	return len(config.APIKey) != 0
+	return len(values.Config().APIKey) != 0
 }
 
 func isGroup() bool {
-	return config.GroupID != ""
+	return values.Config().GroupID != ""
 }
 
 // doLoginWithRetries uses login as a login function by calling it with retries
@@ -428,18 +442,14 @@ func FuncClientSingleton(funcName string, request interface{}) (interface{}, err
 }
 
 func onConnectFunc(conn net.Conn) (net.Conn, string, error) {
-	clientSingletonMu.Lock()
-	defer clientSingletonMu.Unlock()
-
-	clientIsConnected = true
+	values.clientIsConnected.Store(true)
 	remoteAddr := conn.RemoteAddr().String()
 	Log.WithField("remoteAddr", remoteAddr).Debug("connected to RPC server")
-
 	return conn, remoteAddr, nil
 }
 
 func Disconnect() bool {
-	clientIsConnected = false
+	values.clientIsConnected.Store(false)
 	return true
 }
 

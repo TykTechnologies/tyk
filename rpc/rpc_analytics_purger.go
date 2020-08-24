@@ -65,7 +65,7 @@ type Purger struct {
 
 // Connect Connects to RPC
 func (r *Purger) Connect() {
-	if !clientIsConnected {
+	if !values.ClientIsConnected() {
 		Log.Error("RPC client is not connected, use Connect method 1st")
 	}
 
@@ -102,7 +102,7 @@ func (r Purger) PurgeLoop(ctx context.Context) {
 
 // PurgeCache will pull the data from the in-memory store and drop it into the specified MongoDB collection
 func (r *Purger) PurgeCache() {
-	if !clientIsConnected {
+	if !values.ClientIsConnected() {
 		Log.Error("RPC client is not connected, use Connect method 1st")
 	}
 
