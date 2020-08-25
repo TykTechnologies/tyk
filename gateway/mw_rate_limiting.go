@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -89,7 +90,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 
 		if complexityRes.Depth > session.MaxQueryDepth {
 			k.Logger().Debugf("Complexity of the request is higher than the allowed limit '%d'", session.MaxQueryDepth)
-			return errors.New("depth limit exceeded"), http.StatusForbidden
+			return errors.New(fmt.Sprintf(`query depth limit exceeded - current: %d > max: %d`, complexityRes.Depth, session.MaxQueryDepth)), http.StatusForbidden
 		}
 	}
 
