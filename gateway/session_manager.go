@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+
 	"github.com/TykTechnologies/leakybucket"
 	"github.com/TykTechnologies/leakybucket/memorycache"
 	"github.com/TykTechnologies/tyk/config"
@@ -92,6 +94,8 @@ const (
 	sessionFailNone sessionFailReason = iota
 	sessionFailRateLimit
 	sessionFailQuota
+	sessionFailDepthLimit
+	sessionFailInternalServerError
 )
 
 func (l *SessionLimiter) limitSentinel(currentSession *user.SessionState, key string, rateScope string, store storage.Handler,
@@ -177,13 +181,14 @@ func (sfr sessionFailReason) String() string {
 // sessionFailReason if session limits have been exceeded.
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages
 // Per 10 seconds
-func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.SessionState, key string, store storage.Handler, enableRL, enableQ bool, globalConf *config.Config, apiID string, dryRun bool) sessionFailReason {
+func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.SessionState, key string, store storage.Handler, enableRL, enableQ bool, globalConf *config.Config, api *APISpec, dryRun bool) sessionFailReason {
 	// check for limit on API level (set to session by ApplyPolicies)
 	var apiLimit *user.APILimit
 	var allowanceScope string
+
 	if len(currentSession.AccessRights) > 0 {
-		if rights, ok := currentSession.AccessRights[apiID]; !ok {
-			log.WithField("apiID", apiID).Debug("[RATE] unexpected apiID")
+		if rights, ok := currentSession.AccessRights[api.APIID]; !ok {
+			log.WithField("apiID", api.APIID).Debug("[RATE] unexpected apiID")
 			return sessionFailRateLimit
 		} else {
 			apiLimit = rights.Limit
@@ -200,6 +205,14 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			Per:                currentSession.Per,
 			ThrottleInterval:   currentSession.ThrottleInterval,
 			ThrottleRetryLimit: currentSession.ThrottleRetryLimit,
+			MaxQueryDepth:      currentSession.MaxQueryDepth,
+		}
+	}
+
+	// If MaxQueryDepth is -1 or 0, it means unlimited and no need for depth limiting.
+	if api.GraphQL.Enabled && apiLimit.MaxQueryDepth > 0 {
+		if failReason := l.DepthLimitExceeded(r, apiLimit, api.GraphQLExecutor.Schema); failReason != sessionFailNone {
+			return failReason
 		}
 	}
 
@@ -255,6 +268,23 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 
 	return sessionFailNone
 
+}
+
+func (l *SessionLimiter) DepthLimitExceeded(r *http.Request, apiLimit *user.APILimit, schema *graphql.Schema) sessionFailReason {
+	gqlRequest := ctxGetGraphQLRequest(r)
+
+	complexityRes, err := gqlRequest.CalculateComplexity(graphql.DefaultComplexityCalculator, schema)
+	if err != nil {
+		log.Errorf("Error while calculating complexity of GraphQL request: '%s'", err)
+		return sessionFailInternalServerError
+	}
+
+	if complexityRes.Depth > apiLimit.MaxQueryDepth {
+		log.Debugf("Complexity of the request is higher than the allowed limit '%d'", apiLimit.MaxQueryDepth)
+		return sessionFailDepthLimit
+	}
+
+	return sessionFailNone
 }
 
 func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *user.SessionState, scope string, limit *user.APILimit, store storage.Handler) bool {
