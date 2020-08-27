@@ -420,6 +420,26 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 							}
 						}
 
+						mergeFieldLimits := func(res *user.FieldLimits, new user.FieldLimits) {
+							if greaterThanInt(new.MaxQueryDepth, res.MaxQueryDepth) {
+								res.MaxQueryDepth = new.MaxQueryDepth
+							}
+						}
+
+						for _, far := range v.FieldAccessRights {
+							exists := false
+							for i, rfar := range r.FieldAccessRights {
+								if far.TypeName == rfar.TypeName && far.FieldName == rfar.FieldName {
+									exists = true
+									mergeFieldLimits(&r.FieldAccessRights[i].Limits, far.Limits)
+								}
+							}
+
+							if !exists {
+								r.FieldAccessRights = append(r.FieldAccessRights, far)
+							}
+						}
+
 						ar = &r
 					}
 

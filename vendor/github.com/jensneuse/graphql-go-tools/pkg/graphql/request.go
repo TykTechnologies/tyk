@@ -8,6 +8,7 @@ import (
 
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/astparser"
+	"github.com/jensneuse/graphql-go-tools/pkg/middleware/operation_complexity"
 	"github.com/jensneuse/graphql-go-tools/pkg/operationreport"
 )
 
@@ -47,7 +48,15 @@ func (r *Request) CalculateComplexity(complexityCalculator ComplexityCalculator,
 
 	report := r.parseQueryOnce()
 	if report.HasErrors() {
-		return complexityResult(0, 0, 0, report)
+		return complexityResult(
+			operation_complexity.GlobalComplexityResult{
+				NodeCount:  0,
+				Complexity: 0,
+				Depth:      0,
+			},
+			[]operation_complexity.FieldComplexityResult{},
+			report,
+		)
 	}
 
 	return complexityCalculator.Calculate(&r.document, &schema.document)
