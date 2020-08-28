@@ -137,8 +137,8 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 	}
 
 	go startPubSubLoop()
-	go reloadLoop(ReloadTick)
-	go reloadQueueLoop()
+	go reloadLoop(ctx, ReloadTick)
+	go reloadQueueLoop(ctx)
 	go reloadSimulation()
 	exitCode := m.Run()
 	os.RemoveAll(config.Global().AppPath)
@@ -299,12 +299,15 @@ const (
 	testHttpListen = "127.0.0.1:16500"
 	// Accepts any http requests on /, only allows GET on /get, etc.
 	// All return a JSON with request info.
-	TestHttpAny     = "http://" + testHttpListen
-	TestHttpGet     = TestHttpAny + "/get"
-	testHttpPost    = TestHttpAny + "/post"
-	testHttpJWK     = TestHttpAny + "/jwk.json"
-	testHttpJWKDER  = TestHttpAny + "/jwk-der.json"
-	testHttpBundles = TestHttpAny + "/bundles/"
+	TestHttpAny           = "http://" + testHttpListen
+	TestHttpGet           = TestHttpAny + "/get"
+	testHttpPost          = TestHttpAny + "/post"
+	testGraphQLDataSource = TestHttpAny + "/graphql-data-source"
+	testRESTDataSource    = TestHttpAny + "/rest-data-source"
+	testHttpJWK           = TestHttpAny + "/jwk.json"
+	testHttpJWKDER        = TestHttpAny + "/jwk-der.json"
+	testHttpBundles       = TestHttpAny + "/bundles/"
+	testReloadGroup       = TestHttpAny + "/groupReload"
 
 	// Nothing should be listening on port 16501 - useful for
 	// testing TCP and HTTP failures.
@@ -391,6 +394,7 @@ func testHttpHandler() *mux.Router {
 		json.NewEncoder(gz).Encode(response)
 		gz.Close()
 	})
+	r.HandleFunc("/groupReload", groupResetHandler)
 	r.HandleFunc("/bundles/{rest:.*}", bundleHandleFunc)
 	r.HandleFunc("/errors/{status}", func(w http.ResponseWriter, r *http.Request) {
 		statusCode, _ := strconv.Atoi(mux.Vars(r)["status"])
