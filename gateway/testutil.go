@@ -148,8 +148,8 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 		time.Sleep(10 * time.Millisecond)
 	}
 	go startPubSubLoop()
-	go reloadLoop(ReloadTick)
-	go reloadQueueLoop()
+	go reloadLoop(ctx, ReloadTick)
+	go reloadQueueLoop(ctx)
 	go reloadSimulation()
 	exitCode := m.Run()
 	os.RemoveAll(config.Global().AppPath)
@@ -318,6 +318,7 @@ const (
 	testHttpJWK           = TestHttpAny + "/jwk.json"
 	testHttpJWKDER        = TestHttpAny + "/jwk-der.json"
 	testHttpBundles       = TestHttpAny + "/bundles/"
+	testReloadGroup       = TestHttpAny + "/groupReload"
 
 	// Nothing should be listening on port 16501 - useful for
 	// testing TCP and HTTP failures.
@@ -406,6 +407,7 @@ func testHttpHandler() *mux.Router {
 		json.NewEncoder(gz).Encode(response)
 		gz.Close()
 	})
+	r.HandleFunc("/groupReload", groupResetHandler)
 	r.HandleFunc("/bundles/{rest:.*}", bundleHandleFunc)
 	r.HandleFunc("/errors/{status}", func(w http.ResponseWriter, r *http.Request) {
 		statusCode, _ := strconv.Atoi(mux.Vars(r)["status"])
