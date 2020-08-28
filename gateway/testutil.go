@@ -185,6 +185,15 @@ func reloadSimulation() {
 var testBundles = map[string]map[string]string{}
 var testBundleMu sync.Mutex
 
+func RegisterJSFileMiddleware(apiid string, files map[string]string) {
+	os.MkdirAll(config.Global().MiddlewarePath+"/"+apiid+"/post", 0755)
+	os.MkdirAll(config.Global().MiddlewarePath+"/"+apiid+"/pre", 0755)
+
+	for file, content := range files {
+		ioutil.WriteFile(config.Global().MiddlewarePath+"/"+apiid+"/"+file, []byte(content), 0755)
+	}
+}
+
 func RegisterBundle(name string, files map[string]string) string {
 	testBundleMu.Lock()
 	defer testBundleMu.Unlock()

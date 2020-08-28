@@ -513,7 +513,7 @@ func TestKeyHandler_CheckKeysNotDuplicateOnUpdate(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.Name, func(t *testing.T) {
-			GlobalSessionManager.Store().DeleteAllKeys()
+			FallbackKeySesionManager.Store().DeleteAllKeys()
 			session := CreateStandardSession()
 			session.AccessRights = map[string]user.AccessDefinition{"test": {
 				APIID: "test", Versions: []string{"v1"},
@@ -532,7 +532,7 @@ func TestKeyHandler_CheckKeysNotDuplicateOnUpdate(t *testing.T) {
 			r := httptest.NewRequest(http.MethodPut, "/tyk/keys/"+keyName, bytes.NewReader(requestByte))
 			handleAddOrUpdate(keyName, r, true)
 
-			sessions := GlobalSessionManager.Sessions("")
+			sessions := FallbackKeySesionManager.Sessions("")
 			if len(sessions) != 1 {
 				t.Errorf("Sessions stored in global manager should be 1. But got: %v", len(sessions))
 			}
