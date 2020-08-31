@@ -1077,6 +1077,7 @@ func orgHandler(w http.ResponseWriter, r *http.Request) {
 
 func handleOrgAddOrUpdate(orgID string, r *http.Request) (interface{}, int) {
 	newSession := new(user.SessionState)
+	newSession.Mutex = &sync.RWMutex{}
 
 	if err := json.NewDecoder(r.Body).Decode(newSession); err != nil {
 		log.Error("Couldn't decode new session object: ", err)
@@ -1260,6 +1261,7 @@ func resetHandler(fn func()) http.HandlerFunc {
 
 func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	newSession := new(user.SessionState)
+	newSession.Mutex = &sync.RWMutex{}
 	if err := json.NewDecoder(r.Body).Decode(newSession); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -1402,6 +1404,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 func previewKeyHandler(w http.ResponseWriter, r *http.Request) {
 	newSession := new(user.SessionState)
+	newSession.Mutex = &sync.RWMutex{}
 	if err := json.NewDecoder(r.Body).Decode(newSession); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",

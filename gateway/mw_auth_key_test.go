@@ -206,6 +206,7 @@ func createAuthKeyAuthSession(isBench bool) *user.SessionState {
 		session.QuotaMax = 10
 	}
 	session.AccessRights = map[string]user.AccessDefinition{"31": {APIName: "Tyk Auth Key Test", APIID: "31", Versions: []string{"default"}}}
+	session.Mutex = &sync.RWMutex{}
 	return session
 }
 

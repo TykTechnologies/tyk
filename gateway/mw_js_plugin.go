@@ -164,7 +164,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	specAsJson := specToJson(d.Spec)
 
 	session := new(user.SessionState)
-
+	session.Mutex = &sync.RWMutex{}
 	// Encode the session object (if not a pre-process)
 	if !d.Pre && d.UseSession {
 		session = ctxGetSession(r)

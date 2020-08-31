@@ -28,6 +28,7 @@ func createRLSession() *user.SessionState {
 	session.QuotaRemaining = 10
 	session.QuotaMax = 10
 	session.AccessRights = map[string]user.AccessDefinition{"31445455": {APIName: "Tyk Auth Key Test", APIID: "31445455", Versions: []string{"default"}}}
+	session.Mutex = &sync.RWMutex{}
 	return session
 }
 

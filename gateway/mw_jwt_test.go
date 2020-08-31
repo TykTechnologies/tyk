@@ -56,6 +56,7 @@ func createJWTSession() *user.SessionState {
 	session.QuotaRemaining = 1
 	session.QuotaMax = -1
 	session.JWTData = user.JWTData{Secret: jwtSecret}
+	session.Mutex = &sync.RWMutex{}
 	return session
 }
 
