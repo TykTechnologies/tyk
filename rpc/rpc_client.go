@@ -295,7 +295,7 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 		go checkDisconnect()
 	}
 
-	return clientIsConnected
+	return values.ClientIsConnected()
 }
 
 // Login tries to login to the rpc sever. Returns true if it succeeds and false
@@ -439,7 +439,7 @@ func recoverOp(fn func() error) func() error {
 }
 
 func FuncClientSingleton(funcName string, request interface{}) (interface{}, error) {
-	if !clientIsConnected {
+	if !values.ClientIsConnected() {
 		return nil, ErrRPCIsDown
 	}
 	return funcClientSingleton.CallTimeout(funcName, request, GlobalRPCCallTimeout)
