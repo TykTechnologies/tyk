@@ -740,7 +740,7 @@ func shouldReload() ([]func(), bool) {
 	return n, true
 }
 
-func reloadLoop(ctx context.Context, tick <-chan time.Time) {
+func reloadLoop(ctx context.Context, tick <-chan time.Time, complete ...func()) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -767,6 +767,9 @@ func reloadLoop(ctx context.Context, tick <-chan time.Time) {
 					c()
 				}
 			}
+			if len(complete) != 0 {
+				complete[0]()
+			}
 			mainLog.Infof("reload: cycle completed in %v", time.Since(start))
 		}
 	}
@@ -782,7 +785,7 @@ var requeueLock sync.Mutex
 // requeueLock for concurrent use.
 var requeue []func()
 
-func reloadQueueLoop(ctx context.Context) {
+func reloadQueueLoop(ctx context.Context, cb ...func()) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -792,6 +795,9 @@ func reloadQueueLoop(ctx context.Context) {
 			requeue = append(requeue, fn)
 			requeueLock.Unlock()
 			mainLog.Info("Reload queued")
+			if len(cb) != 0 {
+				cb[0]()
+			}
 		}
 	}
 }
