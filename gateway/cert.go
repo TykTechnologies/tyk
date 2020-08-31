@@ -362,7 +362,7 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 				}
 			default:
 				// For APIs which do not use certificates, indicate that there is API for such domain already
-				if domainRequireCert[spec.Domain] == 0 {
+				if domainRequireCert[spec.Domain] <= 0 {
 					domainRequireCert[spec.Domain] = -1
 				} else {
 					domainRequireCert[spec.Domain] = tls.RequestClientCert

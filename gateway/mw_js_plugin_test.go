@@ -4,11 +4,15 @@ import (
 	"bytes"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/user"
@@ -592,5 +596,30 @@ post.NewProcessRequest(function(request, session) {
 			{Path: "/test", Code: 200, BodyMatch: `"Pre":"foobar"`},
 			{Path: "/test", Code: 200, BodyMatch: `"Post":"foobar"`},
 		}...)
+	})
+}
+
+func TestMiniRequestObject_ReconstructParams(t *testing.T) {
+	const exampleURL = "http://example.com/get?b=1&c=2&a=3"
+	r, _ := http.NewRequest(http.MethodGet, exampleURL, nil)
+	mr := MiniRequestObject{}
+
+	t.Run("Don't touch queries if no change on params", func(t *testing.T) {
+		mr.ReconstructParams(r)
+		assert.Equal(t, exampleURL, r.URL.String())
+	})
+
+	t.Run("Update params", func(t *testing.T) {
+		mr.AddParams = map[string]string{
+			"d": "4",
+		}
+		mr.DeleteParams = append(mr.DeleteHeaders, "b")
+		mr.ReconstructParams(r)
+
+		assert.Equal(t, url.Values{
+			"a": []string{"3"},
+			"c": []string{"2"},
+			"d": []string{"4"},
+		}, r.URL.Query())
 	})
 }

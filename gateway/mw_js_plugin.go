@@ -51,6 +51,28 @@ type MiniRequestObject struct {
 	Scheme          string
 }
 
+func (mr *MiniRequestObject) ReconstructParams(r *http.Request) {
+	updatedValues := r.URL.Query()
+
+	for _, k := range mr.DeleteParams {
+		updatedValues.Del(k)
+	}
+
+	for p, v := range mr.AddParams {
+		updatedValues.Set(p, v)
+	}
+
+	for p, v := range mr.ExtendedParams {
+		for _, val := range v {
+			updatedValues.Add(p, val)
+		}
+	}
+
+	if !reflect.DeepEqual(r.URL.Query(), updatedValues) {
+		r.URL.RawQuery = updatedValues.Encode()
+	}
+}
+
 type VMReturnObject struct {
 	Request     MiniRequestObject
 	SessionMeta map[string]string
@@ -210,7 +232,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		r.Body = ioutil.NopCloser(bytes.NewReader(newRequestData.Request.Body))
 	}
 
-	r.URL, err = url.ParseRequestURI(newRequestData.Request.URL)
+	r.URL, err = url.Parse(newRequestData.Request.URL)
 	if err != nil {
 		return nil, http.StatusOK
 	}
@@ -225,22 +247,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Delete and set request parameters
-	values := r.URL.Query()
-	for _, k := range newRequestData.Request.DeleteParams {
-		values.Del(k)
-	}
-
-	for p, v := range newRequestData.Request.AddParams {
-		values.Set(p, v)
-	}
-
-	for p, v := range newRequestData.Request.ExtendedParams {
-		for _, val := range v {
-			values.Add(p, val)
-		}
-	}
-
-	r.URL.RawQuery = values.Encode()
+	newRequestData.Request.ReconstructParams(r)
 
 	// Save the session data (if modified)
 	if !d.Pre && d.UseSession {

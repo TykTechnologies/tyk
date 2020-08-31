@@ -110,7 +110,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession use
 		orgSession.Per > 0 && orgSession.Rate > 0,
 		true,
 		&k.Spec.GlobalConfig,
-		k.Spec.APIID,
+		k.Spec,
 		false,
 	)
 
@@ -241,7 +241,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 		session.Per > 0 && session.Rate > 0,
 		true,
 		&k.Spec.GlobalConfig,
-		k.Spec.APIID,
+		k.Spec,
 		false,
 	)
 
