@@ -136,6 +136,7 @@ func (r *ReloadMachinery) EnsureQueued(t *testing.T) {
 	deadline := time.NewTimer(100 * time.Millisecond)
 	defer deadline.Stop()
 	tick := time.NewTicker(time.Millisecond)
+	defer tick.Stop()
 	for {
 		select {
 		case <-deadline.C:
@@ -154,6 +155,7 @@ func (r *ReloadMachinery) EnsureReloaded(t *testing.T) {
 	deadline := time.NewTimer(100 * time.Millisecond)
 	defer deadline.Stop()
 	tick := time.NewTicker(time.Millisecond)
+	defer tick.Stop()
 	for {
 		select {
 		case <-deadline.C:
