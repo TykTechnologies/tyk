@@ -20,16 +20,32 @@ const (
 const (
 	ErrAuthAuthorizationFieldMissing = "auth.auth_field_missing"
 	ErrAuthKeyNotFound               = "auth.key_not_found"
+	ErrAuthCertNotFound              = "auth.cert_not_found"
+	ErrAuthKeyIsInvalid              = "auth.key_is_invalid"
+
+	MsgNonExistentKey  = "Attempted access with non-existent key."
+	MsgNonExistentCert = "Attempted access with non-existent cert."
+	MsgInvalidKey      = "Attempted access with invalid key."
 )
 
 func init() {
 	TykErrors[ErrAuthAuthorizationFieldMissing] = config.TykError{
-		Message: "Authorization field missing",
+		Message: MsgAuthFieldMissing,
 		Code:    http.StatusUnauthorized,
 	}
 
 	TykErrors[ErrAuthKeyNotFound] = config.TykError{
-		Message: "Access to this API has been disallowed",
+		Message: MsgApiAccessDissalowed,
+		Code:    http.StatusForbidden,
+	}
+
+	TykErrors[ErrAuthCertNotFound] = config.TykError{
+		Message: MsgApiAccessDissalowed,
+		Code:    http.StatusForbidden,
+	}
+
+	TykErrors[ErrAuthKeyIsInvalid] = config.TykError{
+		Message: MsgApiAccessDissalowed,
 		Code:    http.StatusForbidden,
 	}
 }
@@ -61,16 +77,18 @@ func (k *AuthKey) getAuthType() string {
 	return authTokenType
 }
 
-func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
 		return nil, http.StatusOK
 	}
 
-	key, config := k.getAuthToken(k.getAuthType(), r)
+	key, authConfig := k.getAuthToken(k.getAuthType(), r)
 
+	var certHash string
 	// If key not provided in header or cookie and client certificate is provided, try to find certificate based key
-	if config.UseCertificate && key == "" && r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
-		key = generateToken(k.Spec.OrgID, certs.HexSHA256(r.TLS.PeerCertificates[0].Raw))
+	if authConfig.UseCertificate && key == "" && r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
+		certHash = certs.HexSHA256(r.TLS.PeerCertificates[0].Raw)
+		key = generateToken(k.Spec.OrgID, certHash)
 	}
 
 	if key == "" {
@@ -86,15 +104,19 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 	// Check if API key valid
 	session, keyExists := k.CheckSessionAndIdentityForValidKey(&key, r)
 	if !keyExists {
-		k.Logger().WithField("key", obfuscateKey(key)).Info("Attempted access with non-existent key.")
+		return k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)
+	}
 
-		// Fire Authfailed Event
-		AuthFailed(k, r, key)
+	if authConfig.UseCertificate {
+		certID := session.OrgID + certHash
 
-		// Report in health check
-		reportHealthValue(k.Spec, KeyFailure, "1")
+		if _, err := CertificateManager.GetRaw(certID); err != nil {
+			return k.reportInvalidKey(key, r, MsgNonExistentCert, ErrAuthCertNotFound)
+		}
 
-		return errorAndStatusCode(ErrAuthKeyNotFound)
+		if session.Certificate != certID {
+			return k.reportInvalidKey(key, r, MsgInvalidKey, ErrAuthKeyIsInvalid)
+		}
 	}
 
 	// Set session state on context, we will need it later
@@ -105,6 +127,18 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 	}
 
 	return k.validateSignature(r, key)
+}
+
+func (k *AuthKey) reportInvalidKey(key string, r *http.Request, msg string, errMsg string) (error, int) {
+	k.Logger().WithField("key", obfuscateKey(key)).Info(msg)
+
+	// Fire Authfailed Event
+	AuthFailed(k, r, key)
+
+	// Report in health check
+	reportHealthValue(k.Spec, KeyFailure, "1")
+
+	return errorAndStatusCode(errMsg)
 }
 
 func (k *AuthKey) validateSignature(r *http.Request, key string) (error, int) {
@@ -159,6 +193,7 @@ func stripBearer(token string) string {
 	return token
 }
 
+// TODO: move this method to base middleware?
 func AuthFailed(m TykMiddleware, r *http.Request, token string) {
 	m.Base().FireEvent(EventAuthFailure, EventKeyFailureMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Auth Failure", OriginatingRequest: EncodeRequestToEvent(r)},
