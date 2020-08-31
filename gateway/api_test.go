@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/go-redis/redis"
 	uuid "github.com/satori/go.uuid"
@@ -1329,39 +1328,16 @@ func TestGroupResetHandler(t *testing.T) {
 }
 
 func TestHotReloadSingle(t *testing.T) {
+	ReloadTestCase.Enable()
+	defer ReloadTestCase.Disable()
 	oldRouter := mainRouter()
 	var wg sync.WaitGroup
 	wg.Add(1)
 	reloadURLStructure(wg.Done)
-	ReloadTick <- time.Time{}
+	ReloadTestCase.TickOk(t)
 	wg.Wait()
 	if mainRouter() == oldRouter {
 		t.Fatal("router wasn't swapped")
-	}
-}
-
-func TestHotReloadMany(t *testing.T) {
-	var wg sync.WaitGroup
-	wg.Add(25)
-	// Spike of 25 reloads all at once, not giving any time for the
-	// reload worker to pick up any of them. A single one is queued
-	// and waits.
-	// We get a callback for all of them, so 25 wg.Done calls.
-	for i := 0; i < 25; i++ {
-		reloadURLStructure(wg.Done)
-	}
-	// pick it up and finish it
-	ReloadTick <- time.Time{}
-	wg.Wait()
-
-	// 5 reloads, but this time slower - the reload worker has time
-	// to do all of them.
-	for i := 0; i < 5; i++ {
-		wg.Add(1)
-		reloadURLStructure(wg.Done)
-		// pick it up and finish it
-		ReloadTick <- time.Time{}
-		wg.Wait()
 	}
 }
 
