@@ -44,6 +44,9 @@ var (
 	rpcConnectMu sync.Mutex
 )
 
+// ErrRPCIsDown this is returned when we can't reach rpc server.
+var ErrRPCIsDown = errors.New("RPCStorageHandler: rpc is either down or ws not configured")
+
 // rpc.Login is callend may places we only need one in flight at a time.
 var loginFlight singleflight.Group
 
@@ -285,16 +288,14 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 		funcClientSingleton = dispatcher.NewFuncClient(clientSingleton)
 	}
 
-	if !Login() {
-		return false
-	}
+	go Login()
 
 	if !suppressRegister {
 		register()
 		go checkDisconnect()
 	}
 
-	return true
+	return clientIsConnected
 }
 
 // Login tries to login to the rpc sever. Returns true if it succeeds and false
@@ -438,6 +439,9 @@ func recoverOp(fn func() error) func() error {
 }
 
 func FuncClientSingleton(funcName string, request interface{}) (interface{}, error) {
+	if !clientIsConnected {
+		return nil, ErrRPCIsDown
+	}
 	return funcClientSingleton.CallTimeout(funcName, request, GlobalRPCCallTimeout)
 }
 
