@@ -68,7 +68,7 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 
 	// Subtract by 1 because of the delayed add in the window
 	subtractor := 1
-	if globalConf.EnableSentinelRateLimiter {
+	if globalConf.EnableSentinelRateLimiter || globalConf.DRLEnableSentinelRateLimiter {
 		// and another subtraction because of the preemptive limit
 		subtractor = 2
 	}
@@ -77,7 +77,7 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 	//log.Info("break: ", (int(currentSession.Rate) - subtractor))
 	if ratePerPeriodNow > int(rate)-subtractor {
 		// Set a sentinel value with expire
-		if globalConf.EnableSentinelRateLimiter {
+		if globalConf.EnableSentinelRateLimiter || globalConf.DRLEnableSentinelRateLimiter {
 			if !dryRun {
 				store.SetRawKey(rateLimiterSentinelKey, "1", int64(per))
 			}

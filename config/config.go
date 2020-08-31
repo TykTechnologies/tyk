@@ -359,6 +359,7 @@ type Config struct {
 	EnableSentinelRateLimiter         bool    `json:"enable_sentinel_rate_limiter"`
 	EnableRedisRollingLimiter         bool    `json:"enable_redis_rolling_limiter"`
 	DRLNotificationFrequency          int     `json:"drl_notification_frequency"`
+	DRLEnableSentinelRateLimiter      bool    `json:"drl_enable_sentinel_rate_limiter"`
 	DRLThreshold                      float64 `json:"drl_threshold"`
 
 	// Organization configurations
