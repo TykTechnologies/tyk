@@ -404,32 +404,31 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 				log.Warning("Attempted access with non-existent user (OAuth password flow).")
 			} else {
 				var passMatch bool
-				if session.GetBasicAuthData().Hash == user.HashBCrypt {
-					err := bcrypt.CompareHashAndPassword([]byte(session.GetBasicAuthData().Password), []byte(password))
+				if session.BasicAuthData.Hash == user.HashBCrypt {
+					err := bcrypt.CompareHashAndPassword([]byte(session.BasicAuthData.Password), []byte(password))
 					if err == nil {
 						passMatch = true
 					}
 				}
 
-				if session.GetBasicAuthData().Hash == user.HashPlainText &&
-					session.GetBasicAuthData().Password == password {
+				if session.BasicAuthData.Hash == user.HashPlainText &&
+					session.BasicAuthData.Password == password {
 					passMatch = true
 				}
 
 				if passMatch {
-					log.Info("Here we are")
 					ar.Authorized = true
 					// not ideal, but we need to copy the session state across
-					pw := session.GetBasicAuthData().Password
-					hs := session.GetBasicAuthData().Hash
+					pw := session.BasicAuthData.Password
+					hs := session.BasicAuthData.Hash
 
-					session.SetBasicAuthDataPassword("")
-					session.SetBasicAuthDataHash("")
+					session.BasicAuthData.Password = ""
+					session.BasicAuthData.Hash = ""
 					asString, _ := json.Marshal(session)
 					ar.UserData = string(asString)
 
-					session.SetBasicAuthDataPassword(pw)
-					session.SetBasicAuthDataHash(hs)
+					session.BasicAuthData.Password = pw
+					session.BasicAuthData.Hash = hs
 
 					//log.Warning("Old Keys: ", session.OauthKeys)
 				}
@@ -440,9 +439,9 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 		}
 
 		// Does the user have an old OAuth token for this client?
-		if session != nil && session.GetOauthKeys() != nil {
+		if session != nil && session.OauthKeys != nil {
 			log.Debug("There's keys here bill...")
-			oldToken, foundKey := session.GetOauthKeys()[ar.Client.GetId()]
+			oldToken, foundKey := session.OauthKeys[ar.Client.GetId()]
 			if foundKey {
 				log.Info("Found old token, revoking: ", oldToken)
 				GlobalSessionManager.RemoveSession(o.API.OrgID, oldToken, false)
@@ -454,12 +453,12 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 		new_token, foundNewToken := resp.Output["access_token"]
 		if username != "" && foundNewToken {
 			log.Debug("Updating token data in key")
-			if session.GetOauthKeys() == nil {
-				session.SetOauthKeys(make(map[string]string))
+			if session.OauthKeys == nil {
+				session.OauthKeys = make(map[string]string)
 			}
 			session.OauthKeys[ar.Client.GetId()] = new_token.(string)
 			log.Debug("New token: ", new_token.(string))
-			log.Debug("Keys: ", session.GetOauthKeys())
+			log.Debug("Keys: ", session.OauthKeys)
 
 			// add oauth-client user_fields to session's meta
 			if userData := ar.Client.GetUserData(); userData != nil {
@@ -471,7 +470,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 				} else {
 					// set session alias to developer email as we do it for regular API keys created for developer
 					if devEmail, found := session.GetMetaData()[keyDataDeveloperEmail].(string); found {
-						session.SetAlias(devEmail)
+						session.Alias = devEmail
 						// we don't need it in meta-data as we set it to alias
 						session.RemoveMetaData(keyDataDeveloperEmail)
 					}
@@ -1115,7 +1114,7 @@ func (accessTokenGen) GenerateAccessToken(data *osin.AccessData, generaterefresh
 		newSession = sessionFromPolicy
 	}
 
-	accesstoken = keyGen.GenerateAuthKey(newSession.GetOrgID())
+	accesstoken = keyGen.GenerateAuthKey(newSession.OrgID)
 	if generaterefresh {
 		u6 := uuid.NewV4()
 		refreshtoken = base64.StdEncoding.EncodeToString([]byte(u6.String()))

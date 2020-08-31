@@ -28,8 +28,8 @@ func TestRateLimit_Unlimited(t *testing.T) {
 				APIID:   api.APIID,
 			},
 		}
-		s.SetRate(1)
-		s.SetPer(60)
+		s.Rate = 1
+		s.Per = 60
 	})
 
 	authHeader := map[string]string{

@@ -186,10 +186,10 @@ func checkAndApplyTrialPeriod(keyName string, newSession *user.SessionState, isH
 		// Are we foring an expiry?
 		if policy.KeyExpiresIn > 0 {
 			// We are, does the key exist?
-			_, found := GlobalSessionManager.SessionDetail(newSession.GetOrgID(), keyName, isHashed)
+			_, found := GlobalSessionManager.SessionDetail(newSession.OrgID, keyName, isHashed)
 			if !found {
 				// this is a new key, lets expire it
-				newSession.SetExpires(time.Now().Unix() + policy.KeyExpiresIn)
+				newSession.Expires = time.Now().Unix() + policy.KeyExpiresIn
 			}
 		}
 	}
@@ -226,7 +226,7 @@ func doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool
 	// field last_updated plays an important role in in-mem rate limiter
 	// so update last_updated to current timestamp only if suppress_reset wasn't set to 1
 	if !dontReset {
-		newSession.SetLastUpdated(strconv.Itoa(int(time.Now().Unix())))
+		newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 	}
 
 	if len(newSession.GetAccessRights()) > 0 {
@@ -239,7 +239,7 @@ func doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool
 				log.WithFields(logrus.Fields{
 					"prefix":      "api",
 					"key":         keyName,
-					"org_id":      newSession.GetOrgID(),
+					"org_id":      newSession.OrgID,
 					"api_id":      apiId,
 					"user_id":     "system",
 					"user_ip":     "--",
@@ -255,7 +255,7 @@ func doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool
 				// Reset quote by default
 				if !dontReset {
 					GlobalSessionManager.ResetQuota(keyName, newSession, isHashed)
-					newSession.SetQuotaRenews(time.Now().Unix() + newSession.GetQuotaRenewalRate())
+					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
 
 				// apply polices (if any) and save key
@@ -276,7 +276,7 @@ func doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool
 		for _, spec := range apisByID {
 			if !dontReset {
 				GlobalSessionManager.ResetQuota(keyName, newSession, isHashed)
-				newSession.SetQuotaRenews(time.Now().Unix() + newSession.GetQuotaRenewalRate())
+				newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 			}
 			checkAndApplyTrialPeriod(keyName, newSession, isHashed)
 
@@ -290,8 +290,8 @@ func doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool
 	log.WithFields(logrus.Fields{
 		"prefix":      "api",
 		"key":         obfuscateKey(keyName),
-		"expires":     newSession.GetExpires(),
-		"org_id":      newSession.GetOrgID(),
+		"expires":     newSession.Expires,
+		"org_id":      newSession.OrgID,
 		"api_id":      "--",
 		"user_id":     "system",
 		"user_ip":     "--",
@@ -307,15 +307,15 @@ func doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool
 // need to be managed by API, but only for GetDetail, GetList, UpdateKey and DeleteKey
 
 func setSessionPassword(session *user.SessionState) {
-	session.SetBasicAuthDataHash(user.HashBCrypt)
-	newPass, err := bcrypt.GenerateFromPassword([]byte(session.GetBasicAuthData().Password), 10)
+	session.BasicAuthData.Hash = user.HashBCrypt
+	newPass, err := bcrypt.GenerateFromPassword([]byte(session.BasicAuthData.Password), 10)
 	if err != nil {
 		log.Error("Could not hash password, setting to plaintext, error was: ", err)
-		session.SetBasicAuthDataHash(user.HashPlainText)
+		session.BasicAuthData.Hash = user.HashPlainText
 		return
 	}
 
-	session.SetBasicAuthDataPassword(string(newPass))
+	session.BasicAuthData.Password = string(newPass)
 }
 
 func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interface{}, int) {
@@ -340,7 +340,7 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 	// get original session in case of update and preserve fields that SHOULD NOT be updated
 	originalKey := user.SessionState{}
 	if r.Method == http.MethodPut {
-		key, found := GlobalSessionManager.SessionDetail(newSession.GetOrgID(), keyName, isHashed)
+		key, found := GlobalSessionManager.SessionDetail(newSession.OrgID, keyName, isHashed)
 		if !found {
 			log.Error("Could not find key when updating")
 			return apiError("Key is not found"), http.StatusNotFound
@@ -348,7 +348,7 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 		originalKey = key
 
 		// preserve the creation date
-		newSession.DateCreated = originalKey.GetDateCreated()
+		newSession.DateCreated = originalKey.DateCreated
 
 		// don't change fields related to quota and rate limiting if was passed as "suppress_reset=1"
 		if suppressReset {
@@ -358,8 +358,8 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 			// - setting new last_updated with force rate limiter to start new "per" rating period
 
 			// on session level
-			newSession.QuotaRenews = originalKey.GetQuotaRenews()
-			newSession.LastUpdated = originalKey.GetLastUpdated()
+			newSession.QuotaRenews = originalKey.QuotaRenews
+			newSession.LastUpdated = originalKey.LastUpdated
 
 			// on ACL API limit level
 			for apiID, access := range originalKey.GetAccessRights() {
@@ -374,16 +374,16 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 		}
 	} else {
 		newSession.DateCreated = time.Now()
-		keyName = generateToken(newSession.GetOrgID(), keyName)
+		keyName = generateToken(newSession.OrgID, keyName)
 	}
 
 	//set the original expiry if the content in payload is a past time
-	if time.Now().After(time.Unix(newSession.GetExpires(), 0)) && newSession.GetExpires() > 1 {
+	if time.Now().After(time.Unix(newSession.Expires, 0)) && newSession.Expires > 1 {
 		newSession.Expires = originalKey.Expires
 	}
 
 	// Update our session object (create it)
-	if newSession.GetBasicAuthData().Password != "" {
+	if newSession.BasicAuthData.Password != "" {
 		// If we are using a basic auth user, then we need to make the keyname explicit against the OrgId in order to differentiate it
 		// Only if it's NEW
 		switch r.Method {
@@ -391,18 +391,18 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 			// It's a create, so lets hash the password
 			setSessionPassword(&newSession)
 		case http.MethodPut:
-			if originalKey.GetBasicAuthData().Password != newSession.GetBasicAuthData().Password {
+			if originalKey.BasicAuthData.Password != newSession.BasicAuthData.Password {
 				// passwords dont match assume it's new, lets hash it
-				log.Debug("Passwords dont match, original: ", originalKey.GetBasicAuthData().Password)
+				log.Debug("Passwords dont match, original: ", originalKey.BasicAuthData.Password)
 				log.Debug("New: newSession.BasicAuthData.Password")
 				log.Debug("Changing password")
 				setSessionPassword(&newSession)
 			}
 		}
-	} else if originalKey.GetBasicAuthData().Password != "" {
+	} else if originalKey.BasicAuthData.Password != "" {
 		// preserve basic auth data
-		newSession.SetBasicAuthDataHash(originalKey.GetBasicAuthData().Hash)
-		newSession.SetBasicAuthDataPassword(originalKey.GetBasicAuthData().Password)
+		newSession.BasicAuthData.Hash = originalKey.BasicAuthData.Hash
+		newSession.BasicAuthData.Password = originalKey.BasicAuthData.Password
 	}
 
 	if r.Method == http.MethodPost || storage.TokenOrg(keyName) != "" {
@@ -412,7 +412,7 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 		}
 	} else {
 
-		newFormatKey := generateToken(newSession.GetOrgID(), keyName)
+		newFormatKey := generateToken(newSession.OrgID, keyName)
 		// search as a custom key
 		_, err := GlobalSessionManager.Store().GetKey(newFormatKey)
 
@@ -434,7 +434,7 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 	}
 	FireSystemEvent(event, EventTokenMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Key modified."},
-		Org:              newSession.GetOrgID(),
+		Org:              newSession.OrgID,
 		Key:              keyName,
 	})
 
@@ -478,7 +478,7 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 	mw := BaseMiddleware{Spec: spec}
 	mw.ApplyPolicies(&session)
 
-	if session.GetQuotaMax() != -1 {
+	if session.QuotaMax != -1 {
 		quotaKey := QuotaKeyPrefix + storage.HashKey(sessionKey)
 		if byHash {
 			quotaKey = QuotaKeyPrefix + sessionKey
@@ -486,12 +486,12 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 
 		if usedQuota, err := GlobalSessionManager.Store().GetRawKey(quotaKey); err == nil {
 			qInt, _ := strconv.Atoi(usedQuota)
-			remaining := session.GetQuotaMax() - int64(qInt)
+			remaining := session.QuotaMax - int64(qInt)
 
 			if remaining < 0 {
-				session.SetQuotaRemaining(0)
+				session.QuotaRemaining = 0
 			} else {
-				session.SetQuotaRemaining(remaining)
+				session.QuotaRemaining = remaining
 			}
 		} else {
 			log.WithFields(logrus.Fields{
@@ -997,7 +997,7 @@ func handleUpdateHashedKey(keyName string, applyPolicies []string) (interface{},
 	}
 
 	// Set the policy
-	sess.SetLastUpdated(strconv.Itoa(int(time.Now().Unix())))
+	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 	sess.SetPolicies(applyPolicies...)
 
 	err := GlobalSessionManager.UpdateSession(keyName, &sess, 0, true)
@@ -1078,7 +1078,7 @@ func handleOrgAddOrUpdate(orgID string, r *http.Request) (interface{}, int) {
 
 	if r.URL.Query().Get("reset_quota") == "1" {
 		sessionManager.ResetQuota(orgID, newSession, false)
-		newSession.QuotaRenews = time.Now().Unix() + newSession.GetQuotaRenewalRate()
+		newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 		rawKey := QuotaKeyPrefix + storage.HashKey(orgID)
 
 		// manage quotas separately
@@ -1249,14 +1249,14 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newKey := keyGen.GenerateAuthKey(newSession.GetOrgID())
-	if newSession.GetHMACEnabled() {
-		newSession.SetHmacSecret(keyGen.GenerateHMACSecret())
+	newKey := keyGen.GenerateAuthKey(newSession.OrgID)
+	if newSession.HMACEnabled {
+		newSession.HmacSecret = keyGen.GenerateHMACSecret()
 	}
 
-	if newSession.GetCertificate() != "" {
-		newKey = generateToken(newSession.GetOrgID(), newSession.GetCertificate())
-		_, ok := GlobalSessionManager.SessionDetail(newSession.GetOrgID(), newKey, false)
+	if newSession.Certificate != "" {
+		newKey = generateToken(newSession.OrgID, newSession.Certificate)
+		_, ok := GlobalSessionManager.SessionDetail(newSession.OrgID, newKey, false)
 		if ok {
 			doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - Key with given certificate already found:"+newKey))
 			return
@@ -1280,7 +1280,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				if !apiSpec.DontSetQuotasOnCreate {
 					// Reset quota by default
 					GlobalSessionManager.ResetQuota(newKey, newSession, false)
-					newSession.QuotaRenews = time.Now().Unix() + newSession.GetQuotaRenewalRate()
+					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
 				// apply polices (if any) and save key
 				if err := applyPoliciesAndSave(newKey, newSession, apiSpec, false); err != nil {
@@ -1290,7 +1290,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			} else {
 				// Use fallback
 				sessionManager := GlobalSessionManager
-				newSession.QuotaRenews = time.Now().Unix() + newSession.GetQuotaRenewalRate()
+				newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				sessionManager.ResetQuota(newKey, newSession, false)
 				err := sessionManager.UpdateSession(newKey, newSession, -1, false)
 				if err != nil {
@@ -1305,7 +1305,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			log.WithFields(logrus.Fields{
 				"prefix":      "api",
 				"status":      "warning",
-				"org_id":      newSession.GetOrgID(),
+				"org_id":      newSession.OrgID,
 				"api_id":      "--",
 				"user_id":     "system",
 				"user_ip":     requestIPHops(r),
@@ -1320,7 +1320,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				if !spec.DontSetQuotasOnCreate {
 					// Reset quote by default
 					GlobalSessionManager.ResetQuota(newKey, newSession, false)
-					newSession.QuotaRenews = time.Now().Unix() + newSession.GetQuotaRenewalRate()
+					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
 				// apply polices (if any) and save key
 				if err := applyPoliciesAndSave(newKey, newSession, spec, false); err != nil {
@@ -1333,7 +1333,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				"prefix":      "api",
 				"status":      "error",
 				"err":         "master keys disabled",
-				"org_id":      newSession.GetOrgID(),
+				"org_id":      newSession.OrgID,
 				"api_id":      "--",
 				"user_id":     "system",
 				"user_ip":     requestIPHops(r),
@@ -1360,7 +1360,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 	FireSystemEvent(EventTokenCreated, EventTokenMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Key generated."},
-		Org:              newSession.GetOrgID(),
+		Org:              newSession.OrgID,
 		Key:              newKey,
 	})
 
@@ -1369,7 +1369,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 		"key":         obfuscateKey(newKey),
 		"status":      "ok",
 		"api_id":      "--",
-		"org_id":      newSession.GetOrgID(),
+		"org_id":      newSession.OrgID,
 		"user_id":     "system",
 		"user_ip":     requestIPHops(r),
 		"path":        "--",
@@ -2073,11 +2073,11 @@ func userRatesCheck(w http.ResponseWriter, r *http.Request) {
 	}
 
 	returnSession := PublicSession{}
-	returnSession.Quota.QuotaRenews = session.GetQuotaRenews()
-	returnSession.Quota.QuotaRemaining = session.GetQuotaRemaining()
-	returnSession.Quota.QuotaMax = session.GetQuotaMax()
-	returnSession.RateLimit.Rate = session.GetRate()
-	returnSession.RateLimit.Per = session.GetPer()
+	returnSession.Quota.QuotaRenews = session.QuotaRenews
+	returnSession.Quota.QuotaRemaining = session.QuotaRemaining
+	returnSession.Quota.QuotaMax = session.QuotaMax
+	returnSession.RateLimit.Rate = session.Rate
+	returnSession.RateLimit.Per = session.Per
 
 	doJSONWrite(w, http.StatusOK, returnSession)
 }

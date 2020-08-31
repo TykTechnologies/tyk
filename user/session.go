@@ -116,84 +116,6 @@ type SessionState struct {
 	keyHash string
 }
 
-func (s *SessionState) SetLastCheck(lastCheck int64) {
-	s.Mutex.Lock()
-	s.LastCheck = lastCheck
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetAllowance(allowance float64) {
-	s.Mutex.Lock()
-	s.Allowance = allowance
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetRate(rate float64) {
-	s.Mutex.Lock()
-	s.Rate = rate
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetPer(per float64) {
-	s.Mutex.Lock()
-	s.Per = per
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetThrottleInterval(throttleInterval float64) {
-	s.Mutex.Lock()
-	s.ThrottleInterval = throttleInterval
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetThrottleRetryLimit(throttleRetryLimit int) {
-	s.Mutex.Lock()
-	s.ThrottleRetryLimit = throttleRetryLimit
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetMaxQueryDepth(maxQueryDepth int) {
-	s.Mutex.Lock()
-	s.MaxQueryDepth = maxQueryDepth
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetDateCreated(dateCreated time.Time) {
-	s.Mutex.Lock()
-	s.DateCreated = dateCreated
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetExpires(expires int64) {
-	s.Mutex.Lock()
-	s.Expires = expires
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetQuotaMax(quotaMax int64) {
-	s.Mutex.Lock()
-	s.QuotaMax = quotaMax
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetQuotaRenews(quotaRenews int64) {
-	s.Mutex.Lock()
-	s.QuotaRenews = quotaRenews
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetQuotaRemaining(quotaRemaining int64) {
-	s.Mutex.Lock()
-	s.QuotaRemaining = quotaRemaining
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetQuotaRenewalRate(quotaRenewalRate int64) {
-	s.Mutex.Lock()
-	s.QuotaRenewalRate = quotaRenewalRate
-	s.Mutex.Unlock()
-}
-
 func (s *SessionState) SetAccessRights(accessRights map[string]AccessDefinition) {
 	s.Mutex.Lock()
 	s.AccessRights = accessRights
@@ -203,126 +125,6 @@ func (s *SessionState) SetAccessRights(accessRights map[string]AccessDefinition)
 func (s *SessionState) SetAccessRight(key string, accessRight AccessDefinition) {
 	s.Mutex.Lock()
 	s.AccessRights[key] = accessRight
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetOrgID(orgId string) {
-	s.Mutex.Lock()
-	s.OrgID = orgId
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetOauthClientID(oauthClientId string) {
-	s.Mutex.Lock()
-	s.OauthClientID = oauthClientId
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetOauthKeys(oauthKeys map[string]string) {
-	s.Mutex.Lock()
-	s.OauthKeys = oauthKeys
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) AppendOauthKey(key string, oauthKey string) {
-	s.Mutex.Lock()
-	s.OauthKeys[key] = oauthKey
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetCertificate(certificate string) {
-	s.Mutex.Lock()
-	s.Certificate = certificate
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetBasicAuthData(data BasicAuthData) {
-	s.Mutex.Lock()
-	s.BasicAuthData = data
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetBasicAuthDataPassword(password string) {
-	s.Mutex.Lock()
-	s.BasicAuthData.Password = password
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetBasicAuthDataHash(hash HashType) {
-	s.Mutex.Lock()
-	s.BasicAuthData.Hash = hash
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetJWTData(jwtData JWTData) {
-	s.Mutex.Lock()
-	s.JWTData = jwtData
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetHMACEnabled(hmacEnabled bool) {
-	s.Mutex.Lock()
-	s.HMACEnabled = hmacEnabled
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetEnableHTTPSignatureValidation(enableHttpSignatureValidation bool) {
-	s.Mutex.Lock()
-	s.EnableHTTPSignatureValidation = enableHttpSignatureValidation
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetHmacSecret(hmacSecret string) {
-	s.Mutex.Lock()
-	s.HmacSecret = hmacSecret
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetRSACertificateId(rsaCertificateId string) {
-	s.Mutex.Lock()
-	s.RSACertificateId = rsaCertificateId
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetIsInactive(isInactive bool) {
-	s.Mutex.Lock()
-	s.IsInactive = isInactive
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetApplyPolicyID(applyPolicyId string) {
-	s.Mutex.Lock()
-	s.ApplyPolicyID = applyPolicyId
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetApplyPolicies(applyPolicies []string) {
-	s.Mutex.Lock()
-	s.ApplyPolicies = applyPolicies
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetDataExpires(dataExpires int64) {
-	s.Mutex.Lock()
-	s.DataExpires = dataExpires
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetMonitor(monitor Monitor) {
-	s.Mutex.Lock()
-	s.Monitor = monitor
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetEnableDetailRecording(enableDetailRecording bool) {
-	s.Mutex.Lock()
-	s.EnableDetailRecording = enableDetailRecording
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetEnableDetailedRecording(enableDetailedRecording bool) {
-	s.Mutex.Lock()
-	s.EnableDetailedRecording = enableDetailedRecording
 	s.Mutex.Unlock()
 }
 
@@ -344,45 +146,11 @@ func (s *SessionState) RemoveMetaData(key string) {
 	s.Mutex.Unlock()
 }
 
-func (s *SessionState) SetTags(tags []string) {
-	s.Mutex.Lock()
-	s.Tags = tags
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetAlias(alias string) {
-	s.Mutex.Lock()
-	s.Alias = alias
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetLastUpdated(lastUpdated string) {
-	s.Mutex.Lock()
-	s.LastUpdated = lastUpdated
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetIdExtractorDeadline(idExtractorDeadline int64) {
-	s.Mutex.Lock()
-	s.IdExtractorDeadline = idExtractorDeadline
-	s.Mutex.Unlock()
-}
-
-func (s *SessionState) SetSessionLifetime(sessionLifetime int64) {
-	s.Mutex.Lock()
-	s.SessionLifetime = sessionLifetime
-	s.Mutex.Unlock()
-}
-
 func (s *SessionState) SetKeyHash(hash string) {
-	s.Mutex.Lock()
 	s.keyHash = hash
-	s.Mutex.Unlock()
 }
 
 func (s *SessionState) KeyHashEmpty() bool {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
 	return s.keyHash == ""
 }
 
@@ -391,92 +159,12 @@ func (s *SessionState) Lifetime(fallback int64) int64 {
 		return config.Global().GlobalSessionLifetime
 	}
 	if s.SessionLifetime > 0 {
-		s.Mutex.RLock()
-		defer s.Mutex.RUnlock()
 		return s.SessionLifetime
 	}
 	if fallback > 0 {
 		return fallback
 	}
 	return 0
-}
-
-func (s *SessionState) GetLastCheck() (lastCheck int64) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.LastCheck
-}
-
-func (s *SessionState) GetAllowance() (allowance float64) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.Allowance
-}
-
-func (s *SessionState) GetRate() (rate float64) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.Rate
-}
-
-func (s *SessionState) GetPer() (per float64) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.Per
-}
-
-func (s *SessionState) GetThrottleInterval() (throttleInterval float64) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.ThrottleInterval
-}
-
-func (s *SessionState) GetThrottleRetryLimit() (throttleRetryLimit int) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.ThrottleRetryLimit
-}
-
-func (s *SessionState) GetMaxQueryDepth() (maxQueryDepth int) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.MaxQueryDepth
-}
-
-func (s *SessionState) GetDateCreated() (dateCreated time.Time) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.DateCreated
-}
-
-func (s *SessionState) GetExpires() (expires int64) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.Expires
-}
-
-func (s *SessionState) GetQuotaMax() (quotaMax int64) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.QuotaMax
-}
-
-func (s *SessionState) GetQuotaRenews() (quotaRenews int64) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.QuotaRenews
-}
-
-func (s *SessionState) GetQuotaRemaining() (quotaRemaining int64) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.QuotaRemaining
-}
-
-func (s *SessionState) GetQuotaRenewalRate() (renewalRate int64) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.QuotaRenewalRate
 }
 
 func (s *SessionState) GetAccessRights() (AccessRights map[string]AccessDefinition) {
@@ -490,72 +178,6 @@ func (s *SessionState) GetAccessRightByAPIID(key string) (AccessRight AccessDefi
 	defer s.Mutex.RUnlock()
 	accessRight, found := s.AccessRights[key]
 	return accessRight, found
-}
-
-func (s *SessionState) GetOrgID() (orgId string) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.OrgID
-}
-
-func (s *SessionState) GetOauthClientID() (oauthClientID string) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.OauthClientID
-}
-
-func (s *SessionState) GetOauthKeys() (oauthKeys map[string]string) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.OauthKeys
-}
-
-func (s *SessionState) GetCertificate() (certificate string) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.Certificate
-}
-
-func (s *SessionState) GetBasicAuthData() (basicAuthData BasicAuthData) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.BasicAuthData
-}
-
-func (s *SessionState) GetJWTData() (jwtData JWTData) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.JWTData
-}
-
-func (s *SessionState) GetHMACEnabled() (hmacEnabled bool) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.HMACEnabled
-}
-
-func (s *SessionState) GetEnableHTTPSignatureValidation() (enableHTTPSignatureValidation bool) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.EnableHTTPSignatureValidation
-}
-
-func (s *SessionState) GetHmacSecret() (hmacSecret string) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.HmacSecret
-}
-
-func (s *SessionState) GetRSACertificateId() (rsaCertificateId string) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.RSACertificateId
-}
-
-func (s *SessionState) GetIsInactive() (isInactive bool) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.IsInactive
 }
 
 // PolicyIDs returns the IDs of all the policies applied to this
@@ -574,43 +196,6 @@ func (s *SessionState) GetPolicyIDs() []string {
 	return nil
 }
 
-func (s *SessionState) GetApplyPolicies() (policies []string) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.ApplyPolicies
-}
-
-func (s *SessionState) GetApplyPolicyID() (policy string) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.ApplyPolicyID
-}
-
-func (s *SessionState) GetDataExpires() (dataExpires int64) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.DataExpires
-}
-
-func (s *SessionState) GetMonitor() (monitor Monitor) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.Monitor
-}
-
-// Deprecated: EnableDetailedRecording is deprecated
-func (s *SessionState) GetEnableDetailRecording() (enableDetailRecording bool) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.EnableDetailRecording
-}
-
-func (s *SessionState) GetEnableDetailedRecording() (enableDetailedRecording bool) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.EnableDetailedRecording
-}
-
 func (s *SessionState) GetMetaData() (metaData map[string]interface{}) {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
@@ -624,45 +209,11 @@ func (s *SessionState) GetMetaDataByKey(key string) (metaData interface{}, found
 	return value, ok
 }
 
-func (s *SessionState) GetTags() (tags []string) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.Tags
-}
-
-func (s *SessionState) GetAlias() (alias string) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.Alias
-}
-
-func (s *SessionState) GetLastUpdated() (lastUpdated string) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.LastUpdated
-}
-
-func (s *SessionState) GetIdExtractorDeadline() (idExtractorDeadline int64) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.IdExtractorDeadline
-}
-
-func (s *SessionState) GetSessionLifetime() (sessionLifeTime int64) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
-	return s.SessionLifetime
-}
-
 func (s *SessionState) MD5Hash() string {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
 	return fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%+v", s))))
 }
 
 func (s *SessionState) GetKeyHash() string {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
 	if s.keyHash == "" {
 		panic("KeyHash cache not found. You should call `SetKeyHash` before.")
 	}
@@ -671,10 +222,8 @@ func (s *SessionState) GetKeyHash() string {
 }
 
 func (s *SessionState) SetPolicies(ids ...string) {
-	s.Mutex.Lock()
 	s.ApplyPolicyID = ""
 	s.ApplyPolicies = ids
-	s.Mutex.Unlock()
 }
 
 // PoliciesEqualTo compares and returns true if passed slice if IDs contains only current ApplyPolicies

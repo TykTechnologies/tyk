@@ -185,8 +185,8 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		session := ctxGetSession(r)
 		tags := make([]string, 0, estimateTagsCapacity(session, e.Spec))
 		if session != nil {
-			oauthClientID = session.GetOauthClientID()
-			alias = session.GetAlias()
+			oauthClientID = session.OauthClientID
+			alias = session.Alias
 			tags = append(tags, getSessionTags(session)...)
 		}
 

@@ -136,7 +136,7 @@ func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (sessionID string, ret
 	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(&sessionID, r)
 
 	if keyExists {
-		if previousSession.GetIdExtractorDeadline() > time.Now().Unix() {
+		if previousSession.IdExtractorDeadline > time.Now().Unix() {
 			ctxSetSession(r, &previousSession, sessionID, true)
 			returnOverrides = ReturnOverrides{
 				ResponseCode: 200,
@@ -209,7 +209,7 @@ func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(&SessionID, r)
 
 	if keyExists {
-		if previousSession.GetIdExtractorDeadline() > time.Now().Unix() {
+		if previousSession.IdExtractorDeadline > time.Now().Unix() {
 			ctxSetSession(r, &previousSession, SessionID, true)
 			returnOverrides = ReturnOverrides{
 				ResponseCode: 200,
@@ -284,7 +284,7 @@ func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 
 	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(&SessionID, r)
 	if keyExists {
-		if previousSession.GetIdExtractorDeadline() > time.Now().Unix() {
+		if previousSession.IdExtractorDeadline > time.Now().Unix() {
 			ctxSetSession(r, &previousSession, SessionID, true)
 			returnOverrides = ReturnOverrides{
 				ResponseCode: 200,

@@ -47,8 +47,8 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 		per = apiLimit.Per
 		rate = apiLimit.Rate
 	} else {
-		per = currentSession.GetPer()
-		rate = currentSession.GetRate()
+		per = currentSession.Per
+		rate = currentSession.Rate
 	}
 
 	log.Debug("[RATELIMIT] Inbound raw key is: ", key)
@@ -131,7 +131,7 @@ func (l *SessionLimiter) limitDRL(currentSession *user.SessionState, key string,
 		l.bucketStore = memorycache.New()
 	}
 
-	bucketKey := key + ":" + rateScope + currentSession.GetLastUpdated()
+	bucketKey := key + ":" + rateScope + currentSession.LastUpdated
 	currRate := apiLimit.Rate
 	per := apiLimit.Per
 
@@ -193,13 +193,13 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 
 	if apiLimit == nil {
 		apiLimit = &user.APILimit{
-			QuotaMax:           currentSession.GetQuotaMax(),
-			QuotaRenewalRate:   currentSession.GetQuotaRenewalRate(),
-			QuotaRenews:        currentSession.GetQuotaRenews(),
-			Rate:               currentSession.GetRate(),
-			Per:                currentSession.GetPer(),
-			ThrottleInterval:   currentSession.GetThrottleInterval(),
-			ThrottleRetryLimit: currentSession.GetThrottleRetryLimit(),
+			QuotaMax:           currentSession.QuotaMax,
+			QuotaRenewalRate:   currentSession.QuotaRenewalRate,
+			QuotaRenews:        currentSession.QuotaRenews,
+			Rate:               currentSession.Rate,
+			Per:                currentSession.Per,
+			ThrottleInterval:   currentSession.ThrottleInterval,
+			ThrottleRetryLimit: currentSession.ThrottleRetryLimit,
 		}
 	}
 
@@ -245,7 +245,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 
 	if enableQ {
 		if globalConf.LegacyEnableAllowanceCountdown {
-			currentSession.SetAllowance(currentSession.GetAllowance() - 1)
+			currentSession.Allowance = currentSession.Allowance - 1
 		}
 
 		if l.RedisQuotaExceeded(r, currentSession, allowanceScope, apiLimit, store) {
@@ -328,8 +328,8 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 	}
 
 	if scope == "" {
-		currentSession.SetQuotaRemaining(remaining)
-		currentSession.SetQuotaRenews(quotaRenews)
+		currentSession.QuotaRemaining = remaining
+		currentSession.QuotaRenews = quotaRenews
 	}
 
 	return false

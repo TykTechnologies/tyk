@@ -170,7 +170,7 @@ func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.T
 	if !rawKeyExists {
 		return nil, errors.New("token invalid, key not found")
 	}
-	return []byte(session.GetJWTData().Secret), nil
+	return []byte(session.JWTData.Secret), nil
 }
 
 func (k *JWTMiddleware) getPolicyIDFromToken(claims jwt.MapClaims) (string, bool) {
@@ -325,8 +325,8 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		// If base policy is one of the defaults, apply other ones as well
 		if isDefaultPol {
 			for _, pol := range k.Spec.JWTDefaultPolicies {
-				if !contains(session.GetApplyPolicies(), pol) {
-					session.SetApplyPolicies(append(session.GetApplyPolicies(), pol))
+				if !contains(session.ApplyPolicies, pol) {
+					session.ApplyPolicies = append(session.ApplyPolicies, pol)
 				}
 			}
 		}
@@ -343,13 +343,13 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 
 		//override session expiry with JWT if longer lived
 		if f, ok := claims["exp"].(float64); ok {
-			if int64(f)-session.GetExpires() > 0 {
-				session.SetExpires(int64(f))
+			if int64(f)-session.Expires > 0 {
+				session.Expires = int64(f)
 			}
 		}
 
 		session.SetMetaData(map[string]interface{}{"TykJWTSessionID": sessionID})
-		session.SetAlias(baseFieldData)
+		session.Alias = baseFieldData
 
 		// Update the session in the session manager in case it gets called again
 		updateSession = true
@@ -413,8 +413,8 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 
 			if isDefaultPol {
 				for _, pol := range k.Spec.JWTDefaultPolicies {
-					if !contains(session.GetApplyPolicies(), pol) {
-						session.SetApplyPolicies(append(session.GetApplyPolicies(), pol))
+					if !contains(session.ApplyPolicies, pol) {
+						session.ApplyPolicies = append(session.ApplyPolicies, pol)
 					}
 				}
 			}
@@ -428,8 +428,8 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 
 		//override session expiry with JWT if longer lived
 		if f, ok := claims["exp"].(float64); ok {
-			if int64(f)-session.GetExpires() > 0 {
-				session.SetExpires(int64(f))
+			if int64(f)-session.Expires > 0 {
+				session.Expires = int64(f)
 				updateSession = true
 			}
 		}

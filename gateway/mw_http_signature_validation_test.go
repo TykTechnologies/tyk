@@ -50,31 +50,31 @@ const hmacAuthDef = `{
 
 func createHMACAuthSession() *user.SessionState {
 	session := new(user.SessionState)
-	session.SetRate(8.0)
-	session.SetAllowance(session.GetRate())
-	session.SetLastCheck(time.Now().Unix())
-	session.SetPer(1.0)
-	session.SetQuotaRenewalRate(300) // 5 minutes
-	session.SetQuotaRenews(time.Now().Unix() + 20)
-	session.SetQuotaRemaining(1)
-	session.SetQuotaMax(-1)
-	session.SetHMACEnabled(true)
-	session.SetHmacSecret("9879879878787878")
+	session.Rate = 8.0
+	session.Allowance = session.Rate
+	session.LastCheck = time.Now().Unix()
+	session.Per = 1.0
+	session.QuotaRenewalRate = 300 // 5 minutes
+	session.QuotaRenews = time.Now().Unix() + 20
+	session.QuotaRemaining = 1
+	session.QuotaMax = -1
+	session.HMACEnabled = true
+	session.HmacSecret = "9879879878787878"
 	return session
 }
 
 func createRSAAuthSession(pubCertId string) *user.SessionState {
 	session := new(user.SessionState)
-	session.SetRate(8.0)
-	session.SetAllowance(session.GetRate())
-	session.SetLastCheck(time.Now().Unix())
-	session.SetPer(1.0)
-	session.SetQuotaRenewalRate(300) // 5 minutes
-	session.SetQuotaRenews(time.Now().Unix() + 20)
-	session.SetQuotaRemaining(1)
-	session.SetQuotaMax(-1)
-	session.SetEnableHTTPSignatureValidation(true)
-	session.SetRSACertificateId(pubCertId)
+	session.Rate = 8.0
+	session.Allowance = session.Rate
+	session.LastCheck = time.Now().Unix()
+	session.Per = 1.0
+	session.QuotaRenewalRate = 300 // 5 minutes
+	session.QuotaRenews = time.Now().Unix() + 20
+	session.QuotaRemaining = 1
+	session.QuotaMax = -1
+	session.EnableHTTPSignatureValidation = true
+	session.RSACertificateId = pubCertId
 	return session
 }
 

@@ -443,7 +443,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			returnedSession.AppendMetaData(k, string(v))
 		}
 
-		returnedSession.SetOrgID(m.Spec.OrgID)
+		returnedSession.OrgID = m.Spec.OrgID
 
 		if err := m.ApplyPolicies(returnedSession); err != nil {
 			AuthFailed(m, r, r.Header.Get(m.Spec.Auth.AuthHeaderName))
@@ -452,8 +452,8 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 		existingSession, found := GlobalSessionManager.SessionDetail(m.Spec.OrgID, sessionID, false)
 		if found {
-			returnedSession.SetQuotaRenews(existingSession.GetQuotaRenews())
-			returnedSession.SetQuotaRemaining(existingSession.GetQuotaRemaining())
+			returnedSession.QuotaRenews = existingSession.QuotaRenews
+			returnedSession.QuotaRemaining = existingSession.QuotaRemaining
 
 			for api := range returnedSession.GetAccessRights() {
 				if _, found := existingSession.GetAccessRightByAPIID(api); found {

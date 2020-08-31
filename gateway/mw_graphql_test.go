@@ -88,11 +88,11 @@ func TestGraphQL(t *testing.T) {
 	})
 
 	policyAppliedSession, policyAppliedKey := g.CreateSession(func(s *user.SessionState) {
-		s.SetApplyPolicies([]string{pID})
+		s.ApplyPolicies = []string{pID}
 	})
 
 	directSession, directKey := g.CreateSession(func(s *user.SessionState) {
-		s.SetMaxQueryDepth(1)
+		s.MaxQueryDepth = 1
 		s.AccessRights = map[string]user.AccessDefinition{
 			spec.APIID: {
 				APIID:   spec.APIID,
@@ -116,7 +116,7 @@ func TestGraphQL(t *testing.T) {
 	}
 
 	t.Run("Depth limit exceeded", func(t *testing.T) {
-		if directSession.GetMaxQueryDepth() != 1 || policyAppliedSession.GetMaxQueryDepth() != 1 {
+		if directSession.MaxQueryDepth != 1 || policyAppliedSession.MaxQueryDepth != 1 {
 			t.Fatal("MaxQueryDepth couldn't be applied to key")
 		}
 
@@ -128,14 +128,14 @@ func TestGraphQL(t *testing.T) {
 
 	t.Run("Unlimited query depth", func(t *testing.T) {
 		t.Run("0", func(t *testing.T) {
-			directSession.SetMaxQueryDepth(0)
+			directSession.MaxQueryDepth = 0
 			_ = GlobalSessionManager.UpdateSession(directKey, directSession, 0, false)
 
 			_, _ = g.Run(t, test.TestCase{Headers: authHeaderWithDirectKey, Data: request, BodyMatch: "hello", Code: http.StatusOK})
 		})
 
 		t.Run("-1", func(t *testing.T) {
-			directSession.SetMaxQueryDepth(-1)
+			directSession.MaxQueryDepth = -1
 			_ = GlobalSessionManager.UpdateSession(directKey, directSession, 0, false)
 
 			_, _ = g.Run(t, test.TestCase{Headers: authHeaderWithDirectKey, Data: request, BodyMatch: "hello", Code: http.StatusOK})
@@ -143,7 +143,7 @@ func TestGraphQL(t *testing.T) {
 	})
 
 	t.Run("Valid query should successfully work", func(t *testing.T) {
-		directSession.SetMaxQueryDepth(2)
+		directSession.MaxQueryDepth = 2
 		_ = GlobalSessionManager.UpdateSession(directKey, directSession, 0, false)
 
 		_, _ = g.Run(t, test.TestCase{Headers: authHeaderWithDirectKey, Data: request, BodyMatch: "hello", Code: http.StatusOK})

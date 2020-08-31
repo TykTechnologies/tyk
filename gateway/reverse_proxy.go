@@ -898,7 +898,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 		var alias string
 		if session != nil {
-			alias = session.GetAlias()
+			alias = session.Alias
 		}
 
 		p.logger.WithFields(logrus.Fields{

@@ -18,7 +18,7 @@ func (Monitor) Fire(sessionData *user.SessionState, key string, triggerLimit, us
 		Type: EventTriggerExceeded,
 		Meta: EventTriggerExceededMeta{
 			EventMetaDefault: EventMetaDefault{Message: "Quota trigger reached"},
-			OrgID:            sessionData.GetOrgID(),
+			OrgID:            sessionData.OrgID,
 			Key:              key,
 			TriggerLimit:     int64(triggerLimit),
 			UsagePercentage:  int64(usagePercentage),
@@ -34,7 +34,7 @@ func (m Monitor) Check(sessionData *user.SessionState, key string) {
 		return
 	}
 
-	if m.checkLimit(sessionData, key, sessionData.GetQuotaMax(), sessionData.GetQuotaRemaining(), sessionData.GetQuotaRenews()) {
+	if m.checkLimit(sessionData, key, sessionData.QuotaMax, sessionData.QuotaRemaining, sessionData.QuotaRenews) {
 		return
 	}
 
@@ -75,7 +75,7 @@ func (m Monitor) checkLimit(sessionData *user.SessionState, key string, quotaMax
 		return true
 	}
 
-	for _, triggerLimit := range sessionData.GetMonitor().TriggerLimits {
+	for _, triggerLimit := range sessionData.Monitor.TriggerLimits {
 		if usagePerc >= triggerLimit && triggerLimit != config.Global().Monitor.GlobalTriggerLimit {
 			log.Info("Firing...")
 			m.Fire(sessionData, key, triggerLimit, usagePerc)

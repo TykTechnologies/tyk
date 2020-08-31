@@ -385,7 +385,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 		{
 			"InactiveMergeOne", []string{"tags1", "inactive1"},
 			"", func(t *testing.T, s *user.SessionState) {
-				if !s.GetIsInactive() {
+				if !s.IsInactive {
 					t.Fatalf("want IsInactive to be true")
 				}
 			}, nil,
@@ -393,7 +393,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 		{
 			"InactiveMergeAll", []string{"inactive1", "inactive2"},
 			"", func(t *testing.T, s *user.SessionState) {
-				if !s.GetIsInactive() {
+				if !s.IsInactive {
 					t.Fatalf("want IsInactive to be true")
 				}
 			}, nil,
@@ -401,7 +401,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 		{
 			"InactiveWithSession", []string{"tags1", "tags2"},
 			"", func(t *testing.T, s *user.SessionState) {
-				if !s.GetIsInactive() {
+				if !s.IsInactive {
 					t.Fatalf("want IsInactive to be true")
 				}
 			}, &user.SessionState{
@@ -479,7 +479,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 		{
 			"ComplexityPart with unlimited", []string{"unlimitedComplexity"},
 			"", func(t *testing.T, s *user.SessionState) {
-				if s.GetMaxQueryDepth() != -1 {
+				if s.MaxQueryDepth != -1 {
 					t.Fatalf("unlimitied query depth should be -1")
 				}
 			}, nil,
@@ -487,7 +487,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 		{
 			"ComplexityPart", []string{"complexity1"},
 			"", func(t *testing.T, s *user.SessionState) {
-				if s.GetMaxQueryDepth() != 2 {
+				if s.MaxQueryDepth != 2 {
 					t.Fatalf("want MaxQueryDepth to be 2")
 				}
 			}, nil,
@@ -495,7 +495,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 		{
 			"ComplexityParts", []string{"complexity1", "complexity2"},
 			"", func(t *testing.T, s *user.SessionState) {
-				if s.GetMaxQueryDepth() != 3 {
+				if s.MaxQueryDepth != 3 {
 					t.Fatalf("Should pick bigger value")
 				}
 			}, nil,
@@ -653,7 +653,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 		{
 			"Throttle interval from policy", []string{"throttle1"},
 			"", func(t *testing.T, s *user.SessionState) {
-				if s.GetThrottleInterval() != 9 {
+				if s.ThrottleInterval != 9 {
 					t.Fatalf("Throttle interval should be 9 inherited from policy")
 				}
 			}, nil,
@@ -663,7 +663,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			policies: []string{"throttle1"},
 			errMatch: "",
 			sessMatch: func(t *testing.T, s *user.SessionState) {
-				if s.GetThrottleRetryLimit() != 99 {
+				if s.ThrottleRetryLimit != 99 {
 					t.Fatalf("Throttle interval should be 9 inherited from policy")
 				}
 			},

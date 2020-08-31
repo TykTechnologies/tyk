@@ -215,7 +215,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 
 		session.OrgID = k.Spec.OrgID
 		session.SetMetaData(map[string]interface{}{"TykJWTSessionID": sessionID, "ClientID": clientID})
-		session.SetAlias(clientID + ":" + ouser.ID)
+		session.Alias = clientID + ":" + ouser.ID
 
 		// Update the session in the session manager in case it gets called again
 		logger.Debug("Policy applied to key")

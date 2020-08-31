@@ -40,15 +40,15 @@ func TestMain(m *testing.M) {
 
 func createNonThrottledSession() *user.SessionState {
 	session := new(user.SessionState)
-	session.SetRate(100.0)
-	session.SetAllowance(session.GetRate())
-	session.SetLastCheck(time.Now().Unix())
-	session.SetPer(1.0)
-	session.SetQuotaRenewalRate(300) // 5 minutes
-	session.SetQuotaRenews(time.Now().Unix())
-	session.SetQuotaRemaining(10)
-	session.SetQuotaMax(10)
-	session.SetAlias("TEST-ALIAS")
+	session.Rate = 100.0
+	session.Allowance = session.Rate
+	session.LastCheck = time.Now().Unix()
+	session.Per = 1.0
+	session.QuotaRenewalRate = 300 // 5 minutes
+	session.QuotaRenews = time.Now().Unix()
+	session.QuotaRemaining = 10
+	session.QuotaMax = 10
+	session.Alias = "TEST-ALIAS"
 	return session
 }
 
@@ -572,7 +572,7 @@ func TestAnalytics(t *testing.T) {
 		})
 
 		key := CreateSession(func(sess *user.SessionState) {
-			sess.SetEnableDetailRecording(true)
+			sess.EnableDetailRecording = true
 		})
 
 		authHeaders := map[string]string{
@@ -1286,12 +1286,12 @@ func TestCacheAllSafeRequestsWithCachedHeaders(t *testing.T) {
 
 	headerCache := map[string]string{"x-tyk-cached-response": "1"}
 	sess1token := CreateSession(func(s *user.SessionState) {
-		s.SetRate(1)
-		s.SetPer(60)
+		s.Rate = 1
+		s.Per = 60
 	})
 	sess2token := CreateSession(func(s *user.SessionState) {
-		s.SetRate(1)
-		s.SetPer(60)
+		s.Rate = 1
+		s.Per = 60
 	})
 
 	ts.Run(t, []test.TestCase{
@@ -1919,14 +1919,14 @@ func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
 	})
 
 	sess1token := CreateSession(func(s *user.SessionState) {
-		s.SetRate(1)
-		s.SetPer(60)
+		s.Rate = 1
+		s.Per = 60
 	})
 	defer GlobalSessionManager.RemoveSession("default", sess1token, false)
 
 	sess2token := CreateSession(func(s *user.SessionState) {
-		s.SetRate(1)
-		s.SetPer(60)
+		s.Rate = 1
+		s.Per = 60
 	})
 	defer GlobalSessionManager.RemoveSession("default", sess2token, false)
 

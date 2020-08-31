@@ -231,8 +231,8 @@ func (t BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
 	if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
 		// If exists, assume it has been authorized and pass on
 		// We cache org expiry data
-		t.Logger().Debug("Setting data expiry: ", session.GetOrgID())
-		ExpiryCache.Set(session.GetOrgID(), session.GetDataExpires(), cache.DefaultExpiration)
+		t.Logger().Debug("Setting data expiry: ", session.OrgID)
+		ExpiryCache.Set(session.OrgID, session.DataExpires, cache.DefaultExpiration)
 	}
 
 	session.SetKeyHash(storage.HashKey(orgID))
@@ -253,7 +253,7 @@ func (t BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 		}
 		s, found := t.OrgSession(orgid)
 		if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
-			return s.GetDataExpires(), nil
+			return s.DataExpires, nil
 		}
 		return 0, errors.New("missing session")
 	})
@@ -421,15 +421,15 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 						ar.Limit.QuotaMax = policy.QuotaMax
 						//if partition for quota is set the we must use this value in the global information of the key
-						if greaterThanInt64(policy.QuotaMax, session.GetQuotaMax()) || policy.Partitions.Quota {
-							session.SetQuotaMax(policy.QuotaMax)
+						if greaterThanInt64(policy.QuotaMax, session.QuotaMax) || policy.Partitions.Quota {
+							session.QuotaMax = policy.QuotaMax
 						}
 					}
 
 					if policy.QuotaRenewalRate > ar.Limit.QuotaRenewalRate {
 						ar.Limit.QuotaRenewalRate = policy.QuotaRenewalRate
-						if policy.QuotaRenewalRate > session.GetQuotaRenewalRate() {
-							session.SetQuotaRenewalRate(policy.QuotaRenewalRate)
+						if policy.QuotaRenewalRate > session.QuotaRenewalRate {
+							session.QuotaRenewalRate = policy.QuotaRenewalRate
 						}
 					}
 				}
@@ -440,29 +440,29 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					if greaterThanFloat64(policy.Rate, ar.Limit.Rate) {
 						ar.Limit.Rate = policy.Rate
 						//if policy.Partitions.RateLimit then we must set this value in the global data of the key
-						if greaterThanFloat64(policy.Rate, session.GetRate()) || policy.Partitions.RateLimit {
-							session.SetRate(policy.Rate)
+						if greaterThanFloat64(policy.Rate, session.Rate) || policy.Partitions.RateLimit {
+							session.Rate = policy.Rate
 						}
 					}
 
 					if policy.Per > ar.Limit.Per {
 						ar.Limit.Per = policy.Per
-						if policy.Per > session.GetPer() {
-							session.SetPer(policy.Per)
+						if policy.Per > session.Per {
+							session.Per = policy.Per
 						}
 					}
 
 					if policy.ThrottleRetryLimit > ar.Limit.ThrottleRetryLimit {
 						ar.Limit.ThrottleRetryLimit = policy.ThrottleRetryLimit
-						if policy.ThrottleRetryLimit > session.GetThrottleRetryLimit() {
-							session.SetThrottleRetryLimit(policy.ThrottleRetryLimit)
+						if policy.ThrottleRetryLimit > session.ThrottleRetryLimit {
+							session.ThrottleRetryLimit = policy.ThrottleRetryLimit
 						}
 					}
 
 					if policy.ThrottleInterval > ar.Limit.ThrottleInterval {
 						ar.Limit.ThrottleInterval = policy.ThrottleInterval
-						if policy.ThrottleInterval > session.GetThrottleInterval() {
-							session.SetThrottleInterval(policy.ThrottleInterval)
+						if policy.ThrottleInterval > session.ThrottleInterval {
+							session.ThrottleInterval = policy.ThrottleInterval
 						}
 					}
 				}
@@ -472,8 +472,8 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 					if greaterThanInt(policy.MaxQueryDepth, ar.Limit.MaxQueryDepth) {
 						ar.Limit.MaxQueryDepth = policy.MaxQueryDepth
-						if greaterThanInt(policy.MaxQueryDepth, session.GetMaxQueryDepth()) {
-							session.SetMaxQueryDepth(policy.MaxQueryDepth)
+						if greaterThanInt(policy.MaxQueryDepth, session.MaxQueryDepth) {
+							session.MaxQueryDepth = policy.MaxQueryDepth
 						}
 					}
 				}
@@ -491,54 +491,54 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 			// Master policy case
 			if len(policy.AccessRights) == 0 {
 				if !usePartitions || policy.Partitions.RateLimit {
-					session.SetRate(policy.Rate)
-					session.SetPer(policy.Per)
-					session.SetThrottleInterval(policy.ThrottleInterval)
-					session.SetThrottleRetryLimit(policy.ThrottleRetryLimit)
+					session.Rate = policy.Rate
+					session.Per = policy.Per
+					session.ThrottleInterval = policy.ThrottleInterval
+					session.ThrottleRetryLimit = policy.ThrottleRetryLimit
 				}
 
 				if !usePartitions || policy.Partitions.Complexity {
-					session.SetMaxQueryDepth(policy.MaxQueryDepth)
+					session.MaxQueryDepth = policy.MaxQueryDepth
 				}
 
 				if !usePartitions || policy.Partitions.Quota {
-					session.SetQuotaMax(policy.QuotaMax)
-					session.SetQuotaRenewalRate(policy.QuotaRenewalRate)
+					session.QuotaMax = policy.QuotaMax
+					session.QuotaRenewalRate = policy.QuotaRenewalRate
 				}
 			}
 
-			if !session.GetHMACEnabled() {
-				session.SetHMACEnabled(policy.HMACEnabled)
+			if !session.HMACEnabled {
+				session.HMACEnabled = policy.HMACEnabled
 			}
 
-			if !session.GetEnableHTTPSignatureValidation() {
-				session.SetEnableHTTPSignatureValidation(policy.EnableHTTPSignatureValidation)
+			if !session.EnableHTTPSignatureValidation {
+				session.EnableHTTPSignatureValidation = policy.EnableHTTPSignatureValidation
 			}
 		}
 
-		session.SetIsInactive(session.GetIsInactive() || policy.IsInactive)
+		session.IsInactive = session.IsInactive || policy.IsInactive
 
 		for _, tag := range policy.Tags {
 			tags[tag] = true
 		}
 
 		for k, v := range policy.MetaData {
-			session.MetaData[k] = v
+			session.AppendMetaData(k,v)
 		}
 
-		if policy.LastUpdated > session.GetLastUpdated() {
-			session.SetLastUpdated(policy.LastUpdated)
+		if policy.LastUpdated > session.LastUpdated {
+			session.LastUpdated = policy.LastUpdated
 		}
 	}
 
-	for _, tag := range session.GetTags() {
+	for _, tag := range session.Tags {
 		tags[tag] = true
 	}
 
 	// set tags
-	session.SetTags([]string{})
+	session.Tags = []string{}
 	for tag := range tags {
-		session.SetTags(append(session.GetTags(), tag))
+		session.Tags = append(session.Tags, tag)
 	}
 
 	distinctACL := map[string]bool{}
@@ -551,20 +551,20 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	// If some APIs had only ACL partitions, inherit rest from session level
 	for k, v := range rights {
 		if !didRateLimit[k] {
-			v.Limit.Rate = session.GetRate()
-			v.Limit.Per = session.GetPer()
-			v.Limit.ThrottleInterval = session.GetThrottleInterval()
-			v.Limit.ThrottleRetryLimit = session.GetThrottleRetryLimit()
+			v.Limit.Rate = session.Rate
+			v.Limit.Per = session.Per
+			v.Limit.ThrottleInterval = session.ThrottleInterval
+			v.Limit.ThrottleRetryLimit = session.ThrottleRetryLimit
 		}
 
 		if !didComplexity[k] {
-			v.Limit.MaxQueryDepth = session.GetMaxQueryDepth()
+			v.Limit.MaxQueryDepth = session.MaxQueryDepth
 		}
 
 		if !didQuota[k] {
-			v.Limit.QuotaMax = session.GetQuotaMax()
-			v.Limit.QuotaRenewalRate = session.GetQuotaRenewalRate()
-			v.Limit.QuotaRenews = session.GetQuotaRenews()
+			v.Limit.QuotaMax = session.QuotaMax
+			v.Limit.QuotaRenewalRate = session.QuotaRenewalRate
+			v.Limit.QuotaRenews = session.QuotaRenews
 		}
 
 		// If multime ACL
@@ -583,18 +583,18 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	if len(didQuota) == 1 && len(didRateLimit) == 1 && len(didComplexity) == 1 {
 		for _, v := range rights {
 			if len(didRateLimit) == 1 {
-				session.SetRate(v.Limit.Rate)
-				session.SetPer(v.Limit.Per)
+				session.Rate = v.Limit.Rate
+				session.Per = v.Limit.Per
 			}
 
 			if len(didQuota) == 1 {
-				session.SetQuotaMax(v.Limit.QuotaMax)
-				session.SetQuotaRenews(v.Limit.QuotaRenews)
-				session.SetQuotaRenewalRate(v.Limit.QuotaRenewalRate)
+				session.QuotaMax = v.Limit.QuotaMax
+				session.QuotaRenews = v.Limit.QuotaRenews
+				session.QuotaRenewalRate = v.Limit.QuotaRenewalRate
 			}
 
 			if len(didComplexity) == 1 {
-				session.SetMaxQueryDepth(v.Limit.MaxQueryDepth)
+				session.MaxQueryDepth = v.Limit.MaxQueryDepth
 			}
 		}
 	}

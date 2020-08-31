@@ -43,35 +43,35 @@ const multiAuthDev = `{
 
 func createMultiAuthKeyAuthSession(isBench bool) *user.SessionState {
 	session := new(user.SessionState)
-	session.SetRate(100.0)
-	session.SetAllowance(session.GetRate())
-	session.SetLastCheck(time.Now().Unix())
-	session.SetPer(1.0)
-	session.SetQuotaRenewalRate(300) // 5 minutes
-	session.SetQuotaRenews(time.Now().Unix())
+	session.Rate = 100.0
+	session.Allowance = session.Rate
+	session.LastCheck = time.Now().Unix()
+	session.Per = 1.0
+	session.QuotaRenewalRate = 300 // 5 minutes
+	session.QuotaRenews = time.Now().Unix()
 	if isBench {
-		session.SetQuotaRemaining(100000000)
-		session.SetQuotaMax(100000000)
+		session.QuotaRemaining = 100000000
+		session.QuotaMax = 100000000
 	} else {
-		session.SetQuotaRemaining(900)
-		session.SetQuotaMax(10)
+		session.QuotaRemaining = 900
+		session.QuotaMax = 10
 	}
-	session.SetAccessRights(map[string]user.AccessDefinition{"55": {APIName: "Tyk Multi Key Test", APIID: "55", Versions: []string{"default"}}})
+	session.AccessRights = map[string]user.AccessDefinition{"55": {APIName: "Tyk Multi Key Test", APIID: "55", Versions: []string{"default"}}}
 	return session
 }
 
 func createMultiBasicAuthSession(isBench bool) *user.SessionState {
 	session := new(user.SessionState)
-	session.SetRate(8.0)
-	session.SetAllowance(session.GetRate())
-	session.SetLastCheck(time.Now().Unix())
-	session.SetPer(1.0)
-	session.SetQuotaRenewalRate(300) // 5 minutes
-	session.SetQuotaRenews(time.Now().Unix() + 20)
-	session.SetQuotaRemaining(1)
-	session.SetQuotaMax(-1)
-	session.SetBasicAuthData(user.BasicAuthData{Password: "TEST"})
-	session.SetAccessRights(map[string]user.AccessDefinition{"55": {APIName: "Tyk Multi Key Test", APIID: "55", Versions: []string{"default"}}})
+	session.Rate = 8.0
+	session.Allowance = session.Rate
+	session.LastCheck = time.Now().Unix()
+	session.Per = 1.0
+	session.QuotaRenewalRate = 300 // 5 minutes
+	session.QuotaRenews = time.Now().Unix() + 20
+	session.QuotaRemaining = 1
+	session.QuotaMax = -1
+	session.BasicAuthData = user.BasicAuthData{Password: "TEST"}
+	session.AccessRights = map[string]user.AccessDefinition{"55": {APIName: "Tyk Multi Key Test", APIID: "55", Versions: []string{"default"}}}
 	return session
 }
 
