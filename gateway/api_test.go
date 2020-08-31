@@ -242,6 +242,7 @@ func TestKeyHandler(t *testing.T) {
 		s.AccessRights = map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v1"},
 		}}
+		s.Mutex = &sync.RWMutex{}
 	})
 
 	_, unknownOrgKey := ts.CreateSession(func(s *user.SessionState) {
@@ -249,6 +250,7 @@ func TestKeyHandler(t *testing.T) {
 		s.AccessRights = map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v1"},
 		}}
+		s.Mutex = &sync.RWMutex{}
 	})
 
 	t.Run("Get key", func(t *testing.T) {
@@ -274,6 +276,7 @@ func TestKeyHandler(t *testing.T) {
 			s.AccessRights = map[string]user.AccessDefinition{"test": {
 				APIID: "test", Versions: []string{"v1"},
 			}}
+			s.Mutex = &sync.RWMutex{}
 		})
 
 		assert := func(response *http.Response, expected []string) {
@@ -359,6 +362,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 		s.AccessRights = map[string]user.AccessDefinition{testAPIID: {
 			APIID: testAPIID, Versions: []string{"v1"},
 		}}
+		s.Mutex = &sync.RWMutex{}
 	})
 
 	t.Run("Add policy not enforcing acl", func(t *testing.T) {

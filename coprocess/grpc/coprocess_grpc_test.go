@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 
 	"context"
@@ -273,6 +274,7 @@ func TestGRPCDispatch(t *testing.T) {
 			"testkey":  map[string]interface{}{"nestedkey": "nestedvalue"},
 			"testkey2": "testvalue",
 		}
+		s.Mutex = &sync.RWMutex{}
 	})
 	headers := map[string]string{"authorization": keyID}
 
@@ -382,7 +384,9 @@ func BenchmarkGRPCDispatch(b *testing.B) {
 	defer ts.Close()
 	defer grpcServer.Stop()
 
-	keyID := gateway.CreateSession(func(s *user.SessionState) {})
+	keyID := gateway.CreateSession(func(s *user.SessionState) {
+		s.Mutex = &sync.RWMutex{}
+	})
 	headers := map[string]string{"authorization": keyID}
 
 	b.Run("Pre Hook with SetHeaders", func(b *testing.B) {

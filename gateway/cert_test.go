@@ -17,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -859,6 +860,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 				s.SetAccessRights(map[string]user.AccessDefinition{"test": {
 					APIID: "test", Versions: []string{"v1"},
 				}})
+				s.Mutex = &sync.RWMutex{}
 			})
 
 			if key == "" {
@@ -870,6 +872,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 				s.SetAccessRights(map[string]user.AccessDefinition{"test": {
 					APIID: "test", Versions: []string{"v1"},
 				}})
+				s.Mutex = &sync.RWMutex{}
 			})
 
 			if key != "" {
@@ -917,6 +920,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 				s.SetAccessRights(map[string]user.AccessDefinition{"test": {
 					APIID: "test", Versions: []string{"v1"},
 				}})
+				s.Mutex = &sync.RWMutex{}
 			})
 
 			if key == "" {
@@ -928,6 +932,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 				s.SetAccessRights(map[string]user.AccessDefinition{"test": {
 					APIID: "test", Versions: []string{"v1"},
 				}})
+				s.Mutex = &sync.RWMutex{}
 			})
 
 			if key != "" {

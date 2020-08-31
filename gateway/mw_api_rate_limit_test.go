@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sync"
 	"testing"
 	"time"
 
@@ -177,6 +178,7 @@ func requestThrottlingTest(limiter string, testLevel string) func(t *testing.T) 
 
 				key := CreateSession(func(s *user.SessionState) {
 					s.ApplyPolicies = []string{policyID}
+					s.Mutex = &sync.RWMutex{}
 				})
 
 				authHeaders := map[string]string{

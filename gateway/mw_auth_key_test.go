@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sync"
 	"testing"
 	"time"
 
@@ -160,6 +161,7 @@ func TestSignatureValidation(t *testing.T) {
 			s.MetaData = map[string]interface{}{
 				"signature_secret": "foobar",
 			}
+			s.Mutex = &sync.RWMutex{}
 		})
 
 		hasher := signature_validator.MasheryMd5sum{}
