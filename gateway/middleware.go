@@ -533,7 +533,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		}
 
 		for k, v := range policy.MetaData {
-			session.AppendMetaData(k,v)
+			session.AppendMetaData(k, v)
 		}
 
 		if policy.LastUpdated > session.LastUpdated {

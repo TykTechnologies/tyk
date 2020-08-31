@@ -23,7 +23,7 @@ func createRLSession() *user.SessionState {
 	session.LastCheck = time.Now().Unix()
 	session.Per = 1.0
 	session.QuotaRenewalRate = 300 // 5 minutes
-	session.QuotaRenews =  time.Now().Unix()
+	session.QuotaRenews = time.Now().Unix()
 	session.QuotaRemaining = 10
 	session.QuotaMax = 10
 	session.AccessRights = map[string]user.AccessDefinition{"31445455": {APIName: "Tyk Auth Key Test", APIID: "31445455", Versions: []string{"default"}}}
