@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/lonelycode/osin"
@@ -1134,7 +1135,7 @@ func (r *RedisOsinStorageInterface) GetUser(username string) (*user.SessionState
 	}
 
 	// new interface means having to make this nested... ick.
-	session := user.SessionState{}
+	session := user.SessionState{Mutex: &sync.RWMutex{}}
 	if err := json.Unmarshal([]byte(accessJSON), &session); err != nil {
 		log.Error("Couldn't unmarshal OAuth auth data object (LoadRefresh): ", err,
 			"; Decoding: ", accessJSON)

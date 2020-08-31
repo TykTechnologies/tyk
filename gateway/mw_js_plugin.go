@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/robertkrimen/otto"
@@ -577,7 +578,7 @@ func (j *JSVM) LoadTykJSApi() {
 		encoddedSession := call.Argument(1).String()
 		suppressReset := call.Argument(2).String()
 
-		newSession := user.SessionState{}
+		newSession := user.SessionState{Mutex: &sync.RWMutex{}}
 		err := json.Unmarshal([]byte(encoddedSession), &newSession)
 		if err != nil {
 			j.Log.WithError(err).Error("Failed to decode the sesison data")

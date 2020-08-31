@@ -1383,7 +1383,12 @@ func TestContextSession(t *testing.T) {
 	if ctxGetSession(r) != nil {
 		t.Fatal("expected ctxGetSession to return nil")
 	}
-	ctxSetSession(r, &user.SessionState{}, "", false)
+	ctxSetSession(r,
+		&user.SessionState{
+			Mutex: &sync.RWMutex{},
+		},
+		"",
+		false)
 	if ctxGetSession(r) == nil {
 		t.Fatal("expected ctxGetSession to return non-nil")
 	}

@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"encoding/json"
+	"sync"
 
 	"github.com/sirupsen/logrus"
 
@@ -92,6 +93,7 @@ func TykSessionState(session *coprocess.SessionState) *user.SessionState {
 		LastUpdated:             session.LastUpdated,
 		IdExtractorDeadline:     session.IdExtractorDeadline,
 		SessionLifetime:         session.SessionLifetime,
+		Mutex:                   &sync.RWMutex{},
 	}
 }
 

@@ -49,6 +49,7 @@ func createNonThrottledSession() *user.SessionState {
 	session.QuotaRemaining = 10
 	session.QuotaMax = 10
 	session.Alias = "TEST-ALIAS"
+	session.Mutex = &sync.RWMutex{}
 	return session
 }
 

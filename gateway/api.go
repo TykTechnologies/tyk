@@ -322,7 +322,9 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 	suppressReset := r.URL.Query().Get("suppress_reset") == "1"
 
 	// decode payload
-	newSession := user.SessionState{}
+	newSession := user.SessionState{
+		Mutex: &sync.RWMutex{},
+	}
 
 	contents, _ := ioutil.ReadAll(r.Body)
 	r.Body = ioutil.NopCloser(bytes.NewReader(contents))
@@ -338,7 +340,9 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 	// DO ADD OR UPDATE
 
 	// get original session in case of update and preserve fields that SHOULD NOT be updated
-	originalKey := user.SessionState{}
+	originalKey := user.SessionState{
+		Mutex: &sync.RWMutex{},
+	}
 	if r.Method == http.MethodPut {
 		key, found := GlobalSessionManager.SessionDetail(newSession.OrgID, keyName, isHashed)
 		if !found {
@@ -585,7 +589,9 @@ func handleGetAllKeys(filter string) (interface{}, int) {
 }
 
 func handleAddKey(keyName, hashedName, sessionString, apiID string) {
-	sess := user.SessionState{}
+	sess := user.SessionState{
+		Mutex: &sync.RWMutex{},
+	}
 	json.Unmarshal([]byte(sessionString), &sess)
 	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 	var err error
@@ -619,7 +625,12 @@ func handleDeleteKey(keyName, apiID string, resetQuota bool) (interface{}, int) 
 		// Go through ALL managed API's and delete the key
 		apisMu.RLock()
 		removed := GlobalSessionManager.RemoveSession(orgID, keyName, false)
-		GlobalSessionManager.ResetQuota(keyName, &user.SessionState{}, false)
+		GlobalSessionManager.ResetQuota(
+			keyName,
+			&user.SessionState{
+				Mutex: &sync.RWMutex{},
+			},
+			false)
 
 		apisMu.RUnlock()
 
@@ -651,7 +662,12 @@ func handleDeleteKey(keyName, apiID string, resetQuota bool) (interface{}, int) 
 	}
 
 	if resetQuota {
-		GlobalSessionManager.ResetQuota(keyName, &user.SessionState{}, false)
+		GlobalSessionManager.ResetQuota(
+			keyName,
+			&user.SessionState{
+				Mutex: &sync.RWMutex{},
+			},
+			false)
 	}
 
 	statusObj := apiModifyKeySuccess{
@@ -720,7 +736,12 @@ func handleDeleteHashedKey(keyName, apiID string, resetQuota bool) (interface{},
 	}
 
 	if resetQuota {
-		GlobalSessionManager.ResetQuota(keyName, &user.SessionState{}, true)
+		GlobalSessionManager.ResetQuota(
+			keyName,
+			&user.SessionState{
+				Mutex: &sync.RWMutex{},
+			},
+			true)
 	}
 
 	statusObj := apiModifyKeySuccess{

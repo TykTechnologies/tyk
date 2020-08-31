@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/TykTechnologies/tyk/rpc"
@@ -628,7 +629,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 	}
 
 	if len(key) <= minLength {
-		return user.SessionState{IsInactive: true}, false
+		return user.SessionState{IsInactive: true, Mutex: &sync.RWMutex{}}, false
 	}
 
 	// Try and get the session from the session store

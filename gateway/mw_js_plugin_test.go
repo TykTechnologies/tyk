@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -126,7 +127,9 @@ func TestJSVMSessionMetadataUpdate(t *testing.T) {
 	jsvm := JSVM{}
 	jsvm.Init(nil, logrus.NewEntry(log))
 
-	s := &user.SessionState{MetaData: make(map[string]interface{})}
+	s := &user.SessionState{
+		Mutex:    &sync.RWMutex{},
+		MetaData: make(map[string]interface{})}
 	s.MetaData["same"] = "same"
 	s.MetaData["updated"] = "old"
 	s.MetaData["removed"] = "dummy"

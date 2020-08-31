@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
@@ -704,7 +705,7 @@ func generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.Se
 	policiesMu.RLock()
 	policy, ok := policiesByID[policyID]
 	policiesMu.RUnlock()
-	session := user.SessionState{}
+	session := user.SessionState{Mutex: &sync.RWMutex{}}
 	if !ok {
 		return session, errors.New("Policy not found")
 	}
