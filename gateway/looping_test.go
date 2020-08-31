@@ -257,7 +257,7 @@ func TestLooping(t *testing.T) {
 
 		keyID := CreateSession(func(s *user.SessionState) {
 			s.QuotaMax = 2
-			s.Mutex =  &sync.RWMutex{}
+			s.Mutex = &sync.RWMutex{}
 		})
 
 		authHeaders := map[string]string{"authorization": keyID}

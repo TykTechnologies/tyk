@@ -1292,7 +1292,7 @@ func TestCacheAllSafeRequestsWithCachedHeaders(t *testing.T) {
 	sess1token := CreateSession(func(s *user.SessionState) {
 		s.Rate = 1
 		s.Per = 60
-		s.Mutex =  &sync.RWMutex{}
+		s.Mutex = &sync.RWMutex{}
 	})
 	sess2token := CreateSession(func(s *user.SessionState) {
 		s.Rate = 1
@@ -1955,7 +1955,7 @@ func TestTracing(t *testing.T) {
 		spec.UseKeylessAccess = false
 	})[0]
 
-	keyID := CreateSession(func(s *user.SessionState) {s.Mutex= &sync.RWMutex{}})
+	keyID := CreateSession(func(s *user.SessionState) { s.Mutex = &sync.RWMutex{} })
 	authHeaders := map[string][]string{"Authorization": {keyID}}
 
 	ts.Run(t, []test.TestCase{
