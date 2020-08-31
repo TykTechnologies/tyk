@@ -50,7 +50,7 @@ var (
 	discardMuxer = mux.NewRouter()
 
 	// to simulate time ticks for tests that do reloads
-	ReloadTick = make(chan time.Time)
+	reloadTick = make(chan time.Time)
 
 	// Used to store the test bundles:
 	testMiddlewarePath, _ = ioutil.TempDir("", "tyk-middleware-path")
@@ -62,6 +62,127 @@ var (
 
 	EnableTestDNSMock = true
 )
+
+// ReloadMachinery is a helper struct to use when writing tests that do manual
+// gateway reloads
+type ReloadMachinery struct {
+	run    bool
+	count  int
+	cycles int
+	mu     sync.RWMutex
+}
+
+// OnQueued is called when a reload has been queued. This increments the queue
+// count
+func (r *ReloadMachinery) OnQueued() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.run {
+		r.count++
+	}
+}
+
+// OnReload is called when a reload has been completed. This increments the
+// reload cycles count.
+func (r *ReloadMachinery) OnReload() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.run {
+		r.cycles++
+	}
+}
+
+// Reloaded returns true if a read has occured since r was enabled
+func (r *ReloadMachinery) Reloaded() bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.cycles > 0
+}
+
+// Enable  when callled it will allow r to keep track of reload cycles and queues
+func (r *ReloadMachinery) Enable() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.run = true
+}
+
+// Disable turns off tracking of reload cycles and queues
+func (r *ReloadMachinery) Disable() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.run = true
+	r.count = 0
+	r.cycles = 0
+}
+
+// Reset sets reloads counts and queues to 0
+func (r *ReloadMachinery) Reset() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.count = 0
+	r.cycles = 0
+}
+
+// Queued returns true if any queue happened
+func (r *ReloadMachinery) Queued() bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.count > 0
+}
+
+// EnsureQueued this will block until any queue happens. It will timeout after
+// 100ms
+func (r *ReloadMachinery) EnsureQueued(t *testing.T) {
+	deadline := time.NewTimer(100 * time.Millisecond)
+	defer deadline.Stop()
+	tick := time.NewTicker(time.Millisecond)
+	defer tick.Stop()
+	for {
+		select {
+		case <-deadline.C:
+			t.Fatal("Timedout waiting for reload to be queue")
+		case <-tick.C:
+			if r.Queued() {
+				return
+			}
+		}
+	}
+}
+
+// EnsureReloaded this will block until any reload happens. It will timeout after
+// 100ms
+func (r *ReloadMachinery) EnsureReloaded(t *testing.T) {
+	deadline := time.NewTimer(100 * time.Millisecond)
+	defer deadline.Stop()
+	tick := time.NewTicker(time.Millisecond)
+	defer tick.Stop()
+	for {
+		select {
+		case <-deadline.C:
+			t.Fatal("Timedout waiting for reload to be queue")
+		case <-tick.C:
+			if r.Reloaded() {
+				return
+			}
+		}
+	}
+}
+
+// Tick triggers reload
+func (r *ReloadMachinery) Tick() {
+	reloadTick <- time.Time{}
+}
+
+// TickOk triggers a reload and ensures a queue happend and a reload cycle
+// happens. This will block until all the cases are met.
+func (r *ReloadMachinery) TickOk(t *testing.T) {
+	r.EnsureQueued(t)
+	reloadTick <- time.Time{}
+	r.EnsureReloaded(t)
+}
+
+// ReloadTestCase use this when in any test for gateway reloads
+var ReloadTestCase = &ReloadMachinery{}
 
 func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf *config.Config)) int {
 	setTestMode(true)
@@ -148,8 +269,8 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 		time.Sleep(10 * time.Millisecond)
 	}
 	go startPubSubLoop()
-	go reloadLoop(ctx, ReloadTick)
-	go reloadQueueLoop(ctx)
+	go reloadLoop(ctx, reloadTick, ReloadTestCase.OnReload)
+	go reloadQueueLoop(ctx, ReloadTestCase.OnQueued)
 	go reloadSimulation()
 	exitCode := m.Run()
 	os.RemoveAll(config.Global().AppPath)
