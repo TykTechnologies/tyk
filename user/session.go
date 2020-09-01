@@ -134,7 +134,7 @@ func (s *SessionState) SetMetaData(metadata map[string]interface{}) {
 	s.Mutex.Unlock()
 }
 
-func (s *SessionState) AppendMetaData(key string, metadata interface{}) {
+func (s *SessionState) SetMetaDataKey(key string, metadata interface{}) {
 	s.Mutex.Lock()
 	s.MetaData[key] = metadata
 	s.Mutex.Unlock()
