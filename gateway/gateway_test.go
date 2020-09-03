@@ -49,6 +49,7 @@ func createNonThrottledSession() *user.SessionState {
 	session.QuotaRemaining = 10
 	session.QuotaMax = 10
 	session.Alias = "TEST-ALIAS"
+	session.Mutex = &sync.RWMutex{}
 	return session
 }
 
@@ -87,9 +88,10 @@ func TestParambasedAuth(t *testing.T) {
 	})
 
 	key := CreateSession(func(s *user.SessionState) {
-		s.AccessRights = map[string]user.AccessDefinition{"test": {
+		s.SetAccessRights(map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v1"},
-		}}
+		}})
+		s.Mutex = &sync.RWMutex{}
 	})
 
 	form := url.Values{}
@@ -427,6 +429,7 @@ func TestQuota(t *testing.T) {
 	// Create session with Quota = 2
 	keyID = CreateSession(func(s *user.SessionState) {
 		s.QuotaMax = 2
+		s.Mutex = &sync.RWMutex{}
 	})
 
 	authHeaders := map[string]string{
@@ -573,6 +576,7 @@ func TestAnalytics(t *testing.T) {
 
 		key := CreateSession(func(sess *user.SessionState) {
 			sess.EnableDetailedRecording = true
+			sess.Mutex = &sync.RWMutex{}
 		})
 
 		authHeaders := map[string]string{
@@ -1279,10 +1283,12 @@ func TestCacheAllSafeRequestsWithCachedHeaders(t *testing.T) {
 	sess1token := CreateSession(func(s *user.SessionState) {
 		s.Rate = 1
 		s.Per = 60
+		s.Mutex = &sync.RWMutex{}
 	})
 	sess2token := CreateSession(func(s *user.SessionState) {
 		s.Rate = 1
 		s.Per = 60
+		s.Mutex = &sync.RWMutex{}
 	})
 
 	ts.Run(t, []test.TestCase{
@@ -1912,12 +1918,14 @@ func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
 	sess1token := CreateSession(func(s *user.SessionState) {
 		s.Rate = 1
 		s.Per = 60
+		s.Mutex = &sync.RWMutex{}
 	})
 	defer FallbackKeySesionManager.RemoveSession(sess1token, false)
 
 	sess2token := CreateSession(func(s *user.SessionState) {
 		s.Rate = 1
 		s.Per = 60
+		s.Mutex = &sync.RWMutex{}
 	})
 	defer FallbackKeySesionManager.RemoveSession(sess2token, false)
 
@@ -1938,7 +1946,7 @@ func TestTracing(t *testing.T) {
 		spec.UseKeylessAccess = false
 	})[0]
 
-	keyID := CreateSession(func(s *user.SessionState) {})
+	keyID := CreateSession(func(s *user.SessionState) { s.Mutex = &sync.RWMutex{} })
 	authHeaders := map[string][]string{"Authorization": {keyID}}
 
 	ts.Run(t, []test.TestCase{
