@@ -374,14 +374,9 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
 		}...)
 
-<<<<<<< HEAD
 		sessionState, found := FallbackKeySesionManager.SessionDetail(key, false)
-		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 2 {
-=======
-		sessionState, found := GlobalSessionManager.SessionDetail("default", key, false)
 		accessRight, _ := sessionState.GetAccessRightByAPIID(testAPIID)
 		if !found || accessRight.APIID != testAPIID || len(sessionState.ApplyPolicies) != 2 {
->>>>>>> 52b5ce95... implemented rw mutex for session and avoid multiple write access to the session (#3274)
 			t.Fatal("Adding policy to the list failed")
 		}
 	})
@@ -395,14 +390,9 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
 		}...)
 
-<<<<<<< HEAD
 		sessionState, found := FallbackKeySesionManager.SessionDetail(key, false)
-		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 0 {
-=======
-		sessionState, found := GlobalSessionManager.SessionDetail("default", key, false)
 		accessRight, _ := sessionState.GetAccessRightByAPIID(testAPIID)
 		if !found || accessRight.APIID != testAPIID || len(sessionState.ApplyPolicies) != 0 {
->>>>>>> 52b5ce95... implemented rw mutex for session and avoid multiple write access to the session (#3274)
 			t.Fatal("Removing policy from the list failed")
 		}
 	})

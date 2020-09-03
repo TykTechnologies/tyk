@@ -66,7 +66,7 @@ type Monitor struct {
 //
 // swagger:model
 type SessionState struct {
-	Mutex                         *sync.RWMutex
+	Mutex              *sync.RWMutex
 	LastCheck          int64                       `json:"last_check" msg:"last_check"`
 	Allowance          float64                     `json:"allowance" msg:"allowance"`
 	Rate               float64                     `json:"rate" msg:"rate"`
