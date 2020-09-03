@@ -650,6 +650,7 @@ func testPrepareDefaultVersion() string {
 		s.AccessRights = map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v1", "v2"},
 		}}
+		s.Mutex = &sync.RWMutex{}
 	})
 }
 

@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -57,6 +58,7 @@ func createMultiAuthKeyAuthSession(isBench bool) *user.SessionState {
 		session.QuotaMax = 10
 	}
 	session.AccessRights = map[string]user.AccessDefinition{"55": {APIName: "Tyk Multi Key Test", APIID: "55", Versions: []string{"default"}}}
+	session.Mutex = &sync.RWMutex{}
 	return session
 }
 
@@ -70,8 +72,9 @@ func createMultiBasicAuthSession(isBench bool) *user.SessionState {
 	session.QuotaRenews = time.Now().Unix() + 20
 	session.QuotaRemaining = 1
 	session.QuotaMax = -1
-	session.BasicAuthData.Password = "TEST"
+	session.BasicAuthData = user.BasicAuthData{Password: "TEST"}
 	session.AccessRights = map[string]user.AccessDefinition{"55": {APIName: "Tyk Multi Key Test", APIID: "55", Versions: []string{"default"}}}
+	session.Mutex = &sync.RWMutex{}
 	return session
 }
 
