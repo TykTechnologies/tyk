@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"net/http"
+	"sync"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/headers"
@@ -21,6 +22,7 @@ func TestGraphQL_RestrictedTypes(t *testing.T) {
 	})[0]
 
 	_, directKey := g.CreateSession(func(s *user.SessionState) {
+		s.Mutex = &sync.RWMutex{}
 		s.AccessRights = map[string]user.AccessDefinition{
 			api.APIID: {
 				APIID:   api.APIID,
@@ -52,6 +54,7 @@ func TestGraphQL_RestrictedTypes(t *testing.T) {
 
 	_, policyAppliedKey := g.CreateSession(func(s *user.SessionState) {
 		s.ApplyPolicies = []string{pID}
+		s.Mutex = &sync.RWMutex{}
 	})
 
 	q1 := graphql.Request{

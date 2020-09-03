@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/TykTechnologies/tyk/rpc"
@@ -297,7 +298,7 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 	ctxDisableSessionUpdate(r)
 
 	if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-		SessionCache.Set(session.KeyHash(), *session, cache.DefaultExpiration)
+		SessionCache.Set(session.GetKeyHash(), *session, cache.DefaultExpiration)
 	}
 
 	return true
@@ -308,12 +309,12 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	rights := make(map[string]user.AccessDefinition)
 	tags := make(map[string]bool)
-	if session.MetaData == nil {
-		session.MetaData = make(map[string]interface{})
+	if session.GetMetaData() == nil {
+		session.SetMetaData(make(map[string]interface{}))
 	}
 
 	didQuota, didRateLimit, didACL, didComplexity := make(map[string]bool), make(map[string]bool), make(map[string]bool), make(map[string]bool)
-	policies := session.PolicyIDs()
+	policies := session.GetPolicyIDs()
 
 	for _, polID := range policies {
 		policiesMu.RLock()
@@ -367,7 +368,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				accessRights.Limit.SetBy = idForScope
 
 				// respect current quota renews (on API limit level)
-				if r, ok := session.AccessRights[apiID]; ok && r.Limit != nil {
+				if r, ok := session.GetAccessRightByAPIID(apiID); ok && r.Limit != nil {
 					accessRights.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
 
@@ -489,7 +490,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				}
 
 				// Respect existing QuotaRenews
-				if r, ok := session.AccessRights[k]; ok && r.Limit != nil {
+				if r, ok := session.GetAccessRightByAPIID(k); ok && r.Limit != nil {
 					ar.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
 
@@ -533,7 +534,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		}
 
 		for k, v := range policy.MetaData {
-			session.MetaData[k] = v
+			session.SetMetaDataKey(k, v)
 		}
 
 		if policy.LastUpdated > session.LastUpdated {
@@ -611,7 +612,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 	// Override session ACL if at least one policy define it
 	if len(didACL) > 0 {
-		session.AccessRights = rights
+		session.SetAccessRights(rights)
 	}
 
 	return nil
@@ -628,7 +629,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 	}
 
 	if len(key) <= minLength {
-		return user.SessionState{IsInactive: true}, false
+		return user.SessionState{IsInactive: true, Mutex: &sync.RWMutex{}}, false
 	}
 
 	// Try and get the session from the session store

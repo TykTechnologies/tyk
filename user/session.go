@@ -3,6 +3,7 @@ package user
 import (
 	"crypto/md5"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
@@ -52,48 +53,55 @@ type AccessDefinition struct {
 	AllowanceScope string `json:"allowance_scope" msg:"allowance_scope"`
 }
 
+type BasicAuthData struct {
+	Password string   `json:"password" msg:"password"`
+	Hash     HashType `json:"hash_type" msg:"hash_type"`
+}
+
+type JWTData struct {
+	Secret string `json:"secret" msg:"secret"`
+}
+
+type Monitor struct {
+	TriggerLimits []float64 `json:"trigger_limits" msg:"trigger_limits"`
+}
+
 // SessionState objects represent a current API session, mainly used for rate limiting.
 // There's a data structure that's based on this and it's used for Protocol Buffer support, make sure to update "coprocess/proto/coprocess_session_state.proto" and generate the bindings using: cd coprocess/proto && ./update_bindings.sh
 //
 // swagger:model
 type SessionState struct {
-	LastCheck          int64                       `json:"last_check" msg:"last_check"`
-	Allowance          float64                     `json:"allowance" msg:"allowance"`
-	Rate               float64                     `json:"rate" msg:"rate"`
-	Per                float64                     `json:"per" msg:"per"`
-	ThrottleInterval   float64                     `json:"throttle_interval" msg:"throttle_interval"`
-	ThrottleRetryLimit int                         `json:"throttle_retry_limit" msg:"throttle_retry_limit"`
-	MaxQueryDepth      int                         `json:"max_query_depth" msg:"max_query_depth"`
-	DateCreated        time.Time                   `json:"date_created" msg:"date_created"`
-	Expires            int64                       `json:"expires" msg:"expires"`
-	QuotaMax           int64                       `json:"quota_max" msg:"quota_max"`
-	QuotaRenews        int64                       `json:"quota_renews" msg:"quota_renews"`
-	QuotaRemaining     int64                       `json:"quota_remaining" msg:"quota_remaining"`
-	QuotaRenewalRate   int64                       `json:"quota_renewal_rate" msg:"quota_renewal_rate"`
-	AccessRights       map[string]AccessDefinition `json:"access_rights" msg:"access_rights"`
-	OrgID              string                      `json:"org_id" msg:"org_id"`
-	OauthClientID      string                      `json:"oauth_client_id" msg:"oauth_client_id"`
-	OauthKeys          map[string]string           `json:"oauth_keys" msg:"oauth_keys"`
-	Certificate        string                      `json:"certificate" msg:"certificate"`
-	BasicAuthData      struct {
-		Password string   `json:"password" msg:"password"`
-		Hash     HashType `json:"hash_type" msg:"hash_type"`
-	} `json:"basic_auth_data" msg:"basic_auth_data"`
-	JWTData struct {
-		Secret string `json:"secret" msg:"secret"`
-	} `json:"jwt_data" msg:"jwt_data"`
-	HMACEnabled                   bool     `json:"hmac_enabled" msg:"hmac_enabled"`
-	EnableHTTPSignatureValidation bool     `json:"enable_http_signature_validation" msg:"enable_http_signature_validation"`
-	HmacSecret                    string   `json:"hmac_string" msg:"hmac_string"`
-	RSACertificateId              string   `json:"rsa_certificate_id" msg:"rsa_certificate_id"`
-	IsInactive                    bool     `json:"is_inactive" msg:"is_inactive"`
-	ApplyPolicyID                 string   `json:"apply_policy_id" msg:"apply_policy_id"`
-	ApplyPolicies                 []string `json:"apply_policies" msg:"apply_policies"`
-	DataExpires                   int64    `json:"data_expires" msg:"data_expires"`
-	Monitor                       struct {
-		TriggerLimits []float64 `json:"trigger_limits" msg:"trigger_limits"`
-	} `json:"monitor" msg:"monitor"`
-	// EnableDetailRecording is deprecated. Use EnableDetailedRecording
+	Mutex                         *sync.RWMutex
+	LastCheck                     int64                       `json:"last_check" msg:"last_check"`
+	Allowance                     float64                     `json:"allowance" msg:"allowance"`
+	Rate                          float64                     `json:"rate" msg:"rate"`
+	Per                           float64                     `json:"per" msg:"per"`
+	ThrottleInterval              float64                     `json:"throttle_interval" msg:"throttle_interval"`
+	ThrottleRetryLimit            int                         `json:"throttle_retry_limit" msg:"throttle_retry_limit"`
+	MaxQueryDepth                 int                         `json:"max_query_depth" msg:"max_query_depth"`
+	DateCreated                   time.Time                   `json:"date_created" msg:"date_created"`
+	Expires                       int64                       `json:"expires" msg:"expires"`
+	QuotaMax                      int64                       `json:"quota_max" msg:"quota_max"`
+	QuotaRenews                   int64                       `json:"quota_renews" msg:"quota_renews"`
+	QuotaRemaining                int64                       `json:"quota_remaining" msg:"quota_remaining"`
+	QuotaRenewalRate              int64                       `json:"quota_renewal_rate" msg:"quota_renewal_rate"`
+	AccessRights                  map[string]AccessDefinition `json:"access_rights" msg:"access_rights"`
+	OrgID                         string                      `json:"org_id" msg:"org_id"`
+	OauthClientID                 string                      `json:"oauth_client_id" msg:"oauth_client_id"`
+	OauthKeys                     map[string]string           `json:"oauth_keys" msg:"oauth_keys"`
+	Certificate                   string                      `json:"certificate" msg:"certificate"`
+	BasicAuthData                 BasicAuthData               `json:"basic_auth_data" msg:"basic_auth_data"`
+	JWTData                       JWTData                     `json:"jwt_data" msg:"jwt_data"`
+	HMACEnabled                   bool                        `json:"hmac_enabled" msg:"hmac_enabled"`
+	EnableHTTPSignatureValidation bool                        `json:"enable_http_signature_validation" msg:"enable_http_signature_validation"`
+	HmacSecret                    string                      `json:"hmac_string" msg:"hmac_string"`
+	RSACertificateId              string                      `json:"rsa_certificate_id" msg:"rsa_certificate_id"`
+	IsInactive                    bool                        `json:"is_inactive" msg:"is_inactive"`
+	ApplyPolicyID                 string                      `json:"apply_policy_id" msg:"apply_policy_id"`
+	ApplyPolicies                 []string                    `json:"apply_policies" msg:"apply_policies"`
+	DataExpires                   int64                       `json:"data_expires" msg:"data_expires"`
+	Monitor                       Monitor                     `json:"monitor" msg:"monitor"`
+	// Deprecated: EnableDetailRecording is deprecated. Use EnableDetailedRecording
 	// going forward instead
 	EnableDetailRecording   bool                   `json:"enable_detail_recording" msg:"enable_detail_recording"`
 	EnableDetailedRecording bool                   `json:"enable_detailed_recording" msg:"enable_detailed_recording"`
@@ -108,16 +116,34 @@ type SessionState struct {
 	keyHash string
 }
 
-func (s *SessionState) MD5Hash() string {
-	return fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%+v", s))))
+func (s *SessionState) SetAccessRights(accessRights map[string]AccessDefinition) {
+	s.Mutex.Lock()
+	s.AccessRights = accessRights
+	s.Mutex.Unlock()
 }
 
-func (s *SessionState) KeyHash() string {
-	if s.keyHash == "" {
-		panic("KeyHash cache not found. You should call `SetKeyHash` before.")
-	}
+func (s *SessionState) SetAccessRight(key string, accessRight AccessDefinition) {
+	s.Mutex.Lock()
+	s.AccessRights[key] = accessRight
+	s.Mutex.Unlock()
+}
 
-	return s.keyHash
+func (s *SessionState) SetMetaData(metadata map[string]interface{}) {
+	s.Mutex.Lock()
+	s.MetaData = metadata
+	s.Mutex.Unlock()
+}
+
+func (s *SessionState) SetMetaDataKey(key string, metadata interface{}) {
+	s.Mutex.Lock()
+	s.MetaData[key] = metadata
+	s.Mutex.Unlock()
+}
+
+func (s *SessionState) RemoveMetaData(key string) {
+	s.Mutex.Lock()
+	delete(s.MetaData, key)
+	s.Mutex.Unlock()
 }
 
 func (s *SessionState) SetKeyHash(hash string) {
@@ -141,10 +167,26 @@ func (s *SessionState) Lifetime(fallback int64) int64 {
 	return 0
 }
 
+func (s *SessionState) GetAccessRights() (AccessRights map[string]AccessDefinition) {
+	s.Mutex.RLock()
+	defer s.Mutex.RUnlock()
+	return s.AccessRights
+}
+
+func (s *SessionState) GetAccessRightByAPIID(key string) (AccessRight AccessDefinition, found bool) {
+	s.Mutex.RLock()
+	defer s.Mutex.RUnlock()
+	accessRight, found := s.AccessRights[key]
+	return accessRight, found
+}
+
 // PolicyIDs returns the IDs of all the policies applied to this
 // session. For backwards compatibility reasons, this falls back to
 // ApplyPolicyID if ApplyPolicies is empty.
-func (s *SessionState) PolicyIDs() []string {
+func (s *SessionState) GetPolicyIDs() []string {
+	s.Mutex.RLock()
+	defer s.Mutex.RUnlock()
+
 	if len(s.ApplyPolicies) > 0 {
 		return s.ApplyPolicies
 	}
@@ -154,6 +196,31 @@ func (s *SessionState) PolicyIDs() []string {
 	return nil
 }
 
+func (s *SessionState) GetMetaData() (metaData map[string]interface{}) {
+	s.Mutex.RLock()
+	defer s.Mutex.RUnlock()
+	return s.MetaData
+}
+
+func (s *SessionState) GetMetaDataByKey(key string) (metaData interface{}, found bool) {
+	s.Mutex.RLock()
+	defer s.Mutex.RUnlock()
+	value, ok := s.MetaData[key]
+	return value, ok
+}
+
+func (s *SessionState) MD5Hash() string {
+	return fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%+v", s))))
+}
+
+func (s *SessionState) GetKeyHash() string {
+	if s.keyHash == "" {
+		panic("KeyHash cache not found. You should call `SetKeyHash` before.")
+	}
+
+	return s.keyHash
+}
+
 func (s *SessionState) SetPolicies(ids ...string) {
 	s.ApplyPolicyID = ""
 	s.ApplyPolicies = ids
@@ -161,7 +228,12 @@ func (s *SessionState) SetPolicies(ids ...string) {
 
 // PoliciesEqualTo compares and returns true if passed slice if IDs contains only current ApplyPolicies
 func (s *SessionState) PoliciesEqualTo(ids []string) bool {
-	if len(s.ApplyPolicies) != len(ids) {
+
+	s.Mutex.RLock()
+	policies := s.ApplyPolicies
+	s.Mutex.RUnlock()
+
+	if len(policies) != len(ids) {
 		return false
 	}
 
@@ -170,7 +242,7 @@ func (s *SessionState) PoliciesEqualTo(ids []string) bool {
 		polIDMap[id] = true
 	}
 
-	for _, curID := range s.ApplyPolicies {
+	for _, curID := range policies {
 		if !polIDMap[curID] {
 			return false
 		}
@@ -181,6 +253,9 @@ func (s *SessionState) PoliciesEqualTo(ids []string) bool {
 
 // GetQuotaLimitByAPIID return quota max, quota remaining, quota renewal rate and quota renews for the given session
 func (s *SessionState) GetQuotaLimitByAPIID(apiID string) (int64, int64, int64, int64) {
+	s.Mutex.RLock()
+	defer s.Mutex.RUnlock()
+
 	if access, ok := s.AccessRights[apiID]; ok && access.Limit != nil {
 		return access.Limit.QuotaMax,
 			access.Limit.QuotaRemaining,

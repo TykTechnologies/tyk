@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"reflect"
 	"sort"
+	"sync"
 	"testing"
 	"time"
 
@@ -54,7 +55,8 @@ func createJWTSession() *user.SessionState {
 	session.QuotaRenews = time.Now().Unix() + 20
 	session.QuotaRemaining = 1
 	session.QuotaMax = -1
-	session.JWTData.Secret = jwtSecret
+	session.JWTData = user.JWTData{Secret: jwtSecret}
+	session.Mutex = &sync.RWMutex{}
 	return session
 }
 
@@ -1053,7 +1055,9 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 				AdminAuth: true,
 				Code:      http.StatusOK,
 				BodyMatchFunc: func(data []byte) bool {
-					sessionData := user.SessionState{}
+					sessionData := user.SessionState{
+						Mutex: &sync.RWMutex{},
+					}
 					json.Unmarshal(data, &sessionData)
 
 					expect := []string{basePolicyID, p1ID, p2ID}
@@ -1078,7 +1082,9 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 				AdminAuth: true,
 				Code:      http.StatusOK,
 				BodyMatchFunc: func(data []byte) bool {
-					sessionData := user.SessionState{}
+					sessionData := user.SessionState{
+						Mutex: &sync.RWMutex{},
+					}
 					json.Unmarshal(data, &sessionData)
 					expect := []string{p1ID, p2ID}
 					sort.Strings(sessionData.ApplyPolicies)
@@ -1101,7 +1107,9 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 				AdminAuth: true,
 				Code:      http.StatusOK,
 				BodyMatchFunc: func(data []byte) bool {
-					sessionData := user.SessionState{}
+					sessionData := user.SessionState{
+						Mutex: &sync.RWMutex{},
+					}
 					json.Unmarshal(data, &sessionData)
 
 					assert.Equal(t, sessionData.ApplyPolicies, []string{defaultPolicyID})
@@ -1213,7 +1221,9 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 				AdminAuth: true,
 				Code:      http.StatusOK,
 				BodyMatchFunc: func(data []byte) bool {
-					sessionData := user.SessionState{}
+					sessionData := user.SessionState{
+						Mutex: &sync.RWMutex{},
+					}
 					json.Unmarshal(data, &sessionData)
 
 					assert.Equal(t, sessionData.ApplyPolicies, []string{basePolicyID, p3ID})
@@ -1689,7 +1699,7 @@ func TestJWTDefaultPolicies(t *testing.T) {
 
 	assert := func(t *testing.T, expected []string) {
 		session, _ := GlobalSessionManager.SessionDetail(spec.OrgID, sessionID, false)
-		actual := session.PolicyIDs()
+		actual := session.GetPolicyIDs()
 		if !reflect.DeepEqual(expected, actual) {
 			t.Fatalf("Expected %v, actaul %v", expected, actual)
 		}

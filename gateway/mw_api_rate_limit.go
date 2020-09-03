@@ -3,6 +3,7 @@ package gateway
 import (
 	"errors"
 	"net/http"
+	"sync"
 
 	"strconv"
 	"time"
@@ -37,6 +38,7 @@ func (k *RateLimitForAPI) EnabledForSpec() bool {
 		Rate:        k.Spec.GlobalRateLimit.Rate,
 		Per:         k.Spec.GlobalRateLimit.Per,
 		LastUpdated: strconv.Itoa(int(time.Now().UnixNano())),
+		Mutex:       &sync.RWMutex{},
 	}
 	k.apiSess.SetKeyHash(storage.HashKey(k.keyName))
 

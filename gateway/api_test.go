@@ -242,6 +242,7 @@ func TestKeyHandler(t *testing.T) {
 		s.AccessRights = map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v1"},
 		}}
+		s.Mutex = &sync.RWMutex{}
 	})
 
 	_, unknownOrgKey := ts.CreateSession(func(s *user.SessionState) {
@@ -249,6 +250,7 @@ func TestKeyHandler(t *testing.T) {
 		s.AccessRights = map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v1"},
 		}}
+		s.Mutex = &sync.RWMutex{}
 	})
 
 	t.Run("Get key", func(t *testing.T) {
@@ -274,6 +276,7 @@ func TestKeyHandler(t *testing.T) {
 			s.AccessRights = map[string]user.AccessDefinition{"test": {
 				APIID: "test", Versions: []string{"v1"},
 			}}
+			s.Mutex = &sync.RWMutex{}
 		})
 
 		assert := func(response *http.Response, expected []string) {
@@ -359,6 +362,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 		s.AccessRights = map[string]user.AccessDefinition{testAPIID: {
 			APIID: testAPIID, Versions: []string{"v1"},
 		}}
+		s.Mutex = &sync.RWMutex{}
 	})
 
 	t.Run("Add policy not enforcing acl", func(t *testing.T) {
@@ -371,7 +375,8 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 		}...)
 
 		sessionState, found := GlobalSessionManager.SessionDetail("default", key, false)
-		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 2 {
+		accessRight, _ := sessionState.GetAccessRightByAPIID(testAPIID)
+		if !found || accessRight.APIID != testAPIID || len(sessionState.ApplyPolicies) != 2 {
 			t.Fatal("Adding policy to the list failed")
 		}
 	})
@@ -386,7 +391,8 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 		}...)
 
 		sessionState, found := GlobalSessionManager.SessionDetail("default", key, false)
-		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 0 {
+		accessRight, _ := sessionState.GetAccessRightByAPIID(testAPIID)
+		if !found || accessRight.APIID != testAPIID || len(sessionState.ApplyPolicies) != 0 {
 			t.Fatal("Removing policy from the list failed")
 		}
 	})
@@ -443,8 +449,8 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 
 			sessionState, found := GlobalSessionManager.SessionDetail(session.OrgID, key, false)
 
-			if !found || !reflect.DeepEqual(expected, sessionState.MetaData) {
-				t.Fatalf("Expected %v, returned %v", expected, sessionState.MetaData)
+			if !found || !reflect.DeepEqual(expected, sessionState.GetMetaData()) {
+				t.Fatalf("Expected %v, returned %v", expected, sessionState.GetMetaData())
 			}
 		}
 
@@ -477,9 +483,9 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 				"key-meta2": "key-value2",
 			}
 			session.ApplyPolicies = []string{pID, pID2}
-			session.MetaData = map[string]interface{}{
+			session.SetMetaData(map[string]interface{}{
 				"key-meta2": "key-value2",
-			}
+			})
 			assertMetaData(session, expected)
 		})
 	})
@@ -1381,7 +1387,12 @@ func TestContextSession(t *testing.T) {
 	if ctxGetSession(r) != nil {
 		t.Fatal("expected ctxGetSession to return nil")
 	}
-	ctxSetSession(r, &user.SessionState{}, "", false)
+	ctxSetSession(r,
+		&user.SessionState{
+			Mutex: &sync.RWMutex{},
+		},
+		"",
+		false)
 	if ctxGetSession(r) == nil {
 		t.Fatal("expected ctxGetSession to return non-nil")
 	}
