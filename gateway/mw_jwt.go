@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
@@ -205,7 +206,7 @@ func (k *JWTMiddleware) getBasePolicyID(r *http.Request, claims jwt.MapClaims) (
 			return
 		}
 
-		pols := clientSession.PolicyIDs()
+		pols := clientSession.GetPolicyIDs()
 		if len(pols) < 1 {
 			return
 		}
@@ -351,7 +352,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			}
 		}
 
-		session.MetaData = map[string]interface{}{"TykJWTSessionID": sessionID}
+		session.SetMetaData(map[string]interface{}{"TykJWTSessionID": sessionID})
 		session.Alias = baseFieldData
 
 		// Update the session in the session manager in case it gets called again
@@ -379,7 +380,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			return errors.New("key not authorized: no matching policy"), http.StatusForbidden
 		}
 		// check if token for this session was switched to another valid policy
-		pols := session.PolicyIDs()
+		pols := session.GetPolicyIDs()
 		if len(pols) == 0 {
 			k.reportLoginFailure(baseFieldData, r)
 			k.Logger().Error("No policies for the found session. Failing Request.")
@@ -391,14 +392,14 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		if isDefaultPol {
 			// check a policy is removed/added from/to default policies
 
-			for _, pol := range session.PolicyIDs() {
+			for _, pol := range session.GetPolicyIDs() {
 				if !contains(k.Spec.JWTDefaultPolicies, pol) && basePolicyID != pol {
 					defaultPolicyListChanged = true
 				}
 			}
 
 			for _, defPol := range k.Spec.JWTDefaultPolicies {
-				if !contains(session.PolicyIDs(), defPol) {
+				if !contains(session.GetPolicyIDs(), defPol) {
 					defaultPolicyListChanged = true
 				}
 			}
@@ -492,7 +493,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		ctxSetSession(r, &session, sessionID, updateSession)
 
 		if updateSession {
-			SessionCache.Set(session.KeyHash(), session, cache.DefaultExpiration)
+			SessionCache.Set(session.GetKeyHash(), session, cache.DefaultExpiration)
 		}
 	}
 	ctxSetJWTContextVars(k.Spec, r, token)
@@ -704,7 +705,7 @@ func generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.Se
 	policiesMu.RLock()
 	policy, ok := policiesByID[policyID]
 	policiesMu.RUnlock()
-	session := user.SessionState{}
+	session := user.SessionState{Mutex: &sync.RWMutex{}}
 	if !ok {
 		return session, errors.New("Policy not found")
 	}

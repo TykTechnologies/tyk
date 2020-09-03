@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"net/http"
+	"sync"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -89,6 +90,7 @@ func TestGraphQL(t *testing.T) {
 
 	policyAppliedSession, policyAppliedKey := g.CreateSession(func(s *user.SessionState) {
 		s.ApplyPolicies = []string{pID}
+		s.Mutex = &sync.RWMutex{}
 	})
 
 	directSession, directKey := g.CreateSession(func(s *user.SessionState) {
@@ -99,6 +101,7 @@ func TestGraphQL(t *testing.T) {
 				APIName: spec.Name,
 			},
 		}
+		s.Mutex = &sync.RWMutex{}
 	})
 
 	authHeaderWithDirectKey := map[string]string{

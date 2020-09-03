@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"net/http"
+	"sync"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/storage"
@@ -26,9 +27,10 @@ func TestAuthenticationAfterDeleteKey(t *testing.T) {
 		})[0]
 
 		key := CreateSession(func(s *user.SessionState) {
-			s.AccessRights = map[string]user.AccessDefinition{api.APIID: {
+			s.SetAccessRights(map[string]user.AccessDefinition{api.APIID: {
 				APIID: api.APIID,
-			}}
+			}})
+			s.Mutex = &sync.RWMutex{}
 		})
 		deletePath := "/tyk/keys/" + key
 		authHeader := map[string]string{
@@ -68,9 +70,9 @@ func TestAuthenticationAfterUpdateKey(t *testing.T) {
 		key := generateToken("", "")
 
 		session := CreateStandardSession()
-		session.AccessRights = map[string]user.AccessDefinition{api.APIID: {
+		session.SetAccessRights(map[string]user.AccessDefinition{api.APIID: {
 			APIID: api.APIID,
-		}}
+		}})
 
 		GlobalSessionManager.UpdateSession(storage.HashKey(key), session, 0, config.Global().HashKeys)
 
@@ -82,9 +84,9 @@ func TestAuthenticationAfterUpdateKey(t *testing.T) {
 			{Path: "/get", Headers: authHeader, Code: http.StatusOK},
 		}...)
 
-		session.AccessRights = map[string]user.AccessDefinition{"dummy": {
+		session.SetAccessRights(map[string]user.AccessDefinition{"dummy": {
 			APIID: "dummy",
-		}}
+		}})
 
 		GlobalSessionManager.UpdateSession(storage.HashKey(key), session, 0, config.Global().HashKeys)
 

@@ -93,8 +93,8 @@ func estimateTagsCapacity(session *user.SessionState, apiSpec *APISpec) int {
 
 		size += len(session.ApplyPolicies)
 
-		if session.MetaData != nil {
-			if _, ok := session.MetaData[keyDataDeveloperID]; ok {
+		if session.GetMetaData() != nil {
+			if _, ok := session.GetMetaDataByKey(keyDataDeveloperID); ok {
 				size += 1
 			}
 		}
@@ -117,8 +117,8 @@ func getSessionTags(session *user.SessionState) []string {
 		tags = append(tags, "pol-"+polID)
 	}
 
-	if session.MetaData != nil {
-		if developerID, ok := session.MetaData[keyDataDeveloperID].(string); ok {
+	if session.GetMetaData() != nil {
+		if developerID, ok := session.GetMetaData()[keyDataDeveloperID].(string); ok {
 			tags = append(tags, "dev-"+developerID)
 		}
 	}
