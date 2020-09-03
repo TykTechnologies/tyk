@@ -3,10 +3,11 @@ package user
 import (
 	"crypto/md5"
 	"fmt"
-	"github.com/TykTechnologies/tyk/config"
-	logger "github.com/TykTechnologies/tyk/log"
 	"sync"
 	"time"
+
+	"github.com/TykTechnologies/tyk/config"
+	logger "github.com/TykTechnologies/tyk/log"
 )
 
 var log = logger.Get()
