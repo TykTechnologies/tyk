@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -379,7 +380,8 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 
 				assert.Equal(t, want, s.Tags)
 			}, &user.SessionState{
-				Tags: []string{"key-tag"},
+				Mutex: &sync.RWMutex{},
+				Tags:  []string{"key-tag"},
 			},
 		},
 		{
@@ -406,6 +408,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				}
 			}, &user.SessionState{
 				IsInactive: true,
+				Mutex:      &sync.RWMutex{},
 			},
 		},
 		{
@@ -711,7 +714,7 @@ func TestApplyPolicies(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			sess := tc.session
 			if sess == nil {
-				sess = &user.SessionState{}
+				sess = &user.SessionState{Mutex: &sync.RWMutex{}}
 			}
 			sess.SetPolicies(tc.policies...)
 			errStr := ""
@@ -738,7 +741,7 @@ func BenchmarkApplyPolicies(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		for _, tc := range tests {
-			sess := &user.SessionState{}
+			sess := &user.SessionState{Mutex: &sync.RWMutex{}}
 			sess.SetPolicies(tc.policies...)
 			bmid.ApplyPolicies(sess)
 		}
@@ -819,6 +822,7 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 
 	// create test session
 	session := &user.SessionState{
+		Mutex:         &sync.RWMutex{},
 		ApplyPolicies: []string{"two_of_three_with_api_limit"},
 		OrgID:         "default",
 		AccessRights: map[string]user.AccessDefinition{
@@ -879,7 +883,7 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{}
+				sessionData := user.SessionState{Mutex: &sync.RWMutex{}}
 				if err := json.Unmarshal(data, &sessionData); err != nil {
 					t.Log(err.Error())
 					return false
@@ -956,7 +960,7 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{}
+				sessionData := user.SessionState{Mutex: &sync.RWMutex{}}
 				if err := json.Unmarshal(data, &sessionData); err != nil {
 					t.Log(err.Error())
 					return false
@@ -1049,6 +1053,7 @@ func TestApplyMultiPolicies(t *testing.T) {
 	session := &user.SessionState{
 		ApplyPolicies: []string{"policy1", "policy2"},
 		OrgID:         "default",
+		Mutex:         &sync.RWMutex{},
 	}
 
 	// create key
@@ -1091,7 +1096,7 @@ func TestApplyMultiPolicies(t *testing.T) {
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{}
+				sessionData := user.SessionState{Mutex: &sync.RWMutex{}}
 				json.Unmarshal(data, &sessionData)
 
 				policy1Expected := user.APILimit{
@@ -1136,7 +1141,7 @@ func TestApplyMultiPolicies(t *testing.T) {
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{}
+				sessionData := user.SessionState{Mutex: &sync.RWMutex{}}
 				json.Unmarshal(data, &sessionData)
 
 				assert.EqualValues(t, 50, sessionData.AccessRights["api1"].Limit.QuotaRemaining, "should reset policy1 quota")
@@ -1226,6 +1231,7 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 
 	// create test session
 	session := &user.SessionState{
+		Mutex:         &sync.RWMutex{},
 		ApplyPolicies: []string{"per_api_policy_with_two_apis"},
 		OrgID:         "default",
 		AccessRights: map[string]user.AccessDefinition{
@@ -1254,7 +1260,7 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{}
+				sessionData := user.SessionState{Mutex: &sync.RWMutex{}}
 				if err := json.Unmarshal(data, &sessionData); err != nil {
 					t.Log(err.Error())
 					return false
@@ -1305,7 +1311,7 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{}
+				sessionData := user.SessionState{Mutex: &sync.RWMutex{}}
 				if err := json.Unmarshal(data, &sessionData); err != nil {
 					t.Log(err.Error())
 					return false
