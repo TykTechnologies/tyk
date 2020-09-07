@@ -2,8 +2,6 @@ name: Go plugin compiler
 
 on:
   push:
-    branches:
-      - as/auto-build-pc
     tags:
       - v3*
 
