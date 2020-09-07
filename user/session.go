@@ -42,6 +42,9 @@ type APILimit struct {
 }
 
 // AccessDefinition defines which versions of an API a key has access to
+// NOTE: when adding new fields it is required to map them from DBAccessDefinition
+// in the gateway/policy.go:19
+// TODO: is it possible to share fields?
 type AccessDefinition struct {
 	APIName           string                  `json:"api_name" msg:"api_name"`
 	APIID             string                  `json:"api_id" msg:"api_id"`
