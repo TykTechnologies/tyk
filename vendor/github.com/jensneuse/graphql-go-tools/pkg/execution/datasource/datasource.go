@@ -18,6 +18,9 @@ import (
 	"github.com/jensneuse/graphql-go-tools/pkg/astvisitor"
 )
 
+var RootTypeName = []byte("root_type_name")
+var RootFieldName = []byte("root_field_name")
+
 var defaultHttpClient *http.Client
 
 func DefaultHttpClient() *http.Client {
