@@ -3,6 +3,8 @@ name: Go plugin compiler
 on:
   push:
     tags:
+      - v2.9*
+      - v2.10*
       - v3*
 
 jobs:
