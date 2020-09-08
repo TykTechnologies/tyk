@@ -451,6 +451,7 @@ func loadControlAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/keys/create", createKeyHandler).Methods("POST")
 		r.HandleFunc("/apis", apiHandler).Methods("GET", "POST", "PUT", "DELETE")
 		r.HandleFunc("/policies", polHandler).Methods("GET", "POST", "PUT", "DELETE")
+		r.HandleFunc("/policies/{polID}", polHandler).Methods("GET", "POST", "PUT", "DELETE")
 		r.HandleFunc("/apis/{apiID}", apiHandler).Methods("GET", "POST", "PUT", "DELETE")
 		r.HandleFunc("/health", healthCheckhandler).Methods("GET")
 		r.HandleFunc("/oauth/clients/create", createOauthClient).Methods("POST")
