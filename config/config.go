@@ -68,6 +68,7 @@ type PoliciesConfig struct {
 	PolicyConnectionString string `json:"policy_connection_string"`
 	PolicyRecordName       string `json:"policy_record_name"`
 	AllowExplicitPolicyID  bool   `json:"allow_explicit_policy_id"`
+	PolicyPath             string `json:"policy_path"`
 }
 
 type DBAppConfOptionsConfig struct {

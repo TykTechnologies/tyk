@@ -138,6 +138,13 @@ func setTestMode(v bool) {
 	runningTestsMu.Unlock()
 }
 
+func getPolicy(polID string) user.Policy {
+	apisMu.RLock()
+	pol := policiesByID[polID]
+	apisMu.RUnlock()
+	return pol
+}
+
 func getApiSpec(apiID string) *APISpec {
 	apisMu.RLock()
 	spec := apisByID[apiID]
@@ -341,12 +348,18 @@ func syncPolicies() (count int, err error) {
 		mainLog.Debug("Using Policies from RPC")
 		pols, err = LoadPoliciesFromRPC(config.Global().SlaveOptions.RPCKey)
 	default:
-		// this is the only case now where we need a policy record name
-		if config.Global().Policies.PolicyRecordName == "" {
+		//if policy path defined we want to allow use of the REST API
+		if config.Global().Policies.PolicyPath != "" {
+			pols = LoadPoliciesFromDir(config.Global().Policies.PolicyPath)
+
+		} else if config.Global().Policies.PolicyRecordName == "" {
+			// old way of doing things before REST Api added
+			// this is the only case now where we need a policy record name
 			mainLog.Debug("No policy record name defined, skipping...")
 			return 0, nil
+		} else {
+			pols = LoadPoliciesFromFile(config.Global().Policies.PolicyRecordName)
 		}
-		pols = LoadPoliciesFromFile(config.Global().Policies.PolicyRecordName)
 	}
 	mainLog.Infof("Policies found (%d total):", len(pols))
 	for id := range pols {
@@ -437,6 +450,7 @@ func loadControlAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/keys/policy/{keyName}", policyUpdateHandler).Methods("POST")
 		r.HandleFunc("/keys/create", createKeyHandler).Methods("POST")
 		r.HandleFunc("/apis", apiHandler).Methods("GET", "POST", "PUT", "DELETE")
+		r.HandleFunc("/policies", polHandler).Methods("GET", "POST", "PUT", "DELETE")
 		r.HandleFunc("/apis/{apiID}", apiHandler).Methods("GET", "POST", "PUT", "DELETE")
 		r.HandleFunc("/health", healthCheckhandler).Methods("GET")
 		r.HandleFunc("/oauth/clients/create", createOauthClient).Methods("POST")
