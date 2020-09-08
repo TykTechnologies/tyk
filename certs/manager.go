@@ -492,6 +492,8 @@ func (c *CertificateManager) Add(certData []byte, orgID string) (string, error) 
 		c.logger.Error(err)
 		return "",err
 	}
+	certID = orgID+certID
+	
 	if cert, err := c.storage.GetKey("raw-" + certID); err == nil && cert != "" {
 		return "", errors.New("Certificate with " + certID + " id already exists")
 	}
