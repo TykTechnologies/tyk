@@ -195,12 +195,6 @@ func setupGlobals(ctx context.Context) {
 		analytics.Store = &analyticsStore
 		analytics.Init(globalConf)
 
-		redisPurgeOnce.Do(func() {
-			store := storage.RedisCluster{KeyPrefix: "analytics-"}
-			redisPurger := RedisPurger{Store: &store}
-			go redisPurger.PurgeLoop(ctx)
-		})
-
 		if config.Global().AnalyticsConfig.Type == "rpc" {
 			mainLog.Debug("Using RPC cache purge")
 
@@ -356,7 +350,7 @@ func syncPolicies() (count int, err error) {
 	}
 	mainLog.Infof("Policies found (%d total):", len(pols))
 	for id := range pols {
-		mainLog.Infof(" - %s", id)
+		mainLog.Debugf(" - %s", id)
 	}
 
 	policiesMu.Lock()
@@ -459,7 +453,7 @@ func loadControlAPIEndpoints(muxer *mux.Router) {
 	}
 
 	r.HandleFunc("/debug", traceHandler).Methods("POST")
-
+	r.HandleFunc("/cache/{apiID}", invalidateCacheHandler).Methods("DELETE")
 	r.HandleFunc("/keys", keyHandler).Methods("POST", "PUT", "GET", "DELETE")
 	r.HandleFunc("/keys/preview", previewKeyHandler).Methods("POST")
 	r.HandleFunc("/keys/{keyName:[^/]*}", keyHandler).Methods("POST", "PUT", "GET", "DELETE")
@@ -734,27 +728,51 @@ func DoReload() {
 	mainLog.Info("API reload complete")
 }
 
-// startReloadChan and reloadDoneChan are used by the two reload loops
-// running in separate goroutines to talk. reloadQueueLoop will use
-// startReloadChan to signal to reloadLoop to start a reload, and
-// reloadLoop will use reloadDoneChan to signal back that it's done with
-// the reload. Buffered simply to not make the goroutines block each
-// other.
-var startReloadChan = make(chan struct{}, 1)
-var reloadDoneChan = make(chan struct{}, 1)
+// shouldReload returns true if we should perform any reload. Reloads happens if
+// we have reload callback queued.
+func shouldReload() ([]func(), bool) {
+	requeueLock.Lock()
+	defer requeueLock.Unlock()
+	if len(requeue) == 0 {
+		return nil, false
+	}
+	n := requeue
+	requeue = []func(){}
+	return n, true
+}
 
-func reloadLoop(tick <-chan time.Time) {
-	<-tick
-	for range startReloadChan {
-		mainLog.Info("reload: initiating")
-		DoReload()
-		mainLog.Info("reload: complete")
-
-		mainLog.Info("Initiating coprocess reload")
-		DoCoprocessReload()
-
-		reloadDoneChan <- struct{}{}
-		<-tick
+func reloadLoop(ctx context.Context, tick <-chan time.Time, complete ...func()) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		// We don't check for reload right away as the gateway peroms this on the
+		// startup sequence. We expect to start checking on the first tick after the
+		// gateway is up and running.
+		case <-tick:
+			cb, ok := shouldReload()
+			if !ok {
+				continue
+			}
+			start := time.Now()
+			mainLog.Info("reload: initiating")
+			DoReload()
+			mainLog.Info("reload: complete")
+			mainLog.Info("Initiating coprocess reload")
+			DoCoprocessReload()
+			mainLog.Info("coprocess reload complete")
+			for _, c := range cb {
+				// most of the callbacks are nil, we don't want to execute nil functions to
+				// avoid panics.
+				if c != nil {
+					c()
+				}
+			}
+			if len(complete) != 0 {
+				complete[0]()
+			}
+			mainLog.Infof("reload: cycle completed in %v", time.Since(start))
+		}
 	}
 }
 
@@ -762,27 +780,24 @@ func reloadLoop(tick <-chan time.Time) {
 // buffered, as reloadQueueLoop should pick these up immediately.
 var reloadQueue = make(chan func())
 
-func reloadQueueLoop() {
-	reloading := false
-	var fns []func()
+var requeueLock sync.Mutex
+
+// This is a list of callbacks to execute on the next reload. It is protected by
+// requeueLock for concurrent use.
+var requeue []func()
+
+func reloadQueueLoop(ctx context.Context, cb ...func()) {
 	for {
 		select {
-		case <-reloadDoneChan:
-			for _, fn := range fns {
-				fn()
-			}
-			fns = fns[:0]
-			reloading = false
+		case <-ctx.Done():
+			return
 		case fn := <-reloadQueue:
-			if fn != nil {
-				fns = append(fns, fn)
-			}
-			if !reloading {
-				mainLog.Info("Reload queued")
-				startReloadChan <- struct{}{}
-				reloading = true
-			} else {
-				mainLog.Info("Reload already queued")
+			requeueLock.Lock()
+			requeue = append(requeue, fn)
+			requeueLock.Unlock()
+			mainLog.Info("Reload queued")
+			if len(cb) != 0 {
+				cb[0]()
 			}
 		}
 	}
@@ -1023,6 +1038,10 @@ func afterConfSetup(conf *config.Config) {
 		conf.SlaveOptions.PingTimeout = 60
 	}
 
+	if conf.SlaveOptions.KeySpaceSyncInterval == 0 {
+		conf.SlaveOptions.KeySpaceSyncInterval = 10
+	}
+
 	rpc.GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)
 	rpc.GlobalRPCCallTimeout = time.Second * time.Duration(conf.SlaveOptions.CallTimeout)
 	initGenericEventHandlers(conf)
@@ -1223,7 +1242,8 @@ func Start() {
 		trace.SetLogger(mainLog)
 		defer trace.Close()
 	}
-	start()
+
+	start(ctx)
 	go storage.ConnectToRedis(ctx)
 
 	if *cli.MemProfile {
@@ -1319,7 +1339,7 @@ func writeProfiles() {
 	}
 }
 
-func start() {
+func start(ctx context.Context) {
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.Global().SupressDefaultOrgStore {
 		mainLog.Debug("Initialising default org store")
@@ -1348,8 +1368,8 @@ func start() {
 
 	// 1s is the minimum amount of time between hot reloads. The
 	// interval counts from the start of one reload to the next.
-	go reloadLoop(time.Tick(time.Second))
-	go reloadQueueLoop()
+	go reloadLoop(ctx, time.Tick(time.Second))
+	go reloadQueueLoop(ctx)
 }
 
 func dashboardServiceInit() {

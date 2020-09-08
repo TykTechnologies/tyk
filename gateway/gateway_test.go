@@ -49,6 +49,7 @@ func createNonThrottledSession() *user.SessionState {
 	session.QuotaRemaining = 10
 	session.QuotaMax = 10
 	session.Alias = "TEST-ALIAS"
+	session.Mutex = &sync.RWMutex{}
 	return session
 }
 
@@ -87,9 +88,10 @@ func TestParambasedAuth(t *testing.T) {
 	})
 
 	key := CreateSession(func(s *user.SessionState) {
-		s.AccessRights = map[string]user.AccessDefinition{"test": {
+		s.SetAccessRights(map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v1"},
-		}}
+		}})
+		s.Mutex = &sync.RWMutex{}
 	})
 
 	form := url.Values{}
@@ -427,6 +429,7 @@ func TestQuota(t *testing.T) {
 	// Create session with Quota = 2
 	keyID = CreateSession(func(s *user.SessionState) {
 		s.QuotaMax = 2
+		s.Mutex = &sync.RWMutex{}
 	})
 
 	authHeaders := map[string]string{
@@ -573,6 +576,7 @@ func TestAnalytics(t *testing.T) {
 
 		key := CreateSession(func(sess *user.SessionState) {
 			sess.EnableDetailRecording = true
+			sess.Mutex = &sync.RWMutex{}
 		})
 
 		authHeaders := map[string]string{
@@ -770,9 +774,7 @@ func TestAnalytics(t *testing.T) {
 func TestListener(t *testing.T) {
 	// Trick to get spec JSON, without loading API
 	// Specs will be reseted when we do `StartTest`
-	specs := BuildAndLoadAPI()
-	specJSON, _ := json.Marshal(specs[0].APIDefinition)
-	listJSON := fmt.Sprintf(`\[%s\]`, string(specJSON))
+	BuildAndLoadAPI()
 
 	ts := StartTest()
 	defer ts.Close()
@@ -794,8 +796,8 @@ func TestListener(t *testing.T) {
 		// API definitions not reloaded yet
 		{Method: "GET", Path: "/sample", Code: 404},
 		{Method: "GET", Path: "/tyk/reload/?block=true", AdminAuth: true, Code: 200},
-		{Method: "GET", Path: "/tyk/apis/test", AdminAuth: true, Code: 200, BodyMatch: string(specJSON)},
-		{Method: "GET", Path: "/tyk/apis/", AdminAuth: true, Code: 200, BodyMatch: listJSON},
+		{Method: "GET", Path: "/tyk/apis/test", AdminAuth: true, Code: 200, BodyMatch: `^{.*"api_id":"test".*}`},
+		{Method: "GET", Path: "/tyk/apis/", AdminAuth: true, Code: 200, BodyMatch: `^\[.*"api_id":"test".*\]`},
 		{Method: "GET", Path: "/sample", Code: 200},
 		{Method: "GET", Path: "/samplefoo", Code: 200},
 		{Method: "GET", Path: "/sample/", Code: 200},
@@ -805,7 +807,7 @@ func TestListener(t *testing.T) {
 	// have all needed reload ticks ready
 	go func() {
 		for i := 0; i < 4*4; i++ {
-			ReloadTick <- time.Time{}
+			ReloadTestCase.Tick()
 		}
 	}()
 
@@ -1290,10 +1292,12 @@ func TestCacheAllSafeRequestsWithCachedHeaders(t *testing.T) {
 	sess1token := CreateSession(func(s *user.SessionState) {
 		s.Rate = 1
 		s.Per = 60
+		s.Mutex = &sync.RWMutex{}
 	})
 	sess2token := CreateSession(func(s *user.SessionState) {
 		s.Rate = 1
 		s.Per = 60
+		s.Mutex = &sync.RWMutex{}
 	})
 
 	ts.Run(t, []test.TestCase{
@@ -1923,12 +1927,14 @@ func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
 	sess1token := CreateSession(func(s *user.SessionState) {
 		s.Rate = 1
 		s.Per = 60
+		s.Mutex = &sync.RWMutex{}
 	})
 	defer GlobalSessionManager.RemoveSession("default", sess1token, false)
 
 	sess2token := CreateSession(func(s *user.SessionState) {
 		s.Rate = 1
 		s.Per = 60
+		s.Mutex = &sync.RWMutex{}
 	})
 	defer GlobalSessionManager.RemoveSession("default", sess2token, false)
 
@@ -1949,7 +1955,7 @@ func TestTracing(t *testing.T) {
 		spec.UseKeylessAccess = false
 	})[0]
 
-	keyID := CreateSession(func(s *user.SessionState) {})
+	keyID := CreateSession(func(s *user.SessionState) { s.Mutex = &sync.RWMutex{} })
 	authHeaders := map[string][]string{"Authorization": {keyID}}
 
 	ts.Run(t, []test.TestCase{

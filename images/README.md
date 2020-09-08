@@ -1,15 +1,9 @@
 # build-env
 
-Docker environment used to build official images and plugins.
+Docker environment used to build official images.
 
-This is the base image that will slowly be used in all our builds. It
-is not capable of handling i386 or arm64 builds. Those builds are
-handled by installing additional components in the environment section
-of the pipeline.
-
-This image will need to be updated only when upgrading the go version
-or if some system dependencies for building change. This image is
-mainly used internally at Tyk for CD pipelines.
+This used be here but now lives at the repo attached to
+[tyk-build-env](https://hub.docker.com/r/tykio/tyk-build-env)
 
 # plugin-compiler
 

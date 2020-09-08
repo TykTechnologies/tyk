@@ -1,11 +1,11 @@
 package gateway
 
 import (
-	"net/http"
-	"testing"
-
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/user"
+	"net/http"
+	"sync"
+	"testing"
 
 	gql "github.com/jensneuse/graphql-go-tools/pkg/graphql"
 
@@ -86,6 +86,7 @@ func TestGraphQL(t *testing.T) {
 
 	policyAppliedSession, policyAppliedKey := g.CreateSession(func(s *user.SessionState) {
 		s.ApplyPolicies = []string{pID}
+		s.Mutex = &sync.RWMutex{}
 	})
 
 	directSession, directKey := g.CreateSession(func(s *user.SessionState) {
@@ -96,6 +97,7 @@ func TestGraphQL(t *testing.T) {
 				APIName: spec.Name,
 			},
 		}
+		s.Mutex = &sync.RWMutex{}
 	})
 
 	authHeaderWithDirectKey := map[string]string{

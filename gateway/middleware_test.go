@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"net/http"
+	"sync"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -19,6 +20,7 @@ type mockStore struct {
 var sess = user.SessionState{
 	OrgID:       "TestBaseMiddleware_OrgSessionExpiry",
 	DataExpires: 110,
+	Mutex:       &sync.RWMutex{},
 }
 
 func (mockStore) SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool) {
@@ -46,6 +48,37 @@ func TestBaseMiddleware_OrgSessionExpiry(t *testing.T) {
 	got = m.OrgSessionExpiry(sess.OrgID)
 	if got != sess.DataExpires {
 		t.Errorf("expected %d got %d", sess.DataExpires, got)
+	}
+}
+
+func TestOrgSessionWithRPCDown(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+
+	//we need rpc down
+	globalConf := config.Global()
+	globalConf.SlaveOptions.ConnectionString = testHttpFailure
+	globalConf.SlaveOptions.UseRPC = true
+	globalConf.SlaveOptions.RPCKey = "test_org"
+	globalConf.SlaveOptions.APIKey = "test"
+	globalConf.Policies.PolicySource = "rpc"
+	config.SetGlobal(globalConf)
+
+	m := BaseMiddleware{
+		Spec: &APISpec{
+			GlobalConfig: config.Config{
+				EnforceOrgDataAge: true,
+			},
+			OrgSessionManager: mockStore{},
+		},
+		logger: mainLog,
+	}
+	// reload so we force to fall in emergency mode
+	DoReload()
+
+	_, found := m.OrgSession(sess.OrgID)
+	if found {
+		t.Fatal("org  session should be null:")
 	}
 }
 

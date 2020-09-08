@@ -179,7 +179,6 @@ func (a *AnalyticsRecord) SetExpiry(expiresInSeconds int64) {
 // as defined in the Config object
 type RedisAnalyticsHandler struct {
 	Store            storage.AnalyticsHandler
-	Clean            Purger
 	GeoIPDB          *maxminddb.Reader
 	globalConf       config.Config
 	recordsChan      chan *AnalyticsRecord

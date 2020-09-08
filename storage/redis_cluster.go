@@ -497,15 +497,6 @@ func (r *RedisCluster) SetKey(keyName, session string, timeout int64) error {
 		log.Error("Error trying to set value: ", err)
 		return err
 	}
-
-	if timeout > 0 {
-		err := r.singleton().Expire(r.fixKey(keyName), time.Duration(timeout)*time.Second).Err()
-		if err != nil {
-			log.Error("Error trying to set expiry:", err)
-			return err
-		}
-	}
-
 	return nil
 }
 
@@ -1031,6 +1022,15 @@ func (r *RedisCluster) AppendToSetPipelined(key string, values [][]byte) {
 
 	if _, err := pipe.Exec(); err != nil {
 		log.WithError(err).Error("Error trying to append to set keys")
+	}
+
+	// if we need to set an expiration time
+	if storageExpTime := int64(config.Global().AnalyticsConfig.StorageExpirationTime); storageExpTime != int64(-1) {
+		// If there is no expiry on the analytics set, we should set it.
+		exp, _ := r.GetExp(key)
+		if exp == -1 {
+			r.SetExp(key, storageExpTime)
+		}
 	}
 }
 

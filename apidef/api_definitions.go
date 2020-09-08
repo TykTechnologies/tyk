@@ -533,6 +533,7 @@ type ProxyConfig struct {
 	} `bson:"transport" json:"transport"`
 }
 
+
 // GraphQLConfig is the root config object for a GraphQL API.
 type GraphQLConfig struct {
 	// Enabled indicates if GraphQL should be enabled.

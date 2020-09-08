@@ -1,0 +1,3 @@
+issues:
+  # Show only new issues created since branching away from 'master'
+  new-from-rev: master

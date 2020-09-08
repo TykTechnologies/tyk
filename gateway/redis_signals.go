@@ -165,7 +165,7 @@ func isPayloadSignatureValid(notification Notification) bool {
 			notificationVerifier, err = goverify.LoadPublicKeyFromFile(config.Global().PublicKeyPath)
 			if err != nil {
 
-				pubSubLog.Error("Notification signer: Failed loading private key from path: ", err)
+				pubSubLog.Error("Notification signer: Failed loading public key from path: ", err)
 				return false
 			}
 		}

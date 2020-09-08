@@ -481,6 +481,8 @@ func TestWhitelistMethodWithAdditionalMiddleware(t *testing.T) {
 }
 
 func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
+	ReloadTestCase.Enable()
+	defer ReloadTestCase.Disable()
 	// Test Dashboard
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/system/apis" {
@@ -513,8 +515,7 @@ func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 	}
 	handleRedisEvent(&msg, handled, wg.Done)
 
-	// Since we already know that reload is queued
-	ReloadTick <- time.Time{}
+	ReloadTestCase.TickOk(t)
 
 	// Wait for the reload to finish, then check it worked
 	wg.Wait()
@@ -655,6 +656,7 @@ func testPrepareDefaultVersion() string {
 		s.AccessRights = map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v1", "v2"},
 		}}
+		s.Mutex = &sync.RWMutex{}
 	})
 }
 
@@ -779,6 +781,8 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 }
 
 func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
+	ReloadTestCase.Enable()
+	defer ReloadTestCase.Disable()
 	// Test Dashboard
 	callNum := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -818,8 +822,7 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 	}
 	handleRedisEvent(&msg, handled, wg.Done)
 
-	// Since we already know that reload is queued
-	ReloadTick <- time.Time{}
+	ReloadTestCase.TickOk(t)
 
 	// Wait for the reload to finish, then check it worked
 	wg.Wait()
@@ -833,11 +836,10 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 
 	var wg2 sync.WaitGroup
 	wg2.Add(1)
+	ReloadTestCase.Reset()
 	handleRedisEvent(&msg, handled, wg2.Done)
 
-	// Since we already know that reload is queued
-	ReloadTick <- time.Time{}
-
+	ReloadTestCase.TickOk(t)
 	// Wait for the reload to finish, then check it worked
 	wg2.Wait()
 	apisMu.RLock()
