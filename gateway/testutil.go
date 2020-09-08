@@ -472,6 +472,7 @@ func CreateStandardSession() *user.SessionState {
 	session.Tags = []string{}
 	session.MetaData = make(map[string]interface{})
 	session.OrgID = "default"
+	session.Mutex = &sync.RWMutex{}
 	return session
 }
 
