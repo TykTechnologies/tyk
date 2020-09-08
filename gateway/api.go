@@ -818,7 +818,7 @@ func handleAddOrUpdatePolicy(polID string, r *http.Request) (interface{}, int) {
 	}
 
 	// Create a filename
-	polFilePath := filepath.Join(config.Global().Policies.PolicyRecordName, newPol.ID+".json")
+	polFilePath := filepath.Join(config.Global().Policies.PolicyPath, newPol.ID+".json")
 
 	// If it exists, delete it
 	if _, err := os.Stat(polFilePath); err == nil {
@@ -854,7 +854,7 @@ func handleAddOrUpdatePolicy(polID string, r *http.Request) (interface{}, int) {
 
 func handleDeletePolicy(polID string) (interface{}, int) {
 	// Generate a filename
-	defFilePath := filepath.Join(config.Global().Policies.PolicyRecordName, polID+".json")
+	defFilePath := filepath.Join(config.Global().Policies.PolicyPath, polID+".json")
 
 	// If it exists, delete it
 	if _, err := os.Stat(defFilePath); err != nil {
