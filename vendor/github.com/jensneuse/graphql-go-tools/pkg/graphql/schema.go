@@ -7,6 +7,8 @@ import (
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/astparser"
 	"github.com/jensneuse/graphql-go-tools/pkg/asttransform"
+	"github.com/jensneuse/graphql-go-tools/pkg/astvalidation"
+	"github.com/jensneuse/graphql-go-tools/pkg/operationreport"
 )
 
 type Schema struct {
@@ -27,6 +29,20 @@ func NewSchemaFromString(schema string) (*Schema, error) {
 	schemaContent := []byte(schema)
 
 	return createSchema(schemaContent)
+}
+
+func ValidateSchemaString(schema string) (result ValidationResult, err error) {
+	parsedSchema, err := NewSchemaFromString(schema)
+	if err != nil {
+		return ValidationResult{
+			Valid: false,
+			Errors: SchemaValidationErrors{
+				SchemaValidationError{Message: err.Error()},
+			},
+		}, nil
+	}
+
+	return parsedSchema.Validate()
 }
 
 func (s *Schema) Document() []byte {
@@ -69,9 +85,20 @@ func (s *Schema) SubscriptionTypeName() string {
 	return string(s.document.Index.SubscriptionTypeName)
 }
 
-func (s *Schema) Validate() (valid bool, errors SchemaValidationErrors) {
-	// TODO: Needs to be implemented in the core of the library
-	return true, nil
+func (s *Schema) Validate() (result ValidationResult, err error) {
+	var report operationreport.Report
+	var isValid bool
+
+	validator := astvalidation.DefaultDefinitionValidator()
+	validationState := validator.Validate(&s.document, &report)
+	if validationState == astvalidation.Valid {
+		isValid = true
+	}
+
+	return ValidationResult{
+		Valid:  isValid,
+		Errors: schemaValidationErrorsFromOperationReport(report),
+	}, nil
 }
 
 func createSchema(schemaContent []byte) (*Schema, error) {

@@ -8,7 +8,10 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
+
+	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/TykTechnologies/tyk/headers"
 
@@ -226,8 +229,15 @@ func (t BaseMiddleware) Config() (interface{}, error) {
 }
 
 func (t BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
+	var session user.SessionState
+	var found bool
+
+	if rpc.IsEmergencyMode() {
+		return session, false
+	}
+
 	// Try and get the session from the session store
-	session, found := t.Spec.OrgSessionManager.SessionDetail(orgID, orgID, false)
+	session, found = t.Spec.OrgSessionManager.SessionDetail(orgID, orgID, false)
 	if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
 		// If exists, assume it has been authorized and pass on
 		// We cache org expiry data
@@ -236,6 +246,7 @@ func (t BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
 	}
 
 	session.SetKeyHash(storage.HashKey(orgID))
+
 	return session, found
 }
 
@@ -287,7 +298,7 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 	ctxDisableSessionUpdate(r)
 
 	if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-		SessionCache.Set(session.KeyHash(), *session, cache.DefaultExpiration)
+		SessionCache.Set(session.GetKeyHash(), *session, cache.DefaultExpiration)
 	}
 
 	return true
@@ -298,12 +309,12 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	rights := make(map[string]user.AccessDefinition)
 	tags := make(map[string]bool)
-	if session.MetaData == nil {
-		session.MetaData = make(map[string]interface{})
+	if session.GetMetaData() == nil {
+		session.SetMetaData(make(map[string]interface{}))
 	}
 
 	didQuota, didRateLimit, didACL, didComplexity := make(map[string]bool), make(map[string]bool), make(map[string]bool), make(map[string]bool)
-	policies := session.PolicyIDs()
+	policies := session.GetPolicyIDs()
 
 	for _, polID := range policies {
 		policiesMu.RLock()
@@ -357,7 +368,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				accessRights.Limit.SetBy = idForScope
 
 				// respect current quota renews (on API limit level)
-				if r, ok := session.AccessRights[apiID]; ok && r.Limit != nil {
+				if r, ok := session.GetAccessRightByAPIID(apiID); ok && r.Limit != nil {
 					accessRights.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
 
@@ -402,16 +413,10 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 						}
 
 						for _, t := range v.RestrictedTypes {
-							found := false
 							for ri, rt := range r.RestrictedTypes {
 								if t.Name == rt.Name {
-									found = true
-									r.RestrictedTypes[ri].Fields = append(rt.Fields, t.Fields...)
+									r.RestrictedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
 								}
-							}
-
-							if !found {
-								r.RestrictedTypes = append(r.RestrictedTypes, v.RestrictedTypes...)
 							}
 						}
 
@@ -485,7 +490,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				}
 
 				// Respect existing QuotaRenews
-				if r, ok := session.AccessRights[k]; ok && r.Limit != nil {
+				if r, ok := session.GetAccessRightByAPIID(k); ok && r.Limit != nil {
 					ar.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
 
@@ -529,7 +534,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		}
 
 		for k, v := range policy.MetaData {
-			session.MetaData[k] = v
+			session.SetMetaDataKey(k, v)
 		}
 
 		if policy.LastUpdated > session.LastUpdated {
@@ -607,7 +612,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 	// Override session ACL if at least one policy define it
 	if len(didACL) > 0 {
-		session.AccessRights = rights
+		session.SetAccessRights(rights)
 	}
 
 	return nil
@@ -615,7 +620,8 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
 // the Auth Handler, if not found it will fail
-func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.Request) (user.SessionState, bool) {
+func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, r *http.Request) (user.SessionState, bool) {
+	key := *originalKey
 	minLength := t.Spec.GlobalConfig.MinTokenLength
 	if minLength == 0 {
 		// See https://github.com/TykTechnologies/tyk/issues/1681
@@ -623,7 +629,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 	}
 
 	if len(key) <= minLength {
-		return user.SessionState{IsInactive: true}, false
+		return user.SessionState{IsInactive: true, Mutex: &sync.RWMutex{}}, false
 	}
 
 	// Try and get the session from the session store
@@ -670,7 +676,20 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 	t.Logger().Debug("Querying authstore")
 	// 2. If not there, get it from the AuthorizationHandler
 	session, found = t.Spec.AuthManager.KeyAuthorised(key)
+	if !found && storage.TokenOrg(key) != t.Spec.OrgID {
+		//treat it as a custom key
+		key = generateToken(t.Spec.OrgID, key)
+		cacheKey = key
+		if t.Spec.GlobalConfig.HashKeys {
+			cacheKey = storage.HashStr(cacheKey)
+		}
+		session, found = t.Spec.AuthManager.KeyAuthorised(key)
+	}
+
 	if found {
+		// update value of originalKey, as for custom-keys it might get updated (the key is generated again using alias)
+		*originalKey = key
+
 		session.SetKeyHash(cacheKey)
 		// If not in Session, and got it from AuthHandler, create a session with a new TTL
 		t.Logger().Info("Recreating session for key: ", obfuscateKey(key))

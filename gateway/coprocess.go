@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/url"
+	"reflect"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -143,7 +144,7 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response) (*copro
 		if session := ctxGetSession(req); session != nil {
 			object.Session = ProtoSessionState(session)
 			// For compatibility purposes:
-			object.Metadata = object.Session.Metadata
+			object.Metadata = object.Session.GetMetadata()
 		}
 	}
 
@@ -187,13 +188,13 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 		r.Header.Set(h, v)
 	}
 
-	values := r.URL.Query()
+	updatedValues := r.URL.Query()
 	for _, k := range object.Request.DeleteParams {
-		values.Del(k)
+		updatedValues.Del(k)
 	}
 
 	for p, v := range object.Request.AddParams {
-		values.Set(p, v)
+		updatedValues.Set(p, v)
 	}
 
 	parsedURL, err := url.ParseRequestURI(object.Request.Url)
@@ -222,7 +223,9 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 		r.Method = object.Request.Method
 	}
 
-	r.URL.RawQuery = values.Encode()
+	if !reflect.DeepEqual(r.URL.Query(), updatedValues) {
+		r.URL.RawQuery = updatedValues.Encode()
+	}
 
 	return
 }
@@ -365,15 +368,15 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	if returnObject.Session != nil {
 		// For compatibility purposes, inject coprocess.Object.Metadata fields:
 		if returnObject.Metadata != nil {
-			if returnObject.Session.Metadata == nil {
+			if returnObject.Session.GetMetadata() == nil {
 				returnObject.Session.Metadata = make(map[string]string)
 			}
-			for k, v := range returnObject.Metadata {
+			for k, v := range returnObject.GetMetadata() {
 				returnObject.Session.Metadata[k] = v
 			}
 		}
 
-		token = returnObject.Session.Metadata["token"]
+		token = returnObject.Session.GetMetadata()["token"]
 	}
 
 	if returnObject.Request.ReturnOverrides.ResponseError != "" {
@@ -440,7 +443,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 		// If the returned object contains metadata, add them to the session:
 		for k, v := range returnObject.Metadata {
-			returnedSession.MetaData[k] = string(v)
+			returnedSession.SetMetaDataKey(k, string(v))
 		}
 
 		returnedSession.OrgID = m.Spec.OrgID
@@ -455,11 +458,11 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			returnedSession.QuotaRenews = existingSession.QuotaRenews
 			returnedSession.QuotaRemaining = existingSession.QuotaRemaining
 
-			for api := range returnedSession.AccessRights {
-				if _, found := existingSession.AccessRights[api]; found {
-					if returnedSession.AccessRights[api].Limit != nil {
-						returnedSession.AccessRights[api].Limit.QuotaRenews = existingSession.AccessRights[api].Limit.QuotaRenews
-						returnedSession.AccessRights[api].Limit.QuotaRemaining = existingSession.AccessRights[api].Limit.QuotaRemaining
+			for api := range returnedSession.GetAccessRights() {
+				if _, found := existingSession.GetAccessRightByAPIID(api); found {
+					if returnedSession.GetAccessRights()[api].Limit != nil {
+						returnedSession.AccessRights[api].Limit.QuotaRenews = existingSession.GetAccessRights()[api].Limit.QuotaRenews
+						returnedSession.AccessRights[api].Limit.QuotaRemaining = existingSession.GetAccessRights()[api].Limit.QuotaRemaining
 					}
 				}
 			}

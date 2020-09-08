@@ -1,14 +1,20 @@
 package gateway
 
 import (
+	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"sync"
 	"testing"
+	"text/template"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -475,6 +481,8 @@ func TestWhitelistMethodWithAdditionalMiddleware(t *testing.T) {
 }
 
 func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
+	ReloadTestCase.Enable()
+	defer ReloadTestCase.Disable()
 	// Test Dashboard
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/system/apis" {
@@ -507,8 +515,7 @@ func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 	}
 	handleRedisEvent(&msg, handled, wg.Done)
 
-	// Since we already know that reload is queued
-	ReloadTick <- time.Time{}
+	ReloadTestCase.TickOk(t)
 
 	// Wait for the reload to finish, then check it worked
 	wg.Wait()
@@ -649,6 +656,7 @@ func testPrepareDefaultVersion() string {
 		s.AccessRights = map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v1", "v2"},
 		}}
+		s.Mutex = &sync.RWMutex{}
 	})
 }
 
@@ -773,6 +781,8 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 }
 
 func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
+	ReloadTestCase.Enable()
+	defer ReloadTestCase.Disable()
 	// Test Dashboard
 	callNum := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -812,8 +822,7 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 	}
 	handleRedisEvent(&msg, handled, wg.Done)
 
-	// Since we already know that reload is queued
-	ReloadTick <- time.Time{}
+	ReloadTestCase.TickOk(t)
 
 	// Wait for the reload to finish, then check it worked
 	wg.Wait()
@@ -827,11 +836,10 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 
 	var wg2 sync.WaitGroup
 	wg2.Add(1)
+	ReloadTestCase.Reset()
 	handleRedisEvent(&msg, handled, wg2.Done)
 
-	// Since we already know that reload is queued
-	ReloadTick <- time.Time{}
-
+	ReloadTestCase.TickOk(t)
 	// Wait for the reload to finish, then check it worked
 	wg2.Wait()
 	apisMu.RLock()
@@ -840,4 +848,42 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 	}
 	apisMu.RUnlock()
 
+}
+
+func TestAPIDefinitionLoader_Template(t *testing.T) {
+	const testTemplatePath = "../templates/transform_test.tmpl"
+
+	l := APIDefinitionLoader{}
+
+	executeAndAssert := func(t *testing.T, template *template.Template) {
+		var bodyBuffer bytes.Buffer
+		err := template.Execute(&bodyBuffer, map[string]string{
+			"value1": "value-1",
+			"value2": "value-2",
+		})
+		assert.NoError(t, err)
+
+		var res map[string]string
+		_ = json.Unmarshal(bodyBuffer.Bytes(), &res)
+
+		assert.Equal(t, "value-1", res["value2"])
+		assert.Equal(t, "value-2", res["value1"])
+	}
+
+	t.Run("loadFileTemplate", func(t *testing.T) {
+		temp, err := l.loadFileTemplate(testTemplatePath)
+		assert.NoError(t, err)
+
+		executeAndAssert(t, temp)
+	})
+
+	t.Run("loadBlobTemplate", func(t *testing.T) {
+		templateInBytes, _ := ioutil.ReadFile(testTemplatePath)
+		tempBase64 := base64.StdEncoding.EncodeToString(templateInBytes)
+
+		temp, err := l.loadBlobTemplate(tempBase64)
+		assert.NoError(t, err)
+
+		executeAndAssert(t, temp)
+	})
 }

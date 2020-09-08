@@ -8,8 +8,11 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 
 	"github.com/lonelycode/go-uuid/uuid"
 	"github.com/stretchr/testify/assert"
@@ -283,6 +286,26 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				},
 			}},
 		},
+		"restricted-types1": {
+			ID: "restricted_types_1",
+			AccessRights: map[string]user.AccessDefinition{
+				"a": {
+					RestrictedTypes: []graphql.Type{
+						{Name: "Country", Fields: []string{"code", "name"}},
+						{Name: "Person", Fields: []string{"name", "height"}},
+					},
+				}},
+		},
+		"restricted-types2": {
+			ID: "restricted_types_2",
+			AccessRights: map[string]user.AccessDefinition{
+				"a": {
+					RestrictedTypes: []graphql.Type{
+						{Name: "Country", Fields: []string{"code", "phone"}},
+						{Name: "Person", Fields: []string{"name", "mass"}},
+					},
+				}},
+		},
 		"throttle1": {
 			ID:                 "throttle1",
 			ThrottleRetryLimit: 99,
@@ -357,7 +380,8 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 
 				assert.Equal(t, want, s.Tags)
 			}, &user.SessionState{
-				Tags: []string{"key-tag"},
+				Mutex: &sync.RWMutex{},
+				Tags:  []string{"key-tag"},
 			},
 		},
 		{
@@ -384,6 +408,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				}
 			}, &user.SessionState{
 				IsInactive: true,
+				Mutex:      &sync.RWMutex{},
 			},
 		},
 		{
@@ -612,6 +637,23 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			},
 		},
 		{
+			name:     "Merge restricted fields for the same GraphQL API",
+			policies: []string{"restricted-types1", "restricted-types2"},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				want := map[string]user.AccessDefinition{
+					"a": { // It should get intersection of restricted types.
+						RestrictedTypes: []graphql.Type{
+							{Name: "Country", Fields: []string{"code"}},
+							{Name: "Person", Fields: []string{"name"}},
+						},
+						Limit: &user.APILimit{},
+					},
+				}
+
+				assert.Equal(t, want, s.AccessRights)
+			},
+		},
+		{
 			"Throttle interval from policy", []string{"throttle1"},
 			"", func(t *testing.T, s *user.SessionState) {
 				if s.ThrottleInterval != 9 {
@@ -672,7 +714,7 @@ func TestApplyPolicies(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			sess := tc.session
 			if sess == nil {
-				sess = &user.SessionState{}
+				sess = &user.SessionState{Mutex: &sync.RWMutex{}}
 			}
 			sess.SetPolicies(tc.policies...)
 			errStr := ""
@@ -699,7 +741,7 @@ func BenchmarkApplyPolicies(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		for _, tc := range tests {
-			sess := &user.SessionState{}
+			sess := &user.SessionState{Mutex: &sync.RWMutex{}}
 			sess.SetPolicies(tc.policies...)
 			bmid.ApplyPolicies(sess)
 		}
@@ -780,6 +822,7 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 
 	// create test session
 	session := &user.SessionState{
+		Mutex:         &sync.RWMutex{},
 		ApplyPolicies: []string{"two_of_three_with_api_limit"},
 		OrgID:         "default",
 		AccessRights: map[string]user.AccessDefinition{
@@ -840,7 +883,7 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{}
+				sessionData := user.SessionState{Mutex: &sync.RWMutex{}}
 				if err := json.Unmarshal(data, &sessionData); err != nil {
 					t.Log(err.Error())
 					return false
@@ -917,7 +960,7 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{}
+				sessionData := user.SessionState{Mutex: &sync.RWMutex{}}
 				if err := json.Unmarshal(data, &sessionData); err != nil {
 					t.Log(err.Error())
 					return false
@@ -1010,6 +1053,7 @@ func TestApplyMultiPolicies(t *testing.T) {
 	session := &user.SessionState{
 		ApplyPolicies: []string{"policy1", "policy2"},
 		OrgID:         "default",
+		Mutex:         &sync.RWMutex{},
 	}
 
 	// create key
@@ -1052,7 +1096,7 @@ func TestApplyMultiPolicies(t *testing.T) {
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{}
+				sessionData := user.SessionState{Mutex: &sync.RWMutex{}}
 				json.Unmarshal(data, &sessionData)
 
 				policy1Expected := user.APILimit{
@@ -1097,7 +1141,7 @@ func TestApplyMultiPolicies(t *testing.T) {
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{}
+				sessionData := user.SessionState{Mutex: &sync.RWMutex{}}
 				json.Unmarshal(data, &sessionData)
 
 				assert.EqualValues(t, 50, sessionData.AccessRights["api1"].Limit.QuotaRemaining, "should reset policy1 quota")
@@ -1187,6 +1231,7 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 
 	// create test session
 	session := &user.SessionState{
+		Mutex:         &sync.RWMutex{},
 		ApplyPolicies: []string{"per_api_policy_with_two_apis"},
 		OrgID:         "default",
 		AccessRights: map[string]user.AccessDefinition{
@@ -1215,7 +1260,7 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{}
+				sessionData := user.SessionState{Mutex: &sync.RWMutex{}}
 				if err := json.Unmarshal(data, &sessionData); err != nil {
 					t.Log(err.Error())
 					return false
@@ -1266,7 +1311,7 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{}
+				sessionData := user.SessionState{Mutex: &sync.RWMutex{}}
 				if err := json.Unmarshal(data, &sessionData); err != nil {
 					t.Log(err.Error())
 					return false

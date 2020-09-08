@@ -14,6 +14,7 @@ import (
 
 	log "github.com/jensneuse/abstractlogger"
 
+	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/lexer/literal"
 )
 
@@ -58,6 +59,10 @@ func (h *HttpPollingStreamDataSourcePlanner) Plan(args []Argument) (DataSource, 
 	}, append(h.Args, args...)
 }
 
+func (h *HttpPollingStreamDataSourcePlanner) EnterDocument(operation, definition *ast.Document) {
+
+}
+
 func (h *HttpPollingStreamDataSourcePlanner) EnterInlineFragment(ref int) {
 
 }
@@ -76,6 +81,10 @@ func (h *HttpPollingStreamDataSourcePlanner) LeaveSelectionSet(ref int) {
 
 func (h *HttpPollingStreamDataSourcePlanner) EnterField(ref int) {
 	h.RootField.SetIfNotDefined(ref)
+}
+
+func (h *HttpPollingStreamDataSourcePlanner) EnterArgument(ref int) {
+
 }
 
 func (h *HttpPollingStreamDataSourcePlanner) LeaveField(ref int) {

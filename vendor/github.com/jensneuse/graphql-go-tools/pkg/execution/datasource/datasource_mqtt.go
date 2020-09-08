@@ -10,6 +10,7 @@ import (
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	log "github.com/jensneuse/abstractlogger"
 
+	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/lexer/literal"
 )
 
@@ -52,6 +53,10 @@ func (n *MQTTDataSourcePlanner) Plan(args []Argument) (DataSource, []Argument) {
 	}, append(n.Args, args...)
 }
 
+func (n *MQTTDataSourcePlanner) EnterDocument(operation, definition *ast.Document) {
+
+}
+
 func (n *MQTTDataSourcePlanner) EnterInlineFragment(ref int) {
 
 }
@@ -70,6 +75,10 @@ func (n *MQTTDataSourcePlanner) LeaveSelectionSet(ref int) {
 
 func (n *MQTTDataSourcePlanner) EnterField(ref int) {
 	n.RootField.SetIfNotDefined(ref)
+}
+
+func (n *MQTTDataSourcePlanner) EnterArgument(ref int) {
+
 }
 
 func (n *MQTTDataSourcePlanner) LeaveField(ref int) {

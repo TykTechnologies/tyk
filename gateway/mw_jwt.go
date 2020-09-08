@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
@@ -166,7 +167,7 @@ func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.T
 
 	// Couldn't base64 decode the kid, so lets try it raw
 	k.Logger().Debug("Getting key: ", tykId)
-	session, rawKeyExists := k.CheckSessionAndIdentityForValidKey(tykId, r)
+	session, rawKeyExists := k.CheckSessionAndIdentityForValidKey(&tykId, r)
 	if !rawKeyExists {
 		return nil, errors.New("token invalid, key not found")
 	}
@@ -176,12 +177,12 @@ func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.T
 func (k *JWTMiddleware) getPolicyIDFromToken(claims jwt.MapClaims) (string, bool) {
 	policyID, foundPolicy := claims[k.Spec.JWTPolicyFieldName].(string)
 	if !foundPolicy {
-		k.Logger().Error("Could not identify a policy to apply to this token from field")
+		k.Logger().Debugf("Could not identify a policy to apply to this token from field: %s", k.Spec.JWTPolicyFieldName)
 		return "", false
 	}
 
 	if policyID == "" {
-		k.Logger().Error("Policy field has empty value")
+		k.Logger().Errorf("Policy field %s has empty value", k.Spec.JWTPolicyFieldName)
 		return "", false
 	}
 
@@ -195,17 +196,17 @@ func (k *JWTMiddleware) getBasePolicyID(r *http.Request, claims jwt.MapClaims) (
 	} else if k.Spec.JWTClientIDBaseField != "" {
 		clientID, clientIDFound := claims[k.Spec.JWTClientIDBaseField].(string)
 		if !clientIDFound {
-			k.Logger().Error("Could not identify a policy to apply to this token from field")
+			k.Logger().Debug("Could not identify a policy to apply to this token from field")
 			return
 		}
 
 		// Check for a regular token that matches this client ID
-		clientSession, exists := k.CheckSessionAndIdentityForValidKey(clientID, r)
+		clientSession, exists := k.CheckSessionAndIdentityForValidKey(&clientID, r)
 		if !exists {
 			return
 		}
 
-		pols := clientSession.PolicyIDs()
+		pols := clientSession.GetPolicyIDs()
 		if len(pols) < 1 {
 			return
 		}
@@ -270,6 +271,9 @@ func mapScopeToPolicies(mapping map[string]string, scope []string) []string {
 	for _, scopeItem := range scope {
 		if policyID, ok := mapping[scopeItem]; ok {
 			policiesToApply[policyID] = true
+			log.Debugf("Found a matching policy for scope item: %s", scopeItem)
+		} else {
+			log.Errorf("Couldn't find a matching policy for scope item: %s", scopeItem)
 		}
 	}
 	for id := range policiesToApply {
@@ -298,7 +302,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 
 	k.Logger().Debug("JWT Temporary session ID is: ", sessionID)
 
-	session, exists := k.CheckSessionAndIdentityForValidKey(sessionID, r)
+	session, exists := k.CheckSessionAndIdentityForValidKey(&sessionID, r)
 	isDefaultPol := false
 	basePolicyID := ""
 	foundPolicy := false
@@ -348,7 +352,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			}
 		}
 
-		session.MetaData = map[string]interface{}{"TykJWTSessionID": sessionID}
+		session.SetMetaData(map[string]interface{}{"TykJWTSessionID": sessionID})
 		session.Alias = baseFieldData
 
 		// Update the session in the session manager in case it gets called again
@@ -376,7 +380,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			return errors.New("key not authorized: no matching policy"), http.StatusForbidden
 		}
 		// check if token for this session was switched to another valid policy
-		pols := session.PolicyIDs()
+		pols := session.GetPolicyIDs()
 		if len(pols) == 0 {
 			k.reportLoginFailure(baseFieldData, r)
 			k.Logger().Error("No policies for the found session. Failing Request.")
@@ -388,14 +392,14 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		if isDefaultPol {
 			// check a policy is removed/added from/to default policies
 
-			for _, pol := range session.PolicyIDs() {
+			for _, pol := range session.GetPolicyIDs() {
 				if !contains(k.Spec.JWTDefaultPolicies, pol) && basePolicyID != pol {
 					defaultPolicyListChanged = true
 				}
 			}
 
 			for _, defPol := range k.Spec.JWTDefaultPolicies {
-				if !contains(session.PolicyIDs(), defPol) {
+				if !contains(session.GetPolicyIDs(), defPol) {
 					defaultPolicyListChanged = true
 				}
 			}
@@ -454,8 +458,18 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 
 			// add all policies matched from scope-policy mapping
 			mappedPolIDs := mapScopeToPolicies(k.Spec.JWTScopeToPolicyMapping, scope)
+			if len(mappedPolIDs) > 0 {
+				k.Logger().Debugf("Identified policy(s) to apply to this token from scope claim: %s", scopeClaimName)
+			} else {
+				k.Logger().Errorf("Couldn't identify policy(s) to apply to this token from scope claim: %s", scopeClaimName)
+			}
 
 			polIDs = append(polIDs, mappedPolIDs...)
+			if len(polIDs) == 0 {
+				k.reportLoginFailure(baseFieldData, r)
+				k.Logger().Error("no matching policy found in scope claim")
+				return errors.New("key not authorized: no matching policy found in scope claim"), http.StatusForbidden
+			}
 
 			// check if we need to update session
 			if !updateSession {
@@ -479,7 +493,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		ctxSetSession(r, &session, sessionID, updateSession)
 
 		if updateSession {
-			SessionCache.Set(session.KeyHash(), session, cache.DefaultExpiration)
+			SessionCache.Set(session.GetKeyHash(), session, cache.DefaultExpiration)
 		}
 	}
 	ctxSetJWTContextVars(k.Spec, r, token)
@@ -504,7 +518,7 @@ func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Toke
 	}
 
 	k.Logger().Debug("Using raw key ID: ", tykId)
-	session, exists := k.CheckSessionAndIdentityForValidKey(tykId, r)
+	session, exists := k.CheckSessionAndIdentityForValidKey(&tykId, r)
 	if !exists {
 		k.reportLoginFailure(tykId, r)
 		return errors.New("Key not authorized"), http.StatusForbidden
@@ -691,7 +705,7 @@ func generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.Se
 	policiesMu.RLock()
 	policy, ok := policiesByID[policyID]
 	policiesMu.RUnlock()
-	session := user.SessionState{}
+	session := user.SessionState{Mutex: &sync.RWMutex{}}
 	if !ok {
 		return session, errors.New("Policy not found")
 	}

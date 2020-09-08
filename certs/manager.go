@@ -209,8 +209,6 @@ func isCertCanBeListed(cert *tls.Certificate, mode CertificateType) bool {
 	switch mode {
 	case CertificatePrivate:
 		return !isPrivateKeyEmpty(cert)
-	case CertificatePublic:
-		return isPrivateKeyEmpty(cert)
 	case CertificateAny:
 		return true
 	}

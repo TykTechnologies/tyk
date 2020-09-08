@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -46,6 +47,7 @@ func generateSession(algo, data string) string {
 			s.HmacSecret = data
 			s.HMACEnabled = true
 		}
+		s.Mutex = &sync.RWMutex{}
 	})
 
 	return sessionKey
@@ -452,6 +454,7 @@ func TestWithURLRewrite(t *testing.T) {
 	sessionKey := CreateSession(func(session *user.SessionState) {
 		session.EnableHTTPSignatureValidation = true
 		session.HmacSecret = secret
+		session.Mutex = &sync.RWMutex{}
 	})
 
 	t.Run("looping", func(t *testing.T) {
@@ -552,6 +555,12 @@ func TestRequestSigning_getRequestPath(t *testing.T) {
 	t.Run("StripListenPath=true", func(t *testing.T) {
 		api.Proxy.StripListenPath = true
 		assert.Equal(t, "/get?param1=value1", rs.getRequestPath(req))
+
+		t.Run("path is empty", func(t *testing.T) {
+			reqWithEmptyPath, _ := http.NewRequest(http.MethodGet, "http://example.com/test/", nil)
+			assert.Equal(t, "/", rs.getRequestPath(reqWithEmptyPath))
+		})
+
 		api.Proxy.StripListenPath = false
 	})
 

@@ -2,7 +2,11 @@ package gateway
 
 import (
 	"net/http"
+	"sync"
 	"testing"
+
+	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/test"
@@ -30,6 +34,7 @@ func TestRateLimit_Unlimited(t *testing.T) {
 		}
 		s.Rate = 1
 		s.Per = 60
+		s.Mutex = &sync.RWMutex{}
 	})
 
 	authHeader := map[string]string{
@@ -80,6 +85,7 @@ func TestNeverRenewQuota(t *testing.T) {
 	})[0]
 
 	_, key := g.CreateSession(func(s *user.SessionState) {
+		s.Mutex = &sync.RWMutex{}
 		s.AccessRights = map[string]user.AccessDefinition{
 			api.APIID: {
 				APIName: api.Name,
@@ -101,4 +107,48 @@ func TestNeverRenewQuota(t *testing.T) {
 		{Headers: authHeader, Code: http.StatusForbidden},
 	}...)
 
+}
+
+func TestDepthLimit(t *testing.T) {
+	g := StartTest()
+	defer g.Close()
+
+	spec := BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = false
+		spec.Proxy.ListenPath = "/"
+		spec.GraphQL.Enabled = true
+	})[0]
+
+	session, key := g.CreateSession(func(s *user.SessionState) {
+		s.MaxQueryDepth = -1
+		s.Mutex = &sync.RWMutex{}
+		s.AccessRights = map[string]user.AccessDefinition{
+			spec.APIID: {
+				APIID:   spec.APIID,
+				APIName: spec.Name,
+				Limit: &user.APILimit{
+					MaxQueryDepth: 1,
+				},
+			},
+		}
+	})
+
+	authHeader := map[string]string{
+		headers.Authorization: key,
+	}
+
+	request := graphql.Request{
+		OperationName: "Query",
+		Variables:     nil,
+		Query:         "query Query { people { name } }",
+	}
+
+	t.Run("Per API", func(t *testing.T) {
+		assert.Equal(t, -1, session.MaxQueryDepth)
+
+		// Although session.MaxQueryDepth is unlimited, it will be ignored because per API level depth value is set.
+		_, _ = g.Run(t, []test.TestCase{
+			{Headers: authHeader, Data: request, BodyMatch: "depth limit exceeded", Code: http.StatusForbidden},
+		}...)
+	})
 }

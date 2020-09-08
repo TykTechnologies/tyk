@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/go-redis/redis"
 	uuid "github.com/satori/go.uuid"
@@ -243,6 +242,7 @@ func TestKeyHandler(t *testing.T) {
 		s.AccessRights = map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v1"},
 		}}
+		s.Mutex = &sync.RWMutex{}
 	})
 
 	_, unknownOrgKey := ts.CreateSession(func(s *user.SessionState) {
@@ -250,6 +250,7 @@ func TestKeyHandler(t *testing.T) {
 		s.AccessRights = map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v1"},
 		}}
+		s.Mutex = &sync.RWMutex{}
 	})
 
 	t.Run("Get key", func(t *testing.T) {
@@ -275,6 +276,7 @@ func TestKeyHandler(t *testing.T) {
 			s.AccessRights = map[string]user.AccessDefinition{"test": {
 				APIID: "test", Versions: []string{"v1"},
 			}}
+			s.Mutex = &sync.RWMutex{}
 		})
 
 		assert := func(response *http.Response, expected []string) {
@@ -360,6 +362,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 		s.AccessRights = map[string]user.AccessDefinition{testAPIID: {
 			APIID: testAPIID, Versions: []string{"v1"},
 		}}
+		s.Mutex = &sync.RWMutex{}
 	})
 
 	t.Run("Add policy not enforcing acl", func(t *testing.T) {
@@ -372,7 +375,8 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 		}...)
 
 		sessionState, found := GlobalSessionManager.SessionDetail("default", key, false)
-		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 2 {
+		accessRight, _ := sessionState.GetAccessRightByAPIID(testAPIID)
+		if !found || accessRight.APIID != testAPIID || len(sessionState.ApplyPolicies) != 2 {
 			t.Fatal("Adding policy to the list failed")
 		}
 	})
@@ -387,7 +391,8 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 		}...)
 
 		sessionState, found := GlobalSessionManager.SessionDetail("default", key, false)
-		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 0 {
+		accessRight, _ := sessionState.GetAccessRightByAPIID(testAPIID)
+		if !found || accessRight.APIID != testAPIID || len(sessionState.ApplyPolicies) != 0 {
 			t.Fatal("Removing policy from the list failed")
 		}
 	})
@@ -444,8 +449,8 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 
 			sessionState, found := GlobalSessionManager.SessionDetail(session.OrgID, key, false)
 
-			if !found || !reflect.DeepEqual(expected, sessionState.MetaData) {
-				t.Fatalf("Expected %v, returned %v", expected, sessionState.MetaData)
+			if !found || !reflect.DeepEqual(expected, sessionState.GetMetaData()) {
+				t.Fatalf("Expected %v, returned %v", expected, sessionState.GetMetaData())
 			}
 		}
 
@@ -478,12 +483,67 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 				"key-meta2": "key-value2",
 			}
 			session.ApplyPolicies = []string{pID, pID2}
-			session.MetaData = map[string]interface{}{
+			session.SetMetaData(map[string]interface{}{
 				"key-meta2": "key-value2",
-			}
+			})
 			assertMetaData(session, expected)
 		})
 	})
+}
+
+func TestKeyHandler_CheckKeysNotDuplicateOnUpdate(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = false
+		spec.Auth.UseParam = true
+	})
+
+	cases := []struct {
+		Name        string
+		IsCustomKey bool
+		KeyName     string
+	}{
+		{
+			Name:        "duplicity on update custom key",
+			IsCustomKey: true,
+			KeyName:     "my_custom_key",
+		},
+		{
+			Name:        "duplicity on update regular key",
+			IsCustomKey: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.Name, func(t *testing.T) {
+			GlobalSessionManager.Store().DeleteAllKeys()
+			session := CreateStandardSession()
+			session.AccessRights = map[string]user.AccessDefinition{"test": {
+				APIID: "test", Versions: []string{"v1"},
+			}}
+
+			keyName := tc.KeyName
+			if !tc.IsCustomKey {
+				keyName = generateToken(session.OrgID, "")
+			}
+
+			if err := doAddOrUpdate(keyName, session, false, true); err != nil {
+				t.Error("Failed to create key, ensure security settings are correct:" + err.Error())
+			}
+
+			requestByte, _ := json.Marshal(session)
+			r := httptest.NewRequest(http.MethodPut, "/tyk/keys/"+keyName, bytes.NewReader(requestByte))
+			handleAddOrUpdate(keyName, r, true)
+
+			sessions := GlobalSessionManager.Sessions("")
+			if len(sessions) != 1 {
+				t.Errorf("Sessions stored in global manager should be 1. But got: %v", len(sessions))
+			}
+
+		})
+	}
 }
 
 func TestHashKeyHandler(t *testing.T) {
@@ -1274,39 +1334,16 @@ func TestGroupResetHandler(t *testing.T) {
 }
 
 func TestHotReloadSingle(t *testing.T) {
+	ReloadTestCase.Enable()
+	defer ReloadTestCase.Disable()
 	oldRouter := mainRouter()
 	var wg sync.WaitGroup
 	wg.Add(1)
 	reloadURLStructure(wg.Done)
-	ReloadTick <- time.Time{}
+	ReloadTestCase.TickOk(t)
 	wg.Wait()
 	if mainRouter() == oldRouter {
 		t.Fatal("router wasn't swapped")
-	}
-}
-
-func TestHotReloadMany(t *testing.T) {
-	var wg sync.WaitGroup
-	wg.Add(25)
-	// Spike of 25 reloads all at once, not giving any time for the
-	// reload worker to pick up any of them. A single one is queued
-	// and waits.
-	// We get a callback for all of them, so 25 wg.Done calls.
-	for i := 0; i < 25; i++ {
-		reloadURLStructure(wg.Done)
-	}
-	// pick it up and finish it
-	ReloadTick <- time.Time{}
-	wg.Wait()
-
-	// 5 reloads, but this time slower - the reload worker has time
-	// to do all of them.
-	for i := 0; i < 5; i++ {
-		wg.Add(1)
-		reloadURLStructure(wg.Done)
-		// pick it up and finish it
-		ReloadTick <- time.Time{}
-		wg.Wait()
 	}
 }
 
@@ -1350,7 +1387,12 @@ func TestContextSession(t *testing.T) {
 	if ctxGetSession(r) != nil {
 		t.Fatal("expected ctxGetSession to return nil")
 	}
-	ctxSetSession(r, &user.SessionState{}, "", false)
+	ctxSetSession(r,
+		&user.SessionState{
+			Mutex: &sync.RWMutex{},
+		},
+		"",
+		false)
 	if ctxGetSession(r) == nil {
 		t.Fatal("expected ctxGetSession to return non-nil")
 	}

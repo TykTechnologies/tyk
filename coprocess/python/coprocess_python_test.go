@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -283,6 +284,7 @@ func TestPythonBundles(t *testing.T) {
 				"testkey":   map[string]interface{}{"nestedkey": "nestedvalue"},
 				"stringkey": "testvalue",
 			}
+			s.Mutex = &sync.RWMutex{}
 		})
 
 		gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
@@ -309,6 +311,7 @@ func TestPythonBundles(t *testing.T) {
 				"testkey":   map[string]interface{}{"nestedkey": "nestedvalue"},
 				"stringkey": "testvalue",
 			}
+			s.Mutex = &sync.RWMutex{}
 		})
 
 		gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
