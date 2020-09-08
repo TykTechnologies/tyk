@@ -776,6 +776,103 @@ func (gw *Gateway) handleRemoveSortedSetRange(keyName, scoreFrom, scoreTo string
 	return gw.GlobalSessionManager.Store().RemoveSortedSetRange(keyName, scoreFrom, scoreTo)
 }
 
+func handleGetPolicy(polID string) (interface{}, int) {
+	if pol := getPolicy(polID); pol.ID != "" {
+		return user.Policy{}, http.StatusOK
+	}
+
+	log.WithFields(logrus.Fields{
+		"prefix": "policy",
+		"polID":  polID,
+	}).Error("Policy doesn't exist.")
+	return apiError("Policy not found"), http.StatusNotFound
+}
+
+func handleGetPolicyList() (interface{}, int) {
+	apisMu.RLock()
+	defer apisMu.RUnlock()
+	polIDList := make([]user.Policy, len(policiesByID))
+	c := 0
+	for _, pol := range policiesByID {
+		polIDList[c] = pol
+		c++
+	}
+	return polIDList, http.StatusOK
+}
+
+func handleAddOrUpdatePolicy(polID string, r *http.Request) (interface{}, int) {
+	if config.Global().Policies.PolicySource == "service" {
+		log.Error("Rejected new policy due to PolicySource = service")
+		return apiError("Due to enabled service policy source, please use the Dashboard API"), http.StatusInternalServerError
+	}
+
+	newPol := &user.Policy{}
+	if err := json.NewDecoder(r.Body).Decode(newPol); err != nil {
+		log.Error("Couldn't decode new policy object: ", err)
+		return apiError("Request malformed"), http.StatusBadRequest
+	}
+
+	if polID != "" && newPol.ID != polID {
+		log.Error("PUT operation on different IDs")
+		return apiError("Request ID does not match that in policy! For Update operations these must match."), http.StatusBadRequest
+	}
+
+	// Create a filename
+	polFilePath := filepath.Join(config.Global().Policies.PolicyRecordName, newPol.ID+".json")
+
+	// If it exists, delete it
+	if _, err := os.Stat(polFilePath); err == nil {
+		log.Warning("Policy with this ID already exists, deleting file...")
+		os.Remove(polFilePath)
+	}
+
+	// unmarshal the object into the file
+	asByte, err := json.MarshalIndent(newPol, "", "  ")
+	if err != nil {
+		log.Error("Marshalling of policy failed: ", err)
+		return apiError("Marshalling failed"), http.StatusInternalServerError
+	}
+
+	if err := ioutil.WriteFile(polFilePath, asByte, 0644); err != nil {
+		log.Error("Failed to create file! - ", err)
+		return apiError("File object creation failed, write error"), http.StatusInternalServerError
+	}
+
+	action := "modified"
+	if r.Method == "POST" {
+		action = "added"
+	}
+
+	response := apiModifyKeySuccess{
+		Key:    newPol.ID,
+		Status: "ok",
+		Action: action,
+	}
+
+	return response, http.StatusOK
+}
+
+func handleDeletePolicy(polID string) (interface{}, int) {
+	// Generate a filename
+	defFilePath := filepath.Join(config.Global().Policies.PolicyRecordName, polID+".json")
+
+	// If it exists, delete it
+	if _, err := os.Stat(defFilePath); err != nil {
+		log.Warning("File does not exist! ", err)
+		return apiError("Delete failed"), http.StatusInternalServerError
+	}
+
+	os.Remove(defFilePath)
+
+	response := apiModifyKeySuccess{
+		Key:    polID,
+		Status: "ok",
+		Action: "deleted",
+	}
+
+	return response, http.StatusOK
+}
+
 func (gw *Gateway) handleGetAPIList() (interface{}, int) {
 	gw.apisMu.RLock()
 	defer gw.apisMu.RUnlock()
@@ -941,6 +1038,43 @@ func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 	}
 
 	return response, http.StatusOK
+}
+
+func polHandler(w http.ResponseWriter, r *http.Request) {
+	polID := mux.Vars(r)["polID"]
+
+	var obj interface{}
+	var code int
+
+	switch r.Method {
+	case "GET":
+		if polID != "" {
+			log.Debug("Requesting policy for", polID)
+			obj, code = handleGetPolicy(polID)
+		} else {
+			log.Debug("Requesting Policy list")
+			obj, code = handleGetPolicyList()
+		}
+	case "POST":
+		log.Debug("Creating new definition file")
+		obj, code = handleAddOrUpdatePolicy(polID, r)
+	case "PUT":
+		if polID != "" {
+			log.Debug("Updating existing Policy: ", polID)
+			obj, code = handleAddOrUpdatePolicy(polID, r)
+		} else {
+			obj, code = apiError("Must specify an apiID to update"), http.StatusBadRequest
+		}
+	case "DELETE":
+		if polID != "" {
+			log.Debug("Deleting policy for: ", polID)
+			obj, code = handleDeletePolicy(polID)
+		} else {
+			obj, code = apiError("Must specify an apiID to delete"), http.StatusBadRequest
+		}
+	}
+
+	doJSONWrite(w, code, obj)
 }
 
 func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
