@@ -82,7 +82,7 @@ func LoadPoliciesFromDir(dir string) map[string]user.Policy {
 	// Grab json files from directory
 	paths, _ := filepath.Glob(filepath.Join(dir, "*.json"))
 	for _, path := range paths {
-		log.Info("Loading policy from ", path)
+		log.Info("Loading policy from dir ", path)
 		f, err := os.Open(path)
 		if err != nil {
 			log.Error("Couldn't open policy file from dir: ", err)
@@ -90,7 +90,7 @@ func LoadPoliciesFromDir(dir string) map[string]user.Policy {
 		}
 		pol := &user.Policy{}
 		if err := json.NewDecoder(f).Decode(pol); err != nil {
-			log.Error("[RPC] --> Couldn't unmarshal api configuration: ", err)
+			log.Error("Couldn't unmarshal policy configuration from dir: ", err)
 		}
 		f.Close()
 		policies[pol.ID] = *pol
