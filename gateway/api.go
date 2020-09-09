@@ -789,8 +789,8 @@ func handleGetPolicy(polID string) (interface{}, int) {
 }
 
 func handleGetPolicyList() (interface{}, int) {
-	apisMu.RLock()
-	defer apisMu.RUnlock()
+	policiesMu.RLock()
+	defer policiesMu.RUnlock()
 	polIDList := make([]user.Policy, len(policiesByID))
 	c := 0
 	for _, pol := range policiesByID {
@@ -812,7 +812,7 @@ func handleAddOrUpdatePolicy(polID string, r *http.Request) (interface{}, int) {
 		return apiError("Request malformed"), http.StatusBadRequest
 	}
 
-	if polID != "" && newPol.ID != polID {
+	if polID != "" && newPol.ID != polID && r.Method == http.MethodPut {
 		log.Error("PUT operation on different IDs")
 		return apiError("Request ID does not match that in policy! For Update operations these must match."), http.StatusBadRequest
 	}
@@ -820,13 +820,6 @@ func handleAddOrUpdatePolicy(polID string, r *http.Request) (interface{}, int) {
 	// Create a filename
 	polFilePath := filepath.Join(config.Global().Policies.PolicyPath, newPol.ID+".json")
 
-	// If it exists, delete it
-	if _, err := os.Stat(polFilePath); err == nil {
-		log.Warning("Policy with this ID already exists, deleting file...")
-		os.Remove(polFilePath)
-	}
-
-	// unmarshal the object into the file
 	asByte, err := json.MarshalIndent(newPol, "", "  ")
 	if err != nil {
 		log.Error("Marshalling of policy failed: ", err)
@@ -858,11 +851,14 @@ func handleDeletePolicy(polID string) (interface{}, int) {
 
 	// If it exists, delete it
 	if _, err := os.Stat(defFilePath); err != nil {
-		log.Warning("File does not exist! ", err)
+		log.Warningf("Error describing named file: %v ", err)
 		return apiError("Delete failed"), http.StatusInternalServerError
 	}
 
-	os.Remove(defFilePath)
+	if err := os.Remove(defFilePath); err != nil {
+		log.Warningf("Delete failed: %v", err)
+		return apiError("Delete failed"), http.StatusInternalServerError
+	}
 
 	response := apiModifyKeySuccess{
 		Key:    polID,

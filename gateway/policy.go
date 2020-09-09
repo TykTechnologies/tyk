@@ -90,7 +90,7 @@ func LoadPoliciesFromDir(dir string) map[string]user.Policy {
 		}
 		pol := &user.Policy{}
 		if err := json.NewDecoder(f).Decode(pol); err != nil {
-			log.Error("Couldn't unmarshal policy configuration from dir: ", err)
+			log.Errorf("Couldn't unmarshal policy configuration from dir: %v : %v", path, err)
 		}
 		f.Close()
 		policies[pol.ID] = *pol
