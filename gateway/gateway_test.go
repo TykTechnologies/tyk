@@ -776,6 +776,12 @@ func TestListener(t *testing.T) {
 	// Specs will be reseted when we do `StartTest`
 	BuildAndLoadAPI()
 
+	ReloadTestCase.Enable()
+	defer ReloadTestCase.Disable()
+
+	ReloadTestCase.StartTicker()
+	defer ReloadTestCase.StopTicker()
+
 	ts := StartTest()
 	defer ts.Close()
 
@@ -803,13 +809,6 @@ func TestListener(t *testing.T) {
 		{Method: "GET", Path: "/sample/", Code: 200},
 		{Method: "GET", Path: "/sample/foo", Code: 200},
 	}
-
-	// have all needed reload ticks ready
-	go func() {
-		for i := 0; i < 4*4; i++ {
-			ReloadTestCase.Tick()
-		}
-	}()
 
 	ts.RunExt(t, tests...)
 }
