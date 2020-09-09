@@ -31,7 +31,7 @@ jobs:
         run: |
             cd integration/terraform
             terraform init -input=false
-            terraform refresh
+            terraform refresh > /dev/null 2>&1
             eval $(terraform output -json tyk | jq -r 'to_entries[] | [.key,.value] | join("=")')
             region=$(terraform output region)
             [ -z "$key" -o -z "$secret" -o -z "$region" -o -z "$ecr" ] && exit 1
