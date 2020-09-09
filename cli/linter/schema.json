@@ -314,6 +314,9 @@
     "drl_notification_frequency": {
       "type": "integer"
     },
+    "drl_enable_sentinel_rate_limiter": {
+      "type": "boolean"
+    },
     "drl_threshold": {
       "type": "number"
     },
