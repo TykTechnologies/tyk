@@ -283,18 +283,6 @@ func (l *SessionLimiter) DepthLimitEnabled(graphqlEnabled bool, accessDef *user.
 		return false
 	}
 
-	// This is more precise way, however getting fields from gqlRequest is complex at this point.
-	// Getting this info on `gqlRequest.ValidateForSchema` step would work.
-	/*for _, fieldRight := range accessDef.FieldAccessRights {
-		for _, rootField := range gqlRequest.Fields { // GetRootFieldsForSchema
-			if fieldRight.TypeName == rootField.TypeName && fieldRight.FieldName == rootField.FieldName {
-				if fieldRight.Limits.MaxQueryDepth > 0 {
-					return true
-				}
-			}
-		}
-	}*/
-
 	// There is a possibility that depth limit is disabled on field level too,
 	// but we continue with this because of the explanation above.
 	if len(accessDef.FieldAccessRights) > 0 {
@@ -311,23 +299,31 @@ func (l *SessionLimiter) DepthLimitExceeded(gqlRequest *graphql.Request, accessD
 		return sessionFailInternalServerError
 	}
 
-	if len(accessDef.FieldAccessRights) != 0 {
-		for _, fieldAccessDef := range accessDef.FieldAccessRights {
-			for _, fieldComplexityRes := range complexityRes.PerRootField {
-				if fieldComplexityRes.TypeName == fieldAccessDef.TypeName && fieldComplexityRes.FieldName == fieldAccessDef.FieldName {
-					if fieldComplexityRes.Depth > fieldAccessDef.Limits.MaxQueryDepth {
-						log.Debugf("Complexity of the field: %s.%s is higher than the allowed limit '%d'",
-							fieldAccessDef.TypeName, fieldAccessDef.FieldName,
-							accessDef.Limit.MaxQueryDepth)
-						return sessionFailDepthLimit
-					}
-				}
-			}
-		}
-	} else {
+	// do per query depth check
+	if len(accessDef.FieldAccessRights) == 0 {
 		if complexityRes.Depth > accessDef.Limit.MaxQueryDepth {
 			log.Debugf("Complexity of the request is higher than the allowed limit '%d'", accessDef.Limit.MaxQueryDepth)
 			return sessionFailDepthLimit
+		}
+		return sessionFailNone
+	}
+
+	// do per query field depth check
+	for _, fieldAccessDef := range accessDef.FieldAccessRights {
+		for _, fieldComplexityRes := range complexityRes.PerRootField {
+			if fieldComplexityRes.TypeName != fieldAccessDef.TypeName {
+				continue
+			}
+			if fieldComplexityRes.FieldName != fieldAccessDef.FieldName {
+				continue
+			}
+
+			if fieldComplexityRes.Depth > fieldAccessDef.Limits.MaxQueryDepth {
+				log.Debugf("Complexity of the field: %s.%s is higher than the allowed limit '%d'",
+					fieldAccessDef.TypeName, fieldAccessDef.FieldName, accessDef.Limit.MaxQueryDepth)
+
+				return sessionFailDepthLimit
+			}
 		}
 	}
 
