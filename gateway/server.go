@@ -259,9 +259,9 @@ func (gw *Gateway) getApiSpec(apiID string) *APISpec {
 }
 
 func getPolicy(polID string) user.Policy {
-	apisMu.RLock()
+	policiesMu.RLock()
 	pol := policiesByID[polID]
-	apisMu.RUnlock()
+	policiesMu.RUnlock()
 	return pol
 }
 
