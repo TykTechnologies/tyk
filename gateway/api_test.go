@@ -55,6 +55,72 @@ const apiTestDef = `{
 	}
 }`
 
+const defaultTestPol = `{
+"ID": "default-test",
+"rate": 1000,
+"per": 1,
+"quota_max": 100,
+"quota_renewal_rate": 60,
+"access_rights": {
+"41433797848f41a558c1573d3e55a410": {
+"api_name": "My API",
+"api_id": "41433797848f41a558c1573d3e55a410",
+"versions": [
+"Default"
+]
+}
+},
+"org_id": "54de205930c55e15bd000001",
+"hmac_enabled": false
+
+}`
+
+const defaultTestPolUpdated = `{
+"ID": "default-test",
+"rate": 1000,
+"per": 1,
+"quota_max": 100,
+"quota_renewal_rate": 60,
+"access_rights": {
+"41433797848f41a558c1573d3e55a410": {
+"api_name": "My Updated API",
+"api_id": "41433797848f41a558c1573d3e55a410",
+"versions": [
+"Default"
+]
+}
+},
+"org_id": "54de205930c55e15bd000001",
+"hmac_enabled": false
+
+}`
+
+func TestPolicyAPI(t *testing.T) {
+
+	globalConf := config.Global()
+	globalConf.Policies.PolicyPath = "."
+	globalConf.Policies.PolicySource = "file"
+	config.SetGlobal(globalConf)
+
+	ts := StartTest()
+	defer ts.Close()
+	BuildAndLoadAPI()
+
+	ts.Run(t, []test.TestCase{
+		// get nonexistant policy
+		{Path: "/tyk/policies/not-here", AdminAuth: true, Method: "GET", BodyMatch: `{"status":"error","message":"Policy not found"}`},
+		// create Policy
+		{Path: "/tyk/policies", AdminAuth: true, Method: "POST", Data: defaultTestPol, BodyMatch: `{"key":"default-test","status":"ok","action":"added"}`},
+		//update policy with new values
+		{Path: "/tyk/policies/default-test", AdminAuth: true, Method: "PUT", Data: defaultTestPol, BodyMatch: `{"key":"default-test","status":"ok","action":"modified"}`},
+		//get by ID
+		{Path: "/tyk/policies/default-test", AdminAuth: true, Method: "GET", Code: 200},
+		//delete to clean up
+		{Path: "/tyk/policies/default-test", AdminAuth: true, Method: "DELETE", BodyMatch: `{"key":"default-test","status":"ok","action":"deleted"}`},
+	}...)
+
+}
+
 func TestHealthCheckEndpoint(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()

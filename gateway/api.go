@@ -778,7 +778,7 @@ func (gw *Gateway) handleRemoveSortedSetRange(keyName, scoreFrom, scoreTo string
 
 func handleGetPolicy(polID string) (interface{}, int) {
 	if pol := getPolicy(polID); pol.ID != "" {
-		return user.Policy{}, http.StatusOK
+		return pol, http.StatusOK
 	}
 
 	log.WithFields(logrus.Fields{
@@ -828,12 +828,15 @@ func handleAddOrUpdatePolicy(polID string, r *http.Request) (interface{}, int) {
 
 	if err := ioutil.WriteFile(polFilePath, asByte, 0644); err != nil {
 		log.Error("Failed to create file! - ", err)
-		return apiError("File object creation failed, write error"), http.StatusInternalServerError
+		return apiError("Failed to create file!"), http.StatusInternalServerError
 	}
 
 	action := "modified"
 	if r.Method == "POST" {
 		action = "added"
+		policiesMu.Lock()
+		policiesByID[polID] = *newPol
+		policiesMu.Unlock()
 	}
 
 	response := apiModifyKeySuccess{
