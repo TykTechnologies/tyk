@@ -66,7 +66,7 @@ type FieldAccessDefinition struct {
 type FieldLimits struct {
 	MaxQueryDepth int `json:"max_query_depth" msg:"max_query_depth"`
 }
-	
+
 type BasicAuthData struct {
 	Password string   `json:"password" msg:"password"`
 	Hash     HashType `json:"hash_type" msg:"hash_type"`
