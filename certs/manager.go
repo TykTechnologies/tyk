@@ -240,13 +240,12 @@ func ExtractCertificateMeta(cert *tls.Certificate, certID string) *CertificateMe
 	}
 }
 
-func GetCertIDAndChainPEM(certData []byte, secret string) (string,[]byte,error){
+func GetCertIDAndChainPEM(certData []byte, secret string) (string, []byte, error) {
 	var keyPEM, keyRaw []byte
 	var publicKeyPem []byte
 	var certBlocks [][]byte
 	var certID string
 	var certChainPEM []byte
-
 
 	rest := certData
 
@@ -261,7 +260,7 @@ func GetCertIDAndChainPEM(certData []byte, secret string) (string,[]byte,error){
 		if strings.HasSuffix(block.Type, "PRIVATE KEY") {
 			if len(keyRaw) > 0 {
 				err := errors.New("Found multiple private keys")
-				return certID,certChainPEM, err
+				return certID, certChainPEM, err
 			}
 
 			keyRaw = block.Bytes
@@ -270,11 +269,11 @@ func GetCertIDAndChainPEM(certData []byte, secret string) (string,[]byte,error){
 
 			cert, err := x509.ParseCertificate(block.Bytes)
 			if err != nil {
-				return certID,certChainPEM, err
+				return certID, certChainPEM, err
 			}
 
 			if cert.NotAfter.Before(time.Now()) {
-				return certID,certChainPEM, errors.New("certificate is expired")
+				return certID, certChainPEM, errors.New("certificate is expired")
 			}
 
 			certBlocks = append(certBlocks, pem.EncodeToMemory(block))
@@ -288,48 +287,47 @@ func GetCertIDAndChainPEM(certData []byte, secret string) (string,[]byte,error){
 	if len(certChainPEM) == 0 {
 		if len(publicKeyPem) == 0 {
 			err := errors.New("Failed to decode certificate. It should be PEM encoded.")
-			return certID,certChainPEM, err
+			return certID, certChainPEM, err
 		} else {
 			certChainPEM = publicKeyPem
 		}
 	} else if len(publicKeyPem) > 0 {
 		err := errors.New("Public keys can't be combined with certificates")
-		return certID,certChainPEM, err
+		return certID, certChainPEM, err
 	}
-
 
 	// Found private key, check if it match the certificate
 	if len(keyPEM) > 0 {
 		cert, err := tls.X509KeyPair(certChainPEM, keyPEM)
 		if err != nil {
-			return certID,certChainPEM, err
+			return certID, certChainPEM, err
 		}
 
 		// Encrypt private key and append it to the chain
 		encryptedKeyPEMBlock, err := x509.EncryptPEMBlock(rand.Reader, "ENCRYPTED PRIVATE KEY", keyRaw, []byte(secret), x509.PEMCipherAES256)
 		if err != nil {
-			return certID,certChainPEM, err
+			return certID, certChainPEM, err
 		}
 
 		certChainPEM = append(certChainPEM, []byte("\n")...)
 		certChainPEM = append(certChainPEM, pem.EncodeToMemory(encryptedKeyPEMBlock)...)
 
-		certID =  HexSHA256(cert.Certificate[0])
+		certID = HexSHA256(cert.Certificate[0])
 	} else if len(publicKeyPem) > 0 {
 		publicKey, _ := pem.Decode(publicKeyPem)
-		certID =  HexSHA256(publicKey.Bytes)
+		certID = HexSHA256(publicKey.Bytes)
 	} else {
 		// Get first cert
 		certRaw, _ := pem.Decode(certChainPEM)
 		cert, err := x509.ParseCertificate(certRaw.Bytes)
 		if err != nil {
 			err := errors.New("Error while parsing certificate: " + err.Error())
-			return certID,certChainPEM, err
+			return certID, certChainPEM, err
 		}
 
-		certID =  HexSHA256(cert.Raw)
+		certID = HexSHA256(cert.Raw)
 	}
-	return certID,certChainPEM,nil
+	return certID, certChainPEM, nil
 }
 
 func (c *CertificateManager) List(certIDs []string, mode CertificateType) (out []*tls.Certificate) {
@@ -488,12 +486,12 @@ func (c *CertificateManager) GetRaw(certID string) (string, error) {
 func (c *CertificateManager) Add(certData []byte, orgID string) (string, error) {
 
 	certID, certChainPEM, err := GetCertIDAndChainPEM(certData, c.secret)
-	if err != nil{
+	if err != nil {
 		c.logger.Error(err)
-		return "",err
+		return "", err
 	}
-	certID = orgID+certID
-	
+	certID = orgID + certID
+
 	if cert, err := c.storage.GetKey("raw-" + certID); err == nil && cert != "" {
 		return "", errors.New("Certificate with " + certID + " id already exists")
 	}
