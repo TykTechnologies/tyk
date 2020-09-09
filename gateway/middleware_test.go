@@ -64,6 +64,11 @@ func TestOrgSessionWithRPCDown(t *testing.T) {
 	globalConf.Policies.PolicySource = "rpc"
 	config.SetGlobal(globalConf)
 
+	defer func() {
+		globalConf.SlaveOptions.UseRPC = false
+		config.SetGlobal(globalConf)
+	}()
+
 	m := BaseMiddleware{
 		Spec: &APISpec{
 			GlobalConfig: config.Config{
