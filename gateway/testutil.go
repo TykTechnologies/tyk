@@ -664,7 +664,7 @@ func CreateSession(sGen ...func(s *user.SessionState)) string {
 }
 
 func CreateStandardSession() *user.SessionState {
-	session := new(user.SessionState)
+	session := user.NewSessionState()
 	session.Rate = 10000
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
@@ -677,7 +677,6 @@ func CreateStandardSession() *user.SessionState {
 	session.Tags = []string{}
 	session.MetaData = make(map[string]interface{})
 	session.OrgID = "default"
-	session.Mutex = &sync.RWMutex{}
 	return session
 }
 

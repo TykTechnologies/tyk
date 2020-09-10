@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/lonelycode/osin"
@@ -943,13 +942,13 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 	)
 
 	// Create a user.SessionState object and register it with the authmanager
-	newSession := user.SessionState{Mutex: &sync.RWMutex{}}
+	newSession := user.NewSessionState()
 
 	// ------
 	checkPolicy := true
 	if accessData.UserData != nil {
 		checkPolicy = false
-		err := json.Unmarshal([]byte(accessData.UserData.(string)), &newSession)
+		err := json.Unmarshal([]byte(accessData.UserData.(string)), newSession)
 		if err != nil {
 			log.Info("Couldn't decode user.SessionState from UserData, checking policy: ", err)
 			checkPolicy = true
@@ -963,7 +962,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 			return errors.New("Couldn't use policy or key rules to create token, failing")
 		}
 
-		newSession = sessionFromPolicy
+		newSession = &sessionFromPolicy
 	}
 
 	// ------
@@ -989,7 +988,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 	}
 
 	// Use the default session expiry here as this is OAuth
-	r.sessionManager.UpdateSession(accessData.AccessToken, &newSession, int64(accessData.ExpiresIn), false)
+	r.sessionManager.UpdateSession(accessData.AccessToken, newSession, int64(accessData.ExpiresIn), false)
 
 	// Store the refresh token too
 	if accessData.RefreshToken != "" {
@@ -1135,14 +1134,14 @@ func (r *RedisOsinStorageInterface) GetUser(username string) (*user.SessionState
 	}
 
 	// new interface means having to make this nested... ick.
-	session := user.SessionState{Mutex: &sync.RWMutex{}}
-	if err := json.Unmarshal([]byte(accessJSON), &session); err != nil {
+	session := user.NewSessionState()
+	if err := json.Unmarshal([]byte(accessJSON), session); err != nil {
 		log.Error("Couldn't unmarshal OAuth auth data object (LoadRefresh): ", err,
 			"; Decoding: ", accessJSON)
 		return nil, err
 	}
 
-	return &session, nil
+	return session, nil
 }
 
 func (r *RedisOsinStorageInterface) SetUser(username string, session *user.SessionState, timeout int64) error {
