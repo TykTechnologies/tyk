@@ -49,9 +49,6 @@ var (
 	// to register to, but never used
 	discardMuxer = mux.NewRouter()
 
-	// to simulate time ticks for tests that do reloads
-	reloadTick = make(chan time.Time)
-
 	// Used to store the test bundles:
 	testMiddlewarePath, _ = ioutil.TempDir("", "tyk-middleware-path")
 
@@ -61,6 +58,9 @@ var (
 	defaultTestConfig config.Config
 
 	EnableTestDNSMock = true
+
+	// ReloadTestCase use this when in any test for gateway reloads
+	ReloadTestCase = NewReloadMachinery()
 )
 
 // ReloadMachinery is a helper struct to use when writing tests that do manual
@@ -70,6 +70,39 @@ type ReloadMachinery struct {
 	count  int
 	cycles int
 	mu     sync.RWMutex
+
+	// to simulate time ticks for tests that do reloads
+	reloadTick chan time.Time
+	stop       chan struct{}
+}
+
+func NewReloadMachinery() *ReloadMachinery {
+	return &ReloadMachinery{
+		reloadTick: make(chan time.Time),
+	}
+}
+
+func (r *ReloadMachinery) StartTicker() {
+	r.stop = make(chan struct{})
+
+	go func() {
+		for {
+			select {
+			case <-r.stop:
+				return
+			default:
+				r.Tick()
+			}
+		}
+	}()
+}
+
+func (r *ReloadMachinery) StopTicker() {
+	close(r.stop)
+}
+
+func (r *ReloadMachinery) ReloadTicker() <-chan time.Time {
+	return r.reloadTick
 }
 
 // OnQueued is called when a reload has been queued. This increments the queue
@@ -170,19 +203,16 @@ func (r *ReloadMachinery) EnsureReloaded(t *testing.T) {
 
 // Tick triggers reload
 func (r *ReloadMachinery) Tick() {
-	reloadTick <- time.Time{}
+	r.reloadTick <- time.Time{}
 }
 
 // TickOk triggers a reload and ensures a queue happend and a reload cycle
 // happens. This will block until all the cases are met.
 func (r *ReloadMachinery) TickOk(t *testing.T) {
 	r.EnsureQueued(t)
-	reloadTick <- time.Time{}
+	r.Tick()
 	r.EnsureReloaded(t)
 }
-
-// ReloadTestCase use this when in any test for gateway reloads
-var ReloadTestCase = &ReloadMachinery{}
 
 func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf *config.Config)) int {
 	setTestMode(true)
@@ -269,7 +299,7 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 		time.Sleep(10 * time.Millisecond)
 	}
 	go startPubSubLoop()
-	go reloadLoop(ctx, reloadTick, ReloadTestCase.OnReload)
+	go reloadLoop(ctx, ReloadTestCase.ReloadTicker(), ReloadTestCase.OnReload)
 	go reloadQueueLoop(ctx, ReloadTestCase.OnQueued)
 	go reloadSimulation()
 	exitCode := m.Run()
@@ -634,7 +664,7 @@ func CreateSession(sGen ...func(s *user.SessionState)) string {
 }
 
 func CreateStandardSession() *user.SessionState {
-	session := new(user.SessionState)
+	session := user.NewSessionState()
 	session.Rate = 10000
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
@@ -647,7 +677,6 @@ func CreateStandardSession() *user.SessionState {
 	session.Tags = []string{}
 	session.MetaData = make(map[string]interface{})
 	session.OrgID = "default"
-	session.Mutex = &sync.RWMutex{}
 	return session
 }
 

@@ -359,3 +359,43 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		}...)
 	})
 }
+
+func TestOrgSessionWithRPCDown(t *testing.T) {
+	//we need rpc down
+	globalConf := config.Global()
+	globalConf.SlaveOptions.ConnectionString = testHttpFailure
+	globalConf.SlaveOptions.UseRPC = true
+	globalConf.SlaveOptions.RPCKey = "test_org"
+	globalConf.SlaveOptions.APIKey = "test"
+	globalConf.Policies.PolicySource = "rpc"
+	config.SetGlobal(globalConf)
+
+	defer func() {
+		globalConf.SlaveOptions.ConnectionString = ""
+		globalConf.SlaveOptions.UseRPC = false
+		globalConf.SlaveOptions.RPCKey = ""
+		globalConf.SlaveOptions.APIKey = ""
+		globalConf.Policies.PolicySource = ""
+		config.SetGlobal(globalConf)
+	}()
+
+	ts := StartTest()
+	defer ts.Close()
+
+	m := BaseMiddleware{
+		Spec: &APISpec{
+			GlobalConfig: config.Config{
+				EnforceOrgDataAge: true,
+			},
+			OrgSessionManager: mockStore{},
+		},
+		logger: mainLog,
+	}
+	// reload so we force to fall in emergency mode
+	DoReload()
+
+	_, found := m.OrgSession(sess.OrgID)
+	if found {
+		t.Fatal("org  session should be null:")
+	}
+}
