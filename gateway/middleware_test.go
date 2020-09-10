@@ -52,9 +52,6 @@ func TestBaseMiddleware_OrgSessionExpiry(t *testing.T) {
 }
 
 func TestOrgSessionWithRPCDown(t *testing.T) {
-	ts := StartTest()
-	defer ts.Close()
-
 	//we need rpc down
 	globalConf := config.Global()
 	globalConf.SlaveOptions.ConnectionString = testHttpFailure
@@ -65,9 +62,16 @@ func TestOrgSessionWithRPCDown(t *testing.T) {
 	config.SetGlobal(globalConf)
 
 	defer func() {
+		globalConf.SlaveOptions.ConnectionString = ""
 		globalConf.SlaveOptions.UseRPC = false
+		globalConf.SlaveOptions.RPCKey = ""
+		globalConf.SlaveOptions.APIKey = ""
+		globalConf.Policies.PolicySource = ""
 		config.SetGlobal(globalConf)
 	}()
+
+	ts := StartTest()
+	defer ts.Close()
 
 	m := BaseMiddleware{
 		Spec: &APISpec{
