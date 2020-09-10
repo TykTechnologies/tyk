@@ -463,12 +463,12 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 
 			// add oauth-client user_fields to session's meta
 			if userData := ar.Client.GetUserData(); userData != nil {
-				var ok bool
-				session.MetaData, ok = userData.(map[string]interface{})
+				metadata, ok := userData.(map[string]interface{})
 				if !ok {
 					log.WithField("oauthClientID", ar.Client.GetId()).
 						Error("Could not set session meta_data from oauth-client fields, type mismatch")
 				} else {
+					session.SetMetaData(metadata)
 					// set session alias to developer email as we do it for regular API keys created for developer
 					if devEmail, found := session.GetMetaData()[keyDataDeveloperEmail].(string); found {
 						session.Alias = devEmail
@@ -943,7 +943,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 	)
 
 	// Create a user.SessionState object and register it with the authmanager
-	var newSession user.SessionState
+	newSession := user.SessionState{Mutex: &sync.RWMutex{}}
 
 	// ------
 	checkPolicy := true
@@ -983,7 +983,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 		// Allow session inherit and *override* client values
 		for k, v := range c.MetaData.(map[string]interface{}) {
 			if _, found := newSession.GetMetaDataByKey(k); !found {
-				newSession.MetaData[k] = v
+				newSession.SetMetaDataKey(k, v)
 			}
 		}
 	}
