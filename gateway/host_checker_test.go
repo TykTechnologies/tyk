@@ -13,10 +13,12 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/pires/go-proxyproto"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
-	proxyproto "github.com/pires/go-proxyproto"
 )
 
 const sampleUptimeTestAPI = `{
@@ -493,19 +495,28 @@ func TestChecker_triggerSampleLimit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	l.Close()
-	data := HostData{
-		CheckURL: "http://" + l.Addr().String(),
-	}
+	_ = l.Close()
+
 	ctx, cancel := context.WithCancel(context.Background())
-	hs := &HostUptimeChecker{}
+	var wg sync.WaitGroup
+	wg.Add(5)
+
 	setTestMode(false)
-	limit := 4
-	var failed, ping atomic.Value
+	defer func() {
+		setTestMode(true)
+	}()
+
+	var (
+		limit  = 4
+		ping   atomic.Value
+		failed atomic.Value
+	)
 	failed.Store(0)
 	ping.Store(0)
+
+	hs := &HostUptimeChecker{}
 	hs.Init(1, limit, 0, map[string]HostData{
-		l.Addr().String(): data,
+		l.Addr().String(): {CheckURL: "http://" + l.Addr().String()},
 	},
 		HostCheckCallBacks{
 			Ping: func(_ context.Context, _ HostHealthReport) {
@@ -513,19 +524,17 @@ func TestChecker_triggerSampleLimit(t *testing.T) {
 				if ping.Load().(int) >= limit {
 					cancel()
 				}
+				wg.Done()
 			},
 			Fail: func(_ context.Context, _ HostHealthReport) {
 				failed.Store(failed.Load().(int) + 1)
+				wg.Done()
 			},
 		},
 	)
 	go hs.Start(ctx)
-	<-ctx.Done()
-	setTestMode(true)
-	if ping.Load().(int) != limit {
-		t.Errorf("expected %d got %d", limit, ping.Load())
-	}
-	if failed.Load().(int) != 1 {
-		t.Errorf("expected host down to be fired once got %d instead", failed.Load())
-	}
+
+	wg.Wait()
+	assert.Equal(t, limit, ping.Load().(int), "ping count is wrong")
+	assert.Equal(t, 1, failed.Load().(int), "expected host down to be fired once")
 }

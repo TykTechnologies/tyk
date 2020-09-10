@@ -49,7 +49,7 @@ const hmacAuthDef = `{
 }`
 
 func createHMACAuthSession() *user.SessionState {
-	session := new(user.SessionState)
+	session := user.NewSessionState()
 	session.Rate = 8.0
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
@@ -60,12 +60,11 @@ func createHMACAuthSession() *user.SessionState {
 	session.QuotaMax = -1
 	session.HMACEnabled = true
 	session.HmacSecret = "9879879878787878"
-	session.Mutex = &sync.RWMutex{}
 	return session
 }
 
 func createRSAAuthSession(pubCertId string) *user.SessionState {
-	session := new(user.SessionState)
+	session := user.NewSessionState()
 	session.Rate = 8.0
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
@@ -76,7 +75,6 @@ func createRSAAuthSession(pubCertId string) *user.SessionState {
 	session.QuotaMax = -1
 	session.EnableHTTPSignatureValidation = true
 	session.RSACertificateId = pubCertId
-	session.Mutex = &sync.RWMutex{}
 	return session
 }
 

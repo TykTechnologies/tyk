@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/lonelycode/osin"
@@ -463,12 +462,12 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 
 			// add oauth-client user_fields to session's meta
 			if userData := ar.Client.GetUserData(); userData != nil {
-				var ok bool
-				session.MetaData, ok = userData.(map[string]interface{})
+				metadata, ok := userData.(map[string]interface{})
 				if !ok {
 					log.WithField("oauthClientID", ar.Client.GetId()).
 						Error("Could not set session meta_data from oauth-client fields, type mismatch")
 				} else {
+					session.SetMetaData(metadata)
 					// set session alias to developer email as we do it for regular API keys created for developer
 					if devEmail, found := session.GetMetaData()[keyDataDeveloperEmail].(string); found {
 						session.Alias = devEmail
@@ -943,13 +942,13 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 	)
 
 	// Create a user.SessionState object and register it with the authmanager
-	var newSession user.SessionState
+	newSession := user.NewSessionState()
 
 	// ------
 	checkPolicy := true
 	if accessData.UserData != nil {
 		checkPolicy = false
-		err := json.Unmarshal([]byte(accessData.UserData.(string)), &newSession)
+		err := json.Unmarshal([]byte(accessData.UserData.(string)), newSession)
 		if err != nil {
 			log.Info("Couldn't decode user.SessionState from UserData, checking policy: ", err)
 			checkPolicy = true
@@ -963,7 +962,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 			return errors.New("Couldn't use policy or key rules to create token, failing")
 		}
 
-		newSession = sessionFromPolicy
+		newSession = &sessionFromPolicy
 	}
 
 	// ------
@@ -983,13 +982,13 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 		// Allow session inherit and *override* client values
 		for k, v := range c.MetaData.(map[string]interface{}) {
 			if _, found := newSession.GetMetaDataByKey(k); !found {
-				newSession.MetaData[k] = v
+				newSession.SetMetaDataKey(k, v)
 			}
 		}
 	}
 
 	// Use the default session expiry here as this is OAuth
-	r.sessionManager.UpdateSession(accessData.AccessToken, &newSession, int64(accessData.ExpiresIn), false)
+	r.sessionManager.UpdateSession(accessData.AccessToken, newSession, int64(accessData.ExpiresIn), false)
 
 	// Store the refresh token too
 	if accessData.RefreshToken != "" {
@@ -1135,14 +1134,14 @@ func (r *RedisOsinStorageInterface) GetUser(username string) (*user.SessionState
 	}
 
 	// new interface means having to make this nested... ick.
-	session := user.SessionState{Mutex: &sync.RWMutex{}}
-	if err := json.Unmarshal([]byte(accessJSON), &session); err != nil {
+	session := user.NewSessionState()
+	if err := json.Unmarshal([]byte(accessJSON), session); err != nil {
 		log.Error("Couldn't unmarshal OAuth auth data object (LoadRefresh): ", err,
 			"; Decoding: ", accessJSON)
 		return nil, err
 	}
 
-	return &session, nil
+	return session, nil
 }
 
 func (r *RedisOsinStorageInterface) SetUser(username string, session *user.SessionState, timeout int64) error {

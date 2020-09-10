@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"net/http"
-	"sync"
 	"testing"
 
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
@@ -34,7 +33,6 @@ func TestRateLimit_Unlimited(t *testing.T) {
 		}
 		s.Rate = 1
 		s.Per = 60
-		s.Mutex = &sync.RWMutex{}
 	})
 
 	authHeader := map[string]string{
@@ -85,7 +83,6 @@ func TestNeverRenewQuota(t *testing.T) {
 	})[0]
 
 	_, key := g.CreateSession(func(s *user.SessionState) {
-		s.Mutex = &sync.RWMutex{}
 		s.AccessRights = map[string]user.AccessDefinition{
 			api.APIID: {
 				APIName: api.Name,
@@ -121,7 +118,6 @@ func TestDepthLimit(t *testing.T) {
 
 	session, key := g.CreateSession(func(s *user.SessionState) {
 		s.MaxQueryDepth = -1
-		s.Mutex = &sync.RWMutex{}
 		s.AccessRights = map[string]user.AccessDefinition{
 			spec.APIID: {
 				APIID:   spec.APIID,

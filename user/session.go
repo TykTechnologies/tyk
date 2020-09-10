@@ -116,6 +116,10 @@ type SessionState struct {
 	keyHash string
 }
 
+func NewSessionState() *SessionState {
+	return &SessionState{Mutex: &sync.RWMutex{}}
+}
+
 func (s *SessionState) SetAccessRights(accessRights map[string]AccessDefinition) {
 	s.Mutex.Lock()
 	s.AccessRights = accessRights
