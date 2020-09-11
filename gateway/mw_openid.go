@@ -210,7 +210,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 				return errors.New("Key not authorized: no matching policy"), http.StatusForbidden
 			}
 
-			session = newSession
+			session = newSession.Clone()
 		}
 
 		session.OrgID = k.Spec.OrgID
