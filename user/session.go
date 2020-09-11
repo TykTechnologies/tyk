@@ -85,7 +85,7 @@ type Monitor struct {
 //
 // swagger:model
 type SessionState struct {
-	Mutex                         sync.RWMutex                `json:"-" msg:"-"`
+	mu                            sync.RWMutex                `json:"-" msg:"-"`
 	LastCheck                     int64                       `json:"last_check" msg:"last_check"`
 	Allowance                     float64                     `json:"allowance" msg:"allowance"`
 	Rate                          float64                     `json:"rate" msg:"rate"`
@@ -135,33 +135,33 @@ func NewSessionState() *SessionState {
 }
 
 func (s *SessionState) SetAccessRights(accessRights map[string]AccessDefinition) {
-	s.Mutex.Lock()
+	s.mu.Lock()
 	s.AccessRights = accessRights
-	s.Mutex.Unlock()
+	s.mu.Unlock()
 }
 
 func (s *SessionState) SetAccessRight(key string, accessRight AccessDefinition) {
-	s.Mutex.Lock()
+	s.mu.Lock()
 	s.AccessRights[key] = accessRight
-	s.Mutex.Unlock()
+	s.mu.Unlock()
 }
 
 func (s *SessionState) SetMetaData(metadata map[string]interface{}) {
-	s.Mutex.Lock()
+	s.mu.Lock()
 	s.MetaData = metadata
-	s.Mutex.Unlock()
+	s.mu.Unlock()
 }
 
 func (s *SessionState) SetMetaDataKey(key string, metadata interface{}) {
-	s.Mutex.Lock()
+	s.mu.Lock()
 	s.MetaData[key] = metadata
-	s.Mutex.Unlock()
+	s.mu.Unlock()
 }
 
 func (s *SessionState) RemoveMetaData(key string) {
-	s.Mutex.Lock()
+	s.mu.Lock()
 	delete(s.MetaData, key)
-	s.Mutex.Unlock()
+	s.mu.Unlock()
 }
 
 func (s *SessionState) SetKeyHash(hash string) {
@@ -186,14 +186,14 @@ func (s *SessionState) Lifetime(fallback int64) int64 {
 }
 
 func (s *SessionState) GetAccessRights() (AccessRights map[string]AccessDefinition) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	return s.AccessRights
 }
 
 func (s *SessionState) GetAccessRightByAPIID(key string) (AccessRight AccessDefinition, found bool) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	accessRight, found := s.AccessRights[key]
 	return accessRight, found
 }
@@ -202,8 +202,8 @@ func (s *SessionState) GetAccessRightByAPIID(key string) (AccessRight AccessDefi
 // session. For backwards compatibility reasons, this falls back to
 // ApplyPolicyID if ApplyPolicies is empty.
 func (s *SessionState) GetPolicyIDs() []string {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	if len(s.ApplyPolicies) > 0 {
 		return s.ApplyPolicies
@@ -215,14 +215,14 @@ func (s *SessionState) GetPolicyIDs() []string {
 }
 
 func (s *SessionState) GetMetaData() (metaData map[string]interface{}) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	return s.MetaData
 }
 
 func (s *SessionState) GetMetaDataByKey(key string) (metaData interface{}, found bool) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	value, ok := s.MetaData[key]
 	return value, ok
 }
@@ -247,9 +247,9 @@ func (s *SessionState) SetPolicies(ids ...string) {
 // PoliciesEqualTo compares and returns true if passed slice if IDs contains only current ApplyPolicies
 func (s *SessionState) PoliciesEqualTo(ids []string) bool {
 
-	s.Mutex.RLock()
+	s.mu.RLock()
 	policies := s.ApplyPolicies
-	s.Mutex.RUnlock()
+	s.mu.RUnlock()
 
 	if len(policies) != len(ids) {
 		return false
@@ -271,8 +271,8 @@ func (s *SessionState) PoliciesEqualTo(ids []string) bool {
 
 // GetQuotaLimitByAPIID return quota max, quota remaining, quota renewal rate and quota renews for the given session
 func (s *SessionState) GetQuotaLimitByAPIID(apiID string) (int64, int64, int64, int64) {
-	s.Mutex.RLock()
-	defer s.Mutex.RUnlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	if access, ok := s.AccessRights[apiID]; ok && access.Limit != nil {
 		return access.Limit.QuotaMax,
