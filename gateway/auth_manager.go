@@ -136,7 +136,7 @@ func (b *DefaultAuthorisationManager) Init(store storage.Handler) {
 // KeyAuthorised checks if key exists and can be read into a user.SessionState object
 func (b *DefaultAuthorisationManager) KeyAuthorised(keyName string) (user.SessionState, bool) {
 	jsonKeyVal, err := b.store.GetKey(keyName)
-	newSession := user.SessionState{Mutex:&sync.RWMutex{}}
+	newSession := user.SessionState{Mutex: &sync.RWMutex{}}
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix":      "auth-mgr",
@@ -280,7 +280,7 @@ func (b *DefaultSessionManager) RemoveSession(keyName string, hashed bool) bool 
 func (b *DefaultSessionManager) SessionDetail(keyName string, hashed bool) (user.SessionState, bool) {
 	var jsonKeyVal string
 	var err error
-	session := user.SessionState{Mutex:&sync.RWMutex{}}
+	session := user.SessionState{Mutex: &sync.RWMutex{}}
 	// get session by key
 	if hashed {
 		jsonKeyVal, err = b.store.GetRawKey(b.store.GetKeyPrefix() + keyName)
