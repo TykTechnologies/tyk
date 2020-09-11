@@ -136,22 +136,20 @@ func (b *DefaultAuthorisationManager) Init(store storage.Handler) {
 // KeyAuthorised checks if key exists and can be read into a user.SessionState object
 func (b *DefaultAuthorisationManager) KeyAuthorised(keyName string) (user.SessionState, bool) {
 	jsonKeyVal, err := b.store.GetKey(keyName)
-	var newSession user.SessionState
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix":      "auth-mgr",
 			"inbound-key": obfuscateKey(keyName),
 			"err":         err,
 		}).Warning("Key not found in storage engine")
-		return newSession, false
+		return user.SessionState{}, false
 	}
-
-	if err := json.Unmarshal([]byte(jsonKeyVal), &newSession); err != nil {
+	newSession := &user.SessionState{}
+	if err := json.Unmarshal([]byte(jsonKeyVal), newSession); err != nil {
 		log.Error("Couldn't unmarshal session object: ", err)
-		return newSession, false
+		return user.SessionState{}, false
 	}
-
-	return newSession, true
+	return newSession.Clone(), true
 }
 
 // KeyExpired checks if a key has expired, if the value of user.SessionState.Expires is 0, it will be ignored
@@ -280,7 +278,6 @@ func (b *DefaultSessionManager) RemoveSession(orgID string, keyName string, hash
 func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool) {
 	var jsonKeyVal string
 	var err error
-	var session user.SessionState
 
 	// get session by key
 	if hashed {
@@ -315,15 +312,15 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 			"inbound-key": obfuscateKey(keyName),
 			"err":         err,
 		}).Debug("Could not get session detail, key not found")
-		return session, false
+		return user.SessionState{}, false
 	}
-
+	session := &user.SessionState{}
 	if err := json.Unmarshal([]byte(jsonKeyVal), &session); err != nil {
 		log.Error("Couldn't unmarshal session object (may be cache miss): ", err)
-		return session, false
+		return user.SessionState{}, false
 	}
 
-	return session, true
+	return session.Clone(), true
 }
 
 func (b *DefaultSessionManager) Stop() {}
