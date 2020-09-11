@@ -7,10 +7,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/goplugin"
+	"github.com/TykTechnologies/tyk/request"
+	"github.com/sirupsen/logrus"
 )
 
 // customResponseWriter is a wrapper around standard http.ResponseWriter
@@ -148,12 +148,22 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 	// check if response was sent
 	if rw.responseSent {
 		// check if response code was an error one
-		if rw.statusCodeSent >= http.StatusBadRequest {
+		switch {
+		case rw.statusCodeSent == http.StatusForbidden:
+			m.logger.WithError(err).Error("Authentication error in Go-plugin middleware func")
+			m.Base().FireEvent(EventAuthFailure, EventKeyFailureMeta{
+				EventMetaDefault: EventMetaDefault{Message: "Auth Failure", OriginatingRequest: EncodeRequestToEvent(r)},
+				Path:             r.URL.Path,
+				Origin:           request.RealIP(r),
+				Key:              "n/a",
+			})
+			fallthrough
+		case rw.statusCodeSent >= http.StatusBadRequest:
 			// base middleware will report this error to analytics if needed
 			respCode = rw.statusCodeSent
 			err = fmt.Errorf("plugin function sent error response code: %d", rw.statusCodeSent)
 			m.logger.WithError(err).Error("Failed to process request with Go-plugin middleware func")
-		} else {
+		default:
 			// record 2XX to analytics
 			m.successHandler.RecordHit(r, Latency{Total: int64(ms)}, rw.statusCodeSent, rw.getHttpResponse(r))
 
