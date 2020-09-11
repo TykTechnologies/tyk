@@ -134,6 +134,104 @@ func NewSessionState() *SessionState {
 	return &SessionState{}
 }
 
+// Clone  returns a fresh copy of s
+func (s *SessionState) Clone() SessionState {
+	return SessionState{
+		LastCheck:                     s.LastCheck,
+		Allowance:                     s.Allowance,
+		Rate:                          s.Rate,
+		Per:                           s.Per,
+		ThrottleInterval:              s.ThrottleInterval,
+		ThrottleRetryLimit:            s.ThrottleRetryLimit,
+		MaxQueryDepth:                 s.MaxQueryDepth,
+		DateCreated:                   s.DateCreated,
+		Expires:                       s.Expires,
+		QuotaMax:                      s.QuotaMax,
+		QuotaRenews:                   s.QuotaRenews,
+		QuotaRemaining:                s.QuotaRemaining,
+		QuotaRenewalRate:              s.QuotaRenewalRate,
+		AccessRights:                  cloneAccess(s.AccessRights),
+		OrgID:                         s.OrgID,
+		OauthClientID:                 s.OauthClientID,
+		OauthKeys:                     cloneKeys(s.OauthKeys),
+		Certificate:                   s.Certificate,
+		BasicAuthData:                 s.BasicAuthData,
+		JWTData:                       s.JWTData,
+		HMACEnabled:                   s.HMACEnabled,
+		EnableHTTPSignatureValidation: s.EnableHTTPSignatureValidation,
+		HmacSecret:                    s.HmacSecret,
+		RSACertificateId:              s.RSACertificateId,
+		IsInactive:                    s.IsInactive,
+		ApplyPolicyID:                 s.ApplyPolicyID,
+		ApplyPolicies:                 cloneSlice(s.ApplyPolicies),
+		DataExpires:                   s.DataExpires,
+		Monitor:                       s.Monitor,
+		EnableDetailRecording:         s.EnableDetailRecording,
+		EnableDetailedRecording:       s.EnableDetailedRecording,
+		MetaData:                      cloneMetadata(s.MetaData),
+		Tags:                          cloneSlice(s.Tags),
+		Alias:                         s.Alias,
+		LastUpdated:                   s.LastUpdated,
+		IdExtractorDeadline:           s.IdExtractorDeadline,
+		SessionLifetime:               s.SessionLifetime,
+		// Used to store token hash
+		keyHash: s.keyHash,
+	}
+}
+
+func cloneSlice(s []string) []string {
+	if s == nil {
+		return nil
+	}
+	if len(s) == 0 {
+		return []string{}
+	}
+	x := make([]string, len(s))
+	copy(x, s)
+	return x
+}
+
+func cloneMetadata(m map[string]interface{}) map[string]interface{} {
+	if m == nil {
+		return nil
+	}
+	if len(m) == 0 {
+		return map[string]interface{}{}
+	}
+	x := make(map[string]interface{})
+	for k, v := range m {
+		x[k] = v
+	}
+	return x
+}
+
+func cloneKeys(m map[string]string) map[string]string {
+	if m == nil {
+		return nil
+	}
+	if len(m) == 0 {
+		return map[string]string{}
+	}
+	x := make(map[string]string)
+	for k, v := range m {
+		x[k] = v
+	}
+	return x
+}
+func cloneAccess(m map[string]AccessDefinition) map[string]AccessDefinition {
+	if m == nil {
+		return nil
+	}
+	if len(m) == 0 {
+		return map[string]AccessDefinition{}
+	}
+	x := make(map[string]AccessDefinition)
+	for k, v := range m {
+		x[k] = v
+	}
+	return x
+}
+
 func (s *SessionState) SetAccessRights(accessRights map[string]AccessDefinition) {
 	s.mu.Lock()
 	s.AccessRights = accessRights
