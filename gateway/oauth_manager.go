@@ -392,7 +392,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 
 	if ar := o.OsinServer.HandleAccessRequest(resp, r); ar != nil {
 
-		var session *user.SessionState
+		session := user.SessionState{Mutex:&sync.RWMutex{}}
 		if ar.Type == osin.PASSWORD {
 			username = r.Form.Get("username")
 			password := r.Form.Get("password")

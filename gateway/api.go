@@ -472,7 +472,7 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 		sessionManager = spec.SessionManager
 	}
 
-	var session user.SessionState
+	session := user.SessionState{Mutex:&sync.RWMutex{}}
 	var ok bool
 	session, ok = sessionManager.SessionDetail(sessionKey, byHash)
 
