@@ -97,8 +97,8 @@ const (
 func (l *SessionLimiter) limitSentinel(currentSession *user.SessionState, key string, rateScope string, store storage.Handler,
 	globalConf *config.Config, apiLimit *user.APILimit, dryRun bool) bool {
 
-	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash()
-	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash() + ".BLOCKED"
+	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.GetKeyHash()
+	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.GetKeyHash() + ".BLOCKED"
 
 	go l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun)
 
@@ -114,8 +114,8 @@ func (l *SessionLimiter) limitSentinel(currentSession *user.SessionState, key st
 func (l *SessionLimiter) limitRedis(currentSession *user.SessionState, key string, rateScope string, store storage.Handler,
 	globalConf *config.Config, apiLimit *user.APILimit, dryRun bool) bool {
 
-	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash()
-	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash() + ".BLOCKED"
+	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.GetKeyHash()
+	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.GetKeyHash() + ".BLOCKED"
 
 	if l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun) {
 		return true
@@ -269,7 +269,7 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 		quotaScope = scope + "-"
 	}
 
-	rawKey := QuotaKeyPrefix + quotaScope + currentSession.KeyHash()
+	rawKey := QuotaKeyPrefix + quotaScope + currentSession.GetKeyHash()
 	quotaRenewalRate := limit.QuotaRenewalRate
 	quotaRenews := limit.QuotaRenews
 	quotaMax := limit.QuotaMax

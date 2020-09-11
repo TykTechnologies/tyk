@@ -1112,7 +1112,7 @@ func (accessTokenGen) GenerateAccessToken(data *osin.AccessData, generaterefresh
 			return "", "", errors.New("Couldn't use policy or key rules to create token, failing")
 		}
 
-		newSession = sessionFromPolicy
+		newSession = sessionFromPolicy.Clone()
 	}
 
 	accesstoken = keyGen.GenerateAuthKey(newSession.OrgID)

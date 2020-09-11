@@ -592,8 +592,8 @@ func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 			t.Error("Key was not created (Can't find it)!")
 		}
 
-		if !reflect.DeepEqual(session.PolicyIDs(), []string{"TEST-4321"}) {
-			t.Error("Policy not added to token!", session.PolicyIDs())
+		if !reflect.DeepEqual(session.GetPolicyIDs(), []string{"TEST-4321"}) {
+			t.Error("Policy not added to token!", session.GetPolicyIDs())
 		}
 	})
 }

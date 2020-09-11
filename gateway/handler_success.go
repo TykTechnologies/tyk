@@ -293,7 +293,7 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 	}
 
 	// Session found
-	sess := ses.(user.SessionState)
+	sess := ses.(*user.SessionState)
 	return sess.EnableDetailRecording || sess.EnableDetailedRecording
 }
 
