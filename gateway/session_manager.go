@@ -183,50 +183,59 @@ func (sfr sessionFailReason) String() string {
 // Per 10 seconds
 func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.SessionState, key string, store storage.Handler, enableRL, enableQ bool, globalConf *config.Config, api *APISpec, dryRun bool) sessionFailReason {
 	// check for limit on API level (set to session by ApplyPolicies)
-	var apiLimit *user.APILimit
+	accessDef := &user.AccessDefinition{}
 	var allowanceScope string
+
+	var gqlRequest *graphql.Request
+	if api.GraphQL.Enabled {
+		gqlRequest = ctxGetGraphQLRequest(r)
+	}
+
 	if len(currentSession.GetAccessRights()) > 0 {
 		if rights, ok := currentSession.GetAccessRightByAPIID(api.APIID); !ok {
 			log.WithField("apiID", api.APIID).Debug("[RATE] unexpected apiID")
 			return sessionFailRateLimit
 		} else {
-			apiLimit = rights.Limit
+			accessDef.Limit = rights.Limit
+			accessDef.FieldAccessRights = rights.FieldAccessRights
 			allowanceScope = rights.AllowanceScope
 		}
 	}
 
-	if apiLimit == nil {
-		apiLimit = &user.APILimit{
-			QuotaMax:           currentSession.QuotaMax,
-			QuotaRenewalRate:   currentSession.QuotaRenewalRate,
-			QuotaRenews:        currentSession.QuotaRenews,
-			Rate:               currentSession.Rate,
-			Per:                currentSession.Per,
-			ThrottleInterval:   currentSession.ThrottleInterval,
-			ThrottleRetryLimit: currentSession.ThrottleRetryLimit,
-			MaxQueryDepth:      currentSession.MaxQueryDepth,
+	if accessDef.Limit == nil {
+		accessDef = &user.AccessDefinition{
+			Limit: &user.APILimit{
+				QuotaMax:           currentSession.QuotaMax,
+				QuotaRenewalRate:   currentSession.QuotaRenewalRate,
+				QuotaRenews:        currentSession.QuotaRenews,
+				Rate:               currentSession.Rate,
+				Per:                currentSession.Per,
+				ThrottleInterval:   currentSession.ThrottleInterval,
+				ThrottleRetryLimit: currentSession.ThrottleRetryLimit,
+				MaxQueryDepth:      currentSession.MaxQueryDepth,
+			},
 		}
 	}
 
 	// If MaxQueryDepth is -1 or 0, it means unlimited and no need for depth limiting.
-	if api.GraphQL.Enabled && apiLimit.MaxQueryDepth > 0 {
-		if failReason := l.DepthLimitExceeded(r, apiLimit, api.GraphQLExecutor.Schema); failReason != sessionFailNone {
+	if l.DepthLimitEnabled(api.GraphQL.Enabled, accessDef) {
+		if failReason := l.DepthLimitExceeded(gqlRequest, accessDef, api.GraphQLExecutor.Schema); failReason != sessionFailNone {
 			return failReason
 		}
 	}
 
 	// If rate is -1 or 0, it means unlimited and no need for rate limiting.
-	if enableRL && apiLimit.Rate > 0 {
+	if enableRL && accessDef.Limit.Rate > 0 {
 		rateScope := ""
 		if allowanceScope != "" {
 			rateScope = allowanceScope + "-"
 		}
 		if globalConf.EnableSentinelRateLimiter {
-			if l.limitSentinel(currentSession, key, rateScope, store, globalConf, apiLimit, dryRun) {
+			if l.limitSentinel(currentSession, key, rateScope, store, globalConf, accessDef.Limit, dryRun) {
 				return sessionFailRateLimit
 			}
 		} else if globalConf.EnableRedisRollingLimiter {
-			if l.limitRedis(currentSession, key, rateScope, store, globalConf, apiLimit, dryRun) {
+			if l.limitRedis(currentSession, key, rateScope, store, globalConf, accessDef.Limit, dryRun) {
 				return sessionFailRateLimit
 			}
 		} else {
@@ -234,7 +243,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			if DRLManager.Servers != nil {
 				n = float64(DRLManager.Servers.Count())
 			}
-			rate := apiLimit.Rate / apiLimit.Per
+			rate := accessDef.Limit.Rate / accessDef.Limit.Per
 			c := globalConf.DRLThreshold
 			if c == 0 {
 				// defaults to 5
@@ -244,11 +253,11 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			if n <= 1 || n*c < rate {
 				// If we have 1 server, there is no need to strain redis at all the leaky
 				// bucket algorithm will suffice.
-				if l.limitDRL(currentSession, key, rateScope, apiLimit, dryRun) {
+				if l.limitDRL(currentSession, key, rateScope, accessDef.Limit, dryRun) {
 					return sessionFailRateLimit
 				}
 			} else {
-				if l.limitRedis(currentSession, key, rateScope, store, globalConf, apiLimit, dryRun) {
+				if l.limitRedis(currentSession, key, rateScope, store, globalConf, accessDef.Limit, dryRun) {
 					return sessionFailRateLimit
 				}
 			}
@@ -260,7 +269,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			currentSession.Allowance = currentSession.Allowance - 1
 		}
 
-		if l.RedisQuotaExceeded(r, currentSession, allowanceScope, apiLimit, store) {
+		if l.RedisQuotaExceeded(r, currentSession, allowanceScope, accessDef.Limit, store) {
 			return sessionFailQuota
 		}
 	}
@@ -269,18 +278,53 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 
 }
 
-func (l *SessionLimiter) DepthLimitExceeded(r *http.Request, apiLimit *user.APILimit, schema *graphql.Schema) sessionFailReason {
-	gqlRequest := ctxGetGraphQLRequest(r)
+func (l *SessionLimiter) DepthLimitEnabled(graphqlEnabled bool, accessDef *user.AccessDefinition) bool {
+	if !graphqlEnabled {
+		return false
+	}
 
+	// There is a possibility that depth limit is disabled on field level too,
+	// but we continue with this because of the explanation above.
+	if len(accessDef.FieldAccessRights) > 0 {
+		return true
+	}
+
+	return accessDef.Limit.MaxQueryDepth > 0
+}
+
+func (l *SessionLimiter) DepthLimitExceeded(gqlRequest *graphql.Request, accessDef *user.AccessDefinition, schema *graphql.Schema) sessionFailReason {
 	complexityRes, err := gqlRequest.CalculateComplexity(graphql.DefaultComplexityCalculator, schema)
 	if err != nil {
 		log.Errorf("Error while calculating complexity of GraphQL request: '%s'", err)
 		return sessionFailInternalServerError
 	}
 
-	if complexityRes.Depth > apiLimit.MaxQueryDepth {
-		log.Debugf("Complexity of the request is higher than the allowed limit '%d'", apiLimit.MaxQueryDepth)
-		return sessionFailDepthLimit
+	// do per query depth check
+	if len(accessDef.FieldAccessRights) == 0 {
+		if complexityRes.Depth > accessDef.Limit.MaxQueryDepth {
+			log.Debugf("Complexity of the request is higher than the allowed limit '%d'", accessDef.Limit.MaxQueryDepth)
+			return sessionFailDepthLimit
+		}
+		return sessionFailNone
+	}
+
+	// do per query field depth check
+	for _, fieldAccessDef := range accessDef.FieldAccessRights {
+		for _, fieldComplexityRes := range complexityRes.PerRootField {
+			if fieldComplexityRes.TypeName != fieldAccessDef.TypeName {
+				continue
+			}
+			if fieldComplexityRes.FieldName != fieldAccessDef.FieldName {
+				continue
+			}
+
+			if fieldComplexityRes.Depth > fieldAccessDef.Limits.MaxQueryDepth {
+				log.Debugf("Complexity of the field: %s.%s is higher than the allowed limit '%d'",
+					fieldAccessDef.TypeName, fieldAccessDef.FieldName, accessDef.Limit.MaxQueryDepth)
+
+				return sessionFailDepthLimit
+			}
+		}
 	}
 
 	return sessionFailNone
