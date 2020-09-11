@@ -85,7 +85,7 @@ type Monitor struct {
 //
 // swagger:model
 type SessionState struct {
-	Mutex                         *sync.RWMutex
+	Mutex                         sync.RWMutex                `json:"-" msg:"-"`
 	LastCheck                     int64                       `json:"last_check" msg:"last_check"`
 	Allowance                     float64                     `json:"allowance" msg:"allowance"`
 	Rate                          float64                     `json:"rate" msg:"rate"`
@@ -131,7 +131,7 @@ type SessionState struct {
 }
 
 func NewSessionState() *SessionState {
-	return &SessionState{Mutex: &sync.RWMutex{}}
+	return &SessionState{}
 }
 
 func (s *SessionState) SetAccessRights(accessRights map[string]AccessDefinition) {
