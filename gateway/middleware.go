@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/TykTechnologies/tyk/rpc"
@@ -229,15 +228,13 @@ func (t BaseMiddleware) Config() (interface{}, error) {
 }
 
 func (t BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
-	var session user.SessionState
-	var found bool
 
 	if rpc.IsEmergencyMode() {
-		return session, false
+		return user.SessionState{}, false
 	}
 
 	// Try and get the session from the session store
-	session, found = t.Spec.OrgSessionManager.SessionDetail(orgID, orgID, false)
+	session, found := t.Spec.OrgSessionManager.SessionDetail(orgID, orgID, false)
 	if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
 		// If exists, assume it has been authorized and pass on
 		// We cache org expiry data
@@ -247,7 +244,7 @@ func (t BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
 
 	session.SetKeyHash(storage.HashKey(orgID))
 
-	return session, found
+	return session.Clone(), found
 }
 
 func (t BaseMiddleware) SetOrgExpiry(orgid string, expiry int64) {
@@ -298,7 +295,8 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 	ctxDisableSessionUpdate(r)
 
 	if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-		SessionCache.Set(session.GetKeyHash(), *session, cache.DefaultExpiration)
+		clone := session.Clone()
+		SessionCache.Set(session.GetKeyHash(), &clone, cache.DefaultExpiration)
 	}
 
 	return true
@@ -649,7 +647,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 	}
 
 	if len(key) <= minLength {
-		return user.SessionState{IsInactive: true, Mutex: &sync.RWMutex{}}, false
+		return user.SessionState{IsInactive: true}, false
 	}
 
 	// Try and get the session from the session store
@@ -664,12 +662,12 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 		cachedVal, found := SessionCache.Get(cacheKey)
 		if found {
 			t.Logger().Debug("--> Key found in local cache")
-			session := cachedVal.(user.SessionState)
-			if err := t.ApplyPolicies(&session); err != nil {
+			session := cachedVal.(*user.SessionState)
+			if err := t.ApplyPolicies(session); err != nil {
 				t.Logger().Error(err)
-				return session, false
+				return session.Clone(), false
 			}
-			return session, true
+			return session.Clone(), true
 		}
 	}
 
@@ -680,17 +678,18 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 		session.SetKeyHash(cacheKey)
 		// If exists, assume it has been authorized and pass on
 		// cache it
+		clone := session.Clone()
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			go SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
+			go SessionCache.Set(cacheKey, &clone, cache.DefaultExpiration)
 		}
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		if err := t.ApplyPolicies(&session); err != nil {
 			t.Logger().Error(err)
-			return session, false
+			return session.Clone(), false
 		}
 		t.Logger().Debug("Got key")
-		return session, true
+		return session.Clone(), true
 	}
 
 	t.Logger().Debug("Querying authstore")
@@ -715,21 +714,22 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 		t.Logger().Info("Recreating session for key: ", obfuscateKey(key))
 
 		// cache it
+		clone := session.Clone()
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			go SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
+			go SessionCache.Set(cacheKey, &clone, cache.DefaultExpiration)
 		}
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		if err := t.ApplyPolicies(&session); err != nil {
 			t.Logger().Error(err)
-			return session, false
+			return session.Clone(), false
 		}
 
 		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.SessionLifetime))
 		ctxScheduleSessionUpdate(r)
 	}
 
-	return session, found
+	return session.Clone(), found
 }
 
 // FireEvent is added to the BaseMiddleware object so it is available across the entire stack

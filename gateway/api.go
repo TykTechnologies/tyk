@@ -346,7 +346,7 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 			log.Error("Could not find key when updating")
 			return apiError("Key is not found"), http.StatusNotFound
 		}
-		originalKey = key
+		originalKey = key.Clone()
 
 		// preserve the creation date
 		newSession.DateCreated = originalKey.DateCreated
@@ -468,9 +468,7 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 		orgID = spec.OrgID
 	}
 
-	var session user.SessionState
-	var ok bool
-	session, ok = GlobalSessionManager.SessionDetail(orgID, sessionKey, byHash)
+	session, ok := GlobalSessionManager.SessionDetail(orgID, sessionKey, byHash)
 
 	if !ok {
 		return apiError("Key not found"), http.StatusNotFound
@@ -550,7 +548,7 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 		"status": "ok",
 	}).Info("Retrieved key detail.")
 
-	return session, http.StatusOK
+	return session.Clone(), http.StatusOK
 }
 
 // apiAllKeys represents a list of keys in the memory store
@@ -1149,7 +1147,7 @@ func handleGetOrgDetail(orgID string) (interface{}, int) {
 		"org":    orgID,
 		"status": "ok",
 	}).Info("Retrieved record for ORG ID.")
-	return session, http.StatusOK
+	return session.Clone(), http.StatusOK
 }
 
 func handleGetAllOrgKeys(filter string) (interface{}, int) {
