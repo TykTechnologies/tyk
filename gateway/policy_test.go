@@ -306,6 +306,30 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 					},
 				}},
 		},
+		"field-level-depth-limit1": {
+			ID: "field-level-depth-limit1",
+			AccessRights: map[string]user.AccessDefinition{
+				"graphql-api": {
+					Limit: &user.APILimit{},
+					FieldAccessRights: []user.FieldAccessDefinition{
+						{TypeName: "Query", FieldName: "people", Limits: user.FieldLimits{MaxQueryDepth: 4}},
+						{TypeName: "Mutation", FieldName: "putPerson", Limits: user.FieldLimits{MaxQueryDepth: 3}},
+						{TypeName: "Query", FieldName: "countries", Limits: user.FieldLimits{MaxQueryDepth: 3}},
+					},
+				}},
+		},
+		"field-level-depth-limit2": {
+			ID: "field-level-depth-limit2",
+			AccessRights: map[string]user.AccessDefinition{
+				"graphql-api": {
+					Limit: &user.APILimit{},
+					FieldAccessRights: []user.FieldAccessDefinition{
+						{TypeName: "Query", FieldName: "people", Limits: user.FieldLimits{MaxQueryDepth: 2}},
+						{TypeName: "Mutation", FieldName: "putPerson", Limits: user.FieldLimits{MaxQueryDepth: -1}},
+						{TypeName: "Query", FieldName: "continents", Limits: user.FieldLimits{MaxQueryDepth: 4}},
+					},
+				}},
+		},
 		"throttle1": {
 			ID:                 "throttle1",
 			ThrottleRetryLimit: 99,
@@ -647,6 +671,25 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 							{Name: "Person", Fields: []string{"name"}},
 						},
 						Limit: &user.APILimit{},
+					},
+				}
+
+				assert.Equal(t, want, s.AccessRights)
+			},
+		},
+		{
+			name:     "Merge field level depth limit for the same GraphQL API",
+			policies: []string{"field-level-depth-limit1", "field-level-depth-limit2"},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				want := map[string]user.AccessDefinition{
+					"graphql-api": {
+						Limit: &user.APILimit{},
+						FieldAccessRights: []user.FieldAccessDefinition{
+							{TypeName: "Query", FieldName: "people", Limits: user.FieldLimits{MaxQueryDepth: 4}},
+							{TypeName: "Mutation", FieldName: "putPerson", Limits: user.FieldLimits{MaxQueryDepth: -1}},
+							{TypeName: "Query", FieldName: "countries", Limits: user.FieldLimits{MaxQueryDepth: 3}},
+							{TypeName: "Query", FieldName: "continents", Limits: user.FieldLimits{MaxQueryDepth: 4}},
+						},
 					},
 				}
 
