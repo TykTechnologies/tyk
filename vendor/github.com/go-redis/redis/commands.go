@@ -248,7 +248,7 @@ type Cmdable interface {
 	Shutdown() *StatusCmd
 	ShutdownSave() *StatusCmd
 	ShutdownNoSave() *StatusCmd
-	SlaveOf(host, port string) *StatusCmd
+	SubordinateOf(host, port string) *StatusCmd
 	Time() *TimeCmd
 	Eval(script string, keys []string, args ...interface{}) *Cmd
 	EvalSha(sha1 string, keys []string, args ...interface{}) *Cmd
@@ -276,7 +276,7 @@ type Cmdable interface {
 	ClusterDelSlots(slots ...int) *StatusCmd
 	ClusterDelSlotsRange(min, max int) *StatusCmd
 	ClusterSaveConfig() *StatusCmd
-	ClusterSlaves(nodeID string) *StringSliceCmd
+	ClusterSubordinates(nodeID string) *StringSliceCmd
 	ClusterFailover() *StatusCmd
 	ClusterAddSlots(slots ...int) *StatusCmd
 	ClusterAddSlotsRange(min, max int) *StatusCmd
@@ -344,8 +344,8 @@ func (c *cmdable) Ping() *StatusCmd {
 	return cmd
 }
 
-func (c *cmdable) Wait(numSlaves int, timeout time.Duration) *IntCmd {
-	cmd := NewIntCmd("wait", numSlaves, int(timeout/time.Millisecond))
+func (c *cmdable) Wait(numSubordinates int, timeout time.Duration) *IntCmd {
+	cmd := NewIntCmd("wait", numSubordinates, int(timeout/time.Millisecond))
 	c.process(cmd)
 	return cmd
 }
@@ -2223,8 +2223,8 @@ func (c *cmdable) ShutdownNoSave() *StatusCmd {
 	return c.shutdown("nosave")
 }
 
-func (c *cmdable) SlaveOf(host, port string) *StatusCmd {
-	cmd := NewStatusCmd("slaveof", host, port)
+func (c *cmdable) SubordinateOf(host, port string) *StatusCmd {
+	cmd := NewStatusCmd("subordinateof", host, port)
 	c.process(cmd)
 	return cmd
 }
@@ -2449,8 +2449,8 @@ func (c *cmdable) ClusterSaveConfig() *StatusCmd {
 	return cmd
 }
 
-func (c *cmdable) ClusterSlaves(nodeID string) *StringSliceCmd {
-	cmd := NewStringSliceCmd("cluster", "slaves", nodeID)
+func (c *cmdable) ClusterSubordinates(nodeID string) *StringSliceCmd {
+	cmd := NewStringSliceCmd("cluster", "subordinates", nodeID)
 	c.process(cmd)
 	return cmd
 }

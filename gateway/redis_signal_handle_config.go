@@ -118,7 +118,7 @@ func sanitizeConfig(mc map[string]interface{}) map[string]interface{} {
 		"secret",
 		"node_secret",
 		"storage",
-		"slave_options",
+		"subordinate_options",
 		"auth_override",
 	}
 	for _, field_name := range sanitzeFields {

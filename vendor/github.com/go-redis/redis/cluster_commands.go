@@ -5,8 +5,8 @@ import "sync/atomic"
 func (c *ClusterClient) DBSize() *IntCmd {
 	cmd := NewIntCmd("dbsize")
 	var size int64
-	err := c.ForEachMaster(func(master *Client) error {
-		n, err := master.DBSize().Result()
+	err := c.ForEachMain(func(main *Client) error {
+		n, err := main.DBSize().Result()
 		if err != nil {
 			return err
 		}

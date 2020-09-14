@@ -152,7 +152,7 @@ const mesosphere = `{
 		"startedAt": "2016-03-15T14:37:55.941Z",
 		"stagedAt": "2016-03-15T14:37:52.792Z",
 		"version": "2016-03-15T14:37:52.726Z",
-		"slaveId": "d70867df-fdb2-4889-abeb-0829c742fded-S2",
+		"subordinateId": "d70867df-fdb2-4889-abeb-0829c742fded-S2",
 		"appId": "/httpbin"
 	}]
 }`

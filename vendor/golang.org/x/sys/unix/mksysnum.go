@@ -5,8 +5,8 @@
 // +build ignore
 
 // Generate system call table for DragonFly, NetBSD,
-// FreeBSD, OpenBSD or Darwin from master list
-// (for example, /usr/src/sys/kern/syscalls.master or
+// FreeBSD, OpenBSD or Darwin from main list
+// (for example, /usr/src/sys/kern/syscalls.main or
 // sys/syscall.h).
 package main
 
@@ -107,7 +107,7 @@ func main() {
 	file := strings.TrimSpace(os.Args[1])
 	var syscalls io.Reader
 	if strings.HasPrefix(file, "https://") || strings.HasPrefix(file, "http://") {
-		// Download syscalls.master file
+		// Download syscalls.main file
 		syscalls = fetchFile(file)
 	} else {
 		syscalls = readFile(file)

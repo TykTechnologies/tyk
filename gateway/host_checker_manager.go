@@ -128,7 +128,7 @@ func (hc *HostCheckerManager) checkPollerLoop(ctx context.Context) {
 		} else {
 			log.WithFields(logrus.Fields{
 				"prefix": "host-check-mgr",
-			}).Debug("New master found, no tests running")
+			}).Debug("New main found, no tests running")
 			if hc.pollerStarted {
 				hc.StopPoller()
 				hc.pollerStarted = false
@@ -156,7 +156,7 @@ func (hc *HostCheckerManager) AmIPolling() bool {
 	if activeInstance == hc.Id {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
-		}).Debug("Primary instance set, I am master")
+		}).Debug("Primary instance set, I am main")
 		hc.store.SetKey(PollerCacheKey, hc.Id, 15) // Reset TTL
 		return true
 	}

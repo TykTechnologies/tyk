@@ -60,7 +60,7 @@ func DiscardUnknown(m Message) {
 		return
 	}
 	// TODO: Dynamically populate a InternalMessageInfo for legacy messages,
-	// but the master branch has no implementation for InternalMessageInfo,
+	// but the main branch has no implementation for InternalMessageInfo,
 	// so it would be more work to replicate that approach.
 	discardLegacy(m)
 }
