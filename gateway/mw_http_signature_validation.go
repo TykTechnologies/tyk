@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"text/scanner"
 	"time"
 
@@ -96,7 +97,7 @@ func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWrite
 
 	var secret string
 	var rsaKey *rsa.PublicKey
-	var session user.SessionState
+	session := user.SessionState{Mutex: &sync.RWMutex{}}
 
 	if strings.HasPrefix(fieldValues.Algorthm, "rsa") {
 		var certificateId string
