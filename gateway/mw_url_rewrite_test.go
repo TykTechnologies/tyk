@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"net/http/httptest"
-	"sync"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/test"
@@ -902,7 +901,6 @@ func TestRewriterTriggers(t *testing.T) {
 				MetaData: map[string]interface{}{
 					"rewrite": "bar-baz",
 				},
-				Mutex: &sync.RWMutex{},
 			}, "", false)
 
 			return TestDef{
@@ -932,7 +930,6 @@ func TestRewriterTriggers(t *testing.T) {
 				MetaData: map[string]interface{}{
 					"rewrite": "bar-baz",
 				},
-				Mutex: &sync.RWMutex{},
 			}, "", false)
 
 			return TestDef{
@@ -963,7 +960,6 @@ func TestRewriterTriggers(t *testing.T) {
 					"rewrite": "bar-baz",
 					"somevar": "someval",
 				},
-				Mutex: &sync.RWMutex{},
 			}, "", false)
 
 			return TestDef{
@@ -1020,7 +1016,6 @@ func TestRewriterTriggers(t *testing.T) {
 				MetaData: map[string]interface{}{
 					"rewrite": "bar-baz",
 				},
-				Mutex: &sync.RWMutex{},
 			}, "", false)
 
 			return TestDef{

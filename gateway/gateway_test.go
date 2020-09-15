@@ -39,7 +39,7 @@ func TestMain(m *testing.M) {
 }
 
 func createNonThrottledSession() *user.SessionState {
-	session := new(user.SessionState)
+	session := user.NewSessionState()
 	session.Rate = 100.0
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
@@ -49,7 +49,6 @@ func createNonThrottledSession() *user.SessionState {
 	session.QuotaRemaining = 10
 	session.QuotaMax = 10
 	session.Alias = "TEST-ALIAS"
-	session.Mutex = &sync.RWMutex{}
 	return session
 }
 
@@ -91,7 +90,6 @@ func TestParambasedAuth(t *testing.T) {
 		s.SetAccessRights(map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v1"},
 		}})
-		s.Mutex = &sync.RWMutex{}
 	})
 
 	form := url.Values{}
@@ -429,7 +427,6 @@ func TestQuota(t *testing.T) {
 	// Create session with Quota = 2
 	keyID = CreateSession(func(s *user.SessionState) {
 		s.QuotaMax = 2
-		s.Mutex = &sync.RWMutex{}
 	})
 
 	authHeaders := map[string]string{
@@ -576,7 +573,6 @@ func TestAnalytics(t *testing.T) {
 
 		key := CreateSession(func(sess *user.SessionState) {
 			sess.EnableDetailRecording = true
-			sess.Mutex = &sync.RWMutex{}
 		})
 
 		authHeaders := map[string]string{
@@ -776,6 +772,12 @@ func TestListener(t *testing.T) {
 	// Specs will be reseted when we do `StartTest`
 	BuildAndLoadAPI()
 
+	ReloadTestCase.Enable()
+	defer ReloadTestCase.Disable()
+
+	ReloadTestCase.StartTicker()
+	defer ReloadTestCase.StopTicker()
+
 	ts := StartTest()
 	defer ts.Close()
 
@@ -803,13 +805,6 @@ func TestListener(t *testing.T) {
 		{Method: "GET", Path: "/sample/", Code: 200},
 		{Method: "GET", Path: "/sample/foo", Code: 200},
 	}
-
-	// have all needed reload ticks ready
-	go func() {
-		for i := 0; i < 4*4; i++ {
-			ReloadTestCase.Tick()
-		}
-	}()
 
 	ts.RunExt(t, tests...)
 }
@@ -1292,12 +1287,10 @@ func TestCacheAllSafeRequestsWithCachedHeaders(t *testing.T) {
 	sess1token := CreateSession(func(s *user.SessionState) {
 		s.Rate = 1
 		s.Per = 60
-		s.Mutex = &sync.RWMutex{}
 	})
 	sess2token := CreateSession(func(s *user.SessionState) {
 		s.Rate = 1
 		s.Per = 60
-		s.Mutex = &sync.RWMutex{}
 	})
 
 	ts.Run(t, []test.TestCase{
@@ -1927,14 +1920,12 @@ func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
 	sess1token := CreateSession(func(s *user.SessionState) {
 		s.Rate = 1
 		s.Per = 60
-		s.Mutex = &sync.RWMutex{}
 	})
 	defer GlobalSessionManager.RemoveSession("default", sess1token, false)
 
 	sess2token := CreateSession(func(s *user.SessionState) {
 		s.Rate = 1
 		s.Per = 60
-		s.Mutex = &sync.RWMutex{}
 	})
 	defer GlobalSessionManager.RemoveSession("default", sess2token, false)
 
@@ -1955,7 +1946,7 @@ func TestTracing(t *testing.T) {
 		spec.UseKeylessAccess = false
 	})[0]
 
-	keyID := CreateSession(func(s *user.SessionState) { s.Mutex = &sync.RWMutex{} })
+	keyID := CreateSession()
 	authHeaders := map[string][]string{"Authorization": {keyID}}
 
 	ts.Run(t, []test.TestCase{

@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -47,7 +46,6 @@ func generateSession(algo, data string) string {
 			s.HmacSecret = data
 			s.HMACEnabled = true
 		}
-		s.Mutex = &sync.RWMutex{}
 	})
 
 	return sessionKey
@@ -454,7 +452,6 @@ func TestWithURLRewrite(t *testing.T) {
 	sessionKey := CreateSession(func(session *user.SessionState) {
 		session.EnableHTTPSignatureValidation = true
 		session.HmacSecret = secret
-		session.Mutex = &sync.RWMutex{}
 	})
 
 	t.Run("looping", func(t *testing.T) {

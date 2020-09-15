@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"sync"
 	"testing"
 	"time"
 
@@ -17,7 +16,7 @@ import (
 )
 
 func createRLSession() *user.SessionState {
-	session := new(user.SessionState)
+	session := user.NewSessionState()
 	// essentially non-throttled
 	session.Rate = 100.0
 	session.Allowance = session.Rate
@@ -28,7 +27,6 @@ func createRLSession() *user.SessionState {
 	session.QuotaRemaining = 10
 	session.QuotaMax = 10
 	session.AccessRights = map[string]user.AccessDefinition{"31445455": {APIName: "Tyk Auth Key Test", APIID: "31445455", Versions: []string{"default"}}}
-	session.Mutex = &sync.RWMutex{}
 	return session
 }
 
@@ -179,7 +177,6 @@ func requestThrottlingTest(limiter string, testLevel string) func(t *testing.T) 
 
 				key := CreateSession(func(s *user.SessionState) {
 					s.ApplyPolicies = []string{policyID}
-					s.Mutex = &sync.RWMutex{}
 				})
 
 				authHeaders := map[string]string{

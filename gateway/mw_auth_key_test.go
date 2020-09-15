@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"sync"
 	"testing"
 	"time"
 
@@ -161,7 +160,6 @@ func TestSignatureValidation(t *testing.T) {
 			s.MetaData = map[string]interface{}{
 				"signature_secret": "foobar",
 			}
-			s.Mutex = &sync.RWMutex{}
 		})
 
 		hasher := signature_validator.MasheryMd5sum{}
@@ -190,7 +188,7 @@ func TestSignatureValidation(t *testing.T) {
 }
 
 func createAuthKeyAuthSession(isBench bool) *user.SessionState {
-	session := new(user.SessionState)
+	session := user.NewSessionState()
 	// essentially non-throttled
 	session.Rate = 100.0
 	session.Allowance = session.Rate
@@ -206,7 +204,6 @@ func createAuthKeyAuthSession(isBench bool) *user.SessionState {
 		session.QuotaMax = 10
 	}
 	session.AccessRights = map[string]user.AccessDefinition{"31": {APIName: "Tyk Auth Key Test", APIID: "31", Versions: []string{"default"}}}
-	session.Mutex = &sync.RWMutex{}
 	return session
 }
 
