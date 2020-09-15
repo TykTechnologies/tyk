@@ -746,7 +746,7 @@ func handleRemoveSortedSetRange(keyName, scoreFrom, scoreTo string) error {
 
 func handleGetPolicy(polID string) (interface{}, int) {
 	if pol := getPolicy(polID); pol.ID != "" {
-		return user.Policy{}, http.StatusOK
+		return pol, http.StatusOK
 	}
 
 	log.WithFields(logrus.Fields{
