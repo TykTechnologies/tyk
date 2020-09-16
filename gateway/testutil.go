@@ -187,7 +187,7 @@ func (r *ReloadMachinery) EnsureQueued(t *testing.T) {
 // EnsureReloaded this will block until any reload happens. It will timeout after
 // 100ms
 func (r *ReloadMachinery) EnsureReloaded(t *testing.T) {
-	deadline := time.NewTimer(100 * time.Millisecond)
+	deadline := time.NewTimer(500 * time.Millisecond)
 	defer deadline.Stop()
 	tick := time.NewTicker(time.Millisecond)
 	defer tick.Stop()
