@@ -31,6 +31,8 @@ github.com/TykTechnologies/leakybucket/memorycache
 github.com/TykTechnologies/murmur3
 # github.com/TykTechnologies/openid2go v0.0.0-20200312160651-00c254a52b19
 github.com/TykTechnologies/openid2go/openid
+# github.com/TykTechnologies/tyk/certs v0.0.1
+github.com/TykTechnologies/tyk/certs
 # github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751
 github.com/alecthomas/template
 github.com/alecthomas/template/parse
@@ -280,6 +282,7 @@ github.com/sirupsen/logrus/hooks/syslog
 github.com/square/go-jose
 # github.com/stretchr/testify v1.5.1
 github.com/stretchr/testify/assert
+github.com/stretchr/testify/require
 # github.com/tidwall/gjson v1.3.5
 github.com/tidwall/gjson
 # github.com/tidwall/match v1.0.1

@@ -318,7 +318,7 @@ func (l *SessionLimiter) DepthLimitExceeded(gqlRequest *graphql.Request, accessD
 				continue
 			}
 
-			if fieldComplexityRes.Depth > fieldAccessDef.Limits.MaxQueryDepth {
+			if greaterThanInt(fieldComplexityRes.Depth, fieldAccessDef.Limits.MaxQueryDepth) {
 				log.Debugf("Complexity of the field: %s.%s is higher than the allowed limit '%d'",
 					fieldAccessDef.TypeName, fieldAccessDef.FieldName, accessDef.Limit.MaxQueryDepth)
 
