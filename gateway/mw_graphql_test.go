@@ -174,7 +174,7 @@ func TestGraphQL_ComposedAPI(t *testing.T) {
 	}
 
 	people2 := gql.Request{
-		Query: "query Query { people { country name } }",
+		Query: "query Query { people { country { name } name } }",
 	}
 
 	_, _ = g.Run(t, []test.TestCase{
@@ -184,7 +184,7 @@ func TestGraphQL_ComposedAPI(t *testing.T) {
 
 		// REST Data Source
 		{Data: people1, BodyMatch: `"people":.*{"name":"Furkan"},{"name":"Leo"}.*`, Code: http.StatusOK},
-		{Data: people2, BodyMatch: `"people":.*{"country":"Turkey","name":"Furkan"},{"country":"Russia","name":"Leo"}.*`, Code: http.StatusOK},
+		{Data: people2, BodyMatch: `"people":.*{"country":{"name":"Turkey"},"name":"Furkan"},{"country":{"name":"Russia"},"name":"Leo"}.*`, Code: http.StatusOK},
 	}...)
 }
 

@@ -598,19 +598,27 @@ func restDataSourceHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(`[
 			{
 				"name": "Furkan",
-				"country": "Turkey"
+				"country":  {
+					"name": "Turkey"
+				}
 			},
 			{
 				"name": "Leo",
-				"country": "Russia"
+				"country":  {
+					"name": "Russia"
+				}
 			},
 			{
 				"name": "Josh",
-				"country": "UK"
+				"country":  {
+					"name": "UK"
+				}
 			},
 			{
 				"name": "Patric",
-				"country": "Germany"
+				"country":  {
+					"name": "Germany"
+				}
 			}
 		]`))
 }
