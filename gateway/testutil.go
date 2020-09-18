@@ -1049,7 +1049,7 @@ const sampleAPI = `{
     }
 }`
 
-const testComposedSchema = "type Query {people: [Person] countries: [Country]} type Person {name: String country: String} " +
+const testComposedSchema = "type Query {people: [Person] countries: [Country]} type Person {name: String country: Country} " +
 	"type Country {code: String name: String}"
 
 const testGraphQLDataSourceConfiguration = `
