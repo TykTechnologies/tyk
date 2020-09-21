@@ -27,19 +27,17 @@ import (
 	"github.com/jensneuse/graphql-go-tools/pkg/operationreport"
 )
 
-type GlobalComplexityResult struct {
+type OperationStats struct {
 	NodeCount  int
 	Complexity int
 	Depth      int
 }
 
-type FieldComplexityResult struct {
-	TypeName   string
-	FieldName  string
-	Alias      string
-	NodeCount  int
-	Complexity int
-	Depth      int
+type RootFieldStats struct {
+	TypeName  string
+	FieldName string
+	Alias     string
+	Stats     OperationStats
 }
 
 var (
@@ -73,7 +71,7 @@ func NewOperationComplexityEstimator() *OperationComplexityEstimator {
 	}
 }
 
-func (n *OperationComplexityEstimator) Do(operation, definition *ast.Document, report *operationreport.Report) (GlobalComplexityResult, []FieldComplexityResult) {
+func (n *OperationComplexityEstimator) Do(operation, definition *ast.Document, report *operationreport.Report) (OperationStats, []RootFieldStats) {
 	n.visitor.count = 0
 	n.visitor.complexity = 0
 	n.visitor.maxFieldDepth = 0
@@ -82,22 +80,31 @@ func (n *OperationComplexityEstimator) Do(operation, definition *ast.Document, r
 	n.visitor.maxSelectionSetFieldDepth = 0
 	n.visitor.selectionSetDepth = 0
 
-	n.visitor.calculatedRootFieldComplexities = []FieldComplexityResult{}
-	n.visitor.rootOperationTypeNames = make(map[string]bool, len(definition.RootOperationTypeDefinitions))
+	if n.visitor.calculatedRootFieldStats == nil {
+		n.visitor.calculatedRootFieldStats = make([]RootFieldStats, 0, len(definition.RootOperationTypeDefinitions))
+	}
+	n.visitor.calculatedRootFieldStats = n.visitor.calculatedRootFieldStats[:0]
+
+	if n.visitor.rootOperationTypeNames == nil {
+		n.visitor.rootOperationTypeNames = make(map[string]struct{}, len(definition.RootOperationTypeDefinitions))
+	}
+	for key := range n.visitor.rootOperationTypeNames {
+		delete(n.visitor.rootOperationTypeNames, key)
+	}
 
 	n.walker.Walk(operation, definition, report)
 
 	depth := n.visitor.maxFieldDepth - n.visitor.selectionSetDepth
-	globalResult := GlobalComplexityResult{
+	globalResult := OperationStats{
 		NodeCount:  n.visitor.count,
 		Complexity: n.visitor.complexity,
 		Depth:      depth,
 	}
 
-	return globalResult, n.visitor.calculatedRootFieldComplexities
+	return globalResult, n.visitor.calculatedRootFieldStats
 }
 
-func CalculateOperationComplexity(operation, definition *ast.Document, report *operationreport.Report) (GlobalComplexityResult, []FieldComplexityResult) {
+func CalculateOperationComplexity(operation, definition *ast.Document, report *operationreport.Report) (OperationStats, []RootFieldStats) {
 	estimator := NewOperationComplexityEstimator()
 	return estimator.Do(operation, definition, report)
 }
@@ -113,14 +120,14 @@ type complexityVisitor struct {
 	maxSelectionSetFieldDepth int
 	selectionSetDepth         int
 
-	rootOperationTypeNames map[string]bool
+	rootOperationTypeNames map[string]struct{}
 
-	currentRootFieldComplexity           FieldComplexityResult
+	currentRootFieldStats                RootFieldStats
 	currentRootFieldMaxDepth             int
 	currentRootFieldMaxSelectionSetDepth int
 	currentRootFieldSelectionSetDepth    int
 
-	calculatedRootFieldComplexities []FieldComplexityResult
+	calculatedRootFieldStats []RootFieldStats
 }
 
 type multiplier struct {
@@ -141,7 +148,7 @@ func (c *complexityVisitor) EnterDocument(operation, definition *ast.Document) {
 
 	for i := 0; i < len(c.definition.RootOperationTypeDefinitions); i++ {
 		name := c.definition.Input.ByteSliceString(c.definition.RootOperationTypeDefinitions[i].NamedType.Name)
-		c.rootOperationTypeNames[name] = true
+		c.rootOperationTypeNames[name] = struct{}{}
 	}
 }
 
@@ -195,7 +202,7 @@ func (c *complexityVisitor) EnterField(ref int) {
 		c.maxFieldDepth = c.Depth
 	}
 
-	c.currentRootFieldComplexity.Complexity = c.currentRootFieldComplexity.Complexity + c.calculateMultiplied(1)
+	c.currentRootFieldStats.Stats.Complexity = c.currentRootFieldStats.Stats.Complexity + c.calculateMultiplied(1)
 	if c.Depth > c.currentRootFieldMaxDepth {
 		c.currentRootFieldMaxDepth = c.Depth
 	}
@@ -227,7 +234,7 @@ func (c *complexityVisitor) EnterSelectionSet(ref int) {
 		c.selectionSetDepth++
 	}
 
-	c.currentRootFieldComplexity.NodeCount = c.currentRootFieldComplexity.NodeCount + c.calculateMultiplied(1)
+	c.currentRootFieldStats.Stats.NodeCount = c.currentRootFieldStats.Stats.NodeCount + c.calculateMultiplied(1)
 	if c.Depth > c.currentRootFieldMaxSelectionSetDepth {
 		c.currentRootFieldMaxSelectionSetDepth = c.Depth
 		c.currentRootFieldSelectionSetDepth++
@@ -239,19 +246,25 @@ func (c *complexityVisitor) EnterFragmentDefinition(ref int) {
 }
 
 func (c *complexityVisitor) resetCurrentRootFieldComplexity(typeName, fieldName, alias string) {
-	c.currentRootFieldComplexity = FieldComplexityResult{
-		TypeName:   typeName,
-		FieldName:  fieldName,
-		Alias:      alias,
-		NodeCount:  0,
-		Complexity: 0,
-		Depth:      0,
+	c.currentRootFieldStats = RootFieldStats{
+		TypeName:  typeName,
+		FieldName: fieldName,
+		Alias:     alias,
+		Stats: OperationStats{
+			NodeCount:  0,
+			Complexity: 0,
+			Depth:      0,
+		},
 	}
 }
 
 func (c *complexityVisitor) endRootFieldComplexityCalculation() {
-	c.currentRootFieldComplexity.Depth = c.currentRootFieldMaxDepth - c.currentRootFieldSelectionSetDepth
-	c.calculatedRootFieldComplexities = append(c.calculatedRootFieldComplexities, c.currentRootFieldComplexity)
+	currentDepth := c.currentRootFieldMaxDepth - c.currentRootFieldSelectionSetDepth
+	if currentDepth > 0 {
+		currentDepth--
+	}
+	c.currentRootFieldStats.Stats.Depth = currentDepth
+	c.calculatedRootFieldStats = append(c.calculatedRootFieldStats, c.currentRootFieldStats)
 }
 
 func (c *complexityVisitor) extractFieldRelatedNames(ref, definitionRef int) (typeName, fieldName, alias string) {
@@ -265,7 +278,8 @@ func (c *complexityVisitor) extractFieldRelatedNames(ref, definitionRef int) (ty
 }
 
 func (c *complexityVisitor) isRootType(name string) bool {
-	return c.rootOperationTypeNames[name]
+	_, ok := c.rootOperationTypeNames[name]
+	return ok
 }
 
 func (c *complexityVisitor) isRootTypeField() bool {

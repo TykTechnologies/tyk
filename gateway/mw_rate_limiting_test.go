@@ -106,7 +106,7 @@ func TestNeverRenewQuota(t *testing.T) {
 
 }
 
-func TestDepthLimit(t *testing.T) {
+func TestMwRateLimiting_DepthLimit(t *testing.T) {
 	g := StartTest()
 	defer g.Close()
 
@@ -162,7 +162,7 @@ func TestDepthLimit(t *testing.T) {
 	request := graphql.Request{
 		OperationName: "Query",
 		Variables:     nil,
-		Query:         "query Query { people { name } }",
+		Query:         "query Query { people { name country { name } } }",
 	}
 
 	t.Run("Global Level", func(t *testing.T) {
