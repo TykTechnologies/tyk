@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/cenk/backoff"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -17,6 +16,8 @@ import (
 	"sync/atomic"
 	"text/template"
 	"time"
+
+	"github.com/cenk/backoff"
 
 	sprig "gopkg.in/Masterminds/sprig.v2"
 
