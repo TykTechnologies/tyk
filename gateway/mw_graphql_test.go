@@ -174,7 +174,7 @@ func TestGraphQL_ComposedAPI(t *testing.T) {
 	}
 
 	people2 := gql.Request{
-		Query: "query Query { people { country name } }",
+		Query: "query Query { people { country { name } name } }",
 	}
 
 	_, _ = g.Run(t, []test.TestCase{
@@ -184,7 +184,7 @@ func TestGraphQL_ComposedAPI(t *testing.T) {
 
 		// REST Data Source
 		{Data: people1, BodyMatch: `"people":.*{"name":"Furkan"},{"name":"Leo"}.*`, Code: http.StatusOK},
-		{Data: people2, BodyMatch: `"people":.*{"country":"Turkey","name":"Furkan"},{"country":"Russia","name":"Leo"}.*`, Code: http.StatusOK},
+		{Data: people2, BodyMatch: `"people":.*{"country":{"name":"Turkey"},"name":"Furkan"},{"country":{"name":"Russia"},"name":"Leo"}.*`, Code: http.StatusOK},
 	}...)
 }
 
@@ -287,3 +287,79 @@ fragment TypeRef on __Type {
     }
   }
 }`
+
+const gqlCountriesSchema = `directive @cacheControl(
+  maxAge: Int
+  scope: CacheControlScope
+) on FIELD_DEFINITION | OBJECT | INTERFACE
+enum CacheControlScope {
+  PUBLIC
+  PRIVATE
+}
+
+type Continent {
+  code: ID!
+  name: String!
+  countries: [Country!]!
+}
+
+input ContinentFilterInput {
+  code: StringQueryOperatorInput
+}
+
+type Country {
+  code: ID!
+  name: String!
+  native: String!
+  phone: String!
+  continent: Continent!
+  capital: String
+  currency: String
+  languages: [Language!]!
+  emoji: String!
+  emojiU: String!
+  states: [State!]!
+}
+
+input CountryFilterInput {
+  code: StringQueryOperatorInput
+  currency: StringQueryOperatorInput
+  continent: StringQueryOperatorInput
+}
+
+type Language {
+  code: ID!
+  name: String
+  native: String
+  rtl: Boolean!
+}
+
+input LanguageFilterInput {
+  code: StringQueryOperatorInput
+}
+
+type Query {
+  continents(filter: ContinentFilterInput): [Continent!]!
+  continent(code: ID!): Continent
+  countries(filter: CountryFilterInput): [Country!]!
+  country(code: ID!): Country
+  languages(filter: LanguageFilterInput): [Language!]!
+  language(code: ID!): Language
+}
+
+type State {
+  code: String
+  name: String!
+  country: Country!
+}
+
+input StringQueryOperatorInput {
+  eq: String
+  ne: String
+  in: [String]
+  nin: [String]
+  regex: String
+  glob: String
+}
+
+scalar Upload`
