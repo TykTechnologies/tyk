@@ -169,6 +169,9 @@ func setupGlobals(ctx context.Context) {
 		mainLog.Fatal("Analytics requires Redis Storage backend, please enable Redis in the tyk.conf file.")
 	}
 
+	if config.Global().UptimeTests.DisableManagementPoller && config.Global().ManagementNode {
+		mainLog.Warn("Running Uptime checks in a management node.")
+	}
 	// Initialise our Host Checker if it's enabled to be a management poller
 	if !config.Global().UptimeTests.DisableManagementPoller {
 		healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:"}
