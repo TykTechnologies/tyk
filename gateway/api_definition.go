@@ -17,6 +17,8 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/cenk/backoff"
+
 	sprig "gopkg.in/Masterminds/sprig.v2"
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
@@ -748,6 +750,12 @@ func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circui
 		newSpec.CircuitBreaker = ExtendedCircuitBreakerMeta{CircuitBreakerMeta: stringSpec}
 		log.Debug("Initialising circuit breaker for: ", stringSpec.Path)
 		newSpec.CircuitBreaker.CB = circuit.NewRateBreaker(stringSpec.ThresholdPercent, stringSpec.Samples)
+
+		// override backoff algorithm when is not desired to recheck the upstream before the ReturnToServiceAfter happens
+		if stringSpec.DisableHalfOpenState {
+			newSpec.CircuitBreaker.CB.BackOff = &backoff.StopBackOff{}
+		}
+
 		events := newSpec.CircuitBreaker.CB.Subscribe()
 		go func(path string, spec *APISpec, breakerPtr *circuit.Breaker) {
 			timerActive := false
