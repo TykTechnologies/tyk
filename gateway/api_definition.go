@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/cenk/backoff"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -749,6 +750,12 @@ func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circui
 		newSpec.CircuitBreaker = ExtendedCircuitBreakerMeta{CircuitBreakerMeta: stringSpec}
 		log.Debug("Initialising circuit breaker for: ", stringSpec.Path)
 		newSpec.CircuitBreaker.CB = circuit.NewRateBreaker(stringSpec.ThresholdPercent, stringSpec.Samples)
+
+		// override backoff algorithm when is not desired to recheck the upstream before the ReturnToServiceAfter happens
+		if !stringSpec.EnableHalfOpenState {
+			newSpec.CircuitBreaker.CB.BackOff = &backoff.StopBackOff{}
+		}
+
 		events := newSpec.CircuitBreaker.CB.Subscribe()
 		go func(path string, spec *APISpec, breakerPtr *circuit.Breaker) {
 			timerActive := false
