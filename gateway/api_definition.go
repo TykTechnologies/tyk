@@ -753,7 +753,7 @@ func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circui
 		newSpec.CircuitBreaker.CB = circuit.NewRateBreaker(stringSpec.ThresholdPercent, stringSpec.Samples)
 
 		// override backoff algorithm when is not desired to recheck the upstream before the ReturnToServiceAfter happens
-		if !stringSpec.EnableHalfOpenState {
+		if stringSpec.DisableHalfOpenState {
 			newSpec.CircuitBreaker.CB.BackOff = &backoff.StopBackOff{}
 		}
 

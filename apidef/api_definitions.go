@@ -152,7 +152,7 @@ type CircuitBreakerMeta struct {
 	ThresholdPercent     float64 `bson:"threshold_percent" json:"threshold_percent"`
 	Samples              int64   `bson:"samples" json:"samples"`
 	ReturnToServiceAfter int     `bson:"return_to_service_after" json:"return_to_service_after"`
-	EnableHalfOpenState  bool    `bson:"enable_half_open_state" json:"enable_half_open_state"`
+	DisableHalfOpenState  bool    `bson:"disable_half_open_state" json:"disable_half_open_state"`
 }
 
 type StringRegexMap struct {
