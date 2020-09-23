@@ -2,12 +2,13 @@ package gateway
 
 import (
 	"bytes"
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/storage"
-	uuid "github.com/satori/go.uuid"
 	"net/http"
 	"testing"
 	"text/template"
+
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
+	uuid "github.com/satori/go.uuid"
 )
 
 func TestHostCheckerManagerInit(t *testing.T) {
