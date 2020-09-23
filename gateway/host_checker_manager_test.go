@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
-	uuid2 "github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 	"net/http"
 	"testing"
 	"text/template"
@@ -90,7 +90,7 @@ func TestGenerateCheckerId(t *testing.T) {
 		t.Error("HostCheckerManager should generate an Id on GenerateCheckerId")
 	}
 
-	uuid, _ := uuid2.FromString(hc.Id)
+	uuid, _ := uuid.FromString(hc.Id)
 	if uuid.Version() != 4 {
 		t.Error("HostCheckerManager should generate an uuid.v4 id")
 	}
