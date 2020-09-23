@@ -770,6 +770,7 @@ func TestEnsureTransport(t *testing.T) {
 		{"httpbin.org ", "https", "https://httpbin.org"},
 		{"http://httpbin.org ", "https", "http://httpbin.org"},
 		{"httpbin.org ", "tls", "tls://httpbin.org"},
+		{"httpbin.org ", "", "http://httpbin.org"},
 	}
 	for i, v := range cases {
 		t.Run(fmt.Sprintf("case-%d", i), func(t *testing.T) {

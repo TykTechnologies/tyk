@@ -127,6 +127,9 @@ func EnsureTransport(host, protocol string) string {
 		return host
 	}
 	if u.Scheme == "" {
+		if protocol == "" {
+			protocol = "http"
+		}
 		u.Scheme = protocol
 	}
 	return u.String()
