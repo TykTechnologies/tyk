@@ -104,7 +104,7 @@ func TestGRPC_H2C(t *testing.T) {
 	// gRPC server
 	target, s := startGRPCServerH2C(t)
 	defer s.GracefulStop()
-
+	defer target.Close()
 	// Tyk
 	globalConf := config.Global()
 	globalConf.ProxySSLInsecureSkipVerify = true
@@ -119,7 +119,7 @@ func TestGRPC_H2C(t *testing.T) {
 		spec.Name = "h2c_api"
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = true
-		spec.Proxy.TargetURL = target
+		spec.Proxy.TargetURL = toTarget(t, "http", target)
 		spec.ListenPort = port
 		spec.Protocol = "h2c"
 	})
@@ -201,6 +201,7 @@ func TestGRPC_TLS(t *testing.T) {
 	// gRPC server
 	target, s := startGRPCServer(t, nil)
 	defer s.GracefulStop()
+	defer target.Close()
 
 	// Tyk
 	globalConf := config.Global()
@@ -218,7 +219,7 @@ func TestGRPC_TLS(t *testing.T) {
 	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = true
-		spec.Proxy.TargetURL = target
+		spec.Proxy.TargetURL = toTarget(t, "https", target)
 	})
 
 	address := strings.TrimPrefix(ts.URL, "https://")
@@ -253,6 +254,7 @@ func TestGRPC_MutualTLS(t *testing.T) {
 	// Protected gRPC server
 	target, s := startGRPCServer(t, clientCert.Leaf)
 	defer s.GracefulStop()
+	defer target.Close()
 
 	// Tyk
 	globalConf := config.Global()
@@ -273,7 +275,7 @@ func TestGRPC_MutualTLS(t *testing.T) {
 		spec.UpstreamCertificates = map[string]string{
 			"*": clientCertID,
 		}
-		spec.Proxy.TargetURL = target
+		spec.Proxy.TargetURL = toTarget(t, "https", target)
 	})
 
 	address := strings.TrimPrefix(ts.URL, "https://")
@@ -300,6 +302,7 @@ func TestGRPC_BasicAuthentication(t *testing.T) {
 	// gRPC server
 	target, s := startGRPCServer(t, nil)
 	defer s.GracefulStop()
+	defer target.Close()
 
 	// Tyk
 	globalConf := config.Global()
@@ -323,7 +326,7 @@ func TestGRPC_BasicAuthentication(t *testing.T) {
 		spec.UseBasicAuth = true
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = false
-		spec.Proxy.TargetURL = target
+		spec.Proxy.TargetURL = toTarget(t, "https", target)
 		spec.OrgID = "default"
 	})
 
@@ -357,6 +360,7 @@ func TestGRPC_TokenBasedAuthentication(t *testing.T) {
 	// gRPC server
 	target, s := startGRPCServer(t, nil)
 	defer s.GracefulStop()
+	defer target.Close()
 
 	// Tyk
 	globalConf := config.Global()
@@ -378,7 +382,7 @@ func TestGRPC_TokenBasedAuthentication(t *testing.T) {
 	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = false
-		spec.Proxy.TargetURL = target
+		spec.Proxy.TargetURL = toTarget(t, "https", target)
 		spec.OrgID = "default"
 	})
 
@@ -420,7 +424,7 @@ func (s *server) SayHello(ctx context.Context, in *pb.HelloRequest) (*pb.HelloRe
 	return &pb.HelloReply{Message: "Hello " + in.Name}, nil
 }
 
-func startGRPCServerH2C(t *testing.T) (string, *grpc.Server) {
+func startGRPCServerH2C(t *testing.T) (net.Listener, *grpc.Server) {
 	ls, err := net.Listen("tcp", ":0")
 	if err != nil {
 		ls, err = net.Listen("tcp", ":0")
@@ -428,9 +432,6 @@ func startGRPCServerH2C(t *testing.T) (string, *grpc.Server) {
 	if err != nil {
 		t.Fatalf("failed to listen: %v", err)
 	}
-	t.Cleanup(func() {
-		ls.Close()
-	})
 
 	s := grpc.NewServer()
 
@@ -442,14 +443,18 @@ func startGRPCServerH2C(t *testing.T) (string, *grpc.Server) {
 			t.Fatalf("failed to serve: %v", err)
 		}
 	}()
+	return ls, s
+}
+
+func toTarget(t *testing.T, scheme string, ls net.Listener) string {
 	_, port, err := net.SplitHostPort(ls.Addr().String())
 	if err != nil {
 		t.Fatal(err)
 	}
-	return fmt.Sprintf("http://localhost:%v", port), s
+	return fmt.Sprintf("%s://localhost:%v", scheme, port)
 }
 
-func startGRPCServer(t *testing.T, clientCert *x509.Certificate) (string, *grpc.Server) {
+func startGRPCServer(t *testing.T, clientCert *x509.Certificate) (net.Listener, *grpc.Server) {
 	// Server
 	ls, err := net.Listen("tcp", ":0")
 	if err != nil {
@@ -458,9 +463,6 @@ func startGRPCServer(t *testing.T, clientCert *x509.Certificate) (string, *grpc.
 	if err != nil {
 		t.Fatalf("failed to listen: %v", err)
 	}
-	t.Cleanup(func() {
-		ls.Close()
-	})
 
 	cert, key, _, _ := genCertificate(&x509.Certificate{})
 	certificate, _ := tls.X509KeyPair(cert, key)
@@ -499,11 +501,8 @@ func startGRPCServer(t *testing.T, clientCert *x509.Certificate) (string, *grpc.
 			t.Fatalf("failed to serve: %v", err)
 		}
 	}()
-	_, port, err := net.SplitHostPort(ls.Addr().String())
-	if err != nil {
-		t.Fatal(err)
-	}
-	return fmt.Sprintf("https://localhost:%v", port), s
+	return ls, s
+
 }
 
 func sayHelloWithGRPCClientH2C(t *testing.T, address string, name string) *pb.HelloReply {
