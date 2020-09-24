@@ -407,6 +407,7 @@ func (m *proxyMux) serve() {
 				WriteTimeout: writeTimeout,
 				Handler:      h,
 			}
+
 			if config.Global().CloseConnections {
 				p.httpServer.SetKeepAlivesEnabled(false)
 			}

@@ -615,7 +615,6 @@ func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p
 	if config.Global().ProxyEnableHttp2 {
 		http2.ConfigureTransport(transport)
 	}
-
 	if config.Global().ProxyEnableH2c {
 		h2t := &http2.Transport{
 			// kind of a hack, but for plaintext/H2C requests, pretend to dial TLS
