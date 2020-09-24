@@ -505,7 +505,7 @@ func startGRPCServer(t *testing.T, clientCert *x509.Certificate) (string, *grpc.
 	if err != nil {
 		t.Fatal(err)
 	}
-	return fmt.Sprintf("localhost:%v", port), s
+	return fmt.Sprintf("https://localhost:%v", port), s
 }
 
 func sayHelloWithGRPCClientH2C(t *testing.T, address string, name string) *pb.HelloReply {
