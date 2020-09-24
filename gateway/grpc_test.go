@@ -103,8 +103,9 @@ func TestGRPC_H2C(t *testing.T) {
 	EnablePort(port, "h2c")
 	// gRPC server
 	target, s := startGRPCServerH2C(t)
-	defer s.GracefulStop()
 	defer target.Close()
+	defer s.GracefulStop()
+
 	// Tyk
 	globalConf := config.Global()
 	globalConf.ProxySSLInsecureSkipVerify = true
@@ -200,8 +201,8 @@ func TestGRPC_TLS(t *testing.T) {
 
 	// gRPC server
 	target, s := startGRPCServer(t, nil)
-	defer s.GracefulStop()
 	defer target.Close()
+	defer s.GracefulStop()
 
 	// Tyk
 	globalConf := config.Global()
@@ -253,8 +254,8 @@ func TestGRPC_MutualTLS(t *testing.T) {
 
 	// Protected gRPC server
 	target, s := startGRPCServer(t, clientCert.Leaf)
-	defer s.GracefulStop()
 	defer target.Close()
+	defer s.GracefulStop()
 
 	// Tyk
 	globalConf := config.Global()
@@ -301,8 +302,8 @@ func TestGRPC_BasicAuthentication(t *testing.T) {
 
 	// gRPC server
 	target, s := startGRPCServer(t, nil)
-	defer s.GracefulStop()
 	defer target.Close()
+	defer s.GracefulStop()
 
 	// Tyk
 	globalConf := config.Global()
@@ -359,8 +360,8 @@ func TestGRPC_TokenBasedAuthentication(t *testing.T) {
 
 	// gRPC server
 	target, s := startGRPCServer(t, nil)
-	defer s.GracefulStop()
 	defer target.Close()
+	defer s.GracefulStop()
 
 	// Tyk
 	globalConf := config.Global()
