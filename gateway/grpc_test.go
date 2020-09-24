@@ -53,7 +53,6 @@ func TestHTTP2_h2C(t *testing.T) {
 	// Tyk
 	globalConf := config.Global()
 	globalConf.ProxyEnableH2c = true
-	globalConf.HttpServerOptions.EnableH2c = true
 	config.SetGlobal(globalConf)
 	defer ResetTestConfig()
 
@@ -110,7 +109,6 @@ func TestGRPC_H2C(t *testing.T) {
 	globalConf := config.Global()
 	globalConf.ProxySSLInsecureSkipVerify = true
 	globalConf.ProxyEnableH2c = true
-	globalConf.HttpServerOptions.EnableH2c = true
 	config.SetGlobal(globalConf)
 	defer ResetTestConfig()
 

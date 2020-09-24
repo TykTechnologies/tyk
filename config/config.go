@@ -183,7 +183,6 @@ type HttpServerOptionsConfig struct {
 	UseSSL                 bool       `json:"use_ssl"`
 	UseLE_SSL              bool       `json:"use_ssl_le"`
 	EnableHttp2            bool       `json:"enable_http2"`
-	EnableH2c              bool       `json:"enable_h2c"`
 	SSLInsecureSkipVerify  bool       `json:"ssl_insecure_skip_verify"`
 	EnableWebSockets       bool       `json:"enable_websockets"`
 	Certificates           []CertData `json:"certificates"`
