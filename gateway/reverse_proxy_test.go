@@ -1028,3 +1028,23 @@ func BenchmarkCopyRequestResponse(b *testing.B) {
 		}
 	}
 }
+
+func TestEnsureTransport(t *testing.T) {
+	cases := []struct {
+		host, protocol, expect string
+	}{
+		{"https://httpbin.org ", "https", "https://httpbin.org"},
+		{"httpbin.org ", "https", "https://httpbin.org"},
+		{"http://httpbin.org ", "https", "http://httpbin.org"},
+		{"httpbin.org ", "tls", "tls://httpbin.org"},
+		{"httpbin.org ", "", "http://httpbin.org"},
+	}
+	for i, v := range cases {
+		t.Run(fmt.Sprintf("case-%d", i), func(t *testing.T) {
+			g := EnsureTransport(v.host, v.protocol)
+			if g != v.expect {
+				t.Errorf("expected %q got %q", v.expect, g)
+			}
+		})
+	}
+}
