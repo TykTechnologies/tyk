@@ -120,19 +120,19 @@ func urlFromService(spec *APISpec) (*apidef.HostList, error) {
 var httpScheme = regexp.MustCompile(`^(?i)https?://`)
 
 func EnsureTransport(host, protocol string) string {
-	if protocol == "" {
-		for _, v := range []string{"http://", "https://"} {
-			if strings.HasPrefix(host, v) {
-				return host
-			}
-		}
-		return "http://" + host
-	}
-	prefix := protocol + "://"
-	if strings.HasPrefix(host, prefix) {
+	host = strings.TrimSpace(host)
+	protocol = strings.TrimSpace(protocol)
+	u, err := url.Parse(host)
+	if err != nil {
 		return host
 	}
-	return prefix + host
+	if u.Scheme == "" {
+		if protocol == "" {
+			protocol = "http"
+		}
+		u.Scheme = protocol
+	}
+	return u.String()
 }
 
 func nextTarget(targetData *apidef.HostList, spec *APISpec) (string, error) {
@@ -148,7 +148,6 @@ func nextTarget(targetData *apidef.HostList, spec *APISpec) (string, error) {
 			}
 
 			host := EnsureTransport(gotHost, spec.Protocol)
-
 			if !spec.Proxy.CheckHostAgainstUptimeTests {
 				return host, nil // we don't care if it's up
 			}
