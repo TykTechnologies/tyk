@@ -6,8 +6,8 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/goverify"
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/v3/apidef"
+	"github.com/TykTechnologies/tyk/v3/config"
 
 	"archive/zip"
 	"bytes"

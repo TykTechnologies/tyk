@@ -9,7 +9,7 @@ import (
 
 	uuid "github.com/satori/go.uuid"
 
-	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/v3/apidef"
 )
 
 const ApiaryBluePrint APIImporterSource = "blueprint"

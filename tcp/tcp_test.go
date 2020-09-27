@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/v3/test"
 )
 
 func TestProxyModifier(t *testing.T) {

@@ -27,12 +27,12 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/gojsonschema"
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/headers"
-	"github.com/TykTechnologies/tyk/regexp"
-	"github.com/TykTechnologies/tyk/rpc"
-	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/v3/apidef"
+	"github.com/TykTechnologies/tyk/v3/config"
+	"github.com/TykTechnologies/tyk/v3/headers"
+	"github.com/TykTechnologies/tyk/v3/regexp"
+	"github.com/TykTechnologies/tyk/v3/rpc"
+	"github.com/TykTechnologies/tyk/v3/storage"
 )
 
 //const used by cache middleware
@@ -1272,7 +1272,7 @@ func (a *APISpec) RequestValid(r *http.Request) (bool, RequestStatus, interface{
 	// TODO: Don't abuse the interface{} return value for both
 	// *apidef.EndpointMethodMeta and *time.Time. Probably need to
 	// redesign or entirely remove RequestValid. See discussion on
-	// https://github.com/TykTechnologies/tyk/pull/776
+	// https://github.com/TykTechnologies/tyk/v3/pull/776
 	expired, expTime := a.VersionExpired(versionMetaData)
 	if expired {
 		return false, VersionExpired, nil

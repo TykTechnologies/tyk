@@ -16,17 +16,15 @@ import (
 	"testing"
 	"time"
 
-	"google.golang.org/grpc/metadata"
-
-	"golang.org/x/net/http2/h2c"
-
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/test"
-	"github.com/TykTechnologies/tyk/user"
+	"github.com/TykTechnologies/tyk/v3/config"
+	"github.com/TykTechnologies/tyk/v3/test"
+	"github.com/TykTechnologies/tyk/v3/user"
 	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	pb "google.golang.org/grpc/examples/helloworld/helloworld"
+	"google.golang.org/grpc/metadata"
 )
 
 // For gRPC, we should be sure that HTTP/2 works with Tyk in H2C configuration also for insecure grpc over http.

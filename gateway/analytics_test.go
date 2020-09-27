@@ -3,7 +3,7 @@ package gateway
 import (
 	"testing"
 
-	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/v3/config"
 )
 
 func TestGeoIPLookup(t *testing.T) {

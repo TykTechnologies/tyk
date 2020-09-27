@@ -7,10 +7,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/TykTechnologies/tyk/ctx"
-	"github.com/TykTechnologies/tyk/goplugin"
-	"github.com/TykTechnologies/tyk/request"
 	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/v3/ctx"
+	"github.com/TykTechnologies/tyk/v3/goplugin"
+	"github.com/TykTechnologies/tyk/v3/request"
 )
 
 // customResponseWriter is a wrapper around standard http.ResponseWriter

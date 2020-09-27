@@ -1,7 +1,7 @@
 package openzipkin
 
 import (
-	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/v3/config"
 )
 
 // Load retusn a zipkin configuration from the opts.

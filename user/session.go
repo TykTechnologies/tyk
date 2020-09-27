@@ -8,8 +8,8 @@ import (
 
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 
-	"github.com/TykTechnologies/tyk/config"
-	logger "github.com/TykTechnologies/tyk/log"
+	"github.com/TykTechnologies/tyk/v3/config"
+	logger "github.com/TykTechnologies/tyk/v3/log"
 )
 
 var log = logger.Get()

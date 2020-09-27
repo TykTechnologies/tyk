@@ -1,7 +1,7 @@
 package coprocess
 
 import (
-	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/v3/apidef"
 )
 
 // Dispatcher defines a basic interface for the CP dispatcher, check PythonDispatcher for reference.

@@ -11,9 +11,9 @@ import (
 	maxminddb "github.com/oschwald/maxminddb-golang"
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/regexp"
-	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/v3/config"
+	"github.com/TykTechnologies/tyk/v3/regexp"
+	"github.com/TykTechnologies/tyk/v3/storage"
 )
 
 type NetworkStats struct {

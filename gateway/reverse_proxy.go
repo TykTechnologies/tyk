@@ -41,13 +41,18 @@ import (
 	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http2"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/ctx"
-	"github.com/TykTechnologies/tyk/headers"
-	"github.com/TykTechnologies/tyk/regexp"
-	"github.com/TykTechnologies/tyk/trace"
-	"github.com/TykTechnologies/tyk/user"
+	"github.com/TykTechnologies/tyk/v3/apidef"
+	"github.com/TykTechnologies/tyk/v3/config"
+	"github.com/TykTechnologies/tyk/v3/ctx"
+	"github.com/TykTechnologies/tyk/v3/headers"
+	"github.com/TykTechnologies/tyk/v3/regexp"
+	"github.com/TykTechnologies/tyk/v3/trace"
+	"github.com/TykTechnologies/tyk/v3/user"
+	opentracing "github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/ext"
+	cache "github.com/pmylund/go-cache"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/net/http2"
 )
 
 const defaultUserAgent = "Tyk/" + VERSION

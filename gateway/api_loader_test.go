@@ -6,13 +6,13 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/v3/config"
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/v3/test"
 
-	"github.com/TykTechnologies/tyk/trace"
+	"github.com/TykTechnologies/tyk/v3/trace"
 )
 
 func TestOpenTracing(t *testing.T) {

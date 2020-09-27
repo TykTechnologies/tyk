@@ -33,15 +33,15 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/v3/apidef"
 
-	"github.com/TykTechnologies/tyk/cli"
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/storage"
-	_ "github.com/TykTechnologies/tyk/templates" // Don't delete
-	"github.com/TykTechnologies/tyk/test"
-	_ "github.com/TykTechnologies/tyk/testdata" // Don't delete
-	"github.com/TykTechnologies/tyk/user"
+	"github.com/TykTechnologies/tyk/v3/cli"
+	"github.com/TykTechnologies/tyk/v3/config"
+	"github.com/TykTechnologies/tyk/v3/storage"
+	_ "github.com/TykTechnologies/tyk/v3/templates" // Don't delete
+	"github.com/TykTechnologies/tyk/v3/test"
+	_ "github.com/TykTechnologies/tyk/v3/testdata" // Don't delete
+	"github.com/TykTechnologies/tyk/v3/user"
 	uuid "github.com/satori/go.uuid"
 )
 

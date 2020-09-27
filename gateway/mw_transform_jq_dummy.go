@@ -5,7 +5,7 @@ package gateway
 import (
 	"net/http"
 
-	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/v3/apidef"
 )
 
 type TransformJQMiddleware struct {

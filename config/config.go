@@ -12,9 +12,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	logger "github.com/TykTechnologies/tyk/log"
-	"github.com/TykTechnologies/tyk/regexp"
+	"github.com/TykTechnologies/tyk/v3/apidef"
+	logger "github.com/TykTechnologies/tyk/v3/log"
+	"github.com/TykTechnologies/tyk/v3/regexp"
 	"github.com/kelseyhightower/envconfig"
 )
 
