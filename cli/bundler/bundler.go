@@ -14,8 +14,8 @@ import (
 	"os"
 
 	"github.com/TykTechnologies/goverify"
-	"github.com/TykTechnologies/tyk/apidef"
-	logger "github.com/TykTechnologies/tyk/log"
+	"github.com/TykTechnologies/tyk/v3/apidef"
+	logger "github.com/TykTechnologies/tyk/v3/log"
 
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
 )

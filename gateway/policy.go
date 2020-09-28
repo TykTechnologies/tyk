@@ -9,11 +9,11 @@ import (
 
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 
-	"github.com/TykTechnologies/tyk/rpc"
+	"github.com/TykTechnologies/tyk/v3/rpc"
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/TykTechnologies/tyk/user"
+	"github.com/TykTechnologies/tyk/v3/user"
 )
 
 type DBAccessDefinition struct {

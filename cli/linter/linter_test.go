@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/v3/config"
 )
 
 func TestMain(m *testing.M) {

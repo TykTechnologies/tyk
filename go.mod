@@ -1,4 +1,4 @@
-module github.com/TykTechnologies/tyk
+module github.com/TykTechnologies/tyk/v3
 
 go 1.12
 
