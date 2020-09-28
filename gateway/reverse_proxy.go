@@ -36,11 +36,6 @@ import (
 	"github.com/jensneuse/graphql-go-tools/pkg/subscription"
 
 	"github.com/akutz/memconn"
-	"github.com/opentracing/opentracing-go"
-	"github.com/opentracing/opentracing-go/ext"
-	"github.com/pmylund/go-cache"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/net/http2"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -49,6 +44,13 @@ import (
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
+
+	opentracing "github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/ext"
+	cache "github.com/pmylund/go-cache"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/net/http/httpguts"
+	"golang.org/x/net/http2"
 )
 
 const defaultUserAgent = "Tyk/" + VERSION
@@ -1416,6 +1418,13 @@ func (p *ReverseProxy) copyBuffer(dst io.Writer, src io.Reader) (int64, error) {
 	}
 }
 
+func upgradeType(h http.Header) string {
+	if !httpguts.HeaderValuesContainsToken(h["Connection"], "Upgrade") {
+		return ""
+	}
+	return strings.ToLower(h.Get("Upgrade"))
+}
+
 func (p *ReverseProxy) handleUpgradeResponse(rw http.ResponseWriter, req *http.Request, res *http.Response) error {
 	copyHeader(res.Header, rw.Header(), config.Global().IgnoreCanonicalMIMEHeaderKey)
 
@@ -1427,7 +1436,18 @@ func (p *ReverseProxy) handleUpgradeResponse(rw http.ResponseWriter, req *http.R
 	if !ok {
 		return fmt.Errorf("internal error: 101 switching protocols response with non-writable body")
 	}
-	defer backConn.Close()
+	backConnCloseCh := make(chan bool)
+	go func() {
+		// Ensure that the cancelation of a request closes the backend.
+		// See issue https://golang.org/issue/35559.
+		select {
+		case <-req.Context().Done():
+		case <-backConnCloseCh:
+		}
+		backConn.Close()
+	}()
+
+	defer close(backConnCloseCh)
 	conn, brw, err := hj.Hijack()
 	if err != nil {
 		return fmt.Errorf("Hijack failed on protocol switch: %v", err)
