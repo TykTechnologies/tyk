@@ -16,12 +16,12 @@ import (
 	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/ctx"
-	"github.com/TykTechnologies/tyk/dnscache"
-	"github.com/TykTechnologies/tyk/request"
-	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/v3/apidef"
+	"github.com/TykTechnologies/tyk/v3/config"
+	"github.com/TykTechnologies/tyk/v3/ctx"
+	"github.com/TykTechnologies/tyk/v3/dnscache"
+	"github.com/TykTechnologies/tyk/v3/request"
+	"github.com/TykTechnologies/tyk/v3/test"
 )
 
 func TestCopyHeader_NoDuplicateCORSHeaders(t *testing.T) {

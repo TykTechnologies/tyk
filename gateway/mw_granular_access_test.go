@@ -4,11 +4,10 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
-
-	"github.com/TykTechnologies/tyk/headers"
-	"github.com/TykTechnologies/tyk/test"
-	"github.com/TykTechnologies/tyk/user"
+	"github.com/TykTechnologies/tyk/v3/headers"
+	"github.com/TykTechnologies/tyk/v3/test"
+	"github.com/TykTechnologies/tyk/v3/user"
+	"github.com/jensnesuse/graphql-go-tools/pkg/graphql"
 )
 
 func TestGraphQL_RestrictedTypes(t *testing.T) {

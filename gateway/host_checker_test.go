@@ -13,12 +13,11 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/pires/go-proxyproto"
+	"github.com/TykTechnologies/tyk/v3/apidef"
+	"github.com/TykTechnologies/tyk/v3/config"
+	"github.com/TykTechnologies/tyk/v3/storage"
+	proxyproto "github.com/pires/go-proxyproto"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/storage"
 )
 
 const sampleUptimeTestAPI = `{

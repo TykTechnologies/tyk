@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/v3/config"
+	"github.com/TykTechnologies/tyk/v3/storage"
 )
 
 // Purger is an interface that will define how the in-memory store will be purged
