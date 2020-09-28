@@ -1,4 +1,4 @@
-module github.com/TykTechnologies/tyk/certs
+module github.com/TykTechnologies/tyk/v3/certs
 
 go 1.12
 
