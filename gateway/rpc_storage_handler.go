@@ -808,17 +808,16 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 
 	for _, key := range keys {
 		splitKeys := strings.Split(key, ":")
-		if len(splitKeys) > 1 && splitKeys[1] == "resetQuota" {
+
+		action := splitKeys[len(splitKeys)-1]
+		if action == "oAuthRevokeToken" || action == "oAuthRevokeAccessToken" || action == "oAuthRevokeRefreshToken" {
+			TokensToBeRevoked[splitKeys[0]] = key
+			oauthTokenKeys[key] = true
+		} else if action == "revoke_all_tokens" {
+			ClientsToBeRevoked[splitKeys[1]] = key
+			oauthTokenKeys[key] = true
+		} else if action == "resetQuota" {
 			keysToReset[splitKeys[0]] = true
-		} else if len(splitKeys) > 2 {
-			action := splitKeys[len(splitKeys)-1]
-			if action == "oAuthRevokeToken" || action == "oAuthRevokeAccessToken" || action == "oAuthRevokeRefreshToken" {
-				TokensToBeRevoked[splitKeys[0]] = key
-				oauthTokenKeys[key] = true
-			} else if action == "revoke_all_tokens" {
-				ClientsToBeRevoked[splitKeys[1]] = key
-				oauthTokenKeys[key] = true
-			}
 		}
 	}
 
@@ -834,7 +833,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 		keys = append(keys, tokens...)
 	}
 
-	//single and specific tokens
+	//single and specific oauth2 tokens
 	for token, key := range TokensToBeRevoked {
 		//key formed as: token:apiId:tokenActionTypeHint
 		//but hashed as: token#hashed:apiId:tokenActionTypeHint
@@ -866,6 +865,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 	for _, key := range keys {
 		_, isOauthTokenKey := oauthTokenKeys[key]
 		if !isOauthTokenKey {
+			log.Info("------KEY: ", key)
 			splitKeys := strings.Split(key, ":")
 			_, resetQuota := keysToReset[splitKeys[0]]
 			if len(splitKeys) > 1 && splitKeys[1] == "hashed" {
@@ -874,8 +874,13 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 				handleDeleteHashedKey(splitKeys[0], "", resetQuota)
 				getSessionAndCreate(splitKeys[0], r)
 			} else {
+				key = splitKeys[0]
+				orgId := splitKeys[1]
 				log.Info("--> removing cached key: ", key)
-				handleDeleteKey(key, "-1", resetQuota)
+				apiErr, _ := handleDeleteKey(key, "-1", resetQuota)
+				if apiErr != nil {
+					handleDeleteKey(generateToken(orgId, key), "-1", resetQuota)
+				}
 				getSessionAndCreate(splitKeys[0], r)
 			}
 			SessionCache.Delete(key)
