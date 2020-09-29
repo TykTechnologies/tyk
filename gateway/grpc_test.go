@@ -200,7 +200,7 @@ func TestGRPC_TLS(t *testing.T) {
 	defer CertificateManager.Delete(certID, "")
 
 	// gRPC server
-	target, s := startGRPCServer(t, nil)
+	target, s := startGRPCServer(t, nil, setupHelloSVC)
 	defer target.Close()
 	defer s.GracefulStop()
 
@@ -253,7 +253,7 @@ func TestGRPC_MutualTLS(t *testing.T) {
 	defer CertificateManager.Delete(clientCertID, "")
 
 	// Protected gRPC server
-	target, s := startGRPCServer(t, clientCert.Leaf)
+	target, s := startGRPCServer(t, clientCert.Leaf, setupHelloSVC)
 	defer target.Close()
 	defer s.GracefulStop()
 
@@ -301,7 +301,7 @@ func TestGRPC_BasicAuthentication(t *testing.T) {
 	defer CertificateManager.Delete(certID, "")
 
 	// gRPC server
-	target, s := startGRPCServer(t, nil)
+	target, s := startGRPCServer(t, nil, setupHelloSVC)
 	defer target.Close()
 	defer s.GracefulStop()
 
@@ -359,7 +359,7 @@ func TestGRPC_TokenBasedAuthentication(t *testing.T) {
 	defer CertificateManager.Delete(certID, "")
 
 	// gRPC server
-	target, s := startGRPCServer(t, nil)
+	target, s := startGRPCServer(t, nil, setupHelloSVC)
 	defer target.Close()
 	defer s.GracefulStop()
 
@@ -432,7 +432,7 @@ func startGRPCServerH2C(t *testing.T) (net.Listener, *grpc.Server) {
 	go func() {
 		err := s.Serve(ls)
 		if err != nil {
-			t.Fatalf("failed to serve: %v", err)
+			t.Logf("failed to serve: %v", err)
 		}
 	}()
 	return ls, s
@@ -483,12 +483,16 @@ func grpcServerCreds(t *testing.T, clientCert *x509.Certificate) []grpc.ServerOp
 	return []grpc.ServerOption{grpc.Creds(creds)}
 }
 
-func startGRPCServer(t *testing.T, clientCert *x509.Certificate) (net.Listener, *grpc.Server) {
+func setupHelloSVC(t *testing.T, s *grpc.Server) {
+	pb.RegisterGreeterServer(s, &server{})
+}
+
+func startGRPCServer(t *testing.T, clientCert *x509.Certificate, fn func(t *testing.T, s *grpc.Server)) (net.Listener, *grpc.Server) {
 	// Server
 	ls := openListener(t)
 	opts := grpcServerCreds(t, clientCert)
 	s := grpc.NewServer(opts...)
-	pb.RegisterGreeterServer(s, &server{})
+	fn(t, s)
 	go func() {
 		err := s.Serve(ls)
 		if err != nil {
