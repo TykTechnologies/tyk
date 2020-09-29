@@ -835,8 +835,8 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 
 	//single and specific oauth2 tokens
 	for token, key := range TokensToBeRevoked {
-		//key formed as: token:apiId:tokenActionTypeHint
-		//but hashed as: token#hashed:apiId:tokenActionTypeHint
+		// key formed as: token:apiId:tokenActionTypeHint
+		// but hashed as: token#hashed:apiId:tokenActionTypeHint
 		splitKeys := strings.Split(key, ":")
 		apiId := splitKeys[1]
 		tokenActionTypeHint := splitKeys[2]
@@ -865,7 +865,6 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 	for _, key := range keys {
 		_, isOauthTokenKey := oauthTokenKeys[key]
 		if !isOauthTokenKey {
-			log.Info("------KEY: ", key)
 			splitKeys := strings.Split(key, ":")
 			_, resetQuota := keysToReset[splitKeys[0]]
 			if len(splitKeys) > 1 && splitKeys[1] == "hashed" {
@@ -879,6 +878,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 				log.Info("--> removing cached key: ", key)
 				apiErr, _ := handleDeleteKey(key, "-1", resetQuota)
 				if apiErr != nil {
+					log.Debug("Failed to delete key in legacy format, attempting to remove key in new format")
 					handleDeleteKey(generateToken(orgId, key), "-1", resetQuota)
 				}
 				getSessionAndCreate(splitKeys[0], r)
