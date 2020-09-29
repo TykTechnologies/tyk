@@ -15,7 +15,7 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 
-	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/v3/config"
 )
 
 // ------------------- REDIS CLUSTER STORAGE MANAGER -------------------------------

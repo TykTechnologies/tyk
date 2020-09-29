@@ -10,7 +10,7 @@ import (
 	"github.com/newrelic/go-agent/_integrations/nrgorilla/v1"
 	"github.com/sirupsen/logrus"
 
-	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/v3/config"
 )
 
 // SetupNewRelic creates new newrelic.Application instance

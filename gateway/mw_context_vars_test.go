@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/v3/apidef"
+	"github.com/TykTechnologies/tyk/v3/test"
 )
 
 func testPrepareContextVarsMiddleware() {

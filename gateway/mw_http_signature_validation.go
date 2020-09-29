@@ -20,9 +20,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/regexp"
-	"github.com/TykTechnologies/tyk/user"
+	"github.com/TykTechnologies/tyk/v3/apidef"
+	"github.com/TykTechnologies/tyk/v3/regexp"
+	"github.com/TykTechnologies/tyk/v3/user"
 )
 
 const dateHeaderSpec = "Date"

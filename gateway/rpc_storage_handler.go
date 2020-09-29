@@ -7,11 +7,11 @@ import (
 
 	cache "github.com/pmylund/go-cache"
 
-	"github.com/TykTechnologies/tyk/rpc"
+	"github.com/TykTechnologies/tyk/v3/rpc"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/v3/apidef"
+	"github.com/TykTechnologies/tyk/v3/config"
+	"github.com/TykTechnologies/tyk/v3/storage"
 	"github.com/go-redis/redis"
 
 	"github.com/sirupsen/logrus"

@@ -5,7 +5,7 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/TykTechnologies/tyk/request"
+	"github.com/TykTechnologies/tyk/v3/request"
 )
 
 // IPWhiteListMiddleware lets you define a list of IPs to allow upstream

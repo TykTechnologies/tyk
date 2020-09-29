@@ -15,9 +15,9 @@ import (
 	"github.com/justinas/alice"
 	"github.com/sirupsen/logrus"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/test"
-	"github.com/TykTechnologies/tyk/user"
+	"github.com/TykTechnologies/tyk/v3/apidef"
+	"github.com/TykTechnologies/tyk/v3/test"
+	"github.com/TykTechnologies/tyk/v3/user"
 )
 
 var algoList = [4]string{"hmac-sha1", "hmac-sha256", "hmac-sha384", "hmac-sha512"}

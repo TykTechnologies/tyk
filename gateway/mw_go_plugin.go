@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/TykTechnologies/tyk/ctx"
-	"github.com/TykTechnologies/tyk/goplugin"
-	"github.com/TykTechnologies/tyk/request"
+	"github.com/TykTechnologies/tyk/v3/ctx"
+	"github.com/TykTechnologies/tyk/v3/goplugin"
+	"github.com/TykTechnologies/tyk/v3/request"
 	"github.com/sirupsen/logrus"
 )
 
