@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -597,4 +598,55 @@ func (l *loginCredsOrToken) GetRequestMetadata(context.Context, ...string) (head
 
 func (*loginCredsOrToken) RequireTransportSecurity() bool {
 	return true
+}
+
+func TestGRPC_Stream_MutualTLS(t *testing.T) {
+	// Mutual Authentication for both downstream-tyk and tyk-upstream
+	defer ResetTestConfig()
+
+	_, _, combinedClientPEM, clientCert := genCertificate(&x509.Certificate{})
+	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
+	serverCertPem, _, combinedPEM, _ := genServerCertificate()
+
+	certID, _ := CertificateManager.Add(combinedPEM, "") // For tyk to know downstream
+	defer CertificateManager.Delete(certID, "")
+
+	clientCertID, _ := CertificateManager.Add(combinedClientPEM, "") // For upstream to know tyk
+	defer CertificateManager.Delete(clientCertID, "")
+
+	// Protected gRPC server
+	target, s := startGRPCServer(t, clientCert.Leaf, setupStreamSVC)
+	defer target.Close()
+	defer s.GracefulStop()
+
+	// Tyk
+	globalConf := config.Global()
+	globalConf.ProxySSLInsecureSkipVerify = true
+	globalConf.ProxyEnableHttp2 = true
+	globalConf.HttpServerOptions.EnableHttp2 = true
+	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+	globalConf.HttpServerOptions.UseSSL = true
+	config.SetGlobal(globalConf)
+	defer ResetTestConfig()
+
+	ts := StartTest()
+	defer ts.Close()
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.UseKeylessAccess = true
+		spec.UpstreamCertificates = map[string]string{
+			"*": clientCertID,
+		}
+		spec.Proxy.TargetURL = toTarget(t, "https", target)
+	})
+
+	address, err := url.Parse(ts.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// gRPC client
+	opts := grpcCreds(&clientCert, serverCertPem, false, "")
+	testGRPCStreamClient(t, address.Host, opts...)
 }
