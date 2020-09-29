@@ -426,18 +426,9 @@ func (s *server) SayHello(ctx context.Context, in *pb.HelloRequest) (*pb.HelloRe
 }
 
 func startGRPCServerH2C(t *testing.T) (net.Listener, *grpc.Server) {
-	ls, err := net.Listen("tcp", ":0")
-	if err != nil {
-		ls, err = net.Listen("tcp", ":0")
-	}
-	if err != nil {
-		t.Fatalf("failed to listen: %v", err)
-	}
-
+	ls := openListener(t)
 	s := grpc.NewServer()
-
 	pb.RegisterGreeterServer(s, &server{})
-
 	go func() {
 		err := s.Serve(ls)
 		if err != nil {
@@ -455,8 +446,7 @@ func toTarget(t *testing.T, scheme string, ls net.Listener) string {
 	return fmt.Sprintf("%s://localhost:%v", scheme, port)
 }
 
-func startGRPCServer(t *testing.T, clientCert *x509.Certificate) (net.Listener, *grpc.Server) {
-	// Server
+func openListener(t *testing.T) net.Listener {
 	ls, err := net.Listen("tcp", ":0")
 	if err != nil {
 		ls, err = net.Listen("tcp", ":0")
@@ -464,7 +454,10 @@ func startGRPCServer(t *testing.T, clientCert *x509.Certificate) (net.Listener, 
 	if err != nil {
 		t.Fatalf("failed to listen: %v", err)
 	}
+	return ls
+}
 
+func grpcServerCreds(t *testing.T, clientCert *x509.Certificate) []grpc.ServerOption {
 	cert, key, _, _ := genCertificate(&x509.Certificate{})
 	certificate, _ := tls.X509KeyPair(cert, key)
 
@@ -487,19 +480,19 @@ func startGRPCServer(t *testing.T, clientCert *x509.Certificate) (net.Listener, 
 	}
 
 	creds := credentials.NewTLS(tlsConfig)
+	return []grpc.ServerOption{grpc.Creds(creds)}
+}
 
-	if err != nil {
-		t.Fatalf("failed to listen: %v", err)
-	}
-
-	s := grpc.NewServer(grpc.Creds(creds))
-
+func startGRPCServer(t *testing.T, clientCert *x509.Certificate) (net.Listener, *grpc.Server) {
+	// Server
+	ls := openListener(t)
+	opts := grpcServerCreds(t, clientCert)
+	s := grpc.NewServer(opts...)
 	pb.RegisterGreeterServer(s, &server{})
-
 	go func() {
 		err := s.Serve(ls)
 		if err != nil {
-			t.Fatalf("failed to serve: %v", err)
+			t.Logf("failed to serve: %v", err)
 		}
 	}()
 	return ls, s
@@ -525,8 +518,7 @@ func sayHelloWithGRPCClientH2C(t *testing.T, address string, name string) *pb.He
 	return r
 }
 
-func sayHelloWithGRPCClient(t *testing.T, cert *tls.Certificate, caCert []byte, basicAuth bool, token string, address string, name string) *pb.HelloReply {
-	// gRPC client
+func grpcCreds(cert *tls.Certificate, caCert []byte, basicAuth bool, token string) []grpc.DialOption {
 	tlsConfig := &tls.Config{}
 
 	if cert != nil {
@@ -541,11 +533,8 @@ func sayHelloWithGRPCClient(t *testing.T, cert *tls.Certificate, caCert []byte, 
 	} else {
 		tlsConfig.InsecureSkipVerify = true
 	}
-
 	creds := credentials.NewTLS(tlsConfig)
-
 	opts := []grpc.DialOption{grpc.WithTransportCredentials(creds)}
-
 	if basicAuth {
 		opts = append(opts, grpc.WithPerRPCCredentials(&loginCredsOrToken{
 			Username: "user",
@@ -557,7 +546,12 @@ func sayHelloWithGRPCClient(t *testing.T, cert *tls.Certificate, caCert []byte, 
 			Token:          token,
 		}))
 	}
+	return opts
+}
 
+func sayHelloWithGRPCClient(t *testing.T, cert *tls.Certificate, caCert []byte, basicAuth bool, token string, address string, name string) *pb.HelloReply {
+	// gRPC client
+	opts := grpcCreds(cert, caCert, basicAuth, token)
 	conn, err := grpc.Dial(address, opts...)
 	if err != nil {
 		t.Fatalf("did not connect: %v", err)
