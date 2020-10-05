@@ -1,6 +1,7 @@
 package graphql
 
 import (
+	"encoding/json"
 	"io"
 	"io/ioutil"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/jensneuse/graphql-go-tools/pkg/astparser"
 	"github.com/jensneuse/graphql-go-tools/pkg/asttransform"
 	"github.com/jensneuse/graphql-go-tools/pkg/astvalidation"
+	"github.com/jensneuse/graphql-go-tools/pkg/introspection"
 	"github.com/jensneuse/graphql-go-tools/pkg/operationreport"
 )
 
@@ -99,6 +101,19 @@ func (s *Schema) Validate() (result ValidationResult, err error) {
 		Valid:  isValid,
 		Errors: schemaValidationErrorsFromOperationReport(report),
 	}, nil
+}
+
+func (s *Schema) IntrospectionResponse(out io.Writer) error {
+	var (
+		data   introspection.Data
+		report operationreport.Report
+	)
+	gen := introspection.NewGenerator()
+	gen.Generate(&s.document, &report, &data)
+	if report.HasErrors() {
+		return report
+	}
+	return json.NewEncoder(out).Encode(data)
 }
 
 func createSchema(schemaContent []byte) (*Schema, error) {

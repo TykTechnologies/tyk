@@ -265,6 +265,10 @@ func (c *complexityVisitor) endRootFieldComplexityCalculation() {
 	}
 	c.currentRootFieldStats.Stats.Depth = currentDepth
 	c.calculatedRootFieldStats = append(c.calculatedRootFieldStats, c.currentRootFieldStats)
+
+	c.currentRootFieldMaxDepth = 0
+	c.currentRootFieldMaxSelectionSetDepth = 0
+	c.currentRootFieldSelectionSetDepth = 0
 }
 
 func (c *complexityVisitor) extractFieldRelatedNames(ref, definitionRef int) (typeName, fieldName, alias string) {

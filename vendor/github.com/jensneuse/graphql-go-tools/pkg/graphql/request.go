@@ -12,6 +12,11 @@ import (
 	"github.com/jensneuse/graphql-go-tools/pkg/operationreport"
 )
 
+const (
+	defaultInrospectionQueryName = "IntrospectionQuery"
+	schemaFieldName              = "__shema"
+)
+
 var (
 	ErrEmptyRequest = errors.New("the provided request is empty")
 	ErrNilSchema    = errors.New("the provided schema is nil")
@@ -79,4 +84,44 @@ func (r *Request) parseQueryOnce() (report operationreport.Report) {
 	r.isParsed = true
 	r.document, report = astparser.ParseGraphqlDocumentString(r.Query)
 	return report
+}
+
+func (r *Request) IsIntrospectionQuery() (result bool, err error) {
+	report := r.parseQueryOnce()
+	if report.HasErrors() {
+		return false, report
+	}
+
+	if r.OperationName == defaultInrospectionQueryName {
+		return true, nil
+	}
+
+	if len(r.document.RootNodes) == 0 {
+		return
+	}
+
+	rootNode := r.document.RootNodes[0]
+	if rootNode.Kind != ast.NodeKindOperationDefinition {
+		return
+	}
+
+	operationDef := r.document.OperationDefinitions[rootNode.Ref]
+	if operationDef.OperationType != ast.OperationTypeQuery {
+		return
+	}
+	if !operationDef.HasSelections {
+		return
+	}
+
+	selectionSet := r.document.SelectionSets[operationDef.SelectionSet]
+	if len(selectionSet.SelectionRefs) == 0 {
+		return
+	}
+
+	selection := r.document.Selections[selectionSet.SelectionRefs[0]]
+	if selection.Kind != ast.SelectionKindField {
+		return
+	}
+
+	return r.document.FieldNameString(selection.Ref) == schemaFieldName, nil
 }
