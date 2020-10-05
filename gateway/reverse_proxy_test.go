@@ -732,6 +732,33 @@ func TestGraphQL_InternalDataSource(t *testing.T) {
 	}...)
 }
 
+func TestGraphQL_ProxyIntrospection(t *testing.T) {
+	g := StartTest()
+	defer g.Close()
+
+	tykGraphQL := BuildAPI(func(spec *APISpec) {
+		spec.Name = "tyk-graphql"
+		spec.APIID = "test1"
+		spec.Proxy.TargetURL = testGraphQLDataSource
+		spec.Proxy.ListenPath = "/tyk-graphql"
+	})[0]
+
+	LoadAPI(tykGraphQL)
+
+	namedIntrospection := graphql.Request{
+		Query: "query IntrospectionQuery { __schema { queryType { name } } }",
+	}
+
+	silentIntrospection := graphql.Request{
+		Query: "query { __schema { queryType { name } } }",
+	}
+
+	_, _ = g.Run(t, []test.TestCase{
+		{Data: namedIntrospection, BodyMatch: `".*{"name":"code"}.*`, Code: http.StatusOK},
+		{Data: silentIntrospection, BodyMatch: `"".*{"name":"code"}.*`, Code: http.StatusOK},
+	}...)
+}
+
 func BenchmarkRequestIPHops(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
