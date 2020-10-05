@@ -732,31 +732,43 @@ func TestGraphQL_InternalDataSource(t *testing.T) {
 	}...)
 }
 
-func TestGraphQL_ProxyIntrospection(t *testing.T) {
+func TestGraphQL_ProxyIntrospectionInterrupt(t *testing.T) {
 	g := StartTest()
 	defer g.Close()
 
-	tykGraphQL := BuildAPI(func(spec *APISpec) {
-		spec.Name = "tyk-graphql"
-		spec.APIID = "test1"
-		spec.Proxy.TargetURL = testGraphQLDataSource
-		spec.Proxy.ListenPath = "/tyk-graphql"
-	})[0]
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.GraphQL.Enabled = true
+		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
+		spec.GraphQL.Schema = "schema { query: query_root } type query_root { hello: String }"
+		spec.Proxy.ListenPath = "/"
+	})
 
-	LoadAPI(tykGraphQL)
+	t.Run("introspection request should be interrupted", func(t *testing.T) {
+		namedIntrospection := graphql.Request{
+			OperationName: "IntrospectionQuery",
+			Query:         gqlIntrospectionQuery,
+		}
 
-	namedIntrospection := graphql.Request{
-		Query: "query IntrospectionQuery { __schema { queryType { name } } }",
-	}
+		silentIntrospection := graphql.Request{
+			OperationName: "",
+			Query:         strings.Replace(gqlIntrospectionQuery, "query IntrospectionQuery ", "", 1),
+		}
 
-	silentIntrospection := graphql.Request{
-		Query: "query { __schema { queryType { name } } }",
-	}
+		_, _ = g.Run(t, []test.TestCase{
+			{Data: namedIntrospection, BodyMatch: `"name":"query_root"`, Code: http.StatusOK},
+			{Data: silentIntrospection, BodyMatch: `"name":"query_root"`, Code: http.StatusOK},
+		}...)
+	})
 
-	_, _ = g.Run(t, []test.TestCase{
-		{Data: namedIntrospection, BodyMatch: `".*{"name":"code"}.*`, Code: http.StatusOK},
-		{Data: silentIntrospection, BodyMatch: `"".*{"name":"code"}.*`, Code: http.StatusOK},
-	}...)
+	t.Run("normal requests should be proxied", func(t *testing.T) {
+		validRequest := graphql.Request{
+			Query: "query { hello }",
+		}
+
+		_, _ = g.Run(t, []test.TestCase{
+			{Data: validRequest, BodyMatch: `"Headers":{"Accept-Encoding"`, Code: http.StatusOK},
+		}...)
+	})
 }
 
 func BenchmarkRequestIPHops(b *testing.B) {

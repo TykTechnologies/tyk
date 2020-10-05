@@ -744,6 +744,7 @@ func (p *ReverseProxy) sendRequestToUpstream(roundTripper *TykRoundTripper, outr
 	// if not introspection query process as normal
 	if !isIntrospection {
 		res, err = roundTripper.RoundTrip(outreq)
+		return
 	}
 
 	var buf bytes.Buffer
