@@ -14,7 +14,7 @@ import (
 
 const (
 	defaultInrospectionQueryName = "IntrospectionQuery"
-	schemaFieldName              = "__shema"
+	schemaFieldName              = "__schema"
 )
 
 var (

@@ -105,15 +105,17 @@ func (s *Schema) Validate() (result ValidationResult, err error) {
 
 func (s *Schema) IntrospectionResponse(out io.Writer) error {
 	var (
-		data   introspection.Data
+		introspectionData = struct {
+			Data introspection.Data `json:"data"`
+		}{}
 		report operationreport.Report
 	)
 	gen := introspection.NewGenerator()
-	gen.Generate(&s.document, &report, &data)
+	gen.Generate(&s.document, &report, &introspectionData.Data)
 	if report.HasErrors() {
 		return report
 	}
-	return json.NewEncoder(out).Encode(data)
+	return json.NewEncoder(out).Encode(introspectionData)
 }
 
 func createSchema(schemaContent []byte) (*Schema, error) {
