@@ -33,8 +33,8 @@ func TestHostCheckerManagerInit(t *testing.T) {
 func TestAmIPolling(t *testing.T) {
 	hc := HostCheckerManager{}
 
-	pooling := hc.AmIPolling()
-	if pooling {
+	polling := hc.AmIPolling()
+	if polling {
 		t.Error("HostCheckerManager storage not configured, it should have failed.")
 	}
 
@@ -51,9 +51,9 @@ func TestAmIPolling(t *testing.T) {
 	hc2 := HostCheckerManager{}
 	hc2.Init(redisStorage)
 
-	pooling = hc.AmIPolling()
-	poolingHc2 := hc2.AmIPolling()
-	if !pooling && poolingHc2 {
+	polling = hc.AmIPolling()
+	pollingHc2 := hc2.AmIPolling()
+	if !polling && pollingHc2 {
 		t.Error("HostCheckerManager storage configured, it shouldn't have failed.")
 	}
 
