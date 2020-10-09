@@ -206,9 +206,9 @@ type UptimeTestsConfigDetail struct {
 }
 
 type UptimeTestsConfig struct {
-	Disable                 bool                    `json:"disable"`
-	PollerGroup             string                  `json:"poller_group"`
-	Config                  UptimeTestsConfigDetail `json:"config"`
+	Disable     bool                    `json:"disable"`
+	PollerGroup string                  `json:"poller_group"`
+	Config      UptimeTestsConfigDetail `json:"config"`
 }
 
 type ServiceDiscoveryConf struct {
