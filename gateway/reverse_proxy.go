@@ -152,6 +152,10 @@ func nextTarget(targetData *apidef.HostList, spec *APISpec) (string, error) {
 			if !spec.Proxy.CheckHostAgainstUptimeTests {
 				return host, nil // we don't care if it's up
 			}
+			// As checked by HostCheckerManager.AmIPolling
+			if GlobalHostChecker.store == nil {
+				return host, nil
+			}
 			if !GlobalHostChecker.HostDown(host) {
 				return host, nil // we do care and it's up
 			}

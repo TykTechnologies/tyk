@@ -934,6 +934,9 @@
         },
         "disable": {
           "type": "boolean"
+        },
+        "poller_group": {
+          "type": "string"
         }
       }
     },
