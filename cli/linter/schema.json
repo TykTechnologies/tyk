@@ -929,9 +929,6 @@
         "disable": {
           "type": "boolean"
         },
-        "disable_management_poller": {
-          "type": "boolean"
-        },
         "poller_group": {
           "type": "string"
         }
