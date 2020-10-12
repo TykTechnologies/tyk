@@ -747,18 +747,11 @@ func (p *ReverseProxy) sendRequestToUpstream(roundTripper *TykRoundTripper, outr
 		return
 	}
 
-	var buf bytes.Buffer
-	err = p.TykAPISpec.GraphQLExecutor.Schema.IntrospectionResponse(&buf)
+	result, err := graphql.SchemaIntrospection(p.TykAPISpec.GraphQLExecutor.Schema)
 	if err != nil {
 		return
 	}
-
-	res = &http.Response{
-		Body:       ioutil.NopCloser(&buf),
-		Header:     make(http.Header),
-		StatusCode: 200,
-	}
-	res.Header.Set("Content-Type", "application/json")
+	res = result.GetAsHTTPResponse()
 
 	return
 }
