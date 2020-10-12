@@ -1,6 +1,7 @@
 package graphql
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -133,4 +134,10 @@ func createSchema(schemaContent []byte) (*Schema, error) {
 		rawInput: schemaContent,
 		document: document,
 	}, nil
+}
+
+func SchemaIntrospection(schema *Schema) (*ExecutionResult, error) {
+	var buf bytes.Buffer
+	err := schema.IntrospectionResponse(&buf)
+	return &ExecutionResult{&buf}, err
 }
