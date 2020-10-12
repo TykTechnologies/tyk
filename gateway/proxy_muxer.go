@@ -315,10 +315,6 @@ func dialWithServiceDiscovery(spec *APISpec, dial dialFn) dialFn {
 	}
 }
 
-type W2c struct {
-	http.Handler
-}
-
 func (m *proxyMux) swap(new *proxyMux) {
 	m.Lock()
 	defer m.Unlock()
