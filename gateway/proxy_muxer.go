@@ -30,6 +30,16 @@ type handleWrapper struct {
 	router *mux.Router
 }
 
+// h2cWrapper tracks handleWrapper for swapping w.router on reloads.
+type h2cWrapper struct {
+	w *handleWrapper
+	h http.Handler
+}
+
+func (h *h2cWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	h.h.ServeHTTP(w, r)
+}
+
 func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// make request body to be nopCloser and re-readable before serve it through chain of middlewares
 	nopCloseRequestBody(r)
@@ -347,7 +357,12 @@ func (m *proxyMux) swap(new *proxyMux) {
 			}
 			match.router = newP.router
 			if match.httpServer != nil {
-				match.httpServer.Handler.(*handleWrapper).router = newP.router
+				switch e := match.httpServer.Handler.(type) {
+				case *handleWrapper:
+					e.router = newP.router
+				case *h2cWrapper:
+					e.w.router = newP.router
+				}
 			}
 		}
 	}
@@ -398,7 +413,10 @@ func (m *proxyMux) serve() {
 			if p.protocol == "h2c" {
 				// wrapping handler in h2c. This ensures all features including tracing work
 				// in h2c services.
-				h = h2c.NewHandler(h, &http2.Server{})
+				h = &h2cWrapper{
+					w: h.(*handleWrapper),
+					h: h2c.NewHandler(h, &http2.Server{}),
+				}
 			}
 			addr := config.Global().ListenAddress + ":" + strconv.Itoa(p.port)
 			p.httpServer = &http.Server{
