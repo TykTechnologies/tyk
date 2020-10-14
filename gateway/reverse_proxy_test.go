@@ -732,6 +732,45 @@ func TestGraphQL_InternalDataSource(t *testing.T) {
 	}...)
 }
 
+func TestGraphQL_ProxyIntrospectionInterrupt(t *testing.T) {
+	g := StartTest()
+	defer g.Close()
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.GraphQL.Enabled = true
+		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
+		spec.GraphQL.Schema = "schema { query: query_root } type query_root { hello: String }"
+		spec.Proxy.ListenPath = "/"
+	})
+
+	t.Run("introspection request should be interrupted", func(t *testing.T) {
+		namedIntrospection := graphql.Request{
+			OperationName: "IntrospectionQuery",
+			Query:         gqlIntrospectionQuery,
+		}
+
+		silentIntrospection := graphql.Request{
+			OperationName: "",
+			Query:         strings.Replace(gqlIntrospectionQuery, "query IntrospectionQuery ", "", 1),
+		}
+
+		_, _ = g.Run(t, []test.TestCase{
+			{Data: namedIntrospection, BodyMatch: `"name":"query_root"`, Code: http.StatusOK},
+			{Data: silentIntrospection, BodyMatch: `"name":"query_root"`, Code: http.StatusOK},
+		}...)
+	})
+
+	t.Run("normal requests should be proxied", func(t *testing.T) {
+		validRequest := graphql.Request{
+			Query: "query { hello }",
+		}
+
+		_, _ = g.Run(t, []test.TestCase{
+			{Data: validRequest, BodyMatch: `"Headers":{"Accept-Encoding"`, Code: http.StatusOK},
+		}...)
+	})
+}
+
 func BenchmarkRequestIPHops(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {

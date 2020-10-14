@@ -1,6 +1,8 @@
 package graphql
 
 import (
+	"bytes"
+	"encoding/json"
 	"io"
 	"io/ioutil"
 
@@ -8,6 +10,7 @@ import (
 	"github.com/jensneuse/graphql-go-tools/pkg/astparser"
 	"github.com/jensneuse/graphql-go-tools/pkg/asttransform"
 	"github.com/jensneuse/graphql-go-tools/pkg/astvalidation"
+	"github.com/jensneuse/graphql-go-tools/pkg/introspection"
 	"github.com/jensneuse/graphql-go-tools/pkg/operationreport"
 )
 
@@ -101,6 +104,21 @@ func (s *Schema) Validate() (result ValidationResult, err error) {
 	}, nil
 }
 
+func (s *Schema) IntrospectionResponse(out io.Writer) error {
+	var (
+		introspectionData = struct {
+			Data introspection.Data `json:"data"`
+		}{}
+		report operationreport.Report
+	)
+	gen := introspection.NewGenerator()
+	gen.Generate(&s.document, &report, &introspectionData.Data)
+	if report.HasErrors() {
+		return report
+	}
+	return json.NewEncoder(out).Encode(introspectionData)
+}
+
 func createSchema(schemaContent []byte) (*Schema, error) {
 	document, report := astparser.ParseGraphqlDocumentBytes(schemaContent)
 	if report.HasErrors() {
@@ -116,4 +134,10 @@ func createSchema(schemaContent []byte) (*Schema, error) {
 		rawInput: schemaContent,
 		document: document,
 	}, nil
+}
+
+func SchemaIntrospection(schema *Schema) (*ExecutionResult, error) {
+	var buf bytes.Buffer
+	err := schema.IntrospectionResponse(&buf)
+	return &ExecutionResult{&buf}, err
 }
