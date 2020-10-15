@@ -9,8 +9,8 @@ import (
 	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
 	"github.com/sirupsen/logrus"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/v3/apidef"
+	"github.com/TykTechnologies/tyk/v3/headers"
 
 	gql "github.com/jensneuse/graphql-go-tools/pkg/graphql"
 )

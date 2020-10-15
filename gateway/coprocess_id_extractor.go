@@ -13,8 +13,8 @@ import (
 	"github.com/sirupsen/logrus"
 	xmlpath "gopkg.in/xmlpath.v2"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/regexp"
+	"github.com/TykTechnologies/tyk/v3/apidef"
+	"github.com/TykTechnologies/tyk/v3/regexp"
 )
 
 // IdExtractor is the base interface for an ID extractor.

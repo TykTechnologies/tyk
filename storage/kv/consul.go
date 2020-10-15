@@ -1,7 +1,7 @@
 package kv
 
 import (
-	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/v3/config"
 	"github.com/hashicorp/consul/api"
 )
 

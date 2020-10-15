@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/again"
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/tcp"
+	"github.com/TykTechnologies/tyk/v3/config"
+	"github.com/TykTechnologies/tyk/v3/tcp"
 	proxyproto "github.com/pires/go-proxyproto"
 	cache "github.com/pmylund/go-cache"
 

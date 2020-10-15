@@ -7,11 +7,11 @@ import (
 	"net"
 	"time"
 
-	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/v3/config"
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/TykTechnologies/tyk/log"
+	"github.com/TykTechnologies/tyk/v3/log"
 )
 
 var (

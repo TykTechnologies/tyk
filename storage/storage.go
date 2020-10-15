@@ -13,8 +13,8 @@ import (
 	uuid "github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/murmur3"
-	"github.com/TykTechnologies/tyk/config"
-	logger "github.com/TykTechnologies/tyk/log"
+	"github.com/TykTechnologies/tyk/v3/config"
+	logger "github.com/TykTechnologies/tyk/v3/log"
 )
 
 var log = logger.Get()

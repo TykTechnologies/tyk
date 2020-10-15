@@ -10,9 +10,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/TykTechnologies/tyk/rpc"
+	"github.com/TykTechnologies/tyk/v3/rpc"
 
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/v3/headers"
 
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
@@ -22,12 +22,12 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/request"
-	"github.com/TykTechnologies/tyk/storage"
-	"github.com/TykTechnologies/tyk/trace"
-	"github.com/TykTechnologies/tyk/user"
+	"github.com/TykTechnologies/tyk/v3/apidef"
+	"github.com/TykTechnologies/tyk/v3/config"
+	"github.com/TykTechnologies/tyk/v3/request"
+	"github.com/TykTechnologies/tyk/v3/storage"
+	"github.com/TykTechnologies/tyk/v3/trace"
+	"github.com/TykTechnologies/tyk/v3/user"
 )
 
 const mwStatusRespond = 666
@@ -642,7 +642,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 	key := *originalKey
 	minLength := t.Spec.GlobalConfig.MinTokenLength
 	if minLength == 0 {
-		// See https://github.com/TykTechnologies/tyk/issues/1681
+		// See https://github.com/TykTechnologies/tyk/v3/issues/1681
 		minLength = 3
 	}
 

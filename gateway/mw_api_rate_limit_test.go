@@ -10,9 +10,9 @@ import (
 	"github.com/justinas/alice"
 	uuid "github.com/satori/go.uuid"
 
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/test"
-	"github.com/TykTechnologies/tyk/user"
+	"github.com/TykTechnologies/tyk/v3/config"
+	"github.com/TykTechnologies/tyk/v3/test"
+	"github.com/TykTechnologies/tyk/v3/user"
 )
 
 func createRLSession() *user.SessionState {

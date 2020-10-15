@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/gateway"
-	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/v3/config"
+	"github.com/TykTechnologies/tyk/v3/gateway"
+	"github.com/TykTechnologies/tyk/v3/test"
 )
 
 var pythonIDExtractorHeaderValue = map[string]string{
