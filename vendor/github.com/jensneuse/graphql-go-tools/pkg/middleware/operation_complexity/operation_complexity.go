@@ -182,3 +182,49 @@ func (c *complexityVisitor) EnterSelectionSet(ref int) {
 func (c *complexityVisitor) EnterFragmentDefinition(ref int) {
 	c.SkipNode()
 }
+
+func (c *complexityVisitor) resetCurrentRootFieldComplexity(typeName, fieldName, alias string) {
+	c.currentRootFieldStats = RootFieldStats{
+		TypeName:  typeName,
+		FieldName: fieldName,
+		Alias:     alias,
+		Stats: OperationStats{
+			NodeCount:  0,
+			Complexity: 0,
+			Depth:      0,
+		},
+	}
+}
+
+func (c *complexityVisitor) endRootFieldComplexityCalculation() {
+	currentDepth := c.currentRootFieldMaxDepth - c.currentRootFieldSelectionSetDepth
+	if currentDepth > 0 {
+		currentDepth--
+	}
+	c.currentRootFieldStats.Stats.Depth = currentDepth
+	c.calculatedRootFieldStats = append(c.calculatedRootFieldStats, c.currentRootFieldStats)
+
+	c.currentRootFieldMaxDepth = 0
+	c.currentRootFieldMaxSelectionSetDepth = 0
+	c.currentRootFieldSelectionSetDepth = 0
+}
+
+func (c *complexityVisitor) extractFieldRelatedNames(ref, definitionRef int) (typeName, fieldName, alias string) {
+	fieldName = c.definition.FieldDefinitionNameString(definitionRef)
+	alias = c.operation.FieldAliasOrNameString(ref)
+	if fieldName == alias {
+		alias = ""
+	}
+
+	return c.EnclosingTypeDefinition.Name(c.definition), fieldName, alias
+}
+
+func (c *complexityVisitor) isRootType(name string) bool {
+	_, ok := c.rootOperationTypeNames[name]
+	return ok
+}
+
+func (c *complexityVisitor) isRootTypeField() bool {
+	enclosingTypeName := c.EnclosingTypeDefinition.Name(c.definition)
+	return c.isRootType(enclosingTypeName)
+}
