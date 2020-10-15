@@ -447,19 +447,27 @@ func restDataSourceHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(`[
 			{
 				"name": "Furkan",
-				"country": "Turkey"
+				"country":  {
+					"name": "Turkey"
+				}
 			},
 			{
 				"name": "Leo",
-				"country": "Russia"
+				"country":  {
+					"name": "Russia"
+				}
 			},
 			{
 				"name": "Josh",
-				"country": "UK"
+				"country":  {
+					"name": "UK"
+				}
 			},
 			{
 				"name": "Patric",
-				"country": "Germany"
+				"country":  {
+					"name": "Germany"
+				}
 			}
 		]`))
 }
@@ -898,7 +906,7 @@ const sampleAPI = `{
     }
 }`
 
-const testComposedSchema = "type Query {people: [Person] countries: [Country]} type Person {name: String country: String} " +
+const testComposedSchema = "type Query {people: [Person] countries: [Country]} type Person {name: String country: Country} " +
 	"type Country {code: String name: String}"
 
 const testGraphQLDataSourceConfiguration = `
