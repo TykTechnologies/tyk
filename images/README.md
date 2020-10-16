@@ -37,13 +37,19 @@ that goes into the API definition
 
 ## Building the image
 
+The image is built automatically by [Github
+Action](https://github.com/TykTechnologies/tyk/actions?query=workflow%3A%22Go+plugin+compiler).
+There was a [change in paths in
+v2.9.4.1](https://tyk.io/docs/plugins/supported-languages/golang/).
+
 This will build the image that will be used in the plugin build
 step. This section is for only for informational purposes.
 
-In the root of the repo:
+In this directory of the repo:
 
 ``` shell
-docker build --build-arg TYK_GW_TAG=v2.8.4 -t tyk-plugin-build-2.8.4 .
+% docker build --build-arg TYK_GW_TAG=v2.8.4 -t tykio/tyk-plugin-compiler:v2.8.4 plugin-compiler
+% docker push tykio/tyk-plugin-compiler:v2.8.4
 ```
 
 TYK_GW_TAG refers to the _tag_ in github corresponding to a released
