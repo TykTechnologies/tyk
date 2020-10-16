@@ -112,8 +112,8 @@ func TestCheckActivePollerLoop(t *testing.T) {
 
 	found := false
 
-	//Giving 5 retries to find the poller active key
-	for i := 0; i < 5; i++ {
+	//Giving 15 retries to find the poller active key
+	for i := 0; i < 15; i++ {
 		activeInstance, err := hc.store.GetKey(PollerCacheKey)
 		if activeInstance == hc.Id && err == nil {
 			found = true
