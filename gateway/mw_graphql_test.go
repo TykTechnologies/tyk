@@ -14,7 +14,8 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
-func TestGraphQL(t *testing.T) {
+// Note: here we test only validation behaviour and do not expect real graphql responses here
+func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
 	g := StartTest()
 	defer g.Close()
 
@@ -32,10 +33,10 @@ func TestGraphQL(t *testing.T) {
 		_, _ = g.Run(t, test.TestCase{BodyMatch: "there was a problem proxying the request", Code: http.StatusInternalServerError})
 	})
 
-	spec.GraphQL.Schema = "schema { query: query_root } type query_root { hello: word } type word { numOfLetters: Int }"
-	LoadAPI(spec)
-
 	t.Run("Introspection query with custom query type should successfully work", func(t *testing.T) {
+		spec.GraphQL.Schema = "schema { query: query_root } type query_root { hello: word } type word { numOfLetters: Int }"
+		LoadAPI(spec)
+
 		request := gql.Request{
 			OperationName: "IntrospectionQuery",
 			Variables:     nil,
@@ -45,10 +46,10 @@ func TestGraphQL(t *testing.T) {
 		_, _ = g.Run(t, test.TestCase{Data: request, BodyMatch: "__schema", Code: http.StatusOK})
 	})
 
-	spec.GraphQL.Schema = "schema { query: Query } type Query { hello: word } type word { numOfLetters: Int }"
-	LoadAPI(spec)
-
 	t.Run("Empty request shouldn't be unmarshalled", func(t *testing.T) {
+		spec.GraphQL.Schema = "schema { query: Query } type Query { hello: word } type word { numOfLetters: Int }"
+		LoadAPI(spec)
+
 		emptyRequest := ``
 
 		_, _ = g.Run(t, test.TestCase{Data: emptyRequest, BodyMatch: gql.ErrEmptyRequest.Error(), Code: http.StatusBadRequest})
@@ -74,83 +75,85 @@ func TestGraphQL(t *testing.T) {
 		_, _ = g.Run(t, test.TestCase{Data: request, BodyMatch: "__schema", Code: http.StatusOK})
 	})
 
-	spec.UseKeylessAccess = false
-	LoadAPI(spec)
+	t.Run("with policies", func(t *testing.T) {
+		spec.UseKeylessAccess = false
+		LoadAPI(spec)
 
-	pID := CreatePolicy(func(p *user.Policy) {
-		p.MaxQueryDepth = 1
-		p.AccessRights = map[string]user.AccessDefinition{
-			spec.APIID: {
-				APIID:   spec.APIID,
-				APIName: spec.Name,
-			},
-		}
-	})
+		pID := CreatePolicy(func(p *user.Policy) {
+			p.MaxQueryDepth = 1
+			p.AccessRights = map[string]user.AccessDefinition{
+				spec.APIID: {
+					APIID:   spec.APIID,
+					APIName: spec.Name,
+				},
+			}
+		})
 
-	policyAppliedSession, policyAppliedKey := g.CreateSession(func(s *user.SessionState) {
-		s.ApplyPolicies = []string{pID}
-	})
+		policyAppliedSession, policyAppliedKey := g.CreateSession(func(s *user.SessionState) {
+			s.ApplyPolicies = []string{pID}
+		})
 
-	directSession, directKey := g.CreateSession(func(s *user.SessionState) {
-		s.MaxQueryDepth = 1
-		s.AccessRights = map[string]user.AccessDefinition{
-			spec.APIID: {
-				APIID:   spec.APIID,
-				APIName: spec.Name,
-			},
-		}
-	})
+		directSession, directKey := g.CreateSession(func(s *user.SessionState) {
+			s.MaxQueryDepth = 1
+			s.AccessRights = map[string]user.AccessDefinition{
+				spec.APIID: {
+					APIID:   spec.APIID,
+					APIName: spec.Name,
+				},
+			}
+		})
 
-	authHeaderWithDirectKey := map[string]string{
-		headers.Authorization: directKey,
-	}
-
-	authHeaderWithPolicyAppliedKey := map[string]string{
-		headers.Authorization: policyAppliedKey,
-	}
-
-	request := gql.Request{
-		OperationName: "Hello",
-		Variables:     nil,
-		Query:         "query Hello { hello { numOfLetters } }",
-	}
-
-	t.Run("Depth limit exceeded", func(t *testing.T) {
-		if directSession.MaxQueryDepth != 1 || policyAppliedSession.MaxQueryDepth != 1 {
-			t.Fatal("MaxQueryDepth couldn't be applied to key")
+		authHeaderWithDirectKey := map[string]string{
+			headers.Authorization: directKey,
 		}
 
-		_, _ = g.Run(t, []test.TestCase{
-			{Headers: authHeaderWithDirectKey, Data: request, BodyMatch: "depth limit exceeded", Code: http.StatusForbidden},
-			{Headers: authHeaderWithPolicyAppliedKey, Data: request, BodyMatch: "depth limit exceeded", Code: http.StatusForbidden},
-		}...)
-	})
+		authHeaderWithPolicyAppliedKey := map[string]string{
+			headers.Authorization: policyAppliedKey,
+		}
 
-	t.Run("Unlimited query depth", func(t *testing.T) {
-		t.Run("0", func(t *testing.T) {
-			directSession.MaxQueryDepth = 0
+		request := gql.Request{
+			OperationName: "Hello",
+			Variables:     nil,
+			Query:         "query Hello { hello { numOfLetters } }",
+		}
+
+		t.Run("Depth limit exceeded", func(t *testing.T) {
+			if directSession.MaxQueryDepth != 1 || policyAppliedSession.MaxQueryDepth != 1 {
+				t.Fatal("MaxQueryDepth couldn't be applied to key")
+			}
+
+			_, _ = g.Run(t, []test.TestCase{
+				{Headers: authHeaderWithDirectKey, Data: request, BodyMatch: "depth limit exceeded", Code: http.StatusForbidden},
+				{Headers: authHeaderWithPolicyAppliedKey, Data: request, BodyMatch: "depth limit exceeded", Code: http.StatusForbidden},
+			}...)
+		})
+
+		t.Run("Unlimited query depth", func(t *testing.T) {
+			t.Run("0", func(t *testing.T) {
+				directSession.MaxQueryDepth = 0
+				_ = GlobalSessionManager.UpdateSession(directKey, directSession, 0, false)
+
+				_, _ = g.Run(t, test.TestCase{Headers: authHeaderWithDirectKey, Data: request, BodyMatch: "hello", Code: http.StatusOK})
+			})
+
+			t.Run("-1", func(t *testing.T) {
+				directSession.MaxQueryDepth = -1
+				_ = GlobalSessionManager.UpdateSession(directKey, directSession, 0, false)
+
+				_, _ = g.Run(t, test.TestCase{Headers: authHeaderWithDirectKey, Data: request, BodyMatch: "hello", Code: http.StatusOK})
+			})
+		})
+
+		t.Run("Valid query should successfully work", func(t *testing.T) {
+			directSession.MaxQueryDepth = 2
 			_ = GlobalSessionManager.UpdateSession(directKey, directSession, 0, false)
 
 			_, _ = g.Run(t, test.TestCase{Headers: authHeaderWithDirectKey, Data: request, BodyMatch: "hello", Code: http.StatusOK})
 		})
-
-		t.Run("-1", func(t *testing.T) {
-			directSession.MaxQueryDepth = -1
-			_ = GlobalSessionManager.UpdateSession(directKey, directSession, 0, false)
-
-			_, _ = g.Run(t, test.TestCase{Headers: authHeaderWithDirectKey, Data: request, BodyMatch: "hello", Code: http.StatusOK})
-		})
-	})
-
-	t.Run("Valid query should successfully work", func(t *testing.T) {
-		directSession.MaxQueryDepth = 2
-		_ = GlobalSessionManager.UpdateSession(directKey, directSession, 0, false)
-
-		_, _ = g.Run(t, test.TestCase{Headers: authHeaderWithDirectKey, Data: request, BodyMatch: "hello", Code: http.StatusOK})
 	})
 }
 
-func TestGraphQL_ComposedAPI(t *testing.T) {
+func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 	g := StartTest()
 	defer g.Close()
 
@@ -161,31 +164,43 @@ func TestGraphQL_ComposedAPI(t *testing.T) {
 		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
 	})
 
-	countries1 := gql.Request{
-		Query: "query Query { countries { name } }",
-	}
+	t.Run("graphql api requests", func(t *testing.T) {
+		countries1 := gql.Request{
+			Query: "query Query { countries { name } }",
+		}
 
-	countries2 := gql.Request{
-		Query: "query Query { countries { name code } }",
-	}
+		countries2 := gql.Request{
+			Query: "query Query { countries { name code } }",
+		}
 
-	people1 := gql.Request{
-		Query: "query Query { people { name } }",
-	}
+		people1 := gql.Request{
+			Query: "query Query { people { name } }",
+		}
 
-	people2 := gql.Request{
-		Query: "query Query { people { country { name } name } }",
-	}
+		people2 := gql.Request{
+			Query: "query Query { people { country { name } name } }",
+		}
 
-	_, _ = g.Run(t, []test.TestCase{
-		// GraphQL Data Source
-		{Data: countries1, BodyMatch: `"countries":.*{"name":"Turkey"},{"name":"Russia"}.*`, Code: http.StatusOK},
-		{Data: countries2, BodyMatch: `"countries":.*{"name":"Turkey","code":"TR"},{"name":"Russia","code":"RU"}.*`, Code: http.StatusOK},
+		_, _ = g.Run(t, []test.TestCase{
+			// GraphQL Data Source
+			{Data: countries1, BodyMatch: `"countries":.*{"name":"Turkey"},{"name":"Russia"}.*`, Code: http.StatusOK},
+			{Data: countries2, BodyMatch: `"countries":.*{"name":"Turkey","code":"TR"},{"name":"Russia","code":"RU"}.*`, Code: http.StatusOK},
 
-		// REST Data Source
-		{Data: people1, BodyMatch: `"people":.*{"name":"Furkan"},{"name":"Leo"}.*`, Code: http.StatusOK},
-		{Data: people2, BodyMatch: `"people":.*{"country":{"name":"Turkey"},"name":"Furkan"},{"country":{"name":"Russia"},"name":"Leo"}.*`, Code: http.StatusOK},
-	}...)
+			// REST Data Source
+			{Data: people1, BodyMatch: `"people":.*{"name":"Furkan"},{"name":"Leo"}.*`, Code: http.StatusOK},
+			{Data: people2, BodyMatch: `"people":.*{"country":{"name":"Turkey"},"name":"Furkan"},{"country":{"name":"Russia"},"name":"Leo"}.*`, Code: http.StatusOK},
+		}...)
+	})
+
+	t.Run("introspection query", func(t *testing.T) {
+		request := gql.Request{
+			OperationName: "IntrospectionQuery",
+			Variables:     nil,
+			Query:         gqlIntrospectionQuery,
+		}
+
+		_, _ = g.Run(t, test.TestCase{Data: request, BodyMatch: `{"kind":"OBJECT","name":"Country"`, Code: http.StatusOK})
+	})
 }
 
 const gqlIntrospectionQuery = `query IntrospectionQuery {

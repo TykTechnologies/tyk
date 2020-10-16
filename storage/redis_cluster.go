@@ -342,6 +342,7 @@ func (r *RedisCluster) singleton() redis.UniversalClient {
 }
 
 func (r *RedisCluster) hashKey(in string) string {
+
 	if !r.HashKeys {
 		// Not hashing? Return the raw key
 		return in
@@ -369,7 +370,6 @@ func (r *RedisCluster) GetKey(keyName string) (string, error) {
 	if err := r.up(); err != nil {
 		return "", err
 	}
-
 	cluster := r.singleton()
 
 	value, err := cluster.Get(r.fixKey(keyName)).Result()
