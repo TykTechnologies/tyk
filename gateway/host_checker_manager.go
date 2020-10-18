@@ -144,12 +144,17 @@ func (hc *HostCheckerManager) AmIPolling() bool {
 		}).Error("No storage instance set for uptime tests! Disabling poller...")
 		return false
 	}
-	activeInstance, err := hc.store.GetKey(PollerCacheKey)
+	pollerCacheKey := PollerCacheKey
+	if config.Global().UptimeTests.PollerGroup != "" {
+		pollerCacheKey = pollerCacheKey + "." + config.Global().UptimeTests.PollerGroup
+	}
+
+	activeInstance, err := hc.store.GetKey(pollerCacheKey)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
 		}).Debug("No Primary instance found, assuming control")
-		hc.store.SetKey(PollerCacheKey, hc.Id, 15)
+		hc.store.SetKey(pollerCacheKey, hc.Id, 15)
 		return true
 	}
 
@@ -157,7 +162,7 @@ func (hc *HostCheckerManager) AmIPolling() bool {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
 		}).Debug("Primary instance set, I am master")
-		hc.store.SetKey(PollerCacheKey, hc.Id, 15) // Reset TTL
+		hc.store.SetKey(pollerCacheKey, hc.Id, 15) // Reset TTL
 		return true
 	}
 
