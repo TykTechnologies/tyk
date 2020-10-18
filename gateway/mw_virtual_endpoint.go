@@ -44,7 +44,7 @@ type ResponseObject struct {
 
 type VMResponseObject struct {
 	Response    ResponseObject
-	SessionMeta map[string]string
+	SessionMeta map[string]interface{}
 }
 
 // DynamicMiddleware is a generic middleware that will execute JS code before continuing
@@ -228,7 +228,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 
 	// Save the sesison data (if modified)
 	if vmeta.UseSession {
-		newMeta := mapStrsToIfaces(newResponseData.SessionMeta)
+		newMeta := newResponseData.SessionMeta
 		if !reflect.DeepEqual(session.GetMetaData(), newMeta) {
 			session.SetMetaData(newMeta)
 			ctxSetSession(r, session, "", true)
