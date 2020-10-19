@@ -41,6 +41,9 @@
         "master_name": {
           "type": "string"
         },
+        "sentinel_password": {
+          "type": "string"
+        },
         "optimisation_max_active": {
           "type": "integer"
         },
@@ -937,6 +940,9 @@
         },
         "disable": {
           "type": "boolean"
+        },
+        "poller_group": {
+          "type": "string"
         }
       }
     },

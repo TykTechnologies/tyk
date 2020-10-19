@@ -83,6 +83,7 @@ type StorageOptionsConf struct {
 	Hosts                 map[string]string `json:"hosts"` // Deprecated: Addrs instead.
 	Addrs                 []string          `json:"addrs"`
 	MasterName            string            `json:"master_name"`
+	SentinelPassword      string            `json:"sentinel_password"`
 	Username              string            `json:"username"`
 	Password              string            `json:"password"`
 	Database              int               `json:"database"`
@@ -210,10 +211,10 @@ type UptimeTestsConfigDetail struct {
 }
 
 type UptimeTestsConfig struct {
-	Disable bool                    `json:"disable"`
-	Config  UptimeTestsConfigDetail `json:"config"`
+	Disable     bool                    `json:"disable"`
+	PollerGroup string                  `json:"poller_group"`
+	Config      UptimeTestsConfigDetail `json:"config"`
 }
-
 type ServiceDiscoveryConf struct {
 	DefaultCacheTimeout int `json:"default_cache_timeout"`
 }
