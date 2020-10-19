@@ -570,6 +570,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		handler.ServeHTTP(w, r)
 		return
 	}
+	log.Info("========== EL VALOR ES: ", d.SH.Spec.Proxy.EnableH2c)
 	d.SH.ServeHTTP(w, r)
 }
 
