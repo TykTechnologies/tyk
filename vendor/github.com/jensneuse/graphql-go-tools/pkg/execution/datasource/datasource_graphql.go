@@ -48,11 +48,13 @@ type GraphQLDataSourcePlanner struct {
 	whitelistedSchemes           []string
 	whitelistedVariableRefs      []int
 	whitelistedVariableNameHashs map[uint64]bool
+	hooks                        Hooks
 }
 
 type GraphQLDataSourcePlannerFactoryFactory struct {
 	Client             *http.Client
 	WhitelistedSchemes []string
+	Hooks              Hooks
 }
 
 func (g *GraphQLDataSourcePlannerFactoryFactory) httpClient() *http.Client {
@@ -67,6 +69,7 @@ func (g GraphQLDataSourcePlannerFactoryFactory) Initialize(base BasePlanner, con
 		base:               base,
 		client:             g.httpClient(),
 		whitelistedSchemes: g.WhitelistedSchemes,
+		hooks:              g.Hooks,
 	}
 	err := json.NewDecoder(configReader).Decode(&factory.config)
 	return factory, err
@@ -77,6 +80,7 @@ type GraphQLDataSourcePlannerFactory struct {
 	config             GraphQLDataSourceConfig
 	client             *http.Client
 	whitelistedSchemes []string
+	hooks              Hooks
 }
 
 func (g *GraphQLDataSourcePlannerFactory) DataSourcePlanner() Planner {
@@ -89,6 +93,7 @@ func (g *GraphQLDataSourcePlannerFactory) DataSourcePlanner() Planner {
 		whitelistedSchemes:           g.whitelistedSchemes,
 		whitelistedVariableRefs:      []int{},
 		whitelistedVariableNameHashs: map[uint64]bool{},
+		hooks:                        g.hooks,
 	}
 }
 
@@ -162,6 +167,17 @@ func (g *GraphQLDataSourcePlanner) EnterField(ref int) {
 		typeName := g.Definition.NodeNameString(g.Walker.EnclosingTypeDefinition)
 		fieldNameStr := g.Operation.FieldNameString(ref)
 		fieldName := g.Operation.FieldNameBytes(ref)
+
+		g.Args = append(g.Args, &StaticVariableArgument{
+			Name:  RootTypeName,
+			Value: []byte(typeName),
+		})
+
+		g.Args = append(g.Args, &StaticVariableArgument{
+			Name:  RootFieldName,
+			Value: fieldName,
+		})
+
 		mapping := g.Config.MappingForTypeField(typeName, fieldNameStr)
 		if mapping != nil && !mapping.Disabled {
 			fieldName = unsafebytes.StringToBytes(mapping.Path)
@@ -321,6 +337,7 @@ func (g *GraphQLDataSourcePlanner) Plan(args []Argument) (DataSource, []Argument
 		Log:                g.Log,
 		Client:             g.client,
 		WhitelistedSchemes: g.whitelistedSchemes,
+		Hooks:              g.hooks,
 	}, g.Args
 }
 
@@ -328,11 +345,18 @@ type GraphQLDataSource struct {
 	Log                log.Logger
 	Client             *http.Client
 	WhitelistedSchemes []string
+	Hooks              Hooks
 }
 
 func (g *GraphQLDataSource) Resolve(ctx context.Context, args ResolverArgs, out io.Writer) (n int, err error) {
 	urlArg := args.ByKey(literal.URL)
 	queryArg := args.ByKey(literal.QUERY)
+	rootTypeName := args.ByKey(RootTypeName)
+	rootFieldName := args.ByKey(RootFieldName)
+	hookContext := HookContext{
+		TypeName:  string(rootTypeName),
+		FieldName: string(rootFieldName),
+	}
 
 	g.Log.Debug("GraphQLDataSource.Resolve.Args",
 		log.Strings("resolvedArgs", args.Dump()),
@@ -359,6 +383,8 @@ func (g *GraphQLDataSource) Resolve(ctx context.Context, args ResolverArgs, out 
 		switch {
 		case bytes.Equal(keys[i], literal.URL):
 		case bytes.Equal(keys[i], literal.QUERY):
+		case bytes.Equal(keys[i], RootTypeName):
+		case bytes.Equal(keys[i], RootFieldName):
 		default:
 			variables[string(keys[i])] = string(args.ByKey(keys[i]))
 		}
@@ -403,6 +429,10 @@ func (g *GraphQLDataSource) Resolve(ctx context.Context, args ResolverArgs, out 
 	request.Header.Add("Content-Type", "application/json")
 	request.Header.Add("Accept", "application/json")
 
+	if g.Hooks.PreSendHttpHook != nil {
+		g.Hooks.PreSendHttpHook.Execute(hookContext, request)
+	}
+
 	res, err := g.Client.Do(request)
 	if err != nil {
 		g.Log.Error("GraphQLDataSource.Client.Do",
@@ -416,6 +446,10 @@ func (g *GraphQLDataSource) Resolve(ctx context.Context, args ResolverArgs, out 
 			log.Error(err),
 		)
 		return n, err
+	}
+
+	if g.Hooks.PostReceiveHttpHook != nil {
+		g.Hooks.PostReceiveHttpHook.Execute(hookContext, res, data)
 	}
 
 	defer func() {

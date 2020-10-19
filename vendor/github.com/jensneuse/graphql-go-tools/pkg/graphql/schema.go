@@ -1,12 +1,17 @@
 package graphql
 
 import (
+	"bytes"
+	"encoding/json"
 	"io"
 	"io/ioutil"
 
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/astparser"
 	"github.com/jensneuse/graphql-go-tools/pkg/asttransform"
+	"github.com/jensneuse/graphql-go-tools/pkg/astvalidation"
+	"github.com/jensneuse/graphql-go-tools/pkg/introspection"
+	"github.com/jensneuse/graphql-go-tools/pkg/operationreport"
 )
 
 type Schema struct {
@@ -27,6 +32,20 @@ func NewSchemaFromString(schema string) (*Schema, error) {
 	schemaContent := []byte(schema)
 
 	return createSchema(schemaContent)
+}
+
+func ValidateSchemaString(schema string) (result ValidationResult, err error) {
+	parsedSchema, err := NewSchemaFromString(schema)
+	if err != nil {
+		return ValidationResult{
+			Valid: false,
+			Errors: SchemaValidationErrors{
+				SchemaValidationError{Message: err.Error()},
+			},
+		}, nil
+	}
+
+	return parsedSchema.Validate()
 }
 
 func (s *Schema) Document() []byte {
@@ -69,9 +88,35 @@ func (s *Schema) SubscriptionTypeName() string {
 	return string(s.document.Index.SubscriptionTypeName)
 }
 
-func (s *Schema) Validate() (valid bool, errors SchemaValidationErrors) {
-	// TODO: Needs to be implemented in the core of the library
-	return true, nil
+func (s *Schema) Validate() (result ValidationResult, err error) {
+	var report operationreport.Report
+	var isValid bool
+
+	validator := astvalidation.DefaultDefinitionValidator()
+	validationState := validator.Validate(&s.document, &report)
+	if validationState == astvalidation.Valid {
+		isValid = true
+	}
+
+	return ValidationResult{
+		Valid:  isValid,
+		Errors: schemaValidationErrorsFromOperationReport(report),
+	}, nil
+}
+
+func (s *Schema) IntrospectionResponse(out io.Writer) error {
+	var (
+		introspectionData = struct {
+			Data introspection.Data `json:"data"`
+		}{}
+		report operationreport.Report
+	)
+	gen := introspection.NewGenerator()
+	gen.Generate(&s.document, &report, &introspectionData.Data)
+	if report.HasErrors() {
+		return report
+	}
+	return json.NewEncoder(out).Encode(introspectionData)
 }
 
 func createSchema(schemaContent []byte) (*Schema, error) {
@@ -89,4 +134,10 @@ func createSchema(schemaContent []byte) (*Schema, error) {
 		rawInput: schemaContent,
 		document: document,
 	}, nil
+}
+
+func SchemaIntrospection(schema *Schema) (*ExecutionResult, error) {
+	var buf bytes.Buffer
+	err := schema.IntrospectionResponse(&buf)
+	return &ExecutionResult{&buf}, err
 }

@@ -8,14 +8,17 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"text/template"
 	"time"
 
+	proxyproto "github.com/pires/go-proxyproto"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
-	proxyproto "github.com/pires/go-proxyproto"
 )
 
 const sampleUptimeTestAPI = `{
@@ -485,4 +488,53 @@ func TestProxyWhenHostIsDown(t *testing.T) {
 			get()
 		}
 	}
+}
+
+func TestChecker_triggerSampleLimit(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = l.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	var wg sync.WaitGroup
+	wg.Add(5)
+
+	setTestMode(false)
+	defer func() {
+		setTestMode(true)
+	}()
+
+	var (
+		limit  = 4
+		ping   atomic.Value
+		failed atomic.Value
+	)
+	failed.Store(0)
+	ping.Store(0)
+
+	hs := &HostUptimeChecker{}
+	hs.Init(1, limit, 0, map[string]HostData{
+		l.Addr().String(): {CheckURL: "http://" + l.Addr().String()},
+	},
+		HostCheckCallBacks{
+			Ping: func(_ context.Context, _ HostHealthReport) {
+				ping.Store(ping.Load().(int) + 1)
+				if ping.Load().(int) >= limit {
+					cancel()
+				}
+				wg.Done()
+			},
+			Fail: func(_ context.Context, _ HostHealthReport) {
+				failed.Store(failed.Load().(int) + 1)
+				wg.Done()
+			},
+		},
+	)
+	go hs.Start(ctx)
+
+	wg.Wait()
+	assert.Equal(t, limit, ping.Load().(int), "ping count is wrong")
+	assert.Equal(t, 1, failed.Load().(int), "expected host down to be fired once")
 }
