@@ -83,6 +83,7 @@ type StorageOptionsConf struct {
 	Hosts                 map[string]string `json:"hosts"` // Deprecated: Addrs instead.
 	Addrs                 []string          `json:"addrs"`
 	MasterName            string            `json:"master_name"`
+	SentinelPassword      string            `json:"sentinel_password"`
 	Username              string            `json:"username"`
 	Password              string            `json:"password"`
 	Database              int               `json:"database"`
