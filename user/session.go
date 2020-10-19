@@ -116,7 +116,6 @@ type SessionState struct {
 	keyHash string
 }
 
-
 func NewSessionState() *SessionState {
 	return &SessionState{}
 }

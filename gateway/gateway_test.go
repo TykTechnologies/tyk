@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/websocket"
 	proxyproto "github.com/pires/go-proxyproto"
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"

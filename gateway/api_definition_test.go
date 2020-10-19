@@ -20,7 +20,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v8"
 )
 
 func TestURLRewrites(t *testing.T) {
