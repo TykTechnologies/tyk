@@ -185,16 +185,18 @@ func NewRedisClusterPool(isCache bool) redis.UniversalClient {
 
 	var client redis.UniversalClient
 	opts := &redis.UniversalOptions{
-		Addrs:        getRedisAddrs(cfg),
-		MasterName:   cfg.MasterName,
-		Password:     cfg.Password,
-		DB:           cfg.Database,
-		DialTimeout:  timeout,
-		ReadTimeout:  timeout,
-		WriteTimeout: timeout,
-		IdleTimeout:  240 * timeout,
-		PoolSize:     poolSize,
-		TLSConfig:    tlsConfig,
+		Addrs:            getRedisAddrs(cfg),
+		MasterName:       cfg.MasterName,
+		SentinelPassword: cfg.SentinelPassword,
+		Username:         cfg.Username,
+		Password:         cfg.Password,
+		DB:               cfg.Database,
+		DialTimeout:      timeout,
+		ReadTimeout:      timeout,
+		WriteTimeout:     timeout,
+		IdleTimeout:      240 * timeout,
+		PoolSize:         poolSize,
+		TLSConfig:        tlsConfig,
 	}
 
 	if opts.MasterName != "" {
