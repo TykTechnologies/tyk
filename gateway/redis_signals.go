@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v8"
 
 	"github.com/TykTechnologies/goverify"
 	"github.com/TykTechnologies/tyk/config"
