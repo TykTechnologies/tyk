@@ -620,8 +620,18 @@ func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p
 	if config.Global().ProxyEnableHttp2 {
 		http2.ConfigureTransport(transport)
 	}
+	if config.Global().ProxyEnableH2c || p.TykAPISpec.Proxy.EnableH2c {
+		h2t := &http2.Transport{
+			// kind of a hack, but for plaintext/H2C requests, pretend to dial TLS
+			DialTLS: func(network, addr string, _ *tls.Config) (net.Conn, error) {
+				return net.Dial(network, addr)
+			},
+			AllowHTTP: true,
+		}
+		return &TykRoundTripper{transport, h2t, p.logger}
+	}
 
-	return &TykRoundTripper{transport, p.logger}
+	return &TykRoundTripper{transport, nil, p.logger}
 }
 
 func (p *ReverseProxy) setCommonNameVerifyPeerCertificate(tlsConfig *tls.Config, hostName string) {
@@ -674,8 +684,9 @@ func (p *ReverseProxy) setCommonNameVerifyPeerCertificate(tlsConfig *tls.Config,
 }
 
 type TykRoundTripper struct {
-	transport *http.Transport
-	logger    *logrus.Entry
+	transport    *http.Transport
+	h2ctransport *http2.Transport
+	logger       *logrus.Entry
 }
 
 func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
@@ -696,6 +707,9 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 		return recorder.Result(), nil
 	}
 
+	if rt.h2ctransport != nil {
+		return rt.h2ctransport.RoundTrip(r)
+	}
 	return rt.transport.RoundTrip(r)
 }
 
@@ -889,7 +903,9 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	p.TykAPISpec.Lock()
-	roundTripper.transport.TLSClientConfig.Certificates = tlsCertificates
+	if roundTripper.transport != nil {
+		roundTripper.transport.TLSClientConfig.Certificates = tlsCertificates
+	}
 	p.TykAPISpec.Unlock()
 
 	if p.TykAPISpec.Proxy.Transport.SSLForceCommonNameCheck || config.Global().SSLForceCommonNameCheck {
