@@ -41,6 +41,9 @@
         "master_name": {
           "type": "string"
         },
+        "sentinel_password": {
+          "type": "string"
+        },
         "optimisation_max_active": {
           "type": "integer"
         },
