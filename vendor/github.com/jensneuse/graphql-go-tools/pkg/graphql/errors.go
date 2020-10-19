@@ -11,6 +11,7 @@ type Errors interface {
 	error
 	WriteResponse(writer io.Writer) (n int, err error)
 	Count() int
+	ErrorByIndex(i int) error
 }
 
 type OperationValidationErrors []OperationValidationError
@@ -54,6 +55,14 @@ func (o OperationValidationErrors) Count() int {
 	return len(o)
 }
 
+func (o OperationValidationErrors) ErrorByIndex(i int) error {
+	if i >= o.Count() {
+		return nil
+	}
+
+	return o[i]
+}
+
 type OperationValidationError struct {
 	Message   string          `json:"message"`
 	Locations []ErrorLocation `json:"locations,omitempty"`
@@ -66,8 +75,24 @@ func (o OperationValidationError) Error() string {
 
 type SchemaValidationErrors []SchemaValidationError
 
+func schemaValidationErrorsFromOperationReport(report operationreport.Report) (errors SchemaValidationErrors) {
+	if len(report.ExternalErrors) == 0 {
+		return nil
+	}
+
+	for _, externalError := range report.ExternalErrors {
+		validationError := SchemaValidationError{
+			Message: externalError.Message,
+		}
+
+		errors = append(errors, validationError)
+	}
+
+	return errors
+}
+
 func (s SchemaValidationErrors) Error() string {
-	return ""
+	return fmt.Sprintf("schema contains %d error(s)", s.Count())
 }
 
 func (s SchemaValidationErrors) WriteResponse(writer io.Writer) (n int, err error) {
@@ -78,11 +103,19 @@ func (s SchemaValidationErrors) Count() int {
 	return len(s)
 }
 
+func (s SchemaValidationErrors) ErrorByIndex(i int) error {
+	if i >= s.Count() {
+		return nil
+	}
+	return s[i]
+}
+
 type SchemaValidationError struct {
+	Message string `json:"message"`
 }
 
 func (s SchemaValidationError) Error() string {
-	return ""
+	return s.Message
 }
 
 type ErrorPath []interface{}

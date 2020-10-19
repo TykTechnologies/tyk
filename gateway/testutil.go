@@ -25,7 +25,7 @@ import (
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 
@@ -159,14 +159,15 @@ func ResetTestConfig() {
 }
 
 func emptyRedis() error {
+	ctx := context.Background()
 	addr := config.Global().Storage.Host + ":" + strconv.Itoa(config.Global().Storage.Port)
 	c := redis.NewClient(&redis.Options{Addr: addr})
 	defer c.Close()
 	dbName := strconv.Itoa(config.Global().Storage.Database)
-	if err := c.Do("SELECT", dbName).Err(); err != nil {
+	if err := c.Do(ctx, "SELECT", dbName).Err(); err != nil {
 		return err
 	}
-	err := c.FlushDB().Err()
+	err := c.FlushDB(ctx).Err()
 	return err
 }
 
@@ -308,12 +309,12 @@ const (
 	testHttpListen = "127.0.0.1:16500"
 	// Accepts any http requests on /, only allows GET on /get, etc.
 	// All return a JSON with request info.
-	TestHttpAny     = "http://" + testHttpListen
-	TestHttpGet     = TestHttpAny + "/get"
-	testHttpPost    = TestHttpAny + "/post"
-	testHttpJWK     = TestHttpAny + "/jwk.json"
-	testHttpJWKLegacy     = TestHttpAny + "/jwk-legacy.json"
-	testHttpBundles = TestHttpAny + "/bundles/"
+	TestHttpAny       = "http://" + testHttpListen
+	TestHttpGet       = TestHttpAny + "/get"
+	testHttpPost      = TestHttpAny + "/post"
+	testHttpJWK       = TestHttpAny + "/jwk.json"
+	testHttpJWKLegacy = TestHttpAny + "/jwk-legacy.json"
+	testHttpBundles   = TestHttpAny + "/bundles/"
 
 	// Nothing should be listening on port 16501 - useful for
 	// testing TCP and HTTP failures.
