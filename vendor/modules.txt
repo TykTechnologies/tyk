@@ -368,6 +368,8 @@ golang.org/x/net/context
 golang.org/x/net/html/charset
 golang.org/x/net/http/httpguts
 golang.org/x/net/http2
+golang.org/x/net/http2/h2c
+golang.org/x/net/http2/hpack
 golang.org/x/net/trace
 golang.org/x/net/html
 golang.org/x/net/idna
@@ -453,6 +455,8 @@ google.golang.org/grpc/connectivity
 google.golang.org/grpc/credentials
 google.golang.org/grpc/encoding
 google.golang.org/grpc/encoding/proto
+google.golang.org/grpc/examples/helloworld/helloworld
+google.golang.org/grpc/examples/route_guide/routeguide
 google.golang.org/grpc/grpclog
 google.golang.org/grpc/internal
 google.golang.org/grpc/internal/backoff

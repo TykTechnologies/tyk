@@ -28,7 +28,7 @@ import (
 )
 
 func genCertificate(template *x509.Certificate) ([]byte, []byte, []byte, tls.Certificate) {
-	priv, _ := rsa.GenerateKey(rand.Reader, 512)
+	priv, _ := rsa.GenerateKey(rand.Reader, 1024)
 
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, _ := rand.Int(rand.Reader, serialNumberLimit)
