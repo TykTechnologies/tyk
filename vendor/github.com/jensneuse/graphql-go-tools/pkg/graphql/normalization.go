@@ -23,7 +23,7 @@ func (r *Request) Normalize(schema *Schema) (result NormalizationResult, err err
 	r.document.Input.Variables = r.Variables
 
 	normalizer := astnormalization.NewNormalizer(true, true)
-	normalizer.NormalizeOperation(&r.document, &schema.document, &report)
+	normalizer.NormalizeNamedOperation(&r.document, &schema.document, []byte(r.OperationName), &report)
 	if report.HasErrors() {
 		return normalizationResultFromReport(report)
 	}

@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"net/http"
-	"sync"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -65,14 +64,12 @@ func testPrepareVersioning() (string, string) {
 		s.AccessRights = map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v3"},
 		}}
-		s.Mutex = &sync.RWMutex{}
 	})
 
 	keyKnownVersion := CreateSession(func(s *user.SessionState) {
 		s.AccessRights = map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v1", "v2", "expired"},
 		}}
-		s.Mutex = &sync.RWMutex{}
 	})
 
 	return keyWrongVersion, keyKnownVersion

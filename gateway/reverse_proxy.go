@@ -42,6 +42,7 @@ import (
 	"github.com/opentracing/opentracing-go/ext"
 	cache "github.com/pmylund/go-cache"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http2"
 )
 
@@ -120,19 +121,19 @@ func urlFromService(spec *APISpec) (*apidef.HostList, error) {
 var httpScheme = regexp.MustCompile(`^(?i)https?://`)
 
 func EnsureTransport(host, protocol string) string {
-	if protocol == "" {
-		for _, v := range []string{"http://", "https://"} {
-			if strings.HasPrefix(host, v) {
-				return host
-			}
-		}
-		return "http://" + host
-	}
-	prefix := protocol + "://"
-	if strings.HasPrefix(host, prefix) {
+	host = strings.TrimSpace(host)
+	protocol = strings.TrimSpace(protocol)
+	u, err := url.Parse(host)
+	if err != nil {
 		return host
 	}
-	return prefix + host
+	if u.Scheme == "" {
+		if protocol == "" {
+			protocol = "http"
+		}
+		u.Scheme = protocol
+	}
+	return u.String()
 }
 
 func nextTarget(targetData *apidef.HostList, spec *APISpec) (string, error) {
@@ -148,9 +149,12 @@ func nextTarget(targetData *apidef.HostList, spec *APISpec) (string, error) {
 			}
 
 			host := EnsureTransport(gotHost, spec.Protocol)
-
 			if !spec.Proxy.CheckHostAgainstUptimeTests {
 				return host, nil // we don't care if it's up
+			}
+			// As checked by HostCheckerManager.AmIPolling
+			if GlobalHostChecker.store == nil {
+				return host, nil
 			}
 			if !GlobalHostChecker.HostDown(host) {
 				return host, nil // we do care and it's up
@@ -695,6 +699,67 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	return rt.transport.RoundTrip(r)
 }
 
+func (p *ReverseProxy) sendRequestToUpstream(roundTripper *TykRoundTripper, outreq *http.Request) (res *http.Response, upstreamLatency time.Duration, err error) {
+	begin := time.Now()
+	defer func() {
+		upstreamLatency = time.Since(begin)
+	}()
+
+	if !p.TykAPISpec.GraphQL.Enabled {
+		res, err = roundTripper.RoundTrip(outreq)
+		return
+	}
+
+	// process graphql
+
+	gqlRequest := ctxGetGraphQLRequest(outreq)
+	if gqlRequest == nil {
+		err = errors.New("graphql request is nil")
+		return
+	}
+
+	// execution mode
+
+	if p.TykAPISpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeExecutionEngine {
+		if p.TykAPISpec.GraphQLExecutor.Engine == nil {
+			err = errors.New("execution engine is nil")
+			return
+		}
+
+		p.TykAPISpec.GraphQLExecutor.Client.Transport = roundTripper
+		var result *graphql.ExecutionResult
+		result, err = p.TykAPISpec.GraphQLExecutor.Engine.Execute(context.Background(), gqlRequest, graphql.ExecutionOptions{ExtraArguments: gqlRequest.Variables})
+		if err != nil {
+			return
+		}
+		res = result.GetAsHTTPResponse()
+
+		return
+	}
+
+	// proxy mode
+
+	var isIntrospection bool
+	isIntrospection, err = gqlRequest.IsIntrospectionQuery()
+	if err != nil {
+		return
+	}
+
+	// if not introspection query process as normal
+	if !isIntrospection {
+		res, err = roundTripper.RoundTrip(outreq)
+		return
+	}
+
+	result, err := graphql.SchemaIntrospection(p.TykAPISpec.GraphQLExecutor.Schema)
+	if err != nil {
+		return
+	}
+	res = result.GetAsHTTPResponse()
+
+	return
+}
+
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) ProxyResponse {
 	if trace.IsEnabled() {
 		span, ctx := trace.Span(req.Context(), req.URL.Path)
@@ -844,36 +909,11 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	// do request round trip
-	var res *http.Response
-	var err error
-	var upstreamLatency time.Duration
-
-	sendRequestToUpstream := func() {
-		begin := time.Now()
-		if p.TykAPISpec.GraphQL.Enabled && p.TykAPISpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeExecutionEngine {
-
-			if p.TykAPISpec.GraphQLExecutor.Engine == nil {
-				err = errors.New("execution engine is nil")
-				return
-			}
-
-			gqlRequest := ctxGetGraphQLRequest(outreq)
-			if gqlRequest == nil {
-				err = errors.New("graphql request is nil")
-				return
-			}
-
-			p.TykAPISpec.GraphQLExecutor.Client.Transport = roundTripper
-			var result *graphql.ExecutionResult
-			result, err = p.TykAPISpec.GraphQLExecutor.Engine.Execute(context.Background(), gqlRequest, graphql.ExecutionOptions{ExtraArguments: gqlRequest.Variables})
-			res = result.GetAsHTTPResponse()
-
-		} else {
-			res, err = roundTripper.RoundTrip(outreq)
-		}
-
-		upstreamLatency = time.Since(begin)
-	}
+	var (
+		res             *http.Response
+		upstreamLatency time.Duration
+		err             error
+	)
 
 	if breakerEnforced {
 		if !breakerConf.CB.Ready() {
@@ -882,14 +922,14 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			return ProxyResponse{}
 		}
 		p.logger.Debug("ON REQUEST: Circuit Breaker is in CLOSED or HALF-OPEN state")
-		sendRequestToUpstream()
+		res, upstreamLatency, err = p.sendRequestToUpstream(roundTripper, outreq)
 		if err != nil || res.StatusCode/100 == 5 {
 			breakerConf.CB.Fail()
 		} else {
 			breakerConf.CB.Success()
 		}
 	} else {
-		sendRequestToUpstream()
+		res, upstreamLatency, err = p.sendRequestToUpstream(roundTripper, outreq)
 	}
 
 	if err != nil {
@@ -945,8 +985,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		}
 	}
 
-	ses := new(user.SessionState)
-	ses.Mutex = &sync.RWMutex{}
+	ses := user.NewSessionState()
 	if session != nil {
 		ses = session
 	}
@@ -1110,6 +1149,13 @@ func (p *ReverseProxy) copyBuffer(dst io.Writer, src io.Reader) (int64, error) {
 	}
 }
 
+func upgradeType(h http.Header) string {
+	if !httpguts.HeaderValuesContainsToken(h["Connection"], "Upgrade") {
+		return ""
+	}
+	return strings.ToLower(h.Get("Upgrade"))
+}
+
 func (p *ReverseProxy) handleUpgradeResponse(rw http.ResponseWriter, req *http.Request, res *http.Response) error {
 	copyHeader(res.Header, rw.Header())
 
@@ -1121,7 +1167,18 @@ func (p *ReverseProxy) handleUpgradeResponse(rw http.ResponseWriter, req *http.R
 	if !ok {
 		return fmt.Errorf("internal error: 101 switching protocols response with non-writable body")
 	}
-	defer backConn.Close()
+	backConnCloseCh := make(chan bool)
+	go func() {
+		// Ensure that the cancelation of a request closes the backend.
+		// See issue https://golang.org/issue/35559.
+		select {
+		case <-req.Context().Done():
+		case <-backConnCloseCh:
+		}
+		backConn.Close()
+	}()
+
+	defer close(backConnCloseCh)
 	conn, brw, err := hj.Hijack()
 	if err != nil {
 		return fmt.Errorf("Hijack failed on protocol switch: %v", err)

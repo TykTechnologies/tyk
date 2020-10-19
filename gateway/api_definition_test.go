@@ -20,7 +20,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v8"
 )
 
 func TestURLRewrites(t *testing.T) {
@@ -656,7 +656,6 @@ func testPrepareDefaultVersion() string {
 		s.AccessRights = map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v1", "v2"},
 		}}
-		s.Mutex = &sync.RWMutex{}
 	})
 }
 

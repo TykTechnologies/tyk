@@ -112,7 +112,7 @@ func loadTestOAuthSpec() *APISpec {
 	return LoadAPI(buildTestOAuthSpec())[0]
 }
 
-func createTestOAuthClient(spec *APISpec, clientID string) {
+func createTestOAuthClient(spec *APISpec, clientID string) OAuthClient {
 	pID := CreatePolicy(func(p *user.Policy) {
 		p.ID = "TEST-4321"
 		p.AccessRights = map[string]user.AccessDefinition{
@@ -142,6 +142,7 @@ func createTestOAuthClient(spec *APISpec, clientID string) {
 		MetaData:          map[string]interface{}{"foo": "bar", "client": "meta"},
 	}
 	spec.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, "org-id-1", &testClient, false)
+	return testClient
 }
 
 func TestOauthMultipleAPIs(t *testing.T) {

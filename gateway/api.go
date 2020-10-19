@@ -322,34 +322,31 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 	suppressReset := r.URL.Query().Get("suppress_reset") == "1"
 
 	// decode payload
-	newSession := user.SessionState{
-		Mutex: &sync.RWMutex{},
-	}
+	newSession := user.NewSessionState()
 
 	contents, _ := ioutil.ReadAll(r.Body)
 	r.Body = ioutil.NopCloser(bytes.NewReader(contents))
 
-	if err := json.Unmarshal(contents, &newSession); err != nil {
+	if err := json.Unmarshal(contents, newSession); err != nil {
 		log.Error("Couldn't decode new session object: ", err)
 		return apiError("Request malformed"), http.StatusBadRequest
 	}
 
 	mw := BaseMiddleware{}
-	mw.ApplyPolicies(&newSession)
+	// TODO: handle apply policies error
+	mw.ApplyPolicies(newSession)
 
 	// DO ADD OR UPDATE
 
 	// get original session in case of update and preserve fields that SHOULD NOT be updated
-	originalKey := user.SessionState{
-		Mutex: &sync.RWMutex{},
-	}
+	originalKey := *user.NewSessionState()
 	if r.Method == http.MethodPut {
 		key, found := GlobalSessionManager.SessionDetail(newSession.OrgID, keyName, isHashed)
 		if !found {
 			log.Error("Could not find key when updating")
 			return apiError("Key is not found"), http.StatusNotFound
 		}
-		originalKey = key
+		originalKey = key.Clone()
 
 		// preserve the creation date
 		newSession.DateCreated = originalKey.DateCreated
@@ -393,14 +390,14 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 		switch r.Method {
 		case http.MethodPost:
 			// It's a create, so lets hash the password
-			setSessionPassword(&newSession)
+			setSessionPassword(newSession)
 		case http.MethodPut:
 			if originalKey.BasicAuthData.Password != newSession.BasicAuthData.Password {
 				// passwords dont match assume it's new, lets hash it
 				log.Debug("Passwords dont match, original: ", originalKey.BasicAuthData.Password)
 				log.Debug("New: newSession.BasicAuthData.Password")
 				log.Debug("Changing password")
-				setSessionPassword(&newSession)
+				setSessionPassword(newSession)
 			}
 		}
 	} else if originalKey.BasicAuthData.Password != "" {
@@ -411,7 +408,7 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 
 	if r.Method == http.MethodPost || storage.TokenOrg(keyName) != "" {
 		// use new key format if key gets created or updating key with new format
-		if err := doAddOrUpdate(keyName, &newSession, suppressReset, isHashed); err != nil {
+		if err := doAddOrUpdate(keyName, newSession, suppressReset, isHashed); err != nil {
 			return apiError("Failed to create key, ensure security settings are correct."), http.StatusInternalServerError
 		}
 	} else {
@@ -425,7 +422,7 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 			keyName = newFormatKey
 		}
 
-		if err := doAddOrUpdate(keyName, &newSession, suppressReset, isHashed); err != nil {
+		if err := doAddOrUpdate(keyName, newSession, suppressReset, isHashed); err != nil {
 			return apiError("Failed to create key, ensure security settings are correct."), http.StatusInternalServerError
 		}
 	}
@@ -471,15 +468,14 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 		orgID = spec.OrgID
 	}
 
-	var session user.SessionState
-	var ok bool
-	session, ok = GlobalSessionManager.SessionDetail(orgID, sessionKey, byHash)
+	session, ok := GlobalSessionManager.SessionDetail(orgID, sessionKey, byHash)
 
 	if !ok {
 		return apiError("Key not found"), http.StatusNotFound
 	}
 
 	mw := BaseMiddleware{Spec: spec}
+	// TODO: handle apply policies error
 	mw.ApplyPolicies(&session)
 
 	if session.QuotaMax != -1 {
@@ -552,7 +548,7 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 		"status": "ok",
 	}).Info("Retrieved key detail.")
 
-	return session, http.StatusOK
+	return session.Clone(), http.StatusOK
 }
 
 // apiAllKeys represents a list of keys in the memory store
@@ -589,16 +585,14 @@ func handleGetAllKeys(filter string) (interface{}, int) {
 }
 
 func handleAddKey(keyName, hashedName, sessionString, apiID string) {
-	sess := user.SessionState{
-		Mutex: &sync.RWMutex{},
-	}
-	json.Unmarshal([]byte(sessionString), &sess)
+	sess := user.NewSessionState()
+	json.Unmarshal([]byte(sessionString), sess)
 	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 	var err error
 	if config.Global().HashKeys {
-		err = GlobalSessionManager.UpdateSession(hashedName, &sess, 0, true)
+		err = GlobalSessionManager.UpdateSession(hashedName, sess, 0, true)
 	} else {
-		err = GlobalSessionManager.UpdateSession(keyName, &sess, 0, false)
+		err = GlobalSessionManager.UpdateSession(keyName, sess, 0, false)
 	}
 	if err != nil {
 		log.WithFields(logrus.Fields{
@@ -627,9 +621,7 @@ func handleDeleteKey(keyName, apiID string, resetQuota bool) (interface{}, int) 
 		removed := GlobalSessionManager.RemoveSession(orgID, keyName, false)
 		GlobalSessionManager.ResetQuota(
 			keyName,
-			&user.SessionState{
-				Mutex: &sync.RWMutex{},
-			},
+			user.NewSessionState(),
 			false)
 
 		apisMu.RUnlock()
@@ -664,9 +656,7 @@ func handleDeleteKey(keyName, apiID string, resetQuota bool) (interface{}, int) 
 	if resetQuota {
 		GlobalSessionManager.ResetQuota(
 			keyName,
-			&user.SessionState{
-				Mutex: &sync.RWMutex{},
-			},
+			user.NewSessionState(),
 			false)
 	}
 
@@ -738,9 +728,7 @@ func handleDeleteHashedKey(keyName, apiID string, resetQuota bool) (interface{},
 	if resetQuota {
 		GlobalSessionManager.ResetQuota(
 			keyName,
-			&user.SessionState{
-				Mutex: &sync.RWMutex{},
-			},
+			user.NewSessionState(),
 			true)
 	}
 
@@ -1076,8 +1064,7 @@ func orgHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleOrgAddOrUpdate(orgID string, r *http.Request) (interface{}, int) {
-	newSession := new(user.SessionState)
-	newSession.Mutex = &sync.RWMutex{}
+	newSession := user.NewSessionState()
 
 	if err := json.NewDecoder(r.Body).Decode(newSession); err != nil {
 		log.Error("Couldn't decode new session object: ", err)
@@ -1160,7 +1147,7 @@ func handleGetOrgDetail(orgID string) (interface{}, int) {
 		"org":    orgID,
 		"status": "ok",
 	}).Info("Retrieved record for ORG ID.")
-	return session, http.StatusOK
+	return session.Clone(), http.StatusOK
 }
 
 func handleGetAllOrgKeys(filter string) (interface{}, int) {
@@ -1260,8 +1247,7 @@ func resetHandler(fn func()) http.HandlerFunc {
 }
 
 func createKeyHandler(w http.ResponseWriter, r *http.Request) {
-	newSession := new(user.SessionState)
-	newSession.Mutex = &sync.RWMutex{}
+	newSession := user.NewSessionState()
 	if err := json.NewDecoder(r.Body).Decode(newSession); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -1290,6 +1276,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	newSession.DateCreated = time.Now()
 
 	mw := BaseMiddleware{}
+	// TODO: handle apply policies error
 	mw.ApplyPolicies(newSession)
 
 	if len(newSession.GetAccessRights()) > 0 {
@@ -1403,8 +1390,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func previewKeyHandler(w http.ResponseWriter, r *http.Request) {
-	newSession := new(user.SessionState)
-	newSession.Mutex = &sync.RWMutex{}
+	newSession := user.NewSessionState()
 	if err := json.NewDecoder(r.Body).Decode(newSession); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -1419,6 +1405,7 @@ func previewKeyHandler(w http.ResponseWriter, r *http.Request) {
 	newSession.DateCreated = time.Now()
 
 	mw := BaseMiddleware{}
+	// TODO: handle apply policies error
 	mw.ApplyPolicies(newSession)
 
 	doJSONWrite(w, http.StatusOK, newSession)
