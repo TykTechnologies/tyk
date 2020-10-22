@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"strings"
-	"sync"
 	"time"
 
 	uuid "github.com/satori/go.uuid"
@@ -37,69 +36,6 @@ type SessionHandler interface {
 	Store() storage.Handler
 	ResetQuota(string, *user.SessionState, bool)
 	Stop()
-}
-
-const sessionPoolDefaultSize = 50
-const sessionBufferDefaultSize = 1000
-
-type sessionUpdater struct {
-	store      storage.Handler
-	once       sync.Once
-	updateChan chan *SessionUpdate
-	poolSize   int
-	bufferSize int
-	keyPrefix  string
-}
-
-func (s *sessionUpdater) Init(store storage.Handler) {
-	s.once.Do(func() {
-		s.store = store
-		// check pool size in config and set to 50 if unset
-		s.poolSize = config.Global().SessionUpdatePoolSize
-		if s.poolSize <= 0 {
-			s.poolSize = sessionPoolDefaultSize
-		}
-		//check size for channel buffer and set to 1000 if unset
-		s.bufferSize = config.Global().SessionUpdateBufferSize
-		if s.bufferSize <= 0 {
-			s.bufferSize = sessionBufferDefaultSize
-		}
-
-		log.WithField("pool_size", s.poolSize).Debug("Session update async pool size")
-
-		s.updateChan = make(chan *SessionUpdate, s.bufferSize)
-
-		s.keyPrefix = s.store.GetKeyPrefix()
-
-		for i := 0; i < s.poolSize; i++ {
-			go s.updateWorker()
-		}
-	})
-}
-
-func (s *sessionUpdater) updateWorker() {
-	for u := range s.updateChan {
-		v, err := json.Marshal(u.session)
-		if err != nil {
-			log.WithError(err).Error("Error marshalling session for async session update")
-			continue
-		}
-
-		if u.isHashed {
-			u.keyVal = s.keyPrefix + u.keyVal
-			err := s.store.SetRawKey(u.keyVal, string(v), u.ttl)
-			if err != nil {
-				log.WithError(err).Error("Error updating hashed key")
-			}
-			continue
-
-		}
-
-		err = s.store.SetKey(u.keyVal, string(v), u.ttl)
-		if err != nil {
-			log.WithError(err).Error("Error updating key")
-		}
-	}
 }
 
 // DefaultAuthorisationManager implements AuthorisationHandler,
