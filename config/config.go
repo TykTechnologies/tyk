@@ -324,7 +324,6 @@ type Config struct {
 	HttpServerOptions         HttpServerOptionsConfig `json:"http_server_options"`
 	ReloadWaitTime            int                     `bson:"reload_wait_time" json:"reload_wait_time"`
 	VersionHeader             string                  `json:"version_header"`
-	UseAsyncSessionWrite      bool                    `json:"optimisations_use_async_session_write"`
 	SuppressRedisSignalReload bool                    `json:"suppress_redis_signal_reload"`
 
 	// Gateway Security Policies

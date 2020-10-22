@@ -51,12 +51,6 @@ type sessionUpdater struct {
 	keyPrefix  string
 }
 
-var defaultSessionUpdater *sessionUpdater
-
-func init() {
-	defaultSessionUpdater = &sessionUpdater{}
-}
-
 func (s *sessionUpdater) Init(store storage.Handler) {
 	s.once.Do(func() {
 		s.store = store
@@ -116,7 +110,6 @@ type DefaultAuthorisationManager struct {
 
 type DefaultSessionManager struct {
 	store                    storage.Handler
-	asyncWrites              bool
 	disableCacheSessionState bool
 	orgID                    string
 }
@@ -161,7 +154,6 @@ func (b *DefaultAuthorisationManager) KeyExpired(newSession *user.SessionState) 
 }
 
 func (b *DefaultSessionManager) Init(store storage.Handler) {
-	b.asyncWrites = config.Global().UseAsyncSessionWrite
 	b.store = store
 	b.store.Connect()
 
@@ -169,10 +161,6 @@ func (b *DefaultSessionManager) Init(store storage.Handler) {
 	switch store.(type) {
 	case *RPCStorageHandler:
 		return
-	}
-
-	if b.asyncWrites {
-		defaultSessionUpdater.Init(store)
 	}
 }
 
@@ -227,21 +215,6 @@ func (b *DefaultSessionManager) clearCacheForKey(keyName string, hashed bool) {
 func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.SessionState,
 	resetTTLTo int64, hashed bool) error {
 	defer b.clearCacheForKey(keyName, hashed)
-
-	// async update and return if needed
-	if b.asyncWrites {
-		sessionUpdate := &SessionUpdate{
-			isHashed: hashed,
-			keyVal:   keyName,
-			session:  session,
-			ttl:      resetTTLTo,
-		}
-
-		// send sessionupdate object through channel to pool
-		defaultSessionUpdater.updateChan <- sessionUpdate
-
-		return nil
-	}
 
 	v, err := json.Marshal(session)
 	if err != nil {
