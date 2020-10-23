@@ -324,7 +324,6 @@ type Config struct {
 	HttpServerOptions         HttpServerOptionsConfig `json:"http_server_options"`
 	ReloadWaitTime            int                     `bson:"reload_wait_time" json:"reload_wait_time"`
 	VersionHeader             string                  `json:"version_header"`
-	UseAsyncSessionWrite      bool                    `json:"optimisations_use_async_session_write"`
 	SuppressRedisSignalReload bool                    `json:"suppress_redis_signal_reload"`
 
 	// Gateway Security Policies
@@ -456,8 +455,6 @@ type Config struct {
 	EventTriggersDefunct map[apidef.TykEvent][]TykEventHandler `json:"event_triggers_defunct"` // Deprecated: Config.GetEventTriggers instead.
 
 	// TODO: These config options are not documented - What do they do?
-	SessionUpdatePoolSize          int   `json:"session_update_pool_size"`
-	SessionUpdateBufferSize        int   `json:"session_update_buffer_size"`
 	SupressDefaultOrgStore         bool  `json:"suppress_default_org_store"`
 	LegacyEnableAllowanceCountdown bool  `bson:"legacy_enable_allowance_countdown" json:"legacy_enable_allowance_countdown"`
 	GlobalSessionLifetime          int64 `bson:"global_session_lifetime" json:"global_session_lifetime"`

@@ -954,33 +954,6 @@ func TestListenPathTykPrefix(t *testing.T) {
 	})
 }
 
-func TestReloadGoroutineLeakWithAsyncWrites(t *testing.T) {
-	ts := StartTest()
-	defer ts.Close()
-
-	globalConf := config.Global()
-	globalConf.UseAsyncSessionWrite = true
-	globalConf.EnableJSVM = false
-	config.SetGlobal(globalConf)
-	defer ResetTestConfig()
-
-	specs := BuildAndLoadAPI(func(spec *APISpec) {
-		spec.Proxy.ListenPath = "/"
-	})
-
-	before := runtime.NumGoroutine()
-
-	LoadAPI(specs...) // just doing DoReload() doesn't load anything as BuildAndLoadAPI cleans up folder with API specs
-
-	time.Sleep(100 * time.Millisecond)
-
-	after := runtime.NumGoroutine()
-
-	if before < after {
-		t.Errorf("Goroutine leak, was: %d, after reload: %d", before, after)
-	}
-}
-
 func TestReloadGoroutineLeakWithCircuitBreaker(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
