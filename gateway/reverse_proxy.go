@@ -1357,7 +1357,6 @@ func nopCloseResponseBody(r *http.Response) {
 }
 
 func IsUpgrade(req *http.Request) (bool, string) {
-
 	if !config.Global().HttpServerOptions.EnableWebSockets {
 		return false, ""
 	}

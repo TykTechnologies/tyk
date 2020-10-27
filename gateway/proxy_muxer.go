@@ -37,7 +37,6 @@ type h2cWrapper struct {
 }
 
 func (h *h2cWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-
 	h.h.ServeHTTP(w, r)
 }
 
@@ -342,6 +341,7 @@ func (m *proxyMux) swap(new *proxyMux) {
 		}
 	}
 	m.proxies = m.proxies[:i]
+
 	// Replacing existing routers or starting new listeners
 	for _, newP := range new.proxies {
 		match := m.getProxy(newP.port)
@@ -368,7 +368,6 @@ func (m *proxyMux) swap(new *proxyMux) {
 		// Add a root message to check all is OK
 		p.router.HandleFunc("/"+config.Global().HealthCheckEndpointName, liveCheckHandler)
 	}
-
 	m.serve()
 }
 
