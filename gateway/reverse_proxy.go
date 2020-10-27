@@ -321,7 +321,8 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, logger *logrus
 	proxy := &ReverseProxy{
 		Director:      director,
 		TykAPISpec:    spec,
-		FlushInterval: time.Duration(spec.GlobalConfig.HttpServerOptions.FlushInterval) * time.Millisecond,
+	    FlushInterval: time.Duration(spec.GlobalConfig.HttpServerOptions.FlushInterval) * time.Millisecond,
+
 		logger:        logger,
 		sp: sync.Pool{
 			New: func() interface{} {
@@ -880,7 +881,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		logreq.Header.Del(h)
 	}
 
-	if outReqUpgrade {
+	if outReqUpgrade && reqUpType != ""{
 		outreq.Header.Set("Connection", "Upgrade")
 		logreq.Header.Set("Connection", "Upgrade")
 		outreq.Header.Set("Upgrade", reqUpType)
@@ -1357,10 +1358,16 @@ func nopCloseResponseBody(r *http.Response) {
 }
 
 func IsUpgrade(req *http.Request) (bool, string) {
+
 	if !config.Global().HttpServerOptions.EnableWebSockets {
 		return false, ""
 	}
-
+	for name, values := range req.Header {
+		// Loop over all values for the name.
+		for _, value := range values {
+			log.Info(name, value)
+		}
+	}
 	contentType := strings.ToLower(strings.TrimSpace(req.Header.Get(headers.Accept)))
 	if contentType == "text/event-stream" {
 		return true, ""
