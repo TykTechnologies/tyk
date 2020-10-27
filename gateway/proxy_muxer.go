@@ -38,16 +38,6 @@ type h2cWrapper struct {
 
 func (h *h2cWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
-	/*h.w.router.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
-		t, err := route.GetPathTemplate()
-		if err != nil {
-			return err
-		}
-		log.Infof("Una ruta: %+v metofo:%+v", t)
-		return nil
-	})*/
-
-log.Infof("Called:%v Method:%v", r.URL, r.Method)
 	h.h.ServeHTTP(w, r)
 }
 
@@ -171,12 +161,12 @@ func (m *proxyMux) setRouter(port int, protocol string, router *mux.Router) {
 }
 
 func (m *proxyMux) handle404(w http.ResponseWriter, r *http.Request) {
-	//if config.Global().Track404Logs {
+	if config.Global().Track404Logs {
 		requestMeta := fmt.Sprintf("%s %s %s", r.Method, r.URL.Path, r.Proto)
 		log.WithField("request", requestMeta).WithField("origin", r.RemoteAddr).
 			Error(http.StatusText(http.StatusNotFound))
-	//}
-panic("handling 404")
+	}
+
 	w.WriteHeader(http.StatusNotFound)
 	_, _ = fmt.Fprint(w, http.StatusText(http.StatusNotFound))
 }
@@ -357,11 +347,9 @@ func (m *proxyMux) swap(new *proxyMux) {
 		match := m.getProxy(newP.port)
 		if match == nil {
 			m.proxies = append(m.proxies, newP)
-			log.Infof("p: %+v", newP)
 		} else {
 			if match.tcpProxy != nil {
 				match.tcpProxy.Swap(newP.tcpProxy)
-
 			}
 			match.router = newP.router
 			if match.httpServer != nil {
@@ -369,7 +357,6 @@ func (m *proxyMux) swap(new *proxyMux) {
 				case *handleWrapper:
 					e.router = newP.router
 				case *h2cWrapper:
-					log.Info("h2c wrapper")
 					e.w.router = newP.router
 				}
 			}
@@ -382,14 +369,11 @@ func (m *proxyMux) swap(new *proxyMux) {
 		p.router.HandleFunc("/"+config.Global().HealthCheckEndpointName, liveCheckHandler)
 	}
 
-
 	m.serve()
 }
 
 func (m *proxyMux) serve() {
-
 	for _, p := range m.proxies {
-
 		if p.listener == nil {
 			listener, err := m.generateListener(p.port, p.protocol)
 			if err != nil {
@@ -427,19 +411,10 @@ func (m *proxyMux) serve() {
 				// wrapping handler in h2c. This ensures all features including tracing work
 				// in h2c services.
 				h2s := &http2.Server{}
-				/*handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					fmt.Fprintf(w, "Hello, %v, http: %v", r.URL.Path, r.TLS == nil)
-					panic("Hola")
-				})*/
-
-				//h = h2c.NewHandler(handler, h2s)
-
 				h = &h2cWrapper{
 					w: h.(*handleWrapper),
 					h: h2c.NewHandler(p.router, h2s),
 				}
-
-
 			}
 			addr := config.Global().ListenAddress + ":" + strconv.Itoa(p.port)
 			p.httpServer = &http.Server{
