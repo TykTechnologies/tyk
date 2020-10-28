@@ -119,8 +119,8 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		"prefix": "coprocess",
 	})
 
-	if strings.Contains(spec.Proxy.TargetURL,"h2c://"){
-		spec.Proxy.TargetURL = strings.Replace(spec.Proxy.TargetURL,"h2c://","http://",1)
+	if strings.Contains(spec.Proxy.TargetURL, "h2c://") {
+		spec.Proxy.TargetURL = strings.Replace(spec.Proxy.TargetURL, "h2c://", "http://", 1)
 	}
 	if len(spec.TagHeaders) > 0 {
 		// Ensure all headers marked for tagging are lowercase
@@ -766,7 +766,7 @@ func loadApps(specs []*APISpec) {
 	shouldTrace := trace.IsEnabled()
 	for _, spec := range specs {
 		func() {
-			if strings.Contains(spec.Proxy.TargetURL,"h2c://"){
+			if strings.Contains(spec.Proxy.TargetURL, "h2c://") {
 				spec.Protocol = "h2c"
 			}
 			defer func() {
