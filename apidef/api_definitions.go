@@ -516,7 +516,6 @@ type ProxyConfig struct {
 	StructuredTargetList        *HostList                     `bson:"-" json:"-"`
 	CheckHostAgainstUptimeTests bool                          `bson:"check_host_against_uptime_tests" json:"check_host_against_uptime_tests"`
 	ServiceDiscovery            ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
-	EnableH2c                   bool                          `bson:"enable_h2c" json:"enable_h2c"`
 	Transport                   struct {
 		SSLInsecureSkipVerify   bool     `bson:"ssl_insecure_skip_verify" json:"ssl_insecure_skip_verify"`
 		SSLCipherSuites         []string `bson:"ssl_ciphers" json:"ssl_ciphers"`

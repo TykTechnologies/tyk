@@ -766,6 +766,9 @@ func loadApps(specs []*APISpec) {
 	shouldTrace := trace.IsEnabled()
 	for _, spec := range specs {
 		func() {
+			if strings.Contains(spec.Proxy.TargetURL,"h2c://"){
+				spec.Protocol = "h2c"
+			}
 			defer func() {
 				// recover from panic if one occured. Set err to nil otherwise.
 				if err := recover(); err != nil {
