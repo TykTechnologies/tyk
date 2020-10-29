@@ -365,6 +365,11 @@ func (j *JSVM) LoadJSPaths(paths []string, prefix string) {
 		if prefix != "" {
 			mwPath = filepath.Join(prefix, mwPath)
 		}
+		extension := filepath.Ext(mwPath)
+		if !strings.Contains(extension, ".js") {
+			j.Log.Errorf("Unsupported extension '%s' (%s)", extension, mwPath)
+			continue
+		}
 		j.Log.Info("Loading JS File: ", mwPath)
 		f, err := os.Open(mwPath)
 		if err != nil {
