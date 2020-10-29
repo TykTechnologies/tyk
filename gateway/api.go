@@ -624,14 +624,18 @@ func handleDeleteKey(keyName, apiID string, resetQuota bool) (interface{}, int) 
 	if apiID == "-1" {
 		// Go through ALL managed API's and delete the key
 		apisMu.RLock()
-		removed := GlobalSessionManager.RemoveSession(orgID, keyName, false)
-		GlobalSessionManager.ResetQuota(
-			keyName,
-			&user.SessionState{
-				Mutex: &sync.RWMutex{},
-			},
-			false)
+		removed := false
+		for _, spec := range apisByID {
+			removed = GlobalSessionManager.RemoveSession(spec.OrgID, keyName, false)
+			GlobalSessionManager.ResetQuota(
+				keyName,
+				user.NewSessionState(),
+				false)
 
+			if removed {
+				break
+			}
+		}
 		apisMu.RUnlock()
 
 		if !removed {
