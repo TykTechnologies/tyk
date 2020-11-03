@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/lonelycode/osin"
@@ -1112,7 +1111,7 @@ func (accessTokenGen) GenerateAccessToken(data *osin.AccessData, generaterefresh
 			return "", "", errors.New("Couldn't use policy or key rules to create token, failing")
 		}
 
-		newSession = sessionFromPolicy
+		newSession = sessionFromPolicy.Clone()
 	}
 
 	accesstoken = keyGen.GenerateAuthKey(newSession.OrgID)
@@ -1135,14 +1134,14 @@ func (r *RedisOsinStorageInterface) GetUser(username string) (*user.SessionState
 	}
 
 	// new interface means having to make this nested... ick.
-	session := user.SessionState{Mutex: &sync.RWMutex{}}
+	session := user.NewSessionState()
 	if err := json.Unmarshal([]byte(accessJSON), &session); err != nil {
 		log.Error("Couldn't unmarshal OAuth auth data object (LoadRefresh): ", err,
 			"; Decoding: ", accessJSON)
 		return nil, err
 	}
 
-	return &session, nil
+	return session, nil
 }
 
 func (r *RedisOsinStorageInterface) SetUser(username string, session *user.SessionState, timeout int64) error {

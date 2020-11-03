@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"net/http"
-	"sync"
 
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/headers"
@@ -37,7 +36,6 @@ func MyPluginAuthCheck(rw http.ResponseWriter, r *http.Request) {
 	session := &user.SessionState{
 		OrgID: "default",
 		Alias: "abc-session",
-		Mutex: &sync.RWMutex{},
 	}
 	ctx.SetSession(r, session, token, true)
 

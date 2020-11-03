@@ -11,7 +11,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
@@ -473,7 +472,8 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		ctxSetSession(r, &session, sessionID, updateSession)
 
 		if updateSession {
-			SessionCache.Set(session.GetKeyHash(), session, cache.DefaultExpiration)
+			clone := session.Clone()
+			SessionCache.Set(session.GetKeyHash(), &clone, cache.DefaultExpiration)
 		}
 	}
 	ctxSetJWTContextVars(k.Spec, r, token)
@@ -693,9 +693,10 @@ func generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.Se
 	policiesMu.RLock()
 	policy, ok := policiesByID[policyID]
 	policiesMu.RUnlock()
-	session := user.SessionState{Mutex: &sync.RWMutex{}}
+	user.NewSessionState()
+	session := user.NewSessionState()
 	if !ok {
-		return session, errors.New("Policy not found")
+		return session.Clone(), errors.New("Policy not found")
 	}
 	// Check ownership, policy org owner must be the same as API,
 	// otherwise youcould overwrite a session key with a policy from a different org!
@@ -703,7 +704,7 @@ func generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.Se
 	if enforceOrg {
 		if policy.OrgID != orgID {
 			log.Error("Attempting to apply policy from different organisation to key, skipping")
-			return session, errors.New("Key not authorized: no matching policy")
+			return session.Clone(), errors.New("Key not authorized: no matching policy")
 		}
 	} else {
 		// Org isn;t enforced, so lets use the policy baseline
@@ -733,5 +734,5 @@ func generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.Se
 		session.Expires = time.Now().Unix() + policy.KeyExpiresIn
 	}
 
-	return session, nil
+	return session.Clone(), nil
 }

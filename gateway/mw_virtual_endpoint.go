@@ -13,7 +13,6 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/robertkrimen/otto"
@@ -164,8 +163,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	// Encode the configuration data too
 	specAsJson := specToJson(d.Spec)
 
-	session := new(user.SessionState)
-	session.Mutex = &sync.RWMutex{}
+	session := user.NewSessionState()
 
 	// Encode the session object (if not a pre-process)
 	if vmeta.UseSession {

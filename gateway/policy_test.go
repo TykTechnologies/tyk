@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -380,8 +379,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 
 				assert.Equal(t, want, s.Tags)
 			}, &user.SessionState{
-				Mutex: &sync.RWMutex{},
-				Tags:  []string{"key-tag"},
+				Tags: []string{"key-tag"},
 			},
 		},
 		{
@@ -408,7 +406,6 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				}
 			}, &user.SessionState{
 				IsInactive: true,
-				Mutex:      &sync.RWMutex{},
 			},
 		},
 		{
@@ -822,7 +819,6 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 
 	// create test session
 	session := &user.SessionState{
-		Mutex:         &sync.RWMutex{},
 		ApplyPolicies: []string{"two_of_three_with_api_limit"},
 		OrgID:         "default",
 		AccessRights: map[string]user.AccessDefinition{
@@ -1053,7 +1049,6 @@ func TestApplyMultiPolicies(t *testing.T) {
 	session := &user.SessionState{
 		ApplyPolicies: []string{"policy1", "policy2"},
 		OrgID:         "default",
-		Mutex:         &sync.RWMutex{},
 	}
 
 	// create key
@@ -1231,7 +1226,6 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 
 	// create test session
 	session := &user.SessionState{
-		Mutex:         &sync.RWMutex{},
 		ApplyPolicies: []string{"per_api_policy_with_two_apis"},
 		OrgID:         "default",
 		AccessRights: map[string]user.AccessDefinition{
