@@ -620,7 +620,8 @@ func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p
 	if config.Global().ProxyEnableHttp2 {
 		http2.ConfigureTransport(transport)
 	}
-	if config.Global().ProxyEnableH2c || p.TykAPISpec.Proxy.EnableH2c {
+
+	if p.TykAPISpec.Protocol == "h2c" {
 		h2t := &http2.Transport{
 			// kind of a hack, but for plaintext/H2C requests, pretend to dial TLS
 			DialTLS: func(network, addr string, _ *tls.Config) (net.Conn, error) {
