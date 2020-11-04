@@ -775,9 +775,6 @@
     "proxy_enable_http2": {
       "type": "boolean"
     },
-    "proxy_enable_h2c": {
-      "type": "boolean"
-    },
     "proxy_ssl_insecure_skip_verify": {
       "type": "boolean"
     },

@@ -53,7 +53,6 @@ func TestHTTP2_h2C(t *testing.T) {
 
 	// Tyk
 	globalConf := config.Global()
-	globalConf.ProxyEnableH2c = true
 	config.SetGlobal(globalConf)
 	defer ResetTestConfig()
 
@@ -110,7 +109,6 @@ func TestGRPC_H2C(t *testing.T) {
 	// Tyk
 	globalConf := config.Global()
 	globalConf.ProxySSLInsecureSkipVerify = true
-	globalConf.ProxyEnableH2c = true
 	config.SetGlobal(globalConf)
 	defer ResetTestConfig()
 
@@ -121,7 +119,7 @@ func TestGRPC_H2C(t *testing.T) {
 		spec.Name = "h2c_api"
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = true
-		spec.Proxy.TargetURL = toTarget(t, "http", target)
+		spec.Proxy.TargetURL = toTarget(t, "h2c", target)
 		spec.ListenPort = port
 		spec.Protocol = "h2c"
 	})
@@ -778,7 +776,6 @@ func TestGRPC_Stream_H2C(t *testing.T) {
 	// Tyk
 	globalConf := config.Global()
 	globalConf.ProxySSLInsecureSkipVerify = true
-	globalConf.ProxyEnableH2c = true
 	config.SetGlobal(globalConf)
 	defer ResetTestConfig()
 
