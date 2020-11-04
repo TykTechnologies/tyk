@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/robertkrimen/otto"
@@ -141,8 +140,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	specAsJson := specToJson(d.Spec)
 
-	session := new(user.SessionState)
-	session.Mutex = &sync.RWMutex{}
+	session := user.NewSessionState()
 	// Encode the session object (if not a pre-process)
 	if !d.Pre && d.UseSession {
 		session = ctxGetSession(r)
@@ -575,14 +573,14 @@ func (j *JSVM) LoadTykJSApi() {
 		encoddedSession := call.Argument(1).String()
 		suppressReset := call.Argument(2).String()
 
-		newSession := user.SessionState{Mutex: &sync.RWMutex{}}
+		newSession := user.NewSessionState()
 		err := json.Unmarshal([]byte(encoddedSession), &newSession)
 		if err != nil {
 			j.Log.WithError(err).Error("Failed to decode the sesison data")
 			return otto.Value{}
 		}
 
-		doAddOrUpdate(apiKey, &newSession, suppressReset == "1", false)
+		doAddOrUpdate(apiKey, newSession, suppressReset == "1", false)
 
 		return otto.Value{}
 	})
