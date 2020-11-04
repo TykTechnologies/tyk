@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"net/http"
-	"sync"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -20,11 +19,10 @@ type mockStore struct {
 var sess = user.SessionState{
 	OrgID:       "TestBaseMiddleware_OrgSessionExpiry",
 	DataExpires: 110,
-	Mutex:       &sync.RWMutex{},
 }
 
 func (mockStore) SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool) {
-	return sess, true
+	return sess.Clone(), true
 }
 
 func TestBaseMiddleware_OrgSessionExpiry(t *testing.T) {
