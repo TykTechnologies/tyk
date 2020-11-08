@@ -344,6 +344,9 @@
     "jsvm_timeout": {
       "type": "integer"
     },
+    "jsvm_http_request_timeout": {
+      "type": "integer"
+    },
     "enable_non_transactional_rate_limiter": {
       "type": "boolean"
     },

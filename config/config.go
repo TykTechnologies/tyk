@@ -419,6 +419,7 @@ type Config struct {
 	BundleInsecureSkipVerify bool            `bson:"bundle_insecure_skip_verify" json:"bundle_insecure_skip_verify"`
 	EnableJSVM               bool            `json:"enable_jsvm"`
 	JSVMTimeout              int             `json:"jsvm_timeout"`
+	JSVMHTTPRequestTimeout   int             `json:"jsvm_http_request_timeout"`
 	DisableVirtualPathBlobs  bool            `json:"disable_virtual_path_blobs"`
 	TykJSPath                string          `json:"tyk_js_path"`
 	MiddlewarePath           string          `json:"middleware_path"`
