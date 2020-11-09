@@ -48,7 +48,6 @@ func (b *BatchRequestHandler) doRequest(req *http.Request, relURL string) BatchR
 	}
 
 	tr.TLSClientConfig.InsecureSkipVerify = config.Global().ProxySSLInsecureSkipVerify
-
 	tr.DialTLS = customDialTLSCheck(b.API, tr.TLSClientConfig)
 
 	tr.Proxy = proxyFromAPI(b.API)
@@ -84,7 +83,7 @@ func (b *BatchRequestHandler) DecodeBatchRequest(r *http.Request) (BatchRequestS
 
 func (b *BatchRequestHandler) ConstructRequests(batchRequest BatchRequestStructure, unsafe bool) ([]*http.Request, error) {
 	requestSet := []*http.Request{}
-
+	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
 	for i, requestDef := range batchRequest.Requests {
 		// We re-build the URL to ensure that the requested URL is actually for the API in question
 		// URLs need to be built absolute so they go through the rate limiting and request limiting machinery
@@ -104,9 +103,8 @@ func (b *BatchRequestHandler) ConstructRequests(batchRequest BatchRequestStructu
 
 		// Add headers
 		for k, v := range requestDef.Headers {
-			request.Header.Set(k, v)
+			setCustomHeader(request.Header, k, v, ignoreCanonical)
 		}
-
 		requestSet = append(requestSet, request)
 	}
 

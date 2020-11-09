@@ -74,6 +74,10 @@ const (
 	FLUSHO                           = 0x1000
 	FS_IOC_ENABLE_VERITY             = 0x40806685
 	FS_IOC_GETFLAGS                  = 0x80086601
+<<<<<<< HEAD
+=======
+	FS_IOC_GET_ENCRYPTION_NONCE      = 0x8010661b
+>>>>>>> Ignore canonical mime header key (TT-116)
 	FS_IOC_GET_ENCRYPTION_POLICY     = 0x400c6615
 	FS_IOC_GET_ENCRYPTION_PWSALT     = 0x40106614
 	FS_IOC_SET_ENCRYPTION_POLICY     = 0x800c6613

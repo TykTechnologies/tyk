@@ -6,14 +6,17 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
+	"github.com/valyala/fasthttp"
 )
 
 const testBatchRequest = `{
@@ -74,49 +77,52 @@ func TestBatch(t *testing.T) {
 	}
 }
 
-var virtBatchTest = `function batchTest (request, session, config) {
-	// Set up a response object
-	var response = {
-		Body: "",
-		Headers: {
-			"content-type": "application/json"
-		},
-		Code: 202
-	}
+var virtBatchTest = `function batchTest(request, session, config) {
+    // Set up a response object
+    var response = {
+        Body: "",
+        Headers: {
+            "content-type": "application/json"
+        },
+        Code: 202
+    }
 
-	// Batch request
-	var batch = {
-		"requests": [
-			{
-				"method": "GET",
-				"headers": {},
-				"body": "",
-				"relative_url": "{upstream_URL}"
-			},
-			{
-				"method": "GET",
-				"headers": {},
-				"body": "",
-				"relative_url": "{upstream_URL}"
-			}
-		],
-		"suppress_parallel_execution": false
-	}
+    // Batch request
+    var batch = {
+        "requests": [
+            {
+                "method": "GET",
+                "headers": {
+                    "X-CertificateOuid": "X-CertificateOuid"
+                },
+                "body": "",
+                "relative_url": "{upstream_URL}"
+            },
+            {
+                "method": "GET",
+                "headers": {
+                    "X-CertificateOuid": "X-CertificateOuid"
+                },
+                "body": "",
+                "relative_url": "{upstream_URL}"
+            }
+        ],
+        "suppress_parallel_execution": false
+    }
 
-	var newBody = TykBatchRequest(JSON.stringify(batch))
-	var asJS = JSON.parse(newBody)
-	for (var i in asJS) {
-		if (asJS[i].code == 0){
-			response.Code = 500
-		}
-	}
-	return TykJsResponse(response, session.meta_data)
+    var newBody = TykBatchRequest(JSON.stringify(batch))
+    var asJS = JSON.parse(newBody)
+    for (var i in asJS) {
+        if (asJS[i].code == 0) {
+            response.Code = 500
+        }
+    }
+    return TykJsResponse(response, session.meta_data)
 }`
 
 func TestVirtualEndpointBatch(t *testing.T) {
 	_, _, combinedClientPEM, clientCert := genCertificate(&x509.Certificate{})
 	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
-
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	}))
 
@@ -182,4 +188,57 @@ func TestVirtualEndpointBatch(t *testing.T) {
 		ts.Run(t, test.TestCase{Path: "/virt", Code: 500})
 	})
 
+}
+
+func TestBatchIgnoreCanonicalHeaderKey(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		if l, err = net.Listen("tcp", "127.0.0.1:0"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	defer l.Close()
+	var header atomic.Value
+	header.Store("")
+	requestHandler := func(ctx *fasthttp.RequestCtx) {
+		ctx.Request.Header.DisableNormalizing()
+		header.Store(string(ctx.Request.Header.Peek(NonCanonicalHeaderKey)))
+	}
+	srv := &fasthttp.Server{
+		Handler:                       requestHandler,
+		DisableHeaderNamesNormalizing: true,
+	}
+	go func() {
+		srv.Serve(l)
+	}()
+
+	upstream := "http://" + l.Addr().String()
+	virtBatchTest = strings.Replace(virtBatchTest, "{upstream_URL}", upstream, 2)
+	c := config.Global()
+	c.IgnoreCanonicalMIMEHeaderKey = true
+	config.SetGlobal(c)
+	ts := StartTest()
+	defer ts.Close()
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		virtualMeta := apidef.VirtualMeta{
+			ResponseFunctionName: "batchTest",
+			FunctionSourceType:   "blob",
+			FunctionSourceURI:    base64.StdEncoding.EncodeToString([]byte(virtBatchTest)),
+			Path:                 "/virt",
+			Method:               "GET",
+		}
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			v.UseExtendedPaths = true
+			v.ExtendedPaths = apidef.ExtendedPathsSet{
+				Virtual: []apidef.VirtualMeta{virtualMeta},
+			}
+		})
+	})
+	ts.Run(t, test.TestCase{Path: "/virt", Code: 202})
+	got := header.Load().(string)
+	if got != NonCanonicalHeaderKey {
+		t.Errorf("expected %q got %q", NonCanonicalHeaderKey, got)
+	}
 }

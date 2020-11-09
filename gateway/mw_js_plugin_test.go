@@ -230,6 +230,46 @@ testJSVMData.NewProcessRequest(function(request, session, spec) {
 		t.Fatalf("wanted header to be %q, got %q", want, got)
 	}
 }
+func TestJSVM_IgnoreCanonicalHeader(t *testing.T) {
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+	const js = `
+var testJSVMData = new TykJS.TykMiddleware.NewMiddleware({})
+
+testJSVMData.NewProcessRequest(function(request, session, spec) {
+	request.SetHeaders["X-CertificateOuid"] = "X-CertificateOuid"
+	return testJSVMData.ReturnData(request, {})
+});`
+	dynMid := &DynamicMiddleware{
+		BaseMiddleware:      BaseMiddleware{Spec: spec, Proxy: nil},
+		MiddlewareClassName: "testJSVMData",
+		Pre:                 true,
+	}
+	jsvm := JSVM{}
+	jsvm.Init(nil, logrus.NewEntry(log))
+	if _, err := jsvm.VM.Run(js); err != nil {
+		t.Fatalf("failed to set up js plugin: %v", err)
+	}
+	dynMid.Spec.JSVM = jsvm
+
+	r := TestReq(t, "GET", "/v1/test-data", nil)
+	dynMid.ProcessRequest(nil, r, nil)
+	if want, got := NonCanonicalHeaderKey, r.Header.Get(NonCanonicalHeaderKey); want != got {
+		t.Fatalf("wanted header to be %q, got %q", want, got)
+	}
+	r.Header.Del(NonCanonicalHeaderKey)
+
+	c := config.Global()
+	c.IgnoreCanonicalMIMEHeaderKey = true
+	config.SetGlobal(c)
+	defer ResetTestConfig()
+	dynMid.ProcessRequest(nil, r, nil)
+	if want, got := "", r.Header.Get(NonCanonicalHeaderKey); want != got {
+		t.Fatalf("wanted header to be %q, got %q", want, got)
+	}
+	if want, got := NonCanonicalHeaderKey, r.Header[NonCanonicalHeaderKey][0]; want != got {
+		t.Fatalf("wanted header to be %q, got %q", want, got)
+	}
+}
 
 func TestJSVMUserCore(t *testing.T) {
 	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}

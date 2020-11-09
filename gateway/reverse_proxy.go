@@ -412,14 +412,37 @@ func removeDuplicateCORSHeader(dst, src http.Header) {
 	}
 }
 
-func copyHeader(dst, src http.Header) {
+func copyHeader(dst, src http.Header, ignoreCanonical bool) {
 
 	removeDuplicateCORSHeader(dst, src)
 
 	for k, vv := range src {
+		if ignoreCanonical {
+			dst[k] = append(dst[k], vv...)
+			continue
+		}
 		for _, v := range vv {
 			dst.Add(k, v)
 		}
+	}
+}
+
+func addCustomHeader(h http.Header, key string, value []string, ignoreCanonical bool) {
+	if ignoreCanonical {
+		h[key] = append(h[key], value...)
+	} else {
+		for _, v := range value {
+			h.Add(key, v)
+		}
+	}
+
+}
+
+func setCustomHeader(h http.Header, key string, value string, ignoreCanonical bool) {
+	if ignoreCanonical {
+		h[key] = []string{value}
+	} else {
+		h.Set(key, value)
 	}
 }
 
@@ -1078,7 +1101,7 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 		res.Header.Set(headers.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
 	}
 
-	copyHeader(rw.Header(), res.Header)
+	copyHeader(rw.Header(), res.Header, config.Global().IgnoreCanonicalMIMEHeaderKey)
 
 	announcedTrailers := len(res.Trailer)
 	if announcedTrailers > 0 {
@@ -1103,7 +1126,7 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 	p.CopyResponse(rw, res.Body)
 
 	if len(res.Trailer) == announcedTrailers {
-		copyHeader(rw.Header(), res.Trailer)
+		copyHeader(rw.Header(), res.Trailer, config.Global().IgnoreCanonicalMIMEHeaderKey)
 		return nil
 	}
 
@@ -1174,7 +1197,7 @@ func upgradeType(h http.Header) string {
 }
 
 func (p *ReverseProxy) handleUpgradeResponse(rw http.ResponseWriter, req *http.Request, res *http.Response) error {
-	copyHeader(res.Header, rw.Header())
+	copyHeader(res.Header, rw.Header(), config.Global().IgnoreCanonicalMIMEHeaderKey)
 
 	hj, ok := rw.(http.Hijacker)
 	if !ok {

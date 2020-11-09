@@ -236,13 +236,17 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return nil, http.StatusOK
 	}
 
+	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
 	// Delete and set headers
 	for _, dh := range newRequestData.Request.DeleteHeaders {
 		r.Header.Del(dh)
+		if ignoreCanonical {
+			// Make sure we delete the header in case the header key was not canonical.
+			delete(r.Header, dh)
+		}
 	}
-
 	for h, v := range newRequestData.Request.SetHeaders {
-		r.Header.Set(h, v)
+		setCustomHeader(r.Header, h, v, ignoreCanonical)
 	}
 
 	// Delete and set request parameters
@@ -471,7 +475,7 @@ func (j *JSVM) LoadTykJSApi() {
 		}
 		return returnVal
 	})
-
+	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
 	// Enable the creation of HTTP Requsts
 	j.VM.Set("TykMakeHttpRequest", func(call otto.FunctionCall) otto.Value {
 		jsonHRO := call.Argument(0).String()
@@ -509,7 +513,7 @@ func (j *JSVM) LoadTykJSApi() {
 		}
 
 		for k, v := range hro.Headers {
-			r.Header.Set(k, v)
+			setCustomHeader(r.Header, k, v, ignoreCanonical)
 		}
 		r.Close = true
 
@@ -598,7 +602,6 @@ func (j *JSVM) LoadTykJSApi() {
 	j.VM.Set("TykBatchRequest", func(call otto.FunctionCall) otto.Value {
 		requestSet := call.Argument(0).String()
 		j.Log.Debug("Batch input is: ", requestSet)
-
 		bs, err := unsafeBatchHandler.ManualBatchRequest([]byte(requestSet))
 		if err != nil {
 			j.Log.WithError(err).Error("Batch request error")
