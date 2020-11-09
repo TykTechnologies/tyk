@@ -7,6 +7,7 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -47,7 +48,7 @@ func (h *HeaderTransform) HandleResponse(rw http.ResponseWriter,
 	if err != nil {
 		return err
 	}
-
+	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
 	for _, name := range h.config.RevProxyTransform.Headers {
 		// check if header is present and its value is not empty
 		val := res.Header.Get(name)
@@ -72,7 +73,7 @@ func (h *HeaderTransform) HandleResponse(rw http.ResponseWriter,
 				val = strings.Replace(val, h.Spec.target.Path, "/", -1)
 			}
 		}
-		res.Header.Set(name, val)
+		setCustomHeader(res.Header, name, val, ignoreCanonical)
 	}
 	return nil
 }

@@ -474,9 +474,10 @@ const (
 
 	// Nothing should be listening on port 16501 - useful for
 	// testing TCP and HTTP failures.
-	testHttpFailure    = "127.0.0.1:16501"
-	testHttpFailureAny = "http://" + testHttpFailure
-	MockOrgID          = "507f1f77bcf86cd799439011"
+	testHttpFailure       = "127.0.0.1:16501"
+	testHttpFailureAny    = "http://" + testHttpFailure
+	MockOrgID             = "507f1f77bcf86cd799439011"
+	NonCanonicalHeaderKey = "X-CertificateOuid"
 )
 
 func testHttpHandler() *mux.Router {

@@ -160,16 +160,23 @@ const (
 	BPF_A                                       = 0x10
 	BPF_ABS                                     = 0x20
 	BPF_ADD                                     = 0x0
+<<<<<<< HEAD
 	BPF_ADJ_ROOM_ENCAP_L2_MASK                  = 0xff
 	BPF_ADJ_ROOM_ENCAP_L2_SHIFT                 = 0x38
 	BPF_ALU                                     = 0x4
 	BPF_ALU64                                   = 0x7
 	BPF_AND                                     = 0x50
 	BPF_ANY                                     = 0x0
+=======
+	BPF_ALU                                     = 0x4
+	BPF_ALU64                                   = 0x7
+	BPF_AND                                     = 0x50
+>>>>>>> Ignore canonical mime header key (TT-116)
 	BPF_ARSH                                    = 0xc0
 	BPF_B                                       = 0x10
 	BPF_BUILD_ID_SIZE                           = 0x14
 	BPF_CALL                                    = 0x80
+<<<<<<< HEAD
 	BPF_DEVCG_ACC_MKNOD                         = 0x1
 	BPF_DEVCG_ACC_READ                          = 0x2
 	BPF_DEVCG_ACC_WRITE                         = 0x4
@@ -232,6 +239,23 @@ const (
 	BPF_F_WRONLY_PROG                           = 0x100
 	BPF_F_ZERO_CSUM_TX                          = 0x2
 	BPF_F_ZERO_SEED                             = 0x40
+=======
+	BPF_DIV                                     = 0x30
+	BPF_DW                                      = 0x18
+	BPF_END                                     = 0xd0
+	BPF_EXIT                                    = 0x90
+	BPF_FROM_BE                                 = 0x8
+	BPF_FROM_LE                                 = 0x0
+	BPF_FS_MAGIC                                = 0xcafe4a11
+	BPF_F_ALLOW_MULTI                           = 0x2
+	BPF_F_ALLOW_OVERRIDE                        = 0x1
+	BPF_F_ANY_ALIGNMENT                         = 0x2
+	BPF_F_QUERY_EFFECTIVE                       = 0x1
+	BPF_F_REPLACE                               = 0x4
+	BPF_F_STRICT_ALIGNMENT                      = 0x1
+	BPF_F_TEST_RND_HI32                         = 0x4
+	BPF_F_TEST_STATE_FREQ                       = 0x8
+>>>>>>> Ignore canonical mime header key (TT-116)
 	BPF_H                                       = 0x8
 	BPF_IMM                                     = 0x0
 	BPF_IND                                     = 0x40
@@ -267,7 +291,10 @@ const (
 	BPF_MUL                                     = 0x20
 	BPF_NEG                                     = 0x80
 	BPF_NET_OFF                                 = -0x100000
+<<<<<<< HEAD
 	BPF_NOEXIST                                 = 0x1
+=======
+>>>>>>> Ignore canonical mime header key (TT-116)
 	BPF_OBJ_NAME_LEN                            = 0x10
 	BPF_OR                                      = 0x40
 	BPF_PSEUDO_CALL                             = 0x1
@@ -275,12 +302,15 @@ const (
 	BPF_PSEUDO_MAP_VALUE                        = 0x2
 	BPF_RET                                     = 0x6
 	BPF_RSH                                     = 0x70
+<<<<<<< HEAD
 	BPF_SK_STORAGE_GET_F_CREATE                 = 0x1
 	BPF_SOCK_OPS_ALL_CB_FLAGS                   = 0xf
 	BPF_SOCK_OPS_RETRANS_CB_FLAG                = 0x2
 	BPF_SOCK_OPS_RTO_CB_FLAG                    = 0x1
 	BPF_SOCK_OPS_RTT_CB_FLAG                    = 0x8
 	BPF_SOCK_OPS_STATE_CB_FLAG                  = 0x4
+=======
+>>>>>>> Ignore canonical mime header key (TT-116)
 	BPF_ST                                      = 0x2
 	BPF_STX                                     = 0x3
 	BPF_SUB                                     = 0x10
@@ -378,12 +408,20 @@ const (
 	CLOCK_TXINT                                 = 0x3
 	CLONE_ARGS_SIZE_VER0                        = 0x40
 	CLONE_ARGS_SIZE_VER1                        = 0x50
+<<<<<<< HEAD
+=======
+	CLONE_ARGS_SIZE_VER2                        = 0x58
+>>>>>>> Ignore canonical mime header key (TT-116)
 	CLONE_CHILD_CLEARTID                        = 0x200000
 	CLONE_CHILD_SETTID                          = 0x1000000
 	CLONE_CLEAR_SIGHAND                         = 0x100000000
 	CLONE_DETACHED                              = 0x400000
 	CLONE_FILES                                 = 0x400
 	CLONE_FS                                    = 0x200
+<<<<<<< HEAD
+=======
+	CLONE_INTO_CGROUP                           = 0x200000000
+>>>>>>> Ignore canonical mime header key (TT-116)
 	CLONE_IO                                    = 0x80000000
 	CLONE_NEWCGROUP                             = 0x2000000
 	CLONE_NEWIPC                                = 0x8000000
@@ -598,7 +636,13 @@ const (
 	FAN_DELETE                                  = 0x200
 	FAN_DELETE_SELF                             = 0x400
 	FAN_DENY                                    = 0x2
+<<<<<<< HEAD
 	FAN_ENABLE_AUDIT                            = 0x40
+=======
+	FAN_DIR_MODIFY                              = 0x80000
+	FAN_ENABLE_AUDIT                            = 0x40
+	FAN_EVENT_INFO_TYPE_DFID_NAME               = 0x2
+>>>>>>> Ignore canonical mime header key (TT-116)
 	FAN_EVENT_INFO_TYPE_FID                     = 0x1
 	FAN_EVENT_METADATA_LEN                      = 0x18
 	FAN_EVENT_ON_CHILD                          = 0x8000000
@@ -2108,8 +2152,11 @@ const (
 	TCOFLUSH                                    = 0x1
 	TCOOFF                                      = 0x0
 	TCOON                                       = 0x1
+<<<<<<< HEAD
 	TCP_BPF_IW                                  = 0x3e9
 	TCP_BPF_SNDCWND_CLAMP                       = 0x3ea
+=======
+>>>>>>> Ignore canonical mime header key (TT-116)
 	TCP_CC_INFO                                 = 0x1a
 	TCP_CM_INQ                                  = 0x24
 	TCP_CONGESTION                              = 0xd
@@ -2384,8 +2431,14 @@ const (
 	XDP_COPY                                    = 0x2
 	XDP_FLAGS_DRV_MODE                          = 0x4
 	XDP_FLAGS_HW_MODE                           = 0x8
+<<<<<<< HEAD
 	XDP_FLAGS_MASK                              = 0xf
 	XDP_FLAGS_MODES                             = 0xe
+=======
+	XDP_FLAGS_MASK                              = 0x1f
+	XDP_FLAGS_MODES                             = 0xe
+	XDP_FLAGS_REPLACE                           = 0x10
+>>>>>>> Ignore canonical mime header key (TT-116)
 	XDP_FLAGS_SKB_MODE                          = 0x2
 	XDP_FLAGS_UPDATE_IF_NOEXIST                 = 0x1
 	XDP_MMAP_OFFSETS                            = 0x1
