@@ -714,45 +714,20 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	return rt.transport.RoundTrip(r)
 }
 
-func (p *ReverseProxy) sendRequestToUpstream(roundTripper *TykRoundTripper, outreq *http.Request) (res *http.Response, upstreamLatency time.Duration, err error) {
-	begin := time.Now()
-	defer func() {
-		upstreamLatency = time.Since(begin)
-	}()
-
-	if !p.TykAPISpec.GraphQL.Enabled {
-		res, err = roundTripper.RoundTrip(outreq)
-		return
+func (p *ReverseProxy) handleInboundAndOutboundRequest(roundTripper *TykRoundTripper, inboundReq *http.Request, outboundReq *http.Request) (res *http.Response, latency time.Duration, err error) {
+	if p.TykAPISpec.GraphQL.Enabled {
+		return p.handleGraphQL(roundTripper, inboundReq, outboundReq)
 	}
 
-	// process graphql
+	return p.sendRequestToUpstream(roundTripper, outboundReq)
+}
 
-	gqlRequest := ctxGetGraphQLRequest(outreq)
+func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, inboundReq *http.Request, outboundReq *http.Request) (res *http.Response, latency time.Duration, err error) {
+	gqlRequest := ctxGetGraphQLRequest(outboundReq)
 	if gqlRequest == nil {
 		err = errors.New("graphql request is nil")
 		return
 	}
-
-	// execution mode
-
-	if p.TykAPISpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeExecutionEngine {
-		if p.TykAPISpec.GraphQLExecutor.Engine == nil {
-			err = errors.New("execution engine is nil")
-			return
-		}
-
-		p.TykAPISpec.GraphQLExecutor.Client.Transport = roundTripper
-		var result *graphql.ExecutionResult
-		result, err = p.TykAPISpec.GraphQLExecutor.Engine.Execute(context.Background(), gqlRequest, graphql.ExecutionOptions{ExtraArguments: gqlRequest.Variables})
-		if err != nil {
-			return
-		}
-		res = result.GetAsHTTPResponse()
-
-		return
-	}
-
-	// proxy mode
 
 	var isIntrospection bool
 	isIntrospection, err = gqlRequest.IsIntrospectionQuery()
@@ -760,11 +735,22 @@ func (p *ReverseProxy) sendRequestToUpstream(roundTripper *TykRoundTripper, outr
 		return
 	}
 
-	// if not introspection query process as normal
-	if !isIntrospection {
-		res, err = roundTripper.RoundTrip(outreq)
-		return
+	if isIntrospection {
+		return p.handleGraphQLIntrospection()
 	}
+
+	if p.TykAPISpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeExecutionEngine {
+		return p.handoverToGraphQLExecutionEngine(roundTripper, inboundReq, gqlRequest)
+	}
+
+	return p.sendRequestToUpstream(roundTripper, outboundReq)
+}
+
+func (p *ReverseProxy) handleGraphQLIntrospection() (res *http.Response, latency time.Duration, err error) {
+	begin := time.Now()
+	defer func() {
+		latency = time.Since(begin)
+	}()
 
 	result, err := graphql.SchemaIntrospection(p.TykAPISpec.GraphQLExecutor.Schema)
 	if err != nil {
@@ -772,6 +758,38 @@ func (p *ReverseProxy) sendRequestToUpstream(roundTripper *TykRoundTripper, outr
 	}
 	res = result.GetAsHTTPResponse()
 
+	return
+}
+
+func (p *ReverseProxy) handoverToGraphQLExecutionEngine(roundTripper *TykRoundTripper, inreq *http.Request, gqlRequest *graphql.Request) (res *http.Response, latency time.Duration, err error) {
+	begin := time.Now()
+	defer func() {
+		latency = time.Since(begin)
+	}()
+
+	if p.TykAPISpec.GraphQLExecutor.Engine == nil {
+		err = errors.New("execution engine is nil")
+		return
+	}
+
+	p.TykAPISpec.GraphQLExecutor.Client.Transport = roundTripper
+	var result *graphql.ExecutionResult
+	result, err = p.TykAPISpec.GraphQLExecutor.Engine.Execute(context.Background(), gqlRequest, graphql.ExecutionOptions{ExtraArguments: gqlRequest.Variables})
+	if err != nil {
+		return
+	}
+	res = result.GetAsHTTPResponse()
+
+	return
+}
+
+func (p *ReverseProxy) sendRequestToUpstream(roundTripper *TykRoundTripper, outreq *http.Request) (res *http.Response, upstreamLatency time.Duration, err error) {
+	begin := time.Now()
+	defer func() {
+		upstreamLatency = time.Since(begin)
+	}()
+
+	res, err = roundTripper.RoundTrip(outreq)
 	return
 }
 
@@ -939,14 +957,14 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			return ProxyResponse{}
 		}
 		p.logger.Debug("ON REQUEST: Circuit Breaker is in CLOSED or HALF-OPEN state")
-		res, upstreamLatency, err = p.sendRequestToUpstream(roundTripper, outreq)
+		res, upstreamLatency, err = p.handleInboundAndOutboundRequest(roundTripper, req, outreq)
 		if err != nil || res.StatusCode/100 == 5 {
 			breakerConf.CB.Fail()
 		} else {
 			breakerConf.CB.Success()
 		}
 	} else {
-		res, upstreamLatency, err = p.sendRequestToUpstream(roundTripper, outreq)
+		res, upstreamLatency, err = p.handleInboundAndOutboundRequest(roundTripper, req, outreq)
 	}
 
 	if err != nil {
