@@ -130,7 +130,7 @@ func getSessionTags(session *user.SessionState) []string {
 
 func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, responseCopy *http.Response) {
 
-	if s.Spec.DoNotTrack {
+	if s.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
 		return
 	}
 
@@ -196,7 +196,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 
 		trackEP := false
 		trackedPath := r.URL.Path
-		if p := ctxGetTrackedPath(r); p != "" && !ctxGetDoNotTrack(r) {
+		if p := ctxGetTrackedPath(r); p != "" {
 			trackEP = true
 			trackedPath = p
 		}
