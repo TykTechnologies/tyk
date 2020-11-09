@@ -167,7 +167,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		pprof.WriteHeapProfile(memProfFile)
 	}
 
-	if e.Spec.DoNotTrack {
+	if e.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
 		return
 	}
 
@@ -228,7 +228,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 		trackEP := false
 		trackedPath := r.URL.Path
-		if p := ctxGetTrackedPath(r); p != "" && !ctxGetDoNotTrack(r) {
+		if p := ctxGetTrackedPath(r); p != "" {
 			trackEP = true
 			trackedPath = p
 		}
