@@ -12,10 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/request"
-	"github.com/sirupsen/logrus"
-
-	"github.com/lonelycode/osin"
+	"github.com/TykTechnologies/osin"
 	uuid "github.com/satori/go.uuid"
 	"golang.org/x/crypto/bcrypt"
 
