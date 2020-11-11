@@ -1,9 +1,11 @@
 package apidef
 
 import (
+	"database/sql/driver"
 	"encoding/base64"
 	"encoding/json"
 	"encoding/xml"
+	"fmt"
 	"net/http"
 	"text/template"
 	"time"
@@ -14,6 +16,8 @@ import (
 
 	"github.com/lonelycode/osin"
 	"gopkg.in/mgo.v2/bson"
+	_ "gorm.io/gorm"
+	_ "gorm.io/gorm/schema"
 
 	"github.com/TykTechnologies/gojsonschema"
 
@@ -74,6 +78,52 @@ const (
 	Any    RoutingTriggerOnType = "any"
 	Ignore RoutingTriggerOnType = ""
 )
+
+type ObjectId bson.ObjectId
+
+func (j *ObjectId) Scan(value interface{}) error {
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		return fmt.Errorf("Failed to unmarshal JSON value: %v", value)
+	}
+
+	// reflect magic to update existing string without creating new one
+	if len(bytes) > 0 {
+		bs := ObjectId(bson.ObjectIdHex(string(bytes)))
+		*j = bs
+	}
+
+	return nil
+}
+
+func (j ObjectId) Value() (driver.Value, error) {
+	return bson.ObjectId(j).Hex(), nil
+}
+
+func (j ObjectId) Hex() string {
+	return bson.ObjectId(j).Hex()
+}
+
+func (j ObjectId) String() string {
+	return j.Hex()
+}
+
+func (j ObjectId) MarshalJSON() ([]byte, error) {
+	return bson.ObjectId(j).MarshalJSON()
+}
+
+func (j *ObjectId) UnmarshalJSON(buf []byte) error {
+	var b bson.ObjectId
+	b.UnmarshalJSON(buf)
+	*j = ObjectId(string(b))
+
+	return nil
+}
 
 type EndpointMethodMeta struct {
 	Action  EndpointMethodAction `bson:"action" json:"action"`
@@ -366,7 +416,7 @@ type OpenIDOptions struct {
 //
 // swagger:model
 type APIDefinition struct {
-	Id                  bson.ObjectId `bson:"_id,omitempty" json:"id,omitempty"`
+	Id                  ObjectId      `bson:"_id,omitempty" json:"id,omitempty" gorm:"primaryKey;column:_id"`
 	Name                string        `bson:"name" json:"name"`
 	Slug                string        `bson:"slug" json:"slug"`
 	ListenPort          int           `bson:"listen_port" json:"listen_port"`
