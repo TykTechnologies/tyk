@@ -575,6 +575,8 @@ func TykOsinNewServer(config *osin.ServerConfig, storage ExtendedOsinStorageInte
 	overrideServer.Server.Storage = storage
 	overrideServer.Server.AuthorizeTokenGen = overrideServer.AuthorizeTokenGen
 	overrideServer.Server.AccessTokenGen = accessTokenGen{}
+	overrideServer.Server.Now = time.Now
+	overrideServer.Server.Logger = &osin.LoggerDefault{}
 
 	return &overrideServer
 }

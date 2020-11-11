@@ -400,8 +400,8 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 			Headers:   headers,
 			Method:    http.MethodPost,
 			Code:      http.StatusOK,
-			BodyMatch: `{"access_token":".*","expires_in":3600,"redirect_to":"http://client.oauth.com` +
-				`#access_token=.*=&expires_in=3600&token_type=bearer","token_type":"bearer"}`,
+			BodyMatch: `{"access_token":".*","expires_in":3600,"redirect_to":"http://client.oauth.com/` +
+				`#access_token=.*&expires_in=3600&token_type=Bearer","token_type":"Bearer"}`,
 		})
 	})
 
@@ -423,8 +423,8 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 			Headers:   headers,
 			Method:    http.MethodPost,
 			Code:      http.StatusOK,
-			BodyMatch: `{"access_token":".*","expires_in":3600,"redirect_to":"http://client.oauth.com` +
-				`#access_token=.*=&expires_in=3600&token_type=bearer","token_type":"bearer"}`,
+			BodyMatch: `{"access_token":".*","expires_in":3600,"redirect_to":"http://client.oauth.com/` +
+				`#access_token=.*&expires_in=3600&token_type=Bearer","token_type":"Bearer"}`,
 		})
 		if err != nil {
 			t.Error(err)
