@@ -39,8 +39,9 @@ const (
 	XTykAuthorization   = "X-Tyk-Authorization"
 )
 
-// websocket
+// upgrade and websocket
 const (
+	Upgrade              = "Upgrade"
 	SecWebSocketProtocol = "Sec-WebSocket-Protocol"
 )
 

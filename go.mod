@@ -42,7 +42,6 @@ require (
 	github.com/hashicorp/consul/api v1.3.0
 	github.com/hashicorp/go-msgpack v0.5.4 // indirect
 	github.com/hashicorp/vault/api v1.0.4
-	github.com/hpcloud/tail v1.0.0 // indirect
 	github.com/huandu/xstrings v1.3.0 // indirect
 	github.com/imdario/mergo v0.3.9 // indirect
 	github.com/jensneuse/abstractlogger v0.0.4
@@ -88,7 +87,6 @@ require (
 	google.golang.org/grpc v1.29.1
 	gopkg.in/Masterminds/sprig.v2 v2.21.0
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
-	gopkg.in/fsnotify.v1 v1.4.7 // indirect
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 	gopkg.in/sourcemap.v1 v1.0.5 // indirect
 	gopkg.in/square/go-jose.v1 v1.1.2 // indirect
@@ -98,4 +96,5 @@ require (
 	rsc.io/letsencrypt v0.0.2
 )
 
-replace github.com/jensneuse/graphql-go-tools => github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20201012125356-562407e88c4f
+//replace github.com/jensneuse/graphql-go-tools => github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20201012125356-562407e88c4f
+replace github.com/jensneuse/graphql-go-tools => ../graphql-go-tools
