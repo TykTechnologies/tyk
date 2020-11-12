@@ -2426,6 +2426,20 @@ func ctxGetGraphQLRequest(r *http.Request) (gqlRequest *gql.Request) {
 	return nil
 }
 
+func ctxSetGraphQLIsWebSocketUpgrade(r *http.Request, isWebSocketUpgrade bool) {
+	setCtxValue(r, ctx.GraphQLIsWebSocketUpgrade, isWebSocketUpgrade)
+}
+
+func ctxGetGraphQLIsWebSocketUpgrade(r *http.Request) (isWebSocketUpgrade bool) {
+	if v := r.Context().Value(ctx.GraphQLIsWebSocketUpgrade); v != nil {
+		if isWebSocketUpgrade, ok := v.(bool); ok {
+			return isWebSocketUpgrade
+		}
+	}
+
+	return false
+}
+
 func ctxGetDefaultVersion(r *http.Request) bool {
 	return r.Context().Value(ctx.VersionDefault) != nil
 }

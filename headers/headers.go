@@ -40,6 +40,11 @@ const (
 	XTykAuthorization   = "X-Tyk-Authorization"
 )
 
+// websocket
+const (
+	SecWebSocketProtocol = "Sec-WebSocket-Protocol"
+)
+
 // Gateway's custom response headers
 const (
 	XRateLimitLimit     = "X-RateLimit-Limit"
