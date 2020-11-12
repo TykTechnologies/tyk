@@ -135,6 +135,10 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	}
 
 	if m.requestIsWebsocketUpgrade(r) {
+		if !m.websocketUpgradeUsesGraphQLProtocol(r) {
+			return errors.New("invalid websocket protocol for upgrading to a graphql websocket connection"), http.StatusBadRequest
+		}
+
 		ctxSetGraphQLIsWebSocketUpgrade(r, true)
 		return nil, http.StatusSwitchingProtocols
 	}
@@ -180,8 +184,16 @@ func (m *GraphQLMiddleware) writeGraphQLError(w http.ResponseWriter, errors gql.
 }
 
 func (m *GraphQLMiddleware) requestIsWebsocketUpgrade(r *http.Request) bool {
+	if websocket.IsWebSocketUpgrade(r) {
+		return true
+	}
+
+	return false
+}
+
+func (m *GraphQLMiddleware) websocketUpgradeUsesGraphQLProtocol(r *http.Request) bool {
 	websocketProtocol := r.Header.Get(headers.SecWebSocketProtocol)
-	if websocket.IsWebSocketUpgrade(r) && websocketProtocol == GraphQLWebSocketProtocol {
+	if websocketProtocol == GraphQLWebSocketProtocol {
 		return true
 	}
 
