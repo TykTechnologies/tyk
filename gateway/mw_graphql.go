@@ -11,6 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
 
 	gql "github.com/jensneuse/graphql-go-tools/pkg/graphql"
@@ -134,7 +135,7 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
 	}
 
-	if m.requestIsWebsocketUpgrade(r) {
+	if config.Global().HttpServerOptions.EnableWebSockets && m.requestIsWebsocketUpgrade(r) {
 		if !m.websocketUpgradeUsesGraphQLProtocol(r) {
 			return errors.New("invalid websocket protocol for upgrading to a graphql websocket connection"), http.StatusBadRequest
 		}

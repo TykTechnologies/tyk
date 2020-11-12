@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/TykTechnologies/tyk/apidef"
-
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/user"
 
@@ -165,12 +165,20 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 	})
 
 	t.Run("graphql websocket upgrade", func(t *testing.T) {
-		t.Run("should deny upgrade with 400 when protocol ist not graphql-ws", func(t *testing.T) {
+		defer ResetTestConfig()
+		cfg := config.Global()
+		cfg.HttpServerOptions.EnableWebSockets = true
+		config.SetGlobal(cfg)
+
+		t.Run("should deny upgrade with 400 when protocol is not graphql-ws", func(t *testing.T) {
 			_, _ = g.Run(t, []test.TestCase{
 				{
 					Headers: map[string]string{
-						headers.Connection: "upgrade",
-						headers.Upgrade:    "websocket",
+						headers.Connection:           "upgrade",
+						headers.Upgrade:              "websocket",
+						headers.SecWebSocketProtocol: "invalid",
+						headers.SecWebSocketVersion:  "13",
+						headers.SecWebSocketKey:      "123abc",
 					},
 					Code:      http.StatusBadRequest,
 					BodyMatch: "invalid websocket protocol for upgrading to a graphql websocket connection",
@@ -185,6 +193,8 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 						headers.Connection:           "upgrade",
 						headers.Upgrade:              "websocket",
 						headers.SecWebSocketProtocol: GraphQLWebSocketProtocol,
+						headers.SecWebSocketVersion:  "13",
+						headers.SecWebSocketKey:      "123abc",
 					},
 					Code: http.StatusSwitchingProtocols,
 				},

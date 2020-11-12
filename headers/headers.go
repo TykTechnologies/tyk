@@ -44,6 +44,8 @@ const (
 const (
 	Upgrade              = "Upgrade"
 	SecWebSocketProtocol = "Sec-WebSocket-Protocol"
+	SecWebSocketVersion  = "Sec-WebSocket-Version"
+	SecWebSocketKey      = "Sec-WebSocket-Key"
 )
 
 // Gateway's custom response headers
