@@ -2,7 +2,12 @@ package gateway
 
 import (
 	"net/http"
+	"strings"
 	"testing"
+
+	"github.com/gorilla/websocket"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -187,18 +192,22 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 		})
 
 		t.Run("should upgrade to websocket connection with correct protocol", func(t *testing.T) {
-			_, _ = g.Run(t, []test.TestCase{
-				{
-					Headers: map[string]string{
-						headers.Connection:           "upgrade",
-						headers.Upgrade:              "websocket",
-						headers.SecWebSocketProtocol: GraphQLWebSocketProtocol,
-						headers.SecWebSocketVersion:  "13",
-						headers.SecWebSocketKey:      "123abc",
-					},
-					Code: http.StatusSwitchingProtocols,
-				},
-			}...)
+			baseURL := strings.Replace(g.URL, "http://", "ws://", -1)
+			wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
+				headers.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+			})
+			require.NoError(t, err)
+			defer wsConn.Close()
+
+			// Send a connection init message to gateway
+			err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"type":"connection_init","payload":{}}`))
+			require.NoError(t, err)
+
+			_, msg, err := wsConn.ReadMessage()
+
+			// Gateway should acknowledge the connection
+			assert.Equal(t, `{"id":"","type":"connection_ack","payload":null}`, string(msg))
+			assert.NoError(t, err)
 		})
 	})
 

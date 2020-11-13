@@ -118,7 +118,16 @@ func (w *WebsocketSubscriptionClient) isClosedConnectionError(err error) bool {
 	return w.isClosedConnection
 }
 
-func HandleWebsocket(errChan chan error, conn net.Conn, executionHandler *execution.Handler, logger abstractlogger.Logger) {
+func HandleWebsocket(done chan bool, errChan chan error, conn net.Conn, executionHandler *execution.Handler, logger abstractlogger.Logger) {
+	defer func() {
+		if err := conn.Close(); err != nil {
+			logger.Error("http.HandleWebsocket()",
+				abstractlogger.String("message", "could not close connection to client"),
+				abstractlogger.Error(err),
+			)
+		}
+	}()
+
 	websocketClient := NewWebsocketSubscriptionClient(logger, conn)
 	subscriptionHandler, err := subscription.NewHandler(logger, websocketClient, executionHandler)
 	if err != nil {
@@ -128,30 +137,24 @@ func HandleWebsocket(errChan chan error, conn net.Conn, executionHandler *execut
 		)
 
 		errChan <- err
+		return
 	}
 
+	close(done)
 	subscriptionHandler.Handle(context.Background()) // Blocking
-
-	err = conn.Close()
-	if err != nil {
-		logger.Error("http.HandleWebsocket()",
-			abstractlogger.String("message", "could not close connection to client"),
-			abstractlogger.Error(err),
-		)
-	}
 }
 
 // handleWebsocket will handle the websocket connection.
 func (g *GraphQLHTTPRequestHandler) handleWebsocket(conn net.Conn) {
+	done := make(chan bool)
 	errChan := make(chan error)
 
-	go HandleWebsocket(errChan, conn, g.executionHandler, g.log)
+	go HandleWebsocket(done, errChan, conn, g.executionHandler, g.log)
 	select {
 	case err := <-errChan:
 		g.log.Error("http.GraphQLHTTPRequestHandler.handleWebsocket()",
 			abstractlogger.Error(err),
 		)
-		conn.Close()
-	default:
+	case <-done:
 	}
 }
