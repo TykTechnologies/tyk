@@ -818,13 +818,14 @@ func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(round
 	p.TykAPISpec.GraphQLExecutor.Client.Transport = roundTripper
 
 	absLogger := abstractlogger.NewLogrusLogger(log, absLoggerLevel(log.Level))
+	done := make(chan bool)
 	errChan := make(chan error)
 
-	go gqlhttp.HandleWebsocket(errChan, conn, p.TykAPISpec.GraphQLExecutor.Engine.NewExecutionHandler(), absLogger)
+	go gqlhttp.HandleWebsocket(done, errChan, conn, p.TykAPISpec.GraphQLExecutor.Engine.NewExecutionHandler(), absLogger)
 	select {
 	case err := <-errChan:
 		log.Error("could not start graphql websocket handler: ", err)
-	default:
+	case <-done:
 	}
 }
 
