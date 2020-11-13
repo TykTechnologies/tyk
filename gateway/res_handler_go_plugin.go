@@ -1,14 +1,12 @@
 package gateway
 
 import (
-	"bytes"
 	"fmt"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/goplugin"
 	"github.com/TykTechnologies/tyk/user"
 	"github.com/sirupsen/logrus"
-	"io/ioutil"
 	"net/http"
-	"strconv"
 	"time"
 )
 
@@ -25,6 +23,9 @@ func (ResponseGoPluginMiddleware) Name() string {
 }
 
 func (h *ResponseGoPluginMiddleware) Init(c interface{}, spec *APISpec) error {
+	h.Spec = spec
+	h.Path = c.(apidef.MiddlewareDefinition).Path
+	h.SymbolName = c.(apidef.MiddlewareDefinition).Name
 
 	h.logger = log.WithFields(logrus.Fields{
 		"mwPath":       h.Path,
@@ -43,6 +44,7 @@ func (h *ResponseGoPluginMiddleware) Init(c interface{}, spec *APISpec) error {
 		h.logger.WithError(err).Error("Could not load Go-plugin")
 		return err
 	}
+	h.logger.Debugf("Loaded Go response plugin: %s", h.SymbolName)
 
 	return nil
 }
@@ -57,17 +59,9 @@ func (h *ResponseGoPluginMiddleware) HandleResponse(w http.ResponseWriter, res *
 			err := fmt.Errorf("%v", e)
 			w.WriteHeader(http.StatusInternalServerError)
 			h.logger.WithError(err).Error("Recovered from panic while running Go-plugin middleware func")
+
 		}
 	}()
-
-	// make sure response body can be re-read again
-	nopCloseResponseBody(res)
-
-	// decompress body if needed before handing to plugin
-	respBody := respBodyReader(req, res)
-	defer respBody.Close()
-
-	res.Body = respBody
 
 	// wrap ResponseWriter to check if response was sent
 	rw := &customResponseWriter{
@@ -87,26 +81,14 @@ func (h *ResponseGoPluginMiddleware) HandleResponse(w http.ResponseWriter, res *
 	// check if response was sent
 	if rw.responseSent {
 		// check if response code was an error one
-		switch {
-		case rw.statusCodeSent >= http.StatusBadRequest:
+
+		if rw.statusCodeSent >= http.StatusBadRequest {
 			// base middleware will report this error to analytics if needed
 			w.WriteHeader(rw.statusCodeSent)
 			err := fmt.Errorf("plugin function sent error response code: %d", rw.statusCodeSent)
 			h.logger.WithError(err).Error("Returned error code while processing response with Go-plugin middleware func")
-
+			return err
 		}
-	} else {
-		w.WriteHeader(http.StatusOK)
 	}
-
-	var bodyBuffer bytes.Buffer
-
-	// Re-compress if original upstream response was compressed
-	encoding := res.Header.Get("Content-Encoding")
-	bodyBuffer = compressBuffer(bodyBuffer, encoding)
-
-	res.ContentLength = int64(bodyBuffer.Len())
-	res.Header.Set("Content-Length", strconv.Itoa(bodyBuffer.Len()))
-	res.Body = ioutil.NopCloser(&bodyBuffer)
 	return nil
 }
