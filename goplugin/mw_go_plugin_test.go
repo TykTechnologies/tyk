@@ -19,7 +19,7 @@ func TestMain(m *testing.M) {
 }
 
 // TestGoPluginMWs tests all possible Go-plugin MWs ("pre", "auth_check", "post_key_auth" and "post")
-// Please see ./test/goplugins/test_goplugins.go for plugin implementation details
+// Please see ./test/goplugins/test_goplugin.go for plugin implementation details
 func TestGoPluginMWs(t *testing.T) {
 	ts := gateway.StartTest()
 	defer ts.Close()
@@ -35,25 +35,31 @@ func TestGoPluginMWs(t *testing.T) {
 			Pre: []apidef.MiddlewareDefinition{
 				{
 					Name: "MyPluginPre",
-					Path: "../test/goplugins/goplugins.so",
+					Path: "../test/goplugins/test_goplugin.go",
 				},
 			},
 			AuthCheck: apidef.MiddlewareDefinition{
 				Name: "MyPluginAuthCheck",
-				Path: "../test/goplugins/goplugins.so",
+				Path: "../test/goplugins/test_goplugin.go",
 			},
 			PostKeyAuth: []apidef.MiddlewareDefinition{
 				{
 					Name: "MyPluginPostKeyAuth",
-					Path: "../test/goplugins/goplugins.so",
+					Path: "../test/goplugins/test_goplugin.go",
 				},
 			},
 			Post: []apidef.MiddlewareDefinition{
 				{
 					Name: "MyPluginPost",
-					Path: "../test/goplugins/goplugins.so",
+					Path: "../test/goplugins/test_goplugin.go",
 				},
 			},
+			//Response: []apidef.MiddlewareDefinition{
+			//	{
+			//		Name: "MyPluginResponse",
+			//		Path: "../test/goplugins/test_goplugin.go",
+			//	},
+			//},
 		}
 	})
 
@@ -79,9 +85,10 @@ func TestGoPluginMWs(t *testing.T) {
 				Headers: map[string]string{"Authorization": "abc"},
 				Code:    http.StatusOK,
 				HeadersMatch: map[string]string{
-					"X-Initial-URI":   "/goplugin/plugin_hit",
-					"X-Auth-Result":   "OK",
-					"X-Session-Alias": "abc-session",
+					"X-Initial-URI":    "/goplugin/plugin_hit",
+					"X-Auth-Result":    "OK",
+					"X-Session-Alias":  "abc-session",
+					"X-Response-Added": "resp-added",
 				},
 				BodyMatch: `"message":"post message"`,
 			},

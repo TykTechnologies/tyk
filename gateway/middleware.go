@@ -812,7 +812,11 @@ func responseProcessorByName(name string) TykResponseHandler {
 		return &HeaderTransform{}
 	case "custom_mw_res_hook":
 		return &CustomMiddlewareResponseHook{}
+	case "go_plugin_res_hook":
+		return &ResponseGoPluginMiddleware{}
+
 	}
+
 	return nil
 }
 

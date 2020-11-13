@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/TykTechnologies/tyk/ctx"
@@ -12,6 +13,7 @@ import (
 // MyPluginPre checks if session is NOT present, adds custom header
 // with initial URI path and will be used as "pre" custom MW
 func MyPluginPre(rw http.ResponseWriter, r *http.Request) {
+	fmt.Println("PREAUTH")
 	session := ctx.GetSession(r)
 	if session != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
@@ -24,6 +26,9 @@ func MyPluginPre(rw http.ResponseWriter, r *http.Request) {
 // MyPluginAuthCheck does custom auth and will be used as
 // "auth_check" custom MW
 func MyPluginAuthCheck(rw http.ResponseWriter, r *http.Request) {
+
+	fmt.Println("AUTH")
+
 	// perform auth (only one token "abc" is allowed)
 	token := r.Header.Get(headers.Authorization)
 	if token != "abc" {
@@ -71,6 +76,17 @@ func MyPluginPost(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set(headers.ContentType, headers.ApplicationJSON)
 	rw.WriteHeader(http.StatusOK)
 	rw.Write(jsonData)
+}
+
+// MyPluginResponse intercepts response from upstream which we can then manipulate
+func MyPluginResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) {
+	if ses == nil {
+		rw.Header().Add(headers.XSessionAlias, "not found")
+		rw.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	res.Header.Add("X-Response-Added", ses.Alias)
 }
 
 func main() {}

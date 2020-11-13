@@ -240,6 +240,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		fixFuncPath(prefix, mwPreFuncs)
 		fixFuncPath(prefix, mwPostFuncs)
 		fixFuncPath(prefix, mwPostAuthCheckFuncs)
+		//TODO: add bundle support go go response hook i.e. fixFuncPath(prefix,mwResponseFuncs)
 		// TODO: add mwResponseFuncs here when Golang response custom MW support implemented
 	}
 
