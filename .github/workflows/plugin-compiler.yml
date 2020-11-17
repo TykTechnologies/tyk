@@ -1,0 +1,28 @@
+name: Go plugin compiler
+
+on:
+  push:
+    branches:
+      - as/auto-build-pc
+    tags:
+      - v2.9*
+
+jobs:
+  compiler:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Build and push Docker images
+        uses: docker/build-push-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          repository: tykio/tyk-plugin-compiler
+          tag_with_ref: true
+          push: ${{ startsWith(github.ref, 'refs/tags/') }}
+          path: images/plugin-compiler
+          build_args: TYK_GW_TAG=${{ github.event.release.tag_name }}
+          add_git_labels: true
