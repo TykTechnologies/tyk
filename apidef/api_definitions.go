@@ -109,8 +109,32 @@ func (j ObjectId) Hex() string {
 	return bson.ObjectId(j).Hex()
 }
 
+func (j ObjectId) Time() time.Time {
+	return bson.ObjectId(j).Time()
+}
+
+func (j ObjectId) Valid() bool {
+	return bson.ObjectId(j).Valid()
+}
+
 func (j ObjectId) String() string {
 	return j.Hex()
+}
+
+func (j ObjectId) GetBSON() (interface{}, error) {
+	return bson.ObjectId(j), nil
+}
+
+func ObjectIdHex(hex string) ObjectId {
+	return ObjectId(bson.ObjectIdHex(hex))
+}
+
+func NewObjectId() ObjectId {
+	return ObjectId(bson.NewObjectId())
+}
+
+func IsObjectIdHex(hex string) bool {
+	return bson.IsObjectIdHex(hex)
 }
 
 func (j ObjectId) MarshalJSON() ([]byte, error) {
