@@ -42,7 +42,6 @@ require (
 	github.com/hashicorp/consul/api v1.3.0
 	github.com/hashicorp/go-msgpack v0.5.4 // indirect
 	github.com/hashicorp/vault/api v1.0.4
-	github.com/hpcloud/tail v1.0.0 // indirect
 	github.com/huandu/xstrings v1.3.0 // indirect
 	github.com/imdario/mergo v0.3.9 // indirect
 	github.com/jensneuse/abstractlogger v0.0.4
@@ -82,14 +81,13 @@ require (
 	github.com/xeipuuv/gojsonschema v0.0.0-20171025060643-212d8a0df7ac
 	github.com/xenolf/lego v0.3.2-0.20170618175828-28ead50ff1ca // indirect
 	golang.org/x/crypto v0.0.0-20200709230013-948cd5f35899
-	golang.org/x/net v0.0.0-20200520004742-59133d7f0dd7
+	golang.org/x/net v0.0.0-20200602114024-627f9648deb9
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect
 	google.golang.org/appengine v1.6.1 // indirect
 	google.golang.org/grpc v1.29.1
 	gopkg.in/Masterminds/sprig.v2 v2.21.0
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
-	gopkg.in/fsnotify.v1 v1.4.7 // indirect
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 	gopkg.in/sourcemap.v1 v1.0.5 // indirect
 	gopkg.in/square/go-jose.v1 v1.1.2 // indirect
