@@ -204,8 +204,6 @@ func applyPoliciesAndSave(keyName string, session *user.SessionState, spec *APIS
 		return err
 	}
 
-	fmt.Printf("session: %+v\n", session)
-	fmt.Printf("spec: %+v\n", spec)
 	var lifetime int64
 	if session.Expires > 0 {
 		lifetime = session.Lifetime(spec.SessionLifetime)
