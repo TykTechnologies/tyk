@@ -107,6 +107,9 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		case headers.ApplicationXML:
 			templateExtension = "xml"
 			contentType = headers.ApplicationXML
+		case headers.TextXML:
+			templateExtension = "xml"
+			contentType = headers.TextXML
 		default:
 			templateExtension = "json"
 			contentType = headers.ApplicationJSON
