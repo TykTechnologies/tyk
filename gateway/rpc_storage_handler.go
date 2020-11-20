@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"encoding/base64"
 	"strconv"
 	"strings"
 	"time"
@@ -786,7 +787,7 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 
 	if len(keys.([]string)) > 0 {
 		log.Info("Keyspace changes detected, updating local cache")
-		go r.ProcessKeySpaceChanges(keys.([]string))
+		go r.ProcessKeySpaceChanges(keys.([]string), orgId)
 	}
 }
 
@@ -800,7 +801,7 @@ func getSessionAndCreate(keyName string, r *RPCStorageHandler) {
 	}
 }
 
-func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
+func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) {
 	keysToReset := map[string]bool{}
 	TokensToBeRevoked := map[string]string{}
 	ClientsToBeRevoked := map[string]string{}
@@ -875,6 +876,12 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 				getSessionAndCreate(splitKeys[0], r)
 			} else {
 				log.Info("--> removing cached key: ", key)
+
+				// in case it's an username (basic auth) then generate the token
+				if _, err := base64.StdEncoding.DecodeString(key); err != nil {
+					key = generateToken(orgId, key)
+				}
+
 				handleDeleteKey(key, "-1", resetQuota)
 				getSessionAndCreate(splitKeys[0], r)
 			}
