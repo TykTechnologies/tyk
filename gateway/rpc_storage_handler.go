@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"encoding/base64"
 	"strconv"
 	"strings"
 	"time"
@@ -878,10 +877,9 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 				log.Info("--> removing cached key: ", key)
 
 				// in case it's an username (basic auth) then generate the token
-				if _, err := base64.StdEncoding.DecodeString(key); err != nil {
+				if storage.TokenOrg(key) == "" {
 					key = generateToken(orgId, key)
 				}
-
 				handleDeleteKey(key, "-1", resetQuota)
 				getSessionAndCreate(splitKeys[0], r)
 			}
