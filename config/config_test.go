@@ -184,3 +184,35 @@ func TestConfig_GetEventTriggers(t *testing.T) {
 	})
 
 }
+
+func TestLoad_tracing(t *testing.T) {
+	dir, err := ioutil.TempDir("", "tyk")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	t.Run("Zipkin", func(t *testing.T) {
+		f := filepath.Join(dir, "zipkin.json")
+		err := ioutil.WriteFile(f, []byte(`{
+			"tracing": {
+			  "enabled": true,
+			  "name": "zipkin",
+			  "options": {
+				"reporter": {
+				  "url": "http:localhost:9411/api/v2/spans"
+				}
+			  }
+			}
+		  }
+		  `), 0600)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var c Config
+		err = Load([]string{f}, &c)
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+}
