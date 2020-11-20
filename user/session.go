@@ -128,6 +128,7 @@ type SessionState struct {
 
 	// Used to store token hash
 	keyHash string
+	KeyID   string `json:"key_id,omitempty"`
 }
 
 func NewSessionState() *SessionState {
@@ -176,6 +177,7 @@ func (s *SessionState) Clone() SessionState {
 		SessionLifetime:               s.SessionLifetime,
 		// Used to store token hash
 		keyHash: s.keyHash,
+		KeyID:   s.KeyID,
 	}
 }
 
