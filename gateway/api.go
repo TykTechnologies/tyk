@@ -204,7 +204,10 @@ func applyPoliciesAndSave(keyName string, session *user.SessionState, spec *APIS
 		return err
 	}
 
-	lifetime := session.Lifetime(spec.SessionLifetime)
+	var lifetime int64
+	if session.Expires > 0 {
+		lifetime = session.Lifetime(spec.SessionLifetime)
+	}
 	if err := GlobalSessionManager.UpdateSession(keyName, session, lifetime, isHashed); err != nil {
 		return err
 	}
