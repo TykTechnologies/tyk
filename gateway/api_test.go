@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/go-redis/redis/v8"
 	uuid "github.com/satori/go.uuid"
@@ -316,6 +317,50 @@ func TestKeyHandler(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 			{Method: "DELETE", Path: "/tyk/keys/" + knownKey, AdminAuth: true, Code: 200, BodyMatch: `"action":"deleted"`},
 			{Method: "GET", Path: "/tyk/keys/" + knownKey, AdminAuth: true, Code: 404},
+		}...)
+	})
+
+}
+
+func TestKeyExpiration(t *testing.T) {
+	const testAPIID = "testAPIID"
+
+	ts := StartTest()
+	defer ts.Close()
+
+	sessionLifeTime := int64(3)
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = testAPIID
+		spec.UseKeylessAccess = false
+		spec.Auth.UseParam = true
+		spec.SessionLifetime = sessionLifeTime
+	})
+
+	_, nonExpiringKey := ts.CreateSession(func(s *user.SessionState) {
+		s.AccessRights = map[string]user.AccessDefinition{testAPIID: {
+			APIID: testAPIID,
+		}}
+	})
+
+	_, expirationKey := ts.CreateSession(func(s *user.SessionState) {
+		s.Expires = 3600
+		s.AccessRights = map[string]user.AccessDefinition{testAPIID: {
+			APIID: testAPIID,
+		}}
+	})
+
+	t.Run("Get key", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			{Method: "GET", Path: "/tyk/keys/" + nonExpiringKey, AdminAuth: true, Code: 200},
+			{Method: "GET", Path: "/tyk/keys/" + expirationKey, AdminAuth: true, Code: 200},
+		}...)
+
+		//Sleeping sessionLifeTime time and try again
+		time.Sleep(time.Duration(sessionLifeTime) * time.Second)
+
+		ts.Run(t, []test.TestCase{
+			{Method: "GET", Path: "/tyk/keys/" + nonExpiringKey, AdminAuth: true, Code: 200},
+			{Method: "GET", Path: "/tyk/keys/" + expirationKey, AdminAuth: true, Code: 404},
 		}...)
 	})
 }
