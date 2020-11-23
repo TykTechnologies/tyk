@@ -760,11 +760,11 @@ func (p *ReverseProxy) handleOutboundRequest(roundTripper *TykRoundTripper, outr
 
 	if p.TykAPISpec.GraphQL.Enabled {
 		res, hijacked, err = p.handleGraphQL(roundTripper, outreq, w)
-		return res, hijacked, latency, err
+		return
 	}
 
-	res, hijacked, err = p.sendRequestToUpstream(roundTripper, outreq)
-	return res, hijacked, latency, err
+	res, err = p.sendRequestToUpstream(roundTripper, outreq)
+	return
 }
 
 func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, err error) {
@@ -786,24 +786,25 @@ func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http
 	}
 
 	if isIntrospection {
-		return p.handleGraphQLIntrospection()
+		res, err = p.handleGraphQLIntrospection()
+		return
 	}
 
 	if p.TykAPISpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeExecutionEngine {
 		return p.handoverRequestToGraphQLExecutionEngine(roundTripper, gqlRequest)
 	}
 
-	return p.sendRequestToUpstream(roundTripper, outreq)
+	res, err = p.sendRequestToUpstream(roundTripper, outreq)
+	return
 }
 
-func (p *ReverseProxy) handleGraphQLIntrospection() (res *http.Response, hijacked bool, err error) {
-
+func (p *ReverseProxy) handleGraphQLIntrospection() (res *http.Response, err error) {
 	result, err := graphql.SchemaIntrospection(p.TykAPISpec.GraphQLExecutor.Schema)
 	if err != nil {
 		return
 	}
-	res = result.GetAsHTTPResponse()
 
+	res = result.GetAsHTTPResponse()
 	return
 }
 
@@ -832,8 +833,8 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 	if err != nil {
 		return
 	}
-	res = result.GetAsHTTPResponse()
 
+	res = result.GetAsHTTPResponse()
 	return
 }
 
@@ -852,9 +853,8 @@ func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(round
 	}
 }
 
-func (p *ReverseProxy) sendRequestToUpstream(roundTripper *TykRoundTripper, outreq *http.Request) (res *http.Response, hijacked bool, err error) {
-	res, err = roundTripper.RoundTrip(outreq)
-	return
+func (p *ReverseProxy) sendRequestToUpstream(roundTripper *TykRoundTripper, outreq *http.Request) (res *http.Response, err error) {
+	return roundTripper.RoundTrip(outreq)
 }
 
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) ProxyResponse {
