@@ -135,15 +135,17 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
 	}
 
-	if config.Global().HttpServerOptions.EnableWebSockets && websocket.IsWebSocketUpgrade(r) {
+	if websocket.IsWebSocketUpgrade(r) {
+		if !config.Global().HttpServerOptions.EnableWebSockets {
+			return errors.New("websockets are not allowed"), http.StatusUnprocessableEntity
+		}
+
 		if !m.websocketUpgradeUsesGraphQLProtocol(r) {
 			return errors.New("invalid websocket protocol for upgrading to a graphql websocket connection"), http.StatusBadRequest
 		}
 
 		ctxSetGraphQLIsWebSocketUpgrade(r, true)
 		return nil, http.StatusSwitchingProtocols
-	} else if websocket.IsWebSocketUpgrade(r) {
-		return errors.New("websockets are not allowed"), http.StatusUnprocessableEntity
 	}
 
 	var gqlRequest gql.Request
