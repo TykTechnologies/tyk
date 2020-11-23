@@ -29,7 +29,17 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gorilla/websocket"
+	"github.com/jensneuse/abstractlogger"
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+	gqlhttp "github.com/jensneuse/graphql-go-tools/pkg/http"
+
+	"github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/ext"
+	"github.com/pmylund/go-cache"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/net/http/httpguts"
+	"golang.org/x/net/http2"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -38,12 +48,6 @@ import (
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
-	opentracing "github.com/opentracing/opentracing-go"
-	"github.com/opentracing/opentracing-go/ext"
-	cache "github.com/pmylund/go-cache"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/net/http/httpguts"
-	"golang.org/x/net/http2"
 )
 
 const defaultUserAgent = "Tyk/" + VERSION
@@ -323,6 +327,13 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, logger *logrus
 		TykAPISpec:    spec,
 		FlushInterval: time.Duration(spec.GlobalConfig.HttpServerOptions.FlushInterval) * time.Millisecond,
 		logger:        logger,
+		wsUpgrader: websocket.Upgrader{
+			// CheckOrigin is not needed for the upgrader as tyk already provides
+			// its own middlewares for that.
+			CheckOrigin: func(r *http.Request) bool {
+				return true
+			},
+		},
 		sp: sync.Pool{
 			New: func() interface{} {
 				buffer := make([]byte, 32*1024)
@@ -357,6 +368,10 @@ type ReverseProxy struct {
 	// TLSClientConfig specifies the TLS configuration to use for 'wss'.
 	// If nil, the default configuration is used.
 	TLSClientConfig *tls.Config
+
+	// wsUpgrader takes care of upgrading the incoming connection
+	// to a websocket connection.
+	wsUpgrader websocket.Upgrader
 
 	TykAPISpec   *APISpec
 	ErrorHandler ErrorHandler
@@ -737,18 +752,26 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	return rt.transport.RoundTrip(r)
 }
 
-func (p *ReverseProxy) sendRequestToUpstream(roundTripper *TykRoundTripper, outreq *http.Request) (res *http.Response, upstreamLatency time.Duration, err error) {
+func (p *ReverseProxy) handleOutboundRequest(roundTripper *TykRoundTripper, outreq *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, latency time.Duration, err error) {
 	begin := time.Now()
 	defer func() {
-		upstreamLatency = time.Since(begin)
+		latency = time.Since(begin)
 	}()
 
-	if !p.TykAPISpec.GraphQL.Enabled {
-		res, err = roundTripper.RoundTrip(outreq)
+	if p.TykAPISpec.GraphQL.Enabled {
+		res, hijacked, err = p.handleGraphQL(roundTripper, outreq, w)
 		return
 	}
 
-	// process graphql
+	res, err = p.sendRequestToUpstream(roundTripper, outreq)
+	return
+}
+
+func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, err error) {
+	isWebSocketUpgrade := ctxGetGraphQLIsWebSocketUpgrade(outreq)
+	if isWebSocketUpgrade {
+		return p.handleGraphQLEngineWebsocketUpgrade(roundTripper, outreq, w)
+	}
 
 	gqlRequest := ctxGetGraphQLRequest(outreq)
 	if gqlRequest == nil {
@@ -756,46 +779,82 @@ func (p *ReverseProxy) sendRequestToUpstream(roundTripper *TykRoundTripper, outr
 		return
 	}
 
-	// execution mode
-
-	if p.TykAPISpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeExecutionEngine {
-		if p.TykAPISpec.GraphQLExecutor.Engine == nil {
-			err = errors.New("execution engine is nil")
-			return
-		}
-
-		p.TykAPISpec.GraphQLExecutor.Client.Transport = roundTripper
-		var result *graphql.ExecutionResult
-		result, err = p.TykAPISpec.GraphQLExecutor.Engine.Execute(context.Background(), gqlRequest, graphql.ExecutionOptions{ExtraArguments: gqlRequest.Variables})
-		if err != nil {
-			return
-		}
-		res = result.GetAsHTTPResponse()
-
-		return
-	}
-
-	// proxy mode
-
 	var isIntrospection bool
 	isIntrospection, err = gqlRequest.IsIntrospectionQuery()
 	if err != nil {
 		return
 	}
 
-	// if not introspection query process as normal
-	if !isIntrospection {
-		res, err = roundTripper.RoundTrip(outreq)
+	if isIntrospection {
+		res, err = p.handleGraphQLIntrospection()
 		return
 	}
 
+	if p.TykAPISpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeExecutionEngine {
+		return p.handoverRequestToGraphQLExecutionEngine(roundTripper, gqlRequest)
+	}
+
+	res, err = p.sendRequestToUpstream(roundTripper, outreq)
+	return
+}
+
+func (p *ReverseProxy) handleGraphQLIntrospection() (res *http.Response, err error) {
 	result, err := graphql.SchemaIntrospection(p.TykAPISpec.GraphQLExecutor.Schema)
 	if err != nil {
 		return
 	}
-	res = result.GetAsHTTPResponse()
 
+	res = result.GetAsHTTPResponse()
 	return
+}
+
+func (p *ReverseProxy) handleGraphQLEngineWebsocketUpgrade(roundTripper *TykRoundTripper, r *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, err error) {
+	conn, err := p.wsUpgrader.Upgrade(w, r, http.Header{
+		headers.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+	})
+	if err != nil {
+		p.logger.Error("websocket upgrade for GraphQL engine failed: ", err)
+		return nil, false, err
+	}
+
+	p.handoverWebSocketConnectionToGraphQLExecutionEngine(roundTripper, conn.UnderlyingConn())
+	return nil, true, nil
+}
+
+func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *TykRoundTripper, gqlRequest *graphql.Request) (res *http.Response, hijacked bool, err error) {
+	if p.TykAPISpec.GraphQLExecutor.Engine == nil {
+		err = errors.New("execution engine is nil")
+		return
+	}
+
+	p.TykAPISpec.GraphQLExecutor.Client.Transport = roundTripper
+	var result *graphql.ExecutionResult
+	result, err = p.TykAPISpec.GraphQLExecutor.Engine.Execute(context.Background(), gqlRequest, graphql.ExecutionOptions{ExtraArguments: gqlRequest.Variables})
+	if err != nil {
+		return
+	}
+
+	res = result.GetAsHTTPResponse()
+	return
+}
+
+func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(roundTripper *TykRoundTripper, conn net.Conn) {
+	p.TykAPISpec.GraphQLExecutor.Client.Transport = roundTripper
+
+	absLogger := abstractlogger.NewLogrusLogger(log, absLoggerLevel(log.Level))
+	done := make(chan bool)
+	errChan := make(chan error)
+
+	go gqlhttp.HandleWebsocket(done, errChan, conn, p.TykAPISpec.GraphQLExecutor.Engine.NewExecutionHandler(), absLogger)
+	select {
+	case err := <-errChan:
+		log.Error("could not start graphql websocket handler: ", err)
+	case <-done:
+	}
+}
+
+func (p *ReverseProxy) sendRequestToUpstream(roundTripper *TykRoundTripper, outreq *http.Request) (res *http.Response, err error) {
+	return roundTripper.RoundTrip(outreq)
 }
 
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) ProxyResponse {
@@ -951,6 +1010,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	// do request round trip
 	var (
 		res             *http.Response
+		isHijacked      bool
 		upstreamLatency time.Duration
 		err             error
 	)
@@ -962,14 +1022,15 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			return ProxyResponse{}
 		}
 		p.logger.Debug("ON REQUEST: Circuit Breaker is in CLOSED or HALF-OPEN state")
-		res, upstreamLatency, err = p.sendRequestToUpstream(roundTripper, outreq)
+
+		res, isHijacked, upstreamLatency, err = p.handleOutboundRequest(roundTripper, outreq, rw)
 		if err != nil || res.StatusCode/100 == 5 {
 			breakerConf.CB.Fail()
 		} else {
 			breakerConf.CB.Success()
 		}
 	} else {
-		res, upstreamLatency, err = p.sendRequestToUpstream(roundTripper, outreq)
+		res, isHijacked, upstreamLatency, err = p.handleOutboundRequest(roundTripper, outreq, rw)
 	}
 
 	if err != nil {
@@ -1014,6 +1075,10 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		p.ErrorHandler.HandleError(rw, logreq, "There was a problem proxying the request", http.StatusInternalServerError, true)
 		return ProxyResponse{UpstreamLatency: upstreamLatency}
 
+	}
+
+	if isHijacked {
+		return ProxyResponse{UpstreamLatency: upstreamLatency}
 	}
 
 	upgrade, _ := IsUpgrade(req)

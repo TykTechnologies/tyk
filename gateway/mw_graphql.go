@@ -5,11 +5,13 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/gorilla/websocket"
 	"github.com/jensneuse/abstractlogger"
 	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
 
 	gql "github.com/jensneuse/graphql-go-tools/pkg/graphql"
@@ -21,6 +23,10 @@ const (
 	SchemaDataSource     = "SchemaDataSource"
 	TykRESTDataSource    = "TykRESTDataSource"
 	TykGraphQLDataSource = "TykGraphQLDataSource"
+)
+
+const (
+	GraphQLWebSocketProtocol = "graphql-ws"
 )
 
 type GraphQLMiddleware struct {
@@ -129,6 +135,19 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
 	}
 
+	if websocket.IsWebSocketUpgrade(r) {
+		if !config.Global().HttpServerOptions.EnableWebSockets {
+			return errors.New("websockets are not allowed"), http.StatusUnprocessableEntity
+		}
+
+		if !m.websocketUpgradeUsesGraphQLProtocol(r) {
+			return errors.New("invalid websocket protocol for upgrading to a graphql websocket connection"), http.StatusBadRequest
+		}
+
+		ctxSetGraphQLIsWebSocketUpgrade(r, true)
+		return nil, http.StatusSwitchingProtocols
+	}
+
 	var gqlRequest gql.Request
 	err := gql.UnmarshalRequest(r.Body, &gqlRequest)
 	if err != nil {
@@ -167,6 +186,11 @@ func (m *GraphQLMiddleware) writeGraphQLError(w http.ResponseWriter, errors gql.
 	_, _ = errors.WriteResponse(w)
 	m.Logger().Debugf("Error while validating GraphQL request: '%s'", errors)
 	return errCustomBodyResponse, http.StatusBadRequest
+}
+
+func (m *GraphQLMiddleware) websocketUpgradeUsesGraphQLProtocol(r *http.Request) bool {
+	websocketProtocol := r.Header.Get(headers.SecWebSocketProtocol)
+	return websocketProtocol == GraphQLWebSocketProtocol
 }
 
 func absLoggerLevel(level logrus.Level) abstractlogger.Level {

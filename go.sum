@@ -29,8 +29,8 @@ github.com/TykTechnologies/gorpc v0.0.0-20190515174534-b9c10befc5f4 h1:hTjM5Uubg
 github.com/TykTechnologies/gorpc v0.0.0-20190515174534-b9c10befc5f4/go.mod h1:vqhQRhIHefD4jdFo55j+m0vD5NMjx2liq/ubnshQpaY=
 github.com/TykTechnologies/goverify v0.0.0-20160822133757-7ccc57452ade h1:tFUV86NDnfMY4Au+EJHGJx0Rton8xdOLEh1aT+j6XBk=
 github.com/TykTechnologies/goverify v0.0.0-20160822133757-7ccc57452ade/go.mod h1:mkS8jKcz8otdfEXhJs1QQ/DKoIY1NFFsRPKS0RwQENI=
-github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20201012125356-562407e88c4f h1:VB1RMo/6Ex6Q8Ig3fikE9/+H7N0m+EgUTtap/9hQsns=
-github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20201012125356-562407e88c4f/go.mod h1:T6j+5gC7NkmZOMLcxR4qk+nK81LMWW7FTsj/hP3X/Ds=
+github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20201123105516-733fb8df3c8a h1:GPHFQEatjhJz4iW884GYPj7WMyfaUxPWaVdPwqx4Ti0=
+github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20201123105516-733fb8df3c8a/go.mod h1:T6j+5gC7NkmZOMLcxR4qk+nK81LMWW7FTsj/hP3X/Ds=
 github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c h1:j6fd0Fz1R4oSWOmcooGjrdahqrML+btQ+PfEJw8SzbA=
 github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c/go.mod h1:GnHUbsQx+ysI10osPhUdTmsxcE7ef64cVp38Fdyd7e0=
 github.com/TykTechnologies/murmur3 v0.0.0-20180602122059-1915e687e465 h1:A2gBjoX8aF0G3GHEpHyj2f0ixuPkCgcGqmPdKHSkW+0=
@@ -127,8 +127,11 @@ github.com/gobuffalo/packd v0.3.0/go.mod h1:zC7QkmNkYVGKPw4tHpBQ+ml7W/3tIebgeo1b
 github.com/gobuffalo/packr v1.30.1 h1:hu1fuVR3fXEZR7rXNW3h8rqSML8EVAf6KNm0NKO/wKg=
 github.com/gobuffalo/packr v1.30.1/go.mod h1:ljMyFO2EcrnzsHsN99cvbq055Y9OhRrIaviy289eRuk=
 github.com/gobuffalo/packr/v2 v2.5.1/go.mod h1:8f9c96ITobJlPzI44jj+4tHnEKNt0xXWSVlXRN9X1Iw=
+github.com/gobwas/httphead v0.0.0-20180130184737-2c6c146eadee h1:s+21KNqlpePfkah2I+gwHF8xmJWRjooY+5248k6m4A0=
 github.com/gobwas/httphead v0.0.0-20180130184737-2c6c146eadee/go.mod h1:L0fX3K22YWvt/FAX9NnzrNzcI4wNYi9Yku4O0LKYflo=
+github.com/gobwas/pool v0.2.0 h1:QEmUOlnSjWtnpRGHF3SauEiOsy82Cup83Vf2LcMlnc8=
 github.com/gobwas/pool v0.2.0/go.mod h1:q8bcK0KcYlCgd9e7WYLm9LpyS+YeLd8JVDW6WezmKEw=
+github.com/gobwas/ws v1.0.2 h1:CoAavW/wd/kulfZmSIBt6p24n4j7tHgNVCjsfHVNUbo=
 github.com/gobwas/ws v1.0.2/go.mod h1:szmBTxLgaFppYjEmNtny/v3w89xOydFnnZMcgRRu/EM=
 github.com/gocraft/health v0.0.0-20170925182251-8675af27fef0 h1:pKjeDsx7HGGbjr7VGI1HksxDJqSjaGED3cSw9GeSI98=
 github.com/gocraft/health v0.0.0-20170925182251-8675af27fef0/go.mod h1:rWibcVfwbUxi/QXW84U7vNTcIcZFd6miwbt8ritxh/Y=
