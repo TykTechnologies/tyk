@@ -135,13 +135,15 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
 	}
 
-	if config.Global().HttpServerOptions.EnableWebSockets && m.requestIsWebsocketUpgrade(r) {
+	if config.Global().HttpServerOptions.EnableWebSockets && websocket.IsWebSocketUpgrade(r) {
 		if !m.websocketUpgradeUsesGraphQLProtocol(r) {
 			return errors.New("invalid websocket protocol for upgrading to a graphql websocket connection"), http.StatusBadRequest
 		}
 
 		ctxSetGraphQLIsWebSocketUpgrade(r, true)
 		return nil, http.StatusSwitchingProtocols
+	} else if websocket.IsWebSocketUpgrade(r) {
+		return errors.New("websockets are not allowed"), http.StatusUnprocessableEntity
 	}
 
 	var gqlRequest gql.Request
@@ -184,21 +186,9 @@ func (m *GraphQLMiddleware) writeGraphQLError(w http.ResponseWriter, errors gql.
 	return errCustomBodyResponse, http.StatusBadRequest
 }
 
-func (m *GraphQLMiddleware) requestIsWebsocketUpgrade(r *http.Request) bool {
-	if websocket.IsWebSocketUpgrade(r) {
-		return true
-	}
-
-	return false
-}
-
 func (m *GraphQLMiddleware) websocketUpgradeUsesGraphQLProtocol(r *http.Request) bool {
 	websocketProtocol := r.Header.Get(headers.SecWebSocketProtocol)
-	if websocketProtocol == GraphQLWebSocketProtocol {
-		return true
-	}
-
-	return false
+	return websocketProtocol == GraphQLWebSocketProtocol
 }
 
 func absLoggerLevel(level logrus.Level) abstractlogger.Level {

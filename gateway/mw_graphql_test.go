@@ -169,6 +169,29 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
 	})
 
+	t.Run("on disabled websockets", func(t *testing.T) {
+		defer ResetTestConfig()
+		cfg := config.Global()
+		cfg.HttpServerOptions.EnableWebSockets = false
+		config.SetGlobal(cfg)
+
+		t.Run("should respond with 422 when trying to upgrade to websockets", func(t *testing.T) {
+			_, _ = g.Run(t, []test.TestCase{
+				{
+					Headers: map[string]string{
+						headers.Connection:           "upgrade",
+						headers.Upgrade:              "websocket",
+						headers.SecWebSocketProtocol: "graphql-ws",
+						headers.SecWebSocketVersion:  "13",
+						headers.SecWebSocketKey:      "123abc",
+					},
+					Code:      http.StatusUnprocessableEntity,
+					BodyMatch: "websockets are not allowed",
+				},
+			}...)
+		})
+	})
+
 	t.Run("graphql websocket upgrade", func(t *testing.T) {
 		defer ResetTestConfig()
 		cfg := config.Global()
