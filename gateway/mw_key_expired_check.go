@@ -3,6 +3,7 @@ package gateway
 import (
 	"errors"
 	"net/http"
+	"sync"
 
 	"github.com/TykTechnologies/tyk/request"
 )
@@ -26,6 +27,10 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 	session := ctxGetSession(r)
 	if session == nil {
 		return errors.New("Session state is missing or unset! Please make sure that auth headers are properly applied"), http.StatusBadRequest
+	}
+
+	if session.Mutex == nil {
+		session.Mutex = &sync.RWMutex{}
 	}
 
 	token := ctxGetAuthToken(r)
