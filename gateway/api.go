@@ -545,6 +545,13 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 		}
 	}
 
+	// If it's a basic auth key and a valid Base64 string, use it as the key ID:
+	if session.BasicAuthData.Password != "" {
+		if storage.TokenOrg(sessionKey) != "" {
+			session.KeyID = sessionKey
+		}
+	}
+
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
 		"key":    obfuscateKey(sessionKey),
