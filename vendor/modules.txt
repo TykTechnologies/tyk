@@ -379,7 +379,6 @@ golang.org/x/net/context
 golang.org/x/net/html/charset
 golang.org/x/net/http/httpguts
 golang.org/x/net/http2
-golang.org/x/net/http2/h2c
 golang.org/x/net/trace
 golang.org/x/net/html
 golang.org/x/net/idna
