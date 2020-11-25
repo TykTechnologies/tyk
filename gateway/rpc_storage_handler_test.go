@@ -131,7 +131,7 @@ func TestProcessKeySpaceChangesForOauth(t *testing.T) {
 			}
 
 			stringEvent := buildStringEvent(tc.Event, token, myApi.APIID)
-			rpcListener.ProcessKeySpaceChanges([]string{stringEvent}, "")
+			rpcListener.ProcessKeySpaceChanges([]string{stringEvent}, myApi.OrgID)
 			found, err := getKeyFromStore(token)
 			if err == nil {
 				t.Error(" key not removed. event:", stringEvent, " found:", found)
