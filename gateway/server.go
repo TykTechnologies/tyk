@@ -1132,7 +1132,7 @@ func kvStore(value string) (string, error) {
 		key := strings.TrimPrefix(value, "vault://")
 		log.Debugf("Retrieving %s from vault", key)
 		if err := setUpVault(); err != nil {
-			log.WithError(err).Error(err)
+			log.Error("Failed to setup vault: ", err)
 			// Return value as is If vault cannot be set up
 			return value, nil
 		}
