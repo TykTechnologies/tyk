@@ -1120,7 +1120,7 @@ func kvStore(value string) (string, error) {
 		key := strings.TrimPrefix(value, "consul://")
 		log.Debugf("Retrieving %s from consul", key)
 		if err := setUpConsul(); err != nil {
-			log.WithError(err).Error(err)
+			log.Error("Failed to setup consul: ", err)
 			// Return value as is. If consul cannot be set up
 			return value, nil
 		}
