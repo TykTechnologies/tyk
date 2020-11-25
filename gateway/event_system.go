@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"time"
+	"fmt"
 
 	"github.com/sirupsen/logrus"
 
@@ -191,7 +192,7 @@ func (l *LogMessageEventHandler) HandleEvent(em config.EventMessage) {
 
 	if em.Type == EventBreakerTriggered {
 		msgConf := em.Meta.(EventCurcuitBreakerMeta)
-		logMsg = logMsg + ":" + msgConf.APIID + ":" + msgConf.Path + ": [STATUS] " + string(msgConf.CircuitEvent)
+		logMsg = logMsg + ":" + msgConf.APIID + ":" + msgConf.Path + ": [STATUS] " + fmt.Sprint(msgConf.CircuitEvent)
 	}
 
 	l.logger.Warning(logMsg)
