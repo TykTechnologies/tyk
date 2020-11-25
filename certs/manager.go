@@ -376,6 +376,11 @@ func (c *CertificateManager) ListAllIds(prefix string) (out []string) {
 			out = append(out, strings.TrimPrefix(key, "raw-"))
 		}
 	} else {
+		// If list is not exists, but migrated record exists, it means it just empty
+		if _, err := c.storage.GetKey(indexKey + "-migrated"); err == nil {
+			return out
+		}
+
 		keys := c.storage.GetKeys("raw-" + prefix + "*")
 
 		for _, key := range keys {
@@ -385,6 +390,8 @@ func (c *CertificateManager) ListAllIds(prefix string) (out []string) {
 			out = append(out, strings.TrimPrefix(key, "raw-"))
 		}
 	}
+	c.storage.SetKey(indexKey+"-migrated", "1", 0)
+
 	return out
 }
 
