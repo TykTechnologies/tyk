@@ -471,7 +471,7 @@ func (c *CertificateManager) ListAllIds(prefix string) (out []string) {
 		}
 	} else {
 		// If list is not exists, but migrated record exists, it means it just empty
-		if _, err := c.storage.GetKey(indexKey + "-migrated"); err == nil {
+		if val, _ := c.storage.GetKey(indexKey + "-migrated"); val == "1" {
 			return out
 		}
 
