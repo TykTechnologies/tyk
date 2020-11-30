@@ -375,11 +375,13 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 		isControlPort := (gwConfig.ControlAPIPort == 0 && listenPort == gwConfig.ListenPort) || (gwConfig.ControlAPIPort == listenPort && listenPort != 0)
 		isControlAPI := isControlHostName && isControlPort
 
-		if isControlAPI && gwConfig.Security.ControlAPIUseMutualTLS {
-			newConfig.ClientAuth = tls.RequireAndVerifyClientCert
-			newConfig.ClientCAs = gw.CertificateManager.CertPool(gwConfig.Security.Certificates.ControlAPI)
+		if isControlAPI {
+			if gwConfig.Security.ControlAPIUseMutualTLS {
+				newConfig.ClientAuth = tls.RequireAndVerifyClientCert
+				newConfig.ClientCAs = gw.CertificateManager.CertPool(gwConfig.Security.Certificates.ControlAPI)
 
-			tlsConfigCache.Set(hello.ServerName, newConfig, cache.DefaultExpiration)
+				tlsConfigCache.Set(hello.ServerName, newConfig, cache.DefaultExpiration)
+			}
 			return newConfig, nil
 		}
 
