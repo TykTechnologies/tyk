@@ -5,8 +5,7 @@ name: Plugin compiler
 on:
   push:
     tags:
-      - v2.9*
-      - v2.10*
+      - v*
       
 jobs:
   build-env:
@@ -19,8 +18,8 @@ jobs:
       - name: push to github registry
         uses: docker/build-push-action@v1
         with:
-          username: alephnull
-          password: ${{ secrets.dh_pass }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
           repository: tykio/tyk-plugin-compiler
           path: images/plugin-compiler
           tag_with_ref: true
