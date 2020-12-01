@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"reflect"
 	"sort"
-	"sync"
 	"testing"
 	"time"
 
@@ -56,7 +55,6 @@ func createJWTSession() *user.SessionState {
 	session.QuotaRemaining = 1
 	session.QuotaMax = -1
 	session.JWTData = user.JWTData{Secret: jwtSecret}
-	session.Mutex = &sync.RWMutex{}
 	return session
 }
 
@@ -1055,9 +1053,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 				AdminAuth: true,
 				Code:      http.StatusOK,
 				BodyMatchFunc: func(data []byte) bool {
-					sessionData := user.SessionState{
-						Mutex: &sync.RWMutex{},
-					}
+					sessionData := user.SessionState{}
 					json.Unmarshal(data, &sessionData)
 
 					expect := []string{basePolicyID, p1ID, p2ID}
@@ -1082,9 +1078,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 				AdminAuth: true,
 				Code:      http.StatusOK,
 				BodyMatchFunc: func(data []byte) bool {
-					sessionData := user.SessionState{
-						Mutex: &sync.RWMutex{},
-					}
+					sessionData := user.SessionState{}
 					json.Unmarshal(data, &sessionData)
 					expect := []string{p1ID, p2ID}
 					sort.Strings(sessionData.ApplyPolicies)
@@ -1107,9 +1101,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 				AdminAuth: true,
 				Code:      http.StatusOK,
 				BodyMatchFunc: func(data []byte) bool {
-					sessionData := user.SessionState{
-						Mutex: &sync.RWMutex{},
-					}
+					sessionData := user.SessionState{}
 					json.Unmarshal(data, &sessionData)
 
 					assert.Equal(t, sessionData.ApplyPolicies, []string{defaultPolicyID})
@@ -1221,9 +1213,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 				AdminAuth: true,
 				Code:      http.StatusOK,
 				BodyMatchFunc: func(data []byte) bool {
-					sessionData := user.SessionState{
-						Mutex: &sync.RWMutex{},
-					}
+					sessionData := user.SessionState{}
 					json.Unmarshal(data, &sessionData)
 
 					assert.Equal(t, sessionData.ApplyPolicies, []string{basePolicyID, p3ID})
