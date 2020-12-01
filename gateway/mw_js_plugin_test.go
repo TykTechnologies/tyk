@@ -664,3 +664,97 @@ func TestMiniRequestObject_ReconstructParams(t *testing.T) {
 		}, r.URL.Query())
 	})
 }
+
+func TestJSVM_Auth(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+
+	bundle := RegisterBundle("custom_auth", map[string]string{
+		"manifest.json": `{
+			"file_list": [
+				"testmw.js"
+			],
+			"custom_middleware": {
+				"pre": null,
+				"post": null,
+				"post_key_auth": null,
+				"auth_check": {
+					"name": "ottoAuthExample",
+					"path": "testmw.js",
+					"require_session": false
+				},
+				"response": null,
+				"driver": "otto",
+				"id_extractor": {
+					"extract_from": "",
+					"extract_with": "",
+					"extractor_config": null
+				}
+			},
+			"checksum": "65694908d609b14df0e280c1a95a8ca4",
+			"signature": ""
+		}`,
+		"testmw.js": `log("====> JS Auth initialising");
+
+		var ottoAuthExample = new TykJS.TykMiddleware.NewMiddleware({});
+		
+		ottoAuthExample.NewProcessRequest(function(request, session) {
+			log("----> Running ottoAuthExample JSVM Auth Middleware")
+		
+			var thisToken = request.Headers["Authorization"];
+		
+			if (thisToken == undefined) {
+				// no token at all?
+				request.ReturnOverrides.ResponseCode = 401
+				request.ReturnOverrides.ResponseError = 'Header missing (JS middleware)'
+				return ottoAuthExample.ReturnData(request, {});
+			}
+		
+			if (thisToken != "foobar") {
+				request.ReturnOverrides.ResponseCode = 401
+				request.ReturnOverrides.ResponseError = 'Not authorized (JS middleware)'
+				return ottoAuthExample.ReturnData(request, {});
+			}
+		
+			log("auth is ok")
+		
+			var thisSession = {
+				"allowance": 100,
+				"rate": 100,
+				"per": 1,
+				"quota_max": -1,
+				"quota_renews": 1906121006,
+				"expires": 1906121006,
+				"access_rights": {}
+			};
+		
+			return ottoAuthExample.ReturnAuthData(request, thisSession);
+		});
+		
+		// Ensure init with a post-declaration log message
+		log("====> JS Auth initialised");
+		`,
+	})
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/sample"
+		spec.ConfigData = map[string]interface{}{
+			"base_url": ts.URL,
+		}
+		spec.CustomMiddlewareBundle = bundle
+		spec.EnableCoProcessAuth = true
+		spec.UseKeylessAccess = false
+	})
+	ts.Run(t,
+		test.TestCase{Path: "/sample", Code: http.StatusUnauthorized, BodyMatchFunc: func(b []byte) bool {
+			return strings.Contains(string(b), "Header missing (JS middleware)")
+		}},
+		test.TestCase{Path: "/sample", Code: http.StatusUnauthorized, BodyMatchFunc: func(b []byte) bool {
+			return strings.Contains(string(b), "Not authorized (JS middleware)")
+		},
+			Headers: map[string]string{"Authorization": "foo"},
+		},
+		test.TestCase{Path: "/sample", Code: http.StatusOK, Headers: map[string]string{
+			"Authorization": "foobar",
+		}},
+	)
+}
