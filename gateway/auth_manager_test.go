@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"net/http"
-	"sync"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/storage"
@@ -30,7 +29,6 @@ func TestAuthenticationAfterDeleteKey(t *testing.T) {
 			s.SetAccessRights(map[string]user.AccessDefinition{api.APIID: {
 				APIID: api.APIID,
 			}})
-			s.Mutex = &sync.RWMutex{}
 		})
 		deletePath := "/tyk/keys/" + key
 		authHeader := map[string]string{
