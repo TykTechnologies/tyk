@@ -156,11 +156,15 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 		return `[]`, nil
 	})
 
-	rpc := startRPCMock(dispatcher)
-	defer stopRPCMock(rpc)
+	rpcMock := startRPCMock(dispatcher)
+	defer stopRPCMock(rpcMock)
 
+	store := RPCStorageHandler{}
+	store.Connect()
+
+	rpc.ForceConnected(t)
 	// Three cases: 1 API, 2 APIs and Malformed data
-	exp := []int{1, 4, 6, 6, 2}
+	exp := []int{2, 4, 6, 6, 2}
 	if *cli.HTTPProfile {
 		exp = []int{4, 6, 8, 8, 4}
 	}

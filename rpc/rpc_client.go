@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"sync"
 	"sync/atomic"
+	"testing"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
@@ -477,4 +478,10 @@ func loadDispatcher(dispatcherFuncs map[string]interface{}) {
 		dispatcher.AddFunc(funcName, funcBody)
 		addedFuncs[funcName] = true
 	}
+}
+
+// ForceConnected only intended to be used in tests
+// do not use it for any other thing
+func ForceConnected(t *testing.T){
+	values.clientIsConnected.Store(true)
 }
