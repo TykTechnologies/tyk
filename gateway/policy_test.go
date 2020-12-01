@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -712,7 +711,7 @@ func TestApplyPolicies(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			sess := tc.session
 			if sess == nil {
-				sess = &user.SessionState{Mutex: &sync.RWMutex{}}
+				sess = &user.SessionState{}
 			}
 			sess.SetPolicies(tc.policies...)
 			errStr := ""
@@ -739,7 +738,7 @@ func BenchmarkApplyPolicies(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		for _, tc := range tests {
-			sess := &user.SessionState{Mutex: &sync.RWMutex{}}
+			sess := &user.SessionState{}
 			sess.SetPolicies(tc.policies...)
 			bmid.ApplyPolicies(sess)
 		}
@@ -880,7 +879,7 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{Mutex: &sync.RWMutex{}}
+				sessionData := user.SessionState{}
 				if err := json.Unmarshal(data, &sessionData); err != nil {
 					t.Log(err.Error())
 					return false
@@ -957,7 +956,7 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{Mutex: &sync.RWMutex{}}
+				sessionData := user.SessionState{}
 				if err := json.Unmarshal(data, &sessionData); err != nil {
 					t.Log(err.Error())
 					return false
@@ -1092,7 +1091,7 @@ func TestApplyMultiPolicies(t *testing.T) {
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{Mutex: &sync.RWMutex{}}
+				sessionData := user.SessionState{}
 				json.Unmarshal(data, &sessionData)
 
 				policy1Expected := user.APILimit{
@@ -1137,7 +1136,7 @@ func TestApplyMultiPolicies(t *testing.T) {
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{Mutex: &sync.RWMutex{}}
+				sessionData := user.SessionState{}
 				json.Unmarshal(data, &sessionData)
 
 				assert.EqualValues(t, 50, sessionData.AccessRights["api1"].Limit.QuotaRemaining, "should reset policy1 quota")
@@ -1255,7 +1254,7 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{Mutex: &sync.RWMutex{}}
+				sessionData := user.SessionState{}
 				if err := json.Unmarshal(data, &sessionData); err != nil {
 					t.Log(err.Error())
 					return false
@@ -1306,7 +1305,7 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{Mutex: &sync.RWMutex{}}
+				sessionData := user.SessionState{}
 				if err := json.Unmarshal(data, &sessionData); err != nil {
 					t.Log(err.Error())
 					return false
