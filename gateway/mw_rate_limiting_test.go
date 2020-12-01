@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"net/http"
-	"sync"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/headers"
@@ -31,7 +30,6 @@ func TestRateLimit_Unlimited(t *testing.T) {
 		}
 		s.Rate = 1
 		s.Per = 60
-		s.Mutex = &sync.RWMutex{}
 	})
 
 	authHeader := map[string]string{
@@ -82,7 +80,6 @@ func TestNeverRenewQuota(t *testing.T) {
 	})[0]
 
 	_, key := g.CreateSession(func(s *user.SessionState) {
-		s.Mutex = &sync.RWMutex{}
 		s.AccessRights = map[string]user.AccessDefinition{
 			api.APIID: {
 				APIName: api.Name,
