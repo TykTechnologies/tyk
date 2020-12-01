@@ -25,7 +25,7 @@ const (
 )
 
 // ErrRedisIsDown is returned when we can't communicate with redis
-var ErrRedisIsDown = errors.New("storage: Redis is either down or ws not configured")
+var ErrRedisIsDown = errors.New("storage: Redis is either down or was not configured")
 
 var singlePool atomic.Value
 var singleCachePool atomic.Value
