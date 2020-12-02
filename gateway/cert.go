@@ -15,6 +15,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/gorilla/mux"
 	cache "github.com/pmylund/go-cache"
@@ -271,38 +272,40 @@ var tlsConfigCache = cache.New(60*time.Second, 60*time.Minute)
 var tlsConfigMu sync.Mutex
 
 func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
-	// Supporting legacy certificate configuration
-	serverCerts := []tls.Certificate{}
-	certNameMap := map[string]*tls.Certificate{}
-
-	for _, certData := range config.Global().HttpServerOptions.Certificates {
-		cert, err := tls.LoadX509KeyPair(certData.CertFile, certData.KeyFile)
-		if err != nil {
-			log.Errorf("Server error: loadkeys: %s", err)
-			continue
-		}
-		serverCerts = append(serverCerts, cert)
-		certNameMap[certData.Name] = &cert
-	}
-
-	for _, cert := range CertificateManager.List(config.Global().HttpServerOptions.SSLCertificates, certs.CertificatePrivate) {
-		if cert != nil {
-			serverCerts = append(serverCerts, *cert)
-		}
-	}
-
-	baseConfig.Certificates = serverCerts
-	baseConfig.BuildNameToCertificate()
-
-	for name, cert := range certNameMap {
-		baseConfig.NameToCertificate[name] = cert
-	}
-
 	listenPortStr := strconv.Itoa(listenPort)
 
 	return func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
 		if config, found := tlsConfigCache.Get(hello.ServerName + listenPortStr); found {
 			return config.(*tls.Config).Clone(), nil
+		}
+
+		// if we have certificates ID's we don't cache the config if redis is not available yet.
+		noCaching := len(config.Global().HttpServerOptions.SSLCertificates) > 0 && !storage.Connected()
+		// Supporting legacy certificate configuration
+		serverCerts := []tls.Certificate{}
+		certNameMap := map[string]*tls.Certificate{}
+
+		for _, certData := range config.Global().HttpServerOptions.Certificates {
+			cert, err := tls.LoadX509KeyPair(certData.CertFile, certData.KeyFile)
+			if err != nil {
+				log.Errorf("Server error: loadkeys: %s", err)
+				continue
+			}
+			serverCerts = append(serverCerts, cert)
+			certNameMap[certData.Name] = &cert
+		}
+
+		for _, cert := range CertificateManager.List(config.Global().HttpServerOptions.SSLCertificates, certs.CertificatePrivate) {
+			if cert != nil {
+				serverCerts = append(serverCerts, *cert)
+			}
+		}
+
+		baseConfig.Certificates = serverCerts
+		baseConfig.BuildNameToCertificate()
+
+		for name, cert := range certNameMap {
+			baseConfig.NameToCertificate[name] = cert
 		}
 
 		newConfig := baseConfig.Clone()
@@ -322,8 +325,9 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 		if isControlAPI && config.Global().Security.ControlAPIUseMutualTLS {
 			newConfig.ClientAuth = tls.RequireAndVerifyClientCert
 			newConfig.ClientCAs = CertificateManager.CertPool(config.Global().Security.Certificates.ControlAPI)
-
-			tlsConfigCache.Set(hello.ServerName, newConfig, cache.DefaultExpiration)
+			if !noCaching {
+				tlsConfigCache.Set(hello.ServerName, newConfig, cache.DefaultExpiration)
+			}
 			return newConfig, nil
 		}
 
@@ -393,9 +397,10 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 		if newConfig.ClientAuth == 0 {
 			newConfig.ClientAuth = domainRequireCert[""]
 		}
-
-		// Cache the config
-		tlsConfigCache.Set(hello.ServerName+listenPortStr, newConfig, cache.DefaultExpiration)
+		if !noCaching {
+			// Cache the config
+			tlsConfigCache.Set(hello.ServerName+listenPortStr, newConfig, cache.DefaultExpiration)
+		}
 		return newConfig, nil
 	}
 }
