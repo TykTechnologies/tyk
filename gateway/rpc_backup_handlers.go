@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 
@@ -46,7 +47,9 @@ func LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 	cryptoText, err := store.GetKey(checkKey)
 	apiListAsString := decrypt([]byte(secret), cryptoText)
 
+	fmt.Printf("\n\n Store: %+v \n", store)
 	if err != nil {
+		fmt.Println("Error [RPC] --> Failed to get node backup (" + checkKey + "): " + err.Error())
 		return nil, errors.New("[RPC] --> Failed to get node backup (" + checkKey + "): " + err.Error())
 	}
 
