@@ -3,7 +3,6 @@
 package gateway
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -207,9 +206,9 @@ func TestSyncAPISpecsRPCFailure(t *testing.T) {
 
 func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 	// Test RPC
+	rpc.TestLogin = rpc.Login
 	dispatcher := gorpc.NewDispatcher()
 	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *apidef.DefRequest) (string, error) {
-		fmt.Println("GET API DEFSSSSS")
 		return jsonMarshalString(BuildAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
 		})), nil
@@ -225,8 +224,8 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 	})
 
 	t.Run("RPC is live", func(t *testing.T) {
-		rpc := startRPCMock(dispatcher)
-		defer stopRPCMock(rpc)
+		rpc1 := startRPCMock(dispatcher)
+		defer stopRPCMock(rpc1)
 		ts := StartTest()
 		defer ts.Close()
 
@@ -250,7 +249,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 			t.Error("Should return array with one spec", apiSpecs)
 		}
 	})
-/*
+
 	t.Run("RPC down, cold start, load backup", func(t *testing.T) {
 		// Point rpc to non existent address
 		globalConf := config.Global()
@@ -363,7 +362,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 			{Path: "/sample", Headers: notCached, Code: 200},
 		}...)
-	})*/
+	})
 }
 
 func TestOrgSessionWithRPCDown(t *testing.T) {

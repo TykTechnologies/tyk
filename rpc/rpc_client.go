@@ -289,14 +289,22 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 		funcClientSingleton = dispatcher.NewFuncClient(clientSingleton)
 	}
 
-	go Login()
-
+	callLogin()
 	if !suppressRegister {
 		register()
 		go checkDisconnect()
 	}
 
 	return values.ClientIsConnected()
+}
+
+var TestLogin func() bool
+func callLogin(){
+	if TestLogin != nil {
+		TestLogin()
+		return
+	}
+	go Login()
 }
 
 // Login tries to login to the rpc sever. Returns true if it succeeds and false
