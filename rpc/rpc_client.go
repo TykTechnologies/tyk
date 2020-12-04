@@ -43,6 +43,9 @@ var (
 	rpcLoginMu sync.Mutex
 
 	rpcConnectMu sync.Mutex
+
+	// UseSyncLoginRPC for tests where we dont need to execute as a goroutine
+	UseSyncLoginRPC bool
 )
 
 // ErrRPCIsDown this is returned when we can't reach rpc server.
@@ -298,10 +301,9 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 	return values.ClientIsConnected()
 }
 
-var TestLogin func() bool
-func callLogin(){
-	if TestLogin != nil {
-		TestLogin()
+func callLogin() {
+	if UseSyncLoginRPC == true {
+		Login()
 		return
 	}
 	go Login()
@@ -490,6 +492,6 @@ func loadDispatcher(dispatcherFuncs map[string]interface{}) {
 
 // ForceConnected only intended to be used in tests
 // do not use it for any other thing
-func ForceConnected(t *testing.T){
+func ForceConnected(t *testing.T) {
 	values.clientIsConnected.Store(true)
 }

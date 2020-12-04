@@ -161,8 +161,8 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 
 	store := RPCStorageHandler{}
 	store.Connect()
-
 	rpc.ForceConnected(t)
+
 	// Three cases: 1 API, 2 APIs and Malformed data
 	exp := []int{2, 4, 6, 6, 2}
 	if *cli.HTTPProfile {
@@ -206,7 +206,7 @@ func TestSyncAPISpecsRPCFailure(t *testing.T) {
 
 func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 	// Test RPC
-	rpc.TestLogin = rpc.Login
+	rpc.UseSyncLoginRPC = true
 	dispatcher := gorpc.NewDispatcher()
 	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *apidef.DefRequest) (string, error) {
 		return jsonMarshalString(BuildAPI(func(spec *APISpec) {
