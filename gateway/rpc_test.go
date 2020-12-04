@@ -224,8 +224,8 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 	})
 
 	t.Run("RPC is live", func(t *testing.T) {
-		rpc1 := startRPCMock(dispatcher)
-		defer stopRPCMock(rpc1)
+		rpcMock := startRPCMock(dispatcher)
+		defer stopRPCMock(rpcMock)
 		ts := StartTest()
 		defer ts.Close()
 
