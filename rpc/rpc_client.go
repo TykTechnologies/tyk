@@ -292,7 +292,7 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 		funcClientSingleton = dispatcher.NewFuncClient(clientSingleton)
 	}
 
-	callLogin()
+	handleLogin()
 	if !suppressRegister {
 		register()
 		go checkDisconnect()
@@ -301,7 +301,7 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 	return values.ClientIsConnected()
 }
 
-func callLogin() {
+func handleLogin() {
 	if UseSyncLoginRPC == true {
 		Login()
 		return
