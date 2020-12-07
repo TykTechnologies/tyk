@@ -34,13 +34,6 @@ import (
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 	gqlhttp "github.com/jensneuse/graphql-go-tools/pkg/http"
 
-	"github.com/opentracing/opentracing-go"
-	"github.com/opentracing/opentracing-go/ext"
-	"github.com/pmylund/go-cache"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/net/http/httpguts"
-	"golang.org/x/net/http2"
-
 	"github.com/TykTechnologies/tyk/v3/apidef"
 	"github.com/TykTechnologies/tyk/v3/config"
 	"github.com/TykTechnologies/tyk/v3/ctx"
@@ -52,6 +45,7 @@ import (
 	"github.com/opentracing/opentracing-go/ext"
 	cache "github.com/pmylund/go-cache"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http2"
 )
 

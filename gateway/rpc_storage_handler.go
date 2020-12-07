@@ -12,7 +12,7 @@ import (
 	"github.com/TykTechnologies/tyk/v3/apidef"
 	"github.com/TykTechnologies/tyk/v3/config"
 	"github.com/TykTechnologies/tyk/v3/storage"
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v8"
 
 	"github.com/sirupsen/logrus"
 )
