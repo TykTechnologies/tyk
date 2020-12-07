@@ -207,6 +207,7 @@ func TestSyncAPISpecsRPCFailure(t *testing.T) {
 func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 	// Test RPC
 	rpc.UseSyncLoginRPC = true
+	var GetKeyCounter int
 	dispatcher := gorpc.NewDispatcher()
 	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *apidef.DefRequest) (string, error) {
 		return jsonMarshalString(BuildAPI(func(spec *APISpec) {
@@ -220,10 +221,12 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		return true
 	})
 	dispatcher.AddFunc("GetKey", func(clientAddr, key string) (string, error) {
+		GetKeyCounter++
 		return jsonMarshalString(CreateStandardSession()), nil
 	})
 
 	t.Run("RPC is live", func(t *testing.T) {
+		GetKeyCounter = 0
 		rpcMock := startRPCMock(dispatcher)
 		defer stopRPCMock(rpcMock)
 		ts := StartTest()
@@ -248,10 +251,15 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		if count != 1 {
 			t.Error("Should return array with one spec", apiSpecs)
 		}
+
+		if GetKeyCounter != 2 {
+			t.Error("getKey should have been called 2 times")
+		}
 	})
 
 	t.Run("RPC down, cold start, load backup", func(t *testing.T) {
 		// Point rpc to non existent address
+		GetKeyCounter = 0
 		globalConf := config.Global()
 		globalConf.SlaveOptions.ConnectionString = testHttpFailure
 		globalConf.SlaveOptions.UseRPC = true
@@ -269,6 +277,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		ReloadTestCase.Tick()
 		time.Sleep(100 * time.Millisecond)
 
+		rpc.SetEmergencyMode(t, true)
 		cachedAuth := map[string]string{"Authorization": "test"}
 		notCachedAuth := map[string]string{"Authorization": "nope1"}
 		// Stil works, since it knows about cached key
@@ -277,6 +286,11 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 			{Path: "/sample", Headers: notCachedAuth, Code: 403},
 		}...)
 
+		// when rpc in emergency mode, then we must not
+		// request keys in rpc
+		if GetKeyCounter != 0 {
+			t.Error("getKey should have been called 0 times")
+		}
 		stopRPCMock(nil)
 	})
 
