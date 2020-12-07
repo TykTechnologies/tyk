@@ -495,3 +495,8 @@ func loadDispatcher(dispatcherFuncs map[string]interface{}) {
 func ForceConnected(t *testing.T) {
 	values.clientIsConnected.Store(true)
 }
+
+// SetEmergencyMode used in tests to force emergency mode
+func SetEmergencyMode(t *testing.T, value bool) {
+	values.SetEmergencyMode(value)
+}
