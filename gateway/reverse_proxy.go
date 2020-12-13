@@ -131,11 +131,14 @@ func EnsureTransport(host, protocol string) string {
 	if err != nil {
 		return host
 	}
-	if u.Scheme == "" {
+	switch u.Scheme {
+	case "":
 		if protocol == "" {
 			protocol = "http"
 		}
 		u.Scheme = protocol
+	case "h2c":
+		u.Scheme = "http"
 	}
 	return u.String()
 }
