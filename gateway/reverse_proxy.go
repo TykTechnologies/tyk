@@ -124,19 +124,22 @@ func urlFromService(spec *APISpec) (*apidef.HostList, error) {
 var httpScheme = regexp.MustCompile(`^(?i)https?://`)
 
 func EnsureTransport(host, protocol string) string {
-	if protocol == "" {
-		for _, v := range []string{"http://", "https://"} {
-			if strings.HasPrefix(host, v) {
-				return host
-			}
-		}
-		return "http://" + host
-	}
-	prefix := protocol + "://"
-	if strings.HasPrefix(host, prefix) {
+	host = strings.TrimSpace(host)
+	protocol = strings.TrimSpace(protocol)
+	u, err := url.Parse(host)
+	if err != nil {
 		return host
 	}
-	return prefix + host
+	switch u.Scheme {
+	case "":
+		if protocol == "" {
+			protocol = "http"
+		}
+		u.Scheme = protocol
+	case "h2c":
+		u.Scheme = "http"
+	}
+	return u.String()
 }
 
 func nextTarget(targetData *apidef.HostList, spec *APISpec) (string, error) {
