@@ -132,12 +132,6 @@ func ConnectToRedis(ctx context.Context, onConnect func()) {
 		ok = true
 	}
 	redisUp.Store(ok)
-	if ok {
-		// we are connected to Redis
-		if onConnect != nil {
-			onConnect()
-		}
-	}
 	for {
 		select {
 		case <-ctx.Done():
