@@ -290,7 +290,7 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 	if analytics.GeoIPDB == nil {
 		panic("GeoIPDB was not initialized")
 	}
-	go storage.ConnectToRedis(ctx)
+	go storage.ConnectToRedis(ctx, nil)
 	for {
 		if storage.Connected() {
 			break
