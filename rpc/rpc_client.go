@@ -294,8 +294,12 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 		register()
 		go checkDisconnect()
 	}
-
-	return values.ClientIsConnected()
+	return backoff.Retry(func() error {
+		if !values.ClientIsConnected() {
+			return ErrRPCIsDown
+		}
+		return nil
+	}, backoff.NewExponentialBackOff()) == nil
 }
 
 // Login tries to login to the rpc sever. Returns true if it succeeds and false

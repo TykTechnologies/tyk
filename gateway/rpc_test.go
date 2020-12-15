@@ -3,12 +3,14 @@
 package gateway
 
 import (
+	"net/http"
 	"testing"
 	"time"
 
 	"github.com/gorilla/mux"
 
 	"github.com/TykTechnologies/tyk/cli"
+	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/tyk/apidef"
@@ -358,6 +360,67 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 			{Path: "/sample", Headers: notCached, Code: 200},
 		}...)
 	})
+}
+
+func TestSyncAPISpecsRPCSuccess_redis_failure(t *testing.T) {
+	dispatcher := gorpc.NewDispatcher()
+	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *apidef.DefRequest) (string, error) {
+		return jsonMarshalString(BuildAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = false
+		})), nil
+	})
+	dispatcher.AddFunc("GetPolicies", func(clientAddr string, orgid string) (string, error) {
+		return `[{"_id":"507f191e810c19729de860ea", "rate":1, "per":1}]`, nil
+	})
+	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
+		return true
+	})
+	dispatcher.AddFunc("GetKey", func(clientAddr, key string) (string, error) {
+		return jsonMarshalString(CreateStandardSession()), nil
+	})
+	rpc := startRPCMock(dispatcher)
+	defer stopRPCMock(rpc)
+
+	t.Run("Should load apis when redis is down", func(t *testing.T) {
+		storage.DisableRedis(true)
+		defer storage.DisableRedis(false)
+		ts := StartTest()
+		defer ts.Close()
+
+		authHeaders := map[string]string{"Authorization": "test"}
+		ts.Run(t, []test.TestCase{
+			{Path: "/sample", Headers: authHeaders, Code: http.StatusOK},
+		}...)
+	})
+
+	t.Run("Should reload when redis is back up", func(t *testing.T) {
+		storage.DisableRedis(true)
+		ts := StartTest()
+		defer ts.Close()
+		event := make(chan struct{}, 1)
+		OnConnect = func() {
+			event <- struct{}{}
+			DoReload()
+		}
+
+		select {
+		case <-event:
+			t.Fatal("OnConnect should only run after reconnection")
+		case <-time.After(time.Second):
+		}
+		storage.DisableRedis(false)
+		select {
+		case <-event:
+		case <-time.After(time.Second):
+			t.Fatal("Expected redis to reconnect and call the callback")
+		}
+		time.Sleep(time.Second)
+		authHeaders := map[string]string{"Authorization": "test"}
+		ts.Run(t, []test.TestCase{
+			{Path: "/sample", Headers: authHeaders, Code: 200},
+		}...)
+	})
+
 }
 
 func TestOrgSessionWithRPCDown(t *testing.T) {

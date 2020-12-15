@@ -38,19 +38,20 @@ var ctx = context.Background()
 // redisW
 func DisableRedis(ok bool) {
 	if ok {
+		// we make sure to set that redis is down
 		redisUp.Store(false)
 		disableRedis.Store(true)
 		return
 	}
-	redisUp.Store(true)
 	disableRedis.Store(false)
 }
 
 func shouldConnect() bool {
+	ok := true
 	if v := disableRedis.Load(); v != nil {
-		return !v.(bool)
+		ok = !v.(bool)
 	}
-	return true
+	return ok
 }
 
 // Connected returns true if we are connected to redis
@@ -142,6 +143,7 @@ func ConnectToRedis(ctx context.Context, onConnect func()) {
 			}
 			conn := Connected()
 			ok := connectCluster(c...)
+
 			redisUp.Store(ok)
 			if !conn && ok {
 				// Here we are transitioning from DISCONNECTED to CONNECTED state
