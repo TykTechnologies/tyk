@@ -362,7 +362,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 	})
 }
 
-func TestSyncAPISpecsRPCSuccess_redis_failure(t *testing.T) {
+func TestSyncAPISpecsRPC_redis_failure(t *testing.T) {
 	dispatcher := gorpc.NewDispatcher()
 	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *apidef.DefRequest) (string, error) {
 		return jsonMarshalString(BuildAPI(func(spec *APISpec) {
