@@ -928,6 +928,7 @@ func (s *Test) Close() {
 }
 
 func (s *Test) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, error) {
+	t.Helper()
 	return s.testRunner.Run(t, testCases...)
 }
 
