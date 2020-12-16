@@ -1,4 +1,4 @@
-package importer
+package main
 
 import (
 	"bytes"

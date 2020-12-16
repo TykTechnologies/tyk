@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"github.com/TykTechnologies/tyk/cli/oas"
 	"io/ioutil"
 	"os"
 
@@ -100,6 +101,9 @@ func Init(version string, confPaths []string) {
 
 	// Add bundler commands:
 	bundler.AddTo(app)
+
+	// Add OAS commands:
+	oas.AddTo(app)
 }
 
 // Parse parses the command-line arguments.
