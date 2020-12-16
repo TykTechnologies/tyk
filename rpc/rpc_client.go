@@ -437,8 +437,24 @@ func recoverOp(fn func() error) func() error {
 	}
 }
 
-func FuncClientSingleton(funcName string, request interface{}) (interface{}, error) {
-	return funcClientSingleton.CallTimeout(funcName, request, GlobalRPCCallTimeout)
+// FuncClientSingleton performs RPC call. This might be called before we have
+// established RPC connection, in that case we perform a retry with exponential
+// backoff ensuring indeed we can't connect to the rpc, this will eventually
+// fall into emergency mode( That is handled outside of this function call)
+func FuncClientSingleton(funcName string, request interface{}) (result interface{}, err error) {
+	be := backoff.Retry(func() error {
+		if !values.ClientIsConnected() {
+			return ErrRPCIsDown
+		}
+		result, err = funcClientSingleton.CallTimeout(funcName, request, GlobalRPCCallTimeout)
+		return nil
+	}, backoff.WithMaxRetries(
+		backoff.NewExponentialBackOff(), 2,
+	))
+	if be != nil {
+		err = be
+	}
+	return
 }
 
 func onConnectFunc(conn net.Conn) (net.Conn, string, error) {
