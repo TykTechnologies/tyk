@@ -164,26 +164,6 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 	}
 }
 
-// Our RPC layer too racy, but not harmul, mostly global variables like RPCIsClientConnected
-func TestSyncAPISpecsRPCFailure(t *testing.T) {
-	// Test RPC
-	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *apidef.DefRequest) (string, error) {
-		return "malformed json", nil
-	})
-	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
-		return true
-	})
-
-	rpc := startRPCMock(dispatcher)
-	defer stopRPCMock(rpc)
-
-	count, _ := syncAPISpecs()
-	if count != 0 {
-		t.Error("Should return empty value for malformed rpc response", apiSpecs)
-	}
-}
-
 func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 	// Test RPC
 	dispatcher := gorpc.NewDispatcher()
