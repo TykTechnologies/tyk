@@ -432,7 +432,6 @@ func (a APIDefinitionLoader) FromRPC(orgId string) ([]*APISpec, error) {
 	if rpc.IsEmergencyMode() {
 		return LoadDefinitionsFromRPCBackup()
 	}
-
 	store := RPCStorageHandler{}
 	if !store.Connect() {
 		return nil, errors.New("Can't connect RPC layer")

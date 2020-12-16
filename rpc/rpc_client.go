@@ -449,7 +449,7 @@ func FuncClientSingleton(funcName string, request interface{}) (result interface
 		result, err = funcClientSingleton.CallTimeout(funcName, request, GlobalRPCCallTimeout)
 		return nil
 	}, backoff.WithMaxRetries(
-		backoff.NewExponentialBackOff(), 1,
+		backoff.NewConstantBackOff(10*time.Millisecond), 3,
 	))
 	if be != nil {
 		err = be

@@ -225,8 +225,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 
 		// Wait for backup to load
 		time.Sleep(100 * time.Millisecond)
-		ReloadTestCase.Tick()
-		time.Sleep(100 * time.Millisecond)
+		DoReload()
 
 		cachedAuth := map[string]string{"Authorization": "test"}
 		notCachedAuth := map[string]string{"Authorization": "nope1"}
