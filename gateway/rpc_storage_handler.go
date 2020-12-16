@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"errors"
 	"strconv"
 	"strings"
 	"time"
@@ -598,7 +597,7 @@ func (r RPCStorageHandler) RemoveFromSet(keyName, value string) {
 
 func (r RPCStorageHandler) IsRetriableError(err error) bool {
 	if err != nil {
-		return err.Error() == "Access Denied" || errors.Is(err, rpc.ErrRPCIsDown)
+		return err.Error() == "Access Denied"
 	}
 	return false
 }
