@@ -438,9 +438,6 @@ func recoverOp(fn func() error) func() error {
 }
 
 func FuncClientSingleton(funcName string, request interface{}) (interface{}, error) {
-	if !values.ClientIsConnected() {
-		return nil, ErrRPCIsDown
-	}
 	return funcClientSingleton.CallTimeout(funcName, request, GlobalRPCCallTimeout)
 }
 

@@ -7,9 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gorilla/mux"
-
-	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/TykTechnologies/gorpc"
@@ -123,33 +120,29 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
 	defer ResetTestConfig()
-
-	// Test RPC
-	callCount := 0
+	// We test to check if we are actually calling the GetApiDefinitions and
+	// GetPolicies.
+	a := func() func() (string, error) {
+		x := 0
+		return func() (string, error) {
+			defer func() {
+				x++
+			}()
+			switch x {
+			case 1:
+				return apiDefListTest, nil
+			case 2:
+				return apiDefListTest2, nil
+			case 3:
+				return "malformed json", nil
+			default:
+				return `[]`, nil
+			}
+		}
+	}()
 	dispatcher := gorpc.NewDispatcher()
 	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *apidef.DefRequest) (string, error) {
-		if callCount == 0 {
-			callCount += 1
-			return `[]`, nil
-		}
-
-		if callCount == 1 {
-			callCount += 1
-			return apiDefListTest, nil
-		}
-
-		if callCount == 2 {
-			callCount += 1
-			return apiDefListTest2, nil
-		}
-
-		if callCount == 3 {
-			callCount += 1
-			return "malformed json", nil
-		}
-
-		// clean up
-		return `[]`, nil
+		return a()
 	})
 	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
 		return true
@@ -161,23 +154,12 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 	rpc := startRPCMock(dispatcher)
 	defer stopRPCMock(rpc)
 
-	// Three cases: 1 API, 2 APIs and Malformed data
-	exp := []int{1, 4, 6, 6, 2}
-	if *cli.HTTPProfile {
-		exp = []int{4, 6, 8, 8, 4}
-	}
+	exp := []int{0, 1, 2, 2}
 	for _, e := range exp {
 		DoReload()
-
-		rtCnt := 0
-		mainRouter().Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
-			rtCnt += 1
-			//fmt.Println(route.GetPathTemplate())
-			return nil
-		})
-
-		if rtCnt != e {
-			t.Errorf("There should be %v routes, got %v", e, rtCnt)
+		n := apisByIDLen()
+		if n != e {
+			t.Errorf("There should be %v api's, got %v", e, n)
 		}
 	}
 }
