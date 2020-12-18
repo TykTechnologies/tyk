@@ -90,7 +90,7 @@ func (k *JWTMiddleware) legacyGetSecretFromURL(url, kid, keyType string) (interf
 			return nil, err
 		}
 
-		JWKCache.Set("legacy-" + k.Spec.APIID, jwkSet, cache.DefaultExpiration)
+		JWKCache.Set("legacy-"+k.Spec.APIID, jwkSet, cache.DefaultExpiration)
 	} else {
 		jwkSet = cachedJWK.(JWKs)
 	}
@@ -142,7 +142,7 @@ func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) (interface{},
 		}
 		if jwkSet, err = parseJWK(buf); err != nil {
 			k.Logger().WithError(err).Error("Failed to decode body JWK. Trying x5c PEM fallback.")
-			
+
 			key, legacyError := k.legacyGetSecretFromURL(url, kid, keyType)
 			if legacyError == nil {
 				return key, nil
