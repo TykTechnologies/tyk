@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"bytes"
 	"crypto/md5"
 	"crypto/x509"
 	"encoding/base64"
@@ -43,6 +44,21 @@ func (k *JWTMiddleware) EnabledForSpec() bool {
 
 var JWKCache *cache.Cache
 
+type JWK struct {
+	Alg string   `json:"alg"`
+	Kty string   `json:"kty"`
+	Use string   `json:"use"`
+	X5c []string `json:"x5c"`
+	N   string   `json:"n"`
+	E   string   `json:"e"`
+	KID string   `json:"kid"`
+	X5t string   `json:"x5t"`
+}
+
+type JWKs struct {
+	Keys []JWK `json:"keys"`
+}
+
 func parseJWK(buf []byte) (*jose.JSONWebKeySet, error) {
 	var j jose.JSONWebKeySet
 	err := json.Unmarshal(buf, &j)
@@ -50,6 +66,54 @@ func parseJWK(buf []byte) (*jose.JSONWebKeySet, error) {
 		return nil, err
 	}
 	return &j, nil
+}
+
+func (k *JWTMiddleware) legacyGetSecretFromURL(url, kid, keyType string) (interface{}, error) {
+	// Implement a cache
+	if JWKCache == nil {
+		JWKCache = cache.New(240*time.Second, 30*time.Second)
+	}
+
+	var jwkSet JWKs
+	cachedJWK, found := JWKCache.Get("legacy-" + k.Spec.APIID)
+	if !found {
+		resp, err := http.Get(url)
+		if err != nil {
+			k.Logger().WithError(err).Error("Failed to get resource URL")
+			return nil, err
+		}
+		defer resp.Body.Close()
+
+		// Decode it
+		if err := json.NewDecoder(resp.Body).Decode(&jwkSet); err != nil {
+			k.Logger().WithError(err).Error("Failed to decode body JWK")
+			return nil, err
+		}
+
+		JWKCache.Set("legacy-"+k.Spec.APIID, jwkSet, cache.DefaultExpiration)
+	} else {
+		jwkSet = cachedJWK.(JWKs)
+	}
+
+	for _, val := range jwkSet.Keys {
+		if val.KID != kid || strings.ToLower(val.Kty) != strings.ToLower(keyType) {
+			continue
+		}
+		if len(val.X5c) > 0 {
+			// Use the first cert only
+			decodedCert, err := base64.StdEncoding.DecodeString(val.X5c[0])
+			if !bytes.Contains(decodedCert, []byte("-----")) {
+				return nil, errors.New("No legacy public keys found")
+			}
+			if err != nil {
+				return nil, err
+			}
+			return ParseRSAPublicKey(decodedCert)
+		}
+		return nil, errors.New("no certificates in JWK")
+	}
+
+	return nil, errors.New("No matching KID could be found")
 }
 
 func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) (interface{}, error) {
@@ -77,7 +141,13 @@ func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) (interface{},
 			return nil, err
 		}
 		if jwkSet, err = parseJWK(buf); err != nil {
-			k.Logger().WithError(err).Error("Failed to decode body JWK")
+			k.Logger().WithError(err).Info("Failed to decode JWKs body. Trying x5c PEM fallback.")
+
+			key, legacyError := k.legacyGetSecretFromURL(url, kid, keyType)
+			if legacyError == nil {
+				return key, nil
+			}
+
 			return nil, err
 		}
 
