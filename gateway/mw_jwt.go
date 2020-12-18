@@ -126,7 +126,7 @@ func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) (interface{},
 	if key, err := k.legacyGetSecretFromURL(url, kid, keyType); err == nil {
 		return key, nil
 	} else {
-		k.Logger().WithError(err).Info("Legacy JWK qery")
+		k.Logger().WithError(err).Info("Legacy JWK query")
 	}
 
 	var jwkSet *jose.JSONWebKeySet
