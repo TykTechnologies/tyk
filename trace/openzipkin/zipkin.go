@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/v3/config"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/log"
 	zipkin "github.com/openzipkin/zipkin-go"

@@ -15,10 +15,10 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/headers"
-	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/v3/apidef"
+	"github.com/TykTechnologies/tyk/v3/config"
+	"github.com/TykTechnologies/tyk/v3/headers"
+	"github.com/TykTechnologies/tyk/v3/storage"
 )
 
 type WebHookRequestMethod string

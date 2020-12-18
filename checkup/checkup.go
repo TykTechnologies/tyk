@@ -4,8 +4,8 @@ import (
 	"runtime"
 	"syscall"
 
-	"github.com/TykTechnologies/tyk/config"
-	logger "github.com/TykTechnologies/tyk/log"
+	"github.com/TykTechnologies/tyk/v3/config"
+	logger "github.com/TykTechnologies/tyk/v3/log"
 )
 
 var (

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/v3/config"
+	"github.com/TykTechnologies/tyk/v3/storage"
 	"github.com/lonelycode/osin"
 	"github.com/stretchr/testify/assert"
 )

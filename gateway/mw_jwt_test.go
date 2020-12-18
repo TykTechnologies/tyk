@@ -15,8 +15,8 @@ import (
 	"github.com/lonelycode/go-uuid/uuid"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/TykTechnologies/tyk/test"
-	"github.com/TykTechnologies/tyk/user"
+	"github.com/TykTechnologies/tyk/v3/test"
+	"github.com/TykTechnologies/tyk/v3/user"
 )
 
 // openssl rsa -in app.rsa -pubout > app.rsa.pub

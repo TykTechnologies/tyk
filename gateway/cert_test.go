@@ -20,11 +20,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/certs"
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/test"
-	"github.com/TykTechnologies/tyk/user"
+	"github.com/TykTechnologies/tyk/v3/apidef"
+	"github.com/TykTechnologies/tyk/v3/certs"
+	"github.com/TykTechnologies/tyk/v3/config"
+	"github.com/TykTechnologies/tyk/v3/test"
+	"github.com/TykTechnologies/tyk/v3/user"
 )
 
 func genCertificate(template *x509.Certificate) ([]byte, []byte, []byte, tls.Certificate) {

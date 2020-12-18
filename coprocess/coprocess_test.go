@@ -18,10 +18,10 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/coprocess"
-	"github.com/TykTechnologies/tyk/gateway"
-	logger "github.com/TykTechnologies/tyk/log"
+	"github.com/TykTechnologies/tyk/v3/apidef"
+	"github.com/TykTechnologies/tyk/v3/coprocess"
+	"github.com/TykTechnologies/tyk/v3/gateway"
+	logger "github.com/TykTechnologies/tyk/v3/log"
 )
 
 const baseMiddlewarePath = "middleware/python"

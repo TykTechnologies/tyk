@@ -8,13 +8,13 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/TykTechnologies/tyk/cli"
+	"github.com/TykTechnologies/tyk/v3/cli"
 
 	"github.com/TykTechnologies/gorpc"
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/rpc"
-	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/v3/apidef"
+	"github.com/TykTechnologies/tyk/v3/config"
+	"github.com/TykTechnologies/tyk/v3/rpc"
+	"github.com/TykTechnologies/tyk/v3/test"
 )
 
 func startRPCMock(dispatcher *gorpc.Dispatcher) *gorpc.Server {

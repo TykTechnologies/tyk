@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/v3/apidef"
+	"github.com/TykTechnologies/tyk/v3/test"
 )
 
 var testJsonSchema = `{

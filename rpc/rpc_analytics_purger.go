@@ -7,7 +7,7 @@ import (
 
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
-	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/v3/storage"
 )
 
 type AnalyticsRecord struct {

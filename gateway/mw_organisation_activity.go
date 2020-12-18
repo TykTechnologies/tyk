@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TykTechnologies/tyk/ctx"
-	"github.com/TykTechnologies/tyk/request"
-	"github.com/TykTechnologies/tyk/user"
+	"github.com/TykTechnologies/tyk/v3/ctx"
+	"github.com/TykTechnologies/tyk/v3/request"
+	"github.com/TykTechnologies/tyk/v3/user"
 )
 
 type orgChanMapMu struct {

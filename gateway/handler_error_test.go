@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/headers"
-	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/v3/config"
+	"github.com/TykTechnologies/tyk/v3/headers"
+	"github.com/TykTechnologies/tyk/v3/test"
 )
 
 func TestHandleError_text_xml(t *testing.T) {

@@ -4,10 +4,10 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/v3/apidef"
 
-	"github.com/TykTechnologies/tyk/storage"
-	"github.com/TykTechnologies/tyk/user"
+	"github.com/TykTechnologies/tyk/v3/storage"
+	"github.com/TykTechnologies/tyk/v3/user"
 )
 
 type Key uint

@@ -7,8 +7,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/v3/apidef"
+	"github.com/TykTechnologies/tyk/v3/headers"
 )
 
 // TransformMiddleware is a middleware that will apply a template to a request body to transform it's contents ready for an upstream API

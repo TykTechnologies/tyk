@@ -3,9 +3,8 @@ package storage
 import (
 	"testing"
 
+	"github.com/TykTechnologies/tyk/v3/config"
 	"github.com/go-redis/redis/v8"
-
-	"github.com/TykTechnologies/tyk/config"
 )
 
 func TestRedisClusterGetMultiKey(t *testing.T) {

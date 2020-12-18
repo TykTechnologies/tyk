@@ -14,9 +14,9 @@ import (
 	"github.com/justinas/alice"
 	"github.com/lonelycode/go-uuid/uuid"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/test"
-	"github.com/TykTechnologies/tyk/user"
+	"github.com/TykTechnologies/tyk/v3/apidef"
+	"github.com/TykTechnologies/tyk/v3/test"
+	"github.com/TykTechnologies/tyk/v3/user"
 )
 
 const multiAuthDev = `{

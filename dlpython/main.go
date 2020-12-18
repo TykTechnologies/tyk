@@ -22,7 +22,7 @@ import (
 	"strings"
 	"unsafe"
 
-	"github.com/TykTechnologies/tyk/log"
+	"github.com/TykTechnologies/tyk/v3/log"
 )
 
 var (

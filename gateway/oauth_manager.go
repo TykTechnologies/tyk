@@ -18,10 +18,10 @@ import (
 
 	"strconv"
 
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/headers"
-	"github.com/TykTechnologies/tyk/storage"
-	"github.com/TykTechnologies/tyk/user"
+	"github.com/TykTechnologies/tyk/v3/config"
+	"github.com/TykTechnologies/tyk/v3/headers"
+	"github.com/TykTechnologies/tyk/v3/storage"
+	"github.com/TykTechnologies/tyk/v3/user"
 )
 
 /*

@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/v3/config"
+	"github.com/TykTechnologies/tyk/v3/headers"
 )
 
 var dashLog = log.WithField("prefix", "dashboard")
