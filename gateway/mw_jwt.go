@@ -141,7 +141,7 @@ func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) (interface{},
 			return nil, err
 		}
 		if jwkSet, err = parseJWK(buf); err != nil {
-			k.Logger().WithError(err).Error("Failed to decode body JWK. Trying x5c PEM fallback.")
+			k.Logger().WithError(err).Info("Failed to decode JWKs body. Trying x5c PEM fallback.")
 
 			key, legacyError := k.legacyGetSecretFromURL(url, kid, keyType)
 			if legacyError == nil {
