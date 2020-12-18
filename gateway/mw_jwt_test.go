@@ -1402,14 +1402,14 @@ func TestJWTSessionRSAWithEncodedJWK(t *testing.T) {
 			JWKCache.Flush()
 		}
 	}
-	// t.Run("Direct JWK URL", func(t *testing.T) {
-	// 	spec.JWTSource = testHttpJWK
-	// 	LoadAPI(spec)
-	// 	flush()
-	// 	ts.Run(t, test.TestCase{
-	// 		Headers: authHeaders, Code: http.StatusOK,
-	// 	})
-	// })
+	t.Run("Direct JWK URL", func(t *testing.T) {
+		spec.JWTSource = testHttpJWK
+		LoadAPI(spec)
+		flush()
+		ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+	})
 	t.Run("Direct JWK URL with legacy jwk", func(t *testing.T) {
 		spec.JWTSource = testHttpJWKLegacy
 		LoadAPI(spec)
