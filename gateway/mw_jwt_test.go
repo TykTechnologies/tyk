@@ -1410,12 +1410,12 @@ func TestJWTSessionRSAWithEncodedJWK(t *testing.T) {
 			Headers: authHeaders, Code: http.StatusOK,
 		})
 	})
-	t.Run("Direct JWK URL with bad jwk", func(t *testing.T) {
+	t.Run("Direct JWK URL with legacy jwk", func(t *testing.T) {
 		spec.JWTSource = testHttpJWKLegacy
 		LoadAPI(spec)
 		flush()
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: http.StatusForbidden,
+			Headers: authHeaders, Code: http.StatusOK,
 		})
 	})
 	t.Run("Base64", func(t *testing.T) {
@@ -1426,12 +1426,12 @@ func TestJWTSessionRSAWithEncodedJWK(t *testing.T) {
 			Headers: authHeaders, Code: http.StatusOK,
 		})
 	})
-	t.Run("Base64 bad jwk", func(t *testing.T) {
+	t.Run("Base64 legacy jwk", func(t *testing.T) {
 		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(testHttpJWKLegacy))
 		LoadAPI(spec)
 		flush()
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: http.StatusForbidden,
+			Headers: authHeaders, Code: http.StatusOK,
 		})
 	})
 }
