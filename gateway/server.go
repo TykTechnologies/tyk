@@ -1232,8 +1232,11 @@ func Start() {
 		trace.SetLogger(mainLog)
 		defer trace.Close()
 	}
-	start()
-	go storage.ConnectToRedis(ctx)
+
+	start(ctx)
+	go storage.ConnectToRedis(ctx, func() {
+		reloadURLStructure(func() {})
+	})
 
 	if *cli.MemProfile {
 		mainLog.Debug("Memory profiling active")
@@ -1319,7 +1322,7 @@ func writeProfiles() {
 	}
 }
 
-func start() {
+func start(ctx context.Context) {
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.Global().SupressDefaultOrgStore {
 		mainLog.Debug("Initialising default org store")
