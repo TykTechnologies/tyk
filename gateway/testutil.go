@@ -61,6 +61,8 @@ var (
 
 	// ReloadTestCase use this when in any test for gateway reloads
 	ReloadTestCase = NewReloadMachinery()
+	// OnConnect this is a callback which is called whenever we transition redis Disconnected to connected
+	OnConnect func()
 )
 
 // ReloadMachinery is a helper struct to use when writing tests that do manual
@@ -290,7 +292,11 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 	if analytics.GeoIPDB == nil {
 		panic("GeoIPDB was not initialized")
 	}
-	go storage.ConnectToRedis(ctx)
+	go storage.ConnectToRedis(ctx, func() {
+		if OnConnect != nil {
+			OnConnect()
+		}
+	})
 	for {
 		if storage.Connected() {
 			break
@@ -922,6 +928,7 @@ func (s *Test) Close() {
 }
 
 func (s *Test) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, error) {
+	t.Helper()
 	return s.testRunner.Run(t, testCases...)
 }
 

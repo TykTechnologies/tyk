@@ -1247,7 +1247,9 @@ func Start() {
 		defer trace.Close()
 	}
 	start(ctx)
-	go storage.ConnectToRedis(ctx)
+	go storage.ConnectToRedis(ctx, func() {
+		reloadURLStructure(func() {})
+	})
 
 	if *cli.MemProfile {
 		mainLog.Debug("Memory profiling active")

@@ -294,8 +294,7 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 		register()
 		go checkDisconnect()
 	}
-
-	return values.ClientIsConnected()
+	return true
 }
 
 // Login tries to login to the rpc sever. Returns true if it succeeds and false
@@ -438,11 +437,24 @@ func recoverOp(fn func() error) func() error {
 	}
 }
 
-func FuncClientSingleton(funcName string, request interface{}) (interface{}, error) {
-	if !values.ClientIsConnected() {
-		return nil, ErrRPCIsDown
+// FuncClientSingleton performs RPC call. This might be called before we have
+// established RPC connection, in that case we perform a retry with exponential
+// backoff ensuring indeed we can't connect to the rpc, this will eventually
+// fall into emergency mode( That is handled outside of this function call)
+func FuncClientSingleton(funcName string, request interface{}) (result interface{}, err error) {
+	be := backoff.Retry(func() error {
+		if !values.ClientIsConnected() {
+			return ErrRPCIsDown
+		}
+		result, err = funcClientSingleton.CallTimeout(funcName, request, GlobalRPCCallTimeout)
+		return nil
+	}, backoff.WithMaxRetries(
+		backoff.NewConstantBackOff(10*time.Millisecond), 3,
+	))
+	if be != nil {
+		err = be
 	}
-	return funcClientSingleton.CallTimeout(funcName, request, GlobalRPCCallTimeout)
+	return
 }
 
 func onConnectFunc(conn net.Conn) (net.Conn, string, error) {
