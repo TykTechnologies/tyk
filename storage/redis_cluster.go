@@ -38,19 +38,20 @@ var ctx = context.Background()
 // redisW
 func DisableRedis(ok bool) {
 	if ok {
+		// we make sure to set that redis is down
 		redisUp.Store(false)
 		disableRedis.Store(true)
 		return
 	}
-	redisUp.Store(true)
 	disableRedis.Store(false)
 }
 
 func shouldConnect() bool {
+	ok := true
 	if v := disableRedis.Load(); v != nil {
-		return !v.(bool)
+		ok = !v.(bool)
 	}
-	return true
+	return ok
 }
 
 // Connected returns true if we are connected to redis
@@ -112,7 +113,9 @@ func clusterConnectionIsOpen(cluster *RedisCluster) bool {
 
 // ConnectToRedis starts a go routine that periodically tries to connect to
 // redis.
-func ConnectToRedis(ctx context.Context) {
+//
+// onConnect will be called when we have established a successful redis connection
+func ConnectToRedis(ctx context.Context, onConnect func()) {
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 	c := []RedisCluster{
@@ -130,7 +133,6 @@ func ConnectToRedis(ctx context.Context) {
 		ok = true
 	}
 	redisUp.Store(ok)
-again:
 	for {
 		select {
 		case <-ctx.Done():
@@ -139,19 +141,34 @@ again:
 			if !shouldConnect() {
 				continue
 			}
-			for _, v := range c {
-				if !connectSingleton(v.IsCache) {
-					redisUp.Store(false)
-					goto again
-				}
-				if !clusterConnectionIsOpen(&v) {
-					redisUp.Store(false)
-					goto again
+			conn := Connected()
+			ok := connectCluster(c...)
+
+			redisUp.Store(ok)
+			if !conn && ok {
+				// Here we are transitioning from DISCONNECTED to CONNECTED state
+				if onConnect != nil {
+					onConnect()
 				}
 			}
-			redisUp.Store(true)
 		}
 	}
+}
+
+func connectCluster(v ...RedisCluster) bool {
+	for _, x := range v {
+		if ok := establishConnection(&x); ok {
+			return ok
+		}
+	}
+	return false
+}
+
+func establishConnection(v *RedisCluster) bool {
+	if !connectSingleton(v.IsCache) {
+		return false
+	}
+	return clusterConnectionIsOpen(v)
 }
 
 func NewRedisClusterPool(isCache bool) redis.UniversalClient {

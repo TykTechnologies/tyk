@@ -183,7 +183,7 @@ func LoadPoliciesFromRPC(orgId string) (map[string]user.Policy, error) {
 	}
 
 	if err := saveRPCPoliciesBackup(rpcPolicies); err != nil {
-		return nil, err
+		log.Error(err)
 	}
 
 	return policies, nil
