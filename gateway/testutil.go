@@ -969,7 +969,7 @@ func (s *Test) RunExt(t testing.TB, testCases ...test.TestCase) {
 
 		if i > 0 {
 			s.Close()
-			s.Start()
+			s.Start(nil)
 		}
 
 		title := fmt.Sprintf("hotReload: %v, overrideDefaults: %v", m.goagain, m.overrideDefaults)
