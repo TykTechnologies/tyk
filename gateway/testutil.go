@@ -847,7 +847,13 @@ type Test struct {
 	cacnel       func()
 }
 
-func (s *Test) Start() {
+
+type SlaveDataCenter struct {
+	SlaveOptions config.SlaveOptionsConfig
+	Redis config.StorageOptionsConf
+}
+
+func (s *Test) Start(slavedClusterConfig *SlaveDataCenter) {
 	l, _ := net.Listen("tcp", "127.0.0.1:0")
 	_, port, _ := net.SplitHostPort(l.Addr().String())
 	l.Close()
@@ -861,6 +867,18 @@ func (s *Test) Start() {
 		l.Close()
 		globalConf.ControlAPIPort, _ = strconv.Atoi(port)
 	}
+
+	if slavedClusterConfig != nil {
+		globalConf.SlaveOptions = slavedClusterConfig.SlaveOptions
+		// policies source
+		globalConf.Policies.PolicySource = "rpc"
+		globalConf.Policies.PolicyRecordName = "tyk_policies"
+
+		globalConf.UseDBAppConfigs = false
+		// Override redis
+		globalConf.Storage = slavedClusterConfig.Redis
+	}
+
 	globalConf.CoProcessOptions = s.config.CoprocessConfig
 	config.SetGlobal(globalConf)
 
@@ -1016,12 +1034,12 @@ func (s *Test) CreateSession(sGen ...func(s *user.SessionState)) (*user.SessionS
 	return &createdSession, keySuccess.Key
 }
 
-func StartTest(config ...TestConfig) *Test {
+func StartTest(slaveConfig *SlaveDataCenter, config ...TestConfig) *Test {
 	t := &Test{}
 	if len(config) > 0 {
 		t.config = config[0]
 	}
-	t.Start()
+	t.Start(slaveConfig)
 
 	return t
 }
