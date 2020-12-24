@@ -362,12 +362,7 @@ func (m *proxyMux) swap(new *proxyMux) {
 			}
 		}
 	}
-	p := m.getProxy(config.Global().ListenPort)
-	if p != nil && p.router != nil {
-		// All APIs processed, now we can healthcheck
-		// Add a root message to check all is OK
-		p.router.HandleFunc("/"+config.Global().HealthCheckEndpointName, liveCheckHandler)
-	}
+
 	m.serve()
 }
 

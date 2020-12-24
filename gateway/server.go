@@ -419,6 +419,8 @@ func loadControlAPIEndpoints(muxer *mux.Router) {
 		}
 	}
 
+	muxer.HandleFunc("/"+config.Global().HealthCheckEndpointName, liveCheckHandler)
+
 	r := mux.NewRouter()
 	muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
 		stripSlashes(checkIsAPIOwner(controlAPICheckClientCertificate("/gateway/client", InstrumentationMW(r)))),
