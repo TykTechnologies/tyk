@@ -812,7 +812,7 @@ func TestListener(t *testing.T) {
 // Admin api located on separate port
 func TestControlListener(t *testing.T) {
 	ts := StartTest(TestConfig{
-		sepatateControlAPI: true,
+		SeparateControlAPI: true,
 	})
 	defer ts.Close()
 
@@ -847,7 +847,7 @@ func TestHttpPprof(t *testing.T) {
 	defer func() { cli.HTTPProfile = old }()
 
 	ts := StartTest(TestConfig{
-		sepatateControlAPI: true,
+		SeparateControlAPI: true,
 	})
 
 	ts.Run(t, []test.TestCase{
@@ -1189,25 +1189,54 @@ func TestCustomDomain(t *testing.T) {
 	})
 }
 
-func TestHelloHealthcheck(t *testing.T) {
-	ts := StartTest()
-	defer ts.Close()
+func TestGatewayHealthCheck(t *testing.T) {
 
-	t.Run("Without APIs", func(t *testing.T) {
-		ts.Run(t, []test.TestCase{
-			{Method: "GET", Path: "/hello", Code: 200},
-		}...)
-	})
+	t.Run("control api port == listen port", func(t *testing.T) {
+		ts := StartTest()
+		defer ts.Close()
 
-	t.Run("With APIs", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
-			spec.Proxy.ListenPath = "/sample"
+		t.Run("Without APIs", func(t *testing.T) {
+			_, _ = ts.Run(t, []test.TestCase{
+				{Path: "/hello", BodyMatch: `"status":"pass"`, Code: http.StatusOK},
+			}...)
 		})
 
-		ts.Run(t, []test.TestCase{
-			{Method: "GET", Path: "/hello", Code: 200},
-			{Method: "GET", Path: "/sample/hello", Code: 200},
-		}...)
+		t.Run("With API", func(t *testing.T) {
+			BuildAndLoadAPI(func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/sample"
+			})
+
+			_, _ = ts.Run(t, []test.TestCase{
+				{Path: "/hello", BodyMatch: `"status":"pass"`, Code: http.StatusOK},
+			}...)
+		})
+	})
+
+	DoReload()
+
+	t.Run("control api port != listen port", func(t *testing.T) {
+		ts := StartTest(TestConfig{
+			SeparateControlAPI: true,
+		})
+		defer ts.Close()
+
+		t.Run("Without APIs", func(t *testing.T) {
+			_, _ = ts.Run(t, []test.TestCase{
+				{Path: "/hello", Code: http.StatusNotFound},
+				{ControlRequest: true, Path: "/hello", BodyMatch: `"status":"pass"`, Code: http.StatusOK},
+			}...)
+		})
+
+		t.Run("With API", func(t *testing.T) {
+			BuildAndLoadAPI(func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/sample"
+			})
+
+			_, _ = ts.Run(t, []test.TestCase{
+				{Path: "/hello", Code: http.StatusNotFound},
+				{ControlRequest: true, Path: "/hello", BodyMatch: `"status":"pass"`, Code: http.StatusOK},
+			}...)
+		})
 	})
 }
 

@@ -831,7 +831,7 @@ func firstVals(vals map[string][]string) map[string]string {
 }
 
 type TestConfig struct {
-	sepatateControlAPI bool
+	SeparateControlAPI bool
 	Delay              time.Duration
 	HotReload          bool
 	overrideDefaults   bool
@@ -854,7 +854,7 @@ func (s *Test) Start() {
 	globalConf := config.Global()
 	globalConf.ListenPort, _ = strconv.Atoi(port)
 
-	if s.config.sepatateControlAPI {
+	if s.config.SeparateControlAPI {
 		l, _ := net.Listen("tcp", "127.0.0.1:0")
 
 		_, port, _ = net.SplitHostPort(l.Addr().String())
@@ -888,7 +888,7 @@ func (s *Test) Start() {
 		RequestBuilder: func(tc *test.TestCase) (*http.Request, error) {
 			tc.BaseURL = s.URL
 			if tc.ControlRequest {
-				if s.config.sepatateControlAPI {
+				if s.config.SeparateControlAPI {
 					tc.BaseURL = scheme + controlProxy().listener.Addr().String()
 				} else if s.GlobalConfig.ControlAPIHostname != "" {
 					tc.Domain = s.GlobalConfig.ControlAPIHostname
@@ -920,7 +920,7 @@ func (s *Test) Close() {
 		s.cacnel()
 	}
 	defaultProxyMux.swap(&proxyMux{})
-	if s.config.sepatateControlAPI {
+	if s.config.SeparateControlAPI {
 		globalConf := config.Global()
 		globalConf.ControlAPIPort = 0
 		config.SetGlobal(globalConf)
