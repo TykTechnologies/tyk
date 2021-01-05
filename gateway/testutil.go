@@ -1034,8 +1034,15 @@ func (s *Test) CreateSession(sGen ...func(s *user.SessionState)) (*user.SessionS
 	return &createdSession, keySuccess.Key
 }
 
-func (s *Test) GetApi(apiId string) *APISpec{
+func (s *Test) GetApiById(apiId string) *APISpec{
 	return getApiSpec(apiId)
+}
+
+func (s *Test) GetPolicyById(policyId string) (*user.Policy, bool){
+	policiesMu.Lock()
+	defer policiesMu.Unlock()
+
+	return policiesByID[policyId]
 }
 
 func StartTest(slaveConfig *SlaveDataCenter, config ...TestConfig) *Test {
