@@ -1038,11 +1038,11 @@ func (s *Test) GetApiById(apiId string) *APISpec{
 	return getApiSpec(apiId)
 }
 
-func (s *Test) GetPolicyById(policyId string) (*user.Policy, bool){
+func (s *Test) GetPolicyById(policyId string) (user.Policy, bool){
 	policiesMu.Lock()
 	defer policiesMu.Unlock()
-
-	return policiesByID[policyId]
+	pol, found:= policiesByID[policyId]
+	return pol, found
 }
 
 func StartTest(slaveConfig *SlaveDataCenter, config ...TestConfig) *Test {
