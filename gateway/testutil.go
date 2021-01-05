@@ -1034,6 +1034,10 @@ func (s *Test) CreateSession(sGen ...func(s *user.SessionState)) (*user.SessionS
 	return &createdSession, keySuccess.Key
 }
 
+func (s *Test) GetApi(apiId string) *APISpec{
+	return getApiSpec(apiId)
+}
+
 func StartTest(slaveConfig *SlaveDataCenter, config ...TestConfig) *Test {
 	t := &Test{}
 	if len(config) > 0 {
