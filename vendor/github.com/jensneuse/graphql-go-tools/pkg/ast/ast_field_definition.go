@@ -3,8 +3,6 @@ package ast
 import (
 	"bytes"
 
-	"github.com/cespare/xxhash"
-
 	"github.com/jensneuse/graphql-go-tools/internal/pkg/unsafebytes"
 	"github.com/jensneuse/graphql-go-tools/pkg/lexer/literal"
 	"github.com/jensneuse/graphql-go-tools/pkg/lexer/position"
@@ -135,5 +133,6 @@ func (d *Document) FieldDefinitionType(ref int) int {
 
 func (d *Document) FieldDefinitionTypeNode(ref int) Node {
 	typeName := d.ResolveTypeNameBytes(d.FieldDefinitions[ref].Type)
-	return d.Index.Nodes[xxhash.Sum64(typeName)]
+	node, _ := d.Index.FirstNodeByNameBytes(typeName)
+	return node
 }

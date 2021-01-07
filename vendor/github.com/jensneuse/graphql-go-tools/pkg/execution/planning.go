@@ -228,7 +228,7 @@ func (p *planningVisitor) EnterField(ref int) {
 		}
 
 		parent.Fields = append(parent.Fields, Field{
-			Name:  p.operation.FieldObjectNameBytes(ref),
+			Name:  p.operation.FieldAliasOrNameBytes(ref),
 			Value: value,
 			Skip:  skipCondition,
 		})
@@ -260,9 +260,9 @@ func (p *planningVisitor) LeaveField(ref int) {
 				switch parent := p.currentNode[len(p.currentNode)-2].(type) {
 				case *Object:
 					for i := 0; i < len(parent.Fields); i++ {
-						if bytes.Equal(p.operation.FieldObjectNameBytes(ref), parent.Fields[i].Name) {
+						if bytes.Equal(p.operation.FieldAliasOrNameBytes(ref), parent.Fields[i].Name) {
 
-							pathName := p.operation.FieldObjectNameString(ref)
+							pathName := p.operation.FieldAliasOrNameString(ref)
 							parent.Fields[i].HasResolvedData = true
 
 							singleFetch := &SingleFetch{
