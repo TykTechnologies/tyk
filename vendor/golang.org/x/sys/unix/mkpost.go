@@ -57,6 +57,10 @@ func main() {
 	fdSetRegex := regexp.MustCompile(`type (FdSet) struct {(\s+)X__fds_bits(\s+\S+\s+)}`)
 	b = fdSetRegex.ReplaceAll(b, []byte("type $1 struct {${2}Bits$3}"))
 
+	// Intentionally export __icmp6_filt field in icmpv6_filter
+	icmpV6Regex := regexp.MustCompile(`type (ICMPv6Filter) struct {(\s+)X__icmp6_filt(\s+\S+\s+)}`)
+	b = icmpV6Regex.ReplaceAll(b, []byte("type $1 struct {${2}Filt$3}"))
+
 	// If we have empty Ptrace structs, we should delete them. Only s390x emits
 	// nonempty Ptrace structs.
 	ptraceRexexp := regexp.MustCompile(`type Ptrace((Psw|Fpregs|Per) struct {\s*})`)
@@ -80,6 +84,24 @@ func main() {
 	// conversion to string.
 	convertStatvfsRegex := regexp.MustCompile(`((Fstype|Mnton|Mntfrom)name)(\s+)\[(\d+)\]int8`)
 	b = convertStatvfsRegex.ReplaceAll(b, []byte("$1$3[$4]byte"))
+
+	// Convert []int8 to []byte in device mapper ioctl interface
+	convertDmIoctlNames := regexp.MustCompile(`(Name|Uuid|Target_type|Data)(\s+)\[(\d+)\]u?int8`)
+	dmIoctlTypes := regexp.MustCompile(`type Dm(\S+) struct {[^}]*}`)
+	dmStructs := dmIoctlTypes.FindAll(b, -1)
+	for _, s := range dmStructs {
+		newNames := convertDmIoctlNames.ReplaceAll(s, []byte("$1$2[$3]byte"))
+		b = bytes.Replace(b, s, newNames, 1)
+	}
+
+	// Convert []int8 to []byte in ctl_info ioctl interface
+	convertCtlInfoName := regexp.MustCompile(`(Name)(\s+)\[(\d+)\]int8`)
+	ctlInfoType := regexp.MustCompile(`type CtlInfo struct {[^}]*}`)
+	ctlInfoStructs := ctlInfoType.FindAll(b, -1)
+	for _, s := range ctlInfoStructs {
+		newNames := convertCtlInfoName.ReplaceAll(s, []byte("$1$2[$3]byte"))
+		b = bytes.Replace(b, s, newNames, 1)
+	}
 
 	// Convert [1024]int8 to [1024]byte in Ptmget members
 	convertPtmget := regexp.MustCompile(`([SC]n)(\s+)\[(\d+)\]u?int8`)

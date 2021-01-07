@@ -13,9 +13,9 @@ type Index struct {
 	// SubscriptionTypeName is the name of the subscription type on the schema Node
 	// schema { subscription: Subscription }
 	SubscriptionTypeName ByteSlice
-	// Nodes is a list of all root nodes in a schema definition
+	// nodes is a list of all root nodes in a schema definition
 	// The map key is the result of the xxhash algorithm from the Node name.
-	Nodes map[uint64]Node
+	nodes map[uint64][]Node
 	// ReplacedFragmentSpreads is a list of references (slice indices) of all FragmentSpreads that got replaced during normalization.
 	ReplacedFragmentSpreads []int
 	// MergedTypeExtensions is a list of Nodes (Node kind + reference) that got merged during type extension merging.
@@ -29,11 +29,57 @@ func (i *Index) Reset() {
 	i.SubscriptionTypeName = i.SubscriptionTypeName[:0]
 	i.ReplacedFragmentSpreads = i.ReplacedFragmentSpreads[:0]
 	i.MergedTypeExtensions = i.MergedTypeExtensions[:0]
-	for j := range i.Nodes {
-		delete(i.Nodes, j)
+	for j := range i.nodes {
+		delete(i.nodes, j)
 	}
 }
 
-func (i *Index) Add(name string, node Node) {
-	i.Nodes[xxhash.Sum64String(name)] = node
+func (i *Index) AddNodeStr(name string, node Node) {
+	hash := xxhash.Sum64String(name)
+	_, exists := i.nodes[hash]
+	if !exists {
+		i.nodes[hash] = []Node{node}
+		return
+	}
+	i.nodes[hash] = append(i.nodes[hash], node)
+}
+
+func (i *Index) AddNodeBytes(name []byte, node Node) {
+	hash := xxhash.Sum64(name)
+	_, exists := i.nodes[hash]
+	if !exists {
+		i.nodes[hash] = []Node{node}
+		return
+	}
+	i.nodes[hash] = append(i.nodes[hash], node)
+}
+
+func (i *Index) NodesByNameStr(name string) ([]Node, bool) {
+	hash := xxhash.Sum64String(name)
+	node, exists := i.nodes[hash]
+	return node, exists
+}
+
+func (i *Index) FirstNodeByNameStr(name string) (Node, bool) {
+	hash := xxhash.Sum64String(name)
+	node, exists := i.nodes[hash]
+	if !exists || len(node) == 0 {
+		return Node{}, false
+	}
+	return node[0], true
+}
+
+func (i *Index) NodesByNameBytes(name []byte) ([]Node, bool) {
+	hash := xxhash.Sum64(name)
+	node, exists := i.nodes[hash]
+	return node, exists
+}
+
+func (i *Index) FirstNodeByNameBytes(name []byte) (Node, bool) {
+	hash := xxhash.Sum64(name)
+	node, exists := i.nodes[hash]
+	if !exists || len(node) == 0 {
+		return Node{}, false
+	}
+	return node[0], true
 }

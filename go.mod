@@ -38,7 +38,7 @@ require (
 	github.com/golang/protobuf v1.4.2
 	github.com/google/btree v1.0.0 // indirect
 	github.com/gorilla/mux v1.7.3
-	github.com/gorilla/websocket v1.4.1
+	github.com/gorilla/websocket v1.4.2
 	github.com/hashicorp/consul/api v1.3.0
 	github.com/hashicorp/go-msgpack v0.5.4 // indirect
 	github.com/hashicorp/vault/api v1.0.4
@@ -55,7 +55,7 @@ require (
 	github.com/mavricknz/ldap v0.0.0-20160227184754-f5a958005e43
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
 	github.com/miekg/dns v1.0.14
-	github.com/mitchellh/mapstructure v1.1.2
+	github.com/mitchellh/mapstructure v1.2.2
 	github.com/newrelic/go-agent v2.13.0+incompatible
 	github.com/opentracing/opentracing-go v1.1.0
 	github.com/openzipkin/zipkin-go v0.2.2
@@ -63,7 +63,7 @@ require (
 	github.com/paulbellamy/ratecounter v0.2.0
 	github.com/peterbourgon/g2s v0.0.0-20170223122336-d4e7ad98afea // indirect
 	github.com/pires/go-proxyproto v0.0.0-20190615163442-2c19fd512994
-	github.com/pkg/errors v0.8.1
+	github.com/pkg/errors v0.9.1
 	github.com/pmylund/go-cache v2.1.0+incompatible
 	github.com/robertkrimen/otto v0.0.0-20180617131154-15f95af6e78d
 	github.com/rs/cors v1.7.0
@@ -97,4 +97,5 @@ require (
 	rsc.io/letsencrypt v0.0.2
 )
 
-replace github.com/jensneuse/graphql-go-tools => github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20201123105516-733fb8df3c8a
+//replace github.com/jensneuse/graphql-go-tools => github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20201123105516-733fb8df3c8a
+replace github.com/jensneuse/graphql-go-tools => ../graphql-go-tools

@@ -3,8 +3,6 @@ package introspection
 import (
 	"strings"
 
-	"github.com/cespare/xxhash"
-
 	"github.com/jensneuse/graphql-go-tools/internal/pkg/unsafebytes"
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/astvisitor"
@@ -424,7 +422,10 @@ func (i *introspectionVisitor) TypeRef(typeRef int) TypeRef {
 	switch i.definition.Types[typeRef].TypeKind {
 	case ast.TypeKindNamed:
 		name := i.definition.TypeNameBytes(typeRef)
-		node := i.definition.Index.Nodes[xxhash.Sum64(name)]
+		node, exists := i.definition.Index.FirstNodeByNameBytes(name)
+		if !exists {
+			return TypeRef{}
+		}
 		var typeKind __TypeKind
 		switch node.Kind {
 		case ast.NodeKindScalarTypeDefinition:

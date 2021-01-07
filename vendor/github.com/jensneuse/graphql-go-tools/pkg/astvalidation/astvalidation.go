@@ -7,9 +7,8 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/cespare/xxhash"
-
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
+	"github.com/jensneuse/graphql-go-tools/pkg/astimport"
 	"github.com/jensneuse/graphql-go-tools/pkg/astvisitor"
 	"github.com/jensneuse/graphql-go-tools/pkg/lexer/literal"
 	"github.com/jensneuse/graphql-go-tools/pkg/operationreport"
@@ -359,7 +358,7 @@ func (f *fieldSelectionMergingVisitor) EnterField(ref int) {
 	if bytes.Equal(fieldName, literal.TYPENAME) {
 		return
 	}
-	objectName := f.operation.FieldObjectNameBytes(ref)
+	objectName := f.operation.FieldAliasOrNameBytes(ref)
 	definition, ok := f.definition.NodeFieldDefinitionByName(f.EnclosingTypeDefinition, fieldName)
 	if !ok {
 		enclosingTypeName := f.definition.NodeNameBytes(f.EnclosingTypeDefinition)
@@ -644,7 +643,7 @@ func (v *validArgumentsVisitor) nullValueSatisfiesInputValueDefinition(inputValu
 func (v *validArgumentsVisitor) enumValueSatisfiesInputValueDefinition(enumValue, inputValueDefinition int) bool {
 
 	definitionTypeName := v.definition.ResolveTypeNameBytes(v.definition.InputValueDefinitions[inputValueDefinition].Type)
-	node, exists := v.definition.Index.Nodes[xxhash.Sum64(definitionTypeName)]
+	node, exists := v.definition.Index.FirstNodeByNameBytes(definitionTypeName)
 	if !exists {
 		return false
 	}
@@ -721,6 +720,7 @@ func Values() Rule {
 type valuesVisitor struct {
 	*astvisitor.Walker
 	operation, definition *ast.Document
+	importer              astimport.Importer
 }
 
 func (v *valuesVisitor) EnterDocument(operation, definition *ast.Document) {
@@ -775,12 +775,24 @@ func (v *valuesVisitor) valueSatisfiesInputValueDefinitionType(value ast.Value, 
 
 	switch v.definition.Types[definitionTypeRef].TypeKind {
 	case ast.TypeKindNonNull:
-		if value.Kind == ast.ValueKindNull {
+		switch value.Kind {
+		case ast.ValueKindNull:
 			return false
+		case ast.ValueKindVariable:
+			variableName := v.operation.VariableValueNameBytes(value.Ref)
+			variableDefinition, exists := v.operation.VariableDefinitionByNameAndOperation(v.Ancestors[0].Ref, variableName)
+			if !exists {
+				return false
+			}
+			variableTypeRef := v.operation.VariableDefinitions[variableDefinition].Type
+			importedDefinitionType := v.importer.ImportType(definitionTypeRef, v.definition, v.operation)
+			if !v.operation.TypesAreEqualDeep(importedDefinitionType, variableTypeRef) {
+				return false
+			}
 		}
 		return v.valueSatisfiesInputValueDefinitionType(value, v.definition.Types[definitionTypeRef].OfType)
 	case ast.TypeKindNamed:
-		node, exists := v.definition.Index.Nodes[xxhash.Sum64(v.definition.ResolveTypeNameBytes(definitionTypeRef))]
+		node, exists := v.definition.Index.FirstNodeByNameBytes(v.definition.ResolveTypeNameBytes(definitionTypeRef))
 		if !exists {
 			return false
 		}
@@ -900,6 +912,16 @@ func (v *valuesVisitor) objectValueSatisfiesInputValueDefinition(objectValue, in
 
 func (v *valuesVisitor) valueSatisfiesScalar(value ast.Value, scalar int) bool {
 	scalarName := v.definition.ScalarTypeDefinitionNameString(scalar)
+	if value.Kind == ast.ValueKindVariable {
+		variableName := v.operation.VariableValueNameBytes(value.Ref)
+		variableDefinition, exists := v.operation.VariableDefinitionByNameAndOperation(v.Ancestors[0].Ref, variableName)
+		if !exists {
+			return false
+		}
+		variableTypeRef := v.operation.VariableDefinitions[variableDefinition].Type
+		typeName := v.operation.ResolveTypeNameString(variableTypeRef)
+		return scalarName == typeName
+	}
 	switch scalarName {
 	case "Boolean":
 		return value.Kind == ast.ValueKindBoolean
@@ -1046,7 +1068,7 @@ func (f *fragmentsVisitor) EnterInlineFragment(ref int) {
 
 	typeName := f.operation.InlineFragmentTypeConditionName(ref)
 
-	node, exists := f.definition.Index.Nodes[xxhash.Sum64(typeName)]
+	node, exists := f.definition.Index.FirstNodeByNameBytes(typeName)
 	if !exists {
 		f.StopWithExternalErr(operationreport.ErrTypeUndefined(typeName))
 		return
@@ -1075,7 +1097,7 @@ func (f *fragmentsVisitor) EnterFragmentDefinition(ref int) {
 	fragmentDefinitionName := f.operation.FragmentDefinitionNameBytes(ref)
 	typeName := f.operation.FragmentDefinitionTypeName(ref)
 
-	node, exists := f.definition.Index.Nodes[xxhash.Sum64(typeName)]
+	node, exists := f.definition.Index.FirstNodeByNameBytes(typeName)
 	if !exists {
 		f.StopWithExternalErr(operationreport.ErrTypeUndefined(typeName))
 		return
@@ -1120,7 +1142,7 @@ func (d *directivesAreDefinedVisitor) EnterDocument(operation, definition *ast.D
 func (d *directivesAreDefinedVisitor) EnterDirective(ref int) {
 
 	directiveName := d.operation.DirectiveNameBytes(ref)
-	definition, exists := d.definition.Index.Nodes[xxhash.Sum64(directiveName)]
+	definition, exists := d.definition.Index.FirstNodeByNameBytes(directiveName)
 
 	if !exists || definition.Kind != ast.NodeKindDirectiveDefinition {
 		d.StopWithExternalErr(operationreport.ErrDirectiveUndefined(directiveName))
@@ -1152,7 +1174,7 @@ func (d *directivesAreInValidLocationsVisitor) EnterDocument(operation, definiti
 func (d *directivesAreInValidLocationsVisitor) EnterDirective(ref int) {
 
 	directiveName := d.operation.DirectiveNameBytes(ref)
-	definition, exists := d.definition.Index.Nodes[xxhash.Sum64(directiveName)]
+	definition, exists := d.definition.Index.FirstNodeByNameBytes(directiveName)
 
 	if !exists || definition.Kind != ast.NodeKindDirectiveDefinition {
 		return // not defined, skip
@@ -1214,7 +1236,7 @@ func (v *variableUniquenessVisitor) EnterVariableDefinition(ref int) {
 		}
 		if bytes.Equal(name, v.operation.VariableDefinitionNameBytes(i)) {
 			if v.Ancestors[0].Kind != ast.NodeKindOperationDefinition {
-				v.StopWithInternalErr(fmt.Errorf("variable definition must have Operation Definition as root ancestor, got: %s", v.Ancestors[0].Kind))
+				v.StopWithInternalErr(fmt.Errorf("variable definition must have Operation ObjectDefinition as root ancestor, got: %s", v.Ancestors[0].Kind))
 				return
 			}
 			operationName := v.operation.Input.ByteSlice(v.operation.OperationDefinitions[v.Ancestors[0].Ref].Name)
@@ -1285,7 +1307,7 @@ func (v *variablesAreInputTypesVisitor) EnterDocument(operation, definition *ast
 func (v *variablesAreInputTypesVisitor) EnterVariableDefinition(ref int) {
 
 	typeName := v.operation.ResolveTypeNameBytes(v.operation.VariableDefinitions[ref].Type)
-	typeDefinitionNode := v.definition.Index.Nodes[xxhash.Sum64(typeName)]
+	typeDefinitionNode, _ := v.definition.Index.FirstNodeByNameBytes(typeName)
 	switch typeDefinitionNode.Kind {
 	case ast.NodeKindInputObjectTypeDefinition, ast.NodeKindScalarTypeDefinition, ast.NodeKindEnumTypeDefinition:
 		return
@@ -1365,10 +1387,11 @@ type allVariablesUsedVisitor struct {
 func (a *allVariablesUsedVisitor) EnterDocument(operation, definition *ast.Document) {
 	a.operation = operation
 	a.definition = definition
+	a.variableDefinitions = a.variableDefinitions[:0]
 }
 
 func (a *allVariablesUsedVisitor) EnterOperationDefinition(ref int) {
-	a.variableDefinitions = a.operation.OperationDefinitions[ref].VariableDefinitions.Refs
+	a.variableDefinitions = append(a.variableDefinitions, a.operation.OperationDefinitions[ref].VariableDefinitions.Refs...)
 }
 
 func (a *allVariablesUsedVisitor) LeaveOperationDefinition(ref int) {
@@ -1388,11 +1411,26 @@ func (a *allVariablesUsedVisitor) EnterArgument(ref int) {
 		return // nothing to check, skip
 	}
 
-	if a.operation.Arguments[ref].Value.Kind != ast.ValueKindVariable {
-		return // skip non variable value
+	a.verifyValue(a.operation.Arguments[ref].Value)
+}
+
+func (a *allVariablesUsedVisitor) verifyValue(value ast.Value) {
+	switch value.Kind {
+	case ast.ValueKindVariable: // don't skip
+	case ast.ValueKindObject:
+		for _, i := range a.operation.ObjectValues[value.Ref].Refs {
+			a.verifyValue(a.operation.ObjectFields[i].Value)
+		}
+		return
+	case ast.ValueKindList:
+		for _, i := range a.operation.ListValues[value.Ref].Refs {
+			a.verifyValue(a.operation.Values[i])
+		}
+	default:
+		return // skip all others
 	}
 
-	variableName := a.operation.VariableValueNameBytes(a.operation.Arguments[ref].Value.Ref)
+	variableName := a.operation.VariableValueNameBytes(value.Ref)
 	for i, j := range a.variableDefinitions {
 		if bytes.Equal(variableName, a.operation.VariableDefinitionNameBytes(j)) {
 			a.variableDefinitions = append(a.variableDefinitions[:i], a.variableDefinitions[i+1:]...)

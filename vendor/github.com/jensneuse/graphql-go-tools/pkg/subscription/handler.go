@@ -37,7 +37,7 @@ type Message struct {
 	Payload json.RawMessage `json:"payload"`
 }
 
-// Client provides an interface which can be implemented by any possible subscription client like websockets, mqtt, etc.
+// client provides an interface which can be implemented by any possible subscription client like websockets, mqtt, etc.
 type Client interface {
 	// ReadFromClient will invoke a read operation from the client connection.
 	ReadFromClient() (*Message, error)

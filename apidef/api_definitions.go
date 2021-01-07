@@ -543,6 +543,8 @@ type GraphQLConfig struct {
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// ExecutionMode is the mode to define how an api behaves.
 	ExecutionMode GraphQLExecutionMode `bson:"execution_mode" json:"execution_mode"`
+	// Version defines the version of the GraphQL config and engine to be used
+	Version string `bson:"version" json:"version"`
 	// Schema is the GraphQL Schema exposed by the GraphQL API/Upstream/Engine.
 	Schema string `bson:"schema" json:"schema"`
 	// LastSchemaUpdate contains the date and time of the last triggered schema update to the upstream
@@ -551,6 +553,60 @@ type GraphQLConfig struct {
 	TypeFieldConfigurations []datasource.TypeFieldConfiguration `bson:"type_field_configurations" json:"type_field_configurations"`
 	// GraphQLPlayground is the Playground specific configuration.
 	GraphQLPlayground GraphQLPlayground `bson:"playground" json:"playground"`
+	// EngineConfig holds the configuration for engine v2 and upwards
+	EngineConfig GraphQLEngineConfig `bson:"engine_config" json:"engine_config"`
+}
+
+type GraphQLConfigVersion string
+
+const (
+	GraphQLConfigVersionNone = ""
+	GraphQLConfigVersion1    = "1"
+	GraphQLConfigVersion2    = "2"
+)
+
+type GraphQLEngineConfig struct {
+	FieldConfigs []GraphQLFieldConfig      `bson:"field_configs" json:"field_configs"`
+	DataSources  []GraphQLEngineDataSource `bson:"data_sources" json:"data_sources"`
+}
+
+type GraphQLFieldConfig struct {
+	TypeName              string   `bson:"type_name" json:"type_name"`
+	FieldName             string   `bson:"field_name" json:"field_name"`
+	DisableDefaultMapping bool     `bson:"disable_default_mapping" json:"disable_default_mapping"`
+	Path                  []string `bson:"path" json:"path"`
+}
+
+type GraphQLEngineDataSourceKind string
+
+const (
+	GraphQLEngineDataSourceKindREST    = "REST"
+	GraphQLEngineDataSourceKindGraphQL = "GraphQL"
+)
+
+type GraphQLEngineDataSource struct {
+	Kind       GraphQLEngineDataSourceKind `bson:"kind" json:"kind"`
+	Internal   bool                        `bson:"internal" json:"internal"`
+	RootFields []GraphQLTypeFields         `bson:"root_fields" json:"root_fields"`
+	Config     json.RawMessage             `bson:"config" json:"config"`
+}
+
+type GraphQLTypeFields struct {
+	Type   string   `bson:"type" json:"type"`
+	Fields []string `bson:"fields" json:"fields"`
+}
+
+type GraphQLEngineDataSourceConfigREST struct {
+	URL     string
+	Method  string
+	Headers map[string]string
+	Query   []string
+	Body    string
+}
+
+type GraphQLEngineDataSourceConfigGraphQL struct {
+	URL    string
+	Method string
 }
 
 // GraphQLExecutionMode is the mode in which the GraphQL Middleware should operate.
@@ -842,6 +898,7 @@ func DummyAPI() APIDefinition {
 	graphql := GraphQLConfig{
 		Enabled:          false,
 		ExecutionMode:    GraphQLExecutionModeProxyOnly,
+		Version:          GraphQLConfigVersion2,
 		LastSchemaUpdate: nil,
 	}
 

@@ -46,3 +46,8 @@ func (d *Document) InlineFragmentSelections(ref int) []int {
 	}
 	return d.SelectionSets[d.InlineFragments[ref].SelectionSet].SelectionRefs
 }
+
+func (d *Document) AddInlineFragment(fragment InlineFragment) int {
+	d.InlineFragments = append(d.InlineFragments, fragment)
+	return len(d.InlineFragments) - 1
+}
