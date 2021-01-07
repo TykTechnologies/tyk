@@ -86,9 +86,10 @@ type proxyMux struct {
 	again   again.Again
 }
 
+/*
 var defaultProxyMux = &proxyMux{
 	again: again.New(),
-}
+}*/
 
 func (m *proxyMux) getProxy(listenPort int) *proxy {
 	if listenPort == 0 {

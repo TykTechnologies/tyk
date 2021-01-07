@@ -78,6 +78,8 @@ type ReloadMachinery struct {
 	stop       chan struct{}
 }
 
+var globalGateway Gateway
+
 func NewReloadMachinery() *ReloadMachinery {
 	return &ReloadMachinery{
 		reloadTick: make(chan time.Time),
@@ -218,6 +220,7 @@ func (r *ReloadMachinery) TickOk(t *testing.T) {
 
 func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf *config.Config)) int {
 	setTestMode(true)
+	globalGateway = NewGateway()
 	testServerRouter = testHttpHandler()
 	testServer := &http.Server{
 		Addr:           testHttpListen,
@@ -288,7 +291,7 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 	cli.Init(VERSION, confPaths)
 	initialiseSystem(ctx)
 	// Small part of start()
-	loadControlAPIEndpoints(mainRouter())
+	globalGateway.loadControlAPIEndpoints(mainRouter())
 	if analytics.GeoIPDB == nil {
 		panic("GeoIPDB was not initialized")
 	}
@@ -305,7 +308,7 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 		time.Sleep(10 * time.Millisecond)
 	}
 	go startPubSubLoop()
-	go reloadLoop(ctx, ReloadTestCase.ReloadTicker(), ReloadTestCase.OnReload)
+	go globalGateway.reloadLoop(ctx, ReloadTestCase.ReloadTicker(), ReloadTestCase.OnReload)
 	go reloadQueueLoop(ctx, ReloadTestCase.OnQueued)
 	go reloadSimulation()
 	exitCode := m.Run()
@@ -395,15 +398,15 @@ func bundleHandleFunc(w http.ResponseWriter, r *http.Request) {
 	z.Close()
 }
 func mainRouter() *mux.Router {
-	return getMainRouter(defaultProxyMux)
+	return getMainRouter(globalGateway.DefaultProxyMux)
 }
 
 func mainProxy() *proxy {
-	return defaultProxyMux.getProxy(config.Global().ListenPort)
+	return globalGateway.DefaultProxyMux.getProxy(config.Global().ListenPort)
 }
 
 func controlProxy() *proxy {
-	p := defaultProxyMux.getProxy(config.Global().ControlAPIPort)
+	p := globalGateway.DefaultProxyMux.getProxy(config.Global().ControlAPIPort)
 	if p != nil {
 		return p
 	}
@@ -818,7 +821,7 @@ func CreateDefinitionFromString(defStr string) *APISpec {
 
 func LoadSampleAPI(def string) (spec *APISpec) {
 	spec = CreateDefinitionFromString(def)
-	loadApps([]*APISpec{spec})
+	globalGateway.loadApps([]*APISpec{spec})
 	return
 }
 
@@ -859,7 +862,7 @@ func (s *Test) Start(slavedClusterConfig *SlaveDataCenter) {
 	l.Close()
 	globalConf := config.Global()
 	globalConf.ListenPort, _ = strconv.Atoi(port)
-
+	gw := NewGateway()
 	if s.config.sepatateControlAPI {
 		l, _ := net.Listen("tcp", "127.0.0.1:0")
 
@@ -884,7 +887,7 @@ func (s *Test) Start(slavedClusterConfig *SlaveDataCenter) {
 
 	setupPortsWhitelist()
 
-	startServer()
+	gw.startServer()
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cacnel = cancel
 	setupGlobals(ctx)
@@ -937,7 +940,7 @@ func (s *Test) Close() {
 	if s.cacnel != nil {
 		s.cacnel()
 	}
-	defaultProxyMux.swap(&proxyMux{})
+	globalGateway.DefaultProxyMux.swap(&proxyMux{})
 	if s.config.sepatateControlAPI {
 		globalConf := config.Global()
 		globalConf.ControlAPIPort = 0
@@ -1230,7 +1233,7 @@ func LoadAPI(specs ...*APISpec) (out []*APISpec) {
 		}
 	}
 
-	DoReload()
+	globalGateway.DoReload()
 
 	for _, spec := range specs {
 		out = append(out, getApiSpec(spec.APIID))

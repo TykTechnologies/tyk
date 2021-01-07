@@ -603,14 +603,14 @@ func sanitizeProxyPaths(apiSpec *APISpec, request *http.Request) {
 	request.URL.RawPath = apiSpec.StripListenPath(request, request.URL.RawPath)
 }
 
-func loadGlobalApps() {
+func(gw Gateway) loadGlobalApps() {
 	// we need to make a full copy of the slice, as loadApps will
 	// use in-place to sort the apis.
 	apisMu.RLock()
 	specs := make([]*APISpec, len(apiSpecs))
 	copy(specs, apiSpecs)
 	apisMu.RUnlock()
-	loadApps(specs)
+	gw.loadApps(specs)
 }
 
 func trimCategories(name string) string {
@@ -736,7 +736,7 @@ func loadGraphQLPlayground(spec *APISpec, router *mux.Router) {
 }
 
 // Create the individual API (app) specs based on live configurations and assign middleware
-func loadApps(specs []*APISpec) {
+func(gw Gateway) loadApps(specs []*APISpec) {
 	mainLog.Info("Loading API configurations.")
 
 	tmpSpecRegister := make(map[string]*APISpec)
@@ -761,7 +761,7 @@ func loadApps(specs []*APISpec) {
 	muxer := &proxyMux{}
 	router := mux.NewRouter()
 	router.NotFoundHandler = http.HandlerFunc(muxer.handle404)
-	loadControlAPIEndpoints(router)
+	gw.loadControlAPIEndpoints(router)
 
 	muxer.setRouter(port, "", router)
 
@@ -807,7 +807,7 @@ func loadApps(specs []*APISpec) {
 		}()
 	}
 
-	defaultProxyMux.swap(muxer)
+	gw.DefaultProxyMux.swap(muxer)
 
 	// Swap in the new register
 	apisMu.Lock()

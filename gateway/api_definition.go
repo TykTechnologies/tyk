@@ -428,11 +428,15 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*A
 }
 
 // FromCloud will connect and download ApiDefintions from a Mongo DB instance.
-func (a APIDefinitionLoader) FromRPC(orgId string) ([]*APISpec, error) {
+func (a APIDefinitionLoader) FromRPC(orgId string, gw Gateway) ([]*APISpec, error) {
 	if rpc.IsEmergencyMode() {
 		return LoadDefinitionsFromRPCBackup()
 	}
-	store := RPCStorageHandler{}
+
+	store := RPCStorageHandler{
+		DoReload:gw.DoReload,
+	}
+
 	if !store.Connect() {
 		return nil, errors.New("Can't connect RPC layer")
 	}

@@ -270,7 +270,7 @@ func buildConnStr(resource string) string {
 	return config.Global().DBAppConfOptions.ConnectionString + resource
 }
 
-func syncAPISpecs() (int, error) {
+func(gw Gateway) syncAPISpecs() (int, error) {
 	loader := APIDefinitionLoader{}
 	apisMu.Lock()
 	defer apisMu.Unlock()
@@ -290,7 +290,7 @@ func syncAPISpecs() (int, error) {
 		mainLog.Debug("Using RPC Configuration")
 
 		var err error
-		s, err = loader.FromRPC(config.Global().SlaveOptions.RPCKey)
+		s, err = loader.FromRPC(config.Global().SlaveOptions.RPCKey, gw)
 		if err != nil {
 			return 0, err
 		}
@@ -396,7 +396,7 @@ func controlAPICheckClientCertificate(certLevel string, next http.Handler) http.
 }
 
 // loadControlAPIEndpoints loads the endpoints used for controlling the Gateway.
-func loadControlAPIEndpoints(muxer *mux.Router) {
+func(gw Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	hostname := config.Global().HostName
 	if config.Global().ControlAPIHostname != "" {
 		hostname = config.Global().ControlAPIHostname
@@ -404,7 +404,7 @@ func loadControlAPIEndpoints(muxer *mux.Router) {
 
 	if muxer == nil {
 		cp := config.Global().ControlAPIPort
-		muxer = defaultProxyMux.router(cp, "")
+		muxer = gw.DefaultProxyMux.router(cp, "")
 		if muxer == nil {
 			if cp != 0 {
 				log.Error("Can't find control API router")
@@ -700,7 +700,7 @@ func rpcReloadLoop(rpcKey string) {
 
 var reloadMu sync.Mutex
 
-func DoReload() {
+func(gw Gateway) DoReload() {
 	reloadMu.Lock()
 	defer reloadMu.Unlock()
 
@@ -716,7 +716,7 @@ func DoReload() {
 	}
 
 	// load the specs
-	if count, err := syncAPISpecs(); err != nil {
+	if count, err := gw.syncAPISpecs(); err != nil {
 		mainLog.Error("Error during syncing apis:", err.Error())
 		return
 	} else {
@@ -727,7 +727,7 @@ func DoReload() {
 			return
 		}
 	}
-	loadGlobalApps()
+	gw.loadGlobalApps()
 
 	mainLog.Info("API reload complete")
 }
@@ -745,7 +745,7 @@ func shouldReload() ([]func(), bool) {
 	return n, true
 }
 
-func reloadLoop(ctx context.Context, tick <-chan time.Time, complete ...func()) {
+func(gw Gateway) reloadLoop(ctx context.Context, tick <-chan time.Time, complete ...func()) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -760,7 +760,7 @@ func reloadLoop(ctx context.Context, tick <-chan time.Time, complete ...func()) 
 			}
 			start := time.Now()
 			mainLog.Info("reload: initiating")
-			DoReload()
+			gw.DoReload()
 			mainLog.Info("reload: complete")
 			mainLog.Info("Initiating coprocess reload")
 			DoCoprocessReload()
@@ -1196,6 +1196,14 @@ func getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 	return &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys}
 }
 
+func NewGateway()Gateway{
+	return Gateway{
+		DefaultProxyMux:&proxyMux{
+			again: again.New(),
+		},
+	}
+}
+
 func Start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -1205,6 +1213,8 @@ func Start() {
 	if !cli.DefaultMode {
 		os.Exit(0)
 	}
+
+	gw := NewGateway()
 
 	SetNodeID("solo-" + uuid.NewV4().String())
 
@@ -1237,7 +1247,7 @@ func Start() {
 			os.Setenv("TYK_SERVICE_NODEID", GetNodeID())
 		}
 	}
-	err := again.ListenFrom(&defaultProxyMux.again, onFork)
+	err := again.ListenFrom(&gw.DefaultProxyMux.again, onFork)
 	if err != nil {
 		mainLog.Errorf("Initializing again %s", err)
 	}
@@ -1246,7 +1256,7 @@ func Start() {
 		trace.SetLogger(mainLog)
 		defer trace.Close()
 	}
-	start(ctx)
+	gw.start(ctx)
 	go storage.ConnectToRedis(ctx, func() {
 		reloadURLStructure(func() {})
 	})
@@ -1279,7 +1289,7 @@ func Start() {
 
 	// TODO: replace goagain with something that support multiple listeners
 	// Example: https://gravitational.com/blog/golang-ssh-bastion-graceful-restarts/
-	startServer()
+	gw.startServer()
 
 	if again.Child() {
 		// This is a child process, we need to murder the parent now
@@ -1287,9 +1297,9 @@ func Start() {
 			mainLog.Fatal(err)
 		}
 	}
-	again.Wait(&defaultProxyMux.again)
+	again.Wait(&gw.DefaultProxyMux.again)
 	mainLog.Info("Stop signal received.")
-	if err := defaultProxyMux.again.Close(); err != nil {
+	if err := gw.DefaultProxyMux.again.Close(); err != nil {
 		mainLog.Error("Closing listeners: ", err)
 	}
 	// stop analytics workers
@@ -1335,7 +1345,7 @@ func writeProfiles() {
 	}
 }
 
-func start(ctx context.Context) {
+func (gw Gateway) start(ctx context.Context) {
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.Global().SupressDefaultOrgStore {
 		mainLog.Debug("Initialising default org store")
@@ -1364,7 +1374,7 @@ func start(ctx context.Context) {
 
 	// 1s is the minimum amount of time between hot reloads. The
 	// interval counts from the start of one reload to the next.
-	go reloadLoop(ctx, time.Tick(time.Second))
+	go gw.reloadLoop(ctx, time.Tick(time.Second))
 	go reloadQueueLoop(ctx)
 }
 
@@ -1428,19 +1438,24 @@ func setupPortsWhitelist() {
 	config.SetGlobal(globalConf)
 }
 
-func startServer() {
+type Gateway struct {
+	DefaultProxyMux *proxyMux
+}
+
+func (gw Gateway) startServer() {
 	// Ensure that Control listener and default http listener running on first start
 	muxer := &proxyMux{}
 
 	router := mux.NewRouter()
-	loadControlAPIEndpoints(router)
+	gw.loadControlAPIEndpoints(router)
 	muxer.setRouter(config.Global().ControlAPIPort, "", router)
 
 	if muxer.router(config.Global().ListenPort, "") == nil {
 		muxer.setRouter(config.Global().ListenPort, "", mux.NewRouter())
 	}
 
-	defaultProxyMux.swap(muxer)
+//	defaultProxyMux.swap(muxer)
+	gw.DefaultProxyMux.swap(muxer)
 
 	// handle dashboard registration and nonces if available
 	handleDashboardRegistration()
@@ -1457,6 +1472,6 @@ func startServer() {
 	mainLog.Info("--> Listening on port: ", config.Global().ListenPort)
 	mainLog.Info("--> PID: ", hostDetails.PID)
 	if !rpc.IsEmergencyMode() {
-		DoReload()
+		gw.DoReload()
 	}
 }
