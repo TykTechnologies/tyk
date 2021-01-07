@@ -864,6 +864,7 @@ func (s *Test) Start(slavedClusterConfig *SlaveDataCenter) {
 	globalConf.ListenPort, _ = strconv.Atoi(port)
 	gw := NewGateway()
 	s.Gw = &gw
+	s.Gw.Port = globalConf.ListenPort
 
 	if s.config.sepatateControlAPI {
 		l, _ := net.Listen("tcp", "127.0.0.1:0")
@@ -1050,10 +1051,10 @@ func (s *Test) GetPolicyById(policyId string) (user.Policy, bool) {
 	return pol, found
 }
 
-func StartTest(slaveConfig *SlaveDataCenter, config ...TestConfig) *Test {
+func StartTest(slaveConfig *SlaveDataCenter, testConfig ...TestConfig) *Test {
 	t := &Test{}
-	if len(config) > 0 {
-		t.config = config[0]
+	if len(testConfig) > 0 {
+		t.config = testConfig[0]
 	}
 	t.Start(slaveConfig)
 

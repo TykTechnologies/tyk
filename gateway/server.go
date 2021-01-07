@@ -1440,6 +1440,7 @@ func setupPortsWhitelist() {
 
 type Gateway struct {
 	DefaultProxyMux *proxyMux
+	Port            int
 }
 
 func (gw Gateway) startServer() {

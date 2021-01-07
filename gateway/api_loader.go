@@ -758,6 +758,12 @@ func (gw Gateway) loadApps(specs []*APISpec) {
 		port = globalConf.ControlAPIPort
 	}
 
+	if gw.Port != 0 {
+		port = gw.Port
+		globalConf.ListenPort = port
+		config.SetGlobal(globalConf)
+	}
+
 	muxer := &proxyMux{}
 	router := mux.NewRouter()
 	router.NotFoundHandler = http.HandlerFunc(muxer.handle404)
