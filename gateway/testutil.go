@@ -906,7 +906,7 @@ func (s *Test) Start(slavedClusterConfig *SlaveDataCenter) {
 	if s.GlobalConfig.HttpServerOptions.UseSSL {
 		scheme = "https://"
 	}
-	s.URL = scheme + mainProxy().listener.Addr().String()
+	s.URL = scheme + s.Gw.DefaultProxyMux.getProxy(config.Global().ListenPort).listener.Addr().String()
 
 	s.testRunner = &test.HTTPTestRunner{
 		RequestBuilder: func(tc *test.TestCase) (*http.Request, error) {
