@@ -93,7 +93,7 @@ type RPCStorageHandler struct {
 	KeyPrefix        string
 	HashKeys         bool
 	SuppressRegister bool
-	DoReload func()
+	DoReload         func()
 }
 
 var RPCGlobalCache = cache.New(30*time.Second, 15*time.Second)

@@ -434,7 +434,7 @@ func (a APIDefinitionLoader) FromRPC(orgId string, gw Gateway) ([]*APISpec, erro
 	}
 
 	store := RPCStorageHandler{
-		DoReload:gw.DoReload,
+		DoReload: gw.DoReload,
 	}
 
 	if !store.Connect() {

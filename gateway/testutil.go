@@ -848,12 +848,12 @@ type Test struct {
 	GlobalConfig config.Config
 	config       TestConfig
 	cacnel       func()
+	Gw           *Gateway
 }
-
 
 type SlaveDataCenter struct {
 	SlaveOptions config.SlaveOptionsConfig
-	Redis config.StorageOptionsConf
+	Redis        config.StorageOptionsConf
 }
 
 func (s *Test) Start(slavedClusterConfig *SlaveDataCenter) {
@@ -863,6 +863,8 @@ func (s *Test) Start(slavedClusterConfig *SlaveDataCenter) {
 	globalConf := config.Global()
 	globalConf.ListenPort, _ = strconv.Atoi(port)
 	gw := NewGateway()
+	s.Gw = &gw
+
 	if s.config.sepatateControlAPI {
 		l, _ := net.Listen("tcp", "127.0.0.1:0")
 
@@ -1037,14 +1039,14 @@ func (s *Test) CreateSession(sGen ...func(s *user.SessionState)) (*user.SessionS
 	return &createdSession, keySuccess.Key
 }
 
-func (s *Test) GetApiById(apiId string) *APISpec{
+func (s *Test) GetApiById(apiId string) *APISpec {
 	return getApiSpec(apiId)
 }
 
-func (s *Test) GetPolicyById(policyId string) (user.Policy, bool){
+func (s *Test) GetPolicyById(policyId string) (user.Policy, bool) {
 	policiesMu.Lock()
 	defer policiesMu.Unlock()
-	pol, found:= policiesByID[policyId]
+	pol, found := policiesByID[policyId]
 	return pol, found
 }
 

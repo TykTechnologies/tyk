@@ -270,7 +270,7 @@ func buildConnStr(resource string) string {
 	return config.Global().DBAppConfOptions.ConnectionString + resource
 }
 
-func(gw Gateway) syncAPISpecs() (int, error) {
+func (gw Gateway) syncAPISpecs() (int, error) {
 	loader := APIDefinitionLoader{}
 	apisMu.Lock()
 	defer apisMu.Unlock()
@@ -396,7 +396,7 @@ func controlAPICheckClientCertificate(certLevel string, next http.Handler) http.
 }
 
 // loadControlAPIEndpoints loads the endpoints used for controlling the Gateway.
-func(gw Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
+func (gw Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	hostname := config.Global().HostName
 	if config.Global().ControlAPIHostname != "" {
 		hostname = config.Global().ControlAPIHostname
@@ -700,7 +700,7 @@ func rpcReloadLoop(rpcKey string) {
 
 var reloadMu sync.Mutex
 
-func(gw Gateway) DoReload() {
+func (gw Gateway) DoReload() {
 	reloadMu.Lock()
 	defer reloadMu.Unlock()
 
@@ -745,7 +745,7 @@ func shouldReload() ([]func(), bool) {
 	return n, true
 }
 
-func(gw Gateway) reloadLoop(ctx context.Context, tick <-chan time.Time, complete ...func()) {
+func (gw Gateway) reloadLoop(ctx context.Context, tick <-chan time.Time, complete ...func()) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -1196,9 +1196,9 @@ func getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 	return &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys}
 }
 
-func NewGateway()Gateway{
+func NewGateway() Gateway {
 	return Gateway{
-		DefaultProxyMux:&proxyMux{
+		DefaultProxyMux: &proxyMux{
 			again: again.New(),
 		},
 	}
@@ -1454,7 +1454,7 @@ func (gw Gateway) startServer() {
 		muxer.setRouter(config.Global().ListenPort, "", mux.NewRouter())
 	}
 
-//	defaultProxyMux.swap(muxer)
+	//	defaultProxyMux.swap(muxer)
 	gw.DefaultProxyMux.swap(muxer)
 
 	// handle dashboard registration and nonces if available
