@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"github.com/TykTechnologies/tyk/rpc"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -1042,6 +1043,10 @@ func (s *Test) CreateSession(sGen ...func(s *user.SessionState)) (*user.SessionS
 
 func (s *Test) GetApiById(apiId string) *APISpec {
 	return getApiSpec(apiId)
+}
+
+func (s *Test) StopRPCClient(){
+	rpc.Reset()
 }
 
 func (s *Test) GetPolicyById(policyId string) (user.Policy, bool) {
