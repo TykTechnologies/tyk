@@ -17,6 +17,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/TykTechnologies/tyk-pump/analyticspb"
 	"github.com/cenk/backoff"
 
 	sprig "gopkg.in/Masterminds/sprig.v2"
@@ -187,7 +188,7 @@ type APISpec struct {
 
 	middlewareChain *ChainObject
 
-	network NetworkStats
+	network analyticspb.NetworkStats
 
 	GraphQLExecutor struct {
 		Engine *graphql.ExecutionEngine

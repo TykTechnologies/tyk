@@ -289,7 +289,7 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 	initialiseSystem(ctx)
 	// Small part of start()
 	loadControlAPIEndpoints(mainRouter())
-	if analytics.GeoIPDB == nil {
+	if analytics.GetGeoIPDB() == nil {
 		panic("GeoIPDB was not initialized")
 	}
 	go storage.ConnectToRedis(ctx, func() {

@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk-pump/analyticspb"
 	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/murmur3"
@@ -362,7 +363,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	// Record analytics
 	if !m.Spec.DoNotTrack {
-		m.sh.RecordHit(r, Latency{}, newRes.StatusCode, newRes)
+		m.sh.RecordHit(r, analyticspb.Latency{}, newRes.StatusCode, newRes)
 	}
 
 	// Stop any further execution

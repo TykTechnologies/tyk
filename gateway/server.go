@@ -47,7 +47,6 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	logrus_syslog "github.com/sirupsen/logrus/hooks/syslog"
-	"rsc.io/letsencrypt"
 )
 
 var (
@@ -56,7 +55,7 @@ var (
 	pubSubLog            = log.WithField("prefix", "pub-sub")
 	rawLog               = logger.GetRaw()
 	templates            *template.Template
-	analytics            RedisAnalyticsHandler
+	analytics            AnalyticsHandler
 	GlobalEventsJSVM     JSVM
 	memProfFile          *os.File
 	MainNotifier         RedisNotifier
@@ -79,7 +78,7 @@ var (
 	policiesMu   sync.RWMutex
 	policiesByID = map[string]user.Policy{}
 
-	LE_MANAGER  letsencrypt.Manager
+	//LE_MANAGER  letsencrypt.Manager
 	LE_FIRSTRUN bool
 
 	muNodeID sync.Mutex // guards NodeID
@@ -190,14 +189,20 @@ func setupGlobals(ctx context.Context) {
 	versionStore.Connect()
 	_ = versionStore.SetKey("gateway", VERSION, 0)
 
-	if config.Global().EnableAnalytics && analytics.Store == nil {
+	if config.Global().EnableAnalytics  {
 		globalConf := config.Global()
 		globalConf.LoadIgnoredIPs()
 		config.SetGlobal(globalConf)
 		mainLog.Debug("Setting up analytics DB connection")
 
-		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-"}
-		analytics.Store = &analyticsStore
+		if config.Global().AnalyticsConfig.Type == "grpc"{
+			analytics = &GrpcAnalyticsHandler{}
+		}else{
+			analytics = &RedisAnalyticsHandler{}
+			analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-"}
+			analytics.SetStore(&analyticsStore)
+		}
+
 		analytics.Init(globalConf)
 
 		if config.Global().AnalyticsConfig.Type == "rpc" {
@@ -1011,7 +1016,7 @@ func initialiseSystem(ctx context.Context) error {
 	setupInstrumentation()
 
 	if config.Global().HttpServerOptions.UseLE_SSL {
-		go StartPeriodicStateBackup(ctx, &LE_MANAGER)
+		//go StartPeriodicStateBackup(ctx, &LE_MANAGER)
 	}
 	return nil
 }
@@ -1295,7 +1300,7 @@ func Start() {
 		mainLog.Error("Closing listeners: ", err)
 	}
 	// stop analytics workers
-	if config.Global().EnableAnalytics && analytics.Store == nil {
+	if config.Global().EnableAnalytics && analytics.GetStore() == nil {
 		analytics.Stop()
 	}
 

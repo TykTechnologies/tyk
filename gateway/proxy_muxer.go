@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/again"
+	"github.com/TykTechnologies/tyk-pump/analyticspb"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/tcp"
 	proxyproto "github.com/pires/go-proxyproto"
@@ -220,18 +221,19 @@ func flushNetworkAnalytics(ctx context.Context) {
 				if spec.DoNotTrack {
 					continue
 				}
-				record := AnalyticsRecord{
-					Network:      spec.network.Flush(),
-					Day:          t.Day(),
-					Month:        t.Month(),
-					Year:         t.Year(),
-					Hour:         t.Hour(),
+				networkStats := spec.network.Flush()
+				record := analyticspb.AnalyticsRecord{
+					Network:      &networkStats,
+					Day:          int32(t.Day()),
+					Month:        int32(t.Month()),
+					Year:         int32(t.Year()),
+					Hour:         int32(t.Hour()),
 					ResponseCode: -1,
-					TimeStamp:    t,
 					APIName:      spec.Name,
 					APIID:        spec.APIID,
 					OrgID:        spec.OrgID,
 				}
+				record.SetTimestampAsTime(t)
 				record.SetExpiry(spec.ExpireAnalyticsAfter)
 				analytics.RecordHit(&record)
 			}
@@ -255,7 +257,7 @@ func recordTCPHit(specID string, doNotTrack bool) func(tcp.Stat) {
 		case tcp.Open:
 			atomic.AddInt64(&spec.network.OpenConnections, 1)
 		case tcp.Closed:
-			atomic.AddInt64(&spec.network.ClosedConnection, 1)
+			atomic.AddInt64(&spec.network.ClosedConnections, 1)
 		}
 		atomic.AddInt64(&spec.network.BytesIn, stat.BytesIn)
 		atomic.AddInt64(&spec.network.BytesOut, stat.BytesOut)

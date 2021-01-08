@@ -13,7 +13,9 @@ import (
 	"strings"
 	"time"
 
+	pb "github.com/TykTechnologies/tyk-pump/analyticspb"
 	"github.com/TykTechnologies/tyk/config"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/request"
@@ -240,41 +242,41 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		if host == "" && e.Spec.target != nil {
 			host = e.Spec.target.Host
 		}
-
-		record := AnalyticsRecord{
-			r.Method,
-			host,
-			trackedPath,
-			r.URL.Path,
-			r.ContentLength,
-			r.Header.Get(headers.UserAgent),
-			t.Day(),
-			t.Month(),
-			t.Year(),
-			t.Hour(),
-			errCode,
-			token,
-			t,
-			version,
-			e.Spec.Name,
-			e.Spec.APIID,
-			e.Spec.OrgID,
-			oauthClientID,
-			0,
-			Latency{},
-			rawRequest,
-			rawResponse,
-			ip,
-			GeoData{},
-			NetworkStats{},
-			tags,
-			alias,
-			trackEP,
-			t,
+		record := &pb.AnalyticsRecord{
+			Method:        r.Method,
+			Host:          host,
+			Path:          trackedPath,
+			RawPath:       r.URL.Path,
+			ContentLength: r.ContentLength,
+			UserAgent:     r.Header.Get(headers.UserAgent),
+			Day:           int32(t.Day()),
+			Month:         int32(t.Month()),
+			Year:          int32(t.Year()),
+			Hour:          int32(t.Hour()),
+			ResponseCode:  int32(errCode),
+			APIKey:        token,
+			TimeStamp:     &timestamppb.Timestamp{Seconds: time.Now().Unix()},
+			APIVersion:    version,
+			APIName:       e.Spec.Name,
+			APIID:         e.Spec.APIID,
+			OrgID:         e.Spec.OrgID,
+			//oauthClientID,
+			RequestTime: 0,
+			Latency:     &pb.Latency{},
+			RawRequest:  rawRequest,
+			RawResponse: rawResponse,
+			IPAddress:   ip,
+			Geo:         &pb.GeoData{},
+			Network:     &pb.NetworkStats{},
+			Tags:        tags,
+			Alias:       alias,
+			TrackPath:   trackEP,
+			ExpireAt:    &timestamppb.Timestamp{Seconds: t.Unix()},
+			OauthID: oauthClientID,
 		}
 
 		if e.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
-			record.GetGeo(ip)
+			record.GetGeoDataData(analytics.GetGeoIPDB(),ip)
 		}
 
 		expiresAfter := e.Spec.ExpireAnalyticsAfter
@@ -284,14 +286,14 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			if orgExpireDataTime > 0 {
 				expiresAfter = orgExpireDataTime
 			}
-
 		}
 
 		record.SetExpiry(expiresAfter)
+
 		if e.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
 			record.NormalisePath(&e.Spec.GlobalConfig)
 		}
-		analytics.RecordHit(&record)
+		analytics.RecordHit(record)
 	}
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")

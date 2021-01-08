@@ -1,19 +1,9 @@
 package gateway
 
-import (
-	"context"
-	"encoding/json"
 
-	"rsc.io/letsencrypt"
-
-	"github.com/sirupsen/logrus"
-
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/storage"
-)
 
 const LEKeyPrefix = "le_ssl:"
-
+/*
 func StoreLEState(m *letsencrypt.Manager) {
 	log.Debug("Storing SSL backup")
 
@@ -70,6 +60,7 @@ type LE_ServerInfo struct {
 }
 
 func onLESSLStatusReceivedHandler(payload string) {
+
 	serverData := LE_ServerInfo{}
 	if err := json.Unmarshal([]byte(payload), &serverData); err != nil {
 		log.WithFields(logrus.Fields{
@@ -104,3 +95,6 @@ func StartPeriodicStateBackup(ctx context.Context, m *letsencrypt.Manager) {
 		}
 	}
 }
+
+
+*/

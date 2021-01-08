@@ -11,7 +11,9 @@ import (
 	"strings"
 	"time"
 
+	pb "github.com/TykTechnologies/tyk-pump/analyticspb"
 	cache "github.com/pmylund/go-cache"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
@@ -128,7 +130,7 @@ func getSessionTags(session *user.SessionState) []string {
 	return tags
 }
 
-func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, responseCopy *http.Response) {
+func (s *SuccessHandler) RecordHit(r *http.Request, timing pb.Latency, code int, responseCopy *http.Response) {
 
 	if s.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
 		return
@@ -206,40 +208,40 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 			host = s.Spec.target.Host
 		}
 
-		record := AnalyticsRecord{
-			r.Method,
-			host,
-			trackedPath,
-			r.URL.Path,
-			r.ContentLength,
-			r.Header.Get(headers.UserAgent),
-			t.Day(),
-			t.Month(),
-			t.Year(),
-			t.Hour(),
-			code,
-			token,
-			t,
-			version,
-			s.Spec.Name,
-			s.Spec.APIID,
-			s.Spec.OrgID,
-			oauthClientID,
-			timing.Total,
-			timing,
-			rawRequest,
-			rawResponse,
-			ip,
-			GeoData{},
-			NetworkStats{},
-			tags,
-			alias,
-			trackEP,
-			t,
+		record := &pb.AnalyticsRecord{
+			Method:        r.Method,
+			Host:          host,
+			Path:          trackedPath,
+			RawPath:       r.URL.Path,
+			ContentLength: r.ContentLength,
+			UserAgent:     r.Header.Get(headers.UserAgent),
+			Day:           int32(t.Day()),
+			Month:         int32(t.Month()),
+			Year:          int32(t.Year()),
+			Hour:          int32(t.Hour()),
+			ResponseCode:  int32(code),
+			APIKey:        token,
+			TimeStamp:     &timestamppb.Timestamp{Seconds: time.Now().Unix()},
+			APIVersion:    version,
+			APIName:       s.Spec.Name,
+			APIID:         s.Spec.APIID,
+			OrgID:         s.Spec.OrgID,
+			RequestTime: 0,
+			Latency:     &pb.Latency{},
+			RawRequest:  rawRequest,
+			RawResponse: rawResponse,
+			IPAddress:   ip,
+			Geo:         &pb.GeoData{},
+			Network:     &pb.NetworkStats{},
+			Tags:        tags,
+			Alias:       alias,
+			TrackPath:   trackEP,
+			ExpireAt:    &timestamppb.Timestamp{Seconds: t.Unix()},
+			OauthID: oauthClientID,
 		}
 
 		if s.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
-			record.GetGeo(ip)
+			record.GetGeoDataData(analytics.GetGeoIPDB(),ip)
 		}
 
 		expiresAfter := s.Spec.ExpireAnalyticsAfter
@@ -257,7 +259,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 			record.NormalisePath(&s.Spec.GlobalConfig)
 		}
 
-		analytics.RecordHit(&record)
+		analytics.RecordHit(record)
 	}
 
 	// Report in health check
@@ -331,7 +333,7 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if resp.Response != nil {
-		latency := Latency{
+		latency := pb.Latency{
 			Total:    int64(millisec),
 			Upstream: int64(DurationToMillisecond(resp.UpstreamLatency)),
 		}
@@ -371,7 +373,7 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if inRes.Response != nil {
-		latency := Latency{
+		latency := pb.Latency{
 			Total:    int64(millisec),
 			Upstream: int64(DurationToMillisecond(inRes.UpstreamLatency)),
 		}

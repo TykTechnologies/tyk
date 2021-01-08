@@ -1,95 +1,22 @@
 package gateway
 
 import (
-	"fmt"
-	"net"
+	"context"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/TykTechnologies/tyk/regexp"
 	maxminddb "github.com/oschwald/maxminddb-golang"
-	msgpack "gopkg.in/vmihailenco/msgpack.v2"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/storage"
+	pb "github.com/TykTechnologies/tyk-pump/analyticspb"
+	"google.golang.org/grpc"
 )
 
-type NetworkStats struct {
-	OpenConnections  int64
-	ClosedConnection int64
-	BytesIn          int64
-	BytesOut         int64
-}
-
-func (n *NetworkStats) Flush() NetworkStats {
-	s := NetworkStats{
-		OpenConnections:  atomic.LoadInt64(&n.OpenConnections),
-		ClosedConnection: atomic.LoadInt64(&n.ClosedConnection),
-		BytesIn:          atomic.LoadInt64(&n.BytesIn),
-		BytesOut:         atomic.LoadInt64(&n.BytesOut),
-	}
-	atomic.StoreInt64(&n.OpenConnections, 0)
-	atomic.StoreInt64(&n.ClosedConnection, 0)
-	atomic.StoreInt64(&n.BytesIn, 0)
-	atomic.StoreInt64(&n.BytesOut, 0)
-	return s
-}
-
-type Latency struct {
-	Total    int64
-	Upstream int64
-}
-
-// AnalyticsRecord encodes the details of a request
-type AnalyticsRecord struct {
-	Method        string
-	Host          string
-	Path          string // HTTP path, can be overriden by "track path" plugin
-	RawPath       string // Original HTTP path
-	ContentLength int64
-	UserAgent     string
-	Day           int
-	Month         time.Month
-	Year          int
-	Hour          int
-	ResponseCode  int
-	APIKey        string
-	TimeStamp     time.Time
-	APIVersion    string
-	APIName       string
-	APIID         string
-	OrgID         string
-	OauthID       string
-	RequestTime   int64
-	Latency       Latency
-	RawRequest    string // Base64 encoded request data (if detailed recording turned on)
-	RawResponse   string // ^ same but for response
-	IPAddress     string
-	Geo           GeoData
-	Network       NetworkStats
-	Tags          []string
-	Alias         string
-	TrackPath     bool
-	ExpireAt      time.Time `bson:"expireAt" json:"expireAt"`
-}
-
-type GeoData struct {
-	Country struct {
-		ISOCode string `maxminddb:"iso_code"`
-	} `maxminddb:"country"`
-
-	City struct {
-		Names map[string]string `maxminddb:"names"`
-	} `maxminddb:"city"`
-
-	Location struct {
-		Latitude  float64 `maxminddb:"latitude"`
-		Longitude float64 `maxminddb:"longitude"`
-		TimeZone  string  `maxminddb:"time_zone"`
-	} `maxminddb:"location"`
-}
 
 const analyticsKeyName = "tyk-system-analytics"
 
@@ -97,45 +24,6 @@ const (
 	recordsBufferFlushInterval       = 200 * time.Millisecond
 	recordsBufferForcedFlushInterval = 1 * time.Second
 )
-
-func (a *AnalyticsRecord) GetGeo(ipStr string) {
-	// Not great, tightly coupled
-	if analytics.GeoIPDB == nil {
-		return
-	}
-
-	record, err := geoIPLookup(ipStr)
-	if err != nil {
-		log.Error("GeoIP Failure (not recorded): ", err)
-		return
-	}
-	if record == nil {
-		return
-	}
-
-	log.Debug("ISO Code: ", record.Country.ISOCode)
-	log.Debug("City: ", record.City.Names["en"])
-	log.Debug("Lat: ", record.Location.Latitude)
-	log.Debug("Lon: ", record.Location.Longitude)
-	log.Debug("TZ: ", record.Location.TimeZone)
-
-	a.Geo = *record
-}
-
-func geoIPLookup(ipStr string) (*GeoData, error) {
-	if ipStr == "" {
-		return nil, nil
-	}
-	ip := net.ParseIP(ipStr)
-	if ip == nil {
-		return nil, fmt.Errorf("invalid IP address %q", ipStr)
-	}
-	record := new(GeoData)
-	if err := analytics.GeoIPDB.Lookup(ip, record); err != nil {
-		return nil, fmt.Errorf("geoIPDB lookup of %q failed: %v", ipStr, err)
-	}
-	return record, nil
-}
 
 func initNormalisationPatterns() (pats config.NormaliseURLPatterns) {
 	pats.UUIDs = regexp.MustCompile(`[0-9a-fA-F]{8}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{12}`)
@@ -151,29 +39,15 @@ func initNormalisationPatterns() (pats config.NormaliseURLPatterns) {
 	return
 }
 
-func (a *AnalyticsRecord) NormalisePath(globalConfig *config.Config) {
-	if globalConfig.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs {
-		a.Path = globalConfig.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.UUIDs.ReplaceAllString(a.Path, "{uuid}")
-	}
-	if globalConfig.AnalyticsConfig.NormaliseUrls.NormaliseNumbers {
-		a.Path = globalConfig.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.IDs.ReplaceAllString(a.Path, "/{id}")
-	}
-	for _, r := range globalConfig.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.Custom {
-		a.Path = r.ReplaceAllString(a.Path, "{var}")
-	}
+type AnalyticsHandler interface{
+	Init(globalConf config.Config)
+	Stop()
+	RecordHit(record *pb.AnalyticsRecord) error
+	GetStore() storage.AnalyticsHandler
+	SetStore(storage.AnalyticsHandler)
+	GetGeoIPDB() *maxminddb.Reader
 }
 
-func (a *AnalyticsRecord) SetExpiry(expiresInSeconds int64) {
-	expiry := time.Duration(expiresInSeconds) * time.Second
-	if expiresInSeconds == 0 {
-		// Expiry is set to 100 years
-		expiry = (24 * time.Hour) * (365 * 100)
-	}
-
-	t := time.Now()
-	t2 := t.Add(expiry)
-	a.ExpireAt = t2
-}
 
 // RedisAnalyticsHandler will record analytics data to a redis back end
 // as defined in the Config object
@@ -181,7 +55,7 @@ type RedisAnalyticsHandler struct {
 	Store            storage.AnalyticsHandler
 	GeoIPDB          *maxminddb.Reader
 	globalConf       config.Config
-	recordsChan      chan *AnalyticsRecord
+	recordsChan      chan *pb.AnalyticsRecord
 	workerBufferSize uint64
 	shouldStop       uint32
 	poolWg           sync.WaitGroup
@@ -198,14 +72,14 @@ func (r *RedisAnalyticsHandler) Init(globalConf config.Config) {
 		}
 	}
 
-	analytics.Store.Connect()
+	analytics.GetStore().Connect()
 
 	ps := config.Global().AnalyticsConfig.PoolSize
 	recordsBufferSize := config.Global().AnalyticsConfig.RecordsBufferSize
 	r.workerBufferSize = recordsBufferSize / uint64(ps)
 	log.WithField("workerBufferSize", r.workerBufferSize).Debug("Analytics pool worker buffer size")
 
-	r.recordsChan = make(chan *AnalyticsRecord, recordsBufferSize)
+	r.recordsChan = make(chan *pb.AnalyticsRecord, recordsBufferSize)
 
 	// start worker pool
 	atomic.SwapUint32(&r.shouldStop, 0)
@@ -227,7 +101,7 @@ func (r *RedisAnalyticsHandler) Stop() {
 }
 
 // RecordHit will store an AnalyticsRecord in Redis
-func (r *RedisAnalyticsHandler) RecordHit(record *AnalyticsRecord) error {
+func (r *RedisAnalyticsHandler) RecordHit(record *pb.AnalyticsRecord) error {
 	// check if we should stop sending records 1st
 	if atomic.LoadUint32(&r.shouldStop) > 0 {
 		return nil
@@ -295,7 +169,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 				record.RawPath = "/" + record.RawPath
 			}
 
-			if encoded, err := msgpack.Marshal(record); err != nil {
+			if encoded, err := proto.Marshal(record); err != nil {
 				log.WithError(err).Error("Error encoding analytics data")
 			} else {
 				recordsBuffer = append(recordsBuffer, encoded)
@@ -319,6 +193,134 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 	}
 }
 
+func (r *RedisAnalyticsHandler) GetStore() storage.AnalyticsHandler{
+	return r.Store
+}
+func (r *RedisAnalyticsHandler) SetStore(store storage.AnalyticsHandler) {
+	 r.Store = store
+}
+
+func (r *RedisAnalyticsHandler) GetGeoIPDB() *maxminddb.Reader{
+	return r.GeoIPDB
+}
+
 func DurationToMillisecond(d time.Duration) float64 {
 	return float64(d) / 1e6
+}
+
+type GrpcAnalyticsHandler struct{
+	conn *grpc.ClientConn
+
+	client pb.AnalyticsServiceClient
+	GeoIPDB          *maxminddb.Reader
+	globalConf       config.Config
+	recordsChan      chan *pb.AnalyticsRecord
+	shouldStop       uint32
+	poolWg           sync.WaitGroup
+	workerBufferSize uint64
+
+	stopChan	chan bool
+
+}
+
+func (g *GrpcAnalyticsHandler)  Init(globalConf config.Config){
+	g.globalConf = globalConf
+
+	if g.globalConf.AnalyticsConfig.EnableGeoIP {
+		if db, err := maxminddb.Open(g.globalConf.AnalyticsConfig.GeoIPDBLocation); err != nil {
+			log.Error("Failed to init GeoIP Database: ", err)
+		} else {
+			g.GeoIPDB = db
+		}
+	}
+
+	g.initConn()
+
+	ps := config.Global().AnalyticsConfig.PoolSize
+	recordsBufferSize := config.Global().AnalyticsConfig.RecordsBufferSize
+	g.workerBufferSize = recordsBufferSize / uint64(ps)
+	log.WithField("workerBufferSize", g.workerBufferSize).Debug("Analytics pool worker buffer size")
+
+	g.recordsChan = make(chan *pb.AnalyticsRecord, recordsBufferSize)
+	g.stopChan = make(chan bool, recordsBufferSize)
+
+	// start worker pool
+	atomic.SwapUint32(&g.shouldStop, 0)
+	for i := 0; i < ps; i++ {
+		g.poolWg.Add(1)
+		go g.recordWorker()
+	}
+}
+func (g *GrpcAnalyticsHandler) Stop(){
+	defer g.conn.Close()
+	// flag to stop sending records into channel
+	atomic.SwapUint32(&g.shouldStop, 1)
+
+	recordsBufferSize := config.Global().AnalyticsConfig.RecordsBufferSize
+	var i uint64
+	for i = 0; i < recordsBufferSize; i++ {
+		g.stopChan <- true
+	}
+
+	// close channel to stop workers
+	close(g.recordsChan)
+	close(g.stopChan)
+	// wait for all workers to be done
+	g.poolWg.Wait()
+}
+
+func (g *GrpcAnalyticsHandler) RecordHit(record *pb.AnalyticsRecord) error{
+	// check if we should stop sending records 1st
+	if atomic.LoadUint32(&g.shouldStop) > 0 {
+		return nil
+	}
+
+	// just send record to channel consumed by pool of workers
+	// leave all data crunching and Redis I/O work for pool workers
+	g.recordsChan <- record
+
+	return nil
+}
+
+func (g *GrpcAnalyticsHandler) recordWorker(){
+	defer g.poolWg.Done()
+
+	stream, err := g.client.SendData(context.Background())
+	if err != nil {
+		log.WithError(err).Error("Error while calling SendData gRPC: %v", err)
+	}
+	for {
+		select {
+		case record:= <-g.recordsChan:
+			stream.Send(record)
+			if err != nil {
+				log.Fatalf("Error sending data to Pump gRPC: %v",err)
+			}
+			log.Info("Sent analytic record to pump via gRPC!")
+		case <- g.stopChan:
+			_, err := stream.CloseAndRecv()
+			if err != nil {
+				log.Fatalf("Error while closing and receiving SendData gRPC: %v", err)
+			}
+		}
+	}
+}
+
+func (g *GrpcAnalyticsHandler) GetStore() storage.AnalyticsHandler{
+	return nil
+}
+func (g *GrpcAnalyticsHandler) SetStore(storage.AnalyticsHandler){
+}
+func (g *GrpcAnalyticsHandler) GetGeoIPDB() *maxminddb.Reader{
+	return g.GeoIPDB
+}
+
+func (g *GrpcAnalyticsHandler) initConn(){
+	log.Info("Connecting to gRPC!!")
+	conn, err := grpc.Dial("localhost:50051", grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("Could not connect: %v",err)
+	}
+	g.conn = conn
+	g.client = pb.NewAnalyticsServiceClient(conn)
 }

@@ -108,7 +108,7 @@ func handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded
 		}
 		onServerStatusReceivedHandler(notif.Payload)
 	case NoticeGatewayLENotification:
-		onLESSLStatusReceivedHandler(notif.Payload)
+	//	onLESSLStatusReceivedHandler(notif.Payload)
 	case NoticeApiUpdated, NoticeApiRemoved, NoticeApiAdded, NoticePolicyChanged, NoticeGroupReload:
 		pubSubLog.Info("Reloading endpoints")
 		reloadURLStructure(reloaded)
