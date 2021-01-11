@@ -1455,7 +1455,6 @@ func (gw Gateway) startServer() {
 		muxer.setRouter(config.Global().ListenPort, "", mux.NewRouter())
 	}
 
-	//	defaultProxyMux.swap(muxer)
 	gw.DefaultProxyMux.swap(muxer)
 
 	// handle dashboard registration and nonces if available
