@@ -413,6 +413,8 @@ func loadControlAPIEndpoints(muxer *mux.Router) {
 		}
 	}
 
+	muxer.HandleFunc("/"+config.Global().HealthCheckEndpointName, liveCheckHandler)
+
 	r := mux.NewRouter()
 	muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
 		stripSlashes(checkIsAPIOwner(controlAPICheckClientCertificate("/gateway/client", InstrumentationMW(r)))),
@@ -1247,7 +1249,9 @@ func Start() {
 		defer trace.Close()
 	}
 	start(ctx)
-	go storage.ConnectToRedis(ctx)
+	go storage.ConnectToRedis(ctx, func() {
+		reloadURLStructure(func() {})
+	})
 
 	if *cli.MemProfile {
 		mainLog.Debug("Memory profiling active")
@@ -1293,15 +1297,6 @@ func Start() {
 	// stop analytics workers
 	if config.Global().EnableAnalytics && analytics.Store == nil {
 		analytics.Stop()
-	}
-
-	// if using async session writes stop workers
-	if config.Global().UseAsyncSessionWrite {
-		DefaultOrgStore.Stop()
-		for i := range apiSpecs {
-			apiSpecs[i].StopSessionManagerPool()
-		}
-
 	}
 
 	// write pprof profiles

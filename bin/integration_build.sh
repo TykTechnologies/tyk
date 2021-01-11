@@ -49,7 +49,8 @@ cp tyk.conf.example ${bdir}/tyk.conf
 cp -R coprocess ${bdir}
 
 echo "Building Tyk binaries"
-go build -tags 'goplugin' -mod=vendor && mv tyk ${bdir}
+go build -tags 'goplugin' -mod=vendor
+mv tyk ${bdir}
 
 echo "Making tarball"
 tar -C $bdir -pczf ${PKG_PREFIX}-${ARCH}-${VERSION}.tar.gz .

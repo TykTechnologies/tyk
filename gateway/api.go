@@ -542,6 +542,13 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 		}
 	}
 
+	// If it's a basic auth key and a valid Base64 string, use it as the key ID:
+	if session.BasicAuthData.Password != "" {
+		if storage.TokenOrg(sessionKey) != "" {
+			session.KeyID = sessionKey
+		}
+	}
+
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
 		"key":    obfuscateKey(sessionKey),
@@ -2421,6 +2428,20 @@ func ctxGetGraphQLRequest(r *http.Request) (gqlRequest *gql.Request) {
 		}
 	}
 	return nil
+}
+
+func ctxSetGraphQLIsWebSocketUpgrade(r *http.Request, isWebSocketUpgrade bool) {
+	setCtxValue(r, ctx.GraphQLIsWebSocketUpgrade, isWebSocketUpgrade)
+}
+
+func ctxGetGraphQLIsWebSocketUpgrade(r *http.Request) (isWebSocketUpgrade bool) {
+	if v := r.Context().Value(ctx.GraphQLIsWebSocketUpgrade); v != nil {
+		if isWebSocketUpgrade, ok := v.(bool); ok {
+			return isWebSocketUpgrade
+		}
+	}
+
+	return false
 }
 
 func ctxGetDefaultVersion(r *http.Request) bool {

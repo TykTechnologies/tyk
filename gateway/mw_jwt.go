@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"bytes"
 	"crypto/md5"
 	"crypto/x509"
 	"encoding/base64"
@@ -8,12 +9,14 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
 	cache "github.com/pmylund/go-cache"
+	jose "github.com/square/go-jose"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/user"
@@ -56,18 +59,24 @@ type JWKs struct {
 	Keys []JWK `json:"keys"`
 }
 
-func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) ([]byte, error) {
+func parseJWK(buf []byte) (*jose.JSONWebKeySet, error) {
+	var j jose.JSONWebKeySet
+	err := json.Unmarshal(buf, &j)
+	if err != nil {
+		return nil, err
+	}
+	return &j, nil
+}
+
+func (k *JWTMiddleware) legacyGetSecretFromURL(url, kid, keyType string) (interface{}, error) {
 	// Implement a cache
 	if JWKCache == nil {
-		k.Logger().Debug("Creating JWK Cache")
 		JWKCache = cache.New(240*time.Second, 30*time.Second)
 	}
 
 	var jwkSet JWKs
-	cachedJWK, found := JWKCache.Get(k.Spec.APIID)
+	cachedJWK, found := JWKCache.Get("legacy-" + k.Spec.APIID)
 	if !found {
-		// Get the JWK
-		k.Logger().Debug("Pulling JWK")
 		resp, err := http.Get(url)
 		if err != nil {
 			k.Logger().WithError(err).Error("Failed to get resource URL")
@@ -81,14 +90,11 @@ func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) ([]byte, erro
 			return nil, err
 		}
 
-		// Cache it
-		k.Logger().Debug("Caching JWK")
-		JWKCache.Set(k.Spec.APIID, jwkSet, cache.DefaultExpiration)
+		JWKCache.Set("legacy-"+k.Spec.APIID, jwkSet, cache.DefaultExpiration)
 	} else {
 		jwkSet = cachedJWK.(JWKs)
 	}
 
-	k.Logger().Debug("Checking JWKs...")
 	for _, val := range jwkSet.Keys {
 		if val.KID != kid || strings.ToLower(val.Kty) != strings.ToLower(keyType) {
 			continue
@@ -96,16 +102,65 @@ func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) ([]byte, erro
 		if len(val.X5c) > 0 {
 			// Use the first cert only
 			decodedCert, err := base64.StdEncoding.DecodeString(val.X5c[0])
+			if !bytes.Contains(decodedCert, []byte("-----")) {
+				return nil, errors.New("No legacy public keys found")
+			}
 			if err != nil {
 				return nil, err
 			}
-			k.Logger().Debug("Found cert! Replying...")
-			k.Logger().Debug("Cert was: ", string(decodedCert))
-			return decodedCert, nil
+			return ParseRSAPublicKey(decodedCert)
 		}
 		return nil, errors.New("no certificates in JWK")
 	}
 
+	return nil, errors.New("No matching KID could be found")
+}
+
+func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) (interface{}, error) {
+	// Implement a cache
+	if JWKCache == nil {
+		k.Logger().Debug("Creating JWK Cache")
+		JWKCache = cache.New(240*time.Second, 30*time.Second)
+	}
+
+	var jwkSet *jose.JSONWebKeySet
+
+	cachedJWK, found := JWKCache.Get(k.Spec.APIID)
+	if !found {
+		// Get the JWK
+		k.Logger().Debug("Pulling JWK")
+		resp, err := http.Get(url)
+		if err != nil {
+			k.Logger().WithError(err).Error("Failed to get resource URL")
+			return nil, err
+		}
+		defer resp.Body.Close()
+		buf, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			k.Logger().WithError(err).Error("Failed to get read response body")
+			return nil, err
+		}
+		if jwkSet, err = parseJWK(buf); err != nil {
+			k.Logger().WithError(err).Info("Failed to decode JWKs body. Trying x5c PEM fallback.")
+
+			key, legacyError := k.legacyGetSecretFromURL(url, kid, keyType)
+			if legacyError == nil {
+				return key, nil
+			}
+
+			return nil, err
+		}
+
+		// Cache it
+		k.Logger().Debug("Caching JWK")
+		JWKCache.Set(k.Spec.APIID, jwkSet, cache.DefaultExpiration)
+	} else {
+		jwkSet = cachedJWK.(*jose.JSONWebKeySet)
+	}
+	k.Logger().Debug("Checking JWKs...")
+	if keys := jwkSet.Key(kid); len(keys) > 0 {
+		return keys[0].Key, nil
+	}
 	return nil, errors.New("No matching KID could be found")
 }
 
@@ -123,18 +178,13 @@ func (k *JWTMiddleware) getIdentityFromToken(token *jwt.Token) (string, error) {
 	return tykId, err
 }
 
-func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.Token) ([]byte, error) {
+func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.Token) (interface{}, error) {
 	config := k.Spec.APIDefinition
 	// Check for central JWT source
 	if config.JWTSource != "" {
 		// Is it a URL?
 		if httpScheme.MatchString(config.JWTSource) {
-			secret, err := k.getSecretFromURL(config.JWTSource, token.Header[KID].(string), k.Spec.JWTSigningMethod)
-			if err != nil {
-				return nil, err
-			}
-
-			return secret, nil
+			return k.getSecretFromURL(config.JWTSource, token.Header[KID].(string), k.Spec.JWTSigningMethod)
 		}
 
 		// If not, return the actual value
@@ -593,12 +643,20 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		}
 		switch k.Spec.JWTSigningMethod {
 		case RSASign, ECDSASign:
-			key, err := ParseRSAPublicKey(val)
-			if err != nil {
-				logger.WithError(err).Error("Failed to decode JWT key")
-				return nil, errors.New("Failed to decode JWT key")
+			switch e := val.(type) {
+			case []byte:
+				key, err := ParseRSAPublicKey(e)
+				if err != nil {
+					logger.WithError(err).Error("Failed to decode JWT key")
+					return nil, errors.New("Failed to decode JWT key")
+				}
+				return key, nil
+			default:
+				// We have already parsed the correct key so we just return it here.No need
+				// for checks because they already happened somewhere ele.
+				return e, nil
 			}
-			return key, nil
+
 		default:
 			return val, nil
 		}

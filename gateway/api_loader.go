@@ -60,7 +60,6 @@ func skipSpecBecauseInvalid(spec *APISpec, logger *logrus.Entry) bool {
 			return true
 		}
 	}
-
 	if val, err := kvStore(spec.Proxy.TargetURL); err == nil {
 		spec.Proxy.TargetURL = val
 	}
@@ -120,6 +119,9 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		"prefix": "coprocess",
 	})
 
+	if strings.Contains(spec.Proxy.TargetURL, "h2c://") {
+		spec.Proxy.TargetURL = strings.Replace(spec.Proxy.TargetURL, "h2c://", "http://", 1)
+	}
 	if len(spec.TagHeaders) > 0 {
 		// Ensure all headers marked for tagging are lowercase
 		lowerCaseHeaders := make([]string, len(spec.TagHeaders))
@@ -352,7 +354,6 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		coprocessAuth := mwDriver != apidef.OttoDriver && spec.EnableCoProcessAuth
 		ottoAuth := !coprocessAuth && mwDriver == apidef.OttoDriver && spec.EnableCoProcessAuth
 		gopluginAuth := !coprocessAuth && !ottoAuth && mwDriver == apidef.GoPluginDriver && spec.UseGoPluginAuth
-
 		if coprocessAuth {
 			// TODO: check if mwAuthCheckFunc is available/valid
 			coprocessLog.Debug("Registering coprocess middleware, hook name: ", mwAuthCheckFunc.Name, "hook type: CustomKeyCheck", ", driver: ", mwDriver)
@@ -363,8 +364,12 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 		if ottoAuth {
 			logger.Info("----> Checking security policy: JS Plugin")
-
-			authArray = append(authArray, createDynamicMiddleware(mwAuthCheckFunc.Name, true, false, baseMid))
+			authArray = append(authArray, createMiddleware(&DynamicMiddleware{
+				BaseMiddleware:      baseMid,
+				MiddlewareClassName: mwAuthCheckFunc.Name,
+				Pre:                 true,
+				Auth:                true,
+			}))
 		}
 
 		if gopluginAuth {
@@ -438,6 +443,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	//Do not add middlewares after cache middleware.
 	//It will not get executed
 	mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: &cacheStore})
+
 	chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid}})
 
 	if !spec.UseKeylessAccess {
@@ -570,6 +576,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		handler.ServeHTTP(w, r)
 		return
 	}
+
 	d.SH.ServeHTTP(w, r)
 }
 
@@ -653,9 +660,7 @@ func loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStor
 		mainLog.Info("API hostname set: ", hostname)
 		router = router.Host(hostname).Subrouter()
 	}
-
 	chainObj := processSpec(spec, apisByListen, gs, router, logrus.NewEntry(log))
-
 	if chainObj.Skip {
 		return chainObj.ThisHandler
 	}
@@ -665,7 +670,6 @@ func loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStor
 	}
 
 	router.Handle(chainObj.ListenOn, chainObj.ThisHandler)
-
 	return chainObj.ThisHandler
 }
 
@@ -765,6 +769,9 @@ func loadApps(specs []*APISpec) {
 	shouldTrace := trace.IsEnabled()
 	for _, spec := range specs {
 		func() {
+			if strings.Contains(spec.Proxy.TargetURL, "h2c://") {
+				spec.Protocol = "h2c"
+			}
 			defer func() {
 				// recover from panic if one occured. Set err to nil otherwise.
 				if err := recover(); err != nil {
@@ -783,7 +790,7 @@ func loadApps(specs []*APISpec) {
 			tmpSpecRegister[spec.APIID] = spec
 
 			switch spec.Protocol {
-			case "", "http", "https":
+			case "", "http", "https", "h2c":
 				if shouldTrace {
 					// opentracing works only with http services.
 					err := trace.AddTracer("", spec.Name)
