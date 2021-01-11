@@ -464,8 +464,18 @@ func onConnectFunc(conn net.Conn) (net.Conn, string, error) {
 	remoteAddr := conn.RemoteAddr().String()
 	Log.WithField("remoteAddr", remoteAddr).Debug("connected to RPC server")
 	rpcConnectionsPool = append(rpcConnectionsPool, conn)
-	Log.Infof("Currently we have %d connections", len(rpcConnectionsPool))
 	return conn, remoteAddr, nil
+}
+
+func CloseConnections(){
+	for k, v := range rpcConnectionsPool{
+		err := v.Close()
+		if err != nil{
+			Log.WithError(err).Error("closing connection")
+		}else{
+			rpcConnectionsPool = append(rpcConnectionsPool[:k], rpcConnectionsPool[k+1:]...)
+		}
+	}
 }
 
 func Disconnect() bool {
