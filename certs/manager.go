@@ -37,22 +37,24 @@ type StorageHandler interface {
 }
 
 type CertificateManager struct {
-	storage StorageHandler
-	logger  *logrus.Entry
-	cache   *cache.Cache
-	secret  string
+	storage         StorageHandler
+	logger          *logrus.Entry
+	cache           *cache.Cache
+	secret          string
+	migrateCertList bool
 }
 
-func NewCertificateManager(storage StorageHandler, secret string, logger *logrus.Logger) *CertificateManager {
+func NewCertificateManager(storage StorageHandler, secret string, logger *logrus.Logger, migrateCertList bool) *CertificateManager {
 	if logger == nil {
 		logger = logrus.New()
 	}
 
 	return &CertificateManager{
-		storage: storage,
-		logger:  logger.WithFields(logrus.Fields{"prefix": "cert_storage"}),
-		cache:   cache.New(5*time.Minute, 10*time.Minute),
-		secret:  secret,
+		storage:         storage,
+		logger:          logger.WithFields(logrus.Fields{"prefix": "cert_storage"}),
+		cache:           cache.New(5*time.Minute, 10*time.Minute),
+		secret:          secret,
+		migrateCertList: migrateCertList,
 	}
 }
 
@@ -462,7 +464,7 @@ func (c *CertificateManager) ListRawPublicKey(keyID string) (out interface{}) {
 func (c *CertificateManager) ListAllIds(prefix string) (out []string) {
 	indexKey := prefix + "-index"
 	exists, _ := c.storage.Exists(indexKey)
-	if exists && prefix != "" {
+	if !c.migrateCertList || (exists && prefix != "") {
 		keys, _ := c.storage.GetListRange(indexKey, 0, -1)
 		for _, key := range keys {
 			out = append(out, strings.TrimPrefix(key, "raw-"))
