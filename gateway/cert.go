@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,7 +18,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/gorilla/mux"
-	cache "github.com/pmylund/go-cache"
+	"github.com/pmylund/go-cache"
 )
 
 type APICertificateStatusMessage struct {
@@ -389,7 +390,20 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 			}
 		}
 
-		newConfig.ClientAuth = domainRequireCert[hello.ServerName]
+		matches := false
+		for key, clientAuth := range domainRequireCert {
+			req := http.Request{Host: hello.ServerName, URL: &url.URL{}}
+			if mux.NewRouter().Host(key).Match(&req, &mux.RouteMatch{}) {
+				newConfig.ClientAuth = clientAuth
+				matches = true
+				break
+			}
+		}
+
+		if !matches {
+			newConfig.ClientAuth = tls.NoClientCert
+		}
+
 		if newConfig.ClientAuth == 0 {
 			newConfig.ClientAuth = domainRequireCert[""]
 		}
