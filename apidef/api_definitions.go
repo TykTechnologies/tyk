@@ -586,6 +586,7 @@ const (
 
 type GraphQLEngineDataSource struct {
 	Kind       GraphQLEngineDataSourceKind `bson:"kind" json:"kind"`
+	Name       string                      `bson:"name" json:"name"`
 	Internal   bool                        `bson:"internal" json:"internal"`
 	RootFields []GraphQLTypeFields         `bson:"root_fields" json:"root_fields"`
 	Config     json.RawMessage             `bson:"config" json:"config"`
