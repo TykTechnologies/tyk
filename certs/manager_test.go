@@ -115,7 +115,7 @@ func (s *dummyStorage) GetKeys(pattern string) (keys []string) {
 }
 
 func newManager() *CertificateManager {
-	return NewCertificateManager(newDummyStorage(), "test", nil)
+	return NewCertificateManager(newDummyStorage(), "test", nil, false)
 }
 
 func genCertificate(template *x509.Certificate, isExpired bool) ([]byte, []byte) {
