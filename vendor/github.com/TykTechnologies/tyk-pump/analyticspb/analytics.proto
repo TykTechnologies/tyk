@@ -78,5 +78,5 @@ message NetworkStats {
 }
 
 service AnalyticsService{
-  rpc SendData(stream AnalyticsRecord) returns (AnalyticsRecordResp){};
+  rpc SendData(AnalyticsRecord) returns (AnalyticsRecordResp){};
 }

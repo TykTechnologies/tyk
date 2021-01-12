@@ -284,24 +284,18 @@ func (g *GrpcAnalyticsHandler) RecordHit(record *pb.AnalyticsRecord) error{
 
 func (g *GrpcAnalyticsHandler) recordWorker(){
 	defer g.poolWg.Done()
-
-	stream, err := g.client.SendData(context.Background())
-	if err != nil {
-		log.WithError(err).Error("Error while calling SendData gRPC: %v", err)
-	}
+	
 	for {
 		select {
-		case record:= <-g.recordsChan:
-			stream.Send(record)
+		case record := <-g.recordsChan:
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_, err := g.client.SendData(ctx, record)
 			if err != nil {
-				log.Fatalf("Error sending data to Pump gRPC: %v",err)
+				log.Fatalf("Error sending data to Pump gRPC: %v", err)
 			}
 			log.Info("Sent analytic record to pump via gRPC!")
-		case <- g.stopChan:
-			_, err := stream.CloseAndRecv()
-			if err != nil {
-				log.Fatalf("Error while closing and receiving SendData gRPC: %v", err)
-			}
 		}
 	}
 }
