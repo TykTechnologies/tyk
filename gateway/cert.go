@@ -390,21 +390,17 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 			}
 		}
 
-		matches := false
+		newConfig.ClientAuth = tls.NoClientCert
+
 		for key, clientAuth := range domainRequireCert {
 			req := http.Request{Host: hello.ServerName, URL: &url.URL{}}
 			if mux.NewRouter().Host(key).Match(&req, &mux.RouteMatch{}) {
 				newConfig.ClientAuth = clientAuth
-				matches = true
 				break
 			}
 		}
 
-		if !matches {
-			newConfig.ClientAuth = tls.NoClientCert
-		}
-
-		if newConfig.ClientAuth == 0 {
+		if newConfig.ClientAuth == tls.NoClientCert {
 			newConfig.ClientAuth = domainRequireCert[""]
 		}
 
