@@ -3,8 +3,10 @@ package apidef
 import (
 	"encoding/json"
 	"errors"
+	"net/http"
 
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
+	"github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/httpclient"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/rest_datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/plan"
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
@@ -13,7 +15,8 @@ import (
 var ErrUnsupportedGraphQLConfigVersion = errors.New("provided version of GraphQL config is not supported for this operation")
 
 type GraphQLConfigAdapter struct {
-	config GraphQLConfig
+	config     GraphQLConfig
+	httpClient *http.Client
 }
 
 func NewGraphQLConfigAdapter(config GraphQLConfig) GraphQLConfigAdapter {
@@ -80,12 +83,17 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 
 		switch ds.Kind {
 		case GraphQLEngineDataSourceKindREST:
-			planDataSource.Factory = &rest_datasource.Factory{}
 			restConfig := GraphQLEngineDataSourceConfigREST{}
 			err = json.Unmarshal(ds.Config, &restConfig)
 			if err != nil {
 				return nil, err
 			}
+
+			factory := &rest_datasource.Factory{}
+			if g.httpClient != nil {
+				factory.Client = httpclient.NewNetHttpClient(g.httpClient)
+			}
+			planDataSource.Factory = factory
 
 			planDataSource.Custom = rest_datasource.ConfigJSON(rest_datasource.Configuration{
 				Fetch: rest_datasource.FetchConfiguration{
@@ -95,12 +103,18 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 			})
 
 		case GraphQLEngineDataSourceKindGraphQL:
-			planDataSource.Factory = &graphql_datasource.Factory{}
+
 			graphqlConfig := GraphQLEngineDataSourceConfigGraphQL{}
 			err = json.Unmarshal(ds.Config, &graphqlConfig)
 			if err != nil {
 				return nil, err
 			}
+
+			factory := &graphql_datasource.Factory{}
+			if g.httpClient != nil {
+				factory.Client = httpclient.NewNetHttpClient(g.httpClient)
+			}
+			planDataSource.Factory = factory
 
 			planDataSource.Custom = graphql_datasource.ConfigJson(graphql_datasource.Configuration{
 				Fetch: graphql_datasource.FetchConfiguration{
@@ -114,4 +128,8 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 	}
 
 	return planDataSources, nil
+}
+
+func (g *GraphQLConfigAdapter) SetHttpClient(httpClient *http.Client) {
+	g.httpClient = httpClient
 }
