@@ -940,6 +940,40 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 			ts.Run(t, test.TestCase{Path: "/test1", Code: 200, Domain: "localhost", Client: client})
 		})
 	})
+
+	t.Run("With regex custom domain", func(t *testing.T) {
+		_, _, _, clientCert := genCertificate(&x509.Certificate{})
+		clientCertID := certs.HexSHA256(clientCert.Certificate[0])
+
+		api := BuildAndLoadAPI(
+			func(spec *APISpec) {
+				spec.APIID = "api-with-regex-custom-domain"
+				spec.UseKeylessAccess = false
+				spec.BaseIdentityProvidedBy = apidef.AuthToken
+				spec.Auth.UseCertificate = true
+				spec.Proxy.ListenPath = "/test1"
+				spec.OrgID = "default"
+				spec.Domain = "{?:host1|host2}" // gorilla type regex
+			},
+		)[0]
+
+		client := GetTLSClient(&clientCert, nil)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Code: http.StatusNotFound, Path: "/test1", Client: client},
+			{Code: http.StatusForbidden, Path: "/test1", Domain: "host1", Client: client},
+			{Code: http.StatusForbidden, Path: "/test1", Domain: "host2", Client: client},
+		}...)
+
+		_, _ = ts.CreateSession(func(s *user.SessionState) {
+			s.Certificate = clientCertID
+			s.SetAccessRights(map[string]user.AccessDefinition{api.APIID: {
+				APIID: api.APIID, Versions: []string{"v1"},
+			}})
+		})
+
+		_, _ = ts.Run(t, test.TestCase{Code: http.StatusOK, Path: "/test1", Domain: "host2", Client: client})
+	})
 }
 
 func TestAPICertificate(t *testing.T) {
