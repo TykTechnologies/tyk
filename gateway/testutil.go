@@ -1065,7 +1065,7 @@ const sampleAPI = `{
 			{
 				"type_name": "Query",
 				"field_name": "people",
-				"disable_default_mapping": false,
+				"disable_default_mapping": true,
 				"path": [""]
 			}
 		],
