@@ -190,9 +190,10 @@ type APISpec struct {
 	network NetworkStats
 
 	GraphQLExecutor struct {
-		Engine *graphql.ExecutionEngine
-		Client *http.Client
-		Schema *graphql.Schema
+		Engine   *graphql.ExecutionEngine
+		EngineV2 *graphql.ExecutionEngineV2
+		Client   *http.Client
+		Schema   *graphql.Schema
 	}
 }
 
