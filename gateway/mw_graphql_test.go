@@ -275,6 +275,26 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 		})
 	})
 
+	t.Run("on invalid graphql config version", func(t *testing.T) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = true
+			spec.Proxy.ListenPath = "/"
+			spec.GraphQL.Enabled = true
+			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+			spec.GraphQL.Version = "XYZ"
+		})
+
+		t.Run("should return an error with code 500", func(t *testing.T) {
+			countries1 := gql.Request{
+				Query: "query Query { countries { name } }",
+			}
+
+			_, _ = g.Run(t, []test.TestCase{
+				{Data: countries1, BodyMatch: `"There was a problem proxying the request`, Code: http.StatusInternalServerError},
+			}...)
+		})
+	})
+
 	t.Run("graphql engine v1", func(t *testing.T) {
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = true
