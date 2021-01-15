@@ -842,7 +842,9 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
 			spec.BaseIdentityProvidedBy = apidef.AuthToken
-			spec.Auth.UseCertificate = true
+			spec.AuthConfigs = map[string]apidef.AuthConfig{
+				authTokenType: {UseCertificate: true},
+			}
 			spec.Proxy.ListenPath = "/"
 			spec.OrgID = "default"
 		})
@@ -891,7 +893,9 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 			func(spec *APISpec) {
 				spec.UseKeylessAccess = false
 				spec.BaseIdentityProvidedBy = apidef.AuthToken
-				spec.Auth.UseCertificate = true
+				spec.AuthConfigs = map[string]apidef.AuthConfig{
+					authTokenType: {UseCertificate: true},
+				}
 				spec.Proxy.ListenPath = "/test1"
 				spec.OrgID = "default"
 				spec.Domain = "localhost"
@@ -950,7 +954,9 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 				spec.APIID = "api-with-regex-custom-domain"
 				spec.UseKeylessAccess = false
 				spec.BaseIdentityProvidedBy = apidef.AuthToken
-				spec.Auth.UseCertificate = true
+				spec.AuthConfigs = map[string]apidef.AuthConfig{
+					authTokenType: {UseCertificate: true},
+				}
 				spec.Proxy.ListenPath = "/test1"
 				spec.OrgID = "default"
 				spec.Domain = "{?:host1|host2}" // gorilla type regex
