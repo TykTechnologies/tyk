@@ -355,7 +355,7 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 						}
 					}
 				}
-			case spec.Auth.UseCertificate:
+			case spec.AuthConfigs[authTokenType].UseCertificate:
 				// Dynamic certificate check required, falling back to HTTP level check
 				// TODO: Change to VerifyPeerCertificate hook instead, when possible
 				if domainRequireCert[spec.Domain] < tls.RequestClientCert {
