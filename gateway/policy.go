@@ -17,24 +17,27 @@ import (
 )
 
 type DBAccessDefinition struct {
-	APIName           string                       `json:"apiname"`
-	APIID             string                       `json:"apiid"`
-	Versions          []string                     `json:"versions"`
-	AllowedURLs       []user.AccessSpec            `bson:"allowed_urls" json:"allowed_urls"` // mapped string MUST be a valid regex
-	RestrictedTypes   []graphql.Type               `json:"restricted_types"`
+	APIName             string            `json:"apiname"`
+	APIID               string            `json:"apiid"`
+	Versions            []string          `json:"versions"`
+	AllowedURLs         []user.AccessSpec `bson:"allowed_urls" json:"allowed_urls"` // mapped string MUST be a valid regex
+	AllowedTypes        []graphql.Type    `json:"allowed_types"`
+	AllowedTypesEnabled bool              `json:"allowed_types_enabled"`
+
 	FieldAccessRights []user.FieldAccessDefinition `json:"field_access_rights"`
 	Limit             *user.APILimit               `json:"limit"`
 }
 
 func (d *DBAccessDefinition) ToRegularAD() user.AccessDefinition {
 	return user.AccessDefinition{
-		APIName:           d.APIName,
-		APIID:             d.APIID,
-		Versions:          d.Versions,
-		AllowedURLs:       d.AllowedURLs,
-		RestrictedTypes:   d.RestrictedTypes,
-		FieldAccessRights: d.FieldAccessRights,
-		Limit:             d.Limit,
+		APIName:             d.APIName,
+		APIID:               d.APIID,
+		Versions:            d.Versions,
+		AllowedURLs:         d.AllowedURLs,
+		AllowedTypes:        d.AllowedTypes,
+		AllowedTypesEnabled: d.AllowedTypesEnabled,
+		FieldAccessRights:   d.FieldAccessRights,
+		Limit:               d.Limit,
 	}
 }
 

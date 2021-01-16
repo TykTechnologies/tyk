@@ -289,7 +289,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			ID: "restricted_types_1",
 			AccessRights: map[string]user.AccessDefinition{
 				"a": {
-					RestrictedTypes: []graphql.Type{
+					AllowedTypes: []graphql.Type{
 						{Name: "Country", Fields: []string{"code", "name"}},
 						{Name: "Person", Fields: []string{"name", "height"}},
 					},
@@ -299,7 +299,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			ID: "restricted_types_2",
 			AccessRights: map[string]user.AccessDefinition{
 				"a": {
-					RestrictedTypes: []graphql.Type{
+					AllowedTypes: []graphql.Type{
 						{Name: "Country", Fields: []string{"code", "phone"}},
 						{Name: "Person", Fields: []string{"name", "mass"}},
 					},
@@ -663,7 +663,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			sessMatch: func(t *testing.T, s *user.SessionState) {
 				want := map[string]user.AccessDefinition{
 					"a": { // It should get intersection of restricted types.
-						RestrictedTypes: []graphql.Type{
+						AllowedTypes: []graphql.Type{
 							{Name: "Country", Fields: []string{"code"}},
 							{Name: "Person", Fields: []string{"name"}},
 						},

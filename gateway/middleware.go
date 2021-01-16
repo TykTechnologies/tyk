@@ -410,10 +410,12 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 							}
 						}
 
-						for _, t := range v.RestrictedTypes {
-							for ri, rt := range r.RestrictedTypes {
+						// TODO: how to merge allowed types when on some policy they are disabled?
+
+						for _, t := range v.AllowedTypes {
+							for ri, rt := range r.AllowedTypes {
 								if t.Name == rt.Name {
-									r.RestrictedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
+									r.AllowedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
 								}
 							}
 						}

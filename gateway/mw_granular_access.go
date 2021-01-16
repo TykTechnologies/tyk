@@ -33,13 +33,17 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 	}
 
 	if m.Spec.GraphQL.Enabled {
-		if len(sessionVersionData.RestrictedTypes) == 0 {
+		if len(sessionVersionData.AllowedTypes) == 0 {
 			return nil, http.StatusOK
 		}
 
 		gqlRequest := ctxGetGraphQLRequest(r)
 
-		result, err := gqlRequest.ValidateRestrictedFields(m.Spec.GraphQLExecutor.Schema, sessionVersionData.RestrictedTypes)
+		if !sessionVersionData.AllowedTypesEnabled {
+			return nil, http.StatusOK
+		}
+
+		result, err := gqlRequest.ValidateRestrictedFields(m.Spec.GraphQLExecutor.Schema, sessionVersionData.AllowedTypes)
 		if err != nil {
 			m.Logger().Errorf("Error during GraphQL request restricted fields validation: '%s'", err)
 			return errors.New("there was a problem proxying the request"), http.StatusInternalServerError

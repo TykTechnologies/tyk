@@ -26,7 +26,7 @@ func TestGraphQL_RestrictedTypes(t *testing.T) {
 			api.APIID: {
 				APIID:   api.APIID,
 				APIName: api.Name,
-				RestrictedTypes: []graphql.Type{
+				AllowedTypes: []graphql.Type{
 					{
 						Name:   "Country",
 						Fields: []string{"code"},
@@ -41,7 +41,7 @@ func TestGraphQL_RestrictedTypes(t *testing.T) {
 			api.APIID: {
 				APIID:   api.APIID,
 				APIName: api.Name,
-				RestrictedTypes: []graphql.Type{
+				AllowedTypes: []graphql.Type{
 					{
 						Name:   "Country",
 						Fields: []string{"name"},
@@ -56,11 +56,11 @@ func TestGraphQL_RestrictedTypes(t *testing.T) {
 	})
 
 	q1 := graphql.Request{
-		Query: "query Query { countries { code } }",
+		Query: "query Query { countries { name } }",
 	}
 
 	q2 := graphql.Request{
-		Query: "query Query { countries { name } }",
+		Query: "query Query { countries { code } }",
 	}
 
 	t.Run("Direct key", func(t *testing.T) {
@@ -70,7 +70,7 @@ func TestGraphQL_RestrictedTypes(t *testing.T) {
 
 		_, _ = g.Run(t, []test.TestCase{
 			{Data: q1, Headers: authHeaderWithDirectKey,
-				BodyMatch: `{"errors":\[{"message":"field: code is restricted on type: Country"}\]}`, Code: http.StatusBadRequest},
+				BodyMatch: `{"errors":\[{"message":"field: code is not allowed on type: Country"}\]}`, Code: http.StatusBadRequest},
 			{Data: q2, Headers: authHeaderWithDirectKey, Code: http.StatusOK},
 		}...)
 	})
@@ -82,7 +82,7 @@ func TestGraphQL_RestrictedTypes(t *testing.T) {
 
 		_, _ = g.Run(t, []test.TestCase{
 			{Data: q2, Headers: authHeaderWithPolicyAppliedKey,
-				BodyMatch: `{"errors":\[{"message":"field: name is restricted on type: Country"}\]}`, Code: http.StatusBadRequest},
+				BodyMatch: `{"errors":\[{"message":"field: name is not allowed on type: Country"}\]}`, Code: http.StatusBadRequest},
 			{Data: q1, Headers: authHeaderWithPolicyAppliedKey, Code: http.StatusOK},
 		}...)
 	})
