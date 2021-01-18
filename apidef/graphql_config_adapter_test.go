@@ -52,7 +52,7 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 	t.Run("should convert graphql v2 config to engine config v2",
 		runWithoutError(graphqlEngineV2ConfigJson, httpClient,
 			func(t *testing.T) *graphql.EngineV2Configuration {
-				schema, err := graphql.NewSchemaFromString("type Query { rest: String, gql: String }")
+				schema, err := graphql.NewSchemaFromString(v2Schema)
 				require.NoError(t, err)
 
 				conf := graphql.NewEngineV2Configuration(schema)
@@ -100,6 +100,79 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 							},
 						}),
 					},
+					{
+						RootNodes: []plan.TypeField{
+							{
+								TypeName:   "Query",
+								FieldNames: []string{"withChildren"},
+							},
+						},
+						ChildNodes: []plan.TypeField{
+							{
+								TypeName:   "WithChildren",
+								FieldNames: []string{"id", "name"},
+							},
+						},
+						Factory: &rest_datasource.Factory{
+							Client: httpclient.NewNetHttpClient(httpClient),
+						},
+						Custom: rest_datasource.ConfigJSON(rest_datasource.Configuration{
+							Fetch: rest_datasource.FetchConfiguration{
+								URL:    "https://rest.example.com",
+								Method: "POST",
+							},
+						}),
+					},
+					{
+						RootNodes: []plan.TypeField{
+							{
+								TypeName:   "WithChildren",
+								FieldNames: []string{"nested"},
+							},
+						},
+						ChildNodes: []plan.TypeField{
+							{
+								TypeName:   "Nested",
+								FieldNames: []string{"id", "name"},
+							},
+						},
+						Factory: &rest_datasource.Factory{
+							Client: httpclient.NewNetHttpClient(httpClient),
+						},
+						Custom: rest_datasource.ConfigJSON(rest_datasource.Configuration{
+							Fetch: rest_datasource.FetchConfiguration{
+								URL:    "https://rest.example.com",
+								Method: "POST",
+							},
+						}),
+					},
+					{
+						RootNodes: []plan.TypeField{
+							{
+								TypeName:   "Query",
+								FieldNames: []string{"multiRoot1","multiRoot2"},
+							},
+						},
+						ChildNodes: []plan.TypeField{
+							{
+								TypeName: "MultiRoot1",
+								FieldNames: []string{"id"},
+							},
+							{
+								TypeName: "MultiRoot2",
+								FieldNames: []string{"name"},
+							},
+						},
+						Factory: &graphql_datasource.Factory{
+							Client: httpclient.NewNetHttpClient(httpClient),
+						},
+						Custom: graphql_datasource.ConfigJson(graphql_datasource.Configuration{
+							Fetch: graphql_datasource.FetchConfiguration{
+								URL:        "https://graphql.example.com",
+								HttpMethod: "POST",
+							},
+						}),
+					},
 				})
 
 				return &conf
@@ -116,11 +189,13 @@ const graphqlEngineV1ConfigJson = `{
 	"playground": {}
 }`
 
+const v2Schema = `type Query { rest: String gql: String withChildren: WithChildren multiRoot1: MultiRoot1 multiRoot2: MultiRoot2 } type WithChildren { id: ID! name: String nested: Nested} type Nested { id: ID! name: String! } type MultiRoot1 { id: ID! } type MultiRoot2 { name: String! }`
+
 const graphqlEngineV2ConfigJson = `{
 	"enabled": true,
 	"execution_mode": "executionEngine",
 	"version": "2",
-	"schema": "type Query { rest: String, gql: String }",
+	"schema": "` + v2Schema + `",
 	"last_schema_update": "2020-11-11T11:11:11.000+01:00",
 	"engine_config": {
 		"field_configs": [
@@ -152,6 +227,47 @@ const graphqlEngineV2ConfigJson = `{
 				"internal": false,
 				"root_fields": [
 					{ "type": "Query", "fields": ["gql"] }
+				],
+				"config": {
+					"url": "https://graphql.example.com",
+					"method": "POST"
+				}
+			},
+		   	{
+				"kind": "REST",
+				"name": "",
+				"internal": true,
+				"root_fields": [
+					{ "type": "Query", "fields": ["withChildren"] }
+				],
+				"config": {
+					"url": "https://rest.example.com",
+					"method": "POST",
+					"header": {},
+					"query": [],
+					"body": ""
+				}
+			},
+		   	{
+				"kind": "REST",
+				"name": "",
+				"internal": true,
+				"root_fields": [
+					{ "type": "WithChildren", "fields": ["nested"] }
+				],
+				"config": {
+					"url": "https://rest.example.com",
+					"method": "POST",
+					"header": {},
+					"query": [],
+					"body": ""
+				}
+			},
+			{
+				"kind": "GraphQL",
+				"internal": false,
+				"root_fields": [
+					{ "type": "Query", "fields": ["multiRoot1","multiRoot2"] }
 				],
 				"config": {
 					"url": "https://graphql.example.com",
