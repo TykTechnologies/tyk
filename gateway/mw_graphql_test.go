@@ -162,6 +162,26 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 	g := StartTest()
 	defer g.Close()
 
+	t.Run("on invalid graphql config version", func(t *testing.T) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = true
+			spec.Proxy.ListenPath = "/"
+			spec.GraphQL.Enabled = true
+			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+			spec.GraphQL.Version = "XYZ"
+		})
+
+		t.Run("should return an error with code 500", func(t *testing.T) {
+			countries1 := gql.Request{
+				Query: "query Query { countries { name } }",
+			}
+
+			_, _ = g.Run(t, []test.TestCase{
+				{Data: countries1, BodyMatch: `"There was a problem proxying the request`, Code: http.StatusInternalServerError},
+			}...)
+		})
+	})
+
 	t.Run("graphql engine v2", func(t *testing.T) {
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = true
@@ -172,7 +192,6 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 		})
 
 		t.Run("on disabled websockets", func(t *testing.T) {
-			defer ResetTestConfig()
 			cfg := config.Global()
 			cfg.HttpServerOptions.EnableWebSockets = false
 			config.SetGlobal(cfg)
@@ -195,7 +214,6 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 		})
 
 		t.Run("graphql websocket upgrade", func(t *testing.T) {
-			defer ResetTestConfig()
 			cfg := config.Global()
 			cfg.HttpServerOptions.EnableWebSockets = true
 			config.SetGlobal(cfg)
@@ -275,26 +293,6 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 		})
 	})
 
-	t.Run("on invalid graphql config version", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
-			spec.UseKeylessAccess = true
-			spec.Proxy.ListenPath = "/"
-			spec.GraphQL.Enabled = true
-			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
-			spec.GraphQL.Version = "XYZ"
-		})
-
-		t.Run("should return an error with code 500", func(t *testing.T) {
-			countries1 := gql.Request{
-				Query: "query Query { countries { name } }",
-			}
-
-			_, _ = g.Run(t, []test.TestCase{
-				{Data: countries1, BodyMatch: `"There was a problem proxying the request`, Code: http.StatusInternalServerError},
-			}...)
-		})
-	})
-
 	t.Run("graphql engine v1", func(t *testing.T) {
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = true
@@ -304,7 +302,6 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 		})
 
 		t.Run("on disabled websockets", func(t *testing.T) {
-			defer ResetTestConfig()
 			cfg := config.Global()
 			cfg.HttpServerOptions.EnableWebSockets = false
 			config.SetGlobal(cfg)
@@ -327,7 +324,6 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 		})
 
 		t.Run("graphql websocket upgrade", func(t *testing.T) {
-			defer ResetTestConfig()
 			cfg := config.Global()
 			cfg.HttpServerOptions.EnableWebSockets = true
 			config.SetGlobal(cfg)

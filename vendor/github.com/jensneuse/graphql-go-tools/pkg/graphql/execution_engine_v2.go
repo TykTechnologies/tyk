@@ -59,6 +59,12 @@ func NewEngineResultWriter() EngineResultWriter {
 	}
 }
 
+func NewEngineResultWriterFromBuffer(buf *bytes.Buffer) EngineResultWriter {
+	return EngineResultWriter{
+		buf: buf,
+	}
+}
+
 func (e *EngineResultWriter) Write(p []byte) (n int, err error) {
 	return e.buf.Write(p)
 }
@@ -161,7 +167,7 @@ func (e *ExecutionEngineV2) Execute(ctx context.Context, operation *Request, wri
 	var report operationreport.Report
 	planResult := e.planner.Plan(&operation.document, &e.config.schema.document, operation.OperationName, &report)
 	if report.HasErrors() {
-		return report
+		return errors.New(report.Error())
 	}
 
 	planResult = execContext.postProcessor.Process(planResult)
