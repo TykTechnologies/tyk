@@ -155,6 +155,14 @@ func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
 
 			_, _ = g.Run(t, test.TestCase{Headers: authHeaderWithDirectKey, Data: request, BodyMatch: "hello", Code: http.StatusOK})
 		})
+
+		t.Run("Invalid query should return 401 when auth is failing", func(t *testing.T) {
+			request.Query = "query Hello {"
+			directSession.MaxQueryDepth = 2
+			_ = GlobalSessionManager.UpdateSession("invalid key", directSession, 0, false)
+
+			_, _ = g.Run(t, test.TestCase{Headers: authHeaderWithDirectKey, Data: request, BodyMatch: "hello", Code: http.StatusUnauthorized})
+		})
 	})
 }
 
