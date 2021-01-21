@@ -82,7 +82,7 @@ type Handler struct {
 }
 
 // NewHandler creates a new subscription handler.
-func NewHandler(logger abstractlogger.Logger, client Client /*executionHandler *execution.Handler*/, executorPool ExecutorPool) (*Handler, error) {
+func NewHandler(logger abstractlogger.Logger, client Client, executorPool ExecutorPool) (*Handler, error) {
 	keepAliveInterval, err := time.ParseDuration(DefaultKeepAliveInterval)
 	if err != nil {
 		return nil, err
@@ -202,7 +202,7 @@ func (h *Handler) handleStart(id string, payload []byte) {
 }
 
 // handleNonSubscriptionOperation will handle a non-subscription operation like a query or a mutation.
-func (h *Handler) handleNonSubscriptionOperation(id string /*executor *execution.Executor, node execution.RootNode, executionContext execution.Context*/, executor Executor) {
+func (h *Handler) handleNonSubscriptionOperation(id string, executor Executor) {
 	defer func() {
 		err := h.executorPool.Put(executor)
 		if err != nil {
@@ -237,7 +237,7 @@ func (h *Handler) handleNonSubscriptionOperation(id string /*executor *execution
 }
 
 // startSubscription will invoke the actual subscription.
-func (h *Handler) startSubscription(ctx context.Context, id string /*executor *execution.Executor, node execution.RootNode, executionContext execution.Context*/, executor Executor) {
+func (h *Handler) startSubscription(ctx context.Context, id string, executor Executor) {
 	defer func() {
 		err := h.executorPool.Put(executor)
 		if err != nil {
@@ -268,7 +268,7 @@ func (h *Handler) startSubscription(ctx context.Context, id string /*executor *e
 }
 
 // executeSubscription will keep execution the subscription until it ends.
-func (h *Handler) executeSubscription(buf *graphql.EngineResultWriter, id string /*executor *execution.Executor, node execution.RootNode, ctx execution.Context*/, executor Executor) {
+func (h *Handler) executeSubscription(buf *graphql.EngineResultWriter, id string, executor Executor) {
 	//err := executor.Execute(ctx, node, buf)
 	err := executor.Execute(buf)
 	if err != nil {

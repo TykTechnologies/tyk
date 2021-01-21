@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/cenk/backoff"
+	"github.com/jensneuse/graphql-go-tools/pkg/engine/resolve"
 
 	sprig "gopkg.in/Masterminds/sprig.v2"
 
@@ -192,8 +193,12 @@ type APISpec struct {
 	GraphQLExecutor struct {
 		Engine   *graphql.ExecutionEngine
 		EngineV2 *graphql.ExecutionEngineV2
-		Client   *http.Client
-		Schema   *graphql.Schema
+		HooksV2  struct {
+			BeforeFetchHook resolve.BeforeFetchHook
+			AfterFetchHook  resolve.AfterFetchHook
+		}
+		Client *http.Client
+		Schema *graphql.Schema
 	}
 }
 

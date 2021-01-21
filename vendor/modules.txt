@@ -169,6 +169,8 @@ github.com/jensneuse/byte-template
 github.com/jensneuse/graphql-go-tools/internal/pkg/quotes
 =======
 # github.com/jensneuse/graphql-go-tools v0.0.0-00010101000000-000000000000 => ../graphql-go-tools
+github.com/jensneuse/graphql-go-tools/pkg/ast
+github.com/jensneuse/graphql-go-tools/pkg/astparser
 github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/graphql_datasource
 github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/httpclient
 github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/rest_datasource
@@ -199,17 +201,21 @@ github.com/jensneuse/graphql-go-tools/pkg/engine/plan
 github.com/jensneuse/graphql-go-tools/pkg/engine/resolve
 =======
 github.com/jensneuse/graphql-go-tools/pkg/subscription
-github.com/jensneuse/graphql-go-tools/pkg/ast
+github.com/jensneuse/graphql-go-tools/internal/pkg/quotes
+github.com/jensneuse/graphql-go-tools/internal/pkg/unsafebytes
+github.com/jensneuse/graphql-go-tools/pkg/lexer/literal
+github.com/jensneuse/graphql-go-tools/pkg/lexer/position
+github.com/jensneuse/graphql-go-tools/pkg/lexer/runes
+github.com/jensneuse/graphql-go-tools/pkg/lexer
+github.com/jensneuse/graphql-go-tools/pkg/lexer/identkeyword
+github.com/jensneuse/graphql-go-tools/pkg/lexer/keyword
+github.com/jensneuse/graphql-go-tools/pkg/lexer/token
+github.com/jensneuse/graphql-go-tools/pkg/operationreport
 github.com/jensneuse/graphql-go-tools/pkg/astnormalization
-github.com/jensneuse/graphql-go-tools/pkg/astparser
 github.com/jensneuse/graphql-go-tools/pkg/astprinter
 github.com/jensneuse/graphql-go-tools/pkg/engine/resolve
 github.com/jensneuse/graphql-go-tools/pkg/federation
-github.com/jensneuse/graphql-go-tools/pkg/lexer/literal
-github.com/jensneuse/graphql-go-tools/pkg/operationreport
 github.com/jensneuse/graphql-go-tools/pkg/pool
-github.com/jensneuse/graphql-go-tools/internal/pkg/quotes
-github.com/jensneuse/graphql-go-tools/internal/pkg/unsafebytes
 github.com/jensneuse/graphql-go-tools/pkg/engine/subscription/http_polling
 github.com/jensneuse/graphql-go-tools/pkg/astimport
 github.com/jensneuse/graphql-go-tools/pkg/astvisitor
@@ -220,6 +226,7 @@ github.com/jensneuse/graphql-go-tools/pkg/astvalidation
 github.com/jensneuse/graphql-go-tools/pkg/execution
 github.com/jensneuse/graphql-go-tools/pkg/middleware/operation_complexity
 github.com/jensneuse/graphql-go-tools/pkg/postprocess
+<<<<<<< master
 github.com/jensneuse/graphql-go-tools/pkg/lexer/position
 github.com/jensneuse/graphql-go-tools/pkg/lexer/runes
 >>>>>>> implement graphql config adapter
@@ -236,6 +243,8 @@ github.com/jensneuse/graphql-go-tools/pkg/operationreport
 github.com/jensneuse/graphql-go-tools/pkg/playground
 github.com/jensneuse/graphql-go-tools/pkg/subscription
 =======
+=======
+>>>>>>> add hooks to v2 engine
 github.com/jensneuse/graphql-go-tools/pkg/engine/subscription
 github.com/jensneuse/graphql-go-tools/pkg/fastbuffer
 <<<<<<< master

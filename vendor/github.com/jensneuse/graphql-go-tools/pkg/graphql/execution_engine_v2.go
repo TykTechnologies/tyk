@@ -133,6 +133,20 @@ type ExecutionEngineV2 struct {
 	internalExecutionContextPool sync.Pool
 }
 
+type ExecutionOptionsV2 func(ctx *internalExecutionContext)
+
+func WithBeforeFetchHook(hook resolve.BeforeFetchHook) ExecutionOptionsV2 {
+	return func(ctx *internalExecutionContext) {
+		ctx.resolveContext.SetBeforeFetchHook(hook)
+	}
+}
+
+func WithAfterFetchHook(hook resolve.AfterFetchHook) ExecutionOptionsV2 {
+	return func(ctx *internalExecutionContext) {
+		ctx.resolveContext.SetAfterFetchHook(hook)
+	}
+}
+
 func NewExecutionEngineV2(logger abstractlogger.Logger, engineConfig EngineV2Configuration) (*ExecutionEngineV2, error) {
 	return &ExecutionEngineV2{
 		logger:   logger,
@@ -147,7 +161,7 @@ func NewExecutionEngineV2(logger abstractlogger.Logger, engineConfig EngineV2Con
 	}, nil
 }
 
-func (e *ExecutionEngineV2) Execute(ctx context.Context, operation *Request, writer resolve.FlushWriter) error {
+func (e *ExecutionEngineV2) Execute(ctx context.Context, operation *Request, writer resolve.FlushWriter, options ...ExecutionOptionsV2) error {
 	if !operation.IsNormalized() {
 		result, err := operation.Normalize(e.config.schema)
 		if err != nil {
@@ -161,6 +175,10 @@ func (e *ExecutionEngineV2) Execute(ctx context.Context, operation *Request, wri
 
 	execContext := e.getFreshInternalExecutionContext(ctx, operation)
 	defer e.internalExecutionContextPool.Put(execContext)
+
+	for i := range options {
+		options[i](execContext)
+	}
 
 	// Optimization: Hashing the operation and caching the postprocessed plan for
 	// this specific operation will improve perfomance significantly.

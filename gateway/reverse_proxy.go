@@ -852,7 +852,10 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 		}
 
 		resultWriter := graphql.NewEngineResultWriter()
-		err = p.TykAPISpec.GraphQLExecutor.EngineV2.Execute(context.Background(), gqlRequest, &resultWriter)
+		err = p.TykAPISpec.GraphQLExecutor.EngineV2.Execute(context.Background(), gqlRequest, &resultWriter,
+			graphql.WithBeforeFetchHook(p.TykAPISpec.GraphQLExecutor.HooksV2.BeforeFetchHook),
+			graphql.WithAfterFetchHook(p.TykAPISpec.GraphQLExecutor.HooksV2.AfterFetchHook),
+		)
 		if err != nil {
 			return
 		}

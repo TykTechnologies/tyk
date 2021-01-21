@@ -1,4 +1,4 @@
-//go:generate mockgen -self_package=github.com/jensneuse/go-data-resolver/pkg/resolve -destination=resolve_mock_test.go -package=resolve . DataSource
+//go:generate mockgen -self_package=github.com/jensneuse/go-data-resolver/pkg/resolve -destination=resolve_mock_test.go -package=resolve . DataSource,BeforeFetchHook,AfterFetchHook
 
 package resolve
 
@@ -66,15 +66,26 @@ const (
 	FetchKindParallel
 )
 
+type BeforeFetchHook interface {
+	OnBeforeFetch(input []byte)
+}
+
+type AfterFetchHook interface {
+	OnData(output []byte, singleFlight bool)
+	OnError(output []byte, singleFlight bool)
+}
+
 type Context struct {
 	context.Context
-	Variables    []byte
-	pathElements [][]byte
-	patches      []patch
-	usedBuffers  []*bytes.Buffer
-	currentPatch int
-	maxPatch     int
-	pathPrefix   []byte
+	Variables       []byte
+	pathElements    [][]byte
+	patches         []patch
+	usedBuffers     []*bytes.Buffer
+	currentPatch    int
+	maxPatch        int
+	pathPrefix      []byte
+	beforeFetchHook BeforeFetchHook
+	afterFetchHook  AfterFetchHook
 }
 
 func NewContext(ctx context.Context) *Context {
@@ -102,6 +113,16 @@ func (c *Context) Free() {
 	c.usedBuffers = c.usedBuffers[:0]
 	c.currentPatch = -1
 	c.maxPatch = -1
+	c.beforeFetchHook = nil
+	c.afterFetchHook = nil
+}
+
+func (c *Context) SetBeforeFetchHook(hook BeforeFetchHook) {
+	c.beforeFetchHook = hook
+}
+
+func (c *Context) SetAfterFetchHook(hook AfterFetchHook) {
+	c.afterFetchHook = hook
 }
 
 func (c *Context) addPathElement(elem []byte) {
@@ -950,8 +971,21 @@ func (r *Resolver) prepareSingleFetch(ctx *Context, fetch *SingleFetch, data []b
 
 func (r *Resolver) resolveSingleFetch(ctx *Context, fetch *SingleFetch, preparedInput *fastbuffer.FastBuffer, buf *BufPair) (err error) {
 
+	if ctx.beforeFetchHook != nil {
+		ctx.beforeFetchHook.OnBeforeFetch(preparedInput.Bytes())
+	}
+
 	if !r.EnableSingleFlightLoader || fetch.DisallowSingleFlight {
-		return fetch.DataSource.Load(ctx.Context, preparedInput.Bytes(), buf)
+		err = fetch.DataSource.Load(ctx.Context, preparedInput.Bytes(), buf)
+		if ctx.afterFetchHook != nil {
+			if buf.HasData() {
+				ctx.afterFetchHook.OnData(buf.Data.Bytes(), false)
+			}
+			if buf.HasErrors() {
+				ctx.afterFetchHook.OnError(buf.Errors.Bytes(), false)
+			}
+		}
+		return
 	}
 
 	hash64 := r.getHash64()
@@ -968,9 +1002,15 @@ func (r *Resolver) resolveSingleFetch(ctx *Context, fetch *SingleFetch, prepared
 		r.inflightFetchMu.Unlock()
 		inflight.waitLoad.Wait()
 		if inflight.bufPair.HasData() {
+			if ctx.afterFetchHook != nil {
+				ctx.afterFetchHook.OnData(inflight.bufPair.Data.Bytes(), true)
+			}
 			buf.Data.WriteBytes(inflight.bufPair.Data.Bytes())
 		}
 		if inflight.bufPair.HasErrors() {
+			if ctx.afterFetchHook != nil {
+				ctx.afterFetchHook.OnError(inflight.bufPair.Errors.Bytes(), true)
+			}
 			buf.Errors.WriteBytes(inflight.bufPair.Errors.Bytes())
 		}
 		return inflight.err
@@ -986,10 +1026,16 @@ func (r *Resolver) resolveSingleFetch(ctx *Context, fetch *SingleFetch, prepared
 	inflight.err = err
 
 	if inflight.bufPair.HasData() {
+		if ctx.afterFetchHook != nil {
+			ctx.afterFetchHook.OnData(inflight.bufPair.Data.Bytes(), false)
+		}
 		buf.Data.WriteBytes(inflight.bufPair.Data.Bytes())
 	}
 
 	if inflight.bufPair.HasErrors() {
+		if ctx.afterFetchHook != nil {
+			ctx.afterFetchHook.OnError(inflight.bufPair.Errors.Bytes(), true)
+		}
 		buf.Errors.WriteBytes(inflight.bufPair.Errors.Bytes())
 	}
 
