@@ -270,7 +270,7 @@ func buildConnStr(resource string) string {
 	return config.Global().DBAppConfOptions.ConnectionString + resource
 }
 
-func (gw Gateway) syncAPISpecs() (int, error) {
+func (gw *Gateway) syncAPISpecs() (int, error) {
 	loader := APIDefinitionLoader{}
 	apisMu.Lock()
 	defer apisMu.Unlock()
@@ -290,7 +290,7 @@ func (gw Gateway) syncAPISpecs() (int, error) {
 		mainLog.Debug("Using RPC Configuration")
 
 		var err error
-		s, err = loader.FromRPC(config.Global().SlaveOptions.RPCKey, gw)
+		s, err = loader.FromRPC(config.Global().SlaveOptions.RPCKey, *gw)
 		if err != nil {
 			return 0, err
 		}
@@ -396,7 +396,7 @@ func controlAPICheckClientCertificate(certLevel string, next http.Handler) http.
 }
 
 // loadControlAPIEndpoints loads the endpoints used for controlling the Gateway.
-func (gw Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
+func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	hostname := config.Global().HostName
 	if config.Global().ControlAPIHostname != "" {
 		hostname = config.Global().ControlAPIHostname
@@ -700,7 +700,7 @@ func rpcReloadLoop(rpcKey string) {
 
 var reloadMu sync.Mutex
 
-func (gw Gateway) DoReload() {
+func (gw *Gateway) DoReload() {
 	reloadMu.Lock()
 	defer reloadMu.Unlock()
 
@@ -745,7 +745,7 @@ func shouldReload() ([]func(), bool) {
 	return n, true
 }
 
-func (gw Gateway) reloadLoop(ctx context.Context, tick <-chan time.Time, complete ...func()) {
+func (gw *Gateway) reloadLoop(ctx context.Context, tick <-chan time.Time, complete ...func()) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -1345,7 +1345,7 @@ func writeProfiles() {
 	}
 }
 
-func (gw Gateway) start(ctx context.Context) {
+func (gw *Gateway) start(ctx context.Context) {
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.Global().SupressDefaultOrgStore {
 		mainLog.Debug("Initialising default org store")
@@ -1443,7 +1443,7 @@ type Gateway struct {
 	Port            int
 }
 
-func (gw Gateway) startServer() {
+func (gw *Gateway) startServer() {
 	// Ensure that Control listener and default http listener running on first start
 	muxer := &proxyMux{}
 
