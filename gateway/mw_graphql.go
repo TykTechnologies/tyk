@@ -7,6 +7,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/jensneuse/abstractlogger"
+	"github.com/jensneuse/graphql-go-tools/pkg/engine/resolve"
 	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
 	"github.com/sirupsen/logrus"
 
@@ -268,38 +269,38 @@ type beforeFetchHookV2 struct {
 	m *GraphQLMiddleware
 }
 
-func (b beforeFetchHookV2) OnBeforeFetch(input []byte) {
+func (b beforeFetchHookV2) OnBeforeFetch(ctx resolve.HookContext, input []byte) {
 	b.m.BaseMiddleware.Logger().
 		WithFields(
 			logrus.Fields{
-				// "path":     path,
+				"path": ctx.CurrentPath,
 				"data": string(input),
 			},
-		).Debugf("path: beforeFetchHook executed")
+		).Debugf("%s: beforeFetchHook executed", ctx.CurrentPath)
 }
 
 type afterFetchHookV2 struct {
 	m *GraphQLMiddleware
 }
 
-func (a afterFetchHookV2) OnData(output []byte, singleFlight bool) {
+func (a afterFetchHookV2) OnData(ctx resolve.HookContext, output []byte, singleFlight bool) {
 	a.m.BaseMiddleware.Logger().
 		WithFields(
 			logrus.Fields{
-				// "path":     path,
+				"path":          ctx.CurrentPath,
 				"data":          string(output),
 				"single_flight": singleFlight,
 			},
-		).Debugf("path: afterFetchHook.OnData executed")
+		).Debugf("%s: afterFetchHook.OnData executed", ctx.CurrentPath)
 }
 
-func (a afterFetchHookV2) OnError(output []byte, singleFlight bool) {
+func (a afterFetchHookV2) OnError(ctx resolve.HookContext, output []byte, singleFlight bool) {
 	a.m.BaseMiddleware.Logger().
 		WithFields(
 			logrus.Fields{
-				// "path":     path,
+				"path":          ctx.CurrentPath,
 				"data":          string(output),
 				"single_flight": singleFlight,
 			},
-		).Debugf("path: afterFetchHook.OnError executed")
+		).Debugf("%s: afterFetchHook.OnError executed", ctx.CurrentPath)
 }

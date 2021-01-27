@@ -66,13 +66,17 @@ const (
 	FetchKindParallel
 )
 
+type HookContext struct {
+	CurrentPath []byte
+}
+
 type BeforeFetchHook interface {
-	OnBeforeFetch(input []byte)
+	OnBeforeFetch(ctx HookContext, input []byte)
 }
 
 type AfterFetchHook interface {
-	OnData(output []byte, singleFlight bool)
-	OnError(output []byte, singleFlight bool)
+	OnData(ctx HookContext, output []byte, singleFlight bool)
+	OnError(ctx HookContext, output []byte, singleFlight bool)
 }
 
 type Context struct {
@@ -148,6 +152,9 @@ func (c *Context) path() []byte {
 		buf.Write(literal.DATA)
 	}
 	for i := range c.pathElements {
+		if i == 0 && bytes.Equal(literal.DATA,c.pathElements[0]){
+			continue
+		}
 		_, _ = buf.Write(literal.SLASH)
 		_, _ = buf.Write(c.pathElements[i])
 	}
@@ -972,17 +979,17 @@ func (r *Resolver) prepareSingleFetch(ctx *Context, fetch *SingleFetch, data []b
 func (r *Resolver) resolveSingleFetch(ctx *Context, fetch *SingleFetch, preparedInput *fastbuffer.FastBuffer, buf *BufPair) (err error) {
 
 	if ctx.beforeFetchHook != nil {
-		ctx.beforeFetchHook.OnBeforeFetch(preparedInput.Bytes())
+		ctx.beforeFetchHook.OnBeforeFetch(r.hookCtx(ctx), preparedInput.Bytes())
 	}
 
 	if !r.EnableSingleFlightLoader || fetch.DisallowSingleFlight {
 		err = fetch.DataSource.Load(ctx.Context, preparedInput.Bytes(), buf)
 		if ctx.afterFetchHook != nil {
 			if buf.HasData() {
-				ctx.afterFetchHook.OnData(buf.Data.Bytes(), false)
+				ctx.afterFetchHook.OnData(r.hookCtx(ctx),buf.Data.Bytes(), false)
 			}
 			if buf.HasErrors() {
-				ctx.afterFetchHook.OnError(buf.Errors.Bytes(), false)
+				ctx.afterFetchHook.OnError(r.hookCtx(ctx),buf.Errors.Bytes(), false)
 			}
 		}
 		return
@@ -1003,13 +1010,13 @@ func (r *Resolver) resolveSingleFetch(ctx *Context, fetch *SingleFetch, prepared
 		inflight.waitLoad.Wait()
 		if inflight.bufPair.HasData() {
 			if ctx.afterFetchHook != nil {
-				ctx.afterFetchHook.OnData(inflight.bufPair.Data.Bytes(), true)
+				ctx.afterFetchHook.OnData(r.hookCtx(ctx),inflight.bufPair.Data.Bytes(), true)
 			}
 			buf.Data.WriteBytes(inflight.bufPair.Data.Bytes())
 		}
 		if inflight.bufPair.HasErrors() {
 			if ctx.afterFetchHook != nil {
-				ctx.afterFetchHook.OnError(inflight.bufPair.Errors.Bytes(), true)
+				ctx.afterFetchHook.OnError(r.hookCtx(ctx),inflight.bufPair.Errors.Bytes(), true)
 			}
 			buf.Errors.WriteBytes(inflight.bufPair.Errors.Bytes())
 		}
@@ -1027,14 +1034,14 @@ func (r *Resolver) resolveSingleFetch(ctx *Context, fetch *SingleFetch, prepared
 
 	if inflight.bufPair.HasData() {
 		if ctx.afterFetchHook != nil {
-			ctx.afterFetchHook.OnData(inflight.bufPair.Data.Bytes(), false)
+			ctx.afterFetchHook.OnData(r.hookCtx(ctx),inflight.bufPair.Data.Bytes(), false)
 		}
 		buf.Data.WriteBytes(inflight.bufPair.Data.Bytes())
 	}
 
 	if inflight.bufPair.HasErrors() {
 		if ctx.afterFetchHook != nil {
-			ctx.afterFetchHook.OnError(inflight.bufPair.Errors.Bytes(), true)
+			ctx.afterFetchHook.OnError(r.hookCtx(ctx),inflight.bufPair.Errors.Bytes(), true)
 		}
 		buf.Errors.WriteBytes(inflight.bufPair.Errors.Bytes())
 	}
@@ -1051,6 +1058,12 @@ func (r *Resolver) resolveSingleFetch(ctx *Context, fetch *SingleFetch, prepared
 	}()
 
 	return
+}
+
+func (r *Resolver) hookCtx(ctx *Context) HookContext {
+	return HookContext{
+		CurrentPath: ctx.path(),
+	}
 }
 
 type Object struct {
