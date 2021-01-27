@@ -38,6 +38,15 @@ func (v *ValidationResult) ErrorCount() int {
 	return len(v.Errors)
 }
 
+func (v *ValidationResult) ErrorStrings() []string {
+	var errorStrings []string
+	for _, err := range v.Errors {
+		errorStrings = append(errorStrings, err.Error())
+	}
+
+	return errorStrings
+}
+
 type ValidationRuleSet []ValidationRule
 
 var DefaultValidationRuleSet = ValidationRuleSet{

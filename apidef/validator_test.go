@@ -25,6 +25,20 @@ func TestValidationResult_FirstError(t *testing.T) {
 	assert.Equal(t, firstErr, result.FirstError())
 }
 
+func TestValidationResult_ErrorStrings(t *testing.T) {
+	result := ValidationResult{
+		Errors: []error{
+			ErrDuplicateDataSourceName,
+		},
+	}
+
+	expectedErrorStrings := []string{
+		ErrDuplicateDataSourceName.Error(),
+	}
+
+	assert.Equal(t, expectedErrorStrings, result.ErrorStrings())
+}
+
 func runValidationTest(apiDef *APIDefinition, ruleSet ValidationRuleSet, expectedValidationResult ValidationResult) func(t *testing.T) {
 	return func(t *testing.T) {
 		result := Validate(apiDef, ruleSet)
