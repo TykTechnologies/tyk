@@ -177,6 +177,7 @@ github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/rest_datasource
 github.com/jensneuse/graphql-go-tools/pkg/engine/plan
 github.com/jensneuse/graphql-go-tools/pkg/execution/datasource
 github.com/jensneuse/graphql-go-tools/pkg/graphql
+github.com/jensneuse/graphql-go-tools/pkg/engine/resolve
 github.com/jensneuse/graphql-go-tools/pkg/http
 github.com/jensneuse/graphql-go-tools/pkg/playground
 <<<<<<< master
@@ -213,7 +214,6 @@ github.com/jensneuse/graphql-go-tools/pkg/lexer/token
 github.com/jensneuse/graphql-go-tools/pkg/operationreport
 github.com/jensneuse/graphql-go-tools/pkg/astnormalization
 github.com/jensneuse/graphql-go-tools/pkg/astprinter
-github.com/jensneuse/graphql-go-tools/pkg/engine/resolve
 github.com/jensneuse/graphql-go-tools/pkg/federation
 github.com/jensneuse/graphql-go-tools/pkg/pool
 github.com/jensneuse/graphql-go-tools/pkg/engine/subscription/http_polling
@@ -362,6 +362,9 @@ github.com/satori/go.uuid
 # github.com/sirupsen/logrus v1.4.2
 github.com/sirupsen/logrus
 github.com/sirupsen/logrus/hooks/syslog
+# github.com/spf13/afero v1.5.1
+github.com/spf13/afero
+github.com/spf13/afero/mem
 # github.com/square/go-jose v2.4.1+incompatible
 github.com/square/go-jose
 # github.com/stretchr/testify v1.6.1
@@ -480,10 +483,21 @@ golang.org/x/sys/internal/unsafeheader
 >>>>>>> implement graphql config adapter
 golang.org/x/sys/unix
 golang.org/x/sys/windows
+<<<<<<< master
 # golang.org/x/text v0.3.2
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
 golang.org/x/text/encoding/htmlindex
+=======
+golang.org/x/sys/internal/unsafeheader
+# golang.org/x/text v0.3.3
+golang.org/x/text/transform
+golang.org/x/text/unicode/norm
+golang.org/x/text/encoding
+golang.org/x/text/encoding/charmap
+golang.org/x/text/encoding/htmlindex
+golang.org/x/text/encoding/internal/identifier
+>>>>>>> add semantic api definition validation to api
 golang.org/x/text/encoding/internal
 golang.org/x/text/encoding/internal/identifier
 golang.org/x/text/encoding/japanese
@@ -500,7 +514,15 @@ golang.org/x/text/runes
 golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
+<<<<<<< master
 golang.org/x/text/unicode/norm
+=======
+golang.org/x/text/internal/utf8internal
+golang.org/x/text/runes
+golang.org/x/text/internal/language
+golang.org/x/text/internal/language/compact
+golang.org/x/text/internal/tag
+>>>>>>> add semantic api definition validation to api
 # golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 golang.org/x/time/rate
 # golang.org/x/tools v0.0.0-20200414032229-332987a829c3
