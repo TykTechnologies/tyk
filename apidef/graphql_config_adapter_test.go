@@ -106,8 +106,8 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 						},
 						Custom: graphql_datasource.ConfigJson(graphql_datasource.Configuration{
 							Fetch: graphql_datasource.FetchConfiguration{
-								URL:        "https://graphql.example.com",
-								HttpMethod: "POST",
+								URL:    "https://graphql.example.com",
+								Method: "POST",
 							},
 						}),
 					},
@@ -179,8 +179,11 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 						},
 						Custom: graphql_datasource.ConfigJson(graphql_datasource.Configuration{
 							Fetch: graphql_datasource.FetchConfiguration{
-								URL:        "https://graphql.example.com",
-								HttpMethod: "POST",
+								URL:    "https://graphql.example.com",
+								Method: "POST",
+								Header: map[string][]string{
+									"Auth": {"123"},
+								},
 							},
 						}),
 					},
@@ -287,7 +290,10 @@ const graphqlEngineV2ConfigJson = `{
 				],
 				"config": {
 					"url": "https://graphql.example.com",
-					"method": "POST"
+					"method": "POST",
+					"headers": {
+						"Auth": "123"
+					}
 				}
 			}
 		]

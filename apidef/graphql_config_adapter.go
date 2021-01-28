@@ -123,8 +123,9 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 
 			planDataSource.Custom = graphql_datasource.ConfigJson(graphql_datasource.Configuration{
 				Fetch: graphql_datasource.FetchConfiguration{
-					URL:        graphqlConfig.URL,
-					HttpMethod: graphqlConfig.Method,
+					URL:    graphqlConfig.URL,
+					Method: graphqlConfig.Method,
+					Header: g.convertHttpHeadersToEngineV2Headers(graphqlConfig.Headers),
 				},
 			})
 		}
