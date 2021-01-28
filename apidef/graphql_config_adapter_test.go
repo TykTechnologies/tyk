@@ -80,6 +80,17 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 							Fetch: rest_datasource.FetchConfiguration{
 								URL:    "https://rest.example.com",
 								Method: "POST",
+								Header: map[string][]string{
+									"Authorization": {"123"},
+									"X-Custom":      {"A, B"},
+								},
+								Body: "body",
+								Query: []rest_datasource.QueryConfiguration{
+									{
+										Name:  "q",
+										Value: "val",
+									},
+								},
 							},
 						}),
 					},
@@ -150,16 +161,16 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 						RootNodes: []plan.TypeField{
 							{
 								TypeName:   "Query",
-								FieldNames: []string{"multiRoot1","multiRoot2"},
+								FieldNames: []string{"multiRoot1", "multiRoot2"},
 							},
 						},
 						ChildNodes: []plan.TypeField{
 							{
-								TypeName: "MultiRoot1",
+								TypeName:   "MultiRoot1",
 								FieldNames: []string{"id"},
 							},
 							{
-								TypeName: "MultiRoot2",
+								TypeName:   "MultiRoot2",
 								FieldNames: []string{"name"},
 							},
 						},
@@ -217,9 +228,14 @@ const graphqlEngineV2ConfigJson = `{
 				"config": {
 					"url": "https://rest.example.com",
 					"method": "POST",
-					"header": {},
-					"query": [],
-					"body": ""
+					"headers": {
+						"Authorization": "123",
+						"X-Custom": "A, B"
+					},
+					"query": {
+						"q": "val"
+					},
+					"body": "body"
 				}
 			},
 			{
@@ -243,8 +259,8 @@ const graphqlEngineV2ConfigJson = `{
 				"config": {
 					"url": "https://rest.example.com",
 					"method": "POST",
-					"header": {},
-					"query": [],
+					"headers": {},
+					"query": {},
 					"body": ""
 				}
 			},
@@ -258,8 +274,8 @@ const graphqlEngineV2ConfigJson = `{
 				"config": {
 					"url": "https://rest.example.com",
 					"method": "POST",
-					"header": {},
-					"query": [],
+					"headers": {},
+					"query": {},
 					"body": ""
 				}
 			},

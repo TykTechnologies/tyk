@@ -101,6 +101,9 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 				Fetch: rest_datasource.FetchConfiguration{
 					URL:    restConfig.URL,
 					Method: restConfig.Method,
+					Body:   restConfig.Body,
+					Query:  g.convertURLQueriesToEngineV2Queries(restConfig.Query),
+					Header: g.convertHttpHeadersToEngineV2Headers(restConfig.Headers),
 				},
 			})
 
@@ -135,6 +138,37 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 
 func (g *GraphQLConfigAdapter) SetHttpClient(httpClient *http.Client) {
 	g.httpClient = httpClient
+}
+
+func (g *GraphQLConfigAdapter) convertURLQueriesToEngineV2Queries(apiDefQueries map[string]string) []rest_datasource.QueryConfiguration {
+	if len(apiDefQueries) == 0 {
+		return nil
+	}
+
+	var engineV2Queries []rest_datasource.QueryConfiguration
+	for apiDefQueryName, apiDefQueryValue := range apiDefQueries {
+		engineV2Query := rest_datasource.QueryConfiguration{
+			Name:  apiDefQueryName,
+			Value: apiDefQueryValue,
+		}
+
+		engineV2Queries = append(engineV2Queries, engineV2Query)
+	}
+
+	return engineV2Queries
+}
+
+func (g *GraphQLConfigAdapter) convertHttpHeadersToEngineV2Headers(apiDefHeaders map[string]string) http.Header {
+	if len(apiDefHeaders) == 0 {
+		return nil
+	}
+
+	engineV2Headers := make(http.Header)
+	for apiDefHeaderKey, apiDefHeaderValue := range apiDefHeaders {
+		engineV2Headers[apiDefHeaderKey] = []string{apiDefHeaderValue}
+	}
+
+	return engineV2Headers
 }
 
 func (g *GraphQLConfigAdapter) determineChildNodes(planDataSources *[]plan.DataSourceConfiguration) error {
