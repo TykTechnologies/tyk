@@ -22,7 +22,7 @@ type NodeResponseOK struct {
 }
 
 type DashboardServiceSender interface {
-	Init() error
+	Init(config config.Config) error
 	Register() error
 	DeRegister() error
 	StartBeating() error
@@ -86,13 +86,13 @@ func reLogin() {
 	reloadURLStructure(nil)
 }
 
-func (h *HTTPDashboardHandler) Init() error {
-	h.RegistrationEndpoint = buildConnStr("/register/node")
-	h.DeRegistrationEndpoint = buildConnStr("/system/node")
-	h.HeartBeatEndpoint = buildConnStr("/register/ping")
-	h.KeyQuotaTriggerEndpoint = buildConnStr("/system/key/quota_trigger")
+func (h *HTTPDashboardHandler) Init(conf config.Config) error {
+	h.RegistrationEndpoint = buildConnStr("/register/node", conf)
+	h.DeRegistrationEndpoint = buildConnStr("/system/node", conf)
+	h.HeartBeatEndpoint = buildConnStr("/register/ping", conf)
+	h.KeyQuotaTriggerEndpoint = buildConnStr("/system/key/quota_trigger", conf)
 
-	if h.Secret = config.Global().NodeSecret; h.Secret == "" {
+	if h.Secret = conf.NodeSecret; h.Secret == "" {
 		dashLog.Fatal("Node secret is not set, required for dashboard connection")
 	}
 	return nil

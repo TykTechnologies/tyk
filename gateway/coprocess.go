@@ -231,8 +231,8 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 }
 
 // CoProcessInit creates a new CoProcessDispatcher, it will be called when Tyk starts.
-func CoProcessInit() {
-	if !config.Global().CoProcessOptions.EnableCoProcess {
+func (gw *Gateway) CoProcessInit() {
+	if !gw.GetConfig().CoProcessOptions.EnableCoProcess {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
 		}).Info("Rich plugins are disabled")
@@ -240,7 +240,7 @@ func CoProcessInit() {
 	}
 
 	// Load gRPC dispatcher:
-	if config.Global().CoProcessOptions.CoProcessGRPCServer != "" {
+	if gw.GetConfig().CoProcessOptions.CoProcessGRPCServer != "" {
 		var err error
 		loadedDrivers[apidef.GrpcDriver], err = NewGRPCDispatcher()
 		if err == nil {

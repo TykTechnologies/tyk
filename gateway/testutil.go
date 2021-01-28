@@ -221,7 +221,6 @@ func (r *ReloadMachinery) TickOk(t *testing.T) {
 
 func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf *config.Config)) int {
 	setTestMode(true)
-	globalGateway = NewGateway()
 	testServerRouter = testHttpHandler()
 	testServer := &http.Server{
 		Addr:           testHttpListen,
@@ -231,7 +230,9 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 		MaxHeaderBytes: 1 << 20,
 	}
 
-	globalConf := config.Global()
+	globalConf := config.Default
+	// ToDo: replace for get default conf
+	globalGateway = NewGateway(globalConf)
 	if err := config.WriteDefault("", &globalConf); err != nil {
 		panic(err)
 	}
@@ -285,7 +286,7 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 	CoProcessInit()
 	afterConfSetup(&globalConf)
 	defaultTestConfig = globalConf
-	config.SetGlobal(globalConf)
+	globalGateway.SetConfig(globalConf)
 	if err := emptyRedis(); err != nil {
 		panic(err)
 	}
@@ -313,20 +314,22 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 	go reloadQueueLoop(ctx, ReloadTestCase.OnQueued)
 	go reloadSimulation()
 	exitCode := m.Run()
-	os.RemoveAll(config.Global().AppPath)
+	os.RemoveAll(globalGateway.GetConfig().AppPath)
 	return exitCode
 }
 
 func ResetTestConfig() {
-	config.SetGlobal(defaultTestConfig)
+	globalGateway.SetConfig(defaultTestConfig)
 }
 
 func emptyRedis() error {
 	ctx := context.Background()
-	addr := config.Global().Storage.Host + ":" + strconv.Itoa(config.Global().Storage.Port)
+	//addr := config.Global().Storage.Host + ":" + strconv.Itoa(config.Global().Storage.Port)
+	gwConfig := globalGateway.GetConfig()
+	addr := gwConfig.Storage.Host + ":" + strconv.Itoa(gwConfig.Storage.Port)
 	c := redis.NewClient(&redis.Options{Addr: addr})
 	defer c.Close()
-	dbName := strconv.Itoa(config.Global().Storage.Database)
+	dbName := strconv.Itoa(gwConfig.Storage.Database)
 	if err := c.Do(ctx, "SELECT", dbName).Err(); err != nil {
 		return err
 	}
@@ -369,11 +372,12 @@ func RegisterBundle(name string, files map[string]string) string {
 }
 
 func RegisterJSFileMiddleware(apiid string, files map[string]string) {
-	os.MkdirAll(config.Global().MiddlewarePath+"/"+apiid+"/post", 0755)
-	os.MkdirAll(config.Global().MiddlewarePath+"/"+apiid+"/pre", 0755)
+	gwConfig := globalGateway.GetConfig()
+	os.MkdirAll(gwConfig.MiddlewarePath+"/"+apiid+"/post", 0755)
+	os.MkdirAll(gwConfig.MiddlewarePath+"/"+apiid+"/pre", 0755)
 
 	for file, content := range files {
-		ioutil.WriteFile(config.Global().MiddlewarePath+"/"+apiid+"/"+file, []byte(content), 0755)
+		ioutil.WriteFile(gwConfig.MiddlewarePath+"/"+apiid+"/"+file, []byte(content), 0755)
 	}
 }
 
@@ -403,11 +407,11 @@ func mainRouter() *mux.Router {
 }
 
 func mainProxy() *proxy {
-	return globalGateway.DefaultProxyMux.getProxy(config.Global().ListenPort)
+	return globalGateway.DefaultProxyMux.getProxy(globalGateway.GetConfig().ListenPort, globalGateway.GetConfig())
 }
 
 func controlProxy() *proxy {
-	p := globalGateway.DefaultProxyMux.getProxy(config.Global().ControlAPIPort)
+	p := globalGateway.DefaultProxyMux.getProxy(globalGateway.GetConfig().ControlAPIPort, globalGateway.GetConfig())
 	if p != nil {
 		return p
 	}
@@ -415,7 +419,7 @@ func controlProxy() *proxy {
 }
 
 func EnablePort(port int, protocol string) {
-	c := config.Global()
+	c := globalGateway.GetConfig()
 	if c.PortWhiteList == nil {
 		c.PortWhiteList = map[string]config.PortWhiteList{
 			protocol: {
@@ -433,17 +437,18 @@ func EnablePort(port int, protocol string) {
 		}
 		c.PortWhiteList[protocol] = m
 	}
-	config.SetGlobal(c)
+	globalGateway.SetConfig(c)
 }
 
 func getMainRouter(m *proxyMux) *mux.Router {
 	var protocol string
-	if config.Global().HttpServerOptions.UseSSL {
+	gwConfig := globalGateway.GetConfig()
+	if gwConfig.HttpServerOptions.UseSSL {
 		protocol = "https"
 	} else {
 		protocol = "http"
 	}
-	return m.router(config.Global().ListenPort, protocol)
+	return m.router(gwConfig.ListenPort, protocol)
 }
 
 type TestHttpResponse struct {
@@ -664,7 +669,7 @@ const jwkTestJsonLegacy = `{
 
 func withAuth(r *http.Request) *http.Request {
 	// This is the default config secret
-	r.Header.Set("x-tyk-authorization", config.Global().Secret)
+	r.Header.Set("x-tyk-authorization", globalGateway.GetConfig().Secret)
 	return r
 }
 
@@ -679,7 +684,7 @@ func CreateSession(sGen ...func(s *user.SessionState)) string {
 		key = generateToken("default", session.Certificate)
 	}
 
-	GlobalSessionManager.UpdateSession(storage.HashKey(key), session, 60, config.Global().HashKeys)
+	GlobalSessionManager.UpdateSession(storage.HashKey(key), session, 60, globalGateway.GetConfig().HashKeys)
 	return key
 }
 
@@ -843,12 +848,12 @@ type TestConfig struct {
 }
 
 type Test struct {
-	URL string
-
+	URL          string
+	gateway      Gateway
 	testRunner   *test.HTTPTestRunner
 	GlobalConfig config.Config
 	config       TestConfig
-	cacnel       func()
+	cancel       func()
 	Gw           *Gateway
 }
 
@@ -857,57 +862,58 @@ type SlaveDataCenter struct {
 	Redis        config.StorageOptionsConf
 }
 
-func (s *Test) Start(slavedClusterConfig *SlaveDataCenter) {
+// ToDo: better receive a config generator function
+func (s *Test) Start(slavedClusterConfig *SlaveDataCenter) Gateway {
 	l, _ := net.Listen("tcp", "127.0.0.1:0")
 	_, port, _ := net.SplitHostPort(l.Addr().String())
 	l.Close()
-	globalConf := config.Global()
-	globalConf.ListenPort, _ = strconv.Atoi(port)
-	gw := NewGateway()
+	gwConfig := config.Default
+	gwConfig.ListenPort, _ = strconv.Atoi(port)
+
+	// ToDo: replace with get default config
+	gw := NewGateway(gwConfig)
 	s.Gw = &gw
-	s.Gw.Port = globalConf.ListenPort
 
 	if s.config.sepatateControlAPI {
 		l, _ := net.Listen("tcp", "127.0.0.1:0")
-
 		_, port, _ = net.SplitHostPort(l.Addr().String())
 		l.Close()
-		globalConf.ControlAPIPort, _ = strconv.Atoi(port)
+		gwConfig.ControlAPIPort, _ = strconv.Atoi(port)
 	}
 
 	if slavedClusterConfig != nil {
-		globalConf.SlaveOptions = slavedClusterConfig.SlaveOptions
+		gwConfig.SlaveOptions = slavedClusterConfig.SlaveOptions
 		// policies source
-		globalConf.Policies.PolicySource = "rpc"
-		globalConf.Policies.PolicyRecordName = "tyk_policies"
+		gwConfig.Policies.PolicySource = "rpc"
+		gwConfig.Policies.PolicyRecordName = "tyk_policies"
 
-		globalConf.UseDBAppConfigs = false
+		gwConfig.UseDBAppConfigs = false
 		// Override redis
-		globalConf.Storage = slavedClusterConfig.Redis
+		gwConfig.Storage = slavedClusterConfig.Redis
 	}
 
-	globalConf.CoProcessOptions = s.config.CoprocessConfig
-	config.SetGlobal(globalConf)
+	gwConfig.CoProcessOptions = s.config.CoprocessConfig
+	gw.SetConfig(gwConfig)
 
 	setupPortsWhitelist()
 
 	gw.startServer()
 	ctx, cancel := context.WithCancel(context.Background())
-	s.cacnel = cancel
+	s.cancel = cancel
 	setupGlobals(ctx)
 	// Set up a default org manager so we can traverse non-live paths
-	if !config.Global().SupressDefaultOrgStore {
+	if !gwConfig.SupressDefaultOrgStore {
 		DefaultOrgStore.Init(getGlobalStorageHandler("orgkey.", false))
 		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
 	}
 
-	s.GlobalConfig = globalConf
+	s.GlobalConfig = gwConfig
 
 	scheme := "http://"
 	if s.GlobalConfig.HttpServerOptions.UseSSL {
 		scheme = "https://"
 	}
-	s.URL = scheme + s.Gw.DefaultProxyMux.getProxy(config.Global().ListenPort).listener.Addr().String()
+	s.URL = scheme + s.Gw.DefaultProxyMux.getProxy(gwConfig.ListenPort, gw.GetConfig()).listener.Addr().String()
 
 	s.testRunner = &test.HTTPTestRunner{
 		RequestBuilder: func(tc *test.TestCase) (*http.Request, error) {
@@ -933,6 +939,8 @@ func (s *Test) Start(slavedClusterConfig *SlaveDataCenter) {
 		},
 		Do: test.HttpServerRunner(),
 	}
+
+	return gw
 }
 
 func (s *Test) Do(tc test.TestCase) (*http.Response, error) {
@@ -941,14 +949,14 @@ func (s *Test) Do(tc test.TestCase) (*http.Response, error) {
 }
 
 func (s *Test) Close() {
-	if s.cacnel != nil {
-		s.cacnel()
+	if s.cancel != nil {
+		s.cancel()
 	}
 	globalGateway.DefaultProxyMux.swap(&proxyMux{})
 	if s.config.sepatateControlAPI {
-		globalConf := config.Global()
-		globalConf.ControlAPIPort = 0
-		config.SetGlobal(globalConf)
+		gwConfig := globalGateway.GetConfig()
+		gwConfig.ControlAPIPort = 0
+		globalGateway.SetConfig(gwConfig)
 	}
 }
 
@@ -1045,7 +1053,7 @@ func (s *Test) GetApiById(apiId string) *APISpec {
 	return getApiSpec(apiId)
 }
 
-func (s *Test) StopRPCClient(){
+func (s *Test) StopRPCClient() {
 	rpc.Reset()
 }
 
@@ -1218,16 +1226,16 @@ func BuildAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 	return specs
 }
 
-func LoadAPI(specs ...*APISpec) (out []*APISpec) {
-	globalConf := config.Global()
-	oldPath := globalConf.AppPath
-	globalConf.AppPath, _ = ioutil.TempDir("", "apps")
-	config.SetGlobal(globalConf)
+func (gateway *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
+	gwConf := gateway.GetConfig()
+	oldPath := gwConf.AppPath
+	gwConf.AppPath, _ = ioutil.TempDir("", "apps")
+	gateway.SetConfig(gwConf)
 	defer func() {
-		globalConf := config.Global()
+		globalConf := gateway.GetConfig()
 		os.RemoveAll(globalConf.AppPath)
 		globalConf.AppPath = oldPath
-		config.SetGlobal(globalConf)
+		gateway.SetConfig(globalConf)
 	}()
 
 	for i, spec := range specs {
@@ -1235,7 +1243,7 @@ func LoadAPI(specs ...*APISpec) (out []*APISpec) {
 		if err != nil {
 			panic(err)
 		}
-		specFilePath := filepath.Join(config.Global().AppPath, spec.APIID+strconv.Itoa(i)+".json")
+		specFilePath := filepath.Join(gwConf.AppPath, spec.APIID+strconv.Itoa(i)+".json")
 		if err := ioutil.WriteFile(specFilePath, specBytes, 0644); err != nil {
 			panic(err)
 		}
@@ -1250,8 +1258,8 @@ func LoadAPI(specs ...*APISpec) (out []*APISpec) {
 	return out
 }
 
-func BuildAndLoadAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
-	return LoadAPI(BuildAPI(apiGens...)...)
+func (gateway *Gateway) BuildAndLoadAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
+	return gateway.LoadAPI(BuildAPI(apiGens...)...)
 }
 
 func CloneAPI(a *APISpec) *APISpec {

@@ -459,6 +459,7 @@ func FuncClientSingleton(funcName string, request interface{}) (result interface
 }
 
 var rpcConnectionsPool []net.Conn
+
 func onConnectFunc(conn net.Conn) (net.Conn, string, error) {
 	values.clientIsConnected.Store(true)
 	remoteAddr := conn.RemoteAddr().String()
@@ -467,12 +468,12 @@ func onConnectFunc(conn net.Conn) (net.Conn, string, error) {
 	return conn, remoteAddr, nil
 }
 
-func CloseConnections(){
-	for k, v := range rpcConnectionsPool{
+func CloseConnections() {
+	for k, v := range rpcConnectionsPool {
 		err := v.Close()
-		if err != nil{
+		if err != nil {
 			Log.WithError(err).Error("closing connection")
-		}else{
+		} else {
 			rpcConnectionsPool = append(rpcConnectionsPool[:k], rpcConnectionsPool[k+1:]...)
 		}
 	}

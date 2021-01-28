@@ -14,7 +14,7 @@ func TestTraceHttpRequest_toRequest(t *testing.T) {
 	header.Add("key", "value")
 	tr := &traceHttpRequest{Path: "", Method: http.MethodPost, Body: body, Headers: header}
 
-	request, err := tr.toRequest()
+	request, err := tr.toRequest(globalGateway.GetConfig().IgnoreCanonicalMIMEHeaderKey)
 	bodyInBytes, _ := ioutil.ReadAll(request.Body)
 
 	assert.NoError(t, err)

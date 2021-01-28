@@ -269,8 +269,8 @@ func getBundlePaths() []string {
 }
 
 // NewPythonDispatcher wraps all the actions needed for this CP.
-func NewPythonDispatcher() (dispatcher coprocess.Dispatcher, err error) {
-	workDir := config.Global().CoProcessOptions.PythonPathPrefix
+func NewPythonDispatcher() (dispatcher coprocess.Dispatcher, err error, conf config.Config) {
+	workDir := conf.CoProcessOptions.PythonPathPrefix
 	if workDir == "" {
 		tykBin, _ := os.Executable()
 		workDir = filepath.Dir(tykBin)
@@ -281,7 +281,7 @@ func NewPythonDispatcher() (dispatcher coprocess.Dispatcher, err error) {
 	dispatcherPath := filepath.Join(workDir, "coprocess", "python")
 	tykPath := filepath.Join(dispatcherPath, "tyk")
 	protoPath := filepath.Join(workDir, "coprocess", "python", "proto")
-	bundleRootPath := filepath.Join(config.Global().MiddlewarePath, "bundles")
+	bundleRootPath := filepath.Join(conf.MiddlewarePath, "bundles")
 
 	paths := []string{dispatcherPath, tykPath, protoPath, bundleRootPath}
 

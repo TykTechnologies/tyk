@@ -195,7 +195,7 @@ func checkAndApplyTrialPeriod(keyName string, newSession *user.SessionState, isH
 	}
 }
 
-func applyPoliciesAndSave(keyName string, session *user.SessionState, spec *APISpec, isHashed bool) error {
+func (gw *Gateway) applyPoliciesAndSave(keyName string, session *user.SessionState, spec *APISpec, isHashed bool) error {
 	// use basic middleware to apply policies to key/session (it also saves it)
 	mw := BaseMiddleware{
 		Spec: spec,
@@ -204,7 +204,7 @@ func applyPoliciesAndSave(keyName string, session *user.SessionState, spec *APIS
 		return err
 	}
 
-	lifetime := session.Lifetime(spec.SessionLifetime)
+	lifetime := session.Lifetime(spec.SessionLifetime, gw.GetConfig().ForceGlobalSessionLifetime,gw.GetConfig().GlobalSessionLifetime)
 	if err := GlobalSessionManager.UpdateSession(keyName, session, lifetime, isHashed); err != nil {
 		return err
 	}
@@ -222,7 +222,7 @@ func resetAPILimits(accessRights map[string]user.AccessDefinition) {
 	}
 }
 
-func doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool, isHashed bool) error {
+func(gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool, isHashed bool) error {
 	// field last_updated plays an important role in in-mem rate limiter
 	// so update last_updated to current timestamp only if suppress_reset wasn't set to 1
 	if !dontReset {
@@ -259,14 +259,14 @@ func doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool
 				}
 
 				// apply polices (if any) and save key
-				if err := applyPoliciesAndSave(keyName, newSession, apiSpec, isHashed); err != nil {
+				if err := gw.applyPoliciesAndSave(keyName, newSession, apiSpec, isHashed); err != nil {
 					return err
 				}
 			}
 		}
 	} else {
 		// nothing defined, add key to ALL
-		if !config.Global().AllowMasterKeys {
+		if !gw.GetConfig().AllowMasterKeys {
 			log.Error("Master keys disallowed in configuration, key not added.")
 			return errors.New("Master keys not allowed")
 		}
@@ -281,7 +281,7 @@ func doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool
 			checkAndApplyTrialPeriod(keyName, newSession, isHashed)
 
 			// apply polices (if any) and save key
-			if err := applyPoliciesAndSave(keyName, newSession, spec, isHashed); err != nil {
+			if err := gw.applyPoliciesAndSave(keyName, newSession, spec, isHashed); err != nil {
 				return err
 			}
 		}
@@ -318,7 +318,7 @@ func setSessionPassword(session *user.SessionState) {
 	session.BasicAuthData.Password = string(newPass)
 }
 
-func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interface{}, int) {
+func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interface{}, int) {
 	suppressReset := r.URL.Query().Get("suppress_reset") == "1"
 
 	// decode payload
@@ -408,7 +408,7 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 
 	if r.Method == http.MethodPost || storage.TokenOrg(keyName) != "" {
 		// use new key format if key gets created or updating key with new format
-		if err := doAddOrUpdate(keyName, newSession, suppressReset, isHashed); err != nil {
+		if err := gw.doAddOrUpdate(keyName, newSession, suppressReset, isHashed); err != nil {
 			return apiError("Failed to create key, ensure security settings are correct."), http.StatusInternalServerError
 		}
 	} else {
@@ -422,7 +422,7 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 			keyName = newFormatKey
 		}
 
-		if err := doAddOrUpdate(keyName, newSession, suppressReset, isHashed); err != nil {
+		if err := gw.doAddOrUpdate(keyName, newSession, suppressReset, isHashed); err != nil {
 			return apiError("Failed to create key, ensure security settings are correct."), http.StatusInternalServerError
 		}
 	}
@@ -457,7 +457,7 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 	return response, http.StatusOK
 }
 
-func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
+func (gw *Gateway) handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 	if byHash && !config.Global().HashKeys {
 		return apiError("Key requested by hash but key hashing is not enabled"), http.StatusBadRequest
 	}
@@ -564,7 +564,7 @@ type apiAllKeys struct {
 	APIKeys []string `json:"keys"`
 }
 
-func handleGetAllKeys(filter string) (interface{}, int) {
+func(gw *Gateway) handleGetAllKeys(filter string) (interface{}, int) {
 	sessions := GlobalSessionManager.Sessions(filter)
 	if filter != "" {
 		filterB64 := base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString([]byte(fmt.Sprintf(`{"org":"%s"`, filter)))
@@ -616,7 +616,7 @@ func handleAddKey(keyName, hashedName, sessionString, apiID string) {
 	}).Info("Updated hashed key in slave storage.")
 }
 
-func handleDeleteKey(keyName, apiID string, resetQuota bool) (interface{}, int) {
+func (gw *Gateway) handleDeleteKey(keyName, apiID string, resetQuota bool) (interface{}, int) {
 	orgID := ""
 	if spec := getApiSpec(apiID); spec != nil {
 		orgID = spec.OrgID
@@ -689,8 +689,8 @@ func handleDeleteKey(keyName, apiID string, resetQuota bool) (interface{}, int) 
 }
 
 // handleDeleteHashedKeyWithLogs is a wrapper for handleDeleteHashedKey with logs
-func handleDeleteHashedKeyWithLogs(keyName, apiID string, resetQuota bool) (interface{}, int) {
-	res, code := handleDeleteHashedKey(keyName, apiID, resetQuota)
+func (gw *Gateway) handleDeleteHashedKeyWithLogs(keyName, apiID string, resetQuota bool) (interface{}, int) {
+	res, code := gw.handleDeleteHashedKey(keyName, apiID, resetQuota)
 
 	if code != http.StatusOK {
 		log.WithFields(logrus.Fields{
@@ -709,7 +709,7 @@ func handleDeleteHashedKeyWithLogs(keyName, apiID string, resetQuota bool) (inte
 	return res, code
 }
 
-func handleDeleteHashedKey(keyName, apiID string, resetQuota bool) (interface{}, int) {
+func (gw *Gateway) handleDeleteHashedKey(keyName, apiID string, resetQuota bool) (interface{}, int) {
 	orgID := ""
 	if spec := getApiSpec(apiID); spec != nil {
 		orgID = spec.OrgID
@@ -760,7 +760,7 @@ func handleRemoveSortedSetRange(keyName, scoreFrom, scoreTo string) error {
 	return GlobalSessionManager.Store().RemoveSortedSetRange(keyName, scoreFrom, scoreTo)
 }
 
-func handleGetAPIList() (interface{}, int) {
+func (gw *Gateway) handleGetAPIList() (interface{}, int) {
 	apisMu.RLock()
 	defer apisMu.RUnlock()
 	apiIDList := make([]*apidef.APIDefinition, len(apisByID))
@@ -772,7 +772,7 @@ func handleGetAPIList() (interface{}, int) {
 	return apiIDList, http.StatusOK
 }
 
-func handleGetAPI(apiID string) (interface{}, int) {
+func (gw *Gateway) handleGetAPI(apiID string) (interface{}, int) {
 	if spec := getApiSpec(apiID); spec != nil {
 		return spec.APIDefinition, http.StatusOK
 	}
@@ -784,8 +784,8 @@ func handleGetAPI(apiID string) (interface{}, int) {
 	return apiError("API not found"), http.StatusNotFound
 }
 
-func handleAddOrUpdateApi(apiID string, r *http.Request) (interface{}, int) {
-	if config.Global().UseDBAppConfigs {
+func (gw *Gateway) handleAddOrUpdateApi(apiID string, r *http.Request) (interface{}, int) {
+	if gw.GetConfig().UseDBAppConfigs {
 		log.Error("Rejected new API Definition due to UseDBAppConfigs = true")
 		return apiError("Due to enabled use_db_app_configs, please use the Dashboard API"), http.StatusInternalServerError
 	}
@@ -802,7 +802,7 @@ func handleAddOrUpdateApi(apiID string, r *http.Request) (interface{}, int) {
 	}
 
 	// Create a filename
-	defFilePath := filepath.Join(config.Global().AppPath, newDef.APIID+".json")
+	defFilePath := filepath.Join(gw.GetConfig().AppPath, newDef.APIID+".json")
 
 	// If it exists, delete it
 	if _, err := os.Stat(defFilePath); err == nil {
@@ -836,7 +836,7 @@ func handleAddOrUpdateApi(apiID string, r *http.Request) (interface{}, int) {
 	return response, http.StatusOK
 }
 
-func handleDeleteAPI(apiID string) (interface{}, int) {
+func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 	// Generate a filename
 	defFilePath := filepath.Join(config.Global().AppPath, apiID+".json")
 
@@ -857,7 +857,7 @@ func handleDeleteAPI(apiID string) (interface{}, int) {
 	return response, http.StatusOK
 }
 
-func apiHandler(w http.ResponseWriter, r *http.Request) {
+func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
 
 	var obj interface{}
@@ -867,25 +867,25 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 	case "GET":
 		if apiID != "" {
 			log.Debug("Requesting API definition for", apiID)
-			obj, code = handleGetAPI(apiID)
+			obj, code = gw.handleGetAPI(apiID)
 		} else {
 			log.Debug("Requesting API list")
-			obj, code = handleGetAPIList()
+			obj, code = gw.handleGetAPIList()
 		}
 	case "POST":
 		log.Debug("Creating new definition file")
-		obj, code = handleAddOrUpdateApi(apiID, r)
+		obj, code = gw.handleAddOrUpdateApi(apiID, r)
 	case "PUT":
 		if apiID != "" {
 			log.Debug("Updating existing API: ", apiID)
-			obj, code = handleAddOrUpdateApi(apiID, r)
+			obj, code = gw.handleAddOrUpdateApi(apiID, r)
 		} else {
 			obj, code = apiError("Must specify an apiID to update"), http.StatusBadRequest
 		}
 	case "DELETE":
 		if apiID != "" {
 			log.Debug("Deleting API definition for: ", apiID)
-			obj, code = handleDeleteAPI(apiID)
+			obj, code = gw.handleDeleteAPI(apiID)
 		} else {
 			obj, code = apiError("Must specify an apiID to delete"), http.StatusBadRequest
 		}
@@ -894,7 +894,7 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, code, obj)
 }
 
-func keyHandler(w http.ResponseWriter, r *http.Request) {
+func (gw *Gateway) keyHandler(w http.ResponseWriter, r *http.Request) {
 	keyName := mux.Vars(r)["keyName"]
 	apiID := r.URL.Query().Get("api_id")
 	isHashed := r.URL.Query().Get("hashed") != ""
@@ -909,30 +909,31 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 
 	var obj interface{}
 	var code int
-	hashKeyFunction := config.Global().HashKeyFunction
+	gwConfig := gw.GetConfig()
+	hashKeyFunction := gwConfig.HashKeyFunction
 
 	switch r.Method {
 	case http.MethodPost:
-		obj, code = handleAddOrUpdate(keyName, r, isHashed)
+		obj, code = gw.handleAddOrUpdate(keyName, r, isHashed)
 	case http.MethodPut:
-		obj, code = handleAddOrUpdate(keyName, r, isHashed)
+		obj, code = gw.handleAddOrUpdate(keyName, r, isHashed)
 		if code != http.StatusOK && hashKeyFunction != "" {
 			// try to use legacy key format
-			obj, code = handleAddOrUpdate(origKeyName, r, isHashed)
+			obj, code = gw.handleAddOrUpdate(origKeyName, r, isHashed)
 		}
 	case http.MethodGet:
 		if keyName != "" {
 			// Return single key detail
-			obj, code = handleGetDetail(keyName, apiID, isHashed)
+			obj, code = gw.handleGetDetail(keyName, apiID, isHashed)
 			if code != http.StatusOK && hashKeyFunction != "" {
 				// try to use legacy key format
-				obj, code = handleGetDetail(origKeyName, apiID, isHashed)
+				obj, code = gw.handleGetDetail(origKeyName, apiID, isHashed)
 			}
 		} else {
 			// Return list of keys
-			if config.Global().HashKeys {
+			if gwConfig.HashKeys {
 				// get all keys is disabled by default
-				if !config.Global().EnableHashedKeysListing {
+				if !gwConfig.EnableHashedKeysListing {
 					doJSONWrite(
 						w,
 						http.StatusNotFound,
@@ -942,26 +943,26 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 				}
 
 				// we don't use filter for hashed keys
-				obj, code = handleGetAllKeys("")
+				obj, code = gw.handleGetAllKeys("")
 			} else {
 				filter := r.URL.Query().Get("filter")
-				obj, code = handleGetAllKeys(filter)
+				obj, code = gw.handleGetAllKeys(filter)
 			}
 		}
 
 	case http.MethodDelete:
 		// Remove a key
 		if !isHashed {
-			obj, code = handleDeleteKey(keyName, apiID, true)
+			obj, code = gw.handleDeleteKey(keyName, apiID, true)
 		} else {
-			obj, code = handleDeleteHashedKeyWithLogs(keyName, apiID, true)
+			obj, code = gw.handleDeleteHashedKeyWithLogs(keyName, apiID, true)
 		}
 		if code != http.StatusOK && hashKeyFunction != "" {
 			// try to use legacy key format
 			if !isHashed {
-				obj, code = handleDeleteKey(origKeyName, apiID, true)
+				obj, code = gw.handleDeleteKey(origKeyName, apiID, true)
 			} else {
-				obj, code = handleDeleteHashedKeyWithLogs(origKeyName, apiID, true)
+				obj, code = gw.handleDeleteHashedKeyWithLogs(origKeyName, apiID, true)
 			}
 		}
 	}
@@ -1043,7 +1044,7 @@ func handleUpdateHashedKey(keyName string, applyPolicies []string) (interface{},
 	return statusObj, http.StatusOK
 }
 
-func orgHandler(w http.ResponseWriter, r *http.Request) {
+func (gw *Gateway) orgHandler(w http.ResponseWriter, r *http.Request) {
 	orgID := mux.Vars(r)["keyName"]
 	filter := r.URL.Query().Get("filter")
 	var obj interface{}
@@ -1051,26 +1052,26 @@ func orgHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case "POST", "PUT":
-		obj, code = handleOrgAddOrUpdate(orgID, r)
+		obj, code = gw.handleOrgAddOrUpdate(orgID, r)
 
 	case "GET":
 		if orgID != "" {
 			// Return single org detail
-			obj, code = handleGetOrgDetail(orgID)
+			obj, code = gw.handleGetOrgDetail(orgID)
 		} else {
 			// Return list of keys
-			obj, code = handleGetAllOrgKeys(filter)
+			obj, code = gw.handleGetAllOrgKeys(filter)
 		}
 
 	case "DELETE":
 		// Remove a key
-		obj, code = handleDeleteOrgKey(orgID)
+		obj, code = gw.handleDeleteOrgKey(orgID)
 	}
 
 	doJSONWrite(w, code, obj)
 }
 
-func handleOrgAddOrUpdate(orgID string, r *http.Request) (interface{}, int) {
+func (gw *Gateway) handleOrgAddOrUpdate(orgID string, r *http.Request) (interface{}, int) {
 	newSession := user.NewSessionState()
 
 	if err := json.NewDecoder(r.Body).Decode(newSession); err != nil {
@@ -1084,7 +1085,7 @@ func handleOrgAddOrUpdate(orgID string, r *http.Request) (interface{}, int) {
 
 	if spec == nil {
 		log.Warning("Couldn't find org session store in active API list")
-		if config.Global().SupressDefaultOrgStore {
+		if gw.GetConfig().SupressDefaultOrgStore {
 			return apiError("No such organisation found in Active API list"), http.StatusNotFound
 		}
 		sessionManager = &DefaultOrgStore
@@ -1133,7 +1134,7 @@ func handleOrgAddOrUpdate(orgID string, r *http.Request) (interface{}, int) {
 	return response, http.StatusOK
 }
 
-func handleGetOrgDetail(orgID string) (interface{}, int) {
+func (gw *Gateway) handleGetOrgDetail(orgID string) (interface{}, int) {
 	spec := getSpecForOrg(orgID)
 	if spec == nil {
 		return apiError("Org not found"), http.StatusNotFound
@@ -1157,7 +1158,7 @@ func handleGetOrgDetail(orgID string) (interface{}, int) {
 	return session.Clone(), http.StatusOK
 }
 
-func handleGetAllOrgKeys(filter string) (interface{}, int) {
+func (gw *Gateway) handleGetAllOrgKeys(filter string) (interface{}, int) {
 	spec := getSpecForOrg("")
 	if spec == nil {
 		return apiError("ORG not found"), http.StatusNotFound
@@ -1174,7 +1175,7 @@ func handleGetAllOrgKeys(filter string) (interface{}, int) {
 	return sessionsObj, http.StatusOK
 }
 
-func handleDeleteOrgKey(orgID string) (interface{}, int) {
+func (gw *Gateway) handleDeleteOrgKey(orgID string) (interface{}, int) {
 	spec := getSpecForOrg(orgID)
 	if spec == nil {
 		log.WithFields(logrus.Fields{
@@ -1253,7 +1254,7 @@ func resetHandler(fn func()) http.HandlerFunc {
 	}
 }
 
-func createKeyHandler(w http.ResponseWriter, r *http.Request) {
+func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	newSession := user.NewSessionState()
 	if err := json.NewDecoder(r.Body).Decode(newSession); err != nil {
 		log.WithFields(logrus.Fields{
@@ -1300,7 +1301,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
 				// apply polices (if any) and save key
-				if err := applyPoliciesAndSave(newKey, newSession, apiSpec, false); err != nil {
+				if err := gw.applyPoliciesAndSave(newKey, newSession, apiSpec, false); err != nil {
 					doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - "+err.Error()))
 					return
 				}
@@ -1317,7 +1318,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	} else {
-		if config.Global().AllowMasterKeys {
+		if gw.GetConfig().AllowMasterKeys {
 			// nothing defined, add key to ALL
 			log.WithFields(logrus.Fields{
 				"prefix":      "api",
@@ -1340,7 +1341,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
 				// apply polices (if any) and save key
-				if err := applyPoliciesAndSave(newKey, newSession, spec, false); err != nil {
+				if err := gw.applyPoliciesAndSave(newKey, newSession, spec, false); err != nil {
 					doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - "+err.Error()))
 					return
 				}
@@ -1371,7 +1372,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// add key hash to reply
-	if config.Global().HashKeys {
+	if gw.GetConfig().HashKeys {
 		obj.KeyHash = storage.HashKey(newKey)
 	}
 
@@ -2064,8 +2065,8 @@ func getApisForOauthClientId(oauthClientId string, orgId string) []string {
 	return apis
 }
 
-func healthCheckhandler(w http.ResponseWriter, r *http.Request) {
-	if !config.Global().HealthCheck.EnableHealthChecks {
+func (gw *Gateway) healthCheckhandler(w http.ResponseWriter, r *http.Request) {
+	if !gw.GetConfig().HealthCheck.EnableHealthChecks {
 		doJSONWrite(w, http.StatusBadRequest, apiError("Health checks are not enabled for this node"))
 		return
 	}

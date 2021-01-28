@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/TykTechnologies/again"
@@ -155,52 +156,53 @@ var redisPurgeOnce sync.Once
 var rpcPurgeOnce sync.Once
 
 // Create all globals and init connection handlers
-func setupGlobals(ctx context.Context) {
+func (gw *Gateway) setupGlobals(ctx context.Context) {
 	reloadMu.Lock()
 	defer reloadMu.Unlock()
 
-	checkup.Run(config.Global())
+	gwConfig := gw.GetConfig()
+	checkup.Run(gwConfig)
 
-	dnsCacheManager = dnscache.NewDnsCacheManager(config.Global().DnsCache.MultipleIPsHandleStrategy)
-	if config.Global().DnsCache.Enabled {
+	dnsCacheManager = dnscache.NewDnsCacheManager(gwConfig.DnsCache.MultipleIPsHandleStrategy)
+	if gwConfig.DnsCache.Enabled {
 		dnsCacheManager.InitDNSCaching(
-			time.Duration(config.Global().DnsCache.TTL)*time.Second,
-			time.Duration(config.Global().DnsCache.CheckInterval)*time.Second)
+			time.Duration(gwConfig.DnsCache.TTL)*time.Second,
+			time.Duration(gwConfig.DnsCache.CheckInterval)*time.Second)
 	}
 
-	if config.Global().EnableAnalytics && config.Global().Storage.Type != "redis" {
+	if gwConfig.EnableAnalytics && gwConfig.Storage.Type != "redis" {
 		mainLog.Fatal("Analytics requires Redis Storage backend, please enable Redis in the tyk.conf file.")
 	}
 
 	// Initialise HostCheckerManager only if uptime tests are enabled.
-	if !config.Global().UptimeTests.Disable {
-		if config.Global().ManagementNode {
+	if !gwConfig.UptimeTests.Disable {
+		if gwConfig.ManagementNode {
 			mainLog.Warn("Running Uptime checks in a management node.")
 		}
 		healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:"}
 		InitHostCheckManager(ctx, &healthCheckStore)
 	}
 
-	initHealthCheck(ctx)
+	gw.initHealthCheck(ctx)
 
-	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
+	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: gwConfig.HashKeys}
 	GlobalSessionManager.Init(&redisStore)
 
 	versionStore := storage.RedisCluster{KeyPrefix: "version-check-"}
 	versionStore.Connect()
 	_ = versionStore.SetKey("gateway", VERSION, 0)
 
-	if config.Global().EnableAnalytics && analytics.Store == nil {
-		globalConf := config.Global()
-		globalConf.LoadIgnoredIPs()
-		config.SetGlobal(globalConf)
+	if gwConfig.EnableAnalytics && analytics.Store == nil {
+		Conf := gwConfig
+		Conf.LoadIgnoredIPs()
+		gw.SetConfig(Conf)
 		mainLog.Debug("Setting up analytics DB connection")
 
 		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-"}
 		analytics.Store = &analyticsStore
-		analytics.Init(globalConf)
+		analytics.Init(Conf)
 
-		if config.Global().AnalyticsConfig.Type == "rpc" {
+		if gw.GetConfig().AnalyticsConfig.Type == "rpc" {
 			mainLog.Debug("Using RPC cache purge")
 
 			rpcPurgeOnce.Do(func() {
@@ -216,10 +218,10 @@ func setupGlobals(ctx context.Context) {
 	}
 
 	// Load all the files that have the "error" prefix.
-	templatesDir := filepath.Join(config.Global().TemplatePath, "error*")
+	templatesDir := filepath.Join(gwConfig.TemplatePath, "error*")
 	templates = template.Must(template.ParseGlob(templatesDir))
 
-	CoProcessInit()
+	gw.CoProcessInit()
 
 	// Get the notifier ready
 	mainLog.Debug("Notifier will not work in hybrid mode")
@@ -227,47 +229,47 @@ func setupGlobals(ctx context.Context) {
 	mainNotifierStore.Connect()
 	MainNotifier = RedisNotifier{mainNotifierStore, RedisPubSubChannel}
 
-	if config.Global().Monitor.EnableTriggerMonitors {
+	if gwConfig.Monitor.EnableTriggerMonitors {
 		h := &WebHookHandler{}
-		if err := h.Init(config.Global().Monitor.Config); err != nil {
+		if err := h.Init(gwConfig.Monitor.Config); err != nil {
 			mainLog.Error("Failed to initialise monitor! ", err)
 		} else {
 			MonitoringHandler = h
 		}
 	}
 
-	if globalConfig := config.Global(); globalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
+	if conf := gw.GetConfig(); conf.AnalyticsConfig.NormaliseUrls.Enabled {
 		mainLog.Info("Setting up analytics normaliser")
-		globalConfig.AnalyticsConfig.NormaliseUrls.CompiledPatternSet = initNormalisationPatterns()
-		config.SetGlobal(globalConfig)
+		conf.AnalyticsConfig.NormaliseUrls.CompiledPatternSet = initNormalisationPatterns()
+		gw.SetConfig(conf)
 	}
 
-	certificateSecret := config.Global().Secret
-	if config.Global().Security.PrivateCertificateEncodingSecret != "" {
-		certificateSecret = config.Global().Security.PrivateCertificateEncodingSecret
+	certificateSecret := gw.GetConfig().Secret
+	if gw.GetConfig().Security.PrivateCertificateEncodingSecret != "" {
+		certificateSecret = gw.GetConfig().Security.PrivateCertificateEncodingSecret
 	}
 
 	CertificateManager = certs.NewCertificateManager(getGlobalStorageHandler("cert-", false), certificateSecret, log)
 
-	if config.Global().NewRelic.AppName != "" {
+	if gw.GetConfig().NewRelic.AppName != "" {
 		NewRelicApplication = SetupNewRelic()
 	}
 }
 
-func buildConnStr(resource string) string {
+func buildConnStr(resource string, conf config.Config) string {
 
-	if config.Global().DBAppConfOptions.ConnectionString == "" && config.Global().DisableDashboardZeroConf {
+	if conf.DBAppConfOptions.ConnectionString == "" && conf.DisableDashboardZeroConf {
 		mainLog.Fatal("Connection string is empty, failing.")
 	}
 
-	if !config.Global().DisableDashboardZeroConf && config.Global().DBAppConfOptions.ConnectionString == "" {
+	if !conf.DisableDashboardZeroConf && conf.DBAppConfOptions.ConnectionString == "" {
 		mainLog.Info("Waiting for zeroconf signal...")
-		for config.Global().DBAppConfOptions.ConnectionString == "" {
+		for conf.DBAppConfOptions.ConnectionString == "" {
 			time.Sleep(1 * time.Second)
 		}
 	}
 
-	return config.Global().DBAppConfOptions.ConnectionString + resource
+	return conf.DBAppConfOptions.ConnectionString + resource
 }
 
 func (gw *Gateway) syncAPISpecs() (int, error) {
@@ -275,9 +277,9 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 	apisMu.Lock()
 	defer apisMu.Unlock()
 	var s []*APISpec
-	if config.Global().UseDBAppConfigs {
-		connStr := buildConnStr("/system/apis")
-		tmpSpecs, err := loader.FromDashboardService(connStr, config.Global().NodeSecret)
+	if gw.GetConfig().UseDBAppConfigs {
+		connStr := buildConnStr("/system/apis", gw.GetConfig())
+		tmpSpecs, err := loader.FromDashboardService(connStr, gw.GetConfig().NodeSecret)
 		if err != nil {
 			log.Error("failed to load API specs: ", err)
 			return 0, err
@@ -286,29 +288,29 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 		s = tmpSpecs
 
 		mainLog.Debug("Downloading API Configurations from Dashboard Service")
-	} else if config.Global().SlaveOptions.UseRPC {
+	} else if gw.GetConfig().SlaveOptions.UseRPC {
 		mainLog.Debug("Using RPC Configuration")
 
 		var err error
-		s, err = loader.FromRPC(config.Global().SlaveOptions.RPCKey, *gw)
+		s, err = loader.FromRPC(gw.GetConfig().SlaveOptions.RPCKey, *gw)
 		if err != nil {
 			return 0, err
 		}
 	} else {
-		s = loader.FromDir(config.Global().AppPath)
+		s = loader.FromDir(gw.GetConfig().AppPath)
 	}
 
 	mainLog.Printf("Detected %v APIs", len(s))
 
-	if config.Global().AuthOverride.ForceAuthProvider {
+	if gw.GetConfig().AuthOverride.ForceAuthProvider {
 		for i := range s {
-			s[i].AuthProvider = config.Global().AuthOverride.AuthProvider
+			s[i].AuthProvider = gw.GetConfig().AuthOverride.AuthProvider
 		}
 	}
 
-	if config.Global().AuthOverride.ForceSessionProvider {
+	if gw.GetConfig().AuthOverride.ForceSessionProvider {
 		for i := range s {
-			s[i].SessionProvider = config.Global().AuthOverride.SessionProvider
+			s[i].SessionProvider = gw.GetConfig().AuthOverride.SessionProvider
 		}
 	}
 	var filter []*APISpec
@@ -326,32 +328,32 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 	return len(apiSpecs), nil
 }
 
-func syncPolicies() (count int, err error) {
+func (gw *Gateway) syncPolicies() (count int, err error) {
 	var pols map[string]user.Policy
 
 	mainLog.Info("Loading policies")
 
-	switch config.Global().Policies.PolicySource {
+	switch gw.GetConfig().Policies.PolicySource {
 	case "service":
-		if config.Global().Policies.PolicyConnectionString == "" {
+		if gw.GetConfig().Policies.PolicyConnectionString == "" {
 			mainLog.Fatal("No connection string or node ID present. Failing.")
 		}
-		connStr := config.Global().Policies.PolicyConnectionString
+		connStr := gw.GetConfig().Policies.PolicyConnectionString
 		connStr = connStr + "/system/policies"
 
 		mainLog.Info("Using Policies from Dashboard Service")
 
-		pols = LoadPoliciesFromDashboard(connStr, config.Global().NodeSecret, config.Global().Policies.AllowExplicitPolicyID)
+		pols = LoadPoliciesFromDashboard(connStr, gw.GetConfig().NodeSecret, gw.GetConfig().Policies.AllowExplicitPolicyID)
 	case "rpc":
 		mainLog.Debug("Using Policies from RPC")
-		pols, err = LoadPoliciesFromRPC(config.Global().SlaveOptions.RPCKey)
+		pols, err = gw.LoadPoliciesFromRPC(gw.GetConfig().SlaveOptions.RPCKey)
 	default:
 		// this is the only case now where we need a policy record name
-		if config.Global().Policies.PolicyRecordName == "" {
+		if gw.GetConfig().Policies.PolicyRecordName == "" {
 			mainLog.Debug("No policy record name defined, skipping...")
 			return 0, nil
 		}
-		pols = LoadPoliciesFromFile(config.Global().Policies.PolicyRecordName)
+		pols = LoadPoliciesFromFile(gw.GetConfig().Policies.PolicyRecordName)
 	}
 	mainLog.Infof("Policies found (%d total):", len(pols))
 	for id := range pols {
@@ -382,10 +384,10 @@ func stripSlashes(next http.Handler) http.Handler {
 	return http.HandlerFunc(fn)
 }
 
-func controlAPICheckClientCertificate(certLevel string, next http.Handler) http.Handler {
+func (gw *Gateway) controlAPICheckClientCertificate(certLevel string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if config.Global().Security.ControlAPIUseMutualTLS {
-			if err := CertificateManager.ValidateRequestCertificate(config.Global().Security.Certificates.ControlAPI, r); err != nil {
+		if gw.GetConfig().Security.ControlAPIUseMutualTLS {
+			if err := CertificateManager.ValidateRequestCertificate(gw.GetConfig().Security.Certificates.ControlAPI, r); err != nil {
 				doJSONWrite(w, http.StatusForbidden, apiError(err.Error()))
 				return
 			}
@@ -397,13 +399,13 @@ func controlAPICheckClientCertificate(certLevel string, next http.Handler) http.
 
 // loadControlAPIEndpoints loads the endpoints used for controlling the Gateway.
 func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
-	hostname := config.Global().HostName
-	if config.Global().ControlAPIHostname != "" {
-		hostname = config.Global().ControlAPIHostname
+	hostname := gw.GetConfig().HostName
+	if gw.GetConfig().ControlAPIHostname != "" {
+		hostname = gw.GetConfig().ControlAPIHostname
 	}
 
 	if muxer == nil {
-		cp := config.Global().ControlAPIPort
+		cp := gw.GetConfig().ControlAPIPort
 		muxer = gw.DefaultProxyMux.router(cp, "")
 		if muxer == nil {
 			if cp != 0 {
@@ -415,7 +417,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 
 	r := mux.NewRouter()
 	muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
-		stripSlashes(checkIsAPIOwner(controlAPICheckClientCertificate("/gateway/client", InstrumentationMW(r)))),
+		stripSlashes(gw.checkIsAPIOwner(gw.controlAPICheckClientCertificate("/gateway/client", InstrumentationMW(r)))),
 	))
 
 	if hostname != "" {
@@ -423,7 +425,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 		mainLog.Info("Control API hostname set: ", hostname)
 	}
 
-	if *cli.HTTPProfile || config.Global().HTTPProfile {
+	if *cli.HTTPProfile || gw.GetConfig().HTTPProfile {
 		muxer.HandleFunc("/debug/pprof/profile", pprof_http.Profile)
 		muxer.HandleFunc("/debug/pprof/{_:.*}", pprof_http.Index)
 	}
@@ -437,13 +439,13 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	r.HandleFunc("/reload", resetHandler(nil)).Methods("GET")
 
 	if !isRPCMode() {
-		r.HandleFunc("/org/keys", orgHandler).Methods("GET")
-		r.HandleFunc("/org/keys/{keyName:[^/]*}", orgHandler).Methods("POST", "PUT", "GET", "DELETE")
+		r.HandleFunc("/org/keys", gw.orgHandler).Methods("GET")
+		r.HandleFunc("/org/keys/{keyName:[^/]*}", gw.orgHandler).Methods("POST", "PUT", "GET", "DELETE")
 		r.HandleFunc("/keys/policy/{keyName}", policyUpdateHandler).Methods("POST")
-		r.HandleFunc("/keys/create", createKeyHandler).Methods("POST")
-		r.HandleFunc("/apis", apiHandler).Methods("GET", "POST", "PUT", "DELETE")
-		r.HandleFunc("/apis/{apiID}", apiHandler).Methods("GET", "POST", "PUT", "DELETE")
-		r.HandleFunc("/health", healthCheckhandler).Methods("GET")
+		r.HandleFunc("/keys/create", gw.createKeyHandler).Methods("POST")
+		r.HandleFunc("/apis", gw.apiHandler).Methods("GET", "POST", "PUT", "DELETE")
+		r.HandleFunc("/apis/{apiID}", gw.apiHandler).Methods("GET", "POST", "PUT", "DELETE")
+		r.HandleFunc("/health", gw.healthCheckhandler).Methods("GET")
 		r.HandleFunc("/oauth/clients/create", createOauthClient).Methods("POST")
 		r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", oAuthClientHandler).Methods("PUT")
 		r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}/rotate", rotateOauthClientHandler).Methods("PUT")
@@ -456,11 +458,11 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 		mainLog.Info("Node is slaved, REST API minimised")
 	}
 
-	r.HandleFunc("/debug", traceHandler).Methods("POST")
+	r.HandleFunc("/debug", gw.traceHandler).Methods("POST")
 	r.HandleFunc("/cache/{apiID}", invalidateCacheHandler).Methods("DELETE")
-	r.HandleFunc("/keys", keyHandler).Methods("POST", "PUT", "GET", "DELETE")
+	r.HandleFunc("/keys", gw.keyHandler).Methods("POST", "PUT", "GET", "DELETE")
 	r.HandleFunc("/keys/preview", previewKeyHandler).Methods("POST")
-	r.HandleFunc("/keys/{keyName:[^/]*}", keyHandler).Methods("POST", "PUT", "GET", "DELETE")
+	r.HandleFunc("/keys/{keyName:[^/]*}", gw.keyHandler).Methods("POST", "PUT", "GET", "DELETE")
 	r.HandleFunc("/certs", certHandler).Methods("POST", "GET")
 	r.HandleFunc("/certs/{certID:[^/]*}", certHandler).Methods("POST", "GET", "DELETE")
 	r.HandleFunc("/oauth/clients/{apiID}", oAuthClientHandler).Methods("GET", "DELETE")
@@ -474,8 +476,8 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 // correct security credentials - this is a shared secret between the
 // client and the owner and is set in the tyk.conf file. This should
 // never be made public!
-func checkIsAPIOwner(next http.Handler) http.Handler {
-	secret := config.Global().Secret
+func (gw *Gateway) checkIsAPIOwner(next http.Handler) http.Handler {
+	secret := gw.GetConfig().Secret
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tykAuthKey := r.Header.Get(headers.XTykAuthorization)
 		if tykAuthKey != secret {
@@ -494,7 +496,7 @@ func generateOAuthPrefix(apiID string) string {
 }
 
 // Create API-specific OAuth handlers and respective auth servers
-func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
+func (gw *Gateway) addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 	var pathSeparator string
 	if !strings.HasSuffix(spec.Proxy.ListenPath, "/") {
 		pathSeparator = "/"
@@ -508,15 +510,16 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 
 	serverConfig := osin.NewServerConfig()
 
-	if config.Global().OauthErrorStatusCode != 0 {
-		serverConfig.ErrorStatusCode = config.Global().OauthErrorStatusCode
+	gwConfig := gw.GetConfig()
+	if gwConfig.OauthErrorStatusCode != 0 {
+		serverConfig.ErrorStatusCode = gwConfig.OauthErrorStatusCode
 	} else {
 		serverConfig.ErrorStatusCode = http.StatusForbidden
 	}
 
 	serverConfig.AllowedAccessTypes = spec.Oauth2Meta.AllowedAccessTypes
 	serverConfig.AllowedAuthorizeTypes = spec.Oauth2Meta.AllowedAuthorizeTypes
-	serverConfig.RedirectUriSeparator = config.Global().OauthRedirectUriSeparator
+	serverConfig.RedirectUriSeparator = gwConfig.OauthRedirectUriSeparator
 
 	prefix := generateOAuthPrefix(spec.APIID)
 	storageManager := getGlobalStorageHandler(prefix, false)
@@ -528,7 +531,7 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 	oauthManager := OAuthManager{spec, osinServer}
 	oauthHandlers := OAuthHandlers{oauthManager}
 
-	muxer.Handle(apiAuthorizePath, checkIsAPIOwner(allowMethods(oauthHandlers.HandleGenerateAuthCodeData, "POST")))
+	muxer.Handle(apiAuthorizePath, gw.checkIsAPIOwner(allowMethods(oauthHandlers.HandleGenerateAuthCodeData, "POST")))
 	muxer.HandleFunc(clientAuthPath, allowMethods(oauthHandlers.HandleAuthorizePassthrough, "GET", "POST"))
 	muxer.HandleFunc(clientAccessPath, addSecureAndCacheHeaders(allowMethods(oauthHandlers.HandleAccessRequest, "GET", "POST")))
 	muxer.HandleFunc(revokeToken, oauthHandlers.HandleRevokeToken)
@@ -543,7 +546,7 @@ func addBatchEndpoint(spec *APISpec, muxer *mux.Router) {
 	muxer.HandleFunc(apiBatchPath, batchHandler.HandleBatchRequest)
 }
 
-func loadCustomMiddleware(spec *APISpec) ([]string, apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, apidef.MiddlewareDriver) {
+func loadCustomMiddleware(spec *APISpec, conf config.Config) ([]string, apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, apidef.MiddlewareDriver) {
 	mwPaths := []string{}
 	var mwAuthCheckFunc apidef.MiddlewareDefinition
 	mwPreFuncs := []apidef.MiddlewareDefinition{}
@@ -584,7 +587,7 @@ func loadCustomMiddleware(spec *APISpec) ([]string, apidef.MiddlewareDefinition,
 		{name: "post_auth", slice: &mwPostKeyAuthFuncs},
 		{name: "post", slice: &mwPostFuncs},
 	} {
-		globPath := filepath.Join(config.Global().MiddlewarePath, spec.APIID, folder.name, "*.js")
+		globPath := filepath.Join(conf.MiddlewarePath, spec.APIID, folder.name, "*.js")
 		paths, _ := filepath.Glob(globPath)
 		for _, path := range paths {
 			mainLog.Debug("Loading file middleware from ", path)
@@ -705,12 +708,12 @@ func (gw *Gateway) DoReload() {
 	defer reloadMu.Unlock()
 
 	// Initialize/reset the JSVM
-	if config.Global().EnableJSVM {
+	if gw.GetConfig().EnableJSVM {
 		GlobalEventsJSVM.Init(nil, logrus.NewEntry(log))
 	}
 
 	// Load the API Policies
-	if _, err := syncPolicies(); err != nil {
+	if _, err := gw.syncPolicies(); err != nil {
 		mainLog.Error("Error during syncing policies:", err.Error())
 		return
 	}
@@ -820,26 +823,27 @@ func reloadURLStructure(done func()) {
 	reloadQueue <- done
 }
 
-func setupLogger() {
-	if config.Global().UseSentry {
+func (gw *Gateway) setupLogger() {
+	gwConfig := gw.GetConfig()
+	if gwConfig.UseSentry {
 		mainLog.Debug("Enabling Sentry support")
 
 		logLevel := []logrus.Level{}
 
-		if config.Global().SentryLogLevel == "" {
+		if gwConfig.SentryLogLevel == "" {
 			logLevel = []logrus.Level{
 				logrus.PanicLevel,
 				logrus.FatalLevel,
 				logrus.ErrorLevel,
 			}
-		} else if config.Global().SentryLogLevel == "panic" {
+		} else if gwConfig.SentryLogLevel == "panic" {
 			logLevel = []logrus.Level{
 				logrus.PanicLevel,
 				logrus.FatalLevel,
 			}
 		}
 
-		hook, err := logrus_sentry.NewSentryHook(config.Global().SentryCode, logLevel)
+		hook, err := logrus_sentry.NewSentryHook(gwConfig.SentryCode, logLevel)
 
 		hook.Timeout = 0
 
@@ -850,10 +854,10 @@ func setupLogger() {
 		mainLog.Debug("Sentry hook active")
 	}
 
-	if config.Global().UseSyslog {
+	if gwConfig.UseSyslog {
 		mainLog.Debug("Enabling Syslog support")
-		hook, err := logrus_syslog.NewSyslogHook(config.Global().SyslogTransport,
-			config.Global().SyslogNetworkAddr,
+		hook, err := logrus_syslog.NewSyslogHook(gwConfig.SyslogTransport,
+			gwConfig.SyslogNetworkAddr,
 			syslog.LOG_INFO, "")
 
 		if err == nil {
@@ -863,9 +867,9 @@ func setupLogger() {
 		mainLog.Debug("Syslog hook active")
 	}
 
-	if config.Global().UseGraylog {
+	if gwConfig.UseGraylog {
 		mainLog.Debug("Enabling Graylog support")
-		hook := graylogHook.NewGraylogHook(config.Global().GraylogNetworkAddr,
+		hook := graylogHook.NewGraylogHook(gwConfig.GraylogNetworkAddr,
 			map[string]interface{}{"tyk-module": "gateway"})
 
 		log.Hooks.Add(hook)
@@ -874,20 +878,20 @@ func setupLogger() {
 		mainLog.Debug("Graylog hook active")
 	}
 
-	if config.Global().UseLogstash {
+	if gwConfig.UseLogstash {
 		mainLog.Debug("Enabling Logstash support")
 
 		var hook *logstashHook.Hook
 		var err error
 		var conn net.Conn
-		if config.Global().LogstashTransport == "udp" {
+		if gwConfig.LogstashTransport == "udp" {
 			mainLog.Debug("Connecting to Logstash with udp")
-			hook, err = logstashHook.NewHook(config.Global().LogstashTransport,
-				config.Global().LogstashNetworkAddr,
+			hook, err = logstashHook.NewHook(gwConfig.LogstashTransport,
+				gwConfig.LogstashNetworkAddr,
 				appName)
 		} else {
-			mainLog.Debugf("Connecting to Logstash with %s", config.Global().LogstashTransport)
-			conn, err = gas.Dial(config.Global().LogstashTransport, config.Global().LogstashNetworkAddr)
+			mainLog.Debugf("Connecting to Logstash with %s", gwConfig.LogstashTransport)
+			conn, err = gas.Dial(gwConfig.LogstashTransport, gwConfig.LogstashNetworkAddr)
 			if err == nil {
 				hook, err = logstashHook.NewHookWithConn(conn, appName)
 			}
@@ -902,7 +906,7 @@ func setupLogger() {
 		}
 	}
 
-	if config.Global().UseRedisLog {
+	if gwConfig.UseRedisLog {
 		hook := newRedisHook()
 		log.Hooks.Add(hook)
 		rawLog.Hooks.Add(hook)
@@ -911,7 +915,7 @@ func setupLogger() {
 	}
 }
 
-func initialiseSystem(ctx context.Context) error {
+func (gateway *Gateway) initialiseSystem(ctx context.Context) error {
 	if isRunningTests() && os.Getenv("TYK_LOGLEVEL") == "" {
 		// `go test` without TYK_LOGLEVEL set defaults to no log
 		// output
@@ -934,24 +938,25 @@ func initialiseSystem(ctx context.Context) error {
 	mainLog.Infof("Tyk API Gateway %s", VERSION)
 
 	if !isRunningTests() {
-		globalConf := config.Config{}
-		if err := config.Load(confPaths, &globalConf); err != nil {
+		gwConfig := config.Config{}
+		if err := config.Load(confPaths, &gwConfig); err != nil {
 			return err
 		}
-		if globalConf.PIDFileLocation == "" {
-			globalConf.PIDFileLocation = "/var/run/tyk/tyk-gateway.pid"
+		if gwConfig.PIDFileLocation == "" {
+			gwConfig.PIDFileLocation = "/var/run/tyk/tyk-gateway.pid"
 		}
 		// It's necessary to set global conf before and after calling afterConfSetup as global conf
 		// is being used by dependencies of the even handler init and then conf is modified again.
-		config.SetGlobal(globalConf)
-		afterConfSetup(&globalConf)
-		config.SetGlobal(globalConf)
+		gateway.SetConfig(gwConfig)
+		afterConfSetup(&gwConfig)
+		gateway.SetConfig(gwConfig)
 	}
 
-	overrideTykErrors()
+	overrideTykErrors(*gateway)
 
+	gwConfig := gateway.GetConfig()
 	if os.Getenv("TYK_LOGLEVEL") == "" && !*cli.DebugMode {
-		level := strings.ToLower(config.Global().LogLevel)
+		level := strings.ToLower(gwConfig.LogLevel)
 		switch level {
 		case "", "info":
 			// default, do nothing
@@ -966,7 +971,7 @@ func initialiseSystem(ctx context.Context) error {
 		}
 	}
 
-	if config.Global().Storage.Type != "redis" {
+	if gwConfig.Storage.Type != "redis" {
 		mainLog.Fatal("Redis connection details not set, please ensure that the storage type is set to Redis and that the connection parameters are correct.")
 	}
 
@@ -974,48 +979,44 @@ func initialiseSystem(ctx context.Context) error {
 	rpc.Log = log
 	rpc.Instrument = instrument
 
-	setupGlobals(ctx)
-
-	globalConf := config.Global()
-
+	gateway.setupGlobals(ctx)
+	gwConfig = gateway.GetConfig()
 	if *cli.Port != "" {
 		portNum, err := strconv.Atoi(*cli.Port)
 		if err != nil {
 			mainLog.Error("Port specified in flags must be a number: ", err)
 		} else {
-			globalConf.ListenPort = portNum
-			config.SetGlobal(globalConf)
+			gwConfig.ListenPort = portNum
+			gateway.SetConfig(gwConfig)
 		}
 	}
 
 	// Enable all the loggers
-	setupLogger()
+	gateway.setupLogger()
+	mainLog.Info("PIDFile location set to: ", gwConfig.PIDFileLocation)
 
-	mainLog.Info("PIDFile location set to: ", config.Global().PIDFileLocation)
-
-	if err := writePIDFile(); err != nil {
+	if err := writePIDFile(gateway.GetConfig().PIDFileLocation); err != nil {
 		mainLog.Error("Failed to write PIDFile: ", err)
 	}
 
-	if globalConf.UseDBAppConfigs && globalConf.Policies.PolicySource != config.DefaultDashPolicySource {
-		globalConf.Policies.PolicySource = config.DefaultDashPolicySource
-		globalConf.Policies.PolicyConnectionString = globalConf.DBAppConfOptions.ConnectionString
-		if globalConf.Policies.PolicyRecordName == "" {
-			globalConf.Policies.PolicyRecordName = config.DefaultDashPolicyRecordName
+	if gateway.GetConfig().UseDBAppConfigs && gateway.GetConfig().Policies.PolicySource != config.DefaultDashPolicySource {
+		gwConfig.Policies.PolicySource = config.DefaultDashPolicySource
+		gwConfig.Policies.PolicyConnectionString = gwConfig.DBAppConfOptions.ConnectionString
+		if gateway.GetConfig().Policies.PolicyRecordName == "" {
+			gwConfig.Policies.PolicyRecordName = config.DefaultDashPolicyRecordName
 		}
 	}
 
-	getHostDetails()
-	setupInstrumentation()
+	getHostDetails(gateway.GetConfig().PIDFileLocation)
+	setupInstrumentation(*gateway)
 
-	if config.Global().HttpServerOptions.UseLE_SSL {
+	if gateway.GetConfig().HttpServerOptions.UseLE_SSL {
 		go StartPeriodicStateBackup(ctx, &LE_MANAGER)
 	}
 	return nil
 }
 
-func writePIDFile() error {
-	file := config.Global().PIDFileLocation
+func writePIDFile(file string) error {
 	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
 		return err
 	}
@@ -1023,8 +1024,8 @@ func writePIDFile() error {
 	return ioutil.WriteFile(file, []byte(pid), 0600)
 }
 
-func readPIDFromFile() (int, error) {
-	b, err := ioutil.ReadFile(config.Global().PIDFileLocation)
+func readPIDFromFile(file string) (int, error) {
+	b, err := ioutil.ReadFile(file)
 	if err != nil {
 		return 0, err
 	}
@@ -1176,9 +1177,9 @@ var hostDetails struct {
 	PID      int
 }
 
-func getHostDetails() {
+func getHostDetails(file string) {
 	var err error
-	if hostDetails.PID, err = readPIDFromFile(); err != nil {
+	if hostDetails.PID, err = readPIDFromFile(file); err != nil {
 		mainLog.Error("Failed ot get host pid: ", err)
 	}
 	if hostDetails.Hostname, err = os.Hostname(); err != nil {
@@ -1196,14 +1197,6 @@ func getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 	return &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys}
 }
 
-func NewGateway() Gateway {
-	return Gateway{
-		DefaultProxyMux: &proxyMux{
-			again: again.New(),
-		},
-	}
-}
-
 func Start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -1214,15 +1207,17 @@ func Start() {
 		os.Exit(0)
 	}
 
-	gw := NewGateway()
+	// ToDo:Config replace for get default conf
+	gw := NewGateway(config.Default)
 
 	SetNodeID("solo-" + uuid.NewV4().String())
 
-	if err := initialiseSystem(ctx); err != nil {
+	if err := gw.initialiseSystem(ctx); err != nil {
 		mainLog.Fatalf("Error initialising system: %v", err)
 	}
 
-	if config.Global().ControlAPIPort == 0 {
+	gwConfig := gw.GetConfig()
+	if gwConfig.ControlAPIPort == 0 {
 		mainLog.Warn("The control_api_port should be changed for production")
 	}
 	setupPortsWhitelist()
@@ -1237,7 +1232,7 @@ func Start() {
 		// 	mainLog.Info("Control listen closed")
 		// }
 
-		if config.Global().UseDBAppConfigs {
+		if gwConfig.UseDBAppConfigs {
 			mainLog.Info("Stopping heartbeat")
 			DashService.StopBeating()
 			mainLog.Info("Waiting to de-register")
@@ -1251,7 +1246,7 @@ func Start() {
 	if err != nil {
 		mainLog.Errorf("Initializing again %s", err)
 	}
-	if tr := config.Global().Tracer; tr.Enabled {
+	if tr := gwConfig.Tracer; tr.Enabled {
 		trace.SetupTracing(tr.Name, tr.Options)
 		trace.SetLogger(mainLog)
 		defer trace.Close()
@@ -1303,14 +1298,14 @@ func Start() {
 		mainLog.Error("Closing listeners: ", err)
 	}
 	// stop analytics workers
-	if config.Global().EnableAnalytics && analytics.Store == nil {
+	if gwConfig.EnableAnalytics && analytics.Store == nil {
 		analytics.Stop()
 	}
 
 	// write pprof profiles
 	writeProfiles()
 
-	if config.Global().UseDBAppConfigs {
+	if gwConfig.UseDBAppConfigs {
 		mainLog.Info("Stopping heartbeat...")
 		DashService.StopBeating()
 		time.Sleep(2 * time.Second)
@@ -1347,7 +1342,7 @@ func writeProfiles() {
 
 func (gw *Gateway) start(ctx context.Context) {
 	// Set up a default org manager so we can traverse non-live paths
-	if !config.Global().SupressDefaultOrgStore {
+	if !gw.GetConfig().SupressDefaultOrgStore {
 		mainLog.Debug("Initialising default org store")
 		DefaultOrgStore.Init(getGlobalStorageHandler("orgkey.", false))
 		//DefaultQuotaStore.Init(getGlobalStorageHandler(CloudHandler, "orgkey.", false))
@@ -1355,11 +1350,11 @@ func (gw *Gateway) start(ctx context.Context) {
 	}
 
 	// Start listening for reload messages
-	if !config.Global().SuppressRedisSignalReload {
+	if !gw.GetConfig().SuppressRedisSignalReload {
 		go startPubSubLoop()
 	}
 
-	if slaveOptions := config.Global().SlaveOptions; slaveOptions.UseRPC {
+	if slaveOptions := gw.GetConfig().SlaveOptions; slaveOptions.UseRPC {
 		mainLog.Debug("Starting RPC reload listener")
 		RPCListener = RPCStorageHandler{
 			KeyPrefix:        "rpc.listener.",
@@ -1378,19 +1373,19 @@ func (gw *Gateway) start(ctx context.Context) {
 	go reloadQueueLoop(ctx)
 }
 
-func dashboardServiceInit() {
+func dashboardServiceInit(gw Gateway) {
 	if DashService == nil {
 		DashService = &HTTPDashboardHandler{}
-		DashService.Init()
+		DashService.Init(gw.GetConfig())
 	}
 }
 
-func handleDashboardRegistration() {
-	if !config.Global().UseDBAppConfigs {
+func handleDashboardRegistration(gw Gateway) {
+	if !gw.GetConfig().UseDBAppConfigs {
 		return
 	}
 
-	dashboardServiceInit()
+	dashboardServiceInit(gw)
 
 	// connStr := buildConnStr("/register/node")
 	if err := DashService.Register(); err != nil {
@@ -1440,7 +1435,18 @@ func setupPortsWhitelist() {
 
 type Gateway struct {
 	DefaultProxyMux *proxyMux
-	Port            int
+	config          atomic.Value
+	configMu        sync.Mutex
+}
+
+func NewGateway(config config.Config) Gateway {
+	g := Gateway{
+		DefaultProxyMux: &proxyMux{
+			again: again.New(),
+		},
+	}
+	g.SetConfig(config)
+	return g
 }
 
 func (gw *Gateway) startServer() {
@@ -1449,29 +1455,45 @@ func (gw *Gateway) startServer() {
 
 	router := mux.NewRouter()
 	gw.loadControlAPIEndpoints(router)
-	muxer.setRouter(config.Global().ControlAPIPort, "", router)
+	muxer.setRouter(gw.GetConfig().ControlAPIPort, "", router)
 
-	if muxer.router(config.Global().ListenPort, "") == nil {
-		muxer.setRouter(config.Global().ListenPort, "", mux.NewRouter())
+	if muxer.router(gw.GetConfig().ListenPort, "") == nil {
+		muxer.setRouter(gw.GetConfig().ListenPort, "", mux.NewRouter())
 	}
 
 	gw.DefaultProxyMux.swap(muxer)
 
 	// handle dashboard registration and nonces if available
-	handleDashboardRegistration()
+	handleDashboardRegistration(*gw)
 
 	// at this point NodeID is ready to use by DRL
 	drlOnce.Do(startDRL)
 
 	mainLog.Infof("Tyk Gateway started (%s)", VERSION)
-	address := config.Global().ListenAddress
-	if config.Global().ListenAddress == "" {
+	address := gw.GetConfig().ListenAddress
+	if gw.GetConfig().ListenAddress == "" {
 		address = "(open interface)"
 	}
 	mainLog.Info("--> Listening on address: ", address)
-	mainLog.Info("--> Listening on port: ", config.Global().ListenPort)
+	mainLog.Info("--> Listening on port: ", gw.GetConfig().ListenPort)
 	mainLog.Info("--> PID: ", hostDetails.PID)
 	if !rpc.IsEmergencyMode() {
 		gw.DoReload()
 	}
+}
+
+/*
+func init() {
+	SetGlobal(Config{})
+}
+*/
+
+func (gw *Gateway) GetConfig() config.Config {
+	return gw.config.Load().(config.Config)
+}
+
+func (gw *Gateway) SetConfig(conf config.Config) {
+	gw.configMu.Lock()
+	defer gw.configMu.Unlock()
+	gw.config.Store(conf)
 }

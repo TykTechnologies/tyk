@@ -80,7 +80,7 @@ func TestParambasedAuth(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
 
-	BuildAndLoadAPI(func(spec *APISpec) {
+	globalGateway.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Auth.UseParam = true
 		spec.UseKeylessAccess = false
 		spec.Proxy.ListenPath = "/"
@@ -1951,15 +1951,15 @@ func TestTracing(t *testing.T) {
 }
 
 func TestBrokenClients(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 	defer ResetTestConfig()
 
-	globalConf := config.Global()
+	globalConf := globalGateway.GetConfig()
 	globalConf.ProxyDefaultTimeout = 1
-	config.SetGlobal(globalConf)
+	globalGateway.SetConfig(globalConf)
 
-	BuildAndLoadAPI(func(spec *APISpec) {
+	globalGateway.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = true
 		spec.Proxy.ListenPath = "/"
 		spec.EnforcedTimeoutEnabled = true

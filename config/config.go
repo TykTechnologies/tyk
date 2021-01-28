@@ -585,6 +585,7 @@ type TykEventHandler interface {
 	HandleEvent(EventMessage)
 }
 
+/*
 func init() {
 	SetGlobal(Config{})
 }
@@ -598,7 +599,7 @@ func SetGlobal(conf Config) {
 	defer globalMu.Unlock()
 	global.Store(conf)
 }
-
+*/
 func WriteConf(path string, conf *Config) error {
 	bs, err := json.MarshalIndent(conf, "", "    ")
 	if err != nil {

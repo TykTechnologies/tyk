@@ -82,13 +82,14 @@ func (p proxy) getListener() net.Listener {
 
 type proxyMux struct {
 	sync.RWMutex
-	proxies []*proxy
-	again   again.Again
+	proxies      []*proxy
+	again        again.Again
+	track404Logs bool
 }
 
-func (m *proxyMux) getProxy(listenPort int) *proxy {
+func (m *proxyMux) getProxy(listenPort int, conf config.Config) *proxy {
 	if listenPort == 0 {
-		listenPort = config.Global().ListenPort
+		listenPort = conf.ListenPort
 	}
 
 	for _, p := range m.proxies {
@@ -100,16 +101,16 @@ func (m *proxyMux) getProxy(listenPort int) *proxy {
 	return nil
 }
 
-func (m *proxyMux) router(port int, protocol string) *mux.Router {
+func (m *proxyMux) router(port int, protocol string, conf config.Config) *mux.Router {
 	if protocol == "" {
-		if config.Global().HttpServerOptions.UseSSL {
+		if conf.HttpServerOptions.UseSSL {
 			protocol = "https"
 		} else {
 			protocol = "http"
 		}
 	}
 
-	if proxy := m.getProxy(port); proxy != nil {
+	if proxy := m.getProxy(port,conf); proxy != nil {
 		if proxy.protocol != protocol {
 			mainLog.WithField("port", port).Warningf("Can't get router for protocol %s, router for protocol %s found", protocol, proxy.protocol)
 			return nil
@@ -121,21 +122,21 @@ func (m *proxyMux) router(port int, protocol string) *mux.Router {
 	return nil
 }
 
-func (m *proxyMux) setRouter(port int, protocol string, router *mux.Router) {
+func (m *proxyMux) setRouter(port int, protocol string, router *mux.Router, conf config.Config) {
 	if port == 0 {
-		port = config.Global().ListenPort
+		port = conf.ListenPort
 	}
 
 	if protocol == "" {
-		if config.Global().HttpServerOptions.UseSSL {
+		if conf.HttpServerOptions.UseSSL {
 			protocol = "https"
 		} else {
 			protocol = "http"
 		}
 	}
 
-	router.SkipClean(config.Global().HttpServerOptions.SkipURLCleaning)
-	p := m.getProxy(port)
+	router.SkipClean(conf.HttpServerOptions.SkipURLCleaning)
+	p := m.getProxy(port, conf)
 	if p == nil {
 		p = &proxy{
 			port:     port,
@@ -156,7 +157,7 @@ func (m *proxyMux) setRouter(port int, protocol string, router *mux.Router) {
 }
 
 func (m *proxyMux) handle404(w http.ResponseWriter, r *http.Request) {
-	if config.Global().Track404Logs {
+	if m.track404Logs {
 		requestMeta := fmt.Sprintf("%s %s %s", r.Method, r.URL.Path, r.Proto)
 		log.WithField("request", requestMeta).WithField("origin", r.RemoteAddr).
 			Error(http.StatusText(http.StatusNotFound))
@@ -166,7 +167,7 @@ func (m *proxyMux) handle404(w http.ResponseWriter, r *http.Request) {
 	_, _ = fmt.Fprint(w, http.StatusText(http.StatusNotFound))
 }
 
-func (m *proxyMux) addTCPService(spec *APISpec, modifier *tcp.Modifier) {
+func (m *proxyMux) addTCPService(spec *APISpec, modifier *tcp.Modifier, conf config.Config) {
 	hostname := spec.GlobalConfig.HostName
 	if spec.GlobalConfig.EnableCustomDomains {
 		hostname = spec.Domain
@@ -174,7 +175,7 @@ func (m *proxyMux) addTCPService(spec *APISpec, modifier *tcp.Modifier) {
 		hostname = ""
 	}
 
-	if p := m.getProxy(spec.ListenPort); p != nil {
+	if p := m.getProxy(spec.ListenPort, conf); p != nil {
 		p.tcpProxy.AddDomainHandler(hostname, spec.Proxy.TargetURL, modifier)
 	} else {
 		tlsConfig := tlsClientConfig(spec)
@@ -311,15 +312,15 @@ func dialWithServiceDiscovery(spec *APISpec, dial dialFn) dialFn {
 	}
 }
 
-func (m *proxyMux) swap(new *proxyMux) {
+func (m *proxyMux) swap(new *proxyMux,conf config.Config ) {
 	m.Lock()
 	defer m.Unlock()
-	listenAddress := config.Global().ListenAddress
+	listenAddress := conf.ListenAddress
 
 	// Shutting down and removing unused listeners/proxies
 	i := 0
 	for _, curP := range m.proxies {
-		match := new.getProxy(curP.port)
+		match := new.getProxy(curP.port,conf)
 		if match == nil || match.protocol != curP.protocol {
 			mainLog.Infof("Found unused listener at port %d, shutting down", curP.port)
 
@@ -340,7 +341,7 @@ func (m *proxyMux) swap(new *proxyMux) {
 
 	// Replacing existing routers or starting new listeners
 	for _, newP := range new.proxies {
-		match := m.getProxy(newP.port)
+		match := m.getProxy(newP.port, conf)
 		if match == nil {
 			m.proxies = append(m.proxies, newP)
 		} else {
@@ -358,19 +359,19 @@ func (m *proxyMux) swap(new *proxyMux) {
 			}
 		}
 	}
-	p := m.getProxy(config.Global().ListenPort)
+	p := m.getProxy(conf.ListenPort, conf)
 	if p != nil && p.router != nil {
 		// All APIs processed, now we can healthcheck
 		// Add a root message to check all is OK
-		p.router.HandleFunc("/"+config.Global().HealthCheckEndpointName, liveCheckHandler)
+		p.router.HandleFunc("/"+conf.HealthCheckEndpointName, liveCheckHandler)
 	}
-	m.serve()
+	m.serve(conf)
 }
 
-func (m *proxyMux) serve() {
+func (m *proxyMux) serve(conf config.Config) {
 	for _, p := range m.proxies {
 		if p.listener == nil {
-			listener, err := m.generateListener(p.port, p.protocol)
+			listener, err := m.generateListener(p.port, p.protocol, conf)
 			if err != nil {
 				mainLog.WithError(err).Error("Can't start listener")
 				continue
@@ -393,12 +394,12 @@ func (m *proxyMux) serve() {
 			readTimeout := 120 * time.Second
 			writeTimeout := 120 * time.Second
 
-			if config.Global().HttpServerOptions.ReadTimeout > 0 {
-				readTimeout = time.Duration(config.Global().HttpServerOptions.ReadTimeout) * time.Second
+			if conf.HttpServerOptions.ReadTimeout > 0 {
+				readTimeout = time.Duration(conf.HttpServerOptions.ReadTimeout) * time.Second
 			}
 
-			if config.Global().HttpServerOptions.WriteTimeout > 0 {
-				writeTimeout = time.Duration(config.Global().HttpServerOptions.WriteTimeout) * time.Second
+			if conf.HttpServerOptions.WriteTimeout > 0 {
+				writeTimeout = time.Duration(conf.HttpServerOptions.WriteTimeout) * time.Second
 			}
 			var h http.Handler
 			h = &handleWrapper{p.router}
@@ -411,7 +412,7 @@ func (m *proxyMux) serve() {
 					h: h2c.NewHandler(p.router, h2s),
 				}
 			}
-			addr := config.Global().ListenAddress + ":" + strconv.Itoa(p.port)
+			addr := conf.ListenAddress + ":" + strconv.Itoa(p.port)
 			p.httpServer = &http.Server{
 				Addr:         addr,
 				ReadTimeout:  readTimeout,
@@ -419,7 +420,7 @@ func (m *proxyMux) serve() {
 				Handler:      h,
 			}
 
-			if config.Global().CloseConnections {
+			if conf.CloseConnections {
 				p.httpServer.SetKeepAlivesEnabled(false)
 			}
 
@@ -446,10 +447,10 @@ func CheckPortWhiteList(w map[string]config.PortWhiteList, listenPort int, proto
 	return fmt.Errorf("%s:%d trying to open disabled port", protocol, listenPort)
 }
 
-func (m *proxyMux) generateListener(listenPort int, protocol string) (l net.Listener, err error) {
-	listenAddress := config.Global().ListenAddress
-	if !config.Global().DisablePortWhiteList {
-		if err := CheckPortWhiteList(config.Global().PortWhiteList, listenPort, protocol); err != nil {
+func (m *proxyMux) generateListener(listenPort int, protocol string, conf config.Config) (l net.Listener, err error) {
+	listenAddress := conf.ListenAddress
+	if !conf.DisablePortWhiteList {
+		if err := CheckPortWhiteList(conf.PortWhiteList, listenPort, protocol); err != nil {
 			return nil, err
 		}
 	}
@@ -461,7 +462,7 @@ func (m *proxyMux) generateListener(listenPort int, protocol string) (l net.List
 	switch protocol {
 	case "https", "tls":
 		mainLog.Infof("--> Using TLS (%s)", protocol)
-		httpServerOptions := config.Global().HttpServerOptions
+		httpServerOptions := conf.HttpServerOptions
 
 		tlsConfig := tls.Config{
 			GetCertificate:     dummyGetCertificate,

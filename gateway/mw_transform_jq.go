@@ -154,13 +154,13 @@ type TransformJQSpec struct {
 	JQFilter *JQ
 }
 
-func (a *APIDefinitionLoader) compileTransformJQPathSpec(paths []apidef.TransformJQMeta, stat URLStatus) []URLSpec {
+func (a *APIDefinitionLoader) compileTransformJQPathSpec(paths []apidef.TransformJQMeta, stat URLStatus, conf config.Config) []URLSpec {
 	urlSpec := []URLSpec{}
 
 	log.Debug("Checking for JQ tranform paths ...")
 	for _, stringSpec := range paths {
 		newSpec := URLSpec{}
-		a.generateRegex(stringSpec.Path, &newSpec, stat)
+		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
 		newTransformSpec := TransformJQSpec{TransformJQMeta: stringSpec}
 
 		var err error

@@ -67,8 +67,9 @@ func defaultTykErrors() {
 	}
 }
 
-func overrideTykErrors() {
-	for id, err := range config.Global().OverrideMessages {
+func overrideTykErrors(gw Gateway) {
+	gwConfig := gw.GetConfig()
+	for id, err := range gwConfig.OverrideMessages {
 
 		overridenErr := TykErrors[id]
 

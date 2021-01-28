@@ -97,13 +97,13 @@ func (b *Bundle) Verify() error {
 }
 
 // AddToSpec attaches the custom middleware settings to an API definition.
-func (b *Bundle) AddToSpec() {
+func (b *Bundle) AddToSpec(conf config.Config) {
 	b.Spec.CustomMiddleware = b.Manifest.CustomMiddleware
 
 	// Load Python interpreter if the
 	if loadedDrivers[b.Spec.CustomMiddleware.Driver] == nil && b.Spec.CustomMiddleware.Driver == apidef.PythonDriver {
 		var err error
-		loadedDrivers[apidef.PythonDriver], err = NewPythonDispatcher()
+		loadedDrivers[apidef.PythonDriver], err = NewPythonDispatcher(conf)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "coprocess",
@@ -319,14 +319,14 @@ func getBundleDestPath(spec *APISpec) string {
 }
 
 // loadBundle wraps the load and save steps, it will return if an error occurs at any point.
-func loadBundle(spec *APISpec) error {
+func loadBundle(spec *APISpec, gw Gateway) error {
 	// Skip if no custom middleware bundle name is set.
 	if spec.CustomMiddlewareBundle == "" {
 		return nil
 	}
 
 	// Skip if no bundle base URL is set.
-	if config.Global().BundleBaseURL == "" {
+	if gw.GetConfig().BundleBaseURL == "" {
 		return bundleError(spec, nil, "No bundle base URL set, skipping bundle")
 	}
 
@@ -357,7 +357,7 @@ func loadBundle(spec *APISpec) error {
 			"prefix": "main",
 		}).Info("----> Using bundle: ", spec.CustomMiddlewareBundle)
 
-		bundle.AddToSpec()
+		bundle.AddToSpec(gw.GetConfig())
 
 		return nil
 	}
@@ -399,7 +399,7 @@ func loadBundle(spec *APISpec) error {
 		"prefix": "main",
 	}).Info("----> Bundle is valid, adding to spec: ", spec.CustomMiddlewareBundle)
 
-	bundle.AddToSpec()
+	bundle.AddToSpec(gw.GetConfig())
 
 	return nil
 }

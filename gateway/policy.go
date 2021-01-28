@@ -163,9 +163,9 @@ func parsePoliciesFromRPC(list string) (map[string]user.Policy, error) {
 	return policies, nil
 }
 
-func LoadPoliciesFromRPC(orgId string) (map[string]user.Policy, error) {
+func(gw *Gateway) LoadPoliciesFromRPC(orgId string) (map[string]user.Policy, error) {
 	if rpc.IsEmergencyMode() {
-		return LoadPoliciesFromRPCBackup()
+		return gw.LoadPoliciesFromRPCBackup()
 	}
 
 	store := &RPCStorageHandler{}
@@ -184,7 +184,7 @@ func LoadPoliciesFromRPC(orgId string) (map[string]user.Policy, error) {
 		return nil, err
 	}
 
-	if err := saveRPCPoliciesBackup(rpcPolicies); err != nil {
+	if err := gw.saveRPCPoliciesBackup(rpcPolicies); err != nil {
 		log.Error(err)
 	}
 

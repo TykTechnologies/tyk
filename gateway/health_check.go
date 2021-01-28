@@ -67,11 +67,11 @@ type HealthCheckItem struct {
 	Time          string            `json:"time"`
 }
 
-func initHealthCheck(ctx context.Context) {
+func (gw *Gateway) initHealthCheck(ctx context.Context) {
 	setCurrentHealthCheckInfo(make(map[string]HealthCheckItem, 3))
 
 	go func(ctx context.Context) {
-		var n = config.Global().LivenessCheck.CheckDuration
+		var n = gw.GetConfig().LivenessCheck.CheckDuration
 
 		if n == 0 {
 			n = 10

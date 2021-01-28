@@ -36,12 +36,12 @@ type ChainObject struct {
 	Subrouter      *mux.Router
 }
 
-func prepareStorage() generalStores {
+func (gw *Gateway) prepareStorage() generalStores {
 	var gs generalStores
-	gs.redisStore = &storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
+	gs.redisStore = &storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: gw.GetConfig().HashKeys}
 	gs.redisOrgStore = &storage.RedisCluster{KeyPrefix: "orgkey."}
 	gs.healthStore = &storage.RedisCluster{KeyPrefix: "apihealth."}
-	gs.rpcAuthStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
+	gs.rpcAuthStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: gw.GetConfig().HashKeys}
 	gs.rpcOrgStore = &RPCStorageHandler{KeyPrefix: "orgkey."}
 	GlobalSessionManager.Init(gs.redisStore)
 	return gs
@@ -103,7 +103,7 @@ func fixFuncPath(pathPrefix string, funcs []apidef.MiddlewareDefinition) {
 	}
 }
 
-func processSpec(spec *APISpec, apisByListen map[string]int,
+func(gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	gs *generalStores, subrouter *mux.Router, logger *logrus.Entry) *ChainObject {
 
 	var chainDef ChainObject
@@ -187,9 +187,9 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		authStore = gs.rpcAuthStore
 		orgStore = gs.rpcOrgStore
 		spec.GlobalConfig.EnforceOrgDataAge = true
-		globalConf := config.Global()
+		globalConf := gw.GetConfig()
 		globalConf.EnforceOrgDataAge = true
-		config.SetGlobal(globalConf)
+		gw.SetConfig(globalConf)
 	}
 
 	sessionStore := gs.redisStore
@@ -212,7 +212,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 	var prefix string
 	if spec.CustomMiddlewareBundle != "" {
-		if err := loadBundle(spec); err != nil {
+		if err := loadBundle(spec, *gw); err != nil {
 			logger.WithError(err).Error("Couldn't load bundle")
 		}
 		prefix = getBundleDestPath(spec)
@@ -222,7 +222,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	var mwPaths []string
 
 	mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwResponseFuncs, mwDriver = loadCustomMiddleware(spec)
-	if config.Global().EnableJSVM && mwDriver == apidef.OttoDriver {
+	if gw.GetConfig().EnableJSVM && mwDriver == apidef.OttoDriver {
 		spec.JSVM.LoadJSPaths(mwPaths, prefix)
 	}
 
@@ -236,7 +236,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	}
 
 	if spec.GraphQL.GraphQLPlayground.Enabled {
-		loadGraphQLPlayground(spec, subrouter)
+		gw.loadGraphQLPlayground(spec, subrouter)
 	}
 
 	if spec.EnableBatchRequestSupport {
@@ -245,7 +245,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 	if spec.UseOauth2 {
 		logger.Debug("Loading OAuth Manager")
-		oauthManager := addOAuthHandlers(spec, subrouter)
+		oauthManager := gw.addOAuthHandlers(spec, subrouter)
 		logger.Debug("-- Added OAuth Handlers")
 
 		spec.OAuthManager = oauthManager
@@ -640,19 +640,20 @@ func fuzzyFindAPI(search string) *APISpec {
 	return nil
 }
 
-func loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStores, muxer *proxyMux) http.Handler {
-	port := config.Global().ListenPort
+func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStores, muxer *proxyMux) http.Handler {
+	gwConfig := gw.GetConfig()
+	port := gwConfig.ListenPort
 	if spec.ListenPort != 0 {
 		port = spec.ListenPort
 	}
-	router := muxer.router(port, spec.Protocol)
+	router := muxer.router(port, spec.Protocol,gw.GetConfig())
 	if router == nil {
 		router = mux.NewRouter()
 		muxer.setRouter(port, spec.Protocol, router)
 	}
 
-	hostname := config.Global().HostName
-	if config.Global().EnableCustomDomains && spec.Domain != "" {
+	hostname := gwConfig.HostName
+	if gwConfig.EnableCustomDomains && spec.Domain != "" {
 		hostname = spec.Domain
 	}
 
@@ -660,7 +661,7 @@ func loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStor
 		mainLog.Info("API hostname set: ", hostname)
 		router = router.Host(hostname).Subrouter()
 	}
-	chainObj := processSpec(spec, apisByListen, gs, router, logrus.NewEntry(log))
+	chainObj := gw.processSpec(spec, apisByListen, gs, router, logrus.NewEntry(log))
 	if chainObj.Skip {
 		return chainObj.ThisHandler
 	}
@@ -673,7 +674,7 @@ func loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStor
 	return chainObj.ThisHandler
 }
 
-func loadTCPService(spec *APISpec, gs *generalStores, muxer *proxyMux) {
+func (gw *Gateway) loadTCPService(spec *APISpec, gs *generalStores, muxer *proxyMux) {
 	// Initialise the auth and session managers (use Redis for now)
 	authStore := gs.redisStore
 	orgStore := gs.redisOrgStore
@@ -686,9 +687,9 @@ func loadTCPService(spec *APISpec, gs *generalStores, muxer *proxyMux) {
 		authStore = gs.rpcAuthStore
 		orgStore = gs.rpcOrgStore
 		spec.GlobalConfig.EnforceOrgDataAge = true
-		globalConf := config.Global()
-		globalConf.EnforceOrgDataAge = true
-		config.SetGlobal(globalConf)
+		gwConfig := gw.GetConfig()
+		gwConfig.EnforceOrgDataAge = true
+		gw.SetConfig(gwConfig)
 	}
 
 	sessionStore := gs.redisStore
@@ -700,20 +701,20 @@ func loadTCPService(spec *APISpec, gs *generalStores, muxer *proxyMux) {
 	// Health checkers are initialised per spec so that each API handler has it's own connection and redis storage pool
 	spec.Init(authStore, sessionStore, gs.healthStore, orgStore)
 
-	muxer.addTCPService(spec, nil)
+	muxer.addTCPService(spec, nil, gw.GetConfig())
 }
 
 type generalStores struct {
 	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore storage.Handler
 }
 
-func loadGraphQLPlayground(spec *APISpec, router *mux.Router) {
+func (gw *Gateway) loadGraphQLPlayground(spec *APISpec, router *mux.Router) {
 	// endpoint is the endpoint of the url which playground makes request to.
 	endpoint := spec.Proxy.ListenPath
 
 	// If tyk-cloud is enabled, listen path will be api id and slug is mapped to listen path in nginx config.
 	// So, requests should be sent to slug endpoint, nginx will route them to internal gateway's listen path.
-	if config.Global().Cloud {
+	if gw.GetConfig().Cloud {
 		endpoint = fmt.Sprintf("/%s/", spec.Slug)
 	}
 
@@ -751,27 +752,23 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	// Create a new handler for each API spec
 	apisByListen := countApisByListenHash(specs)
 
-	globalConf := config.Global()
-	port := globalConf.ListenPort
+	gwConf := gw.GetConfig()
+	port := gwConf.ListenPort
 
-	if globalConf.ControlAPIPort != 0 {
-		port = globalConf.ControlAPIPort
+	if gwConf.ControlAPIPort != 0 {
+		port = gwConf.ControlAPIPort
 	}
 
-	if gw.Port != 0 {
-		port = gw.Port
-		globalConf.ListenPort = port
-		config.SetGlobal(globalConf)
+	muxer := &proxyMux{
+		track404Logs: gwConf.Track404Logs,
 	}
-
-	muxer := &proxyMux{}
 	router := mux.NewRouter()
 	router.NotFoundHandler = http.HandlerFunc(muxer.handle404)
 	gw.loadControlAPIEndpoints(router)
 
 	muxer.setRouter(port, "", router)
 
-	gs := prepareStorage()
+	gs := gw.prepareStorage()
 	shouldTrace := trace.IsEnabled()
 	for _, spec := range specs {
 		func() {
@@ -806,9 +803,9 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 						mainLog.Infof("Intialized tracer  api_name=%q", spec.Name)
 					}
 				}
-				tmpSpecHandles.Store(spec.APIID, loadHTTPService(spec, apisByListen, &gs, muxer))
+				tmpSpecHandles.Store(spec.APIID, gw.loadHTTPService(spec, apisByListen, &gs, muxer))
 			case "tcp", "tls":
-				loadTCPService(spec, &gs, muxer)
+				gw.loadTCPService(spec, &gs, muxer)
 			}
 		}()
 	}
@@ -831,7 +828,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	mainLog.Debug("Checker host list")
 
 	// Kick off our host checkers
-	if !config.Global().UptimeTests.Disable {
+	if !gw.GetConfig().UptimeTests.Disable {
 		SetCheckerHostList()
 	}
 
