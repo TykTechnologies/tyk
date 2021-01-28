@@ -81,7 +81,7 @@ func (r *RuleUniqueDataSourceNames) Validate(apiDef *APIDefinition, validationRe
 
 	usedNames := map[string]bool{}
 	for _, ds := range apiDef.GraphQL.EngineConfig.DataSources {
-		trimmedName := strings.TrimSpace(ds.Name)
+		trimmedName := strings.TrimSpace(strings.ToLower(ds.Name))
 		if usedNames[trimmedName] {
 			validationResult.IsValid = false
 			validationResult.AppendError(ErrDuplicateDataSourceName)

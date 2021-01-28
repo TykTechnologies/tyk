@@ -59,7 +59,7 @@ func TestRuleUniqueDataSourceNames_Validate(t *testing.T) {
 				EngineConfig: GraphQLEngineConfig{
 					DataSources: []GraphQLEngineDataSource{
 						{
-							Name: "     datasource",
+							Name: "     DataSource",
 						},
 						{
 							Name: "datasource     ",
