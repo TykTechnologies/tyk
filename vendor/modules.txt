@@ -165,10 +165,14 @@ github.com/jensneuse/abstractlogger
 # github.com/jensneuse/byte-template v0.0.0-20200214152254-4f3cf06e5c68
 github.com/jensneuse/byte-template
 <<<<<<< master
+<<<<<<< master
 # github.com/jensneuse/graphql-go-tools v0.0.0-00010101000000-000000000000 => github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20201123105516-733fb8df3c8a
 github.com/jensneuse/graphql-go-tools/internal/pkg/quotes
 =======
 # github.com/jensneuse/graphql-go-tools v0.0.0-00010101000000-000000000000 => ../graphql-go-tools
+=======
+# github.com/jensneuse/graphql-go-tools v0.0.0-00010101000000-000000000000 => github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20210128132753-3d71d69ea680
+>>>>>>> update go-tools vendoring
 github.com/jensneuse/graphql-go-tools/pkg/ast
 github.com/jensneuse/graphql-go-tools/pkg/astparser
 github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/graphql_datasource

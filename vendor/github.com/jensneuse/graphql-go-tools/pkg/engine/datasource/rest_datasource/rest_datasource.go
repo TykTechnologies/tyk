@@ -70,7 +70,7 @@ type QueryConfiguration struct {
 	Value string `json:"value"`
 }
 
-func (p *Planner) Register(visitor *plan.Visitor, customConfiguration json.RawMessage) error {
+func (p *Planner) Register(visitor *plan.Visitor, customConfiguration json.RawMessage, isNested bool) error {
 	p.v = visitor
 	visitor.Walker.RegisterEnterFieldVisitor(p)
 	visitor.Walker.RegisterEnterOperationVisitor(p)
@@ -89,7 +89,7 @@ func (p *Planner) configureInput() []byte {
 
 	header, err := json.Marshal(p.config.Fetch.Header)
 	if err == nil && len(header) != 0 && !bytes.Equal(header, literal.NULL) {
-		input = httpclient.SetInputHeaders(input, header)
+		input = httpclient.SetInputHeader(input, header)
 	}
 
 	preparedQuery := p.prepareQueryParams(p.rootField, p.config.Fetch.Query)

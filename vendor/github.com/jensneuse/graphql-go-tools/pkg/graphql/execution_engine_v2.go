@@ -113,6 +113,16 @@ func newInternalExecutionContext() *internalExecutionContext {
 	}
 }
 
+func (e *internalExecutionContext) prepare (ctx context.Context, variables []byte, request resolve.Request) {
+	e.setContext(ctx)
+	e.setVariables(variables)
+	e.setRequest(request)
+}
+
+func (e *internalExecutionContext) setRequest(request resolve.Request){
+	e.resolveContext.Request = request
+}
+
 func (e *internalExecutionContext) setContext(ctx context.Context) {
 	e.resolveContext.Context = ctx
 }
@@ -173,8 +183,10 @@ func (e *ExecutionEngineV2) Execute(ctx context.Context, operation *Request, wri
 		}
 	}
 
-	execContext := e.getFreshInternalExecutionContext(ctx, operation)
-	defer e.internalExecutionContextPool.Put(execContext)
+	execContext := e.getExecutionCtx()
+	defer e.putExecutionCtx(execContext)
+
+	execContext.prepare(ctx,operation.Variables,operation.request)
 
 	for i := range options {
 		options[i](execContext)
@@ -201,11 +213,11 @@ func (e *ExecutionEngineV2) Execute(ctx context.Context, operation *Request, wri
 	return err
 }
 
-func (e *ExecutionEngineV2) getFreshInternalExecutionContext(ctx context.Context, operation *Request) *internalExecutionContext {
-	execCtx := e.internalExecutionContextPool.Get().(*internalExecutionContext)
-	execCtx.reset()
-	execCtx.setContext(ctx)
-	execCtx.setVariables(operation.Variables)
+func (e *ExecutionEngineV2) getExecutionCtx() *internalExecutionContext {
+	return e.internalExecutionContextPool.Get().(*internalExecutionContext)
+}
 
-	return execCtx
+func (e *ExecutionEngineV2) putExecutionCtx(ctx *internalExecutionContext){
+	ctx.reset()
+	e.internalExecutionContextPool.Put(ctx)
 }

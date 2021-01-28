@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 
@@ -41,6 +42,7 @@ type Planner struct {
 	hasFederationRoot          bool
 	extractEntities            bool
 	client                     httpclient.Client
+	isNested bool
 }
 
 type Configuration struct {
@@ -64,17 +66,18 @@ type SubscriptionConfiguration struct {
 }
 
 type FetchConfiguration struct {
-	URL        string
-	HttpMethod string
+	URL    string
+	Method string
+	Header http.Header
 }
 
 func (c *Configuration) ApplyDefaults() {
-	if c.Fetch.HttpMethod == "" {
-		c.Fetch.HttpMethod = "POST"
+	if c.Fetch.Method == "" {
+		c.Fetch.Method = "POST"
 	}
 }
 
-func (p *Planner) Register(visitor *plan.Visitor, config json.RawMessage) error {
+func (p *Planner) Register(visitor *plan.Visitor, config json.RawMessage, isNested bool) error {
 	p.visitor = visitor
 	p.visitor.Walker.RegisterDocumentVisitor(p)
 	p.visitor.Walker.RegisterFieldVisitor(p)
@@ -88,6 +91,7 @@ func (p *Planner) Register(visitor *plan.Visitor, config json.RawMessage) error 
 	}
 
 	p.config.ApplyDefaults()
+	p.isNested = isNested
 
 	return nil
 }
@@ -100,8 +104,14 @@ func (p *Planner) ConfigureFetch() plan.FetchConfiguration {
 	}
 	input = httpclient.SetInputBodyWithPath(input, p.upstreamVariables, "variables")
 	input = httpclient.SetInputBodyWithPath(input, p.printOperation(), "query")
+
+	header, err := json.Marshal(p.config.Fetch.Header)
+	if err == nil && len(header) != 0 && !bytes.Equal(header, literal.NULL) {
+		input = httpclient.SetInputHeader(input, header)
+	}
+
 	input = httpclient.SetInputURL(input, []byte(p.config.Fetch.URL))
-	input = httpclient.SetInputMethod(input, []byte(p.config.Fetch.HttpMethod))
+	input = httpclient.SetInputMethod(input, []byte(p.config.Fetch.Method))
 
 	return plan.FetchConfiguration{
 		Input: string(input),
@@ -119,6 +129,11 @@ func (p *Planner) ConfigureSubscription() plan.SubscriptionConfiguration {
 	input = httpclient.SetInputBodyWithPath(input, p.printOperation(), "query")
 	input = httpclient.SetInputURL(input, []byte(p.config.Subscription.URL))
 
+	header, err := json.Marshal(p.config.Fetch.Header)
+	if err == nil && len(header) != 0 && !bytes.Equal(header, literal.NULL) {
+		input = httpclient.SetInputHeader(input, header)
+	}
+
 	return plan.SubscriptionConfiguration{
 		Input:                 string(input),
 		SubscriptionManagerID: "graphql_websocket_subscription",
@@ -126,10 +141,14 @@ func (p *Planner) ConfigureSubscription() plan.SubscriptionConfiguration {
 }
 
 func (p *Planner) EnterOperationDefinition(ref int) {
+	operationType := p.visitor.Operation.OperationDefinitions[ref].OperationType
+	if p.isNested {
+		operationType = ast.OperationTypeQuery
+	}
 	definition := p.upstreamOperation.AddOperationDefinitionToRootNodes(ast.OperationDefinition{
-		OperationType: p.visitor.Operation.OperationDefinitions[ref].OperationType,
+		OperationType: operationType,
 	})
-	p.disallowSingleFlight = p.visitor.Operation.OperationDefinitions[ref].OperationType == ast.OperationTypeMutation
+	p.disallowSingleFlight = operationType == ast.OperationTypeMutation
 	p.nodes = append(p.nodes, definition)
 }
 

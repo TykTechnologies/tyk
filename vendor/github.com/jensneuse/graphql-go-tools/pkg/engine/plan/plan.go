@@ -201,7 +201,9 @@ func (p *Planner) Plan(operation, definition *ast.Document, operationName string
 	p.planningWalker.RegisterEnterDirectiveVisitor(p.planningVisitor)
 
 	for key := range p.planningVisitor.planners {
-		err := p.planningVisitor.planners[key].planner.Register(p.planningVisitor, p.planningVisitor.planners[key].dataSourceConfiguration.Custom)
+		custom := p.planningVisitor.planners[key].dataSourceConfiguration.Custom
+		isNested := p.planningVisitor.planners[key].isNestedPlanner()
+		err := p.planningVisitor.planners[key].planner.Register(p.planningVisitor, custom, isNested)
 		if err != nil {
 			p.planningWalker.StopWithInternalErr(err)
 		}
@@ -548,6 +550,7 @@ func (v *Visitor) EnterOperationDefinition(ref int) {
 
 	if isSubscription {
 		v.plan = &SubscriptionResponsePlan{
+			FlushInterval: v.Config.DefaultFlushInterval,
 			Response: resolve.GraphQLSubscription{
 				Response: graphQLResponse,
 			},
@@ -649,6 +652,17 @@ func (v *Visitor) resolveInputTemplates(config objectFetchConfiguration, input *
 			variableName, _ = variables.AddVariable(&resolve.ContextVariable{
 				Path: []string{variableValue},
 			}, false)
+		case "request":
+			if len(path) != 2 {
+				break
+			}
+			switch path[0] {
+			case "header":
+				key := path[1]
+				variableName, _ = variables.AddVariable(&resolve.HeaderVariable{
+					Path: []string{key},
+				}, false)
+			}
 		}
 		return variableName
 	})
@@ -748,7 +762,7 @@ func (_ *SubscriptionResponsePlan) PlanKind() Kind {
 }
 
 type DataSourcePlanner interface {
-	Register(visitor *Visitor, customConfiguration json.RawMessage) error
+	Register(visitor *Visitor, customConfiguration json.RawMessage, isNested bool) error
 	ConfigureFetch() FetchConfiguration
 	ConfigureSubscription() SubscriptionConfiguration
 }
@@ -783,6 +797,18 @@ type plannerConfiguration struct {
 	paths                   []pathConfiguration
 	dataSourceConfiguration DataSourceConfiguration
 	bufferID                int
+}
+
+//isNestedPlanner returns true in case the planner is not directly attached to the Operation root
+// a nested planner should always build a Query
+func (p *plannerConfiguration) isNestedPlanner() bool {
+	for i := range p.paths {
+		pathElements := strings.Count(p.paths[i].path, ".") + 1
+		if pathElements == 2 {
+			return false
+		}
+	}
+	return true
 }
 
 func (c *configurationVisitor) nextBufferID() int {
@@ -884,7 +910,7 @@ func (c *configurationVisitor) EnterField(ref int) {
 	if root.Kind != ast.NodeKindOperationDefinition {
 		return
 	}
-	isSubscription := c.operation.OperationDefinitions[root.Ref].OperationType == ast.OperationTypeSubscription
+	isSubscription := c.isSubscription(root.Ref, current)
 	for i, planner := range c.planners {
 		if planner.hasParent(parent) && planner.hasRootNode(typeName, fieldName) {
 			// same parent + root node = root sibling
@@ -962,6 +988,14 @@ func (c *configurationVisitor) EnterDocument(operation, definition *ast.Document
 			delete(c.fieldBuffers, i)
 		}
 	}
+}
+
+func (c *configurationVisitor) isSubscription(root int, path string) bool {
+	rootOperationType := c.operation.OperationDefinitions[root].OperationType
+	if rootOperationType != ast.OperationTypeSubscription {
+		return false
+	}
+	return strings.Count(path,".") == 1
 }
 
 type requiredFieldsVisitor struct {

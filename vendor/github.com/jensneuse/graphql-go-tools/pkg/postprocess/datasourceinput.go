@@ -54,97 +54,43 @@ func (d *ProcessDataSource) traverseFetch(fetch resolve.Fetch) {
 }
 
 func (d *ProcessDataSource) traverseTrigger(trigger *resolve.GraphQLSubscriptionTrigger) {
-	defer func() {
-		trigger.Variables = nil
-		trigger.Input = ""
-	}()
-
-	if trigger.Input == "" {
-		return
-	}
-
-	if !strings.Contains(trigger.Input, "$$") {
-		trigger.InputTemplate.Segments = append(trigger.InputTemplate.Segments, resolve.TemplateSegment{
-			SegmentType: resolve.StaticSegmentType,
-			Data:        []byte(trigger.Input),
-		})
-		return
-	}
-
-	segments := strings.Split(trigger.Input, "$$")
-
-	isVariable := false
-	for _, seg := range segments {
-		switch {
-		case isVariable:
-			i, _ := strconv.Atoi(seg)
-			switch v := (trigger.Variables)[i].(type) {
-			case *resolve.ContextVariable:
-				trigger.InputTemplate.Segments = append(trigger.InputTemplate.Segments, resolve.TemplateSegment{
-					SegmentType:        resolve.VariableSegmentType,
-					VariableSource:     resolve.VariableSourceContext,
-					VariableSourcePath: v.Path,
-				})
-			case *resolve.ObjectVariable:
-				trigger.InputTemplate.Segments = append(trigger.InputTemplate.Segments, resolve.TemplateSegment{
-					SegmentType:        resolve.VariableSegmentType,
-					VariableSource:     resolve.VariableSourceObject,
-					VariableSourcePath: v.Path,
-				})
-			}
-			isVariable = false
-		default:
-			trigger.InputTemplate.Segments = append(trigger.InputTemplate.Segments, resolve.TemplateSegment{
-				SegmentType: resolve.StaticSegmentType,
-				Data:        []byte(seg),
-			})
-			isVariable = true
-		}
-	}
+	d.resolveInputTemplate(trigger.Variables,trigger.Input,&trigger.InputTemplate)
+	trigger.Input = ""
+	trigger.Variables = nil
 }
 
 func (d *ProcessDataSource) traverseSingleFetch(fetch *resolve.SingleFetch) {
-	defer func() {
-		fetch.Variables = nil
-		fetch.Input = ""
-	}()
+	d.resolveInputTemplate(fetch.Variables,fetch.Input,&fetch.InputTemplate)
+	fetch.Input = ""
+	fetch.Variables = nil
+}
 
-	if fetch.Input == "" {
+func (d *ProcessDataSource) resolveInputTemplate(variables resolve.Variables, input string, template *resolve.InputTemplate) {
+
+	if input == "" {
 		return
 	}
 
-	if !strings.Contains(fetch.Input, "$$") {
-		fetch.InputTemplate.Segments = append(fetch.InputTemplate.Segments, resolve.TemplateSegment{
+	if !strings.Contains(input, "$$") {
+		template.Segments = append(template.Segments, resolve.TemplateSegment{
 			SegmentType: resolve.StaticSegmentType,
-			Data:        []byte(fetch.Input),
+			Data:        []byte(input),
 		})
 		return
 	}
 
-	segments := strings.Split(fetch.Input, "$$")
+	segments := strings.Split(input, "$$")
 
 	isVariable := false
 	for _, seg := range segments {
 		switch {
 		case isVariable:
 			i, _ := strconv.Atoi(seg)
-			switch v := (fetch.Variables)[i].(type) {
-			case *resolve.ContextVariable:
-				fetch.InputTemplate.Segments = append(fetch.InputTemplate.Segments, resolve.TemplateSegment{
-					SegmentType:        resolve.VariableSegmentType,
-					VariableSource:     resolve.VariableSourceContext,
-					VariableSourcePath: v.Path,
-				})
-			case *resolve.ObjectVariable:
-				fetch.InputTemplate.Segments = append(fetch.InputTemplate.Segments, resolve.TemplateSegment{
-					SegmentType:        resolve.VariableSegmentType,
-					VariableSource:     resolve.VariableSourceObject,
-					VariableSourcePath: v.Path,
-				})
-			}
+			variableTemplateSegment := (variables)[i].TemplateSegment()
+			template.Segments = append(template.Segments, variableTemplateSegment)
 			isVariable = false
 		default:
-			fetch.InputTemplate.Segments = append(fetch.InputTemplate.Segments, resolve.TemplateSegment{
+			template.Segments = append(template.Segments, resolve.TemplateSegment{
 				SegmentType: resolve.StaticSegmentType,
 				Data:        []byte(seg),
 			})
