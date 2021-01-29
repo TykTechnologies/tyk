@@ -54,7 +54,7 @@ func (m *GraphQLMiddleware) Init() {
 		absLogger := abstractlogger.NewLogrusLogger(log, absLoggerLevel(log.Level))
 		m.Spec.GraphQLExecutor.Client = &http.Client{}
 
-		if len(m.Spec.GraphQL.Version) == 0 || m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion1 {
+		if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersionNone || m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion1 {
 			m.initGraphQLEngineV1(absLogger)
 		} else if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion2 {
 			m.initGraphQLEngineV2(absLogger)

@@ -829,7 +829,7 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 	p.TykAPISpec.GraphQLExecutor.Client.Transport = roundTripper
 
 	switch p.TykAPISpec.GraphQL.Version {
-	case "":
+	case apidef.GraphQLConfigVersionNone:
 		fallthrough
 	case apidef.GraphQLConfigVersion1:
 		if p.TykAPISpec.GraphQLExecutor.Engine == nil {
