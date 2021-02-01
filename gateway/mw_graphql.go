@@ -153,8 +153,8 @@ func (m *GraphQLMiddleware) initGraphQLEngineV2(logger *abstractlogger.LogrusLog
 	}
 
 	m.Spec.GraphQLExecutor.EngineV2 = engine
-	m.Spec.GraphQLExecutor.HooksV2.BeforeFetchHook = &beforeFetchHookV2{m: m}
-	m.Spec.GraphQLExecutor.HooksV2.AfterFetchHook = &afterFetchHookV2{m: m}
+	m.Spec.GraphQLExecutor.HooksV2.BeforeFetchHook = m
+	m.Spec.GraphQLExecutor.HooksV2.AfterFetchHook = m
 }
 
 func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
@@ -222,6 +222,38 @@ func (m *GraphQLMiddleware) websocketUpgradeUsesGraphQLProtocol(r *http.Request)
 	return websocketProtocol == GraphQLWebSocketProtocol
 }
 
+func (m *GraphQLMiddleware) OnBeforeFetch(ctx resolve.HookContext, input []byte) {
+	m.BaseMiddleware.Logger().
+		WithFields(
+			logrus.Fields{
+				"path": ctx.CurrentPath,
+				"data": string(input),
+			},
+		).Debugf("%s: beforeFetchHook executed", ctx.CurrentPath)
+}
+
+func (m *GraphQLMiddleware) OnData(ctx resolve.HookContext, output []byte, singleFlight bool) {
+	m.BaseMiddleware.Logger().
+		WithFields(
+			logrus.Fields{
+				"path":          ctx.CurrentPath,
+				"data":          string(output),
+				"single_flight": singleFlight,
+			},
+		).Debugf("%s: afterFetchHook.OnData executed", ctx.CurrentPath)
+}
+
+func (m *GraphQLMiddleware) OnError(ctx resolve.HookContext, output []byte, singleFlight bool) {
+	m.BaseMiddleware.Logger().
+		WithFields(
+			logrus.Fields{
+				"path":          ctx.CurrentPath,
+				"data":          string(output),
+				"single_flight": singleFlight,
+			},
+		).Debugf("%s: afterFetchHook.OnError executed", ctx.CurrentPath)
+}
+
 func absLoggerLevel(level logrus.Level) abstractlogger.Level {
 	switch level {
 	case logrus.ErrorLevel:
@@ -263,44 +295,4 @@ func (p postReceiveHttpHook) Execute(ctx datasource.HookContext, resp *http.Resp
 				"status_code":   resp.StatusCode,
 			},
 		).Debugf("%s.%s: postReceiveHttpHook executed", ctx.TypeName, ctx.FieldName)
-}
-
-type beforeFetchHookV2 struct {
-	m *GraphQLMiddleware
-}
-
-func (b beforeFetchHookV2) OnBeforeFetch(ctx resolve.HookContext, input []byte) {
-	b.m.BaseMiddleware.Logger().
-		WithFields(
-			logrus.Fields{
-				"path": ctx.CurrentPath,
-				"data": string(input),
-			},
-		).Debugf("%s: beforeFetchHook executed", ctx.CurrentPath)
-}
-
-type afterFetchHookV2 struct {
-	m *GraphQLMiddleware
-}
-
-func (a afterFetchHookV2) OnData(ctx resolve.HookContext, output []byte, singleFlight bool) {
-	a.m.BaseMiddleware.Logger().
-		WithFields(
-			logrus.Fields{
-				"path":          ctx.CurrentPath,
-				"data":          string(output),
-				"single_flight": singleFlight,
-			},
-		).Debugf("%s: afterFetchHook.OnData executed", ctx.CurrentPath)
-}
-
-func (a afterFetchHookV2) OnError(ctx resolve.HookContext, output []byte, singleFlight bool) {
-	a.m.BaseMiddleware.Logger().
-		WithFields(
-			logrus.Fields{
-				"path":          ctx.CurrentPath,
-				"data":          string(output),
-				"single_flight": singleFlight,
-			},
-		).Debugf("%s: afterFetchHook.OnError executed", ctx.CurrentPath)
 }

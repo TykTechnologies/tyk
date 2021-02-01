@@ -1060,7 +1060,7 @@ const sampleAPI = `{
         ` + testGraphQLDataSourceConfiguration + `,
         ` + testRESTDataSourceConfiguration + `
       ],
-	  "engine_config": {
+	  "engine": {
 		"field_configs": [
 			{
 				"type_name": "Query",
@@ -1127,8 +1127,8 @@ const testRESTDataSourceConfigurationV2 = `
 	"config": {
 		"url": "` + testRESTDataSource + `",
 		"method": "GET",
-		"header": {},
-		"query": [],
+		"headers": {},
+		"query": {},
 		"body": ""
 	}
 }`

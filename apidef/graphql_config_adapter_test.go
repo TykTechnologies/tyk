@@ -211,7 +211,7 @@ const graphqlEngineV2ConfigJson = `{
 	"version": "2",
 	"schema": "` + v2Schema + `",
 	"last_schema_update": "2020-11-11T11:11:11.000+01:00",
-	"engine_config": {
+	"engine": {
 		"field_configs": [
 			{
 				"type_name": "Query",
