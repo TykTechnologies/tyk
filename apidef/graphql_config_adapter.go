@@ -7,9 +7,9 @@ import (
 
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/astparser"
-	"github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
+	graphqlDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/httpclient"
-	"github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/rest_datasource"
+	restDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/rest_datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/plan"
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 )
@@ -37,11 +37,7 @@ func (g *GraphQLConfigAdapter) EngineConfigV2() (*graphql.EngineV2Configuration,
 
 	conf := graphql.NewEngineV2Configuration(schema)
 
-	fieldConfigs, err := g.engineConfigV2FieldConfigs()
-	if err != nil {
-		return nil, err
-	}
-
+	fieldConfigs := g.engineConfigV2FieldConfigs()
 	datsSources, err := g.engineConfigV2DataSources()
 	if err != nil {
 		return nil, err
@@ -53,7 +49,7 @@ func (g *GraphQLConfigAdapter) EngineConfigV2() (*graphql.EngineV2Configuration,
 	return &conf, nil
 }
 
-func (g *GraphQLConfigAdapter) engineConfigV2FieldConfigs() (planFieldConfigs plan.FieldConfigurations, err error) {
+func (g *GraphQLConfigAdapter) engineConfigV2FieldConfigs() (planFieldConfigs plan.FieldConfigurations) {
 	for _, fc := range g.config.Engine.FieldConfigs {
 		planFieldConfig := plan.FieldConfiguration{
 			TypeName:              fc.TypeName,
@@ -65,7 +61,7 @@ func (g *GraphQLConfigAdapter) engineConfigV2FieldConfigs() (planFieldConfigs pl
 		planFieldConfigs = append(planFieldConfigs, planFieldConfig)
 	}
 
-	return planFieldConfigs, nil
+	return planFieldConfigs
 }
 
 func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []plan.DataSourceConfiguration, err error) {
@@ -91,14 +87,14 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 				return nil, err
 			}
 
-			factory := &rest_datasource.Factory{}
+			factory := &restDataSource.Factory{}
 			if g.httpClient != nil {
 				factory.Client = httpclient.NewNetHttpClient(g.httpClient)
 			}
 			planDataSource.Factory = factory
 
-			planDataSource.Custom = rest_datasource.ConfigJSON(rest_datasource.Configuration{
-				Fetch: rest_datasource.FetchConfiguration{
+			planDataSource.Custom = restDataSource.ConfigJSON(restDataSource.Configuration{
+				Fetch: restDataSource.FetchConfiguration{
 					URL:    restConfig.URL,
 					Method: restConfig.Method,
 					Body:   restConfig.Body,
@@ -115,14 +111,14 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 				return nil, err
 			}
 
-			factory := &graphql_datasource.Factory{}
+			factory := &graphqlDataSource.Factory{}
 			if g.httpClient != nil {
 				factory.Client = httpclient.NewNetHttpClient(g.httpClient)
 			}
 			planDataSource.Factory = factory
 
-			planDataSource.Custom = graphql_datasource.ConfigJson(graphql_datasource.Configuration{
-				Fetch: graphql_datasource.FetchConfiguration{
+			planDataSource.Custom = graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
+				Fetch: graphqlDataSource.FetchConfiguration{
 					URL:    graphqlConfig.URL,
 					Method: graphqlConfig.Method,
 					Header: g.convertHttpHeadersToEngineV2Headers(graphqlConfig.Headers),
@@ -141,14 +137,14 @@ func (g *GraphQLConfigAdapter) SetHttpClient(httpClient *http.Client) {
 	g.httpClient = httpClient
 }
 
-func (g *GraphQLConfigAdapter) convertURLQueriesToEngineV2Queries(apiDefQueries map[string]string) []rest_datasource.QueryConfiguration {
+func (g *GraphQLConfigAdapter) convertURLQueriesToEngineV2Queries(apiDefQueries map[string]string) []restDataSource.QueryConfiguration {
 	if len(apiDefQueries) == 0 {
 		return nil
 	}
 
-	var engineV2Queries []rest_datasource.QueryConfiguration
+	var engineV2Queries []restDataSource.QueryConfiguration
 	for apiDefQueryName, apiDefQueryValue := range apiDefQueries {
-		engineV2Query := rest_datasource.QueryConfiguration{
+		engineV2Query := restDataSource.QueryConfiguration{
 			Name:  apiDefQueryName,
 			Value: apiDefQueryValue,
 		}

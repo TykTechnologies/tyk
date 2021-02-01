@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
+	graphqlDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/httpclient"
-	"github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/rest_datasource"
+	restDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/rest_datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/plan"
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 	"github.com/stretchr/testify/assert"
@@ -73,11 +73,11 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 								FieldNames: []string{"rest"},
 							},
 						},
-						Factory: &rest_datasource.Factory{
+						Factory: &restDataSource.Factory{
 							Client: httpclient.NewNetHttpClient(httpClient),
 						},
-						Custom: rest_datasource.ConfigJSON(rest_datasource.Configuration{
-							Fetch: rest_datasource.FetchConfiguration{
+						Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
+							Fetch: restDataSource.FetchConfiguration{
 								URL:    "https://rest.example.com",
 								Method: "POST",
 								Header: map[string][]string{
@@ -85,7 +85,7 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 									"X-Custom":      {"A, B"},
 								},
 								Body: "body",
-								Query: []rest_datasource.QueryConfiguration{
+								Query: []restDataSource.QueryConfiguration{
 									{
 										Name:  "q",
 										Value: "val",
@@ -101,11 +101,11 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 								FieldNames: []string{"gql"},
 							},
 						},
-						Factory: &graphql_datasource.Factory{
+						Factory: &graphqlDataSource.Factory{
 							Client: httpclient.NewNetHttpClient(httpClient),
 						},
-						Custom: graphql_datasource.ConfigJson(graphql_datasource.Configuration{
-							Fetch: graphql_datasource.FetchConfiguration{
+						Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
+							Fetch: graphqlDataSource.FetchConfiguration{
 								URL:    "https://graphql.example.com",
 								Method: "POST",
 							},
@@ -124,11 +124,11 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 								FieldNames: []string{"id", "name"},
 							},
 						},
-						Factory: &rest_datasource.Factory{
+						Factory: &restDataSource.Factory{
 							Client: httpclient.NewNetHttpClient(httpClient),
 						},
-						Custom: rest_datasource.ConfigJSON(rest_datasource.Configuration{
-							Fetch: rest_datasource.FetchConfiguration{
+						Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
+							Fetch: restDataSource.FetchConfiguration{
 								URL:    "https://rest.example.com",
 								Method: "POST",
 							},
@@ -147,11 +147,11 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 								FieldNames: []string{"id", "name"},
 							},
 						},
-						Factory: &rest_datasource.Factory{
+						Factory: &restDataSource.Factory{
 							Client: httpclient.NewNetHttpClient(httpClient),
 						},
-						Custom: rest_datasource.ConfigJSON(rest_datasource.Configuration{
-							Fetch: rest_datasource.FetchConfiguration{
+						Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
+							Fetch: restDataSource.FetchConfiguration{
 								URL:    "https://rest.example.com",
 								Method: "POST",
 							},
@@ -174,11 +174,11 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 								FieldNames: []string{"name"},
 							},
 						},
-						Factory: &graphql_datasource.Factory{
+						Factory: &graphqlDataSource.Factory{
 							Client: httpclient.NewNetHttpClient(httpClient),
 						},
-						Custom: graphql_datasource.ConfigJson(graphql_datasource.Configuration{
-							Fetch: graphql_datasource.FetchConfiguration{
+						Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
+							Fetch: graphqlDataSource.FetchConfiguration{
 								URL:    "https://graphql.example.com",
 								Method: "POST",
 								Header: map[string][]string{
