@@ -1564,7 +1564,7 @@ func TestHandleAddOrUpdateApi(t *testing.T) {
 
 	t.Run("should return error when api definition json is invalid", func(t *testing.T) {
 		apiDefJson := []byte("{")
-		req, err := http.NewRequest("POST", "http://gateway", bytes.NewBuffer(apiDefJson))
+		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
 		require.NoError(t, err)
 
 		response, statusCode := handleAddOrUpdateApi("", req, testFs)
@@ -1581,7 +1581,7 @@ func TestHandleAddOrUpdateApi(t *testing.T) {
 		apiDefJson, err := json.Marshal(apiDef)
 		require.NoError(t, err)
 
-		req, err := http.NewRequest("POST", "http://gateway", bytes.NewBuffer(apiDefJson))
+		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
 		require.NoError(t, err)
 
 		response, statusCode := handleAddOrUpdateApi("555", req, testFs)
@@ -1606,7 +1606,7 @@ func TestHandleAddOrUpdateApi(t *testing.T) {
 		apiDefJson, err := json.Marshal(apiDef)
 		require.NoError(t, err)
 
-		req, err := http.NewRequest("POST", "http://gateway", bytes.NewBuffer(apiDefJson))
+		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
 		require.NoError(t, err)
 
 		response, statusCode := handleAddOrUpdateApi("", req, testFs)
@@ -1623,7 +1623,7 @@ func TestHandleAddOrUpdateApi(t *testing.T) {
 		apiDefJson, err := json.Marshal(apiDef)
 		require.NoError(t, err)
 
-		req, err := http.NewRequest("POST", "http://gateway", bytes.NewBuffer(apiDefJson))
+		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
 		require.NoError(t, err)
 
 		response, statusCode := handleAddOrUpdateApi("", req, testFs)
