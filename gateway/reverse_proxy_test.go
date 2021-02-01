@@ -708,10 +708,10 @@ func TestGraphQL_InternalDataSource(t *testing.T) {
 			spec.GraphQL.Enabled = true
 			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
 			spec.GraphQL.Version = apidef.GraphQLConfigVersion2
-			spec.GraphQL.EngineConfig.DataSources[0] = generateRESTDataSourceV2(func(_ *apidef.GraphQLEngineDataSource, restConfig *apidef.GraphQLEngineDataSourceConfigREST) {
+			spec.GraphQL.Engine.DataSources[0] = generateRESTDataSourceV2(func(_ *apidef.GraphQLEngineDataSource, restConfig *apidef.GraphQLEngineDataSourceConfigREST) {
 				restConfig.URL = fmt.Sprintf("tyk://%s", tykREST.Name)
 			})
-			spec.GraphQL.EngineConfig.DataSources[1] = generateGraphQLDataSourceV2(func(_ *apidef.GraphQLEngineDataSource, graphqlConf *apidef.GraphQLEngineDataSourceConfigGraphQL) {
+			spec.GraphQL.Engine.DataSources[1] = generateGraphQLDataSourceV2(func(_ *apidef.GraphQLEngineDataSource, graphqlConf *apidef.GraphQLEngineDataSourceConfigGraphQL) {
 				graphqlConf.URL = fmt.Sprintf("tyk://%s", tykGraphQL.Name)
 			})
 			spec.GraphQL.TypeFieldConfigurations = nil

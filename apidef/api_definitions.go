@@ -553,8 +553,8 @@ type GraphQLConfig struct {
 	TypeFieldConfigurations []datasource.TypeFieldConfiguration `bson:"type_field_configurations" json:"type_field_configurations"`
 	// GraphQLPlayground is the Playground specific configuration.
 	GraphQLPlayground GraphQLPlayground `bson:"playground" json:"playground"`
-	// EngineConfig holds the configuration for engine v2 and upwards
-	EngineConfig GraphQLEngineConfig `bson:"engine_config" json:"engine_config"`
+	// Engine holds the configuration for engine v2 and upwards.
+	Engine GraphQLEngineConfig `bson:"engine" json:"engine"`
 }
 
 type GraphQLConfigVersion string

@@ -54,7 +54,7 @@ func (g *GraphQLConfigAdapter) EngineConfigV2() (*graphql.EngineV2Configuration,
 }
 
 func (g *GraphQLConfigAdapter) engineConfigV2FieldConfigs() (planFieldConfigs plan.FieldConfigurations, err error) {
-	for _, fc := range g.config.EngineConfig.FieldConfigs {
+	for _, fc := range g.config.Engine.FieldConfigs {
 		planFieldConfig := plan.FieldConfiguration{
 			TypeName:              fc.TypeName,
 			FieldName:             fc.FieldName,
@@ -69,7 +69,7 @@ func (g *GraphQLConfigAdapter) engineConfigV2FieldConfigs() (planFieldConfigs pl
 }
 
 func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []plan.DataSourceConfiguration, err error) {
-	for _, ds := range g.config.EngineConfig.DataSources {
+	for _, ds := range g.config.Engine.DataSources {
 		planDataSource := plan.DataSourceConfiguration{
 			RootNodes: []plan.TypeField{},
 		}

@@ -75,12 +75,12 @@ var ErrDuplicateDataSourceName = errors.New("duplicate data source names are not
 type RuleUniqueDataSourceNames struct{}
 
 func (r *RuleUniqueDataSourceNames) Validate(apiDef *APIDefinition, validationResult *ValidationResult) {
-	if apiDef.GraphQL.EngineConfig.DataSources == nil || len(apiDef.GraphQL.EngineConfig.DataSources) <= 1 {
+	if apiDef.GraphQL.Engine.DataSources == nil || len(apiDef.GraphQL.Engine.DataSources) <= 1 {
 		return
 	}
 
 	usedNames := map[string]bool{}
-	for _, ds := range apiDef.GraphQL.EngineConfig.DataSources {
+	for _, ds := range apiDef.GraphQL.Engine.DataSources {
 		trimmedName := strings.TrimSpace(strings.ToLower(ds.Name))
 		if usedNames[trimmedName] {
 			validationResult.IsValid = false

@@ -1595,7 +1595,7 @@ func TestHandleAddOrUpdateApi(t *testing.T) {
 	t.Run("should return error when semantic validation fails", func(t *testing.T) {
 		apiDef := apidef.DummyAPI()
 		apiDef.APIID = "123"
-		apiDef.GraphQL.EngineConfig.DataSources = []apidef.GraphQLEngineDataSource{
+		apiDef.GraphQL.Engine.DataSources = []apidef.GraphQLEngineDataSource{
 			{
 				Name: "duplicate",
 			},
