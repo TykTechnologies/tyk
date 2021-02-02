@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/cespare/xxhash"
-
 	"github.com/jensneuse/graphql-go-tools/internal/pkg/unsafebytes"
 )
 
@@ -41,7 +39,11 @@ func (d *Document) NodeNameBytes(node Node) ByteSlice {
 	return d.Input.ByteSlice(ref)
 }
 
-func (n Node) Name(definition *Document) string {
+func (n Node) NameBytes(definition *Document) []byte {
+	return definition.NodeNameBytes(n)
+}
+
+func (n Node) NameString(definition *Document) string {
 	return unsafebytes.BytesToString(definition.NodeNameBytes(n))
 }
 
@@ -412,7 +414,10 @@ func (d *Document) NodeFragmentIsAllowedOnObjectTypeDefinition(fragmentNode, obj
 func (d *Document) UnionNodeIntersectsInterfaceNode(unionNode, interfaceNode Node) bool {
 	for _, i := range d.UnionTypeDefinitions[unionNode.Ref].UnionMemberTypes.Refs {
 		memberName := d.ResolveTypeNameBytes(i)
-		node := d.Index.Nodes[xxhash.Sum64(memberName)]
+		node, exists := d.Index.FirstNodeByNameBytes(memberName)
+		if !exists {
+			continue
+		}
 		if node.Kind != NodeKindObjectTypeDefinition {
 			continue
 		}
