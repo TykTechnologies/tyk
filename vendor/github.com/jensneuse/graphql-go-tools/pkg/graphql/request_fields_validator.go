@@ -26,14 +26,14 @@ type FieldRestrictionList struct {
 	Types []Type
 }
 
-type fieldsValidator struct {
+type DefaultFieldsValidator struct {
 }
 
 // Validate validates a request by checking if `restrictions` contains blocked fields.
 //
 // Deprecated: This function can only handle blocked fields. Use `ValidateByFieldList` if you
 // want to check for blocked or allowed fields instead.
-func (d fieldsValidator) Validate(request *Request, schema *Schema, restrictions []Type) (RequestFieldsValidationResult, error) {
+func (d DefaultFieldsValidator) Validate(request *Request, schema *Schema, restrictions []Type) (RequestFieldsValidationResult, error) {
 	restrictionList := FieldRestrictionList{
 		Kind:  BlockList,
 		Types: restrictions,
@@ -43,7 +43,7 @@ func (d fieldsValidator) Validate(request *Request, schema *Schema, restrictions
 }
 
 // ValidateByFieldList will validate a request by using a list of allowed or blocked fields.
-func (d fieldsValidator) ValidateByFieldList(request *Request, schema *Schema, restrictionList FieldRestrictionList) (RequestFieldsValidationResult, error) {
+func (d DefaultFieldsValidator) ValidateByFieldList(request *Request, schema *Schema, restrictionList FieldRestrictionList) (RequestFieldsValidationResult, error) {
 	report := operationreport.Report{}
 	if len(restrictionList.Types) == 0 {
 		return fieldsValidationResult(report, true, "", "")
@@ -59,7 +59,7 @@ func (d fieldsValidator) ValidateByFieldList(request *Request, schema *Schema, r
 	return d.checkForAllowedFields(restrictionList, requestedTypes, report)
 }
 
-func (d fieldsValidator) checkForBlockedFields(restrictionList FieldRestrictionList, requestTypes RequestTypes, report operationreport.Report) (RequestFieldsValidationResult, error) {
+func (d DefaultFieldsValidator) checkForBlockedFields(restrictionList FieldRestrictionList, requestTypes RequestTypes, report operationreport.Report) (RequestFieldsValidationResult, error) {
 	for _, typeFromList := range restrictionList.Types {
 		requestedFields, hasRestrictedType := requestTypes[typeFromList.Name]
 		if !hasRestrictedType {
@@ -76,7 +76,7 @@ func (d fieldsValidator) checkForBlockedFields(restrictionList FieldRestrictionL
 	return fieldsValidationResult(report, true, "", "")
 }
 
-func (d fieldsValidator) checkForAllowedFields(restrictionList FieldRestrictionList, requestTypes RequestTypes, report operationreport.Report) (RequestFieldsValidationResult, error) {
+func (d DefaultFieldsValidator) checkForAllowedFields(restrictionList FieldRestrictionList, requestTypes RequestTypes, report operationreport.Report) (RequestFieldsValidationResult, error) {
 	allowedFieldsLookupMap := make(map[string]map[string]bool)
 	for _, allowedType := range restrictionList.Types {
 		allowedFieldsLookupMap[allowedType.Name] = make(map[string]bool)
