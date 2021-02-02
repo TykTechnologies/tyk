@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+
 	"github.com/TykTechnologies/tyk/headers"
 
 	"github.com/TykTechnologies/tyk/regexp"
@@ -43,7 +45,12 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 			return nil, http.StatusOK
 		}
 
-		result, err := gqlRequest.ValidateRestrictedFields(m.Spec.GraphQLExecutor.Schema, sessionVersionData.AllowedTypes)
+		fieldRestrictionList := graphql.FieldRestrictionList{
+			Kind:  graphql.AllowList,
+			Types: sessionVersionData.AllowedTypes,
+		}
+
+		result, err := gqlRequest.ValidateFieldRestrictions(m.Spec.GraphQLExecutor.Schema, fieldRestrictionList, graphql.DefaultFieldsValidator{})
 		if err != nil {
 			m.Logger().Errorf("Error during GraphQL request restricted fields validation: '%s'", err)
 			return errors.New("there was a problem proxying the request"), http.StatusInternalServerError

@@ -24,9 +24,14 @@ func TestGraphQL_RestrictedTypes(t *testing.T) {
 	_, directKey := g.CreateSession(func(s *user.SessionState) {
 		s.AccessRights = map[string]user.AccessDefinition{
 			api.APIID: {
-				APIID:   api.APIID,
-				APIName: api.Name,
+				APIID:               api.APIID,
+				APIName:             api.Name,
+				AllowedTypesEnabled: true,
 				AllowedTypes: []graphql.Type{
+					{
+						Name:   "Query",
+						Fields: []string{"countries"},
+					},
 					{
 						Name:   "Country",
 						Fields: []string{"code"},
@@ -39,9 +44,14 @@ func TestGraphQL_RestrictedTypes(t *testing.T) {
 	pID := CreatePolicy(func(p *user.Policy) {
 		p.AccessRights = map[string]user.AccessDefinition{
 			api.APIID: {
-				APIID:   api.APIID,
-				APIName: api.Name,
+				APIID:               api.APIID,
+				APIName:             api.Name,
+				AllowedTypesEnabled: true,
 				AllowedTypes: []graphql.Type{
+					{
+						Name:   "Query",
+						Fields: []string{"countries"},
+					},
 					{
 						Name:   "Country",
 						Fields: []string{"name"},
@@ -70,7 +80,7 @@ func TestGraphQL_RestrictedTypes(t *testing.T) {
 
 		_, _ = g.Run(t, []test.TestCase{
 			{Data: q1, Headers: authHeaderWithDirectKey,
-				BodyMatch: `{"errors":\[{"message":"field: code is not allowed on type: Country"}\]}`, Code: http.StatusBadRequest},
+				BodyMatch: `{"errors":\[{"message":"field: name is restricted on type: Country","path":null}\]}`, Code: http.StatusBadRequest},
 			{Data: q2, Headers: authHeaderWithDirectKey, Code: http.StatusOK},
 		}...)
 	})
@@ -82,7 +92,7 @@ func TestGraphQL_RestrictedTypes(t *testing.T) {
 
 		_, _ = g.Run(t, []test.TestCase{
 			{Data: q2, Headers: authHeaderWithPolicyAppliedKey,
-				BodyMatch: `{"errors":\[{"message":"field: name is not allowed on type: Country"}\]}`, Code: http.StatusBadRequest},
+				BodyMatch: `{"errors":\[{"message":"field: code is restricted on type: Country","path":null}\]}`, Code: http.StatusBadRequest},
 			{Data: q1, Headers: authHeaderWithPolicyAppliedKey, Code: http.StatusOK},
 		}...)
 	})
