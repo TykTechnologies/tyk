@@ -33,6 +33,7 @@ import (
 	"github.com/jensneuse/abstractlogger"
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 	gqlhttp "github.com/jensneuse/graphql-go-tools/pkg/http"
+	"github.com/jensneuse/graphql-go-tools/pkg/subscription"
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
@@ -848,7 +849,8 @@ func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(round
 	done := make(chan bool)
 	errChan := make(chan error)
 
-	go gqlhttp.HandleWebsocket(done, errChan, conn, p.TykAPISpec.GraphQLExecutor.Engine.NewExecutionHandler(), absLogger)
+	executorPool := subscription.NewExecutorV1Pool(p.TykAPISpec.GraphQLExecutor.Engine.NewExecutionHandler())
+	go gqlhttp.HandleWebsocket(done, errChan, conn, executorPool, absLogger)
 	select {
 	case err := <-errChan:
 		log.Error("could not start graphql websocket handler: ", err)
