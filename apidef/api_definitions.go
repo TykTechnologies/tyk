@@ -543,7 +543,7 @@ type GraphQLConfig struct {
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// ExecutionMode is the mode to define how an api behaves.
 	ExecutionMode GraphQLExecutionMode `bson:"execution_mode" json:"execution_mode"`
-	// Version defines the version of the GraphQL config and engine to be used
+	// Version defines the version of the GraphQL config and engine to be used.
 	Version GraphQLConfigVersion `bson:"version" json:"version"`
 	// Schema is the GraphQL Schema exposed by the GraphQL API/Upstream/Engine.
 	Schema string `bson:"schema" json:"schema"`
