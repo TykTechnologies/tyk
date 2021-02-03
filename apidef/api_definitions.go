@@ -598,11 +598,11 @@ type GraphQLTypeFields struct {
 }
 
 type GraphQLEngineDataSourceConfigREST struct {
-	URL     string            `bson:"url" json:"url"`
-	Method  string            `bson:"method" json:"method"`
-	Headers map[string]string `bson:"headers" json:"headers"`
-	Query   map[string]string `bson:"query" json:"query"`
-	Body    string            `bson:"body" json:"body"`
+	URL     string              `bson:"url" json:"url"`
+	Method  string              `bson:"method" json:"method"`
+	Headers map[string]string   `bson:"headers" json:"headers"`
+	Query   map[string][]string `bson:"query" json:"query"`
+	Body    string              `bson:"body" json:"body"`
 }
 
 type GraphQLEngineDataSourceConfigGraphQL struct {

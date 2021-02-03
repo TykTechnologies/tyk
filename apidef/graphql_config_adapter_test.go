@@ -88,7 +88,7 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 								Query: []restDataSource.QueryConfiguration{
 									{
 										Name:  "q",
-										Value: "val",
+										Value: "val1,val2",
 									},
 								},
 							},
@@ -236,7 +236,7 @@ const graphqlEngineV2ConfigJson = `{
 						"X-Custom": "A, B"
 					},
 					"query": {
-						"q": "val"
+						"q": ["val1", "val2"]
 					},
 					"body": "body"
 				}
