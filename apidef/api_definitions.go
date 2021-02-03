@@ -544,10 +544,10 @@ type GraphQLConfig struct {
 	// ExecutionMode is the mode to define how an api behaves.
 	ExecutionMode GraphQLExecutionMode `bson:"execution_mode" json:"execution_mode"`
 	// Version defines the version of the GraphQL config and engine to be used
-	Version string `bson:"version" json:"version"`
+	Version GraphQLConfigVersion `bson:"version" json:"version"`
 	// Schema is the GraphQL Schema exposed by the GraphQL API/Upstream/Engine.
 	Schema string `bson:"schema" json:"schema"`
-	// LastSchemaUpdate contains the date and time of the last triggered schema update to the upstream
+	// LastSchemaUpdate contains the date and time of the last triggered schema update to the upstream.
 	LastSchemaUpdate *time.Time `bson:"last_schema_update" json:"last_schema_update,omitempty"`
 	// TypeFieldConfigurations is a rule set of data source and mapping of a schema field.
 	TypeFieldConfigurations []datasource.TypeFieldConfiguration `bson:"type_field_configurations" json:"type_field_configurations"`
@@ -560,9 +560,9 @@ type GraphQLConfig struct {
 type GraphQLConfigVersion string
 
 const (
-	GraphQLConfigVersionNone = ""
-	GraphQLConfigVersion1    = "1"
-	GraphQLConfigVersion2    = "2"
+	GraphQLConfigVersionNone GraphQLConfigVersion = ""
+	GraphQLConfigVersion1    GraphQLConfigVersion = "1"
+	GraphQLConfigVersion2    GraphQLConfigVersion = "2"
 )
 
 type GraphQLEngineConfig struct {

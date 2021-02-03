@@ -81,7 +81,7 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 
 		switch ds.Kind {
 		case GraphQLEngineDataSourceKindREST:
-			restConfig := GraphQLEngineDataSourceConfigREST{}
+			var restConfig GraphQLEngineDataSourceConfigREST
 			err = json.Unmarshal(ds.Config, &restConfig)
 			if err != nil {
 				return nil, err
@@ -104,8 +104,7 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 			})
 
 		case GraphQLEngineDataSourceKindGraphQL:
-
-			graphqlConfig := GraphQLEngineDataSourceConfigGraphQL{}
+			var graphqlConfig GraphQLEngineDataSourceConfigGraphQL
 			err = json.Unmarshal(ds.Config, &graphqlConfig)
 			if err != nil {
 				return nil, err
