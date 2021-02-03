@@ -12,6 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/adapter"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
 
@@ -139,7 +140,7 @@ func (m *GraphQLMiddleware) initGraphQLEngineV1(logger *abstractlogger.LogrusLog
 }
 
 func (m *GraphQLMiddleware) initGraphQLEngineV2(logger *abstractlogger.LogrusLogger) {
-	configAdapter := apidef.NewGraphQLConfigAdapter(m.Spec.GraphQL)
+	configAdapter := adapter.NewGraphQLConfigAdapter(m.Spec.GraphQL)
 	configAdapter.SetHttpClient(m.Spec.GraphQLExecutor.Client)
 
 	engineConfig, err := configAdapter.EngineConfigV2()

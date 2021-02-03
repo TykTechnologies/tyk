@@ -1,4 +1,4 @@
-package apidef
+package adapter
 
 import (
 	"encoding/json"
@@ -13,21 +13,23 @@ import (
 	restDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/rest_datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/plan"
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 var ErrUnsupportedGraphQLConfigVersion = errors.New("provided version of GraphQL config is not supported for this operation")
 
 type GraphQLConfigAdapter struct {
-	config     GraphQLConfig
+	config     apidef.GraphQLConfig
 	httpClient *http.Client
 }
 
-func NewGraphQLConfigAdapter(config GraphQLConfig) GraphQLConfigAdapter {
+func NewGraphQLConfigAdapter(config apidef.GraphQLConfig) GraphQLConfigAdapter {
 	return GraphQLConfigAdapter{config: config}
 }
 
 func (g *GraphQLConfigAdapter) EngineConfigV2() (*graphql.EngineV2Configuration, error) {
-	if g.config.Version != GraphQLConfigVersion2 {
+	if g.config.Version != apidef.GraphQLConfigVersion2 {
 		return nil, ErrUnsupportedGraphQLConfigVersion
 	}
 
@@ -81,8 +83,8 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 		}
 
 		switch ds.Kind {
-		case GraphQLEngineDataSourceKindREST:
-			var restConfig GraphQLEngineDataSourceConfigREST
+		case apidef.GraphQLEngineDataSourceKindREST:
+			var restConfig apidef.GraphQLEngineDataSourceConfigREST
 			err = json.Unmarshal(ds.Config, &restConfig)
 			if err != nil {
 				return nil, err
@@ -104,8 +106,8 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 				},
 			})
 
-		case GraphQLEngineDataSourceKindGraphQL:
-			var graphqlConfig GraphQLEngineDataSourceConfigGraphQL
+		case apidef.GraphQLEngineDataSourceKindGraphQL:
+			var graphqlConfig apidef.GraphQLEngineDataSourceConfigGraphQL
 			err = json.Unmarshal(ds.Config, &graphqlConfig)
 			if err != nil {
 				return nil, err

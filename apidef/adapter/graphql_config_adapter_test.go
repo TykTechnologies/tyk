@@ -1,4 +1,4 @@
-package apidef
+package adapter
 
 import (
 	"encoding/json"
@@ -12,11 +12,13 @@ import (
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 	run := func(t *testing.T, inputJSON string, httpClient *http.Client) (*graphql.EngineV2Configuration, error) {
-		var gqlConfig GraphQLConfig
+		var gqlConfig apidef.GraphQLConfig
 		err := json.Unmarshal([]byte(inputJSON), &gqlConfig)
 		require.NoError(t, err)
 
