@@ -128,7 +128,7 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 		planDataSources = append(planDataSources, planDataSource)
 	}
 
-	err = g.determineChildNodes(&planDataSources)
+	err = g.determineChildNodes(planDataSources)
 	return planDataSources, err
 }
 
@@ -167,18 +167,18 @@ func (g *GraphQLConfigAdapter) convertHttpHeadersToEngineV2Headers(apiDefHeaders
 	return engineV2Headers
 }
 
-func (g *GraphQLConfigAdapter) determineChildNodes(planDataSources *[]plan.DataSourceConfiguration) error {
+func (g *GraphQLConfigAdapter) determineChildNodes(planDataSources []plan.DataSourceConfiguration) error {
 	schema, report := astparser.ParseGraphqlDocumentString(g.config.Schema)
 	if report.HasErrors() {
 		return report
 	}
-	for i := range *planDataSources {
-		for j := range (*planDataSources)[i].RootNodes {
-			typeName := (*planDataSources)[i].RootNodes[j].TypeName
-			for k := range (*planDataSources)[i].RootNodes[j].FieldNames {
-				fieldName := (*planDataSources)[i].RootNodes[j].FieldNames[k]
-				children := g.findFieldChildren(typeName, fieldName, &schema, *planDataSources)
-				(*planDataSources)[i].ChildNodes = append((*planDataSources)[i].ChildNodes, children...)
+	for i := range planDataSources {
+		for j := range planDataSources[i].RootNodes {
+			typeName := planDataSources[i].RootNodes[j].TypeName
+			for k := range planDataSources[i].RootNodes[j].FieldNames {
+				fieldName := planDataSources[i].RootNodes[j].FieldNames[k]
+				children := g.findFieldChildren(typeName, fieldName, &schema, planDataSources)
+				planDataSources[i].ChildNodes = append(planDataSources[i].ChildNodes, children...)
 			}
 		}
 	}
