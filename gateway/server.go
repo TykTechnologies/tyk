@@ -119,13 +119,13 @@ type Gateway struct {
 }
 
 func NewGateway(config config.Config) Gateway {
-	g := Gateway{
+	gw := Gateway{
 		DefaultProxyMux: &proxyMux{
 			again: again.New(),
 		},
 	}
-	g.SetConfig(config)
-	return g
+	gw.SetConfig(config)
+	return gw
 }
 
 // SetNodeID writes NodeID safely.
@@ -1385,6 +1385,7 @@ func (gw *Gateway) start(ctx context.Context) {
 		RPCListener = RPCStorageHandler{
 			KeyPrefix:        "rpc.listener.",
 			SuppressRegister: true,
+			Gw:gw,
 		}
 
 		RPCListener.Connect()
