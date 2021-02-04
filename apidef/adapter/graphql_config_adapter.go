@@ -188,19 +188,7 @@ func (g *GraphQLConfigAdapter) determineChildNodes(planDataSources []plan.DataSo
 }
 
 func (g *GraphQLConfigAdapter) findFieldChildren(typeName, fieldName string, schema *ast.Document, dataSources []plan.DataSourceConfiguration) []plan.TypeField {
-	node, exists := schema.Index.FirstNodeByNameStr(typeName)
-	if !exists {
-		return nil
-	}
-	var fields []int
-	switch node.Kind {
-	case ast.NodeKindObjectTypeDefinition:
-		fields = schema.ObjectTypeDefinitions[node.Ref].FieldsDefinition.Refs
-	case ast.NodeKindInterfaceTypeDefinition:
-		fields = schema.InterfaceTypeDefinitions[node.Ref].FieldsDefinition.Refs
-	default:
-		return nil
-	}
+	fields := g.nodeFieldRefs(typeName, schema)
 	if len(fields) == 0 {
 		return nil
 	}
@@ -217,19 +205,7 @@ func (g *GraphQLConfigAdapter) findFieldChildren(typeName, fieldName string, sch
 }
 
 func (g *GraphQLConfigAdapter) findNestedFieldChildren(typeName string, schema *ast.Document, dataSources []plan.DataSourceConfiguration, childNodes *[]plan.TypeField) {
-	node, exists := schema.Index.FirstNodeByNameStr(typeName)
-	if !exists {
-		return
-	}
-	var fields []int
-	switch node.Kind {
-	case ast.NodeKindObjectTypeDefinition:
-		fields = schema.ObjectTypeDefinitions[node.Ref].FieldsDefinition.Refs
-	case ast.NodeKindInterfaceTypeDefinition:
-		fields = schema.InterfaceTypeDefinitions[node.Ref].FieldsDefinition.Refs
-	default:
-		return
-	}
+	fields := g.nodeFieldRefs(typeName, schema)
 	if len(fields) == 0 {
 		return
 	}
@@ -243,6 +219,24 @@ func (g *GraphQLConfigAdapter) findNestedFieldChildren(typeName string, schema *
 		g.findNestedFieldChildren(fieldTypeName, schema, dataSources, childNodes)
 	}
 	return
+}
+
+func (g *GraphQLConfigAdapter) nodeFieldRefs(typeName string, schema *ast.Document) []int {
+	node, exists := schema.Index.FirstNodeByNameStr(typeName)
+	if !exists {
+		return nil
+	}
+	var fields []int
+	switch node.Kind {
+	case ast.NodeKindObjectTypeDefinition:
+		fields = schema.ObjectTypeDefinitions[node.Ref].FieldsDefinition.Refs
+	case ast.NodeKindInterfaceTypeDefinition:
+		fields = schema.InterfaceTypeDefinitions[node.Ref].FieldsDefinition.Refs
+	default:
+		return nil
+	}
+
+	return fields
 }
 
 func (g *GraphQLConfigAdapter) isRootField(typeName, fieldName string, dataSources []plan.DataSourceConfiguration) bool {
