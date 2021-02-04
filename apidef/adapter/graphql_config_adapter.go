@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strings"
 
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/astparser"
@@ -139,16 +138,16 @@ func (g *GraphQLConfigAdapter) SetHttpClient(httpClient *http.Client) {
 	g.httpClient = httpClient
 }
 
-func (g *GraphQLConfigAdapter) convertURLQueriesToEngineV2Queries(apiDefQueries map[string][]string) []restDataSource.QueryConfiguration {
+func (g *GraphQLConfigAdapter) convertURLQueriesToEngineV2Queries(apiDefQueries []apidef.QueryVariable) []restDataSource.QueryConfiguration {
 	if len(apiDefQueries) == 0 {
 		return nil
 	}
 
 	var engineV2Queries []restDataSource.QueryConfiguration
-	for apiDefQueryName, apiDefQueryValues := range apiDefQueries {
+	for _, apiDefQueryVar := range apiDefQueries {
 		engineV2Query := restDataSource.QueryConfiguration{
-			Name:  apiDefQueryName,
-			Value: strings.Join(apiDefQueryValues, ","),
+			Name:  apiDefQueryVar.Name,
+			Value: apiDefQueryVar.Value,
 		}
 
 		engineV2Queries = append(engineV2Queries, engineV2Query)

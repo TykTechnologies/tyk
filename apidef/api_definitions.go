@@ -598,17 +598,22 @@ type GraphQLTypeFields struct {
 }
 
 type GraphQLEngineDataSourceConfigREST struct {
-	URL     string              `bson:"url" json:"url"`
-	Method  string              `bson:"method" json:"method"`
-	Headers map[string]string   `bson:"headers" json:"headers"`
-	Query   map[string][]string `bson:"query" json:"query"`
-	Body    string              `bson:"body" json:"body"`
+	URL     string            `bson:"url" json:"url"`
+	Method  string            `bson:"method" json:"method"`
+	Headers map[string]string `bson:"headers" json:"headers"`
+	Query   []QueryVariable   `bson:"query" json:"query"`
+	Body    string            `bson:"body" json:"body"`
 }
 
 type GraphQLEngineDataSourceConfigGraphQL struct {
 	URL     string            `bson:"url" json:"url"`
 	Method  string            `bson:"method" json:"method"`
 	Headers map[string]string `bson:"headers" json:"headers"`
+}
+
+type QueryVariable struct {
+	Name  string `bson:"name" json:"name"`
+	Value string `bson:"value" json:"value"`
 }
 
 // GraphQLExecutionMode is the mode in which the GraphQL Middleware should operate.

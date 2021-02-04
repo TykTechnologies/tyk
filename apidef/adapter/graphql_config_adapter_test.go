@@ -92,6 +92,14 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 										Name:  "q",
 										Value: "val1,val2",
 									},
+									{
+										Name:  "repeat",
+										Value: "val1",
+									},
+									{
+										Name:  "repeat",
+										Value: "val2",
+									},
 								},
 							},
 						}),
@@ -237,9 +245,20 @@ const graphqlEngineV2ConfigJson = `{
 						"Authorization": "123",
 						"X-Custom": "A, B"
 					},
-					"query": {
-						"q": ["val1", "val2"]
-					},
+					"query": [
+						{
+							"name": "q",
+							"value": "val1,val2"
+						},
+						{
+							"name": "repeat",
+							"value": "val1"
+						},
+						{
+							"name": "repeat",
+							"value": "val2"
+						}
+					],
 					"body": "body"
 				}
 			},
@@ -265,7 +284,7 @@ const graphqlEngineV2ConfigJson = `{
 					"url": "https://rest.example.com",
 					"method": "POST",
 					"headers": {},
-					"query": {},
+					"query": [],
 					"body": ""
 				}
 			},
@@ -280,7 +299,7 @@ const graphqlEngineV2ConfigJson = `{
 					"url": "https://rest.example.com",
 					"method": "POST",
 					"headers": {},
-					"query": {},
+					"query": [],
 					"body": ""
 				}
 			},
