@@ -26,6 +26,7 @@ package unix
 #include <mach/mach.h>
 #include <mach/message.h>
 #include <sys/event.h>
+#include <sys/kern_control.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
 #include <sys/param.h>
@@ -125,6 +126,12 @@ type Fsid C.struct_fsid
 
 type Dirent C.struct_dirent
 
+// File system limits
+
+const (
+	PathMax = C.PATH_MAX
+)
+
 // Sockets
 
 type RawSockaddrInet4 C.struct_sockaddr_in
@@ -138,6 +145,8 @@ type RawSockaddrDatalink C.struct_sockaddr_dl
 type RawSockaddr C.struct_sockaddr
 
 type RawSockaddrAny C.struct_sockaddr_any
+
+type RawSockaddrCtl C.struct_sockaddr_ctl
 
 type _Socklen C.socklen_t
 
@@ -167,6 +176,7 @@ const (
 	SizeofSockaddrAny      = C.sizeof_struct_sockaddr_any
 	SizeofSockaddrUnix     = C.sizeof_struct_sockaddr_un
 	SizeofSockaddrDatalink = C.sizeof_struct_sockaddr_dl
+	SizeofSockaddrCtl      = C.sizeof_struct_sockaddr_ctl
 	SizeofLinger           = C.sizeof_struct_linger
 	SizeofIPMreq           = C.sizeof_struct_ip_mreq
 	SizeofIPv6Mreq         = C.sizeof_struct_ipv6_mreq
@@ -281,3 +291,7 @@ type Utsname C.struct_utsname
 const SizeofClockinfo = C.sizeof_struct_clockinfo
 
 type Clockinfo C.struct_clockinfo
+
+// ctl_info
+
+type CtlInfo C.struct_ctl_info

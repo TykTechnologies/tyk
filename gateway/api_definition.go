@@ -21,10 +21,13 @@ import (
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
 	"github.com/gorilla/mux"
+	"github.com/jensneuse/graphql-go-tools/pkg/engine/resolve"
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/gojsonschema"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
@@ -188,7 +191,12 @@ type APISpec struct {
 	network NetworkStats
 
 	GraphQLExecutor struct {
-		Engine *graphql.ExecutionEngine
+		Engine   *graphql.ExecutionEngine
+		EngineV2 *graphql.ExecutionEngineV2
+		HooksV2  struct {
+			BeforeFetchHook resolve.BeforeFetchHook
+			AfterFetchHook  resolve.AfterFetchHook
+		}
 		Client *http.Client
 		Schema *graphql.Schema
 	}
