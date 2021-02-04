@@ -178,8 +178,8 @@ func (d *PythonDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, baseP
 }
 
 // PythonInit initializes the Python interpreter.
-func PythonInit() error {
-	ver, err := python.FindPythonConfig(config.Global().CoProcessOptions.PythonVersion)
+func PythonInit(pythonVersion string) error {
+	ver, err := python.FindPythonConfig(pythonVersion)
 	if err != nil {
 		log.WithError(err).Errorf("Python version '%s' doesn't exist", ver)
 		return fmt.Errorf("python version '%s' doesn't exist", ver)
@@ -255,8 +255,8 @@ func PythonSetEnv(pythonPaths ...string) {
 }
 
 // getBundlePaths will return an array of the available bundle directories:
-func getBundlePaths() []string {
-	bundlePath := filepath.Join(config.Global().MiddlewarePath, "bundles")
+func getBundlePaths(conf config.Config) []string {
+	bundlePath := filepath.Join(conf.MiddlewarePath, "bundles")
 	directories := make([]string, 0)
 	bundles, _ := ioutil.ReadDir(bundlePath)
 	for _, f := range bundles {
@@ -269,7 +269,7 @@ func getBundlePaths() []string {
 }
 
 // NewPythonDispatcher wraps all the actions needed for this CP.
-func NewPythonDispatcher() (dispatcher coprocess.Dispatcher, err error, conf config.Config) {
+func NewPythonDispatcher(conf config.Config) (dispatcher coprocess.Dispatcher, err error) {
 	workDir := conf.CoProcessOptions.PythonPathPrefix
 	if workDir == "" {
 		tykBin, _ := os.Executable()
@@ -292,7 +292,7 @@ func NewPythonDispatcher() (dispatcher coprocess.Dispatcher, err error, conf con
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
 		PythonSetEnv(paths...)
-		err := PythonInit()
+		err := PythonInit(conf.CoProcessOptions.PythonVersion)
 		if err != nil {
 			initDone <- err
 			return

@@ -283,25 +283,27 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 
 	defer testServer.Shutdown(context.Background())
 
-	CoProcessInit()
-	afterConfSetup(&globalConf)
+	globalGateway.CoProcessInit()
+	globalGateway.afterConfSetup()
 	defaultTestConfig = globalConf
 	globalGateway.SetConfig(globalConf)
 	if err := emptyRedis(); err != nil {
 		panic(err)
 	}
 	cli.Init(VERSION, confPaths)
-	initialiseSystem(ctx)
+	globalGateway.initialiseSystem(ctx)
 	// Small part of start()
 	globalGateway.loadControlAPIEndpoints(mainRouter())
 	if analytics.GeoIPDB == nil {
 		panic("GeoIPDB was not initialized")
 	}
+
+	configs := globalGateway.GetConfig()
 	go storage.ConnectToRedis(ctx, func() {
 		if OnConnect != nil {
 			OnConnect()
 		}
-	})
+	}, &configs,)
 	for {
 		if storage.Connected() {
 			break
@@ -309,7 +311,7 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 
 		time.Sleep(10 * time.Millisecond)
 	}
-	go startPubSubLoop()
+	go globalGateway.startPubSubLoop()
 	go globalGateway.reloadLoop(ctx, ReloadTestCase.ReloadTicker(), ReloadTestCase.OnReload)
 	go reloadQueueLoop(ctx, ReloadTestCase.OnQueued)
 	go reloadSimulation()
@@ -448,7 +450,7 @@ func getMainRouter(m *proxyMux) *mux.Router {
 	} else {
 		protocol = "http"
 	}
-	return m.router(gwConfig.ListenPort, protocol)
+	return m.router(gwConfig.ListenPort, protocol, gwConfig)
 }
 
 type TestHttpResponse struct {
@@ -576,7 +578,7 @@ func testHttpHandler() *mux.Router {
 		json.NewEncoder(gz).Encode(response)
 		gz.Close()
 	})
-	r.HandleFunc("/groupReload", groupResetHandler)
+	r.HandleFunc("/groupReload", globalGateway.groupResetHandler)
 	r.HandleFunc("/bundles/{rest:.*}", bundleHandleFunc)
 	r.HandleFunc("/errors/{status}", func(w http.ResponseWriter, r *http.Request) {
 		statusCode, _ := strconv.Atoi(mux.Vars(r)["status"])
@@ -675,16 +677,16 @@ func withAuth(r *http.Request) *http.Request {
 
 // Deprecated: Use Test.CreateSession instead.
 func CreateSession(sGen ...func(s *user.SessionState)) string {
-	key := generateToken("default", "")
+	key := globalGateway.generateToken("default", "")
 	session := CreateStandardSession()
 	if len(sGen) > 0 {
 		sGen[0](session)
 	}
 	if session.Certificate != "" {
-		key = generateToken("default", session.Certificate)
+		key = globalGateway.generateToken("default", session.Certificate)
 	}
 
-	GlobalSessionManager.UpdateSession(storage.HashKey(key), session, 60, globalGateway.GetConfig().HashKeys)
+	GlobalSessionManager.UpdateSession(storage.HashKey(key, globalGateway.GetConfig().HashKeys), session, 60, globalGateway.GetConfig().HashKeys)
 	return key
 }
 
@@ -895,16 +897,16 @@ func (s *Test) Start(slavedClusterConfig *SlaveDataCenter) Gateway {
 	gwConfig.CoProcessOptions = s.config.CoprocessConfig
 	gw.SetConfig(gwConfig)
 
-	setupPortsWhitelist()
+	gw.setupPortsWhitelist()
 
 	gw.startServer()
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
-	setupGlobals(ctx)
+	gw.setupGlobals(ctx)
 	// Set up a default org manager so we can traverse non-live paths
 	if !gwConfig.SupressDefaultOrgStore {
-		DefaultOrgStore.Init(getGlobalStorageHandler("orgkey.", false))
-		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
+		DefaultOrgStore.Init(gw.getGlobalStorageHandler("orgkey.", false))
+		DefaultQuotaStore.Init(gw.getGlobalStorageHandler("orgkey.", false))
 	}
 
 	s.GlobalConfig = gwConfig
@@ -952,7 +954,7 @@ func (s *Test) Close() {
 	if s.cancel != nil {
 		s.cancel()
 	}
-	globalGateway.DefaultProxyMux.swap(&proxyMux{})
+	globalGateway.DefaultProxyMux.swap(&proxyMux{}, globalGateway.GetConfig())
 	if s.config.sepatateControlAPI {
 		gwConfig := globalGateway.GetConfig()
 		gwConfig.ControlAPIPort = 0

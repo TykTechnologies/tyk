@@ -137,11 +137,11 @@ func geoIPLookup(ipStr string) (*GeoData, error) {
 	return record, nil
 }
 
-func initNormalisationPatterns() (pats config.NormaliseURLPatterns) {
+func(gw *Gateway) initNormalisationPatterns() (pats config.NormaliseURLPatterns) {
 	pats.UUIDs = regexp.MustCompile(`[0-9a-fA-F]{8}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{12}`)
 	pats.IDs = regexp.MustCompile(`\/(\d+)`)
 
-	for _, pattern := range config.Global().AnalyticsConfig.NormaliseUrls.Custom {
+	for _, pattern := range gw.GetConfig().AnalyticsConfig.NormaliseUrls.Custom {
 		if patRe, err := regexp.Compile(pattern); err != nil {
 			log.Error("failed to compile custom pattern: ", err)
 		} else {
@@ -187,8 +187,8 @@ type RedisAnalyticsHandler struct {
 	poolWg           sync.WaitGroup
 }
 
-func (r *RedisAnalyticsHandler) Init(globalConf config.Config) {
-	r.globalConf = globalConf
+func (r *RedisAnalyticsHandler) Init(gwConf config.Config) {
+	r.globalConf = gwConf
 
 	if r.globalConf.AnalyticsConfig.EnableGeoIP {
 		if db, err := maxminddb.Open(r.globalConf.AnalyticsConfig.GeoIPDBLocation); err != nil {
@@ -200,8 +200,8 @@ func (r *RedisAnalyticsHandler) Init(globalConf config.Config) {
 
 	analytics.Store.Connect()
 
-	ps := config.Global().AnalyticsConfig.PoolSize
-	recordsBufferSize := config.Global().AnalyticsConfig.RecordsBufferSize
+	ps := gwConf.AnalyticsConfig.PoolSize
+	recordsBufferSize := gwConf.AnalyticsConfig.RecordsBufferSize
 	r.workerBufferSize = recordsBufferSize / uint64(ps)
 	log.WithField("workerBufferSize", r.workerBufferSize).Debug("Analytics pool worker buffer size")
 
@@ -257,14 +257,14 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 			// check if channel was closed and it is time to exit from worker
 			if !ok {
 				// send what is left in buffer
-				r.Store.AppendToSetPipelined(analyticsKeyName, recordsBuffer)
+				r.Store.AppendToSetPipelined(analyticsKeyName, recordsBuffer, r.globalConf.AnalyticsConfig.StorageExpirationTime)
 				return
 			}
 
 			// we have new record - prepare it and add to buffer
 
 			// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
-			record.APIKey = storage.HashKey(record.APIKey)
+			record.APIKey = storage.HashKey(record.APIKey, r.globalConf.HashKeys)
 
 			if r.globalConf.SlaveOptions.UseRPC {
 				// Extend tag list to include this data so wecan segment by node if necessary
@@ -312,7 +312,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 
 		// send data to Redis and reset buffer
 		if len(recordsBuffer) > 0 && (readyToSend || time.Since(lastSentTs) >= recordsBufferForcedFlushInterval) {
-			r.Store.AppendToSetPipelined(analyticsKeyName, recordsBuffer)
+			r.Store.AppendToSetPipelined(analyticsKeyName, recordsBuffer, r.globalConf.AnalyticsConfig.StorageExpirationTime)
 			recordsBuffer = recordsBuffer[:0]
 			lastSentTs = time.Now()
 		}

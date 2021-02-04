@@ -905,6 +905,7 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 		n := Notification{
 			Command: NoticeGroupReload,
 			Payload: string("test"),
+			Gateway: &globalGateway,
 		}
 		n.Sign()
 		msg := redis.Message{}

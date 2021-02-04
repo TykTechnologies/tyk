@@ -87,6 +87,7 @@ func TestProcessKeySpaceChangesForOauth(t *testing.T) {
 				KeyPrefix:        "rpc.listener.",
 				SuppressRegister: true,
 				HashKeys:         tc.Hashed,
+				Gateway: &globalGateway,
 			}
 
 			myApi := loadTestOAuthSpec()

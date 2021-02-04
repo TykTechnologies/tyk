@@ -112,8 +112,8 @@ func(gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 	gs := gw.prepareStorage()
 	subrouter := mux.NewRouter()
 
-	loader := &APIDefinitionLoader{}
-	spec := loader.MakeSpec(traceReq.Spec, logrus.NewEntry(logger), gw.GetConfig())
+	loader := &APIDefinitionLoader{gw}
+	spec := loader.MakeSpec(traceReq.Spec, logrus.NewEntry(logger))
 
 	chainObj := gw.processSpec(spec, nil, &gs, subrouter, logrus.NewEntry(logger))
 	spec.middlewareChain = chainObj

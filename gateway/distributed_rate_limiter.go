@@ -7,21 +7,20 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/drl"
-	"github.com/TykTechnologies/tyk/config"
 )
 
 var DRLManager = &drl.DRL{}
 
-func setupDRL() {
+func(gw *Gateway) setupDRL() {
 	drlManager := &drl.DRL{}
 	drlManager.Init()
-	drlManager.ThisServerID = GetNodeID() + "|" + hostDetails.Hostname
+	drlManager.ThisServerID = gw.GetNodeID() + "|" + hostDetails.Hostname
 	log.Debug("DRL: Setting node ID: ", drlManager.ThisServerID)
 	DRLManager = drlManager
 }
 
-func startRateLimitNotifications() {
-	notificationFreq := config.Global().DRLNotificationFrequency
+func(gw *Gateway) startRateLimitNotifications() {
+	notificationFreq := gw.GetConfig().DRLNotificationFrequency
 	if notificationFreq == 0 {
 		notificationFreq = 2
 	}
@@ -29,8 +28,8 @@ func startRateLimitNotifications() {
 	go func() {
 		log.Info("Starting gateway rate limiter notifications...")
 		for {
-			if GetNodeID() != "" {
-				NotifyCurrentServerStatus()
+			if gw.GetNodeID() != "" {
+				gw.NotifyCurrentServerStatus()
 			} else {
 				log.Warning("Node not registered yet, skipping DRL Notification")
 			}
@@ -40,15 +39,15 @@ func startRateLimitNotifications() {
 	}()
 }
 
-func getTagHash() string {
+func(gw *Gateway) getTagHash() string {
 	th := ""
-	for _, tag := range config.Global().DBAppConfOptions.Tags {
+	for _, tag := range gw.GetConfig().DBAppConfOptions.Tags {
 		th += tag
 	}
 	return th
 }
 
-func NotifyCurrentServerStatus() {
+func(gw *Gateway) NotifyCurrentServerStatus() {
 	if !DRLManager.Ready {
 		return
 	}
@@ -60,9 +59,9 @@ func NotifyCurrentServerStatus() {
 
 	server := drl.Server{
 		HostName:   hostDetails.Hostname,
-		ID:         GetNodeID(),
+		ID:         gw.GetNodeID(),
 		LoadPerSec: rate,
-		TagHash:    getTagHash(),
+		TagHash:    gw.getTagHash(),
 	}
 
 	asJson, err := json.Marshal(server)
@@ -74,6 +73,7 @@ func NotifyCurrentServerStatus() {
 	n := Notification{
 		Command: NoticeGatewayDRLNotification,
 		Payload: string(asJson),
+		Gateway: gw,
 	}
 
 	MainNotifier.Notify(n)

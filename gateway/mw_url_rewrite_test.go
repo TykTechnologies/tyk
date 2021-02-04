@@ -901,7 +901,7 @@ func TestRewriterTriggers(t *testing.T) {
 				MetaData: map[string]interface{}{
 					"rewrite": "bar-baz",
 				},
-			}, "", false)
+			}, "", false, globalGateway.GetConfig().HashKeys)
 
 			return TestDef{
 				"Meta Simple",

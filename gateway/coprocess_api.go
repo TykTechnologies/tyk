@@ -37,12 +37,12 @@ func TykGetData(CKey *C.char) *C.char {
 }
 
 // TykTriggerEvent is a CoProcess API function for triggering Tyk system events.
-//export TykTriggerEvent
-func TykTriggerEvent(CEventName, CPayload *C.char) {
+//gexport TykTriggerEvent
+func (gw *Gateway) TykTriggerEvent(CEventName, CPayload *C.char) {
 	eventName := C.GoString(CEventName)
 	payload := C.GoString(CPayload)
 
-	FireSystemEvent(apidef.TykEvent(eventName), EventMetaDefault{
+	gw.FireSystemEvent(apidef.TykEvent(eventName), EventMetaDefault{
 		Message: payload,
 	})
 }

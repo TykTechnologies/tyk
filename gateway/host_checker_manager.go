@@ -15,13 +15,13 @@ import (
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
 var GlobalHostChecker HostCheckerManager
 
 type HostCheckerManager struct {
+	*Gateway
 	Id                string
 	store             storage.Handler
 	checkerMu         sync.Mutex
@@ -145,8 +145,8 @@ func (hc *HostCheckerManager) AmIPolling() bool {
 		return false
 	}
 	pollerCacheKey := PollerCacheKey
-	if config.Global().UptimeTests.PollerGroup != "" {
-		pollerCacheKey = pollerCacheKey + "." + config.Global().UptimeTests.PollerGroup
+	if hc.GetConfig().UptimeTests.PollerGroup != "" {
+		pollerCacheKey = pollerCacheKey + "." + hc.GetConfig().UptimeTests.PollerGroup
 	}
 
 	activeInstance, err := hc.store.GetKey(pollerCacheKey)
@@ -185,12 +185,12 @@ func (hc *HostCheckerManager) StartPoller(ctx context.Context) {
 	// If we are restarting, we want to retain the host list
 	hc.checkerMu.Lock()
 	if hc.checker == nil {
-		hc.checker = &HostUptimeChecker{}
+		hc.checker = &HostUptimeChecker{Gateway: hc.Gateway}
 	}
 
-	hc.checker.Init(config.Global().UptimeTests.Config.CheckerPoolSize,
-		config.Global().UptimeTests.Config.FailureTriggerSampleSize,
-		config.Global().UptimeTests.Config.TimeWait,
+	hc.checker.Init(hc.GetConfig().UptimeTests.Config.CheckerPoolSize,
+		hc.GetConfig().UptimeTests.Config.FailureTriggerSampleSize,
+		hc.GetConfig().UptimeTests.Config.TimeWait,
 		hc.currentHostList,
 		HostCheckCallBacks{
 			Up:   hc.OnHostBackUp,
@@ -223,7 +223,7 @@ func (hc *HostCheckerManager) getHostKey(report HostHealthReport) string {
 }
 
 func (hc *HostCheckerManager) OnHostReport(ctx context.Context, report HostHealthReport) {
-	if config.Global().UptimeTests.Config.EnableUptimeAnalytics {
+	if hc.GetConfig().UptimeTests.Config.EnableUptimeAnalytics {
 		go hc.RecordUptimeAnalytics(report)
 	}
 }
@@ -529,13 +529,13 @@ func (hc *HostCheckerManager) RecordUptimeAnalytics(report HostHealthReport) err
 	return nil
 }
 
-func InitHostCheckManager(ctx context.Context, store storage.Handler) {
+func(gw *Gateway) InitHostCheckManager(ctx context.Context, store storage.Handler) {
 	// Already initialized
 	if GlobalHostChecker.Id != "" {
 		return
 	}
 
-	GlobalHostChecker = HostCheckerManager{}
+	GlobalHostChecker = HostCheckerManager{Gateway: gw}
 	GlobalHostChecker.Init(store)
 	GlobalHostChecker.Start(ctx)
 }

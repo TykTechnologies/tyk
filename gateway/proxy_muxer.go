@@ -185,7 +185,7 @@ func (m *proxyMux) addTCPService(spec *APISpec, modifier *tcp.Modifier, conf con
 			protocol:         spec.Protocol,
 			useProxyProtocol: spec.EnableProxyProtocol,
 			tcpProxy: &tcp.Proxy{
-				DialTLS:         dialWithServiceDiscovery(spec, customDialTLSCheck(spec, tlsConfig)),
+				DialTLS:         dialWithServiceDiscovery(spec, customDialTLSCheck(spec, tlsConfig, conf)),
 				Dial:            dialWithServiceDiscovery(spec, net.Dial),
 				TLSConfigTarget: tlsConfig,
 				// SyncStats:       recordTCPHit(spec.APIID, spec.DoNotTrack),
@@ -477,7 +477,7 @@ func (m *proxyMux) generateListener(listenPort int, protocol string, conf config
 			tlsConfig.NextProtos = append(tlsConfig.NextProtos, http2.NextProtoTLS)
 		}
 
-		tlsConfig.GetConfigForClient = getTLSConfigForClient(&tlsConfig, listenPort)
+		tlsConfig.GetConfigForClient = getTLSConfigForClient(&tlsConfig, listenPort,conf)
 		l, err = tls.Listen("tcp", targetPort, &tlsConfig)
 	default:
 		mainLog.WithField("port", targetPort).Infof("--> Standard listener (%s)", protocol)

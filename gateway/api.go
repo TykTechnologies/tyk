@@ -48,7 +48,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/storage"
@@ -289,7 +288,7 @@ func(gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, d
 
 	log.WithFields(logrus.Fields{
 		"prefix":      "api",
-		"key":         obfuscateKey(keyName),
+		"key":         gw.obfuscateKey(keyName),
 		"expires":     newSession.Expires,
 		"org_id":      newSession.OrgID,
 		"api_id":      "--",
@@ -332,7 +331,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 		return apiError("Request malformed"), http.StatusBadRequest
 	}
 
-	mw := BaseMiddleware{}
+	mw := BaseMiddleware{Gateway: gw}
 	// TODO: handle apply policies error
 	mw.ApplyPolicies(newSession)
 
@@ -375,7 +374,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 		}
 	} else {
 		newSession.DateCreated = time.Now()
-		keyName = generateToken(newSession.OrgID, keyName)
+		keyName = gw.generateToken(newSession.OrgID, keyName)
 	}
 
 	//set the original expiry if the content in payload is a past time
@@ -413,7 +412,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 		}
 	} else {
 
-		newFormatKey := generateToken(newSession.OrgID, keyName)
+		newFormatKey := gw.generateToken(newSession.OrgID, keyName)
 		// search as a custom key
 		_, err := GlobalSessionManager.Store().GetKey(newFormatKey)
 
@@ -433,7 +432,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 		action = "added"
 		event = EventTokenCreated
 	}
-	FireSystemEvent(event, EventTokenMeta{
+	gw.FireSystemEvent(event, EventTokenMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Key modified."},
 		Org:              newSession.OrgID,
 		Key:              keyName,
@@ -446,11 +445,11 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 	}
 
 	// add key hash for newly created key
-	if config.Global().HashKeys && r.Method == http.MethodPost {
+	if gw.GetConfig().HashKeys && r.Method == http.MethodPost {
 		if isHashed {
 			response.KeyHash = keyName
 		} else {
-			response.KeyHash = storage.HashKey(keyName)
+			response.KeyHash = storage.HashKey(keyName, gw.GetConfig().HashKeys)
 		}
 	}
 
@@ -458,7 +457,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 }
 
 func (gw *Gateway) handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
-	if byHash && !config.Global().HashKeys {
+	if byHash && !gw.GetConfig().HashKeys {
 		return apiError("Key requested by hash but key hashing is not enabled"), http.StatusBadRequest
 	}
 
@@ -479,7 +478,7 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID string, byHash bool) (inter
 	mw.ApplyPolicies(&session)
 
 	if session.QuotaMax != -1 {
-		quotaKey := QuotaKeyPrefix + storage.HashKey(sessionKey)
+		quotaKey := QuotaKeyPrefix + storage.HashKey(sessionKey, gw.GetConfig().HashKeys)
 		if byHash {
 			quotaKey = QuotaKeyPrefix + sessionKey
 		}
@@ -496,7 +495,7 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID string, byHash bool) (inter
 		} else {
 			log.WithFields(logrus.Fields{
 				"prefix":  "api",
-				"key":     obfuscateKey(quotaKey),
+				"key":     gw.obfuscateKey(quotaKey),
 				"message": err,
 				"status":  "ok",
 			}).Info("Can't retrieve key quota")
@@ -514,7 +513,7 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID string, byHash bool) (inter
 			quotaScope = access.AllowanceScope + "-"
 		}
 
-		limQuotaKey := QuotaKeyPrefix + quotaScope + storage.HashKey(sessionKey)
+		limQuotaKey := QuotaKeyPrefix + quotaScope + storage.HashKey(sessionKey, gw.GetConfig().HashKeys)
 		if byHash {
 			limQuotaKey = QuotaKeyPrefix + quotaScope + sessionKey
 		}
@@ -536,7 +535,7 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID string, byHash bool) (inter
 			log.WithFields(logrus.Fields{
 				"prefix": "api",
 				"apiID":  id,
-				"key":    obfuscateKey(sessionKey),
+				"key":    gw.obfuscateKey(sessionKey),
 				"error":  err,
 			}).Info("Can't retrieve api limit quota")
 		}
@@ -551,7 +550,7 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID string, byHash bool) (inter
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
-		"key":    obfuscateKey(sessionKey),
+		"key":    gw.obfuscateKey(sessionKey),
 		"status": "ok",
 	}).Info("Retrieved key detail.")
 
@@ -591,12 +590,12 @@ func(gw *Gateway) handleGetAllKeys(filter string) (interface{}, int) {
 	return sessionsObj, http.StatusOK
 }
 
-func handleAddKey(keyName, hashedName, sessionString, apiID string) {
+func(gw *Gateway) handleAddKey(keyName, hashedName, sessionString, apiID string) {
 	sess := user.NewSessionState()
 	json.Unmarshal([]byte(sessionString), sess)
 	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 	var err error
-	if config.Global().HashKeys {
+	if gw.GetConfig().HashKeys {
 		err = GlobalSessionManager.UpdateSession(hashedName, sess, 0, true)
 	} else {
 		err = GlobalSessionManager.UpdateSession(keyName, sess, 0, false)
@@ -604,14 +603,14 @@ func handleAddKey(keyName, hashedName, sessionString, apiID string) {
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"key":    obfuscateKey(keyName),
+			"key":    gw.obfuscateKey(keyName),
 			"status": "fail",
 			"err":    err,
 		}).Error("Failed to update key.")
 	}
 	log.WithFields(logrus.Fields{
 		"prefix": "RPC",
-		"key":    obfuscateKey(keyName),
+		"key":    gw.obfuscateKey(keyName),
 		"status": "ok",
 	}).Info("Updated hashed key in slave storage.")
 }
@@ -636,7 +635,7 @@ func (gw *Gateway) handleDeleteKey(keyName, apiID string, resetQuota bool) (inte
 		if !removed {
 			log.WithFields(logrus.Fields{
 				"prefix": "api",
-				"key":    obfuscateKey(keyName),
+				"key":    gw.obfuscateKey(keyName),
 				"status": "fail",
 			}).Error("Failed to remove the key")
 			return apiError("Failed to remove the key"), http.StatusBadRequest
@@ -654,7 +653,7 @@ func (gw *Gateway) handleDeleteKey(keyName, apiID string, resetQuota bool) (inte
 	if !GlobalSessionManager.RemoveSession(orgID, keyName, false) {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"key":    obfuscateKey(keyName),
+			"key":    gw.obfuscateKey(keyName),
 			"status": "fail",
 		}).Error("Failed to remove the key")
 		return apiError("Failed to remove the key"), http.StatusBadRequest
@@ -673,7 +672,7 @@ func (gw *Gateway) handleDeleteKey(keyName, apiID string, resetQuota bool) (inte
 		Action: "deleted",
 	}
 
-	FireSystemEvent(EventTokenDeleted, EventTokenMeta{
+	gw.FireSystemEvent(EventTokenDeleted, EventTokenMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Key deleted."},
 		Org:              orgID,
 		Key:              keyName,
@@ -695,7 +694,7 @@ func (gw *Gateway) handleDeleteHashedKeyWithLogs(keyName, apiID string, resetQuo
 	if code != http.StatusOK {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"key":    obfuscateKey(keyName),
+			"key":    gw.obfuscateKey(keyName),
 			"status": "fail",
 		}).Error(res)
 	}
@@ -838,7 +837,7 @@ func (gw *Gateway) handleAddOrUpdateApi(apiID string, r *http.Request) (interfac
 
 func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 	// Generate a filename
-	defFilePath := filepath.Join(config.Global().AppPath, apiID+".json")
+	defFilePath := filepath.Join(gw.GetConfig().AppPath, apiID+".json")
 
 	// If it exists, delete it
 	if _, err := os.Stat(defFilePath); err != nil {
@@ -904,7 +903,7 @@ func (gw *Gateway) keyHandler(w http.ResponseWriter, r *http.Request) {
 	// check if passed key is user name and convert it to real key with respect to current hashing algorithm
 	origKeyName := keyName
 	if r.Method != http.MethodPost && isUserName {
-		keyName = generateToken(orgID, keyName)
+		keyName = gw.generateToken(orgID, keyName)
 	}
 
 	var obj interface{}
@@ -1096,7 +1095,7 @@ func (gw *Gateway) handleOrgAddOrUpdate(orgID string, r *http.Request) (interfac
 	if r.URL.Query().Get("reset_quota") == "1" {
 		sessionManager.ResetQuota(orgID, newSession, false)
 		newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
-		rawKey := QuotaKeyPrefix + storage.HashKey(orgID)
+		rawKey := QuotaKeyPrefix + storage.HashKey(orgID, gw.GetConfig().HashKeys)
 
 		// manage quotas separately
 		DefaultQuotaStore.RemoveSession(orgID, rawKey, false)
@@ -1213,14 +1212,14 @@ func (gw *Gateway) handleDeleteOrgKey(orgID string) (interface{}, int) {
 	return statusObj, http.StatusOK
 }
 
-func groupResetHandler(w http.ResponseWriter, r *http.Request) {
+func(gw *Gateway) groupResetHandler(w http.ResponseWriter, r *http.Request) {
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
 		"status": "ok",
 	}).Info("Group reload accepted.")
 
 	// Signal to the group via redis
-	MainNotifier.Notify(Notification{Command: NoticeGroupReload})
+	MainNotifier.Notify(Notification{Command: NoticeGroupReload, Gateway: gw})
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
@@ -1272,7 +1271,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if newSession.Certificate != "" {
-		newKey = generateToken(newSession.OrgID, newSession.Certificate)
+		newKey = gw.generateToken(newSession.OrgID, newSession.Certificate)
 		_, ok := GlobalSessionManager.SessionDetail(newSession.OrgID, newKey, false)
 		if ok {
 			doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - Key with given certificate already found:"+newKey))
@@ -1373,10 +1372,10 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 	// add key hash to reply
 	if gw.GetConfig().HashKeys {
-		obj.KeyHash = storage.HashKey(newKey)
+		obj.KeyHash = storage.HashKey(newKey, gw.GetConfig().HashKeys)
 	}
 
-	FireSystemEvent(EventTokenCreated, EventTokenMeta{
+	gw.FireSystemEvent(EventTokenCreated, EventTokenMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Key generated."},
 		Org:              newSession.OrgID,
 		Key:              newKey,
@@ -1384,7 +1383,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.WithFields(logrus.Fields{
 		"prefix":      "api",
-		"key":         obfuscateKey(newKey),
+		"key":         gw.obfuscateKey(newKey),
 		"status":      "ok",
 		"api_id":      "--",
 		"org_id":      newSession.OrgID,
@@ -1392,7 +1391,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 		"user_ip":     requestIPHops(r),
 		"path":        "--",
 		"server_name": "system",
-	}).Info("Generated new key: (", obfuscateKey(newKey), ")")
+	}).Info("Generated new key: (", gw.obfuscateKey(newKey), ")")
 
 	doJSONWrite(w, http.StatusOK, obj)
 }
@@ -2133,7 +2132,7 @@ func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, http.StatusOK, apiOk("cache invalidated"))
 }
 
-func RevokeTokenHandler(w http.ResponseWriter, r *http.Request) {
+func(gw *Gateway) RevokeTokenHandler(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 
 	if err != nil {
@@ -2198,7 +2197,7 @@ func GetStorageForApi(apiID string) (ExtendedOsinStorageInterface, int, error) {
 	return apiSpec.OAuthManager.OsinServer.Storage, http.StatusOK, nil
 }
 
-func RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request) {
+func(gw *Gateway) RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 
 	if err != nil {
@@ -2239,6 +2238,7 @@ func RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request) {
 	n := Notification{
 		Command: KeySpaceUpdateNotification,
 		Payload: strings.Join(tokens, ","),
+		Gateway: gw,
 	}
 	MainNotifier.Notify(n)
 
@@ -2277,8 +2277,8 @@ func ctxGetSession(r *http.Request) *user.SessionState {
 	return ctx.GetSession(r)
 }
 
-func ctxSetSession(r *http.Request, s *user.SessionState, token string, scheduleUpdate bool) {
-	ctx.SetSession(r, s, token, scheduleUpdate)
+func ctxSetSession(r *http.Request, s *user.SessionState, token string, scheduleUpdate bool, hashKey bool) {
+	ctx.SetSession(r, s, token, scheduleUpdate, hashKey)
 }
 
 func ctxScheduleSessionUpdate(r *http.Request) {

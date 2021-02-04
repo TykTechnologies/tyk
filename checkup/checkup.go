@@ -25,13 +25,13 @@ const (
 	minRecordsBufferSize = 1000
 )
 
-func Run(c config.Config) {
-	legacyRateLimiters(c)
-	allowInsecureConfigs(c)
-	healthCheck(c)
+func Run(c *config.Config) {
+	legacyRateLimiters(*c)
+	allowInsecureConfigs(*c)
+	healthCheck(*c)
 	fileDescriptors()
 	cpus()
-	defaultSecrets(c)
+	defaultSecrets(*c)
 	defaultAnalytics(c)
 }
 
@@ -94,7 +94,7 @@ func defaultSecrets(c config.Config) {
 	}
 }
 
-func defaultAnalytics(c config.Config) {
+func defaultAnalytics(c *config.Config) {
 	if !c.EnableAnalytics {
 		return
 	}
@@ -118,6 +118,4 @@ func defaultAnalytics(c config.Config) {
 			Warning("AnalyticsConfig.StorageExpirationTime is 0, defaulting to 60s")
 		c.AnalyticsConfig.StorageExpirationTime = 60
 	}
-
-	config.SetGlobal(c)
 }

@@ -18,7 +18,6 @@ import (
 
 	"strconv"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
@@ -290,6 +289,7 @@ func (o *OAuthHandlers) HandleRevokeAllTokens(w http.ResponseWriter, r *http.Req
 	n := Notification{
 		Command: KeySpaceUpdateNotification,
 		Payload: strings.Join(tokens, ","),
+		Gateway: o.Manager.Gateway,
 	}
 	MainNotifier.Notify(n)
 
@@ -332,6 +332,7 @@ func RevokeAllTokens(storage ExtendedOsinStorageInterface, clientId, clientSecre
 type OAuthManager struct {
 	API        *APISpec
 	OsinServer *TykOsinServer
+	*Gateway
 }
 
 // HandleAuthorisation creates the authorisation data for the request
@@ -395,7 +396,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 		if ar.Type == osin.PASSWORD {
 			username = r.Form.Get("username")
 			password := r.Form.Get("password")
-			searchKey := "apikey-" + storage.HashKey(o.API.OrgID+username)
+			searchKey := "apikey-" + storage.HashKey(o.API.OrgID+username, o.GetConfig().HashKeys)
 			log.Debug("Getting: ", searchKey)
 
 			var err error
@@ -477,10 +478,10 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 				}
 			}
 
-			keyName := generateToken(o.API.OrgID, username)
+			keyName := o.generateToken(o.API.OrgID, username)
 
 			log.Debug("Updating user:", keyName)
-			err := GlobalSessionManager.UpdateSession(keyName, session, session.Lifetime(o.API.SessionLifetime), false)
+			err := GlobalSessionManager.UpdateSession(keyName, session, session.Lifetime(o.API.SessionLifetime, o.GetConfig().ForceGlobalSessionLifetime,o.GetConfig().GlobalSessionLifetime), false)
 			if err != nil {
 				log.Error(err)
 			}
@@ -579,6 +580,7 @@ type RedisOsinStorageInterface struct {
 	sessionManager SessionHandler
 	redisStore     storage.Handler
 	orgID          string
+	*Gateway
 }
 
 func (r *RedisOsinStorageInterface) Clone() osin.Storage {
@@ -656,7 +658,7 @@ func (r *RedisOsinStorageInterface) GetClients(filter string, orgID string, igno
 	indexKey := prefixClientIndexList + orgID
 
 	var clientJSON map[string]string
-	if !config.Global().Storage.EnableCluster {
+	if !r.GetConfig().Storage.EnableCluster {
 		exists, _ := r.store.Exists(indexKey)
 		if exists {
 			keys, err := r.store.GetListRange(indexKey, 0, -1)
@@ -719,8 +721,8 @@ func (r *RedisOsinStorageInterface) GetPaginatedClientTokens(id string, page int
 	}
 
 	// clean up expired tokens in sorted set (remove all tokens with score up to current timestamp minus retention)
-	if config.Global().OauthTokenExpiredRetainPeriod > 0 {
-		cleanupStartScore := strconv.FormatInt(nowTs-int64(config.Global().OauthTokenExpiredRetainPeriod), 10)
+	if r.GetConfig().OauthTokenExpiredRetainPeriod > 0 {
+		cleanupStartScore := strconv.FormatInt(nowTs-int64(r.GetConfig().OauthTokenExpiredRetainPeriod), 10)
 		go r.store.RemoveSortedSetRange(key, "-inf", cleanupStartScore)
 	}
 
@@ -774,8 +776,8 @@ func (r *RedisOsinStorageInterface) GetClientTokens(id string) ([]OAuthClientTok
 	}
 
 	// clean up expired tokens in sorted set (remove all tokens with score up to current timestamp minus retention)
-	if config.Global().OauthTokenExpiredRetainPeriod > 0 {
-		cleanupStartScore := strconv.FormatInt(nowTs-int64(config.Global().OauthTokenExpiredRetainPeriod), 10)
+	if r.GetConfig().OauthTokenExpiredRetainPeriod > 0 {
+		cleanupStartScore := strconv.FormatInt(nowTs-int64(r.GetConfig().OauthTokenExpiredRetainPeriod), 10)
 		go r.redisStore.RemoveSortedSetRange(key, "-inf", cleanupStartScore)
 	}
 
@@ -864,7 +866,7 @@ func (r *RedisOsinStorageInterface) DeleteClient(id string, orgID string, ignore
 
 	// delete list of tokens for this client
 	r.store.DeleteKey(prefixClientTokens + id)
-	if config.Global().SlaveOptions.UseRPC {
+	if r.GetConfig().SlaveOptions.UseRPC {
 		r.redisStore.RemoveFromList(indexKey, key)
 		r.redisStore.DeleteKey(prefixClientTokens + id)
 		r.redisStore.RemoveFromSet(keyForSet, clientJSON)
@@ -920,11 +922,11 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 	if err != nil {
 		return err
 	}
-	key := prefixAccess + storage.HashKey(accessData.AccessToken)
+	key := prefixAccess + storage.HashKey(accessData.AccessToken, r.GetConfig().HashKeys)
 	log.Debug("Saving ACCESS key: ", key)
 
 	// Overide default ExpiresIn:
-	if oauthTokenExpire := config.Global().OauthTokenExpire; oauthTokenExpire != 0 {
+	if oauthTokenExpire := r.GetConfig().OauthTokenExpire; oauthTokenExpire != 0 {
 		accessData.ExpiresIn = oauthTokenExpire
 	}
 
@@ -935,7 +937,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 	log.Debug("Adding ACCESS key to sorted list: ", sortedListKey)
 	r.redisStore.AddToSortedSet(
 		sortedListKey,
-		storage.HashKey(accessData.AccessToken),
+		storage.HashKey(accessData.AccessToken,r.GetConfig().HashKeys),
 		float64(accessData.CreatedAt.Unix()+int64(accessData.ExpiresIn)), // set score as token expire timestamp
 	)
 
@@ -996,7 +998,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 		}
 		key := prefixRefresh + accessData.RefreshToken
 		refreshExpire := int64(1209600) // 14 days
-		if oauthRefreshExpire := config.Global().OauthRefreshExpire; oauthRefreshExpire != 0 {
+		if oauthRefreshExpire := r.GetConfig().OauthRefreshExpire; oauthRefreshExpire != 0 {
 			refreshExpire = oauthRefreshExpire
 		}
 		r.store.SetKey(key, string(accessDataJSON), refreshExpire)
@@ -1009,7 +1011,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 
 // LoadAccess will load access data from redis
 func (r *RedisOsinStorageInterface) LoadAccess(token string) (*osin.AccessData, error) {
-	key := prefixAccess + storage.HashKey(token)
+	key := prefixAccess + storage.HashKey(token, r.GetConfig().HashKeys)
 	log.Debug("Loading ACCESS key: ", key)
 	accessJSON, err := r.store.GetKey(key)
 
@@ -1047,7 +1049,7 @@ func (r *RedisOsinStorageInterface) RemoveAccess(token string) error {
 		log.Warning("Cannot load access token:", token)
 	}
 
-	key := prefixAccess + storage.HashKey(token)
+	key := prefixAccess + storage.HashKey(token, r.GetConfig().HashKeys)
 	r.store.DeleteKey(key)
 	// remove the access token from central storage too
 	r.sessionManager.RemoveSession(r.orgID, token, false)

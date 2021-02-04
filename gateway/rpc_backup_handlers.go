@@ -49,8 +49,8 @@ func(gw *Gateway) LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 
 	apiListAsString := decrypt([]byte(secret), cryptoText)
 
-	a := APIDefinitionLoader{}
-	return a.processRPCDefinitions(apiListAsString,*gw)
+	a := APIDefinitionLoader{gw}
+	return a.processRPCDefinitions(apiListAsString,gw)
 }
 
 func(gw *Gateway) saveRPCDefinitionsBackup(list string) error {

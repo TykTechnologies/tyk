@@ -115,7 +115,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession *us
 		false,
 	)
 
-	sessionLifeTime := orgSession.Lifetime(k.Spec.SessionLifetime)
+	sessionLifeTime := orgSession.Lifetime(k.Spec.SessionLifetime, k.GetConfig().ForceGlobalSessionLifetime, k.GetConfig().GlobalSessionLifetime)
 
 	if err := k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, orgSession, sessionLifeTime, false); err == nil {
 		// update in-app cache if needed
@@ -228,7 +228,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 	session *user.SessionState) {
 
 	// Is it active?
-	logEntry := getExplicitLogEntryForRequest(k.Logger(), path, IP, k.Spec.OrgID, nil)
+	logEntry := k.getExplicitLogEntryForRequest(k.Logger(), path, IP, k.Spec.OrgID, nil)
 	if session.IsInactive {
 		logEntry.Warning("Organisation access is disabled.")
 		orgChan <- false
@@ -248,7 +248,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 		false,
 	)
 
-	sessionLifeTime := session.Lifetime(k.Spec.SessionLifetime)
+	sessionLifeTime := session.Lifetime(k.Spec.SessionLifetime, k.GetConfig().ForceGlobalSessionLifetime, k.GetConfig().GlobalSessionLifetime)
 
 	if err := k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, session, sessionLifeTime, false); err == nil {
 		// update in-app cache if needed

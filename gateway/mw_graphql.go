@@ -11,7 +11,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
 
 	gql "github.com/jensneuse/graphql-go-tools/pkg/graphql"
@@ -136,7 +135,7 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	}
 
 	if websocket.IsWebSocketUpgrade(r) {
-		if !config.Global().HttpServerOptions.EnableWebSockets {
+		if !m.GetConfig().HttpServerOptions.EnableWebSockets {
 			return errors.New("websockets are not allowed"), http.StatusUnprocessableEntity
 		}
 

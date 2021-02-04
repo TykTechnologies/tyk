@@ -10,7 +10,6 @@ import (
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/go-redis/redis/v8"
 
@@ -94,13 +93,14 @@ type RPCStorageHandler struct {
 	HashKeys         bool
 	SuppressRegister bool
 	DoReload         func()
+	*Gateway
 }
 
 var RPCGlobalCache = cache.New(30*time.Second, 15*time.Second)
 
 // Connect will establish a connection to the RPC
 func (r *RPCStorageHandler) Connect() bool {
-	slaveOptions := config.Global().SlaveOptions
+	slaveOptions := r.GetConfig().SlaveOptions
 	rpcConfig := rpc.Config{
 		UseSSL:                slaveOptions.UseSSL,
 		SSLInsecureSkipVerify: slaveOptions.SSLInsecureSkipVerify,
@@ -166,7 +166,7 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 
 func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 	// Check the cache first
-	if config.Global().SlaveOptions.EnableRPCCache {
+	if r.GetConfig().SlaveOptions.EnableRPCCache {
 		log.Debug("Using cache for: ", keyName)
 		cachedVal, found := RPCGlobalCache.Get(keyName)
 		log.Debug("--> Found? ", found)
@@ -193,7 +193,7 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 		log.Debug("Error trying to get value:", err)
 		return "", storage.ErrKeyNotFound
 	}
-	if config.Global().SlaveOptions.EnableRPCCache {
+	if r.GetConfig().SlaveOptions.EnableRPCCache {
 		// Cache key
 		RPCGlobalCache.Set(keyName, value, cache.DefaultExpiration)
 	}
@@ -694,20 +694,20 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) {
 		// Do the reload!
 		log.Warning("[RPC STORE] Received Reload instruction!")
 		go func() {
-			MainNotifier.Notify(Notification{Command: NoticeGroupReload})
+			MainNotifier.Notify(Notification{Command: NoticeGroupReload, Gateway: r.Gateway})
 		}()
 	}
 }
 
 func (r *RPCStorageHandler) StartRPCLoopCheck(orgId string) {
-	if config.Global().SlaveOptions.DisableKeySpaceSync {
+	if r.GetConfig().SlaveOptions.DisableKeySpaceSync {
 		return
 	}
 
 	log.Info("[RPC] Starting keyspace poller")
 
 	for {
-		seconds := config.Global().SlaveOptions.KeySpaceSyncInterval
+		seconds := r.GetConfig().SlaveOptions.KeySpaceSyncInterval
 		r.CheckForKeyspaceChanges(orgId)
 		time.Sleep(time.Duration(seconds) * time.Second)
 	}
@@ -749,7 +749,7 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 	var req interface{}
 
 	reqData := map[string]string{}
-	if groupID := config.Global().SlaveOptions.GroupID; groupID == "" {
+	if groupID := r.GetConfig().SlaveOptions.GroupID; groupID == "" {
 		funcName = "GetKeySpaceUpdate"
 		req = orgId
 		reqData["orgId"] = orgId
@@ -791,13 +791,13 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 	}
 }
 
-func getSessionAndCreate(keyName string, r *RPCStorageHandler) {
+func(gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler) {
 	newKeyName := "apikey-" + storage.HashStr(keyName)
 	sessionString, err := r.GetRawKey(keyName)
 	if err != nil {
 		log.Error("Key not found in master - skipping")
 	} else {
-		handleAddKey(keyName, newKeyName[7:], sessionString, "-1")
+		gw.handleAddKey(keyName, newKeyName[7:], sessionString, "-1")
 	}
 }
 
@@ -858,7 +858,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			RevokeToken(storage, token, tokenTypeHint)
 		} else {
 			token = strings.Split(token, "#")[0]
-			handleDeleteHashedKey(token, apiId, false)
+			r.handleDeleteHashedKey(token, apiId, false)
 		}
 		SessionCache.Delete(token)
 		RPCGlobalCache.Delete(r.KeyPrefix + token)
@@ -872,16 +872,16 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			if len(splitKeys) > 1 && splitKeys[1] == "hashed" {
 				key = splitKeys[0]
 				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
-				handleDeleteHashedKey(splitKeys[0], "", resetQuota)
-				getSessionAndCreate(splitKeys[0], r)
+				r.handleDeleteHashedKey(splitKeys[0], "", resetQuota)
+				r.getSessionAndCreate(splitKeys[0], r)
 			} else {
 				log.Info("--> removing cached key: ", key)
 				// in case it's an username (basic auth) then generate the token
 				if storage.TokenOrg(key) == "" {
-					key = generateToken(orgId, key)
+					key = r.generateToken(orgId, key)
 				}
-				handleDeleteKey(key, "-1", resetQuota)
-				getSessionAndCreate(splitKeys[0], r)
+				r.handleDeleteKey(key, "-1", resetQuota)
+				r.getSessionAndCreate(splitKeys[0], r)
 			}
 			SessionCache.Delete(key)
 			RPCGlobalCache.Delete(r.KeyPrefix + key)
@@ -891,6 +891,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 	n := Notification{
 		Command: KeySpaceUpdateNotification,
 		Payload: strings.Join(keys, ","),
+		Gateway: r.Gateway,
 	}
 	MainNotifier.Notify(n)
 }

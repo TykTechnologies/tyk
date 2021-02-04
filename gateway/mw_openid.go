@@ -167,12 +167,12 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 
 	data := []byte(ouser.ID)
 	keyID := fmt.Sprintf("%x", md5.Sum(data))
-	sessionID := generateToken(k.Spec.OrgID, keyID)
+	sessionID := k.Gateway.generateToken(k.Spec.OrgID, keyID)
 
 	if k.Spec.OpenIDOptions.SegregateByClient {
 		// We are segregating by client, so use it as part of the internal token
 		logger.Debug("Client ID:", clientID)
-		sessionID = generateToken(k.Spec.OrgID, fmt.Sprintf("%x", md5.Sum([]byte(clientID)))+keyID)
+		sessionID = k.Gateway.generateToken(k.Spec.OrgID, fmt.Sprintf("%x", md5.Sum([]byte(clientID)))+keyID)
 	}
 
 	logger.Debug("Generated Session ID: ", sessionID)
@@ -230,7 +230,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 	// 4. Set session state on context, we will need it later
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.OIDCUser, apidef.UnsetAuth:
-		ctxSetSession(r, &session, sessionID, true)
+		ctxSetSession(r, &session, sessionID, true,k.GetConfig().HashKeys)
 	}
 	ctxSetJWTContextVars(k.Spec, r, token)
 
@@ -239,7 +239,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 
 func (k *OpenIDMW) reportLoginFailure(tykId string, r *http.Request) {
 	k.Logger().WithFields(logrus.Fields{
-		"key": obfuscateKey(tykId),
+		"key":k.Gateway.obfuscateKey(tykId),
 	}).Warning("Attempted access with invalid key.")
 
 	// Fire Authfailed Event

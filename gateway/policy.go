@@ -73,7 +73,7 @@ func LoadPoliciesFromFile(filePath string) map[string]user.Policy {
 }
 
 // LoadPoliciesFromDashboard will connect and download Policies from a Tyk Dashboard instance.
-func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[string]user.Policy {
+func(gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[string]user.Policy {
 
 	// Get the definitions
 	newRequest, err := http.NewRequest("GET", endpoint, nil)
@@ -82,14 +82,14 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 	}
 
 	newRequest.Header.Set("authorization", secret)
-	newRequest.Header.Set("x-tyk-nodeid", GetNodeID())
+	newRequest.Header.Set("x-tyk-nodeid", gw.GetNodeID())
 
 	newRequest.Header.Set("x-tyk-nonce", ServiceNonce)
 
 	log.WithFields(logrus.Fields{
 		"prefix": "policy",
 	}).Info("Mutex lock acquired... calling")
-	c := initialiseClient()
+	c := gw.initialiseClient()
 
 	log.WithFields(logrus.Fields{
 		"prefix": "policy",
@@ -104,7 +104,7 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 	if resp.StatusCode == http.StatusForbidden {
 		body, _ := ioutil.ReadAll(resp.Body)
 		log.Error("Policy request login failure, Response was: ", string(body))
-		reLogin()
+		gw.reLogin()
 		return nil
 	}
 
@@ -168,7 +168,7 @@ func(gw *Gateway) LoadPoliciesFromRPC(orgId string) (map[string]user.Policy, err
 		return gw.LoadPoliciesFromRPCBackup()
 	}
 
-	store := &RPCStorageHandler{}
+	store := &RPCStorageHandler{Gateway: gw}
 	if !store.Connect() {
 		return nil, errors.New("Policies backup: Failed connecting to database")
 	}

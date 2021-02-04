@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
 )
 
@@ -22,7 +21,7 @@ type NodeResponseOK struct {
 }
 
 type DashboardServiceSender interface {
-	Init(config config.Config) error
+	Init() error
 	Register() error
 	DeRegister() error
 	StartBeating() error
@@ -40,20 +39,21 @@ type HTTPDashboardHandler struct {
 	Secret string
 
 	heartBeatStopSentinel bool
+	*Gateway
 }
 
 var dashClient *http.Client
 
-func initialiseClient() *http.Client {
+func(gw *Gateway) initialiseClient() *http.Client {
 	if dashClient == nil {
 		dashClient = &http.Client{
 			Timeout: 30 * time.Second,
 		}
 
-		if config.Global().HttpServerOptions.UseSSL {
+		if gw.GetConfig().HttpServerOptions.UseSSL {
 			// Setup HTTPS client
 			tlsConfig := &tls.Config{
-				InsecureSkipVerify: config.Global().HttpServerOptions.SSLInsecureSkipVerify,
+				InsecureSkipVerify: gw.GetConfig().HttpServerOptions.SSLInsecureSkipVerify,
 			}
 
 			dashClient.Transport = &http.Transport{TLSClientConfig: tlsConfig}
@@ -63,8 +63,8 @@ func initialiseClient() *http.Client {
 	return dashClient
 }
 
-func reLogin() {
-	if !config.Global().UseDBAppConfigs {
+func(gw *Gateway) reLogin() {
+	if !gw.GetConfig().UseDBAppConfigs {
 		return
 	}
 
@@ -86,13 +86,13 @@ func reLogin() {
 	reloadURLStructure(nil)
 }
 
-func (h *HTTPDashboardHandler) Init(conf config.Config) error {
-	h.RegistrationEndpoint = buildConnStr("/register/node", conf)
-	h.DeRegistrationEndpoint = buildConnStr("/system/node", conf)
-	h.HeartBeatEndpoint = buildConnStr("/register/ping", conf)
-	h.KeyQuotaTriggerEndpoint = buildConnStr("/system/key/quota_trigger", conf)
+func (h *HTTPDashboardHandler) Init() error {
+	h.RegistrationEndpoint = buildConnStr("/register/node", h.GetConfig())
+	h.DeRegistrationEndpoint = buildConnStr("/system/node", h.GetConfig())
+	h.HeartBeatEndpoint = buildConnStr("/register/ping", h.GetConfig())
+	h.KeyQuotaTriggerEndpoint = buildConnStr("/system/key/quota_trigger", h.GetConfig())
 
-	if h.Secret = conf.NodeSecret; h.Secret == "" {
+	if h.Secret = h.GetConfig().NodeSecret; h.Secret == "" {
 		dashLog.Fatal("Node secret is not set, required for dashboard connection")
 	}
 	return nil
@@ -120,10 +120,10 @@ func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 	}
 
 	req.Header.Set("authorization", h.Secret)
-	req.Header.Set(headers.XTykNodeID, GetNodeID())
+	req.Header.Set(headers.XTykNodeID, h.GetNodeID())
 	req.Header.Set(headers.XTykNonce, ServiceNonce)
 
-	c := initialiseClient()
+	c := h.initialiseClient()
 
 	resp, err := c.Do(req)
 	if err != nil {
@@ -152,7 +152,7 @@ func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 func (h *HTTPDashboardHandler) Register() error {
 	dashLog.Info("Registering gateway node with Dashboard")
 	req := h.newRequest(h.RegistrationEndpoint)
-	c := initialiseClient()
+	c := h.initialiseClient()
 	resp, err := c.Do(req)
 
 	if err != nil {
@@ -174,14 +174,14 @@ func (h *HTTPDashboardHandler) Register() error {
 	// Set the NodeID
 	var found bool
 	nodeID, found := val.Message["NodeID"]
-	SetNodeID(nodeID)
+	h.SetNodeID(nodeID)
 	if !found {
 		dashLog.Error("Failed to register node, retrying in 5s")
 		time.Sleep(time.Second * 5)
 		return h.Register()
 	}
 
-	dashLog.WithField("id", GetNodeID()).Info("Node Registered")
+	dashLog.WithField("id", h.GetNodeID()).Info("Node Registered")
 
 	// Set the nonce
 	ServiceNonce = val.Nonce
@@ -193,14 +193,14 @@ func (h *HTTPDashboardHandler) Register() error {
 func (h *HTTPDashboardHandler) Ping() error {
 	return h.sendHeartBeat(
 		h.newRequest(h.HeartBeatEndpoint),
-		initialiseClient())
+		h.initialiseClient())
 }
 
 func (h *HTTPDashboardHandler) StartBeating() error {
 
 	req := h.newRequest(h.HeartBeatEndpoint)
 
-	client := initialiseClient()
+	client := h.initialiseClient()
 
 	for !h.heartBeatStopSentinel {
 		if err := h.sendHeartBeat(req, client); err != nil {
@@ -229,7 +229,7 @@ func (h *HTTPDashboardHandler) newRequest(endpoint string) *http.Request {
 }
 
 func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Client) error {
-	req.Header.Set(headers.XTykNodeID, GetNodeID())
+	req.Header.Set(headers.XTykNodeID, h.GetNodeID())
 	req.Header.Set(headers.XTykNonce, ServiceNonce)
 
 	resp, err := client.Do(req)
@@ -261,10 +261,10 @@ func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Cli
 func (h *HTTPDashboardHandler) DeRegister() error {
 	req := h.newRequest(h.DeRegistrationEndpoint)
 
-	req.Header.Set(headers.XTykNodeID, GetNodeID())
+	req.Header.Set(headers.XTykNodeID, h.GetNodeID())
 	req.Header.Set(headers.XTykNonce, ServiceNonce)
 
-	c := initialiseClient()
+	c := h.initialiseClient()
 	resp, err := c.Do(req)
 
 	if err != nil {

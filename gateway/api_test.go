@@ -1280,7 +1280,7 @@ func TestGroupResetHandler(t *testing.T) {
 			case *redis.Subscription:
 				didSubscribe <- true
 			case *redis.Message:
-				notf := Notification{}
+				notf := Notification{Gateway: &globalGateway}
 				if err := json.Unmarshal([]byte(x.Payload), &notf); err != nil {
 					t.Fatal(err)
 				}
@@ -1386,7 +1386,8 @@ func TestContextSession(t *testing.T) {
 	ctxSetSession(r,
 		user.NewSessionState(),
 		"",
-		false)
+		false,
+		globalGateway.GetConfig().HashKeys)
 	if ctxGetSession(r) == nil {
 		t.Fatal("expected ctxGetSession to return non-nil")
 	}

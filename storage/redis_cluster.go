@@ -78,15 +78,15 @@ func singleton(cache bool) redis.UniversalClient {
 	return nil
 }
 
-func connectSingleton(cache bool) bool {
+func connectSingleton(cache bool, conf config.Config) bool {
 	d := singleton(cache) == nil
 	if d {
 		log.Debug("Connecting to redis cluster")
 		if cache {
-			singleCachePool.Store(NewRedisClusterPool(cache))
+			singleCachePool.Store(NewRedisClusterPool(cache, conf))
 			return true
 		}
-		singlePool.Store(NewRedisClusterPool(cache))
+		singlePool.Store(NewRedisClusterPool(cache, conf))
 		return true
 	}
 	return true
@@ -115,7 +115,7 @@ func clusterConnectionIsOpen(cluster *RedisCluster) bool {
 // redis.
 //
 // onConnect will be called when we have established a successful redis connection
-func ConnectToRedis(ctx context.Context, onConnect func()) {
+func ConnectToRedis(ctx context.Context, onConnect func(), conf *config.Config) {
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 	c := []RedisCluster{
@@ -123,7 +123,7 @@ func ConnectToRedis(ctx context.Context, onConnect func()) {
 	}
 	var ok bool
 	for _, v := range c {
-		if !connectSingleton(v.IsCache) {
+		if !connectSingleton(v.IsCache,*conf) {
 			break
 		}
 		if !clusterConnectionIsOpen(&v) {
@@ -142,7 +142,7 @@ func ConnectToRedis(ctx context.Context, onConnect func()) {
 				continue
 			}
 			conn := Connected()
-			ok := connectCluster(c...)
+			ok := connectCluster(*conf, c...)
 
 			redisUp.Store(ok)
 			if !conn && ok {
@@ -155,27 +155,27 @@ func ConnectToRedis(ctx context.Context, onConnect func()) {
 	}
 }
 
-func connectCluster(v ...RedisCluster) bool {
+func connectCluster(conf config.Config,v ...RedisCluster) bool {
 	for _, x := range v {
-		if ok := establishConnection(&x); ok {
+		if ok := establishConnection(&x, conf); ok {
 			return ok
 		}
 	}
 	return false
 }
 
-func establishConnection(v *RedisCluster) bool {
-	if !connectSingleton(v.IsCache) {
+func establishConnection(v *RedisCluster, conf config.Config) bool {
+	if !connectSingleton(v.IsCache, conf) {
 		return false
 	}
 	return clusterConnectionIsOpen(v)
 }
 
-func NewRedisClusterPool(isCache bool) redis.UniversalClient {
+func NewRedisClusterPool(isCache bool, conf config.Config) redis.UniversalClient {
 	// redisSingletonMu is locked and we know the singleton is nil
-	cfg := config.Global().Storage
-	if isCache && config.Global().EnableSeperateCacheStore {
-		cfg = config.Global().CacheStorage
+	cfg := conf.Storage
+	if isCache && conf.EnableSeperateCacheStore {
+		cfg = conf.CacheStorage
 	}
 
 	log.Debug("Creating new Redis connection pool")
@@ -920,7 +920,7 @@ func (r *RedisCluster) GetListRange(keyName string, from, to int64) ([]string, e
 	return elements, nil
 }
 
-func (r *RedisCluster) AppendToSetPipelined(key string, values [][]byte) {
+func (r *RedisCluster) AppendToSetPipelined(key string, values [][]byte, StorageExpirationTime int) {
 	if len(values) == 0 {
 		return
 	}
@@ -942,7 +942,7 @@ func (r *RedisCluster) AppendToSetPipelined(key string, values [][]byte) {
 	}
 
 	// if we need to set an expiration time
-	if storageExpTime := int64(config.Global().AnalyticsConfig.StorageExpirationTime); storageExpTime != int64(-1) {
+	if storageExpTime := int64(StorageExpirationTime); storageExpTime != int64(-1) {
 		// If there is no expiry on the analytics set, we should set it.
 		exp, _ := r.GetExp(key)
 		if exp == -1 {

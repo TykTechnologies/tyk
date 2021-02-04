@@ -17,7 +17,6 @@ import (
 	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 )
 
 const (
@@ -70,6 +69,7 @@ type HostUptimeChecker struct {
 	resetListMu sync.Mutex
 	doResetList bool
 	newList     map[string]HostData
+	*Gateway
 }
 
 func (h *HostUptimeChecker) getStopLoop() bool {
@@ -276,14 +276,14 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 			log.Error("Could not create request: ", err)
 			return
 		}
-		ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
+		ignoreCanonical := h.GetConfig().IgnoreCanonicalMIMEHeaderKey
 		for headerName, headerValue := range toCheck.Headers {
 			setCustomHeader(req.Header, headerName, headerValue, ignoreCanonical)
 		}
 		req.Header.Set("Connection", "close")
 		HostCheckerClient.Transport = &http.Transport{
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: config.Global().ProxySSLInsecureSkipVerify,
+				InsecureSkipVerify: h.GetConfig().ProxySSLInsecureSkipVerify,
 			},
 		}
 		if toCheck.Timeout != 0 {

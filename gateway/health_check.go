@@ -11,7 +11,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/rpc"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/sirupsen/logrus"
@@ -90,7 +89,7 @@ func (gw *Gateway) initHealthCheck(ctx context.Context) {
 				return
 
 			case <-ticker.C:
-				gatherHealthChecks()
+				gw.gatherHealthChecks()
 			}
 		}
 	}(ctx)
@@ -101,7 +100,7 @@ type SafeHealthCheck struct {
 	mux  sync.Mutex
 }
 
-func gatherHealthChecks() {
+func(gw *Gateway) gatherHealthChecks() {
 	allInfos := SafeHealthCheck{info: make(map[string]HealthCheckItem, 3)}
 
 	redisStore := storage.RedisCluster{KeyPrefix: "livenesscheck-"}
@@ -132,7 +131,7 @@ func gatherHealthChecks() {
 		allInfos.mux.Unlock()
 	}()
 
-	if config.Global().UseDBAppConfigs {
+	if gw.GetConfig().UseDBAppConfigs {
 		wg.Add(1)
 
 		go func() {
@@ -163,7 +162,7 @@ func gatherHealthChecks() {
 		}()
 	}
 
-	if config.Global().Policies.PolicySource == "rpc" {
+	if gw.GetConfig().Policies.PolicySource == "rpc" {
 
 		wg.Add(1)
 

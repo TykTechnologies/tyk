@@ -236,14 +236,16 @@ func (s *APISpec) validateHTTP() error {
 
 // APIDefinitionLoader will load an Api definition from a storage
 // system.
-type APIDefinitionLoader struct{}
+type APIDefinitionLoader struct{
+	*Gateway
+}
 
 // Nonce to use when interacting with the dashboard service
 var ServiceNonce string
 
 // MakeSpec will generate a flattened URLSpec from and APIDefinitions' VersionInfo data. paths are
 // keyed to the Api version name, which is determined during routing to speed up lookups
-func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.Entry, conf config.Config) *APISpec {
+func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.Entry) *APISpec {
 	spec := &APISpec{}
 
 	if logger == nil {
@@ -268,21 +270,22 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 
 	// We'll push the default HealthChecker:
 	spec.Health = &DefaultHealthChecker{
+		Gateway: *a.Gateway,
 		APIID: spec.APIID,
 	}
 
 	// Add any new session managers or auth handlers here
-	spec.AuthManager = &DefaultAuthorisationManager{}
+	spec.AuthManager = &DefaultAuthorisationManager{Gateway: a.Gateway}
 
 	spec.OrgSessionManager = &DefaultSessionManager{
 		orgID: spec.OrgID,
 	}
 
-	spec.GlobalConfig = conf
+	spec.GlobalConfig = a.GetConfig()
 
 	// Create and init the virtual Machine
-	if conf.EnableJSVM {
-		mwPaths, _, _, _, _, _, _ := loadCustomMiddleware(spec,conf)
+	if a.GetConfig().EnableJSVM {
+		mwPaths, _, _, _, _, _, _ := a.loadCustomMiddleware(spec)
 
 		hasVirtualEndpoint := false
 
@@ -294,7 +297,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 		}
 
 		if spec.CustomMiddlewareBundle != "" || len(mwPaths) > 0 || hasVirtualEndpoint {
-			spec.JSVM.Init(spec, logger)
+			spec.JSVM.Init(spec, logger,a.Gateway)
 		}
 	}
 
@@ -307,7 +310,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 		logger.Debug("FOUND EVENTS TO INIT")
 		for _, handlerConf := range eventHandlerConfs {
 			logger.Debug("CREATING EVENT HANDLERS")
-			eventHandlerInstance, err := EventHandlerByName(handlerConf, spec)
+			eventHandlerInstance, err := a.EventHandlerByName(handlerConf, spec)
 
 			if err != nil {
 				logger.Error("Failed to init event handler: ", err)
@@ -326,10 +329,10 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 
 		// If we have transitioned to extended path specifications, we should use these now
 		if v.UseExtendedPaths {
-			pathSpecs, whiteListSpecs = a.getExtendedPathSpecs(v, spec)
+			pathSpecs, whiteListSpecs = a.getExtendedPathSpecs(v, spec, a.GetConfig())
 		} else {
 			logger.Warning("Legacy path detected! Upgrade to extended.")
-			pathSpecs, whiteListSpecs = a.getPathSpecs(v, conf)
+			pathSpecs, whiteListSpecs = a.getPathSpecs(v, a.GetConfig())
 		}
 		spec.RxPaths[v.Name] = pathSpecs
 		spec.WhiteListEnabled[v.Name] = whiteListSpecs
@@ -339,7 +342,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 }
 
 // FromDashboardService will connect and download ApiDefintions from a Tyk Dashboard instance.
-func (a APIDefinitionLoader) FromDashboardService(endpoint string, conf config.Config) ([]*APISpec, error) {
+func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, error) {
 	// Get the definitions
 	log.Debug("Calling: ", endpoint)
 	newRequest, err := http.NewRequest("GET", endpoint, nil)
@@ -347,13 +350,13 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string, conf config.C
 		log.Error("Failed to create request: ", err)
 	}
 
-	newRequest.Header.Set("authorization", conf.NodeSecret)
-	log.Debug("Using: NodeID: ", GetNodeID())
-	newRequest.Header.Set(headers.XTykNodeID, GetNodeID())
+	newRequest.Header.Set("authorization", a.GetConfig().NodeSecret)
+	log.Debug("Using: NodeID: ", a.Gateway.GetNodeID())
+	newRequest.Header.Set(headers.XTykNodeID, a.Gateway.GetNodeID())
 
 	newRequest.Header.Set(headers.XTykNonce, ServiceNonce)
 
-	c := initialiseClient()
+	c := a.Gateway.initialiseClient()
 	resp, err := c.Do(newRequest)
 	if err != nil {
 		return nil, err
@@ -362,13 +365,13 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string, conf config.C
 
 	if resp.StatusCode == http.StatusForbidden {
 		body, _ := ioutil.ReadAll(resp.Body)
-		reLogin()
+		a.Gateway.reLogin()
 		return nil, fmt.Errorf("login failure, Response was: %v", string(body))
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := ioutil.ReadAll(resp.Body)
-		reLogin()
+		a.Gateway.reLogin()
 		return nil, fmt.Errorf("dashboard API error, response was: %v", string(body))
 	}
 
@@ -387,11 +390,11 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string, conf config.C
 	// Extract tagged entries only
 	apiDefs := make([]*apidef.APIDefinition, 0)
 
-	if conf.DBAppConfOptions.NodeIsSegmented {
-		tagList := make(map[string]bool, len(conf.DBAppConfOptions.Tags))
+	if a.GetConfig().DBAppConfOptions.NodeIsSegmented {
+		tagList := make(map[string]bool, len(a.GetConfig().DBAppConfOptions.Tags))
 		toLoad := make(map[string]*apidef.APIDefinition)
 
-		for _, mt := range conf.DBAppConfOptions.Tags {
+		for _, mt := range a.GetConfig().DBAppConfOptions.Tags {
 			tagList[mt] = true
 		}
 
@@ -427,13 +430,14 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string, conf config.C
 }
 
 // FromCloud will connect and download ApiDefintions from a Mongo DB instance.
-func (a APIDefinitionLoader) FromRPC(orgId string, gw Gateway) ([]*APISpec, error) {
+func (a APIDefinitionLoader) FromRPC(orgId string, gw *Gateway) ([]*APISpec, error) {
 	if rpc.IsEmergencyMode() {
 		return gw.LoadDefinitionsFromRPCBackup()
 	}
 
 	store := RPCStorageHandler{
 		DoReload: gw.DoReload,
+		Gateway: a.Gateway,
 	}
 
 	if !store.Connect() {
@@ -460,7 +464,7 @@ func (a APIDefinitionLoader) FromRPC(orgId string, gw Gateway) ([]*APISpec, erro
 	return a.processRPCDefinitions(apiCollection, gw)
 }
 
-func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw Gateway) ([]*APISpec, error) {
+func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw *Gateway) ([]*APISpec, error) {
 
 	var apiDefs []*apidef.APIDefinition
 	if err := json.Unmarshal([]byte(apiCollection), &apiDefs); err != nil {
@@ -481,7 +485,7 @@ func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw Gate
 			def.Proxy.ListenPath = newListenPath
 		}
 
-		spec := a.MakeSpec(def, nil,gw.GetConfig())
+		spec := a.MakeSpec(def, nil)
 		specs = append(specs, spec)
 	}
 
@@ -847,7 +851,7 @@ func (a APIDefinitionLoader) compileVirtualPathspathSpec(paths []apidef.VirtualM
 		// Extend with method actions
 		newSpec.VirtualPathSpec = stringSpec
 
-		preLoadVirtualMetaCode(&newSpec.VirtualPathSpec, &apiSpec.JSVM)
+		a.Gateway.preLoadVirtualMetaCode(&newSpec.VirtualPathSpec, &apiSpec.JSVM)
 
 		urlSpec = append(urlSpec, newSpec)
 	}

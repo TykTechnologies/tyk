@@ -60,7 +60,7 @@ func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWrite
 	if token == "" {
 		return hm.authorizationError(r)
 	}
-	logger := hm.Logger().WithField("key", obfuscateKey(token))
+	logger := hm.Logger().WithField("key", hm.obfuscateKey(token))
 
 	// Clean it
 	token = stripSignature(token)
@@ -201,7 +201,7 @@ func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWrite
 	// Set session state on context, we will need it later
 	switch hm.Spec.BaseIdentityProvidedBy {
 	case apidef.HMACKey, apidef.UnsetAuth:
-		ctxSetSession(r, &session, fieldValues.KeyID, false)
+		ctxSetSession(r, &session, fieldValues.KeyID, false, hm.GetConfig().HashKeys)
 		hm.setContextVars(r, fieldValues.KeyID)
 	}
 
