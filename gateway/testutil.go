@@ -1054,11 +1054,26 @@ const sampleAPI = `{
 	"graphql": {
       "enabled": false,
       "execution_mode": "executionEngine",
+	  "version": "",
       "schema": "` + testComposedSchema + `",
       "type_field_configurations": [
         ` + testGraphQLDataSourceConfiguration + `,
         ` + testRESTDataSourceConfiguration + `
       ],
+	  "engine": {
+		"field_configs": [
+			{
+				"type_name": "Query",
+				"field_name": "people",
+				"disable_default_mapping": true,
+				"path": [""]
+			}
+		],
+		"data_sources": [
+		    ` + testRESTDataSourceConfigurationV2 + `,
+			` + testGraphQLDataSourceConfigurationV2 + `
+		]
+	},
       "playground": {
         "enabled": false,
         "path": "/playground"
@@ -1068,6 +1083,20 @@ const sampleAPI = `{
 
 const testComposedSchema = "type Query {people: [Person] countries: [Country]} type Person {name: String country: Country} " +
 	"type Country {code: String name: String}"
+
+const testGraphQLDataSourceConfigurationV2 = `
+{
+	"kind": "GraphQL",
+	"name": "countries",
+	"internal": true,
+	"root_fields": [
+		{ "type": "Query", "fields": ["countries"] }
+	],
+	"config": {
+		"url": "` + testGraphQLDataSource + `",
+		"method": "POST"
+	}
+}`
 
 const testGraphQLDataSourceConfiguration = `
 {
@@ -1086,6 +1115,23 @@ const testGraphQLDataSourceConfiguration = `
   }
 }
 `
+
+const testRESTDataSourceConfigurationV2 = `
+{
+	"kind": "REST",
+	"name": "people",
+	"internal": true,
+	"root_fields": [
+		{ "type": "Query", "fields": ["people"] }
+	],
+	"config": {
+		"url": "` + testRESTDataSource + `",
+		"method": "GET",
+		"headers": {},
+		"query": [],
+		"body": ""
+	}
+}`
 
 const testRESTDataSourceConfiguration = `
 {
@@ -1112,6 +1158,50 @@ const testRESTDataSourceConfiguration = `
 	}
   }
 }`
+
+func generateRESTDataSourceV2(gen func(dataSource *apidef.GraphQLEngineDataSource, restConf *apidef.GraphQLEngineDataSourceConfigREST)) apidef.GraphQLEngineDataSource {
+	ds := apidef.GraphQLEngineDataSource{}
+	if err := json.Unmarshal([]byte(testRESTDataSourceConfigurationV2), &ds); err != nil {
+		panic(err)
+	}
+
+	restConf := apidef.GraphQLEngineDataSourceConfigREST{}
+	if err := json.Unmarshal(ds.Config, &restConf); err != nil {
+		panic(err)
+	}
+
+	gen(&ds, &restConf)
+
+	rawConfig, err := json.Marshal(restConf)
+	if err != nil {
+		panic(err)
+	}
+
+	ds.Config = rawConfig
+	return ds
+}
+
+func generateGraphQLDataSourceV2(gen func(dataSource *apidef.GraphQLEngineDataSource, graphqlConf *apidef.GraphQLEngineDataSourceConfigGraphQL)) apidef.GraphQLEngineDataSource {
+	ds := apidef.GraphQLEngineDataSource{}
+	if err := json.Unmarshal([]byte(testGraphQLDataSourceConfigurationV2), &ds); err != nil {
+		panic(err)
+	}
+
+	graphqlConf := apidef.GraphQLEngineDataSourceConfigGraphQL{}
+	if err := json.Unmarshal(ds.Config, &graphqlConf); err != nil {
+		panic(err)
+	}
+
+	gen(&ds, &graphqlConf)
+
+	rawConfig, err := json.Marshal(graphqlConf)
+	if err != nil {
+		panic(err)
+	}
+
+	ds.Config = rawConfig
+	return ds
+}
 
 func generateRESTDataSource(gen ...func(restDataSource *datasource.HttpJsonDataSourceConfig)) json.RawMessage {
 	typeFieldConfiguration := datasource.TypeFieldConfiguration{}

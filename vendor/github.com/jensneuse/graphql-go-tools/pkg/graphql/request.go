@@ -5,9 +5,11 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
+	"net/http"
 
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/astparser"
+	"github.com/jensneuse/graphql-go-tools/pkg/engine/resolve"
 	"github.com/jensneuse/graphql-go-tools/pkg/middleware/operation_complexity"
 	"github.com/jensneuse/graphql-go-tools/pkg/operationreport"
 )
@@ -17,10 +19,18 @@ const (
 	schemaFieldName              = "__schema"
 )
 
+type OperationType ast.OperationType
+
+const (
+	OperationTypeUnknown      OperationType = OperationType(ast.OperationTypeUnknown)
+	OperationTypeQuery        OperationType = OperationType(ast.OperationTypeQuery)
+	OperationTypeMutation     OperationType = OperationType(ast.OperationTypeMutation)
+	OperationTypeSubscription OperationType = OperationType(ast.OperationTypeSubscription)
+)
+
 var (
 	ErrEmptyRequest = errors.New("the provided request is empty")
 	ErrNilSchema    = errors.New("the provided schema is nil")
-	ErrEmptySchema  = errors.New("the provided schema is empty")
 )
 
 type Request struct {
@@ -31,6 +41,7 @@ type Request struct {
 	document     ast.Document
 	isParsed     bool
 	isNormalized bool
+	request      resolve.Request
 }
 
 func UnmarshalRequest(reader io.Reader, request *Request) error {
@@ -44,6 +55,15 @@ func UnmarshalRequest(reader io.Reader, request *Request) error {
 	}
 
 	return json.Unmarshal(requestBytes, &request)
+}
+
+func UnmarshalHttpRequest(r *http.Request, request *Request) error {
+	request.request.Header = r.Header
+	return UnmarshalRequest(r.Body, request)
+}
+
+func (r *Request) SetHeader(header http.Header){
+	r.request.Header = header
 }
 
 func (r *Request) CalculateComplexity(complexityCalculator ComplexityCalculator, schema *Schema) (ComplexityResult, error) {
@@ -124,4 +144,26 @@ func (r *Request) IsIntrospectionQuery() (result bool, err error) {
 	}
 
 	return r.document.FieldNameString(selection.Ref) == schemaFieldName, nil
+}
+
+func (r *Request) OperationType() (OperationType, error) {
+	report := r.parseQueryOnce()
+	if report.HasErrors() {
+		return OperationTypeUnknown, report
+	}
+
+	for _, rootNode := range r.document.RootNodes {
+		if rootNode.Kind != ast.NodeKindOperationDefinition {
+			continue
+		}
+
+		if r.document.OperationDefinitionNameString(rootNode.Ref) != r.OperationName {
+			continue
+		}
+
+		opType := r.document.OperationDefinitions[rootNode.Ref].OperationType
+		return OperationType(opType), nil
+	}
+
+	return OperationTypeUnknown, nil
 }

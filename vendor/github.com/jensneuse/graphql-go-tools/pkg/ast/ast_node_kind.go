@@ -17,6 +17,7 @@ const (
 	NodeKindInterfaceTypeExtension
 	NodeKindUnionTypeDefinition
 	NodeKindUnionTypeExtension
+	NodeKindUnionMemberType
 	NodeKindEnumTypeDefinition
 	NodeKindEnumValueDefinition
 	NodeKindEnumTypeExtension

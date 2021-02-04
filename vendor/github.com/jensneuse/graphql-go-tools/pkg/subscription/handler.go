@@ -11,7 +11,8 @@ import (
 	"github.com/jensneuse/abstractlogger"
 
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
-	"github.com/jensneuse/graphql-go-tools/pkg/execution"
+	"github.com/jensneuse/graphql-go-tools/pkg/engine/resolve"
+	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 )
 
 const (
@@ -37,7 +38,7 @@ type Message struct {
 	Payload json.RawMessage `json:"payload"`
 }
 
-// Client provides an interface which can be implemented by any possible subscription client like websockets, mqtt, etc.
+// client provides an interface which can be implemented by any possible subscription client like websockets, mqtt, etc.
 type Client interface {
 	// ReadFromClient will invoke a read operation from the client connection.
 	ReadFromClient() (*Message, error)
@@ -47,6 +48,20 @@ type Client interface {
 	IsConnected() bool
 	// Disconnect will close the connection between server and client.
 	Disconnect() error
+}
+
+// ExecutorPool is an abstraction for creating executors
+type ExecutorPool interface {
+	Get(payload []byte) (Executor, error)
+	Put(executor Executor) error
+}
+
+// Executor is an abstraction for executing a GraphQL engine
+type Executor interface {
+	Execute(writer resolve.FlushWriter) error
+	OperationType() ast.OperationType
+	SetContext(context context.Context)
+	Reset()
 }
 
 // Handler is the actual subscription handler which will keep track on how to handle messages coming from the client.
@@ -60,14 +75,14 @@ type Handler struct {
 	subscriptionUpdateInterval time.Duration
 	// subCancellations is map containing the cancellation functions to every active subscription.
 	subCancellations subscriptionCancellations
-	// executionHandler will handle the graphql execution.
-	executionHandler *execution.Handler
+	// executorPool is responsible to create and hold executors.
+	executorPool ExecutorPool
 	// bufferPool will hold buffers.
 	bufferPool *sync.Pool
 }
 
 // NewHandler creates a new subscription handler.
-func NewHandler(logger abstractlogger.Logger, client Client, executionHandler *execution.Handler) (*Handler, error) {
+func NewHandler(logger abstractlogger.Logger, client Client, executorPool ExecutorPool) (*Handler, error) {
 	keepAliveInterval, err := time.ParseDuration(DefaultKeepAliveInterval)
 	if err != nil {
 		return nil, err
@@ -84,10 +99,11 @@ func NewHandler(logger abstractlogger.Logger, client Client, executionHandler *e
 		keepAliveInterval:          keepAliveInterval,
 		subscriptionUpdateInterval: subscriptionUpdateInterval,
 		subCancellations:           subscriptionCancellations{},
-		executionHandler:           executionHandler,
+		executorPool:               executorPool,
 		bufferPool: &sync.Pool{
 			New: func() interface{} {
-				return bytes.NewBuffer(make([]byte, 0, 1024))
+				writer := graphql.NewEngineResultWriterFromBuffer(bytes.NewBuffer(make([]byte, 0, 1024)))
+				return &writer
 			},
 		},
 	}, nil
@@ -166,7 +182,7 @@ func (h *Handler) handleInit() {
 
 // handleStart will handle s start message.
 func (h *Handler) handleStart(id string, payload []byte) {
-	executor, node, executionContext, err := h.executionHandler.Handle(payload, []byte(""))
+	executor, err := h.executorPool.Get(payload)
 	if err != nil {
 		h.logger.Error("subscription.Handler.handleStart()",
 			abstractlogger.Error(err),
@@ -176,27 +192,39 @@ func (h *Handler) handleStart(id string, payload []byte) {
 		return
 	}
 
-	if node.OperationType() == ast.OperationTypeSubscription {
+	if executor.OperationType() == ast.OperationTypeSubscription {
 		ctx := h.subCancellations.Add(id)
-		go h.startSubscription(ctx, id, executor, node, executionContext)
+		go h.startSubscription(ctx, id, executor)
 		return
 	}
 
-	go h.handleNonSubscriptionOperation(id, executor, node, executionContext)
+	go h.handleNonSubscriptionOperation(id, executor)
 }
 
 // handleNonSubscriptionOperation will handle a non-subscription operation like a query or a mutation.
-func (h *Handler) handleNonSubscriptionOperation(id string, executor *execution.Executor, node execution.RootNode, executionContext execution.Context) {
-	buf := h.bufferPool.Get().(*bytes.Buffer)
+func (h *Handler) handleNonSubscriptionOperation(id string, executor Executor) {
+	defer func() {
+		err := h.executorPool.Put(executor)
+		if err != nil {
+			h.logger.Error("subscription.Handle.handleNonSubscriptionOperation()",
+				abstractlogger.Error(err),
+			)
+		}
+	}()
+
+	buf := h.bufferPool.Get().(*graphql.EngineResultWriter)
 	buf.Reset()
 
-	err := executor.Execute(executionContext, node, buf)
+	defer h.bufferPool.Put(buf)
+
+	//err := executor.Execute(executionContext, node, buf)
+	err := executor.Execute(buf)
 	if err != nil {
 		h.logger.Error("subscription.Handle.handleNonSubscriptionOperation()",
 			abstractlogger.Error(err),
 		)
 
-		h.handleError(id, err)
+		h.handleError(id, err.Error())
 		return
 	}
 
@@ -209,12 +237,23 @@ func (h *Handler) handleNonSubscriptionOperation(id string, executor *execution.
 }
 
 // startSubscription will invoke the actual subscription.
-func (h *Handler) startSubscription(ctx context.Context, id string, executor *execution.Executor, node execution.RootNode, executionContext execution.Context) {
-	executionContext.Context = ctx
-	buf := h.bufferPool.Get().(*bytes.Buffer)
+func (h *Handler) startSubscription(ctx context.Context, id string, executor Executor) {
+	defer func() {
+		err := h.executorPool.Put(executor)
+		if err != nil {
+			h.logger.Error("subscription.Handle.startSubscription()",
+				abstractlogger.Error(err),
+			)
+		}
+	}()
+
+	executor.SetContext(ctx)
+	buf := h.bufferPool.Get().(*graphql.EngineResultWriter)
 	buf.Reset()
 
-	h.executeSubscription(buf, id, executor, node, executionContext)
+	defer h.bufferPool.Put(buf)
+
+	h.executeSubscription(buf, id, executor)
 
 	for {
 		buf.Reset()
@@ -222,15 +261,16 @@ func (h *Handler) startSubscription(ctx context.Context, id string, executor *ex
 		case <-ctx.Done():
 			return
 		case <-time.After(h.subscriptionUpdateInterval):
-			h.executeSubscription(buf, id, executor, node, executionContext)
+			h.executeSubscription(buf, id, executor)
 		}
 	}
 
 }
 
 // executeSubscription will keep execution the subscription until it ends.
-func (h *Handler) executeSubscription(buf *bytes.Buffer, id string, executor *execution.Executor, node execution.RootNode, ctx execution.Context) {
-	err := executor.Execute(ctx, node, buf)
+func (h *Handler) executeSubscription(buf *graphql.EngineResultWriter, id string, executor Executor) {
+	//err := executor.Execute(ctx, node, buf)
+	err := executor.Execute(buf)
 	if err != nil {
 		h.logger.Error("subscription.Handle.executeSubscription()",
 			abstractlogger.Error(err),

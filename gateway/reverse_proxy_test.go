@@ -701,35 +701,72 @@ func TestGraphQL_InternalDataSource(t *testing.T) {
 		spec.Proxy.ListenPath = "/tyk-rest"
 	})[0]
 
-	composedAPI := BuildAPI(func(spec *APISpec) {
-		spec.Proxy.ListenPath = "/"
-		spec.APIID = "test3"
-		spec.GraphQL.Enabled = true
-		spec.GraphQL.TypeFieldConfigurations[0].DataSource.Config = generateGraphQLDataSource(func(graphQLDataSource *datasource.GraphQLDataSourceConfig) {
-			graphQLDataSource.URL = fmt.Sprintf("tyk://%s", tykGraphQL.Name)
-		})
-		spec.GraphQL.TypeFieldConfigurations[1].DataSource.Config = generateRESTDataSource(func(restDataSource *datasource.HttpJsonDataSourceConfig) {
-			restDataSource.URL = fmt.Sprintf("tyk://%s", tykREST.Name)
-		})
-	})[0]
+	t.Run("graphql engine v2", func(t *testing.T) {
+		composedAPI := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.APIID = "test3"
+			spec.GraphQL.Enabled = true
+			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+			spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+			spec.GraphQL.Engine.DataSources[0] = generateRESTDataSourceV2(func(_ *apidef.GraphQLEngineDataSource, restConfig *apidef.GraphQLEngineDataSourceConfigREST) {
+				restConfig.URL = fmt.Sprintf("tyk://%s", tykREST.Name)
+			})
+			spec.GraphQL.Engine.DataSources[1] = generateGraphQLDataSourceV2(func(_ *apidef.GraphQLEngineDataSource, graphqlConf *apidef.GraphQLEngineDataSourceConfigGraphQL) {
+				graphqlConf.URL = fmt.Sprintf("tyk://%s", tykGraphQL.Name)
+			})
+			spec.GraphQL.TypeFieldConfigurations = nil
+		})[0]
 
-	LoadAPI(tykGraphQL, tykREST, composedAPI)
+		LoadAPI(tykGraphQL, tykREST, composedAPI)
 
-	countries := graphql.Request{
-		Query: "query Query { countries { name } }",
-	}
+		countries := graphql.Request{
+			Query: "query Query { countries { name } }",
+		}
 
-	people := graphql.Request{
-		Query: "query Query { people { name } }",
-	}
+		people := graphql.Request{
+			Query: "query Query { people { name } }",
+		}
 
-	_, _ = g.Run(t, []test.TestCase{
-		// GraphQL Data Source
-		{Data: countries, BodyMatch: `"countries":.*{"name":"Turkey"},{"name":"Russia"}.*`, Code: http.StatusOK},
+		_, _ = g.Run(t, []test.TestCase{
+			// GraphQL Data Source
+			{Data: countries, BodyMatch: `"countries":.*{"name":"Turkey"},{"name":"Russia"}.*`, Code: http.StatusOK},
 
-		// REST Data Source
-		{Data: people, BodyMatch: `"people":.*{"name":"Furkan"},{"name":"Leo"}.*`, Code: http.StatusOK},
-	}...)
+			// REST Data Source
+			{Data: people, BodyMatch: `"people":.*{"name":"Furkan"},{"name":"Leo"}.*`, Code: http.StatusOK},
+		}...)
+	})
+
+	t.Run("graphql engine v1", func(t *testing.T) {
+		composedAPI := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.APIID = "test4"
+			spec.GraphQL.Enabled = true
+			spec.GraphQL.TypeFieldConfigurations[0].DataSource.Config = generateGraphQLDataSource(func(graphQLDataSource *datasource.GraphQLDataSourceConfig) {
+				graphQLDataSource.URL = fmt.Sprintf("tyk://%s", tykGraphQL.Name)
+			})
+			spec.GraphQL.TypeFieldConfigurations[1].DataSource.Config = generateRESTDataSource(func(restDataSource *datasource.HttpJsonDataSourceConfig) {
+				restDataSource.URL = fmt.Sprintf("tyk://%s", tykREST.Name)
+			})
+		})[0]
+
+		LoadAPI(tykGraphQL, tykREST, composedAPI)
+
+		countries := graphql.Request{
+			Query: "query Query { countries { name } }",
+		}
+
+		people := graphql.Request{
+			Query: "query Query { people { name } }",
+		}
+
+		_, _ = g.Run(t, []test.TestCase{
+			// GraphQL Data Source
+			{Data: countries, BodyMatch: `"countries":.*{"name":"Turkey"},{"name":"Russia"}.*`, Code: http.StatusOK},
+
+			// REST Data Source
+			{Data: people, BodyMatch: `"people":.*{"name":"Furkan"},{"name":"Leo"}.*`, Code: http.StatusOK},
+		}...)
+	})
 }
 
 func TestGraphQL_ProxyIntrospectionInterrupt(t *testing.T) {

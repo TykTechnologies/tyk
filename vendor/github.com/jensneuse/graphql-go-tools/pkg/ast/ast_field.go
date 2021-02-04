@@ -17,17 +17,6 @@ type Field struct {
 	HasSelections bool
 }
 
-func (d *Document) FieldObjectNameString(ref int) string {
-	return unsafebytes.BytesToString(d.FieldObjectNameBytes(ref))
-}
-
-func (d *Document) FieldObjectNameBytes(ref int) ByteSlice {
-	if d.Fields[ref].Alias.IsDefined {
-		return d.FieldAliasBytes(ref)
-	}
-	return d.FieldNameBytes(ref)
-}
-
 func (d *Document) FieldNameBytes(ref int) ByteSlice {
 	return d.Input.ByteSlice(d.Fields[ref].Name)
 }

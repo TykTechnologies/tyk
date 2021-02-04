@@ -1,8 +1,6 @@
 package astnormalization
 
 import (
-	"github.com/cespare/xxhash"
-
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/astvisitor"
 )
@@ -26,14 +24,16 @@ func (e *extendUnionTypeDefinitionVisitor) EnterDocument(operation, definition *
 
 func (e *extendUnionTypeDefinitionVisitor) EnterUnionTypeExtension(ref int) {
 
-	baseNode, exists := e.operation.Index.Nodes[xxhash.Sum64(e.operation.UnionTypeExtensionNameBytes(ref))]
+	nodes, exists := e.operation.Index.NodesByNameBytes(e.operation.UnionTypeExtensionNameBytes(ref))
 	if !exists {
 		return
 	}
 
-	if baseNode.Kind != ast.NodeKindUnionTypeDefinition {
+	for i := range nodes {
+		if nodes[i].Kind != ast.NodeKindUnionTypeDefinition {
+			continue
+		}
+		e.operation.ExtendUnionTypeDefinitionByUnionTypeExtension(nodes[i].Ref, ref)
 		return
 	}
-
-	e.operation.ExtendUnionTypeDefinitionByUnionTypeExtension(baseNode.Ref, ref)
 }
