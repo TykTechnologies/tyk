@@ -38,13 +38,13 @@ func (k *RateLimitForAPI) EnabledForSpec() bool {
 		Per:         k.Spec.GlobalRateLimit.Per,
 		LastUpdated: strconv.Itoa(int(time.Now().UnixNano())),
 	}
-	k.apiSess.SetKeyHash(storage.HashKey(k.keyName,k.GetConfig().HashKeys))
+	k.apiSess.SetKeyHash(storage.HashKey(k.keyName,k.Gw.GetConfig().HashKeys))
 
 	return true
 }
 
 func (k *RateLimitForAPI) handleRateLimitFailure(r *http.Request, token string) (error, int) {
-	k.Logger().WithField("key", k.obfuscateKey(token)).Info("API rate limit exceeded.")
+	k.Logger().WithField("key", k.Gw.obfuscateKey(token)).Info("API rate limit exceeded.")
 
 	// Fire a rate limit exceeded event
 	k.FireEvent(EventRateLimitExceeded, EventKeyFailureMeta{

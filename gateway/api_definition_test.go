@@ -852,7 +852,7 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 func TestAPIDefinitionLoader_Template(t *testing.T) {
 	const testTemplatePath = "../templates/transform_test.tmpl"
 
-	l := APIDefinitionLoader{}
+	l := APIDefinitionLoader{Gw: &globalGateway}
 
 	executeAndAssert := func(t *testing.T, template *template.Template) {
 		var bodyBuffer bytes.Buffer

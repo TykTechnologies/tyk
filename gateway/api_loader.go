@@ -40,8 +40,8 @@ func (gw *Gateway) prepareStorage() generalStores {
 	gs.redisStore = &storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: gw.GetConfig().HashKeys}
 	gs.redisOrgStore = &storage.RedisCluster{KeyPrefix: "orgkey."}
 	gs.healthStore = &storage.RedisCluster{KeyPrefix: "apihealth."}
-	gs.rpcAuthStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: gw.GetConfig().HashKeys, Gateway: gw}
-	gs.rpcOrgStore = &RPCStorageHandler{KeyPrefix: "orgkey.", Gateway: gw}
+	gs.rpcAuthStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: gw.GetConfig().HashKeys, Gw:gw}
+	gs.rpcOrgStore = &RPCStorageHandler{KeyPrefix: "orgkey.", Gw:gw}
 	GlobalSessionManager.Init(gs.redisStore)
 	return gs
 }
@@ -273,7 +273,7 @@ func(gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	// Create the response processors, pass all the loaded custom middleware response functions:
 	gw.createResponseMiddlewareChain(spec, mwResponseFuncs)
 
-	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy, logger: logger}
+	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy, logger: logger, }
 
 	for _, v := range baseMid.Spec.VersionData.Versions {
 		if len(v.ExtendedPaths.CircuitBreaker) > 0 {
@@ -443,7 +443,7 @@ func(gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	//It will not get executed
 	gw.mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: &cacheStore})
 
-	chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid}, Gateway: gw})
+	chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid}, Gw: gw})
 
 	if !spec.UseKeylessAccess {
 		var simpleArray []alice.Constructor
@@ -506,7 +506,7 @@ func isLoop(r *http.Request) (bool, error) {
 
 type DummyProxyHandler struct {
 	SH SuccessHandler
-	*Gateway
+	Gw *Gateway
 }
 
 func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {

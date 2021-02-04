@@ -331,7 +331,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 		return apiError("Request malformed"), http.StatusBadRequest
 	}
 
-	mw := BaseMiddleware{Gateway: gw}
+	mw := BaseMiddleware{Gw:gw}
 	// TODO: handle apply policies error
 	mw.ApplyPolicies(newSession)
 
@@ -1219,7 +1219,7 @@ func(gw *Gateway) groupResetHandler(w http.ResponseWriter, r *http.Request) {
 	}).Info("Group reload accepted.")
 
 	// Signal to the group via redis
-	MainNotifier.Notify(Notification{Command: NoticeGroupReload, Gateway: gw})
+	MainNotifier.Notify(Notification{Command: NoticeGroupReload, Gw: gw})
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
@@ -2238,7 +2238,7 @@ func(gw *Gateway) RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request)
 	n := Notification{
 		Command: KeySpaceUpdateNotification,
 		Payload: strings.Join(tokens, ","),
-		Gateway: gw,
+		Gw: gw,
 	}
 	MainNotifier.Notify(n)
 

@@ -73,7 +73,7 @@ func(gw *Gateway) NotifyCurrentServerStatus() {
 	n := Notification{
 		Command: NoticeGatewayDRLNotification,
 		Payload: string(asJson),
-		Gateway: gw,
+		Gw: gw,
 	}
 
 	MainNotifier.Notify(n)

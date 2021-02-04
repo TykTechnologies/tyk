@@ -184,7 +184,7 @@ func(gw *Gateway) handleSendMiniConfig(payload string) {
 	asNotification := Notification{
 		Command: NoticeGatewayConfigResponse,
 		Payload: string(payloadAsJSON),
-		Gateway: gw,
+		Gw: gw,
 	}
 
 	MainNotifier.Notify(asNotification)

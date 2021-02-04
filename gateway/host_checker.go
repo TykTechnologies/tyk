@@ -69,7 +69,7 @@ type HostUptimeChecker struct {
 	resetListMu sync.Mutex
 	doResetList bool
 	newList     map[string]HostData
-	*Gateway
+	Gw *Gateway
 }
 
 func (h *HostUptimeChecker) getStopLoop() bool {
@@ -276,14 +276,14 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 			log.Error("Could not create request: ", err)
 			return
 		}
-		ignoreCanonical := h.GetConfig().IgnoreCanonicalMIMEHeaderKey
+		ignoreCanonical := h.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
 		for headerName, headerValue := range toCheck.Headers {
 			setCustomHeader(req.Header, headerName, headerValue, ignoreCanonical)
 		}
 		req.Header.Set("Connection", "close")
 		HostCheckerClient.Transport = &http.Transport{
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: h.GetConfig().ProxySSLInsecureSkipVerify,
+				InsecureSkipVerify: h.Gw.GetConfig().ProxySSLInsecureSkipVerify,
 			},
 		}
 		if toCheck.Timeout != 0 {

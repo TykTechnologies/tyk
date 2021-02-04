@@ -93,14 +93,14 @@ type RPCStorageHandler struct {
 	HashKeys         bool
 	SuppressRegister bool
 	DoReload         func()
-	*Gateway
+	Gw *Gateway
 }
 
 var RPCGlobalCache = cache.New(30*time.Second, 15*time.Second)
 
 // Connect will establish a connection to the RPC
 func (r *RPCStorageHandler) Connect() bool {
-	slaveOptions := r.GetConfig().SlaveOptions
+	slaveOptions := r.Gw.GetConfig().SlaveOptions
 	rpcConfig := rpc.Config{
 		UseSSL:                slaveOptions.UseSSL,
 		SSLInsecureSkipVerify: slaveOptions.SSLInsecureSkipVerify,
@@ -166,7 +166,7 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 
 func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 	// Check the cache first
-	if r.GetConfig().SlaveOptions.EnableRPCCache {
+	if r.Gw.GetConfig().SlaveOptions.EnableRPCCache {
 		log.Debug("Using cache for: ", keyName)
 		cachedVal, found := RPCGlobalCache.Get(keyName)
 		log.Debug("--> Found? ", found)
@@ -193,7 +193,7 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 		log.Debug("Error trying to get value:", err)
 		return "", storage.ErrKeyNotFound
 	}
-	if r.GetConfig().SlaveOptions.EnableRPCCache {
+	if r.Gw.GetConfig().SlaveOptions.EnableRPCCache {
 		// Cache key
 		RPCGlobalCache.Set(keyName, value, cache.DefaultExpiration)
 	}
@@ -694,20 +694,20 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) {
 		// Do the reload!
 		log.Warning("[RPC STORE] Received Reload instruction!")
 		go func() {
-			MainNotifier.Notify(Notification{Command: NoticeGroupReload, Gateway: r.Gateway})
+			MainNotifier.Notify(Notification{Command: NoticeGroupReload, Gw: r.Gw})
 		}()
 	}
 }
 
 func (r *RPCStorageHandler) StartRPCLoopCheck(orgId string) {
-	if r.GetConfig().SlaveOptions.DisableKeySpaceSync {
+	if r.Gw.GetConfig().SlaveOptions.DisableKeySpaceSync {
 		return
 	}
 
 	log.Info("[RPC] Starting keyspace poller")
 
 	for {
-		seconds := r.GetConfig().SlaveOptions.KeySpaceSyncInterval
+		seconds := r.Gw.GetConfig().SlaveOptions.KeySpaceSyncInterval
 		r.CheckForKeyspaceChanges(orgId)
 		time.Sleep(time.Duration(seconds) * time.Second)
 	}
@@ -749,7 +749,7 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 	var req interface{}
 
 	reqData := map[string]string{}
-	if groupID := r.GetConfig().SlaveOptions.GroupID; groupID == "" {
+	if groupID := r.Gw.GetConfig().SlaveOptions.GroupID; groupID == "" {
 		funcName = "GetKeySpaceUpdate"
 		req = orgId
 		reqData["orgId"] = orgId
@@ -858,7 +858,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			RevokeToken(storage, token, tokenTypeHint)
 		} else {
 			token = strings.Split(token, "#")[0]
-			r.handleDeleteHashedKey(token, apiId, false)
+			r.Gw.handleDeleteHashedKey(token, apiId, false)
 		}
 		SessionCache.Delete(token)
 		RPCGlobalCache.Delete(r.KeyPrefix + token)
@@ -872,16 +872,16 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			if len(splitKeys) > 1 && splitKeys[1] == "hashed" {
 				key = splitKeys[0]
 				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
-				r.handleDeleteHashedKey(splitKeys[0], "", resetQuota)
-				r.getSessionAndCreate(splitKeys[0], r)
+				r.Gw.handleDeleteHashedKey(splitKeys[0], "", resetQuota)
+				r.Gw.getSessionAndCreate(splitKeys[0], r)
 			} else {
 				log.Info("--> removing cached key: ", key)
 				// in case it's an username (basic auth) then generate the token
 				if storage.TokenOrg(key) == "" {
-					key = r.generateToken(orgId, key)
+					key = r.Gw.generateToken(orgId, key)
 				}
-				r.handleDeleteKey(key, "-1", resetQuota)
-				r.getSessionAndCreate(splitKeys[0], r)
+				r.Gw.handleDeleteKey(key, "-1", resetQuota)
+				r.Gw.getSessionAndCreate(splitKeys[0], r)
 			}
 			SessionCache.Delete(key)
 			RPCGlobalCache.Delete(r.KeyPrefix + key)
@@ -891,7 +891,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 	n := Notification{
 		Command: KeySpaceUpdateNotification,
 		Payload: strings.Join(keys, ","),
-		Gateway: r.Gateway,
+		Gw: r.Gw,
 	}
 	MainNotifier.Notify(n)
 }

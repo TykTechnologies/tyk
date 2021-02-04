@@ -292,7 +292,7 @@ func TestTestCheckerTCPHosts_correct_answers(t *testing.T) {
 		}
 	}(l)
 	ctx, cancel := context.WithCancel(context.Background())
-	hs := &HostUptimeChecker{}
+	hs := &HostUptimeChecker{Gw: &globalGateway}
 	ans := &answers{cancel: cancel}
 	setTestMode(false)
 
@@ -348,7 +348,7 @@ func TestTestCheckerTCPHosts_correct_answers_proxy_protocol(t *testing.T) {
 		}
 	}(l)
 	ctx, cancel := context.WithCancel(context.Background())
-	hs := &HostUptimeChecker{}
+	hs := &HostUptimeChecker{Gw: &globalGateway}
 	ans := &answers{cancel: cancel}
 	setTestMode(false)
 
@@ -398,7 +398,7 @@ func TestTestCheckerTCPHosts_correct_wrong_answers(t *testing.T) {
 		}
 	}(l)
 	ctx, cancel := context.WithCancel(context.Background())
-	hs := &HostUptimeChecker{}
+	hs := &HostUptimeChecker{Gw: &globalGateway}
 	failed := false
 	setTestMode(false)
 	hs.Init(1, 1, 0, map[string]HostData{
@@ -514,7 +514,7 @@ func TestChecker_triggerSampleLimit(t *testing.T) {
 	failed.Store(0)
 	ping.Store(0)
 
-	hs := &HostUptimeChecker{}
+	hs := &HostUptimeChecker{Gw:&globalGateway}
 	hs.Init(1, limit, 0, map[string]HostData{
 		l.Addr().String(): {CheckURL: "http://" + l.Addr().String()},
 	},

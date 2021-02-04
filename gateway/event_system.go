@@ -107,7 +107,7 @@ func(gw *Gateway) EventHandlerByName(handlerConf apidef.EventHandlerTriggerConfi
 		err := h.Init(conf)
 		return h, err
 	case EH_WebHook:
-		h := &WebHookHandler{Gateway: gw}
+		h := &WebHookHandler{Gw: gw}
 		err := h.Init(conf)
 		return h, err
 	case EH_JSVMHandler:

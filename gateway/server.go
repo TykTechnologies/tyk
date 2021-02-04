@@ -168,7 +168,7 @@ func apisByIDLen() int {
 	return len(apisByID)
 }
 
-//var redisPurgeOnce sync.Once
+var redisPurgeOnce sync.Once
 var rpcPurgeOnce sync.Once
 
 // Create all globals and init connection handlers
@@ -247,7 +247,7 @@ func (gw *Gateway) setupGlobals(ctx context.Context) {
 	MainNotifier = RedisNotifier{mainNotifierStore, RedisPubSubChannel, gw}
 
 	if gwConfig.Monitor.EnableTriggerMonitors {
-		h := &WebHookHandler{Gateway: gw}
+		h := &WebHookHandler{Gw: gw}
 		if err := h.Init(gwConfig.Monitor.Config); err != nil {
 			mainLog.Error("Failed to initialise monitor! ", err)
 		} else {
@@ -565,7 +565,7 @@ func (gw *Gateway) addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthMana
 func (gw *Gateway) addBatchEndpoint(spec *APISpec, muxer *mux.Router) {
 	mainLog.Debug("Batch requests enabled for API")
 	apiBatchPath := spec.Proxy.ListenPath + "tyk/batch/"
-	batchHandler := BatchRequestHandler{API: spec, Gateway: gw}
+	batchHandler := BatchRequestHandler{API: spec, Gw: gw}
 	muxer.HandleFunc(apiBatchPath, batchHandler.HandleBatchRequest)
 }
 
@@ -1216,7 +1216,7 @@ func (gw *Gateway) getGlobalStorageHandler(keyPrefix string, hashKeys bool) stor
 		return &RPCStorageHandler{
 			KeyPrefix: keyPrefix,
 			HashKeys:  hashKeys,
-			Gateway: gw,
+			Gw:gw,
 		}
 	}
 	return &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys}
@@ -1234,7 +1234,6 @@ func Start() {
 
 	// ToDo:Config replace for get default conf
 	gw := NewGateway(config.Default)
-
 	gw.SetNodeID("solo-" + uuid.NewV4().String())
 
 	if err := gw.initialiseSystem(ctx); err != nil {
@@ -1246,7 +1245,7 @@ func Start() {
 		mainLog.Warn("The control_api_port should be changed for production")
 	}
 	gw.setupPortsWhitelist()
-	keyGen = DefaultKeyGenerator{Gateway: &gw}
+	keyGen = DefaultKeyGenerator{Gw: &gw}
 
 	onFork := func() {
 		mainLog.Warning("PREPARING TO FORK")
@@ -1402,7 +1401,7 @@ func (gw *Gateway) start(ctx context.Context) {
 
 func dashboardServiceInit(gw *Gateway) {
 	if DashService == nil {
-		DashService = &HTTPDashboardHandler{Gateway: gw}
+		DashService = &HTTPDashboardHandler{Gw: gw}
 		DashService.Init()
 	}
 }

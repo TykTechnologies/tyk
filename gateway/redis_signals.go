@@ -42,12 +42,12 @@ type Notification struct {
 	Payload       string              `json:"payload"`
 	Signature     string              `json:"signature"`
 	SignatureAlgo crypto.Hash         `json:"algorithm"`
-	*Gateway
+	Gw *Gateway
 }
 
 func (n *Notification) Sign() {
 	n.SignatureAlgo = crypto.SHA256
-	hash := sha256.Sum256([]byte(string(n.Command) + n.Payload + n.GetConfig().NodeSecret))
+	hash := sha256.Sum256([]byte(string(n.Command) + n.Payload + n.Gw.GetConfig().NodeSecret))
 	n.Signature = hex.EncodeToString(hash[:])
 }
 
@@ -74,7 +74,7 @@ func(gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationComma
 	if !ok {
 		return
 	}
-	notif := Notification{Gateway: gw}
+	notif := Notification{Gw: gw}
 	if err := json.Unmarshal([]byte(message.Payload), &notif); err != nil {
 		pubSubLog.Error("Unmarshalling message body failed, malformed: ", err)
 		return
@@ -143,13 +143,13 @@ var redisInsecureWarn sync.Once
 var notificationVerifier goverify.Verifier
 
 func isPayloadSignatureValid(notification Notification) bool {
-	if notification.GetConfig().AllowInsecureConfigs {
+	if notification.Gw.GetConfig().AllowInsecureConfigs {
 		return true
 	}
 
 	switch notification.SignatureAlgo {
 	case crypto.SHA256:
-		hash := sha256.Sum256([]byte(string(notification.Command) + notification.Payload + notification.GetConfig().NodeSecret))
+		hash := sha256.Sum256([]byte(string(notification.Command) + notification.Payload + notification.Gw.GetConfig().NodeSecret))
 		expectedSignature := hex.EncodeToString(hash[:])
 
 		if expectedSignature == notification.Signature {
@@ -159,10 +159,10 @@ func isPayloadSignatureValid(notification Notification) bool {
 			return false
 		}
 	default:
-		if notification.GetConfig().PublicKeyPath != "" && notificationVerifier == nil {
+		if notification.Gw.GetConfig().PublicKeyPath != "" && notificationVerifier == nil {
 			var err error
 
-			notificationVerifier, err = goverify.LoadPublicKeyFromFile(notification.GetConfig().PublicKeyPath)
+			notificationVerifier, err = goverify.LoadPublicKeyFromFile(notification.Gw.GetConfig().PublicKeyPath)
 			if err != nil {
 
 				pubSubLog.Error("Notification signer: Failed loading public key from path: ", err)

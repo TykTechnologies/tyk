@@ -33,13 +33,13 @@ type HealthCheckValues struct {
 }
 
 type DefaultHealthChecker struct {
-	Gateway
+	Gw *Gateway
 	storage storage.Handler
 	APIID   string
 }
 
 func (h *DefaultHealthChecker) Init(storeType storage.Handler) {
-	if !h.GetConfig().HealthCheck.EnableHealthChecks {
+	if !h.Gw.GetConfig().HealthCheck.EnableHealthChecks {
 		return
 	}
 
@@ -73,16 +73,16 @@ func (h *DefaultHealthChecker) StoreCounterVal(counterType HealthPrefix, value s
 		value = now_string + "." + value
 		log.Debug("Set value to: ", value)
 	}
-	go h.storage.SetRollingWindow(searchStr, h.GetConfig().HealthCheck.HealthCheckValueTimeout, value, false)
+	go h.storage.SetRollingWindow(searchStr, h.Gw.GetConfig().HealthCheck.HealthCheckValueTimeout, value, false)
 }
 
 func (h *DefaultHealthChecker) getAvgCount(prefix HealthPrefix) float64 {
 	searchStr := h.CreateKeyName(prefix)
 	log.Debug("Searching for: ", searchStr)
 
-	count, _ := h.storage.SetRollingWindow(searchStr, h.GetConfig().HealthCheck.HealthCheckValueTimeout, "-1", false)
+	count, _ := h.storage.SetRollingWindow(searchStr, h.Gw.GetConfig().HealthCheck.HealthCheckValueTimeout, "-1", false)
 	log.Debug("Count is: ", count)
-	divisor := float64(h.GetConfig().HealthCheck.HealthCheckValueTimeout)
+	divisor := float64(h.Gw.GetConfig().HealthCheck.HealthCheckValueTimeout)
 	if divisor == 0 {
 		log.Warning("The Health Check sample timeout is set to 0, samples will never be deleted!!!")
 		divisor = 60.0
@@ -110,7 +110,7 @@ func (h *DefaultHealthChecker) ApiHealthValues() (HealthCheckValues, error) {
 	// Get the micro latency graph, an average upstream latency
 	searchStr := h.APIID + "." + string(RequestLog)
 	log.Debug("Searching KV for: ", searchStr)
-	_, vals := h.storage.SetRollingWindow(searchStr, h.GetConfig().HealthCheck.HealthCheckValueTimeout, "-1", false)
+	_, vals := h.storage.SetRollingWindow(searchStr, h.Gw.GetConfig().HealthCheck.HealthCheckValueTimeout, "-1", false)
 	log.Debug("Found: ", vals)
 	if len(vals) == 0 {
 		return values, nil

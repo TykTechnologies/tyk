@@ -22,7 +22,7 @@ type HeaderTransformOptions struct {
 type HeaderTransform struct {
 	Spec   *APISpec
 	config HeaderTransformOptions
-	*Gateway
+	Gw *Gateway
 }
 
 func (HeaderTransform) Name() string {
@@ -48,7 +48,7 @@ func (h *HeaderTransform) HandleResponse(rw http.ResponseWriter,
 	if err != nil {
 		return err
 	}
-	ignoreCanonical := h.GetConfig().IgnoreCanonicalMIMEHeaderKey
+	ignoreCanonical := h.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
 	for _, name := range h.config.RevProxyTransform.Headers {
 		// check if header is present and its value is not empty
 		val := res.Header.Get(name)

@@ -168,7 +168,7 @@ func(gw *Gateway) LoadPoliciesFromRPC(orgId string) (map[string]user.Policy, err
 		return gw.LoadPoliciesFromRPCBackup()
 	}
 
-	store := &RPCStorageHandler{Gateway: gw}
+	store := &RPCStorageHandler{Gw:gw}
 	if !store.Connect() {
 		return nil, errors.New("Policies backup: Failed connecting to database")
 	}

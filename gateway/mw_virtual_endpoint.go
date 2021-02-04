@@ -227,11 +227,11 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 		newMeta := newResponseData.SessionMeta
 		if !reflect.DeepEqual(session.GetMetaData(), newMeta) {
 			session.SetMetaData(newMeta)
-			ctxSetSession(r, session, "", true, d.GetConfig().HashKeys)
+			ctxSetSession(r, session, "", true, d.Gw.GetConfig().HashKeys)
 		}
 	}
 
-	copiedResponse := d.forceResponse(w, r, &newResponseData, d.Spec, session, false, d.Logger())
+	copiedResponse := d.Gw.forceResponse(w, r, &newResponseData, d.Spec, session, false, d.Logger())
 	ms := DurationToMillisecond(time.Since(t1))
 	d.Logger().Debug("JSVM Virtual Endpoint execution took: (ms) ", ms)
 
@@ -318,7 +318,7 @@ func (d *VirtualEndpoint) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 func (d *VirtualEndpoint) HandleResponse(rw http.ResponseWriter, res *http.Response, ses *user.SessionState) {
 	// Externalising this from the MW so we can re-use it elsewhere
-	d.handleForcedResponse(rw, res, ses, d.Spec)
+	d.Gw.handleForcedResponse(rw, res, ses, d.Spec)
 }
 
 func(gw *Gateway) handleForcedResponse(rw http.ResponseWriter, res *http.Response, ses *user.SessionState, spec *APISpec) {

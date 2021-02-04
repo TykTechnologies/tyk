@@ -34,7 +34,7 @@ type BatchReplyUnit struct {
 
 // BatchRequestHandler handles batch requests on /tyk/batch for any API Definition that has the feature enabled
 type BatchRequestHandler struct {
-	*Gateway
+	Gw *Gateway
 	API *APISpec
 }
 
@@ -42,12 +42,12 @@ type BatchRequestHandler struct {
 func (b *BatchRequestHandler) doRequest(req *http.Request, relURL string) BatchReplyUnit {
 	tr := &http.Transport{TLSClientConfig: &tls.Config{}}
 
-	if cert := b.getUpstreamCertificate(req.Host, b.API); cert != nil {
+	if cert := b.Gw.getUpstreamCertificate(req.Host, b.API); cert != nil {
 		tr.TLSClientConfig.Certificates = []tls.Certificate{*cert}
 	}
 
-	tr.TLSClientConfig.InsecureSkipVerify = b.GetConfig().ProxySSLInsecureSkipVerify
-	tr.DialTLS = customDialTLSCheck(b.API, tr.TLSClientConfig, b.GetConfig())
+	tr.TLSClientConfig.InsecureSkipVerify = b.Gw.GetConfig().ProxySSLInsecureSkipVerify
+	tr.DialTLS = customDialTLSCheck(b.API, tr.TLSClientConfig, b.Gw.GetConfig())
 
 	tr.Proxy = proxyFromAPI(b.API)
 
@@ -83,13 +83,13 @@ func (b *BatchRequestHandler) DecodeBatchRequest(r *http.Request) (BatchRequestS
 func (b *BatchRequestHandler) ConstructRequests(batchRequest BatchRequestStructure, unsafe bool) ([]*http.Request, error) {
 	requestSet := []*http.Request{}
 
-	ignoreCanonical := 	b.GetConfig().IgnoreCanonicalMIMEHeaderKey
+	ignoreCanonical := 	b.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
 	for i, requestDef := range batchRequest.Requests {
 		// We re-build the URL to ensure that the requested URL is actually for the API in question
 		// URLs need to be built absolute so they go through the rate limiting and request limiting machinery
 		var absURL string
 		if !unsafe {
-			absUrlHeader := "http://localhost:" + strconv.Itoa(b.GetConfig().ListenPort)
+			absUrlHeader := "http://localhost:" + strconv.Itoa(b.Gw.GetConfig().ListenPort)
 			absURL = strings.Join([]string{absUrlHeader, strings.Trim(b.API.Proxy.ListenPath, "/"), requestDef.RelativeURL}, "/")
 		} else {
 			absURL = requestDef.RelativeURL

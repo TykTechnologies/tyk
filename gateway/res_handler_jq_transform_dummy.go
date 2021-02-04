@@ -10,7 +10,7 @@ import (
 
 type ResponseTransformJQMiddleware struct {
 	Spec *APISpec
-	*Gateway
+	Gw *Gateway
 }
 
 func (ResponseTransformJQMiddleware) Name() string {

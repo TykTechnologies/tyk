@@ -70,7 +70,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 
 	// If key not provided in header or cookie and client certificate is provided, try to find certificate based key
 	if config.UseCertificate && key == "" && r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
-		key = k.generateToken(k.Spec.OrgID, certs.HexSHA256(r.TLS.PeerCertificates[0].Raw))
+		key = k.Gw.generateToken(k.Spec.OrgID, certs.HexSHA256(r.TLS.PeerCertificates[0].Raw))
 	}
 
 	if key == "" {
@@ -86,7 +86,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 	// Check if API key valid
 	session, keyExists := k.CheckSessionAndIdentityForValidKey(&key, r)
 	if !keyExists {
-		k.Logger().WithField("key", k.obfuscateKey(key)).Info("Attempted access with non-existent key.")
+		k.Logger().WithField("key", k.Gw.obfuscateKey(key)).Info("Attempted access with non-existent key.")
 
 		// Fire Authfailed Event
 		AuthFailed(k, r, key)
@@ -100,7 +100,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 	// Set session state on context, we will need it later
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.AuthToken, apidef.UnsetAuth:
-		ctxSetSession(r, &session, key, false,k.GetConfig().HashKeys)
+		ctxSetSession(r, &session, key, false,k.Gw.GetConfig().HashKeys)
 		k.setContextVars(r, key)
 	}
 
@@ -109,7 +109,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 
 func (k *AuthKey) validateSignature(r *http.Request, key string) (error, int) {
 	config := k.Spec.Auth
-	logger := k.Logger().WithField("key", k.obfuscateKey(key))
+	logger := k.Logger().WithField("key", k.Gw.obfuscateKey(key))
 
 	if !config.ValidateSignature {
 		return nil, http.StatusOK
@@ -137,7 +137,7 @@ func (k *AuthKey) validateSignature(r *http.Request, key string) (error, int) {
 		return errors.New(errorMessage), errorCode
 	}
 
-	secret := k.replaceTykVariables(r, config.Signature.Secret, false)
+	secret := k.Gw.replaceTykVariables(r, config.Signature.Secret, false)
 
 	if secret == "" {
 		logger.Info("Request signature secret not found or empty")

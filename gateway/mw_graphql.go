@@ -135,7 +135,7 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	}
 
 	if websocket.IsWebSocketUpgrade(r) {
-		if !m.GetConfig().HttpServerOptions.EnableWebSockets {
+		if !m.Gw.GetConfig().HttpServerOptions.EnableWebSockets {
 			return errors.New("websockets are not allowed"), http.StatusUnprocessableEntity
 		}
 

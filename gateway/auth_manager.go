@@ -41,14 +41,14 @@ type SessionHandler interface {
 // requires a storage.Handler to interact with key store
 type DefaultAuthorisationManager struct {
 	store storage.Handler
-	*Gateway
+	Gw *Gateway
 }
 
 type DefaultSessionManager struct {
 	store                    storage.Handler
 	disableCacheSessionState bool
 	orgID                    string
-	*Gateway
+	Gw *Gateway
 }
 
 type SessionUpdate struct {
@@ -69,7 +69,7 @@ func (b *DefaultAuthorisationManager) KeyAuthorised(keyName string) (user.Sessio
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix":      "auth-mgr",
-			"inbound-key": b.obfuscateKey(keyName),
+			"inbound-key": b.Gw.obfuscateKey(keyName),
 			"err":         err,
 		}).Warning("Key not found in storage engine")
 		return user.SessionState{}, false
@@ -108,13 +108,13 @@ func (b *DefaultSessionManager) Store() storage.Handler {
 func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.SessionState, isHashed bool) {
 	origKeyName := keyName
 	if !isHashed {
-		keyName = storage.HashKey(keyName, b.GetConfig().HashKeys)
+		keyName = storage.HashKey(keyName, b.Gw.GetConfig().HashKeys)
 	}
 
 	rawKey := QuotaKeyPrefix + keyName
 	log.WithFields(logrus.Fields{
 		"prefix":      "auth-mgr",
-		"inbound-key": b.obfuscateKey(origKeyName),
+		"inbound-key": b.Gw.obfuscateKey(origKeyName),
 		"key":         rawKey,
 	}).Info("Reset quota for key.")
 
@@ -134,7 +134,7 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 func (b *DefaultSessionManager) clearCacheForKey(keyName string, hashed bool) {
 	cacheKey := keyName
 	if !hashed {
-		cacheKey = storage.HashKey(keyName, b.GetConfig().HashKeys)
+		cacheKey = storage.HashKey(keyName, b.Gw.GetConfig().HashKeys)
 	}
 
 	// Delete current gateway's cache immediately
@@ -144,7 +144,7 @@ func (b *DefaultSessionManager) clearCacheForKey(keyName string, hashed bool) {
 	n := Notification{
 		Command: KeySpaceUpdateNotification,
 		Payload: cacheKey,
-		Gateway: b.Gateway,
+		Gw: b.Gw,
 	}
 	MainNotifier.Notify(n)
 }
@@ -180,7 +180,7 @@ func (b *DefaultSessionManager) RemoveSession(orgID string, keyName string, hash
 	} else {
 		// support both old and new key hashing
 		res1 := b.store.DeleteKey(keyName)
-		res2 := b.store.DeleteKey(b.generateToken(orgID, keyName))
+		res2 := b.store.DeleteKey(b.Gw.generateToken(orgID, keyName))
 		return res1 || res2
 	}
 }
@@ -199,7 +199,7 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 			var jsonKeyValList []string
 			jsonKeyValList, err = b.store.GetMultiKey(
 				[]string{
-					b.generateToken(orgID, keyName),
+					b.Gw.generateToken(orgID, keyName),
 					keyName,
 				},
 			)
@@ -220,7 +220,7 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix":      "auth-mgr",
-			"inbound-key": b.obfuscateKey(keyName),
+			"inbound-key": b.Gw.obfuscateKey(keyName),
 			"err":         err,
 		}).Debug("Could not get session detail, key not found")
 		return user.SessionState{}, false
@@ -242,7 +242,7 @@ func (b *DefaultSessionManager) Sessions(filter string) []string {
 }
 
 type DefaultKeyGenerator struct{
-	*Gateway
+	Gw *Gateway
 }
 
 func(gw *Gateway) generateToken(orgID, keyID string) string {
@@ -261,7 +261,7 @@ func(gw *Gateway) generateToken(orgID, keyID string) string {
 
 // GenerateAuthKey is a utility function for generating new auth keys. Returns the storage key name and the actual key
 func (d DefaultKeyGenerator) GenerateAuthKey(orgID string) string {
-	return d.generateToken(orgID, "")
+	return d.Gw.generateToken(orgID, "")
 }
 
 // GenerateHMACSecret is a utility function for generating new auth keys. Returns the storage key name and the actual key

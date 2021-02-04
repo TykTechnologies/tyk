@@ -106,7 +106,7 @@ func transformBody(r *http.Request, tmeta *TransformSpec, t *TransformMiddleware
 		return fmt.Errorf("failed to apply template to request: %v", err)
 	}
 
-	s := t.replaceTykVariables(r, bodyBuffer.String(), true)
+	s := t.Gw.replaceTykVariables(r, bodyBuffer.String(), true)
 
 	newBuf := bytes.NewBufferString(s)
 

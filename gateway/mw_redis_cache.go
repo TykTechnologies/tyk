@@ -334,7 +334,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		newRes.Header.Del(h)
 	}
 
-	copyHeader(w.Header(), newRes.Header, m.GetConfig().IgnoreCanonicalMIMEHeaderKey)
+	copyHeader(w.Header(), newRes.Header, m.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
 	session := ctxGetSession(r)
 
 	// Only add ratelimit data to keyed sessions

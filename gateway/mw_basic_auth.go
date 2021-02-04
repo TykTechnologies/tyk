@@ -85,7 +85,7 @@ func (k *BasicAuthKeyIsValid) getAuthType() string {
 
 func (k *BasicAuthKeyIsValid) basicAuthHeaderCredentials(w http.ResponseWriter, r *http.Request) (username, password string, err error, code int) {
 	token, _ := k.getAuthToken(k.getAuthType(), r)
-	logger := k.Logger().WithField("key", k.obfuscateKey(token))
+	logger := k.Logger().WithField("key", k.Gw.obfuscateKey(token))
 	if token == "" {
 		// No header value, fail
 		err, code = k.requestForBasicAuth(w, "Authorization field missing")
@@ -177,11 +177,11 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Check if API key valid
-	keyName := k.Gateway.generateToken(k.Spec.OrgID, username)
-	logger := k.Logger().WithField("key", k.obfuscateKey(keyName))
+	keyName := k.Gw.generateToken(k.Spec.OrgID, username)
+	logger := k.Logger().WithField("key", k.Gw.obfuscateKey(keyName))
 	session, keyExists := k.CheckSessionAndIdentityForValidKey(&keyName, r)
 	if !keyExists {
-		if k.GetConfig().HashKeyFunction == "" {
+		if k.Gw.GetConfig().HashKeyFunction == "" {
 			logger.Warning("Attempted access with non-existent user.")
 			return k.handleAuthFail(w, r, token)
 		} else { // check for key with legacy format "org_id" + "user_name"
@@ -212,7 +212,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	// Set session state on context, we will need it later
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.BasicAuthUser, apidef.UnsetAuth:
-		ctxSetSession(r, &session, keyName, false,k.GetConfig().HashKeys)
+		ctxSetSession(r, &session, keyName, false,k.Gw.GetConfig().HashKeys)
 	}
 
 	return nil, http.StatusOK

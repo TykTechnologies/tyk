@@ -339,7 +339,7 @@ func(gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, l
 				return &buffer
 			},
 		},
-		Gateway: gw,
+		Gw:gw,
 	}
 	proxy.ErrorHandler.BaseMiddleware = BaseMiddleware{Spec: spec, Proxy: proxy}
 	return proxy
@@ -378,7 +378,7 @@ type ReverseProxy struct {
 
 	logger *logrus.Entry
 	sp     sync.Pool
-	*Gateway
+	Gw *Gateway
 }
 
 func(p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
@@ -400,8 +400,8 @@ func(p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
 
 	return &http.Transport{
 		DialContext:           dialContextFunc,
-		MaxIdleConns:          p.GetConfig().MaxIdleConns,
-		MaxIdleConnsPerHost:   p.GetConfig().MaxIdleConnsPerHost, // default is 100
+		MaxIdleConns:          p.Gw.GetConfig().MaxIdleConns,
+		MaxIdleConnsPerHost:   p.Gw.GetConfig().MaxIdleConnsPerHost, // default is 100
 		ResponseHeaderTimeout: time.Duration(dialerTimeout) * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 	}
@@ -613,7 +613,7 @@ func(p *ReverseProxy) httpTransport(timeOut float64, rw http.ResponseWriter, req
 	transport.TLSClientConfig = &tls.Config{}
 	transport.Proxy = proxyFromAPI(p.TykAPISpec)
 
-	if p.GetConfig().ProxySSLInsecureSkipVerify {
+	if p.Gw.GetConfig().ProxySSLInsecureSkipVerify {
 		transport.TLSClientConfig.InsecureSkipVerify = true
 	}
 
@@ -625,13 +625,13 @@ func(p *ReverseProxy) httpTransport(timeOut float64, rw http.ResponseWriter, req
 	// The reason behind two separate checks is that `DialTLS` supports specifying public keys per hostname, and `VerifyPeerCertificate` only global ones, e.g. `*`
 	if proxyURL, _ := transport.Proxy(req); proxyURL != nil {
 		p.logger.Debug("Detected proxy: " + proxyURL.String())
-		transport.TLSClientConfig.VerifyPeerCertificate = p.Gateway.verifyPeerCertificatePinnedCheck(p.TykAPISpec, transport.TLSClientConfig)
+		transport.TLSClientConfig.VerifyPeerCertificate = p.Gw.verifyPeerCertificatePinnedCheck(p.TykAPISpec, transport.TLSClientConfig)
 
 		if transport.TLSClientConfig.VerifyPeerCertificate != nil {
 			p.logger.Debug("Certificate pinning check is enabled")
 		}
 	} else {
-		transport.DialTLS = customDialTLSCheck(p.TykAPISpec, transport.TLSClientConfig, p.GetConfig())
+		transport.DialTLS = customDialTLSCheck(p.TykAPISpec, transport.TLSClientConfig, p.Gw.GetConfig())
 	}
 
 	if p.TykAPISpec.GlobalConfig.ProxySSLMinVersion > 0 {
@@ -650,13 +650,13 @@ func(p *ReverseProxy) httpTransport(timeOut float64, rw http.ResponseWriter, req
 		transport.TLSClientConfig.CipherSuites = getCipherAliases(p.TykAPISpec.Proxy.Transport.SSLCipherSuites)
 	}
 
-	if !p.GetConfig().ProxySSLDisableRenegotiation {
+	if !p.Gw.GetConfig().ProxySSLDisableRenegotiation {
 		transport.TLSClientConfig.Renegotiation = tls.RenegotiateFreelyAsClient
 	}
 
 	transport.DisableKeepAlives = p.TykAPISpec.GlobalConfig.ProxyCloseConnections
 
-	if p.GetConfig().ProxyEnableHttp2 {
+	if p.Gw.GetConfig().ProxyEnableHttp2 {
 		http2.ConfigureTransport(transport)
 	}
 
@@ -698,7 +698,7 @@ func (p *ReverseProxy) setCommonNameVerifyPeerCertificate(tlsConfig *tls.Config,
 			certs[i] = cert
 		}
 
-		if !p.TykAPISpec.Proxy.Transport.SSLInsecureSkipVerify && !p.GetConfig().ProxySSLInsecureSkipVerify {
+		if !p.TykAPISpec.Proxy.Transport.SSLInsecureSkipVerify && !p.Gw.GetConfig().ProxySSLInsecureSkipVerify {
 			opts := x509.VerifyOptions{
 				Roots:         tlsConfig.RootCAs,
 				CurrentTime:   time.Now(),
@@ -873,8 +873,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	createTransport := p.TykAPISpec.HTTPTransport == nil
 
 	// Check if timeouts are set for this endpoint
-	if !createTransport && p.GetConfig().MaxConnTime != 0 {
-		createTransport = time.Since(p.TykAPISpec.HTTPTransportCreated) > time.Duration(p.GetConfig().MaxConnTime)*time.Second
+	if !createTransport && p.Gw.GetConfig().MaxConnTime != 0 {
+		createTransport = time.Since(p.TykAPISpec.HTTPTransportCreated) > time.Duration(p.Gw.GetConfig().MaxConnTime)*time.Second
 	}
 
 	if createTransport {
@@ -981,7 +981,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	// set up TLS certificates for upstream if needed
 	var tlsCertificates []tls.Certificate
-	if cert := p.getUpstreamCertificate(outreq.Host, p.TykAPISpec); cert != nil {
+	if cert := p.Gw.getUpstreamCertificate(outreq.Host, p.TykAPISpec); cert != nil {
 		p.logger.Debug("Found upstream mutual TLS certificate")
 		tlsCertificates = []tls.Certificate{*cert}
 	}
@@ -992,7 +992,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 	p.TykAPISpec.Unlock()
 
-	if p.TykAPISpec.Proxy.Transport.SSLForceCommonNameCheck || p.GetConfig().SSLForceCommonNameCheck {
+	if p.TykAPISpec.Proxy.Transport.SSLForceCommonNameCheck || p.Gw.GetConfig().SSLForceCommonNameCheck {
 		// if proxy is enabled, add CommonName verification in verifyPeerCertificate
 		// DialTLS is not executed if proxy is used
 		httpTransport := roundTripper.transport
@@ -1047,7 +1047,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			"prefix":      "proxy",
 			"user_ip":     addrs,
 			"server_name": outreq.Host,
-			"user_id":     p.obfuscateKey(token),
+			"user_id":     p.Gw.obfuscateKey(token),
 			"user_name":   alias,
 			"org_id":      p.TykAPISpec.OrgID,
 			"api_id":      p.TykAPISpec.APIID,
@@ -1154,7 +1154,7 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 	defer res.Body.Close()
 
 	// Close connections
-	if p.GetConfig().CloseConnections {
+	if p.Gw.GetConfig().CloseConnections {
 		res.Header.Set(headers.Connection, "close")
 	}
 
@@ -1167,7 +1167,7 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 		res.Header.Set(headers.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
 	}
 
-	copyHeader(rw.Header(), res.Header, p.GetConfig().IgnoreCanonicalMIMEHeaderKey)
+	copyHeader(rw.Header(), res.Header, p.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
 
 	announcedTrailers := len(res.Trailer)
 	if announcedTrailers > 0 {
@@ -1192,7 +1192,7 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 	p.CopyResponse(rw, res.Body)
 
 	if len(res.Trailer) == announcedTrailers {
-		copyHeader(rw.Header(), res.Trailer, p.GetConfig().IgnoreCanonicalMIMEHeaderKey)
+		copyHeader(rw.Header(), res.Trailer, p.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
 		return nil
 	}
 
@@ -1263,7 +1263,7 @@ func upgradeType(h http.Header) string {
 }
 
 func (p *ReverseProxy) handleUpgradeResponse(rw http.ResponseWriter, req *http.Request, res *http.Response) error {
-	copyHeader(res.Header, rw.Header(), p.GetConfig().IgnoreCanonicalMIMEHeaderKey)
+	copyHeader(res.Header, rw.Header(), p.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
 
 	hj, ok := rw.(http.Hijacker)
 	if !ok {
@@ -1447,7 +1447,7 @@ func nopCloseResponseBody(r *http.Response) {
 }
 
 func(p *ReverseProxy) IsUpgrade(req *http.Request) (bool, string) {
-	if !p.GetConfig().HttpServerOptions.EnableWebSockets {
+	if !p.Gw.GetConfig().HttpServerOptions.EnableWebSockets {
 		return false, ""
 	}
 

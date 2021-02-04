@@ -346,7 +346,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	// Generate a virtual token
 	data := []byte(baseFieldData)
 	keyID := fmt.Sprintf("%x", md5.Sum(data))
-	sessionID := k.Gateway.generateToken(k.Spec.OrgID, keyID)
+	sessionID := k.Gw.generateToken(k.Spec.OrgID, keyID)
 	updateSession := false
 
 	k.Logger().Debug("JWT Temporary session ID is: ", sessionID)
@@ -539,7 +539,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	k.Logger().Debug("Key found")
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.JWTClaim, apidef.UnsetAuth:
-		ctxSetSession(r, &session, sessionID, updateSession, k.GetConfig().HashKeys)
+		ctxSetSession(r, &session, sessionID, updateSession, k.Gw.GetConfig().HashKeys)
 
 		if updateSession {
 			clone := session.Clone()
@@ -575,7 +575,7 @@ func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Toke
 	}
 
 	k.Logger().Debug("Raw key ID found.")
-	ctxSetSession(r, &session, tykId, false, k.GetConfig().HashKeys)
+	ctxSetSession(r, &session, tykId, false, k.Gw.GetConfig().HashKeys)
 	ctxSetJWTContextVars(k.Spec, r, token)
 	return nil, http.StatusOK
 }

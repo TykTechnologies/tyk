@@ -1280,7 +1280,7 @@ func TestGroupResetHandler(t *testing.T) {
 			case *redis.Subscription:
 				didSubscribe <- true
 			case *redis.Message:
-				notf := Notification{Gateway: &globalGateway}
+				notf := Notification{Gw: &globalGateway}
 				if err := json.Unmarshal([]byte(x.Payload), &notf); err != nil {
 					t.Fatal(err)
 				}

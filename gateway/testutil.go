@@ -1228,16 +1228,16 @@ func BuildAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 	return specs
 }
 
-func (gateway *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
-	gwConf := gateway.GetConfig()
+func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
+	gwConf := gw.GetConfig()
 	oldPath := gwConf.AppPath
 	gwConf.AppPath, _ = ioutil.TempDir("", "apps")
-	gateway.SetConfig(gwConf)
+	gw.SetConfig(gwConf)
 	defer func() {
-		globalConf := gateway.GetConfig()
+		globalConf := gw.GetConfig()
 		os.RemoveAll(globalConf.AppPath)
 		globalConf.AppPath = oldPath
-		gateway.SetConfig(globalConf)
+		gw.SetConfig(globalConf)
 	}()
 
 	for i, spec := range specs {
@@ -1260,8 +1260,8 @@ func (gateway *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
 	return out
 }
 
-func (gateway *Gateway) BuildAndLoadAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
-	return gateway.LoadAPI(BuildAPI(apiGens...)...)
+func (gw *Gateway) BuildAndLoadAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
+	return gw.LoadAPI(BuildAPI(apiGens...)...)
 }
 
 func CloneAPI(a *APISpec) *APISpec {

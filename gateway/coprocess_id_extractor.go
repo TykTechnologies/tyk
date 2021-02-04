@@ -75,7 +75,7 @@ func (e *BaseExtractor) ExtractBody(r *http.Request) (string, error) {
 
 // Error is a helper for logging the extractor errors. It always returns HTTP 400 (so we don't expose any details).
 func (e *BaseExtractor) Error(r *http.Request, err error, message string) (returnOverrides ReturnOverrides) {
-	logEntry := e.getLogEntryForRequest(e.Logger(), r, "", nil)
+	logEntry := e.Gw.getLogEntryForRequest(e.Logger(), r, "", nil)
 	logEntry.Info("Extractor error: ", message, ", ", err)
 
 	return ReturnOverrides{
@@ -88,7 +88,7 @@ func (e *BaseExtractor) Error(r *http.Request, err error, message string) (retur
 func (e *BaseExtractor) GenerateSessionID(input string, mw BaseMiddleware) (sessionID string) {
 	data := []byte(input)
 	tokenID := fmt.Sprintf("%x", md5.Sum(data))
-	sessionID = e.generateToken(mw.Spec.OrgID, tokenID)
+	sessionID = e.Gw.generateToken(mw.Spec.OrgID, tokenID)
 	return sessionID
 }
 
@@ -137,7 +137,7 @@ func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (sessionID string, ret
 
 	if keyExists {
 		if previousSession.IdExtractorDeadline > time.Now().Unix() {
-			ctxSetSession(r, &previousSession, sessionID, true, e.GetConfig().HashKeys)
+			ctxSetSession(r, &previousSession, sessionID, true, e.Gw.GetConfig().HashKeys)
 			returnOverrides = ReturnOverrides{
 				ResponseCode: 200,
 			}
@@ -210,7 +210,7 @@ func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 
 	if keyExists {
 		if previousSession.IdExtractorDeadline > time.Now().Unix() {
-			ctxSetSession(r, &previousSession, SessionID, true, e.GetConfig().HashKeys)
+			ctxSetSession(r, &previousSession, SessionID, true, e.Gw.GetConfig().HashKeys)
 			returnOverrides = ReturnOverrides{
 				ResponseCode: 200,
 			}
@@ -285,7 +285,7 @@ func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 	previousSession, keyExists := e.CheckSessionAndIdentityForValidKey(&SessionID, r)
 	if keyExists {
 		if previousSession.IdExtractorDeadline > time.Now().Unix() {
-			ctxSetSession(r, &previousSession, SessionID, true, e.GetConfig().HashKeys)
+			ctxSetSession(r, &previousSession, SessionID, true, e.Gw.GetConfig().HashKeys)
 			returnOverrides = ReturnOverrides{
 				ResponseCode: 200,
 			}

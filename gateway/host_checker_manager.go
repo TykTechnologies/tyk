@@ -21,7 +21,7 @@ import (
 var GlobalHostChecker HostCheckerManager
 
 type HostCheckerManager struct {
-	*Gateway
+	Gw *Gateway
 	Id                string
 	store             storage.Handler
 	checkerMu         sync.Mutex
@@ -145,8 +145,8 @@ func (hc *HostCheckerManager) AmIPolling() bool {
 		return false
 	}
 	pollerCacheKey := PollerCacheKey
-	if hc.GetConfig().UptimeTests.PollerGroup != "" {
-		pollerCacheKey = pollerCacheKey + "." + hc.GetConfig().UptimeTests.PollerGroup
+	if hc.Gw.GetConfig().UptimeTests.PollerGroup != "" {
+		pollerCacheKey = pollerCacheKey + "." + hc.Gw.GetConfig().UptimeTests.PollerGroup
 	}
 
 	activeInstance, err := hc.store.GetKey(pollerCacheKey)
@@ -185,12 +185,12 @@ func (hc *HostCheckerManager) StartPoller(ctx context.Context) {
 	// If we are restarting, we want to retain the host list
 	hc.checkerMu.Lock()
 	if hc.checker == nil {
-		hc.checker = &HostUptimeChecker{Gateway: hc.Gateway}
+		hc.checker = &HostUptimeChecker{Gw: hc.Gw}
 	}
 
-	hc.checker.Init(hc.GetConfig().UptimeTests.Config.CheckerPoolSize,
-		hc.GetConfig().UptimeTests.Config.FailureTriggerSampleSize,
-		hc.GetConfig().UptimeTests.Config.TimeWait,
+	hc.checker.Init(hc.Gw.GetConfig().UptimeTests.Config.CheckerPoolSize,
+		hc.Gw.GetConfig().UptimeTests.Config.FailureTriggerSampleSize,
+		hc.Gw.GetConfig().UptimeTests.Config.TimeWait,
 		hc.currentHostList,
 		HostCheckCallBacks{
 			Up:   hc.OnHostBackUp,
@@ -223,7 +223,7 @@ func (hc *HostCheckerManager) getHostKey(report HostHealthReport) string {
 }
 
 func (hc *HostCheckerManager) OnHostReport(ctx context.Context, report HostHealthReport) {
-	if hc.GetConfig().UptimeTests.Config.EnableUptimeAnalytics {
+	if hc.Gw.GetConfig().UptimeTests.Config.EnableUptimeAnalytics {
 		go hc.RecordUptimeAnalytics(report)
 	}
 }
@@ -535,7 +535,7 @@ func(gw *Gateway) InitHostCheckManager(ctx context.Context, store storage.Handle
 		return
 	}
 
-	GlobalHostChecker = HostCheckerManager{Gateway: gw}
+	GlobalHostChecker = HostCheckerManager{Gw:gw}
 	GlobalHostChecker.Init(store)
 	GlobalHostChecker.Start(ctx)
 }

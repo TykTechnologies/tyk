@@ -30,7 +30,7 @@ type Bundle struct {
 	Path     string
 	Spec     *APISpec
 	Manifest apidef.BundleManifest
-	*Gateway
+	Gw *Gateway
 }
 
 // Verify performs a signature verification on the bundle file.
@@ -43,14 +43,14 @@ func (b *Bundle) Verify() error {
 	var bundleVerifier goverify.Verifier
 
 	// Perform signature verification if a public key path is set:
-	if b.GetConfig().PublicKeyPath != "" {
+	if b.Gw.GetConfig().PublicKeyPath != "" {
 		if b.Manifest.Signature == "" {
 			// Error: A public key is set, but the bundle isn't signed.
 			return errors.New("Bundle isn't signed")
 		}
 		if notificationVerifier == nil {
 			var err error
-			bundleVerifier, err = goverify.LoadPublicKeyFromFile(b.GetConfig().PublicKeyPath)
+			bundleVerifier, err = goverify.LoadPublicKeyFromFile(b.Gw.GetConfig().PublicKeyPath)
 			if err != nil {
 				return err
 			}
@@ -102,7 +102,7 @@ func (b *Bundle) AddToSpec() {
 	// Load Python interpreter if the
 	if loadedDrivers[b.Spec.CustomMiddleware.Driver] == nil && b.Spec.CustomMiddleware.Driver == apidef.PythonDriver {
 		var err error
-		loadedDrivers[apidef.PythonDriver], err = NewPythonDispatcher(b.GetConfig())
+		loadedDrivers[apidef.PythonDriver], err = NewPythonDispatcher(b.Gw.GetConfig())
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "coprocess",
@@ -210,7 +210,7 @@ func (ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) err
 
 // fetchBundle will fetch a given bundle, using the right BundleGetter. The first argument is the bundle name, the base bundle URL will be used as prefix.
 func(gw *Gateway) fetchBundle(spec *APISpec) (Bundle, error) {
-	bundle := Bundle{Gateway:gw}
+	bundle := Bundle{Gw:gw}
 	var err error
 
 	if !gw.GetConfig().EnableBundleDownloader {
@@ -345,7 +345,7 @@ func(gw *Gateway) loadBundle(spec *APISpec) error {
 			Name: spec.CustomMiddlewareBundle,
 			Path: destPath,
 			Spec: spec,
-			Gateway: gw,
+			Gw:gw,
 		}
 
 		err = loadBundleManifest(&bundle, spec, true)

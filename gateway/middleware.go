@@ -198,7 +198,7 @@ type BaseMiddleware struct {
 	Spec   *APISpec
 	Proxy  ReturningHttpHandler
 	logger *logrus.Entry
-	*Gateway
+	Gw *Gateway
 }
 
 func (t BaseMiddleware) Base() *BaseMiddleware { return &t }
@@ -216,7 +216,7 @@ func (t *BaseMiddleware) SetName(name string) {
 }
 
 func (t *BaseMiddleware) SetRequestLogger(r *http.Request) {
-	t.logger = t.getLogEntryForRequest(t.Logger(), r, ctxGetAuthToken(r), nil)
+	t.logger = t.Gw.getLogEntryForRequest(t.Logger(), r, ctxGetAuthToken(r), nil)
 }
 
 func (t BaseMiddleware) Init() {}
@@ -242,7 +242,7 @@ func (t BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
 		ExpiryCache.Set(session.OrgID, session.DataExpires, cache.DefaultExpiration)
 	}
 
-	session.SetKeyHash(storage.HashKey(orgID,t.GetConfig().HashKeys))
+	session.SetKeyHash(storage.HashKey(orgID,t.Gw.GetConfig().HashKeys))
 
 	return session.Clone(), found
 }
@@ -284,7 +284,7 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 		return false
 	}
 
-	lifetime := session.Lifetime(t.Spec.SessionLifetime, t.GetConfig().ForceGlobalSessionLifetime, t.GetConfig().GlobalSessionLifetime)
+	lifetime := session.Lifetime(t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime)
 	if err := GlobalSessionManager.UpdateSession(token, session, lifetime, false); err != nil {
 		t.Logger().WithError(err).Error("Can't update session")
 		return false
@@ -697,7 +697,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 	session, found = t.Spec.AuthManager.KeyAuthorised(key)
 	if !found && storage.TokenOrg(key) != t.Spec.OrgID {
 		//treat it as a custom key
-		key = t.Gateway.generateToken(t.Spec.OrgID, key)
+		key = t.Gw.generateToken(t.Spec.OrgID, key)
 		cacheKey = key
 		if t.Spec.GlobalConfig.HashKeys {
 			cacheKey = storage.HashStr(cacheKey)
@@ -711,7 +711,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 
 		session.SetKeyHash(cacheKey)
 		// If not in Session, and got it from AuthHandler, create a session with a new TTL
-		t.Logger().Info("Recreating session for key: ", t.obfuscateKey(key))
+		t.Logger().Info("Recreating session for key: ", t.Gw.obfuscateKey(key))
 
 		// cache it
 		clone := session.Clone()
@@ -725,7 +725,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 			return session.Clone(), false
 		}
 
-		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.SessionLifetime,t.GetConfig().ForceGlobalSessionLifetime, t.GetConfig().GlobalSessionLifetime))
+		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.SessionLifetime,t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime))
 		ctxScheduleSessionUpdate(r)
 	}
 
@@ -798,13 +798,13 @@ type TykResponseHandler interface {
 func(gw *Gateway) responseProcessorByName(name string) TykResponseHandler {
 	switch name {
 	case "header_injector":
-		return &HeaderInjector{Gateway: gw}
+		return &HeaderInjector{Gw: gw}
 	case "response_body_transform":
 		return &ResponseTransformMiddleware{}
 	case "response_body_transform_jq":
-		return &ResponseTransformJQMiddleware{Gateway: gw}
+		return &ResponseTransformJQMiddleware{Gw: gw}
 	case "header_transform":
-		return &HeaderTransform{Gateway: gw}
+		return &HeaderTransform{Gw: gw}
 	case "custom_mw_res_hook":
 		return &CustomMiddlewareResponseHook{}
 	}

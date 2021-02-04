@@ -51,7 +51,7 @@ func CreateCoProcessMiddleware(hookName string, hookType coprocess.HookType, mwD
 		successHandler:   &SuccessHandler{baseMid},
 	}
 
-	return baseMid.createMiddleware(dMiddleware)
+	return baseMid.Gw.createMiddleware(dMiddleware)
 }
 
 func DoCoprocessReload() {
@@ -182,7 +182,7 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 	for _, dh := range object.Request.DeleteHeaders {
 		r.Header.Del(dh)
 	}
-	ignoreCanonical := c.Middleware.GetConfig().IgnoreCanonicalMIMEHeaderKey
+	ignoreCanonical := c.Middleware.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
 	for h, v := range object.Request.SetHeaders {
 		setCustomHeader(r.Header, h, v, ignoreCanonical)
 	}
@@ -257,7 +257,7 @@ func (gw *Gateway) CoProcessInit() {
 // EnabledForSpec checks if this middleware should be enabled for a given API.
 func (m *CoProcessMiddleware) EnabledForSpec() bool {
 
-	if !m.GetConfig().CoProcessOptions.EnableCoProcess {
+	if !m.Gw.GetConfig().CoProcessOptions.EnableCoProcess {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
 		}).Error("Your API specifies a CP custom middleware, either Tyk wasn't build with CP support or CP is not enabled in your Tyk configuration file!")
@@ -385,7 +385,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	// The CP middleware indicates this is a bad auth:
 	if returnObject.Request.ReturnOverrides.ResponseCode >= http.StatusBadRequest && !returnObject.Request.ReturnOverrides.OverrideError {
-		logger.WithField("key", m.obfuscateKey(token)).Info("Attempted access with invalid key")
+		logger.WithField("key", m.Gw.obfuscateKey(token)).Info("Attempted access with invalid key")
 
 		for h, v := range returnObject.Request.ReturnOverrides.Headers {
 			w.Header().Set(h, v)
@@ -474,7 +474,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			return errors.New(http.StatusText(http.StatusForbidden)), http.StatusForbidden
 		}
 
-		ctxSetSession(r, returnedSession, sessionID, true, m.GetConfig().HashKeys)
+		ctxSetSession(r, returnedSession, sessionID, true, m.Gw.GetConfig().HashKeys)
 	}
 
 	return nil, http.StatusOK
@@ -539,7 +539,7 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 	}
 
 	// Set headers:
-	ignoreCanonical := h.mw.GetConfig().IgnoreCanonicalMIMEHeaderKey
+	ignoreCanonical := h.mw.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
 	for k, v := range retObject.Response.Headers {
 		setCustomHeader(res.Header, k, v, ignoreCanonical)
 	}

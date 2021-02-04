@@ -466,7 +466,7 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	umeta := meta.(*apidef.URLRewriteMeta)
 	log.Debug(r.URL)
 	oldPath := r.URL.String()
-	p, err := m.urlRewrite(umeta, r)
+	p, err := m.Gw.urlRewrite(umeta, r)
 	if err != nil {
 		log.Error(err)
 		return err, http.StatusInternalServerError
