@@ -58,7 +58,7 @@ var (
 	rawLog               = logger.GetRaw()
 	templates            *template.Template
 	analytics            RedisAnalyticsHandler
-	GlobalEventsJSVM     JSVM
+
 	memProfFile          *os.File
 	MainNotifier         RedisNotifier
 	DefaultOrgStore      DefaultSessionManager
@@ -116,6 +116,10 @@ type Gateway struct {
 
 	muNodeID sync.Mutex // guards NodeID
 	NodeID   string
+
+	reloadMu sync.Mutex
+
+	GlobalEventsJSVM     JSVM
 }
 
 func NewGateway(config config.Config) Gateway {
@@ -173,8 +177,8 @@ var rpcPurgeOnce sync.Once
 
 // Create all globals and init connection handlers
 func (gw *Gateway) setupGlobals(ctx context.Context) {
-	reloadMu.Lock()
-	defer reloadMu.Unlock()
+	gw.reloadMu.Lock()
+	defer gw.reloadMu.Unlock()
 
 	gwConfig := gw.GetConfig()
 	checkup.Run(&gwConfig)
@@ -724,15 +728,13 @@ func rpcReloadLoop(rpcKey string) {
 	}
 }
 
-var reloadMu sync.Mutex
-
 func (gw *Gateway) DoReload() {
-	reloadMu.Lock()
-	defer reloadMu.Unlock()
+	gw.reloadMu.Lock()
+	defer gw.reloadMu.Unlock()
 
 	// Initialize/reset the JSVM
 	if gw.GetConfig().EnableJSVM {
-		GlobalEventsJSVM.Init(nil, logrus.NewEntry(log), gw)
+		gw.GlobalEventsJSVM.Init(nil, logrus.NewEntry(log), gw)
 	}
 
 	// Load the API Policies

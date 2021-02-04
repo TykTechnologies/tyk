@@ -113,10 +113,10 @@ func(gw *Gateway) EventHandlerByName(handlerConf apidef.EventHandlerTriggerConfi
 	case EH_JSVMHandler:
 		// Load the globals and file here
 		if spec != nil {
-			h := &JSVMEventHandler{Spec: spec}
+			h := &JSVMEventHandler{Spec: spec, Gw:gw}
 			err := h.Init(conf)
 			if err == nil {
-				GlobalEventsJSVM.LoadJSPaths([]string{conf["path"].(string)}, "")
+				gw.GlobalEventsJSVM.LoadJSPaths([]string{conf["path"].(string)}, "")
 			}
 			return h, err
 		}
