@@ -1128,7 +1128,7 @@ const testRESTDataSourceConfigurationV2 = `
 		"url": "` + testRESTDataSource + `",
 		"method": "GET",
 		"headers": {},
-		"query": {},
+		"query": [],
 		"body": ""
 	}
 }`
