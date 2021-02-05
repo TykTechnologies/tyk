@@ -954,7 +954,7 @@ func (s *Test) Close() {
 	if s.cancel != nil {
 		s.cancel()
 	}
-	globalGateway.DefaultProxyMux.swap(&proxyMux{}, globalGateway.GetConfig())
+	globalGateway.DefaultProxyMux.swap(&proxyMux{}, &globalGateway)
 	if s.config.sepatateControlAPI {
 		gwConfig := globalGateway.GetConfig()
 		gwConfig.ControlAPIPort = 0

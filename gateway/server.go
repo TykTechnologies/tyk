@@ -60,7 +60,6 @@ var (
 
 	memProfFile *os.File
 
-	CertificateManager  *certs.CertificateManager
 	NewRelicApplication newrelic.Application
 
 	apisMu          sync.RWMutex
@@ -121,6 +120,7 @@ type Gateway struct {
 	MonitoringHandler    config.TykEventHandler
 	RPCListener         RPCStorageHandler
 	DashService         DashboardServiceSender
+	CertificateManager  *certs.CertificateManager
 }
 
 func NewGateway(config config.Config) *Gateway {
@@ -273,7 +273,7 @@ func (gw *Gateway) setupGlobals(ctx context.Context) {
 		certificateSecret = gw.GetConfig().Security.PrivateCertificateEncodingSecret
 	}
 
-	CertificateManager = certs.NewCertificateManager(gw.getGlobalStorageHandler("cert-", false), certificateSecret, log)
+	gw.CertificateManager = certs.NewCertificateManager(gw.getGlobalStorageHandler("cert-", false), certificateSecret, log)
 
 	if gw.GetConfig().NewRelic.AppName != "" {
 		NewRelicApplication = gw.SetupNewRelic()
@@ -411,7 +411,7 @@ func stripSlashes(next http.Handler) http.Handler {
 func (gw *Gateway) controlAPICheckClientCertificate(certLevel string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if gw.GetConfig().Security.ControlAPIUseMutualTLS {
-			if err := CertificateManager.ValidateRequestCertificate(gw.GetConfig().Security.Certificates.ControlAPI, r); err != nil {
+			if err := gw.CertificateManager.ValidateRequestCertificate(gw.GetConfig().Security.Certificates.ControlAPI, r); err != nil {
 				doJSONWrite(w, http.StatusForbidden, apiError(err.Error()))
 				return
 			}
@@ -487,8 +487,8 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	r.HandleFunc("/keys", gw.keyHandler).Methods("POST", "PUT", "GET", "DELETE")
 	r.HandleFunc("/keys/preview", previewKeyHandler).Methods("POST")
 	r.HandleFunc("/keys/{keyName:[^/]*}", gw.keyHandler).Methods("POST", "PUT", "GET", "DELETE")
-	r.HandleFunc("/certs", certHandler).Methods("POST", "GET")
-	r.HandleFunc("/certs/{certID:[^/]*}", certHandler).Methods("POST", "GET", "DELETE")
+	r.HandleFunc("/certs", gw.certHandler).Methods("POST", "GET")
+	r.HandleFunc("/certs/{certID:[^/]*}", gw.certHandler).Methods("POST", "GET", "DELETE")
 	r.HandleFunc("/oauth/clients/{apiID}", oAuthClientHandler).Methods("GET", "DELETE")
 	r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", oAuthClientHandler).Methods("GET", "DELETE")
 	r.HandleFunc("/oauth/clients/{apiID}/{keyName}/tokens", oAuthClientTokensHandler).Methods("GET")
@@ -1477,7 +1477,7 @@ func (gw *Gateway) startServer() {
 		muxer.setRouter(gw.GetConfig().ListenPort, "", mux.NewRouter(), gw.GetConfig())
 	}
 
-	gw.DefaultProxyMux.swap(muxer, gw.GetConfig())
+	gw.DefaultProxyMux.swap(muxer, gw)
 
 	// handle dashboard registration and nonces if available
 	handleDashboardRegistration(gw)

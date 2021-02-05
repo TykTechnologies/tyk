@@ -631,7 +631,7 @@ func(p *ReverseProxy) httpTransport(timeOut float64, rw http.ResponseWriter, req
 			p.logger.Debug("Certificate pinning check is enabled")
 		}
 	} else {
-		transport.DialTLS = customDialTLSCheck(p.TykAPISpec, transport.TLSClientConfig, p.Gw.GetConfig())
+		transport.DialTLS = p.Gw.customDialTLSCheck(p.TykAPISpec, transport.TLSClientConfig)
 	}
 
 	if p.TykAPISpec.GlobalConfig.ProxySSLMinVersion > 0 {

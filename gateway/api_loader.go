@@ -701,7 +701,7 @@ func (gw *Gateway) loadTCPService(spec *APISpec, gs *generalStores, muxer *proxy
 	// Health checkers are initialised per spec so that each API handler has it's own connection and redis storage pool
 	spec.Init(authStore, sessionStore, gs.healthStore, orgStore)
 
-	muxer.addTCPService(spec, nil, gw.GetConfig())
+	muxer.addTCPService(spec, nil, gw)
 }
 
 type generalStores struct {
@@ -810,7 +810,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 		}()
 	}
 
-	gw.DefaultProxyMux.swap(muxer, gw.GetConfig())
+	gw.DefaultProxyMux.swap(muxer, gw)
 
 	// Swap in the new register
 	apisMu.Lock()

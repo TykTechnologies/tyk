@@ -25,7 +25,7 @@ func (m *CertificateCheckMW) ProcessRequest(w http.ResponseWriter, r *http.Reque
 	if m.Spec.UseMutualTLSAuth {
 		certIDs := append(m.Spec.ClientCertificates, m.Spec.GlobalConfig.Security.Certificates.API...)
 
-		if err := CertificateManager.ValidateRequestCertificate(certIDs, r); err != nil {
+		if err := m.Gw.CertificateManager.ValidateRequestCertificate(certIDs, r); err != nil {
 			return err, http.StatusForbidden
 		}
 	}

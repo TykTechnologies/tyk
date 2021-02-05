@@ -109,7 +109,7 @@ func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWrite
 			return hm.authorizationError(r)
 		}
 
-		publicKey := CertificateManager.ListRawPublicKey(certificateId)
+		publicKey := hm.Gw.CertificateManager.ListRawPublicKey(certificateId)
 		if publicKey == nil {
 			log.Error("Certificate not found")
 			return errors.New("Certificate not found"), http.StatusInternalServerError
