@@ -60,7 +60,6 @@ var (
 
 	memProfFile *os.File
 
-	RPCListener         RPCStorageHandler
 	DashService         DashboardServiceSender
 	CertificateManager  *certs.CertificateManager
 	NewRelicApplication newrelic.Application
@@ -121,6 +120,7 @@ type Gateway struct {
 	DefaultQuotaStore    DefaultSessionManager
 	GlobalSessionManager SessionHandler
 	MonitoringHandler    config.TykEventHandler
+	RPCListener         RPCStorageHandler
 }
 
 func NewGateway(config config.Config) *Gateway {
@@ -725,9 +725,9 @@ func (gw *Gateway) isRPCMode() bool {
 		gw.GetConfig().AuthOverride.AuthProvider.StorageEngine == RPCStorageEngine
 }
 
-func rpcReloadLoop(rpcKey string) {
+func(gw *Gateway) rpcReloadLoop(rpcKey string) {
 	for {
-		RPCListener.CheckForReload(rpcKey)
+		gw.RPCListener.CheckForReload(rpcKey)
 	}
 }
 
@@ -1387,16 +1387,16 @@ func (gw *Gateway) start(ctx context.Context) {
 
 	if slaveOptions := gw.GetConfig().SlaveOptions; slaveOptions.UseRPC {
 		mainLog.Debug("Starting RPC reload listener")
-		RPCListener = RPCStorageHandler{
+		gw.RPCListener = RPCStorageHandler{
 			KeyPrefix:        "rpc.listener.",
 			SuppressRegister: true,
 			Gw:               gw,
 		}
 
-		RPCListener.Connect()
-		go rpcReloadLoop(slaveOptions.RPCKey)
-		go RPCListener.StartRPCKeepaliveWatcher()
-		go RPCListener.StartRPCLoopCheck(slaveOptions.RPCKey)
+		gw.RPCListener.Connect()
+		go gw.rpcReloadLoop(slaveOptions.RPCKey)
+		go gw.RPCListener.StartRPCKeepaliveWatcher()
+		go gw.RPCListener.StartRPCLoopCheck(slaveOptions.RPCKey)
 	}
 
 	// 1s is the minimum amount of time between hot reloads. The
