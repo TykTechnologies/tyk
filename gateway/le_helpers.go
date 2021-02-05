@@ -82,7 +82,7 @@ func(gw *Gateway) onLESSLStatusReceivedHandler(payload string) {
 	// not great
 	if serverData.ID != gw.GetNodeID() {
 		log.Info("Received Redis LE change notification!")
-		gw.GetLEState(&LE_MANAGER)
+		gw.GetLEState(&gw.LE_MANAGER)
 	}
 
 	log.Info("Received Redis LE change notification from myself, ignoring")
@@ -95,11 +95,11 @@ func(gw *Gateway) StartPeriodicStateBackup(ctx context.Context, m *letsencrypt.M
 		case <-ctx.Done():
 			return
 		case <-m.Watch():
-			if LE_FIRSTRUN {
+			if gw.LE_FIRSTRUN {
 				log.Info("[SSL] State change detected, storing")
 				gw.StoreLEState(m)
 			}
-			LE_FIRSTRUN = true
+			gw.LE_FIRSTRUN = true
 		}
 	}
 }

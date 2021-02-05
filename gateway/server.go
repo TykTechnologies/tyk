@@ -64,9 +64,6 @@ var (
 	policiesMu   sync.RWMutex
 	policiesByID = map[string]user.Policy{}
 
-	LE_MANAGER  letsencrypt.Manager
-	LE_FIRSTRUN bool
-
 	runningTestsMu sync.RWMutex
 	testMode       bool
 
@@ -120,6 +117,9 @@ type Gateway struct {
 
 	consulKVStore kv.Store
 	vaultKVStore  kv.Store
+
+	LE_MANAGER  letsencrypt.Manager
+	LE_FIRSTRUN bool
 }
 
 func NewGateway(config config.Config) *Gateway {
@@ -1041,7 +1041,7 @@ func (gw *Gateway) initialiseSystem(ctx context.Context) error {
 	setupInstrumentation(*gw)
 
 	if gw.GetConfig().HttpServerOptions.UseLE_SSL {
-		go gw.StartPeriodicStateBackup(ctx, &LE_MANAGER)
+		go gw.StartPeriodicStateBackup(ctx, &gw.LE_MANAGER)
 	}
 	return nil
 }
