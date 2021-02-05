@@ -103,7 +103,7 @@ func(gw *Gateway) EventHandlerByName(handlerConf apidef.EventHandlerTriggerConfi
 	conf := handlerConf.HandlerMeta
 	switch handlerConf.Handler {
 	case EH_LogHandler:
-		h := &LogMessageEventHandler{}
+		h := &LogMessageEventHandler{Gw:gw}
 		err := h.Init(conf)
 		return h, err
 	case EH_WebHook:
@@ -164,6 +164,7 @@ func(gw *Gateway) FireSystemEvent(name apidef.TykEvent, meta interface{}) {
 type LogMessageEventHandler struct {
 	prefix string
 	logger *logrus.Logger
+	Gw *Gateway
 }
 
 // New enables the intitialisation of event handler instances when they are created on ApiSpec creation
@@ -171,7 +172,7 @@ func (l *LogMessageEventHandler) Init(handlerConf interface{}) error {
 	conf := handlerConf.(map[string]interface{})
 	l.prefix = conf["prefix"].(string)
 	l.logger = log
-	if isRunningTests() {
+	if l.Gw.isRunningTests() {
 		logger, ok := conf["logger"]
 		if ok {
 			l.logger = logger.(*logrus.Logger)

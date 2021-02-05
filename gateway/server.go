@@ -64,9 +64,6 @@ var (
 	policiesMu   sync.RWMutex
 	policiesByID = map[string]user.Policy{}
 
-	runningTestsMu sync.RWMutex
-	testMode       bool
-
 	// confPaths is the series of paths to try to use as config files. The
 	// first one to exist will be used. If none exists, a default config
 	// will be written to the first path in the list.
@@ -120,6 +117,9 @@ type Gateway struct {
 
 	LE_MANAGER  letsencrypt.Manager
 	LE_FIRSTRUN bool
+
+	runningTestsMu sync.RWMutex
+	testMode       bool
 }
 
 func NewGateway(config config.Config) *Gateway {
@@ -151,17 +151,17 @@ func (gw *Gateway) GetNodeID() string {
 	return gw.NodeID
 }
 
-func isRunningTests() bool {
-	runningTestsMu.RLock()
-	v := testMode
-	runningTestsMu.RUnlock()
+func(gw *Gateway) isRunningTests() bool {
+	gw.runningTestsMu.RLock()
+	v := gw.testMode
+	gw.runningTestsMu.RUnlock()
 	return v
 }
 
-func setTestMode(v bool) {
-	runningTestsMu.Lock()
-	testMode = v
-	runningTestsMu.Unlock()
+func(gw *Gateway) setTestMode(v bool) {
+	gw.runningTestsMu.Lock()
+	gw.testMode = v
+	gw.runningTestsMu.Unlock()
 }
 
 func (gw *Gateway) getApiSpec(apiID string) *APISpec {
@@ -946,7 +946,7 @@ func (gw *Gateway) setupLogger() {
 }
 
 func (gw *Gateway) initialiseSystem(ctx context.Context) error {
-	if isRunningTests() && os.Getenv("TYK_LOGLEVEL") == "" {
+	if gw.isRunningTests() && os.Getenv("TYK_LOGLEVEL") == "" {
 		// `go test` without TYK_LOGLEVEL set defaults to no log
 		// output
 		log.Level = logrus.ErrorLevel
@@ -967,7 +967,7 @@ func (gw *Gateway) initialiseSystem(ctx context.Context) error {
 
 	mainLog.Infof("Tyk API Gateway %s", VERSION)
 
-	if !isRunningTests() {
+	if !gw.isRunningTests() {
 		gwConfig := config.Config{}
 		if err := config.Load(confPaths, &gwConfig); err != nil {
 			return err

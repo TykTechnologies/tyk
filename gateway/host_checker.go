@@ -102,7 +102,7 @@ func (h *HostUptimeChecker) HostCheckLoop(ctx context.Context) {
 	defer func() {
 		log.Info("[HOST CHECKER] Checker stopped")
 	}()
-	if isRunningTests() {
+	if h.Gw.isRunningTests() {
 		for {
 			select {
 			case <-ctx.Done():

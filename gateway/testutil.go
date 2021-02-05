@@ -220,7 +220,6 @@ func (r *ReloadMachinery) TickOk(t *testing.T) {
 }
 
 func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf *config.Config)) int {
-	setTestMode(true)
 	testServerRouter = testHttpHandler()
 	testServer := &http.Server{
 		Addr:           testHttpListen,
@@ -233,6 +232,8 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 	globalConf := config.Default
 	// ToDo: replace for get default conf
 	globalGateway = *NewGateway(globalConf)
+	globalGateway.setTestMode(true)
+
 	if err := config.WriteDefault("", &globalConf); err != nil {
 		panic(err)
 	}
