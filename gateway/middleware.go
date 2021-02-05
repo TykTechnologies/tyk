@@ -315,16 +315,16 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	policies := session.GetPolicyIDs()
 
 	for _, polID := range policies {
-		policiesMu.RLock()
-		policy, ok := policiesByID[polID]
-		policiesMu.RUnlock()
+		t.Gw.policiesMu.RLock()
+		policy, ok := t.Gw.policiesByID[polID]
+		t.Gw.policiesMu.RUnlock()
 		if !ok {
 			err := fmt.Errorf("policy not found: %q", polID)
 			t.Logger().Error(err)
 			return err
 		}
 		// Check ownership, policy org owner must be the same as API,
-		// otherwise youcould overwrite a session key with a policy from a different org!
+		// otherwise you could overwrite a session key with a policy from a different org!
 		if t.Spec != nil && policy.OrgID != t.Spec.OrgID {
 			err := fmt.Errorf("attempting to apply policy from different organisation to key, skipping")
 			t.Logger().Error(err)

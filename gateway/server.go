@@ -61,9 +61,6 @@ var (
 	memProfFile         *os.File
 	NewRelicApplication newrelic.Application
 
-	policiesMu   sync.RWMutex
-	policiesByID = map[string]user.Policy{}
-
 	// confPaths is the series of paths to try to use as config files. The
 	// first one to exist will be used. If none exists, a default config
 	// will be written to the first path in the list.
@@ -110,6 +107,9 @@ type Gateway struct {
 	apisByID        map[string]*APISpec
 	apisHandlesByID *sync.Map
 
+	policiesMu   sync.RWMutex
+	policiesByID map[string]user.Policy
+
 	dnsCacheManager dnscache.IDnsCacheManager
 
 	consulKVStore kv.Store
@@ -134,6 +134,8 @@ func NewGateway(config config.Config) *Gateway {
 
 	gw.apisByID = map[string]*APISpec{}
 	gw.apisHandlesByID = new(sync.Map)
+
+	gw.policiesByID = map[string]user.Policy{}
 	return &gw
 }
 
@@ -151,14 +153,14 @@ func (gw *Gateway) GetNodeID() string {
 	return gw.NodeID
 }
 
-func(gw *Gateway) isRunningTests() bool {
+func (gw *Gateway) isRunningTests() bool {
 	gw.runningTestsMu.RLock()
 	v := gw.testMode
 	gw.runningTestsMu.RUnlock()
 	return v
 }
 
-func(gw *Gateway) setTestMode(v bool) {
+func (gw *Gateway) setTestMode(v bool) {
 	gw.runningTestsMu.Lock()
 	gw.testMode = v
 	gw.runningTestsMu.Unlock()
@@ -386,10 +388,10 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 		mainLog.Debugf(" - %s", id)
 	}
 
-	policiesMu.Lock()
-	defer policiesMu.Unlock()
+	gw.policiesMu.Lock()
+	defer gw.policiesMu.Unlock()
 	if len(pols) > 0 {
-		policiesByID = pols
+		gw.policiesByID = pols
 	}
 
 	return len(pols), err

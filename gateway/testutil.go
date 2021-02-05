@@ -345,10 +345,10 @@ func emptyRedis() error {
 // racy way like the policies and api specs maps.
 func reloadSimulation() {
 	for {
-		policiesMu.Lock()
-		policiesByID["_"] = user.Policy{}
-		delete(policiesByID, "_")
-		policiesMu.Unlock()
+		globalGateway.policiesMu.Lock()
+		globalGateway.policiesByID["_"] = user.Policy{}
+		delete(globalGateway.policiesByID, "_")
+		globalGateway.policiesMu.Unlock()
 		globalGateway.apisMu.Lock()
 		old := globalGateway.apiSpecs
 		globalGateway.apiSpecs = append(globalGateway.apiSpecs, nil)
@@ -730,9 +730,9 @@ func CreatePolicy(pGen ...func(p *user.Policy)) string {
 		pGen[0](pol)
 	}
 
-	policiesMu.Lock()
-	policiesByID[pol.ID] = *pol
-	policiesMu.Unlock()
+	globalGateway.policiesMu.Lock()
+	globalGateway.policiesByID[pol.ID] = *pol
+	globalGateway.policiesMu.Unlock()
 
 	return pol.ID
 }
@@ -1061,9 +1061,9 @@ func (s *Test) StopRPCClient() {
 }
 
 func (s *Test) GetPolicyById(policyId string) (user.Policy, bool) {
-	policiesMu.Lock()
-	defer policiesMu.Unlock()
-	pol, found := policiesByID[policyId]
+	s.Gw.policiesMu.Lock()
+	defer s.Gw.policiesMu.Unlock()
+	pol, found := s.Gw.policiesByID[policyId]
 	return pol, found
 }
 

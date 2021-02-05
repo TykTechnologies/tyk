@@ -371,7 +371,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			}
 		}
 
-		session, err = generateSessionFromPolicy(basePolicyID,
+		session, err = k.Gw.generateSessionFromPolicy(basePolicyID,
 			k.Spec.OrgID,
 			true)
 
@@ -420,9 +420,9 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			}
 		}
 		// check if we received a valid policy ID in claim
-		policiesMu.RLock()
-		policy, ok := policiesByID[basePolicyID]
-		policiesMu.RUnlock()
+		k.Gw.policiesMu.RLock()
+		policy, ok := k.Gw.policiesByID[basePolicyID]
+		k.Gw.policiesMu.RUnlock()
 		if !ok {
 			k.reportLoginFailure(baseFieldData, r)
 			k.Logger().Error("Policy ID found is invalid!")
@@ -759,10 +759,10 @@ func ctxSetJWTContextVars(s *APISpec, r *http.Request, token *jwt.Token) {
 	}
 }
 
-func generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.SessionState, error) {
-	policiesMu.RLock()
-	policy, ok := policiesByID[policyID]
-	policiesMu.RUnlock()
+func(gw *Gateway) generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.SessionState, error) {
+	gw.policiesMu.RLock()
+	policy, ok := gw.policiesByID[policyID]
+	gw.policiesMu.RUnlock()
 	session := user.NewSessionState()
 	if !ok {
 		return session.Clone(), errors.New("Policy not found")

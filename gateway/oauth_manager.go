@@ -957,7 +957,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 
 	if checkPolicy {
 		// defined in JWT middleware
-		sessionFromPolicy, err := generateSessionFromPolicy(accessData.Client.GetPolicyID(), "", false)
+		sessionFromPolicy, err := r.Gw.generateSessionFromPolicy(accessData.Client.GetPolicyID(), "", false)
 		if err != nil {
 			return errors.New("Couldn't use policy or key rules to create token, failing")
 		}
@@ -1108,7 +1108,7 @@ func (a accessTokenGen) GenerateAccessToken(data *osin.AccessData, generaterefre
 
 	if checkPolicy {
 		// defined in JWT middleware
-		sessionFromPolicy, err := generateSessionFromPolicy(data.Client.GetPolicyID(), "", false)
+		sessionFromPolicy, err := a.Gw.generateSessionFromPolicy(data.Client.GetPolicyID(), "", false)
 		if err != nil {
 			return "", "", errors.New("Couldn't use policy or key rules to create token, failing")
 		}

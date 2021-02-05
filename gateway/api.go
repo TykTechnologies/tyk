@@ -176,9 +176,9 @@ func (gw *Gateway) getApisIdsForOrg(orgID string) []string {
 func (gw *Gateway) checkAndApplyTrialPeriod(keyName string, newSession *user.SessionState, isHashed bool) {
 	// Check the policies to see if we are forcing an expiry on the key
 	for _, polID := range newSession.GetPolicyIDs() {
-		policiesMu.RLock()
-		policy, ok := policiesByID[polID]
-		policiesMu.RUnlock()
+		gw.policiesMu.RLock()
+		policy, ok := gw.policiesByID[polID]
+		gw.policiesMu.RUnlock()
 		if !ok {
 			continue
 		}
@@ -996,9 +996,9 @@ func (gw *Gateway) policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 func (gw *Gateway) handleUpdateHashedKey(keyName string, applyPolicies []string) (interface{}, int) {
 	var orgID string
 	if len(applyPolicies) != 0 {
-		policiesMu.RLock()
-		orgID = policiesByID[applyPolicies[0]].OrgID
-		policiesMu.RUnlock()
+		gw.policiesMu.RLock()
+		orgID = gw.policiesByID[applyPolicies[0]].OrgID
+		gw.policiesMu.RUnlock()
 	}
 
 	sess, ok := gw.GlobalSessionManager.SessionDetail(orgID, keyName, true)
@@ -1508,9 +1508,9 @@ func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		// set client for all APIs from the given policy
-		policiesMu.RLock()
-		policy, ok := policiesByID[newClient.PolicyID]
-		policiesMu.RUnlock()
+		gw.policiesMu.RLock()
+		policy, ok := gw.policiesByID[newClient.PolicyID]
+		gw.policiesMu.RUnlock()
 		if !ok {
 			log.WithFields(logrus.Fields{
 				"prefix":   "api",
@@ -1654,9 +1654,9 @@ func (gw *Gateway) updateOauthClient(keyName, apiID string, r *http.Request) (in
 
 	// check policy
 	if updateClientData.PolicyID != "" {
-		policiesMu.RLock()
-		policy, ok := policiesByID[updateClientData.PolicyID]
-		policiesMu.RUnlock()
+		gw.policiesMu.RLock()
+		policy, ok := gw.policiesByID[updateClientData.PolicyID]
+		gw.policiesMu.RUnlock()
 		if !ok {
 			return apiError("Policy doesn't exist"), http.StatusNotFound
 		}

@@ -200,7 +200,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 
 		if !useScope {
 			// We need a base policy as a template, either get it from the token itself OR a proxy client ID within Tyk
-			newSession, err := generateSessionFromPolicy(policyID,
+			newSession, err := k.Gw.generateSessionFromPolicy(policyID,
 				k.Spec.OrgID,
 				true)
 
