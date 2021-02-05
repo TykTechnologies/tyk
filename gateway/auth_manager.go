@@ -146,7 +146,7 @@ func (b *DefaultSessionManager) clearCacheForKey(keyName string, hashed bool) {
 		Payload: cacheKey,
 		Gw: b.Gw,
 	}
-	MainNotifier.Notify(n)
+	b.Gw.MainNotifier.Notify(n)
 }
 
 // UpdateSession updates the session state in the storage engine

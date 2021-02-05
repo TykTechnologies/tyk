@@ -694,7 +694,7 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) {
 		// Do the reload!
 		log.Warning("[RPC STORE] Received Reload instruction!")
 		go func() {
-			MainNotifier.Notify(Notification{Command: NoticeGroupReload, Gw: r.Gw})
+			r.Gw.MainNotifier.Notify(Notification{Command: NoticeGroupReload, Gw: r.Gw})
 		}()
 	}
 }
@@ -893,7 +893,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		Payload: strings.Join(keys, ","),
 		Gw: r.Gw,
 	}
-	MainNotifier.Notify(n)
+	r.Gw.MainNotifier.Notify(n)
 }
 
 func (r *RPCStorageHandler) DeleteScanMatch(pattern string) bool {

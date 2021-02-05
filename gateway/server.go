@@ -59,7 +59,7 @@ var (
 	templates *template.Template
 
 	memProfFile          *os.File
-	MainNotifier         RedisNotifier
+
 	DefaultOrgStore      DefaultSessionManager
 	DefaultQuotaStore    DefaultSessionManager
 	GlobalSessionManager = SessionHandler(&DefaultSessionManager{})
@@ -120,6 +120,7 @@ type Gateway struct {
 
 	analytics        RedisAnalyticsHandler
 	GlobalEventsJSVM JSVM
+	MainNotifier         RedisNotifier
 }
 
 func NewGateway(config config.Config) *Gateway {
@@ -249,7 +250,7 @@ func (gw *Gateway) setupGlobals(ctx context.Context) {
 	mainLog.Debug("Notifier will not work in hybrid mode")
 	mainNotifierStore := &storage.RedisCluster{}
 	mainNotifierStore.Connect()
-	MainNotifier = RedisNotifier{mainNotifierStore, RedisPubSubChannel, gw}
+	gw.MainNotifier = RedisNotifier{mainNotifierStore, RedisPubSubChannel, gw}
 
 	if gwConfig.Monitor.EnableTriggerMonitors {
 		h := &WebHookHandler{Gw: gw}

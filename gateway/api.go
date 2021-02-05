@@ -1219,7 +1219,7 @@ func(gw *Gateway) groupResetHandler(w http.ResponseWriter, r *http.Request) {
 	}).Info("Group reload accepted.")
 
 	// Signal to the group via redis
-	MainNotifier.Notify(Notification{Command: NoticeGroupReload, Gw: gw})
+	gw.MainNotifier.Notify(Notification{Command: NoticeGroupReload, Gw: gw})
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
@@ -2240,7 +2240,7 @@ func(gw *Gateway) RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request)
 		Payload: strings.Join(tokens, ","),
 		Gw: gw,
 	}
-	MainNotifier.Notify(n)
+	gw.MainNotifier.Notify(n)
 
 	doJSONWrite(w, http.StatusOK, apiOk("tokens revoked successfully"))
 }

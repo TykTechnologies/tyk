@@ -187,7 +187,7 @@ func(gw *Gateway) handleSendMiniConfig(payload string) {
 		Gw: gw,
 	}
 
-	MainNotifier.Notify(asNotification)
+	gw.MainNotifier.Notify(asNotification)
 	log.WithFields(logrus.Fields{
 		"prefix": "pub-sub",
 	}).Debug("Configuration request responded.")

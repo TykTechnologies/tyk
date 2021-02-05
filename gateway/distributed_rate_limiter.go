@@ -76,7 +76,7 @@ func(gw *Gateway) NotifyCurrentServerStatus() {
 		Gw: gw,
 	}
 
-	MainNotifier.Notify(n)
+	gw.MainNotifier.Notify(n)
 }
 
 func onServerStatusReceivedHandler(payload string) {

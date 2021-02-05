@@ -291,7 +291,7 @@ func (o *OAuthHandlers) HandleRevokeAllTokens(w http.ResponseWriter, r *http.Req
 		Payload: strings.Join(tokens, ","),
 		Gw: o.Manager.Gw,
 	}
-	MainNotifier.Notify(n)
+	o.Manager.Gw.MainNotifier.Notify(n)
 
 	doJSONWrite(w, http.StatusOK, apiOk("tokens revoked successfully"))
 }
