@@ -11,7 +11,7 @@ import (
 // https://github.com/jaegertracing/jaeger-client-go/blob/master/config/config.go#L37
 func Load(opts map[string]interface{}) (*config.Configuration, error) {
 	// The object opts is loaded from json. Instead of decoding every single value
-	// by had we marshal to then fro yaml.
+	// by had we marshal to then to yaml.
 	//
 	// This is possible because the tags are the same for both json and yaml.
 	b, err := yaml.Marshal(opts)
