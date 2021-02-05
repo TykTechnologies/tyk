@@ -445,7 +445,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			oldToken, foundKey := session.OauthKeys[ar.Client.GetId()]
 			if foundKey {
 				log.Info("Found old token, revoking: ", oldToken)
-				GlobalSessionManager.RemoveSession(o.API.OrgID, oldToken, false)
+				o.Gw.GlobalSessionManager.RemoveSession(o.API.OrgID, oldToken, false)
 			}
 		}
 
@@ -481,7 +481,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			keyName := o.Gw.generateToken(o.API.OrgID, username)
 
 			log.Debug("Updating user:", keyName)
-			err := GlobalSessionManager.UpdateSession(keyName, session, session.Lifetime(o.API.SessionLifetime, o.Gw.GetConfig().ForceGlobalSessionLifetime,o.Gw.GetConfig().GlobalSessionLifetime), false)
+			err := o.Gw.GlobalSessionManager.UpdateSession(keyName, session, session.Lifetime(o.API.SessionLifetime, o.Gw.GetConfig().ForceGlobalSessionLifetime,o.Gw.GetConfig().GlobalSessionLifetime), false)
 			if err != nil {
 				log.Error(err)
 			}

@@ -686,7 +686,7 @@ func CreateSession(sGen ...func(s *user.SessionState)) string {
 		key = globalGateway.generateToken("default", session.Certificate)
 	}
 
-	GlobalSessionManager.UpdateSession(storage.HashKey(key, globalGateway.GetConfig().HashKeys), session, 60, globalGateway.GetConfig().HashKeys)
+	globalGateway.GlobalSessionManager.UpdateSession(storage.HashKey(key, globalGateway.GetConfig().HashKeys), session, 60, globalGateway.GetConfig().HashKeys)
 	return key
 }
 
@@ -1046,7 +1046,7 @@ func (s *Test) CreateSession(sGen ...func(s *user.SessionState)) (*user.SessionS
 		return nil, ""
 	}
 
-	createdSession, _ := GlobalSessionManager.SessionDetail(session.OrgID, keySuccess.Key, false)
+	createdSession, _ := globalGateway.GlobalSessionManager.SessionDetail(session.OrgID, keySuccess.Key, false)
 
 	return &createdSession, keySuccess.Key
 }

@@ -60,7 +60,6 @@ var (
 
 	memProfFile          *os.File
 
-	GlobalSessionManager = SessionHandler(&DefaultSessionManager{})
 	MonitoringHandler    config.TykEventHandler
 	RPCListener          RPCStorageHandler
 	DashService          DashboardServiceSender
@@ -121,6 +120,7 @@ type Gateway struct {
 	MainNotifier         RedisNotifier
 	DefaultOrgStore      DefaultSessionManager
 	DefaultQuotaStore    DefaultSessionManager
+	GlobalSessionManager  SessionHandler
 }
 
 func NewGateway(config config.Config) *Gateway {
@@ -131,6 +131,7 @@ func NewGateway(config config.Config) *Gateway {
 	}
 	gw.analytics = RedisAnalyticsHandler{Gw: &gw}
 	gw.SetConfig(config)
+	gw.GlobalSessionManager = SessionHandler(&DefaultSessionManager{})
 	return &gw
 }
 
@@ -209,7 +210,7 @@ func (gw *Gateway) setupGlobals(ctx context.Context) {
 	gw.initHealthCheck(ctx)
 
 	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: gwConfig.HashKeys}
-	GlobalSessionManager.Init(&redisStore)
+	gw.GlobalSessionManager.Init(&redisStore)
 
 	versionStore := storage.RedisCluster{KeyPrefix: "version-check-"}
 	versionStore.Connect()
@@ -464,7 +465,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	if !gw.isRPCMode() {
 		r.HandleFunc("/org/keys", gw.orgHandler).Methods("GET")
 		r.HandleFunc("/org/keys/{keyName:[^/]*}", gw.orgHandler).Methods("POST", "PUT", "GET", "DELETE")
-		r.HandleFunc("/keys/policy/{keyName}", policyUpdateHandler).Methods("POST")
+		r.HandleFunc("/keys/policy/{keyName}", gw.policyUpdateHandler).Methods("POST")
 		r.HandleFunc("/keys/create", gw.createKeyHandler).Methods("POST")
 		r.HandleFunc("/apis", gw.apiHandler).Methods("GET", "POST", "PUT", "DELETE")
 		r.HandleFunc("/apis/{apiID}", gw.apiHandler).Methods("GET", "POST", "PUT", "DELETE")
@@ -549,7 +550,7 @@ func (gw *Gateway) addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthMana
 	storageManager.Connect()
 	osinStorage := &RedisOsinStorageInterface{
 		storageManager,
-		GlobalSessionManager,
+		gw.GlobalSessionManager,
 		&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false},
 		spec.OrgID,
 		gw,

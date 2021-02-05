@@ -285,7 +285,7 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 	}
 
 	lifetime := session.Lifetime(t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime)
-	if err := GlobalSessionManager.UpdateSession(token, session, lifetime, false); err != nil {
+	if err := t.Gw.GlobalSessionManager.UpdateSession(token, session, lifetime, false); err != nil {
 		t.Logger().WithError(err).Error("Can't update session")
 		return false
 	}
@@ -673,7 +673,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 
 	// Check session store
 	t.Logger().Debug("Querying keystore")
-	session, found := GlobalSessionManager.SessionDetail(t.Spec.OrgID, key, false)
+	session, found := t.Gw.GlobalSessionManager.SessionDetail(t.Spec.OrgID, key, false)
 	if found {
 		session.SetKeyHash(cacheKey)
 		// If exists, assume it has been authorized and pass on

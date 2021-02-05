@@ -453,7 +453,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			return errors.New(http.StatusText(http.StatusForbidden)), http.StatusForbidden
 		}
 
-		existingSession, found := GlobalSessionManager.SessionDetail(m.Spec.OrgID, sessionID, false)
+		existingSession, found := m.Gw.GlobalSessionManager.SessionDetail(m.Spec.OrgID, sessionID, false)
 		if found {
 			returnedSession.QuotaRenews = existingSession.QuotaRenews
 			returnedSession.QuotaRemaining = existingSession.QuotaRemaining

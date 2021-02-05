@@ -42,7 +42,7 @@ func (gw *Gateway) prepareStorage() generalStores {
 	gs.healthStore = &storage.RedisCluster{KeyPrefix: "apihealth."}
 	gs.rpcAuthStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: gw.GetConfig().HashKeys, Gw:gw}
 	gs.rpcOrgStore = &RPCStorageHandler{KeyPrefix: "orgkey.", Gw:gw}
-	GlobalSessionManager.Init(gs.redisStore)
+	gw.GlobalSessionManager.Init(gs.redisStore)
 	return gs
 }
 

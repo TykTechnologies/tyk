@@ -907,15 +907,15 @@ func (r *RPCStorageHandler) GetKeyPrefix() string {
 }
 
 func (r *RPCStorageHandler) AddToSortedSet(keyName, value string, score float64) {
-	handleGlobalAddToSortedSet(keyName, value, score)
+	r.Gw.handleGlobalAddToSortedSet(keyName, value, score)
 }
 
 func (r *RPCStorageHandler) GetSortedSetRange(keyName, scoreFrom, scoreTo string) ([]string, []float64, error) {
-	return handleGetSortedSetRange(keyName, scoreFrom, scoreTo)
+	return r.Gw.handleGetSortedSetRange(keyName, scoreFrom, scoreTo)
 }
 
 func (r *RPCStorageHandler) RemoveSortedSetRange(keyName, scoreFrom, scoreTo string) error {
-	return handleRemoveSortedSetRange(keyName, scoreFrom, scoreTo)
+	return r.Gw.handleRemoveSortedSetRange(keyName, scoreFrom, scoreTo)
 }
 
 func (r *RPCStorageHandler) RemoveFromList(keyName, value string) error {

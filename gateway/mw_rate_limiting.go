@@ -75,7 +75,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	session := ctxGetSession(r)
 	token := ctxGetAuthToken(r)
 
-	storeRef := GlobalSessionManager.Store()
+	storeRef := k.Gw.GlobalSessionManager.Store()
 	reason := sessionLimiter.ForwardMessage(
 		r,
 		session,

@@ -173,7 +173,7 @@ func getApisIdsForOrg(orgID string) []string {
 	return result
 }
 
-func checkAndApplyTrialPeriod(keyName string, newSession *user.SessionState, isHashed bool) {
+func(gw *Gateway) checkAndApplyTrialPeriod(keyName string, newSession *user.SessionState, isHashed bool) {
 	// Check the policies to see if we are forcing an expiry on the key
 	for _, polID := range newSession.GetPolicyIDs() {
 		policiesMu.RLock()
@@ -185,7 +185,7 @@ func checkAndApplyTrialPeriod(keyName string, newSession *user.SessionState, isH
 		// Are we foring an expiry?
 		if policy.KeyExpiresIn > 0 {
 			// We are, does the key exist?
-			_, found := GlobalSessionManager.SessionDetail(newSession.OrgID, keyName, isHashed)
+			_, found := gw.GlobalSessionManager.SessionDetail(newSession.OrgID, keyName, isHashed)
 			if !found {
 				// this is a new key, lets expire it
 				newSession.Expires = time.Now().Unix() + policy.KeyExpiresIn
@@ -204,7 +204,7 @@ func (gw *Gateway) applyPoliciesAndSave(keyName string, session *user.SessionSta
 	}
 
 	lifetime := session.Lifetime(spec.SessionLifetime, gw.GetConfig().ForceGlobalSessionLifetime,gw.GetConfig().GlobalSessionLifetime)
-	if err := GlobalSessionManager.UpdateSession(keyName, session, lifetime, isHashed); err != nil {
+	if err := gw.GlobalSessionManager.UpdateSession(keyName, session, lifetime, isHashed); err != nil {
 		return err
 	}
 
@@ -247,13 +247,13 @@ func(gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, d
 				}).Error("Could not add key for this API ID, API doesn't exist.")
 				return errors.New("API must be active to add keys")
 			}
-			checkAndApplyTrialPeriod(keyName, newSession, isHashed)
+			gw.checkAndApplyTrialPeriod(keyName, newSession, isHashed)
 
 			// Lets reset keys if they are edited by admin
 			if !apiSpec.DontSetQuotasOnCreate {
 				// Reset quote by default
 				if !dontReset {
-					GlobalSessionManager.ResetQuota(keyName, newSession, isHashed)
+					gw.GlobalSessionManager.ResetQuota(keyName, newSession, isHashed)
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
 
@@ -274,10 +274,10 @@ func(gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, d
 		defer apisMu.RUnlock()
 		for _, spec := range apisByID {
 			if !dontReset {
-				GlobalSessionManager.ResetQuota(keyName, newSession, isHashed)
+				gw.GlobalSessionManager.ResetQuota(keyName, newSession, isHashed)
 				newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 			}
-			checkAndApplyTrialPeriod(keyName, newSession, isHashed)
+			gw.checkAndApplyTrialPeriod(keyName, newSession, isHashed)
 
 			// apply polices (if any) and save key
 			if err := gw.applyPoliciesAndSave(keyName, newSession, spec, isHashed); err != nil {
@@ -340,7 +340,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 	// get original session in case of update and preserve fields that SHOULD NOT be updated
 	originalKey := *user.NewSessionState()
 	if r.Method == http.MethodPut {
-		key, found := GlobalSessionManager.SessionDetail(newSession.OrgID, keyName, isHashed)
+		key, found := gw.GlobalSessionManager.SessionDetail(newSession.OrgID, keyName, isHashed)
 		if !found {
 			log.Error("Could not find key when updating")
 			return apiError("Key is not found"), http.StatusNotFound
@@ -414,7 +414,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 
 		newFormatKey := gw.generateToken(newSession.OrgID, keyName)
 		// search as a custom key
-		_, err := GlobalSessionManager.Store().GetKey(newFormatKey)
+		_, err := gw.GlobalSessionManager.Store().GetKey(newFormatKey)
 
 		if err == nil {
 			// update new format key for custom keys, as it was found then its a customKey
@@ -467,7 +467,7 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID string, byHash bool) (inter
 		orgID = spec.OrgID
 	}
 
-	session, ok := GlobalSessionManager.SessionDetail(orgID, sessionKey, byHash)
+	session, ok := gw.GlobalSessionManager.SessionDetail(orgID, sessionKey, byHash)
 
 	if !ok {
 		return apiError("Key not found"), http.StatusNotFound
@@ -483,7 +483,7 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID string, byHash bool) (inter
 			quotaKey = QuotaKeyPrefix + sessionKey
 		}
 
-		if usedQuota, err := GlobalSessionManager.Store().GetRawKey(quotaKey); err == nil {
+		if usedQuota, err := gw.GlobalSessionManager.Store().GetRawKey(quotaKey); err == nil {
 			qInt, _ := strconv.Atoi(usedQuota)
 			remaining := session.QuotaMax - int64(qInt)
 
@@ -518,7 +518,7 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID string, byHash bool) (inter
 			limQuotaKey = QuotaKeyPrefix + quotaScope + sessionKey
 		}
 
-		if usedQuota, err := GlobalSessionManager.Store().GetRawKey(limQuotaKey); err == nil {
+		if usedQuota, err := gw.GlobalSessionManager.Store().GetRawKey(limQuotaKey); err == nil {
 			qInt, _ := strconv.Atoi(usedQuota)
 			remaining := access.Limit.QuotaMax - int64(qInt)
 
@@ -564,12 +564,12 @@ type apiAllKeys struct {
 }
 
 func(gw *Gateway) handleGetAllKeys(filter string) (interface{}, int) {
-	sessions := GlobalSessionManager.Sessions(filter)
+	sessions := gw.GlobalSessionManager.Sessions(filter)
 	if filter != "" {
 		filterB64 := base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString([]byte(fmt.Sprintf(`{"org":"%s"`, filter)))
 		// Remove last 2 digits to look exact match
 		filterB64 = filterB64[0 : len(filterB64)-2]
-		orgIDB64Sessions := GlobalSessionManager.Sessions(filterB64)
+		orgIDB64Sessions := gw.GlobalSessionManager.Sessions(filterB64)
 		sessions = append(sessions, orgIDB64Sessions...)
 	}
 
@@ -596,9 +596,9 @@ func(gw *Gateway) handleAddKey(keyName, hashedName, sessionString, apiID string)
 	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 	var err error
 	if gw.GetConfig().HashKeys {
-		err = GlobalSessionManager.UpdateSession(hashedName, sess, 0, true)
+		err = gw.GlobalSessionManager.UpdateSession(hashedName, sess, 0, true)
 	} else {
-		err = GlobalSessionManager.UpdateSession(keyName, sess, 0, false)
+		err = gw.GlobalSessionManager.UpdateSession(keyName, sess, 0, false)
 	}
 	if err != nil {
 		log.WithFields(logrus.Fields{
@@ -624,8 +624,8 @@ func (gw *Gateway) handleDeleteKey(keyName, apiID string, resetQuota bool) (inte
 	if apiID == "-1" {
 		// Go through ALL managed API's and delete the key
 		apisMu.RLock()
-		removed := GlobalSessionManager.RemoveSession(orgID, keyName, false)
-		GlobalSessionManager.ResetQuota(
+		removed :=gw. GlobalSessionManager.RemoveSession(orgID, keyName, false)
+		gw.GlobalSessionManager.ResetQuota(
 			keyName,
 			user.NewSessionState(),
 			false)
@@ -650,7 +650,7 @@ func (gw *Gateway) handleDeleteKey(keyName, apiID string, resetQuota bool) (inte
 		return nil, http.StatusOK
 	}
 
-	if !GlobalSessionManager.RemoveSession(orgID, keyName, false) {
+	if !gw.GlobalSessionManager.RemoveSession(orgID, keyName, false) {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
 			"key":    gw.obfuscateKey(keyName),
@@ -660,7 +660,7 @@ func (gw *Gateway) handleDeleteKey(keyName, apiID string, resetQuota bool) (inte
 	}
 
 	if resetQuota {
-		GlobalSessionManager.ResetQuota(
+		gw.GlobalSessionManager.ResetQuota(
 			keyName,
 			user.NewSessionState(),
 			false)
@@ -717,7 +717,7 @@ func (gw *Gateway) handleDeleteHashedKey(keyName, apiID string, resetQuota bool)
 	if apiID == "-1" {
 		// Go through ALL managed API's and delete the key
 		apisMu.RLock()
-		removed := GlobalSessionManager.RemoveSession(orgID, keyName, true)
+		removed := gw.GlobalSessionManager.RemoveSession(orgID, keyName, true)
 		apisMu.RUnlock()
 
 		if !removed {
@@ -727,12 +727,12 @@ func (gw *Gateway) handleDeleteHashedKey(keyName, apiID string, resetQuota bool)
 		return nil, http.StatusOK
 	}
 
-	if !GlobalSessionManager.RemoveSession(orgID, keyName, true) {
+	if !gw.GlobalSessionManager.RemoveSession(orgID, keyName, true) {
 		return apiError("Failed to remove the key"), http.StatusBadRequest
 	}
 
 	if resetQuota {
-		GlobalSessionManager.ResetQuota(
+		gw.GlobalSessionManager.ResetQuota(
 			keyName,
 			user.NewSessionState(),
 			true)
@@ -747,16 +747,16 @@ func (gw *Gateway) handleDeleteHashedKey(keyName, apiID string, resetQuota bool)
 	return statusObj, http.StatusOK
 }
 
-func handleGlobalAddToSortedSet(keyName, value string, score float64) {
-	GlobalSessionManager.Store().AddToSortedSet(keyName, value, score)
+func(gw *Gateway) handleGlobalAddToSortedSet(keyName, value string, score float64) {
+	gw.GlobalSessionManager.Store().AddToSortedSet(keyName, value, score)
 }
 
-func handleGetSortedSetRange(keyName, scoreFrom, scoreTo string) ([]string, []float64, error) {
-	return GlobalSessionManager.Store().GetSortedSetRange(keyName, scoreFrom, scoreTo)
+func(gw *Gateway) handleGetSortedSetRange(keyName, scoreFrom, scoreTo string) ([]string, []float64, error) {
+	return gw.GlobalSessionManager.Store().GetSortedSetRange(keyName, scoreFrom, scoreTo)
 }
 
-func handleRemoveSortedSetRange(keyName, scoreFrom, scoreTo string) error {
-	return GlobalSessionManager.Store().RemoveSortedSetRange(keyName, scoreFrom, scoreTo)
+func(gw *Gateway) handleRemoveSortedSetRange(keyName, scoreFrom, scoreTo string) error {
+	return gw.GlobalSessionManager.Store().RemoveSortedSetRange(keyName, scoreFrom, scoreTo)
 }
 
 func (gw *Gateway) handleGetAPIList() (interface{}, int) {
@@ -974,7 +974,7 @@ type PolicyUpdateObj struct {
 	ApplyPolicies []string `json:"apply_policies"`
 }
 
-func policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
+func(gw *Gateway) policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	log.Warning("Hashed key change request detected!")
 
 	var policRecord PolicyUpdateObj
@@ -988,12 +988,12 @@ func policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	keyName := mux.Vars(r)["keyName"]
-	obj, code := handleUpdateHashedKey(keyName, policRecord.ApplyPolicies)
+	obj, code := gw.handleUpdateHashedKey(keyName, policRecord.ApplyPolicies)
 
 	doJSONWrite(w, code, obj)
 }
 
-func handleUpdateHashedKey(keyName string, applyPolicies []string) (interface{}, int) {
+func(gw *Gateway) handleUpdateHashedKey(keyName string, applyPolicies []string) (interface{}, int) {
 	var orgID string
 	if len(applyPolicies) != 0 {
 		policiesMu.RLock()
@@ -1001,7 +1001,7 @@ func handleUpdateHashedKey(keyName string, applyPolicies []string) (interface{},
 		policiesMu.RUnlock()
 	}
 
-	sess, ok := GlobalSessionManager.SessionDetail(orgID, keyName, true)
+	sess, ok := gw.GlobalSessionManager.SessionDetail(orgID, keyName, true)
 	if !ok {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -1016,7 +1016,7 @@ func handleUpdateHashedKey(keyName string, applyPolicies []string) (interface{},
 	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 	sess.SetPolicies(applyPolicies...)
 
-	err := GlobalSessionManager.UpdateSession(keyName, &sess, 0, true)
+	err := gw.GlobalSessionManager.UpdateSession(keyName, &sess, 0, true)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -1272,7 +1272,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 	if newSession.Certificate != "" {
 		newKey = gw.generateToken(newSession.OrgID, newSession.Certificate)
-		_, ok := GlobalSessionManager.SessionDetail(newSession.OrgID, newKey, false)
+		_, ok := gw.GlobalSessionManager.SessionDetail(newSession.OrgID, newKey, false)
 		if ok {
 			doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - Key with given certificate already found:"+newKey))
 			return
@@ -1292,11 +1292,11 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 		for apiID := range newSession.GetAccessRights() {
 			apiSpec := getApiSpec(apiID)
 			if apiSpec != nil {
-				checkAndApplyTrialPeriod(newKey, newSession, false)
+				gw.checkAndApplyTrialPeriod(newKey, newSession, false)
 				// If we have enabled HMAC checking for keys, we need to generate a secret for the client to use
 				if !apiSpec.DontSetQuotasOnCreate {
 					// Reset quota by default
-					GlobalSessionManager.ResetQuota(newKey, newSession, false)
+					gw.GlobalSessionManager.ResetQuota(newKey, newSession, false)
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
 				// apply polices (if any) and save key
@@ -1306,7 +1306,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			} else {
 				// Use fallback
-				sessionManager := GlobalSessionManager
+				sessionManager := gw.GlobalSessionManager
 				newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				sessionManager.ResetQuota(newKey, newSession, false)
 				err := sessionManager.UpdateSession(newKey, newSession, -1, false)
@@ -1333,10 +1333,10 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			apisMu.RLock()
 			defer apisMu.RUnlock()
 			for _, spec := range apisByID {
-				checkAndApplyTrialPeriod(newKey, newSession, false)
+				gw.checkAndApplyTrialPeriod(newKey, newSession, false)
 				if !spec.DontSetQuotasOnCreate {
 					// Reset quote by default
-					GlobalSessionManager.ResetQuota(newKey, newSession, false)
+					gw.GlobalSessionManager.ResetQuota(newKey, newSession, false)
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
 				// apply polices (if any) and save key
