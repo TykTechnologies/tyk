@@ -142,29 +142,29 @@ func allowMethods(next http.HandlerFunc, methods ...string) http.HandlerFunc {
 	}
 }
 
-func getSpecForOrg(orgID string) *APISpec {
-	apisMu.RLock()
-	defer apisMu.RUnlock()
-	for _, v := range apisByID {
+func(gw *Gateway) getSpecForOrg(orgID string) *APISpec {
+	gw.apisMu.RLock()
+	defer gw.apisMu.RUnlock()
+	for _, v := range gw.apisByID {
 		if v.OrgID == orgID {
 			return v
 		}
 	}
 
 	// If we can't find a spec, it doesn't matter, because we default to Redis anyway, grab whatever you can find
-	for _, v := range apisByID {
+	for _, v := range gw.apisByID {
 		return v
 	}
 	return nil
 }
 
-func getApisIdsForOrg(orgID string) []string {
+func(gw *Gateway) getApisIdsForOrg(orgID string) []string {
 	result := []string{}
 
 	showAll := orgID == ""
-	apisMu.RLock()
-	defer apisMu.RUnlock()
-	for _, v := range apisByID {
+	gw.apisMu.RLock()
+	defer gw.apisMu.RUnlock()
+	for _, v := range gw.apisByID {
 		if v.OrgID == orgID || showAll {
 			result = append(result, v.APIID)
 		}
@@ -233,7 +233,7 @@ func(gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, d
 		resetAPILimits(newSession.AccessRights)
 		// We have a specific list of access rules, only add / update those
 		for apiId := range newSession.GetAccessRights() {
-			apiSpec := getApiSpec(apiId)
+			apiSpec := gw.getApiSpec(apiId)
 			if apiSpec == nil {
 				log.WithFields(logrus.Fields{
 					"prefix":      "api",
@@ -270,9 +270,9 @@ func(gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, d
 			return errors.New("Master keys not allowed")
 		}
 		log.Warning("No API Access Rights set, adding key to ALL.")
-		apisMu.RLock()
-		defer apisMu.RUnlock()
-		for _, spec := range apisByID {
+		gw.apisMu.RLock()
+		defer gw.apisMu.RUnlock()
+		for _, spec := range gw.apisByID {
 			if !dontReset {
 				gw.GlobalSessionManager.ResetQuota(keyName, newSession, isHashed)
 				newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
@@ -461,7 +461,7 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID string, byHash bool) (inter
 		return apiError("Key requested by hash but key hashing is not enabled"), http.StatusBadRequest
 	}
 
-	spec := getApiSpec(apiID)
+	spec := gw.getApiSpec(apiID)
 	orgID := ""
 	if spec != nil {
 		orgID = spec.OrgID
@@ -617,20 +617,20 @@ func(gw *Gateway) handleAddKey(keyName, hashedName, sessionString, apiID string)
 
 func (gw *Gateway) handleDeleteKey(keyName, apiID string, resetQuota bool) (interface{}, int) {
 	orgID := ""
-	if spec := getApiSpec(apiID); spec != nil {
+	if spec := gw.getApiSpec(apiID); spec != nil {
 		orgID = spec.OrgID
 	}
 
 	if apiID == "-1" {
 		// Go through ALL managed API's and delete the key
-		apisMu.RLock()
+		gw.apisMu.RLock()
 		removed :=gw. GlobalSessionManager.RemoveSession(orgID, keyName, false)
 		gw.GlobalSessionManager.ResetQuota(
 			keyName,
 			user.NewSessionState(),
 			false)
 
-		apisMu.RUnlock()
+		gw.apisMu.RUnlock()
 
 		if !removed {
 			log.WithFields(logrus.Fields{
@@ -710,15 +710,15 @@ func (gw *Gateway) handleDeleteHashedKeyWithLogs(keyName, apiID string, resetQuo
 
 func (gw *Gateway) handleDeleteHashedKey(keyName, apiID string, resetQuota bool) (interface{}, int) {
 	orgID := ""
-	if spec := getApiSpec(apiID); spec != nil {
+	if spec := gw.getApiSpec(apiID); spec != nil {
 		orgID = spec.OrgID
 	}
 
 	if apiID == "-1" {
 		// Go through ALL managed API's and delete the key
-		apisMu.RLock()
+		gw.apisMu.RLock()
 		removed := gw.GlobalSessionManager.RemoveSession(orgID, keyName, true)
-		apisMu.RUnlock()
+		gw.apisMu.RUnlock()
 
 		if !removed {
 			return apiError("Failed to remove the key"), http.StatusBadRequest
@@ -760,11 +760,11 @@ func(gw *Gateway) handleRemoveSortedSetRange(keyName, scoreFrom, scoreTo string)
 }
 
 func (gw *Gateway) handleGetAPIList() (interface{}, int) {
-	apisMu.RLock()
-	defer apisMu.RUnlock()
-	apiIDList := make([]*apidef.APIDefinition, len(apisByID))
+	gw.apisMu.RLock()
+	defer gw.apisMu.RUnlock()
+	apiIDList := make([]*apidef.APIDefinition, len(gw.apisByID))
 	c := 0
-	for _, apiSpec := range apisByID {
+	for _, apiSpec := range gw.apisByID {
 		apiIDList[c] = apiSpec.APIDefinition
 		c++
 	}
@@ -772,7 +772,7 @@ func (gw *Gateway) handleGetAPIList() (interface{}, int) {
 }
 
 func (gw *Gateway) handleGetAPI(apiID string) (interface{}, int) {
-	if spec := getApiSpec(apiID); spec != nil {
+	if spec := gw.getApiSpec(apiID); spec != nil {
 		return spec.APIDefinition, http.StatusOK
 	}
 
@@ -1079,7 +1079,7 @@ func (gw *Gateway) handleOrgAddOrUpdate(orgID string, r *http.Request) (interfac
 	}
 	// Update our session object (create it)
 
-	spec := getSpecForOrg(orgID)
+	spec := gw.getSpecForOrg(orgID)
 	var sessionManager SessionHandler
 
 	if spec == nil {
@@ -1134,7 +1134,7 @@ func (gw *Gateway) handleOrgAddOrUpdate(orgID string, r *http.Request) (interfac
 }
 
 func (gw *Gateway) handleGetOrgDetail(orgID string) (interface{}, int) {
-	spec := getSpecForOrg(orgID)
+	spec := gw.getSpecForOrg(orgID)
 	if spec == nil {
 		return apiError("Org not found"), http.StatusNotFound
 	}
@@ -1158,7 +1158,7 @@ func (gw *Gateway) handleGetOrgDetail(orgID string) (interface{}, int) {
 }
 
 func (gw *Gateway) handleGetAllOrgKeys(filter string) (interface{}, int) {
-	spec := getSpecForOrg("")
+	spec := gw.getSpecForOrg("")
 	if spec == nil {
 		return apiError("ORG not found"), http.StatusNotFound
 	}
@@ -1175,7 +1175,7 @@ func (gw *Gateway) handleGetAllOrgKeys(filter string) (interface{}, int) {
 }
 
 func (gw *Gateway) handleDeleteOrgKey(orgID string) (interface{}, int) {
-	spec := getSpecForOrg(orgID)
+	spec := gw.getSpecForOrg(orgID)
 	if spec == nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -1282,7 +1282,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 	newSession.DateCreated = time.Now()
 
-	mw := BaseMiddleware{}
+	mw := BaseMiddleware{Gw:gw}
 	// TODO: handle apply policies error
 	mw.ApplyPolicies(newSession)
 
@@ -1290,7 +1290,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 		// reset API-level limit to nil if any has a zero-value
 		resetAPILimits(newSession.AccessRights)
 		for apiID := range newSession.GetAccessRights() {
-			apiSpec := getApiSpec(apiID)
+			apiSpec := gw.getApiSpec(apiID)
 			if apiSpec != nil {
 				gw.checkAndApplyTrialPeriod(newKey, newSession, false)
 				// If we have enabled HMAC checking for keys, we need to generate a secret for the client to use
@@ -1330,9 +1330,9 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				"server_name": "system",
 			}).Warning("No API Access Rights set on key session, adding key to all APIs.")
 
-			apisMu.RLock()
-			defer apisMu.RUnlock()
-			for _, spec := range apisByID {
+			gw.apisMu.RLock()
+			defer gw.apisMu.RUnlock()
+			for _, spec := range gw.apisByID {
 				gw.checkAndApplyTrialPeriod(newKey, newSession, false)
 				if !spec.DontSetQuotasOnCreate {
 					// Reset quote by default
@@ -1435,7 +1435,7 @@ func oauthClientStorageID(clientID string) string {
 	return prefixClient + clientID
 }
 
-func createOauthClient(w http.ResponseWriter, r *http.Request) {
+func(gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 	var newOauthClient NewClientRequest
 	if err := json.NewDecoder(r.Body).Decode(&newOauthClient); err != nil {
 		log.WithFields(logrus.Fields{
@@ -1477,7 +1477,7 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 
 	if newOauthClient.APIID != "" {
 		// set client only for passed API ID
-		apiSpec := getApiSpec(newOauthClient.APIID)
+		apiSpec := gw.getApiSpec(newOauthClient.APIID)
 		if apiSpec == nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "api",
@@ -1525,7 +1525,7 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		oauth2 := false
 		// iterate over APIs and set client for each of them
 		for apiID := range policy.AccessRights {
-			apiSpec := getApiSpec(apiID)
+			apiSpec := gw.getApiSpec(apiID)
 			if apiSpec == nil {
 				log.WithFields(logrus.Fields{
 					"prefix": "api",
@@ -1582,9 +1582,9 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, http.StatusOK, clientData)
 }
 
-func rotateOauthClient(keyName, apiID string) (interface{}, int) {
+func(gw *Gateway) rotateOauthClient(keyName, apiID string) (interface{}, int) {
 	// check API
-	apiSpec := getApiSpec(apiID)
+	apiSpec := gw.getApiSpec(apiID)
 	if apiSpec == nil {
 		return apiError("API doesn't exist"), http.StatusNotFound
 	}
@@ -1634,7 +1634,7 @@ func rotateOauthClient(keyName, apiID string) (interface{}, int) {
 }
 
 // Update Client
-func updateOauthClient(keyName, apiID string, r *http.Request) (interface{}, int) {
+func(gw *Gateway) updateOauthClient(keyName, apiID string, r *http.Request) (interface{}, int) {
 	// read payload
 	var updateClientData NewClientRequest
 	if err := json.NewDecoder(r.Body).Decode(&updateClientData); err != nil {
@@ -1647,7 +1647,7 @@ func updateOauthClient(keyName, apiID string, r *http.Request) (interface{}, int
 	}
 
 	// check API
-	apiSpec := getApiSpec(apiID)
+	apiSpec := gw.getApiSpec(apiID)
 	if apiSpec == nil {
 		return apiError("API doesn't exist"), http.StatusNotFound
 	}
@@ -1710,13 +1710,13 @@ func updateOauthClient(keyName, apiID string, r *http.Request) (interface{}, int
 	return replyData, http.StatusOK
 }
 
-func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
+func(gw *Gateway) invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 	apiID := r.URL.Query().Get("api_id")
 	if apiID == "" {
 		doJSONWrite(w, http.StatusBadRequest, apiError("Missing parameter api_id"))
 		return
 	}
-	apiSpec := getApiSpec(apiID)
+	apiSpec := gw.getApiSpec(apiID)
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
@@ -1777,28 +1777,28 @@ func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, http.StatusOK, success)
 }
 
-func rotateOauthClientHandler(w http.ResponseWriter, r *http.Request) {
+func(gw *Gateway) rotateOauthClientHandler(w http.ResponseWriter, r *http.Request) {
 
 	apiID := mux.Vars(r)["apiID"]
 	keyName := mux.Vars(r)["keyName"]
 
-	obj, code := rotateOauthClient(keyName, apiID)
+	obj, code := gw.rotateOauthClient(keyName, apiID)
 
 	doJSONWrite(w, code, obj)
 }
 
-func getApisForOauthApp(w http.ResponseWriter, r *http.Request) {
+func(gw *Gateway) getApisForOauthApp(w http.ResponseWriter, r *http.Request) {
 	apis := []string{}
 	appID := mux.Vars(r)["appID"]
 	orgID := r.FormValue("orgID")
 
 	//get all organization apis
-	apisIds := getApisIdsForOrg(orgID)
+	apisIds := gw.getApisIdsForOrg(orgID)
 
 	for index := range apisIds {
-		if api := getApiSpec(apisIds[index]); api != nil {
+		if api := gw.getApiSpec(apisIds[index]); api != nil {
 			if api.UseOauth2 {
-				clients, _, code := getApiClients(apisIds[index])
+				clients, _, code := gw.getApiClients(apisIds[index])
 				if code == http.StatusOK {
 					for _, client := range clients {
 						if client.GetId() == appID {
@@ -1813,7 +1813,7 @@ func getApisForOauthApp(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, http.StatusOK, apis)
 }
 
-func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
+func(gw *Gateway) oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
 	keyName := mux.Vars(r)["keyName"]
 
@@ -1823,27 +1823,27 @@ func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		if keyName != "" {
 			// Return single client detail
-			obj, code = getOauthClientDetails(keyName, apiID)
+			obj, code = gw.getOauthClientDetails(keyName, apiID)
 		} else {
 			// Return list of keys
-			obj, code = getOauthClients(apiID)
+			obj, code = gw.getOauthClients(apiID)
 		}
 	case http.MethodPut:
 		// Update client
-		obj, code = updateOauthClient(keyName, apiID, r)
+		obj, code = gw.updateOauthClient(keyName, apiID, r)
 	case http.MethodDelete:
 		// Remove a key
-		obj, code = handleDeleteOAuthClient(keyName, apiID)
+		obj, code = gw.handleDeleteOAuthClient(keyName, apiID)
 	}
 
 	doJSONWrite(w, code, obj)
 }
 
-func oAuthClientTokensHandler(w http.ResponseWriter, r *http.Request) {
+func(gw *Gateway) oAuthClientTokensHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
 	keyName := mux.Vars(r)["keyName"]
 
-	apiSpec := getApiSpec(apiID)
+	apiSpec := gw.getApiSpec(apiID)
 	if apiSpec == nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -1896,9 +1896,9 @@ func oAuthClientTokensHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // Get client details
-func getOauthClientDetails(keyName, apiID string) (interface{}, int) {
+func(gw *Gateway) getOauthClientDetails(keyName, apiID string) (interface{}, int) {
 	storageID := oauthClientStorageID(keyName)
-	apiSpec := getApiSpec(apiID)
+	apiSpec := gw.getApiSpec(apiID)
 	if apiSpec == nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -1934,10 +1934,10 @@ func getOauthClientDetails(keyName, apiID string) (interface{}, int) {
 }
 
 // Delete Client
-func handleDeleteOAuthClient(keyName, apiID string) (interface{}, int) {
+func(gw *Gateway) handleDeleteOAuthClient(keyName, apiID string) (interface{}, int) {
 	storageID := oauthClientStorageID(keyName)
 
-	apiSpec := getApiSpec(apiID)
+	apiSpec := gw.getApiSpec(apiID)
 	if apiSpec == nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -1982,10 +1982,10 @@ const oauthClientSecretEmpty = "client_secret is required"
 const oauthClientSecretWrong = "client secret is wrong"
 const oauthTokenEmpty = "token is required"
 
-func getApiClients(apiID string) ([]ExtendedOsinClientInterface, apiStatusMessage, int) {
+func(gw *Gateway) getApiClients(apiID string) ([]ExtendedOsinClientInterface, apiStatusMessage, int) {
 	var err error
 	filterID := prefixClient
-	apiSpec := getApiSpec(apiID)
+	apiSpec := gw.getApiSpec(apiID)
 
 	if apiSpec == nil {
 		log.WithFields(logrus.Fields{
@@ -2016,9 +2016,9 @@ func getApiClients(apiID string) ([]ExtendedOsinClientInterface, apiStatusMessag
 }
 
 // List Clients
-func getOauthClients(apiID string) (interface{}, int) {
+func(gw *Gateway) getOauthClients(apiID string) (interface{}, int) {
 
-	clientData, _, apiStatusCode := getApiClients(apiID)
+	clientData, _, apiStatusCode := gw.getApiClients(apiID)
 
 	if apiStatusCode != 200 {
 		return clientData, apiStatusCode
@@ -2046,12 +2046,12 @@ func getOauthClients(apiID string) (interface{}, int) {
 	return clients, http.StatusOK
 }
 
-func getApisForOauthClientId(oauthClientId string, orgId string) []string {
+func(gw *Gateway) getApisForOauthClientId(oauthClientId string, orgId string) []string {
 	apis := []string{}
-	orgApis := getApisIdsForOrg(orgId)
+	orgApis := gw.getApisIdsForOrg(orgId)
 
 	for index := range orgApis {
-		clientsData, _, status := getApiClients(orgApis[index])
+		clientsData, _, status := gw.getApiClients(orgApis[index])
 		if status == http.StatusOK {
 			for _, client := range clientsData {
 				if client.GetId() == oauthClientId {
@@ -2074,7 +2074,7 @@ func (gw *Gateway) healthCheckhandler(w http.ResponseWriter, r *http.Request) {
 		doJSONWrite(w, http.StatusBadRequest, apiError("missing api_id parameter"))
 		return
 	}
-	apiSpec := getApiSpec(apiID)
+	apiSpec := gw.getApiSpec(apiID)
 	if apiSpec == nil {
 		doJSONWrite(w, http.StatusNotFound, apiError("API ID not found"))
 		return
@@ -2100,7 +2100,7 @@ func userRatesCheck(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, http.StatusOK, returnSession)
 }
 
-func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
+func(gw *Gateway) invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
 
 	keyPrefix := "cache-" + apiID
@@ -2110,7 +2110,7 @@ func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 	if ok := store.DeleteScanMatch(matchPattern); !ok {
 		err := errors.New("scan/delete failed")
 		var orgid string
-		if spec := getApiSpec(apiID); spec != nil {
+		if spec := gw.getApiSpec(apiID); spec != nil {
 			orgid = spec.OrgID
 		}
 		log.WithFields(logrus.Fields{
@@ -2155,14 +2155,14 @@ func(gw *Gateway) RevokeTokenHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	apis := getApisForOauthClientId(clientID, orgID)
+	apis := gw.getApisForOauthClientId(clientID, orgID)
 	if len(apis) == 0 {
 		doJSONWrite(w, http.StatusBadRequest, apiError("oauth client doesn't exist"))
 		return
 	}
 
 	for _, apiID := range apis {
-		storage, _, err := GetStorageForApi(apiID)
+		storage, _, err := gw.GetStorageForApi(apiID)
 		if err == nil {
 			RevokeToken(storage, token, tokenTypeHint)
 		}
@@ -2170,8 +2170,8 @@ func(gw *Gateway) RevokeTokenHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, http.StatusOK, apiOk("token revoked successfully"))
 }
 
-func GetStorageForApi(apiID string) (ExtendedOsinStorageInterface, int, error) {
-	apiSpec := getApiSpec(apiID)
+func(gw *Gateway) GetStorageForApi(apiID string) (ExtendedOsinStorageInterface, int, error) {
+	apiSpec := gw.getApiSpec(apiID)
 	if apiSpec == nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -2219,7 +2219,7 @@ func(gw *Gateway) RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	apis := getApisForOauthClientId(clientId, orgId)
+	apis := gw.getApisForOauthClientId(clientId, orgId)
 	if len(apis) == 0 {
 		//if api is 0 is because the client wasn't found
 		doJSONWrite(w, http.StatusNotFound, apiError("oauth client doesn't exist"))
@@ -2228,7 +2228,7 @@ func(gw *Gateway) RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request)
 
 	tokens := []string{}
 	for _, apiId := range apis {
-		storage, _, err := GetStorageForApi(apiId)
+		storage, _, err := gw.GetStorageForApi(apiId)
 		if err == nil {
 			_, tokensRevoked, _ := RevokeAllTokens(storage, clientId, clientSecret)
 			tokens = append(tokens, tokensRevoked...)

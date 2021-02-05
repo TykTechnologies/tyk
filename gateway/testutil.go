@@ -348,13 +348,13 @@ func reloadSimulation() {
 		policiesByID["_"] = user.Policy{}
 		delete(policiesByID, "_")
 		policiesMu.Unlock()
-		apisMu.Lock()
-		old := apiSpecs
-		apiSpecs = append(apiSpecs, nil)
-		apiSpecs = old
-		apisByID["_"] = nil
-		delete(apisByID, "_")
-		apisMu.Unlock()
+		globalGateway.apisMu.Lock()
+		old := globalGateway.apiSpecs
+		globalGateway.apiSpecs = append(globalGateway.apiSpecs, nil)
+		globalGateway.apiSpecs = old
+		globalGateway.apisByID["_"] = nil
+		delete(globalGateway.apisByID, "_")
+		globalGateway.apisMu.Unlock()
 		time.Sleep(5 * time.Millisecond)
 	}
 }
@@ -1052,7 +1052,7 @@ func (s *Test) CreateSession(sGen ...func(s *user.SessionState)) (*user.SessionS
 }
 
 func (s *Test) GetApiById(apiId string) *APISpec {
-	return getApiSpec(apiId)
+	return s.Gw.getApiSpec(apiId)
 }
 
 func (s *Test) StopRPCClient() {
@@ -1254,7 +1254,7 @@ func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
 	globalGateway.DoReload()
 
 	for _, spec := range specs {
-		out = append(out, getApiSpec(spec.APIID))
+		out = append(out, gw.getApiSpec(spec.APIID))
 	}
 
 	return out

@@ -110,7 +110,7 @@ func TestHostChecker(t *testing.T) {
 		GlobalHostChecker.checkerMu.Unlock()
 	}()
 
-	SetCheckerHostList()
+	globalGateway.SetCheckerHostList()
 	GlobalHostChecker.checkerMu.Lock()
 	if len(GlobalHostChecker.currentHostList) != 2 {
 		t.Error("Should update hosts manager check list", GlobalHostChecker.currentHostList)
@@ -207,7 +207,7 @@ func TestReverseProxyAllDown(t *testing.T) {
 		GlobalHostChecker.checkerMu.Unlock()
 	}()
 
-	SetCheckerHostList()
+	globalGateway.SetCheckerHostList()
 
 	hostCheckTicker <- struct{}{}
 	eventWG.Wait()

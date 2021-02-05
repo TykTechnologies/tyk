@@ -235,7 +235,7 @@ func (hc *HostCheckerManager) OnHostDown(ctx context.Context, report HostHealthR
 	}).Debug("Update key: ", key)
 	hc.store.SetKey(key, "1", int64(hc.checker.checkTimeout*hc.checker.sampleTriggerLimit))
 	hc.unhealthyHostList.Store(key, 1)
-	spec := getApiSpec(report.MetaData[UnHealthyHostMetaDataAPIKey])
+	spec := hc.Gw.getApiSpec(report.MetaData[UnHealthyHostMetaDataAPIKey])
 	if spec == nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
@@ -279,7 +279,7 @@ func (hc *HostCheckerManager) OnHostBackUp(ctx context.Context, report HostHealt
 	}).Debug("Delete key: ", key)
 	hc.store.DeleteKey(key)
 	hc.unhealthyHostList.Delete(key)
-	spec := getApiSpec(report.MetaData[UnHealthyHostMetaDataAPIKey])
+	spec := hc.Gw.getApiSpec(report.MetaData[UnHealthyHostMetaDataAPIKey])
 	if spec == nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
@@ -416,7 +416,7 @@ func (hc *HostCheckerManager) UpdateTrackingListByAPIID(hd []HostData, apiId str
 }
 
 func (hc *HostCheckerManager) ListFromService(apiID string) ([]HostData, error) {
-	spec := getApiSpec(apiID)
+	spec := hc.Gw.getApiSpec(apiID)
 	if spec == nil {
 		return nil, errors.New("API ID not found in register")
 	}
@@ -477,7 +477,7 @@ func (hc *HostCheckerManager) DoServiceDiscoveryListUpdateForID(apiID string) {
 func (hc *HostCheckerManager) RecordUptimeAnalytics(report HostHealthReport) error {
 	// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
 
-	spec := getApiSpec(report.MetaData[UnHealthyHostMetaDataAPIKey])
+	spec := hc.Gw.getApiSpec(report.MetaData[UnHealthyHostMetaDataAPIKey])
 	orgID := ""
 	if spec != nil {
 		orgID = spec.OrgID
@@ -540,13 +540,13 @@ func(gw *Gateway) InitHostCheckManager(ctx context.Context, store storage.Handle
 	GlobalHostChecker.Start(ctx)
 }
 
-func SetCheckerHostList() {
+func(gw *Gateway) SetCheckerHostList() {
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
 	}).Info("Loading uptime tests...")
 	hostList := []HostData{}
-	apisMu.RLock()
-	for _, spec := range apisByID {
+	gw.apisMu.RLock()
+	for _, spec := range gw.apisByID {
 		if spec.UptimeTests.Config.ServiceDiscovery.UseDiscoveryService {
 			hostList, err := GlobalHostChecker.ListFromService(spec.APIID)
 			if err == nil {
@@ -579,7 +579,7 @@ func SetCheckerHostList() {
 			}
 		}
 	}
-	apisMu.RUnlock()
+	gw.apisMu.RUnlock()
 
 	GlobalHostChecker.UpdateTrackingList(hostList)
 }

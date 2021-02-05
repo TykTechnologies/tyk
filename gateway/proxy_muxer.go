@@ -207,8 +207,8 @@ func(gw *Gateway) flushNetworkAnalytics(ctx context.Context) {
 			return
 		case t := <-tick.C:
 
-			apisMu.RLock()
-			for _, spec := range apiSpecs {
+			gw.apisMu.RLock()
+			for _, spec := range gw.apiSpecs {
 				switch spec.Protocol {
 				case "tcp", "tls":
 					// we only flush network analytics for these services
@@ -233,12 +233,12 @@ func(gw *Gateway) flushNetworkAnalytics(ctx context.Context) {
 				record.SetExpiry(spec.ExpireAnalyticsAfter)
 				gw.analytics.RecordHit(&record)
 			}
-			apisMu.RUnlock()
+			gw.apisMu.RUnlock()
 		}
 	}
 }
 
-func recordTCPHit(specID string, doNotTrack bool) func(tcp.Stat) {
+func(gw *Gateway) recordTCPHit(specID string, doNotTrack bool) func(tcp.Stat) {
 	if doNotTrack {
 		return nil
 	}
@@ -246,9 +246,9 @@ func recordTCPHit(specID string, doNotTrack bool) func(tcp.Stat) {
 		// Between reloads, pointers to the actual spec might have changed. The spec
 		// id stays the same so we need to pic the latest refence to the spec and
 		// update network stats.
-		apisMu.RLock()
-		spec := apisByID[specID]
-		apisMu.RUnlock()
+		gw.apisMu.RLock()
+		spec := gw.apisByID[specID]
+		gw.apisMu.RUnlock()
 		switch stat.State {
 		case tcp.Open:
 			atomic.AddInt64(&spec.network.OpenConnections, 1)

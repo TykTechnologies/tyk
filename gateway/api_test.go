@@ -64,7 +64,7 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 
 	assertListenPaths := func(tests []testCase) {
 		for _, tc := range tests {
-			s := getApiSpec(tc.APIID)
+			s := globalGateway.getApiSpec(tc.APIID)
 			if want, got := tc.ListenPath, s.Proxy.ListenPath; want != got {
 				t.Errorf("API spec %s want path %s, got %s", "2", want, got)
 			}

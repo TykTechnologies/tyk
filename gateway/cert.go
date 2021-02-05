@@ -329,13 +329,13 @@ func(gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int) 
 			return newConfig, nil
 		}
 
-		apisMu.RLock()
-		defer apisMu.RUnlock()
+		gw.apisMu.RLock()
+		defer gw.apisMu.RUnlock()
 
 		newConfig.ClientCAs = x509.NewCertPool()
 
 		domainRequireCert := map[string]tls.ClientAuthType{}
-		for _, spec := range apiSpecs {
+		for _, spec := range gw.apiSpecs {
 			switch {
 			case spec.UseMutualTLSAuth:
 				if domainRequireCert[spec.Domain] == 0 {

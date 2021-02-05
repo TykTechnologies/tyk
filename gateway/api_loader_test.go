@@ -87,13 +87,13 @@ func TestInternalAPIUsage(t *testing.T) {
 }
 
 func TestFuzzyFindAPI(t *testing.T) {
-	BuildAndLoadAPI(func(spec *APISpec) {
+	globalGateway.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Name = "IgnoreCase"
 		spec.APIID = "123456"
 		spec.Proxy.ListenPath = "/"
 	})
 
-	spec := fuzzyFindAPI("ignoreCase")
+	spec := globalGateway.fuzzyFindAPI("ignoreCase")
 	assert.Equal(t, "123456", spec.APIID)
 }
 

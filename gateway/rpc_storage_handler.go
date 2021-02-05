@@ -827,7 +827,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		splitKeys := strings.Split(key, ":")
 		apiId := splitKeys[0]
 		clientSecret := splitKeys[2]
-		storage, _, err := GetStorageForApi(apiId)
+		storage, _, err := r.Gw.GetStorageForApi(apiId)
 		if err != nil {
 			continue
 		}
@@ -844,7 +844,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		tokenActionTypeHint := splitKeys[2]
 		hashedKey := strings.Contains(token, "#hashed")
 		if !hashedKey {
-			storage, _, err := GetStorageForApi(apiId)
+			storage, _, err := r.Gw.GetStorageForApi(apiId)
 			if err != nil {
 				continue
 			}

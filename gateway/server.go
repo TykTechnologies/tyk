@@ -59,13 +59,8 @@ var (
 	templates *template.Template
 
 	memProfFile *os.File
-
 	NewRelicApplication newrelic.Application
 
-	apisMu          sync.RWMutex
-	apiSpecs        []*APISpec
-	apisByID        = map[string]*APISpec{}
-	apisHandlesByID = new(sync.Map)
 
 	keyGen DefaultKeyGenerator
 
@@ -121,6 +116,11 @@ type Gateway struct {
 	RPCListener         RPCStorageHandler
 	DashService         DashboardServiceSender
 	CertificateManager  *certs.CertificateManager
+
+	apisMu          sync.RWMutex
+	apiSpecs        []*APISpec
+	apisByID        map[string]*APISpec
+	apisHandlesByID  *sync.Map
 }
 
 func NewGateway(config config.Config) *Gateway {
@@ -132,6 +132,9 @@ func NewGateway(config config.Config) *Gateway {
 	gw.analytics = RedisAnalyticsHandler{Gw: &gw}
 	gw.SetConfig(config)
 	gw.GlobalSessionManager = SessionHandler(&DefaultSessionManager{})
+
+	gw.apisByID = map[string]*APISpec{}
+	gw.apisHandlesByID = new(sync.Map)
 	return &gw
 }
 
@@ -162,17 +165,17 @@ func setTestMode(v bool) {
 	runningTestsMu.Unlock()
 }
 
-func getApiSpec(apiID string) *APISpec {
-	apisMu.RLock()
-	spec := apisByID[apiID]
-	apisMu.RUnlock()
+func(gw *Gateway) getApiSpec(apiID string) *APISpec {
+	gw.apisMu.RLock()
+	spec := gw.apisByID[apiID]
+	gw.apisMu.RUnlock()
 	return spec
 }
 
-func apisByIDLen() int {
-	apisMu.RLock()
-	defer apisMu.RUnlock()
-	return len(apisByID)
+func(gw *Gateway) apisByIDLen() int {
+	gw.apisMu.RLock()
+	defer gw.apisMu.RUnlock()
+	return len(gw.apisByID)
 }
 
 var redisPurgeOnce sync.Once
@@ -298,8 +301,8 @@ func buildConnStr(resource string, conf config.Config) string {
 
 func (gw *Gateway) syncAPISpecs() (int, error) {
 	loader := APIDefinitionLoader{gw}
-	apisMu.Lock()
-	defer apisMu.Unlock()
+	gw.apisMu.Lock()
+	defer gw.apisMu.Unlock()
 	var s []*APISpec
 	if gw.GetConfig().UseDBAppConfigs {
 		connStr := buildConnStr("/system/apis", gw.GetConfig())
@@ -345,11 +348,11 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 		}
 		filter = append(filter, v)
 	}
-	apiSpecs = filter
+	gw.apiSpecs = filter
 
 	tlsConfigCache.Flush()
 
-	return len(apiSpecs), nil
+	return len(gw.apiSpecs), nil
 }
 
 func (gw *Gateway) syncPolicies() (count int, err error) {
@@ -470,11 +473,11 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/apis", gw.apiHandler).Methods("GET", "POST", "PUT", "DELETE")
 		r.HandleFunc("/apis/{apiID}", gw.apiHandler).Methods("GET", "POST", "PUT", "DELETE")
 		r.HandleFunc("/health", gw.healthCheckhandler).Methods("GET")
-		r.HandleFunc("/oauth/clients/create", createOauthClient).Methods("POST")
-		r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", oAuthClientHandler).Methods("PUT")
-		r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}/rotate", rotateOauthClientHandler).Methods("PUT")
-		r.HandleFunc("/oauth/clients/apis/{appID}", getApisForOauthApp).Queries("orgID", "{[0-9]*?}").Methods("GET")
-		r.HandleFunc("/oauth/refresh/{keyName}", invalidateOauthRefresh).Methods("DELETE")
+		r.HandleFunc("/oauth/clients/create", gw.createOauthClient).Methods("POST")
+		r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", gw.oAuthClientHandler).Methods("PUT")
+		r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}/rotate", gw.rotateOauthClientHandler).Methods("PUT")
+		r.HandleFunc("/oauth/clients/apis/{appID}", gw.getApisForOauthApp).Queries("orgID", "{[0-9]*?}").Methods("GET")
+		r.HandleFunc("/oauth/refresh/{keyName}", gw.invalidateOauthRefresh).Methods("DELETE")
 		r.HandleFunc("/oauth/revoke", gw.RevokeTokenHandler).Methods("POST")
 		r.HandleFunc("/oauth/revoke_all", gw.RevokeAllTokensHandler).Methods("POST")
 
@@ -483,15 +486,15 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	}
 
 	r.HandleFunc("/debug", gw.traceHandler).Methods("POST")
-	r.HandleFunc("/cache/{apiID}", invalidateCacheHandler).Methods("DELETE")
+	r.HandleFunc("/cache/{apiID}", gw.invalidateCacheHandler).Methods("DELETE")
 	r.HandleFunc("/keys", gw.keyHandler).Methods("POST", "PUT", "GET", "DELETE")
 	r.HandleFunc("/keys/preview", previewKeyHandler).Methods("POST")
 	r.HandleFunc("/keys/{keyName:[^/]*}", gw.keyHandler).Methods("POST", "PUT", "GET", "DELETE")
 	r.HandleFunc("/certs", gw.certHandler).Methods("POST", "GET")
 	r.HandleFunc("/certs/{certID:[^/]*}", gw.certHandler).Methods("POST", "GET", "DELETE")
-	r.HandleFunc("/oauth/clients/{apiID}", oAuthClientHandler).Methods("GET", "DELETE")
-	r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", oAuthClientHandler).Methods("GET", "DELETE")
-	r.HandleFunc("/oauth/clients/{apiID}/{keyName}/tokens", oAuthClientTokensHandler).Methods("GET")
+	r.HandleFunc("/oauth/clients/{apiID}", gw.oAuthClientHandler).Methods("GET", "DELETE")
+	r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", gw.oAuthClientHandler).Methods("GET", "DELETE")
+	r.HandleFunc("/oauth/clients/{apiID}/{keyName}/tokens", gw.oAuthClientTokensHandler).Methods("GET")
 
 	mainLog.Debug("Loaded API Endpoints")
 }
@@ -753,7 +756,7 @@ func (gw *Gateway) DoReload() {
 	} else {
 		// skip re-loading only if dashboard service reported 0 APIs
 		// and current registry had 0 APIs
-		if count == 0 && apisByIDLen() == 0 {
+		if count == 0 && gw.apisByIDLen() == 0 {
 			mainLog.Warning("No API Definitions found, not reloading")
 			return
 		}

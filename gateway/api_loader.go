@@ -151,7 +151,7 @@ func(gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 			break
 		}
 		if !pathModified {
-			prev := getApiSpec(spec.APIID)
+			prev := gw.getApiSpec(spec.APIID)
 			if prev != nil && prev.Proxy.ListenPath == spec.Proxy.ListenPath {
 				// if this APIID was already loaded and
 				// had this listen path, let it keep it.
@@ -532,14 +532,14 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		var handler http.Handler
 		if r.URL.Hostname() == "self" {
-			if h, found := apisHandlesByID.Load(d.SH.Spec.APIID); found {
+			if h, found := d.Gw.apisHandlesByID.Load(d.SH.Spec.APIID); found {
 				handler = h.(http.Handler)
 			}
 		} else {
 			ctxSetVersionInfo(r, nil)
 
-			if targetAPI := fuzzyFindAPI(r.URL.Hostname()); targetAPI != nil {
-				if h, found := apisHandlesByID.Load(targetAPI.APIID); found {
+			if targetAPI := d.Gw.fuzzyFindAPI(r.URL.Hostname()); targetAPI != nil {
+				if h, found := d.Gw.apisHandlesByID.Load(targetAPI.APIID); found {
 					handler = h.(http.Handler)
 				}
 			} else {
@@ -565,7 +565,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if d.SH.Spec.target.Scheme == "tyk" {
-		handler, found := findInternalHttpHandlerByNameOrID(d.SH.Spec.target.Host)
+		handler, found := d.Gw.findInternalHttpHandlerByNameOrID(d.SH.Spec.target.Host)
 		if !found {
 			handler := ErrorHandler{*d.SH.Base()}
 			handler.HandleError(w, r, "Couldn't detect target", http.StatusInternalServerError, true)
@@ -580,13 +580,13 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	d.SH.ServeHTTP(w, r)
 }
 
-func findInternalHttpHandlerByNameOrID(apiNameOrID string) (handler http.Handler, ok bool) {
-	targetAPI := fuzzyFindAPI(apiNameOrID)
+func(gw *Gateway) findInternalHttpHandlerByNameOrID(apiNameOrID string) (handler http.Handler, ok bool) {
+	targetAPI := gw.fuzzyFindAPI(apiNameOrID)
 	if targetAPI == nil {
 		return nil, false
 	}
 
-	h, found := apisHandlesByID.Load(targetAPI.APIID)
+	h, found := gw.apisHandlesByID.Load(targetAPI.APIID)
 	if !found {
 		return nil, false
 	}
@@ -606,10 +606,10 @@ func sanitizeProxyPaths(apiSpec *APISpec, request *http.Request) {
 func (gw *Gateway) loadGlobalApps() {
 	// we need to make a full copy of the slice, as loadApps will
 	// use in-place to sort the apis.
-	apisMu.RLock()
-	specs := make([]*APISpec, len(apiSpecs))
-	copy(specs, apiSpecs)
-	apisMu.RUnlock()
+	gw.apisMu.RLock()
+	specs := make([]*APISpec, len(gw.apiSpecs))
+	copy(specs, gw.apiSpecs)
+	gw.apisMu.RUnlock()
 	gw.loadApps(specs)
 }
 
@@ -621,15 +621,15 @@ func trimCategories(name string) string {
 	return name
 }
 
-func fuzzyFindAPI(search string) *APISpec {
+func(gw *Gateway) fuzzyFindAPI(search string) *APISpec {
 	if search == "" {
 		return nil
 	}
 
-	apisMu.RLock()
-	defer apisMu.RUnlock()
+	gw.apisMu.RLock()
+	defer gw.apisMu.RUnlock()
 
-	for _, api := range apisByID {
+	for _, api := range gw.apisByID {
 		if api.APIID == search ||
 			api.Id.Hex() == search ||
 			strings.EqualFold(replaceNonAlphaNumeric(trimCategories(api.Name)), search) {
@@ -813,23 +813,23 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	gw.DefaultProxyMux.swap(muxer, gw)
 
 	// Swap in the new register
-	apisMu.Lock()
+	gw.apisMu.Lock()
 
 	// release current specs resources before overwriting map
-	for _, curSpec := range apisByID {
+	for _, curSpec := range gw.apisByID {
 		curSpec.Release()
 	}
 
-	apisByID = tmpSpecRegister
-	apisHandlesByID = tmpSpecHandles
+	gw.apisByID = tmpSpecRegister
+	gw.apisHandlesByID = tmpSpecHandles
 
-	apisMu.Unlock()
+	gw.apisMu.Unlock()
 
 	mainLog.Debug("Checker host list")
 
 	// Kick off our host checkers
 	if !gw.GetConfig().UptimeTests.Disable {
-		SetCheckerHostList()
+		gw.SetCheckerHostList()
 	}
 
 	mainLog.Debug("Checker host Done")
