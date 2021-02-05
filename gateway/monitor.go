@@ -28,7 +28,7 @@ func (m Monitor) Fire(sessionData *user.SessionState, key string, triggerLimit, 
 		TimeStamp: time.Now().String(),
 	}
 
-	go MonitoringHandler.HandleEvent(em)
+	go m.Gw.MonitoringHandler.HandleEvent(em)
 }
 
 func (m Monitor) Check(sessionData *user.SessionState, key string) {

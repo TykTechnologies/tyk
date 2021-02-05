@@ -58,13 +58,12 @@ var (
 	rawLog    = logger.GetRaw()
 	templates *template.Template
 
-	memProfFile          *os.File
+	memProfFile *os.File
 
-	MonitoringHandler    config.TykEventHandler
-	RPCListener          RPCStorageHandler
-	DashService          DashboardServiceSender
-	CertificateManager   *certs.CertificateManager
-	NewRelicApplication  newrelic.Application
+	RPCListener         RPCStorageHandler
+	DashService         DashboardServiceSender
+	CertificateManager  *certs.CertificateManager
+	NewRelicApplication newrelic.Application
 
 	apisMu          sync.RWMutex
 	apiSpecs        []*APISpec
@@ -115,12 +114,13 @@ type Gateway struct {
 
 	reloadMu sync.Mutex
 
-	analytics        RedisAnalyticsHandler
-	GlobalEventsJSVM JSVM
+	analytics            RedisAnalyticsHandler
+	GlobalEventsJSVM     JSVM
 	MainNotifier         RedisNotifier
 	DefaultOrgStore      DefaultSessionManager
 	DefaultQuotaStore    DefaultSessionManager
-	GlobalSessionManager  SessionHandler
+	GlobalSessionManager SessionHandler
+	MonitoringHandler    config.TykEventHandler
 }
 
 func NewGateway(config config.Config) *Gateway {
@@ -258,7 +258,7 @@ func (gw *Gateway) setupGlobals(ctx context.Context) {
 		if err := h.Init(gwConfig.Monitor.Config); err != nil {
 			mainLog.Error("Failed to initialise monitor! ", err)
 		} else {
-			MonitoringHandler = h
+			gw.MonitoringHandler = h
 		}
 	}
 
