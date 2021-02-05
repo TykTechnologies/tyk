@@ -1098,7 +1098,7 @@ func (gw *Gateway) handleOrgAddOrUpdate(orgID string, r *http.Request) (interfac
 		rawKey := QuotaKeyPrefix + storage.HashKey(orgID, gw.GetConfig().HashKeys)
 
 		// manage quotas separately
-		DefaultQuotaStore.RemoveSession(orgID, rawKey, false)
+		gw.DefaultQuotaStore.RemoveSession(orgID, rawKey, false)
 	}
 
 	err := sessionManager.UpdateSession(orgID, newSession, 0, false)

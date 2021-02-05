@@ -60,7 +60,6 @@ var (
 
 	memProfFile          *os.File
 
-	DefaultQuotaStore    DefaultSessionManager
 	GlobalSessionManager = SessionHandler(&DefaultSessionManager{})
 	MonitoringHandler    config.TykEventHandler
 	RPCListener          RPCStorageHandler
@@ -121,6 +120,7 @@ type Gateway struct {
 	GlobalEventsJSVM JSVM
 	MainNotifier         RedisNotifier
 	DefaultOrgStore      DefaultSessionManager
+	DefaultQuotaStore    DefaultSessionManager
 }
 
 func NewGateway(config config.Config) *Gateway {
@@ -1376,7 +1376,7 @@ func (gw *Gateway) start(ctx context.Context) {
 		mainLog.Debug("Initialising default org store")
 		gw.DefaultOrgStore.Init(gw.getGlobalStorageHandler("orgkey.", false))
 		//DefaultQuotaStore.Init(getGlobalStorageHandler(CloudHandler, "orgkey.", false))
-		DefaultQuotaStore.Init(gw.getGlobalStorageHandler("orgkey.", false))
+		gw.DefaultQuotaStore.Init(gw.getGlobalStorageHandler("orgkey.", false))
 	}
 
 	// Start listening for reload messages
