@@ -394,8 +394,8 @@ func(p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
 		DualStack: true,
 	}
 	dialContextFunc := dialer.DialContext
-	if dnsCacheManager.IsCacheEnabled() {
-		dialContextFunc = dnsCacheManager.WrapDialer(dialer)
+	if p.Gw.dnsCacheManager.IsCacheEnabled() {
+		dialContextFunc = p.Gw.dnsCacheManager.WrapDialer(dialer)
 	}
 
 	return &http.Transport{

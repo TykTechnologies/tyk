@@ -84,8 +84,6 @@ var (
 		"/etc/tyk/tyk.conf",
 	}
 
-	dnsCacheManager dnscache.IDnsCacheManager
-
 	consulKVStore kv.Store
 	vaultKVStore  kv.Store
 )
@@ -121,6 +119,8 @@ type Gateway struct {
 	apiSpecs        []*APISpec
 	apisByID        map[string]*APISpec
 	apisHandlesByID  *sync.Map
+
+	dnsCacheManager dnscache.IDnsCacheManager
 }
 
 func NewGateway(config config.Config) *Gateway {
@@ -190,9 +190,9 @@ func (gw *Gateway) setupGlobals(ctx context.Context) {
 	checkup.Run(&gwConfig)
 
 	gw.SetConfig(gwConfig)
-	dnsCacheManager = dnscache.NewDnsCacheManager(gwConfig.DnsCache.MultipleIPsHandleStrategy)
+	gw.dnsCacheManager = dnscache.NewDnsCacheManager(gwConfig.DnsCache.MultipleIPsHandleStrategy)
 	if gwConfig.DnsCache.Enabled {
-		dnsCacheManager.InitDNSCaching(
+		gw.dnsCacheManager.InitDNSCaching(
 			time.Duration(gwConfig.DnsCache.TTL)*time.Second,
 			time.Duration(gwConfig.DnsCache.CheckInterval)*time.Second)
 	}
