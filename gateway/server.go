@@ -61,7 +61,6 @@ var (
 	memProfFile *os.File
 	NewRelicApplication newrelic.Application
 
-
 	keyGen DefaultKeyGenerator
 
 	policiesMu   sync.RWMutex
@@ -83,9 +82,6 @@ var (
 		// TODO: add ~/.config/tyk/tyk.conf here?
 		"/etc/tyk/tyk.conf",
 	}
-
-	consulKVStore kv.Store
-	vaultKVStore  kv.Store
 )
 
 const (
@@ -121,6 +117,9 @@ type Gateway struct {
 	apisHandlesByID  *sync.Map
 
 	dnsCacheManager dnscache.IDnsCacheManager
+
+	consulKVStore kv.Store
+	vaultKVStore  kv.Store
 }
 
 func NewGateway(config config.Config) *Gateway {
@@ -1157,7 +1156,7 @@ func (gw *Gateway) kvStore(value string) (string, error) {
 			return value, nil
 		}
 
-		return consulKVStore.Get(key)
+		return gw.consulKVStore.Get(key)
 	}
 
 	if strings.HasPrefix(value, "vault://") {
@@ -1168,20 +1167,20 @@ func (gw *Gateway) kvStore(value string) (string, error) {
 			return value, nil
 		}
 
-		return vaultKVStore.Get(key)
+		return gw.vaultKVStore.Get(key)
 	}
 
 	return value, nil
 }
 
 func (gw *Gateway) setUpVault() error {
-	if vaultKVStore != nil {
+	if gw.vaultKVStore != nil {
 		return nil
 	}
 
 	var err error
 
-	vaultKVStore, err = kv.NewVault(gw.GetConfig().KV.Vault)
+	gw.vaultKVStore, err = kv.NewVault(gw.GetConfig().KV.Vault)
 	if err != nil {
 		log.Debugf("an error occurred while setting up vault... %v", err)
 	}
@@ -1190,13 +1189,13 @@ func (gw *Gateway) setUpVault() error {
 }
 
 func (gw *Gateway) setUpConsul() error {
-	if consulKVStore != nil {
+	if gw.consulKVStore != nil {
 		return nil
 	}
 
 	var err error
 
-	consulKVStore, err = kv.NewConsul(gw.GetConfig().KV.Consul)
+	gw.consulKVStore, err = kv.NewConsul(gw.GetConfig().KV.Consul)
 	if err != nil {
 		log.Debugf("an error occurred while setting up consul.. %v", err)
 	}

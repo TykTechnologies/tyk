@@ -291,7 +291,7 @@ func(gw *Gateway) replaceVariables(in string, vars []string, vals map[string]int
 				continue
 			}
 
-			val, err := vaultKVStore.Get(key)
+			val, err := gw.vaultKVStore.Get(key)
 			if err != nil {
 				in = emptyStringFn(key, in, v)
 				continue
@@ -306,7 +306,7 @@ func(gw *Gateway) replaceVariables(in string, vars []string, vals map[string]int
 				continue
 			}
 
-			val, err := consulKVStore.Get(key)
+			val, err := gw.consulKVStore.Get(key)
 			if err != nil {
 				in = strings.Replace(in, v, "", -1)
 				continue
