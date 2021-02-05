@@ -120,7 +120,7 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 
 	if w.Gw.GetConfig().UseDBAppConfigs {
 		dashboardServiceInit(w.Gw)
-		w.dashboardService = DashService
+		w.dashboardService = w.Gw.DashService
 	}
 
 	return nil

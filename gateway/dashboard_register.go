@@ -69,17 +69,17 @@ func(gw *Gateway) reLogin() {
 	}
 
 	dashLog.Info("Registering node (again).")
-	DashService.StopBeating()
-	if err := DashService.DeRegister(); err != nil {
+	gw.DashService.StopBeating()
+	if err := gw.DashService.DeRegister(); err != nil {
 		dashLog.Error("Could not deregister: ", err)
 	}
 
 	time.Sleep(5 * time.Second)
 
-	if err := DashService.Register(); err != nil {
+	if err := gw.DashService.Register(); err != nil {
 		dashLog.Error("Could not register: ", err)
 	} else {
-		go DashService.StartBeating()
+		go gw.DashService.StartBeating()
 	}
 
 	dashLog.Info("Recovering configurations, reloading...")
@@ -240,7 +240,7 @@ func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Cli
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusForbidden {
-		return DashService.Register()
+		return h.Gw.DashService.Register()
 	}
 
 	if resp.StatusCode != http.StatusOK {

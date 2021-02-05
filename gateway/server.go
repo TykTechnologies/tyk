@@ -60,7 +60,6 @@ var (
 
 	memProfFile *os.File
 
-	DashService         DashboardServiceSender
 	CertificateManager  *certs.CertificateManager
 	NewRelicApplication newrelic.Application
 
@@ -121,6 +120,7 @@ type Gateway struct {
 	GlobalSessionManager SessionHandler
 	MonitoringHandler    config.TykEventHandler
 	RPCListener         RPCStorageHandler
+	DashService         DashboardServiceSender
 }
 
 func NewGateway(config config.Config) *Gateway {
@@ -1264,7 +1264,7 @@ func Start() {
 
 		if gwConfig.UseDBAppConfigs {
 			mainLog.Info("Stopping heartbeat")
-			DashService.StopBeating()
+			gw.DashService.StopBeating()
 			mainLog.Info("Waiting to de-register")
 			time.Sleep(10 * time.Second)
 
@@ -1338,9 +1338,9 @@ func Start() {
 
 	if gwConfig.UseDBAppConfigs {
 		mainLog.Info("Stopping heartbeat...")
-		DashService.StopBeating()
+		gw.DashService.StopBeating()
 		time.Sleep(2 * time.Second)
-		DashService.DeRegister()
+		gw.DashService.DeRegister()
 	}
 
 	mainLog.Info("Terminating.")
@@ -1406,9 +1406,9 @@ func (gw *Gateway) start(ctx context.Context) {
 }
 
 func dashboardServiceInit(gw *Gateway) {
-	if DashService == nil {
-		DashService = &HTTPDashboardHandler{Gw: gw}
-		DashService.Init()
+	if gw.DashService == nil {
+		gw.DashService = &HTTPDashboardHandler{Gw: gw}
+		gw.DashService.Init()
 	}
 }
 
@@ -1420,11 +1420,11 @@ func handleDashboardRegistration(gw *Gateway) {
 	dashboardServiceInit(gw)
 
 	// connStr := buildConnStr("/register/node")
-	if err := DashService.Register(); err != nil {
+	if err := gw.DashService.Register(); err != nil {
 		dashLog.Fatal("Registration failed: ", err)
 	}
 
-	go DashService.StartBeating()
+	go gw.DashService.StartBeating()
 }
 
 var drlOnce sync.Once

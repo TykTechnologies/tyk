@@ -143,12 +143,12 @@ func(gw *Gateway) gatherHealthChecks() {
 				Time:          time.Now().Format(time.RFC3339),
 			}
 
-			if DashService == nil {
+			if gw.DashService == nil {
 				err := errors.New("Dashboard service not initialized")
 				mainLog.WithField("liveness-check", true).Error(err)
 				checkItem.Output = err.Error()
 				checkItem.Status = Fail
-			} else if err := DashService.Ping(); err != nil {
+			} else if err := gw.DashService.Ping(); err != nil {
 				mainLog.WithField("liveness-check", true).Error(err)
 				checkItem.Output = err.Error()
 				checkItem.Status = Fail
