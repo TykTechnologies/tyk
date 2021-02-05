@@ -905,7 +905,7 @@ func (s *Test) Start(slavedClusterConfig *SlaveDataCenter) *Gateway {
 	gw.setupGlobals(ctx)
 	// Set up a default org manager so we can traverse non-live paths
 	if !gwConfig.SupressDefaultOrgStore {
-		DefaultOrgStore.Init(gw.getGlobalStorageHandler("orgkey.", false))
+		gw.DefaultOrgStore.Init(gw.getGlobalStorageHandler("orgkey.", false))
 		DefaultQuotaStore.Init(gw.getGlobalStorageHandler("orgkey.", false))
 	}
 

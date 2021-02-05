@@ -60,7 +60,6 @@ var (
 
 	memProfFile          *os.File
 
-	DefaultOrgStore      DefaultSessionManager
 	DefaultQuotaStore    DefaultSessionManager
 	GlobalSessionManager = SessionHandler(&DefaultSessionManager{})
 	MonitoringHandler    config.TykEventHandler
@@ -121,6 +120,7 @@ type Gateway struct {
 	analytics        RedisAnalyticsHandler
 	GlobalEventsJSVM JSVM
 	MainNotifier         RedisNotifier
+	DefaultOrgStore      DefaultSessionManager
 }
 
 func NewGateway(config config.Config) *Gateway {
@@ -1374,7 +1374,7 @@ func (gw *Gateway) start(ctx context.Context) {
 	// Set up a default org manager so we can traverse non-live paths
 	if !gw.GetConfig().SupressDefaultOrgStore {
 		mainLog.Debug("Initialising default org store")
-		DefaultOrgStore.Init(gw.getGlobalStorageHandler("orgkey.", false))
+		gw.DefaultOrgStore.Init(gw.getGlobalStorageHandler("orgkey.", false))
 		//DefaultQuotaStore.Init(getGlobalStorageHandler(CloudHandler, "orgkey.", false))
 		DefaultQuotaStore.Init(gw.getGlobalStorageHandler("orgkey.", false))
 	}

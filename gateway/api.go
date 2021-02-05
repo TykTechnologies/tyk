@@ -1087,7 +1087,7 @@ func (gw *Gateway) handleOrgAddOrUpdate(orgID string, r *http.Request) (interfac
 		if gw.GetConfig().SupressDefaultOrgStore {
 			return apiError("No such organisation found in Active API list"), http.StatusNotFound
 		}
-		sessionManager = &DefaultOrgStore
+		sessionManager = &gw.DefaultOrgStore
 	} else {
 		sessionManager = spec.OrgSessionManager
 	}
