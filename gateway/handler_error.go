@@ -275,7 +275,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		}
 
 		if e.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
-			record.GetGeo(ip)
+			record.GetGeo(ip,e.Gw)
 		}
 
 		expiresAfter := e.Spec.ExpireAnalyticsAfter
@@ -292,7 +292,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		if e.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
 			record.NormalisePath(&e.Spec.GlobalConfig)
 		}
-		analytics.RecordHit(&record)
+		e.Gw.analytics.RecordHit(&record)
 	}
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")

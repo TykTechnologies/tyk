@@ -16,7 +16,7 @@ func TestGeoIPLookup(t *testing.T) {
 		{"1.2.3.4", false},
 	}
 	for _, tc := range testCases {
-		_, err := geoIPLookup(tc.in)
+		_, err := geoIPLookup(tc.in, &globalGateway)
 		switch {
 		case tc.wantErr && err == nil:
 			t.Errorf("geoIPLookup(%q) did not error", tc.in)

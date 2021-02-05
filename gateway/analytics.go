@@ -98,13 +98,13 @@ const (
 	recordsBufferForcedFlushInterval = 1 * time.Second
 )
 
-func (a *AnalyticsRecord) GetGeo(ipStr string) {
+func (a *AnalyticsRecord) GetGeo(ipStr string, gw *Gateway) {
 	// Not great, tightly coupled
-	if analytics.GeoIPDB == nil {
+	if gw.analytics.GeoIPDB == nil {
 		return
 	}
 
-	record, err := geoIPLookup(ipStr)
+	record, err := geoIPLookup(ipStr,gw)
 	if err != nil {
 		log.Error("GeoIP Failure (not recorded): ", err)
 		return
@@ -122,7 +122,7 @@ func (a *AnalyticsRecord) GetGeo(ipStr string) {
 	a.Geo = *record
 }
 
-func geoIPLookup(ipStr string) (*GeoData, error) {
+func geoIPLookup(ipStr string, gw *Gateway) (*GeoData, error) {
 	if ipStr == "" {
 		return nil, nil
 	}
@@ -131,7 +131,7 @@ func geoIPLookup(ipStr string) (*GeoData, error) {
 		return nil, fmt.Errorf("invalid IP address %q", ipStr)
 	}
 	record := new(GeoData)
-	if err := analytics.GeoIPDB.Lookup(ip, record); err != nil {
+	if err := gw.analytics.GeoIPDB.Lookup(ip, record); err != nil {
 		return nil, fmt.Errorf("geoIPDB lookup of %q failed: %v", ipStr, err)
 	}
 	return record, nil
@@ -185,11 +185,11 @@ type RedisAnalyticsHandler struct {
 	workerBufferSize uint64
 	shouldStop       uint32
 	poolWg           sync.WaitGroup
+	Gw *Gateway
 }
 
-func (r *RedisAnalyticsHandler) Init(gwConf config.Config) {
-	r.globalConf = gwConf
-
+func (r *RedisAnalyticsHandler) Init() {
+	r.globalConf = r.Gw.GetConfig()
 	if r.globalConf.AnalyticsConfig.EnableGeoIP {
 		if db, err := maxminddb.Open(r.globalConf.AnalyticsConfig.GeoIPDBLocation); err != nil {
 			log.Error("Failed to init GeoIP Database: ", err)
@@ -198,10 +198,9 @@ func (r *RedisAnalyticsHandler) Init(gwConf config.Config) {
 		}
 	}
 
-	analytics.Store.Connect()
-
-	ps := gwConf.AnalyticsConfig.PoolSize
-	recordsBufferSize := gwConf.AnalyticsConfig.RecordsBufferSize
+	r.Store.Connect()
+	ps := r.Gw.GetConfig().AnalyticsConfig.PoolSize
+	recordsBufferSize := r.globalConf.AnalyticsConfig.RecordsBufferSize
 	r.workerBufferSize = recordsBufferSize / uint64(ps)
 	log.WithField("workerBufferSize", r.workerBufferSize).Debug("Analytics pool worker buffer size")
 

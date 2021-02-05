@@ -196,7 +196,7 @@ func (m *proxyMux) addTCPService(spec *APISpec, modifier *tcp.Modifier, conf con
 	}
 }
 
-func flushNetworkAnalytics(ctx context.Context) {
+func(gw *Gateway) flushNetworkAnalytics(ctx context.Context) {
 	mainLog.Debug("Starting routine for flushing network analytics")
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
@@ -230,7 +230,7 @@ func flushNetworkAnalytics(ctx context.Context) {
 					OrgID:        spec.OrgID,
 				}
 				record.SetExpiry(spec.ExpireAnalyticsAfter)
-				analytics.RecordHit(&record)
+				gw.analytics.RecordHit(&record)
 			}
 			apisMu.RUnlock()
 		}

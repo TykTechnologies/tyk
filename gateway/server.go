@@ -52,12 +52,11 @@ import (
 )
 
 var (
-	log                  = logger.Get()
-	mainLog              = log.WithField("prefix", "main")
-	pubSubLog            = log.WithField("prefix", "pub-sub")
-	rawLog               = logger.GetRaw()
-	templates            *template.Template
-	analytics            RedisAnalyticsHandler
+	log       = logger.Get()
+	mainLog   = log.WithField("prefix", "main")
+	pubSubLog = log.WithField("prefix", "pub-sub")
+	rawLog    = logger.GetRaw()
+	templates *template.Template
 
 	memProfFile          *os.File
 	MainNotifier         RedisNotifier
@@ -119,28 +118,30 @@ type Gateway struct {
 
 	reloadMu sync.Mutex
 
-	GlobalEventsJSVM     JSVM
+	analytics        RedisAnalyticsHandler
+	GlobalEventsJSVM JSVM
 }
 
-func NewGateway(config config.Config) Gateway {
+func NewGateway(config config.Config) *Gateway {
 	gw := Gateway{
 		DefaultProxyMux: &proxyMux{
 			again: again.New(),
 		},
 	}
+	gw.analytics = RedisAnalyticsHandler{Gw: &gw}
 	gw.SetConfig(config)
-	return gw
+	return &gw
 }
 
 // SetNodeID writes NodeID safely.
-func(gw *Gateway) SetNodeID(nodeID string) {
+func (gw *Gateway) SetNodeID(nodeID string) {
 	gw.muNodeID.Lock()
 	gw.NodeID = nodeID
 	gw.muNodeID.Unlock()
 }
 
 // GetNodeID reads NodeID safely.
-func(gw *Gateway) GetNodeID() string {
+func (gw *Gateway) GetNodeID() string {
 	gw.muNodeID.Lock()
 	defer gw.muNodeID.Unlock()
 	return gw.NodeID
@@ -182,8 +183,8 @@ func (gw *Gateway) setupGlobals(ctx context.Context) {
 
 	gwConfig := gw.GetConfig()
 	checkup.Run(&gwConfig)
-	gw.SetConfig(gwConfig)
 
+	gw.SetConfig(gwConfig)
 	dnsCacheManager = dnscache.NewDnsCacheManager(gwConfig.DnsCache.MultipleIPsHandleStrategy)
 	if gwConfig.DnsCache.Enabled {
 		dnsCacheManager.InitDNSCaching(
@@ -213,15 +214,15 @@ func (gw *Gateway) setupGlobals(ctx context.Context) {
 	versionStore.Connect()
 	_ = versionStore.SetKey("gateway", VERSION, 0)
 
-	if gwConfig.EnableAnalytics && analytics.Store == nil {
+	if gwConfig.EnableAnalytics && gw.analytics.Store == nil {
 		Conf := gwConfig
 		Conf.LoadIgnoredIPs()
 		gw.SetConfig(Conf)
 		mainLog.Debug("Setting up analytics DB connection")
 
 		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-"}
-		analytics.Store = &analyticsStore
-		analytics.Init(Conf)
+		gw.analytics.Store = &analyticsStore
+		gw.analytics.Init()
 
 		if gw.GetConfig().AnalyticsConfig.Type == "rpc" {
 			mainLog.Debug("Using RPC cache purge")
@@ -235,7 +236,7 @@ func (gw *Gateway) setupGlobals(ctx context.Context) {
 				go purger.PurgeLoop(ctx)
 			})
 		}
-		go flushNetworkAnalytics(ctx)
+		go gw.flushNetworkAnalytics(ctx)
 	}
 
 	// Load all the files that have the "error" prefix.
@@ -1218,7 +1219,7 @@ func (gw *Gateway) getGlobalStorageHandler(keyPrefix string, hashKeys bool) stor
 		return &RPCStorageHandler{
 			KeyPrefix: keyPrefix,
 			HashKeys:  hashKeys,
-			Gw:gw,
+			Gw:        gw,
 		}
 	}
 	return &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys}
@@ -1247,7 +1248,7 @@ func Start() {
 		mainLog.Warn("The control_api_port should be changed for production")
 	}
 	gw.setupPortsWhitelist()
-	keyGen = DefaultKeyGenerator{Gw: &gw}
+	keyGen = DefaultKeyGenerator{Gw: gw}
 
 	onFork := func() {
 		mainLog.Warning("PREPARING TO FORK")
@@ -1282,7 +1283,7 @@ func Start() {
 	configs := gw.GetConfig()
 	go storage.ConnectToRedis(ctx, func() {
 		reloadURLStructure(func() {})
-	}, &configs,)
+	}, &configs)
 
 	if *cli.MemProfile {
 		mainLog.Debug("Memory profiling active")
@@ -1326,8 +1327,8 @@ func Start() {
 		mainLog.Error("Closing listeners: ", err)
 	}
 	// stop analytics workers
-	if gwConfig.EnableAnalytics && analytics.Store == nil {
-		analytics.Stop()
+	if gwConfig.EnableAnalytics && gw.analytics.Store == nil {
+		gw.analytics.Stop()
 	}
 
 	// write pprof profiles
@@ -1387,7 +1388,7 @@ func (gw *Gateway) start(ctx context.Context) {
 		RPCListener = RPCStorageHandler{
 			KeyPrefix:        "rpc.listener.",
 			SuppressRegister: true,
-			Gw:gw,
+			Gw:               gw,
 		}
 
 		RPCListener.Connect()

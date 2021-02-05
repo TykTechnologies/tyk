@@ -232,7 +232,7 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 
 	globalConf := config.Default
 	// ToDo: replace for get default conf
-	globalGateway = NewGateway(globalConf)
+	globalGateway = *NewGateway(globalConf)
 	if err := config.WriteDefault("", &globalConf); err != nil {
 		panic(err)
 	}
@@ -294,7 +294,7 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 	globalGateway.initialiseSystem(ctx)
 	// Small part of start()
 	globalGateway.loadControlAPIEndpoints(mainRouter())
-	if analytics.GeoIPDB == nil {
+	if globalGateway.analytics.GeoIPDB == nil {
 		panic("GeoIPDB was not initialized")
 	}
 
@@ -865,7 +865,7 @@ type SlaveDataCenter struct {
 }
 
 // ToDo: better receive a config generator function
-func (s *Test) Start(slavedClusterConfig *SlaveDataCenter) Gateway {
+func (s *Test) Start(slavedClusterConfig *SlaveDataCenter) *Gateway {
 	l, _ := net.Listen("tcp", "127.0.0.1:0")
 	_, port, _ := net.SplitHostPort(l.Addr().String())
 	l.Close()
@@ -874,7 +874,7 @@ func (s *Test) Start(slavedClusterConfig *SlaveDataCenter) Gateway {
 
 	// ToDo: replace with get default config
 	gw := NewGateway(gwConfig)
-	s.Gw = &gw
+	s.Gw = gw
 
 	if s.config.sepatateControlAPI {
 		l, _ := net.Listen("tcp", "127.0.0.1:0")

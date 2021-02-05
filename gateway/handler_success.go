@@ -239,7 +239,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 		}
 
 		if s.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
-			record.GetGeo(ip)
+			record.GetGeo(ip,s.Gw)
 		}
 
 		expiresAfter := s.Spec.ExpireAnalyticsAfter
@@ -257,7 +257,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 			record.NormalisePath(&s.Spec.GlobalConfig)
 		}
 
-		analytics.RecordHit(&record)
+		s.Gw.analytics.RecordHit(&record)
 	}
 
 	// Report in health check
