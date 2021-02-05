@@ -58,10 +58,8 @@ var (
 	rawLog    = logger.GetRaw()
 	templates *template.Template
 
-	memProfFile *os.File
+	memProfFile         *os.File
 	NewRelicApplication newrelic.Application
-
-	keyGen DefaultKeyGenerator
 
 	policiesMu   sync.RWMutex
 	policiesByID = map[string]user.Policy{}
@@ -107,14 +105,16 @@ type Gateway struct {
 	DefaultQuotaStore    DefaultSessionManager
 	GlobalSessionManager SessionHandler
 	MonitoringHandler    config.TykEventHandler
-	RPCListener         RPCStorageHandler
-	DashService         DashboardServiceSender
-	CertificateManager  *certs.CertificateManager
+	RPCListener          RPCStorageHandler
+	DashService          DashboardServiceSender
+	CertificateManager   *certs.CertificateManager
+
+	keyGen DefaultKeyGenerator
 
 	apisMu          sync.RWMutex
 	apiSpecs        []*APISpec
 	apisByID        map[string]*APISpec
-	apisHandlesByID  *sync.Map
+	apisHandlesByID *sync.Map
 
 	dnsCacheManager dnscache.IDnsCacheManager
 
@@ -164,14 +164,14 @@ func setTestMode(v bool) {
 	runningTestsMu.Unlock()
 }
 
-func(gw *Gateway) getApiSpec(apiID string) *APISpec {
+func (gw *Gateway) getApiSpec(apiID string) *APISpec {
 	gw.apisMu.RLock()
 	spec := gw.apisByID[apiID]
 	gw.apisMu.RUnlock()
 	return spec
 }
 
-func(gw *Gateway) apisByIDLen() int {
+func (gw *Gateway) apisByIDLen() int {
 	gw.apisMu.RLock()
 	defer gw.apisMu.RUnlock()
 	return len(gw.apisByID)
@@ -558,7 +558,7 @@ func (gw *Gateway) addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthMana
 		gw,
 	}
 
-	osinServer := TykOsinNewServer(serverConfig, osinStorage)
+	osinServer := gw.TykOsinNewServer(serverConfig, osinStorage)
 
 	oauthManager := OAuthManager{spec, osinServer, gw}
 	oauthHandlers := OAuthHandlers{oauthManager}
@@ -727,7 +727,7 @@ func (gw *Gateway) isRPCMode() bool {
 		gw.GetConfig().AuthOverride.AuthProvider.StorageEngine == RPCStorageEngine
 }
 
-func(gw *Gateway) rpcReloadLoop(rpcKey string) {
+func (gw *Gateway) rpcReloadLoop(rpcKey string) {
 	for {
 		gw.RPCListener.CheckForReload(rpcKey)
 	}
@@ -1252,7 +1252,7 @@ func Start() {
 		mainLog.Warn("The control_api_port should be changed for production")
 	}
 	gw.setupPortsWhitelist()
-	keyGen = DefaultKeyGenerator{Gw: gw}
+	gw.keyGen = DefaultKeyGenerator{Gw: gw}
 
 	onFork := func() {
 		mainLog.Warning("PREPARING TO FORK")

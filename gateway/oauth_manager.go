@@ -556,19 +556,19 @@ type TykOsinServer struct {
 }
 
 // TykOsinNewServer creates a new server instance, but uses an extended interface so we can SetClient() too.
-func TykOsinNewServer(config *osin.ServerConfig, storage ExtendedOsinStorageInterface) *TykOsinServer {
+func(gw *Gateway) TykOsinNewServer(config *osin.ServerConfig, storage ExtendedOsinStorageInterface) *TykOsinServer {
 
 	overrideServer := TykOsinServer{
 		Config:            config,
 		Storage:           storage,
 		AuthorizeTokenGen: &osin.AuthorizeTokenGenDefault{},
-		AccessTokenGen:    accessTokenGen{},
+		AccessTokenGen:    accessTokenGen{gw},
 	}
 
 	overrideServer.Server.Config = config
 	overrideServer.Server.Storage = storage
 	overrideServer.Server.AuthorizeTokenGen = overrideServer.AuthorizeTokenGen
-	overrideServer.Server.AccessTokenGen = accessTokenGen{}
+	overrideServer.Server.AccessTokenGen = accessTokenGen{gw}
 
 	return &overrideServer
 }
@@ -1087,10 +1087,12 @@ func (r *RedisOsinStorageInterface) RemoveRefresh(token string) error {
 }
 
 // accessTokenGen is a modified authorization token generator that uses the same method used to generate tokens for Tyk authHandler
-type accessTokenGen struct{}
+type accessTokenGen struct{
+	Gw *Gateway
+}
 
 // GenerateAccessToken generates base64-encoded UUID access and refresh tokens
-func (accessTokenGen) GenerateAccessToken(data *osin.AccessData, generaterefresh bool) (accesstoken, refreshtoken string, err error) {
+func (a accessTokenGen) GenerateAccessToken(data *osin.AccessData, generaterefresh bool) (accesstoken, refreshtoken string, err error) {
 	log.Info("[OAuth] Generating new token")
 
 	var newSession user.SessionState
@@ -1114,7 +1116,7 @@ func (accessTokenGen) GenerateAccessToken(data *osin.AccessData, generaterefresh
 		newSession = sessionFromPolicy.Clone()
 	}
 
-	accesstoken = keyGen.GenerateAuthKey(newSession.OrgID)
+	accesstoken = a.Gw.keyGen.GenerateAuthKey(newSession.OrgID)
 	if generaterefresh {
 		u6 := uuid.NewV4()
 		refreshtoken = base64.StdEncoding.EncodeToString([]byte(u6.String()))

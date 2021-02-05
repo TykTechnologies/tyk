@@ -721,7 +721,7 @@ func CreateStandardPolicy() *user.Policy {
 }
 
 func CreatePolicy(pGen ...func(p *user.Policy)) string {
-	pID := keyGen.GenerateAuthKey("")
+	pID := globalGateway.keyGen.GenerateAuthKey("")
 	pol := CreateStandardPolicy()
 	pol.ID = pID
 

@@ -142,7 +142,7 @@ func allowMethods(next http.HandlerFunc, methods ...string) http.HandlerFunc {
 	}
 }
 
-func(gw *Gateway) getSpecForOrg(orgID string) *APISpec {
+func (gw *Gateway) getSpecForOrg(orgID string) *APISpec {
 	gw.apisMu.RLock()
 	defer gw.apisMu.RUnlock()
 	for _, v := range gw.apisByID {
@@ -158,7 +158,7 @@ func(gw *Gateway) getSpecForOrg(orgID string) *APISpec {
 	return nil
 }
 
-func(gw *Gateway) getApisIdsForOrg(orgID string) []string {
+func (gw *Gateway) getApisIdsForOrg(orgID string) []string {
 	result := []string{}
 
 	showAll := orgID == ""
@@ -173,7 +173,7 @@ func(gw *Gateway) getApisIdsForOrg(orgID string) []string {
 	return result
 }
 
-func(gw *Gateway) checkAndApplyTrialPeriod(keyName string, newSession *user.SessionState, isHashed bool) {
+func (gw *Gateway) checkAndApplyTrialPeriod(keyName string, newSession *user.SessionState, isHashed bool) {
 	// Check the policies to see if we are forcing an expiry on the key
 	for _, polID := range newSession.GetPolicyIDs() {
 		policiesMu.RLock()
@@ -203,7 +203,7 @@ func (gw *Gateway) applyPoliciesAndSave(keyName string, session *user.SessionSta
 		return err
 	}
 
-	lifetime := session.Lifetime(spec.SessionLifetime, gw.GetConfig().ForceGlobalSessionLifetime,gw.GetConfig().GlobalSessionLifetime)
+	lifetime := session.Lifetime(spec.SessionLifetime, gw.GetConfig().ForceGlobalSessionLifetime, gw.GetConfig().GlobalSessionLifetime)
 	if err := gw.GlobalSessionManager.UpdateSession(keyName, session, lifetime, isHashed); err != nil {
 		return err
 	}
@@ -221,7 +221,7 @@ func resetAPILimits(accessRights map[string]user.AccessDefinition) {
 	}
 }
 
-func(gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool, isHashed bool) error {
+func (gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool, isHashed bool) error {
 	// field last_updated plays an important role in in-mem rate limiter
 	// so update last_updated to current timestamp only if suppress_reset wasn't set to 1
 	if !dontReset {
@@ -331,7 +331,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 		return apiError("Request malformed"), http.StatusBadRequest
 	}
 
-	mw := BaseMiddleware{Gw:gw}
+	mw := BaseMiddleware{Gw: gw}
 	// TODO: handle apply policies error
 	mw.ApplyPolicies(newSession)
 
@@ -563,7 +563,7 @@ type apiAllKeys struct {
 	APIKeys []string `json:"keys"`
 }
 
-func(gw *Gateway) handleGetAllKeys(filter string) (interface{}, int) {
+func (gw *Gateway) handleGetAllKeys(filter string) (interface{}, int) {
 	sessions := gw.GlobalSessionManager.Sessions(filter)
 	if filter != "" {
 		filterB64 := base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString([]byte(fmt.Sprintf(`{"org":"%s"`, filter)))
@@ -590,7 +590,7 @@ func(gw *Gateway) handleGetAllKeys(filter string) (interface{}, int) {
 	return sessionsObj, http.StatusOK
 }
 
-func(gw *Gateway) handleAddKey(keyName, hashedName, sessionString, apiID string) {
+func (gw *Gateway) handleAddKey(keyName, hashedName, sessionString, apiID string) {
 	sess := user.NewSessionState()
 	json.Unmarshal([]byte(sessionString), sess)
 	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
@@ -624,7 +624,7 @@ func (gw *Gateway) handleDeleteKey(keyName, apiID string, resetQuota bool) (inte
 	if apiID == "-1" {
 		// Go through ALL managed API's and delete the key
 		gw.apisMu.RLock()
-		removed :=gw. GlobalSessionManager.RemoveSession(orgID, keyName, false)
+		removed := gw.GlobalSessionManager.RemoveSession(orgID, keyName, false)
 		gw.GlobalSessionManager.ResetQuota(
 			keyName,
 			user.NewSessionState(),
@@ -747,15 +747,15 @@ func (gw *Gateway) handleDeleteHashedKey(keyName, apiID string, resetQuota bool)
 	return statusObj, http.StatusOK
 }
 
-func(gw *Gateway) handleGlobalAddToSortedSet(keyName, value string, score float64) {
+func (gw *Gateway) handleGlobalAddToSortedSet(keyName, value string, score float64) {
 	gw.GlobalSessionManager.Store().AddToSortedSet(keyName, value, score)
 }
 
-func(gw *Gateway) handleGetSortedSetRange(keyName, scoreFrom, scoreTo string) ([]string, []float64, error) {
+func (gw *Gateway) handleGetSortedSetRange(keyName, scoreFrom, scoreTo string) ([]string, []float64, error) {
 	return gw.GlobalSessionManager.Store().GetSortedSetRange(keyName, scoreFrom, scoreTo)
 }
 
-func(gw *Gateway) handleRemoveSortedSetRange(keyName, scoreFrom, scoreTo string) error {
+func (gw *Gateway) handleRemoveSortedSetRange(keyName, scoreFrom, scoreTo string) error {
 	return gw.GlobalSessionManager.Store().RemoveSortedSetRange(keyName, scoreFrom, scoreTo)
 }
 
@@ -974,7 +974,7 @@ type PolicyUpdateObj struct {
 	ApplyPolicies []string `json:"apply_policies"`
 }
 
-func(gw *Gateway) policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
+func (gw *Gateway) policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	log.Warning("Hashed key change request detected!")
 
 	var policRecord PolicyUpdateObj
@@ -993,7 +993,7 @@ func(gw *Gateway) policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, code, obj)
 }
 
-func(gw *Gateway) handleUpdateHashedKey(keyName string, applyPolicies []string) (interface{}, int) {
+func (gw *Gateway) handleUpdateHashedKey(keyName string, applyPolicies []string) (interface{}, int) {
 	var orgID string
 	if len(applyPolicies) != 0 {
 		policiesMu.RLock()
@@ -1212,7 +1212,7 @@ func (gw *Gateway) handleDeleteOrgKey(orgID string) (interface{}, int) {
 	return statusObj, http.StatusOK
 }
 
-func(gw *Gateway) groupResetHandler(w http.ResponseWriter, r *http.Request) {
+func (gw *Gateway) groupResetHandler(w http.ResponseWriter, r *http.Request) {
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
 		"status": "ok",
@@ -1265,9 +1265,9 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newKey := keyGen.GenerateAuthKey(newSession.OrgID)
+	newKey := gw.keyGen.GenerateAuthKey(newSession.OrgID)
 	if newSession.HMACEnabled {
-		newSession.HmacSecret = keyGen.GenerateHMACSecret()
+		newSession.HmacSecret = gw.keyGen.GenerateHMACSecret()
 	}
 
 	if newSession.Certificate != "" {
@@ -1282,7 +1282,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 	newSession.DateCreated = time.Now()
 
-	mw := BaseMiddleware{Gw:gw}
+	mw := BaseMiddleware{Gw: gw}
 	// TODO: handle apply policies error
 	mw.ApplyPolicies(newSession)
 
@@ -1435,7 +1435,7 @@ func oauthClientStorageID(clientID string) string {
 	return prefixClient + clientID
 }
 
-func(gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
+func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 	var newOauthClient NewClientRequest
 	if err := json.NewDecoder(r.Body).Decode(&newOauthClient); err != nil {
 		log.WithFields(logrus.Fields{
@@ -1582,7 +1582,7 @@ func(gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, http.StatusOK, clientData)
 }
 
-func(gw *Gateway) rotateOauthClient(keyName, apiID string) (interface{}, int) {
+func (gw *Gateway) rotateOauthClient(keyName, apiID string) (interface{}, int) {
 	// check API
 	apiSpec := gw.getApiSpec(apiID)
 	if apiSpec == nil {
@@ -1634,7 +1634,7 @@ func(gw *Gateway) rotateOauthClient(keyName, apiID string) (interface{}, int) {
 }
 
 // Update Client
-func(gw *Gateway) updateOauthClient(keyName, apiID string, r *http.Request) (interface{}, int) {
+func (gw *Gateway) updateOauthClient(keyName, apiID string, r *http.Request) (interface{}, int) {
 	// read payload
 	var updateClientData NewClientRequest
 	if err := json.NewDecoder(r.Body).Decode(&updateClientData); err != nil {
@@ -1710,7 +1710,7 @@ func(gw *Gateway) updateOauthClient(keyName, apiID string, r *http.Request) (int
 	return replyData, http.StatusOK
 }
 
-func(gw *Gateway) invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
+func (gw *Gateway) invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 	apiID := r.URL.Query().Get("api_id")
 	if apiID == "" {
 		doJSONWrite(w, http.StatusBadRequest, apiError("Missing parameter api_id"))
@@ -1777,7 +1777,7 @@ func(gw *Gateway) invalidateOauthRefresh(w http.ResponseWriter, r *http.Request)
 	doJSONWrite(w, http.StatusOK, success)
 }
 
-func(gw *Gateway) rotateOauthClientHandler(w http.ResponseWriter, r *http.Request) {
+func (gw *Gateway) rotateOauthClientHandler(w http.ResponseWriter, r *http.Request) {
 
 	apiID := mux.Vars(r)["apiID"]
 	keyName := mux.Vars(r)["keyName"]
@@ -1787,7 +1787,7 @@ func(gw *Gateway) rotateOauthClientHandler(w http.ResponseWriter, r *http.Reques
 	doJSONWrite(w, code, obj)
 }
 
-func(gw *Gateway) getApisForOauthApp(w http.ResponseWriter, r *http.Request) {
+func (gw *Gateway) getApisForOauthApp(w http.ResponseWriter, r *http.Request) {
 	apis := []string{}
 	appID := mux.Vars(r)["appID"]
 	orgID := r.FormValue("orgID")
@@ -1813,7 +1813,7 @@ func(gw *Gateway) getApisForOauthApp(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, http.StatusOK, apis)
 }
 
-func(gw *Gateway) oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
+func (gw *Gateway) oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
 	keyName := mux.Vars(r)["keyName"]
 
@@ -1839,7 +1839,7 @@ func(gw *Gateway) oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, code, obj)
 }
 
-func(gw *Gateway) oAuthClientTokensHandler(w http.ResponseWriter, r *http.Request) {
+func (gw *Gateway) oAuthClientTokensHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
 	keyName := mux.Vars(r)["keyName"]
 
@@ -1896,7 +1896,7 @@ func(gw *Gateway) oAuthClientTokensHandler(w http.ResponseWriter, r *http.Reques
 }
 
 // Get client details
-func(gw *Gateway) getOauthClientDetails(keyName, apiID string) (interface{}, int) {
+func (gw *Gateway) getOauthClientDetails(keyName, apiID string) (interface{}, int) {
 	storageID := oauthClientStorageID(keyName)
 	apiSpec := gw.getApiSpec(apiID)
 	if apiSpec == nil {
@@ -1934,7 +1934,7 @@ func(gw *Gateway) getOauthClientDetails(keyName, apiID string) (interface{}, int
 }
 
 // Delete Client
-func(gw *Gateway) handleDeleteOAuthClient(keyName, apiID string) (interface{}, int) {
+func (gw *Gateway) handleDeleteOAuthClient(keyName, apiID string) (interface{}, int) {
 	storageID := oauthClientStorageID(keyName)
 
 	apiSpec := gw.getApiSpec(apiID)
@@ -1982,7 +1982,7 @@ const oauthClientSecretEmpty = "client_secret is required"
 const oauthClientSecretWrong = "client secret is wrong"
 const oauthTokenEmpty = "token is required"
 
-func(gw *Gateway) getApiClients(apiID string) ([]ExtendedOsinClientInterface, apiStatusMessage, int) {
+func (gw *Gateway) getApiClients(apiID string) ([]ExtendedOsinClientInterface, apiStatusMessage, int) {
 	var err error
 	filterID := prefixClient
 	apiSpec := gw.getApiSpec(apiID)
@@ -2016,7 +2016,7 @@ func(gw *Gateway) getApiClients(apiID string) ([]ExtendedOsinClientInterface, ap
 }
 
 // List Clients
-func(gw *Gateway) getOauthClients(apiID string) (interface{}, int) {
+func (gw *Gateway) getOauthClients(apiID string) (interface{}, int) {
 
 	clientData, _, apiStatusCode := gw.getApiClients(apiID)
 
@@ -2046,7 +2046,7 @@ func(gw *Gateway) getOauthClients(apiID string) (interface{}, int) {
 	return clients, http.StatusOK
 }
 
-func(gw *Gateway) getApisForOauthClientId(oauthClientId string, orgId string) []string {
+func (gw *Gateway) getApisForOauthClientId(oauthClientId string, orgId string) []string {
 	apis := []string{}
 	orgApis := gw.getApisIdsForOrg(orgId)
 
@@ -2100,7 +2100,7 @@ func userRatesCheck(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, http.StatusOK, returnSession)
 }
 
-func(gw *Gateway) invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
+func (gw *Gateway) invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
 
 	keyPrefix := "cache-" + apiID
@@ -2132,7 +2132,7 @@ func(gw *Gateway) invalidateCacheHandler(w http.ResponseWriter, r *http.Request)
 	doJSONWrite(w, http.StatusOK, apiOk("cache invalidated"))
 }
 
-func(gw *Gateway) RevokeTokenHandler(w http.ResponseWriter, r *http.Request) {
+func (gw *Gateway) RevokeTokenHandler(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 
 	if err != nil {
@@ -2170,7 +2170,7 @@ func(gw *Gateway) RevokeTokenHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, http.StatusOK, apiOk("token revoked successfully"))
 }
 
-func(gw *Gateway) GetStorageForApi(apiID string) (ExtendedOsinStorageInterface, int, error) {
+func (gw *Gateway) GetStorageForApi(apiID string) (ExtendedOsinStorageInterface, int, error) {
 	apiSpec := gw.getApiSpec(apiID)
 	if apiSpec == nil {
 		log.WithFields(logrus.Fields{
@@ -2197,7 +2197,7 @@ func(gw *Gateway) GetStorageForApi(apiID string) (ExtendedOsinStorageInterface, 
 	return apiSpec.OAuthManager.OsinServer.Storage, http.StatusOK, nil
 }
 
-func(gw *Gateway) RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request) {
+func (gw *Gateway) RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 
 	if err != nil {
@@ -2238,7 +2238,7 @@ func(gw *Gateway) RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request)
 	n := Notification{
 		Command: KeySpaceUpdateNotification,
 		Payload: strings.Join(tokens, ","),
-		Gw: gw,
+		Gw:      gw,
 	}
 	gw.MainNotifier.Notify(n)
 
