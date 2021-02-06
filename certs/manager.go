@@ -13,7 +13,6 @@ import (
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -473,8 +472,6 @@ func (c *CertificateManager) ListAllIds(prefix string) (out []string) {
 		}
 
 		keys := c.storage.GetKeys("raw-" + prefix + "*")
-
-		fmt.Println("KEYS!!!!!!!", keys, prefix)
 
 		for _, key := range keys {
 			if prefix != "" {
