@@ -1,15 +1,7 @@
 package oas
 
 import (
-	"encoding/json"
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/apidef/oas"
-	"github.com/getkin/kin-openapi/openapi3"
-	"github.com/ghodss/yaml"
 	"gopkg.in/alecthomas/kingpin.v2"
-	"io/ioutil"
-	"path/filepath"
-	"strings"
 )
 
 const (
@@ -28,10 +20,10 @@ type Converter struct {
 	input   *string
 	version *string
 	//swaggerMode    *bool
-	swagger oas.Converter
+	//swagger oas.Converter
 }
 
-func (c Converter) TykAPIDefinitionToSwagger(ctx *kingpin.ParseContext) error {
+/*func (c Converter) TykAPIDefinitionToSwagger(ctx *kingpin.ParseContext) error {
 	var api apidef.APIDefinition
 	apiInBytes, _ := ioutil.ReadFile(*c.input)
 	_ = json.Unmarshal(apiInBytes, &api)
@@ -67,15 +59,15 @@ func (c Converter) SwaggerToTykAPIDefinition(ctx *kingpin.ParseContext) error {
 
 func init() {
 	converter = &Converter{swagger: oas.Converter{}}
-}
+}*/
 
 // AddTo initializes an oas object.
 func AddTo(app *kingpin.Application) {
-	cmd := app.Command(cmdConvertToOASName, cmdConvertToOASDesc)
+	/*cmd := app.Command(cmdConvertToOASName, cmdConvertToOASDesc)
 	converter.input = cmd.Arg("input", "e.g. tyk-api.json, tyk-swagger.json").String()
 	cmd.Action(converter.TykAPIDefinitionToSwagger)
 
 	cmd2 := app.Command(cmdConvertToTykName, cmdConvertToTykDesc)
 	converter.input = cmd2.Arg("input", "e.g. tyk-api.json, tyk-swagger.json").String()
-	cmd2.Action(converter.SwaggerToTykAPIDefinition)
+	cmd2.Action(converter.SwaggerToTykAPIDefinition)*/
 }
