@@ -520,6 +520,7 @@ type ProxyConfig struct {
 		SSLInsecureSkipVerify   bool     `bson:"ssl_insecure_skip_verify" json:"ssl_insecure_skip_verify"`
 		SSLCipherSuites         []string `bson:"ssl_ciphers" json:"ssl_ciphers"`
 		SSLMinVersion           uint16   `bson:"ssl_min_version" json:"ssl_min_version"`
+		SSLMaxVersion           uint16   `bson:"ssl_max_version" json:"ssl_max_version"`
 		SSLForceCommonNameCheck bool     `json:"ssl_force_common_name_check"`
 		ProxyURL                string   `bson:"proxy_url" json:"proxy_url"`
 	} `bson:"transport" json:"transport"`

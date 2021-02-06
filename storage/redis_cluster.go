@@ -43,6 +43,7 @@ func DisableRedis(ok bool) {
 		disableRedis.Store(true)
 		return
 	}
+	redisUp.Store(true)
 	disableRedis.Store(false)
 }
 

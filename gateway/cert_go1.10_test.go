@@ -48,6 +48,7 @@ func TestPublicKeyPinning(t *testing.T) {
 	upstream.TLS = &tls.Config{
 		InsecureSkipVerify: true,
 		Certificates:       []tls.Certificate{serverCert},
+		MaxVersion:         tls.VersionTLS12,
 	}
 
 	upstream.StartTLS()
@@ -106,6 +107,7 @@ func TestPublicKeyPinning(t *testing.T) {
 		_, _, _, proxyCert := genServerCertificate()
 		proxy := initProxy("https", &tls.Config{
 			Certificates: []tls.Certificate{proxyCert},
+			MaxVersion:   tls.VersionTLS12,
 		})
 
 		globalConf := config.Global()
@@ -145,6 +147,7 @@ func TestPublicKeyPinning(t *testing.T) {
 		upstream.TLS = &tls.Config{
 			InsecureSkipVerify: true,
 			Certificates:       []tls.Certificate{serverCert},
+			MaxVersion:         tls.VersionTLS12,
 		}
 
 		upstream.StartTLS()
@@ -162,6 +165,7 @@ func TestPublicKeyPinning(t *testing.T) {
 
 		proxy := initProxy("http", &tls.Config{
 			Certificates: []tls.Certificate{proxyCert},
+			MaxVersion:   tls.VersionTLS12,
 		})
 		defer proxy.Stop()
 
@@ -305,6 +309,7 @@ func TestProxyTransport(t *testing.T) {
 		_, _, _, proxyCert := genServerCertificate()
 		proxy := initProxy("https", &tls.Config{
 			Certificates: []tls.Certificate{proxyCert},
+			MaxVersion:   tls.VersionTLS12,
 		})
 		defer proxy.Stop()
 

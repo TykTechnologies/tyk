@@ -133,6 +133,7 @@ func TestVirtualEndpointBatch(t *testing.T) {
 		ClientAuth:         tls.RequireAndVerifyClientCert,
 		ClientCAs:          pool,
 		InsecureSkipVerify: true,
+		MaxVersion:         tls.VersionTLS12,
 	}
 
 	upstream.StartTLS()

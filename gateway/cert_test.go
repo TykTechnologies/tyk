@@ -60,7 +60,7 @@ func genServerCertificate() ([]byte, []byte, []byte, tls.Certificate) {
 }
 
 const (
-	internalTLSErr  = "tls: internal error"
+	internalTLSErr  = "tls: unrecognized name"
 	badcertErr      = "tls: bad certificate"
 	certNotMatchErr = "Client TLS certificate is required"
 )
@@ -724,6 +724,7 @@ func TestUpstreamMutualTLS(t *testing.T) {
 		ClientAuth:         tls.RequireAndVerifyClientCert,
 		ClientCAs:          pool,
 		InsecureSkipVerify: true,
+		MaxVersion:         tls.VersionTLS12,
 	}
 
 	upstream.StartTLS()
@@ -783,6 +784,7 @@ func TestSSLForceCommonName(t *testing.T) {
 
 	upstream.TLS = &tls.Config{
 		Certificates: []tls.Certificate{cert},
+		MaxVersion:   tls.VersionTLS12,
 	}
 
 	upstream.StartTLS()
@@ -998,6 +1000,7 @@ func TestAPICertificate(t *testing.T) {
 
 	client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{
 		InsecureSkipVerify: true,
+		MaxVersion:         tls.VersionTLS12,
 	}}}
 
 	t.Run("Cert set via API", func(t *testing.T) {
@@ -1016,7 +1019,7 @@ func TestAPICertificate(t *testing.T) {
 			spec.Proxy.ListenPath = "/"
 		})
 
-		ts.Run(t, test.TestCase{ErrorMatch: "tls: internal error"})
+		ts.Run(t, test.TestCase{ErrorMatch: internalTLSErr})
 	})
 }
 
@@ -1032,45 +1035,45 @@ func TestCertificateHandlerTLS(t *testing.T) {
 
 	t.Run("List certificates, empty", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
-			Path: "/tyk/certs", Code: 200, AdminAuth: true, BodyMatch: `{"certs":null}`,
+			Path: "/tyk/certs?org_id=1", Code: 200, AdminAuth: true, BodyMatch: `{"certs":null}`,
 		})
 	})
 
 	t.Run("Should add certificates with and without private keys", func(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 			// Public Certificate
-			{Method: "POST", Path: "/tyk/certs", Data: string(clientPEM), AdminAuth: true, Code: 200, BodyMatch: `"id":"` + clientCertID},
+			{Method: "POST", Path: "/tyk/certs?org_id=1", Data: string(clientPEM), AdminAuth: true, Code: 200, BodyMatch: `"id":"1` + clientCertID},
 			// Public + Private
-			{Method: "POST", Path: "/tyk/certs", Data: string(combinedServerPEM), AdminAuth: true, Code: 200, BodyMatch: `"id":"` + serverCertID},
+			{Method: "POST", Path: "/tyk/certs?org_id=1", Data: string(combinedServerPEM), AdminAuth: true, Code: 200, BodyMatch: `"id":"1` + serverCertID},
 		}...)
 	})
 
 	t.Run("List certificates, non empty", func(t *testing.T) {
 		ts.Run(t, []test.TestCase{
-			{Method: "GET", Path: "/tyk/certs", AdminAuth: true, Code: 200, BodyMatch: clientCertID},
-			{Method: "GET", Path: "/tyk/certs", AdminAuth: true, Code: 200, BodyMatch: serverCertID},
+			{Method: "GET", Path: "/tyk/certs?org_id=1", AdminAuth: true, Code: 200, BodyMatch: clientCertID},
+			{Method: "GET", Path: "/tyk/certs?org_id=1", AdminAuth: true, Code: 200, BodyMatch: serverCertID},
 		}...)
 	})
 
-	certMetaTemplate := `{"id":"%s","fingerprint":"%s","has_private":%s`
+	certMetaTemplate := `{"id":"1%s","fingerprint":"%s","has_private":%s`
 
 	t.Run("Certificate meta info", func(t *testing.T) {
 		clientCertMeta := fmt.Sprintf(certMetaTemplate, clientCertID, clientCertID, "false")
 		serverCertMeta := fmt.Sprintf(certMetaTemplate, serverCertID, serverCertID, "true")
 
 		ts.Run(t, []test.TestCase{
-			{Method: "GET", Path: "/tyk/certs/" + clientCertID, AdminAuth: true, Code: 200, BodyMatch: clientCertMeta},
-			{Method: "GET", Path: "/tyk/certs/" + serverCertID, AdminAuth: true, Code: 200, BodyMatch: serverCertMeta},
-			{Method: "GET", Path: "/tyk/certs/" + serverCertID + "," + clientCertID, AdminAuth: true, Code: 200, BodyMatch: `\[` + serverCertMeta},
-			{Method: "GET", Path: "/tyk/certs/" + serverCertID + "," + clientCertID, AdminAuth: true, Code: 200, BodyMatch: clientCertMeta},
+			{Method: "GET", Path: "/tyk/certs/1" + clientCertID + "?org_id=1", AdminAuth: true, Code: 200, BodyMatch: clientCertMeta},
+			{Method: "GET", Path: "/tyk/certs/1" + serverCertID + "?org_id=1", AdminAuth: true, Code: 200, BodyMatch: serverCertMeta},
+			{Method: "GET", Path: "/tyk/certs/1" + serverCertID + ",1" + clientCertID + "?org_id=1", AdminAuth: true, Code: 200, BodyMatch: `\[` + serverCertMeta},
+			{Method: "GET", Path: "/tyk/certs/1" + serverCertID + ",1" + clientCertID + "?org_id=1", AdminAuth: true, Code: 200, BodyMatch: clientCertMeta},
 		}...)
 	})
 
 	t.Run("Certificate removal", func(t *testing.T) {
 		ts.Run(t, []test.TestCase{
-			{Method: "DELETE", Path: "/tyk/certs/" + serverCertID, AdminAuth: true, Code: 200},
-			{Method: "DELETE", Path: "/tyk/certs/" + clientCertID, AdminAuth: true, Code: 200},
-			{Method: "GET", Path: "/tyk/certs", AdminAuth: true, Code: 200, BodyMatch: `{"certs":null}`},
+			{Method: "DELETE", Path: "/tyk/certs/1" + serverCertID + "?org_id=1", AdminAuth: true, Code: 200},
+			{Method: "DELETE", Path: "/tyk/certs/1" + clientCertID + "?org_id=1", AdminAuth: true, Code: 200},
+			{Method: "GET", Path: "/tyk/certs?org_id=1", AdminAuth: true, Code: 200, BodyMatch: `{"certs":null}`},
 		}...)
 	})
 }
@@ -1101,6 +1104,7 @@ func TestCipherSuites(t *testing.T) {
 		client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{
 			CipherSuites:       getCipherAliases([]string{"TLS_RSA_WITH_RC4_128_SHA", "TLS_RSA_WITH_3DES_EDE_CBC_SHA", "TLS_RSA_WITH_AES_128_CBC_SHA"}),
 			InsecureSkipVerify: true,
+			MaxVersion:         tls.VersionTLS12,
 		}}}
 
 		// If there is an internal TLS error it will fail test
@@ -1112,6 +1116,7 @@ func TestCipherSuites(t *testing.T) {
 		client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{
 			CipherSuites:       getCipherAliases([]string{"TLS_RSA_WITH_AES_256_CBC_SHA"}), // not matching ciphers
 			InsecureSkipVerify: true,
+			MaxVersion:         tls.VersionTLS12,
 		}}}
 
 		ts.Run(t, test.TestCase{Client: client, Path: "/", ErrorMatch: "tls: handshake failure"})

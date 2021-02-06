@@ -273,6 +273,11 @@ func TestProcessRequestLiveRedisRollingLimiter(t *testing.T) {
 				break
 			}
 			reqNum++
+
+			if reqNum > 30 {
+				t.Errorf("Test takes too long to complete")
+				break
+			}
 		}
 
 		if reqNum < 10 {

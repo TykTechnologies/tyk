@@ -296,7 +296,7 @@ func TestTestCheckerTCPHosts_correct_answers(t *testing.T) {
 	ans := &answers{cancel: cancel}
 	setTestMode(false)
 
-	hs.Init(1, 1, 0, map[string]HostData{
+	hs.Init(1, 1, 1, map[string]HostData{
 		l.Addr().String(): data,
 	},
 		ans.cb(),
@@ -352,7 +352,7 @@ func TestTestCheckerTCPHosts_correct_answers_proxy_protocol(t *testing.T) {
 	ans := &answers{cancel: cancel}
 	setTestMode(false)
 
-	hs.Init(1, 1, 0, map[string]HostData{
+	hs.Init(1, 1, 1, map[string]HostData{
 		l.Addr().String(): data,
 	},
 		ans.cb(),
@@ -401,7 +401,7 @@ func TestTestCheckerTCPHosts_correct_wrong_answers(t *testing.T) {
 	hs := &HostUptimeChecker{}
 	failed := false
 	setTestMode(false)
-	hs.Init(1, 1, 0, map[string]HostData{
+	hs.Init(1, 1, 1, map[string]HostData{
 		l.Addr().String(): data,
 	},
 		HostCheckCallBacks{
@@ -515,7 +515,7 @@ func TestChecker_triggerSampleLimit(t *testing.T) {
 	ping.Store(0)
 
 	hs := &HostUptimeChecker{}
-	hs.Init(1, limit, 0, map[string]HostData{
+	hs.Init(1, limit, 1, map[string]HostData{
 		l.Addr().String(): {CheckURL: "http://" + l.Addr().String()},
 	},
 		HostCheckCallBacks{
