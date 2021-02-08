@@ -1,8 +1,6 @@
 package astnormalization
 
 import (
-	"github.com/cespare/xxhash"
-
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/astvisitor"
 )
@@ -26,14 +24,16 @@ func (e *extendInputObjectTypeDefinitionVisitor) EnterDocument(operation, defini
 
 func (e *extendInputObjectTypeDefinitionVisitor) EnterInputObjectTypeExtension(ref int) {
 
-	baseNode, exists := e.operation.Index.Nodes[xxhash.Sum64(e.operation.InputObjectTypeExtensionNameBytes(ref))]
+	nodes, exists := e.operation.Index.NodesByNameBytes(e.operation.InputObjectTypeExtensionNameBytes(ref))
 	if !exists {
 		return
 	}
 
-	if baseNode.Kind != ast.NodeKindInputObjectTypeDefinition {
+	for i := range nodes {
+		if nodes[i].Kind != ast.NodeKindInputObjectTypeDefinition {
+			continue
+		}
+		e.operation.ExtendInputObjectTypeDefinitionByInputObjectTypeExtension(nodes[i].Ref, ref)
 		return
 	}
-
-	e.operation.ExtendInputObjectTypeDefinitionByInputObjectTypeExtension(baseNode.Ref, ref)
 }

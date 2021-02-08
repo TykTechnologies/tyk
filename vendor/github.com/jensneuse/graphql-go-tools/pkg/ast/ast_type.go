@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"io"
 
-	"github.com/cespare/xxhash"
-
 	"github.com/jensneuse/graphql-go-tools/internal/pkg/unsafebytes"
 	"github.com/jensneuse/graphql-go-tools/pkg/lexer/literal"
 	"github.com/jensneuse/graphql-go-tools/pkg/lexer/position"
@@ -114,6 +112,22 @@ func (d *Document) TypesAreEqualDeep(left int, right int) bool {
 	}
 }
 
+func (d *Document) TypeIsScalar(ref int, definition *Document) bool {
+	switch d.Types[ref].TypeKind {
+	case TypeKindNamed:
+		typeName := d.TypeNameBytes(ref)
+		node, _ := definition.Index.FirstNodeByNameBytes(typeName)
+		return node.Kind == NodeKindScalarTypeDefinition
+	case TypeKindNonNull:
+		return d.TypeIsScalar(d.Types[ref].OfType, definition)
+	}
+	return false
+}
+
+func (d *Document) TypeIsNonNull(ref int) bool {
+	return d.Types[ref].TypeKind == TypeKindNonNull
+}
+
 func (d *Document) TypeIsList(ref int) bool {
 	switch d.Types[ref].TypeKind {
 	case TypeKindList:
@@ -139,8 +153,8 @@ func (d *Document) TypesAreCompatibleDeep(left int, right int) bool {
 			if bytes.Equal(leftName, rightName) {
 				return true
 			}
-			leftNode := d.Index.Nodes[xxhash.Sum64(leftName)]
-			rightNode := d.Index.Nodes[xxhash.Sum64(rightName)]
+			leftNode, _ := d.Index.FirstNodeByNameBytes(leftName)
+			rightNode, _ := d.Index.FirstNodeByNameBytes(rightName)
 			if leftNode.Kind == rightNode.Kind {
 				return false
 			}
@@ -160,5 +174,38 @@ func (d *Document) TypesAreCompatibleDeep(left int, right int) bool {
 		}
 		left = d.Types[left].OfType
 		right = d.Types[right].OfType
+	}
+}
+
+func (d *Document) ResolveTypeNameBytes(ref int) ByteSlice {
+	graphqlType := d.Types[ref]
+	for graphqlType.TypeKind != TypeKindNamed {
+		graphqlType = d.Types[graphqlType.OfType]
+	}
+	return d.Input.ByteSlice(graphqlType.Name)
+}
+
+func (d *Document) ResolveTypeNameString(ref int) string {
+	return unsafebytes.BytesToString(d.ResolveTypeNameBytes(ref))
+}
+
+func (d *Document) TypeValueNeedsQuotes(ref int, definition *Document) bool {
+	graphqlType := d.Types[ref]
+	switch graphqlType.TypeKind {
+	case TypeKindNonNull:
+		return d.TypeValueNeedsQuotes(graphqlType.OfType, definition)
+	case TypeKindList:
+		return false
+	case TypeKindNamed:
+		typeName := d.Input.ByteSliceString(graphqlType.Name)
+		switch typeName {
+		case "String", "Date", "ID":
+			return true
+		default:
+			node, _ := definition.Index.FirstNodeByNameStr(typeName)
+			return node.Kind == NodeKindEnumTypeDefinition
+		}
+	default:
+		return false
 	}
 }

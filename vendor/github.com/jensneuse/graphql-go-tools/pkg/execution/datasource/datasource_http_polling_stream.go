@@ -167,7 +167,7 @@ func (h *HttpPollingStreamDataSource) startPolling(ctx context.Context) {
 		default:
 			response, err := h.client.Do(h.request)
 			if err != nil {
-				h.Log.Error("HttpPollingStreamDataSource.startPolling.Client.Do",
+				h.Log.Error("HttpPollingStreamDataSource.startPolling.client.Do",
 					log.Error(err),
 				)
 				return

@@ -515,7 +515,6 @@ const Schema = `{
 		}
     },
     "required": [
-        "auth",
         "name",
         "proxy",
         "version_data"

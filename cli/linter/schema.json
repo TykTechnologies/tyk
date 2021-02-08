@@ -281,6 +281,9 @@
     "ignore_endpoint_case": {
       "type": "boolean"
     },
+    "ignore_canonical_mime_header_key": {
+      "type": "boolean"
+    },
     "db_app_conf_options": {
       "type": [
         "object",
@@ -714,15 +717,6 @@
       "type": "integer"
     },
     "oauth_error_status_code": {
-      "type": "integer"
-    },
-    "optimisations_use_async_session_write": {
-      "type": "boolean"
-    },
-    "session_update_pool_size": {
-      "type": "integer"
-    },
-    "session_update_buffer_size": {
       "type": "integer"
     },
     "pid_file_location": {

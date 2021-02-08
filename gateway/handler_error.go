@@ -107,6 +107,9 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		case headers.ApplicationXML:
 			templateExtension = "xml"
 			contentType = headers.ApplicationXML
+		case headers.TextXML:
+			templateExtension = "xml"
+			contentType = headers.TextXML
 		default:
 			templateExtension = "json"
 			contentType = headers.ApplicationJSON
@@ -167,7 +170,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		pprof.WriteHeapProfile(memProfFile)
 	}
 
-	if e.Spec.DoNotTrack {
+	if e.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
 		return
 	}
 
@@ -228,7 +231,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 		trackEP := false
 		trackedPath := r.URL.Path
-		if p := ctxGetTrackedPath(r); p != "" && !ctxGetDoNotTrack(r) {
+		if p := ctxGetTrackedPath(r); p != "" {
 			trackEP = true
 			trackedPath = p
 		}

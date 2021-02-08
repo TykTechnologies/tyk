@@ -276,8 +276,9 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 			log.Error("Could not create request: ", err)
 			return
 		}
+		ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
 		for headerName, headerValue := range toCheck.Headers {
-			req.Header.Set(headerName, headerValue)
+			setCustomHeader(req.Header, headerName, headerValue, ignoreCanonical)
 		}
 		req.Header.Set("Connection", "close")
 		HostCheckerClient.Transport = &http.Transport{

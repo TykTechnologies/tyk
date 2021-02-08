@@ -119,7 +119,8 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		"prefix": "coprocess",
 	})
 
-	if strings.HasPrefix(spec.Proxy.TargetURL, "h2c://") {
+
+	if strings.Contains(spec.Proxy.TargetURL, "h2c://") {
 		spec.Proxy.TargetURL = strings.Replace(spec.Proxy.TargetURL, "h2c://", "http://", 1)
 	}
 	if len(spec.TagHeaders) > 0 {
@@ -354,7 +355,6 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		coprocessAuth := mwDriver != apidef.OttoDriver && spec.EnableCoProcessAuth
 		ottoAuth := !coprocessAuth && mwDriver == apidef.OttoDriver && spec.EnableCoProcessAuth
 		gopluginAuth := !coprocessAuth && !ottoAuth && mwDriver == apidef.GoPluginDriver && spec.UseGoPluginAuth
-
 		if coprocessAuth {
 			// TODO: check if mwAuthCheckFunc is available/valid
 			coprocessLog.Debug("Registering coprocess middleware, hook name: ", mwAuthCheckFunc.Name, "hook type: CustomKeyCheck", ", driver: ", mwDriver)
@@ -365,8 +365,12 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 		if ottoAuth {
 			logger.Info("----> Checking security policy: JS Plugin")
-
-			authArray = append(authArray, createDynamicMiddleware(mwAuthCheckFunc.Name, true, false, baseMid))
+			authArray = append(authArray, createMiddleware(&DynamicMiddleware{
+				BaseMiddleware:      baseMid,
+				MiddlewareClassName: mwAuthCheckFunc.Name,
+				Pre:                 true,
+				Auth:                true,
+			}))
 		}
 
 		if gopluginAuth {

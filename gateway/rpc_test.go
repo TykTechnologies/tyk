@@ -3,12 +3,11 @@
 package gateway
 
 import (
+	"net/http"
 	"testing"
 	"time"
 
-	"github.com/gorilla/mux"
-
-	"github.com/TykTechnologies/tyk/cli"
+	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/tyk/apidef"
@@ -121,33 +120,29 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
 	defer ResetTestConfig()
-
-	// Test RPC
-	callCount := 0
+	// We test to check if we are actually calling the GetApiDefinitions and
+	// GetPolicies.
+	a := func() func() (string, error) {
+		x := 0
+		return func() (string, error) {
+			defer func() {
+				x++
+			}()
+			switch x {
+			case 1:
+				return apiDefListTest, nil
+			case 2:
+				return apiDefListTest2, nil
+			case 3:
+				return "malformed json", nil
+			default:
+				return `[]`, nil
+			}
+		}
+	}()
 	dispatcher := gorpc.NewDispatcher()
 	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *apidef.DefRequest) (string, error) {
-		if callCount == 0 {
-			callCount += 1
-			return `[]`, nil
-		}
-
-		if callCount == 1 {
-			callCount += 1
-			return apiDefListTest, nil
-		}
-
-		if callCount == 2 {
-			callCount += 1
-			return apiDefListTest2, nil
-		}
-
-		if callCount == 3 {
-			callCount += 1
-			return "malformed json", nil
-		}
-
-		// clean up
-		return `[]`, nil
+		return a()
 	})
 	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
 		return true
@@ -159,44 +154,13 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 	rpc := startRPCMock(dispatcher)
 	defer stopRPCMock(rpc)
 
-	// Three cases: 1 API, 2 APIs and Malformed data
-	exp := []int{1, 4, 6, 6, 2}
-	if *cli.HTTPProfile {
-		exp = []int{4, 6, 8, 8, 4}
-	}
+	exp := []int{0, 1, 2, 2}
 	for _, e := range exp {
 		DoReload()
-
-		rtCnt := 0
-		mainRouter().Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
-			rtCnt += 1
-			//fmt.Println(route.GetPathTemplate())
-			return nil
-		})
-
-		if rtCnt != e {
-			t.Errorf("There should be %v routes, got %v", e, rtCnt)
+		n := apisByIDLen()
+		if n != e {
+			t.Errorf("There should be %v api's, got %v", e, n)
 		}
-	}
-}
-
-// Our RPC layer too racy, but not harmul, mostly global variables like RPCIsClientConnected
-func TestSyncAPISpecsRPCFailure(t *testing.T) {
-	// Test RPC
-	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *apidef.DefRequest) (string, error) {
-		return "malformed json", nil
-	})
-	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
-		return true
-	})
-
-	rpc := startRPCMock(dispatcher)
-	defer stopRPCMock(rpc)
-
-	count, _ := syncAPISpecs()
-	if count != 0 {
-		t.Error("Should return empty value for malformed rpc response", apiSpecs)
 	}
 }
 
@@ -261,8 +225,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 
 		// Wait for backup to load
 		time.Sleep(100 * time.Millisecond)
-		ReloadTestCase.Tick()
-		time.Sleep(100 * time.Millisecond)
+		DoReload()
 
 		cachedAuth := map[string]string{"Authorization": "test"}
 		notCachedAuth := map[string]string{"Authorization": "nope1"}
@@ -358,6 +321,67 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 			{Path: "/sample", Headers: notCached, Code: 200},
 		}...)
 	})
+}
+
+func TestSyncAPISpecsRPC_redis_failure(t *testing.T) {
+	dispatcher := gorpc.NewDispatcher()
+	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *apidef.DefRequest) (string, error) {
+		return jsonMarshalString(BuildAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = false
+		})), nil
+	})
+	dispatcher.AddFunc("GetPolicies", func(clientAddr string, orgid string) (string, error) {
+		return `[{"_id":"507f191e810c19729de860ea", "rate":1, "per":1}]`, nil
+	})
+	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
+		return true
+	})
+	dispatcher.AddFunc("GetKey", func(clientAddr, key string) (string, error) {
+		return jsonMarshalString(CreateStandardSession()), nil
+	})
+	rpc := startRPCMock(dispatcher)
+	defer stopRPCMock(rpc)
+
+	t.Run("Should load apis when redis is down", func(t *testing.T) {
+		storage.DisableRedis(true)
+		defer storage.DisableRedis(false)
+		ts := StartTest()
+		defer ts.Close()
+
+		authHeaders := map[string]string{"Authorization": "test"}
+		ts.Run(t, []test.TestCase{
+			{Path: "/sample", Headers: authHeaders, Code: http.StatusOK},
+		}...)
+	})
+
+	t.Run("Should reload when redis is back up", func(t *testing.T) {
+		storage.DisableRedis(true)
+		ts := StartTest()
+		defer ts.Close()
+		event := make(chan struct{}, 1)
+		OnConnect = func() {
+			event <- struct{}{}
+			DoReload()
+		}
+
+		select {
+		case <-event:
+			t.Fatal("OnConnect should only run after reconnection")
+		case <-time.After(time.Second):
+		}
+		storage.DisableRedis(false)
+		select {
+		case <-event:
+		case <-time.After(time.Second):
+			t.Fatal("Expected redis to reconnect and call the callback")
+		}
+		time.Sleep(time.Second)
+		authHeaders := map[string]string{"Authorization": "test"}
+		ts.Run(t, []test.TestCase{
+			{Path: "/sample", Headers: authHeaders, Code: 200},
+		}...)
+	})
+
 }
 
 func TestOrgSessionWithRPCDown(t *testing.T) {
