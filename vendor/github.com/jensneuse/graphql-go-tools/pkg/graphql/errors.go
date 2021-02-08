@@ -1,9 +1,11 @@
 package graphql
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 
+	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/operationreport"
 )
 
@@ -22,10 +24,20 @@ func operationValidationErrorsFromOperationReport(report operationreport.Report)
 	}
 
 	for _, externalError := range report.ExternalErrors {
+		locations := make([]ErrorLocation, 0)
+		for _, reportLocation := range externalError.Locations {
+			loc := ErrorLocation{
+				Line:   reportLocation.Line,
+				Column: reportLocation.Column,
+			}
+
+			locations = append(locations, loc)
+		}
+
 		validationError := OperationValidationError{
-			Message: externalError.Message,
-			// TODO: add path
-			// TODO: add location
+			Message:   externalError.Message,
+			Path:      ErrorPath{astPath: externalError.Path},
+			Locations: locations,
 		}
 
 		errors = append(errors, validationError)
@@ -35,7 +47,11 @@ func operationValidationErrorsFromOperationReport(report operationreport.Report)
 }
 
 func (o OperationValidationErrors) Error() string {
-	return fmt.Sprintf("operation contains %d error(s)", len(o))
+	if len(o) > 0 { // avoid panic ...
+		return o.ErrorByIndex(0).Error()
+	}
+
+	return "no error" // ... so, this should never be returned
 }
 
 func (o OperationValidationErrors) WriteResponse(writer io.Writer) (n int, err error) {
@@ -70,7 +86,7 @@ type OperationValidationError struct {
 }
 
 func (o OperationValidationError) Error() string {
-	return o.Message
+	return fmt.Sprintf("%s, locations: %+v, path: %s", o.Message, o.Locations, o.Path.String())
 }
 
 type SchemaValidationErrors []SchemaValidationError
@@ -118,9 +134,19 @@ func (s SchemaValidationError) Error() string {
 	return s.Message
 }
 
-type ErrorPath []interface{}
+type ErrorPath struct {
+	astPath ast.Path
+}
+
+func (e *ErrorPath) String() string {
+	return e.astPath.String()
+}
+
+func (e *ErrorPath) MarshalJSON() ([]byte, error) {
+	return json.Marshal(e.astPath)
+}
 
 type ErrorLocation struct {
-	Line   int `json:"line"`
-	Column int `json:"column"`
+	Line   uint32 `json:"line"`
+	Column uint32 `json:"column"`
 }

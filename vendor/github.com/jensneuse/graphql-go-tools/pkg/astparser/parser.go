@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/cespare/xxhash"
-
 	"github.com/jensneuse/graphql-go-tools/internal/pkg/unsafebytes"
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/lexer"
@@ -850,7 +848,8 @@ func (p *Parser) parseObjectTypeDefinition(description *ast.Description) {
 }
 
 func (p *Parser) indexNode(key ast.ByteSliceReference, value ast.Node) {
-	p.document.Index.Nodes[xxhash.Sum64(p.document.Input.ByteSlice(key))] = value
+	name := p.document.Input.ByteSlice(key)
+	p.document.Index.AddNodeBytes(name, value)
 }
 
 func (p *Parser) parseRootDescription() {
@@ -1824,7 +1823,12 @@ func (p *Parser) parseObjectTypeExtension(extend position.Position) {
 	}
 	p.document.ObjectTypeExtensions = append(p.document.ObjectTypeExtensions, objectTypeExtension)
 	ref := len(p.document.ObjectTypeExtensions) - 1
-	p.document.RootNodes = append(p.document.RootNodes, ast.Node{Ref: ref, Kind: ast.NodeKindObjectTypeExtension})
+	node := ast.Node{Ref: ref, Kind: ast.NodeKindObjectTypeExtension}
+	p.document.RootNodes = append(p.document.RootNodes, node)
+
+	if p.shouldIndex {
+		p.indexNode(objectTypeDefinition.Name, node)
+	}
 }
 
 func (p *Parser) parseInterfaceTypeExtension(extend position.Position) {

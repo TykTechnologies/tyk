@@ -122,8 +122,7 @@ func (d *VirtualEndpoint) getMetaFromRequest(r *http.Request) *apidef.VirtualMet
 }
 
 func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Request, vmeta *apidef.VirtualMeta) *http.Response {
-	t1 := time.Now().UnixNano()
-
+	t1 := time.Now()
 	if vmeta == nil {
 		if vmeta = d.getMetaFromRequest(r); vmeta == nil {
 			return nil
@@ -233,12 +232,12 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
-	d.Logger().Debug("JSVM Virtual Endpoint execution took: (ns) ", time.Now().UnixNano()-t1)
-
 	copiedResponse := forceResponse(w, r, &newResponseData, d.Spec, session, false, d.Logger())
+	ms := DurationToMillisecond(time.Since(t1))
+	d.Logger().Debug("JSVM Virtual Endpoint execution took: (ms) ", ms)
 
 	if copiedResponse != nil {
-		d.sh.RecordHit(r, Latency{}, copiedResponse.StatusCode, copiedResponse)
+		d.sh.RecordHit(r, Latency{Total: int64(ms)}, copiedResponse.StatusCode, copiedResponse)
 	}
 
 	return copiedResponse
@@ -256,9 +255,9 @@ func forceResponse(w http.ResponseWriter,
 	newResponse.Header = make(map[string][]string)
 
 	requestTime := time.Now().UTC().Format(http.TimeFormat)
-
+	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
 	for header, value := range newResponseData.Response.Headers {
-		newResponse.Header.Set(header, value)
+		setCustomHeader(newResponse.Header, header, value, ignoreCanonical)
 	}
 
 	newResponse.ContentLength = int64(len(responseMessage))
@@ -340,7 +339,7 @@ func handleForcedResponse(rw http.ResponseWriter, res *http.Response, ses *user.
 		res.Header.Set(headers.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
 	}
 
-	copyHeader(rw.Header(), res.Header)
+	copyHeader(rw.Header(), res.Header, config.Global().IgnoreCanonicalMIMEHeaderKey)
 
 	rw.WriteHeader(res.StatusCode)
 	io.Copy(rw, res.Body)

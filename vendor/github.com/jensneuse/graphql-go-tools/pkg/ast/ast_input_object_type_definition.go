@@ -3,8 +3,6 @@ package ast
 import (
 	"bytes"
 
-	"github.com/cespare/xxhash"
-
 	"github.com/jensneuse/graphql-go-tools/internal/pkg/unsafebytes"
 	"github.com/jensneuse/graphql-go-tools/pkg/lexer/position"
 )
@@ -71,7 +69,10 @@ func (d *Document) InputObjectTypeDefinitionInputValueDefinitionDefaultValueFloa
 }
 
 func (d *Document) InputObjectTypeDefinitionInputValueDefinitionDefaultValue(inputObjectTypeDefinitionName, inputValueDefinitionName string) Value {
-	inputObjectTypeDefinition := d.Index.Nodes[xxhash.Sum64String(inputObjectTypeDefinitionName)]
+	inputObjectTypeDefinition, exists := d.Index.FirstNodeByNameStr(inputObjectTypeDefinitionName)
+	if !exists {
+		return Value{}
+	}
 	if inputObjectTypeDefinition.Kind != NodeKindInputObjectTypeDefinition {
 		return Value{}
 	}

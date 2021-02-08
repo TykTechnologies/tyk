@@ -115,7 +115,7 @@ func (s *dummyStorage) GetKeys(pattern string) (keys []string) {
 }
 
 func newManager() *CertificateManager {
-	return NewCertificateManager(newDummyStorage(), "test", nil)
+	return NewCertificateManager(newDummyStorage(), "test", nil, false)
 }
 
 func genCertificate(template *x509.Certificate, isExpired bool) ([]byte, []byte) {
@@ -292,8 +292,19 @@ func TestStorageIndex(t *testing.T) {
 	if len(storage.indexList) != 0 {
 		t.Error("Storage index list should have 0 certificates and indexes after creation")
 	}
+	if _, err := storage.GetKey("orgid-1-index-migrated"); err == nil {
+		t.Error("There should not be migration done")
+	}
+
+	m.ListAllIds("orgid-1")
+	if _, err := storage.GetKey("orgid-1-index-migrated"); err != nil {
+		t.Error("Migrated flag should be set after first listing", err)
+	}
+	// Set recound outside of collection. It should not be visible if migration was applied.
+	storage.data["raw-raw-orgid-1dummy"] = "test"
 
 	certID, _ := m.Add(storageCert, "orgid-1")
+
 	if len(storage.indexList["orgid-1-index"]) != 1 {
 		t.Error("Storage index list should have 1 certificates after adding a certificate")
 	}

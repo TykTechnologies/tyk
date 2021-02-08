@@ -362,12 +362,7 @@ func (m *proxyMux) swap(new *proxyMux) {
 			}
 		}
 	}
-	p := m.getProxy(config.Global().ListenPort)
-	if p != nil && p.router != nil {
-		// All APIs processed, now we can healthcheck
-		// Add a root message to check all is OK
-		p.router.HandleFunc("/"+config.Global().HealthCheckEndpointName, liveCheckHandler)
-	}
+
 	m.serve()
 }
 
@@ -409,9 +404,10 @@ func (m *proxyMux) serve() {
 			if p.protocol == "h2c" {
 				// wrapping handler in h2c. This ensures all features including tracing work
 				// in h2c services.
+				h2s := &http2.Server{}
 				h = &h2cWrapper{
 					w: h.(*handleWrapper),
-					h: h2c.NewHandler(h, &http2.Server{}),
+					h: h2c.NewHandler(p.router, h2s),
 				}
 			}
 			addr := config.Global().ListenAddress + ":" + strconv.Itoa(p.port)
