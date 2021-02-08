@@ -203,9 +203,14 @@ func TestPublicKeyPinning(t *testing.T) {
 }
 
 func TestProxyTransport(t *testing.T) {
-	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("test"))
 	}))
+	upstream.TLS = &tls.Config{
+		MaxVersion: tls.VersionTLS12,
+	}
+	upstream.StartTLS()
+
 	defer upstream.Close()
 
 	defer ResetTestConfig()

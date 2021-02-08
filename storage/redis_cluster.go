@@ -43,8 +43,9 @@ func DisableRedis(ok bool) {
 		disableRedis.Store(true)
 		return
 	}
-	redisUp.Store(true)
+
 	disableRedis.Store(false)
+	WaitConnect(context.Background())
 }
 
 func shouldConnect() bool {
@@ -61,6 +62,23 @@ func Connected() bool {
 	if v != nil {
 		return v.(bool)
 	}
+	return false
+}
+
+func WaitConnect(ctx context.Context) bool {
+	for {
+		select {
+		case <-ctx.Done():
+			return false
+		default:
+			if Connected() {
+				return true
+			}
+
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+
 	return false
 }
 

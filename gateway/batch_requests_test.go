@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -237,6 +238,10 @@ func TestBatchIgnoreCanonicalHeaderKey(t *testing.T) {
 			}
 		})
 	})
+
+	// Let the server start
+	time.Sleep(500 * time.Millisecond)
+
 	ts.Run(t, test.TestCase{Path: "/virt", Code: 202})
 	got := header.Load().(string)
 	if got != NonCanonicalHeaderKey {

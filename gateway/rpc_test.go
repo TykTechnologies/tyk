@@ -383,16 +383,20 @@ func TestSyncAPISpecsRPC_redis_failure(t *testing.T) {
 			event <- struct{}{}
 			DoReload()
 		}
+		defer func() {
+			OnConnect = nil
+		}()
 
 		select {
 		case <-event:
 			t.Fatal("OnConnect should only run after reconnection")
-		case <-time.After(time.Second):
+		case <-time.After(1 * time.Second):
 		}
 		storage.DisableRedis(false)
+
 		select {
 		case <-event:
-		case <-time.After(time.Second):
+		case <-time.After(3 * time.Second):
 			t.Fatal("Expected redis to reconnect and call the callback")
 		}
 		time.Sleep(time.Second)

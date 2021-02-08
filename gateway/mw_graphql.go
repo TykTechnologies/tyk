@@ -53,7 +53,7 @@ func (m *GraphQLMiddleware) Init() {
 
 	if m.Spec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeExecutionEngine {
 		absLogger := abstractlogger.NewLogrusLogger(log, absLoggerLevel(log.Level))
-		m.Spec.GraphQLExecutor.Client = &http.Client{}
+		m.Spec.GraphQLExecutor.Client = &http.Client{Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec)}}
 
 		if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersionNone || m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion1 {
 			m.initGraphQLEngineV1(absLogger)

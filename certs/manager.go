@@ -353,8 +353,8 @@ func (c *CertificateManager) List(certIDs []string, mode CertificateType) (out [
 			if err != nil {
 				c.logger.Warn("Can't retrieve certificate:", id, err)
 				out = append(out, nil)
+				continue
 			}
-			continue
 		} else {
 			rawCert = []byte(val)
 		}
