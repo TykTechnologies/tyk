@@ -228,9 +228,8 @@ func (m *GraphQLMiddleware) OnBeforeFetch(ctx resolve.HookContext, input []byte)
 		WithFields(
 			logrus.Fields{
 				"path": ctx.CurrentPath,
-				"data": string(input),
 			},
-		).Debugf("%s: beforeFetchHook executed", ctx.CurrentPath)
+		).Debugf("%s (beforeFetchHook): %s", ctx.CurrentPath, string(input))
 }
 
 func (m *GraphQLMiddleware) OnData(ctx resolve.HookContext, output []byte, singleFlight bool) {
@@ -238,10 +237,9 @@ func (m *GraphQLMiddleware) OnData(ctx resolve.HookContext, output []byte, singl
 		WithFields(
 			logrus.Fields{
 				"path":          ctx.CurrentPath,
-				"data":          string(output),
 				"single_flight": singleFlight,
 			},
-		).Debugf("%s: afterFetchHook.OnData executed", ctx.CurrentPath)
+		).Debugf("%s (afterFetchHook.OnData): %s", ctx.CurrentPath, string(output))
 }
 
 func (m *GraphQLMiddleware) OnError(ctx resolve.HookContext, output []byte, singleFlight bool) {
@@ -249,10 +247,9 @@ func (m *GraphQLMiddleware) OnError(ctx resolve.HookContext, output []byte, sing
 		WithFields(
 			logrus.Fields{
 				"path":          ctx.CurrentPath,
-				"data":          string(output),
 				"single_flight": singleFlight,
 			},
-		).Debugf("%s: afterFetchHook.OnError executed", ctx.CurrentPath)
+		).Debugf("%s (afterFetchHook.OnError): %s", ctx.CurrentPath, string(output))
 }
 
 func absLoggerLevel(level logrus.Level) abstractlogger.Level {
