@@ -692,8 +692,8 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 		return session.Clone(), true
 	}
 
-	// Only search in RPC if not in emergency mode
-	if !rpc.IsEmergencyMode() {
+	// Only search in RPC if the storage is RPCStorageHandler and it's not in emergency mode
+	if _, ok := t.Spec.AuthManager.Store().(*RPCStorageHandler); ok && !rpc.IsEmergencyMode() {
 		t.Logger().Debug("Querying authstore")
 		// 2. If not there, get it from the AuthorizationHandler
 		session, found = t.Spec.AuthManager.KeyAuthorised(key)
