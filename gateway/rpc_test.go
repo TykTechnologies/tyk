@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/TykTechnologies/gorpc"
@@ -161,10 +160,6 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 
 	// Three cases: 1 API, 2 APIs and Malformed data
 	exp := []int{0, 1, 2, 2}
-	if *cli.HTTPProfile {
-		exp = []int{4, 6, 8, 8, 4}
-	}
-
 	for _, e := range exp {
 		DoReload()
 		n := apisByIDLen()
