@@ -692,7 +692,6 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 		return session.Clone(), true
 	}
 
-
 	if _, ok := t.Spec.AuthManager.Store().(*RPCStorageHandler); ok && rpc.IsEmergencyMode() {
 		return session.Clone(), false
 	}
@@ -710,7 +709,6 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 		}
 		session, found = t.Spec.AuthManager.KeyAuthorised(key)
 	}
-
 
 	if found {
 		// update value of originalKey, as for custom-keys it might get updated (the key is generated again using alias)
