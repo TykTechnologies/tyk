@@ -45,8 +45,13 @@ func (n *NetHttpClient) Do(ctx context.Context, requestInput []byte, out io.Writ
 
 	if headers != nil {
 		err = jsonparser.ObjectEach(headers, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
-			request.Header.Add(unsafebytes.BytesToString(key), unsafebytes.BytesToString(value))
-			return nil
+			_, err := jsonparser.ArrayEach(value, func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+				if err != nil {
+					return
+				}
+				request.Header.Add(unsafebytes.BytesToString(key), unsafebytes.BytesToString(value))
+			})
+			return err
 		})
 		if err != nil {
 			return err
