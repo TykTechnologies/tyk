@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"crypto/x509"
 	"encoding/json"
+	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/getkin/kin-openapi/openapi3"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -13,7 +15,7 @@ import (
 	"testing"
 
 	"github.com/go-redis/redis/v8"
-	uuid "github.com/satori/go.uuid"
+	"github.com/satori/go.uuid"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1683,7 +1685,7 @@ func TestHandleAddOrUpdateApi(t *testing.T) {
 		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
 		require.NoError(t, err)
 
-		response, statusCode := handleAddOrUpdateApi("", req, testFs)
+		response, statusCode := handleAddOrUpdateApi("", req, testFs, false)
 		errorResponse, ok := response.(apiStatusMessage)
 		require.True(t, ok)
 
@@ -1700,7 +1702,7 @@ func TestHandleAddOrUpdateApi(t *testing.T) {
 		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
 		require.NoError(t, err)
 
-		response, statusCode := handleAddOrUpdateApi("555", req, testFs)
+		response, statusCode := handleAddOrUpdateApi("555", req, testFs, false)
 		errorResponse, ok := response.(apiStatusMessage)
 		require.True(t, ok)
 
@@ -1725,7 +1727,7 @@ func TestHandleAddOrUpdateApi(t *testing.T) {
 		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
 		require.NoError(t, err)
 
-		response, statusCode := handleAddOrUpdateApi("", req, testFs)
+		response, statusCode := handleAddOrUpdateApi("", req, testFs, false)
 		errorResponse, ok := response.(apiStatusMessage)
 		require.True(t, ok)
 
@@ -1742,12 +1744,78 @@ func TestHandleAddOrUpdateApi(t *testing.T) {
 		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
 		require.NoError(t, err)
 
-		response, statusCode := handleAddOrUpdateApi("", req, testFs)
+		response, statusCode := handleAddOrUpdateApi("", req, testFs, false)
 		successResponse, ok := response.(apiModifyKeySuccess)
 		require.True(t, ok)
 
 		assert.Equal(t, "123", successResponse.Key)
 		assert.Equal(t, "added", successResponse.Action)
 		assert.Equal(t, http.StatusOK, statusCode)
+	})
+}
+
+func TestOAS(t *testing.T) {
+	g := StartTest()
+	defer g.Close()
+
+	tykExtension := oas.XTykAPIGateway{
+		Info: oas.Info{
+			ID:   "123",
+			Name: "Furkan API Gateway",
+			State: oas.State{
+				Active: false,
+			},
+		},
+		Upstream: oas.Upstream{
+			URL: "https://my-example-upstream.com",
+		},
+		Server: oas.Server{
+			ListenPath: oas.ListenPath{
+				Value: "/listenpath/",
+				Strip: false,
+			},
+		},
+	}
+
+	oasDoc := openapi3.Swagger{
+		Info: &openapi3.Info{
+			Title: "Furkan API Documentation",
+		},
+	}
+
+	oasDoc.Extensions = map[string]interface{}{
+		oas.ExtensionTykAPIGateway: tykExtension,
+	}
+
+	// add - didn't put inside a run to make each test pass separately.
+	_, _ = g.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis?type=oas", Data: &oasDoc,
+		BodyMatch: `"action":"added"`, Code: http.StatusOK})
+
+	t.Run("add-get", func(t *testing.T) {
+		_, _ = g.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodGet, Path: "/tyk/apis/123?type=oas",
+			BodyMatch: `{.*"info":{"title":"Furkan API Documentation".*"x-tyk-api-gateway":{"info":{.*"name":"Furkan API Gateway"`,
+			Code:      http.StatusOK})
+	})
+
+	t.Run("update", func(t *testing.T) {
+		oasDoc.Info.Title = "updated title"
+		tykExtension.Info.Name = "updated name"
+		oasDoc.Extensions[oas.ExtensionTykAPIGateway] = tykExtension
+
+		_, _ = g.Run(t, []test.TestCase{
+			{AdminAuth: true, Method: http.MethodPut, Path: "/tyk/apis/123?type=oas", Data: &oasDoc,
+				BodyMatch: `"action":"modified"`, Code: http.StatusOK},
+			{AdminAuth: true, Method: http.MethodGet, Path: "/tyk/apis/123?type=oas",
+				BodyMatch: `{.*"info":{"title":"updated title".*"x-tyk-api-gateway":{"info":{.*"name":"updated name"`,
+				Code:      http.StatusOK},
+		}...)
+	})
+
+	t.Run("delete", func(t *testing.T) {
+		_, _ = g.Run(t, []test.TestCase{
+			{AdminAuth: true, Method: http.MethodDelete, Path: "/tyk/apis/123?type=oas", BodyMatch: `"action":"deleted"`, Code: http.StatusOK},
+			{AdminAuth: true, Method: http.MethodGet, Path: "/tyk/apis/123?type=oas",
+				BodyMatch: `"message":"API not found"`, Code: http.StatusNotFound},
+		}...)
 	})
 }

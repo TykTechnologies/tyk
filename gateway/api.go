@@ -32,6 +32,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/getkin/kin-openapi/openapi3"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -45,6 +47,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/lonelycode/osin"
 	uuid "github.com/satori/go.uuid"
+
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"golang.org/x/crypto/bcrypt"
@@ -785,9 +788,14 @@ func handleGetAPIList() (interface{}, int) {
 	return apiIDList, http.StatusOK
 }
 
-func handleGetAPI(apiID string) (interface{}, int) {
+func handleGetAPI(apiID string, oasTyped bool) (interface{}, int) {
 	if spec := getApiSpec(apiID); spec != nil {
-		return spec.APIDefinition, http.StatusOK
+		if oasTyped {
+			return &spec.OAS, http.StatusOK
+		} else {
+			return spec.APIDefinition, http.StatusOK
+		}
+
 	}
 
 	log.WithFields(logrus.Fields{
@@ -797,16 +805,38 @@ func handleGetAPI(apiID string) (interface{}, int) {
 	return apiError("API not found"), http.StatusNotFound
 }
 
-func handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.Fs) (interface{}, int) {
+func handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.Fs, oasTyped bool) (interface{}, int) {
 	if config.Global().UseDBAppConfigs {
 		log.Error("Rejected new API Definition due to UseDBAppConfigs = true")
 		return apiError("Due to enabled use_db_app_configs, please use the Dashboard API"), http.StatusInternalServerError
 	}
 
-	newDef := &apidef.APIDefinition{}
-	if err := json.NewDecoder(r.Body).Decode(newDef); err != nil {
-		log.Error("Couldn't decode new API Definition object: ", err)
-		return apiError("Request malformed"), http.StatusBadRequest
+	var newDef apidef.APIDefinition
+	var oasDoc openapi3.Swagger
+	var xTykAPIGateway oas.XTykAPIGateway
+
+	if oasTyped {
+		if err := json.NewDecoder(r.Body).Decode(&oasDoc); err != nil {
+			log.Error("Couldn't decode new OAS object: ", err)
+			return apiError("Request malformed"), http.StatusBadRequest
+		}
+
+		if intTykAPIGateway, ok := oasDoc.Extensions[oas.ExtensionTykAPIGateway]; ok {
+			rawTykAPIGateway := intTykAPIGateway.(json.RawMessage)
+			err := json.Unmarshal(rawTykAPIGateway, &xTykAPIGateway)
+			if err != nil {
+				return apiError("Couldn't unmarshal " + oas.ExtensionTykAPIGateway + " extension in the document"), http.StatusBadRequest
+			}
+		} else {
+			return apiError("Couldn't find " + oas.ExtensionTykAPIGateway + " extension in the document"), http.StatusBadRequest
+		}
+
+		xTykAPIGateway.ExtractTo(&newDef)
+	} else {
+		if err := json.NewDecoder(r.Body).Decode(&newDef); err != nil {
+			log.Error("Couldn't decode new API Definition object: ", err)
+			return apiError("Request malformed"), http.StatusBadRequest
+		}
 	}
 
 	if apiID != "" && newDef.APIID != apiID {
@@ -814,7 +844,7 @@ func handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.Fs) (interface
 		return apiError("Request APIID does not match that in Definition! For Update operations these must match."), http.StatusBadRequest
 	}
 
-	validationResult := apidef.Validate(newDef, apidef.DefaultValidationRuleSet)
+	validationResult := apidef.Validate(&newDef, apidef.DefaultValidationRuleSet)
 	if !validationResult.IsValid {
 		reason := "unknown"
 		if validationResult.ErrorCount() > 0 {
@@ -825,26 +855,21 @@ func handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.Fs) (interface
 		return apiError(fmt.Sprintf("Validation of API Definition failed. Reason: %s.", reason)), http.StatusBadRequest
 	}
 
-	// Create a filename
-	defFilePath := filepath.Join(config.Global().AppPath, newDef.APIID+".json")
-
-	// If it exists, delete it
-	if _, err := fs.Stat(defFilePath); err == nil {
-		log.Warning("API Definition with this ID already exists, deleting file...")
-		fs.Remove(defFilePath)
-	}
-
-	// unmarshal the object into the file
-	asByte, err := json.MarshalIndent(newDef, "", "  ")
+	// api
+	err, errCode := writeToFile(fs, newDef, newDef.APIID)
 	if err != nil {
-		log.Error("Marshalling of API Definition failed: ", err)
-		return apiError("Marshalling failed"), http.StatusInternalServerError
+		return apiError(err.Error()), errCode
 	}
 
-	if err := ioutil.WriteFile(defFilePath, asByte, 0644); err != nil {
-		log.Error("Failed to create file! - ", err)
-		return apiError("File object creation failed, write error"), http.StatusInternalServerError
+	// oas
+	if oasTyped {
+		err, errCode = writeToFile(fs, &oasDoc, newDef.APIID+"-oas")
+		if err != nil {
+			return apiError(err.Error()), errCode
+		}
 	}
+
+	DoReload()
 
 	action := "modified"
 	if r.Method == "POST" {
@@ -858,6 +883,31 @@ func handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.Fs) (interface
 	}
 
 	return response, http.StatusOK
+}
+
+func writeToFile(fs afero.Fs, newDef interface{}, filename string) (err error, errCode int) {
+	// Create a filename
+	defFilePath := filepath.Join(config.Global().AppPath, filename+".json")
+
+	// If it exists, delete it
+	if _, err := fs.Stat(defFilePath); err == nil {
+		log.Warning("API Definition with this ID already exists, deleting file...")
+		fs.Remove(defFilePath)
+	}
+
+	// unmarshal the object into the file
+	asByte, err := json.MarshalIndent(newDef, "", "  ")
+	if err != nil {
+		log.Error("Marshalling of API Definition failed: ", err)
+		return errors.New("marshalling failed"), http.StatusInternalServerError
+	}
+
+	if err := ioutil.WriteFile(defFilePath, asByte, 0644); err != nil {
+		log.Error("Failed to create file! - ", err)
+		return errors.New("file object creation failed, write error"), http.StatusInternalServerError
+	}
+
+	return nil, 0
 }
 
 func handleDeleteAPI(apiID string) (interface{}, int) {
@@ -878,11 +928,14 @@ func handleDeleteAPI(apiID string) (interface{}, int) {
 		Action: "deleted",
 	}
 
+	DoReload()
+
 	return response, http.StatusOK
 }
 
 func apiHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
+	oasTyped := r.FormValue("type") == "oas"
 
 	var obj interface{}
 	var code int
@@ -891,18 +944,18 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 	case "GET":
 		if apiID != "" {
 			log.Debug("Requesting API definition for", apiID)
-			obj, code = handleGetAPI(apiID)
+			obj, code = handleGetAPI(apiID, oasTyped)
 		} else {
 			log.Debug("Requesting API list")
 			obj, code = handleGetAPIList()
 		}
 	case "POST":
 		log.Debug("Creating new definition file")
-		obj, code = handleAddOrUpdateApi(apiID, r, afero.NewOsFs())
+		obj, code = handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), oasTyped)
 	case "PUT":
 		if apiID != "" {
 			log.Debug("Updating existing API: ", apiID)
-			obj, code = handleAddOrUpdateApi(apiID, r, afero.NewOsFs())
+			obj, code = handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), oasTyped)
 		} else {
 			obj, code = apiError("Must specify an apiID to update"), http.StatusBadRequest
 		}
