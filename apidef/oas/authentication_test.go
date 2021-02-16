@@ -1,9 +1,10 @@
 package oas
 
 import (
+	"testing"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestAuthentication(t *testing.T) {

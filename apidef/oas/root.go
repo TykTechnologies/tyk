@@ -1,6 +1,8 @@
 package oas
 
 import (
+	"reflect"
+
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
@@ -15,21 +17,35 @@ const (
 )
 
 type XTykAPIGateway struct {
-	Info     Info     `bson:"info" json:"info"`         // required
-	Upstream Upstream `bson:"upstream" json:"upstream"` // required
-	Server   Server   `bson:"server" json:"server"`     // required
+	Info       Info        `bson:"info" json:"info"`         // required
+	Upstream   Upstream    `bson:"upstream" json:"upstream"` // required
+	Server     Server      `bson:"server" json:"server"`     // required
+	Middleware *Middleware `bson:"middleware" json:"middleware"`
 }
 
 func (x *XTykAPIGateway) Fill(api apidef.APIDefinition) {
 	x.Info.Fill(api)
 	x.Upstream.Fill(api)
 	x.Server.Fill(api)
+
+	if x.Middleware == nil {
+		x.Middleware = &Middleware{}
+	}
+
+	x.Middleware.Fill(api)
+	if (*x.Middleware == Middleware{}) {
+		x.Middleware = nil
+	}
 }
 
 func (x *XTykAPIGateway) ExtractTo(api *apidef.APIDefinition) {
 	x.Info.ExtractTo(api)
 	x.Upstream.ExtractTo(api)
 	x.Server.ExtractTo(api)
+
+	if x.Middleware != nil {
+		x.Middleware.ExtractTo(api)
+	}
 }
 
 type Info struct {
@@ -121,4 +137,25 @@ func (lp *ListenPath) Fill(api apidef.APIDefinition) {
 func (lp *ListenPath) ExtractTo(api *apidef.APIDefinition) {
 	api.Proxy.ListenPath = lp.Value
 	api.Proxy.StripListenPath = lp.Strip
+}
+
+type Middleware struct {
+	Global *Global `bson:"global,omitempty" json:"global,omitempty"`
+}
+
+func (m *Middleware) Fill(api apidef.APIDefinition) {
+	if m.Global == nil {
+		m.Global = &Global{}
+	}
+
+	m.Global.Fill(api)
+	if reflect.DeepEqual(m.Global, &Global{}) {
+		m.Global = nil
+	}
+}
+
+func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
+	if m.Global != nil {
+		m.Global.ExtractTo(api)
+	}
 }
