@@ -3,9 +3,10 @@ package oas
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -30,11 +31,11 @@ func TestXTykAPIGateway(t *testing.T) {
 		xTykAPIGateway := XTykAPIGateway{}
 		xTykAPIGateway.Fill(initialAPI)
 
+		ss, _ := json.MarshalIndent(xTykAPIGateway, "", "  ")
+		fmt.Println(string(ss))
+
 		var convertedAPI apidef.APIDefinition
 		xTykAPIGateway.ExtractTo(&convertedAPI)
-
-		bytes, _ := json.MarshalIndent(convertedAPI, "", "  ")
-		fmt.Println(string(bytes))
 
 		assert.Equal(t, initialAPI, convertedAPI)
 	})
@@ -98,6 +99,18 @@ func TestListenPath(t *testing.T) {
 	resultListenPath.Fill(convertedAPI)
 
 	assert.Equal(t, emptyListenPath, resultListenPath)
+}
+
+func TestMiddleware(t *testing.T) {
+	var emptyMiddleware Middleware
+
+	var convertedAPI apidef.APIDefinition
+	emptyMiddleware.ExtractTo(&convertedAPI)
+
+	var resultMiddleware Middleware
+	resultMiddleware.Fill(convertedAPI)
+
+	assert.Equal(t, emptyMiddleware, resultMiddleware)
 }
 
 // Fill populates the given input with non-default values. Index is where to start incrementing values.
