@@ -73,7 +73,7 @@ func LoadPoliciesFromFile(filePath string) map[string]user.Policy {
 }
 
 // LoadPoliciesFromDashboard will connect and download Policies from a Tyk Dashboard instance.
-func(gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[string]user.Policy {
+func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[string]user.Policy {
 
 	// Get the definitions
 	newRequest, err := http.NewRequest("GET", endpoint, nil)
@@ -163,12 +163,12 @@ func parsePoliciesFromRPC(list string) (map[string]user.Policy, error) {
 	return policies, nil
 }
 
-func(gw *Gateway) LoadPoliciesFromRPC(orgId string) (map[string]user.Policy, error) {
+func (gw *Gateway) LoadPoliciesFromRPC(orgId string) (map[string]user.Policy, error) {
 	if rpc.IsEmergencyMode() {
 		return gw.LoadPoliciesFromRPCBackup()
 	}
 
-	store := &RPCStorageHandler{Gw:gw}
+	store := &RPCStorageHandler{Gw: gw}
 	if !store.Connect() {
 		return nil, errors.New("Policies backup: Failed connecting to database")
 	}

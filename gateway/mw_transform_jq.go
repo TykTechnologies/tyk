@@ -89,7 +89,7 @@ func (t *TransformJQMiddleware) transformJQBody(r *http.Request, ts *TransformJQ
 	bodyBuffer := bytes.NewBuffer(transformed)
 	r.Body = ioutil.NopCloser(bodyBuffer)
 	r.ContentLength = int64(bodyBuffer.Len())
-t
+	t
 	// Replace header in the request
 	ignoreCanonical := t.GetConfig().IgnoreCanonicalMIMEHeaderKey
 	for hName, hValue := range jqResult.RewriteHeaders {

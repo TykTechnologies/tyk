@@ -17,7 +17,7 @@ type HeaderInjectorOptions struct {
 type HeaderInjector struct {
 	Spec   *APISpec
 	config HeaderInjectorOptions
-	Gw *Gateway
+	Gw     *Gateway
 }
 
 func (HeaderInjector) Name() string {

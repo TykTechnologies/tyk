@@ -38,7 +38,7 @@ func (k *RateLimitForAPI) EnabledForSpec() bool {
 		Per:         k.Spec.GlobalRateLimit.Per,
 		LastUpdated: strconv.Itoa(int(time.Now().UnixNano())),
 	}
-	k.apiSess.SetKeyHash(storage.HashKey(k.keyName,k.Gw.GetConfig().HashKeys))
+	k.apiSess.SetKeyHash(storage.HashKey(k.keyName, k.Gw.GetConfig().HashKeys))
 
 	return true
 }

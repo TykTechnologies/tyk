@@ -12,7 +12,7 @@ import (
 )
 
 // SetupNewRelic creates new newrelic.Application instance
-func(gw *Gateway) SetupNewRelic() (app newrelic.Application) {
+func (gw *Gateway) SetupNewRelic() (app newrelic.Application) {
 	var err error
 	logger := log.WithFields(logrus.Fields{"prefix": "newrelic"})
 

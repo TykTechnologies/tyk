@@ -19,7 +19,7 @@ type ConfigPayload struct {
 	TimeStamp     int64
 }
 
-func(gw *Gateway) backupConfiguration() error {
+func (gw *Gateway) backupConfiguration() error {
 	oldConfig, err := json.MarshalIndent(gw.GetConfig(), "", "    ")
 	if err != nil {
 		return err
@@ -39,7 +39,7 @@ func writeNewConfiguration(payload ConfigPayload) error {
 	return ioutil.WriteFile(confPaths[0], newConfig, 0644)
 }
 
-func(gw *Gateway) handleNewConfiguration(payload string) {
+func (gw *Gateway) handleNewConfiguration(payload string) {
 	// Decode the configuration from the payload
 	configPayload := ConfigPayload{}
 
@@ -127,7 +127,7 @@ func sanitizeConfig(mc map[string]interface{}) map[string]interface{} {
 	return mc
 }
 
-func(gw *Gateway) getExistingConfig() (map[string]interface{}, error) {
+func (gw *Gateway) getExistingConfig() (map[string]interface{}, error) {
 	f, err := os.Open(gw.GetConfig().OriginalPath)
 	if err != nil {
 		return nil, err
@@ -139,7 +139,7 @@ func(gw *Gateway) getExistingConfig() (map[string]interface{}, error) {
 	return sanitizeConfig(microConfig), nil
 }
 
-func(gw *Gateway) handleSendMiniConfig(payload string) {
+func (gw *Gateway) handleSendMiniConfig(payload string) {
 	// Decode the configuration from the payload
 	configPayload := GetConfigPayload{}
 	err := json.Unmarshal([]byte(payload), &configPayload)
@@ -184,7 +184,7 @@ func(gw *Gateway) handleSendMiniConfig(payload string) {
 	asNotification := Notification{
 		Command: NoticeGatewayConfigResponse,
 		Payload: string(payloadAsJSON),
-		Gw: gw,
+		Gw:      gw,
 	}
 
 	gw.MainNotifier.Notify(asNotification)

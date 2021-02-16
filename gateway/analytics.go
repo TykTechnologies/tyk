@@ -104,7 +104,7 @@ func (a *AnalyticsRecord) GetGeo(ipStr string, gw *Gateway) {
 		return
 	}
 
-	record, err := geoIPLookup(ipStr,gw)
+	record, err := geoIPLookup(ipStr, gw)
 	if err != nil {
 		log.Error("GeoIP Failure (not recorded): ", err)
 		return
@@ -137,7 +137,7 @@ func geoIPLookup(ipStr string, gw *Gateway) (*GeoData, error) {
 	return record, nil
 }
 
-func(gw *Gateway) initNormalisationPatterns() (pats config.NormaliseURLPatterns) {
+func (gw *Gateway) initNormalisationPatterns() (pats config.NormaliseURLPatterns) {
 	pats.UUIDs = regexp.MustCompile(`[0-9a-fA-F]{8}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{12}`)
 	pats.IDs = regexp.MustCompile(`\/(\d+)`)
 
@@ -185,7 +185,7 @@ type RedisAnalyticsHandler struct {
 	workerBufferSize uint64
 	shouldStop       uint32
 	poolWg           sync.WaitGroup
-	Gw *Gateway
+	Gw               *Gateway
 }
 
 func (r *RedisAnalyticsHandler) Init() {

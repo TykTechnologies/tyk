@@ -236,7 +236,7 @@ func (s *APISpec) validateHTTP() error {
 
 // APIDefinitionLoader will load an Api definition from a storage
 // system.
-type APIDefinitionLoader struct{
+type APIDefinitionLoader struct {
 	Gw *Gateway
 }
 
@@ -270,7 +270,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 
 	// We'll push the default HealthChecker:
 	spec.Health = &DefaultHealthChecker{
-		Gw: a.Gw,
+		Gw:    a.Gw,
 		APIID: spec.APIID,
 	}
 
@@ -297,7 +297,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 		}
 
 		if spec.CustomMiddlewareBundle != "" || len(mwPaths) > 0 || hasVirtualEndpoint {
-			spec.JSVM.Init(spec, logger,a.Gw)
+			spec.JSVM.Init(spec, logger, a.Gw)
 		}
 	}
 
@@ -437,7 +437,7 @@ func (a APIDefinitionLoader) FromRPC(orgId string, gw *Gateway) ([]*APISpec, err
 
 	store := RPCStorageHandler{
 		DoReload: gw.DoReload,
-		Gw:a.Gw,
+		Gw:       a.Gw,
 	}
 
 	if !store.Connect() {

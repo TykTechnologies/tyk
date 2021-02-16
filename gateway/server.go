@@ -130,7 +130,8 @@ func NewGateway(config config.Config) *Gateway {
 	}
 	gw.analytics = RedisAnalyticsHandler{Gw: &gw}
 	gw.SetConfig(config)
-	gw.GlobalSessionManager = SessionHandler(&DefaultSessionManager{})
+	sessionManager := DefaultSessionManager{Gw: &gw}
+	gw.GlobalSessionManager = SessionHandler(&sessionManager)
 
 	gw.apisByID = map[string]*APISpec{}
 	gw.apisHandlesByID = new(sync.Map)
@@ -246,6 +247,12 @@ func (gw *Gateway) setupGlobals(ctx context.Context) {
 	}
 
 	// Load all the files that have the "error" prefix.
+	//gwConfig.TemplatePath = "/Users/sredny/go/src/github.com/TykTechnologies/tyk/templates"
+
+	if gwConfig.TemplatePath != "/Users/sredny/go/src/github.com/TykTechnologies/tyk/templates" {
+		panic("jumm")
+	}
+	fmt.Println("dir:" + gwConfig.TemplatePath)
 	templatesDir := filepath.Join(gwConfig.TemplatePath, "error*")
 	templates = template.Must(template.ParseGlob(templatesDir))
 

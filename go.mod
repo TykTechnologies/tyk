@@ -3,6 +3,7 @@ module github.com/TykTechnologies/tyk
 go 1.12
 
 require (
+	github.com/99designs/gqlgen v0.13.0
 	github.com/Jeffail/gabs v1.4.0
 	github.com/Jeffail/tunny v0.0.0-20171107125207-452a8e97d6a3
 	github.com/TykTechnologies/again v0.0.0-20190805133618-6ad301e7eaed
@@ -38,7 +39,7 @@ require (
 	github.com/golang/protobuf v1.4.2
 	github.com/google/btree v1.0.0 // indirect
 	github.com/gorilla/mux v1.7.3
-	github.com/gorilla/websocket v1.4.1
+	github.com/gorilla/websocket v1.4.2
 	github.com/hashicorp/consul/api v1.3.0
 	github.com/hashicorp/go-msgpack v0.5.4 // indirect
 	github.com/hashicorp/vault/api v1.0.4

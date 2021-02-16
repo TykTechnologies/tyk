@@ -81,7 +81,7 @@ func TestReloadLoop_handlerWithBlock(t *testing.T) {
 }
 
 func TestReloadLoop_group(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
 	res, err := http.Get(testReloadGroup)

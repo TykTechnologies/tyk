@@ -33,7 +33,10 @@ var testJsonSchema = `{
 }`
 
 func testPrepareValidateJSONSchema() {
-	BuildAndLoadAPI(func(spec *APISpec) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 			json.Unmarshal([]byte(`[
 				{
@@ -49,7 +52,7 @@ func testPrepareValidateJSONSchema() {
 }
 
 func TestValidateJSONSchema(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
 	testPrepareValidateJSONSchema()
@@ -67,7 +70,7 @@ func TestValidateJSONSchema(t *testing.T) {
 func BenchmarkValidateJSONSchema(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
 	testPrepareValidateJSONSchema()

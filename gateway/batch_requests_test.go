@@ -14,7 +14,6 @@ import (
 	"testing"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/valyala/fasthttp"
 )
@@ -43,10 +42,10 @@ const testBatchRequest = `{
 }`
 
 func TestBatch(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	BuildAndLoadAPI(func(spec *APISpec) {
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/v1/"
 		spec.EnableBatchRequestSupport = true
 	})
@@ -121,6 +120,9 @@ var virtBatchTest = `function batchTest(request, session, config) {
 }`
 
 func TestVirtualEndpointBatch(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	_, _, combinedClientPEM, clientCert := genCertificate(&x509.Certificate{})
 	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -138,24 +140,19 @@ func TestVirtualEndpointBatch(t *testing.T) {
 	upstream.StartTLS()
 	defer upstream.Close()
 
-	clientCertID, _ := CertificateManager.Add(combinedClientPEM, "")
-	defer CertificateManager.Delete(clientCertID, "")
+	clientCertID, _ := ts.Gw.CertificateManager.Add(combinedClientPEM, "")
+	defer ts.Gw.CertificateManager.Delete(clientCertID, "")
 
 	virtBatchTest = strings.Replace(virtBatchTest, "{upstream_URL}", upstream.URL, 2)
 	defer upstream.Close()
 
 	upstreamHost := strings.TrimPrefix(upstream.URL, "https://")
 
-	globalConf := config.Global()
+	globalConf := ts.Gw.GetConfig()
 	globalConf.Security.Certificates.Upstream = map[string]string{upstreamHost: clientCertID}
-	config.SetGlobal(globalConf)
+	ts.Gw.SetConfig(globalConf)
 
-	defer ResetTestConfig()
-
-	ts := StartTest()
-	defer ts.Close()
-
-	BuildAndLoadAPI(func(spec *APISpec) {
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		virtualMeta := apidef.VirtualMeta{
 			ResponseFunctionName: "batchTest",
@@ -173,17 +170,17 @@ func TestVirtualEndpointBatch(t *testing.T) {
 	})
 
 	t.Run("Skip verification", func(t *testing.T) {
-		globalConf := config.Global()
+		globalConf := ts.Gw.GetConfig()
 		globalConf.ProxySSLInsecureSkipVerify = true
-		config.SetGlobal(globalConf)
+		ts.Gw.SetConfig(globalConf)
 
 		ts.Run(t, test.TestCase{Path: "/virt", Code: 202})
 	})
 
 	t.Run("Verification required", func(t *testing.T) {
-		globalConf := config.Global()
+		globalConf := ts.Gw.GetConfig()
 		globalConf.ProxySSLInsecureSkipVerify = false
-		config.SetGlobal(globalConf)
+		ts.Gw.SetConfig(globalConf)
 
 		ts.Run(t, test.TestCase{Path: "/virt", Code: 500})
 	})
@@ -191,6 +188,9 @@ func TestVirtualEndpointBatch(t *testing.T) {
 }
 
 func TestBatchIgnoreCanonicalHeaderKey(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		if l, err = net.Listen("tcp", "127.0.0.1:0"); err != nil {
@@ -214,13 +214,11 @@ func TestBatchIgnoreCanonicalHeaderKey(t *testing.T) {
 
 	upstream := "http://" + l.Addr().String()
 	virtBatchTest = strings.Replace(virtBatchTest, "{upstream_URL}", upstream, 2)
-	c := config.Global()
+	c := ts.Gw.GetConfig()
 	c.IgnoreCanonicalMIMEHeaderKey = true
-	config.SetGlobal(c)
-	ts := StartTest()
-	defer ts.Close()
+	ts.Gw.SetConfig(c)
 
-	BuildAndLoadAPI(func(spec *APISpec) {
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		virtualMeta := apidef.VirtualMeta{
 			ResponseFunctionName: "batchTest",

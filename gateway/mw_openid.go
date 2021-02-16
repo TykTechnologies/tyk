@@ -230,7 +230,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 	// 4. Set session state on context, we will need it later
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.OIDCUser, apidef.UnsetAuth:
-		ctxSetSession(r, &session, sessionID, true,k.Gw.GetConfig().HashKeys)
+		ctxSetSession(r, &session, sessionID, true, k.Gw.GetConfig().HashKeys)
 	}
 	ctxSetJWTContextVars(k.Spec, r, token)
 
@@ -239,7 +239,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 
 func (k *OpenIDMW) reportLoginFailure(tykId string, r *http.Request) {
 	k.Logger().WithFields(logrus.Fields{
-		"key":k.Gw.obfuscateKey(tykId),
+		"key": k.Gw.obfuscateKey(tykId),
 	}).Warning("Attempted access with invalid key.")
 
 	// Fire Authfailed Event

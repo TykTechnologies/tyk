@@ -13,7 +13,7 @@ import (
 
 const LEKeyPrefix = "le_ssl:"
 
-func(gw *Gateway) StoreLEState(m *letsencrypt.Manager) {
+func (gw *Gateway) StoreLEState(m *letsencrypt.Manager) {
 	log.Debug("Storing SSL backup")
 
 	log.Debug("[SSL] --> Connecting to DB")
@@ -38,7 +38,7 @@ func(gw *Gateway) StoreLEState(m *letsencrypt.Manager) {
 	}
 }
 
-func(gw *Gateway) GetLEState(m *letsencrypt.Manager) {
+func (gw *Gateway) GetLEState(m *letsencrypt.Manager) {
 	checkKey := "cache"
 
 	store := storage.RedisCluster{KeyPrefix: LEKeyPrefix}
@@ -68,7 +68,7 @@ type LE_ServerInfo struct {
 	ID       string
 }
 
-func(gw *Gateway) onLESSLStatusReceivedHandler(payload string) {
+func (gw *Gateway) onLESSLStatusReceivedHandler(payload string) {
 	serverData := LE_ServerInfo{}
 	if err := json.Unmarshal([]byte(payload), &serverData); err != nil {
 		log.WithFields(logrus.Fields{
@@ -89,7 +89,7 @@ func(gw *Gateway) onLESSLStatusReceivedHandler(payload string) {
 
 }
 
-func(gw *Gateway) StartPeriodicStateBackup(ctx context.Context, m *letsencrypt.Manager) {
+func (gw *Gateway) StartPeriodicStateBackup(ctx context.Context, m *letsencrypt.Manager) {
 	for {
 		select {
 		case <-ctx.Done():

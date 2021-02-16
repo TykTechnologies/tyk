@@ -13,14 +13,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/TykTechnologies/goverify"
-	"github.com/TykTechnologies/tyk/apidef"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+
+	"github.com/TykTechnologies/goverify"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 // Bundle is the basic bundle data structure, it holds the bundle name and the data.
@@ -30,7 +31,7 @@ type Bundle struct {
 	Path     string
 	Spec     *APISpec
 	Manifest apidef.BundleManifest
-	Gw *Gateway
+	Gw       *Gateway
 }
 
 // Verify performs a signature verification on the bundle file.
@@ -209,8 +210,8 @@ func (ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) err
 }
 
 // fetchBundle will fetch a given bundle, using the right BundleGetter. The first argument is the bundle name, the base bundle URL will be used as prefix.
-func(gw *Gateway) fetchBundle(spec *APISpec) (Bundle, error) {
-	bundle := Bundle{Gw:gw}
+func (gw *Gateway) fetchBundle(spec *APISpec) (Bundle, error) {
+	bundle := Bundle{Gw: gw}
 	var err error
 
 	if !gw.GetConfig().EnableBundleDownloader {
@@ -311,7 +312,7 @@ func loadBundleManifest(bundle *Bundle, spec *APISpec, skipVerification bool) er
 	return nil
 }
 
-func(gw *Gateway) getBundleDestPath(spec *APISpec) string {
+func (gw *Gateway) getBundleDestPath(spec *APISpec) string {
 	tykBundlePath := filepath.Join(gw.GetConfig().MiddlewarePath, "bundles")
 	bundleNameHash := md5.New()
 	io.WriteString(bundleNameHash, spec.CustomMiddlewareBundle)
@@ -320,7 +321,7 @@ func(gw *Gateway) getBundleDestPath(spec *APISpec) string {
 }
 
 // loadBundle wraps the load and save steps, it will return if an error occurs at any point.
-func(gw *Gateway) loadBundle(spec *APISpec) error {
+func (gw *Gateway) loadBundle(spec *APISpec) error {
 	// Skip if no custom middleware bundle name is set.
 	if spec.CustomMiddlewareBundle == "" {
 		return nil
@@ -345,7 +346,7 @@ func(gw *Gateway) loadBundle(spec *APISpec) error {
 			Name: spec.CustomMiddlewareBundle,
 			Path: destPath,
 			Spec: spec,
-			Gw:gw,
+			Gw:   gw,
 		}
 
 		err = loadBundleManifest(&bundle, spec, true)

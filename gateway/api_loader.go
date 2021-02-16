@@ -40,13 +40,13 @@ func (gw *Gateway) prepareStorage() generalStores {
 	gs.redisStore = &storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: gw.GetConfig().HashKeys}
 	gs.redisOrgStore = &storage.RedisCluster{KeyPrefix: "orgkey."}
 	gs.healthStore = &storage.RedisCluster{KeyPrefix: "apihealth."}
-	gs.rpcAuthStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: gw.GetConfig().HashKeys, Gw:gw}
-	gs.rpcOrgStore = &RPCStorageHandler{KeyPrefix: "orgkey.", Gw:gw}
+	gs.rpcAuthStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: gw.GetConfig().HashKeys, Gw: gw}
+	gs.rpcOrgStore = &RPCStorageHandler{KeyPrefix: "orgkey.", Gw: gw}
 	gw.GlobalSessionManager.Init(gs.redisStore)
 	return gs
 }
 
-func(gw *Gateway) skipSpecBecauseInvalid(spec *APISpec, logger *logrus.Entry) bool {
+func (gw *Gateway) skipSpecBecauseInvalid(spec *APISpec, logger *logrus.Entry) bool {
 
 	switch spec.Protocol {
 	case "", "http", "https":
@@ -102,7 +102,7 @@ func fixFuncPath(pathPrefix string, funcs []apidef.MiddlewareDefinition) {
 	}
 }
 
-func(gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
+func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	gs *generalStores, subrouter *mux.Router, logger *logrus.Entry) *ChainObject {
 
 	var chainDef ChainObject
@@ -273,7 +273,7 @@ func(gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	// Create the response processors, pass all the loaded custom middleware response functions:
 	gw.createResponseMiddlewareChain(spec, mwResponseFuncs)
 
-	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy, logger: logger, }
+	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy, logger: logger}
 
 	for _, v := range baseMid.Spec.VersionData.Versions {
 		if len(v.ExtendedPaths.CircuitBreaker) > 0 {
@@ -580,7 +580,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	d.SH.ServeHTTP(w, r)
 }
 
-func(gw *Gateway) findInternalHttpHandlerByNameOrID(apiNameOrID string) (handler http.Handler, ok bool) {
+func (gw *Gateway) findInternalHttpHandlerByNameOrID(apiNameOrID string) (handler http.Handler, ok bool) {
 	targetAPI := gw.fuzzyFindAPI(apiNameOrID)
 	if targetAPI == nil {
 		return nil, false
@@ -621,7 +621,7 @@ func trimCategories(name string) string {
 	return name
 }
 
-func(gw *Gateway) fuzzyFindAPI(search string) *APISpec {
+func (gw *Gateway) fuzzyFindAPI(search string) *APISpec {
 	if search == "" {
 		return nil
 	}
@@ -646,7 +646,7 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 	if spec.ListenPort != 0 {
 		port = spec.ListenPort
 	}
-	router := muxer.router(port, spec.Protocol,gw.GetConfig())
+	router := muxer.router(port, spec.Protocol, gw.GetConfig())
 	if router == nil {
 		router = mux.NewRouter()
 		muxer.setRouter(port, spec.Protocol, router, gw.GetConfig())

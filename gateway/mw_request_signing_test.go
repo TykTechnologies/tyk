@@ -23,11 +23,14 @@ import (
 var algoList = [4]string{"hmac-sha1", "hmac-sha256", "hmac-sha384", "hmac-sha512"}
 
 func getMiddlewareChain(spec *APISpec) http.Handler {
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	remote, _ := url.Parse(TestHttpAny)
-	proxy := TykNewSingleHostReverseProxy(remote, spec, logrus.New().WithFields(logrus.Fields{}))
+	proxy := ts.Gw.TykNewSingleHostReverseProxy(remote, spec, logrus.New().WithFields(logrus.Fields{}))
 	proxyHandler := ProxyHandler(proxy, spec)
 	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy}
-	chain := alice.New(mwList(
+	chain := alice.New(ts.Gw.mwList(
 		&IPWhiteListMiddleware{baseMid},
 		&IPBlackListMiddleware{BaseMiddleware: baseMid},
 		&RequestSigning{BaseMiddleware: baseMid},
@@ -38,7 +41,10 @@ func getMiddlewareChain(spec *APISpec) http.Handler {
 }
 
 func generateSession(algo, data string) string {
-	sessionKey := CreateSession(func(s *user.SessionState) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	sessionKey := CreateSession(ts.Gw, func(s *user.SessionState) {
 		if strings.HasPrefix(algo, "rsa") {
 			s.RSACertificateId = data
 			s.EnableHTTPSignatureValidation = true
@@ -52,7 +58,10 @@ func generateSession(algo, data string) string {
 }
 
 func generateSpec(algo string, data string, sessionKey string, headerList []string) (specs []*APISpec) {
-	return BuildAndLoadAPI(func(spec *APISpec) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	return ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/test"
 		spec.UseKeylessAccess = true
 		spec.EnableSignatureChecking = true
@@ -74,7 +83,7 @@ func generateSpec(algo string, data string, sessionKey string, headerList []stri
 }
 
 func TestHMACRequestSigning(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 	secret := "9879879878787878"
 
@@ -230,18 +239,18 @@ func TestHMACRequestSigning(t *testing.T) {
 }
 
 func TestRSARequestSigning(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
 	_, _, combinedPem, cert := genServerCertificate()
-	privCertId, _ := CertificateManager.Add(combinedPem, "")
-	defer CertificateManager.Delete(privCertId, "")
+	privCertId, _ := ts.Gw.CertificateManager.Add(combinedPem, "")
+	defer ts.Gw.CertificateManager.Delete(privCertId, "")
 
 	x509Cert, _ := x509.ParseCertificate(cert.Certificate[0])
 	pubDer, _ := x509.MarshalPKIXPublicKey(x509Cert.PublicKey)
 	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDer})
-	pubCertId, _ := CertificateManager.Add(pubPem, "")
-	defer CertificateManager.Delete(pubCertId, "")
+	pubCertId, _ := ts.Gw.CertificateManager.Add(pubPem, "")
+	defer ts.Gw.CertificateManager.Delete(pubCertId, "")
 
 	name := "Test with rsa-sha256"
 	t.Run(name, func(t *testing.T) {
@@ -388,7 +397,7 @@ func TestRSARequestSigning(t *testing.T) {
 }
 
 func TestStripListenPath(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
 	algo := "hmac-sha256"
@@ -409,7 +418,7 @@ func TestStripListenPath(t *testing.T) {
 	})
 
 	t.Run("On", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.APIID = "protected"
 			spec.Proxy.ListenPath = "/protected"
 			spec.EnableSignatureChecking = true
@@ -443,19 +452,19 @@ func TestStripListenPath(t *testing.T) {
 }
 
 func TestWithURLRewrite(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
 	algo := "hmac-sha256"
 	secret := "12345"
 
-	sessionKey := CreateSession(func(session *user.SessionState) {
+	sessionKey := CreateSession(ts.Gw, func(session *user.SessionState) {
 		session.EnableHTTPSignatureValidation = true
 		session.HmacSecret = secret
 	})
 
 	t.Run("looping", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.APIID = "protected"
 			spec.Proxy.ListenPath = "/protected"
 			spec.EnableSignatureChecking = true
@@ -497,7 +506,7 @@ func TestWithURLRewrite(t *testing.T) {
 	})
 
 	t.Run("external", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.APIID = "protected"
 			spec.Proxy.ListenPath = "/protected"
 			spec.EnableSignatureChecking = true

@@ -40,7 +40,7 @@ func (m *MultiTargetProxy) CopyResponse(dst io.Writer, src io.Reader) {
 	m.defaultProxy.CopyResponse(dst, src)
 }
 
-func(gw *Gateway) NewMultiTargetProxy(spec *APISpec, logger *logrus.Entry) *MultiTargetProxy {
+func (gw *Gateway) NewMultiTargetProxy(spec *APISpec, logger *logrus.Entry) *MultiTargetProxy {
 	m := &MultiTargetProxy{}
 	m.versionProxies = make(map[string]*ReverseProxy)
 	m.specReference = spec

@@ -313,7 +313,7 @@ type JSVM struct {
 	Timeout time.Duration
 	Log     *logrus.Entry  // logger used by the JS code
 	RawLog  *logrus.Logger // logger used by `rawlog` func to avoid formatting
-	Gw *Gateway
+	Gw      *Gateway
 }
 
 const defaultJSVMTimeout = 5

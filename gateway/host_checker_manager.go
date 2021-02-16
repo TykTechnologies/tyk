@@ -21,7 +21,7 @@ import (
 var GlobalHostChecker HostCheckerManager
 
 type HostCheckerManager struct {
-	Gw *Gateway
+	Gw                *Gateway
 	Id                string
 	store             storage.Handler
 	checkerMu         sync.Mutex
@@ -529,18 +529,18 @@ func (hc *HostCheckerManager) RecordUptimeAnalytics(report HostHealthReport) err
 	return nil
 }
 
-func(gw *Gateway) InitHostCheckManager(ctx context.Context, store storage.Handler) {
+func (gw *Gateway) InitHostCheckManager(ctx context.Context, store storage.Handler) {
 	// Already initialized
 	if GlobalHostChecker.Id != "" {
 		return
 	}
 
-	GlobalHostChecker = HostCheckerManager{Gw:gw}
+	GlobalHostChecker = HostCheckerManager{Gw: gw}
 	GlobalHostChecker.Init(store)
 	GlobalHostChecker.Start(ctx)
 }
 
-func(gw *Gateway) SetCheckerHostList() {
+func (gw *Gateway) SetCheckerHostList() {
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
 	}).Info("Loading uptime tests...")

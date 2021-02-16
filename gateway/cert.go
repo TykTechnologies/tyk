@@ -57,7 +57,7 @@ var cipherSuites = map[string]uint16{
 
 var certLog = log.WithField("prefix", "certs")
 
-func(gw *Gateway) getUpstreamCertificate(host string, spec *APISpec) (cert *tls.Certificate) {
+func (gw *Gateway) getUpstreamCertificate(host string, spec *APISpec) (cert *tls.Certificate) {
 	var certID string
 
 	certMaps := []map[string]string{gw.GetConfig().Security.Certificates.Upstream}
@@ -102,14 +102,14 @@ func(gw *Gateway) getUpstreamCertificate(host string, spec *APISpec) (cert *tls.
 	return certs[0]
 }
 
-func(gw *Gateway) verifyPeerCertificatePinnedCheck(spec *APISpec, tlsConfig *tls.Config) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+func (gw *Gateway) verifyPeerCertificatePinnedCheck(spec *APISpec, tlsConfig *tls.Config) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 	if (spec == nil || len(spec.PinnedPublicKeys) == 0) && len(gw.GetConfig().Security.PinnedPublicKeys) == 0 {
 		return nil
 	}
 
 	tlsConfig.InsecureSkipVerify = true
 
-	whitelist := gw.getPinnedPublicKeys("*", spec,gw.GetConfig())
+	whitelist := gw.getPinnedPublicKeys("*", spec, gw.GetConfig())
 	if len(whitelist) == 0 {
 		return nil
 	}
@@ -137,7 +137,7 @@ func(gw *Gateway) verifyPeerCertificatePinnedCheck(spec *APISpec, tlsConfig *tls
 	}
 }
 
-func(gw *Gateway) validatePublicKeys(host string, conn *tls.Conn, spec *APISpec) bool {
+func (gw *Gateway) validatePublicKeys(host string, conn *tls.Conn, spec *APISpec) bool {
 	gwConf := gw.GetConfig()
 	certLog.Debug("Checking certificate public key for host:", host)
 
@@ -177,7 +177,7 @@ func validateCommonName(host string, cert *x509.Certificate) error {
 	return nil
 }
 
-func(gw *Gateway) customDialTLSCheck(spec *APISpec, tc *tls.Config) func(network, addr string) (net.Conn, error) {
+func (gw *Gateway) customDialTLSCheck(spec *APISpec, tc *tls.Config) func(network, addr string) (net.Conn, error) {
 	var checkPinnedKeys, checkCommonName bool
 	gwConfig := gw.GetConfig()
 	if (spec != nil && len(spec.PinnedPublicKeys) != 0) || len(gwConfig.Security.PinnedPublicKeys) != 0 {
@@ -223,7 +223,7 @@ func(gw *Gateway) customDialTLSCheck(spec *APISpec, tc *tls.Config) func(network
 	}
 }
 
-func(gw *Gateway) getPinnedPublicKeys(host string, spec *APISpec, conf config.Config) (fingerprint []string) {
+func (gw *Gateway) getPinnedPublicKeys(host string, spec *APISpec, conf config.Config) (fingerprint []string) {
 	var keyIDs string
 
 	pinMaps := []map[string]string{conf.Security.PinnedPublicKeys}
@@ -271,7 +271,7 @@ var tlsConfigCache = cache.New(60*time.Second, 60*time.Minute)
 
 var tlsConfigMu sync.Mutex
 
-func(gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
+func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
 	gwConfig := gw.GetConfig()
 	// Supporting legacy certificate configuration
 	serverCerts := []tls.Certificate{}
@@ -402,7 +402,7 @@ func(gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int) 
 	}
 }
 
-func(gw *Gateway) certHandler(w http.ResponseWriter, r *http.Request) {
+func (gw *Gateway) certHandler(w http.ResponseWriter, r *http.Request) {
 	certID := mux.Vars(r)["certID"]
 
 	switch r.Method {

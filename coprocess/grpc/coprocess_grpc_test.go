@@ -125,7 +125,10 @@ func newTestGRPCServer() (s *grpc.Server) {
 }
 
 func loadTestGRPCAPIs() {
-	gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+	ts := gateway.StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 		spec.APIID = "1"
 		spec.OrgID = gateway.MockOrgID
 		spec.Auth = apidef.AuthConfig{
@@ -251,7 +254,7 @@ func startTykWithGRPC() (*gateway.Test, *grpc.Server) {
 		GRPCRecvMaxSize:     grpcTestMaxSize,
 		GRPCSendMaxSize:     grpcTestMaxSize,
 	}
-	ts := gateway.StartTest(gateway.TestConfig{CoprocessConfig: cfg})
+	ts := gateway.StartTest(nil, gateway.TestConfig{CoprocessConfig: cfg})
 
 	// Load test APIs:
 	loadTestGRPCAPIs()
@@ -267,7 +270,7 @@ func TestGRPCDispatch(t *testing.T) {
 	defer ts.Close()
 	defer grpcServer.Stop()
 
-	keyID := gateway.CreateSession(func(s *user.SessionState) {
+	keyID := gateway.CreateSession(ts.Gw, func(s *user.SessionState) {
 		s.MetaData = map[string]interface{}{
 			"testkey":  map[string]interface{}{"nestedkey": "nestedvalue"},
 			"testkey2": "testvalue",
@@ -381,7 +384,7 @@ func BenchmarkGRPCDispatch(b *testing.B) {
 	defer ts.Close()
 	defer grpcServer.Stop()
 
-	keyID := gateway.CreateSession()
+	keyID := gateway.CreateSession(ts.Gw)
 	headers := map[string]string{"authorization": keyID}
 
 	b.Run("Pre Hook with SetHeaders", func(b *testing.B) {

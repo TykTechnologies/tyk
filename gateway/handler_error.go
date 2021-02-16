@@ -275,7 +275,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		}
 
 		if e.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
-			record.GetGeo(ip,e.Gw)
+			record.GetGeo(ip, e.Gw)
 		}
 
 		expiresAfter := e.Spec.ExpireAnalyticsAfter

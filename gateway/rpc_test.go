@@ -16,19 +16,9 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
-func startRPCMock(dispatcher *gorpc.Dispatcher) *gorpc.Server {
+func startRPCMock(dispatcher *gorpc.Dispatcher) (*gorpc.Server, *Test) {
 
 	rpc.GlobalRPCCallTimeout = 100 * time.Millisecond
-
-	globalConf := config.Global()
-	globalConf.SlaveOptions.UseRPC = true
-	globalConf.SlaveOptions.RPCKey = "test_org"
-	globalConf.SlaveOptions.APIKey = "test"
-	globalConf.Policies.PolicySource = "rpc"
-	globalConf.SlaveOptions.CallTimeout = 1
-	globalConf.SlaveOptions.RPCPoolSize = 2
-	globalConf.AuthOverride.ForceAuthProvider = true
-	globalConf.AuthOverride.AuthProvider.StorageEngine = "rpc"
 
 	server := gorpc.NewTCPServer("127.0.0.1:0", dispatcher.NewHandlerFunc())
 	list := &customListener{}
@@ -38,22 +28,27 @@ func startRPCMock(dispatcher *gorpc.Dispatcher) *gorpc.Server {
 	if err := server.Start(); err != nil {
 		panic(err)
 	}
-	globalConf.SlaveOptions.ConnectionString = list.L.Addr().String()
 
-	config.SetGlobal(globalConf)
+	conf := func(globalConf *config.Config) {
+		globalConf.SlaveOptions.UseRPC = true
+		globalConf.SlaveOptions.RPCKey = "test_org"
+		globalConf.SlaveOptions.APIKey = "test"
+		globalConf.Policies.PolicySource = "rpc"
+		globalConf.SlaveOptions.CallTimeout = 1
+		globalConf.SlaveOptions.RPCPoolSize = 2
+		globalConf.AuthOverride.ForceAuthProvider = true
+		globalConf.AuthOverride.AuthProvider.StorageEngine = "rpc"
+		globalConf.SlaveOptions.ConnectionString = list.L.Addr().String()
+	}
+	ts := StartTest(conf)
 
-	return server
+	return server, ts
 }
 
-func stopRPCMock(server *gorpc.Server) {
-	globalConf := config.Global()
-	globalConf.SlaveOptions.ConnectionString = ""
-	globalConf.SlaveOptions.RPCKey = ""
-	globalConf.SlaveOptions.APIKey = ""
-	globalConf.SlaveOptions.UseRPC = false
-	globalConf.Policies.PolicySource = ""
-	globalConf.AuthOverride.ForceAuthProvider = false
-	config.SetGlobal(globalConf)
+func stopRPCMock(server *gorpc.Server, s *Test) {
+	if s != nil {
+		s.Close()
+	}
 
 	if server != nil {
 		server.Listener.Close()
@@ -117,9 +112,9 @@ const apiDefListTest2 = `[{
 }]`
 
 func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
-	defer ResetTestConfig()
+
 	// We test to check if we are actually calling the GetApiDefinitions and
 	// GetPolicies.
 	a := func() func() (string, error) {
@@ -151,13 +146,13 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 		return `[]`, nil
 	})
 
-	rpc := startRPCMock(dispatcher)
-	defer stopRPCMock(rpc)
+	rpc, ts := startRPCMock(dispatcher)
+	defer stopRPCMock(rpc, ts)
 
 	exp := []int{0, 1, 2, 2}
 	for _, e := range exp {
-		DoReload()
-		n := apisByIDLen()
+		ts.Gw.DoReload()
+		n := ts.Gw.apisByIDLen()
 		if n != e {
 			t.Errorf("There should be %v api's, got %v", e, n)
 		}
@@ -183,17 +178,15 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 	})
 
 	t.Run("RPC is live", func(t *testing.T) {
-		rpc := startRPCMock(dispatcher)
-		defer stopRPCMock(rpc)
-		ts := StartTest()
-		defer ts.Close()
+		rpc, ts := startRPCMock(dispatcher)
+		defer stopRPCMock(rpc, ts)
 
-		apiBackup, _ := LoadDefinitionsFromRPCBackup()
+		apiBackup, _ := ts.Gw.LoadDefinitionsFromRPCBackup()
 		if len(apiBackup) != 1 {
 			t.Fatal("Should have APIs in backup")
 		}
 
-		policyBackup, _ := LoadPoliciesFromRPCBackup()
+		policyBackup, _ := ts.Gw.LoadPoliciesFromRPCBackup()
 		if len(policyBackup) != 1 {
 			t.Fatal("Should have Policies in backup")
 		}
@@ -203,39 +196,38 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 			{Path: "/sample", Headers: authHeaders, Code: 200},
 		}...)
 
-		count, _ := syncAPISpecs()
+		count, _ := ts.Gw.syncAPISpecs()
 		if count != 1 {
-			t.Error("Should return array with one spec", apiSpecs)
+			t.Error("Should return array with one spec", ts.Gw.apiSpecs)
 		}
 	})
 
 	t.Run("RPC down, cold start, load backup", func(t *testing.T) {
 		// Point rpc to non existent address
-		globalConf := config.Global()
-		globalConf.SlaveOptions.ConnectionString = testHttpFailure
-		globalConf.SlaveOptions.UseRPC = true
-		globalConf.SlaveOptions.RPCKey = "test_org"
-		globalConf.SlaveOptions.APIKey = "test"
-		globalConf.Policies.PolicySource = "rpc"
-		config.SetGlobal(globalConf)
-
+		conf := func(globalConf *config.Config) {
+			globalConf.SlaveOptions.ConnectionString = testHttpFailure
+			globalConf.SlaveOptions.UseRPC = true
+			globalConf.SlaveOptions.RPCKey = "test_org"
+			globalConf.SlaveOptions.APIKey = "test"
+			globalConf.Policies.PolicySource = "rpc"
+		}
 		// RPC layer is down
-		ts := StartTest()
+		ts := StartTest(conf)
 		defer ts.Close()
 
 		// Wait for backup to load
 		time.Sleep(100 * time.Millisecond)
-		DoReload()
+		ts.Gw.DoReload()
 
 		cachedAuth := map[string]string{"Authorization": "test"}
 		notCachedAuth := map[string]string{"Authorization": "nope1"}
-		// Stil works, since it knows about cached key
+		// Still works, since it knows about cached key
 		ts.Run(t, []test.TestCase{
 			{Path: "/sample", Headers: cachedAuth, Code: 200},
 			{Path: "/sample", Headers: notCachedAuth, Code: 403},
 		}...)
 
-		stopRPCMock(nil)
+		stopRPCMock(nil, nil)
 	})
 
 	t.Run("RPC is back, hard reload", func(t *testing.T) {
@@ -258,10 +250,8 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 			return jsonMarshalString(CreateStandardSession()), nil
 		})
 		// Back to live
-		rpc := startRPCMock(dispatcher)
-		defer stopRPCMock(rpc)
-		ts := StartTest()
-		defer ts.Close()
+		rpc, ts := startRPCMock(dispatcher)
+		defer stopRPCMock(rpc, ts)
 
 		time.Sleep(100 * time.Millisecond)
 
@@ -272,20 +262,17 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 			{Path: "/sample", Headers: notCachedAuth, Code: 200},
 		}...)
 
-		if count, _ := syncAPISpecs(); count != 2 {
+		if count, _ := ts.Gw.syncAPISpecs(); count != 2 {
 			t.Error("Should fetch latest specs", count)
 		}
 
-		if count, _ := syncPolicies(); count != 2 {
+		if count, _ := ts.Gw.syncPolicies(); count != 2 {
 			t.Error("Should fetch latest policies", count)
 		}
 	})
 
 	t.Run("RPC is back, live reload", func(t *testing.T) {
-		rpc := startRPCMock(dispatcher)
-		ts := StartTest()
-		defer ts.Close()
-
+		rpc, ts := startRPCMock(dispatcher)
 		time.Sleep(100 * time.Millisecond)
 
 		authHeaders := map[string]string{"Authorization": "test"}
@@ -311,7 +298,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		if err := rpc.Start(); err != nil {
 			panic(err)
 		}
-		defer stopRPCMock(rpc)
+		defer stopRPCMock(rpc, ts)
 
 		// Internal gorpc reconnect timeout is 1 second
 		time.Sleep(1000 * time.Millisecond)
@@ -339,14 +326,12 @@ func TestSyncAPISpecsRPC_redis_failure(t *testing.T) {
 	dispatcher.AddFunc("GetKey", func(clientAddr, key string) (string, error) {
 		return jsonMarshalString(CreateStandardSession()), nil
 	})
-	rpc := startRPCMock(dispatcher)
-	defer stopRPCMock(rpc)
+	rpc, ts := startRPCMock(dispatcher)
+	defer stopRPCMock(rpc, ts)
 
 	t.Run("Should load apis when redis is down", func(t *testing.T) {
 		storage.DisableRedis(true)
 		defer storage.DisableRedis(false)
-		ts := StartTest()
-		defer ts.Close()
 
 		authHeaders := map[string]string{"Authorization": "test"}
 		ts.Run(t, []test.TestCase{
@@ -356,12 +341,10 @@ func TestSyncAPISpecsRPC_redis_failure(t *testing.T) {
 
 	t.Run("Should reload when redis is back up", func(t *testing.T) {
 		storage.DisableRedis(true)
-		ts := StartTest()
-		defer ts.Close()
 		event := make(chan struct{}, 1)
 		OnConnect = func() {
 			event <- struct{}{}
-			DoReload()
+			ts.Gw.DoReload()
 		}
 
 		select {
@@ -386,24 +369,14 @@ func TestSyncAPISpecsRPC_redis_failure(t *testing.T) {
 
 func TestOrgSessionWithRPCDown(t *testing.T) {
 	//we need rpc down
-	globalConf := config.Global()
-	globalConf.SlaveOptions.ConnectionString = testHttpFailure
-	globalConf.SlaveOptions.UseRPC = true
-	globalConf.SlaveOptions.RPCKey = "test_org"
-	globalConf.SlaveOptions.APIKey = "test"
-	globalConf.Policies.PolicySource = "rpc"
-	config.SetGlobal(globalConf)
-
-	defer func() {
-		globalConf.SlaveOptions.ConnectionString = ""
-		globalConf.SlaveOptions.UseRPC = false
-		globalConf.SlaveOptions.RPCKey = ""
-		globalConf.SlaveOptions.APIKey = ""
-		globalConf.Policies.PolicySource = ""
-		config.SetGlobal(globalConf)
-	}()
-
-	ts := StartTest()
+	conf := func(globalConf *config.Config) {
+		globalConf.SlaveOptions.ConnectionString = testHttpFailure
+		globalConf.SlaveOptions.UseRPC = true
+		globalConf.SlaveOptions.RPCKey = "test_org"
+		globalConf.SlaveOptions.APIKey = "test"
+		globalConf.Policies.PolicySource = "rpc"
+	}
+	ts := StartTest(conf)
 	defer ts.Close()
 
 	m := BaseMiddleware{
@@ -416,7 +389,7 @@ func TestOrgSessionWithRPCDown(t *testing.T) {
 		logger: mainLog,
 	}
 	// reload so we force to fall in emergency mode
-	DoReload()
+	ts.Gw.DoReload()
 
 	_, found := m.OrgSession(sess.OrgID)
 	if found {

@@ -42,7 +42,7 @@ type WebHookHandler struct {
 
 	contentType      string
 	dashboardService DashboardServiceSender
-	Gw *Gateway
+	Gw               *Gateway
 }
 
 // createConfigObject by default tyk will provide a map[string]interface{} type as a conf, converting it

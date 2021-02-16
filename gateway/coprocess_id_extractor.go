@@ -25,9 +25,9 @@ type IdExtractor interface {
 
 // BaseExtractor is the base structure for an ID extractor, it implements the IdExtractor interface. Other extractors may override some of its methods.
 type BaseExtractor struct {
-	Config  *apidef.MiddlewareIdExtractor
+	Config *apidef.MiddlewareIdExtractor
 	BaseMiddleware
-	Spec    *APISpec
+	Spec *APISpec
 }
 
 // ExtractAndCheck is called from the CP middleware, if ID extractor is enabled for the current API.

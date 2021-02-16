@@ -252,6 +252,7 @@ func (gw *Gateway) CoProcessInit() {
 			}).WithError(err).Error("Couldn't load gRPC dispatcher")
 		}
 	}
+
 }
 
 // EnabledForSpec checks if this middleware should be enabled for a given API.

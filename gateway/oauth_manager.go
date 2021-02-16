@@ -289,7 +289,7 @@ func (o *OAuthHandlers) HandleRevokeAllTokens(w http.ResponseWriter, r *http.Req
 	n := Notification{
 		Command: KeySpaceUpdateNotification,
 		Payload: strings.Join(tokens, ","),
-		Gw: o.Manager.Gw,
+		Gw:      o.Manager.Gw,
 	}
 	o.Manager.Gw.MainNotifier.Notify(n)
 
@@ -332,7 +332,7 @@ func RevokeAllTokens(storage ExtendedOsinStorageInterface, clientId, clientSecre
 type OAuthManager struct {
 	API        *APISpec
 	OsinServer *TykOsinServer
-	Gw *Gateway
+	Gw         *Gateway
 }
 
 // HandleAuthorisation creates the authorisation data for the request
@@ -481,7 +481,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			keyName := o.Gw.generateToken(o.API.OrgID, username)
 
 			log.Debug("Updating user:", keyName)
-			err := o.Gw.GlobalSessionManager.UpdateSession(keyName, session, session.Lifetime(o.API.SessionLifetime, o.Gw.GetConfig().ForceGlobalSessionLifetime,o.Gw.GetConfig().GlobalSessionLifetime), false)
+			err := o.Gw.GlobalSessionManager.UpdateSession(keyName, session, session.Lifetime(o.API.SessionLifetime, o.Gw.GetConfig().ForceGlobalSessionLifetime, o.Gw.GetConfig().GlobalSessionLifetime), false)
 			if err != nil {
 				log.Error(err)
 			}
@@ -556,7 +556,7 @@ type TykOsinServer struct {
 }
 
 // TykOsinNewServer creates a new server instance, but uses an extended interface so we can SetClient() too.
-func(gw *Gateway) TykOsinNewServer(config *osin.ServerConfig, storage ExtendedOsinStorageInterface) *TykOsinServer {
+func (gw *Gateway) TykOsinNewServer(config *osin.ServerConfig, storage ExtendedOsinStorageInterface) *TykOsinServer {
 
 	overrideServer := TykOsinServer{
 		Config:            config,
@@ -580,7 +580,7 @@ type RedisOsinStorageInterface struct {
 	sessionManager SessionHandler
 	redisStore     storage.Handler
 	orgID          string
-	Gw *Gateway
+	Gw             *Gateway
 }
 
 func (r *RedisOsinStorageInterface) Clone() osin.Storage {
@@ -937,7 +937,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 	log.Debug("Adding ACCESS key to sorted list: ", sortedListKey)
 	r.redisStore.AddToSortedSet(
 		sortedListKey,
-		storage.HashKey(accessData.AccessToken,r.Gw.GetConfig().HashKeys),
+		storage.HashKey(accessData.AccessToken, r.Gw.GetConfig().HashKeys),
 		float64(accessData.CreatedAt.Unix()+int64(accessData.ExpiresIn)), // set score as token expire timestamp
 	)
 
@@ -1087,7 +1087,7 @@ func (r *RedisOsinStorageInterface) RemoveRefresh(token string) error {
 }
 
 // accessTokenGen is a modified authorization token generator that uses the same method used to generate tokens for Tyk authHandler
-type accessTokenGen struct{
+type accessTokenGen struct {
 	Gw *Gateway
 }
 

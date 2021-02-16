@@ -98,12 +98,12 @@ func EncodeRequestToEvent(r *http.Request) string {
 }
 
 // EventHandlerByName is a convenience function to get event handler instances from an API Definition
-func(gw *Gateway) EventHandlerByName(handlerConf apidef.EventHandlerTriggerConfig, spec *APISpec) (config.TykEventHandler, error) {
+func (gw *Gateway) EventHandlerByName(handlerConf apidef.EventHandlerTriggerConfig, spec *APISpec) (config.TykEventHandler, error) {
 
 	conf := handlerConf.HandlerMeta
 	switch handlerConf.Handler {
 	case EH_LogHandler:
-		h := &LogMessageEventHandler{Gw:gw}
+		h := &LogMessageEventHandler{Gw: gw}
 		err := h.Init(conf)
 		return h, err
 	case EH_WebHook:
@@ -113,7 +113,7 @@ func(gw *Gateway) EventHandlerByName(handlerConf apidef.EventHandlerTriggerConfi
 	case EH_JSVMHandler:
 		// Load the globals and file here
 		if spec != nil {
-			h := &JSVMEventHandler{Spec: spec, Gw:gw}
+			h := &JSVMEventHandler{Spec: spec, Gw: gw}
 			err := h.Init(conf)
 			if err == nil {
 				gw.GlobalEventsJSVM.LoadJSPaths([]string{conf["path"].(string)}, "")
@@ -156,7 +156,7 @@ func (s *APISpec) FireEvent(name apidef.TykEvent, meta interface{}) {
 	fireEvent(name, meta, s.EventPaths)
 }
 
-func(gw *Gateway) FireSystemEvent(name apidef.TykEvent, meta interface{}) {
+func (gw *Gateway) FireSystemEvent(name apidef.TykEvent, meta interface{}) {
 	fireEvent(name, meta, gw.GetConfig().GetEventTriggers())
 }
 
@@ -164,7 +164,7 @@ func(gw *Gateway) FireSystemEvent(name apidef.TykEvent, meta interface{}) {
 type LogMessageEventHandler struct {
 	prefix string
 	logger *logrus.Logger
-	Gw *Gateway
+	Gw     *Gateway
 }
 
 // New enables the intitialisation of event handler instances when they are created on ApiSpec creation
@@ -199,7 +199,7 @@ func (l *LogMessageEventHandler) HandleEvent(em config.EventMessage) {
 	l.logger.Warning(logMsg)
 }
 
-func(gw *Gateway) initGenericEventHandlers() {
+func (gw *Gateway) initGenericEventHandlers() {
 	conf := gw.GetConfig()
 	handlers := make(map[apidef.TykEvent][]config.TykEventHandler)
 	for eventName, eventHandlerConfs := range conf.EventHandlers.Events {

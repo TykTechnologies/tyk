@@ -110,7 +110,7 @@ func (m *proxyMux) router(port int, protocol string, conf config.Config) *mux.Ro
 		}
 	}
 
-	if proxy := m.getProxy(port,conf); proxy != nil {
+	if proxy := m.getProxy(port, conf); proxy != nil {
 		if proxy.protocol != protocol {
 			mainLog.WithField("port", port).Warningf("Can't get router for protocol %s, router for protocol %s found", protocol, proxy.protocol)
 			return nil
@@ -197,7 +197,7 @@ func (m *proxyMux) addTCPService(spec *APISpec, modifier *tcp.Modifier, gw *Gate
 	}
 }
 
-func(gw *Gateway) flushNetworkAnalytics(ctx context.Context) {
+func (gw *Gateway) flushNetworkAnalytics(ctx context.Context) {
 	mainLog.Debug("Starting routine for flushing network analytics")
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
@@ -238,7 +238,7 @@ func(gw *Gateway) flushNetworkAnalytics(ctx context.Context) {
 	}
 }
 
-func(gw *Gateway) recordTCPHit(specID string, doNotTrack bool) func(tcp.Stat) {
+func (gw *Gateway) recordTCPHit(specID string, doNotTrack bool) func(tcp.Stat) {
 	if doNotTrack {
 		return nil
 	}
@@ -313,7 +313,7 @@ func dialWithServiceDiscovery(spec *APISpec, dial dialFn) dialFn {
 	}
 }
 
-func (m *proxyMux) swap(new *proxyMux,gw *Gateway ) {
+func (m *proxyMux) swap(new *proxyMux, gw *Gateway) {
 	conf := gw.GetConfig()
 	m.Lock()
 	defer m.Unlock()
@@ -322,7 +322,7 @@ func (m *proxyMux) swap(new *proxyMux,gw *Gateway ) {
 	// Shutting down and removing unused listeners/proxies
 	i := 0
 	for _, curP := range m.proxies {
-		match := new.getProxy(curP.port,conf)
+		match := new.getProxy(curP.port, conf)
 		if match == nil || match.protocol != curP.protocol {
 			mainLog.Infof("Found unused listener at port %d, shutting down", curP.port)
 

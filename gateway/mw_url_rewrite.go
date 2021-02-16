@@ -38,7 +38,7 @@ var envValueMatch = regexp.MustCompile(`\$secret_env.([A-Za-z0-9_\-\.]+)`)
 var metaMatch = regexp.MustCompile(`\$tyk_meta.([A-Za-z0-9_\-\.]+)`)
 var secretsConfMatch = regexp.MustCompile(`\$secret_conf.([A-Za-z0-9[.\-\_]+)`)
 
-func(gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
+func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 	path := r.URL.String()
 	log.Debug("Inbound path: ", path)
 	newpath := path
@@ -199,7 +199,7 @@ func(gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (stri
 	return newpath, nil
 }
 
-func(gw *Gateway) replaceTykVariables(r *http.Request, in string, escape bool) string {
+func (gw *Gateway) replaceTykVariables(r *http.Request, in string, escape bool) string {
 
 	if strings.Contains(in, secretsConfLabel) {
 		contextData := ctxGetData(r)
@@ -244,7 +244,7 @@ func(gw *Gateway) replaceTykVariables(r *http.Request, in string, escape bool) s
 	return in
 }
 
-func(gw *Gateway) replaceVariables(in string, vars []string, vals map[string]interface{}, label string, escape bool) string {
+func (gw *Gateway) replaceVariables(in string, vars []string, vals map[string]interface{}, label string, escape bool) string {
 
 	emptyStringFn := func(key, in, val string) string {
 		in = strings.Replace(in, val, "", -1)

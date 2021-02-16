@@ -9,8 +9,8 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
-func testPrepareResponseHeaderInjection() {
-	BuildAndLoadAPI(func(spec *APISpec) {
+func testPrepareResponseHeaderInjection(ts *Test) {
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = true
 		spec.Proxy.ListenPath = "/"
 		spec.OrgID = "default"
@@ -61,10 +61,10 @@ func testPrepareResponseHeaderInjection() {
 }
 
 func TestResponseHeaderInjection(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	testPrepareResponseHeaderInjection()
+	testPrepareResponseHeaderInjection(ts)
 
 	addHeaders := map[string]string{"X-Test": "test"}
 	deleteHeaders := map[string]string{"X-Tyk-Test": "1"}
@@ -83,10 +83,10 @@ func TestResponseHeaderInjection(t *testing.T) {
 func BenchmarkResponseHeaderInjection(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	testPrepareResponseHeaderInjection()
+	testPrepareResponseHeaderInjection(ts)
 
 	addHeaders := map[string]string{"X-Test": "test"}
 	deleteHeaders := map[string]string{"X-Tyk-Test": "1"}
@@ -105,7 +105,7 @@ func BenchmarkResponseHeaderInjection(b *testing.B) {
 }
 
 func TestGlobalResponseHeaders(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
 	spec := BuildAPI(func(spec *APISpec) {
@@ -115,7 +115,7 @@ func TestGlobalResponseHeaders(t *testing.T) {
 		spec.ResponseProcessors = []apidef.ResponseProcessor{{Name: "header_injector"}}
 
 	})[0]
-	LoadAPI(spec)
+	ts.Gw.LoadAPI(spec)
 
 	addedHeaders := map[string]string{"X-Tyk-Test": "1"}
 	removedHeaders := map[string]string{}
@@ -130,7 +130,7 @@ func TestGlobalResponseHeaders(t *testing.T) {
 		}
 		v.GlobalResponseHeadersRemove = []string{"X-Tyk-Test"}
 	})
-	LoadAPI(spec)
+	ts.Gw.LoadAPI(spec)
 
 	addedHeaders = map[string]string{"global-header": "global-value"}
 	removedHeaders = map[string]string{"X-Tyk-Test": "1"}

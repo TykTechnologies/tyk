@@ -39,12 +39,12 @@ type HTTPDashboardHandler struct {
 	Secret string
 
 	heartBeatStopSentinel bool
-	Gw *Gateway
+	Gw                    *Gateway
 }
 
 var dashClient *http.Client
 
-func(gw *Gateway) initialiseClient() *http.Client {
+func (gw *Gateway) initialiseClient() *http.Client {
 	if dashClient == nil {
 		dashClient = &http.Client{
 			Timeout: 30 * time.Second,
@@ -63,7 +63,7 @@ func(gw *Gateway) initialiseClient() *http.Client {
 	return dashClient
 }
 
-func(gw *Gateway) reLogin() {
+func (gw *Gateway) reLogin() {
 	if !gw.GetConfig().UseDBAppConfigs {
 		return
 	}

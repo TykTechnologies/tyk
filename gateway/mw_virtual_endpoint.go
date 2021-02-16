@@ -55,7 +55,7 @@ func (d *VirtualEndpoint) Name() string {
 	return "VirtualEndpoint"
 }
 
-func(gw *Gateway) preLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
+func (gw *Gateway) preLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
 	// the only call site uses (&foo, &bar) so meta and j won't be
 	// nil.
 	var src interface{}
@@ -242,7 +242,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	return copiedResponse
 }
 
-func(gw *Gateway) forceResponse(w http.ResponseWriter,
+func (gw *Gateway) forceResponse(w http.ResponseWriter,
 	r *http.Request,
 	newResponseData *VMResponseObject,
 	spec *APISpec,
@@ -321,7 +321,7 @@ func (d *VirtualEndpoint) HandleResponse(rw http.ResponseWriter, res *http.Respo
 	d.Gw.handleForcedResponse(rw, res, ses, d.Spec)
 }
 
-func(gw *Gateway) handleForcedResponse(rw http.ResponseWriter, res *http.Response, ses *user.SessionState, spec *APISpec) {
+func (gw *Gateway) handleForcedResponse(rw http.ResponseWriter, res *http.Response, ses *user.SessionState, spec *APISpec) {
 	defer res.Body.Close()
 
 	// Close connections

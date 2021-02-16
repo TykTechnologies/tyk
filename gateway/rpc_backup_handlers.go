@@ -29,7 +29,7 @@ func getTagListAsString(tags []string) string {
 	return tagList
 }
 
-func(gw *Gateway) LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
+func (gw *Gateway) LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 	tagList := getTagListAsString(gw.GetConfig().DBAppConfOptions.Tags)
 	checkKey := BackupApiKeyBase + tagList
 
@@ -50,10 +50,10 @@ func(gw *Gateway) LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 	apiListAsString := decrypt([]byte(secret), cryptoText)
 
 	a := APIDefinitionLoader{gw}
-	return a.processRPCDefinitions(apiListAsString,gw)
+	return a.processRPCDefinitions(apiListAsString, gw)
 }
 
-func(gw *Gateway) saveRPCDefinitionsBackup(list string) error {
+func (gw *Gateway) saveRPCDefinitionsBackup(list string) error {
 	if !json.Valid([]byte(list)) {
 		return errors.New("--> RPC Backup save failure: wrong format, skipping.")
 	}
@@ -82,7 +82,7 @@ func(gw *Gateway) saveRPCDefinitionsBackup(list string) error {
 	return nil
 }
 
-func(gw *Gateway) LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
+func (gw *Gateway) LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
 	tagList := getTagListAsString(gw.GetConfig().DBAppConfOptions.Tags)
 	checkKey := BackupPolicyKeyBase + tagList
 
@@ -113,7 +113,7 @@ func(gw *Gateway) LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
 	}
 }
 
-func(gw *Gateway) saveRPCPoliciesBackup(list string) error {
+func (gw *Gateway) saveRPCPoliciesBackup(list string) error {
 	if !json.Valid([]byte(list)) {
 		return errors.New("--> RPC Backup save failure: wrong format, skipping.")
 	}

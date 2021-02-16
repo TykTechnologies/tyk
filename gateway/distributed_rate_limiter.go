@@ -11,7 +11,7 @@ import (
 
 var DRLManager = &drl.DRL{}
 
-func(gw *Gateway) setupDRL() {
+func (gw *Gateway) setupDRL() {
 	drlManager := &drl.DRL{}
 	drlManager.Init()
 	drlManager.ThisServerID = gw.GetNodeID() + "|" + hostDetails.Hostname
@@ -19,7 +19,7 @@ func(gw *Gateway) setupDRL() {
 	DRLManager = drlManager
 }
 
-func(gw *Gateway) startRateLimitNotifications() {
+func (gw *Gateway) startRateLimitNotifications() {
 	notificationFreq := gw.GetConfig().DRLNotificationFrequency
 	if notificationFreq == 0 {
 		notificationFreq = 2
@@ -39,7 +39,7 @@ func(gw *Gateway) startRateLimitNotifications() {
 	}()
 }
 
-func(gw *Gateway) getTagHash() string {
+func (gw *Gateway) getTagHash() string {
 	th := ""
 	for _, tag := range gw.GetConfig().DBAppConfOptions.Tags {
 		th += tag
@@ -47,7 +47,7 @@ func(gw *Gateway) getTagHash() string {
 	return th
 }
 
-func(gw *Gateway) NotifyCurrentServerStatus() {
+func (gw *Gateway) NotifyCurrentServerStatus() {
 	if !DRLManager.Ready {
 		return
 	}
@@ -73,7 +73,7 @@ func(gw *Gateway) NotifyCurrentServerStatus() {
 	n := Notification{
 		Command: NoticeGatewayDRLNotification,
 		Payload: string(asJson),
-		Gw: gw,
+		Gw:      gw,
 	}
 
 	gw.MainNotifier.Notify(n)

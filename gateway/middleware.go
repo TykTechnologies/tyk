@@ -72,7 +72,7 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	return tr.TykMiddleware.ProcessRequest(w, r, conf)
 }
 
-func(gw *Gateway) createDynamicMiddleware(name string, isPre, useSession bool, baseMid BaseMiddleware) func(http.Handler) http.Handler {
+func (gw *Gateway) createDynamicMiddleware(name string, isPre, useSession bool, baseMid BaseMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &DynamicMiddleware{
 		BaseMiddleware:      baseMid,
 		MiddlewareClassName: name,
@@ -84,7 +84,7 @@ func(gw *Gateway) createDynamicMiddleware(name string, isPre, useSession bool, b
 }
 
 // Generic middleware caller to make extension easier
-func(gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) http.Handler {
+func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) http.Handler {
 	mw := &TraceMiddleware{
 		TykMiddleware: actualMW,
 	}
@@ -176,7 +176,7 @@ func(gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) ht
 	}
 }
 
-func(gw *Gateway) mwAppendEnabled(chain *[]alice.Constructor, mw TykMiddleware) bool {
+func (gw *Gateway) mwAppendEnabled(chain *[]alice.Constructor, mw TykMiddleware) bool {
 	if mw.EnabledForSpec() {
 		*chain = append(*chain, gw.createMiddleware(mw))
 		return true
@@ -184,7 +184,7 @@ func(gw *Gateway) mwAppendEnabled(chain *[]alice.Constructor, mw TykMiddleware) 
 	return false
 }
 
-func(gw *Gateway) mwList(mws ...TykMiddleware) []alice.Constructor {
+func (gw *Gateway) mwList(mws ...TykMiddleware) []alice.Constructor {
 	var list []alice.Constructor
 	for _, mw := range mws {
 		gw.mwAppendEnabled(&list, mw)
@@ -198,7 +198,7 @@ type BaseMiddleware struct {
 	Spec   *APISpec
 	Proxy  ReturningHttpHandler
 	logger *logrus.Entry
-	Gw *Gateway
+	Gw     *Gateway
 }
 
 func (t BaseMiddleware) Base() *BaseMiddleware { return &t }
@@ -242,7 +242,7 @@ func (t BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
 		ExpiryCache.Set(session.OrgID, session.DataExpires, cache.DefaultExpiration)
 	}
 
-	session.SetKeyHash(storage.HashKey(orgID,t.Gw.GetConfig().HashKeys))
+	session.SetKeyHash(storage.HashKey(orgID, t.Gw.GetConfig().HashKeys))
 
 	return session.Clone(), found
 }
@@ -725,7 +725,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 			return session.Clone(), false
 		}
 
-		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.SessionLifetime,t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime))
+		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime))
 		ctxScheduleSessionUpdate(r)
 	}
 
@@ -795,7 +795,7 @@ type TykResponseHandler interface {
 	HandleError(http.ResponseWriter, *http.Request)
 }
 
-func(gw *Gateway) responseProcessorByName(name string) TykResponseHandler {
+func (gw *Gateway) responseProcessorByName(name string) TykResponseHandler {
 	switch name {
 	case "header_injector":
 		return &HeaderInjector{Gw: gw}

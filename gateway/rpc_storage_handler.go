@@ -93,7 +93,7 @@ type RPCStorageHandler struct {
 	HashKeys         bool
 	SuppressRegister bool
 	DoReload         func()
-	Gw *Gateway
+	Gw               *Gateway
 }
 
 var RPCGlobalCache = cache.New(30*time.Second, 15*time.Second)
@@ -791,7 +791,7 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 	}
 }
 
-func(gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler) {
+func (gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler) {
 	newKeyName := "apikey-" + storage.HashStr(keyName)
 	sessionString, err := r.GetRawKey(keyName)
 	if err != nil {
@@ -891,7 +891,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 	n := Notification{
 		Command: KeySpaceUpdateNotification,
 		Payload: strings.Join(keys, ","),
-		Gw: r.Gw,
+		Gw:      r.Gw,
 	}
 	r.Gw.MainNotifier.Notify(n)
 }

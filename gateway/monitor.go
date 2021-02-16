@@ -7,7 +7,7 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-type Monitor struct{
+type Monitor struct {
 	Gw *Gateway
 }
 

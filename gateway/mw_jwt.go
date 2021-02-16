@@ -759,7 +759,7 @@ func ctxSetJWTContextVars(s *APISpec, r *http.Request, token *jwt.Token) {
 	}
 }
 
-func(gw *Gateway) generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.SessionState, error) {
+func (gw *Gateway) generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.SessionState, error) {
 	gw.policiesMu.RLock()
 	policy, ok := gw.policiesByID[policyID]
 	gw.policiesMu.RUnlock()

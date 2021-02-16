@@ -192,7 +192,7 @@ var (
 // the target request will be for /base/dir. This version modifies the
 // stdlib version by also setting the host to the target, this allows
 // us to work with heroku and other such providers
-func(gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, logger *logrus.Entry) *ReverseProxy {
+func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, logger *logrus.Entry) *ReverseProxy {
 	onceStartAllHostsDown.Do(func() {
 		handler := func(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "all hosts are down", http.StatusServiceUnavailable)
@@ -339,7 +339,7 @@ func(gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, l
 				return &buffer
 			},
 		},
-		Gw:gw,
+		Gw: gw,
 	}
 	proxy.ErrorHandler.BaseMiddleware = BaseMiddleware{Spec: spec, Proxy: proxy}
 	return proxy
@@ -378,10 +378,10 @@ type ReverseProxy struct {
 
 	logger *logrus.Entry
 	sp     sync.Pool
-	Gw *Gateway
+	Gw     *Gateway
 }
 
-func(p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
+func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
 	timeout := 30.0
 	if dialerTimeout > 0 {
 		log.Debug("Setting timeout for outbound request to: ", dialerTimeout)
@@ -608,7 +608,7 @@ func tlsClientConfig(s *APISpec) *tls.Config {
 	return config
 }
 
-func(p *ReverseProxy) httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request) *TykRoundTripper {
+func (p *ReverseProxy) httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request) *TykRoundTripper {
 	transport := p.defaultTransport(timeOut) // modifies a newly created transport
 	transport.TLSClientConfig = &tls.Config{}
 	transport.Proxy = proxyFromAPI(p.TykAPISpec)
@@ -671,7 +671,7 @@ func(p *ReverseProxy) httpTransport(timeOut float64, rw http.ResponseWriter, req
 		return &TykRoundTripper{transport, h2t, p.logger, p.Gw}
 	}
 
-	return &TykRoundTripper{transport, nil, p.logger,p.Gw }
+	return &TykRoundTripper{transport, nil, p.logger, p.Gw}
 }
 
 func (p *ReverseProxy) setCommonNameVerifyPeerCertificate(tlsConfig *tls.Config, hostName string) {
@@ -727,7 +727,7 @@ type TykRoundTripper struct {
 	transport    *http.Transport
 	h2ctransport *http2.Transport
 	logger       *logrus.Entry
-	Gw *Gateway
+	Gw           *Gateway
 }
 
 func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
@@ -1447,7 +1447,7 @@ func nopCloseResponseBody(r *http.Response) {
 	copyResponse(r)
 }
 
-func(p *ReverseProxy) IsUpgrade(req *http.Request) (bool, string) {
+func (p *ReverseProxy) IsUpgrade(req *http.Request) (bool, string) {
 	if !p.Gw.GetConfig().HttpServerOptions.EnableWebSockets {
 		return false, ""
 	}

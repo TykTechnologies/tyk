@@ -14,7 +14,10 @@ import (
 )
 
 func testPrepareContextVarsMiddleware() {
-	BuildAndLoadAPI(func(spec *APISpec) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.EnableContextVars = true
 		spec.VersionData.Versions = map[string]apidef.VersionInfo{
@@ -32,7 +35,7 @@ func testPrepareContextVarsMiddleware() {
 }
 
 func TestContextVarsMiddleware(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
 	testPrepareContextVarsMiddleware()
@@ -48,7 +51,7 @@ func TestContextVarsMiddleware(t *testing.T) {
 func BenchmarkContextVarsMiddleware(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
 	testPrepareContextVarsMiddleware()

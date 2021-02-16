@@ -17,18 +17,17 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 	"github.com/go-redis/redis/v8"
 )
 
 func TestURLRewrites(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
 	t.Run("Extended Paths with url_rewrites", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				json.Unmarshal([]byte(`[
 						{
@@ -78,11 +77,11 @@ func TestURLRewrites(t *testing.T) {
 }
 
 func TestWhitelist(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
 	t.Run("Extended Paths", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				json.Unmarshal([]byte(`[
 					{
@@ -113,7 +112,7 @@ func TestWhitelist(t *testing.T) {
 	})
 
 	t.Run("Simple Paths", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.Paths.WhiteList = []string{"/simple", "/regex/{id}/test"}
 				v.UseExtendedPaths = false
@@ -132,7 +131,7 @@ func TestWhitelist(t *testing.T) {
 	})
 
 	t.Run("Test #1944", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.Paths.WhiteList = []string{"/foo/{fooId}$", "/foo/{fooId}/bar/{barId}$", "/baz/{bazId}"}
 				v.UseExtendedPaths = false
@@ -158,7 +157,7 @@ func TestWhitelist(t *testing.T) {
 	})
 
 	t.Run("Case Sensitivity", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.Paths.WhiteList = []string{"/Foo", "/bar"}
 				v.UseExtendedPaths = false
@@ -177,11 +176,11 @@ func TestWhitelist(t *testing.T) {
 }
 
 func TestBlacklist(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
 	t.Run("Extended Paths", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				json.Unmarshal([]byte(`[
 					{
@@ -209,7 +208,7 @@ func TestBlacklist(t *testing.T) {
 	})
 
 	t.Run("Simple Paths", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.Paths.BlackList = []string{"/blacklist/literal", "/blacklist/{id}/test"}
 				v.UseExtendedPaths = false
@@ -229,7 +228,7 @@ func TestBlacklist(t *testing.T) {
 	})
 
 	t.Run("Case Sensitivity", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.Paths.BlackList = []string{"/Foo", "/bar"}
 				v.UseExtendedPaths = false
@@ -248,10 +247,10 @@ func TestBlacklist(t *testing.T) {
 }
 
 func TestConflictingPaths(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	BuildAndLoadAPI(func(spec *APISpec) {
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 			json.Unmarshal([]byte(`[
 				{
@@ -276,11 +275,11 @@ func TestConflictingPaths(t *testing.T) {
 }
 
 func TestIgnored(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
 	t.Run("Extended Paths", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				json.Unmarshal([]byte(`[
 					{
@@ -310,7 +309,8 @@ func TestIgnored(t *testing.T) {
 	})
 
 	t.Run("Simple Paths", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.Paths.Ignored = []string{"/ignored/literal", "/ignored/{id}/test"}
 				v.UseExtendedPaths = false
@@ -332,7 +332,8 @@ func TestIgnored(t *testing.T) {
 	})
 
 	t.Run("With URL rewrite", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{{
 					Path:         "/ignored",
@@ -366,6 +367,7 @@ func TestIgnored(t *testing.T) {
 	})
 
 	t.Run("Case Sensitivity", func(t *testing.T) {
+
 		spec := BuildAPI(func(spec *APISpec) {
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.ExtendedPaths.Ignored = []apidef.EndPointMeta{{Path: "/Foo", IgnoreCase: false}, {Path: "/bar", IgnoreCase: true}}
@@ -376,7 +378,7 @@ func TestIgnored(t *testing.T) {
 			spec.Proxy.ListenPath = "/"
 		})[0]
 
-		LoadAPI(spec)
+		ts.Gw.LoadAPI(spec)
 
 		_, _ = ts.Run(t, []test.TestCase{
 			{Path: "/foo", Code: http.StatusUnauthorized},
@@ -386,11 +388,11 @@ func TestIgnored(t *testing.T) {
 		}...)
 
 		t.Run("ignore-case globally", func(t *testing.T) {
-			globalConf := config.Global()
+			globalConf := ts.Gw.GetConfig()
 			globalConf.IgnoreEndpointCase = true
-			config.SetGlobal(globalConf)
+			ts.Gw.SetConfig(globalConf)
 
-			LoadAPI(spec)
+			ts.Gw.LoadAPI(spec)
 
 			_, _ = ts.Run(t, []test.TestCase{
 				{Path: "/foo", Code: http.StatusOK},
@@ -401,15 +403,15 @@ func TestIgnored(t *testing.T) {
 		})
 
 		t.Run("ignore-case in api level", func(t *testing.T) {
-			globalConf := config.Global()
+			globalConf := ts.Gw.GetConfig()
 			globalConf.IgnoreEndpointCase = false
-			config.SetGlobal(globalConf)
+			ts.Gw.SetConfig(globalConf)
 
 			v := spec.VersionData.Versions["v1"]
 			v.IgnoreEndpointCase = true
 			spec.VersionData.Versions["v1"] = v
 
-			LoadAPI(spec)
+			ts.Gw.LoadAPI(spec)
 
 			_, _ = ts.Run(t, []test.TestCase{
 				{Path: "/foo", Code: http.StatusOK},
@@ -420,15 +422,15 @@ func TestIgnored(t *testing.T) {
 		})
 
 		// Check whether everything returns normal
-		globalConf := config.Global()
+		globalConf := ts.Gw.GetConfig()
 		globalConf.IgnoreEndpointCase = false
-		config.SetGlobal(globalConf)
+		ts.Gw.SetConfig(globalConf)
 
 		v := spec.VersionData.Versions["v1"]
 		v.IgnoreEndpointCase = false
 		spec.VersionData.Versions["v1"] = v
 
-		LoadAPI(spec)
+		ts.Gw.LoadAPI(spec)
 
 		_, _ = ts.Run(t, []test.TestCase{
 			{Path: "/foo", Code: http.StatusUnauthorized},
@@ -440,11 +442,11 @@ func TestIgnored(t *testing.T) {
 }
 
 func TestWhitelistMethodWithAdditionalMiddleware(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
 	t.Run("Extended Paths", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = true
 			spec.Proxy.ListenPath = "/"
 
@@ -483,27 +485,29 @@ func TestWhitelistMethodWithAdditionalMiddleware(t *testing.T) {
 func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 	ReloadTestCase.Enable()
 	defer ReloadTestCase.Disable()
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	// Test Dashboard
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	tsDash := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/system/apis" {
 			w.Write([]byte(`{"Status": "OK", "Nonce": "1", "Message": [{"api_definition": {}}]}`))
 		} else {
 			t.Fatal("Unknown dashboard API request", r)
 		}
 	}))
-	defer ts.Close()
+	defer tsDash.Close()
 
-	apisMu.Lock()
-	apisByID = make(map[string]*APISpec)
-	apisMu.Unlock()
+	ts.Gw.apisMu.Lock()
+	ts.Gw.apisByID = make(map[string]*APISpec)
+	ts.Gw.apisMu.Unlock()
 
-	globalConf := config.Global()
+	globalConf := ts.Gw.GetConfig()
 	globalConf.UseDBAppConfigs = true
 	globalConf.AllowInsecureConfigs = true
-	globalConf.DBAppConfOptions.ConnectionString = ts.URL
-	config.SetGlobal(globalConf)
-
-	defer ResetTestConfig()
+	globalConf.DBAppConfOptions.ConnectionString = tsDash.URL
+	ts.Gw.SetConfig(globalConf)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -513,17 +517,17 @@ func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 			t.Fatalf("want %q, got %q", want, got)
 		}
 	}
-	handleRedisEvent(&msg, handled, wg.Done)
+	ts.Gw.handleRedisEvent(&msg, handled, wg.Done)
 
 	ReloadTestCase.TickOk(t)
-
 	// Wait for the reload to finish, then check it worked
 	wg.Wait()
-	apisMu.RLock()
-	if len(apisByID) != 1 {
-		t.Error("Should return array with one spec", apisByID)
+	ts.Gw.apisMu.RLock()
+	defer ts.Gw.apisMu.RUnlock()
+
+	if len(ts.Gw.apisByID) != 1 {
+		t.Error("Should return array with one spec", ts.Gw.apisByID)
 	}
-	apisMu.RUnlock()
 }
 
 func TestRoundRobin(t *testing.T) {
@@ -593,11 +597,10 @@ func (ln *customListener) Close() error {
 }
 
 func TestDefaultVersion(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	key := testPrepareDefaultVersion()
-
+	key := ts.testPrepareDefaultVersion()
 	authHeaders := map[string]string{"authorization": key}
 
 	ts.Run(t, []test.TestCase{
@@ -611,10 +614,10 @@ func TestDefaultVersion(t *testing.T) {
 func BenchmarkDefaultVersion(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	key := testPrepareDefaultVersion()
+	key := ts.testPrepareDefaultVersion()
 
 	authHeaders := map[string]string{"authorization": key}
 
@@ -631,8 +634,9 @@ func BenchmarkDefaultVersion(b *testing.B) {
 	}
 }
 
-func testPrepareDefaultVersion() string {
-	BuildAndLoadAPI(func(spec *APISpec) {
+func (ts *Test) testPrepareDefaultVersion() string {
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		v1 := apidef.VersionInfo{Name: "v1"}
 		v1.Name = "v1"
 		v1.Paths.WhiteList = []string{"/foo"}
@@ -652,7 +656,7 @@ func testPrepareDefaultVersion() string {
 		spec.UseKeylessAccess = false
 	})
 
-	return CreateSession(func(s *user.SessionState) {
+	return CreateSession(ts.Gw, func(s *user.SessionState) {
 		s.AccessRights = map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v1", "v2"},
 		}}
@@ -660,7 +664,7 @@ func testPrepareDefaultVersion() string {
 }
 
 func TestGetVersionFromRequest(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
 	versionInfo := apidef.VersionInfo{}
@@ -668,7 +672,7 @@ func TestGetVersionFromRequest(t *testing.T) {
 	versionInfo.Paths.BlackList = []string{"/bar"}
 
 	t.Run("Header location", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
 			spec.VersionDefinition.Location = headerLocation
@@ -685,7 +689,7 @@ func TestGetVersionFromRequest(t *testing.T) {
 	})
 
 	t.Run("URL param location", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
 			spec.VersionDefinition.Location = urlParamLocation
@@ -700,7 +704,7 @@ func TestGetVersionFromRequest(t *testing.T) {
 	})
 
 	t.Run("URL location", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
 			spec.VersionDefinition.Location = urlLocation
@@ -716,7 +720,7 @@ func TestGetVersionFromRequest(t *testing.T) {
 
 func BenchmarkGetVersionFromRequest(b *testing.B) {
 	b.ReportAllocs()
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
 	versionInfo := apidef.VersionInfo{}
@@ -725,7 +729,7 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 
 	b.Run("Header location", func(b *testing.B) {
 		b.ReportAllocs()
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
 			spec.VersionDefinition.Location = headerLocation
@@ -745,7 +749,7 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 
 	b.Run("URL param location", func(b *testing.B) {
 		b.ReportAllocs()
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
 			spec.VersionDefinition.Location = urlParamLocation
@@ -763,7 +767,7 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 
 	b.Run("URL location", func(b *testing.B) {
 		b.ReportAllocs()
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
 			spec.VersionDefinition.Location = urlLocation
@@ -782,9 +786,13 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 	ReloadTestCase.Enable()
 	defer ReloadTestCase.Disable()
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	// Test Dashboard
 	callNum := 0
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	tsDash := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/system/apis" {
 			if callNum == 0 {
 				w.Write([]byte(`{"Status": "OK", "Nonce": "1", "Message": [{"api_definition": {}}]}`))
@@ -797,19 +805,17 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 			t.Fatal("Unknown dashboard API request", r)
 		}
 	}))
-	defer ts.Close()
+	defer tsDash.Close()
 
-	apisMu.Lock()
-	apisByID = make(map[string]*APISpec)
-	apisMu.Unlock()
+	ts.Gw.apisMu.Lock()
+	ts.Gw.apisByID = make(map[string]*APISpec)
+	ts.Gw.apisMu.Unlock()
 
-	globalConf := config.Global()
+	globalConf := ts.Gw.GetConfig()
 	globalConf.UseDBAppConfigs = true
 	globalConf.AllowInsecureConfigs = true
-	globalConf.DBAppConfOptions.ConnectionString = ts.URL
-	config.SetGlobal(globalConf)
-
-	defer ResetTestConfig()
+	globalConf.DBAppConfOptions.ConnectionString = tsDash.URL
+	ts.Gw.SetConfig(globalConf)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -819,40 +825,43 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 			t.Fatalf("want %q, got %q", want, got)
 		}
 	}
-	handleRedisEvent(&msg, handled, wg.Done)
+	ts.Gw.handleRedisEvent(&msg, handled, wg.Done)
 
 	ReloadTestCase.TickOk(t)
 
 	// Wait for the reload to finish, then check it worked
 	wg.Wait()
-	apisMu.RLock()
-	if len(apisByID) != 1 {
-		t.Error("should return array with one spec", apisByID)
+	ts.Gw.apisMu.RLock()
+	if len(ts.Gw.apisByID) != 1 {
+		t.Error("should return array with one spec", ts.Gw.apisByID)
 	}
-	apisMu.RUnlock()
+	ts.Gw.apisMu.RUnlock()
 
 	// Second call
 
 	var wg2 sync.WaitGroup
 	wg2.Add(1)
 	ReloadTestCase.Reset()
-	handleRedisEvent(&msg, handled, wg2.Done)
+	ts.Gw.handleRedisEvent(&msg, handled, wg2.Done)
 
 	ReloadTestCase.TickOk(t)
 	// Wait for the reload to finish, then check it worked
 	wg2.Wait()
-	apisMu.RLock()
-	if len(apisByID) != 1 {
-		t.Error("second call should return array with one spec", apisByID)
+	ts.Gw.apisMu.RLock()
+	if len(ts.Gw.apisByID) != 1 {
+		t.Error("second call should return array with one spec", ts.Gw.apisByID)
 	}
-	apisMu.RUnlock()
+	ts.Gw.apisMu.RUnlock()
 
 }
 
 func TestAPIDefinitionLoader_Template(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	const testTemplatePath = "../templates/transform_test.tmpl"
 
-	l := APIDefinitionLoader{Gw: &globalGateway}
+	l := APIDefinitionLoader{Gw: ts.Gw}
 
 	executeAndAssert := func(t *testing.T, template *template.Template) {
 		var bodyBuffer bytes.Buffer

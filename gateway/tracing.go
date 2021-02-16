@@ -82,7 +82,7 @@ type traceResponse struct {
 //           Header: value
 //         body: body-value
 //       logs: {...}\n{...}
-func(gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
+func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 	var traceReq traceRequest
 	if err := json.NewDecoder(r.Body).Decode(&traceReq); err != nil {
 		log.Error("Couldn't decode trace request: ", err)

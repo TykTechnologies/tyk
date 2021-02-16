@@ -123,7 +123,7 @@ func ConnectToRedis(ctx context.Context, onConnect func(), conf *config.Config) 
 	}
 	var ok bool
 	for _, v := range c {
-		if !connectSingleton(v.IsCache,*conf) {
+		if !connectSingleton(v.IsCache, *conf) {
 			break
 		}
 		if !clusterConnectionIsOpen(&v) {
@@ -155,7 +155,7 @@ func ConnectToRedis(ctx context.Context, onConnect func(), conf *config.Config) 
 	}
 }
 
-func connectCluster(conf config.Config,v ...RedisCluster) bool {
+func connectCluster(conf config.Config, v ...RedisCluster) bool {
 	for _, x := range v {
 		if ok := establishConnection(&x, conf); ok {
 			return ok

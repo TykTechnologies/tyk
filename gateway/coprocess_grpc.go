@@ -24,7 +24,7 @@ type GRPCDispatcher struct {
 	coprocess.Dispatcher
 }
 
-func(gw *Gateway) dialer(addr string, timeout time.Duration) (net.Conn, error) {
+func (gw *Gateway) dialer(addr string, timeout time.Duration) (net.Conn, error) {
 	grpcURL, err := url.Parse(gw.GetConfig().CoProcessOptions.CoProcessGRPCServer)
 	if err != nil {
 		log.WithFields(logrus.Fields{
@@ -71,7 +71,7 @@ func (d *GRPCDispatcher) Reload() {}
 // HandleMiddlewareCache isn't used by gRPC.
 func (d *GRPCDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, basePath string) {}
 
-func(gw *Gateway) grpcCallOpts() grpc.DialOption {
+func (gw *Gateway) grpcCallOpts() grpc.DialOption {
 	recvSize := gw.GetConfig().CoProcessOptions.GRPCRecvMaxSize
 	sendSize := gw.GetConfig().CoProcessOptions.GRPCSendMaxSize
 	var opts []grpc.CallOption
@@ -85,7 +85,7 @@ func(gw *Gateway) grpcCallOpts() grpc.DialOption {
 }
 
 // NewGRPCDispatcher wraps all the actions needed for this CP.
-func(gw *Gateway) NewGRPCDispatcher() (coprocess.Dispatcher, error) {
+func (gw *Gateway) NewGRPCDispatcher() (coprocess.Dispatcher, error) {
 	if gw.GetConfig().CoProcessOptions.CoProcessGRPCServer == "" {
 		return nil, errors.New("No gRPC URL is set")
 	}

@@ -42,7 +42,7 @@ type Notification struct {
 	Payload       string              `json:"payload"`
 	Signature     string              `json:"signature"`
 	SignatureAlgo crypto.Hash         `json:"algorithm"`
-	Gw *Gateway
+	Gw            *Gateway            `json:"-"`
 }
 
 func (n *Notification) Sign() {
@@ -51,7 +51,7 @@ func (n *Notification) Sign() {
 	n.Signature = hex.EncodeToString(hash[:])
 }
 
-func(gw *Gateway) startPubSubLoop() {
+func (gw *Gateway) startPubSubLoop() {
 	cacheStore := storage.RedisCluster{}
 	cacheStore.Connect()
 	// On message, synchronise
@@ -69,7 +69,7 @@ func(gw *Gateway) startPubSubLoop() {
 	}
 }
 
-func(gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded func()) {
+func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded func()) {
 	message, ok := v.(*redis.Message)
 	if !ok {
 		return
@@ -255,7 +255,7 @@ func createConnectionStringFromDashboardObject(config dashboardConfigPayload) st
 	return hostname
 }
 
-func(gw *Gateway) handleDashboardZeroConfMessage(payload string) {
+func (gw *Gateway) handleDashboardZeroConfMessage(payload string) {
 	// Decode the configuration from the payload
 	dashPayload := dashboardConfigPayload{}
 

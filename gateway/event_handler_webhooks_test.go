@@ -106,10 +106,12 @@ func TestBuildRequest(t *testing.T) {
 }
 
 func TestBuildRequestIngoreCanonicalHeaderKey(t *testing.T) {
-	c := config.Global()
-	defer ResetTestConfig()
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	c := ts.Gw.GetConfig()
 	c.IgnoreCanonicalMIMEHeaderKey = true
-	config.SetGlobal(c)
+	ts.Gw.SetConfig(c)
 	eventHandlerConf := config.WebHookHandlerConf{
 		TargetPath:   TestHttpGet,
 		Method:       "GET",
@@ -208,6 +210,10 @@ func TestPost(t *testing.T) {
 }
 
 func TestNewCustomTemplate(t *testing.T) {
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	tests := []struct {
 		name           string
 		missingDefault bool
@@ -224,13 +230,13 @@ func TestNewCustomTemplate(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.missingDefault {
-				globalConf := config.Global()
+				globalConf := ts.Gw.GetConfig()
 				old := globalConf.TemplatePath
 				globalConf.TemplatePath = "missing-dir"
-				config.SetGlobal(globalConf)
+				ts.Gw.SetConfig(globalConf)
 				defer func() {
 					globalConf.TemplatePath = old
-					config.SetGlobal(globalConf)
+					ts.Gw.SetConfig(globalConf)
 				}()
 			}
 			h := &WebHookHandler{}
@@ -251,7 +257,10 @@ func TestNewCustomTemplate(t *testing.T) {
 }
 
 func TestWebhookContentTypeHeader(t *testing.T) {
-	globalConf := config.Global()
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	globalConf := ts.Gw.GetConfig()
 	templatePath := globalConf.TemplatePath
 
 	tests := []struct {

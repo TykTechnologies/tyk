@@ -100,7 +100,7 @@ type SafeHealthCheck struct {
 	mux  sync.Mutex
 }
 
-func(gw *Gateway) gatherHealthChecks() {
+func (gw *Gateway) gatherHealthChecks() {
 	allInfos := SafeHealthCheck{info: make(map[string]HealthCheckItem, 3)}
 
 	redisStore := storage.RedisCluster{KeyPrefix: "livenesscheck-"}

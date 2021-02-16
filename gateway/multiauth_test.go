@@ -76,11 +76,14 @@ func createMultiBasicAuthSession(isBench bool) *user.SessionState {
 }
 
 func getMultiAuthStandardAndBasicAuthChain(spec *APISpec) http.Handler {
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	remote, _ := url.Parse(TestHttpAny)
-	proxy := TykNewSingleHostReverseProxy(remote, spec, nil)
+	proxy := ts.Gw.TykNewSingleHostReverseProxy(remote, spec, nil)
 	proxyHandler := ProxyHandler(proxy, spec)
-	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy}
-	chain := alice.New(mwList(
+	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy, Gw: ts.Gw}
+	chain := alice.New(ts.Gw.mwList(
 		&IPWhiteListMiddleware{baseMid},
 		&IPBlackListMiddleware{BaseMiddleware: baseMid},
 		&BasicAuthKeyIsValid{baseMid, nil, nil},
@@ -94,7 +97,10 @@ func getMultiAuthStandardAndBasicAuthChain(spec *APISpec) http.Handler {
 }
 
 func testPrepareMultiSessionBA(t testing.TB, isBench bool) (*APISpec, *http.Request) {
-	spec := LoadSampleAPI(multiAuthDev)
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	spec := ts.Gw.LoadSampleAPI(multiAuthDev)
 
 	// Create BA
 	baSession := createMultiBasicAuthSession(isBench)
@@ -105,9 +111,9 @@ func testPrepareMultiSessionBA(t testing.TB, isBench bool) (*APISpec, *http.Requ
 		username = "0987876"
 	}
 	password := "TEST"
-	keyName := generateToken("default", username)
+	keyName := ts.Gw.generateToken("default", username)
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	GlobalSessionManager.UpdateSession(keyName, baSession, 60, false)
+	ts.Gw.GlobalSessionManager.UpdateSession(keyName, baSession, 60, false)
 
 	// Create key
 	session := createMultiAuthKeyAuthSession(isBench)
@@ -118,7 +124,7 @@ func testPrepareMultiSessionBA(t testing.TB, isBench bool) (*APISpec, *http.Requ
 		customToken = "84573485734587384888723487243"
 	}
 	// AuthKey sessions are stored by {token}
-	GlobalSessionManager.UpdateSession(customToken, session, 60, false)
+	ts.Gw.GlobalSessionManager.UpdateSession(customToken, session, 60, false)
 
 	toEncode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(toEncode))
@@ -159,20 +165,23 @@ func BenchmarkMultiSession_BA_Standard_OK(b *testing.B) {
 }
 
 func TestMultiSession_BA_Standard_Identity(t *testing.T) {
-	spec := LoadSampleAPI(multiAuthDev)
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	spec := ts.Gw.LoadSampleAPI(multiAuthDev)
 
 	// Create BA
 	baSession := createMultiBasicAuthSession(false)
 	username := "0987876"
 	password := "TEST"
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	GlobalSessionManager.UpdateSession("default0987876", baSession, 60, false)
+	ts.Gw.GlobalSessionManager.UpdateSession("default0987876", baSession, 60, false)
 
 	// Create key
 	session := createMultiAuthKeyAuthSession(false)
 	customToken := "84573485734587384888723487243"
 	// AuthKey sessions are stored by {token}
-	GlobalSessionManager.UpdateSession(customToken, session, 60, false)
+	ts.Gw.GlobalSessionManager.UpdateSession(customToken, session, 60, false)
 
 	to_encode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
@@ -196,20 +205,23 @@ func TestMultiSession_BA_Standard_Identity(t *testing.T) {
 }
 
 func TestMultiSession_BA_Standard_FAILBA(t *testing.T) {
-	spec := LoadSampleAPI(multiAuthDev)
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	spec := ts.Gw.LoadSampleAPI(multiAuthDev)
 
 	// Create BA
 	baSession := createMultiBasicAuthSession(false)
 	username := "0987876"
 	password := "WRONG"
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	GlobalSessionManager.UpdateSession("default0987876", baSession, 60, false)
+	ts.Gw.GlobalSessionManager.UpdateSession("default0987876", baSession, 60, false)
 
 	// Create key
 	session := createMultiAuthKeyAuthSession(false)
 	customToken := "84573485734587384888723487243"
 	// AuthKey sessions are stored by {token}
-	GlobalSessionManager.UpdateSession(customToken, session, 60, false)
+	ts.Gw.GlobalSessionManager.UpdateSession(customToken, session, 60, false)
 
 	to_encode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
@@ -228,20 +240,23 @@ func TestMultiSession_BA_Standard_FAILBA(t *testing.T) {
 }
 
 func TestMultiSession_BA_Standard_FAILAuth(t *testing.T) {
-	spec := LoadSampleAPI(multiAuthDev)
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	spec := ts.Gw.LoadSampleAPI(multiAuthDev)
 
 	// Create BA
 	baSession := createMultiBasicAuthSession(false)
 	username := "0987876"
 	password := "TEST"
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	GlobalSessionManager.UpdateSession("default0987876", baSession, 60, false)
+	ts.Gw.GlobalSessionManager.UpdateSession("default0987876", baSession, 60, false)
 
 	// Create key
 	session := createMultiAuthKeyAuthSession(false)
 	customToken := "84573485734587384888723487243"
 	// AuthKey sessions are stored by {token}
-	GlobalSessionManager.UpdateSession(customToken, session, 60, false)
+	ts.Gw.GlobalSessionManager.UpdateSession(customToken, session, 60, false)
 
 	to_encode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
@@ -260,12 +275,12 @@ func TestMultiSession_BA_Standard_FAILAuth(t *testing.T) {
 }
 
 func TestJWTAuthKeyMultiAuth(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	pID := CreatePolicy()
+	pID := ts.CreatePolicy()
 
-	spec := BuildAndLoadAPI(func(spec *APISpec) {
+	spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 
 		spec.AuthConfigs = make(map[string]apidef.AuthConfig)
@@ -289,14 +304,14 @@ func TestJWTAuthKeyMultiAuth(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 	})[0]
 
-	LoadAPI(spec)
+	ts.Gw.LoadAPI(spec)
 
 	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Claims.(jwt.MapClaims)["user_id"] = "user"
 		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	})
 
-	key := CreateSession()
+	key := CreateSession(ts.Gw)
 
 	ts.Run(t, []test.TestCase{
 		{

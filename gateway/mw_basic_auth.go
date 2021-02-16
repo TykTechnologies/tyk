@@ -212,7 +212,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	// Set session state on context, we will need it later
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.BasicAuthUser, apidef.UnsetAuth:
-		ctxSetSession(r, &session, keyName, false,k.Gw.GetConfig().HashKeys)
+		ctxSetSession(r, &session, keyName, false, k.Gw.GetConfig().HashKeys)
 	}
 
 	return nil, http.StatusOK

@@ -41,14 +41,14 @@ type SessionHandler interface {
 // requires a storage.Handler to interact with key store
 type DefaultAuthorisationManager struct {
 	store storage.Handler
-	Gw *Gateway
+	Gw    *Gateway
 }
 
 type DefaultSessionManager struct {
 	store                    storage.Handler
 	disableCacheSessionState bool
 	orgID                    string
-	Gw *Gateway
+	Gw                       *Gateway
 }
 
 type SessionUpdate struct {
@@ -144,7 +144,7 @@ func (b *DefaultSessionManager) clearCacheForKey(keyName string, hashed bool) {
 	n := Notification{
 		Command: KeySpaceUpdateNotification,
 		Payload: cacheKey,
-		Gw: b.Gw,
+		Gw:      b.Gw,
 	}
 	b.Gw.MainNotifier.Notify(n)
 }
@@ -241,11 +241,11 @@ func (b *DefaultSessionManager) Sessions(filter string) []string {
 	return b.store.GetKeys(filter)
 }
 
-type DefaultKeyGenerator struct{
+type DefaultKeyGenerator struct {
 	Gw *Gateway
 }
 
-func(gw *Gateway) generateToken(orgID, keyID string) string {
+func (gw *Gateway) generateToken(orgID, keyID string) string {
 	keyID = strings.TrimPrefix(keyID, orgID)
 	token, err := storage.GenerateToken(orgID, keyID, gw.GetConfig().HashKeyFunction)
 
