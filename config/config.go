@@ -614,8 +614,6 @@ func WriteDefault(path string, conf *Config) error {
 	_, b, _, _ := runtime.Caller(0)
 	configPath := filepath.Dir(b)
 	rootPath := filepath.Dir(configPath)
-	//config path:/Users/sredny/go/src/github.com/TykTechnologies/tyk/config
-	//rootpath:/Users/sredny/go/src/github.com/TykTechnologies/tyk
 	Default.TemplatePath = filepath.Join(rootPath, "templates")
 
 	*conf = Default

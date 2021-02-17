@@ -247,13 +247,6 @@ func (gw *Gateway) setupGlobals(ctx context.Context) {
 	}
 
 	// Load all the files that have the "error" prefix.
-	//gwConfig.TemplatePath = "/Users/sredny/go/src/github.com/TykTechnologies/tyk/templates"
-
-	if gwConfig.TemplatePath != "/Users/sredny/go/src/github.com/TykTechnologies/tyk/templates" {
-		//	panic("jumm")
-	}
-
-	fmt.Println("dir:" + gwConfig.TemplatePath)
 	templatesDir := filepath.Join(gwConfig.TemplatePath, "error*")
 	templates = template.Must(template.ParseGlob(templatesDir))
 
@@ -1511,12 +1504,6 @@ func (gw *Gateway) startServer() {
 		gw.DoReload()
 	}
 }
-
-/*
-func init() {
-	SetGlobal(Config{})
-}
-*/
 
 func (gw *Gateway) GetConfig() config.Config {
 	return gw.config.Load().(config.Config)

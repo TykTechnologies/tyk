@@ -800,18 +800,7 @@ func (s *Test) Start(genConf func(globalConf *config.Config)) *Gateway {
 		l.Close()
 		gwConfig.ControlAPIPort, _ = strconv.Atoi(port)
 	}
-	/*
-		if slavedClusterConfig != nil {
-			gwConfig.SlaveOptions = slavedClusterConfig.SlaveOptions
-			// policies source
-			gwConfig.Policies.PolicySource = "rpc"
-			gwConfig.Policies.PolicyRecordName = "tyk_policies"
 
-			gwConfig.UseDBAppConfigs = false
-			// Override redis
-			gwConfig.Storage = slavedClusterConfig.Redis
-		}
-	*/
 	gwConfig.CoProcessOptions = s.config.CoprocessConfig
 	s.Gw.SetConfig(gwConfig)
 
