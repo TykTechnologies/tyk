@@ -16,7 +16,6 @@ require (
 	github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c
 	github.com/TykTechnologies/murmur3 v0.0.0-20180602122059-1915e687e465
 	github.com/TykTechnologies/openid2go v0.0.0-20200312160651-00c254a52b19
-	github.com/TykTechnologies/tyk/certs v0.0.1
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
 	github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d // indirect
 	github.com/bshuster-repo/logrus-logstash-hook v0.4.1
@@ -56,7 +55,7 @@ require (
 	github.com/mavricknz/ldap v0.0.0-20160227184754-f5a958005e43
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
 	github.com/miekg/dns v1.0.14
-	github.com/mitchellh/mapstructure v1.1.2
+	github.com/mitchellh/mapstructure v1.2.2
 	github.com/newrelic/go-agent v2.13.0+incompatible
 	github.com/opentracing/opentracing-go v1.1.0
 	github.com/openzipkin/zipkin-go v0.2.2
@@ -64,12 +63,13 @@ require (
 	github.com/paulbellamy/ratecounter v0.2.0
 	github.com/peterbourgon/g2s v0.0.0-20170223122336-d4e7ad98afea // indirect
 	github.com/pires/go-proxyproto v0.0.0-20190615163442-2c19fd512994
-	github.com/pkg/errors v0.8.1
+	github.com/pkg/errors v0.9.1
 	github.com/pmylund/go-cache v2.1.0+incompatible
 	github.com/robertkrimen/otto v0.0.0-20180617131154-15f95af6e78d
 	github.com/rs/cors v1.7.0
 	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.4.2
+	github.com/spf13/afero v1.5.1
 	github.com/square/go-jose v2.4.1+incompatible
 	github.com/stretchr/testify v1.6.1
 	github.com/uber-go/atomic v1.4.0 // indirect
@@ -98,4 +98,6 @@ require (
 	rsc.io/letsencrypt v0.0.2
 )
 
-replace github.com/jensneuse/graphql-go-tools => github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20201123105516-733fb8df3c8a
+replace github.com/jensneuse/graphql-go-tools => github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20210128132753-3d71d69ea680
+
+//replace github.com/jensneuse/graphql-go-tools => ../graphql-go-tools

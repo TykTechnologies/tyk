@@ -250,7 +250,7 @@ func (gw *Gateway) setupGlobals(ctx context.Context) {
 	//gwConfig.TemplatePath = "/Users/sredny/go/src/github.com/TykTechnologies/tyk/templates"
 
 	if gwConfig.TemplatePath != "/Users/sredny/go/src/github.com/TykTechnologies/tyk/templates" {
-	//	panic("jumm")
+		//	panic("jumm")
 	}
 
 	fmt.Println("dir:" + gwConfig.TemplatePath)
@@ -285,7 +285,7 @@ func (gw *Gateway) setupGlobals(ctx context.Context) {
 		certificateSecret = gw.GetConfig().Security.PrivateCertificateEncodingSecret
 	}
 
-	gw.CertificateManager = certs.NewCertificateManager(gw.getGlobalStorageHandler("cert-", false), certificateSecret, log)
+	gw.CertificateManager = certs.NewCertificateManager(gw.getGlobalStorageHandler("cert-", false), certificateSecret, log, !gw.GetConfig().Cloud)
 
 	if gw.GetConfig().NewRelic.AppName != "" {
 		NewRelicApplication = gw.SetupNewRelic()
@@ -450,6 +450,8 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 			return
 		}
 	}
+
+	muxer.HandleFunc("/"+gw.GetConfig().HealthCheckEndpointName, liveCheckHandler)
 
 	r := mux.NewRouter()
 	muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
