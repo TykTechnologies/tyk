@@ -23,6 +23,7 @@ type AuthorisationHandler interface {
 	Init(storage.Handler)
 	KeyAuthorised(string) (user.SessionState, bool)
 	KeyExpired(*user.SessionState) bool
+	Store() storage.Handler
 }
 
 // SessionHandler handles all update/create/access session functions and deals exclusively with
@@ -79,6 +80,10 @@ func (b *DefaultAuthorisationManager) KeyAuthorised(keyName string) (user.Sessio
 		return user.SessionState{}, false
 	}
 	return newSession.Clone(), true
+}
+
+func (b *DefaultAuthorisationManager) Store() storage.Handler {
+	return b.store
 }
 
 // KeyExpired checks if a key has expired, if the value of user.SessionState.Expires is 0, it will be ignored
