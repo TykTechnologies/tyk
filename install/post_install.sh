@@ -5,7 +5,7 @@ SYSTEMD="/lib/systemd/system"
 UPSTART="/etc/init"
 SYSV1="/etc/init.d"
 SYSV2="/etc/rc.d/init.d/"
-DIR="/opt/tyk-gateway/install"
+DIR="/opt/tyk/install"
 
 if [ -d "$SYSTEMD" ] && systemctl status > /dev/null 2> /dev/null; then
 	echo "Found Systemd"
