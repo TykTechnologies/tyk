@@ -821,6 +821,7 @@ func (s *Test) Start(genConf func(globalConf *config.Config)) *Gateway {
 	s.Gw.startServer()
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
+	fmt.Println(s.Gw.GetConfig().TemplatePath)
 	s.Gw.setupGlobals(ctx)
 	// Set up a default org manager so we can traverse non-live paths
 	if !gwConfig.SupressDefaultOrgStore {
@@ -881,7 +882,6 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 
 	s.HttpHandler = testServer
 	go func() {
-		fmt.Println("una vez")
 		err := testServer.ListenAndServe()
 		if err != nil {
 			log.Warn("testServer.ListenAndServe() err: ", err.Error())
