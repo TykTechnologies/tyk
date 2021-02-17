@@ -57,7 +57,5 @@ for pkg in ${PKGS}; do
 done
 
 # run rpc tests separately
-# TODO: fix rpc tests and enable this
-#rpc_tests='SyncAPISpecsRPC|OrgSessionWithRPCDown'
-rpc_tests='OrgSessionWithRPCDown'
+rpc_tests='SyncAPISpecsRPC|OrgSessionWithRPCDown'
 show go test -v -timeout ${TEST_TIMEOUT} -coverprofile=test.cov github.com/TykTechnologies/tyk/gateway -p 1 -run '"'${rpc_tests}'"' || fatal "Test Failed"

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"sync"
 	"sync/atomic"
+	"testing"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
@@ -42,6 +43,9 @@ var (
 	rpcLoginMu sync.Mutex
 
 	rpcConnectMu sync.Mutex
+
+	// UseSyncLoginRPC for tests where we dont need to execute as a goroutine
+	UseSyncLoginRPC bool
 )
 
 // ErrRPCIsDown this is returned when we can't reach rpc server.
@@ -288,13 +292,20 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 		funcClientSingleton = dispatcher.NewFuncClient(clientSingleton)
 	}
 
-	go Login()
-
+	handleLogin()
 	if !suppressRegister {
 		register()
 		go checkDisconnect()
 	}
 	return true
+}
+
+func handleLogin() {
+	if UseSyncLoginRPC == true {
+		Login()
+		return
+	}
+	go Login()
 }
 
 // Login tries to login to the rpc sever. Returns true if it succeeds and false
@@ -489,4 +500,15 @@ func loadDispatcher(dispatcherFuncs map[string]interface{}) {
 		dispatcher.AddFunc(funcName, funcBody)
 		addedFuncs[funcName] = true
 	}
+}
+
+// ForceConnected only intended to be used in tests
+// do not use it for any other thing
+func ForceConnected(t *testing.T) {
+	values.clientIsConnected.Store(true)
+}
+
+// SetEmergencyMode used in tests to force emergency mode
+func SetEmergencyMode(t *testing.T, value bool) {
+	values.SetEmergencyMode(value)
 }
