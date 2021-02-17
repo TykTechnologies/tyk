@@ -119,6 +119,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		"prefix": "coprocess",
 	})
 
+
 	if strings.Contains(spec.Proxy.TargetURL, "h2c://") {
 		spec.Proxy.TargetURL = strings.Replace(spec.Proxy.TargetURL, "h2c://", "http://", 1)
 	}
