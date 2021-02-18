@@ -24,15 +24,12 @@ import (
 )
 
 type ChainObject struct {
-	Domain         string
 	ListenOn       string
 	ThisHandler    http.Handler
 	RateLimitChain http.Handler
 	RateLimitPath  string
 	Open           bool
-	Index          int
 	Skip           bool
-	Subrouter      *mux.Router
 }
 
 func (gw *Gateway) prepareStorage() generalStores {
@@ -106,7 +103,8 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	gs *generalStores, subrouter *mux.Router, logger *logrus.Entry) *ChainObject {
 
 	var chainDef ChainObject
-	chainDef.Subrouter = subrouter
+
+	handleCORS(subrouter, spec)
 
 	logger = logger.WithFields(logrus.Fields{
 		"org_id":   spec.OrgID,
@@ -121,6 +119,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	if strings.Contains(spec.Proxy.TargetURL, "h2c://") {
 		spec.Proxy.TargetURL = strings.Replace(spec.Proxy.TargetURL, "h2c://", "http://", 1)
 	}
+
 	if len(spec.TagHeaders) > 0 {
 		// Ensure all headers marked for tagging are lowercase
 		lowerCaseHeaders := make([]string, len(spec.TagHeaders))
@@ -297,8 +296,6 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		logger.Info("Checking security policy: Open")
 	}
 
-	handleCORS(&chainArray, spec)
-
 	for _, obj := range mwPreFuncs {
 		if mwDriver == apidef.GoPluginDriver {
 			gw.mwAppendEnabled(
@@ -472,7 +469,6 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		chainDef.ThisHandler = chain
 	}
 	chainDef.ListenOn = spec.Proxy.ListenPath + "{rest:.*}"
-	chainDef.Domain = spec.Domain
 
 	logger.WithFields(logrus.Fields{
 		"prefix":      "gateway",

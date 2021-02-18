@@ -612,7 +612,7 @@ func (v *Visitor) LeaveDocument(operation, definition *ast.Document) {
 
 var (
 	templateRegex = regexp.MustCompile(`{{.*?}}`)
-	selectorRegex = regexp.MustCompile(`{{\s(.*?)\s}}`)
+	selectorRegex = regexp.MustCompile(`{{\s*(.*?)\s*}}`)
 )
 
 func (v *Visitor) resolveInputTemplates(config objectFetchConfiguration, input *string, variables *resolve.Variables) {
@@ -995,7 +995,7 @@ func (c *configurationVisitor) isSubscription(root int, path string) bool {
 	if rootOperationType != ast.OperationTypeSubscription {
 		return false
 	}
-	return strings.Count(path,".") == 1
+	return strings.Count(path, ".") == 1
 }
 
 type requiredFieldsVisitor struct {

@@ -154,3 +154,62 @@ func TestGraphQLPlayground(t *testing.T) {
 		})
 	}
 }
+
+func TestCORS(t *testing.T) {
+	g := StartTest()
+	defer g.Close()
+
+	api := BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Name = "CORS test API"
+		spec.Proxy.ListenPath = "/"
+		spec.CORS.Enable = false
+		spec.CORS.ExposedHeaders = []string{"Custom-Header"}
+		spec.CORS.AllowedOrigins = []string{"*"}
+
+	})[0]
+
+	headers := map[string]string{
+		"Origin": "my-custom-origin",
+	}
+
+	headersMatch := map[string]string{
+		"Access-Control-Allow-Origin":   "*",
+		"Access-Control-Expose-Headers": "Custom-Header",
+	}
+
+	t.Run("CORS disabled", func(t *testing.T) {
+		_, _ = g.Run(t, []test.TestCase{
+			{Headers: headers, HeadersNotMatch: headersMatch, Code: http.StatusOK},
+		}...)
+	})
+
+	t.Run("CORS enabled", func(t *testing.T) {
+		api.CORS.Enable = true
+		LoadAPI(api)
+
+		_, _ = g.Run(t, []test.TestCase{
+			{Headers: headers, HeadersMatch: headersMatch, Code: http.StatusOK},
+		}...)
+	})
+
+	t.Run("oauth endpoints", func(t *testing.T) {
+		api.UseOauth2 = true
+		api.CORS.Enable = false
+		LoadAPI(api)
+
+		t.Run("CORS disabled", func(t *testing.T) {
+			_, _ = g.Run(t, []test.TestCase{
+				{Path: "/oauth/token", Headers: headers, HeadersNotMatch: headersMatch, Code: http.StatusForbidden},
+			}...)
+		})
+
+		t.Run("CORS enabled", func(t *testing.T) {
+			api.CORS.Enable = true
+			LoadAPI(api)
+
+			_, _ = g.Run(t, []test.TestCase{
+				{Path: "/oauth/token", Headers: headers, HeadersMatch: headersMatch, Code: http.StatusForbidden},
+			}...)
+		})
+	})
+}

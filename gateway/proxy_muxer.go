@@ -12,17 +12,17 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/net/http2/h2c"
+
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/tcp"
 	proxyproto "github.com/pires/go-proxyproto"
 	cache "github.com/pmylund/go-cache"
 
-	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/h2c"
-
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/net/http2"
 )
 
 // handleWrapper's only purpose is to allow router to be dynamically replaced
@@ -123,6 +123,7 @@ func (m *proxyMux) router(port int, protocol string, conf config.Config) *mux.Ro
 }
 
 func (m *proxyMux) setRouter(port int, protocol string, router *mux.Router, conf config.Config) {
+
 	if port == 0 {
 		port = conf.ListenPort
 	}
@@ -403,6 +404,7 @@ func (m *proxyMux) serve(gw *Gateway) {
 			}
 			var h http.Handler
 			h = &handleWrapper{p.router}
+
 			if p.protocol == "h2c" {
 				// wrapping handler in h2c. This ensures all features including tracing work
 				// in h2c services.
@@ -412,6 +414,7 @@ func (m *proxyMux) serve(gw *Gateway) {
 					h: h2c.NewHandler(p.router, h2s),
 				}
 			}
+
 			addr := conf.ListenAddress + ":" + strconv.Itoa(p.port)
 			p.httpServer = &http.Server{
 				Addr:         addr,
@@ -423,9 +426,7 @@ func (m *proxyMux) serve(gw *Gateway) {
 			if conf.CloseConnections {
 				p.httpServer.SetKeepAlivesEnabled(false)
 			}
-
 			go p.httpServer.Serve(p.listener)
-
 		}
 		p.started = true
 	}
