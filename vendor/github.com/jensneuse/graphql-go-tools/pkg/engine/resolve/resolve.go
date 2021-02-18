@@ -9,6 +9,7 @@ import (
 	"hash"
 	"io"
 	"net/http"
+	"net/textproto"
 	"strconv"
 	"sync"
 	"time"
@@ -160,7 +161,7 @@ func (c *Context) path() []byte {
 		buf.Write(literal.DATA)
 	}
 	for i := range c.pathElements {
-		if i == 0 && bytes.Equal(literal.DATA,c.pathElements[0]){
+		if i == 0 && bytes.Equal(literal.DATA, c.pathElements[0]) {
 			continue
 		}
 		_, _ = buf.Write(literal.SLASH)
@@ -930,10 +931,10 @@ func (r *Resolver) resolveSingleFetch(ctx *Context, fetch *SingleFetch, prepared
 		err = fetch.DataSource.Load(ctx.Context, preparedInput.Bytes(), buf)
 		if ctx.afterFetchHook != nil {
 			if buf.HasData() {
-				ctx.afterFetchHook.OnData(r.hookCtx(ctx),buf.Data.Bytes(), false)
+				ctx.afterFetchHook.OnData(r.hookCtx(ctx), buf.Data.Bytes(), false)
 			}
 			if buf.HasErrors() {
-				ctx.afterFetchHook.OnError(r.hookCtx(ctx),buf.Errors.Bytes(), false)
+				ctx.afterFetchHook.OnError(r.hookCtx(ctx), buf.Errors.Bytes(), false)
 			}
 		}
 		return
@@ -954,13 +955,13 @@ func (r *Resolver) resolveSingleFetch(ctx *Context, fetch *SingleFetch, prepared
 		inflight.waitLoad.Wait()
 		if inflight.bufPair.HasData() {
 			if ctx.afterFetchHook != nil {
-				ctx.afterFetchHook.OnData(r.hookCtx(ctx),inflight.bufPair.Data.Bytes(), true)
+				ctx.afterFetchHook.OnData(r.hookCtx(ctx), inflight.bufPair.Data.Bytes(), true)
 			}
 			buf.Data.WriteBytes(inflight.bufPair.Data.Bytes())
 		}
 		if inflight.bufPair.HasErrors() {
 			if ctx.afterFetchHook != nil {
-				ctx.afterFetchHook.OnError(r.hookCtx(ctx),inflight.bufPair.Errors.Bytes(), true)
+				ctx.afterFetchHook.OnError(r.hookCtx(ctx), inflight.bufPair.Errors.Bytes(), true)
 			}
 			buf.Errors.WriteBytes(inflight.bufPair.Errors.Bytes())
 		}
@@ -978,14 +979,14 @@ func (r *Resolver) resolveSingleFetch(ctx *Context, fetch *SingleFetch, prepared
 
 	if inflight.bufPair.HasData() {
 		if ctx.afterFetchHook != nil {
-			ctx.afterFetchHook.OnData(r.hookCtx(ctx),inflight.bufPair.Data.Bytes(), false)
+			ctx.afterFetchHook.OnData(r.hookCtx(ctx), inflight.bufPair.Data.Bytes(), false)
 		}
 		buf.Data.WriteBytes(inflight.bufPair.Data.Bytes())
 	}
 
 	if inflight.bufPair.HasErrors() {
 		if ctx.afterFetchHook != nil {
-			ctx.afterFetchHook.OnError(r.hookCtx(ctx),inflight.bufPair.Errors.Bytes(), true)
+			ctx.afterFetchHook.OnError(r.hookCtx(ctx), inflight.bufPair.Errors.Bytes(), true)
 		}
 		buf.Errors.WriteBytes(inflight.bufPair.Errors.Bytes())
 	}
@@ -1093,9 +1094,9 @@ func (i *InputTemplate) Render(ctx *Context, data []byte, preparedInput *fastbuf
 			case VariableSourceObject:
 				err = i.renderObjectVariable(data, i.Segments[j].VariableSourcePath, preparedInput)
 			case VariableSourceContext:
-				err = i.renderContextVariable(ctx,i.Segments[j].VariableSourcePath,preparedInput)
+				err = i.renderContextVariable(ctx, i.Segments[j].VariableSourcePath, preparedInput)
 			case VariableSourceRequestHeader:
-				err = i.renderHeaderVariable(ctx,i.Segments[j].VariableSourcePath,preparedInput)
+				err = i.renderHeaderVariable(ctx, i.Segments[j].VariableSourcePath, preparedInput)
 			default:
 				err = fmt.Errorf("InputTemplate.Render: cannot resolve variable of kind: %d", i.Segments[j].VariableSource)
 			}
@@ -1125,11 +1126,15 @@ func (i *InputTemplate) renderContextVariable(ctx *Context, path []string, prepa
 	return nil
 }
 
-func (i *InputTemplate) renderHeaderVariable(ctx *Context,path []string, preparedInput *fastbuffer.FastBuffer) error {
+func (i *InputTemplate) renderHeaderVariable(ctx *Context, path []string, preparedInput *fastbuffer.FastBuffer) error {
 	if len(path) != 1 {
 		return errHeaderPathInvalid
 	}
-	value := ctx.Request.Header[path[0]]
+	// Header.Values is available from go 1.14
+	// value := ctx.Request.Header.Values(path[0])
+	// could be simplified once go 1.12 support will be dropped
+	canonicalName := textproto.CanonicalMIMEHeaderKey(path[0])
+	value := ctx.Request.Header[canonicalName]
 	if len(value) == 0 {
 		return nil
 	}
@@ -1234,7 +1239,7 @@ func (_ *Array) NodeKind() NodeKind {
 type Variable interface {
 	VariableKind() VariableKind
 	Equals(another Variable) bool
-	TemplateSegment () TemplateSegment
+	TemplateSegment() TemplateSegment
 }
 
 type Variables []Variable
