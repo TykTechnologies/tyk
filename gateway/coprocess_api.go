@@ -36,13 +36,16 @@ func TykGetData(CKey *C.char) *C.char {
 	return C.CString(val)
 }
 
+// GatewayFireSystemEvent declared as global variable, set during gw start
+var GatewayFireSystemEvent func(name apidef.TykEvent, meta interface{})
+
 // TykTriggerEvent is a CoProcess API function for triggering Tyk system events.
-//gexport TykTriggerEvent
-func (gw *Gateway) TykTriggerEvent(CEventName, CPayload *C.char) {
+//export TykTriggerEvent
+func TykTriggerEvent(CEventName, CPayload *C.char) {
 	eventName := C.GoString(CEventName)
 	payload := C.GoString(CPayload)
 
-	gw.FireSystemEvent(apidef.TykEvent(eventName), EventMetaDefault{
+	GatewayFireSystemEvent(apidef.TykEvent(eventName), EventMetaDefault{
 		Message: payload,
 	})
 }

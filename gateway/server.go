@@ -1322,6 +1322,8 @@ func Start() {
 		runtime.SetMutexProfileFraction(1)
 	}
 
+	// set var as global so we can export TykTriggerEvent(CEventName, CPayload *C.char)
+	GatewayFireSystemEvent = gw.FireSystemEvent
 	// TODO: replace goagain with something that support multiple listeners
 	// Example: https://gravitational.com/blog/golang-ssh-bastion-graceful-restarts/
 	gw.startServer()
