@@ -785,45 +785,31 @@ type SlaveDataCenter struct {
 
 // ToDo: better receive a config generator function
 func (s *Test) Start(genConf func(globalConf *config.Config)) *Gateway {
-	l, _ := net.Listen("tcp", "127.0.0.1:0")
-	_, port, _ := net.SplitHostPort(l.Addr().String())
-	l.Close()
-	gwConfig := config.Default
-	gwConfig.ListenPort, _ = strconv.Atoi(port)
 
 	// init and create gw
 	s.BootstrapGw(context.Background(), genConf)
 
-	if s.config.SeparateControlAPI {
-		l, _ := net.Listen("tcp", "127.0.0.1:0")
-		_, port, _ = net.SplitHostPort(l.Addr().String())
-		l.Close()
-		gwConfig.ControlAPIPort, _ = strconv.Atoi(port)
-	}
-
-	gwConfig.CoProcessOptions = s.config.CoprocessConfig
-	s.Gw.SetConfig(gwConfig)
-
 	s.Gw.setupPortsWhitelist()
-
 	s.Gw.startServer()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
-	fmt.Println(s.Gw.GetConfig().TemplatePath)
+
 	s.Gw.setupGlobals(ctx)
 	// Set up a default org manager so we can traverse non-live paths
-	if !gwConfig.SupressDefaultOrgStore {
+	if !s.Gw.GetConfig().SupressDefaultOrgStore {
 		s.Gw.DefaultOrgStore.Init(s.Gw.getGlobalStorageHandler("orgkey.", false))
 		s.Gw.DefaultQuotaStore.Init(s.Gw.getGlobalStorageHandler("orgkey.", false))
 	}
 
-	s.GlobalConfig = gwConfig
+	s.GlobalConfig = s.Gw.GetConfig()
 
 	scheme := "http://"
 	if s.GlobalConfig.HttpServerOptions.UseSSL {
 		scheme = "https://"
 	}
-	s.URL = scheme + s.Gw.DefaultProxyMux.getProxy(gwConfig.ListenPort, s.Gw.GetConfig()).listener.Addr().String()
+
+	s.URL = scheme + s.Gw.DefaultProxyMux.getProxy(s.Gw.GetConfig().ListenPort, s.Gw.GetConfig()).listener.Addr().String()
 
 	s.testRunner = &test.HTTPTestRunner{
 		RequestBuilder: func(tc *test.TestCase) (*http.Request, error) {
@@ -855,8 +841,22 @@ func (s *Test) Start(genConf func(globalConf *config.Config)) *Gateway {
 }
 
 func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.Config)) {
-	gwConf := config.Default
-	gw := NewGateway(gwConf)
+	gwConfig := config.Default
+
+	l, _ := net.Listen("tcp", "127.0.0.1:0")
+	_, port, _ := net.SplitHostPort(l.Addr().String())
+	l.Close()
+	gwConfig.ListenPort, _ = strconv.Atoi(port)
+
+	gwConfig.CoProcessOptions = s.config.CoprocessConfig
+	if s.config.SeparateControlAPI {
+		l, _ := net.Listen("tcp", "127.0.0.1:0")
+		_, port, _ = net.SplitHostPort(l.Addr().String())
+		l.Close()
+		gwConfig.ControlAPIPort, _ = strconv.Atoi(port)
+	}
+
+	gw := NewGateway(gwConfig)
 	gw.setTestMode(true)
 
 	s.Gw = gw
@@ -877,48 +877,48 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 		}
 	}()
 
-	if err := config.WriteDefault("", &gwConf); err != nil {
+	if err := config.WriteDefault("", &gwConfig); err != nil {
 		panic(err)
 	}
 
 	var err error
-	gwConf.Storage.Database = rand.Intn(15)
-	gwConf.AppPath, err = ioutil.TempDir("", "tyk-test-")
+	gwConfig.Storage.Database = rand.Intn(15)
+	gwConfig.AppPath, err = ioutil.TempDir("", "tyk-test-")
 
 	if err != nil {
 		panic(err)
 	}
-	gwConf.EnableAnalytics = true
-	gwConf.AnalyticsConfig.EnableGeoIP = true
+	gwConfig.EnableAnalytics = true
+	gwConfig.AnalyticsConfig.EnableGeoIP = true
 
 	_, b, _, _ := runtime.Caller(0)
 	gatewayPath := filepath.Dir(b)
 	rootPath := filepath.Dir(gatewayPath)
 
-	gwConf.AnalyticsConfig.GeoIPDBLocation = filepath.Join(rootPath, "testdata", "MaxMind-DB-test-ipv4-24.mmdb")
-	gwConf.EnableJSVM = true
-	gwConf.HashKeyFunction = storage.HashMurmur64
-	gwConf.Monitor.EnableTriggerMonitors = true
-	gwConf.AnalyticsConfig.NormaliseUrls.Enabled = true
-	gwConf.AllowInsecureConfigs = true
+	gwConfig.AnalyticsConfig.GeoIPDBLocation = filepath.Join(rootPath, "testdata", "MaxMind-DB-test-ipv4-24.mmdb")
+	gwConfig.EnableJSVM = true
+	gwConfig.HashKeyFunction = storage.HashMurmur64
+	gwConfig.Monitor.EnableTriggerMonitors = true
+	gwConfig.AnalyticsConfig.NormaliseUrls.Enabled = true
+	gwConfig.AllowInsecureConfigs = true
 	// Enable coprocess and bundle downloader:
-	gwConf.CoProcessOptions.EnableCoProcess = true
-	gwConf.EnableBundleDownloader = true
-	gwConf.BundleBaseURL = testHttpBundles
-	gwConf.MiddlewarePath = testMiddlewarePath
+	gwConfig.CoProcessOptions.EnableCoProcess = true
+	gwConfig.EnableBundleDownloader = true
+	gwConfig.BundleBaseURL = testHttpBundles
+	gwConfig.MiddlewarePath = testMiddlewarePath
 
 	// force ipv4 for now, to work around the docker bug affecting
 	// Go 1.8 and ealier
-	gwConf.ListenAddress = "127.0.0.1"
+	gwConfig.ListenAddress = "127.0.0.1"
 	if genConf != nil {
-		genConf(&gwConf)
+		genConf(&gwConfig)
 	}
 
 	gw.CoProcessInit()
 	gw.afterConfSetup()
 
-	defaultTestConfig = gwConf
-	gw.SetConfig(gwConf)
+	defaultTestConfig = gwConfig
+	gw.SetConfig(gwConfig)
 
 	cli.Init(VERSION, confPaths)
 
@@ -967,13 +967,19 @@ func (s *Test) Close() {
 		s.cancel()
 	}
 
+	for _, p := range s.Gw.DefaultProxyMux.proxies {
+		if p.listener != nil {
+			p.listener.Close()
+		} else {
+			fmt.Println("es nil")
+		}
+	}
 	s.Gw.DefaultProxyMux.swap(&proxyMux{}, s.Gw)
 	if s.config.SeparateControlAPI {
 		gwConfig := s.Gw.GetConfig()
 		gwConfig.ControlAPIPort = 0
 		s.Gw.SetConfig(gwConfig)
 	}
-
 	s.HttpHandler.Shutdown(context.Background())
 }
 

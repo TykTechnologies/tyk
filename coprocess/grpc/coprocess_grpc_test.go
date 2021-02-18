@@ -124,11 +124,9 @@ func newTestGRPCServer() (s *grpc.Server) {
 	return s
 }
 
-func loadTestGRPCAPIs() {
-	ts := gateway.StartTest(nil)
-	defer ts.Close()
+func loadTestGRPCAPIs(s *gateway.Test) {
 
-	ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+	s.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 		spec.APIID = "1"
 		spec.OrgID = gateway.MockOrgID
 		spec.Auth = apidef.AuthConfig{
@@ -305,7 +303,7 @@ func startTykWithGRPC() (*gateway.Test, *grpc.Server) {
 	ts := gateway.StartTest(nil, gateway.TestConfig{CoprocessConfig: cfg})
 
 	// Load test APIs:
-	loadTestGRPCAPIs()
+	loadTestGRPCAPIs(ts)
 	return ts, grpcServer
 }
 

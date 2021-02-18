@@ -366,11 +366,13 @@ func (m *proxyMux) swap(new *proxyMux, gw *Gateway) {
 }
 
 func (m *proxyMux) serve(gw *Gateway) {
+
 	conf := gw.GetConfig()
 	for _, p := range m.proxies {
 		if p.listener == nil {
 			listener, err := m.generateListener(p.port, p.protocol, gw)
 			if err != nil {
+				fmt.Println("cant start listener" + err.Error())
 				mainLog.WithError(err).Error("Can't start listener")
 				continue
 			}
@@ -425,7 +427,6 @@ func (m *proxyMux) serve(gw *Gateway) {
 			go p.httpServer.Serve(p.listener)
 
 		}
-
 		p.started = true
 	}
 }
