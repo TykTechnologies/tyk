@@ -143,15 +143,15 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 		return `[]`, nil
 	})
 
-	rpc, connectionString := startRPCMock(dispatcher)
-	defer stopRPCMock(rpc)
+	rpcMock, connectionString := startRPCMock(dispatcher)
+	defer stopRPCMock(rpcMock)
 
 	ts := StartSlaveGw(connectionString)
 	defer ts.Close()
 
 	store := RPCStorageHandler{Gw: ts.Gw}
 	store.Connect()
-	//rpc.ForceConnected(t)
+	rpc.ForceConnected(t)
 
 	// Three cases: 1 API, 2 APIs and Malformed data
 	exp := []int{0, 1, 2, 2}
@@ -187,8 +187,8 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 	})
 
 	t.Run("RPC is live", func(t *testing.T) {
-		rpc, connectionString := startRPCMock(dispatcher)
-		defer stopRPCMock(rpc)
+		rpcMock, connectionString := startRPCMock(dispatcher)
+		defer stopRPCMock(rpcMock)
 
 		ts := StartSlaveGw(connectionString)
 		defer ts.Close()
@@ -215,7 +215,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		}
 
 		if GetKeyCounter != 2 {
-			t.Error("getKey should have been called 2 times")
+			t.Errorf("getKey should have been called 2 times, instead, was called %v times", GetKeyCounter)
 		}
 	})
 
@@ -275,8 +275,8 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 			return jsonMarshalString(CreateStandardSession()), nil
 		})
 		// Back to live
-		rpc, connectionString := startRPCMock(dispatcher)
-		defer stopRPCMock(rpc)
+		rpcMock, connectionString := startRPCMock(dispatcher)
+		defer stopRPCMock(rpcMock)
 
 		ts := StartSlaveGw(connectionString)
 		defer ts.Close()
@@ -300,7 +300,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 	})
 
 	t.Run("RPC is back, live reload", func(t *testing.T) {
-		rpc, connectionString := startRPCMock(dispatcher)
+		rpcMock, connectionString := startRPCMock(dispatcher)
 
 		ts := StartSlaveGw(connectionString)
 		defer ts.Close()
@@ -311,8 +311,8 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 			{Path: "/sample", Headers: authHeaders, Code: 200},
 		}...)
 
-		rpc.Listener.Close()
-		rpc.Stop()
+		rpcMock.Listener.Close()
+		rpcMock.Stop()
 
 		cached := map[string]string{"Authorization": "test"}
 		notCached := map[string]string{"Authorization": "nope3"}
@@ -322,11 +322,11 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		}...)
 
 		// Dynamically restart RPC layer
-		rpc = gorpc.NewTCPServer(rpc.Listener.(*customListener).L.Addr().String(), dispatcher.NewHandlerFunc())
+		rpcMock = gorpc.NewTCPServer(rpcMock.Listener.(*customListener).L.Addr().String(), dispatcher.NewHandlerFunc())
 		list := &customListener{}
-		rpc.Listener = list
-		rpc.LogError = gorpc.NilErrorLogger
-		if err := rpc.Start(); err != nil {
+		rpcMock.Listener = list
+		rpcMock.LogError = gorpc.NilErrorLogger
+		if err := rpcMock.Start(); err != nil {
 			panic(err)
 		}
 
@@ -357,8 +357,8 @@ func TestSyncAPISpecsRPC_redis_failure(t *testing.T) {
 		return jsonMarshalString(CreateStandardSession()), nil
 	})
 
-	rpc, connectionString := startRPCMock(dispatcher)
-	defer stopRPCMock(rpc)
+	rpcMock, connectionString := startRPCMock(dispatcher)
+	defer stopRPCMock(rpcMock)
 
 	ts := StartSlaveGw(connectionString)
 	defer ts.Close()
