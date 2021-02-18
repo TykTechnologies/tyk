@@ -25,15 +25,12 @@ import (
 )
 
 type ChainObject struct {
-	Domain         string
 	ListenOn       string
 	ThisHandler    http.Handler
 	RateLimitChain http.Handler
 	RateLimitPath  string
 	Open           bool
-	Index          int
 	Skip           bool
-	Subrouter      *mux.Router
 }
 
 func prepareStorage() generalStores {
@@ -107,7 +104,6 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	gs *generalStores, subrouter *mux.Router, logger *logrus.Entry) *ChainObject {
 
 	var chainDef ChainObject
-	chainDef.Subrouter = subrouter
 
 	logger = logger.WithFields(logrus.Fields{
 		"org_id":   spec.OrgID,
@@ -119,10 +115,10 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		"prefix": "coprocess",
 	})
 
-
 	if strings.Contains(spec.Proxy.TargetURL, "h2c://") {
 		spec.Proxy.TargetURL = strings.Replace(spec.Proxy.TargetURL, "h2c://", "http://", 1)
 	}
+
 	if len(spec.TagHeaders) > 0 {
 		// Ensure all headers marked for tagging are lowercase
 		lowerCaseHeaders := make([]string, len(spec.TagHeaders))
@@ -474,7 +470,6 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		chainDef.ThisHandler = chain
 	}
 	chainDef.ListenOn = spec.Proxy.ListenPath + "{rest:.*}"
-	chainDef.Domain = spec.Domain
 
 	logger.WithFields(logrus.Fields{
 		"prefix":      "gateway",
