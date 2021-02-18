@@ -78,8 +78,6 @@ func WaitConnect(ctx context.Context) bool {
 			time.Sleep(10 * time.Millisecond)
 		}
 	}
-
-	return false
 }
 
 func singleton(cache bool) redis.UniversalClient {
