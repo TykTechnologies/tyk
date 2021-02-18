@@ -42,7 +42,7 @@ github.com/andybalholm/brotli
 github.com/armon/go-metrics
 # github.com/bshuster-repo/logrus-logstash-hook v0.4.1
 github.com/bshuster-repo/logrus-logstash-hook
-# github.com/buger/jsonparser v0.0.0-20181115193947-bf1c66bbce23
+# github.com/buger/jsonparser v1.1.1
 github.com/buger/jsonparser
 # github.com/cenk/backoff v2.2.1+incompatible
 github.com/cenk/backoff
