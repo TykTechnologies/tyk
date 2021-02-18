@@ -82,6 +82,7 @@ func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
 
 	t.Run("with policies", func(t *testing.T) {
 		spec.UseKeylessAccess = false
+		spec.GraphQL.Schema = "schema { query: Query } type Query { hello: word } type word { numOfLetters: Int }"
 		LoadAPI(spec)
 
 		pID := CreatePolicy(func(p *user.Policy) {
