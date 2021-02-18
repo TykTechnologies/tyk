@@ -15,23 +15,36 @@ addons:
   apt:
     packages:
     - python3-pip
-    - libluajit-5.1-dev
 
 matrix:
   include:
-    - go: 1.12.x
+    - arch: amd64
+      go: 1.12.x
+    - arch: arm64
+      go: 1.12.x
 
 services:
   - redis-server
 
 install:
+  - if [ "${TRAVIS_CPU_ARCH}" == "arm64" ]; then
+      wget https://github.com/moonjit/moonjit/archive/2.2.0.tar.gz;
+      tar -zxvf 2.2.0.tar.gz;
+      cd moonjit-2.2.0;
+      sudo make -j4;
+      sudo make install;
+      cd ..;
+      rm -rf moonjit-2.2.0 2.2.0.tar.gz;
+    else
+      sudo apt-get install libluajit-5.1-dev;
+    fi
   - go get golang.org/x/tools/cmd/goimports
   - go get github.com/wadey/gocovmerge
   - go get github.com/mattn/goveralls
 
 
 before_script:
-   - 'if [[ ! -f $CONSUL_DIR/consul ]]; then (mkdir -p "$CONSUL_DIR" && cd $CONSUL_DIR && wget https://releases.hashicorp.com/consul/${CONSUL_VERSION}/consul_${CONSUL_VERSION}_linux_amd64.zip && unzip consul_${CONSUL_VERSION}_linux_amd64.zip); fi'
+   - 'if [[ ! -f $CONSUL_DIR/consul ]]; then (mkdir -p "$CONSUL_DIR" && cd $CONSUL_DIR && wget https://releases.hashicorp.com/consul/${CONSUL_VERSION}/consul_${CONSUL_VERSION}_linux_${TRAVIS_CPU_ARCH}.zip && unzip consul_${CONSUL_VERSION}_linux_${TRAVIS_CPU_ARCH}.zip); fi'
    - $CONSUL_DIR/consul --version
    - $CONSUL_DIR/consul agent --dev &
    # Wait for consul's raft election
