@@ -782,6 +782,7 @@ func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http
 		err = errors.New("graphql request is nil")
 		return
 	}
+	gqlRequest.SetHeader(outreq.Header)
 
 	var isIntrospection bool
 	isIntrospection, err = gqlRequest.IsIntrospectionQuery()

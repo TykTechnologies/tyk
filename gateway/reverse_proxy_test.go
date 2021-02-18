@@ -18,6 +18,7 @@ import (
 
 	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -681,6 +682,42 @@ func TestNopCloseResponseBody(t *testing.T) {
 			t.Error("3rd read, body's data is not as expectd")
 		}
 	}
+}
+
+func TestGraphQL_HeadersInjection(t *testing.T) {
+	g := StartTest()
+	defer g.Close()
+
+	composedAPI := BuildAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.GraphQL.Enabled = true
+		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+		spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+
+		spec.GraphQL.Engine.DataSources = []apidef.GraphQLEngineDataSource{
+			generateRESTDataSourceV2(func(ds *apidef.GraphQLEngineDataSource, restConfig *apidef.GraphQLEngineDataSourceConfigREST) {
+				require.NoError(t, json.Unmarshal([]byte(testRESTHeadersDataSourceConfigurationV2), ds))
+				require.NoError(t, json.Unmarshal(ds.Config, restConfig))
+			}),
+		}
+
+		spec.GraphQL.TypeFieldConfigurations = nil
+	})[0]
+
+	LoadAPI(composedAPI)
+
+	headers := graphql.Request{
+		Query: "query Query { headers { name value } }",
+	}
+
+	_, _ = g.Run(t, []test.TestCase{
+		{
+			Data:      headers,
+			Headers:   map[string]string{"injected": "FOO"},
+			BodyMatch: `"headers":.*{"name":"Injected","value":"FOO"},{"name":"Static","value":"barbaz"}.*`,
+			Code:      http.StatusOK,
+		},
+	}...)
 }
 
 func TestGraphQL_InternalDataSource(t *testing.T) {
