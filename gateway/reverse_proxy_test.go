@@ -698,7 +698,7 @@ func TestNopCloseResponseBody(t *testing.T) {
 }
 
 func TestGraphQL_HeadersInjection(t *testing.T) {
-	g := StartTest()
+	g := StartTest(nil)
 	defer g.Close()
 
 	composedAPI := BuildAPI(func(spec *APISpec) {
@@ -717,7 +717,7 @@ func TestGraphQL_HeadersInjection(t *testing.T) {
 		spec.GraphQL.TypeFieldConfigurations = nil
 	})[0]
 
-	LoadAPI(composedAPI)
+	g.Gw.LoadAPI(composedAPI)
 
 	headers := graphql.Request{
 		Query: "query Query { headers { name value } }",

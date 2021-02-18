@@ -156,10 +156,10 @@ func TestGraphQLPlayground(t *testing.T) {
 }
 
 func TestCORS(t *testing.T) {
-	g := StartTest()
+	g := StartTest(nil)
 	defer g.Close()
 
-	api := BuildAndLoadAPI(func(spec *APISpec) {
+	api := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Name = "CORS test API"
 		spec.Proxy.ListenPath = "/"
 		spec.CORS.Enable = false
@@ -185,7 +185,7 @@ func TestCORS(t *testing.T) {
 
 	t.Run("CORS enabled", func(t *testing.T) {
 		api.CORS.Enable = true
-		LoadAPI(api)
+		g.Gw.LoadAPI(api)
 
 		_, _ = g.Run(t, []test.TestCase{
 			{Headers: headers, HeadersMatch: headersMatch, Code: http.StatusOK},
@@ -195,7 +195,7 @@ func TestCORS(t *testing.T) {
 	t.Run("oauth endpoints", func(t *testing.T) {
 		api.UseOauth2 = true
 		api.CORS.Enable = false
-		LoadAPI(api)
+		g.Gw.LoadAPI(api)
 
 		t.Run("CORS disabled", func(t *testing.T) {
 			_, _ = g.Run(t, []test.TestCase{
@@ -205,7 +205,7 @@ func TestCORS(t *testing.T) {
 
 		t.Run("CORS enabled", func(t *testing.T) {
 			api.CORS.Enable = true
-			LoadAPI(api)
+			g.Gw.LoadAPI(api)
 
 			_, _ = g.Run(t, []test.TestCase{
 				{Path: "/oauth/token", Headers: headers, HeadersMatch: headersMatch, Code: http.StatusForbidden},
