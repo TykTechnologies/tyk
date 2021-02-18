@@ -105,6 +105,8 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 	var chainDef ChainObject
 
+	handleCORS(subrouter, spec)
+
 	logger = logger.WithFields(logrus.Fields{
 		"org_id":   spec.OrgID,
 		"api_id":   spec.APIID,
@@ -294,8 +296,6 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		chainDef.Open = true
 		logger.Info("Checking security policy: Open")
 	}
-
-	handleCORS(&chainArray, spec)
 
 	for _, obj := range mwPreFuncs {
 		if mwDriver == apidef.GoPluginDriver {
