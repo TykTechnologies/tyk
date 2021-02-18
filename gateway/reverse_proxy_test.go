@@ -18,6 +18,7 @@ import (
 
 	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -681,6 +682,91 @@ func TestNopCloseResponseBody(t *testing.T) {
 			t.Error("3rd read, body's data is not as expectd")
 		}
 	}
+}
+
+func TestGraphQL_HeadersInjection(t *testing.T) {
+	g := StartTest()
+	defer g.Close()
+
+	schema := `type KeyVal {
+  key: String
+  val: String
+}
+
+type Query {
+  headers: [KeyVal]
+}`
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		type KeyVal struct {
+			Key string `json:"key"`
+			Val string `json:"val"`
+		}
+
+		var headers []KeyVal
+		for name, reqHeader := range req.Header {
+			for _, h := range reqHeader {
+				headers = append(headers, KeyVal{Key: name, Val: h})
+			}
+		}
+		json.NewEncoder(w).Encode(headers)
+	}))
+	defer ts.Close()
+
+	composedAPI := BuildAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.GraphQL.Enabled = true
+		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+		spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+
+		ds := apidef.GraphQLEngineDataSource{
+			Kind:     apidef.GraphQLEngineDataSourceKindREST,
+			Name:     "headers",
+			Internal: false,
+			RootFields: []apidef.GraphQLTypeFields{
+				{Type: "Query", Fields: []string{"headers"}},
+			},
+		}
+
+		restConf := apidef.GraphQLEngineDataSourceConfigREST{
+			URL:    ts.URL,
+			Method: "GET",
+			Headers: map[string]string{
+				"static":   "barbaz",
+				"injected": "{{ .request.header.qa }}",
+			},
+		}
+
+		var err error
+		ds.Config, err = json.Marshal(restConf)
+		require.NoError(t, err)
+
+		spec.GraphQL.Engine.DataSources = []apidef.GraphQLEngineDataSource{ds}
+		spec.GraphQL.Engine.FieldConfigs = []apidef.GraphQLFieldConfig{
+			{
+				TypeName:              "Query",
+				FieldName:             "headers",
+				DisableDefaultMapping: true,
+				Path:                  []string{""},
+			},
+		}
+
+		spec.GraphQL.TypeFieldConfigurations = nil
+		spec.GraphQL.Schema = schema
+	})[0]
+
+	LoadAPI(composedAPI)
+
+	headersQuery := graphql.Request{
+		Query: "query Query { headers { key val } }",
+	}
+
+	_, _ = g.Run(t, []test.TestCase{{
+		Data:      headersQuery,
+		Headers:   map[string]string{"qa": "FOO"},
+		BodyMatch: `{"key":"Injected","val":"FOO"},{"key":"Static","val":"barbaz"}`,
+		Code:      http.StatusOK,
+	}}...)
 }
 
 func TestGraphQL_InternalDataSource(t *testing.T) {
