@@ -136,6 +136,8 @@ const (
 type Config struct {
 	UseSSL                bool   `json:"use_ssl"`
 	SSLInsecureSkipVerify bool   `json:"ssl_insecure_skip_verify"`
+	SSLMinVersion         uint16 `json:"ssl_min_version"`
+	SSLMaxVersion         uint16 `json:"ssl_max_version"`
 	ConnectionString      string `json:"connection_string"`
 	RPCKey                string `json:"rpc_key"`
 	APIKey                string `json:"api_key"`
@@ -230,6 +232,8 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 	if values.Config().UseSSL {
 		clientCfg := &tls.Config{
 			InsecureSkipVerify: values.Config().SSLInsecureSkipVerify,
+			MinVersion:         values.Config().SSLMinVersion,
+			MaxVersion:         values.Config().SSLMaxVersion,
 		}
 
 		clientSingleton = gorpc.NewTLSClient(values.Config().ConnectionString, clientCfg)
@@ -259,6 +263,8 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 		if useSSL {
 			cfg := &tls.Config{
 				InsecureSkipVerify: values.Config().SSLInsecureSkipVerify,
+				MinVersion:         values.Config().SSLMinVersion,
+				MaxVersion:         values.Config().SSLMaxVersion,
 			}
 
 			conn, err = tls.DialWithDialer(dialer, "tcp", addr, cfg)

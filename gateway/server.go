@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -1005,6 +1006,32 @@ func initialiseSystem(ctx context.Context) error {
 			globalConf.Policies.PolicyRecordName = config.DefaultDashPolicyRecordName
 		}
 	}
+
+	if globalConf.ProxySSLMaxVersion == 0 {
+		globalConf.ProxySSLMaxVersion = tls.VersionTLS12
+	}
+
+	if globalConf.ProxySSLMinVersion > globalConf.ProxySSLMaxVersion {
+		globalConf.ProxySSLMaxVersion = globalConf.ProxySSLMinVersion
+	}
+
+	if globalConf.HttpServerOptions.MaxVersion == 0 {
+		globalConf.HttpServerOptions.MaxVersion = tls.VersionTLS12
+	}
+
+	if globalConf.HttpServerOptions.MinVersion > globalConf.HttpServerOptions.MaxVersion {
+		globalConf.HttpServerOptions.MaxVersion = globalConf.HttpServerOptions.MinVersion
+	}
+
+	if globalConf.UseDBAppConfigs && globalConf.Policies.PolicySource != config.DefaultDashPolicySource {
+		globalConf.Policies.PolicySource = config.DefaultDashPolicySource
+		globalConf.Policies.PolicyConnectionString = globalConf.DBAppConfOptions.ConnectionString
+		if globalConf.Policies.PolicyRecordName == "" {
+			globalConf.Policies.PolicyRecordName = config.DefaultDashPolicyRecordName
+		}
+	}
+
+	config.SetGlobal(globalConf)
 
 	getHostDetails()
 	setupInstrumentation()

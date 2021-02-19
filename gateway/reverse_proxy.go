@@ -596,6 +596,14 @@ func tlsClientConfig(s *APISpec) *tls.Config {
 		config.MinVersion = s.Proxy.Transport.SSLMinVersion
 	}
 
+	if s.GlobalConfig.ProxySSLMaxVersion > 0 {
+		config.MaxVersion = s.GlobalConfig.ProxySSLMaxVersion
+	}
+
+	if s.Proxy.Transport.SSLMaxVersion > 0 {
+		config.MaxVersion = s.Proxy.Transport.SSLMaxVersion
+	}
+
 	if len(s.GlobalConfig.ProxySSLCipherSuites) > 0 {
 		config.CipherSuites = getCipherAliases(s.GlobalConfig.ProxySSLCipherSuites)
 	}
@@ -643,6 +651,14 @@ func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p
 
 	if p.TykAPISpec.Proxy.Transport.SSLMinVersion > 0 {
 		transport.TLSClientConfig.MinVersion = p.TykAPISpec.Proxy.Transport.SSLMinVersion
+	}
+
+	if p.TykAPISpec.GlobalConfig.ProxySSLMaxVersion > 0 {
+		transport.TLSClientConfig.MaxVersion = p.TykAPISpec.GlobalConfig.ProxySSLMaxVersion
+	}
+
+	if p.TykAPISpec.Proxy.Transport.SSLMaxVersion > 0 {
+		transport.TLSClientConfig.MaxVersion = p.TykAPISpec.Proxy.Transport.SSLMaxVersion
 	}
 
 	if len(p.TykAPISpec.GlobalConfig.ProxySSLCipherSuites) > 0 {

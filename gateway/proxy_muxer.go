@@ -466,6 +466,7 @@ func (m *proxyMux) generateListener(listenPort int, protocol string) (l net.List
 			GetCertificate:     dummyGetCertificate,
 			ServerName:         httpServerOptions.ServerName,
 			MinVersion:         httpServerOptions.MinVersion,
+			MaxVersion:         httpServerOptions.MaxVersion,
 			ClientAuth:         tls.NoClientCert,
 			InsecureSkipVerify: httpServerOptions.SSLInsecureSkipVerify,
 			CipherSuites:       getCipherAliases(httpServerOptions.Ciphers),
