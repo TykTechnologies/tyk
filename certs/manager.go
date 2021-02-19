@@ -255,22 +255,18 @@ func (c *CertificateManager) List(certIDs []string, mode CertificateType) (out [
 			continue
 		}
 
-		if isSHA256(id) {
-			var val string
-			val, err = c.storage.GetKey("raw-" + id)
-			if err != nil {
-				c.logger.Warn("Can't retrieve certificate from Redis:", id, err)
-				out = append(out, nil)
-				continue
-			}
-			rawCert = []byte(val)
-		} else {
+		var val string
+		val, err = c.storage.GetKey("raw-" + id)
+		if err != nil {
+			// Try read from file
 			rawCert, err = ioutil.ReadFile(id)
 			if err != nil {
-				c.logger.Error("Error while reading certificate from file:", id, err)
+				c.logger.Warn("Can't retrieve certificate:", id, err)
 				out = append(out, nil)
 				continue
 			}
+		} else {
+			rawCert = []byte(val)
 		}
 
 		cert, err = ParsePEMCertificate(rawCert, c.secret)
@@ -381,6 +377,7 @@ func (c *CertificateManager) ListAllIds(prefix string) (out []string) {
 		}
 	} else {
 		keys := c.storage.GetKeys("raw-" + prefix + "*")
+
 		for _, key := range keys {
 			if prefix != "" {
 				c.storage.AppendToSet(indexKey, key)

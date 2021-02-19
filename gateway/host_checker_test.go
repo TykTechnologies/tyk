@@ -296,7 +296,7 @@ func TestTestCheckerTCPHosts_correct_answers(t *testing.T) {
 	ans := &answers{cancel: cancel}
 	setTestMode(false)
 
-	hs.Init(1, 1, 0, map[string]HostData{
+	hs.Init(1, 1, 1, map[string]HostData{
 		l.Addr().String(): data,
 	},
 		ans.cb(),
@@ -352,7 +352,7 @@ func TestTestCheckerTCPHosts_correct_answers_proxy_protocol(t *testing.T) {
 	ans := &answers{cancel: cancel}
 	setTestMode(false)
 
-	hs.Init(1, 1, 0, map[string]HostData{
+	hs.Init(1, 1, 1, map[string]HostData{
 		l.Addr().String(): data,
 	},
 		ans.cb(),
@@ -401,7 +401,7 @@ func TestTestCheckerTCPHosts_correct_wrong_answers(t *testing.T) {
 	hs := &HostUptimeChecker{}
 	failed := false
 	setTestMode(false)
-	hs.Init(1, 1, 0, map[string]HostData{
+	hs.Init(1, 1, 1, map[string]HostData{
 		l.Addr().String(): data,
 	},
 		HostCheckCallBacks{
@@ -421,7 +421,6 @@ func TestTestCheckerTCPHosts_correct_wrong_answers(t *testing.T) {
 }
 
 func TestProxyWhenHostIsDown(t *testing.T) {
-
 	g := config.Global()
 	g.UptimeTests.Config.FailureTriggerSampleSize = 1
 	g.UptimeTests.Config.TimeWait = 5
@@ -448,7 +447,7 @@ func TestProxyWhenHostIsDown(t *testing.T) {
 	GlobalHostChecker.checker.sampleTriggerLimit = 1
 	GlobalHostChecker.checkerMu.Unlock()
 
-	tick := time.NewTicker(time.Millisecond)
+	tick := time.NewTicker(10 * time.Millisecond)
 	defer tick.Stop()
 	x := 0
 	get := func() {
@@ -515,7 +514,7 @@ func TestChecker_triggerSampleLimit(t *testing.T) {
 	ping.Store(0)
 
 	hs := &HostUptimeChecker{}
-	hs.Init(1, limit, 0, map[string]HostData{
+	hs.Init(1, limit, 1, map[string]HostData{
 		l.Addr().String(): {CheckURL: "http://" + l.Addr().String()},
 	},
 		HostCheckCallBacks{

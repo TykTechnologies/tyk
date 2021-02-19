@@ -96,7 +96,6 @@ type ErrorHandler struct {
 // HandleError is the actual error handler and will store the error details in analytics if analytics processing is enabled.
 func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMsg string, errCode int, writeResponse bool) {
 	defer e.Base().UpdateRequestSession(r)
-
 	if writeResponse {
 		var templateExtension string
 		var contentType string

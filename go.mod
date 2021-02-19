@@ -1,6 +1,6 @@
 module github.com/TykTechnologies/tyk
 
-go 1.12
+go 1.15
 
 require (
 	github.com/Jeffail/gabs v1.4.0
