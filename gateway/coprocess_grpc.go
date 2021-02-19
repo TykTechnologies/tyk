@@ -95,9 +95,11 @@ func (gw *Gateway) NewGRPCDispatcher() (coprocess.Dispatcher, error) {
 		grpc.WithInsecure(),
 		grpc.WithDialer(gw.dialer),
 	)
+
 	grpcClient = coprocess.NewDispatcherClient(grpcConnection)
 
 	if err != nil {
+
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
 		}).Error(err)

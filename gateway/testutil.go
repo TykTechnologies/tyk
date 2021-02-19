@@ -663,6 +663,7 @@ func CreateStandardPolicy() *user.Policy {
 }
 
 func (s *Test) CreatePolicy(pGen ...func(p *user.Policy)) string {
+
 	pID := s.Gw.keyGen.GenerateAuthKey("")
 	pol := CreateStandardPolicy()
 	pol.ID = pID
@@ -808,7 +809,6 @@ type SlaveDataCenter struct {
 
 // ToDo: better receive a config generator function
 func (s *Test) Start(genConf func(globalConf *config.Config)) *Gateway {
-
 	// init and create gw
 	s.BootstrapGw(context.Background(), genConf)
 
@@ -864,20 +864,23 @@ func (s *Test) Start(genConf func(globalConf *config.Config)) *Gateway {
 }
 
 func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.Config)) {
-	gwConfig := config.Default
+	var gwConfig config.Config
+	if err := config.WriteDefault("", &gwConfig); err != nil {
+		panic(err)
+	}
 
 	l, _ := net.Listen("tcp", "127.0.0.1:0")
 	_, port, _ := net.SplitHostPort(l.Addr().String())
 	l.Close()
 	gwConfig.ListenPort, _ = strconv.Atoi(port)
 
-	gwConfig.CoProcessOptions = s.config.CoprocessConfig
 	if s.config.SeparateControlAPI {
 		l, _ := net.Listen("tcp", "127.0.0.1:0")
 		_, port, _ = net.SplitHostPort(l.Addr().String())
 		l.Close()
 		gwConfig.ControlAPIPort, _ = strconv.Atoi(port)
 	}
+	gwConfig.CoProcessOptions = s.config.CoprocessConfig
 
 	gw := NewGateway(gwConfig)
 	gw.setTestMode(true)
@@ -891,7 +894,6 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 		WriteTimeout:   1 * time.Second,
 		MaxHeaderBytes: 1 << 20,
 	}
-
 	s.HttpHandler = testServer
 	go func() {
 		err := testServer.ListenAndServe()
@@ -899,10 +901,6 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 			log.Warn("testServer.ListenAndServe() err: ", err.Error())
 		}
 	}()
-
-	if err := config.WriteDefault("", &gwConfig); err != nil {
-		panic(err)
-	}
 
 	var err error
 	gwConfig.Storage.Database = rand.Intn(15)
@@ -937,6 +935,7 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 		genConf(&gwConfig)
 	}
 
+	gw.keyGen = DefaultKeyGenerator{Gw: gw}
 	gw.CoProcessInit()
 	gw.afterConfSetup()
 

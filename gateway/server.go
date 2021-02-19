@@ -1284,6 +1284,7 @@ func Start() {
 	if err != nil {
 		mainLog.Errorf("Initializing again %s", err)
 	}
+
 	if tr := gwConfig.Tracer; tr.Enabled {
 		trace.SetupTracing(tr.Name, tr.Options)
 		trace.SetLogger(mainLog)
