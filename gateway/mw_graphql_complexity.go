@@ -51,7 +51,7 @@ func (m *GraphQLComplexityMiddleware) ProcessRequest(w http.ResponseWriter, r *h
 
 func (m *GraphQLComplexityMiddleware) DepthLimitEnabled(accessDef *user.AccessDefinition) bool {
 	// There is a possibility that depth limit is disabled on field level too,
-	// but we continue with this because of the explanation above.
+	// but we could not determine this without analyzing actual requested fields.
 	if len(accessDef.FieldAccessRights) > 0 {
 		return true
 	}

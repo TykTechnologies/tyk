@@ -55,23 +55,23 @@ func TestGraphQL_RestrictedTypes(t *testing.T) {
 		s.ApplyPolicies = []string{pID}
 	})
 
-	q1 := graphql.Request{
-		Query: "query Query { countries { code } }",
-	}
-
-	q2 := graphql.Request{
-		Query: "query Query { countries { name } }",
-	}
-
 	t.Run("Direct key", func(t *testing.T) {
 		authHeaderWithDirectKey := map[string]string{
 			headers.Authorization: directKey,
 		}
 
+		restrictedQuery := graphql.Request{
+			Query: "query Query { countries { code } }",
+		}
+
+		unrestrictedQuery := graphql.Request{
+			Query: "query Query { countries { name } }",
+		}
+
 		_, _ = g.Run(t, []test.TestCase{
-			{Data: q1, Headers: authHeaderWithDirectKey,
+			{Data: restrictedQuery, Headers: authHeaderWithDirectKey,
 				BodyMatch: `{"errors":\[{"message":"field: code is restricted on type: Country","path":null}\]}`, Code: http.StatusBadRequest},
-			{Data: q2, Headers: authHeaderWithDirectKey, Code: http.StatusOK},
+			{Data: unrestrictedQuery, Headers: authHeaderWithDirectKey, Code: http.StatusOK},
 		}...)
 	})
 
@@ -80,10 +80,18 @@ func TestGraphQL_RestrictedTypes(t *testing.T) {
 			headers.Authorization: policyAppliedKey,
 		}
 
+		restrictedQuery := graphql.Request{
+			Query: "query Query { countries { name } }",
+		}
+
+		unrestrictedQuery := graphql.Request{
+			Query: "query Query { countries { code } }",
+		}
+
 		_, _ = g.Run(t, []test.TestCase{
-			{Data: q2, Headers: authHeaderWithPolicyAppliedKey,
+			{Data: restrictedQuery, Headers: authHeaderWithPolicyAppliedKey,
 				BodyMatch: `{"errors":\[{"message":"field: name is restricted on type: Country","path":null}\]}`, Code: http.StatusBadRequest},
-			{Data: q1, Headers: authHeaderWithPolicyAppliedKey, Code: http.StatusOK},
+			{Data: unrestrictedQuery, Headers: authHeaderWithPolicyAppliedKey, Code: http.StatusOK},
 		}...)
 	})
 }
