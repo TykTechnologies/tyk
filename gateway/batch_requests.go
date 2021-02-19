@@ -47,6 +47,15 @@ func (b *BatchRequestHandler) doRequest(req *http.Request, relURL string) BatchR
 	}
 
 	tr.TLSClientConfig.InsecureSkipVerify = b.Gw.GetConfig().ProxySSLInsecureSkipVerify
+
+	if b.Gw.GetConfig().ProxySSLMaxVersion > 0 {
+		tr.TLSClientConfig.MaxVersion = b.Gw.GetConfig().ProxySSLMaxVersion
+	}
+
+	if b.API != nil && b.API.Proxy.Transport.SSLMaxVersion > 0 {
+		tr.TLSClientConfig.MaxVersion = b.API.Proxy.Transport.SSLMaxVersion
+	}
+
 	tr.DialTLS = b.Gw.customDialTLSCheck(b.API, tr.TLSClientConfig)
 
 	tr.Proxy = proxyFromAPI(b.API)

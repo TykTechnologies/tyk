@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -118,6 +119,14 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 
 	if strings.Contains(spec.Proxy.TargetURL, "h2c://") {
 		spec.Proxy.TargetURL = strings.Replace(spec.Proxy.TargetURL, "h2c://", "http://", 1)
+	}
+
+	if spec.Proxy.Transport.SSLMaxVersion > 0 {
+		spec.Proxy.Transport.SSLMaxVersion = tls.VersionTLS12
+	}
+
+	if spec.Proxy.Transport.SSLMinVersion > spec.Proxy.Transport.SSLMaxVersion {
+		spec.Proxy.Transport.SSLMaxVersion = spec.Proxy.Transport.SSLMinVersion
 	}
 
 	if len(spec.TagHeaders) > 0 {

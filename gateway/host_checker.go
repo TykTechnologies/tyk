@@ -284,6 +284,7 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 		HostCheckerClient.Transport = &http.Transport{
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: h.Gw.GetConfig().ProxySSLInsecureSkipVerify,
+				MaxVersion:         h.Gw.GetConfig().ProxySSLMaxVersion,
 			},
 		}
 		if toCheck.Timeout != 0 {

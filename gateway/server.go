@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -1043,6 +1044,31 @@ func (gw *Gateway) initialiseSystem(ctx context.Context) error {
 		}
 	}
 
+	if gwConfig.ProxySSLMaxVersion == 0 {
+		gwConfig.ProxySSLMaxVersion = tls.VersionTLS12
+	}
+
+	if gwConfig.ProxySSLMinVersion > gwConfig.ProxySSLMaxVersion {
+		gwConfig.ProxySSLMaxVersion = gwConfig.ProxySSLMinVersion
+	}
+
+	if gwConfig.HttpServerOptions.MaxVersion == 0 {
+		gwConfig.HttpServerOptions.MaxVersion = tls.VersionTLS12
+	}
+
+	if gwConfig.HttpServerOptions.MinVersion > gwConfig.HttpServerOptions.MaxVersion {
+		gwConfig.HttpServerOptions.MaxVersion = gwConfig.HttpServerOptions.MinVersion
+	}
+
+	if gwConfig.UseDBAppConfigs && gwConfig.Policies.PolicySource != config.DefaultDashPolicySource {
+		gwConfig.Policies.PolicySource = config.DefaultDashPolicySource
+		gwConfig.Policies.PolicyConnectionString = gwConfig.DBAppConfOptions.ConnectionString
+		if gwConfig.Policies.PolicyRecordName == "" {
+			gwConfig.Policies.PolicyRecordName = config.DefaultDashPolicyRecordName
+		}
+	}
+
+	gw.SetConfig(gwConfig)
 	getHostDetails(gw.GetConfig().PIDFileLocation)
 	setupInstrumentation(*gw)
 

@@ -29,15 +29,20 @@ func (s *Test) TestHandleError_text_xml(t *testing.T) {
 <error>
 	<code>500</code>
 	<message>There was a problem proxying the request</message>
-</error>
-	`
-	ts := StartTest(nil)
+</error>`
+	ts := StartTest()
 	defer ts.Close()
-	h := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
-	h.Close()
-	s.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+
+	// Simulate 500 error
+	h := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		panic("I should fail!")
+	}))
+	defer h.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+
 		spec.Proxy.ListenPath = "/"
-		spec.Proxy.TargetURL = ts.URL
+		spec.Proxy.TargetURL = h.URL
 	})
 	ts.Run(t, test.TestCase{
 		Path: "/",

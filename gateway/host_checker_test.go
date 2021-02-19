@@ -305,7 +305,7 @@ func TestTestCheckerTCPHosts_correct_answers(t *testing.T) {
 	ans := &answers{cancel: cancel}
 	ts.Gw.setTestMode(false)
 
-	hs.Init(1, 1, 0, map[string]HostData{
+	hs.Init(1, 1, 1, map[string]HostData{
 		l.Addr().String(): data,
 	},
 		ans.cb(),
@@ -364,7 +364,7 @@ func TestTestCheckerTCPHosts_correct_answers_proxy_protocol(t *testing.T) {
 	ans := &answers{cancel: cancel}
 	ts.Gw.setTestMode(false)
 
-	hs.Init(1, 1, 0, map[string]HostData{
+	hs.Init(1, 1, 1, map[string]HostData{
 		l.Addr().String(): data,
 	},
 		ans.cb(),
@@ -416,7 +416,7 @@ func TestTestCheckerTCPHosts_correct_wrong_answers(t *testing.T) {
 	hs := &HostUptimeChecker{Gw: ts.Gw}
 	failed := false
 	ts.Gw.setTestMode(false)
-	hs.Init(1, 1, 0, map[string]HostData{
+	hs.Init(1, 1, 1, map[string]HostData{
 		l.Addr().String(): data,
 	},
 		HostCheckCallBacks{
@@ -440,6 +440,7 @@ func TestProxyWhenHostIsDown(t *testing.T) {
 	defer ts.Close()
 
 	g := ts.Gw.GetConfig()
+
 	g.UptimeTests.Config.FailureTriggerSampleSize = 1
 	g.UptimeTests.Config.TimeWait = 5
 	g.UptimeTests.Config.EnableUptimeAnalytics = true
@@ -462,7 +463,7 @@ func TestProxyWhenHostIsDown(t *testing.T) {
 	GlobalHostChecker.checker.sampleTriggerLimit = 1
 	GlobalHostChecker.checkerMu.Unlock()
 
-	tick := time.NewTicker(time.Millisecond)
+	tick := time.NewTicker(10 * time.Millisecond)
 	defer tick.Stop()
 	x := 0
 	get := func() {

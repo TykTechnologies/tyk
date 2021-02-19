@@ -19,7 +19,7 @@ addons:
 
 matrix:
   include:
-    - go: 1.12.x
+    - go: 1.15.x
 
 services:
   - redis-server

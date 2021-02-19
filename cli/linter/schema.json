@@ -506,6 +506,9 @@
         "min_version": {
           "type": "integer"
         },
+        "max_version": {
+          "type": "integer"
+        },
         "override_defaults": {
           "type": "boolean"
         },
@@ -782,6 +785,9 @@
       "type": "boolean"
     },
     "proxy_ssl_min_version": {
+      "type": "integer"
+    },
+    "proxy_ssl_max_version": {
       "type": "integer"
     },
     "proxy_ssl_ciphers": {

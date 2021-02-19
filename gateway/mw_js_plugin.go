@@ -518,7 +518,15 @@ func (j *JSVM) LoadTykJSApi() {
 		}
 		r.Close = true
 
-		tr := &http.Transport{TLSClientConfig: &tls.Config{}}
+		maxSSLVersion := j.Gw.GetConfig().ProxySSLMaxVersion
+		if j.Spec.Proxy.Transport.SSLMaxVersion > 0 {
+			maxSSLVersion = j.Spec.Proxy.Transport.SSLMaxVersion
+		}
+
+		tr := &http.Transport{TLSClientConfig: &tls.Config{
+			MaxVersion: maxSSLVersion,
+		}}
+
 		if cert := j.Gw.getUpstreamCertificate(r.Host, j.Spec); cert != nil {
 			tr.TLSClientConfig.Certificates = []tls.Certificate{*cert}
 		}
