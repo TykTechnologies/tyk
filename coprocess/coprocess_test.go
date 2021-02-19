@@ -55,8 +55,12 @@ func TestCoProcessDispatch(t *testing.T) {
 func TestCoProcessDispatchEvent(t *testing.T) {
 	spec := gateway.LoadSampleAPI(basicCoProcessDef)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
+
+	ts := gateway.StartTest(nil)
+	defer ts.Close()
+
 	proxy := gateway.TykNewSingleHostReverseProxy(remote, spec)
-	baseMid := gateway.BaseMiddleware{Spec: spec, Proxy: proxy}
+	baseMid := gateway.BaseMiddleware{Spec: spec, Proxy: proxy, Gw: ts.Gw}
 
 	meta := gateway.EventKeyFailureMeta{
 		EventMetaDefault: gateway.EventMetaDefault{Message: "Auth Failure"},
@@ -138,7 +142,11 @@ func buildCoProcessChain(spec *gateway.APISpec, hookName string, hookType coproc
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := gateway.TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := gateway.ProxyHandler(proxy, spec)
-	baseMid := gateway.BaseMiddleware{Spec: spec, Proxy: proxy} // TODO
+
+	ts := gateway.StartTest(nil)
+	defer ts.Close()
+
+	baseMid := gateway.BaseMiddleware{Spec: spec, Proxy: proxy, Gw: ts.Gw} // TODO
 	mw := gateway.CreateCoProcessMiddleware(hookName, hookType, driver, baseMid)
 	return alice.New(mw).Then(proxyHandler)
 }

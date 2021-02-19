@@ -31,8 +31,11 @@ func TestTransformNonAscii(t *testing.T) {
 
 	r := TestReq(t, "GET", "/", in)
 
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	spec := APISpec{}
-	base := BaseMiddleware{Spec: &spec}
+	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
 	base.Spec.EnableContextVars = false
 	transform := TransformMiddleware{base}
 
@@ -53,8 +56,11 @@ func BenchmarkTransformNonAscii(b *testing.B) {
 
 	tmeta, in := testPrepareTransformNonAscii()
 
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	spec := APISpec{}
-	base := BaseMiddleware{Spec: &spec}
+	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
 	base.Spec.EnableContextVars = false
 	transform := TransformMiddleware{base}
 
@@ -76,8 +82,11 @@ func TestTransformXMLCrash(t *testing.T) {
 	tmeta.TemplateData.Input = apidef.RequestXML
 	tmeta.Template = template.Must(apidef.Template.New("").Parse(""))
 
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	spec := APISpec{}
-	base := BaseMiddleware{Spec: &spec}
+	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
 	base.Spec.EnableContextVars = false
 	transform := TransformMiddleware{base}
 
@@ -127,8 +136,11 @@ func TestTransformJSONMarshalXMLInput(t *testing.T) {
 	want := `["Foo\"oo", "Bàr"]`
 	r := TestReq(t, "GET", "/", in)
 
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	spec := APISpec{}
-	base := BaseMiddleware{Spec: &spec}
+	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
 	base.Spec.EnableContextVars = false
 	transform := TransformMiddleware{base}
 
@@ -150,8 +162,11 @@ func TestTransformJSONMarshalJSONInput(t *testing.T) {
 	want := `["Foo\"oo", "Bàr"]`
 	r := TestReq(t, "GET", "/", in)
 
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	spec := APISpec{}
-	base := BaseMiddleware{Spec: &spec}
+	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
 	base.Spec.EnableContextVars = false
 	transform := TransformMiddleware{base}
 
@@ -185,8 +200,11 @@ func TestTransformJSONMarshalJSONArrayInput(t *testing.T) {
 	want := `[123,456]`
 	r := TestReq(t, "GET", "/", in)
 
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	spec := APISpec{}
-	base := BaseMiddleware{Spec: &spec}
+	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
 	base.Spec.EnableContextVars = false
 	transform := TransformMiddleware{base}
 
@@ -206,9 +224,11 @@ func BenchmarkTransformJSONMarshal(b *testing.B) {
 	b.ReportAllocs()
 
 	tmeta, in := testPrepareTransformJSONMarshal("xml")
+	ts := StartTest(nil)
+	defer ts.Close()
 
 	spec := APISpec{}
-	base := BaseMiddleware{Spec: &spec}
+	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
 	base.Spec.EnableContextVars = false
 	transform := TransformMiddleware{base}
 
@@ -225,8 +245,11 @@ func TestTransformXMLMarshal(t *testing.T) {
 		tmeta := testPrepareTransformXMLMarshal(tmpl, inputType)
 		r := TestReq(t, "GET", "/", input)
 
+		ts := StartTest(nil)
+		defer ts.Close()
+
 		spec := APISpec{}
-		base := BaseMiddleware{Spec: &spec}
+		base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
 		base.Spec.EnableContextVars = false
 		transform := TransformMiddleware{base}
 

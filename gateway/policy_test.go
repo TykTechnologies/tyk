@@ -333,9 +333,12 @@ func (s *Test) testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 		},
 	}
 	s.Gw.policiesMu.RUnlock()
-	bmid := &BaseMiddleware{Spec: &APISpec{
-		APIDefinition: &apidef.APIDefinition{},
-	}}
+	bmid := &BaseMiddleware{
+		Spec: &APISpec{
+			APIDefinition: &apidef.APIDefinition{},
+		},
+		Gw: s.Gw,
+	}
 	tests := []testApplyPoliciesData{
 		{
 			"Empty", nil,

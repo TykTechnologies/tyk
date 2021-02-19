@@ -493,7 +493,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	r.HandleFunc("/debug", gw.traceHandler).Methods("POST")
 	r.HandleFunc("/cache/{apiID}", gw.invalidateCacheHandler).Methods("DELETE")
 	r.HandleFunc("/keys", gw.keyHandler).Methods("POST", "PUT", "GET", "DELETE")
-	r.HandleFunc("/keys/preview", previewKeyHandler).Methods("POST")
+	r.HandleFunc("/keys/preview", gw.previewKeyHandler).Methods("POST")
 	r.HandleFunc("/keys/{keyName:[^/]*}", gw.keyHandler).Methods("POST", "PUT", "GET", "DELETE")
 	r.HandleFunc("/certs", gw.certHandler).Methods("POST", "GET")
 	r.HandleFunc("/certs/{certID:[^/]*}", gw.certHandler).Methods("POST", "GET", "DELETE")
@@ -1500,6 +1500,7 @@ func (gw *Gateway) startServer() {
 	if gw.GetConfig().ListenAddress == "" {
 		address = "(open interface)"
 	}
+
 	mainLog.Info("--> Listening on address: ", address)
 	mainLog.Info("--> Listening on port: ", gw.GetConfig().ListenPort)
 	mainLog.Info("--> PID: ", hostDetails.PID)

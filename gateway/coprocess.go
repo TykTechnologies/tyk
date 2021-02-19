@@ -490,13 +490,16 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 type CustomMiddlewareResponseHook struct {
 	mw *CoProcessMiddleware
+	Gw *Gateway
 }
 
 func (h *CustomMiddlewareResponseHook) Init(mwDef interface{}, spec *APISpec) error {
 	mwDefinition := mwDef.(apidef.MiddlewareDefinition)
+
 	h.mw = &CoProcessMiddleware{
 		BaseMiddleware: BaseMiddleware{
 			Spec: spec,
+			Gw:   h.Gw,
 		},
 		HookName:         mwDefinition.Name,
 		HookType:         coprocess.HookType_Response,

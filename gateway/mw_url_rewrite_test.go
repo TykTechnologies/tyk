@@ -1092,12 +1092,16 @@ func TestRewriterTriggers(t *testing.T) {
 }
 
 func TestInitTriggerRx(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	// prepare test data
 	testRewriteMW := &URLRewriteMiddleware{
 		BaseMiddleware: BaseMiddleware{
 			Spec: &APISpec{
 				APIDefinition: &apidef.APIDefinition{},
 			},
+			Gw: ts.Gw,
 		},
 	}
 	testRewriteMW.Spec.APIDefinition.VersionData = struct {

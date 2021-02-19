@@ -272,7 +272,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	// Create the response processors, pass all the loaded custom middleware response functions:
 	gw.createResponseMiddlewareChain(spec, mwResponseFuncs)
 
-	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy, logger: logger}
+	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy, logger: logger, Gw: gw}
 
 	for _, v := range baseMid.Spec.VersionData.Versions {
 		if len(v.ExtendedPaths.CircuitBreaker) > 0 {

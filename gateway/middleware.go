@@ -811,7 +811,7 @@ func (gw *Gateway) responseProcessorByName(name string) TykResponseHandler {
 	case "header_transform":
 		return &HeaderTransform{Gw: gw}
 	case "custom_mw_res_hook":
-		return &CustomMiddlewareResponseHook{}
+		return &CustomMiddlewareResponseHook{Gw: gw}
 	}
 	return nil
 }

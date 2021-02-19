@@ -664,14 +664,18 @@ func (ts *Test) testPrepareDefaultVersion() string {
 }
 
 func TestGetVersionFromRequest(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
 
 	versionInfo := apidef.VersionInfo{}
 	versionInfo.Paths.WhiteList = []string{"/foo"}
 	versionInfo.Paths.BlackList = []string{"/bar"}
 
 	t.Run("Header location", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer func() {
+			time.Sleep(1 * time.Second)
+			ts.Close()
+		}()
+
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
@@ -689,6 +693,9 @@ func TestGetVersionFromRequest(t *testing.T) {
 	})
 
 	t.Run("URL param location", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
@@ -704,6 +711,9 @@ func TestGetVersionFromRequest(t *testing.T) {
 	})
 
 	t.Run("URL location", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false

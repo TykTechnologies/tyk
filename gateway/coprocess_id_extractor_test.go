@@ -38,6 +38,9 @@ func createSpecTestFrom(t testing.TB, def *apidef.APIDefinition) *APISpec {
 }
 
 func prepareExtractor(t testing.TB, extractorSource apidef.IdExtractorSource, extractorType apidef.IdExtractorType, config map[string]interface{}) (IdExtractor, *APISpec) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	def := &apidef.APIDefinition{
 		OrgID: MockOrgID,
 		CustomMiddleware: apidef.MiddlewareSection{
@@ -48,8 +51,9 @@ func prepareExtractor(t testing.TB, extractorSource apidef.IdExtractorSource, ex
 			},
 		},
 	}
+
 	spec := createSpecTestFrom(t, def)
-	mw := BaseMiddleware{Spec: spec}
+	mw := BaseMiddleware{Spec: spec, Gw: ts.Gw}
 	newExtractor(spec, mw)
 	return spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor), spec
 }

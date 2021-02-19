@@ -31,7 +31,7 @@ func StartSlaveGw(connectionString string) *Test {
 	return StartTest(conf)
 }
 
-func startRPCMock(dispatcher *gorpc.Dispatcher) (*gorpc.Server,string) {
+func startRPCMock(dispatcher *gorpc.Dispatcher) (*gorpc.Server, string) {
 
 	rpc.GlobalRPCCallTimeout = 100 * time.Millisecond
 
@@ -421,7 +421,7 @@ func TestOrgSessionWithRPCDown(t *testing.T) {
 			OrgSessionManager: mockStore{},
 		},
 		logger: mainLog,
-		Gw: ts.Gw,
+		Gw:     ts.Gw,
 	}
 	// reload so we force to fall in emergency mode
 	ts.Gw.DoReload()

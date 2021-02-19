@@ -29,7 +29,7 @@ func getMiddlewareChain(spec *APISpec) http.Handler {
 	remote, _ := url.Parse(TestHttpAny)
 	proxy := ts.Gw.TykNewSingleHostReverseProxy(remote, spec, logrus.New().WithFields(logrus.Fields{}))
 	proxyHandler := ProxyHandler(proxy, spec)
-	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy}
+	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy, Gw: ts.Gw}
 	chain := alice.New(ts.Gw.mwList(
 		&IPWhiteListMiddleware{baseMid},
 		&IPBlackListMiddleware{BaseMiddleware: baseMid},
@@ -554,7 +554,10 @@ func TestRequestSigning_getRequestPath(t *testing.T) {
 		spec.Proxy.StripListenPath = false
 	})[0]
 
-	rs := RequestSigning{BaseMiddleware{Spec: api}}
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	rs := RequestSigning{BaseMiddleware{Spec: api, Gw: ts.Gw}}
 
 	req, _ := http.NewRequest(http.MethodGet, "http://example.com/test/get?param1=value1", nil)
 

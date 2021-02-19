@@ -199,6 +199,7 @@ func (gw *Gateway) applyPoliciesAndSave(keyName string, session *user.SessionSta
 	// use basic middleware to apply policies to key/session (it also saves it)
 	mw := BaseMiddleware{
 		Spec: spec,
+		Gw:   gw,
 	}
 	if err := mw.ApplyPolicies(session); err != nil {
 		return err
@@ -474,7 +475,7 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID string, byHash bool) (inter
 		return apiError("Key not found"), http.StatusNotFound
 	}
 
-	mw := BaseMiddleware{Spec: spec}
+	mw := BaseMiddleware{Spec: spec, Gw: gw}
 	// TODO: handle apply policies error
 	mw.ApplyPolicies(&session)
 
@@ -1409,7 +1410,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, http.StatusOK, obj)
 }
 
-func previewKeyHandler(w http.ResponseWriter, r *http.Request) {
+func (gw *Gateway) previewKeyHandler(w http.ResponseWriter, r *http.Request) {
 	newSession := user.NewSessionState()
 	if err := json.NewDecoder(r.Body).Decode(newSession); err != nil {
 		log.WithFields(logrus.Fields{
@@ -1424,7 +1425,7 @@ func previewKeyHandler(w http.ResponseWriter, r *http.Request) {
 	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 	newSession.DateCreated = time.Now()
 
-	mw := BaseMiddleware{}
+	mw := BaseMiddleware{Gw: gw}
 	// TODO: handle apply policies error
 	mw.ApplyPolicies(newSession)
 
