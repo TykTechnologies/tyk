@@ -82,6 +82,7 @@ func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
 
 	t.Run("with policies", func(t *testing.T) {
 		spec.UseKeylessAccess = false
+		spec.GraphQL.Schema = "schema { query: Query } type Query { hello: word } type word { numOfLetters: Int }"
 		LoadAPI(spec)
 
 		pID := CreatePolicy(func(p *user.Policy) {
@@ -154,6 +155,14 @@ func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
 			_ = GlobalSessionManager.UpdateSession(directKey, directSession, 0, false)
 
 			_, _ = g.Run(t, test.TestCase{Headers: authHeaderWithDirectKey, Data: request, BodyMatch: "hello", Code: http.StatusOK})
+		})
+
+		t.Run("Invalid query should return 403 when auth is failing", func(t *testing.T) {
+			request.Query = "query Hello {"
+			authHeaderWithInvalidDirectKey := map[string]string{
+				headers.Authorization: "invalid key",
+			}
+			_, _ = g.Run(t, test.TestCase{Headers: authHeaderWithInvalidDirectKey, Data: request, BodyMatch: "", Code: http.StatusForbidden})
 		})
 	})
 }

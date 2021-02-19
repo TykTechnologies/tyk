@@ -139,8 +139,6 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 
 	case sessionFailQuota:
 		return k.handleQuotaFailure(r, token)
-	case sessionFailDepthLimit:
-		return errors.New("depth limit exceeded"), http.StatusForbidden
 	case sessionFailInternalServerError:
 		return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
 	default:
