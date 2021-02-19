@@ -420,8 +420,11 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 	mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &GraphQLMiddleware{BaseMiddleware: baseMid})
-	mwAppendEnabled(&chainArray, &GraphQLComplexityMiddleware{BaseMiddleware: baseMid})
-	mwAppendEnabled(&chainArray, &GraphQLGranularAccessMiddleware{BaseMiddleware: baseMid})
+	if !spec.UseKeylessAccess {
+		mwAppendEnabled(&chainArray, &GraphQLComplexityMiddleware{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &GraphQLGranularAccessMiddleware{BaseMiddleware: baseMid})
+	}
+
 	mwAppendEnabled(&chainArray, &ValidateJSON{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &TransformMiddleware{baseMid})
 	mwAppendEnabled(&chainArray, &TransformJQMiddleware{baseMid})

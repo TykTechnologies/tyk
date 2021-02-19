@@ -26,7 +26,7 @@ func (m *GraphQLComplexityMiddleware) Name() string {
 }
 
 func (m *GraphQLComplexityMiddleware) EnabledForSpec() bool {
-	return m.Spec.GraphQL.Enabled && !m.Spec.UseKeylessAccess
+	return m.Spec.GraphQL.Enabled
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
