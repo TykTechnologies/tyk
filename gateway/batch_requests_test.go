@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -77,7 +78,7 @@ func TestBatch(t *testing.T) {
 	}
 }
 
-var virtBatchTest = `function batchTest(request, session, config) {
+const virtBatchTest = `function batchTest(request, session, config) {
     // Set up a response object
     var response = {
         Body: "",
@@ -133,6 +134,7 @@ func TestVirtualEndpointBatch(t *testing.T) {
 		ClientAuth:         tls.RequireAndVerifyClientCert,
 		ClientCAs:          pool,
 		InsecureSkipVerify: true,
+		MaxVersion:         tls.VersionTLS12,
 	}
 
 	upstream.StartTLS()
@@ -141,7 +143,7 @@ func TestVirtualEndpointBatch(t *testing.T) {
 	clientCertID, _ := CertificateManager.Add(combinedClientPEM, "")
 	defer CertificateManager.Delete(clientCertID, "")
 
-	virtBatchTest = strings.Replace(virtBatchTest, "{upstream_URL}", upstream.URL, 2)
+	js := strings.Replace(virtBatchTest, "{upstream_URL}", upstream.URL, 2)
 	defer upstream.Close()
 
 	upstreamHost := strings.TrimPrefix(upstream.URL, "https://")
@@ -160,7 +162,7 @@ func TestVirtualEndpointBatch(t *testing.T) {
 		virtualMeta := apidef.VirtualMeta{
 			ResponseFunctionName: "batchTest",
 			FunctionSourceType:   "blob",
-			FunctionSourceURI:    base64.StdEncoding.EncodeToString([]byte(virtBatchTest)),
+			FunctionSourceURI:    base64.StdEncoding.EncodeToString([]byte(js)),
 			Path:                 "/virt",
 			Method:               "GET",
 		}
@@ -213,7 +215,7 @@ func TestBatchIgnoreCanonicalHeaderKey(t *testing.T) {
 	}()
 
 	upstream := "http://" + l.Addr().String()
-	virtBatchTest = strings.Replace(virtBatchTest, "{upstream_URL}", upstream, 2)
+	js := strings.Replace(virtBatchTest, "{upstream_URL}", upstream, 2)
 	c := config.Global()
 	c.IgnoreCanonicalMIMEHeaderKey = true
 	config.SetGlobal(c)
@@ -225,7 +227,7 @@ func TestBatchIgnoreCanonicalHeaderKey(t *testing.T) {
 		virtualMeta := apidef.VirtualMeta{
 			ResponseFunctionName: "batchTest",
 			FunctionSourceType:   "blob",
-			FunctionSourceURI:    base64.StdEncoding.EncodeToString([]byte(virtBatchTest)),
+			FunctionSourceURI:    base64.StdEncoding.EncodeToString([]byte(js)),
 			Path:                 "/virt",
 			Method:               "GET",
 		}
@@ -236,6 +238,10 @@ func TestBatchIgnoreCanonicalHeaderKey(t *testing.T) {
 			}
 		})
 	})
+
+	// Let the server start
+	time.Sleep(500 * time.Millisecond)
+
 	ts.Run(t, test.TestCase{Path: "/virt", Code: 202})
 	got := header.Load().(string)
 	if got != NonCanonicalHeaderKey {

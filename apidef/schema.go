@@ -245,9 +245,9 @@ const Schema = `{
                 }
             }
         },
-		"auth_configs":{
-			"type": ["object", "null"]
-		},
+        "auth_configs":{
+            "type": ["object", "null"]
+        },
         "definition": {
             "type": ["object", "null"],
             "id": "http://jsonschema.net/definition",
@@ -318,6 +318,9 @@ const Schema = `{
                             "type": ["array", "null"]
                         },
                         "ssl_min_version": {
+                            "type": "number"
+                        },
+                        "ssl_max_version": {
                             "type": "number"
                         },
                         "proxy_url": {
@@ -431,88 +434,88 @@ const Schema = `{
         ]
         },
         "graphql": {
-			"type": ["object", "null"],
-			"properties": {
-				"enabled": {
-					"type": "boolean"
-				},
-				"execution_mode": {
-					"type": "string",
-					"enum": [
-						"proxyOnly",
-						"executionEngine",
-						""
-					]
-				},
-				"schema": {
-					"type": "string"
-				},
-				"last_schema_update": {
-					"type": "string",
-					"format": "date-time"
-				},
-				"type_field_configurations": {
-					"type": ["array", "null"],
-					"properties": {
-						"type_name": {
-							"type": "string"
-						},
-						"field_name": {
-							"type": "string"
-						},
-						"mapping": {
-							"type": ["object", "null"],
-							"properties": {
-								"disabled": {
-									"type": "boolean"
-								},
-								"path": {
-									"type": "string"
-								}
-							},
-							"required": [
-								"disabled"
-							]
-						},
-						"data_source": {
-							"type": ["object", "null"],
-							"properties": {
-								"kind": {
-									"type": "boolean"
-								},
-								"data_source_config": {
-									"type": ["object", "null"]
-								}
-							},
-							"required": [
-								"kind"
-							]
-						}
-					},
-					"required": [
-						"type_name",
-						"field_name"
-					]
-				},
-				"playground": {
-					"type": ["object", "null"],
-					"properties": {
-						"enabled": {
-							"type": "boolean"
-						},
-						"path": {
-							"type": "string"
-						}
-					},
-					"required": [
-						"enabled"
-					]
-				}
-			},
-			"required": [
-				"enabled"
-			]
-		}
+            "type": ["object", "null"],
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "execution_mode": {
+                    "type": "string",
+                    "enum": [
+                        "proxyOnly",
+                        "executionEngine",
+                        ""
+                    ]
+                },
+                "schema": {
+                    "type": "string"
+                },
+                "last_schema_update": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "type_field_configurations": {
+                    "type": ["array", "null"],
+                    "properties": {
+                        "type_name": {
+                            "type": "string"
+                        },
+                        "field_name": {
+                            "type": "string"
+                        },
+                        "mapping": {
+                            "type": ["object", "null"],
+                            "properties": {
+                                "disabled": {
+                                    "type": "boolean"
+                                },
+                                "path": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "disabled"
+                            ]
+                        },
+                        "data_source": {
+                            "type": ["object", "null"],
+                            "properties": {
+                                "kind": {
+                                    "type": "boolean"
+                                },
+                                "data_source_config": {
+                                    "type": ["object", "null"]
+                                }
+                            },
+                            "required": [
+                                "kind"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "type_name",
+                        "field_name"
+                    ]
+                },
+                "playground": {
+                    "type": ["object", "null"],
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean"
+                        },
+                        "path": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "enabled"
+                    ]
+                }
+            },
+            "required": [
+                "enabled"
+            ]
+        }
     },
     "required": [
         "name",

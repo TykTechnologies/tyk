@@ -459,21 +459,26 @@ func ProxyHandler(p *ReverseProxy, apiSpec *APISpec) http.Handler {
 }
 
 const (
+	handlerPathRestDataSource        = "/rest-data-source"
+	handlerPathGraphQLDataSource     = "/graphql-data-source"
+	handlerPathHeadersRestDataSource = "/rest-headers-data-source"
+
 	// We need a static port so that the urls can be used in static
 	// test data, and to prevent the requests from being randomized
 	// for checksums. Port 16500 should be obscure and unused.
 	testHttpListen = "127.0.0.1:16500"
 	// Accepts any http requests on /, only allows GET on /get, etc.
 	// All return a JSON with request info.
-	TestHttpAny           = "http://" + testHttpListen
-	TestHttpGet           = TestHttpAny + "/get"
-	testHttpPost          = TestHttpAny + "/post"
-	testGraphQLDataSource = TestHttpAny + "/graphql-data-source"
-	testRESTDataSource    = TestHttpAny + "/rest-data-source"
-	testHttpJWK           = TestHttpAny + "/jwk.json"
-	testHttpJWKLegacy     = TestHttpAny + "/jwk-legacy.json"
-	testHttpBundles       = TestHttpAny + "/bundles/"
-	testReloadGroup       = TestHttpAny + "/groupReload"
+	TestHttpAny               = "http://" + testHttpListen
+	TestHttpGet               = TestHttpAny + "/get"
+	testHttpPost              = TestHttpAny + "/post"
+	testGraphQLDataSource     = TestHttpAny + handlerPathGraphQLDataSource
+	testRESTDataSource        = TestHttpAny + handlerPathRestDataSource
+	testRESTHeadersDataSource = TestHttpAny + handlerPathHeadersRestDataSource
+	testHttpJWK               = TestHttpAny + "/jwk.json"
+	testHttpJWKLegacy         = TestHttpAny + "/jwk-legacy.json"
+	testHttpBundles           = TestHttpAny + "/bundles/"
+	testReloadGroup           = TestHttpAny + "/groupReload"
 
 	// Nothing should be listening on port 16501 - useful for
 	// testing TCP and HTTP failures.
@@ -547,8 +552,11 @@ func testHttpHandler() *mux.Router {
 
 	r.HandleFunc("/get", handleMethod("GET"))
 	r.HandleFunc("/post", handleMethod("POST"))
-	r.HandleFunc("/graphql-data-source", graphqlDataSourceHandler)
-	r.HandleFunc("/rest-data-source", restDataSourceHandler)
+
+	r.HandleFunc(handlerPathGraphQLDataSource, graphqlDataSourceHandler)
+	r.HandleFunc(handlerPathRestDataSource, restDataSourceHandler)
+	r.HandleFunc(handlerPathHeadersRestDataSource, restHeadersDataSourceHandler)
+
 	r.HandleFunc("/ws", wsHandler)
 	r.HandleFunc("/jwk.json", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, jwkTestJson)
@@ -598,6 +606,21 @@ func graphqlDataSourceHandler(w http.ResponseWriter, r *http.Request) {
 				]
 			}
 		}`))
+}
+
+func restHeadersDataSourceHandler(w http.ResponseWriter, r *http.Request) {
+	type KeyVal struct {
+		Name  string `json:"name"`
+		Value string `json:"value"`
+	}
+
+	var headers []KeyVal
+	for name, values := range r.Header {
+		for _, value := range values {
+			headers = append(headers, KeyVal{name, value})
+		}
+	}
+	json.NewEncoder(w).Encode(headers)
 }
 
 func restDataSourceHandler(w http.ResponseWriter, r *http.Request) {
@@ -1051,11 +1074,33 @@ const sampleAPI = `{
 	"graphql": {
       "enabled": false,
       "execution_mode": "executionEngine",
+	  "version": "",
       "schema": "` + testComposedSchema + `",
       "type_field_configurations": [
         ` + testGraphQLDataSourceConfiguration + `,
         ` + testRESTDataSourceConfiguration + `
       ],
+	  "engine": {
+		"field_configs": [
+			{
+				"type_name": "Query",
+				"field_name": "people",
+				"disable_default_mapping": true,
+				"path": [""]
+			},
+			{
+				"type_name": "Query",
+				"field_name": "headers",
+				"disable_default_mapping": true,
+				"path": [""]
+			}
+		],
+		"data_sources": [
+		    ` + testRESTDataSourceConfigurationV2 + `,
+			` + testGraphQLDataSourceConfigurationV2 + `,
+			` + testRESTHeadersDataSourceConfigurationV2 + `
+		]
+	},
       "playground": {
         "enabled": false,
         "path": "/playground"
@@ -1063,8 +1108,24 @@ const sampleAPI = `{
     }
 }`
 
-const testComposedSchema = "type Query {people: [Person] countries: [Country]} type Person {name: String country: Country} " +
-	"type Country {code: String name: String}"
+const testComposedSchema = "type Query {people: [Person] countries: [Country] headers: [Header]} " +
+	"type Person {name: String country: Country} " +
+	"type Country {code: String name: String} " +
+	"type Header {name:String value: String}"
+
+const testGraphQLDataSourceConfigurationV2 = `
+{
+	"kind": "GraphQL",
+	"name": "countries",
+	"internal": true,
+	"root_fields": [
+		{ "type": "Query", "fields": ["countries"] }
+	],
+	"config": {
+		"url": "` + testGraphQLDataSource + `",
+		"method": "POST"
+	}
+}`
 
 const testGraphQLDataSourceConfiguration = `
 {
@@ -1083,6 +1144,43 @@ const testGraphQLDataSourceConfiguration = `
   }
 }
 `
+
+const testRESTHeadersDataSourceConfigurationV2 = `
+{
+	"kind": "REST",
+	"name": "headers",
+	"internal": true,
+	"root_fields": [
+		{ "type": "Query", "fields": ["headers"] }
+	],
+	"config": {
+		"url": "` + testRESTHeadersDataSource + `",
+		"method": "GET",
+		"headers": {
+			"static": "barbaz",
+			"injected": "{{ .request.header.injected }}"
+		},
+		"query": [],
+		"body": ""
+	}
+}`
+
+const testRESTDataSourceConfigurationV2 = `
+{
+	"kind": "REST",
+	"name": "people",
+	"internal": true,
+	"root_fields": [
+		{ "type": "Query", "fields": ["people"] }
+	],
+	"config": {
+		"url": "` + testRESTDataSource + `",
+		"method": "GET",
+		"headers": {},
+		"query": [],
+		"body": ""
+	}
+}`
 
 const testRESTDataSourceConfiguration = `
 {
@@ -1109,6 +1207,50 @@ const testRESTDataSourceConfiguration = `
 	}
   }
 }`
+
+func generateRESTDataSourceV2(gen func(dataSource *apidef.GraphQLEngineDataSource, restConf *apidef.GraphQLEngineDataSourceConfigREST)) apidef.GraphQLEngineDataSource {
+	ds := apidef.GraphQLEngineDataSource{}
+	if err := json.Unmarshal([]byte(testRESTDataSourceConfigurationV2), &ds); err != nil {
+		panic(err)
+	}
+
+	restConf := apidef.GraphQLEngineDataSourceConfigREST{}
+	if err := json.Unmarshal(ds.Config, &restConf); err != nil {
+		panic(err)
+	}
+
+	gen(&ds, &restConf)
+
+	rawConfig, err := json.Marshal(restConf)
+	if err != nil {
+		panic(err)
+	}
+
+	ds.Config = rawConfig
+	return ds
+}
+
+func generateGraphQLDataSourceV2(gen func(dataSource *apidef.GraphQLEngineDataSource, graphqlConf *apidef.GraphQLEngineDataSourceConfigGraphQL)) apidef.GraphQLEngineDataSource {
+	ds := apidef.GraphQLEngineDataSource{}
+	if err := json.Unmarshal([]byte(testGraphQLDataSourceConfigurationV2), &ds); err != nil {
+		panic(err)
+	}
+
+	graphqlConf := apidef.GraphQLEngineDataSourceConfigGraphQL{}
+	if err := json.Unmarshal(ds.Config, &graphqlConf); err != nil {
+		panic(err)
+	}
+
+	gen(&ds, &graphqlConf)
+
+	rawConfig, err := json.Marshal(graphqlConf)
+	if err != nil {
+		panic(err)
+	}
+
+	ds.Config = rawConfig
+	return ds
+}
 
 func generateRESTDataSource(gen ...func(restDataSource *datasource.HttpJsonDataSourceConfig)) json.RawMessage {
 	typeFieldConfiguration := datasource.TypeFieldConfiguration{}

@@ -190,6 +190,7 @@ type HttpServerOptionsConfig struct {
 	SSLCertificates        []string   `json:"ssl_certificates"`
 	ServerName             string     `json:"server_name"`
 	MinVersion             uint16     `json:"min_version"`
+	MaxVersion             uint16     `json:"max_version"`
 	FlushInterval          int        `json:"flush_interval"`
 	SkipURLCleaning        bool       `json:"skip_url_cleaning"`
 	SkipTargetPathEscaping bool       `json:"skip_target_path_escaping"`
@@ -386,6 +387,7 @@ type Config struct {
 	ProxySSLInsecureSkipVerify    bool                 `json:"proxy_ssl_insecure_skip_verify"`
 	ProxyEnableHttp2              bool                 `json:"proxy_enable_http2"`
 	ProxySSLMinVersion            uint16               `json:"proxy_ssl_min_version"`
+	ProxySSLMaxVersion            uint16               `json:"proxy_ssl_max_version"`
 	ProxySSLCipherSuites          []string             `json:"proxy_ssl_ciphers"`
 	ProxyDefaultTimeout           float64              `json:"proxy_default_timeout"`
 	ProxySSLDisableRenegotiation  bool                 `json:"proxy_ssl_disable_renegotiation"`
