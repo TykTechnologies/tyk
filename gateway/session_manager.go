@@ -1,12 +1,14 @@
 package gateway
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/TykTechnologies/leakybucket"
 	"github.com/TykTechnologies/leakybucket/memorycache"
+
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
@@ -179,30 +181,13 @@ func (sfr sessionFailReason) String() string {
 // Per 10 seconds
 func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.SessionState, key string, store storage.Handler, enableRL, enableQ bool, globalConf *config.Config, apiID string, dryRun bool) sessionFailReason {
 	// check for limit on API level (set to session by ApplyPolicies)
-	var apiLimit *user.APILimit
-	var allowanceScope string
-
-	if len(currentSession.GetAccessRights()) > 0 {
-		if rights, ok := currentSession.GetAccessRightByAPIID(apiID); !ok {
-			log.WithField("apiID", apiID).Debug("[RATE] unexpected apiID")
-			return sessionFailRateLimit
-		} else {
-			apiLimit = rights.Limit
-			allowanceScope = rights.AllowanceScope
-		}
+	accessDef, allowanceScope, err := GetAccessDefinitionByAPIIDOrSession(currentSession, apiID)
+	if err != nil {
+		log.WithField("apiID", apiID).Debugf("[RATE] %s", err.Error())
+		return sessionFailRateLimit
 	}
 
-	if apiLimit == nil {
-		apiLimit = &user.APILimit{
-			QuotaMax:           currentSession.QuotaMax,
-			QuotaRenewalRate:   currentSession.QuotaRenewalRate,
-			QuotaRenews:        currentSession.QuotaRenews,
-			Rate:               currentSession.Rate,
-			Per:                currentSession.Per,
-			ThrottleInterval:   currentSession.ThrottleInterval,
-			ThrottleRetryLimit: currentSession.ThrottleRetryLimit,
-		}
-	}
+	apiLimit := accessDef.Limit
 
 	// If rate is -1 or 0, it means unlimited and no need for rate limiting.
 	if enableRL && apiLimit.Rate > 0 {
@@ -334,4 +319,33 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 	}
 
 	return false
+}
+
+func GetAccessDefinitionByAPIIDOrSession(currentSession *user.SessionState, apiID string) (accessDef *user.AccessDefinition, allowanceScope string, err error) {
+	accessDef = &user.AccessDefinition{}
+	if len(currentSession.GetAccessRights()) > 0 {
+		if rights, ok := currentSession.GetAccessRightByAPIID(apiID); !ok {
+			return nil, "", errors.New("unexpected apiID")
+		} else {
+			accessDef.Limit = rights.Limit
+			allowanceScope = rights.AllowanceScope
+		}
+	}
+
+	if accessDef.Limit == nil {
+		accessDef = &user.AccessDefinition{
+			Limit: &user.APILimit{
+				QuotaMax:           currentSession.QuotaMax,
+				QuotaRenewalRate:   currentSession.QuotaRenewalRate,
+				QuotaRenews:        currentSession.QuotaRenews,
+				Rate:               currentSession.Rate,
+				Per:                currentSession.Per,
+				ThrottleInterval:   currentSession.ThrottleInterval,
+				ThrottleRetryLimit: currentSession.ThrottleRetryLimit,
+				MaxQueryDepth:      currentSession.MaxQueryDepth,
+			},
+		}
+	}
+
+	return accessDef, allowanceScope, nil
 }
