@@ -83,6 +83,7 @@ type StorageOptionsConf struct {
 	Hosts                 map[string]string `json:"hosts"` // Deprecated: Addrs instead.
 	Addrs                 []string          `json:"addrs"`
 	MasterName            string            `json:"master_name"`
+	SentinelPassword      string            `json:"sentinel_password"`
 	Username              string            `json:"username"`
 	Password              string            `json:"password"`
 	Database              int               `json:"database"`
@@ -189,6 +190,7 @@ type HttpServerOptionsConfig struct {
 	SSLCertificates        []string   `json:"ssl_certificates"`
 	ServerName             string     `json:"server_name"`
 	MinVersion             uint16     `json:"min_version"`
+	MaxVersion             uint16     `json:"max_version"`
 	FlushInterval          int        `json:"flush_interval"`
 	SkipURLCleaning        bool       `json:"skip_url_cleaning"`
 	SkipTargetPathEscaping bool       `json:"skip_target_path_escaping"`
@@ -210,10 +212,10 @@ type UptimeTestsConfigDetail struct {
 }
 
 type UptimeTestsConfig struct {
-	Disable bool                    `json:"disable"`
-	Config  UptimeTestsConfigDetail `json:"config"`
+	Disable     bool                    `json:"disable"`
+	PollerGroup string                  `json:"poller_group"`
+	Config      UptimeTestsConfigDetail `json:"config"`
 }
-
 type ServiceDiscoveryConf struct {
 	DefaultCacheTimeout int `json:"default_cache_timeout"`
 }
@@ -323,7 +325,6 @@ type Config struct {
 	HttpServerOptions         HttpServerOptionsConfig `json:"http_server_options"`
 	ReloadWaitTime            int                     `bson:"reload_wait_time" json:"reload_wait_time"`
 	VersionHeader             string                  `json:"version_header"`
-	UseAsyncSessionWrite      bool                    `json:"optimisations_use_async_session_write"`
 	SuppressRedisSignalReload bool                    `json:"suppress_redis_signal_reload"`
 
 	// Gateway Security Policies
@@ -386,6 +387,7 @@ type Config struct {
 	ProxySSLInsecureSkipVerify    bool                 `json:"proxy_ssl_insecure_skip_verify"`
 	ProxyEnableHttp2              bool                 `json:"proxy_enable_http2"`
 	ProxySSLMinVersion            uint16               `json:"proxy_ssl_min_version"`
+	ProxySSLMaxVersion            uint16               `json:"proxy_ssl_max_version"`
 	ProxySSLCipherSuites          []string             `json:"proxy_ssl_ciphers"`
 	ProxyDefaultTimeout           float64              `json:"proxy_default_timeout"`
 	ProxySSLDisableRenegotiation  bool                 `json:"proxy_ssl_disable_renegotiation"`
@@ -414,16 +416,17 @@ type Config struct {
 	CacheStorage             StorageOptionsConf    `json:"cache_storage"`
 
 	// Middleware/Plugin Configuration
-	EnableBundleDownloader   bool            `bson:"enable_bundle_downloader" json:"enable_bundle_downloader"`
-	BundleBaseURL            string          `bson:"bundle_base_url" json:"bundle_base_url"`
-	BundleInsecureSkipVerify bool            `bson:"bundle_insecure_skip_verify" json:"bundle_insecure_skip_verify"`
-	EnableJSVM               bool            `json:"enable_jsvm"`
-	JSVMTimeout              int             `json:"jsvm_timeout"`
-	DisableVirtualPathBlobs  bool            `json:"disable_virtual_path_blobs"`
-	TykJSPath                string          `json:"tyk_js_path"`
-	MiddlewarePath           string          `json:"middleware_path"`
-	CoProcessOptions         CoProcessConfig `json:"coprocess_options"`
-	IgnoreEndpointCase       bool            `json:"ignore_endpoint_case"`
+	EnableBundleDownloader       bool            `bson:"enable_bundle_downloader" json:"enable_bundle_downloader"`
+	BundleBaseURL                string          `bson:"bundle_base_url" json:"bundle_base_url"`
+	BundleInsecureSkipVerify     bool            `bson:"bundle_insecure_skip_verify" json:"bundle_insecure_skip_verify"`
+	EnableJSVM                   bool            `json:"enable_jsvm"`
+	JSVMTimeout                  int             `json:"jsvm_timeout"`
+	DisableVirtualPathBlobs      bool            `json:"disable_virtual_path_blobs"`
+	TykJSPath                    string          `json:"tyk_js_path"`
+	MiddlewarePath               string          `json:"middleware_path"`
+	CoProcessOptions             CoProcessConfig `json:"coprocess_options"`
+	IgnoreEndpointCase           bool            `json:"ignore_endpoint_case"`
+	IgnoreCanonicalMIMEHeaderKey bool            `json:"ignore_canonical_mime_header_key"`
 
 	// Monitoring, Logging & Profiling
 	LogLevel                string         `json:"log_level"`
@@ -453,8 +456,6 @@ type Config struct {
 	EventTriggersDefunct map[apidef.TykEvent][]TykEventHandler `json:"event_triggers_defunct"` // Deprecated: Config.GetEventTriggers instead.
 
 	// TODO: These config options are not documented - What do they do?
-	SessionUpdatePoolSize          int   `json:"session_update_pool_size"`
-	SessionUpdateBufferSize        int   `json:"session_update_buffer_size"`
 	SupressDefaultOrgStore         bool  `json:"suppress_default_org_store"`
 	LegacyEnableAllowanceCountdown bool  `bson:"legacy_enable_allowance_countdown" json:"legacy_enable_allowance_countdown"`
 	GlobalSessionLifetime          int64 `bson:"global_session_lifetime" json:"global_session_lifetime"`

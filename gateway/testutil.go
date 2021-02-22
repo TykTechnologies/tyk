@@ -27,7 +27,7 @@ import (
 	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
 
 	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 
@@ -61,6 +61,8 @@ var (
 
 	// ReloadTestCase use this when in any test for gateway reloads
 	ReloadTestCase = NewReloadMachinery()
+	// OnConnect this is a callback which is called whenever we transition redis Disconnected to connected
+	OnConnect func()
 )
 
 // ReloadMachinery is a helper struct to use when writing tests that do manual
@@ -290,7 +292,11 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 	if analytics.GeoIPDB == nil {
 		panic("GeoIPDB was not initialized")
 	}
-	go storage.ConnectToRedis(ctx)
+	go storage.ConnectToRedis(ctx, func() {
+		if OnConnect != nil {
+			OnConnect()
+		}
+	})
 	for {
 		if storage.Connected() {
 			break
@@ -312,14 +318,15 @@ func ResetTestConfig() {
 }
 
 func emptyRedis() error {
+	ctx := context.Background()
 	addr := config.Global().Storage.Host + ":" + strconv.Itoa(config.Global().Storage.Port)
 	c := redis.NewClient(&redis.Options{Addr: addr})
 	defer c.Close()
 	dbName := strconv.Itoa(config.Global().Storage.Database)
-	if err := c.Do("SELECT", dbName).Err(); err != nil {
+	if err := c.Do(ctx, "SELECT", dbName).Err(); err != nil {
 		return err
 	}
-	err := c.FlushDB().Err()
+	err := c.FlushDB(ctx).Err()
 	return err
 }
 
@@ -455,27 +462,33 @@ func ProxyHandler(p *ReverseProxy, apiSpec *APISpec) http.Handler {
 }
 
 const (
+	handlerPathRestDataSource        = "/rest-data-source"
+	handlerPathGraphQLDataSource     = "/graphql-data-source"
+	handlerPathHeadersRestDataSource = "/rest-headers-data-source"
+
 	// We need a static port so that the urls can be used in static
 	// test data, and to prevent the requests from being randomized
 	// for checksums. Port 16500 should be obscure and unused.
 	testHttpListen = "127.0.0.1:16500"
 	// Accepts any http requests on /, only allows GET on /get, etc.
 	// All return a JSON with request info.
-	TestHttpAny           = "http://" + testHttpListen
-	TestHttpGet           = TestHttpAny + "/get"
-	testHttpPost          = TestHttpAny + "/post"
-	testGraphQLDataSource = TestHttpAny + "/graphql-data-source"
-	testRESTDataSource    = TestHttpAny + "/rest-data-source"
-	testHttpJWK           = TestHttpAny + "/jwk.json"
-	testHttpJWKDER        = TestHttpAny + "/jwk-der.json"
-	testHttpBundles       = TestHttpAny + "/bundles/"
-	testReloadGroup       = TestHttpAny + "/groupReload"
+	TestHttpAny               = "http://" + testHttpListen
+	TestHttpGet               = TestHttpAny + "/get"
+	testHttpPost              = TestHttpAny + "/post"
+	testGraphQLDataSource     = TestHttpAny + handlerPathGraphQLDataSource
+	testRESTDataSource        = TestHttpAny + handlerPathRestDataSource
+	testRESTHeadersDataSource = TestHttpAny + handlerPathHeadersRestDataSource
+	testHttpJWK               = TestHttpAny + "/jwk.json"
+	testHttpJWKLegacy         = TestHttpAny + "/jwk-legacy.json"
+	testHttpBundles           = TestHttpAny + "/bundles/"
+	testReloadGroup           = TestHttpAny + "/groupReload"
 
 	// Nothing should be listening on port 16501 - useful for
 	// testing TCP and HTTP failures.
-	testHttpFailure    = "127.0.0.1:16501"
-	testHttpFailureAny = "http://" + testHttpFailure
-	MockOrgID          = "507f1f77bcf86cd799439011"
+	testHttpFailure       = "127.0.0.1:16501"
+	testHttpFailureAny    = "http://" + testHttpFailure
+	MockOrgID             = "507f1f77bcf86cd799439011"
+	NonCanonicalHeaderKey = "X-CertificateOuid"
 )
 
 func testHttpHandler() *mux.Router {
@@ -542,15 +555,19 @@ func testHttpHandler() *mux.Router {
 
 	r.HandleFunc("/get", handleMethod("GET"))
 	r.HandleFunc("/post", handleMethod("POST"))
-	r.HandleFunc("/graphql-data-source", graphqlDataSourceHandler)
-	r.HandleFunc("/rest-data-source", restDataSourceHandler)
+
+	r.HandleFunc(handlerPathGraphQLDataSource, graphqlDataSourceHandler)
+	r.HandleFunc(handlerPathRestDataSource, restDataSourceHandler)
+	r.HandleFunc(handlerPathHeadersRestDataSource, restHeadersDataSourceHandler)
+
 	r.HandleFunc("/ws", wsHandler)
 	r.HandleFunc("/jwk.json", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, jwkTestJson)
 	})
-	r.HandleFunc("/jwk-der.json", func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, jwkTestDERJson)
+	r.HandleFunc("/jwk-legacy.json", func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, jwkTestJsonLegacy)
 	})
+
 	r.HandleFunc("/compressed", func(w http.ResponseWriter, r *http.Request) {
 		response := "This is a compressed response"
 		w.Header().Set("Content-Encoding", "gzip")
@@ -594,6 +611,21 @@ func graphqlDataSourceHandler(w http.ResponseWriter, r *http.Request) {
 		}`))
 }
 
+func restHeadersDataSourceHandler(w http.ResponseWriter, r *http.Request) {
+	type KeyVal struct {
+		Name  string `json:"name"`
+		Value string `json:"value"`
+	}
+
+	var headers []KeyVal
+	for name, values := range r.Header {
+		for _, value := range values {
+			headers = append(headers, KeyVal{name, value})
+		}
+	}
+	json.NewEncoder(w).Encode(headers)
+}
+
 func restDataSourceHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(`[
 			{
@@ -624,25 +656,24 @@ func restDataSourceHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 const jwkTestJson = `{
+    "keys": [
+        {
+            "use": "sig",
+            "kty": "RSA",
+            "kid": "12345",
+            "alg": "RS256",
+            "n": "yqZ4rwKF8qCExS7kpY4cnJa_37FMkJNkalZ3OuslLB0oRL8T4c94kdF4aeNzSFkSe2n99IBI6Ssl79vbfMZb-t06L0Q94k-_P37x7-_RJZiff4y1VGjrnrnMI2iu9l4iBBRYzNmG6eblroEMMWlgk5tysHgxB59CSNIcD9gqk1hx4n_FgOmvKsfQgWHNlPSDTRcWGWGhB2_XgNVYG2pOlQxAPqLhBHeqGTXBbPfGF9cHzixpsPr6GtbzPwhsQ_8bPxoJ7hdfn-rzztks3d6-HWURcyNTLRe0mjXjjee9Z6-gZ-H-fS4pnP9tqT7IgU6ePUWTpjoiPtLexgsAa_ctjQ",
+            "e": "AQAB"
+        }
+    ]
+}`
+
+const jwkTestJsonLegacy = `{
     "keys": [{
         "alg": "RS256",
         "kty": "RSA",
         "use": "sig",
         "x5c": ["Ci0tLS0tQkVHSU4gUFVCTElDIEtFWS0tLS0tCk1JSUJJakFOQmdrcWhraUc5dzBCQVFFRkFBT0NBUThBTUlJQkNnS0NBUUVBeXFaNHJ3S0Y4cUNFeFM3a3BZNGMKbkphLzM3Rk1rSk5rYWxaM091c2xMQjBvUkw4VDRjOTRrZEY0YWVOelNGa1NlMm45OUlCSTZTc2w3OXZiZk1aYgordDA2TDBROTRrKy9QMzd4NysvUkpaaWZmNHkxVkdqcm5ybk1JMml1OWw0aUJCUll6Tm1HNmVibHJvRU1NV2xnCms1dHlzSGd4QjU5Q1NOSWNEOWdxazFoeDRuL0ZnT212S3NmUWdXSE5sUFNEVFJjV0dXR2hCMi9YZ05WWUcycE8KbFF4QVBxTGhCSGVxR1RYQmJQZkdGOWNIeml4cHNQcjZHdGJ6UHdoc1EvOGJQeG9KN2hkZm4rcnp6dGtzM2Q2KwpIV1VSY3lOVExSZTBtalhqamVlOVo2K2daK0grZlM0cG5QOXRxVDdJZ1U2ZVBVV1Rwam9pUHRMZXhnc0FhL2N0CmpRSURBUUFCCi0tLS0tRU5EIFBVQkxJQyBLRVktLS0tLQo="],
-        "n": "xofiG8gsnv9-I_g-5OWTLhaZtgAGq1QEsBCPK9lmLqhuonHe8lT-nK1DM49f6J9QgaOjZ3DB50QkhBysnIFNcXFyzaYIPMoccvuHLPgdBawX4WYKm5gficD0WB0XnTt4sqTI5usFpuop9vvW44BwVGhRqMT7c11gA8TSWMBxDI4A5ARc4MuQtfm64oN-JQodSztArwb9wcmH8WrBvSUkR4pyi9MT8W27gqJ2e2Xn8jgGnswNQWOyCTN84PawOYaN-2ORHeIea1g-URln1bofcHN73vZCIrVbE6iA2D7Ybh22AVrCfunekEDEe2GZfLZLejiZiBWG7enJhcrQIzAQGw",
-        "e": "AQAB",
-        "kid": "12345",
-        "x5t": "12345"
-    }]
-}`
-
-// This has public key encoded as PKIX, ASN.1 DER form.
-const jwkTestDERJson = `{
-    "keys": [{
-        "alg": "RS256",
-        "kty": "RSA",
-        "use": "sig",
-        "x5c": ["MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyqZ4rwKF8qCExS7kpY4cnJa/37FMkJNkalZ3OuslLB0oRL8T4c94kdF4aeNzSFkSe2n99IBI6Ssl79vbfMZb+t06L0Q94k+/P37x7+/RJZiff4y1VGjrnrnMI2iu9l4iBBRYzNmG6eblroEMMWlgk5tysHgxB59CSNIcD9gqk1hx4n/FgOmvKsfQgWHNlPSDTRcWGWGhB2/XgNVYG2pOlQxAPqLhBHeqGTXBbPfGF9cHzixpsPr6GtbzPwhsQ/8bPxoJ7hdfn+rzztks3d6+HWURcyNTLRe0mjXjjee9Z6+gZ+H+fS4pnP9tqT7IgU6ePUWTpjoiPtLexgsAa/ctjQIDAQAB"],
         "n": "xofiG8gsnv9-I_g-5OWTLhaZtgAGq1QEsBCPK9lmLqhuonHe8lT-nK1DM49f6J9QgaOjZ3DB50QkhBysnIFNcXFyzaYIPMoccvuHLPgdBawX4WYKm5gficD0WB0XnTt4sqTI5usFpuop9vvW44BwVGhRqMT7c11gA8TSWMBxDI4A5ARc4MuQtfm64oN-JQodSztArwb9wcmH8WrBvSUkR4pyi9MT8W27gqJ2e2Xn8jgGnswNQWOyCTN84PawOYaN-2ORHeIea1g-URln1bofcHN73vZCIrVbE6iA2D7Ybh22AVrCfunekEDEe2GZfLZLejiZiBWG7enJhcrQIzAQGw",
         "e": "AQAB",
         "kid": "12345",
@@ -823,7 +854,7 @@ func firstVals(vals map[string][]string) map[string]string {
 }
 
 type TestConfig struct {
-	sepatateControlAPI bool
+	SeparateControlAPI bool
 	Delay              time.Duration
 	HotReload          bool
 	overrideDefaults   bool
@@ -846,7 +877,7 @@ func (s *Test) Start() {
 	globalConf := config.Global()
 	globalConf.ListenPort, _ = strconv.Atoi(port)
 
-	if s.config.sepatateControlAPI {
+	if s.config.SeparateControlAPI {
 		l, _ := net.Listen("tcp", "127.0.0.1:0")
 
 		_, port, _ = net.SplitHostPort(l.Addr().String())
@@ -880,7 +911,7 @@ func (s *Test) Start() {
 		RequestBuilder: func(tc *test.TestCase) (*http.Request, error) {
 			tc.BaseURL = s.URL
 			if tc.ControlRequest {
-				if s.config.sepatateControlAPI {
+				if s.config.SeparateControlAPI {
 					tc.BaseURL = scheme + controlProxy().listener.Addr().String()
 				} else if s.GlobalConfig.ControlAPIHostname != "" {
 					tc.Domain = s.GlobalConfig.ControlAPIHostname
@@ -912,7 +943,7 @@ func (s *Test) Close() {
 		s.cacnel()
 	}
 	defaultProxyMux.swap(&proxyMux{})
-	if s.config.sepatateControlAPI {
+	if s.config.SeparateControlAPI {
 		globalConf := config.Global()
 		globalConf.ControlAPIPort = 0
 		config.SetGlobal(globalConf)
@@ -920,6 +951,7 @@ func (s *Test) Close() {
 }
 
 func (s *Test) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, error) {
+	t.Helper()
 	return s.testRunner.Run(t, testCases...)
 }
 
@@ -1045,11 +1077,33 @@ const sampleAPI = `{
 	"graphql": {
       "enabled": false,
       "execution_mode": "executionEngine",
+	  "version": "",
       "schema": "` + testComposedSchema + `",
       "type_field_configurations": [
         ` + testGraphQLDataSourceConfiguration + `,
         ` + testRESTDataSourceConfiguration + `
       ],
+	  "engine": {
+		"field_configs": [
+			{
+				"type_name": "Query",
+				"field_name": "people",
+				"disable_default_mapping": true,
+				"path": [""]
+			},
+			{
+				"type_name": "Query",
+				"field_name": "headers",
+				"disable_default_mapping": true,
+				"path": [""]
+			}
+		],
+		"data_sources": [
+		    ` + testRESTDataSourceConfigurationV2 + `,
+			` + testGraphQLDataSourceConfigurationV2 + `,
+			` + testRESTHeadersDataSourceConfigurationV2 + `
+		]
+	},
       "playground": {
         "enabled": false,
         "path": "/playground"
@@ -1057,8 +1111,24 @@ const sampleAPI = `{
     }
 }`
 
-const testComposedSchema = "type Query {people: [Person] countries: [Country]} type Person {name: String country: Country} " +
-	"type Country {code: String name: String}"
+const testComposedSchema = "type Query {people: [Person] countries: [Country] headers: [Header]} " +
+	"type Person {name: String country: Country} " +
+	"type Country {code: String name: String} " +
+	"type Header {name:String value: String}"
+
+const testGraphQLDataSourceConfigurationV2 = `
+{
+	"kind": "GraphQL",
+	"name": "countries",
+	"internal": true,
+	"root_fields": [
+		{ "type": "Query", "fields": ["countries"] }
+	],
+	"config": {
+		"url": "` + testGraphQLDataSource + `",
+		"method": "POST"
+	}
+}`
 
 const testGraphQLDataSourceConfiguration = `
 {
@@ -1077,6 +1147,43 @@ const testGraphQLDataSourceConfiguration = `
   }
 }
 `
+
+const testRESTHeadersDataSourceConfigurationV2 = `
+{
+	"kind": "REST",
+	"name": "headers",
+	"internal": true,
+	"root_fields": [
+		{ "type": "Query", "fields": ["headers"] }
+	],
+	"config": {
+		"url": "` + testRESTHeadersDataSource + `",
+		"method": "GET",
+		"headers": {
+			"static": "barbaz",
+			"injected": "{{ .request.header.injected }}"
+		},
+		"query": [],
+		"body": ""
+	}
+}`
+
+const testRESTDataSourceConfigurationV2 = `
+{
+	"kind": "REST",
+	"name": "people",
+	"internal": true,
+	"root_fields": [
+		{ "type": "Query", "fields": ["people"] }
+	],
+	"config": {
+		"url": "` + testRESTDataSource + `",
+		"method": "GET",
+		"headers": {},
+		"query": [],
+		"body": ""
+	}
+}`
 
 const testRESTDataSourceConfiguration = `
 {
@@ -1103,6 +1210,50 @@ const testRESTDataSourceConfiguration = `
 	}
   }
 }`
+
+func generateRESTDataSourceV2(gen func(dataSource *apidef.GraphQLEngineDataSource, restConf *apidef.GraphQLEngineDataSourceConfigREST)) apidef.GraphQLEngineDataSource {
+	ds := apidef.GraphQLEngineDataSource{}
+	if err := json.Unmarshal([]byte(testRESTDataSourceConfigurationV2), &ds); err != nil {
+		panic(err)
+	}
+
+	restConf := apidef.GraphQLEngineDataSourceConfigREST{}
+	if err := json.Unmarshal(ds.Config, &restConf); err != nil {
+		panic(err)
+	}
+
+	gen(&ds, &restConf)
+
+	rawConfig, err := json.Marshal(restConf)
+	if err != nil {
+		panic(err)
+	}
+
+	ds.Config = rawConfig
+	return ds
+}
+
+func generateGraphQLDataSourceV2(gen func(dataSource *apidef.GraphQLEngineDataSource, graphqlConf *apidef.GraphQLEngineDataSourceConfigGraphQL)) apidef.GraphQLEngineDataSource {
+	ds := apidef.GraphQLEngineDataSource{}
+	if err := json.Unmarshal([]byte(testGraphQLDataSourceConfigurationV2), &ds); err != nil {
+		panic(err)
+	}
+
+	graphqlConf := apidef.GraphQLEngineDataSourceConfigGraphQL{}
+	if err := json.Unmarshal(ds.Config, &graphqlConf); err != nil {
+		panic(err)
+	}
+
+	gen(&ds, &graphqlConf)
+
+	rawConfig, err := json.Marshal(graphqlConf)
+	if err != nil {
+		panic(err)
+	}
+
+	ds.Config = rawConfig
+	return ds
+}
 
 func generateRESTDataSource(gen ...func(restDataSource *datasource.HttpJsonDataSourceConfig)) json.RawMessage {
 	typeFieldConfiguration := datasource.TypeFieldConfiguration{}

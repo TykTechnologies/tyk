@@ -41,6 +41,9 @@
         "master_name": {
           "type": "string"
         },
+        "sentinel_password": {
+          "type": "string"
+        },
         "optimisation_max_active": {
           "type": "integer"
         },
@@ -278,6 +281,9 @@
     "ignore_endpoint_case": {
       "type": "boolean"
     },
+    "ignore_canonical_mime_header_key": {
+      "type": "boolean"
+    },
     "db_app_conf_options": {
       "type": [
         "object",
@@ -500,6 +506,9 @@
         "min_version": {
           "type": "integer"
         },
+        "max_version": {
+          "type": "integer"
+        },
         "override_defaults": {
           "type": "boolean"
         },
@@ -713,15 +722,6 @@
     "oauth_error_status_code": {
       "type": "integer"
     },
-    "optimisations_use_async_session_write": {
-      "type": "boolean"
-    },
-    "session_update_pool_size": {
-      "type": "integer"
-    },
-    "session_update_buffer_size": {
-      "type": "integer"
-    },
     "pid_file_location": {
       "type": "string"
     },
@@ -785,6 +785,9 @@
       "type": "boolean"
     },
     "proxy_ssl_min_version": {
+      "type": "integer"
+    },
+    "proxy_ssl_max_version": {
       "type": "integer"
     },
     "proxy_ssl_ciphers": {
@@ -934,6 +937,9 @@
         },
         "disable": {
           "type": "boolean"
+        },
+        "poller_group": {
+          "type": "string"
         }
       }
     },

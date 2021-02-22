@@ -183,9 +183,9 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 	for _, dh := range object.Request.DeleteHeaders {
 		r.Header.Del(dh)
 	}
-
+	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
 	for h, v := range object.Request.SetHeaders {
-		r.Header.Set(h, v)
+		setCustomHeader(r.Header, h, v, ignoreCanonical)
 	}
 
 	updatedValues := r.URL.Query()
@@ -294,9 +294,16 @@ func (m *CoProcessMiddleware) EnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	if m.HookType == coprocess.HookType_CustomKeyCheck {
+		if ctxGetRequestStatus(r) == StatusOkAndIgnore {
+			return nil, http.StatusOK
+		}
+	}
+
 	logger := m.Logger()
 	logger.Debug("CoProcess Request, HookType: ", m.HookType)
 	originalURL := r.URL
+	authToken, _ := m.getAuthToken(coprocessType, r)
 
 	var extractor IdExtractor
 	if m.Spec.EnableCoProcessAuth && m.Spec.CustomMiddleware.IdExtractor.Extractor != nil {
@@ -449,7 +456,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		returnedSession.OrgID = m.Spec.OrgID
 
 		if err := m.ApplyPolicies(returnedSession); err != nil {
-			AuthFailed(m, r, r.Header.Get(m.Spec.Auth.AuthHeaderName))
+			AuthFailed(m, r, authToken)
 			return errors.New(http.StatusText(http.StatusForbidden)), http.StatusForbidden
 		}
 
@@ -470,7 +477,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 		// Apply it second time to fix the quota
 		if err := m.ApplyPolicies(returnedSession); err != nil {
-			AuthFailed(m, r, r.Header.Get(m.Spec.Auth.AuthHeaderName))
+			AuthFailed(m, r, authToken)
 			return errors.New(http.StatusText(http.StatusForbidden)), http.StatusForbidden
 		}
 
@@ -539,8 +546,9 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 	}
 
 	// Set headers:
+	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
 	for k, v := range retObject.Response.Headers {
-		res.Header.Set(k, v)
+		setCustomHeader(res.Header, k, v, ignoreCanonical)
 	}
 
 	// Set response body:

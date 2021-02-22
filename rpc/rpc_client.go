@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"sync"
 	"sync/atomic"
+	"testing"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
@@ -42,10 +43,13 @@ var (
 	rpcLoginMu sync.Mutex
 
 	rpcConnectMu sync.Mutex
+
+	// UseSyncLoginRPC for tests where we dont need to execute as a goroutine
+	UseSyncLoginRPC bool
 )
 
 // ErrRPCIsDown this is returned when we can't reach rpc server.
-var ErrRPCIsDown = errors.New("RPCStorageHandler: rpc is either down or ws not configured")
+var ErrRPCIsDown = errors.New("RPCStorageHandler: rpc is either down or was not configured")
 
 // rpc.Login is callend may places we only need one in flight at a time.
 var loginFlight singleflight.Group
@@ -132,6 +136,8 @@ const (
 type Config struct {
 	UseSSL                bool   `json:"use_ssl"`
 	SSLInsecureSkipVerify bool   `json:"ssl_insecure_skip_verify"`
+	SSLMinVersion         uint16 `json:"ssl_min_version"`
+	SSLMaxVersion         uint16 `json:"ssl_max_version"`
 	ConnectionString      string `json:"connection_string"`
 	RPCKey                string `json:"rpc_key"`
 	APIKey                string `json:"api_key"`
@@ -226,6 +232,8 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 	if values.Config().UseSSL {
 		clientCfg := &tls.Config{
 			InsecureSkipVerify: values.Config().SSLInsecureSkipVerify,
+			MinVersion:         values.Config().SSLMinVersion,
+			MaxVersion:         values.Config().SSLMaxVersion,
 		}
 
 		clientSingleton = gorpc.NewTLSClient(values.Config().ConnectionString, clientCfg)
@@ -255,6 +263,8 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 		if useSSL {
 			cfg := &tls.Config{
 				InsecureSkipVerify: values.Config().SSLInsecureSkipVerify,
+				MinVersion:         values.Config().SSLMinVersion,
+				MaxVersion:         values.Config().SSLMaxVersion,
 			}
 
 			conn, err = tls.DialWithDialer(dialer, "tcp", addr, cfg)
@@ -288,14 +298,20 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 		funcClientSingleton = dispatcher.NewFuncClient(clientSingleton)
 	}
 
-	go Login()
-
+	handleLogin()
 	if !suppressRegister {
 		register()
 		go checkDisconnect()
 	}
+	return true
+}
 
-	return values.ClientIsConnected()
+func handleLogin() {
+	if UseSyncLoginRPC == true {
+		Login()
+		return
+	}
+	go Login()
 }
 
 // Login tries to login to the rpc sever. Returns true if it succeeds and false
@@ -438,11 +454,24 @@ func recoverOp(fn func() error) func() error {
 	}
 }
 
-func FuncClientSingleton(funcName string, request interface{}) (interface{}, error) {
-	if !values.ClientIsConnected() {
-		return nil, ErrRPCIsDown
+// FuncClientSingleton performs RPC call. This might be called before we have
+// established RPC connection, in that case we perform a retry with exponential
+// backoff ensuring indeed we can't connect to the rpc, this will eventually
+// fall into emergency mode( That is handled outside of this function call)
+func FuncClientSingleton(funcName string, request interface{}) (result interface{}, err error) {
+	be := backoff.Retry(func() error {
+		if !values.ClientIsConnected() {
+			return ErrRPCIsDown
+		}
+		result, err = funcClientSingleton.CallTimeout(funcName, request, GlobalRPCCallTimeout)
+		return nil
+	}, backoff.WithMaxRetries(
+		backoff.NewConstantBackOff(10*time.Millisecond), 3,
+	))
+	if be != nil {
+		err = be
 	}
-	return funcClientSingleton.CallTimeout(funcName, request, GlobalRPCCallTimeout)
+	return
 }
 
 func onConnectFunc(conn net.Conn) (net.Conn, string, error) {
@@ -477,4 +506,15 @@ func loadDispatcher(dispatcherFuncs map[string]interface{}) {
 		dispatcher.AddFunc(funcName, funcBody)
 		addedFuncs[funcName] = true
 	}
+}
+
+// ForceConnected only intended to be used in tests
+// do not use it for any other thing
+func ForceConnected(t *testing.T) {
+	values.clientIsConnected.Store(true)
+}
+
+// SetEmergencyMode used in tests to force emergency mode
+func SetEmergencyMode(t *testing.T, value bool) {
+	values.SetEmergencyMode(value)
 }

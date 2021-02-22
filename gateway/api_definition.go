@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/cenk/backoff"
+	"github.com/jensneuse/graphql-go-tools/pkg/engine/resolve"
 
 	sprig "gopkg.in/Masterminds/sprig.v2"
 
@@ -190,7 +191,12 @@ type APISpec struct {
 	network NetworkStats
 
 	GraphQLExecutor struct {
-		Engine *graphql.ExecutionEngine
+		Engine   *graphql.ExecutionEngine
+		EngineV2 *graphql.ExecutionEngineV2
+		HooksV2  struct {
+			BeforeFetchHook resolve.BeforeFetchHook
+			AfterFetchHook  resolve.AfterFetchHook
+		}
 		Client *http.Client
 		Schema *graphql.Schema
 	}
@@ -432,7 +438,6 @@ func (a APIDefinitionLoader) FromRPC(orgId string) ([]*APISpec, error) {
 	if rpc.IsEmergencyMode() {
 		return LoadDefinitionsFromRPCBackup()
 	}
-
 	store := RPCStorageHandler{}
 	if !store.Connect() {
 		return nil, errors.New("Can't connect RPC layer")
@@ -451,7 +456,7 @@ func (a APIDefinitionLoader) FromRPC(orgId string) ([]*APISpec, error) {
 
 	if rpc.LoadCount() > 0 {
 		if err := saveRPCDefinitionsBackup(apiCollection); err != nil {
-			return nil, err
+			log.Error(err)
 		}
 	}
 

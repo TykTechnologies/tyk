@@ -12,6 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 type traceHttpRequest struct {
@@ -27,10 +28,9 @@ func (tr *traceHttpRequest) toRequest() (*http.Request, error) {
 		return nil, err
 	}
 
+	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
 	for key, values := range tr.Headers {
-		for _, v := range values {
-			r.Header.Add(key, v)
-		}
+		addCustomHeader(r.Header, key, values, ignoreCanonical)
 	}
 
 	ctxSetTrace(r)

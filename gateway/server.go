@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -40,7 +41,6 @@ import (
 	"github.com/evalphobia/logrus_sentry"
 	graylogHook "github.com/gemnasium/logrus-graylog-hook"
 	"github.com/gorilla/mux"
-	"github.com/justinas/alice"
 	"github.com/lonelycode/osin"
 	newrelic "github.com/newrelic/go-agent"
 	"github.com/rs/cors"
@@ -172,9 +172,14 @@ func setupGlobals(ctx context.Context) {
 		mainLog.Fatal("Analytics requires Redis Storage backend, please enable Redis in the tyk.conf file.")
 	}
 
-	// Initialise our Host Checker
-	healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:"}
-	InitHostCheckManager(ctx, &healthCheckStore)
+	// Initialise HostCheckerManager only if uptime tests are enabled.
+	if !config.Global().UptimeTests.Disable {
+		if config.Global().ManagementNode {
+			mainLog.Warn("Running Uptime checks in a management node.")
+		}
+		healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:"}
+		InitHostCheckManager(ctx, &healthCheckStore)
+	}
 
 	initHealthCheck(ctx)
 
@@ -242,7 +247,7 @@ func setupGlobals(ctx context.Context) {
 		certificateSecret = config.Global().Security.PrivateCertificateEncodingSecret
 	}
 
-	CertificateManager = certs.NewCertificateManager(getGlobalStorageHandler("cert-", false), certificateSecret, log)
+	CertificateManager = certs.NewCertificateManager(getGlobalStorageHandler("cert-", false), certificateSecret, log, !config.Global().Cloud)
 
 	if config.Global().NewRelic.AppName != "" {
 		NewRelicApplication = SetupNewRelic()
@@ -407,6 +412,8 @@ func loadControlAPIEndpoints(muxer *mux.Router) {
 			return
 		}
 	}
+
+	muxer.HandleFunc("/"+config.Global().HealthCheckEndpointName, liveCheckHandler)
 
 	r := mux.NewRouter()
 	muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
@@ -663,7 +670,7 @@ func createResponseMiddlewareChain(spec *APISpec, responseFuncs []apidef.Middlew
 	spec.ResponseChain = responseChain
 }
 
-func handleCORS(chain *[]alice.Constructor, spec *APISpec) {
+func handleCORS(router *mux.Router, spec *APISpec) {
 
 	if spec.CORS.Enable {
 		mainLog.Debug("CORS ENABLED")
@@ -678,7 +685,7 @@ func handleCORS(chain *[]alice.Constructor, spec *APISpec) {
 			Debug:              spec.CORS.Debug,
 		})
 
-		*chain = append(*chain, c.Handler)
+		router.Use(c.Handler)
 	}
 }
 
@@ -1000,6 +1007,32 @@ func initialiseSystem(ctx context.Context) error {
 		}
 	}
 
+	if globalConf.ProxySSLMaxVersion == 0 {
+		globalConf.ProxySSLMaxVersion = tls.VersionTLS12
+	}
+
+	if globalConf.ProxySSLMinVersion > globalConf.ProxySSLMaxVersion {
+		globalConf.ProxySSLMaxVersion = globalConf.ProxySSLMinVersion
+	}
+
+	if globalConf.HttpServerOptions.MaxVersion == 0 {
+		globalConf.HttpServerOptions.MaxVersion = tls.VersionTLS12
+	}
+
+	if globalConf.HttpServerOptions.MinVersion > globalConf.HttpServerOptions.MaxVersion {
+		globalConf.HttpServerOptions.MaxVersion = globalConf.HttpServerOptions.MinVersion
+	}
+
+	if globalConf.UseDBAppConfigs && globalConf.Policies.PolicySource != config.DefaultDashPolicySource {
+		globalConf.Policies.PolicySource = config.DefaultDashPolicySource
+		globalConf.Policies.PolicyConnectionString = globalConf.DBAppConfOptions.ConnectionString
+		if globalConf.Policies.PolicyRecordName == "" {
+			globalConf.Policies.PolicyRecordName = config.DefaultDashPolicyRecordName
+		}
+	}
+
+	config.SetGlobal(globalConf)
+
 	getHostDetails()
 	setupInstrumentation()
 
@@ -1242,7 +1275,9 @@ func Start() {
 		defer trace.Close()
 	}
 	start(ctx)
-	go storage.ConnectToRedis(ctx)
+	go storage.ConnectToRedis(ctx, func() {
+		reloadURLStructure(func() {})
+	})
 
 	if *cli.MemProfile {
 		mainLog.Debug("Memory profiling active")
@@ -1288,15 +1323,6 @@ func Start() {
 	// stop analytics workers
 	if config.Global().EnableAnalytics && analytics.Store == nil {
 		analytics.Stop()
-	}
-
-	// if using async session writes stop workers
-	if config.Global().UseAsyncSessionWrite {
-		DefaultOrgStore.Stop()
-		for i := range apiSpecs {
-			apiSpecs[i].StopSessionManagerPool()
-		}
-
 	}
 
 	// write pprof profiles
