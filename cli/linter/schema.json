@@ -323,6 +323,9 @@
     "drl_threshold": {
       "type": "number"
     },
+    "drl_enable_sentinel_rate_limiter": {
+      "type": "boolean"
+    },
     "enable_analytics": {
       "type": "boolean"
     },

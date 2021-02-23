@@ -31,8 +31,6 @@ github.com/TykTechnologies/leakybucket/memorycache
 github.com/TykTechnologies/murmur3
 # github.com/TykTechnologies/openid2go v0.0.0-20200312160651-00c254a52b19
 github.com/TykTechnologies/openid2go/openid
-# github.com/TykTechnologies/tyk/certs v0.0.1
-github.com/TykTechnologies/tyk/certs
 # github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751
 github.com/alecthomas/template
 github.com/alecthomas/template/parse
