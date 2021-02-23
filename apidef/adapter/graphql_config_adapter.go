@@ -211,7 +211,7 @@ func (g *GraphQLConfigAdapter) findNestedFieldChildren(typeName string, schema *
 		}
 
 		if added := g.putChildNode(childNodes, typeName, fieldName); !added {
-			return
+			continue
 		}
 
 		fieldTypeName := schema.FieldDefinitionTypeNode(ref).NameString(schema)
