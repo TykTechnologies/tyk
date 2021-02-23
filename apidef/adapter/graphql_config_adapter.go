@@ -187,18 +187,16 @@ func (g *GraphQLConfigAdapter) determineChildNodes(planDataSources []plan.DataSo
 	return nil
 }
 
-func (g *GraphQLConfigAdapter) findFieldChildren(typeName, fieldName string, schema *ast.Document, dataSources []plan.DataSourceConfiguration) []plan.TypeField {
+func (g *GraphQLConfigAdapter) findFieldChildren(typeName, fieldName string, schema *ast.Document, dataSources []plan.DataSourceConfiguration) (childNodes []plan.TypeField) {
 	fields := g.nodeFieldRefs(typeName, schema)
-	if len(fields) == 0 {
-		return nil
-	}
 	for _, ref := range fields {
-		if fieldName == schema.FieldDefinitionNameString(ref) {
-			fieldTypeName := schema.FieldDefinitionTypeNode(ref).NameString(schema)
-			childNodes := []plan.TypeField{}
-			g.findNestedFieldChildren(fieldTypeName, schema, dataSources, &childNodes)
-			return childNodes
+		if fieldName != schema.FieldDefinitionNameString(ref) {
+			continue
 		}
+
+		fieldTypeName := schema.FieldDefinitionTypeNode(ref).NameString(schema)
+		g.findNestedFieldChildren(fieldTypeName, schema, dataSources, &childNodes)
+		return childNodes
 	}
 
 	return nil
@@ -206,18 +204,20 @@ func (g *GraphQLConfigAdapter) findFieldChildren(typeName, fieldName string, sch
 
 func (g *GraphQLConfigAdapter) findNestedFieldChildren(typeName string, schema *ast.Document, dataSources []plan.DataSourceConfiguration, childNodes *[]plan.TypeField) {
 	fields := g.nodeFieldRefs(typeName, schema)
-	if len(fields) == 0 {
-		return
-	}
 	for _, ref := range fields {
 		fieldName := schema.FieldDefinitionNameString(ref)
 		if g.isRootField(typeName, fieldName, dataSources) {
 			continue
 		}
-		g.putChildNode(childNodes, typeName, fieldName)
+
+		if added := g.putChildNode(childNodes, typeName, fieldName); !added {
+			return
+		}
+
 		fieldTypeName := schema.FieldDefinitionTypeNode(ref).NameString(schema)
 		g.findNestedFieldChildren(fieldTypeName, schema, dataSources, childNodes)
 	}
+
 	return
 }
 
@@ -255,21 +255,22 @@ func (g *GraphQLConfigAdapter) isRootField(typeName, fieldName string, dataSourc
 	return false
 }
 
-func (g *GraphQLConfigAdapter) putChildNode(nodes *[]plan.TypeField, typeName, fieldName string) {
+func (g *GraphQLConfigAdapter) putChildNode(nodes *[]plan.TypeField, typeName, fieldName string) (added bool) {
 	for i := range *nodes {
 		if typeName != (*nodes)[i].TypeName {
 			continue
 		}
 		for j := range (*nodes)[i].FieldNames {
 			if fieldName == (*nodes)[i].FieldNames[j] {
-				return
+				return false
 			}
 		}
 		(*nodes)[i].FieldNames = append((*nodes)[i].FieldNames, fieldName)
-		return
+		return true
 	}
 	*nodes = append(*nodes, plan.TypeField{
 		TypeName:   typeName,
 		FieldNames: []string{fieldName},
 	})
+	return true
 }

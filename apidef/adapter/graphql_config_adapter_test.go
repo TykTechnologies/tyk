@@ -203,6 +203,65 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 			},
 		),
 	)
+
+	t.Run("should succesfully convert v2 graphql config of trevorblades schema with recursive types to engine config v2",
+		runWithoutError(graphqlEngineV2TrevorbladesConfigJson, httpClient,
+			func(t *testing.T) *graphql.EngineV2Configuration {
+				schema, err := graphql.NewSchemaFromString(trevorbladesSchema)
+				require.NoError(t, err)
+
+				conf := graphql.NewEngineV2Configuration(schema)
+				conf.SetFieldConfigurations(plan.FieldConfigurations{
+					{
+						TypeName:              "Query",
+						FieldName:             "countries",
+						DisableDefaultMapping: false,
+						Path:                  []string{"countries"},
+					},
+				})
+
+				conf.SetDataSources([]plan.DataSourceConfiguration{
+					{
+						RootNodes: []plan.TypeField{
+							{
+								TypeName:   "Query",
+								FieldNames: []string{"countries"},
+							},
+						},
+						ChildNodes: []plan.TypeField{
+							{
+								TypeName:   "Country",
+								FieldNames: []string{"code", "name", "native", "phone", "continent", "capital", "currency", "languages", "emoji", "emojiU", "states"},
+							},
+							{
+								TypeName:   "Continent",
+								FieldNames: []string{"code", "name", "countries"},
+							},
+							{
+								TypeName:   "Language",
+								FieldNames: []string{"code", "name", "native", "rtl"},
+							},
+							{
+								TypeName:   "State",
+								FieldNames: []string{"code", "name", "country"},
+							},
+						},
+						Factory: &graphqlDataSource.Factory{
+							Client: httpclient.NewNetHttpClient(httpClient),
+						},
+						Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
+							Fetch: graphqlDataSource.FetchConfiguration{
+								URL:    "https://graphql.example.com",
+								Method: "POST",
+							},
+						}),
+					},
+				})
+
+				return &conf
+			},
+		),
+	)
 }
 
 const graphqlEngineV1ConfigJson = `{
@@ -315,6 +374,40 @@ const graphqlEngineV2ConfigJson = `{
 					"headers": {
 						"Auth": "123"
 					}
+				}
+			}
+		]
+	},
+	"playground": {}
+}`
+
+const trevorbladesSchema = "enum CacheControlScope {   PUBLIC   PRIVATE }  type Continent {   code: ID!   name: String!   countries: [Country!]! }  input ContinentFilterInput {   code: StringQueryOperatorInput }  type Country {   code: ID!   name: String!   native: String!   phone: String!   continent: Continent!   capital: String   currency: String   languages: [Language!]!   emoji: String!   emojiU: String!   states: [State!]! }  input CountryFilterInput {   code: StringQueryOperatorInput   currency: StringQueryOperatorInput   continent: StringQueryOperatorInput }  type Language {   code: ID!   name: String   native: String   rtl: Boolean! }  input LanguageFilterInput {   code: StringQueryOperatorInput }  type Query {   continents(filter: ContinentFilterInput): [Continent!]!   continent(code: ID!): Continent   countries(filter: CountryFilterInput): [Country!]!   country(code: ID!): Country   languages(filter: LanguageFilterInput): [Language!]!   language(code: ID!): Language }  type State {   code: String   name: String!   country: Country! }  input StringQueryOperatorInput {   eq: String   ne: String   in: [String]   nin: [String]   regex: String   glob: String } scalar Upload"
+
+const graphqlEngineV2TrevorbladesConfigJson = `{
+	"enabled": true,
+	"execution_mode": "executionEngine",
+	"version": "2",
+	"schema": "` + trevorbladesSchema + `",
+	"last_schema_update": "2020-11-11T11:11:11.000+01:00",
+	"engine": {
+		"field_configs": [
+			{
+				"type_name": "Query",
+				"field_name": "countries",
+				"disable_default_mapping": false,
+				"path": ["countries"]
+			}
+		],
+		"data_sources": [
+			{
+				"kind": "GraphQL",
+				"internal": false,
+				"root_fields": [
+					{ "type": "Query", "fields": ["countries"] }
+				],
+				"config": {
+					"url": "https://graphql.example.com",
+					"method": "POST"
 				}
 			}
 		]
