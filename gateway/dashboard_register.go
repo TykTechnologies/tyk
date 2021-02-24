@@ -39,7 +39,7 @@ type HTTPDashboardHandler struct {
 	Secret string
 
 	heartBeatStopSentinel bool
-	Gw                    *Gateway
+	Gw                    *Gateway `json:"-"`
 }
 
 var dashClient *http.Client

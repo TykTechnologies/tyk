@@ -164,7 +164,7 @@ func (gw *Gateway) FireSystemEvent(name apidef.TykEvent, meta interface{}) {
 type LogMessageEventHandler struct {
 	prefix string
 	logger *logrus.Logger
-	Gw     *Gateway
+	Gw     *Gateway `json:"-"`
 }
 
 // New enables the intitialisation of event handler instances when they are created on ApiSpec creation

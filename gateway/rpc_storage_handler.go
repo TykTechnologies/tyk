@@ -93,7 +93,7 @@ type RPCStorageHandler struct {
 	HashKeys         bool
 	SuppressRegister bool
 	DoReload         func()
-	Gw               *Gateway
+	Gw               *Gateway `json:"-"`
 }
 
 var RPCGlobalCache = cache.New(30*time.Second, 15*time.Second)

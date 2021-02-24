@@ -8,7 +8,7 @@ import (
 )
 
 type Monitor struct {
-	Gw *Gateway
+	Gw *Gateway `json:"-"`
 }
 
 func (m Monitor) Enabled() bool {

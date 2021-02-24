@@ -516,7 +516,7 @@ func isLoop(r *http.Request) (bool, error) {
 
 type DummyProxyHandler struct {
 	SH SuccessHandler
-	Gw *Gateway
+	Gw *Gateway `json:"-"`
 }
 
 func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {

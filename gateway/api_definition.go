@@ -243,7 +243,7 @@ func (s *APISpec) validateHTTP() error {
 // APIDefinitionLoader will load an Api definition from a storage
 // system.
 type APIDefinitionLoader struct {
-	Gw *Gateway
+	Gw *Gateway `json:"-"`
 }
 
 // Nonce to use when interacting with the dashboard service

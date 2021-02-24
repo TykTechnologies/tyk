@@ -9,7 +9,6 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-
 func TestGranularAccessMiddleware_ProcessRequest(t *testing.T) {
 	g := StartTest(nil)
 	defer g.Close()

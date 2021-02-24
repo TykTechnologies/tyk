@@ -31,7 +31,7 @@ type Bundle struct {
 	Path     string
 	Spec     *APISpec
 	Manifest apidef.BundleManifest
-	Gw       *Gateway
+	Gw       *Gateway `json:"-"`
 }
 
 // Verify performs a signature verification on the bundle file.

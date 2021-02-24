@@ -175,6 +175,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Run the middleware
+
 	vm := d.Spec.JSVM.VM.Copy()
 	vm.Interrupt = make(chan func(), 1)
 	d.Logger().Debug("Running: ", vmeta.ResponseFunctionName)

@@ -30,7 +30,7 @@ func (s *Test) TestHandleError_text_xml(t *testing.T) {
 	<code>500</code>
 	<message>There was a problem proxying the request</message>
 </error>`
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
 	// Simulate 500 error

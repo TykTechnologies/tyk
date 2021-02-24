@@ -29,7 +29,7 @@ import (
 	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
 
 	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/go-redis/redis/v8"
+	redis "github.com/go-redis/redis/v8"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 
@@ -798,7 +798,7 @@ type Test struct {
 	GlobalConfig config.Config
 	config       TestConfig
 	cancel       func()
-	Gw           *Gateway
+	Gw           *Gateway `json:"-"`
 	HttpHandler  *http.Server
 }
 
@@ -1406,6 +1406,7 @@ func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
 	for i, spec := range specs {
 		specBytes, err := json.Marshal(spec)
 		if err != nil {
+			fmt.Printf(" \n %+v \n", spec)
 			panic(err)
 		}
 		specFilePath := filepath.Join(gwConf.AppPath, spec.APIID+strconv.Itoa(i)+".json")

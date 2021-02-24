@@ -14,7 +14,7 @@ import (
 
 type ResponseTransformJQMiddleware struct {
 	Spec *APISpec
-	Gw   *Gateway
+	Gw   *Gateway `json:"-"`
 }
 
 func (h *ResponseTransformJQMiddleware) Init(c interface{}, spec *APISpec) error {

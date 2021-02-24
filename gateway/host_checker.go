@@ -69,7 +69,7 @@ type HostUptimeChecker struct {
 	resetListMu sync.Mutex
 	doResetList bool
 	newList     map[string]HostData
-	Gw          *Gateway
+	Gw          *Gateway `json:"-"`
 }
 
 func (h *HostUptimeChecker) getStopLoop() bool {

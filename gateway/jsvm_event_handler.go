@@ -19,7 +19,7 @@ type JSVMEventHandler struct {
 	methodName string
 	Spec       *APISpec
 	SpecJSON   string
-	Gw         *Gateway
+	Gw         *Gateway `json:"-"`
 }
 
 // New enables the intitialisation of event handler instances when they are created on ApiSpec creation

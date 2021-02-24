@@ -309,11 +309,11 @@ func mapStrsToIfaces(m map[string]string) map[string]interface{} {
 
 type JSVM struct {
 	Spec    *APISpec
-	VM      *otto.Otto
+	VM      *otto.Otto `json:"-"`
 	Timeout time.Duration
-	Log     *logrus.Entry  // logger used by the JS code
-	RawLog  *logrus.Logger // logger used by `rawlog` func to avoid formatting
-	Gw      *Gateway
+	Log     *logrus.Entry  `json:"-"` // logger used by the JS code
+	RawLog  *logrus.Logger `json:"-"` // logger used by `rawlog` func to avoid formatting
+	Gw      *Gateway       `json:"-"`
 }
 
 const defaultJSVMTimeout = 5

@@ -33,7 +33,7 @@ type HealthCheckValues struct {
 }
 
 type DefaultHealthChecker struct {
-	Gw      *Gateway
+	Gw      *Gateway `json:"-"`
 	storage storage.Handler
 	APIID   string
 }

@@ -198,7 +198,7 @@ type BaseMiddleware struct {
 	Spec   *APISpec
 	Proxy  ReturningHttpHandler
 	logger *logrus.Entry
-	Gw     *Gateway
+	Gw     *Gateway `json:"-"`
 }
 
 func (t BaseMiddleware) Base() *BaseMiddleware { return &t }

@@ -21,7 +21,7 @@ import (
 var GlobalHostChecker HostCheckerManager
 
 type HostCheckerManager struct {
-	Gw                *Gateway
+	Gw                *Gateway `json:"-"`
 	Id                string
 	store             storage.Handler
 	checkerMu         sync.Mutex

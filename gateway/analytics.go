@@ -185,7 +185,7 @@ type RedisAnalyticsHandler struct {
 	workerBufferSize uint64
 	shouldStop       uint32
 	poolWg           sync.WaitGroup
-	Gw               *Gateway
+	Gw               *Gateway `json:"-"`
 }
 
 func (r *RedisAnalyticsHandler) Init() {

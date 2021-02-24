@@ -382,7 +382,7 @@ type ReverseProxy struct {
 
 	logger *logrus.Entry
 	sp     sync.Pool
-	Gw     *Gateway
+	Gw     *Gateway `json:"-"`
 }
 
 func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {

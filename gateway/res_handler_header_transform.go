@@ -22,7 +22,7 @@ type HeaderTransformOptions struct {
 type HeaderTransform struct {
 	Spec   *APISpec
 	config HeaderTransformOptions
-	Gw     *Gateway
+	Gw     *Gateway `json:"-"`
 }
 
 func (HeaderTransform) Name() string {

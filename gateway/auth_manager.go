@@ -42,14 +42,14 @@ type SessionHandler interface {
 // requires a storage.Handler to interact with key store
 type DefaultAuthorisationManager struct {
 	store storage.Handler
-	Gw    *Gateway
+	Gw    *Gateway `json:"-"`
 }
 
 type DefaultSessionManager struct {
 	store                    storage.Handler
 	disableCacheSessionState bool
 	orgID                    string
-	Gw                       *Gateway
+	Gw                       *Gateway `json:"-"`
 }
 
 type SessionUpdate struct {
@@ -247,7 +247,7 @@ func (b *DefaultSessionManager) Sessions(filter string) []string {
 }
 
 type DefaultKeyGenerator struct {
-	Gw *Gateway
+	Gw *Gateway `json:"-"`
 }
 
 func (gw *Gateway) generateToken(orgID, keyID string) string {

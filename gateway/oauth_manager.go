@@ -332,7 +332,7 @@ func RevokeAllTokens(storage ExtendedOsinStorageInterface, clientId, clientSecre
 type OAuthManager struct {
 	API        *APISpec
 	OsinServer *TykOsinServer
-	Gw         *Gateway
+	Gw         *Gateway `json:"-"`
 }
 
 // HandleAuthorisation creates the authorisation data for the request
@@ -580,7 +580,7 @@ type RedisOsinStorageInterface struct {
 	sessionManager SessionHandler
 	redisStore     storage.Handler
 	orgID          string
-	Gw             *Gateway
+	Gw             *Gateway `json:"-"`
 }
 
 func (r *RedisOsinStorageInterface) Clone() osin.Storage {
@@ -1088,7 +1088,7 @@ func (r *RedisOsinStorageInterface) RemoveRefresh(token string) error {
 
 // accessTokenGen is a modified authorization token generator that uses the same method used to generate tokens for Tyk authHandler
 type accessTokenGen struct {
-	Gw *Gateway
+	Gw *Gateway `json:"-"`
 }
 
 // GenerateAccessToken generates base64-encoded UUID access and refresh tokens

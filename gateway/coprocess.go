@@ -490,7 +490,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 type CustomMiddlewareResponseHook struct {
 	mw *CoProcessMiddleware
-	Gw *Gateway
+	Gw *Gateway `json:"-"`
 }
 
 func (h *CustomMiddlewareResponseHook) Init(mwDef interface{}, spec *APISpec) error {
