@@ -1,11 +1,10 @@
-FROM tykio/tyk-build-env:latest
-LABEL io.tyk.vendor="Tyk" \
-      version="1.0" \
-      description="Image for plugin development"
+# Go version here should match https://github.com/TykTechnologies/golang-cross/blob/master/.github/workflows/release.yml#L16
+
+FROM golang:1.15.8-buster
+LABEL description="Image for plugin development"
 
 ARG TYK_GW_TAG
-ENV GOPATH=/go
-ENV TYK_GW_PATH=${GOPATH}/src/github.com/TykTechnologies/tyk
+ENV TYK_GW_PATH=/go/src/github.com/TykTechnologies/tyk
 # This directory will contain the plugin source and will be
 # mounted from the host box by the user using docker volumes
 ENV PLUGIN_SOURCE_PATH=/plugin-source
