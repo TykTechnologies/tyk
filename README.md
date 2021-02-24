@@ -52,6 +52,14 @@ simple and does one thing well - protecting your API from unauthorised access.
 
 All the documentation can be found at http://tyk.io/docs/.
 
+### Docker
+
+You can build the Dockerfile from source:
+
+```bash
+docker build -t my-repo/tyk-gateway:v1 .
+```
+
 ### License
 
 Tyk is released under the MPL v2.0; please see [LICENSE.md](LICENSE.md) for a full version of the license.
