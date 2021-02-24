@@ -11,7 +11,7 @@ Go version 1.10 is required to build `master`, the current
 development version. Tyk is officially supported on `linux/amd64`,
 `linux/i386` and `linux/arm64`.
 
-Tests are run against both Go versions 1.10 & 1.11, however at present, only Go 1.10 is officially supported.
+Tests are run against both Go versions 1.11 & 1.12, however at present.
 
 ## What is an API Gateway?
 
