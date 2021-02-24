@@ -50,7 +50,7 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-const defaultUserAgent = "Tyk/" + VERSION
+var defaultUserAgent = "Tyk/" + VERSION
 
 var corsHeaders = []string{
 	"Access-Control-Allow-Origin",

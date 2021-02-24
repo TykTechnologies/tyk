@@ -404,15 +404,12 @@ func (m *proxyMux) serve(gw *Gateway) {
 			}
 			var h http.Handler
 			h = &handleWrapper{p.router}
-
-			if p.protocol == "h2c" {
-				// wrapping handler in h2c. This ensures all features including tracing work
-				// in h2c services.
-				h2s := &http2.Server{}
-				h = &h2cWrapper{
-					w: h.(*handleWrapper),
-					h: h2c.NewHandler(p.router, h2s),
-				}
+			// by default enabling h2c by wrapping handler in h2c. This ensures all features including tracing work
+			// in h2c services.
+			h2s := &http2.Server{}
+			h = &h2cWrapper{
+				w: h.(*handleWrapper),
+				h: h2c.NewHandler(h, h2s),
 			}
 
 			addr := conf.ListenAddress + ":" + strconv.Itoa(p.port)

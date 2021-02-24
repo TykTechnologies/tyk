@@ -332,7 +332,6 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	gw.mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid})
 	gw.mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid})
-	gw.mwAppendEnabled(&chainArray, &GraphQLMiddleware{BaseMiddleware: baseMid})
 
 	if !spec.UseKeylessAccess {
 		// Select the keying method to use for setting session states
@@ -419,6 +418,12 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	}
 
 	gw.mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &GraphQLMiddleware{BaseMiddleware: baseMid})
+	if !spec.UseKeylessAccess {
+		gw.mwAppendEnabled(&chainArray, &GraphQLComplexityMiddleware{BaseMiddleware: baseMid})
+		gw.mwAppendEnabled(&chainArray, &GraphQLGranularAccessMiddleware{BaseMiddleware: baseMid})
+	}
+
 	gw.mwAppendEnabled(&chainArray, &ValidateJSON{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &TransformMiddleware{baseMid})
 	gw.mwAppendEnabled(&chainArray, &TransformJQMiddleware{baseMid})
