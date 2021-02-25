@@ -146,39 +146,31 @@ func (g *GraphQLConfigAdapter) engineConfigV2Arguments(fieldConfs *plan.FieldCon
 			continue
 		}
 
-		argConfs := plan.ArgumentsConfigurations{}
-		for _, argName := range currentArgs.ArgumentNames {
-			argConf := plan.ArgumentConfiguration{
-				Name:       argName,
-				SourceType: plan.FieldArgumentSource,
-			}
-
-			argConfs = append(argConfs, argConf)
-		}
-
-		(*fieldConfs)[i].Arguments = argConfs
+		(*fieldConfs)[i].Arguments = g.createArgumentConfigurationsForArgumentNames(currentArgs.ArgumentNames)
 		delete(generatedArgs, lookupKey)
 	}
 
 	for _, genArgs := range generatedArgs {
-		fieldConf := plan.FieldConfiguration{
+		*fieldConfs = append(*fieldConfs, plan.FieldConfiguration{
 			TypeName:  genArgs.TypeName,
 			FieldName: genArgs.FieldName,
-		}
-
-		argConfs := plan.ArgumentsConfigurations{}
-		for _, argName := range genArgs.ArgumentNames {
-			argConf := plan.ArgumentConfiguration{
-				Name:       argName,
-				SourceType: plan.FieldArgumentSource,
-			}
-
-			argConfs = append(argConfs, argConf)
-		}
-
-		fieldConf.Arguments = argConfs
-		*fieldConfs = append(*fieldConfs, fieldConf)
+			Arguments: g.createArgumentConfigurationsForArgumentNames(genArgs.ArgumentNames),
+		})
 	}
+}
+
+func (g *GraphQLConfigAdapter) createArgumentConfigurationsForArgumentNames(argumentNames []string) plan.ArgumentsConfigurations {
+	argConfs := plan.ArgumentsConfigurations{}
+	for _, argName := range argumentNames {
+		argConf := plan.ArgumentConfiguration{
+			Name:       argName,
+			SourceType: plan.FieldArgumentSource,
+		}
+
+		argConfs = append(argConfs, argConf)
+	}
+
+	return argConfs
 }
 
 func (g *GraphQLConfigAdapter) SetHttpClient(httpClient *http.Client) {
