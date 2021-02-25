@@ -5,8 +5,6 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/jensneuse/graphql-go-tools/pkg/ast"
-	"github.com/jensneuse/graphql-go-tools/pkg/astparser"
 	graphqlDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/httpclient"
 	restDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/rest_datasource"
@@ -170,106 +168,28 @@ func (g *GraphQLConfigAdapter) convertHttpHeadersToEngineV2Headers(apiDefHeaders
 }
 
 func (g *GraphQLConfigAdapter) determineChildNodes(planDataSources []plan.DataSourceConfiguration) error {
-	schema, report := astparser.ParseGraphqlDocumentString(g.config.Schema)
-	if report.HasErrors() {
-		return report
+	schema, err := graphql.NewSchemaFromString(g.config.Schema)
+	if err != nil {
+		return err
 	}
 	for i := range planDataSources {
 		for j := range planDataSources[i].RootNodes {
 			typeName := planDataSources[i].RootNodes[j].TypeName
 			for k := range planDataSources[i].RootNodes[j].FieldNames {
 				fieldName := planDataSources[i].RootNodes[j].FieldNames[k]
-				children := g.findFieldChildren(typeName, fieldName, &schema, planDataSources)
+				typeFields := schema.GetAllNestedFieldChildrenFromTypeField(typeName, fieldName, graphql.NewIsDataSourceConfigV2RootFieldSkipFunc(planDataSources))
+
+				children := make([]plan.TypeField, 0)
+				for _, tf := range typeFields {
+					childNode := plan.TypeField{
+						TypeName:   tf.TypeName,
+						FieldNames: tf.FieldNames,
+					}
+					children = append(children, childNode)
+				}
 				planDataSources[i].ChildNodes = append(planDataSources[i].ChildNodes, children...)
 			}
 		}
 	}
 	return nil
-}
-
-func (g *GraphQLConfigAdapter) findFieldChildren(typeName, fieldName string, schema *ast.Document, dataSources []plan.DataSourceConfiguration) []plan.TypeField {
-	fields := g.nodeFieldRefs(typeName, schema)
-	if len(fields) == 0 {
-		return nil
-	}
-	for _, ref := range fields {
-		if fieldName == schema.FieldDefinitionNameString(ref) {
-			fieldTypeName := schema.FieldDefinitionTypeNode(ref).NameString(schema)
-			childNodes := []plan.TypeField{}
-			g.findNestedFieldChildren(fieldTypeName, schema, dataSources, &childNodes)
-			return childNodes
-		}
-	}
-
-	return nil
-}
-
-func (g *GraphQLConfigAdapter) findNestedFieldChildren(typeName string, schema *ast.Document, dataSources []plan.DataSourceConfiguration, childNodes *[]plan.TypeField) {
-	fields := g.nodeFieldRefs(typeName, schema)
-	if len(fields) == 0 {
-		return
-	}
-	for _, ref := range fields {
-		fieldName := schema.FieldDefinitionNameString(ref)
-		if g.isRootField(typeName, fieldName, dataSources) {
-			continue
-		}
-		g.putChildNode(childNodes, typeName, fieldName)
-		fieldTypeName := schema.FieldDefinitionTypeNode(ref).NameString(schema)
-		g.findNestedFieldChildren(fieldTypeName, schema, dataSources, childNodes)
-	}
-	return
-}
-
-func (g *GraphQLConfigAdapter) nodeFieldRefs(typeName string, schema *ast.Document) []int {
-	node, exists := schema.Index.FirstNodeByNameStr(typeName)
-	if !exists {
-		return nil
-	}
-	var fields []int
-	switch node.Kind {
-	case ast.NodeKindObjectTypeDefinition:
-		fields = schema.ObjectTypeDefinitions[node.Ref].FieldsDefinition.Refs
-	case ast.NodeKindInterfaceTypeDefinition:
-		fields = schema.InterfaceTypeDefinitions[node.Ref].FieldsDefinition.Refs
-	default:
-		return nil
-	}
-
-	return fields
-}
-
-func (g *GraphQLConfigAdapter) isRootField(typeName, fieldName string, dataSources []plan.DataSourceConfiguration) bool {
-	for i := range dataSources {
-		for j := range dataSources[i].RootNodes {
-			if typeName != dataSources[i].RootNodes[j].TypeName {
-				continue
-			}
-			for k := range dataSources[i].RootNodes[j].FieldNames {
-				if fieldName == dataSources[i].RootNodes[j].FieldNames[k] {
-					return true
-				}
-			}
-		}
-	}
-	return false
-}
-
-func (g *GraphQLConfigAdapter) putChildNode(nodes *[]plan.TypeField, typeName, fieldName string) {
-	for i := range *nodes {
-		if typeName != (*nodes)[i].TypeName {
-			continue
-		}
-		for j := range (*nodes)[i].FieldNames {
-			if fieldName == (*nodes)[i].FieldNames[j] {
-				return
-			}
-		}
-		(*nodes)[i].FieldNames = append((*nodes)[i].FieldNames, fieldName)
-		return
-	}
-	*nodes = append(*nodes, plan.TypeField{
-		TypeName:   typeName,
-		FieldNames: []string{fieldName},
-	})
 }
