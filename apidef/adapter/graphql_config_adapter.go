@@ -19,6 +19,7 @@ var ErrUnsupportedGraphQLConfigVersion = errors.New("provided version of GraphQL
 type GraphQLConfigAdapter struct {
 	config     apidef.GraphQLConfig
 	httpClient *http.Client
+	schema     *graphql.Schema
 }
 
 func NewGraphQLConfigAdapter(config apidef.GraphQLConfig) GraphQLConfigAdapter {
@@ -30,12 +31,13 @@ func (g *GraphQLConfigAdapter) EngineConfigV2() (*graphql.EngineV2Configuration,
 		return nil, ErrUnsupportedGraphQLConfigVersion
 	}
 
-	schema, err := graphql.NewSchemaFromString(g.config.Schema)
+	var err error
+	g.schema, err = graphql.NewSchemaFromString(g.config.Schema)
 	if err != nil {
 		return nil, err
 	}
 
-	conf := graphql.NewEngineV2Configuration(schema)
+	conf := graphql.NewEngineV2Configuration(g.schema)
 
 	fieldConfigs := g.engineConfigV2FieldConfigs()
 	datsSources, err := g.engineConfigV2DataSources()
@@ -60,6 +62,10 @@ func (g *GraphQLConfigAdapter) engineConfigV2FieldConfigs() (planFieldConfigs pl
 
 		planFieldConfigs = append(planFieldConfigs, planFieldConfig)
 	}
+
+	generatedArgs := g.schema.GetAllFieldArguments(graphql.NewSkipReservedNamesFunc())
+	generatedArgsAsLookupMap := graphql.CreateTypeFieldArgumentsLookupMap(generatedArgs)
+	g.engineConfigV2Arguments(&planFieldConfigs, generatedArgsAsLookupMap)
 
 	return planFieldConfigs
 }
@@ -132,6 +138,49 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 	return planDataSources, err
 }
 
+func (g *GraphQLConfigAdapter) engineConfigV2Arguments(fieldConfs *plan.FieldConfigurations, generatedArgs map[graphql.TypeFieldLookupKey]graphql.TypeFieldArguments) {
+	for _, fieldConf := range *fieldConfs {
+		lookupKey := graphql.CreateTypeFieldLookupKey(fieldConf.TypeName, fieldConf.FieldName)
+		currentArgs, ok := generatedArgs[lookupKey]
+		if !ok {
+			continue
+		}
+
+		argConfs := plan.ArgumentsConfigurations{}
+		for _, argName := range currentArgs.ArgumentNames {
+			argConf := plan.ArgumentConfiguration{
+				Name:       argName,
+				SourceType: plan.FieldArgumentSource,
+			}
+
+			argConfs = append(argConfs, argConf)
+		}
+
+		fieldConf.Arguments = argConfs
+		delete(generatedArgs, lookupKey)
+	}
+
+	for _, genArgs := range generatedArgs {
+		fieldConf := plan.FieldConfiguration{
+			TypeName:  genArgs.TypeName,
+			FieldName: genArgs.FieldName,
+		}
+
+		argConfs := plan.ArgumentsConfigurations{}
+		for _, argName := range genArgs.ArgumentNames {
+			argConf := plan.ArgumentConfiguration{
+				Name:       argName,
+				SourceType: plan.FieldArgumentSource,
+			}
+
+			argConfs = append(argConfs, argConf)
+		}
+
+		fieldConf.Arguments = argConfs
+		*fieldConfs = append(*fieldConfs, fieldConf)
+	}
+}
+
 func (g *GraphQLConfigAdapter) SetHttpClient(httpClient *http.Client) {
 	g.httpClient = httpClient
 }
@@ -168,16 +217,12 @@ func (g *GraphQLConfigAdapter) convertHttpHeadersToEngineV2Headers(apiDefHeaders
 }
 
 func (g *GraphQLConfigAdapter) determineChildNodes(planDataSources []plan.DataSourceConfiguration) error {
-	schema, err := graphql.NewSchemaFromString(g.config.Schema)
-	if err != nil {
-		return err
-	}
 	for i := range planDataSources {
 		for j := range planDataSources[i].RootNodes {
 			typeName := planDataSources[i].RootNodes[j].TypeName
 			for k := range planDataSources[i].RootNodes[j].FieldNames {
 				fieldName := planDataSources[i].RootNodes[j].FieldNames[k]
-				typeFields := schema.GetAllNestedFieldChildrenFromTypeField(typeName, fieldName, graphql.NewIsDataSourceConfigV2RootFieldSkipFunc(planDataSources))
+				typeFields := g.schema.GetAllNestedFieldChildrenFromTypeField(typeName, fieldName, graphql.NewIsDataSourceConfigV2RootFieldSkipFunc(planDataSources))
 
 				children := make([]plan.TypeField, 0)
 				for _, tf := range typeFields {

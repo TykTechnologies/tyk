@@ -65,6 +65,20 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 						DisableDefaultMapping: false,
 						Path:                  []string{"my_rest"},
 					},
+					{
+						TypeName:  "Query",
+						FieldName: "gql",
+						Arguments: []plan.ArgumentConfiguration{
+							{
+								Name:       "id",
+								SourceType: plan.FieldArgumentSource,
+							},
+							{
+								Name:       "name",
+								SourceType: plan.FieldArgumentSource,
+							},
+						},
+					},
 				})
 
 				conf.SetDataSources([]plan.DataSourceConfiguration{
@@ -213,7 +227,7 @@ const graphqlEngineV1ConfigJson = `{
 	"playground": {}
 }`
 
-const v2Schema = `type Query { rest: String gql: String withChildren: WithChildren multiRoot1: MultiRoot1 multiRoot2: MultiRoot2 } type WithChildren { id: ID! name: String nested: Nested} type Nested { id: ID! name: String! } type MultiRoot1 { id: ID! } type MultiRoot2 { name: String! }`
+const v2Schema = `type Query { rest: String gql(id: ID!, name: String): String withChildren: WithChildren multiRoot1: MultiRoot1 multiRoot2: MultiRoot2 } type WithChildren { id: ID! name: String nested: Nested} type Nested { id: ID! name: String! } type MultiRoot1 { id: ID! } type MultiRoot2 { name: String! }`
 
 const graphqlEngineV2ConfigJson = `{
 	"enabled": true,
