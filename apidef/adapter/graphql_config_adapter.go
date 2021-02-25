@@ -139,8 +139,8 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 }
 
 func (g *GraphQLConfigAdapter) engineConfigV2Arguments(fieldConfs *plan.FieldConfigurations, generatedArgs map[graphql.TypeFieldLookupKey]graphql.TypeFieldArguments) {
-	for _, fieldConf := range *fieldConfs {
-		lookupKey := graphql.CreateTypeFieldLookupKey(fieldConf.TypeName, fieldConf.FieldName)
+	for i := range *fieldConfs {
+		lookupKey := graphql.CreateTypeFieldLookupKey((*fieldConfs)[i].TypeName, (*fieldConfs)[i].FieldName)
 		currentArgs, ok := generatedArgs[lookupKey]
 		if !ok {
 			continue
@@ -156,7 +156,7 @@ func (g *GraphQLConfigAdapter) engineConfigV2Arguments(fieldConfs *plan.FieldCon
 			argConfs = append(argConfs, argConf)
 		}
 
-		fieldConf.Arguments = argConfs
+		(*fieldConfs)[i].Arguments = argConfs
 		delete(generatedArgs, lookupKey)
 	}
 
