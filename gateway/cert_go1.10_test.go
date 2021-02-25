@@ -113,7 +113,12 @@ func TestPublicKeyPinning(t *testing.T) {
 		ts.Gw.SetConfig(globalConf)
 		defer ts.ResetTestConfig()
 
-		defer proxy.Stop(ts)
+		defer func() {
+			proxyErr := proxy.Stop(ts)
+			if proxyErr != nil {
+				t.Errorf("Cannot stop proxy: %v", proxyErr.Error())
+			}
+		}()
 
 		ts := StartTest(nil)
 		defer ts.Close()
@@ -165,7 +170,13 @@ func TestPublicKeyPinning(t *testing.T) {
 			Certificates: []tls.Certificate{proxyCert},
 			MaxVersion:   tls.VersionTLS12,
 		})
-		defer proxy.Stop(ts)
+
+		defer func() {
+			proxyErr := proxy.Stop(ts)
+			if proxyErr != nil {
+				t.Errorf("Cannot stop proxy: %v", proxyErr.Error())
+			}
+		}()
 
 		globalConf := ts.Gw.GetConfig()
 		globalConf.SSLForceCommonNameCheck = true
@@ -315,7 +326,12 @@ func TestProxyTransport(t *testing.T) {
 			Certificates: []tls.Certificate{proxyCert},
 			MaxVersion:   tls.VersionTLS12,
 		})
-		defer proxy.Stop(ts)
+		defer func() {
+			proxyErr := proxy.Stop(ts)
+			if proxyErr != nil {
+				t.Errorf("Cannot stop proxy: %v", proxyErr.Error())
+			}
+		}()
 
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"

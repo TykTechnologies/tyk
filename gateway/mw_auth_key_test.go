@@ -224,7 +224,7 @@ func getAuthKeyChain(spec *APISpec) http.Handler {
 	return chain
 }
 
-func testPrepareAuthKeySession(apiDef string, isBench bool) (string, *APISpec) {
+func testPrepareAuthKeySession(apiDef string, isBench bool) (string, *APISpec, error) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -238,12 +238,15 @@ func testPrepareAuthKeySession(apiDef string, isBench bool) (string, *APISpec) {
 		customToken = "54321111"
 	}
 	// AuthKey sessions are stored by {token}
-	ts.Gw.GlobalSessionManager.UpdateSession(customToken, session, 60, false)
-	return customToken, spec
+	err := ts.Gw.GlobalSessionManager.UpdateSession(customToken, session, 60, false)
+	return customToken, spec, err
 }
 
 func TestBearerTokenAuthKeySession(t *testing.T) {
-	customToken, spec := testPrepareAuthKeySession(authKeyDef, false)
+	customToken, spec, err := testPrepareAuthKeySession(authKeyDef, false)
+	if err != nil {
+		t.Error(err)
+	}
 
 	recorder := httptest.NewRecorder()
 	req := TestReq(t, "GET", "/auth_key_test/", nil)
@@ -262,7 +265,10 @@ func TestBearerTokenAuthKeySession(t *testing.T) {
 func BenchmarkBearerTokenAuthKeySession(b *testing.B) {
 	b.ReportAllocs()
 
-	customToken, spec := testPrepareAuthKeySession(authKeyDef, true)
+	customToken, spec, err := testPrepareAuthKeySession(authKeyDef, true)
+	if err != nil {
+		b.Error(err)
+	}
 
 	recorder := httptest.NewRecorder()
 	req := TestReq(b, "GET", "/auth_key_test/", nil)
@@ -297,7 +303,10 @@ const authKeyDef = `{
 }`
 
 func TestMultiAuthBackwardsCompatibleSession(t *testing.T) {
-	customToken, spec := testPrepareAuthKeySession(multiAuthBackwardsCompatible, false)
+	customToken, spec, err := testPrepareAuthKeySession(multiAuthBackwardsCompatible, false)
+	if err != nil {
+		t.Error(err)
+	}
 
 	recorder := httptest.NewRecorder()
 	req := TestReq(t, "GET", fmt.Sprintf("/auth_key_test/?token=%s", customToken), nil)
@@ -314,7 +323,10 @@ func TestMultiAuthBackwardsCompatibleSession(t *testing.T) {
 func BenchmarkMultiAuthBackwardsCompatibleSession(b *testing.B) {
 	b.ReportAllocs()
 
-	customToken, spec := testPrepareAuthKeySession(multiAuthBackwardsCompatible, true)
+	customToken, spec, err := testPrepareAuthKeySession(multiAuthBackwardsCompatible, true)
+	if err != nil {
+		b.Error(err)
+	}
 
 	recorder := httptest.NewRecorder()
 	req := TestReq(b, "GET", fmt.Sprintf("/auth_key_test/?token=%s", customToken), nil)
