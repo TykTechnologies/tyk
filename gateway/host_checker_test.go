@@ -81,7 +81,7 @@ func TestHostChecker(t *testing.T) {
 	specBuf := &bytes.Buffer{}
 	specTmpl.ExecuteTemplate(specBuf, specTmpl.Name(), &tmplData)
 
-	spec := CreateDefinitionFromString(specBuf.String())
+	spec := ts.Gw.CreateDefinitionFromString(specBuf.String())
 
 	// From api_loader.go#processSpec
 	sl := apidef.NewHostListFromList(spec.Proxy.Targets)
@@ -182,7 +182,7 @@ func TestReverseProxyAllDown(t *testing.T) {
 	specBuf := &bytes.Buffer{}
 	specTmpl.ExecuteTemplate(specBuf, specTmpl.Name(), &tmplData)
 
-	spec := CreateDefinitionFromString(specBuf.String())
+	spec := ts.Gw.CreateDefinitionFromString(specBuf.String())
 
 	// From api_loader.go#processSpec
 	sl := apidef.NewHostListFromList(spec.Proxy.Targets)

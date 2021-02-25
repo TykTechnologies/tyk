@@ -282,9 +282,9 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 
 	// Add any new session managers or auth handlers here
 	spec.AuthManager = &DefaultAuthorisationManager{Gw: a.Gw}
-
 	spec.OrgSessionManager = &DefaultSessionManager{
 		orgID: spec.OrgID,
+		Gw: a.Gw,
 	}
 
 	spec.GlobalConfig = a.Gw.GetConfig()

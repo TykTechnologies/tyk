@@ -763,15 +763,15 @@ func TestReq(t testing.TB, method, urlStr string, body interface{}) *http.Reques
 	return httptest.NewRequest(method, urlStr, TestReqBody(t, body))
 }
 
-func CreateDefinitionFromString(defStr string) *APISpec {
-	loader := APIDefinitionLoader{}
+func(gw *Gateway) CreateDefinitionFromString(defStr string) *APISpec {
+	loader := APIDefinitionLoader{ Gw: gw}
 	def := loader.ParseDefinition(strings.NewReader(defStr))
 	spec := loader.MakeSpec(def, nil)
 	return spec
 }
 
 func (gw *Gateway) LoadSampleAPI(def string) (spec *APISpec) {
-	spec = CreateDefinitionFromString(def)
+	spec = gw.CreateDefinitionFromString(def)
 	gw.loadApps([]*APISpec{spec})
 	return
 }
