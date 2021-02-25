@@ -73,11 +73,7 @@ var (
 	}
 )
 
-const (
-	defReadTimeout  = 120 * time.Second
-	defWriteTimeout = 120 * time.Second
-	appName         = "tyk-gateway"
-)
+const appName = "tyk-gateway"
 
 type Gateway struct {
 	DefaultProxyMux *proxyMux
