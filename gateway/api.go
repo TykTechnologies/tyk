@@ -831,6 +831,7 @@ func (gw *Gateway) handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.
 	}
 
 	if err := ioutil.WriteFile(defFilePath, asByte, 0644); err != nil {
+		log.Infof("EL file path: %v", defFilePath)
 		log.Error("Failed to create file! - ", err)
 		return apiError("File object creation failed, write error"), http.StatusInternalServerError
 	}

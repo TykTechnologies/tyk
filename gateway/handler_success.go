@@ -257,7 +257,10 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 			record.NormalisePath(&s.Spec.GlobalConfig)
 		}
 
-		s.Gw.analytics.RecordHit(&record)
+		err := s.Gw.analytics.RecordHit(&record)
+		if err != nil {
+			log.WithError(err).Error("could not store analytic record")
+		}
 	}
 
 	// Report in health check

@@ -123,8 +123,12 @@ func TestProcessKeySpaceChangesForOauth(t *testing.T) {
 			} else {
 				getKeyFromStore = ts.Gw.GlobalSessionManager.Store().GetKey
 				ts.Gw.GlobalSessionManager.Store().DeleteAllKeys()
-				ts.Gw.GlobalSessionManager.Store().SetKey(token, token, 100)
-				_, err := ts.Gw.GlobalSessionManager.Store().GetKey(token)
+				err := ts.Gw.GlobalSessionManager.Store().SetKey(token, token, 100)
+				if err != nil {
+					t.Fatal("could not set key in global session manager")
+				}
+
+				_, err = ts.Gw.GlobalSessionManager.Store().GetKey(token)
 				if err != nil {
 					t.Fatal("Key should be pre-loaded in store previously so the test can perform the revoke action.")
 				}

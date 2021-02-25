@@ -144,7 +144,10 @@ func (w *WebHookHandler) setHookFired(checksum string) {
 	log.WithFields(logrus.Fields{
 		"prefix": "webhooks",
 	}).Debug("Setting Webhook Checksum: ", checksum)
-	w.store.SetKey(checksum, "1", w.conf.EventTimeout)
+	err := w.store.SetKey(checksum, "1", w.conf.EventTimeout)
+	if err != nil {
+		log.WithError(err).Error("could not set key")
+	}
 }
 
 func (w *WebHookHandler) getRequestMethod(m string) WebHookRequestMethod {

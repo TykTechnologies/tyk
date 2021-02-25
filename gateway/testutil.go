@@ -290,11 +290,20 @@ func RegisterBundle(name string, files map[string]string) string {
 
 func (s *Test) RegisterJSFileMiddleware(apiid string, files map[string]string) {
 	gwConfig := s.Gw.GetConfig()
-	os.MkdirAll(gwConfig.MiddlewarePath+"/"+apiid+"/post", 0755)
-	os.MkdirAll(gwConfig.MiddlewarePath+"/"+apiid+"/pre", 0755)
+	err := os.MkdirAll(gwConfig.MiddlewarePath+"/"+apiid+"/post", 0755)
+	if err != nil {
+		log.WithError(err).Error("creating directory in middleware post path")
+	}
+	err = os.MkdirAll(gwConfig.MiddlewarePath+"/"+apiid+"/pre", 0755)
+	if err != nil {
+		log.WithError(err).Error("creating directory in middleware pre path")
+	}
 
 	for file, content := range files {
-		ioutil.WriteFile(gwConfig.MiddlewarePath+"/"+apiid+"/"+file, []byte(content), 0755)
+		err = ioutil.WriteFile(gwConfig.MiddlewarePath+"/"+apiid+"/"+file, []byte(content), 0755)
+		if err != nil {
+			log.WithError(err).Error("writing in file")
+		}
 	}
 }
 
@@ -628,7 +637,10 @@ func CreateSession(gw *Gateway, sGen ...func(s *user.SessionState)) string {
 
 	hashKeys := gw.GetConfig().HashKeys
 	hashedKey := storage.HashKey(key, hashKeys)
-	gw.GlobalSessionManager.UpdateSession(hashedKey, session, 60, hashKeys)
+	err := gw.GlobalSessionManager.UpdateSession(hashedKey, session, 60, hashKeys)
+	if err != nil {
+		log.WithError(err).Error("updating session.")
+	}
 	return key
 }
 
@@ -944,7 +956,10 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 
 	cli.Init(VERSION, confPaths)
 
-	gw.initialiseSystem(ctx)
+	err = gw.initialiseSystem(ctx)
+	if err != nil {
+		panic(err)
+	}
 
 	// Small part of start()
 	gw.loadControlAPIEndpoints(s.mainRouter())
@@ -992,8 +1007,6 @@ func (s *Test) Close() {
 	for _, p := range s.Gw.DefaultProxyMux.proxies {
 		if p.listener != nil {
 			p.listener.Close()
-		} else {
-			fmt.Println("es nil")
 		}
 	}
 	s.Gw.DefaultProxyMux.swap(&proxyMux{}, s.Gw)
@@ -1002,7 +1015,10 @@ func (s *Test) Close() {
 		gwConfig.ControlAPIPort = 0
 		s.Gw.SetConfig(gwConfig)
 	}
-	s.HttpHandler.Shutdown(context.Background())
+	err := s.HttpHandler.Shutdown(context.Background())
+	if err != nil {
+		log.WithError(err).Error("shutting down the http handler")
+	}
 }
 
 func (s *Test) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, error) {

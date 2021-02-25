@@ -1641,6 +1641,7 @@ func TestHandleAddOrUpdateApi(t *testing.T) {
 		require.NoError(t, err)
 
 		response, statusCode := ts.Gw.handleAddOrUpdateApi("", req, testFs)
+		t.Logf("returns %v", statusCode)
 		successResponse, ok := response.(apiModifyKeySuccess)
 		require.True(t, ok)
 

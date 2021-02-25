@@ -293,7 +293,10 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		if e.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
 			record.NormalisePath(&e.Spec.GlobalConfig)
 		}
-		e.Gw.analytics.RecordHit(&record)
+		err := e.Gw.analytics.RecordHit(&record)
+		if err != nil {
+			log.WithError(err).Error("could not store analytic record")
+		}
 	}
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")

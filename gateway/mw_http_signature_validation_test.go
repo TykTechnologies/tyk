@@ -147,7 +147,10 @@ func testPrepareHMACAuthSessionPass(tb testing.TB, hashFn func() hash.Hash, even
 		sessionKey = "9876"
 	}
 
-	ts.Gw.GlobalSessionManager.UpdateSession(sessionKey, session, 60, false)
+	err := ts.Gw.GlobalSessionManager.UpdateSession(sessionKey, session, 60, false)
+	if err != nil {
+		tb.Error("could not update session in Session Manager. " + err.Error())
+	}
 
 	req := TestReq(tb, "GET", "/", nil)
 
@@ -203,7 +206,10 @@ func testPrepareRSAAuthSessionPass(tb testing.TB, eventWG *sync.WaitGroup, priva
 		sessionKey = "9876"
 	}
 
-	ts.Gw.GlobalSessionManager.UpdateSession(sessionKey, session, 60, false)
+	err := ts.Gw.GlobalSessionManager.UpdateSession(sessionKey, session, 60, false)
+	if err != nil {
+		tb.Error("could not update session in Session Manager. " + err.Error())
+	}
 
 	req := TestReq(tb, "GET", "/", nil)
 
@@ -321,7 +327,10 @@ func TestHMACAuthSessionAuxDateHeader(t *testing.T) {
 	}
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	ts.Gw.GlobalSessionManager.UpdateSession("9876", session, 60, false)
+	err := ts.Gw.GlobalSessionManager.UpdateSession("9876", session, 60, false)
+	if err != nil {
+		t.Error("could not update session in Session Manager. " + err.Error())
+	}
 
 	recorder := httptest.NewRecorder()
 	req := TestReq(t, "GET", "/", nil)
@@ -376,7 +385,10 @@ func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
 	}
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	ts.Gw.GlobalSessionManager.UpdateSession("9876", session, 60, false)
+	err := ts.Gw.GlobalSessionManager.UpdateSession("9876", session, 60, false)
+	if err != nil {
+		t.Error("could not update session in Session Manager. " + err.Error())
+	}
 
 	recorder := httptest.NewRecorder()
 	req := TestReq(t, "GET", "/", nil)
@@ -431,7 +443,10 @@ func TestHMACAuthSessionKeyMissing(t *testing.T) {
 	}
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	ts.Gw.GlobalSessionManager.UpdateSession("9876", session, 60, false)
+	err := ts.Gw.GlobalSessionManager.UpdateSession("9876", session, 60, false)
+	if err != nil {
+		t.Error("could not update session in Session Manager. " + err.Error())
+	}
 
 	recorder := httptest.NewRecorder()
 	req := TestReq(t, "GET", "/", nil)
@@ -486,7 +501,10 @@ func TestHMACAuthSessionMalformedHeader(t *testing.T) {
 	}
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	ts.Gw.GlobalSessionManager.UpdateSession("9876", session, 60, false)
+	err := ts.Gw.GlobalSessionManager.UpdateSession("9876", session, 60, false)
+	if err != nil {
+		t.Error("could not update session in Session Manager. " + err.Error())
+	}
 
 	recorder := httptest.NewRecorder()
 	req := TestReq(t, "GET", "/", nil)
@@ -599,7 +617,10 @@ func TestHMACAuthSessionPassWithHeaderFieldLowerCase(t *testing.T) {
 	}
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	ts.Gw.GlobalSessionManager.UpdateSession("9876", session, 60, false)
+	err := ts.Gw.GlobalSessionManager.UpdateSession("9876", session, 60, false)
+	if err != nil {
+		t.Error("could not update session in Session Manager. " + err.Error())
+	}
 
 	recorder := httptest.NewRecorder()
 	req := TestReq(t, "GET", "/", nil)

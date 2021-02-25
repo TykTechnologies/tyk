@@ -215,7 +215,10 @@ func (gw *Gateway) setupGlobals(ctx context.Context) {
 
 	versionStore := storage.RedisCluster{KeyPrefix: "version-check-"}
 	versionStore.Connect()
-	_ = versionStore.SetKey("gateway", VERSION, 0)
+	err := versionStore.SetKey("gateway", VERSION, 0)
+	if err != nil {
+		mainLog.WithError(err).Error("Could not set version in versionStore")
+	}
 
 	if gwConfig.EnableAnalytics && gw.analytics.Store == nil {
 		Conf := gwConfig
@@ -1356,9 +1359,12 @@ func Start() {
 			mainLog.Fatal(err)
 		}
 	}
-	again.Wait(&gw.DefaultProxyMux.again)
+	_, err = again.Wait(&gw.DefaultProxyMux.again)
+	if err != nil {
+		mainLog.WithError(err).Error("waiting")
+	}
 	mainLog.Info("Stop signal received.")
-	if err := gw.DefaultProxyMux.again.Close(); err != nil {
+	if err = gw.DefaultProxyMux.again.Close(); err != nil {
 		mainLog.Error("Closing listeners: ", err)
 	}
 	// stop analytics workers
@@ -1373,7 +1379,10 @@ func Start() {
 		mainLog.Info("Stopping heartbeat...")
 		gw.DashService.StopBeating()
 		time.Sleep(2 * time.Second)
-		gw.DashService.DeRegister()
+		err := gw.DashService.DeRegister()
+		if err != nil {
+			mainLog.WithError(err).Error("deregistering in dashboard")
+		}
 	}
 
 	mainLog.Info("Terminating.")
@@ -1441,7 +1450,10 @@ func (gw *Gateway) start(ctx context.Context) {
 func dashboardServiceInit(gw *Gateway) {
 	if gw.DashService == nil {
 		gw.DashService = &HTTPDashboardHandler{Gw: gw}
-		gw.DashService.Init()
+		err := gw.DashService.Init()
+		if err != nil {
+			mainLog.WithError(err).Error("Initiating dashboard service")
+		}
 	}
 }
 
@@ -1457,7 +1469,12 @@ func handleDashboardRegistration(gw *Gateway) {
 		dashLog.Fatal("Registration failed: ", err)
 	}
 
-	go gw.DashService.StartBeating()
+	go func() {
+		beatErr := gw.DashService.StartBeating()
+		if beatErr != nil {
+			dashLog.Error("Could not start beating. ", beatErr.Error())
+		}
+	}()
 }
 
 var drlOnce sync.Once

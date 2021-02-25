@@ -81,7 +81,12 @@ func (gw *Gateway) reLogin() {
 	if err := gw.DashService.Register(); err != nil {
 		dashLog.Error("Could not register: ", err)
 	} else {
-		go gw.DashService.StartBeating()
+		go func() {
+			beatErr := gw.DashService.StartBeating()
+			if beatErr != nil {
+				dashLog.Error("Could not start beating. ", beatErr.Error())
+			}
+		}()
 	}
 
 	dashLog.Info("Recovering configurations, reloading...")

@@ -146,7 +146,10 @@ func prepareGenericJWTSession(testName string, method string, claimName string, 
 			spec.JWTIdentityBaseField = claimName
 		}
 	})[0]
-	ts.Gw.GlobalSessionManager.UpdateSession(tokenKID, sessionFunc(), 60, false)
+	err := ts.Gw.GlobalSessionManager.UpdateSession(tokenKID, sessionFunc(), 60, false)
+	if err != nil {
+		log.WithError(err).Error("could not update session in Session Manager.")
+	}
 
 	return spec, jwtToken
 
@@ -474,7 +477,10 @@ func prepareJWTSessionRSAWithRawSourceOnWithClientID(isBench bool) string {
 	session := createJWTSessionWithRSAWithPolicy(policyID)
 
 	ts.Gw.GlobalSessionManager.ResetQuota(tokenID, session, false)
-	ts.Gw.GlobalSessionManager.UpdateSession(tokenID, session, 60, false)
+	err := ts.Gw.GlobalSessionManager.UpdateSession(tokenID, session, 60, false)
+	if err != nil {
+		log.WithError(err).Error("could not update session in Session Manager.")
+	}
 
 	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"

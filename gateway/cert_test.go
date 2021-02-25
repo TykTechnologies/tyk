@@ -94,10 +94,16 @@ func TestGatewayTLS(t *testing.T) {
 		defer ts.Close()
 
 		certFilePath := filepath.Join(dir, "server.crt")
-		ioutil.WriteFile(certFilePath, serverCertPem, 0666)
+		err := ioutil.WriteFile(certFilePath, serverCertPem, 0666)
+		if err != nil {
+			t.Error("writing serverCertPem")
+		}
 
 		certKeyPath := filepath.Join(dir, "server.key")
-		ioutil.WriteFile(certKeyPath, serverPrivPem, 0666)
+		err = ioutil.WriteFile(certKeyPath, serverPrivPem, 0666)
+		if err != nil {
+			t.Error("writing serverPrivPem")
+		}
 
 		globalConf := ts.Gw.GetConfig()
 		globalConf.HttpServerOptions.Certificates = []config.CertData{{
@@ -123,7 +129,10 @@ func TestGatewayTLS(t *testing.T) {
 		defer ts.Close()
 
 		certPath := filepath.Join(dir, "server.pem")
-		ioutil.WriteFile(certPath, combinedPEM, 0666)
+		err := ioutil.WriteFile(certPath, combinedPEM, 0666)
+		if err != nil {
+			t.Error("could not write server.pem file")
+		}
 
 		globalConf := ts.Gw.GetConfig()
 		globalConf.HttpServerOptions.SSLCertificates = []string{certPath}

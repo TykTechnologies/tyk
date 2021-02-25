@@ -238,8 +238,7 @@ func testPrepareAuthKeySession(apiDef string, isBench bool) (string, *APISpec, e
 		customToken = "54321111"
 	}
 	// AuthKey sessions are stored by {token}
-	err := ts.Gw.GlobalSessionManager.UpdateSession(customToken, session, 60, false)
-	return customToken, spec, err
+	return customToken, spec, ts.Gw.GlobalSessionManager.UpdateSession(customToken, session, 60, false)
 }
 
 func TestBearerTokenAuthKeySession(t *testing.T) {
@@ -369,7 +368,10 @@ func TestMultiAuthSession(t *testing.T) {
 	session := createAuthKeyAuthSession(false)
 	customToken := "54321111"
 	// AuthKey sessions are stored by {token}
-	ts.Gw.GlobalSessionManager.UpdateSession(customToken, session, 60, false)
+	err := ts.Gw.GlobalSessionManager.UpdateSession(customToken, session, 60, false)
+	if err != nil {
+		t.Error("could not update session in Session Manager. " + err.Error())
+	}
 
 	// Set the url param
 	recorder := httptest.NewRecorder()

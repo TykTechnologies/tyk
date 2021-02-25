@@ -22,7 +22,10 @@ func TykStoreData(CKey, CValue *C.char, CTTL C.int) {
 	ttl := int64(CTTL)
 
 	store := storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix}
-	store.SetKey(key, value, ttl)
+	err := store.SetKey(key, value, ttl)
+	if err != nil {
+		log.WithError(err).Error("could not set key")
+	}
 }
 
 // TykGetData is a CoProcess API function for fetching data.

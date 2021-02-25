@@ -303,7 +303,12 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 			log.Debug("Cache TTL is:", cacheTTL)
 			ts := m.getTimeTTL(cacheTTL)
 			toStore := m.encodePayload(wireFormatReq.String(), ts)
-			go m.CacheStore.SetKey(key, toStore, cacheTTL)
+			go func() {
+				err := m.CacheStore.SetKey(key, toStore, cacheTTL)
+				if err != nil {
+					log.WithError(err).Error("could not save key in cache store")
+				}
+			}()
 		}
 
 		return nil, mwStatusRespond

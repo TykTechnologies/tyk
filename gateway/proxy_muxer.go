@@ -239,6 +239,7 @@ func (gw *Gateway) flushNetworkAnalytics(ctx context.Context) {
 	}
 }
 
+//nolint
 func (gw *Gateway) recordTCPHit(specID string, doNotTrack bool) func(tcp.Stat) {
 	if doNotTrack {
 		return nil

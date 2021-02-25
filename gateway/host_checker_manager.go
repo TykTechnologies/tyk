@@ -154,7 +154,10 @@ func (hc *HostCheckerManager) AmIPolling() bool {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
 		}).Debug("No Primary instance found, assuming control")
-		hc.store.SetKey(pollerCacheKey, hc.Id, 15)
+		err := hc.store.SetKey(pollerCacheKey, hc.Id, 15)
+		if err != nil {
+			log.WithError(err).Error("cannot set key in pollerCacheKey")
+		}
 		return true
 	}
 
@@ -162,7 +165,10 @@ func (hc *HostCheckerManager) AmIPolling() bool {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
 		}).Debug("Primary instance set, I am master")
-		hc.store.SetKey(pollerCacheKey, hc.Id, 15) // Reset TTL
+		err := hc.store.SetKey(pollerCacheKey, hc.Id, 15) // Reset TTL
+		if err != nil {
+			log.WithError(err).Error("could not reset TTL in polled cacheKey")
+		}
 		return true
 	}
 
@@ -233,7 +239,10 @@ func (hc *HostCheckerManager) OnHostDown(ctx context.Context, report HostHealthR
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
 	}).Debug("Update key: ", key)
-	hc.store.SetKey(key, "1", int64(hc.checker.checkTimeout*hc.checker.sampleTriggerLimit))
+	err := hc.store.SetKey(key, "1", int64(hc.checker.checkTimeout*hc.checker.sampleTriggerLimit))
+	if err != nil {
+		log.WithError(err).Error("Host-Checker could not save key")
+	}
 	hc.unhealthyHostList.Store(key, 1)
 	spec := hc.Gw.getApiSpec(report.MetaData[UnHealthyHostMetaDataAPIKey])
 	if spec == nil {

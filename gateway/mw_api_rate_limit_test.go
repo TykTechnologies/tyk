@@ -231,7 +231,10 @@ func TestRLClosed(t *testing.T) {
 	session := createRLSession()
 	customToken := uuid.NewV4().String()
 	// AuthKey sessions are stored by {token}
-	ts.Gw.GlobalSessionManager.UpdateSession(customToken, session, 60, false)
+	err := ts.Gw.GlobalSessionManager.UpdateSession(customToken, session, 60, false)
+	if err != nil {
+		t.Error("could not update session in Session Manager. " + err.Error())
+	}
 	req.Header.Set("authorization", "Bearer "+customToken)
 
 	DRLManager.SetCurrentTokenValue(1)

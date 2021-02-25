@@ -113,7 +113,10 @@ func testPrepareMultiSessionBA(t testing.TB, isBench bool) (*APISpec, *http.Requ
 	password := "TEST"
 	keyName := ts.Gw.generateToken("default", username)
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	ts.Gw.GlobalSessionManager.UpdateSession(keyName, baSession, 60, false)
+	err := ts.Gw.GlobalSessionManager.UpdateSession(keyName, baSession, 60, false)
+	if err != nil {
+		t.Error("could not update session in Session Manager. " + err.Error())
+	}
 
 	// Create key
 	session := createMultiAuthKeyAuthSession(isBench)
@@ -124,7 +127,10 @@ func testPrepareMultiSessionBA(t testing.TB, isBench bool) (*APISpec, *http.Requ
 		customToken = "84573485734587384888723487243"
 	}
 	// AuthKey sessions are stored by {token}
-	ts.Gw.GlobalSessionManager.UpdateSession(customToken, session, 60, false)
+	err = ts.Gw.GlobalSessionManager.UpdateSession(customToken, session, 60, false)
+	if err != nil {
+		t.Error("could not update session in Session Manager. " + err.Error())
+	}
 
 	toEncode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(toEncode))
@@ -175,13 +181,19 @@ func TestMultiSession_BA_Standard_Identity(t *testing.T) {
 	username := "0987876"
 	password := "TEST"
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	ts.Gw.GlobalSessionManager.UpdateSession("default0987876", baSession, 60, false)
+	err := ts.Gw.GlobalSessionManager.UpdateSession("default0987876", baSession, 60, false)
+	if err != nil {
+		t.Error("could not update session in Session Manager. " + err.Error())
+	}
 
 	// Create key
 	session := createMultiAuthKeyAuthSession(false)
 	customToken := "84573485734587384888723487243"
 	// AuthKey sessions are stored by {token}
-	ts.Gw.GlobalSessionManager.UpdateSession(customToken, session, 60, false)
+	err = ts.Gw.GlobalSessionManager.UpdateSession(customToken, session, 60, false)
+	if err != nil {
+		t.Error("could not update session in Session Manager. " + err.Error())
+	}
 
 	to_encode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
@@ -215,13 +227,19 @@ func TestMultiSession_BA_Standard_FAILBA(t *testing.T) {
 	username := "0987876"
 	password := "WRONG"
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	ts.Gw.GlobalSessionManager.UpdateSession("default0987876", baSession, 60, false)
+	err := ts.Gw.GlobalSessionManager.UpdateSession("default0987876", baSession, 60, false)
+	if err != nil {
+		t.Error("could not update session in Session Manager. " + err.Error())
+	}
 
 	// Create key
 	session := createMultiAuthKeyAuthSession(false)
 	customToken := "84573485734587384888723487243"
 	// AuthKey sessions are stored by {token}
-	ts.Gw.GlobalSessionManager.UpdateSession(customToken, session, 60, false)
+	err = ts.Gw.GlobalSessionManager.UpdateSession(customToken, session, 60, false)
+	if err != nil {
+		t.Error("could not update session in Session Manager. " + err.Error())
+	}
 
 	to_encode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
@@ -250,13 +268,19 @@ func TestMultiSession_BA_Standard_FAILAuth(t *testing.T) {
 	username := "0987876"
 	password := "TEST"
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	ts.Gw.GlobalSessionManager.UpdateSession("default0987876", baSession, 60, false)
+	err := ts.Gw.GlobalSessionManager.UpdateSession("default0987876", baSession, 60, false)
+	if err != nil {
+		t.Error("could not update session in Session Manager. " + err.Error())
+	}
 
 	// Create key
 	session := createMultiAuthKeyAuthSession(false)
 	customToken := "84573485734587384888723487243"
 	// AuthKey sessions are stored by {token}
-	ts.Gw.GlobalSessionManager.UpdateSession(customToken, session, 60, false)
+	err = ts.Gw.GlobalSessionManager.UpdateSession(customToken, session, 60, false)
+	if err != nil {
+		t.Error("could not update session in Session Manager. " + err.Error())
+	}
 
 	to_encode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))

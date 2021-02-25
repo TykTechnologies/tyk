@@ -814,7 +814,10 @@ func (r *RedisOsinStorageInterface) SetClient(id string, orgID string, client os
 
 	log.Debug("CREATING: ", key)
 
-	r.store.SetKey(key, string(clientDataJSON), 0)
+	err = r.store.SetKey(key, string(clientDataJSON), 0)
+	if err != nil {
+		log.WithError(err).Error("could not save oauth client data")
+	}
 
 	keyForSet := prefixClientset + prefixClient // Org ID
 
@@ -884,7 +887,7 @@ func (r *RedisOsinStorageInterface) SaveAuthorize(authData *osin.AuthorizeData) 
 	key := prefixAuth + authData.Code
 	log.Debug("Saving auth code: ", key)
 
-	r.store.SetKey(key, string(authDataJSON), int64(authData.ExpiresIn))
+	err = r.store.SetKey(key, string(authDataJSON), int64(authData.ExpiresIn))
 
 	return nil
 }
@@ -930,7 +933,10 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 		accessData.ExpiresIn = oauthTokenExpire
 	}
 
-	r.store.SetKey(key, string(authDataJSON), int64(accessData.ExpiresIn))
+	err = r.store.SetKey(key, string(authDataJSON), int64(accessData.ExpiresIn))
+	if err != nil {
+		log.WithError(err).Error("could not save access data")
+	}
 
 	// add code to list of tokens for this client
 	sortedListKey := prefixClientTokens + accessData.Client.GetId()
@@ -1001,9 +1007,12 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 		if oauthRefreshExpire := r.Gw.GetConfig().OauthRefreshExpire; oauthRefreshExpire != 0 {
 			refreshExpire = oauthRefreshExpire
 		}
-		r.store.SetKey(key, string(accessDataJSON), refreshExpire)
 		log.Debug("STORING ACCESS DATA: ", string(accessDataJSON))
-		return nil
+		err = r.store.SetKey(key, string(accessDataJSON), refreshExpire)
+		if err != nil {
+			log.WithError(err).Error("could not save access data")
+		}
+		return err
 	}
 
 	return nil

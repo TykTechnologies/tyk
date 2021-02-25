@@ -74,7 +74,10 @@ func TestAuthenticationAfterUpdateKey(t *testing.T) {
 			APIID: api.APIID,
 		}})
 
-		ts.Gw.GlobalSessionManager.UpdateSession(storage.HashKey(key, ts.Gw.GetConfig().HashKeys), session, 0, ts.Gw.GetConfig().HashKeys)
+		err := ts.Gw.GlobalSessionManager.UpdateSession(storage.HashKey(key, ts.Gw.GetConfig().HashKeys), session, 0, ts.Gw.GetConfig().HashKeys)
+		if err != nil {
+			t.Error("could not update session in Session Manager. " + err.Error())
+		}
 
 		authHeader := map[string]string{
 			"authorization": key,
@@ -88,7 +91,10 @@ func TestAuthenticationAfterUpdateKey(t *testing.T) {
 			APIID: "dummy",
 		}})
 
-		ts.Gw.GlobalSessionManager.UpdateSession(storage.HashKey(key, ts.Gw.GetConfig().HashKeys), session, 0, ts.Gw.GetConfig().HashKeys)
+		err = ts.Gw.GlobalSessionManager.UpdateSession(storage.HashKey(key, ts.Gw.GetConfig().HashKeys), session, 0, ts.Gw.GetConfig().HashKeys)
+		if err != nil {
+			t.Error("could not update session in Session Manager. " + err.Error())
+		}
 
 		ts.Run(t, []test.TestCase{
 			{Path: "/get", Headers: authHeader, Code: http.StatusForbidden},
