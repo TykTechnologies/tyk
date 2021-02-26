@@ -79,6 +79,16 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 							},
 						},
 					},
+					{
+						TypeName:  "DeepGQL",
+						FieldName: "query",
+						Arguments: []plan.ArgumentConfiguration{
+							{
+								Name:       "code",
+								SourceType: plan.FieldArgumentSource,
+							},
+						},
+					},
 				})
 
 				conf.SetDataSources([]plan.DataSourceConfiguration{
@@ -227,7 +237,7 @@ const graphqlEngineV1ConfigJson = `{
 	"playground": {}
 }`
 
-const v2Schema = `type Query { rest: String gql(id: ID!, name: String): String withChildren: WithChildren multiRoot1: MultiRoot1 multiRoot2: MultiRoot2 } type WithChildren { id: ID! name: String nested: Nested} type Nested { id: ID! name: String! } type MultiRoot1 { id: ID! } type MultiRoot2 { name: String! }`
+const v2Schema = `type Query { rest: String gql(id: ID!, name: String): String deepGQL: DeepGQL withChildren: WithChildren multiRoot1: MultiRoot1 multiRoot2: MultiRoot2 } type WithChildren { id: ID! name: String nested: Nested } type Nested { id: ID! name: String! } type MultiRoot1 { id: ID! } type MultiRoot2 { name: String! } type DeepGQL { query(code: String!): String }`
 
 const graphqlEngineV2ConfigJson = `{
 	"enabled": true,
