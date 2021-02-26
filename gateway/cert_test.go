@@ -183,20 +183,16 @@ func TestGatewayTLS(t *testing.T) {
 func TestGatewayControlAPIMutualTLS(t *testing.T) {
 	// Configure server
 	serverCertPem, _, combinedPEM, _ := genServerCertificate()
-
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	globalConf := ts.Gw.GetConfig()
-	globalConf.HttpServerOptions.UseSSL = true
-	globalConf.Security.ControlAPIUseMutualTLS = true
-	ts.Gw.SetConfig(globalConf)
-
 	dir, _ := ioutil.TempDir("", "certs")
+
+	// just a hack to get a working certManager
+	s := StartTest(nil)
+	certManager := s.Gw.CertificateManager
+	s.Close()
 
 	defer func() {
 		os.RemoveAll(dir)
-		ts.Gw.CertificateManager.FlushCache()
+		certManager.FlushCache()
 		tlsConfigCache.Flush()
 	}()
 
@@ -204,17 +200,18 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 	clientWithCert := GetTLSClient(&clientCert, serverCertPem)
 
 	clientWithoutCert := GetTLSClient(nil, nil)
+	certID, _ := certManager.Add(combinedPEM, "")
+	defer certManager.Delete(certID, "")
 
 	t.Run("Separate domain", func(t *testing.T) {
-		certID, _ := ts.Gw.CertificateManager.Add(combinedPEM, "")
-		defer ts.Gw.CertificateManager.Delete(certID, "")
 
-		globalConf := ts.Gw.GetConfig()
-		globalConf.ControlAPIHostname = "localhost"
-		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
-		ts.Gw.SetConfig(globalConf)
-
-		ts := StartTest(nil)
+		conf := func(globalConf *config.Config) {
+			globalConf.HttpServerOptions.UseSSL = true
+			globalConf.Security.ControlAPIUseMutualTLS = true
+			globalConf.ControlAPIHostname = "localhost"
+			globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+		}
+		ts := StartTest(conf)
 		defer ts.Close()
 
 		defer func() {
@@ -236,13 +233,22 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 			// Should raise error for for unknown certificate
 			{ControlRequest: true, ErrorMatch: badcertErr, Client: clientWithCert},
 		}...)
+	})
 
-		clientCertID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
-		defer ts.Gw.CertificateManager.Delete(clientCertID, "")
+	t.Run("Separate domain/ control api with valid cert", func(t *testing.T) {
+		clientCertID, _ := certManager.Add(clientCertPem, "")
+		defer certManager.Delete(clientCertID, "")
 
-		globalConf = ts.Gw.GetConfig()
-		globalConf.Security.Certificates.ControlAPI = []string{clientCertID}
-		ts.Gw.SetConfig(globalConf)
+		conf := func(globalConf *config.Config) {
+			globalConf.HttpServerOptions.UseSSL = true
+			globalConf.Security.ControlAPIUseMutualTLS = true
+			globalConf.ControlAPIHostname = "localhost"
+			globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+			globalConf.Security.Certificates.ControlAPI = []string{clientCertID}
+		}
+
+		ts := StartTest(conf)
+		defer ts.Close()
 
 		// Should pass request with valid client cert
 		ts.Run(t, test.TestCase{
