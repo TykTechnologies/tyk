@@ -989,8 +989,6 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 	go gw.reloadLoop(ctx, ReloadTestCase.ReloadTicker(), ReloadTestCase.OnReload)
 	go reloadQueueLoop(ctx, ReloadTestCase.OnQueued)
 	go s.reloadSimulation()
-
-	os.RemoveAll(gw.GetConfig().AppPath)
 }
 
 func (s *Test) Do(tc test.TestCase) (*http.Response, error) {
@@ -1019,6 +1017,7 @@ func (s *Test) Close() {
 	if err != nil {
 		log.WithError(err).Error("shutting down the http handler")
 	}
+	os.RemoveAll(s.Gw.GetConfig().AppPath)
 }
 
 func (s *Test) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, error) {

@@ -817,6 +817,7 @@ func (gw *Gateway) handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.
 	// Create a filename
 	defFilePath := filepath.Join(gw.GetConfig().AppPath, newDef.APIID+".json")
 
+	log.Infof("App path: %v", gw.GetConfig().AppPath)
 	// If it exists, delete it
 	if _, err := fs.Stat(defFilePath); err == nil {
 		log.Warning("API Definition with this ID already exists, deleting file...")
