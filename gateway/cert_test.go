@@ -793,6 +793,7 @@ func TestUpstreamMutualTLS(t *testing.T) {
 
 }
 
+// fail
 func TestSSLForceCommonName(t *testing.T) {
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	}))
@@ -842,6 +843,7 @@ func TestSSLForceCommonName(t *testing.T) {
 	})
 }
 
+// fail
 func TestKeyWithCertificateTLS(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -855,6 +857,8 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 	globalConf.EnableCustomDomains = true
 	globalConf.HttpServerOptions.SSLCertificates = []string{serverCertID}
 	ts.Gw.SetConfig(globalConf)
+	ts.Gw.DoReload()
+
 
 	t.Run("Without domain", func(t *testing.T) {
 		_, _, _, clientCert := genCertificate(&x509.Certificate{})
@@ -1003,19 +1007,25 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 	})
 }
 
+///fail
 func TestAPICertificate(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
+
+	// Just a hack to get a Certificate manager
+	s := StartTest(nil)
+	certManager := s.Gw.CertificateManager
+	s.Close()
 
 	_, _, combinedPEM, _ := genServerCertificate()
-	serverCertID, _ := ts.Gw.CertificateManager.Add(combinedPEM, "")
-	defer ts.Gw.CertificateManager.Delete(serverCertID, "")
+	serverCertID, _ := certManager.Add(combinedPEM, "")
+	defer certManager.Delete(serverCertID, "")
 
-	globalConf := ts.Gw.GetConfig()
-	globalConf.HttpServerOptions.UseSSL = true
-	globalConf.HttpServerOptions.SSLCertificates = []string{}
-	ts.Gw.SetConfig(globalConf)
-	ts.Gw.DoReload()
+	conf := func(globalConf *config.Config) {
+		globalConf.HttpServerOptions.UseSSL = true
+		globalConf.HttpServerOptions.SSLCertificates = []string{}
+	}
+
+	ts := StartTest(conf)
+	defer ts.Close()
 
 	client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{
 		InsecureSkipVerify: true,
@@ -1098,19 +1108,23 @@ func TestCertificateHandlerTLS(t *testing.T) {
 }
 
 func TestCipherSuites(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
+	// Just a hack to get a Certificate manager
+	s := StartTest(nil)
+	certManager := s.Gw.CertificateManager
+	s.Close()
 
 	//configure server so we can useSSL and utilize the logic, but skip verification in the clients
 	_, _, combinedPEM, _ := genServerCertificate()
-	serverCertID, _ := ts.Gw.CertificateManager.Add(combinedPEM, "")
-	defer ts.Gw.CertificateManager.Delete(serverCertID, "")
+	serverCertID, _ := certManager.Add(combinedPEM, "")
+	defer certManager.Delete(serverCertID, "")
 
-	globalConf := ts.Gw.GetConfig()
-	globalConf.HttpServerOptions.UseSSL = true
-	globalConf.HttpServerOptions.Ciphers = []string{"TLS_RSA_WITH_RC4_128_SHA", "TLS_RSA_WITH_3DES_EDE_CBC_SHA", "TLS_RSA_WITH_AES_128_CBC_SHA"}
-	globalConf.HttpServerOptions.SSLCertificates = []string{serverCertID}
-	ts.Gw.SetConfig(globalConf)
+	conf := func(globalConf *config.Config) {
+		globalConf.HttpServerOptions.UseSSL = true
+		globalConf.HttpServerOptions.Ciphers = []string{"TLS_RSA_WITH_RC4_128_SHA", "TLS_RSA_WITH_3DES_EDE_CBC_SHA", "TLS_RSA_WITH_AES_128_CBC_SHA"}
+		globalConf.HttpServerOptions.SSLCertificates = []string{serverCertID}
+	}
+	ts := StartTest(conf)
+	defer ts.Close()
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
