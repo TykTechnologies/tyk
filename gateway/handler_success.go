@@ -3,6 +3,7 @@ package gateway
 import (
 	"bytes"
 	"encoding/base64"
+	"github.com/TykTechnologies/tyk/storage"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -170,7 +171,8 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 			// Get the wire format representation
 			var wireFormatReq bytes.Buffer
 			r.Write(&wireFormatReq)
-			rawRequest = base64.StdEncoding.EncodeToString(wireFormatReq.Bytes())
+			rawRequest = base64.StdEncoding.EncodeToString(
+				bytes.ReplaceAll(wireFormatReq.Bytes(), []byte(token), []byte(storage.HashKey(token)) ))
 			// responseCopy, unlike requestCopy, can be nil
 			// here - if the response was cached in
 			// mw_redis_cache, RecordHit gets passed a nil
@@ -268,7 +270,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 	}
 }
 
-func recordDetail(r *http.Request, spec *APISpec) bool {
+func  recordDetail(r *http.Request, spec *APISpec) bool {
 	if spec.EnableDetailedRecording {
 		return true
 	}
