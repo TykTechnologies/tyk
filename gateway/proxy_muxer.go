@@ -374,7 +374,6 @@ func (m *proxyMux) serve(gw *Gateway) {
 		if p.listener == nil {
 			listener, err := m.generateListener(p.port, p.protocol, gw)
 			if err != nil {
-				fmt.Println("cant start listener" + err.Error())
 				mainLog.WithError(err).Error("Can't start listener")
 				continue
 			}
@@ -435,6 +434,7 @@ func target(listenAddress string, listenPort int) string {
 }
 
 func CheckPortWhiteList(w map[string]config.PortWhiteList, listenPort int, protocol string) error {
+
 	if w != nil {
 		if ls, ok := w[protocol]; ok {
 			if ls.Match(listenPort) {
@@ -442,6 +442,7 @@ func CheckPortWhiteList(w map[string]config.PortWhiteList, listenPort int, proto
 			}
 		}
 	}
+
 	return fmt.Errorf("%s:%d trying to open disabled port", protocol, listenPort)
 }
 
