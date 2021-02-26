@@ -139,11 +139,11 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 }
 
 func (g *GraphQLConfigAdapter) engineConfigV2Arguments(fieldConfs *plan.FieldConfigurations, generatedArgs map[graphql.TypeFieldLookupKey]graphql.TypeFieldArguments) {
-	if len(generatedArgs) == 0 {
-		return
-	}
-
 	for i := range *fieldConfs {
+		if len(generatedArgs) == 0 {
+			return
+		}
+
 		lookupKey := graphql.CreateTypeFieldLookupKey((*fieldConfs)[i].TypeName, (*fieldConfs)[i].FieldName)
 		currentArgs, ok := generatedArgs[lookupKey]
 		if !ok {
