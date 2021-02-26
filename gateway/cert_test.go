@@ -1007,17 +1007,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 	})
 }
 
-///fail
 func TestAPICertificate(t *testing.T) {
-
-	// Just a hack to get a Certificate manager
-	s := StartTest(nil)
-	certManager := s.Gw.CertificateManager
-	s.Close()
-
-	_, _, combinedPEM, _ := genServerCertificate()
-	serverCertID, _ := certManager.Add(combinedPEM, "")
-	defer certManager.Delete(serverCertID, "")
 
 	conf := func(globalConf *config.Config) {
 		globalConf.HttpServerOptions.UseSSL = true
@@ -1027,6 +1017,9 @@ func TestAPICertificate(t *testing.T) {
 	ts := StartTest(conf)
 	defer ts.Close()
 
+	_, _, combinedPEM, _ := genServerCertificate()
+	serverCertID, _ := ts.Gw.CertificateManager.Add(combinedPEM, "")
+	defer ts.Gw.CertificateManager.Delete(serverCertID, "")
 	client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{
 		InsecureSkipVerify: true,
 		MaxVersion:         tls.VersionTLS12,
