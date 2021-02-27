@@ -129,7 +129,7 @@ func FindPythonConfig(customVersion string) (selectedVersion string, err error) 
 }
 
 func getLibraryPathFromCfg() error {
-	out, err := exec.Command(pythonConfigPath, "--ldflags").Output()
+	out, err := exec.Command(pythonConfigPath, "--ldflags", "--embed").Output()
 	if err != nil {
 		logger.Errorf("Error while executing command for python config path: %s", pythonConfigPath)
 		return err
