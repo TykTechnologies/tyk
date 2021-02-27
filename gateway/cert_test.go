@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"io/ioutil"
@@ -856,7 +857,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 
 	_, _, combinedPEM, _ := genServerCertificate()
 	serverCertID, _ := certmanager.Add(combinedPEM, "")
-	defer certmanager.Delete(serverCertID, "")
+	//defer certmanager.Delete(serverCertID, "")
 
 	conf := func(globalConf *config.Config) {
 		globalConf.HttpServerOptions.UseSSL = true
@@ -867,6 +868,13 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 	ts := StartTest(conf)
 	defer ts.Close()
 
+	b, err := json.Marshal(ts.Gw.GetConfig())
+	if err != nil {
+		return
+	}
+
+	fmt.Printf("\n\n La config: \n %+v\n", string(b))
+	panic("sd")
 	t.Run("Without domain", func(t *testing.T) {
 		_, _, _, clientCert := genCertificate(&x509.Certificate{})
 	//	clientCertID := certs.HexSHA256(clientCert.Certificate[0])
