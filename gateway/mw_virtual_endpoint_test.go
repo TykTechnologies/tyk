@@ -25,9 +25,7 @@ function testVirtData(request, session, config) {
 }
 `
 
-func testPrepareVirtualEndpoint(js string, method string, path string, proxyOnError bool, keyless bool) {
-	ts := StartTest(nil)
-	defer ts.Close()
+func(ts *Test) testPrepareVirtualEndpoint(js string, method string, path string, proxyOnError bool, keyless bool) {
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.APIID = "test"
@@ -71,7 +69,7 @@ func TestVirtualEndpoint(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt", true, true)
+	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt", true, true)
 
 	ts.Run(t, test.TestCase{
 		Path:      "/virt",
@@ -88,7 +86,7 @@ func TestVirtualEndpoint500(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	testPrepareVirtualEndpoint("abc", "GET", "/abc", false, true)
+	ts.testPrepareVirtualEndpoint("abc", "GET", "/abc", false, true)
 
 	ts.Run(t, test.TestCase{
 		Path: "/abc",
@@ -111,7 +109,7 @@ func TestVirtualEndpointSessionMetadata(t *testing.T) {
 		}
 	})
 
-	testPrepareVirtualEndpoint(virtTestJS, "GET", "/abc", false, false)
+	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/abc", false, false)
 
 	ts.Run(t, test.TestCase{
 		Path:    "/abc",
@@ -126,7 +124,7 @@ func BenchmarkVirtualEndpoint(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt", true, true)
+	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt", true, true)
 
 	for i := 0; i < b.N; i++ {
 		ts.Run(b, test.TestCase{
