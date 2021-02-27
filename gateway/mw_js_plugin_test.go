@@ -382,8 +382,6 @@ leakMid.NewProcessRequest(function(request, session) {
 }
 
 func TestTykMakeHTTPRequest(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
 
 	bundle := RegisterBundle("jsvm_make_http_request", map[string]string{
 		"manifest.json": `
@@ -424,6 +422,9 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 	`})
 
 	t.Run("Existing endpoint", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/sample"
 			spec.ConfigData = map[string]interface{}{
@@ -438,6 +439,9 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 	})
 
 	t.Run("Nonexistent endpoint", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/sample"
 			spec.ConfigData = map[string]interface{}{
@@ -450,6 +454,9 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 	})
 
 	t.Run("Endpoint with query", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/sample"
 			spec.ConfigData = map[string]interface{}{
@@ -464,7 +471,9 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 	})
 
 	t.Run("Endpoint with skip cleaning", func(t *testing.T) {
-		ts.Close()
+		ts := StartTest(nil)
+		defer ts.Close()
+
 		globalConf := ts.Gw.GetConfig()
 		globalConf.HttpServerOptions.SkipURLCleaning = true
 		globalConf.HttpServerOptions.OverrideDefaults = true
@@ -474,9 +483,6 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 			defaultTestConfig.HttpServerOptions.SkipURLCleaning
 		testServerRouter.SkipClean(true)
 		defer testServerRouter.SkipClean(prevSkipClean)
-
-		ts := StartTest(nil)
-		defer ts.Close()
 
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/sample"
