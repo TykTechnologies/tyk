@@ -101,6 +101,7 @@ func TestHostChecker(t *testing.T) {
 	ts.Gw.apisMu.Lock()
 	ts.Gw.apisByID = map[string]*APISpec{spec.APIID: spec}
 	ts.Gw.apisMu.Unlock()
+	GlobalHostChecker.Gw = ts.Gw
 	GlobalHostChecker.checkerMu.Lock()
 	GlobalHostChecker.checker.sampleTriggerLimit = 1
 	GlobalHostChecker.checkerMu.Unlock()
