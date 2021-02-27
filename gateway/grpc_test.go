@@ -589,18 +589,17 @@ func (*loginCredsOrToken) RequireTransportSecurity() bool {
 
 func TestGRPC_Stream_MutualTLS(t *testing.T) {
 	// Mutual Authentication for both downstream-tyk and tyk-upstream
-	ts := StartTest(nil)
-	defer ts.Close()
 
+	certManager := getCertManager()
 	_, _, combinedClientPEM, clientCert := genCertificate(&x509.Certificate{})
 	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
 	serverCertPem, _, combinedPEM, _ := genServerCertificate()
 
-	certID, _ := ts.Gw.CertificateManager.Add(combinedPEM, "") // For tyk to know downstream
-	defer ts.Gw.CertificateManager.Delete(certID, "")
+	certID, _ := certManager.Add(combinedPEM, "") // For tyk to know downstream
+	defer certManager.Delete(certID, "")
 
-	clientCertID, _ := ts.Gw.CertificateManager.Add(combinedClientPEM, "") // For upstream to know tyk
-	defer ts.Gw.CertificateManager.Delete(clientCertID, "")
+	clientCertID, _ := certManager.Add(combinedClientPEM, "") // For upstream to know tyk
+	defer certManager.Delete(clientCertID, "")
 
 	// Protected gRPC server
 	target, s := startGRPCServer(t, clientCert.Leaf, setupStreamSVC)
@@ -608,14 +607,15 @@ func TestGRPC_Stream_MutualTLS(t *testing.T) {
 	defer s.GracefulStop()
 
 	// Tyk
-	globalConf := ts.Gw.GetConfig()
-	globalConf.ProxySSLInsecureSkipVerify = true
-	globalConf.ProxyEnableHttp2 = true
-	globalConf.HttpServerOptions.EnableHttp2 = true
-	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
-	globalConf.HttpServerOptions.UseSSL = true
-	ts.Gw.SetConfig(globalConf)
-	ts.Gw.DoReload()
+	conf := func(globalConf *config.Config) {
+		globalConf.ProxySSLInsecureSkipVerify = true
+		globalConf.ProxyEnableHttp2 = true
+		globalConf.HttpServerOptions.EnableHttp2 = true
+		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+		globalConf.HttpServerOptions.UseSSL = true
+	}
+	ts := StartTest(conf)
+	defer ts.Close()
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
