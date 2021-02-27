@@ -218,4 +218,5 @@ func (gw *Gateway) initGenericEventHandlers() {
 		}
 	}
 	conf.SetEventTriggers(handlers)
+	gw.SetConfig(conf)
 }

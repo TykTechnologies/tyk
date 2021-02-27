@@ -144,12 +144,18 @@ func TestLogMessageEventHandler(t *testing.T) {
 }
 
 func TestInitGenericEventHandlers(t *testing.T) {
-	ts := StartTest(nil)
+
+	eventsConf := prepareEventsConf()
+	conf := func(confi *config.Config) {
+		confi.EventHandlers = eventsConf.EventHandlers
+	}
+
+	ts := StartTest(conf)
 	defer ts.Close()
 
-	conf := prepareEventsConf()
 	ts.Gw.initGenericEventHandlers()
-	triggers := conf.GetEventTriggers()
+	triggers := ts.Gw.GetConfig().GetEventTriggers()
+
 	if len(triggers) != 2 {
 		t.Fatal("EventTriggers length doesn't match")
 	}
