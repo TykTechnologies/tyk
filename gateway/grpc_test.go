@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/TykTechnologies/tyk/config"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -132,16 +133,15 @@ func TestGRPC_H2C(t *testing.T) {
 
 // For gRPC, we should be sure that HTTP/2 works with Tyk.
 func TestHTTP2_TLS(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
+	certManager := getCertManager()
 
 	expected := "HTTP/2.0"
 
 	// Certificates
 	_, _, _, clientCert := genCertificate(&x509.Certificate{})
 	serverCertPem, _, combinedPEM, _ := genServerCertificate()
-	certID, _ := ts.Gw.CertificateManager.Add(combinedPEM, "")
-	defer ts.Gw.CertificateManager.Delete(certID, "")
+	certID, _ := certManager.Add(combinedPEM, "")
+	defer certManager.Delete(certID, "")
 
 	// Upstream server supporting HTTP/2
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -159,14 +159,15 @@ func TestHTTP2_TLS(t *testing.T) {
 	defer upstream.Close()
 
 	// Tyk
-	globalConf := ts.Gw.GetConfig()
-	globalConf.ProxySSLInsecureSkipVerify = true
-	globalConf.ProxyEnableHttp2 = true
-	globalConf.HttpServerOptions.EnableHttp2 = true
-	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
-	globalConf.HttpServerOptions.UseSSL = true
-	ts.Gw.SetConfig(globalConf)
-	ts.Gw.DoReload()
+	conf := func(globalConf *config.Config) {
+		globalConf.ProxySSLInsecureSkipVerify = true
+		globalConf.ProxyEnableHttp2 = true
+		globalConf.HttpServerOptions.EnableHttp2 = true
+		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+		globalConf.HttpServerOptions.UseSSL = true
+	}
+	ts := StartTest(conf)
+	defer ts.Close()
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
