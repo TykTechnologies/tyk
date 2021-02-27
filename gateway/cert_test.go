@@ -7,9 +7,9 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"github.com/TykTechnologies/tyk/user"
 	"io/ioutil"
 	"math/big"
 	"net"
@@ -59,7 +59,7 @@ func genServerCertificate() ([]byte, []byte, []byte, tls.Certificate) {
 	return certPem, privPem, combinedPEM, cert
 }
 
-func getCertManager() *certs.CertificateManager{
+func getCertManager() *certs.CertificateManager {
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -192,10 +192,7 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 	serverCertPem, _, combinedPEM, _ := genServerCertificate()
 	dir, _ := ioutil.TempDir("", "certs")
 
-	// just a hack to get a working certManager
-	s := StartTest(nil)
-	certManager := s.Gw.CertificateManager
-	s.Close()
+	certManager := getCertManager()
 
 	defer func() {
 		os.RemoveAll(dir)
@@ -267,9 +264,7 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 func TestAPIMutualTLS(t *testing.T) {
 
 	// Just a hack to get a Certificate manager
-	s := StartTest(nil)
-	certManager := s.Gw.CertificateManager
-	s.Close()
+	certManager := getCertManager()
 
 	serverCertPem, _, combinedPEM, _ := genServerCertificate()
 	certID, err := certManager.Add(combinedPEM, "")
@@ -800,7 +795,6 @@ func TestUpstreamMutualTLS(t *testing.T) {
 
 }
 
-// fail
 func TestSSLForceCommonName(t *testing.T) {
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	}))
@@ -853,31 +847,25 @@ func TestSSLForceCommonName(t *testing.T) {
 // fail
 func TestKeyWithCertificateTLS(t *testing.T) {
 
-	certmanager := getCertManager()
+	certManager := getCertManager()
 
 	_, _, combinedPEM, _ := genServerCertificate()
-	serverCertID, _ := certmanager.Add(combinedPEM, "")
-	//defer certmanager.Delete(serverCertID, "")
+	serverCertID, _ := certManager.Add(combinedPEM, "")
+	defer certManager.Delete(serverCertID, "")
 
 	conf := func(globalConf *config.Config) {
 		globalConf.HttpServerOptions.UseSSL = true
 		globalConf.EnableCustomDomains = true
 		globalConf.HttpServerOptions.SSLCertificates = []string{serverCertID}
+		globalConf.HealthCheckEndpointName = "hello"
 	}
 
 	ts := StartTest(conf)
 	defer ts.Close()
 
-	b, err := json.Marshal(ts.Gw.GetConfig())
-	if err != nil {
-		return
-	}
-
-	fmt.Printf("\n\n La config: \n %+v\n", string(b))
-	panic("sd")
 	t.Run("Without domain", func(t *testing.T) {
 		_, _, _, clientCert := genCertificate(&x509.Certificate{})
-	//	clientCertID := certs.HexSHA256(clientCert.Certificate[0])
+		clientCertID := certs.HexSHA256(clientCert.Certificate[0])
 
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
@@ -894,7 +882,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 		t.Run("Cert unknown", func(t *testing.T) {
 			ts.Run(t, test.TestCase{Code: 403, Client: client})
 		})
-/*
+
 		t.Run("Cert known", func(t *testing.T) {
 			_, key := ts.CreateSession(func(s *user.SessionState) {
 				s.Certificate = clientCertID
@@ -922,10 +910,10 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 
 			// Domain is not set, but we still pass it, it should still work
 			ts.Run(t, test.TestCase{Path: "/", Code: 200, Domain: "localhost", Client: client})
-		})*/
+		})
 	})
 
-	/*t.Run("With custom domain", func(t *testing.T) {
+	t.Run("With custom domain", func(t *testing.T) {
 		_, _, _, clientCert := genCertificate(&x509.Certificate{})
 		clientCertID := certs.HexSHA256(clientCert.Certificate[0])
 
@@ -1019,7 +1007,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 		})
 
 		_, _ = ts.Run(t, test.TestCase{Code: http.StatusOK, Path: "/test1", Domain: "host2", Client: client})
-	})*/
+	})
 }
 
 func TestAPICertificate(t *testing.T) {
@@ -1116,10 +1104,7 @@ func TestCertificateHandlerTLS(t *testing.T) {
 }
 
 func TestCipherSuites(t *testing.T) {
-	// Just a hack to get a Certificate manager
-	s := StartTest(nil)
-	certManager := s.Gw.CertificateManager
-	s.Close()
+	certManager := getCertManager()
 
 	//configure server so we can useSSL and utilize the logic, but skip verification in the clients
 	_, _, combinedPEM, _ := genServerCertificate()
