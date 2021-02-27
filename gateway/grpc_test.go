@@ -184,12 +184,10 @@ func TestHTTP2_TLS(t *testing.T) {
 
 func TestGRPC_TLS(t *testing.T) {
 
-	ts := StartTest(nil)
-	defer ts.Close()
-
+	certManager := getCertManager()
 	_, _, combinedPEM, _ := genServerCertificate()
-	certID, _ := ts.Gw.CertificateManager.Add(combinedPEM, "")
-	defer ts.Gw.CertificateManager.Delete(certID, "")
+	certID, _ := certManager.Add(combinedPEM, "")
+	defer certManager.Delete(certID, "")
 
 	// gRPC server
 	target, s := startGRPCServer(t, nil, setupHelloSVC)
@@ -197,14 +195,15 @@ func TestGRPC_TLS(t *testing.T) {
 	defer s.GracefulStop()
 
 	// Tyk
-	globalConf := ts.Gw.GetConfig()
-	globalConf.ProxySSLInsecureSkipVerify = true
-	globalConf.ProxyEnableHttp2 = true
-	globalConf.HttpServerOptions.EnableHttp2 = true
-	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
-	globalConf.HttpServerOptions.UseSSL = true
-	ts.Gw.SetConfig(globalConf)
-	ts.Gw.DoReload()
+	conf := func(globalConf *config.Config) {
+		globalConf.ProxySSLInsecureSkipVerify = true
+		globalConf.ProxyEnableHttp2 = true
+		globalConf.HttpServerOptions.EnableHttp2 = true
+		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+		globalConf.HttpServerOptions.UseSSL = true
+	}
+	ts := StartTest(conf)
+	defer ts.Close()
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
