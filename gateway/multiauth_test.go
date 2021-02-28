@@ -75,9 +75,7 @@ func createMultiBasicAuthSession(isBench bool) *user.SessionState {
 	return session
 }
 
-func getMultiAuthStandardAndBasicAuthChain(spec *APISpec) http.Handler {
-	ts := StartTest(nil)
-	defer ts.Close()
+func(ts *Test) getMultiAuthStandardAndBasicAuthChain(spec *APISpec) http.Handler {
 
 	remote, _ := url.Parse(TestHttpAny)
 	proxy := ts.Gw.TykNewSingleHostReverseProxy(remote, spec, nil)
@@ -143,10 +141,12 @@ func testPrepareMultiSessionBA(t testing.TB, isBench bool) (*APISpec, *http.Requ
 }
 
 func TestMultiSession_BA_Standard_OK(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
 	spec, req := testPrepareMultiSessionBA(t, false)
 
 	recorder := httptest.NewRecorder()
-	chain := getMultiAuthStandardAndBasicAuthChain(spec)
+	chain := ts.getMultiAuthStandardAndBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 200 {
@@ -155,12 +155,15 @@ func TestMultiSession_BA_Standard_OK(t *testing.T) {
 }
 
 func BenchmarkMultiSession_BA_Standard_OK(b *testing.B) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	b.ReportAllocs()
 
 	spec, req := testPrepareMultiSessionBA(b, true)
 
 	recorder := httptest.NewRecorder()
-	chain := getMultiAuthStandardAndBasicAuthChain(spec)
+	chain := ts.getMultiAuthStandardAndBasicAuthChain(spec)
 
 	for i := 0; i < b.N; i++ {
 		chain.ServeHTTP(recorder, req)
@@ -203,7 +206,7 @@ func TestMultiSession_BA_Standard_Identity(t *testing.T) {
 	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 	req.Header.Set("x-standard-auth", fmt.Sprintf("Bearer %s", customToken))
 
-	chain := getMultiAuthStandardAndBasicAuthChain(spec)
+	chain := ts.getMultiAuthStandardAndBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 200 {
@@ -249,7 +252,7 @@ func TestMultiSession_BA_Standard_FAILBA(t *testing.T) {
 	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 	req.Header.Set("x-standard-auth", fmt.Sprintf("Bearer %s", customToken))
 
-	chain := getMultiAuthStandardAndBasicAuthChain(spec)
+	chain := ts.getMultiAuthStandardAndBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 401 {
@@ -290,7 +293,7 @@ func TestMultiSession_BA_Standard_FAILAuth(t *testing.T) {
 	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 	req.Header.Set("x-standard-auth", fmt.Sprintf("Bearer %s", "WRONGTOKEN"))
 
-	chain := getMultiAuthStandardAndBasicAuthChain(spec)
+	chain := ts.getMultiAuthStandardAndBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 403 {

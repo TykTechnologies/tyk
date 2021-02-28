@@ -440,9 +440,7 @@ func TestJWTSessionRSABearerInvalidTwoBears(t *testing.T) {
 
 // JWTSessionRSAWithRawSourceOnWithClientID
 
-func prepareJWTSessionRSAWithRawSourceOnWithClientID(isBench bool) string {
-	ts := StartTest(nil)
-	defer ts.Close()
+func(ts *Test) prepareJWTSessionRSAWithRawSourceOnWithClientID(isBench bool) string {
 
 	spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.OrgID = "default"
@@ -495,7 +493,7 @@ func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	jwtToken := prepareJWTSessionRSAWithRawSourceOnWithClientID(false)
+	jwtToken := ts.prepareJWTSessionRSAWithRawSourceOnWithClientID(false)
 	authHeaders := map[string]string{"authorization": jwtToken}
 
 	t.Run("Initial request with no policy base field in JWT", func(t *testing.T) {
@@ -511,7 +509,7 @@ func BenchmarkJWTSessionRSAWithRawSourceOnWithClientID(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	jwtToken := prepareJWTSessionRSAWithRawSourceOnWithClientID(true)
+	jwtToken := ts.prepareJWTSessionRSAWithRawSourceOnWithClientID(true)
 	authHeaders := map[string]string{"authorization": jwtToken}
 
 	for i := 0; i < b.N; i++ {
@@ -523,9 +521,7 @@ func BenchmarkJWTSessionRSAWithRawSourceOnWithClientID(b *testing.B) {
 
 // JWTSessionRSAWithRawSource
 
-func prepareJWTSessionRSAWithRawSource() string {
-	ts := StartTest(nil)
-	defer ts.Close()
+func(ts *Test) prepareJWTSessionRSAWithRawSource() string {
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
@@ -554,7 +550,7 @@ func TestJWTSessionRSAWithRawSource(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	jwtToken := prepareJWTSessionRSAWithRawSource()
+	jwtToken := ts.prepareJWTSessionRSAWithRawSource()
 
 	authHeaders := map[string]string{"authorization": jwtToken}
 	t.Run("Initial request with valid policy", func(t *testing.T) {
@@ -570,7 +566,7 @@ func BenchmarkJWTSessionRSAWithRawSource(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	jwtToken := prepareJWTSessionRSAWithRawSource()
+	jwtToken := ts.prepareJWTSessionRSAWithRawSource()
 
 	authHeaders := map[string]string{"authorization": jwtToken}
 
@@ -1318,9 +1314,7 @@ func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
 
 // JWTSessionRSAWithJWK
 
-func prepareJWTSessionRSAWithJWK() string {
-	ts := StartTest(nil)
-	defer ts.Close()
+func(ts *Test) prepareJWTSessionRSAWithJWK() string {
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
@@ -1348,7 +1342,7 @@ func TestJWTSessionRSAWithJWK(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	jwtToken := prepareJWTSessionRSAWithJWK()
+	jwtToken := ts.prepareJWTSessionRSAWithJWK()
 	authHeaders := map[string]string{"authorization": jwtToken}
 
 	t.Run("JWTSessionRSAWithJWK", func(t *testing.T) {
@@ -1364,7 +1358,7 @@ func BenchmarkJWTSessionRSAWithJWK(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	jwtToken := prepareJWTSessionRSAWithJWK()
+	jwtToken := ts.prepareJWTSessionRSAWithJWK()
 	authHeaders := map[string]string{"authorization": jwtToken}
 
 	for i := 0; i < b.N; i++ {
@@ -1380,9 +1374,7 @@ func BenchmarkJWTSessionRSAWithJWK(b *testing.B) {
 
 // JWTSessionRSAWithEncodedJWK
 
-func prepareJWTSessionRSAWithEncodedJWK() (*APISpec, string) {
-	ts := StartTest(nil)
-	defer ts.Close()
+func(ts *Test) prepareJWTSessionRSAWithEncodedJWK() (*APISpec, string) {
 
 	spec := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
@@ -1410,7 +1402,7 @@ func TestJWTSessionRSAWithEncodedJWK(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec, jwtToken := prepareJWTSessionRSAWithEncodedJWK()
+	spec, jwtToken := ts.prepareJWTSessionRSAWithEncodedJWK()
 
 	authHeaders := map[string]string{"authorization": jwtToken}
 	flush := func() {
@@ -1474,7 +1466,7 @@ func BenchmarkJWTSessionRSAWithEncodedJWK(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec, jwtToken := prepareJWTSessionRSAWithEncodedJWK()
+	spec, jwtToken := ts.prepareJWTSessionRSAWithEncodedJWK()
 	spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(testHttpJWK))
 
 	ts.Gw.LoadAPI(spec)
