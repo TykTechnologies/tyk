@@ -34,7 +34,9 @@ func TestTransformNonAscii(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := APISpec{}
+	ad := apidef.APIDefinition{}
+	spec := APISpec{APIDefinition: &ad}
+	spec.EnableContextVars = false
 	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
 	base.Spec.EnableContextVars = false
 	transform := TransformMiddleware{base}
@@ -85,7 +87,8 @@ func TestTransformXMLCrash(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := APISpec{}
+	ad := apidef.APIDefinition{}
+	spec := APISpec{APIDefinition: &ad}
 	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
 	base.Spec.EnableContextVars = false
 	transform := TransformMiddleware{base}
