@@ -1522,28 +1522,13 @@ func (gw *Gateway) startServer() {
 
 	router := mux.NewRouter()
 	gw.loadControlAPIEndpoints(router)
-	fmt.Printf("\n  After load api endpoint\n")
-	fmt.Printf("new router: %+v \n", muxer.proxies)
-	fmt.Printf("Gw Muuxer: %+v \n", gw.DefaultProxyMux.proxies)
 
 	muxer.setRouter(gw.GetConfig().ControlAPIPort, "", router, gw.GetConfig())
-	fmt.Printf("\n  After set router for control\n")
-	fmt.Printf("new router: %+v \n", muxer.proxies)
-	fmt.Printf("Gw Muuxer: %+v \n", gw.DefaultProxyMux.proxies)
 
 	if muxer.router(gw.GetConfig().ListenPort, "", gw.GetConfig()) == nil {
 		muxer.setRouter(gw.GetConfig().ListenPort, "", mux.NewRouter(), gw.GetConfig())
 	}
-	fmt.Printf("\n  After set router for standard\n")
-	fmt.Printf("new router: %+v \n", muxer.proxies)
-	fmt.Printf("Gw Muuxer: %+v \n", gw.DefaultProxyMux.proxies)
-
 	gw.DefaultProxyMux.swap(muxer, gw)
-
-	fmt.Printf("\n  After swapt\n")
-	fmt.Printf("new router: %+v \n", muxer.proxies)
-	fmt.Printf("Gw Muuxer: %+v \n", gw.DefaultProxyMux.proxies)
-
 	// handle dashboard registration and nonces if available
 	handleDashboardRegistration(gw)
 

@@ -154,7 +154,7 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 	store.Connect()
 
 	// Three cases: 1 API, 2 APIs and Malformed data
-	exp := []int{ 1, 2, 2 }
+	exp := []int{1, 2, 2}
 	for _, e := range exp {
 		ts.Gw.DoReload()
 		n := ts.Gw.apisByIDLen()
@@ -231,7 +231,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 
 		GetKeyCounter = 0
 		// RPC layer is down,
-		ts := StartTest(conf, TestConfig{SkipEmptyRedis:true})
+		ts := StartTest(conf, TestConfig{SkipEmptyRedis: true})
 		defer ts.Close()
 
 		// Wait for backup to load

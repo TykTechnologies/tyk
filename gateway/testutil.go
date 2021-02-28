@@ -803,7 +803,7 @@ type TestConfig struct {
 	overrideDefaults   bool
 	CoprocessConfig    config.CoProcessConfig
 	// SkipEmptyRedis to avoid restart the storage
-	SkipEmptyRedis     bool
+	SkipEmptyRedis bool
 }
 
 type Test struct {
@@ -983,7 +983,7 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 		time.Sleep(10 * time.Millisecond)
 	}
 
-	if !s.config.SkipEmptyRedis{
+	if !s.config.SkipEmptyRedis {
 		if err := s.emptyRedis(); err != nil {
 			panic(err)
 		}

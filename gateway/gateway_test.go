@@ -25,7 +25,6 @@ import (
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
@@ -841,14 +840,12 @@ func TestControlListener(t *testing.T) {
 }
 
 func TestHttpPprof(t *testing.T) {
-	old := cli.HTTPProfile
-	defer func() { cli.HTTPProfile = old }()
-/*
-	t.Run("HTTP Profile not active", func(t *testing.T) {
-		httpProfileEnabled := false
-		cli.HTTPProfile = &httpProfileEnabled
 
-		ts := StartTest(nil, TestConfig{
+	t.Run("HTTP Profile not active", func(t *testing.T) {
+		conf := func(globalConf *config.Config) {
+			globalConf.HTTPProfile = false
+		}
+		ts := StartTest(conf, TestConfig{
 			SeparateControlAPI: true,
 		})
 		defer ts.Close()
@@ -857,19 +854,16 @@ func TestHttpPprof(t *testing.T) {
 			{Path: "/debug/pprof/", Code: 404},
 			{Path: "/debug/pprof/", Code: 404, ControlRequest: true},
 		}...)
-
-	})*/
+	})
 
 	t.Run("HTTP Profile active", func(t *testing.T) {
-		httpProfileEnabled := false
-		cli.HTTPProfile = &httpProfileEnabled
-
-		ts := StartTest(nil, TestConfig{
+		conf := func(globalConf *config.Config) {
+			globalConf.HTTPProfile = true
+		}
+		ts := StartTest(conf, TestConfig{
 			SeparateControlAPI: true,
 		})
 		defer ts.Close()
-
-		time.Sleep(2*time.Minute)
 
 		ts.Run(t, []test.TestCase{
 			{Path: "/debug/pprof/", Code: 404},
