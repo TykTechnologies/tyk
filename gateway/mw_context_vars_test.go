@@ -13,9 +13,7 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
-func testPrepareContextVarsMiddleware() {
-	ts := StartTest(nil)
-	defer ts.Close()
+func(ts *Test) testPrepareContextVarsMiddleware() {
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
@@ -38,7 +36,7 @@ func TestContextVarsMiddleware(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	testPrepareContextVarsMiddleware()
+	ts.testPrepareContextVarsMiddleware()
 
 	ts.Run(t, []test.TestCase{
 		{Path: "/test/path", Code: 200, BodyMatch: `"X-Remote-Addr":"127.0.0.1"`},
@@ -54,7 +52,7 @@ func BenchmarkContextVarsMiddleware(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	testPrepareContextVarsMiddleware()
+	ts.testPrepareContextVarsMiddleware()
 
 	for i := 0; i < b.N; i++ {
 		ts.Run(b, []test.TestCase{
