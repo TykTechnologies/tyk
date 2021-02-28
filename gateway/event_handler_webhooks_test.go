@@ -260,7 +260,7 @@ func TestNewCustomTemplate(t *testing.T) {
 					ts.Gw.SetConfig(globalConf)
 				}()
 			}
-			h := &WebHookHandler{}
+			h := &WebHookHandler{ Gw: ts.Gw }
 			err := h.Init(map[string]interface{}{
 				"target_path":   testHttpPost,
 				"template_path": tc.templatePath,
