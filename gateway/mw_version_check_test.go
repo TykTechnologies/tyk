@@ -9,9 +9,7 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-func testPrepareVersioning() (string, string) {
-	ts := StartTest(nil)
-	defer ts.Close()
+func(ts *Test) testPrepareVersioning() (string, string) {
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
@@ -82,7 +80,7 @@ func TestVersioning(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	keyWrongVersion, keyKnownVersion := testPrepareVersioning()
+	keyWrongVersion, keyKnownVersion := ts.testPrepareVersioning()
 
 	wrongVersionHeaders := map[string]string{
 		"authorization": keyWrongVersion,
@@ -125,7 +123,7 @@ func BenchmarkVersioning(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	keyWrongVersion, keyKnownVersion := testPrepareVersioning()
+	keyWrongVersion, keyKnownVersion := ts.testPrepareVersioning()
 	wrongVersionHeaders := map[string]string{
 		"authorization": keyWrongVersion,
 		"version":       "v3",
