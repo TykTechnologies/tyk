@@ -142,7 +142,8 @@ func TestTransformJSONMarshalXMLInput(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := APISpec{}
+	ad := apidef.APIDefinition{}
+	spec := APISpec{APIDefinition: &ad}
 	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
 	base.Spec.EnableContextVars = false
 	transform := TransformMiddleware{base}
@@ -168,7 +169,8 @@ func TestTransformJSONMarshalJSONInput(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := APISpec{}
+	ad := apidef.APIDefinition{}
+	spec := APISpec{APIDefinition: &ad}
 	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
 	base.Spec.EnableContextVars = false
 	transform := TransformMiddleware{base}
@@ -206,7 +208,8 @@ func TestTransformJSONMarshalJSONArrayInput(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := APISpec{}
+	ad := apidef.APIDefinition{}
+	spec := APISpec{APIDefinition: &ad}
 	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
 	base.Spec.EnableContextVars = false
 	transform := TransformMiddleware{base}
@@ -251,7 +254,8 @@ func TestTransformXMLMarshal(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
 
-		spec := APISpec{}
+		ad := apidef.APIDefinition{}
+		spec := APISpec{APIDefinition: &ad}
 		base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
 		base.Spec.EnableContextVars = false
 		transform := TransformMiddleware{base}
