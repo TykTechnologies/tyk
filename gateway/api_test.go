@@ -3,6 +3,7 @@ package gateway
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/TykTechnologies/tyk/config"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -548,15 +549,14 @@ func TestKeyHandler_CheckKeysNotDuplicateOnUpdate(t *testing.T) {
 
 func TestHashKeyHandler(t *testing.T) {
 
-	ts := StartTest(nil)
+	conf := func(globalConf *config.Config) {
+		// make it to use hashes for Redis keys
+		globalConf.HashKeys = true
+		// enable hashed keys listing
+		globalConf.EnableHashedKeysListing = true
+	}
+	ts := StartTest(conf)
 	defer ts.Close()
-
-	globalConf := ts.Gw.GetConfig()
-	// make it to use hashes for Redis keys
-	globalConf.HashKeys = true
-	// enable hashed keys listing
-	globalConf.EnableHashedKeysListing = true
-	ts.Gw.SetConfig(globalConf)
 
 	hashTests := []struct {
 		hashFunction     string
@@ -572,11 +572,12 @@ func TestHashKeyHandler(t *testing.T) {
 	}
 
 	for _, tc := range hashTests {
-		globalConf.HashKeyFunction = tc.hashFunction
-		ts.Gw.SetConfig(globalConf)
+		gwConf := ts.Gw.GetConfig()
+		gwConf.HashKeyFunction = tc.hashFunction
+		ts.Gw.SetConfig(gwConf)
 
 		t.Run(fmt.Sprintf("%sHash fn: %s", tc.desc, tc.hashFunction), func(t *testing.T) {
-			testHashKeyHandlerHelper(t, tc.expectedHashSize)
+			ts.testHashKeyHandlerHelper(t, tc.expectedHashSize)
 		})
 		t.Run(fmt.Sprintf("%sHash fn: %s and Basic Auth", tc.desc, tc.hashFunction), func(t *testing.T) {
 			testHashFuncAndBAHelper(t)
@@ -636,9 +637,7 @@ func TestHashKeyHandlerLegacyWithHashFunc(t *testing.T) {
 	}...)
 }
 
-func testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
-	ts := StartTest(nil)
-	defer ts.Close()
+func(ts *Test) testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 
 	ts.Gw.BuildAndLoadAPI()
 
