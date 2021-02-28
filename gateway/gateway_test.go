@@ -843,26 +843,40 @@ func TestControlListener(t *testing.T) {
 func TestHttpPprof(t *testing.T) {
 	old := cli.HTTPProfile
 	defer func() { cli.HTTPProfile = old }()
+/*
+	t.Run("HTTP Profile not active", func(t *testing.T) {
+		httpProfileEnabled := false
+		cli.HTTPProfile = &httpProfileEnabled
 
-	ts := StartTest(nil, TestConfig{
-		SeparateControlAPI: true,
+		ts := StartTest(nil, TestConfig{
+			SeparateControlAPI: true,
+		})
+		defer ts.Close()
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/debug/pprof/", Code: 404},
+			{Path: "/debug/pprof/", Code: 404, ControlRequest: true},
+		}...)
+
+	})*/
+
+	t.Run("HTTP Profile active", func(t *testing.T) {
+		httpProfileEnabled := false
+		cli.HTTPProfile = &httpProfileEnabled
+
+		ts := StartTest(nil, TestConfig{
+			SeparateControlAPI: true,
+		})
+		defer ts.Close()
+
+		time.Sleep(2*time.Minute)
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/debug/pprof/", Code: 404},
+			{Path: "/debug/pprof/", Code: 200, ControlRequest: true},
+			{Path: "/debug/pprof/heap", Code: 200, ControlRequest: true},
+		}...)
 	})
-
-	ts.Run(t, []test.TestCase{
-		{Path: "/debug/pprof/", Code: 404},
-		{Path: "/debug/pprof/", Code: 404, ControlRequest: true},
-	}...)
-	ts.Close()
-
-	*cli.HTTPProfile = true
-
-	ts.Start(nil)
-	ts.Run(t, []test.TestCase{
-		{Path: "/debug/pprof/", Code: 404},
-		{Path: "/debug/pprof/", Code: 200, ControlRequest: true},
-		{Path: "/debug/pprof/heap", Code: 200, ControlRequest: true},
-	}...)
-	ts.Close()
 }
 
 func TestManagementNodeRedisEvents(t *testing.T) {
