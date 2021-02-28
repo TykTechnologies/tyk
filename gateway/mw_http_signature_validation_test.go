@@ -78,9 +78,7 @@ func createRSAAuthSession(pubCertId string) *user.SessionState {
 	return session
 }
 
-func getHMACAuthChain(spec *APISpec) http.Handler {
-	ts := StartTest(nil)
-	defer ts.Close()
+func(ts *Test) getHMACAuthChain(spec *APISpec) http.Handler {
 
 	remote, _ := url.Parse(TestHttpAny)
 	proxy := ts.Gw.TykNewSingleHostReverseProxy(remote, spec, nil)
@@ -247,12 +245,14 @@ func TestHMACAuthSessionPass(t *testing.T) {
 	// Should not receive an AuthFailure event
 	var eventWG sync.WaitGroup
 	eventWG.Add(1)
+	ts := StartTest(nil)
+	defer ts.Close()
 	encodedString, spec, req, sessionKey := testPrepareHMACAuthSessionPass(t, sha1.New, &eventWG, false, false)
 
 	recorder := httptest.NewRecorder()
 	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"%s\",algorithm=\"hmac-sha1\",signature=\"%s\"", sessionKey, encodedString))
 
-	chain := getHMACAuthChain(spec)
+	chain := ts.getHMACAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 200 {
@@ -269,13 +269,15 @@ func TestHMACAuthSessionSHA512Pass(t *testing.T) {
 	// Should not receive an AuthFailure event
 	var eventWG sync.WaitGroup
 	eventWG.Add(1)
+	ts := StartTest(nil)
+	defer ts.Close()
 	encodedString, spec, req, sessionKey := testPrepareHMACAuthSessionPass(t, sha512.New, &eventWG, false, false)
 
 	recorder := httptest.NewRecorder()
 	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"%s\",algorithm=\"hmac-sha512\",signature=\"%s\"", sessionKey, encodedString))
 
 	spec.HmacAllowedAlgorithms = []string{"hmac-sha512"}
-	chain := getHMACAuthChain(spec)
+	chain := ts.getHMACAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 200 {
@@ -293,12 +295,14 @@ func BenchmarkHMACAuthSessionPass(b *testing.B) {
 
 	var eventWG sync.WaitGroup
 	eventWG.Add(b.N)
+	ts := StartTest(nil)
+	defer ts.Close()
 	encodedString, spec, req, sessionKey := testPrepareHMACAuthSessionPass(b, sha1.New, &eventWG, false, true)
 
 	recorder := httptest.NewRecorder()
 	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"%s\",algorithm=\"hmac-sha1\",signature=\"%s\"", sessionKey, encodedString))
 
-	chain := getHMACAuthChain(spec)
+	chain := ts.getHMACAuthChain(spec)
 
 	for i := 0; i < b.N; i++ {
 		chain.ServeHTTP(recorder, req)
@@ -354,7 +358,7 @@ func TestHMACAuthSessionAuxDateHeader(t *testing.T) {
 
 	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
 
-	chain := getHMACAuthChain(spec)
+	chain := ts.getHMACAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 200 {
@@ -412,7 +416,7 @@ func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
 
 	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
 
-	chain := getHMACAuthChain(spec)
+	chain := ts.getHMACAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 400 {
@@ -470,7 +474,7 @@ func TestHMACAuthSessionKeyMissing(t *testing.T) {
 
 	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"98765\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
 
-	chain := getHMACAuthChain(spec)
+	chain := ts.getHMACAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 400 {
@@ -528,7 +532,7 @@ func TestHMACAuthSessionMalformedHeader(t *testing.T) {
 
 	req.Header.Set("Authorization", fmt.Sprintf("Signature keyID=\"98765\", algorithm=\"hmac-sha256\", signature=\"%s\"", encodedString))
 
-	chain := getHMACAuthChain(spec)
+	chain := ts.getHMACAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 400 {
@@ -545,12 +549,14 @@ func TestHMACAuthSessionPassWithHeaderField(t *testing.T) {
 	// Should not receive an AuthFailure event
 	var eventWG sync.WaitGroup
 	eventWG.Add(1)
+	ts := StartTest(nil)
+	defer ts.Close()
 	encodedString, spec, req, sessionKey := testPrepareHMACAuthSessionPass(t, sha1.New, &eventWG, true, false)
 
 	recorder := httptest.NewRecorder()
 	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"%s\",algorithm=\"hmac-sha1\",headers=\"(request-target) date x-test-1 x-test-2\",signature=\"%s\"", sessionKey, encodedString))
 
-	chain := getHMACAuthChain(spec)
+	chain := ts.getHMACAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 200 {
@@ -565,6 +571,8 @@ func TestHMACAuthSessionPassWithHeaderField(t *testing.T) {
 
 func BenchmarkHMACAuthSessionPassWithHeaderField(b *testing.B) {
 	b.ReportAllocs()
+	ts:= StartTest(nil)
+	defer ts.Close()
 
 	var eventWG sync.WaitGroup
 	eventWG.Add(b.N)
@@ -573,7 +581,7 @@ func BenchmarkHMACAuthSessionPassWithHeaderField(b *testing.B) {
 	recorder := httptest.NewRecorder()
 	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"%s\",algorithm=\"hmac-sha1\",headers=\"(request-target) date x-test-1 x-test-2\",signature=\"%s\"", sessionKey, encodedString))
 
-	chain := getHMACAuthChain(spec)
+	chain := ts.getHMACAuthChain(spec)
 
 	for i := 0; i < b.N; i++ {
 		chain.ServeHTTP(recorder, req)
@@ -652,7 +660,7 @@ func TestHMACAuthSessionPassWithHeaderFieldLowerCase(t *testing.T) {
 
 	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",headers=\"(request-target) date x-test-1 x-test-2\",signature=\"%s\"", newEncodedSignature))
 
-	chain := getHMACAuthChain(spec)
+	chain := ts.getHMACAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 200 {
@@ -705,7 +713,7 @@ func TestRSAAuthSessionPass(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"%s\",algorithm=\"rsa-sha256\",signature=\"%s\"", sessionKey, encodedString))
 
-	chain := getHMACAuthChain(spec)
+	chain := ts.getHMACAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 200 {
@@ -739,7 +747,7 @@ func BenchmarkRSAAuthSessionPass(b *testing.B) {
 	recorder := httptest.NewRecorder()
 	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"%s\",algorithm=\"rsa-sha256\",signature=\"%s\"", sessionKey, encodedString))
 
-	chain := getHMACAuthChain(spec)
+	chain := ts.getHMACAuthChain(spec)
 
 	for i := 0; i < b.N; i++ {
 		chain.ServeHTTP(recorder, req)
@@ -778,7 +786,7 @@ func TestRSAAuthSessionKeyMissing(t *testing.T) {
 
 	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"98765\",algorithm=\"rsa-sha256\",signature=\"%s\"", encodedString))
 
-	chain := getHMACAuthChain(spec)
+	chain := ts.getHMACAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 400 {
