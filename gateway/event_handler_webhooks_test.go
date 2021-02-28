@@ -26,7 +26,10 @@ func(ts *Test) createGetHandler() *WebHookHandler {
 }
 
 func TestNewValid(t *testing.T) {
-	h := &WebHookHandler{}
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	h := &WebHookHandler{Gw:ts.Gw}
 	err := h.Init(map[string]interface{}{
 		"method":        "POST",
 		"target_path":   testHttpPost,
@@ -40,7 +43,10 @@ func TestNewValid(t *testing.T) {
 }
 
 func TestNewInvalid(t *testing.T) {
-	h := &WebHookHandler{}
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	h := &WebHookHandler{Gw:ts.Gw}
 	err := h.Init(map[string]interface{}{
 		"method":        123,
 		"target_path":   testHttpPost,
