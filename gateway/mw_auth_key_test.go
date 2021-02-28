@@ -224,9 +224,7 @@ func getAuthKeyChain(spec *APISpec) http.Handler {
 	return chain
 }
 
-func testPrepareAuthKeySession(apiDef string, isBench bool) (string, *APISpec, error) {
-	ts := StartTest(nil)
-	defer ts.Close()
+func(ts *Test) testPrepareAuthKeySession(apiDef string, isBench bool) (string, *APISpec, error) {
 
 	spec := ts.Gw.LoadSampleAPI(apiDef)
 
@@ -242,7 +240,9 @@ func testPrepareAuthKeySession(apiDef string, isBench bool) (string, *APISpec, e
 }
 
 func TestBearerTokenAuthKeySession(t *testing.T) {
-	customToken, spec, err := testPrepareAuthKeySession(authKeyDef, false)
+	ts := StartTest(nil)
+	defer ts.Close()
+	customToken, spec, err := ts.testPrepareAuthKeySession(authKeyDef, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -262,9 +262,11 @@ func TestBearerTokenAuthKeySession(t *testing.T) {
 }
 
 func BenchmarkBearerTokenAuthKeySession(b *testing.B) {
+	ts := StartTest(nil)
+	defer ts.Close()
 	b.ReportAllocs()
 
-	customToken, spec, err := testPrepareAuthKeySession(authKeyDef, true)
+	customToken, spec, err := ts.testPrepareAuthKeySession(authKeyDef, true)
 	if err != nil {
 		b.Error(err)
 	}
@@ -302,7 +304,9 @@ const authKeyDef = `{
 }`
 
 func TestMultiAuthBackwardsCompatibleSession(t *testing.T) {
-	customToken, spec, err := testPrepareAuthKeySession(multiAuthBackwardsCompatible, false)
+	ts := StartTest(nil)
+	defer ts.Close()
+	customToken, spec, err := ts.testPrepareAuthKeySession(multiAuthBackwardsCompatible, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -320,9 +324,11 @@ func TestMultiAuthBackwardsCompatibleSession(t *testing.T) {
 }
 
 func BenchmarkMultiAuthBackwardsCompatibleSession(b *testing.B) {
-	b.ReportAllocs()
+	ts := StartTest(nil)
+	defer ts.Close()
 
-	customToken, spec, err := testPrepareAuthKeySession(multiAuthBackwardsCompatible, true)
+	b.ReportAllocs()
+	customToken, spec, err := ts.testPrepareAuthKeySession(multiAuthBackwardsCompatible, true)
 	if err != nil {
 		b.Error(err)
 	}

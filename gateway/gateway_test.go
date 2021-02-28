@@ -771,7 +771,7 @@ func TestListener(t *testing.T) {
 
 	// Trick to get spec JSON, without loading API
 	// Specs will be reseted when we do `StartTest`
-	ts.Gw.BuildAndLoadAPI()
+	//ts.Gw.BuildAndLoadAPI()
 
 	ReloadTestCase.Enable()
 	defer ReloadTestCase.Disable()

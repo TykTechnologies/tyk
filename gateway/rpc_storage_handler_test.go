@@ -90,7 +90,7 @@ func TestProcessKeySpaceChangesForOauth(t *testing.T) {
 			}
 
 			myApi := ts.loadTestOAuthSpec()
-			oauthClient := createTestOAuthClient(myApi, authClientID)
+			oauthClient := ts.createTestOAuthClient(myApi, authClientID)
 			tokenData := getToken(t, ts)
 			token := tc.GetToken(tokenData)
 

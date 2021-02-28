@@ -1424,6 +1424,7 @@ func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
 			fmt.Printf(" \n %+v \n", spec)
 			panic(err)
 		}
+
 		specFilePath := filepath.Join(gwConf.AppPath, spec.APIID+strconv.Itoa(i)+".json")
 		if err := ioutil.WriteFile(specFilePath, specBytes, 0644); err != nil {
 			panic(err)
@@ -1431,7 +1432,6 @@ func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
 	}
 
 	gw.DoReload()
-
 	for _, spec := range specs {
 		out = append(out, gw.getApiSpec(spec.APIID))
 	}

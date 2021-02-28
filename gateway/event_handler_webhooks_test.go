@@ -10,7 +10,7 @@ import (
 	"github.com/TykTechnologies/tyk/headers"
 )
 
-func createGetHandler() *WebHookHandler {
+func(ts *Test) createGetHandler() *WebHookHandler {
 	eventHandlerConf := config.WebHookHandlerConf{
 		TargetPath:   TestHttpGet,
 		Method:       "GET",
@@ -18,7 +18,7 @@ func createGetHandler() *WebHookHandler {
 		TemplatePath: "../templates/default_webhook.json",
 		HeaderList:   map[string]string{"x-tyk-test": "TEST"},
 	}
-	ev := &WebHookHandler{}
+	ev := &WebHookHandler{Gw:ts.Gw}
 	if err := ev.Init(eventHandlerConf); err != nil {
 		panic(err)
 	}
@@ -54,6 +54,9 @@ func TestNewInvalid(t *testing.T) {
 }
 
 func TestChecksum(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	rBody := `{
 		"event": "QuotaExceeded",
 		"message": "Key Quota Limit Exceeded",
@@ -63,7 +66,7 @@ func TestChecksum(t *testing.T) {
 		"timestamp": 2014-11-27 12:52:05.944549825 &#43;0000 GMT
 	}`
 
-	hook := createGetHandler()
+	hook := ts.createGetHandler()
 	checksum, err := hook.Checksum(rBody)
 
 	if err != nil {
@@ -77,7 +80,10 @@ func TestChecksum(t *testing.T) {
 }
 
 func TestBuildRequest(t *testing.T) {
-	hook := createGetHandler()
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	hook := ts.createGetHandler()
 
 	rBody := `{
 		"event": "QuotaExceeded",
@@ -120,7 +126,7 @@ func TestBuildRequestIngoreCanonicalHeaderKey(t *testing.T) {
 		HeaderList:   map[string]string{NonCanonicalHeaderKey: NonCanonicalHeaderKey},
 	}
 
-	ev := &WebHookHandler{}
+	ev := &WebHookHandler{Gw:ts.Gw}
 	if err := ev.Init(eventHandlerConf); err != nil {
 		t.Fatal(err)
 	}
@@ -135,12 +141,15 @@ func TestBuildRequestIngoreCanonicalHeaderKey(t *testing.T) {
 }
 
 func TestCreateBody(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	em := config.EventMessage{
 		Type:      EventQuotaExceeded,
 		TimeStamp: "0",
 	}
 
-	hook := createGetHandler()
+	hook := ts.createGetHandler()
 	body, err := hook.CreateBody(em)
 	if err != nil {
 		t.Error("Create body failed with error! ", err)
@@ -153,7 +162,10 @@ func TestCreateBody(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	eventHandler := createGetHandler()
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	eventHandler := ts.createGetHandler()
 
 	eventMessage := config.EventMessage{
 		Type: EventKeyExpired,
@@ -176,6 +188,9 @@ func TestGet(t *testing.T) {
 }
 
 func TestPost(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	eventHandlerConf := config.WebHookHandlerConf{
 		TargetPath:   "`+testHttpPost+`",
 		Method:       "POST",
@@ -184,7 +199,7 @@ func TestPost(t *testing.T) {
 		HeaderList:   map[string]string{"x-tyk-test": "TEST POST"},
 	}
 
-	eventHandler := &WebHookHandler{}
+	eventHandler := &WebHookHandler{Gw: ts.Gw}
 	if err := eventHandler.Init(eventHandlerConf); err != nil {
 		t.Fatal(err)
 	}
