@@ -26,8 +26,8 @@ const (
 	extractorParamName  = "testparam"
 )
 
-func createSpecTestFrom(t testing.TB, def *apidef.APIDefinition) *APISpec {
-	loader := APIDefinitionLoader{}
+func(ts *Test) createSpecTestFrom(t testing.TB, def *apidef.APIDefinition) *APISpec {
+	loader := APIDefinitionLoader{ Gw: ts.Gw}
 	spec := loader.MakeSpec(def, nil)
 	tname := t.Name()
 	redisStore := &storage.RedisCluster{KeyPrefix: tname + "-apikey."}
@@ -52,7 +52,7 @@ func prepareExtractor(t testing.TB, extractorSource apidef.IdExtractorSource, ex
 		},
 	}
 
-	spec := createSpecTestFrom(t, def)
+	spec := ts.createSpecTestFrom(t, def)
 	mw := BaseMiddleware{Spec: spec, Gw: ts.Gw}
 	newExtractor(spec, mw)
 	return spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor), spec
