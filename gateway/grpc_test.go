@@ -233,7 +233,7 @@ func TestGRPC_MutualTLS(t *testing.T) {
 	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
 	serverCertPem, _, combinedPEM, _ := genServerCertificate()
 
-	certID, _ :=certManager.Add(combinedPEM, "") // For tyk to know downstream
+	certID, _ := certManager.Add(combinedPEM, "") // For tyk to know downstream
 	defer certManager.Delete(certID, "")
 
 	clientCertID, _ := certManager.Add(combinedClientPEM, "") // For upstream to know tyk
@@ -246,12 +246,12 @@ func TestGRPC_MutualTLS(t *testing.T) {
 
 	// Tyk
 	conf := func(globalConf *config.Config) {
-		 globalConf.ProxySSLInsecureSkipVerify = true
-		 globalConf.ProxyEnableHttp2 = true
-		 globalConf.HttpServerOptions.EnableHttp2 = true
-		 globalConf.HttpServerOptions.SSLCertificates = []string{certID}
-		 globalConf.HttpServerOptions.UseSSL = true
-	 }
+		globalConf.ProxySSLInsecureSkipVerify = true
+		globalConf.ProxyEnableHttp2 = true
+		globalConf.HttpServerOptions.EnableHttp2 = true
+		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+		globalConf.HttpServerOptions.UseSSL = true
+	}
 	ts := StartTest(conf)
 	defer ts.Close()
 

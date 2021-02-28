@@ -10,7 +10,7 @@ import (
 	"github.com/TykTechnologies/tyk/headers"
 )
 
-func(ts *Test) createGetHandler() *WebHookHandler {
+func (ts *Test) createGetHandler() *WebHookHandler {
 	eventHandlerConf := config.WebHookHandlerConf{
 		TargetPath:   TestHttpGet,
 		Method:       "GET",
@@ -18,7 +18,7 @@ func(ts *Test) createGetHandler() *WebHookHandler {
 		TemplatePath: "../templates/default_webhook.json",
 		HeaderList:   map[string]string{"x-tyk-test": "TEST"},
 	}
-	ev := &WebHookHandler{Gw:ts.Gw}
+	ev := &WebHookHandler{Gw: ts.Gw}
 	if err := ev.Init(eventHandlerConf); err != nil {
 		panic(err)
 	}
@@ -29,7 +29,7 @@ func TestNewValid(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	h := &WebHookHandler{Gw:ts.Gw}
+	h := &WebHookHandler{Gw: ts.Gw}
 	err := h.Init(map[string]interface{}{
 		"method":        "POST",
 		"target_path":   testHttpPost,
@@ -46,7 +46,7 @@ func TestNewInvalid(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	h := &WebHookHandler{Gw:ts.Gw}
+	h := &WebHookHandler{Gw: ts.Gw}
 	err := h.Init(map[string]interface{}{
 		"method":        123,
 		"target_path":   testHttpPost,
@@ -132,7 +132,7 @@ func TestBuildRequestIngoreCanonicalHeaderKey(t *testing.T) {
 		HeaderList:   map[string]string{NonCanonicalHeaderKey: NonCanonicalHeaderKey},
 	}
 
-	ev := &WebHookHandler{Gw:ts.Gw}
+	ev := &WebHookHandler{Gw: ts.Gw}
 	if err := ev.Init(eventHandlerConf); err != nil {
 		t.Fatal(err)
 	}
@@ -260,7 +260,7 @@ func TestNewCustomTemplate(t *testing.T) {
 					ts.Gw.SetConfig(globalConf)
 				}()
 			}
-			h := &WebHookHandler{ Gw: ts.Gw }
+			h := &WebHookHandler{Gw: ts.Gw}
 			err := h.Init(map[string]interface{}{
 				"target_path":   testHttpPost,
 				"template_path": tc.templatePath,
@@ -305,7 +305,7 @@ func TestWebhookContentTypeHeader(t *testing.T) {
 				HeaderList:   ts.InputHeaders,
 			}
 
-			hook := &WebHookHandler{Gw:gw.Gw}
+			hook := &WebHookHandler{Gw: gw.Gw}
 			if err := hook.Init(conf); err != nil {
 				t.Fatal("Webhook Init failed with err ", err)
 			}

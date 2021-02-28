@@ -113,7 +113,7 @@ func (s *Test) loadTestOAuthSpec() *APISpec {
 	return s.Gw.LoadAPI(buildTestOAuthSpec())[0]
 }
 
-func(ts *Test) createTestOAuthClient(spec *APISpec, clientID string) OAuthClient {
+func (ts *Test) createTestOAuthClient(spec *APISpec, clientID string) OAuthClient {
 
 	pID := ts.CreatePolicy(func(p *user.Policy) {
 		p.ID = "TEST-4321"

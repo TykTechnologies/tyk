@@ -75,7 +75,7 @@ func createMultiBasicAuthSession(isBench bool) *user.SessionState {
 	return session
 }
 
-func(ts *Test) getMultiAuthStandardAndBasicAuthChain(spec *APISpec) http.Handler {
+func (ts *Test) getMultiAuthStandardAndBasicAuthChain(spec *APISpec) http.Handler {
 
 	remote, _ := url.Parse(TestHttpAny)
 	proxy := ts.Gw.TykNewSingleHostReverseProxy(remote, spec, nil)

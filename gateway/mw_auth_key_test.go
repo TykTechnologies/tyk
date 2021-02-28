@@ -224,7 +224,7 @@ func getAuthKeyChain(spec *APISpec) http.Handler {
 	return chain
 }
 
-func(ts *Test) testPrepareAuthKeySession(apiDef string, isBench bool) (string, *APISpec, error) {
+func (ts *Test) testPrepareAuthKeySession(apiDef string, isBench bool) (string, *APISpec, error) {
 
 	spec := ts.Gw.LoadSampleAPI(apiDef)
 

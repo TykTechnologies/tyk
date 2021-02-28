@@ -19,7 +19,7 @@ func genAuthHeader(username, password string) string {
 	return fmt.Sprintf("Basic %s", encodedPass)
 }
 
-func(ts *Test) testPrepareBasicAuth(cacheDisabled bool) *user.SessionState {
+func (ts *Test) testPrepareBasicAuth(cacheDisabled bool) *user.SessionState {
 
 	session := CreateStandardSession()
 	session.BasicAuthData.Password = "password"

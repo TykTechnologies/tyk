@@ -78,7 +78,7 @@ func createRSAAuthSession(pubCertId string) *user.SessionState {
 	return session
 }
 
-func(ts *Test) getHMACAuthChain(spec *APISpec) http.Handler {
+func (ts *Test) getHMACAuthChain(spec *APISpec) http.Handler {
 
 	remote, _ := url.Parse(TestHttpAny)
 	proxy := ts.Gw.TykNewSingleHostReverseProxy(remote, spec, nil)
@@ -571,7 +571,7 @@ func TestHMACAuthSessionPassWithHeaderField(t *testing.T) {
 
 func BenchmarkHMACAuthSessionPassWithHeaderField(b *testing.B) {
 	b.ReportAllocs()
-	ts:= StartTest(nil)
+	ts := StartTest(nil)
 	defer ts.Close()
 
 	var eventWG sync.WaitGroup

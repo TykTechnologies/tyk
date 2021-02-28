@@ -13,7 +13,7 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
-func(ts *Test) testPrepareContextVarsMiddleware() {
+func (ts *Test) testPrepareContextVarsMiddleware() {
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"

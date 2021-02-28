@@ -22,7 +22,7 @@ import (
 
 var algoList = [4]string{"hmac-sha1", "hmac-sha256", "hmac-sha384", "hmac-sha512"}
 
-func(ts *Test) getMiddlewareChain(spec *APISpec) http.Handler {
+func (ts *Test) getMiddlewareChain(spec *APISpec) http.Handler {
 
 	remote, _ := url.Parse(TestHttpAny)
 	proxy := ts.Gw.TykNewSingleHostReverseProxy(remote, spec, logrus.New().WithFields(logrus.Fields{}))

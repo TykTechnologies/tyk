@@ -637,7 +637,7 @@ func TestHashKeyHandlerLegacyWithHashFunc(t *testing.T) {
 	}...)
 }
 
-func(ts *Test) testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
+func (ts *Test) testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 
 	ts.Gw.BuildAndLoadAPI()
 

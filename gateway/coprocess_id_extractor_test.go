@@ -26,8 +26,8 @@ const (
 	extractorParamName  = "testparam"
 )
 
-func(ts *Test) createSpecTestFrom(t testing.TB, def *apidef.APIDefinition) *APISpec {
-	loader := APIDefinitionLoader{ Gw: ts.Gw}
+func (ts *Test) createSpecTestFrom(t testing.TB, def *apidef.APIDefinition) *APISpec {
+	loader := APIDefinitionLoader{Gw: ts.Gw}
 	spec := loader.MakeSpec(def, nil)
 	tname := t.Name()
 	redisStore := &storage.RedisCluster{KeyPrefix: tname + "-apikey."}

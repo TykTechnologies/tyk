@@ -78,7 +78,7 @@ func createJWTSessionWithRSAWithPolicy(policyID string) *user.SessionState {
 
 type JwtCreator func() *user.SessionState
 
-func(ts *Test) prepareGenericJWTSession(testName string, method string, claimName string, ApiSkipKid bool) (*APISpec, string) {
+func (ts *Test) prepareGenericJWTSession(testName string, method string, claimName string, ApiSkipKid bool) (*APISpec, string) {
 
 	tokenKID := testKey(testName, "token")
 
@@ -440,7 +440,7 @@ func TestJWTSessionRSABearerInvalidTwoBears(t *testing.T) {
 
 // JWTSessionRSAWithRawSourceOnWithClientID
 
-func(ts *Test) prepareJWTSessionRSAWithRawSourceOnWithClientID(isBench bool) string {
+func (ts *Test) prepareJWTSessionRSAWithRawSourceOnWithClientID(isBench bool) string {
 
 	spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.OrgID = "default"
@@ -521,7 +521,7 @@ func BenchmarkJWTSessionRSAWithRawSourceOnWithClientID(b *testing.B) {
 
 // JWTSessionRSAWithRawSource
 
-func(ts *Test) prepareJWTSessionRSAWithRawSource() string {
+func (ts *Test) prepareJWTSessionRSAWithRawSource() string {
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
@@ -1314,7 +1314,7 @@ func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
 
 // JWTSessionRSAWithJWK
 
-func(ts *Test) prepareJWTSessionRSAWithJWK() string {
+func (ts *Test) prepareJWTSessionRSAWithJWK() string {
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
@@ -1374,7 +1374,7 @@ func BenchmarkJWTSessionRSAWithJWK(b *testing.B) {
 
 // JWTSessionRSAWithEncodedJWK
 
-func(ts *Test) prepareJWTSessionRSAWithEncodedJWK() (*APISpec, string) {
+func (ts *Test) prepareJWTSessionRSAWithEncodedJWK() (*APISpec, string) {
 
 	spec := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false

@@ -9,7 +9,7 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-func(ts *Test) testPrepareVersioning() (string, string) {
+func (ts *Test) testPrepareVersioning() (string, string) {
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false

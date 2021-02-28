@@ -25,7 +25,7 @@ function testVirtData(request, session, config) {
 }
 `
 
-func(ts *Test) testPrepareVirtualEndpoint(js string, method string, path string, proxyOnError bool, keyless bool) {
+func (ts *Test) testPrepareVirtualEndpoint(js string, method string, path string, proxyOnError bool, keyless bool) {
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.APIID = "test"
