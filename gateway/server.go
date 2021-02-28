@@ -128,6 +128,7 @@ func NewGateway(config config.Config) *Gateway {
 	gw.SetConfig(config)
 	sessionManager := DefaultSessionManager{Gw: &gw}
 	gw.GlobalSessionManager = SessionHandler(&sessionManager)
+	gw.DefaultQuotaStore = DefaultSessionManager{ Gw: &gw}
 
 	gw.apisByID = map[string]*APISpec{}
 	gw.apisHandlesByID = new(sync.Map)
