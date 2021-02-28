@@ -278,10 +278,10 @@ func TestNewCustomTemplate(t *testing.T) {
 }
 
 func TestWebhookContentTypeHeader(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
+	gw := StartTest(nil)
+	defer gw.Close()
 
-	globalConf := ts.Gw.GetConfig()
+	globalConf := gw.Gw.GetConfig()
 	templatePath := globalConf.TemplatePath
 
 	tests := []struct {
@@ -305,7 +305,7 @@ func TestWebhookContentTypeHeader(t *testing.T) {
 				HeaderList:   ts.InputHeaders,
 			}
 
-			hook := &WebHookHandler{}
+			hook := &WebHookHandler{Gw:gw.Gw}
 			if err := hook.Init(conf); err != nil {
 				t.Fatal("Webhook Init failed with err ", err)
 			}
