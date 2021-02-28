@@ -184,7 +184,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		GetKeyCounter++
 		return jsonMarshalString(CreateStandardSession()), nil
 	})
-/*
+
 	t.Run("RPC is live", func(t *testing.T) {
 		rpcMock, connectionString := startRPCMock(dispatcher)
 		defer stopRPCMock(rpcMock)
@@ -254,7 +254,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		}
 		stopRPCMock(nil)
 	})
-*/
+
 	t.Run("RPC is back, hard reload", func(t *testing.T) {
 		rpc.ResetEmergencyMode()
 
@@ -294,15 +294,13 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 			t.Error("Should fetch latest policies", count)
 		}
 
+		// ToDo: if listen path collides, then gw will modify them, hence we need to fetch it
 		ts.Run(t, []test.TestCase{
-			{Path: "/sample", Headers: cachedAuth, Code: 200},
-			{Path: "/sample", Headers: notCachedAuth, Code: 200},
+			{Path: "/sample-test", Headers: cachedAuth, Code: 200},
+			{Path: "/sample-test", Headers: notCachedAuth, Code: 200},
 		}...)
-
-
 	})
 
-/*
 	t.Run("RPC is back, live reload", func(t *testing.T) {
 		rpcMock, connectionString := startRPCMock(dispatcher)
 
@@ -342,7 +340,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 			{Path: "/sample", Headers: notCached, Code: 200},
 		}...)
 	})
-	*/
+
 }
 
 func TestSyncAPISpecsRPC_redis_failure(t *testing.T) {
