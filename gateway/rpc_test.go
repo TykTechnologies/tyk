@@ -3,6 +3,7 @@
 package gateway
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -118,6 +119,7 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 		x := 0
 		return func() (string, error) {
 			defer func() {
+				fmt.Printf("\n called %v times", x)
 				x++
 			}()
 			switch x {

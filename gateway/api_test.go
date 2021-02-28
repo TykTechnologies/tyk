@@ -3,7 +3,6 @@ package gateway
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/TykTechnologies/tyk/config"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -11,6 +10,8 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+
+	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/TykTechnologies/tyk/apidef"
 
