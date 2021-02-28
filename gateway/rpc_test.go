@@ -3,7 +3,6 @@
 package gateway
 
 import (
-	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -119,7 +118,6 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 		x := 0
 		return func() (string, error) {
 			defer func() {
-				fmt.Printf("\n called %v times", x)
 				x++
 			}()
 			switch x {
@@ -136,6 +134,7 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 	}()
 	dispatcher := gorpc.NewDispatcher()
 	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *apidef.DefRequest) (string, error) {
+		// the firts time called is when we start the slave gateway
 		return a()
 	})
 	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
@@ -156,8 +155,7 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 	rpc.ForceConnected(t)
 
 	// Three cases: 1 API, 2 APIs and Malformed data
-	exp := []int{0, 1, 2, 2}
-
+	exp := []int{ 1, 2, 2 }
 	for _, e := range exp {
 		ts.Gw.DoReload()
 		n := ts.Gw.apisByIDLen()
