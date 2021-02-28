@@ -597,7 +597,7 @@ func TestHashKeyHandlerLegacyWithHashFunc(t *testing.T) {
 	ts.Gw.SetConfig(globalConf)
 
 	// create session with legacy key format
-	session := testPrepareBasicAuth(false)
+	session := ts.testPrepareBasicAuth(false)
 
 	ts.Run(t, []test.TestCase{
 		{
@@ -766,7 +766,7 @@ func testHashFuncAndBAHelper(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	session := testPrepareBasicAuth(false)
+	session := ts.testPrepareBasicAuth(false)
 
 	ts.Run(t, []test.TestCase{
 		{
