@@ -152,7 +152,6 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 
 	store := RPCStorageHandler{Gw: ts.Gw}
 	store.Connect()
-	rpc.ForceConnected(t)
 
 	// Three cases: 1 API, 2 APIs and Malformed data
 	exp := []int{ 1, 2, 2 }
@@ -185,7 +184,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		GetKeyCounter++
 		return jsonMarshalString(CreateStandardSession()), nil
 	})
-
+/*
 	t.Run("RPC is live", func(t *testing.T) {
 		rpcMock, connectionString := startRPCMock(dispatcher)
 		defer stopRPCMock(rpcMock)
@@ -220,6 +219,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 	})
 
 	t.Run("RPC down, cold start, load backup", func(t *testing.T) {
+
 		// Point rpc to non existent address
 		conf := func(globalConf *config.Config) {
 			globalConf.SlaveOptions.ConnectionString = testHttpFailure
@@ -230,8 +230,8 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		}
 
 		GetKeyCounter = 0
-		// RPC layer is down
-		ts := StartTest(conf)
+		// RPC layer is down,
+		ts := StartTest(conf, TestConfig{SkipEmptyRedis:true})
 		defer ts.Close()
 
 		// Wait for backup to load
@@ -254,7 +254,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		}
 		stopRPCMock(nil)
 	})
-
+*/
 	t.Run("RPC is back, hard reload", func(t *testing.T) {
 		rpc.ResetEmergencyMode()
 
@@ -281,14 +281,10 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		ts := StartSlaveGw(connectionString)
 		defer ts.Close()
 
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(1000 * time.Millisecond)
 
 		cachedAuth := map[string]string{"Authorization": "test"}
 		notCachedAuth := map[string]string{"Authorization": "nope2"}
-		ts.Run(t, []test.TestCase{
-			{Path: "/sample", Headers: cachedAuth, Code: 200},
-			{Path: "/sample", Headers: notCachedAuth, Code: 200},
-		}...)
 
 		if count, _ := ts.Gw.syncAPISpecs(); count != 2 {
 			t.Error("Should fetch latest specs", count)
@@ -297,8 +293,16 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		if count, _ := ts.Gw.syncPolicies(); count != 2 {
 			t.Error("Should fetch latest policies", count)
 		}
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/sample", Headers: cachedAuth, Code: 200},
+			{Path: "/sample", Headers: notCachedAuth, Code: 200},
+		}...)
+
+
 	})
 
+/*
 	t.Run("RPC is back, live reload", func(t *testing.T) {
 		rpcMock, connectionString := startRPCMock(dispatcher)
 
@@ -331,13 +335,14 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		}
 
 		// Internal gorpc reconnect timeout is 1 second
-		time.Sleep(1000 * time.Millisecond)
+		time.Sleep(1 * time.Second)
 
 		notCached = map[string]string{"Authorization": "nope4"}
 		ts.Run(t, []test.TestCase{
 			{Path: "/sample", Headers: notCached, Code: 200},
 		}...)
 	})
+	*/
 }
 
 func TestSyncAPISpecsRPC_redis_failure(t *testing.T) {

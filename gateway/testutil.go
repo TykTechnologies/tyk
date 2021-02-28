@@ -802,6 +802,8 @@ type TestConfig struct {
 	HotReload          bool
 	overrideDefaults   bool
 	CoprocessConfig    config.CoProcessConfig
+	// SkipEmptyRedis to avoid restart the storage
+	SkipEmptyRedis     bool
 }
 
 type Test struct {
@@ -981,8 +983,10 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 		time.Sleep(10 * time.Millisecond)
 	}
 
-	if err := s.emptyRedis(); err != nil {
-		panic(err)
+	if !s.config.SkipEmptyRedis{
+		if err := s.emptyRedis(); err != nil {
+			panic(err)
+		}
 	}
 
 	go gw.startPubSubLoop()
