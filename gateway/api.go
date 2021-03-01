@@ -1249,15 +1249,15 @@ func (gw *Gateway) groupResetHandler(w http.ResponseWriter, r *http.Request) {
 // Otherwise, it won't block and fn will be called once the reload is
 // finished.
 //
-func resetHandler(fn func()) http.HandlerFunc {
+func (gw *Gateway) resetHandler(fn func()) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var wg sync.WaitGroup
 
 		if fn == nil && r.URL.Query().Get("block") == "true" {
 			wg.Add(1)
-			reloadURLStructure(wg.Done)
+			gw.reloadURLStructure(wg.Done)
 		} else {
-			reloadURLStructure(fn)
+			gw.reloadURLStructure(fn)
 		}
 
 		log.WithFields(logrus.Fields{

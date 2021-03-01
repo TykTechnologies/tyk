@@ -90,7 +90,7 @@ func (gw *Gateway) reLogin() {
 	}
 
 	dashLog.Info("Recovering configurations, reloading...")
-	reloadURLStructure(nil)
+	gw.reloadURLStructure(nil)
 }
 
 func (h *HTTPDashboardHandler) Init() error {

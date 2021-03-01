@@ -19,7 +19,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
-	"github.com/go-redis/redis/v8"
+	redis "github.com/go-redis/redis/v8"
 )
 
 func TestURLRewrites(t *testing.T) {
@@ -483,11 +483,11 @@ func TestWhitelistMethodWithAdditionalMiddleware(t *testing.T) {
 }
 
 func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
-	ReloadTestCase.Enable()
-	defer ReloadTestCase.Disable()
-
 	ts := StartTest(nil)
 	defer ts.Close()
+
+	ts.Gw.ReloadTestCase.Enable()
+	defer ts.Gw.ReloadTestCase.Disable()
 
 	// Test Dashboard
 	tsDash := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -519,7 +519,7 @@ func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 	}
 	ts.Gw.handleRedisEvent(&msg, handled, wg.Done)
 
-	ReloadTestCase.TickOk(t)
+	ts.Gw.ReloadTestCase.TickOk(t)
 	// Wait for the reload to finish, then check it worked
 	wg.Wait()
 	ts.Gw.apisMu.RLock()
@@ -794,11 +794,11 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 }
 
 func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
-	ReloadTestCase.Enable()
-	defer ReloadTestCase.Disable()
-
 	ts := StartTest(nil)
 	defer ts.Close()
+
+	ts.Gw.ReloadTestCase.Enable()
+	defer ts.Gw.ReloadTestCase.Disable()
 
 	// Test Dashboard
 	callNum := 0
@@ -837,7 +837,7 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 	}
 	ts.Gw.handleRedisEvent(&msg, handled, wg.Done)
 
-	ReloadTestCase.TickOk(t)
+	ts.Gw.ReloadTestCase.TickOk(t)
 
 	// Wait for the reload to finish, then check it worked
 	wg.Wait()
@@ -851,10 +851,10 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 
 	var wg2 sync.WaitGroup
 	wg2.Add(1)
-	ReloadTestCase.Reset()
+	ts.Gw.ReloadTestCase.Reset()
 	ts.Gw.handleRedisEvent(&msg, handled, wg2.Done)
 
-	ReloadTestCase.TickOk(t)
+	ts.Gw.ReloadTestCase.TickOk(t)
 	// Wait for the reload to finish, then check it worked
 	wg2.Wait()
 	ts.Gw.apisMu.RLock()

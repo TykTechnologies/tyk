@@ -772,11 +772,11 @@ func TestListener(t *testing.T) {
 	// Specs will be reseted when we do `StartTest`
 	//ts.Gw.BuildAndLoadAPI()
 
-	ReloadTestCase.Enable()
-	defer ReloadTestCase.Disable()
+	ts.Gw.ReloadTestCase.Enable()
+	defer ts.Gw.ReloadTestCase.Disable()
 
-	ReloadTestCase.StartTicker()
-	defer ReloadTestCase.StopTicker()
+	ts.Gw.ReloadTestCase.StartTicker()
+	defer ts.Gw.ReloadTestCase.StopTicker()
 
 	tests := []test.TestCase{
 		// Cleanup before tests

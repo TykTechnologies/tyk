@@ -1339,13 +1339,13 @@ func TestHotReloadSingle(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	ReloadTestCase.Enable()
-	defer ReloadTestCase.Disable()
+	ts.Gw.ReloadTestCase.Enable()
+	defer ts.Gw.ReloadTestCase.Disable()
 	oldRouter := ts.mainRouter()
 	var wg sync.WaitGroup
 	wg.Add(1)
-	reloadURLStructure(wg.Done)
-	ReloadTestCase.TickOk(t)
+	ts.Gw.reloadURLStructure(wg.Done)
+	ts.Gw.ReloadTestCase.TickOk(t)
 	wg.Wait()
 	if ts.mainRouter() == oldRouter {
 		t.Fatal("router wasn't swapped")

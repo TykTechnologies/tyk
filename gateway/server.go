@@ -116,6 +116,19 @@ type Gateway struct {
 
 	runningTestsMu sync.RWMutex
 	testMode       bool
+
+	// reloadQueue is used by reloadURLStructure to queue a reload. It's not
+	// buffered, as reloadQueueLoop should pick these up immediately.
+	reloadQueue chan func()
+
+	requeueLock sync.Mutex
+
+	// This is a list of callbacks to execute on the next reload. It is protected by
+	// requeueLock for concurrent use.
+	requeue []func()
+
+	// ReloadTestCase use this when in any test for gateway reloads
+	ReloadTestCase *ReloadMachinery
 }
 
 func NewGateway(config config.Config) *Gateway {
@@ -134,6 +147,11 @@ func NewGateway(config config.Config) *Gateway {
 	gw.apisHandlesByID = new(sync.Map)
 
 	gw.policiesByID = map[string]user.Policy{}
+
+	// reload
+	gw.reloadQueue = make(chan func())
+	// only for tests
+	gw.ReloadTestCase = NewReloadMachinery()
 	return &gw
 }
 
@@ -469,7 +487,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 
 	// set up main API handlers
 	r.HandleFunc("/reload/group", gw.groupResetHandler).Methods("GET")
-	r.HandleFunc("/reload", resetHandler(nil)).Methods("GET")
+	r.HandleFunc("/reload", gw.resetHandler(nil)).Methods("GET")
 
 	if !gw.isRPCMode() {
 		r.HandleFunc("/org/keys", gw.orgHandler).Methods("GET")
@@ -774,14 +792,14 @@ func (gw *Gateway) DoReload() {
 
 // shouldReload returns true if we should perform any reload. Reloads happens if
 // we have reload callback queued.
-func shouldReload() ([]func(), bool) {
-	requeueLock.Lock()
-	defer requeueLock.Unlock()
-	if len(requeue) == 0 {
+func (gw *Gateway) shouldReload() ([]func(), bool) {
+	gw.requeueLock.Lock()
+	defer gw.requeueLock.Unlock()
+	if len(gw.requeue) == 0 {
 		return nil, false
 	}
-	n := requeue
-	requeue = []func(){}
+	n := gw.requeue
+	gw.requeue = []func(){}
 	return n, true
 }
 
@@ -794,7 +812,7 @@ func (gw *Gateway) reloadLoop(ctx context.Context, tick <-chan time.Time, comple
 		// startup sequence. We expect to start checking on the first tick after the
 		// gateway is up and running.
 		case <-tick:
-			cb, ok := shouldReload()
+			cb, ok := gw.shouldReload()
 			if !ok {
 				continue
 			}
@@ -820,25 +838,15 @@ func (gw *Gateway) reloadLoop(ctx context.Context, tick <-chan time.Time, comple
 	}
 }
 
-// reloadQueue is used by reloadURLStructure to queue a reload. It's not
-// buffered, as reloadQueueLoop should pick these up immediately.
-var reloadQueue = make(chan func())
-
-var requeueLock sync.Mutex
-
-// This is a list of callbacks to execute on the next reload. It is protected by
-// requeueLock for concurrent use.
-var requeue []func()
-
-func reloadQueueLoop(ctx context.Context, cb ...func()) {
+func (gw *Gateway) reloadQueueLoop(ctx context.Context, cb ...func()) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case fn := <-reloadQueue:
-			requeueLock.Lock()
-			requeue = append(requeue, fn)
-			requeueLock.Unlock()
+		case fn := <-gw.reloadQueue:
+			gw.requeueLock.Lock()
+			gw.requeue = append(gw.requeue, fn)
+			gw.requeueLock.Unlock()
 			mainLog.Info("Reload queued")
 			if len(cb) != 0 {
 				cb[0]()
@@ -856,8 +864,8 @@ func reloadQueueLoop(ctx context.Context, cb ...func()) {
 // done will be called when the reload is finished. Note that if a
 // reload is already queued, another won't be queued, but done will
 // still be called when said queued reload is finished.
-func reloadURLStructure(done func()) {
-	reloadQueue <- done
+func (gw *Gateway) reloadURLStructure(done func()) {
+	gw.reloadQueue <- done
 }
 
 func (gw *Gateway) setupLogger() {
@@ -1319,7 +1327,7 @@ func Start() {
 	gw.start(ctx)
 	configs := gw.GetConfig()
 	go storage.ConnectToRedis(ctx, func() {
-		reloadURLStructure(func() {})
+		gw.reloadURLStructure(func() {})
 	}, &configs)
 
 	if *cli.MemProfile {
@@ -1445,7 +1453,7 @@ func (gw *Gateway) start(ctx context.Context) {
 	// 1s is the minimum amount of time between hot reloads. The
 	// interval counts from the start of one reload to the next.
 	go gw.reloadLoop(ctx, time.Tick(time.Second))
-	go reloadQueueLoop(ctx)
+	go gw.reloadQueueLoop(ctx)
 }
 
 func dashboardServiceInit(gw *Gateway) {

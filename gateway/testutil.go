@@ -61,8 +61,6 @@ var (
 
 	EnableTestDNSMock = true
 
-	// ReloadTestCase use this when in any test for gateway reloads
-	ReloadTestCase = NewReloadMachinery()
 	// OnConnect this is a callback which is called whenever we transition redis Disconnected to connected
 	OnConnect func()
 )
@@ -990,8 +988,8 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 	}
 
 	go gw.startPubSubLoop()
-	go gw.reloadLoop(ctx, ReloadTestCase.ReloadTicker(), ReloadTestCase.OnReload)
-	go reloadQueueLoop(ctx, ReloadTestCase.OnQueued)
+	go gw.reloadLoop(ctx, gw.ReloadTestCase.ReloadTicker(), gw.ReloadTestCase.OnReload)
+	go gw.reloadQueueLoop(ctx, gw.ReloadTestCase.OnQueued)
 	go s.reloadSimulation()
 }
 

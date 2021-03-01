@@ -111,7 +111,7 @@ func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationComm
 		gw.onLESSLStatusReceivedHandler(notif.Payload)
 	case NoticeApiUpdated, NoticeApiRemoved, NoticeApiAdded, NoticePolicyChanged, NoticeGroupReload:
 		pubSubLog.Info("Reloading endpoints")
-		reloadURLStructure(reloaded)
+		gw.reloadURLStructure(reloaded)
 	case KeySpaceUpdateNotification:
 		handleKeySpaceEventCacheFlush(notif.Payload)
 	default:

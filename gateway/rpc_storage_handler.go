@@ -126,7 +126,7 @@ func (r *RPCStorageHandler) Connect() bool {
 			}
 		},
 		func() {
-			reloadURLStructure(nil)
+			r.Gw.reloadURLStructure(nil)
 		},
 		r.DoReload,
 	)
