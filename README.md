@@ -87,7 +87,7 @@ Tests are run against both Go versions 1.12, 1.13, 1.14 and 1.15, however at pre
 In order to run tests locally use the following command:
 
 ```
-go test ./..
+go test ./...
 ```
 
 Note that tests require Redis to be running on the same machine (default port).
