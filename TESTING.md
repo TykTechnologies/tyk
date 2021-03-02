@@ -354,12 +354,12 @@ def MyAuthHook(request, session, metadata, spec):
 }
     
 func TestPython(t *testing.T) {
-    ts := newTykTestServer()
-    defer ts.Close()
+     ts := gateway.StartTest(nil)
+     defer ts.Close()
     
-    bundleID := registerBundle("python_with_auth_check", pythonBundleWithAuthCheck)
+    bundleID := ts.registerBundle("python_with_auth_check", pythonBundleWithAuthCheck)
 
-    buildAndLoadAPI(func(spec *APISpec) {
+    ts.Gw.buildAndLoadAPI(func(spec *APISpec) {
         spec.UseKeylessAccess = false
         spec.EnableCoProcessAuth = true
         spec.CustomMiddlewareBundle = bundleID

@@ -82,6 +82,7 @@ type Gateway struct {
 
 	muNodeID sync.Mutex // guards NodeID
 	NodeID   string
+	drlOnce sync.Once
 
 	reloadMu sync.Mutex
 
@@ -1491,8 +1492,6 @@ func handleDashboardRegistration(gw *Gateway) {
 	}()
 }
 
-var drlOnce sync.Once
-
 func (gw *Gateway) startDRL() {
 	switch {
 	case gw.GetConfig().ManagementNode:
@@ -1546,7 +1545,7 @@ func (gw *Gateway) startServer() {
 	handleDashboardRegistration(gw)
 
 	// at this point NodeID is ready to use by DRL
-	drlOnce.Do(gw.startDRL)
+	gw.drlOnce.Do(gw.startDRL)
 
 	mainLog.Infof("Tyk Gateway started (%s)", VERSION)
 	address := gw.GetConfig().ListenAddress
