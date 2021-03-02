@@ -118,16 +118,15 @@ jobs:
           current_tag=$(git describe --tags)
           if [[ $current_tag =~ ".+-(qa|rc).*" ]]; then
                   echo "::set-output name=upload::true"
-                  echo "::set-output name=pc::tyk/tyk-gateway-unstable"
+                  echo "::set-output name=pc::tyk-gateway-unstable"
                   echo "::set-output name=hub::unstable"
           # From https://semver.org/#is-there-a-suggested-regular-expression-regex-to-check-a-semver-string
           elif [[ $current_tag =~ "v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?" ]]; then
                   echo "::set-output name=upload::true"
-                  echo "::set-output name=pc::tyk/tyk-gateway"
+                  echo "::set-output name=pc::tyk-gateway"
                   echo "::set-output name=hub::stable"
           else
                   echo "::set-output name=upload::false"
-                  echo "::set-output name=pc::tyk/tyk-gateway-unstable"
                   echo "::set-output name=hub::unstable"
           fi
 
@@ -145,12 +144,12 @@ jobs:
           HUB_TAG: ${{ steps.targets.outputs.hub }}
 
       - name: Push to packagecloud
-        if: ${{ steps.targets.outputs.upload }} == true
+        if: steps.targets.outputs.upload == "true"
         uses: TykTechnologies/packagecloud-action@main
         env:
           PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
         with:
-          repo: ${{ steps.targets.outputs.pc }}
+          repo: tyk/${{ steps.targets.outputs.pc }}
           dir: 'dist'
 
 # AWS mktplace update only for LTS releases
