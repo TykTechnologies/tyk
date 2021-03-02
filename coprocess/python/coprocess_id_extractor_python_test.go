@@ -161,7 +161,7 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 		spec.EnableCoProcessAuth = true
 	})[0]
 	t.Run("Header value", func(t *testing.T) {
-		bundleID := gateway.RegisterBundle("id_extractor_header_value", pythonIDExtractorHeaderValue)
+		bundleID := ts.RegisterBundle("id_extractor_header_value", pythonIDExtractorHeaderValue)
 		spec.CustomMiddlewareBundle = bundleID
 		spec.APIID = "api1"
 
@@ -175,7 +175,7 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 		}...)
 	})
 	t.Run("Form value", func(t *testing.T) {
-		bundleID := gateway.RegisterBundle("id_extractor_form_value", pythonIDExtractorFormValue)
+		bundleID := ts.RegisterBundle("id_extractor_form_value", pythonIDExtractorFormValue)
 		spec.CustomMiddlewareBundle = bundleID
 		spec.APIID = "api2"
 
@@ -191,7 +191,7 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 		}...)
 	})
 	t.Run("Header regex", func(t *testing.T) {
-		bundleID := gateway.RegisterBundle("id_extractor_header_regex", pythonIDExtractorHeaderRegex)
+		bundleID := ts.RegisterBundle("id_extractor_header_regex", pythonIDExtractorHeaderRegex)
 		spec.CustomMiddlewareBundle = bundleID
 		spec.APIID = "api3"
 

@@ -96,7 +96,6 @@ func TestCoProcessReload(t *testing.T) {
 }
 
 /* Serialization, CP Objects */
-
 func TestCoProcessSerialization(t *testing.T) {
 	object := &coprocess.Object{
 		HookType: coprocess.HookType_Pre,

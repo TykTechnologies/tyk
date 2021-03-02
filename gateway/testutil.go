@@ -272,16 +272,12 @@ func (s *Test) reloadSimulation() {
 	}
 }
 
-// map[bundleName]map[fileName]fileContent
-var testBundles = map[string]map[string]string{}
-var testBundleMu sync.Mutex
-
-func RegisterBundle(name string, files map[string]string) string {
-	testBundleMu.Lock()
-	defer testBundleMu.Unlock()
+func(s *Test) RegisterBundle(name string, files map[string]string) string {
+	s.Gw.TestBundleMu.Lock()
+	defer s.Gw.TestBundleMu.Unlock()
 
 	bundleID := name + "-" + uuid.NewV4().String() + ".zip"
-	testBundles[bundleID] = files
+	s.Gw.TestBundles[bundleID] = files
 
 	return bundleID
 }
@@ -305,14 +301,14 @@ func (s *Test) RegisterJSFileMiddleware(apiid string, files map[string]string) {
 	}
 }
 
-func bundleHandleFunc(w http.ResponseWriter, r *http.Request) {
-	testBundleMu.Lock()
-	defer testBundleMu.Unlock()
+func(s *Test) BundleHandleFunc(w http.ResponseWriter, r *http.Request) {
+	s.Gw.TestBundleMu.Lock()
+	defer s.Gw.TestBundleMu.Unlock()
 
 	bundleName := strings.Replace(r.URL.Path, "/bundles/", "", -1)
-	bundle, exists := testBundles[bundleName]
+	bundle, exists := s.Gw.TestBundles[bundleName]
 	if !exists {
-		log.Warning(testBundles)
+		log.Warning(s.Gw.TestBundles)
 		http.Error(w, "Bundle not found", http.StatusNotFound)
 		return
 	}
@@ -510,7 +506,7 @@ func (s *Test) testHttpHandler() *mux.Router {
 		gz.Close()
 	})
 	r.HandleFunc("/groupReload", s.Gw.groupResetHandler)
-	r.HandleFunc("/bundles/{rest:.*}", bundleHandleFunc)
+	r.HandleFunc("/bundles/{rest:.*}", s.BundleHandleFunc)
 	r.HandleFunc("/errors/{status}", func(w http.ResponseWriter, r *http.Request) {
 		statusCode, _ := strconv.Atoi(mux.Vars(r)["status"])
 		httpError(w, statusCode)

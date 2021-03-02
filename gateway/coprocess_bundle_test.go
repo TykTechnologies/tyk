@@ -40,10 +40,10 @@ var grpcBundleWithAuthCheck = map[string]string{
 }
 
 func TestBundleLoader(t *testing.T) {
-	bundleID := RegisterBundle("grpc_with_auth_check", grpcBundleWithAuthCheck)
-
 	ts := StartTest(nil)
 	defer ts.Close()
+
+	bundleID := ts.RegisterBundle("grpc_with_auth_check", grpcBundleWithAuthCheck)
 
 	t.Run("Nonexistent bundle", func(t *testing.T) {
 		specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
@@ -235,10 +235,10 @@ func TestResponseOverride(t *testing.T) {
 		}...)
 	}
 	t.Run("Python", func(t *testing.T) {
-		testOverride(t, RegisterBundle("python_override", overrideResponsePython))
+		testOverride(t, ts.RegisterBundle("python_override", overrideResponsePython))
 	})
 
 	t.Run("JSVM", func(t *testing.T) {
-		testOverride(t, RegisterBundle("jsvm_override", overrideResponseJSVM))
+		testOverride(t, ts.RegisterBundle("jsvm_override", overrideResponseJSVM))
 	})
 }

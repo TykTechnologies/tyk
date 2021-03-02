@@ -221,11 +221,11 @@ func TestPythonBundles(t *testing.T) {
 		}})
 	defer ts.Close()
 
-	authCheckBundle := gateway.RegisterBundle("python_with_auth_check", pythonBundleWithAuthCheck)
-	postHookBundle := gateway.RegisterBundle("python_with_post_hook", pythonBundleWithPostHook)
-	preHookBundle := gateway.RegisterBundle("python_with_pre_hook", pythonBundleWithPreHook)
-	responseHookBundle := gateway.RegisterBundle("python_with_response_hook", pythonBundleWithResponseHook)
-	postRequestTransformHookBundle := gateway.RegisterBundle("python_post_with_request_transform_hook", pythonPostRequestTransform)
+	authCheckBundle := ts.RegisterBundle("python_with_auth_check", pythonBundleWithAuthCheck)
+	postHookBundle := ts.RegisterBundle("python_with_post_hook", pythonBundleWithPostHook)
+	preHookBundle := ts.RegisterBundle("python_with_pre_hook", pythonBundleWithPreHook)
+	responseHookBundle := ts.RegisterBundle("python_with_response_hook", pythonBundleWithResponseHook)
+	postRequestTransformHookBundle := ts.RegisterBundle("python_post_with_request_transform_hook", pythonPostRequestTransform)
 
 	t.Run("Single-file bundle with authentication hook", func(t *testing.T) {
 		ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {

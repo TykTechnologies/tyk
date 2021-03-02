@@ -383,7 +383,7 @@ leakMid.NewProcessRequest(function(request, session) {
 
 func TestTykMakeHTTPRequest(t *testing.T) {
 
-	bundle := RegisterBundle("jsvm_make_http_request", map[string]string{
+	manifest := map[string]string{
 		"manifest.json": `
 		{
 		    "file_list": [],
@@ -419,11 +419,12 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 
 		return testTykMakeHTTPRequest.ReturnData(request, {})
 	});
-	`})
+	`}
 
 	t.Run("Existing endpoint", func(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
+		bundle := ts.RegisterBundle("jsvm_make_http_request", manifest)
 
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/sample"
@@ -441,6 +442,7 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 	t.Run("Nonexistent endpoint", func(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
+		bundle := ts.RegisterBundle("jsvm_make_http_request", manifest)
 
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/sample"
@@ -456,6 +458,7 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 	t.Run("Endpoint with query", func(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
+		bundle := ts.RegisterBundle("jsvm_make_http_request", manifest)
 
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/sample"
@@ -473,6 +476,7 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 	t.Run("Endpoint with skip cleaning", func(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
+		bundle := ts.RegisterBundle("jsvm_make_http_request", manifest)
 
 		globalConf := ts.Gw.GetConfig()
 		globalConf.HttpServerOptions.SkipURLCleaning = true
@@ -597,7 +601,7 @@ post.NewProcessRequest(function(request, session) {
 });`
 
 	t.Run("Bundles", func(t *testing.T) {
-		bundle := RegisterBundle("jsvm_stages", map[string]string{
+		bundle := ts.RegisterBundle("jsvm_stages", map[string]string{
 			"manifest.json": `
 		{
 		    "file_list": [],
@@ -704,7 +708,7 @@ func TestJSVM_Auth(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	bundle := RegisterBundle("custom_auth", map[string]string{
+	bundle := ts.RegisterBundle("custom_auth", map[string]string{
 		"manifest.json": `{
 			"file_list": [
 				"testmw.js"

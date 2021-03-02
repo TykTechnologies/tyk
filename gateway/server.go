@@ -129,6 +129,10 @@ type Gateway struct {
 
 	// ReloadTestCase use this when in any test for gateway reloads
 	ReloadTestCase *ReloadMachinery
+
+	// map[bundleName]map[fileName]fileContent used for tests
+	TestBundles  map[string]map[string]string
+	TestBundleMu sync.Mutex
 }
 
 func NewGateway(config config.Config) *Gateway {
@@ -152,6 +156,7 @@ func NewGateway(config config.Config) *Gateway {
 	gw.reloadQueue = make(chan func())
 	// only for tests
 	gw.ReloadTestCase = NewReloadMachinery()
+	gw.TestBundles = map[string]map[string]string{}
 	return &gw
 }
 
