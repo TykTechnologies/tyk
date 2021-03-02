@@ -807,6 +807,7 @@ type TestConfig struct {
 type Test struct {
 	URL          string
 	testRunner   *test.HTTPTestRunner
+	// GlobalConfig deprecate this and instead use GW.getConfig()
 	GlobalConfig config.Config
 	config       TestConfig
 	cancel       func()
