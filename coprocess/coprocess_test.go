@@ -53,11 +53,11 @@ func TestCoProcessDispatch(t *testing.T) {
 }
 
 func TestCoProcessDispatchEvent(t *testing.T) {
-	spec := gateway.LoadSampleAPI(basicCoProcessDef)
-	remote, _ := url.Parse(spec.Proxy.TargetURL)
-
-	ts := gateway.StartTest(nil)
+	ts := gateway.StartTest()
 	defer ts.Close()
+
+	spec := ts.Gw.LoadSampleAPI().LoadSampleAPI(basicCoProcessDef)
+	remote, _ := url.Parse(spec.Proxy.TargetURL)
 
 	proxy := gateway.TykNewSingleHostReverseProxy(remote, spec)
 	baseMid := gateway.BaseMiddleware{Spec: spec, Proxy: proxy, Gw: ts.Gw}
