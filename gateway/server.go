@@ -82,7 +82,7 @@ type Gateway struct {
 
 	muNodeID sync.Mutex // guards NodeID
 	NodeID   string
-	drlOnce sync.Once
+	drlOnce  sync.Once
 
 	reloadMu sync.Mutex
 
@@ -114,6 +114,9 @@ type Gateway struct {
 
 	LE_MANAGER  letsencrypt.Manager
 	LE_FIRSTRUN bool
+
+	RedisPurgeOnce sync.Once
+	RpcPurgeOnce   sync.Once
 
 	runningTestsMu sync.RWMutex
 	testMode       bool
@@ -201,9 +204,6 @@ func (gw *Gateway) apisByIDLen() int {
 	return len(gw.apisByID)
 }
 
-var redisPurgeOnce sync.Once
-var rpcPurgeOnce sync.Once
-
 // Create all globals and init connection handlers
 func (gw *Gateway) setupGlobals(ctx context.Context) {
 	gw.reloadMu.Lock()
@@ -258,7 +258,7 @@ func (gw *Gateway) setupGlobals(ctx context.Context) {
 		if gw.GetConfig().AnalyticsConfig.Type == "rpc" {
 			mainLog.Debug("Using RPC cache purge")
 
-			rpcPurgeOnce.Do(func() {
+			gw.RpcPurgeOnce.Do(func() {
 				store := storage.RedisCluster{KeyPrefix: "analytics-"}
 				purger := rpc.Purger{
 					Store: &store,
