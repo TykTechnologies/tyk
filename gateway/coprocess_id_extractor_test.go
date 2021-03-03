@@ -86,7 +86,7 @@ func prepareExtractorFormRequest(values map[string]string) *http.Request {
 	return r
 }
 
-func (s *Test) generateSessionID(input string) string {
+func (s *Test) GenerateSessionID(input string) string {
 	data := []byte(input)
 	tokenID := fmt.Sprintf("%x", md5.Sum(data))
 	return s.Gw.generateToken(MockOrgID, tokenID)
@@ -96,7 +96,7 @@ func TestValueExtractor(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	testSessionID := ts.generateSessionID(extractorValueInput)
+	testSessionID := ts.GenerateSessionID(extractorValueInput)
 
 	t.Run("HeaderSource", func(t *testing.T) {
 		extractor, spec := prepareExtractor(t, apidef.HeaderSource, apidef.ValueExtractor, map[string]interface{}{
@@ -157,7 +157,7 @@ func TestRegexExtractor(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	testSessionID := ts.generateSessionID(extractorRegexInput)
+	testSessionID := ts.GenerateSessionID(extractorRegexInput)
 
 	t.Run("HeaderSource", func(t *testing.T) {
 		extractor, spec := prepareExtractor(t, apidef.HeaderSource, apidef.RegexExtractor, map[string]interface{}{
@@ -250,7 +250,7 @@ func TestXPathExtractor(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	testSessionID := ts.generateSessionID("thevalue")
+	testSessionID := ts.GenerateSessionID("thevalue")
 
 	t.Run("HeaderSource", func(t *testing.T) {
 		extractor, spec := prepareExtractor(t, apidef.HeaderSource, apidef.XPathExtractor, map[string]interface{}{

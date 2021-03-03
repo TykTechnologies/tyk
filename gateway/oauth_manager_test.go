@@ -109,7 +109,7 @@ func buildTestOAuthSpec(apiGens ...func(spec *APISpec)) *APISpec {
 	})[0]
 }
 
-func (s *Test) loadTestOAuthSpec() *APISpec {
+func (s *Test) LoadTestOAuthSpec() *APISpec {
 	return s.Gw.LoadAPI(buildTestOAuthSpec())[0]
 }
 
@@ -241,7 +241,7 @@ func TestAuthCodeRedirect(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := ts.loadTestOAuthSpec()
+	spec := ts.LoadTestOAuthSpec()
 
 	ts.createTestOAuthClient(spec, authClientID)
 
@@ -278,7 +278,7 @@ func TestAuthCodeRedirectMultipleURL(t *testing.T) {
 	ts := StartTest(conf)
 	defer ts.Close()
 
-	spec := ts.loadTestOAuthSpec()
+	spec := ts.LoadTestOAuthSpec()
 
 	ts.createTestOAuthClient(spec, authClientID)
 
@@ -317,7 +317,7 @@ func TestAuthCodeRedirectInvalidMultipleURL(t *testing.T) {
 	ts := StartTest(conf)
 	defer ts.Close()
 
-	spec := ts.loadTestOAuthSpec()
+	spec := ts.LoadTestOAuthSpec()
 
 	ts.createTestOAuthClient(spec, authClientID)
 
@@ -345,7 +345,7 @@ func TestAPIClientAuthorizeAuthCode(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := ts.loadTestOAuthSpec()
+	spec := ts.LoadTestOAuthSpec()
 
 	ts.createTestOAuthClient(spec, authClientID)
 
@@ -376,7 +376,7 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := ts.loadTestOAuthSpec()
+	spec := ts.LoadTestOAuthSpec()
 
 	ts.createTestOAuthClient(spec, authClientID)
 
@@ -456,7 +456,7 @@ func TestDeleteOauthClient(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := ts.loadTestOAuthSpec()
+	spec := ts.LoadTestOAuthSpec()
 
 	ts.createTestOAuthClient(spec, authClientID)
 
@@ -549,7 +549,7 @@ func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := ts.loadTestOAuthSpec()
+	spec := ts.LoadTestOAuthSpec()
 
 	ts.createTestOAuthClient(spec, authClientID)
 
@@ -637,7 +637,7 @@ func TestGetPaginatedClientTokens(t *testing.T) {
 		ts := StartTest(conf)
 		defer ts.Close()
 
-		spec := ts.loadTestOAuthSpec()
+		spec := ts.LoadTestOAuthSpec()
 
 		clientID := uuid.NewV4().String()
 		ts.createTestOAuthClient(spec, clientID)
@@ -752,7 +752,7 @@ func testGetClientTokens(t *testing.T, hashed bool) {
 	ts := StartTest(conf)
 	defer ts.Close()
 
-	spec := ts.loadTestOAuthSpec()
+	spec := ts.LoadTestOAuthSpec()
 
 	clientID := uuid.NewV4().String()
 	ts.createTestOAuthClient(spec, clientID)
@@ -892,7 +892,7 @@ func TestOAuthClientCredsGrant(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := ts.loadTestOAuthSpec()
+	spec := ts.LoadTestOAuthSpec()
 
 	ts.createTestOAuthClient(spec, authClientID)
 
@@ -931,7 +931,7 @@ func TestClientAccessRequest(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := ts.loadTestOAuthSpec()
+	spec := ts.LoadTestOAuthSpec()
 
 	ts.createTestOAuthClient(spec, authClientID)
 
@@ -963,7 +963,7 @@ func TestOAuthAPIRefreshInvalidate(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := ts.loadTestOAuthSpec()
+	spec := ts.LoadTestOAuthSpec()
 
 	ts.createTestOAuthClient(spec, authClientID)
 
@@ -1020,7 +1020,7 @@ func TestClientRefreshRequest(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := ts.loadTestOAuthSpec()
+	spec := ts.LoadTestOAuthSpec()
 
 	ts.createTestOAuthClient(spec, authClientID)
 
@@ -1052,7 +1052,7 @@ func TestClientRefreshRequestDouble(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := ts.loadTestOAuthSpec()
+	spec := ts.LoadTestOAuthSpec()
 
 	ts.createTestOAuthClient(spec, authClientID)
 
@@ -1113,7 +1113,7 @@ func TestTokenEndpointHeaders(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := ts.loadTestOAuthSpec()
+	spec := ts.LoadTestOAuthSpec()
 	ts.createTestOAuthClient(spec, authClientID)
 
 	param := make(url.Values)

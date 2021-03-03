@@ -61,7 +61,7 @@ type testApplyPoliciesData struct {
 	session   *user.SessionState
 }
 
-func (s *Test) testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
+func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 	s.Gw.policiesMu.RLock()
 	s.Gw.policiesByID = map[string]user.Policy{
 		"nonpart1": {
@@ -751,7 +751,7 @@ func TestApplyPolicies(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	bmid, tests := ts.testPrepareApplyPolicies()
+	bmid, tests := ts.TestPrepareApplyPolicies()
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -782,7 +782,7 @@ func BenchmarkApplyPolicies(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	bmid, tests := ts.testPrepareApplyPolicies()
+	bmid, tests := ts.TestPrepareApplyPolicies()
 
 	for i := 0; i < b.N; i++ {
 		for _, tc := range tests {

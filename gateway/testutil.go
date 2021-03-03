@@ -272,7 +272,7 @@ func (s *Test) reloadSimulation() {
 	}
 }
 
-func(s *Test) RegisterBundle(name string, files map[string]string) string {
+func (s *Test) RegisterBundle(name string, files map[string]string) string {
 	s.Gw.TestBundleMu.Lock()
 	defer s.Gw.TestBundleMu.Unlock()
 
@@ -301,7 +301,7 @@ func (s *Test) RegisterJSFileMiddleware(apiid string, files map[string]string) {
 	}
 }
 
-func(s *Test) BundleHandleFunc(w http.ResponseWriter, r *http.Request) {
+func (s *Test) BundleHandleFunc(w http.ResponseWriter, r *http.Request) {
 	s.Gw.TestBundleMu.Lock()
 	defer s.Gw.TestBundleMu.Unlock()
 
@@ -801,8 +801,8 @@ type TestConfig struct {
 }
 
 type Test struct {
-	URL          string
-	testRunner   *test.HTTPTestRunner
+	URL        string
+	testRunner *test.HTTPTestRunner
 	// GlobalConfig deprecate this and instead use GW.getConfig()
 	GlobalConfig config.Config
 	config       TestConfig

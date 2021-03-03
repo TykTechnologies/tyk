@@ -176,7 +176,7 @@ func TestWhitelist(t *testing.T) {
 	})
 
 	t.Run("Listen path matches", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.Paths.WhiteList = []string{"/fruits/fruit"}
 				v.UseExtendedPaths = false
@@ -273,7 +273,7 @@ func TestBlacklist(t *testing.T) {
 	})
 
 	t.Run("Listen path matches", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.Paths.BlackList = []string{"/fruits/fruit"}
 				v.UseExtendedPaths = false

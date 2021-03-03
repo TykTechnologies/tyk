@@ -128,7 +128,7 @@ type configTestReverseProxyDnsCache struct {
 	dnsConfig   config.DnsCacheConfig
 }
 
-func (s *Test) setupTestReverseProxyDnsCache(cfg *configTestReverseProxyDnsCache) func() {
+func (s *Test) SetupTestReverseProxyDnsCache(cfg *configTestReverseProxyDnsCache) func() {
 	pullDomains := mockHandle.PushDomains(cfg.etcHostsMap, nil)
 	s.Gw.dnsCacheManager.InitDNSCaching(
 		time.Duration(cfg.dnsConfig.TTL)*time.Second, time.Duration(cfg.dnsConfig.CheckInterval)*time.Second)
@@ -177,7 +177,7 @@ func TestReverseProxyDnsCache(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	tearDown := ts.setupTestReverseProxyDnsCache(&configTestReverseProxyDnsCache{t, etcHostsMap,
+	tearDown := ts.SetupTestReverseProxyDnsCache(&configTestReverseProxyDnsCache{t, etcHostsMap,
 		config.DnsCacheConfig{
 			Enabled: true, TTL: cacheTTL, CheckInterval: cacheUpdateInterval,
 			MultipleIPsHandleStrategy: config.NoCacheStrategy}})
@@ -322,7 +322,7 @@ func TestReverseProxyDnsCache(t *testing.T) {
 	}
 }
 
-func (s *Test) testNewWrappedServeHTTP() *ReverseProxy {
+func (s *Test) TestNewWrappedServeHTTP() *ReverseProxy {
 
 	target, _ := url.Parse(TestHttpGet)
 	def := apidef.APIDefinition{}
@@ -364,7 +364,7 @@ func TestWrappedServeHTTP(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	proxy := ts.testNewWrappedServeHTTP()
+	proxy := ts.TestNewWrappedServeHTTP()
 	recorder := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodGet, "/", nil)
 	proxy.WrappedServeHTTP(recorder, req, false)
@@ -871,7 +871,7 @@ func BenchmarkWrappedServeHTTP(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	proxy := ts.testNewWrappedServeHTTP()
+	proxy := ts.TestNewWrappedServeHTTP()
 	recorder := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodGet, "/", nil)
 	for i := 0; i < b.N; i++ {

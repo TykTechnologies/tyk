@@ -48,7 +48,7 @@ func TestAmIPolling(t *testing.T) {
 
 	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test:"}
 	hc.Init(redisStorage)
-	hc2 := HostCheckerManager{Gw:ts.Gw}
+	hc2 := HostCheckerManager{Gw: ts.Gw}
 	hc2.Init(redisStorage)
 
 	polling = hc.AmIPolling()
@@ -74,7 +74,7 @@ func TestAmIPolling(t *testing.T) {
 	ts.Gw.SetConfig(globalConf)
 
 	//Testing if the PollerCacheKey doesn't contains the poller_group by default
-	hc = HostCheckerManager{Gw:ts.Gw}
+	hc = HostCheckerManager{Gw: ts.Gw}
 	redisStorage = &storage.RedisCluster{KeyPrefix: "host-checker-test:"}
 	hc.Init(redisStorage)
 	hc.AmIPolling()
