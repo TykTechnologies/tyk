@@ -90,6 +90,7 @@ func (gw *Gateway) onLESSLStatusReceivedHandler(payload string) {
 }
 
 func (gw *Gateway) StartPeriodicStateBackup(ctx context.Context, m *letsencrypt.Manager) {
+
 	for {
 		select {
 		case <-ctx.Done():
