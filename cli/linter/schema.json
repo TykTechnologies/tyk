@@ -159,6 +159,9 @@
           "type": "integer"
         },
         "records_buffer_size": {
+          "type": "boolean"
+        },
+        "enable_multiple_analytics_keys": {
           "type": "integer"
         },
         "storage_expiration_time": {
