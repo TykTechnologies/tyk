@@ -1926,6 +1926,20 @@ func getOauthClientDetails(keyName, apiID string) (interface{}, int) {
 		return apiError("OAuth Client ID not found"), http.StatusNotFound
 	}
 
+	if apiSpec.OAuthManager == nil {
+		prefix := generateOAuthPrefix(apiSpec.APIID)
+		storageManager := getGlobalStorageHandler(prefix, false)
+		storageManager.Connect()
+		apiSpec.OAuthManager = &OAuthManager{
+			OsinServer: TykOsinNewServer(&osin.ServerConfig{},
+				&RedisOsinStorageInterface{
+					storageManager,
+					GlobalSessionManager,
+					&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false},
+					apiSpec.OrgID}),
+		}
+	}
+
 	clientData, err := apiSpec.OAuthManager.OsinServer.Storage.GetExtendedClientNoPrefix(storageID)
 	if err != nil {
 		return apiError("OAuth Client ID not found"), http.StatusNotFound
