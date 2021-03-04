@@ -14,7 +14,7 @@ type XTykAPIGateway struct {
 	Info       Info        `bson:"info" json:"info"`         // required
 	Upstream   Upstream    `bson:"upstream" json:"upstream"` // required
 	Server     Server      `bson:"server" json:"server"`     // required
-	Middleware *Middleware `bson:"middleware" json:"middleware"`
+	Middleware *Middleware `bson:"middleware,omitempty" json:"middleware,omitempty"`
 }
 
 func (x *XTykAPIGateway) Fill(api apidef.APIDefinition) {
