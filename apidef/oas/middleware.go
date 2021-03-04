@@ -7,10 +7,12 @@ import (
 )
 
 type Global struct {
-	CORS *CORS `bson:"cors,omitempty" json:"cors,omitempty"`
+	CORS  *CORS  `bson:"cors,omitempty" json:"cors,omitempty"`
+	Cache *Cache `bson:"cache,omitempty" json:"cache,omitempty"`
 }
 
 func (g *Global) Fill(api apidef.APIDefinition) {
+	// CORS
 	if g.CORS == nil {
 		g.CORS = &CORS{}
 	}
@@ -19,11 +21,25 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 	if reflect.DeepEqual(g.CORS, &CORS{}) {
 		g.CORS = nil
 	}
+
+	// Cache
+	if g.Cache == nil {
+		g.Cache = &Cache{}
+	}
+
+	g.Cache.Fill(api.CacheOptions)
+	if reflect.DeepEqual(g.Cache, &Cache{}) {
+		g.Cache = nil
+	}
 }
 
 func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	if g.CORS != nil {
 		g.CORS.ExtractTo(&api.CORS)
+	}
+
+	if g.Cache != nil {
+		g.Cache.ExtractTo(&api.CacheOptions)
 	}
 }
 
@@ -61,4 +77,34 @@ func (c *CORS) ExtractTo(cors *apidef.CORSConfig) {
 	cors.Debug = c.Debug
 	cors.AllowedOrigins = c.AllowedOrigins
 	cors.AllowedMethods = c.AllowedMethods
+}
+
+type Cache struct {
+	Enabled                    bool     `bson:"enabled" json:"enabled"` // required
+	Timeout                    int64    `bson:"timeout,omitempty" json:"timeout,omitempty"`
+	CacheAllSafeRequests       bool     `bson:"cacheAllSafeRequests,omitempty" json:"cacheAllSafeRequests,omitempty"`
+	CacheResponseCodes         []int    `bson:"cacheResponseCodes,omitempty" json:"cacheResponseCodes,omitempty"`
+	CacheByHeaders             []string `bson:"cacheByHeaders,omitempty" json:"cacheByHeaders,omitempty"`
+	EnableUpstreamCacheControl bool     `bson:"enableUpstreamCacheControl,omitempty" json:"enableUpstreamCacheControl,omitempty"`
+	ControlTTLHeaderName       string   `bson:"controlTTLHeaderName,omitempty" json:"controlTTLHeaderName,omitempty"`
+}
+
+func (c *Cache) Fill(cache apidef.CacheOptions) {
+	c.Enabled = cache.EnableCache
+	c.Timeout = cache.CacheTimeout
+	c.CacheAllSafeRequests = cache.CacheAllSafeRequests
+	c.CacheResponseCodes = cache.CacheOnlyResponseCodes
+	c.CacheByHeaders = cache.CacheByHeaders
+	c.EnableUpstreamCacheControl = cache.EnableUpstreamCacheControl
+	c.ControlTTLHeaderName = cache.CacheControlTTLHeader
+}
+
+func (c *Cache) ExtractTo(cache *apidef.CacheOptions) {
+	cache.EnableCache = c.Enabled
+	cache.CacheTimeout = c.Timeout
+	cache.CacheAllSafeRequests = c.CacheAllSafeRequests
+	cache.CacheOnlyResponseCodes = c.CacheResponseCodes
+	cache.CacheByHeaders = c.CacheByHeaders
+	cache.EnableUpstreamCacheControl = c.EnableUpstreamCacheControl
+	cache.CacheControlTTLHeader = c.ControlTTLHeaderName
 }

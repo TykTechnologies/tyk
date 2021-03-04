@@ -30,3 +30,15 @@ func TestCORS(t *testing.T) {
 
 	assert.Equal(t, emptyCORS, resultCORS)
 }
+
+func TestCache(t *testing.T) {
+	var emptyCache Cache
+
+	var convertedCache apidef.CacheOptions
+	emptyCache.ExtractTo(&convertedCache)
+
+	var resultCache Cache
+	resultCache.Fill(convertedCache)
+
+	assert.Equal(t, emptyCache, resultCache)
+}
