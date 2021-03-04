@@ -983,6 +983,12 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 			panic(err)
 		}
 	}
+
+	// Start listening for reload messages
+	if !gw.GetConfig().SuppressRedisSignalReload {
+		go gw.startPubSubLoop()
+	}
+
 	if slaveOptions := gw.GetConfig().SlaveOptions; slaveOptions.UseRPC {
 		mainLog.Debug("Starting RPC reload listener")
 		gw.RPCListener = RPCStorageHandler{
@@ -997,9 +1003,8 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 		go gw.RPCListener.StartRPCLoopCheck(slaveOptions.RPCKey)
 	}
 
-	go gw.startPubSubLoop()
-	go gw.reloadLoop(ctx, gw.ReloadTestCase.ReloadTicker(), gw.ReloadTestCase.OnReload)
-	go gw.reloadQueueLoop(ctx, gw.ReloadTestCase.OnQueued)
+	go gw.reloadLoop(ctx, time.Tick(time.Second))
+	go gw.reloadQueueLoop(ctx)
 	go s.reloadSimulation()
 }
 
