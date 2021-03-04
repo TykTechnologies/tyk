@@ -8,14 +8,6 @@ import (
 
 const ExtensionTykAPIGateway = "x-tyk-api-gateway"
 
-type EndpointMetaType int
-
-const (
-	whiteList EndpointMetaType = 0
-	blackList EndpointMetaType = 1
-	ignored   EndpointMetaType = 2
-)
-
 type XTykAPIGateway struct {
 	Info       Info        `bson:"info" json:"info"`         // required
 	Upstream   Upstream    `bson:"upstream" json:"upstream"` // required
