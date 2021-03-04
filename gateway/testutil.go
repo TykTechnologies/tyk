@@ -983,6 +983,19 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 			panic(err)
 		}
 	}
+	if slaveOptions := gw.GetConfig().SlaveOptions; slaveOptions.UseRPC {
+		mainLog.Debug("Starting RPC reload listener")
+		gw.RPCListener = RPCStorageHandler{
+			KeyPrefix:        "rpc.listener.",
+			SuppressRegister: true,
+			Gw:               gw,
+		}
+
+		gw.RPCListener.Connect()
+		go gw.rpcReloadLoop(slaveOptions.RPCKey)
+		go gw.RPCListener.StartRPCKeepaliveWatcher()
+		go gw.RPCListener.StartRPCLoopCheck(slaveOptions.RPCKey)
+	}
 
 	go gw.startPubSubLoop()
 	go gw.reloadLoop(ctx, gw.ReloadTestCase.ReloadTicker(), gw.ReloadTestCase.OnReload)
