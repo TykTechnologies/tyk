@@ -3,6 +3,8 @@ package oas
 import (
 	"reflect"
 
+	"gopkg.in/mgo.v2/bson"
+
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
@@ -41,19 +43,25 @@ func (x *XTykAPIGateway) ExtractTo(api *apidef.APIDefinition) {
 }
 
 type Info struct {
-	ID    string `bson:"id" json:"id,omitempty"` // just required on database
-	Name  string `bson:"name" json:"name"`       // required
-	State State  `bson:"state" json:"state"`     // required
+	ID    string        `bson:"id" json:"id,omitempty"`       // just required on database
+	DBID  bson.ObjectId `bson:"dbID" json:"dbID,omitempty"`   // just required on database
+	OrgID string        `bson:"orgID" json:"orgID,omitempty"` // just required on database
+	Name  string        `bson:"name" json:"name"`             // required
+	State State         `bson:"state" json:"state"`           // required
 }
 
 func (i *Info) Fill(api apidef.APIDefinition) {
 	i.ID = api.APIID
+	i.DBID = api.Id
+	i.OrgID = api.OrgID
 	i.Name = api.Name
 	i.State.Fill(api)
 }
 
 func (i *Info) ExtractTo(api *apidef.APIDefinition) {
 	api.APIID = i.ID
+	api.Id = i.DBID
+	api.OrgID = i.OrgID
 	api.Name = i.Name
 	i.State.ExtractTo(api)
 }
