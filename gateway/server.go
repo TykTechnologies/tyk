@@ -177,7 +177,7 @@ func setupGlobals(ctx context.Context) {
 		if config.Global().ManagementNode {
 			mainLog.Warn("Running Uptime checks in a management node.")
 		}
-		healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:"}
+		healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:", IsAnalytics: true}
 		InitHostCheckManager(ctx, &healthCheckStore)
 	}
 
@@ -196,7 +196,7 @@ func setupGlobals(ctx context.Context) {
 		config.SetGlobal(globalConf)
 		mainLog.Debug("Setting up analytics DB connection")
 
-		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-"}
+		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true}
 		analytics.Store = &analyticsStore
 		analytics.Init(globalConf)
 
@@ -204,7 +204,7 @@ func setupGlobals(ctx context.Context) {
 			mainLog.Debug("Using RPC cache purge")
 
 			rpcPurgeOnce.Do(func() {
-				store := storage.RedisCluster{KeyPrefix: "analytics-"}
+				store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true}
 				purger := rpc.Purger{
 					Store: &store,
 				}
