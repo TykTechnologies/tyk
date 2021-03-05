@@ -149,10 +149,7 @@ func ConnectToRedis(ctx context.Context, onConnect func()) {
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 	c := []RedisCluster{
-		{}, {IsCache: true},
-	}
-	if config.Global().EnableAnalytics {
-		c = append(c, RedisCluster{IsAnalytics: true})
+		{}, {IsCache: true},{IsAnalytics: true},
 	}
 	var ok bool
 	for _, v := range c {
