@@ -256,7 +256,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 		analyticKey := analyticsKeyName
 		if r.enableMultipleAnalyticsKeys {
 			suffix := rand.Intn(10)
-			analyticKey += "_" + fmt.Sprint(suffix)
+			analyticKey = fmt.Sprintf("%v_%v", analyticKey, suffix)
 		}
 		readyToSend := false
 		select {
