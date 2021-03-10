@@ -110,16 +110,17 @@ type NormaliseURLPatterns struct {
 }
 
 type AnalyticsConfigConfig struct {
-	Type                    string              `json:"type"`
-	IgnoredIPs              []string            `json:"ignored_ips"`
-	EnableDetailedRecording bool                `json:"enable_detailed_recording"`
-	EnableGeoIP             bool                `json:"enable_geo_ip"`
-	GeoIPDBLocation         string              `json:"geo_ip_db_path"`
-	NormaliseUrls           NormalisedURLConfig `json:"normalise_urls"`
-	PoolSize                int                 `json:"pool_size"`
-	RecordsBufferSize       uint64              `json:"records_buffer_size"`
-	StorageExpirationTime   int                 `json:"storage_expiration_time"`
-	ignoredIPsCompiled      map[string]bool
+	Type                        string              `json:"type"`
+	IgnoredIPs                  []string            `json:"ignored_ips"`
+	EnableDetailedRecording     bool                `json:"enable_detailed_recording"`
+	EnableGeoIP                 bool                `json:"enable_geo_ip"`
+	GeoIPDBLocation             string              `json:"geo_ip_db_path"`
+	NormaliseUrls               NormalisedURLConfig `json:"normalise_urls"`
+	PoolSize                    int                 `json:"pool_size"`
+	RecordsBufferSize           uint64              `json:"records_buffer_size"`
+	StorageExpirationTime       int                 `json:"storage_expiration_time"`
+	ignoredIPsCompiled          map[string]bool
+	EnableMultipleAnalyticsKeys bool `json:"enable_multiple_analytics_keys"`
 }
 
 type HealthCheckConfig struct {
