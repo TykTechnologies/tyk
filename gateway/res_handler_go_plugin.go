@@ -15,7 +15,7 @@ type ResponseGoPluginMiddleware struct {
 	SymbolName string // function symbol to look up
 	logger     *logrus.Entry
 	Spec       *APISpec
-	ResHandler func(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState)
+	ResHandler func(rw http.ResponseWriter, res *http.Response, req *http.Request)
 }
 
 func (ResponseGoPluginMiddleware) Name() string {
@@ -50,9 +50,14 @@ func (h *ResponseGoPluginMiddleware) Init(c interface{}, spec *APISpec) error {
 }
 
 func (h *ResponseGoPluginMiddleware) HandleError(rw http.ResponseWriter, req *http.Request) {
+	//noop
 }
 
 func (h *ResponseGoPluginMiddleware) HandleResponse(w http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
+	return nil
+}
+
+func (h *ResponseGoPluginMiddleware) HandleGoPluginResponse(w http.ResponseWriter, res *http.Response, req *http.Request) error {
 	// make sure tyk recover in case Go-plugin function panics
 	defer func() {
 		if e := recover(); e != nil {
@@ -72,7 +77,7 @@ func (h *ResponseGoPluginMiddleware) HandleResponse(w http.ResponseWriter, res *
 	// call Go-plugin function
 	t1 := time.Now()
 
-	h.ResHandler(rw, res, req, ses)
+	h.ResHandler(rw, res, req)
 
 	// calculate latency
 	ms := DurationToMillisecond(time.Since(t1))

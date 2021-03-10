@@ -6,8 +6,6 @@ import (
 	"errors"
 	"net/http"
 	"plugin"
-
-	"github.com/TykTechnologies/tyk/user"
 )
 
 func GetHandler(path string, symbol string) (http.HandlerFunc, error) {
@@ -32,7 +30,7 @@ func GetHandler(path string, symbol string) (http.HandlerFunc, error) {
 	return pluginHandler, nil
 }
 
-func GetResponseHandler(path string, symbol string) (func(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState), error) {
+func GetResponseHandler(path string, symbol string) (func(rw http.ResponseWriter, res *http.Response, req *http.Request), error) {
 	// try to load plugin
 	loadedPlugin, err := plugin.Open(path)
 	if err != nil {
@@ -46,7 +44,7 @@ func GetResponseHandler(path string, symbol string) (func(rw http.ResponseWriter
 	}
 
 	// try to cast symbol to real func
-	respPluginHandler, ok := funcSymbol.(func(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState))
+	respPluginHandler, ok := funcSymbol.(func(rw http.ResponseWriter, res *http.Response, req *http.Request))
 	if !ok {
 		return nil, errors.New("could not cast function symbol to TykResponseHandler")
 	}

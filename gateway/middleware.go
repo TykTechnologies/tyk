@@ -800,6 +800,11 @@ type TykResponseHandler interface {
 	HandleError(http.ResponseWriter, *http.Request)
 }
 
+type TykGoPluginResponseHandler interface {
+	TykResponseHandler
+	HandleGoPluginResponse(http.ResponseWriter, *http.Response, *http.Request) error
+}
+
 func responseProcessorByName(name string) TykResponseHandler {
 	switch name {
 	case "header_injector":

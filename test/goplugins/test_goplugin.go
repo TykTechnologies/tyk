@@ -76,7 +76,7 @@ func MyPluginPost(rw http.ResponseWriter, r *http.Request) {
 }
 
 // MyPluginResponse intercepts response from upstream which we can then manipulate
-func MyPluginResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) {
+func MyPluginResponse(rw http.ResponseWriter, res *http.Response, req *http.Request) {
 
 	res.Header.Add("X-Response-Added", "resp-added")
 
