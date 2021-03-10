@@ -202,7 +202,6 @@ func (r *RedisAnalyticsHandler) Init(globalConf config.Config) {
 	}
 
 	analytics.Store.Connect()
-
 	ps := config.Global().AnalyticsConfig.PoolSize
 	recordsBufferSize := config.Global().AnalyticsConfig.RecordsBufferSize
 	r.workerBufferSize = recordsBufferSize / uint64(ps)

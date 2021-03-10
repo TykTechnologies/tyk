@@ -332,6 +332,12 @@
     "enable_analytics": {
       "type": "boolean"
     },
+    "enable_separate_analytics_store": {
+      "type": "boolean"
+    },
+    "analytics_storage": {
+      "$ref": "#/definitions/StorageOptions"
+    },
     "enable_api_segregation": {
       "type": "boolean"
     },
