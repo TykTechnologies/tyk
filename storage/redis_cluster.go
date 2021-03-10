@@ -29,6 +29,8 @@ var ErrRedisIsDown = errors.New("storage: Redis is either down or was not config
 
 var singlePool atomic.Value
 var singleCachePool atomic.Value
+var singleAnalyticsPool atomic.Value
+
 var redisUp atomic.Value
 
 var disableRedis atomic.Value
@@ -80,9 +82,16 @@ func WaitConnect(ctx context.Context) bool {
 	}
 }
 
-func singleton(cache bool) redis.UniversalClient {
+func singleton(cache, analytics bool) redis.UniversalClient {
 	if cache {
 		v := singleCachePool.Load()
+		if v != nil {
+			return v.(redis.UniversalClient)
+		}
+		return nil
+	}
+	if analytics {
+		v := singleAnalyticsPool.Load()
 		if v != nil {
 			return v.(redis.UniversalClient)
 		}
@@ -95,15 +104,18 @@ func singleton(cache bool) redis.UniversalClient {
 	return nil
 }
 
-func connectSingleton(cache bool) bool {
-	d := singleton(cache) == nil
+func connectSingleton(cache, analytics bool) bool {
+	d := singleton(cache, analytics) == nil
 	if d {
 		log.Debug("Connecting to redis cluster")
 		if cache {
-			singleCachePool.Store(NewRedisClusterPool(cache))
+			singleCachePool.Store(NewRedisClusterPool(cache, analytics))
+			return true
+		} else if analytics {
+			singleAnalyticsPool.Store(NewRedisClusterPool(cache, analytics))
 			return true
 		}
-		singlePool.Store(NewRedisClusterPool(cache))
+		singlePool.Store(NewRedisClusterPool(cache, analytics))
 		return true
 	}
 	return true
@@ -111,13 +123,14 @@ func connectSingleton(cache bool) bool {
 
 // RedisCluster is a storage manager that uses the redis database.
 type RedisCluster struct {
-	KeyPrefix string
-	HashKeys  bool
-	IsCache   bool
+	KeyPrefix   string
+	HashKeys    bool
+	IsCache     bool
+	IsAnalytics bool
 }
 
 func clusterConnectionIsOpen(cluster *RedisCluster) bool {
-	c := singleton(cluster.IsCache)
+	c := singleton(cluster.IsCache, cluster.IsAnalytics)
 	testKey := "redis-test-" + uuid.NewV4().String()
 	if err := c.Set(ctx, testKey, "test", time.Second).Err(); err != nil {
 		return false
@@ -136,11 +149,11 @@ func ConnectToRedis(ctx context.Context, onConnect func()) {
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 	c := []RedisCluster{
-		{}, {IsCache: true},
+		{}, {IsCache: true}, {IsAnalytics: true},
 	}
 	var ok bool
 	for _, v := range c {
-		if !connectSingleton(v.IsCache) {
+		if !connectSingleton(v.IsCache, v.IsAnalytics) {
 			break
 		}
 		if !clusterConnectionIsOpen(&v) {
@@ -182,19 +195,20 @@ func connectCluster(v ...RedisCluster) bool {
 }
 
 func establishConnection(v *RedisCluster) bool {
-	if !connectSingleton(v.IsCache) {
+	if !connectSingleton(v.IsCache, v.IsAnalytics) {
 		return false
 	}
 	return clusterConnectionIsOpen(v)
 }
 
-func NewRedisClusterPool(isCache bool) redis.UniversalClient {
+func NewRedisClusterPool(isCache, isAnalytics bool) redis.UniversalClient {
 	// redisSingletonMu is locked and we know the singleton is nil
 	cfg := config.Global().Storage
 	if isCache && config.Global().EnableSeperateCacheStore {
 		cfg = config.Global().CacheStorage
+	} else if isAnalytics && config.Global().EnableAnalytics && config.Global().EnableSeperateAnalyticsStore {
+		cfg = config.Global().AnalyticsStorage
 	}
-
 	log.Debug("Creating new Redis connection pool")
 
 	// poolSize applies per cluster node and not for the whole cluster.
@@ -272,7 +286,7 @@ func (r *RedisCluster) Connect() bool {
 }
 
 func (r *RedisCluster) singleton() redis.UniversalClient {
-	return singleton(r.IsCache)
+	return singleton(r.IsCache, r.IsAnalytics)
 }
 
 func (r *RedisCluster) hashKey(in string) string {
