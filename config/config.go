@@ -404,8 +404,10 @@ type Config struct {
 	SSLForceCommonNameCheck       bool                 `json:"ssl_force_common_name_check"`
 
 	// Proxy analytics configuration
-	EnableAnalytics bool                  `json:"enable_analytics"`
-	AnalyticsConfig AnalyticsConfigConfig `json:"analytics_config"`
+	EnableAnalytics              bool                  `json:"enable_analytics"`
+	AnalyticsConfig              AnalyticsConfigConfig `json:"analytics_config"`
+	EnableSeperateAnalyticsStore bool                  `json:"enable_separate_analytics_store"`
+	AnalyticsStorage             StorageOptionsConf    `json:"analytics_storage"`
 
 	LivenessCheck LivenessCheckConfig `json:"liveness_check"`
 	// Cache
