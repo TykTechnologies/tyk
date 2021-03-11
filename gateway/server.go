@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -40,7 +41,6 @@ import (
 	"github.com/evalphobia/logrus_sentry"
 	graylogHook "github.com/gemnasium/logrus-graylog-hook"
 	"github.com/gorilla/mux"
-	"github.com/justinas/alice"
 	"github.com/lonelycode/osin"
 	newrelic "github.com/newrelic/go-agent"
 	"github.com/rs/cors"
@@ -177,7 +177,7 @@ func setupGlobals(ctx context.Context) {
 		if config.Global().ManagementNode {
 			mainLog.Warn("Running Uptime checks in a management node.")
 		}
-		healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:"}
+		healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:", IsAnalytics: true}
 		InitHostCheckManager(ctx, &healthCheckStore)
 	}
 
@@ -196,7 +196,7 @@ func setupGlobals(ctx context.Context) {
 		config.SetGlobal(globalConf)
 		mainLog.Debug("Setting up analytics DB connection")
 
-		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-"}
+		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true}
 		analytics.Store = &analyticsStore
 		analytics.Init(globalConf)
 
@@ -204,7 +204,7 @@ func setupGlobals(ctx context.Context) {
 			mainLog.Debug("Using RPC cache purge")
 
 			rpcPurgeOnce.Do(func() {
-				store := storage.RedisCluster{KeyPrefix: "analytics-"}
+				store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true}
 				purger := rpc.Purger{
 					Store: &store,
 				}
@@ -670,7 +670,7 @@ func createResponseMiddlewareChain(spec *APISpec, responseFuncs []apidef.Middlew
 	spec.ResponseChain = responseChain
 }
 
-func handleCORS(chain *[]alice.Constructor, spec *APISpec) {
+func handleCORS(router *mux.Router, spec *APISpec) {
 
 	if spec.CORS.Enable {
 		mainLog.Debug("CORS ENABLED")
@@ -685,7 +685,7 @@ func handleCORS(chain *[]alice.Constructor, spec *APISpec) {
 			Debug:              spec.CORS.Debug,
 		})
 
-		*chain = append(*chain, c.Handler)
+		router.Use(c.Handler)
 	}
 }
 
@@ -1006,6 +1006,32 @@ func initialiseSystem(ctx context.Context) error {
 			globalConf.Policies.PolicyRecordName = config.DefaultDashPolicyRecordName
 		}
 	}
+
+	if globalConf.ProxySSLMaxVersion == 0 {
+		globalConf.ProxySSLMaxVersion = tls.VersionTLS12
+	}
+
+	if globalConf.ProxySSLMinVersion > globalConf.ProxySSLMaxVersion {
+		globalConf.ProxySSLMaxVersion = globalConf.ProxySSLMinVersion
+	}
+
+	if globalConf.HttpServerOptions.MaxVersion == 0 {
+		globalConf.HttpServerOptions.MaxVersion = tls.VersionTLS12
+	}
+
+	if globalConf.HttpServerOptions.MinVersion > globalConf.HttpServerOptions.MaxVersion {
+		globalConf.HttpServerOptions.MaxVersion = globalConf.HttpServerOptions.MinVersion
+	}
+
+	if globalConf.UseDBAppConfigs && globalConf.Policies.PolicySource != config.DefaultDashPolicySource {
+		globalConf.Policies.PolicySource = config.DefaultDashPolicySource
+		globalConf.Policies.PolicyConnectionString = globalConf.DBAppConfOptions.ConnectionString
+		if globalConf.Policies.PolicyRecordName == "" {
+			globalConf.Policies.PolicyRecordName = config.DefaultDashPolicyRecordName
+		}
+	}
+
+	config.SetGlobal(globalConf)
 
 	getHostDetails()
 	setupInstrumentation()

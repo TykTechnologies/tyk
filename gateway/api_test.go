@@ -13,9 +13,13 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	uuid "github.com/satori/go.uuid"
+	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"fmt"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
@@ -1553,4 +1557,81 @@ func TestRotateClientSecretHandler(t *testing.T) {
 			ts.Run(t, testCase)
 		})
 	}
+}
+
+func TestHandleAddOrUpdateApi(t *testing.T) {
+	testFs := afero.NewMemMapFs()
+
+	t.Run("should return error when api definition json is invalid", func(t *testing.T) {
+		apiDefJson := []byte("{")
+		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
+		require.NoError(t, err)
+
+		response, statusCode := handleAddOrUpdateApi("", req, testFs)
+		errorResponse, ok := response.(apiStatusMessage)
+		require.True(t, ok)
+
+		assert.Equal(t, "Request malformed", errorResponse.Message)
+		assert.Equal(t, http.StatusBadRequest, statusCode)
+	})
+
+	t.Run("should return error when api ids are different", func(t *testing.T) {
+		apiDef := apidef.DummyAPI()
+		apiDef.APIID = "123"
+		apiDefJson, err := json.Marshal(apiDef)
+		require.NoError(t, err)
+
+		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
+		require.NoError(t, err)
+
+		response, statusCode := handleAddOrUpdateApi("555", req, testFs)
+		errorResponse, ok := response.(apiStatusMessage)
+		require.True(t, ok)
+
+		assert.Equal(t, "Request APIID does not match that in Definition! For Update operations these must match.", errorResponse.Message)
+		assert.Equal(t, http.StatusBadRequest, statusCode)
+	})
+
+	t.Run("should return error when semantic validation fails", func(t *testing.T) {
+		apiDef := apidef.DummyAPI()
+		apiDef.APIID = "123"
+		apiDef.GraphQL.Engine.DataSources = []apidef.GraphQLEngineDataSource{
+			{
+				Name: "duplicate",
+			},
+			{
+				Name: "duplicate",
+			},
+		}
+		apiDefJson, err := json.Marshal(apiDef)
+		require.NoError(t, err)
+
+		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
+		require.NoError(t, err)
+
+		response, statusCode := handleAddOrUpdateApi("", req, testFs)
+		errorResponse, ok := response.(apiStatusMessage)
+		require.True(t, ok)
+
+		assert.Equal(t, "Validation of API Definition failed. Reason: duplicate data source names are not allowed.", errorResponse.Message)
+		assert.Equal(t, http.StatusBadRequest, statusCode)
+	})
+
+	t.Run("should return success when no error occurs", func(t *testing.T) {
+		apiDef := apidef.DummyAPI()
+		apiDef.APIID = "123"
+		apiDefJson, err := json.Marshal(apiDef)
+		require.NoError(t, err)
+
+		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
+		require.NoError(t, err)
+
+		response, statusCode := handleAddOrUpdateApi("", req, testFs)
+		successResponse, ok := response.(apiModifyKeySuccess)
+		require.True(t, ok)
+
+		assert.Equal(t, "123", successResponse.Key)
+		assert.Equal(t, "added", successResponse.Action)
+		assert.Equal(t, http.StatusOK, statusCode)
+	})
 }

@@ -235,7 +235,7 @@ func TestCertificateStorage(t *testing.T) {
 	t.Run("File certificates", func(t *testing.T) {
 		certs := m.List([]string{certPath, "wrong"}, CertificatePublic)
 		if len(certs) != 2 {
-			t.Fatal("Should contain 1 cert", len(certs))
+			t.Fatal("Should contain 2 cert", len(certs))
 		}
 
 		if certs[1] != nil {

@@ -49,7 +49,7 @@ cp tyk.conf.example ${bdir}/tyk.conf
 cp -R coprocess ${bdir}
 
 echo "Building Tyk binaries"
-go build -tags 'goplugin' -mod=vendor
+go build -tags 'goplugin'
 mv tyk ${bdir}
 
 echo "Making tarball"

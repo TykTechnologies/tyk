@@ -54,6 +54,8 @@ func initialiseClient() *http.Client {
 			// Setup HTTPS client
 			tlsConfig := &tls.Config{
 				InsecureSkipVerify: config.Global().HttpServerOptions.SSLInsecureSkipVerify,
+				MinVersion:         config.Global().HttpServerOptions.MinVersion,
+				MaxVersion:         config.Global().HttpServerOptions.MaxVersion,
 			}
 
 			dashClient.Transport = &http.Transport{TLSClientConfig: tlsConfig}

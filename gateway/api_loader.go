@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -25,15 +26,12 @@ import (
 )
 
 type ChainObject struct {
-	Domain         string
 	ListenOn       string
 	ThisHandler    http.Handler
 	RateLimitChain http.Handler
 	RateLimitPath  string
 	Open           bool
-	Index          int
 	Skip           bool
-	Subrouter      *mux.Router
 }
 
 func prepareStorage() generalStores {
@@ -107,7 +105,8 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	gs *generalStores, subrouter *mux.Router, logger *logrus.Entry) *ChainObject {
 
 	var chainDef ChainObject
-	chainDef.Subrouter = subrouter
+
+	handleCORS(subrouter, spec)
 
 	logger = logger.WithFields(logrus.Fields{
 		"org_id":   spec.OrgID,
@@ -122,6 +121,15 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	if strings.Contains(spec.Proxy.TargetURL, "h2c://") {
 		spec.Proxy.TargetURL = strings.Replace(spec.Proxy.TargetURL, "h2c://", "http://", 1)
 	}
+
+	if spec.Proxy.Transport.SSLMaxVersion > 0 {
+		spec.Proxy.Transport.SSLMaxVersion = tls.VersionTLS12
+	}
+
+	if spec.Proxy.Transport.SSLMinVersion > spec.Proxy.Transport.SSLMaxVersion {
+		spec.Proxy.Transport.SSLMaxVersion = spec.Proxy.Transport.SSLMinVersion
+	}
+
 	if len(spec.TagHeaders) > 0 {
 		// Ensure all headers marked for tagging are lowercase
 		lowerCaseHeaders := make([]string, len(spec.TagHeaders))
@@ -298,8 +306,6 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		logger.Info("Checking security policy: Open")
 	}
 
-	handleCORS(&chainArray, spec)
-
 	for _, obj := range mwPreFuncs {
 		if mwDriver == apidef.GoPluginDriver {
 			mwAppendEnabled(
@@ -327,7 +333,6 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid})
 	mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid})
-	mwAppendEnabled(&chainArray, &GraphQLMiddleware{BaseMiddleware: baseMid})
 
 	if !spec.UseKeylessAccess {
 		// Select the keying method to use for setting session states
@@ -414,6 +419,12 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	}
 
 	mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid})
+	mwAppendEnabled(&chainArray, &GraphQLMiddleware{BaseMiddleware: baseMid})
+	if !spec.UseKeylessAccess {
+		mwAppendEnabled(&chainArray, &GraphQLComplexityMiddleware{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &GraphQLGranularAccessMiddleware{BaseMiddleware: baseMid})
+	}
+
 	mwAppendEnabled(&chainArray, &ValidateJSON{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &TransformMiddleware{baseMid})
 	mwAppendEnabled(&chainArray, &TransformJQMiddleware{baseMid})
@@ -473,7 +484,6 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		chainDef.ThisHandler = chain
 	}
 	chainDef.ListenOn = spec.Proxy.ListenPath + "{rest:.*}"
-	chainDef.Domain = spec.Domain
 
 	logger.WithFields(logrus.Fields{
 		"prefix":      "gateway",
