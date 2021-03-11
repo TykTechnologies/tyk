@@ -1236,6 +1236,10 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 			if method == rxPaths[i].Internal.Method {
 				return true, &rxPaths[i].Internal
 			}
+		case GoPlugin:
+			if method == rxPaths[i].Internal.Method {
+				return true, &rxPaths[i].GoPluginConfig
+			}
 		}
 	}
 	return false, nil
