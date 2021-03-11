@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/tyk/request"
+	"github.com/sirupsen/logrus"
 	"math"
 	"net/http"
 	"net/url"
@@ -143,6 +145,7 @@ func (o *OAuthHandlers) HandleGenerateAuthCodeData(w http.ResponseWriter, r *htt
 	resp := o.Manager.HandleAuthorisation(r, true, sessionJSONData)
 	code := http.StatusOK
 	msg := o.generateOAuthOutputFromOsinResponse(resp)
+
 	if resp.IsError {
 		code = resp.ErrorStatusCode
 		log.Error("[OAuth] OAuth response marked as error: ", resp)
@@ -157,7 +160,7 @@ func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *htt
 	// Extract client data and check
 	resp := o.Manager.HandleAuthorisation(r, false, "")
 	if resp.IsError {
-		log.Error("There was an error with the request: ", resp)
+		log.Error("[OAuth] There was an error with the request: ", resp)
 		// Something went wrong, write out the error details and kill the response
 		doJSONWrite(w, resp.ErrorStatusCode, apiError(resp.StatusText))
 		return
@@ -486,9 +489,15 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			}
 		}
 	}
-
-	if resp.IsError && resp.InternalError != nil {
-		log.Error("ERROR: ", resp.InternalError)
+	if resp.IsError {
+		clientId := r.Form.Get("client_id")
+		log.WithFields(logrus.Fields{
+			"org_id":         o.API.OrgID,
+			"client_id":      clientId,
+			"response error": resp.StatusText,
+			"response code":  resp.ErrorStatusCode,
+			"RemoteAddr":     request.RealIP(r), //r.RemoteAddr,
+		}).Error("[OAuth] OAuth response marked as error")
 	}
 
 	return resp
