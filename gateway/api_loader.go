@@ -431,6 +431,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid})
+	mwAppendEnabled(&chainArray, &GoPluginMiddleware{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &RequestSigning{BaseMiddleware: baseMid})
 

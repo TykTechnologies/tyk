@@ -79,6 +79,7 @@ const (
 	RequestNotTracked
 	ValidateJSONRequest
 	Internal
+	GoPlugin
 )
 
 // RequestStatus is a custom type to avoid collisions
@@ -111,6 +112,7 @@ const (
 	StatusRequestNotTracked        RequestStatus = "Request Not Tracked"
 	StatusValidateJSON             RequestStatus = "Validate JSON"
 	StatusInternal                 RequestStatus = "Internal path"
+	StatusGoPlugin                 RequestStatus = "Go plugin"
 )
 
 // URLSpec represents a flattened specification for URLs, used to check if a proxy URL
@@ -137,6 +139,7 @@ type URLSpec struct {
 	DoNotTrackEndpoint        apidef.TrackEndpointMeta
 	ValidatePathMeta          apidef.ValidatePathMeta
 	Internal                  apidef.InternalMeta
+	GoPluginConfig            GoPluginMiddleware
 	IgnoreCase                bool
 }
 
@@ -858,6 +861,26 @@ func (a APIDefinitionLoader) compileVirtualPathspathSpec(paths []apidef.VirtualM
 	return urlSpec
 }
 
+func (a APIDefinitionLoader) compileGopluginPathspathSpec(paths []apidef.GoPluginMeta, stat URLStatus, apiSpec *APISpec) []URLSpec {
+
+	// transform an extended configuration URL into an array of URLSpecs
+	// This way we can iterate the whole array once, on match we break with status
+	urlSpec := []URLSpec{}
+	for _, stringSpec := range paths {
+		newSpec := URLSpec{}
+		a.generateRegex(stringSpec.Path, &newSpec, stat)
+		// Extend with method actions
+		newSpec.GoPluginConfig.Path = stringSpec.PluginPath
+		newSpec.GoPluginConfig.SymbolName = stringSpec.SymbolName
+
+		loadPerPathGoPlugins(&newSpec.GoPluginConfig)
+
+		urlSpec = append(urlSpec, newSpec)
+	}
+
+	return urlSpec
+}
+
 func (a APIDefinitionLoader) compileTrackedEndpointPathspathSpec(paths []apidef.TrackEndpointMeta, stat URLStatus) []URLSpec {
 	urlSpec := []URLSpec{}
 
@@ -939,6 +962,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	hardTimeouts := a.compileTimeoutPathSpec(apiVersionDef.ExtendedPaths.HardTimeouts, HardTimeout)
 	circuitBreakers := a.compileCircuitBreakerPathSpec(apiVersionDef.ExtendedPaths.CircuitBreaker, CircuitBreaker, apiSpec)
 	urlRewrites := a.compileURLRewritesPathSpec(apiVersionDef.ExtendedPaths.URLRewrite, URLRewrite)
+	goPlugins := a.compileGopluginPathspathSpec(apiVersionDef.ExtendedPaths.GoPlugin, GoPlugin, apiSpec)
 	virtualPaths := a.compileVirtualPathspathSpec(apiVersionDef.ExtendedPaths.Virtual, VirtualPath, apiSpec)
 	requestSizes := a.compileRequestSizePathSpec(apiVersionDef.ExtendedPaths.SizeLimit, RequestSizeLimit)
 	methodTransforms := a.compileMethodTransformSpec(apiVersionDef.ExtendedPaths.MethodTransforms, MethodTransformed)
@@ -962,6 +986,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	combinedPath = append(combinedPath, circuitBreakers...)
 	combinedPath = append(combinedPath, urlRewrites...)
 	combinedPath = append(combinedPath, requestSizes...)
+	combinedPath = append(combinedPath, goPlugins...)
 	combinedPath = append(combinedPath, virtualPaths...)
 	combinedPath = append(combinedPath, methodTransforms...)
 	combinedPath = append(combinedPath, trackedPaths...)
@@ -1024,6 +1049,8 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusValidateJSON
 	case Internal:
 		return StatusInternal
+	case GoPlugin:
+		return StatusGoPlugin
 
 	default:
 		log.Error("URL Status was not one of Ignored, Blacklist or WhiteList! Blocking.")

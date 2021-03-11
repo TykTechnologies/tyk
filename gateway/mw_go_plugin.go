@@ -88,7 +88,29 @@ func (m *GoPluginMiddleware) Name() string {
 	return "GoPluginMiddleware: " + m.Path + ":" + m.SymbolName
 }
 
+func loadPerPathGoPlugins(m *GoPluginMiddleware) {
+	m.loadPlugin()
+}
+
 func (m *GoPluginMiddleware) EnabledForSpec() bool {
+
+	// global go plugins
+	if m.Path != "" && m.SymbolName != "" {
+		m.loadPlugin()
+		return true
+	}
+
+	// per path go plugins
+	for _, version := range m.Spec.VersionData.Versions {
+		if len(version.ExtendedPaths.GoPlugin) > 0 {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (m *GoPluginMiddleware) loadPlugin() bool {
 	m.logger = log.WithFields(logrus.Fields{
 		"mwPath":       m.Path,
 		"mwSymbolName": m.SymbolName,
