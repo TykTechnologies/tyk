@@ -214,7 +214,7 @@ type ValidatePathMeta struct {
 type GoPluginMeta struct {
 	Path       string `bson:"path" json:"path"`
 	Method     string `bson:"method" json:"method"`
-	PluginPath string `bson:"path" json:"path"`
+	PluginPath string `bson:"plugin_path" json:"plugin_path"`
 	SymbolName string `bson:"func_name" json:"func_name"`
 }
 
