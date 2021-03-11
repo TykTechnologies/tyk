@@ -489,14 +489,14 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			}
 		}
 	}
-  if resp.IsError {
+	if resp.IsError {
 		clientId := r.Form.Get("client_id")
 		log.WithFields(logrus.Fields{
 			"org_id":         o.API.OrgID,
 			"client_id":      clientId,
 			"response error": resp.StatusText,
 			"response code":  resp.ErrorStatusCode,
-			"RemoteAddr":  request.RealIP(r),//r.RemoteAddr,
+			"RemoteAddr":     request.RealIP(r), //r.RemoteAddr,
 		}).Error("[OAuth] OAuth response marked as error")
 	}
 
