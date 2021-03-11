@@ -219,6 +219,13 @@ type ValidatePathMeta struct {
 	ErrorResponseCode int `bson:"error_response_code" json:"error_response_code"`
 }
 
+type GoPluginMeta struct {
+	Path       string `bson:"path" json:"path"`
+	Method     string `bson:"method" json:"method"`
+	PluginPath string `bson:"path" json:"path"`
+	SymbolName string `bson:"func_name" json:"func_name"`
+}
+
 type ExtendedPathsSet struct {
 	Ignored                 []EndPointMeta        `bson:"ignored" json:"ignored,omitempty"`
 	WhiteList               []EndPointMeta        `bson:"white_list" json:"white_list,omitempty"`

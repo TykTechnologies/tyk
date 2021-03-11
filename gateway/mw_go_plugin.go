@@ -90,6 +90,10 @@ func (m *GoPluginMiddleware) Name() string {
 	return "GoPluginMiddleware: " + m.Path + ":" + m.SymbolName
 }
 
+func loadPerPathGoPlugins(m *GoPluginMiddleware) {
+	m.loadPlugin()
+}
+
 func (m *GoPluginMiddleware) EnabledForSpec() bool {
 
 	// global go plugins
@@ -104,6 +108,10 @@ func (m *GoPluginMiddleware) EnabledForSpec() bool {
 			return true
 		}
 	}
+<<<<<<< HEAD
+=======
+
+>>>>>>> 1bd68c67... load go plugins per method and path in apispec
 	return false
 }
 
