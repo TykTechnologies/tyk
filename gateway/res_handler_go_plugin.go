@@ -2,12 +2,13 @@ package gateway
 
 import (
 	"fmt"
+	"net/http"
+	"time"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/goplugin"
 	"github.com/TykTechnologies/tyk/user"
 	"github.com/sirupsen/logrus"
-	"net/http"
-	"time"
 )
 
 type ResponseGoPluginMiddleware struct {
