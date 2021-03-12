@@ -99,6 +99,7 @@ type ErrorHandler struct {
 func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMsg string, errCode int, writeResponse bool) {
 	defer e.Base().UpdateRequestSession(r)
 	response := &http.Response{}
+
 	if writeResponse {
 		var templateExtension string
 		var contentType string

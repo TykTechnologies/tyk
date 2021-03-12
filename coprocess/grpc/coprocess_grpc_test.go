@@ -235,6 +235,54 @@ func loadTestGRPCAPIs() {
 				Driver: apidef.GrpcDriver,
 			}
 		},
+		func(spec *gateway.APISpec) {
+			spec.APIID = "ignore_plugin"
+			spec.OrgID = gateway.MockOrgID
+			spec.Auth = apidef.AuthConfig{
+				AuthHeaderName: "authorization",
+			}
+			spec.UseKeylessAccess = false
+			spec.EnableCoProcessAuth = true
+			spec.VersionData = struct {
+				NotVersioned   bool                          `bson:"not_versioned" json:"not_versioned"`
+				DefaultVersion string                        `bson:"default_version" json:"default_version"`
+				Versions       map[string]apidef.VersionInfo `bson:"versions" json:"versions"`
+			}{
+				DefaultVersion: "v1",
+				Versions: map[string]apidef.VersionInfo{
+					"v1": {
+						Name:             "v1",
+						UseExtendedPaths: true,
+						ExtendedPaths: apidef.ExtendedPathsSet{
+							Ignored: []apidef.EndPointMeta{
+								{
+									Path:       "/anything",
+									IgnoreCase: true,
+									MethodActions: map[string]apidef.EndpointMethodMeta{
+										http.MethodGet: {
+											Action: apidef.NoAction,
+											Code:   http.StatusOK,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			spec.Proxy.ListenPath = "/grpc-test-api-ignore/"
+			spec.Proxy.StripListenPath = true
+			spec.CustomMiddleware = apidef.MiddlewareSection{
+				Driver: apidef.GrpcDriver,
+				IdExtractor: apidef.MiddlewareIdExtractor{
+					ExtractFrom: apidef.HeaderSource,
+					ExtractWith: apidef.ValueExtractor,
+					ExtractorConfig: map[string]interface{}{
+						"header_name": "Authorization",
+					},
+				},
+			}
+		},
 	)
 }
 
@@ -408,4 +456,44 @@ func randStringBytes(n int) string {
 	}
 
 	return string(b)
+}
+
+func TestGRPCIgnore(t *testing.T) {
+	ts, grpcServer := startTykWithGRPC()
+	defer ts.Close()
+	defer grpcServer.Stop()
+
+	path := "/grpc-test-api-ignore/"
+
+	// no header
+	ts.Run(t, test.TestCase{
+		Path:   path + "something",
+		Method: http.MethodGet,
+		Code:   http.StatusBadRequest,
+		BodyMatchFunc: func(b []byte) bool {
+			return bytes.Contains(b, []byte("Authorization field missing"))
+		},
+	})
+
+	ts.Run(t, test.TestCase{
+		Path:   path + "anything",
+		Method: http.MethodGet,
+		Code:   http.StatusOK,
+	})
+
+	// bad header
+	headers := map[string]string{"authorization": "bad"}
+	ts.Run(t, test.TestCase{
+		Path:    path + "something",
+		Method:  http.MethodGet,
+		Code:    http.StatusForbidden,
+		Headers: headers,
+	})
+
+	ts.Run(t, test.TestCase{
+		Path:    path + "anything",
+		Method:  http.MethodGet,
+		Code:    http.StatusOK,
+		Headers: headers,
+	})
 }

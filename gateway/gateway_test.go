@@ -2067,7 +2067,9 @@ func TestStripRegex(t *testing.T) {
 func TestCache_singleErrorResponse(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("{}"))
+	}))
 	defer srv.Close()
 	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = true

@@ -294,10 +294,15 @@ func (m *CoProcessMiddleware) EnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	if m.HookType == coprocess.HookType_CustomKeyCheck {
+		if ctxGetRequestStatus(r) == StatusOkAndIgnore {
+			return nil, http.StatusOK
+		}
+	}
+
 	logger := m.Logger()
 	logger.Debug("CoProcess Request, HookType: ", m.HookType)
 	originalURL := r.URL
-
 	authToken, _ := m.getAuthToken(coprocessType, r)
 
 	var extractor IdExtractor
