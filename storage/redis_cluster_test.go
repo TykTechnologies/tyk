@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func init(){
+func init() {
 	go ConnectToRedis(context.Background(), nil)
 	for {
 		if Connected() {
@@ -23,7 +23,6 @@ func init(){
 }
 
 func TestRedisClusterGetMultiKey(t *testing.T) {
-
 
 	keys := []string{"first", "second"}
 	r := RedisCluster{KeyPrefix: "test-cluster"}
