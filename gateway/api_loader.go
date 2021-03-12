@@ -240,7 +240,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		fixFuncPath(prefix, mwPreFuncs)
 		fixFuncPath(prefix, mwPostFuncs)
 		fixFuncPath(prefix, mwPostAuthCheckFuncs)
-		// TODO: add mwResponseFuncs here when Golang response custom MW support implemented
+		fixFuncPath(prefix, mwResponseFuncs)
 	}
 
 	if spec.GraphQL.GraphQLPlayground.Enabled {

@@ -6,13 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/TykTechnologies/tyk/request"
-	"github.com/sirupsen/logrus"
 	"math"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/TykTechnologies/tyk/request"
+	"github.com/sirupsen/logrus"
 
 	"github.com/lonelycode/osin"
 	uuid "github.com/satori/go.uuid"
