@@ -317,6 +317,9 @@
     "disable_dashboard_zeroconf": {
       "type": "boolean"
     },
+    "jwt_ssl_insecure_skip_verify": {
+      "type": "boolean"
+    },
     "disable_virtual_path_blobs": {
       "type": "boolean"
     },
