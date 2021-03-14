@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"path"
 	"path/filepath"
 	"runtime/debug"
 	"sort"
@@ -25,11 +26,13 @@ import (
 	"github.com/TykTechnologies/tyk/trace"
 )
 
+const (
+	rateLimitEndpoint = "/tyk/rate-limits/"
+)
+
 type ChainObject struct {
-	ListenOn       string
 	ThisHandler    http.Handler
 	RateLimitChain http.Handler
-	RateLimitPath  string
 	Open           bool
 	Skip           bool
 }
@@ -467,11 +470,9 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		mwAppendEnabled(&simpleArray, &KeyExpired{baseMid})
 		mwAppendEnabled(&simpleArray, &AccessRightsCheck{baseMid})
 
-		rateLimitPath := spec.Proxy.ListenPath + "tyk/rate-limits/"
-
+		rateLimitPath := path.Join(spec.Proxy.ListenPath, rateLimitEndpoint)
 		logger.Debug("Rate limit endpoint is: ", rateLimitPath)
 
-		chainDef.RateLimitPath = rateLimitPath
 		chainDef.RateLimitChain = alice.New(simpleArray...).
 			Then(http.HandlerFunc(userRatesCheck))
 	}
@@ -483,7 +484,6 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	} else {
 		chainDef.ThisHandler = chain
 	}
-	chainDef.ListenOn = spec.Proxy.ListenPath + "{rest:.*}"
 
 	logger.WithFields(logrus.Fields{
 		"prefix":      "gateway",
@@ -670,16 +670,19 @@ func loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStor
 		mainLog.Info("API hostname set: ", hostname)
 		router = router.Host(hostname).Subrouter()
 	}
-	chainObj := processSpec(spec, apisByListen, gs, router, logrus.NewEntry(log))
+
+	subrouter := router.PathPrefix(spec.Proxy.ListenPath).Subrouter()
+
+	chainObj := processSpec(spec, apisByListen, gs, subrouter, logrus.NewEntry(log))
 	if chainObj.Skip {
 		return chainObj.ThisHandler
 	}
 
 	if !chainObj.Open {
-		router.Handle(chainObj.RateLimitPath, chainObj.RateLimitChain)
+		subrouter.Handle(rateLimitEndpoint, chainObj.RateLimitChain)
 	}
 
-	router.Handle(chainObj.ListenOn, chainObj.ThisHandler)
+	subrouter.NewRoute().Handler(chainObj.ThisHandler)
 	return chainObj.ThisHandler
 }
 
@@ -717,7 +720,7 @@ type generalStores struct {
 	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore storage.Handler
 }
 
-func loadGraphQLPlayground(spec *APISpec, router *mux.Router) {
+func loadGraphQLPlayground(spec *APISpec, subrouter *mux.Router) {
 	// endpoint is the endpoint of the url which playground makes request to.
 	endpoint := spec.Proxy.ListenPath
 
@@ -729,7 +732,7 @@ func loadGraphQLPlayground(spec *APISpec, router *mux.Router) {
 
 	p := playground.New(playground.Config{
 		// PathPrefix is the path on the router where playground handler is loaded.
-		PathPrefix:                      spec.Proxy.ListenPath,
+		PathPrefix:                      "/",
 		PlaygroundPath:                  spec.GraphQL.GraphQLPlayground.Path,
 		GraphqlEndpointPath:             endpoint,
 		GraphQLSubscriptionEndpointPath: endpoint,
@@ -741,7 +744,7 @@ func loadGraphQLPlayground(spec *APISpec, router *mux.Router) {
 	}
 
 	for _, cfg := range handlers {
-		router.HandleFunc(cfg.Path, cfg.Handler)
+		subrouter.HandleFunc(cfg.Path, cfg.Handler)
 	}
 }
 
