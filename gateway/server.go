@@ -657,20 +657,12 @@ func createResponseMiddlewareChain(spec *APISpec, responseFuncs []apidef.Middlew
 	}
 
 	for _, mw := range responseFuncs {
-		var processor TykResponseHandler
-		//is it goplugin or other middleware
-		if strings.HasSuffix(mw.Path, ".so") {
-			processor = responseProcessorByName("goplugin_res_hook")
-		} else {
-			processor = responseProcessorByName("custom_mw_res_hook")
-		}
-
+		processor := responseProcessorByName("custom_mw_res_hook")
 		// TODO: perhaps error when plugin support is disabled?
 		if processor == nil {
 			mainLog.Error("Couldn't find custom middleware processor")
 			return
 		}
-
 		if err := processor.Init(mw, spec); err != nil {
 			mainLog.Debug("Failed to init processor: ", err)
 		}

@@ -800,11 +800,6 @@ type TykResponseHandler interface {
 	HandleError(http.ResponseWriter, *http.Request)
 }
 
-type TykGoPluginResponseHandler interface {
-	TykResponseHandler
-	HandleGoPluginResponse(http.ResponseWriter, *http.Response, *http.Request) error
-}
-
 func responseProcessorByName(name string) TykResponseHandler {
 	switch name {
 	case "header_injector":
@@ -817,11 +812,7 @@ func responseProcessorByName(name string) TykResponseHandler {
 		return &HeaderTransform{}
 	case "custom_mw_res_hook":
 		return &CustomMiddlewareResponseHook{}
-	case "goplugin_res_hook":
-		return &ResponseGoPluginMiddleware{}
-
 	}
-
 	return nil
 }
 
