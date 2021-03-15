@@ -35,7 +35,7 @@ func (r RedisPurger) PurgeLoop(ctx context.Context) {
 
 func (r *RedisPurger) PurgeCache() {
 	expireAfter := config.Global().AnalyticsConfig.StorageExpirationTime
-	if expireAfter == -1{
+	if expireAfter == -1 {
 		return
 	}
 	if expireAfter == 0 {

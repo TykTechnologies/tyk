@@ -187,7 +187,7 @@ type RedisAnalyticsHandler struct {
 	shouldStop                  uint32
 	poolWg                      sync.WaitGroup
 	enableMultipleAnalyticsKeys bool
-	Clean            Purger
+	Clean                       Purger
 }
 
 func (r *RedisAnalyticsHandler) Init(globalConf config.Config) {
