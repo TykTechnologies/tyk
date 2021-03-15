@@ -201,7 +201,7 @@ func setupGlobals(ctx context.Context) {
 		analytics.Init(globalConf)
 
 		redisPurgeOnce.Do(func() {
-			store := storage.RedisCluster{KeyPrefix: "analytics-"}
+			store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true}
 			redisPurger := RedisPurger{Store: &store}
 			go redisPurger.PurgeLoop(ctx)
 		})
