@@ -477,6 +477,9 @@ type Config struct {
 
 	// Cloud flag shows that gateway runs in Tyk-cloud.
 	Cloud bool `json:"cloud"`
+
+	// SSL options for JWT middleware.
+	JWTSSLInsecureSkipVerify bool `json:"jwt_ssl_insecure_skip_verify"`
 }
 
 type TykError struct {
