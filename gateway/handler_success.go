@@ -172,7 +172,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 			var wireFormatReq bytes.Buffer
 			r.Write(&wireFormatReq)
 			rawRequest = base64.StdEncoding.EncodeToString(
-				bytes.ReplaceAll(wireFormatReq.Bytes(), []byte(token), []byte(storage.HashKey(token)) ))
+				bytes.ReplaceAll(wireFormatReq.Bytes(), []byte(token), []byte(storage.HashStr(token)) ))
 			// responseCopy, unlike requestCopy, can be nil
 			// here - if the response was cached in
 			// mw_redis_cache, RecordHit gets passed a nil
