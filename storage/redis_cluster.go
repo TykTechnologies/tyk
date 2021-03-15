@@ -418,6 +418,11 @@ func (r *RedisCluster) GetExp(keyName string) (int64, error) {
 		log.Error("Error trying to get TTL: ", err)
 		return 0, ErrKeyNotFound
 	}
+	//since redis-go v8.3.1, if there's no expiration or the key doesn't exists, the ttl returned is measured in nanoseconds
+	if value.Nanoseconds() == -1 || value.Nanoseconds() == -2 {
+		return value.Nanoseconds(), nil
+	}
+
 	return int64(value.Seconds()), nil
 }
 
@@ -970,15 +975,6 @@ func (r *RedisCluster) AppendToSetPipelined(key string, values [][]byte) {
 
 	if _, err := pipe.Exec(ctx); err != nil {
 		log.WithError(err).Error("Error trying to append to set keys")
-	}
-
-	// if we need to set an expiration time
-	if storageExpTime := int64(config.Global().AnalyticsConfig.StorageExpirationTime); storageExpTime != int64(-1) {
-		// If there is no expiry on the analytics set, we should set it.
-		exp, _ := r.GetExp(key)
-		if exp == -1 {
-			r.SetExp(key, storageExpTime)
-		}
 	}
 }
 
