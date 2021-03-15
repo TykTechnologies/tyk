@@ -45,7 +45,7 @@ func (h *ResponseGoPluginMiddleware) Init(c interface{}, spec *APISpec) error {
 		h.logger.WithError(err).Error("Could not load Go-plugin")
 		return err
 	}
-	h.logger.Debugf("Loaded Go response plugin: %s", h.SymbolName)
+	h.logger.Infof("Loaded Go response plugin: %s", h.SymbolName)
 
 	return nil
 }
@@ -55,6 +55,10 @@ func (h *ResponseGoPluginMiddleware) HandleError(rw http.ResponseWriter, req *ht
 }
 
 func (h *ResponseGoPluginMiddleware) HandleResponse(w http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
+	err := h.HandleGoPluginResponse(w, res, req)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
