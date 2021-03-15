@@ -6,6 +6,8 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/user"
+
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/stretchr/testify/assert"
@@ -222,4 +224,41 @@ func TestCORS(t *testing.T) {
 			}...)
 		})
 	})
+}
+
+func TestTykRateLimitsStatusOfAPI(t *testing.T) {
+	g := StartTest()
+	defer g.Close()
+
+	const (
+		quotaMax       = 20
+		quotaRemaining = 10
+		rate           = 10
+		per            = 3
+	)
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test"
+		spec.Proxy.ListenPath = "/my-api/"
+		spec.UseKeylessAccess = false
+	})
+	_, key := g.CreateSession(func(s *user.SessionState) {
+		s.QuotaMax = quotaMax
+		s.QuotaRemaining = quotaRemaining
+		s.Rate = rate
+		s.Per = per
+
+		s.AccessRights = map[string]user.AccessDefinition{"test": {
+			APIID: "test", Versions: []string{"v1"},
+		}}
+	})
+
+	authHeader := map[string]string{
+		"Authorization": key,
+	}
+
+	bodyMatch := fmt.Sprintf(`{"quota":{"quota_max":%d,"quota_remaining":%d,"quota_renews":.*},"rate_limit":{"requests":%d,"per_unit":%d}}`,
+		quotaMax, quotaRemaining, rate, per)
+
+	_, _ = g.Run(t, test.TestCase{Path: "/my-api/tyk/rate-limits/", Headers: authHeader, BodyMatch: bodyMatch, Code: http.StatusOK})
 }
