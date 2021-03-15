@@ -25,6 +25,10 @@ func (r *Request) ValidateForSchema(schema *Schema) (result ValidationResult, er
 	return operationValidationResultFromReport(report)
 }
 
+// ValidateRestrictedFields validates a request by checking if `restrictedFields` contains blocked fields.
+//
+// Deprecated: This function can only handle blocked fields. Use `ValidateFieldRestrictions` if you
+// want to check for blocked or allowed fields instead.
 func (r *Request) ValidateRestrictedFields(schema *Schema, restrictedFields []Type) (RequestFieldsValidationResult, error) {
 	if schema == nil {
 		return RequestFieldsValidationResult{Valid: false}, ErrNilSchema
@@ -35,8 +39,22 @@ func (r *Request) ValidateRestrictedFields(schema *Schema, restrictedFields []Ty
 		return fieldsValidationResult(report, false, "", "")
 	}
 
-	var fieldsValidator RequestFieldsValidator = fieldsValidator{}
+	var fieldsValidator RequestFieldsValidator = DefaultFieldsValidator{}
 	return fieldsValidator.Validate(r, schema, restrictedFields)
+}
+
+// ValidateFieldRestrictions will validate a request by using a list of allowed or blocked fields.
+func (r *Request) ValidateFieldRestrictions(schema *Schema, restrictedFieldsList FieldRestrictionList, validator FieldRestrictionValidator) (RequestFieldsValidationResult, error) {
+	if schema == nil {
+		return RequestFieldsValidationResult{Valid: false}, ErrNilSchema
+	}
+
+	report := r.parseQueryOnce()
+	if report.HasErrors() {
+		return fieldsValidationResult(report, false, "", "")
+	}
+
+	return validator.ValidateByFieldList(r, schema, restrictedFieldsList)
 }
 
 func operationValidationResultFromReport(report operationreport.Report) (ValidationResult, error) {

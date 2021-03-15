@@ -5,12 +5,6 @@
 // The document struct is designed in a way to enable performant parsing while keeping the ast easy to use with helper methods.
 package ast
 
-import (
-	"github.com/cespare/xxhash"
-
-	"github.com/jensneuse/graphql-go-tools/internal/pkg/unsafebytes"
-)
-
 type Document struct {
 	Input                        Input
 	RootNodes                    []Node
@@ -114,7 +108,7 @@ func NewDocument() *Document {
 		Refs:                         make([][8]int, 48),
 		RefIndex:                     -1,
 		Index: Index{
-			Nodes: make(map[uint64]Node, 48),
+			nodes: make(map[uint64][]Node, 48),
 		},
 	}
 }
@@ -176,7 +170,7 @@ func (d *Document) NextRefIndex() int {
 
 func (d *Document) AddRootNode(node Node) {
 	d.RootNodes = append(d.RootNodes, node)
-	d.Index.Add(d.NodeNameString(node), node)
+	d.Index.AddNodeStr(d.NodeNameString(node), node)
 }
 
 func (d *Document) ImportRootNode(ref int, kind NodeKind) {
@@ -216,25 +210,13 @@ func (d *Document) RemoveRootNode(node Node) {
 	}
 }
 
-func (d *Document) ResolveTypeNameBytes(ref int) ByteSlice {
-	graphqlType := d.Types[ref]
-	for graphqlType.TypeKind != TypeKindNamed {
-		graphqlType = d.Types[graphqlType.OfType]
-	}
-	return d.Input.ByteSlice(graphqlType.Name)
-}
-
-func (d *Document) ResolveTypeNameString(ref int) string {
-	return unsafebytes.BytesToString(d.ResolveTypeNameBytes(ref))
-}
-
 func (d *Document) NodeByName(name ByteSlice) (Node, bool) {
-	node, exists := d.Index.Nodes[xxhash.Sum64(name)]
+	node, exists := d.Index.FirstNodeByNameBytes(name)
 	return node, exists
 }
 
 func (d *Document) TypeDefinitionContainsImplementsInterface(typeName, interfaceName ByteSlice) bool {
-	typeDefinition, exists := d.Index.Nodes[xxhash.Sum64(typeName)]
+	typeDefinition, exists := d.Index.FirstNodeByNameBytes(typeName)
 	if !exists {
 		return false
 	}

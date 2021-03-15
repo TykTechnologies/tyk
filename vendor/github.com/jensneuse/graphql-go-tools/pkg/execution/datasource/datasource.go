@@ -57,10 +57,10 @@ type CorePlanner interface {
 	// During runtime the arguments get resolved and passed to the DataSource
 	Plan(args []Argument) (DataSource, []Argument)
 	// Configure is the function to initialize all important values for the Planner to function correctly
-	// You probably need access to the Walker, Operation and Definition to use the Planner to its full power
+	// You probably need access to the Walker, Operation and ObjectDefinition to use the Planner to its full power
 	// Walker gives you useful information from within all visitor Callbacks, e.g. the Path & Ancestors
 	// Operation is the AST of the GraphQL Operation
-	// Definition is the AST of the GraphQL schema Definition
+	// ObjectDefinition is the AST of the GraphQL schema ObjectDefinition
 	// Args are the pre-calculated Arguments from the planner
 	// resolverParameters are the parameters from the @directive params field
 	Configure(operation, definition *ast.Document, walker *astvisitor.Walker)

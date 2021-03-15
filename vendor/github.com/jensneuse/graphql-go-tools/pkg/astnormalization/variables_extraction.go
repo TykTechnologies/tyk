@@ -45,15 +45,19 @@ func (v *variablesExtractionVisitor) EnterArgument(ref int) {
 	if v.operation.Arguments[ref].Value.Kind == ast.ValueKindVariable {
 		return
 	}
-
 	if len(v.Ancestors) == 0 || v.Ancestors[0].Kind != ast.NodeKindOperationDefinition {
 		return
+	}
+
+	for i := range v.Ancestors {
+		if v.Ancestors[i].Kind == ast.NodeKindDirective {
+			return // skip all directives in any case
+		}
 	}
 
 	variableNameBytes := v.operation.GenerateUnusedVariableDefinitionName(v.Ancestors[0].Ref)
 	valueBytes, err := v.operation.ValueToJSON(v.operation.Arguments[ref].Value)
 	if err != nil {
-		v.StopWithInternalErr(err)
 		return
 	}
 	v.operation.Input.Variables, err = sjson.SetRawBytes(v.operation.Input.Variables, unsafebytes.BytesToString(variableNameBytes), valueBytes)

@@ -3,8 +3,6 @@ package asttransform
 import (
 	"bytes"
 
-	"github.com/cespare/xxhash"
-
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/astparser"
 	"github.com/jensneuse/graphql-go-tools/pkg/operationreport"
@@ -119,7 +117,7 @@ func addTypeField(definition *ast.Document) (ref int) {
 }
 
 func findQueryNode(definition *ast.Document) (queryNode ast.Node, ok bool) {
-	queryNode, ok = definition.Index.Nodes[xxhash.Sum64(definition.Index.QueryTypeName)]
+	queryNode, ok = definition.Index.FirstNodeByNameBytes(definition.Index.QueryTypeName)
 	return queryNode, ok
 }
 

@@ -155,7 +155,8 @@ func (p *Playground) configurePlaygroundHandler(handlers *Handlers) (err error) 
 	}
 
 	playgroundURL := path.Join(p.cfg.PathPrefix, p.cfg.PlaygroundPath)
-	if strings.HasSuffix(p.cfg.PlaygroundPath, "/") || (p.cfg.PlaygroundPath == "" && strings.HasSuffix(p.cfg.PathPrefix, "/")) {
+	if playgroundURL != "/" && (playgroundURL == "" || strings.HasSuffix(p.cfg.PlaygroundPath, "/") ||
+		(p.cfg.PlaygroundPath == "" && strings.HasSuffix(p.cfg.PathPrefix, "/"))) {
 		playgroundURL += "/"
 	}
 
