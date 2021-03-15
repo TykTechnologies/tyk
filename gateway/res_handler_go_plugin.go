@@ -47,7 +47,6 @@ func (h *ResponseGoPluginMiddleware) Init(c interface{}, spec *APISpec) error {
 	}
 	h.logger.Infof("Loaded Go response plugin: %s", h.SymbolName)
 
-
 	return nil
 }
 
