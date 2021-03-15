@@ -278,7 +278,7 @@ func (c *complexityVisitor) extractFieldRelatedNames(ref, definitionRef int) (ty
 		alias = ""
 	}
 
-	return c.EnclosingTypeDefinition.Name(c.definition), fieldName, alias
+	return c.EnclosingTypeDefinition.NameString(c.definition), fieldName, alias
 }
 
 func (c *complexityVisitor) isRootType(name string) bool {
@@ -287,6 +287,6 @@ func (c *complexityVisitor) isRootType(name string) bool {
 }
 
 func (c *complexityVisitor) isRootTypeField() bool {
-	enclosingTypeName := c.EnclosingTypeDefinition.Name(c.definition)
+	enclosingTypeName := c.EnclosingTypeDefinition.NameString(c.definition)
 	return c.isRootType(enclosingTypeName)
 }

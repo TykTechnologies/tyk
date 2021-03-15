@@ -145,6 +145,10 @@ func (e *ExecutionEngine) Execute(ctx context.Context, operation *Request, optio
 	return &ExecutionResult{&buf}, err
 }
 
+func (e *ExecutionEngine) NewExecutionHandler() *execution.Handler {
+	return execution.NewHandler(e.basePlanner, nil)
+}
+
 type ExecutionResult struct {
 	buf *bytes.Buffer
 }

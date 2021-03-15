@@ -159,14 +159,20 @@ func TestCORS(t *testing.T) {
 	g := StartTest()
 	defer g.Close()
 
-	api := BuildAndLoadAPI(func(spec *APISpec) {
+	apis := BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Name = "CORS test API"
-		spec.Proxy.ListenPath = "/"
+		spec.APIID = "cors-api"
+		spec.Proxy.ListenPath = "/cors-api/"
 		spec.CORS.Enable = false
 		spec.CORS.ExposedHeaders = []string{"Custom-Header"}
 		spec.CORS.AllowedOrigins = []string{"*"}
-
-	})[0]
+	}, func(spec *APISpec) {
+		spec.Name = "Another API"
+		spec.APIID = "another-api"
+		spec.Proxy.ListenPath = "/another-api/"
+		spec.CORS.ExposedHeaders = []string{"Custom-Header"}
+		spec.CORS.AllowedOrigins = []string{"*"}
+	})
 
 	headers := map[string]string{
 		"Origin": "my-custom-origin",
@@ -179,36 +185,40 @@ func TestCORS(t *testing.T) {
 
 	t.Run("CORS disabled", func(t *testing.T) {
 		_, _ = g.Run(t, []test.TestCase{
-			{Headers: headers, HeadersNotMatch: headersMatch, Code: http.StatusOK},
+			{Path: "/cors-api/", Headers: headers, HeadersNotMatch: headersMatch, Code: http.StatusOK},
 		}...)
 	})
 
 	t.Run("CORS enabled", func(t *testing.T) {
-		api.CORS.Enable = true
-		LoadAPI(api)
+		apis[0].CORS.Enable = true
+		LoadAPI(apis...)
 
 		_, _ = g.Run(t, []test.TestCase{
-			{Headers: headers, HeadersMatch: headersMatch, Code: http.StatusOK},
+			{Path: "/cors-api/", Headers: headers, HeadersMatch: headersMatch, Code: http.StatusOK},
+		}...)
+
+		_, _ = g.Run(t, []test.TestCase{
+			{Path: "/another-api/", Headers: headers, HeadersNotMatch: headersMatch, Code: http.StatusOK},
 		}...)
 	})
 
 	t.Run("oauth endpoints", func(t *testing.T) {
-		api.UseOauth2 = true
-		api.CORS.Enable = false
-		LoadAPI(api)
+		apis[0].UseOauth2 = true
+		apis[0].CORS.Enable = false
+		LoadAPI(apis...)
 
 		t.Run("CORS disabled", func(t *testing.T) {
 			_, _ = g.Run(t, []test.TestCase{
-				{Path: "/oauth/token", Headers: headers, HeadersNotMatch: headersMatch, Code: http.StatusForbidden},
+				{Path: "/cors-api/oauth/token", Headers: headers, HeadersNotMatch: headersMatch, Code: http.StatusForbidden},
 			}...)
 		})
 
 		t.Run("CORS enabled", func(t *testing.T) {
-			api.CORS.Enable = true
-			LoadAPI(api)
+			apis[0].CORS.Enable = true
+			LoadAPI(apis...)
 
 			_, _ = g.Run(t, []test.TestCase{
-				{Path: "/oauth/token", Headers: headers, HeadersMatch: headersMatch, Code: http.StatusForbidden},
+				{Path: "/cors-api/oauth/token", Headers: headers, HeadersMatch: headersMatch, Code: http.StatusForbidden},
 			}...)
 		})
 	})

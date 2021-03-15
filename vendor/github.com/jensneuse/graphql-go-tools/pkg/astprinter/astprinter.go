@@ -230,10 +230,11 @@ func (p *printVisitor) LeaveArgument(ref int) {
 func (p *printVisitor) EnterOperationDefinition(ref int) {
 
 	hasName := p.document.OperationDefinitions[ref].Name.Length() > 0
+	hasVariables := p.document.OperationDefinitions[ref].HasVariableDefinitions
 
 	switch p.document.OperationDefinitions[ref].OperationType {
 	case ast.OperationTypeQuery:
-		if hasName {
+		if hasName || hasVariables {
 			p.write(literal.QUERY)
 		}
 	case ast.OperationTypeMutation:
@@ -855,6 +856,9 @@ func (p *printVisitor) EnterDirectiveDefinition(ref int) {
 	p.write(literal.AT)
 	p.write(p.document.DirectiveDefinitionNameBytes(ref))
 	p.isFirstDirectiveLocation = true
+
+	p.inputValueDefinitionOpener = literal.LPAREN
+	p.inputValueDefinitionCloser = literal.RPAREN
 }
 
 func (p *printVisitor) LeaveDirectiveDefinition(ref int) {

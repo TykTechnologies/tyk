@@ -1,6 +1,8 @@
 package ast
 
-import "github.com/jensneuse/graphql-go-tools/pkg/lexer/position"
+import (
+	"github.com/jensneuse/graphql-go-tools/pkg/lexer/position"
+)
 
 type RootOperationTypeDefinitionList struct {
 	LBrace position.Position // {
@@ -74,12 +76,36 @@ func (d *Document) AddRootOperationTypeDefinition(rootOperationTypeDefinition Ro
 }
 
 func (d *Document) ImportRootOperationTypeDefinition(name string, operationType OperationType) (ref int) {
+	nameBytes := []byte(name)
+
+	switch operationType {
+	case OperationTypeQuery:
+		d.Index.QueryTypeName = nameBytes
+	case OperationTypeMutation:
+		d.Index.MutationTypeName = nameBytes
+	case OperationTypeSubscription:
+		d.Index.SubscriptionTypeName = nameBytes
+	default:
+		return -1
+	}
+
 	operationTypeDefinition := RootOperationTypeDefinition{
 		OperationType: operationType,
 		NamedType: Type{
-			Name: d.Input.AppendInputString(name),
+			Name: d.Input.AppendInputBytes(nameBytes),
 		},
 	}
 
 	return d.AddRootOperationTypeDefinition(operationTypeDefinition)
+}
+
+func (d *Document) ReplaceRootOperationTypeDefinition(name string, operationType OperationType) (ref int) {
+	for i := range d.RootOperationTypeDefinitions {
+		if d.RootOperationTypeDefinitions[i].OperationType == operationType {
+			d.RootOperationTypeDefinitions = append(d.RootOperationTypeDefinitions[:i], d.RootOperationTypeDefinitions[i+1:]...)
+			break
+		}
+	}
+
+	return d.ImportRootOperationTypeDefinition(name, operationType)
 }

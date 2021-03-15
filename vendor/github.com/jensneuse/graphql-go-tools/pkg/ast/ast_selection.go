@@ -1,8 +1,10 @@
 package ast
 
 import (
+	"bytes"
 	"fmt"
 
+	"github.com/jensneuse/graphql-go-tools/internal/pkg/unsafebytes"
 	"github.com/jensneuse/graphql-go-tools/pkg/lexer/position"
 )
 
@@ -119,4 +121,29 @@ func (d *Document) ReplaceSelectionOnSelectionSet(ref, replace, with int) {
 
 func (d *Document) RemoveFromSelectionSet(ref int, index int) {
 	d.SelectionSets[ref].SelectionRefs = append(d.SelectionSets[ref].SelectionRefs[:index], d.SelectionSets[ref].SelectionRefs[index+1:]...)
+}
+
+func (d *Document) SelectionSetHasFieldSelectionWithNameOrAliasBytes(set int, nameOrAlias []byte) bool {
+	for _, i := range d.SelectionSets[set].SelectionRefs {
+		if d.Selections[i].Kind != SelectionKindField {
+			continue
+		}
+		field := d.Selections[i].Ref
+		fieldName := d.FieldNameBytes(field)
+		if bytes.Equal(fieldName, nameOrAlias) {
+			return true
+		}
+		if !d.FieldAliasIsDefined(field) {
+			continue
+		}
+		fieldAlias := d.FieldAliasBytes(field)
+		if bytes.Equal(fieldAlias, nameOrAlias) {
+			return true
+		}
+	}
+	return false
+}
+
+func (d *Document) SelectionSetHasFieldSelectionWithNameOrAliasString(set int, nameOrAlias string) bool {
+	return d.SelectionSetHasFieldSelectionWithNameOrAliasBytes(set, unsafebytes.StringToBytes(nameOrAlias))
 }

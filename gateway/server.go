@@ -503,16 +503,12 @@ func generateOAuthPrefix(apiID string) string {
 
 // Create API-specific OAuth handlers and respective auth servers
 func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
-	var pathSeparator string
-	if !strings.HasSuffix(spec.Proxy.ListenPath, "/") {
-		pathSeparator = "/"
-	}
 
-	apiAuthorizePath := spec.Proxy.ListenPath + pathSeparator + "tyk/oauth/authorize-client{_:/?}"
-	clientAuthPath := spec.Proxy.ListenPath + pathSeparator + "oauth/authorize{_:/?}"
-	clientAccessPath := spec.Proxy.ListenPath + pathSeparator + "oauth/token{_:/?}"
-	revokeToken := spec.Proxy.ListenPath + pathSeparator + "oauth/revoke"
-	revokeAllTokens := spec.Proxy.ListenPath + pathSeparator + "oauth/revoke_all"
+	apiAuthorizePath := "/tyk/oauth/authorize-client{_:/?}"
+	clientAuthPath := "/oauth/authorize{_:/?}"
+	clientAccessPath := "/oauth/token{_:/?}"
+	revokeToken := "/oauth/revoke"
+	revokeAllTokens := "/oauth/revoke_all"
 
 	serverConfig := osin.NewServerConfig()
 
@@ -544,11 +540,10 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 	return &oauthManager
 }
 
-func addBatchEndpoint(spec *APISpec, muxer *mux.Router) {
+func addBatchEndpoint(spec *APISpec, subrouter *mux.Router) {
 	mainLog.Debug("Batch requests enabled for API")
-	apiBatchPath := spec.Proxy.ListenPath + "tyk/batch/"
 	batchHandler := BatchRequestHandler{API: spec}
-	muxer.HandleFunc(apiBatchPath, batchHandler.HandleBatchRequest)
+	subrouter.HandleFunc("/tyk/batch/", batchHandler.HandleBatchRequest)
 }
 
 func loadCustomMiddleware(spec *APISpec) ([]string, apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, apidef.MiddlewareDriver) {

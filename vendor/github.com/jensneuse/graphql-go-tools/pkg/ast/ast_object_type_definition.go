@@ -88,3 +88,24 @@ func (d *Document) ImportObjectTypeDefinition(name, description string, fieldRef
 
 	return
 }
+
+func (d *Document) RemoveObjectTypeDefinition(name ByteSlice) bool {
+	node, ok := d.Index.FirstNodeByNameBytes(name)
+	if !ok {
+		return false
+	}
+
+	if node.Kind != NodeKindObjectTypeDefinition {
+		return false
+	}
+
+	for i := range d.RootNodes {
+		if d.RootNodes[i].Kind == NodeKindObjectTypeDefinition && d.RootNodes[i].Ref == node.Ref {
+			d.RootNodes = append(d.RootNodes[:i], d.RootNodes[i+1:]...)
+			break
+		}
+	}
+
+	d.Index.RemoveNodeByName(name)
+	return true
+}
