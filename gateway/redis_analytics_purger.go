@@ -43,7 +43,6 @@ func (r *RedisPurger) PurgeCache() {
 		expireAfter = 60 // 1 minute
 	}
 
-
 	for i := -1; i < 10; i++ {
 		var analyticsKey string
 		if i == -1 {
