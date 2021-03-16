@@ -175,8 +175,13 @@ func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 		// get the indices for the replacements:
 		replaceGroups := dollarMatch.FindAllStringSubmatch(rewriteToPath, -1)
 
-		log.Debug(matchGroups)
-		log.Debug(replaceGroups)
+		log.WithFields(logrus.Fields{
+			"match-groups": matchGroups,
+			"replace-groups": replaceGroups,
+			"path-before-rewrite": path,
+			"path-after-rewrite": newpath,
+		}).Debug("URL rewrite MW")
+
 
 		groupReplace := make(map[string]string)
 		for mI, replacementVal := range matchGroups[0] {
@@ -188,8 +193,6 @@ func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 			newpath = strings.Replace(newpath, v[0], groupReplace[v[0]], -1)
 		}
 
-		log.Debug("URL Re-written from: ", path)
-		log.Debug("URL Re-written to: ", newpath)
 
 		// put url_rewrite path to context to be used in ResponseTransformMiddleware
 		ctxSetUrlRewritePath(r, meta.Path)

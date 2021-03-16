@@ -116,18 +116,21 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 	}
 
 	rawKey := QuotaKeyPrefix + keyName
-	log.WithFields(logrus.Fields{
-		"prefix":      "auth-mgr",
-		"inbound-key": obfuscateKey(origKeyName),
-		"key":         rawKey,
-	}).Info("Reset quota for key.")
 
 	rateLimiterSentinelKey := RateLimitKeyPrefix + keyName + ".BLOCKED"
 	// Clear the rate limiter
 	go b.store.DeleteRawKey(rateLimiterSentinelKey)
 	// Fix the raw key
 	go b.store.DeleteRawKey(rawKey)
-	//go b.store.SetKey(rawKey, "0", session.QuotaRenewalRate)
+
+	// Obfuscating is required for GWs that have non-hashed keys
+	obfuscatedKey := obfuscateKey(origKeyName)
+	log.WithFields(logrus.Fields{
+		"prefix":         "auth-mgr",
+		"inbound-key":    obfuscatedKey,
+		"quota-key":      QuotaKeyPrefix + obfuscatedKey,
+		"rate-limit-key": RateLimitKeyPrefix + obfuscatedKey,
+	}).Info("Reset quota and rate-limit for key.")
 
 	for _, acl := range session.GetAccessRights() {
 		rawKey = QuotaKeyPrefix + acl.AllowanceScope + "-" + keyName
