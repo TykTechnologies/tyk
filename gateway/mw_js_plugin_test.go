@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"github.com/TykTechnologies/tyk/config"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -474,19 +475,15 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 	})
 
 	t.Run("Endpoint with skip cleaning", func(t *testing.T) {
-		ts := StartTest(nil)
+		conf := func(conf *config.Config) {
+			conf.HttpServerOptions.SkipURLCleaning = true
+			conf.HttpServerOptions.OverrideDefaults = true
+		}
+
+		ts := StartTest(conf)
 		defer ts.Close()
 		bundle := ts.RegisterBundle("jsvm_make_http_request", manifest)
-
-		globalConf := ts.Gw.GetConfig()
-		globalConf.HttpServerOptions.SkipURLCleaning = true
-		globalConf.HttpServerOptions.OverrideDefaults = true
-		ts.Gw.SetConfig(globalConf)
-
-		prevSkipClean := defaultTestConfig.HttpServerOptions.OverrideDefaults &&
-			defaultTestConfig.HttpServerOptions.SkipURLCleaning
-		testServerRouter.SkipClean(true)
-		defer testServerRouter.SkipClean(prevSkipClean)
+		ts.TestServerRouter.SkipClean(true)
 
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/sample"

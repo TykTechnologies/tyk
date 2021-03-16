@@ -111,7 +111,6 @@ func TestParambasedAuth(t *testing.T) {
 func TestStripPathWithURLRewrite(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
-	defer ts.ResetTestConfig()
 
 	t.Run("rewrite URL containing listen path", func(t *testing.T) {
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
@@ -255,8 +254,9 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 	// so test upstream shouldn't reply with 301 and process them as well
 	prevSkipClean := defaultTestConfig.HttpServerOptions.OverrideDefaults &&
 		defaultTestConfig.HttpServerOptions.SkipURLCleaning
-	testServerRouter.SkipClean(true)
-	defer testServerRouter.SkipClean(prevSkipClean)
+
+	ts.TestServerRouter.SkipClean(true)
+	defer ts.TestServerRouter.SkipClean(prevSkipClean)
 
 	t.Run("With escaping, default", func(t *testing.T) {
 		globalConf := ts.Gw.GetConfig()
@@ -357,7 +357,6 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 			{Path: "/listen_me/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/sent_to_me/http%3A%2F%2Ftest.com\?arg=val`},
 		}...)
 	})
-
 }
 
 func TestQuota(t *testing.T) {
@@ -1981,12 +1980,12 @@ func TestTracing(t *testing.T) {
 }
 
 func TestBrokenClients(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
 
-	globalConf := ts.Gw.GetConfig()
-	globalConf.ProxyDefaultTimeout = 1
-	ts.Gw.SetConfig(globalConf)
+	conf := func(gwConf *config.Config) {
+		gwConf.ProxyDefaultTimeout = 1
+	}
+	ts := StartTest(conf)
+	defer ts.Close()
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = true

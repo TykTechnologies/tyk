@@ -139,7 +139,7 @@ func TestKeyHandler(t *testing.T) {
 	// Access right not specified
 	masterKey := CreateStandardSession()
 	masterKeyJSON, _ := json.Marshal(masterKey)
-
+//TestTykMakeHTTPRequest
 	// with access
 	withAccess := CreateStandardSession()
 	withAccess.AccessRights = map[string]user.AccessDefinition{"test": {

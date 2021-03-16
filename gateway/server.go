@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/again"
+	"github.com/TykTechnologies/drl"
 	gas "github.com/TykTechnologies/goautosocket"
 	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/tyk/apidef"
@@ -80,11 +81,11 @@ type Gateway struct {
 	config          atomic.Value
 	configMu        sync.Mutex
 
-	muNodeID sync.Mutex // guards NodeID
-	NodeID   string
-	drlOnce  sync.Once
-
-	reloadMu sync.Mutex
+	muNodeID   sync.Mutex // guards NodeID
+	NodeID     string
+	drlOnce    sync.Once
+	DRLManager *drl.DRL
+	reloadMu   sync.Mutex
 
 	analytics            RedisAnalyticsHandler
 	GlobalEventsJSVM     JSVM
@@ -98,6 +99,9 @@ type Gateway struct {
 	CertificateManager   *certs.CertificateManager
 
 	keyGen DefaultKeyGenerator
+
+	SessionLimiter SessionLimiter
+	SessionMonitor Monitor
 
 	apisMu          sync.RWMutex
 	apiSpecs        []*APISpec
@@ -134,6 +138,7 @@ type Gateway struct {
 	// ReloadTestCase use this when in any test for gateway reloads
 	ReloadTestCase *ReloadMachinery
 
+
 	// map[bundleName]map[fileName]fileContent used for tests
 	TestBundles  map[string]map[string]string
 	TestBundleMu sync.Mutex
@@ -150,6 +155,8 @@ func NewGateway(config config.Config) *Gateway {
 	sessionManager := DefaultSessionManager{Gw: &gw}
 	gw.GlobalSessionManager = SessionHandler(&sessionManager)
 	gw.DefaultQuotaStore = DefaultSessionManager{Gw: &gw}
+	gw.SessionLimiter = SessionLimiter{Gw: &gw}
+	gw.SessionMonitor = Monitor{Gw: &gw}
 
 	gw.apisByID = map[string]*APISpec{}
 	gw.apisHandlesByID = new(sync.Map)
@@ -1544,6 +1551,7 @@ func (gw *Gateway) startServer() {
 	// handle dashboard registration and nonces if available
 	handleDashboardRegistration(gw)
 
+	gw.DRLManager = &drl.DRL{}
 	// at this point NodeID is ready to use by DRL
 	gw.drlOnce.Do(gw.startDRL)
 

@@ -10,8 +10,6 @@ import (
 	"github.com/TykTechnologies/tyk/request"
 )
 
-var sessionLimiter = SessionLimiter{}
-var sessionMonitor = Monitor{}
 
 // RateLimitAndQuotaCheck will check the incomming request and key whether it is within it's quota and
 // within it's rate limit, it makes use of the SessionLimiter object to do this
@@ -76,7 +74,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	token := ctxGetAuthToken(r)
 
 	storeRef := k.Gw.GlobalSessionManager.Store()
-	reason := sessionLimiter.ForwardMessage(
+	reason := k.Gw.SessionLimiter.ForwardMessage(
 		r,
 		session,
 		token,
@@ -109,7 +107,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 				ctxIncThrottleLevel(r, throttleRetryLimit)
 				time.Sleep(time.Duration(throttleInterval * float64(time.Second)))
 
-				reason = sessionLimiter.ForwardMessage(
+				reason = k.Gw.SessionLimiter.ForwardMessage(
 					r,
 					session,
 					token,
@@ -147,7 +145,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	}
 	// Run the trigger monitor
 	if k.Spec.GlobalConfig.Monitor.MonitorUserKeys {
-		sessionMonitor.Check(session, token)
+		k.Gw.SessionMonitor.Check(session, token)
 	}
 
 	// Request is valid, carry on

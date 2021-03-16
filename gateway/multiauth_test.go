@@ -94,9 +94,7 @@ func (ts *Test) getMultiAuthStandardAndBasicAuthChain(spec *APISpec) http.Handle
 	return chain
 }
 
-func testPrepareMultiSessionBA(t testing.TB, isBench bool) (*APISpec, *http.Request) {
-	ts := StartTest(nil)
-	defer ts.Close()
+func(ts *Test) testPrepareMultiSessionBA(t testing.TB, isBench bool) (*APISpec, *http.Request) {
 
 	spec := ts.Gw.LoadSampleAPI(multiAuthDev)
 
@@ -143,7 +141,7 @@ func testPrepareMultiSessionBA(t testing.TB, isBench bool) (*APISpec, *http.Requ
 func TestMultiSession_BA_Standard_OK(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
-	spec, req := testPrepareMultiSessionBA(t, false)
+	spec, req := ts.testPrepareMultiSessionBA(t, false)
 
 	recorder := httptest.NewRecorder()
 	chain := ts.getMultiAuthStandardAndBasicAuthChain(spec)
@@ -160,7 +158,7 @@ func BenchmarkMultiSession_BA_Standard_OK(b *testing.B) {
 
 	b.ReportAllocs()
 
-	spec, req := testPrepareMultiSessionBA(b, true)
+	spec, req := ts.testPrepareMultiSessionBA(b, true)
 
 	recorder := httptest.NewRecorder()
 	chain := ts.getMultiAuthStandardAndBasicAuthChain(spec)

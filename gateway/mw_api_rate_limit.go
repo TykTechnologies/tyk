@@ -68,7 +68,7 @@ func (k *RateLimitForAPI) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	}
 
 	storeRef := k.Gw.GlobalSessionManager.Store()
-	reason := sessionLimiter.ForwardMessage(r, k.apiSess,
+	reason := k.Gw.SessionLimiter.ForwardMessage(r, k.apiSess,
 		k.keyName,
 		storeRef,
 		true,

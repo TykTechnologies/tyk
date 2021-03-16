@@ -106,7 +106,7 @@ func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationComm
 			// with warnings since DRLManager.Ready == false
 			return
 		}
-		onServerStatusReceivedHandler(notif.Payload)
+		gw.onServerStatusReceivedHandler(notif.Payload)
 	case NoticeGatewayLENotification:
 		gw.onLESSLStatusReceivedHandler(notif.Payload)
 	case NoticeApiUpdated, NoticeApiRemoved, NoticeApiAdded, NoticePolicyChanged, NoticeGroupReload:

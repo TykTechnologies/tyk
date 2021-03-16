@@ -54,12 +54,7 @@ var (
 	// Used to store the test bundles:
 	testMiddlewarePath, _ = ioutil.TempDir("", "tyk-middleware-path")
 
-	mockHandle *test.DnsMockHandle
-
-	testServerRouter  *mux.Router
 	defaultTestConfig config.Config
-
-	EnableTestDNSMock = true
 
 	// OnConnect this is a callback which is called whenever we transition redis Disconnected to connected
 	OnConnect func()
@@ -217,20 +212,14 @@ func (r *ReloadMachinery) TickOk(t *testing.T) {
 }
 
 func InitTestMain(ctx context.Context, m *testing.M) int {
-
-	var err error
-	if EnableTestDNSMock {
-		mockHandle, err = test.InitDNSMock(test.DomainsToAddresses, nil)
-		if err != nil {
-			panic(err)
-		}
-		defer mockHandle.ShutdownDnsMock()
-	}
-
 	exitCode := m.Run()
-
 	return exitCode
 }
+
+// TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue
+// TestBrokenClients
+// TestGRPC_TokenBasedAuthentication
+
 
 // ResetTestConfig resets the config for the global gateway
 func (s *Test) ResetTestConfig() {
@@ -798,6 +787,7 @@ type TestConfig struct {
 	CoprocessConfig    config.CoProcessConfig
 	// SkipEmptyRedis to avoid restart the storage
 	SkipEmptyRedis bool
+	EnableTestDNSMock  bool
 }
 
 type Test struct {
@@ -809,6 +799,8 @@ type Test struct {
 	cancel       func()
 	Gw           *Gateway `json:"-"`
 	HttpHandler  *http.Server
+	TestServerRouter  *mux.Router
+	MockHandle *test.DnsMockHandle
 }
 
 type SlaveDataCenter struct {
@@ -816,7 +808,6 @@ type SlaveDataCenter struct {
 	Redis        config.StorageOptionsConf
 }
 
-// ToDo: better receive a config generator function
 func (s *Test) Start(genConf func(globalConf *config.Config)) *Gateway {
 	// init and create gw
 	s.BootstrapGw(context.Background(), genConf)
@@ -895,15 +886,25 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 	gw.setTestMode(true)
 
 	s.Gw = gw
-	testServerRouter = s.testHttpHandler()
+	s.TestServerRouter = s.testHttpHandler()
 	testServer := &http.Server{
 		Addr:           testHttpListen,
-		Handler:        testServerRouter,
+		Handler:        s.TestServerRouter,
 		ReadTimeout:    1 * time.Second,
 		WriteTimeout:   1 * time.Second,
 		MaxHeaderBytes: 1 << 20,
 	}
 	s.HttpHandler = testServer
+
+	//if s.config.EnableTestDNSMock {
+		var errMock error
+		s.MockHandle,errMock = test.InitDNSMock(test.DomainsToAddresses, nil)
+		if errMock != nil {
+			panic(errMock)
+		}
+	//	defer s.MockHandle.ShutdownDnsMock()
+//	}
+
 	go func() {
 		err := testServer.ListenAndServe()
 		if err != nil {
@@ -1034,6 +1035,11 @@ func (s *Test) Close() {
 	if err != nil {
 		log.WithError(err).Error("shutting down the http handler")
 	}
+
+	if s.config.EnableTestDNSMock{
+		s.MockHandle.ShutdownDnsMock()
+	}
+
 	os.RemoveAll(s.Gw.GetConfig().AppPath)
 }
 
@@ -1143,6 +1149,9 @@ func (s *Test) GetPolicyById(policyId string) (user.Policy, bool) {
 
 func StartTest(genConf func(globalConf *config.Config), testConfig ...TestConfig) *Test {
 	t := &Test{}
+
+	// DNS mock enabled by default
+	t.config.EnableTestDNSMock = true
 	if len(testConfig) > 0 {
 		t.config = testConfig[0]
 	}

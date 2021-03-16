@@ -29,9 +29,7 @@ func createRLSession() *user.SessionState {
 	return session
 }
 
-func getRLOpenChain(spec *APISpec) http.Handler {
-	ts := StartTest(nil)
-	defer ts.Close()
+func(ts *Test) getRLOpenChain(spec *APISpec) http.Handler {
 
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := ts.Gw.TykNewSingleHostReverseProxy(remote, spec, nil)
@@ -46,9 +44,7 @@ func getRLOpenChain(spec *APISpec) http.Handler {
 	return chain
 }
 
-func getGlobalRLAuthKeyChain(spec *APISpec) http.Handler {
-	ts := StartTest(nil)
-	defer ts.Close()
+func(ts *Test) getGlobalRLAuthKeyChain(spec *APISpec) http.Handler {
 
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := ts.Gw.TykNewSingleHostReverseProxy(remote, spec, nil)
@@ -75,10 +71,10 @@ func TestRLOpen(t *testing.T) {
 
 	req := TestReq(t, "GET", "/rl_test/", nil)
 
-	DRLManager.SetCurrentTokenValue(1)
-	DRLManager.RequestTokenValue = 1
+	ts.Gw.DRLManager.SetCurrentTokenValue(1)
+	ts.Gw.DRLManager.RequestTokenValue = 1
 
-	chain := getRLOpenChain(spec)
+	chain := ts.getRLOpenChain(spec)
 	for a := 0; a <= 10; a++ {
 		recorder := httptest.NewRecorder()
 		chain.ServeHTTP(recorder, req)
@@ -94,9 +90,6 @@ func TestRLOpen(t *testing.T) {
 			}
 		}
 	}
-
-	DRLManager.SetCurrentTokenValue(0)
-	DRLManager.RequestTokenValue = 0
 }
 
 func requestThrottlingTest(limiter string, testLevel string) func(t *testing.T) {
@@ -109,8 +102,8 @@ func requestThrottlingTest(limiter string, testLevel string) func(t *testing.T) 
 
 		switch limiter {
 		case "InMemoryRateLimiter":
-			DRLManager.SetCurrentTokenValue(1)
-			DRLManager.RequestTokenValue = 1
+			ts.Gw.DRLManager.SetCurrentTokenValue(1)
+			ts.Gw.DRLManager.RequestTokenValue = 1
 		case "SentinelRateLimiter":
 			globalCfg.EnableSentinelRateLimiter = true
 		case "RedisRollingRateLimiter":
@@ -237,10 +230,10 @@ func TestRLClosed(t *testing.T) {
 	}
 	req.Header.Set("authorization", "Bearer "+customToken)
 
-	DRLManager.SetCurrentTokenValue(1)
-	DRLManager.RequestTokenValue = 1
+	ts.Gw.DRLManager.SetCurrentTokenValue(1)
+	ts.Gw.DRLManager.RequestTokenValue = 1
 
-	chain := getGlobalRLAuthKeyChain(spec)
+	chain := ts.getGlobalRLAuthKeyChain(spec)
 	for a := 0; a <= 10; a++ {
 		recorder := httptest.NewRecorder()
 		chain.ServeHTTP(recorder, req)
@@ -256,11 +249,9 @@ func TestRLClosed(t *testing.T) {
 			}
 		}
 	}
-
-	DRLManager.SetCurrentTokenValue(0)
-	DRLManager.RequestTokenValue = 0
 }
-
+//TestJSVMStagesRequest
+//TestProcessRequestLiveQuotaLimit
 func TestRLOpenWithReload(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -269,10 +260,10 @@ func TestRLOpenWithReload(t *testing.T) {
 
 	req := TestReq(t, "GET", "/rl_test/", nil)
 
-	DRLManager.SetCurrentTokenValue(1)
-	DRLManager.RequestTokenValue = 1
+	ts.Gw.DRLManager.SetCurrentTokenValue(1)
+	ts.Gw.DRLManager.RequestTokenValue = 1
 
-	chain := getRLOpenChain(spec)
+	chain := ts.getRLOpenChain(spec)
 	for a := 0; a <= 10; a++ {
 		recorder := httptest.NewRecorder()
 		chain.ServeHTTP(recorder, req)
@@ -291,7 +282,7 @@ func TestRLOpenWithReload(t *testing.T) {
 
 	// Change rate and emulate a reload
 	spec.GlobalRateLimit.Rate = 20
-	chain = getRLOpenChain(spec)
+	chain = ts.getRLOpenChain(spec)
 	for a := 0; a <= 30; a++ {
 		recorder := httptest.NewRecorder()
 		chain.ServeHTTP(recorder, req)
@@ -307,9 +298,6 @@ func TestRLOpenWithReload(t *testing.T) {
 			}
 		}
 	}
-
-	DRLManager.SetCurrentTokenValue(0)
-	DRLManager.RequestTokenValue = 0
 }
 
 const openRLDefSmall = `{

@@ -16,8 +16,8 @@ func TestRateLimit_Unlimited(t *testing.T) {
 	g := StartTest(nil)
 	defer g.Close()
 
-	DRLManager.SetCurrentTokenValue(1)
-	DRLManager.RequestTokenValue = 1
+	g.Gw.DRLManager.SetCurrentTokenValue(1)
+	g.Gw.DRLManager.RequestTokenValue = 1
 
 	api := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
@@ -65,9 +65,6 @@ func TestRateLimit_Unlimited(t *testing.T) {
 			{Headers: authHeader, Code: http.StatusOK},
 		}...)
 	})
-
-	DRLManager.SetCurrentTokenValue(0)
-	DRLManager.RequestTokenValue = 0
 }
 
 func TestNeverRenewQuota(t *testing.T) {

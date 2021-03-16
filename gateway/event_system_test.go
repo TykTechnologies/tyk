@@ -19,9 +19,7 @@ var (
 	}
 )
 
-func prepareSpecWithEvents(logger *logrus.Logger) (spec *APISpec) {
-	ts := StartTest(nil)
-	defer ts.Close()
+func(ts *Test) prepareSpecWithEvents(logger *logrus.Logger) (spec *APISpec) {
 
 	if logger == nil {
 		logger = log
@@ -105,7 +103,7 @@ func TestEventHandlerByName(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := prepareSpecWithEvents(nil)
+	spec := ts.prepareSpecWithEvents(nil)
 	for _, handlerType := range handlerTypes {
 		handlerConfig := prepareEventHandlerConfig(handlerType)
 		_, err := ts.Gw.EventHandlerByName(handlerConfig, spec)
@@ -121,10 +119,13 @@ func TestEventHandlerByName(t *testing.T) {
 }
 
 func TestLogMessageEventHandler(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	buf := &bytes.Buffer{}
 	testLogger := logrus.New()
 	testLogger.Out = buf
-	spec := prepareSpecWithEvents(testLogger)
+	spec := ts.prepareSpecWithEvents(testLogger)
 	handler := spec.EventPaths[EventAuthFailure][0]
 	em := config.EventMessage{
 		Type: EventAuthFailure,

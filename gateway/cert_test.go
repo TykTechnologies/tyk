@@ -72,7 +72,6 @@ func getCertManager() *certs.CertificateManager {
 		ts.Close()
 	})
 
-	fmt.Printf("\n cm returned :\n %+v \n", cm)
 	return cm
 }
 

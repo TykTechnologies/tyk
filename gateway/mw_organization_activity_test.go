@@ -14,7 +14,7 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
-func testPrepareProcessRequestQuotaLimit(tb testing.TB, ts *Test, data map[string]interface{}) {
+func(ts *Test) testPrepareProcessRequestQuotaLimit(tb testing.TB, data map[string]interface{}) {
 
 	// load API
 	orgID := "test-org-" + uuid.NewV4().String()
@@ -57,9 +57,8 @@ func TestProcessRequestLiveQuotaLimit(t *testing.T) {
 	defer ts.Close()
 
 	// load API
-	testPrepareProcessRequestQuotaLimit(
+	ts.testPrepareProcessRequestQuotaLimit(
 		t,
-		ts,
 		map[string]interface{}{
 			"quota_max":          10,
 			"quota_remaining":    10,
@@ -106,9 +105,8 @@ func BenchmarkProcessRequestLiveQuotaLimit(b *testing.B) {
 	ts.Gw.SetConfig(globalConf)
 
 	// load API
-	testPrepareProcessRequestQuotaLimit(
+	ts.testPrepareProcessRequestQuotaLimit(
 		b,
-		ts,
 		map[string]interface{}{
 			"quota_max":          100000000,
 			"quota_remaining":    100000000,
@@ -133,9 +131,8 @@ func TestProcessRequestOffThreadQuotaLimit(t *testing.T) {
 	defer ts.Close()
 
 	// load API
-	testPrepareProcessRequestQuotaLimit(
+	ts.testPrepareProcessRequestQuotaLimit(
 		t,
-		ts,
 		map[string]interface{}{
 			"quota_max":          10,
 			"quota_remaining":    10,
@@ -203,9 +200,8 @@ func BenchmarkProcessRequestOffThreadQuotaLimit(b *testing.B) {
 	defer ts.Close()
 
 	// load API
-	testPrepareProcessRequestQuotaLimit(
+	ts.testPrepareProcessRequestQuotaLimit(
 		b,
-		ts,
 		map[string]interface{}{
 			"quota_max":          100000000,
 			"quota_remaining":    100000000,
@@ -233,9 +229,8 @@ func TestProcessRequestLiveRedisRollingLimiter(t *testing.T) {
 	ts.Gw.DoReload()
 
 	// load API
-	testPrepareProcessRequestQuotaLimit(
+	ts.testPrepareProcessRequestQuotaLimit(
 		t,
-		ts,
 		map[string]interface{}{
 			"quota_max": -1,
 			"rate":      10,
@@ -292,9 +287,8 @@ func BenchmarkProcessRequestLiveRedisRollingLimiter(b *testing.B) {
 	defer ts.Close()
 
 	// load API
-	testPrepareProcessRequestQuotaLimit(
+	ts.testPrepareProcessRequestQuotaLimit(
 		b,
-		ts,
 		map[string]interface{}{
 			"quota_max": -1,
 			"rate":      10000,
@@ -322,9 +316,8 @@ func TestProcessRequestOffThreadRedisRollingLimiter(t *testing.T) {
 	defer ts.Close()
 
 	// load API
-	testPrepareProcessRequestQuotaLimit(
+	ts.testPrepareProcessRequestQuotaLimit(
 		t,
-		ts,
 		map[string]interface{}{
 			"quota_max": -1,
 			"rate":      10,
@@ -377,9 +370,8 @@ func BenchmarkProcessRequestOffThreadRedisRollingLimiter(b *testing.B) {
 	defer ts.Close()
 
 	// load API
-	testPrepareProcessRequestQuotaLimit(
+	ts.testPrepareProcessRequestQuotaLimit(
 		b,
-		ts,
 		map[string]interface{}{
 			"quota_max": -1,
 			"rate":      10000,

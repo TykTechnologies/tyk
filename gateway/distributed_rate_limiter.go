@@ -9,14 +9,12 @@ import (
 	"github.com/TykTechnologies/drl"
 )
 
-var DRLManager = &drl.DRL{}
-
 func (gw *Gateway) setupDRL() {
 	drlManager := &drl.DRL{}
 	drlManager.Init()
 	drlManager.ThisServerID = gw.GetNodeID() + "|" + hostDetails.Hostname
 	log.Debug("DRL: Setting node ID: ", drlManager.ThisServerID)
-	DRLManager = drlManager
+	gw.DRLManager = drlManager
 }
 
 func (gw *Gateway) startRateLimitNotifications() {
@@ -48,7 +46,7 @@ func (gw *Gateway) getTagHash() string {
 }
 
 func (gw *Gateway) NotifyCurrentServerStatus() {
-	if !DRLManager.Ready {
+	if !gw.DRLManager.Ready {
 		return
 	}
 
@@ -79,7 +77,7 @@ func (gw *Gateway) NotifyCurrentServerStatus() {
 	gw.MainNotifier.Notify(n)
 }
 
-func onServerStatusReceivedHandler(payload string) {
+func(gw *Gateway) onServerStatusReceivedHandler(payload string) {
 	serverData := drl.Server{}
 	if err := json.Unmarshal([]byte(payload), &serverData); err != nil {
 		log.WithFields(logrus.Fields{
@@ -91,8 +89,8 @@ func onServerStatusReceivedHandler(payload string) {
 
 	// log.Debug("Received DRL data: ", serverData)
 
-	if DRLManager.Ready {
-		if err := DRLManager.AddOrUpdateServer(serverData); err != nil {
+	if gw.DRLManager.Ready {
+		if err := gw.DRLManager.AddOrUpdateServer(serverData); err != nil {
 			log.WithError(err).
 				WithField("serverData", serverData).
 				Debug("AddOrUpdateServer error. Seems like you running multiple segmented Tyk groups in same Redis.")
