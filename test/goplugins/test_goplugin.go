@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
 
 	"github.com/TykTechnologies/tyk/ctx"
@@ -71,6 +73,19 @@ func MyPluginPost(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set(headers.ContentType, headers.ApplicationJSON)
 	rw.WriteHeader(http.StatusOK)
 	rw.Write(jsonData)
+}
+
+// MyPluginResponse intercepts response from upstream which we can then manipulate
+func MyPluginResponse(rw http.ResponseWriter, res *http.Response, req *http.Request) {
+
+	res.Header.Add("X-Response-Added", "resp-added")
+
+	var buf bytes.Buffer
+
+	buf.Write([]byte(`{"message":"response injected message"}`))
+
+	res.Body = ioutil.NopCloser(&buf)
+
 }
 
 func main() {}

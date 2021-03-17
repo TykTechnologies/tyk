@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"path"
 	"path/filepath"
 	"runtime/debug"
 	"sort"
@@ -24,11 +25,13 @@ import (
 	"github.com/TykTechnologies/tyk/trace"
 )
 
+const (
+	rateLimitEndpoint = "/tyk/rate-limits/"
+)
+
 type ChainObject struct {
-	ListenOn       string
 	ThisHandler    http.Handler
 	RateLimitChain http.Handler
-	RateLimitPath  string
 	Open           bool
 	Skip           bool
 }
@@ -239,7 +242,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		fixFuncPath(prefix, mwPreFuncs)
 		fixFuncPath(prefix, mwPostFuncs)
 		fixFuncPath(prefix, mwPostAuthCheckFuncs)
-		// TODO: add mwResponseFuncs here when Golang response custom MW support implemented
+		fixFuncPath(prefix, mwResponseFuncs)
 	}
 
 	if spec.GraphQL.GraphQLPlayground.Enabled {
@@ -466,11 +469,9 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		gw.mwAppendEnabled(&simpleArray, &KeyExpired{baseMid})
 		gw.mwAppendEnabled(&simpleArray, &AccessRightsCheck{baseMid})
 
-		rateLimitPath := spec.Proxy.ListenPath + "tyk/rate-limits/"
-
+		rateLimitPath := path.Join(spec.Proxy.ListenPath, rateLimitEndpoint)
 		logger.Debug("Rate limit endpoint is: ", rateLimitPath)
 
-		chainDef.RateLimitPath = rateLimitPath
 		chainDef.RateLimitChain = alice.New(simpleArray...).
 			Then(http.HandlerFunc(userRatesCheck))
 	}
@@ -482,7 +483,6 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	} else {
 		chainDef.ThisHandler = chain
 	}
-	chainDef.ListenOn = spec.Proxy.ListenPath + "{rest:.*}"
 
 	logger.WithFields(logrus.Fields{
 		"prefix":      "gateway",
@@ -671,16 +671,18 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 		mainLog.Info("API hostname set: ", hostname)
 		router = router.Host(hostname).Subrouter()
 	}
-	chainObj := gw.processSpec(spec, apisByListen, gs, router, logrus.NewEntry(log))
+
+	subrouter := router.PathPrefix(spec.Proxy.ListenPath).Subrouter()
+	chainObj := gw.processSpec(spec, apisByListen, gs, subrouter, logrus.NewEntry(log))
 	if chainObj.Skip {
 		return chainObj.ThisHandler
 	}
 
 	if !chainObj.Open {
-		router.Handle(chainObj.RateLimitPath, chainObj.RateLimitChain)
+		subrouter.Handle(rateLimitEndpoint, chainObj.RateLimitChain)
 	}
 
-	router.Handle(chainObj.ListenOn, chainObj.ThisHandler)
+	subrouter.NewRoute().Handler(chainObj.ThisHandler)
 	return chainObj.ThisHandler
 }
 
@@ -718,7 +720,8 @@ type generalStores struct {
 	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore storage.Handler
 }
 
-func (gw *Gateway) loadGraphQLPlayground(spec *APISpec, router *mux.Router) {
+func (gw *Gateway) loadGraphQLPlayground(spec *APISpec, subrouter *mux.Router) {
+
 	// endpoint is the endpoint of the url which playground makes request to.
 	endpoint := spec.Proxy.ListenPath
 
@@ -730,7 +733,7 @@ func (gw *Gateway) loadGraphQLPlayground(spec *APISpec, router *mux.Router) {
 
 	p := playground.New(playground.Config{
 		// PathPrefix is the path on the router where playground handler is loaded.
-		PathPrefix:                      spec.Proxy.ListenPath,
+		PathPrefix:                      "/",
 		PlaygroundPath:                  spec.GraphQL.GraphQLPlayground.Path,
 		GraphqlEndpointPath:             endpoint,
 		GraphQLSubscriptionEndpointPath: endpoint,
@@ -742,7 +745,7 @@ func (gw *Gateway) loadGraphQLPlayground(spec *APISpec, router *mux.Router) {
 	}
 
 	for _, cfg := range handlers {
-		router.HandleFunc(cfg.Path, cfg.Handler)
+		subrouter.HandleFunc(cfg.Path, cfg.Handler)
 	}
 }
 

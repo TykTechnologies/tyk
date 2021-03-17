@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"fmt"
+	"math/rand"
 	"net"
 	"strings"
 	"sync"
@@ -178,14 +179,16 @@ func (a *AnalyticsRecord) SetExpiry(expiresInSeconds int64) {
 // RedisAnalyticsHandler will record analytics data to a redis back end
 // as defined in the Config object
 type RedisAnalyticsHandler struct {
-	Store            storage.AnalyticsHandler
-	GeoIPDB          *maxminddb.Reader
-	globalConf       config.Config
-	recordsChan      chan *AnalyticsRecord
-	workerBufferSize uint64
-	shouldStop       uint32
-	poolWg           sync.WaitGroup
-	Gw               *Gateway `json:"-"`
+	Store                       storage.AnalyticsHandler
+	GeoIPDB                     *maxminddb.Reader
+	globalConf                  config.Config
+	recordsChan                 chan *AnalyticsRecord
+	workerBufferSize            uint64
+	shouldStop                  uint32
+	poolWg                      sync.WaitGroup
+	enableMultipleAnalyticsKeys bool
+	Clean                       Purger
+	Gw                          *Gateway `json:"-"`
 }
 
 func (r *RedisAnalyticsHandler) Init() {
@@ -201,9 +204,10 @@ func (r *RedisAnalyticsHandler) Init() {
 	r.Store.Connect()
 	ps := r.Gw.GetConfig().AnalyticsConfig.PoolSize
 	recordsBufferSize := r.globalConf.AnalyticsConfig.RecordsBufferSize
+
 	r.workerBufferSize = recordsBufferSize / uint64(ps)
 	log.WithField("workerBufferSize", r.workerBufferSize).Debug("Analytics pool worker buffer size")
-
+	r.enableMultipleAnalyticsKeys = r.Gw.GetConfig().AnalyticsConfig.EnableMultipleAnalyticsKeys
 	r.recordsChan = make(chan *AnalyticsRecord, recordsBufferSize)
 
 	// start worker pool
@@ -245,10 +249,16 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 	// this is buffer to send one pipelined command to redis
 	// use r.recordsBufferSize as cap to reduce slice re-allocations
 	recordsBuffer := make([][]byte, 0, r.workerBufferSize)
+	rand.Seed(time.Now().Unix())
 
 	// read records from channel and process
 	lastSentTs := time.Now()
 	for {
+		analyticKey := analyticsKeyName
+		if r.enableMultipleAnalyticsKeys {
+			suffix := rand.Intn(10)
+			analyticKey = fmt.Sprintf("%v_%v", analyticKey, suffix)
+		}
 		readyToSend := false
 		select {
 
@@ -256,7 +266,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 			// check if channel was closed and it is time to exit from worker
 			if !ok {
 				// send what is left in buffer
-				r.Store.AppendToSetPipelined(analyticsKeyName, recordsBuffer, r.globalConf.AnalyticsConfig.StorageExpirationTime)
+				r.Store.AppendToSetPipelined(analyticKey, recordsBuffer)
 				return
 			}
 
@@ -311,7 +321,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 
 		// send data to Redis and reset buffer
 		if len(recordsBuffer) > 0 && (readyToSend || time.Since(lastSentTs) >= recordsBufferForcedFlushInterval) {
-			r.Store.AppendToSetPipelined(analyticsKeyName, recordsBuffer, r.globalConf.AnalyticsConfig.StorageExpirationTime)
+			r.Store.AppendToSetPipelined(analyticKey, recordsBuffer)
 			recordsBuffer = recordsBuffer[:0]
 			lastSentTs = time.Now()
 		}

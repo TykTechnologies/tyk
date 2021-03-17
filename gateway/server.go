@@ -256,7 +256,8 @@ func (gw *Gateway) setupGlobals(ctx context.Context) {
 		if gwConfig.ManagementNode {
 			mainLog.Warn("Running Uptime checks in a management node.")
 		}
-		healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:"}
+
+		healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:", IsAnalytics: true}
 		gw.InitHostCheckManager(ctx, &healthCheckStore)
 	}
 
@@ -278,15 +279,21 @@ func (gw *Gateway) setupGlobals(ctx context.Context) {
 		gw.SetConfig(Conf)
 		mainLog.Debug("Setting up analytics DB connection")
 
-		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-"}
+		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true}
 		gw.analytics.Store = &analyticsStore
 		gw.analytics.Init()
+
+		gw.RedisPurgeOnce.Do(func() {
+			store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true}
+			redisPurger := RedisPurger{Store: &store, Gw: gw}
+			go redisPurger.PurgeLoop(ctx)
+		})
 
 		if gw.GetConfig().AnalyticsConfig.Type == "rpc" {
 			mainLog.Debug("Using RPC cache purge")
 
 			gw.RpcPurgeOnce.Do(func() {
-				store := storage.RedisCluster{KeyPrefix: "analytics-"}
+				store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true}
 				purger := rpc.Purger{
 					Store: &store,
 				}
@@ -581,16 +588,12 @@ func generateOAuthPrefix(apiID string) string {
 
 // Create API-specific OAuth handlers and respective auth servers
 func (gw *Gateway) addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
-	var pathSeparator string
-	if !strings.HasSuffix(spec.Proxy.ListenPath, "/") {
-		pathSeparator = "/"
-	}
 
-	apiAuthorizePath := spec.Proxy.ListenPath + pathSeparator + "tyk/oauth/authorize-client{_:/?}"
-	clientAuthPath := spec.Proxy.ListenPath + pathSeparator + "oauth/authorize{_:/?}"
-	clientAccessPath := spec.Proxy.ListenPath + pathSeparator + "oauth/token{_:/?}"
-	revokeToken := spec.Proxy.ListenPath + pathSeparator + "oauth/revoke"
-	revokeAllTokens := spec.Proxy.ListenPath + pathSeparator + "oauth/revoke_all"
+	apiAuthorizePath := "/tyk/oauth/authorize-client{_:/?}"
+	clientAuthPath := "/oauth/authorize{_:/?}"
+	clientAccessPath := "/oauth/token{_:/?}"
+	revokeToken := "/oauth/revoke"
+	revokeAllTokens := "/oauth/revoke_all"
 
 	serverConfig := osin.NewServerConfig()
 
@@ -629,11 +632,10 @@ func (gw *Gateway) addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthMana
 	return &oauthManager
 }
 
-func (gw *Gateway) addBatchEndpoint(spec *APISpec, muxer *mux.Router) {
+func (gw *Gateway) addBatchEndpoint(spec *APISpec, subrouter *mux.Router) {
 	mainLog.Debug("Batch requests enabled for API")
-	apiBatchPath := spec.Proxy.ListenPath + "tyk/batch/"
 	batchHandler := BatchRequestHandler{API: spec, Gw: gw}
-	muxer.HandleFunc(apiBatchPath, batchHandler.HandleBatchRequest)
+	subrouter.HandleFunc("/tyk/batch/", batchHandler.HandleBatchRequest)
 }
 
 func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, apidef.MiddlewareDriver) {
@@ -746,12 +748,20 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 	}
 
 	for _, mw := range responseFuncs {
-		processor := gw.responseProcessorByName("custom_mw_res_hook")
+		var processor TykResponseHandler
+		//is it goplugin or other middleware
+		if strings.HasSuffix(mw.Path, ".so") {
+			processor = gw.responseProcessorByName("goplugin_res_hook")
+		} else {
+			processor = gw.responseProcessorByName("custom_mw_res_hook")
+		}
+
 		// TODO: perhaps error when plugin support is disabled?
 		if processor == nil {
 			mainLog.Error("Couldn't find custom middleware processor")
 			return
 		}
+
 		if err := processor.Init(mw, spec); err != nil {
 			mainLog.Debug("Failed to init processor: ", err)
 		}

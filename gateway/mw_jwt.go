@@ -3,6 +3,7 @@ package gateway
 import (
 	"bytes"
 	"crypto/md5"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
@@ -74,10 +75,15 @@ func (k *JWTMiddleware) legacyGetSecretFromURL(url, kid, keyType string) (interf
 		JWKCache = cache.New(240*time.Second, 30*time.Second)
 	}
 
+	var client http.Client
+	client.Transport = &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: k.Gw.GetConfig().JWTSSLInsecureSkipVerify},
+	}
+
 	var jwkSet JWKs
 	cachedJWK, found := JWKCache.Get("legacy-" + k.Spec.APIID)
 	if !found {
-		resp, err := http.Get(url)
+		resp, err := client.Get(url)
 		if err != nil {
 			k.Logger().WithError(err).Error("Failed to get resource URL")
 			return nil, err
@@ -124,12 +130,16 @@ func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) (interface{},
 	}
 
 	var jwkSet *jose.JSONWebKeySet
+	var client http.Client
+	client.Transport = &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: k.Gw.GetConfig().JWTSSLInsecureSkipVerify},
+	}
 
 	cachedJWK, found := JWKCache.Get(k.Spec.APIID)
 	if !found {
 		// Get the JWK
 		k.Logger().Debug("Pulling JWK")
-		resp, err := http.Get(url)
+		resp, err := client.Get(url)
 		if err != nil {
 			k.Logger().WithError(err).Error("Failed to get resource URL")
 			return nil, err

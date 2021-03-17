@@ -161,6 +161,9 @@
         "records_buffer_size": {
           "type": "integer"
         },
+        "enable_multiple_analytics_keys": {
+          "type": "boolean"
+        },
         "storage_expiration_time": {
           "type": "integer"
         },
@@ -314,6 +317,9 @@
     "disable_dashboard_zeroconf": {
       "type": "boolean"
     },
+    "jwt_ssl_insecure_skip_verify": {
+      "type": "boolean"
+    },
     "disable_virtual_path_blobs": {
       "type": "boolean"
     },
@@ -328,6 +334,12 @@
     },
     "enable_analytics": {
       "type": "boolean"
+    },
+    "enable_separate_analytics_store": {
+      "type": "boolean"
+    },
+    "analytics_storage": {
+      "$ref": "#/definitions/StorageOptions"
     },
     "enable_api_segregation": {
       "type": "boolean"

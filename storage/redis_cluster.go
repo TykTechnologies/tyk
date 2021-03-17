@@ -11,7 +11,7 @@ import (
 
 	"crypto/tls"
 
-	"github.com/go-redis/redis/v8"
+	redis "github.com/go-redis/redis/v8"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 
@@ -29,6 +29,8 @@ var ErrRedisIsDown = errors.New("storage: Redis is either down or was not config
 
 var singlePool atomic.Value
 var singleCachePool atomic.Value
+var singleAnalyticsPool atomic.Value
+
 var redisUp atomic.Value
 
 var disableRedis atomic.Value
@@ -80,9 +82,16 @@ func WaitConnect(ctx context.Context) bool {
 	}
 }
 
-func singleton(cache bool) redis.UniversalClient {
+func singleton(cache, analytics bool) redis.UniversalClient {
 	if cache {
 		v := singleCachePool.Load()
+		if v != nil {
+			return v.(redis.UniversalClient)
+		}
+		return nil
+	}
+	if analytics {
+		v := singleAnalyticsPool.Load()
 		if v != nil {
 			return v.(redis.UniversalClient)
 		}
@@ -95,15 +104,18 @@ func singleton(cache bool) redis.UniversalClient {
 	return nil
 }
 
-func connectSingleton(cache bool, conf config.Config) bool {
-	d := singleton(cache) == nil
+func connectSingleton(cache, analytics bool, conf config.Config) bool {
+	d := singleton(cache, analytics) == nil
 	if d {
 		log.Debug("Connecting to redis cluster")
 		if cache {
-			singleCachePool.Store(NewRedisClusterPool(cache, conf))
+			singleCachePool.Store(NewRedisClusterPool(cache, analytics, conf))
+			return true
+		} else if analytics {
+			singleAnalyticsPool.Store(NewRedisClusterPool(cache, analytics, conf))
 			return true
 		}
-		singlePool.Store(NewRedisClusterPool(cache, conf))
+		singlePool.Store(NewRedisClusterPool(cache, analytics, conf))
 		return true
 	}
 	return true
@@ -111,13 +123,14 @@ func connectSingleton(cache bool, conf config.Config) bool {
 
 // RedisCluster is a storage manager that uses the redis database.
 type RedisCluster struct {
-	KeyPrefix string
-	HashKeys  bool
-	IsCache   bool
+	KeyPrefix   string
+	HashKeys    bool
+	IsCache     bool
+	IsAnalytics bool
 }
 
 func clusterConnectionIsOpen(cluster *RedisCluster) bool {
-	c := singleton(cluster.IsCache)
+	c := singleton(cluster.IsCache, cluster.IsAnalytics)
 	testKey := "redis-test-" + uuid.NewV4().String()
 	if err := c.Set(ctx, testKey, "test", time.Second).Err(); err != nil {
 		return false
@@ -136,11 +149,11 @@ func ConnectToRedis(ctx context.Context, onConnect func(), conf *config.Config) 
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 	c := []RedisCluster{
-		{}, {IsCache: true},
+		{}, {IsCache: true}, {IsAnalytics: true},
 	}
 	var ok bool
 	for _, v := range c {
-		if !connectSingleton(v.IsCache, *conf) {
+		if !connectSingleton(v.IsCache, v.IsAnalytics, *conf) {
 			break
 		}
 		if !clusterConnectionIsOpen(&v) {
@@ -182,19 +195,20 @@ func connectCluster(conf config.Config, v ...RedisCluster) bool {
 }
 
 func establishConnection(v *RedisCluster, conf config.Config) bool {
-	if !connectSingleton(v.IsCache, conf) {
+	if !connectSingleton(v.IsCache, v.IsAnalytics, conf) {
 		return false
 	}
 	return clusterConnectionIsOpen(v)
 }
 
-func NewRedisClusterPool(isCache bool, conf config.Config) redis.UniversalClient {
+func NewRedisClusterPool(isCache, isAnalytics bool, conf config.Config) redis.UniversalClient {
 	// redisSingletonMu is locked and we know the singleton is nil
 	cfg := conf.Storage
 	if isCache && conf.EnableSeperateCacheStore {
 		cfg = conf.CacheStorage
+	} else if isAnalytics && conf.EnableAnalytics && conf.EnableSeperateAnalyticsStore {
+		cfg = conf.AnalyticsStorage
 	}
-
 	log.Debug("Creating new Redis connection pool")
 
 	// poolSize applies per cluster node and not for the whole cluster.
@@ -272,7 +286,7 @@ func (r *RedisCluster) Connect() bool {
 }
 
 func (r *RedisCluster) singleton() redis.UniversalClient {
-	return singleton(r.IsCache)
+	return singleton(r.IsCache, r.IsAnalytics)
 }
 
 func (r *RedisCluster) hashKey(in string) string {
@@ -404,6 +418,11 @@ func (r *RedisCluster) GetExp(keyName string) (int64, error) {
 		log.Error("Error trying to get TTL: ", err)
 		return 0, ErrKeyNotFound
 	}
+	//since redis-go v8.3.1, if there's no expiration or the key doesn't exists, the ttl returned is measured in nanoseconds
+	if value.Nanoseconds() == -1 || value.Nanoseconds() == -2 {
+		return value.Nanoseconds(), nil
+	}
+
 	return int64(value.Seconds()), nil
 }
 
@@ -937,7 +956,7 @@ func (r *RedisCluster) GetListRange(keyName string, from, to int64) ([]string, e
 	return elements, nil
 }
 
-func (r *RedisCluster) AppendToSetPipelined(key string, values [][]byte, StorageExpirationTime int) {
+func (r *RedisCluster) AppendToSetPipelined(key string, values [][]byte) {
 	if len(values) == 0 {
 		return
 	}
@@ -956,15 +975,6 @@ func (r *RedisCluster) AppendToSetPipelined(key string, values [][]byte, Storage
 
 	if _, err := pipe.Exec(ctx); err != nil {
 		log.WithError(err).Error("Error trying to append to set keys")
-	}
-
-	// if we need to set an expiration time
-	if storageExpTime := int64(StorageExpirationTime); storageExpTime != int64(-1) {
-		// If there is no expiry on the analytics set, we should set it.
-		exp, _ := r.GetExp(key)
-		if exp == -1 {
-			r.SetExp(key, storageExpTime)
-		}
 	}
 }
 

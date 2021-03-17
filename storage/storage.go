@@ -60,7 +60,7 @@ type Handler interface {
 
 type AnalyticsHandler interface {
 	Connect() bool
-	AppendToSetPipelined(string, [][]byte, int)
+	AppendToSetPipelined(string, [][]byte)
 	GetAndDeleteSet(string) []interface{}
 	SetExp(string, int64) error   // Set key expiration
 	GetExp(string) (int64, error) // Returns expiry of a key
