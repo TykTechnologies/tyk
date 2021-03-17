@@ -25,6 +25,7 @@ import (
 	"github.com/TykTechnologies/drl"
 	gas "github.com/TykTechnologies/goautosocket"
 	"github.com/TykTechnologies/gorpc"
+	"github.com/TykTechnologies/goverify"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/checkup"
@@ -45,6 +46,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/lonelycode/osin"
 	newrelic "github.com/newrelic/go-agent"
+	cache "github.com/pmylund/go-cache"
 	"github.com/rs/cors"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
@@ -103,6 +105,14 @@ type Gateway struct {
 	SessionLimiter SessionLimiter
 	SessionMonitor Monitor
 
+	RPCGlobalCache *cache.Cache
+	// key session memory cache
+	SessionCache *cache.Cache
+	// org session memory cache
+	ExpiryCache *cache.Cache
+	// memory cache to store arbitrary items
+	UtilCache *cache.Cache
+
 	apisMu          sync.RWMutex
 	apiSpecs        []*APISpec
 	apisByID        map[string]*APISpec
@@ -119,8 +129,13 @@ type Gateway struct {
 	LE_MANAGER  letsencrypt.Manager
 	LE_FIRSTRUN bool
 
+	NotificationVerifier goverify.Verifier
+
 	RedisPurgeOnce sync.Once
 	RpcPurgeOnce   sync.Once
+
+	// OnConnect this is a callback which is called whenever we transition redis Disconnected to connected
+	OnConnect func()
 
 	runningTestsMu sync.RWMutex
 	testMode       bool
@@ -137,7 +152,6 @@ type Gateway struct {
 
 	// ReloadTestCase use this when in any test for gateway reloads
 	ReloadTestCase *ReloadMachinery
-
 
 	// map[bundleName]map[fileName]fileContent used for tests
 	TestBundles  map[string]map[string]string
@@ -157,6 +171,11 @@ func NewGateway(config config.Config) *Gateway {
 	gw.DefaultQuotaStore = DefaultSessionManager{Gw: &gw}
 	gw.SessionLimiter = SessionLimiter{Gw: &gw}
 	gw.SessionMonitor = Monitor{Gw: &gw}
+	gw.RPCGlobalCache = cache.New(30*time.Second, 15*time.Second)
+
+	gw.SessionCache = cache.New(10*time.Second, 5*time.Second)
+	gw.ExpiryCache = cache.New(600*time.Second, 10*time.Minute)
+	gw.UtilCache = cache.New(time.Hour, 10*time.Minute)
 
 	gw.apisByID = map[string]*APISpec{}
 	gw.apisHandlesByID = new(sync.Map)
@@ -168,6 +187,7 @@ func NewGateway(config config.Config) *Gateway {
 	// only for tests
 	gw.ReloadTestCase = NewReloadMachinery()
 	gw.TestBundles = map[string]map[string]string{}
+
 	return &gw
 }
 

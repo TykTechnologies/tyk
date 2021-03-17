@@ -543,7 +543,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 
 		if updateSession {
 			clone := session.Clone()
-			SessionCache.Set(session.GetKeyHash(), &clone, cache.DefaultExpiration)
+			k.Gw.SessionCache.Set(session.GetKeyHash(), &clone, cache.DefaultExpiration)
 		}
 	}
 	ctxSetJWTContextVars(k.Spec, r, token)

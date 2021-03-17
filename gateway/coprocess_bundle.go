@@ -49,7 +49,7 @@ func (b *Bundle) Verify() error {
 			// Error: A public key is set, but the bundle isn't signed.
 			return errors.New("Bundle isn't signed")
 		}
-		if notificationVerifier == nil {
+		if b.Gw.NotificationVerifier == nil {
 			var err error
 			bundleVerifier, err = goverify.LoadPublicKeyFromFile(b.Gw.GetConfig().PublicKeyPath)
 			if err != nil {

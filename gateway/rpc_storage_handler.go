@@ -96,8 +96,6 @@ type RPCStorageHandler struct {
 	Gw               *Gateway `json:"-"`
 }
 
-var RPCGlobalCache = cache.New(30*time.Second, 15*time.Second)
-
 // Connect will establish a connection to the RPC
 func (r *RPCStorageHandler) Connect() bool {
 	slaveOptions := r.Gw.GetConfig().SlaveOptions
@@ -170,7 +168,7 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 	// Check the cache first
 	if r.Gw.GetConfig().SlaveOptions.EnableRPCCache {
 		log.Debug("Using cache for: ", keyName)
-		cachedVal, found := RPCGlobalCache.Get(keyName)
+		cachedVal, found := r.Gw.RPCGlobalCache.Get(keyName)
 		log.Debug("--> Found? ", found)
 		if found {
 			return cachedVal.(string), nil
@@ -197,7 +195,7 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 	}
 	if r.Gw.GetConfig().SlaveOptions.EnableRPCCache {
 		// Cache key
-		RPCGlobalCache.Set(keyName, value, cache.DefaultExpiration)
+		r.Gw.RPCGlobalCache.Set(keyName, value, cache.DefaultExpiration)
 	}
 	//return hash key without prefix so it doesnt get double prefixed in redis
 	return value.(string), nil
@@ -862,8 +860,8 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			token = strings.Split(token, "#")[0]
 			r.Gw.handleDeleteHashedKey(token, apiId, false)
 		}
-		SessionCache.Delete(token)
-		RPCGlobalCache.Delete(r.KeyPrefix + token)
+		r.Gw.SessionCache.Delete(token)
+		r.Gw.RPCGlobalCache.Delete(r.KeyPrefix + token)
 	}
 
 	for _, key := range keys {
@@ -885,8 +883,8 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 				r.Gw.handleDeleteKey(key, "-1", resetQuota)
 				r.Gw.getSessionAndCreate(splitKeys[0], r)
 			}
-			SessionCache.Delete(key)
-			RPCGlobalCache.Delete(r.KeyPrefix + key)
+			r.Gw.SessionCache.Delete(key)
+			r.Gw.RPCGlobalCache.Delete(r.KeyPrefix + key)
 		}
 	}
 	// Notify rest of gateways in cluster to flush cache

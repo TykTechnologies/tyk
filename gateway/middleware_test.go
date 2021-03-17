@@ -40,13 +40,13 @@ func TestBaseMiddleware_OrgSessionExpiry(t *testing.T) {
 		Gw:     ts.Gw,
 	}
 	v := int64(100)
-	ExpiryCache.Set(sess.OrgID, v, cache.DefaultExpiration)
+	ts.Gw.ExpiryCache.Set(sess.OrgID, v, cache.DefaultExpiration)
 
 	got := m.OrgSessionExpiry(sess.OrgID)
 	if got != v {
 		t.Errorf("expected %d got %d", v, got)
 	}
-	ExpiryCache.Delete(sess.OrgID)
+	ts.Gw.ExpiryCache.Delete(sess.OrgID)
 	got = m.OrgSessionExpiry(sess.OrgID)
 	if got != sess.DataExpires {
 		t.Errorf("expected %d got %d", sess.DataExpires, got)

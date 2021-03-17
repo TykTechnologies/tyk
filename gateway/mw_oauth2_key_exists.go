@@ -105,17 +105,17 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	oauthClientDeletedKey := "oauth-del-" + k.Spec.APIID + session.OauthClientID
 	oauthClientDeleted := false
 	// check if that oauth client was deleted with using  memory cache first
-	if val, found := UtilCache.Get(oauthClientDeletedKey); found {
+	if val, found := k.Gw.UtilCache.Get(oauthClientDeletedKey); found {
 		oauthClientDeleted = val.(bool)
 	} else {
 		// if not cached in memory then hit Redis to get oauth-client from there
 		if _, err := k.Spec.OAuthManager.OsinServer.Storage.GetClient(session.OauthClientID); err != nil {
 			// set this oauth client as deleted in memory cache for the next N sec
-			UtilCache.Set(oauthClientDeletedKey, true, checkOAuthClientDeletedInetrval)
+			k.Gw.UtilCache.Set(oauthClientDeletedKey, true, checkOAuthClientDeletedInetrval)
 			oauthClientDeleted = true
 		} else {
 			// set this oauth client as NOT deleted in memory cache for next N sec
-			UtilCache.Set(oauthClientDeletedKey, false, checkOAuthClientDeletedInetrval)
+			k.Gw.UtilCache.Set(oauthClientDeletedKey, false, checkOAuthClientDeletedInetrval)
 		}
 	}
 	if oauthClientDeleted {

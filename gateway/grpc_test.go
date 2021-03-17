@@ -641,8 +641,12 @@ func TestGRPC_Stream_TokenBasedAuthentication(t *testing.T) {
 
 	certManager := getCertManager()
 	_, _, combinedPEM, _ := genServerCertificate()
-	certID, _ := certManager.Add(combinedPEM, "")
+	certID, err := certManager.Add(combinedPEM, "")
 	defer certManager.Delete(certID, "")
+
+	if err != nil {
+		t.Errorf("could not add certificate: %v", err.Error())
+	}
 
 	// gRPC server
 	target, s := startGRPCServer(t, nil, setupStreamSVC)
@@ -674,14 +678,18 @@ func TestGRPC_Stream_TokenBasedAuthentication(t *testing.T) {
 	client := GetTLSClient(nil, nil)
 
 	// To create key
-	resp, _ := ts.Run(t, []test.TestCase{
+	resp, errKey := ts.Run(t, []test.TestCase{
 		{Method: "POST", Path: "/tyk/keys/create", Data: session, AdminAuth: true, Code: 200, Client: client},
 	}...)
+
+	if errKey != nil {
+		t.Errorf("creating key: %v", errKey.Error())
+	}
 
 	// Read key
 	body, _ := ioutil.ReadAll(resp.Body)
 	var resMap map[string]string
-	err := json.Unmarshal(body, &resMap)
+	err = json.Unmarshal(body, &resMap)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -55,9 +55,6 @@ var (
 	testMiddlewarePath, _ = ioutil.TempDir("", "tyk-middleware-path")
 
 	defaultTestConfig config.Config
-
-	// OnConnect this is a callback which is called whenever we transition redis Disconnected to connected
-	OnConnect func()
 )
 
 // ReloadMachinery is a helper struct to use when writing tests that do manual
@@ -967,8 +964,8 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 
 	configs := gw.GetConfig()
 	go storage.ConnectToRedis(ctx, func() {
-		if OnConnect != nil {
-			OnConnect()
+		if gw.OnConnect != nil {
+			gw.OnConnect()
 		}
 	}, &configs)
 	for {

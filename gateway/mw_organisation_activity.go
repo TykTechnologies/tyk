@@ -66,7 +66,7 @@ func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	// try to check in in-app cache 1st
 	if !k.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
 		var cachedSession interface{}
-		if cachedSession, found = SessionCache.Get(k.Spec.OrgID); found {
+		if cachedSession, found = k.Gw.SessionCache.Get(k.Spec.OrgID); found {
 			sess := cachedSession.(*user.SessionState)
 			orgSession = sess.Clone()
 		}
@@ -121,7 +121,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession *us
 		// update in-app cache if needed
 		if !k.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
 			clone := orgSession.Clone()
-			SessionCache.Set(k.Spec.OrgID, &clone, time.Second*time.Duration(sessionLifeTime))
+			k.Gw.SessionCache.Set(k.Spec.OrgID, &clone, time.Second*time.Duration(sessionLifeTime))
 		}
 	} else {
 		logger.WithError(err).Error("Could not update org session")
@@ -254,7 +254,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 		// update in-app cache if needed
 		if !k.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
 			clone := session.Clone()
-			SessionCache.Set(k.Spec.OrgID, &clone, time.Second*time.Duration(sessionLifeTime))
+			k.Gw.SessionCache.Set(k.Spec.OrgID, &clone, time.Second*time.Duration(sessionLifeTime))
 		}
 	} else {
 		logEntry.WithError(err).WithField("orgID", k.Spec.OrgID).Error("Could not update org session")

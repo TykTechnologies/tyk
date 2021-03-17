@@ -142,8 +142,8 @@ func (b *DefaultSessionManager) clearCacheForKey(keyName string, hashed bool) {
 		cacheKey = storage.HashKey(keyName, b.Gw.GetConfig().HashKeys)
 	}
 
-	// Delete current gateway's cache immediately
-	SessionCache.Delete(cacheKey)
+	// Delete gateway's cache immediately
+	b.Gw.SessionCache.Delete(cacheKey)
 
 	// Notify gateways in cluster to flush cache
 	n := Notification{

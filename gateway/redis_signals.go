@@ -113,7 +113,7 @@ func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationComm
 		pubSubLog.Info("Reloading endpoints")
 		gw.reloadURLStructure(reloaded)
 	case KeySpaceUpdateNotification:
-		handleKeySpaceEventCacheFlush(notif.Payload)
+		gw.handleKeySpaceEventCacheFlush(notif.Payload)
 	default:
 		pubSubLog.Warnf("Unknown notification command: %q", notif.Command)
 		return
@@ -124,7 +124,7 @@ func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationComm
 	}
 }
 
-func handleKeySpaceEventCacheFlush(payload string) {
+func(gw *Gateway) handleKeySpaceEventCacheFlush(payload string) {
 
 	keys := strings.Split(payload, ",")
 
@@ -134,13 +134,12 @@ func handleKeySpaceEventCacheFlush(payload string) {
 			key = splitKeys[0]
 		}
 
-		RPCGlobalCache.Delete("apikey-" + key)
-		SessionCache.Delete(key)
+		gw.RPCGlobalCache.Delete("apikey-" + key)
+		gw.SessionCache.Delete(key)
 	}
 }
 
 var redisInsecureWarn sync.Once
-var notificationVerifier goverify.Verifier
 
 func isPayloadSignatureValid(notification Notification) bool {
 	if notification.Gw.GetConfig().AllowInsecureConfigs {
@@ -159,10 +158,10 @@ func isPayloadSignatureValid(notification Notification) bool {
 			return false
 		}
 	default:
-		if notification.Gw.GetConfig().PublicKeyPath != "" && notificationVerifier == nil {
+		if notification.Gw.GetConfig().PublicKeyPath != "" && notification.Gw.NotificationVerifier == nil {
 			var err error
 
-			notificationVerifier, err = goverify.LoadPublicKeyFromFile(notification.Gw.GetConfig().PublicKeyPath)
+			notification.Gw.NotificationVerifier, err = goverify.LoadPublicKeyFromFile(notification.Gw.GetConfig().PublicKeyPath)
 			if err != nil {
 
 				pubSubLog.Error("Notification signer: Failed loading public key from path: ", err)
@@ -170,7 +169,7 @@ func isPayloadSignatureValid(notification Notification) bool {
 			}
 		}
 
-		if notificationVerifier != nil {
+		if notification.Gw.NotificationVerifier != nil {
 
 			signed, err := base64.StdEncoding.DecodeString(notification.Signature)
 			if err != nil {
@@ -179,7 +178,7 @@ func isPayloadSignatureValid(notification Notification) bool {
 				return false
 			}
 
-			if err := notificationVerifier.Verify([]byte(notification.Payload), signed); err != nil {
+			if err := notification.Gw.NotificationVerifier.Verify([]byte(notification.Payload), signed); err != nil {
 
 				pubSubLog.Error("Could not verify notification: ", err, ": ", notification)
 

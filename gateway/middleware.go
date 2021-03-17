@@ -239,7 +239,7 @@ func (t BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
 		// If exists, assume it has been authorized and pass on
 		// We cache org expiry data
 		t.Logger().Debug("Setting data expiry: ", session.OrgID)
-		ExpiryCache.Set(session.OrgID, session.DataExpires, cache.DefaultExpiration)
+		t.Gw.ExpiryCache.Set(session.OrgID, session.DataExpires, cache.DefaultExpiration)
 	}
 
 	session.SetKeyHash(storage.HashKey(orgID, t.Gw.GetConfig().HashKeys))
@@ -248,14 +248,14 @@ func (t BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
 }
 
 func (t BaseMiddleware) SetOrgExpiry(orgid string, expiry int64) {
-	ExpiryCache.Set(orgid, expiry, cache.DefaultExpiration)
+	t.Gw.ExpiryCache.Set(orgid, expiry, cache.DefaultExpiration)
 }
 
 func (t BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 	t.Logger().Debug("Checking: ", orgid)
 	// Cache failed attempt
 	id, err, _ := orgSessionExpiryCache.Do(orgid, func() (interface{}, error) {
-		cachedVal, found := ExpiryCache.Get(orgid)
+		cachedVal, found := t.Gw.ExpiryCache.Get(orgid)
 		if found {
 			return cachedVal, nil
 		}
@@ -296,7 +296,7 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 
 	if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
 		clone := session.Clone()
-		SessionCache.Set(session.GetKeyHash(), &clone, cache.DefaultExpiration)
+		t.Gw.SessionCache.Set(session.GetKeyHash(), &clone, cache.DefaultExpiration)
 	}
 
 	return true
@@ -659,7 +659,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 
 	// Check in-memory cache
 	if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-		cachedVal, found := SessionCache.Get(cacheKey)
+		cachedVal, found := t.Gw.SessionCache.Get(cacheKey)
 		if found {
 			t.Logger().Debug("--> Key found in local cache")
 			session := cachedVal.(*user.SessionState)
@@ -680,7 +680,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 		// cache it
 		clone := session.Clone()
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			go SessionCache.Set(cacheKey, &clone, cache.DefaultExpiration)
+			go t.Gw.SessionCache.Set(cacheKey, &clone, cache.DefaultExpiration)
 		}
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
@@ -721,7 +721,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 		// cache it
 		clone := session.Clone()
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			go SessionCache.Set(cacheKey, &clone, cache.DefaultExpiration)
+			go t.Gw.SessionCache.Set(cacheKey, &clone, cache.DefaultExpiration)
 		}
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
