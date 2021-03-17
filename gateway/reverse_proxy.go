@@ -619,7 +619,9 @@ func tlsClientConfig(s *APISpec) *tls.Config {
 	return config
 }
 
-func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p *ReverseProxy) *TykRoundTripper {
+func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, outReq *http.Request, p *ReverseProxy) *TykRoundTripper {
+	p.logger.Debug("Creating new transport")
+
 	transport := defaultTransport(timeOut) // modifies a newly created transport
 	transport.TLSClientConfig = &tls.Config{}
 	transport.Proxy = proxyFromAPI(p.TykAPISpec)
@@ -679,7 +681,10 @@ func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p
 		http2.ConfigureTransport(transport)
 	}
 
-	if p.TykAPISpec.Protocol == "h2c" {
+	p.logger.Debug("Out request url: ", outReq.URL.String())
+
+	if outReq.URL.Scheme == "h2c" {
+		p.logger.Info("Enabling h2c mode")
 		h2t := &http2.Transport{
 			// kind of a hack, but for plaintext/H2C requests, pretend to dial TLS
 			DialTLS: func(network, addr string, _ *tls.Config) (net.Conn, error) {
@@ -924,28 +929,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 	var roundTripper *TykRoundTripper
 
-	p.TykAPISpec.Lock()
-
-	// create HTTP transport
-	createTransport := p.TykAPISpec.HTTPTransport == nil
-
-	// Check if timeouts are set for this endpoint
-	if !createTransport && config.Global().MaxConnTime != 0 {
-		createTransport = time.Since(p.TykAPISpec.HTTPTransportCreated) > time.Duration(config.Global().MaxConnTime)*time.Second
-	}
-
-	if createTransport {
-		_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
-		p.TykAPISpec.HTTPTransport = httpTransport(timeout, rw, req, p)
-		p.TykAPISpec.HTTPTransportCreated = time.Now()
-
-		p.logger.Debug("Creating new transport")
-	}
-
-	roundTripper = p.TykAPISpec.HTTPTransport
-
-	p.TykAPISpec.Unlock()
-
 	reqCtx := req.Context()
 	if cn, ok := rw.(http.CloseNotifier); ok {
 		var cancel context.CancelFunc
@@ -1044,10 +1027,31 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	p.TykAPISpec.Lock()
+
+	// create HTTP transport
+	createTransport := p.TykAPISpec.HTTPTransport == nil
+
+	// Check if timeouts are set for this endpoint
+	if !createTransport && config.Global().MaxConnTime != 0 {
+		createTransport = time.Since(p.TykAPISpec.HTTPTransportCreated) > time.Duration(config.Global().MaxConnTime)*time.Second
+	}
+
+	if createTransport {
+		_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
+		p.TykAPISpec.HTTPTransport = httpTransport(timeout, rw, req, outreq, p)
+		p.TykAPISpec.HTTPTransportCreated = time.Now()
+	}
+
+	roundTripper = p.TykAPISpec.HTTPTransport
+
 	if roundTripper.transport != nil {
 		roundTripper.transport.TLSClientConfig.Certificates = tlsCertificates
 	}
 	p.TykAPISpec.Unlock()
+
+	if outreq.URL.Scheme == "h2c" {
+		outreq.URL.Scheme = "http"
+	}
 
 	if p.TykAPISpec.Proxy.Transport.SSLForceCommonNameCheck || config.Global().SSLForceCommonNameCheck {
 		// if proxy is enabled, add CommonName verification in verifyPeerCertificate
