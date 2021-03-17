@@ -22,7 +22,7 @@ import (
 
 var algoList = [4]string{"hmac-sha1", "hmac-sha256", "hmac-sha384", "hmac-sha512"}
 
-func(ts *Test) getMiddlewareChain(spec *APISpec) http.Handler {
+func (ts *Test) getMiddlewareChain(spec *APISpec) http.Handler {
 
 	remote, _ := url.Parse(TestHttpAny)
 	proxy := ts.Gw.TykNewSingleHostReverseProxy(remote, spec, logrus.New().WithFields(logrus.Fields{}))
@@ -38,7 +38,7 @@ func(ts *Test) getMiddlewareChain(spec *APISpec) http.Handler {
 	return chain
 }
 
-func(ts *Test) generateSession(algo, data string) string {
+func (ts *Test) generateSession(algo, data string) string {
 	sessionKey := CreateSession(ts.Gw, func(s *user.SessionState) {
 		if strings.HasPrefix(algo, "rsa") {
 			s.RSACertificateId = data
@@ -52,7 +52,7 @@ func(ts *Test) generateSession(algo, data string) string {
 	return sessionKey
 }
 
-func(ts *Test) generateSpec(algo string, data string, sessionKey string, headerList []string) (specs []*APISpec) {
+func (ts *Test) generateSpec(algo string, data string, sessionKey string, headerList []string) (specs []*APISpec) {
 	return ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/test"
 		spec.UseKeylessAccess = true

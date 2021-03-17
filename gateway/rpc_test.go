@@ -4,8 +4,7 @@ package gateway
 
 import (
 	"net/http"
-	_"net/http"
-	_"net/http"
+	_ "net/http"
 	"testing"
 	"time"
 
@@ -150,7 +149,7 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 	rpcMock, connectionString := startRPCMock(dispatcher)
 	defer stopRPCMock(rpcMock)
 
-	ts := StartSlaveGw(connectionString,"")
+	ts := StartSlaveGw(connectionString, "")
 	defer ts.Close()
 
 	store := RPCStorageHandler{Gw: ts.Gw}
@@ -192,7 +191,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		rpcMock, connectionString := startRPCMock(dispatcher)
 		defer stopRPCMock(rpcMock)
 
-		ts := StartSlaveGw(connectionString,"")
+		ts := StartSlaveGw(connectionString, "")
 		defer ts.Close()
 
 		GetKeyCounter = 0
@@ -281,7 +280,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		rpcMock, connectionString := startRPCMock(dispatcher)
 		defer stopRPCMock(rpcMock)
 
-		ts := StartSlaveGw(connectionString,"")
+		ts := StartSlaveGw(connectionString, "")
 		defer ts.Close()
 
 		time.Sleep(1000 * time.Millisecond)
@@ -307,7 +306,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 	t.Run("RPC is back, live reload", func(t *testing.T) {
 		rpcMock, connectionString := startRPCMock(dispatcher)
 
-		ts := StartSlaveGw(connectionString,"")
+		ts := StartSlaveGw(connectionString, "")
 		defer ts.Close()
 		time.Sleep(100 * time.Millisecond)
 
@@ -366,7 +365,7 @@ func TestSyncAPISpecsRPC_redis_failure(t *testing.T) {
 	rpcMock, connectionString := startRPCMock(dispatcher)
 	defer stopRPCMock(rpcMock)
 
-	ts := StartSlaveGw(connectionString,"")
+	ts := StartSlaveGw(connectionString, "")
 	defer ts.Close()
 
 	t.Run("Should load apis when redis is down", func(t *testing.T) {

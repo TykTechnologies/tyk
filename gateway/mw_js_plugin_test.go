@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"bytes"
-	"github.com/TykTechnologies/tyk/config"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -12,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/stretchr/testify/assert"
 

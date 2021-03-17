@@ -32,7 +32,7 @@ var testJsonSchema = `{
     "required": ["firstName", "lastName"]
 }`
 
-func(ts *Test) testPrepareValidateJSONSchema() {
+func (ts *Test) testPrepareValidateJSONSchema() {
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {

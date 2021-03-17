@@ -35,7 +35,7 @@ const (
 // check if a message should pass through or not
 type SessionLimiter struct {
 	bucketStore leakybucket.Storage
-	Gw *Gateway `json:"-"`
+	Gw          *Gateway `json:"-"`
 }
 
 func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string,

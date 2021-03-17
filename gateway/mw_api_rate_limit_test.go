@@ -29,7 +29,7 @@ func createRLSession() *user.SessionState {
 	return session
 }
 
-func(ts *Test) getRLOpenChain(spec *APISpec) http.Handler {
+func (ts *Test) getRLOpenChain(spec *APISpec) http.Handler {
 
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := ts.Gw.TykNewSingleHostReverseProxy(remote, spec, nil)
@@ -44,7 +44,7 @@ func(ts *Test) getRLOpenChain(spec *APISpec) http.Handler {
 	return chain
 }
 
-func(ts *Test) getGlobalRLAuthKeyChain(spec *APISpec) http.Handler {
+func (ts *Test) getGlobalRLAuthKeyChain(spec *APISpec) http.Handler {
 
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := ts.Gw.TykNewSingleHostReverseProxy(remote, spec, nil)
@@ -250,6 +250,7 @@ func TestRLClosed(t *testing.T) {
 		}
 	}
 }
+
 //TestJSVMStagesRequest
 //TestProcessRequestLiveQuotaLimit
 func TestRLOpenWithReload(t *testing.T) {

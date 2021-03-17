@@ -54,7 +54,6 @@ func createNonThrottledSession() *user.SessionState {
 func TestAA(t *testing.T) {
 	ts := StartTest(nil)
 
-	ts.Start(nil)
 	defer ts.Close()
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
@@ -242,21 +241,15 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 }
 
 func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
-	ts := StartTest(nil)
+
+	conf := func(c *config.Config) {
+		c.HttpServerOptions.OverrideDefaults = true
+		c.HttpServerOptions.SkipURLCleaning = true
+	}
+	ts := StartTest(conf)
 	defer ts.Close()
 
-	globalConf := ts.Gw.GetConfig()
-	globalConf.HttpServerOptions.OverrideDefaults = true
-	globalConf.HttpServerOptions.SkipURLCleaning = true
-	ts.Gw.SetConfig(globalConf)
-
-	// here we expect that test gateway will be sending to test upstream requests with not cleaned URI
-	// so test upstream shouldn't reply with 301 and process them as well
-	prevSkipClean := defaultTestConfig.HttpServerOptions.OverrideDefaults &&
-		defaultTestConfig.HttpServerOptions.SkipURLCleaning
-
 	ts.TestServerRouter.SkipClean(true)
-	defer ts.TestServerRouter.SkipClean(prevSkipClean)
 
 	t.Run("With escaping, default", func(t *testing.T) {
 		globalConf := ts.Gw.GetConfig()
@@ -357,6 +350,7 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 			{Path: "/listen_me/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/sent_to_me/http%3A%2F%2Ftest.com\?arg=val`},
 		}...)
 	})
+
 }
 
 func TestQuota(t *testing.T) {

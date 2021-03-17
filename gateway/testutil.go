@@ -217,7 +217,6 @@ func InitTestMain(ctx context.Context, m *testing.M) int {
 // TestBrokenClients
 // TestGRPC_TokenBasedAuthentication
 
-
 // ResetTestConfig resets the config for the global gateway
 func (s *Test) ResetTestConfig() {
 	s.Gw.SetConfig(defaultTestConfig)
@@ -783,21 +782,21 @@ type TestConfig struct {
 	overrideDefaults   bool
 	CoprocessConfig    config.CoProcessConfig
 	// SkipEmptyRedis to avoid restart the storage
-	SkipEmptyRedis bool
-	EnableTestDNSMock  bool
+	SkipEmptyRedis    bool
+	EnableTestDNSMock bool
 }
 
 type Test struct {
 	URL        string
 	testRunner *test.HTTPTestRunner
 	// GlobalConfig deprecate this and instead use GW.getConfig()
-	GlobalConfig config.Config
-	config       TestConfig
-	cancel       func()
-	Gw           *Gateway `json:"-"`
-	HttpHandler  *http.Server
-	TestServerRouter  *mux.Router
-	MockHandle *test.DnsMockHandle
+	GlobalConfig     config.Config
+	config           TestConfig
+	cancel           func()
+	Gw               *Gateway `json:"-"`
+	HttpHandler      *http.Server
+	TestServerRouter *mux.Router
+	MockHandle       *test.DnsMockHandle
 }
 
 type SlaveDataCenter struct {
@@ -807,13 +806,13 @@ type SlaveDataCenter struct {
 
 func (s *Test) Start(genConf func(globalConf *config.Config)) *Gateway {
 	// init and create gw
-	s.BootstrapGw(context.Background(), genConf)
+	ctx, cancel := context.WithCancel(context.Background())
+	s.cancel = cancel
+
+	s.BootstrapGw(ctx, genConf)
 
 	s.Gw.setupPortsWhitelist()
 	s.Gw.startServer()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	s.cancel = cancel
 
 	s.Gw.setupGlobals(ctx)
 	// Set up a default org manager so we can traverse non-live paths
@@ -883,31 +882,12 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 	gw.setTestMode(true)
 
 	s.Gw = gw
-	s.TestServerRouter = s.testHttpHandler()
-	testServer := &http.Server{
-		Addr:           testHttpListen,
-		Handler:        s.TestServerRouter,
-		ReadTimeout:    1 * time.Second,
-		WriteTimeout:   1 * time.Second,
-		MaxHeaderBytes: 1 << 20,
+
+	var errMock error
+	s.MockHandle, errMock = test.InitDNSMock(test.DomainsToAddresses, nil)
+	if errMock != nil {
+		panic(errMock)
 	}
-	s.HttpHandler = testServer
-
-	//if s.config.EnableTestDNSMock {
-		var errMock error
-		s.MockHandle,errMock = test.InitDNSMock(test.DomainsToAddresses, nil)
-		if errMock != nil {
-			panic(errMock)
-		}
-	//	defer s.MockHandle.ShutdownDnsMock()
-//	}
-
-	go func() {
-		err := testServer.ListenAndServe()
-		if err != nil {
-			log.Warn("testServer.ListenAndServe() err: ", err.Error())
-		}
-	}()
 
 	var err error
 	gwConfig.Storage.Database = rand.Intn(15)
@@ -936,11 +916,29 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 	gwConfig.MiddlewarePath = testMiddlewarePath
 
 	// force ipv4 for now, to work around the docker bug affecting
-	// Go 1.8 and ealier
+	// Go 1.8 and earlier
 	gwConfig.ListenAddress = "127.0.0.1"
 	if genConf != nil {
 		genConf(&gwConfig)
 	}
+
+	s.TestServerRouter = s.testHttpHandler()
+
+	skip := gwConfig.HttpServerOptions.SkipURLCleaning
+	s.TestServerRouter.SkipClean(skip)
+	s.HttpHandler = &http.Server{
+		Addr:           testHttpListen,
+		Handler:        s.TestServerRouter,
+		ReadTimeout:    1 * time.Second,
+		WriteTimeout:   1 * time.Second,
+		MaxHeaderBytes: 1 << 20,
+	}
+
+	go func() {
+		if err := s.HttpHandler.ListenAndServe(); err != http.ErrServerClosed {
+			log.Warn("testServer.ListenAndServe() err: ", err.Error())
+		}
+	}()
 
 	gw.keyGen = DefaultKeyGenerator{Gw: gw}
 	gw.CoProcessInit()
@@ -1012,7 +1010,6 @@ func (s *Test) Do(tc test.TestCase) (*http.Response, error) {
 }
 
 func (s *Test) Close() {
-
 	if s.cancel != nil {
 		s.cancel()
 	}
@@ -1022,20 +1019,24 @@ func (s *Test) Close() {
 			p.listener.Close()
 		}
 	}
+
 	s.Gw.DefaultProxyMux.swap(&proxyMux{}, s.Gw)
 	if s.config.SeparateControlAPI {
 		gwConfig := s.Gw.GetConfig()
 		gwConfig.ControlAPIPort = 0
 		s.Gw.SetConfig(gwConfig)
 	}
-	err := s.HttpHandler.Shutdown(context.Background())
+
+	ctxShutDown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := s.HttpHandler.Shutdown(ctxShutDown)
 	if err != nil {
 		log.WithError(err).Error("shutting down the http handler")
+	} else {
+		log.Info("server exited properly")
 	}
-
-	if s.config.EnableTestDNSMock{
-		s.MockHandle.ShutdownDnsMock()
-	}
+	s.MockHandle.ShutdownDnsMock()
 
 	os.RemoveAll(s.Gw.GetConfig().AppPath)
 }

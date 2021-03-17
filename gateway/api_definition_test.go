@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"github.com/TykTechnologies/tyk/config"
 	"io"
 	"io/ioutil"
 	"net"
@@ -14,6 +13,8 @@ import (
 	"testing"
 	"text/template"
 	"time"
+
+	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/stretchr/testify/assert"
 
@@ -848,7 +849,7 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 }
 
 func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
-return
+	return
 	// Test Dashboard
 	callNum := 0
 	tsDash := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -917,7 +918,6 @@ return
 	ts.Gw.apisMu.RUnlock()
 
 }
-
 
 func TestAPIDefinitionLoader_Template(t *testing.T) {
 	ts := StartTest(nil)

@@ -77,7 +77,7 @@ func (gw *Gateway) NotifyCurrentServerStatus() {
 	gw.MainNotifier.Notify(n)
 }
 
-func(gw *Gateway) onServerStatusReceivedHandler(payload string) {
+func (gw *Gateway) onServerStatusReceivedHandler(payload string) {
 	serverData := drl.Server{}
 	if err := json.Unmarshal([]byte(payload), &serverData); err != nil {
 		log.WithFields(logrus.Fields{

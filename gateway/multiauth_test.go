@@ -94,7 +94,7 @@ func (ts *Test) getMultiAuthStandardAndBasicAuthChain(spec *APISpec) http.Handle
 	return chain
 }
 
-func(ts *Test) testPrepareMultiSessionBA(t testing.TB, isBench bool) (*APISpec, *http.Request) {
+func (ts *Test) testPrepareMultiSessionBA(t testing.TB, isBench bool) (*APISpec, *http.Request) {
 
 	spec := ts.Gw.LoadSampleAPI(multiAuthDev)
 

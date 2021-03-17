@@ -37,7 +37,7 @@ func (ts *Test) createSpecTestFrom(t testing.TB, def *apidef.APIDefinition) *API
 	return spec
 }
 
-func(ts *Test) prepareExtractor(t testing.TB, extractorSource apidef.IdExtractorSource, extractorType apidef.IdExtractorType, config map[string]interface{}) (IdExtractor, *APISpec) {
+func (ts *Test) prepareExtractor(t testing.TB, extractorSource apidef.IdExtractorSource, extractorType apidef.IdExtractorType, config map[string]interface{}) (IdExtractor, *APISpec) {
 
 	def := &apidef.APIDefinition{
 		OrgID: MockOrgID,

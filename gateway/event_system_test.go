@@ -19,7 +19,7 @@ var (
 	}
 )
 
-func(ts *Test) prepareSpecWithEvents(logger *logrus.Logger) (spec *APISpec) {
+func (ts *Test) prepareSpecWithEvents(logger *logrus.Logger) (spec *APISpec) {
 
 	if logger == nil {
 		logger = log

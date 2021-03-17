@@ -124,7 +124,7 @@ func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationComm
 	}
 }
 
-func(gw *Gateway) handleKeySpaceEventCacheFlush(payload string) {
+func (gw *Gateway) handleKeySpaceEventCacheFlush(payload string) {
 
 	keys := strings.Split(payload, ",")
 
