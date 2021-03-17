@@ -7,6 +7,18 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestMiddleware(t *testing.T) {
+	var emptyMiddleware Middleware
+
+	var convertedAPI apidef.APIDefinition
+	emptyMiddleware.ExtractTo(&convertedAPI)
+
+	var resultMiddleware Middleware
+	resultMiddleware.Fill(convertedAPI)
+
+	assert.Equal(t, emptyMiddleware, resultMiddleware)
+}
+
 func TestGlobal(t *testing.T) {
 	var emptyGlobal Global
 

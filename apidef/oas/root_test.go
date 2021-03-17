@@ -65,54 +65,6 @@ func TestState(t *testing.T) {
 	assert.Equal(t, emptyState, resultState)
 }
 
-func TestUpstream(t *testing.T) {
-	var emptyUpstream Upstream
-
-	var convertedAPI apidef.APIDefinition
-	emptyUpstream.ExtractTo(&convertedAPI)
-
-	var resultUpstream Upstream
-	resultUpstream.Fill(convertedAPI)
-
-	assert.Equal(t, emptyUpstream, resultUpstream)
-}
-
-func TestServer(t *testing.T) {
-	var emptyServer Server
-
-	var convertedAPI apidef.APIDefinition
-	emptyServer.ExtractTo(&convertedAPI)
-
-	var resultServer Server
-	resultServer.Fill(convertedAPI)
-
-	assert.Equal(t, emptyServer, resultServer)
-}
-
-func TestListenPath(t *testing.T) {
-	var emptyListenPath ListenPath
-
-	var convertedAPI apidef.APIDefinition
-	emptyListenPath.ExtractTo(&convertedAPI)
-
-	var resultListenPath ListenPath
-	resultListenPath.Fill(convertedAPI)
-
-	assert.Equal(t, emptyListenPath, resultListenPath)
-}
-
-func TestMiddleware(t *testing.T) {
-	var emptyMiddleware Middleware
-
-	var convertedAPI apidef.APIDefinition
-	emptyMiddleware.ExtractTo(&convertedAPI)
-
-	var resultMiddleware Middleware
-	resultMiddleware.Fill(convertedAPI)
-
-	assert.Equal(t, emptyMiddleware, resultMiddleware)
-}
-
 // Fill populates the given input with non-default values. Index is where to start incrementing values.
 func Fill(t *testing.T, input interface{}, index int) {
 	v := reflect.ValueOf(input).Elem()

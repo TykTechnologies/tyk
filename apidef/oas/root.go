@@ -1,8 +1,6 @@
 package oas
 
 import (
-	"reflect"
-
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -79,83 +77,4 @@ func (s *State) Fill(api apidef.APIDefinition) {
 func (s *State) ExtractTo(api *apidef.APIDefinition) {
 	api.Active = s.Active
 	api.Internal = s.Internal
-}
-
-type Upstream struct {
-	URL string `bson:"url" json:"url"` // required
-}
-
-func (u *Upstream) Fill(api apidef.APIDefinition) {
-	u.URL = api.Proxy.TargetURL
-}
-
-func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
-	api.Proxy.TargetURL = u.URL
-}
-
-type Server struct {
-	ListenPath     ListenPath      `bson:"listenPath" json:"listenPath"` // required
-	Slug           string          `bson:"slug,omitempty" json:"slug,omitempty"`
-	Authentication *Authentication `bson:"authentication,omitempty" json:"authentication,omitempty"`
-}
-
-func (s *Server) Fill(api apidef.APIDefinition) {
-	s.ListenPath.Fill(api)
-	s.Slug = api.Slug
-
-	if s.Authentication == nil {
-		s.Authentication = &Authentication{}
-	}
-
-	s.Authentication.Fill(api)
-	if (*s.Authentication == Authentication{}) {
-		s.Authentication = nil
-	}
-}
-
-func (s *Server) ExtractTo(api *apidef.APIDefinition) {
-	s.ListenPath.ExtractTo(api)
-	api.Slug = s.Slug
-
-	if s.Authentication != nil {
-		s.Authentication.ExtractTo(api)
-	} else {
-		api.UseKeylessAccess = true
-	}
-}
-
-type ListenPath struct {
-	Value string `bson:"value" json:"value"` // required
-	Strip bool   `bson:"strip,omitempty" json:"strip,omitempty"`
-}
-
-func (lp *ListenPath) Fill(api apidef.APIDefinition) {
-	lp.Value = api.Proxy.ListenPath
-	lp.Strip = api.Proxy.StripListenPath
-}
-
-func (lp *ListenPath) ExtractTo(api *apidef.APIDefinition) {
-	api.Proxy.ListenPath = lp.Value
-	api.Proxy.StripListenPath = lp.Strip
-}
-
-type Middleware struct {
-	Global *Global `bson:"global,omitempty" json:"global,omitempty"`
-}
-
-func (m *Middleware) Fill(api apidef.APIDefinition) {
-	if m.Global == nil {
-		m.Global = &Global{}
-	}
-
-	m.Global.Fill(api)
-	if reflect.DeepEqual(m.Global, &Global{}) {
-		m.Global = nil
-	}
-}
-
-func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
-	if m.Global != nil {
-		m.Global.ExtractTo(api)
-	}
 }
