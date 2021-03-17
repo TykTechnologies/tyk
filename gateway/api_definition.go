@@ -22,6 +22,7 @@ import (
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
 	"github.com/TykTechnologies/gojsonschema"
+
 	"github.com/gorilla/mux"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/resolve"
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"

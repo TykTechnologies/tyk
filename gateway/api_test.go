@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"crypto/x509"
 	"encoding/json"
-	"github.com/TykTechnologies/tyk/apidef/oas"
-	"github.com/getkin/kin-openapi/openapi3"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -14,8 +12,11 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/getkin/kin-openapi/openapi3"
+	uuid "github.com/satori/go.uuid"
+
 	"github.com/go-redis/redis/v8"
-	"github.com/satori/go.uuid"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
