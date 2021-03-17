@@ -1,7 +1,5 @@
 package oas
 
-const ExtensionXTykPlugins = "x-tyk-plugins"
-
 type XTykPlugins struct {
 	TransformHeaders     *TransformHeaders `bson:"transform-headers,omitempty" json:"transform-headers,omitempty"`
 	Allowed              *Allow            `bson:"allowed,omitempty" json:"allowed,omitempty"`

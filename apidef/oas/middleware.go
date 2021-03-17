@@ -6,6 +6,27 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+type Middleware struct {
+	Global *Global `bson:"global,omitempty" json:"global,omitempty"`
+}
+
+func (m *Middleware) Fill(api apidef.APIDefinition) {
+	if m.Global == nil {
+		m.Global = &Global{}
+	}
+
+	m.Global.Fill(api)
+	if reflect.DeepEqual(m.Global, &Global{}) {
+		m.Global = nil
+	}
+}
+
+func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
+	if m.Global != nil {
+		m.Global.ExtractTo(api)
+	}
+}
+
 type Global struct {
 	CORS  *CORS  `bson:"cors,omitempty" json:"cors,omitempty"`
 	Cache *Cache `bson:"cache,omitempty" json:"cache,omitempty"`
