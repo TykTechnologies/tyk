@@ -38,6 +38,13 @@ func (x *XTykAPIGateway) ExtractTo(api *apidef.APIDefinition) {
 	if x.Middleware != nil {
 		x.Middleware.ExtractTo(api)
 	}
+
+	// This is used to make API calls work before actual versioning implementation.
+	api.VersionData.DefaultVersion = "Default"
+	api.VersionData.NotVersioned = true
+	api.VersionData.Versions = map[string]apidef.VersionInfo{
+		"Default": {},
+	}
 }
 
 type Info struct {

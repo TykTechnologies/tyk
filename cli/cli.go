@@ -2,9 +2,10 @@ package cli
 
 import (
 	"fmt"
-	"github.com/TykTechnologies/tyk/cli/oas"
 	"io/ioutil"
 	"os"
+
+	"github.com/TykTechnologies/tyk/cli/oas"
 
 	"github.com/TykTechnologies/tyk/cli/linter"
 

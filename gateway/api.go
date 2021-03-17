@@ -32,8 +32,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/TykTechnologies/tyk/apidef/oas"
-	"github.com/getkin/kin-openapi/openapi3"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -43,6 +41,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/gorilla/mux"
 	"github.com/lonelycode/osin"

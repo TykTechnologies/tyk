@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/getkin/kin-openapi/openapi3"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -19,12 +18,14 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/getkin/kin-openapi/openapi3"
+
 	"github.com/cenk/backoff"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/resolve"
 
 	"gopkg.in/Masterminds/sprig.v2"
 
-	"github.com/TykTechnologies/circuitbreaker"
+	circuit "github.com/TykTechnologies/circuitbreaker"
 	"github.com/gorilla/mux"
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 	"github.com/sirupsen/logrus"
