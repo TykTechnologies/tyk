@@ -548,13 +548,13 @@ func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 		spec := a.MakeSpec(&def, nil)
 
 		_, _ = f.Seek(0, io.SeekStart)
+		_ = f.Close()
 
 		f, err = os.Open(a.GetOASFilepath(path))
 		if err == nil {
 			spec.OAS = a.ParseOAS(f)
+			_ = f.Close()
 		}
-
-		_ = f.Close()
 
 		specs = append(specs, spec)
 	}
