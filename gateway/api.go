@@ -44,10 +44,10 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/getkin/kin-openapi/openapi3"
+	uuid "github.com/satori/go.uuid"
 
 	"github.com/gorilla/mux"
 	"github.com/lonelycode/osin"
-	uuid "github.com/satori/go.uuid"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
@@ -796,7 +796,6 @@ func handleGetAPI(apiID string, oasTyped bool) (interface{}, int) {
 		} else {
 			return spec.APIDefinition, http.StatusOK
 		}
-
 	}
 
 	log.WithFields(logrus.Fields{
@@ -838,6 +837,19 @@ func handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.Fs, oasTyped b
 			log.Error("Couldn't decode new API Definition object: ", err)
 			return apiError("Request malformed"), http.StatusBadRequest
 		}
+
+		xTykAPIGateway.Fill(newDef)
+
+		spec := getApiSpec(newDef.APIID)
+		if spec != nil {
+			oasDoc = spec.OAS
+		}
+
+		if oasDoc.Extensions == nil {
+			oasDoc.Extensions = make(map[string]interface{})
+		}
+
+		oasDoc.Extensions[oas.ExtensionTykAPIGateway] = xTykAPIGateway
 	}
 
 	if apiID != "" && newDef.APIID != apiID {
@@ -863,14 +875,10 @@ func handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.Fs, oasTyped b
 	}
 
 	// oas
-	if oasTyped {
-		err, errCode = writeToFile(fs, &oasDoc, newDef.APIID+"-oas")
-		if err != nil {
-			return apiError(err.Error()), errCode
-		}
+	err, errCode = writeToFile(fs, &oasDoc, newDef.APIID+"-oas")
+	if err != nil {
+		return apiError(err.Error()), errCode
 	}
-
-	DoReload()
 
 	action := "modified"
 	if r.Method == "POST" {
@@ -914,6 +922,7 @@ func writeToFile(fs afero.Fs, newDef interface{}, filename string) (err error, e
 func handleDeleteAPI(apiID string) (interface{}, int) {
 	// Generate a filename
 	defFilePath := filepath.Join(config.Global().AppPath, apiID+".json")
+	defOASFilePath := filepath.Join(config.Global().AppPath, apiID+"-oas.json")
 
 	// If it exists, delete it
 	if _, err := os.Stat(defFilePath); err != nil {
@@ -922,14 +931,13 @@ func handleDeleteAPI(apiID string) (interface{}, int) {
 	}
 
 	os.Remove(defFilePath)
+	os.Remove(defOASFilePath)
 
 	response := apiModifyKeySuccess{
 		Key:    apiID,
 		Status: "ok",
 		Action: "deleted",
 	}
-
-	DoReload()
 
 	return response, http.StatusOK
 }
