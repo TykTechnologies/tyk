@@ -113,7 +113,7 @@ func TestLoadJaeger(t *testing.T) {
 			t.Fatal(err)
 		}
 		var got jaeger.Configuration
-		err = DecodeJSON(&got, conf.Tracer.Options)
+		err = DecodeYAML(&got, conf.Tracer.Options)
 		if err != nil {
 			t.Fatal(err)
 		}

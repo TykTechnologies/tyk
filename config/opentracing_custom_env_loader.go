@@ -5,7 +5,7 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 	jaeger "github.com/uber/jaeger-client-go/config"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 // ZipkinConfig configuration options used to initialize openzipkin opentracing

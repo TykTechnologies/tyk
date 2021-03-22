@@ -93,7 +93,7 @@ require (
 	gopkg.in/square/go-jose.v1 v1.1.2 // indirect
 	gopkg.in/vmihailenco/msgpack.v2 v2.9.1
 	gopkg.in/xmlpath.v2 v2.0.0-20150820204837-860cbeca3ebc
-	gopkg.in/yaml.v2 v2.3.0
+	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 	rsc.io/letsencrypt v0.0.2
 )
 

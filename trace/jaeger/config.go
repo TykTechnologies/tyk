@@ -2,7 +2,7 @@ package jaeger
 
 import (
 	"github.com/uber/jaeger-client-go/config"
-	yaml "gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v3"
 )
 
 // Load returns jaeger configuration from opts. Please see jaeger configuration
@@ -20,5 +20,8 @@ func Load(opts map[string]interface{}) (*config.Configuration, error) {
 	}
 	var c config.Configuration
 	err = yaml.Unmarshal(b, &c)
+	if err != nil {
+		return nil, err
+	}
 	return &c, nil
 }
