@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/kelseyhightower/envconfig"
 	jaeger "github.com/uber/jaeger-client-go/config"
@@ -133,6 +134,7 @@ func loadJaeger(prefix string, c *Config) error {
 	}
 	var j jaeger.Configuration
 	if err := DecodeYAML(&j, c.Tracer.Options); err != nil {
+		fmt.Printf(" %#v\n ", c.Tracer.Options)
 		return err
 	}
 	qualifyPrefix := prefix + "_TRACER_OPTIONS"

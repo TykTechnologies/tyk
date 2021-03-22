@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -191,28 +192,34 @@ func TestLoad_tracing(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(dir)
-
-	t.Run("Zipkin", func(t *testing.T) {
-		f := filepath.Join(dir, "zipkin.json")
-		err := ioutil.WriteFile(f, []byte(`{
-			"tracing": {
-			  "enabled": true,
-			  "name": "zipkin",
-			  "options": {
-				"reporter": {
-				  "url": "http:localhost:9411/api/v2/spans"
+	t.Run("Read and write config with tracing", func(t *testing.T) {
+		files := []string{"testdata/jaeger.json", "testdata/zipkin.json"}
+		for _, f := range files {
+			t.Run(f, func(t *testing.T) {
+				var c Config
+				err = Load([]string{f}, &c)
+				if err != nil {
+					t.Fatal(err)
 				}
-			  }
-			}
-		  }
-		  `), 0600)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var c Config
-		err = Load([]string{f}, &c)
-		if err != nil {
-			t.Fatal(err)
+				o := filepath.Join(dir, filepath.Base(f))
+				err = WriteConf(o, &c)
+				if err != nil {
+					t.Fatal(err)
+				}
+				// lets compare the two files to make sure we didn't messup the
+				// configuration
+				src, err := ioutil.ReadFile(f)
+				if err != nil {
+					t.Fatal(err)
+				}
+				b, err := ioutil.ReadFile(o)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !bytes.Equal(src, b) {
+					t.Error("mismatch configuration")
+				}
+			})
 		}
 	})
 }
