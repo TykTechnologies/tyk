@@ -93,7 +93,7 @@ jobs:
 
   goreleaser:
     runs-on: ubuntu-latest
-    container: tykio/golang-cross:1.15.8
+    container: tykio/golang-cross:1.12
 
     steps:
       - name: Checkout tyk
