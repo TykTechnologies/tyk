@@ -11,7 +11,7 @@ import (
 func TestLoadZipkin(t *testing.T) {
 	base := ZipkinConfig{
 		Reporter: Reporter{
-			URL:        "repoturl",
+			URL:        "http://example.com",
 			BatchSize:  10,
 			MaxBacklog: 20,
 		},
@@ -33,16 +33,6 @@ func TestLoadZipkin(t *testing.T) {
 		{"TYK_GW_TRACER_OPTIONS_SAMPLER_SALT", fmt.Sprint(base.Sampler.Salt)},
 		{"TYK_GW_TRACER_OPTIONS_SAMPLER_MOD", fmt.Sprint(base.Sampler.Mod)},
 	}
-	t.Run("Returns nil when it is not zipkin config", func(t *testing.T) {
-		conf := &Config{}
-		err := loadZipkin(envPrefix, conf)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if conf.Tracer.Options != nil {
-			t.Error("expected options to be nil")
-		}
-	})
 
 	t.Run("loads env vars", func(t *testing.T) {
 		for _, v := range sample {
@@ -56,8 +46,8 @@ func TestLoadZipkin(t *testing.T) {
 				os.Unsetenv(v.env)
 			}
 		}()
-		conf := &Config{Tracer: Tracer{Name: "zipkin"}}
-		err := loadZipkin(envPrefix, conf)
+		var conf Config
+		err := Load([]string{"testdata/zipkin.json"}, &conf)
 		if err != nil {
 			t.Fatal(err)
 		}
