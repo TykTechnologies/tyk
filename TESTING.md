@@ -25,7 +25,7 @@ Main points of the test framework are:
 - All tests run HTTP requests though the full HTTP stack, same as user will do
 - Test definition logic separated from test runner.
 - Official mocks for the Dashboard, RPC, and Bundler
-- The majority of the time you will need a gateway instance in order to use the gateway functions and properties
+- Most of the time, you will need a gateway instance to use the gateway functions and properties
 
 Framework located inside "github.com/TykTechnologies/tyk/test" package.
 See its API docs https://godoc.org/github.com/TykTechnologies/tyk/test
