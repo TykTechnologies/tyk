@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -201,22 +202,19 @@ func TestLoad_tracing(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				o := filepath.Join(dir, filepath.Base(f))
-				err = WriteConf(o, &c)
+				o := filepath.Join(
+					filepath.Dir(f),
+					"expect."+filepath.Base(f),
+				)
+				expect, err := ioutil.ReadFile(o)
 				if err != nil {
 					t.Fatal(err)
 				}
-				// lets compare the two files to make sure we didn't messup the
-				// configuration
-				src, err := ioutil.ReadFile(f)
+				got, err := json.MarshalIndent(c.Tracer.Options, "", "    ")
 				if err != nil {
 					t.Fatal(err)
 				}
-				b, err := ioutil.ReadFile(o)
-				if err != nil {
-					t.Fatal(err)
-				}
-				diff, s := jsondiff.Compare(src, b, &jsondiff.Options{
+				diff, s := jsondiff.Compare(expect, got, &jsondiff.Options{
 					PrintTypes: true,
 				})
 				if diff == jsondiff.NoMatch {
