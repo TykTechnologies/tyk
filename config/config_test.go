@@ -1,7 +1,6 @@
 package config
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -11,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/nsf/jsondiff"
 )
 
 func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
@@ -216,8 +216,11 @@ func TestLoad_tracing(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if !bytes.Equal(src, b) {
-					t.Error("mismatch configuration")
+				diff, s := jsondiff.Compare(src, b, &jsondiff.Options{
+					PrintTypes: true,
+				})
+				if diff == jsondiff.NoMatch {
+					t.Error(s)
 				}
 			})
 		}
