@@ -29,7 +29,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: [ release-3, release-3-lts, release-3.2 ]
+        branch: [ release-3.2 ]
           
     steps:
       - uses: actions/checkout@v2
@@ -44,6 +44,6 @@ jobs:
           for f in $FILES; do 
             git checkout --theirs origin/master -- $f || true
           done
-          git commit -a -m "[CI] Syncing automation from master"
+          git commit -a -m "[CI] Syncing release automation from master"
           git push origin
           echo "::warning::${FILES} syncd for ${{matrix.branch}}"

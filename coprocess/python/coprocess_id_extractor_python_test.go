@@ -150,6 +150,7 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 		CoprocessConfig: config.CoProcessConfig{
 			EnableCoProcess:  true,
 			PythonPathPrefix: pkgPath,
+			PythonVersion:    "3.5",
 		},
 		Delay: 10 * time.Millisecond,
 	})

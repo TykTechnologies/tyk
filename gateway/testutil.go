@@ -1271,7 +1271,7 @@ const testRESTHeadersDataSourceConfigurationV2 = `
 		"method": "GET",
 		"headers": {
 			"static": "barbaz",
-			"injected": "{{ .request.header.injected }}"
+			"injected": "{{ .request.headers.injected }}"
 		},
 		"query": [],
 		"body": ""
