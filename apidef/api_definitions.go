@@ -196,13 +196,6 @@ type VirtualMeta struct {
 	ProxyOnError         bool   `bson:"proxy_on_error" json:"proxy_on_error"`
 }
 
-type GoPluginMeta struct {
-	Path       string `bson:"path" json:"path"`
-	Method     string `bson:"method" json:"method"`
-	PluginPath string `bson:"plugin_path" json:"plugin_path"`
-	SymbolName string `bson:"func_name" json:"func_name"`
-}
-
 type MethodTransformMeta struct {
 	Path     string `bson:"path" json:"path"`
 	Method   string `bson:"method" json:"method"`

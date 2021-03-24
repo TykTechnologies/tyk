@@ -140,6 +140,7 @@ type URLSpec struct {
 	ValidatePathMeta          apidef.ValidatePathMeta
 	Internal                  apidef.InternalMeta
 	GoPluginMeta              GoPluginMiddleware
+
 	IgnoreCase                bool
 }
 
@@ -1245,6 +1246,10 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 		case GoPlugin:
 			if method == rxPaths[i].GoPluginMeta.Meta.Method {
 				return true, &rxPaths[i].GoPluginMeta
+<<<<<<< HEAD
+=======
+
+>>>>>>> 6359edc9... clean up merge conflicts
 			}
 		}
 	}
