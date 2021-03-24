@@ -141,7 +141,7 @@ type URLSpec struct {
 	Internal                  apidef.InternalMeta
 	GoPluginMeta              GoPluginMiddleware
 
-	IgnoreCase                bool
+	IgnoreCase bool
 }
 
 type EndPointCacheMeta struct {
@@ -879,7 +879,7 @@ func (a APIDefinitionLoader) compileGopluginPathspathSpec(paths []apidef.GoPlugi
 
 		ok := newSpec.GoPluginMeta.loadPlugin()
 		if !ok {
-			fmt.Println("Cant load")
+			log.Error("Error while loading per path Go Plugin")
 		}
 
 		urlSpec = append(urlSpec, newSpec)
@@ -1246,10 +1246,6 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 		case GoPlugin:
 			if method == rxPaths[i].GoPluginMeta.Meta.Method {
 				return true, &rxPaths[i].GoPluginMeta
-<<<<<<< HEAD
-=======
-
->>>>>>> 6359edc9... clean up merge conflicts
 			}
 		}
 	}

@@ -108,10 +108,7 @@ func (m *GoPluginMiddleware) EnabledForSpec() bool {
 			return true
 		}
 	}
-<<<<<<< HEAD
-=======
 
->>>>>>> 1bd68c67... load go plugins per method and path in apispec
 	return false
 }
 
