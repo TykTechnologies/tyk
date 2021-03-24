@@ -34,21 +34,26 @@ func TestHandleError_text_xml(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
 
-	// Simulate 500 error
-	h := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		panic("I should fail!")
-	}))
-	defer h.Close()
-
 	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
-		spec.Proxy.TargetURL = h.URL
+		spec.Proxy.TargetURL = "http://localhost:66666"
 	})
 	ts.Run(t, test.TestCase{
 		Path: "/",
 		Code: http.StatusInternalServerError,
 		Headers: map[string]string{
 			headers.ContentType: headers.TextXML,
+		},
+		BodyMatchFunc: func(b []byte) bool {
+			return strings.TrimSpace(expect) == string(bytes.TrimSpace(b))
+		},
+	})
+
+	ts.Run(t, test.TestCase{
+		Path: "/",
+		Code: http.StatusInternalServerError,
+		Headers: map[string]string{
+			headers.ContentType: headers.TextXML + "; charset=UTF-8",
 		},
 		BodyMatchFunc: func(b []byte) bool {
 			return strings.TrimSpace(expect) == string(bytes.TrimSpace(b))
