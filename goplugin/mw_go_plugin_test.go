@@ -19,7 +19,9 @@ func TestMain(m *testing.M) {
 }
 
 // TestGoPluginMWs tests all possible Go-plugin MWs ("pre", "auth_check", "post_key_auth" and "post")
-// Please see ./test/goplugins/test_goplugins.go for plugin implementation details
+// Please see ./test/goplugins/test_goplugin.go for plugin implementation details
+
+// run go build -buildmode=plugin -o goplugins.so in ./test/goplugins directory prior to running tests
 func TestGoPluginMWs(t *testing.T) {
 	ts := gateway.StartTest()
 	defer ts.Close()
@@ -209,3 +211,4 @@ func TestGoPluginPerPathSingleFile(t *testing.T) {
 	})
 
 }
+
