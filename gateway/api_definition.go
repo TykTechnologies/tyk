@@ -877,10 +877,7 @@ func (a APIDefinitionLoader) compileGopluginPathspathSpec(paths []apidef.GoPlugi
 		newSpec.GoPluginMeta.Meta.Method = stringSpec.Method
 		newSpec.GoPluginMeta.Meta.Path = stringSpec.Path
 
-		ok := newSpec.GoPluginMeta.loadPlugin()
-		if !ok {
-			log.Error("Error while loading per path Go Plugin")
-		}
+		newSpec.GoPluginMeta.loadPlugin()
 
 		urlSpec = append(urlSpec, newSpec)
 	}
