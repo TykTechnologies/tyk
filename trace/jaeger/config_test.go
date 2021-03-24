@@ -1,8 +1,6 @@
 package jaeger
 
 import (
-	"io/ioutil"
-	"os"
 	"reflect"
 	"testing"
 
@@ -12,15 +10,9 @@ import (
 )
 
 func TestLoad(t *testing.T) {
-	dir, err := ioutil.TempDir("", "tyk")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
-
 	f := "testdata/jaeger.json"
 	var c tykconf.Config
-	err = tykconf.Load([]string{f}, &c)
+	err := tykconf.Load([]string{f}, &c)
 	if err != nil {
 		t.Fatal(err)
 	}
