@@ -90,10 +90,6 @@ func (m *GoPluginMiddleware) Name() string {
 	return "GoPluginMiddleware: " + m.Path + ":" + m.SymbolName
 }
 
-func loadPerPathGoPlugins(m *GoPluginMiddleware) {
-	m.loadPlugin()
-}
-
 func (m *GoPluginMiddleware) EnabledForSpec() bool {
 
 	// global go plugins
@@ -140,6 +136,9 @@ func (m *GoPluginMiddleware) goPluginConfigFromRequest(r *http.Request) {
 
 	found, perPathPerMethodGoPlugin := m.Spec.CheckSpecMatchesStatus(r, versionPaths, GoPlugin)
 	if found {
+		//fmt.Printf("%#v", m)
+		//fmt.Println()
+
 		m.handler = perPathPerMethodGoPlugin.(*GoPluginMiddleware).handler
 		m.Meta = perPathPerMethodGoPlugin.(*GoPluginMiddleware).Meta
 		m.Path = perPathPerMethodGoPlugin.(*GoPluginMiddleware).Path
