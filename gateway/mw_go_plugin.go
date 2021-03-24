@@ -136,9 +136,6 @@ func (m *GoPluginMiddleware) goPluginConfigFromRequest(r *http.Request) {
 
 	found, perPathPerMethodGoPlugin := m.Spec.CheckSpecMatchesStatus(r, versionPaths, GoPlugin)
 	if found {
-		//fmt.Printf("%#v", m)
-		//fmt.Println()
-
 		m.handler = perPathPerMethodGoPlugin.(*GoPluginMiddleware).handler
 		m.Meta = perPathPerMethodGoPlugin.(*GoPluginMiddleware).Meta
 		m.Path = perPathPerMethodGoPlugin.(*GoPluginMiddleware).Path
