@@ -3,7 +3,6 @@ package jaeger
 import (
 	"io/ioutil"
 	"os"
-	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -12,39 +11,6 @@ import (
 	"github.com/uber/jaeger-client-go/config"
 )
 
-const sampleConfig = `{
-	"tracing": {
-	  "enabled": true,
-	  "name": "jaeger",
-	  "options": {
-		"baggage_restrictions": null,
-		"disabled": false,
-		"headers": null,
-		"reporter": {
-		  "BufferFlushInterval": 0,
-		  "collectorEndpoint": "",
-		  "localAgentHostPort": "jaeger:6831",
-		  "logSpans": true,
-		  "password": "",
-		  "queueSize": 0,
-		  "user": ""
-		},
-		"rpc_metrics": false,
-		"sampler": {
-		  "maxOperations": 0,
-		  "param": 1,
-		  "samplingRefreshInterval": 0,
-		  "samplingServerURL": "",
-		  "type": "const"
-		},
-		"serviceName": "tyk-gateway",
-		"tags": null,
-		"throttler": null
-	  }
-	}
-  }
-  `
-
 func TestLoad(t *testing.T) {
 	dir, err := ioutil.TempDir("", "tyk")
 	if err != nil {
@@ -52,11 +18,7 @@ func TestLoad(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
-	f := filepath.Join(dir, "jaeger.json")
-	err = ioutil.WriteFile(f, []byte(sampleConfig), 0600)
-	if err != nil {
-		t.Fatal(err)
-	}
+	f := "testdata/jaeger.json"
 	var c tykconf.Config
 	err = tykconf.Load([]string{f}, &c)
 	if err != nil {
