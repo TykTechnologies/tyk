@@ -1,12 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
-	"net/http"
-
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/user"
+	"io/ioutil"
+	"net/http"
 )
 
 // MyPluginPre checks if session is NOT present, adds custom header
@@ -69,6 +70,48 @@ func MyPluginPost(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	rw.Header().Set(headers.ContentType, headers.ApplicationJSON)
+	rw.WriteHeader(http.StatusOK)
+	rw.Write(jsonData)
+}
+
+// MyPluginResponse intercepts response from upstream which we can then manipulate
+func MyPluginResponse(rw http.ResponseWriter, res *http.Response, req *http.Request) {
+
+	res.Header.Add("X-Response-Added", "resp-added")
+
+	var buf bytes.Buffer
+
+	buf.Write([]byte(`{"message":"response injected message"}`))
+
+	res.Body = ioutil.NopCloser(&buf)
+
+}
+
+func MyPluginPerPathFoo(rw http.ResponseWriter, r *http.Request) {
+
+	rw.Header().Add("X-foo", "foo")
+
+}
+
+func MyPluginPerPathBar(rw http.ResponseWriter, r *http.Request) {
+	rw.Header().Add("X-bar", "bar")
+
+}
+
+func MyPluginPerPathResp(rw http.ResponseWriter, r *http.Request) {
+	// prepare data to send
+	replyData := map[string]string{
+		"current_time": "now",
+	}
+
+	jsonData, err := json.Marshal(replyData)
+	if err != nil {
+		rw.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// send HTTP response from Golang plugin
+	rw.Header().Set("Content-Type", "application/json")
 	rw.WriteHeader(http.StatusOK)
 	rw.Write(jsonData)
 }

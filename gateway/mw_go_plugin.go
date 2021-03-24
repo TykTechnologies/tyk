@@ -3,6 +3,7 @@ package gateway
 import (
 	"bytes"
 	"fmt"
+	"github.com/TykTechnologies/tyk/apidef"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -82,14 +83,11 @@ type GoPluginMiddleware struct {
 	handler        http.HandlerFunc
 	logger         *logrus.Entry
 	successHandler *SuccessHandler // to record analytics
+	Meta           apidef.GoPluginMeta
 }
 
 func (m *GoPluginMiddleware) Name() string {
 	return "GoPluginMiddleware: " + m.Path + ":" + m.SymbolName
-}
-
-func loadPerPathGoPlugins(m *GoPluginMiddleware) {
-	m.loadPlugin()
 }
 
 func (m *GoPluginMiddleware) EnabledForSpec() bool {
@@ -106,7 +104,6 @@ func (m *GoPluginMiddleware) EnabledForSpec() bool {
 			return true
 		}
 	}
-
 	return false
 }
 
@@ -130,11 +127,26 @@ func (m *GoPluginMiddleware) loadPlugin() bool {
 
 	// to record 2XX hits in analytics
 	m.successHandler = &SuccessHandler{BaseMiddleware: m.BaseMiddleware}
-
 	return true
 }
 
+func (m *GoPluginMiddleware) goPluginConfigFromRequest(r *http.Request) {
+	_, versionPaths, _, _ := m.Spec.Version(r)
+
+	found, perPathPerMethodGoPlugin := m.Spec.CheckSpecMatchesStatus(r, versionPaths, GoPlugin)
+	if found {
+		m.handler = perPathPerMethodGoPlugin.(*GoPluginMiddleware).handler
+		m.Meta = perPathPerMethodGoPlugin.(*GoPluginMiddleware).Meta
+		m.Path = perPathPerMethodGoPlugin.(*GoPluginMiddleware).Path
+		m.SymbolName = perPathPerMethodGoPlugin.(*GoPluginMiddleware).SymbolName
+		m.logger = perPathPerMethodGoPlugin.(*GoPluginMiddleware).logger
+	}
+}
 func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (err error, respCode int) {
+
+	// is there a go plugin per path - we copy the handler etc from the urlspec if we find one
+	m.goPluginConfigFromRequest(r)
+
 	// make sure tyk recover in case Go-plugin function panics
 	defer func() {
 		if e := recover(); e != nil {

@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/xml"
+
 	"net/http"
 	"text/template"
 
@@ -195,6 +196,13 @@ type VirtualMeta struct {
 	ProxyOnError         bool   `bson:"proxy_on_error" json:"proxy_on_error"`
 }
 
+type GoPluginMeta struct {
+	Path       string `bson:"path" json:"path"`
+	Method     string `bson:"method" json:"method"`
+	PluginPath string `bson:"plugin_path" json:"plugin_path"`
+	SymbolName string `bson:"func_name" json:"func_name"`
+}
+
 type MethodTransformMeta struct {
 	Path     string `bson:"path" json:"path"`
 	Method   string `bson:"method" json:"method"`
@@ -209,13 +217,6 @@ type ValidatePathMeta struct {
 	SchemaCache gojsonschema.JSONLoader `bson:"-" json:"-"`
 	// Allows override of default 422 Unprocessible Entity response code for validation errors.
 	ErrorResponseCode int `bson:"error_response_code" json:"error_response_code"`
-}
-
-type GoPluginMeta struct {
-	Path       string `bson:"path" json:"path"`
-	Method     string `bson:"method" json:"method"`
-	PluginPath string `bson:"plugin_path" json:"plugin_path"`
-	SymbolName string `bson:"func_name" json:"func_name"`
 }
 
 type ExtendedPathsSet struct {

@@ -843,4 +843,5 @@ func loadApps(specs []*APISpec) {
 	mainLog.Debug("Checker host Done")
 
 	mainLog.Info("Initialised API Definitions")
+
 }

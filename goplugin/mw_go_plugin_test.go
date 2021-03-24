@@ -94,3 +94,118 @@ func TestGoPluginMWs(t *testing.T) {
 		}...)
 	})
 }
+
+func TestGoPluginResponseHook(t *testing.T) {
+	ts := gateway.StartTest()
+	defer ts.Close()
+
+	gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+		spec.APIID = "plugin_api"
+		spec.Proxy.ListenPath = "/goplugin"
+		spec.UseKeylessAccess = true
+		spec.UseStandardAuth = false
+		spec.UseGoPluginAuth = false
+		spec.CustomMiddleware = apidef.MiddlewareSection{
+			Driver: apidef.GoPluginDriver,
+			Response: []apidef.MiddlewareDefinition{
+				{
+					Name: "MyPluginResponse",
+					Path: "../test/goplugins/goplugins.so",
+				},
+			},
+		}
+	})
+
+	time.Sleep(1 * time.Second)
+
+	t.Run("Run Go-plugin all middle-wares", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			{
+				Path:    "/goplugin/plugin_hit",
+				Headers: map[string]string{"Authorization": "abc"},
+				Code:    http.StatusOK,
+				HeadersMatch: map[string]string{
+					"X-Response-Added": "resp-added",
+				},
+				BodyMatch: `{"message":"response injected message"}`,
+			},
+		}...)
+	})
+}
+
+func TestGoPluginPerPathSingleFile(t *testing.T) {
+	ts := gateway.StartTest()
+	defer ts.Close()
+
+	gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+		spec.APIID = "plugin_api"
+		spec.Proxy.ListenPath = "/goplugin"
+		spec.UseKeylessAccess = true
+		spec.UseStandardAuth = false
+
+		goPluginMetaFoo := apidef.GoPluginMeta{
+			Path:       "/foo",
+			Method:     "GET",
+			PluginPath: "../test/goplugins/goplugins.so",
+			SymbolName: "MyPluginPerPathFoo",
+		}
+
+		goPluginMetaBar := apidef.GoPluginMeta{
+			Path:       "/bar",
+			Method:     "GET",
+			PluginPath: "../test/goplugins/goplugins.so",
+			SymbolName: "MyPluginPerPathBar",
+		}
+
+		goPluginMetaResp := apidef.GoPluginMeta{
+			Path:       "/resp",
+			Method:     "GET",
+			PluginPath: "../test/goplugins/goplugins.so",
+			SymbolName: "MyPluginPerPathResp",
+		}
+
+		v := spec.VersionData.Versions["v1"]
+
+		v.UseExtendedPaths = true
+		v.ExtendedPaths = apidef.ExtendedPathsSet{
+			GoPlugin: []apidef.GoPluginMeta{
+				goPluginMetaFoo,
+				goPluginMetaBar,
+				goPluginMetaResp,
+			},
+		}
+		spec.VersionData.Versions["v1"] = v
+
+	})
+
+	time.Sleep(1 * time.Second)
+
+	t.Run("Run Go-plugins on each path", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			{
+				Path:   "/goplugin/foo",
+				Method: http.MethodGet,
+				HeadersMatch: map[string]string{
+					"X-foo": "foo",
+				},
+			},
+			{
+				Path:   "/goplugin/bar",
+				Method: http.MethodGet,
+				HeadersMatch: map[string]string{
+					"X-bar": "bar",
+				},
+			},
+			{
+				Path:   "/goplugin/resp",
+				Method: http.MethodGet,
+				HeadersMatch: map[string]string{
+					"Content-Type": "application/json",
+				},
+				Code:      http.StatusOK,
+				BodyMatch: `{"current_time":"now"}`,
+			},
+		}...)
+	})
+
+}

@@ -139,7 +139,7 @@ type URLSpec struct {
 	DoNotTrackEndpoint        apidef.TrackEndpointMeta
 	ValidatePathMeta          apidef.ValidatePathMeta
 	Internal                  apidef.InternalMeta
-	GoPluginConfig            GoPluginMiddleware
+	GoPluginMeta              GoPluginMiddleware
 	IgnoreCase                bool
 }
 
@@ -865,15 +865,20 @@ func (a APIDefinitionLoader) compileGopluginPathspathSpec(paths []apidef.GoPlugi
 
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
-	urlSpec := []URLSpec{}
+	var urlSpec []URLSpec
 	for _, stringSpec := range paths {
 		newSpec := URLSpec{}
 		a.generateRegex(stringSpec.Path, &newSpec, stat)
 		// Extend with method actions
-		newSpec.GoPluginConfig.Path = stringSpec.PluginPath
-		newSpec.GoPluginConfig.SymbolName = stringSpec.SymbolName
+		newSpec.GoPluginMeta.Path = stringSpec.PluginPath
+		newSpec.GoPluginMeta.SymbolName = stringSpec.SymbolName
+		newSpec.GoPluginMeta.Meta.Method = stringSpec.Method
+		newSpec.GoPluginMeta.Meta.Path = stringSpec.Path
 
-		loadPerPathGoPlugins(&newSpec.GoPluginConfig)
+		ok := newSpec.GoPluginMeta.loadPlugin()
+		if !ok {
+			fmt.Println("Cant load")
+		}
 
 		urlSpec = append(urlSpec, newSpec)
 	}
@@ -1237,8 +1242,8 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 				return true, &rxPaths[i].Internal
 			}
 		case GoPlugin:
-			if method == rxPaths[i].Internal.Method {
-				return true, &rxPaths[i].GoPluginConfig
+			if method == rxPaths[i].GoPluginMeta.Meta.Method {
+				return true, &rxPaths[i].GoPluginMeta
 			}
 		}
 	}
