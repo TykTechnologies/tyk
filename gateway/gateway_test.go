@@ -833,7 +833,6 @@ func TestControlListener(t *testing.T) {
 	}...)
 }
 
-
 func TestHttpPprof(t *testing.T) {
 
 	t.Run("HTTP Profile not active", func(t *testing.T) {
