@@ -317,6 +317,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 					BaseMiddleware: baseMid,
 					Path:           obj.Path,
 					SymbolName:     obj.Name,
+					APILevel:       true,
 				},
 			)
 		} else if mwDriver != apidef.OttoDriver {
@@ -387,6 +388,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 					BaseMiddleware: baseMid,
 					Path:           mwAuthCheckFunc.Path,
 					SymbolName:     mwAuthCheckFunc.Name,
+					APILevel:       true,
 				},
 			)
 		}
@@ -406,6 +408,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 						BaseMiddleware: baseMid,
 						Path:           obj.Path,
 						SymbolName:     obj.Name,
+						APILevel:       true,
 					},
 				)
 			} else {
@@ -446,6 +449,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 					BaseMiddleware: baseMid,
 					Path:           obj.Path,
 					SymbolName:     obj.Name,
+					APILevel:       true,
 				},
 			)
 		} else if mwDriver != apidef.OttoDriver {

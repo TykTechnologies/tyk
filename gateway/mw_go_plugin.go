@@ -84,6 +84,7 @@ type GoPluginMiddleware struct {
 	logger         *logrus.Entry
 	successHandler *SuccessHandler // to record analytics
 	Meta           apidef.GoPluginMeta
+	APILevel       bool
 }
 
 func (m *GoPluginMiddleware) Name() string {
@@ -132,13 +133,11 @@ func (m *GoPluginMiddleware) loadPlugin() bool {
 }
 
 func (m *GoPluginMiddleware) goPluginConfigFromRequest(r *http.Request) {
+
 	_, versionPaths, _, _ := m.Spec.Version(r)
 
 	found, perPathPerMethodGoPlugin := m.Spec.CheckSpecMatchesStatus(r, versionPaths, GoPlugin)
 	if found {
-		//fmt.Printf("%#v", m)
-		//fmt.Println()
-
 		m.handler = perPathPerMethodGoPlugin.(*GoPluginMiddleware).handler
 		m.Meta = perPathPerMethodGoPlugin.(*GoPluginMiddleware).Meta
 		m.Path = perPathPerMethodGoPlugin.(*GoPluginMiddleware).Path
@@ -149,7 +148,9 @@ func (m *GoPluginMiddleware) goPluginConfigFromRequest(r *http.Request) {
 func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (err error, respCode int) {
 
 	// is there a go plugin per path - we copy the handler etc from the urlspec if we find one
-	m.goPluginConfigFromRequest(r)
+	if !m.APILevel {
+		m.goPluginConfigFromRequest(r)
+	}
 
 	// make sure tyk recover in case Go-plugin function panics
 	defer func() {

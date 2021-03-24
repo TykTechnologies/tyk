@@ -212,3 +212,54 @@ func TestGoPluginPerPathSingleFile(t *testing.T) {
 
 }
 
+func TestGoPluginAPIandPerPath(t *testing.T) {
+	ts := gateway.StartTest()
+	defer ts.Close()
+
+	gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+		spec.APIID = "plugin_api"
+		spec.Proxy.ListenPath = "/goplugin"
+		spec.UseKeylessAccess = true
+		spec.UseStandardAuth = false
+		spec.CustomMiddleware = apidef.MiddlewareSection{
+			Driver: apidef.GoPluginDriver,
+			Pre: []apidef.MiddlewareDefinition{
+				{
+					Name: "MyPluginPre",
+					Path: "../test/goplugins/goplugins.so",
+				},
+			},
+		}
+		goPluginMetaFoo := apidef.GoPluginMeta{
+			Path:       "/foo",
+			Method:     "GET",
+			PluginPath: "../test/goplugins/goplugins.so",
+			SymbolName: "MyPluginPerPathFoo",
+		}
+		v := spec.VersionData.Versions["v1"]
+
+		v.UseExtendedPaths = true
+		v.ExtendedPaths = apidef.ExtendedPathsSet{
+			GoPlugin: []apidef.GoPluginMeta{
+				goPluginMetaFoo,
+			},
+		}
+		spec.VersionData.Versions["v1"] = v
+
+	})
+
+	time.Sleep(1 * time.Second)
+
+	t.Run("Run on per API and per path on same def", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			{
+				Path: "/goplugin/foo",
+				Code: http.StatusOK,
+				HeadersMatch: map[string]string{
+					"X-Initial-URI": "/goplugin/foo",
+					"X-foo":         "foo",
+				},
+			},
+		}...)
+	})
+}
