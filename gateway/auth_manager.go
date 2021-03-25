@@ -186,10 +186,15 @@ func (b *DefaultSessionManager) Sessions(filter string) []string {
 
 type DefaultKeyGenerator struct{}
 
-func generateToken(orgID, keyID string) string {
+func generateToken(orgID, keyID string, customHashKeyFunction ...string) string {
 	keyID = strings.TrimPrefix(keyID, orgID)
-	token, err := storage.GenerateToken(orgID, keyID, config.Global().HashKeyFunction)
+	hashKeyFunction := config.Global().HashKeyFunction
 
+	if len(customHashKeyFunction) > 0 {
+		hashKeyFunction = customHashKeyFunction[0]
+	}
+
+	token, err := storage.GenerateToken(orgID, keyID, hashKeyFunction)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "auth-mgr",
