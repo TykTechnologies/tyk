@@ -11,7 +11,7 @@ import (
 
 	"crypto/tls"
 
-	redis "github.com/go-redis/redis/v8"
+	"github.com/go-redis/redis/v8"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 
@@ -104,18 +104,18 @@ func singleton(cache, analytics bool) redis.UniversalClient {
 	return nil
 }
 
-func connectSingleton(cache, analytics bool, conf config.Config) bool {
+func connectSingleton(cache, analytics bool) bool {
 	d := singleton(cache, analytics) == nil
 	if d {
 		log.Debug("Connecting to redis cluster")
 		if cache {
-			singleCachePool.Store(NewRedisClusterPool(cache, analytics, conf))
+			singleCachePool.Store(NewRedisClusterPool(cache, analytics))
 			return true
 		} else if analytics {
-			singleAnalyticsPool.Store(NewRedisClusterPool(cache, analytics, conf))
+			singleAnalyticsPool.Store(NewRedisClusterPool(cache, analytics))
 			return true
 		}
-		singlePool.Store(NewRedisClusterPool(cache, analytics, conf))
+		singlePool.Store(NewRedisClusterPool(cache, analytics))
 		return true
 	}
 	return true
@@ -145,7 +145,7 @@ func clusterConnectionIsOpen(cluster *RedisCluster) bool {
 // redis.
 //
 // onConnect will be called when we have established a successful redis connection
-func ConnectToRedis(ctx context.Context, onConnect func(), conf *config.Config) {
+func ConnectToRedis(ctx context.Context, onConnect func()) {
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 	c := []RedisCluster{
@@ -153,7 +153,7 @@ func ConnectToRedis(ctx context.Context, onConnect func(), conf *config.Config) 
 	}
 	var ok bool
 	for _, v := range c {
-		if !connectSingleton(v.IsCache, v.IsAnalytics, *conf) {
+		if !connectSingleton(v.IsCache, v.IsAnalytics) {
 			break
 		}
 		if !clusterConnectionIsOpen(&v) {
@@ -172,7 +172,7 @@ func ConnectToRedis(ctx context.Context, onConnect func(), conf *config.Config) 
 				continue
 			}
 			conn := Connected()
-			ok := connectCluster(*conf, c...)
+			ok := connectCluster(c...)
 
 			redisUp.Store(ok)
 			if !conn && ok {
@@ -185,29 +185,29 @@ func ConnectToRedis(ctx context.Context, onConnect func(), conf *config.Config) 
 	}
 }
 
-func connectCluster(conf config.Config, v ...RedisCluster) bool {
+func connectCluster(v ...RedisCluster) bool {
 	for _, x := range v {
-		if ok := establishConnection(&x, conf); ok {
+		if ok := establishConnection(&x); ok {
 			return ok
 		}
 	}
 	return false
 }
 
-func establishConnection(v *RedisCluster, conf config.Config) bool {
-	if !connectSingleton(v.IsCache, v.IsAnalytics, conf) {
+func establishConnection(v *RedisCluster) bool {
+	if !connectSingleton(v.IsCache, v.IsAnalytics) {
 		return false
 	}
 	return clusterConnectionIsOpen(v)
 }
 
-func NewRedisClusterPool(isCache, isAnalytics bool, conf config.Config) redis.UniversalClient {
+func NewRedisClusterPool(isCache, isAnalytics bool) redis.UniversalClient {
 	// redisSingletonMu is locked and we know the singleton is nil
-	cfg := conf.Storage
-	if isCache && conf.EnableSeperateCacheStore {
-		cfg = conf.CacheStorage
-	} else if isAnalytics && conf.EnableAnalytics && conf.EnableSeperateAnalyticsStore {
-		cfg = conf.AnalyticsStorage
+	cfg := config.Global().Storage
+	if isCache && config.Global().EnableSeperateCacheStore {
+		cfg = config.Global().CacheStorage
+	} else if isAnalytics && config.Global().EnableAnalytics && config.Global().EnableSeperateAnalyticsStore {
+		cfg = config.Global().AnalyticsStorage
 	}
 	log.Debug("Creating new Redis connection pool")
 

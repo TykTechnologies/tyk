@@ -75,13 +75,12 @@ func createMultiBasicAuthSession(isBench bool) *user.SessionState {
 	return session
 }
 
-func (ts *Test) getMultiAuthStandardAndBasicAuthChain(spec *APISpec) http.Handler {
-
+func getMultiAuthStandardAndBasicAuthChain(spec *APISpec) http.Handler {
 	remote, _ := url.Parse(TestHttpAny)
-	proxy := ts.Gw.TykNewSingleHostReverseProxy(remote, spec, nil)
+	proxy := TykNewSingleHostReverseProxy(remote, spec, nil)
 	proxyHandler := ProxyHandler(proxy, spec)
-	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy, Gw: ts.Gw}
-	chain := alice.New(ts.Gw.mwList(
+	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy}
+	chain := alice.New(mwList(
 		&IPWhiteListMiddleware{baseMid},
 		&IPBlackListMiddleware{BaseMiddleware: baseMid},
 		&BasicAuthKeyIsValid{baseMid, nil, nil},
@@ -94,9 +93,8 @@ func (ts *Test) getMultiAuthStandardAndBasicAuthChain(spec *APISpec) http.Handle
 	return chain
 }
 
-func (ts *Test) testPrepareMultiSessionBA(t testing.TB, isBench bool) (*APISpec, *http.Request) {
-
-	spec := ts.Gw.LoadSampleAPI(multiAuthDev)
+func testPrepareMultiSessionBA(t testing.TB, isBench bool) (*APISpec, *http.Request) {
+	spec := LoadSampleAPI(multiAuthDev)
 
 	// Create BA
 	baSession := createMultiBasicAuthSession(isBench)
@@ -107,12 +105,9 @@ func (ts *Test) testPrepareMultiSessionBA(t testing.TB, isBench bool) (*APISpec,
 		username = "0987876"
 	}
 	password := "TEST"
-	keyName := ts.Gw.generateToken("default", username)
+	keyName := generateToken("default", username)
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	err := ts.Gw.GlobalSessionManager.UpdateSession(keyName, baSession, 60, false)
-	if err != nil {
-		t.Error("could not update session in Session Manager. " + err.Error())
-	}
+	GlobalSessionManager.UpdateSession(keyName, baSession, 60, false)
 
 	// Create key
 	session := createMultiAuthKeyAuthSession(isBench)
@@ -123,10 +118,7 @@ func (ts *Test) testPrepareMultiSessionBA(t testing.TB, isBench bool) (*APISpec,
 		customToken = "84573485734587384888723487243"
 	}
 	// AuthKey sessions are stored by {token}
-	err = ts.Gw.GlobalSessionManager.UpdateSession(customToken, session, 60, false)
-	if err != nil {
-		t.Error("could not update session in Session Manager. " + err.Error())
-	}
+	GlobalSessionManager.UpdateSession(customToken, session, 60, false)
 
 	toEncode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(toEncode))
@@ -139,12 +131,10 @@ func (ts *Test) testPrepareMultiSessionBA(t testing.TB, isBench bool) (*APISpec,
 }
 
 func TestMultiSession_BA_Standard_OK(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-	spec, req := ts.testPrepareMultiSessionBA(t, false)
+	spec, req := testPrepareMultiSessionBA(t, false)
 
 	recorder := httptest.NewRecorder()
-	chain := ts.getMultiAuthStandardAndBasicAuthChain(spec)
+	chain := getMultiAuthStandardAndBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 200 {
@@ -153,15 +143,12 @@ func TestMultiSession_BA_Standard_OK(t *testing.T) {
 }
 
 func BenchmarkMultiSession_BA_Standard_OK(b *testing.B) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
 	b.ReportAllocs()
 
-	spec, req := ts.testPrepareMultiSessionBA(b, true)
+	spec, req := testPrepareMultiSessionBA(b, true)
 
 	recorder := httptest.NewRecorder()
-	chain := ts.getMultiAuthStandardAndBasicAuthChain(spec)
+	chain := getMultiAuthStandardAndBasicAuthChain(spec)
 
 	for i := 0; i < b.N; i++ {
 		chain.ServeHTTP(recorder, req)
@@ -172,29 +159,20 @@ func BenchmarkMultiSession_BA_Standard_OK(b *testing.B) {
 }
 
 func TestMultiSession_BA_Standard_Identity(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	spec := ts.Gw.LoadSampleAPI(multiAuthDev)
+	spec := LoadSampleAPI(multiAuthDev)
 
 	// Create BA
 	baSession := createMultiBasicAuthSession(false)
 	username := "0987876"
 	password := "TEST"
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	err := ts.Gw.GlobalSessionManager.UpdateSession("default0987876", baSession, 60, false)
-	if err != nil {
-		t.Error("could not update session in Session Manager. " + err.Error())
-	}
+	GlobalSessionManager.UpdateSession("default0987876", baSession, 60, false)
 
 	// Create key
 	session := createMultiAuthKeyAuthSession(false)
 	customToken := "84573485734587384888723487243"
 	// AuthKey sessions are stored by {token}
-	err = ts.Gw.GlobalSessionManager.UpdateSession(customToken, session, 60, false)
-	if err != nil {
-		t.Error("could not update session in Session Manager. " + err.Error())
-	}
+	GlobalSessionManager.UpdateSession(customToken, session, 60, false)
 
 	to_encode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
@@ -204,7 +182,7 @@ func TestMultiSession_BA_Standard_Identity(t *testing.T) {
 	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 	req.Header.Set("x-standard-auth", fmt.Sprintf("Bearer %s", customToken))
 
-	chain := ts.getMultiAuthStandardAndBasicAuthChain(spec)
+	chain := getMultiAuthStandardAndBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 200 {
@@ -218,29 +196,20 @@ func TestMultiSession_BA_Standard_Identity(t *testing.T) {
 }
 
 func TestMultiSession_BA_Standard_FAILBA(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	spec := ts.Gw.LoadSampleAPI(multiAuthDev)
+	spec := LoadSampleAPI(multiAuthDev)
 
 	// Create BA
 	baSession := createMultiBasicAuthSession(false)
 	username := "0987876"
 	password := "WRONG"
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	err := ts.Gw.GlobalSessionManager.UpdateSession("default0987876", baSession, 60, false)
-	if err != nil {
-		t.Error("could not update session in Session Manager. " + err.Error())
-	}
+	GlobalSessionManager.UpdateSession("default0987876", baSession, 60, false)
 
 	// Create key
 	session := createMultiAuthKeyAuthSession(false)
 	customToken := "84573485734587384888723487243"
 	// AuthKey sessions are stored by {token}
-	err = ts.Gw.GlobalSessionManager.UpdateSession(customToken, session, 60, false)
-	if err != nil {
-		t.Error("could not update session in Session Manager. " + err.Error())
-	}
+	GlobalSessionManager.UpdateSession(customToken, session, 60, false)
 
 	to_encode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
@@ -250,7 +219,7 @@ func TestMultiSession_BA_Standard_FAILBA(t *testing.T) {
 	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 	req.Header.Set("x-standard-auth", fmt.Sprintf("Bearer %s", customToken))
 
-	chain := ts.getMultiAuthStandardAndBasicAuthChain(spec)
+	chain := getMultiAuthStandardAndBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 401 {
@@ -259,29 +228,20 @@ func TestMultiSession_BA_Standard_FAILBA(t *testing.T) {
 }
 
 func TestMultiSession_BA_Standard_FAILAuth(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	spec := ts.Gw.LoadSampleAPI(multiAuthDev)
+	spec := LoadSampleAPI(multiAuthDev)
 
 	// Create BA
 	baSession := createMultiBasicAuthSession(false)
 	username := "0987876"
 	password := "TEST"
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	err := ts.Gw.GlobalSessionManager.UpdateSession("default0987876", baSession, 60, false)
-	if err != nil {
-		t.Error("could not update session in Session Manager. " + err.Error())
-	}
+	GlobalSessionManager.UpdateSession("default0987876", baSession, 60, false)
 
 	// Create key
 	session := createMultiAuthKeyAuthSession(false)
 	customToken := "84573485734587384888723487243"
 	// AuthKey sessions are stored by {token}
-	err = ts.Gw.GlobalSessionManager.UpdateSession(customToken, session, 60, false)
-	if err != nil {
-		t.Error("could not update session in Session Manager. " + err.Error())
-	}
+	GlobalSessionManager.UpdateSession(customToken, session, 60, false)
 
 	to_encode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
@@ -291,7 +251,7 @@ func TestMultiSession_BA_Standard_FAILAuth(t *testing.T) {
 	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 	req.Header.Set("x-standard-auth", fmt.Sprintf("Bearer %s", "WRONGTOKEN"))
 
-	chain := ts.getMultiAuthStandardAndBasicAuthChain(spec)
+	chain := getMultiAuthStandardAndBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 403 {
@@ -300,12 +260,12 @@ func TestMultiSession_BA_Standard_FAILAuth(t *testing.T) {
 }
 
 func TestJWTAuthKeyMultiAuth(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
 
-	pID := ts.CreatePolicy()
+	pID := CreatePolicy()
 
-	spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	spec := BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 
 		spec.AuthConfigs = make(map[string]apidef.AuthConfig)
@@ -329,14 +289,14 @@ func TestJWTAuthKeyMultiAuth(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 	})[0]
 
-	ts.Gw.LoadAPI(spec)
+	LoadAPI(spec)
 
 	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Claims.(jwt.MapClaims)["user_id"] = "user"
 		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	})
 
-	key := CreateSession(ts.Gw)
+	key := CreateSession()
 
 	ts.Run(t, []test.TestCase{
 		{

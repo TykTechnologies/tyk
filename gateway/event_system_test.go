@@ -19,8 +19,7 @@ var (
 	}
 )
 
-func (ts *Test) prepareSpecWithEvents(logger *logrus.Logger) (spec *APISpec) {
-
+func prepareSpecWithEvents(logger *logrus.Logger) (spec *APISpec) {
 	if logger == nil {
 		logger = log
 	}
@@ -45,7 +44,7 @@ func (ts *Test) prepareSpecWithEvents(logger *logrus.Logger) (spec *APISpec) {
 	spec.EventPaths = make(map[apidef.TykEvent][]config.TykEventHandler)
 	for eventName, eventHandlerConfs := range def.EventHandlers.Events {
 		for _, handlerConf := range eventHandlerConfs {
-			eventHandlerInstance, err := ts.Gw.EventHandlerByName(handlerConf, spec)
+			eventHandlerInstance, err := EventHandlerByName(handlerConf, spec)
 
 			if err != nil {
 				log.Error("Failed to init event handler: ", err)
@@ -100,13 +99,10 @@ func prepareEventHandlerConfig(handler apidef.TykEventHandlerName) (config apide
 	return config
 }
 func TestEventHandlerByName(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	spec := ts.prepareSpecWithEvents(nil)
+	spec := prepareSpecWithEvents(nil)
 	for _, handlerType := range handlerTypes {
 		handlerConfig := prepareEventHandlerConfig(handlerType)
-		_, err := ts.Gw.EventHandlerByName(handlerConfig, spec)
+		_, err := EventHandlerByName(handlerConfig, spec)
 
 		// CP is disabled on standard builds:
 		if handlerType == EH_CoProcessHandler {
@@ -119,13 +115,10 @@ func TestEventHandlerByName(t *testing.T) {
 }
 
 func TestLogMessageEventHandler(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
 	buf := &bytes.Buffer{}
 	testLogger := logrus.New()
 	testLogger.Out = buf
-	spec := ts.prepareSpecWithEvents(testLogger)
+	spec := prepareSpecWithEvents(testLogger)
 	handler := spec.EventPaths[EventAuthFailure][0]
 	em := config.EventMessage{
 		Type: EventAuthFailure,
@@ -145,18 +138,9 @@ func TestLogMessageEventHandler(t *testing.T) {
 }
 
 func TestInitGenericEventHandlers(t *testing.T) {
-
-	eventsConf := prepareEventsConf()
-	conf := func(confi *config.Config) {
-		confi.EventHandlers = eventsConf.EventHandlers
-	}
-
-	ts := StartTest(conf)
-	defer ts.Close()
-
-	ts.Gw.initGenericEventHandlers()
-	triggers := ts.Gw.GetConfig().GetEventTriggers()
-
+	conf := prepareEventsConf()
+	initGenericEventHandlers(conf)
+	triggers := conf.GetEventTriggers()
 	if len(triggers) != 2 {
 		t.Fatal("EventTriggers length doesn't match")
 	}
@@ -173,14 +157,10 @@ func TestInitGenericEventHandlers(t *testing.T) {
 }
 
 func BenchmarkInitGenericEventHandlers(b *testing.B) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
 	b.ReportAllocs()
 
 	conf := prepareEventsConf()
-	ts.Gw.SetConfig(*conf)
 	for i := 0; i < b.N; i++ {
-		ts.Gw.initGenericEventHandlers()
+		initGenericEventHandlers(conf)
 	}
 }

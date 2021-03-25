@@ -12,6 +12,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -20,17 +21,17 @@ const RPCKeyPrefix = "rpc:"
 const BackupApiKeyBase = "node-definition-backup:"
 const BackupPolicyKeyBase = "node-policy-backup:"
 
-func getTagListAsString(tags []string) string {
+func getTagListAsString() string {
 	tagList := ""
-	if len(tags) > 0 {
+	if tags := config.Global().DBAppConfOptions.Tags; len(tags) > 0 {
 		tagList = strings.Join(tags, "-")
 	}
 
 	return tagList
 }
 
-func (gw *Gateway) LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
-	tagList := getTagListAsString(gw.GetConfig().DBAppConfOptions.Tags)
+func LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
+	tagList := getTagListAsString()
 	checkKey := BackupApiKeyBase + tagList
 
 	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix}
@@ -41,7 +42,7 @@ func (gw *Gateway) LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 		return nil, errors.New("[RPC] --> RPC Backup recovery failed: redis connection failed")
 	}
 
-	secret := rightPad2Len(gw.GetConfig().Secret, "=", 32)
+	secret := rightPad2Len(config.Global().Secret, "=", 32)
 	cryptoText, err := store.GetKey(checkKey)
 	if err != nil {
 		return nil, errors.New("[RPC] --> Failed to get node backup (" + checkKey + "): " + err.Error())
@@ -49,17 +50,17 @@ func (gw *Gateway) LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 
 	apiListAsString := decrypt([]byte(secret), cryptoText)
 
-	a := APIDefinitionLoader{gw}
-	return a.processRPCDefinitions(apiListAsString, gw)
+	a := APIDefinitionLoader{}
+	return a.processRPCDefinitions(apiListAsString)
 }
 
-func (gw *Gateway) saveRPCDefinitionsBackup(list string) error {
+func saveRPCDefinitionsBackup(list string) error {
 	if !json.Valid([]byte(list)) {
 		return errors.New("--> RPC Backup save failure: wrong format, skipping.")
 	}
 
 	log.Info("Storing RPC Definitions backup")
-	tagList := getTagListAsString(gw.GetConfig().DBAppConfOptions.Tags)
+	tagList := getTagListAsString()
 
 	log.Info("--> Connecting to DB")
 
@@ -72,7 +73,7 @@ func (gw *Gateway) saveRPCDefinitionsBackup(list string) error {
 		return errors.New("--> RPC Backup save failed: redis connection failed")
 	}
 
-	secret := rightPad2Len(gw.GetConfig().Secret, "=", 32)
+	secret := rightPad2Len(config.Global().Secret, "=", 32)
 	cryptoText := encrypt([]byte(secret), list)
 	err := store.SetKey(BackupApiKeyBase+tagList, cryptoText, -1)
 	if err != nil {
@@ -82,8 +83,8 @@ func (gw *Gateway) saveRPCDefinitionsBackup(list string) error {
 	return nil
 }
 
-func (gw *Gateway) LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
-	tagList := getTagListAsString(gw.GetConfig().DBAppConfOptions.Tags)
+func LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
+	tagList := getTagListAsString()
 	checkKey := BackupPolicyKeyBase + tagList
 
 	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix}
@@ -95,7 +96,7 @@ func (gw *Gateway) LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
 		return nil, errors.New("[RPC] --> RPC Policy Backup recovery failed: redis connection failed")
 	}
 
-	secret := rightPad2Len(gw.GetConfig().Secret, "=", 32)
+	secret := rightPad2Len(config.Global().Secret, "=", 32)
 	cryptoText, err := store.GetKey(checkKey)
 	listAsString := decrypt([]byte(secret), cryptoText)
 
@@ -113,13 +114,13 @@ func (gw *Gateway) LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
 	}
 }
 
-func (gw *Gateway) saveRPCPoliciesBackup(list string) error {
+func saveRPCPoliciesBackup(list string) error {
 	if !json.Valid([]byte(list)) {
 		return errors.New("--> RPC Backup save failure: wrong format, skipping.")
 	}
 
 	log.Info("Storing RPC policies backup")
-	tagList := getTagListAsString(gw.GetConfig().DBAppConfOptions.Tags)
+	tagList := getTagListAsString()
 
 	log.Info("--> Connecting to DB")
 
@@ -132,7 +133,7 @@ func (gw *Gateway) saveRPCPoliciesBackup(list string) error {
 		return errors.New("--> RPC Backup save failed: redis connection failed")
 	}
 
-	secret := rightPad2Len(gw.GetConfig().Secret, "=", 32)
+	secret := rightPad2Len(config.Global().Secret, "=", 32)
 	cryptoText := encrypt([]byte(secret), list)
 	err := store.SetKey(BackupPolicyKeyBase+tagList, cryptoText, -1)
 	if err != nil {

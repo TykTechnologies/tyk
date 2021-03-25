@@ -25,9 +25,8 @@ function testVirtData(request, session, config) {
 }
 `
 
-func (ts *Test) testPrepareVirtualEndpoint(js string, method string, path string, proxyOnError bool, keyless bool) {
-
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+func testPrepareVirtualEndpoint(js string, method string, path string, proxyOnError bool, keyless bool) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.APIID = "test"
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = keyless
@@ -66,10 +65,10 @@ func (ts *Test) testPrepareVirtualEndpoint(js string, method string, path string
 }
 
 func TestVirtualEndpoint(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
 
-	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt", true, true)
+	testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt", true, true)
 
 	ts.Run(t, test.TestCase{
 		Path:      "/virt",
@@ -83,10 +82,10 @@ func TestVirtualEndpoint(t *testing.T) {
 }
 
 func TestVirtualEndpoint500(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
 
-	ts.testPrepareVirtualEndpoint("abc", "GET", "/abc", false, true)
+	testPrepareVirtualEndpoint("abc", "GET", "/abc", false, true)
 
 	ts.Run(t, test.TestCase{
 		Path: "/abc",
@@ -95,7 +94,7 @@ func TestVirtualEndpoint500(t *testing.T) {
 }
 
 func TestVirtualEndpointSessionMetadata(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
 
 	_, key := ts.CreateSession(func(s *user.SessionState) {
@@ -109,7 +108,7 @@ func TestVirtualEndpointSessionMetadata(t *testing.T) {
 		}
 	})
 
-	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/abc", false, false)
+	testPrepareVirtualEndpoint(virtTestJS, "GET", "/abc", false, false)
 
 	ts.Run(t, test.TestCase{
 		Path:    "/abc",
@@ -121,10 +120,10 @@ func TestVirtualEndpointSessionMetadata(t *testing.T) {
 func BenchmarkVirtualEndpoint(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
 
-	ts.testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt", true, true)
+	testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt", true, true)
 
 	for i := 0; i < b.N; i++ {
 		ts.Run(b, test.TestCase{

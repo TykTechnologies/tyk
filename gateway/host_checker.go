@@ -17,6 +17,7 @@ import (
 	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 const (
@@ -69,7 +70,6 @@ type HostUptimeChecker struct {
 	resetListMu sync.Mutex
 	doResetList bool
 	newList     map[string]HostData
-	Gw          *Gateway `json:"-"`
 }
 
 func (h *HostUptimeChecker) getStopLoop() bool {
@@ -102,7 +102,7 @@ func (h *HostUptimeChecker) HostCheckLoop(ctx context.Context) {
 	defer func() {
 		log.Info("[HOST CHECKER] Checker stopped")
 	}()
-	if h.Gw.isRunningTests() {
+	if isRunningTests() {
 		for {
 			select {
 			case <-ctx.Done():
@@ -276,15 +276,15 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 			log.Error("Could not create request: ", err)
 			return
 		}
-		ignoreCanonical := h.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
+		ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
 		for headerName, headerValue := range toCheck.Headers {
 			setCustomHeader(req.Header, headerName, headerValue, ignoreCanonical)
 		}
 		req.Header.Set("Connection", "close")
 		HostCheckerClient.Transport = &http.Transport{
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: h.Gw.GetConfig().ProxySSLInsecureSkipVerify,
-				MaxVersion:         h.Gw.GetConfig().ProxySSLMaxVersion,
+				InsecureSkipVerify: config.Global().ProxySSLInsecureSkipVerify,
+				MaxVersion:         config.Global().ProxySSLMaxVersion,
 			},
 		}
 		if toCheck.Timeout != 0 {

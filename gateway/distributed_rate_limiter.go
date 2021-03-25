@@ -7,18 +7,21 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/drl"
+	"github.com/TykTechnologies/tyk/config"
 )
 
-func (gw *Gateway) setupDRL() {
+var DRLManager = &drl.DRL{}
+
+func setupDRL() {
 	drlManager := &drl.DRL{}
 	drlManager.Init()
-	drlManager.ThisServerID = gw.GetNodeID() + "|" + hostDetails.Hostname
+	drlManager.ThisServerID = GetNodeID() + "|" + hostDetails.Hostname
 	log.Debug("DRL: Setting node ID: ", drlManager.ThisServerID)
-	gw.DRLManager = drlManager
+	DRLManager = drlManager
 }
 
-func (gw *Gateway) startRateLimitNotifications() {
-	notificationFreq := gw.GetConfig().DRLNotificationFrequency
+func startRateLimitNotifications() {
+	notificationFreq := config.Global().DRLNotificationFrequency
 	if notificationFreq == 0 {
 		notificationFreq = 2
 	}
@@ -26,8 +29,8 @@ func (gw *Gateway) startRateLimitNotifications() {
 	go func() {
 		log.Info("Starting gateway rate limiter notifications...")
 		for {
-			if gw.GetNodeID() != "" {
-				gw.NotifyCurrentServerStatus()
+			if GetNodeID() != "" {
+				NotifyCurrentServerStatus()
 			} else {
 				log.Warning("Node not registered yet, skipping DRL Notification")
 			}
@@ -37,16 +40,16 @@ func (gw *Gateway) startRateLimitNotifications() {
 	}()
 }
 
-func (gw *Gateway) getTagHash() string {
+func getTagHash() string {
 	th := ""
-	for _, tag := range gw.GetConfig().DBAppConfOptions.Tags {
+	for _, tag := range config.Global().DBAppConfOptions.Tags {
 		th += tag
 	}
 	return th
 }
 
-func (gw *Gateway) NotifyCurrentServerStatus() {
-	if !gw.DRLManager.Ready {
+func NotifyCurrentServerStatus() {
+	if !DRLManager.Ready {
 		return
 	}
 
@@ -57,9 +60,9 @@ func (gw *Gateway) NotifyCurrentServerStatus() {
 
 	server := drl.Server{
 		HostName:   hostDetails.Hostname,
-		ID:         gw.GetNodeID(),
+		ID:         GetNodeID(),
 		LoadPerSec: rate,
-		TagHash:    gw.getTagHash(),
+		TagHash:    getTagHash(),
 	}
 
 	asJson, err := json.Marshal(server)
@@ -71,13 +74,12 @@ func (gw *Gateway) NotifyCurrentServerStatus() {
 	n := Notification{
 		Command: NoticeGatewayDRLNotification,
 		Payload: string(asJson),
-		Gw:      gw,
 	}
 
-	gw.MainNotifier.Notify(n)
+	MainNotifier.Notify(n)
 }
 
-func (gw *Gateway) onServerStatusReceivedHandler(payload string) {
+func onServerStatusReceivedHandler(payload string) {
 	serverData := drl.Server{}
 	if err := json.Unmarshal([]byte(payload), &serverData); err != nil {
 		log.WithFields(logrus.Fields{
@@ -89,8 +91,8 @@ func (gw *Gateway) onServerStatusReceivedHandler(payload string) {
 
 	// log.Debug("Received DRL data: ", serverData)
 
-	if gw.DRLManager.Ready {
-		if err := gw.DRLManager.AddOrUpdateServer(serverData); err != nil {
+	if DRLManager.Ready {
+		if err := DRLManager.AddOrUpdateServer(serverData); err != nil {
 			log.WithError(err).
 				WithField("serverData", serverData).
 				Debug("AddOrUpdateServer error. Seems like you running multiple segmented Tyk groups in same Redis.")

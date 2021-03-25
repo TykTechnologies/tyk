@@ -26,9 +26,6 @@ func (mockStore) SessionDetail(orgID string, keyName string, hashed bool) (user.
 }
 
 func TestBaseMiddleware_OrgSessionExpiry(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
 	m := BaseMiddleware{
 		Spec: &APISpec{
 			GlobalConfig: config.Config{
@@ -37,16 +34,15 @@ func TestBaseMiddleware_OrgSessionExpiry(t *testing.T) {
 			OrgSessionManager: mockStore{},
 		},
 		logger: mainLog,
-		Gw:     ts.Gw,
 	}
 	v := int64(100)
-	ts.Gw.ExpiryCache.Set(sess.OrgID, v, cache.DefaultExpiration)
+	ExpiryCache.Set(sess.OrgID, v, cache.DefaultExpiration)
 
 	got := m.OrgSessionExpiry(sess.OrgID)
 	if got != v {
 		t.Errorf("expected %d got %d", v, got)
 	}
-	ts.Gw.ExpiryCache.Delete(sess.OrgID)
+	ExpiryCache.Delete(sess.OrgID)
 	got = m.OrgSessionExpiry(sess.OrgID)
 	if got != sess.DataExpires {
 		t.Errorf("expected %d got %d", sess.DataExpires, got)
@@ -65,10 +61,7 @@ func TestBaseMiddleware_getAuthType(t *testing.T) {
 		"oidc":      {AuthHeaderName: "h7"},
 	}
 
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	baseMid := BaseMiddleware{Spec: spec, Gw: ts.Gw}
+	baseMid := BaseMiddleware{Spec: spec}
 
 	r, _ := http.NewRequest(http.MethodGet, "", nil)
 	r.Header.Set("h1", "t1")

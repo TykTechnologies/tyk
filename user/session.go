@@ -8,6 +8,7 @@ import (
 
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 
+	"github.com/TykTechnologies/tyk/config"
 	logger "github.com/TykTechnologies/tyk/log"
 )
 
@@ -271,9 +272,9 @@ func (s *SessionState) KeyHashEmpty() bool {
 	return s.keyHash == ""
 }
 
-func (s *SessionState) Lifetime(fallback int64, forceGlobalSessionLifetime bool, globalSessionLifetime int64) int64 {
-	if forceGlobalSessionLifetime {
-		return globalSessionLifetime
+func (s *SessionState) Lifetime(fallback int64) int64 {
+	if config.Global().ForceGlobalSessionLifetime {
+		return config.Global().GlobalSessionLifetime
 	}
 	if s.SessionLifetime > 0 {
 		return s.SessionLifetime

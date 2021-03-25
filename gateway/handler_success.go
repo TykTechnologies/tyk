@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	cache "github.com/pmylund/go-cache"
+
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/headers"
@@ -21,6 +23,17 @@ import (
 const (
 	keyDataDeveloperID    = "tyk_developer_id"
 	keyDataDeveloperEmail = "tyk_developer_email"
+)
+
+var (
+	// key session memory cache
+	SessionCache = cache.New(10*time.Second, 5*time.Second)
+
+	// org session memory cache
+	ExpiryCache = cache.New(600*time.Second, 10*time.Minute)
+
+	// memory cache to store arbitrary items
+	UtilCache = cache.New(time.Hour, 10*time.Minute)
 )
 
 type ProxyResponse struct {
@@ -226,7 +239,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 		}
 
 		if s.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
-			record.GetGeo(ip, s.Gw)
+			record.GetGeo(ip)
 		}
 
 		expiresAfter := s.Spec.ExpireAnalyticsAfter
@@ -244,10 +257,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 			record.NormalisePath(&s.Spec.GlobalConfig)
 		}
 
-		err := s.Gw.analytics.RecordHit(&record)
-		if err != nil {
-			log.WithError(err).Error("could not store analytic record")
-		}
+		analytics.RecordHit(&record)
 	}
 
 	// Report in health check

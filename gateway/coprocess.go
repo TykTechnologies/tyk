@@ -12,6 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tyk/user"
 
@@ -51,7 +52,7 @@ func CreateCoProcessMiddleware(hookName string, hookType coprocess.HookType, mwD
 		successHandler:   &SuccessHandler{baseMid},
 	}
 
-	return baseMid.Gw.createMiddleware(dMiddleware)
+	return createMiddleware(dMiddleware)
 }
 
 func DoCoprocessReload() {
@@ -182,7 +183,7 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 	for _, dh := range object.Request.DeleteHeaders {
 		r.Header.Del(dh)
 	}
-	ignoreCanonical := c.Middleware.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
+	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
 	for h, v := range object.Request.SetHeaders {
 		setCustomHeader(r.Header, h, v, ignoreCanonical)
 	}
@@ -230,8 +231,8 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 }
 
 // CoProcessInit creates a new CoProcessDispatcher, it will be called when Tyk starts.
-func (gw *Gateway) CoProcessInit() {
-	if !gw.GetConfig().CoProcessOptions.EnableCoProcess {
+func CoProcessInit() {
+	if !config.Global().CoProcessOptions.EnableCoProcess {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
 		}).Info("Rich plugins are disabled")
@@ -239,9 +240,9 @@ func (gw *Gateway) CoProcessInit() {
 	}
 
 	// Load gRPC dispatcher:
-	if gw.GetConfig().CoProcessOptions.CoProcessGRPCServer != "" {
+	if config.Global().CoProcessOptions.CoProcessGRPCServer != "" {
 		var err error
-		loadedDrivers[apidef.GrpcDriver], err = gw.NewGRPCDispatcher()
+		loadedDrivers[apidef.GrpcDriver], err = NewGRPCDispatcher()
 		if err == nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "coprocess",
@@ -252,13 +253,11 @@ func (gw *Gateway) CoProcessInit() {
 			}).WithError(err).Error("Couldn't load gRPC dispatcher")
 		}
 	}
-
 }
 
 // EnabledForSpec checks if this middleware should be enabled for a given API.
 func (m *CoProcessMiddleware) EnabledForSpec() bool {
-
-	if !m.Gw.GetConfig().CoProcessOptions.EnableCoProcess {
+	if !config.Global().CoProcessOptions.EnableCoProcess {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
 		}).Error("Your API specifies a CP custom middleware, either Tyk wasn't build with CP support or CP is not enabled in your Tyk configuration file!")
@@ -393,7 +392,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	// The CP middleware indicates this is a bad auth:
 	if returnObject.Request.ReturnOverrides.ResponseCode >= http.StatusBadRequest && !returnObject.Request.ReturnOverrides.OverrideError {
-		logger.WithField("key", m.Gw.obfuscateKey(token)).Info("Attempted access with invalid key")
+		logger.WithField("key", obfuscateKey(token)).Info("Attempted access with invalid key")
 
 		for h, v := range returnObject.Request.ReturnOverrides.Headers {
 			w.Header().Set(h, v)
@@ -461,7 +460,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			return errors.New(http.StatusText(http.StatusForbidden)), http.StatusForbidden
 		}
 
-		existingSession, found := m.Gw.GlobalSessionManager.SessionDetail(m.Spec.OrgID, sessionID, false)
+		existingSession, found := GlobalSessionManager.SessionDetail(m.Spec.OrgID, sessionID, false)
 		if found {
 			returnedSession.QuotaRenews = existingSession.QuotaRenews
 			returnedSession.QuotaRemaining = existingSession.QuotaRemaining
@@ -482,7 +481,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			return errors.New(http.StatusText(http.StatusForbidden)), http.StatusForbidden
 		}
 
-		ctxSetSession(r, returnedSession, sessionID, true, m.Gw.GetConfig().HashKeys)
+		ctxSetSession(r, returnedSession, sessionID, true)
 	}
 
 	return nil, http.StatusOK
@@ -490,16 +489,13 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 type CustomMiddlewareResponseHook struct {
 	mw *CoProcessMiddleware
-	Gw *Gateway `json:"-"`
 }
 
 func (h *CustomMiddlewareResponseHook) Init(mwDef interface{}, spec *APISpec) error {
 	mwDefinition := mwDef.(apidef.MiddlewareDefinition)
-
 	h.mw = &CoProcessMiddleware{
 		BaseMiddleware: BaseMiddleware{
 			Spec: spec,
-			Gw:   h.Gw,
 		},
 		HookName:         mwDefinition.Name,
 		HookType:         coprocess.HookType_Response,
@@ -550,7 +546,7 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 	}
 
 	// Set headers:
-	ignoreCanonical := h.mw.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
+	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
 	for k, v := range retObject.Response.Headers {
 		setCustomHeader(res.Header, k, v, ignoreCanonical)
 	}

@@ -43,14 +43,14 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	if !found {
 		return nil, http.StatusOK
 	}
-	err := transformBody(r, meta.(*TransformSpec), t)
+	err := transformBody(r, meta.(*TransformSpec), t.Spec.EnableContextVars)
 	if err != nil {
 		t.Logger().WithError(err).Error("Body transform failure")
 	}
 	return nil, http.StatusOK
 }
 
-func transformBody(r *http.Request, tmeta *TransformSpec, t *TransformMiddleware) error {
+func transformBody(r *http.Request, tmeta *TransformSpec, contextVars bool) error {
 	body, _ := ioutil.ReadAll(r.Body)
 	defer r.Body.Close()
 
@@ -96,7 +96,7 @@ func transformBody(r *http.Request, tmeta *TransformSpec, t *TransformMiddleware
 		}
 	}
 
-	if t.Spec.EnableContextVars {
+	if contextVars {
 		bodyData["_tyk_context"] = ctxGetData(r)
 	}
 
@@ -106,7 +106,7 @@ func transformBody(r *http.Request, tmeta *TransformSpec, t *TransformMiddleware
 		return fmt.Errorf("failed to apply template to request: %v", err)
 	}
 
-	s := t.Gw.replaceTykVariables(r, bodyBuffer.String(), true)
+	s := replaceTykVariables(r, bodyBuffer.String(), true)
 
 	newBuf := bytes.NewBufferString(s)
 

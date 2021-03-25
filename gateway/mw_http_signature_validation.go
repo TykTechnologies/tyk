@@ -60,7 +60,7 @@ func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWrite
 	if token == "" {
 		return hm.authorizationError(r)
 	}
-	logger := hm.Logger().WithField("key", hm.Gw.obfuscateKey(token))
+	logger := hm.Logger().WithField("key", obfuscateKey(token))
 
 	// Clean it
 	token = stripSignature(token)
@@ -109,7 +109,7 @@ func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWrite
 			return hm.authorizationError(r)
 		}
 
-		publicKey := hm.Gw.CertificateManager.ListRawPublicKey(certificateId)
+		publicKey := CertificateManager.ListRawPublicKey(certificateId)
 		if publicKey == nil {
 			log.Error("Certificate not found")
 			return errors.New("Certificate not found"), http.StatusInternalServerError
@@ -201,7 +201,7 @@ func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWrite
 	// Set session state on context, we will need it later
 	switch hm.Spec.BaseIdentityProvidedBy {
 	case apidef.HMACKey, apidef.UnsetAuth:
-		ctxSetSession(r, &session, fieldValues.KeyID, false, hm.Gw.GetConfig().HashKeys)
+		ctxSetSession(r, &session, fieldValues.KeyID, false)
 		hm.setContextVars(r, fieldValues.KeyID)
 	}
 
