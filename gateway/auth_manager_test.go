@@ -6,26 +6,28 @@ import (
 
 	"github.com/TykTechnologies/tyk/storage"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
 
 func TestAuthenticationAfterDeleteKey(t *testing.T) {
-	assert := func(hashKeys bool) {
-		globalConf := config.Global()
-		globalConf.HashKeys = hashKeys
-		config.SetGlobal(globalConf)
+	ts := StartTest(nil)
+	defer ts.Close()
 
-		ts := StartTest()
+	assert := func(hashKeys bool) {
+		globalConf := ts.Gw.GetConfig()
+		globalConf.HashKeys = hashKeys
+		ts.Gw.SetConfig(globalConf)
+
+		ts := StartTest(nil)
 		defer ts.Close()
 
-		api := BuildAndLoadAPI(func(spec *APISpec) {
+		api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
 			spec.Proxy.ListenPath = "/"
 		})[0]
 
-		key := CreateSession(func(s *user.SessionState) {
+		key := CreateSession(ts.Gw, func(s *user.SessionState) {
 			s.SetAccessRights(map[string]user.AccessDefinition{api.APIID: {
 				APIID: api.APIID,
 			}})
@@ -52,27 +54,30 @@ func TestAuthenticationAfterDeleteKey(t *testing.T) {
 }
 
 func TestAuthenticationAfterUpdateKey(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	assert := func(hashKeys bool) {
-		globalConf := config.Global()
+		globalConf := ts.Gw.GetConfig()
 		globalConf.HashKeys = hashKeys
-		config.SetGlobal(globalConf)
+		ts.Gw.SetConfig(globalConf)
 
-		ts := StartTest()
-		defer ts.Close()
-
-		api := BuildAndLoadAPI(func(spec *APISpec) {
+		api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
 			spec.Proxy.ListenPath = "/"
 		})[0]
 
-		key := generateToken("", "")
+		key := ts.Gw.generateToken("", "")
 
 		session := CreateStandardSession()
 		session.SetAccessRights(map[string]user.AccessDefinition{api.APIID: {
 			APIID: api.APIID,
 		}})
 
-		GlobalSessionManager.UpdateSession(storage.HashKey(key), session, 0, config.Global().HashKeys)
+		err := ts.Gw.GlobalSessionManager.UpdateSession(storage.HashKey(key, ts.Gw.GetConfig().HashKeys), session, 0, ts.Gw.GetConfig().HashKeys)
+		if err != nil {
+			t.Error("could not update session in Session Manager. " + err.Error())
+		}
 
 		authHeader := map[string]string{
 			"authorization": key,
@@ -86,7 +91,10 @@ func TestAuthenticationAfterUpdateKey(t *testing.T) {
 			APIID: "dummy",
 		}})
 
-		GlobalSessionManager.UpdateSession(storage.HashKey(key), session, 0, config.Global().HashKeys)
+		err = ts.Gw.GlobalSessionManager.UpdateSession(storage.HashKey(key, ts.Gw.GetConfig().HashKeys), session, 0, ts.Gw.GetConfig().HashKeys)
+		if err != nil {
+			t.Error("could not update session in Session Manager. " + err.Error())
+		}
 
 		ts.Run(t, []test.TestCase{
 			{Path: "/get", Headers: authHeader, Code: http.StatusForbidden},

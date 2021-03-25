@@ -136,7 +136,7 @@ func (s *RequestSigning) ProcessRequest(w http.ResponseWriter, r *http.Request, 
 			return errors.New("CertificateID is empty"), http.StatusInternalServerError
 		}
 
-		certList := CertificateManager.List([]string{s.Spec.RequestSigning.CertificateId}, certs.CertificatePrivate)
+		certList := s.Gw.CertificateManager.List([]string{s.Spec.RequestSigning.CertificateId}, certs.CertificatePrivate)
 		if len(certList) == 0 || certList[0] == nil {
 			log.Error("Certificate not found")
 			return errors.New("Certificate not found"), http.StatusInternalServerError

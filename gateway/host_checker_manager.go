@@ -15,13 +15,13 @@ import (
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
 var GlobalHostChecker HostCheckerManager
 
 type HostCheckerManager struct {
+	Gw                *Gateway `json:"-"`
 	Id                string
 	store             storage.Handler
 	checkerMu         sync.Mutex
@@ -145,8 +145,8 @@ func (hc *HostCheckerManager) AmIPolling() bool {
 		return false
 	}
 	pollerCacheKey := PollerCacheKey
-	if config.Global().UptimeTests.PollerGroup != "" {
-		pollerCacheKey = pollerCacheKey + "." + config.Global().UptimeTests.PollerGroup
+	if hc.Gw.GetConfig().UptimeTests.PollerGroup != "" {
+		pollerCacheKey = pollerCacheKey + "." + hc.Gw.GetConfig().UptimeTests.PollerGroup
 	}
 
 	activeInstance, err := hc.store.GetKey(pollerCacheKey)
@@ -154,7 +154,10 @@ func (hc *HostCheckerManager) AmIPolling() bool {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
 		}).Debug("No Primary instance found, assuming control")
-		hc.store.SetKey(pollerCacheKey, hc.Id, 15)
+		err := hc.store.SetKey(pollerCacheKey, hc.Id, 15)
+		if err != nil {
+			log.WithError(err).Error("cannot set key in pollerCacheKey")
+		}
 		return true
 	}
 
@@ -162,7 +165,10 @@ func (hc *HostCheckerManager) AmIPolling() bool {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
 		}).Debug("Primary instance set, I am master")
-		hc.store.SetKey(pollerCacheKey, hc.Id, 15) // Reset TTL
+		err := hc.store.SetKey(pollerCacheKey, hc.Id, 15) // Reset TTL
+		if err != nil {
+			log.WithError(err).Error("could not reset TTL in polled cacheKey")
+		}
 		return true
 	}
 
@@ -185,12 +191,12 @@ func (hc *HostCheckerManager) StartPoller(ctx context.Context) {
 	// If we are restarting, we want to retain the host list
 	hc.checkerMu.Lock()
 	if hc.checker == nil {
-		hc.checker = &HostUptimeChecker{}
+		hc.checker = &HostUptimeChecker{Gw: hc.Gw}
 	}
 
-	hc.checker.Init(config.Global().UptimeTests.Config.CheckerPoolSize,
-		config.Global().UptimeTests.Config.FailureTriggerSampleSize,
-		config.Global().UptimeTests.Config.TimeWait,
+	hc.checker.Init(hc.Gw.GetConfig().UptimeTests.Config.CheckerPoolSize,
+		hc.Gw.GetConfig().UptimeTests.Config.FailureTriggerSampleSize,
+		hc.Gw.GetConfig().UptimeTests.Config.TimeWait,
 		hc.currentHostList,
 		HostCheckCallBacks{
 			Up:   hc.OnHostBackUp,
@@ -223,7 +229,7 @@ func (hc *HostCheckerManager) getHostKey(report HostHealthReport) string {
 }
 
 func (hc *HostCheckerManager) OnHostReport(ctx context.Context, report HostHealthReport) {
-	if config.Global().UptimeTests.Config.EnableUptimeAnalytics {
+	if hc.Gw.GetConfig().UptimeTests.Config.EnableUptimeAnalytics {
 		go hc.RecordUptimeAnalytics(report)
 	}
 }
@@ -233,9 +239,12 @@ func (hc *HostCheckerManager) OnHostDown(ctx context.Context, report HostHealthR
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
 	}).Debug("Update key: ", key)
-	hc.store.SetKey(key, "1", int64(hc.checker.checkTimeout*hc.checker.sampleTriggerLimit))
+	err := hc.store.SetKey(key, "1", int64(hc.checker.checkTimeout*hc.checker.sampleTriggerLimit))
+	if err != nil {
+		log.WithError(err).Error("Host-Checker could not save key")
+	}
 	hc.unhealthyHostList.Store(key, 1)
-	spec := getApiSpec(report.MetaData[UnHealthyHostMetaDataAPIKey])
+	spec := hc.Gw.getApiSpec(report.MetaData[UnHealthyHostMetaDataAPIKey])
 	if spec == nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
@@ -279,7 +288,7 @@ func (hc *HostCheckerManager) OnHostBackUp(ctx context.Context, report HostHealt
 	}).Debug("Delete key: ", key)
 	hc.store.DeleteKey(key)
 	hc.unhealthyHostList.Delete(key)
-	spec := getApiSpec(report.MetaData[UnHealthyHostMetaDataAPIKey])
+	spec := hc.Gw.getApiSpec(report.MetaData[UnHealthyHostMetaDataAPIKey])
 	if spec == nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
@@ -416,7 +425,7 @@ func (hc *HostCheckerManager) UpdateTrackingListByAPIID(hd []HostData, apiId str
 }
 
 func (hc *HostCheckerManager) ListFromService(apiID string) ([]HostData, error) {
-	spec := getApiSpec(apiID)
+	spec := hc.Gw.getApiSpec(apiID)
 	if spec == nil {
 		return nil, errors.New("API ID not found in register")
 	}
@@ -477,7 +486,7 @@ func (hc *HostCheckerManager) DoServiceDiscoveryListUpdateForID(apiID string) {
 func (hc *HostCheckerManager) RecordUptimeAnalytics(report HostHealthReport) error {
 	// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
 
-	spec := getApiSpec(report.MetaData[UnHealthyHostMetaDataAPIKey])
+	spec := hc.Gw.getApiSpec(report.MetaData[UnHealthyHostMetaDataAPIKey])
 	orgID := ""
 	if spec != nil {
 		orgID = spec.OrgID
@@ -529,24 +538,24 @@ func (hc *HostCheckerManager) RecordUptimeAnalytics(report HostHealthReport) err
 	return nil
 }
 
-func InitHostCheckManager(ctx context.Context, store storage.Handler) {
+func (gw *Gateway) InitHostCheckManager(ctx context.Context, store storage.Handler) {
 	// Already initialized
 	if GlobalHostChecker.Id != "" {
 		return
 	}
 
-	GlobalHostChecker = HostCheckerManager{}
+	GlobalHostChecker = HostCheckerManager{Gw: gw}
 	GlobalHostChecker.Init(store)
 	GlobalHostChecker.Start(ctx)
 }
 
-func SetCheckerHostList() {
+func (gw *Gateway) SetCheckerHostList() {
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
 	}).Info("Loading uptime tests...")
 	hostList := []HostData{}
-	apisMu.RLock()
-	for _, spec := range apisByID {
+	gw.apisMu.RLock()
+	for _, spec := range gw.apisByID {
 		if spec.UptimeTests.Config.ServiceDiscovery.UseDiscoveryService {
 			hostList, err := GlobalHostChecker.ListFromService(spec.APIID)
 			if err == nil {
@@ -579,7 +588,7 @@ func SetCheckerHostList() {
 			}
 		}
 	}
-	apisMu.RUnlock()
+	gw.apisMu.RUnlock()
 
 	GlobalHostChecker.UpdateTrackingList(hostList)
 }

@@ -8,8 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 )
@@ -17,15 +18,14 @@ import (
 func TestRedisCacheMiddleware_WithCompressedResponse(t *testing.T) {
 	const path = "/compressed"
 
-	globalConf := config.Global()
-	globalConf.AnalyticsConfig.EnableDetailedRecording = true
-	config.SetGlobal(globalConf)
-
-	ts := StartTest()
+	conf := func(globalConf *config.Config) {
+		globalConf.AnalyticsConfig.EnableDetailedRecording = true
+	}
+	ts := StartTest(conf)
 	defer ts.Close()
 
 	createAPI := func(withCache bool) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.CacheOptions.CacheTimeout = 60
 			spec.CacheOptions.EnableCache = withCache

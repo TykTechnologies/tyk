@@ -19,6 +19,7 @@ type JSVMEventHandler struct {
 	methodName string
 	Spec       *APISpec
 	SpecJSON   string
+	Gw         *Gateway `json:"-"`
 }
 
 // New enables the intitialisation of event handler instances when they are created on ApiSpec creation
@@ -50,5 +51,8 @@ func (l *JSVMEventHandler) HandleEvent(em config.EventMessage) {
 	}
 
 	// Execute the method name with the JSON object
-	GlobalEventsJSVM.VM.Run(l.methodName + `.DoProcessEvent(` + string(msgAsJSON) + `,` + l.SpecJSON + `);`)
+	_, err = l.Gw.GlobalEventsJSVM.VM.Run(l.methodName + `.DoProcessEvent(` + string(msgAsJSON) + `,` + l.SpecJSON + `);`)
+	if err != nil {
+		log.WithError(err).Error("executing JSVM method")
+	}
 }

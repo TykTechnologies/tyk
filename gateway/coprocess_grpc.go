@@ -11,7 +11,6 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/coprocess"
 )
 
@@ -25,8 +24,8 @@ type GRPCDispatcher struct {
 	coprocess.Dispatcher
 }
 
-func dialer(addr string, timeout time.Duration) (net.Conn, error) {
-	grpcURL, err := url.Parse(config.Global().CoProcessOptions.CoProcessGRPCServer)
+func (gw *Gateway) dialer(addr string, timeout time.Duration) (net.Conn, error) {
+	grpcURL, err := url.Parse(gw.GetConfig().CoProcessOptions.CoProcessGRPCServer)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
@@ -34,7 +33,7 @@ func dialer(addr string, timeout time.Duration) (net.Conn, error) {
 		return nil, err
 	}
 
-	if grpcURL == nil || config.Global().CoProcessOptions.CoProcessGRPCServer == "" {
+	if grpcURL == nil || gw.GetConfig().CoProcessOptions.CoProcessGRPCServer == "" {
 		errString := "No gRPC URL is set!"
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
@@ -42,7 +41,7 @@ func dialer(addr string, timeout time.Duration) (net.Conn, error) {
 		return nil, errors.New(errString)
 	}
 
-	grpcURLString := config.Global().CoProcessOptions.CoProcessGRPCServer[len(grpcURL.Scheme)+3:]
+	grpcURLString := gw.GetConfig().CoProcessOptions.CoProcessGRPCServer[len(grpcURL.Scheme)+3:]
 	return net.DialTimeout(grpcURL.Scheme, grpcURLString, timeout)
 }
 
@@ -72,9 +71,9 @@ func (d *GRPCDispatcher) Reload() {}
 // HandleMiddlewareCache isn't used by gRPC.
 func (d *GRPCDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, basePath string) {}
 
-func grpcCallOpts() grpc.DialOption {
-	recvSize := config.Global().CoProcessOptions.GRPCRecvMaxSize
-	sendSize := config.Global().CoProcessOptions.GRPCSendMaxSize
+func (gw *Gateway) grpcCallOpts() grpc.DialOption {
+	recvSize := gw.GetConfig().CoProcessOptions.GRPCRecvMaxSize
+	sendSize := gw.GetConfig().CoProcessOptions.GRPCSendMaxSize
 	var opts []grpc.CallOption
 	if recvSize > 0 {
 		opts = append(opts, grpc.MaxCallRecvMsgSize(recvSize))
@@ -86,19 +85,21 @@ func grpcCallOpts() grpc.DialOption {
 }
 
 // NewGRPCDispatcher wraps all the actions needed for this CP.
-func NewGRPCDispatcher() (coprocess.Dispatcher, error) {
-	if config.Global().CoProcessOptions.CoProcessGRPCServer == "" {
+func (gw *Gateway) NewGRPCDispatcher() (coprocess.Dispatcher, error) {
+	if gw.GetConfig().CoProcessOptions.CoProcessGRPCServer == "" {
 		return nil, errors.New("No gRPC URL is set")
 	}
 	var err error
 	grpcConnection, err = grpc.Dial("",
-		grpcCallOpts(),
+		gw.grpcCallOpts(),
 		grpc.WithInsecure(),
-		grpc.WithDialer(dialer),
+		grpc.WithDialer(gw.dialer),
 	)
+
 	grpcClient = coprocess.NewDispatcherClient(grpcConnection)
 
 	if err != nil {
+
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
 		}).Error(err)

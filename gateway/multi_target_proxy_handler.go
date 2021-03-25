@@ -40,11 +40,11 @@ func (m *MultiTargetProxy) CopyResponse(dst io.Writer, src io.Reader) {
 	m.defaultProxy.CopyResponse(dst, src)
 }
 
-func NewMultiTargetProxy(spec *APISpec, logger *logrus.Entry) *MultiTargetProxy {
+func (gw *Gateway) NewMultiTargetProxy(spec *APISpec, logger *logrus.Entry) *MultiTargetProxy {
 	m := &MultiTargetProxy{}
 	m.versionProxies = make(map[string]*ReverseProxy)
 	m.specReference = spec
-	m.defaultProxy = TykNewSingleHostReverseProxy(spec.target, spec, logger)
+	m.defaultProxy = gw.TykNewSingleHostReverseProxy(spec.target, spec, logger)
 
 	for vname, vdata := range spec.VersionData.Versions {
 		if vdata.OverrideTarget == "" {
@@ -69,7 +69,7 @@ func NewMultiTargetProxy(spec *APISpec, logger *logrus.Entry) *MultiTargetProxy 
 				"prefix": "multi-target",
 			}).Error("Couldn't parse version target URL in MultiTarget: ", err)
 		}
-		m.versionProxies[vname] = TykNewSingleHostReverseProxy(remote, spec, logger)
+		m.versionProxies[vname] = gw.TykNewSingleHostReverseProxy(remote, spec, logger)
 	}
 	return m
 }

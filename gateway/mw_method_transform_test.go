@@ -8,7 +8,7 @@ import (
 )
 
 func TestMethodTransform(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
 	t.Run("Using URL rewrite", func(t *testing.T) {
@@ -24,7 +24,7 @@ func TestMethodTransform(t *testing.T) {
 		urlRewrite.MatchPattern = "/get(.*)"
 		urlRewrite.RewriteTo = "/post$1"
 
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.UseExtendedPaths = true
@@ -46,7 +46,7 @@ func TestMethodTransform(t *testing.T) {
 		methodTransform.Method = "GET"
 		methodTransform.ToMethod = "POST"
 
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.CacheOptions = apidef.CacheOptions{
 				CacheTimeout: 120,
 				EnableCache:  true,

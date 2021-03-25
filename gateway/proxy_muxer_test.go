@@ -18,6 +18,9 @@ import (
 )
 
 func TestTCPDial_with_service_discovery(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	service1, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -78,8 +81,7 @@ func TestTCPDial_with_service_discovery(t *testing.T) {
 		})
 	}))
 	defer sds.Close()
-	ts := StartTest()
-	defer ts.Close()
+
 	rp, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -92,11 +94,10 @@ func TestTCPDial_with_service_discovery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	EnablePort(p, "tcp")
-	defer ResetTestConfig()
+	ts.EnablePort(p, "tcp")
 	address := rp.Addr().String()
 	rp.Close()
-	BuildAndLoadAPI(func(spec *APISpec) {
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.Protocol = "tcp"
 		spec.Proxy.ServiceDiscovery.UseDiscoveryService = true
@@ -141,15 +142,15 @@ func TestTCPDial_with_service_discovery(t *testing.T) {
 }
 
 func TestTCP_missing_port(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
-	BuildAndLoadAPI(func(spec *APISpec) {
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Name = "no -listen-port"
 		spec.Protocol = "tcp"
 	})
-	apisMu.RLock()
-	n := len(apiSpecs)
-	apisMu.RUnlock()
+	ts.Gw.apisMu.RLock()
+	n := len(ts.Gw.apiSpecs)
+	ts.Gw.apisMu.RUnlock()
 	if n != 0 {
 		t.Errorf("expected 0 apis to be loaded got %d", n)
 	}
@@ -174,7 +175,10 @@ func getUnusedPort() (int, error) {
 }
 
 func TestCheckPortWhiteList(t *testing.T) {
-	base := config.Global()
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	base := ts.Gw.GetConfig()
 	cases := []struct {
 		name     string
 		protocol string
@@ -258,7 +262,7 @@ func TestCheckPortWhiteList(t *testing.T) {
 }
 
 func TestHTTP_custom_ports(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 	echo := "Hello, world"
 	us := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -269,8 +273,8 @@ func TestHTTP_custom_ports(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	EnablePort(port, "http")
-	BuildAndLoadAPI(func(spec *APISpec) {
+	ts.EnablePort(port, "http")
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.Protocol = "http"
 		spec.ListenPort = port
@@ -293,10 +297,10 @@ func TestHTTP_custom_ports(t *testing.T) {
 }
 
 func TestHandle404(t *testing.T) {
-	g := StartTest()
+	g := StartTest(nil)
 	defer g.Close()
 
-	BuildAndLoadAPI(func(spec *APISpec) {
+	g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/existing"
 		spec.UseKeylessAccess = true
 	})
