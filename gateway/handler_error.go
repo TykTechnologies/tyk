@@ -102,9 +102,10 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 	if writeResponse {
 		var templateExtension string
-		var contentType string
+		contentType := r.Header.Get(headers.ContentType)
+		contentType = strings.Split(contentType, ";")[0]
 
-		switch r.Header.Get(headers.ContentType) {
+		switch contentType {
 		case headers.ApplicationXML:
 			templateExtension = "xml"
 			contentType = headers.ApplicationXML
