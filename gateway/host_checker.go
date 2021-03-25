@@ -137,7 +137,7 @@ func (h *HostUptimeChecker) execCheck() {
 	for _, host := range h.HostList {
 		_, err := h.pool.SendWork(host)
 		if err != nil && err != tunny.ErrPoolNotRunning {
-			log.Warn("[HOST CHECKER] could not send work, error: %v", err)
+			log.Warnf("[HOST CHECKER] could not send work, error: %v", err)
 		}
 	}
 }
