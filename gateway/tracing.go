@@ -12,6 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 type traceHttpRequest struct {
@@ -21,14 +22,15 @@ type traceHttpRequest struct {
 	Headers http.Header `json:"headers"`
 }
 
-func (tr *traceHttpRequest) toRequest(ignoreCanonicalMIMEHeaderKey bool) (*http.Request, error) {
+func (tr *traceHttpRequest) toRequest() (*http.Request, error) {
 	r, err := http.NewRequest(tr.Method, tr.Path, strings.NewReader(tr.Body))
 	if err != nil {
 		return nil, err
 	}
 
+	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
 	for key, values := range tr.Headers {
-		addCustomHeader(r.Header, key, values, ignoreCanonicalMIMEHeaderKey)
+		addCustomHeader(r.Header, key, values, ignoreCanonical)
 	}
 
 	ctxSetTrace(r)
@@ -82,7 +84,7 @@ type traceResponse struct {
 //           Header: value
 //         body: body-value
 //       logs: {...}\n{...}
-func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
+func traceHandler(w http.ResponseWriter, r *http.Request) {
 	var traceReq traceRequest
 	if err := json.NewDecoder(r.Body).Decode(&traceReq); err != nil {
 		log.Error("Couldn't decode trace request: ", err)
@@ -109,13 +111,13 @@ func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 	logger.Level = logrus.DebugLevel
 	logger.Out = &logStorage
 
-	gs := gw.prepareStorage()
+	gs := prepareStorage()
 	subrouter := mux.NewRouter()
 
-	loader := &APIDefinitionLoader{gw}
+	loader := &APIDefinitionLoader{}
 	spec := loader.MakeSpec(traceReq.Spec, logrus.NewEntry(logger))
 
-	chainObj := gw.processSpec(spec, nil, &gs, subrouter, logrus.NewEntry(logger))
+	chainObj := processSpec(spec, nil, &gs, subrouter, logrus.NewEntry(logger))
 	spec.middlewareChain = chainObj
 
 	if chainObj.ThisHandler == nil {
@@ -124,7 +126,7 @@ func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	wr := httptest.NewRecorder()
-	tr, err := traceReq.Request.toRequest(gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
+	tr, err := traceReq.Request.toRequest()
 	if err != nil {
 		doJSONWrite(w, http.StatusInternalServerError, apiError("Unexpected failure: "+err.Error()))
 		return

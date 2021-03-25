@@ -87,14 +87,11 @@ func prepareRewriterCases() []testRewriterCase {
 }
 
 func TestRewriter(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
 	cases := prepareRewriterCases()
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := tc.reqMaker()
-			got, err := ts.Gw.urlRewrite(tc.meta, r)
+			got, err := urlRewrite(tc.meta, r)
 			if err != nil {
 				t.Error("compile failed:", err)
 			}
@@ -105,14 +102,11 @@ func TestRewriter(t *testing.T) {
 	}
 }
 func BenchmarkRewriter(b *testing.B) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
 	cases := prepareRewriterCases()
 	//warm-up regexp caches
 	for _, tc := range cases {
 		r := tc.reqMaker()
-		ts.Gw.urlRewrite(tc.meta, r)
+		urlRewrite(tc.meta, r)
 	}
 
 	b.ReportAllocs()
@@ -122,7 +116,7 @@ func BenchmarkRewriter(b *testing.B) {
 			b.StopTimer()
 			r := tc.reqMaker()
 			b.StartTimer()
-			ts.Gw.urlRewrite(tc.meta, r)
+			urlRewrite(tc.meta, r)
 		}
 	}
 }
@@ -135,10 +129,6 @@ func TestRewriterTriggers(t *testing.T) {
 		triggerConf []apidef.RoutingTrigger
 		req         *http.Request
 	}
-
-	ts := StartTest(nil)
-	defer ts.Close()
-
 	tests := []func() TestDef{
 		func() TestDef {
 			r, _ := http.NewRequest("GET", "/test/straight/rewrite", nil)
@@ -911,7 +901,7 @@ func TestRewriterTriggers(t *testing.T) {
 				MetaData: map[string]interface{}{
 					"rewrite": "bar-baz",
 				},
-			}, "", false, ts.Gw.GetConfig().HashKeys)
+			}, "", false)
 
 			return TestDef{
 				"Meta Simple",
@@ -940,7 +930,7 @@ func TestRewriterTriggers(t *testing.T) {
 				MetaData: map[string]interface{}{
 					"rewrite": "bar-baz",
 				},
-			}, "", false, ts.Gw.GetConfig().HashKeys)
+			}, "", false)
 
 			return TestDef{
 				"Meta Simple Group",
@@ -970,7 +960,7 @@ func TestRewriterTriggers(t *testing.T) {
 					"rewrite": "bar-baz",
 					"somevar": "someval",
 				},
-			}, "", false, ts.Gw.GetConfig().HashKeys)
+			}, "", false)
 
 			return TestDef{
 				"Meta Value from Session",
@@ -1026,7 +1016,7 @@ func TestRewriterTriggers(t *testing.T) {
 				MetaData: map[string]interface{}{
 					"rewrite": "bar-baz",
 				},
-			}, "", false, ts.Gw.GetConfig().HashKeys)
+			}, "", false)
 
 			return TestDef{
 				"Variable not found",
@@ -1073,14 +1063,13 @@ func TestRewriterTriggers(t *testing.T) {
 	for _, tf := range tests {
 		tc := tf()
 		t.Run(tc.name, func(t *testing.T) {
-
 			testConf := apidef.URLRewriteMeta{
 				MatchPattern: tc.pattern,
 				RewriteTo:    tc.to,
 				Triggers:     tc.triggerConf,
 			}
 
-			got, err := ts.Gw.urlRewrite(&testConf, tc.req)
+			got, err := urlRewrite(&testConf, tc.req)
 			if err != nil {
 				t.Error("compile failed:", err)
 			}
@@ -1092,16 +1081,12 @@ func TestRewriterTriggers(t *testing.T) {
 }
 
 func TestInitTriggerRx(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
 	// prepare test data
 	testRewriteMW := &URLRewriteMiddleware{
 		BaseMiddleware: BaseMiddleware{
 			Spec: &APISpec{
 				APIDefinition: &apidef.APIDefinition{},
 			},
-			Gw: ts.Gw,
 		},
 	}
 	testRewriteMW.Spec.APIDefinition.VersionData = struct {
@@ -1193,11 +1178,11 @@ func TestInitTriggerRx(t *testing.T) {
 }
 
 func TestURLRewriteCaseSensitivity(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
 
 	assert := func(relativePath string, requestedPath string, bodyMatch string) {
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{{

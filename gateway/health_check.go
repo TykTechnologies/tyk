@@ -11,6 +11,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/rpc"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/sirupsen/logrus"
@@ -66,11 +67,11 @@ type HealthCheckItem struct {
 	Time          string            `json:"time"`
 }
 
-func (gw *Gateway) initHealthCheck(ctx context.Context) {
+func initHealthCheck(ctx context.Context) {
 	setCurrentHealthCheckInfo(make(map[string]HealthCheckItem, 3))
 
 	go func(ctx context.Context) {
-		var n = gw.GetConfig().LivenessCheck.CheckDuration
+		var n = config.Global().LivenessCheck.CheckDuration
 
 		if n == 0 {
 			n = 10
@@ -89,7 +90,7 @@ func (gw *Gateway) initHealthCheck(ctx context.Context) {
 				return
 
 			case <-ticker.C:
-				gw.gatherHealthChecks()
+				gatherHealthChecks()
 			}
 		}
 	}(ctx)
@@ -100,7 +101,7 @@ type SafeHealthCheck struct {
 	mux  sync.Mutex
 }
 
-func (gw *Gateway) gatherHealthChecks() {
+func gatherHealthChecks() {
 	allInfos := SafeHealthCheck{info: make(map[string]HealthCheckItem, 3)}
 
 	redisStore := storage.RedisCluster{KeyPrefix: "livenesscheck-"}
@@ -131,7 +132,7 @@ func (gw *Gateway) gatherHealthChecks() {
 		allInfos.mux.Unlock()
 	}()
 
-	if gw.GetConfig().UseDBAppConfigs {
+	if config.Global().UseDBAppConfigs {
 		wg.Add(1)
 
 		go func() {
@@ -143,12 +144,12 @@ func (gw *Gateway) gatherHealthChecks() {
 				Time:          time.Now().Format(time.RFC3339),
 			}
 
-			if gw.DashService == nil {
+			if DashService == nil {
 				err := errors.New("Dashboard service not initialized")
 				mainLog.WithField("liveness-check", true).Error(err)
 				checkItem.Output = err.Error()
 				checkItem.Status = Fail
-			} else if err := gw.DashService.Ping(); err != nil {
+			} else if err := DashService.Ping(); err != nil {
 				mainLog.WithField("liveness-check", true).Error(err)
 				checkItem.Output = err.Error()
 				checkItem.Status = Fail
@@ -162,7 +163,7 @@ func (gw *Gateway) gatherHealthChecks() {
 		}()
 	}
 
-	if gw.GetConfig().Policies.PolicySource == "rpc" {
+	if config.Global().Policies.PolicySource == "rpc" {
 
 		wg.Add(1)
 

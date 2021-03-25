@@ -13,6 +13,7 @@ import (
 	uuid "github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/murmur3"
+	"github.com/TykTechnologies/tyk/config"
 	logger "github.com/TykTechnologies/tyk/log"
 )
 
@@ -149,8 +150,8 @@ func HashStr(in string) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func HashKey(in string, hashKey bool) string {
-	if !hashKey {
+func HashKey(in string) string {
+	if !config.Global().HashKeys {
 		// Not hashing? Return the raw key
 		return in
 	}

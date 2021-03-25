@@ -99,13 +99,13 @@ const (
 	recordsBufferForcedFlushInterval = 1 * time.Second
 )
 
-func (a *AnalyticsRecord) GetGeo(ipStr string, gw *Gateway) {
+func (a *AnalyticsRecord) GetGeo(ipStr string) {
 	// Not great, tightly coupled
-	if gw.analytics.GeoIPDB == nil {
+	if analytics.GeoIPDB == nil {
 		return
 	}
 
-	record, err := geoIPLookup(ipStr, gw)
+	record, err := geoIPLookup(ipStr)
 	if err != nil {
 		log.Error("GeoIP Failure (not recorded): ", err)
 		return
@@ -123,7 +123,7 @@ func (a *AnalyticsRecord) GetGeo(ipStr string, gw *Gateway) {
 	a.Geo = *record
 }
 
-func geoIPLookup(ipStr string, gw *Gateway) (*GeoData, error) {
+func geoIPLookup(ipStr string) (*GeoData, error) {
 	if ipStr == "" {
 		return nil, nil
 	}
@@ -132,17 +132,17 @@ func geoIPLookup(ipStr string, gw *Gateway) (*GeoData, error) {
 		return nil, fmt.Errorf("invalid IP address %q", ipStr)
 	}
 	record := new(GeoData)
-	if err := gw.analytics.GeoIPDB.Lookup(ip, record); err != nil {
+	if err := analytics.GeoIPDB.Lookup(ip, record); err != nil {
 		return nil, fmt.Errorf("geoIPDB lookup of %q failed: %v", ipStr, err)
 	}
 	return record, nil
 }
 
-func (gw *Gateway) initNormalisationPatterns() (pats config.NormaliseURLPatterns) {
+func initNormalisationPatterns() (pats config.NormaliseURLPatterns) {
 	pats.UUIDs = regexp.MustCompile(`[0-9a-fA-F]{8}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{12}`)
 	pats.IDs = regexp.MustCompile(`\/(\d+)`)
 
-	for _, pattern := range gw.GetConfig().AnalyticsConfig.NormaliseUrls.Custom {
+	for _, pattern := range config.Global().AnalyticsConfig.NormaliseUrls.Custom {
 		if patRe, err := regexp.Compile(pattern); err != nil {
 			log.Error("failed to compile custom pattern: ", err)
 		} else {
@@ -188,11 +188,11 @@ type RedisAnalyticsHandler struct {
 	poolWg                      sync.WaitGroup
 	enableMultipleAnalyticsKeys bool
 	Clean                       Purger
-	Gw                          *Gateway `json:"-"`
 }
 
-func (r *RedisAnalyticsHandler) Init() {
-	r.globalConf = r.Gw.GetConfig()
+func (r *RedisAnalyticsHandler) Init(globalConf config.Config) {
+	r.globalConf = globalConf
+
 	if r.globalConf.AnalyticsConfig.EnableGeoIP {
 		if db, err := maxminddb.Open(r.globalConf.AnalyticsConfig.GeoIPDBLocation); err != nil {
 			log.Error("Failed to init GeoIP Database: ", err)
@@ -201,13 +201,12 @@ func (r *RedisAnalyticsHandler) Init() {
 		}
 	}
 
-	r.Store.Connect()
-	ps := r.Gw.GetConfig().AnalyticsConfig.PoolSize
-	recordsBufferSize := r.globalConf.AnalyticsConfig.RecordsBufferSize
-
+	analytics.Store.Connect()
+	ps := config.Global().AnalyticsConfig.PoolSize
+	recordsBufferSize := config.Global().AnalyticsConfig.RecordsBufferSize
 	r.workerBufferSize = recordsBufferSize / uint64(ps)
 	log.WithField("workerBufferSize", r.workerBufferSize).Debug("Analytics pool worker buffer size")
-	r.enableMultipleAnalyticsKeys = r.Gw.GetConfig().AnalyticsConfig.EnableMultipleAnalyticsKeys
+	r.enableMultipleAnalyticsKeys = config.Global().AnalyticsConfig.EnableMultipleAnalyticsKeys
 	r.recordsChan = make(chan *AnalyticsRecord, recordsBufferSize)
 
 	// start worker pool
@@ -273,7 +272,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 			// we have new record - prepare it and add to buffer
 
 			// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
-			record.APIKey = storage.HashKey(record.APIKey, r.globalConf.HashKeys)
+			record.APIKey = storage.HashKey(record.APIKey)
 
 			if r.globalConf.SlaveOptions.UseRPC {
 				// Extend tag list to include this data so wecan segment by node if necessary

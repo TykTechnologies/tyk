@@ -73,7 +73,7 @@ func LoadPoliciesFromFile(filePath string) map[string]user.Policy {
 }
 
 // LoadPoliciesFromDashboard will connect and download Policies from a Tyk Dashboard instance.
-func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[string]user.Policy {
+func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[string]user.Policy {
 
 	// Get the definitions
 	newRequest, err := http.NewRequest("GET", endpoint, nil)
@@ -82,14 +82,14 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 	}
 
 	newRequest.Header.Set("authorization", secret)
-	newRequest.Header.Set("x-tyk-nodeid", gw.GetNodeID())
+	newRequest.Header.Set("x-tyk-nodeid", GetNodeID())
 
 	newRequest.Header.Set("x-tyk-nonce", ServiceNonce)
 
 	log.WithFields(logrus.Fields{
 		"prefix": "policy",
 	}).Info("Mutex lock acquired... calling")
-	c := gw.initialiseClient()
+	c := initialiseClient()
 
 	log.WithFields(logrus.Fields{
 		"prefix": "policy",
@@ -104,7 +104,7 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 	if resp.StatusCode == http.StatusForbidden {
 		body, _ := ioutil.ReadAll(resp.Body)
 		log.Error("Policy request login failure, Response was: ", string(body))
-		gw.reLogin()
+		reLogin()
 		return nil
 	}
 
@@ -163,12 +163,12 @@ func parsePoliciesFromRPC(list string) (map[string]user.Policy, error) {
 	return policies, nil
 }
 
-func (gw *Gateway) LoadPoliciesFromRPC(orgId string) (map[string]user.Policy, error) {
+func LoadPoliciesFromRPC(orgId string) (map[string]user.Policy, error) {
 	if rpc.IsEmergencyMode() {
-		return gw.LoadPoliciesFromRPCBackup()
+		return LoadPoliciesFromRPCBackup()
 	}
 
-	store := &RPCStorageHandler{Gw: gw}
+	store := &RPCStorageHandler{}
 	if !store.Connect() {
 		return nil, errors.New("Policies backup: Failed connecting to database")
 	}
@@ -184,7 +184,7 @@ func (gw *Gateway) LoadPoliciesFromRPC(orgId string) (map[string]user.Policy, er
 		return nil, err
 	}
 
-	if err := gw.saveRPCPoliciesBackup(rpcPolicies); err != nil {
+	if err := saveRPCPoliciesBackup(rpcPolicies); err != nil {
 		log.Error(err)
 	}
 

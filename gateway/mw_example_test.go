@@ -35,6 +35,7 @@ func (m *modifiedMiddleware) Config() (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return conf, nil
 }
 

@@ -98,25 +98,25 @@ func EncodeRequestToEvent(r *http.Request) string {
 }
 
 // EventHandlerByName is a convenience function to get event handler instances from an API Definition
-func (gw *Gateway) EventHandlerByName(handlerConf apidef.EventHandlerTriggerConfig, spec *APISpec) (config.TykEventHandler, error) {
+func EventHandlerByName(handlerConf apidef.EventHandlerTriggerConfig, spec *APISpec) (config.TykEventHandler, error) {
 
 	conf := handlerConf.HandlerMeta
 	switch handlerConf.Handler {
 	case EH_LogHandler:
-		h := &LogMessageEventHandler{Gw: gw}
+		h := &LogMessageEventHandler{}
 		err := h.Init(conf)
 		return h, err
 	case EH_WebHook:
-		h := &WebHookHandler{Gw: gw}
+		h := &WebHookHandler{}
 		err := h.Init(conf)
 		return h, err
 	case EH_JSVMHandler:
 		// Load the globals and file here
 		if spec != nil {
-			h := &JSVMEventHandler{Spec: spec, Gw: gw}
+			h := &JSVMEventHandler{Spec: spec}
 			err := h.Init(conf)
 			if err == nil {
-				gw.GlobalEventsJSVM.LoadJSPaths([]string{conf["path"].(string)}, "")
+				GlobalEventsJSVM.LoadJSPaths([]string{conf["path"].(string)}, "")
 			}
 			return h, err
 		}
@@ -156,15 +156,14 @@ func (s *APISpec) FireEvent(name apidef.TykEvent, meta interface{}) {
 	fireEvent(name, meta, s.EventPaths)
 }
 
-func (gw *Gateway) FireSystemEvent(name apidef.TykEvent, meta interface{}) {
-	fireEvent(name, meta, gw.GetConfig().GetEventTriggers())
+func FireSystemEvent(name apidef.TykEvent, meta interface{}) {
+	fireEvent(name, meta, config.Global().GetEventTriggers())
 }
 
 // LogMessageEventHandler is a sample Event Handler
 type LogMessageEventHandler struct {
 	prefix string
 	logger *logrus.Logger
-	Gw     *Gateway `json:"-"`
 }
 
 // New enables the intitialisation of event handler instances when they are created on ApiSpec creation
@@ -172,7 +171,7 @@ func (l *LogMessageEventHandler) Init(handlerConf interface{}) error {
 	conf := handlerConf.(map[string]interface{})
 	l.prefix = conf["prefix"].(string)
 	l.logger = log
-	if l.Gw.isRunningTests() {
+	if isRunningTests() {
 		logger, ok := conf["logger"]
 		if ok {
 			l.logger = logger.(*logrus.Logger)
@@ -199,14 +198,13 @@ func (l *LogMessageEventHandler) HandleEvent(em config.EventMessage) {
 	l.logger.Warning(logMsg)
 }
 
-func (gw *Gateway) initGenericEventHandlers() {
-	conf := gw.GetConfig()
+func initGenericEventHandlers(conf *config.Config) {
 	handlers := make(map[apidef.TykEvent][]config.TykEventHandler)
 	for eventName, eventHandlerConfs := range conf.EventHandlers.Events {
 		log.Debug("FOUND EVENTS TO INIT")
 		for _, handlerConf := range eventHandlerConfs {
 			log.Debug("CREATING EVENT HANDLERS")
-			eventHandlerInstance, err := gw.EventHandlerByName(handlerConf, nil)
+			eventHandlerInstance, err := EventHandlerByName(handlerConf, nil)
 
 			if err != nil {
 				log.Error("Failed to init event handler: ", err)
@@ -218,5 +216,4 @@ func (gw *Gateway) initGenericEventHandlers() {
 		}
 	}
 	conf.SetEventTriggers(handlers)
-	gw.SetConfig(conf)
 }

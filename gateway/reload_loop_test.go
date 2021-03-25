@@ -10,11 +10,8 @@ import (
 )
 
 func TestReloadLoop_basic(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	ts.Gw.ReloadTestCase.Enable()
-	defer ts.Gw.ReloadTestCase.Disable()
+	ReloadTestCase.Enable()
+	defer ReloadTestCase.Disable()
 	var n atomic.Value
 	add := func() {
 		if x := n.Load(); x != nil {
@@ -24,9 +21,9 @@ func TestReloadLoop_basic(t *testing.T) {
 		}
 	}
 
-	ts.Gw.reloadURLStructure(add)
-	ts.Gw.reloadURLStructure(add)
-	ts.Gw.ReloadTestCase.TickOk(t)
+	reloadURLStructure(add)
+	reloadURLStructure(add)
+	ReloadTestCase.TickOk(t)
 	x := n.Load().(int)
 	if x != 1 {
 		t.Errorf("expected 1 got %d", x)
@@ -34,11 +31,8 @@ func TestReloadLoop_basic(t *testing.T) {
 }
 
 func TestReloadLoop_handler(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	ts.Gw.ReloadTestCase.Enable()
-	defer ts.Gw.ReloadTestCase.Disable()
+	ReloadTestCase.Enable()
+	defer ReloadTestCase.Disable()
 	var n atomic.Value
 	add := func() {
 		if x := n.Load(); x != nil {
@@ -47,11 +41,11 @@ func TestReloadLoop_handler(t *testing.T) {
 			n.Store(int(1))
 		}
 	}
-	h := ts.Gw.resetHandler(add)
+	h := resetHandler(add)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/reload", nil)
 	h(w, r)
-	ts.Gw.ReloadTestCase.TickOk(t)
+	ReloadTestCase.TickOk(t)
 	x := n.Load().(int)
 	if x != 1 {
 		t.Errorf("expected 1 got %d", x)
@@ -59,15 +53,12 @@ func TestReloadLoop_handler(t *testing.T) {
 }
 
 func TestReloadLoop_handlerWithBlock(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	ts.Gw.ReloadTestCase.Enable()
-	defer ts.Gw.ReloadTestCase.Disable()
+	ReloadTestCase.Enable()
+	defer ReloadTestCase.Disable()
 
 	signal := make(chan struct{}, 1)
 	go func() {
-		h := ts.Gw.resetHandler(nil)
+		h := resetHandler(nil)
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, "/reload", nil)
 		q := make(url.Values)
@@ -81,7 +72,7 @@ func TestReloadLoop_handlerWithBlock(t *testing.T) {
 		signal <- struct{}{}
 	}()
 	<-signal
-	ts.Gw.ReloadTestCase.TickOk(t)
+	ReloadTestCase.TickOk(t)
 	select {
 	case <-signal:
 	case <-time.After(10 * time.Millisecond):
@@ -90,7 +81,7 @@ func TestReloadLoop_handlerWithBlock(t *testing.T) {
 }
 
 func TestReloadLoop_group(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
 
 	res, err := http.Get(testReloadGroup)
@@ -102,10 +93,10 @@ func TestReloadLoop_group(t *testing.T) {
 		t.Errorf("expected %d got %d", http.StatusOK, res.StatusCode)
 	}
 	time.Sleep(time.Second)
-	ts.Gw.requeueLock.Lock()
-	n := len(ts.Gw.requeue)
-	ts.Gw.requeue = []func(){}
-	ts.Gw.requeueLock.Unlock()
+	requeueLock.Lock()
+	n := len(requeue)
+	requeue = []func(){}
+	requeueLock.Unlock()
 	if n != 1 {
 		t.Errorf("expected 1 reload queue got %d", n)
 	}

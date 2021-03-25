@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -17,7 +18,6 @@ type Purger interface {
 
 type RedisPurger struct {
 	Store storage.Handler
-	Gw    *Gateway `json:"-"`
 }
 
 func (r RedisPurger) PurgeLoop(ctx context.Context) {
@@ -34,7 +34,7 @@ func (r RedisPurger) PurgeLoop(ctx context.Context) {
 }
 
 func (r *RedisPurger) PurgeCache() {
-	expireAfter := r.Gw.GetConfig().AnalyticsConfig.StorageExpirationTime
+	expireAfter := config.Global().AnalyticsConfig.StorageExpirationTime
 	if expireAfter == -1 {
 		return
 	}

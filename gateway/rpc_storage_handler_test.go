@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/lonelycode/osin"
 	"github.com/stretchr/testify/assert"
@@ -75,22 +76,21 @@ func TestProcessKeySpaceChangesForOauth(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.TestName, func(t *testing.T) {
-			ts := StartTest(nil)
+			ts := StartTest()
 			defer ts.Close()
 
-			globalConf := ts.Gw.GetConfig()
+			globalConf := config.Global()
 			globalConf.HashKeys = tc.Hashed
-			ts.Gw.SetConfig(globalConf)
+			config.SetGlobal(globalConf)
 
 			rpcListener := RPCStorageHandler{
 				KeyPrefix:        "rpc.listener.",
 				SuppressRegister: true,
 				HashKeys:         tc.Hashed,
-				Gw:               ts.Gw,
 			}
 
-			myApi := ts.LoadTestOAuthSpec()
-			oauthClient := ts.createTestOAuthClient(myApi, authClientID)
+			myApi := loadTestOAuthSpec()
+			oauthClient := createTestOAuthClient(myApi, authClientID)
 			tokenData := getToken(t, ts)
 			token := tc.GetToken(tokenData)
 
@@ -121,14 +121,10 @@ func TestProcessKeySpaceChangesForOauth(t *testing.T) {
 					return refresh, err
 				}
 			} else {
-				getKeyFromStore = ts.Gw.GlobalSessionManager.Store().GetKey
-				ts.Gw.GlobalSessionManager.Store().DeleteAllKeys()
-				err := ts.Gw.GlobalSessionManager.Store().SetKey(token, token, 100)
-				if err != nil {
-					t.Fatal("could not set key in global session manager")
-				}
-
-				_, err = ts.Gw.GlobalSessionManager.Store().GetKey(token)
+				getKeyFromStore = GlobalSessionManager.Store().GetKey
+				GlobalSessionManager.Store().DeleteAllKeys()
+				GlobalSessionManager.Store().SetKey(token, token, 100)
+				_, err := GlobalSessionManager.Store().GetKey(token)
 				if err != nil {
 					t.Fatal("Key should be pre-loaded in store previously so the test can perform the revoke action.")
 				}

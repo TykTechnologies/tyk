@@ -9,9 +9,8 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-func (ts *Test) testPrepareVersioning() (string, string) {
-
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+func testPrepareVersioning() (string, string) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.VersionData.NotVersioned = false
 		spec.VersionDefinition.Location = "header"
@@ -61,13 +60,13 @@ func (ts *Test) testPrepareVersioning() (string, string) {
 		}
 	})
 
-	keyWrongVersion := CreateSession(ts.Gw, func(s *user.SessionState) {
+	keyWrongVersion := CreateSession(func(s *user.SessionState) {
 		s.AccessRights = map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v3"},
 		}}
 	})
 
-	keyKnownVersion := CreateSession(ts.Gw, func(s *user.SessionState) {
+	keyKnownVersion := CreateSession(func(s *user.SessionState) {
 		s.AccessRights = map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v1", "v2", "expired"},
 		}}
@@ -77,10 +76,10 @@ func (ts *Test) testPrepareVersioning() (string, string) {
 }
 
 func TestVersioning(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
 
-	keyWrongVersion, keyKnownVersion := ts.testPrepareVersioning()
+	keyWrongVersion, keyKnownVersion := testPrepareVersioning()
 
 	wrongVersionHeaders := map[string]string{
 		"authorization": keyWrongVersion,
@@ -120,10 +119,10 @@ func TestVersioning(t *testing.T) {
 func BenchmarkVersioning(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
 
-	keyWrongVersion, keyKnownVersion := ts.testPrepareVersioning()
+	keyWrongVersion, keyKnownVersion := testPrepareVersioning()
 	wrongVersionHeaders := map[string]string{
 		"authorization": keyWrongVersion,
 		"version":       "v3",
@@ -161,7 +160,7 @@ func BenchmarkVersioning(b *testing.B) {
 }
 
 func TestNotVersioned(t *testing.T) {
-	g := StartTest(nil)
+	g := StartTest()
 	defer g.Close()
 
 	api := BuildAPI(func(spec *APISpec) {
@@ -174,13 +173,13 @@ func TestNotVersioned(t *testing.T) {
 	})[0]
 
 	t.Run("Versioning enabled, override target URL", func(t *testing.T) {
-		g.Gw.LoadAPI(api)
+		LoadAPI(api)
 		_, _ = g.Run(t, test.TestCase{Code: http.StatusInternalServerError})
 	})
 
 	t.Run("Versioning disabled, use original target URL", func(t *testing.T) {
 		api.VersionData.NotVersioned = true
-		g.Gw.LoadAPI(api)
+		LoadAPI(api)
 
 		_, _ = g.Run(t, test.TestCase{Code: http.StatusOK})
 	})

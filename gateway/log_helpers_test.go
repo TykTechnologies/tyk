@@ -5,11 +5,12 @@ import (
 	"testing"
 
 	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 func TestGetLogEntryForRequest(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
+	defer ResetTestConfig()
 
 	testReq := httptest.NewRequest("GET", "http://tyk.io/test", nil)
 	testReq.RemoteAddr = "127.0.0.1:80"
@@ -73,7 +74,7 @@ func TestGetLogEntryForRequest(t *testing.T) {
 			Result: logrus.WithFields(logrus.Fields{
 				"path":   "/test",
 				"origin": "127.0.0.1",
-				"key":    ts.Gw.obfuscateKey("abs"),
+				"key":    obfuscateKey("abs"),
 			}),
 		},
 		// enable_key_logging is not set, key is not passed, no additional data field
@@ -96,7 +97,7 @@ func TestGetLogEntryForRequest(t *testing.T) {
 				"origin": "127.0.0.1",
 				"a":      1,
 				"b":      "test",
-				"key":    ts.Gw.obfuscateKey("abc"),
+				"key":    obfuscateKey("abc"),
 			}),
 		},
 		// enable_key_logging is not set, key is not passed, additional data fields are passed
@@ -112,11 +113,11 @@ func TestGetLogEntryForRequest(t *testing.T) {
 			}),
 		},
 	}
-	globalConf := ts.Gw.GetConfig()
+	globalConf := config.Global()
 	for _, test := range testData {
 		globalConf.EnableKeyLogging = test.EnableKeyLogging
-		ts.Gw.SetConfig(globalConf)
-		logEntry := ts.Gw.getLogEntryForRequest(nil, testReq, test.Key, test.Data)
+		config.SetGlobal(globalConf)
+		logEntry := getLogEntryForRequest(nil, testReq, test.Key, test.Data)
 		if logEntry.Data["path"] != test.Result.Data["path"] {
 			t.Error("Expected 'path':", test.Result.Data["path"], "Got:", logEntry.Data["path"])
 		}

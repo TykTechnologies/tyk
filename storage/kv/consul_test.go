@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/TykTechnologies/tyk/config"
-
 	"github.com/hashicorp/consul/api"
 )
 
@@ -12,7 +11,7 @@ var _ Store = (*Consul)(nil)
 
 func TestConsul_Get(t *testing.T) {
 
-	store, err := NewConsul(config.Default.KV.Consul)
+	store, err := NewConsul(config.Global().KV.Consul)
 	if err != nil {
 		t.Fatal(err)
 	}

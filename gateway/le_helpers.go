@@ -8,12 +8,13 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
 const LEKeyPrefix = "le_ssl:"
 
-func (gw *Gateway) StoreLEState(m *letsencrypt.Manager) {
+func StoreLEState(m *letsencrypt.Manager) {
 	log.Debug("Storing SSL backup")
 
 	log.Debug("[SSL] --> Connecting to DB")
@@ -29,7 +30,7 @@ func (gw *Gateway) StoreLEState(m *letsencrypt.Manager) {
 	}
 
 	state := m.Marshal()
-	secret := rightPad2Len(gw.GetConfig().Secret, "=", 32)
+	secret := rightPad2Len(config.Global().Secret, "=", 32)
 	cryptoText := encrypt([]byte(secret), state)
 
 	if err := store.SetKey("cache", cryptoText, -1); err != nil {
@@ -38,7 +39,7 @@ func (gw *Gateway) StoreLEState(m *letsencrypt.Manager) {
 	}
 }
 
-func (gw *Gateway) GetLEState(m *letsencrypt.Manager) {
+func GetLEState(m *letsencrypt.Manager) {
 	checkKey := "cache"
 
 	store := storage.RedisCluster{KeyPrefix: LEKeyPrefix}
@@ -57,7 +58,7 @@ func (gw *Gateway) GetLEState(m *letsencrypt.Manager) {
 		return
 	}
 
-	secret := rightPad2Len(gw.GetConfig().Secret, "=", 32)
+	secret := rightPad2Len(config.Global().Secret, "=", 32)
 	sslState := decrypt([]byte(secret), cryptoText)
 
 	m.Unmarshal(sslState)
@@ -68,7 +69,7 @@ type LE_ServerInfo struct {
 	ID       string
 }
 
-func (gw *Gateway) onLESSLStatusReceivedHandler(payload string) {
+func onLESSLStatusReceivedHandler(payload string) {
 	serverData := LE_ServerInfo{}
 	if err := json.Unmarshal([]byte(payload), &serverData); err != nil {
 		log.WithFields(logrus.Fields{
@@ -80,27 +81,28 @@ func (gw *Gateway) onLESSLStatusReceivedHandler(payload string) {
 	log.Debug("Received LE data: ", serverData)
 
 	// not great
-	if serverData.ID != gw.GetNodeID() {
+	if serverData.ID != GetNodeID() {
 		log.Info("Received Redis LE change notification!")
-		gw.GetLEState(&gw.LE_MANAGER)
+		GetLEState(&LE_MANAGER)
 	}
 
 	log.Info("Received Redis LE change notification from myself, ignoring")
 
 }
 
-func (gw *Gateway) StartPeriodicStateBackup(ctx context.Context, m *letsencrypt.Manager) {
+func StartPeriodicStateBackup(ctx context.Context, m *letsencrypt.Manager) {
+	watch := m.Watch()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-m.Watch():
-			if gw.LE_FIRSTRUN {
+		case <-watch:
+			if LE_FIRSTRUN {
 				log.Info("[SSL] State change detected, storing")
-				gw.StoreLEState(m)
+				StoreLEState(m)
 			}
-			gw.LE_FIRSTRUN = true
+			LE_FIRSTRUN = true
 		}
 	}
 }

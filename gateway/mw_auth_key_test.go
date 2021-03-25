@@ -12,6 +12,7 @@ import (
 	"github.com/justinas/alice"
 	"github.com/lonelycode/go-uuid/uuid"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/signature_validator"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
@@ -19,7 +20,8 @@ import (
 )
 
 func TestMurmur3CharBug(t *testing.T) {
-	ts := StartTest(nil)
+	defer ResetTestConfig()
+	ts := StartTest()
 	defer ts.Close()
 
 	api := BuildAPI(func(spec *APISpec) {
@@ -32,13 +34,13 @@ func TestMurmur3CharBug(t *testing.T) {
 	}
 
 	t.Run("Without hashing", func(t *testing.T) {
-		globalConf := ts.Gw.GetConfig()
+		globalConf := config.Global()
 		globalConf.HashKeys = false
-		ts.Gw.SetConfig(globalConf)
+		config.SetGlobal(globalConf)
 
-		ts.Gw.LoadAPI(api)
+		LoadAPI(api)
 
-		key := CreateSession(ts.Gw)
+		key := CreateSession()
 
 		ts.Run(t, []test.TestCase{
 			genTestCase("wrong", 403),
@@ -48,14 +50,14 @@ func TestMurmur3CharBug(t *testing.T) {
 	})
 
 	t.Run("murmur32 hashing, legacy", func(t *testing.T) {
-		globalConf := ts.Gw.GetConfig()
+		globalConf := config.Global()
 		globalConf.HashKeys = true
 		globalConf.HashKeyFunction = ""
-		ts.Gw.SetConfig(globalConf)
+		config.SetGlobal(globalConf)
 
-		ts.Gw.LoadAPI(api)
+		LoadAPI(api)
 
-		key := CreateSession(ts.Gw)
+		key := CreateSession()
 
 		ts.Run(t, []test.TestCase{
 			genTestCase("wrong", 403),
@@ -65,14 +67,14 @@ func TestMurmur3CharBug(t *testing.T) {
 	})
 
 	t.Run("murmur32 hashing, json keys", func(t *testing.T) {
-		globalConf := ts.Gw.GetConfig()
+		globalConf := config.Global()
 		globalConf.HashKeys = true
 		globalConf.HashKeyFunction = "murmur32"
-		ts.Gw.SetConfig(globalConf)
+		config.SetGlobal(globalConf)
 
-		ts.Gw.LoadAPI(api)
+		LoadAPI(api)
 
-		key := CreateSession(ts.Gw)
+		key := CreateSession()
 
 		ts.Run(t, []test.TestCase{
 			genTestCase("wrong", 403),
@@ -83,14 +85,14 @@ func TestMurmur3CharBug(t *testing.T) {
 	})
 
 	t.Run("murmur64 hashing", func(t *testing.T) {
-		globalConf := ts.Gw.GetConfig()
+		globalConf := config.Global()
 		globalConf.HashKeys = true
 		globalConf.HashKeyFunction = "murmur64"
-		ts.Gw.SetConfig(globalConf)
+		config.SetGlobal(globalConf)
 
-		ts.Gw.LoadAPI(api)
+		LoadAPI(api)
 
-		key := CreateSession(ts.Gw)
+		key := CreateSession()
 
 		ts.Run(t, []test.TestCase{
 			genTestCase("wrong", 403),
@@ -102,7 +104,8 @@ func TestMurmur3CharBug(t *testing.T) {
 }
 
 func TestSignatureValidation(t *testing.T) {
-	ts := StartTest(nil)
+	defer ResetTestConfig()
+	ts := StartTest()
 	defer ts.Close()
 	api := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
@@ -116,9 +119,9 @@ func TestSignatureValidation(t *testing.T) {
 
 	t.Run("Static signature", func(t *testing.T) {
 		api.Auth.Signature.Secret = "foobar"
-		ts.Gw.LoadAPI(api)
+		LoadAPI(api)
 
-		key := CreateSession(ts.Gw)
+		key := CreateSession()
 		hasher := signature_validator.MasheryMd5sum{}
 		validHash := hasher.Hash(key, "foobar", time.Now().Unix())
 
@@ -151,9 +154,9 @@ func TestSignatureValidation(t *testing.T) {
 
 	t.Run("Dynamic signature", func(t *testing.T) {
 		api.Auth.Signature.Secret = "$tyk_meta.signature_secret"
-		ts.Gw.LoadAPI(api)
+		LoadAPI(api)
 
-		key := CreateSession(ts.Gw, func(s *user.SessionState) {
+		key := CreateSession(func(s *user.SessionState) {
 			s.MetaData = map[string]interface{}{
 				"signature_secret": "foobar",
 			}
@@ -205,14 +208,11 @@ func createAuthKeyAuthSession(isBench bool) *user.SessionState {
 }
 
 func getAuthKeyChain(spec *APISpec) http.Handler {
-	ts := StartTest(nil)
-	defer ts.Close()
-
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
-	proxy := ts.Gw.TykNewSingleHostReverseProxy(remote, spec, nil)
+	proxy := TykNewSingleHostReverseProxy(remote, spec, nil)
 	proxyHandler := ProxyHandler(proxy, spec)
-	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy, Gw: ts.Gw}
-	chain := alice.New(ts.Gw.mwList(
+	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy}
+	chain := alice.New(mwList(
 		&IPWhiteListMiddleware{baseMid},
 		&IPBlackListMiddleware{BaseMiddleware: baseMid},
 		&AuthKey{baseMid},
@@ -224,9 +224,8 @@ func getAuthKeyChain(spec *APISpec) http.Handler {
 	return chain
 }
 
-func (ts *Test) testPrepareAuthKeySession(apiDef string, isBench bool) (string, *APISpec, error) {
-
-	spec := ts.Gw.LoadSampleAPI(apiDef)
+func testPrepareAuthKeySession(apiDef string, isBench bool) (string, *APISpec) {
+	spec := LoadSampleAPI(apiDef)
 
 	session := createAuthKeyAuthSession(isBench)
 	customToken := ""
@@ -236,16 +235,12 @@ func (ts *Test) testPrepareAuthKeySession(apiDef string, isBench bool) (string, 
 		customToken = "54321111"
 	}
 	// AuthKey sessions are stored by {token}
-	return customToken, spec, ts.Gw.GlobalSessionManager.UpdateSession(customToken, session, 60, false)
+	GlobalSessionManager.UpdateSession(customToken, session, 60, false)
+	return customToken, spec
 }
 
 func TestBearerTokenAuthKeySession(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-	customToken, spec, err := ts.testPrepareAuthKeySession(authKeyDef, false)
-	if err != nil {
-		t.Error(err)
-	}
+	customToken, spec := testPrepareAuthKeySession(authKeyDef, false)
 
 	recorder := httptest.NewRecorder()
 	req := TestReq(t, "GET", "/auth_key_test/", nil)
@@ -262,14 +257,9 @@ func TestBearerTokenAuthKeySession(t *testing.T) {
 }
 
 func BenchmarkBearerTokenAuthKeySession(b *testing.B) {
-	ts := StartTest(nil)
-	defer ts.Close()
 	b.ReportAllocs()
 
-	customToken, spec, err := ts.testPrepareAuthKeySession(authKeyDef, true)
-	if err != nil {
-		b.Error(err)
-	}
+	customToken, spec := testPrepareAuthKeySession(authKeyDef, true)
 
 	recorder := httptest.NewRecorder()
 	req := TestReq(b, "GET", "/auth_key_test/", nil)
@@ -304,12 +294,7 @@ const authKeyDef = `{
 }`
 
 func TestMultiAuthBackwardsCompatibleSession(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-	customToken, spec, err := ts.testPrepareAuthKeySession(multiAuthBackwardsCompatible, false)
-	if err != nil {
-		t.Error(err)
-	}
+	customToken, spec := testPrepareAuthKeySession(multiAuthBackwardsCompatible, false)
 
 	recorder := httptest.NewRecorder()
 	req := TestReq(t, "GET", fmt.Sprintf("/auth_key_test/?token=%s", customToken), nil)
@@ -324,14 +309,9 @@ func TestMultiAuthBackwardsCompatibleSession(t *testing.T) {
 }
 
 func BenchmarkMultiAuthBackwardsCompatibleSession(b *testing.B) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
 	b.ReportAllocs()
-	customToken, spec, err := ts.testPrepareAuthKeySession(multiAuthBackwardsCompatible, true)
-	if err != nil {
-		b.Error(err)
-	}
+
+	customToken, spec := testPrepareAuthKeySession(multiAuthBackwardsCompatible, true)
 
 	recorder := httptest.NewRecorder()
 	req := TestReq(b, "GET", fmt.Sprintf("/auth_key_test/?token=%s", customToken), nil)
@@ -367,17 +347,11 @@ const multiAuthBackwardsCompatible = `{
 }`
 
 func TestMultiAuthSession(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	spec := ts.Gw.LoadSampleAPI(multiAuthDef)
+	spec := LoadSampleAPI(multiAuthDef)
 	session := createAuthKeyAuthSession(false)
 	customToken := "54321111"
 	// AuthKey sessions are stored by {token}
-	err := ts.Gw.GlobalSessionManager.UpdateSession(customToken, session, 60, false)
-	if err != nil {
-		t.Error("could not update session in Session Manager. " + err.Error())
-	}
+	GlobalSessionManager.UpdateSession(customToken, session, 60, false)
 
 	// Set the url param
 	recorder := httptest.NewRecorder()

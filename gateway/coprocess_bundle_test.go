@@ -40,27 +40,24 @@ var grpcBundleWithAuthCheck = map[string]string{
 }
 
 func TestBundleLoader(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	bundleID := ts.RegisterBundle("grpc_with_auth_check", grpcBundleWithAuthCheck)
+	bundleID := RegisterBundle("grpc_with_auth_check", grpcBundleWithAuthCheck)
 
 	t.Run("Nonexistent bundle", func(t *testing.T) {
-		specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		specs := BuildAndLoadAPI(func(spec *APISpec) {
 			spec.CustomMiddlewareBundle = "nonexistent.zip"
 		})
-		err := ts.Gw.loadBundle(specs[0])
+		err := loadBundle(specs[0])
 		if err == nil {
 			t.Fatal("Fetching a nonexistent bundle, expected an error")
 		}
 	})
 
 	t.Run("Existing bundle with auth check", func(t *testing.T) {
-		specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		specs := BuildAndLoadAPI(func(spec *APISpec) {
 			spec.CustomMiddlewareBundle = bundleID
 		})
 		spec := specs[0]
-		err := ts.Gw.loadBundle(spec)
+		err := loadBundle(spec)
 		if err != nil {
 			t.Fatalf("Bundle not found: %s\n", bundleID)
 		}
@@ -85,19 +82,18 @@ func TestBundleLoader(t *testing.T) {
 
 func TestBundleFetcher(t *testing.T) {
 	bundleID := "testbundle"
-	ts := StartTest(nil)
-	defer ts.Close()
+	defer ResetTestConfig()
 
 	t.Run("Simple bundle base URL", func(t *testing.T) {
-		globalConf := ts.Gw.GetConfig()
+		globalConf := config.Global()
 		globalConf.BundleBaseURL = "mock://somepath"
 		globalConf.BundleInsecureSkipVerify = false
-		ts.Gw.SetConfig(globalConf)
-		specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		config.SetGlobal(globalConf)
+		specs := BuildAndLoadAPI(func(spec *APISpec) {
 			spec.CustomMiddlewareBundle = bundleID
 		})
 		spec := specs[0]
-		bundle, err := ts.Gw.fetchBundle(spec)
+		bundle, err := fetchBundle(spec)
 		if err != nil {
 			t.Fatalf("Couldn't fetch bundle: %s", err.Error())
 		}
@@ -111,15 +107,15 @@ func TestBundleFetcher(t *testing.T) {
 	})
 
 	t.Run("Bundle base URL with querystring", func(t *testing.T) {
-		globalConf := ts.Gw.GetConfig()
+		globalConf := config.Global()
 		globalConf.BundleBaseURL = "mock://somepath?api_key=supersecret"
 		globalConf.BundleInsecureSkipVerify = true
-		ts.Gw.SetConfig(globalConf)
-		specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		config.SetGlobal(globalConf)
+		specs := BuildAndLoadAPI(func(spec *APISpec) {
 			spec.CustomMiddlewareBundle = bundleID
 		})
 		spec := specs[0]
-		bundle, err := ts.Gw.fetchBundle(spec)
+		bundle, err := fetchBundle(spec)
 		if err != nil {
 			t.Fatalf("Couldn't fetch bundle: %s", err.Error())
 		}
@@ -203,7 +199,7 @@ pre.NewProcessRequest(function(request, session) {
 }
 
 func TestResponseOverride(t *testing.T) {
-	ts := StartTest(nil, TestConfig{
+	ts := StartTest(TestConfig{
 		CoprocessConfig: config.CoProcessConfig{
 			EnableCoProcess:  true,
 			PythonPathPrefix: pkgPath,
@@ -216,7 +212,7 @@ func TestResponseOverride(t *testing.T) {
 	customBody := `foobar`
 
 	testOverride := func(t *testing.T, bundle string) {
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/test/"
 			spec.UseKeylessAccess = true
 			spec.CustomMiddlewareBundle = bundle
@@ -236,10 +232,10 @@ func TestResponseOverride(t *testing.T) {
 		}...)
 	}
 	t.Run("Python", func(t *testing.T) {
-		testOverride(t, ts.RegisterBundle("python_override", overrideResponsePython))
+		testOverride(t, RegisterBundle("python_override", overrideResponsePython))
 	})
 
 	t.Run("JSVM", func(t *testing.T) {
-		testOverride(t, ts.RegisterBundle("jsvm_override", overrideResponseJSVM))
+		testOverride(t, RegisterBundle("jsvm_override", overrideResponseJSVM))
 	})
 }

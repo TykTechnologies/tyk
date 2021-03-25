@@ -178,8 +178,8 @@ func (d *PythonDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, baseP
 }
 
 // PythonInit initializes the Python interpreter.
-func PythonInit(pythonVersion string) error {
-	ver, err := python.FindPythonConfig(pythonVersion)
+func PythonInit() error {
+	ver, err := python.FindPythonConfig(config.Global().CoProcessOptions.PythonVersion)
 	if err != nil {
 		log.WithError(err).Errorf("Python version '%s' doesn't exist", ver)
 		return fmt.Errorf("python version '%s' doesn't exist", ver)
@@ -254,9 +254,9 @@ func PythonSetEnv(pythonPaths ...string) {
 	python.SetPythonPath(pythonPaths)
 }
 
-//nolint getBundlePaths will return an array of the available bundle directories:
-func getBundlePaths(conf config.Config) []string {
-	bundlePath := filepath.Join(conf.MiddlewarePath, "bundles")
+// getBundlePaths will return an array of the available bundle directories:
+func getBundlePaths() []string {
+	bundlePath := filepath.Join(config.Global().MiddlewarePath, "bundles")
 	directories := make([]string, 0)
 	bundles, _ := ioutil.ReadDir(bundlePath)
 	for _, f := range bundles {
@@ -269,8 +269,8 @@ func getBundlePaths(conf config.Config) []string {
 }
 
 // NewPythonDispatcher wraps all the actions needed for this CP.
-func NewPythonDispatcher(conf config.Config) (dispatcher coprocess.Dispatcher, err error) {
-	workDir := conf.CoProcessOptions.PythonPathPrefix
+func NewPythonDispatcher() (dispatcher coprocess.Dispatcher, err error) {
+	workDir := config.Global().CoProcessOptions.PythonPathPrefix
 	if workDir == "" {
 		tykBin, _ := os.Executable()
 		workDir = filepath.Dir(tykBin)
@@ -281,7 +281,7 @@ func NewPythonDispatcher(conf config.Config) (dispatcher coprocess.Dispatcher, e
 	dispatcherPath := filepath.Join(workDir, "coprocess", "python")
 	tykPath := filepath.Join(dispatcherPath, "tyk")
 	protoPath := filepath.Join(workDir, "coprocess", "python", "proto")
-	bundleRootPath := filepath.Join(conf.MiddlewarePath, "bundles")
+	bundleRootPath := filepath.Join(config.Global().MiddlewarePath, "bundles")
 
 	paths := []string{dispatcherPath, tykPath, protoPath, bundleRootPath}
 
@@ -292,7 +292,7 @@ func NewPythonDispatcher(conf config.Config) (dispatcher coprocess.Dispatcher, e
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
 		PythonSetEnv(paths...)
-		err := PythonInit(conf.CoProcessOptions.PythonVersion)
+		err := PythonInit()
 		if err != nil {
 			initDone <- err
 			return

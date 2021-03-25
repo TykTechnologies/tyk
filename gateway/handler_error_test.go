@@ -9,12 +9,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/test"
 )
 
-func (s *Test) TestHandleError_text_xml(t *testing.T) {
-	file := filepath.Join(s.Gw.GetConfig().TemplatePath, "error_500.xml")
+func TestHandleError_text_xml(t *testing.T) {
+	file := filepath.Join(config.Global().TemplatePath, "error_500.xml")
 	xml := `<error>
 	<code>500</code>
 	<message>{{.Message}}</message>
@@ -29,11 +30,10 @@ func (s *Test) TestHandleError_text_xml(t *testing.T) {
 	<code>500</code>
 	<message>There was a problem proxying the request</message>
 </error>`
-
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.Proxy.TargetURL = "http://localhost:66666"
 	})

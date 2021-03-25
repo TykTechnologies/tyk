@@ -16,6 +16,7 @@ import (
 
 	"github.com/TykTechnologies/murmur3"
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/storage"
@@ -85,7 +86,7 @@ func (k *BasicAuthKeyIsValid) getAuthType() string {
 
 func (k *BasicAuthKeyIsValid) basicAuthHeaderCredentials(w http.ResponseWriter, r *http.Request) (username, password string, err error, code int) {
 	token, _ := k.getAuthToken(k.getAuthType(), r)
-	logger := k.Logger().WithField("key", k.Gw.obfuscateKey(token))
+	logger := k.Logger().WithField("key", obfuscateKey(token))
 	if token == "" {
 		// No header value, fail
 		err, code = k.requestForBasicAuth(w, "Authorization field missing")
@@ -177,11 +178,11 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Check if API key valid
-	keyName := k.Gw.generateToken(k.Spec.OrgID, username)
-	logger := k.Logger().WithField("key", k.Gw.obfuscateKey(keyName))
+	keyName := generateToken(k.Spec.OrgID, username)
+	logger := k.Logger().WithField("key", obfuscateKey(keyName))
 	session, keyExists := k.CheckSessionAndIdentityForValidKey(&keyName, r)
 	if !keyExists {
-		if k.Gw.GetConfig().HashKeyFunction == "" {
+		if config.Global().HashKeyFunction == "" {
 			logger.Warning("Attempted access with non-existent user.")
 			return k.handleAuthFail(w, r, token)
 		} else { // check for key with legacy format "org_id" + "user_name"
@@ -212,7 +213,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	// Set session state on context, we will need it later
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.BasicAuthUser, apidef.UnsetAuth:
-		ctxSetSession(r, &session, keyName, false, k.Gw.GetConfig().HashKeys)
+		ctxSetSession(r, &session, keyName, false)
 	}
 
 	return nil, http.StatusOK

@@ -32,9 +32,8 @@ var testJsonSchema = `{
     "required": ["firstName", "lastName"]
 }`
 
-func (ts *Test) testPrepareValidateJSONSchema() {
-
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+func testPrepareValidateJSONSchema() {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 			json.Unmarshal([]byte(`[
 				{
@@ -50,10 +49,10 @@ func (ts *Test) testPrepareValidateJSONSchema() {
 }
 
 func TestValidateJSONSchema(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
 
-	ts.testPrepareValidateJSONSchema()
+	testPrepareValidateJSONSchema()
 
 	ts.Run(t, []test.TestCase{
 		{Method: "POST", Path: "/without_validation", Data: "{not_valid}", Code: http.StatusOK},
@@ -68,10 +67,10 @@ func TestValidateJSONSchema(t *testing.T) {
 func BenchmarkValidateJSONSchema(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
 
-	ts.testPrepareValidateJSONSchema()
+	testPrepareValidateJSONSchema()
 
 	for i := 0; i < b.N; i++ {
 		ts.Run(b, []test.TestCase{

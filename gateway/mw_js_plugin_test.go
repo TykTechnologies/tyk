@@ -12,8 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/config"
-
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/ctx"
@@ -23,21 +21,19 @@ import (
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/test"
 )
 
 func TestJSVMLogs(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
 	var buf bytes.Buffer
 	log := logrus.New()
 	log.Out = &buf
 	log.Formatter = new(prefixed.TextFormatter)
 
 	jsvm := JSVM{}
-	jsvm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	jsvm.Init(nil, logrus.NewEntry(log))
 
 	jsvm.RawLog = logrus.New()
 	jsvm.RawLog.Out = &buf
@@ -81,13 +77,9 @@ rawlog('{"x": "y"}')
 }
 
 func TestJSVMBody(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
 	dynMid := &DynamicMiddleware{
 		BaseMiddleware: BaseMiddleware{
 			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}},
-			Gw:   ts.Gw,
 		},
 		MiddlewareClassName: "leakMid",
 		Pre:                 true,
@@ -95,7 +87,7 @@ func TestJSVMBody(t *testing.T) {
 	body := "foô \uffff \u0000 \xff bàr"
 	req := httptest.NewRequest("GET", "/foo", strings.NewReader(body))
 	jsvm := JSVM{}
-	jsvm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	jsvm.Init(nil, logrus.NewEntry(log))
 
 	const js = `
 var leakMid = new TykJS.TykMiddleware.NewMiddleware({})
@@ -122,13 +114,9 @@ leakMid.NewProcessRequest(function(request, session) {
 }
 
 func TestJSVMSessionMetadataUpdate(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
 	dynMid := &DynamicMiddleware{
 		BaseMiddleware: BaseMiddleware{
 			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}},
-			Gw:   ts.Gw,
 		},
 		MiddlewareClassName: "testJSVMMiddleware",
 		Pre:                 false,
@@ -136,14 +124,14 @@ func TestJSVMSessionMetadataUpdate(t *testing.T) {
 	}
 	req := httptest.NewRequest("GET", "/foo", nil)
 	jsvm := JSVM{}
-	jsvm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	jsvm.Init(nil, logrus.NewEntry(log))
 
 	s := &user.SessionState{
 		MetaData: make(map[string]interface{})}
 	s.MetaData["same"] = "same"
 	s.MetaData["updated"] = "old"
 	s.MetaData["removed"] = "dummy"
-	ctxSetSession(req, s, "", true, ts.Gw.GetConfig().HashKeys)
+	ctxSetSession(req, s, "", true)
 
 	const js = `
 var testJSVMMiddleware = new TykJS.TykMiddleware.NewMiddleware({});
@@ -173,20 +161,16 @@ testJSVMMiddleware.NewProcessRequest(function(request, session) {
 }
 
 func TestJSVMProcessTimeout(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
 	dynMid := &DynamicMiddleware{
 		BaseMiddleware: BaseMiddleware{
 			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}},
-			Gw:   ts.Gw,
 		},
 		MiddlewareClassName: "leakMid",
 		Pre:                 true,
 	}
 	req := httptest.NewRequest("GET", "/foo", strings.NewReader("body"))
 	jsvm := JSVM{}
-	jsvm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	jsvm.Init(nil, logrus.NewEntry(log))
 	jsvm.Timeout = time.Millisecond
 
 	// this js plugin just loops forever, keeping Otto at 100% CPU
@@ -217,9 +201,6 @@ leakMid.NewProcessRequest(function(request, session) {
 }
 
 func TestJSVMConfigData(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
 	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
 	spec.ConfigData = map[string]interface{}{
 		"foo": "bar",
@@ -232,12 +213,12 @@ testJSVMData.NewProcessRequest(function(request, session, spec) {
 	return testJSVMData.ReturnData(request, {})
 });`
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware:      BaseMiddleware{Spec: spec, Proxy: nil, Gw: ts.Gw},
+		BaseMiddleware:      BaseMiddleware{Spec: spec, Proxy: nil},
 		MiddlewareClassName: "testJSVMData",
 		Pre:                 true,
 	}
 	jsvm := JSVM{}
-	jsvm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	jsvm.Init(nil, logrus.NewEntry(log))
 	if _, err := jsvm.VM.Run(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
 	}
@@ -250,9 +231,6 @@ testJSVMData.NewProcessRequest(function(request, session, spec) {
 	}
 }
 func TestJSVM_IgnoreCanonicalHeader(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
 	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
 	const js = `
 var testJSVMData = new TykJS.TykMiddleware.NewMiddleware({})
@@ -262,12 +240,12 @@ testJSVMData.NewProcessRequest(function(request, session, spec) {
 	return testJSVMData.ReturnData(request, {})
 });`
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware:      BaseMiddleware{Spec: spec, Proxy: nil, Gw: ts.Gw},
+		BaseMiddleware:      BaseMiddleware{Spec: spec, Proxy: nil},
 		MiddlewareClassName: "testJSVMData",
 		Pre:                 true,
 	}
 	jsvm := JSVM{}
-	jsvm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	jsvm.Init(nil, logrus.NewEntry(log))
 	if _, err := jsvm.VM.Run(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
 	}
@@ -280,10 +258,10 @@ testJSVMData.NewProcessRequest(function(request, session, spec) {
 	}
 	r.Header.Del(NonCanonicalHeaderKey)
 
-	c := ts.Gw.GetConfig()
+	c := config.Global()
 	c.IgnoreCanonicalMIMEHeaderKey = true
-	ts.Gw.SetConfig(c)
-
+	config.SetGlobal(c)
+	defer ResetTestConfig()
 	dynMid.ProcessRequest(nil, r, nil)
 	if want, got := "", r.Header.Get(NonCanonicalHeaderKey); want != got {
 		t.Fatalf("wanted header to be %q, got %q", want, got)
@@ -294,9 +272,6 @@ testJSVMData.NewProcessRequest(function(request, session, spec) {
 }
 
 func TestJSVMUserCore(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
 	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
 	const js = `
 var testJSVMCore = new TykJS.TykMiddleware.NewMiddleware({})
@@ -306,7 +281,7 @@ testJSVMCore.NewProcessRequest(function(request, session, config) {
 	return testJSVMCore.ReturnData(request, {})
 });`
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware:      BaseMiddleware{Spec: spec, Proxy: nil, Gw: ts.Gw},
+		BaseMiddleware:      BaseMiddleware{Spec: spec, Proxy: nil},
 		MiddlewareClassName: "testJSVMCore",
 		Pre:                 true,
 	}
@@ -317,16 +292,16 @@ testJSVMCore.NewProcessRequest(function(request, session, config) {
 	if _, err := io.WriteString(tfile, `var globalVar = "globalValue"`); err != nil {
 		t.Fatal(err)
 	}
-	globalConf := ts.Gw.GetConfig()
+	globalConf := config.Global()
 	old := globalConf.TykJSPath
 	globalConf.TykJSPath = tfile.Name()
-	ts.Gw.SetConfig(globalConf)
+	config.SetGlobal(globalConf)
 	defer func() {
 		globalConf.TykJSPath = old
-		ts.Gw.SetConfig(globalConf)
+		config.SetGlobal(globalConf)
 	}()
 	jsvm := JSVM{}
-	jsvm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	jsvm.Init(nil, logrus.NewEntry(log))
 	if _, err := jsvm.VM.Run(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
 	}
@@ -341,20 +316,16 @@ testJSVMCore.NewProcessRequest(function(request, session, config) {
 }
 
 func TestJSVMRequestScheme(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
 	dynMid := &DynamicMiddleware{
 		BaseMiddleware: BaseMiddleware{
 			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}},
-			Gw:   ts.Gw,
 		},
 		MiddlewareClassName: "leakMid",
 		Pre:                 true,
 	}
 	req := httptest.NewRequest("GET", "/foo", nil)
 	jsvm := JSVM{}
-	jsvm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	jsvm.Init(nil, logrus.NewEntry(log))
 
 	const js = `
 var leakMid = new TykJS.TykMiddleware.NewMiddleware({})
@@ -384,8 +355,10 @@ leakMid.NewProcessRequest(function(request, session) {
 }
 
 func TestTykMakeHTTPRequest(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
 
-	manifest := map[string]string{
+	bundle := RegisterBundle("jsvm_make_http_request", map[string]string{
 		"manifest.json": `
 		{
 		    "file_list": [],
@@ -421,14 +394,10 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 
 		return testTykMakeHTTPRequest.ReturnData(request, {})
 	});
-	`}
+	`})
 
 	t.Run("Existing endpoint", func(t *testing.T) {
-		ts := StartTest(nil)
-		defer ts.Close()
-		bundle := ts.RegisterBundle("jsvm_make_http_request", manifest)
-
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/sample"
 			spec.ConfigData = map[string]interface{}{
 				"base_url": ts.URL,
@@ -442,11 +411,7 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 	})
 
 	t.Run("Nonexistent endpoint", func(t *testing.T) {
-		ts := StartTest(nil)
-		defer ts.Close()
-		bundle := ts.RegisterBundle("jsvm_make_http_request", manifest)
-
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/sample"
 			spec.ConfigData = map[string]interface{}{
 				"base_url": ts.URL,
@@ -458,11 +423,7 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 	})
 
 	t.Run("Endpoint with query", func(t *testing.T) {
-		ts := StartTest(nil)
-		defer ts.Close()
-		bundle := ts.RegisterBundle("jsvm_make_http_request", manifest)
-
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/sample"
 			spec.ConfigData = map[string]interface{}{
 				"base_url": ts.URL,
@@ -476,17 +437,22 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 	})
 
 	t.Run("Endpoint with skip cleaning", func(t *testing.T) {
-		conf := func(conf *config.Config) {
-			conf.HttpServerOptions.SkipURLCleaning = true
-			conf.HttpServerOptions.OverrideDefaults = true
-		}
+		ts.Close()
+		globalConf := config.Global()
+		globalConf.HttpServerOptions.SkipURLCleaning = true
+		globalConf.HttpServerOptions.OverrideDefaults = true
+		config.SetGlobal(globalConf)
 
-		ts := StartTest(conf)
+		prevSkipClean := defaultTestConfig.HttpServerOptions.OverrideDefaults &&
+			defaultTestConfig.HttpServerOptions.SkipURLCleaning
+		testServerRouter.SkipClean(true)
+		defer testServerRouter.SkipClean(prevSkipClean)
+
+		ts := StartTest()
 		defer ts.Close()
-		bundle := ts.RegisterBundle("jsvm_make_http_request", manifest)
-		ts.TestServerRouter.SkipClean(true)
+		defer ResetTestConfig()
 
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/sample"
 			spec.ConfigData = map[string]interface{}{
 				"base_url": ts.URL,
@@ -501,11 +467,8 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 }
 
 func TestJSVMBase64(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
 	jsvm := JSVM{}
-	jsvm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	jsvm.Init(nil, logrus.NewEntry(log))
 
 	inputString := "teststring"
 	inputB64 := "dGVzdHN0cmluZw=="
@@ -565,7 +528,7 @@ func TestJSVMBase64(t *testing.T) {
 }
 
 func TestJSVMStagesRequest(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
 
 	pre := `var pre = new TykJS.TykMiddleware.NewMiddleware({});
@@ -599,7 +562,7 @@ post.NewProcessRequest(function(request, session) {
 });`
 
 	t.Run("Bundles", func(t *testing.T) {
-		bundle := ts.RegisterBundle("jsvm_stages", map[string]string{
+		bundle := RegisterBundle("jsvm_stages", map[string]string{
 			"manifest.json": `
 		{
 		    "file_list": [],
@@ -620,7 +583,7 @@ post.NewProcessRequest(function(request, session) {
 			"post.js": post,
 		})
 
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/test"
 			spec.CustomMiddlewareBundle = bundle
 		})
@@ -633,12 +596,12 @@ post.NewProcessRequest(function(request, session) {
 
 	t.Run("Files", func(t *testing.T) {
 		// Object names are forced to be "pre" and "post"
-		ts.RegisterJSFileMiddleware("jsvm_file_test", map[string]string{
+		RegisterJSFileMiddleware("jsvm_file_test", map[string]string{
 			"pre/pre.js":   pre,
 			"post/post.js": post,
 		})
 
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.APIID = "jsvm_file_test"
 			spec.Proxy.ListenPath = "/test"
 		})
@@ -651,21 +614,21 @@ post.NewProcessRequest(function(request, session) {
 
 	t.Run("API definition", func(t *testing.T) {
 		// Write to non APIID folder
-		ts.RegisterJSFileMiddleware("jsvm_api", map[string]string{
+		RegisterJSFileMiddleware("jsvm_api", map[string]string{
 			"pre.js":  pre,
 			"post.js": post,
 		})
 
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/test"
 			spec.CustomMiddleware = apidef.MiddlewareSection{
 				Pre: []apidef.MiddlewareDefinition{{
 					Name: "pre",
-					Path: ts.Gw.GetConfig().MiddlewarePath + "/jsvm_api/pre.js",
+					Path: config.Global().MiddlewarePath + "/jsvm_api/pre.js",
 				}},
 				Post: []apidef.MiddlewareDefinition{{
 					Name: "post",
-					Path: ts.Gw.GetConfig().MiddlewarePath + "/jsvm_api/post.js",
+					Path: config.Global().MiddlewarePath + "/jsvm_api/post.js",
 				}},
 			}
 		})
@@ -703,10 +666,10 @@ func TestMiniRequestObject_ReconstructParams(t *testing.T) {
 }
 
 func TestJSVM_Auth(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
 
-	bundle := ts.RegisterBundle("custom_auth", map[string]string{
+	bundle := RegisterBundle("custom_auth", map[string]string{
 		"manifest.json": `{
 			"file_list": [
 				"testmw.js"
@@ -772,7 +735,7 @@ func TestJSVM_Auth(t *testing.T) {
 		log("====> JS Auth initialised");
 		`,
 	})
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/sample"
 		spec.ConfigData = map[string]interface{}{
 			"base_url": ts.URL,
