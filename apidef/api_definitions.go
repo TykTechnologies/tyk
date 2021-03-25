@@ -11,7 +11,7 @@ import (
 
 	"github.com/clbanning/mxj"
 
-	"github.com/lonelycode/osin"
+	"github.com/TykTechnologies/osin"
 	"gopkg.in/mgo.v2/bson"
 
 	"time"

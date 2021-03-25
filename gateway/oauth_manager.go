@@ -12,14 +12,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/osin"
 	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 
 	"strconv"
 
+	"github.com/TykTechnologies/osin"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
