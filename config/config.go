@@ -46,10 +46,6 @@ var (
 			CheckInterval:             dnsCacheDefaultCheckInterval,
 			MultipleIPsHandleStrategy: NoCacheStrategy,
 		},
-		HealthCheckEndpointName: "hello",
-		CoProcessOptions: CoProcessConfig{
-			EnableCoProcess: false,
-		},
 	}
 )
 
@@ -595,6 +591,20 @@ type EventMessage struct {
 type TykEventHandler interface {
 	Init(interface{}) error
 	HandleEvent(EventMessage)
+}
+
+func init() {
+	SetGlobal(Config{})
+}
+
+func Global() Config {
+	return global.Load().(Config)
+}
+
+func SetGlobal(conf Config) {
+	globalMu.Lock()
+	defer globalMu.Unlock()
+	global.Store(conf)
 }
 
 func WriteConf(path string, conf *Config) error {

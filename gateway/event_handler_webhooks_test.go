@@ -10,7 +10,7 @@ import (
 	"github.com/TykTechnologies/tyk/headers"
 )
 
-func (ts *Test) createGetHandler() *WebHookHandler {
+func createGetHandler() *WebHookHandler {
 	eventHandlerConf := config.WebHookHandlerConf{
 		TargetPath:   TestHttpGet,
 		Method:       "GET",
@@ -18,7 +18,7 @@ func (ts *Test) createGetHandler() *WebHookHandler {
 		TemplatePath: "../templates/default_webhook.json",
 		HeaderList:   map[string]string{"x-tyk-test": "TEST"},
 	}
-	ev := &WebHookHandler{Gw: ts.Gw}
+	ev := &WebHookHandler{}
 	if err := ev.Init(eventHandlerConf); err != nil {
 		panic(err)
 	}
@@ -26,10 +26,7 @@ func (ts *Test) createGetHandler() *WebHookHandler {
 }
 
 func TestNewValid(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	h := &WebHookHandler{Gw: ts.Gw}
+	h := &WebHookHandler{}
 	err := h.Init(map[string]interface{}{
 		"method":        "POST",
 		"target_path":   testHttpPost,
@@ -43,10 +40,7 @@ func TestNewValid(t *testing.T) {
 }
 
 func TestNewInvalid(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	h := &WebHookHandler{Gw: ts.Gw}
+	h := &WebHookHandler{}
 	err := h.Init(map[string]interface{}{
 		"method":        123,
 		"target_path":   testHttpPost,
@@ -60,9 +54,6 @@ func TestNewInvalid(t *testing.T) {
 }
 
 func TestChecksum(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
 	rBody := `{
 		"event": "QuotaExceeded",
 		"message": "Key Quota Limit Exceeded",
@@ -72,7 +63,7 @@ func TestChecksum(t *testing.T) {
 		"timestamp": 2014-11-27 12:52:05.944549825 &#43;0000 GMT
 	}`
 
-	hook := ts.createGetHandler()
+	hook := createGetHandler()
 	checksum, err := hook.Checksum(rBody)
 
 	if err != nil {
@@ -86,10 +77,7 @@ func TestChecksum(t *testing.T) {
 }
 
 func TestBuildRequest(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	hook := ts.createGetHandler()
+	hook := createGetHandler()
 
 	rBody := `{
 		"event": "QuotaExceeded",
@@ -118,12 +106,10 @@ func TestBuildRequest(t *testing.T) {
 }
 
 func TestBuildRequestIngoreCanonicalHeaderKey(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	c := ts.Gw.GetConfig()
+	c := config.Global()
+	defer ResetTestConfig()
 	c.IgnoreCanonicalMIMEHeaderKey = true
-	ts.Gw.SetConfig(c)
+	config.SetGlobal(c)
 	eventHandlerConf := config.WebHookHandlerConf{
 		TargetPath:   TestHttpGet,
 		Method:       "GET",
@@ -132,7 +118,7 @@ func TestBuildRequestIngoreCanonicalHeaderKey(t *testing.T) {
 		HeaderList:   map[string]string{NonCanonicalHeaderKey: NonCanonicalHeaderKey},
 	}
 
-	ev := &WebHookHandler{Gw: ts.Gw}
+	ev := &WebHookHandler{}
 	if err := ev.Init(eventHandlerConf); err != nil {
 		t.Fatal(err)
 	}
@@ -147,15 +133,12 @@ func TestBuildRequestIngoreCanonicalHeaderKey(t *testing.T) {
 }
 
 func TestCreateBody(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
 	em := config.EventMessage{
 		Type:      EventQuotaExceeded,
 		TimeStamp: "0",
 	}
 
-	hook := ts.createGetHandler()
+	hook := createGetHandler()
 	body, err := hook.CreateBody(em)
 	if err != nil {
 		t.Error("Create body failed with error! ", err)
@@ -168,10 +151,7 @@ func TestCreateBody(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	eventHandler := ts.createGetHandler()
+	eventHandler := createGetHandler()
 
 	eventMessage := config.EventMessage{
 		Type: EventKeyExpired,
@@ -194,9 +174,6 @@ func TestGet(t *testing.T) {
 }
 
 func TestPost(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
 	eventHandlerConf := config.WebHookHandlerConf{
 		TargetPath:   "`+testHttpPost+`",
 		Method:       "POST",
@@ -205,7 +182,7 @@ func TestPost(t *testing.T) {
 		HeaderList:   map[string]string{"x-tyk-test": "TEST POST"},
 	}
 
-	eventHandler := &WebHookHandler{Gw: ts.Gw}
+	eventHandler := &WebHookHandler{}
 	if err := eventHandler.Init(eventHandlerConf); err != nil {
 		t.Fatal(err)
 	}
@@ -231,10 +208,6 @@ func TestPost(t *testing.T) {
 }
 
 func TestNewCustomTemplate(t *testing.T) {
-
-	ts := StartTest(nil)
-	defer ts.Close()
-
 	tests := []struct {
 		name           string
 		missingDefault bool
@@ -251,16 +224,16 @@ func TestNewCustomTemplate(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.missingDefault {
-				globalConf := ts.Gw.GetConfig()
+				globalConf := config.Global()
 				old := globalConf.TemplatePath
 				globalConf.TemplatePath = "missing-dir"
-				ts.Gw.SetConfig(globalConf)
+				config.SetGlobal(globalConf)
 				defer func() {
 					globalConf.TemplatePath = old
-					ts.Gw.SetConfig(globalConf)
+					config.SetGlobal(globalConf)
 				}()
 			}
-			h := &WebHookHandler{Gw: ts.Gw}
+			h := &WebHookHandler{}
 			err := h.Init(map[string]interface{}{
 				"target_path":   testHttpPost,
 				"template_path": tc.templatePath,
@@ -278,10 +251,7 @@ func TestNewCustomTemplate(t *testing.T) {
 }
 
 func TestWebhookContentTypeHeader(t *testing.T) {
-	gw := StartTest(nil)
-	defer gw.Close()
-
-	globalConf := gw.Gw.GetConfig()
+	globalConf := config.Global()
 	templatePath := globalConf.TemplatePath
 
 	tests := []struct {
@@ -305,7 +275,7 @@ func TestWebhookContentTypeHeader(t *testing.T) {
 				HeaderList:   ts.InputHeaders,
 			}
 
-			hook := &WebHookHandler{Gw: gw.Gw}
+			hook := &WebHookHandler{}
 			if err := hook.Init(conf); err != nil {
 				t.Fatal("Webhook Init failed with err ", err)
 			}

@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 // TransformMiddleware is a middleware that will apply a template to a request body to transform it's contents ready for an upstream API
@@ -37,10 +38,10 @@ func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request
 	}
 
 	// Add
-	ignoreCanonical := t.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
+	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
 	for nKey, nVal := range vInfo.GlobalHeaders {
 		t.Logger().Debug("Adding: ", nKey)
-		setCustomHeader(r.Header, nKey, t.Gw.replaceTykVariables(r, nVal, false), ignoreCanonical)
+		setCustomHeader(r.Header, nKey, replaceTykVariables(r, nVal, false), ignoreCanonical)
 	}
 
 	found, meta := t.Spec.CheckSpecMatchesStatus(r, versionPaths, HeaderInjected)
@@ -50,7 +51,7 @@ func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request
 			r.Header.Del(dKey)
 		}
 		for nKey, nVal := range hmeta.AddHeaders {
-			setCustomHeader(r.Header, nKey, t.Gw.replaceTykVariables(r, nVal, false), ignoreCanonical)
+			setCustomHeader(r.Header, nKey, replaceTykVariables(r, nVal, false), ignoreCanonical)
 		}
 	}
 

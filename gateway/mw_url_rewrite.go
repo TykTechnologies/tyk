@@ -14,6 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/user"
@@ -38,7 +39,7 @@ var envValueMatch = regexp.MustCompile(`\$secret_env.([A-Za-z0-9_\-\.]+)`)
 var metaMatch = regexp.MustCompile(`\$tyk_meta.([A-Za-z0-9_\-\.]+)`)
 var secretsConfMatch = regexp.MustCompile(`\$secret_conf.([A-Za-z0-9[.\-\_]+)`)
 
-func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
+func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 	path := r.URL.String()
 	log.Debug("Inbound path: ", path)
 	newpath := path
@@ -194,57 +195,57 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (str
 		ctxSetUrlRewritePath(r, meta.Path)
 	}
 
-	newpath = gw.replaceTykVariables(r, newpath, true)
+	newpath = replaceTykVariables(r, newpath, true)
 
 	return newpath, nil
 }
 
-func (gw *Gateway) replaceTykVariables(r *http.Request, in string, escape bool) string {
+func replaceTykVariables(r *http.Request, in string, escape bool) string {
 
 	if strings.Contains(in, secretsConfLabel) {
 		contextData := ctxGetData(r)
 		vars := secretsConfMatch.FindAllString(in, -1)
-		in = gw.replaceVariables(in, vars, contextData, secretsConfLabel, escape)
+		in = replaceVariables(in, vars, contextData, secretsConfLabel, escape)
 	}
 
 	if strings.Contains(in, envLabel) {
 		contextData := ctxGetData(r)
 		vars := envValueMatch.FindAllString(in, -1)
-		in = gw.replaceVariables(in, vars, contextData, envLabel, escape)
+		in = replaceVariables(in, vars, contextData, envLabel, escape)
 	}
 
 	if strings.Contains(in, vaultLabel) {
 		contextData := ctxGetData(r)
 		vars := vaultMatch.FindAllString(in, -1)
-		in = gw.replaceVariables(in, vars, contextData, vaultLabel, escape)
+		in = replaceVariables(in, vars, contextData, vaultLabel, escape)
 	}
 
 	if strings.Contains(in, consulLabel) {
 		contextData := ctxGetData(r)
 		vars := consulMatch.FindAllString(in, -1)
-		in = gw.replaceVariables(in, vars, contextData, consulLabel, escape)
+		in = replaceVariables(in, vars, contextData, consulLabel, escape)
 	}
 
 	if strings.Contains(in, contextLabel) {
 		contextData := ctxGetData(r)
 		vars := contextMatch.FindAllString(in, -1)
-		in = gw.replaceVariables(in, vars, contextData, contextLabel, escape)
+		in = replaceVariables(in, vars, contextData, contextLabel, escape)
 	}
 
 	if strings.Contains(in, metaLabel) {
 		vars := metaMatch.FindAllString(in, -1)
 		session := ctxGetSession(r)
 		if session == nil {
-			in = gw.replaceVariables(in, vars, nil, metaLabel, escape)
+			in = replaceVariables(in, vars, nil, metaLabel, escape)
 		} else {
-			in = gw.replaceVariables(in, vars, session.GetMetaData(), metaLabel, escape)
+			in = replaceVariables(in, vars, session.GetMetaData(), metaLabel, escape)
 		}
 	}
 	//todo add config_data
 	return in
 }
 
-func (gw *Gateway) replaceVariables(in string, vars []string, vals map[string]interface{}, label string, escape bool) string {
+func replaceVariables(in string, vars []string, vals map[string]interface{}, label string, escape bool) string {
 
 	emptyStringFn := func(key, in, val string) string {
 		in = strings.Replace(in, val, "", -1)
@@ -264,7 +265,7 @@ func (gw *Gateway) replaceVariables(in string, vars []string, vals map[string]in
 
 		case secretsConfLabel:
 
-			secrets := gw.GetConfig().Secrets
+			secrets := config.Global().Secrets
 
 			val, ok := secrets[key]
 			if !ok || val == "" {
@@ -286,12 +287,12 @@ func (gw *Gateway) replaceVariables(in string, vars []string, vals map[string]in
 
 		case vaultLabel:
 
-			if err := gw.setUpVault(); err != nil {
+			if err := setUpVault(); err != nil {
 				in = emptyStringFn(key, in, v)
 				continue
 			}
 
-			val, err := gw.vaultKVStore.Get(key)
+			val, err := vaultKVStore.Get(key)
 			if err != nil {
 				in = emptyStringFn(key, in, v)
 				continue
@@ -301,12 +302,12 @@ func (gw *Gateway) replaceVariables(in string, vars []string, vals map[string]in
 
 		case consulLabel:
 
-			if err := gw.setUpConsul(); err != nil {
+			if err := setUpConsul(); err != nil {
 				in = emptyStringFn(key, in, v)
 				continue
 			}
 
-			val, err := gw.consulKVStore.Get(key)
+			val, err := consulKVStore.Get(key)
 			if err != nil {
 				in = strings.Replace(in, v, "", -1)
 				continue
@@ -466,7 +467,7 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	umeta := meta.(*apidef.URLRewriteMeta)
 	log.Debug(r.URL)
 	oldPath := r.URL.String()
-	p, err := m.Gw.urlRewrite(umeta, r)
+	p, err := urlRewrite(umeta, r)
 	if err != nil {
 		log.Error(err)
 		return err, http.StatusInternalServerError

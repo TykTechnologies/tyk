@@ -10,6 +10,9 @@ import (
 	"github.com/TykTechnologies/tyk/request"
 )
 
+var sessionLimiter = SessionLimiter{}
+var sessionMonitor = Monitor{}
+
 // RateLimitAndQuotaCheck will check the incomming request and key whether it is within it's quota and
 // within it's rate limit, it makes use of the SessionLimiter object to do this
 type RateLimitAndQuotaCheck struct {
@@ -25,7 +28,7 @@ func (k *RateLimitAndQuotaCheck) EnabledForSpec() bool {
 }
 
 func (k *RateLimitAndQuotaCheck) handleRateLimitFailure(r *http.Request, token string) (error, int) {
-	k.Logger().WithField("key", k.Gw.obfuscateKey(token)).Info("Key rate limit exceeded.")
+	k.Logger().WithField("key", obfuscateKey(token)).Info("Key rate limit exceeded.")
 
 	// Fire a rate limit exceeded event
 	k.FireEvent(EventRateLimitExceeded, EventKeyFailureMeta{
@@ -42,7 +45,7 @@ func (k *RateLimitAndQuotaCheck) handleRateLimitFailure(r *http.Request, token s
 }
 
 func (k *RateLimitAndQuotaCheck) handleQuotaFailure(r *http.Request, token string) (error, int) {
-	k.Logger().WithField("key", k.Gw.obfuscateKey(token)).Info("Key quota limit exceeded.")
+	k.Logger().WithField("key", obfuscateKey(token)).Info("Key quota limit exceeded.")
 
 	// Fire a quota exceeded event
 	k.FireEvent(EventQuotaExceeded, EventKeyFailureMeta{
@@ -72,8 +75,8 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	session := ctxGetSession(r)
 	token := ctxGetAuthToken(r)
 
-	storeRef := k.Gw.GlobalSessionManager.Store()
-	reason := k.Gw.SessionLimiter.ForwardMessage(
+	storeRef := GlobalSessionManager.Store()
+	reason := sessionLimiter.ForwardMessage(
 		r,
 		session,
 		token,
@@ -106,7 +109,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 				ctxIncThrottleLevel(r, throttleRetryLimit)
 				time.Sleep(time.Duration(throttleInterval * float64(time.Second)))
 
-				reason = k.Gw.SessionLimiter.ForwardMessage(
+				reason = sessionLimiter.ForwardMessage(
 					r,
 					session,
 					token,
@@ -144,7 +147,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	}
 	// Run the trigger monitor
 	if k.Spec.GlobalConfig.Monitor.MonitorUserKeys {
-		k.Gw.SessionMonitor.Check(session, token)
+		sessionMonitor.Check(session, token)
 	}
 
 	// Request is valid, carry on

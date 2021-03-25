@@ -67,9 +67,8 @@ func defaultTykErrors() {
 	}
 }
 
-func overrideTykErrors(gw Gateway) {
-	gwConfig := gw.GetConfig()
-	for id, err := range gwConfig.OverrideMessages {
+func overrideTykErrors() {
+	for id, err := range config.Global().OverrideMessages {
 
 		overridenErr := TykErrors[id]
 
@@ -277,7 +276,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		}
 
 		if e.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
-			record.GetGeo(ip, e.Gw)
+			record.GetGeo(ip)
 		}
 
 		expiresAfter := e.Spec.ExpireAnalyticsAfter
@@ -294,10 +293,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		if e.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
 			record.NormalisePath(&e.Spec.GlobalConfig)
 		}
-		err := e.Gw.analytics.RecordHit(&record)
-		if err != nil {
-			log.WithError(err).Error("could not store analytic record")
-		}
+		analytics.RecordHit(&record)
 	}
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")

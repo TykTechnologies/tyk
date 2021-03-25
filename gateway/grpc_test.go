@@ -16,12 +16,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/config"
-
 	"google.golang.org/grpc/metadata"
 
 	"golang.org/x/net/http2/h2c"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 	"golang.org/x/net/http2"
@@ -32,12 +31,10 @@ import (
 
 // For gRPC, we should be sure that HTTP/2 works with Tyk in H2C configuration also for insecure grpc over http.
 func TestHTTP2_h2C(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
+	defer ResetTestConfig()
 	var port = 6666
 
-	ts.EnablePort(port, "h2c")
+	EnablePort(port, "h2c")
 	var echo = "Hello, I am an HTTP/2 Server"
 	expected := "HTTP/2.0"
 	serv := &http2.Server{}
@@ -54,7 +51,14 @@ func TestHTTP2_h2C(t *testing.T) {
 	upstream.Start()
 	defer upstream.Close()
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	// Tyk
+	globalConf := config.Global()
+	config.SetGlobal(globalConf)
+	defer ResetTestConfig()
+
+	ts := StartTest()
+	defer ts.Close()
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = true
 		spec.Proxy.TargetURL = upstream.URL
@@ -93,23 +97,25 @@ func TestHTTP2_h2C(t *testing.T) {
 }
 
 func TestGRPC_H2C(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
+	defer ResetTestConfig()
 
 	var port = 6666
-	ts.EnablePort(port, "h2c")
+	EnablePort(port, "h2c")
 	// gRPC server
 	target, s := startGRPCServerH2C(t, setupHelloSVC)
 	defer target.Close()
 	defer s.GracefulStop()
 
 	// Tyk
-	globalConf := ts.Gw.GetConfig()
+	globalConf := config.Global()
 	globalConf.ProxySSLInsecureSkipVerify = true
-	ts.Gw.SetConfig(globalConf)
-	ts.Gw.DoReload()
+	config.SetGlobal(globalConf)
+	defer ResetTestConfig()
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	ts := StartTest()
+	defer ts.Close()
+
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Name = "h2c_api"
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = true
@@ -134,15 +140,15 @@ func TestGRPC_H2C(t *testing.T) {
 
 // For gRPC, we should be sure that HTTP/2 works with Tyk.
 func TestHTTP2_TLS(t *testing.T) {
-	certManager := getCertManager()
+	defer ResetTestConfig()
 
 	expected := "HTTP/2.0"
 
 	// Certificates
 	_, _, _, clientCert := genCertificate(&x509.Certificate{})
 	serverCertPem, _, combinedPEM, _ := genServerCertificate()
-	certID, _ := certManager.Add(combinedPEM, "")
-	defer certManager.Delete(certID, "")
+	certID, _ := CertificateManager.Add(combinedPEM, "")
+	defer CertificateManager.Delete(certID, "")
 
 	// Upstream server supporting HTTP/2
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -160,17 +166,19 @@ func TestHTTP2_TLS(t *testing.T) {
 	defer upstream.Close()
 
 	// Tyk
-	conf := func(globalConf *config.Config) {
-		globalConf.ProxySSLInsecureSkipVerify = true
-		globalConf.ProxyEnableHttp2 = true
-		globalConf.HttpServerOptions.EnableHttp2 = true
-		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
-		globalConf.HttpServerOptions.UseSSL = true
-	}
-	ts := StartTest(conf)
+	globalConf := config.Global()
+	globalConf.ProxySSLInsecureSkipVerify = true
+	globalConf.ProxyEnableHttp2 = true
+	globalConf.HttpServerOptions.EnableHttp2 = true
+	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+	globalConf.HttpServerOptions.UseSSL = true
+	config.SetGlobal(globalConf)
+	defer ResetTestConfig()
+
+	ts := StartTest()
 	defer ts.Close()
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = true
 		spec.Proxy.TargetURL = upstream.URL
@@ -184,11 +192,11 @@ func TestHTTP2_TLS(t *testing.T) {
 }
 
 func TestGRPC_TLS(t *testing.T) {
+	defer ResetTestConfig()
 
-	certManager := getCertManager()
 	_, _, combinedPEM, _ := genServerCertificate()
-	certID, _ := certManager.Add(combinedPEM, "")
-	defer certManager.Delete(certID, "")
+	certID, _ := CertificateManager.Add(combinedPEM, "")
+	defer CertificateManager.Delete(certID, "")
 
 	// gRPC server
 	target, s := startGRPCServer(t, nil, setupHelloSVC)
@@ -196,17 +204,19 @@ func TestGRPC_TLS(t *testing.T) {
 	defer s.GracefulStop()
 
 	// Tyk
-	conf := func(globalConf *config.Config) {
-		globalConf.ProxySSLInsecureSkipVerify = true
-		globalConf.ProxyEnableHttp2 = true
-		globalConf.HttpServerOptions.EnableHttp2 = true
-		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
-		globalConf.HttpServerOptions.UseSSL = true
-	}
-	ts := StartTest(conf)
+	globalConf := config.Global()
+	globalConf.ProxySSLInsecureSkipVerify = true
+	globalConf.ProxyEnableHttp2 = true
+	globalConf.HttpServerOptions.EnableHttp2 = true
+	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+	globalConf.HttpServerOptions.UseSSL = true
+	config.SetGlobal(globalConf)
+	defer ResetTestConfig()
+
+	ts := StartTest()
 	defer ts.Close()
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = true
 		spec.Proxy.TargetURL = toTarget(t, "https", target)
@@ -229,16 +239,17 @@ func TestGRPC_TLS(t *testing.T) {
 
 func TestGRPC_MutualTLS(t *testing.T) {
 	// Mutual Authentication for both downstream-tyk and tyk-upstream
-	certManager := getCertManager()
+	defer ResetTestConfig()
+
 	_, _, combinedClientPEM, clientCert := genCertificate(&x509.Certificate{})
 	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
 	serverCertPem, _, combinedPEM, _ := genServerCertificate()
 
-	certID, _ := certManager.Add(combinedPEM, "") // For tyk to know downstream
-	defer certManager.Delete(certID, "")
+	certID, _ := CertificateManager.Add(combinedPEM, "") // For tyk to know downstream
+	defer CertificateManager.Delete(certID, "")
 
-	clientCertID, _ := certManager.Add(combinedClientPEM, "") // For upstream to know tyk
-	defer certManager.Delete(clientCertID, "")
+	clientCertID, _ := CertificateManager.Add(combinedClientPEM, "") // For upstream to know tyk
+	defer CertificateManager.Delete(clientCertID, "")
 
 	// Protected gRPC server
 	target, s := startGRPCServer(t, clientCert.Leaf, setupHelloSVC)
@@ -246,17 +257,19 @@ func TestGRPC_MutualTLS(t *testing.T) {
 	defer s.GracefulStop()
 
 	// Tyk
-	conf := func(globalConf *config.Config) {
-		globalConf.ProxySSLInsecureSkipVerify = true
-		globalConf.ProxyEnableHttp2 = true
-		globalConf.HttpServerOptions.EnableHttp2 = true
-		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
-		globalConf.HttpServerOptions.UseSSL = true
-	}
-	ts := StartTest(conf)
+	globalConf := config.Global()
+	globalConf.ProxySSLInsecureSkipVerify = true
+	globalConf.ProxyEnableHttp2 = true
+	globalConf.HttpServerOptions.EnableHttp2 = true
+	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+	globalConf.HttpServerOptions.UseSSL = true
+	config.SetGlobal(globalConf)
+	defer ResetTestConfig()
+
+	ts := StartTest()
 	defer ts.Close()
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = true
 		spec.UpstreamCertificates = map[string]string{
@@ -281,11 +294,10 @@ func TestGRPC_MutualTLS(t *testing.T) {
 }
 
 func TestGRPC_BasicAuthentication(t *testing.T) {
-
-	certManager := getCertManager()
+	defer ResetTestConfig()
 	_, _, combinedPEM, _ := genServerCertificate()
-	certID, _ := certManager.Add(combinedPEM, "")
-	defer certManager.Delete(certID, "")
+	certID, _ := CertificateManager.Add(combinedPEM, "")
+	defer CertificateManager.Delete(certID, "")
 
 	// gRPC server
 	target, s := startGRPCServer(t, nil, setupHelloSVC)
@@ -293,14 +305,16 @@ func TestGRPC_BasicAuthentication(t *testing.T) {
 	defer s.GracefulStop()
 
 	// Tyk
-	conf := func(globalConf *config.Config) {
-		globalConf.ProxySSLInsecureSkipVerify = true
-		globalConf.ProxyEnableHttp2 = true
-		globalConf.HttpServerOptions.EnableHttp2 = true
-		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
-		globalConf.HttpServerOptions.UseSSL = true
-	}
-	ts := StartTest(conf)
+	globalConf := config.Global()
+	globalConf.ProxySSLInsecureSkipVerify = true
+	globalConf.ProxyEnableHttp2 = true
+	globalConf.HttpServerOptions.EnableHttp2 = true
+	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+	globalConf.HttpServerOptions.UseSSL = true
+	config.SetGlobal(globalConf)
+	defer ResetTestConfig()
+
+	ts := StartTest()
 	defer ts.Close()
 
 	session := CreateStandardSession()
@@ -308,7 +322,7 @@ func TestGRPC_BasicAuthentication(t *testing.T) {
 	session.AccessRights = map[string]user.AccessDefinition{"test": {APIID: "test", Versions: []string{"v1"}}}
 	session.OrgID = "default"
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseBasicAuth = true
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = false
@@ -338,11 +352,10 @@ func TestGRPC_BasicAuthentication(t *testing.T) {
 }
 
 func TestGRPC_TokenBasedAuthentication(t *testing.T) {
-
-	certManager := getCertManager()
+	defer ResetTestConfig()
 	_, _, combinedPEM, _ := genServerCertificate()
-	certID, _ := certManager.Add(combinedPEM, "")
-	defer certManager.Delete(certID, "")
+	certID, _ := CertificateManager.Add(combinedPEM, "")
+	defer CertificateManager.Delete(certID, "")
 
 	// gRPC server
 	target, s := startGRPCServer(t, nil, setupHelloSVC)
@@ -350,22 +363,23 @@ func TestGRPC_TokenBasedAuthentication(t *testing.T) {
 	defer s.GracefulStop()
 
 	// Tyk
-	conf := func(globalConf *config.Config) {
-		globalConf.ProxySSLInsecureSkipVerify = true
-		globalConf.ProxyEnableHttp2 = true
-		globalConf.HttpServerOptions.EnableHttp2 = true
-		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
-		globalConf.HttpServerOptions.UseSSL = true
-	}
+	globalConf := config.Global()
+	globalConf.ProxySSLInsecureSkipVerify = true
+	globalConf.ProxyEnableHttp2 = true
+	globalConf.HttpServerOptions.EnableHttp2 = true
+	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+	globalConf.HttpServerOptions.UseSSL = true
+	config.SetGlobal(globalConf)
+	defer ResetTestConfig()
 
-	ts := StartTest(conf)
+	ts := StartTest()
 	defer ts.Close()
 
 	session := CreateStandardSession()
 	session.AccessRights = map[string]user.AccessDefinition{"test": {APIID: "test", Versions: []string{"v1"}}}
 	session.OrgID = "default"
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = false
 		spec.Proxy.TargetURL = toTarget(t, "https", target)
@@ -590,17 +604,17 @@ func (*loginCredsOrToken) RequireTransportSecurity() bool {
 
 func TestGRPC_Stream_MutualTLS(t *testing.T) {
 	// Mutual Authentication for both downstream-tyk and tyk-upstream
+	defer ResetTestConfig()
 
-	certManager := getCertManager()
 	_, _, combinedClientPEM, clientCert := genCertificate(&x509.Certificate{})
 	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
 	serverCertPem, _, combinedPEM, _ := genServerCertificate()
 
-	certID, _ := certManager.Add(combinedPEM, "") // For tyk to know downstream
-	defer certManager.Delete(certID, "")
+	certID, _ := CertificateManager.Add(combinedPEM, "") // For tyk to know downstream
+	defer CertificateManager.Delete(certID, "")
 
-	clientCertID, _ := certManager.Add(combinedClientPEM, "") // For upstream to know tyk
-	defer certManager.Delete(clientCertID, "")
+	clientCertID, _ := CertificateManager.Add(combinedClientPEM, "") // For upstream to know tyk
+	defer CertificateManager.Delete(clientCertID, "")
 
 	// Protected gRPC server
 	target, s := startGRPCServer(t, clientCert.Leaf, setupStreamSVC)
@@ -608,17 +622,19 @@ func TestGRPC_Stream_MutualTLS(t *testing.T) {
 	defer s.GracefulStop()
 
 	// Tyk
-	conf := func(globalConf *config.Config) {
-		globalConf.ProxySSLInsecureSkipVerify = true
-		globalConf.ProxyEnableHttp2 = true
-		globalConf.HttpServerOptions.EnableHttp2 = true
-		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
-		globalConf.HttpServerOptions.UseSSL = true
-	}
-	ts := StartTest(conf)
+	globalConf := config.Global()
+	globalConf.ProxySSLInsecureSkipVerify = true
+	globalConf.ProxyEnableHttp2 = true
+	globalConf.HttpServerOptions.EnableHttp2 = true
+	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+	globalConf.HttpServerOptions.UseSSL = true
+	config.SetGlobal(globalConf)
+	defer ResetTestConfig()
+
+	ts := StartTest()
 	defer ts.Close()
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = true
 		spec.UpstreamCertificates = map[string]string{
@@ -638,15 +654,10 @@ func TestGRPC_Stream_MutualTLS(t *testing.T) {
 }
 
 func TestGRPC_Stream_TokenBasedAuthentication(t *testing.T) {
-
-	certManager := getCertManager()
+	defer ResetTestConfig()
 	_, _, combinedPEM, _ := genServerCertificate()
-	certID, err := certManager.Add(combinedPEM, "")
-	defer certManager.Delete(certID, "")
-
-	if err != nil {
-		t.Errorf("could not add certificate: %v", err.Error())
-	}
+	certID, _ := CertificateManager.Add(combinedPEM, "")
+	defer CertificateManager.Delete(certID, "")
 
 	// gRPC server
 	target, s := startGRPCServer(t, nil, setupStreamSVC)
@@ -654,21 +665,23 @@ func TestGRPC_Stream_TokenBasedAuthentication(t *testing.T) {
 	defer s.GracefulStop()
 
 	// Tyk
-	conf := func(globalConf *config.Config) {
-		globalConf.ProxySSLInsecureSkipVerify = true
-		globalConf.ProxyEnableHttp2 = true
-		globalConf.HttpServerOptions.EnableHttp2 = true
-		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
-		globalConf.HttpServerOptions.UseSSL = true
-	}
-	ts := StartTest(conf)
+	globalConf := config.Global()
+	globalConf.ProxySSLInsecureSkipVerify = true
+	globalConf.ProxyEnableHttp2 = true
+	globalConf.HttpServerOptions.EnableHttp2 = true
+	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+	globalConf.HttpServerOptions.UseSSL = true
+	config.SetGlobal(globalConf)
+	defer ResetTestConfig()
+
+	ts := StartTest()
 	defer ts.Close()
 
 	session := CreateStandardSession()
 	session.AccessRights = map[string]user.AccessDefinition{"test": {APIID: "test", Versions: []string{"v1"}}}
 	session.OrgID = "default"
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = false
 		spec.Proxy.TargetURL = toTarget(t, "https", target)
@@ -678,18 +691,14 @@ func TestGRPC_Stream_TokenBasedAuthentication(t *testing.T) {
 	client := GetTLSClient(nil, nil)
 
 	// To create key
-	resp, errKey := ts.Run(t, []test.TestCase{
+	resp, _ := ts.Run(t, []test.TestCase{
 		{Method: "POST", Path: "/tyk/keys/create", Data: session, AdminAuth: true, Code: 200, Client: client},
 	}...)
-
-	if errKey != nil {
-		t.Errorf("creating key: %v", errKey.Error())
-	}
 
 	// Read key
 	body, _ := ioutil.ReadAll(resp.Body)
 	var resMap map[string]string
-	err = json.Unmarshal(body, &resMap)
+	err := json.Unmarshal(body, &resMap)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -705,11 +714,10 @@ func TestGRPC_Stream_TokenBasedAuthentication(t *testing.T) {
 }
 
 func TestGRPC_Stream_BasicAuthentication(t *testing.T) {
-
-	certManager := getCertManager()
+	defer ResetTestConfig()
 	_, _, combinedPEM, _ := genServerCertificate()
-	certID, _ := certManager.Add(combinedPEM, "")
-	defer certManager.Delete(certID, "")
+	certID, _ := CertificateManager.Add(combinedPEM, "")
+	defer CertificateManager.Delete(certID, "")
 
 	// gRPC server
 	target, s := startGRPCServer(t, nil, setupStreamSVC)
@@ -717,14 +725,16 @@ func TestGRPC_Stream_BasicAuthentication(t *testing.T) {
 	defer s.GracefulStop()
 
 	// Tyk
-	conf := func(globalConf *config.Config) {
-		globalConf.ProxySSLInsecureSkipVerify = true
-		globalConf.ProxyEnableHttp2 = true
-		globalConf.HttpServerOptions.EnableHttp2 = true
-		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
-		globalConf.HttpServerOptions.UseSSL = true
-	}
-	ts := StartTest(conf)
+	globalConf := config.Global()
+	globalConf.ProxySSLInsecureSkipVerify = true
+	globalConf.ProxyEnableHttp2 = true
+	globalConf.HttpServerOptions.EnableHttp2 = true
+	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+	globalConf.HttpServerOptions.UseSSL = true
+	config.SetGlobal(globalConf)
+	defer ResetTestConfig()
+
+	ts := StartTest()
 	defer ts.Close()
 
 	session := CreateStandardSession()
@@ -732,7 +742,7 @@ func TestGRPC_Stream_BasicAuthentication(t *testing.T) {
 	session.AccessRights = map[string]user.AccessDefinition{"test": {APIID: "test", Versions: []string{"v1"}}}
 	session.OrgID = "default"
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseBasicAuth = true
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = false
@@ -758,23 +768,25 @@ func TestGRPC_Stream_BasicAuthentication(t *testing.T) {
 }
 
 func TestGRPC_Stream_H2C(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
+	defer ResetTestConfig()
 
 	var port = 6666
-	ts.EnablePort(port, "h2c")
+	EnablePort(port, "h2c")
 	// gRPC server
 	target, s := startGRPCServerH2C(t, setupStreamSVC)
 	defer target.Close()
 	defer s.GracefulStop()
 
 	// Tyk
-	globalConf := ts.Gw.GetConfig()
+	globalConf := config.Global()
 	globalConf.ProxySSLInsecureSkipVerify = true
-	ts.Gw.SetConfig(globalConf)
-	ts.Gw.DoReload()
+	config.SetGlobal(globalConf)
+	defer ResetTestConfig()
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	ts := StartTest()
+	defer ts.Close()
+
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Name = "h2c_api"
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = true

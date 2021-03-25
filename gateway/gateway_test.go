@@ -25,6 +25,7 @@ import (
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
@@ -52,11 +53,12 @@ func createNonThrottledSession() *user.SessionState {
 }
 
 func TestAA(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest()
 
+	ts.Start()
 	defer ts.Close()
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 	})
 
@@ -75,16 +77,16 @@ func testKey(testName string, name string) string {
 }
 
 func TestParambasedAuth(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Auth.UseParam = true
 		spec.UseKeylessAccess = false
 		spec.Proxy.ListenPath = "/"
 	})
 
-	key := CreateSession(ts.Gw, func(s *user.SessionState) {
+	key := CreateSession(func(s *user.SessionState) {
 		s.SetAccessRights(map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v1"},
 		}})
@@ -108,11 +110,12 @@ func TestParambasedAuth(t *testing.T) {
 }
 
 func TestStripPathWithURLRewrite(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
+	defer ResetTestConfig()
 
 	t.Run("rewrite URL containing listen path", func(t *testing.T) {
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			version := spec.VersionData.Versions["v1"]
 			json.Unmarshal([]byte(`{
                 "use_extended_paths": true,
@@ -138,15 +141,16 @@ func TestStripPathWithURLRewrite(t *testing.T) {
 }
 
 func TestSkipTargetPassEscapingOff(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
+	defer ResetTestConfig()
 
 	t.Run("With escaping, default", func(t *testing.T) {
-		globalConf := ts.Gw.GetConfig()
+		globalConf := config.Global()
 		globalConf.HttpServerOptions.SkipTargetPathEscaping = false
-		ts.Gw.SetConfig(globalConf)
+		config.SetGlobal(globalConf)
 
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 		})
 
@@ -157,11 +161,11 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 	})
 
 	t.Run("Without escaping", func(t *testing.T) {
-		globalConf := ts.Gw.GetConfig()
+		globalConf := config.Global()
 		globalConf.HttpServerOptions.SkipTargetPathEscaping = true
-		ts.Gw.SetConfig(globalConf)
+		config.SetGlobal(globalConf)
 
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 		})
 
@@ -172,11 +176,11 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 	})
 
 	t.Run("With escaping, listen path and target URL are set, StripListenPath is OFF", func(t *testing.T) {
-		globalConf := ts.Gw.GetConfig()
+		globalConf := config.Global()
 		globalConf.HttpServerOptions.SkipTargetPathEscaping = false
-		ts.Gw.SetConfig(globalConf)
+		config.SetGlobal(globalConf)
 
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = false
 			spec.Proxy.ListenPath = "/listen_me"
 			spec.Proxy.TargetURL = TestHttpAny + "/sent_to_me"
@@ -189,11 +193,11 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 	})
 
 	t.Run("Without escaping, listen path and target URL are set, StripListenPath is OFF", func(t *testing.T) {
-		globalConf := ts.Gw.GetConfig()
+		globalConf := config.Global()
 		globalConf.HttpServerOptions.SkipTargetPathEscaping = true
-		ts.Gw.SetConfig(globalConf)
+		config.SetGlobal(globalConf)
 
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = false
 			spec.Proxy.ListenPath = "/listen_me"
 			spec.Proxy.TargetURL = TestHttpAny + "/sent_to_me"
@@ -206,11 +210,11 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 	})
 
 	t.Run("With escaping, listen path and target URL are set, StripListenPath is ON", func(t *testing.T) {
-		globalConf := ts.Gw.GetConfig()
+		globalConf := config.Global()
 		globalConf.HttpServerOptions.SkipTargetPathEscaping = false
-		ts.Gw.SetConfig(globalConf)
+		config.SetGlobal(globalConf)
 
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = true
 			spec.Proxy.ListenPath = "/listen_me"
 			spec.Proxy.TargetURL = TestHttpAny + "/sent_to_me"
@@ -223,11 +227,11 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 	})
 
 	t.Run("Without escaping, listen path and target URL are set, StripListenPath is ON", func(t *testing.T) {
-		globalConf := ts.Gw.GetConfig()
+		globalConf := config.Global()
 		globalConf.HttpServerOptions.SkipTargetPathEscaping = true
-		ts.Gw.SetConfig(globalConf)
+		config.SetGlobal(globalConf)
 
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = true
 			spec.Proxy.ListenPath = "/listen_me"
 			spec.Proxy.TargetURL = TestHttpAny + "/sent_to_me"
@@ -241,22 +245,28 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 }
 
 func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
+	globalConf := config.Global()
+	globalConf.HttpServerOptions.OverrideDefaults = true
+	globalConf.HttpServerOptions.SkipURLCleaning = true
+	config.SetGlobal(globalConf)
+	defer ResetTestConfig()
 
-	conf := func(c *config.Config) {
-		c.HttpServerOptions.OverrideDefaults = true
-		c.HttpServerOptions.SkipURLCleaning = true
-	}
-	ts := StartTest(conf)
+	// here we expect that test gateway will be sending to test upstream requests with not cleaned URI
+	// so test upstream shouldn't reply with 301 and process them as well
+	prevSkipClean := defaultTestConfig.HttpServerOptions.OverrideDefaults &&
+		defaultTestConfig.HttpServerOptions.SkipURLCleaning
+	testServerRouter.SkipClean(true)
+	defer testServerRouter.SkipClean(prevSkipClean)
+
+	ts := StartTest()
 	defer ts.Close()
 
-	ts.TestServerRouter.SkipClean(true)
-
 	t.Run("With escaping, default", func(t *testing.T) {
-		globalConf := ts.Gw.GetConfig()
+		globalConf := config.Global()
 		globalConf.HttpServerOptions.SkipTargetPathEscaping = false
-		ts.Gw.SetConfig(globalConf)
+		config.SetGlobal(globalConf)
 
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 		})
 
@@ -266,11 +276,11 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 	})
 
 	t.Run("Without escaping, default", func(t *testing.T) {
-		globalConf := ts.Gw.GetConfig()
+		globalConf := config.Global()
 		globalConf.HttpServerOptions.SkipTargetPathEscaping = true
-		ts.Gw.SetConfig(globalConf)
+		config.SetGlobal(globalConf)
 
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 		})
 
@@ -280,11 +290,11 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 	})
 
 	t.Run("With escaping, listen path and target URL are set, StripListenPath is OFF", func(t *testing.T) {
-		globalConf := ts.Gw.GetConfig()
+		globalConf := config.Global()
 		globalConf.HttpServerOptions.SkipTargetPathEscaping = false
-		ts.Gw.SetConfig(globalConf)
+		config.SetGlobal(globalConf)
 
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = false
 			spec.Proxy.ListenPath = "/listen_me"
 			spec.Proxy.TargetURL = TestHttpAny + "/sent_to_me"
@@ -298,11 +308,11 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 	})
 
 	t.Run("Without escaping, listen path and target URL are set, StripListenPath is OFF", func(t *testing.T) {
-		globalConf := ts.Gw.GetConfig()
+		globalConf := config.Global()
 		globalConf.HttpServerOptions.SkipTargetPathEscaping = true
-		ts.Gw.SetConfig(globalConf)
+		config.SetGlobal(globalConf)
 
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = false
 			spec.Proxy.ListenPath = "/listen_me"
 			spec.Proxy.TargetURL = TestHttpAny + "/sent_to_me"
@@ -316,11 +326,11 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 	})
 
 	t.Run("With escaping, listen path and target URL are set, StripListenPath is ON", func(t *testing.T) {
-		globalConf := ts.Gw.GetConfig()
+		globalConf := config.Global()
 		globalConf.HttpServerOptions.SkipTargetPathEscaping = false
-		ts.Gw.SetConfig(globalConf)
+		config.SetGlobal(globalConf)
 
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = true
 			spec.Proxy.ListenPath = "/listen_me"
 			spec.Proxy.TargetURL = TestHttpAny + "/sent_to_me"
@@ -334,11 +344,11 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 	})
 
 	t.Run("Without escaping, listen path and target URL are set, StripListenPath is ON", func(t *testing.T) {
-		globalConf := ts.Gw.GetConfig()
+		globalConf := config.Global()
 		globalConf.HttpServerOptions.SkipTargetPathEscaping = true
-		ts.Gw.SetConfig(globalConf)
+		config.SetGlobal(globalConf)
 
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = true
 			spec.Proxy.ListenPath = "/listen_me"
 			spec.Proxy.TargetURL = TestHttpAny + "/sent_to_me"
@@ -354,7 +364,7 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 }
 
 func TestQuota(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
 
 	var keyID string
@@ -377,7 +387,7 @@ func TestQuota(t *testing.T) {
 	}))
 	defer webhook.Close()
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.Proxy.ListenPath = "/"
 
@@ -415,7 +425,7 @@ func TestQuota(t *testing.T) {
 	})
 
 	// Create session with Quota = 2
-	keyID = CreateSession(ts.Gw, func(s *user.SessionState) {
+	keyID = CreateSession(func(s *user.SessionState) {
 		s.QuotaMax = 2
 	})
 
@@ -437,13 +447,13 @@ func TestQuota(t *testing.T) {
 }
 
 func TestAnalytics(t *testing.T) {
-	ts := StartTest(nil, TestConfig{
+	ts := StartTest(TestConfig{
 		Delay: 20 * time.Millisecond,
 	})
 	defer ts.Close()
-	base := ts.Gw.GetConfig()
+	base := config.Global()
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.Proxy.ListenPath = "/"
 	})
@@ -451,7 +461,7 @@ func TestAnalytics(t *testing.T) {
 	// Cleanup before test
 	// let records to to be sent
 	time.Sleep(recordsBufferFlushInterval + 50)
-	ts.Gw.analytics.Store.GetAndDeleteSet(analyticsKeyName)
+	analytics.Store.GetAndDeleteSet(analyticsKeyName)
 
 	t.Run("Log errors", func(t *testing.T) {
 		ts.Run(t, []test.TestCase{
@@ -462,7 +472,7 @@ func TestAnalytics(t *testing.T) {
 		// let records to to be sent
 		time.Sleep(recordsBufferFlushInterval + 50)
 
-		results := ts.Gw.analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
 		if len(results) != 2 {
 			t.Error("Should return 2 record", len(results))
 		}
@@ -475,7 +485,7 @@ func TestAnalytics(t *testing.T) {
 	})
 
 	t.Run("Log success", func(t *testing.T) {
-		key := CreateSession(ts.Gw)
+		key := CreateSession()
 
 		authHeaders := map[string]string{
 			"authorization": key,
@@ -488,7 +498,7 @@ func TestAnalytics(t *testing.T) {
 		// let records to to be sent
 		time.Sleep(recordsBufferFlushInterval + 50)
 
-		results := ts.Gw.analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
 		if len(results) != 1 {
 			t.Error("Should return 1 record: ", len(results))
 		}
@@ -502,19 +512,19 @@ func TestAnalytics(t *testing.T) {
 
 	t.Run("Detailed analytics with api spec config enabled", func(t *testing.T) {
 		defer func() {
-			ts.Gw.SetConfig(base)
+			config.SetGlobal(base)
 		}()
-		globalConf := ts.Gw.GetConfig()
+		globalConf := config.Global()
 		globalConf.AnalyticsConfig.EnableDetailedRecording = false
-		ts.Gw.SetConfig(globalConf)
+		config.SetGlobal(globalConf)
 
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
 			spec.Proxy.ListenPath = "/"
 			spec.EnableDetailedRecording = true
 		})
 
-		key := CreateSession(ts.Gw)
+		key := CreateSession()
 
 		authHeaders := map[string]string{
 			"authorization": key,
@@ -527,7 +537,7 @@ func TestAnalytics(t *testing.T) {
 		// let records to to be sent
 		time.Sleep(recordsBufferFlushInterval + 50)
 
-		results := ts.Gw.analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
 		if len(results) != 1 {
 			t.Error("Should return 1 record: ", len(results))
 		}
@@ -549,19 +559,19 @@ func TestAnalytics(t *testing.T) {
 
 	t.Run("Detailed analytics with only key flag set", func(t *testing.T) {
 		defer func() {
-			ts.Gw.SetConfig(base)
+			config.SetGlobal(base)
 		}()
-		globalConf := ts.Gw.GetConfig()
+		globalConf := config.Global()
 		globalConf.AnalyticsConfig.EnableDetailedRecording = false
-		ts.Gw.SetConfig(globalConf)
+		config.SetGlobal(globalConf)
 
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
 			spec.Proxy.ListenPath = "/"
 			spec.EnableDetailedRecording = false
 		})
 
-		key := CreateSession(ts.Gw, func(sess *user.SessionState) {
+		key := CreateSession(func(sess *user.SessionState) {
 			sess.EnableDetailRecording = true
 		})
 
@@ -576,7 +586,7 @@ func TestAnalytics(t *testing.T) {
 		// let records to to be sent
 		time.Sleep(recordsBufferFlushInterval + 50)
 
-		results := ts.Gw.analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
 		if len(results) != 1 {
 			t.Error("Should return 1 record: ", len(results))
 		}
@@ -597,18 +607,18 @@ func TestAnalytics(t *testing.T) {
 	})
 	t.Run("Detailed analytics", func(t *testing.T) {
 		defer func() {
-			ts.Gw.SetConfig(base)
+			config.SetGlobal(base)
 		}()
-		globalConf := ts.Gw.GetConfig()
+		globalConf := config.Global()
 		globalConf.AnalyticsConfig.EnableDetailedRecording = true
-		ts.Gw.SetConfig(globalConf)
+		config.SetGlobal(globalConf)
 
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
 			spec.Proxy.ListenPath = "/"
 		})
 
-		key := CreateSession(ts.Gw)
+		key := CreateSession()
 
 		authHeaders := map[string]string{
 			"authorization": key,
@@ -621,7 +631,7 @@ func TestAnalytics(t *testing.T) {
 		// let records to to be sent
 		time.Sleep(recordsBufferFlushInterval + 50)
 
-		results := ts.Gw.analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
 		if len(results) != 1 {
 			t.Error("Should return 1 record: ", len(results))
 		}
@@ -643,11 +653,11 @@ func TestAnalytics(t *testing.T) {
 
 	t.Run("Detailed analytics with latency", func(t *testing.T) {
 		defer func() {
-			ts.Gw.SetConfig(base)
+			config.SetGlobal(base)
 		}()
-		globalConf := ts.Gw.GetConfig()
+		globalConf := config.Global()
 		globalConf.AnalyticsConfig.EnableDetailedRecording = true
-		ts.Gw.SetConfig(globalConf)
+		config.SetGlobal(globalConf)
 		ls := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// We are delaying the response by 2 ms. This is important because anytime
 			// less than 0 eg  0.2 ms will be round off to 0 which is not good to check if we have
@@ -655,13 +665,13 @@ func TestAnalytics(t *testing.T) {
 			time.Sleep(2 * time.Millisecond)
 		}))
 		defer ls.Close()
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = ls.URL
 		})
 
-		key := CreateSession(ts.Gw)
+		key := CreateSession()
 
 		authHeaders := map[string]string{
 			"authorization": key,
@@ -674,7 +684,7 @@ func TestAnalytics(t *testing.T) {
 		// let records to to be sent
 		time.Sleep(recordsBufferFlushInterval + 50)
 
-		results := ts.Gw.analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
 		if len(results) != 1 {
 			t.Error("Should return 1 record: ", len(results))
 		}
@@ -705,13 +715,13 @@ func TestAnalytics(t *testing.T) {
 
 	t.Run("Detailed analytics with cache", func(t *testing.T) {
 		defer func() {
-			ts.Gw.SetConfig(base)
+			config.SetGlobal(base)
 		}()
-		globalConf := ts.Gw.GetConfig()
+		globalConf := config.Global()
 		globalConf.AnalyticsConfig.EnableDetailedRecording = true
-		ts.Gw.SetConfig(globalConf)
+		config.SetGlobal(globalConf)
 
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
 			spec.Proxy.ListenPath = "/"
 			spec.CacheOptions = apidef.CacheOptions{
@@ -721,7 +731,7 @@ func TestAnalytics(t *testing.T) {
 			}
 		})
 
-		key := CreateSession(ts.Gw)
+		key := CreateSession()
 
 		authHeaders := map[string]string{
 			"authorization": key,
@@ -735,7 +745,7 @@ func TestAnalytics(t *testing.T) {
 		// let records to to be sent
 		time.Sleep(recordsBufferFlushInterval + 50)
 
-		results := ts.Gw.analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
 		if len(results) != 2 {
 			t.Fatal("Should return 1 record: ", len(results))
 		}
@@ -757,20 +767,19 @@ func TestAnalytics(t *testing.T) {
 	})
 }
 
-// ToDo check why it blocks
 func TestListener(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
 	// Trick to get spec JSON, without loading API
 	// Specs will be reseted when we do `StartTest`
-	//ts.Gw.BuildAndLoadAPI()
+	BuildAndLoadAPI()
 
-	ts.Gw.ReloadTestCase.Enable()
-	defer ts.Gw.ReloadTestCase.Disable()
+	ReloadTestCase.Enable()
+	defer ReloadTestCase.Disable()
 
-	ts.Gw.ReloadTestCase.StartTicker()
-	defer ts.Gw.ReloadTestCase.StopTicker()
+	ReloadTestCase.StartTicker()
+	defer ReloadTestCase.StopTicker()
+
+	ts := StartTest()
+	defer ts.Close()
 
 	tests := []test.TestCase{
 		// Cleanup before tests
@@ -802,7 +811,7 @@ func TestListener(t *testing.T) {
 
 // Admin api located on separate port
 func TestControlListener(t *testing.T) {
-	ts := StartTest(nil, TestConfig{
+	ts := StartTest(TestConfig{
 		SeparateControlAPI: true,
 	})
 	defer ts.Close()
@@ -818,11 +827,11 @@ func TestControlListener(t *testing.T) {
 	}
 
 	ts.RunExt(t, tests...)
-	ts.Gw.DoReload()
+	DoReload()
 	ts.RunExt(t, tests...)
 
-	// Moved here because globalGateway.DoReload overrides it
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	// Moved here because DoReload overrides it
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/user-api"
 		spec.UseKeylessAccess = true
 	})
@@ -834,46 +843,35 @@ func TestControlListener(t *testing.T) {
 }
 
 func TestHttpPprof(t *testing.T) {
+	old := cli.HTTPProfile
+	defer func() { cli.HTTPProfile = old }()
 
-	t.Run("HTTP Profile not active", func(t *testing.T) {
-		conf := func(globalConf *config.Config) {
-			globalConf.HTTPProfile = false
-		}
-		ts := StartTest(conf, TestConfig{
-			SeparateControlAPI: true,
-		})
-		defer ts.Close()
-
-		ts.Run(t, []test.TestCase{
-			{Path: "/debug/pprof/", Code: 404},
-			{Path: "/debug/pprof/", Code: 404, ControlRequest: true},
-		}...)
+	ts := StartTest(TestConfig{
+		SeparateControlAPI: true,
 	})
 
-	t.Run("HTTP Profile active", func(t *testing.T) {
-		conf := func(globalConf *config.Config) {
-			globalConf.HTTPProfile = true
-		}
-		ts := StartTest(conf, TestConfig{
-			SeparateControlAPI: true,
-		})
-		defer ts.Close()
+	ts.Run(t, []test.TestCase{
+		{Path: "/debug/pprof/", Code: 404},
+		{Path: "/debug/pprof/", Code: 404, ControlRequest: true},
+	}...)
+	ts.Close()
 
-		ts.Run(t, []test.TestCase{
-			{Path: "/debug/pprof/", Code: 404},
-			{Path: "/debug/pprof/", Code: 200, ControlRequest: true},
-			{Path: "/debug/pprof/heap", Code: 200, ControlRequest: true},
-		}...)
-	})
+	*cli.HTTPProfile = true
+
+	ts.Start()
+	ts.Run(t, []test.TestCase{
+		{Path: "/debug/pprof/", Code: 404},
+		{Path: "/debug/pprof/", Code: 200, ControlRequest: true},
+		{Path: "/debug/pprof/heap", Code: 200, ControlRequest: true},
+	}...)
+	ts.Close()
 }
 
 func TestManagementNodeRedisEvents(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	globalConf := ts.Gw.GetConfig()
+	defer ResetTestConfig()
+	globalConf := config.Global()
 	globalConf.ManagementNode = false
-	ts.Gw.SetConfig(globalConf)
+	config.SetGlobal(globalConf)
 
 	t.Run("Without signing:", func(t *testing.T) {
 		msg := redis.Message{
@@ -887,27 +885,26 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 				t.Fatalf("want %q, got %q", want, got)
 			}
 		}
-		ts.Gw.handleRedisEvent(&msg, shouldHandle, nil)
+		handleRedisEvent(&msg, shouldHandle, nil)
 		if !callbackRun {
 			t.Fatalf("Should run callback")
 		}
 		globalConf.ManagementNode = true
-		ts.Gw.SetConfig(globalConf)
+		config.SetGlobal(globalConf)
 		notHandle := func(got NotificationCommand) {
 			t.Fatalf("should have not handled redis event")
 		}
-		ts.Gw.handleRedisEvent(msg, notHandle, nil)
+		handleRedisEvent(msg, notHandle, nil)
 	})
 
 	t.Run("With signature", func(t *testing.T) {
-		globalConf := ts.Gw.GetConfig()
+		globalConf := config.Global()
 		globalConf.AllowInsecureConfigs = false
-		ts.Gw.SetConfig(globalConf)
+		config.SetGlobal(globalConf)
 
 		n := Notification{
 			Command: NoticeGroupReload,
 			Payload: string("test"),
-			Gw:      ts.Gw,
 		}
 		n.Sign()
 		msg := redis.Message{}
@@ -922,7 +919,7 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 			}
 		}
 
-		ts.Gw.handleRedisEvent(&msg, shouldHandle, nil)
+		handleRedisEvent(&msg, shouldHandle, nil)
 		if !callbackRun {
 			t.Fatalf("Should run callback")
 		}
@@ -935,7 +932,7 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 		shouldFail := func(got NotificationCommand) {
 			valid = true
 		}
-		ts.Gw.handleRedisEvent(&msg, shouldFail, nil)
+		handleRedisEvent(&msg, shouldFail, nil)
 		if valid {
 			t.Fatalf("Should fail validation")
 		}
@@ -943,10 +940,10 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 }
 
 func TestListenPathTykPrefix(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/tyk-foo/"
 	})
 
@@ -957,14 +954,15 @@ func TestListenPathTykPrefix(t *testing.T) {
 }
 
 func TestReloadGoroutineLeakWithCircuitBreaker(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
 
-	globalConf := ts.Gw.GetConfig()
+	globalConf := config.Global()
 	globalConf.EnableJSVM = false
-	ts.Gw.SetConfig(globalConf)
+	config.SetGlobal(globalConf)
+	defer ResetTestConfig()
 
-	specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	specs := BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		UpdateAPIVersion(spec, "v1", func(version *apidef.VersionInfo) {
 			version.ExtendedPaths = apidef.ExtendedPathsSet{
@@ -983,7 +981,7 @@ func TestReloadGoroutineLeakWithCircuitBreaker(t *testing.T) {
 
 	before := runtime.NumGoroutine()
 
-	ts.Gw.LoadAPI(specs...) // just doing globalGateway.DoReload() doesn't load anything as BuildAndLoadAPI cleans up folder with API specs
+	LoadAPI(specs...) // just doing DoReload() doesn't load anything as BuildAndLoadAPI cleans up folder with API specs
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -1019,7 +1017,7 @@ func TestProxyProtocol(t *testing.T) {
 	}
 	defer l.Close()
 	go listenProxyProto(l)
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
 	rp, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -1033,11 +1031,12 @@ func TestProxyProtocol(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ts.EnablePort(p, "tcp")
+	EnablePort(p, "tcp")
+	defer ResetTestConfig()
 
 	proxyAddr := rp.Addr().String()
 	rp.Close()
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.Protocol = "tcp"
 		spec.EnableProxyProtocol = true
@@ -1063,10 +1062,10 @@ func TestProxyProtocol(t *testing.T) {
 }
 
 func TestProxyUserAgent(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 	})
 
@@ -1083,20 +1082,21 @@ func TestProxyUserAgent(t *testing.T) {
 }
 
 func TestSkipUrlCleaning(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	globalConf := ts.Gw.GetConfig()
+	globalConf := config.Global()
 	globalConf.HttpServerOptions.OverrideDefaults = true
 	globalConf.HttpServerOptions.SkipURLCleaning = true
-	ts.Gw.SetConfig(globalConf)
+	config.SetGlobal(globalConf)
+	defer ResetTestConfig()
+
+	ts := StartTest()
+	defer ts.Close()
 
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(r.URL.Path))
 	}))
 	defer s.Close()
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.Proxy.TargetURL = s.URL
 	})
@@ -1107,10 +1107,10 @@ func TestSkipUrlCleaning(t *testing.T) {
 }
 
 func TestMultiTargetProxy(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.VersionData.NotVersioned = false
 		spec.VersionData.Versions = map[string]apidef.VersionInfo{
 			"vdef": {Name: "vdef"},
@@ -1137,16 +1137,16 @@ func TestMultiTargetProxy(t *testing.T) {
 }
 
 func TestCustomDomain(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
 	t.Run("With custom domain support", func(t *testing.T) {
-		globalConf := ts.Gw.GetConfig()
+		globalConf := config.Global()
 		globalConf.EnableCustomDomains = true
-		ts.Gw.SetConfig(globalConf)
-		defer ts.ResetTestConfig()
+		config.SetGlobal(globalConf)
+		defer ResetTestConfig()
 
-		ts.Gw.BuildAndLoadAPI(
+		ts := StartTest()
+		defer ts.Close()
+
+		BuildAndLoadAPI(
 			func(spec *APISpec) {
 				spec.Domain = "host1"
 				spec.Proxy.ListenPath = "/with_domain"
@@ -1166,8 +1166,10 @@ func TestCustomDomain(t *testing.T) {
 	})
 
 	t.Run("Without custom domain support", func(t *testing.T) {
+		ts := StartTest()
+		defer ts.Close()
 
-		ts.Gw.BuildAndLoadAPI(
+		BuildAndLoadAPI(
 			func(spec *APISpec) {
 				spec.Domain = "host1.local."
 				spec.Proxy.ListenPath = "/"
@@ -1190,7 +1192,7 @@ func TestCustomDomain(t *testing.T) {
 func TestGatewayHealthCheck(t *testing.T) {
 
 	t.Run("control api port == listen port", func(t *testing.T) {
-		ts := StartTest(nil)
+		ts := StartTest()
 		defer ts.Close()
 
 		t.Run("Without APIs", func(t *testing.T) {
@@ -1200,7 +1202,7 @@ func TestGatewayHealthCheck(t *testing.T) {
 		})
 
 		t.Run("With API", func(t *testing.T) {
-			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			BuildAndLoadAPI(func(spec *APISpec) {
 				spec.Proxy.ListenPath = "/sample"
 			})
 
@@ -1210,8 +1212,10 @@ func TestGatewayHealthCheck(t *testing.T) {
 		})
 	})
 
+	DoReload()
+
 	t.Run("control api port != listen port", func(t *testing.T) {
-		ts := StartTest(nil, TestConfig{
+		ts := StartTest(TestConfig{
 			SeparateControlAPI: true,
 		})
 		defer ts.Close()
@@ -1224,7 +1228,7 @@ func TestGatewayHealthCheck(t *testing.T) {
 		})
 
 		t.Run("With API", func(t *testing.T) {
-			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			BuildAndLoadAPI(func(spec *APISpec) {
 				spec.Proxy.ListenPath = "/sample"
 			})
 
@@ -1237,12 +1241,12 @@ func TestGatewayHealthCheck(t *testing.T) {
 }
 
 func TestCacheAllSafeRequests(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-"}
 	defer cache.DeleteScanMatch("*")
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.CacheOptions = apidef.CacheOptions{
 			CacheTimeout:         120,
 			EnableCache:          true,
@@ -1263,14 +1267,14 @@ func TestCacheAllSafeRequests(t *testing.T) {
 }
 
 func TestCacheAllSafeRequestsWithCachedHeaders(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-"}
 	defer cache.DeleteScanMatch("*")
 	authorization := "authorization"
 	tenant := "tenant-id"
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.CacheOptions = apidef.CacheOptions{
 			CacheTimeout:         120,
 			EnableCache:          true,
@@ -1282,11 +1286,11 @@ func TestCacheAllSafeRequestsWithCachedHeaders(t *testing.T) {
 	})
 
 	headerCache := map[string]string{"x-tyk-cached-response": "1"}
-	sess1token := CreateSession(ts.Gw, func(s *user.SessionState) {
+	sess1token := CreateSession(func(s *user.SessionState) {
 		s.Rate = 1
 		s.Per = 60
 	})
-	sess2token := CreateSession(ts.Gw, func(s *user.SessionState) {
+	sess2token := CreateSession(func(s *user.SessionState) {
 		s.Rate = 1
 		s.Per = 60
 	})
@@ -1304,12 +1308,12 @@ func TestCacheAllSafeRequestsWithCachedHeaders(t *testing.T) {
 }
 
 func TestCacheWithAdvanceUrlRewrite(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-"}
 	defer cache.DeleteScanMatch("*")
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		version := spec.VersionData.Versions["v1"]
 		version.UseExtendedPaths = true
 		version.ExtendedPaths = apidef.ExtendedPathsSet{
@@ -1359,13 +1363,13 @@ func TestCacheWithAdvanceUrlRewrite(t *testing.T) {
 }
 
 func TestCachePostRequest(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-"}
 	defer cache.DeleteScanMatch("*")
 	tenant := "tenant-id"
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.CacheOptions = apidef.CacheOptions{
 			CacheTimeout:         120,
 			EnableCache:          true,
@@ -1401,13 +1405,13 @@ func TestCachePostRequest(t *testing.T) {
 }
 
 func TestAdvanceCachePutRequest(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-"}
 	defer cache.DeleteScanMatch("*")
 	tenant := "tenant-id"
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.CacheOptions = apidef.CacheOptions{
 			CacheTimeout:           120,
 			EnableCache:            true,
@@ -1488,12 +1492,12 @@ func TestAdvanceCachePutRequest(t *testing.T) {
 }
 
 func TestCacheAllSafeRequestsWithAdvancedCacheEndpoint(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-"}
 	defer cache.DeleteScanMatch("*")
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.CacheOptions = apidef.CacheOptions{
 			CacheTimeout:           120,
 			EnableCache:            true,
@@ -1523,7 +1527,7 @@ func TestCacheAllSafeRequestsWithAdvancedCacheEndpoint(t *testing.T) {
 }
 
 func TestCacheEtag(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-"}
 	defer cache.DeleteScanMatch("*")
@@ -1533,7 +1537,7 @@ func TestCacheEtag(t *testing.T) {
 		w.Write([]byte("body"))
 	}))
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.CacheOptions = apidef.CacheOptions{
 			CacheTimeout:         120,
 			EnableCache:          true,
@@ -1557,15 +1561,15 @@ func TestCacheEtag(t *testing.T) {
 
 // func TestWebsocketsUpstreamUpgradeRequest(t *testing.T) {
 // 	// setup spec and do test HTTP upgrade-request
-// 	globalConf := ts.Gw.GetConfig()
+// 	globalConf := config.Global()
 // 	globalConf.HttpServerOptions.EnableWebSockets = true
-// 	ts.Gw.SetConfig(globalConf)
+// 	config.SetGlobal(globalConf)
 // 	defer ResetTestConfig()
 
-// 	ts := StartTest(nil)
+// 	ts := StartTest()
 // 	defer ts.Close()
 
-// 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+// 	BuildAndLoadAPI(func(spec *APISpec) {
 // 		spec.Proxy.ListenPath = "/"
 // 	})
 
@@ -1582,14 +1586,15 @@ func TestCacheEtag(t *testing.T) {
 // }
 
 func TestWebsocketsSeveralOpenClose(t *testing.T) {
-	ts := StartTest(nil)
+	globalConf := config.Global()
+	globalConf.HttpServerOptions.EnableWebSockets = true
+	config.SetGlobal(globalConf)
+	defer ResetTestConfig()
+
+	ts := StartTest()
 	defer ts.Close()
 
-	globalConf := ts.Gw.GetConfig()
-	globalConf.HttpServerOptions.EnableWebSockets = true
-	ts.Gw.SetConfig(globalConf)
-
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 	})
 
@@ -1679,14 +1684,15 @@ func TestWebsocketsSeveralOpenClose(t *testing.T) {
 }
 
 func TestWebsocketsAndHTTPEndpointMatch(t *testing.T) {
-	ts := StartTest(nil)
+	globalConf := config.Global()
+	globalConf.HttpServerOptions.EnableWebSockets = true
+	config.SetGlobal(globalConf)
+	defer ResetTestConfig()
+
+	ts := StartTest()
 	defer ts.Close()
 
-	globalConf := ts.Gw.GetConfig()
-	globalConf.HttpServerOptions.EnableWebSockets = true
-	ts.Gw.SetConfig(globalConf)
-
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 	})
 
@@ -1812,20 +1818,21 @@ func createTestUptream(t *testing.T, allowedConns int, readsPerConn int) net.Lis
 }
 
 func TestKeepAliveConns(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
+	defer ResetTestConfig()
 
 	t.Run("Should use same connection", func(t *testing.T) {
 		// set keep alive option
-		globalConf := ts.Gw.GetConfig()
+		globalConf := config.Global()
 		globalConf.ProxyCloseConnections = false
-		ts.Gw.SetConfig(globalConf)
+		config.SetGlobal(globalConf)
 
 		// Allow 1 connection with 3 reads
 		upstream := createTestUptream(t, 1, 3)
 		defer upstream.Close()
 
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = "http://" + upstream.Addr().String()
 		})
@@ -1838,15 +1845,15 @@ func TestKeepAliveConns(t *testing.T) {
 	})
 
 	t.Run("Should use separate connection", func(t *testing.T) {
-		globalConf := ts.Gw.GetConfig()
+		globalConf := config.Global()
 		globalConf.ProxyCloseConnections = true
-		ts.Gw.SetConfig(globalConf)
+		config.SetGlobal(globalConf)
 
 		// Allow 3 connections with 1 read
 		upstream := createTestUptream(t, 3, 1)
 		defer upstream.Close()
 
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = "http://" + upstream.Addr().String()
 		})
@@ -1859,16 +1866,16 @@ func TestKeepAliveConns(t *testing.T) {
 	})
 
 	t.Run("Should respect max_conn_time", func(t *testing.T) {
-		globalConf := ts.Gw.GetConfig()
+		globalConf := config.Global()
 		globalConf.ProxyCloseConnections = false
 		globalConf.MaxConnTime = 1
-		ts.Gw.SetConfig(globalConf)
+		config.SetGlobal(globalConf)
 
 		// Allow 2 connection with 2 reads
 		upstream := createTestUptream(t, 2, 2)
 		defer upstream.Close()
 
-		spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec := BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = "http://" + upstream.Addr().String()
 		})[0]
@@ -1891,15 +1898,16 @@ func TestKeepAliveConns(t *testing.T) {
 // for the API. Meaning that a single token cannot reduce service availability for other tokens by simply going over the
 // API's global rate limit.
 func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
-	ts := StartTest(nil)
+	defer ResetTestConfig()
+	ts := StartTest()
 	defer ts.Close()
 
-	globalCfg := ts.Gw.GetConfig()
+	globalCfg := config.Global()
 	globalCfg.EnableNonTransactionalRateLimiter = false
 	globalCfg.EnableSentinelRateLimiter = true
-	ts.Gw.SetConfig(globalCfg)
+	config.SetGlobal(globalCfg)
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.APIID += "_" + time.Now().String()
 		spec.UseKeylessAccess = false
 		spec.DisableRateLimit = false
@@ -1911,17 +1919,17 @@ func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 	})
 
-	sess1token := CreateSession(ts.Gw, func(s *user.SessionState) {
+	sess1token := CreateSession(func(s *user.SessionState) {
 		s.Rate = 1
 		s.Per = 60
 	})
-	defer ts.Gw.GlobalSessionManager.RemoveSession("default", sess1token, false)
+	defer GlobalSessionManager.RemoveSession("default", sess1token, false)
 
-	sess2token := CreateSession(ts.Gw, func(s *user.SessionState) {
+	sess2token := CreateSession(func(s *user.SessionState) {
 		s.Rate = 1
 		s.Per = 60
 	})
-	defer ts.Gw.GlobalSessionManager.RemoveSession("default", sess2token, false)
+	defer GlobalSessionManager.RemoveSession("default", sess2token, false)
 
 	ts.Run(t, []test.TestCase{
 		{Headers: map[string]string{"Authorization": sess1token}, Code: http.StatusOK, Path: "/", Delay: 100 * time.Millisecond},
@@ -1932,15 +1940,15 @@ func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
 }
 
 func TestTracing(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
 
-	ts.Gw.prepareStorage()
+	prepareStorage()
 	spec := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 	})[0]
 
-	keyID := CreateSession(ts.Gw)
+	keyID := CreateSession()
 	authHeaders := map[string][]string{"Authorization": {keyID}}
 
 	ts.Run(t, []test.TestCase{
@@ -1972,14 +1980,15 @@ func TestTracing(t *testing.T) {
 }
 
 func TestBrokenClients(t *testing.T) {
-
-	conf := func(gwConf *config.Config) {
-		gwConf.ProxyDefaultTimeout = 1
-	}
-	ts := StartTest(conf)
+	ts := StartTest()
 	defer ts.Close()
+	defer ResetTestConfig()
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	globalConf := config.Global()
+	globalConf.ProxyDefaultTimeout = 1
+	config.SetGlobal(globalConf)
+
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = true
 		spec.Proxy.ListenPath = "/"
 		spec.EnforcedTimeoutEnabled = true
@@ -1988,7 +1997,7 @@ func TestBrokenClients(t *testing.T) {
 	buf := make([]byte, 1024)
 
 	t.Run("Valid client", func(t *testing.T) {
-		conn, _ := net.DialTimeout("tcp", ts.mainProxy().listener.Addr().String(), 0)
+		conn, _ := net.DialTimeout("tcp", mainProxy().listener.Addr().String(), 0)
 		conn.Write([]byte("GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"))
 		conn.Read(buf)
 
@@ -1999,15 +2008,15 @@ func TestBrokenClients(t *testing.T) {
 
 	t.Run("Invalid client: close without read", func(t *testing.T) {
 		time.Sleep(recordsBufferFlushInterval + 50*time.Millisecond)
-		ts.Gw.analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		analytics.Store.GetAndDeleteSet(analyticsKeyName)
 
-		conn, _ := net.DialTimeout("tcp", ts.mainProxy().listener.Addr().String(), 0)
+		conn, _ := net.DialTimeout("tcp", mainProxy().listener.Addr().String(), 0)
 		conn.Write([]byte("GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"))
 		conn.Close()
 		//conn.Read(buf)
 
 		time.Sleep(recordsBufferFlushInterval + 50*time.Millisecond)
-		results := ts.Gw.analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
 
 		var record AnalyticsRecord
 		msgpack.Unmarshal([]byte(results[0].(string)), &record)
@@ -2056,13 +2065,13 @@ func TestStripRegex(t *testing.T) {
 }
 
 func TestCache_singleErrorResponse(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest()
 	defer ts.Close()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("{}"))
 	}))
 	defer srv.Close()
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = true
 		spec.Proxy.ListenPath = "/"
 		spec.Proxy.TargetURL = srv.URL
@@ -2084,9 +2093,7 @@ func TestCache_singleErrorResponse(t *testing.T) {
 }
 
 func TestOverrideErrors(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
+	defer ResetTestConfig()
 	defer defaultTykErrors()
 
 	assert := func(expectedError string, expectedCode int, actualError error, actualCode int) {
@@ -2108,7 +2115,7 @@ func TestOverrideErrors(t *testing.T) {
 	const message6 = "Message6"
 	const code6 = 906
 
-	testConf := ts.Gw.GetConfig()
+	testConf := config.Global()
 
 	testConf.OverrideMessages = map[string]config.TykError{
 		ErrOAuthAuthorizationFieldMissing: {
@@ -2136,9 +2143,9 @@ func TestOverrideErrors(t *testing.T) {
 			Code:    code6,
 		},
 	}
-	ts.Gw.SetConfig(testConf)
+	config.SetGlobal(testConf)
 
-	overrideTykErrors(*ts.Gw)
+	overrideTykErrors()
 
 	e, i := errorAndStatusCode(ErrOAuthAuthorizationFieldMissing)
 	assert(message1, code1, e, i)
@@ -2168,9 +2175,9 @@ func TestOverrideErrors(t *testing.T) {
 			},
 		}
 
-		ts.Gw.SetConfig(testConf)
+		config.SetGlobal(testConf)
 
-		overrideTykErrors(*ts.Gw)
+		overrideTykErrors()
 
 		e, i := errorAndStatusCode(ErrOAuthAuthorizationFieldMissing)
 		assert(message1, code4, e, i)

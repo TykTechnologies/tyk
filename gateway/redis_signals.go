@@ -14,6 +14,7 @@ import (
 	"github.com/go-redis/redis/v8"
 
 	"github.com/TykTechnologies/goverify"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -42,22 +43,21 @@ type Notification struct {
 	Payload       string              `json:"payload"`
 	Signature     string              `json:"signature"`
 	SignatureAlgo crypto.Hash         `json:"algorithm"`
-	Gw            *Gateway            `json:"-"`
 }
 
 func (n *Notification) Sign() {
 	n.SignatureAlgo = crypto.SHA256
-	hash := sha256.Sum256([]byte(string(n.Command) + n.Payload + n.Gw.GetConfig().NodeSecret))
+	hash := sha256.Sum256([]byte(string(n.Command) + n.Payload + config.Global().NodeSecret))
 	n.Signature = hex.EncodeToString(hash[:])
 }
 
-func (gw *Gateway) startPubSubLoop() {
+func startPubSubLoop() {
 	cacheStore := storage.RedisCluster{}
 	cacheStore.Connect()
 	// On message, synchronise
 	for {
 		err := cacheStore.StartPubSubHandler(RedisPubSubChannel, func(v interface{}) {
-			gw.handleRedisEvent(v, nil, nil)
+			handleRedisEvent(v, nil, nil)
 		})
 		if err != nil {
 			if err != storage.ErrRedisIsDown {
@@ -69,12 +69,12 @@ func (gw *Gateway) startPubSubLoop() {
 	}
 }
 
-func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded func()) {
+func handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded func()) {
 	message, ok := v.(*redis.Message)
 	if !ok {
 		return
 	}
-	notif := Notification{Gw: gw}
+	notif := Notification{}
 	if err := json.Unmarshal([]byte(message.Payload), &notif); err != nil {
 		pubSubLog.Error("Unmarshalling message body failed, malformed: ", err)
 		return
@@ -94,26 +94,26 @@ func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationComm
 
 	switch notif.Command {
 	case NoticeDashboardZeroConf:
-		gw.handleDashboardZeroConfMessage(notif.Payload)
+		handleDashboardZeroConfMessage(notif.Payload)
 	case NoticeConfigUpdate:
-		gw.handleNewConfiguration(notif.Payload)
+		handleNewConfiguration(notif.Payload)
 	case NoticeDashboardConfigRequest:
-		gw.handleSendMiniConfig(notif.Payload)
+		handleSendMiniConfig(notif.Payload)
 	case NoticeGatewayDRLNotification:
-		if gw.GetConfig().ManagementNode {
+		if config.Global().ManagementNode {
 			// DRL is not initialized, going through would
 			// be mostly harmless but would flood the log
 			// with warnings since DRLManager.Ready == false
 			return
 		}
-		gw.onServerStatusReceivedHandler(notif.Payload)
+		onServerStatusReceivedHandler(notif.Payload)
 	case NoticeGatewayLENotification:
-		gw.onLESSLStatusReceivedHandler(notif.Payload)
+		onLESSLStatusReceivedHandler(notif.Payload)
 	case NoticeApiUpdated, NoticeApiRemoved, NoticeApiAdded, NoticePolicyChanged, NoticeGroupReload:
 		pubSubLog.Info("Reloading endpoints")
-		gw.reloadURLStructure(reloaded)
+		reloadURLStructure(reloaded)
 	case KeySpaceUpdateNotification:
-		gw.handleKeySpaceEventCacheFlush(notif.Payload)
+		handleKeySpaceEventCacheFlush(notif.Payload)
 	default:
 		pubSubLog.Warnf("Unknown notification command: %q", notif.Command)
 		return
@@ -124,7 +124,7 @@ func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationComm
 	}
 }
 
-func (gw *Gateway) handleKeySpaceEventCacheFlush(payload string) {
+func handleKeySpaceEventCacheFlush(payload string) {
 
 	keys := strings.Split(payload, ",")
 
@@ -134,21 +134,22 @@ func (gw *Gateway) handleKeySpaceEventCacheFlush(payload string) {
 			key = splitKeys[0]
 		}
 
-		gw.RPCGlobalCache.Delete("apikey-" + key)
-		gw.SessionCache.Delete(key)
+		RPCGlobalCache.Delete("apikey-" + key)
+		SessionCache.Delete(key)
 	}
 }
 
 var redisInsecureWarn sync.Once
+var notificationVerifier goverify.Verifier
 
 func isPayloadSignatureValid(notification Notification) bool {
-	if notification.Gw.GetConfig().AllowInsecureConfigs {
+	if config.Global().AllowInsecureConfigs {
 		return true
 	}
 
 	switch notification.SignatureAlgo {
 	case crypto.SHA256:
-		hash := sha256.Sum256([]byte(string(notification.Command) + notification.Payload + notification.Gw.GetConfig().NodeSecret))
+		hash := sha256.Sum256([]byte(string(notification.Command) + notification.Payload + config.Global().NodeSecret))
 		expectedSignature := hex.EncodeToString(hash[:])
 
 		if expectedSignature == notification.Signature {
@@ -158,10 +159,10 @@ func isPayloadSignatureValid(notification Notification) bool {
 			return false
 		}
 	default:
-		if notification.Gw.GetConfig().PublicKeyPath != "" && notification.Gw.NotificationVerifier == nil {
+		if config.Global().PublicKeyPath != "" && notificationVerifier == nil {
 			var err error
 
-			notification.Gw.NotificationVerifier, err = goverify.LoadPublicKeyFromFile(notification.Gw.GetConfig().PublicKeyPath)
+			notificationVerifier, err = goverify.LoadPublicKeyFromFile(config.Global().PublicKeyPath)
 			if err != nil {
 
 				pubSubLog.Error("Notification signer: Failed loading public key from path: ", err)
@@ -169,7 +170,7 @@ func isPayloadSignatureValid(notification Notification) bool {
 			}
 		}
 
-		if notification.Gw.NotificationVerifier != nil {
+		if notificationVerifier != nil {
 
 			signed, err := base64.StdEncoding.DecodeString(notification.Signature)
 			if err != nil {
@@ -178,7 +179,7 @@ func isPayloadSignatureValid(notification Notification) bool {
 				return false
 			}
 
-			if err := notification.Gw.NotificationVerifier.Verify([]byte(notification.Payload), signed); err != nil {
+			if err := notificationVerifier.Verify([]byte(notification.Payload), signed); err != nil {
 
 				pubSubLog.Error("Could not verify notification: ", err, ": ", notification)
 
@@ -196,7 +197,6 @@ func isPayloadSignatureValid(notification Notification) bool {
 type RedisNotifier struct {
 	store   *storage.RedisCluster
 	channel string
-	*Gateway
 }
 
 // Notify will send a notification to a channel
@@ -254,7 +254,7 @@ func createConnectionStringFromDashboardObject(config dashboardConfigPayload) st
 	return hostname
 }
 
-func (gw *Gateway) handleDashboardZeroConfMessage(payload string) {
+func handleDashboardZeroConfMessage(payload string) {
 	// Decode the configuration from the payload
 	dashPayload := dashboardConfigPayload{}
 
@@ -264,7 +264,7 @@ func (gw *Gateway) handleDashboardZeroConfMessage(payload string) {
 		return
 	}
 
-	globalConf := gw.GetConfig()
+	globalConf := config.Global()
 
 	if !globalConf.UseDBAppConfigs || globalConf.DisableDashboardZeroConf {
 		return
@@ -284,7 +284,7 @@ func (gw *Gateway) handleDashboardZeroConfMessage(payload string) {
 	}
 
 	if setHostname {
-		gw.SetConfig(globalConf)
+		config.SetGlobal(globalConf)
 		pubSubLog.Info("Hostname set with dashboard zeroconf signal")
 	}
 }

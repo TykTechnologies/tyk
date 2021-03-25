@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
-
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/gateway"
 	"github.com/TykTechnologies/tyk/test"
@@ -214,7 +213,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestPythonBundles(t *testing.T) {
-	ts := gateway.StartTest(nil, gateway.TestConfig{
+	ts := gateway.StartTest(gateway.TestConfig{
 		CoprocessConfig: config.CoProcessConfig{
 			EnableCoProcess:  true,
 			PythonPathPrefix: pkgPath,
@@ -222,14 +221,14 @@ func TestPythonBundles(t *testing.T) {
 		}})
 	defer ts.Close()
 
-	authCheckBundle := ts.RegisterBundle("python_with_auth_check", pythonBundleWithAuthCheck)
-	postHookBundle := ts.RegisterBundle("python_with_post_hook", pythonBundleWithPostHook)
-	preHookBundle := ts.RegisterBundle("python_with_pre_hook", pythonBundleWithPreHook)
-	responseHookBundle := ts.RegisterBundle("python_with_response_hook", pythonBundleWithResponseHook)
-	postRequestTransformHookBundle := ts.RegisterBundle("python_post_with_request_transform_hook", pythonPostRequestTransform)
+	authCheckBundle := gateway.RegisterBundle("python_with_auth_check", pythonBundleWithAuthCheck)
+	postHookBundle := gateway.RegisterBundle("python_with_post_hook", pythonBundleWithPostHook)
+	preHookBundle := gateway.RegisterBundle("python_with_pre_hook", pythonBundleWithPreHook)
+	responseHookBundle := gateway.RegisterBundle("python_with_response_hook", pythonBundleWithResponseHook)
+	postRequestTransformHookBundle := gateway.RegisterBundle("python_post_with_request_transform_hook", pythonPostRequestTransform)
 
 	t.Run("Single-file bundle with authentication hook", func(t *testing.T) {
-		ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+		gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 			spec.Proxy.ListenPath = "/test-api/"
 			spec.UseKeylessAccess = false
 			spec.EnableCoProcessAuth = true
@@ -250,7 +249,7 @@ func TestPythonBundles(t *testing.T) {
 	})
 
 	t.Run("Auth with policy", func(t *testing.T) {
-		specs := ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+		specs := gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 			spec.Auth.AuthHeaderName = "Authorization"
 			spec.Proxy.ListenPath = "/test-api/"
 			spec.UseKeylessAccess = false
@@ -261,7 +260,7 @@ func TestPythonBundles(t *testing.T) {
 
 		time.Sleep(1 * time.Second)
 
-		pID := ts.CreatePolicy(func(p *user.Policy) {
+		pID := gateway.CreatePolicy(func(p *user.Policy) {
 			p.QuotaMax = 1
 			p.QuotaRenewalRate = 60
 			p.AccessRights = map[string]user.AccessDefinition{"test": {
@@ -280,14 +279,14 @@ func TestPythonBundles(t *testing.T) {
 
 	t.Run("Single-file bundle with post hook", func(t *testing.T) {
 
-		keyID := gateway.CreateSession(ts.Gw, func(s *user.SessionState) {
+		keyID := gateway.CreateSession(func(s *user.SessionState) {
 			s.MetaData = map[string]interface{}{
 				"testkey":   map[string]interface{}{"nestedkey": "nestedvalue"},
 				"stringkey": "testvalue",
 			}
 		})
 
-		ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+		gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 			spec.Proxy.ListenPath = "/test-api-2/"
 			spec.UseKeylessAccess = false
 			spec.EnableCoProcessAuth = false
@@ -306,14 +305,14 @@ func TestPythonBundles(t *testing.T) {
 
 	t.Run("Single-file bundle with response hook", func(t *testing.T) {
 
-		keyID := gateway.CreateSession(ts.Gw, func(s *user.SessionState) {
+		keyID := gateway.CreateSession(func(s *user.SessionState) {
 			s.MetaData = map[string]interface{}{
 				"testkey":   map[string]interface{}{"nestedkey": "nestedvalue"},
 				"stringkey": "testvalue",
 			}
 		})
 
-		ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+		gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 			spec.Proxy.ListenPath = "/test-api-3/"
 			spec.UseKeylessAccess = false
 			spec.EnableCoProcessAuth = false
@@ -331,7 +330,7 @@ func TestPythonBundles(t *testing.T) {
 	})
 
 	t.Run("Single-file bundle with pre hook and UTF-8/non-UTF-8 request data", func(t *testing.T) {
-		ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+		gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 			spec.Proxy.ListenPath = "/test-api-2/"
 			spec.UseKeylessAccess = true
 			spec.EnableCoProcessAuth = false
@@ -372,7 +371,7 @@ func TestPythonBundles(t *testing.T) {
 	})
 
 	t.Run("python post hook with url rewrite and method transform", func(t *testing.T) {
-		ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+		gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 			spec.Proxy.ListenPath = "/test-api-1/"
 			spec.UseKeylessAccess = true
 			spec.EnableCoProcessAuth = false

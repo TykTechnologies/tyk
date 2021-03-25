@@ -6,13 +6,15 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/request"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 // identifies that field value was hidden before output to the log
 const logHiddenValue = "<hidden>"
 
-func (gw *Gateway) obfuscateKey(keyName string) string {
-	if gw.GetConfig().EnableKeyLogging {
+func obfuscateKey(keyName string) string {
+	if config.Global().EnableKeyLogging {
 		return keyName
 	}
 
@@ -22,7 +24,7 @@ func (gw *Gateway) obfuscateKey(keyName string) string {
 	return "--"
 }
 
-func (gw *Gateway) getLogEntryForRequest(logger *logrus.Entry, r *http.Request, key string, data map[string]interface{}) *logrus.Entry {
+func getLogEntryForRequest(logger *logrus.Entry, r *http.Request, key string, data map[string]interface{}) *logrus.Entry {
 	if logger == nil {
 		logger = logrus.NewEntry(log)
 	}
@@ -35,8 +37,8 @@ func (gw *Gateway) getLogEntryForRequest(logger *logrus.Entry, r *http.Request, 
 	// add key to log if configured to do so
 	if key != "" {
 		fields["key"] = key
-		if !gw.GetConfig().EnableKeyLogging {
-			fields["key"] = gw.obfuscateKey(key)
+		if !config.Global().EnableKeyLogging {
+			fields["key"] = obfuscateKey(key)
 		}
 	}
 	// add to log additional fields if any passed
@@ -46,7 +48,7 @@ func (gw *Gateway) getLogEntryForRequest(logger *logrus.Entry, r *http.Request, 
 	return logger.WithFields(fields)
 }
 
-func (gw *Gateway) getExplicitLogEntryForRequest(logger *logrus.Entry, path string, IP string, key string, data map[string]interface{}) *logrus.Entry {
+func getExplicitLogEntryForRequest(logger *logrus.Entry, path string, IP string, key string, data map[string]interface{}) *logrus.Entry {
 	// populate http request fields
 	fields := logrus.Fields{
 		"path":   path,
@@ -55,7 +57,7 @@ func (gw *Gateway) getExplicitLogEntryForRequest(logger *logrus.Entry, path stri
 	// add key to log if configured to do so
 	if key != "" {
 		fields["key"] = key
-		if !gw.GetConfig().EnableKeyLogging {
+		if !config.Global().EnableKeyLogging {
 			fields["key"] = logHiddenValue
 		}
 	}
