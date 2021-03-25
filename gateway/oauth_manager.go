@@ -342,7 +342,7 @@ func (o *OAuthManager) HandleAuthorisation(r *http.Request, complete bool, sessi
 	resp := o.OsinServer.NewResponse()
 
 	if ar := o.OsinServer.HandleAuthorizeRequest(resp, r); ar != nil {
-		// Since this is called by the Reource provider (proxied API), we assume it has been approved
+		// Since this is called by the Resource provider (proxied API), we assume it has been approved
 		ar.Authorized = true
 
 		if complete {

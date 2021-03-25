@@ -521,6 +521,7 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 	serverConfig.AllowedAccessTypes = spec.Oauth2Meta.AllowedAccessTypes
 	serverConfig.AllowedAuthorizeTypes = spec.Oauth2Meta.AllowedAuthorizeTypes
 	serverConfig.RedirectUriSeparator = config.Global().OauthRedirectUriSeparator
+	serverConfig.RequirePKCEForPublicClients = spec.Oauth2Meta.RequirePKCE
 
 	prefix := generateOAuthPrefix(spec.APIID)
 	storageManager := getGlobalStorageHandler(prefix, false)

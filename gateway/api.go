@@ -1508,6 +1508,10 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		if apiSpec.Oauth2Meta.RequirePKCE {
+			newClient.ClientSecret = ""
+		}
+
 		err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, apiSpec.OrgID, &newClient, true)
 		if err != nil {
 			log.WithFields(logrus.Fields{
@@ -1567,6 +1571,11 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 								apiSpec.OrgID}),
 					}
 				}
+
+				if apiSpec.Oauth2Meta.RequirePKCE {
+					newClient.ClientSecret = ""
+				}
+
 				err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, apiSpec.APIDefinition.OrgID, &newClient, true)
 				if err != nil {
 					log.WithFields(logrus.Fields{
