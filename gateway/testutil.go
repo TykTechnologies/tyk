@@ -250,9 +250,9 @@ func (s *Test) reloadSimulation() {
 		s.Gw.policiesMu.Unlock()
 
 		s.Gw.apisMu.Lock()
-	//	old := s.Gw.apiSpecs
-	//	s.Gw.apiSpecs = append(old, nil)
-	//	s.Gw.apiSpecs = old
+		//	old := s.Gw.apiSpecs
+		//	s.Gw.apiSpecs = append(old, nil)
+		//	s.Gw.apiSpecs = old
 		s.Gw.apisByID["_"] = nil
 		delete(s.Gw.apisByID, "_")
 		s.Gw.apisMu.Unlock()
@@ -795,9 +795,9 @@ type Test struct {
 	URL        string
 	testRunner *test.HTTPTestRunner
 	// GlobalConfig deprecate this and instead use GW.getConfig()
-	GlobalConfig     config.Config
-	config           TestConfig
-	cancel           func()
+	GlobalConfig config.Config
+	config       TestConfig
+	cancel       func()
 
 	gwMu             sync.Mutex
 	Gw               *Gateway `json:"-"`
