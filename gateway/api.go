@@ -43,6 +43,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/lonelycode/osin"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
@@ -1549,9 +1550,24 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			// set oauth client if it is oauth API
-			if apiSpec.UseOauth2 {
+			if apiSpec.UseOauth2 || apiSpec.EnableJWT {
 				oauth2 = true
-				err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, apiSpec.OrgID, &newClient, true)
+				if apiSpec.OAuthManager == nil {
+
+					prefix := generateOAuthPrefix(apiSpec.APIID)
+					storageManager := getGlobalStorageHandler(prefix, false)
+					storageManager.Connect()
+
+					apiSpec.OAuthManager = &OAuthManager{
+						OsinServer: TykOsinNewServer(&osin.ServerConfig{},
+							&RedisOsinStorageInterface{
+								storageManager,
+								GlobalSessionManager,
+								&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false},
+								apiSpec.OrgID}),
+					}
+				}
+				err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, apiSpec.APIDefinition.OrgID, &newClient, true)
 				if err != nil {
 					log.WithFields(logrus.Fields{
 						"prefix": "api",
@@ -1920,6 +1936,20 @@ func getOauthClientDetails(keyName, apiID string) (interface{}, int) {
 			"err":    "not found",
 		}).Error("Failed to retrieve OAuth client details")
 		return apiError("OAuth Client ID not found"), http.StatusNotFound
+	}
+
+	if apiSpec.OAuthManager == nil {
+		prefix := generateOAuthPrefix(apiSpec.APIID)
+		storageManager := getGlobalStorageHandler(prefix, false)
+		storageManager.Connect()
+		apiSpec.OAuthManager = &OAuthManager{
+			OsinServer: TykOsinNewServer(&osin.ServerConfig{},
+				&RedisOsinStorageInterface{
+					storageManager,
+					GlobalSessionManager,
+					&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false},
+					apiSpec.OrgID}),
+		}
 	}
 
 	clientData, err := apiSpec.OAuthManager.OsinServer.Storage.GetExtendedClientNoPrefix(storageID)

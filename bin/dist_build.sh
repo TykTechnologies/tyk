@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# This file is deprecated in favour of .goreleaser.yml
+# Automation in .g/w/release.yml
+
 set -ex
 
 : ${ORGDIR:="/go/src/github.com/TykTechnologies"}
