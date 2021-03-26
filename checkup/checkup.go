@@ -63,7 +63,7 @@ func sessionLifetimeCheck(c config.Config) {
 	if c.GlobalSessionLifetime <= 0 {
 		log.Warn("Tyk has not detected any setting for session lifetime (`global_session_lifetime` defaults to 0 seconds). \n" +
 			"\tThis means that in case there's also no `session_lifetime` defined in the api, Tyk will not set expiration on keys\n" +
-			"\tcreated in Redis, i.e. tokens will not get deleted from Redis and it eventually can overgrown.\n" +
+			"\tcreated in Redis, i.e. tokens will not get deleted from Redis and it eventually become overgrown.\n" +
 			"\tPlease refer to the following link for further guidance:\n" +
 			"\thttps://tyk.io/docs/basic-config-and-security/security/authentication-authorization/physical-token-expiry/")
 	}
