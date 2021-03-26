@@ -1048,7 +1048,7 @@ func (gw *Gateway) initialiseSystem(ctx context.Context) error {
 		gw.SetConfig(gwConfig)
 	}
 
-	overrideTykErrors(*gw)
+	overrideTykErrors(gw)
 
 	gwConfig := gw.GetConfig()
 	if os.Getenv("TYK_LOGLEVEL") == "" && !*cli.DebugMode {

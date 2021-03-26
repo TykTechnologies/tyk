@@ -2138,7 +2138,7 @@ func TestOverrideErrors(t *testing.T) {
 	}
 	ts.Gw.SetConfig(testConf)
 
-	overrideTykErrors(*ts.Gw)
+	overrideTykErrors(ts.Gw)
 
 	e, i := errorAndStatusCode(ErrOAuthAuthorizationFieldMissing)
 	assert(message1, code1, e, i)
@@ -2170,7 +2170,7 @@ func TestOverrideErrors(t *testing.T) {
 
 		ts.Gw.SetConfig(testConf)
 
-		overrideTykErrors(*ts.Gw)
+		overrideTykErrors(ts.Gw)
 
 		e, i := errorAndStatusCode(ErrOAuthAuthorizationFieldMissing)
 		assert(message1, code4, e, i)
