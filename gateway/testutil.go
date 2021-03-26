@@ -243,16 +243,19 @@ func (s *Test) emptyRedis() error {
 func (s *Test) reloadSimulation() {
 	for {
 		s.Gw.policiesMu.Lock()
+
 		s.Gw.policiesByID["_"] = user.Policy{}
 		delete(s.Gw.policiesByID, "_")
 		s.Gw.policiesMu.Unlock()
+
 		s.Gw.apisMu.Lock()
 		old := s.Gw.apiSpecs
-		s.Gw.apiSpecs = append(s.Gw.apiSpecs, nil)
+		s.Gw.apiSpecs = append(old, nil)
 		s.Gw.apiSpecs = old
 		s.Gw.apisByID["_"] = nil
 		delete(s.Gw.apisByID, "_")
 		s.Gw.apisMu.Unlock()
+
 		time.Sleep(5 * time.Millisecond)
 	}
 }
@@ -878,10 +881,8 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 	}
 	gwConfig.CoProcessOptions = s.config.CoprocessConfig
 
-	gw := NewGateway(gwConfig)
-	gw.setTestMode(true)
-
-	s.Gw = gw
+	s.Gw = NewGateway(gwConfig)
+	s.Gw.setTestMode(true)
 
 	var errMock error
 	s.MockHandle, errMock = test.InitDNSMock(test.DomainsToAddresses, nil)
@@ -940,30 +941,30 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 		}
 	}()
 
-	gw.keyGen = DefaultKeyGenerator{Gw: gw}
-	gw.CoProcessInit()
-	gw.afterConfSetup()
+	s.Gw.keyGen = DefaultKeyGenerator{Gw: s.Gw}
+	s.Gw.CoProcessInit()
+	s.Gw.afterConfSetup()
 
 	defaultTestConfig = gwConfig
-	gw.SetConfig(gwConfig)
+	s.Gw.SetConfig(gwConfig)
 
 	cli.Init(VERSION, confPaths)
 
-	err = gw.initialiseSystem(ctx)
+	err = s.Gw.initialiseSystem(ctx)
 	if err != nil {
 		panic(err)
 	}
 
 	// Small part of start()
-	gw.loadControlAPIEndpoints(s.mainRouter())
-	if gw.analytics.GeoIPDB == nil {
+	s.Gw.loadControlAPIEndpoints(s.mainRouter())
+	if s.Gw.analytics.GeoIPDB == nil {
 		panic("GeoIPDB was not initialized")
 	}
 
-	configs := gw.GetConfig()
+	configs := s.Gw.GetConfig()
 	go storage.ConnectToRedis(ctx, func() {
-		if gw.OnConnect != nil {
-			gw.OnConnect()
+		if s.Gw.OnConnect != nil {
+			s.Gw.OnConnect()
 		}
 	}, &configs)
 	for {
@@ -981,26 +982,26 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 	}
 
 	// Start listening for reload messages
-	if !gw.GetConfig().SuppressRedisSignalReload {
-		go gw.startPubSubLoop()
+	if !s.Gw.GetConfig().SuppressRedisSignalReload {
+		go s.Gw.startPubSubLoop()
 	}
 
-	if slaveOptions := gw.GetConfig().SlaveOptions; slaveOptions.UseRPC {
+	if slaveOptions := s.Gw.GetConfig().SlaveOptions; slaveOptions.UseRPC {
 		mainLog.Debug("Starting RPC reload listener")
-		gw.RPCListener = RPCStorageHandler{
+		s.Gw.RPCListener = RPCStorageHandler{
 			KeyPrefix:        "rpc.listener.",
 			SuppressRegister: true,
-			Gw:               gw,
+			Gw:               s.Gw,
 		}
 
-		gw.RPCListener.Connect()
-		go gw.rpcReloadLoop(slaveOptions.RPCKey)
-		go gw.RPCListener.StartRPCKeepaliveWatcher()
-		go gw.RPCListener.StartRPCLoopCheck(slaveOptions.RPCKey)
+		s.Gw.RPCListener.Connect()
+		go s.Gw.rpcReloadLoop(slaveOptions.RPCKey)
+		go s.Gw.RPCListener.StartRPCKeepaliveWatcher()
+		go s.Gw.RPCListener.StartRPCLoopCheck(slaveOptions.RPCKey)
 	}
 
-	go gw.reloadLoop(ctx, time.Tick(time.Second))
-	go gw.reloadQueueLoop(ctx)
+	go s.Gw.reloadLoop(ctx, time.Tick(time.Second))
+	go s.Gw.reloadQueueLoop(ctx)
 	go s.reloadSimulation()
 }
 

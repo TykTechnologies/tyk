@@ -581,7 +581,7 @@ func TestHashKeyHandler(t *testing.T) {
 			ts.testHashKeyHandlerHelper(t, tc.expectedHashSize)
 		})
 		t.Run(fmt.Sprintf("%sHash fn: %s and Basic Auth", tc.desc, tc.hashFunction), func(t *testing.T) {
-			testHashFuncAndBAHelper(t)
+			ts.testHashFuncAndBAHelper(t)
 		})
 	}
 }
@@ -762,9 +762,7 @@ func (ts *Test) testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 	})
 }
 
-func testHashFuncAndBAHelper(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
+func(ts *Test) testHashFuncAndBAHelper(t *testing.T) {
 
 	session := ts.testPrepareBasicAuth(false)
 
