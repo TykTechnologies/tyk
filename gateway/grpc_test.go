@@ -687,7 +687,10 @@ func TestGRPC_Stream_TokenBasedAuthentication(t *testing.T) {
 	}
 
 	// Read key
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Error("Fail reading body from create key request")
+	}
 	var resMap map[string]string
 	err = json.Unmarshal(body, &resMap)
 	if err != nil {
