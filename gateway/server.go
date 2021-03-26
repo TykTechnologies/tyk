@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -189,6 +190,13 @@ func NewGateway(config config.Config) *Gateway {
 	gw.TestBundles = map[string]map[string]string{}
 
 	return &gw
+}
+
+func (gw *Gateway) UnmarshalJSON(data []byte) error {
+	return nil
+}
+func (gw *Gateway) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct{}{})
 }
 
 // SetNodeID writes NodeID safely.
@@ -1007,8 +1015,8 @@ func (gw *Gateway) initialiseSystem(ctx context.Context) error {
 	if gw.isRunningTests() && os.Getenv("TYK_LOGLEVEL") == "" {
 		// `go test` without TYK_LOGLEVEL set defaults to no log
 		// output
-		log.Level = logrus.ErrorLevel
-		log.Out = ioutil.Discard
+		log.SetLevel(logrus.ErrorLevel)
+		log.SetOutput(ioutil.Discard)
 		gorpc.SetErrorLogger(func(string, ...interface{}) {})
 		stdlog.SetOutput(ioutil.Discard)
 	} else if *cli.DebugMode {

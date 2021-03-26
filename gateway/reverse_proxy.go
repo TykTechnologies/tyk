@@ -747,7 +747,7 @@ type TykRoundTripper struct {
 	transport    *http.Transport
 	h2ctransport *http2.Transport
 	logger       *logrus.Entry
-	Gw           *Gateway
+	Gw           *Gateway `json:"-"`
 }
 
 func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {

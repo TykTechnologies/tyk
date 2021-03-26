@@ -34,7 +34,7 @@ type BatchReplyUnit struct {
 
 // BatchRequestHandler handles batch requests on /tyk/batch for any API Definition that has the feature enabled
 type BatchRequestHandler struct {
-	Gw  *Gateway
+	Gw  *Gateway `json:"-"`
 	API *APISpec
 }
 
