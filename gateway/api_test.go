@@ -762,7 +762,7 @@ func (ts *Test) testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 	})
 }
 
-func(ts *Test) testHashFuncAndBAHelper(t *testing.T) {
+func (ts *Test) testHashFuncAndBAHelper(t *testing.T) {
 
 	session := ts.testPrepareBasicAuth(false)
 
