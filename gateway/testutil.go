@@ -242,6 +242,7 @@ func (s *Test) emptyRedis() error {
 // racy way like the policies and api specs maps.
 func (s *Test) reloadSimulation() {
 	for {
+		s.gwMu.Lock()
 		s.Gw.policiesMu.Lock()
 
 		s.Gw.policiesByID["_"] = user.Policy{}
@@ -249,12 +250,13 @@ func (s *Test) reloadSimulation() {
 		s.Gw.policiesMu.Unlock()
 
 		s.Gw.apisMu.Lock()
-		old := s.Gw.apiSpecs
-		s.Gw.apiSpecs = append(old, nil)
-		s.Gw.apiSpecs = old
+	//	old := s.Gw.apiSpecs
+	//	s.Gw.apiSpecs = append(old, nil)
+	//	s.Gw.apiSpecs = old
 		s.Gw.apisByID["_"] = nil
 		delete(s.Gw.apisByID, "_")
 		s.Gw.apisMu.Unlock()
+		s.gwMu.Unlock()
 
 		time.Sleep(5 * time.Millisecond)
 	}
@@ -796,6 +798,8 @@ type Test struct {
 	GlobalConfig     config.Config
 	config           TestConfig
 	cancel           func()
+
+	gwMu             sync.Mutex
 	Gw               *Gateway `json:"-"`
 	HttpHandler      *http.Server
 	TestServerRouter *mux.Router
@@ -881,8 +885,10 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 	}
 	gwConfig.CoProcessOptions = s.config.CoprocessConfig
 
+	s.gwMu.Lock()
 	s.Gw = NewGateway(gwConfig)
 	s.Gw.setTestMode(true)
+	s.gwMu.Unlock()
 
 	var errMock error
 	s.MockHandle, errMock = test.InitDNSMock(test.DomainsToAddresses, nil)
