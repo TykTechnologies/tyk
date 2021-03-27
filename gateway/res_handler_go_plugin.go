@@ -2,11 +2,11 @@ package gateway
 
 import (
 	"fmt"
-	"github.com/TykTechnologies/tyk/ctx"
 	"net/http"
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/goplugin"
 	"github.com/TykTechnologies/tyk/user"
 	"github.com/sirupsen/logrus"
