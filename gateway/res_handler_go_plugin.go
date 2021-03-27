@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"fmt"
+	"github.com/TykTechnologies/tyk/ctx"
 	"net/http"
 	"time"
 
@@ -73,6 +74,9 @@ func (h *ResponseGoPluginMiddleware) HandleGoPluginResponse(w http.ResponseWrite
 
 		}
 	}()
+
+	// Inject definition into response context
+	ctx.SetDefinition(req, h.Spec.APIDefinition)
 
 	// wrap ResponseWriter to check if response was sent
 	rw := &customResponseWriter{
