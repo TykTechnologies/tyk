@@ -982,40 +982,6 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 
 		_, _ = ts.Run(t, test.TestCase{Code: http.StatusOK, Path: "/test1", Domain: "host2", Client: client})
 	})
-
-	t.Run("Hash key function changed", func(t *testing.T) {
-
-		BuildAndLoadAPI(func(spec *APISpec) {
-			spec.Proxy.ListenPath = "/"
-			spec.UseKeylessAccess = false
-			spec.AuthConfigs = map[string]apidef.AuthConfig{
-				authTokenType: {UseCertificate: true},
-			}
-		})
-
-		_, _, _, clientCert := genCertificate(&x509.Certificate{})
-		clientCertID := certs.HexSHA256(clientCert.Certificate[0])
-		client := GetTLSClient(&clientCert, nil)
-
-		_, _ = ts.CreateSession(func(s *user.SessionState) {
-			s.Certificate = clientCertID
-			s.SetAccessRights(map[string]user.AccessDefinition{"test": {
-				APIID: "test", Versions: []string{"v1"},
-			}})
-		})
-
-		_, _ = ts.Run(t, test.TestCase{Path: "/", Client: client, Code: http.StatusOK})
-
-		globalConf.HashKeyFunction = "sha256"
-		config.SetGlobal(globalConf)
-
-		_, _ = ts.Run(t, test.TestCase{Path: "/", Client: client, Code: http.StatusForbidden})
-
-		globalConf.HashKeyFunctionFallback = []string{"murmur64"}
-		config.SetGlobal(globalConf)
-
-		_, _ = ts.Run(t, test.TestCase{Path: "/", Client: client, Code: http.StatusOK})
-	})
 }
 
 func TestAPICertificate(t *testing.T) {

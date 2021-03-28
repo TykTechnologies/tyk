@@ -5,10 +5,11 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/TykTechnologies/tyk/certs"
+
 	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/signature_validator"
@@ -74,23 +75,17 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 	var session user.SessionState
 	if key != "" {
 		key = stripBearer(key)
-		session, keyExists = k.CheckSessionAndIdentityForValidKey(&key, r)
 	} else if authConfig.UseCertificate && key == "" && r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
-		functionsToTryInOrder := []string{config.Global().HashKeyFunction}
-		for _, nextFunction := range append(functionsToTryInOrder, config.Global().HashKeyFunctionFallback...) {
-			log.Debugf("Trying to find key by client certificate with hash function: %s", nextFunction)
+		log.Debug("Trying to find key by client certificate")
 
-			key = generateToken(k.Spec.OrgID, certs.HexSHA256(r.TLS.PeerCertificates[0].Raw), nextFunction)
-			if session, keyExists = k.CheckSessionAndIdentityForValidKey(&key, r); keyExists {
-				break
-			}
-		}
+		key = certs.HexSHA256(r.TLS.PeerCertificates[0].Raw)
 	} else {
 		k.Logger().Info("Attempted access with malformed header, no auth header found.")
 
 		return errorAndStatusCode(ErrAuthAuthorizationFieldMissing)
 	}
 
+	session, keyExists = k.CheckSessionAndIdentityForValidKey(&key, r)
 	if !keyExists {
 		k.Logger().WithField("key", obfuscateKey(key)).Info("Attempted access with non-existent key.")
 
