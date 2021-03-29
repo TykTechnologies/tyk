@@ -458,13 +458,16 @@ type Config struct {
 	EventTriggers        map[apidef.TykEvent][]TykEventHandler `json:"event_trigers_defunct"`  // Deprecated: Config.GetEventTriggers instead.
 	EventTriggersDefunct map[apidef.TykEvent][]TykEventHandler `json:"event_triggers_defunct"` // Deprecated: Config.GetEventTriggers instead.
 
+	// HideGeneratorHeader will mask the 'X-Generator' and 'X-Mascot-...' headers, if set to true.
+	HideGeneratorHeader bool `json:"hide_generator_header"`
+
 	// TODO: These config options are not documented - What do they do?
 	SupressDefaultOrgStore         bool  `json:"suppress_default_org_store"`
 	LegacyEnableAllowanceCountdown bool  `bson:"legacy_enable_allowance_countdown" json:"legacy_enable_allowance_countdown"`
 	GlobalSessionLifetime          int64 `bson:"global_session_lifetime" json:"global_session_lifetime"`
 	ForceGlobalSessionLifetime     bool  `bson:"force_global_session_lifetime" json:"force_global_session_lifetime"`
-	HideGeneratorHeader            bool  `json:"hide_generator_header"`
-	KV                             struct {
+
+	KV struct {
 		Consul ConsulConfig `json:"consul"`
 		Vault  VaultConfig  `json:"vault"`
 	} `json:"kv"`
