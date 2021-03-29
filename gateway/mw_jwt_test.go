@@ -45,7 +45,7 @@ jQIDAQAB!!!!
 `
 
 func createJWTSession() *user.SessionState {
-	session := new(user.SessionState)
+	session := user.NewSessionState()
 	session.Rate = 1000000.0
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix() - 10
@@ -54,7 +54,7 @@ func createJWTSession() *user.SessionState {
 	session.QuotaRenews = time.Now().Unix() + 20
 	session.QuotaRemaining = 1
 	session.QuotaMax = -1
-	session.JWTData.Secret = jwtSecret
+	session.JWTData = user.JWTData{Secret: jwtSecret}
 	return session
 }
 
@@ -1053,8 +1053,8 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 				AdminAuth: true,
 				Code:      http.StatusOK,
 				BodyMatchFunc: func(data []byte) bool {
-					sessionData := user.SessionState{}
-					json.Unmarshal(data, &sessionData)
+					sessionData := user.NewSessionState()
+					json.Unmarshal(data, sessionData)
 
 					expect := []string{basePolicyID, p1ID, p2ID}
 					sort.Strings(sessionData.ApplyPolicies)
@@ -1078,8 +1078,8 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 				AdminAuth: true,
 				Code:      http.StatusOK,
 				BodyMatchFunc: func(data []byte) bool {
-					sessionData := user.SessionState{}
-					json.Unmarshal(data, &sessionData)
+					sessionData := user.NewSessionState()
+					json.Unmarshal(data, sessionData)
 					expect := []string{p1ID, p2ID}
 					sort.Strings(sessionData.ApplyPolicies)
 					sort.Strings(expect)
@@ -1101,8 +1101,8 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 				AdminAuth: true,
 				Code:      http.StatusOK,
 				BodyMatchFunc: func(data []byte) bool {
-					sessionData := user.SessionState{}
-					json.Unmarshal(data, &sessionData)
+					sessionData := user.NewSessionState()
+					json.Unmarshal(data, sessionData)
 
 					assert.Equal(t, sessionData.ApplyPolicies, []string{defaultPolicyID})
 
@@ -1185,6 +1185,24 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 			})
 	})
 
+	t.Run("Request with a wrong scope in JWT and then correct scope", func(t *testing.T) {
+
+		jwtTokenWrongScope := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["user_id"] = userID
+			t.Claims.(jwt.MapClaims)["scope"] = "nonexisting"
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
+		})
+
+		authHeadersWithWrongScope := map[string]string{"authorization": jwtTokenWrongScope}
+
+		_, _ = ts.Run(t, []test.TestCase{
+			// Make consecutively to check whether caching becomes a problem
+			{Path: "/base", Headers: authHeadersWithWrongScope, BodyMatch: "no matching policy found in scope claim", Code: http.StatusForbidden},
+			{Path: "/base", Headers: authHeaders, Code: http.StatusOK},
+			{Path: "/base", Headers: authHeadersWithWrongScope, BodyMatch: "no matching policy found in scope claim", Code: http.StatusForbidden},
+		}...)
+	})
+
 	// check that key has right set of policies assigned - there should be updated list (base one and one from scope)
 	t.Run("Request to check that session has got changed apply_policies value", func(t *testing.T) {
 		ts.Run(
@@ -1195,8 +1213,8 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 				AdminAuth: true,
 				Code:      http.StatusOK,
 				BodyMatchFunc: func(data []byte) bool {
-					sessionData := user.SessionState{}
-					json.Unmarshal(data, &sessionData)
+					sessionData := user.NewSessionState()
+					json.Unmarshal(data, sessionData)
 
 					assert.Equal(t, sessionData.ApplyPolicies, []string{basePolicyID, p3ID})
 
@@ -1379,37 +1397,39 @@ func TestJWTSessionRSAWithEncodedJWK(t *testing.T) {
 	spec, jwtToken := prepareJWTSessionRSAWithEncodedJWK()
 
 	authHeaders := map[string]string{"authorization": jwtToken}
-
+	flush := func() {
+		if JWKCache != nil {
+			JWKCache.Flush()
+		}
+	}
 	t.Run("Direct JWK URL", func(t *testing.T) {
 		spec.JWTSource = testHttpJWK
 		LoadAPI(spec)
-
+		flush()
 		ts.Run(t, test.TestCase{
 			Headers: authHeaders, Code: http.StatusOK,
 		})
 	})
-
-	t.Run("Base64 JWK URL", func(t *testing.T) {
+	t.Run("Direct JWK URL with legacy jwk", func(t *testing.T) {
+		spec.JWTSource = testHttpJWKLegacy
+		LoadAPI(spec)
+		flush()
+		ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+	})
+	t.Run("Base64", func(t *testing.T) {
 		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(testHttpJWK))
 		LoadAPI(spec)
-
+		flush()
 		ts.Run(t, test.TestCase{
 			Headers: authHeaders, Code: http.StatusOK,
 		})
 	})
-	t.Run("Direct JWK URL with der encoding", func(t *testing.T) {
-		spec.JWTSource = testHttpJWKDER
+	t.Run("Base64 legacy jwk", func(t *testing.T) {
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(testHttpJWKLegacy))
 		LoadAPI(spec)
-
-		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: http.StatusOK,
-		})
-	})
-
-	t.Run("Base64 JWK URL with der encoding", func(t *testing.T) {
-		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(testHttpJWKDER))
-		LoadAPI(spec)
-
+		flush()
 		ts.Run(t, test.TestCase{
 			Headers: authHeaders, Code: http.StatusOK,
 		})
@@ -1671,7 +1691,7 @@ func TestJWTDefaultPolicies(t *testing.T) {
 
 	assert := func(t *testing.T, expected []string) {
 		session, _ := GlobalSessionManager.SessionDetail(spec.OrgID, sessionID, false)
-		actual := session.PolicyIDs()
+		actual := session.GetPolicyIDs()
 		if !reflect.DeepEqual(expected, actual) {
 			t.Fatalf("Expected %v, actaul %v", expected, actual)
 		}

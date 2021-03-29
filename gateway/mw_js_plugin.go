@@ -51,6 +51,28 @@ type MiniRequestObject struct {
 	Scheme          string
 }
 
+func (mr *MiniRequestObject) ReconstructParams(r *http.Request) {
+	updatedValues := r.URL.Query()
+
+	for _, k := range mr.DeleteParams {
+		updatedValues.Del(k)
+	}
+
+	for p, v := range mr.AddParams {
+		updatedValues.Set(p, v)
+	}
+
+	for p, v := range mr.ExtendedParams {
+		for _, val := range v {
+			updatedValues.Add(p, val)
+		}
+	}
+
+	if !reflect.DeepEqual(r.URL.Query(), updatedValues) {
+		r.URL.RawQuery = updatedValues.Encode()
+	}
+}
+
 type VMReturnObject struct {
 	Request     MiniRequestObject
 	SessionMeta map[string]string
@@ -140,8 +162,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	specAsJson := specToJson(d.Spec)
 
-	session := new(user.SessionState)
-
+	session := user.NewSessionState()
 	// Encode the session object (if not a pre-process)
 	if !d.Pre && d.UseSession {
 		session = ctxGetSession(r)
@@ -210,43 +231,32 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		r.Body = ioutil.NopCloser(bytes.NewReader(newRequestData.Request.Body))
 	}
 
-	r.URL, err = url.ParseRequestURI(newRequestData.Request.URL)
+	r.URL, err = url.Parse(newRequestData.Request.URL)
 	if err != nil {
 		return nil, http.StatusOK
 	}
 
+	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
 	// Delete and set headers
 	for _, dh := range newRequestData.Request.DeleteHeaders {
 		r.Header.Del(dh)
+		if ignoreCanonical {
+			// Make sure we delete the header in case the header key was not canonical.
+			delete(r.Header, dh)
+		}
 	}
-
 	for h, v := range newRequestData.Request.SetHeaders {
-		r.Header.Set(h, v)
+		setCustomHeader(r.Header, h, v, ignoreCanonical)
 	}
 
 	// Delete and set request parameters
-	values := r.URL.Query()
-	for _, k := range newRequestData.Request.DeleteParams {
-		values.Del(k)
-	}
-
-	for p, v := range newRequestData.Request.AddParams {
-		values.Set(p, v)
-	}
-
-	for p, v := range newRequestData.Request.ExtendedParams {
-		for _, val := range v {
-			values.Add(p, val)
-		}
-	}
-
-	r.URL.RawQuery = values.Encode()
+	newRequestData.Request.ReconstructParams(r)
 
 	// Save the session data (if modified)
 	if !d.Pre && d.UseSession {
 		newMeta := mapStrsToIfaces(newRequestData.SessionMeta)
-		if !reflect.DeepEqual(session.MetaData, newMeta) {
-			session.MetaData = newMeta
+		if !reflect.DeepEqual(session.GetMetaData(), newMeta) {
+			session.SetMetaData(newMeta)
 			ctxScheduleSessionUpdate(r)
 		}
 	}
@@ -357,6 +367,11 @@ func (j *JSVM) LoadJSPaths(paths []string, prefix string) {
 		if prefix != "" {
 			mwPath = filepath.Join(prefix, mwPath)
 		}
+		extension := filepath.Ext(mwPath)
+		if !strings.Contains(extension, ".js") {
+			j.Log.Errorf("Unsupported extension '%s' (%s)", extension, mwPath)
+			continue
+		}
 		j.Log.Info("Loading JS File: ", mwPath)
 		f, err := os.Open(mwPath)
 		if err != nil {
@@ -460,7 +475,7 @@ func (j *JSVM) LoadTykJSApi() {
 		}
 		return returnVal
 	})
-
+	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
 	// Enable the creation of HTTP Requsts
 	j.VM.Set("TykMakeHttpRequest", func(call otto.FunctionCall) otto.Value {
 		jsonHRO := call.Argument(0).String()
@@ -498,11 +513,19 @@ func (j *JSVM) LoadTykJSApi() {
 		}
 
 		for k, v := range hro.Headers {
-			r.Header.Set(k, v)
+			setCustomHeader(r.Header, k, v, ignoreCanonical)
 		}
 		r.Close = true
 
-		tr := &http.Transport{TLSClientConfig: &tls.Config{}}
+		maxSSLVersion := config.Global().ProxySSLMaxVersion
+		if j.Spec.Proxy.Transport.SSLMaxVersion > 0 {
+			maxSSLVersion = j.Spec.Proxy.Transport.SSLMaxVersion
+		}
+
+		tr := &http.Transport{TLSClientConfig: &tls.Config{
+			MaxVersion: maxSSLVersion,
+		}}
+
 		if cert := getUpstreamCertificate(r.Host, j.Spec); cert != nil {
 			tr.TLSClientConfig.Certificates = []tls.Certificate{*cert}
 		}
@@ -570,14 +593,14 @@ func (j *JSVM) LoadTykJSApi() {
 		encoddedSession := call.Argument(1).String()
 		suppressReset := call.Argument(2).String()
 
-		newSession := user.SessionState{}
-		err := json.Unmarshal([]byte(encoddedSession), &newSession)
+		newSession := user.NewSessionState()
+		err := json.Unmarshal([]byte(encoddedSession), newSession)
 		if err != nil {
 			j.Log.WithError(err).Error("Failed to decode the sesison data")
 			return otto.Value{}
 		}
 
-		doAddOrUpdate(apiKey, &newSession, suppressReset == "1", false)
+		doAddOrUpdate(apiKey, newSession, suppressReset == "1", false)
 
 		return otto.Value{}
 	})
@@ -587,7 +610,6 @@ func (j *JSVM) LoadTykJSApi() {
 	j.VM.Set("TykBatchRequest", func(call otto.FunctionCall) otto.Value {
 		requestSet := call.Argument(0).String()
 		j.Log.Debug("Batch input is: ", requestSet)
-
 		bs, err := unsafeBatchHandler.ManualBatchRequest([]byte(requestSet))
 		if err != nil {
 			j.Log.WithError(err).Error("Batch request error")

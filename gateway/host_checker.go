@@ -136,8 +136,8 @@ func (h *HostUptimeChecker) execCheck() {
 	h.resetListMu.Unlock()
 	for _, host := range h.HostList {
 		_, err := h.pool.SendWork(host)
-		if err != nil {
-			log.Errorf("[HOST CHECKER] could not send work, error: %v", err)
+		if err != nil && err != tunny.ErrPoolNotRunning {
+			log.Warnf("[HOST CHECKER] could not send work, error: %v", err)
 		}
 	}
 }
@@ -276,13 +276,15 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 			log.Error("Could not create request: ", err)
 			return
 		}
+		ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
 		for headerName, headerValue := range toCheck.Headers {
-			req.Header.Set(headerName, headerValue)
+			setCustomHeader(req.Header, headerName, headerValue, ignoreCanonical)
 		}
 		req.Header.Set("Connection", "close")
 		HostCheckerClient.Transport = &http.Transport{
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: config.Global().ProxySSLInsecureSkipVerify,
+				MaxVersion:         config.Global().ProxySSLMaxVersion,
 			},
 		}
 		if toCheck.Timeout != 0 {

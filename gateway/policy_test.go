@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+
 	"github.com/lonelycode/go-uuid/uuid"
 	"github.com/stretchr/testify/assert"
 
@@ -282,6 +284,50 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 					{URL: "/companies", Methods: []string{"GET", "POST"}},
 				},
 			}},
+		},
+		"restricted-types1": {
+			ID: "restricted_types_1",
+			AccessRights: map[string]user.AccessDefinition{
+				"a": {
+					RestrictedTypes: []graphql.Type{
+						{Name: "Country", Fields: []string{"code", "name"}},
+						{Name: "Person", Fields: []string{"name", "height"}},
+					},
+				}},
+		},
+		"restricted-types2": {
+			ID: "restricted_types_2",
+			AccessRights: map[string]user.AccessDefinition{
+				"a": {
+					RestrictedTypes: []graphql.Type{
+						{Name: "Country", Fields: []string{"code", "phone"}},
+						{Name: "Person", Fields: []string{"name", "mass"}},
+					},
+				}},
+		},
+		"field-level-depth-limit1": {
+			ID: "field-level-depth-limit1",
+			AccessRights: map[string]user.AccessDefinition{
+				"graphql-api": {
+					Limit: &user.APILimit{},
+					FieldAccessRights: []user.FieldAccessDefinition{
+						{TypeName: "Query", FieldName: "people", Limits: user.FieldLimits{MaxQueryDepth: 4}},
+						{TypeName: "Mutation", FieldName: "putPerson", Limits: user.FieldLimits{MaxQueryDepth: 3}},
+						{TypeName: "Query", FieldName: "countries", Limits: user.FieldLimits{MaxQueryDepth: 3}},
+					},
+				}},
+		},
+		"field-level-depth-limit2": {
+			ID: "field-level-depth-limit2",
+			AccessRights: map[string]user.AccessDefinition{
+				"graphql-api": {
+					Limit: &user.APILimit{},
+					FieldAccessRights: []user.FieldAccessDefinition{
+						{TypeName: "Query", FieldName: "people", Limits: user.FieldLimits{MaxQueryDepth: 2}},
+						{TypeName: "Mutation", FieldName: "putPerson", Limits: user.FieldLimits{MaxQueryDepth: -1}},
+						{TypeName: "Query", FieldName: "continents", Limits: user.FieldLimits{MaxQueryDepth: 4}},
+					},
+				}},
 		},
 		"throttle1": {
 			ID:                 "throttle1",
@@ -612,6 +658,42 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			},
 		},
 		{
+			name:     "Merge restricted fields for the same GraphQL API",
+			policies: []string{"restricted-types1", "restricted-types2"},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				want := map[string]user.AccessDefinition{
+					"a": { // It should get intersection of restricted types.
+						RestrictedTypes: []graphql.Type{
+							{Name: "Country", Fields: []string{"code"}},
+							{Name: "Person", Fields: []string{"name"}},
+						},
+						Limit: &user.APILimit{},
+					},
+				}
+
+				assert.Equal(t, want, s.AccessRights)
+			},
+		},
+		{
+			name:     "Merge field level depth limit for the same GraphQL API",
+			policies: []string{"field-level-depth-limit1", "field-level-depth-limit2"},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				want := map[string]user.AccessDefinition{
+					"graphql-api": {
+						Limit: &user.APILimit{},
+						FieldAccessRights: []user.FieldAccessDefinition{
+							{TypeName: "Query", FieldName: "people", Limits: user.FieldLimits{MaxQueryDepth: 4}},
+							{TypeName: "Mutation", FieldName: "putPerson", Limits: user.FieldLimits{MaxQueryDepth: -1}},
+							{TypeName: "Query", FieldName: "countries", Limits: user.FieldLimits{MaxQueryDepth: 3}},
+							{TypeName: "Query", FieldName: "continents", Limits: user.FieldLimits{MaxQueryDepth: 4}},
+						},
+					},
+				}
+
+				assert.Equal(t, want, s.AccessRights)
+			},
+		},
+		{
 			"Throttle interval from policy", []string{"throttle1"},
 			"", func(t *testing.T, s *user.SessionState) {
 				if s.ThrottleInterval != 9 {
@@ -672,7 +754,7 @@ func TestApplyPolicies(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			sess := tc.session
 			if sess == nil {
-				sess = &user.SessionState{}
+				sess = user.NewSessionState()
 			}
 			sess.SetPolicies(tc.policies...)
 			errStr := ""
@@ -699,7 +781,7 @@ func BenchmarkApplyPolicies(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		for _, tc := range tests {
-			sess := &user.SessionState{}
+			sess := user.NewSessionState()
 			sess.SetPolicies(tc.policies...)
 			bmid.ApplyPolicies(sess)
 		}
@@ -840,8 +922,8 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{}
-				if err := json.Unmarshal(data, &sessionData); err != nil {
+				sessionData := user.NewSessionState()
+				if err := json.Unmarshal(data, sessionData); err != nil {
 					t.Log(err.Error())
 					return false
 				}
@@ -917,8 +999,8 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{}
-				if err := json.Unmarshal(data, &sessionData); err != nil {
+				sessionData := user.NewSessionState()
+				if err := json.Unmarshal(data, sessionData); err != nil {
 					t.Log(err.Error())
 					return false
 				}
@@ -1052,8 +1134,8 @@ func TestApplyMultiPolicies(t *testing.T) {
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{}
-				json.Unmarshal(data, &sessionData)
+				sessionData := user.NewSessionState()
+				json.Unmarshal(data, sessionData)
 
 				policy1Expected := user.APILimit{
 					Rate:             1000,
@@ -1097,8 +1179,8 @@ func TestApplyMultiPolicies(t *testing.T) {
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{}
-				json.Unmarshal(data, &sessionData)
+				sessionData := user.NewSessionState()
+				json.Unmarshal(data, sessionData)
 
 				assert.EqualValues(t, 50, sessionData.AccessRights["api1"].Limit.QuotaRemaining, "should reset policy1 quota")
 				assert.EqualValues(t, 100, sessionData.AccessRights["api2"].Limit.QuotaRemaining, "should reset policy2 quota")
@@ -1215,8 +1297,8 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{}
-				if err := json.Unmarshal(data, &sessionData); err != nil {
+				sessionData := user.NewSessionState()
+				if err := json.Unmarshal(data, sessionData); err != nil {
 					t.Log(err.Error())
 					return false
 				}
@@ -1266,8 +1348,8 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{}
-				if err := json.Unmarshal(data, &sessionData); err != nil {
+				sessionData := user.NewSessionState()
+				if err := json.Unmarshal(data, sessionData); err != nil {
 					t.Log(err.Error())
 					return false
 				}

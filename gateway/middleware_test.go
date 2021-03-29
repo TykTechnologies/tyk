@@ -22,7 +22,7 @@ var sess = user.SessionState{
 }
 
 func (mockStore) SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool) {
-	return sess, true
+	return sess.Clone(), true
 }
 
 func TestBaseMiddleware_OrgSessionExpiry(t *testing.T) {

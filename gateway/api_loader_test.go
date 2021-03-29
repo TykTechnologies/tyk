@@ -6,6 +6,8 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/user"
+
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/stretchr/testify/assert"
@@ -153,4 +155,110 @@ func TestGraphQLPlayground(t *testing.T) {
 			})
 		})
 	}
+}
+
+func TestCORS(t *testing.T) {
+	g := StartTest()
+	defer g.Close()
+
+	apis := BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Name = "CORS test API"
+		spec.APIID = "cors-api"
+		spec.Proxy.ListenPath = "/cors-api/"
+		spec.CORS.Enable = false
+		spec.CORS.ExposedHeaders = []string{"Custom-Header"}
+		spec.CORS.AllowedOrigins = []string{"*"}
+	}, func(spec *APISpec) {
+		spec.Name = "Another API"
+		spec.APIID = "another-api"
+		spec.Proxy.ListenPath = "/another-api/"
+		spec.CORS.ExposedHeaders = []string{"Custom-Header"}
+		spec.CORS.AllowedOrigins = []string{"*"}
+	})
+
+	headers := map[string]string{
+		"Origin": "my-custom-origin",
+	}
+
+	headersMatch := map[string]string{
+		"Access-Control-Allow-Origin":   "*",
+		"Access-Control-Expose-Headers": "Custom-Header",
+	}
+
+	t.Run("CORS disabled", func(t *testing.T) {
+		_, _ = g.Run(t, []test.TestCase{
+			{Path: "/cors-api/", Headers: headers, HeadersNotMatch: headersMatch, Code: http.StatusOK},
+		}...)
+	})
+
+	t.Run("CORS enabled", func(t *testing.T) {
+		apis[0].CORS.Enable = true
+		LoadAPI(apis...)
+
+		_, _ = g.Run(t, []test.TestCase{
+			{Path: "/cors-api/", Headers: headers, HeadersMatch: headersMatch, Code: http.StatusOK},
+		}...)
+
+		_, _ = g.Run(t, []test.TestCase{
+			{Path: "/another-api/", Headers: headers, HeadersNotMatch: headersMatch, Code: http.StatusOK},
+		}...)
+	})
+
+	t.Run("oauth endpoints", func(t *testing.T) {
+		apis[0].UseOauth2 = true
+		apis[0].CORS.Enable = false
+		LoadAPI(apis...)
+
+		t.Run("CORS disabled", func(t *testing.T) {
+			_, _ = g.Run(t, []test.TestCase{
+				{Path: "/cors-api/oauth/token", Headers: headers, HeadersNotMatch: headersMatch, Code: http.StatusForbidden},
+			}...)
+		})
+
+		t.Run("CORS enabled", func(t *testing.T) {
+			apis[0].CORS.Enable = true
+			LoadAPI(apis...)
+
+			_, _ = g.Run(t, []test.TestCase{
+				{Path: "/cors-api/oauth/token", Headers: headers, HeadersMatch: headersMatch, Code: http.StatusForbidden},
+			}...)
+		})
+	})
+}
+
+func TestTykRateLimitsStatusOfAPI(t *testing.T) {
+	g := StartTest()
+	defer g.Close()
+
+	const (
+		quotaMax       = 20
+		quotaRemaining = 10
+		rate           = 10
+		per            = 3
+	)
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test"
+		spec.Proxy.ListenPath = "/my-api/"
+		spec.UseKeylessAccess = false
+	})
+	_, key := g.CreateSession(func(s *user.SessionState) {
+		s.QuotaMax = quotaMax
+		s.QuotaRemaining = quotaRemaining
+		s.Rate = rate
+		s.Per = per
+
+		s.AccessRights = map[string]user.AccessDefinition{"test": {
+			APIID: "test", Versions: []string{"v1"},
+		}}
+	})
+
+	authHeader := map[string]string{
+		"Authorization": key,
+	}
+
+	bodyMatch := fmt.Sprintf(`{"quota":{"quota_max":%d,"quota_remaining":%d,"quota_renews":.*},"rate_limit":{"requests":%d,"per_unit":%d}}`,
+		quotaMax, quotaRemaining, rate, per)
+
+	_, _ = g.Run(t, test.TestCase{Path: "/my-api/tyk/rate-limits/", Headers: authHeader, BodyMatch: bodyMatch, Code: http.StatusOK})
 }

@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/TykTechnologies/tyk/rpc"
+
 	"github.com/TykTechnologies/tyk/headers"
 
 	"github.com/gocraft/health"
@@ -226,6 +228,11 @@ func (t BaseMiddleware) Config() (interface{}, error) {
 }
 
 func (t BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
+
+	if rpc.IsEmergencyMode() {
+		return user.SessionState{}, false
+	}
+
 	// Try and get the session from the session store
 	session, found := t.Spec.OrgSessionManager.SessionDetail(orgID, orgID, false)
 	if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
@@ -236,7 +243,8 @@ func (t BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
 	}
 
 	session.SetKeyHash(storage.HashKey(orgID))
-	return session, found
+
+	return session.Clone(), found
 }
 
 func (t BaseMiddleware) SetOrgExpiry(orgid string, expiry int64) {
@@ -287,7 +295,8 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 	ctxDisableSessionUpdate(r)
 
 	if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-		SessionCache.Set(session.KeyHash(), *session, cache.DefaultExpiration)
+		clone := session.Clone()
+		SessionCache.Set(session.GetKeyHash(), &clone, cache.DefaultExpiration)
 	}
 
 	return true
@@ -298,12 +307,12 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	rights := make(map[string]user.AccessDefinition)
 	tags := make(map[string]bool)
-	if session.MetaData == nil {
-		session.MetaData = make(map[string]interface{})
+	if session.GetMetaData() == nil {
+		session.SetMetaData(make(map[string]interface{}))
 	}
 
 	didQuota, didRateLimit, didACL, didComplexity := make(map[string]bool), make(map[string]bool), make(map[string]bool), make(map[string]bool)
-	policies := session.PolicyIDs()
+	policies := session.GetPolicyIDs()
 
 	for _, polID := range policies {
 		policiesMu.RLock()
@@ -357,7 +366,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				accessRights.Limit.SetBy = idForScope
 
 				// respect current quota renews (on API limit level)
-				if r, ok := session.AccessRights[apiID]; ok && r.Limit != nil {
+				if r, ok := session.GetAccessRightByAPIID(apiID); ok && r.Limit != nil {
 					accessRights.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
 
@@ -402,16 +411,30 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 						}
 
 						for _, t := range v.RestrictedTypes {
-							found := false
 							for ri, rt := range r.RestrictedTypes {
 								if t.Name == rt.Name {
-									found = true
-									r.RestrictedTypes[ri].Fields = append(rt.Fields, t.Fields...)
+									r.RestrictedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
+								}
+							}
+						}
+
+						mergeFieldLimits := func(res *user.FieldLimits, new user.FieldLimits) {
+							if greaterThanInt(new.MaxQueryDepth, res.MaxQueryDepth) {
+								res.MaxQueryDepth = new.MaxQueryDepth
+							}
+						}
+
+						for _, far := range v.FieldAccessRights {
+							exists := false
+							for i, rfar := range r.FieldAccessRights {
+								if far.TypeName == rfar.TypeName && far.FieldName == rfar.FieldName {
+									exists = true
+									mergeFieldLimits(&r.FieldAccessRights[i].Limits, far.Limits)
 								}
 							}
 
-							if !found {
-								r.RestrictedTypes = append(r.RestrictedTypes, v.RestrictedTypes...)
+							if !exists {
+								r.FieldAccessRights = append(r.FieldAccessRights, far)
 							}
 						}
 
@@ -485,7 +508,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				}
 
 				// Respect existing QuotaRenews
-				if r, ok := session.AccessRights[k]; ok && r.Limit != nil {
+				if r, ok := session.GetAccessRightByAPIID(k); ok && r.Limit != nil {
 					ar.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
 
@@ -529,7 +552,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		}
 
 		for k, v := range policy.MetaData {
-			session.MetaData[k] = v
+			session.SetMetaDataKey(k, v)
 		}
 
 		if policy.LastUpdated > session.LastUpdated {
@@ -607,7 +630,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 	// Override session ACL if at least one policy define it
 	if len(didACL) > 0 {
-		session.AccessRights = rights
+		session.SetAccessRights(rights)
 	}
 
 	return nil
@@ -615,7 +638,8 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
 // the Auth Handler, if not found it will fail
-func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.Request) (user.SessionState, bool) {
+func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, r *http.Request) (user.SessionState, bool) {
+	key := *originalKey
 	minLength := t.Spec.GlobalConfig.MinTokenLength
 	if minLength == 0 {
 		// See https://github.com/TykTechnologies/tyk/issues/1681
@@ -638,12 +662,12 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 		cachedVal, found := SessionCache.Get(cacheKey)
 		if found {
 			t.Logger().Debug("--> Key found in local cache")
-			session := cachedVal.(user.SessionState)
-			if err := t.ApplyPolicies(&session); err != nil {
+			session := cachedVal.(*user.SessionState)
+			if err := t.ApplyPolicies(session); err != nil {
 				t.Logger().Error(err)
-				return session, false
+				return session.Clone(), false
 			}
-			return session, true
+			return session.Clone(), true
 		}
 	}
 
@@ -654,43 +678,63 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 		session.SetKeyHash(cacheKey)
 		// If exists, assume it has been authorized and pass on
 		// cache it
+		clone := session.Clone()
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			go SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
+			go SessionCache.Set(cacheKey, &clone, cache.DefaultExpiration)
 		}
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		if err := t.ApplyPolicies(&session); err != nil {
 			t.Logger().Error(err)
-			return session, false
+			return session.Clone(), false
 		}
 		t.Logger().Debug("Got key")
-		return session, true
+		return session.Clone(), true
 	}
 
+	if _, ok := t.Spec.AuthManager.Store().(*RPCStorageHandler); ok && rpc.IsEmergencyMode() {
+		return session.Clone(), false
+	}
+
+	// Only search in RPC if it's not in emergency mode
 	t.Logger().Debug("Querying authstore")
 	// 2. If not there, get it from the AuthorizationHandler
 	session, found = t.Spec.AuthManager.KeyAuthorised(key)
+	if !found && storage.TokenOrg(key) != t.Spec.OrgID {
+		//treat it as a custom key
+		key = generateToken(t.Spec.OrgID, key)
+		cacheKey = key
+		if t.Spec.GlobalConfig.HashKeys {
+			cacheKey = storage.HashStr(cacheKey)
+		}
+		session, found = t.Spec.AuthManager.KeyAuthorised(key)
+	}
+
 	if found {
+		// update value of originalKey, as for custom-keys it might get updated (the key is generated again using alias)
+		*originalKey = key
+
 		session.SetKeyHash(cacheKey)
 		// If not in Session, and got it from AuthHandler, create a session with a new TTL
 		t.Logger().Info("Recreating session for key: ", obfuscateKey(key))
 
 		// cache it
+		clone := session.Clone()
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			go SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
+			go SessionCache.Set(cacheKey, &clone, cache.DefaultExpiration)
 		}
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		if err := t.ApplyPolicies(&session); err != nil {
 			t.Logger().Error(err)
-			return session, false
+			return session.Clone(), false
 		}
 
 		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.SessionLifetime))
 		ctxScheduleSessionUpdate(r)
 	}
 
-	return session, found
+	return session.Clone(), found
 }
 
 // FireEvent is added to the BaseMiddleware object so it is available across the entire stack
@@ -756,6 +800,11 @@ type TykResponseHandler interface {
 	HandleError(http.ResponseWriter, *http.Request)
 }
 
+type TykGoPluginResponseHandler interface {
+	TykResponseHandler
+	HandleGoPluginResponse(http.ResponseWriter, *http.Response, *http.Request) error
+}
+
 func responseProcessorByName(name string) TykResponseHandler {
 	switch name {
 	case "header_injector":
@@ -768,7 +817,11 @@ func responseProcessorByName(name string) TykResponseHandler {
 		return &HeaderTransform{}
 	case "custom_mw_res_hook":
 		return &CustomMiddlewareResponseHook{}
+	case "goplugin_res_hook":
+		return &ResponseGoPluginMiddleware{}
+
 	}
+
 	return nil
 }
 

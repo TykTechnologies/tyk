@@ -16,7 +16,7 @@ import (
 )
 
 func createRLSession() *user.SessionState {
-	session := new(user.SessionState)
+	session := user.NewSessionState()
 	// essentially non-throttled
 	session.Rate = 100.0
 	session.Allowance = session.Rate

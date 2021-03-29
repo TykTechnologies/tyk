@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v8"
 
 	"github.com/TykTechnologies/goverify"
 	"github.com/TykTechnologies/tyk/config"
@@ -165,7 +165,7 @@ func isPayloadSignatureValid(notification Notification) bool {
 			notificationVerifier, err = goverify.LoadPublicKeyFromFile(config.Global().PublicKeyPath)
 			if err != nil {
 
-				pubSubLog.Error("Notification signer: Failed loading private key from path: ", err)
+				pubSubLog.Error("Notification signer: Failed loading public key from path: ", err)
 				return false
 			}
 		}
