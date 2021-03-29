@@ -235,7 +235,12 @@ func liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 	res.Status = status
 
 	w.Header().Set("Content-Type", headers.ApplicationJSON)
-	addMascotHeaders(w)
+
+	// If this option is not set, or is explicitly set to false, add the mascot headers
+	if !config.Global().HideGeneratorHeader {
+		addMascotHeaders(w)
+	}
+
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(res)
 }
