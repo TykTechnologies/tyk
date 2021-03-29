@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"errors"
 	"html/template"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"runtime/pprof"
 	"strconv"
@@ -112,21 +114,28 @@ type ErrorHandler struct {
 // HandleError is the actual error handler and will store the error details in analytics if analytics processing is enabled.
 func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMsg string, errCode int, writeResponse bool) {
 	defer e.Base().UpdateRequestSession(r)
+	response := &http.Response{}
 
 	if writeResponse {
 		var templateExtension string
-		var contentType string
+		contentType := r.Header.Get(headers.ContentType)
+		contentType = strings.Split(contentType, ";")[0]
 
-		switch r.Header.Get(headers.ContentType) {
+		switch contentType {
 		case headers.ApplicationXML:
 			templateExtension = "xml"
 			contentType = headers.ApplicationXML
+		case headers.TextXML:
+			templateExtension = "xml"
+			contentType = headers.TextXML
 		default:
 			templateExtension = "json"
 			contentType = headers.ApplicationJSON
 		}
 
 		w.Header().Set(headers.ContentType, contentType)
+		response.Header = http.Header{}
+		response.Header.Set(headers.ContentType, contentType)
 
 		templateName := "error_" + strconv.Itoa(errCode) + "." + templateExtension
 
@@ -144,23 +153,34 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			templateName = defaultTemplateName + "." + defaultTemplateFormat
 			tmpl = templates.Lookup(templateName)
 			w.Header().Set(headers.ContentType, defaultContentType)
+			response.Header.Set(headers.ContentType, defaultContentType)
+
 		}
 
 		//If the config option is not set or is false, add the header
 		if !e.Spec.GlobalConfig.HideGeneratorHeader {
 			w.Header().Add(headers.XGenerator, "tyk.io")
+			response.Header.Add(headers.XGenerator, "tyk.io")
 		}
 
 		// Close connections
 		if e.Spec.GlobalConfig.CloseConnections {
 			w.Header().Add(headers.Connection, "close")
+			response.Header.Add(headers.Connection, "close")
+
 		}
 
 		// If error is not customized write error in default way
 		if errMsg != errCustomBodyResponse.Error() {
 			w.WriteHeader(errCode)
+			response.StatusCode = errCode
+
 			apiError := APIError{template.HTML(template.JSEscapeString(errMsg))}
-			tmpl.Execute(w, &apiError)
+			var log bytes.Buffer
+
+			rsp := io.MultiWriter(w, &log)
+			tmpl.Execute(rsp, &apiError)
+			response.Body = ioutil.NopCloser(&log)
 		}
 	}
 
@@ -168,7 +188,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		pprof.WriteHeapProfile(memProfFile)
 	}
 
-	if e.Spec.DoNotTrack {
+	if e.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
 		return
 	}
 
@@ -178,6 +198,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 	ip := request.RealIP(r)
 	if e.Spec.GlobalConfig.StoreAnalytics(ip) {
+
 		t := time.Now()
 
 		addVersionHeader(w, r, e.Spec.GlobalConfig)
@@ -213,15 +234,22 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		rawRequest := ""
 		rawResponse := ""
 		if recordDetail(r, e.Spec) {
+
 			// Get the wire format representation
+
 			var wireFormatReq bytes.Buffer
 			r.Write(&wireFormatReq)
 			rawRequest = base64.StdEncoding.EncodeToString(wireFormatReq.Bytes())
+
+			var wireFormatRes bytes.Buffer
+			response.Write(&wireFormatRes)
+			rawResponse = base64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
+
 		}
 
 		trackEP := false
 		trackedPath := r.URL.Path
-		if p := ctxGetTrackedPath(r); p != "" && !ctxGetDoNotTrack(r) {
+		if p := ctxGetTrackedPath(r); p != "" {
 			trackEP = true
 			trackedPath = p
 		}
@@ -281,7 +309,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		if e.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
 			record.NormalisePath(&e.Spec.GlobalConfig)
 		}
-
 		analytics.RecordHit(&record)
 	}
 	// Report in health check

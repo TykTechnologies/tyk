@@ -144,7 +144,7 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response) (*copro
 		if session := ctxGetSession(req); session != nil {
 			object.Session = ProtoSessionState(session)
 			// For compatibility purposes:
-			object.Metadata = object.Session.Metadata
+			object.Metadata = object.Session.GetMetadata()
 		}
 	}
 
@@ -183,9 +183,9 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 	for _, dh := range object.Request.DeleteHeaders {
 		r.Header.Del(dh)
 	}
-
+	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
 	for h, v := range object.Request.SetHeaders {
-		r.Header.Set(h, v)
+		setCustomHeader(r.Header, h, v, ignoreCanonical)
 	}
 
 	updatedValues := r.URL.Query()
@@ -294,9 +294,16 @@ func (m *CoProcessMiddleware) EnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	if m.HookType == coprocess.HookType_CustomKeyCheck {
+		if ctxGetRequestStatus(r) == StatusOkAndIgnore {
+			return nil, http.StatusOK
+		}
+	}
+
 	logger := m.Logger()
 	logger.Debug("CoProcess Request, HookType: ", m.HookType)
 	originalURL := r.URL
+	authToken, _ := m.getAuthToken(coprocessType, r)
 
 	var extractor IdExtractor
 	if m.Spec.EnableCoProcessAuth && m.Spec.CustomMiddleware.IdExtractor.Extractor != nil {
@@ -368,15 +375,15 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	if returnObject.Session != nil {
 		// For compatibility purposes, inject coprocess.Object.Metadata fields:
 		if returnObject.Metadata != nil {
-			if returnObject.Session.Metadata == nil {
+			if returnObject.Session.GetMetadata() == nil {
 				returnObject.Session.Metadata = make(map[string]string)
 			}
-			for k, v := range returnObject.Metadata {
+			for k, v := range returnObject.GetMetadata() {
 				returnObject.Session.Metadata[k] = v
 			}
 		}
 
-		token = returnObject.Session.Metadata["token"]
+		token = returnObject.Session.GetMetadata()["token"]
 	}
 
 	if returnObject.Request.ReturnOverrides.ResponseError != "" {
@@ -443,13 +450,13 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 		// If the returned object contains metadata, add them to the session:
 		for k, v := range returnObject.Metadata {
-			returnedSession.MetaData[k] = string(v)
+			returnedSession.SetMetaDataKey(k, string(v))
 		}
 
 		returnedSession.OrgID = m.Spec.OrgID
 
 		if err := m.ApplyPolicies(returnedSession); err != nil {
-			AuthFailed(m, r, r.Header.Get(m.Spec.Auth.AuthHeaderName))
+			AuthFailed(m, r, authToken)
 			return errors.New(http.StatusText(http.StatusForbidden)), http.StatusForbidden
 		}
 
@@ -458,11 +465,11 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			returnedSession.QuotaRenews = existingSession.QuotaRenews
 			returnedSession.QuotaRemaining = existingSession.QuotaRemaining
 
-			for api := range returnedSession.AccessRights {
-				if _, found := existingSession.AccessRights[api]; found {
-					if returnedSession.AccessRights[api].Limit != nil {
-						returnedSession.AccessRights[api].Limit.QuotaRenews = existingSession.AccessRights[api].Limit.QuotaRenews
-						returnedSession.AccessRights[api].Limit.QuotaRemaining = existingSession.AccessRights[api].Limit.QuotaRemaining
+			for api := range returnedSession.GetAccessRights() {
+				if _, found := existingSession.GetAccessRightByAPIID(api); found {
+					if returnedSession.GetAccessRights()[api].Limit != nil {
+						returnedSession.AccessRights[api].Limit.QuotaRenews = existingSession.GetAccessRights()[api].Limit.QuotaRenews
+						returnedSession.AccessRights[api].Limit.QuotaRemaining = existingSession.GetAccessRights()[api].Limit.QuotaRemaining
 					}
 				}
 			}
@@ -470,7 +477,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 		// Apply it second time to fix the quota
 		if err := m.ApplyPolicies(returnedSession); err != nil {
-			AuthFailed(m, r, r.Header.Get(m.Spec.Auth.AuthHeaderName))
+			AuthFailed(m, r, authToken)
 			return errors.New(http.StatusText(http.StatusForbidden)), http.StatusForbidden
 		}
 
@@ -539,8 +546,9 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 	}
 
 	// Set headers:
+	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
 	for k, v := range retObject.Response.Headers {
-		res.Header.Set(k, v)
+		setCustomHeader(res.Header, k, v, ignoreCanonical)
 	}
 
 	// Set response body:

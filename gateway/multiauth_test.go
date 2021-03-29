@@ -42,7 +42,7 @@ const multiAuthDev = `{
 }`
 
 func createMultiAuthKeyAuthSession(isBench bool) *user.SessionState {
-	session := new(user.SessionState)
+	session := user.NewSessionState()
 	session.Rate = 100.0
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
@@ -61,7 +61,7 @@ func createMultiAuthKeyAuthSession(isBench bool) *user.SessionState {
 }
 
 func createMultiBasicAuthSession(isBench bool) *user.SessionState {
-	session := new(user.SessionState)
+	session := user.NewSessionState()
 	session.Rate = 8.0
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
@@ -70,7 +70,7 @@ func createMultiBasicAuthSession(isBench bool) *user.SessionState {
 	session.QuotaRenews = time.Now().Unix() + 20
 	session.QuotaRemaining = 1
 	session.QuotaMax = -1
-	session.BasicAuthData.Password = "TEST"
+	session.BasicAuthData = user.BasicAuthData{Password: "TEST"}
 	session.AccessRights = map[string]user.AccessDefinition{"55": {APIName: "Tyk Multi Key Test", APIID: "55", Versions: []string{"default"}}}
 	return session
 }

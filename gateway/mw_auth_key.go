@@ -142,7 +142,7 @@ func (k *AuthKey) reportInvalidKey(key string, r *http.Request, msg string, errM
 }
 
 func (k *AuthKey) validateSignature(r *http.Request, key string) (error, int) {
-	config := k.Spec.Auth
+	_, config := k.getAuthToken(k.getAuthType(), r)
 	logger := k.Logger().WithField("key", obfuscateKey(key))
 
 	if !config.ValidateSignature {

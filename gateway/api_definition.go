@@ -17,6 +17,9 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/cenk/backoff"
+	"github.com/jensneuse/graphql-go-tools/pkg/engine/resolve"
+
 	sprig "gopkg.in/Masterminds/sprig.v2"
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
@@ -188,7 +191,12 @@ type APISpec struct {
 	network NetworkStats
 
 	GraphQLExecutor struct {
-		Engine *graphql.ExecutionEngine
+		Engine   *graphql.ExecutionEngine
+		EngineV2 *graphql.ExecutionEngineV2
+		HooksV2  struct {
+			BeforeFetchHook resolve.BeforeFetchHook
+			AfterFetchHook  resolve.AfterFetchHook
+		}
 		Client *http.Client
 		Schema *graphql.Schema
 	}
@@ -430,7 +438,6 @@ func (a APIDefinitionLoader) FromRPC(orgId string) ([]*APISpec, error) {
 	if rpc.IsEmergencyMode() {
 		return LoadDefinitionsFromRPCBackup()
 	}
-
 	store := RPCStorageHandler{}
 	if !store.Connect() {
 		return nil, errors.New("Can't connect RPC layer")
@@ -449,7 +456,7 @@ func (a APIDefinitionLoader) FromRPC(orgId string) ([]*APISpec, error) {
 
 	if rpc.LoadCount() > 0 {
 		if err := saveRPCDefinitionsBackup(apiCollection); err != nil {
-			return nil, err
+			log.Error(err)
 		}
 	}
 
@@ -749,6 +756,12 @@ func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circui
 		newSpec.CircuitBreaker = ExtendedCircuitBreakerMeta{CircuitBreakerMeta: stringSpec}
 		log.Debug("Initialising circuit breaker for: ", stringSpec.Path)
 		newSpec.CircuitBreaker.CB = circuit.NewRateBreaker(stringSpec.ThresholdPercent, stringSpec.Samples)
+
+		// override backoff algorithm when is not desired to recheck the upstream before the ReturnToServiceAfter happens
+		if stringSpec.DisableHalfOpenState {
+			newSpec.CircuitBreaker.CB.BackOff = &backoff.StopBackOff{}
+		}
+
 		events := newSpec.CircuitBreaker.CB.Subscribe()
 		go func(path string, spec *APISpec, breakerPtr *circuit.Breaker) {
 			timerActive := false

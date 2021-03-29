@@ -93,8 +93,8 @@ func estimateTagsCapacity(session *user.SessionState, apiSpec *APISpec) int {
 
 		size += len(session.ApplyPolicies)
 
-		if session.MetaData != nil {
-			if _, ok := session.MetaData[keyDataDeveloperID]; ok {
+		if session.GetMetaData() != nil {
+			if _, ok := session.GetMetaDataByKey(keyDataDeveloperID); ok {
 				size += 1
 			}
 		}
@@ -117,8 +117,8 @@ func getSessionTags(session *user.SessionState) []string {
 		tags = append(tags, "pol-"+polID)
 	}
 
-	if session.MetaData != nil {
-		if developerID, ok := session.MetaData[keyDataDeveloperID].(string); ok {
+	if session.GetMetaData() != nil {
+		if developerID, ok := session.GetMetaData()[keyDataDeveloperID].(string); ok {
 			tags = append(tags, "dev-"+developerID)
 		}
 	}
@@ -130,7 +130,7 @@ func getSessionTags(session *user.SessionState) []string {
 
 func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, responseCopy *http.Response) {
 
-	if s.Spec.DoNotTrack {
+	if s.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
 		return
 	}
 
@@ -196,7 +196,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 
 		trackEP := false
 		trackedPath := r.URL.Path
-		if p := ctxGetTrackedPath(r); p != "" && !ctxGetDoNotTrack(r) {
+		if p := ctxGetTrackedPath(r); p != "" {
 			trackEP = true
 			trackedPath = p
 		}
@@ -293,7 +293,7 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 	}
 
 	// Session found
-	sess := ses.(user.SessionState)
+	sess := ses.(*user.SessionState)
 	return sess.EnableDetailRecording || sess.EnableDetailedRecording
 }
 

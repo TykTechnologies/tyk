@@ -10,13 +10,16 @@ import (
 	"strconv"
 	"sync"
 	"testing"
-	"time"
 
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v8"
 	uuid "github.com/satori/go.uuid"
+	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"fmt"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
@@ -372,7 +375,8 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 		}...)
 
 		sessionState, found := GlobalSessionManager.SessionDetail("default", key, false)
-		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 2 {
+		accessRight, _ := sessionState.GetAccessRightByAPIID(testAPIID)
+		if !found || accessRight.APIID != testAPIID || len(sessionState.ApplyPolicies) != 2 {
 			t.Fatal("Adding policy to the list failed")
 		}
 	})
@@ -387,7 +391,8 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 		}...)
 
 		sessionState, found := GlobalSessionManager.SessionDetail("default", key, false)
-		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 0 {
+		accessRight, _ := sessionState.GetAccessRightByAPIID(testAPIID)
+		if !found || accessRight.APIID != testAPIID || len(sessionState.ApplyPolicies) != 0 {
 			t.Fatal("Removing policy from the list failed")
 		}
 	})
@@ -444,8 +449,8 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 
 			sessionState, found := GlobalSessionManager.SessionDetail(session.OrgID, key, false)
 
-			if !found || !reflect.DeepEqual(expected, sessionState.MetaData) {
-				t.Fatalf("Expected %v, returned %v", expected, sessionState.MetaData)
+			if !found || !reflect.DeepEqual(expected, sessionState.GetMetaData()) {
+				t.Fatalf("Expected %v, returned %v", expected, sessionState.GetMetaData())
 			}
 		}
 
@@ -478,9 +483,9 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 				"key-meta2": "key-value2",
 			}
 			session.ApplyPolicies = []string{pID, pID2}
-			session.MetaData = map[string]interface{}{
+			session.SetMetaData(map[string]interface{}{
 				"key-meta2": "key-value2",
-			}
+			})
 			assertMetaData(session, expected)
 		})
 	})
@@ -1329,39 +1334,16 @@ func TestGroupResetHandler(t *testing.T) {
 }
 
 func TestHotReloadSingle(t *testing.T) {
+	ReloadTestCase.Enable()
+	defer ReloadTestCase.Disable()
 	oldRouter := mainRouter()
 	var wg sync.WaitGroup
 	wg.Add(1)
 	reloadURLStructure(wg.Done)
-	ReloadTick <- time.Time{}
+	ReloadTestCase.TickOk(t)
 	wg.Wait()
 	if mainRouter() == oldRouter {
 		t.Fatal("router wasn't swapped")
-	}
-}
-
-func TestHotReloadMany(t *testing.T) {
-	var wg sync.WaitGroup
-	wg.Add(25)
-	// Spike of 25 reloads all at once, not giving any time for the
-	// reload worker to pick up any of them. A single one is queued
-	// and waits.
-	// We get a callback for all of them, so 25 wg.Done calls.
-	for i := 0; i < 25; i++ {
-		reloadURLStructure(wg.Done)
-	}
-	// pick it up and finish it
-	ReloadTick <- time.Time{}
-	wg.Wait()
-
-	// 5 reloads, but this time slower - the reload worker has time
-	// to do all of them.
-	for i := 0; i < 5; i++ {
-		wg.Add(1)
-		reloadURLStructure(wg.Done)
-		// pick it up and finish it
-		ReloadTick <- time.Time{}
-		wg.Wait()
 	}
 }
 
@@ -1405,7 +1387,10 @@ func TestContextSession(t *testing.T) {
 	if ctxGetSession(r) != nil {
 		t.Fatal("expected ctxGetSession to return nil")
 	}
-	ctxSetSession(r, &user.SessionState{}, "", false)
+	ctxSetSession(r,
+		user.NewSessionState(),
+		"",
+		false)
 	if ctxGetSession(r) == nil {
 		t.Fatal("expected ctxGetSession to return non-nil")
 	}
@@ -1572,4 +1557,81 @@ func TestRotateClientSecretHandler(t *testing.T) {
 			ts.Run(t, testCase)
 		})
 	}
+}
+
+func TestHandleAddOrUpdateApi(t *testing.T) {
+	testFs := afero.NewMemMapFs()
+
+	t.Run("should return error when api definition json is invalid", func(t *testing.T) {
+		apiDefJson := []byte("{")
+		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
+		require.NoError(t, err)
+
+		response, statusCode := handleAddOrUpdateApi("", req, testFs)
+		errorResponse, ok := response.(apiStatusMessage)
+		require.True(t, ok)
+
+		assert.Equal(t, "Request malformed", errorResponse.Message)
+		assert.Equal(t, http.StatusBadRequest, statusCode)
+	})
+
+	t.Run("should return error when api ids are different", func(t *testing.T) {
+		apiDef := apidef.DummyAPI()
+		apiDef.APIID = "123"
+		apiDefJson, err := json.Marshal(apiDef)
+		require.NoError(t, err)
+
+		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
+		require.NoError(t, err)
+
+		response, statusCode := handleAddOrUpdateApi("555", req, testFs)
+		errorResponse, ok := response.(apiStatusMessage)
+		require.True(t, ok)
+
+		assert.Equal(t, "Request APIID does not match that in Definition! For Update operations these must match.", errorResponse.Message)
+		assert.Equal(t, http.StatusBadRequest, statusCode)
+	})
+
+	t.Run("should return error when semantic validation fails", func(t *testing.T) {
+		apiDef := apidef.DummyAPI()
+		apiDef.APIID = "123"
+		apiDef.GraphQL.Engine.DataSources = []apidef.GraphQLEngineDataSource{
+			{
+				Name: "duplicate",
+			},
+			{
+				Name: "duplicate",
+			},
+		}
+		apiDefJson, err := json.Marshal(apiDef)
+		require.NoError(t, err)
+
+		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
+		require.NoError(t, err)
+
+		response, statusCode := handleAddOrUpdateApi("", req, testFs)
+		errorResponse, ok := response.(apiStatusMessage)
+		require.True(t, ok)
+
+		assert.Equal(t, "Validation of API Definition failed. Reason: duplicate data source names are not allowed.", errorResponse.Message)
+		assert.Equal(t, http.StatusBadRequest, statusCode)
+	})
+
+	t.Run("should return success when no error occurs", func(t *testing.T) {
+		apiDef := apidef.DummyAPI()
+		apiDef.APIID = "123"
+		apiDefJson, err := json.Marshal(apiDef)
+		require.NoError(t, err)
+
+		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
+		require.NoError(t, err)
+
+		response, statusCode := handleAddOrUpdateApi("", req, testFs)
+		successResponse, ok := response.(apiModifyKeySuccess)
+		require.True(t, ok)
+
+		assert.Equal(t, "123", successResponse.Key)
+		assert.Equal(t, "added", successResponse.Action)
+		assert.Equal(t, http.StatusOK, statusCode)
+	})
 }

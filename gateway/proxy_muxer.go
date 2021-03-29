@@ -12,21 +12,32 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/net/http2/h2c"
+
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/tcp"
 	proxyproto "github.com/pires/go-proxyproto"
 	cache "github.com/pmylund/go-cache"
 
-	"golang.org/x/net/http2"
-
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/net/http2"
 )
 
 // handleWrapper's only purpose is to allow router to be dynamically replaced
 type handleWrapper struct {
 	router *mux.Router
+}
+
+// h2cWrapper tracks handleWrapper for swapping w.router on reloads.
+type h2cWrapper struct {
+	w *handleWrapper
+	h http.Handler
+}
+
+func (h *h2cWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	h.h.ServeHTTP(w, r)
 }
 
 func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -115,6 +126,7 @@ func (m *proxyMux) router(port int, protocol string) *mux.Router {
 }
 
 func (m *proxyMux) setRouter(port int, protocol string, router *mux.Router) {
+
 	if port == 0 {
 		port = config.Global().ListenPort
 	}
@@ -342,16 +354,16 @@ func (m *proxyMux) swap(new *proxyMux) {
 			}
 			match.router = newP.router
 			if match.httpServer != nil {
-				match.httpServer.Handler.(*handleWrapper).router = newP.router
+				switch e := match.httpServer.Handler.(type) {
+				case *handleWrapper:
+					e.router = newP.router
+				case *h2cWrapper:
+					e.w.router = newP.router
+				}
 			}
 		}
 	}
-	p := m.getProxy(config.Global().ListenPort)
-	if p != nil && p.router != nil {
-		// All APIs processed, now we can healthcheck
-		// Add a root message to check all is OK
-		p.router.HandleFunc("/"+config.Global().HealthCheckEndpointName, liveCheckHandler)
-	}
+
 	m.serve()
 }
 
@@ -372,12 +384,11 @@ func (m *proxyMux) serve() {
 		if p.started {
 			continue
 		}
-
 		switch p.protocol {
 		case "tcp", "tls":
 			mainLog.Warning("Starting TCP server on:", p.listener.Addr().String())
 			go p.tcpProxy.Serve(p.getListener())
-		case "http", "https":
+		case "http", "https", "h2c":
 			mainLog.Warning("Starting HTTP server on:", p.listener.Addr().String())
 			readTimeout := 120 * time.Second
 			writeTimeout := 120 * time.Second
@@ -389,22 +400,27 @@ func (m *proxyMux) serve() {
 			if config.Global().HttpServerOptions.WriteTimeout > 0 {
 				writeTimeout = time.Duration(config.Global().HttpServerOptions.WriteTimeout) * time.Second
 			}
-
+			var h http.Handler
+			h = &handleWrapper{p.router}
+			// by default enabling h2c by wrapping handler in h2c. This ensures all features including tracing work
+			// in h2c services.
+			h2s := &http2.Server{}
+			h = &h2cWrapper{
+				w: h.(*handleWrapper),
+				h: h2c.NewHandler(h, h2s),
+			}
 			addr := config.Global().ListenAddress + ":" + strconv.Itoa(p.port)
 			p.httpServer = &http.Server{
 				Addr:         addr,
 				ReadTimeout:  readTimeout,
 				WriteTimeout: writeTimeout,
-				Handler:      &handleWrapper{p.router},
+				Handler:      h,
 			}
-
 			if config.Global().CloseConnections {
 				p.httpServer.SetKeepAlivesEnabled(false)
 			}
-
 			go p.httpServer.Serve(p.listener)
 		}
-
 		p.started = true
 	}
 }
@@ -445,6 +461,7 @@ func (m *proxyMux) generateListener(listenPort int, protocol string) (l net.List
 			GetCertificate:     dummyGetCertificate,
 			ServerName:         httpServerOptions.ServerName,
 			MinVersion:         httpServerOptions.MinVersion,
+			MaxVersion:         httpServerOptions.MaxVersion,
 			ClientAuth:         tls.NoClientCert,
 			InsecureSkipVerify: httpServerOptions.SSLInsecureSkipVerify,
 			CipherSuites:       getCipherAliases(httpServerOptions.Ciphers),

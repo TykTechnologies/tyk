@@ -68,7 +68,7 @@ func DecodeJSON(dest, src interface{}) error {
 // TYK_GW_TRACER_OPTIONS_SAMPLER_SALT
 // TYK_GW_TRACER_OPTIONS_SAMPLER_MOD
 func loadZipkin(prefix string, c *Config) error {
-	if c.Tracer.Name != "zipkin" || c.Tracer.Options == nil {
+	if c.Tracer.Name != "zipkin" {
 		return nil
 	}
 	var zip ZipkinConfig
@@ -119,7 +119,7 @@ func loadZipkin(prefix string, c *Config) error {
 // TYK_GW_TRACER_OPTIONS_THROTTLER_REFRESHINTERVAL
 // TYK_GW_TRACER_OPTIONS_THROTTLER_SYNCHRONOUSINITIALIZATION
 func loadJaeger(prefix string, c *Config) error {
-	if c.Tracer.Name != "jaeger" || c.Tracer.Options == nil {
+	if c.Tracer.Name != "jaeger" {
 		return nil
 	}
 	var j jaeger.Configuration

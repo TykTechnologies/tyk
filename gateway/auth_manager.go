@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"strings"
-	"sync"
 	"time"
 
 	uuid "github.com/satori/go.uuid"
@@ -24,6 +23,7 @@ type AuthorisationHandler interface {
 	Init(storage.Handler)
 	KeyAuthorised(string) (user.SessionState, bool)
 	KeyExpired(*user.SessionState) bool
+	Store() storage.Handler
 }
 
 // SessionHandler handles all update/create/access session functions and deals exclusively with
@@ -39,75 +39,6 @@ type SessionHandler interface {
 	Stop()
 }
 
-const sessionPoolDefaultSize = 50
-const sessionBufferDefaultSize = 1000
-
-type sessionUpdater struct {
-	store      storage.Handler
-	once       sync.Once
-	updateChan chan *SessionUpdate
-	poolSize   int
-	bufferSize int
-	keyPrefix  string
-}
-
-var defaultSessionUpdater *sessionUpdater
-
-func init() {
-	defaultSessionUpdater = &sessionUpdater{}
-}
-
-func (s *sessionUpdater) Init(store storage.Handler) {
-	s.once.Do(func() {
-		s.store = store
-		// check pool size in config and set to 50 if unset
-		s.poolSize = config.Global().SessionUpdatePoolSize
-		if s.poolSize <= 0 {
-			s.poolSize = sessionPoolDefaultSize
-		}
-		//check size for channel buffer and set to 1000 if unset
-		s.bufferSize = config.Global().SessionUpdateBufferSize
-		if s.bufferSize <= 0 {
-			s.bufferSize = sessionBufferDefaultSize
-		}
-
-		log.WithField("pool_size", s.poolSize).Debug("Session update async pool size")
-
-		s.updateChan = make(chan *SessionUpdate, s.bufferSize)
-
-		s.keyPrefix = s.store.GetKeyPrefix()
-
-		for i := 0; i < s.poolSize; i++ {
-			go s.updateWorker()
-		}
-	})
-}
-
-func (s *sessionUpdater) updateWorker() {
-	for u := range s.updateChan {
-		v, err := json.Marshal(u.session)
-		if err != nil {
-			log.WithError(err).Error("Error marshalling session for async session update")
-			continue
-		}
-
-		if u.isHashed {
-			u.keyVal = s.keyPrefix + u.keyVal
-			err := s.store.SetRawKey(u.keyVal, string(v), u.ttl)
-			if err != nil {
-				log.WithError(err).Error("Error updating hashed key")
-			}
-			continue
-
-		}
-
-		err = s.store.SetKey(u.keyVal, string(v), u.ttl)
-		if err != nil {
-			log.WithError(err).Error("Error updating key")
-		}
-	}
-}
-
 // DefaultAuthorisationManager implements AuthorisationHandler,
 // requires a storage.Handler to interact with key store
 type DefaultAuthorisationManager struct {
@@ -116,7 +47,6 @@ type DefaultAuthorisationManager struct {
 
 type DefaultSessionManager struct {
 	store                    storage.Handler
-	asyncWrites              bool
 	disableCacheSessionState bool
 	orgID                    string
 }
@@ -136,22 +66,24 @@ func (b *DefaultAuthorisationManager) Init(store storage.Handler) {
 // KeyAuthorised checks if key exists and can be read into a user.SessionState object
 func (b *DefaultAuthorisationManager) KeyAuthorised(keyName string) (user.SessionState, bool) {
 	jsonKeyVal, err := b.store.GetKey(keyName)
-	var newSession user.SessionState
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix":      "auth-mgr",
 			"inbound-key": obfuscateKey(keyName),
 			"err":         err,
 		}).Warning("Key not found in storage engine")
-		return newSession, false
+		return user.SessionState{}, false
 	}
-
-	if err := json.Unmarshal([]byte(jsonKeyVal), &newSession); err != nil {
+	newSession := &user.SessionState{}
+	if err := json.Unmarshal([]byte(jsonKeyVal), newSession); err != nil {
 		log.Error("Couldn't unmarshal session object: ", err)
-		return newSession, false
+		return user.SessionState{}, false
 	}
+	return newSession.Clone(), true
+}
 
-	return newSession, true
+func (b *DefaultAuthorisationManager) Store() storage.Handler {
+	return b.store
 }
 
 // KeyExpired checks if a key has expired, if the value of user.SessionState.Expires is 0, it will be ignored
@@ -163,7 +95,6 @@ func (b *DefaultAuthorisationManager) KeyExpired(newSession *user.SessionState) 
 }
 
 func (b *DefaultSessionManager) Init(store storage.Handler) {
-	b.asyncWrites = config.Global().UseAsyncSessionWrite
 	b.store = store
 	b.store.Connect()
 
@@ -171,10 +102,6 @@ func (b *DefaultSessionManager) Init(store storage.Handler) {
 	switch store.(type) {
 	case *RPCStorageHandler:
 		return
-	}
-
-	if b.asyncWrites {
-		defaultSessionUpdater.Init(store)
 	}
 }
 
@@ -202,7 +129,7 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 	go b.store.DeleteRawKey(rawKey)
 	//go b.store.SetKey(rawKey, "0", session.QuotaRenewalRate)
 
-	for _, acl := range session.AccessRights {
+	for _, acl := range session.GetAccessRights() {
 		rawKey = QuotaKeyPrefix + acl.AllowanceScope + "-" + keyName
 		go b.store.DeleteRawKey(rawKey)
 	}
@@ -229,21 +156,6 @@ func (b *DefaultSessionManager) clearCacheForKey(keyName string, hashed bool) {
 func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.SessionState,
 	resetTTLTo int64, hashed bool) error {
 	defer b.clearCacheForKey(keyName, hashed)
-
-	// async update and return if needed
-	if b.asyncWrites {
-		sessionUpdate := &SessionUpdate{
-			isHashed: hashed,
-			keyVal:   keyName,
-			session:  session,
-			ttl:      resetTTLTo,
-		}
-
-		// send sessionupdate object through channel to pool
-		defaultSessionUpdater.updateChan <- sessionUpdate
-
-		return nil
-	}
 
 	v, err := json.Marshal(session)
 	if err != nil {
@@ -280,7 +192,6 @@ func (b *DefaultSessionManager) RemoveSession(orgID string, keyName string, hash
 func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool) {
 	var jsonKeyVal string
 	var err error
-	var session user.SessionState
 
 	// get session by key
 	if hashed {
@@ -315,15 +226,15 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 			"inbound-key": obfuscateKey(keyName),
 			"err":         err,
 		}).Debug("Could not get session detail, key not found")
-		return session, false
+		return user.SessionState{}, false
 	}
-
+	session := &user.SessionState{}
 	if err := json.Unmarshal([]byte(jsonKeyVal), &session); err != nil {
 		log.Error("Couldn't unmarshal session object (may be cache miss): ", err)
-		return session, false
+		return user.SessionState{}, false
 	}
 
-	return session, true
+	return session.Clone(), true
 }
 
 func (b *DefaultSessionManager) Stop() {}
