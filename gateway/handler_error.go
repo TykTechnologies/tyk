@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
-	"html/template"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"runtime/pprof"
 	"strconv"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -86,7 +86,7 @@ func overrideTykErrors() {
 
 // APIError is generic error object returned if there is something wrong with the request
 type APIError struct {
-	Message template.HTML
+	Message string
 }
 
 // ErrorHandler is invoked whenever there is an issue with a proxied request, most middleware will invoke
@@ -159,7 +159,10 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			w.WriteHeader(errCode)
 			response.StatusCode = errCode
 
-			apiError := APIError{template.HTML(template.JSEscapeString(errMsg))}
+			apiError := APIError{template.JSEscapeString(errMsg)}
+			if contentType == headers.ApplicationXML || contentType == headers.TextXML {
+				apiError.Message = errMsg
+			}
 			var log bytes.Buffer
 
 			rsp := io.MultiWriter(w, &log)

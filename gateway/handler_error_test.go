@@ -59,3 +59,38 @@ func TestHandleError_text_xml(t *testing.T) {
 		},
 	})
 }
+
+func TestHandleErrorXml(t *testing.T) {
+
+	expect := `
+<?xml version = "1.0" encoding = "UTF-8"?>
+<error>There was a problem proxying the request</error>`
+	ts := StartTest()
+	defer ts.Close()
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.Proxy.TargetURL = "http://localhost:66666"
+	})
+	ts.Run(t, test.TestCase{
+		Path: "/",
+		Code: http.StatusInternalServerError,
+		Headers: map[string]string{
+			headers.ContentType: headers.TextXML,
+		},
+		BodyMatchFunc: func(b []byte) bool {
+			return strings.TrimSpace(expect) == string(bytes.TrimSpace(b))
+		},
+	})
+
+	ts.Run(t, test.TestCase{
+		Path: "/",
+		Code: http.StatusInternalServerError,
+		Headers: map[string]string{
+			headers.ContentType: headers.TextXML + "; charset=UTF-8",
+		},
+		BodyMatchFunc: func(b []byte) bool {
+			return strings.TrimSpace(expect) == string(bytes.TrimSpace(b))
+		},
+	})
+}

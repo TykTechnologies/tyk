@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"html/template"
+	"text/template"
 	"io/ioutil"
 	stdlog "log"
 	"log/syslog"
