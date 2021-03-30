@@ -564,6 +564,8 @@ type AuthConfig struct {
 type SignatureConfig struct {
 	Algorithm        string `mapstructure:"algorithm" bson:"algorithm" json:"algorithm"`
 	Header           string `mapstructure:"header" bson:"header" json:"header"`
+	UseParam         bool   `mapstructure:"use_param" bson:"use_param" json:"use_param"`
+	Param            string `mapstructure:"param" bson:"param" json:"param"`
 	Secret           string `mapstructure:"secret" bson:"secret" json:"secret"`
 	AllowedClockSkew int64  `mapstructure:"allowed_clock_skew" bson:"allowed_clock_skew" json:"allowed_clock_skew"`
 	ErrorCode        int    `mapstructure:"error_code" bson:"error_code" json:"error_code"`

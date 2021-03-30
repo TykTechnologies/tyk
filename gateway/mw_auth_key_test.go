@@ -108,8 +108,12 @@ func TestSignatureValidation(t *testing.T) {
 		spec.UseKeylessAccess = false
 		spec.Proxy.ListenPath = "/"
 		spec.Auth.ValidateSignature = true
+		spec.Auth.UseParam = true
+		spec.Auth.ParamName = "api_key"
 		spec.Auth.Signature.Algorithm = "MasheryMD5"
 		spec.Auth.Signature.Header = "Signature"
+		spec.Auth.Signature.UseParam = true
+		spec.Auth.Signature.Param = "sig"
 		spec.Auth.Signature.Secret = "foobar"
 		spec.Auth.Signature.AllowedClockSkew = 1
 	})[0]
@@ -146,6 +150,32 @@ func TestSignatureValidation(t *testing.T) {
 			{Headers: emptySigHeader, Code: 401},
 			{Headers: invalidSigHeader, Code: 401},
 			{Headers: validSigHeader, Code: 200},
+		}...)
+	})
+
+	t.Run("Static signature in params", func(t *testing.T) {
+		api.Auth.Signature.Secret = "foobar"
+		LoadAPI(api)
+
+		key := CreateSession()
+		hasher := signature_validator.MasheryMd5sum{}
+		validHash := hasher.Hash(key, "foobar", time.Now().Unix())
+
+		emptySigPath := "?api_key=" + key
+		invalidSigPath := emptySigPath + "&sig=junk"
+		validSigPath := emptySigPath + "&sig=" + hex.EncodeToString(validHash)
+
+		storage.DisableRedis(true)
+		ts.Run(t, []test.TestCase{
+			{Path: emptySigPath, Code: http.StatusForbidden},
+			{Path: invalidSigPath, Code: http.StatusForbidden},
+			{Path: validSigPath, Code: http.StatusForbidden},
+		}...)
+		storage.DisableRedis(false)
+		ts.Run(t, []test.TestCase{
+			{Path: emptySigPath, Code: 401},
+			{Path: invalidSigPath, Code: 401},
+			{Path: validSigPath, Code: 200},
 		}...)
 	})
 
