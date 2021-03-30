@@ -36,6 +36,15 @@ const (
 	ECDSASign = "ecdsa"
 )
 
+var (
+	// List of common OAuth Client ID claims used by IDPs:
+	oauthClientIDClaims = []string{
+		"clientId",  // Keycloak
+		"cid",       // OKTA
+		"client_id", // Gluu
+	}
+)
+
 func (k *JWTMiddleware) Name() string {
 	return "JWTMiddleware"
 }
@@ -343,6 +352,15 @@ func mapScopeToPolicies(mapping map[string]string, scope []string) []string {
 	return polIDs
 }
 
+func (k *JWTMiddleware) getOAuthClientIDFromClaim(claims jwt.MapClaims) string {
+	for _, claimName := range oauthClientIDClaims {
+		if val, ok := claims[claimName]; ok {
+			return val.(string)
+		}
+	}
+	return ""
+}
+
 // processCentralisedJWT Will check a JWT token centrally against the secret stored in the API Definition.
 func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token) (error, int) {
 	k.Logger().Debug("JWT authority is centralised")
@@ -353,6 +371,9 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		k.reportLoginFailure("[NOT FOUND]", r)
 		return err, http.StatusForbidden
 	}
+
+	// Get the OAuth client ID if available:
+	oauthClientID := k.getOAuthClientIDFromClaim(claims)
 
 	// Generate a virtual token
 	data := []byte(baseFieldData)
@@ -547,6 +568,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		}
 	}
 
+	session.OauthClientID = oauthClientID
 	k.Logger().Debug("Key found")
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.JWTClaim, apidef.UnsetAuth:
