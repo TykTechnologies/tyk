@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
+	"html/template"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"runtime/pprof"
 	"strconv"
 	"strings"
-	"text/template"
 	"time"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -86,7 +86,7 @@ func overrideTykErrors() {
 
 // APIError is generic error object returned if there is something wrong with the request
 type APIError struct {
-	Message string
+	Message template.HTML
 }
 
 // ErrorHandler is invoked whenever there is an issue with a proxied request, most middleware will invoke
@@ -112,35 +112,15 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		case headers.TextXML:
 			templateExtension = "xml"
 			contentType = headers.TextXML
+
 		default:
 			templateExtension = "json"
-			contentType = headers.ApplicationJSON
+			contentType = defaultContentType
 		}
 
 		w.Header().Set(headers.ContentType, contentType)
 		response.Header = http.Header{}
 		response.Header.Set(headers.ContentType, contentType)
-
-		templateName := "error_" + strconv.Itoa(errCode) + "." + templateExtension
-
-		// Try to use an error template that matches the HTTP error code and the content type: 500.json, 400.xml, etc.
-		tmpl := templates.Lookup(templateName)
-
-		// Fallback to a generic error template, but match the content type: error.json, error.xml, etc.
-		if tmpl == nil {
-			templateName = defaultTemplateName + "." + templateExtension
-			tmpl = templates.Lookup(templateName)
-		}
-
-		// If no template is available for this content type, fallback to "error.json".
-		if tmpl == nil {
-			templateName = defaultTemplateName + "." + defaultTemplateFormat
-			tmpl = templates.Lookup(templateName)
-			w.Header().Set(headers.ContentType, defaultContentType)
-			response.Header.Set(headers.ContentType, defaultContentType)
-
-		}
-
 		//If the config option is not set or is false, add the header
 		if !e.Spec.GlobalConfig.HideGeneratorHeader {
 			w.Header().Add(headers.XGenerator, "tyk.io")
@@ -151,24 +131,56 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		if e.Spec.GlobalConfig.CloseConnections {
 			w.Header().Add(headers.Connection, "close")
 			response.Header.Add(headers.Connection, "close")
-
 		}
 
-		// If error is not customized write error in default way
-		if errMsg != errCustomBodyResponse.Error() {
-			w.WriteHeader(errCode)
-			response.StatusCode = errCode
+		templateName := "error_" + strconv.Itoa(errCode) + "." + templateExtension
 
-			apiError := APIError{template.JSEscapeString(errMsg)}
-			if contentType == headers.ApplicationXML || contentType == headers.TextXML {
-				apiError.Message = errMsg
+		//if the contentType is XML related, we use the template from text/template to avoid special characters escape
+		if contentType == headers.ApplicationXML || contentType == headers.TextXML {
+			// Try to use an error template that matches the HTTP error code and the content type: 500.xml, 400.xml, etc.
+			tmpl := templatesRaw.Lookup(templateName)
+			// Fallback to a generic error template, but match the content type: error.json, error.xml, etc.
+			if tmpl == nil {
+				templateName = defaultTemplateName + "." + templateExtension
+				tmpl = templatesRaw.Lookup(templateName)
 			}
-			var log bytes.Buffer
+			// If error is not customized write error in default way
+			if errMsg != errCustomBodyResponse.Error() {
+				w.WriteHeader(errCode)
+				response.StatusCode = errCode
+				apiError := APIError{template.HTML(errMsg)}
+				var log bytes.Buffer
+				rsp := io.MultiWriter(w, &log)
+				tmpl.Execute(rsp, &apiError)
+				response.Body = ioutil.NopCloser(&log)
+			}
+		} else {
+			// Try to use an error template that matches the HTTP error code and the content type: 500.json, 400.json, etc.
+			tmpl := templates.Lookup(templateName)
+			// Fallback to a generic error template, but match the content type: error.json, error.xml, etc.
+			if tmpl == nil {
+				templateName = defaultTemplateName + "." + templateExtension
+				tmpl = templates.Lookup(templateName)
+			}
 
-			rsp := io.MultiWriter(w, &log)
-			tmpl.Execute(rsp, &apiError)
-			response.Body = ioutil.NopCloser(&log)
+			// If no template is available for this content type, fallback to "error.json".
+			if tmpl == nil {
+				templateName = defaultTemplateName + "." + defaultTemplateFormat
+				tmpl = templates.Lookup(templateName)
+			}
+
+			// If error is not customized write error in default way
+			if errMsg != errCustomBodyResponse.Error() {
+				w.WriteHeader(errCode)
+				response.StatusCode = errCode
+				apiError := APIError{template.HTML(template.JSEscapeString(errMsg))}
+				var log bytes.Buffer
+				rsp := io.MultiWriter(w, &log)
+				tmpl.Execute(rsp, &apiError)
+				response.Body = ioutil.NopCloser(&log)
+			}
 		}
+
 	}
 
 	if memProfFile != nil {
