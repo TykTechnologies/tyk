@@ -19,7 +19,7 @@ import (
 
 	"github.com/cenk/backoff"
 
-	sprig "gopkg.in/Masterminds/sprig.v2"
+	"gopkg.in/Masterminds/sprig.v2"
 
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/rpc"
@@ -27,7 +27,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	circuit "github.com/TykTechnologies/circuitbreaker"
+	"github.com/TykTechnologies/circuitbreaker"
 	"github.com/TykTechnologies/gojsonschema"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -267,7 +267,9 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 	}
 
 	// Add any new session managers or auth handlers here
-	spec.AuthManager = &DefaultSessionManager{}
+	spec.AuthManager = &DefaultSessionManager{
+		orgID: spec.OrgID,
+	}
 
 	spec.SessionManager = &DefaultSessionManager{
 		orgID: spec.OrgID,

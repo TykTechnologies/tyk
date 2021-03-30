@@ -140,13 +140,13 @@ func (b *DefaultSessionManager) SessionDetail(keyName string, hashed bool) (user
 	} else {
 		if storage.TokenOrg(keyName) != b.orgID {
 			// try to get legacy and new format key at once
+			toSearchList := []string{generateToken(b.orgID, keyName), keyName}
+			for _, fallback := range config.Global().HashKeyFunctionFallback {
+				toSearchList = append(toSearchList, generateToken(b.orgID, keyName, fallback))
+			}
+
 			var jsonKeyValList []string
-			jsonKeyValList, err = b.store.GetMultiKey(
-				[]string{
-					generateToken(b.orgID, keyName),
-					keyName,
-				},
-			)
+			jsonKeyValList, err = b.store.GetMultiKey(toSearchList)
 
 			// pick the 1st non empty from the returned list
 			for _, val := range jsonKeyValList {
@@ -187,10 +187,15 @@ func (b *DefaultSessionManager) Sessions(filter string) []string {
 
 type DefaultKeyGenerator struct{}
 
-func generateToken(orgID, keyID string) string {
+func generateToken(orgID, keyID string, customHashKeyFunction ...string) string {
 	keyID = strings.TrimPrefix(keyID, orgID)
-	token, err := storage.GenerateToken(orgID, keyID, config.Global().HashKeyFunction)
+	hashKeyFunction := config.Global().HashKeyFunction
 
+	if len(customHashKeyFunction) > 0 {
+		hashKeyFunction = customHashKeyFunction[0]
+	}
+
+	token, err := storage.GenerateToken(orgID, keyID, hashKeyFunction)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "auth-mgr",

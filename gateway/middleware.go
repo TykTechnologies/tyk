@@ -16,7 +16,7 @@ import (
 	"github.com/justinas/alice"
 	newrelic "github.com/newrelic/go-agent"
 	"github.com/paulbellamy/ratecounter"
-	cache "github.com/pmylund/go-cache"
+	"github.com/pmylund/go-cache"
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -560,9 +560,11 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 
 	// Try and get the session from the session store
 	t.Logger().Debug("Querying local cache")
+	keyHash := key
 	cacheKey := key
 	if t.Spec.GlobalConfig.HashKeys {
-		cacheKey = storage.HashStr(key)
+		keyHash = storage.HashStr(key)
+		cacheKey = storage.HashStr(key, storage.HashMurmur64) // always hash cache keys with murmur64 to prevent collisions
 	}
 
 	// Check in-memory cache
@@ -583,7 +585,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 	t.Logger().Debug("Querying keystore")
 	session, found := t.Spec.SessionManager.SessionDetail(key, false)
 	if found {
-		session.SetKeyHash(cacheKey)
+		session.SetKeyHash(keyHash)
 		// If exists, assume it has been authorized and pass on
 		// cache it
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
@@ -606,7 +608,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 		// update value of originalKey, as for custom-keys it might get updated (the key is generated again using alias)
 		*originalKey = key
 
-		session.SetKeyHash(cacheKey)
+		session.SetKeyHash(keyHash)
 		// If not in Session, and got it from AuthHandler, create a session with a new TTL
 		t.Logger().Info("Recreating session for key: ", obfuscateKey(key))
 
