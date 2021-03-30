@@ -166,13 +166,13 @@ func TestSignatureValidation(t *testing.T) {
 		validSigPath := emptySigPath + "&sig=" + hex.EncodeToString(validHash)
 
 		storage.DisableRedis(true)
-		ts.Run(t, []test.TestCase{
+		_, _ = ts.Run(t, []test.TestCase{
 			{Path: emptySigPath, Code: http.StatusForbidden},
 			{Path: invalidSigPath, Code: http.StatusForbidden},
 			{Path: validSigPath, Code: http.StatusForbidden},
 		}...)
 		storage.DisableRedis(false)
-		ts.Run(t, []test.TestCase{
+		_, _ = ts.Run(t, []test.TestCase{
 			{Path: emptySigPath, Code: 401},
 			{Path: invalidSigPath, Code: 401},
 			{Path: validSigPath, Code: 200},
