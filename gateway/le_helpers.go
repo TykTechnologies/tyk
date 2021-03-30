@@ -91,11 +91,13 @@ func onLESSLStatusReceivedHandler(payload string) {
 }
 
 func StartPeriodicStateBackup(ctx context.Context, m *letsencrypt.Manager) {
+	watch := m.Watch()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-m.Watch():
+		case <-watch:
 			if LE_FIRSTRUN {
 				log.Info("[SSL] State change detected, storing")
 				StoreLEState(m)

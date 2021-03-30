@@ -1,21 +1,26 @@
 package gateway
 
 import (
+	"bytes"
 	"crypto/md5"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
 	cache "github.com/pmylund/go-cache"
+	jose "github.com/square/go-jose"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -56,19 +61,30 @@ type JWKs struct {
 	Keys []JWK `json:"keys"`
 }
 
-func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) ([]byte, error) {
+func parseJWK(buf []byte) (*jose.JSONWebKeySet, error) {
+	var j jose.JSONWebKeySet
+	err := json.Unmarshal(buf, &j)
+	if err != nil {
+		return nil, err
+	}
+	return &j, nil
+}
+
+func (k *JWTMiddleware) legacyGetSecretFromURL(url, kid, keyType string) (interface{}, error) {
 	// Implement a cache
 	if JWKCache == nil {
-		k.Logger().Debug("Creating JWK Cache")
 		JWKCache = cache.New(240*time.Second, 30*time.Second)
 	}
 
+	var client http.Client
+	client.Transport = &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Global().JWTSSLInsecureSkipVerify},
+	}
+
 	var jwkSet JWKs
-	cachedJWK, found := JWKCache.Get(k.Spec.APIID)
+	cachedJWK, found := JWKCache.Get("legacy-" + k.Spec.APIID)
 	if !found {
-		// Get the JWK
-		k.Logger().Debug("Pulling JWK")
-		resp, err := http.Get(url)
+		resp, err := client.Get(url)
 		if err != nil {
 			k.Logger().WithError(err).Error("Failed to get resource URL")
 			return nil, err
@@ -81,14 +97,11 @@ func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) ([]byte, erro
 			return nil, err
 		}
 
-		// Cache it
-		k.Logger().Debug("Caching JWK")
-		JWKCache.Set(k.Spec.APIID, jwkSet, cache.DefaultExpiration)
+		JWKCache.Set("legacy-"+k.Spec.APIID, jwkSet, cache.DefaultExpiration)
 	} else {
 		jwkSet = cachedJWK.(JWKs)
 	}
 
-	k.Logger().Debug("Checking JWKs...")
 	for _, val := range jwkSet.Keys {
 		if val.KID != kid || strings.ToLower(val.Kty) != strings.ToLower(keyType) {
 			continue
@@ -96,16 +109,69 @@ func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) ([]byte, erro
 		if len(val.X5c) > 0 {
 			// Use the first cert only
 			decodedCert, err := base64.StdEncoding.DecodeString(val.X5c[0])
+			if !bytes.Contains(decodedCert, []byte("-----")) {
+				return nil, errors.New("No legacy public keys found")
+			}
 			if err != nil {
 				return nil, err
 			}
-			k.Logger().Debug("Found cert! Replying...")
-			k.Logger().Debug("Cert was: ", string(decodedCert))
-			return decodedCert, nil
+			return ParseRSAPublicKey(decodedCert)
 		}
 		return nil, errors.New("no certificates in JWK")
 	}
 
+	return nil, errors.New("No matching KID could be found")
+}
+
+func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) (interface{}, error) {
+	// Implement a cache
+	if JWKCache == nil {
+		k.Logger().Debug("Creating JWK Cache")
+		JWKCache = cache.New(240*time.Second, 30*time.Second)
+	}
+
+	var jwkSet *jose.JSONWebKeySet
+	var client http.Client
+	client.Transport = &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Global().JWTSSLInsecureSkipVerify},
+	}
+
+	cachedJWK, found := JWKCache.Get(k.Spec.APIID)
+	if !found {
+		// Get the JWK
+		k.Logger().Debug("Pulling JWK")
+		resp, err := client.Get(url)
+		if err != nil {
+			k.Logger().WithError(err).Error("Failed to get resource URL")
+			return nil, err
+		}
+		defer resp.Body.Close()
+		buf, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			k.Logger().WithError(err).Error("Failed to get read response body")
+			return nil, err
+		}
+		if jwkSet, err = parseJWK(buf); err != nil {
+			k.Logger().WithError(err).Info("Failed to decode JWKs body. Trying x5c PEM fallback.")
+
+			key, legacyError := k.legacyGetSecretFromURL(url, kid, keyType)
+			if legacyError == nil {
+				return key, nil
+			}
+
+			return nil, err
+		}
+
+		// Cache it
+		k.Logger().Debug("Caching JWK")
+		JWKCache.Set(k.Spec.APIID, jwkSet, cache.DefaultExpiration)
+	} else {
+		jwkSet = cachedJWK.(*jose.JSONWebKeySet)
+	}
+	k.Logger().Debug("Checking JWKs...")
+	if keys := jwkSet.Key(kid); len(keys) > 0 {
+		return keys[0].Key, nil
+	}
 	return nil, errors.New("No matching KID could be found")
 }
 
@@ -123,18 +189,13 @@ func (k *JWTMiddleware) getIdentityFromToken(token *jwt.Token) (string, error) {
 	return tykId, err
 }
 
-func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.Token) ([]byte, error) {
+func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.Token) (interface{}, error) {
 	config := k.Spec.APIDefinition
 	// Check for central JWT source
 	if config.JWTSource != "" {
 		// Is it a URL?
 		if httpScheme.MatchString(config.JWTSource) {
-			secret, err := k.getSecretFromURL(config.JWTSource, token.Header[KID].(string), k.Spec.JWTSigningMethod)
-			if err != nil {
-				return nil, err
-			}
-
-			return secret, nil
+			return k.getSecretFromURL(config.JWTSource, token.Header[KID].(string), k.Spec.JWTSigningMethod)
 		}
 
 		// If not, return the actual value
@@ -205,7 +266,7 @@ func (k *JWTMiddleware) getBasePolicyID(r *http.Request, claims jwt.MapClaims) (
 			return
 		}
 
-		pols := clientSession.PolicyIDs()
+		pols := clientSession.GetPolicyIDs()
 		if len(pols) < 1 {
 			return
 		}
@@ -351,7 +412,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			}
 		}
 
-		session.MetaData = map[string]interface{}{"TykJWTSessionID": sessionID}
+		session.SetMetaData(map[string]interface{}{"TykJWTSessionID": sessionID})
 		session.Alias = baseFieldData
 
 		// Update the session in the session manager in case it gets called again
@@ -379,7 +440,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			return errors.New("key not authorized: no matching policy"), http.StatusForbidden
 		}
 		// check if token for this session was switched to another valid policy
-		pols := session.PolicyIDs()
+		pols := session.GetPolicyIDs()
 		if len(pols) == 0 {
 			k.reportLoginFailure(baseFieldData, r)
 			k.Logger().Error("No policies for the found session. Failing Request.")
@@ -391,14 +452,14 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		if isDefaultPol {
 			// check a policy is removed/added from/to default policies
 
-			for _, pol := range session.PolicyIDs() {
+			for _, pol := range session.GetPolicyIDs() {
 				if !contains(k.Spec.JWTDefaultPolicies, pol) && basePolicyID != pol {
 					defaultPolicyListChanged = true
 				}
 			}
 
 			for _, defPol := range k.Spec.JWTDefaultPolicies {
-				if !contains(session.PolicyIDs(), defPol) {
+				if !contains(session.GetPolicyIDs(), defPol) {
 					defaultPolicyListChanged = true
 				}
 			}
@@ -492,7 +553,8 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		ctxSetSession(r, &session, sessionID, updateSession)
 
 		if updateSession {
-			SessionCache.Set(session.KeyHash(), session, cache.DefaultExpiration)
+			clone := session.Clone()
+			SessionCache.Set(session.GetKeyHash(), &clone, cache.DefaultExpiration)
 		}
 	}
 	ctxSetJWTContextVars(k.Spec, r, token)
@@ -592,12 +654,20 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		}
 		switch k.Spec.JWTSigningMethod {
 		case RSASign, ECDSASign:
-			key, err := ParseRSAPublicKey(val)
-			if err != nil {
-				logger.WithError(err).Error("Failed to decode JWT key")
-				return nil, errors.New("Failed to decode JWT key")
+			switch e := val.(type) {
+			case []byte:
+				key, err := ParseRSAPublicKey(e)
+				if err != nil {
+					logger.WithError(err).Error("Failed to decode JWT key")
+					return nil, errors.New("Failed to decode JWT key")
+				}
+				return key, nil
+			default:
+				// We have already parsed the correct key so we just return it here.No need
+				// for checks because they already happened somewhere ele.
+				return e, nil
 			}
-			return key, nil
+
 		default:
 			return val, nil
 		}
@@ -704,9 +774,9 @@ func generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.Se
 	policiesMu.RLock()
 	policy, ok := policiesByID[policyID]
 	policiesMu.RUnlock()
-	session := user.SessionState{}
+	session := user.NewSessionState()
 	if !ok {
-		return session, errors.New("Policy not found")
+		return session.Clone(), errors.New("Policy not found")
 	}
 	// Check ownership, policy org owner must be the same as API,
 	// otherwise youcould overwrite a session key with a policy from a different org!
@@ -714,7 +784,7 @@ func generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.Se
 	if enforceOrg {
 		if policy.OrgID != orgID {
 			log.Error("Attempting to apply policy from different organisation to key, skipping")
-			return session, errors.New("Key not authorized: no matching policy")
+			return session.Clone(), errors.New("Key not authorized: no matching policy")
 		}
 	} else {
 		// Org isn;t enforced, so lets use the policy baseline
@@ -744,5 +814,5 @@ func generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.Se
 		session.Expires = time.Now().Unix() + policy.KeyExpiresIn
 	}
 
-	return session, nil
+	return session.Clone(), nil
 }

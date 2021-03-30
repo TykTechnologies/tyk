@@ -25,7 +25,7 @@ func testPrepareProcessRequestQuotaLimit(tb testing.TB, ts *Test, data map[strin
 
 	data["org_id"] = orgID
 	storage.DisableRedis(true)
-	expectBody := `{"status":"error","message":"Error writing to key store storage: Redis is either down or ws not configured"}`
+	expectBody := `{"status":"error","message":"Error writing to key store storage: Redis is either down or was not configured"}`
 	// create org key with quota
 	ts.Run(tb, test.TestCase{
 		Path:      "/tyk/org/keys/" + orgID + "?reset_quota=1",
@@ -36,6 +36,7 @@ func testPrepareProcessRequestQuotaLimit(tb testing.TB, ts *Test, data map[strin
 		BodyMatch: expectBody,
 	})
 	storage.DisableRedis(false)
+
 	ts.Run(tb, test.TestCase{
 		Path:      "/tyk/org/keys/" + orgID + "?reset_quota=1",
 		AdminAuth: true,
@@ -62,7 +63,7 @@ func TestProcessRequestLiveQuotaLimit(t *testing.T) {
 		map[string]interface{}{
 			"quota_max":          10,
 			"quota_remaining":    10,
-			"quota_renewal_rate": 3,
+			"quota_renewal_rate": 1,
 		},
 	)
 
@@ -73,19 +74,13 @@ func TestProcessRequestLiveQuotaLimit(t *testing.T) {
 				Code: http.StatusOK,
 			})
 		}
-		storage.DisableRedis(true)
-		ts.Run(t, test.TestCase{
-			Code: http.StatusOK,
-		})
-		storage.DisableRedis(false)
-
 		// next request should fail with 403 as it is out of quota
 		ts.Run(t, test.TestCase{
 			Code: http.StatusForbidden,
 		})
 
 		// wait for renewal
-		time.Sleep(4 * time.Second)
+		time.Sleep(2 * time.Second)
 
 		// next one should be OK
 		ts.Run(t, test.TestCase{
@@ -262,7 +257,7 @@ func TestProcessRequestLiveRedisRollingLimiter(t *testing.T) {
 		}
 
 		// wait for next time window
-		time.Sleep(2 * time.Second)
+		time.Sleep(1 * time.Second)
 
 		// try to run over rate limit
 		reqNum := 1
@@ -273,6 +268,11 @@ func TestProcessRequestLiveRedisRollingLimiter(t *testing.T) {
 				break
 			}
 			reqNum++
+
+			if reqNum > 20 {
+				t.Errorf("Test takes too long to complete")
+				break
+			}
 		}
 
 		if reqNum < 10 {

@@ -20,7 +20,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v8"
 )
 
 func TestURLRewrites(t *testing.T) {
@@ -115,7 +115,7 @@ func TestWhitelist(t *testing.T) {
 	t.Run("Simple Paths", func(t *testing.T) {
 		BuildAndLoadAPI(func(spec *APISpec) {
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
-				v.Paths.WhiteList = []string{"/simple", "/regex/{id}/test"}
+				v.Paths.WhiteList = []string{"/simple", "pathWithoutSlash", "/regex/{id}/test"}
 				v.UseExtendedPaths = false
 			})
 
@@ -125,6 +125,7 @@ func TestWhitelist(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 			// Should mock path
 			{Path: "/simple", Code: http.StatusOK},
+			{Path: "/pathWithoutSlash", Code: http.StatusOK},
 			{Path: "/regex/123/test", Code: http.StatusOK},
 			{Path: "/regex/123/differ", Code: http.StatusForbidden},
 			{Path: "/", Code: http.StatusForbidden},
@@ -172,6 +173,32 @@ func TestWhitelist(t *testing.T) {
 			{Path: "/Foo", Code: http.StatusOK},
 			{Path: "/bar", Code: http.StatusOK},
 			{Path: "/Bar", Code: http.StatusForbidden},
+		}...)
+	})
+
+	t.Run("Listen path matches", func(t *testing.T) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.Paths.WhiteList = []string{"/fruits/fruit"}
+				v.UseExtendedPaths = false
+			})
+
+			spec.Proxy.ListenPath = "/fruits/"
+		}, func(spec *APISpec) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.Paths.WhiteList = []string{"/vegetable$"}
+				v.UseExtendedPaths = false
+			})
+
+			spec.Proxy.ListenPath = "/vegetables/"
+		})
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/fruits/fruit", Code: http.StatusOK},
+			{Path: "/fruits/count", Code: http.StatusForbidden},
+
+			{Path: "/vegetables/vegetable", Code: http.StatusOK},
+			{Path: "/vegetables/count", Code: http.StatusForbidden},
 		}...)
 	})
 }
@@ -243,6 +270,32 @@ func TestBlacklist(t *testing.T) {
 			{Path: "/Foo", Code: http.StatusForbidden},
 			{Path: "/bar", Code: http.StatusForbidden},
 			{Path: "/Bar", Code: http.StatusOK},
+		}...)
+	})
+
+	t.Run("Listen path matches", func(t *testing.T) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.Paths.BlackList = []string{"/fruits/fruit"}
+				v.UseExtendedPaths = false
+			})
+
+			spec.Proxy.ListenPath = "/fruits/"
+		}, func(spec *APISpec) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.Paths.BlackList = []string{"/vegetable$"}
+				v.UseExtendedPaths = false
+			})
+
+			spec.Proxy.ListenPath = "/vegetables/"
+		})
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/fruits/fruit", Code: http.StatusForbidden},
+			{Path: "/fruits/count", Code: http.StatusOK},
+
+			{Path: "/vegetables/vegetable", Code: http.StatusForbidden},
+			{Path: "/vegetables/count", Code: http.StatusOK},
 		}...)
 	})
 }
@@ -481,6 +534,8 @@ func TestWhitelistMethodWithAdditionalMiddleware(t *testing.T) {
 }
 
 func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
+	ReloadTestCase.Enable()
+	defer ReloadTestCase.Disable()
 	// Test Dashboard
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/system/apis" {
@@ -513,8 +568,7 @@ func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 	}
 	handleRedisEvent(&msg, handled, wg.Done)
 
-	// Since we already know that reload is queued
-	ReloadTick <- time.Time{}
+	ReloadTestCase.TickOk(t)
 
 	// Wait for the reload to finish, then check it worked
 	wg.Wait()
@@ -779,6 +833,8 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 }
 
 func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
+	ReloadTestCase.Enable()
+	defer ReloadTestCase.Disable()
 	// Test Dashboard
 	callNum := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -818,8 +874,7 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 	}
 	handleRedisEvent(&msg, handled, wg.Done)
 
-	// Since we already know that reload is queued
-	ReloadTick <- time.Time{}
+	ReloadTestCase.TickOk(t)
 
 	// Wait for the reload to finish, then check it worked
 	wg.Wait()
@@ -833,11 +888,10 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 
 	var wg2 sync.WaitGroup
 	wg2.Add(1)
+	ReloadTestCase.Reset()
 	handleRedisEvent(&msg, handled, wg2.Done)
 
-	// Since we already know that reload is queued
-	ReloadTick <- time.Time{}
-
+	ReloadTestCase.TickOk(t)
 	// Wait for the reload to finish, then check it worked
 	wg2.Wait()
 	apisMu.RLock()

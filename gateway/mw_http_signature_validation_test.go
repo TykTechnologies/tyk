@@ -49,7 +49,7 @@ const hmacAuthDef = `{
 }`
 
 func createHMACAuthSession() *user.SessionState {
-	session := new(user.SessionState)
+	session := user.NewSessionState()
 	session.Rate = 8.0
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
@@ -64,7 +64,7 @@ func createHMACAuthSession() *user.SessionState {
 }
 
 func createRSAAuthSession(pubCertId string) *user.SessionState {
-	session := new(user.SessionState)
+	session := user.NewSessionState()
 	session.Rate = 8.0
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()

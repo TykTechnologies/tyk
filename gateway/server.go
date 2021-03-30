@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -40,7 +41,6 @@ import (
 	"github.com/evalphobia/logrus_sentry"
 	graylogHook "github.com/gemnasium/logrus-graylog-hook"
 	"github.com/gorilla/mux"
-	"github.com/justinas/alice"
 	"github.com/lonelycode/osin"
 	newrelic "github.com/newrelic/go-agent"
 	"github.com/rs/cors"
@@ -172,9 +172,14 @@ func setupGlobals(ctx context.Context) {
 		mainLog.Fatal("Analytics requires Redis Storage backend, please enable Redis in the tyk.conf file.")
 	}
 
-	// Initialise our Host Checker
-	healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:"}
-	InitHostCheckManager(ctx, &healthCheckStore)
+	// Initialise HostCheckerManager only if uptime tests are enabled.
+	if !config.Global().UptimeTests.Disable {
+		if config.Global().ManagementNode {
+			mainLog.Warn("Running Uptime checks in a management node.")
+		}
+		healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:", IsAnalytics: true}
+		InitHostCheckManager(ctx, &healthCheckStore)
+	}
 
 	initHealthCheck(ctx)
 
@@ -191,15 +196,21 @@ func setupGlobals(ctx context.Context) {
 		config.SetGlobal(globalConf)
 		mainLog.Debug("Setting up analytics DB connection")
 
-		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-"}
+		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true}
 		analytics.Store = &analyticsStore
 		analytics.Init(globalConf)
+
+		redisPurgeOnce.Do(func() {
+			store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true}
+			redisPurger := RedisPurger{Store: &store}
+			go redisPurger.PurgeLoop(ctx)
+		})
 
 		if config.Global().AnalyticsConfig.Type == "rpc" {
 			mainLog.Debug("Using RPC cache purge")
 
 			rpcPurgeOnce.Do(func() {
-				store := storage.RedisCluster{KeyPrefix: "analytics-"}
+				store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true}
 				purger := rpc.Purger{
 					Store: &store,
 				}
@@ -242,7 +253,7 @@ func setupGlobals(ctx context.Context) {
 		certificateSecret = config.Global().Security.PrivateCertificateEncodingSecret
 	}
 
-	CertificateManager = certs.NewCertificateManager(getGlobalStorageHandler("cert-", false), certificateSecret, log)
+	CertificateManager = certs.NewCertificateManager(getGlobalStorageHandler("cert-", false), certificateSecret, log, !config.Global().Cloud)
 
 	if config.Global().NewRelic.AppName != "" {
 		NewRelicApplication = SetupNewRelic()
@@ -408,6 +419,8 @@ func loadControlAPIEndpoints(muxer *mux.Router) {
 		}
 	}
 
+	muxer.HandleFunc("/"+config.Global().HealthCheckEndpointName, liveCheckHandler)
+
 	r := mux.NewRouter()
 	muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
 		stripSlashes(checkIsAPIOwner(controlAPICheckClientCertificate("/gateway/client", InstrumentationMW(r)))),
@@ -490,16 +503,12 @@ func generateOAuthPrefix(apiID string) string {
 
 // Create API-specific OAuth handlers and respective auth servers
 func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
-	var pathSeparator string
-	if !strings.HasSuffix(spec.Proxy.ListenPath, "/") {
-		pathSeparator = "/"
-	}
 
-	apiAuthorizePath := spec.Proxy.ListenPath + pathSeparator + "tyk/oauth/authorize-client{_:/?}"
-	clientAuthPath := spec.Proxy.ListenPath + pathSeparator + "oauth/authorize{_:/?}"
-	clientAccessPath := spec.Proxy.ListenPath + pathSeparator + "oauth/token{_:/?}"
-	revokeToken := spec.Proxy.ListenPath + pathSeparator + "oauth/revoke"
-	revokeAllTokens := spec.Proxy.ListenPath + pathSeparator + "oauth/revoke_all"
+	apiAuthorizePath := "/tyk/oauth/authorize-client{_:/?}"
+	clientAuthPath := "/oauth/authorize{_:/?}"
+	clientAccessPath := "/oauth/token{_:/?}"
+	revokeToken := "/oauth/revoke"
+	revokeAllTokens := "/oauth/revoke_all"
 
 	serverConfig := osin.NewServerConfig()
 
@@ -531,11 +540,10 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 	return &oauthManager
 }
 
-func addBatchEndpoint(spec *APISpec, muxer *mux.Router) {
+func addBatchEndpoint(spec *APISpec, subrouter *mux.Router) {
 	mainLog.Debug("Batch requests enabled for API")
-	apiBatchPath := spec.Proxy.ListenPath + "tyk/batch/"
 	batchHandler := BatchRequestHandler{API: spec}
-	muxer.HandleFunc(apiBatchPath, batchHandler.HandleBatchRequest)
+	subrouter.HandleFunc("/tyk/batch/", batchHandler.HandleBatchRequest)
 }
 
 func loadCustomMiddleware(spec *APISpec) ([]string, apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, apidef.MiddlewareDriver) {
@@ -648,12 +656,20 @@ func createResponseMiddlewareChain(spec *APISpec, responseFuncs []apidef.Middlew
 	}
 
 	for _, mw := range responseFuncs {
-		processor := responseProcessorByName("custom_mw_res_hook")
+		var processor TykResponseHandler
+		//is it goplugin or other middleware
+		if strings.HasSuffix(mw.Path, ".so") {
+			processor = responseProcessorByName("goplugin_res_hook")
+		} else {
+			processor = responseProcessorByName("custom_mw_res_hook")
+		}
+
 		// TODO: perhaps error when plugin support is disabled?
 		if processor == nil {
 			mainLog.Error("Couldn't find custom middleware processor")
 			return
 		}
+
 		if err := processor.Init(mw, spec); err != nil {
 			mainLog.Debug("Failed to init processor: ", err)
 		}
@@ -663,7 +679,7 @@ func createResponseMiddlewareChain(spec *APISpec, responseFuncs []apidef.Middlew
 	spec.ResponseChain = responseChain
 }
 
-func handleCORS(chain *[]alice.Constructor, spec *APISpec) {
+func handleCORS(router *mux.Router, spec *APISpec) {
 
 	if spec.CORS.Enable {
 		mainLog.Debug("CORS ENABLED")
@@ -678,7 +694,7 @@ func handleCORS(chain *[]alice.Constructor, spec *APISpec) {
 			Debug:              spec.CORS.Debug,
 		})
 
-		*chain = append(*chain, c.Handler)
+		router.Use(c.Handler)
 	}
 }
 
@@ -740,7 +756,7 @@ func shouldReload() ([]func(), bool) {
 	return n, true
 }
 
-func reloadLoop(ctx context.Context, tick <-chan time.Time) {
+func reloadLoop(ctx context.Context, tick <-chan time.Time, complete ...func()) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -767,6 +783,9 @@ func reloadLoop(ctx context.Context, tick <-chan time.Time) {
 					c()
 				}
 			}
+			if len(complete) != 0 {
+				complete[0]()
+			}
 			mainLog.Infof("reload: cycle completed in %v", time.Since(start))
 		}
 	}
@@ -782,7 +801,7 @@ var requeueLock sync.Mutex
 // requeueLock for concurrent use.
 var requeue []func()
 
-func reloadQueueLoop(ctx context.Context) {
+func reloadQueueLoop(ctx context.Context, cb ...func()) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -792,6 +811,9 @@ func reloadQueueLoop(ctx context.Context) {
 			requeue = append(requeue, fn)
 			requeueLock.Unlock()
 			mainLog.Info("Reload queued")
+			if len(cb) != 0 {
+				cb[0]()
+			}
 		}
 	}
 }
@@ -993,6 +1015,32 @@ func initialiseSystem(ctx context.Context) error {
 			globalConf.Policies.PolicyRecordName = config.DefaultDashPolicyRecordName
 		}
 	}
+
+	if globalConf.ProxySSLMaxVersion == 0 {
+		globalConf.ProxySSLMaxVersion = tls.VersionTLS12
+	}
+
+	if globalConf.ProxySSLMinVersion > globalConf.ProxySSLMaxVersion {
+		globalConf.ProxySSLMaxVersion = globalConf.ProxySSLMinVersion
+	}
+
+	if globalConf.HttpServerOptions.MaxVersion == 0 {
+		globalConf.HttpServerOptions.MaxVersion = tls.VersionTLS12
+	}
+
+	if globalConf.HttpServerOptions.MinVersion > globalConf.HttpServerOptions.MaxVersion {
+		globalConf.HttpServerOptions.MaxVersion = globalConf.HttpServerOptions.MinVersion
+	}
+
+	if globalConf.UseDBAppConfigs && globalConf.Policies.PolicySource != config.DefaultDashPolicySource {
+		globalConf.Policies.PolicySource = config.DefaultDashPolicySource
+		globalConf.Policies.PolicyConnectionString = globalConf.DBAppConfOptions.ConnectionString
+		if globalConf.Policies.PolicyRecordName == "" {
+			globalConf.Policies.PolicyRecordName = config.DefaultDashPolicyRecordName
+		}
+	}
+
+	config.SetGlobal(globalConf)
 
 	getHostDetails()
 	setupInstrumentation()
@@ -1236,7 +1284,9 @@ func Start() {
 		defer trace.Close()
 	}
 	start(ctx)
-	go storage.ConnectToRedis(ctx)
+	go storage.ConnectToRedis(ctx, func() {
+		reloadURLStructure(func() {})
+	})
 
 	if *cli.MemProfile {
 		mainLog.Debug("Memory profiling active")
@@ -1282,15 +1332,6 @@ func Start() {
 	// stop analytics workers
 	if config.Global().EnableAnalytics && analytics.Store == nil {
 		analytics.Stop()
-	}
-
-	// if using async session writes stop workers
-	if config.Global().UseAsyncSessionWrite {
-		DefaultOrgStore.Stop()
-		for i := range apiSpecs {
-			apiSpecs[i].StopSessionManagerPool()
-		}
-
 	}
 
 	// write pprof profiles
