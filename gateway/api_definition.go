@@ -165,7 +165,7 @@ type APISpec struct {
 	RxPaths                  map[string][]URLSpec
 	WhiteListEnabled         map[string]bool
 	target                   *url.URL
-	AuthManager              AuthorisationHandler
+	AuthManager              SessionHandler
 	OAuthManager             *OAuthManager
 	OrgSessionManager        SessionHandler
 	EventPaths               map[apidef.TykEvent][]config.TykEventHandler
@@ -278,7 +278,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 	}
 
 	// Add any new session managers or auth handlers here
-	spec.AuthManager = &DefaultAuthorisationManager{}
+	spec.AuthManager = &DefaultSessionManager{}
 
 	spec.OrgSessionManager = &DefaultSessionManager{
 		orgID: spec.OrgID,

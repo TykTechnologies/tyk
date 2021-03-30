@@ -699,17 +699,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 	// Only search in RPC if it's not in emergency mode
 	t.Logger().Debug("Querying authstore")
 	// 2. If not there, get it from the AuthorizationHandler
-	session, found = t.Spec.AuthManager.KeyAuthorised(key)
-	if !found && storage.TokenOrg(key) != t.Spec.OrgID {
-		//treat it as a custom key
-		key = generateToken(t.Spec.OrgID, key)
-		cacheKey = key
-		if t.Spec.GlobalConfig.HashKeys {
-			cacheKey = storage.HashStr(cacheKey)
-		}
-		session, found = t.Spec.AuthManager.KeyAuthorised(key)
-	}
-
+	session, found = t.Spec.AuthManager.SessionDetail(t.Spec.OrgID, key, false)
 	if found {
 		// update value of originalKey, as for custom-keys it might get updated (the key is generated again using alias)
 		*originalKey = key
