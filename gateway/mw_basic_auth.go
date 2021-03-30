@@ -178,7 +178,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Check if API key valid
-	keyName := generateToken(k.Spec.OrgID, username)
+	keyName := username
 	logger := k.Logger().WithField("key", obfuscateKey(keyName))
 	session, keyExists := k.CheckSessionAndIdentityForValidKey(&keyName, r)
 	if !keyExists {
