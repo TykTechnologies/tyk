@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"strings"
+	"sync"
 	"time"
 
 	uuid "github.com/satori/go.uuid"
