@@ -350,6 +350,14 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 		}
 		originalKey = key.Clone()
 
+		isCertificateChanged := newSession.Certificate != originalKey.Certificate
+		if isCertificateChanged{
+			if newSession.Certificate == ""{
+				log.Error("Key must contain a certificate")
+				return apiError("Key cannot be used without a certificate"), http.StatusBadRequest
+			}
+		}
+
 		// preserve the creation date
 		newSession.DateCreated = originalKey.DateCreated
 
@@ -1304,6 +1312,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 		resetAPILimits(newSession.AccessRights)
 		for apiID := range newSession.GetAccessRights() {
 			apiSpec := getApiSpec(apiID)
+
 			if apiSpec != nil {
 				checkAndApplyTrialPeriod(newKey, newSession, false)
 				// If we have enabled HMAC checking for keys, we need to generate a secret for the client to use
