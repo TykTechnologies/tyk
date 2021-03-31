@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"html/template"
+	"io"
 	"net/http"
 	"runtime/pprof"
 	"strconv"
@@ -58,6 +59,12 @@ type ErrorHandler struct {
 	BaseMiddleware
 }
 
+// TemplateExecutor is an interface used to switch between text/templates and html/template.
+// It only switch to text/template (templatesRaw) when contentType is XML related
+type TemplateExecutor interface {
+	Execute(wr io.Writer, data interface{}) error
+}
+
 // HandleError is the actual error handler and will store the error details in analytics if analytics processing is enabled.
 func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMsg string, errCode int, writeResponse bool) {
 	defer e.Base().UpdateRequestSession(r)
@@ -109,10 +116,20 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			w.Header().Add(headers.Connection, "close")
 		}
 
-		// Need to return the correct error code!
 		w.WriteHeader(errCode)
+		var tmplExecutor TemplateExecutor
+		tmplExecutor = tmpl
+
 		apiError := APIError{template.HTML(template.JSEscapeString(errMsg))}
-		tmpl.Execute(w, &apiError)
+		if contentType == headers.ApplicationXML || contentType == headers.TextXML {
+			apiError.Message = template.HTML(errMsg)
+
+			//we look up in the last defined templateName to obtain the template.
+			rawTmpl := templatesRaw.Lookup(templateName)
+			tmplExecutor = rawTmpl
+		}
+
+		tmplExecutor.Execute(w, &apiError)
 	}
 
 	if memProfFile != nil {
