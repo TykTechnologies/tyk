@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	textTemplate "text/template"
 	"time"
 
 	"github.com/TykTechnologies/again"
@@ -56,6 +57,7 @@ var (
 	pubSubLog            = log.WithField("prefix", "pub-sub")
 	rawLog               = logger.GetRaw()
 	templates            *template.Template
+	templatesRaw         *textTemplate.Template
 	analytics            RedisAnalyticsHandler
 	GlobalEventsJSVM     JSVM
 	memProfFile          *os.File
@@ -227,6 +229,7 @@ func setupGlobals(ctx context.Context) {
 	// Load all the files that have the "error" prefix.
 	templatesDir := filepath.Join(config.Global().TemplatePath, "error*")
 	templates = template.Must(template.ParseGlob(templatesDir))
+	templatesRaw = textTemplate.Must(textTemplate.ParseGlob(templatesDir))
 
 	CoProcessInit()
 
