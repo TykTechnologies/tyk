@@ -358,6 +358,14 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 			}
 		}
 
+		// check that the certificate exists in the system
+		_, err := CertificateManager.GetRaw(newSession.Certificate)
+		if err != nil {
+			log.Error("Key must contain an existing certificate")
+			return apiError("Key must be used with an existent certificate"), http.StatusBadRequest
+
+		}
+
 		// preserve the creation date
 		newSession.DateCreated = originalKey.DateCreated
 
