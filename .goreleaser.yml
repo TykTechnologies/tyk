@@ -20,24 +20,8 @@ builds:
       - linux
     goarch:
       - amd64
-  - id: std-darwin
-    ldflags:
-      - -X gateway.VERSION={{.Version}} -X gateway.commit={{.Commit}} -X gateway.buildDate={{.Date}} -X gateway.builtBy=goreleaser
-    env:
-      - CC=o64-clang
-    goos:
-      - darwin
-    goarch:
-      - amd64
-  - id: std-arm64
-    ldflags:
-      - -X gateway.VERSION={{.Version}} -X gateway.commit={{.Commit}} -X gateway.buildDate={{.Date}} -X gateway.builtBy=goreleaser
-    env:
-      - CC=aarch64-linux-gnu-gcc
-    goos:
-      - linux
-    goarch:
-      - arm64
+    hooks:
+      pre: go get
   # static builds strip symbols and do not allow plugins
   - id: static-amd64
     ldflags:
@@ -47,6 +31,8 @@ builds:
       - linux
     goarch:
       - amd64
+    hooks:
+      pre: go get
 
 
 dockers:
@@ -55,9 +41,8 @@ dockers:
     image_templates:
       - "tykio/tyk-gateway:{{ .Tag }}"
       - "tykio/tyk-gateway:v{{ .Major }}.{{ .Minor }}"
-      - "{{ .Env.ECR_REGISTRY }}:{{ .Env.IMAGE_TAG }}"
-      - "{{ .Env.ECR_REGISTRY }}:{{ .Commit }}"
-      - "{{ .Env.ECR_REGISTRY }}:latest"
+      - "docker.cloudsmith.io/tyk/tyk-gateway/tyk-gateway:{{ .Tag }}"
+      - "docker.cloudsmith.io/tyk/tyk-gateway/tyk-gateway:v{{ .Major }}.{{ .Minor }}"
     build_flag_templates:
       - "--build-arg=PORTS=8080"
       - "--label=org.opencontainers.image.created={{.Date}}"
@@ -110,10 +95,8 @@ nfpms:
     maintainer: "Tyk <info@tyk.io>"
     description: Tyk API Gateway
     package_name: tyk-gateway
-    version_metadata: git
     builds:
       - std-linux
-      - std-arm64
     formats:
       - deb
       - rpm
@@ -151,10 +134,6 @@ nfpms:
       rpm:
         replacements:
           amd64: x86_64
-          arm: aarch64
-      deb:
-        replacements:
-          arm: arm64
     rpm:
       signature:
         key_file: tyk.io.signing.key
@@ -180,20 +159,6 @@ archives:
     - "coprocess/*"
     - tyk.conf.example
 
-- id: std-arm64
-  builds:
-    - std-arm64
-  files:
-    - README.md
-    - "LICENSE.md"
-    - "apps/app_sample.json"
-    - "templates/*.json"
-    - "install/*"
-    - "middleware/*.js"
-    - "event_handlers/sample/*.js"
-    - "policies/*.json"
-    - "coprocess/*"
-    - tyk.conf.example
 - id: static-amd64
   name_template: "{{ .ProjectName }}_{{ .Version }}_static_{{ .Os }}_{{ .Arch }}"
   builds:
@@ -225,3 +190,8 @@ changelog:
     - '^utils:'
     - (?i)typo
     - 'Merge (pull request|branch)'
+    - '\[CI\]'
+    - '(?i)\[Buddy\]'
+    - 'cherry picked'
+    - '^rel-eng:'
+    - '^minor:'
