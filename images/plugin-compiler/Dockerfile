@@ -1,4 +1,4 @@
-FROM tykio/tyk-build-env:latest
+FROM golang:1.12
 LABEL io.tyk.vendor="Tyk" \
       version="1.0" \
       description="Image for plugin development"
@@ -13,7 +13,7 @@ ENV PLUGIN_SOURCE_PATH=/plugin-source
 ENV PLUGIN_BUILD_PATH=/go/src/plugin-build
 
 RUN mkdir -p $TYK_GW_PATH $PLUGIN_SOURCE_PATH $PLUGIN_BUILD_PATH
-COPY data/build.sh /build.sh
+COPY images/plugin-compiler/data/build.sh /build.sh
 RUN chmod +x /build.sh
 
 RUN curl -sL "https://api.github.com/repos/TykTechnologies/tyk/tarball/${TYK_GW_TAG}" | \
