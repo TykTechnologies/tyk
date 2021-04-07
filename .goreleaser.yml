@@ -34,6 +34,8 @@ builds:
     hooks:
       pre: go get
 
+snapshot:
+  name_template: 0.0.0-SNAPSHOT-{{ .ShortCommit }}
 
 dockers:
   - ids:
