@@ -167,7 +167,7 @@ jobs:
 
       - name: Build with goreleaser in image
         run: |
-          goreleaser build --rm-dist
+          goreleaser release --rm-dist
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CGO_ENABLED: 1
