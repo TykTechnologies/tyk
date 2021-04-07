@@ -27,22 +27,20 @@ on:
 jobs:
   int-image:
     runs-on: ubuntu-latest
+    container: tykio/golang-cross:1.12
 
     steps:
       - name: Checkout tyk
         uses: actions/checkout@v2
         with:
           fetch-depth: 1
+          path: 'go/src/github.com/TykTechnologies/tyk'
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v1
         with:
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
           terraform_wrapper: false
-
-      - uses: actions/setup-go@v2
-        with:
-          go-version: '1.12'
 
       - name: Get AWS creds from Terraform remote state
         id: aws-creds
@@ -72,6 +70,8 @@ jobs:
       - name: Build integration tarball
         env:
           GO111MODULE: auto
+          GOPATH: ${{ github.workspace }}/go
+        working-directory: ${{ github.workspace }}/go/src/github.com/TykTechnologies/tyk
         run: |
             if [ -x bin/integration_build.sh ]; then
                SIGNPKGS=0 BUILDPKGS=0 BUILDWEB=0 ARCH=amd64 bin/integration_build.sh
@@ -165,9 +165,10 @@ jobs:
             *.txt.sig
             *.txt
 
-      - name: Build with goreleaser in image
-        run: |
-          goreleaser release --rm-dist
+      - uses: goreleaser/goreleaser-action@v2
+        with:
+          version: latest
+          args: release --rm-dist
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CGO_ENABLED: 1
