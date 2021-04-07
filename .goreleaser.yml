@@ -20,8 +20,6 @@ builds:
       - linux
     goarch:
       - amd64
-    hooks:
-      pre: go get
   # static builds strip symbols and do not allow plugins
   - id: static-amd64
     ldflags:
@@ -31,8 +29,6 @@ builds:
       - linux
     goarch:
       - amd64
-    hooks:
-      pre: go get
 
 snapshot:
   name_template: 0.0.0-SNAPSHOT-{{ .ShortCommit }}

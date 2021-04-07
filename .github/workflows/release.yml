@@ -68,7 +68,6 @@ jobs:
       - name: Build integration tarball
         env:
           GO111MODULE: auto
-          GOPATH: ${{ github.workspace }}/go
         run: |
             if [ -x bin/integration_build.sh ]; then
                SIGNPKGS=0 BUILDPKGS=0 BUILDWEB=0 ARCH=amd64 bin/integration_build.sh
@@ -170,7 +169,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CGO_ENABLED: 1
           GO111MODULE: auto
-          GOPATH: ${{ github.workspace }}/go
           NFPM_STD_PASSPHRASE: ${{ secrets.SIGNING_KEY_PASSPHRASE }}
           NFPM_PAYG_PASSPHRASE: ${{ secrets.SIGNING_KEY_PASSPHRASE }}
           GPG_FINGERPRINT: 12B5D62C28F57592D1575BD51ED14C59E37DAC20
