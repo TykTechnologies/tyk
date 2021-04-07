@@ -84,6 +84,7 @@ jobs:
       - name: Build, tag, and push image to Amazon ECR
         env:
           ECR_REGISTRY: ${{ steps.aws-creds.outputs.ecr }}
+        working-directory: ${{ env.REPO_PATH }}
         run: |
             docker build -t ${ECR_REGISTRY}:${GITHUB_REF##*/} \
                          -t ${ECR_REGISTRY}:latest \
@@ -168,10 +169,9 @@ jobs:
             *.txt.sig
             *.txt
 
-      - uses: goreleaser/goreleaser-action@v2
-        with:
-          version: latest
-          args: release --rm-dist
+      - name: Build from goreleaser in golang-cross
+        run: |
+          goreleaser release --rm-dist
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CGO_ENABLED: 1
