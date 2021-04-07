@@ -24,6 +24,9 @@ on:
     tags:
       - 'v*'
 
+env:
+  REPO_PATH: go/src/github.com/TykTechnologies/tyk
+
 jobs:
   int-image:
     runs-on: ubuntu-latest
@@ -34,7 +37,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 1
-          path: 'go/src/github.com/TykTechnologies/tyk'
+          path: ${{ env.REPO_PATH }}
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v1
@@ -45,7 +48,7 @@ jobs:
       - name: Get AWS creds from Terraform remote state
         id: aws-creds
         run: |
-            cd integration/terraform
+            cd ${{ env.REPO_PATH }}/integration/terraform
             terraform init -input=false -lock=false
             terraform refresh
             eval $(terraform output -json tyk | jq -r 'to_entries[] | [.key,.value] | join("=")')
@@ -71,7 +74,7 @@ jobs:
         env:
           GO111MODULE: auto
           GOPATH: ${{ github.workspace }}/go
-        working-directory: ${{ github.workspace }}/go/src/github.com/TykTechnologies/tyk
+        working-directory: ${{ env.REPO_PATH }}
         run: |
             if [ -x bin/integration_build.sh ]; then
                SIGNPKGS=0 BUILDPKGS=0 BUILDWEB=0 ARCH=amd64 bin/integration_build.sh
