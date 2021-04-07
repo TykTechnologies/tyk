@@ -110,6 +110,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
+          path: ${{ env.REPO_PATH }}
 
       - name: Login to DockerHub
         if: startsWith(github.ref, 'refs/tags')
@@ -169,13 +170,19 @@ jobs:
             *.txt.sig
             *.txt
 
-      - name: Build from goreleaser in golang-cross
+      - uses: goreleaser/goreleaser-action@v2
+        with:
+          version: 0.157
+          args: release --rm-dist
+          workdir: ${{ env.REPO_PATH }}
+        name: Build from goreleaser in golang-cross
         run: |
           goreleaser release --rm-dist
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CGO_ENABLED: 1
           GO111MODULE: auto
+          GOPATH: ${{ github.workspace }}/go
           NFPM_STD_PASSPHRASE: ${{ secrets.SIGNING_KEY_PASSPHRASE }}
           NFPM_PAYG_PASSPHRASE: ${{ secrets.SIGNING_KEY_PASSPHRASE }}
           GPG_FINGERPRINT: 12B5D62C28F57592D1575BD51ED14C59E37DAC20
