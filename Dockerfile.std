@@ -5,7 +5,7 @@
 # ./pr.zsh -branch goreleaser/more -base goreleaser/more -title Removed: vol mount, compatibility symlink for pump -p
 # m4 -E -DxREPO=tyk
 
-FROM debian:buster-20210208-slim
+FROM debian:buster-slim
 RUN apt-get update \
  && apt-get dist-upgrade -y ca-certificates \
  && apt-get autoremove -y
@@ -19,7 +19,7 @@ EXPOSE $PORTS
 RUN apt-get install -y python3-setuptools libpython3.7 python3.7-dev curl \
  && curl https://bootstrap.pypa.io/get-pip.py | python3 \
  && pip3 install protobuf grpcio==1.24.0
-COPY install/data/tyk.standalone.conf /opt/tyk-gateway/tyk.conf
+COPY install/data/tyk.self_contained.conf /opt/tyk-gateway/tyk.conf
 COPY install/data/entrypoint.sh /
 
 ENTRYPOINT ["/entrypoint.sh" ]
