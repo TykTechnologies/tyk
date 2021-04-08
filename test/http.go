@@ -252,10 +252,21 @@ func (r HTTPTestRunner) Run(t testing.TB, testCases ...TestCase) (*http.Response
 			t.Errorf("[%d] Request build error: %s", ti, err.Error())
 			continue
 		}
+
+		const maxRetryCount = 2
+		retryCount := 0
+	retry:
+
 		lastResponse, lastError = r.Do(req, &tc)
 		tcJSON, _ := json.Marshal(tc)
 
 		if lastError != nil {
+			if retryCount < maxRetryCount && (strings.Contains(lastError.Error(), "broken pipe") ||
+				strings.Contains(lastError.Error(), "protocol wrong type for socket")) {
+				retryCount++
+				goto retry
+			}
+
 			if tc.ErrorMatch != "" {
 				if !strings.Contains(lastError.Error(), tc.ErrorMatch) {
 					t.Errorf("[%d] Expect error `%s` to contain `%s`. %s", ti, lastError.Error(), tc.ErrorMatch, string(tcJSON))
