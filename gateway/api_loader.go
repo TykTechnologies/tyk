@@ -722,24 +722,13 @@ type generalStores struct {
 
 var playgroundTemplate *template.Template
 
-func getPlaygroundTemplate() *template.Template {
-	var err error
-	defer func() {
-		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "playground",
-			}).Error("Could not load the default playground templates: ", err)
-		}
-	}()
-
-	if playgroundTemplate != nil {
-		return playgroundTemplate
-	}
-
+func readGraphqlPlaygroundTemplate() {
 	playgroundPath := filepath.Join(config.Global().TemplatePath, "playground")
 	files, err := ioutil.ReadDir(playgroundPath)
 	if err != nil {
-		return nil
+		log.WithFields(logrus.Fields{
+			"prefix": "playground",
+		}).Error("Could not load the default playground templates: ", err)
 	}
 
 	var paths []string
@@ -749,10 +738,10 @@ func getPlaygroundTemplate() *template.Template {
 
 	playgroundTemplate, err = template.ParseFiles(paths...)
 	if err != nil {
-		return nil
+		log.WithFields(logrus.Fields{
+			"prefix": "playground",
+		}).Error("Could not parse the default playground templates: ", err)
 	}
-
-	return playgroundTemplate
 }
 
 func loadGraphQLPlayground(spec *APISpec, subrouter *mux.Router) {
@@ -766,9 +755,7 @@ func loadGraphQLPlayground(spec *APISpec, subrouter *mux.Router) {
 	}
 
 	subrouter.PathPrefix(spec.GraphQL.GraphQLPlayground.Path).HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		tmpl := getPlaygroundTemplate()
-
-		if tmpl == nil {
+		if playgroundTemplate == nil {
 			rw.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -776,9 +763,9 @@ func loadGraphQLPlayground(spec *APISpec, subrouter *mux.Router) {
 		var err error
 		switch {
 		case strings.HasSuffix(req.URL.Path, "playground.js"):
-			err = tmpl.ExecuteTemplate(rw, "playground.js", nil)
+			err = playgroundTemplate.ExecuteTemplate(rw, "playground.js", nil)
 		default:
-			err = tmpl.ExecuteTemplate(rw, "index.html", struct {
+			err = playgroundTemplate.ExecuteTemplate(rw, "index.html", struct {
 				Url, Schema string
 			}{endpoint, strconv.Quote(spec.GraphQL.Schema)})
 		}
