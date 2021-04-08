@@ -108,6 +108,14 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      - name: Login to Cloudsmith
+        if: startsWith(github.ref, 'refs/tags')
+        uses: docker/login-action@v1
+        with:
+          registry: docker.cloudsmith.io
+          username: ${{ secrets.CLOUDSMITH_USERNAME }}
+          password: ${{ secrets.CLOUDSMITH_API_KEY }}
+
       - name: Unlock agent and set targets
         id: targets
         shell: bash
@@ -176,9 +184,14 @@ jobs:
       - name: Push unstable docker image
         if: steps.targets.outputs.hub == 'unstable' && steps.targets.outputs.upload == 'true'
         run: |
-          docker tag tykio/tyk-gateway tykio/tyk-gateway:${{ steps.targets.outputs.hub }}
-          docker tag tykio/tyk-gateway tykio/tyk-gateway:${GITHUB_REF##*/}
-          docker push --all-tags tykio/tyk-gateway
+          tag=${GITHUB_REF##*/}
+          docker tag tykio/tyk-gateway:${tag} tykio/tyk-gateway:${{ steps.targets.outputs.hub }}
+          docker push tykio/tyk-gateway:${{ steps.targets.outputs.hub }}
+          docker push tykio/tyk-gateway:${tag}
+          docker tag tykio/tyk-gateway:${tag} docker.cloudsmith.io/tyk/tyk-gateway/tyk-gateway:${tag}
+          docker push docker.cloudsmith.io/tyk/tyk-gateway/tyk-gateway:${tag}
+          docker push tykio/tyk-plugin-compiler:${tag}
+          docker push tykio/tyk-hybrid-docker:${tag}
 
 # AWS mktplace update only for LTS releases
   aws-mktplace-byol:
