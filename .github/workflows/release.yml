@@ -130,6 +130,7 @@ jobs:
       - name: Unlock agent and set targets
         id: targets
         shell: bash
+        working-directory: ${{ env.REPO_PATH }}
         env:
           NFPM_STD_PASSPHRASE: ${{ secrets.SIGNING_KEY_PASSPHRASE }}
           GPG_FINGERPRINT: 12B5D62C28F57592D1575BD51ED14C59E37DAC20
