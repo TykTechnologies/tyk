@@ -331,6 +331,7 @@ type Config struct {
 	// Gateway Security Policies
 	HashKeys                bool           `json:"hash_keys"`
 	HashKeyFunction         string         `json:"hash_key_function"`
+	HashKeyFunctionFallback []string       `json:"hash_key_function_fallback"`
 	EnableHashedKeysListing bool           `json:"enable_hashed_keys_listing"`
 	MinTokenLength          int            `json:"min_token_length"`
 	EnableAPISegregation    bool           `json:"enable_api_segregation"`

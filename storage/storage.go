@@ -144,8 +144,15 @@ func hashFunction(algorithm string) (hash.Hash, error) {
 	}
 }
 
-func HashStr(in string) string {
-	h, _ := hashFunction(TokenHashAlgo(in))
+func HashStr(in string, withAlg ...string) string {
+	var algo string
+	if len(withAlg) > 0 && withAlg[0] != "" {
+		algo = withAlg[0]
+	} else {
+		algo = TokenHashAlgo(in)
+	}
+
+	h, _ := hashFunction(algo)
 	h.Write([]byte(in))
 	return hex.EncodeToString(h.Sum(nil))
 }
