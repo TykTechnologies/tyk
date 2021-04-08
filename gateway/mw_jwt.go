@@ -16,11 +16,13 @@ import (
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/lonelycode/osin"
 	cache "github.com/pmylund/go-cache"
 	jose "github.com/square/go-jose"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -569,6 +571,40 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	}
 
 	session.OauthClientID = oauthClientID
+	if session.OauthClientID != "" {
+		// Initialize the OAuthManager if empty:
+		if k.Spec.OAuthManager == nil {
+			prefix := generateOAuthPrefix(k.Spec.APIID)
+			storageManager := getGlobalStorageHandler(prefix, false)
+			storageManager.Connect()
+			k.Spec.OAuthManager = &OAuthManager{
+				OsinServer: TykOsinNewServer(&osin.ServerConfig{},
+					&RedisOsinStorageInterface{
+						storageManager,
+						GlobalSessionManager,
+						&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false},
+						k.Spec.OrgID}),
+			}
+		}
+
+		// Retrieve OAuth client data from storage and inject developer ID into the session object:
+		client, err := k.Spec.OAuthManager.OsinServer.Storage.GetClient(oauthClientID)
+		if err == nil {
+			userData := client.GetUserData()
+			if userData != nil {
+				data, ok := userData.(map[string]interface{})
+				if ok {
+					developerID, keyFound := data["tyk_developer_id"].(string)
+					if keyFound {
+						session.MetaData["tyk_developer_id"] = developerID
+					}
+				}
+			}
+		} else {
+			k.Logger().WithError(err).Error("Couldn't get OAuth client")
+		}
+	}
+
 	k.Logger().Debug("Key found")
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.JWTClaim, apidef.UnsetAuth:
