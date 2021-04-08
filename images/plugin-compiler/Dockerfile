@@ -1,4 +1,4 @@
-FROM golang:1.12
+FROM tykio/tyk-build-env:latest
 LABEL io.tyk.vendor="Tyk" \
       version="1.0" \
       description="Image for plugin development"
