@@ -193,7 +193,7 @@ jobs:
           PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
         with:
           repo: tyk/${{ steps.targets.outputs.pc }}
-          dir: 'dist'
+          dir: '${{ env.REPO_PATH }}/dist'
 
       - name: Push unstable docker image
         if: steps.targets.outputs.hub == 'unstable' && steps.targets.outputs.upload == 'true'
