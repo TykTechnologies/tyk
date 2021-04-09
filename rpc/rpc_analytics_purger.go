@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/TykTechnologies/tyk/config"
 	"time"
+
+	"github.com/TykTechnologies/tyk/config"
 
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
