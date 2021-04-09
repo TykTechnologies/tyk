@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"io/ioutil"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,7 +16,8 @@ import (
 
 func TestHandleError_text_xml(t *testing.T) {
 	file := filepath.Join(config.Global().TemplatePath, "error_500.xml")
-	xml := `<error>
+	xml := `<?xml version = "1.0" encoding = "UTF-8"?>
+<error>
 	<code>500</code>
 	<message>{{.Message}}</message>
 </error>`
@@ -26,19 +26,17 @@ func TestHandleError_text_xml(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.Remove(file)
-	expect := `
+	expect := `<?xml version = "1.0" encoding = "UTF-8"?>
 <error>
 	<code>500</code>
 	<message>There was a problem proxying the request</message>
-</error>
-	`
+</error>`
 	ts := StartTest()
 	defer ts.Close()
-	h := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
-	h.Close()
+
 	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
-		spec.Proxy.TargetURL = ts.URL
+		spec.Proxy.TargetURL = "http://localhost:66666"
 	})
 	ts.Run(t, test.TestCase{
 		Path: "/",
@@ -50,4 +48,77 @@ func TestHandleError_text_xml(t *testing.T) {
 			return strings.TrimSpace(expect) == string(bytes.TrimSpace(b))
 		},
 	})
+
+	ts.Run(t, test.TestCase{
+		Path: "/",
+		Code: http.StatusInternalServerError,
+		Headers: map[string]string{
+			headers.ContentType: headers.TextXML + "; charset=UTF-8",
+		},
+		BodyMatchFunc: func(b []byte) bool {
+			return strings.TrimSpace(expect) == string(bytes.TrimSpace(b))
+		},
+	})
+}
+
+func TestHandleDefaultErrorXml(t *testing.T) {
+
+	expect := `<?xml version = "1.0" encoding = "UTF-8"?>
+<error>There was a problem proxying the request</error>`
+	ts := StartTest()
+	defer ts.Close()
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.Proxy.TargetURL = "http://localhost:66666"
+	})
+	ts.Run(t, test.TestCase{
+		Path: "/",
+		Code: http.StatusInternalServerError,
+		Headers: map[string]string{
+			headers.ContentType: headers.TextXML,
+		},
+		BodyMatchFunc: func(b []byte) bool {
+			return strings.TrimSpace(expect) == string(bytes.TrimSpace(b))
+		},
+	})
+
+	ts.Run(t, test.TestCase{
+		Path: "/",
+		Code: http.StatusInternalServerError,
+		Headers: map[string]string{
+			headers.ContentType: headers.TextXML + "; charset=UTF-8",
+		},
+		BodyMatchFunc: func(b []byte) bool {
+			return strings.TrimSpace(expect) == string(bytes.TrimSpace(b))
+		},
+	})
+}
+
+func TestHandleDefaultErrorJSON(t *testing.T) {
+
+	expect := `
+{
+    "error": "There was a problem proxying the request"
+}
+`
+
+	ts := StartTest()
+	defer ts.Close()
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.Proxy.TargetURL = "http://localhost:66666"
+	})
+	ts.Run(t, test.TestCase{
+		Path: "/",
+		Code: http.StatusInternalServerError,
+		Headers: map[string]string{
+			headers.ContentType: headers.ApplicationJSON,
+		},
+		BodyMatchFunc: func(b []byte) bool {
+			return strings.TrimSpace(expect) == string(bytes.TrimSpace(b))
+		},
+	})
+
 }

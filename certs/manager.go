@@ -37,22 +37,24 @@ type StorageHandler interface {
 }
 
 type CertificateManager struct {
-	storage StorageHandler
-	logger  *logrus.Entry
-	cache   *cache.Cache
-	secret  string
+	storage         StorageHandler
+	logger          *logrus.Entry
+	cache           *cache.Cache
+	secret          string
+	migrateCertList bool
 }
 
-func NewCertificateManager(storage StorageHandler, secret string, logger *logrus.Logger) *CertificateManager {
+func NewCertificateManager(storage StorageHandler, secret string, logger *logrus.Logger, migrateCertList bool) *CertificateManager {
 	if logger == nil {
 		logger = logrus.New()
 	}
 
 	return &CertificateManager{
-		storage: storage,
-		logger:  logger.WithFields(logrus.Fields{"prefix": "cert_storage"}),
-		cache:   cache.New(5*time.Minute, 10*time.Minute),
-		secret:  secret,
+		storage:         storage,
+		logger:          logger.WithFields(logrus.Fields{"prefix": "cert_storage"}),
+		cache:           cache.New(5*time.Minute, 10*time.Minute),
+		secret:          secret,
+		migrateCertList: migrateCertList,
 	}
 }
 
@@ -343,22 +345,18 @@ func (c *CertificateManager) List(certIDs []string, mode CertificateType) (out [
 			continue
 		}
 
-		if isSHA256(id) {
-			var val string
-			val, err = c.storage.GetKey("raw-" + id)
-			if err != nil {
-				c.logger.Warn("Can't retrieve certificate from Redis:", id, err)
-				out = append(out, nil)
-				continue
-			}
-			rawCert = []byte(val)
-		} else {
+		var val string
+		val, err = c.storage.GetKey("raw-" + id)
+		if err != nil {
+			// Try read from file
 			rawCert, err = ioutil.ReadFile(id)
 			if err != nil {
-				c.logger.Error("Error while reading certificate from file:", id, err)
+				c.logger.Warn("Can't retrieve certificate:", id, err)
 				out = append(out, nil)
 				continue
 			}
+		} else {
+			rawCert = []byte(val)
 		}
 
 		cert, err = ParsePEMCertificate(rawCert, c.secret)
@@ -462,7 +460,7 @@ func (c *CertificateManager) ListRawPublicKey(keyID string) (out interface{}) {
 func (c *CertificateManager) ListAllIds(prefix string) (out []string) {
 	indexKey := prefix + "-index"
 	exists, _ := c.storage.Exists(indexKey)
-	if exists && prefix != "" {
+	if !c.migrateCertList || (exists && prefix != "") {
 		keys, _ := c.storage.GetListRange(indexKey, 0, -1)
 		for _, key := range keys {
 			out = append(out, strings.TrimPrefix(key, "raw-"))
@@ -474,6 +472,7 @@ func (c *CertificateManager) ListAllIds(prefix string) (out []string) {
 		}
 
 		keys := c.storage.GetKeys("raw-" + prefix + "*")
+
 		for _, key := range keys {
 			if prefix != "" {
 				c.storage.AppendToSet(indexKey, key)

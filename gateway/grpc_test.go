@@ -469,12 +469,14 @@ func grpcServerCreds(t *testing.T, clientCert *x509.Certificate) []grpc.ServerOp
 			ClientCAs:          pool,
 			InsecureSkipVerify: true,
 			Certificates:       []tls.Certificate{certificate},
+			MaxVersion:         tls.VersionTLS12,
 		}
 		pool.AddCert(clientCert)
 	} else {
 		tlsConfig = &tls.Config{
 			InsecureSkipVerify: true,
 			Certificates:       []tls.Certificate{certificate},
+			MaxVersion:         tls.VersionTLS12,
 		}
 	}
 
@@ -522,7 +524,9 @@ func sayHelloWithGRPCClientH2C(t *testing.T, address string, name string) *pb.He
 }
 
 func grpcCreds(cert *tls.Certificate, caCert []byte, basicAuth bool, token string) []grpc.DialOption {
-	tlsConfig := &tls.Config{}
+	tlsConfig := &tls.Config{
+		MaxVersion: tls.VersionTLS12,
+	}
 
 	if cert != nil {
 		tlsConfig.Certificates = []tls.Certificate{*cert}

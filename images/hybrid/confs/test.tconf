@@ -1,0 +1,26 @@
+server {
+
+        server_name banana;
+
+        gzip              on;
+        gzip_buffers      16 8k;
+        gzip_comp_level   4;
+        gzip_http_version 1.1;
+        gzip_min_length   1280;
+        gzip_types        text/plain text/css application/x-javascript text/xml application/xml application/xml+rss text/javascript image/x-icon image/bmp;
+        gzip_vary         on;
+
+        # The Go application server
+        location / {
+            rewrite /(.*) /APIID/$1 break;
+
+            proxy_pass_header Server;
+            proxy_set_header Host $http_host;
+            proxy_redirect off;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Scheme $scheme;
+            proxy_pass http://tyk;
+        }
+
+
+    }

@@ -43,8 +43,10 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/lonelycode/osin"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/afero"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -784,7 +786,7 @@ func handleGetAPI(apiID string) (interface{}, int) {
 	return apiError("API not found"), http.StatusNotFound
 }
 
-func handleAddOrUpdateApi(apiID string, r *http.Request) (interface{}, int) {
+func handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.Fs) (interface{}, int) {
 	if config.Global().UseDBAppConfigs {
 		log.Error("Rejected new API Definition due to UseDBAppConfigs = true")
 		return apiError("Due to enabled use_db_app_configs, please use the Dashboard API"), http.StatusInternalServerError
@@ -798,16 +800,27 @@ func handleAddOrUpdateApi(apiID string, r *http.Request) (interface{}, int) {
 
 	if apiID != "" && newDef.APIID != apiID {
 		log.Error("PUT operation on different APIIDs")
-		return apiError("Request APIID does not match that in Definition! For Updtae operations these must match."), http.StatusBadRequest
+		return apiError("Request APIID does not match that in Definition! For Update operations these must match."), http.StatusBadRequest
+	}
+
+	validationResult := apidef.Validate(newDef, apidef.DefaultValidationRuleSet)
+	if !validationResult.IsValid {
+		reason := "unknown"
+		if validationResult.ErrorCount() > 0 {
+			reason = validationResult.FirstError().Error()
+		}
+
+		log.Debugf("Semantic validation for API Definition failed. Reason: %s.", reason)
+		return apiError(fmt.Sprintf("Validation of API Definition failed. Reason: %s.", reason)), http.StatusBadRequest
 	}
 
 	// Create a filename
 	defFilePath := filepath.Join(config.Global().AppPath, newDef.APIID+".json")
 
 	// If it exists, delete it
-	if _, err := os.Stat(defFilePath); err == nil {
+	if _, err := fs.Stat(defFilePath); err == nil {
 		log.Warning("API Definition with this ID already exists, deleting file...")
-		os.Remove(defFilePath)
+		fs.Remove(defFilePath)
 	}
 
 	// unmarshal the object into the file
@@ -874,11 +887,11 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	case "POST":
 		log.Debug("Creating new definition file")
-		obj, code = handleAddOrUpdateApi(apiID, r)
+		obj, code = handleAddOrUpdateApi(apiID, r, afero.NewOsFs())
 	case "PUT":
 		if apiID != "" {
 			log.Debug("Updating existing API: ", apiID)
-			obj, code = handleAddOrUpdateApi(apiID, r)
+			obj, code = handleAddOrUpdateApi(apiID, r, afero.NewOsFs())
 		} else {
 			obj, code = apiError("Must specify an apiID to update"), http.StatusBadRequest
 		}
@@ -1537,9 +1550,24 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			// set oauth client if it is oauth API
-			if apiSpec.UseOauth2 {
+			if apiSpec.UseOauth2 || apiSpec.EnableJWT {
 				oauth2 = true
-				err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, apiSpec.OrgID, &newClient, true)
+				if apiSpec.OAuthManager == nil {
+
+					prefix := generateOAuthPrefix(apiSpec.APIID)
+					storageManager := getGlobalStorageHandler(prefix, false)
+					storageManager.Connect()
+
+					apiSpec.OAuthManager = &OAuthManager{
+						OsinServer: TykOsinNewServer(&osin.ServerConfig{},
+							&RedisOsinStorageInterface{
+								storageManager,
+								GlobalSessionManager,
+								&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false},
+								apiSpec.OrgID}),
+					}
+				}
+				err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, apiSpec.APIDefinition.OrgID, &newClient, true)
 				if err != nil {
 					log.WithFields(logrus.Fields{
 						"prefix": "api",
@@ -1908,6 +1936,20 @@ func getOauthClientDetails(keyName, apiID string) (interface{}, int) {
 			"err":    "not found",
 		}).Error("Failed to retrieve OAuth client details")
 		return apiError("OAuth Client ID not found"), http.StatusNotFound
+	}
+
+	if apiSpec.OAuthManager == nil {
+		prefix := generateOAuthPrefix(apiSpec.APIID)
+		storageManager := getGlobalStorageHandler(prefix, false)
+		storageManager.Connect()
+		apiSpec.OAuthManager = &OAuthManager{
+			OsinServer: TykOsinNewServer(&osin.ServerConfig{},
+				&RedisOsinStorageInterface{
+					storageManager,
+					GlobalSessionManager,
+					&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false},
+					apiSpec.OrgID}),
+		}
 	}
 
 	clientData, err := apiSpec.OAuthManager.OsinServer.Storage.GetExtendedClientNoPrefix(storageID)

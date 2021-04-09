@@ -33,6 +33,7 @@ import (
 	"github.com/jensneuse/abstractlogger"
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 	gqlhttp "github.com/jensneuse/graphql-go-tools/pkg/http"
+	"github.com/jensneuse/graphql-go-tools/pkg/subscription"
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
@@ -50,7 +51,7 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-const defaultUserAgent = "Tyk/" + VERSION
+var defaultUserAgent = "Tyk/" + VERSION
 
 var corsHeaders = []string{
 	"Access-Control-Allow-Origin",
@@ -131,11 +132,14 @@ func EnsureTransport(host, protocol string) string {
 	if err != nil {
 		return host
 	}
-	if u.Scheme == "" {
+	switch u.Scheme {
+	case "":
 		if protocol == "" {
 			protocol = "http"
 		}
 		u.Scheme = protocol
+	case "h2c":
+		u.Scheme = "http"
 	}
 	return u.String()
 }
@@ -592,6 +596,14 @@ func tlsClientConfig(s *APISpec) *tls.Config {
 		config.MinVersion = s.Proxy.Transport.SSLMinVersion
 	}
 
+	if s.GlobalConfig.ProxySSLMaxVersion > 0 {
+		config.MaxVersion = s.GlobalConfig.ProxySSLMaxVersion
+	}
+
+	if s.Proxy.Transport.SSLMaxVersion > 0 {
+		config.MaxVersion = s.Proxy.Transport.SSLMaxVersion
+	}
+
 	if len(s.GlobalConfig.ProxySSLCipherSuites) > 0 {
 		config.CipherSuites = getCipherAliases(s.GlobalConfig.ProxySSLCipherSuites)
 	}
@@ -639,6 +651,14 @@ func httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, p
 
 	if p.TykAPISpec.Proxy.Transport.SSLMinVersion > 0 {
 		transport.TLSClientConfig.MinVersion = p.TykAPISpec.Proxy.Transport.SSLMinVersion
+	}
+
+	if p.TykAPISpec.GlobalConfig.ProxySSLMaxVersion > 0 {
+		transport.TLSClientConfig.MaxVersion = p.TykAPISpec.GlobalConfig.ProxySSLMaxVersion
+	}
+
+	if p.TykAPISpec.Proxy.Transport.SSLMaxVersion > 0 {
+		transport.TLSClientConfig.MaxVersion = p.TykAPISpec.Proxy.Transport.SSLMaxVersion
 	}
 
 	if len(p.TykAPISpec.GlobalConfig.ProxySSLCipherSuites) > 0 {
@@ -778,6 +798,7 @@ func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http
 		err = errors.New("graphql request is nil")
 		return
 	}
+	gqlRequest.SetHeader(outreq.Header)
 
 	var isIntrospection bool
 	isIntrospection, err = gqlRequest.IsIntrospectionQuery()
@@ -822,20 +843,47 @@ func (p *ReverseProxy) handleGraphQLEngineWebsocketUpgrade(roundTripper *TykRoun
 }
 
 func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *TykRoundTripper, gqlRequest *graphql.Request) (res *http.Response, hijacked bool, err error) {
-	if p.TykAPISpec.GraphQLExecutor.Engine == nil {
-		err = errors.New("execution engine is nil")
-		return
-	}
-
 	p.TykAPISpec.GraphQLExecutor.Client.Transport = roundTripper
-	var result *graphql.ExecutionResult
-	result, err = p.TykAPISpec.GraphQLExecutor.Engine.Execute(context.Background(), gqlRequest, graphql.ExecutionOptions{ExtraArguments: gqlRequest.Variables})
-	if err != nil {
+
+	switch p.TykAPISpec.GraphQL.Version {
+	case apidef.GraphQLConfigVersionNone:
+		fallthrough
+	case apidef.GraphQLConfigVersion1:
+		if p.TykAPISpec.GraphQLExecutor.Engine == nil {
+			err = errors.New("execution engine is nil")
+			return
+		}
+
+		var result *graphql.ExecutionResult
+		result, err = p.TykAPISpec.GraphQLExecutor.Engine.Execute(context.Background(), gqlRequest, graphql.ExecutionOptions{ExtraArguments: gqlRequest.Variables})
+		if err != nil {
+			return
+		}
+
+		res = result.GetAsHTTPResponse()
+		return
+	case apidef.GraphQLConfigVersion2:
+		if p.TykAPISpec.GraphQLExecutor.EngineV2 == nil {
+			err = errors.New("execution engine is nil")
+			return
+		}
+
+		resultWriter := graphql.NewEngineResultWriter()
+		err = p.TykAPISpec.GraphQLExecutor.EngineV2.Execute(context.Background(), gqlRequest, &resultWriter,
+			graphql.WithBeforeFetchHook(p.TykAPISpec.GraphQLExecutor.HooksV2.BeforeFetchHook),
+			graphql.WithAfterFetchHook(p.TykAPISpec.GraphQLExecutor.HooksV2.AfterFetchHook),
+		)
+		if err != nil {
+			return
+		}
+
+		header := make(http.Header)
+		header.Set("Content-Type", "application/json")
+		res = resultWriter.AsHTTPResponse(http.StatusOK, header)
 		return
 	}
 
-	res = result.GetAsHTTPResponse()
-	return
+	return nil, false, errors.New("graphql configuration is invalid")
 }
 
 func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(roundTripper *TykRoundTripper, conn net.Conn) {
@@ -845,7 +893,17 @@ func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(round
 	done := make(chan bool)
 	errChan := make(chan error)
 
-	go gqlhttp.HandleWebsocket(done, errChan, conn, p.TykAPISpec.GraphQLExecutor.Engine.NewExecutionHandler(), absLogger)
+	var executorPool subscription.ExecutorPool
+	switch p.TykAPISpec.GraphQL.Version {
+	case apidef.GraphQLConfigVersionNone:
+		fallthrough
+	case apidef.GraphQLConfigVersion1:
+		executorPool = subscription.NewExecutorV1Pool(p.TykAPISpec.GraphQLExecutor.Engine.NewExecutionHandler())
+	case apidef.GraphQLConfigVersion2:
+		executorPool = subscription.NewExecutorV2Pool(p.TykAPISpec.GraphQLExecutor.EngineV2)
+	}
+
+	go gqlhttp.HandleWebsocket(done, errChan, conn, executorPool, absLogger)
 	select {
 	case err := <-errChan:
 		log.Error("could not start graphql websocket handler: ", err)
