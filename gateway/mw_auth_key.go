@@ -203,7 +203,7 @@ func (k *AuthKey) validateSignature(r *http.Request, key string) (error, int) {
 
 	signature := r.Header.Get(authConfig.Signature.Header)
 
-	paramName := authConfig.Signature.Param
+	paramName := authConfig.Signature.ParamName
 	if authConfig.Signature.UseParam || paramName != "" {
 		if paramName == "" {
 			paramName = authConfig.Signature.Header

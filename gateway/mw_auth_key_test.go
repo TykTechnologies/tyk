@@ -113,7 +113,7 @@ func TestSignatureValidation(t *testing.T) {
 		spec.Auth.Signature.Algorithm = "MasheryMD5"
 		spec.Auth.Signature.Header = "Signature"
 		spec.Auth.Signature.UseParam = true
-		spec.Auth.Signature.Param = "sig"
+		spec.Auth.Signature.ParamName = "sig"
 		spec.Auth.Signature.Secret = "foobar"
 		spec.Auth.Signature.AllowedClockSkew = 1
 	})[0]
