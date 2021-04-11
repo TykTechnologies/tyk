@@ -100,6 +100,7 @@ type Gateway struct {
 	RPCListener          RPCStorageHandler
 	DashService          DashboardServiceSender
 	CertificateManager   *certs.CertificateManager
+	GlobalHostChecker    HostCheckerManager
 
 	keyGen DefaultKeyGenerator
 

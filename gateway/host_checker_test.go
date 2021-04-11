@@ -1,13 +1,16 @@
 package gateway
 
 import (
+	"bytes"
 	"context"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"text/template"
 	"time"
 
 	proxyproto "github.com/pires/go-proxyproto"
@@ -15,6 +18,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 const sampleUptimeTestAPI = `{
@@ -62,7 +66,7 @@ func (w *testEventHandler) HandleEvent(em config.EventMessage) {
 }
 
 //// ToDo check why it blocks
-/*
+
 func TestHostChecker(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -99,38 +103,37 @@ func TestHostChecker(t *testing.T) {
 	ts.Gw.apisMu.Lock()
 	ts.Gw.apisByID = map[string]*APISpec{spec.APIID: spec}
 	ts.Gw.apisMu.Unlock()
-	GlobalHostChecker.Gw = ts.Gw
-	GlobalHostChecker.checkerMu.Lock()
-	GlobalHostChecker.checker.sampleTriggerLimit = 1
-	GlobalHostChecker.checkerMu.Unlock()
+	ts.Gw.GlobalHostChecker.checkerMu.Lock()
+	ts.Gw.GlobalHostChecker.checker.sampleTriggerLimit = 1
+	ts.Gw.GlobalHostChecker.checkerMu.Unlock()
 	defer func() {
 		ts.Gw.apisMu.Lock()
 		ts.Gw.apisByID = make(map[string]*APISpec)
 		ts.Gw.apisMu.Unlock()
-		GlobalHostChecker.checkerMu.Lock()
-		GlobalHostChecker.checker.sampleTriggerLimit = defaultSampletTriggerLimit
-		GlobalHostChecker.checkerMu.Unlock()
+		ts.Gw.GlobalHostChecker.checkerMu.Lock()
+		ts.Gw.GlobalHostChecker.checker.sampleTriggerLimit = defaultSampletTriggerLimit
+		ts.Gw.GlobalHostChecker.checkerMu.Unlock()
 	}()
 
 	ts.Gw.SetCheckerHostList()
-	GlobalHostChecker.checkerMu.Lock()
-	if len(GlobalHostChecker.currentHostList) != 2 {
-		t.Error("Should update hosts manager check list", GlobalHostChecker.currentHostList)
+	ts.Gw.GlobalHostChecker.checkerMu.Lock()
+	if len(ts.Gw.GlobalHostChecker.currentHostList) != 2 {
+		t.Error("Should update hosts manager check list", ts.Gw.GlobalHostChecker.currentHostList)
 	}
 
-	if len(GlobalHostChecker.checker.newList) != 2 {
+	if len(ts.Gw.GlobalHostChecker.checker.newList) != 2 {
 		t.Error("Should update host checker check list")
 	}
-	GlobalHostChecker.checkerMu.Unlock()
+	ts.Gw.GlobalHostChecker.checkerMu.Unlock()
 
 	hostCheckTicker <- struct{}{}
 	eventWG.Wait()
 
-	if GlobalHostChecker.HostDown(TestHttpAny) {
+	if ts.Gw.GlobalHostChecker.HostDown(TestHttpAny) {
 		t.Error("Should not mark as down")
 	}
 
-	if !GlobalHostChecker.HostDown(testHttpFailureAny) {
+	if !ts.Gw.GlobalHostChecker.HostDown(testHttpFailureAny) {
 		t.Error("Should mark as down")
 	}
 
@@ -141,7 +144,7 @@ func TestHostChecker(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		targetWG.Add(1)
 		go func() {
-			host, err := nextTarget(spec.Proxy.StructuredTargetList, spec)
+			host, err := ts.Gw.nextTarget(spec.Proxy.StructuredTargetList, spec)
 			if err != nil {
 				t.Error("Should return nil error, got", err)
 			}
@@ -153,16 +156,16 @@ func TestHostChecker(t *testing.T) {
 	}
 	targetWG.Wait()
 
-	GlobalHostChecker.checkerMu.Lock()
-	if GlobalHostChecker.checker.checkTimeout != defaultTimeout {
-		t.Error("Should set defaults", GlobalHostChecker.checker.checkTimeout)
+	ts.Gw.GlobalHostChecker.checkerMu.Lock()
+	if ts.Gw.GlobalHostChecker.checker.checkTimeout != defaultTimeout {
+		t.Error("Should set defaults", ts.Gw.GlobalHostChecker.checker.checkTimeout)
 	}
 
-	redisStore := GlobalHostChecker.store.(*storage.RedisCluster)
-	if ttl, _ := redisStore.GetKeyTTL(PoolerHostSentinelKeyPrefix + testHttpFailure); int(ttl) != GlobalHostChecker.checker.checkTimeout*GlobalHostChecker.checker.sampleTriggerLimit {
+	redisStore := ts.Gw.GlobalHostChecker.store.(*storage.RedisCluster)
+	if ttl, _ := redisStore.GetKeyTTL(PoolerHostSentinelKeyPrefix + testHttpFailure); int(ttl) != ts.Gw.GlobalHostChecker.checker.checkTimeout*ts.Gw.GlobalHostChecker.checker.sampleTriggerLimit {
 		t.Error("HostDown expiration key should be checkTimeout + 1", ttl)
 	}
-	GlobalHostChecker.checkerMu.Unlock()
+	ts.Gw.GlobalHostChecker.checkerMu.Unlock()
 }
 
 func TestReverseProxyAllDown(t *testing.T) {
@@ -200,16 +203,16 @@ func TestReverseProxyAllDown(t *testing.T) {
 	ts.Gw.apisMu.Lock()
 	ts.Gw.apisByID = map[string]*APISpec{spec.APIID: spec}
 	ts.Gw.apisMu.Unlock()
-	GlobalHostChecker.checkerMu.Lock()
-	GlobalHostChecker.checker.sampleTriggerLimit = 1
-	GlobalHostChecker.checkerMu.Unlock()
+	ts.Gw.GlobalHostChecker.checkerMu.Lock()
+	ts.Gw.GlobalHostChecker.checker.sampleTriggerLimit = 1
+	ts.Gw.GlobalHostChecker.checkerMu.Unlock()
 	defer func() {
 		ts.Gw.apisMu.Lock()
 		ts.Gw.apisByID = make(map[string]*APISpec)
 		ts.Gw.apisMu.Unlock()
-		GlobalHostChecker.checkerMu.Lock()
-		GlobalHostChecker.checker.sampleTriggerLimit = defaultSampletTriggerLimit
-		GlobalHostChecker.checkerMu.Unlock()
+		ts.Gw.GlobalHostChecker.checkerMu.Lock()
+		ts.Gw.GlobalHostChecker.checker.sampleTriggerLimit = defaultSampletTriggerLimit
+		ts.Gw.GlobalHostChecker.checkerMu.Unlock()
 	}()
 
 	ts.Gw.SetCheckerHostList()
@@ -226,7 +229,7 @@ func TestReverseProxyAllDown(t *testing.T) {
 	if rec.Code != 503 {
 		t.Fatalf("wanted code to be 503, was %d", rec.Code)
 	}
-}*/
+}
 
 type answers struct {
 	mu             sync.RWMutex
@@ -455,9 +458,9 @@ func TestProxyWhenHostIsDown(t *testing.T) {
 			{CheckURL: l.URL},
 		}
 	})
-	GlobalHostChecker.checkerMu.Lock()
-	GlobalHostChecker.checker.sampleTriggerLimit = 1
-	GlobalHostChecker.checkerMu.Unlock()
+	ts.Gw.GlobalHostChecker.checkerMu.Lock()
+	ts.Gw.GlobalHostChecker.checker.sampleTriggerLimit = 1
+	ts.Gw.GlobalHostChecker.checkerMu.Unlock()
 
 	tick := time.NewTicker(10 * time.Millisecond)
 	defer tick.Stop()

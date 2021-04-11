@@ -18,8 +18,6 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 )
 
-var GlobalHostChecker HostCheckerManager
-
 type HostCheckerManager struct {
 	Gw                *Gateway `json:"-"`
 	Id                string
@@ -452,7 +450,7 @@ func (hc *HostCheckerManager) ListFromService(apiID string) ([]HostData, error) 
 
 	hostData := make([]HostData, len(checkTargets))
 	for i, target := range checkTargets {
-		newHostDoc, err := GlobalHostChecker.PrepareTrackingHost(target, spec.APIID)
+		newHostDoc, err := hc.Gw.GlobalHostChecker.PrepareTrackingHost(target, spec.APIID)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "host-check-mgr",
@@ -540,13 +538,13 @@ func (hc *HostCheckerManager) RecordUptimeAnalytics(report HostHealthReport) err
 
 func (gw *Gateway) InitHostCheckManager(ctx context.Context, store storage.Handler) {
 	// Already initialized
-	if GlobalHostChecker.Id != "" {
+	if gw.GlobalHostChecker.Id != "" {
 		return
 	}
 
-	GlobalHostChecker = HostCheckerManager{Gw: gw}
-	GlobalHostChecker.Init(store)
-	GlobalHostChecker.Start(ctx)
+	gw.GlobalHostChecker = HostCheckerManager{Gw: gw}
+	gw.GlobalHostChecker.Init(store)
+	gw.GlobalHostChecker.Start(ctx)
 }
 
 func (gw *Gateway) SetCheckerHostList() {
@@ -557,7 +555,7 @@ func (gw *Gateway) SetCheckerHostList() {
 	gw.apisMu.RLock()
 	for _, spec := range gw.apisByID {
 		if spec.UptimeTests.Config.ServiceDiscovery.UseDiscoveryService {
-			hostList, err := GlobalHostChecker.ListFromService(spec.APIID)
+			hostList, err := gw.GlobalHostChecker.ListFromService(spec.APIID)
 			if err == nil {
 				hostList = append(hostList, hostList...)
 				for _, t := range hostList {
@@ -570,7 +568,7 @@ func (gw *Gateway) SetCheckerHostList() {
 			}
 		} else {
 			for _, checkItem := range spec.UptimeTests.CheckList {
-				newHostDoc, err := GlobalHostChecker.PrepareTrackingHost(checkItem, spec.APIID)
+				newHostDoc, err := gw.GlobalHostChecker.PrepareTrackingHost(checkItem, spec.APIID)
 				if err == nil {
 					hostList = append(hostList, newHostDoc)
 					log.WithFields(logrus.Fields{
@@ -590,7 +588,7 @@ func (gw *Gateway) SetCheckerHostList() {
 	}
 	gw.apisMu.RUnlock()
 
-	GlobalHostChecker.UpdateTrackingList(hostList)
+	gw.GlobalHostChecker.UpdateTrackingList(hostList)
 }
 
 /*

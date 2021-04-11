@@ -187,8 +187,8 @@ func (m *proxyMux) addTCPService(spec *APISpec, modifier *tcp.Modifier, gw *Gate
 			protocol:         spec.Protocol,
 			useProxyProtocol: spec.EnableProxyProtocol,
 			tcpProxy: &tcp.Proxy{
-				DialTLS:         dialWithServiceDiscovery(spec, gw.customDialTLSCheck(spec, tlsConfig)),
-				Dial:            dialWithServiceDiscovery(spec, net.Dial),
+				DialTLS:         gw.dialWithServiceDiscovery(spec, gw.customDialTLSCheck(spec, tlsConfig)),
+				Dial:            gw.dialWithServiceDiscovery(spec, net.Dial),
 				TLSConfigTarget: tlsConfig,
 				// SyncStats:       recordTCPHit(spec.APIID, spec.DoNotTrack),
 			},
@@ -264,7 +264,7 @@ func (gw *Gateway) recordTCPHit(specID string, doNotTrack bool) func(tcp.Stat) {
 
 type dialFn func(network string, address string) (net.Conn, error)
 
-func dialWithServiceDiscovery(spec *APISpec, dial dialFn) dialFn {
+func (gw *Gateway) dialWithServiceDiscovery(spec *APISpec, dial dialFn) dialFn {
 	if dial == nil {
 		return nil
 	}
@@ -295,7 +295,7 @@ func dialWithServiceDiscovery(spec *APISpec, dial dialFn) dialFn {
 			log.Debug("[PROXY] [SERVICE DISCOVERY] received host list ", hostList.All())
 			fallthrough // implies load balancing, with replaced host list
 		case spec.Proxy.EnableLoadBalancing:
-			host, err := nextTarget(hostList, spec)
+			host, err := gw.nextTarget(hostList, spec)
 			if err != nil {
 				log.Error("[PROXY] [LOAD BALANCING] ", err)
 				host = allHostsDownURL

@@ -143,7 +143,7 @@ func EnsureTransport(host, protocol string) string {
 	return u.String()
 }
 
-func nextTarget(targetData *apidef.HostList, spec *APISpec) (string, error) {
+func (gw *Gateway) nextTarget(targetData *apidef.HostList, spec *APISpec) (string, error) {
 	if spec.Proxy.EnableLoadBalancing {
 		log.Debug("[PROXY] [LOAD BALANCING] Load balancer enabled, getting upstream target")
 		// Use a HostList
@@ -160,10 +160,10 @@ func nextTarget(targetData *apidef.HostList, spec *APISpec) (string, error) {
 				return host, nil // we don't care if it's up
 			}
 			// As checked by HostCheckerManager.AmIPolling
-			if GlobalHostChecker.store == nil {
+			if gw.GlobalHostChecker.store == nil {
 				return host, nil
 			}
-			if !GlobalHostChecker.HostDown(host) {
+			if !gw.GlobalHostChecker.HostDown(host) {
 				return host, nil // we do care and it's up
 			}
 			// if the host is down, keep trying all the rest
@@ -243,7 +243,7 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 			}
 			fallthrough // implies load balancing, with replaced host list
 		case spec.Proxy.EnableLoadBalancing:
-			host, err := nextTarget(hostList, spec)
+			host, err := gw.nextTarget(hostList, spec)
 			if err != nil {
 				log.Error("[PROXY] [LOAD BALANCING] ", err)
 				host = allHostsDownURL
