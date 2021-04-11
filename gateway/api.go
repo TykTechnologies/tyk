@@ -351,8 +351,8 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 		originalKey = key.Clone()
 
 		isCertificateChanged := newSession.Certificate != originalKey.Certificate
-		if isCertificateChanged{
-			if newSession.Certificate == ""{
+		if isCertificateChanged {
+			if newSession.Certificate == "" {
 				log.Error("Key must contain a certificate")
 				return apiError("Key cannot be used without a certificate"), http.StatusBadRequest
 			}
