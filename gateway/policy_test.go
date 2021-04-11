@@ -1164,7 +1164,7 @@ func TestApplyMultiPolicies(t *testing.T) {
 			},
 		},
 	}...)
-fmt.Printf("\n\n La sesion: %+v\n", session)
+	fmt.Printf("\n\n La sesion: %+v\n", session)
 	// Reset quota
 	ts.Run(t, []test.TestCase{
 		{
