@@ -3,6 +3,7 @@ package gateway
 import (
 	"crypto/tls"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
@@ -12,8 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-
-	"github.com/jensneuse/graphql-go-tools/pkg/playground"
+	"text/template"
 
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
@@ -720,6 +720,30 @@ type generalStores struct {
 	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore storage.Handler
 }
 
+var playgroundTemplate *template.Template
+
+func readGraphqlPlaygroundTemplate() {
+	playgroundPath := filepath.Join(config.Global().TemplatePath, "playground")
+	files, err := ioutil.ReadDir(playgroundPath)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "playground",
+		}).Error("Could not load the default playground templates: ", err)
+	}
+
+	var paths []string
+	for _, file := range files {
+		paths = append(paths, filepath.Join(playgroundPath, file.Name()))
+	}
+
+	playgroundTemplate, err = template.ParseFiles(paths...)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "playground",
+		}).Error("Could not parse the default playground templates: ", err)
+	}
+}
+
 func loadGraphQLPlayground(spec *APISpec, subrouter *mux.Router) {
 	// endpoint is the endpoint of the url which playground makes request to.
 	endpoint := spec.Proxy.ListenPath
@@ -730,22 +754,26 @@ func loadGraphQLPlayground(spec *APISpec, subrouter *mux.Router) {
 		endpoint = fmt.Sprintf("/%s/", spec.Slug)
 	}
 
-	p := playground.New(playground.Config{
-		// PathPrefix is the path on the router where playground handler is loaded.
-		PathPrefix:                      "/",
-		PlaygroundPath:                  spec.GraphQL.GraphQLPlayground.Path,
-		GraphqlEndpointPath:             endpoint,
-		GraphQLSubscriptionEndpointPath: endpoint,
+	subrouter.PathPrefix(spec.GraphQL.GraphQLPlayground.Path).HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		if playgroundTemplate == nil {
+			rw.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		var err error
+		switch {
+		case strings.HasSuffix(req.URL.Path, "playground.js"):
+			err = playgroundTemplate.ExecuteTemplate(rw, "playground.js", nil)
+		default:
+			err = playgroundTemplate.ExecuteTemplate(rw, "index.html", struct {
+				Url, Schema string
+			}{endpoint, strconv.Quote(spec.GraphQL.Schema)})
+		}
+
+		if err != nil {
+			rw.WriteHeader(http.StatusInternalServerError)
+		}
 	})
-
-	handlers, err := p.Handlers()
-	if err != nil {
-		log.WithError(err).Error("Could not setup graphql playground handlers")
-	}
-
-	for _, cfg := range handlers {
-		subrouter.HandleFunc(cfg.Path, cfg.Handler)
-	}
 }
 
 // Create the individual API (app) specs based on live configurations and assign middleware

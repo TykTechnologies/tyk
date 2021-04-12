@@ -261,6 +261,8 @@ func setupGlobals(ctx context.Context) {
 	if config.Global().NewRelic.AppName != "" {
 		NewRelicApplication = SetupNewRelic()
 	}
+
+	readGraphqlPlaygroundTemplate()
 }
 
 func buildConnStr(resource string) string {
