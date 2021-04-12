@@ -114,10 +114,23 @@ func TestGraphQLPlayground(t *testing.T) {
 		spec.GraphQL.GraphQLPlayground.Enabled = true
 	})[0]
 
+	run := func(t *testing.T, path string, api *APISpec, env string) {
+		endpoint := api.Proxy.ListenPath
+		if env == "cloud" {
+			endpoint = fmt.Sprintf("/%s/", api.Slug)
+		}
+
+		_, _ = g.Run(t, []test.TestCase{
+			{Path: path, BodyMatch: `<title>API Playground</title>`, Code: http.StatusOK},
+			{Path: path, BodyMatch: fmt.Sprintf(`const apiUrl = "%s"`, endpoint), Code: http.StatusOK},
+			{Path: path + "playground.js", BodyMatch: "var TykGraphiqlExplorer", Code: http.StatusOK},
+		}...)
+	}
+
 	for _, env := range []string{"on-premise", "cloud"} {
 		if env == "cloud" {
 			api.Proxy.ListenPath = fmt.Sprintf("/%s/", api.APIID)
-			api.Slug = apiName
+			api.Slug = "someslug"
 			globalConf := config.Global()
 			globalConf.Cloud = true
 			config.SetGlobal(globalConf)
@@ -127,31 +140,19 @@ func TestGraphQLPlayground(t *testing.T) {
 			t.Run("path is empty", func(t *testing.T) {
 				api.GraphQL.GraphQLPlayground.Path = ""
 				LoadAPI(api)
-				_, _ = g.Run(t, []test.TestCase{
-					{Path: api.Proxy.ListenPath, BodyMatch: `<link rel="stylesheet" href="playground.css" />`},
-					{Path: api.Proxy.ListenPath, BodyMatch: `endpoint: "\\/` + apiName + `\\/"`},
-					{Path: api.Proxy.ListenPath + "playground.css", BodyMatch: "body{margin:0;padding:0;font-family:.*"},
-				}...)
+				run(t, api.Proxy.ListenPath, api, env)
 			})
 
-			t.Run("path is /", func(t *testing.T) {
+			t.Run("path is '/'", func(t *testing.T) {
 				api.GraphQL.GraphQLPlayground.Path = "/"
 				LoadAPI(api)
-				_, _ = g.Run(t, []test.TestCase{
-					{Path: api.Proxy.ListenPath, BodyMatch: `<link rel="stylesheet" href="playground.css" />`},
-					{Path: api.Proxy.ListenPath, BodyMatch: `endpoint: "\\/` + apiName + `\\/"`},
-					{Path: api.Proxy.ListenPath + "playground.css", BodyMatch: "body{margin:0;padding:0;font-family:.*"},
-				}...)
+				run(t, api.Proxy.ListenPath, api, env)
 			})
 
-			t.Run("path is /playground", func(t *testing.T) {
+			t.Run("path is '/playground'", func(t *testing.T) {
 				api.GraphQL.GraphQLPlayground.Path = "/playground"
 				LoadAPI(api)
-				_, _ = g.Run(t, []test.TestCase{
-					{Path: api.Proxy.ListenPath + "playground", BodyMatch: `<link rel="stylesheet" href="playground/playground.css" />`},
-					{Path: api.Proxy.ListenPath + "playground", BodyMatch: `endpoint: "\\/` + apiName + `\\/"`},
-					{Path: api.Proxy.ListenPath + "playground/playground.css", BodyMatch: "body{margin:0;padding:0;font-family:.*"},
-				}...)
+				run(t, api.Proxy.ListenPath+"playground", api, env)
 			})
 		})
 	}
