@@ -1088,6 +1088,11 @@ func afterConfSetup(conf *config.Config) {
 		conf.SlaveOptions.KeySpaceSyncInterval = 10
 	}
 
+	if conf.AnalyticsConfig.PurgeInterval == 0 {
+		// as default 10 seconds
+		conf.AnalyticsConfig.PurgeInterval = 10
+	}
+
 	rpc.GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)
 	rpc.GlobalRPCCallTimeout = time.Second * time.Duration(conf.SlaveOptions.CallTimeout)
 	initGenericEventHandlers(conf)
