@@ -754,7 +754,7 @@ func loadGraphQLPlayground(spec *APISpec, subrouter *mux.Router) {
 		endpoint = fmt.Sprintf("/%s/", spec.Slug)
 	}
 
-	subrouter.PathPrefix(spec.GraphQL.GraphQLPlayground.Path).HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+	subrouter.PathPrefix(spec.GraphQL.GraphQLPlayground.Path).Methods(http.MethodGet).HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		if playgroundTemplate == nil {
 			rw.WriteHeader(http.StatusInternalServerError)
 			return
