@@ -124,6 +124,13 @@ func TestGraphQLPlayground(t *testing.T) {
 			{Path: path, BodyMatch: `<title>API Playground</title>`, Code: http.StatusOK},
 			{Path: path, BodyMatch: fmt.Sprintf(`const apiUrl = "%s"`, endpoint), Code: http.StatusOK},
 			{Path: path + "playground.js", BodyMatch: "var TykGraphiqlExplorer", Code: http.StatusOK},
+			{
+				Path:         path,
+				Method:       http.MethodPost,
+				BodyNotMatch: `<title>API Playground</title>`,
+				BodyMatch:    `"error": "the provided request is empty"`,
+				Code:         http.StatusBadRequest,
+			},
 		}...)
 	}
 
