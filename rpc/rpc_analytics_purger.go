@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/TykTechnologies/tyk/config"
+
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk/storage"
@@ -89,7 +91,9 @@ func (r *Purger) Connect() {
 // PurgeLoop starts the loop that will pull data out of the in-memory
 // store and into RPC.
 func (r Purger) PurgeLoop(ctx context.Context) {
-	tick := time.NewTicker(10 * time.Second)
+	interval := time.Duration(config.Global().AnalyticsConfig.PurgeInterval)
+	tick := time.NewTicker(interval * time.Second)
+
 	for {
 		select {
 		case <-ctx.Done():
