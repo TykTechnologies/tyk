@@ -1,22 +1,28 @@
 # plugin-compiler
 
-Does not support go modules. If your plugin has vendored modules that
-are [also used by Tyk
+~~Does not support go modules. If your plugin has vendored modules that
+are [also used by tyk
 gateway](https://github.com/TykTechnologies/tyk/tree/master/vendor)
-then your module will be overridden by the version that Tyk uses.
+then your module will be overridden by the version that Tyk uses.~~
+
+Since 3.2, tyk has started using go.mod and thus your vendor'd code will no longer be overridden by tyk's versions.
+
+## Using the image
+Assuming that you are in the plugin source directory and that you want to build a plugin for v3.0.4 of the the gateway,
 
 ``` shell
-cd ${GOPATH}/src/tyk-plugin
-docker run -v `pwd`:/go/src/plugin-build plugin-build pre
+% docker run --rm -v `pwd`:/plugin-source tykio/tyk-plugin-compiler:v3.0.4 testplugin.so
 ```
 
-You will find a `pre.so` in the current directory which is the file
-that goes into the API definition
+You will find a `testplugin.so` in the current directory which is the file that goes into the API definition
 
 ## Testing the image
 
 ```shell
-% ./test.zsh v2.9.5
+% export tag=v2.9.5
+% rm -v testplugin/*.so
+% docker run --rm -v `pwd`/testplugin:/plugin-source tykio/tyk-plugin-compiler:${tag} testplugin.so
+% docker-compose -f test.yml up
 ....
 ```
 Look for `msg="API Loaded" api_id= api_name="Goplugin test"` in the output. Test that the plugin is working correctly by,

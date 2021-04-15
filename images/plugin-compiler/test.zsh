@@ -21,5 +21,5 @@ TRAPINT() {
 export tag=$1
 
 rm -v testplugin/*.so
-podman run --rm -v `pwd`/testplugin:/plugin-source tykio/tyk-plugin-compiler:${tag} testplugin.so
+docker run --rm -v `pwd`/testplugin:/plugin-source tykio/tyk-plugin-compiler:${tag} testplugin.so
 docker-compose -f test.yml up
