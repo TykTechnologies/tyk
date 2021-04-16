@@ -521,7 +521,7 @@ const Schema = `{
                             }
                         },
                         "data_sources": {
-                            "type": ["object", "null"],
+                            "type": ["array", "null"],
                             "properties": {
                                 "kind": {
                                     "type": "string",
