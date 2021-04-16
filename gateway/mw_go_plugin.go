@@ -3,10 +3,11 @@ package gateway
 import (
 	"bytes"
 	"fmt"
-	"github.com/TykTechnologies/tyk/apidef"
 	"io/ioutil"
 	"net/http"
 	"time"
+
+	"github.com/TykTechnologies/tyk/apidef"
 
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/goplugin"
