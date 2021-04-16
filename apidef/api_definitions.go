@@ -914,6 +914,9 @@ func DummyAPI() APIDefinition {
 		ExecutionMode:    GraphQLExecutionModeProxyOnly,
 		Version:          GraphQLConfigVersion2,
 		LastSchemaUpdate: nil,
+		Proxy: GraphQLProxyConfig{
+			AuthHeaders: map[string]string{},
+		},
 	}
 
 	return APIDefinition{
