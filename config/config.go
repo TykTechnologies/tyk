@@ -120,7 +120,8 @@ type AnalyticsConfigConfig struct {
 	RecordsBufferSize           uint64              `json:"records_buffer_size"`
 	StorageExpirationTime       int                 `json:"storage_expiration_time"`
 	ignoredIPsCompiled          map[string]bool
-	EnableMultipleAnalyticsKeys bool `json:"enable_multiple_analytics_keys"`
+	EnableMultipleAnalyticsKeys bool    `json:"enable_multiple_analytics_keys"`
+	PurgeInterval               float32 `json:"purge_interval"`
 }
 
 type HealthCheckConfig struct {

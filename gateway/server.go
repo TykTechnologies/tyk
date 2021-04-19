@@ -261,6 +261,8 @@ func setupGlobals(ctx context.Context) {
 	if config.Global().NewRelic.AppName != "" {
 		NewRelicApplication = SetupNewRelic()
 	}
+
+	readGraphqlPlaygroundTemplate()
 }
 
 func buildConnStr(resource string) string {
@@ -1084,6 +1086,11 @@ func afterConfSetup(conf *config.Config) {
 
 	if conf.SlaveOptions.KeySpaceSyncInterval == 0 {
 		conf.SlaveOptions.KeySpaceSyncInterval = 10
+	}
+
+	if conf.AnalyticsConfig.PurgeInterval == 0 {
+		// as default 10 seconds
+		conf.AnalyticsConfig.PurgeInterval = 10
 	}
 
 	rpc.GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)

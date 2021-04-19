@@ -16,11 +16,13 @@ import (
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/lonelycode/osin"
 	cache "github.com/pmylund/go-cache"
 	jose "github.com/square/go-jose"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -34,6 +36,15 @@ const (
 	HMACSign  = "hmac"
 	RSASign   = "rsa"
 	ECDSASign = "ecdsa"
+)
+
+var (
+	// List of common OAuth Client ID claims used by IDPs:
+	oauthClientIDClaims = []string{
+		"clientId",  // Keycloak
+		"cid",       // OKTA
+		"client_id", // Gluu
+	}
 )
 
 func (k *JWTMiddleware) Name() string {
@@ -343,6 +354,15 @@ func mapScopeToPolicies(mapping map[string]string, scope []string) []string {
 	return polIDs
 }
 
+func (k *JWTMiddleware) getOAuthClientIDFromClaim(claims jwt.MapClaims) string {
+	for _, claimName := range oauthClientIDClaims {
+		if val, ok := claims[claimName]; ok {
+			return val.(string)
+		}
+	}
+	return ""
+}
+
 // processCentralisedJWT Will check a JWT token centrally against the secret stored in the API Definition.
 func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token) (error, int) {
 	k.Logger().Debug("JWT authority is centralised")
@@ -353,6 +373,9 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		k.reportLoginFailure("[NOT FOUND]", r)
 		return err, http.StatusForbidden
 	}
+
+	// Get the OAuth client ID if available:
+	oauthClientID := k.getOAuthClientIDFromClaim(claims)
 
 	// Generate a virtual token
 	data := []byte(baseFieldData)
@@ -544,6 +567,41 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 				k.Logger().WithError(err).Error("Could not several policies from scope-claim mapping to JWT to session")
 				return errors.New("key not authorized: could not apply several policies"), http.StatusForbidden
 			}
+		}
+	}
+
+	session.OauthClientID = oauthClientID
+	if session.OauthClientID != "" {
+		// Initialize the OAuthManager if empty:
+		if k.Spec.OAuthManager == nil {
+			prefix := generateOAuthPrefix(k.Spec.APIID)
+			storageManager := getGlobalStorageHandler(prefix, false)
+			storageManager.Connect()
+			k.Spec.OAuthManager = &OAuthManager{
+				OsinServer: TykOsinNewServer(&osin.ServerConfig{},
+					&RedisOsinStorageInterface{
+						storageManager,
+						GlobalSessionManager,
+						&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false},
+						k.Spec.OrgID}),
+			}
+		}
+
+		// Retrieve OAuth client data from storage and inject developer ID into the session object:
+		client, err := k.Spec.OAuthManager.OsinServer.Storage.GetClient(oauthClientID)
+		if err == nil {
+			userData := client.GetUserData()
+			if userData != nil {
+				data, ok := userData.(map[string]interface{})
+				if ok {
+					developerID, keyFound := data["tyk_developer_id"].(string)
+					if keyFound {
+						session.MetaData["tyk_developer_id"] = developerID
+					}
+				}
+			}
+		} else {
+			k.Logger().WithError(err).Error("Couldn't get OAuth client")
 		}
 	}
 
