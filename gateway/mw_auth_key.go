@@ -38,17 +38,17 @@ func init() {
 	}
 
 	TykErrors[ErrAuthKeyNotFound] = config.TykError{
-		Message: MsgApiAccessDissalowed,
+		Message: MsgApiAccessDisallowed,
 		Code:    http.StatusForbidden,
 	}
 
 	TykErrors[ErrAuthCertNotFound] = config.TykError{
-		Message: MsgApiAccessDissalowed,
+		Message: MsgApiAccessDisallowed,
 		Code:    http.StatusForbidden,
 	}
 
 	TykErrors[ErrAuthKeyIsInvalid] = config.TykError{
-		Message: MsgApiAccessDissalowed,
+		Message: MsgApiAccessDisallowed,
 		Code:    http.StatusForbidden,
 	}
 }
@@ -96,6 +96,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		log.Debug("Trying to find key by client certificate")
 		certHash = certs.HexSHA256(r.TLS.PeerCertificates[0].Raw)
 		key = generateToken(k.Spec.OrgID, certHash)
+
 	} else {
 		k.Logger().Info("Attempted access with malformed header, no auth header found.")
 		return errorAndStatusCode(ErrAuthAuthorizationFieldMissing)
@@ -103,12 +104,15 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 
 	session, keyExists = k.CheckSessionAndIdentityForValidKey(&key, r)
 	if !keyExists {
-		return k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)
+		// fallback to search by cert
+		session, keyExists = k.CheckSessionAndIdentityForValidKey(&certHash, r)
+		if !keyExists {
+			return k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)
+		}
 	}
 
 	if authConfig.UseCertificate {
 		certID := session.OrgID + certHash
-
 		if _, err := CertificateManager.GetRaw(certID); err != nil {
 			return k.reportInvalidKey(key, r, MsgNonExistentCert, ErrAuthCertNotFound)
 		}
@@ -117,7 +121,6 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 			return k.reportInvalidKey(key, r, MsgInvalidKey, ErrAuthKeyIsInvalid)
 		}
 	}
-
 	// Set session state on context, we will need it later
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.AuthToken, apidef.UnsetAuth:

@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -1164,7 +1163,7 @@ func TestApplyMultiPolicies(t *testing.T) {
 			},
 		},
 	}...)
-	fmt.Printf("\n\n La sesion: %+v\n", session)
+
 	// Reset quota
 	ts.Run(t, []test.TestCase{
 		{

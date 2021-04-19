@@ -25,7 +25,7 @@ const (
 	defaultContentType    = headers.ApplicationJSON
 
 	MsgAuthFieldMissing    = "Authorization field missing"
-	MsgApiAccessDissalowed = "Access to this API has been disallowed"
+	MsgApiAccessDisallowed = "Access to this API has been disallowed"
 	MsgBearerMailformed    = "Bearer token malformed"
 	MsgKeyNotAuthorized    = "Key not authorised"
 	MsgOauthClientRevoked  = "Key not authorised. OAuth client access was revoked"
@@ -48,17 +48,17 @@ func defaultTykErrors() {
 	}
 
 	TykErrors[ErrAuthKeyNotFound] = config.TykError{
-		Message: MsgApiAccessDissalowed,
+		Message: MsgApiAccessDisallowed,
 		Code:    http.StatusForbidden,
 	}
 
 	TykErrors[ErrAuthCertNotFound] = config.TykError{
-		Message: MsgApiAccessDissalowed,
+		Message: MsgApiAccessDisallowed,
 		Code:    http.StatusForbidden,
 	}
 
 	TykErrors[ErrAuthKeyIsInvalid] = config.TykError{
-		Message: MsgApiAccessDissalowed,
+		Message: MsgApiAccessDisallowed,
 		Code:    http.StatusForbidden,
 	}
 
