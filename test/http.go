@@ -229,6 +229,23 @@ type HTTPTestRunner struct {
 	RequestBuilder func(*TestCase) (*http.Request, error)
 }
 
+const maxRetryCount = 2
+
+var retryReasons = []string{
+	"broken pipe",
+	"protocol wrong type for socket",
+	"connection reset by peer",
+}
+
+func needRetry(errString string) bool {
+	for _, reason := range retryReasons {
+		if strings.Contains(errString, reason) {
+			return true
+		}
+	}
+	return false
+}
+
 func (r HTTPTestRunner) Run(t testing.TB, testCases ...TestCase) (*http.Response, error) {
 	t.Helper()
 	var lastResponse *http.Response
@@ -253,7 +270,6 @@ func (r HTTPTestRunner) Run(t testing.TB, testCases ...TestCase) (*http.Response
 			continue
 		}
 
-		const maxRetryCount = 2
 		retryCount := 0
 	retry:
 
@@ -261,8 +277,7 @@ func (r HTTPTestRunner) Run(t testing.TB, testCases ...TestCase) (*http.Response
 		tcJSON, _ := json.Marshal(tc)
 
 		if lastError != nil {
-			if retryCount < maxRetryCount && (strings.Contains(lastError.Error(), "broken pipe") ||
-				strings.Contains(lastError.Error(), "protocol wrong type for socket")) {
+			if retryCount < maxRetryCount && needRetry(lastError.Error()) {
 				retryCount++
 				goto retry
 			}
