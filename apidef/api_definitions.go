@@ -6,6 +6,7 @@ import (
 	"encoding/xml"
 	"net/http"
 	"text/template"
+	"time"
 
 	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
 
@@ -14,9 +15,8 @@ import (
 	"github.com/lonelycode/osin"
 	"gopkg.in/mgo.v2/bson"
 
-	"time"
-
 	"github.com/TykTechnologies/gojsonschema"
+
 	"github.com/TykTechnologies/tyk/regexp"
 )
 
@@ -556,6 +556,8 @@ type GraphQLConfig struct {
 	GraphQLPlayground GraphQLPlayground `bson:"playground" json:"playground"`
 	// Engine holds the configuration for engine v2 and upwards.
 	Engine GraphQLEngineConfig `bson:"engine" json:"engine"`
+	// Proxy holds the configuration for a proxy only api.
+	Proxy GraphQLProxyConfig `bson:"proxy" json:"proxy"`
 }
 
 type GraphQLConfigVersion string
@@ -565,6 +567,10 @@ const (
 	GraphQLConfigVersion1    GraphQLConfigVersion = "1"
 	GraphQLConfigVersion2    GraphQLConfigVersion = "2"
 )
+
+type GraphQLProxyConfig struct {
+	AuthHeaders map[string]string `bson:"auth_headers" json:"auth_headers"`
+}
 
 type GraphQLEngineConfig struct {
 	FieldConfigs []GraphQLFieldConfig      `bson:"field_configs" json:"field_configs"`
@@ -908,6 +914,9 @@ func DummyAPI() APIDefinition {
 		ExecutionMode:    GraphQLExecutionModeProxyOnly,
 		Version:          GraphQLConfigVersion2,
 		LastSchemaUpdate: nil,
+		Proxy: GraphQLProxyConfig{
+			AuthHeaders: map[string]string{},
+		},
 	}
 
 	return APIDefinition{
