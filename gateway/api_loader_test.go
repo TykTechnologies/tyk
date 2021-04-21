@@ -120,7 +120,6 @@ func TestGraphQLPlayground(t *testing.T) {
 		if env == "cloud" {
 			endpoint = fmt.Sprintf("/%s/", api.Slug)
 		}
-		_ = endpoint
 
 		t.Run("playground html is loaded", func(t *testing.T) {
 			_, _ = g.Run(t, []test.TestCase{
@@ -178,6 +177,12 @@ func TestGraphQLPlayground(t *testing.T) {
 				api.GraphQL.GraphQLPlayground.Path = "/ppp"
 				LoadAPI(api)
 				run(t, path.Join(api.Proxy.ListenPath, "/ppp"), api, env)
+			})
+
+			t.Run("playground path is '/zzz/'", func(t *testing.T) {
+				api.GraphQL.GraphQLPlayground.Path = "/zzz/"
+				LoadAPI(api)
+				run(t, path.Join(api.Proxy.ListenPath, "/zzz"), api, env)
 			})
 
 			t.Run("playground path is 'aaa'", func(t *testing.T) {
