@@ -1,0 +1,38 @@
+{
+    "baggage_restrictions": {
+        "denyBaggageOnInitializationFailure": false,
+        "hostPort": "",
+        "refreshInterval": "0s"
+    },
+    "disabled": false,
+    "headers": {
+        "TraceContextHeaderName": "",
+        "jaegerBaggageHeader": "",
+        "jaegerDebugHeader": "",
+        "traceBaggageHeaderPrefix": ""
+    },
+    "reporter": {
+        "bufferflushinterval": "0s",
+        "collectorEndpoint": "",
+        "localAgentHostPort": "jaeger:6831",
+        "logSpans": true,
+        "password": "",
+        "queueSize": 0,
+        "user": ""
+    },
+    "rpc_metrics": false,
+    "sampler": {
+        "maxOperations": 0,
+        "param": 1,
+        "samplingRefreshInterval": "0s",
+        "samplingServerURL": "",
+        "type": "const"
+    },
+    "serviceName": "tyk-gateway",
+    "tags": [],
+    "throttler": {
+        "hostPort": "",
+        "refreshInterval": "0s",
+        "synchronousInitialization": false
+    }
+}

@@ -1,0 +1,13 @@
+{
+    "reporter": {
+        "batch_size": 0,
+        "max_backlog": 0,
+        "url": "http:localhost:9411/api/v2/spans"
+    },
+    "sampler": {
+        "mod": 0,
+        "name": "",
+        "rate": 0,
+        "salt": 0
+    }
+}
