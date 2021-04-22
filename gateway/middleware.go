@@ -70,6 +70,7 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		setContext(r, ctx)
 		return tr.TykMiddleware.ProcessRequest(w, r, conf)
 	}
+
 	return tr.TykMiddleware.ProcessRequest(w, r, conf)
 }
 
@@ -134,6 +135,7 @@ func createMiddleware(actualMW TykMiddleware) func(http.Handler) http.Handler {
 				h.ServeHTTP(w, r)
 				return
 			}
+
 			err, errCode := mw.ProcessRequest(w, r, mwConf)
 			if err != nil {
 				// GoPluginMiddleware are expected to send response in case of error
