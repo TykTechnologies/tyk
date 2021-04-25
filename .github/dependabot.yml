@@ -5,13 +5,10 @@
 # ./pr.zsh -title updated release engineering -branch release-3-lts -base release-3-lts -repos tyk,tyk-analytics -p
 # m4 -E -DxREPO=tyk
 
-FROM gcr.io/distroless/static-debian10
-WORKDIR /opt/tyk
-COPY tyk .
-COPY apps/app_sample.json apps/app_sample.json
-COPY tyk.conf.example tyk.conf
-ARG PORTS
-EXPOSE $PORTS
-
-ENTRYPOINT ["/opt/tyk/tyk" ]
-CMD [ "--conf=/opt/tyk/tyk.conf" ]
+version: 2
+updates:
+  # Maintain dependencies for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
