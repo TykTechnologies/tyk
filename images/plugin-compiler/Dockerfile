@@ -1,6 +1,6 @@
 # Go version here should match https://github.com/TykTechnologies/golang-cross/blob/master/.github/workflows/release.yml#L16
 
-FROM golang:1.15.8-buster
+FROM golang:1.15.8-stretch
 LABEL description="Image for plugin development"
 
 ARG TYK_GW_TAG
