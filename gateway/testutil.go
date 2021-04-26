@@ -1006,8 +1006,10 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 		go s.Gw.RPCListener.StartRPCLoopCheck(slaveOptions.RPCKey)
 	}
 
-	go s.Gw.reloadLoop(ctx, time.Tick(time.Second))
-	go s.Gw.reloadQueueLoop(ctx)
+//	go s.Gw.reloadLoop(ctx, time.Tick(time.Second))
+//	go s.Gw.reloadQueueLoop(ctx)
+	go s.Gw.reloadLoop(ctx, s.Gw.ReloadTestCase.ReloadTicker(), s.Gw.ReloadTestCase.OnReload)
+	go s.Gw.reloadQueueLoop(ctx, s.Gw.ReloadTestCase.OnQueued)
 	go s.reloadSimulation()
 }
 
