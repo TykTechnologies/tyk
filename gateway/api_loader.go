@@ -317,6 +317,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 					BaseMiddleware: baseMid,
 					Path:           obj.Path,
 					SymbolName:     obj.Name,
+					APILevel:       true,
 				},
 			)
 		} else if mwDriver != apidef.OttoDriver {
@@ -387,6 +388,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 					BaseMiddleware: baseMid,
 					Path:           mwAuthCheckFunc.Path,
 					SymbolName:     mwAuthCheckFunc.Name,
+					APILevel:       true,
 				},
 			)
 		}
@@ -406,6 +408,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 						BaseMiddleware: baseMid,
 						Path:           obj.Path,
 						SymbolName:     obj.Name,
+						APILevel:       true,
 					},
 				)
 			} else {
@@ -434,6 +437,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid})
+	mwAppendEnabled(&chainArray, &GoPluginMiddleware{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &RequestSigning{BaseMiddleware: baseMid})
 
@@ -445,6 +449,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 					BaseMiddleware: baseMid,
 					Path:           obj.Path,
 					SymbolName:     obj.Name,
+					APILevel:       true,
 				},
 			)
 		} else if mwDriver != apidef.OttoDriver {
@@ -873,4 +878,5 @@ func loadApps(specs []*APISpec) {
 	mainLog.Debug("Checker host Done")
 
 	mainLog.Info("Initialised API Definitions")
+
 }
