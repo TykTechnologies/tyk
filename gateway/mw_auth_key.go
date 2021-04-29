@@ -23,16 +23,32 @@ const (
 const (
 	ErrAuthAuthorizationFieldMissing = "auth.auth_field_missing"
 	ErrAuthKeyNotFound               = "auth.key_not_found"
+	ErrAuthCertNotFound              = "auth.cert_not_found"
+	ErrAuthKeyIsInvalid              = "auth.key_is_invalid"
+
+	MsgNonExistentKey  = "Attempted access with non-existent key."
+	MsgNonExistentCert = "Attempted access with non-existent cert."
+	MsgInvalidKey      = "Attempted access with invalid key."
 )
 
 func init() {
 	TykErrors[ErrAuthAuthorizationFieldMissing] = config.TykError{
-		Message: "Authorization field missing",
+		Message: MsgAuthFieldMissing,
 		Code:    http.StatusUnauthorized,
 	}
 
 	TykErrors[ErrAuthKeyNotFound] = config.TykError{
-		Message: "Access to this API has been disallowed",
+		Message: MsgApiAccessDisallowed,
+		Code:    http.StatusForbidden,
+	}
+
+	TykErrors[ErrAuthCertNotFound] = config.TykError{
+		Message: MsgApiAccessDisallowed,
+		Code:    http.StatusForbidden,
+	}
+
+	TykErrors[ErrAuthKeyIsInvalid] = config.TykError{
+		Message: MsgApiAccessDisallowed,
 		Code:    http.StatusForbidden,
 	}
 }
@@ -64,12 +80,13 @@ func (k *AuthKey) getAuthType() string {
 	return authTokenType
 }
 
-func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
 		return nil, http.StatusOK
 	}
 
 	key, authConfig := k.getAuthToken(k.getAuthType(), r)
+	var certHash string
 
 	keyExists := false
 	var session user.SessionState
@@ -77,27 +94,33 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 		key = stripBearer(key)
 	} else if authConfig.UseCertificate && key == "" && r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
 		log.Debug("Trying to find key by client certificate")
+		certHash = certs.HexSHA256(r.TLS.PeerCertificates[0].Raw)
+		key = generateToken(k.Spec.OrgID, certHash)
 
-		key = certs.HexSHA256(r.TLS.PeerCertificates[0].Raw)
 	} else {
 		k.Logger().Info("Attempted access with malformed header, no auth header found.")
-
 		return errorAndStatusCode(ErrAuthAuthorizationFieldMissing)
 	}
 
 	session, keyExists = k.CheckSessionAndIdentityForValidKey(&key, r)
 	if !keyExists {
-		k.Logger().WithField("key", obfuscateKey(key)).Info("Attempted access with non-existent key.")
-
-		// Fire Authfailed Event
-		AuthFailed(k, r, key)
-
-		// Report in health check
-		reportHealthValue(k.Spec, KeyFailure, "1")
-
-		return errorAndStatusCode(ErrAuthKeyNotFound)
+		// fallback to search by cert
+		session, keyExists = k.CheckSessionAndIdentityForValidKey(&certHash, r)
+		if !keyExists {
+			return k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)
+		}
 	}
 
+	if authConfig.UseCertificate {
+		certID := session.OrgID + certHash
+		if _, err := CertificateManager.GetRaw(certID); err != nil {
+			return k.reportInvalidKey(key, r, MsgNonExistentCert, ErrAuthCertNotFound)
+		}
+
+		if session.Certificate != certID {
+			return k.reportInvalidKey(key, r, MsgInvalidKey, ErrAuthKeyIsInvalid)
+		}
+	}
 	// Set session state on context, we will need it later
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.AuthToken, apidef.UnsetAuth:
@@ -106,6 +129,18 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 	}
 
 	return k.validateSignature(r, key)
+}
+
+func (k *AuthKey) reportInvalidKey(key string, r *http.Request, msg string, errMsg string) (error, int) {
+	k.Logger().WithField("key", obfuscateKey(key)).Info(msg)
+
+	// Fire Authfailed Event
+	AuthFailed(k, r, key)
+
+	// Report in health check
+	reportHealthValue(k.Spec, KeyFailure, "1")
+
+	return errorAndStatusCode(errMsg)
 }
 
 func (k *AuthKey) validateSignature(r *http.Request, key string) (error, int) {
@@ -160,6 +195,7 @@ func stripBearer(token string) string {
 	return token
 }
 
+// TODO: move this method to base middleware?
 func AuthFailed(m TykMiddleware, r *http.Request, token string) {
 	m.Base().FireEvent(EventAuthFailure, EventKeyFailureMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Auth Failure", OriginatingRequest: EncodeRequestToEvent(r)},
