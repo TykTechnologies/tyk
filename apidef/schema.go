@@ -447,6 +447,8 @@ const Schema = `{
                     "enum": [
                         "proxyOnly",
                         "executionEngine",
+						"subgraph",
+						"supergraph",
                         ""
                     ]
                 },
@@ -563,6 +565,36 @@ const Schema = `{
                     "properties": {
                         "auth_headers": {
                             "type": ["object", "null"]
+                        }
+                    }
+                },
+                "subgraph": {
+                    "type": ["object", "null"],
+                    "properties": {
+                        "sdl": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "supergraph": {
+                    "type": ["object", "null"],
+                    "properties": {
+                        "subgraphs": {
+                            "type": ["array", "null"],
+                            "properties": {
+                                "api_id": {
+                                    "type": "string"
+                                },
+                                "url": {
+                                    "type": "string"
+                                },
+                                "sdl": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "merged_sdl": {
+                            "type": "string"
                         }
                     }
                 },
