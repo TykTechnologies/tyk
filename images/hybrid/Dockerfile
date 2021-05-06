@@ -1,4 +1,5 @@
 FROM debian:buster-slim
+ARG TARGETARCH
 
 LABEL Description="Tyk Gateway docker image" Vendor="Tyk"
 
@@ -18,6 +19,9 @@ COPY images/hybrid/nginx/1_upstream.conf /etc/nginx/conf.d/
 COPY images/hybrid/nginx/sample.tconf /etc/nginx/sites-enabled/
 COPY images/hybrid/EULA.md /opt/tyk-gateway/EULA.md
 COPY images/hybrid/entrypoint.sh /opt/tyk-gateway/entrypoint.sh
+COPY *${TARGETARCH}.deb /
+
+RUN dpkg -i /*${TARGETARCH}.deb
 
 VOLUME ["/etc/nginx/sites-enabled/"]
 
