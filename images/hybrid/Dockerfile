@@ -5,7 +5,7 @@ LABEL Description="Tyk Gateway docker image" Vendor="Tyk"
 
 RUN apt-get update \
  && apt-get dist-upgrade -y --no-install-recommends redis-server nginx \
-            build-essential python3-setuptools libpython3.7 curl ca-certificates  \
+            build-essential python3-setuptools libpython3-dev curl ca-certificates  \
  && curl https://bootstrap.pypa.io/get-pip.py | python3 \
  && pip3 install grpcio==1.24.0 \
  && apt-get purge -y build-essential \
