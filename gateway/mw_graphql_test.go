@@ -410,6 +410,21 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 
 			_, _ = g.Run(t, test.TestCase{Data: request, BodyMatch: `{"kind":"OBJECT","name":"Country"`, Code: http.StatusOK})
 		})
+
+		t.Run("should return error when supergraph is used with v1", func(t *testing.T) {
+			BuildAndLoadAPI(func(spec *APISpec) {
+				spec.UseKeylessAccess = true
+				spec.Proxy.ListenPath = "/"
+				spec.GraphQL.Enabled = true
+				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeSupergraph
+			})
+
+			request := gql.Request{
+				Query: "query Query { countries { name } }",
+			}
+
+			_, _ = g.Run(t, test.TestCase{Data: request, BodyMatch: `there was a problem proxying the request`, Code: http.StatusInternalServerError})
+		})
 	})
 
 }
