@@ -61,7 +61,7 @@ func (m *GraphQLMiddleware) Init() {
 
 	m.Spec.GraphQLExecutor.Schema = schema
 
-	if m.needsExecutionEngine() {
+	if needsGraphQLExecutionEngine(m.Spec) {
 		absLogger := abstractlogger.NewLogrusLogger(log, absLoggerLevel(log.Level))
 		m.Spec.GraphQLExecutor.Client = &http.Client{Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec)}}
 
@@ -244,11 +244,6 @@ func (m *GraphQLMiddleware) websocketUpgradeUsesGraphQLProtocol(r *http.Request)
 	return websocketProtocol == GraphQLWebSocketProtocol
 }
 
-func (m *GraphQLMiddleware) needsExecutionEngine() bool {
-	return m.Spec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeExecutionEngine ||
-		m.Spec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph
-}
-
 func (m *GraphQLMiddleware) checkForUnsupportedUsage() error {
 	if m.isGraphQLConfigVersion1() && m.isSupergraphAPIDefinition() {
 		return errors.New("supergraph execution mode is not supported for graphql config version 1 - please use version 2")
@@ -296,6 +291,11 @@ func (m *GraphQLMiddleware) OnError(ctx resolve.HookContext, output []byte, sing
 				"single_flight": singleFlight,
 			},
 		).Debugf("%s (afterFetchHook.OnError): %s", ctx.CurrentPath, string(output))
+}
+
+func needsGraphQLExecutionEngine(apiSpec *APISpec) bool {
+	return apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeExecutionEngine ||
+		apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph
 }
 
 func absLoggerLevel(level logrus.Level) abstractlogger.Level {
