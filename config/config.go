@@ -180,22 +180,57 @@ type LocalSessionCacheConf struct {
 }
 
 type HttpServerOptionsConfig struct {
-	OverrideDefaults       bool       `json:"override_defaults"`
+	// No longer used
+	OverrideDefaults       bool       `json:"-"`
+	
+	// User -> Gateway network read timeout
 	ReadTimeout            int        `json:"read_timeout"`
+	
+	// User -> Gateway network write timeout
 	WriteTimeout           int        `json:"write_timeout"`
+	
+	// Set to true to enable SSL connections
 	UseSSL                 bool       `json:"use_ssl"`
+	
+	// Enable lets-encrypt support
 	UseLE_SSL              bool       `json:"use_ssl_le"`
+	
+	// Enable HTTP2 protocol handling
 	EnableHttp2            bool       `json:"enable_http2"`
+	
+	// Disable TLS verification. Required if you are using self-signed certificates.
 	SSLInsecureSkipVerify  bool       `json:"ssl_insecure_skip_verify"`
+	
+	// Enabled websockets and server side events support
 	EnableWebSockets       bool       `json:"enable_websockets"`
+	
+	// Deprecated. SSL certificates used by Gateway server. 
 	Certificates           []CertData `json:"certificates"`
+	
+	// SSL certificates used by Gateway server. List of certificate IDs or path to files.
 	SSLCertificates        []string   `json:"ssl_certificates"`
+	
+	// Start Gateway HTTP server on specific server name
 	ServerName             string     `json:"server_name"`
+	
+	// Minimum TLS version. Possible values: https://tyk.io/docs/basic-config-and-security/security/tls-and-ssl/#values-for-tls-versions
 	MinVersion             uint16     `json:"min_version"`
+	
+	// Maximum TLS version. 
 	MaxVersion             uint16     `json:"max_version"`
+	
+	// Set this to the number of seconds that Tyk should use to flush content from the proxied upstream connection to the open downstream connection. 
+	// This option needed be set streaming protocols like Server Side Events, or gRPC streaming.
 	FlushInterval          int        `json:"flush_interval"`
+	
+	// Allow the use of a double slash in url path, and can be useful if you need to pass raw URLs to your API endpoints. 
+	// For example: `http://myapi.com/get/http://example.com`.
 	SkipURLCleaning        bool       `json:"skip_url_cleaning"`
+	
+	// Disable automatic character escaping, allowing to path original url data to the upstream.
 	SkipTargetPathEscaping bool       `json:"skip_target_path_escaping"`
+	
+	// Custom SSL ciphers. See list of ciphers here https://tyk.io/docs/basic-config-and-security/security/tls-and-ssl/#specify-tls-cipher-suites-for-tyk-gateway--tyk-dashboard
 	Ciphers                []string   `json:"ssl_ciphers"`
 }
 
@@ -233,37 +268,44 @@ type CoProcessConfig struct {
 
 type CertificatesConfig struct {
 	API        []string          `json:"apis"`
+	// Specify upstream mutual TLS certificates on global level in the following format: { "<host>": "<cert>" }
 	Upstream   map[string]string `json:"upstream"`
+	// Certificates used for Control API Mutual TLS
 	ControlAPI []string          `json:"control_api"`
+	// Used for communicating with the Dashboard if it is configured to use Mutual TLS
 	Dashboard  []string          `json:"dashboard_api"`
+	// Certificates used for MDCB Mutual TLS 
 	MDCB       []string          `json:"mdcb_api"`
 }
 
 type SecurityConfig struct {
+	// Set AES256 secret which is used to encode certificate private keys when they uploaded via certificate storage
 	PrivateCertificateEncodingSecret string             `json:"private_certificate_encoding_secret"`
+	
+	// Enable Gateway Control API to use Mutual TLS. Certificates can be set via `security.certificates.control_api` section
 	ControlAPIUseMutualTLS           bool               `json:"control_api_use_mutual_tls"`
+	
+	// Specify public keys used for Certificate Pinning on global level. 
 	PinnedPublicKeys                 map[string]string  `json:"pinned_public_keys"`
+	
 	Certificates                     CertificatesConfig `json:"certificates"`
 }
 
 type NewRelicConfig struct {
+	// New Relic Application name
 	AppName    string `json:"app_name"`
+	// New Relic License key
 	LicenseKey string `json:"license_key"`
 }
 
 type Tracer struct {
-	// The name of the tracer to initialize. For instance appdash, to use appdash
-	// tracer
+	// The name of the tracer to initialize. For instance appdash, to use appdash tracer
 	Name string `json:"name"`
 
-	// If true then this tracer will be activated and all tracing data will be sent
-	// to this tracer.NoOp tracer is used otherwise which collects traces but
-	// discard them.
+	// Enable tracing
 	Enabled bool `json:"enabled"`
 
-	// Key value pairs used to initialize the tracer. These are tracer specific,
-	// each tracer requires different options to operate. Please see trace package
-	// for options required by supported tracer implementation.
+	// Tracing configuration. Refer to the Tracing Docs for the full list of options.
 	Options map[string]interface{} `json:"options"`
 }
 
@@ -311,32 +353,72 @@ type Config struct {
 	// none was found, it's the path to the default config file that
 	// was written.
 	OriginalPath string `json:"-"`
-
+	
+	// Force gateway to work only on a specifc domain name. Can be overriden by API custom domain.
 	HostName                  string                  `json:"hostname"`
+	
+	// If your machine has mulitple network devices or IPs you can force Gateway to use IP address you need
 	ListenAddress             string                  `json:"listen_address"`
+	
+	// Setting this value will change the port that Tyk listens on. Default: 8080.
 	ListenPort                int                     `json:"listen_port"`
+	
+	// Custom hostname for the Control API
 	ControlAPIHostname        string                  `json:"control_api_hostname"`
+	
+	// Set to run Gateway Control API on separate port, and protect it behind a firewall if needed. Please make sure you follow instructions when setting the control port https://tyk.io/docs/planning-for-production/#change-your-control-port.
 	ControlAPIPort            int                     `json:"control_api_port"`
+	
+	// This should be changed as soon as Tyk is installed on the system. 
+	// This value is used in every interaction with the Tyk REST API, it should be passed along as the X-Tyk-Authorization header in any requests made.
+	// Tyk assumes that you are sensible enough not to expose the management endpoints to the public and to keep this configuration value to yourself.
 	Secret                    string                  `json:"secret"`
+	
+	// The shared secret between the Gateway and the Dashboard to ensure that API Definition downloads, heartbeat and Policy loads are from a valid source.
 	NodeSecret                string                  `json:"node_secret"`
+	
+	// Linux PID file location. Do not change until you know what you are doing. Default: /var/run/tyk/tyk-gateway.pid
 	PIDFileLocation           string                  `json:"pid_file_location"`
+		
+	// Can be set to disable Dashboard message signature verification. When set to `true`, `public_key_path` can be ignored.
 	AllowInsecureConfigs      bool                    `json:"allow_insecure_configs"`
+	
+	// While communicating with the Dashboard, by default, all the messages are signed by a private/public key pair. Set path to public key.
 	PublicKeyPath             string                  `json:"public_key_path"`
+	
+	// Allow Dashboard to remotely set Gateway configuration via Nodes screen. 
 	AllowRemoteConfig         bool                    `bson:"allow_remote_config" json:"allow_remote_config"`
+	
+	// Global Certificate configuration
 	Security                  SecurityConfig          `json:"security"`
+	
+	// Gateway HTTP server configuration
 	HttpServerOptions         HttpServerOptionsConfig `json:"http_server_options"`
-	ReloadWaitTime            int                     `bson:"reload_wait_time" json:"reload_wait_time"`
+	
+	// Expose version header with a given name. Works only for versioned APIs.
 	VersionHeader             string                  `json:"version_header"`
+	
+	// Disable dynamic API and Policcy reloads, e.g. it will load new changes only on procecss start.
 	SuppressRedisSignalReload bool                    `json:"suppress_redis_signal_reload"`
 
-	// Gateway Security Policies
+	// Enable Key hashing
 	HashKeys                bool           `json:"hash_keys"`
+	
+	// Specify Key hashing algorithm. Possible values: murmur64, murmur128, sha256
 	HashKeyFunction         string         `json:"hash_key_function"`
+	
+	// Specify previous key hashing algorithms if you migrated from one algorithm to another.
 	HashKeyFunctionFallback []string       `json:"hash_key_function_fallback"`
+	
+	// Allow listing hashed API keys
 	EnableHashedKeysListing bool           `json:"enable_hashed_keys_listing"`
+	
+	// Minimum API token length
 	MinTokenLength          int            `json:"min_token_length"`
-	EnableAPISegregation    bool           `json:"enable_api_segregation"`
+	
+	// Path to error and webhook templates. Defaults to current binary path.
 	TemplatePath            string         `json:"template_path"`
+	
 	Policies                PoliciesConfig `json:"policies"`
 	DisablePortWhiteList    bool           `json:"disable_ports_whitelist"`
 	// Defines the ports that will be available for the api services to bind to.
