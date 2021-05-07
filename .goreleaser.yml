@@ -76,9 +76,7 @@ dockers:
   extra_files:
     - "install/"
     - "README.md"
-
     - "LICENSE.md"
-    - "apps/app_sample.json"
     - "templates"
     - "middleware"
     - "event_handlers/sample"
@@ -170,14 +168,10 @@ nfpms:
 
       - src: "LICENSE.md"
         dst: "/opt/share/docs/tyk-gateway/LICENSE.md"
-      - src: "apps/app_sample.json"
+      - src: "apps/*"
         dst: "/opt/tyk-gateway/apps"
       - src: "templates/*.json"
         dst: "/opt/tyk-gateway/templates"
-      - src: "templates/playground/index.html"
-        dst: "/opt/tyk-gateway/templates/playground/index.html"
-      - src: "templates/playground/playground.js"
-        dst: "/opt/tyk-gateway/templates/playground/playground.js"
       - src: "install/*"
         dst: "/opt/tyk-gateway/install"
       - src: "middleware/*.js"
