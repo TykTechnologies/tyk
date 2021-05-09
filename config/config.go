@@ -64,34 +64,68 @@ const (
 )
 
 type PoliciesConfig struct {
+	// Set this value to `file` to look on the file system for a definition file, set to `service` to use the Dashboard service.
 	PolicySource           string `json:"policy_source"`
+	
+	// This option is required if `policies.policy_source` set to `service`. 
+	// Set this to the URL of your dashboard installation, the URL should take the form of: http://dashboard_host:port.
 	PolicyConnectionString string `json:"policy_connection_string"`
+	
+	// This option is required if `policies.policy_source` set to `file`. 
+	// Specifies the path of a JSON file containing the available policies.
 	PolicyRecordName       string `json:"policy_record_name"`
+	
+	// In a Pro installation, Tyk will load Policy IDs and use the internal object-ID as the ID of the policy. 
+	// This is not portable in cases where the data needs to be moved from installation to installation.
+	//
+	// If you set this value to true, then the id parameter in a stored policy (or imported policy using the REST API of the Dashboard), will be used instead of the internal ID.
+	//
+	// This option should only be used when transporting an installation to a new database.
 	AllowExplicitPolicyID  bool   `json:"allow_explicit_policy_id"`
 }
 
 type DBAppConfOptionsConfig struct {
+	// Set the URL to your Dashboard instance (or a load balanced instance), the URL should take the form of: `http://dashboard_host:port`
 	ConnectionString string   `json:"connection_string"`
+	
+	// Set to true to enable filtering (sharding) of APIs.
 	NodeIsSegmented  bool     `json:"node_is_segmented"`
+	
+	// The tags to use when filtering (sharding) Tyk Gateway nodes, tags are processed as OR operations.
+	// If you include a non-filter tag (e.g. an identifier such as `node-id-1`, this will become available to your analytics Dashboard).
 	Tags             []string `json:"tags"`
 }
 
 type StorageOptionsConf struct {
+	// This should be set to `redis` (lowercase)
 	Type                  string            `json:"type"`
+	// The Redis host, by default this is set to `localhost`, but for production this should be set to a cluster.
 	Host                  string            `json:"host"`
+	// The Redis instance port.
 	Port                  int               `json:"port"`
-	Hosts                 map[string]string `json:"hosts"` // Deprecated: Addrs instead.
+	// If you have multi-node setup, you should use this field instead. Example: ["host1:port1", "host2:port2"]. 
 	Addrs                 []string          `json:"addrs"`
+	// Redis sentinel master name
 	MasterName            string            `json:"master_name"`
+	// Redis sentinel password
 	SentinelPassword      string            `json:"sentinel_password"`
+	// Redis user name
 	Username              string            `json:"username"`
+	// If your Redis instance has a password set for access, you can tell Tyk about it here.
 	Password              string            `json:"password"`
+	// Redis database
 	Database              int               `json:"database"`
+	// Set the number of maximum idle connections in the Redis connection pool, which defaults to 100. Set to higher if you are expecting more traffic.
 	MaxIdle               int               `json:"optimisation_max_idle"`
+	// Set the number of maximum connections in the Redis connection pool, which defaults to 500. Set to higher if you are expecting more traffic.
 	MaxActive             int               `json:"optimisation_max_active"`
+	// Set cutom timeout for Redis network operations. Default value 5 seconds.
 	Timeout               int               `json:"timeout"`
+	// Enable Redis Cluster support
 	EnableCluster         bool              `json:"enable_cluster"`
+	// Enable SSL/TLS connection between Tyk Gateway & Redis.
 	UseSSL                bool              `json:"use_ssl"`
+	// Disable TLS verification
 	SSLInsecureSkipVerify bool              `json:"ssl_insecure_skip_verify"`
 }
 
@@ -141,35 +175,76 @@ type DnsCacheConfig struct {
 }
 
 type MonitorConfig struct {
+	// Set this to `true` to have monitors enabled in your configuration for the node.
 	EnableTriggerMonitors bool               `json:"enable_trigger_monitors"`
 	Config                WebHookHandlerConf `json:"configuration"`
+	// The trigger limit, as a percentage of the quota that must be reached in order to trigger the event, any time the quota percentage is increased the event will trigger.
 	GlobalTriggerLimit    float64            `json:"global_trigger_limit"`
+	// Apply the monitoring subsystem to user keys.
 	MonitorUserKeys       bool               `json:"monitor_user_keys"`
+	// Apply the monitoring subsystem to organisation keys.
 	MonitorOrgKeys        bool               `json:"monitor_org_keys"`
 }
 
 type WebHookHandlerConf struct {
+	// The method to use for the webhook.
 	Method       string            `bson:"method" json:"method"`
+	// The target path on which to send the request.
 	TargetPath   string            `bson:"target_path" json:"target_path"`
+	// The template to load in order to format the request.
 	TemplatePath string            `bson:"template_path" json:"template_path"`
+	// Headers to set when firing the webhook.
 	HeaderList   map[string]string `bson:"header_map" json:"header_map"`
+	// The cool-down for the event so it does not trigger again (in seconds).
 	EventTimeout int64             `bson:"event_timeout" json:"event_timeout"`
 }
 
 type SlaveOptionsConfig struct {
+	// Set to `true` to connect a worker gateway using RPC.
 	UseRPC                          bool    `json:"use_rpc"`
+	
+	// Set this option to `true` to use an SSL RPC connection.
 	UseSSL                          bool    `json:"use_ssl"`
+	
+	// Set this option to `true` to allow the certificate validation (certificate chain and hostname) to be skipped.
+	// This can be useful if you use a self-signed certificate.
 	SSLInsecureSkipVerify           bool    `json:"ssl_insecure_skip_verify"`
+	
+	// Use this setting to add the URL for your MDCB or load balancer host.
 	ConnectionString                string  `json:"connection_string"`
+	
+	// Your organisation ID to connect to the MDCB installation.
 	RPCKey                          string  `json:"rpc_key"`
+	
+	// This the API key of a user used to authenticate and authorise the Gateway’s access through MDCB.
+	// The user should be a standard Dashboard user with minimal privileges so as to reduce risk if compromised.
+	// The suggested security settings are read for Real-time notifications and the remaining options set to deny.
 	APIKey                          string  `json:"api_key"`
+	
+	// Set this option to `true` to enable RPC caching for keys.
 	EnableRPCCache                  bool    `json:"enable_rpc_cache"`
+	
+	// For an On-Premises installation this can be left at `false` (the default setting). For Legacy Cloud Gateways it must be set to ‘true’.
 	BindToSlugsInsteadOfListenPaths bool    `json:"bind_to_slugs"`
+	
+	// Set this option to `true` if you don’t want to monitor changes in the keys from a master Gateway.
 	DisableKeySpaceSync             bool    `json:"disable_keyspace_sync"`
+	
+	// This is the `zone` that this instance inhabits, e.g. the cluster/data-centre the Gateway lives in. 
+	// The group ID must be the same across all the Gateways of a data-centre/cluster which are also sharing the same Redis instance.
+	// This ID should also be unique per cluster (otherwise another Gateway cluster can pick up your keyspace events and your cluster will get zero updates).
 	GroupID                         string  `json:"group_id"`
+	
+	// Call Timeout allows to specify a time in seconds for the maximum allowed duration of a RPC call.
 	CallTimeout                     int     `json:"call_timeout"`
+	
+	// The maximum time in seconds that a RPC ping can last.
 	PingTimeout                     int     `json:"ping_timeout"`
+	
+	// The number of RPC connections in the pool, basically it creates a set of connections that you can re-use as needed.
 	RPCPoolSize                     int     `json:"rpc_pool_size"`
+	
+	// You can use this config to set the period’s length in which the gateway will check if there’re changes in keys that must be synchronized, if this value is not set then by default it will be 10 seconds.
 	KeySpaceSyncInterval            float32 `json:"key_space_sync_interval"`
 }
 
@@ -419,40 +494,113 @@ type Config struct {
 	// Path to error and webhook templates. Defaults to current binary path.
 	TemplatePath            string         `json:"template_path"`
 	
+	// The policies section allows you to define where Tyk can find its policy templates. Policy templates are similar to key definitions in that they allow you to set quotas, access rights and rate limits for keys.
+	// Policies are loaded when Tyk starts and if changed require a hot-reload so they are loaded into memory.
+	// A policy can be defined in a file (stand alone mode) or from the same database as the Dashboard.
 	Policies                PoliciesConfig `json:"policies"`
-	DisablePortWhiteList    bool           `json:"disable_ports_whitelist"`
+		
 	// Defines the ports that will be available for the api services to bind to.
 	// This is a map of protocol to PortWhiteList. This allows per protocol
 	// configurations.
 	PortWhiteList map[string]PortWhiteList `json:"ports_whitelist"`
+	
+	// Disable port whilisting, essentially allowing you to use any port for your API
+	DisablePortWhiteList    bool           `json:"disable_ports_whitelist"`
 
-	// CE Configurations
+	// If Tyk is being used in its standard configuration (CE Mode), then API definitions are stored in the apps folder (by default in /opt/tyk-gateway/apps). 
+	// This file is scanned for files that ending in .json extension and interpreted at startup or reload. 
+	// See the API Management section of the Tyk Gateway API for more details.
 	AppPath string `json:"app_path"`
 
-	// Dashboard Configurations
+	// If you are a Tyk Pro user, this option will enable polling the Dashboard service for API definitions. 
+	// On startup Tyk will attempt to connect and download any relevant application configurations from from a Dashboard instance.
+	// The documents are exactly the same as the JSON configuration on disk with the exception of a BSON ID supplied by the service.
 	UseDBAppConfigs          bool                   `json:"use_db_app_configs"`
+	
+	// This section defines API loading and shard options, enable these settings to only selectively load API definitions on a node from a Dashboard service.
 	DBAppConfOptions         DBAppConfOptionsConfig `json:"db_app_conf_options"`
+	
+	// This section of the configuration is to hold the Redis configuration.
 	Storage                  StorageOptionsConf     `json:"storage"`
+	
+	// Disable the capability of the Gateway to `autodiscover` the Dashboard through heartbeat messages via Redis. 
+	// The goal of zeroconf is auto-discovery, so you do not have to specify the Tyk Dashboard address in `tyk.conf`.
+	// In some specific cases, for example, when the Dashboard is bound to a public domain, not accessible inside an internal network, or similar, `disable_dashboard_zeroconf` can be set to true, in favour of directly specifying a Tyk Dashboard address.
 	DisableDashboardZeroConf bool                   `json:"disable_dashboard_zeroconf"`
 
-	// Slave Configurations
+	// The `slave_options` allow you to configure the RPC slave connection for MDCB installations.
+	// These settings must be configured for every RPC slave/worker node.
 	SlaveOptions   SlaveOptionsConfig `json:"slave_options"`
+	
+	// If set to `true`, distributed rate limiter will be disabled for this node, and it will be excluded from rate limit calculation.
+	// 
+	// **Note**
+	//   If you set `db_app_conf_options.node_is_segmented` to `true` for multiple gateway nodes, you should ensure that `management_node` is set to false. 
+	//   This is to ensure visibility for the management node across all APIs.
 	ManagementNode bool               `json:"management_node"`
+	
+	// Is used as part of the RPC / Hybrid back-end configuration when using Tyk Enterprise and isn’t used anywhere else.
 	AuthOverride   AuthOverrideConf   `json:"auth_override"`
 
-	// Rate Limiting Strategy
-	EnableNonTransactionalRateLimiter bool    `json:"enable_non_transactional_rate_limiter"`
-	EnableSentinelRateLimiter         bool    `json:"enable_sentinel_rate_limiter"`
+	// Redis based rate limiter with fixed window. Provides 100% rate limiting accuracy, but require two additional Redis roundtrip for each request.
 	EnableRedisRollingLimiter         bool    `json:"enable_redis_rolling_limiter"`
+	
+	// To enable, set to true. The sentinel-based rate limiter provides a smoother performance curve as rate-limit calculations happen off-thread, but a stricter time-out based cool-down for clients, i.e. when a throttling action is triggered, they are required to cool-down for the period of the rate limit.
+	// Disabling the sentinel based limiter will make rate-limit calculations happen on-thread and therefore offers staggered cool-down and a smoother rate-limit experience for the client. 
+	// I.e. the client can slow their connection throughput to regain entry into their rate limit, this is more of a “throttle” than a “block”.
+	// The standard rate limiter offers similar performance as the sentinel-based limiter. This is disabled by default.
+	EnableSentinelRateLimiter         bool    `json:"enable_sentinel_rate_limiter"`
+	
+	// Enchancment for the Redis and Sentinel rate limiters, which that offers a significant improvement in performance by not using transactions on Redis rate-limit buckets.
+	EnableNonTransactionalRateLimiter bool    `json:"enable_non_transactional_rate_limiter"`
+	
+	// How frequently distributed rate limiter synchronise information between the gateway nodes. Default: 2 seconds.
 	DRLNotificationFrequency          int     `json:"drl_notification_frequency"`
-	DRLEnableSentinelRateLimiter      bool    `json:"drl_enable_sentinel_rate_limiter"`
+	
+	// Distributed rate limiter is inaccurate on small rate limits, thus it will fallback to Redis or Sentinel rate limiter on individual user basis, if its rate limiter lower then threshold.
+	// Rate limiter threshold calculated using the following formula: `rate_threshold = drl_threshold * number_of_gateways`. 
+	// So you have 2 gateways, and threshold is 5, if user rate limit is bigger then 10, it will use distributed rate limiter algorithm.
+	// Default: 5
 	DRLThreshold                      float64 `json:"drl_threshold"`
+	
+	// Controls which algorthm to use as fallback when distributed rate limiter can't be used.
+	DRLEnableSentinelRateLimiter      bool    `json:"drl_enable_sentinel_rate_limiter"`
 
-	// Organization configurations
+
+	// Allow dynamically configure analytics expiration on per organisation level 
 	EnforceOrgDataAge               bool          `json:"enforce_org_data_age"`
+
+	// Allow dynamically configure detailed logging on per organisation level 
 	EnforceOrgDataDetailLogging     bool          `json:"enforce_org_data_detail_logging"`
+	
+	// Allow dynamically configure organisation quotas on per organisation level 
 	EnforceOrgQuotas                bool          `json:"enforce_org_quotas"`
+	
 	ExperimentalProcessOrgOffThread bool          `json:"experimental_process_org_off_thread"`
+	
+	// The monitor section is useful if you wish to enforce a global trigger limit on organisation and user quotas. 
+	// This feature will trigger a webhook event to fire when specific triggers are reached. 
+	// Triggers can be global (set in the node), by organisation (set in the organisation session object) or by key (set in the key session object)
+	// 
+	// While Organisation-level and Key-level triggers can be tiered (e.g. trigger at 10%, trigger at 20%, trigger at 80%), in the node-level configuration only a global value can be set.
+	// If a global value and specific trigger level are the same the trigger will only fire once:
+	//
+	// ```
+	// "monitor": {
+	//   "enable_trigger_monitors": true,
+	//   "configuration": {
+	//    "method": "POST",
+	//    "target_path": "http://domain.com/notify/quota-trigger",
+	//    "template_path": "templates/monitor_template.json",
+	//    "header_map": {
+	//      "some-secret": "89787855"
+	//    },
+	//    "event_timeout": 10
+	//  },
+	//  "global_trigger_limit": 80.0,
+	//  "monitor_user_keys": false,
+	//  "monitor_org_keys": true
+	// },
 	Monitor                         MonitorConfig `json:"monitor"`
 
 	// Client-Gateway Configuration
