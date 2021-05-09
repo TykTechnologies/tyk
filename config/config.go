@@ -103,6 +103,7 @@ type StorageOptionsConf struct {
 	Host                  string            `json:"host"`
 	// The Redis instance port.
 	Port                  int               `json:"port"`
+	Hosts map[string]string `json:"hosts"` // Deprecated: Addrs instead.
 	// If you have multi-node setup, you should use this field instead. Example: ["host1:port1", "host2:port2"]. 
 	Addrs                 []string          `json:"addrs"`
 	// Redis sentinel master name
