@@ -160,7 +160,12 @@ type AnalyticsConfigConfig struct {
 }
 
 type HealthCheckConfig struct {
+	// Setting this value to true will enable the health-check endpoint on /Tyk/health.
 	EnableHealthChecks      bool  `json:"enable_health_checks"`
+	
+	// This setting defaults to 60, this is the time window that Tyk will use to sample health-check data.
+	// Increase this value for more accurate data (larger sample period), and decrease for less accurate.
+	// The reason this value is configurable is because sample data takes up space in your Redis DB to store the data to calculate samples, on high-availability systems this may not be desirable and smaller values may be preferred.
 	HealthCheckValueTimeout int64 `json:"health_check_value_timeouts"`
 }
 
@@ -318,18 +323,25 @@ type AuthOverrideConf struct {
 }
 
 type UptimeTestsConfigDetail struct {
+	// The sample size to trigger a `HostUp` or `HostDown` event, e.g. a setting of 3 will require at least three failures to occur before the uptime test is triggered.
 	FailureTriggerSampleSize int  `json:"failure_trigger_sample_size"`
+	// The amount of seconds between tests runs, all tests will run simultaneously, this value will set the periodicity between those tests. e.g. A value of 60 will run all uptime tests every 60 seconds.
 	TimeWait                 int  `json:"time_wait"`
+	// The goroutine pool size to keep idle for uptime tests, if you have many uptime tests running at a high periodicity, then make this value higher.
 	CheckerPoolSize          int  `json:"checker_pool_size"`
+	// Set this value to true to have the node capture and record analytics data regarding the uptime tests.
 	EnableUptimeAnalytics    bool `json:"enable_uptime_analytics"`
 }
 
 type UptimeTestsConfig struct {
+	// To disable uptime tests on this node, switch this value to true.
 	Disable     bool                    `json:"disable"`
+	// If you have multiple Gateway clusters connected to the same Redis, you need to set uniq poller group for each cluster.
 	PollerGroup string                  `json:"poller_group"`
 	Config      UptimeTestsConfigDetail `json:"config"`
 }
 type ServiceDiscoveryConf struct {
+	// Service discovery cache timeout
 	DefaultCacheTimeout int `json:"default_cache_timeout"`
 }
 
@@ -604,39 +616,88 @@ type Config struct {
 	// },
 	Monitor                         MonitorConfig `json:"monitor"`
 
-	// Client-Gateway Configuration
+	// Maximum idle connections, per API, between Tyk and Upstream. By default not limited.
 	MaxIdleConns         int   `bson:"max_idle_connections" json:"max_idle_connections"`
+	// Maximum idle connections, per API, per upstream, between Tyk and Upstream. Default: 100
 	MaxIdleConnsPerHost  int   `bson:"max_idle_connections_per_host" json:"max_idle_connections_per_host"`
+	// Maximum connection time. If set it will force gateway reconnect to the upstream. 
 	MaxConnTime          int64 `json:"max_conn_time"`
-	CloseIdleConnections bool  `json:"close_idle_connections"`
+	
+	// If set, disable keepalive between User and Tyk
 	CloseConnections     bool  `json:"close_connections"`
+	
+	// Allow use of custom domains
 	EnableCustomDomains  bool  `json:"enable_custom_domains"`
+	
 	// If AllowMasterKeys is set to true, session objects (key definitions) that do not have explicit access rights set
 	// will be allowed by Tyk. This means that keys that are created have access to ALL APIs, which in many cases is
 	// unwanted behaviour unless you are sure about what you are doing.
 	AllowMasterKeys bool `json:"allow_master_keys"`
 
-	// Gateway-Service Configuration
+
 	ServiceDiscovery              ServiceDiscoveryConf `json:"service_discovery"`
+	
+	// Globally ignore TLS verification between Tyk and Upstream 
 	ProxySSLInsecureSkipVerify    bool                 `json:"proxy_ssl_insecure_skip_verify"`
+	
+	// Enable HTTP2 support between Tyk and Upstream. Required for gRPC.
 	ProxyEnableHttp2              bool                 `json:"proxy_enable_http2"`
+	
+	// Minimum TLS version for connection between Tyk and Upstream.
 	ProxySSLMinVersion            uint16               `json:"proxy_ssl_min_version"`
+	
+	// Maximum TLS version for connection between Tyk and Upstream.
 	ProxySSLMaxVersion            uint16               `json:"proxy_ssl_max_version"`
+	
+	// Whitelist ciphers for connection between Tyk and Upstream.
 	ProxySSLCipherSuites          []string             `json:"proxy_ssl_ciphers"`
+	
+	// This can specify a default timeout in seconds for upstream API requests.
 	ProxyDefaultTimeout           float64              `json:"proxy_default_timeout"`
+	
+	// Disable TLS renegotiation.
 	ProxySSLDisableRenegotiation  bool                 `json:"proxy_ssl_disable_renegotiation"`
+	
+	// Disable keepalives between Tyk and Upstream.
+	// Set this value to true to force Tyk to close the connection with the server, otherwise the connections will remain open for as long as your OS keeps TCP connections open. 
+	// This can cause a file-handler limit to be exceeded. Setting to false can have performance benefits as the connection can be reused.
 	ProxyCloseConnections         bool                 `json:"proxy_close_connections"`
+	
+	// Tyk nodes can provide uptime awareness, uptime testing and analytics for your underlying APIs uptime and availability.
+	// Tyk can also notify you when a service goes down.
 	UptimeTests                   UptimeTestsConfig    `json:"uptime_tests"`
+	
+	// This section enables the configuration of the health-check API endpoint and the size of the sample data cache (in seconds).
 	HealthCheck                   HealthCheckConfig    `json:"health_check"`
+	
+	// Way to rename the /hello endpoint
+	HealthCheckEndpointName string         `json:"health_check_endpoint_name"`
+	
+	// Change the expiry time of refresh token, by default 14 days (in seconds).
 	OauthRefreshExpire            int64                `json:"oauth_refresh_token_expire"`
+	
+	// Change the expiry time of OAuth token (in seconds).
 	OauthTokenExpire              int32                `json:"oauth_token_expire"`
+	
+	// Specifies how long expired tokens are stored in Redis. The value is in seconds and the default is 0. Using the default means expired tokens are never removed from Redis.
 	OauthTokenExpiredRetainPeriod int32                `json:"oauth_token_expired_retain_period"`
+	
+	// Character which should be used as a separator for oauth redirect uri urls. Default: ;.
 	OauthRedirectUriSeparator     string               `json:"oauth_redirect_uri_separator"`
+	
+	// Configure the OAuth error status code returned. If not set, it defaults to a 403 error.
 	OauthErrorStatusCode          int                  `json:"oauth_error_status_code"`
+	
+	// By default all key ids in logs are hidden. Turn it on if you want to see them for debugging reasons.
 	EnableKeyLogging              bool                 `json:"enable_key_logging"`
+	
+	// Force validation of the hostname against the common name, even if TLS verification is disabled.
 	SSLForceCommonNameCheck       bool                 `json:"ssl_force_common_name_check"`
 
-	// Proxy analytics configuration
+	// Tyk is capable of recording every hit to your API into a database with various filtering parameters, set this value to true and fill in the sub-section below to enable logging.
+	// 
+	// **Note**
+	//   For performance reasons, Tyk will store traffic data to Redis initially and then purge the data from Redis to MongoDB or other, data stores, on a regular basis as determined by the purge_delay setting in your Tyk Pump configuration.
 	EnableAnalytics              bool                  `json:"enable_analytics"`
 	AnalyticsConfig              AnalyticsConfigConfig `json:"analytics_config"`
 	EnableSeperateAnalyticsStore bool                  `json:"enable_separate_analytics_store"`
@@ -666,7 +727,6 @@ type Config struct {
 
 	// Monitoring, Logging & Profiling
 	LogLevel                string         `json:"log_level"`
-	HealthCheckEndpointName string         `json:"health_check_endpoint_name"`
 	Tracer                  Tracer         `json:"tracing"`
 	NewRelic                NewRelicConfig `json:"newrelic"`
 	HTTPProfile             bool           `json:"enable_http_profiler"`
