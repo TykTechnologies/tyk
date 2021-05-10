@@ -1,18 +1,19 @@
 FROM debian:buster-slim
+ARG TARGETARCH
 
-LABEL Description="Tyk Gateway docker image" Vendor="Tyk"
+LABEL Description="Tyk Hybrid Gateway image" Vendor="Tyk"
 
 RUN apt-get update \
  && apt-get dist-upgrade -y --no-install-recommends redis-server nginx \
-            build-essential python3-setuptools libpython3.7 curl ca-certificates  \
+            python3-setuptools libpython3.7 curl ca-certificates  \
  && curl https://bootstrap.pypa.io/get-pip.py | python3 \
- && pip3 install grpcio==1.24.0 \
- && apt-get purge -y build-essential \
+ && pip3 install grpcio \
  && apt-get autoremove -y \
  && rm -rf /root/.cache \
  && rm -rf /var/lib/apt/lists/*
 
-RUN rm /etc/nginx/sites-enabled/default && rm /etc/nginx/sites-available/default
+COPY *${TARGETARCH}.deb /
+RUN dpkg -i /*${TARGETARCH}.deb
 
 COPY images/hybrid/nginx/1_upstream.conf /etc/nginx/conf.d/
 COPY images/hybrid/nginx/sample.tconf /etc/nginx/sites-enabled/
