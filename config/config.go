@@ -547,7 +547,7 @@ type Config struct {
 	
 	// If set to `true`, distributed rate limiter will be disabled for this node, and it will be excluded from rate limit calculation.
 	// 
-	// **Note**
+	// Note:
 	//   If you set `db_app_conf_options.node_is_segmented` to `true` for multiple gateway nodes, you should ensure that `management_node` is set to false. 
 	//   This is to ensure visibility for the management node across all APIs.
 	ManagementNode bool               `json:"management_node"`
@@ -696,7 +696,7 @@ type Config struct {
 
 	// Tyk is capable of recording every hit to your API into a database with various filtering parameters, set this value to true and fill in the sub-section below to enable logging.
 	// 
-	// **Note**
+	// Note:
 	//   For performance reasons, Tyk will store traffic data to Redis initially and then purge the data from Redis to MongoDB or other, data stores, on a regular basis as determined by the purge_delay setting in your Tyk Pump configuration.
 	EnableAnalytics              bool                  `json:"enable_analytics"`
 	AnalyticsConfig              AnalyticsConfigConfig `json:"analytics_config"`
