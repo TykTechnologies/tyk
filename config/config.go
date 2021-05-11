@@ -614,6 +614,7 @@ type Config struct {
 	//  "monitor_user_keys": false,
 	//  "monitor_org_keys": true
 	// },
+	// ```
 	Monitor                         MonitorConfig `json:"monitor"`
 
 	// Maximum idle connections, per API, between Tyk and Upstream. By default not limited.
