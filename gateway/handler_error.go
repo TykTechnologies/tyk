@@ -121,7 +121,7 @@ type TemplateExecutor interface {
 func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMsg string, errCode int, writeResponse bool) {
 	defer e.Base().UpdateRequestSession(r)
 	response := &http.Response{}
-	
+
 	if writeResponse {
 		var templateExtension string
 		contentType := r.Header.Get(headers.ContentType)
