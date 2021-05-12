@@ -256,7 +256,7 @@ nfpms:
       - src: "templates/*.json"
         dst: "/opt/tyk-gateway/templates"
       - src: "templates/playground/*"
-        dst: "/opt/tyk-gateway/templates/playground/"
+        dst: "/opt/tyk-gateway/templates/playground"
       - src: "middleware/*.js"
         dst: "/opt/tyk-gateway/middleware"
       - src: "event_handlers/sample/*.js"
