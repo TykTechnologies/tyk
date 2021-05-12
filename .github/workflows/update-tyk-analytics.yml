@@ -14,7 +14,7 @@ jobs:
     name: tyk-analytics
     runs-on: ubuntu-latest
     steps:
-      - uses: peter-evans/repository-dispatch@v1
+      - uses: peter-evans/repository-dispatch@v1.1.3
         with:
           token: ${{ secrets.TYK_ANALYTICS_TOKEN }}
           repository: TykTechnologies/tyk-analytics
