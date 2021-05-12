@@ -6,6 +6,8 @@
 # m4 -E -DxREPO=tyk
 
 FROM debian:buster-slim
+ARG TARGETARCH
+
 RUN apt-get update \
     && apt-get dist-upgrade -y ca-certificates
 
@@ -19,8 +21,8 @@ RUN apt-get install -y python3-setuptools libpython3.7 python3.7-dev curl \
     && rm -rf /var/lib/apt/lists/*
 
 
-COPY *.deb /
-RUN dpkg -i /*.deb && rm /*.deb
+COPY *${TARGETARCH}.deb /
+RUN dpkg -i /tyk-gateway*${TARGETARCH}.deb
 
 ARG PORTS
 
