@@ -48,7 +48,7 @@ jobs:
         with:
           fetch-depth: ${{ ! startsWith(github.ref, 'refs/tags') }}
 
-      - uses: docker/setup-qemu-action@v1
+      - uses: docker/setup-qemu-action@v1.1.0
 
       - uses: docker/setup-buildx-action@v1
 
@@ -183,7 +183,7 @@ jobs:
         with:
           name: deb
 
-      - uses: docker/setup-qemu-action@v1
+      - uses: docker/setup-qemu-action@v1.1.0
 
       - uses: docker/setup-buildx-action@v1
 
