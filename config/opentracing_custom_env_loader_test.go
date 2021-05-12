@@ -11,7 +11,7 @@ import (
 func TestLoadZipkin(t *testing.T) {
 	base := ZipkinConfig{
 		Reporter: Reporter{
-			URL:        "repoturl",
+			URL:        "http://example.com",
 			BatchSize:  10,
 			MaxBacklog: 20,
 		},
@@ -33,16 +33,6 @@ func TestLoadZipkin(t *testing.T) {
 		{"TYK_GW_TRACER_OPTIONS_SAMPLER_SALT", fmt.Sprint(base.Sampler.Salt)},
 		{"TYK_GW_TRACER_OPTIONS_SAMPLER_MOD", fmt.Sprint(base.Sampler.Mod)},
 	}
-	t.Run("Returns nil when it is not zipkin config", func(t *testing.T) {
-		conf := &Config{}
-		err := loadZipkin(envPrefix, conf)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if conf.Tracer.Options != nil {
-			t.Error("expected options to be nil")
-		}
-	})
 
 	t.Run("loads env vars", func(t *testing.T) {
 		for _, v := range sample {
@@ -56,8 +46,8 @@ func TestLoadZipkin(t *testing.T) {
 				os.Unsetenv(v.env)
 			}
 		}()
-		conf := &Config{Tracer: Tracer{Name: "zipkin"}}
-		err := loadZipkin(envPrefix, conf)
+		var conf Config
+		err := Load([]string{"testdata/zipkin.json"}, &conf)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -76,23 +66,13 @@ func TestLoadZipkin(t *testing.T) {
 }
 
 func TestLoadJaeger(t *testing.T) {
-	base := &jaeger.Configuration{ServiceName: "jaeger-test-service"}
+	name := "jaeger-test-service"
 	sample := []struct {
 		env   string
 		value string
 	}{
-		{"TYK_GW_TRACER_OPTIONS_SERVICENAME", base.ServiceName},
+		{"TYK_GW_TRACER_OPTIONS_SERVICENAME", name},
 	}
-	t.Run("Returns nil when it is not jaeger config", func(t *testing.T) {
-		conf := &Config{}
-		err := loadJaeger(envPrefix, conf)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if conf.Tracer.Options != nil {
-			t.Error("expected options to be nil")
-		}
-	})
 
 	t.Run("Loads env vars", func(t *testing.T) {
 		for _, v := range sample {
@@ -107,18 +87,18 @@ func TestLoadJaeger(t *testing.T) {
 			}
 		}()
 
-		conf := &Config{Tracer: Tracer{Name: "jaeger"}}
-		err := loadJaeger(envPrefix, conf)
+		var conf Config
+		err := Load([]string{"testdata/jaeger.json"}, &conf)
 		if err != nil {
 			t.Fatal(err)
 		}
 		var got jaeger.Configuration
-		err = DecodeJSON(&got, conf.Tracer.Options)
+		err = DecodeYAML(&got, conf.Tracer.Options)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if base.ServiceName != got.ServiceName {
-			t.Errorf("expected %#v got %#v", base.ServiceName, got.ServiceName)
+		if got.ServiceName != name {
+			t.Errorf("expected %#v got %#v", name, got.ServiceName)
 		}
 	})
 }

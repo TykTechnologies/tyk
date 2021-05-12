@@ -9,7 +9,6 @@ import (
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/httpclient"
 	restDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/rest_datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/plan"
-	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -17,216 +16,219 @@ import (
 )
 
 func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
-	run := func(t *testing.T, inputJSON string, httpClient *http.Client) (*graphql.EngineV2Configuration, error) {
+	t.Run("should create v2 config without err", func(t *testing.T) {
 		var gqlConfig apidef.GraphQLConfig
-		err := json.Unmarshal([]byte(inputJSON), &gqlConfig)
-		require.NoError(t, err)
+		require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2ConfigJson), &gqlConfig))
 
+		httpClient := &http.Client{}
 		adapter := NewGraphQLConfigAdapter(gqlConfig)
 		adapter.SetHttpClient(httpClient)
-		return adapter.EngineConfigV2()
+
+		_, err := adapter.EngineConfigV2()
+		assert.NoError(t, err)
+	})
+
+	t.Run("should return an error for unsupported config", func(t *testing.T) {
+		var gqlConfig apidef.GraphQLConfig
+		require.NoError(t, json.Unmarshal([]byte(graphqlEngineV1ConfigJson), &gqlConfig))
+
+		adapter := NewGraphQLConfigAdapter(gqlConfig)
+		_, err := adapter.EngineConfigV2()
+
+		assert.Error(t, err)
+		assert.Equal(t, ErrUnsupportedGraphQLConfigVersion, err)
+	})
+}
+
+func TestGraphQLConfigAdapter_engineConfigV2FieldConfigs(t *testing.T) {
+	expectedFieldCfgs := plan.FieldConfigurations{
+		{
+			TypeName:              "Query",
+			FieldName:             "rest",
+			DisableDefaultMapping: false,
+			Path:                  []string{"my_rest"},
+		},
+		{
+			TypeName:  "Query",
+			FieldName: "gql",
+			Arguments: []plan.ArgumentConfiguration{
+				{
+					Name:       "id",
+					SourceType: plan.FieldArgumentSource,
+				},
+				{
+					Name:       "name",
+					SourceType: plan.FieldArgumentSource,
+				},
+			},
+		},
+		{
+			TypeName:  "DeepGQL",
+			FieldName: "query",
+			Arguments: []plan.ArgumentConfiguration{
+				{
+					Name:       "code",
+					SourceType: plan.FieldArgumentSource,
+				},
+			},
+		},
 	}
 
-	runWithError := func(inputJSON string, expectedErr error) func(t *testing.T) {
-		return func(t *testing.T) {
-			_, err := run(t, inputJSON, nil)
-			assert.Error(t, err)
-			assert.Equal(t, expectedErr, err)
-		}
-	}
+	var gqlConfig apidef.GraphQLConfig
+	require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2ConfigJson), &gqlConfig))
 
-	runWithoutError := func(inputJSON string, httpClient *http.Client, expectedEngineV2ConfigBuilder func(t *testing.T) *graphql.EngineV2Configuration) func(t *testing.T) {
-		return func(t *testing.T) {
-			engineV2Conf, err := run(t, inputJSON, httpClient)
-			expectedEngineV2Config := expectedEngineV2ConfigBuilder(t)
+	adapter := NewGraphQLConfigAdapter(gqlConfig)
+	require.NoError(t, adapter.parseSchema())
 
-			assert.NoError(t, err)
-			assert.Equal(t, expectedEngineV2Config, engineV2Conf)
-		}
-	}
+	actualFieldCfgs := adapter.engineConfigV2FieldConfigs()
+	assert.ElementsMatch(t, expectedFieldCfgs, actualFieldCfgs)
+}
 
+func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 	httpClient := &http.Client{}
 
-	t.Run("should return error when provided config is not v2",
-		runWithError(graphqlEngineV1ConfigJson, ErrUnsupportedGraphQLConfigVersion),
-	)
-
-	t.Run("should convert graphql v2 config to engine config v2",
-		runWithoutError(graphqlEngineV2ConfigJson, httpClient,
-			func(t *testing.T) *graphql.EngineV2Configuration {
-				schema, err := graphql.NewSchemaFromString(v2Schema)
-				require.NoError(t, err)
-
-				conf := graphql.NewEngineV2Configuration(schema)
-				conf.SetFieldConfigurations(plan.FieldConfigurations{
-					{
-						TypeName:              "Query",
-						FieldName:             "rest",
-						DisableDefaultMapping: false,
-						Path:                  []string{"my_rest"},
-					},
-					{
-						TypeName:  "Query",
-						FieldName: "gql",
-						Arguments: []plan.ArgumentConfiguration{
-							{
-								Name:       "id",
-								SourceType: plan.FieldArgumentSource,
-							},
-							{
-								Name:       "name",
-								SourceType: plan.FieldArgumentSource,
-							},
-						},
-					},
-					{
-						TypeName:  "DeepGQL",
-						FieldName: "query",
-						Arguments: []plan.ArgumentConfiguration{
-							{
-								Name:       "code",
-								SourceType: plan.FieldArgumentSource,
-							},
-						},
-					},
-				})
-
-				conf.SetDataSources([]plan.DataSourceConfiguration{
-					{
-						RootNodes: []plan.TypeField{
-							{
-								TypeName:   "Query",
-								FieldNames: []string{"rest"},
-							},
-						},
-						Factory: &restDataSource.Factory{
-							Client: httpclient.NewNetHttpClient(httpClient),
-						},
-						Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
-							Fetch: restDataSource.FetchConfiguration{
-								URL:    "https://rest.example.com",
-								Method: "POST",
-								Header: map[string][]string{
-									"Authorization": {"123"},
-									"X-Custom":      {"A, B"},
-								},
-								Body: "body",
-								Query: []restDataSource.QueryConfiguration{
-									{
-										Name:  "q",
-										Value: "val1,val2",
-									},
-									{
-										Name:  "repeat",
-										Value: "val1",
-									},
-									{
-										Name:  "repeat",
-										Value: "val2",
-									},
-								},
-							},
-						}),
-					},
-					{
-						RootNodes: []plan.TypeField{
-							{
-								TypeName:   "Query",
-								FieldNames: []string{"gql"},
-							},
-						},
-						Factory: &graphqlDataSource.Factory{
-							Client: httpclient.NewNetHttpClient(httpClient),
-						},
-						Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
-							Fetch: graphqlDataSource.FetchConfiguration{
-								URL:    "https://graphql.example.com",
-								Method: "POST",
-							},
-						}),
-					},
-					{
-						RootNodes: []plan.TypeField{
-							{
-								TypeName:   "Query",
-								FieldNames: []string{"withChildren"},
-							},
-						},
-						ChildNodes: []plan.TypeField{
-							{
-								TypeName:   "WithChildren",
-								FieldNames: []string{"id", "name"},
-							},
-						},
-						Factory: &restDataSource.Factory{
-							Client: httpclient.NewNetHttpClient(httpClient),
-						},
-						Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
-							Fetch: restDataSource.FetchConfiguration{
-								URL:    "https://rest.example.com",
-								Method: "POST",
-							},
-						}),
-					},
-					{
-						RootNodes: []plan.TypeField{
-							{
-								TypeName:   "WithChildren",
-								FieldNames: []string{"nested"},
-							},
-						},
-						ChildNodes: []plan.TypeField{
-							{
-								TypeName:   "Nested",
-								FieldNames: []string{"id", "name"},
-							},
-						},
-						Factory: &restDataSource.Factory{
-							Client: httpclient.NewNetHttpClient(httpClient),
-						},
-						Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
-							Fetch: restDataSource.FetchConfiguration{
-								URL:    "https://rest.example.com",
-								Method: "POST",
-							},
-						}),
-					},
-					{
-						RootNodes: []plan.TypeField{
-							{
-								TypeName:   "Query",
-								FieldNames: []string{"multiRoot1", "multiRoot2"},
-							},
-						},
-						ChildNodes: []plan.TypeField{
-							{
-								TypeName:   "MultiRoot1",
-								FieldNames: []string{"id"},
-							},
-							{
-								TypeName:   "MultiRoot2",
-								FieldNames: []string{"name"},
-							},
-						},
-						Factory: &graphqlDataSource.Factory{
-							Client: httpclient.NewNetHttpClient(httpClient),
-						},
-						Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
-							Fetch: graphqlDataSource.FetchConfiguration{
-								URL:    "https://graphql.example.com",
-								Method: "POST",
-								Header: map[string][]string{
-									"Auth": {"123"},
-								},
-							},
-						}),
-					},
-				})
-
-				return &conf
+	expectedDataSources := []plan.DataSourceConfiguration{
+		{
+			RootNodes: []plan.TypeField{
+				{
+					TypeName:   "Query",
+					FieldNames: []string{"rest"},
+				},
 			},
-		),
-	)
+			Factory: &restDataSource.Factory{
+				Client: httpclient.NewNetHttpClient(httpClient),
+			},
+			Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
+				Fetch: restDataSource.FetchConfiguration{
+					URL:    "https://rest.example.com",
+					Method: "POST",
+					Header: map[string][]string{
+						"Authorization": {"123"},
+						"X-Custom":      {"A, B"},
+					},
+					Body: "body",
+					Query: []restDataSource.QueryConfiguration{
+						{
+							Name:  "q",
+							Value: "val1,val2",
+						},
+						{
+							Name:  "repeat",
+							Value: "val1",
+						},
+						{
+							Name:  "repeat",
+							Value: "val2",
+						},
+					},
+				},
+			}),
+		},
+		{
+			RootNodes: []plan.TypeField{
+				{
+					TypeName:   "Query",
+					FieldNames: []string{"gql"},
+				},
+			},
+			Factory: &graphqlDataSource.Factory{
+				Client: httpclient.NewNetHttpClient(httpClient),
+			},
+			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
+				Fetch: graphqlDataSource.FetchConfiguration{
+					URL:    "https://graphql.example.com",
+					Method: "POST",
+				},
+			}),
+		},
+		{
+			RootNodes: []plan.TypeField{
+				{
+					TypeName:   "Query",
+					FieldNames: []string{"withChildren"},
+				},
+			},
+			ChildNodes: []plan.TypeField{
+				{
+					TypeName:   "WithChildren",
+					FieldNames: []string{"id", "name"},
+				},
+			},
+			Factory: &restDataSource.Factory{
+				Client: httpclient.NewNetHttpClient(httpClient),
+			},
+			Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
+				Fetch: restDataSource.FetchConfiguration{
+					URL:    "https://rest.example.com",
+					Method: "POST",
+				},
+			}),
+		},
+		{
+			RootNodes: []plan.TypeField{
+				{
+					TypeName:   "WithChildren",
+					FieldNames: []string{"nested"},
+				},
+			},
+			ChildNodes: []plan.TypeField{
+				{
+					TypeName:   "Nested",
+					FieldNames: []string{"id", "name"},
+				},
+			},
+			Factory: &restDataSource.Factory{
+				Client: httpclient.NewNetHttpClient(httpClient),
+			},
+			Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
+				Fetch: restDataSource.FetchConfiguration{
+					URL:    "https://rest.example.com",
+					Method: "POST",
+				},
+			}),
+		},
+		{
+			RootNodes: []plan.TypeField{
+				{
+					TypeName:   "Query",
+					FieldNames: []string{"multiRoot1", "multiRoot2"},
+				},
+			},
+			ChildNodes: []plan.TypeField{
+				{
+					TypeName:   "MultiRoot1",
+					FieldNames: []string{"id"},
+				},
+				{
+					TypeName:   "MultiRoot2",
+					FieldNames: []string{"name"},
+				},
+			},
+			Factory: &graphqlDataSource.Factory{
+				Client: httpclient.NewNetHttpClient(httpClient),
+			},
+			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
+				Fetch: graphqlDataSource.FetchConfiguration{
+					URL:    "https://graphql.example.com",
+					Method: "POST",
+					Header: map[string][]string{
+						"Auth": {"123"},
+					},
+				},
+			}),
+		},
+	}
+
+	var gqlConfig apidef.GraphQLConfig
+	require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2ConfigJson), &gqlConfig))
+
+	adapter := NewGraphQLConfigAdapter(gqlConfig)
+	adapter.SetHttpClient(httpClient)
+	require.NoError(t, adapter.parseSchema())
+
+	actualDataSources, err := adapter.engineConfigV2DataSources()
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, expectedDataSources, actualDataSources)
 }
 
 const graphqlEngineV1ConfigJson = `{

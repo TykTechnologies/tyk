@@ -56,6 +56,7 @@ require (
 	github.com/miekg/dns v1.0.14
 	github.com/mitchellh/mapstructure v1.2.2
 	github.com/newrelic/go-agent v2.13.0+incompatible
+	github.com/nsf/jsondiff v0.0.0-20210303162244-6ea32392771e // indirect
 	github.com/opentracing/opentracing-go v1.1.0
 	github.com/openzipkin/zipkin-go v0.2.2
 	github.com/oschwald/maxminddb-golang v1.5.0
@@ -93,10 +94,10 @@ require (
 	gopkg.in/square/go-jose.v1 v1.1.2 // indirect
 	gopkg.in/vmihailenco/msgpack.v2 v2.9.1
 	gopkg.in/xmlpath.v2 v2.0.0-20150820204837-860cbeca3ebc
-	gopkg.in/yaml.v2 v2.3.0
+	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 	rsc.io/letsencrypt v0.0.2
 )
 
-replace github.com/jensneuse/graphql-go-tools => github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20210310152233-6ff6aba4c612
+replace github.com/jensneuse/graphql-go-tools => github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20210324124248-3397d6fea435
 
 //replace github.com/jensneuse/graphql-go-tools => ../graphql-go-tools
