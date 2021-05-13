@@ -88,4 +88,33 @@ func MyPluginResponse(rw http.ResponseWriter, res *http.Response, req *http.Requ
 
 }
 
+func MyPluginPerPathFoo(rw http.ResponseWriter, r *http.Request) {
+
+	rw.Header().Add("X-foo", "foo")
+
+}
+
+func MyPluginPerPathBar(rw http.ResponseWriter, r *http.Request) {
+	rw.Header().Add("X-bar", "bar")
+
+}
+
+func MyPluginPerPathResp(rw http.ResponseWriter, r *http.Request) {
+	// prepare data to send
+	replyData := map[string]string{
+		"current_time": "now",
+	}
+
+	jsonData, err := json.Marshal(replyData)
+	if err != nil {
+		rw.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// send HTTP response from Golang plugin
+	rw.Header().Set("Content-Type", "application/json")
+	rw.WriteHeader(http.StatusOK)
+	rw.Write(jsonData)
+}
+
 func main() {}

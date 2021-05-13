@@ -24,17 +24,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
-
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-
+	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
+	uuid "github.com/satori/go.uuid"
 	"golang.org/x/net/context"
 
 	"github.com/TykTechnologies/tyk/apidef"
-
 	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
@@ -42,7 +40,6 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 	_ "github.com/TykTechnologies/tyk/testdata" // Don't delete
 	"github.com/TykTechnologies/tyk/user"
-	uuid "github.com/satori/go.uuid"
 )
 
 var (
@@ -590,9 +587,9 @@ func graphqlDataSourceHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(`{
 			"data": {
 				"countries": [
-					{	
+					{
 						"code": "TR",
-						"name": "Turkey"	
+						"name": "Turkey"
 					},
 					{
 						"code": "RU",
@@ -867,7 +864,7 @@ type Test struct {
 	testRunner   *test.HTTPTestRunner
 	GlobalConfig config.Config
 	config       TestConfig
-	cacnel       func()
+	cancel       func()
 }
 
 func (s *Test) Start() {
@@ -891,7 +888,7 @@ func (s *Test) Start() {
 
 	startServer()
 	ctx, cancel := context.WithCancel(context.Background())
-	s.cacnel = cancel
+	s.cancel = cancel
 	setupGlobals(ctx)
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.Global().SupressDefaultOrgStore {
@@ -939,8 +936,8 @@ func (s *Test) Do(tc test.TestCase) (*http.Response, error) {
 }
 
 func (s *Test) Close() {
-	if s.cacnel != nil {
-		s.cacnel()
+	if s.cancel != nil {
+		s.cancel()
 	}
 	defaultProxyMux.swap(&proxyMux{})
 	if s.config.SeparateControlAPI {

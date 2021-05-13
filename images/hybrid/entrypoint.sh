@@ -32,6 +32,4 @@ service redis-server start
 
 cd /opt/tyk-gateway/
 CONFPATH=/opt/tyk-gateway
-# Compatibility with old directory structure
-[ -f /opt/tyk/tyk.conf ] && CONFPATH=/opt/tyk
 ./tyk --conf=$CONFPATH/tyk.conf
