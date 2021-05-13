@@ -32,9 +32,6 @@ import (
 // For gRPC, we should be sure that HTTP/2 works with Tyk in H2C configuration also for insecure grpc over http.
 func TestHTTP2_h2C(t *testing.T) {
 
-	// h2c in user -> tyk
-	// h2c in tyk -> upstream
-	// h2c en
 	defer ResetTestConfig()
 	var port = 6666
 
@@ -135,7 +132,6 @@ func TestGRPC_H2C(t *testing.T) {
 	})
 
 	name := "Josh"
-//TestGRPC_Stream_H2C/Valid_feature
 	// gRPC client
 	r := sayHelloWithGRPCClientH2C(t, "localhost:6666", name)
 
