@@ -290,8 +290,10 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 
 func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout, sampleExpiration int, hostList map[string]HostData, failureCallback, upCallback, pingCallback func(HostHealthReport)) {
 	if sampleExpiration == 0 {
+		log.Debug("[HOST CHECKER] Config:SampleExpiration: ", 30)
 		h.sampleCache = cache.New(30*time.Second, 30*time.Second)
 	} else {
+		log.Debug("[HOST CHECKER] Config:SampleExpiration: ", sampleExpiration)
 		h.sampleCache = cache.New(time.Duration(sampleExpiration)*time.Second, time.Duration(sampleExpiration)*time.Second)
 	}
 
