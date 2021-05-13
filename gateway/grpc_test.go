@@ -135,7 +135,7 @@ func TestGRPC_H2C(t *testing.T) {
 	})
 
 	name := "Josh"
-
+//TestGRPC_Stream_H2C/Valid_feature
 	// gRPC client
 	r := sayHelloWithGRPCClientH2C(t, "localhost:6666", name)
 
@@ -839,7 +839,8 @@ func TestGRPC_Stream_H2C(t *testing.T) {
 	defer ResetTestConfig()
 
 	var port = 6666
-	EnablePort(port, "h2c")
+
+	EnablePort(port, "http")
 	// gRPC server
 	target, s := startGRPCServerH2C(t, setupStreamSVC)
 	defer target.Close()
@@ -858,9 +859,9 @@ func TestGRPC_Stream_H2C(t *testing.T) {
 		spec.Name = "h2c_api"
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = true
-		spec.Proxy.TargetURL = toTarget(t, "http", target)
+		spec.Proxy.TargetURL = toTarget(t, "h2c", target)
 		spec.ListenPort = port
-		spec.Protocol = "h2c"
+		spec.Protocol = "http"
 	})
 
 	// gRPC client
