@@ -56,7 +56,7 @@ var (
 	pubSubLog                = log.WithField("prefix", "pub-sub")
 	rawLog                   = logger.GetRaw()
 	templates                *template.Template
-	templatesRaw         *textTemplate.Template
+	templatesRaw             *textTemplate.Template
 	analytics                RedisAnalyticsHandler
 	GlobalEventsJSVM         JSVM
 	memProfFile              *os.File

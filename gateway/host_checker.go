@@ -288,8 +288,13 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 	h.okChan <- report
 }
 
-func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList map[string]HostData, failureCallback, upCallback, pingCallback func(HostHealthReport)) {
-	h.sampleCache = cache.New(30*time.Second, 30*time.Second)
+func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout, sampleExpiration int, hostList map[string]HostData, failureCallback, upCallback, pingCallback func(HostHealthReport)) {
+	if sampleExpiration == 0 {
+		h.sampleCache = cache.New(30*time.Second, 30*time.Second)
+	} else {
+		h.sampleCache = cache.New(time.Duration(sampleExpiration)*time.Second, time.Duration(sampleExpiration)*time.Second)
+	}
+
 	h.stopPollingChan = make(chan bool)
 	h.errorChan = make(chan HostHealthReport)
 	h.okChan = make(chan HostHealthReport)

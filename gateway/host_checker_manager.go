@@ -178,6 +178,7 @@ func (hc *HostCheckerManager) StartPoller() {
 	hc.checker.Init(config.Global().UptimeTests.Config.CheckerPoolSize,
 		config.Global().UptimeTests.Config.FailureTriggerSampleSize,
 		config.Global().UptimeTests.Config.TimeWait,
+		config.Global().UptimeTests.Config.SampleExpiration,
 		hc.currentHostList,
 		hc.OnHostDown,   // On failure
 		hc.OnHostBackUp, // On success
