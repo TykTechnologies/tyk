@@ -155,7 +155,6 @@ dockers:
   goarch: amd64
   goos: linux
   dockerfile: images/hybrid/Dockerfile
-  skip_push: auto
   extra_files:
     - "images/hybrid/"
 - ids:
@@ -172,7 +171,6 @@ dockers:
   goarch: arm64
   goos: linux
   dockerfile: images/hybrid/Dockerfile
-  skip_push: auto
   extra_files:
     - "images/hybrid/"
 - ids:
@@ -189,7 +187,6 @@ dockers:
   goarch: amd64
   goos: linux
   dockerfile: images/plugin-compiler/Dockerfile
-  skip_push: auto
   extra_files:
     - "images/plugin-compiler/"
 
