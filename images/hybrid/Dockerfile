@@ -9,8 +9,7 @@ RUN apt-get update \
  && curl https://bootstrap.pypa.io/get-pip.py | python3 \
  && pip3 install --only-binary ":all:" grpcio protobuf \
  && apt-get autoremove -y \
- && rm -rf /usr/include/* && rm /usr/lib/*-linux-gnu/*.a && rm /usr/lib/*-linux-gnu/*.o \
- && rm /usr/lib/python3.7/config-3.7m-*-linux-gnu/*.a \
+ && rm -rf /usr/include/* && rm -f /usr/lib/*-linux-gnu/*.a /usr/lib/*-linux-gnu/*.o /usr/lib/python3.7/config-3.7m-*-linux-gnu/*.a \
  && rm -rf /root/.cache \
  && rm -rf /var/lib/apt/lists/*
 

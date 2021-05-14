@@ -235,7 +235,6 @@ nfpms:
         dst: "/opt/share/docs/tyk-gateway/README.md"
       - src: "install/*"
         dst: "/opt/tyk-gateway/install"
-
       - src: /opt/tyk-gateway
         dst: /opt/tyk
         type: "symlink"
