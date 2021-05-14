@@ -8,7 +8,6 @@ import (
 
 	"github.com/TykTechnologies/leakybucket"
 	"github.com/TykTechnologies/leakybucket/memorycache"
-	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
@@ -95,7 +94,6 @@ const (
 	sessionFailNone sessionFailReason = iota
 	sessionFailRateLimit
 	sessionFailQuota
-	sessionFailDepthLimit
 	sessionFailInternalServerError
 )
 
@@ -190,12 +188,6 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 		return sessionFailRateLimit
 	}
 
-	// If MaxQueryDepth is -1 or 0, it means unlimited and no need for depth limiting.
-	if l.DepthLimitEnabled(api.GraphQL.Enabled, accessDef) {
-		if failReason := l.DepthLimitExceeded(ctxGetGraphQLRequest(r), accessDef, api.GraphQLExecutor.Schema); failReason != sessionFailNone {
-			return failReason
-		}
-	}
 	// If rate is -1 or 0, it means unlimited and no need for rate limiting.
 	if enableRL && accessDef.Limit.Rate > 0 {
 		rateScope := ""
@@ -353,78 +345,4 @@ func GetAccessDefinitionByAPIIDOrSession(currentSession *user.SessionState, api 
 	}
 
 	return accessDef, allowanceScope, nil
-}
-
-func (l *SessionLimiter) DepthLimitEnabled(graphqlEnabled bool, accessDef *user.AccessDefinition) bool {
-	if !graphqlEnabled {
-		return false
-	}
-
-	// There is a possibility that depth limit is disabled on field level too,
-	// but we continue with this as we do not know per root field level values until we have calculated request complexity
-	if len(accessDef.FieldAccessRights) > 0 {
-		return true
-	}
-
-	return accessDef.Limit.MaxQueryDepth > 0
-}
-
-func (l *SessionLimiter) DepthLimitExceeded(gqlRequest *graphql.Request, accessDef *user.AccessDefinition, schema *graphql.Schema) sessionFailReason {
-	complexityRes, err := gqlRequest.CalculateComplexity(graphql.DefaultComplexityCalculator, schema)
-	if err != nil {
-		log.Errorf("Error while calculating complexity of GraphQL request: '%s'", err)
-		return sessionFailInternalServerError
-	}
-
-	// do per query field depth check
-	if len(accessDef.FieldAccessRights) == 0 {
-		if complexityRes.Depth > accessDef.Limit.MaxQueryDepth {
-			log.Debugf("Depth '%d' of the request is higher than the allowed global limit '%d'", complexityRes.Depth, accessDef.Limit.MaxQueryDepth)
-			return sessionFailDepthLimit
-		}
-		return sessionFailNone
-	}
-
-	// do per query field depth check
-	for _, fieldComplexityRes := range complexityRes.PerRootField {
-		var (
-			fieldAccessDefinition user.FieldAccessDefinition
-			hasPerFieldLimits     bool
-		)
-
-		for _, fieldAccessRight := range accessDef.FieldAccessRights {
-			if fieldComplexityRes.TypeName != fieldAccessRight.TypeName {
-				continue
-			}
-			if fieldComplexityRes.FieldName != fieldAccessRight.FieldName {
-				continue
-			}
-
-			fieldAccessDefinition = fieldAccessRight
-			hasPerFieldLimits = true
-			break
-		}
-
-		if hasPerFieldLimits {
-			if greaterThanInt(fieldComplexityRes.Depth, fieldAccessDefinition.Limits.MaxQueryDepth) {
-				log.Debugf("Depth '%d' of the root field: %s.%s is higher than the allowed field limit '%d'",
-					fieldComplexityRes.Depth, fieldAccessDefinition.TypeName, fieldAccessDefinition.FieldName, fieldAccessDefinition.Limits.MaxQueryDepth)
-
-				return sessionFailDepthLimit
-			}
-			continue
-		}
-
-		// favour global limit for query field
-		// have to increase resulting field depth by 1 to get a global depth
-		queryDepth := fieldComplexityRes.Depth + 1
-		if greaterThanInt(queryDepth, accessDef.Limit.MaxQueryDepth) {
-			log.Debugf("Depth '%d' of the root field: %s.%s is higher than the allowed global limit '%d'",
-				queryDepth, fieldComplexityRes.TypeName, fieldComplexityRes.FieldName, accessDef.Limit.MaxQueryDepth)
-
-			return sessionFailDepthLimit
-		}
-	}
-
-	return sessionFailNone
 }
