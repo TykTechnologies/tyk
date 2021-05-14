@@ -193,27 +193,14 @@ docker_manifests:
     image_templates:
     - tykio/tyk-gateway:{{ .Tag }}-amd64
     - tykio/tyk-gateway:{{ .Tag }}-arm64
-  - name_template: docker.tyk.io/tyk-gateway/tyk-gateway:{{ .Tag }}
-    image_templates:
-    - docker.tyk.io/tyk-gateway/tyk-gateway:{{ .Tag }}-amd64
-    - docker.tyk.io/tyk-gateway/tyk-gateway:{{ .Tag }}-arm64
   - name_template: tykio/tyk-gateway:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}
     image_templates:
     - tykio/tyk-gateway:{{ .Tag }}-amd64
     - tykio/tyk-gateway:{{ .Tag }}-arm64
-  - name_template: docker.tyk.io/tyk-gateway/tyk-gateway:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}
-    image_templates:
-    - docker.tyk.io/tyk-gateway/tyk-gateway:{{ .Tag }}-amd64
-    - docker.tyk.io/tyk-gateway/tyk-gateway:{{ .Tag }}-arm64
-
   - name_template: tykio/tyk-hybrid-docker:{{ .Tag }}
     image_templates:
     - tykio/tyk-hybrid-docker:{{ .Tag }}-amd64
     - tykio/tyk-hybrid-docker:{{ .Tag }}-arm64
-  - name_template: docker.tyk.io/tyk/tyk-hybrid-docker:{{ .Tag }}
-    image_templates:
-    - docker.tyk.io/tykio/tyk-hybrid-docker:{{ .Tag }}-amd64
-    - docker.tyk.io/tykio/tyk-hybrid-docker:{{ .Tag }}-arm64
 
 
 nfpms:
