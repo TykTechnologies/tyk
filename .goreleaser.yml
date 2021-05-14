@@ -86,7 +86,7 @@ dockers:
     - "tykio/tyk-gateway:{{ .Tag }}"
     - "tykio/tyk-gateway:s{{ .Major }}.{{ .Minor }}"
     - "docker.cloudsmith.io/tyk/tyk-gateway/tyk-gateway:{{ .Tag }}"
-    - "docker.cloudsmith.io/tyk/tyk-gateway/tyk-gateway:v{{ .Major }}.{{ .Minor }}"
+    - "docker.cloudsmith.io/tyk/tyk-gateway/tyk-gateway:s{{ .Major }}.{{ .Minor }}"
   build_flag_templates:
     - "--build-arg=PORTS=8080"
     - "--label=org.opencontainers.image.created={{.Date}}"
@@ -96,16 +96,9 @@ dockers:
   goarch: amd64
   goos: linux
   dockerfile: Dockerfile.slim
-  skip_push: auto
   extra_files:
-    - "install/"
-    - "README.md"
     - "LICENSE.md"
     - "templates"
-    - "middleware"
-    - "event_handlers/sample"
-    - "policies"
-    - "coprocess"
     - "tyk.conf.example"
 
 - ids:
@@ -126,7 +119,6 @@ dockers:
   goos: linux
   use_buildx: true
   dockerfile: Dockerfile.std
-  skip_push: auto
   extra_files:
     - "install/"
     - "README.md"
@@ -151,7 +143,6 @@ dockers:
   goarch: amd64
   goos: linux
   dockerfile: images/hybrid/Dockerfile
-  skip_push: auto
   extra_files:
     - "images/hybrid/"
 - ids:
@@ -243,8 +234,6 @@ archives:
     - "LICENSE.md"
     - "apps/app_sample.json"
     - "templates/*.json"
-    - "templates/playground/index.html"
-    - "templates/playground/playground.js"
     - "install/*"
     - "middleware/*.js"
     - "event_handlers/sample/*.js"
