@@ -131,10 +131,24 @@ type StorageOptionsConf struct {
 }
 
 type NormalisedURLConfig struct {
+	// Set this to `true` to enable normalisation.
 	Enabled            bool                 `json:"enabled"`
+	// Set this to true to have Tyk automatically clean up UUIDs, it will match the following styles:
+	// 
+	// * `/15873a748894492162c402d67e92283b/search`
+	// * `/CA761232-ED42-11CE-BACD-00AA0057B223/search`
+	// * `/ca761232-ed42-11ce-BAcd-00aa0057b223/search`
+	// * `/ca761232-ed42-11ce-BAcd-00aa0057b223/search`
+	
+	// Each UUID will be replaced with a placeholder {uuid}
 	NormaliseUUIDs     bool                 `json:"normalise_uuids"`
+	
+	// Set this to true to have Tyk automatically match for numeric ID’s, it will match with a preceding slash so as not to capture actual numbers:
 	NormaliseNumbers   bool                 `json:"normalise_numbers"`
+	
+	// This is a list of custom patterns you can add, these must be valid regex strings, Tyk will replace these values with a {var} placeholder.
 	Custom             []string             `json:"custom_patterns"`
+	
 	CompiledPatternSet NormaliseURLPatterns `json:"-"` // see analytics.go
 }
 
@@ -145,18 +159,48 @@ type NormaliseURLPatterns struct {
 }
 
 type AnalyticsConfigConfig struct {
+	// Set empty for on-premise setup or `rpc` for multi-cloud. 
 	Type                        string              `json:"type"`
+	
+	// Adding IP addresses to this list will cause Tyk to ignore these IPs in the analytics data, these IP addresses will not produce an analytics log record.
+	// This is useful for health checks and other samplers that might skew usage data.
+	// The IP addresses must be provided as a JSON array, with the values being single IPs. CIDR values are not supported. 
+	// This is useful for health checks and other samplers that might skew usage data.
 	IgnoredIPs                  []string            `json:"ignored_ips"`
+	
+	// Set this value to `true` to have Tyk store the inbound request and outbound response data in HTTP Wire format as part of the Analytics data. 
+	// Please note, this will greatly increase your analytics DB size and can cause performance degradation on analytics processing by the Dashboard.
+	// This setting can be overridden with an organisation flag, enabed on API level, or on individual Key level.
 	EnableDetailedRecording     bool                `json:"enable_detailed_recording"`
+	
+	// Tyk can store GeoIP information based on MaxMind DB’s, to enable GeoIP tracking on inbound request analytics, set this value to `true` and assign a DB using the `geo_ip_db_path` setting.
 	EnableGeoIP                 bool                `json:"enable_geo_ip"`
+	
+	// Path to MaxMind GeoIP database
+	// The analytics GeoIP DB can be replaced on disk, it will cleanly auto-reload every hour.
 	GeoIPDBLocation             string              `json:"geo_ip_db_path"`
+	
+	// This section describes methods that enable you to normalise inbound URLs in your analytics so as to have more meaningful per-path data.
 	NormaliseUrls               NormalisedURLConfig `json:"normalise_urls"`
+	
+	// Number of workers used to process analytics. Defaults to number of CPU cores.
 	PoolSize                    int                 `json:"pool_size"`
+	
+	// Number of records in analytics queue, per worker. Default: 1000.
 	RecordsBufferSize           uint64              `json:"records_buffer_size"`
+	
+	// You can set a time (in seconds) to configure how long analytics are kept if they are not processed. The default is 60 seconds.
+	// This is used to prevent the potential infinite growth of Redis analytics storage.
 	StorageExpirationTime       int                 `json:"storage_expiration_time"`
-	ignoredIPsCompiled          map[string]bool
+	
+	// Set this to `true` to have Tyk automatically divide the analytics records in multiple analytics keys.
+	// This is especially useful when `storage.enable_cluster` is `true` since it will distribute the analytic keys across all the cluster nodes.
 	EnableMultipleAnalyticsKeys bool    `json:"enable_multiple_analytics_keys"`
+	
+	// You can set the interval length on how often the gateway will purge analytics data, this value is in seconds and defaults to 10 seconds.
 	PurgeInterval               float32 `json:"purge_interval"`
+	
+	ignoredIPsCompiled          map[string]bool
 }
 
 type HealthCheckConfig struct {
@@ -170,13 +214,26 @@ type HealthCheckConfig struct {
 }
 
 type LivenessCheckConfig struct {
+	// Frequence of performing interal healthchecks for Redis, Dashboard, and RPC layer. Default: 10 seconds.
 	CheckDuration time.Duration `json:"check_duration"`
 }
 
 type DnsCacheConfig struct {
+	// Setting this value to true will enable caching of dns queries responses used for API endpoint’s host names. By default caching is disabled.
 	Enabled                   bool              `json:"enabled"`
+	
+	// This setting allows to specify duration in seconds before the record will be removed from cache after being added to it on first dns query resolution of API endpoints.
+	// Setting ttl to -1 prevents record from being expired and removed from cache on next check interval.
 	TTL                       int64             `json:"ttl"`
+	
 	CheckInterval             int64             `json:"-" ignored:"true"` //controls cache cleanup interval. By convention shouldn't be exposed to config or env_variable_setup
+	
+	// A strategy, which will be used when dns query will reply with more than 1 ip address per single host. 
+	// As dns query response ip addresses can have changing order depending on dns server balancing strategy(eg: round robin, geographically dependent origin-ip ordering, etc) this option allows to not to limit connection to first host within cached response list or prevent response caching.
+	// 
+	// * `pick_first` will instruct gateway to connect to first ip in returned ips list and cache the response.
+	// * `random` will instruct gateway to connect to random ip in returned ips list and cache the response.
+	// * `no_cache` will instruct gateway to connect to first ip in returned ips list and fetch each addresses list without caching on each API endpoint dns query.
 	MultipleIPsHandleStrategy IPsHandleStrategy `json:"multiple_ips_handle_strategy"`
 }
 
@@ -255,7 +312,9 @@ type SlaveOptionsConfig struct {
 }
 
 type LocalSessionCacheConf struct {
+	// By default sessions are set to cache, set this to true to stop Tyk from caching keys locally on the node.
 	DisableCacheSessionState bool `json:"disable_cached_session_state"`
+	
 	CachedSessionTimeout     int  `json:"cached_session_timeout"`
 	CacheSessionEviction     int  `json:"cached_session_eviction"`
 }
@@ -346,11 +405,22 @@ type ServiceDiscoveryConf struct {
 }
 
 type CoProcessConfig struct {
+	// Enable gRPC and Python plugins
 	EnableCoProcess     bool   `json:"enable_coprocess"`
+	
+	// Address of gRPC user
 	CoProcessGRPCServer string `json:"coprocess_grpc_server"`
+	
+	// Maximum message which can be received from gRPC server
 	GRPCRecvMaxSize     int    `json:"grpc_recv_max_size"`
+	
+	// Maximum message which can be sent to gRPC server
 	GRPCSendMaxSize     int    `json:"grpc_send_max_size"`
+	
+	// Sets the path to built-in Tyk modules, this will be part of the Python module lookup path. The value used here is the default one for most installations.
 	PythonPathPrefix    string `json:"python_path_prefix"`
+	
+	// If you have multiple Python installations you can specify version you need
 	PythonVersion       string `json:"python_version"`
 }
 
@@ -700,51 +770,138 @@ type Config struct {
 	// Note:
 	//   For performance reasons, Tyk will store traffic data to Redis initially and then purge the data from Redis to MongoDB or other, data stores, on a regular basis as determined by the purge_delay setting in your Tyk Pump configuration.
 	EnableAnalytics              bool                  `json:"enable_analytics"`
+	
+	// This section defines options on what analytics data to store.
 	AnalyticsConfig              AnalyticsConfigConfig `json:"analytics_config"`
+	
+	// Enable separate analytics storage. Used together with `analytics_storage`.
 	EnableSeperateAnalyticsStore bool                  `json:"enable_separate_analytics_store"`
 	AnalyticsStorage             StorageOptionsConf    `json:"analytics_storage"`
-
+	
 	LivenessCheck LivenessCheckConfig `json:"liveness_check"`
-	// Cache
+	
+	// This section enables the global configuration of the expireable dns records caching for gateway API endpoints.
+	// By design caching affects only http(s), ws(s) protocols apis and doesn’t affect any plugin/middleware dns queries.
+	//
+	// ```
+	// "dns_cache": {
+    	//   "enabled": true, //Turned off by default
+    	//   "ttl": 60, //Time in seconds before the record will be removed from cache
+    	//   "multiple_ips_handle_strategy": "random" //A strategy, which will be used when dns query will reply with more than 1 ip address per single host.
+	// }
+	// ```
 	DnsCache                 DnsCacheConfig        `json:"dns_cache"`
+	
+	// If set to true this allows you to disable the regular expression cache. The default setting is false.
 	DisableRegexpCache       bool                  `json:"disable_regexp_cache"`
+	
+	// If you set disable_regexp_cache to false, you can use this setting to limit how long the regular expression cache is kept for in seconds.
+	// The default is 60 seconds. This must be a positive value. If you set to 0 this sets it uses the default value.
 	RegexpCacheExpire        int32                 `json:"regexp_cache_expire"`
+	
+	// Tyk can cache some data locally, this can speed up lookup times on a single node and lower the number of connections and operations being done on Redis, it will however introduce a slight delay when updating or modifying keys as the cache must expire.
+	// This does not affect rate limiting.
 	LocalSessionCache        LocalSessionCacheConf `json:"local_session_cache"`
+	
+	// Enable using separate redis for cache storage
 	EnableSeperateCacheStore bool                  `json:"enable_separate_cache_store"`
 	CacheStorage             StorageOptionsConf    `json:"cache_storage"`
 
-	// Middleware/Plugin Configuration
+	// Enable downloading Plugin bundles 
+	// Example:
+	// ```
+	// "enable_bundle_downloader": true,
+	// "bundle_base_url": "http://my-bundle-server.com/bundles/",
+	// "public_key_path": "/path/to/my/pubkey",
+	// ```
 	EnableBundleDownloader       bool            `bson:"enable_bundle_downloader" json:"enable_bundle_downloader"`
+	
+	// Is a base URL that will be used to download the bundle, in this example we have `bundle-latest.zip` specified in the API settings, Tyk will fetch the following URL: http://my-bundle-server.com/bundles/bundle-latest.zip (see the next section for details).
 	BundleBaseURL                string          `bson:"bundle_base_url" json:"bundle_base_url"`
+	
+	// Disable TLS validation for bundle URLs
 	BundleInsecureSkipVerify     bool            `bson:"bundle_insecure_skip_verify" json:"bundle_insecure_skip_verify"`
+	
+	// Set to true if you are using JSVM custom middleware or virtual endpoints.
 	EnableJSVM                   bool            `json:"enable_jsvm"`
+	
+	// Set execution timeout for JSVM plugins and virtal endpoints
 	JSVMTimeout                  int             `json:"jsvm_timeout"`
+	
+	// Disable virtual endpoints and the code will not be loaded into the VM when the API definition initialises.
+	// This is useful for systems where you want to avoid having third-party code run.
 	DisableVirtualPathBlobs      bool            `json:"disable_virtual_path_blobs"`
+	
+	// Path javascript file which will be pre-loaded for any JSVM middleware or virtual endpoint. Useful for defining global shared functions.
 	TykJSPath                    string          `json:"tyk_js_path"`
+	
+	// Path to the plugins dirrectory. By default is "./middleware"
 	MiddlewarePath               string          `json:"middleware_path"`
+	
+	// Section with configuration options for Python and gRPC plugins
 	CoProcessOptions             CoProcessConfig `json:"coprocess_options"`
+	
+	// Ignore the case of any endpoints for APIs managed by Tyk. Setting this to `true` will override any individual API and Ignore, Blacklist and Whitelist plugin endpoint settings.
 	IgnoreEndpointCase           bool            `json:"ignore_endpoint_case"`
+	
+	// When enabled Tyk ignores the canonical format of the MIME header keys.
+	//
+	// For example when a request header with a “my-header” key is injected using “global_headers”, the upstream would typically get it as “My-Header”, when this flag is enabled it will be sent as “my-header” instead.
+	//
+	// Current support is limited to JS plugins, global header injection, virtual endpoint and JQ transform header rewrites. 
+	// This functionality doesn’t affect headers that are sent by the HTTP client and the default formatting will apply for this case.
+	//
+	// For technical details refer to the [CanonicalMIMEHeaderKey](https://golang.org/pkg/net/textproto/#CanonicalMIMEHeaderKey) functionality in the Go documentation.
 	IgnoreCanonicalMIMEHeaderKey bool            `json:"ignore_canonical_mime_header_key"`
 
-	// Monitoring, Logging & Profiling
+	
+	// You can now set a logging level (log_level). The following levels can be set: debug, info, warn, error.
+	// If unset or left empty, it will default to `info`.
 	LogLevel                string         `json:"log_level"`
+	
+	// Section for configuring OpenTracing support
 	Tracer                  Tracer         `json:"tracing"`
+	
 	NewRelic                NewRelicConfig `json:"newrelic"`
+	
+	// Enable debugging Tyk Gateway by exposing profiling information through https://tyk.io/docs/troubleshooting/tyk-gateway/profiling/
 	HTTPProfile             bool           `json:"enable_http_profiler"`
+	
+	// Enables the real-time Gateway log view in the Dashboard.
 	UseRedisLog             bool           `json:"use_redis_log"`
-	SentryCode              string         `json:"sentry_code"`
-	SentryLogLevel          string         `json:"sentry_log_level"`
+	
+	// Enable Sentry logging
 	UseSentry               bool           `json:"use_sentry"`
+	// Sentry API code
+	SentryCode              string         `json:"sentry_code"`
+	// Log verbosity for Sentry logging
+	SentryLogLevel          string         `json:"sentry_log_level"`
+	
+	// Enable Syslog log output
 	UseSyslog               bool           `json:"use_syslog"`
-	UseGraylog              bool           `json:"use_graylog"`
-	UseLogstash             bool           `json:"use_logstash"`
-	Track404Logs            bool           `json:"track_404_logs"`
-	GraylogNetworkAddr      string         `json:"graylog_network_addr"`
-	LogstashNetworkAddr     string         `json:"logstash_network_addr"`
+	// Syslong transport to use. Values: tcp or udp.
 	SyslogTransport         string         `json:"syslog_transport"`
-	LogstashTransport       string         `json:"logstash_transport"`
+	// Graylog server address
 	SyslogNetworkAddr       string         `json:"syslog_network_addr"`
+	
+	// Use Graylog log output
+	UseGraylog              bool           `json:"use_graylog"`
+	// Graylog server address
+	GraylogNetworkAddr      string         `json:"graylog_network_addr"`
+	
+	// Use logstash log output
+	UseLogstash             bool           `json:"use_logstash"`
+	// Logstash network transport. Values: tcp or udp.
+	LogstashTransport       string         `json:"logstash_transport"`
+	// Logstash server address
+	LogstashNetworkAddr     string         `json:"logstash_network_addr"`
+	
+	// Show 404 HTTP errors in gateway application logs
+	Track404Logs            bool           `json:"track_404_logs"`
+	
+	// Address of StatsD server. If set enable statsd monitoring.
 	StatsdConnectionString  string         `json:"statsd_connection_string"`
+	// StatsD prefix
 	StatsdPrefix            string         `json:"statsd_prefix"`
 
 	// Event System
@@ -755,12 +912,18 @@ type Config struct {
 	// HideGeneratorHeader will mask the 'X-Generator' and 'X-Mascot-...' headers, if set to true.
 	HideGeneratorHeader bool `json:"hide_generator_header"`
 
-	// TODO: These config options are not documented - What do they do?
+
 	SupressDefaultOrgStore         bool  `json:"suppress_default_org_store"`
 	LegacyEnableAllowanceCountdown bool  `bson:"legacy_enable_allowance_countdown" json:"legacy_enable_allowance_countdown"`
-	GlobalSessionLifetime          int64 `bson:"global_session_lifetime" json:"global_session_lifetime"`
+	
+	// Enable global API token expiration. Can be needed if all your APIs using JWT or oAuth2 auth methods with dynamically generatedd keys.
 	ForceGlobalSessionLifetime     bool  `bson:"force_global_session_lifetime" json:"force_global_session_lifetime"`
+	// global session lifetime, in seconds.
+	GlobalSessionLifetime          int64 `bson:"global_session_lifetime" json:"global_session_lifetime"`
 
+	
+	// This section enables the usage of the KV capabilites to subsitute configuration values.
+	// See more details https://tyk.io/docs/tyk-configuration-reference/kv-store/
 	KV struct {
 		Consul ConsulConfig `json:"consul"`
 		Vault  VaultConfig  `json:"vault"`
@@ -769,13 +932,34 @@ type Config struct {
 	// Secrets are key-value pairs that can be accessed in the dashboard via "secrets://"
 	Secrets map[string]string `json:"secrets"`
 
-	// OverrideMessages is used to override returned API error codes and messages.
+	// Override the default error code and or message returned by middleware.
+	// The following message IDs can be used to override the message and error codes:
+	//
+	// AuthToken message IDs
+	// * `auth.auth_field_missing`
+	// * `auth.key_not_found`
+	//
+	// OIDC message IDs
+	// * `oauth.auth_field_missing`
+	// * `oauth.auth_field_malformed`
+	// * `oauth.key_not_found`
+	// * `oauth.client_deleted`
+	//
+	// Sample Override Message Setting
+	// ```
+	// "override_messages": {
+  	//   "oauth.auth_field_missing" : {
+	//    "code": 401,
+	//    "message": "Token is not authorised"
+	//  }
+	// }
+	// ```
 	OverrideMessages map[string]TykError `bson:"override_messages" json:"override_messages"`
 
 	// Cloud flag shows that gateway runs in Tyk-cloud.
 	Cloud bool `json:"cloud"`
 
-	// SSL options for JWT middleware.
+	// Skip TLS verification for JWT JWKs url validation
 	JWTSSLInsecureSkipVerify bool `json:"jwt_ssl_insecure_skip_verify"`
 }
 
@@ -836,18 +1020,20 @@ type ConsulConfig struct {
 	// Token is used to provide a per-request ACL token
 	// which overrides the agent's default token.
 	Token string `json:"token"`
-
+	
+	// TLS configuration 
 	TLSConfig struct {
+		// Address
 		Address string `json:"address"`
-
+		// CA file
 		CAFile string `json:"ca_file"`
-
+		// CA Path
 		CAPath string `json:"ca_path"`
-
+		// Cert file
 		CertFile string `json:"cert_file"`
-
+		// Key file
 		KeyFile string `json:"key_file"`
-
+		// Disable TLS validation
 		InsecureSkipVerify bool `json:"insecure_skip_verify"`
 	} `json:"tls_config"`
 }
@@ -872,8 +1058,11 @@ func (c *Config) SetEventTriggers(eventTriggers map[apidef.TykEvent][]TykEventHa
 }
 
 type CertData struct {
+	// Domain name
 	Name     string `json:"domain_name"`
+	// Path to certificate file
 	CertFile string `json:"cert_file"`
+	// Path to private key file
 	KeyFile  string `json:"key_file"`
 }
 
