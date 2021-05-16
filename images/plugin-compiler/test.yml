@@ -10,7 +10,7 @@ services:
   #   command: testplugin.so
       
   gw:
-    image: tykio/tyk-gateway:${tag}-amd64
+    image: tykio/tyk-gateway:${tag}
     volumes:
       - ./testplugin/testplugin.so:/opt/tyk-gateway/middleware/testplugin.so
       - ./testplugin/apidef.json:/opt/tyk-gateway/apps/testplugin.json
