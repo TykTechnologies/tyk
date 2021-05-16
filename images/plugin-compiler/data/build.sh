@@ -24,5 +24,5 @@ yes | cp -r $PLUGIN_BUILD_PATH/vendor $GOPATH/src || true \
         && rm -rf $PLUGIN_BUILD_PATH/vendor
 
 cd $PLUGIN_BUILD_PATH \
-    && go build -buildmode=plugin -ldflags "-pluginpath=$plugin_path" -o $plugin_name \
+    && go build -buildmode=plugin -o $plugin_name \
     && mv $plugin_name $PLUGIN_SOURCE_PATH
