@@ -178,7 +178,6 @@ func (hc *HostCheckerManager) StartPoller() {
 	hc.checker.Init(config.Global().UptimeTests.Config.CheckerPoolSize,
 		config.Global().UptimeTests.Config.FailureTriggerSampleSize,
 		config.Global().UptimeTests.Config.TimeWait,
-		config.Global().UptimeTests.Config.SampleExpiration,
 		hc.currentHostList,
 		hc.OnHostDown,   // On failure
 		hc.OnHostBackUp, // On success
@@ -218,6 +217,7 @@ func (hc *HostCheckerManager) OnHostDown(report HostHealthReport) {
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
 	}).Debug("Update key: ", key)
+
 	hc.store.SetKey(key, "1", int64(hc.checker.checkTimeout*hc.checker.sampleTriggerLimit))
 	hc.unhealthyHostList.Store(key, 1)
 	spec := getApiSpec(report.MetaData[UnHealthyHostMetaDataAPIKey])

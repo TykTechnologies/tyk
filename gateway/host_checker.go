@@ -11,12 +11,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jeffail/tunny"
-	proxyproto "github.com/pires/go-proxyproto"
-	cache "github.com/pmylund/go-cache"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/jeffail/tunny"
+	proxyproto "github.com/pires/go-proxyproto"
 )
 
 const (
@@ -65,7 +63,7 @@ type HostUptimeChecker struct {
 	errorChan       chan HostHealthReport
 	okChan          chan HostHealthReport
 	stopPollingChan chan bool
-	sampleCache     *cache.Cache
+	sampleCache     *sync.Map
 	stopLoop        bool
 	muStopLoop      sync.RWMutex
 
@@ -134,7 +132,7 @@ func (h *HostUptimeChecker) HostReporter() {
 			// Clear host from unhealthylist if it exists
 			if h.unHealthyList[okHost.CheckURL] {
 				newVal := 1
-				if count, found := h.sampleCache.Get(okHost.CheckURL); found {
+				if count, found := h.sampleCache.Load(okHost.CheckURL); found {
 					newVal = count.(int) - 1
 				}
 
@@ -146,14 +144,14 @@ func (h *HostUptimeChecker) HostReporter() {
 					delete(h.unHealthyList, okHost.CheckURL)
 				} else {
 					log.Warning("[HOST CHECKER] [HOST UP BUT NOT REACHED LIMIT]: ", okHost.CheckURL)
-					h.sampleCache.Set(okHost.CheckURL, newVal, cache.DefaultExpiration)
+					h.sampleCache.Store(okHost.CheckURL, newVal)
 				}
 			}
 			go h.pingCallback(okHost)
 
 		case failedHost := <-h.errorChan:
 			newVal := 1
-			if count, found := h.sampleCache.Get(failedHost.CheckURL); found {
+			if count, found := h.sampleCache.Load(failedHost.CheckURL); found {
 				newVal = count.(int) + 1
 			}
 
@@ -165,7 +163,7 @@ func (h *HostUptimeChecker) HostReporter() {
 				go h.failureCallback(failedHost)
 			} else {
 				log.Warning("[HOST CHECKER] [HOST DOWN BUT NOT REACHED LIMIT]: ", failedHost.CheckURL)
-				h.sampleCache.Set(failedHost.CheckURL, newVal, cache.DefaultExpiration)
+				h.sampleCache.Store(failedHost.CheckURL, newVal)
 			}
 			go h.pingCallback(failedHost)
 
@@ -288,15 +286,9 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 	h.okChan <- report
 }
 
-func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout, sampleExpiration int, hostList map[string]HostData, failureCallback, upCallback, pingCallback func(HostHealthReport)) {
-	if sampleExpiration == 0 {
-		log.Debug("[HOST CHECKER] Config:SampleExpiration: ", 30)
-		h.sampleCache = cache.New(30*time.Second, 30*time.Second)
-	} else {
-		log.Debug("[HOST CHECKER] Config:SampleExpiration: ", sampleExpiration)
-		h.sampleCache = cache.New(time.Duration(sampleExpiration)*time.Second, time.Duration(sampleExpiration)*time.Second)
-	}
+func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList map[string]HostData, failureCallback, upCallback, pingCallback func(HostHealthReport)) {
 
+	h.sampleCache = new(sync.Map)
 	h.stopPollingChan = make(chan bool)
 	h.errorChan = make(chan HostHealthReport)
 	h.okChan = make(chan HostHealthReport)
@@ -351,7 +343,7 @@ func (h *HostUptimeChecker) Start() {
 
 func (h *HostUptimeChecker) Stop() {
 	h.setStopLoop(true)
-
+	h.sampleCache = new(sync.Map)
 	h.stopPollingChan <- true
 	log.Info("[HOST CHECKER] Stopping poller")
 	h.pool.Close()

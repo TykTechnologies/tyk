@@ -203,7 +203,6 @@ type UptimeTestsConfigDetail struct {
 	TimeWait                 int  `json:"time_wait"`
 	CheckerPoolSize          int  `json:"checker_pool_size"`
 	EnableUptimeAnalytics    bool `json:"enable_uptime_analytics"`
-	SampleExpiration         int  `json:"sample_expiration"`
 }
 
 type UptimeTestsConfig struct {
