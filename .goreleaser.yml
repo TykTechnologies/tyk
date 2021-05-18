@@ -207,16 +207,10 @@ docker_manifests:
     image_templates:
     - docker.tyk.io/tyk-gateway/tyk-gateway:{{ .Tag }}-amd64
     - docker.tyk.io/tyk-gateway/tyk-gateway:{{ .Tag }}-arm64
-
   - name_template: tykio/tyk-hybrid-docker:{{ .Tag }}
     image_templates:
     - tykio/tyk-hybrid-docker:{{ .Tag }}-amd64
     - tykio/tyk-hybrid-docker:{{ .Tag }}-arm64
-  - name_template: docker.tyk.io/tyk/tyk-hybrid-docker:{{ .Tag }}
-    image_templates:
-    - docker.tyk.io/tykio/tyk-hybrid-docker:{{ .Tag }}-amd64
-    - docker.tyk.io/tykio/tyk-hybrid-docker:{{ .Tag }}-arm64
-
 
 nfpms:
   - id: std
