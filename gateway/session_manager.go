@@ -336,19 +336,16 @@ func GetAccessDefinitionByAPIIDOrSession(currentSession *user.SessionState, api 
 			allowanceScope = rights.AllowanceScope
 		}
 	}
-
 	if accessDef.Limit == nil {
-		accessDef = &user.AccessDefinition{
-			Limit: &user.APILimit{
-				QuotaMax:           currentSession.QuotaMax,
-				QuotaRenewalRate:   currentSession.QuotaRenewalRate,
-				QuotaRenews:        currentSession.QuotaRenews,
-				Rate:               currentSession.Rate,
-				Per:                currentSession.Per,
-				ThrottleInterval:   currentSession.ThrottleInterval,
-				ThrottleRetryLimit: currentSession.ThrottleRetryLimit,
-				MaxQueryDepth:      currentSession.MaxQueryDepth,
-			},
+		accessDef.Limit = &user.APILimit{
+			QuotaMax:           currentSession.QuotaMax,
+			QuotaRenewalRate:   currentSession.QuotaRenewalRate,
+			QuotaRenews:        currentSession.QuotaRenews,
+			Rate:               currentSession.Rate,
+			Per:                currentSession.Per,
+			ThrottleInterval:   currentSession.ThrottleInterval,
+			ThrottleRetryLimit: currentSession.ThrottleRetryLimit,
+			MaxQueryDepth:      currentSession.MaxQueryDepth,
 		}
 	}
 
