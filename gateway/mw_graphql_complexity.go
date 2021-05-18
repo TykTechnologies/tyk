@@ -76,24 +76,45 @@ func (m *GraphQLComplexityMiddleware) DepthLimitExceeded(gqlRequest *graphql.Req
 	}
 
 	// do per query field depth check
-	for _, fieldAccessDef := range accessDef.FieldAccessRights {
-		for _, fieldComplexityRes := range complexityRes.PerRootField {
-			if fieldComplexityRes.TypeName != fieldAccessDef.TypeName {
+	for _, fieldComplexityRes := range complexityRes.PerRootField {
+		var (
+			fieldAccessDefinition user.FieldAccessDefinition
+			hasPerFieldLimits     bool
+		)
+
+		for _, fieldAccessRight := range accessDef.FieldAccessRights {
+			if fieldComplexityRes.TypeName != fieldAccessRight.TypeName {
 				continue
 			}
-			if fieldComplexityRes.FieldName != fieldAccessDef.FieldName {
+			if fieldComplexityRes.FieldName != fieldAccessRight.FieldName {
 				continue
 			}
 
-			if greaterThanInt(fieldComplexityRes.Depth, fieldAccessDef.Limits.MaxQueryDepth) {
-				log.Debugf("Complexity of the field: %s.%s is higher than the allowed limit '%d'",
-					fieldAccessDef.TypeName, fieldAccessDef.FieldName, accessDef.Limit.MaxQueryDepth)
+			fieldAccessDefinition = fieldAccessRight
+			hasPerFieldLimits = true
+			break
+		}
+
+		if hasPerFieldLimits {
+			if greaterThanInt(fieldComplexityRes.Depth, fieldAccessDefinition.Limits.MaxQueryDepth) {
+				log.Debugf("Depth '%d' of the root field: %s.%s is higher than the allowed field limit '%d'",
+					fieldComplexityRes.Depth, fieldAccessDefinition.TypeName, fieldAccessDefinition.FieldName, fieldAccessDefinition.Limits.MaxQueryDepth)
 
 				return ComplexityFailReasonDepthLimitExceeded
 			}
+			continue
+		}
+
+		// favour global limit for query field
+		// have to increase resulting field depth by 1 to get a global depth
+		queryDepth := fieldComplexityRes.Depth + 1
+		if greaterThanInt(queryDepth, accessDef.Limit.MaxQueryDepth) {
+			log.Debugf("Depth '%d' of the root field: %s.%s is higher than the allowed global limit '%d'",
+				queryDepth, fieldComplexityRes.TypeName, fieldComplexityRes.FieldName, accessDef.Limit.MaxQueryDepth)
+
+			return ComplexityFailReasonDepthLimitExceeded
 		}
 	}
-
 	return ComplexityFailReasonNone
 }
 
