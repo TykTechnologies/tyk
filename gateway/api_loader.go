@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -120,8 +121,12 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		"prefix": "coprocess",
 	})
 
-	if strings.Contains(spec.Proxy.TargetURL, "h2c://") {
-		spec.Proxy.TargetURL = strings.Replace(spec.Proxy.TargetURL, "h2c://", "http://", 1)
+	if spec.Proxy.Transport.SSLMaxVersion > 0 {
+		spec.Proxy.Transport.SSLMaxVersion = tls.VersionTLS12
+	}
+
+	if spec.Proxy.Transport.SSLMinVersion > spec.Proxy.Transport.SSLMaxVersion {
+		spec.Proxy.Transport.SSLMaxVersion = spec.Proxy.Transport.SSLMinVersion
 	}
 
 	if len(spec.TagHeaders) > 0 {
@@ -773,9 +778,6 @@ func loadApps(specs []*APISpec) {
 	shouldTrace := trace.IsEnabled()
 	for _, spec := range specs {
 		func() {
-			if strings.Contains(spec.Proxy.TargetURL, "h2c://") {
-				spec.Protocol = "h2c"
-			}
 			defer func() {
 				// recover from panic if one occured. Set err to nil otherwise.
 				if err := recover(); err != nil {
