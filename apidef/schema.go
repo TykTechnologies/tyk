@@ -439,6 +439,9 @@ const Schema = `{
                 "enabled": {
                     "type": "boolean"
                 },
+				"version": {
+                    "type": "string"
+                },
                 "execution_mode": {
                     "type": "string",
                     "enum": [
@@ -496,6 +499,72 @@ const Schema = `{
                         "type_name",
                         "field_name"
                     ]
+                },
+				"engine": {
+                    "type": ["object", "null"],
+                    "properties": {
+                        "field_configs": {
+                            "type": ["array", "null"],
+                            "properties": {
+                                "type_name": {
+                                    "type": "string"
+                                },
+                                "field_name": {
+                                    "type": "string"
+                                },
+                                "disable_default_mapping": {
+                                    "type": "boolean"
+                                },
+                                "path": {
+                                    "type": ["array", "null"]
+                                }
+                            }
+                        },
+                        "data_sources": {
+                            "type": ["array", "null"],
+                            "properties": {
+                                "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                        "REST",
+                                        "GraphQL",
+                                        ""
+                                    ]
+                                },
+                                "name": {
+                                    "type": "string"
+                                },
+                                "internal": {
+                                    "type": "boolean"
+                                },
+                                "root_fields": {
+                                    "type": ["array", "null"],
+                                    "properties": {
+                                        "type": {
+                                            "type": "string"
+                                        },
+                                        "fields": {
+                                            "type": ["array", "null"]
+                                        }
+                                    }
+                                },
+                                "config": {
+                                    "type": ["object", "null"]
+                                }
+                            },
+                            "required": [
+                                "kind"
+                            ]
+                        }
+                    }
+                },
+				"proxy": {
+                    "type": ["object", "null"],
+                    "properties": {
+                        "auth_headers": {
+                            "type": ["object", "null"]
+                        }
+                    }
                 },
                 "playground": {
                     "type": ["object", "null"],

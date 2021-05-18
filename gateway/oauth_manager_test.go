@@ -437,7 +437,7 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 		if !ok {
 			t.Fatal("No access token found")
 		}
-		session, ok := spec.AuthManager.KeyAuthorised(token)
+		session, ok := spec.AuthManager.SessionDetail("", token, false)
 		if !ok {
 			t.Error("Key was not created (Can't find it)!")
 		}
@@ -588,7 +588,7 @@ func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 		}
 
 		// Verify the token is correct
-		session, ok := spec.AuthManager.KeyAuthorised(token)
+		session, ok := spec.AuthManager.SessionDetail("", token, false)
 		if !ok {
 			t.Error("Key was not created (Can't find it)!")
 		}

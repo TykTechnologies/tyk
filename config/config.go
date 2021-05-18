@@ -120,7 +120,8 @@ type AnalyticsConfigConfig struct {
 	RecordsBufferSize           uint64              `json:"records_buffer_size"`
 	StorageExpirationTime       int                 `json:"storage_expiration_time"`
 	ignoredIPsCompiled          map[string]bool
-	EnableMultipleAnalyticsKeys bool `json:"enable_multiple_analytics_keys"`
+	EnableMultipleAnalyticsKeys bool    `json:"enable_multiple_analytics_keys"`
+	PurgeInterval               float32 `json:"purge_interval"`
 }
 
 type HealthCheckConfig struct {
@@ -331,6 +332,7 @@ type Config struct {
 	// Gateway Security Policies
 	HashKeys                bool           `json:"hash_keys"`
 	HashKeyFunction         string         `json:"hash_key_function"`
+	HashKeyFunctionFallback []string       `json:"hash_key_function_fallback"`
 	EnableHashedKeysListing bool           `json:"enable_hashed_keys_listing"`
 	MinTokenLength          int            `json:"min_token_length"`
 	EnableAPISegregation    bool           `json:"enable_api_segregation"`
