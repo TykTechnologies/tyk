@@ -168,15 +168,20 @@ func (h *HostUptimeChecker) HostReporter() {
 				sample.count = sample.count + 1
 			}
 
-			if sample.count == h.sampleTriggerLimit {
+			if sample.count >= h.sampleTriggerLimit {
 				// if it reached the h.sampleTriggerLimit, it means the host is down for us. We update the reachedLimit flag and store it in the sample map
 				log.Warning("[HOST CHECKER] [HOST DOWN]: ", failedHost.CheckURL)
 
-				sample.reachedLimit = true
-				h.samples.Store(failedHost.CheckURL, sample)
+				//if this is the first time it reached the h.sampleTriggerLimit, the value of the reachedLimit flag is stored with the new count
+				if sample.reachedLimit == false {
+					sample.reachedLimit = true
+					h.samples.Store(failedHost.CheckURL, sample)
+				}
+
+				//we call the failureCallback to keep the redis key and the host checker manager updated
 				go h.failureCallback(failedHost)
 
-			} else if sample.count <= h.sampleTriggerLimit {
+			} else {
 				//if it failed but not reached the h.sampleTriggerLimit yet, we just add the counter to the map.
 				log.Warning("[HOST CHECKER] [HOST DOWN BUT NOT REACHED LIMIT]: ", failedHost.CheckURL)
 				h.samples.Store(failedHost.CheckURL, sample)
