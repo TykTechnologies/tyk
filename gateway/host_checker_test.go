@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"text/template"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	proxyproto "github.com/pires/go-proxyproto"
+	"github.com/stretchr/testify/assert"
 )
 
 const sampleUptimeTestAPI = `{
@@ -95,6 +97,7 @@ func TestHostChecker(t *testing.T) {
 	apisMu.Lock()
 	apisByID = map[string]*APISpec{spec.APIID: spec}
 	apisMu.Unlock()
+
 	GlobalHostChecker.checkerMu.Lock()
 	GlobalHostChecker.checker.sampleTriggerLimit = 1
 	GlobalHostChecker.checkerMu.Unlock()
@@ -484,4 +487,257 @@ func TestProxyWhenHostIsDown(t *testing.T) {
 			get()
 		}
 	}
+}
+
+func TestChecker_triggerSampleLimit(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = l.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	var wg sync.WaitGroup
+	wg.Add(5)
+
+	setTestMode(false)
+	defer func() {
+		setTestMode(true)
+	}()
+
+	var (
+		limit  = 4
+		ping   atomic.Value
+		failed atomic.Value
+	)
+	failed.Store(0)
+	ping.Store(0)
+
+	hs := &HostUptimeChecker{}
+	hs.Init(1, limit, 1, map[string]HostData{
+		l.Addr().String(): {CheckURL: "http://" + l.Addr().String()},
+	},
+		func(HostHealthReport) {
+			failed.Store(failed.Load().(int) + 1)
+			wg.Done()
+		},
+		func(HostHealthReport) {},
+		func(HostHealthReport) {
+			ping.Store(ping.Load().(int) + 1)
+			if ping.Load().(int) >= limit {
+				cancel()
+			}
+			wg.Done()
+		},
+	)
+
+	go hs.Start()
+
+	wg.Wait()
+	<-ctx.Done()
+	assert.Equal(t, limit, ping.Load().(int), "ping count is wrong")
+	assert.Equal(t, 1, failed.Load().(int), "expected host down to be fired once")
+}
+
+func TestChecker_HostReporter_up_then_down(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := HostData{
+		CheckURL:            l.Addr().String(),
+		Protocol:            "tcp",
+		EnableProxyProtocol: true,
+		Commands: []apidef.CheckCommand{
+			{
+				Name: "send", Message: "ping",
+			}, {
+				Name: "expect", Message: "pong",
+			},
+		},
+	}
+	defer l.Close()
+
+	changeResponse := make(chan bool)
+
+	go func(ls net.Listener, change chan bool) {
+		ls = &proxyproto.Listener{Listener: ls}
+		accept := false
+		for {
+			select {
+			case <-change:
+				accept = true
+			default:
+				s, err := ls.Accept()
+				if err != nil {
+					return
+				}
+				buf := make([]byte, 4)
+				_, err = s.Read(buf)
+				if err != nil {
+					return
+				}
+				if !accept {
+					s.Write([]byte("pong"))
+				} else {
+					s.Write([]byte("unknown"))
+				}
+			}
+
+		}
+	}(l, changeResponse)
+
+	setTestMode(false)
+	defer func() {
+		setTestMode(true)
+	}()
+
+	var (
+		limit = 2
+		ping   atomic.Value
+		failed atomic.Value
+	)
+	failed.Store(0)
+	ping.Store(0)
+
+	hs := &HostUptimeChecker{}
+	hs.Init(1, limit, 1, map[string]HostData{
+		l.Addr().String(): data,
+	},
+		func(HostHealthReport) {
+			failed.Store(failed.Load().(int) + 1)
+		},
+		func(HostHealthReport) {
+		},
+		func(HostHealthReport) {
+			ping.Store(ping.Load().(int) + 1)
+		},
+	)
+
+	go hs.Start()
+	defer hs.Stop()
+
+	for {
+		val := ping.Load()
+		if val != nil && val == 1 {
+			break
+		}
+	}
+
+	changeResponse <- true
+	for {
+		val := failed.Load()
+		if val != nil && val.(int) == 1 {
+			break
+		}
+	}
+
+
+	val, found := hs.samples.Load(data.CheckURL)
+	assert.Equal(t, true, found, "the host url should be in samples")
+	assert.Equal(t, 1, failed.Load().(int), "expected host down to be fired once")
+
+	samples := val.(HostSample)
+	assert.Equal(t, true, samples.reachedLimit, "the host failures should have reached the error limit")
+	assert.Equal(t, 2, samples.count, "samples count should be 2")
+}
+
+func TestChecker_HostReporter_down_then_up(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := HostData{
+		CheckURL:            l.Addr().String(),
+		Protocol:            "tcp",
+		EnableProxyProtocol: true,
+		Commands: []apidef.CheckCommand{
+			{
+				Name: "send", Message: "ping",
+			}, {
+				Name: "expect", Message: "pong",
+			},
+		},
+	}
+	defer l.Close()
+
+	changeResponse := make(chan bool)
+
+	go func(ls net.Listener, change chan bool) {
+		ls = &proxyproto.Listener{Listener: ls}
+		accept := false
+		for {
+			select {
+			case <-change:
+				accept = true
+			default:
+				s, err := ls.Accept()
+				if err != nil {
+					return
+				}
+				buf := make([]byte, 4)
+				_, err = s.Read(buf)
+				if err != nil {
+					return
+				}
+				if accept {
+					s.Write([]byte("pong"))
+				} else {
+					s.Write([]byte("unknown"))
+				}
+			}
+
+		}
+	}(l, changeResponse)
+
+	setTestMode(false)
+	defer func() {
+		setTestMode(true)
+	}()
+
+	var (
+		limit = 2
+		up   atomic.Value
+		failed atomic.Value
+	)
+	failed.Store(0)
+	up.Store(0)
+
+	hs := &HostUptimeChecker{}
+	hs.Init(1, limit, 1, map[string]HostData{
+		l.Addr().String(): data,
+	},
+		func(HostHealthReport) {
+			failed.Store(failed.Load().(int) + 1)
+		},
+		func(HostHealthReport) {
+			up.Store(up.Load().(int) + 1)
+		},
+		func(HostHealthReport) {},
+	)
+
+	go hs.Start()
+	defer hs.Stop()
+
+	for {
+		val := failed.Load()
+		if val != nil && val.(int) == 1 {
+			break
+		}
+	}
+
+	changeResponse <- true
+
+	for {
+		val := up.Load()
+		if val != nil && val == 1 {
+			break
+		}
+	}
+
+	_, found := hs.samples.Load(data.CheckURL)
+	assert.Equal(t, false, found, "the host url should be in samples")
+	assert.Equal(t, 2, failed.Load().(int), "expected host down to be fired twice")
+	assert.Equal(t, 1, up.Load().(int), "expected host up to be fired once")
+
 }
