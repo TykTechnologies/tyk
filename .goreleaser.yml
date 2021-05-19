@@ -145,6 +145,7 @@ dockers:
     - std
   image_templates:
     - "tykio/tyk-hybrid-docker:{{ .Tag }}-amd64"
+    - "docker.tyk.io/tykio/tyk-hybrid-docker:{{ .Tag }}-amd64"
   build_flag_templates:
     - "--platform=linux/amd64"
     - "--label=org.opencontainers.image.created={{.Date}}"
@@ -157,10 +158,12 @@ dockers:
   dockerfile: images/hybrid/Dockerfile
   extra_files:
     - "images/hybrid/"
+
 - ids:
     - std
   image_templates:
     - "tykio/tyk-hybrid-docker:{{ .Tag }}-arm64"
+    - "docker.tyk.io/tykio/tyk-hybrid-docker:{{ .Tag }}-arm64"
   build_flag_templates:
     - "--platform=linux/arm64"
     - "--label=org.opencontainers.image.created={{.Date}}"
@@ -173,6 +176,7 @@ dockers:
   dockerfile: images/hybrid/Dockerfile
   extra_files:
     - "images/hybrid/"
+
 - ids:
     - std
   image_templates:
