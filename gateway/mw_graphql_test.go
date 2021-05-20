@@ -192,113 +192,138 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 	})
 
 	t.Run("graphql engine v2", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
-			spec.UseKeylessAccess = true
-			spec.Proxy.ListenPath = "/"
-			spec.GraphQL.Enabled = true
-			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
-			spec.GraphQL.Version = apidef.GraphQLConfigVersion2
-		})
-
-		t.Run("on disabled websockets", func(t *testing.T) {
-			cfg := config.Global()
-			cfg.HttpServerOptions.EnableWebSockets = false
-			config.SetGlobal(cfg)
-
-			t.Run("should respond with 422 when trying to upgrade to websockets", func(t *testing.T) {
-				_, _ = g.Run(t, []test.TestCase{
-					{
-						Headers: map[string]string{
-							headers.Connection:           "upgrade",
-							headers.Upgrade:              "websocket",
-							headers.SecWebSocketProtocol: "graphql-ws",
-							headers.SecWebSocketVersion:  "13",
-							headers.SecWebSocketKey:      "123abc",
-						},
-						Code:      http.StatusUnprocessableEntity,
-						BodyMatch: "websockets are not allowed",
-					},
-				}...)
-			})
-		})
-
-		t.Run("graphql websocket upgrade", func(t *testing.T) {
-			cfg := config.Global()
-			cfg.HttpServerOptions.EnableWebSockets = true
-			config.SetGlobal(cfg)
-
-			t.Run("should deny upgrade with 400 when protocol is not graphql-ws", func(t *testing.T) {
-				_, _ = g.Run(t, []test.TestCase{
-					{
-						Headers: map[string]string{
-							headers.Connection:           "upgrade",
-							headers.Upgrade:              "websocket",
-							headers.SecWebSocketProtocol: "invalid",
-							headers.SecWebSocketVersion:  "13",
-							headers.SecWebSocketKey:      "123abc",
-						},
-						Code:      http.StatusBadRequest,
-						BodyMatch: "invalid websocket protocol for upgrading to a graphql websocket connection",
-					},
-				}...)
+		t.Run("subgraph", func(t *testing.T) {
+			BuildAndLoadAPI(func(spec *APISpec) {
+				spec.UseKeylessAccess = true
+				spec.Proxy.ListenPath = "/"
+				spec.GraphQL.Enabled = true
+				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeSubgraph
+				spec.GraphQL.Schema = gqlSubgraphSchema
 			})
 
-			t.Run("should upgrade to websocket connection with correct protocol", func(t *testing.T) {
-				baseURL := strings.Replace(g.URL, "http://", "ws://", -1)
-				wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
-					headers.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+			t.Run("should execute subgraph successfully", func(t *testing.T) {
+				request := gql.Request{
+					Query:     gqlSubgraphQuery,
+					Variables: []byte(gqlSubgraphVariables),
+				}
+
+				_, _ = g.Run(t, test.TestCase{
+					Data:      request,
+					BodyMatch: `\\"operationName\\":\\"\\",\\"variables\\":{\\"_representations\\":\[{\\"__typename\\":\\"User\\",\\"id\\":\\"1\\"}\]},\\"query\\":\\"query Subgraph\(\$_representations: \[_Any!\]!\) {.*_entities\(representations: \$_representations\) {.*\.\.\. on User {.*id.*username.*}.*}.*}\\"`,
+					Code:      http.StatusOK,
 				})
-				require.NoError(t, err)
-				defer wsConn.Close()
-
-				// Send a connection init message to gateway
-				err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"type":"connection_init","payload":{}}`))
-				require.NoError(t, err)
-
-				_, msg, err := wsConn.ReadMessage()
-
-				// Gateway should acknowledge the connection
-				assert.Equal(t, `{"id":"","type":"connection_ack","payload":null}`, string(msg))
-				assert.NoError(t, err)
 			})
 		})
 
-		t.Run("graphql api requests", func(t *testing.T) {
-			countries1 := gql.Request{
-				Query: "query Query { countries { name } }",
-			}
+		t.Run("proxy-only", func(t *testing.T) {
+			BuildAndLoadAPI(func(spec *APISpec) {
+				spec.UseKeylessAccess = true
+				spec.Proxy.ListenPath = "/"
+				spec.GraphQL.Enabled = true
+				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+				spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+			})
 
-			countries2 := gql.Request{
-				Query: "query Query { countries { name code } }",
-			}
+			t.Run("on disabled websockets", func(t *testing.T) {
+				cfg := config.Global()
+				cfg.HttpServerOptions.EnableWebSockets = false
+				config.SetGlobal(cfg)
 
-			people1 := gql.Request{
-				Query: "query Query { people { name } }",
-			}
+				t.Run("should respond with 422 when trying to upgrade to websockets", func(t *testing.T) {
+					_, _ = g.Run(t, []test.TestCase{
+						{
+							Headers: map[string]string{
+								headers.Connection:           "upgrade",
+								headers.Upgrade:              "websocket",
+								headers.SecWebSocketProtocol: "graphql-ws",
+								headers.SecWebSocketVersion:  "13",
+								headers.SecWebSocketKey:      "123abc",
+							},
+							Code:      http.StatusUnprocessableEntity,
+							BodyMatch: "websockets are not allowed",
+						},
+					}...)
+				})
+			})
 
-			people2 := gql.Request{
-				Query: "query Query { people { country { name } name } }",
-			}
+			t.Run("graphql websocket upgrade", func(t *testing.T) {
+				cfg := config.Global()
+				cfg.HttpServerOptions.EnableWebSockets = true
+				config.SetGlobal(cfg)
 
-			_, _ = g.Run(t, []test.TestCase{
-				// GraphQL Data Source
-				{Data: countries1, BodyMatch: `"countries":.*{"name":"Turkey"},{"name":"Russia"}.*`, Code: http.StatusOK},
-				{Data: countries2, BodyMatch: `"countries":.*{"name":"Turkey","code":"TR"},{"name":"Russia","code":"RU"}.*`, Code: http.StatusOK},
+				t.Run("should deny upgrade with 400 when protocol is not graphql-ws", func(t *testing.T) {
+					_, _ = g.Run(t, []test.TestCase{
+						{
+							Headers: map[string]string{
+								headers.Connection:           "upgrade",
+								headers.Upgrade:              "websocket",
+								headers.SecWebSocketProtocol: "invalid",
+								headers.SecWebSocketVersion:  "13",
+								headers.SecWebSocketKey:      "123abc",
+							},
+							Code:      http.StatusBadRequest,
+							BodyMatch: "invalid websocket protocol for upgrading to a graphql websocket connection",
+						},
+					}...)
+				})
 
-				// REST Data Source
-				{Data: people1, BodyMatch: `"people":.*{"name":"Furkan"},{"name":"Leo"}.*`, Code: http.StatusOK},
-				{Data: people2, BodyMatch: `"people":.*{"country":{"name":"Turkey"},"name":"Furkan"},{"country":{"name":"Russia"},"name":"Leo"}.*`, Code: http.StatusOK},
-			}...)
-		})
+				t.Run("should upgrade to websocket connection with correct protocol", func(t *testing.T) {
+					baseURL := strings.Replace(g.URL, "http://", "ws://", -1)
+					wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
+						headers.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+					})
+					require.NoError(t, err)
+					defer wsConn.Close()
 
-		t.Run("introspection query", func(t *testing.T) {
-			request := gql.Request{
-				OperationName: "IntrospectionQuery",
-				Variables:     nil,
-				Query:         gqlIntrospectionQuery,
-			}
+					// Send a connection init message to gateway
+					err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"type":"connection_init","payload":{}}`))
+					require.NoError(t, err)
 
-			_, _ = g.Run(t, test.TestCase{Data: request, BodyMatch: `{"kind":"OBJECT","name":"Country"`, Code: http.StatusOK})
+					_, msg, err := wsConn.ReadMessage()
+
+					// Gateway should acknowledge the connection
+					assert.Equal(t, `{"id":"","type":"connection_ack","payload":null}`, string(msg))
+					assert.NoError(t, err)
+				})
+			})
+
+			t.Run("graphql api requests", func(t *testing.T) {
+				countries1 := gql.Request{
+					Query: "query Query { countries { name } }",
+				}
+
+				countries2 := gql.Request{
+					Query: "query Query { countries { name code } }",
+				}
+
+				people1 := gql.Request{
+					Query: "query Query { people { name } }",
+				}
+
+				people2 := gql.Request{
+					Query: "query Query { people { country { name } name } }",
+				}
+
+				_, _ = g.Run(t, []test.TestCase{
+					// GraphQL Data Source
+					{Data: countries1, BodyMatch: `"countries":.*{"name":"Turkey"},{"name":"Russia"}.*`, Code: http.StatusOK},
+					{Data: countries2, BodyMatch: `"countries":.*{"name":"Turkey","code":"TR"},{"name":"Russia","code":"RU"}.*`, Code: http.StatusOK},
+
+					// REST Data Source
+					{Data: people1, BodyMatch: `"people":.*{"name":"Furkan"},{"name":"Leo"}.*`, Code: http.StatusOK},
+					{Data: people2, BodyMatch: `"people":.*{"country":{"name":"Turkey"},"name":"Furkan"},{"country":{"name":"Russia"},"name":"Leo"}.*`, Code: http.StatusOK},
+				}...)
+			})
+
+			t.Run("introspection query", func(t *testing.T) {
+				request := gql.Request{
+					OperationName: "IntrospectionQuery",
+					Variables:     nil,
+					Query:         gqlIntrospectionQuery,
+				}
+
+				_, _ = g.Run(t, test.TestCase{Data: request, BodyMatch: `{"kind":"OBJECT","name":"Country"`, Code: http.StatusOK})
+			})
 		})
 	})
 
@@ -604,3 +629,52 @@ input StringQueryOperatorInput {
 }
 
 scalar Upload`
+
+const gqlSubgraphSchema = `scalar _Any
+scalar _FieldSet
+
+# a union of all types that use the @key directive
+union _Entity = User
+
+type _Service {
+  sdl: String
+}
+
+extend type Query {
+  _entities(representations: [_Any!]!): [_Entity]!
+  _service: _Service!
+}
+
+directive @external on FIELD_DEFINITION
+directive @requires(fields: _FieldSet!) on FIELD_DEFINITION
+directive @provides(fields: _FieldSet!) on FIELD_DEFINITION
+directive @key(fields: _FieldSet!) on OBJECT | INTERFACE
+
+# this is an optional directive discussed below
+directive @extends on OBJECT | INTERFACE
+
+extend type Query {
+	me: User
+} 
+type User @key(fields: "id"){ 
+	id: ID! 
+	username: String!
+}`
+
+const gqlSubgraphQuery = `query Subgraph($_representations: [_Any!]!) {
+  _entities(representations: $_representations) {
+    ... on User {
+      id
+      username
+    }
+  }
+}`
+
+const gqlSubgraphVariables = `{
+	"_representations": [
+		{
+			"__typename": "User",
+			"id": "1"
+		}
+	]
+}`
