@@ -116,6 +116,10 @@ func TestGoPluginResponseHook(t *testing.T) {
 				},
 			},
 		}
+		configData := map[string]interface{}{
+			"my-context-data": "my-plugin-config",
+		}
+		spec.ConfigData = configData
 	})
 
 	time.Sleep(1 * time.Second)
@@ -128,6 +132,7 @@ func TestGoPluginResponseHook(t *testing.T) {
 				Code:    http.StatusOK,
 				HeadersMatch: map[string]string{
 					"X-Response-Added": "resp-added",
+					"X-Plugin-Data":    "my-plugin-config",
 				},
 				BodyMatch: `{"message":"response injected message"}`,
 			},

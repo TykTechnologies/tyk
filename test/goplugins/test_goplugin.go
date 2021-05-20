@@ -86,6 +86,17 @@ func MyPluginResponse(rw http.ResponseWriter, res *http.Response, req *http.Requ
 
 	res.Body = ioutil.NopCloser(&buf)
 
+	apiDefinition := ctx.GetDefinition(req)
+	if apiDefinition == nil {
+		res.Header.Add("X-Plugin-Data", "null")
+		return
+	}
+	pluginConfig, ok := apiDefinition.ConfigData["my-context-data"].(string)
+	if !ok || pluginConfig == "" {
+		res.Header.Add("X-Plugin-Data", "null")
+		return
+	}
+	res.Header.Add("X-Plugin-Data", pluginConfig)
 }
 
 func MyPluginPerPathFoo(rw http.ResponseWriter, r *http.Request) {
