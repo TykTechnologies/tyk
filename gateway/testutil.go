@@ -962,7 +962,8 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 	}
 
 	// Small part of start()
-	s.Gw.loadControlAPIEndpoints(s.mainRouter())
+	// this should be removed in favor of  loadControlAPIEndpoints in startServer
+	//s.Gw.loadControlAPIEndpoints(s.mainRouter())
 	if s.Gw.analytics.GeoIPDB == nil {
 		panic("GeoIPDB was not initialized")
 	}

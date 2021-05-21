@@ -769,9 +769,12 @@ func TestListener(t *testing.T) {
 	ts.Gw.ReloadTestCase.Enable()
 	defer ts.Gw.ReloadTestCase.Disable()
 
+	t.Logf("\nAddress:%v\n",ts.URL)
+	time.Sleep(1*time.Second)
 	ts.Gw.ReloadTestCase.StartTicker()
 	defer ts.Gw.ReloadTestCase.StopTicker()
 
+	fmt.Printf("\nGateway Memory: %v\n", &ts.Gw)
 	tests := []test.TestCase{
 		// Cleanup before tests
 		{Method: "DELETE", Path: "/tyk/apis/test", AdminAuth: true},

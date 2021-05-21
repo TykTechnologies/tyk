@@ -1251,6 +1251,7 @@ func (gw *Gateway) groupResetHandler(w http.ResponseWriter, r *http.Request) {
 // finished.
 //
 func (gw *Gateway) resetHandler(fn func()) http.HandlerFunc {
+	fmt.Printf("\n from handler, gateway memory: %v\n", &gw)
 	return func(w http.ResponseWriter, r *http.Request) {
 		var wg sync.WaitGroup
 
