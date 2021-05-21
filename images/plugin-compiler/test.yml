@@ -3,12 +3,18 @@ services:
   redis:
     image: redis
 
+  # compiler:
+  #   image: tykio/tyk-plugin-compiler:${tag}
+  #   volumes:
+  #     - ./testplugin:/plugin-source
+  #   command: testplugin.so
+      
   gw:
     image: tykio/tyk-gateway:${tag}
     volumes:
       - ./testplugin/testplugin.so:/opt/tyk-gateway/middleware/testplugin.so
       - ./testplugin/apidef.json:/opt/tyk-gateway/apps/testplugin.json
     ports:
-      - "8080:8080"
+      - "0.0.0.0:8080:8080"
     environment:
       - TYK_LOGLEVEL=debug

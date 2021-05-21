@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/goplugin"
 	"github.com/TykTechnologies/tyk/user"
 	"github.com/sirupsen/logrus"
@@ -73,6 +74,9 @@ func (h *ResponseGoPluginMiddleware) HandleGoPluginResponse(w http.ResponseWrite
 
 		}
 	}()
+
+	// Inject definition into response context
+	ctx.SetDefinition(req, h.Spec.APIDefinition)
 
 	// wrap ResponseWriter to check if response was sent
 	rw := &customResponseWriter{
