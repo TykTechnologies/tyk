@@ -785,9 +785,9 @@ type Config struct {
 	//
 	// ```
 	// "dns_cache": {
-    	//   "enabled": true, //Turned off by default
-    	//   "ttl": 60, //Time in seconds before the record will be removed from cache
-    	//   "multiple_ips_handle_strategy": "random" //A strategy, which will be used when dns query will reply with more than 1 ip address per single host.
+		//   "enabled": true, //Turned off by default
+		//   "ttl": 60, //Time in seconds before the record will be removed from cache
+		//   "multiple_ips_handle_strategy": "random" //A strategy, which will be used when dns query will reply with more than 1 ip address per single host.
 	// }
 	// ```
 	DnsCache                 DnsCacheConfig        `json:"dns_cache"`
@@ -948,7 +948,7 @@ type Config struct {
 	// Sample Override Message Setting
 	// ```
 	// "override_messages": {
-  	//   "oauth.auth_field_missing" : {
+	//   "oauth.auth_field_missing" : {
 	//    "code": 401,
 	//    "message": "Token is not authorised"
 	//  }
