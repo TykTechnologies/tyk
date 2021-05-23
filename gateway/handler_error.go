@@ -23,6 +23,12 @@ const (
 	defaultTemplateName   = "error"
 	defaultTemplateFormat = "json"
 	defaultContentType    = headers.ApplicationJSON
+
+	MsgAuthFieldMissing    = "Authorization field missing"
+	MsgApiAccessDisallowed = "Access to this API has been disallowed"
+	MsgBearerMailformed    = "Bearer token malformed"
+	MsgKeyNotAuthorized    = "Key not authorised"
+	MsgOauthClientRevoked  = "Key not authorised. OAuth client access was revoked"
 )
 
 var errCustomBodyResponse = errors.New("errCustomBodyResponse")
@@ -37,32 +43,42 @@ func errorAndStatusCode(errType string) (error, int) {
 func defaultTykErrors() {
 	TykErrors = make(map[string]config.TykError)
 	TykErrors[ErrAuthAuthorizationFieldMissing] = config.TykError{
-		Message: "Authorization field missing",
+		Message: MsgAuthFieldMissing,
 		Code:    http.StatusUnauthorized,
 	}
 
 	TykErrors[ErrAuthKeyNotFound] = config.TykError{
-		Message: "Access to this API has been disallowed",
+		Message: MsgApiAccessDisallowed,
+		Code:    http.StatusForbidden,
+	}
+
+	TykErrors[ErrAuthCertNotFound] = config.TykError{
+		Message: MsgApiAccessDisallowed,
+		Code:    http.StatusForbidden,
+	}
+
+	TykErrors[ErrAuthKeyIsInvalid] = config.TykError{
+		Message: MsgApiAccessDisallowed,
 		Code:    http.StatusForbidden,
 	}
 
 	TykErrors[ErrOAuthAuthorizationFieldMissing] = config.TykError{
-		Message: "Authorization field missing",
+		Message: MsgAuthFieldMissing,
 		Code:    http.StatusBadRequest,
 	}
 
 	TykErrors[ErrOAuthAuthorizationFieldMalformed] = config.TykError{
-		Message: "Bearer token malformed",
+		Message: MsgBearerMailformed,
 		Code:    http.StatusBadRequest,
 	}
 
 	TykErrors[ErrOAuthKeyNotFound] = config.TykError{
-		Message: "Key not authorised",
+		Message: MsgKeyNotAuthorized,
 		Code:    http.StatusForbidden,
 	}
 
 	TykErrors[ErrOAuthClientDeleted] = config.TykError{
-		Message: "Key not authorised. OAuth client access was revoked",
+		Message: MsgOauthClientRevoked,
 		Code:    http.StatusForbidden,
 	}
 }
@@ -95,6 +111,12 @@ type ErrorHandler struct {
 	BaseMiddleware
 }
 
+// TemplateExecutor is an interface used to switch between text/templates and html/template.
+// It only switch to text/template (templatesRaw) when contentType is XML related
+type TemplateExecutor interface {
+	Execute(wr io.Writer, data interface{}) error
+}
+
 // HandleError is the actual error handler and will store the error details in analytics if analytics processing is enabled.
 func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMsg string, errCode int, writeResponse bool) {
 	defer e.Base().UpdateRequestSession(r)
@@ -120,7 +142,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		w.Header().Set(headers.ContentType, contentType)
 		response.Header = http.Header{}
 		response.Header.Set(headers.ContentType, contentType)
-
 		templateName := "error_" + strconv.Itoa(errCode) + "." + templateExtension
 
 		// Try to use an error template that matches the HTTP error code and the content type: 500.json, 400.xml, etc.
@@ -158,12 +179,22 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		if errMsg != errCustomBodyResponse.Error() {
 			w.WriteHeader(errCode)
 			response.StatusCode = errCode
+			var tmplExecutor TemplateExecutor
+			tmplExecutor = tmpl
 
 			apiError := APIError{template.HTML(template.JSEscapeString(errMsg))}
+			if contentType == headers.ApplicationXML || contentType == headers.TextXML {
+				apiError.Message = template.HTML(errMsg)
+
+				//we look up in the last defined templateName to obtain the template.
+				rawTmpl := templatesRaw.Lookup(templateName)
+				tmplExecutor = rawTmpl
+			}
+
 			var log bytes.Buffer
 
 			rsp := io.MultiWriter(w, &log)
-			tmpl.Execute(rsp, &apiError)
+			tmplExecutor.Execute(rsp, &apiError)
 			response.Body = ioutil.NopCloser(&log)
 		}
 	}

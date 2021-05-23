@@ -31,9 +31,7 @@ func (g *GraphQLConfigAdapter) EngineConfigV2() (*graphql.EngineV2Configuration,
 		return nil, ErrUnsupportedGraphQLConfigVersion
 	}
 
-	var err error
-	g.schema, err = graphql.NewSchemaFromString(g.config.Schema)
-	if err != nil {
+	if err := g.parseSchema(); err != nil {
 		return nil, err
 	}
 
@@ -49,6 +47,11 @@ func (g *GraphQLConfigAdapter) EngineConfigV2() (*graphql.EngineV2Configuration,
 	conf.SetDataSources(datsSources)
 
 	return &conf, nil
+}
+
+func (g *GraphQLConfigAdapter) parseSchema() (err error) {
+	g.schema, err = graphql.NewSchemaFromString(g.config.Schema)
+	return err
 }
 
 func (g *GraphQLConfigAdapter) engineConfigV2FieldConfigs() (planFieldConfigs plan.FieldConfigurations) {
