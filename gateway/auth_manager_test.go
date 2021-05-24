@@ -2,9 +2,10 @@ package gateway
 
 import (
 	"crypto/x509"
-	"github.com/TykTechnologies/tyk/config"
 	"net/http"
 	"testing"
+
+	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/TykTechnologies/tyk/headers"
 

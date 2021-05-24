@@ -2,6 +2,8 @@ package gateway
 
 import (
 	"testing"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 func TestGeoIPLookup(t *testing.T) {
@@ -28,15 +30,15 @@ func TestGeoIPLookup(t *testing.T) {
 }
 
 func TestURLReplacer(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
 
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.AnalyticsConfig.NormaliseUrls.Enabled = true
+		globalConf.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs = true
+		globalConf.AnalyticsConfig.NormaliseUrls.NormaliseNumbers = true
+		globalConf.AnalyticsConfig.NormaliseUrls.Custom = []string{"ihatethisstring"}
+	})
+	defer ts.Close()
 	globalConf := ts.Gw.GetConfig()
-	globalConf.AnalyticsConfig.NormaliseUrls.Enabled = true
-	globalConf.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs = true
-	globalConf.AnalyticsConfig.NormaliseUrls.NormaliseNumbers = true
-	globalConf.AnalyticsConfig.NormaliseUrls.Custom = []string{"ihatethisstring"}
-	ts.Gw.SetConfig(globalConf)
 
 	recordUUID1 := AnalyticsRecord{Path: "/15873a748894492162c402d67e92283b/search"}
 	recordUUID2 := AnalyticsRecord{Path: "/CA761232-ED42-11CE-BACD-00AA0057B223/search"}
@@ -89,14 +91,15 @@ func TestURLReplacer(t *testing.T) {
 
 func BenchmarkURLReplacer(b *testing.B) {
 	b.ReportAllocs()
-	ts := StartTest(nil)
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.AnalyticsConfig.NormaliseUrls.Enabled = true
+		globalConf.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs = true
+		globalConf.AnalyticsConfig.NormaliseUrls.NormaliseNumbers = true
+		globalConf.AnalyticsConfig.NormaliseUrls.Custom = []string{"ihatethisstring"}
+	})
 	defer ts.Close()
 
 	globalConf := ts.Gw.GetConfig()
-	globalConf.AnalyticsConfig.NormaliseUrls.Enabled = true
-	globalConf.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs = true
-	globalConf.AnalyticsConfig.NormaliseUrls.NormaliseNumbers = true
-	globalConf.AnalyticsConfig.NormaliseUrls.Custom = []string{"ihatethisstring"}
 	globalConf.AnalyticsConfig.NormaliseUrls.CompiledPatternSet = ts.Gw.initNormalisationPatterns()
 	ts.Gw.SetConfig(globalConf)
 
