@@ -495,13 +495,14 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 }
 
 func TestUpdateKeyWithCert(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
+	CertificateManager := getCertManager()
 	apiId := "MTLSApi"
-	pID := CreatePolicy(func(p *user.Policy) {})
+	pID := ts.CreatePolicy(func(p *user.Policy) {})
 
-	BuildAndLoadAPI(func(spec *APISpec) {
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.APIID = apiId
 		spec.UseKeylessAccess = false
 		spec.Auth.UseCertificate = true
