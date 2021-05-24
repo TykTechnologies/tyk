@@ -11,6 +11,7 @@ import (
 var _ Store = (*Consul)(nil)
 
 func TestConsul_Get(t *testing.T) {
+	t.Skip()
 
 	store, err := NewConsul(config.Default.KV.Consul)
 	if err != nil {

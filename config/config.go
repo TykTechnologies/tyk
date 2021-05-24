@@ -124,7 +124,8 @@ type AnalyticsConfigConfig struct {
 	RecordsBufferSize           uint64              `json:"records_buffer_size"`
 	StorageExpirationTime       int                 `json:"storage_expiration_time"`
 	ignoredIPsCompiled          map[string]bool
-	EnableMultipleAnalyticsKeys bool `json:"enable_multiple_analytics_keys"`
+	EnableMultipleAnalyticsKeys bool    `json:"enable_multiple_analytics_keys"`
+	PurgeInterval               float32 `json:"purge_interval"`
 }
 
 type HealthCheckConfig struct {
@@ -335,6 +336,7 @@ type Config struct {
 	// Gateway Security Policies
 	HashKeys                bool           `json:"hash_keys"`
 	HashKeyFunction         string         `json:"hash_key_function"`
+	HashKeyFunctionFallback []string       `json:"hash_key_function_fallback"`
 	EnableHashedKeysListing bool           `json:"enable_hashed_keys_listing"`
 	MinTokenLength          int            `json:"min_token_length"`
 	EnableAPISegregation    bool           `json:"enable_api_segregation"`
@@ -462,13 +464,16 @@ type Config struct {
 	EventTriggers        map[apidef.TykEvent][]TykEventHandler `json:"event_trigers_defunct"`  // Deprecated: Config.GetEventTriggers instead.
 	EventTriggersDefunct map[apidef.TykEvent][]TykEventHandler `json:"event_triggers_defunct"` // Deprecated: Config.GetEventTriggers instead.
 
+	// HideGeneratorHeader will mask the 'X-Generator' and 'X-Mascot-...' headers, if set to true.
+	HideGeneratorHeader bool `json:"hide_generator_header"`
+
 	// TODO: These config options are not documented - What do they do?
 	SupressDefaultOrgStore         bool  `json:"suppress_default_org_store"`
 	LegacyEnableAllowanceCountdown bool  `bson:"legacy_enable_allowance_countdown" json:"legacy_enable_allowance_countdown"`
 	GlobalSessionLifetime          int64 `bson:"global_session_lifetime" json:"global_session_lifetime"`
 	ForceGlobalSessionLifetime     bool  `bson:"force_global_session_lifetime" json:"force_global_session_lifetime"`
-	HideGeneratorHeader            bool  `json:"hide_generator_header"`
-	KV                             struct {
+
+	KV struct {
 		Consul ConsulConfig `json:"consul"`
 		Vault  VaultConfig  `json:"vault"`
 	} `json:"kv"`

@@ -195,7 +195,7 @@ func (gw *Gateway) gatherHealthChecks() {
 	allInfos.mux.Unlock()
 }
 
-func liveCheckHandler(w http.ResponseWriter, r *http.Request) {
+func (gw *Gateway) liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		doJSONWrite(w, http.StatusMethodNotAllowed, apiError(http.StatusText(http.StatusMethodNotAllowed)))
 		return
@@ -234,6 +234,12 @@ func liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 	res.Status = status
 
 	w.Header().Set("Content-Type", headers.ApplicationJSON)
+
+	// If this option is not set, or is explicitly set to false, add the mascot headers
+	if !gw.GetConfig().HideGeneratorHeader {
+		addMascotHeaders(w)
+	}
+
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(res)
 }

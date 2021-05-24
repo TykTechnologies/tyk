@@ -699,7 +699,7 @@ func TestNopCloseResponseBody(t *testing.T) {
 
 func TestGraphQL_HeadersInjection(t *testing.T) {
 	g := StartTest(nil)
-	defer g.Close()
+	t.Cleanup(g.Close)
 
 	composedAPI := BuildAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
@@ -725,10 +725,15 @@ func TestGraphQL_HeadersInjection(t *testing.T) {
 
 	_, _ = g.Run(t, []test.TestCase{
 		{
-			Data:      headers,
-			Headers:   map[string]string{"injected": "FOO"},
-			BodyMatch: `"headers":.*{"name":"Injected","value":"FOO"},{"name":"Static","value":"barbaz"}.*`,
-			Code:      http.StatusOK,
+			Data:    headers,
+			Headers: map[string]string{"injected": "FOO"},
+			Code:    http.StatusOK,
+
+			BodyMatchFunc: func(b []byte) bool {
+				return strings.Contains(string(b), `"headers":`) &&
+					strings.Contains(string(b), `{"name":"Injected","value":"FOO"}`) &&
+					strings.Contains(string(b), `{"name":"Static","value":"barbaz"}`)
+			},
 		},
 	}...)
 }

@@ -19,7 +19,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
 	"sync/atomic"
+	textTemplate "text/template"
 	"time"
 
 	"github.com/TykTechnologies/again"
@@ -56,11 +58,12 @@ import (
 )
 
 var (
-	log       = logger.Get()
-	mainLog   = log.WithField("prefix", "main")
-	pubSubLog = log.WithField("prefix", "pub-sub")
-	rawLog    = logger.GetRaw()
-	templates *template.Template
+	log          = logger.Get()
+	mainLog      = log.WithField("prefix", "main")
+	pubSubLog    = log.WithField("prefix", "pub-sub")
+	rawLog       = logger.GetRaw()
+	templates    *template.Template
+	templatesRaw *textTemplate.Template
 
 	memProfFile         *os.File
 	NewRelicApplication newrelic.Application
@@ -307,7 +310,7 @@ func (gw *Gateway) setupGlobals(ctx context.Context) {
 					Store: &store,
 				}
 				purger.Connect()
-				go purger.PurgeLoop(ctx)
+				go purger.PurgeLoop(ctx, time.Duration(gw.GetConfig().AnalyticsConfig.PurgeInterval))
 			})
 		}
 		go gw.flushNetworkAnalytics(ctx)
@@ -318,6 +321,7 @@ func (gw *Gateway) setupGlobals(ctx context.Context) {
 
 	templatesDir := filepath.Join(gwConfig.TemplatePath, "error*")
 	templates = template.Must(template.ParseGlob(templatesDir))
+	templatesRaw = textTemplate.Must(textTemplate.ParseGlob(templatesDir))
 
 	gw.CoProcessInit()
 
@@ -352,6 +356,8 @@ func (gw *Gateway) setupGlobals(ctx context.Context) {
 	if gw.GetConfig().NewRelic.AppName != "" {
 		NewRelicApplication = gw.SetupNewRelic()
 	}
+
+	gw.readGraphqlPlaygroundTemplate()
 }
 
 func buildConnStr(resource string, conf config.Config) string {
@@ -513,7 +519,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 		}
 	}
 
-	muxer.HandleFunc("/"+gw.GetConfig().HealthCheckEndpointName, liveCheckHandler)
+	muxer.HandleFunc("/"+gw.GetConfig().HealthCheckEndpointName, gw.liveCheckHandler)
 
 	r := mux.NewRouter()
 	muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
@@ -1168,6 +1174,11 @@ func (gw *Gateway) afterConfSetup() {
 
 	if conf.SlaveOptions.KeySpaceSyncInterval == 0 {
 		conf.SlaveOptions.KeySpaceSyncInterval = 10
+	}
+
+	if conf.AnalyticsConfig.PurgeInterval == 0 {
+		// as default 10 seconds
+		conf.AnalyticsConfig.PurgeInterval = 10
 	}
 
 	rpc.GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)

@@ -89,8 +89,9 @@ func (r *Purger) Connect() {
 
 // PurgeLoop starts the loop that will pull data out of the in-memory
 // store and into RPC.
-func (r Purger) PurgeLoop(ctx context.Context) {
-	tick := time.NewTicker(10 * time.Second)
+func (r Purger) PurgeLoop(ctx context.Context, interval time.Duration) {
+	tick := time.NewTicker(interval * time.Second)
+
 	for {
 		select {
 		case <-ctx.Done():

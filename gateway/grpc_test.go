@@ -36,33 +36,37 @@ func TestHTTP2_h2C(t *testing.T) {
 	defer ts.Close()
 
 	var port = 6666
+	ts.EnablePort(port, "http")
 
-	ts.EnablePort(port, "h2c")
 	var echo = "Hello, I am an HTTP/2 Server"
 	expected := "HTTP/2.0"
-	serv := &http2.Server{}
+	h2cServ := &http2.Server{}
 	// Upstream server supporting HTTP/2
-	upstream := httptest.NewUnstartedServer(h2c.NewHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		actual := r.Proto
-		if expected != actual {
-			t.Fatalf("Tyk-Upstream connection protocol is expected %s, actual %s", expected, actual)
-		}
+	upstream := httptest.NewUnstartedServer(
+		h2c.NewHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			actual := r.Proto
+			if expected != actual {
+				t.Fatalf("Tyk-Upstream connection protocol is expected %s, actual %s", expected, actual)
+			}
 
-		w.Write([]byte(echo))
-
-	}), serv))
+			w.Write([]byte(echo))
+		}), h2cServ),
+	)
 	upstream.Start()
 	defer upstream.Close()
 
+	// upstream protocol should be h2c
+	upstream.URL = strings.Replace(upstream.URL, "http", "h2c", -1)
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = true
 		spec.Proxy.TargetURL = upstream.URL
-		spec.Protocol = "h2c"
+		spec.Protocol = "http"
 		spec.ListenPort = port
 	})
 	client := &http.Client{
 		Transport: &http2.Transport{
+			// So http2.Transport doesn't complain the URL scheme isn't 'https'
 			AllowHTTP: true,
 			// Pretend we are dialing a TLS endpoint. (Note, we ignore the passed tls.Config)
 			DialTLS: func(network, addr string, cfg *tls.Config) (net.Conn, error) {
@@ -71,7 +75,7 @@ func TestHTTP2_h2C(t *testing.T) {
 		},
 	}
 
-	s := fmt.Sprintf("http://localhost:%d", port)
+	s := fmt.Sprintf("https://localhost:%d", port)
 	w, err := client.Get(s)
 	if err != nil {
 		t.Fatal(err)
@@ -81,6 +85,7 @@ func TestHTTP2_h2C(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	bs := string(b)
 	if bs != "Hello, I am an HTTP/2 Server" {
 		t.Errorf("expected %s to %s", echo, bs)
@@ -89,7 +94,6 @@ func TestHTTP2_h2C(t *testing.T) {
 	if w.ProtoMajor != 2 {
 		t.Error("expected %i to %i", 2, w.ProtoMajor)
 	}
-
 }
 
 func TestGRPC_H2C(t *testing.T) {
@@ -119,7 +123,6 @@ func TestGRPC_H2C(t *testing.T) {
 	})
 
 	name := "Josh"
-
 	// gRPC client
 	r := sayHelloWithGRPCClientH2C(t, "localhost:6666", name)
 
@@ -170,6 +173,64 @@ func TestHTTP2_TLS(t *testing.T) {
 	ts := StartTest(conf)
 	defer ts.Close()
 
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.UseKeylessAccess = true
+		spec.Proxy.TargetURL = upstream.URL
+	})
+
+	// HTTP/2 client
+	http2Client := GetTLSClient(&clientCert, serverCertPem)
+	http2.ConfigureTransport(http2Client.Transport.(*http.Transport))
+
+	ts.Run(t, test.TestCase{Client: http2Client, Path: "", Code: 200, Proto: "HTTP/2.0", BodyMatch: "Hello, I am an HTTP/2 Server"})
+}
+
+// TestTLSTyk_H2cUpstream check that we can expose an api via https
+// but consume it internally via h2c
+// user -> tyk = HTTPS | tyk -> upstream = H2C
+func TestTLSTyk_H2cUpstream(t *testing.T) {
+	certManager := getCertManager()
+
+	// Certificates
+	_, _, _, clientCert := genCertificate(&x509.Certificate{})
+	serverCertPem, _, combinedPEM, _ := genServerCertificate()
+	certID, _ := certManager.Add(combinedPEM, "")
+	defer certManager.Delete(certID, "")
+
+	var port = 6666
+	// run Tyk in HTTPS
+	conf := func(globalConf *config.Config) {
+		globalConf.ListenPort = port
+		globalConf.ProxySSLInsecureSkipVerify = true
+		globalConf.ProxyEnableHttp2 = true
+		globalConf.HttpServerOptions.EnableHttp2 = true
+		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+		globalConf.HttpServerOptions.UseSSL = true
+	}
+
+	ts := StartTest(conf)
+	defer ts.Close()
+
+	h2cServ := &http2.Server{}
+	expected := "HTTP/2.0"
+	var echo = "Hello, I am an HTTP/2 Server"
+	// Upstream server supporting HTTP/2
+	upstream := httptest.NewUnstartedServer(
+		h2c.NewHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			actual := r.Proto
+			if expected != actual {
+				t.Fatalf("Tyk-Upstream connection protocol is expected %s, actual %s", expected, actual)
+			}
+
+			w.Write([]byte(echo))
+		}), h2cServ),
+	)
+	upstream.Start()
+	defer upstream.Close()
+
+	// upstream protocol should be h2c
+	upstream.URL = strings.Replace(upstream.URL, "http", "h2c", 1)
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = true
@@ -765,7 +826,8 @@ func TestGRPC_Stream_H2C(t *testing.T) {
 	defer ts.Close()
 
 	var port = 6666
-	ts.EnablePort(port, "h2c")
+	ts.EnablePort(port, "http")
+
 	// gRPC server
 	target, s := startGRPCServerH2C(t, setupStreamSVC)
 	defer target.Close()
@@ -781,9 +843,9 @@ func TestGRPC_Stream_H2C(t *testing.T) {
 		spec.Name = "h2c_api"
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = true
-		spec.Proxy.TargetURL = toTarget(t, "http", target)
+		spec.Proxy.TargetURL = toTarget(t, "h2c", target)
 		spec.ListenPort = port
-		spec.Protocol = "h2c"
+		spec.Protocol = "http"
 	})
 
 	// gRPC client

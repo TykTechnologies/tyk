@@ -18,7 +18,7 @@ import (
 	"github.com/justinas/alice"
 	newrelic "github.com/newrelic/go-agent"
 	"github.com/paulbellamy/ratecounter"
-	cache "github.com/pmylund/go-cache"
+	"github.com/pmylund/go-cache"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
 
@@ -69,6 +69,7 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		setContext(r, ctx)
 		return tr.TykMiddleware.ProcessRequest(w, r, conf)
 	}
+
 	return tr.TykMiddleware.ProcessRequest(w, r, conf)
 }
 
@@ -133,6 +134,7 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 				h.ServeHTTP(w, r)
 				return
 			}
+
 			err, errCode := mw.ProcessRequest(w, r, mwConf)
 			if err != nil {
 				// GoPluginMiddleware are expected to send response in case of error
@@ -652,9 +654,11 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 
 	// Try and get the session from the session store
 	t.Logger().Debug("Querying local cache")
+	keyHash := key
 	cacheKey := key
 	if t.Spec.GlobalConfig.HashKeys {
-		cacheKey = storage.HashStr(key)
+		keyHash = storage.HashStr(key)
+		cacheKey = storage.HashStr(key, storage.HashMurmur64) // always hash cache keys with murmur64 to prevent collisions
 	}
 
 	// Check in-memory cache
@@ -675,7 +679,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 	t.Logger().Debug("Querying keystore")
 	session, found := t.Gw.GlobalSessionManager.SessionDetail(t.Spec.OrgID, key, false)
 	if found {
-		session.SetKeyHash(cacheKey)
+		session.SetKeyHash(keyHash)
 		// If exists, assume it has been authorized and pass on
 		// cache it
 		clone := session.Clone()
@@ -699,22 +703,12 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 	// Only search in RPC if it's not in emergency mode
 	t.Logger().Debug("Querying authstore")
 	// 2. If not there, get it from the AuthorizationHandler
-	session, found = t.Spec.AuthManager.KeyAuthorised(key)
-	if !found && storage.TokenOrg(key) != t.Spec.OrgID {
-		//treat it as a custom key
-		key = t.Gw.generateToken(t.Spec.OrgID, key)
-		cacheKey = key
-		if t.Spec.GlobalConfig.HashKeys {
-			cacheKey = storage.HashStr(cacheKey)
-		}
-		session, found = t.Spec.AuthManager.KeyAuthorised(key)
-	}
-
+	session, found = t.Spec.AuthManager.SessionDetail(t.Spec.OrgID, key, false)
 	if found {
 		// update value of originalKey, as for custom-keys it might get updated (the key is generated again using alias)
 		*originalKey = key
 
-		session.SetKeyHash(cacheKey)
+		session.SetKeyHash(keyHash)
 		// If not in Session, and got it from AuthHandler, create a session with a new TTL
 		t.Logger().Info("Recreating session for key: ", t.Gw.obfuscateKey(key))
 

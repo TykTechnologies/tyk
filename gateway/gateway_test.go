@@ -769,8 +769,8 @@ func TestListener(t *testing.T) {
 	ts.Gw.ReloadTestCase.Enable()
 	defer ts.Gw.ReloadTestCase.Disable()
 
-	t.Logf("\nAddress:%v\n",ts.URL)
-	time.Sleep(1*time.Second)
+	t.Logf("\nAddress:%v\n", ts.URL)
+	time.Sleep(1 * time.Second)
 	ts.Gw.ReloadTestCase.StartTicker()
 	defer ts.Gw.ReloadTestCase.StopTicker()
 

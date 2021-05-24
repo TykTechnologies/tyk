@@ -3,6 +3,7 @@ package gateway
 import (
 	"crypto/tls"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
@@ -12,8 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-
-	"github.com/jensneuse/graphql-go-tools/pkg/playground"
+	"text/template"
 
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
@@ -119,10 +119,6 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	var coprocessLog = logger.WithFields(logrus.Fields{
 		"prefix": "coprocess",
 	})
-
-	if strings.Contains(spec.Proxy.TargetURL, "h2c://") {
-		spec.Proxy.TargetURL = strings.Replace(spec.Proxy.TargetURL, "h2c://", "http://", 1)
-	}
 
 	if spec.Proxy.Transport.SSLMaxVersion > 0 {
 		spec.Proxy.Transport.SSLMaxVersion = tls.VersionTLS12
@@ -316,6 +312,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 					BaseMiddleware: baseMid,
 					Path:           obj.Path,
 					SymbolName:     obj.Name,
+					APILevel:       true,
 				},
 			)
 		} else if mwDriver != apidef.OttoDriver {
@@ -386,6 +383,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 					BaseMiddleware: baseMid,
 					Path:           mwAuthCheckFunc.Path,
 					SymbolName:     mwAuthCheckFunc.Name,
+					APILevel:       true,
 				},
 			)
 		}
@@ -405,6 +403,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 						BaseMiddleware: baseMid,
 						Path:           obj.Path,
 						SymbolName:     obj.Name,
+						APILevel:       true,
 					},
 				)
 			} else {
@@ -435,6 +434,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	gw.mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &RequestSigning{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &GoPluginMiddleware{BaseMiddleware: baseMid})
 
 	for _, obj := range mwPostFuncs {
 		if mwDriver == apidef.GoPluginDriver {
@@ -444,6 +444,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 					BaseMiddleware: baseMid,
 					Path:           obj.Path,
 					SymbolName:     obj.Name,
+					APILevel:       true,
 				},
 			)
 		} else if mwDriver != apidef.OttoDriver {
@@ -720,10 +721,40 @@ type generalStores struct {
 	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore storage.Handler
 }
 
-func (gw *Gateway) loadGraphQLPlayground(spec *APISpec, subrouter *mux.Router) {
+var playgroundTemplate *template.Template
 
-	// endpoint is the endpoint of the url which playground makes request to.
+func (gw *Gateway) readGraphqlPlaygroundTemplate() {
+	playgroundPath := filepath.Join(gw.GetConfig().TemplatePath, "playground")
+	files, err := ioutil.ReadDir(playgroundPath)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "playground",
+		}).Error("Could not load the default playground templates: ", err)
+	}
+
+	var paths []string
+	for _, file := range files {
+		paths = append(paths, filepath.Join(playgroundPath, file.Name()))
+	}
+
+	playgroundTemplate, err = template.ParseFiles(paths...)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "playground",
+		}).Error("Could not parse the default playground templates: ", err)
+	}
+}
+
+const (
+	playgroundJSTemplateName   = "playground.js"
+	playgroundHTMLTemplateName = "index.html"
+)
+
+func (gw *Gateway) loadGraphQLPlayground(spec *APISpec, subrouter *mux.Router) {
+	// endpoint is a graphql server url to which a playground makes the request.
+
 	endpoint := spec.Proxy.ListenPath
+	playgroundPath := path.Join("/", spec.GraphQL.GraphQLPlayground.Path)
 
 	// If tyk-cloud is enabled, listen path will be api id and slug is mapped to listen path in nginx config.
 	// So, requests should be sent to slug endpoint, nginx will route them to internal gateway's listen path.
@@ -731,22 +762,31 @@ func (gw *Gateway) loadGraphQLPlayground(spec *APISpec, subrouter *mux.Router) {
 		endpoint = fmt.Sprintf("/%s/", spec.Slug)
 	}
 
-	p := playground.New(playground.Config{
-		// PathPrefix is the path on the router where playground handler is loaded.
-		PathPrefix:                      "/",
-		PlaygroundPath:                  spec.GraphQL.GraphQLPlayground.Path,
-		GraphqlEndpointPath:             endpoint,
-		GraphQLSubscriptionEndpointPath: endpoint,
+	subrouter.Methods(http.MethodGet).Path(path.Join(playgroundPath, playgroundJSTemplateName)).HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		if playgroundTemplate == nil {
+			rw.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		if err := playgroundTemplate.ExecuteTemplate(rw, playgroundJSTemplateName, nil); err != nil {
+			rw.WriteHeader(http.StatusInternalServerError)
+		}
 	})
 
-	handlers, err := p.Handlers()
-	if err != nil {
-		log.WithError(err).Error("Could not setup graphql playground handlers")
-	}
+	subrouter.Methods(http.MethodGet).Path(playgroundPath).HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		if playgroundTemplate == nil {
+			rw.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 
-	for _, cfg := range handlers {
-		subrouter.HandleFunc(cfg.Path, cfg.Handler)
-	}
+		err := playgroundTemplate.ExecuteTemplate(rw, playgroundHTMLTemplateName, struct {
+			Url, Schema, PathPrefix string
+		}{endpoint, strconv.Quote(spec.GraphQL.Schema), path.Join(endpoint, playgroundPath)})
+
+		if err != nil {
+			rw.WriteHeader(http.StatusInternalServerError)
+		}
+	})
 }
 
 // Create the individual API (app) specs based on live configurations and assign middleware
@@ -785,9 +825,6 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	shouldTrace := trace.IsEnabled()
 	for _, spec := range specs {
 		func() {
-			if strings.Contains(spec.Proxy.TargetURL, "h2c://") {
-				spec.Protocol = "h2c"
-			}
 			defer func() {
 				// recover from panic if one occured. Set err to nil otherwise.
 				if err := recover(); err != nil {
@@ -848,4 +885,5 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	mainLog.Debug("Checker host Done")
 
 	mainLog.Info("Initialised API Definitions")
+
 }

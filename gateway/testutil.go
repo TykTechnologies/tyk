@@ -26,17 +26,15 @@ import (
 
 	"github.com/TykTechnologies/tyk/rpc"
 
-	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
-
 	jwt "github.com/dgrijalva/jwt-go"
 	redis "github.com/go-redis/redis/v8"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-
+	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
+	uuid "github.com/satori/go.uuid"
 	"golang.org/x/net/context"
 
 	"github.com/TykTechnologies/tyk/apidef"
-
 	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
@@ -44,7 +42,6 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 	_ "github.com/TykTechnologies/tyk/testdata" // Don't delete
 	"github.com/TykTechnologies/tyk/user"
-	uuid "github.com/satori/go.uuid"
 )
 
 var (
@@ -510,9 +507,9 @@ func graphqlDataSourceHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(`{
 			"data": {
 				"countries": [
-					{	
+					{
 						"code": "TR",
-						"name": "Turkey"	
+						"name": "Turkey"
 					},
 					{
 						"code": "RU",
@@ -795,10 +792,9 @@ type Test struct {
 	URL        string
 	testRunner *test.HTTPTestRunner
 	// GlobalConfig deprecate this and instead use GW.getConfig()
-	GlobalConfig config.Config
-	config       TestConfig
-	cancel       func()
-
+	GlobalConfig     config.Config
+	config           TestConfig
+	cancel           func()
 	gwMu             sync.Mutex
 	Gw               *Gateway `json:"-"`
 	HttpHandler      *http.Server
@@ -820,8 +816,8 @@ func (s *Test) Start(genConf func(globalConf *config.Config)) *Gateway {
 
 	s.Gw.setupPortsWhitelist()
 	s.Gw.startServer()
-
 	s.Gw.setupGlobals(ctx)
+
 	// Set up a default org manager so we can traverse non-live paths
 	if !s.Gw.GetConfig().SupressDefaultOrgStore {
 		s.Gw.DefaultOrgStore.Init(s.Gw.getGlobalStorageHandler("orgkey.", false))
@@ -1007,8 +1003,8 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 		go s.Gw.RPCListener.StartRPCLoopCheck(slaveOptions.RPCKey)
 	}
 
-//	go s.Gw.reloadLoop(ctx, time.Tick(time.Second))
-//	go s.Gw.reloadQueueLoop(ctx)
+	//	go s.Gw.reloadLoop(ctx, time.Tick(time.Second))
+	//	go s.Gw.reloadQueueLoop(ctx)
 	go s.Gw.reloadLoop(ctx, s.Gw.ReloadTestCase.ReloadTicker(), s.Gw.ReloadTestCase.OnReload)
 	go s.Gw.reloadQueueLoop(ctx, s.Gw.ReloadTestCase.OnQueued)
 	go s.reloadSimulation()
@@ -1056,7 +1052,7 @@ func (s *Test) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, er
 	return s.testRunner.Run(t, testCases...)
 }
 
-//TODO:(gernest) when hot reload is suppored enable this.
+//TODO:(gernest) when hot reload is supported enable this.
 func (s *Test) RunExt(t testing.TB, testCases ...test.TestCase) {
 	s.Run(t, testCases...)
 	var testMatrix = []struct {
