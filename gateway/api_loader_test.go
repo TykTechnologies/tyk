@@ -159,7 +159,7 @@ func TestGraphQLPlayground(t *testing.T) {
 			t.Run("playground path is empty", func(t *testing.T) {
 				api.GraphQL.GraphQLPlayground.Path = ""
 				g.Gw.LoadAPI(api)
-				g.run(t, api.Proxy.ListenPath, api, env)
+				run(t, api.Proxy.ListenPath, api, env)
 			})
 
 			t.Run("playground path is '/'", func(t *testing.T) {
@@ -176,25 +176,25 @@ func TestGraphQLPlayground(t *testing.T) {
 			t.Run("playground path is '/playground'", func(t *testing.T) {
 				api.GraphQL.GraphQLPlayground.Path = "/playground"
 				g.Gw.LoadAPI(api)
-				g.run(t, path.Join(api.Proxy.ListenPath, "playground"), api, env)
+				run(t, path.Join(api.Proxy.ListenPath, "playground"), api, env)
 			})
 
 			t.Run("playground path is '/ppp'", func(t *testing.T) {
 				api.GraphQL.GraphQLPlayground.Path = "/ppp"
 				g.Gw.LoadAPI(api)
-				g.run(t, path.Join(api.Proxy.ListenPath, "/ppp"), api, env)
+				run(t, path.Join(api.Proxy.ListenPath, "/ppp"), api, env)
 			})
 
 			t.Run("playground path is '/zzz/'", func(t *testing.T) {
 				api.GraphQL.GraphQLPlayground.Path = "/zzz/"
 				g.Gw.LoadAPI(api)
-				g.run(t, path.Join(api.Proxy.ListenPath, "/zzz"), api, env)
+				run(t, path.Join(api.Proxy.ListenPath, "/zzz"), api, env)
 			})
 
 			t.Run("playground path is 'aaa'", func(t *testing.T) {
 				api.GraphQL.GraphQLPlayground.Path = "aaa"
 				g.Gw.LoadAPI(api)
-				g.run(t, path.Join(api.Proxy.ListenPath, "aaa"), api, env)
+				run(t, path.Join(api.Proxy.ListenPath, "aaa"), api, env)
 			})
 
 		})
