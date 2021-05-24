@@ -150,7 +150,7 @@ func TestGraphQLPlayground(t *testing.T) {
 			api.Proxy.ListenPath = fmt.Sprintf("/%s/", api.APIID)
 			api.Slug = apiName
 			globalConf := g.Gw.GetConfig()
-			//	api.Slug = "someslug"
+			//api.Slug = "someslug"
 			globalConf.Cloud = true
 			g.Gw.SetConfig(globalConf)
 		}
@@ -158,7 +158,6 @@ func TestGraphQLPlayground(t *testing.T) {
 		t.Run(env, func(t *testing.T) {
 			t.Run("playground path is empty", func(t *testing.T) {
 				api.GraphQL.GraphQLPlayground.Path = ""
-				g.Gw.LoadAPI(api)
 				run(t, api.Proxy.ListenPath, api, env)
 			})
 
@@ -170,7 +169,6 @@ func TestGraphQLPlayground(t *testing.T) {
 					{Path: api.Proxy.ListenPath, BodyMatch: `endpoint: "\\/` + apiName + `\\/"`},
 					{Path: api.Proxy.ListenPath + "playground.css", BodyMatch: "body{margin:0;padding:0;font-family:.*"},
 				}...)
-
 			})
 
 			t.Run("playground path is '/playground'", func(t *testing.T) {
