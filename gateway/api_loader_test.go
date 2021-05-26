@@ -101,7 +101,6 @@ func TestFuzzyFindAPI(t *testing.T) {
 	assert.Equal(t, "123456", spec.APIID)
 }
 
-
 func TestGraphQLPlayground(t *testing.T) {
 	g := StartTest(nil)
 	defer g.Close()
@@ -157,17 +156,14 @@ func TestGraphQLPlayground(t *testing.T) {
 		t.Run(env, func(t *testing.T) {
 			t.Run("playground path is empty", func(t *testing.T) {
 				api.GraphQL.GraphQLPlayground.Path = ""
+				g.Gw.LoadAPI(api)
 				run(t, api.Proxy.ListenPath, api, env)
 			})
 
 			t.Run("playground path is '/'", func(t *testing.T) {
 				api.GraphQL.GraphQLPlayground.Path = "/"
 				g.Gw.LoadAPI(api)
-				_, _ = g.Run(t, []test.TestCase{
-					{Path: api.Proxy.ListenPath, BodyMatch: `<link rel="stylesheet" href="playground.css" />`},
-					{Path: api.Proxy.ListenPath, BodyMatch: `endpoint: "\\/` + apiName + `\\/"`},
-					{Path: api.Proxy.ListenPath + "playground.css", BodyMatch: "body{margin:0;padding:0;font-family:.*"},
-				}...)
+				run(t, api.Proxy.ListenPath, api, env)
 			})
 
 			t.Run("playground path is '/playground'", func(t *testing.T) {
