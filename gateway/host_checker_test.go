@@ -1,15 +1,25 @@
 package gateway
 
 import (
+	"bytes"
 	"context"
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
-	proxyproto "github.com/pires/go-proxyproto"
-	"github.com/stretchr/testify/assert"
+	"fmt"
 	"net"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"text/template"
+	"time"
+
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
+	proxyproto "github.com/pires/go-proxyproto"
+	uuid "github.com/satori/go.uuid"
+	"github.com/stretchr/testify/assert"
 )
 
 const sampleUptimeTestAPI = `{
@@ -57,9 +67,11 @@ func (w *testEventHandler) HandleEvent(em config.EventMessage) {
 }
 
 //// ToDo check why it blocks
-/*
+
 func TestHostChecker(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.UptimeTests.PollerGroup = uuid.NewV4().String()
+	})
 	defer ts.Close()
 
 	specTmpl := template.Must(template.New("spec").Parse(sampleUptimeTestAPI))
@@ -95,6 +107,10 @@ func TestHostChecker(t *testing.T) {
 	ts.Gw.apisByID = map[string]*APISpec{spec.APIID: spec}
 	ts.Gw.apisMu.Unlock()
 	ts.Gw.GlobalHostChecker.checkerMu.Lock()
+
+	if ts.Gw.GlobalHostChecker.checker == nil {
+		t.Fatal("is nil")
+	}
 	ts.Gw.GlobalHostChecker.checker.sampleTriggerLimit = 1
 	ts.Gw.GlobalHostChecker.checkerMu.Unlock()
 	defer func() {
@@ -116,8 +132,7 @@ func TestHostChecker(t *testing.T) {
 		t.Error("Should update host checker check list")
 	}
 	ts.Gw.GlobalHostChecker.checkerMu.Unlock()
-
-	hostCheckTicker <- struct{}{}
+	ts.Gw.HostCheckTicker <- struct{}{}
 	eventWG.Wait()
 
 	if ts.Gw.GlobalHostChecker.HostDown(TestHttpAny) {
@@ -158,11 +173,12 @@ func TestHostChecker(t *testing.T) {
 	}
 	ts.Gw.GlobalHostChecker.checkerMu.Unlock()
 }
-*/
 
-/*
 func TestReverseProxyAllDown(t *testing.T) {
-	ts := StartTest(nil)
+
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.UptimeTests.PollerGroup = uuid.NewV4().String()
+	})
 	defer ts.Close()
 
 	specTmpl := template.Must(template.New("spec").Parse(sampleUptimeTestAPI))
@@ -192,6 +208,11 @@ func TestReverseProxyAllDown(t *testing.T) {
 	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
 		"HostDown": {&testEventHandler{cb}},
 	}
+	if ts.Gw.GlobalHostChecker.checker == nil {
+		fmt.Printf("\nStop loop: %v\n", !ts.Gw.GlobalHostChecker.stopLoop)
+		fmt.Printf("\n Am I pooling: %v\n", ts.Gw.GlobalHostChecker.AmIPolling())
+
+	}
 
 	ts.Gw.apisMu.Lock()
 	ts.Gw.apisByID = map[string]*APISpec{spec.APIID: spec}
@@ -210,7 +231,7 @@ func TestReverseProxyAllDown(t *testing.T) {
 
 	ts.Gw.SetCheckerHostList()
 
-	hostCheckTicker <- struct{}{}
+	ts.Gw.HostCheckTicker <- struct{}{}
 	eventWG.Wait()
 
 	remote, _ := url.Parse(TestHttpAny)
@@ -223,7 +244,6 @@ func TestReverseProxyAllDown(t *testing.T) {
 		t.Fatalf("wanted code to be 503, was %d", rec.Code)
 	}
 }
-*/
 
 type answers struct {
 	mu             sync.RWMutex
@@ -431,12 +451,12 @@ func TestTestCheckerTCPHosts_correct_wrong_answers(t *testing.T) {
 	}
 }
 
-/*
 func TestProxyWhenHostIsDown(t *testing.T) {
 	conf := func(conf *config.Config) {
 		conf.UptimeTests.Config.FailureTriggerSampleSize = 1
 		conf.UptimeTests.Config.TimeWait = 5
 		conf.UptimeTests.Config.EnableUptimeAnalytics = true
+		conf.UptimeTests.PollerGroup = uuid.NewV4().String()
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
@@ -485,7 +505,7 @@ func TestProxyWhenHostIsDown(t *testing.T) {
 			}
 			if n == 2 {
 				l.Close()
-				hostCheckTicker <- struct{}{}
+				ts.Gw.HostCheckTicker <- struct{}{}
 				n++
 				sentSignal = true
 				continue
@@ -498,7 +518,6 @@ func TestProxyWhenHostIsDown(t *testing.T) {
 		}
 	}
 }
-*/
 
 func TestChecker_triggerSampleLimit(t *testing.T) {
 	ts := StartTest(nil)

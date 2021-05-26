@@ -176,7 +176,6 @@ func (hc *HostCheckerManager) AmIPolling() bool {
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
 	}).Debug("--- I am: ", hc.Id)
-
 	return false
 }
 

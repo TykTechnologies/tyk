@@ -104,6 +104,8 @@ type Gateway struct {
 	DashService          DashboardServiceSender
 	CertificateManager   *certs.CertificateManager
 	GlobalHostChecker    HostCheckerManager
+	HostCheckTicker      chan struct{}
+	HostCheckerClient    *http.Client
 
 	keyGen DefaultKeyGenerator
 
@@ -177,6 +179,10 @@ func NewGateway(config config.Config) *Gateway {
 	gw.SessionLimiter = SessionLimiter{Gw: &gw}
 	gw.SessionMonitor = Monitor{Gw: &gw}
 	gw.RPCGlobalCache = cache.New(30*time.Second, 15*time.Second)
+	gw.HostCheckTicker = make(chan struct{})
+	gw.HostCheckerClient = &http.Client{
+		Timeout: 500 * time.Millisecond,
+	}
 
 	gw.SessionCache = cache.New(10*time.Second, 5*time.Second)
 	gw.ExpiryCache = cache.New(600*time.Second, 10*time.Minute)
