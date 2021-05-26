@@ -12,7 +12,8 @@ import (
 )
 
 func init() {
-	go ConnectToRedis(context.Background(), nil)
+	conf := config.Default
+	go ConnectToRedis(context.Background(), nil, &conf)
 	for {
 		if Connected() {
 			break

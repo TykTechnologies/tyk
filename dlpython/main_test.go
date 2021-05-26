@@ -1,6 +1,7 @@
 package python
 
 import (
+	"fmt"
 	"os"
 	"testing"
 )
@@ -11,6 +12,7 @@ func init() {
 	if versionOverride := os.Getenv("PYTHON_VERSION"); versionOverride != "" {
 		testVersion = versionOverride
 	}
+	fmt.Printf("Using Python %s for tests\n", testVersion)
 }
 
 func TestFindPythonConfig(t *testing.T) {
