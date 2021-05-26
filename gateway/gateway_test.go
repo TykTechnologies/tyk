@@ -758,7 +758,7 @@ func TestAnalytics(t *testing.T) {
 }
 
 // ToDo check why it blocks
-/*
+
 func TestListener(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -803,7 +803,7 @@ func TestListener(t *testing.T) {
 
 	ts.RunExt(t, tests...)
 }
-*/
+
 
 // Admin api located on separate port
 func TestControlListener(t *testing.T) {

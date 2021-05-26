@@ -3,6 +3,7 @@ package gateway
 import (
 	"fmt"
 	"net/http"
+	"path"
 	_ "path"
 	"sync/atomic"
 	"testing"
@@ -100,7 +101,7 @@ func TestFuzzyFindAPI(t *testing.T) {
 	assert.Equal(t, "123456", spec.APIID)
 }
 
-/*
+
 func TestGraphQLPlayground(t *testing.T) {
 	g := StartTest(nil)
 	defer g.Close()
@@ -196,7 +197,7 @@ func TestGraphQLPlayground(t *testing.T) {
 		})
 	}
 }
-*/
+
 func TestCORS(t *testing.T) {
 	g := StartTest(nil)
 	defer g.Close()
