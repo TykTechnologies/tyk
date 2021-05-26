@@ -757,25 +757,15 @@ func TestAnalytics(t *testing.T) {
 	})
 }
 
-// ToDo check why it blocks
-
 func TestListener(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	// Trick to get spec JSON, without loading API
-	// Specs will be reseted when we do `StartTest`
-	//ts.Gw.BuildAndLoadAPI()
-
 	ts.Gw.ReloadTestCase.Enable()
 	defer ts.Gw.ReloadTestCase.Disable()
 
-	t.Logf("\nAddress:%v\n", ts.URL)
-	time.Sleep(1 * time.Second)
 	ts.Gw.ReloadTestCase.StartTicker()
 	defer ts.Gw.ReloadTestCase.StopTicker()
-
-	fmt.Printf("\nGateway Memory: %v\n", &ts.Gw)
 	tests := []test.TestCase{
 		// Cleanup before tests
 		{Method: "DELETE", Path: "/tyk/apis/test", AdminAuth: true},
@@ -803,7 +793,6 @@ func TestListener(t *testing.T) {
 
 	ts.RunExt(t, tests...)
 }
-
 
 // Admin api located on separate port
 func TestControlListener(t *testing.T) {

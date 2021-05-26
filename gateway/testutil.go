@@ -1065,14 +1065,9 @@ func (s *Test) RunExt(t testing.TB, testCases ...test.TestCase) {
 		{true, false},
 	}
 
-	for i, m := range testMatrix {
+	for _, m := range testMatrix {
 		s.config.HotReload = m.goagain
 		s.config.overrideDefaults = m.overrideDefaults
-
-		if i > 0 {
-			s.Close()
-			s.Start(nil)
-		}
 
 		title := fmt.Sprintf("hotReload: %v, overrideDefaults: %v", m.goagain, m.overrideDefaults)
 		t.(*testing.T).Run(title, func(t *testing.T) {

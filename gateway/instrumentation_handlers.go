@@ -18,7 +18,7 @@ var instrument = health.NewStream()
 var instrumentationEnabled bool
 
 // setupInstrumentation handles all the initialisation of the instrumentation handler
-func(gw *Gateway) setupInstrumentation() {
+func (gw *Gateway) setupInstrumentation() {
 	switch {
 	case *cli.LogInstrumentation:
 	case os.Getenv("TYK_INSTRUMENTATION") == "1":

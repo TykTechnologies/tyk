@@ -1279,7 +1279,6 @@ func (gw *Gateway) resetHandler(fn func()) http.HandlerFunc {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
 		}).Info("Reload URL Structure - Scheduled")
-
 		wg.Wait()
 		doJSONWrite(w, http.StatusOK, apiOk(""))
 	}
