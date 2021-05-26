@@ -1142,7 +1142,7 @@ func (gw *Gateway) initialiseSystem(ctx context.Context) error {
 
 	gw.SetConfig(gwConfig)
 	getHostDetails(gw.GetConfig().PIDFileLocation)
-	setupInstrumentation(*gw)
+	gw.setupInstrumentation()
 
 	if gw.GetConfig().HttpServerOptions.UseLE_SSL {
 		go gw.StartPeriodicStateBackup(ctx, &gw.LE_MANAGER)

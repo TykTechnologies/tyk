@@ -208,11 +208,12 @@ func TestReverseProxyAllDown(t *testing.T) {
 	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
 		"HostDown": {&testEventHandler{cb}},
 	}
+	ts.Gw.GlobalHostChecker.checkerMu.Lock()
 	if ts.Gw.GlobalHostChecker.checker == nil {
 		fmt.Printf("\nStop loop: %v\n", !ts.Gw.GlobalHostChecker.stopLoop)
 		fmt.Printf("\n Am I pooling: %v\n", ts.Gw.GlobalHostChecker.AmIPolling())
-
 	}
+	ts.Gw.GlobalHostChecker.checkerMu.Unlock()
 
 	ts.Gw.apisMu.Lock()
 	ts.Gw.apisByID = map[string]*APISpec{spec.APIID: spec}
