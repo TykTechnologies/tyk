@@ -198,12 +198,12 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				spec.Proxy.ListenPath = "/"
 				spec.GraphQL.Enabled = true
 				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeSubgraph
-				spec.GraphQL.Schema = gqlSubgraphSchema
+				spec.GraphQL.Schema = gqlSubgraphSchemaAccounts
 			})
 
 			t.Run("should execute subgraph successfully", func(t *testing.T) {
 				request := gql.Request{
-					Query:     gqlSubgraphQuery,
+					Query:     gqlSubgraphQueryAccounts,
 					Variables: []byte(gqlSubgraphVariables),
 				}
 
@@ -630,38 +630,93 @@ input StringQueryOperatorInput {
 
 scalar Upload`
 
-const gqlSubgraphSchema = `scalar _Any
+const gqlSubgraphSchemaAccounts = `scalar _Any
 scalar _FieldSet
-
-# a union of all types that use the @key directive
 union _Entity = User
 
 type _Service {
   sdl: String
 }
 
-extend type Query {
+type Query {
+  me: User
   _entities(representations: [_Any!]!): [_Entity]!
   _service: _Service!
+}
+
+type User @key(fields: "id"){ 
+	id: ID! 
+	username: String!
 }
 
 directive @external on FIELD_DEFINITION
 directive @requires(fields: _FieldSet!) on FIELD_DEFINITION
 directive @provides(fields: _FieldSet!) on FIELD_DEFINITION
 directive @key(fields: _FieldSet!) on OBJECT | INTERFACE
+directive @extends on OBJECT | INTERFACE`
 
-# this is an optional directive discussed below
-directive @extends on OBJECT | INTERFACE
-
-extend type Query {
+const gqlSubgraphSDLAccounts = `extend type Query {
 	me: User
 } 
-type User @key(fields: "id"){ 
+
+type User @key(fields: "id") { 
 	id: ID! 
 	username: String!
 }`
 
-const gqlSubgraphQuery = `query Subgraph($_representations: [_Any!]!) {
+const gqlSubgraphSchemaReviews = `scalar _Any
+scalar _FieldSet
+union _Entity = User | Product
+
+type _Service {
+  sdl: String
+}
+
+type Query {
+  _entities(representations: [_Any!]!): [_Entity]!
+  _service: _Service!
+}
+
+type Review {
+	body: String!
+	author: User! @provides(fields: "username")
+	product: Product!
+}
+
+type User @key(fields: "id") {
+	id: ID! @external
+	reviews: [Review]
+}
+
+type Product @key(fields: "upc") {
+	upc: String! @external
+	name: String! @external
+	reviews: [Review] @requires(fields: "name")
+}
+
+directive @external on FIELD_DEFINITION
+directive @requires(fields: _FieldSet!) on FIELD_DEFINITION
+directive @provides(fields: _FieldSet!) on FIELD_DEFINITION
+directive @key(fields: _FieldSet!) on OBJECT | INTERFACE
+directive @extends on OBJECT | INTERFACE`
+
+const gqlSubgraphSDLReviews = `type Review {
+	body: String!
+	author: User! @provides(fields: "username")
+	product: Product!
+}
+
+extend type User @key(fields: "id") {
+	id: ID! @external
+	reviews: [Review]
+}
+
+extend type Product @key(fields: "upc") {
+	upc: String! @external
+	reviews: [Review]
+}`
+
+const gqlSubgraphQueryAccounts = `query Subgraph($_representations: [_Any!]!) {
   _entities(representations: $_representations) {
     ... on User {
       id
@@ -677,4 +732,32 @@ const gqlSubgraphVariables = `{
 			"id": "1"
 		}
 	]
+}`
+
+const gqlMergedSupergraphSDL = `type Query {
+	me: User
+	topProducts(first: Int = 5): [Product]
+}
+
+type Subscription {
+	review: Review!
+}
+
+type User {
+	id: ID!
+	username: String!
+	reviews: [Review]
+}
+
+type Product {
+	upc: String!
+	name: String!
+	price: Int!
+	reviews: [Review]
+}
+
+type Review {
+	body: String!
+	author: User!
+	product: Product!
 }`

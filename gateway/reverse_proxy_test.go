@@ -743,6 +743,76 @@ func TestGraphQL_InternalDataSource(t *testing.T) {
 		spec.Proxy.ListenPath = "/tyk-rest"
 	})[0]
 
+	tykSubgraphAccounts := BuildAPI(func(spec *APISpec) {
+		spec.Name = "subgraph-accounts"
+		spec.APIID = "subgraph1"
+		spec.Proxy.TargetURL = testSubgraphAccounts
+		spec.Proxy.ListenPath = "/tyk-subgraph-accounts"
+		spec.GraphQL = apidef.GraphQLConfig{
+			Enabled:       true,
+			ExecutionMode: apidef.GraphQLExecutionModeSubgraph,
+			Version:       apidef.GraphQLConfigVersion2,
+			Schema:        gqlSubgraphSchemaAccounts,
+			Subgraph: apidef.GraphQLSubgraphConfig{
+				SDL: gqlSubgraphSDLAccounts,
+			},
+		}
+	})[0]
+
+	tykSubgraphReviews := BuildAPI(func(spec *APISpec) {
+		spec.Name = "subgraph-reviews"
+		spec.APIID = "subgraph2"
+		spec.Proxy.TargetURL = testSubgraphReviews
+		spec.Proxy.ListenPath = "/tyk-subgraph-reviews"
+		spec.GraphQL = apidef.GraphQLConfig{
+			Enabled:       true,
+			ExecutionMode: apidef.GraphQLExecutionModeSubgraph,
+			Version:       apidef.GraphQLConfigVersion2,
+			Schema:        gqlSubgraphSchemaReviews,
+			Subgraph: apidef.GraphQLSubgraphConfig{
+				SDL: gqlSubgraphSDLReviews,
+			},
+		}
+	})[0]
+
+	t.Run("supergraph (engine v2)", func(t *testing.T) {
+		supergraph := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.APIID = "supergraph"
+			spec.GraphQL = apidef.GraphQLConfig{
+				Enabled:       true,
+				Version:       apidef.GraphQLConfigVersion2,
+				ExecutionMode: apidef.GraphQLExecutionModeSupergraph,
+				Supergraph: apidef.GraphQLSupergraphConfig{
+					Subgraphs: []apidef.GraphQLSubgraphEntity{
+						{
+							APIID: "subgraph1",
+							URL:   "tyk://" + tykSubgraphAccounts.Name,
+							SDL:   gqlSubgraphSDLAccounts,
+						},
+						{
+							APIID: "subgraph2",
+							URL:   "tyk://" + tykSubgraphReviews.Name,
+							SDL:   gqlSubgraphSDLReviews,
+						},
+					},
+					MergedSDL: gqlMergedSupergraphSDL,
+				},
+				Schema: gqlMergedSupergraphSDL,
+			}
+		})[0]
+
+		LoadAPI(tykSubgraphAccounts, tykSubgraphReviews, supergraph)
+
+		reviews := graphql.Request{
+			Query: `query Query { me { id username reviews { body } } }`,
+		}
+
+		_, _ = g.Run(t, []test.TestCase{
+			{Data: reviews, BodyMatch: `{"data":{"me":{"id":"1","username":"tyk","reviews":\[{"body":"A highly effective form of birth control."},{"body":"Fedoras are one of the most fashionable hats around and can look great with a variety of outfits."}\]}}}`, Code: http.StatusOK},
+		}...)
+	})
+
 	t.Run("graphql engine v2", func(t *testing.T) {
 		composedAPI := BuildAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"

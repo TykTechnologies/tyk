@@ -462,6 +462,8 @@ const (
 	handlerPathRestDataSource        = "/rest-data-source"
 	handlerPathGraphQLDataSource     = "/graphql-data-source"
 	handlerPathHeadersRestDataSource = "/rest-headers-data-source"
+	handlerSubgraphAccounts          = "/subgraph-accounts"
+	handlerSubgraphReviews           = "/subgraph-reviews"
 
 	// We need a static port so that the urls can be used in static
 	// test data, and to prevent the requests from being randomized
@@ -475,6 +477,8 @@ const (
 	testGraphQLDataSource     = TestHttpAny + handlerPathGraphQLDataSource
 	testRESTDataSource        = TestHttpAny + handlerPathRestDataSource
 	testRESTHeadersDataSource = TestHttpAny + handlerPathHeadersRestDataSource
+	testSubgraphAccounts      = TestHttpAny + handlerSubgraphAccounts
+	testSubgraphReviews       = TestHttpAny + handlerSubgraphReviews
 	testHttpJWK               = TestHttpAny + "/jwk.json"
 	testHttpJWKLegacy         = TestHttpAny + "/jwk-legacy.json"
 	testHttpBundles           = TestHttpAny + "/bundles/"
@@ -556,6 +560,8 @@ func testHttpHandler() *mux.Router {
 	r.HandleFunc(handlerPathGraphQLDataSource, graphqlDataSourceHandler)
 	r.HandleFunc(handlerPathRestDataSource, restDataSourceHandler)
 	r.HandleFunc(handlerPathHeadersRestDataSource, restHeadersDataSourceHandler)
+	r.HandleFunc(handlerSubgraphAccounts, subgraphAccountsHandler)
+	r.HandleFunc(handlerSubgraphReviews, subgraphReviewsHandler)
 
 	r.HandleFunc("/ws", wsHandler)
 	r.HandleFunc("/jwk.json", func(w http.ResponseWriter, r *http.Request) {
@@ -650,6 +656,36 @@ func restDataSourceHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		]`))
+}
+
+func subgraphAccountsHandler(w http.ResponseWriter, r *http.Request) {
+	_, _ = w.Write([]byte(`{
+		"data": {
+			"me": {
+				"id": "1",
+				"username": "tyk"
+			}
+		}
+	}`))
+}
+
+func subgraphReviewsHandler(w http.ResponseWriter, r *http.Request) {
+	_, _ = w.Write([]byte(`{
+		"data": {
+		    "_entities": [
+			    {
+			        "reviews": [
+				      	{
+				        	"body": "A highly effective form of birth control."
+						},
+				    	{
+				    		"body": "Fedoras are one of the most fashionable hats around and can look great with a variety of outfits."
+				    	}
+					]
+			    }
+		    ]
+		}
+	  }`))
 }
 
 const jwkTestJson = `{
