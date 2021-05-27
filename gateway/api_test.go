@@ -1517,9 +1517,6 @@ func TestApiLoaderLongestPathFirst(t *testing.T) {
 		host, path string
 	}
 
-	if MockHandle == nil {
-		t.Fatal("s q esta verga es nula")
-	}
 	inputs := map[hostAndPath]bool{}
 	hosts := []string{"host1.local", "host2.local", "host3.local"}
 	paths := []string{"a", "ab", "a/b/c", "ab/c", "abc", "a/b/c"}
