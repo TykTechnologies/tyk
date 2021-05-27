@@ -53,7 +53,7 @@ var (
 
 	defaultTestConfig config.Config
 	EnableTestDNSMock = true
-	MockHandle *test.DnsMockHandle
+	MockHandle        *test.DnsMockHandle
 )
 
 // ReloadMachinery is a helper struct to use when writing tests that do manual
@@ -218,7 +218,6 @@ func InitTestMain(ctx context.Context, m *testing.M) int {
 
 		defer MockHandle.ShutdownDnsMock()
 	}
-
 
 	exitCode := m.Run()
 
