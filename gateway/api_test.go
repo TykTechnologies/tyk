@@ -1508,15 +1508,17 @@ func TestContextSession(t *testing.T) {
 }
 
 func TestApiLoaderLongestPathFirst(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.EnableCustomDomains = true
+	})
 	defer ts.Close()
-
-	globalConf := ts.Gw.GetConfig()
-	globalConf.EnableCustomDomains = true
-	ts.Gw.SetConfig(globalConf)
 
 	type hostAndPath struct {
 		host, path string
+	}
+
+	if MockHandle == nil {
+		t.Fatal("s q esta verga es nula")
 	}
 	inputs := map[hostAndPath]bool{}
 	hosts := []string{"host1.local", "host2.local", "host3.local"}

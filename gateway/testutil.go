@@ -52,6 +52,8 @@ var (
 	testMiddlewarePath, _ = ioutil.TempDir("", "tyk-middleware-path")
 
 	defaultTestConfig config.Config
+	EnableTestDNSMock = true
+	MockHandle *test.DnsMockHandle
 )
 
 // ReloadMachinery is a helper struct to use when writing tests that do manual
@@ -206,7 +208,20 @@ func (r *ReloadMachinery) TickOk(t *testing.T) {
 }
 
 func InitTestMain(ctx context.Context, m *testing.M) int {
+
+	if EnableTestDNSMock {
+		var errMock error
+		MockHandle, errMock = test.InitDNSMock(test.DomainsToAddresses, nil)
+		if errMock != nil {
+			panic(errMock)
+		}
+
+		defer MockHandle.ShutdownDnsMock()
+	}
+
+
 	exitCode := m.Run()
+
 	return exitCode
 }
 
@@ -886,11 +901,7 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 	s.Gw.setTestMode(true)
 	s.gwMu.Unlock()
 
-	var errMock error
-	s.MockHandle, errMock = test.InitDNSMock(test.DomainsToAddresses, nil)
-	if errMock != nil {
-		panic(errMock)
-	}
+	s.MockHandle = MockHandle
 
 	var err error
 	gwConfig.Storage.Database = rand.Intn(15)
@@ -957,9 +968,6 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 		panic(err)
 	}
 
-	// Small part of start()
-	// this should be removed in favor of  loadControlAPIEndpoints in startServer
-	//s.Gw.loadControlAPIEndpoints(s.mainRouter())
 	if s.Gw.analytics.GeoIPDB == nil {
 		panic("GeoIPDB was not initialized")
 	}
@@ -1042,7 +1050,6 @@ func (s *Test) Close() {
 	} else {
 		log.Info("server exited properly")
 	}
-	s.MockHandle.ShutdownDnsMock()
 
 	os.RemoveAll(s.Gw.GetConfig().AppPath)
 }

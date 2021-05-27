@@ -95,7 +95,6 @@ func TestRLOpen(t *testing.T) {
 func requestThrottlingTest(limiter string, testLevel string) func(t *testing.T) {
 	return func(t *testing.T) {
 		ts := StartTest(nil)
-		defer ts.ResetTestConfig()
 		defer ts.Close()
 
 		globalCfg := ts.Gw.GetConfig()
