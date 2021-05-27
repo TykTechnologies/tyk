@@ -209,7 +209,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 
 				_, _ = g.Run(t, test.TestCase{
 					Data:      request,
-					BodyMatch: `\\"operationName\\":\\"\\",\\"variables\\":{\\"_representations\\":\[{\\"__typename\\":\\"User\\",\\"id\\":\\"1\\"}\]},\\"query\\":\\"query Subgraph\(\$_representations: \[_Any!\]!\) {.*_entities\(representations: \$_representations\) {.*\.\.\. on User {.*id.*username.*}.*}.*}\\"`,
+					BodyMatch: `variables.*_representations.*__typename.*User.*id.*1.*query Subgraph\(\$_representations: \[_Any!\]!\) {.*_entities\(representations: \$_representations\) {.*on User {.* id.* username.*}.*}.*}.*}`,
 					Code:      http.StatusOK,
 				})
 			})
