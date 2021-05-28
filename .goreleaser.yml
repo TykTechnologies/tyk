@@ -70,15 +70,6 @@ dockers:
   dockerfile: Dockerfile.std
   skip_push: auto
   extra_files:
-    - "install/"
-    - "README.md"
-    - "LICENSE.md"
-    - "templates"
-    - "middleware"
-    - "event_handlers/sample"
-    - "policies"
-    - "coprocess"
-    - "tyk.conf.example"
 
 - ids:
     - static-amd64
@@ -98,14 +89,7 @@ dockers:
   dockerfile: Dockerfile.slim
   skip_push: auto
   extra_files:
-    - "install/"
-    - "README.md"
-    - "LICENSE.md"
-    - "templates"
-    - "middleware"
-    - "event_handlers/sample"
-    - "policies"
-    - "coprocess"
+    - "apps/app_sample.json"
     - "tyk.conf.example"
 
 - ids:
@@ -128,15 +112,6 @@ dockers:
   dockerfile: Dockerfile.std
   skip_push: auto
   extra_files:
-    - "install/"
-    - "README.md"
-    - "LICENSE.md"
-    - "templates"
-    - "middleware"
-    - "event_handlers/sample"
-    - "policies"
-    - "coprocess"
-    - "tyk.conf.example"
 
 - ids:
     - std
@@ -243,8 +218,6 @@ archives:
     - "LICENSE.md"
     - "apps/app_sample.json"
     - "templates/*.json"
-    - "templates/playground/index.html"
-    - "templates/playground/playground.js"
     - "install/*"
     - "middleware/*.js"
     - "event_handlers/sample/*.js"
