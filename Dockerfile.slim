@@ -8,8 +8,7 @@
 FROM gcr.io/distroless/static-debian10
 WORKDIR /opt/tyk
 COPY tyk .
-COPY LICENSE.md /
-COPY templates/* templates/
+COPY apps/app_sample.json apps/app_sample.json
 COPY tyk.conf.example tyk.conf
 ARG PORTS
 EXPOSE $PORTS
