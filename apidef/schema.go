@@ -439,7 +439,7 @@ const Schema = `{
                 "enabled": {
                     "type": "boolean"
                 },
-				"version": {
+                "version": {
                     "type": "string"
                 },
                 "execution_mode": {
@@ -447,8 +447,8 @@ const Schema = `{
                     "enum": [
                         "proxyOnly",
                         "executionEngine",
-						"subgraph",
-						"supergraph",
+                        "subgraph",
+                        "supergraph",
                         ""
                     ]
                 },
@@ -502,7 +502,7 @@ const Schema = `{
                         "field_name"
                     ]
                 },
-				"engine": {
+                "engine": {
                     "type": ["object", "null"],
                     "properties": {
                         "field_configs": {
@@ -560,7 +560,7 @@ const Schema = `{
                         }
                     }
                 },
-				"proxy": {
+                "proxy": {
                     "type": ["object", "null"],
                     "properties": {
                         "auth_headers": {

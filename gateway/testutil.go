@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
@@ -671,21 +671,21 @@ func subgraphAccountsHandler(w http.ResponseWriter, r *http.Request) {
 
 func subgraphReviewsHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(`{
-		"data": {
-		    "_entities": [
-			    {
-			        "reviews": [
-				      	{
-				        	"body": "A highly effective form of birth control."
-						},
-				    	{
-				    		"body": "Fedoras are one of the most fashionable hats around and can look great with a variety of outfits."
-				    	}
-					]
-			    }
-		    ]
-		}
-	  }`))
+			"data": {
+				"_entities": [
+					{
+						"reviews": [
+							{
+								"body": "A highly effective form of birth control."
+							},
+							{
+								"body": "Fedoras are one of the most fashionable hats around and can look great with a variety of outfits."
+							}
+						]
+					}
+				]
+			}
+		}`))
 }
 
 const jwkTestJson = `{
