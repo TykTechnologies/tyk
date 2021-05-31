@@ -207,7 +207,6 @@ docker_manifests:
     image_templates:
     - tykio/tyk-gateway:{{ .Tag }}-amd64
     - tykio/tyk-gateway:{{ .Tag }}-arm64
-
   - name_template: tykio/tyk-hybrid-docker:{{ .Tag }}
     image_templates:
     - tykio/tyk-hybrid-docker:{{ .Tag }}-amd64
