@@ -120,18 +120,6 @@ jobs:
           CI_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           CI_TAG: ${{ steps.targets.outputs.tag }}
  
-      - name: Push unstable docker image
-        if: steps.targets.outputs.hub == 'unstable' && steps.targets.outputs.upload == 'true'
-        run: |
-          docker tag tykio/tyk-gateway:${{ steps.targets.outputs.tag }} tykio/tyk-gateway:${{ steps.targets.outputs.hub }}
-          docker push tykio/tyk-gateway:${{ steps.targets.outputs.hub }}
-          docker push tykio/tyk-gateway:${{ steps.targets.outputs.tag }}
-          docker tag tykio/tyk-gateway:${{ steps.targets.outputs.tag }} docker.cloudsmith.io/tyk/tyk-gateway/tyk-gateway:${{ steps.targets.outputs.tag }}
-          docker push docker.cloudsmith.io/tyk/tyk-gateway/tyk-gateway:${{ steps.targets.outputs.tag }}
-          docker push tykio/tyk-plugin-compiler:${{ steps.targets.outputs.tag }}
-          docker push tykio/tyk-hybrid-docker:${{ steps.targets.outputs.tag }}
-
-
       - uses: actions/upload-artifact@v2
         with:
           name: deb
