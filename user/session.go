@@ -123,6 +123,9 @@ func NewSessionState() *SessionState {
 
 // Clone  returns a fresh copy of s
 func (s *SessionState) Clone() SessionState {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	return SessionState{
 		LastCheck:                     s.LastCheck,
 		Allowance:                     s.Allowance,
