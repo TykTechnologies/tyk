@@ -100,4 +100,4 @@ require (
 
 replace github.com/jensneuse/graphql-go-tools => github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20210602073701-d05425e1bfd0
 
-replace github.com/jensneuse/graphql-go-tools => ../graphql-go-tools
+//replace github.com/jensneuse/graphql-go-tools => ../graphql-go-tools
