@@ -1108,7 +1108,8 @@ const sampleAPI = `{
     }
 }`
 
-const testComposedSchema = "type Query {people: [Person] countries: [Country] headers: [Header]} " +
+const testComposedSchema = "type Query {countries: [Country] headers: [Header]} " +
+	"extend type Query {people: [Person]}" +
 	"type Person {name: String country: Country} " +
 	"type Country {code: String name: String} " +
 	"type Header {name:String value: String}"

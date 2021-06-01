@@ -16,14 +16,33 @@ import (
 
 var ErrUnsupportedGraphQLConfigVersion = errors.New("provided version of GraphQL config is not supported for this operation")
 
+type GraphQLConfigAdapterOption func(adapter *GraphQLConfigAdapter)
+
+func WithSchema(schema *graphql.Schema) GraphQLConfigAdapterOption {
+	return func(adapter *GraphQLConfigAdapter) {
+		adapter.schema = schema
+	}
+}
+
+func WithHttpClient(httpClient *http.Client) GraphQLConfigAdapterOption {
+	return func(adapter *GraphQLConfigAdapter) {
+		adapter.httpClient = httpClient
+	}
+}
+
 type GraphQLConfigAdapter struct {
 	config     apidef.GraphQLConfig
 	httpClient *http.Client
 	schema     *graphql.Schema
 }
 
-func NewGraphQLConfigAdapter(config apidef.GraphQLConfig) GraphQLConfigAdapter {
-	return GraphQLConfigAdapter{config: config}
+func NewGraphQLConfigAdapter(config apidef.GraphQLConfig, options ...GraphQLConfigAdapterOption) GraphQLConfigAdapter {
+	adapter := GraphQLConfigAdapter{config: config}
+	for _, option := range options {
+		option(&adapter)
+	}
+
+	return adapter
 }
 
 func (g *GraphQLConfigAdapter) EngineConfigV2() (*graphql.EngineV2Configuration, error) {
@@ -50,8 +69,25 @@ func (g *GraphQLConfigAdapter) EngineConfigV2() (*graphql.EngineV2Configuration,
 }
 
 func (g *GraphQLConfigAdapter) parseSchema() (err error) {
+	if g.schema != nil {
+		return nil
+	}
+
 	g.schema, err = graphql.NewSchemaFromString(g.config.Schema)
-	return err
+	if err != nil {
+		return err
+	}
+
+	normalizationResult, err := g.schema.Normalize()
+	if err != nil {
+		return err
+	}
+
+	if !normalizationResult.Successful && normalizationResult.Errors != nil {
+		return normalizationResult.Errors
+	}
+
+	return nil
 }
 
 func (g *GraphQLConfigAdapter) engineConfigV2FieldConfigs() (planFieldConfigs plan.FieldConfigurations) {
@@ -178,10 +214,6 @@ func (g *GraphQLConfigAdapter) createArgumentConfigurationsForArgumentNames(argu
 	}
 
 	return argConfs
-}
-
-func (g *GraphQLConfigAdapter) SetHttpClient(httpClient *http.Client) {
-	g.httpClient = httpClient
 }
 
 func (g *GraphQLConfigAdapter) convertURLQueriesToEngineV2Queries(apiDefQueries []apidef.QueryVariable) []restDataSource.QueryConfiguration {
