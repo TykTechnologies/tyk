@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package coprocess;
+
+message AccessSpec {
+  string url = 1;
+  repeated string methods = 2;
+}
+
+message AccessDefinition {
+  string api_name = 1;
+  string api_id = 2;
+  repeated string versions = 3;
+  repeated AccessSpec allowed_urls = 4;
+}
+
+message BasicAuthData {
+  string password = 1;
+  string hash = 2;
+}
+
+message JWTData {
+  string secret = 1;
+}
+
+message Monitor {
+  repeated double trigger_limits = 1;
+}
+
+message SessionState {
+  int64 last_check = 1;
+
+  double allowance = 2;
+  double rate = 3;
+  double per = 4;
+
+  int64 expires = 5;
+  int64 quota_max = 6;
+  int64 quota_renews = 7;
+  int64 quota_remaining = 8;
+  int64 quota_renewal_rate = 9;
+
+  map<string, AccessDefinition> access_rights = 10;
+
+  string org_id = 11;
+  string oauth_client_id = 12;
+  map<string, string> oauth_keys = 13;
+
+  BasicAuthData basic_auth_data = 14;
+
+  JWTData jwt_data = 15;
+
+  bool hmac_enabled = 16;
+  string hmac_secret = 17;
+  bool is_inactive = 18;
+  string apply_policy_id = 19;
+  int64 data_expires = 20;
+
+  Monitor monitor = 21;
+
+  bool enable_detailed_recording = 22;
+
+  map<string, string> metadata = 23;
+
+  repeated string tags = 24;
+  string alias = 25;
+  string last_updated = 26;
+
+  int64 id_extractor_deadline = 27;
+  int64 session_lifetime = 28;
+  repeated string apply_policies = 29;
+
+  string certificate = 30;
+
+  int64 max_query_depth = 31;
+}
