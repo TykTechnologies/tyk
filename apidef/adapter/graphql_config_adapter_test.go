@@ -21,8 +21,7 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 		require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2ConfigJson), &gqlConfig))
 
 		httpClient := &http.Client{}
-		adapter := NewGraphQLConfigAdapter(gqlConfig)
-		adapter.SetHttpClient(httpClient)
+		adapter := NewGraphQLConfigAdapter(gqlConfig, WithHttpClient(httpClient))
 
 		_, err := adapter.EngineConfigV2()
 		assert.NoError(t, err)
@@ -222,8 +221,7 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 	var gqlConfig apidef.GraphQLConfig
 	require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2ConfigJson), &gqlConfig))
 
-	adapter := NewGraphQLConfigAdapter(gqlConfig)
-	adapter.SetHttpClient(httpClient)
+	adapter := NewGraphQLConfigAdapter(gqlConfig, WithHttpClient(httpClient))
 	require.NoError(t, adapter.parseSchema())
 
 	actualDataSources, err := adapter.engineConfigV2DataSources()
