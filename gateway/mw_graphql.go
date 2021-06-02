@@ -47,6 +47,16 @@ func (m *GraphQLMiddleware) Init() {
 	schema, err := gql.NewSchemaFromString(m.Spec.GraphQL.Schema)
 	if err != nil {
 		log.Errorf("Error while creating schema from API definition: %v", err)
+		return
+	}
+
+	normalizationResult, err := schema.Normalize()
+	if err != nil {
+		log.Errorf("Error while normalizing schema from API definition: %v", err)
+	}
+
+	if !normalizationResult.Successful {
+		log.Errorf("Schema normalization was not successful. Reason: %v", normalizationResult.Errors)
 	}
 
 	m.Spec.GraphQLExecutor.Schema = schema
@@ -140,8 +150,10 @@ func (m *GraphQLMiddleware) initGraphQLEngineV1(logger *abstractlogger.LogrusLog
 }
 
 func (m *GraphQLMiddleware) initGraphQLEngineV2(logger *abstractlogger.LogrusLogger) {
-	configAdapter := adapter.NewGraphQLConfigAdapter(m.Spec.GraphQL)
-	configAdapter.SetHttpClient(m.Spec.GraphQLExecutor.Client)
+	configAdapter := adapter.NewGraphQLConfigAdapter(m.Spec.GraphQL,
+		adapter.WithHttpClient(m.Spec.GraphQLExecutor.Client),
+		adapter.WithSchema(m.Spec.GraphQLExecutor.Schema),
+	)
 
 	engineConfig, err := configAdapter.EngineConfigV2()
 	if err != nil {
