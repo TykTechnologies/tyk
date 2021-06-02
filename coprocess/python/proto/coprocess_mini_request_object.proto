@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+import "coprocess_return_overrides.proto";
+// import "coprocess_common.proto";
+
+package coprocess;
+
+message MiniRequestObject {
+  map<string, string> headers = 1;
+  map<string, string> set_headers = 2;
+  repeated string delete_headers = 3;
+  string body = 4;
+  string url = 5;
+  map<string, string> params = 6;
+  map<string, string> add_params = 7;
+  map<string, string> extended_params = 8;
+  repeated string delete_params = 9;
+  ReturnOverrides return_overrides = 10;
+  string method = 11;
+  string request_uri = 12;
+  string scheme = 13;
+  bytes raw_body = 14;
+}
