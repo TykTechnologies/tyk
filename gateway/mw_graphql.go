@@ -47,6 +47,7 @@ func (m *GraphQLMiddleware) Init() {
 	schema, err := gql.NewSchemaFromString(m.Spec.GraphQL.Schema)
 	if err != nil {
 		log.Errorf("Error while creating schema from API definition: %v", err)
+		return
 	}
 
 	normalizationResult, err := schema.Normalize()
