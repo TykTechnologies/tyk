@@ -17,5 +17,7 @@ echo "Generating bindings for Ruby."
 mkdir -p ../bindings/ruby
 protoc -I. --ruby_out=plugins=grpc:../bindings/ruby *.proto
 
+cp *.proto ../python/proto/
+
 echo
 echo "Done"
