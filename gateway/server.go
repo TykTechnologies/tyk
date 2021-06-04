@@ -87,6 +87,9 @@ var (
 	muNodeID sync.Mutex // guards NodeID
 	NodeID   string
 
+	// SessionID is the unique session id which is used while connecting to dashboard to prevent multiple node allocation.
+	SessionID string
+
 	runningTestsMu sync.RWMutex
 	testMode       bool
 
@@ -1254,6 +1257,8 @@ func Start() {
 	}
 
 	SetNodeID("solo-" + uuid.NewV4().String())
+
+	SessionID = uuid.NewV4().String()
 
 	if err := initialiseSystem(ctx); err != nil {
 		mainLog.Fatalf("Error initialising system: %v", err)

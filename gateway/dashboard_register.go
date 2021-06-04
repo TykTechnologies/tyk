@@ -161,6 +161,9 @@ func (h *HTTPDashboardHandler) Register() error {
 		dashLog.Errorf("Request failed with error %v; retrying in 5s", err)
 		time.Sleep(time.Second * 5)
 		return h.Register()
+	} else if resp.StatusCode == http.StatusConflict {
+		dashLog.Debug("Node is already registered")
+		return nil
 	} else if resp != nil && resp.StatusCode != 200 {
 		dashLog.Errorf("Response failed with code %d; retrying in 5s", resp.StatusCode)
 		time.Sleep(time.Second * 5)
@@ -227,6 +230,7 @@ func (h *HTTPDashboardHandler) newRequest(endpoint string) *http.Request {
 	}
 	req.Header.Set("authorization", h.Secret)
 	req.Header.Set(headers.XTykHostname, hostDetails.Hostname)
+	req.Header.Set(headers.XTykSessionID, SessionID)
 	return req
 }
 
