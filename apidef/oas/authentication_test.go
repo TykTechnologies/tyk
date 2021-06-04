@@ -32,7 +32,15 @@ func TestToken(t *testing.T) {
 }
 
 func TestJWT(t *testing.T) {
-	// will be implemented
+	var emptyJWT JWT
+
+	var convertedAPI apidef.APIDefinition
+	emptyJWT.ExtractTo(&convertedAPI)
+
+	var resultJWT JWT
+	resultJWT.Fill(convertedAPI)
+
+	assert.Equal(t, emptyJWT, resultJWT)
 }
 
 func TestAuthSources(t *testing.T) {

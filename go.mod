@@ -15,7 +15,6 @@ require (
 	github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c
 	github.com/TykTechnologies/murmur3 v0.0.0-20180602122059-1915e687e465
 	github.com/TykTechnologies/openid2go v0.0.0-20200312160651-00c254a52b19
-	github.com/alecthomas/jsonschema v0.0.0-20210127012834-19bc6f27d155 // indirect
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
 	github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d // indirect
 	github.com/bshuster-repo/logrus-logstash-hook v0.4.1
@@ -34,7 +33,6 @@ require (
 	github.com/gemnasium/logrus-graylog-hook v2.0.7+incompatible
 	github.com/getkin/kin-openapi v0.32.0
 	github.com/getsentry/raven-go v0.2.0 // indirect
-	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-redis/redis/v8 v8.3.1
 	github.com/gocraft/health v0.0.0-20170925182251-8675af27fef0
 	github.com/golang/protobuf v1.4.2
@@ -82,7 +80,6 @@ require (
 	github.com/valyala/fasthttp v1.15.1
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
-	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0
 	github.com/xenolf/lego v0.3.2-0.20170618175828-28ead50ff1ca // indirect
 	golang.org/x/crypto v0.0.0-20210616213533-5ff15b29337e

@@ -1,6 +1,8 @@
 package oas
 
 import (
+	"reflect"
+
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
@@ -8,6 +10,7 @@ type Authentication struct {
 	Enabled                bool   `bson:"enabled" json:"enabled"` // required
 	StripAuthorizationData bool   `bson:"stripAuthorizationData,omitempty" json:"stripAuthorizationData,omitempty"`
 	Token                  *Token `bson:"token,omitempty" json:"token,omitempty"`
+	JWT                    *JWT   `bson:"jwt,omitempty" json:"jwt,omitempty"`
 }
 
 func (a *Authentication) Fill(api apidef.APIDefinition) {
@@ -25,6 +28,22 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 
 		a.Token.Fill(api.UseStandardAuth, authToken)
 	}
+
+	if reflect.DeepEqual(a.Token, &Token{}) {
+		a.Token = nil
+	}
+
+	if _, ok := api.AuthConfigs["jwt"]; ok {
+		if a.JWT == nil {
+			a.JWT = &JWT{}
+		}
+
+		a.JWT.Fill(api)
+	}
+
+	if reflect.DeepEqual(a.JWT, &JWT{}) {
+		a.JWT = nil
+	}
 }
 
 func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
@@ -33,6 +52,10 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 
 	if a.Token != nil {
 		a.Token.ExtractTo(api)
+	}
+
+	if a.JWT != nil {
+		a.JWT.ExtractTo(api)
 	}
 }
 
@@ -79,21 +102,6 @@ func (t *Token) ExtractTo(api *apidef.APIDefinition) {
 
 	api.AuthConfigs["authToken"] = authConfig
 }
-
-/*type JWT struct {
-	SkipKid                 bool              `json:"skip-kid,omitempty"`
-	Source                  string            `json:"source,omitempty"`
-	SigningMethod           string            `json:"signing-method,omitempty"`
-	NotBeforeValidationSkew uint64            `json:"not-before-validation-skew,omitempty"`
-	IssuedAtValidationSkew  uint64            `json:"issued-at-validation-skew,omitempty"`
-	ExpiresAtValidationSkew uint64            `json:"expires-at-validation-skew,omitempty"`
-	IdentityBaseField       string            `json:"identity-base-field,omitempty"`
-	ClientBaseField         string            `json:"client-base-field,omitempty"`
-	ScopeToPolicyMapping    map[string]string `json:"scope-to-policy-mapping,omitempty"`
-	PolicyFieldName         string            `json:"policy-field-name,omitempty"`
-	ScopeClaimName          string            `json:"scope-claim-name,omitempty"`
-	DefaultPolicies         []string          `json:"default-policies,omitempty"`
-}*/
 
 type AuthSources struct {
 	Header HeaderAuthSource `bson:"header" json:"header"` // required
@@ -191,4 +199,64 @@ func (s *Signature) ExtractTo(authConfig *apidef.AuthConfig) {
 	authConfig.Signature.AllowedClockSkew = s.AllowedClockSkew
 	authConfig.Signature.ErrorCode = s.ErrorCode
 	authConfig.Signature.ErrorMessage = s.ErrorMessage
+}
+
+type JWT struct {
+	Enabled                 bool `bson:"enabled" json:"enabled"` // required
+	AuthSources             `bson:",inline" json:",inline"`
+	Source                  string            `json:"source,omitempty"`
+	SigningMethod           string            `bson:"signingMethod,omitempty" json:"signingMethod,omitempty"`
+	IdentityBaseField       string            `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
+	SkipKid                 bool              `bson:"skipKid,omitempty" json:"skipKid,omitempty"`
+	ScopeClaimName          string            `bson:"scopeClaimName,omitempty" json:"scopeClaimName,omitempty"`
+	ScopeToPolicyMapping    map[string]string `bson:"scopeToPolicyMapping,omitempty" json:"scopeToPolicyMapping,omitempty"`
+	PolicyFieldName         string            `bson:"policyFieldName,omitempty" json:"policyFieldName,omitempty"`
+	ClientBaseField         string            `bson:"clientBaseField,omitempty" json:"clientBaseField,omitempty"`
+	DefaultPolicies         []string          `bson:"defaultPolicies,omitempty" json:"defaultPolicies,omitempty"`
+	IssuedAtValidationSkew  uint64            `bson:"issuedAtValidationSkew,omitempty" json:"issuedAtValidationSkew,omitempty"`
+	NotBeforeValidationSkew uint64            `bson:"notBeforeValidationSkew,omitempty" json:"notBeforeValidationSkew,omitempty"`
+	ExpiresAtValidationSkew uint64            `bson:"expiresAtValidationSkew,omitempty" json:"expiresAtValidationSkew,omitempty"`
+}
+
+func (j *JWT) Fill(api apidef.APIDefinition) {
+	j.AuthSources.Fill(api.AuthConfigs["jwt"])
+
+	j.Enabled = api.EnableJWT
+	j.Source = api.JWTSource
+	j.SigningMethod = api.JWTSigningMethod
+	j.IdentityBaseField = api.JWTIdentityBaseField
+	j.SkipKid = api.JWTSkipKid
+	j.ScopeClaimName = api.JWTScopeClaimName
+	j.ScopeToPolicyMapping = api.JWTScopeToPolicyMapping
+	j.PolicyFieldName = api.JWTPolicyFieldName
+	j.ClientBaseField = api.JWTClientIDBaseField
+	j.DefaultPolicies = api.JWTDefaultPolicies
+	j.IssuedAtValidationSkew = api.JWTIssuedAtValidationSkew
+	j.NotBeforeValidationSkew = api.JWTNotBeforeValidationSkew
+	j.ExpiresAtValidationSkew = api.JWTExpiresAtValidationSkew
+}
+
+func (j *JWT) ExtractTo(api *apidef.APIDefinition) {
+	authConfig := apidef.AuthConfig{}
+	j.AuthSources.ExtractTo(&authConfig)
+
+	if api.AuthConfigs == nil {
+		api.AuthConfigs = make(map[string]apidef.AuthConfig)
+	}
+
+	api.AuthConfigs["jwt"] = authConfig
+
+	api.EnableJWT = j.Enabled
+	api.JWTSource = j.Source
+	api.JWTSigningMethod = j.SigningMethod
+	api.JWTIdentityBaseField = j.IdentityBaseField
+	api.JWTSkipKid = j.SkipKid
+	api.JWTScopeClaimName = j.ScopeClaimName
+	api.JWTScopeToPolicyMapping = j.ScopeToPolicyMapping
+	api.JWTPolicyFieldName = j.PolicyFieldName
+	api.JWTClientIDBaseField = j.ClientBaseField
+	api.JWTDefaultPolicies = j.DefaultPolicies
+	api.JWTIssuedAtValidationSkew = j.IssuedAtValidationSkew
+	api.JWTNotBeforeValidationSkew = j.NotBeforeValidationSkew
+	api.JWTExpiresAtValidationSkew = j.ExpiresAtValidationSkew
 }
