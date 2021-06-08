@@ -59,13 +59,8 @@ func (g *GraphQLConfigAdapter) EngineConfigV2() (*graphql.EngineV2Configuration,
 }
 
 func (g *GraphQLConfigAdapter) createV2ConfigForSupergraphExecutionMode() (*graphql.EngineV2Configuration, error) {
-	client := g.httpClient
-	if client == nil {
-		client = httpclient.DefaultNetHttpClient
-	}
-
 	dataSourceConfs := g.supergraphDataSourceConfigs()
-	federationConfigV2Factory := federation.NewEngineConfigV2Factory(client, dataSourceConfs...)
+	federationConfigV2Factory := federation.NewEngineConfigV2Factory(g.getHttpClient(), dataSourceConfs...)
 	err := federationConfigV2Factory.SetMergedSchemaFromString(g.config.Supergraph.MergedSDL)
 	if err != nil {
 		return nil, err
@@ -162,11 +157,9 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 				return nil, err
 			}
 
-			factory := &restDataSource.Factory{}
-			if g.httpClient != nil {
-				factory.Client = httpclient.NewNetHttpClient(g.httpClient)
+			planDataSource.Factory = &restDataSource.Factory{
+				Client: httpclient.NewNetHttpClient(g.getHttpClient()),
 			}
-			planDataSource.Factory = factory
 
 			planDataSource.Custom = restDataSource.ConfigJSON(restDataSource.Configuration{
 				Fetch: restDataSource.FetchConfiguration{
@@ -185,11 +178,9 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 				return nil, err
 			}
 
-			factory := &graphqlDataSource.Factory{}
-			if g.httpClient != nil {
-				factory.Client = httpclient.NewNetHttpClient(g.httpClient)
+			planDataSource.Factory = &graphqlDataSource.Factory{
+				Client: httpclient.NewNetHttpClient(g.getHttpClient()),
 			}
-			planDataSource.Factory = factory
 
 			planDataSource.Custom = graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
 				Fetch: graphqlDataSource.FetchConfiguration{
@@ -331,4 +322,12 @@ func (g *GraphQLConfigAdapter) determineChildNodes(planDataSources []plan.DataSo
 
 func (g *GraphQLConfigAdapter) isSupergraphAPIDefinition() bool {
 	return g.config.Enabled && g.config.ExecutionMode == apidef.GraphQLExecutionModeSupergraph
+}
+
+func (g *GraphQLConfigAdapter) getHttpClient() *http.Client {
+	if g.httpClient == nil {
+		g.httpClient = httpclient.DefaultNetHttpClient
+	}
+
+	return g.httpClient
 }
