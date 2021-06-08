@@ -76,7 +76,7 @@ jobs:
           PKG_SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
         run: |
           bin/unlock-agent.sh
-          mkdir -p /go/src/github.com/TykTechnologies/ && ln -s . /go/src/github.com/TykTechnologies/tyk
+          mkdir -p /go/src/github.com/TykTechnologies/ && ln -s $GITHUB_WORKSPACE /go/src/github.com/TykTechnologies/tyk
           DOCKER_CFG_PATH="${DOCKER_CONFIG:-$HOME/.docker}/config.json"
           jq '. + {"experimental": "enabled"}' "$DOCKER_CFG_PATH" > c.json && mv c.json "$DOCKER_CFG_PATH" || rm c.json
           current_tag=${GITHUB_REF##*/}
