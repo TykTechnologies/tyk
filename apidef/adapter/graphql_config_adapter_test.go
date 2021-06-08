@@ -3,7 +3,7 @@ package adapter
 import (
 	"encoding/json"
 	"net/http"
-	"strings"
+	"strconv"
 	"testing"
 
 	graphqlDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
@@ -62,7 +62,7 @@ func TestGraphQLConfigAdapter_supergraphDataSourceConfigs(t *testing.T) {
 			},
 			Federation: graphqlDataSource.FederationConfiguration{
 				Enabled:    true,
-				ServiceSDL: cleanEscapeCharacters(federationAccountsServiceSDL),
+				ServiceSDL: federationAccountsServiceSDL,
 			},
 		},
 		{
@@ -73,7 +73,7 @@ func TestGraphQLConfigAdapter_supergraphDataSourceConfigs(t *testing.T) {
 			},
 			Federation: graphqlDataSource.FederationConfiguration{
 				Enabled:    true,
-				ServiceSDL: cleanEscapeCharacters(federationProductsServiceSDL),
+				ServiceSDL: federationProductsServiceSDL,
 			},
 		},
 		{
@@ -84,7 +84,7 @@ func TestGraphQLConfigAdapter_supergraphDataSourceConfigs(t *testing.T) {
 			},
 			Federation: graphqlDataSource.FederationConfiguration{
 				Enabled:    true,
-				ServiceSDL: cleanEscapeCharacters(federationReviewsServiceSDL),
+				ServiceSDL: federationReviewsServiceSDL,
 			},
 		},
 	}
@@ -287,10 +287,6 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 	assert.ElementsMatch(t, expectedDataSources, actualDataSources)
 }
 
-func cleanEscapeCharacters(input string) string {
-	return strings.ReplaceAll(input, "\\\"", "\"")
-}
-
 const graphqlEngineV1ConfigJson = `{
 	"enabled": true,
 	"execution_mode": "executionEngine",
@@ -408,11 +404,12 @@ const graphqlEngineV2ConfigJson = `{
 	"playground": {}
 }`
 
-const federationAccountsServiceSDL = "extend type Query {me: User} type User @key(fields: \\\"id\\\"){ id: ID! username: String!}"
-const federationProductsServiceSDL = "extend type Query {topProducts(first: Int = 5): [Product]} type Product @key(fields: \\\"upc\\\") {upc: String! name: String! price: Int!}"
-const federationReviewsServiceSDL = "type Review { body: String! author: User! @provides(fields: \\\"username\\\") product: Product! } extend type User @key(fields: \\\"id\\\") { id: ID! @external reviews: [Review] } extend type Product @key(fields: \\\"upc\\\") { upc: String! @external reviews: [Review] }"
+const federationAccountsServiceSDL = `extend type Query {me: User} type User @key(fields: "id"){ id: ID! username: String!}`
+const federationProductsServiceSDL = `extend type Query {topProducts(first: Int = 5): [Product]} type Product @key(fields: "upc") {upc: String! name: String! price: Int!}`
+const federationReviewsServiceSDL = `type Review { body: String! author: User! @provides(fields: "username") product: Product! } extend type User @key(fields: "id") { id: ID! @external reviews: [Review] } extend type Product @key(fields: "upc") { upc: String! @external reviews: [Review] }`
 const federationMergedSDL = `type Query { me: User topProducts(first: Int = 5): [Product] } type User { id: ID! username: String! reviews: [Review] } type Product { upc: String! name: String! price: Int! reviews: [Review] } type Review { body: String! author: User! product: Product! }`
-const graphqlEngineV2SupergraphConfigJson = `{
+
+var graphqlEngineV2SupergraphConfigJson = `{
 	"enabled": true,
 	"execution_mode": "supergraph",
 	"version": "2",
@@ -427,12 +424,12 @@ const graphqlEngineV2SupergraphConfigJson = `{
 			{
 				"api_id": "",
 				"url": "http://accounts.service",
-				"sdl": "` + federationAccountsServiceSDL + `"
+				"sdl": ` + strconv.Quote(federationAccountsServiceSDL) + `
 			},
 			{
 				"api_id": "",
 				"url": "http://products.service",
-				"sdl": "` + federationProductsServiceSDL + `"
+				"sdl": ` + strconv.Quote(federationProductsServiceSDL) + `
 			},
 			{
 				"api_id": "",
@@ -442,7 +439,7 @@ const graphqlEngineV2SupergraphConfigJson = `{
 			{
 				"api_id": "",
 				"url": "http://reviews.service",
-				"sdl": "` + federationReviewsServiceSDL + `"
+				"sdl": ` + strconv.Quote(federationReviewsServiceSDL) + `
 			}
 		],
 		"merged_sdl": "` + federationMergedSDL + `"
