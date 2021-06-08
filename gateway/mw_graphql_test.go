@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -208,9 +209,13 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				}
 
 				_, _ = g.Run(t, test.TestCase{
-					Data:      request,
-					BodyMatch: `variables.*_representations.*__typename.*User.*id.*1.*query Subgraph\(\$_representations: \[_Any!\]!\) {.*_entities\(representations: \$_representations\) {.*on User {.* id.* username.*}.*}.*}.*}`,
-					Code:      http.StatusOK,
+					Data: request,
+					BodyMatchFunc: func(bytes []byte) bool {
+						gqlRequest := graphQLRequestFromBodyMatchFuncBytes(t, bytes)
+						assertionResult := assert.Equal(t, `{"_representations":[{"__typename":"User","id":"1"}]}`, string(gqlRequest.Variables))
+						return assertionResult && assert.Equal(t, `query Subgraph($_representations: [_Any!]!) { _entities(representations: $_representations) { ... on User { id username } } }`, strings.Join(strings.Fields(gqlRequest.Query), " "))
+					},
+					Code: http.StatusOK,
 				})
 			})
 		})
@@ -761,3 +766,15 @@ type Review {
 	author: User!
 	product: Product!
 }`
+
+func graphQLRequestFromBodyMatchFuncBytes(t *testing.T, bytes []byte) gql.Request {
+	bodyContent := make(map[string]interface{})
+	err := json.Unmarshal(bytes, &bodyContent)
+	require.NoError(t, err)
+
+	gqlRequest := gql.Request{}
+	err = json.Unmarshal([]byte(bodyContent["Body"].(string)), &gqlRequest)
+	require.NoError(t, err)
+
+	return gqlRequest
+}
