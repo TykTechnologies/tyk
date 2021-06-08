@@ -3,6 +3,7 @@ package adapter
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"testing"
 
 	graphqlDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
@@ -16,9 +17,20 @@ import (
 )
 
 func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
-	t.Run("should create v2 config without err", func(t *testing.T) {
+	t.Run("should create v2 config for engine execution mode without error", func(t *testing.T) {
 		var gqlConfig apidef.GraphQLConfig
 		require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2ConfigJson), &gqlConfig))
+
+		httpClient := &http.Client{}
+		adapter := NewGraphQLConfigAdapter(gqlConfig, WithHttpClient(httpClient))
+
+		_, err := adapter.EngineConfigV2()
+		assert.NoError(t, err)
+	})
+
+	t.Run("should create v2 config for supergraph execution mode without error", func(t *testing.T) {
+		var gqlConfig apidef.GraphQLConfig
+		require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2SupergraphConfigJson), &gqlConfig))
 
 		httpClient := &http.Client{}
 		adapter := NewGraphQLConfigAdapter(gqlConfig, WithHttpClient(httpClient))
@@ -37,6 +49,51 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 		assert.Error(t, err)
 		assert.Equal(t, ErrUnsupportedGraphQLConfigVersion, err)
 	})
+}
+
+func TestGraphQLConfigAdapter_supergraphDataSourceConfigs(t *testing.T) {
+	expectedDataSourceConfigs := []graphqlDataSource.Configuration{
+		{
+			Fetch: graphqlDataSource.FetchConfiguration{
+				URL:    "http://accounts.service",
+				Method: http.MethodPost,
+				Header: nil,
+			},
+			Federation: graphqlDataSource.FederationConfiguration{
+				Enabled:    true,
+				ServiceSDL: federationAccountsServiceSDL,
+			},
+		},
+		{
+			Fetch: graphqlDataSource.FetchConfiguration{
+				URL:    "http://products.service",
+				Method: http.MethodPost,
+				Header: nil,
+			},
+			Federation: graphqlDataSource.FederationConfiguration{
+				Enabled:    true,
+				ServiceSDL: federationProductsServiceSDL,
+			},
+		},
+		{
+			Fetch: graphqlDataSource.FetchConfiguration{
+				URL:    "http://reviews.service",
+				Method: http.MethodPost,
+				Header: nil,
+			},
+			Federation: graphqlDataSource.FederationConfiguration{
+				Enabled:    true,
+				ServiceSDL: federationReviewsServiceSDL,
+			},
+		},
+	}
+
+	var gqlConfig apidef.GraphQLConfig
+	require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2SupergraphConfigJson), &gqlConfig))
+
+	adapter := NewGraphQLConfigAdapter(gqlConfig)
+	actualGraphQLConfigs := adapter.supergraphDataSourceConfigs()
+	assert.Equal(t, expectedDataSourceConfigs, actualGraphQLConfigs)
 }
 
 func TestGraphQLConfigAdapter_engineConfigV2FieldConfigs(t *testing.T) {
@@ -342,6 +399,49 @@ const graphqlEngineV2ConfigJson = `{
 				}
 			}
 		]
+	},
+	"playground": {}
+}`
+
+const federationAccountsServiceSDL = `extend type Query {me: User} type User @key(fields: "id"){ id: ID! username: String!}`
+const federationProductsServiceSDL = `extend type Query {topProducts(first: Int = 5): [Product]} type Product @key(fields: "upc") {upc: String! name: String! price: Int!}`
+const federationReviewsServiceSDL = `type Review { body: String! author: User! @provides(fields: "username") product: Product! } extend type User @key(fields: "id") { id: ID! @external reviews: [Review] } extend type Product @key(fields: "upc") { upc: String! @external reviews: [Review] }`
+const federationMergedSDL = `type Query { me: User topProducts(first: Int = 5): [Product] } type User { id: ID! username: String! reviews: [Review] } type Product { upc: String! name: String! price: Int! reviews: [Review] } type Review { body: String! author: User! product: Product! }`
+
+var graphqlEngineV2SupergraphConfigJson = `{
+	"enabled": true,
+	"execution_mode": "supergraph",
+	"version": "2",
+	"schema": "",
+	"last_schema_update": "2020-11-11T11:11:11.000+01:00",
+	"engine": {
+		"field_configs": [],
+		"data_sources": []
+	},
+	"supergraph": {
+		"subgraphs": [
+			{
+				"api_id": "",
+				"url": "http://accounts.service",
+				"sdl": ` + strconv.Quote(federationAccountsServiceSDL) + `
+			},
+			{
+				"api_id": "",
+				"url": "http://products.service",
+				"sdl": ` + strconv.Quote(federationProductsServiceSDL) + `
+			},
+			{
+				"api_id": "",
+				"url": "http://ignored.service",
+				"sdl": ""
+			},
+			{
+				"api_id": "",
+				"url": "http://reviews.service",
+				"sdl": ` + strconv.Quote(federationReviewsServiceSDL) + `
+			}
+		],
+		"merged_sdl": "` + federationMergedSDL + `"
 	},
 	"playground": {}
 }`
