@@ -61,7 +61,7 @@ func (m *GraphQLMiddleware) Init() {
 
 	m.Spec.GraphQLExecutor.Schema = schema
 
-	if m.Spec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeExecutionEngine {
+	if needsGraphQLExecutionEngine(m.Spec) {
 		absLogger := abstractlogger.NewLogrusLogger(log, absLoggerLevel(log.Level))
 		m.Spec.GraphQLExecutor.Client = &http.Client{Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec)}}
 
@@ -168,9 +168,18 @@ func (m *GraphQLMiddleware) initGraphQLEngineV2(logger *abstractlogger.LogrusLog
 	m.Spec.GraphQLExecutor.EngineV2 = engine
 	m.Spec.GraphQLExecutor.HooksV2.BeforeFetchHook = m
 	m.Spec.GraphQLExecutor.HooksV2.AfterFetchHook = m
+
+	if m.isSupergraphAPIDefinition() {
+		m.loadSupergraphMergedSDLAsSchema()
+	}
 }
 
 func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	err := m.checkForUnsupportedUsage()
+	if err != nil {
+		m.Logger().WithError(err).Error("request could not be executed because of unsupported usage")
+		return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
+	}
 
 	if m.Spec.GraphQLExecutor.Schema == nil {
 		m.Logger().Error("Schema is not created")
@@ -191,7 +200,7 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	}
 
 	var gqlRequest gql.Request
-	err := gql.UnmarshalRequest(r.Body, &gqlRequest)
+	err = gql.UnmarshalRequest(r.Body, &gqlRequest)
 	if err != nil {
 		m.Logger().Debugf("Error while unmarshalling GraphQL request: '%s'", err)
 		return err, http.StatusBadRequest
@@ -235,6 +244,26 @@ func (m *GraphQLMiddleware) websocketUpgradeUsesGraphQLProtocol(r *http.Request)
 	return websocketProtocol == GraphQLWebSocketProtocol
 }
 
+func (m *GraphQLMiddleware) checkForUnsupportedUsage() error {
+	if m.isGraphQLConfigVersion1() && m.isSupergraphAPIDefinition() {
+		return errors.New("supergraph execution mode is not supported for graphql config version 1 - please use version 2")
+	}
+
+	return nil
+}
+
+func (m *GraphQLMiddleware) isGraphQLConfigVersion1() bool {
+	return m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion1 || m.Spec.GraphQL.Version == apidef.GraphQLConfigVersionNone
+}
+
+func (m *GraphQLMiddleware) isSupergraphAPIDefinition() bool {
+	return m.Spec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph
+}
+
+func (m *GraphQLMiddleware) loadSupergraphMergedSDLAsSchema() {
+	m.Spec.GraphQL.Schema = m.Spec.GraphQL.Supergraph.MergedSDL
+}
+
 func (m *GraphQLMiddleware) OnBeforeFetch(ctx resolve.HookContext, input []byte) {
 	m.BaseMiddleware.Logger().
 		WithFields(
@@ -262,6 +291,11 @@ func (m *GraphQLMiddleware) OnError(ctx resolve.HookContext, output []byte, sing
 				"single_flight": singleFlight,
 			},
 		).Debugf("%s (afterFetchHook.OnError): %s", ctx.CurrentPath, string(output))
+}
+
+func needsGraphQLExecutionEngine(apiSpec *APISpec) bool {
+	return apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeExecutionEngine ||
+		apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph
 }
 
 func absLoggerLevel(level logrus.Level) abstractlogger.Level {

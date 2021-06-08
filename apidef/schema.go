@@ -439,7 +439,7 @@ const Schema = `{
                 "enabled": {
                     "type": "boolean"
                 },
-				"version": {
+                "version": {
                     "type": "string"
                 },
                 "execution_mode": {
@@ -447,6 +447,8 @@ const Schema = `{
                     "enum": [
                         "proxyOnly",
                         "executionEngine",
+                        "subgraph",
+                        "supergraph",
                         ""
                     ]
                 },
@@ -500,7 +502,7 @@ const Schema = `{
                         "field_name"
                     ]
                 },
-				"engine": {
+                "engine": {
                     "type": ["object", "null"],
                     "properties": {
                         "field_configs": {
@@ -558,11 +560,41 @@ const Schema = `{
                         }
                     }
                 },
-				"proxy": {
+                "proxy": {
                     "type": ["object", "null"],
                     "properties": {
                         "auth_headers": {
                             "type": ["object", "null"]
+                        }
+                    }
+                },
+                "subgraph": {
+                    "type": ["object", "null"],
+                    "properties": {
+                        "sdl": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "supergraph": {
+                    "type": ["object", "null"],
+                    "properties": {
+                        "subgraphs": {
+                            "type": ["array", "null"],
+                            "properties": {
+                                "api_id": {
+                                    "type": "string"
+                                },
+                                "url": {
+                                    "type": "string"
+                                },
+                                "sdl": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "merged_sdl": {
+                            "type": "string"
                         }
                     }
                 },

@@ -10,6 +10,7 @@ import (
 	restDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/rest_datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/plan"
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+	"github.com/jensneuse/graphql-go-tools/pkg/graphql/federation"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -50,6 +51,30 @@ func (g *GraphQLConfigAdapter) EngineConfigV2() (*graphql.EngineV2Configuration,
 		return nil, ErrUnsupportedGraphQLConfigVersion
 	}
 
+	if g.isSupergraphAPIDefinition() {
+		return g.createV2ConfigForSupergraphExecutionMode()
+	}
+
+	return g.createV2ConfigForEngineExecutionMode()
+}
+
+func (g *GraphQLConfigAdapter) createV2ConfigForSupergraphExecutionMode() (*graphql.EngineV2Configuration, error) {
+	dataSourceConfs := g.supergraphDataSourceConfigs()
+	federationConfigV2Factory := federation.NewEngineConfigV2Factory(g.getHttpClient(), dataSourceConfs...)
+	err := federationConfigV2Factory.SetMergedSchemaFromString(g.config.Supergraph.MergedSDL)
+	if err != nil {
+		return nil, err
+	}
+
+	conf, err := federationConfigV2Factory.EngineV2Configuration()
+	if err != nil {
+		return nil, err
+	}
+
+	return &conf, nil
+}
+
+func (g *GraphQLConfigAdapter) createV2ConfigForEngineExecutionMode() (*graphql.EngineV2Configuration, error) {
 	if err := g.parseSchema(); err != nil {
 		return nil, err
 	}
@@ -132,11 +157,9 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 				return nil, err
 			}
 
-			factory := &restDataSource.Factory{}
-			if g.httpClient != nil {
-				factory.Client = httpclient.NewNetHttpClient(g.httpClient)
+			planDataSource.Factory = &restDataSource.Factory{
+				Client: httpclient.NewNetHttpClient(g.getHttpClient()),
 			}
-			planDataSource.Factory = factory
 
 			planDataSource.Custom = restDataSource.ConfigJSON(restDataSource.Configuration{
 				Fetch: restDataSource.FetchConfiguration{
@@ -155,11 +178,9 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 				return nil, err
 			}
 
-			factory := &graphqlDataSource.Factory{}
-			if g.httpClient != nil {
-				factory.Client = httpclient.NewNetHttpClient(g.httpClient)
+			planDataSource.Factory = &graphqlDataSource.Factory{
+				Client: httpclient.NewNetHttpClient(g.getHttpClient()),
 			}
-			planDataSource.Factory = factory
 
 			planDataSource.Custom = graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
 				Fetch: graphqlDataSource.FetchConfiguration{
@@ -175,6 +196,35 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 
 	err = g.determineChildNodes(planDataSources)
 	return planDataSources, err
+}
+
+func (g *GraphQLConfigAdapter) supergraphDataSourceConfigs() []graphqlDataSource.Configuration {
+	confs := make([]graphqlDataSource.Configuration, 0)
+	if len(g.config.Supergraph.Subgraphs) == 0 {
+		return confs
+	}
+
+	for _, apiDefSubgraphConf := range g.config.Supergraph.Subgraphs {
+		if len(apiDefSubgraphConf.SDL) == 0 {
+			continue
+		}
+
+		conf := graphqlDataSource.Configuration{
+			Fetch: graphqlDataSource.FetchConfiguration{
+				URL:    apiDefSubgraphConf.URL,
+				Method: http.MethodPost,
+				Header: nil,
+			},
+			Federation: graphqlDataSource.FederationConfiguration{
+				Enabled:    true,
+				ServiceSDL: apiDefSubgraphConf.SDL,
+			},
+		}
+
+		confs = append(confs, conf)
+	}
+
+	return confs
 }
 
 func (g *GraphQLConfigAdapter) engineConfigV2Arguments(fieldConfs *plan.FieldConfigurations, generatedArgs map[graphql.TypeFieldLookupKey]graphql.TypeFieldArguments) {
@@ -268,4 +318,16 @@ func (g *GraphQLConfigAdapter) determineChildNodes(planDataSources []plan.DataSo
 		}
 	}
 	return nil
+}
+
+func (g *GraphQLConfigAdapter) isSupergraphAPIDefinition() bool {
+	return g.config.Enabled && g.config.ExecutionMode == apidef.GraphQLExecutionModeSupergraph
+}
+
+func (g *GraphQLConfigAdapter) getHttpClient() *http.Client {
+	if g.httpClient == nil {
+		g.httpClient = httpclient.DefaultNetHttpClient
+	}
+
+	return g.httpClient
 }
