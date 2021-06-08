@@ -33,8 +33,7 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 		require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2SupergraphConfigJson), &gqlConfig))
 
 		httpClient := &http.Client{}
-		adapter := NewGraphQLConfigAdapter(gqlConfig)
-		adapter.SetHttpClient(httpClient)
+		adapter := NewGraphQLConfigAdapter(gqlConfig, WithHttpClient(httpClient))
 
 		_, err := adapter.EngineConfigV2()
 		assert.NoError(t, err)
