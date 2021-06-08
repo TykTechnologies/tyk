@@ -34,6 +34,9 @@ env:
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: /go/src/github.com/TykTechnologies/tyk
 
     container: tykio/golang-cross:1.12
 
@@ -47,6 +50,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: ${{ ! startsWith(github.ref, 'refs/tags') }}
+          path: /go/src/github.com/TykTechnologies/tyk
 
       - uses: docker/setup-qemu-action@v1
 
