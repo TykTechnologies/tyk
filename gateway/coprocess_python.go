@@ -201,6 +201,9 @@ func PythonLoadDispatcher() error {
 	pythonLock.Lock()
 	defer pythonLock.Unlock()
 	moduleDict, err := python.LoadModuleDict("dispatcher")
+	fmt.Println("LoadModuleDict", moduleDict, err)
+	// time.Sleep(1*time.Second)
+
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
@@ -270,6 +273,8 @@ func getBundlePaths() []string {
 
 // NewPythonDispatcher wraps all the actions needed for this CP.
 func NewPythonDispatcher() (dispatcher coprocess.Dispatcher, err error) {
+	fmt.Println("newPythonDispatcher is called")
+
 	workDir := config.Global().CoProcessOptions.PythonPathPrefix
 	if workDir == "" {
 		tykBin, _ := os.Executable()
@@ -278,13 +283,16 @@ func NewPythonDispatcher() (dispatcher coprocess.Dispatcher, err error) {
 			"prefix": "coprocess",
 		}).Debugf("Python path prefix isn't set, using '%s'", workDir)
 	}
+	fmt.Println("workdir=", workDir)
+
 	dispatcherPath := filepath.Join(workDir, "coprocess", "python")
 	tykPath := filepath.Join(dispatcherPath, "tyk")
 	protoPath := filepath.Join(workDir, "coprocess", "python", "proto")
 	bundleRootPath := filepath.Join(config.Global().MiddlewarePath, "bundles")
 
 	paths := []string{dispatcherPath, tykPath, protoPath, bundleRootPath}
-
+	fmt.Println("paths=", paths)
+	// time.Sleep(60*time.Second)
 	// initDone is used to signal the end of Python initialization step:
 	initDone := make(chan error)
 
@@ -310,6 +318,9 @@ func NewPythonDispatcher() (dispatcher coprocess.Dispatcher, err error) {
 
 		initDone <- err
 	}()
+	fmt.Println("ERR!")
+	// time.Sleep(60*time.Second)
+
 	err = <-initDone
 	return dispatcher, err
 }
