@@ -848,6 +848,7 @@ func TestJWTSessionNotBeforeValidationConfigs(t *testing.T) {
 func TestJWTExistingSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
+	defer ResetTestConfig()
 
 	spec := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
