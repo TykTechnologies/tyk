@@ -816,7 +816,7 @@ func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http
 		return
 	}
 
-	if p.TykAPISpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeExecutionEngine {
+	if needsGraphQLExecutionEngine(p.TykAPISpec) {
 		return p.handoverRequestToGraphQLExecutionEngine(roundTripper, gqlRequest)
 	}
 

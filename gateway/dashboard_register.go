@@ -153,7 +153,7 @@ func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 
 func (h *HTTPDashboardHandler) Register() error {
 	dashLog.Info("Registering gateway node with Dashboard")
-	req := h.newRequest(h.RegistrationEndpoint)
+	req := h.newRequest(http.MethodGet, h.RegistrationEndpoint)
 	c := initialiseClient()
 	resp, err := c.Do(req)
 
@@ -197,13 +197,13 @@ func (h *HTTPDashboardHandler) Register() error {
 
 func (h *HTTPDashboardHandler) Ping() error {
 	return h.sendHeartBeat(
-		h.newRequest(h.HeartBeatEndpoint),
+		h.newRequest(http.MethodGet, h.HeartBeatEndpoint),
 		initialiseClient())
 }
 
 func (h *HTTPDashboardHandler) StartBeating() error {
 
-	req := h.newRequest(h.HeartBeatEndpoint)
+	req := h.newRequest(http.MethodGet, h.HeartBeatEndpoint)
 
 	client := initialiseClient()
 
@@ -223,8 +223,8 @@ func (h *HTTPDashboardHandler) StopBeating() {
 	h.heartBeatStopSentinel = true
 }
 
-func (h *HTTPDashboardHandler) newRequest(endpoint string) *http.Request {
-	req, err := http.NewRequest("GET", endpoint, nil)
+func (h *HTTPDashboardHandler) newRequest(method, endpoint string) *http.Request {
+	req, err := http.NewRequest(method, endpoint, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -265,7 +265,7 @@ func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Cli
 }
 
 func (h *HTTPDashboardHandler) DeRegister() error {
-	req := h.newRequest(h.DeRegistrationEndpoint)
+	req := h.newRequest(http.MethodDelete, h.DeRegistrationEndpoint)
 
 	req.Header.Set(headers.XTykNodeID, GetNodeID())
 	req.Header.Set(headers.XTykNonce, ServiceNonce)

@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/xml"
-
 	"net/http"
 	"text/template"
 	"time"
@@ -567,6 +566,10 @@ type GraphQLConfig struct {
 	Engine GraphQLEngineConfig `bson:"engine" json:"engine"`
 	// Proxy holds the configuration for a proxy only api.
 	Proxy GraphQLProxyConfig `bson:"proxy" json:"proxy"`
+	// Subgraph holds the configuration for a GraphQL federation subgraph.
+	Subgraph GraphQLSubgraphConfig `bson:"subgraph" json:"subgraph"`
+	// Supergraph holds the configuration for a GraphQL federation supergraph.
+	Supergraph GraphQLSupergraphConfig `bson:"supergraph" json:"supergraph"`
 }
 
 type GraphQLConfigVersion string
@@ -579,6 +582,21 @@ const (
 
 type GraphQLProxyConfig struct {
 	AuthHeaders map[string]string `bson:"auth_headers" json:"auth_headers"`
+}
+
+type GraphQLSubgraphConfig struct {
+	SDL string `bson:"sdl" json:"sdl"`
+}
+
+type GraphQLSupergraphConfig struct {
+	Subgraphs []GraphQLSubgraphEntity `bson:"subgraphs" json:"subgraphs"`
+	MergedSDL string                  `bson:"merged_sdl" json:"merged_sdl"`
+}
+
+type GraphQLSubgraphEntity struct {
+	APIID string `bson:"api_id" json:"api_id"`
+	URL   string `bson:"url" json:"url"`
+	SDL   string `bson:"sdl" json:"sdl"`
 }
 
 type GraphQLEngineConfig struct {
@@ -643,6 +661,11 @@ const (
 	// GraphQLExecutionModeExecutionEngine is the mode in which the GraphQL Middleware will evaluate every request.
 	// This means the Middleware will act as a independent GraphQL service which might delegate partial execution to upstreams.
 	GraphQLExecutionModeExecutionEngine GraphQLExecutionMode = "executionEngine"
+	// GraphQLExecutionModeSubgraph is the mode if the API is defined as a subgraph for usage in GraphQL federation.
+	// It will basically act the same as an API in proxyOnly mode but can be used in a supergraph.
+	GraphQLExecutionModeSubgraph GraphQLExecutionMode = "subgraph"
+	// GraphQLExecutionModeSupergraph is the mode where an API is able to use subgraphs to build a supergraph in GraphQL federation.
+	GraphQLExecutionModeSupergraph GraphQLExecutionMode = "supergraph"
 )
 
 // GraphQLPlayground represents the configuration for the public playground which will be hosted alongside the api.
