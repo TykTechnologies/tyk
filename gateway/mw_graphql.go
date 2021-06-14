@@ -160,7 +160,8 @@ func (m *GraphQLMiddleware) initGraphQLEngineV2(logger *abstractlogger.LogrusLog
 		m.Logger().WithError(err).Error("could not create engine v2 config")
 	}
 
-	engine, err := gql.NewExecutionEngineV2(logger, *engineConfig)
+	// TODO: replace closer chan arg with a real channel once closing logic will be implemented
+	engine, err := gql.NewExecutionEngineV2(logger, *engineConfig, nil)
 	if err != nil {
 		m.Logger().WithError(err).Error("could not create execution engine v2")
 	}
