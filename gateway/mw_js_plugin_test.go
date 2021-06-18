@@ -102,15 +102,15 @@ leakMid.NewProcessRequest(function(request, session) {
 	dynMid.Spec.JSVM = jsvm
 	dynMid.ProcessRequest(nil, req, nil)
 
-	bs, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		t.Fatalf("failed to read final body: %v", err)
-	}
 	want := body + " appended"
-	if got := string(bs); want != got {
-		t.Fatalf("JS plugin broke non-UTF8 body %q into %q",
-			want, got)
-	}
+
+	newBodyInBytes, _ := ioutil.ReadAll(req.Body)
+	assert.Equal(t, want, string(newBodyInBytes))
+
+	t.Run("check request body is re-readable", func(t *testing.T) {
+		newBodyInBytes, _ = ioutil.ReadAll(req.Body)
+		assert.Equal(t, want, string(newBodyInBytes))
+	})
 }
 
 func TestJSVMSessionMetadataUpdate(t *testing.T) {
