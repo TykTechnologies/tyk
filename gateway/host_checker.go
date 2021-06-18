@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Jeffail/tunny"
+	"github.com/jeffail/tunny"
 	proxyproto "github.com/pires/go-proxyproto"
 	cache "github.com/pmylund/go-cache"
 
