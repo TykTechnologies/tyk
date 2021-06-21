@@ -929,6 +929,7 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 	isHashed := r.URL.Query().Get("hashed") != ""
 	isUserName := r.URL.Query().Get("username") == "true"
 	orgID := r.URL.Query().Get("org_id")
+	certID := r.URL.Query().Get("cert_id")
 
 	// check if passed key is user name and convert it to real key with respect to current hashing algorithm
 	origKeyName := keyName
@@ -979,6 +980,10 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 	case http.MethodDelete:
+		if certID != "" {
+			keyName =  generateToken(orgID, certID)
+		}
+
 		// Remove a key
 		if !isHashed {
 			obj, code = handleDeleteKey(keyName, apiID, true)
@@ -2313,6 +2318,7 @@ func setContext(r *http.Request, ctx context.Context) {
 	r2 := r.WithContext(ctx)
 	*r = *r2
 }
+
 func setCtxValue(r *http.Request, key, val interface{}) {
 	setContext(r, context.WithValue(r.Context(), key, val))
 }
