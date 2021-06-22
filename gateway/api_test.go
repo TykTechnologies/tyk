@@ -318,8 +318,20 @@ func TestKeyHandler(t *testing.T) {
 	})
 
 	t.Run("Delete key", func(t *testing.T) {
+		// cert-id to create a key and check that we can remove cert keys
+		// by having the cert and org id
+		certId := "my-fake-cert-id"
+		session, certKey := ts.CreateSession(func(s *user.SessionState) {
+			s.Certificate = certId
+			s.AccessRights = map[string]user.AccessDefinition{"test": {
+				APIID: "test", Versions: []string{"v1"},
+			}}
+		})
+		urlQueryParams := fmt.Sprintf("?cert_id=%v&org_id=%v", certKey, session.OrgID)
+
 		ts.Run(t, []test.TestCase{
 			{Method: "DELETE", Path: "/tyk/keys/" + knownKey, AdminAuth: true, Code: 200, BodyMatch: `"action":"deleted"`},
+			{Method: "DELETE", Path: "/tyk/keys/" + urlQueryParams, AdminAuth: true, Code: 200, BodyMatch: `"action":"deleted"`},
 			{Method: "GET", Path: "/tyk/keys/" + knownKey, AdminAuth: true, Code: 404},
 		}...)
 	})
