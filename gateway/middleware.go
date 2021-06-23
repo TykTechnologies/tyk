@@ -384,11 +384,11 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 			usePartitions := policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl || policy.Partitions.Complexity
 
 			for k, v := range policy.AccessRights {
-				ar := v
-
 				if v.Limit == nil {
 					v.Limit = &user.APILimit{}
 				}
+
+				ar := v
 
 				if !usePartitions || policy.Partitions.Acl {
 					didACL[k] = true
