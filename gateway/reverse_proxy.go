@@ -520,7 +520,8 @@ func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request
 		return false, spec.GlobalConfig.ProxyDefaultTimeout
 	}
 
-	_, versionPaths, _, _ := spec.Version(req)
+	vInfo, _ := spec.Version(req)
+	versionPaths := spec.RxPaths[vInfo.Name]
 	found, meta := spec.CheckSpecMatchesStatus(req, versionPaths, HardTimeout)
 	if found {
 		intMeta := meta.(*int)
@@ -532,7 +533,8 @@ func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request
 }
 
 func (p *ReverseProxy) CheckHeaderInRemoveList(hdr string, spec *APISpec, req *http.Request) bool {
-	vInfo, versionPaths, _, _ := spec.Version(req)
+	vInfo, _ := spec.Version(req)
+	versionPaths := spec.RxPaths[vInfo.Name]
 	for _, gdKey := range vInfo.GlobalHeadersRemove {
 		if strings.ToLower(gdKey) == strings.ToLower(hdr) {
 			return true
@@ -557,7 +559,8 @@ func (p *ReverseProxy) CheckCircuitBreakerEnforced(spec *APISpec, req *http.Requ
 		return false, nil
 	}
 
-	_, versionPaths, _, _ := spec.Version(req)
+	versionInfo, _ := spec.Version(req)
+	versionPaths := spec.RxPaths[versionInfo.Name]
 	found, meta := spec.CheckSpecMatchesStatus(req, versionPaths, CircuitBreaker)
 	if found {
 		exMeta := meta.(*ExtendedCircuitBreakerMeta)
