@@ -419,6 +419,10 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 							}
 						}
 
+						if r.Limit == nil {
+							r.Limit = &user.APILimit{}
+						}
+
 						ar = r
 					}
 
