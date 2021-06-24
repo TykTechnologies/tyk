@@ -1691,7 +1691,7 @@ func TestJWTDefaultPolicies(t *testing.T) {
 
 	assert := func(t *testing.T, expected []string) {
 		session, _ := GlobalSessionManager.SessionDetail(spec.OrgID, sessionID, false)
-		actual := session.GetPolicyIDs()
+		actual := session.PolicyIDs()
 		if !reflect.DeepEqual(expected, actual) {
 			t.Fatalf("Expected %v, actaul %v", expected, actual)
 		}

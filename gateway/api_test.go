@@ -372,8 +372,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 		}...)
 
 		sessionState, found := GlobalSessionManager.SessionDetail("default", key, false)
-		accessRight, _ := sessionState.GetAccessRightByAPIID(testAPIID)
-		if !found || accessRight.APIID != testAPIID || len(sessionState.ApplyPolicies) != 2 {
+		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 2 {
 			t.Fatal("Adding policy to the list failed")
 		}
 	})
@@ -388,8 +387,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 		}...)
 
 		sessionState, found := GlobalSessionManager.SessionDetail("default", key, false)
-		accessRight, _ := sessionState.GetAccessRightByAPIID(testAPIID)
-		if !found || accessRight.APIID != testAPIID || len(sessionState.ApplyPolicies) != 0 {
+		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 0 {
 			t.Fatal("Removing policy from the list failed")
 		}
 	})
@@ -446,8 +444,8 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 
 			sessionState, found := GlobalSessionManager.SessionDetail(session.OrgID, key, false)
 
-			if !found || !reflect.DeepEqual(expected, sessionState.GetMetaData()) {
-				t.Fatalf("Expected %v, returned %v", expected, sessionState.GetMetaData())
+			if !found || !reflect.DeepEqual(expected, sessionState.MetaData) {
+				t.Fatalf("Expected %v, returned %v", expected, sessionState.MetaData)
 			}
 		}
 
@@ -480,9 +478,9 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 				"key-meta2": "key-value2",
 			}
 			session.ApplyPolicies = []string{pID, pID2}
-			session.SetMetaData(map[string]interface{}{
+			session.MetaData = map[string]interface{}{
 				"key-meta2": "key-value2",
-			})
+			}
 			assertMetaData(session, expected)
 		})
 	})
@@ -1407,10 +1405,7 @@ func TestContextSession(t *testing.T) {
 	if ctxGetSession(r) != nil {
 		t.Fatal("expected ctxGetSession to return nil")
 	}
-	ctxSetSession(r,
-		&user.SessionState{},
-		"",
-		false)
+	ctxSetSession(r, &user.SessionState{}, "", false)
 	if ctxGetSession(r) == nil {
 		t.Fatal("expected ctxGetSession to return non-nil")
 	}
