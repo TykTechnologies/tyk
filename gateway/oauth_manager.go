@@ -417,7 +417,6 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 				}
 
 				if passMatch {
-					log.Info("Here we are")
 					ar.Authorized = true
 					// not ideal, but we need to copy the session state across
 					pw := session.BasicAuthData.Password
