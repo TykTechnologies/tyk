@@ -438,6 +438,10 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 								r.FieldAccessRights = append(r.FieldAccessRights, far)
 							}
 						}
+						
+						if r.Limit == nil {
+							r.Limit = &user.APILimit{}
+						}
 
 						ar = r
 					}
