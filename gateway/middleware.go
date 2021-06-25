@@ -350,7 +350,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				}
 
 				idForScope := apiID
-				// check if we already have limit on API level specified when policy was created
+				// check if we don't have limit on API level specified when policy was created
 				if accessRights.Limit == nil || *accessRights.Limit == (user.APILimit{}) {
 					// limit was not specified on API level so we will populate it from policy
 					idForScope = policy.ID
@@ -570,6 +570,17 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	session.Tags = []string{}
 	for tag := range tags {
 		session.Tags = append(session.Tags, tag)
+	}
+
+	if len(policies) == 0 {
+		accessRights := session.GetAccessRights()
+		for apiID, accessRight := range accessRights {
+			// check if the api in the session has per api limit
+			if accessRight.Limit != nil && *accessRight.Limit != (user.APILimit{}) {
+				accessRight.AllowanceScope = apiID
+				session.AccessRights[apiID] = accessRight
+			}
+		}
 	}
 
 	distinctACL := map[string]bool{}
