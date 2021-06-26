@@ -34,7 +34,7 @@ func (w wrapLogger) Error(msg string) {
 
 // Init returns a implementation of tyk.Tracer using jaeger client.
 func Init(service string, opts map[string]interface{}, log Logger) (*Trace, error) {
-	cfg, err := Load(opts)
+	cfg, _ := Load(opts)
 	if service != "" {
 		cfg.ServiceName = service
 	}

@@ -66,7 +66,7 @@ func transformBody(r *http.Request, tmeta *TransformSpec, contextVars bool) erro
 		var err error
 		bodyData, err = mxj.NewMapXml(body) // unmarshal
 		if err != nil {
-			return fmt.Errorf("error unmarshalling XML: %v", err)
+			return fmt.Errorf("error unmarshalling XML: %w", err)
 		}
 	case apidef.RequestJSON:
 		if len(body) == 0 {
@@ -78,11 +78,9 @@ func transformBody(r *http.Request, tmeta *TransformSpec, contextVars bool) erro
 			return err
 		}
 
-		switch tempBody.(type) {
+		switch tempBody := tempBody.(type) {
 		case []interface{}:
 			bodyData["array"] = tempBody
-		case map[string]interface{}:
-			bodyData = tempBody.(map[string]interface{})
 		}
 	default:
 		return fmt.Errorf("unsupported request input type: %v", tmeta.TemplateData.Input)
@@ -103,7 +101,7 @@ func transformBody(r *http.Request, tmeta *TransformSpec, contextVars bool) erro
 	// Apply to template
 	var bodyBuffer bytes.Buffer
 	if err := tmeta.Template.Execute(&bodyBuffer, bodyData); err != nil {
-		return fmt.Errorf("failed to apply template to request: %v", err)
+		return fmt.Errorf("failed to apply template to request: %w", err)
 	}
 
 	s := replaceTykVariables(r, bodyBuffer.String(), true)

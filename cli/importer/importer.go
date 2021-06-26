@@ -137,20 +137,20 @@ func (i *Importer) handleBluePrintMode() error {
 
 		defFromFile, err := i.apiDefLoadFile(*i.forAPI)
 		if err != nil {
-			return fmt.Errorf("failed to load and decode file data for API Definition: %v", err)
+			return fmt.Errorf("failed to load and decode file data for API Definition: %w", err)
 		}
 
 		bp, err := i.bluePrintLoadFile(*i.input)
 		if err != nil {
-			return fmt.Errorf("File load error: %v", err)
+			return fmt.Errorf("File load error: %w", err)
 		}
 		versionData, err := bp.ConvertIntoApiVersion(*i.asMock)
 		if err != nil {
-			return fmt.Errorf("onversion into API Def failed: %v", err)
+			return fmt.Errorf("onversion into API Def failed: %w", err)
 		}
 
 		if err := bp.InsertIntoAPIDefinitionAsVersion(versionData, defFromFile, *i.asVersion); err != nil {
-			return fmt.Errorf("Insertion failed: %v", err)
+			return fmt.Errorf("Insertion failed: %w", err)
 		}
 
 		i.printDef(defFromFile)
@@ -164,7 +164,7 @@ func (i *Importer) handleBluePrintMode() error {
 	// Create the API with the blueprint
 	bp, err := i.bluePrintLoadFile(*i.input)
 	if err != nil {
-		return fmt.Errorf("File load error: %v", err)
+		return fmt.Errorf("File load error: %w", err)
 	}
 
 	def, err := bp.ToAPIDefinition(*i.orgID, *i.upstreamTarget, *i.asMock)
@@ -182,7 +182,7 @@ func (i *Importer) handleSwaggerMode() error {
 			// Create the API with the blueprint
 			s, err := i.swaggerLoadFile(*i.input)
 			if err != nil {
-				return fmt.Errorf("File load error: %v", err)
+				return fmt.Errorf("File load error: %w", err)
 			}
 
 			def, err := s.ToAPIDefinition(*i.orgID, *i.upstreamTarget, *i.asMock)
@@ -209,21 +209,21 @@ func (i *Importer) handleSwaggerMode() error {
 
 	defFromFile, err := i.apiDefLoadFile(*i.forAPI)
 	if err != nil {
-		return fmt.Errorf("failed to load and decode file data for API Definition: %v", err)
+		return fmt.Errorf("failed to load and decode file data for API Definition: %w", err)
 	}
 
 	s, err := i.swaggerLoadFile(*i.input)
 	if err != nil {
-		return fmt.Errorf("File load error: %v", err)
+		return fmt.Errorf("File load error: %w", err)
 	}
 
 	versionData, err := s.ConvertIntoApiVersion(*i.asMock)
 	if err != nil {
-		return fmt.Errorf("Conversion into API Def failed: %v", err)
+		return fmt.Errorf("Conversion into API Def failed: %w", err)
 	}
 
 	if err := s.InsertIntoAPIDefinitionAsVersion(versionData, defFromFile, *i.asVersion); err != nil {
-		return fmt.Errorf("Insertion failed: %v", err)
+		return fmt.Errorf("Insertion failed: %w", err)
 	}
 
 	i.printDef(defFromFile)
@@ -243,7 +243,7 @@ func (i *Importer) handleWSDLMode() error {
 	// Load WSDL file
 	w, err := i.wsdlLoadFile(*i.input)
 	if err != nil {
-		return fmt.Errorf("File load error: %v", err)
+		return fmt.Errorf("File load error: %w", err)
 	}
 
 	w.SetServicePortMapping(serviceportMapping)
@@ -258,16 +258,16 @@ func (i *Importer) handleWSDLMode() error {
 		// Add into existing API
 		def, err = i.apiDefLoadFile(*i.forAPI)
 		if err != nil {
-			return fmt.Errorf("failed to load and decode file data for API Definition: %v", err)
+			return fmt.Errorf("failed to load and decode file data for API Definition: %w", err)
 		}
 
 		versionData, err := w.ConvertIntoApiVersion(*i.asMock)
 		if err != nil {
-			return fmt.Errorf("Conversion into API Def failed: %v", err)
+			return fmt.Errorf("Conversion into API Def failed: %w", err)
 		}
 
 		if err := w.InsertIntoAPIDefinitionAsVersion(versionData, def, *i.asVersion); err != nil {
-			return fmt.Errorf("Insertion failed: %v", err)
+			return fmt.Errorf("Insertion failed: %w", err)
 		}
 
 	}

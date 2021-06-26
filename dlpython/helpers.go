@@ -120,9 +120,9 @@ func PyObjectCallObject(o unsafe.Pointer, args unsafe.Pointer) (unsafe.Pointer, 
 
 // PyObjectGetAttr wraps PyObject_GetAttr
 func PyObjectGetAttr(o unsafe.Pointer, attr interface{}) (unsafe.Pointer, error) {
-	switch attr.(type) {
+	switch attr := attr.(type) {
 	case string:
-		str := C.CString(attr.(string))
+		str := C.CString(attr)
 		defer C.free(unsafe.Pointer(str))
 		pystr := PyUnicode_FromString(str)
 		if pystr == nil {

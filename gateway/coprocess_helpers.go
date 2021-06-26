@@ -131,9 +131,9 @@ func ProtoSessionState(session *user.SessionState) *coprocess.SessionState {
 	metadata := make(map[string]string)
 	if len(session.GetMetaData()) > 0 {
 		for k, v := range session.GetMetaData() {
-			switch v.(type) {
+			switch v := v.(type) {
 			case string:
-				metadata[k] = v.(string)
+				metadata[k] = v
 			default:
 				jsonValue, err := json.Marshal(v)
 				if err != nil {
@@ -184,10 +184,8 @@ func ProtoSessionState(session *user.SessionState) *coprocess.SessionState {
 func ProtoMap(inputMap map[string][]string) map[string]string {
 	newMap := make(map[string]string)
 
-	if inputMap != nil {
-		for k, v := range inputMap {
-			newMap[k] = v[0]
-		}
+	for k, v := range inputMap {
+		newMap[k] = v[0]
 	}
 
 	return newMap

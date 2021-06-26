@@ -352,7 +352,7 @@ func syncPolicies() (count int, err error) {
 			mainLog.Fatal("No connection string or node ID present. Failing.")
 		}
 		connStr := config.Global().Policies.PolicyConnectionString
-		connStr = connStr + "/system/policies"
+		connStr += "/system/policies"
 
 		mainLog.Info("Using Policies from Dashboard Service")
 
@@ -638,9 +638,7 @@ func loadCustomMiddleware(spec *APISpec) ([]string, apidef.MiddlewareDefinition,
 	}
 
 	// Load response hooks
-	for _, mw := range spec.CustomMiddleware.Response {
-		mwResponseFuncs = append(mwResponseFuncs, mw)
-	}
+	mwResponseFuncs = append(mwResponseFuncs, spec.CustomMiddleware.Response...)
 
 	return mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostKeyAuthFuncs, mwResponseFuncs, mwDriver
 }
@@ -736,13 +734,11 @@ func DoReload() {
 	if count, err := syncAPISpecs(); err != nil {
 		mainLog.Error("Error during syncing apis:", err.Error())
 		return
-	} else {
+	} else if count == 0 && apisByIDLen() == 0 {
 		// skip re-loading only if dashboard service reported 0 APIs
 		// and current registry had 0 APIs
-		if count == 0 && apisByIDLen() == 0 {
-			mainLog.Warning("No API Definitions found, not reloading")
-			return
-		}
+		mainLog.Warning("No API Definitions found, not reloading")
+		return
 	}
 	loadGlobalApps()
 
@@ -1245,13 +1241,13 @@ func getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 
 func Start() {
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	cli.Init(VERSION, confPaths)
 	cli.Parse()
 	// Stop gateway process if not running in "start" mode:
 	if !cli.DefaultMode {
 		os.Exit(0)
 	}
+	defer cancel()
 
 	SetNodeID("solo-" + uuid.NewV4().String())
 

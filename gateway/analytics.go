@@ -133,7 +133,7 @@ func geoIPLookup(ipStr string) (*GeoData, error) {
 	}
 	record := new(GeoData)
 	if err := analytics.GeoIPDB.Lookup(ip, record); err != nil {
-		return nil, fmt.Errorf("geoIPDB lookup of %q failed: %v", ipStr, err)
+		return nil, fmt.Errorf("geoIPDB lookup of %q failed: %w", ipStr, err)
 	}
 	return record, nil
 }

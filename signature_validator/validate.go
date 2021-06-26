@@ -24,7 +24,7 @@ func (v *SignatureValidator) Init(hasherName string) error {
 	case "MasheryMD5":
 		v.h = MasheryMd5sum{}
 	default:
-		return errors.New(fmt.Sprintf("unsupported hasher type (%s)", hasherName))
+		return fmt.Errorf("unsupported hasher type (%s)", hasherName)
 	}
 
 	return nil

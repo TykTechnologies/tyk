@@ -354,7 +354,7 @@ func (r *RedisCluster) GetMultiKey(keys []string) ([]string, error) {
 				getCmds = append(getCmds, pipe.Get(ctx, key))
 			}
 			_, err := pipe.Exec(ctx)
-			if err != nil && err != redis.Nil {
+			if err != nil && !errors.Is(err, redis.Nil) {
 				log.WithError(err).Debug("Error trying to get value")
 				return nil, ErrKeyNotFound
 			}
@@ -607,7 +607,7 @@ func (r *RedisCluster) GetKeysAndValuesWithFilter(filter string) map[string]stri
 				getCmds = append(getCmds, pipe.Get(ctx, key))
 			}
 			_, err := pipe.Exec(ctx)
-			if err != nil && err != redis.Nil {
+			if err != nil && !errors.Is(err, redis.Nil) {
 				log.Error("Error trying to get client keys: ", err)
 				return nil
 			}
@@ -1038,7 +1038,7 @@ func (r *RedisCluster) IsMemberOfSet(keyName, value string) bool {
 
 	log.Debug("SISMEMBER", keyName, value, val, err)
 
-	return val == true
+	return val
 }
 
 // SetRollingWindow will append to a sorted set in redis and extract a timed window of values

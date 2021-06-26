@@ -307,7 +307,7 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 }
 
 func handleLogin() {
-	if UseSyncLoginRPC == true {
+	if UseSyncLoginRPC {
 		Login()
 		return
 	}

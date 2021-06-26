@@ -26,7 +26,7 @@ const (
 
 	defaultManifestPath = "manifest.json"
 	defaultBundlePath   = "bundle.zip"
-	defaultBundlePerm   = 0o755
+	defaultBundlePerm   = 0755
 )
 
 var (
@@ -139,8 +139,8 @@ func (b *Bundler) Build(ctx *kingpin.ParseContext) error {
 	}
 
 	// Append the updated manifest file to the ZIP file:
-	newManifest, err := zipWriter.Create(defaultManifestPath)
-	_, err = newManifest.Write(manifestData)
+	newManifest, _ := zipWriter.Create(defaultManifestPath)
+	newManifest.Write(manifestData)
 	zipWriter.Close()
 	err = ioutil.WriteFile(bundlePath, buf.Bytes(), defaultBundlePerm)
 	if err != nil {

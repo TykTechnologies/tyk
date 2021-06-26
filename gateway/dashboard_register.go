@@ -271,7 +271,7 @@ func (h *HTTPDashboardHandler) DeRegister() error {
 	c := initialiseClient()
 	resp, err := c.Do(req)
 	if err != nil {
-		return fmt.Errorf("deregister request failed with error %v", err)
+		return fmt.Errorf("deregister request failed with error %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {

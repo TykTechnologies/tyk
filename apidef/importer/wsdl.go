@@ -388,7 +388,7 @@ func (def *WSDLDef) ConvertIntoApiVersion(bool) (apidef.VersionInfo, error) {
 					operationUrlRewrite.Path = path
 
 					if binding.Protocol == PROT_HTTP {
-						if op.IsUrlReplacement == true {
+						if op.IsUrlReplacement {
 							pattern := ReplaceWildCards(op.Endpoint)
 							operationUrlRewrite.MatchPattern = "(" + pattern + ")"
 						} else {
@@ -407,7 +407,7 @@ func (def *WSDLDef) ConvertIntoApiVersion(bool) (apidef.VersionInfo, error) {
 			}
 		}
 
-		if foundPort == false {
+		if !foundPort {
 			log.Errorf("Port for service %s not found. Skiping processing of the service", service.Name)
 		}
 	}
@@ -439,7 +439,7 @@ func ReplaceWildCards(endpoint string) string {
 			continue
 		}
 
-		if inside == false {
+		if !inside {
 			result = append(result, s)
 		}
 	}

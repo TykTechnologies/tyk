@@ -171,7 +171,7 @@ func (m *proxyMux) handle404(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *proxyMux) addTCPService(spec *APISpec, modifier *tcp.Modifier) {
-	hostname := spec.GlobalConfig.HostName
+	var hostname string
 	if spec.GlobalConfig.EnableCustomDomains {
 		hostname = spec.Domain
 	} else {

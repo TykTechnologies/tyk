@@ -260,7 +260,7 @@ func (p *Proxy) handleConn(conn net.Conn) error {
 			if IsSocketClosed(err) && connectionClosed.Load().(bool) {
 				return
 			}
-			if err == io.EOF {
+			if errors.Is(io.EOF, err) {
 				// End of stream from the client.
 				connectionClosed.Store(true)
 				log.WithField("conn", clientConn(conn)).Debug("End of client stream")
@@ -288,7 +288,7 @@ func (p *Proxy) handleConn(conn net.Conn) error {
 			if IsSocketClosed(err) && connectionClosed.Load().(bool) {
 				return
 			}
-			if err == io.EOF {
+			if errors.Is(io.EOF, err) {
 				// End of stream from upstream
 				connectionClosed.Store(true)
 				log.WithField("conn", upstreamConn(rconn)).Debug("End of upstream stream")

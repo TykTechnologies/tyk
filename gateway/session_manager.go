@@ -107,11 +107,8 @@ func (l *SessionLimiter) limitSentinel(currentSession *user.SessionState, key st
 
 	// Check sentinel
 	_, sentinelActive := store.GetRawKey(rateLimiterSentinelKey)
-	if sentinelActive == nil {
-		// Sentinel is set, fail
-		return true
-	}
-	return false
+
+	return sentinelActive == nil
 }
 
 func (l *SessionLimiter) limitRedis(currentSession *user.SessionState, key string, rateScope string, store storage.Handler,
@@ -120,10 +117,7 @@ func (l *SessionLimiter) limitRedis(currentSession *user.SessionState, key strin
 	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.GetKeyHash()
 	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.GetKeyHash() + ".BLOCKED"
 
-	if l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun) {
-		return true
-	}
-	return false
+	return l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun)
 }
 
 func (l *SessionLimiter) limitDRL(currentSession *user.SessionState, key string, rateScope string,
@@ -230,7 +224,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 
 	if enableQ {
 		if globalConf.LegacyEnableAllowanceCountdown {
-			currentSession.Allowance = currentSession.Allowance - 1
+			currentSession.Allowance--
 		}
 
 		if l.RedisQuotaExceeded(r, currentSession, allowanceScope, accessDef.Limit, store) {

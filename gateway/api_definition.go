@@ -392,7 +392,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*A
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
 		body, _ := ioutil.ReadAll(resp.Body)
-		return nil, fmt.Errorf("failed to decode body: %v body was: %v", err, string(body))
+		return nil, fmt.Errorf("failed to decode body: %w body was: %v", err, string(body))
 	}
 
 	// Extract tagged entries only

@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"strconv"
 	"strings"
 	"sync"
@@ -59,13 +60,14 @@ func startPubSubLoop() {
 		err := cacheStore.StartPubSubHandler(RedisPubSubChannel, func(v interface{}) {
 			handleRedisEvent(v, nil, nil)
 		})
-		if err != nil {
-			if err != storage.ErrRedisIsDown {
-				pubSubLog.WithField("err", err).Error("Connection to Redis failed, reconnect in 10s")
-			}
-			time.Sleep(10 * time.Second)
-			pubSubLog.Warning("Reconnecting ", err)
+		if err == nil {
+			continue
 		}
+		if !errors.Is(err, storage.ErrRedisIsDown) {
+			pubSubLog.WithField("err", err).Error("Connection to Redis failed, reconnect in 10s")
+		}
+		time.Sleep(10 * time.Second)
+		pubSubLog.Warning("Reconnecting ", err)
 	}
 }
 
@@ -217,7 +219,7 @@ func (r *RedisNotifier) Notify(notif interface{}) bool {
 	// pubSubLog.Debug("Sending notification", notif)
 
 	if err := r.store.Publish(r.channel, string(toSend)); err != nil {
-		if err != storage.ErrRedisIsDown {
+		if !errors.Is(err, storage.ErrRedisIsDown) {
 			pubSubLog.Error("Could not send notification: ", err)
 		}
 		return false

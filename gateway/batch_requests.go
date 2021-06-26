@@ -166,7 +166,7 @@ func (b *BatchRequestHandler) HandleBatchRequest(w http.ResponseWriter, r *http.
 	// Construct the requests
 	requestSet, err := b.ConstructRequests(batchRequest, false)
 	if err != nil {
-		doJSONWrite(w, http.StatusBadRequest, apiError(fmt.Sprintf("Batch request creation failed , request structure malformed")))
+		doJSONWrite(w, http.StatusBadRequest, apiError("Batch request creation failed , request structure malformed"))
 		return
 	}
 
@@ -182,13 +182,13 @@ func (b *BatchRequestHandler) ManualBatchRequest(requestObject []byte) ([]byte, 
 	// Decode request
 	var batchRequest BatchRequestStructure
 	if err := json.Unmarshal(requestObject, &batchRequest); err != nil {
-		return nil, fmt.Errorf("Could not decode batch request, decoding failed: %v", err)
+		return nil, fmt.Errorf("Could not decode batch request, decoding failed: %w", err)
 	}
 
 	// Construct the unsafe requests
 	requestSet, err := b.ConstructRequests(batchRequest, true)
 	if err != nil {
-		return nil, fmt.Errorf("Batch request creation failed , request structure malformed: %v", err)
+		return nil, fmt.Errorf("Batch request creation failed , request structure malformed: %w", err)
 	}
 
 	// Run requests and collate responses
@@ -197,7 +197,7 @@ func (b *BatchRequestHandler) ManualBatchRequest(requestObject []byte) ([]byte, 
 	// Encode responses
 	replyMessage, err := json.Marshal(&replySet)
 	if err != nil {
-		return nil, fmt.Errorf("Couldn't encode response to string: %v", err)
+		return nil, fmt.Errorf("Couldn't encode response to string: %w", err)
 	}
 
 	return replyMessage, nil

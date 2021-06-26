@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"math/rand"
 	"net"
 	"net/http"
@@ -136,7 +137,7 @@ func (h *HostUptimeChecker) execCheck() {
 	h.resetListMu.Unlock()
 	for _, host := range h.HostList {
 		_, err := h.pool.SendWork(host)
-		if err != nil && err != tunny.ErrPoolNotRunning {
+		if err != nil && errors.Is(err, tunny.ErrPoolNotRunning) {
 			log.Warnf("[HOST CHECKER] could not send work, error: %v", err)
 		}
 	}

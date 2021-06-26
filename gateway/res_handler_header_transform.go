@@ -56,21 +56,21 @@ func (h *HeaderTransform) HandleResponse(rw http.ResponseWriter,
 			continue
 		}
 		// Replace scheme
-		val = strings.Replace(val, h.Spec.target.Scheme, target_url.Scheme, -1)
+		val = strings.ReplaceAll(val, h.Spec.target.Scheme, target_url.Scheme)
 		// Replace host
-		val = strings.Replace(val, h.Spec.target.Host, target_url.Host, -1)
+		val = strings.ReplaceAll(val, h.Spec.target.Host, target_url.Host)
 		// Transform path
 		if h.Spec.Proxy.StripListenPath {
 			if len(h.Spec.target.Path) != 0 {
-				val = strings.Replace(val, h.Spec.target.Path,
-					h.Spec.Proxy.ListenPath, -1)
+				val = strings.ReplaceAll(val, h.Spec.target.Path,
+					h.Spec.Proxy.ListenPath)
 			} else {
-				val = strings.Replace(val, req.URL.Path,
-					h.Spec.Proxy.ListenPath+req.URL.Path, -1)
+				val = strings.ReplaceAll(val, req.URL.Path,
+					h.Spec.Proxy.ListenPath+req.URL.Path)
 			}
 		} else {
 			if len(h.Spec.target.Path) != 0 {
-				val = strings.Replace(val, h.Spec.target.Path, "/", -1)
+				val = strings.ReplaceAll(val, h.Spec.target.Path, "/")
 			}
 		}
 		setCustomHeader(res.Header, name, val, ignoreCanonical)

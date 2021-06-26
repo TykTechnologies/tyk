@@ -208,10 +208,8 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 	// Set up all the JSVM middleware
 	var mwAuthCheckFunc apidef.MiddlewareDefinition
-	mwPreFuncs := []apidef.MiddlewareDefinition{}
-	mwPostFuncs := []apidef.MiddlewareDefinition{}
-	mwPostAuthCheckFuncs := []apidef.MiddlewareDefinition{}
-	mwResponseFuncs := []apidef.MiddlewareDefinition{}
+	var mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, 
+	mwResponseFuncs []apidef.MiddlewareDefinition
 
 	var mwDriver apidef.MiddlewareDriver
 

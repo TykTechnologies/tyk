@@ -1147,13 +1147,13 @@ func Load(paths []string, conf *Config) error {
 		return Load([]string{path}, conf)
 	}
 	if err := json.NewDecoder(r).Decode(&conf); err != nil {
-		return fmt.Errorf("couldn't unmarshal config: %v", err)
+		return fmt.Errorf("couldn't unmarshal config: %w", err)
 	}
 	if err := envconfig.Process(envPrefix, conf); err != nil {
-		return fmt.Errorf("failed to process config env vars: %v", err)
+		return fmt.Errorf("failed to process config env vars: %w", err)
 	}
 	if err := processCustom(envPrefix, conf, loadZipkin, loadJaeger); err != nil {
-		return fmt.Errorf("failed to process config custom loader: %v", err)
+		return fmt.Errorf("failed to process config custom loader: %w", err)
 	}
 	return nil
 }

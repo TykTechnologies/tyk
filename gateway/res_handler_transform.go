@@ -129,11 +129,9 @@ func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 			break
 		}
 
-		switch tempBody.(type) {
+		switch tempBody := tempBody.(type) {
 		case []interface{}:
 			bodyData["array"] = tempBody
-		case map[string]interface{}:
-			bodyData = tempBody.(map[string]interface{})
 		}
 	}
 
