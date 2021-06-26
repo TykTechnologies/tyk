@@ -2,12 +2,14 @@ SHELL := /bin/bash
 
 GOCMD=go
 LINTCMD=golangci-lint
+FMTCMD=gofumpt
 
 GOTEST=$(GOCMD) test
 GOCLEAN=$(GOCMD) clean
 GOBUILD=$(GOCMD) build
 GOINSTALL=$(GOCMD) install
 GOLINT=$(LINTCMD) run
+GOFORMAT=$(FMTCMD) -l -w
 
 BINARY_NAME=tyk
 BINARY_LINUX=tyk
@@ -53,6 +55,12 @@ install:
 .PHONY: lint
 lint:
 	$(GOLINT) ./...
+
+.PHONY: format
+format:
+	GO111MODULE=off go install mvdan.cc/gofumpt
+
+	$(GOFORMAT) .
 
 .PHONY: db-start
 db-start: redis-start mongo-start
