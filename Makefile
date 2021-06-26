@@ -1,10 +1,13 @@
 SHELL := /bin/bash
 
 GOCMD=go
+LINTCMD=golangci-lint
+
 GOTEST=$(GOCMD) test
 GOCLEAN=$(GOCMD) clean
 GOBUILD=$(GOCMD) build
 GOINSTALL=$(GOCMD) install
+GOLINT=$(LINTCMD) run
 
 BINARY_NAME=tyk
 BINARY_LINUX=tyk
@@ -46,6 +49,10 @@ build-linux:
 .PHONY: install
 install:
 	$(GOINSTALL) -tags "$(TAGS)"
+
+.PHONY: lint
+lint:
+	$(GOLINT) ./...
 
 .PHONY: db-start
 db-start: redis-start mongo-start

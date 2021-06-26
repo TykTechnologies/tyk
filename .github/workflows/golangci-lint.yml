@@ -26,7 +26,7 @@ jobs:
           # working-directory: somedir
 
           # golangci-lint command line arguments.
-          args: --timeout=5m --verbose
+          args: ./... --timeout=5m --verbose
 
           # If set to true and the action runs on a pull request - the action outputs only newly found issues
           only-new-issues: true
