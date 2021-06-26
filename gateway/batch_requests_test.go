@@ -189,7 +189,6 @@ func TestVirtualEndpointBatch(t *testing.T) {
 
 		ts.Run(t, test.TestCase{Path: "/virt", Code: 500})
 	})
-
 }
 
 func TestBatchIgnoreCanonicalHeaderKey(t *testing.T) {

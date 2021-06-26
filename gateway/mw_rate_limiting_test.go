@@ -71,7 +71,6 @@ func TestRateLimit_Unlimited(t *testing.T) {
 }
 
 func TestNeverRenewQuota(t *testing.T) {
-
 	g := StartTest()
 	defer g.Close()
 
@@ -103,7 +102,6 @@ func TestNeverRenewQuota(t *testing.T) {
 		{Headers: authHeader, Code: http.StatusOK},
 		{Headers: authHeader, Code: http.StatusForbidden},
 	}...)
-
 }
 
 func TestMwRateLimiting_DepthLimit(t *testing.T) {

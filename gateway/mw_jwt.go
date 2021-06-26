@@ -38,14 +38,12 @@ const (
 	ECDSASign = "ecdsa"
 )
 
-var (
-	// List of common OAuth Client ID claims used by IDPs:
-	oauthClientIDClaims = []string{
-		"clientId",  // Keycloak
-		"cid",       // OKTA
-		"client_id", // Gluu
-	}
-)
+// List of common OAuth Client ID claims used by IDPs:
+var oauthClientIDClaims = []string{
+	"clientId",  // Keycloak
+	"cid",       // OKTA
+	"client_id", // Gluu
+}
 
 func (k *JWTMiddleware) Name() string {
 	return "JWTMiddleware"
@@ -291,7 +289,7 @@ func (k *JWTMiddleware) getBasePolicyID(r *http.Request, claims jwt.MapClaims) (
 
 func (k *JWTMiddleware) getUserIdFromClaim(claims jwt.MapClaims) (string, error) {
 	var userId string
-	var found = false
+	found := false
 
 	if k.Spec.JWTIdentityBaseField != "" {
 		if userId, found = claims[k.Spec.JWTIdentityBaseField].(string); found {
@@ -428,7 +426,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			return errors.New("key not authorized: no matching policy"), http.StatusForbidden
 		}
 
-		//override session expiry with JWT if longer lived
+		// override session expiry with JWT if longer lived
 		if f, ok := claims["exp"].(float64); ok {
 			if int64(f)-session.Expires > 0 {
 				session.Expires = int64(f)
@@ -513,7 +511,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			}
 		}
 
-		//override session expiry with JWT if longer lived
+		// override session expiry with JWT if longer lived
 		if f, ok := claims["exp"].(float64); ok {
 			if int64(f)-session.Expires > 0 {
 				session.Expires = int64(f)
@@ -583,7 +581,8 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 						storageManager,
 						GlobalSessionManager,
 						&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false},
-						k.Spec.OrgID}),
+						k.Spec.OrgID,
+					}),
 			}
 		}
 

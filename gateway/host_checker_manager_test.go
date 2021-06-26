@@ -12,7 +12,6 @@ import (
 )
 
 func TestHostCheckerManagerInit(t *testing.T) {
-
 	hc := HostCheckerManager{}
 	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test:"}
 	hc.Init(redisStorage)
@@ -36,7 +35,7 @@ func TestAmIPolling(t *testing.T) {
 		t.Error("HostCheckerManager storage not configured, it should have failed.")
 	}
 
-	//Testing if we had 2 active host checker managers, only 1 takes control of the uptimechecks
+	// Testing if we had 2 active host checker managers, only 1 takes control of the uptimechecks
 	globalConf := config.Global()
 	groupID := "TEST"
 	globalConf.UptimeTests.PollerGroup = groupID
@@ -55,7 +54,7 @@ func TestAmIPolling(t *testing.T) {
 		t.Error("HostCheckerManager storage configured, it shouldn't have failed.")
 	}
 
-	//Testing if the PollerCacheKey contains the poller_group
+	// Testing if the PollerCacheKey contains the poller_group
 	testKey := PollerCacheKey + "." + groupID
 	activeInstance, err := hc.store.GetKey(testKey)
 	if err != nil {
@@ -71,7 +70,7 @@ func TestAmIPolling(t *testing.T) {
 	config.SetGlobal(globalConf)
 	defer ResetTestConfig()
 
-	//Testing if the PollerCacheKey doesn't contains the poller_group by default
+	// Testing if the PollerCacheKey doesn't contains the poller_group by default
 	hc = HostCheckerManager{}
 	redisStorage = &storage.RedisCluster{KeyPrefix: "host-checker-test:"}
 	hc.Init(redisStorage)
@@ -84,7 +83,6 @@ func TestAmIPolling(t *testing.T) {
 	if activeInstance != hc.Id {
 		t.Errorf("%q : value expected %v got %v", PollerCacheKey, hc.Id, activeInstance)
 	}
-
 }
 
 func TestGenerateCheckerId(t *testing.T) {
@@ -101,7 +99,6 @@ func TestGenerateCheckerId(t *testing.T) {
 }
 
 func TestCheckActivePollerLoop(t *testing.T) {
-
 	hc := &HostCheckerManager{}
 	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test-1:"}
 	hc.Init(redisStorage)
@@ -112,7 +109,7 @@ func TestCheckActivePollerLoop(t *testing.T) {
 
 	found := false
 
-	//Giving 15 retries to find the poller active key
+	// Giving 15 retries to find the poller active key
 	for i := 0; i < 15; i++ {
 		activeInstance, err := hc.store.GetKey(PollerCacheKey)
 		if activeInstance == hc.Id && err == nil {
@@ -124,7 +121,6 @@ func TestCheckActivePollerLoop(t *testing.T) {
 	if !found {
 		t.Errorf("activeInstance should be %q when the CheckActivePollerLoop is running", hc.Id)
 	}
-
 }
 
 func TestStartPoller(t *testing.T) {
@@ -142,7 +138,6 @@ func TestStartPoller(t *testing.T) {
 }
 
 func TestRecordUptimeAnalytics(t *testing.T) {
-
 	hc := &HostCheckerManager{}
 	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test-analytics:"}
 	hc.Init(redisStorage)
@@ -182,5 +177,4 @@ func TestRecordUptimeAnalytics(t *testing.T) {
 	if err != nil || !set {
 		t.Error("tyk-uptime-analytics should exist in redis.", err)
 	}
-
 }

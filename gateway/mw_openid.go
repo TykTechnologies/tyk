@@ -203,7 +203,6 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 			newSession, err := generateSessionFromPolicy(policyID,
 				k.Spec.OrgID,
 				true)
-
 			if err != nil {
 				k.reportLoginFailure(sessionID, r)
 				logger.Error("Could not find a valid policy to apply to this token!")

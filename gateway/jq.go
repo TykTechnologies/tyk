@@ -6,6 +6,7 @@ package gateway
 // #include <jq.h>
 // #include <jv.h>
 import "C"
+
 import (
 	"errors"
 	"fmt"

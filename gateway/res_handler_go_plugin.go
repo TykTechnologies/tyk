@@ -52,7 +52,7 @@ func (h *ResponseGoPluginMiddleware) Init(c interface{}, spec *APISpec) error {
 }
 
 func (h *ResponseGoPluginMiddleware) HandleError(rw http.ResponseWriter, req *http.Request) {
-	//noop
+	// noop
 }
 
 func (h *ResponseGoPluginMiddleware) HandleResponse(w http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {

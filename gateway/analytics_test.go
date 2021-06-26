@@ -126,7 +126,8 @@ func TestTagHeaders(t *testing.T) {
 	existingTags = tagHeaders(req, []string{
 		"x-tag-me",
 		"x-tag-me2",
-		"x-tag-me3"},
+		"x-tag-me3",
+	},
 		existingTags)
 
 	if len(existingTags) == 2 {
@@ -153,7 +154,6 @@ func TestTagHeaders(t *testing.T) {
 	if len(check) != 0 {
 		t.Fatalf("Header values not proerly set, got: %v, remnainder: %v", existingTags, check)
 	}
-
 }
 
 func BenchmarkTagHeaders(b *testing.B) {

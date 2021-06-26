@@ -99,7 +99,6 @@ func EncodeRequestToEvent(r *http.Request) string {
 
 // EventHandlerByName is a convenience function to get event handler instances from an API Definition
 func EventHandlerByName(handlerConf apidef.EventHandlerTriggerConfig, spec *APISpec) (config.TykEventHandler, error) {
-
 	conf := handlerConf.HandlerMeta
 	switch handlerConf.Handler {
 	case EH_LogHandler:

@@ -456,7 +456,6 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 			_, _ = g.Run(t, test.TestCase{Data: request, BodyMatch: `there was a problem proxying the request`, Code: http.StatusInternalServerError})
 		})
 	})
-
 }
 
 const gqlIntrospectionQuery = `query IntrospectionQuery {

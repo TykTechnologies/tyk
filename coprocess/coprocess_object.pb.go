@@ -15,9 +15,11 @@ import (
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -48,15 +50,19 @@ func (*Object) Descriptor() ([]byte, []int) {
 func (m *Object) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Object.Unmarshal(m, b)
 }
+
 func (m *Object) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Object.Marshal(b, m, deterministic)
 }
+
 func (m *Object) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Object.Merge(m, src)
 }
+
 func (m *Object) XXX_Size() int {
 	return xxx_messageInfo_Object.Size(m)
 }
+
 func (m *Object) XXX_DiscardUnknown() {
 	xxx_messageInfo_Object.DiscardUnknown(m)
 }
@@ -129,15 +135,19 @@ func (*Event) Descriptor() ([]byte, []int) {
 func (m *Event) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Event.Unmarshal(m, b)
 }
+
 func (m *Event) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Event.Marshal(b, m, deterministic)
 }
+
 func (m *Event) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Event.Merge(m, src)
 }
+
 func (m *Event) XXX_Size() int {
 	return xxx_messageInfo_Event.Size(m)
 }
+
 func (m *Event) XXX_DiscardUnknown() {
 	xxx_messageInfo_Event.DiscardUnknown(m)
 }
@@ -167,15 +177,19 @@ func (*EventReply) Descriptor() ([]byte, []int) {
 func (m *EventReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_EventReply.Unmarshal(m, b)
 }
+
 func (m *EventReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_EventReply.Marshal(b, m, deterministic)
 }
+
 func (m *EventReply) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_EventReply.Merge(m, src)
 }
+
 func (m *EventReply) XXX_Size() int {
 	return xxx_messageInfo_EventReply.Size(m)
 }
+
 func (m *EventReply) XXX_DiscardUnknown() {
 	xxx_messageInfo_EventReply.DiscardUnknown(m)
 }
@@ -223,8 +237,10 @@ var fileDescriptor_72698a2223f86099 = []byte{
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ context.Context
-var _ grpc.ClientConnInterface
+var (
+	_ context.Context
+	_ grpc.ClientConnInterface
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
@@ -271,12 +287,12 @@ type DispatcherServer interface {
 }
 
 // UnimplementedDispatcherServer can be embedded to have forward compatible implementations.
-type UnimplementedDispatcherServer struct {
-}
+type UnimplementedDispatcherServer struct{}
 
 func (*UnimplementedDispatcherServer) Dispatch(ctx context.Context, req *Object) (*Object, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Dispatch not implemented")
 }
+
 func (*UnimplementedDispatcherServer) DispatchEvent(ctx context.Context, req *Event) (*EventReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DispatchEvent not implemented")
 }

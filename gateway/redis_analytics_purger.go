@@ -45,7 +45,7 @@ func (r *RedisPurger) PurgeCache() {
 	for i := -1; i < 10; i++ {
 		var analyticsKey string
 		if i == -1 {
-			//if it's the first iteration, we look for tyk-system-analytics to maintain backwards compatibility or if analytics_config.enable_multiple_analytics_keys is disabled in the gateway
+			// if it's the first iteration, we look for tyk-system-analytics to maintain backwards compatibility or if analytics_config.enable_multiple_analytics_keys is disabled in the gateway
 			analyticsKey = analyticsKeyName
 		} else {
 			analyticsKey = fmt.Sprintf("%v_%v", analyticsKeyName, i)

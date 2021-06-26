@@ -87,7 +87,6 @@ func onLESSLStatusReceivedHandler(payload string) {
 	}
 
 	log.Info("Received Redis LE change notification from myself, ignoring")
-
 }
 
 func StartPeriodicStateBackup(ctx context.Context, m *letsencrypt.Manager) {

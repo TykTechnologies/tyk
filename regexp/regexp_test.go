@@ -381,7 +381,6 @@ func BenchmarkRegexpReplaceAllString(b *testing.B) {
 	}
 
 	b.Log(str)
-
 }
 
 func TestReplaceAllLiteralString(t *testing.T) {
@@ -421,7 +420,6 @@ func BenchmarkRegexpReplaceAllLiteralString(b *testing.B) {
 	}
 
 	b.Log(str)
-
 }
 
 func TestReplaceAllStringFunc(t *testing.T) {
@@ -475,7 +473,6 @@ func BenchmarkRegexpReplaceAllStringFunc(b *testing.B) {
 	}
 
 	b.Log(str)
-
 }
 
 func TestFindAllString(t *testing.T) {

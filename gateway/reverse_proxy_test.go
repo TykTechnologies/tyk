@@ -29,10 +29,8 @@ import (
 )
 
 func TestCopyHeader_NoDuplicateCORSHeaders(t *testing.T) {
-
 	makeHeaders := func(withCORS bool) http.Header {
-
-		var h = http.Header{}
+		h := http.Header{}
 
 		h.Set("Vary", "Origin")
 		h.Set("Location", "https://tyk.io")
@@ -162,19 +160,20 @@ func TestReverseProxyDnsCache(t *testing.T) {
 		cacheUpdateInterval = 10
 	)
 
-	var (
-		etcHostsMap = map[string][]string{
-			host:   {"127.0.0.10", "127.0.0.20"},
-			host2:  {"10.0.20.0", "10.0.20.1", "10.0.20.2"},
-			host3:  {"10.0.20.15", "10.0.20.16"},
-			wsHost: {"127.0.0.10", "127.0.0.10"},
-		}
-	)
+	etcHostsMap := map[string][]string{
+		host:   {"127.0.0.10", "127.0.0.20"},
+		host2:  {"10.0.20.0", "10.0.20.1", "10.0.20.2"},
+		host3:  {"10.0.20.15", "10.0.20.16"},
+		wsHost: {"127.0.0.10", "127.0.0.10"},
+	}
 
-	tearDown := setupTestReverseProxyDnsCache(&configTestReverseProxyDnsCache{t, etcHostsMap,
+	tearDown := setupTestReverseProxyDnsCache(&configTestReverseProxyDnsCache{
+		t, etcHostsMap,
 		config.DnsCacheConfig{
 			Enabled: true, TTL: cacheTTL, CheckInterval: cacheUpdateInterval,
-			MultipleIPsHandleStrategy: config.NoCacheStrategy}})
+			MultipleIPsHandleStrategy: config.NoCacheStrategy,
+		},
+	})
 
 	currentStorage := dnsCacheManager.CacheStorage()
 	fakeDeleteStorage := &dnscache.MockStorage{
@@ -182,9 +181,10 @@ func TestReverseProxyDnsCache(t *testing.T) {
 		MockGet:       currentStorage.Get,
 		MockSet:       currentStorage.Set,
 		MockDelete: func(key string) {
-			//prevent deletion
+			// prevent deletion
 		},
-		MockClear: currentStorage.Clear}
+		MockClear: currentStorage.Clear,
+	}
 	dnsCacheManager.SetCacheStorage(fakeDeleteStorage)
 
 	defer tearDown()
@@ -282,9 +282,11 @@ func TestReverseProxyDnsCache(t *testing.T) {
 				dnsCacheManager.SetCacheStorage(nil)
 			}
 
-			spec := &APISpec{APIDefinition: &apidef.APIDefinition{},
+			spec := &APISpec{
+				APIDefinition:          &apidef.APIDefinition{},
 				EnforcedTimeoutEnabled: true,
-				GlobalConfig:           config.Config{ProxyCloseConnections: true, ProxyDefaultTimeout: 0.1}}
+				GlobalConfig:           config.Config{ProxyCloseConnections: true, ProxyDefaultTimeout: 0.1},
+			}
 
 			req := TestReq(t, tc.Method, tc.URL, tc.Body)
 			for name, value := range tc.Headers {

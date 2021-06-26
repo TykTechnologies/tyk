@@ -31,13 +31,15 @@ const (
 	triggerKeySep    = "-"
 )
 
-var dollarMatch = regexp.MustCompile(`\$\d+`)
-var contextMatch = regexp.MustCompile(`\$tyk_context.([A-Za-z0-9_\-\.]+)`)
-var consulMatch = regexp.MustCompile(`\$secret_consul.([A-Za-z0-9\/\-\.]+)`)
-var vaultMatch = regexp.MustCompile(`\$secret_vault.([A-Za-z0-9\/\-\.]+)`)
-var envValueMatch = regexp.MustCompile(`\$secret_env.([A-Za-z0-9_\-\.]+)`)
-var metaMatch = regexp.MustCompile(`\$tyk_meta.([A-Za-z0-9_\-\.]+)`)
-var secretsConfMatch = regexp.MustCompile(`\$secret_conf.([A-Za-z0-9[.\-\_]+)`)
+var (
+	dollarMatch      = regexp.MustCompile(`\$\d+`)
+	contextMatch     = regexp.MustCompile(`\$tyk_context.([A-Za-z0-9_\-\.]+)`)
+	consulMatch      = regexp.MustCompile(`\$secret_consul.([A-Za-z0-9\/\-\.]+)`)
+	vaultMatch       = regexp.MustCompile(`\$secret_vault.([A-Za-z0-9\/\-\.]+)`)
+	envValueMatch    = regexp.MustCompile(`\$secret_env.([A-Za-z0-9_\-\.]+)`)
+	metaMatch        = regexp.MustCompile(`\$tyk_meta.([A-Za-z0-9_\-\.]+)`)
+	secretsConfMatch = regexp.MustCompile(`\$secret_conf.([A-Za-z0-9[.\-\_]+)`)
+)
 
 func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 	path := r.URL.String()
@@ -201,7 +203,6 @@ func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 }
 
 func replaceTykVariables(r *http.Request, in string, escape bool) string {
-
 	if strings.Contains(in, secretsConfLabel) {
 		contextData := ctxGetData(r)
 		vars := secretsConfMatch.FindAllString(in, -1)
@@ -241,12 +242,11 @@ func replaceTykVariables(r *http.Request, in string, escape bool) string {
 			in = replaceVariables(in, vars, session.GetMetaData(), metaLabel, escape)
 		}
 	}
-	//todo add config_data
+	// todo add config_data
 	return in
 }
 
 func replaceVariables(in string, vars []string, vals map[string]interface{}, label string, escape bool) string {
-
 	emptyStringFn := func(key, in, val string) string {
 		in = strings.Replace(in, val, "", -1)
 		log.WithFields(logrus.Fields{
@@ -443,8 +443,10 @@ func (m *URLRewriteMiddleware) CheckHostRewrite(oldPath, newTarget string, r *ht
 
 const LoopScheme = "tyk"
 
-var NonAlphaNumRE = regexp.MustCompile("[^A-Za-z0-9]+")
-var LoopHostRE = regexp.MustCompile("tyk://([^/]+)")
+var (
+	NonAlphaNumRE = regexp.MustCompile("[^A-Za-z0-9]+")
+	LoopHostRE    = regexp.MustCompile("tyk://([^/]+)")
+)
 
 func replaceNonAlphaNumeric(in string) string {
 	return NonAlphaNumRE.ReplaceAllString(in, "-")
@@ -459,8 +461,8 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		return nil, http.StatusOK
 	}
 
-	//Used for looping feature
-	//To get host and query parameters
+	// Used for looping feature
+	// To get host and query parameters
 	ctxSetOrigRequestURL(r, r.URL)
 
 	log.Debug("Rewriter active")
@@ -488,8 +490,8 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	if err != nil {
 		log.Error("URL Rewrite failed, could not parse: ", p)
 	} else {
-		//Setting new path here breaks request middleware
-		//New path is set in DummyProxyHandler/Cache middleware
+		// Setting new path here breaks request middleware
+		// New path is set in DummyProxyHandler/Cache middleware
 		ctxSetURLRewriteTarget(r, newURL)
 	}
 	return nil, http.StatusOK

@@ -119,7 +119,6 @@ func isBodyHashRequired(request *http.Request) bool {
 		(request.Method == http.MethodPost ||
 			request.Method == http.MethodPut ||
 			request.Method == http.MethodPatch)
-
 }
 
 func (m *RedisCacheMiddleware) getTimeTTL(cacheTTL int64) string {

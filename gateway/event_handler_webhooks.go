@@ -212,7 +212,6 @@ func (w *WebHookHandler) CreateBody(em config.EventMessage) (string, error) {
 
 // HandleEvent will be fired when the event handler instance is found in an APISpec EventPaths object during a request chain
 func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
-
 	// Inject event message into template, render to string
 	reqBody, _ := w.CreateBody(em)
 

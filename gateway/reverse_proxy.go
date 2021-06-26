@@ -59,13 +59,15 @@ var corsHeaders = []string{
 	"Access-Control-Max-Age",
 	"Access-Control-Allow-Credentials",
 	"Access-Control-Allow-Methods",
-	"Access-Control-Allow-Headers"}
+	"Access-Control-Allow-Headers",
+}
 
-var ServiceCache *cache.Cache
-var sdMu sync.RWMutex
+var (
+	ServiceCache *cache.Cache
+	sdMu         sync.RWMutex
+)
 
 func urlFromService(spec *APISpec) (*apidef.HostList, error) {
-
 	doCacheRefresh := func() (*apidef.HostList, error) {
 		log.Debug("--> Refreshing")
 		spec.ServiceRefreshInProgress = true
@@ -432,7 +434,6 @@ func removeDuplicateCORSHeader(dst, src http.Header) {
 }
 
 func copyHeader(dst, src http.Header, ignoreCanonical bool) {
-
 	removeDuplicateCORSHeader(dst, src)
 
 	for k, vv := range src {
@@ -454,7 +455,6 @@ func addCustomHeader(h http.Header, key string, value []string, ignoreCanonical 
 			h.Add(key, v)
 		}
 	}
-
 }
 
 func setCustomHeader(h http.Header, key string, value string, ignoreCanonical bool) {
@@ -1198,7 +1198,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 }
 
 func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response, ses *user.SessionState) error {
-
 	// Remove hop-by-hop headers listed in the
 	// "Connection" header of the response.
 	if c := res.Header.Get(headers.Connection); c != "" {
@@ -1284,7 +1283,6 @@ func (p *ReverseProxy) CopyResponse(dst io.Writer, src io.Reader) {
 }
 
 func (p *ReverseProxy) copyBuffer(dst io.Writer, src io.Reader) (int64, error) {
-
 	buf := p.sp.Get().(*[]byte)
 	defer p.sp.Put(buf)
 

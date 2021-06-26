@@ -113,7 +113,6 @@ func TestGlobalResponseHeaders(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 
 		spec.ResponseProcessors = []apidef.ResponseProcessor{{Name: "header_injector"}}
-
 	})[0]
 	LoadAPI(spec)
 

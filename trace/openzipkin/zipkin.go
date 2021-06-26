@@ -16,9 +16,11 @@ import (
 	"github.com/openzipkin/zipkin-go/reporter/http"
 )
 
-var _ opentracing.Tracer = (*zipkinTracer)(nil)
-var _ opentracing.SpanContext = (*spanContext)(nil)
-var _ opentracing.Span = (*Span)(nil)
+var (
+	_ opentracing.Tracer      = (*zipkinTracer)(nil)
+	_ opentracing.SpanContext = (*spanContext)(nil)
+	_ opentracing.Span        = (*Span)(nil)
+)
 
 const Name = "zipkin"
 

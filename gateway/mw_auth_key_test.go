@@ -422,7 +422,7 @@ const multiAuthDef = `{
 }`
 
 func TestStripBearer(t *testing.T) {
-	var bearerTests = []struct {
+	bearerTests := []struct {
 		in  string
 		out string
 	}{

@@ -9,7 +9,6 @@ import (
 )
 
 func TestValidateSignature_Init(t *testing.T) {
-
 	type tt = struct {
 		In    string
 		Error error

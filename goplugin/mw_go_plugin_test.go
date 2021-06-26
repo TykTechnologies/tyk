@@ -92,7 +92,8 @@ func TestGoPluginMWs(t *testing.T) {
 				Path:      "/tyk/keys/abc",
 				AdminAuth: true,
 				Code:      http.StatusOK,
-				BodyMatch: `"action":"deleted"`},
+				BodyMatch: `"action":"deleted"`,
+			},
 		}...)
 	})
 }
@@ -182,7 +183,6 @@ func TestGoPluginPerPathSingleFile(t *testing.T) {
 			},
 		}
 		spec.VersionData.Versions["v1"] = v
-
 	})
 
 	time.Sleep(1 * time.Second)
@@ -214,7 +214,6 @@ func TestGoPluginPerPathSingleFile(t *testing.T) {
 			},
 		}...)
 	})
-
 }
 
 func TestGoPluginAPIandPerPath(t *testing.T) {
@@ -250,7 +249,6 @@ func TestGoPluginAPIandPerPath(t *testing.T) {
 			},
 		}
 		spec.VersionData.Versions["v1"] = v
-
 	})
 
 	time.Sleep(1 * time.Second)

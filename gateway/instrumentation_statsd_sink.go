@@ -86,8 +86,10 @@ type statsdEmitCmd struct {
 	Status health.CompletionStatus
 }
 
-const cmdChanBuffSize = 8192 // random-ass-guess
-const maxUdpBytes = 1440     // 1500(Ethernet MTU) - 60(Max UDP header size
+const (
+	cmdChanBuffSize = 8192 // random-ass-guess
+	maxUdpBytes     = 1440 // 1500(Ethernet MTU) - 60(Max UDP header size
+)
 
 func NewStatsDSink(addr string, options *StatsDSinkOptions) (*StatsDSink, error) {
 	c, err := net.ListenPacket("udp", ":0")

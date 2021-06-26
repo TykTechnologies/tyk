@@ -49,7 +49,6 @@ func prepareStorage() generalStores {
 }
 
 func skipSpecBecauseInvalid(spec *APISpec, logger *logrus.Entry) bool {
-
 	switch spec.Protocol {
 	case "", "http", "https":
 		if spec.Proxy.ListenPath == "" {
@@ -117,7 +116,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		"api_name": spec.Name,
 	})
 
-	var coprocessLog = logger.WithFields(logrus.Fields{
+	coprocessLog := logger.WithFields(logrus.Fields{
 		"prefix": "coprocess",
 	})
 
@@ -134,7 +133,6 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		lowerCaseHeaders := make([]string, len(spec.TagHeaders))
 		for i, k := range spec.TagHeaders {
 			lowerCaseHeaders[i] = strings.ToLower(k)
-
 		}
 		spec.TagHeaders = lowerCaseHeaders
 	}
@@ -455,8 +453,8 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 			chainArray = append(chainArray, createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
 		}
 	}
-	//Do not add middlewares after cache middleware.
-	//It will not get executed
+	// Do not add middlewares after cache middleware.
+	// It will not get executed
 	mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: &cacheStore})
 
 	chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid}})
@@ -781,7 +779,6 @@ func loadGraphQLPlayground(spec *APISpec, subrouter *mux.Router) {
 		err := playgroundTemplate.ExecuteTemplate(rw, playgroundHTMLTemplateName, struct {
 			Url, Schema, PathPrefix string
 		}{endpoint, strconv.Quote(spec.GraphQL.Schema), path.Join(endpoint, playgroundPath)})
-
 		if err != nil {
 			rw.WriteHeader(http.StatusInternalServerError)
 		}
@@ -882,5 +879,4 @@ func loadApps(specs []*APISpec) {
 	mainLog.Debug("Checker host Done")
 
 	mainLog.Info("Initialised API Definitions")
-
 }

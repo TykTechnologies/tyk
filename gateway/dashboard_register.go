@@ -103,7 +103,6 @@ func (h *HTTPDashboardHandler) Init() error {
 // NotifyDashboardOfEvent acts as a form of event which informs the
 // dashboard of a key which has reached a certain usage quota
 func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
-
 	meta, ok := event.(EventTriggerExceededMeta)
 	if !ok {
 		return errors.New("event type is currently not supported as a notification to the dashboard")
@@ -202,7 +201,6 @@ func (h *HTTPDashboardHandler) Ping() error {
 }
 
 func (h *HTTPDashboardHandler) StartBeating() error {
-
 	req := h.newRequest(http.MethodGet, h.HeartBeatEndpoint)
 
 	client := initialiseClient()
@@ -259,7 +257,7 @@ func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Cli
 
 	// Set the nonce
 	ServiceNonce = val.Nonce
-	//log.Debug("Heartbeat Finished: Nonce Set: ", ServiceNonce)
+	// log.Debug("Heartbeat Finished: Nonce Set: ", ServiceNonce)
 
 	return nil
 }
@@ -272,7 +270,6 @@ func (h *HTTPDashboardHandler) DeRegister() error {
 
 	c := initialiseClient()
 	resp, err := c.Do(req)
-
 	if err != nil {
 		return fmt.Errorf("deregister request failed with error %v", err)
 	}

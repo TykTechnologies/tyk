@@ -19,7 +19,6 @@ func TestToAPIDefinition_Swagger(t *testing.T) {
 	}
 
 	def, err := imp.ToAPIDefinition("testOrg", "http://test.com", false)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +39,6 @@ func TestToAPIDefinition_Swagger(t *testing.T) {
 	if len(v.ExtendedPaths.TrackEndpoints) != 3 {
 		t.Fatalf("Expected 3 endpoints, found %v\n", len(v.ExtendedPaths.TrackEndpoints))
 	}
-
 }
 
 var petstoreJSON string = `{

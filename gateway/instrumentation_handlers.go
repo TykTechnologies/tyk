@@ -15,9 +15,11 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 )
 
-var applicationGCStats = debug.GCStats{}
-var instrument = health.NewStream()
-var instrumentationEnabled bool
+var (
+	applicationGCStats     = debug.GCStats{}
+	instrument             = health.NewStream()
+	instrumentationEnabled bool
+)
 
 // setupInstrumentation handles all the intialisation of the instrumentation handler
 func setupInstrumentation() {
@@ -38,7 +40,6 @@ func setupInstrumentation() {
 	log.Info("Sending stats to: ", config.Global().StatsdConnectionString, " with prefix: ", config.Global().StatsdPrefix)
 	statsdSink, err := NewStatsDSink(config.Global().StatsdConnectionString,
 		&StatsDSinkOptions{Prefix: config.Global().StatsdPrefix})
-
 	if err != nil {
 		log.Fatal("Failed to start StatsD check: ", err)
 	}

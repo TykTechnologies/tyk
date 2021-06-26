@@ -35,13 +35,11 @@ func (i *IPBlackListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 
 		// Check CIDR if possible
 		if blockedNet != nil && blockedNet.Contains(remoteIP) {
-
 			return i.handleError(r, remoteIP.String())
 		}
 
 		// We parse the IP to manage IPv4 and IPv6 easily
 		if blockedIP.Equal(remoteIP) {
-
 			return i.handleError(r, remoteIP.String())
 		}
 	}
@@ -50,7 +48,6 @@ func (i *IPBlackListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 }
 
 func (i *IPBlackListMiddleware) handleError(r *http.Request, blacklistedIP string) (error, int) {
-
 	// Fire Authfailed Event
 	AuthFailed(i, r, blacklistedIP)
 	// Report in health check

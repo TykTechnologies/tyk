@@ -89,7 +89,6 @@ func TestGranularAccessMiddleware_ProcessRequest(t *testing.T) {
 				},
 			}...)
 		})
-
 	})
 
 	t.Run("Policy applied key", func(t *testing.T) {

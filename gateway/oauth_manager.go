@@ -9,6 +9,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,8 +19,6 @@ import (
 	"github.com/lonelycode/osin"
 	uuid "github.com/satori/go.uuid"
 	"golang.org/x/crypto/bcrypt"
-
-	"strconv"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
@@ -106,7 +105,6 @@ type OAuthHandlers struct {
 }
 
 func (o *OAuthHandlers) generateOAuthOutputFromOsinResponse(osinResponse *osin.Response) []byte {
-
 	// TODO: Might need to clear this out
 	if osinResponse.Output["state"] == "" {
 		log.Debug("Removing state")
@@ -173,7 +171,6 @@ func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *htt
 		w.Header().Add("Location", o.Manager.API.Oauth2Meta.AuthorizeLoginRedirect)
 	}
 	w.WriteHeader(307)
-
 }
 
 // HandleAccessRequest handles the OAuth 2.0 token or refresh access request, and wraps Tyk's own and Osin's OAuth handlers,
@@ -232,8 +229,8 @@ const (
 	refreshToken = "refresh_token"
 )
 
-//in compliance with https://tools.ietf.org/html/rfc7009#section-2.1
-//ToDo: set an authentication mechanism
+// in compliance with https://tools.ietf.org/html/rfc7009#section-2.1
+// ToDo: set an authentication mechanism
 func (o *OAuthHandlers) HandleRevokeToken(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
@@ -434,7 +431,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 					session.BasicAuthData.Password = pw
 					session.BasicAuthData.Hash = hs
 
-					//log.Warning("Old Keys: ", session.OauthKeys)
+					// log.Warning("Old Keys: ", session.OauthKeys)
 				}
 			}
 		} else {
@@ -497,7 +494,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			"client_id":      clientId,
 			"response error": resp.StatusText,
 			"response code":  resp.ErrorStatusCode,
-			"RemoteAddr":     request.RealIP(r), //r.RemoteAddr,
+			"RemoteAddr":     request.RealIP(r), // r.RemoteAddr,
 		}).Error("[OAuth] OAuth response marked as error")
 	}
 
@@ -566,7 +563,6 @@ type TykOsinServer struct {
 
 // TykOsinNewServer creates a new server instance, but uses an extended interface so we can SetClient() too.
 func TykOsinNewServer(config *osin.ServerConfig, storage ExtendedOsinStorageInterface) *TykOsinServer {
-
 	overrideServer := TykOsinServer{
 		Config:            config,
 		Storage:           storage,
@@ -618,11 +614,9 @@ func (r *RedisOsinStorageInterface) GetClient(id string) (osin.Client, error) {
 // GetClientNoPrefix will retrieve client data, but not assign a prefix - this is an unfortunate hack,
 // but we don't want to change the signature in Osin for GetClient to support the odd Redis prefixing
 func (r *RedisOsinStorageInterface) GetClientNoPrefix(id string) (osin.Client, error) {
-
 	key := id
 
 	clientJSON, err := r.store.GetKey(key)
-
 	if err != nil {
 		log.Error("Failure retrieving client ID key: ", err)
 		return nil, err
@@ -808,7 +802,6 @@ func (r *RedisOsinStorageInterface) GetClientTokens(id string) ([]OAuthClientTok
 // SetClient creates client data
 func (r *RedisOsinStorageInterface) SetClient(id string, orgID string, client osin.Client, ignorePrefix bool) error {
 	clientDataJSON, err := json.Marshal(client)
-
 	if err != nil {
 		log.Error("Couldn't marshal client data: ", err)
 		return err
@@ -827,7 +820,7 @@ func (r *RedisOsinStorageInterface) SetClient(id string, orgID string, client os
 	keyForSet := prefixClientset + prefixClient // Org ID
 
 	indexKey := prefixClientIndexList + orgID
-	//check if the indexKey exists
+	// check if the indexKey exists
 	exists, err := r.store.Exists(indexKey)
 	if err != nil {
 		return err
@@ -902,7 +895,6 @@ func (r *RedisOsinStorageInterface) LoadAuthorize(code string) (*osin.AuthorizeD
 	key := prefixAuth + code
 	log.Debug("Loading auth code: ", key)
 	authJSON, err := r.store.GetKey(key)
-
 	if err != nil {
 		log.Error("Failure retreiving auth code key: ", err)
 		return nil, err
@@ -1022,7 +1014,6 @@ func (r *RedisOsinStorageInterface) LoadAccess(token string) (*osin.AccessData, 
 	key := prefixAccess + storage.HashKey(token)
 	log.Debug("Loading ACCESS key: ", key)
 	accessJSON, err := r.store.GetKey(key)
-
 	if err != nil {
 		// Fallback to unhashed value for backward compatibility
 		key = prefixAccess + token
@@ -1045,11 +1036,10 @@ func (r *RedisOsinStorageInterface) LoadAccess(token string) (*osin.AccessData, 
 
 // RemoveAccess will remove access data from Redis
 func (r *RedisOsinStorageInterface) RemoveAccess(token string) error {
-
 	access, err := r.LoadAccess(token)
 	if err == nil {
 		key := prefixClientTokens + access.Client.GetId()
-		//remove from set oauth.client-tokens
+		// remove from set oauth.client-tokens
 		log.Info("removing token from oauth client tokens list")
 		limit := strconv.FormatFloat(float64(access.ExpireAt().Unix()), 'f', 0, 64)
 		r.redisStore.RemoveSortedSetRange(key, limit, limit)
@@ -1069,7 +1059,6 @@ func (r *RedisOsinStorageInterface) LoadRefresh(token string) (*osin.AccessData,
 	key := prefixRefresh + token
 	log.Debug("Loading REFRESH key: ", key)
 	accessJSON, err := r.store.GetKey(key)
-
 	if err != nil {
 		log.Error("Failure retreiving access token by key: ", err)
 		return nil, err
@@ -1135,7 +1124,6 @@ func (r *RedisOsinStorageInterface) GetUser(username string) (*user.SessionState
 	key := username
 	log.Debug("Loading User key: ", key)
 	accessJSON, err := r.store.GetRawKey(key)
-
 	if err != nil {
 		log.Error("Failure retreiving access token by key: ", err)
 		return nil, err
@@ -1165,5 +1153,4 @@ func (r *RedisOsinStorageInterface) SetUser(username string, session *user.Sessi
 	}
 
 	return nil
-
 }

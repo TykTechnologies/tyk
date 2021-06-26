@@ -39,9 +39,9 @@ type Sampler struct {
 	// "mod"
 	// provides a generic type Sampler
 	Name string `json:"name"`
-	//Rate is used by both "boundary" and "count" samplers
+	// Rate is used by both "boundary" and "count" samplers
 	Rate float64 `json:"rate"`
-	//Salt is used by "boundary" sampler
+	// Salt is used by "boundary" sampler
 	Salt int64 `json:"salt"`
 	// Mod is only used when sampler is mod
 	Mod uint64 `json:"mod"`

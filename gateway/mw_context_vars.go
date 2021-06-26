@@ -23,7 +23,6 @@ func (m *MiddlewareContextVars) EnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *MiddlewareContextVars) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-
 	parseForm(r)
 
 	contextDataObject := map[string]interface{}{
@@ -33,7 +32,7 @@ func (m *MiddlewareContextVars) ProcessRequest(w http.ResponseWriter, r *http.Re
 		"path_parts":   strings.Split(r.URL.Path, "/"), // Path parts
 		"path":         r.URL.Path,                     // path data
 		"remote_addr":  request.RealIP(r),              // IP
-		"request_id":   uuid.NewV4().String(),          //Correlation ID
+		"request_id":   uuid.NewV4().String(),          // Correlation ID
 	}
 
 	for hname, vals := range r.Header {

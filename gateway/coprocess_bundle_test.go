@@ -14,9 +14,7 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
-var (
-	testBundlesPath = filepath.Join(testMiddlewarePath, "bundles")
-)
+var testBundlesPath = filepath.Join(testMiddlewarePath, "bundles")
 
 var pkgPath string
 
@@ -204,7 +202,8 @@ func TestResponseOverride(t *testing.T) {
 			EnableCoProcess:  true,
 			PythonPathPrefix: pkgPath,
 			PythonVersion:    "3.5",
-		}})
+		},
+	})
 	defer ts.Close()
 
 	customHeader := map[string]string{"X-Foo": "Bar"}

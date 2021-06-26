@@ -157,7 +157,6 @@ func TestTransformResponse_WithCache(t *testing.T) {
 				v.ExtendedPaths.Cached = []string{path}
 			})
 		})
-
 	}
 
 	// without cache
@@ -175,5 +174,4 @@ func TestTransformResponse_WithCache(t *testing.T) {
 		{Path: path, Headers: map[string]string{"Foo": "Bar"}, Code: 200, BodyMatch: `{"foo":"Bar"}`, Delay: 100 * time.Millisecond}, // Returns response and caches it
 		{Path: path, Headers: map[string]string{"Foo": "Bar2"}, Code: 200, BodyMatch: `{"foo":"Bar"}`},                               // Returns cached response directly
 	}...)
-
 }

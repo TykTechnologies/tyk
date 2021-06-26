@@ -273,5 +273,4 @@ func (s *ServiceDiscovery) Target(serviceURL string) (*apidef.HostList, error) {
 	}
 
 	return s.ProcessRawData(rawData)
-
 }

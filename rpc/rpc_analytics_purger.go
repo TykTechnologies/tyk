@@ -41,6 +41,7 @@ type AnalyticsRecord struct {
 	TrackPath     bool
 	ExpireAt      time.Time `bson:"expireAt" json:"expireAt"`
 }
+
 type GeoData struct {
 	Country struct {
 		ISOCode string `maxminddb:"iso_code"`
@@ -119,7 +120,7 @@ func (r *Purger) PurgeCache() {
 	for i := -1; i < 10; i++ {
 		var analyticsKeyName string
 		if i == -1 {
-			//if it's the first iteration, we look for tyk-system-analytics to maintain backwards compatibility or if analytics_config.enable_multiple_analytics_keys is disabled in the gateway
+			// if it's the first iteration, we look for tyk-system-analytics to maintain backwards compatibility or if analytics_config.enable_multiple_analytics_keys is disabled in the gateway
 			analyticsKeyName = ANALYTICS_KEYNAME
 		} else {
 			analyticsKeyName = fmt.Sprintf("%v_%v", ANALYTICS_KEYNAME, i)

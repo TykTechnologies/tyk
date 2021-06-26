@@ -121,7 +121,7 @@ func TestLooping(t *testing.T) {
 			spec.Proxy.ListenPath = "/"
 		})
 
-		//addHeaders := map[string]string{"X-Test": "test", "X-Internal": "test"}
+		// addHeaders := map[string]string{"X-Test": "test", "X-Internal": "test"}
 
 		ts.Run(t, []test.TestCase{
 			{Method: "GET", Path: "/test", BodyMatch: `"Url":"/upstream"`},

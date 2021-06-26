@@ -219,7 +219,7 @@ func TestCertificateStorage(t *testing.T) {
 
 	certPem, _ := genCertificateFromCommonName("file", false)
 	certPath := filepath.Join(dir, "cert.pem")
-	ioutil.WriteFile(certPath, certPem, 0666)
+	ioutil.WriteFile(certPath, certPem, 0o666)
 
 	privateCertPEM, keyCertPEM := genCertificateFromCommonName("private", false)
 	privateCertID, _ := m.Add(append(privateCertPEM, keyCertPEM...), "")

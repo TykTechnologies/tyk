@@ -520,10 +520,9 @@ func TestWhitelistMethodWithAdditionalMiddleware(t *testing.T) {
 				]`), &v.ExtendedPaths.TransformResponseHeader)
 			})
 			spec.ResponseProcessors = []apidef.ResponseProcessor{{Name: "header_injector"}}
-
 		})
 
-		//headers := map[string]string{"foo": "bar"}
+		// headers := map[string]string{"foo": "bar"}
 		ts.Run(t, []test.TestCase{
 			//Should get original upstream response
 			//{Method: "GET", Path: "/get", Code: http.StatusOK, HeadersMatch: headers},
@@ -899,7 +898,6 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 		t.Error("second call should return array with one spec", apisByID)
 	}
 	apisMu.RUnlock()
-
 }
 
 func TestAPIDefinitionLoader_Template(t *testing.T) {

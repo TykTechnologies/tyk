@@ -33,7 +33,6 @@ func (l *LDAPStorageHandler) LoadConfFromMeta(meta map[string]interface{}) {
 	l.Attributes = attrArray
 	l.SessionAttributeName = meta["session_attribute_name"].(string)
 	l.SearchString = meta["search_string"].(string)
-
 }
 
 func (l *LDAPStorageHandler) Connect() bool {
@@ -117,12 +116,14 @@ func (l *LDAPStorageHandler) GetKeys(filter string) []string {
 
 	return s
 }
+
 func (l *LDAPStorageHandler) GetKeysAndValues() map[string]string {
 	log.Warning("Not implementated")
 
 	s := map[string]string{}
 	return s
 }
+
 func (l *LDAPStorageHandler) GetKeysAndValuesWithFilter(filter string) map[string]string {
 	log.Warning("Not implementated")
 	s := map[string]string{}

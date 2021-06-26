@@ -220,6 +220,7 @@ func cloneKeys(m map[string]string) map[string]string {
 	}
 	return x
 }
+
 func cloneAccess(m map[string]AccessDefinition) map[string]AccessDefinition {
 	if m == nil {
 		return nil
@@ -346,7 +347,6 @@ func (s *SessionState) SetPolicies(ids ...string) {
 
 // PoliciesEqualTo compares and returns true if passed slice if IDs contains only current ApplyPolicies
 func (s *SessionState) PoliciesEqualTo(ids []string) bool {
-
 	s.mu.RLock()
 	policies := s.ApplyPolicies
 	s.mu.RUnlock()

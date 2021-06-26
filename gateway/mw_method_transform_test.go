@@ -12,7 +12,6 @@ func TestMethodTransform(t *testing.T) {
 	defer ts.Close()
 
 	t.Run("Using URL rewrite", func(t *testing.T) {
-
 		methodTransform := apidef.MethodTransformMeta{}
 		methodTransform.Path = "/get"
 		methodTransform.Method = "GET"

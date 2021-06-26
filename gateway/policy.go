@@ -74,7 +74,6 @@ func LoadPoliciesFromFile(filePath string) map[string]user.Policy {
 
 // LoadPoliciesFromDashboard will connect and download Policies from a Tyk Dashboard instance.
 func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[string]user.Policy {
-
 	// Get the definitions
 	newRequest, err := http.NewRequest("GET", endpoint, nil)
 	if err != nil {
@@ -176,7 +175,6 @@ func LoadPoliciesFromRPC(orgId string) (map[string]user.Policy, error) {
 	rpcPolicies := store.GetPolicies(orgId)
 
 	policies, err := parsePoliciesFromRPC(rpcPolicies)
-
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "policy",

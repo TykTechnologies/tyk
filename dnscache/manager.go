@@ -14,9 +14,7 @@ import (
 	"github.com/TykTechnologies/tyk/log"
 )
 
-var (
-	logger = log.Get().WithField("prefix", "dnscache")
-)
+var logger = log.Get().WithField("prefix", "dnscache")
 
 type DialContextFunc func(ctx context.Context, network, address string) (net.Conn, error)
 

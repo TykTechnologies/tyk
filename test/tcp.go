@@ -17,7 +17,7 @@ import (
 )
 
 type TCPTestCase struct {
-	Action     string //read or write
+	Action     string // read or write
 	Payload    string
 	ErrorMatch string
 }

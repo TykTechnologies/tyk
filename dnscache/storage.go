@@ -1,10 +1,9 @@
 package dnscache
 
 import (
+	"fmt"
 	"net"
 	"time"
-
-	"fmt"
 
 	cache "github.com/pmylund/go-cache"
 	"github.com/sirupsen/logrus"
@@ -27,7 +26,7 @@ func NewDnsCacheStorage(expiration, checkInterval time.Duration) *DnsCacheStorag
 
 // Items returns map of non expired dns cache items
 func (dc *DnsCacheStorage) Items(includeExpired bool) map[string]DnsCacheItem {
-	var allItems = dc.cache.Items()
+	allItems := dc.cache.Items()
 
 	nonExpiredItems := map[string]DnsCacheItem{}
 

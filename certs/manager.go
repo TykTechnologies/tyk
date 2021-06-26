@@ -490,7 +490,6 @@ func (c *CertificateManager) GetRaw(certID string) (string, error) {
 }
 
 func (c *CertificateManager) Add(certData []byte, orgID string) (string, error) {
-
 	certID, certChainPEM, err := GetCertIDAndChainPEM(certData, c.secret)
 	if err != nil {
 		c.logger.Error(err)
@@ -515,7 +514,6 @@ func (c *CertificateManager) Add(certData []byte, orgID string) (string, error) 
 }
 
 func (c *CertificateManager) Delete(certID string, orgID string) {
-
 	if orgID != "" {
 		c.storage.RemoveFromList(orgID+"-index", "raw-"+certID)
 	}

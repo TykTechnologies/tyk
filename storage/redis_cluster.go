@@ -2,14 +2,13 @@ package storage
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
-
-	"crypto/tls"
 
 	"github.com/go-redis/redis/v8"
 	uuid "github.com/satori/go.uuid"
@@ -27,14 +26,18 @@ const (
 // ErrRedisIsDown is returned when we can't communicate with redis
 var ErrRedisIsDown = errors.New("storage: Redis is either down or was not configured")
 
-var singlePool atomic.Value
-var singleCachePool atomic.Value
-var singleAnalyticsPool atomic.Value
+var (
+	singlePool          atomic.Value
+	singleCachePool     atomic.Value
+	singleAnalyticsPool atomic.Value
+)
 
 var redisUp atomic.Value
 
-var disableRedis atomic.Value
-var ctx = context.Background()
+var (
+	disableRedis atomic.Value
+	ctx          = context.Background()
+)
 
 // DisableRedis very handy when testsing it allows to dynamically enable/disable talking with
 // redisW
@@ -290,7 +293,6 @@ func (r *RedisCluster) singleton() redis.UniversalClient {
 }
 
 func (r *RedisCluster) hashKey(in string) string {
-
 	if !r.HashKeys {
 		// Not hashing? Return the raw key
 		return in
@@ -418,7 +420,7 @@ func (r *RedisCluster) GetExp(keyName string) (int64, error) {
 		log.Error("Error trying to get TTL: ", err)
 		return 0, ErrKeyNotFound
 	}
-	//since redis-go v8.3.1, if there's no expiration or the key doesn't exists, the ttl returned is measured in nanoseconds
+	// since redis-go v8.3.1, if there's no expiration or the key doesn't exists, the ttl returned is measured in nanoseconds
 	if value.Nanoseconds() == -1 || value.Nanoseconds() == -2 {
 		return value.Nanoseconds(), nil
 	}
@@ -439,8 +441,8 @@ func (r *RedisCluster) SetExp(keyName string, timeout int64) error {
 
 // SetKey will create (or update) a key value in the store
 func (r *RedisCluster) SetKey(keyName, session string, timeout int64) error {
-	//log.Debug("[STORE] SET Raw key is: ", keyName)
-	//log.Debug("[STORE] Setting key: ", r.fixKey(keyName))
+	// log.Debug("[STORE] SET Raw key is: ", keyName)
+	// log.Debug("[STORE] Setting key: ", r.fixKey(keyName))
 
 	if err := r.up(); err != nil {
 		return err
@@ -635,7 +637,6 @@ func (r *RedisCluster) GetKeysAndValuesWithFilter(filter string) map[string]stri
 	m := make(map[string]string)
 	for i, v := range keys {
 		m[r.cleanKey(v)] = values[i]
-
 	}
 
 	return m
@@ -902,7 +903,7 @@ func (r *RedisCluster) AppendToSet(keyName, value string) {
 	}
 }
 
-//Exists check if keyName exists
+// Exists check if keyName exists
 func (r *RedisCluster) Exists(keyName string) (bool, error) {
 	fixedKey := r.fixKey(keyName)
 	log.WithField("keyName", fixedKey).Debug("Checking if exists")
@@ -1030,7 +1031,6 @@ func (r *RedisCluster) IsMemberOfSet(keyName, value string) bool {
 		return false
 	}
 	val, err := r.singleton().SIsMember(ctx, r.fixKey(keyName), value).Result()
-
 	if err != nil {
 		log.Error("Error trying to check set memeber: ", err)
 		return false

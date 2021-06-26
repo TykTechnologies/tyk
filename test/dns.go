@@ -7,10 +7,8 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
-
-	"time"
-
 	"sync"
+	"time"
 
 	"github.com/miekg/dns"
 )
@@ -205,7 +203,7 @@ func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int)
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
 			d := net.Dialer{}
 
-			//Use write lock to prevent unsafe d.DialContext update of net.DefaultResolver
+			// Use write lock to prevent unsafe d.DialContext update of net.DefaultResolver
 			muDefaultResolver.Lock()
 			defer muDefaultResolver.Unlock()
 			return d.DialContext(ctx, network, mockServer.PacketConn.LocalAddr().String())

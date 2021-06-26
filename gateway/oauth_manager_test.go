@@ -7,15 +7,12 @@ package gateway
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"net/http"
 	"net/url"
 	"reflect"
 	"strings"
 	"testing"
-
-	"fmt"
-
-	"net/http"
-
 	"time"
 
 	"github.com/lonelycode/osin"
@@ -162,7 +159,6 @@ func TestOauthMultipleAPIs(t *testing.T) {
 		spec.UseOauth2 = true
 		spec.Proxy.ListenPath = "/api2/"
 		spec.OrgID = "org-id-2"
-
 	})
 
 	apis := LoadAPI(spec, spec2)
@@ -544,7 +540,6 @@ func TestDeleteOauthClient(t *testing.T) {
 			},
 		)
 	})
-
 }
 
 func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
@@ -616,7 +611,6 @@ func getAuthCode(t *testing.T, ts *Test) map[string]string {
 		Method:    http.MethodPost,
 		Code:      http.StatusOK,
 	})
-
 	if err != nil {
 		t.Error(err)
 	}
@@ -886,7 +880,6 @@ func getToken(t *testing.T, ts *Test) tokenData {
 		Method:  http.MethodPost,
 		Code:    http.StatusOK,
 	})
-
 	if err != nil {
 		t.Error(err)
 	}
@@ -1158,7 +1151,8 @@ func TestTokenEndpointHeaders(t *testing.T) {
 			Method:       http.MethodPost,
 			Code:         http.StatusForbidden,
 			HeadersMatch: securityAndCacheHeaders,
-		}}...)
+		},
+	}...)
 }
 
 func TestJSONToFormValues(t *testing.T) {

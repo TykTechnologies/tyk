@@ -5,8 +5,10 @@ import (
 	"testing"
 )
 
-var tStr1 = "aαa⏰𐌈"
-var tStr2 = "bβb⏳𐌏"
+var (
+	tStr1 = "aαa⏰𐌈"
+	tStr2 = "bβb⏳𐌏"
+)
 
 func TestKeyImmutabilityReset(t *testing.T) {
 	kb := keyBuilder{}
@@ -76,7 +78,6 @@ func TestWrite(t *testing.T) {
 
 	b := []byte(tStr2)
 	n, err := kb.AppendString(tStr1).Write(b)
-
 	if err != nil {
 		t.Errorf("Write should always pass without error, got %v", err)
 	}

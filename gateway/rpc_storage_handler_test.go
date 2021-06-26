@@ -47,7 +47,6 @@ func getRefreshToken(td tokenData) string {
 }
 
 func TestProcessKeySpaceChangesForOauth(t *testing.T) {
-
 	cases := []struct {
 		TestName string
 		Event    string
@@ -96,7 +95,7 @@ func TestProcessKeySpaceChangesForOauth(t *testing.T) {
 
 			var getKeyFromStore func(string) (string, error)
 			if tc.Event == RevokeOauthRefreshToken {
-				//Refresh token are threated in a different way due that they reside in a different level and we cannot access them directly
+				// Refresh token are threated in a different way due that they reside in a different level and we cannot access them directly
 				client := new(OAuthClient)
 				client.MetaData = oauthClient.MetaData
 				client.Description = oauthClient.Description

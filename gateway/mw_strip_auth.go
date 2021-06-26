@@ -23,7 +23,6 @@ func (sa *StripAuth) EnabledForSpec() bool {
 }
 
 func (sa *StripAuth) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-
 	strip := func(typ string, config *apidef.AuthConfig) {
 		log.WithFields(logrus.Fields{
 			"prefix": sa.Name(),
@@ -49,7 +48,6 @@ func (sa *StripAuth) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 
 // strips auth from query string params
 func (sa *StripAuth) stripFromParams(r *http.Request, config *apidef.AuthConfig) {
-
 	reqUrlPtr, _ := url.Parse(r.URL.String())
 
 	authParamName := "Authorization"
@@ -71,7 +69,6 @@ func (sa *StripAuth) stripFromParams(r *http.Request, config *apidef.AuthConfig)
 
 // strips auth key from headers
 func (sa *StripAuth) stripFromHeaders(r *http.Request, config *apidef.AuthConfig) {
-
 	authHeaderName := "Authorization"
 	if config.AuthHeaderName != "" {
 		authHeaderName = config.AuthHeaderName
@@ -95,6 +92,5 @@ func (sa *StripAuth) stripFromHeaders(r *http.Request, config *apidef.AuthConfig
 			r.Header.Set(cookieName, cookieValue)
 			break
 		}
-
 	}
 }

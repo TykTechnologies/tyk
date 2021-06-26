@@ -28,7 +28,7 @@ func backupConfiguration() error {
 	now := time.Now()
 	asStr := now.Format("Mon-Jan-_2-15-04-05-2006")
 	fName := asStr + ".tyk.conf"
-	return ioutil.WriteFile(fName, oldConfig, 0644)
+	return ioutil.WriteFile(fName, oldConfig, 0o644)
 }
 
 func writeNewConfiguration(payload ConfigPayload) error {
@@ -36,7 +36,7 @@ func writeNewConfiguration(payload ConfigPayload) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(confPaths[0], newConfig, 0644)
+	return ioutil.WriteFile(confPaths[0], newConfig, 0o644)
 }
 
 func handleNewConfiguration(payload string) {
@@ -190,5 +190,4 @@ func handleSendMiniConfig(payload string) {
 	log.WithFields(logrus.Fields{
 		"prefix": "pub-sub",
 	}).Debug("Configuration request responded.")
-
 }

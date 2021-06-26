@@ -37,7 +37,6 @@ func TestStripAuth_stripFromHeaders(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("stripping %+v", tc), func(t *testing.T) {
-
 			sa := StripAuth{}
 			sa.Spec = &APISpec{APIDefinition: &apidef.APIDefinition{}}
 
@@ -162,7 +161,6 @@ func TestStripAuth_stripFromParams(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("stripping %s", tc.QueryParam), func(t *testing.T) {
-
 			sa := StripAuth{}
 			sa.Spec = &APISpec{APIDefinition: &apidef.APIDefinition{}}
 

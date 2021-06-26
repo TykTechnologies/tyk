@@ -93,7 +93,6 @@ func (m *GoPluginMiddleware) Name() string {
 }
 
 func (m *GoPluginMiddleware) EnabledForSpec() bool {
-
 	// global go plugins
 	if m.Path != "" && m.SymbolName != "" {
 		m.loadPlugin()
@@ -134,7 +133,6 @@ func (m *GoPluginMiddleware) loadPlugin() bool {
 }
 
 func (m *GoPluginMiddleware) goPluginConfigFromRequest(r *http.Request) {
-
 	_, versionPaths, _, _ := m.Spec.Version(r)
 
 	found, perPathPerMethodGoPlugin := m.Spec.CheckSpecMatchesStatus(r, versionPaths, GoPlugin)
@@ -146,8 +144,8 @@ func (m *GoPluginMiddleware) goPluginConfigFromRequest(r *http.Request) {
 		m.logger = perPathPerMethodGoPlugin.(*GoPluginMiddleware).logger
 	}
 }
-func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (err error, respCode int) {
 
+func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (err error, respCode int) {
 	// is there a go plugin per path - we copy the handler etc from the urlspec if we find one
 	if !m.APILevel {
 		m.goPluginConfigFromRequest(r)

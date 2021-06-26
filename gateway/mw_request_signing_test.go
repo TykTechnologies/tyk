@@ -69,7 +69,6 @@ func generateSpec(algo string, data string, sessionKey string, headerList []stri
 		if headerList != nil {
 			spec.RequestSigning.HeaderList = headerList
 		}
-
 	})
 }
 
@@ -536,7 +535,6 @@ func TestWithURLRewrite(t *testing.T) {
 			{Path: "/test/self", Method: http.MethodGet, Code: http.StatusOK},
 		}...)
 	})
-
 }
 
 func TestRequestSigning_getRequestPath(t *testing.T) {

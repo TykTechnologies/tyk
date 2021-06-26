@@ -129,7 +129,6 @@ func getSessionTags(session *user.SessionState) []string {
 }
 
 func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, responseCopy *http.Response) {
-
 	if s.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
 		return
 	}
@@ -345,7 +344,6 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 // final destination, this is invoked by the ProxyHandler or right at the start of a request chain if the URL
 // Spec states the path is Ignored Itwill also return a response object for the cache
 func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Request) ProxyResponse {
-
 	versionDef := s.Spec.VersionDefinition
 	if !s.Spec.VersionData.NotVersioned && versionDef.Location == "url" && versionDef.StripPath {
 		part := s.Spec.getVersionFromRequest(r)

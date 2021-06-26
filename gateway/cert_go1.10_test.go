@@ -182,18 +182,20 @@ func TestPublicKeyPinning(t *testing.T) {
 		upstream.URL = strings.Replace(upstream.URL, "127.0.0.1", "localhost", 1)
 		proxy.URL = strings.Replace(proxy.URL, "127.0.0.1", "local1.host", 1)
 
-		BuildAndLoadAPI([]func(spec *APISpec){func(spec *APISpec) {
-			spec.Proxy.ListenPath = "/valid"
-			spec.Proxy.TargetURL = upstream.URL
-			spec.Proxy.Transport.ProxyURL = proxy.URL
-			spec.PinnedPublicKeys = map[string]string{"*": pubKeys}
-		},
+		BuildAndLoadAPI([]func(spec *APISpec){
+			func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/valid"
+				spec.Proxy.TargetURL = upstream.URL
+				spec.Proxy.Transport.ProxyURL = proxy.URL
+				spec.PinnedPublicKeys = map[string]string{"*": pubKeys}
+			},
 			func(spec *APISpec) {
 				spec.Proxy.ListenPath = "/invalid"
 				spec.Proxy.TargetURL = upstream.URL
 				spec.Proxy.Transport.ProxyURL = proxy.URL
 				spec.PinnedPublicKeys = map[string]string{"*": "wrong"}
-			}}...)
+			},
+		}...)
 
 		ts.Run(t, []test.TestCase{
 			{Code: 200, Path: "/valid"},
@@ -218,7 +220,7 @@ func TestProxyTransport(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
 
-	//matching ciphers
+	// matching ciphers
 	t.Run("Global: Cipher match", func(t *testing.T) {
 		globalConf := config.Global()
 		globalConf.ProxySSLInsecureSkipVerify = true

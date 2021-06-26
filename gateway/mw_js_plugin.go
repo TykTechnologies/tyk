@@ -425,7 +425,6 @@ func (j *JSVM) LoadTykJSApi() {
 	j.VM.Set("b64dec", func(call otto.FunctionCall) otto.Value {
 		in := call.Argument(0).String()
 		out, err := base64.StdEncoding.DecodeString(in)
-
 		// Fallback to RawStdEncoding:
 		if err != nil {
 			out, err = base64.RawStdEncoding.DecodeString(in)

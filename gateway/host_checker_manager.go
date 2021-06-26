@@ -177,7 +177,6 @@ func (hc *HostCheckerManager) AmIPolling() bool {
 }
 
 func (hc *HostCheckerManager) StartPoller(ctx context.Context) {
-
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
 	}).Debug("---> Initialising checker")
@@ -317,7 +316,6 @@ func (hc *HostCheckerManager) HostDown(urlStr string) bool {
 	_, ok := hc.unhealthyHostList.Load(key)
 	// Found a key, the host is down
 	return ok
-
 }
 
 func (hc *HostCheckerManager) PrepareTrackingHost(checkObject apidef.HostCheckObject, apiID string) (HostData, error) {
@@ -423,7 +421,6 @@ func (hc *HostCheckerManager) ListFromService(apiID string) ([]HostData, error) 
 	sd := ServiceDiscovery{}
 	sd.Init(&spec.UptimeTests.Config.ServiceDiscovery)
 	data, err := sd.Target(spec.UptimeTests.Config.ServiceDiscovery.QueryEndpoint)
-
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
@@ -514,7 +511,6 @@ func (hc *HostCheckerManager) RecordUptimeAnalytics(report HostHealthReport) err
 	newAnalyticsRecord.SetExpiry(spec.UptimeTests.Config.ExpireUptimeAnalyticsAfter)
 
 	encoded, err := msgpack.Marshal(newAnalyticsRecord)
-
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",

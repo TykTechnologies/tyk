@@ -66,7 +66,7 @@ func (h *DefaultHealthChecker) StoreCounterVal(counterType HealthPrefix, value s
 	searchStr := h.CreateKeyName(counterType)
 	log.Debug("Adding Healthcheck to: ", searchStr)
 	log.Debug("Val is: ", value)
-	//go h.storage.SetKey(searchStr, value, config.Global.HealthCheck.HealthCheckValueTimeout)
+	// go h.storage.SetKey(searchStr, value, config.Global.HealthCheck.HealthCheckValueTimeout)
 	if value != "-1" {
 		// need to ensure uniqueness
 		now_string := strconv.Itoa(int(time.Now().UnixNano()))

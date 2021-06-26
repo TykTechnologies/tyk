@@ -69,8 +69,10 @@ func TestGraphQL_RestrictedTypes(t *testing.T) {
 		}
 
 		_, _ = g.Run(t, []test.TestCase{
-			{Data: restrictedQuery, Headers: authHeaderWithDirectKey,
-				BodyMatch: `{"errors":\[{"message":"field: code is restricted on type: Country","path":null}\]}`, Code: http.StatusBadRequest},
+			{
+				Data: restrictedQuery, Headers: authHeaderWithDirectKey,
+				BodyMatch: `{"errors":\[{"message":"field: code is restricted on type: Country","path":null}\]}`, Code: http.StatusBadRequest,
+			},
 			{Data: unrestrictedQuery, Headers: authHeaderWithDirectKey, Code: http.StatusOK},
 		}...)
 	})
@@ -89,8 +91,10 @@ func TestGraphQL_RestrictedTypes(t *testing.T) {
 		}
 
 		_, _ = g.Run(t, []test.TestCase{
-			{Data: restrictedQuery, Headers: authHeaderWithPolicyAppliedKey,
-				BodyMatch: `{"errors":\[{"message":"field: name is restricted on type: Country","path":null}\]}`, Code: http.StatusBadRequest},
+			{
+				Data: restrictedQuery, Headers: authHeaderWithPolicyAppliedKey,
+				BodyMatch: `{"errors":\[{"message":"field: name is restricted on type: Country","path":null}\]}`, Code: http.StatusBadRequest,
+			},
 			{Data: unrestrictedQuery, Headers: authHeaderWithPolicyAppliedKey, Code: http.StatusOK},
 		}...)
 	})

@@ -156,8 +156,10 @@ func apisByIDLen() int {
 	return len(apisByID)
 }
 
-var redisPurgeOnce sync.Once
-var rpcPurgeOnce sync.Once
+var (
+	redisPurgeOnce sync.Once
+	rpcPurgeOnce   sync.Once
+)
 
 // Create all globals and init connection handlers
 func setupGlobals(ctx context.Context) {
@@ -269,7 +271,6 @@ func setupGlobals(ctx context.Context) {
 }
 
 func buildConnStr(resource string) string {
-
 	if config.Global().DBAppConfOptions.ConnectionString == "" && config.Global().DisableDashboardZeroConf {
 		mainLog.Fatal("Connection string is empty, failing.")
 	}
@@ -511,7 +512,6 @@ func generateOAuthPrefix(apiID string) string {
 
 // Create API-specific OAuth handlers and respective auth servers
 func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
-
 	apiAuthorizePath := "/tyk/oauth/authorize-client{_:/?}"
 	clientAuthPath := "/oauth/authorize{_:/?}"
 	clientAccessPath := "/oauth/token{_:/?}"
@@ -643,7 +643,6 @@ func loadCustomMiddleware(spec *APISpec) ([]string, apidef.MiddlewareDefinition,
 	}
 
 	return mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostKeyAuthFuncs, mwResponseFuncs, mwDriver
-
 }
 
 func createResponseMiddlewareChain(spec *APISpec, responseFuncs []apidef.MiddlewareDefinition) {
@@ -665,7 +664,7 @@ func createResponseMiddlewareChain(spec *APISpec, responseFuncs []apidef.Middlew
 
 	for _, mw := range responseFuncs {
 		var processor TykResponseHandler
-		//is it goplugin or other middleware
+		// is it goplugin or other middleware
 		if strings.HasSuffix(mw.Path, ".so") {
 			processor = responseProcessorByName("goplugin_res_hook")
 		} else {
@@ -688,7 +687,6 @@ func createResponseMiddlewareChain(spec *APISpec, responseFuncs []apidef.Middlew
 }
 
 func handleCORS(router *mux.Router, spec *APISpec) {
-
 	if spec.CORS.Enable {
 		mainLog.Debug("CORS ENABLED")
 		c := cors.New(cors.Options{
@@ -1061,11 +1059,11 @@ func initialiseSystem(ctx context.Context) error {
 
 func writePIDFile() error {
 	file := config.Global().PIDFileLocation
-	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
 		return err
 	}
 	pid := strconv.Itoa(os.Getpid())
-	return ioutil.WriteFile(file, []byte(pid), 0600)
+	return ioutil.WriteFile(file, []byte(pid), 0o600)
 }
 
 func readPIDFromFile() (int, error) {
@@ -1148,7 +1146,6 @@ func afterConfSetup(conf *config.Config) {
 }
 
 func kvStore(value string) (string, error) {
-
 	if strings.HasPrefix(value, "secrets://") {
 		key := strings.TrimPrefix(value, "secrets://")
 		log.Debugf("Retrieving %s from secret store in config", key)
@@ -1392,7 +1389,7 @@ func start(ctx context.Context) {
 	if !config.Global().SupressDefaultOrgStore {
 		mainLog.Debug("Initialising default org store")
 		DefaultOrgStore.Init(getGlobalStorageHandler("orgkey.", false))
-		//DefaultQuotaStore.Init(getGlobalStorageHandler(CloudHandler, "orgkey.", false))
+		// DefaultQuotaStore.Init(getGlobalStorageHandler(CloudHandler, "orgkey.", false))
 		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
 	}
 

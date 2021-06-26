@@ -220,7 +220,6 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 }
 
 func (k *BasicAuthKeyIsValid) handleAuthFail(w http.ResponseWriter, r *http.Request, token string) (error, int) {
-
 	// Fire Authfailed Event
 	AuthFailed(k, r, token)
 

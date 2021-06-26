@@ -13,8 +13,10 @@ import (
 
 const WSDLSource APIImporterSource = "wsdl"
 
-var portName = map[string]string{}
-var bindingList = map[string]*WSDLBinding{}
+var (
+	portName    = map[string]string{}
+	bindingList = map[string]*WSDLBinding{}
+)
 
 func (*WSDLDef) SetServicePortMapping(input map[string]string) {
 	for k, v := range input {
@@ -85,7 +87,7 @@ func (def *WSDLDef) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 }
 
 func (b *WSDLBinding) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
-	//Get value of name attribute
+	// Get value of name attribute
 	for _, attr := range start.Attr {
 		if attr.Name.Local == "name" {
 			b.Name = attr.Value
@@ -97,10 +99,10 @@ func (b *WSDLBinding) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 		return errors.New("Binding name is empty. Malformed wsdl")
 	}
 
-	//Fetch protocol specific data
-	//If soap/soap12 is used, set Method to POST
-	//If http is used, get value of verb attribute
-	//If any other protocol is used, then skip
+	// Fetch protocol specific data
+	// If soap/soap12 is used, set Method to POST
+	// If http is used, get value of verb attribute
+	// If any other protocol is used, then skip
 	for {
 		tok, err := d.Token()
 		if err != nil {
@@ -124,8 +126,8 @@ func (b *WSDLBinding) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 									b.Protocol = PROT_SOAP_12
 								}
 
-								//Get transport protocol
-								//TODO if transport protocol is different from http
+								// Get transport protocol
+								// TODO if transport protocol is different from http
 								var transport string
 								for _, attr := range t.Attr {
 									if attr.Name.Local == "transport" {
@@ -359,7 +361,7 @@ func (def *WSDLDef) ConvertIntoApiVersion(bool) (apidef.VersionInfo, error) {
 				serviceCount++
 				method := binding.Method
 
-				//Create endpoints for each operation
+				// Create endpoints for each operation
 				for _, op := range binding.Operations {
 					operationTrackEndpoint := apidef.TrackEndpointMeta{}
 					operationUrlRewrite := apidef.URLRewriteMeta{}
@@ -375,13 +377,13 @@ func (def *WSDLDef) ConvertIntoApiVersion(bool) (apidef.VersionInfo, error) {
 						path = service.Name + "/" + op.Name
 					}
 
-					//Add each operation in trackendpoint
+					// Add each operation in trackendpoint
 					operationTrackEndpoint.Path = path
 					operationTrackEndpoint.Method = method
 
 					versionInfo.ExtendedPaths.TrackEndpoints = append(versionInfo.ExtendedPaths.TrackEndpoints, operationTrackEndpoint)
 
-					//Rewrite operation to service endpoint
+					// Rewrite operation to service endpoint
 					operationUrlRewrite.Method = method
 					operationUrlRewrite.Path = path
 

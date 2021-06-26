@@ -11,9 +11,11 @@ import (
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -39,15 +41,19 @@ func (*AccessSpec) Descriptor() ([]byte, []int) {
 func (m *AccessSpec) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_AccessSpec.Unmarshal(m, b)
 }
+
 func (m *AccessSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_AccessSpec.Marshal(b, m, deterministic)
 }
+
 func (m *AccessSpec) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_AccessSpec.Merge(m, src)
 }
+
 func (m *AccessSpec) XXX_Size() int {
 	return xxx_messageInfo_AccessSpec.Size(m)
 }
+
 func (m *AccessSpec) XXX_DiscardUnknown() {
 	xxx_messageInfo_AccessSpec.DiscardUnknown(m)
 }
@@ -88,15 +94,19 @@ func (*AccessDefinition) Descriptor() ([]byte, []int) {
 func (m *AccessDefinition) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_AccessDefinition.Unmarshal(m, b)
 }
+
 func (m *AccessDefinition) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_AccessDefinition.Marshal(b, m, deterministic)
 }
+
 func (m *AccessDefinition) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_AccessDefinition.Merge(m, src)
 }
+
 func (m *AccessDefinition) XXX_Size() int {
 	return xxx_messageInfo_AccessDefinition.Size(m)
 }
+
 func (m *AccessDefinition) XXX_DiscardUnknown() {
 	xxx_messageInfo_AccessDefinition.DiscardUnknown(m)
 }
@@ -149,15 +159,19 @@ func (*BasicAuthData) Descriptor() ([]byte, []int) {
 func (m *BasicAuthData) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_BasicAuthData.Unmarshal(m, b)
 }
+
 func (m *BasicAuthData) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_BasicAuthData.Marshal(b, m, deterministic)
 }
+
 func (m *BasicAuthData) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_BasicAuthData.Merge(m, src)
 }
+
 func (m *BasicAuthData) XXX_Size() int {
 	return xxx_messageInfo_BasicAuthData.Size(m)
 }
+
 func (m *BasicAuthData) XXX_DiscardUnknown() {
 	xxx_messageInfo_BasicAuthData.DiscardUnknown(m)
 }
@@ -195,15 +209,19 @@ func (*JWTData) Descriptor() ([]byte, []int) {
 func (m *JWTData) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_JWTData.Unmarshal(m, b)
 }
+
 func (m *JWTData) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_JWTData.Marshal(b, m, deterministic)
 }
+
 func (m *JWTData) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_JWTData.Merge(m, src)
 }
+
 func (m *JWTData) XXX_Size() int {
 	return xxx_messageInfo_JWTData.Size(m)
 }
+
 func (m *JWTData) XXX_DiscardUnknown() {
 	xxx_messageInfo_JWTData.DiscardUnknown(m)
 }
@@ -234,15 +252,19 @@ func (*Monitor) Descriptor() ([]byte, []int) {
 func (m *Monitor) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Monitor.Unmarshal(m, b)
 }
+
 func (m *Monitor) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Monitor.Marshal(b, m, deterministic)
 }
+
 func (m *Monitor) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Monitor.Merge(m, src)
 }
+
 func (m *Monitor) XXX_Size() int {
 	return xxx_messageInfo_Monitor.Size(m)
 }
+
 func (m *Monitor) XXX_DiscardUnknown() {
 	xxx_messageInfo_Monitor.DiscardUnknown(m)
 }
@@ -303,15 +325,19 @@ func (*SessionState) Descriptor() ([]byte, []int) {
 func (m *SessionState) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_SessionState.Unmarshal(m, b)
 }
+
 func (m *SessionState) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_SessionState.Marshal(b, m, deterministic)
 }
+
 func (m *SessionState) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_SessionState.Merge(m, src)
 }
+
 func (m *SessionState) XXX_Size() int {
 	return xxx_messageInfo_SessionState.Size(m)
 }
+
 func (m *SessionState) XXX_DiscardUnknown() {
 	xxx_messageInfo_SessionState.DiscardUnknown(m)
 }

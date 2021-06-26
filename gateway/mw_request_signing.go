@@ -160,15 +160,15 @@ func (s *RequestSigning) ProcessRequest(w http.ResponseWriter, r *http.Request, 
 		}
 	}
 
-	//Generate Authorization header
+	// Generate Authorization header
 	authHeader := "Signature "
-	//Append keyId
+	// Append keyId
 	authHeader += "keyId=\"" + s.Spec.RequestSigning.KeyId + "\","
-	//Append algorithm
+	// Append algorithm
 	authHeader += "algorithm=\"" + s.Spec.RequestSigning.Algorithm + "\","
-	//Append Headers
+	// Append Headers
 	authHeader += "headers=\"" + strHeaders + "\","
-	//Append signature
+	// Append signature
 	authHeader += "signature=\"" + encodedSignature + "\""
 
 	if s.Spec.RequestSigning.SignatureHeader != "" {

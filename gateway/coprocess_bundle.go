@@ -1,14 +1,6 @@
 package gateway
 
 import (
-	"path"
-
-	"github.com/sirupsen/logrus"
-
-	"github.com/TykTechnologies/goverify"
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
-
 	"archive/zip"
 	"bytes"
 	"crypto/md5"
@@ -22,7 +14,14 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
+
+	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/goverify"
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 // Bundle is the basic bundle data structure, it holds the bundle name and the data.
@@ -188,7 +187,7 @@ func (ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) err
 		destPath := filepath.Join(bundlePath, f.Name)
 
 		if f.FileHeader.Mode().IsDir() {
-			if err := os.Mkdir(destPath, 0700); err != nil {
+			if err := os.Mkdir(destPath, 0o700); err != nil {
 				return err
 			}
 			continue
@@ -214,7 +213,6 @@ func (ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) err
 
 // fetchBundle will fetch a given bundle, using the right BundleGetter. The first argument is the bundle name, the base bundle URL will be used as prefix.
 func fetchBundle(spec *APISpec) (bundle Bundle, err error) {
-
 	if !config.Global().EnableBundleDownloader {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
@@ -374,7 +372,7 @@ func loadBundle(spec *APISpec) error {
 		return bundleError(spec, err, "Couldn't fetch bundle")
 	}
 
-	if err := os.MkdirAll(destPath, 0700); err != nil {
+	if err := os.MkdirAll(destPath, 0o700); err != nil {
 		return bundleError(spec, err, "Couldn't create bundle directory")
 	}
 

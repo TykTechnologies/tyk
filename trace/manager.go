@@ -25,9 +25,11 @@ var manager = &sync.Map{}
 var services = &sync.Map{}
 
 // Stores status of tracing.
-var enabled atomic.Value
-var logger Logger = StdLogger{}
-var initializer = Init
+var (
+	enabled     atomic.Value
+	logger      Logger = StdLogger{}
+	initializer        = Init
+)
 
 // serviceID key used to store the service name in request context.Context.
 type serviceID = struct{}
@@ -59,6 +61,7 @@ type StdLogger struct{}
 func (StdLogger) Errorf(format string, args ...interface{}) {
 	log.Println("[ERROR] trace: ", fmt.Sprintf(format, args...))
 }
+
 func (StdLogger) Infof(format string, args ...interface{}) {
 	log.Println("[INFO] trace: ", fmt.Sprintf(format, args...))
 }

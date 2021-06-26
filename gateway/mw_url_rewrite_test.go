@@ -1,13 +1,12 @@
 package gateway
 
 import (
+	"bytes"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/test"
-
-	"bytes"
-	"net/http"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/user"
@@ -101,9 +100,10 @@ func TestRewriter(t *testing.T) {
 		})
 	}
 }
+
 func BenchmarkRewriter(b *testing.B) {
 	cases := prepareRewriterCases()
-	//warm-up regexp caches
+	// warm-up regexp caches
 	for _, tc := range cases {
 		r := tc.reqMaker()
 		urlRewrite(tc.meta, r)
@@ -616,7 +616,7 @@ func TestRewriterTriggers(t *testing.T) {
 			}
 		},
 		func() TestDef {
-			var jsonStr = []byte(`{"foo":"bar"}`)
+			jsonStr := []byte(`{"foo":"bar"}`)
 			r, _ := http.NewRequest("POST", "/test/pl/rewrite", bytes.NewBuffer(jsonStr))
 
 			hOpt := apidef.StringRegexMap{MatchPattern: "bar"}
@@ -639,7 +639,7 @@ func TestRewriterTriggers(t *testing.T) {
 			}
 		},
 		func() TestDef {
-			var jsonStr = []byte(`{"foo":"barxxx", "fooble":"baryyy"}`)
+			jsonStr := []byte(`{"foo":"barxxx", "fooble":"baryyy"}`)
 			r, _ := http.NewRequest("POST", "/test/pl/rewrite", bytes.NewBuffer(jsonStr))
 
 			hOpt := apidef.StringRegexMap{MatchPattern: "bar\\w*"}
@@ -662,7 +662,7 @@ func TestRewriterTriggers(t *testing.T) {
 			}
 		},
 		func() TestDef {
-			var jsonStr = []byte(`{"foo":"barxxx", "fooble":"baryyy"}`)
+			jsonStr := []byte(`{"foo":"barxxx", "fooble":"baryyy"}`)
 			r, _ := http.NewRequest("POST", "/test/pl/rewrite", bytes.NewBuffer(jsonStr))
 
 			hOpt := apidef.StringRegexMap{MatchPattern: "bar(\\w*)"}
@@ -685,7 +685,7 @@ func TestRewriterTriggers(t *testing.T) {
 			}
 		},
 		func() TestDef {
-			var jsonStr = []byte(`{"foo":"barxxx", "fooble":"baryyy"}`)
+			jsonStr := []byte(`{"foo":"barxxx", "fooble":"baryyy"}`)
 			r, _ := http.NewRequest("POST", "/test/pl/rewrite", bytes.NewBuffer(jsonStr))
 
 			hOpt := apidef.StringRegexMap{MatchPattern: "bar(\\w*)"}
@@ -708,7 +708,7 @@ func TestRewriterTriggers(t *testing.T) {
 			}
 		},
 		func() TestDef {
-			var jsonStr = []byte(`{"foo":"bar"}`)
+			jsonStr := []byte(`{"foo":"bar"}`)
 			r, _ := http.NewRequest("POST", "/test/pl/rewrite", bytes.NewBuffer(jsonStr))
 			r.Header.Set("x-test", "apple")
 
@@ -737,7 +737,7 @@ func TestRewriterTriggers(t *testing.T) {
 			}
 		},
 		func() TestDef {
-			var jsonStr = []byte(`{"foo":"bar"}`)
+			jsonStr := []byte(`{"foo":"bar"}`)
 			r, _ := http.NewRequest("POST", "/test/pl/rewrite", bytes.NewBuffer(jsonStr))
 			r.Header.Set("x-test", "apple")
 
@@ -789,7 +789,7 @@ func TestRewriterTriggers(t *testing.T) {
 			}
 		},
 		func() TestDef {
-			var jsonStr = []byte(`{"foo":"bar"}`)
+			jsonStr := []byte(`{"foo":"bar"}`)
 			r, _ := http.NewRequest("POST", "/test/pl/rewrite", bytes.NewBuffer(jsonStr))
 			r.Header.Set("x-test", "apple")
 
@@ -818,7 +818,7 @@ func TestRewriterTriggers(t *testing.T) {
 			}
 		},
 		func() TestDef {
-			var jsonStr = []byte(`{"foo":"bar"}`)
+			jsonStr := []byte(`{"foo":"bar"}`)
 			r, _ := http.NewRequest("POST", "/test/pl/rewrite", bytes.NewBuffer(jsonStr))
 			r.Header.Set("x-test", "apple")
 
@@ -1221,7 +1221,6 @@ func TestURLRewriteCaseSensitivity(t *testing.T) {
 }
 
 func TestValToStr(t *testing.T) {
-
 	example := []interface{}{
 		"abc",      // string
 		int64(456), // int64

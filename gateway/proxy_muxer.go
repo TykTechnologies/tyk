@@ -126,7 +126,6 @@ func (m *proxyMux) router(port int, protocol string) *mux.Router {
 }
 
 func (m *proxyMux) setRouter(port int, protocol string, router *mux.Router) {
-
 	if port == 0 {
 		port = config.Global().ListenPort
 	}

@@ -125,7 +125,6 @@ func handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded
 }
 
 func handleKeySpaceEventCacheFlush(payload string) {
-
 	keys := strings.Split(payload, ",")
 
 	for _, key := range keys {
@@ -139,8 +138,10 @@ func handleKeySpaceEventCacheFlush(payload string) {
 	}
 }
 
-var redisInsecureWarn sync.Once
-var notificationVerifier goverify.Verifier
+var (
+	redisInsecureWarn    sync.Once
+	notificationVerifier goverify.Verifier
+)
 
 func isPayloadSignatureValid(notification Notification) bool {
 	if config.Global().AllowInsecureConfigs {
@@ -207,7 +208,6 @@ func (r *RedisNotifier) Notify(notif interface{}) bool {
 	}
 
 	toSend, err := json.Marshal(notif)
-
 	if err != nil {
 
 		pubSubLog.Error("Problem marshalling notification: ", err)
@@ -236,7 +236,6 @@ type dashboardConfigPayload struct {
 }
 
 func createConnectionStringFromDashboardObject(config dashboardConfigPayload) string {
-
 	hostname := "http://"
 
 	if config.DashboardConfig.UseTLS {

@@ -20,7 +20,6 @@ var ipHeaderTests = []struct {
 }
 
 func TestRealIP(t *testing.T) {
-
 	for _, test := range ipHeaderTests {
 		t.Log(test.comment)
 

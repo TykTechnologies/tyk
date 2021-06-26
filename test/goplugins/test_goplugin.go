@@ -59,7 +59,6 @@ func MyPluginPostKeyAuth(rw http.ResponseWriter, r *http.Request) {
 
 // MyPluginPost prepares and sends reply, will be used as "post" custom MW
 func MyPluginPost(rw http.ResponseWriter, r *http.Request) {
-
 	replyData := map[string]interface{}{
 		"message": "post message",
 	}
@@ -77,7 +76,6 @@ func MyPluginPost(rw http.ResponseWriter, r *http.Request) {
 
 // MyPluginResponse intercepts response from upstream which we can then manipulate
 func MyPluginResponse(rw http.ResponseWriter, res *http.Response, req *http.Request) {
-
 	res.Header.Add("X-Response-Added", "resp-added")
 
 	var buf bytes.Buffer
@@ -100,14 +98,11 @@ func MyPluginResponse(rw http.ResponseWriter, res *http.Response, req *http.Requ
 }
 
 func MyPluginPerPathFoo(rw http.ResponseWriter, r *http.Request) {
-
 	rw.Header().Add("X-foo", "foo")
-
 }
 
 func MyPluginPerPathBar(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Add("X-bar", "bar")
-
 }
 
 func MyPluginPerPathResp(rw http.ResponseWriter, r *http.Request) {

@@ -218,7 +218,8 @@ func TestPythonBundles(t *testing.T) {
 			EnableCoProcess:  true,
 			PythonPathPrefix: pkgPath,
 			PythonVersion:    "3.5",
-		}})
+		},
+	})
 	defer ts.Close()
 
 	authCheckBundle := gateway.RegisterBundle("python_with_auth_check", pythonBundleWithAuthCheck)
@@ -278,7 +279,6 @@ func TestPythonBundles(t *testing.T) {
 	})
 
 	t.Run("Single-file bundle with post hook", func(t *testing.T) {
-
 		keyID := gateway.CreateSession(func(s *user.SessionState) {
 			s.MetaData = map[string]interface{}{
 				"testkey":   map[string]interface{}{"nestedkey": "nestedvalue"},
@@ -304,7 +304,6 @@ func TestPythonBundles(t *testing.T) {
 	})
 
 	t.Run("Single-file bundle with response hook", func(t *testing.T) {
-
 		keyID := gateway.CreateSession(func(s *user.SessionState) {
 			s.MetaData = map[string]interface{}{
 				"testkey":   map[string]interface{}{"nestedkey": "nestedvalue"},
@@ -393,7 +392,6 @@ func TestPythonBundles(t *testing.T) {
 			}}
 
 			spec.VersionData.Versions["v1"] = v1
-
 		}, func(spec *gateway.APISpec) {
 			spec.Name = "test-api-2"
 			spec.Proxy.ListenPath = "/test-api-2/"

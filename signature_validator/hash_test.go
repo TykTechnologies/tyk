@@ -24,7 +24,6 @@ func TestMasherySha256Sum_Hash(t *testing.T) {
 }
 
 func BenchmarkMasherySha256Sum_Hash(b *testing.B) {
-
 	b.ReportAllocs()
 
 	for n := 0; n < b.N; n++ {

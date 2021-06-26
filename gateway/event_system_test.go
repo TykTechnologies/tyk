@@ -12,12 +12,10 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 )
 
-var (
-	handlerTypes = []apidef.TykEventHandlerName{
-		EH_LogHandler,
-		EH_WebHook,
-	}
-)
+var handlerTypes = []apidef.TykEventHandlerName{
+	EH_LogHandler,
+	EH_WebHook,
+}
 
 func prepareSpecWithEvents(logger *logrus.Logger) (spec *APISpec) {
 	if logger == nil {
@@ -98,6 +96,7 @@ func prepareEventHandlerConfig(handler apidef.TykEventHandlerName) (config apide
 	}
 	return config
 }
+
 func TestEventHandlerByName(t *testing.T) {
 	spec := prepareSpecWithEvents(nil)
 	for _, handlerType := range handlerTypes {

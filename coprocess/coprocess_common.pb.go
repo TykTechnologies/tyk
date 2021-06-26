@@ -11,9 +11,11 @@ import (
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -75,15 +77,19 @@ func (*StringSlice) Descriptor() ([]byte, []int) {
 func (m *StringSlice) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_StringSlice.Unmarshal(m, b)
 }
+
 func (m *StringSlice) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_StringSlice.Marshal(b, m, deterministic)
 }
+
 func (m *StringSlice) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_StringSlice.Merge(m, src)
 }
+
 func (m *StringSlice) XXX_Size() int {
 	return xxx_messageInfo_StringSlice.Size(m)
 }
+
 func (m *StringSlice) XXX_DiscardUnknown() {
 	xxx_messageInfo_StringSlice.DiscardUnknown(m)
 }

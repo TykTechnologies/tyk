@@ -64,7 +64,7 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 		ratePerPeriodNow, _ = store.SetRollingWindow(rateLimiterKey, int64(per), "-1", pipeline)
 	}
 
-	//log.Info("Num Requests: ", ratePerPeriodNow)
+	// log.Info("Num Requests: ", ratePerPeriodNow)
 
 	// Subtract by 1 because of the delayed add in the window
 	subtractor := 1
@@ -74,7 +74,7 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 	}
 	// The test TestRateLimitForAPIAndRateLimitAndQuotaCheck
 	// will only work with ththese two lines here
-	//log.Info("break: ", (int(currentSession.Rate) - subtractor))
+	// log.Info("break: ", (int(currentSession.Rate) - subtractor))
 	if ratePerPeriodNow > int(rate)-subtractor {
 		// Set a sentinel value with expire
 		if globalConf.EnableSentinelRateLimiter || globalConf.DRLEnableSentinelRateLimiter {
@@ -239,7 +239,6 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 	}
 
 	return sessionFailNone
-
 }
 
 func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *user.SessionState, scope string, limit *user.APILimit, store storage.Handler) bool {
@@ -271,7 +270,7 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 		log.Debug("Session: ", currentSession)
 		log.Debug("Now:", time.Now())
 		if time.Now().After(renewalDate) {
-			//for renew quota = never, once we get the quota max we must not allow using it again
+			// for renew quota = never, once we get the quota max we must not allow using it again
 
 			if quotaRenewalRate <= 0 {
 				return true

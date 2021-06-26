@@ -2,8 +2,7 @@ package user
 
 import "gopkg.in/mgo.v2/bson"
 
-type GraphAccessDefinition struct {
-}
+type GraphAccessDefinition struct{}
 
 type Policy struct {
 	MID                           bson.ObjectId                    `bson:"_id,omitempty" json:"_id"`

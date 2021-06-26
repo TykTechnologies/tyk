@@ -32,7 +32,6 @@ func (h *ResponseTransformMiddleware) Init(c interface{}, spec *APISpec) error {
 }
 
 func respBodyReader(req *http.Request, resp *http.Response) io.ReadCloser {
-
 	if req.Header.Get(headers.AcceptEncoding) == "" {
 		return resp.Body
 	}
@@ -80,7 +79,6 @@ func (h *ResponseTransformMiddleware) HandleError(rw http.ResponseWriter, req *h
 }
 
 func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
-
 	logger := log.WithFields(logrus.Fields{
 		"prefix":      "outbound-transform",
 		"server_name": h.Spec.Proxy.TargetURL,
@@ -113,7 +111,7 @@ func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 		xmlMap, err := mxj.NewMapXml(body) // unmarshal
 		if err != nil {
 			logger.WithError(err).Error("Error unmarshalling XML")
-			//todo return error
+			// todo return error
 			break
 		}
 		for k, v := range xmlMap {
@@ -127,7 +125,7 @@ func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 		var tempBody interface{}
 		if err := json.Unmarshal(body, &tempBody); err != nil {
 			logger.WithError(err).Error("Error unmarshalling JSON")
-			//todo return error
+			// todo return error
 			break
 		}
 

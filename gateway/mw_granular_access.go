@@ -56,5 +56,4 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 	logger.Info("Attempted access to unauthorised endpoint (Granular).")
 
 	return errors.New("Access to this resource has been disallowed"), http.StatusForbidden
-
 }

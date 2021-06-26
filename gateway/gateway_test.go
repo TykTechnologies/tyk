@@ -13,7 +13,6 @@ import (
 	"os"
 	"runtime"
 	"strconv"
-
 	"strings"
 	"sync"
 	"testing"
@@ -65,7 +64,6 @@ func TestAA(t *testing.T) {
 	ts.Run(t, []test.TestCase{
 		{Code: 200},
 	}...)
-
 }
 
 type tykErrorResponse struct {
@@ -131,7 +129,6 @@ func TestStripPathWithURLRewrite(t *testing.T) {
 			spec.VersionData.Versions["v1"] = version
 			spec.Proxy.ListenPath = "/myapi/"
 			spec.Proxy.StripListenPath = true
-
 		})
 
 		ts.Run(t, []test.TestCase{
@@ -360,7 +357,6 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 			{Path: "/listen_me/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/sent_to_me/http%3A%2F%2Ftest.com\?arg=val`},
 		}...)
 	})
-
 }
 
 func TestQuota(t *testing.T) {
@@ -1190,7 +1186,6 @@ func TestCustomDomain(t *testing.T) {
 }
 
 func TestGatewayHealthCheck(t *testing.T) {
-
 	t.Run("control api port == listen port", func(t *testing.T) {
 		ts := StartTest()
 		defer ts.Close()
@@ -1354,7 +1349,7 @@ func TestCacheWithAdvanceUrlRewrite(t *testing.T) {
 	ts.Run(t, []test.TestCase{
 		{Method: http.MethodGet, Path: "/test", Headers: matchHeaders, HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
 		{Method: http.MethodGet, Path: "/test", Headers: matchHeaders, HeadersMatch: headerCache},
-		//Even if trigger condition failed, as response is cached
+		// Even if trigger condition failed, as response is cached
 		// will still get redirected response
 		{Method: http.MethodGet, Path: "/test", Headers: randomheaders, HeadersMatch: headerCache, BodyMatch: `"Url":"/newpath"`},
 		{Method: http.MethodPost, Path: "/test", HeadersNotMatch: headerCache},
@@ -1971,10 +1966,14 @@ func TestTracing(t *testing.T) {
 		customAuthHeaders := map[string][]string{"custom-auth-header": {keyID}}
 
 		_, _ = ts.Run(t, []test.TestCase{
-			{Method: http.MethodPost, Path: "/tyk/debug", Data: traceRequest{Spec: spec.APIDefinition,
-				Request: &traceHttpRequest{Path: "/", Headers: authHeaders}}, AdminAuth: true, Code: 200, BodyMatch: `401 Unauthorized`},
-			{Method: http.MethodPost, Path: "/tyk/debug", Data: traceRequest{Spec: spec.APIDefinition,
-				Request: &traceHttpRequest{Path: "/", Headers: customAuthHeaders}}, AdminAuth: true, Code: 200, BodyMatch: `200 OK`},
+			{Method: http.MethodPost, Path: "/tyk/debug", Data: traceRequest{
+				Spec:    spec.APIDefinition,
+				Request: &traceHttpRequest{Path: "/", Headers: authHeaders},
+			}, AdminAuth: true, Code: 200, BodyMatch: `401 Unauthorized`},
+			{Method: http.MethodPost, Path: "/tyk/debug", Data: traceRequest{
+				Spec:    spec.APIDefinition,
+				Request: &traceHttpRequest{Path: "/", Headers: customAuthHeaders},
+			}, AdminAuth: true, Code: 200, BodyMatch: `200 OK`},
 		}...)
 	})
 }
@@ -2013,7 +2012,7 @@ func TestBrokenClients(t *testing.T) {
 		conn, _ := net.DialTimeout("tcp", mainProxy().listener.Addr().String(), 0)
 		conn.Write([]byte("GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"))
 		conn.Close()
-		//conn.Read(buf)
+		// conn.Read(buf)
 
 		time.Sleep(recordsBufferFlushInterval + 50*time.Millisecond)
 		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
@@ -2185,5 +2184,4 @@ func TestOverrideErrors(t *testing.T) {
 		e, i = errorAndStatusCode(ErrOAuthAuthorizationFieldMalformed)
 		assert(message4, code2, e, i)
 	})
-
 }

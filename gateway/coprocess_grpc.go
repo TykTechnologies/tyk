@@ -58,7 +58,6 @@ func (d *GRPCDispatcher) DispatchEvent(eventJSON []byte) {
 	}
 
 	_, err := grpcClient.DispatchEvent(context.Background(), eventObject)
-
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",

@@ -92,10 +92,10 @@ func TestGatewayTLS(t *testing.T) {
 
 	t.Run("Legacy TLS certificate path", func(t *testing.T) {
 		certFilePath := filepath.Join(dir, "server.crt")
-		ioutil.WriteFile(certFilePath, serverCertPem, 0666)
+		ioutil.WriteFile(certFilePath, serverCertPem, 0o666)
 
 		certKeyPath := filepath.Join(dir, "server.key")
-		ioutil.WriteFile(certKeyPath, serverPrivPem, 0666)
+		ioutil.WriteFile(certKeyPath, serverPrivPem, 0o666)
 
 		globalConf := config.Global()
 		globalConf.HttpServerOptions.Certificates = []config.CertData{{
@@ -122,7 +122,7 @@ func TestGatewayTLS(t *testing.T) {
 
 	t.Run("File certificate path", func(t *testing.T) {
 		certPath := filepath.Join(dir, "server.pem")
-		ioutil.WriteFile(certPath, combinedPEM, 0666)
+		ioutil.WriteFile(certPath, combinedPEM, 0o666)
 
 		globalConf := config.Global()
 		globalConf.HttpServerOptions.SSLCertificates = []string{certPath}
@@ -769,7 +769,6 @@ func TestUpstreamMutualTLS(t *testing.T) {
 		// Should pass with valid upstream certificate
 		ts.Run(t, test.TestCase{Code: 200})
 	})
-
 }
 
 func TestSSLForceCommonName(t *testing.T) {
@@ -841,7 +840,6 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 	t.Run("Without domain", func(t *testing.T) {
 		clientPEM, _, _, clientCert := genCertificate(&x509.Certificate{})
 		clientCertID, err := CertificateManager.Add(clientPEM, orgId)
-
 		if err != nil {
 			t.Fatal("certificate should be added to cert manager")
 		}
@@ -896,7 +894,6 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 	t.Run("With custom domain", func(t *testing.T) {
 		clientPEM, _, _, clientCert := genCertificate(&x509.Certificate{})
 		clientCertID, err := CertificateManager.Add(clientPEM, orgId)
-
 		if err != nil {
 			t.Fatal("certificate should be added to cert manager")
 		}
@@ -960,7 +957,6 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 	t.Run("With regex custom domain", func(t *testing.T) {
 		clientPEM, _, _, clientCert := genCertificate(&x509.Certificate{})
 		clientCertID, err := CertificateManager.Add(clientPEM, orgId)
-
 		if err != nil {
 			t.Fatal("certificate should be added to cert manager")
 		}
@@ -1001,7 +997,6 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 	t.Run("Cert removed", func(t *testing.T) {
 		clientPEM, _, _, clientCert := genCertificate(&x509.Certificate{})
 		clientCertID, err := CertificateManager.Add(clientPEM, orgId)
-
 		if err != nil {
 			t.Fatal("certificate should be added to cert manager")
 		}
@@ -1033,7 +1028,6 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 		// now we should not be allowed to use the key
 		ts.Run(t, test.TestCase{Path: "/", Code: 403, Client: client})
 	})
-
 }
 
 func TestAPICertificate(t *testing.T) {
@@ -1131,7 +1125,7 @@ func TestCertificateHandlerTLS(t *testing.T) {
 }
 
 func TestCipherSuites(t *testing.T) {
-	//configure server so we can useSSL and utilize the logic, but skip verification in the clients
+	// configure server so we can useSSL and utilize the logic, but skip verification in the clients
 	_, _, combinedPEM, _ := genServerCertificate()
 	serverCertID, _ := CertificateManager.Add(combinedPEM, "")
 	defer CertificateManager.Delete(serverCertID, "")
@@ -1150,9 +1144,8 @@ func TestCipherSuites(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 	})
 
-	//matching ciphers
+	// matching ciphers
 	t.Run("Cipher match", func(t *testing.T) {
-
 		client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{
 			CipherSuites:       getCipherAliases([]string{"TLS_RSA_WITH_RC4_128_SHA", "TLS_RSA_WITH_3DES_EDE_CBC_SHA", "TLS_RSA_WITH_AES_128_CBC_SHA"}),
 			InsecureSkipVerify: true,
@@ -1164,7 +1157,6 @@ func TestCipherSuites(t *testing.T) {
 	})
 
 	t.Run("Cipher non-match", func(t *testing.T) {
-
 		client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{
 			CipherSuites:       getCipherAliases([]string{"TLS_RSA_WITH_AES_256_CBC_SHA"}), // not matching ciphers
 			InsecureSkipVerify: true,

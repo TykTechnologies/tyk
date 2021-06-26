@@ -3,6 +3,10 @@ package gateway
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"io/ioutil"
+	"net/http"
 	"net/url"
 	"reflect"
 	"strings"
@@ -15,11 +19,6 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tyk/user"
-
-	"errors"
-	"fmt"
-	"io/ioutil"
-	"net/http"
 )
 
 var (

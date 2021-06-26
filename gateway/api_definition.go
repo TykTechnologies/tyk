@@ -36,7 +36,7 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 )
 
-//const used by cache middleware
+// const used by cache middleware
 const SAFE_METHODS = "SAFE_METHODS"
 
 const (
@@ -456,7 +456,7 @@ func (a APIDefinitionLoader) FromRPC(orgId string) ([]*APISpec, error) {
 
 	apiCollection := store.GetApiDefinitions(orgId, tags)
 
-	//store.Disconnect()
+	// store.Disconnect()
 
 	if rpc.LoadCount() > 0 {
 		if err := saveRPCDefinitionsBackup(apiCollection); err != nil {
@@ -468,7 +468,6 @@ func (a APIDefinitionLoader) FromRPC(orgId string) ([]*APISpec, error) {
 }
 
 func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string) ([]*APISpec, error) {
-
 	var apiDefs []*apidef.APIDefinition
 	if err := json.Unmarshal([]byte(apiCollection), &apiDefs); err != nil {
 		return nil, err
@@ -863,7 +862,6 @@ func (a APIDefinitionLoader) compileVirtualPathspathSpec(paths []apidef.VirtualM
 }
 
 func (a APIDefinitionLoader) compileGopluginPathspathSpec(paths []apidef.GoPluginMeta, stat URLStatus, apiSpec *APISpec) []URLSpec {
-
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	var urlSpec []URLSpec
@@ -1139,7 +1137,7 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode URLStatus) (bool, interface{}) {
 	var matchPath, method string
 
-	//If url-rewrite middleware was used, call response middleware of original path and not of rewritten path
+	// If url-rewrite middleware was used, call response middleware of original path and not of rewritten path
 	// context variable UrlRewritePath is set by rewrite middleware
 	if mode == TransformedJQResponse || mode == HeaderInjectedResponse || mode == TransformedResponse {
 		matchPath = ctxGetUrlRewritePath(r)

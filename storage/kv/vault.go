@@ -20,7 +20,6 @@ func NewVault(conf config.VaultConfig) (Store, error) {
 }
 
 func (v *Vault) Get(key string) (string, error) {
-
 	logicalStore := v.client.Logical()
 
 	if v.kvV2 {

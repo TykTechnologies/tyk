@@ -42,7 +42,7 @@ func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
 			"CheckInterval", "TYK_GW_DNSCACHE_CHECKINTERVAL",
 			func(c *Config) interface{} { return c.DnsCache.CheckInterval },
 			int64(60),
-			int64(60), //CheckInterval shouldn't be configured from *.conf and env var
+			int64(60), // CheckInterval shouldn't be configured from *.conf and env var
 		},
 		{
 			"CheckMultipleIPsHandleStrategy", "TYK_GW_DNSCACHE_MULTIPLEIPSHANDLESTRATEGY",
@@ -138,14 +138,13 @@ func TestConfigFiles(t *testing.T) {
 
 	// path1 exists but is invalid
 	os.Remove(path2)
-	ioutil.WriteFile(path1, []byte("{"), 0644)
+	ioutil.WriteFile(path1, []byte("{"), 0o644)
 	if err := Load(paths, conf); err == nil {
 		t.Fatalf("Load with an invalid config did not error")
 	}
 }
 
 func TestConfig_GetEventTriggers(t *testing.T) {
-
 	assert := func(t *testing.T, config string, expected string) {
 		conf := &Config{}
 
@@ -187,7 +186,6 @@ func TestConfig_GetEventTriggers(t *testing.T) {
 		both := `{"event_trigers_defunct": {"deprecated": []}, "event_triggers_defunct": {"current": []}}`
 		assert(t, both, "current")
 	})
-
 }
 
 func TestLoad_tracing(t *testing.T) {

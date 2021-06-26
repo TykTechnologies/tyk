@@ -67,7 +67,7 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 	go b.store.DeleteRawKey(rateLimiterSentinelKey)
 	// Fix the raw key
 	go b.store.DeleteRawKey(rawKey)
-	//go b.store.SetKey(rawKey, "0", session.QuotaRenewalRate)
+	// go b.store.SetKey(rawKey, "0", session.QuotaRenewalRate)
 
 	for _, acl := range session.GetAccessRights() {
 		rawKey = QuotaKeyPrefix + acl.AllowanceScope + "-" + keyName

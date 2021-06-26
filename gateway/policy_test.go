@@ -293,7 +293,8 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 						{Name: "Country", Fields: []string{"code", "name"}},
 						{Name: "Person", Fields: []string{"name", "height"}},
 					},
-				}},
+				},
+			},
 		},
 		"restricted-types2": {
 			ID: "restricted_types_2",
@@ -303,7 +304,8 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 						{Name: "Country", Fields: []string{"code", "phone"}},
 						{Name: "Person", Fields: []string{"name", "mass"}},
 					},
-				}},
+				},
+			},
 		},
 		"field-level-depth-limit1": {
 			ID: "field-level-depth-limit1",
@@ -315,7 +317,8 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 						{TypeName: "Mutation", FieldName: "putPerson", Limits: user.FieldLimits{MaxQueryDepth: 3}},
 						{TypeName: "Query", FieldName: "countries", Limits: user.FieldLimits{MaxQueryDepth: 3}},
 					},
-				}},
+				},
+			},
 		},
 		"field-level-depth-limit2": {
 			ID: "field-level-depth-limit2",
@@ -327,7 +330,8 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 						{TypeName: "Mutation", FieldName: "putPerson", Limits: user.FieldLimits{MaxQueryDepth: -1}},
 						{TypeName: "Query", FieldName: "continents", Limits: user.FieldLimits{MaxQueryDepth: 4}},
 					},
-				}},
+				},
+			},
 		},
 		"throttle1": {
 			ID:                 "throttle1",
@@ -346,15 +350,18 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			"", nil, nil,
 		},
 		{
-			"Single", []string{"nonpart1"},
+			"Single",
+			[]string{"nonpart1"},
 			"", nil, nil,
 		},
 		{
-			"Missing", []string{"nonexistent"},
+			"Missing",
+			[]string{"nonexistent"},
 			"not found", nil, nil,
 		},
 		{
-			"DiffOrg", []string{"difforg"},
+			"DiffOrg",
+			[]string{"difforg"},
 			"different org", nil, nil,
 		},
 		{
@@ -392,11 +399,13 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			},
 		},
 		{
-			"NonpartAndPart", []string{"nonpart1", "quota1"},
+			"NonpartAndPart",
+			[]string{"nonpart1", "quota1"},
 			"", nil, nil,
 		},
 		{
-			"TagMerge", []string{"tags1", "tags2"},
+			"TagMerge",
+			[]string{"tags1", "tags2"},
 			"", func(t *testing.T, s *user.SessionState) {
 				want := []string{"key-tag", "tagA", "tagX", "tagY"}
 				sort.Strings(s.Tags)
@@ -407,7 +416,8 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			},
 		},
 		{
-			"InactiveMergeOne", []string{"tags1", "inactive1"},
+			"InactiveMergeOne",
+			[]string{"tags1", "inactive1"},
 			"", func(t *testing.T, s *user.SessionState) {
 				if !s.IsInactive {
 					t.Fatalf("want IsInactive to be true")
@@ -415,7 +425,8 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			}, nil,
 		},
 		{
-			"InactiveMergeAll", []string{"inactive1", "inactive2"},
+			"InactiveMergeAll",
+			[]string{"inactive1", "inactive2"},
 			"", func(t *testing.T, s *user.SessionState) {
 				if !s.IsInactive {
 					t.Fatalf("want IsInactive to be true")
@@ -423,7 +434,8 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			}, nil,
 		},
 		{
-			"InactiveWithSession", []string{"tags1", "tags2"},
+			"InactiveWithSession",
+			[]string{"tags1", "tags2"},
 			"", func(t *testing.T, s *user.SessionState) {
 				if !s.IsInactive {
 					t.Fatalf("want IsInactive to be true")
@@ -433,7 +445,8 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			},
 		},
 		{
-			"QuotaPart with unlimited", []string{"unlimited-quota"},
+			"QuotaPart with unlimited",
+			[]string{"unlimited-quota"},
 			"", func(t *testing.T, s *user.SessionState) {
 				if s.QuotaMax != -1 {
 					t.Fatalf("want unlimited quota to be -1")
@@ -441,7 +454,8 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			}, nil,
 		},
 		{
-			"QuotaPart", []string{"quota1"},
+			"QuotaPart",
+			[]string{"quota1"},
 			"", func(t *testing.T, s *user.SessionState) {
 				if s.QuotaMax != 2 {
 					t.Fatalf("want QuotaMax to be 2")
@@ -449,7 +463,8 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			}, nil,
 		},
 		{
-			"QuotaParts", []string{"quota1", "quota2"},
+			"QuotaParts",
+			[]string{"quota1", "quota2"},
 			"", func(t *testing.T, s *user.SessionState) {
 				if s.QuotaMax != 3 {
 					t.Fatalf("Should pick bigger value")
@@ -457,7 +472,8 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			}, nil,
 		},
 		{
-			"QuotaPart with access rights", []string{"quota3"},
+			"QuotaPart with access rights",
+			[]string{"quota3"},
 			"", func(t *testing.T, s *user.SessionState) {
 				if s.QuotaMax != 3 {
 					t.Fatalf("quota should be the same as policy quota")
@@ -465,7 +481,8 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			}, nil,
 		},
 		{
-			"QuotaPart with access rights in multi-policy", []string{"quota4", "nonpart1"},
+			"QuotaPart with access rights in multi-policy",
+			[]string{"quota4", "nonpart1"},
 			"", func(t *testing.T, s *user.SessionState) {
 				if s.QuotaMax != 3 {
 					t.Fatalf("quota should be the same as policy quota")
@@ -477,7 +494,8 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			}, nil,
 		},
 		{
-			"RatePart with unlimited", []string{"unlimited-rate"},
+			"RatePart with unlimited",
+			[]string{"unlimited-rate"},
 			"", func(t *testing.T, s *user.SessionState) {
 				if s.Rate != -1 {
 					t.Fatalf("want unlimited rate to be -1")
@@ -485,7 +503,8 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			}, nil,
 		},
 		{
-			"RatePart", []string{"rate1"},
+			"RatePart",
+			[]string{"rate1"},
 			"", func(t *testing.T, s *user.SessionState) {
 				if s.Rate != 3 {
 					t.Fatalf("want Rate to be 3")
@@ -493,7 +512,8 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			}, nil,
 		},
 		{
-			"RateParts", []string{"rate1", "rate2"},
+			"RateParts",
+			[]string{"rate1", "rate2"},
 			"", func(t *testing.T, s *user.SessionState) {
 				if s.Rate != 4 {
 					t.Fatalf("Should pick bigger value")
@@ -501,7 +521,8 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			}, nil,
 		},
 		{
-			"ComplexityPart with unlimited", []string{"unlimitedComplexity"},
+			"ComplexityPart with unlimited",
+			[]string{"unlimitedComplexity"},
 			"", func(t *testing.T, s *user.SessionState) {
 				if s.MaxQueryDepth != -1 {
 					t.Fatalf("unlimitied query depth should be -1")
@@ -509,7 +530,8 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			}, nil,
 		},
 		{
-			"ComplexityPart", []string{"complexity1"},
+			"ComplexityPart",
+			[]string{"complexity1"},
 			"", func(t *testing.T, s *user.SessionState) {
 				if s.MaxQueryDepth != 2 {
 					t.Fatalf("want MaxQueryDepth to be 2")
@@ -517,7 +539,8 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			}, nil,
 		},
 		{
-			"ComplexityParts", []string{"complexity1", "complexity2"},
+			"ComplexityParts",
+			[]string{"complexity1", "complexity2"},
 			"", func(t *testing.T, s *user.SessionState) {
 				if s.MaxQueryDepth != 3 {
 					t.Fatalf("Should pick bigger value")
@@ -525,7 +548,8 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			}, nil,
 		},
 		{
-			"AclPart", []string{"acl1"},
+			"AclPart",
+			[]string{"acl1"},
 			"", func(t *testing.T, s *user.SessionState) {
 				want := map[string]user.AccessDefinition{"a": {Limit: &user.APILimit{}}}
 
@@ -533,14 +557,16 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			}, nil,
 		},
 		{
-			"AclPart", []string{"acl1", "acl2"},
+			"AclPart",
+			[]string{"acl1", "acl2"},
 			"", func(t *testing.T, s *user.SessionState) {
 				want := map[string]user.AccessDefinition{"a": {Limit: &user.APILimit{}}, "b": {Limit: &user.APILimit{}}}
 				assert.Equal(t, want, s.AccessRights)
 			}, nil,
 		},
 		{
-			"RightsUpdate", []string{"acl3"},
+			"RightsUpdate",
+			[]string{"acl3"},
 			"", func(t *testing.T, s *user.SessionState) {
 				newPolicy := user.Policy{
 					AccessRights: map[string]user.AccessDefinition{"a": {Limit: &user.APILimit{}}, "b": {Limit: &user.APILimit{}}, "c": {Limit: &user.APILimit{}}},
@@ -694,7 +720,8 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			},
 		},
 		{
-			"Throttle interval from policy", []string{"throttle1"},
+			"Throttle interval from policy",
+			[]string{"throttle1"},
 			"", func(t *testing.T, s *user.SessionState) {
 				if s.ThrottleInterval != 9 {
 					t.Fatalf("Throttle interval should be 9 inherited from policy")
@@ -890,28 +917,48 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 	authHeader := map[string]string{"Authorization": key}
 	ts.Run(t, []test.TestCase{
 		// 2 requests to api1, API limit quota remaining should be 98
-		{Method: http.MethodGet, Path: "/api1", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "99"}},
-		{Method: http.MethodGet, Path: "/api1", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "98"}},
+		{
+			Method: http.MethodGet, Path: "/api1", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "99"},
+		},
+		{
+			Method: http.MethodGet, Path: "/api1", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "98"},
+		},
 		// 3 requests to api2, API limit quota remaining should be 197
-		{Method: http.MethodGet, Path: "/api2", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "199"}},
-		{Method: http.MethodGet, Path: "/api2", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "198"}},
-		{Method: http.MethodGet, Path: "/api2", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "197"}},
+		{
+			Method: http.MethodGet, Path: "/api2", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "199"},
+		},
+		{
+			Method: http.MethodGet, Path: "/api2", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "198"},
+		},
+		{
+			Method: http.MethodGet, Path: "/api2", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "197"},
+		},
 		// 5 requests to api3, API limit quota remaining should be 45
-		{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "49"}},
-		{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "48"}},
-		{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "47"}},
-		{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "46"}},
-		{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "45"}},
+		{
+			Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "49"},
+		},
+		{
+			Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "48"},
+		},
+		{
+			Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "47"},
+		},
+		{
+			Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "46"},
+		},
+		{
+			Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "45"},
+		},
 	}...)
 
 	// check key session
@@ -1104,26 +1151,42 @@ func TestApplyMultiPolicies(t *testing.T) {
 	authHeader := map[string]string{"Authorization": key}
 	ts.Run(t, []test.TestCase{
 		// 2 requests to api1, API limit quota remaining should be 48
-		{Path: "/api1", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "49"}},
-		{Path: "/api1", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "48"}},
+		{
+			Path: "/api1", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "49"},
+		},
+		{
+			Path: "/api1", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "48"},
+		},
 
 		// 3 requests to api2, API limit quota remaining should be 197
-		{Path: "/api2", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "99"}},
-		{Path: "/api2", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "98"}},
-		{Path: "/api2", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "97"}},
+		{
+			Path: "/api2", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "99"},
+		},
+		{
+			Path: "/api2", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "98"},
+		},
+		{
+			Path: "/api2", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "97"},
+		},
 
 		// 3 requests to api3, should consume policy2 quota, same as for api2
-		{Path: "/api3", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "96"}},
-		{Path: "/api3", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "95"}},
-		{Path: "/api3", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "94"}},
+		{
+			Path: "/api3", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "96"},
+		},
+		{
+			Path: "/api3", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "95"},
+		},
+		{
+			Path: "/api3", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "94"},
+		},
 	}...)
 
 	// check key session
@@ -1194,10 +1257,14 @@ func TestApplyMultiPolicies(t *testing.T) {
 	// Rate limits before
 	ts.Run(t, []test.TestCase{
 		// 2 requests to api1, API limit quota remaining should be 48
-		{Path: "/api1", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "49"}},
-		{Path: "/api1", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "48"}},
+		{
+			Path: "/api1", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "49"},
+		},
+		{
+			Path: "/api1", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "48"},
+		},
 	}...)
 
 	policiesMu.RLock()
@@ -1214,11 +1281,12 @@ func TestApplyMultiPolicies(t *testing.T) {
 
 	// Rate limits after policy update
 	ts.Run(t, []test.TestCase{
-		{Path: "/api1", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "47"}},
+		{
+			Path: "/api1", Headers: authHeader, Code: http.StatusOK,
+			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "47"},
+		},
 		{Path: "/api1", Headers: authHeader, Code: http.StatusTooManyRequests},
 	}...)
-
 }
 
 func TestPerAPIPolicyUpdate(t *testing.T) {
@@ -1319,7 +1387,7 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 		},
 	}...)
 
-	//Update policy
+	// Update policy
 	policiesMu.RLock()
 	policy = user.Policy{
 		ID:    "per_api_policy_with_two_apis",

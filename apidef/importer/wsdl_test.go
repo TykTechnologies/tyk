@@ -198,16 +198,16 @@ var testData = []testWSDLInput{
 				},
 			},
 			{
-				//invalid portName is provided
-				//should throw an error
+				// invalid portName is provided
+				// should throw an error
 				servicePortNameMapping: map[string]string{"HolidayService2": "something"},
 				returnErr:              true,
 			},
 		},
 	},
 	{
-		//smtp protocol is not supported
-		//should throw error
+		// smtp protocol is not supported
+		// should throw error
 		wsdlDefinition: smtpExample,
 		data: []testWSDLData{
 			{
@@ -217,12 +217,12 @@ var testData = []testWSDLInput{
 		},
 	},
 	{
-		//Invalid input
+		// Invalid input
 		wsdlDefinition: "<ghfsdfjadhfkadf>",
 		isInvalidInput: true,
 	},
 	{
-		//Invalid input
+		// Invalid input
 		wsdlDefinition: wsdl_2_0_example,
 		isInvalidInput: true,
 	},
@@ -245,7 +245,6 @@ func TestToAPIDefinition_WSDL(t *testing.T) {
 		for _, data := range input.data {
 			wsdl_imp.SetServicePortMapping(data.servicePortNameMapping)
 			def, err := wsdl_imp.ToAPIDefinition("testOrg", "http://test.com", false)
-
 			if err != nil {
 				if !data.returnErr {
 					t.Fatal(err)
@@ -273,7 +272,6 @@ func TestToAPIDefinition_WSDL(t *testing.T) {
 
 			for _, endpoint := range data.endpoints {
 				for _, rewriteData := range v.ExtendedPaths.URLRewrite {
-
 					if rewriteData.Path == endpoint.path {
 						if rewriteData.Method != endpoint.method {
 							t.Fatalf("Invalid endpoint method. Expected %s found %s", endpoint.method, rewriteData.Method)
@@ -287,7 +285,6 @@ func TestToAPIDefinition_WSDL(t *testing.T) {
 							t.Fatalf("Invalid rewrite path. Expected %s found %s", endpoint.rewritePath, rewriteData.RewriteTo)
 						}
 					}
-
 				}
 			}
 		}

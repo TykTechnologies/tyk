@@ -26,7 +26,7 @@ const (
 
 	defaultManifestPath = "manifest.json"
 	defaultBundlePath   = "bundle.zip"
-	defaultBundlePerm   = 0755
+	defaultBundlePerm   = 0o755
 )
 
 var (

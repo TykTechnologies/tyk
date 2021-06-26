@@ -17,7 +17,6 @@ import (
 )
 
 func startRPCMock(dispatcher *gorpc.Dispatcher) *gorpc.Server {
-
 	rpc.GlobalRPCCallTimeout = 100 * time.Millisecond
 
 	globalConf := config.Global()
@@ -405,11 +404,10 @@ func TestSyncAPISpecsRPC_redis_failure(t *testing.T) {
 			{Path: "/sample", Headers: authHeaders, Code: 200},
 		}...)
 	})
-
 }
 
 func TestOrgSessionWithRPCDown(t *testing.T) {
-	//we need rpc down
+	// we need rpc down
 	globalConf := config.Global()
 	globalConf.SlaveOptions.ConnectionString = testHttpFailure
 	globalConf.SlaveOptions.UseRPC = true

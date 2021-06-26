@@ -25,8 +25,10 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-const dateHeaderSpec = "Date"
-const altHeaderSpec = "x-aux-date"
+const (
+	dateHeaderSpec = "Date"
+	altHeaderSpec  = "x-aux-date"
+)
 
 // HTTPSignatureValidationMiddleware will check if the request has a signature, and if the request is allowed through
 type HTTPSignatureValidationMiddleware struct {
@@ -74,7 +76,6 @@ func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWrite
 
 	// Generate a signature string
 	signatureString, err := generateHMACSignatureStringFromRequest(r, fieldValues.Headers, r.URL.Path)
-
 	if err != nil {
 		logger.WithError(err).WithField("signature_string", signatureString).Error("Signature string generation failed")
 		return hm.authorizationError(r)

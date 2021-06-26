@@ -127,7 +127,8 @@ func TestJSVMSessionMetadataUpdate(t *testing.T) {
 	jsvm.Init(nil, logrus.NewEntry(log))
 
 	s := &user.SessionState{
-		MetaData: make(map[string]interface{})}
+		MetaData: make(map[string]interface{}),
+	}
 	s.MetaData["same"] = "same"
 	s.MetaData["updated"] = "old"
 	s.MetaData["removed"] = "dummy"
@@ -230,6 +231,7 @@ testJSVMData.NewProcessRequest(function(request, session, spec) {
 		t.Fatalf("wanted header to be %q, got %q", want, got)
 	}
 }
+
 func TestJSVM_IgnoreCanonicalHeader(t *testing.T) {
 	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
 	const js = `
@@ -394,7 +396,8 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 
 		return testTykMakeHTTPRequest.ReturnData(request, {})
 	});
-	`})
+	`,
+	})
 
 	t.Run("Existing endpoint", func(t *testing.T) {
 		BuildAndLoadAPI(func(spec *APISpec) {
@@ -748,9 +751,10 @@ func TestJSVM_Auth(t *testing.T) {
 		test.TestCase{Path: "/sample", Code: http.StatusUnauthorized, BodyMatchFunc: func(b []byte) bool {
 			return strings.Contains(string(b), "Header missing (JS middleware)")
 		}},
-		test.TestCase{Path: "/sample", Code: http.StatusUnauthorized, BodyMatchFunc: func(b []byte) bool {
-			return strings.Contains(string(b), "Not authorized (JS middleware)")
-		},
+		test.TestCase{
+			Path: "/sample", Code: http.StatusUnauthorized, BodyMatchFunc: func(b []byte) bool {
+				return strings.Contains(string(b), "Not authorized (JS middleware)")
+			},
 			Headers: map[string]string{"Authorization": "foo"},
 		},
 		test.TestCase{Path: "/sample", Code: http.StatusOK, Headers: map[string]string{

@@ -10,7 +10,6 @@ import (
 
 // RealIP takes a request object, and returns the real Client IP address.
 func RealIP(r *http.Request) string {
-
 	if contextIp := r.Context().Value("remote_addr"); contextIp != nil {
 		return contextIp.(string)
 	}
@@ -22,7 +21,6 @@ func RealIP(r *http.Request) string {
 	if fw := r.Header.Get(headers.XForwardFor); fw != "" {
 		// X-Forwarded-For has no port
 		if i := strings.IndexByte(fw, ','); i >= 0 {
-
 			return fw[:i]
 		}
 

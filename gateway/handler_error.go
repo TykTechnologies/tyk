@@ -162,7 +162,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 		}
 
-		//If the config option is not set or is false, add the header
+		// If the config option is not set or is false, add the header
 		if !e.Spec.GlobalConfig.HideGeneratorHeader {
 			w.Header().Add(headers.XGenerator, "tyk.io")
 			response.Header.Add(headers.XGenerator, "tyk.io")
@@ -186,7 +186,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			if contentType == headers.ApplicationXML || contentType == headers.TextXML {
 				apiError.Message = template.HTML(errMsg)
 
-				//we look up in the last defined templateName to obtain the template.
+				// we look up in the last defined templateName to obtain the template.
 				rawTmpl := templatesRaw.Lookup(templateName)
 				tmplExecutor = rawTmpl
 			}

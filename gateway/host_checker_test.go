@@ -242,12 +242,14 @@ func (a *answers) onPing(_ context.Context, _ HostHealthReport) {
 	a.ping = true
 	a.mu.Unlock()
 }
+
 func (a *answers) onUp(_ context.Context, _ HostHealthReport) {
 	defer a.cancel()
 	a.mu.Lock()
 	a.up = true
 	a.mu.Unlock()
 }
+
 func (a *answers) cb() HostCheckCallBacks {
 	return HostCheckCallBacks{
 		Up:   a.onUp,
@@ -310,6 +312,7 @@ func TestTestCheckerTCPHosts_correct_answers(t *testing.T) {
 		t.Errorf("expected the host to be up : field:%v up:%v pinged:%v", ans.fail, ans.up, ans.ping)
 	}
 }
+
 func TestTestCheckerTCPHosts_correct_answers_proxy_protocol(t *testing.T) {
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

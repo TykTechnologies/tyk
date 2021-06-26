@@ -103,13 +103,16 @@ PyTuple_ClearFreeList_f PyTuple_ClearFreeList_ptr;
 int PyTuple_ClearFreeList() { return PyTuple_ClearFreeList_ptr(); };
 */
 import "C"
+
 import (
 	"errors"
 	"unsafe"
 )
 
-type dummyPtr unsafe.Pointer
-type pyobj C.PyObject
+type (
+	dummyPtr unsafe.Pointer
+	pyobj    C.PyObject
+)
 
 func PyObject_GetAttr(arg0 *C.PyObject, arg1 *C.PyObject) *C.PyObject {
 	return C.PyObject_GetAttr(arg0, arg1)

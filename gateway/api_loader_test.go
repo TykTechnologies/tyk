@@ -190,7 +190,6 @@ func TestGraphQLPlayground(t *testing.T) {
 				LoadAPI(api)
 				run(t, path.Join(api.Proxy.ListenPath, "aaa"), api, env)
 			})
-
 		})
 	}
 }

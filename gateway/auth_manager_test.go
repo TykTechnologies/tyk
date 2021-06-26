@@ -97,7 +97,6 @@ func TestAuthenticationAfterUpdateKey(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 			{Path: "/get", Headers: authHeader, Code: http.StatusForbidden},
 		}...)
-
 	}
 
 	t.Run("HashKeys=false", func(t *testing.T) {
@@ -166,7 +165,6 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 	}
 
 	t.Run("custom key", func(t *testing.T) {
-
 		const customKey = "custom-key"
 
 		session := CreateStandardSession()
@@ -174,8 +172,10 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 			APIID: "test", Versions: []string{"v1"},
 		}}
 
-		_, _ = g.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/keys/" + customKey,
-			Data: session, Client: client, Code: http.StatusOK})
+		_, _ = g.Run(t, test.TestCase{
+			AdminAuth: true, Method: http.MethodPost, Path: "/tyk/keys/" + customKey,
+			Data: session, Client: client, Code: http.StatusOK,
+		})
 
 		testChangeHashFunc(t, map[string]string{headers.Authorization: customKey}, client, http.StatusForbidden)
 	})
@@ -194,8 +194,10 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 			APIID: "test", Versions: []string{"v1"},
 		}}
 
-		_, _ = g.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/keys/user",
-			Data: session, Client: client, Code: http.StatusOK})
+		_, _ = g.Run(t, test.TestCase{
+			AdminAuth: true, Method: http.MethodPost, Path: "/tyk/keys/user",
+			Data: session, Client: client, Code: http.StatusOK,
+		})
 
 		authHeader := map[string]string{"Authorization": genAuthHeader("user", "password")}
 
@@ -219,11 +221,12 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 			APIID: "test", Versions: []string{"v1"},
 		}}
 
-		_, _ = g.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/keys/create",
-			Data: session, Client: client, Code: http.StatusOK})
+		_, _ = g.Run(t, test.TestCase{
+			AdminAuth: true, Method: http.MethodPost, Path: "/tyk/keys/create",
+			Data: session, Client: client, Code: http.StatusOK,
+		})
 
 		client = GetTLSClient(&clientCert, nil)
 		testChangeHashFunc(t, nil, client, http.StatusForbidden)
 	})
-
 }

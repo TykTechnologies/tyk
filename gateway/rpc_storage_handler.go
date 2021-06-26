@@ -17,76 +17,74 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var (
-	dispatcherFuncs = map[string]interface{}{
-		"Login": func(clientAddr, userKey string) bool {
-			return false
-		},
-		"LoginWithGroup": func(clientAddr string, groupData *apidef.GroupLoginRequest) bool {
-			return false
-		},
-		"GetKey": func(keyName string) (string, error) {
-			return "", nil
-		},
-		"SetKey": func(ibd *apidef.InboundData) error {
-			return nil
-		},
-		"GetExp": func(keyName string) (int64, error) {
-			return 0, nil
-		},
-		"GetKeys": func(keyName string) ([]string, error) {
-			return nil, nil
-		},
-		"DeleteKey": func(keyName string) (bool, error) {
-			return true, nil
-		},
-		"DeleteRawKey": func(keyName string) (bool, error) {
-			return true, nil
-		},
-		"GetKeysAndValues": func(searchString string) (*apidef.KeysValuesPair, error) {
-			return nil, nil
-		},
-		"GetKeysAndValuesWithFilter": func(searchString string) (*apidef.KeysValuesPair, error) {
-			return nil, nil
-		},
-		"DeleteKeys": func(keys []string) (bool, error) {
-			return true, nil
-		},
-		"Decrement": func(keyName string) error {
-			return nil
-		},
-		"IncrememntWithExpire": func(ibd *apidef.InboundData) (int64, error) {
-			return 0, nil
-		},
-		"AppendToSet": func(ibd *apidef.InboundData) error {
-			return nil
-		},
-		"SetRollingWindow": func(ibd *apidef.InboundData) (int, error) {
-			return 0, nil
-		},
-		"GetApiDefinitions": func(dr *apidef.DefRequest) (string, error) {
-			return "", nil
-		},
-		"GetPolicies": func(orgId string) (string, error) {
-			return "", nil
-		},
-		"PurgeAnalyticsData": func(data string) error {
-			return nil
-		},
-		"CheckReload": func(clientAddr, orgId string) (bool, error) {
-			return false, nil
-		},
-		"GetKeySpaceUpdate": func(clientAddr, orgId string) ([]string, error) {
-			return nil, nil
-		},
-		"GetGroupKeySpaceUpdate": func(clientAddr string, groupData *apidef.GroupKeySpaceRequest) ([]string, error) {
-			return nil, nil
-		},
-		"Ping": func() bool {
-			return false
-		},
-	}
-)
+var dispatcherFuncs = map[string]interface{}{
+	"Login": func(clientAddr, userKey string) bool {
+		return false
+	},
+	"LoginWithGroup": func(clientAddr string, groupData *apidef.GroupLoginRequest) bool {
+		return false
+	},
+	"GetKey": func(keyName string) (string, error) {
+		return "", nil
+	},
+	"SetKey": func(ibd *apidef.InboundData) error {
+		return nil
+	},
+	"GetExp": func(keyName string) (int64, error) {
+		return 0, nil
+	},
+	"GetKeys": func(keyName string) ([]string, error) {
+		return nil, nil
+	},
+	"DeleteKey": func(keyName string) (bool, error) {
+		return true, nil
+	},
+	"DeleteRawKey": func(keyName string) (bool, error) {
+		return true, nil
+	},
+	"GetKeysAndValues": func(searchString string) (*apidef.KeysValuesPair, error) {
+		return nil, nil
+	},
+	"GetKeysAndValuesWithFilter": func(searchString string) (*apidef.KeysValuesPair, error) {
+		return nil, nil
+	},
+	"DeleteKeys": func(keys []string) (bool, error) {
+		return true, nil
+	},
+	"Decrement": func(keyName string) error {
+		return nil
+	},
+	"IncrememntWithExpire": func(ibd *apidef.InboundData) (int64, error) {
+		return 0, nil
+	},
+	"AppendToSet": func(ibd *apidef.InboundData) error {
+		return nil
+	},
+	"SetRollingWindow": func(ibd *apidef.InboundData) (int, error) {
+		return 0, nil
+	},
+	"GetApiDefinitions": func(dr *apidef.DefRequest) (string, error) {
+		return "", nil
+	},
+	"GetPolicies": func(orgId string) (string, error) {
+		return "", nil
+	},
+	"PurgeAnalyticsData": func(data string) error {
+		return nil
+	},
+	"CheckReload": func(clientAddr, orgId string) (bool, error) {
+		return false, nil
+	},
+	"GetKeySpaceUpdate": func(clientAddr, orgId string) ([]string, error) {
+		return nil, nil
+	},
+	"GetGroupKeySpaceUpdate": func(clientAddr string, groupData *apidef.GroupKeySpaceRequest) ([]string, error) {
+		return nil, nil
+	},
+	"Ping": func() bool {
+		return false
+	},
+}
 
 // RPCStorageHandler is a storage manager that uses the redis database.
 type RPCStorageHandler struct {
@@ -198,7 +196,7 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 		// Cache key
 		RPCGlobalCache.Set(keyName, value, cache.DefaultExpiration)
 	}
-	//return hash key without prefix so it doesnt get double prefixed in redis
+	// return hash key without prefix so it doesnt get double prefixed in redis
 	return value.(string), nil
 }
 
@@ -279,7 +277,6 @@ func (r *RPCStorageHandler) SetKey(keyName, session string, timeout int64) error
 	elapsed := time.Since(start)
 	log.Debug("SetKey took ", elapsed)
 	return nil
-
 }
 
 func (r *RPCStorageHandler) SetRawKey(keyName, session string, timeout int64) error {
@@ -310,7 +307,6 @@ func (r *RPCStorageHandler) Decrement(keyName string) {
 
 // IncrementWithExpire will increment a key in redis
 func (r *RPCStorageHandler) IncrememntWithExpire(keyName string, expire int64) int64 {
-
 	ibd := apidef.InboundData{
 		KeyName: keyName,
 		Expire:  expire,
@@ -339,7 +335,6 @@ func (r *RPCStorageHandler) IncrememntWithExpire(keyName string, expire int64) i
 	}
 
 	return val.(int64)
-
 }
 
 // GetKeys will return all keys according to the filter (filter is a prefix - e.g. tyk.keys.*)
@@ -350,7 +345,6 @@ func (r *RPCStorageHandler) GetKeys(filter string) []string {
 
 // GetKeysAndValuesWithFilter will return all keys and their values with a filter
 func (r *RPCStorageHandler) GetKeysAndValuesWithFilter(filter string) map[string]string {
-
 	searchStr := r.KeyPrefix + r.hashKey(filter) + "*"
 	log.Debug("[STORE] Getting list by: ", searchStr)
 
@@ -385,7 +379,6 @@ func (r *RPCStorageHandler) GetKeysAndValuesWithFilter(filter string) map[string
 
 // GetKeysAndValues will return all keys and their values - not to be used lightly
 func (r *RPCStorageHandler) GetKeysAndValues() map[string]string {
-
 	searchStr := r.KeyPrefix + "*"
 
 	kvPair, err := rpc.FuncClientSingleton("GetKeysAndValues", searchStr)
@@ -407,12 +400,10 @@ func (r *RPCStorageHandler) GetKeysAndValues() map[string]string {
 	}
 
 	return returnValues
-
 }
 
 // DeleteKey will remove a key from the database
 func (r *RPCStorageHandler) DeleteKey(keyName string) bool {
-
 	log.Debug("DEL Key was: ", keyName)
 	log.Debug("DEL Key became: ", r.fixKey(keyName))
 	ok, err := rpc.FuncClientSingleton("DeleteKey", r.fixKey(keyName))
@@ -576,7 +567,6 @@ func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, val stri
 	}
 
 	return intVal.(int), nil
-
 }
 
 func (r *RPCStorageHandler) GetRollingWindow(keyName string, per int64, pipeline bool) (int, []interface{}) {
@@ -836,10 +826,10 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		keys = append(keys, tokens...)
 	}
 
-	//single and specific tokens
+	// single and specific tokens
 	for token, key := range TokensToBeRevoked {
-		//key formed as: token:apiId:tokenActionTypeHint
-		//but hashed as: token#hashed:apiId:tokenActionTypeHint
+		// key formed as: token:apiId:tokenActionTypeHint
+		// but hashed as: token#hashed:apiId:tokenActionTypeHint
 		splitKeys := strings.Split(key, ":")
 		apiId := splitKeys[1]
 		tokenActionTypeHint := splitKeys[2]

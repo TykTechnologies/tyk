@@ -71,7 +71,7 @@ func initHealthCheck(ctx context.Context) {
 	setCurrentHealthCheckInfo(make(map[string]HealthCheckItem, 3))
 
 	go func(ctx context.Context) {
-		var n = config.Global().LivenessCheck.CheckDuration
+		n := config.Global().LivenessCheck.CheckDuration
 
 		if n == 0 {
 			n = 10
@@ -114,7 +114,7 @@ func gatherHealthChecks() {
 	go func() {
 		defer wg.Done()
 
-		var checkItem = HealthCheckItem{
+		checkItem := HealthCheckItem{
 			Status:        Pass,
 			ComponentType: Datastore,
 			Time:          time.Now().Format(time.RFC3339),
@@ -138,7 +138,7 @@ func gatherHealthChecks() {
 		go func() {
 			defer wg.Done()
 
-			var checkItem = HealthCheckItem{
+			checkItem := HealthCheckItem{
 				Status:        Pass,
 				ComponentType: Datastore,
 				Time:          time.Now().Format(time.RFC3339),
@@ -170,7 +170,7 @@ func gatherHealthChecks() {
 		go func() {
 			defer wg.Done()
 
-			var checkItem = HealthCheckItem{
+			checkItem := HealthCheckItem{
 				Status:        Pass,
 				ComponentType: Datastore,
 				Time:          time.Now().Format(time.RFC3339),

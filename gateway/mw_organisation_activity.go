@@ -16,8 +16,10 @@ type orgChanMapMu struct {
 	channels map[string](chan bool)
 }
 
-var orgChanMap = orgChanMapMu{channels: map[string](chan bool){}}
-var orgActiveMap sync.Map
+var (
+	orgChanMap   = orgChanMapMu{channels: map[string](chan bool){}}
+	orgActiveMap sync.Map
+)
 
 // RateLimitAndQuotaCheck will check the incoming request and key whether it is within it's quota and
 // within it's rate limit, it makes use of the SessionLimiter object to do this

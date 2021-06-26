@@ -215,7 +215,6 @@ func TestServiceDiscovery_EUREKA(t *testing.T) {
 	sd := ServiceDiscovery{}
 	rawData := configureService("eureka", &sd)
 	data, err := sd.ProcessRawData(rawData)
-
 	if err != nil {
 		t.Error(err)
 	}
@@ -232,14 +231,12 @@ func TestServiceDiscovery_EUREKA(t *testing.T) {
 			t.Error(err)
 		}
 	}
-
 }
 
 func TestServiceDiscovery_CONSUL(t *testing.T) {
 	sd := ServiceDiscovery{}
 	rawData := configureService("consul", &sd)
 	data, err := sd.ProcessRawData(rawData)
-
 	if err != nil {
 		t.Error(err)
 	}
@@ -256,14 +253,12 @@ func TestServiceDiscovery_CONSUL(t *testing.T) {
 			t.Error(err)
 		}
 	}
-
 }
 
 func TestServiceDiscovery_NESTED_CONSUL(t *testing.T) {
 	sd := ServiceDiscovery{}
 	rawData := configureService("nested_consul", &sd)
 	data, err := sd.ProcessRawData(rawData)
-
 	if err != nil {
 		t.Error(err)
 	}
@@ -280,14 +275,12 @@ func TestServiceDiscovery_NESTED_CONSUL(t *testing.T) {
 			t.Error(err)
 		}
 	}
-
 }
 
 func TestServiceDiscovery_ETCD_NESTED_LIST(t *testing.T) {
 	sd := ServiceDiscovery{}
 	rawData := configureService("nested_list", &sd)
 	data, err := sd.ProcessRawData(rawData)
-
 	if err != nil {
 		t.Error(err)
 	}
@@ -304,14 +297,12 @@ func TestServiceDiscovery_ETCD_NESTED_LIST(t *testing.T) {
 			t.Error(err)
 		}
 	}
-
 }
 
 func TestServiceDiscovery_ETCD_NESTED_NOLIST(t *testing.T) {
 	sd := ServiceDiscovery{}
 	rawData := configureService("nested", &sd)
 	data, err := sd.ProcessRawData(rawData)
-
 	if err != nil {
 		t.Error(err)
 	}
@@ -324,14 +315,12 @@ func TestServiceDiscovery_ETCD_NESTED_NOLIST(t *testing.T) {
 		err := "Value is wrong, should be: " + tVal + " have: " + host
 		t.Error(err)
 	}
-
 }
 
 func TestServiceDiscovery_ETCD_NOLIST(t *testing.T) {
 	sd := ServiceDiscovery{}
 	rawData := configureService("etcd", &sd)
 	data, err := sd.ProcessRawData(rawData)
-
 	if err != nil {
 		t.Error(err)
 	}
@@ -344,14 +333,12 @@ func TestServiceDiscovery_ETCD_NOLIST(t *testing.T) {
 		err := "Value is wrong, should be: " + tVal + " have: " + host
 		t.Error(err)
 	}
-
 }
 
 func TestServiceDiscovery_MESOSPHERE(t *testing.T) {
 	sd := ServiceDiscovery{}
 	rawData := configureService("mesosphere", &sd)
 	data, err := sd.ProcessRawData(rawData)
-
 	if err != nil {
 		t.Error(err)
 	}
@@ -368,5 +355,4 @@ func TestServiceDiscovery_MESOSPHERE(t *testing.T) {
 			t.Error(err)
 		}
 	}
-
 }

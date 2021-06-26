@@ -21,7 +21,7 @@ func TestHandleError_text_xml(t *testing.T) {
 	<code>500</code>
 	<message>{{.Message}}</message>
 </error>`
-	err := ioutil.WriteFile(file, []byte(xml), 0600)
+	err := ioutil.WriteFile(file, []byte(xml), 0o600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +62,6 @@ func TestHandleError_text_xml(t *testing.T) {
 }
 
 func TestHandleDefaultErrorXml(t *testing.T) {
-
 	expect := `<?xml version = "1.0" encoding = "UTF-8"?>
 <error>There was a problem proxying the request</error>`
 	ts := StartTest()
@@ -96,7 +95,6 @@ func TestHandleDefaultErrorXml(t *testing.T) {
 }
 
 func TestHandleDefaultErrorJSON(t *testing.T) {
-
 	expect := `
 {
     "error": "There was a problem proxying the request"
@@ -120,5 +118,4 @@ func TestHandleDefaultErrorJSON(t *testing.T) {
 			return strings.TrimSpace(expect) == string(bytes.TrimSpace(b))
 		},
 	})
-
 }

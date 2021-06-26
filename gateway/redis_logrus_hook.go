@@ -22,7 +22,6 @@ func newRedisHook() *redisChannelHook {
 }
 
 func (hook *redisChannelHook) Fire(entry *logrus.Entry) error {
-
 	orgId, found := entry.Data["org_id"]
 	if !found {
 		return nil

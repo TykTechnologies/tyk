@@ -100,8 +100,10 @@ func init() {
 }
 
 // gMiddlewareCache will hold LuaDispatcher.gMiddlewareCache.
-var gMiddlewareCache map[string]string
-var gModuleCache map[string]string
+var (
+	gMiddlewareCache map[string]string
+	gModuleCache     map[string]string
+)
 
 // LuaDispatcher implements a coprocess.Dispatcher
 type LuaDispatcher struct {

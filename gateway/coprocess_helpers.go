@@ -97,7 +97,6 @@ func TykSessionState(session *coprocess.SessionState) *user.SessionState {
 
 // ProtoSessionState takes a standard SessionState and outputs a SessionState object compatible with Protocol Buffers.
 func ProtoSessionState(session *user.SessionState) *coprocess.SessionState {
-
 	accessDefinitions := make(map[string]*coprocess.AccessDefinition, len(session.GetAccessRights()))
 
 	for key, accessDefinition := range session.GetAccessRights() {

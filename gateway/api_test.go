@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/x509"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -17,8 +18,6 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"fmt"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -436,7 +435,6 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 			session.Tags = []string{"key-tag2"}
 			assertTags(session, expected)
 		})
-
 	})
 
 	t.Run("MetaData on key level", func(t *testing.T) {
@@ -635,7 +633,6 @@ func TestKeyHandler_CheckKeysNotDuplicateOnUpdate(t *testing.T) {
 			if len(sessions) != 1 {
 				t.Errorf("Sessions stored in global manager should be 1. But got: %v", len(sessions))
 			}
-
 		})
 	}
 }
@@ -1547,7 +1544,6 @@ func TestApiLoaderLongestPathFirst(t *testing.T) {
 }
 
 func TestRotateClientSecretHandler(t *testing.T) {
-
 	ts := StartTest()
 	defer ts.Close()
 
@@ -1600,10 +1596,8 @@ func TestRotateClientSecretHandler(t *testing.T) {
 			BodyMatch: `"client_id":"12345"`,
 		},
 	)
-
 	if err != nil {
 		t.Error(err)
-
 	}
 
 	var client NewClientRequest

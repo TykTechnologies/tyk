@@ -90,7 +90,6 @@ func (i *Importer) Import(ctx *kingpin.ParseContext) (err error) {
 }
 
 func (i *Importer) validateInput() error {
-
 	if *i.createAPI {
 		if *i.upstreamTarget == "" || *i.orgID == "" {
 			return fmt.Errorf("No upstream target or org ID defined, these are both required")
@@ -235,13 +234,13 @@ func (i *Importer) handleSwaggerMode() error {
 func (i *Importer) handleWSDLMode() error {
 	var def *apidef.APIDefinition
 
-	//Process Input
+	// Process Input
 	if err := i.validateInput(); err != nil {
 		return err
 	}
 	serviceportMapping := i.processPortNames()
 
-	//Load WSDL file
+	// Load WSDL file
 	w, err := i.wsdlLoadFile(*i.input)
 	if err != nil {
 		return fmt.Errorf("File load error: %v", err)
@@ -250,13 +249,13 @@ func (i *Importer) handleWSDLMode() error {
 	w.SetServicePortMapping(serviceportMapping)
 
 	if *i.createAPI {
-		//Create new API
+		// Create new API
 		def, err = w.ToAPIDefinition(*i.orgID, *i.upstreamTarget, *i.asMock)
 		if err != nil {
 			return fmt.Errorf("Failed to create API Defintition from file")
 		}
 	} else {
-		//Add into existing API
+		// Add into existing API
 		def, err = i.apiDefLoadFile(*i.forAPI)
 		if err != nil {
 			return fmt.Errorf("failed to load and decode file data for API Definition: %v", err)

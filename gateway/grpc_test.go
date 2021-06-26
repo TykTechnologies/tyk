@@ -31,12 +31,11 @@ import (
 
 // For gRPC, we should be sure that HTTP/2 works with Tyk in H2C configuration also for insecure grpc over http.
 func TestHTTP2_h2C(t *testing.T) {
-
 	defer ResetTestConfig()
-	var port = 6666
+	port := 6666
 
 	EnablePort(port, "http")
-	var echo = "Hello, I am an HTTP/2 Server"
+	echo := "Hello, I am an HTTP/2 Server"
 	expected := "HTTP/2.0"
 	h2cServ := &http2.Server{}
 	// Upstream server supporting HTTP/2
@@ -100,13 +99,12 @@ func TestHTTP2_h2C(t *testing.T) {
 	if w.ProtoMajor != 2 {
 		t.Error("expected %i to %i", 2, w.ProtoMajor)
 	}
-
 }
 
 func TestGRPC_H2C(t *testing.T) {
 	defer ResetTestConfig()
 
-	var port = 6666
+	port := 6666
 	EnablePort(port, "h2c")
 	// gRPC server
 	target, s := startGRPCServerH2C(t, setupHelloSVC)
@@ -164,7 +162,6 @@ func TestHTTP2_TLS(t *testing.T) {
 		}
 
 		fmt.Fprintln(w, "Hello, I am an HTTP/2 Server")
-
 	}))
 	upstream.TLS = new(tls.Config)
 	upstream.TLS.NextProtos = []string{"h2"}
@@ -201,14 +198,13 @@ func TestHTTP2_TLS(t *testing.T) {
 // but consume it internally via h2c
 // user -> tyk = HTTPS | tyk -> upstream = H2C
 func TestTLSTyk_H2cUpstream(t *testing.T) {
-
 	// Certificates
 	_, _, _, clientCert := genCertificate(&x509.Certificate{})
 	serverCertPem, _, combinedPEM, _ := genServerCertificate()
 	certID, _ := CertificateManager.Add(combinedPEM, "")
 	defer CertificateManager.Delete(certID, "")
 
-	var port = 6666
+	port := 6666
 	// run Tyk in HTTPS
 	globalConf := config.Global()
 	globalConf.ListenPort = port
@@ -225,7 +221,7 @@ func TestTLSTyk_H2cUpstream(t *testing.T) {
 
 	h2cServ := &http2.Server{}
 	expected := "HTTP/2.0"
-	var echo = "Hello, I am an HTTP/2 Server"
+	echo := "Hello, I am an HTTP/2 Server"
 	// Upstream server supporting HTTP/2
 	upstream := httptest.NewUnstartedServer(
 		h2c.NewHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -565,7 +561,6 @@ func startGRPCServer(t *testing.T, clientCert *x509.Certificate, fn func(t *test
 		}
 	}()
 	return ls, s
-
 }
 
 func sayHelloWithGRPCClientH2C(t *testing.T, address string, name string) *pb.HelloReply {
@@ -834,7 +829,7 @@ func TestGRPC_Stream_BasicAuthentication(t *testing.T) {
 func TestGRPC_Stream_H2C(t *testing.T) {
 	defer ResetTestConfig()
 
-	var port = 6666
+	port := 6666
 
 	EnablePort(port, "http")
 	// gRPC server

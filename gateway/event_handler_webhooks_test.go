@@ -65,7 +65,6 @@ func TestChecksum(t *testing.T) {
 
 	hook := createGetHandler()
 	checksum, err := hook.Checksum(rBody)
-
 	if err != nil {
 		t.Error("Checksum should not have failed with good objet and body")
 	}
@@ -170,7 +169,6 @@ func TestGet(t *testing.T) {
 	if wasFired := eventHandler.WasHookFired(checksum); !wasFired {
 		t.Error("Checksum should have matched, event did not fire!")
 	}
-
 }
 
 func TestPost(t *testing.T) {
@@ -290,5 +288,4 @@ func TestWebhookContentTypeHeader(t *testing.T) {
 			}
 		})
 	}
-
 }

@@ -19,7 +19,7 @@ func TestWrapDialerDialContextFunc(t *testing.T) {
 	hostWithPort := expectedHost + ":8078"
 	singleIpHostWithPort := expectedSingleIpHost + ":8078"
 	dialerContext, cancel := context.WithCancel(context.TODO())
-	cancel() //Manually disable connection establishment
+	cancel() // Manually disable connection establishment
 
 	cases := []struct {
 		name string
@@ -82,21 +82,23 @@ func TestWrapDialerDialContextFunc(t *testing.T) {
 				key    string
 			}
 
-			storage := &MockStorage{func(key string) ([]string, error) {
-				fetchItemCall.called = true
-				fetchItemCall.key = key
-				return etcHostsMap[key+"."], nil
-			}, func(key string) (DnsCacheItem, bool) {
-				if _, ok := etcHostsMap[key]; ok {
-					return DnsCacheItem{}, true
-				}
+			storage := &MockStorage{
+				func(key string) ([]string, error) {
+					fetchItemCall.called = true
+					fetchItemCall.key = key
+					return etcHostsMap[key+"."], nil
+				}, func(key string) (DnsCacheItem, bool) {
+					if _, ok := etcHostsMap[key]; ok {
+						return DnsCacheItem{}, true
+					}
 
-				return DnsCacheItem{}, false
-			}, func(key string, addrs []string) {},
+					return DnsCacheItem{}, false
+				}, func(key string, addrs []string) {},
 				func(key string) {
 					deleteCall.called = true
 					deleteCall.key = key
-				}, func() {}}
+				}, func() {},
+			}
 
 			dnsManager := NewDnsCacheManager(tc.multiIPsStrategy)
 			if tc.initStorage {

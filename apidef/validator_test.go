@@ -117,5 +117,4 @@ func TestRuleUniqueDataSourceNames_Validate(t *testing.T) {
 			Errors:  nil,
 		},
 	))
-
 }

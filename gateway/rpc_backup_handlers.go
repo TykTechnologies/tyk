@@ -17,9 +17,11 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-const RPCKeyPrefix = "rpc:"
-const BackupApiKeyBase = "node-definition-backup:"
-const BackupPolicyKeyBase = "node-policy-backup:"
+const (
+	RPCKeyPrefix        = "rpc:"
+	BackupApiKeyBase    = "node-definition-backup:"
+	BackupPolicyKeyBase = "node-policy-backup:"
+)
 
 func getTagListAsString() string {
 	tagList := ""
