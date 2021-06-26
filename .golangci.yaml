@@ -1,0 +1,16 @@
+run:
+  tests: false
+  linter-settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: false
+  skip-dirs:
+    - test
+linters:
+  disable-all: true
+  enable:
+    - ineffassign
+    - structcheck
+    - errorlint
+    # - gocritic
+    - gofumpt
