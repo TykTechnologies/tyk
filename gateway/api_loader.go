@@ -103,9 +103,7 @@ func fixFuncPath(pathPrefix string, funcs []apidef.MiddlewareDefinition) {
 	}
 }
 
-func processSpec(spec *APISpec, apisByListen map[string]int,
-	gs *generalStores, subrouter *mux.Router, logger *logrus.Entry) *ChainObject {
-
+func processSpec(spec *APISpec, apisByListen map[string]int, gs *generalStores, subrouter *mux.Router, logger *logrus.Entry) *ChainObject {
 	var chainDef ChainObject
 
 	handleCORS(subrouter, spec)
@@ -208,8 +206,8 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 	// Set up all the JSVM middleware
 	var mwAuthCheckFunc apidef.MiddlewareDefinition
-	var mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, 
-	mwResponseFuncs []apidef.MiddlewareDefinition
+	var mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs,
+		mwResponseFuncs []apidef.MiddlewareDefinition
 
 	var mwDriver apidef.MiddlewareDriver
 

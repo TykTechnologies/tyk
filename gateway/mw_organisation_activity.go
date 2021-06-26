@@ -222,13 +222,7 @@ func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request, orgSessio
 	return nil, http.StatusOK
 }
 
-func (k *OrganizationMonitor) AllowAccessNext(
-	orgChan chan bool,
-	path string,
-	IP string,
-	r *http.Request,
-	session *user.SessionState) {
-
+func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, path string, IP string, r *http.Request, session *user.SessionState) {
 	// Is it active?
 	logEntry := getExplicitLogEntryForRequest(k.Logger(), path, IP, k.Spec.OrgID, nil)
 	if session.IsInactive {

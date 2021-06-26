@@ -1,3 +1,4 @@
+//nolint:gofumpt
 package gateway
 
 import (
@@ -37,12 +38,7 @@ type SessionLimiter struct {
 	bucketStore leakybucket.Storage
 }
 
-func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string,
-	currentSession *user.SessionState,
-	store storage.Handler,
-	globalConf *config.Config,
-	apiLimit *user.APILimit, dryRun bool) bool {
-
+func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string, currentSession *user.SessionState, store storage.Handler, globalConf *config.Config, apiLimit *user.APILimit, dryRun bool) bool {
 	var per, rate float64
 
 	if apiLimit != nil { // respect limit on API level
@@ -97,9 +93,7 @@ const (
 	sessionFailInternalServerError
 )
 
-func (l *SessionLimiter) limitSentinel(currentSession *user.SessionState, key string, rateScope string, store storage.Handler,
-	globalConf *config.Config, apiLimit *user.APILimit, dryRun bool) bool {
-
+func (l *SessionLimiter) limitSentinel(currentSession *user.SessionState, key string, rateScope string, store storage.Handler, globalConf *config.Config, apiLimit *user.APILimit, dryRun bool) bool {
 	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.GetKeyHash()
 	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.GetKeyHash() + ".BLOCKED"
 
@@ -111,9 +105,7 @@ func (l *SessionLimiter) limitSentinel(currentSession *user.SessionState, key st
 	return sentinelActive == nil
 }
 
-func (l *SessionLimiter) limitRedis(currentSession *user.SessionState, key string, rateScope string, store storage.Handler,
-	globalConf *config.Config, apiLimit *user.APILimit, dryRun bool) bool {
-
+func (l *SessionLimiter) limitRedis(currentSession *user.SessionState, key string, rateScope string, store storage.Handler, globalConf *config.Config, apiLimit *user.APILimit, dryRun bool) bool {
 	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.GetKeyHash()
 	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.GetKeyHash() + ".BLOCKED"
 

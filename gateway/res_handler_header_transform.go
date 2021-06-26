@@ -40,9 +40,7 @@ func (h *HeaderTransform) Init(c interface{}, spec *APISpec) error {
 func (h *HeaderTransform) HandleError(rw http.ResponseWriter, req *http.Request) {
 }
 
-func (h *HeaderTransform) HandleResponse(rw http.ResponseWriter,
-	res *http.Response, req *http.Request, ses *user.SessionState) error {
-
+func (h *HeaderTransform) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
 	// Parse target_host parameter from configuration
 	target_url, err := url.Parse(h.config.RevProxyTransform.Target_host)
 	if err != nil {
