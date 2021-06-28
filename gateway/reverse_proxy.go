@@ -1529,6 +1529,7 @@ func copyRequest(r *http.Request) *http.Request {
 }
 
 func copyResponse(r *http.Response) *http.Response {
+	// for the case of streaming for which Content-Length might be unset = -1.
 	if r.ContentLength == -1 {
 		return r
 	}
