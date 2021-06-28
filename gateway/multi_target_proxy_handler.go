@@ -37,7 +37,7 @@ func (m *MultiTargetProxy) ServeHTTPForCache(w http.ResponseWriter, r *http.Requ
 	return m.proxyForRequest(r).ServeHTTPForCache(w, r)
 }
 
-func (m *MultiTargetProxy) CopyResponse(dst io.Writer, src io.Reader,flushInterval time.Duration) {
+func (m *MultiTargetProxy) CopyResponse(dst io.Writer, src io.Reader, flushInterval time.Duration) {
 	m.defaultProxy.CopyResponse(dst, src, flushInterval)
 }
 
