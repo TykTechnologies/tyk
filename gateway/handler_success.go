@@ -46,7 +46,7 @@ type ProxyResponse struct {
 type ReturningHttpHandler interface {
 	ServeHTTP(http.ResponseWriter, *http.Request) ProxyResponse
 	ServeHTTPForCache(http.ResponseWriter, *http.Request) ProxyResponse
-	CopyResponse(io.Writer, io.Reader)
+	CopyResponse(io.Writer, io.Reader, time.Duration)
 }
 
 // SuccessHandler represents the final ServeHTTP() request for a proxied API request
@@ -302,6 +302,8 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 // Spec states the path is Ignored
 func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.Response {
 	log.Debug("Started proxy")
+
+log.Infof("Header: %+v",r.Header)
 	defer s.Base().UpdateRequestSession(r)
 
 	versionDef := s.Spec.VersionDefinition

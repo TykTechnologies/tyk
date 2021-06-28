@@ -746,6 +746,7 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 }
 
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) ProxyResponse {
+	log.Info("----Wrapped serve HTTP ")
 	if trace.IsEnabled() {
 		span, ctx := trace.Span(req.Context(), req.URL.Path)
 		defer span.Finish()
@@ -1025,7 +1026,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			var bodyBuffer bytes.Buffer
 			bodyBuffer2 := new(bytes.Buffer)
 
-			p.CopyResponse(&bodyBuffer, res.Body)
+			p.CopyResponse(&bodyBuffer, res.Body, p.flushInterval(res))
 			*bodyBuffer2 = bodyBuffer
 
 			// Create new ReadClosers so we can split output
@@ -1094,7 +1095,7 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 		}
 	}
 
-	p.CopyResponse(rw, res.Body)
+	p.CopyResponse(rw, res.Body, p.flushInterval(res))
 
 	if len(res.Trailer) == announcedTrailers {
 		copyHeader(rw.Header(), res.Trailer, config.Global().IgnoreCanonicalMIMEHeaderKey)
@@ -1110,16 +1111,39 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 	return nil
 }
 
-func (p *ReverseProxy) CopyResponse(dst io.Writer, src io.Reader) {
-	if p.FlushInterval != 0 {
+// flushInterval returns the p.FlushInterval value, conditionally
+// overriding its value for a specific request/response.
+func (p *ReverseProxy) flushInterval(res *http.Response) time.Duration {
+	resCT := res.Header.Get("Content-Type")
+
+	// For Server-Sent Events responses, flush immediately.
+	// The MIME type is defined in https://www.w3.org/TR/eventsource/#text-event-stream
+	if resCT == "text/event-stream" {
+		return -1 // negative means immediately
+	}
+
+	// We might have the case of streaming for which Content-Length might be unset.
+	if res.ContentLength == -1 {
+		return -1
+	}
+
+	return p.FlushInterval
+}
+
+func (p *ReverseProxy) CopyResponse(dst io.Writer, src io.Reader, flushInterval time.Duration) {
+
+	if flushInterval != 0 {
 		if wf, ok := dst.(writeFlusher); ok {
 			mlw := &maxLatencyWriter{
 				dst:     wf,
-				latency: p.FlushInterval,
-				done:    make(chan bool),
+				latency: flushInterval,
 			}
-			go mlw.flushLoop()
 			defer mlw.stop()
+
+			// set up initial timer so headers get flushed even if body writes are delayed
+			mlw.flushPending = true
+			mlw.t = time.AfterFunc(flushInterval, mlw.delayedFlush)
+
 			dst = mlw
 		}
 	}
@@ -1236,34 +1260,51 @@ type writeFlusher interface {
 
 type maxLatencyWriter struct {
 	dst     writeFlusher
-	latency time.Duration
+	latency time.Duration // non-zero; negative means to flush immediately
 
-	mu   sync.Mutex // protects Write + Flush
-	done chan bool
+	mu           sync.Mutex // protects t, flushPending, and dst.Flush
+	t            *time.Timer
+	flushPending bool
 }
 
-func (m *maxLatencyWriter) Write(p []byte) (int, error) {
+func (m *maxLatencyWriter) Write(p []byte) (n int, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.dst.Write(p)
+	n, err = m.dst.Write(p)
+	if m.latency < 0 {
+		m.dst.Flush()
+		return
+	}
+	if m.flushPending {
+		return
+	}
+	if m.t == nil {
+		m.t = time.AfterFunc(m.latency, m.delayedFlush)
+	} else {
+		m.t.Reset(m.latency)
+	}
+	m.flushPending = true
+	return
 }
 
-func (m *maxLatencyWriter) flushLoop() {
-	t := time.NewTicker(m.latency)
-	defer t.Stop()
-	for {
-		select {
-		case <-m.done:
-			return
-		case <-t.C:
-			m.mu.Lock()
-			m.dst.Flush()
-			m.mu.Unlock()
-		}
+func (m *maxLatencyWriter) delayedFlush() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if !m.flushPending { // if stop was called but AfterFunc already started this goroutine
+		return
+	}
+	m.dst.Flush()
+	m.flushPending = false
+}
+
+func (m *maxLatencyWriter) stop() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.flushPending = false
+	if m.t != nil {
+		m.t.Stop()
 	}
 }
-
-func (m *maxLatencyWriter) stop() { m.done <- true }
 
 func requestIPHops(r *http.Request) string {
 	clientIP, _, err := net.SplitHostPort(r.RemoteAddr)
@@ -1322,6 +1363,10 @@ func copyBody(body io.ReadCloser) io.ReadCloser {
 }
 
 func copyRequest(r *http.Request) *http.Request {
+	if r.ContentLength == -1 {
+		return r
+	}
+
 	if r.Body != nil {
 		r.Body = copyBody(r.Body)
 	}
@@ -1329,6 +1374,10 @@ func copyRequest(r *http.Request) *http.Request {
 }
 
 func copyResponse(r *http.Response) *http.Response {
+	if r.ContentLength == -1 {
+		return r
+	}
+
 	if r.Body != nil {
 		r.Body = copyBody(r.Body)
 	}
@@ -1352,12 +1401,19 @@ func nopCloseResponseBody(r *http.Response) {
 }
 
 func IsUpgrade(req *http.Request) (bool, string) {
+log.Info("-----IsUpgraded Function----")
 	if !config.Global().HttpServerOptions.EnableWebSockets {
 		return false, ""
 	}
 
-	contentType := strings.ToLower(strings.TrimSpace(req.Header.Get(headers.Accept)))
-	if contentType == "text/event-stream" {
+	/*contentType := strings.ToLower(strings.TrimSpace(req.Header.Get("Content-Type")))
+	if contentType == "application/grpc" {
+		log.Info("=======application grpc upgraded=====")
+		return true, ""
+	}*/
+
+	EncodeAccept := strings.ToLower(strings.TrimSpace(req.Header.Get(headers.Accept)))
+	if EncodeAccept == "text/event-stream" {
 		return true, ""
 	}
 
