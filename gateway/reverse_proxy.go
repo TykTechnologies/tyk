@@ -785,12 +785,19 @@ func (p *ReverseProxy) handleOutboundRequest(roundTripper *TykRoundTripper, outr
 
 	if p.TykAPISpec.GraphQL.Enabled {
 		res, hijacked, err = p.handleGraphQL(roundTripper, outreq, w)
-		return
+		if !errors.Is(err, errGQLNil{}) {
+			return
+		}
+		// err is errGQLNil, fallback by upstreaming request with normal mechanisms
 	}
 
 	res, err = p.sendRequestToUpstream(roundTripper, outreq)
 	return
 }
+
+type errGQLNil struct{}
+
+func (e errGQLNil) Error() string { return "graphql request is nil" }
 
 func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, err error) {
 	isWebSocketUpgrade := ctxGetGraphQLIsWebSocketUpgrade(outreq)
@@ -800,7 +807,7 @@ func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http
 
 	gqlRequest := ctxGetGraphQLRequest(outreq)
 	if gqlRequest == nil {
-		err = errors.New("graphql request is nil")
+		err = errGQLNil{}
 		return
 	}
 	gqlRequest.SetHeader(outreq.Header)
