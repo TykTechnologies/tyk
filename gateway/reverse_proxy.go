@@ -1374,6 +1374,7 @@ func copyRequest(r *http.Request) *http.Request {
 }
 
 func copyResponse(r *http.Response) *http.Response {
+	// We might have the case of streaming for which Content-Length might be unset = -1.
 	if r.ContentLength == -1 {
 		return r
 	}
@@ -1401,16 +1402,9 @@ func nopCloseResponseBody(r *http.Response) {
 }
 
 func IsUpgrade(req *http.Request) (bool, string) {
-log.Info("-----IsUpgraded Function----")
 	if !config.Global().HttpServerOptions.EnableWebSockets {
 		return false, ""
 	}
-
-	/*contentType := strings.ToLower(strings.TrimSpace(req.Header.Get("Content-Type")))
-	if contentType == "application/grpc" {
-		log.Info("=======application grpc upgraded=====")
-		return true, ""
-	}*/
 
 	EncodeAccept := strings.ToLower(strings.TrimSpace(req.Header.Get(headers.Accept)))
 	if EncodeAccept == "text/event-stream" {

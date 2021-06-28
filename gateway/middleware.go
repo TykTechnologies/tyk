@@ -87,7 +87,7 @@ func createDynamicMiddleware(name string, isPre, useSession bool, baseMid BaseMi
 
 // Generic middleware caller to make extension easier
 func createMiddleware(actualMW TykMiddleware) func(http.Handler) http.Handler {
-//	panic("create middleware")
+	//	panic("create middleware")
 	mw := &TraceMiddleware{
 		TykMiddleware: actualMW,
 	}
@@ -137,7 +137,7 @@ func createMiddleware(actualMW TykMiddleware) func(http.Handler) http.Handler {
 				h.ServeHTTP(w, r)
 				return
 			}
-log.Info("will process the request")
+
 			err, errCode := mw.ProcessRequest(w, r, mwConf)
 			if err != nil {
 				// GoPluginMiddleware are expected to send response in case of error
@@ -176,8 +176,6 @@ log.Info("will process the request")
 				meta["bypass"] = "1"
 				h.ServeHTTP(w, r)
 			} else {
-				log.Info("---updating request session----")
-				log.Infof("---el error %v",errCode)
 				mw.Base().UpdateRequestSession(r)
 			}
 		})

@@ -583,7 +583,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		handler.ServeHTTP(w, r)
 		return
 	}
-log.Info("Por aca")
+
 	d.SH.ServeHTTP(w, r)
 }
 

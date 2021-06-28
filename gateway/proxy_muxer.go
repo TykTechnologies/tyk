@@ -37,12 +37,10 @@ type h2cWrapper struct {
 }
 
 func (h *h2cWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	log.Infof("-------serving h2c, req: %+v", r)
 	h.h.ServeHTTP(w, r)
 }
 
 func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	log.Infof("---------serving http, req: %+v", r)
 	// make request body to be nopCloser and re-readable before serve it through chain of middlewares
 	nopCloseRequestBody(r)
 	log.Info("---after nopcloseRequestBody")

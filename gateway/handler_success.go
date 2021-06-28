@@ -303,7 +303,6 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.Response {
 	log.Debug("Started proxy")
 
-log.Infof("Header: %+v",r.Header)
 	defer s.Base().UpdateRequestSession(r)
 
 	versionDef := s.Spec.VersionDefinition
