@@ -46,7 +46,7 @@ type ProxyResponse struct {
 type ReturningHttpHandler interface {
 	ServeHTTP(http.ResponseWriter, *http.Request) ProxyResponse
 	ServeHTTPForCache(http.ResponseWriter, *http.Request) ProxyResponse
-	CopyResponse(io.Writer, io.Reader)
+	CopyResponse(io.Writer, io.Reader, time.Duration)
 }
 
 // SuccessHandler represents the final ServeHTTP() request for a proxied API request
