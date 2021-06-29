@@ -17,6 +17,6 @@ EOF
 [[ -z $1 ]] && usage $0
 export tag=$1
 
-docker-compose -f test.yml build && docker-compose -f test.yml up -d
+docker-compose build && docker-compose up -d
 sleep 2 # Wait to start
 curl http://localhost:8080/pyplugin/headers | jq -e '.headers.Foo == "Bar"'
