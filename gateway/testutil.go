@@ -29,7 +29,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
-	"github.com/rs/cors"
 	uuid "github.com/satori/go.uuid"
 	"golang.org/x/net/context"
 
@@ -940,8 +939,7 @@ func (s *Test) Start() {
 		scheme = "https://"
 	}
 	s.URL = scheme + mainProxy().listener.Addr().String()
-	// set simple CORS options
-	controlProxy().router.Use(cors.New(cors.Options{}).Handler)
+
 	s.testRunner = &test.HTTPTestRunner{
 		RequestBuilder: func(tc *test.TestCase) (*http.Request, error) {
 			tc.BaseURL = s.URL

@@ -783,9 +783,17 @@ func (p *ReverseProxy) handleOutboundRequest(roundTripper *TykRoundTripper, outr
 		latency = time.Since(begin)
 	}()
 
-	if p.TykAPISpec.GraphQL.Enabled && isNotCORSPreflight(outreq) {
-		res, hijacked, err = p.handleGraphQL(roundTripper, outreq, w)
-		return
+	if p.TykAPISpec.GraphQL.Enabled {
+		if isNotCORSPreflight(outreq) {
+			res, hijacked, err = p.handleGraphQL(roundTripper, outreq, w)
+			return
+		}
+		if needsGraphQLExecutionEngine(p.TykAPISpec) {
+			err = errors.New("options passthrough not allowed")
+			return
+		}
+		// request is pre-flight and the GQL execution mode is probably Proxy only,
+		// so fallback to sending request with normal mechanisms
 	}
 
 	res, err = p.sendRequestToUpstream(roundTripper, outreq)
