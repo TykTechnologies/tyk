@@ -9,6 +9,8 @@ name: Sync automation
 
 on:
   push:
+    branches:
+      - master
     paths:
       - bin/unlock-agent.sh
       - .goreleaser.yml
