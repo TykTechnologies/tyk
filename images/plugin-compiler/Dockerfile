@@ -15,8 +15,10 @@ RUN mkdir -p $TYK_GW_PATH $PLUGIN_SOURCE_PATH $PLUGIN_BUILD_PATH
 COPY images/plugin-compiler/data/build.sh /build.sh
 RUN chmod +x /build.sh
 
-RUN curl -sL "https://api.github.com/repos/TykTechnologies/tyk/tarball/${TYK_GW_TAG}" | \
-    tar -C $TYK_GW_PATH --strip-components=1 -xzf - 
+# Cache tyk dependencies for compile time
+COPY . /tyk
+WORKDIR /tyk
+RUN go mod vendor && mv vendor $PLUGIN_BUILD_PATH && rm -rf /tyk
 
 ENTRYPOINT ["/build.sh"]
 
