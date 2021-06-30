@@ -903,8 +903,16 @@ func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(round
 	case apidef.GraphQLConfigVersionNone:
 		fallthrough
 	case apidef.GraphQLConfigVersion1:
+		if p.TykAPISpec.GraphQLExecutor.Engine == nil {
+			log.Error("could not start graphql websocket handler: execution engine is nil")
+			return
+		}
 		executorPool = subscription.NewExecutorV1Pool(p.TykAPISpec.GraphQLExecutor.Engine.NewExecutionHandler())
 	case apidef.GraphQLConfigVersion2:
+		if p.TykAPISpec.GraphQLExecutor.EngineV2 == nil {
+			log.Error("could not start graphql websocket handler: execution engine is nil")
+			return
+		}
 		executorPool = subscription.NewExecutorV2Pool(p.TykAPISpec.GraphQLExecutor.EngineV2)
 	}
 
