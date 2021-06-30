@@ -16,9 +16,8 @@ COPY images/plugin-compiler/data/build.sh /build.sh
 RUN chmod +x /build.sh
 
 # Cache tyk dependencies for compile time
-COPY . /tyk
-WORKDIR /tyk
-RUN go mod vendor && mv vendor $PLUGIN_BUILD_PATH && rm -rf /tyk
+COPY go.mod $PLUGIN_BUILD_PATH
+RUN cd $PLUGIN_BUILD_PATH && go mod vendor && rm go.mod
 
 ENTRYPOINT ["/build.sh"]
 
