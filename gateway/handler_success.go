@@ -269,6 +269,12 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 }
 
 func recordDetail(r *http.Request, spec *APISpec) bool {
+
+	// when streaming in grpc, we do not record the request
+	if IsGrpcStreaming(r) {
+		return false
+	}
+
 	if spec.EnableDetailedRecording {
 		return true
 	}

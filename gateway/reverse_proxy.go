@@ -1578,3 +1578,8 @@ func IsUpgrade(req *http.Request) (bool, string) {
 
 	return false, ""
 }
+
+// IsGrpcStreaming  determines wether a request represents a grpc streaming req
+func IsGrpcStreaming(r *http.Request) bool {
+	return r.ContentLength == -1 && r.Header.Get(headers.ContentType) == "application/grpc"
+}
