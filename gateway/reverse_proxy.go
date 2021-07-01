@@ -784,12 +784,24 @@ func (p *ReverseProxy) handleOutboundRequest(roundTripper *TykRoundTripper, outr
 	}()
 
 	if p.TykAPISpec.GraphQL.Enabled {
-		res, hijacked, err = p.handleGraphQL(roundTripper, outreq, w)
-		return
+		if isNotCORSPreflight(outreq) {
+			res, hijacked, err = p.handleGraphQL(roundTripper, outreq, w)
+			return
+		}
+		if needsGraphQLExecutionEngine(p.TykAPISpec) {
+			err = errors.New("options passthrough not allowed")
+			return
+		}
+		// request is pre-flight and the GQL execution mode is probably Proxy only,
+		// so fallback to sending request with normal mechanisms
 	}
 
 	res, err = p.sendRequestToUpstream(roundTripper, outreq)
 	return
+}
+
+func isNotCORSPreflight(r *http.Request) bool {
+	return r.Method != http.MethodOptions
 }
 
 func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, err error) {
@@ -903,8 +915,16 @@ func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(round
 	case apidef.GraphQLConfigVersionNone:
 		fallthrough
 	case apidef.GraphQLConfigVersion1:
+		if p.TykAPISpec.GraphQLExecutor.Engine == nil {
+			log.Error("could not start graphql websocket handler: execution engine is nil")
+			return
+		}
 		executorPool = subscription.NewExecutorV1Pool(p.TykAPISpec.GraphQLExecutor.Engine.NewExecutionHandler())
 	case apidef.GraphQLConfigVersion2:
+		if p.TykAPISpec.GraphQLExecutor.EngineV2 == nil {
+			log.Error("could not start graphql websocket handler: execution engine is nil")
+			return
+		}
 		executorPool = subscription.NewExecutorV2Pool(p.TykAPISpec.GraphQLExecutor.EngineV2)
 	}
 

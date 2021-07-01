@@ -585,6 +585,9 @@ const Schema = `{
                                 "api_id": {
                                     "type": "string"
                                 },
+                                "name": {
+                                    "type": "string"
+                                },
                                 "url": {
                                     "type": "string"
                                 },

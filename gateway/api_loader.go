@@ -632,6 +632,10 @@ func trimCategories(name string) string {
 	return name
 }
 
+func APILoopingName(name string) string {
+	return replaceNonAlphaNumeric(trimCategories(name))
+}
+
 func fuzzyFindAPI(search string) *APISpec {
 	if search == "" {
 		return nil
@@ -643,7 +647,8 @@ func fuzzyFindAPI(search string) *APISpec {
 	for _, api := range apisByID {
 		if api.APIID == search ||
 			api.Id.Hex() == search ||
-			strings.EqualFold(replaceNonAlphaNumeric(trimCategories(api.Name)), search) {
+			strings.EqualFold(APILoopingName(api.Name), search) {
+
 			return api
 		}
 	}
