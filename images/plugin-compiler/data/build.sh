@@ -22,6 +22,6 @@ yes | cp -r $PLUGIN_SOURCE_PATH/* $PLUGIN_BUILD_PATH || true
 
 cd $PLUGIN_BUILD_PATH
 # if plugin has go.mod
-[ -f go.mod ] && go mod vendor
+[ -f $PLUGIN_BUILD_PATH/go.mod ] && go mod vendor
 go build -buildmode=plugin -o $plugin_name \
     && mv $plugin_name $PLUGIN_SOURCE_PATH
