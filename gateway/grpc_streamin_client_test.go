@@ -166,7 +166,10 @@ func runRouteChat(t *testing.T, client pb.RouteGuideClient) {
 	wg.Wait()
 	// only close the stream when we check that we're
 	// receiving and sending data in bidirectional
-	stream.CloseSend()
+	err = stream.CloseSend()
+	if err != nil {
+		t.Logf("Error closing the grpc stream: %+v", err)
+	}
 }
 
 func randomPoint(r *rand.Rand) *pb.Point {
