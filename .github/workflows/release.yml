@@ -125,7 +125,7 @@ jobs:
           rm go.mod && rm go.sum
           export GO111MODULE=off 
 
-          mkdir -P /go/src/github.com/TykTechnologies/tyk
+          mkdir -p /go/src/github.com/TykTechnologies/tyk
           cp ./* /go/src/github.com/TykTechnologies/tyk
 
           snapshot="--snapshot"
