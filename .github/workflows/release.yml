@@ -124,12 +124,10 @@ jobs:
           mv -f vendor/* $GOPATH/src/
           rm go.mod && rm go.sum
           export GO111MODULE=off 
-          echo "GOPATH: "
-          echo $GOPATH
-          pwd
-          ls /go/src/github.com/TykTechnologies/tyk
-          echo "BUID DIR:"
-          ls ./
+
+          mkdir -P /go/src/github.com/TykTechnologies/tyk
+          cp ./* /go/src/github.com/TykTechnologies/tyk
+
           snapshot="--snapshot"
           if [[ ${{steps.targets.outputs.tag}} = $(git describe --tags) ]]; then
               snapshot=""
