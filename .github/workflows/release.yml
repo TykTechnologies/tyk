@@ -121,8 +121,12 @@ jobs:
         shell: bash
         run: |
           echo "Moving vendor"
-          mv -rf vendor/* $GOPATH/src/
+          mv -f vendor/* $GOPATH/src/
           rm go.mod && rm go.sum
+          echo "GOPATH:"
+          ls $GOPATH/src/
+          echo "BUID DIR:"
+          ls ./
           snapshot="--snapshot"
           if [[ ${{steps.targets.outputs.tag}} = $(git describe --tags) ]]; then
               snapshot=""
