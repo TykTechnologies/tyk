@@ -13,7 +13,7 @@
 # - amd64
 before:
   hooks:
-    - sh -c "yes | cp -r vendor ${GOPATH}/src/ && rm -rf vendor"
+    - sh -c "yes | cp -rf vendor/* ${GOPATH}/src/ && rm -rf vendor"
 
 
 builds:
