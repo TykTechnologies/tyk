@@ -11,6 +11,9 @@
 # - arm64
 # - macOS (only 10.15 is supported)
 # - amd64
+before:
+  hooks:
+    - sh -c "yes | cp -r vendor ${GOPATH}/src/ && rm -rf vendor"
 
 
 builds:
@@ -24,8 +27,6 @@ builds:
       - linux
     goarch:
       - amd64
-    hooks:
-      pre: yes | cp -r vendor ${GOPATH}/src/ && rm -rf vendor
 
   - id: std-darwin
     ldflags:
@@ -36,8 +37,6 @@ builds:
       - darwin
     goarch:
       - amd64
-    hooks:
-      pre: yes | cp -r vendor ${GOPATH}/src/ && rm -rf vendor
 
   - id: std-arm64
 
@@ -51,8 +50,6 @@ builds:
       - linux
     goarch:
       - arm64
-    hooks:
-      pre: yes | cp -r vendor ${GOPATH}/src/ && rm -rf vendor
 
   # static builds strip symbols and do not allow plugins
   - id: static-amd64
@@ -63,10 +60,6 @@ builds:
       - linux
     goarch:
       - amd64
-    hooks:
-      pre: yes | cp -r vendor ${GOPATH}/src/ && rm -rf vendor
-
-
 
 
 dockers:
