@@ -120,6 +120,8 @@ jobs:
           PKG_SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
         shell: bash
         run: |
+          echo "Moving vendor"
+          yes | cp -rf vendor/* $GOPATH/src/ && rm -rf vendor
           snapshot="--snapshot"
           if [[ ${{steps.targets.outputs.tag}} = $(git describe --tags) ]]; then
               snapshot=""

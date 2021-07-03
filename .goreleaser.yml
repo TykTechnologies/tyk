@@ -11,10 +11,6 @@
 # - arm64
 # - macOS (only 10.15 is supported)
 # - amd64
-before:
-  hooks:
-    - sh -c "yes | cp -rf vendor/* ${GOPATH}/src/ && rm -rf vendor"
-
 
 builds:
   - id: std-linux
