@@ -132,6 +132,8 @@ jobs:
               snapshot=""
           fi
           export GO111MODULE=off
+          git add -A
+          git commit -a --message "test"
           goreleaser release --rm-dist $snapshot
 
       - uses: actions/upload-artifact@v2
