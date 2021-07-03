@@ -131,6 +131,7 @@ jobs:
           if [[ ${{steps.targets.outputs.tag}} = $(git describe --tags) ]]; then
               snapshot=""
           fi
+          export GO111MODULE=off
           goreleaser release --rm-dist $snapshot
 
       - uses: actions/upload-artifact@v2
