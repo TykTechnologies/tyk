@@ -28,12 +28,9 @@ cd $PLUGIN_BUILD_PATH
 [ -f go.mod ] && [ ! -d ./vendor ] && GO111MODULE=on go mod vendor
 # Ensure that go modules not used
 rm -rf go.mod
-# rm -rf $PLUGIN_BUILD_PATH/vendor
 
 # We do not needd to care whicch version of Tyk vendored in plugin, since we going to use version inside compiler
 rm -rf $PLUGIN_BUILD_PATH/vendor/github.com/TykTechnologies/tyk
-
-# ls -d $PLUGIN_BUILD_PATH/vendor/*/*/*
 
 # Copy plugin vendored pkgs to GOPATH
 yes | cp -rf $PLUGIN_BUILD_PATH/vendor/* $GOPATH/src || true \
