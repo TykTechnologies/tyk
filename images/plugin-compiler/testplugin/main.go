@@ -1,10 +1,14 @@
 package main
 
 import (
-	"net/http"
 	"html/template"
+	"net/http"
 
+	// Example of package with different version in go.mod
 	"gopkg.in/Masterminds/sprig.v2"
+
+	// Example of package which is not part of Gateway
+	// "github.com/kr/pretty"
 
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/log"
@@ -20,6 +24,7 @@ func AddFooBarHeader(rw http.ResponseWriter, r *http.Request) {
 
 	api := ctx.GetDefinition(r)
 	if api != nil {
+		// logger.Info("API Definition", pretty.Sprint(api))
 		logger.Info("API Definition", api)
 	}
 
