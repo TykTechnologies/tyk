@@ -15,10 +15,5 @@ RUN mkdir -p $TYK_GW_PATH $PLUGIN_SOURCE_PATH $PLUGIN_BUILD_PATH
 COPY images/plugin-compiler/data/build.sh /build.sh
 RUN chmod +x /build.sh
 
-# Cache tyk dependencies for compile time
-COPY go.mod $PLUGIN_BUILD_PATH
-# Moving to /tmp, so later with can override plugin deps
-RUN cd $PLUGIN_BUILD_PATH && go mod vendor && rm go.mod && mv ./vendor /tmp/vendor
-
 ENTRYPOINT ["/build.sh"]
 
