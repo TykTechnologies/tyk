@@ -82,6 +82,7 @@ type PoliciesConfig struct {
 	//
 	// This option should only be used when moving an installation to a new database.
 	AllowExplicitPolicyID  bool   `json:"allow_explicit_policy_id"`
+	PolicyPath             string `json:"policy_path"`
 }
 
 type DBAppConfOptionsConfig struct {
