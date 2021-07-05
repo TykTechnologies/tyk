@@ -158,7 +158,7 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 			}
 
 			planDataSource.Factory = &restDataSource.Factory{
-				Client: httpclient.NewNetHttpClient(g.getHttpClient()),
+				Client: g.getHttpClient(),
 			}
 
 			planDataSource.Custom = restDataSource.ConfigJSON(restDataSource.Configuration{
@@ -179,7 +179,7 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 			}
 
 			planDataSource.Factory = &graphqlDataSource.Factory{
-				Client: httpclient.NewNetHttpClient(g.getHttpClient()),
+				Client: g.getHttpClient(),
 			}
 
 			planDataSource.Custom = graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
