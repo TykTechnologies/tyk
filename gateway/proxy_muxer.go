@@ -43,12 +43,14 @@ func (h *h2cWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// make request body to be nopCloser and re-readable before serve it through chain of middlewares
 	nopCloseRequestBody(r)
+	log.Info("---after nopcloseRequestBody")
 	if NewRelicApplication != nil {
 		txn := NewRelicApplication.StartTransaction(r.URL.Path, w, r)
 		defer txn.End()
 		h.router.ServeHTTP(txn, r)
 		return
 	}
+
 	h.router.ServeHTTP(w, r)
 }
 
