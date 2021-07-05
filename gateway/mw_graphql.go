@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -161,14 +162,16 @@ func (m *GraphQLMiddleware) initGraphQLEngineV2(logger *abstractlogger.LogrusLog
 		return
 	}
 
-	// TODO: replace closer chan arg with a real channel once closing logic will be implemented
-	engine, err := gql.NewExecutionEngineV2(logger, *engineConfig, nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	engine, err := gql.NewExecutionEngineV2(ctx, logger, *engineConfig)
 	if err != nil {
 		m.Logger().WithError(err).Error("could not create execution engine v2")
+		cancel()
 		return
 	}
 
 	m.Spec.GraphQLExecutor.EngineV2 = engine
+	m.Spec.GraphQLExecutor.CancelV2 = cancel
 	m.Spec.GraphQLExecutor.HooksV2.BeforeFetchHook = m
 	m.Spec.GraphQLExecutor.HooksV2.AfterFetchHook = m
 

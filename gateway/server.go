@@ -24,6 +24,18 @@ import (
 	"github.com/TykTechnologies/again"
 	gas "github.com/TykTechnologies/goautosocket"
 	"github.com/TykTechnologies/gorpc"
+	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
+	"github.com/evalphobia/logrus_sentry"
+	graylogHook "github.com/gemnasium/logrus-graylog-hook"
+	"github.com/gorilla/mux"
+	"github.com/lonelycode/osin"
+	newrelic "github.com/newrelic/go-agent"
+	"github.com/rs/cors"
+	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
+	logrus_syslog "github.com/sirupsen/logrus/hooks/syslog"
+	"rsc.io/letsencrypt"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/checkup"
@@ -38,17 +50,6 @@ import (
 	"github.com/TykTechnologies/tyk/storage/kv"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
-	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
-	"github.com/evalphobia/logrus_sentry"
-	graylogHook "github.com/gemnasium/logrus-graylog-hook"
-	"github.com/gorilla/mux"
-	"github.com/lonelycode/osin"
-	newrelic "github.com/newrelic/go-agent"
-	"github.com/rs/cors"
-	uuid "github.com/satori/go.uuid"
-	"github.com/sirupsen/logrus"
-	logrus_syslog "github.com/sirupsen/logrus/hooks/syslog"
-	"rsc.io/letsencrypt"
 )
 
 var (
@@ -734,6 +735,9 @@ func DoReload() {
 		return
 	}
 
+	// have to be done before we will replace apiSpecs
+	cancelSubscriptions()
+
 	// load the specs
 	if count, err := syncAPISpecs(); err != nil {
 		mainLog.Error("Error during syncing apis:", err.Error())
@@ -749,6 +753,15 @@ func DoReload() {
 	loadGlobalApps()
 
 	mainLog.Info("API reload complete")
+}
+
+// cancelSubscriptions - cancels context of graphql engine to free statefull resources
+func cancelSubscriptions() {
+	for i := 0; i < len(apiSpecs); i++ {
+		if needsGraphQLExecutionEngine(apiSpecs[i]) && apiSpecs[i].GraphQLExecutor.CancelV2 != nil {
+			apiSpecs[i].GraphQLExecutor.CancelV2()
+		}
+	}
 }
 
 // shouldReload returns true if we should perform any reload. Reloads happens if
