@@ -27,6 +27,7 @@ import (
 	"encoding/json"
 	"io"
 	"math/rand"
+	"sync"
 	"testing"
 	"time"
 
@@ -114,7 +115,8 @@ func runRecordRoute(t *testing.T, client pb.RouteGuideClient) {
 	}
 }
 
-// runRouteChat receives a sequence of route notes, while sending notes for various locations.
+// runRouteChat receives a sequence of route notes, while sending notes for various locations
+// this test bidirectional grpc data streaming
 func runRouteChat(t *testing.T, client pb.RouteGuideClient) {
 	notes := []*pb.RouteNote{
 		{Location: &pb.Point{Latitude: 0, Longitude: 1}, Message: "First message"},
@@ -130,28 +132,44 @@ func runRouteChat(t *testing.T, client pb.RouteGuideClient) {
 	if err != nil {
 		t.Fatalf("%v.RouteChat(_) = _, %v", client, err)
 	}
-	waitc := make(chan struct{})
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	// goroutine to receive streaming data
 	go func() {
-		for {
+		// lets receive some messages
+		for i := 0; i < 5; i++ {
 			in, err := stream.Recv()
-			if err == io.EOF {
-				// read done.
-				close(waitc)
-				return
-			}
 			if err != nil {
 				t.Fatalf("Failed to receive a note : %v", err)
 			}
 			t.Logf("Got message %s at point(%d, %d)", in.Message, in.Location.Latitude, in.Location.Longitude)
 		}
+		wg.Done()
 	}()
-	for _, note := range notes {
-		if err := stream.Send(note); err != nil {
-			t.Fatalf("Failed to send a note: %v", err)
+
+	// goroutine to send data
+	go func() {
+		for _, note := range notes {
+			// wait some time until we send more data so we can see the parallelism
+			time.Sleep(10 * time.Millisecond)
+			if err := stream.Send(note); err != nil {
+				t.Fatalf("Failed to send a note: %v", err)
+			}
+			t.Log("Sending one note")
 		}
+		wg.Done()
+		t.Logf("finish to send the notes")
+	}()
+
+	wg.Wait()
+	// only close the stream when we check that we're
+	// receiving and sending data in bidirectional
+	err = stream.CloseSend()
+	if err != nil {
+		t.Logf("Error closing the grpc stream: %+v", err)
 	}
-	stream.CloseSend()
-	<-waitc
 }
 
 func randomPoint(r *rand.Rand) *pb.Point {

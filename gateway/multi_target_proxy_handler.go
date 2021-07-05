@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/sirupsen/logrus"
 )
@@ -36,8 +37,8 @@ func (m *MultiTargetProxy) ServeHTTPForCache(w http.ResponseWriter, r *http.Requ
 	return m.proxyForRequest(r).ServeHTTPForCache(w, r)
 }
 
-func (m *MultiTargetProxy) CopyResponse(dst io.Writer, src io.Reader) {
-	m.defaultProxy.CopyResponse(dst, src)
+func (m *MultiTargetProxy) CopyResponse(dst io.Writer, src io.Reader, flushInterval time.Duration) {
+	m.defaultProxy.CopyResponse(dst, src, flushInterval)
 }
 
 func NewMultiTargetProxy(spec *APISpec, logger *logrus.Entry) *MultiTargetProxy {
