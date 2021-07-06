@@ -111,5 +111,4 @@ func TestGraphQLComplexityMiddleware_DepthLimitExceeded(t *testing.T) {
 		failReason := m.DepthLimitExceeded(req, accessDef, countriesSchema)
 		assert.Equal(t, ComplexityFailReasonDepthLimitExceeded, failReason)
 	})
-
 }
