@@ -579,10 +579,17 @@ const Schema = `{
                 "supergraph": {
                     "type": ["object", "null"],
                     "properties": {
+                        "updated_at": {
+                            "type": "string",
+                            "format": "date-time"
+                        },
                         "subgraphs": {
                             "type": ["array", "null"],
                             "properties": {
                                 "api_id": {
+                                    "type": "string"
+                                },
+                                "name": {
                                     "type": "string"
                                 },
                                 "url": {

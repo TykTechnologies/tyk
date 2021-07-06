@@ -589,12 +589,15 @@ type GraphQLSubgraphConfig struct {
 }
 
 type GraphQLSupergraphConfig struct {
+	// UpdatedAt contains the date and time of the last update of a supergraph API.
+	UpdatedAt *time.Time              `bson:"updated_at" json:"updated_at,omitempty"`
 	Subgraphs []GraphQLSubgraphEntity `bson:"subgraphs" json:"subgraphs"`
 	MergedSDL string                  `bson:"merged_sdl" json:"merged_sdl"`
 }
 
 type GraphQLSubgraphEntity struct {
 	APIID string `bson:"api_id" json:"api_id"`
+	Name  string `bson:"name" json:"name"`
 	URL   string `bson:"url" json:"url"`
 	SDL   string `bson:"sdl" json:"sdl"`
 }
