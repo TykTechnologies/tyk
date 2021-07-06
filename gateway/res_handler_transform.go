@@ -145,7 +145,7 @@ func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 
 	if tmeta.TemplateData.EnableSession {
 		if session := ctxGetSession(req); session != nil {
-			bodyData["_tyk_meta"] = session.GetMetaData()
+			bodyData["_tyk_meta"] = session.MetaData
 		} else {
 			logger.Error("Session context was enabled but not found.")
 		}
