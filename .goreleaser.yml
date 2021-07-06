@@ -12,7 +12,6 @@
 # - macOS (only 10.15 is supported)
 # - amd64
 
-
 builds:
   - id: std-linux
 
@@ -24,6 +23,7 @@ builds:
       - linux
     goarch:
       - amd64
+
   - id: std-darwin
     ldflags:
       - -X gateway.VERSION={{.Version}} -X gateway.commit={{.FullCommit}} -X gateway.buildDate={{.Date}} -X gateway.builtBy=goreleaser
@@ -33,6 +33,7 @@ builds:
       - darwin
     goarch:
       - amd64
+
   - id: std-arm64
 
     flags:
@@ -45,6 +46,7 @@ builds:
       - linux
     goarch:
       - arm64
+
   # static builds strip symbols and do not allow plugins
   - id: static-amd64
     ldflags:
@@ -54,7 +56,6 @@ builds:
       - linux
     goarch:
       - amd64
-
 
 
 dockers:
@@ -191,6 +192,7 @@ dockers:
     - "tykio/tyk-plugin-compiler:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}"
   build_flag_templates:
     - "--build-arg=branch={{ .Branch }}"
+    - "--build-arg=TYK_GW_TAG={{ .Tag }}"
     - "--label=org.opencontainers.image.created={{.Date}}"
     - "--label=org.opencontainers.image.title=tyk-plugin-compiler"
     - "--label=org.opencontainers.image.revision={{.FullCommit}}"
