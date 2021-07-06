@@ -162,7 +162,8 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	specAsJson := specToJson(d.Spec)
 
-	session := user.NewSessionState()
+	session := new(user.SessionState)
+
 	// Encode the session object (if not a pre-process)
 	if !d.Pre && d.UseSession {
 		session = ctxGetSession(r)
@@ -258,8 +259,8 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	// Save the session data (if modified)
 	if !d.Pre && d.UseSession {
 		newMeta := mapStrsToIfaces(newRequestData.SessionMeta)
-		if !reflect.DeepEqual(session.GetMetaData(), newMeta) {
-			session.SetMetaData(newMeta)
+		if !reflect.DeepEqual(session.MetaData, newMeta) {
+			session.MetaData = newMeta
 			ctxScheduleSessionUpdate(r)
 		}
 	}
@@ -596,14 +597,14 @@ func (j *JSVM) LoadTykJSApi() {
 		encoddedSession := call.Argument(1).String()
 		suppressReset := call.Argument(2).String()
 
-		newSession := user.NewSessionState()
-		err := json.Unmarshal([]byte(encoddedSession), newSession)
+		newSession := user.SessionState{}
+		err := json.Unmarshal([]byte(encoddedSession), &newSession)
 		if err != nil {
 			j.Log.WithError(err).Error("Failed to decode the sesison data")
 			return otto.Value{}
 		}
 
-		doAddOrUpdate(apiKey, newSession, suppressReset == "1", false)
+		doAddOrUpdate(apiKey, &newSession, suppressReset == "1", false)
 
 		return otto.Value{}
 	})

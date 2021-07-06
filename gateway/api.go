@@ -178,7 +178,7 @@ func getApisIdsForOrg(orgID string) []string {
 
 func checkAndApplyTrialPeriod(keyName string, newSession *user.SessionState, isHashed bool) {
 	// Check the policies to see if we are forcing an expiry on the key
-	for _, polID := range newSession.GetPolicyIDs() {
+	for _, polID := range newSession.PolicyIDs() {
 		policiesMu.RLock()
 		policy, ok := policiesByID[polID]
 		policiesMu.RUnlock()
@@ -231,11 +231,11 @@ func doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool
 		newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 	}
 
-	if len(newSession.GetAccessRights()) > 0 {
+	if len(newSession.AccessRights) > 0 {
 		// reset API-level limit to nil if any has a zero-value
 		resetAPILimits(newSession.AccessRights)
 		// We have a specific list of access rules, only add / update those
-		for apiId := range newSession.GetAccessRights() {
+		for apiId := range newSession.AccessRights {
 			apiSpec := getApiSpec(apiId)
 			if apiSpec == nil {
 				log.WithFields(logrus.Fields{
@@ -324,7 +324,7 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 	suppressReset := r.URL.Query().Get("suppress_reset") == "1"
 
 	// decode payload
-	newSession := user.NewSessionState()
+	newSession := &user.SessionState{}
 
 	contents, _ := ioutil.ReadAll(r.Body)
 	r.Body = ioutil.NopCloser(bytes.NewReader(contents))
@@ -341,7 +341,7 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 	// DO ADD OR UPDATE
 
 	// get original session in case of update and preserve fields that SHOULD NOT be updated
-	originalKey := *user.NewSessionState()
+	originalKey := user.SessionState{}
 	if r.Method == http.MethodPut {
 		key, found := GlobalSessionManager.SessionDetail(newSession.OrgID, keyName, isHashed)
 		if !found {
@@ -381,11 +381,11 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 			newSession.LastUpdated = originalKey.LastUpdated
 
 			// on ACL API limit level
-			for apiID, access := range originalKey.GetAccessRights() {
+			for apiID, access := range originalKey.AccessRights {
 				if access.Limit == nil {
 					continue
 				}
-				if newAccess, ok := newSession.GetAccessRightByAPIID(apiID); ok && newAccess.Limit != nil {
+				if newAccess, ok := newSession.AccessRights[apiID]; ok && newAccess.Limit != nil {
 					newAccess.Limit.QuotaRenews = access.Limit.QuotaRenews
 					newSession.AccessRights[apiID] = newAccess
 				}
@@ -522,7 +522,7 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 	}
 
 	// populate remaining quota for API limits (if any)
-	for id, access := range session.GetAccessRights() {
+	for id, access := range session.AccessRights {
 		if access.Limit == nil || access.Limit.QuotaMax == -1 || access.Limit.QuotaMax == 0 {
 			continue
 		}
@@ -610,7 +610,7 @@ func handleGetAllKeys(filter string) (interface{}, int) {
 }
 
 func handleAddKey(keyName, hashedName, sessionString, apiID string) {
-	sess := user.NewSessionState()
+	sess := &user.SessionState{}
 	json.Unmarshal([]byte(sessionString), sess)
 	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 	var err error
@@ -644,10 +644,7 @@ func handleDeleteKey(keyName, apiID string, resetQuota bool) (interface{}, int) 
 		// Go through ALL managed API's and delete the key
 		apisMu.RLock()
 		removed := GlobalSessionManager.RemoveSession(orgID, keyName, false)
-		GlobalSessionManager.ResetQuota(
-			keyName,
-			user.NewSessionState(),
-			false)
+		GlobalSessionManager.ResetQuota(keyName, &user.SessionState{}, false)
 
 		apisMu.RUnlock()
 
@@ -679,10 +676,7 @@ func handleDeleteKey(keyName, apiID string, resetQuota bool) (interface{}, int) 
 	}
 
 	if resetQuota {
-		GlobalSessionManager.ResetQuota(
-			keyName,
-			user.NewSessionState(),
-			false)
+		GlobalSessionManager.ResetQuota(keyName, &user.SessionState{}, false)
 	}
 
 	statusObj := apiModifyKeySuccess{
@@ -751,10 +745,7 @@ func handleDeleteHashedKey(keyName, apiID string, resetQuota bool) (interface{},
 	}
 
 	if resetQuota {
-		GlobalSessionManager.ResetQuota(
-			keyName,
-			user.NewSessionState(),
-			true)
+		GlobalSessionManager.ResetQuota(keyName, &user.SessionState{}, true)
 	}
 
 	statusObj := apiModifyKeySuccess{
@@ -1100,7 +1091,7 @@ func orgHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleOrgAddOrUpdate(orgID string, r *http.Request) (interface{}, int) {
-	newSession := user.NewSessionState()
+	newSession := new(user.SessionState)
 
 	if err := json.NewDecoder(r.Body).Decode(newSession); err != nil {
 		log.Error("Couldn't decode new session object: ", err)
@@ -1283,7 +1274,7 @@ func resetHandler(fn func()) http.HandlerFunc {
 }
 
 func createKeyHandler(w http.ResponseWriter, r *http.Request) {
-	newSession := user.NewSessionState()
+	newSession := new(user.SessionState)
 	if err := json.NewDecoder(r.Body).Decode(newSession); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -1315,10 +1306,10 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	// TODO: handle apply policies error
 	mw.ApplyPolicies(newSession)
 
-	if len(newSession.GetAccessRights()) > 0 {
+	if len(newSession.AccessRights) > 0 {
 		// reset API-level limit to nil if any has a zero-value
 		resetAPILimits(newSession.AccessRights)
-		for apiID := range newSession.GetAccessRights() {
+		for apiID := range newSession.AccessRights {
 			apiSpec := getApiSpec(apiID)
 
 			if apiSpec != nil {
@@ -1427,7 +1418,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func previewKeyHandler(w http.ResponseWriter, r *http.Request) {
-	newSession := user.NewSessionState()
+	newSession := new(user.SessionState)
 	if err := json.NewDecoder(r.Body).Decode(newSession); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",

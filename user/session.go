@@ -3,7 +3,6 @@ package user
 import (
 	"crypto/md5"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
@@ -85,7 +84,6 @@ type Monitor struct {
 //
 // swagger:model
 type SessionState struct {
-	mu                            sync.RWMutex
 	LastCheck                     int64                       `json:"last_check" msg:"last_check"`
 	Allowance                     float64                     `json:"allowance" msg:"allowance"`
 	Rate                          float64                     `json:"rate" msg:"rate"`
@@ -136,49 +134,16 @@ func NewSessionState() *SessionState {
 }
 
 // Clone  returns a fresh copy of s
-func (s *SessionState) Clone() SessionState {
-	return SessionState{
-		LastCheck:                     s.LastCheck,
-		Allowance:                     s.Allowance,
-		Rate:                          s.Rate,
-		Per:                           s.Per,
-		ThrottleInterval:              s.ThrottleInterval,
-		ThrottleRetryLimit:            s.ThrottleRetryLimit,
-		MaxQueryDepth:                 s.MaxQueryDepth,
-		DateCreated:                   s.DateCreated,
-		Expires:                       s.Expires,
-		QuotaMax:                      s.QuotaMax,
-		QuotaRenews:                   s.QuotaRenews,
-		QuotaRemaining:                s.QuotaRemaining,
-		QuotaRenewalRate:              s.QuotaRenewalRate,
-		AccessRights:                  cloneAccess(s.AccessRights),
-		OrgID:                         s.OrgID,
-		OauthClientID:                 s.OauthClientID,
-		OauthKeys:                     cloneKeys(s.OauthKeys),
-		Certificate:                   s.Certificate,
-		BasicAuthData:                 s.BasicAuthData,
-		JWTData:                       s.JWTData,
-		HMACEnabled:                   s.HMACEnabled,
-		EnableHTTPSignatureValidation: s.EnableHTTPSignatureValidation,
-		HmacSecret:                    s.HmacSecret,
-		RSACertificateId:              s.RSACertificateId,
-		IsInactive:                    s.IsInactive,
-		ApplyPolicyID:                 s.ApplyPolicyID,
-		ApplyPolicies:                 cloneSlice(s.ApplyPolicies),
-		DataExpires:                   s.DataExpires,
-		Monitor:                       s.Monitor,
-		EnableDetailRecording:         s.EnableDetailRecording,
-		EnableDetailedRecording:       s.EnableDetailedRecording,
-		MetaData:                      cloneMetadata(s.MetaData),
-		Tags:                          cloneSlice(s.Tags),
-		Alias:                         s.Alias,
-		LastUpdated:                   s.LastUpdated,
-		IdExtractorDeadline:           s.IdExtractorDeadline,
-		SessionLifetime:               s.SessionLifetime,
-		// Used to store token hash
-		keyHash: s.keyHash,
-		KeyID:   s.KeyID,
-	}
+func (s SessionState) Clone() SessionState {
+	// Simple vales are cloned by value
+	newSession := s
+	newSession.AccessRights = cloneAccess(s.AccessRights)
+	newSession.OauthKeys = cloneKeys(s.OauthKeys)
+	newSession.ApplyPolicies = cloneSlice(s.ApplyPolicies)
+	newSession.MetaData = cloneMetadata(s.MetaData)
+	newSession.Tags = cloneSlice(s.Tags)
+
+	return newSession
 }
 
 func cloneSlice(s []string) []string {
@@ -234,34 +199,16 @@ func cloneAccess(m map[string]AccessDefinition) map[string]AccessDefinition {
 	return x
 }
 
-func (s *SessionState) SetAccessRights(accessRights map[string]AccessDefinition) {
-	s.mu.Lock()
-	s.AccessRights = accessRights
-	s.mu.Unlock()
+func (s *SessionState) MD5Hash() string {
+	return fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%+v", s))))
 }
 
-func (s *SessionState) SetAccessRight(key string, accessRight AccessDefinition) {
-	s.mu.Lock()
-	s.AccessRights[key] = accessRight
-	s.mu.Unlock()
-}
+func (s *SessionState) KeyHash() string {
+	if s.keyHash == "" {
+		panic("KeyHash cache not found. You should call `SetKeyHash` before.")
+	}
 
-func (s *SessionState) SetMetaData(metadata map[string]interface{}) {
-	s.mu.Lock()
-	s.MetaData = metadata
-	s.mu.Unlock()
-}
-
-func (s *SessionState) SetMetaDataKey(key string, metadata interface{}) {
-	s.mu.Lock()
-	s.MetaData[key] = metadata
-	s.mu.Unlock()
-}
-
-func (s *SessionState) RemoveMetaData(key string) {
-	s.mu.Lock()
-	delete(s.MetaData, key)
-	s.mu.Unlock()
+	return s.keyHash
 }
 
 func (s *SessionState) SetKeyHash(hash string) {
@@ -285,26 +232,10 @@ func (s *SessionState) Lifetime(fallback int64) int64 {
 	return 0
 }
 
-func (s *SessionState) GetAccessRights() (AccessRights map[string]AccessDefinition) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.AccessRights
-}
-
-func (s *SessionState) GetAccessRightByAPIID(key string) (AccessRight AccessDefinition, found bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	accessRight, found := s.AccessRights[key]
-	return accessRight, found
-}
-
 // PolicyIDs returns the IDs of all the policies applied to this
 // session. For backwards compatibility reasons, this falls back to
 // ApplyPolicyID if ApplyPolicies is empty.
-func (s *SessionState) GetPolicyIDs() []string {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
+func (s *SessionState) PolicyIDs() []string {
 	if len(s.ApplyPolicies) > 0 {
 		return s.ApplyPolicies
 	}
@@ -314,31 +245,6 @@ func (s *SessionState) GetPolicyIDs() []string {
 	return nil
 }
 
-func (s *SessionState) GetMetaData() (metaData map[string]interface{}) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.MetaData
-}
-
-func (s *SessionState) GetMetaDataByKey(key string) (metaData interface{}, found bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	value, ok := s.MetaData[key]
-	return value, ok
-}
-
-func (s *SessionState) MD5Hash() string {
-	return fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%+v", s))))
-}
-
-func (s *SessionState) GetKeyHash() string {
-	if s.keyHash == "" {
-		panic("KeyHash cache not found. You should call `SetKeyHash` before.")
-	}
-
-	return s.keyHash
-}
-
 func (s *SessionState) SetPolicies(ids ...string) {
 	s.ApplyPolicyID = ""
 	s.ApplyPolicies = ids
@@ -346,12 +252,7 @@ func (s *SessionState) SetPolicies(ids ...string) {
 
 // PoliciesEqualTo compares and returns true if passed slice if IDs contains only current ApplyPolicies
 func (s *SessionState) PoliciesEqualTo(ids []string) bool {
-
-	s.mu.RLock()
-	policies := s.ApplyPolicies
-	s.mu.RUnlock()
-
-	if len(policies) != len(ids) {
+	if len(s.ApplyPolicies) != len(ids) {
 		return false
 	}
 
@@ -360,7 +261,7 @@ func (s *SessionState) PoliciesEqualTo(ids []string) bool {
 		polIDMap[id] = true
 	}
 
-	for _, curID := range policies {
+	for _, curID := range s.ApplyPolicies {
 		if !polIDMap[curID] {
 			return false
 		}
@@ -371,9 +272,6 @@ func (s *SessionState) PoliciesEqualTo(ids []string) bool {
 
 // GetQuotaLimitByAPIID return quota max, quota remaining, quota renewal rate and quota renews for the given session
 func (s *SessionState) GetQuotaLimitByAPIID(apiID string) (int64, int64, int64, int64) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
 	if access, ok := s.AccessRights[apiID]; ok && access.Limit != nil {
 		return access.Limit.QuotaMax,
 			access.Limit.QuotaRemaining,
