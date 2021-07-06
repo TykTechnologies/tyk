@@ -1172,7 +1172,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		}
 	}
 
-	ses := user.NewSessionState()
+	ses := new(user.SessionState)
 	if session != nil {
 		ses = session
 	}

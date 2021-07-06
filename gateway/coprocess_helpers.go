@@ -33,15 +33,15 @@ func TykSessionState(session *coprocess.SessionState) *user.SessionState {
 		Password string        `json:"password" msg:"password"`
 		Hash     user.HashType `json:"hash_type" msg:"hash_type"`
 	}
-	if session.GetBasicAuthData() != nil {
-		basicAuthData.Password = session.GetBasicAuthData().Password
-		basicAuthData.Hash = user.HashType(session.GetBasicAuthData().Hash)
+	if session.BasicAuthData != nil {
+		basicAuthData.Password = session.BasicAuthData.Password
+		basicAuthData.Hash = user.HashType(session.BasicAuthData.Hash)
 	}
 
 	var jwtData struct {
 		Secret string `json:"secret" msg:"secret"`
 	}
-	if session.GetJwtData() != nil {
+	if session.JwtData != nil {
 		jwtData.Secret = session.JwtData.Secret
 	}
 
@@ -98,9 +98,9 @@ func TykSessionState(session *coprocess.SessionState) *user.SessionState {
 // ProtoSessionState takes a standard SessionState and outputs a SessionState object compatible with Protocol Buffers.
 func ProtoSessionState(session *user.SessionState) *coprocess.SessionState {
 
-	accessDefinitions := make(map[string]*coprocess.AccessDefinition, len(session.GetAccessRights()))
+	accessDefinitions := make(map[string]*coprocess.AccessDefinition, len(session.AccessRights))
 
-	for key, accessDefinition := range session.GetAccessRights() {
+	for key, accessDefinition := range session.AccessRights {
 		var allowedUrls []*coprocess.AccessSpec
 		for _, allowedURL := range accessDefinition.AllowedURLs {
 			accessSpec := &coprocess.AccessSpec{
@@ -130,8 +130,8 @@ func ProtoSessionState(session *user.SessionState) *coprocess.SessionState {
 	}
 
 	metadata := make(map[string]string)
-	if len(session.GetMetaData()) > 0 {
-		for k, v := range session.GetMetaData() {
+	if len(session.MetaData) > 0 {
+		for k, v := range session.MetaData {
 			switch v.(type) {
 			case string:
 				metadata[k] = v.(string)
