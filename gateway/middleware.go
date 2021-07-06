@@ -87,7 +87,6 @@ func createDynamicMiddleware(name string, isPre, useSession bool, baseMid BaseMi
 
 // Generic middleware caller to make extension easier
 func createMiddleware(actualMW TykMiddleware) func(http.Handler) http.Handler {
-	//	panic("create middleware")
 	mw := &TraceMiddleware{
 		TykMiddleware: actualMW,
 	}
@@ -133,7 +132,6 @@ func createMiddleware(actualMW TykMiddleware) func(http.Handler) http.Handler {
 			mw.Logger().WithField("ts", startTime.UnixNano()).Debug("Started")
 
 			if mw.Base().Spec.CORS.OptionsPassthrough && r.Method == "OPTIONS" {
-				log.Info("will process options")
 				h.ServeHTTP(w, r)
 				return
 			}
@@ -172,7 +170,6 @@ func createMiddleware(actualMW TykMiddleware) func(http.Handler) http.Handler {
 			// Special code, bypasses all other execution
 			if errCode != mwStatusRespond {
 				// No error, carry on...
-				log.Info("bypassing-----")
 				meta["bypass"] = "1"
 				h.ServeHTTP(w, r)
 			} else {
