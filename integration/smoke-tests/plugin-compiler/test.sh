@@ -21,5 +21,7 @@ rm -fv testplugin/*.so || true
 docker run --rm -v `pwd`/testplugin:/plugin-source tykio/tyk-plugin-compiler:${tag} testplugin.so
 docker-compose up -d
 sleep 2 # Wait for init
+curl -vvv http://localhost:8080/goplugin/headers
 curl http://localhost:8080/goplugin/headers | jq -e '.headers.Foo == "Bar"'
+docker-compose logs
 docker-compose down 
