@@ -438,7 +438,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 								r.FieldAccessRights = append(r.FieldAccessRights, far)
 							}
 						}
-						
+
 						if r.Limit == nil {
 							r.Limit = &user.APILimit{}
 						}
@@ -576,8 +576,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	}
 
 	if len(policies) == 0 {
-		accessRights := session.GetAccessRights()
-		for apiID, accessRight := range accessRights {
+		for apiID, accessRight := range session.AccessRights {
 			// check if the api in the session has per api limit
 			if accessRight.Limit != nil && *accessRight.Limit != (user.APILimit{}) {
 				accessRight.AllowanceScope = apiID
