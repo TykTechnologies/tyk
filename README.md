@@ -77,7 +77,8 @@ Compile from Source
 
 ```
 git clone https://github.com/TykTechnologies/tyk
-go build
+cd tyk
+make build
 ```
 
 
