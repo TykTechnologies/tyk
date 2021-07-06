@@ -197,6 +197,7 @@ dockers:
   skip_push: auto
   extra_files:
     - "images/plugin-compiler/"
+    - "go.mod"
 
 docker_manifests:
   - name_template: tykio/tyk-gateway:{{ .Tag }}
