@@ -746,7 +746,6 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 }
 
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) ProxyResponse {
-	log.Info("----Wrapped serve HTTP ")
 	if trace.IsEnabled() {
 		span, ctx := trace.Span(req.Context(), req.URL.Path)
 		defer span.Finish()
@@ -1422,4 +1421,9 @@ func IsUpgrade(req *http.Request) (bool, string) {
 	}
 
 	return false, ""
+}
+
+// IsGrpcStreaming  determines wether a request represents a grpc streaming req
+func IsGrpcStreaming(r *http.Request) bool {
+	return r.ContentLength == -1 && r.Header.Get(headers.ContentType) == "application/grpc"
 }
