@@ -2,12 +2,11 @@ package gateway
 
 import (
 	"fmt"
+	"github.com/TykTechnologies/tyk/apidef"
 	"net/http"
 	"path"
 	"sync/atomic"
 	"testing"
-
-	"gopkg.in/mgo.v2/bson"
 
 	"github.com/TykTechnologies/tyk/user"
 
@@ -92,7 +91,7 @@ func TestInternalAPIUsage(t *testing.T) {
 }
 
 func TestFuzzyFindAPI(t *testing.T) {
-	objectId := bson.NewObjectId()
+	objectId := apidef.NewObjectId()
 
 	BuildAndLoadAPI(
 		func(spec *APISpec) {
