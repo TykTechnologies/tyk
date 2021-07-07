@@ -143,7 +143,11 @@ func (j ObjectId) MarshalJSON() ([]byte, error) {
 
 func (j *ObjectId) UnmarshalJSON(buf []byte) error {
 	var b bson.ObjectId
-	b.UnmarshalJSON(buf)
+	err := b.UnmarshalJSON(buf)
+	if err != nil {
+		return err
+	}
+
 	*j = ObjectId(string(b))
 
 	return nil
