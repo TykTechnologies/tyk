@@ -14,7 +14,7 @@ import (
 
 	"github.com/clbanning/mxj"
 
-	"github.com/lonelycode/osin"
+	"github.com/TykTechnologies/osin"
 	"gopkg.in/mgo.v2/bson"
 	_ "gorm.io/gorm"
 	_ "gorm.io/gorm/schema"
@@ -456,6 +456,7 @@ type APIDefinition struct {
 		AllowedAccessTypes     []osin.AccessRequestType    `bson:"allowed_access_types" json:"allowed_access_types"`
 		AllowedAuthorizeTypes  []osin.AuthorizeRequestType `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
 		AuthorizeLoginRedirect string                      `bson:"auth_login_redirect" json:"auth_login_redirect"`
+		RequirePKCE            bool                        `bson:"require_pkce" json:"require_pkce"`
 	} `bson:"oauth_meta" json:"oauth_meta"`
 	Auth         AuthConfig            `bson:"auth" json:"auth"` // Deprecated: Use AuthConfigs instead.
 	AuthConfigs  map[string]AuthConfig `bson:"auth_configs" json:"auth_configs"`

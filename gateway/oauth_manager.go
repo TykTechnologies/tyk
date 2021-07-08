@@ -12,17 +12,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/request"
-	"github.com/sirupsen/logrus"
-
-	"github.com/lonelycode/osin"
 	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 
 	"strconv"
 
+	"github.com/TykTechnologies/osin"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -343,7 +342,7 @@ func (o *OAuthManager) HandleAuthorisation(r *http.Request, complete bool, sessi
 	resp := o.OsinServer.NewResponse()
 
 	if ar := o.OsinServer.HandleAuthorizeRequest(resp, r); ar != nil {
-		// Since this is called by the Reource provider (proxied API), we assume it has been approved
+		// Since this is called by the Resource provider (proxied API), we assume it has been approved
 		ar.Authorized = true
 
 		if complete {
@@ -578,6 +577,8 @@ func TykOsinNewServer(config *osin.ServerConfig, storage ExtendedOsinStorageInte
 	overrideServer.Server.Storage = storage
 	overrideServer.Server.AuthorizeTokenGen = overrideServer.AuthorizeTokenGen
 	overrideServer.Server.AccessTokenGen = accessTokenGen{}
+	overrideServer.Server.Now = time.Now
+	overrideServer.Server.Logger = &osin.LoggerDefault{}
 
 	return &overrideServer
 }

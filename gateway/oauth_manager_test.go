@@ -18,7 +18,7 @@ import (
 
 	"time"
 
-	"github.com/lonelycode/osin"
+	"github.com/TykTechnologies/osin"
 	uuid "github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -58,7 +58,7 @@ const keyRulesWithMetadata = `{
 	"meta_data": {"key": "meta", "foo": "keybar"}
 }`
 
-func buildTestOAuthSpec(apiGens ...func(spec *APISpec)) *APISpec {
+func buildTestOAuthSpec(requirePKCE bool, apiGens ...func(spec *APISpec)) *APISpec {
 	return BuildAPI(func(spec *APISpec) {
 		spec.APIID = "999999"
 		spec.OrgID = "default"
@@ -71,6 +71,7 @@ func buildTestOAuthSpec(apiGens ...func(spec *APISpec)) *APISpec {
 			AllowedAccessTypes     []osin.AccessRequestType    `bson:"allowed_access_types" json:"allowed_access_types"`
 			AllowedAuthorizeTypes  []osin.AuthorizeRequestType `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
 			AuthorizeLoginRedirect string                      `bson:"auth_login_redirect" json:"auth_login_redirect"`
+			RequirePKCE            bool                        `bson:"require_pkce" json:"require_pkce"`
 		}{
 			AllowedAccessTypes: []osin.AccessRequestType{
 				"authorization_code",
@@ -82,6 +83,7 @@ func buildTestOAuthSpec(apiGens ...func(spec *APISpec)) *APISpec {
 				"token",
 			},
 			AuthorizeLoginRedirect: testHttpPost,
+			RequirePKCE:            requirePKCE,
 		}
 		spec.NotificationsDetails = apidef.NotificationsManager{
 			SharedSecret:      "9878767657654343123434556564444",
@@ -109,7 +111,7 @@ func buildTestOAuthSpec(apiGens ...func(spec *APISpec)) *APISpec {
 }
 
 func loadTestOAuthSpec() *APISpec {
-	return LoadAPI(buildTestOAuthSpec())[0]
+	return LoadAPI(buildTestOAuthSpec(false))[0]
 }
 
 func createTestOAuthClient(spec *APISpec, clientID string) OAuthClient {
@@ -149,14 +151,14 @@ func TestOauthMultipleAPIs(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
 
-	spec := buildTestOAuthSpec(func(spec *APISpec) {
+	spec := buildTestOAuthSpec(false, func(spec *APISpec) {
 		spec.APIID = "oauth2"
 		spec.UseOauth2 = true
 		spec.UseKeylessAccess = false
 		spec.Proxy.ListenPath = "/api1/"
 		spec.OrgID = "org-id-1"
 	})
-	spec2 := buildTestOAuthSpec(func(spec *APISpec) {
+	spec2 := buildTestOAuthSpec(false, func(spec *APISpec) {
 		spec.APIID = "oauth2_copy"
 		spec.UseKeylessAccess = false
 		spec.UseOauth2 = true
@@ -374,6 +376,87 @@ func TestAPIClientAuthorizeAuthCode(t *testing.T) {
 	})
 }
 
+func TestAPIClientAuthorizeRequestWithPKCE(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+
+	spec := LoadAPI(buildTestOAuthSpec(true))[0]
+
+	pID := CreatePolicy(func(p *user.Policy) {
+		p.ID = "TEST-4321"
+		p.AccessRights = map[string]user.AccessDefinition{
+			"test": {
+				APIID: "test",
+			},
+			"abc": {
+				APIID: "abc",
+			},
+		}
+	})
+
+	var redirectURI string
+	// If separator is not set that means multiple redirect uris not supported
+	if config.Global().OauthRedirectUriSeparator == "" {
+		redirectURI = "http://client.oauth.com"
+
+		// If separator config is set that means multiple redirect uris are supported
+	} else {
+		redirectURI = strings.Join([]string{"http://client.oauth.com", "http://client2.oauth.com", "http://client3.oauth.com"}, config.Global().OauthRedirectUriSeparator)
+	}
+	testClient := OAuthClient{
+		ClientID:          authClientID,
+		ClientSecret:      "",
+		ClientRedirectURI: redirectURI,
+		PolicyID:          pID,
+		MetaData:          map[string]interface{}{"foo": "bar", "client": "meta"},
+	}
+	spec.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, "org-id-1", &testClient, false)
+
+	t.Run("Client authorize token request with PKCE and no code challenge", func(t *testing.T) {
+		param := make(url.Values)
+		param.Set("response_type", "code")
+		param.Set("client_id", authClientID)
+		param.Set("key_rules", keyRules)
+
+		headers := map[string]string{
+			"Content-Type": "application/x-www-form-urlencoded",
+		}
+
+		_, _ = ts.Run(t, test.TestCase{
+			Path:      "/APIID/tyk/oauth/authorize-client/",
+			AdminAuth: true,
+			Data:      param.Encode(),
+			Headers:   headers,
+			Method:    http.MethodPost,
+			Code:      http.StatusForbidden,
+		})
+	})
+
+	t.Run("Client authorize token request with PKCE and code_challenge", func(t *testing.T) {
+
+		challenge := "12345678901234567890123456789012345678901234567890"
+
+		param := make(url.Values)
+		param.Set("response_type", "code")
+		param.Set("client_id", authClientID)
+		param.Set("key_rules", keyRules)
+		param.Set("code_challenge", challenge)
+
+		headers := map[string]string{
+			"Content-Type": "application/x-www-form-urlencoded",
+		}
+
+		_, _ = ts.Run(t, test.TestCase{
+			Path:      "/APIID/tyk/oauth/authorize-client/",
+			AdminAuth: true,
+			Data:      param.Encode(),
+			Headers:   headers,
+			Method:    http.MethodPost,
+			Code:      http.StatusOK,
+		})
+	})
+}
+
 func TestAPIClientAuthorizeToken(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
@@ -400,8 +483,8 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 			Headers:   headers,
 			Method:    http.MethodPost,
 			Code:      http.StatusOK,
-			BodyMatch: `{"access_token":".*","expires_in":3600,"redirect_to":"http://client.oauth.com` +
-				`#access_token=.*=&expires_in=3600&token_type=bearer","token_type":"bearer"}`,
+			BodyMatch: `{"access_token":".*","expires_in":3600,"redirect_to":"http://client.oauth.com/` +
+				`#access_token=.*&expires_in=3600&token_type=Bearer","token_type":"Bearer"}`,
 		})
 	})
 
@@ -423,8 +506,8 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 			Headers:   headers,
 			Method:    http.MethodPost,
 			Code:      http.StatusOK,
-			BodyMatch: `{"access_token":".*","expires_in":3600,"redirect_to":"http://client.oauth.com` +
-				`#access_token=.*=&expires_in=3600&token_type=bearer","token_type":"bearer"}`,
+			BodyMatch: `{"access_token":".*","expires_in":3600,"redirect_to":"http://client.oauth.com/` +
+				`#access_token=.*&expires_in=3600&token_type=Bearer","token_type":"Bearer"}`,
 		})
 		if err != nil {
 			t.Error(err)

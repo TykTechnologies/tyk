@@ -42,8 +42,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TykTechnologies/osin"
 	"github.com/gorilla/mux"
-	"github.com/lonelycode/osin"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
@@ -1516,6 +1516,10 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		if apiSpec.Oauth2Meta.RequirePKCE {
+			newClient.ClientSecret = ""
+		}
+
 		err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, apiSpec.OrgID, &newClient, true)
 		if err != nil {
 			log.WithFields(logrus.Fields{
@@ -1575,6 +1579,11 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 								apiSpec.OrgID}),
 					}
 				}
+
+				if apiSpec.Oauth2Meta.RequirePKCE {
+					newClient.ClientSecret = ""
+				}
+
 				err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, apiSpec.APIDefinition.OrgID, &newClient, true)
 				if err != nil {
 					log.WithFields(logrus.Fields{

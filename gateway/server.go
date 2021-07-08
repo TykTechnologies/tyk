@@ -24,6 +24,7 @@ import (
 	"github.com/TykTechnologies/again"
 	gas "github.com/TykTechnologies/goautosocket"
 	"github.com/TykTechnologies/gorpc"
+	"github.com/TykTechnologies/osin"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/checkup"
@@ -42,7 +43,6 @@ import (
 	"github.com/evalphobia/logrus_sentry"
 	graylogHook "github.com/gemnasium/logrus-graylog-hook"
 	"github.com/gorilla/mux"
-	"github.com/lonelycode/osin"
 	newrelic "github.com/newrelic/go-agent"
 	"github.com/rs/cors"
 	uuid "github.com/satori/go.uuid"
@@ -529,6 +529,7 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 	serverConfig.AllowedAccessTypes = spec.Oauth2Meta.AllowedAccessTypes
 	serverConfig.AllowedAuthorizeTypes = spec.Oauth2Meta.AllowedAuthorizeTypes
 	serverConfig.RedirectUriSeparator = config.Global().OauthRedirectUriSeparator
+	serverConfig.RequirePKCEForPublicClients = spec.Oauth2Meta.RequirePKCE
 
 	prefix := generateOAuthPrefix(spec.APIID)
 	storageManager := getGlobalStorageHandler(prefix, false)
