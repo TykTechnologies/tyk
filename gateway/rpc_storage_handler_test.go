@@ -2,10 +2,14 @@ package gateway
 
 import (
 	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 	"github.com/lonelycode/osin"
 	"github.com/stretchr/testify/assert"
 )
@@ -140,4 +144,60 @@ func TestProcessKeySpaceChangesForOauth(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestProcessKeySpaceChanges_ResetQuota(t *testing.T) {
+	rpcListener := RPCStorageHandler{
+		KeyPrefix:        "rpc.listener.",
+		SuppressRegister: true,
+		HashKeys:         false,
+	}
+
+	g := StartTest()
+	defer g.Close()
+
+	api := BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = false
+		spec.Proxy.ListenPath = "/api"
+	})[0]
+
+	session, key := g.CreateSession(func(s *user.SessionState) {
+		s.AccessRights = map[string]user.AccessDefinition{api.APIID: {
+			APIID: api.APIID,
+			Limit: &user.APILimit{
+				QuotaMax: 30,
+			},
+		}}
+	})
+
+	auth := map[string]string{
+		headers.Authorization: key,
+	}
+
+	// Call 3 times
+	_, _ = g.Run(t, []test.TestCase{
+		{Path: "/api", Headers: auth, Code: http.StatusOK},
+		{Path: "/api", Headers: auth, Code: http.StatusOK},
+		{Path: "/api", Headers: auth, Code: http.StatusOK},
+	}...)
+
+	// AllowanceScope is api id.
+	quotaKey := QuotaKeyPrefix + api.APIID + "-" + key
+	quotaCounter, err := GlobalSessionManager.Store().GetRawKey(quotaKey)
+	assert.NoError(t, err)
+	assert.Equal(t, "3", quotaCounter)
+
+	rpcListener.ProcessKeySpaceChanges([]string{key + ":resetQuota", key}, api.OrgID)
+
+	// mock of key reload in mdcb environment
+	err = GlobalSessionManager.UpdateSession(key, session, 0, false)
+	assert.NoError(t, err)
+
+	// Call 1 time
+	_, _ = g.Run(t, test.TestCase{Path: "/api", Headers: auth, Code: http.StatusOK})
+
+	// ProcessKeySpaceChanges should reset the quota counter, it should be 1 instead of 4.
+	quotaCounter, err = GlobalSessionManager.Store().GetRawKey(quotaKey)
+	assert.NoError(t, err)
+	assert.Equal(t, "1", quotaCounter)
 }
