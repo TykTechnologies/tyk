@@ -117,7 +117,7 @@ func TestBaseMiddleware_getAuthType(t *testing.T) {
 }
 
 func TestSessionLimiter_RedisQuotaExceeded_PerAPI(t *testing.T) {
-	g := StartTest()
+	g := StartTest(nil)
 	defer g.Close()
 
 	apis := BuildAPI(func(spec *APISpec) {
@@ -134,7 +134,7 @@ func TestSessionLimiter_RedisQuotaExceeded_PerAPI(t *testing.T) {
 		spec.Proxy.ListenPath = "/api3/"
 	})
 
-	LoadAPI(apis...)
+	g.Gw.LoadAPI(apis...)
 
 	const globalQuotaMax int64 = 25
 

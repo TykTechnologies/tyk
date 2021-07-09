@@ -815,7 +815,7 @@ func TestGraphQL_InternalDataSource(t *testing.T) {
 			}
 		})[0]
 
-		LoadAPI(tykSubgraphAccounts, tykSubgraphReviews, supergraph)
+		g.Gw.LoadAPI(tykSubgraphAccounts, tykSubgraphReviews, supergraph)
 
 		reviews := graphql.Request{
 			Query: `query Query { me { id username reviews { body } } }`,
@@ -934,7 +934,7 @@ func TestGraphQL_ProxyIntrospectionInterrupt(t *testing.T) {
 }
 
 func TestGraphQL_OptionsPassThrough(t *testing.T) {
-	g := StartTest()
+	g := StartTest(nil)
 	defer g.Close()
 
 	var headers = map[string]string{
@@ -952,7 +952,7 @@ func TestGraphQL_OptionsPassThrough(t *testing.T) {
 	}
 
 	t.Run("ProxyOnly should pass through", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.GraphQL.Enabled = true
 			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
 			spec.GraphQL.Schema = "schema { query: query_root } type query_root { hello: String }"
@@ -975,7 +975,7 @@ func TestGraphQL_OptionsPassThrough(t *testing.T) {
 		})
 	})
 	t.Run("UDG should not pass through", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.GraphQL.Enabled = true
 			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
 			spec.GraphQL.Schema = "schema { query: query_root } type query_root { hello: String }"
@@ -993,7 +993,7 @@ func TestGraphQL_OptionsPassThrough(t *testing.T) {
 		})
 	})
 	t.Run("Supergraph should not pass through", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.GraphQL.Enabled = true
 			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
 			spec.GraphQL.Schema = "schema { query: query_root } type query_root { hello: String }"

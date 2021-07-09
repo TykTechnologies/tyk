@@ -2,12 +2,13 @@ package gateway
 
 import (
 	"fmt"
-	"github.com/TykTechnologies/tyk/apidef"
 	"net/http"
 	"path"
 	_ "path"
 	"sync/atomic"
 	"testing"
+
+	"github.com/TykTechnologies/tyk/apidef"
 
 	"github.com/TykTechnologies/tyk/user"
 
