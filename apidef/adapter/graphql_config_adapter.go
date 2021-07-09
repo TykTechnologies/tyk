@@ -188,6 +188,7 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 					Method: graphqlConfig.Method,
 					Header: g.convertHttpHeadersToEngineV2Headers(graphqlConfig.Headers),
 				},
+				Subscription: graphqlDataSource.SubscriptionConfiguration{URL: graphqlConfig.URL},
 			})
 		}
 
