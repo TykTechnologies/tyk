@@ -630,17 +630,17 @@ func handleAddKey(keyName, hashedName, sessionString, apiID string) {
 	}).Info("Updated hashed key in slave storage.")
 }
 
-func handleDeleteKey(keyName, apiID string, resetQuota bool) (interface{}, int) {
-	orgID := ""
-	if spec := getApiSpec(apiID); spec != nil {
-		orgID = spec.OrgID
+func handleDeleteKey(keyName, orgID, apiID string, resetQuota bool) (interface{}, int) {
+	session, ok := GlobalSessionManager.SessionDetail(orgID, keyName, false)
+	if !ok {
+		return apiError("There is no such key found"), http.StatusNotFound
 	}
 
 	if apiID == "-1" {
 		// Go through ALL managed API's and delete the key
 		apisMu.RLock()
 		removed := GlobalSessionManager.RemoveSession(orgID, keyName, false)
-		GlobalSessionManager.ResetQuota(keyName, &user.SessionState{}, false)
+		GlobalSessionManager.ResetQuota(keyName, &session, false)
 
 		apisMu.RUnlock()
 
@@ -672,7 +672,7 @@ func handleDeleteKey(keyName, apiID string, resetQuota bool) (interface{}, int) 
 	}
 
 	if resetQuota {
-		GlobalSessionManager.ResetQuota(keyName, &user.SessionState{}, false)
+		GlobalSessionManager.ResetQuota(keyName, &session, false)
 	}
 
 	statusObj := apiModifyKeySuccess{
@@ -697,8 +697,8 @@ func handleDeleteKey(keyName, apiID string, resetQuota bool) (interface{}, int) 
 }
 
 // handleDeleteHashedKeyWithLogs is a wrapper for handleDeleteHashedKey with logs
-func handleDeleteHashedKeyWithLogs(keyName, apiID string, resetQuota bool) (interface{}, int) {
-	res, code := handleDeleteHashedKey(keyName, apiID, resetQuota)
+func handleDeleteHashedKeyWithLogs(keyName, orgID, apiID string, resetQuota bool) (interface{}, int) {
+	res, code := handleDeleteHashedKey(keyName, orgID, apiID, resetQuota)
 
 	if code != http.StatusOK {
 		log.WithFields(logrus.Fields{
@@ -717,10 +717,11 @@ func handleDeleteHashedKeyWithLogs(keyName, apiID string, resetQuota bool) (inte
 	return res, code
 }
 
-func handleDeleteHashedKey(keyName, apiID string, resetQuota bool) (interface{}, int) {
-	orgID := ""
-	if spec := getApiSpec(apiID); spec != nil {
-		orgID = spec.OrgID
+func handleDeleteHashedKey(keyName, orgID, apiID string, resetQuota bool) (interface{}, int) {
+
+	session, ok := GlobalSessionManager.SessionDetail(orgID, keyName, true)
+	if !ok {
+		return apiError("There is no such key found"), http.StatusNotFound
 	}
 
 	if apiID == "-1" {
@@ -741,7 +742,7 @@ func handleDeleteHashedKey(keyName, apiID string, resetQuota bool) (interface{},
 	}
 
 	if resetQuota {
-		GlobalSessionManager.ResetQuota(keyName, &user.SessionState{}, true)
+		GlobalSessionManager.ResetQuota(keyName, &session, true)
 	}
 
 	statusObj := apiModifyKeySuccess{
@@ -957,16 +958,16 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodDelete:
 		// Remove a key
 		if !isHashed {
-			obj, code = handleDeleteKey(keyName, apiID, true)
+			obj, code = handleDeleteKey(keyName, orgID, apiID, true)
 		} else {
-			obj, code = handleDeleteHashedKeyWithLogs(keyName, apiID, true)
+			obj, code = handleDeleteHashedKeyWithLogs(keyName, orgID, apiID, true)
 		}
 		if code != http.StatusOK && hashKeyFunction != "" {
 			// try to use legacy key format
 			if !isHashed {
-				obj, code = handleDeleteKey(origKeyName, apiID, true)
+				obj, code = handleDeleteKey(origKeyName, orgID, apiID, true)
 			} else {
-				obj, code = handleDeleteHashedKeyWithLogs(origKeyName, apiID, true)
+				obj, code = handleDeleteHashedKeyWithLogs(origKeyName, orgID, apiID, true)
 			}
 		}
 	}
