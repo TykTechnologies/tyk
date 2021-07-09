@@ -334,6 +334,10 @@ func syncAPISpecs() (int, error) {
 		}
 		filter = append(filter, v)
 	}
+
+	// have to be done before we will replace apiSpecs
+	cancelSubscriptions()
+
 	apiSpecs = filter
 
 	tlsConfigCache.Flush()
@@ -734,9 +738,6 @@ func DoReload() {
 		mainLog.Error("Error during syncing policies:", err.Error())
 		return
 	}
-
-	// have to be done before we will replace apiSpecs
-	cancelSubscriptions()
 
 	// load the specs
 	if count, err := syncAPISpecs(); err != nil {
