@@ -7,13 +7,15 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-type Monitor struct{}
-
-func (Monitor) Enabled() bool {
-	return config.Global().Monitor.EnableTriggerMonitors
+type Monitor struct {
+	Gw *Gateway `json:"-"`
 }
 
-func (Monitor) Fire(sessionData *user.SessionState, key string, triggerLimit, usagePercentage float64) {
+func (m Monitor) Enabled() bool {
+	return m.Gw.GetConfig().Monitor.EnableTriggerMonitors
+}
+
+func (m Monitor) Fire(sessionData *user.SessionState, key string, triggerLimit, usagePercentage float64) {
 	em := config.EventMessage{
 		Type: EventTriggerExceeded,
 		Meta: EventTriggerExceededMeta{
@@ -26,7 +28,7 @@ func (Monitor) Fire(sessionData *user.SessionState, key string, triggerLimit, us
 		TimeStamp: time.Now().String(),
 	}
 
-	go MonitoringHandler.HandleEvent(em)
+	go m.Gw.MonitoringHandler.HandleEvent(em)
 }
 
 func (m Monitor) Check(sessionData *user.SessionState, key string) {
@@ -69,14 +71,14 @@ func (m Monitor) checkLimit(sessionData *user.SessionState, key string, quotaMax
 		return false
 	}
 
-	if config.Global().Monitor.GlobalTriggerLimit > 0.0 && usagePerc >= config.Global().Monitor.GlobalTriggerLimit {
+	if m.Gw.GetConfig().Monitor.GlobalTriggerLimit > 0.0 && usagePerc >= m.Gw.GetConfig().Monitor.GlobalTriggerLimit {
 		log.Info("Firing...")
-		m.Fire(sessionData, key, config.Global().Monitor.GlobalTriggerLimit, usagePerc)
+		m.Fire(sessionData, key, m.Gw.GetConfig().Monitor.GlobalTriggerLimit, usagePerc)
 		return true
 	}
 
 	for _, triggerLimit := range sessionData.Monitor.TriggerLimits {
-		if usagePerc >= triggerLimit && triggerLimit != config.Global().Monitor.GlobalTriggerLimit {
+		if usagePerc >= triggerLimit && triggerLimit != m.Gw.GetConfig().Monitor.GlobalTriggerLimit {
 			log.Info("Firing...")
 			m.Fire(sessionData, key, triggerLimit, usagePerc)
 			return true

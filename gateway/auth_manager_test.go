@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/config"
+
 	"github.com/TykTechnologies/tyk/headers"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -12,26 +14,28 @@ import (
 
 	"github.com/TykTechnologies/tyk/storage"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
 
 func TestAuthenticationAfterDeleteKey(t *testing.T) {
-	assert := func(hashKeys bool) {
-		globalConf := config.Global()
-		globalConf.HashKeys = hashKeys
-		config.SetGlobal(globalConf)
+	ts := StartTest(nil)
+	defer ts.Close()
 
-		ts := StartTest()
+	assert := func(hashKeys bool) {
+		globalConf := ts.Gw.GetConfig()
+		globalConf.HashKeys = hashKeys
+		ts.Gw.SetConfig(globalConf)
+
+		ts := StartTest(nil)
 		defer ts.Close()
 
-		api := BuildAndLoadAPI(func(spec *APISpec) {
+		api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
 			spec.Proxy.ListenPath = "/"
 		})[0]
 
-		key := CreateSession(func(s *user.SessionState) {
+		key := CreateSession(ts.Gw, func(s *user.SessionState) {
 			s.AccessRights = map[string]user.AccessDefinition{api.APIID: {
 				APIID: api.APIID,
 			}}
@@ -58,27 +62,30 @@ func TestAuthenticationAfterDeleteKey(t *testing.T) {
 }
 
 func TestAuthenticationAfterUpdateKey(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	assert := func(hashKeys bool) {
-		globalConf := config.Global()
+		globalConf := ts.Gw.GetConfig()
 		globalConf.HashKeys = hashKeys
-		config.SetGlobal(globalConf)
+		ts.Gw.SetConfig(globalConf)
 
-		ts := StartTest()
-		defer ts.Close()
-
-		api := BuildAndLoadAPI(func(spec *APISpec) {
+		api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
 			spec.Proxy.ListenPath = "/"
 		})[0]
 
-		key := generateToken("", "")
+		key := ts.Gw.generateToken("", "")
 
 		session := CreateStandardSession()
 		session.AccessRights = map[string]user.AccessDefinition{api.APIID: {
 			APIID: api.APIID,
 		}}
 
-		GlobalSessionManager.UpdateSession(storage.HashKey(key), session, 0, config.Global().HashKeys)
+		err := ts.Gw.GlobalSessionManager.UpdateSession(storage.HashKey(key, ts.Gw.GetConfig().HashKeys), session, 0, ts.Gw.GetConfig().HashKeys)
+		if err != nil {
+			t.Error("could not update session in Session Manager. " + err.Error())
+		}
 
 		authHeader := map[string]string{
 			"authorization": key,
@@ -92,7 +99,10 @@ func TestAuthenticationAfterUpdateKey(t *testing.T) {
 			APIID: "dummy",
 		}}
 
-		GlobalSessionManager.UpdateSession(storage.HashKey(key), session, 0, config.Global().HashKeys)
+		err = ts.Gw.GlobalSessionManager.UpdateSession(storage.HashKey(key, ts.Gw.GetConfig().HashKeys), session, 0, ts.Gw.GetConfig().HashKeys)
+		if err != nil {
+			t.Error("could not update session in Session Manager. " + err.Error())
+		}
 
 		ts.Run(t, []test.TestCase{
 			{Path: "/get", Headers: authHeader, Code: http.StatusForbidden},
@@ -111,6 +121,8 @@ func TestAuthenticationAfterUpdateKey(t *testing.T) {
 
 func TestHashKeyFunctionChanged(t *testing.T) {
 	_, _, combinedPEM, _ := genServerCertificate()
+
+	CertificateManager := getCertManager()
 	serverCertID, _ := CertificateManager.Add(combinedPEM, "")
 	orgId := "default"
 	defer CertificateManager.Delete(serverCertID, orgId)
@@ -123,20 +135,18 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 	}
 
 	client := GetTLSClient(nil, nil)
-	globalConf := config.Global()
-	globalConf.HttpServerOptions.UseSSL = true
-	globalConf.HttpServerOptions.SSLCertificates = []string{serverCertID}
-	globalConf.HashKeys = true
-	globalConf.HashKeyFunction = "murmur64"
-	globalConf.LocalSessionCache.DisableCacheSessionState = true
-	config.SetGlobal(globalConf)
+	conf := func(globalConf *config.Config) {
+		globalConf.HttpServerOptions.UseSSL = true
+		globalConf.HttpServerOptions.SSLCertificates = []string{serverCertID}
+		globalConf.HashKeys = true
+		globalConf.HashKeyFunction = "murmur64"
+		globalConf.LocalSessionCache.DisableCacheSessionState = true
+	}
 
-	defer ResetTestConfig()
+	ts := StartTest(conf)
+	defer ts.Close()
 
-	g := StartTest()
-	defer g.Close()
-
-	api := BuildAndLoadAPI(func(spec *APISpec) {
+	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = false
 		spec.AuthConfigs = map[string]apidef.AuthConfig{
@@ -144,25 +154,24 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 		}
 	})[0]
 
-	globalConf = config.Global()
-
+	globalConf := ts.Gw.GetConfig()
 	testChangeHashFunc := func(t *testing.T, authHeader map[string]string, client *http.Client, failCode int) {
-		_, _ = g.Run(t, test.TestCase{Headers: authHeader, Client: client, Code: http.StatusOK})
+		_, _ = ts.Run(t, test.TestCase{Headers: authHeader, Client: client, Code: http.StatusOK})
 
 		globalConf.HashKeyFunction = "sha256"
-		config.SetGlobal(globalConf)
+		ts.Gw.SetConfig(globalConf)
 
-		_, _ = g.Run(t, test.TestCase{Headers: authHeader, Client: client, Code: failCode})
+		_, _ = ts.Run(t, test.TestCase{Headers: authHeader, Client: client, Code: failCode})
 
 		globalConf.HashKeyFunctionFallback = []string{"murmur64"}
-		config.SetGlobal(globalConf)
+		ts.Gw.SetConfig(globalConf)
 
-		_, _ = g.Run(t, test.TestCase{Headers: authHeader, Client: client, Code: http.StatusOK})
+		_, _ = ts.Run(t, test.TestCase{Headers: authHeader, Client: client, Code: http.StatusOK})
 
 		// Reset
 		globalConf.HashKeyFunction = "murmur64"
 		globalConf.HashKeyFunctionFallback = nil
-		config.SetGlobal(globalConf)
+		ts.Gw.SetConfig(globalConf)
 	}
 
 	t.Run("custom key", func(t *testing.T) {
@@ -174,7 +183,7 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 			APIID: "test", Versions: []string{"v1"},
 		}}
 
-		_, _ = g.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/keys/" + customKey,
+		_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/keys/" + customKey,
 			Data: session, Client: client, Code: http.StatusOK})
 
 		testChangeHashFunc(t, map[string]string{headers.Authorization: customKey}, client, http.StatusForbidden)
@@ -185,8 +194,8 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 		api.AuthConfigs = map[string]apidef.AuthConfig{
 			authTokenType: {UseCertificate: true},
 		}
-		LoadAPI(api)
-		globalConf = config.Global()
+		ts.Gw.LoadAPI(api)
+		globalConf = ts.Gw.GetConfig()
 
 		session := CreateStandardSession()
 		session.BasicAuthData.Password = "password"
@@ -194,7 +203,7 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 			APIID: "test", Versions: []string{"v1"},
 		}}
 
-		_, _ = g.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/keys/user",
+		_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/keys/user",
 			Data: session, Client: client, Code: http.StatusOK})
 
 		authHeader := map[string]string{"Authorization": genAuthHeader("user", "password")}
@@ -202,8 +211,8 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 		testChangeHashFunc(t, authHeader, client, http.StatusUnauthorized)
 
 		api.UseBasicAuth = false
-		LoadAPI(api)
-		globalConf = config.Global()
+		ts.Gw.LoadAPI(api)
+		globalConf = ts.Gw.GetConfig()
 	})
 
 	t.Run("client certificate", func(t *testing.T) {
@@ -211,7 +220,7 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 		api.AuthConfigs = map[string]apidef.AuthConfig{
 			authTokenType: {UseCertificate: true},
 		}
-		LoadAPI(api)
+		ts.Gw.LoadAPI(api)
 		session := CreateStandardSession()
 		session.Certificate = clientCertID
 		session.BasicAuthData.Password = "password"
@@ -219,7 +228,7 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 			APIID: "test", Versions: []string{"v1"},
 		}}
 
-		_, _ = g.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/keys/create",
+		_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/keys/create",
 			Data: session, Client: client, Code: http.StatusOK})
 
 		client = GetTLSClient(&clientCert, nil)

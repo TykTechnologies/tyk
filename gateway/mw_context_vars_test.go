@@ -13,8 +13,9 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
-func testPrepareContextVarsMiddleware() {
-	BuildAndLoadAPI(func(spec *APISpec) {
+func (ts *Test) testPrepareContextVarsMiddleware() {
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.EnableContextVars = true
 		spec.VersionData.Versions = map[string]apidef.VersionInfo{
@@ -32,10 +33,10 @@ func testPrepareContextVarsMiddleware() {
 }
 
 func TestContextVarsMiddleware(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	testPrepareContextVarsMiddleware()
+	ts.testPrepareContextVarsMiddleware()
 
 	ts.Run(t, []test.TestCase{
 		{Path: "/test/path", Code: 200, BodyMatch: `"X-Remote-Addr":"127.0.0.1"`},
@@ -48,10 +49,10 @@ func TestContextVarsMiddleware(t *testing.T) {
 func BenchmarkContextVarsMiddleware(b *testing.B) {
 	b.ReportAllocs()
 
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	testPrepareContextVarsMiddleware()
+	ts.testPrepareContextVarsMiddleware()
 
 	for i := 0; i < b.N; i++ {
 		ts.Run(b, []test.TestCase{

@@ -35,6 +35,7 @@ const (
 // check if a message should pass through or not
 type SessionLimiter struct {
 	bucketStore leakybucket.Storage
+	Gw          *Gateway `json:"-"`
 }
 
 func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string,
@@ -139,9 +140,9 @@ func (l *SessionLimiter) limitDRL(currentSession *user.SessionState, key string,
 	per := apiLimit.Per
 
 	// DRL will always overflow with more servers on low rates
-	rate := uint(currRate * float64(DRLManager.RequestTokenValue))
-	if rate < uint(DRLManager.CurrentTokenValue()) {
-		rate = uint(DRLManager.CurrentTokenValue())
+	rate := uint(currRate * float64(l.Gw.DRLManager.RequestTokenValue))
+	if rate < uint(l.Gw.DRLManager.CurrentTokenValue()) {
+		rate = uint(l.Gw.DRLManager.CurrentTokenValue())
 	}
 	userBucket, err := l.bucketStore.Create(bucketKey, rate, time.Duration(per)*time.Second)
 	if err != nil {
@@ -155,7 +156,7 @@ func (l *SessionLimiter) limitDRL(currentSession *user.SessionState, key string,
 			return true
 		}
 	} else {
-		_, errF := userBucket.Add(uint(DRLManager.CurrentTokenValue()))
+		_, errF := userBucket.Add(uint(l.Gw.DRLManager.CurrentTokenValue()))
 		if errF != nil {
 			return true
 		}
@@ -204,8 +205,8 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			}
 		} else {
 			var n float64
-			if DRLManager.Servers != nil {
-				n = float64(DRLManager.Servers.Count())
+			if l.Gw.DRLManager.Servers != nil {
+				n = float64(l.Gw.DRLManager.Servers.Count())
 			}
 			rate := accessDef.Limit.Rate / accessDef.Limit.Per
 			c := globalConf.DRLThreshold

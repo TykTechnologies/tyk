@@ -11,13 +11,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TykTechnologies/tyk/config"
+
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 
 	"github.com/lonelycode/go-uuid/uuid"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -30,19 +31,14 @@ func TestLoadPoliciesFromDashboardReLogin(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	globalConf := config.Global()
-	oldUseDBAppConfigs := globalConf.UseDBAppConfigs
-	globalConf.UseDBAppConfigs = false
-	config.SetGlobal(globalConf)
+	conf := func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = false
+	}
+	g := StartTest(conf)
+	defer g.Close()
 
-	defer func() {
-		globalConf.UseDBAppConfigs = oldUseDBAppConfigs
-		config.SetGlobal(globalConf)
-	}()
-
-	allowExplicitPolicyID := config.Global().Policies.AllowExplicitPolicyID
-
-	policyMap := LoadPoliciesFromDashboard(ts.URL, "", allowExplicitPolicyID)
+	allowExplicitPolicyID := g.Gw.GetConfig().Policies.AllowExplicitPolicyID
+	policyMap := g.Gw.LoadPoliciesFromDashboard(ts.URL, "", allowExplicitPolicyID)
 
 	if policyMap != nil {
 		t.Error("Should be nil because got back 403 from Dashboard")
@@ -65,9 +61,9 @@ type testApplyPoliciesData struct {
 	session   *user.SessionState
 }
 
-func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
-	policiesMu.RLock()
-	policiesByID = map[string]user.Policy{
+func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
+	s.Gw.policiesMu.RLock()
+	s.Gw.policiesByID = map[string]user.Policy{
 		"nonpart1": {
 			ID:           "p1",
 			AccessRights: map[string]user.AccessDefinition{"a": {}},
@@ -336,10 +332,13 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			AccessRights:       map[string]user.AccessDefinition{"a": {}},
 		},
 	}
-	policiesMu.RUnlock()
-	bmid := &BaseMiddleware{Spec: &APISpec{
-		APIDefinition: &apidef.APIDefinition{},
-	}}
+	s.Gw.policiesMu.RUnlock()
+	bmid := &BaseMiddleware{
+		Spec: &APISpec{
+			APIDefinition: &apidef.APIDefinition{},
+		},
+		Gw: s.Gw,
+	}
 	tests := []testApplyPoliciesData{
 		{
 			"Empty", nil,
@@ -541,18 +540,19 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 		},
 		{
 			"RightsUpdate", []string{"acl3"},
-			"", func(t *testing.T, s *user.SessionState) {
+			"", func(t *testing.T, ses *user.SessionState) {
 				newPolicy := user.Policy{
 					AccessRights: map[string]user.AccessDefinition{"a": {Limit: &user.APILimit{}}, "b": {Limit: &user.APILimit{}}, "c": {Limit: &user.APILimit{}}},
 				}
-				policiesMu.Lock()
-				policiesByID["acl3"] = newPolicy
-				policiesMu.Unlock()
-				err := bmid.ApplyPolicies(s)
+
+				s.Gw.policiesMu.Lock()
+				s.Gw.policiesByID["acl3"] = newPolicy
+				s.Gw.policiesMu.Unlock()
+				err := bmid.ApplyPolicies(ses)
 				if err != nil {
 					t.Fatalf("couldn't apply policy: %s", err.Error())
 				}
-				assert.Equal(t, newPolicy.AccessRights, s.AccessRights)
+				assert.Equal(t, newPolicy.AccessRights, ses.AccessRights)
 			}, nil,
 		},
 		{
@@ -748,7 +748,10 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 }
 
 func TestApplyPolicies(t *testing.T) {
-	bmid, tests := testPrepareApplyPolicies()
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	bmid, tests := ts.TestPrepareApplyPolicies()
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -776,8 +779,10 @@ func TestApplyPolicies(t *testing.T) {
 
 func BenchmarkApplyPolicies(b *testing.B) {
 	b.ReportAllocs()
+	ts := StartTest(nil)
+	defer ts.Close()
 
-	bmid, tests := testPrepareApplyPolicies()
+	bmid, tests := ts.TestPrepareApplyPolicies()
 
 	for i := 0; i < b.N; i++ {
 		for _, tc := range tests {
@@ -789,7 +794,10 @@ func BenchmarkApplyPolicies(b *testing.B) {
 }
 
 func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
-	policiesMu.RLock()
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.policiesMu.RLock()
 	policy := user.Policy{
 		ID:               "two_of_three_with_api_limit",
 		Per:              1,
@@ -827,16 +835,13 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 			},
 		},
 	}
-	policiesByID = map[string]user.Policy{
+	ts.Gw.policiesByID = map[string]user.Policy{
 		"two_of_three_with_api_limit": policy,
 	}
-	policiesMu.RUnlock()
-
-	ts := StartTest()
-	defer ts.Close()
+	ts.Gw.policiesMu.RUnlock()
 
 	// load APIs
-	BuildAndLoadAPI(
+	ts.Gw.BuildAndLoadAPI(
 		func(spec *APISpec) {
 			spec.Name = "api 1"
 			spec.APIID = "api1"
@@ -1022,7 +1027,10 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 }
 
 func TestApplyMultiPolicies(t *testing.T) {
-	policiesMu.RLock()
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.policiesMu.RLock()
 	policy1 := user.Policy{
 		ID:               "policy1",
 		Rate:             1000,
@@ -1054,17 +1062,14 @@ func TestApplyMultiPolicies(t *testing.T) {
 		},
 	}
 
-	policiesByID = map[string]user.Policy{
+	ts.Gw.policiesByID = map[string]user.Policy{
 		"policy1": policy1,
 		"policy2": policy2,
 	}
-	policiesMu.RUnlock()
-
-	ts := StartTest()
-	defer ts.Close()
+	ts.Gw.policiesMu.RUnlock()
 
 	// load APIs
-	BuildAndLoadAPI(
+	ts.Gw.BuildAndLoadAPI(
 		func(spec *APISpec) {
 			spec.Name = "api 1"
 			spec.APIID = "api1"
@@ -1200,17 +1205,17 @@ func TestApplyMultiPolicies(t *testing.T) {
 			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "48"}},
 	}...)
 
-	policiesMu.RLock()
+	ts.Gw.policiesMu.RLock()
 	policy1.Rate = 1
 	policy1.LastUpdated = strconv.Itoa(int(time.Now().Unix() + 1))
-	DRLManager.SetCurrentTokenValue(100)
-	defer DRLManager.SetCurrentTokenValue(0)
+	ts.Gw.DRLManager.SetCurrentTokenValue(100)
+	defer ts.Gw.DRLManager.SetCurrentTokenValue(0)
 
-	policiesByID = map[string]user.Policy{
+	ts.Gw.policiesByID = map[string]user.Policy{
 		"policy1": policy1,
 		"policy2": policy2,
 	}
-	policiesMu.RUnlock()
+	ts.Gw.policiesMu.RUnlock()
 
 	// Rate limits after policy update
 	ts.Run(t, []test.TestCase{
@@ -1222,7 +1227,10 @@ func TestApplyMultiPolicies(t *testing.T) {
 }
 
 func TestPerAPIPolicyUpdate(t *testing.T) {
-	policiesMu.RLock()
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.policiesMu.RLock()
 	policy := user.Policy{
 		ID:    "per_api_policy_with_two_apis",
 		OrgID: "default",
@@ -1241,16 +1249,13 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 			},
 		},
 	}
-	policiesByID = map[string]user.Policy{
+	ts.Gw.policiesByID = map[string]user.Policy{
 		"per_api_policy_with_two_apis": policy,
 	}
-	policiesMu.RUnlock()
-
-	ts := StartTest()
-	defer ts.Close()
+	ts.Gw.policiesMu.RUnlock()
 
 	// load APIs
-	BuildAndLoadAPI(
+	ts.Gw.BuildAndLoadAPI(
 		func(spec *APISpec) {
 			spec.Name = "api 1"
 			spec.APIID = "api1"
@@ -1320,7 +1325,7 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 	}...)
 
 	//Update policy
-	policiesMu.RLock()
+	ts.Gw.policiesMu.RLock()
 	policy = user.Policy{
 		ID:    "per_api_policy_with_two_apis",
 		OrgID: "default",
@@ -1336,10 +1341,10 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 			},
 		},
 	}
-	policiesByID = map[string]user.Policy{
+	ts.Gw.policiesByID = map[string]user.Policy{
 		"per_api_policy_with_two_apis": policy,
 	}
-	policiesMu.RUnlock()
+	ts.Gw.policiesMu.RUnlock()
 
 	ts.Run(t, []test.TestCase{
 		{
