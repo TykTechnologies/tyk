@@ -277,7 +277,7 @@ func (k *JWTMiddleware) getBasePolicyID(r *http.Request, claims jwt.MapClaims) (
 			return
 		}
 
-		pols := clientSession.GetPolicyIDs()
+		pols := clientSession.PolicyIDs()
 		if len(pols) < 1 {
 			return
 		}
@@ -435,7 +435,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			}
 		}
 
-		session.SetMetaData(map[string]interface{}{"TykJWTSessionID": sessionID})
+		session.MetaData = map[string]interface{}{"TykJWTSessionID": sessionID}
 		session.Alias = baseFieldData
 
 		// Update the session in the session manager in case it gets called again
@@ -463,7 +463,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			return errors.New("key not authorized: no matching policy"), http.StatusForbidden
 		}
 		// check if token for this session was switched to another valid policy
-		pols := session.GetPolicyIDs()
+		pols := session.PolicyIDs()
 		if len(pols) == 0 {
 			k.reportLoginFailure(baseFieldData, r)
 			k.Logger().Error("No policies for the found session. Failing Request.")
@@ -475,14 +475,14 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		if isDefaultPol {
 			// check a policy is removed/added from/to default policies
 
-			for _, pol := range session.GetPolicyIDs() {
+			for _, pol := range session.PolicyIDs() {
 				if !contains(k.Spec.JWTDefaultPolicies, pol) && basePolicyID != pol {
 					defaultPolicyListChanged = true
 				}
 			}
 
 			for _, defPol := range k.Spec.JWTDefaultPolicies {
-				if !contains(session.GetPolicyIDs(), defPol) {
+				if !contains(session.PolicyIDs(), defPol) {
 					defaultPolicyListChanged = true
 				}
 			}
@@ -613,8 +613,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		ctxSetSession(r, &session, sessionID, updateSession, k.Gw.GetConfig().HashKeys)
 
 		if updateSession {
-			clone := session.Clone()
-			k.Gw.SessionCache.Set(session.GetKeyHash(), &clone, cache.DefaultExpiration)
+			k.Gw.SessionCache.Set(session.KeyHash(), session.Clone(), cache.DefaultExpiration)
 		}
 	}
 	ctxSetJWTContextVars(k.Spec, r, token)
@@ -834,12 +833,13 @@ func (gw *Gateway) generateSessionFromPolicy(policyID, orgID string, enforceOrg 
 	gw.policiesMu.RLock()
 	policy, ok := gw.policiesByID[policyID]
 	gw.policiesMu.RUnlock()
-	session := user.NewSessionState()
+	session := user.SessionState{}
+
 	if !ok {
 		return session.Clone(), errors.New("Policy not found")
 	}
 	// Check ownership, policy org owner must be the same as API,
-	// otherwise youcould overwrite a session key with a policy from a different org!
+	// otherwise you could overwrite a session key with a policy from a different org!
 
 	if enforceOrg {
 		if policy.OrgID != orgID {

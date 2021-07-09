@@ -255,7 +255,7 @@ func TestGraphQLComplexityMiddleware_ProcessRequest_GraphqlLimits(t *testing.T) 
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			session.SetAccessRights(tc.rights)
+			session.AccessRights = tc.rights
 			_, failReason := m.ProcessRequest(nil, httpReq, nil)
 			assert.Equal(t, tc.result, failReason)
 		})

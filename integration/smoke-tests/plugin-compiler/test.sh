@@ -1,4 +1,6 @@
-#!/usr/bin/env zsh
+#!/bin/bash
+
+set -eo pipefail
 
 function usage {
     local progname=$1
@@ -12,15 +14,14 @@ EOF
     exit 1
 }
 
-TRAPINT() {
-    print Tearing down test env
-    docker-compose -f test.yml down
-}
-
 [[ -z $1 ]] && usage $0
 export tag=$1
 
-rm -v testplugin/*.so
+rm -fv testplugin/*.so || true
 docker run --rm -v `pwd`/testplugin:/plugin-source tykio/tyk-plugin-compiler:${tag} testplugin.so
-(cd testplugin && cp testplugin.so testplugin-${tag}.so)
-docker-compose -f test.yml up
+docker-compose up -d
+sleep 2 # Wait for init
+curl -vvv http://localhost:8080/goplugin/headers
+curl http://localhost:8080/goplugin/headers | jq -e '.headers.Foo == "Bar"'
+docker-compose logs
+docker-compose down 

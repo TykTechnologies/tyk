@@ -196,7 +196,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 	if !exists {
 		// Create it
 		logger.Debug("Key does not exist, creating")
-		session = *user.NewSessionState()
+		session = user.SessionState{}
 
 		if !useScope {
 			// We need a base policy as a template, either get it from the token itself OR a proxy client ID within Tyk
@@ -214,7 +214,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 		}
 
 		session.OrgID = k.Spec.OrgID
-		session.SetMetaData(map[string]interface{}{"TykJWTSessionID": sessionID, "ClientID": clientID})
+		session.MetaData = map[string]interface{}{"TykJWTSessionID": sessionID, "ClientID": clientID}
 		session.Alias = clientID + ":" + ouser.ID
 
 		// Update the session in the session manager in case it gets called again

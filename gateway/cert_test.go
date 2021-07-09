@@ -900,9 +900,9 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 		t.Run("Cert known", func(t *testing.T) {
 			_, key := ts.CreateSession(func(s *user.SessionState) {
 				s.Certificate = clientCertID
-				s.SetAccessRights(map[string]user.AccessDefinition{"test": {
+				s.AccessRights = map[string]user.AccessDefinition{"test": {
 					APIID: "test", Versions: []string{"v1"},
-				}})
+				}}
 			})
 
 			if key == "" {
@@ -911,9 +911,9 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 
 			_, key = ts.CreateSession(func(s *user.SessionState) {
 				s.Certificate = clientCertID
-				s.SetAccessRights(map[string]user.AccessDefinition{"test": {
+				s.AccessRights = map[string]user.AccessDefinition{"test": {
 					APIID: "test", Versions: []string{"v1"},
-				}})
+				}}
 			})
 
 			if key != "" {
@@ -965,9 +965,9 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 		t.Run("Cert known", func(t *testing.T) {
 			_, key := ts.CreateSession(func(s *user.SessionState) {
 				s.Certificate = clientCertID
-				s.SetAccessRights(map[string]user.AccessDefinition{"test": {
+				s.AccessRights = map[string]user.AccessDefinition{"test": {
 					APIID: "test", Versions: []string{"v1"},
-				}})
+				}}
 			})
 
 			if key == "" {
@@ -976,9 +976,9 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 
 			_, key = ts.CreateSession(func(s *user.SessionState) {
 				s.Certificate = clientCertID
-				s.SetAccessRights(map[string]user.AccessDefinition{"test": {
+				s.AccessRights = map[string]user.AccessDefinition{"test": {
 					APIID: "test", Versions: []string{"v1"},
-				}})
+				}}
 			})
 
 			if key != "" {
@@ -1024,9 +1024,9 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 
 		_, _ = ts.CreateSession(func(s *user.SessionState) {
 			s.Certificate = clientCertID
-			s.SetAccessRights(map[string]user.AccessDefinition{api.APIID: {
+			s.AccessRights = map[string]user.AccessDefinition{api.APIID: {
 				APIID: api.APIID, Versions: []string{"v1"},
-			}})
+			}}
 		})
 
 		_, _ = ts.Run(t, test.TestCase{Code: http.StatusOK, Path: "/test1", Domain: "host2", Client: client})
@@ -1053,9 +1053,9 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 		client := GetTLSClient(&clientCert, nil)
 		_, key := ts.CreateSession(func(s *user.SessionState) {
 			s.Certificate = clientCertID
-			s.SetAccessRights(map[string]user.AccessDefinition{"test": {
+			s.AccessRights = map[string]user.AccessDefinition{"test": {
 				APIID: "test", Versions: []string{"v1"},
-			}})
+			}}
 		})
 
 		if key == "" {

@@ -144,6 +144,9 @@ type Gateway struct {
 	// OnConnect this is a callback which is called whenever we transition redis Disconnected to connected
 	OnConnect func()
 
+	// SessionID is the unique session id which is used while connecting to dashboard to prevent multiple node allocation.
+	SessionID string
+
 	runningTestsMu sync.RWMutex
 	testMode       bool
 
@@ -1352,6 +1355,7 @@ func Start() {
 	gw := NewGateway(config.Default)
 	gw.SetNodeID("solo-" + uuid.NewV4().String())
 
+	gw.SessionID = uuid.NewV4().String()
 	if err := gw.initialiseSystem(ctx); err != nil {
 		mainLog.Fatalf("Error initialising system: %v", err)
 	}

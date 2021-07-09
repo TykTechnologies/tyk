@@ -177,7 +177,7 @@ func (gw *Gateway) getApisIdsForOrg(orgID string) []string {
 
 func (gw *Gateway) checkAndApplyTrialPeriod(keyName string, newSession *user.SessionState, isHashed bool) {
 	// Check the policies to see if we are forcing an expiry on the key
-	for _, polID := range newSession.GetPolicyIDs() {
+	for _, polID := range newSession.PolicyIDs() {
 		gw.policiesMu.RLock()
 		policy, ok := gw.policiesByID[polID]
 		gw.policiesMu.RUnlock()
@@ -231,11 +231,12 @@ func (gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, 
 		newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 	}
 
-	if len(newSession.GetAccessRights()) > 0 {
+	if len(newSession.AccessRights) > 0 {
 		// reset API-level limit to nil if any has a zero-value
 		resetAPILimits(newSession.AccessRights)
 		// We have a specific list of access rules, only add / update those
-		for apiId := range newSession.GetAccessRights() {
+
+		for apiId := range newSession.AccessRights {
 			apiSpec := gw.getApiSpec(apiId)
 			if apiSpec == nil {
 				log.WithFields(logrus.Fields{
@@ -324,7 +325,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 	suppressReset := r.URL.Query().Get("suppress_reset") == "1"
 
 	// decode payload
-	newSession := user.NewSessionState()
+	newSession := &user.SessionState{}
 
 	contents, _ := ioutil.ReadAll(r.Body)
 	r.Body = ioutil.NopCloser(bytes.NewReader(contents))
@@ -341,7 +342,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 	// DO ADD OR UPDATE
 
 	// get original session in case of update and preserve fields that SHOULD NOT be updated
-	originalKey := *user.NewSessionState()
+	originalKey := user.SessionState{}
 	if r.Method == http.MethodPut {
 		key, found := gw.GlobalSessionManager.SessionDetail(newSession.OrgID, keyName, isHashed)
 		if !found {
@@ -380,11 +381,11 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 			newSession.LastUpdated = originalKey.LastUpdated
 
 			// on ACL API limit level
-			for apiID, access := range originalKey.GetAccessRights() {
+			for apiID, access := range originalKey.AccessRights {
 				if access.Limit == nil {
 					continue
 				}
-				if newAccess, ok := newSession.GetAccessRightByAPIID(apiID); ok && newAccess.Limit != nil {
+				if newAccess, ok := newSession.AccessRights[apiID]; ok && newAccess.Limit != nil {
 					newAccess.Limit.QuotaRenews = access.Limit.QuotaRenews
 					newSession.AccessRights[apiID] = newAccess
 				}
@@ -521,7 +522,7 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID string, byHash bool) (inter
 	}
 
 	// populate remaining quota for API limits (if any)
-	for id, access := range session.GetAccessRights() {
+	for id, access := range session.AccessRights {
 		if access.Limit == nil || access.Limit.QuotaMax == -1 || access.Limit.QuotaMax == 0 {
 			continue
 		}
@@ -609,7 +610,7 @@ func (gw *Gateway) handleGetAllKeys(filter string) (interface{}, int) {
 }
 
 func (gw *Gateway) handleAddKey(keyName, hashedName, sessionString, apiID string) {
-	sess := user.NewSessionState()
+	sess := &user.SessionState{}
 	json.Unmarshal([]byte(sessionString), sess)
 	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 	var err error
@@ -645,7 +646,7 @@ func (gw *Gateway) handleDeleteKey(keyName, apiID string, resetQuota bool) (inte
 		removed := gw.GlobalSessionManager.RemoveSession(orgID, keyName, false)
 		gw.GlobalSessionManager.ResetQuota(
 			keyName,
-			user.NewSessionState(),
+			&user.SessionState{},
 			false)
 
 		gw.apisMu.RUnlock()
@@ -680,7 +681,7 @@ func (gw *Gateway) handleDeleteKey(keyName, apiID string, resetQuota bool) (inte
 	if resetQuota {
 		gw.GlobalSessionManager.ResetQuota(
 			keyName,
-			user.NewSessionState(),
+			&user.SessionState{},
 			false)
 	}
 
@@ -752,7 +753,7 @@ func (gw *Gateway) handleDeleteHashedKey(keyName, apiID string, resetQuota bool)
 	if resetQuota {
 		gw.GlobalSessionManager.ResetQuota(
 			keyName,
-			user.NewSessionState(),
+			&user.SessionState{},
 			true)
 	}
 
@@ -1103,7 +1104,7 @@ func (gw *Gateway) orgHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (gw *Gateway) handleOrgAddOrUpdate(orgID string, r *http.Request) (interface{}, int) {
-	newSession := user.NewSessionState()
+	newSession := new(user.SessionState)
 
 	if err := json.NewDecoder(r.Body).Decode(newSession); err != nil {
 		log.Error("Couldn't decode new session object: ", err)
@@ -1285,7 +1286,7 @@ func (gw *Gateway) resetHandler(fn func()) http.HandlerFunc {
 }
 
 func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
-	newSession := user.NewSessionState()
+	newSession := new(user.SessionState)
 	if err := json.NewDecoder(r.Body).Decode(newSession); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -1317,12 +1318,11 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	// TODO: handle apply policies error
 	mw.ApplyPolicies(newSession)
 
-	if len(newSession.GetAccessRights()) > 0 {
+	if len(newSession.AccessRights) > 0 {
 		// reset API-level limit to nil if any has a zero-value
 		resetAPILimits(newSession.AccessRights)
-		for apiID := range newSession.GetAccessRights() {
+		for apiID := range newSession.AccessRights {
 			apiSpec := gw.getApiSpec(apiID)
-
 			if apiSpec != nil {
 				gw.checkAndApplyTrialPeriod(newKey, newSession, false)
 				// If we have enabled HMAC checking for keys, we need to generate a secret for the client to use
@@ -1429,7 +1429,8 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (gw *Gateway) previewKeyHandler(w http.ResponseWriter, r *http.Request) {
-	newSession := user.NewSessionState()
+	newSession := new(user.SessionState)
+
 	if err := json.NewDecoder(r.Body).Decode(newSession); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
