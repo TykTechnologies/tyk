@@ -859,7 +859,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			RevokeToken(storage, token, tokenTypeHint)
 		} else {
 			token = strings.Split(token, "#")[0]
-			handleDeleteHashedKey(token, apiId, false)
+			handleDeleteHashedKey(token, orgId, apiId, false)
 		}
 		SessionCache.Delete(token)
 		RPCGlobalCache.Delete(r.KeyPrefix + token)
@@ -873,7 +873,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			if len(splitKeys) > 1 && splitKeys[1] == "hashed" {
 				key = splitKeys[0]
 				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
-				handleDeleteHashedKey(splitKeys[0], "", resetQuota)
+				handleDeleteHashedKey(splitKeys[0], orgId, "", resetQuota)
 				getSessionAndCreate(splitKeys[0], r)
 			} else {
 				log.Info("--> removing cached key: ", key)
@@ -881,7 +881,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 				if storage.TokenOrg(key) == "" {
 					key = generateToken(orgId, key)
 				}
-				handleDeleteKey(key, "-1", resetQuota)
+				handleDeleteKey(key, orgId, "-1", resetQuota)
 				getSessionAndCreate(splitKeys[0], r)
 			}
 			SessionCache.Delete(key)
