@@ -152,6 +152,9 @@ func TestProcessKeySpaceChanges_ResetQuota(t *testing.T) {
 		HashKeys:         false,
 	}
 
+	GlobalSessionManager.Store().DeleteAllKeys()
+	defer GlobalSessionManager.Store().DeleteAllKeys()
+
 	g := StartTest()
 	defer g.Close()
 
