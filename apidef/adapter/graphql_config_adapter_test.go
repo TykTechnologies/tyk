@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	graphqlDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
-	"github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/httpclient"
 	restDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/rest_datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/plan"
 	"github.com/stretchr/testify/assert"
@@ -59,6 +58,9 @@ func TestGraphQLConfigAdapter_supergraphDataSourceConfigs(t *testing.T) {
 				Method: http.MethodPost,
 				Header: nil,
 			},
+			Subscription: graphqlDataSource.SubscriptionConfiguration{
+				URL: "http://accounts.service",
+			},
 			Federation: graphqlDataSource.FederationConfiguration{
 				Enabled:    true,
 				ServiceSDL: federationAccountsServiceSDL,
@@ -69,6 +71,9 @@ func TestGraphQLConfigAdapter_supergraphDataSourceConfigs(t *testing.T) {
 				URL:    "http://products.service",
 				Method: http.MethodPost,
 				Header: nil,
+			},
+			Subscription: graphqlDataSource.SubscriptionConfiguration{
+				URL: "http://products.service",
 			},
 			Federation: graphqlDataSource.FederationConfiguration{
 				Enabled:    true,
@@ -81,6 +86,9 @@ func TestGraphQLConfigAdapter_supergraphDataSourceConfigs(t *testing.T) {
 				Method: http.MethodPost,
 				Header: nil,
 			},
+			Subscription: graphqlDataSource.SubscriptionConfiguration{
+				URL: "http://reviews.service",
+			},
 			Federation: graphqlDataSource.FederationConfiguration{
 				Enabled:    true,
 				ServiceSDL: federationReviewsServiceSDL,
@@ -92,7 +100,7 @@ func TestGraphQLConfigAdapter_supergraphDataSourceConfigs(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2SupergraphConfigJson), &gqlConfig))
 
 	adapter := NewGraphQLConfigAdapter(gqlConfig)
-	actualGraphQLConfigs := adapter.supergraphDataSourceConfigs()
+	actualGraphQLConfigs := adapter.subgraphDataSourceConfigs()
 	assert.Equal(t, expectedDataSourceConfigs, actualGraphQLConfigs)
 }
 
@@ -152,7 +160,7 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 				},
 			},
 			Factory: &restDataSource.Factory{
-				Client: httpclient.NewNetHttpClient(httpClient),
+				Client: httpClient,
 			},
 			Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
 				Fetch: restDataSource.FetchConfiguration{
@@ -188,12 +196,15 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 				},
 			},
 			Factory: &graphqlDataSource.Factory{
-				Client: httpclient.NewNetHttpClient(httpClient),
+				Client: httpClient,
 			},
 			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
 				Fetch: graphqlDataSource.FetchConfiguration{
 					URL:    "https://graphql.example.com",
 					Method: "POST",
+				},
+				Subscription: graphqlDataSource.SubscriptionConfiguration{
+					URL: "https://graphql.example.com",
 				},
 			}),
 		},
@@ -211,7 +222,7 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 				},
 			},
 			Factory: &restDataSource.Factory{
-				Client: httpclient.NewNetHttpClient(httpClient),
+				Client: httpClient,
 			},
 			Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
 				Fetch: restDataSource.FetchConfiguration{
@@ -234,7 +245,7 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 				},
 			},
 			Factory: &restDataSource.Factory{
-				Client: httpclient.NewNetHttpClient(httpClient),
+				Client: httpClient,
 			},
 			Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
 				Fetch: restDataSource.FetchConfiguration{
@@ -261,7 +272,7 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 				},
 			},
 			Factory: &graphqlDataSource.Factory{
-				Client: httpclient.NewNetHttpClient(httpClient),
+				Client: httpClient,
 			},
 			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
 				Fetch: graphqlDataSource.FetchConfiguration{
@@ -270,6 +281,9 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 					Header: map[string][]string{
 						"Auth": {"123"},
 					},
+				},
+				Subscription: graphqlDataSource.SubscriptionConfiguration{
+					URL: "https://graphql.example.com",
 				},
 			}),
 		},

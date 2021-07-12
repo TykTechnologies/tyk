@@ -59,7 +59,7 @@ func (g *GraphQLConfigAdapter) EngineConfigV2() (*graphql.EngineV2Configuration,
 }
 
 func (g *GraphQLConfigAdapter) createV2ConfigForSupergraphExecutionMode() (*graphql.EngineV2Configuration, error) {
-	dataSourceConfs := g.supergraphDataSourceConfigs()
+	dataSourceConfs := g.subgraphDataSourceConfigs()
 	federationConfigV2Factory := federation.NewEngineConfigV2Factory(g.getHttpClient(), dataSourceConfs...)
 	err := federationConfigV2Factory.SetMergedSchemaFromString(g.config.Supergraph.MergedSDL)
 	if err != nil {
@@ -199,7 +199,7 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 	return planDataSources, err
 }
 
-func (g *GraphQLConfigAdapter) supergraphDataSourceConfigs() []graphqlDataSource.Configuration {
+func (g *GraphQLConfigAdapter) subgraphDataSourceConfigs() []graphqlDataSource.Configuration {
 	confs := make([]graphqlDataSource.Configuration, 0)
 	if len(g.config.Supergraph.Subgraphs) == 0 {
 		return confs
@@ -215,6 +215,9 @@ func (g *GraphQLConfigAdapter) supergraphDataSourceConfigs() []graphqlDataSource
 				URL:    apiDefSubgraphConf.URL,
 				Method: http.MethodPost,
 				Header: nil,
+			},
+			Subscription: graphqlDataSource.SubscriptionConfiguration{
+				URL: apiDefSubgraphConf.URL,
 			},
 			Federation: graphqlDataSource.FederationConfiguration{
 				Enabled:    true,
