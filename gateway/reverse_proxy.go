@@ -754,21 +754,28 @@ type TykRoundTripper struct {
 }
 
 func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
-	if r.URL.Scheme == "tyk" {
+	hasInternalHeader := r.Header.Get(apidef.TykInternalApiHeader) != ""
+
+	if r.URL.Scheme == "tyk" || hasInternalHeader {
+		if hasInternalHeader {
+			r.Header.Del(apidef.TykInternalApiHeader)
+		}
+
 		handler, found := findInternalHttpHandlerByNameOrID(r.Host)
 		if !found {
 			rt.logger.WithField("looping_url", "tyk://"+r.Host).Error("Couldn't detect target")
 			return nil, errors.New("handler could")
 		}
 
-		r.URL.Scheme = ""
-
 		rt.logger.WithField("looping_url", "tyk://"+r.Host).Debug("Executing request on internal route")
-		recorder := httptest.NewRecorder()
 
-		nopCloseRequestBody(r)
-		handler.ServeHTTP(recorder, r)
-		return recorder.Result(), nil
+		srv := httptest.NewServer(handler)
+		defer srv.Close()
+
+		r.URL.Scheme = "http"
+		r.URL.Host = srv.Listener.Addr().String()
+
+		return srv.Client().Do(r)
 	}
 
 	if rt.h2ctransport != nil {
@@ -807,7 +814,12 @@ func isNotCORSPreflight(r *http.Request) bool {
 func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, err error) {
 	isWebSocketUpgrade := ctxGetGraphQLIsWebSocketUpgrade(outreq)
 	if isWebSocketUpgrade {
-		return p.handleGraphQLEngineWebsocketUpgrade(roundTripper, outreq, w)
+		if needsGraphQLExecutionEngine(p.TykAPISpec) {
+			return p.handleGraphQLEngineWebsocketUpgrade(roundTripper, outreq, w)
+		}
+
+		res, err = p.sendRequestToUpstream(roundTripper, outreq)
+		return
 	}
 
 	gqlRequest := ctxGetGraphQLRequest(outreq)
