@@ -671,7 +671,6 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 	keyHash := key
 	cacheKey := key
 	if t.Spec.GlobalConfig.HashKeys {
-		keyHash = storage.HashStr(key)
 		cacheKey = storage.HashStr(key, storage.HashMurmur64) // always hash cache keys with murmur64 to prevent collisions
 	}
 
@@ -694,6 +693,9 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 	session, found := GlobalSessionManager.SessionDetail(t.Spec.OrgID, key, false)
 
 	if found {
+		if t.Spec.GlobalConfig.HashKeys {
+			keyHash = storage.HashStr(session.KeyID)
+		}
 		session := session.Clone()
 		session.SetKeyHash(keyHash)
 		// If exists, assume it has been authorized and pass on
@@ -718,9 +720,10 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 	// Only search in RPC if it's not in emergency mode
 	t.Logger().Debug("Querying authstore")
 	// 2. If not there, get it from the AuthorizationHandler
-
+	session, found = t.Spec.AuthManager.SessionDetail(t.Spec.OrgID, key, false)
 	// first lets try as a custom key
-	customKey := generateToken(t.Spec.OrgID, key)
+	/*customKey := generateToken(t.Spec.OrgID, key)
+
 	session, found = t.Spec.AuthManager.SessionDetail(t.Spec.OrgID, customKey, false)
 	if !found {
 		// not a custom key, then continue the process with original key
@@ -728,7 +731,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 	} else {
 		key = customKey
 	}
-
+	*/
 	if found {
 		// update value of originalKey, as for custom-keys it might get updated (the key is generated again using alias)
 		*originalKey = key
