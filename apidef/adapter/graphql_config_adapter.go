@@ -213,7 +213,7 @@ func (g *GraphQLConfigAdapter) supergraphDataSourceConfigs() []graphqlDataSource
 			Fetch: graphqlDataSource.FetchConfiguration{
 				URL:    apiDefSubgraphConf.URL,
 				Method: http.MethodPost,
-				Header: nil,
+				Header: g.convertHttpHeadersToEngineV2Headers(g.config.Supergraph.GlobalHeaders),
 			},
 			Federation: graphqlDataSource.FederationConfiguration{
 				Enabled:    true,
