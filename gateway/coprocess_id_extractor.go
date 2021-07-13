@@ -133,7 +133,8 @@ func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (sessionID string, ret
 
 	sessionID = e.GenerateSessionID(extractorOutput, e.BaseMid)
 
-	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(&sessionID, r)
+	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(sessionID, r)
+	sessionID = previousSession.KeyID
 
 	if keyExists {
 		if previousSession.IdExtractorDeadline > time.Now().Unix() {
@@ -206,7 +207,8 @@ func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 	}
 
 	SessionID = e.GenerateSessionID(regexOutput[e.cfg.RegexMatchIndex], e.BaseMid)
-	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(&SessionID, r)
+	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(SessionID, r)
+	SessionID = previousSession.KeyID
 
 	if keyExists {
 		if previousSession.IdExtractorDeadline > time.Now().Unix() {
@@ -282,7 +284,8 @@ func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 
 	SessionID = e.GenerateSessionID(output, e.BaseMid)
 
-	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(&SessionID, r)
+	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(SessionID, r)
+	SessionID = previousSession.KeyID
 	if keyExists {
 		if previousSession.IdExtractorDeadline > time.Now().Unix() {
 			ctxSetSession(r, &previousSession, SessionID, true)

@@ -102,10 +102,12 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		return errorAndStatusCode(ErrAuthAuthorizationFieldMissing)
 	}
 
-	session, keyExists = k.CheckSessionAndIdentityForValidKey(&key, r)
+	session, keyExists = k.CheckSessionAndIdentityForValidKey(key, r)
+	key = session.KeyID
 	if !keyExists {
 		// fallback to search by cert
-		session, keyExists = k.CheckSessionAndIdentityForValidKey(&certHash, r)
+		session, keyExists = k.CheckSessionAndIdentityForValidKey(certHash, r)
+		certHash = session.KeyID
 		if !keyExists {
 			return k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)
 		}

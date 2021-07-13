@@ -654,8 +654,8 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
 // the Auth Handler, if not found it will fail
-func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, r *http.Request) (user.SessionState, bool) {
-	key := *originalKey
+func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r *http.Request) (user.SessionState, bool) {
+	key := originalKey
 	minLength := t.Spec.GlobalConfig.MinTokenLength
 	if minLength == 0 {
 		// See https://github.com/TykTechnologies/tyk/issues/1681
@@ -724,8 +724,6 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 
 	if found {
 		key = session.KeyID
-		// update value of originalKey, as for custom-keys it might get updated (the key is generated again using alias)
-		*originalKey = key
 
 		session := session.Clone()
 		session.SetKeyHash(keyHash)
