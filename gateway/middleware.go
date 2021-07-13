@@ -721,18 +721,9 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 	t.Logger().Debug("Querying authstore")
 	// 2. If not there, get it from the AuthorizationHandler
 	session, found = t.Spec.AuthManager.SessionDetail(t.Spec.OrgID, key, false)
-	// first lets try as a custom key
-	/*customKey := generateToken(t.Spec.OrgID, key)
 
-	session, found = t.Spec.AuthManager.SessionDetail(t.Spec.OrgID, customKey, false)
-	if !found {
-		// not a custom key, then continue the process with original key
-		session, found = t.Spec.AuthManager.SessionDetail(t.Spec.OrgID, key, false)
-	} else {
-		key = customKey
-	}
-	*/
 	if found {
+		key = session.KeyID
 		// update value of originalKey, as for custom-keys it might get updated (the key is generated again using alias)
 		*originalKey = key
 
@@ -743,7 +734,6 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 		t.Logger().Info("Recreating session for key: ", obfuscateKey(key))
 
 		// cache it
-
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
 			SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
 		}
