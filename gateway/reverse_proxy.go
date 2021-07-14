@@ -1267,7 +1267,10 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 		rw.Header().Add("Trailer", strings.Join(trailerKeys, ", "))
 	}
 
-	rw.WriteHeader(res.StatusCode)
+	// do not write on a hijacked connection
+	if res.StatusCode != http.StatusSwitchingProtocols {
+		rw.WriteHeader(res.StatusCode)
+	}
 
 	if len(res.Trailer) > 0 {
 		// Force chunking if we saw a response trailer.
