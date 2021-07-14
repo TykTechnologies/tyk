@@ -205,6 +205,10 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return nil, http.StatusSwitchingProtocols
 	}
 
+	// With current in memory server approach we need body to be readable again
+	// as for proxy only API we are sending it as is
+	nopCloseRequestBody(r)
+
 	var gqlRequest gql.Request
 	err = gql.UnmarshalRequest(r.Body, &gqlRequest)
 	if err != nil {
