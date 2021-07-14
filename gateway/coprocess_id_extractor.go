@@ -132,7 +132,7 @@ func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (sessionID string, ret
 	}
 
 	sessionID = e.GenerateSessionID(extractorOutput, e.BaseMid)
-
+fmt.Printf("\n ")
 	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(sessionID, r)
 	sessionID = previousSession.KeyID
 
@@ -143,6 +143,8 @@ func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (sessionID string, ret
 				ResponseCode: 200,
 			}
 		}
+	}else{
+		fmt.Printf("\n No encontrado")
 	}
 
 	return sessionID, returnOverrides

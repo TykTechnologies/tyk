@@ -655,6 +655,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
 // the Auth Handler, if not found it will fail
 func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r *http.Request) (user.SessionState, bool) {
+	log.Infof("CheckSessionAndIdentityForValidKey- Key: %+v",originalKey)
 	key := originalKey
 	minLength := t.Spec.GlobalConfig.MinTokenLength
 	if minLength == 0 {
