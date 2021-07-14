@@ -7,6 +7,8 @@ import (
 	"sync/atomic"
 )
 
+// MemoryListener - in memory tcp listener
+// Credits: https://github.com/hydrogen18/memlistener/blob/master/memory_listener.go
 type MemoryListener struct {
 	connections   chan net.Conn
 	state         chan int

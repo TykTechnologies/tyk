@@ -769,8 +769,7 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 		rt.logger.WithField("looping_url", "tyk://"+r.Host).Debug("Executing request on internal route")
 
 		srv := NewInMemoryServer(handler)
-		defer srv.Close()
-		defer srv.Listener.Close()
+		defer func() { _ = srv.Close() }()
 
 		r.URL.Scheme = "http"
 		r.URL.Host = srv.Listener.Addr().String()
