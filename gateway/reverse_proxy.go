@@ -791,57 +791,53 @@ func (p *ReverseProxy) handleOutboundRequest(roundTripper *TykRoundTripper, outr
 	}()
 
 	if p.TykAPISpec.GraphQL.Enabled {
-		if isNotCORSPreflight(outreq) {
-			res, hijacked, err = p.handleGraphQL(roundTripper, outreq, w)
-			return
-		}
-		if needsGraphQLExecutionEngine(p.TykAPISpec) {
-			err = errors.New("options passthrough not allowed")
-			return
-		}
-		// request is pre-flight and the GQL execution mode is probably Proxy only,
-		// so fallback to sending request with normal mechanisms
+		res, hijacked, err = p.handleGraphQL(roundTripper, outreq, w)
+		return
 	}
 
 	res, err = p.sendRequestToUpstream(roundTripper, outreq)
 	return
 }
 
-func isNotCORSPreflight(r *http.Request) bool {
-	return r.Method != http.MethodOptions
+func isCORSPreflight(r *http.Request) bool {
+	return r.Method == http.MethodOptions
 }
 
 func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, err error) {
 	isWebSocketUpgrade := ctxGetGraphQLIsWebSocketUpgrade(outreq)
-	if isWebSocketUpgrade {
-		if needsGraphQLExecutionEngine(p.TykAPISpec) {
+	needEngine := needsGraphQLExecutionEngine(p.TykAPISpec)
+
+	switch {
+	case isCORSPreflight(outreq):
+		if needEngine {
+			err = errors.New("options passthrough not allowed")
+			return
+		}
+	case isWebSocketUpgrade:
+		if needEngine {
 			return p.handleGraphQLEngineWebsocketUpgrade(roundTripper, outreq, w)
 		}
+	default:
+		gqlRequest := ctxGetGraphQLRequest(outreq)
+		if gqlRequest == nil {
+			err = errors.New("graphql request is nil")
+			return
+		}
+		gqlRequest.SetHeader(outreq.Header)
 
-		res, err = p.sendRequestToUpstream(roundTripper, outreq)
-		return
-	}
+		var isIntrospection bool
+		isIntrospection, err = gqlRequest.IsIntrospectionQuery()
+		if err != nil {
+			return
+		}
 
-	gqlRequest := ctxGetGraphQLRequest(outreq)
-	if gqlRequest == nil {
-		err = errors.New("graphql request is nil")
-		return
-	}
-	gqlRequest.SetHeader(outreq.Header)
-
-	var isIntrospection bool
-	isIntrospection, err = gqlRequest.IsIntrospectionQuery()
-	if err != nil {
-		return
-	}
-
-	if isIntrospection {
-		res, err = p.handleGraphQLIntrospection()
-		return
-	}
-
-	if needsGraphQLExecutionEngine(p.TykAPISpec) {
-		return p.handoverRequestToGraphQLExecutionEngine(roundTripper, gqlRequest)
+		if isIntrospection {
+			res, err = p.handleGraphQLIntrospection()
+			return
+		}
+		if needEngine {
+			return p.handoverRequestToGraphQLExecutionEngine(roundTripper, gqlRequest)
+		}
 	}
 
 	res, err = p.sendRequestToUpstream(roundTripper, outreq)
