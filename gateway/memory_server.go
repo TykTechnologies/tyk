@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"errors"
 	"net"
 	"net/http"
@@ -38,7 +39,7 @@ func (ml *MemoryListener) Close() error {
 	return nil
 }
 
-func (ml *MemoryListener) Dial(network, addr string) (net.Conn, error) {
+func (ml *MemoryListener) Dial(_ context.Context, network, addr string) (net.Conn, error) {
 	select {
 	case <-ml.state:
 		return nil, errors.New("Listener closed")
@@ -77,14 +78,16 @@ func NewInMemoryServer(h http.Handler) (srv *MemoryServer) {
 			Handler: h,
 		},
 	}
-	go srv.Serve(srv.Listener)
+	go func() {
+		_ = srv.Serve(srv.Listener)
+	}()
 
 	return srv
 }
 
 func (ms *MemoryServer) NewTransport() *http.Transport {
 	transport := &http.Transport{}
-	transport.Dial = ms.Listener.Dial
+	transport.DialContext = ms.Listener.Dial
 	return transport
 }
 
