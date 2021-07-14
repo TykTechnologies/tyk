@@ -22,7 +22,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"strconv"
 	"strings"
@@ -769,13 +768,14 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 
 		rt.logger.WithField("looping_url", "tyk://"+r.Host).Debug("Executing request on internal route")
 
-		srv := httptest.NewServer(handler)
+		srv := NewInMemoryServer(handler)
 		defer srv.Close()
+		defer srv.Listener.Close()
 
 		r.URL.Scheme = "http"
 		r.URL.Host = srv.Listener.Addr().String()
 
-		return srv.Client().Do(r)
+		return srv.NewClient().Do(r)
 	}
 
 	if rt.h2ctransport != nil {
