@@ -56,7 +56,9 @@ func TestGraphQLConfigAdapter_supergraphDataSourceConfigs(t *testing.T) {
 			Fetch: graphqlDataSource.FetchConfiguration{
 				URL:    "http://accounts.service",
 				Method: http.MethodPost,
-				Header: nil,
+				Header: http.Header{
+					"X-Tyk-Internal": []string{"true"},
+				},
 			},
 			Subscription: graphqlDataSource.SubscriptionConfiguration{
 				URL: "http://accounts.service",
@@ -164,7 +166,7 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 			},
 			Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
 				Fetch: restDataSource.FetchConfiguration{
-					URL:    "https://rest.example.com",
+					URL:    "tyk://rest-example",
 					Method: "POST",
 					Header: map[string][]string{
 						"Authorization": {"123"},
@@ -200,11 +202,14 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 			},
 			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
 				Fetch: graphqlDataSource.FetchConfiguration{
-					URL:    "https://graphql.example.com",
+					URL:    "http://graphql-example",
 					Method: "POST",
+					Header: http.Header{
+						"X-Tyk-Internal": []string{"true"},
+					},
 				},
 				Subscription: graphqlDataSource.SubscriptionConfiguration{
-					URL: "https://graphql.example.com",
+					URL: "http://graphql-example",
 				},
 			}),
 		},
@@ -334,7 +339,7 @@ const graphqlEngineV2ConfigJson = `{
 					{ "type": "Query", "fields": ["rest"] }
 				],
 				"config": {
-					"url": "https://rest.example.com",
+					"url": "tyk://rest-example",
 					"method": "POST",
 					"headers": {
 						"Authorization": "123",
@@ -359,12 +364,12 @@ const graphqlEngineV2ConfigJson = `{
 			},
 			{
 				"kind": "GraphQL",
-				"internal": false,
+				"internal": true,
 				"root_fields": [
 					{ "type": "Query", "fields": ["gql"] }
 				],
 				"config": {
-					"url": "https://graphql.example.com",
+					"url": "tyk://graphql-example",
 					"method": "POST"
 				}
 			},
@@ -436,7 +441,7 @@ var graphqlEngineV2SupergraphConfigJson = `{
 		"subgraphs": [
 			{
 				"api_id": "",
-				"url": "http://accounts.service",
+				"url": "tyk://accounts.service",
 				"sdl": ` + strconv.Quote(federationAccountsServiceSDL) + `
 			},
 			{
