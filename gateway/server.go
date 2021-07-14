@@ -335,9 +335,6 @@ func syncAPISpecs() (int, error) {
 		filter = append(filter, v)
 	}
 
-	// have to be done before we will replace apiSpecs
-	cancelSubscriptions()
-
 	apiSpecs = filter
 
 	tlsConfigCache.Flush()
@@ -754,15 +751,6 @@ func DoReload() {
 	loadGlobalApps()
 
 	mainLog.Info("API reload complete")
-}
-
-// cancelSubscriptions - cancels context of graphql engine to free statefull resources
-func cancelSubscriptions() {
-	for i := 0; i < len(apiSpecs); i++ {
-		if needsGraphQLExecutionEngine(apiSpecs[i]) && apiSpecs[i].GraphQLExecutor.CancelV2 != nil {
-			apiSpecs[i].GraphQLExecutor.CancelV2()
-		}
-	}
 }
 
 // shouldReload returns true if we should perform any reload. Reloads happens if
