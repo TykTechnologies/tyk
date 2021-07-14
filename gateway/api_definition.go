@@ -206,7 +206,7 @@ type APISpec struct {
 		}
 		Client *http.Client
 		Schema *graphql.Schema
-	}
+	} `json:"-"`
 }
 
 // Release re;leases all resources associated with API spec
