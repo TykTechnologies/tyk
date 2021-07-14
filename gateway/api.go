@@ -949,6 +949,11 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 				// try to use legacy key format
 				obj, code = handleGetDetail(origKeyName, apiID, isHashed)
 			}
+			if code != http.StatusOK {
+				// do another try for custom keys, called by delete method
+				token := generateToken(orgID, keyName)
+				obj, code = handleGetDetail(storage.HashStr(token), apiID, true)
+			}
 		} else {
 			// Return list of keys
 			if config.Global().HashKeys {
@@ -985,6 +990,12 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 				obj, code = handleDeleteHashedKeyWithLogs(origKeyName, orgID, apiID, true)
 			}
 		}
+		// another try for custom keys:
+		if code != http.StatusOK {
+			token := generateToken(orgID, keyName)
+			obj, code = handleDeleteKey(token, orgID, apiID, true)
+		}
+
 	}
 
 	doJSONWrite(w, code, obj)
