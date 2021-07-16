@@ -329,7 +329,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		case apidef.WasmDriver:
 			if wasmVM == nil {
 				// initialize the wasm vm once
-				wasmLogger = logger.WithField("prefix", "PROXY-WASM")
+				wasmLogger = logger.WithField("prefix", "wasm")
 				wasmVM = wasm.New(wasmLogger)
 			}
 			h, err := handler.New(
@@ -482,7 +482,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		case apidef.WasmDriver:
 			if wasmVM == nil {
 				// initialize the wasm vm once
-				wasmLogger = logger.WithField("prefix", "PROXY-WASM")
+				wasmLogger = logger.WithField("prefix", "wasm")
 				wasmVM = wasm.New(wasmLogger)
 			}
 			h, err := handler.New(
