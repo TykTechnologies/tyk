@@ -24,6 +24,8 @@ import (
 	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/trace"
+	"github.com/TykTechnologies/tyk/wasm"
+	"github.com/TykTechnologies/tyk/wasm/v1/handler"
 )
 
 const (
@@ -305,6 +307,9 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		logger.Info("Checking security policy: Open")
 	}
 
+	var wasmVM *wasm.Wasm
+	var wasmLogger *logrus.Entry
+
 	for _, obj := range mwPreFuncs {
 		if mwDriver == apidef.GoPluginDriver {
 			mwAppendEnabled(
@@ -319,6 +324,24 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		} else if mwDriver != apidef.OttoDriver {
 			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
 			mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver, obj.RawBodyOnly, nil})
+		} else if mwDriver == apidef.WasmDriver {
+			if wasmVM == nil {
+				// initialize the wasm vm once
+				wasmLogger = logger.WithField("prefix", "PROXY-WASM")
+				wasmVM = wasm.New(wasmLogger)
+			}
+			h, err := handler.New(
+				wasmVM,
+				config.Global().MiddlewarePath,
+				wasm.ConfigFromApidef(&obj),
+				wasmLogger,
+				handler.Pre,
+			)
+			if err != nil {
+				wasmLogger.WithError(err).Error("Failed to create wasm plugin")
+			} else {
+				chainArray = append(chainArray, h.Handle)
+			}
 		} else {
 			chainArray = append(chainArray, createDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
 		}

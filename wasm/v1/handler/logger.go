@@ -1,8 +1,8 @@
 package handler
 
 import (
-	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tyk/wasm/v1/imports"
+	"github.com/sirupsen/logrus"
 	x "mosn.io/proxy-wasm-go-host/proxywasm/v1"
 )
 

@@ -54,6 +54,7 @@ const (
 	LuaDriver      MiddlewareDriver = "lua"
 	GrpcDriver     MiddlewareDriver = "grpc"
 	GoPluginDriver MiddlewareDriver = "goplugin"
+	WasmDriver     MiddlewareDriver = "wasm"
 
 	BodySource        IdExtractorSource = "body"
 	HeaderSource      IdExtractorSource = "header"

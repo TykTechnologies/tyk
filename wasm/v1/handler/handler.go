@@ -1,12 +1,11 @@
 package handler
 
 import (
-	"context"
 	"net/http"
 	"path/filepath"
 
-	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tyk/wasm"
+	"github.com/sirupsen/logrus"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
 	proxywasm "mosn.io/proxy-wasm-go-host/proxywasm/v1"
@@ -31,7 +30,7 @@ type H struct {
 }
 
 func New(
-	ctx context.Context,
+	vm *wasm.Wasm,
 	wasmModulesPath string,
 	mw *wasm.Config,
 	log *logrus.Entry,
@@ -45,7 +44,6 @@ func New(
 
 	mwLog.Info("Compiling wasm module")
 	mwLog.Debug("Module path " + file)
-	vm := wasm.New(mwLog)
 	m, err := vm.CompileFile(file)
 	if err != nil {
 		return nil, err

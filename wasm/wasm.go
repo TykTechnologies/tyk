@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/TykTechnologies/logrus"
+	"github.com/sirupsen/logrus"
 	wasmerGo "github.com/wasmerio/wasmer-go/wasmer"
 )
 

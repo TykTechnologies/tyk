@@ -26,8 +26,8 @@ type Config struct {
 	Plugin   map[string]interface{}
 }
 
-func ConfigFromApidef(a *apidef.MiddlewareDefinition) Config {
-	return Config{
+func ConfigFromApidef(a *apidef.MiddlewareDefinition) *Config {
+	return &Config{
 		Name:   a.Name,
 		Module: a.Path,
 		Instance: InstanceConfig{
