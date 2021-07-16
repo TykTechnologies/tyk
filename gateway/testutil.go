@@ -868,7 +868,7 @@ func TestReq(t testing.TB, method, urlStr string, body interface{}) *http.Reques
 func CreateDefinitionFromString(defStr string) *APISpec {
 	loader := APIDefinitionLoader{}
 	def := loader.ParseDefinition(strings.NewReader(defStr))
-	spec := loader.MakeSpec(def, nil)
+	spec := loader.MakeSpec(&def, nil)
 	return spec
 }
 
