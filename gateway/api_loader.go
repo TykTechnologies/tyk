@@ -474,6 +474,24 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		} else if mwDriver != apidef.OttoDriver {
 			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
 			mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver, obj.RawBodyOnly, nil})
+		} else if mwDriver == apidef.WasmDriver {
+			if wasmVM == nil {
+				// initialize the wasm vm once
+				wasmLogger = logger.WithField("prefix", "PROXY-WASM")
+				wasmVM = wasm.New(wasmLogger)
+			}
+			h, err := handler.New(
+				wasmVM,
+				config.Global().MiddlewarePath,
+				wasm.ConfigFromApidef(&obj),
+				wasmLogger,
+				handler.Pre,
+			)
+			if err != nil {
+				wasmLogger.WithError(err).Error("Failed to create wasm plugin")
+			} else {
+				chainArray = append(chainArray, h.Handle)
+			}
 		} else {
 			chainArray = append(chainArray, createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
 		}
