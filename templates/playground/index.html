@@ -20,7 +20,7 @@
   </div>
   <script src="{{.PathPrefix}}/playground.js"> </script>
   <script>
-    const apiUrl = "{{.Url}}";
+    const apiUrl = window.location.origin + "{{.Url}}";
     const schema = {{.Schema}};
     const GraphiQlInitInstance = new window.GraphiqlInit({
       containerId: 'root',
