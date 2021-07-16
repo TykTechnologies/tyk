@@ -13,6 +13,7 @@ require (
 	github.com/TykTechnologies/gorpc v0.0.0-20190515174534-b9c10befc5f4
 	github.com/TykTechnologies/goverify v0.0.0-20160822133757-7ccc57452ade
 	github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c
+	github.com/TykTechnologies/logrus v0.11.0
 	github.com/TykTechnologies/murmur3 v0.0.0-20180602122059-1915e687e465
 	github.com/TykTechnologies/openid2go v0.0.0-20200312160651-00c254a52b19
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
@@ -75,6 +76,7 @@ require (
 	github.com/uber/jaeger-client-go v2.19.0+incompatible
 	github.com/uber/jaeger-lib v2.2.0+incompatible // indirect
 	github.com/valyala/fasthttp v1.15.1
+	github.com/wasmerio/wasmer-go v1.0.3
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
@@ -82,6 +84,8 @@ require (
 	github.com/xenolf/lego v0.3.2-0.20170618175828-28ead50ff1ca // indirect
 	golang.org/x/crypto v0.0.0-20210314154223-e6e6c4f2bb5b
 	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
+	go.uber.org/atomic v1.5.1
+	go.uber.org/zap v1.13.0
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	google.golang.org/appengine v1.6.1 // indirect
 	google.golang.org/grpc v1.29.1
@@ -94,6 +98,7 @@ require (
 	gopkg.in/xmlpath.v2 v2.0.0-20150820204837-860cbeca3ebc
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 	gorm.io/gorm v1.21.11
+	mosn.io/proxy-wasm-go-host v0.1.1-0.20210524020952-3fb13ba763a6
 	rsc.io/letsencrypt v0.0.2
 )
 
