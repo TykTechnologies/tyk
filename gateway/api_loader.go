@@ -311,7 +311,12 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	var wasmLogger *logrus.Entry
 
 	for _, obj := range mwPreFuncs {
-		if mwDriver == apidef.GoPluginDriver {
+		switch mwDriver {
+		case apidef.OttoDriver:
+		case apidef.PythonDriver, apidef.LuaDriver, apidef.GrpcDriver:
+			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
+			mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver, obj.RawBodyOnly, nil})
+		case apidef.GoPluginDriver:
 			mwAppendEnabled(
 				&chainArray,
 				&GoPluginMiddleware{
@@ -321,10 +326,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 					APILevel:       true,
 				},
 			)
-		} else if mwDriver != apidef.OttoDriver {
-			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
-			mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver, obj.RawBodyOnly, nil})
-		} else if mwDriver == apidef.WasmDriver {
+		case apidef.WasmDriver:
 			if wasmVM == nil {
 				// initialize the wasm vm once
 				wasmLogger = logger.WithField("prefix", "PROXY-WASM")
@@ -342,7 +344,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 			} else {
 				chainArray = append(chainArray, h.Handle)
 			}
-		} else {
+		default:
 			chainArray = append(chainArray, createDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
 		}
 	}
@@ -379,7 +381,9 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 			logger.Info("Checking security policy: OpenID")
 		}
 
-		coprocessAuth := mwDriver != apidef.OttoDriver && spec.EnableCoProcessAuth
+		coprocessAuth := spec.EnableCoProcessAuth &&
+			mwDriver != apidef.OttoDriver &&
+			mwDriver != apidef.WasmDriver
 		ottoAuth := !coprocessAuth && mwDriver == apidef.OttoDriver && spec.EnableCoProcessAuth
 		gopluginAuth := !coprocessAuth && !ottoAuth && mwDriver == apidef.GoPluginDriver && spec.UseGoPluginAuth
 		if coprocessAuth {
@@ -461,7 +465,8 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	mwAppendEnabled(&chainArray, &RequestSigning{BaseMiddleware: baseMid})
 
 	for _, obj := range mwPostFuncs {
-		if mwDriver == apidef.GoPluginDriver {
+		switch mwDriver {
+		case apidef.GoPluginDriver:
 			mwAppendEnabled(
 				&chainArray,
 				&GoPluginMiddleware{
@@ -471,10 +476,10 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 					APILevel:       true,
 				},
 			)
-		} else if mwDriver != apidef.OttoDriver {
+		case apidef.PythonDriver, apidef.LuaDriver, apidef.GrpcDriver:
 			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
 			mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver, obj.RawBodyOnly, nil})
-		} else if mwDriver == apidef.WasmDriver {
+		case apidef.WasmDriver:
 			if wasmVM == nil {
 				// initialize the wasm vm once
 				wasmLogger = logger.WithField("prefix", "PROXY-WASM")
@@ -492,7 +497,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 			} else {
 				chainArray = append(chainArray, h.Handle)
 			}
-		} else {
+		default:
 			chainArray = append(chainArray, createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
 		}
 	}
