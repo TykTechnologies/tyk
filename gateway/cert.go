@@ -320,12 +320,16 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 
 		isControlAPI := (listenPort != 0 && config.Global().ControlAPIPort == listenPort) || (config.Global().ControlAPIHostname == hello.ServerName)
 
-		if isControlAPI && config.Global().Security.ControlAPIUseMutualTLS {
-			newConfig.ClientAuth = tls.RequireAndVerifyClientCert
-			newConfig.ClientCAs = CertificateManager.CertPool(config.Global().Security.Certificates.ControlAPI)
+		if isControlAPI {
+			if config.Global().Security.ControlAPIUseMutualTLS {
+				newConfig.ClientAuth = tls.RequireAndVerifyClientCert
+				newConfig.ClientCAs = CertificateManager.CertPool(config.Global().Security.Certificates.ControlAPI)
 
-			tlsConfigCache.Set(hello.ServerName, newConfig, cache.DefaultExpiration)
-			return newConfig, nil
+				tlsConfigCache.Set(hello.ServerName, newConfig, cache.DefaultExpiration)
+				return newConfig, nil
+			} else {
+				return newConfig, nil
+			}
 		}
 
 		apisMu.RLock()
