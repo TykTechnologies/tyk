@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/textproto"
 	"net/url"
-	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -25,7 +24,6 @@ const (
 	contextLabel     = "$tyk_context."
 	consulLabel      = "$secret_consul."
 	vaultLabel       = "$secret_vault."
-	envLabel         = "$secret_env."
 	secretsConfLabel = "$secret_conf."
 	triggerKeyPrefix = "trigger"
 	triggerKeySep    = "-"
@@ -208,12 +206,6 @@ func replaceTykVariables(r *http.Request, in string, escape bool) string {
 		in = replaceVariables(in, vars, contextData, secretsConfLabel, escape)
 	}
 
-	if strings.Contains(in, envLabel) {
-		contextData := ctxGetData(r)
-		vars := envValueMatch.FindAllString(in, -1)
-		in = replaceVariables(in, vars, contextData, envLabel, escape)
-	}
-
 	if strings.Contains(in, vaultLabel) {
 		contextData := ctxGetData(r)
 		vars := vaultMatch.FindAllString(in, -1)
@@ -269,16 +261,6 @@ func replaceVariables(in string, vars []string, vals map[string]interface{}, lab
 
 			val, ok := secrets[key]
 			if !ok || val == "" {
-				in = emptyStringFn(key, in, v)
-				continue
-			}
-
-			in = strings.Replace(in, v, val, -1)
-
-		case envLabel:
-
-			val := os.Getenv(fmt.Sprintf("TYK_SECRET_%s", strings.ToUpper(key)))
-			if val == "" {
 				in = emptyStringFn(key, in, v)
 				continue
 			}
