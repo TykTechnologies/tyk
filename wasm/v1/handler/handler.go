@@ -38,8 +38,8 @@ func New(
 ) (*H, error) {
 	file := filepath.Join(wasmModulesPath, mw.Module)
 	mwLog := log.WithFields(logrus.Fields{
-		"middleware": mw.Name,
-		"module":     "module",
+		"middleware_name": mw.Name,
+		"module_name":     filepath.Base(mw.Module),
 	})
 
 	mwLog.Info("Compiling wasm module")
