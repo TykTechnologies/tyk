@@ -77,6 +77,9 @@ const (
 	All    RoutingTriggerOnType = "all"
 	Any    RoutingTriggerOnType = "any"
 	Ignore RoutingTriggerOnType = ""
+
+	// TykInternalApiHeader - flags request as internal api looping request
+	TykInternalApiHeader = "x-tyk-internal"
 )
 
 type ObjectId bson.ObjectId
