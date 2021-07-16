@@ -475,13 +475,12 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 	return response, http.StatusOK
 }
 
-func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
+func handleGetDetail(sessionKey, apiID, orgID string, byHash bool) (interface{}, int) {
 	if byHash && !config.Global().HashKeys {
 		return apiError("Key requested by hash but key hashing is not enabled"), http.StatusBadRequest
 	}
 
 	spec := getApiSpec(apiID)
-	orgID := ""
 	if spec != nil {
 		orgID = spec.OrgID
 	}
@@ -944,10 +943,10 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		if keyName != "" {
 			// Return single key detail
-			obj, code = handleGetDetail(keyName, apiID, isHashed)
+			obj, code = handleGetDetail(keyName, apiID, orgID, isHashed)
 			if code != http.StatusOK && hashKeyFunction != "" {
 				// try to use legacy key format
-				obj, code = handleGetDetail(origKeyName, apiID, isHashed)
+				obj, code = handleGetDetail(origKeyName, apiID, orgID, isHashed)
 			}
 		} else {
 			// Return list of keys
