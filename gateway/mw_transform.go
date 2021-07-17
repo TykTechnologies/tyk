@@ -38,7 +38,8 @@ func (t *TransformMiddleware) EnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	_, versionPaths, _, _ := t.Spec.Version(r)
+	vInfo, _ := t.Spec.Version(r)
+	versionPaths := t.Spec.RxPaths[vInfo.Name]
 	found, meta := t.Spec.CheckSpecMatchesStatus(r, versionPaths, Transformed)
 	if !found {
 		return nil, http.StatusOK
