@@ -135,11 +135,46 @@ func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object
 
 // DispatchEvent dispatches a Tyk event.
 func (d *PythonDispatcher) DispatchEvent(eventJSON []byte) {
-	/*
-		CEventJSON := C.CString(string(eventJSON))
-		defer C.free(unsafe.Pointer(CEventJSON))
-		C.Python_DispatchEvent(CEventJSON)
-	*/
+	pythonLock.Lock()
+	defer pythonLock.Unlock()
+	dispatchEventFunc, err := python.PyObjectGetAttr(dispatcherInstance, "dispatch_event")
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "python",
+		}).Fatal(err)
+		python.PyErr_Print()
+		return
+	}
+
+	objectBytes, err := python.PyBytesFromString(eventJSON)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "python",
+		}).Fatal(err)
+		python.PyErr_Print()
+		return
+	}
+
+	args, err := python.PyTupleNew(1)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "python",
+		}).Fatal(err)
+		python.PyErr_Print()
+		return
+	}
+
+	python.PyTupleSetItem(args, 0, objectBytes)
+	_, err = python.PyObjectCallObject(dispatchEventFunc, args)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "python",
+		}).Error(err)
+		python.PyErr_Print()
+		return
+	}
+	python.PyDecRef(args)
+	python.PyDecRef(dispatchEventFunc)
 }
 
 // Reload triggers a reload affecting CP middlewares and event handlers.
