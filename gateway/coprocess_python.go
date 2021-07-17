@@ -28,6 +28,7 @@ import (
 var (
 	dispatcherClass    unsafe.Pointer
 	dispatcherInstance unsafe.Pointer
+	dispatchHookFunc   unsafe.Pointer
 	pythonLock         = sync.Mutex{}
 )
 
@@ -45,17 +46,6 @@ func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object
 	}
 
 	pythonLock.Lock()
-	// Find the dispatch_hook:
-	dispatchHookFunc, err := python.PyObjectGetAttr(dispatcherInstance, "dispatch_hook")
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "python",
-		}).Fatal(err)
-		python.PyErr_Print()
-		pythonLock.Unlock()
-		return nil, err
-	}
-
 	objectBytes, err := python.PyBytesFromString(objectMsg)
 	if err != nil {
 		log.WithFields(logrus.Fields{
@@ -87,7 +77,6 @@ func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object
 		return nil, err
 	}
 	python.PyDecRef(args)
-	python.PyDecRef(dispatchHookFunc)
 
 	newObjectPtr, err := python.PyTupleGetItem(result, 0)
 	if err != nil {
@@ -242,6 +231,14 @@ func PythonNewDispatcher(bundleRootPath string) (coprocess.Dispatcher, error) {
 		log.WithFields(logrus.Fields{
 			"prefix": "python",
 		}).Error(err)
+		python.PyErr_Print()
+		return nil, err
+	}
+	dispatchHookFunc, err = python.PyObjectGetAttr(dispatcherInstance, "dispatch_hook")
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "python",
+		}).Fatal(err)
 		python.PyErr_Print()
 		return nil, err
 	}
