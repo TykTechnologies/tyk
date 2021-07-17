@@ -42,6 +42,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/lonelycode/osin"
+
 	"github.com/gorilla/mux"
 	"github.com/lonelycode/osin"
 	uuid "github.com/satori/go.uuid"
