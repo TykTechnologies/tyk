@@ -845,7 +845,7 @@ func (r *RedisCluster) Publish(channel, message string) error {
 	}
 	err := r.singleton().Publish(ctx, channel, message).Err()
 	if err != nil {
-		log.Error("Error trying to set value: ", err)
+		log.Error("Error trying to publish message: ", err)
 		return err
 	}
 	return nil
