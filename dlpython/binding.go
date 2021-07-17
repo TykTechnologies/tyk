@@ -97,14 +97,10 @@ void Py_IncRef(PyObject* object) { return Py_IncRef_ptr(object); };
 typedef void (*Py_DecRef_f)(PyObject*);
 Py_DecRef_f Py_DecRef_ptr;
 void Py_DecRef(PyObject* object) { return Py_DecRef_ptr(object); };
-
-typedef int (*PyTuple_ClearFreeList_f)();
-PyTuple_ClearFreeList_f PyTuple_ClearFreeList_ptr;
-int PyTuple_ClearFreeList() { return PyTuple_ClearFreeList_ptr(); };
 */
 import "C"
 import (
-	"errors"
+	"fmt"
 	"unsafe"
 )
 
@@ -199,14 +195,14 @@ func Py_DecRef(object *C.PyObject) {
 	C.Py_DecRef(object)
 }
 
-func PyTuple_ClearFreeList() C.int {
-	return C.PyTuple_ClearFreeList()
-}
-
 func mapCalls() error {
 	C.python_lib = C.dlopen(libPath, C.RTLD_NOW|C.RTLD_GLOBAL)
 
-	C.dlerror()
+	dlErr := C.dlerror()
+	if dlErr != nil {
+		dlErrStr := C.GoString(dlErr)
+		return fmt.Errorf("dlerror: %s", dlErrStr)
+	}
 
 	s_PyObject_GetAttr := C.CString("PyObject_GetAttr")
 	defer C.free(unsafe.Pointer(s_PyObject_GetAttr))
@@ -296,14 +292,10 @@ func mapCalls() error {
 	defer C.free(unsafe.Pointer(s_Py_DecRef))
 	C.Py_DecRef_ptr = C.Py_DecRef_f(C.dlsym(C.python_lib, s_Py_DecRef))
 
-	s_PyTuple_ClearFreeList := C.CString("PyTuple_ClearFreeList")
-	defer C.free(unsafe.Pointer(s_PyTuple_ClearFreeList))
-	C.PyTuple_ClearFreeList_ptr = C.PyTuple_ClearFreeList_f(C.dlsym(C.python_lib, s_PyTuple_ClearFreeList))
-
-	dlErr := C.dlerror()
+	dlErr = C.dlerror()
 	if dlErr != nil {
-		// TODO: create a proper Go error from dlerror output
-		return errors.New("dl error")
+		dlErrStr := C.GoString(dlErr)
+		return fmt.Errorf("dlerror: %s", dlErrStr)
 	}
 	return nil
 }

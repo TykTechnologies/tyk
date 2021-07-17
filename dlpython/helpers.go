@@ -172,8 +172,3 @@ func PyIncRef(o unsafe.Pointer) {
 func PyDecRef(o unsafe.Pointer) {
 	Py_DecRef(ToPyObject(o))
 }
-
-func PyTupleClearFreeList() int {
-	sz := PyTuple_ClearFreeList()
-	return int(sz)
-}
