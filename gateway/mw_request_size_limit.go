@@ -21,6 +21,19 @@ func (t *RequestSizeLimitMiddleware) Name() string {
 }
 
 func (t *RequestSizeLimitMiddleware) EnabledForSpec() bool {
+	if t.Spec.VersionData.NotVersioned {
+
+		var vInfo apidef.VersionInfo
+
+		for _, v := range t.Spec.VersionData.Versions {
+			// Use the first version
+			vInfo = v
+			break
+		}
+
+		return vInfo.GlobalSizeLimit > 0
+	}
+
 	for _, version := range t.Spec.VersionData.Versions {
 		if len(version.ExtendedPaths.SizeLimit) > 0 {
 			return true
