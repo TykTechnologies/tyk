@@ -538,13 +538,11 @@ func (a APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo) ([]U
 }
 
 func (a APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, specType URLStatus) {
-	apiLangIDsRegex := regexp.MustCompile(`{([^}]*)}`)
-	asRegexStr := apiLangIDsRegex.ReplaceAllString(stringSpec, `([^/]*)`)
 	// Case insensitive match
 	if newSpec.IgnoreCase || config.Global().IgnoreEndpointCase {
-		asRegexStr = "(?i)" + asRegexStr
+		stringSpec = "(?i)" + stringSpec
 	}
-	asRegex, _ := regexp.Compile(asRegexStr)
+	asRegex, _ := regexp.Compile(stringSpec)
 	newSpec.Status = specType
 	newSpec.Spec = asRegex
 }
