@@ -4,7 +4,6 @@ go 1.15
 
 require (
 	github.com/Jeffail/gabs v1.4.0
-	github.com/Jeffail/tunny v0.0.0-20171107125207-452a8e97d6a3
 	github.com/TykTechnologies/again v0.0.0-20190805133618-6ad301e7eaed
 	github.com/TykTechnologies/circuitbreaker v2.2.2+incompatible
 	github.com/TykTechnologies/drl v0.0.0-20190905191955-cc541aa8e3e1
@@ -43,6 +42,7 @@ require (
 	github.com/hashicorp/vault/api v1.0.4
 	github.com/huandu/xstrings v1.3.0 // indirect
 	github.com/imdario/mergo v0.3.9 // indirect
+	github.com/jeffail/tunny v0.0.0-20171107125207-452a8e97d6a3
 	github.com/jensneuse/abstractlogger v0.0.4
 	github.com/jensneuse/graphql-go-tools v0.0.0-00010101000000-000000000000
 	github.com/justinas/alice v0.0.0-20171023064455-03f45bd4b7da
