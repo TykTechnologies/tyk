@@ -163,6 +163,10 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 			tags = tagHeaders(r, s.Spec.TagHeaders, tags)
 		}
 
+		if len(s.Spec.Tags) > 0 {
+			tags = append(tags, s.Spec.Tags...)
+		}
+
 		rawRequest := ""
 		rawResponse := ""
 
