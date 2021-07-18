@@ -11,13 +11,6 @@ import (
 	proxywasm "mosn.io/proxy-wasm-go-host/proxywasm/v1"
 )
 
-type Hook uint
-
-const (
-	Pre Hook = iota
-	Post
-)
-
 type H struct {
 	mw          *wasm.Config
 	vm          *wasm.Wasm
@@ -26,7 +19,6 @@ type H struct {
 	base        *Wasm
 	id          atomic.Int32
 	rootContext int32
-	hook        Hook
 }
 
 func New(
@@ -34,7 +26,6 @@ func New(
 	wasmModulesPath string,
 	mw *wasm.Config,
 	log *logrus.Entry,
-	hook Hook,
 ) (*H, error) {
 	file := filepath.Join(wasmModulesPath, mw.Module)
 	mwLog := log.WithFields(logrus.Fields{
@@ -134,14 +125,8 @@ func (h *H) Handle(next http.Handler) http.Handler {
 				mwLog.Error("ProxyOnContextFinalize", zap.Error(err))
 			}
 		}()
-		if h.hook == Pre {
-			if !ctx.Apply() {
-				return
-			}
-		}
-		next.ServeHTTP(w, r)
-		if h.hook == Post {
-			ctx.Apply()
+		if ctx.Apply() {
+			next.ServeHTTP(w, r)
 		}
 	})
 }

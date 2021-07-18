@@ -337,7 +337,6 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 				config.Global().MiddlewarePath,
 				wasm.ConfigFromApidef(&obj),
 				wasmLogger,
-				handler.Pre,
 			)
 			if err != nil {
 				wasmLogger.WithError(err).Error("Failed to create wasm plugin")
@@ -490,7 +489,6 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 				config.Global().MiddlewarePath,
 				wasm.ConfigFromApidef(&obj),
 				wasmLogger,
-				handler.Pre,
 			)
 			if err != nil {
 				wasmLogger.WithError(err).Error("Failed to create wasm plugin")
