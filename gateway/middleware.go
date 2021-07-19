@@ -721,7 +721,6 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r
 	t.Logger().Debug("Querying authstore")
 	// 2. If not there, get it from the AuthorizationHandler
 	session, found = t.Spec.AuthManager.SessionDetail(t.Spec.OrgID, key, false)
-
 	if found {
 		key = session.KeyID
 
@@ -744,6 +743,9 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r
 
 		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.SessionLifetime))
 		ctxScheduleSessionUpdate(r)
+	} else {
+		// defaulting
+		session.KeyID = key
 	}
 
 	return session, found
