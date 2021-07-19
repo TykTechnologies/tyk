@@ -208,7 +208,7 @@ func (g *GraphQLConfigAdapter) subgraphDataSourceConfigs() []graphqlDataSource.C
 			continue
 		}
 
-		conf := g.graphqlDataSourceConfiguration(apiDefSubgraphConf.URL, http.MethodPost, nil)
+		conf := g.graphqlDataSourceConfiguration(apiDefSubgraphConf.URL, http.MethodPost, g.config.Supergraph.GlobalHeaders)
 		conf.Federation = graphqlDataSource.FederationConfiguration{
 			Enabled:    true,
 			ServiceSDL: apiDefSubgraphConf.SDL,
@@ -220,21 +220,22 @@ func (g *GraphQLConfigAdapter) subgraphDataSourceConfigs() []graphqlDataSource.C
 	return confs
 }
 
-func (g *GraphQLConfigAdapter) graphqlDataSourceConfiguration(url string, method string, header map[string]string) graphqlDataSource.Configuration {
-	if strings.HasPrefix(url, "tyk://") {
-		if header == nil {
-			header = make(map[string]string)
-		}
+func (g *GraphQLConfigAdapter) graphqlDataSourceConfiguration(url string, method string, headers map[string]string) graphqlDataSource.Configuration {
+	dataSourceHeaders := make(map[string]string)
+	for name, value := range headers {
+		dataSourceHeaders[name] = value
+	}
 
+	if strings.HasPrefix(url, "tyk://") {
 		url = strings.ReplaceAll(url, "tyk://", "http://")
-		header[apidef.TykInternalApiHeader] = "true"
+		dataSourceHeaders[apidef.TykInternalApiHeader] = "true"
 	}
 
 	cfg := graphqlDataSource.Configuration{
 		Fetch: graphqlDataSource.FetchConfiguration{
 			URL:    url,
 			Method: method,
-			Header: g.convertHeadersToHttpHeaders(header),
+			Header: g.convertHeadersToHttpHeaders(dataSourceHeaders),
 		},
 		Subscription: graphqlDataSource.SubscriptionConfiguration{
 			URL: url,

@@ -2,11 +2,12 @@ package gateway
 
 import (
 	"fmt"
-	"github.com/TykTechnologies/tyk/apidef"
 	"net/http"
 	"path"
 	"sync/atomic"
 	"testing"
+
+	"github.com/TykTechnologies/tyk/apidef"
 
 	"github.com/TykTechnologies/tyk/user"
 
@@ -190,7 +191,9 @@ func TestGraphQLPlayground(t *testing.T) {
 		t.Run("playground html is loaded", func(t *testing.T) {
 			_, _ = g.Run(t, []test.TestCase{
 				{Path: playgroundPath, BodyMatch: `<title>API Playground</title>`, Code: http.StatusOK},
-				{Path: playgroundPath, BodyMatch: fmt.Sprintf(`const apiUrl = "%s"`, endpoint), Code: http.StatusOK},
+				{Path: playgroundPath, BodyMatchFunc: func(bytes []byte) bool {
+					return assert.Contains(t, string(bytes), fmt.Sprintf(`const apiUrl = window.location.origin + "%s";`, endpoint))
+				}, Code: http.StatusOK},
 			}...)
 		})
 		t.Run("playground.js is loaded", func(t *testing.T) {

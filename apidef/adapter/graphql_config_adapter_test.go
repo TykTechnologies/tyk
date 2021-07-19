@@ -57,6 +57,8 @@ func TestGraphQLConfigAdapter_supergraphDataSourceConfigs(t *testing.T) {
 				URL:    "http://accounts.service",
 				Method: http.MethodPost,
 				Header: http.Header{
+					"Header1":        []string{"value1"},
+					"Header2":        []string{"value2"},
 					"X-Tyk-Internal": []string{"true"},
 				},
 			},
@@ -72,7 +74,10 @@ func TestGraphQLConfigAdapter_supergraphDataSourceConfigs(t *testing.T) {
 			Fetch: graphqlDataSource.FetchConfiguration{
 				URL:    "http://products.service",
 				Method: http.MethodPost,
-				Header: nil,
+				Header: http.Header{
+					"Header1": []string{"value1"},
+					"Header2": []string{"value2"},
+				},
 			},
 			Subscription: graphqlDataSource.SubscriptionConfiguration{
 				URL: "http://products.service",
@@ -86,7 +91,10 @@ func TestGraphQLConfigAdapter_supergraphDataSourceConfigs(t *testing.T) {
 			Fetch: graphqlDataSource.FetchConfiguration{
 				URL:    "http://reviews.service",
 				Method: http.MethodPost,
-				Header: nil,
+				Header: http.Header{
+					"Header1": []string{"value1"},
+					"Header2": []string{"value2"},
+				},
 			},
 			Subscription: graphqlDataSource.SubscriptionConfiguration{
 				URL: "http://reviews.service",
@@ -460,6 +468,10 @@ var graphqlEngineV2SupergraphConfigJson = `{
 				"sdl": ` + strconv.Quote(federationReviewsServiceSDL) + `
 			}
 		],
+		"global_headers": {
+			"header1": "value1",
+			"header2": "value2"
+		},
 		"merged_sdl": "` + federationMergedSDL + `"
 	},
 	"playground": {}
