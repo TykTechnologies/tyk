@@ -57,7 +57,10 @@ func TestGraphQLConfigAdapter_supergraphDataSourceConfigs(t *testing.T) {
 			Fetch: graphqlDataSource.FetchConfiguration{
 				URL:    "http://accounts.service",
 				Method: http.MethodPost,
-				Header: nil,
+				Header: http.Header{
+					"header1": []string{"value1"},
+					"header2": []string{"value2"},
+				},
 			},
 			Federation: graphqlDataSource.FederationConfiguration{
 				Enabled:    true,
@@ -68,7 +71,10 @@ func TestGraphQLConfigAdapter_supergraphDataSourceConfigs(t *testing.T) {
 			Fetch: graphqlDataSource.FetchConfiguration{
 				URL:    "http://products.service",
 				Method: http.MethodPost,
-				Header: nil,
+				Header: http.Header{
+					"header1": []string{"value1"},
+					"header2": []string{"value2"},
+				},
 			},
 			Federation: graphqlDataSource.FederationConfiguration{
 				Enabled:    true,
@@ -79,7 +85,10 @@ func TestGraphQLConfigAdapter_supergraphDataSourceConfigs(t *testing.T) {
 			Fetch: graphqlDataSource.FetchConfiguration{
 				URL:    "http://reviews.service",
 				Method: http.MethodPost,
-				Header: nil,
+				Header: http.Header{
+					"header1": []string{"value1"},
+					"header2": []string{"value2"},
+				},
 			},
 			Federation: graphqlDataSource.FederationConfiguration{
 				Enabled:    true,
@@ -441,6 +450,10 @@ var graphqlEngineV2SupergraphConfigJson = `{
 				"sdl": ` + strconv.Quote(federationReviewsServiceSDL) + `
 			}
 		],
+		"global_headers": {
+			"header1": "value1",
+			"header2": "value2"
+		},
 		"merged_sdl": "` + federationMergedSDL + `"
 	},
 	"playground": {}
