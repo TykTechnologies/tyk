@@ -61,8 +61,8 @@ func ctxSetSession(r *http.Request, s *user.SessionState, token string, schedule
 
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, SessionData, s)
-	ctx = context.WithValue(ctx, AuthToken, s.KeyID)
-
+//	ctx = context.WithValue(ctx, AuthToken, s.KeyID)
+	ctx = context.WithValue(ctx, AuthToken, token)
 	if scheduleUpdate {
 		ctx = context.WithValue(ctx, UpdateSession, true)
 	}
