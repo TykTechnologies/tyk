@@ -772,8 +772,6 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 		defer func() { _ = srv.Close() }()
 
 		r.URL.Scheme = "http"
-		r.URL.Host = srv.Listener.Addr().String()
-
 		return srv.NewClient().Do(r)
 	}
 
