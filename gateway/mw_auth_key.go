@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/TykTechnologies/tyk/certs"
+	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/TykTechnologies/tyk/user"
 
@@ -115,8 +116,15 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 
 	if authConfig.UseCertificate {
 		certID := session.OrgID + certHash
-		if _, err := CertificateManager.GetRaw(certID); err != nil {
-			return k.reportInvalidKey(key, r, MsgNonExistentCert, ErrAuthCertNotFound)
+		_, err := CertificateManager.GetRaw(certID)
+		if err != nil {
+			// Try alternative approach:
+			id := storage.TokenID(session.KeyID)
+			certID = session.OrgID + id
+			_, err = CertificateManager.GetRaw(certID)
+			if err != nil {
+				return k.reportInvalidKey(key, r, MsgNonExistentCert, ErrAuthCertNotFound)
+			}
 		}
 
 		if session.Certificate != certID {
