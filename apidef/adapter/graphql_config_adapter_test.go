@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	graphqlDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
-	"github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/httpclient"
 	restDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/rest_datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/plan"
 	"github.com/stretchr/testify/assert"
@@ -58,9 +57,13 @@ func TestGraphQLConfigAdapter_supergraphDataSourceConfigs(t *testing.T) {
 				URL:    "http://accounts.service",
 				Method: http.MethodPost,
 				Header: http.Header{
-					"header1": []string{"value1"},
-					"header2": []string{"value2"},
+					"Header1":        []string{"value1"},
+					"Header2":        []string{"value2"},
+					"X-Tyk-Internal": []string{"true"},
 				},
+			},
+			Subscription: graphqlDataSource.SubscriptionConfiguration{
+				URL: "http://accounts.service",
 			},
 			Federation: graphqlDataSource.FederationConfiguration{
 				Enabled:    true,
@@ -72,9 +75,12 @@ func TestGraphQLConfigAdapter_supergraphDataSourceConfigs(t *testing.T) {
 				URL:    "http://products.service",
 				Method: http.MethodPost,
 				Header: http.Header{
-					"header1": []string{"value1"},
-					"header2": []string{"value2"},
+					"Header1": []string{"value1"},
+					"Header2": []string{"value2"},
 				},
+			},
+			Subscription: graphqlDataSource.SubscriptionConfiguration{
+				URL: "http://products.service",
 			},
 			Federation: graphqlDataSource.FederationConfiguration{
 				Enabled:    true,
@@ -86,9 +92,12 @@ func TestGraphQLConfigAdapter_supergraphDataSourceConfigs(t *testing.T) {
 				URL:    "http://reviews.service",
 				Method: http.MethodPost,
 				Header: http.Header{
-					"header1": []string{"value1"},
-					"header2": []string{"value2"},
+					"Header1": []string{"value1"},
+					"Header2": []string{"value2"},
 				},
+			},
+			Subscription: graphqlDataSource.SubscriptionConfiguration{
+				URL: "http://reviews.service",
 			},
 			Federation: graphqlDataSource.FederationConfiguration{
 				Enabled:    true,
@@ -101,7 +110,7 @@ func TestGraphQLConfigAdapter_supergraphDataSourceConfigs(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2SupergraphConfigJson), &gqlConfig))
 
 	adapter := NewGraphQLConfigAdapter(gqlConfig)
-	actualGraphQLConfigs := adapter.supergraphDataSourceConfigs()
+	actualGraphQLConfigs := adapter.subgraphDataSourceConfigs()
 	assert.Equal(t, expectedDataSourceConfigs, actualGraphQLConfigs)
 }
 
@@ -161,11 +170,11 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 				},
 			},
 			Factory: &restDataSource.Factory{
-				Client: httpclient.NewNetHttpClient(httpClient),
+				Client: httpClient,
 			},
 			Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
 				Fetch: restDataSource.FetchConfiguration{
-					URL:    "https://rest.example.com",
+					URL:    "tyk://rest-example",
 					Method: "POST",
 					Header: map[string][]string{
 						"Authorization": {"123"},
@@ -197,12 +206,18 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 				},
 			},
 			Factory: &graphqlDataSource.Factory{
-				Client: httpclient.NewNetHttpClient(httpClient),
+				Client: httpClient,
 			},
 			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
 				Fetch: graphqlDataSource.FetchConfiguration{
-					URL:    "https://graphql.example.com",
+					URL:    "http://graphql-example",
 					Method: "POST",
+					Header: http.Header{
+						"X-Tyk-Internal": []string{"true"},
+					},
+				},
+				Subscription: graphqlDataSource.SubscriptionConfiguration{
+					URL: "http://graphql-example",
 				},
 			}),
 		},
@@ -220,7 +235,7 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 				},
 			},
 			Factory: &restDataSource.Factory{
-				Client: httpclient.NewNetHttpClient(httpClient),
+				Client: httpClient,
 			},
 			Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
 				Fetch: restDataSource.FetchConfiguration{
@@ -243,7 +258,7 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 				},
 			},
 			Factory: &restDataSource.Factory{
-				Client: httpclient.NewNetHttpClient(httpClient),
+				Client: httpClient,
 			},
 			Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
 				Fetch: restDataSource.FetchConfiguration{
@@ -270,7 +285,7 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 				},
 			},
 			Factory: &graphqlDataSource.Factory{
-				Client: httpclient.NewNetHttpClient(httpClient),
+				Client: httpClient,
 			},
 			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
 				Fetch: graphqlDataSource.FetchConfiguration{
@@ -279,6 +294,9 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 					Header: map[string][]string{
 						"Auth": {"123"},
 					},
+				},
+				Subscription: graphqlDataSource.SubscriptionConfiguration{
+					URL: "https://graphql.example.com",
 				},
 			}),
 		},
@@ -329,7 +347,7 @@ const graphqlEngineV2ConfigJson = `{
 					{ "type": "Query", "fields": ["rest"] }
 				],
 				"config": {
-					"url": "https://rest.example.com",
+					"url": "tyk://rest-example",
 					"method": "POST",
 					"headers": {
 						"Authorization": "123",
@@ -354,12 +372,12 @@ const graphqlEngineV2ConfigJson = `{
 			},
 			{
 				"kind": "GraphQL",
-				"internal": false,
+				"internal": true,
 				"root_fields": [
 					{ "type": "Query", "fields": ["gql"] }
 				],
 				"config": {
-					"url": "https://graphql.example.com",
+					"url": "tyk://graphql-example",
 					"method": "POST"
 				}
 			},
@@ -431,7 +449,7 @@ var graphqlEngineV2SupergraphConfigJson = `{
 		"subgraphs": [
 			{
 				"api_id": "",
-				"url": "http://accounts.service",
+				"url": "tyk://accounts.service",
 				"sdl": ` + strconv.Quote(federationAccountsServiceSDL) + `
 			},
 			{
