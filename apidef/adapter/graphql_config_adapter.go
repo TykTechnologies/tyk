@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	graphqlDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/httpclient"
@@ -59,7 +60,7 @@ func (g *GraphQLConfigAdapter) EngineConfigV2() (*graphql.EngineV2Configuration,
 }
 
 func (g *GraphQLConfigAdapter) createV2ConfigForSupergraphExecutionMode() (*graphql.EngineV2Configuration, error) {
-	dataSourceConfs := g.supergraphDataSourceConfigs()
+	dataSourceConfs := g.subgraphDataSourceConfigs()
 	federationConfigV2Factory := federation.NewEngineConfigV2Factory(g.getHttpClient(), dataSourceConfs...)
 	err := federationConfigV2Factory.SetMergedSchemaFromString(g.config.Supergraph.MergedSDL)
 	if err != nil {
@@ -158,7 +159,7 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 			}
 
 			planDataSource.Factory = &restDataSource.Factory{
-				Client: httpclient.NewNetHttpClient(g.getHttpClient()),
+				Client: g.getHttpClient(),
 			}
 
 			planDataSource.Custom = restDataSource.ConfigJSON(restDataSource.Configuration{
@@ -167,7 +168,7 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 					Method: restConfig.Method,
 					Body:   restConfig.Body,
 					Query:  g.convertURLQueriesToEngineV2Queries(restConfig.Query),
-					Header: g.convertHttpHeadersToEngineV2Headers(restConfig.Headers),
+					Header: g.convertHeadersToHttpHeaders(restConfig.Headers),
 				},
 			})
 
@@ -179,16 +180,14 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 			}
 
 			planDataSource.Factory = &graphqlDataSource.Factory{
-				Client: httpclient.NewNetHttpClient(g.getHttpClient()),
+				Client: g.getHttpClient(),
 			}
 
-			planDataSource.Custom = graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
-				Fetch: graphqlDataSource.FetchConfiguration{
-					URL:    graphqlConfig.URL,
-					Method: graphqlConfig.Method,
-					Header: g.convertHttpHeadersToEngineV2Headers(graphqlConfig.Headers),
-				},
-			})
+			planDataSource.Custom = graphqlDataSource.ConfigJson(g.graphqlDataSourceConfiguration(
+				graphqlConfig.URL,
+				graphqlConfig.Method,
+				graphqlConfig.Headers,
+			))
 		}
 
 		planDataSources = append(planDataSources, planDataSource)
@@ -198,7 +197,7 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 	return planDataSources, err
 }
 
-func (g *GraphQLConfigAdapter) supergraphDataSourceConfigs() []graphqlDataSource.Configuration {
+func (g *GraphQLConfigAdapter) subgraphDataSourceConfigs() []graphqlDataSource.Configuration {
 	confs := make([]graphqlDataSource.Configuration, 0)
 	if len(g.config.Supergraph.Subgraphs) == 0 {
 		return confs
@@ -209,22 +208,41 @@ func (g *GraphQLConfigAdapter) supergraphDataSourceConfigs() []graphqlDataSource
 			continue
 		}
 
-		conf := graphqlDataSource.Configuration{
-			Fetch: graphqlDataSource.FetchConfiguration{
-				URL:    apiDefSubgraphConf.URL,
-				Method: http.MethodPost,
-				Header: g.convertHttpHeadersToEngineV2Headers(g.config.Supergraph.GlobalHeaders),
-			},
-			Federation: graphqlDataSource.FederationConfiguration{
-				Enabled:    true,
-				ServiceSDL: apiDefSubgraphConf.SDL,
-			},
+		conf := g.graphqlDataSourceConfiguration(apiDefSubgraphConf.URL, http.MethodPost, g.config.Supergraph.GlobalHeaders)
+		conf.Federation = graphqlDataSource.FederationConfiguration{
+			Enabled:    true,
+			ServiceSDL: apiDefSubgraphConf.SDL,
 		}
 
 		confs = append(confs, conf)
 	}
 
 	return confs
+}
+
+func (g *GraphQLConfigAdapter) graphqlDataSourceConfiguration(url string, method string, headers map[string]string) graphqlDataSource.Configuration {
+	dataSourceHeaders := make(map[string]string)
+	for name, value := range headers {
+		dataSourceHeaders[name] = value
+	}
+
+	if strings.HasPrefix(url, "tyk://") {
+		url = strings.ReplaceAll(url, "tyk://", "http://")
+		dataSourceHeaders[apidef.TykInternalApiHeader] = "true"
+	}
+
+	cfg := graphqlDataSource.Configuration{
+		Fetch: graphqlDataSource.FetchConfiguration{
+			URL:    url,
+			Method: method,
+			Header: g.convertHeadersToHttpHeaders(dataSourceHeaders),
+		},
+		Subscription: graphqlDataSource.SubscriptionConfiguration{
+			URL: url,
+		},
+	}
+
+	return cfg
 }
 
 func (g *GraphQLConfigAdapter) engineConfigV2Arguments(fieldConfs *plan.FieldConfigurations, generatedArgs map[graphql.TypeFieldLookupKey]graphql.TypeFieldArguments) {
@@ -284,14 +302,14 @@ func (g *GraphQLConfigAdapter) convertURLQueriesToEngineV2Queries(apiDefQueries 
 	return engineV2Queries
 }
 
-func (g *GraphQLConfigAdapter) convertHttpHeadersToEngineV2Headers(apiDefHeaders map[string]string) http.Header {
+func (g *GraphQLConfigAdapter) convertHeadersToHttpHeaders(apiDefHeaders map[string]string) http.Header {
 	if len(apiDefHeaders) == 0 {
 		return nil
 	}
 
 	engineV2Headers := make(http.Header)
 	for apiDefHeaderKey, apiDefHeaderValue := range apiDefHeaders {
-		engineV2Headers[apiDefHeaderKey] = []string{apiDefHeaderValue}
+		engineV2Headers.Add(apiDefHeaderKey, apiDefHeaderValue)
 	}
 
 	return engineV2Headers
