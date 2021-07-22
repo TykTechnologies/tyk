@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -796,7 +797,7 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 		Rate:             1000,
 		QuotaMax:         50,
 		QuotaRenewalRate: 3600,
-		OrgID:            "default",
+		OrgID:            DefaultOrg,
 		Partitions: user.PolicyPartitions{
 			PerAPI:    true,
 			Quota:     false,
@@ -842,28 +843,28 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 			spec.APIID = "api1"
 			spec.UseKeylessAccess = false
 			spec.Proxy.ListenPath = "/api1"
-			spec.OrgID = "default"
+			spec.OrgID = DefaultOrg
 		},
 		func(spec *APISpec) {
 			spec.Name = "api 2"
 			spec.APIID = "api2"
 			spec.UseKeylessAccess = false
 			spec.Proxy.ListenPath = "/api2"
-			spec.OrgID = "default"
+			spec.OrgID = DefaultOrg
 		},
 		func(spec *APISpec) {
 			spec.Name = "api 3"
 			spec.APIID = "api3"
 			spec.UseKeylessAccess = false
 			spec.Proxy.ListenPath = "/api3"
-			spec.OrgID = "default"
+			spec.OrgID = DefaultOrg
 		},
 	)
 
 	// create test session
 	session := &user.SessionState{
 		ApplyPolicies: []string{"two_of_three_with_api_limit"},
-		OrgID:         "default",
+		OrgID:         DefaultOrg,
 		AccessRights: map[string]user.AccessDefinition{
 			"api1": {
 				APIID:    "api1",
@@ -888,137 +889,145 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 
 	// run requests to different APIs
 	authHeader := map[string]string{"Authorization": key}
-	ts.Run(t, []test.TestCase{
-		// 2 requests to api1, API limit quota remaining should be 98
-		{Method: http.MethodGet, Path: "/api1", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "99"}},
-		{Method: http.MethodGet, Path: "/api1", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "98"}},
-		// 3 requests to api2, API limit quota remaining should be 197
-		{Method: http.MethodGet, Path: "/api2", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "199"}},
-		{Method: http.MethodGet, Path: "/api2", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "198"}},
-		{Method: http.MethodGet, Path: "/api2", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "197"}},
-		// 5 requests to api3, API limit quota remaining should be 45
-		{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "49"}},
-		{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "48"}},
-		{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "47"}},
-		{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "46"}},
-		{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "45"}},
-	}...)
+	t.Run("requests to different apis", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			// 2 requests to api1, API limit quota remaining should be 98
+			{Method: http.MethodGet, Path: "/api1", Headers: authHeader, Code: http.StatusOK,
+				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "99"}},
+			{Method: http.MethodGet, Path: "/api1", Headers: authHeader, Code: http.StatusOK,
+				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "98"}},
+			// 3 requests to api2, API limit quota remaining should be 197
+			{Method: http.MethodGet, Path: "/api2", Headers: authHeader, Code: http.StatusOK,
+				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "199"}},
+			{Method: http.MethodGet, Path: "/api2", Headers: authHeader, Code: http.StatusOK,
+				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "198"}},
+			{Method: http.MethodGet, Path: "/api2", Headers: authHeader, Code: http.StatusOK,
+				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "197"}},
+			// 5 requests to api3, API limit quota remaining should be 45
+			{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK,
+				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "49"}},
+			{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK,
+				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "48"}},
+			{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK,
+				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "47"}},
+			{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK,
+				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "46"}},
+			{Method: http.MethodGet, Path: "/api3", Headers: authHeader, Code: http.StatusOK,
+				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "45"}},
+		}...)
+	})
 
 	// check key session
-	ts.Run(t, []test.TestCase{
-		{
-			Method:    http.MethodGet,
-			Path:      "/tyk/keys/" + key,
-			AdminAuth: true,
-			Code:      http.StatusOK,
-			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{}
-				if err := json.Unmarshal(data, &sessionData); err != nil {
-					t.Log(err.Error())
-					return false
-				}
-				api1Limit := sessionData.AccessRights["api1"].Limit
-				if api1Limit == nil {
-					t.Log("api1 limit is not set")
-					return false
-				}
-				api1LimitExpected := user.APILimit{
-					Rate:             1000,
-					Per:              1,
-					QuotaMax:         100,
-					QuotaRenewalRate: 3600,
-					QuotaRenews:      api1Limit.QuotaRenews,
-					QuotaRemaining:   98,
-				}
-				if !reflect.DeepEqual(*api1Limit, api1LimitExpected) {
-					t.Log("api1 limit received:", *api1Limit, "expected:", api1LimitExpected)
-					return false
-				}
-				api2Limit := sessionData.AccessRights["api2"].Limit
-				if api2Limit == nil {
-					t.Log("api2 limit is not set")
-					return false
-				}
-				api2LimitExpected := user.APILimit{
-					Rate:             1000,
-					Per:              1,
-					QuotaMax:         200,
-					QuotaRenewalRate: 3600,
-					QuotaRenews:      api2Limit.QuotaRenews,
-					QuotaRemaining:   197,
-				}
-				if !reflect.DeepEqual(*api2Limit, api2LimitExpected) {
-					t.Log("api2 limit received:", *api2Limit, "expected:", api2LimitExpected)
-					return false
-				}
-				api3Limit := sessionData.AccessRights["api3"].Limit
-				if api3Limit == nil {
-					t.Log("api3 limit is not set")
-					return false
-				}
-				api3LimitExpected := user.APILimit{
-					Rate:             1000,
-					Per:              1,
-					QuotaMax:         50,
-					QuotaRenewalRate: 3600,
-					QuotaRenews:      api3Limit.QuotaRenews,
-					QuotaRemaining:   45,
-				}
+	t.Run("Check session key", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			{
+				Method:    http.MethodGet,
+				Path:      fmt.Sprintf("/tyk/keys/%v?org_id=%v", key, DefaultOrg),
+				AdminAuth: true,
+				Code:      http.StatusOK,
+				BodyMatchFunc: func(data []byte) bool {
+					sessionData := user.SessionState{}
+					if err := json.Unmarshal(data, &sessionData); err != nil {
+						t.Log(err.Error())
+						return false
+					}
+					api1Limit := sessionData.AccessRights["api1"].Limit
+					if api1Limit == nil {
+						t.Log("api1 limit is not set")
+						return false
+					}
+					api1LimitExpected := user.APILimit{
+						Rate:             1000,
+						Per:              1,
+						QuotaMax:         100,
+						QuotaRenewalRate: 3600,
+						QuotaRenews:      api1Limit.QuotaRenews,
+						QuotaRemaining:   98,
+					}
+					if !reflect.DeepEqual(*api1Limit, api1LimitExpected) {
+						t.Log("api1 limit received:", *api1Limit, "expected:", api1LimitExpected)
+						return false
+					}
+					api2Limit := sessionData.AccessRights["api2"].Limit
+					if api2Limit == nil {
+						t.Log("api2 limit is not set")
+						return false
+					}
+					api2LimitExpected := user.APILimit{
+						Rate:             1000,
+						Per:              1,
+						QuotaMax:         200,
+						QuotaRenewalRate: 3600,
+						QuotaRenews:      api2Limit.QuotaRenews,
+						QuotaRemaining:   197,
+					}
+					if !reflect.DeepEqual(*api2Limit, api2LimitExpected) {
+						t.Log("api2 limit received:", *api2Limit, "expected:", api2LimitExpected)
+						return false
+					}
+					api3Limit := sessionData.AccessRights["api3"].Limit
+					if api3Limit == nil {
+						t.Log("api3 limit is not set")
+						return false
+					}
+					api3LimitExpected := user.APILimit{
+						Rate:             1000,
+						Per:              1,
+						QuotaMax:         50,
+						QuotaRenewalRate: 3600,
+						QuotaRenews:      api3Limit.QuotaRenews,
+						QuotaRemaining:   45,
+					}
 
-				if !reflect.DeepEqual(*api3Limit, api3LimitExpected) {
-					t.Log("api3 limit received:", *api3Limit, "expected:", api3LimitExpected)
-					return false
-				}
-				return true
+					if !reflect.DeepEqual(*api3Limit, api3LimitExpected) {
+						t.Log("api3 limit received:", *api3Limit, "expected:", api3LimitExpected)
+						return false
+					}
+					return true
+				},
 			},
-		},
-	}...)
+		}...)
+
+	})
 
 	// Reset quota
-	ts.Run(t, []test.TestCase{
-		{
-			Method:    http.MethodPut,
-			Path:      "/tyk/keys/" + key,
-			AdminAuth: true,
-			Code:      http.StatusOK,
-			Data:      session,
-		},
-		{
-			Method:    http.MethodGet,
-			Path:      "/tyk/keys/" + key,
-			AdminAuth: true,
-			Code:      http.StatusOK,
-			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{}
-				if err := json.Unmarshal(data, &sessionData); err != nil {
-					t.Log(err.Error())
-					return false
-				}
-				api1Limit := sessionData.AccessRights["api1"].Limit
-				if api1Limit == nil {
-					t.Error("api1 limit is not set")
-					return false
-				}
-
-				if api1Limit.QuotaRemaining != 100 {
-					t.Error("Should reset quota:", api1Limit.QuotaRemaining)
-					return false
-				}
-
-				return true
+	t.Run("Reset quota", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			{
+				Method:    http.MethodPut,
+				Path:      fmt.Sprintf("/tyk/keys/%v?org_id=%v", key, DefaultOrg),
+				AdminAuth: true,
+				Code:      http.StatusOK,
+				Data:      session,
 			},
-		},
-	}...)
+			{
+				Method:    http.MethodGet,
+				Path:      "/tyk/keys/" + key,
+				AdminAuth: true,
+				Code:      http.StatusOK,
+				BodyMatchFunc: func(data []byte) bool {
+					sessionData := user.SessionState{}
+					if err := json.Unmarshal(data, &sessionData); err != nil {
+						t.Log(err.Error())
+						return false
+					}
+					api1Limit := sessionData.AccessRights["api1"].Limit
+					if api1Limit == nil {
+						t.Error("api1 limit is not set")
+						return false
+					}
+
+					if api1Limit.QuotaRemaining != 100 {
+						t.Error("Should reset quota:", api1Limit.QuotaRemaining)
+						return false
+					}
+
+					return true
+				},
+			},
+		}...)
+	})
+
 }
 
 func TestApplyMultiPolicies(t *testing.T) {
@@ -1029,7 +1038,7 @@ func TestApplyMultiPolicies(t *testing.T) {
 		Per:              1,
 		QuotaMax:         50,
 		QuotaRenewalRate: 3600,
-		OrgID:            "default",
+		OrgID:            DefaultOrg,
 		AccessRights: map[string]user.AccessDefinition{
 			"api1": {
 				Versions: []string{"v1"},
@@ -1043,7 +1052,7 @@ func TestApplyMultiPolicies(t *testing.T) {
 		Per:              1,
 		QuotaMax:         100,
 		QuotaRenewalRate: 3600,
-		OrgID:            "default",
+		OrgID:            DefaultOrg,
 		AccessRights: map[string]user.AccessDefinition{
 			"api2": {
 				Versions: []string{"v1"},
@@ -1070,28 +1079,28 @@ func TestApplyMultiPolicies(t *testing.T) {
 			spec.APIID = "api1"
 			spec.UseKeylessAccess = false
 			spec.Proxy.ListenPath = "/api1"
-			spec.OrgID = "default"
+			spec.OrgID = DefaultOrg
 		},
 		func(spec *APISpec) {
 			spec.Name = "api 2"
 			spec.APIID = "api2"
 			spec.UseKeylessAccess = false
 			spec.Proxy.ListenPath = "/api2"
-			spec.OrgID = "default"
+			spec.OrgID = DefaultOrg
 		},
 		func(spec *APISpec) {
 			spec.Name = "api 3"
 			spec.APIID = "api3"
 			spec.UseKeylessAccess = false
 			spec.Proxy.ListenPath = "/api3"
-			spec.OrgID = "default"
+			spec.OrgID = DefaultOrg
 		},
 	)
 
 	// create test session
 	session := &user.SessionState{
 		ApplyPolicies: []string{"policy1", "policy2"},
-		OrgID:         "default",
+		OrgID:         DefaultOrg,
 	}
 
 	// create key
@@ -1130,7 +1139,7 @@ func TestApplyMultiPolicies(t *testing.T) {
 	ts.Run(t, []test.TestCase{
 		{
 			Method:    http.MethodGet,
-			Path:      "/tyk/keys/" + key,
+			Path:      fmt.Sprintf("/tyk/keys/%v?org_id=%v", key, DefaultOrg),
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {

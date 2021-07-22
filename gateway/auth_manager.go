@@ -140,7 +140,7 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 	} else {
 		if storage.TokenOrg(keyName) != orgID {
 			// try to get legacy and new format key at once
-			toSearchList := []string{generateToken(orgID, keyName), keyName, generateToken("default", keyName)}
+			toSearchList := []string{generateToken(orgID, keyName), keyName}
 			for _, fallback := range config.Global().HashKeyFunctionFallback {
 				toSearchList = append(toSearchList, generateToken(orgID, keyName, fallback))
 			}

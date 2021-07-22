@@ -1,0 +1,2535 @@
+time="Jul 21 18:25:44" level=info msg="Rich plugins are disabled" prefix=coprocess
+=== RUN   TestGeoIPLookup
+--- PASS: TestGeoIPLookup (0.00s)
+=== RUN   TestURLReplacer
+--- PASS: TestURLReplacer (0.00s)
+=== RUN   TestTagHeaders
+--- PASS: TestTagHeaders (0.00s)
+=== RUN   TestURLRewrites
+=== RUN   TestURLRewrites/Extended_Paths_with_url_rewrites
+--- PASS: TestURLRewrites (0.04s)
+    --- PASS: TestURLRewrites/Extended_Paths_with_url_rewrites (0.02s)
+=== RUN   TestWhitelist
+=== RUN   TestWhitelist/Extended_Paths
+=== RUN   TestWhitelist/Simple_Paths
+=== RUN   TestWhitelist/Test_#1944
+=== RUN   TestWhitelist/Case_Sensitivity
+=== RUN   TestWhitelist/Listen_path_matches
+--- PASS: TestWhitelist (0.10s)
+    --- PASS: TestWhitelist/Extended_Paths (0.02s)
+    --- PASS: TestWhitelist/Simple_Paths (0.01s)
+    --- PASS: TestWhitelist/Test_#1944 (0.02s)
+    --- PASS: TestWhitelist/Case_Sensitivity (0.02s)
+    --- PASS: TestWhitelist/Listen_path_matches (0.02s)
+=== RUN   TestBlacklist
+=== RUN   TestBlacklist/Extended_Paths
+=== RUN   TestBlacklist/Simple_Paths
+=== RUN   TestBlacklist/Case_Sensitivity
+=== RUN   TestBlacklist/Listen_path_matches
+--- PASS: TestBlacklist (0.08s)
+    --- PASS: TestBlacklist/Extended_Paths (0.01s)
+    --- PASS: TestBlacklist/Simple_Paths (0.01s)
+    --- PASS: TestBlacklist/Case_Sensitivity (0.01s)
+    --- PASS: TestBlacklist/Listen_path_matches (0.01s)
+=== RUN   TestConflictingPaths
+--- PASS: TestConflictingPaths (0.03s)
+=== RUN   TestIgnored
+=== RUN   TestIgnored/Extended_Paths
+=== RUN   TestIgnored/Simple_Paths
+=== RUN   TestIgnored/With_URL_rewrite
+=== RUN   TestIgnored/Case_Sensitivity
+=== RUN   TestIgnored/Case_Sensitivity/ignore-case_globally
+=== RUN   TestIgnored/Case_Sensitivity/ignore-case_in_api_level
+--- PASS: TestIgnored (0.13s)
+    --- PASS: TestIgnored/Extended_Paths (0.01s)
+    --- PASS: TestIgnored/Simple_Paths (0.02s)
+    --- PASS: TestIgnored/With_URL_rewrite (0.01s)
+    --- PASS: TestIgnored/Case_Sensitivity (0.07s)
+        --- PASS: TestIgnored/Case_Sensitivity/ignore-case_globally (0.01s)
+        --- PASS: TestIgnored/Case_Sensitivity/ignore-case_in_api_level (0.02s)
+=== RUN   TestWhitelistMethodWithAdditionalMiddleware
+=== RUN   TestWhitelistMethodWithAdditionalMiddleware/Extended_Paths
+--- PASS: TestWhitelistMethodWithAdditionalMiddleware (0.02s)
+    --- PASS: TestWhitelistMethodWithAdditionalMiddleware/Extended_Paths (0.01s)
+=== RUN   TestSyncAPISpecsDashboardSuccess
+--- PASS: TestSyncAPISpecsDashboardSuccess (0.01s)
+=== RUN   TestRoundRobin
+--- PASS: TestRoundRobin (0.00s)
+=== RUN   TestDefaultVersion
+--- PASS: TestDefaultVersion (0.03s)
+=== RUN   TestGetVersionFromRequest
+=== RUN   TestGetVersionFromRequest/Header_location
+=== RUN   TestGetVersionFromRequest/URL_param_location
+=== RUN   TestGetVersionFromRequest/URL_location
+--- PASS: TestGetVersionFromRequest (0.11s)
+    --- PASS: TestGetVersionFromRequest/Header_location (0.01s)
+    --- PASS: TestGetVersionFromRequest/URL_param_location (0.01s)
+    --- PASS: TestGetVersionFromRequest/URL_location (0.08s)
+=== RUN   TestSyncAPISpecsDashboardJSONFailure
+--- PASS: TestSyncAPISpecsDashboardJSONFailure (0.03s)
+=== RUN   TestAPIDefinitionLoader_Template
+=== RUN   TestAPIDefinitionLoader_Template/loadFileTemplate
+=== RUN   TestAPIDefinitionLoader_Template/loadBlobTemplate
+--- PASS: TestAPIDefinitionLoader_Template (0.00s)
+    --- PASS: TestAPIDefinitionLoader_Template/loadFileTemplate (0.00s)
+    --- PASS: TestAPIDefinitionLoader_Template/loadBlobTemplate (0.00s)
+=== RUN   TestOpenTracing
+=== RUN   TestOpenTracing/ensure_the_manager_is_enabled
+=== RUN   TestOpenTracing/ensure_services_are_initialized
+--- PASS: TestOpenTracing (0.06s)
+    --- PASS: TestOpenTracing/ensure_the_manager_is_enabled (0.00s)
+    --- PASS: TestOpenTracing/ensure_services_are_initialized (0.01s)
+=== RUN   TestInternalAPIUsage
+=== RUN   TestInternalAPIUsage/with_name
+=== RUN   TestInternalAPIUsage/with_api_id
+--- PASS: TestInternalAPIUsage (0.08s)
+    --- PASS: TestInternalAPIUsage/with_name (0.00s)
+    --- PASS: TestInternalAPIUsage/with_api_id (0.02s)
+=== RUN   TestFuzzyFindAPI
+=== RUN   TestFuzzyFindAPI/ignore_case
+=== RUN   TestFuzzyFindAPI/ignore_categories
+=== RUN   TestFuzzyFindAPI/replace_underscores
+=== RUN   TestFuzzyFindAPI/replace_@
+=== RUN   TestFuzzyFindAPI/supply_hex
+=== RUN   TestFuzzyFindAPI/supply_APIID
+=== RUN   TestFuzzyFindAPI/empty_search_string
+--- PASS: TestFuzzyFindAPI (0.02s)
+    --- PASS: TestFuzzyFindAPI/ignore_case (0.00s)
+    --- PASS: TestFuzzyFindAPI/ignore_categories (0.00s)
+    --- PASS: TestFuzzyFindAPI/replace_underscores (0.00s)
+    --- PASS: TestFuzzyFindAPI/replace_@ (0.00s)
+    --- PASS: TestFuzzyFindAPI/supply_hex (0.00s)
+    --- PASS: TestFuzzyFindAPI/supply_APIID (0.00s)
+    --- PASS: TestFuzzyFindAPI/empty_search_string (0.00s)
+=== RUN   TestAPILoopingName
+=== RUN   TestAPILoopingName/api_#a_#b_#c
+=== RUN   TestAPILoopingName/__api_#a_#b_#c
+=== RUN   TestAPILoopingName/@api_#a_#b_#c
+=== RUN   TestAPILoopingName/api
+=== RUN   TestAPILoopingName/__api__
+=== RUN   TestAPILoopingName/@___api_-__name_@__
+=== RUN   TestAPILoopingName/@___api_-__name_@___#a_#b
+--- PASS: TestAPILoopingName (0.00s)
+    --- PASS: TestAPILoopingName/api_#a_#b_#c (0.00s)
+    --- PASS: TestAPILoopingName/__api_#a_#b_#c (0.00s)
+    --- PASS: TestAPILoopingName/@api_#a_#b_#c (0.00s)
+    --- PASS: TestAPILoopingName/api (0.00s)
+    --- PASS: TestAPILoopingName/__api__ (0.00s)
+    --- PASS: TestAPILoopingName/@___api_-__name_@__ (0.00s)
+    --- PASS: TestAPILoopingName/@___api_-__name_@___#a_#b (0.00s)
+=== RUN   TestGraphQLPlayground
+=== RUN   TestGraphQLPlayground/on-premise
+=== RUN   TestGraphQLPlayground/on-premise/playground_path_is_empty
+=== RUN   TestGraphQLPlayground/on-premise/playground_path_is_empty/playground_html_is_loaded
+=== RUN   TestGraphQLPlayground/on-premise/playground_path_is_empty/playground.js_is_loaded
+=== RUN   TestGraphQLPlayground/on-premise/playground_path_is_empty/should_get_error_on_post_request_to_playground_path
+=== RUN   TestGraphQLPlayground/on-premise/playground_path_is_'/'
+=== RUN   TestGraphQLPlayground/on-premise/playground_path_is_'/'/playground_html_is_loaded
+=== RUN   TestGraphQLPlayground/on-premise/playground_path_is_'/'/playground.js_is_loaded
+=== RUN   TestGraphQLPlayground/on-premise/playground_path_is_'/'/should_get_error_on_post_request_to_playground_path
+=== RUN   TestGraphQLPlayground/on-premise/playground_path_is_'/playground'
+=== RUN   TestGraphQLPlayground/on-premise/playground_path_is_'/playground'/playground_html_is_loaded
+=== RUN   TestGraphQLPlayground/on-premise/playground_path_is_'/playground'/playground.js_is_loaded
+=== RUN   TestGraphQLPlayground/on-premise/playground_path_is_'/playground'/should_get_error_on_post_request_to_playground_path
+=== RUN   TestGraphQLPlayground/on-premise/playground_path_is_'/ppp'
+=== RUN   TestGraphQLPlayground/on-premise/playground_path_is_'/ppp'/playground_html_is_loaded
+=== RUN   TestGraphQLPlayground/on-premise/playground_path_is_'/ppp'/playground.js_is_loaded
+=== RUN   TestGraphQLPlayground/on-premise/playground_path_is_'/ppp'/should_get_error_on_post_request_to_playground_path
+=== RUN   TestGraphQLPlayground/on-premise/playground_path_is_'/zzz/'
+=== RUN   TestGraphQLPlayground/on-premise/playground_path_is_'/zzz/'/playground_html_is_loaded
+=== RUN   TestGraphQLPlayground/on-premise/playground_path_is_'/zzz/'/playground.js_is_loaded
+=== RUN   TestGraphQLPlayground/on-premise/playground_path_is_'/zzz/'/should_get_error_on_post_request_to_playground_path
+=== RUN   TestGraphQLPlayground/on-premise/playground_path_is_'aaa'
+=== RUN   TestGraphQLPlayground/on-premise/playground_path_is_'aaa'/playground_html_is_loaded
+=== RUN   TestGraphQLPlayground/on-premise/playground_path_is_'aaa'/playground.js_is_loaded
+=== RUN   TestGraphQLPlayground/on-premise/playground_path_is_'aaa'/should_get_error_on_post_request_to_playground_path
+=== RUN   TestGraphQLPlayground/cloud
+=== RUN   TestGraphQLPlayground/cloud/playground_path_is_empty
+=== RUN   TestGraphQLPlayground/cloud/playground_path_is_empty/playground_html_is_loaded
+=== RUN   TestGraphQLPlayground/cloud/playground_path_is_empty/playground.js_is_loaded
+=== RUN   TestGraphQLPlayground/cloud/playground_path_is_empty/should_get_error_on_post_request_to_playground_path
+=== RUN   TestGraphQLPlayground/cloud/playground_path_is_'/'
+=== RUN   TestGraphQLPlayground/cloud/playground_path_is_'/'/playground_html_is_loaded
+=== RUN   TestGraphQLPlayground/cloud/playground_path_is_'/'/playground.js_is_loaded
+=== RUN   TestGraphQLPlayground/cloud/playground_path_is_'/'/should_get_error_on_post_request_to_playground_path
+=== RUN   TestGraphQLPlayground/cloud/playground_path_is_'/playground'
+=== RUN   TestGraphQLPlayground/cloud/playground_path_is_'/playground'/playground_html_is_loaded
+=== RUN   TestGraphQLPlayground/cloud/playground_path_is_'/playground'/playground.js_is_loaded
+=== RUN   TestGraphQLPlayground/cloud/playground_path_is_'/playground'/should_get_error_on_post_request_to_playground_path
+=== RUN   TestGraphQLPlayground/cloud/playground_path_is_'/ppp'
+=== RUN   TestGraphQLPlayground/cloud/playground_path_is_'/ppp'/playground_html_is_loaded
+=== RUN   TestGraphQLPlayground/cloud/playground_path_is_'/ppp'/playground.js_is_loaded
+=== RUN   TestGraphQLPlayground/cloud/playground_path_is_'/ppp'/should_get_error_on_post_request_to_playground_path
+=== RUN   TestGraphQLPlayground/cloud/playground_path_is_'/zzz/'
+=== RUN   TestGraphQLPlayground/cloud/playground_path_is_'/zzz/'/playground_html_is_loaded
+=== RUN   TestGraphQLPlayground/cloud/playground_path_is_'/zzz/'/playground.js_is_loaded
+=== RUN   TestGraphQLPlayground/cloud/playground_path_is_'/zzz/'/should_get_error_on_post_request_to_playground_path
+=== RUN   TestGraphQLPlayground/cloud/playground_path_is_'aaa'
+=== RUN   TestGraphQLPlayground/cloud/playground_path_is_'aaa'/playground_html_is_loaded
+=== RUN   TestGraphQLPlayground/cloud/playground_path_is_'aaa'/playground.js_is_loaded
+=== RUN   TestGraphQLPlayground/cloud/playground_path_is_'aaa'/should_get_error_on_post_request_to_playground_path
+--- PASS: TestGraphQLPlayground (0.34s)
+    --- PASS: TestGraphQLPlayground/on-premise (0.19s)
+        --- PASS: TestGraphQLPlayground/on-premise/playground_path_is_empty (0.07s)
+            --- PASS: TestGraphQLPlayground/on-premise/playground_path_is_empty/playground_html_is_loaded (0.02s)
+            --- PASS: TestGraphQLPlayground/on-premise/playground_path_is_empty/playground.js_is_loaded (0.04s)
+            --- PASS: TestGraphQLPlayground/on-premise/playground_path_is_empty/should_get_error_on_post_request_to_playground_path (0.00s)
+        --- PASS: TestGraphQLPlayground/on-premise/playground_path_is_'/' (0.03s)
+            --- PASS: TestGraphQLPlayground/on-premise/playground_path_is_'/'/playground_html_is_loaded (0.00s)
+            --- PASS: TestGraphQLPlayground/on-premise/playground_path_is_'/'/playground.js_is_loaded (0.01s)
+            --- PASS: TestGraphQLPlayground/on-premise/playground_path_is_'/'/should_get_error_on_post_request_to_playground_path (0.00s)
+        --- PASS: TestGraphQLPlayground/on-premise/playground_path_is_'/playground' (0.03s)
+            --- PASS: TestGraphQLPlayground/on-premise/playground_path_is_'/playground'/playground_html_is_loaded (0.00s)
+            --- PASS: TestGraphQLPlayground/on-premise/playground_path_is_'/playground'/playground.js_is_loaded (0.01s)
+            --- PASS: TestGraphQLPlayground/on-premise/playground_path_is_'/playground'/should_get_error_on_post_request_to_playground_path (0.00s)
+        --- PASS: TestGraphQLPlayground/on-premise/playground_path_is_'/ppp' (0.02s)
+            --- PASS: TestGraphQLPlayground/on-premise/playground_path_is_'/ppp'/playground_html_is_loaded (0.00s)
+            --- PASS: TestGraphQLPlayground/on-premise/playground_path_is_'/ppp'/playground.js_is_loaded (0.01s)
+            --- PASS: TestGraphQLPlayground/on-premise/playground_path_is_'/ppp'/should_get_error_on_post_request_to_playground_path (0.00s)
+        --- PASS: TestGraphQLPlayground/on-premise/playground_path_is_'/zzz/' (0.02s)
+            --- PASS: TestGraphQLPlayground/on-premise/playground_path_is_'/zzz/'/playground_html_is_loaded (0.00s)
+            --- PASS: TestGraphQLPlayground/on-premise/playground_path_is_'/zzz/'/playground.js_is_loaded (0.01s)
+            --- PASS: TestGraphQLPlayground/on-premise/playground_path_is_'/zzz/'/should_get_error_on_post_request_to_playground_path (0.00s)
+        --- PASS: TestGraphQLPlayground/on-premise/playground_path_is_'aaa' (0.02s)
+            --- PASS: TestGraphQLPlayground/on-premise/playground_path_is_'aaa'/playground_html_is_loaded (0.00s)
+            --- PASS: TestGraphQLPlayground/on-premise/playground_path_is_'aaa'/playground.js_is_loaded (0.01s)
+            --- PASS: TestGraphQLPlayground/on-premise/playground_path_is_'aaa'/should_get_error_on_post_request_to_playground_path (0.00s)
+    --- PASS: TestGraphQLPlayground/cloud (0.13s)
+        --- PASS: TestGraphQLPlayground/cloud/playground_path_is_empty (0.02s)
+            --- PASS: TestGraphQLPlayground/cloud/playground_path_is_empty/playground_html_is_loaded (0.00s)
+            --- PASS: TestGraphQLPlayground/cloud/playground_path_is_empty/playground.js_is_loaded (0.01s)
+            --- PASS: TestGraphQLPlayground/cloud/playground_path_is_empty/should_get_error_on_post_request_to_playground_path (0.00s)
+        --- PASS: TestGraphQLPlayground/cloud/playground_path_is_'/' (0.02s)
+            --- PASS: TestGraphQLPlayground/cloud/playground_path_is_'/'/playground_html_is_loaded (0.00s)
+            --- PASS: TestGraphQLPlayground/cloud/playground_path_is_'/'/playground.js_is_loaded (0.01s)
+            --- PASS: TestGraphQLPlayground/cloud/playground_path_is_'/'/should_get_error_on_post_request_to_playground_path (0.00s)
+        --- PASS: TestGraphQLPlayground/cloud/playground_path_is_'/playground' (0.02s)
+            --- PASS: TestGraphQLPlayground/cloud/playground_path_is_'/playground'/playground_html_is_loaded (0.00s)
+            --- PASS: TestGraphQLPlayground/cloud/playground_path_is_'/playground'/playground.js_is_loaded (0.01s)
+            --- PASS: TestGraphQLPlayground/cloud/playground_path_is_'/playground'/should_get_error_on_post_request_to_playground_path (0.00s)
+        --- PASS: TestGraphQLPlayground/cloud/playground_path_is_'/ppp' (0.02s)
+            --- PASS: TestGraphQLPlayground/cloud/playground_path_is_'/ppp'/playground_html_is_loaded (0.00s)
+            --- PASS: TestGraphQLPlayground/cloud/playground_path_is_'/ppp'/playground.js_is_loaded (0.01s)
+            --- PASS: TestGraphQLPlayground/cloud/playground_path_is_'/ppp'/should_get_error_on_post_request_to_playground_path (0.00s)
+        --- PASS: TestGraphQLPlayground/cloud/playground_path_is_'/zzz/' (0.02s)
+            --- PASS: TestGraphQLPlayground/cloud/playground_path_is_'/zzz/'/playground_html_is_loaded (0.00s)
+            --- PASS: TestGraphQLPlayground/cloud/playground_path_is_'/zzz/'/playground.js_is_loaded (0.01s)
+            --- PASS: TestGraphQLPlayground/cloud/playground_path_is_'/zzz/'/should_get_error_on_post_request_to_playground_path (0.00s)
+        --- PASS: TestGraphQLPlayground/cloud/playground_path_is_'aaa' (0.02s)
+            --- PASS: TestGraphQLPlayground/cloud/playground_path_is_'aaa'/playground_html_is_loaded (0.00s)
+            --- PASS: TestGraphQLPlayground/cloud/playground_path_is_'aaa'/playground.js_is_loaded (0.01s)
+            --- PASS: TestGraphQLPlayground/cloud/playground_path_is_'aaa'/should_get_error_on_post_request_to_playground_path (0.00s)
+=== RUN   TestCORS
+=== RUN   TestCORS/CORS_disabled
+=== RUN   TestCORS/CORS_enabled
+=== RUN   TestCORS/oauth_endpoints
+=== RUN   TestCORS/oauth_endpoints/CORS_disabled
+=== RUN   TestCORS/oauth_endpoints/CORS_enabled
+--- PASS: TestCORS (0.08s)
+    --- PASS: TestCORS/CORS_disabled (0.00s)
+    --- PASS: TestCORS/CORS_enabled (0.02s)
+    --- PASS: TestCORS/oauth_endpoints (0.03s)
+        --- PASS: TestCORS/oauth_endpoints/CORS_disabled (0.00s)
+        --- PASS: TestCORS/oauth_endpoints/CORS_enabled (0.01s)
+=== RUN   TestTykRateLimitsStatusOfAPI
+--- PASS: TestTykRateLimitsStatusOfAPI (0.05s)
+=== RUN   TestHealthCheckEndpoint
+--- PASS: TestHealthCheckEndpoint (0.04s)
+=== RUN   TestApiHandlerPostDupPath
+=== RUN   TestApiHandlerPostDupPath/Sequentieal_order
+=== RUN   TestApiHandlerPostDupPath/Should_re-order
+=== RUN   TestApiHandlerPostDupPath/Restore_original_order
+--- PASS: TestApiHandlerPostDupPath (0.05s)
+    --- PASS: TestApiHandlerPostDupPath/Sequentieal_order (0.02s)
+    --- PASS: TestApiHandlerPostDupPath/Should_re-order (0.01s)
+    --- PASS: TestApiHandlerPostDupPath/Restore_original_order (0.01s)
+=== RUN   TestKeyHandler
+=== RUN   TestKeyHandler/Create_key
+=== RUN   TestKeyHandler/Create_key_with_policy
+
+ Primer 
+ KeyName: my_key_id, ApiID: test, orgID: , isHashed: false
+ COde: 200
+ Primer 
+ KeyName: my_key_id, ApiID: test, orgID: , isHashed: false
+ COde: 200=== RUN   TestKeyHandler/Get_key
+
+ Primer 
+ KeyName: unknown, ApiID: , orgID: , isHashed: false
+ COde: 404
+ SEGUNDOOOOOOOO
+ Primer 
+ KeyName: eyJvcmciOiJkZWZhdWx0IiwiaWQiOiJkZDJlMGY2YzBjNDE0MzE2ODBmZjk0ZmEyMWE2ZDdmNSIsImgiOiJtdXJtdXI2NCJ9, ApiID: , orgID: , isHashed: false
+ COde: 200
+ Primer 
+ KeyName: eyJvcmciOiJkZWZhdWx0IiwiaWQiOiJkZDJlMGY2YzBjNDE0MzE2ODBmZjk0ZmEyMWE2ZDdmNSIsImgiOiJtdXJtdXI2NCJ9, ApiID: test, orgID: , isHashed: false
+ COde: 200
+ Primer 
+ KeyName: eyJvcmciOiJkZWZhdWx0IiwiaWQiOiJkZDJlMGY2YzBjNDE0MzE2ODBmZjk0ZmEyMWE2ZDdmNSIsImgiOiJtdXJtdXI2NCJ9, ApiID: unknown, orgID: , isHashed: false
+ COde: 200=== RUN   TestKeyHandler/List_keys
+=== RUN   TestKeyHandler/List_keys/filter=""
+=== RUN   TestKeyHandler/List_keys/filter=orgID
+=== RUN   TestKeyHandler/Update_key
+=== RUN   TestKeyHandler/Delete_key
+
+ Primer 
+ KeyName: eyJvcmciOiJkZWZhdWx0IiwiaWQiOiJkZDJlMGY2YzBjNDE0MzE2ODBmZjk0ZmEyMWE2ZDdmNSIsImgiOiJtdXJtdXI2NCJ9, ApiID: , orgID: , isHashed: false
+ COde: 404--- PASS: TestKeyHandler (0.11s)
+    --- PASS: TestKeyHandler/Create_key (0.01s)
+    --- PASS: TestKeyHandler/Create_key_with_policy (0.03s)
+    --- PASS: TestKeyHandler/Get_key (0.01s)
+    --- PASS: TestKeyHandler/List_keys (0.01s)
+        --- PASS: TestKeyHandler/List_keys/filter="" (0.00s)
+        --- PASS: TestKeyHandler/List_keys/filter=orgID (0.00s)
+    --- PASS: TestKeyHandler/Update_key (0.01s)
+    --- PASS: TestKeyHandler/Delete_key (0.01s)
+=== RUN   TestKeyHandler_UpdateKey
+=== RUN   TestKeyHandler_UpdateKey/Add_policy_not_enforcing_acl
+=== RUN   TestKeyHandler_UpdateKey/Remove_policy_not_enforcing_acl
+=== RUN   TestKeyHandler_UpdateKey/Tags_on_key_level
+=== RUN   TestKeyHandler_UpdateKey/Tags_on_key_level/Add
+=== RUN   TestKeyHandler_UpdateKey/Tags_on_key_level/Make_unique
+=== RUN   TestKeyHandler_UpdateKey/Tags_on_key_level/Remove
+=== RUN   TestKeyHandler_UpdateKey/MetaData_on_key_level
+=== RUN   TestKeyHandler_UpdateKey/MetaData_on_key_level/Add
+=== RUN   TestKeyHandler_UpdateKey/MetaData_on_key_level/Make_unique
+=== RUN   TestKeyHandler_UpdateKey/MetaData_on_key_level/Remove
+--- PASS: TestKeyHandler_UpdateKey (0.08s)
+    --- PASS: TestKeyHandler_UpdateKey/Add_policy_not_enforcing_acl (0.01s)
+    --- PASS: TestKeyHandler_UpdateKey/Remove_policy_not_enforcing_acl (0.01s)
+    --- PASS: TestKeyHandler_UpdateKey/Tags_on_key_level (0.02s)
+        --- PASS: TestKeyHandler_UpdateKey/Tags_on_key_level/Add (0.01s)
+        --- PASS: TestKeyHandler_UpdateKey/Tags_on_key_level/Make_unique (0.01s)
+        --- PASS: TestKeyHandler_UpdateKey/Tags_on_key_level/Remove (0.01s)
+    --- PASS: TestKeyHandler_UpdateKey/MetaData_on_key_level (0.02s)
+        --- PASS: TestKeyHandler_UpdateKey/MetaData_on_key_level/Add (0.01s)
+        --- PASS: TestKeyHandler_UpdateKey/MetaData_on_key_level/Make_unique (0.01s)
+        --- PASS: TestKeyHandler_UpdateKey/MetaData_on_key_level/Remove (0.01s)
+=== RUN   TestUpdateKeyWithCert
+=== RUN   TestUpdateKeyWithCert/Update_key_with_valid_cert
+=== RUN   TestUpdateKeyWithCert/Update_key_with_empty_cert
+=== RUN   TestUpdateKeyWithCert/Update_key_with_invalid_cert
+--- PASS: TestUpdateKeyWithCert (0.12s)
+    --- PASS: TestUpdateKeyWithCert/Update_key_with_valid_cert (0.05s)
+    --- PASS: TestUpdateKeyWithCert/Update_key_with_empty_cert (0.02s)
+    --- PASS: TestUpdateKeyWithCert/Update_key_with_invalid_cert (0.03s)
+=== RUN   TestKeyHandler_CheckKeysNotDuplicateOnUpdate
+=== RUN   TestKeyHandler_CheckKeysNotDuplicateOnUpdate/duplicity_on_update_custom_key
+=== RUN   TestKeyHandler_CheckKeysNotDuplicateOnUpdate/duplicity_on_update_regular_key
+--- PASS: TestKeyHandler_CheckKeysNotDuplicateOnUpdate (0.03s)
+    --- PASS: TestKeyHandler_CheckKeysNotDuplicateOnUpdate/duplicity_on_update_custom_key (0.01s)
+    --- PASS: TestKeyHandler_CheckKeysNotDuplicateOnUpdate/duplicity_on_update_regular_key (0.01s)
+=== RUN   TestHashKeyHandler
+=== RUN   TestHashKeyHandler/_Legacy_tokens,_fallback_to_murmur32Hash_fn:_
+=== RUN   TestHashKeyHandler/_Legacy_tokens,_fallback_to_murmur32Hash_fn:_/Create,_get_and_delete_key_with_key_hashing
+
+ Primer 
+ KeyName: my_key_id, ApiID: test, orgID: , isHashed: false
+ COde: 200
+ Primer 
+ KeyName: 1914d918, ApiID: , orgID: , isHashed: true
+ COde: 200
+ Primer 
+ KeyName: 1914d918, ApiID: test, orgID: , isHashed: true
+ COde: 200
+ Primer 
+ KeyName: 1914d918, ApiID: , orgID: , isHashed: false
+ COde: 404
+ Primer 
+ KeyName: 1914d918, ApiID: test, orgID: , isHashed: true
+ COde: 404=== RUN   TestHashKeyHandler/_Legacy_tokens,_fallback_to_murmur32Hash_fn:__and_Basic_Auth
+
+ Primer 
+ KeyName: defaultuser, ApiID: , orgID: default, isHashed: false
+ COde: 200=== RUN   TestHashKeyHandler/Hash_fn:_murmur32
+=== RUN   TestHashKeyHandler/Hash_fn:_murmur32/Create,_get_and_delete_key_with_key_hashing
+
+ Primer 
+ KeyName: my_key_id, ApiID: test, orgID: , isHashed: false
+ COde: 200
+ Primer 
+ KeyName: 106f2dd2, ApiID: , orgID: , isHashed: true
+ COde: 200
+ Primer 
+ KeyName: 106f2dd2, ApiID: test, orgID: , isHashed: true
+ COde: 200
+ Primer 
+ KeyName: 106f2dd2, ApiID: , orgID: , isHashed: false
+ COde: 404
+ SEGUNDOOOOOOOO
+ Primer 
+ KeyName: 106f2dd2, ApiID: test, orgID: , isHashed: true
+ COde: 404
+ SEGUNDOOOOOOOO=== RUN   TestHashKeyHandler/Hash_fn:_murmur32_and_Basic_Auth
+
+ Primer 
+ KeyName: eyJvcmciOiJkZWZhdWx0IiwiaWQiOiJ1c2VyIiwiaCI6Im11cm11cjMyIn0=, ApiID: , orgID: default, isHashed: false
+ COde: 200=== RUN   TestHashKeyHandler/Hash_fn:_murmur64
+=== RUN   TestHashKeyHandler/Hash_fn:_murmur64/Create,_get_and_delete_key_with_key_hashing
+
+ Primer 
+ KeyName: my_key_id, ApiID: test, orgID: , isHashed: false
+ COde: 200
+ Primer 
+ KeyName: 563ba3f939bdd1c0, ApiID: , orgID: , isHashed: true
+ COde: 200
+ Primer 
+ KeyName: 563ba3f939bdd1c0, ApiID: test, orgID: , isHashed: true
+ COde: 200
+ Primer 
+ KeyName: 563ba3f939bdd1c0, ApiID: , orgID: , isHashed: false
+ COde: 404
+ SEGUNDOOOOOOOO
+ Primer 
+ KeyName: 563ba3f939bdd1c0, ApiID: test, orgID: , isHashed: true
+ COde: 404
+ SEGUNDOOOOOOOO=== RUN   TestHashKeyHandler/Hash_fn:_murmur64_and_Basic_Auth
+
+ Primer 
+ KeyName: eyJvcmciOiJkZWZhdWx0IiwiaWQiOiJ1c2VyIiwiaCI6Im11cm11cjY0In0=, ApiID: , orgID: default, isHashed: false
+ COde: 200=== RUN   TestHashKeyHandler/Hash_fn:_murmur128
+=== RUN   TestHashKeyHandler/Hash_fn:_murmur128/Create,_get_and_delete_key_with_key_hashing
+
+ Primer 
+ KeyName: my_key_id, ApiID: test, orgID: , isHashed: false
+ COde: 200
+ Primer 
+ KeyName: 9b2b48ad1662971144e7a9d9c8d71fd0, ApiID: , orgID: , isHashed: true
+ COde: 200
+ Primer 
+ KeyName: 9b2b48ad1662971144e7a9d9c8d71fd0, ApiID: test, orgID: , isHashed: true
+ COde: 200
+ Primer 
+ KeyName: 9b2b48ad1662971144e7a9d9c8d71fd0, ApiID: , orgID: , isHashed: false
+ COde: 404
+ SEGUNDOOOOOOOO
+ Primer 
+ KeyName: 9b2b48ad1662971144e7a9d9c8d71fd0, ApiID: test, orgID: , isHashed: true
+ COde: 404
+ SEGUNDOOOOOOOO=== RUN   TestHashKeyHandler/Hash_fn:_murmur128_and_Basic_Auth
+
+ Primer 
+ KeyName: eyJvcmciOiJkZWZhdWx0IiwiaWQiOiJ1c2VyIiwiaCI6Im11cm11cjEyOCJ9, ApiID: , orgID: default, isHashed: false
+ COde: 200=== RUN   TestHashKeyHandler/Hash_fn:_sha256
+=== RUN   TestHashKeyHandler/Hash_fn:_sha256/Create,_get_and_delete_key_with_key_hashing
+
+ Primer 
+ KeyName: my_key_id, ApiID: test, orgID: , isHashed: false
+ COde: 200
+ Primer 
+ KeyName: 0c2706dc4d51a55a462cc88ecceb2070702fdc2461821a080d54e7494b047f9f, ApiID: , orgID: , isHashed: true
+ COde: 200
+ Primer 
+ KeyName: 0c2706dc4d51a55a462cc88ecceb2070702fdc2461821a080d54e7494b047f9f, ApiID: test, orgID: , isHashed: true
+ COde: 200
+ Primer 
+ KeyName: 0c2706dc4d51a55a462cc88ecceb2070702fdc2461821a080d54e7494b047f9f, ApiID: , orgID: , isHashed: false
+ COde: 404
+ SEGUNDOOOOOOOO
+ Primer 
+ KeyName: 0c2706dc4d51a55a462cc88ecceb2070702fdc2461821a080d54e7494b047f9f, ApiID: test, orgID: , isHashed: true
+ COde: 404
+ SEGUNDOOOOOOOO=== RUN   TestHashKeyHandler/Hash_fn:_sha256_and_Basic_Auth
+
+ Primer 
+ KeyName: eyJvcmciOiJkZWZhdWx0IiwiaWQiOiJ1c2VyIiwiaCI6InNoYTI1NiJ9, ApiID: , orgID: default, isHashed: false
+ COde: 200=== RUN   TestHashKeyHandler/_Should_fallback_to_murmur64_if_wrong_algHash_fn:_wrong
+=== RUN   TestHashKeyHandler/_Should_fallback_to_murmur64_if_wrong_algHash_fn:_wrong/Create,_get_and_delete_key_with_key_hashing
+
+ Primer 
+ KeyName: my_key_id, ApiID: test, orgID: , isHashed: false
+ COde: 200
+ Primer 
+ KeyName: 563ba3f939bdd1c0, ApiID: , orgID: , isHashed: true
+ COde: 200
+ Primer 
+ KeyName: 563ba3f939bdd1c0, ApiID: test, orgID: , isHashed: true
+ COde: 200
+ Primer 
+ KeyName: 563ba3f939bdd1c0, ApiID: , orgID: , isHashed: false
+ COde: 404
+ SEGUNDOOOOOOOO
+ Primer 
+ KeyName: 563ba3f939bdd1c0, ApiID: test, orgID: , isHashed: true
+ COde: 404
+ SEGUNDOOOOOOOO=== RUN   TestHashKeyHandler/_Should_fallback_to_murmur64_if_wrong_algHash_fn:_wrong_and_Basic_Auth
+
+ Primer 
+ KeyName: eyJvcmciOiJkZWZhdWx0IiwiaWQiOiJ1c2VyIiwiaCI6Im11cm11cjY0In0=, ApiID: , orgID: default, isHashed: false
+ COde: 200--- PASS: TestHashKeyHandler (0.64s)
+    --- PASS: TestHashKeyHandler/_Legacy_tokens,_fallback_to_murmur32Hash_fn:_ (0.03s)
+        --- PASS: TestHashKeyHandler/_Legacy_tokens,_fallback_to_murmur32Hash_fn:_/Create,_get_and_delete_key_with_key_hashing (0.01s)
+    --- PASS: TestHashKeyHandler/_Legacy_tokens,_fallback_to_murmur32Hash_fn:__and_Basic_Auth (0.07s)
+    --- PASS: TestHashKeyHandler/Hash_fn:_murmur32 (0.03s)
+        --- PASS: TestHashKeyHandler/Hash_fn:_murmur32/Create,_get_and_delete_key_with_key_hashing (0.02s)
+    --- PASS: TestHashKeyHandler/Hash_fn:_murmur32_and_Basic_Auth (0.07s)
+    --- PASS: TestHashKeyHandler/Hash_fn:_murmur64 (0.03s)
+        --- PASS: TestHashKeyHandler/Hash_fn:_murmur64/Create,_get_and_delete_key_with_key_hashing (0.02s)
+    --- PASS: TestHashKeyHandler/Hash_fn:_murmur64_and_Basic_Auth (0.08s)
+    --- PASS: TestHashKeyHandler/Hash_fn:_murmur128 (0.03s)
+        --- PASS: TestHashKeyHandler/Hash_fn:_murmur128/Create,_get_and_delete_key_with_key_hashing (0.02s)
+    --- PASS: TestHashKeyHandler/Hash_fn:_murmur128_and_Basic_Auth (0.08s)
+    --- PASS: TestHashKeyHandler/Hash_fn:_sha256 (0.03s)
+        --- PASS: TestHashKeyHandler/Hash_fn:_sha256/Create,_get_and_delete_key_with_key_hashing (0.02s)
+    --- PASS: TestHashKeyHandler/Hash_fn:_sha256_and_Basic_Auth (0.08s)
+    --- PASS: TestHashKeyHandler/_Should_fallback_to_murmur64_if_wrong_algHash_fn:_wrong (0.03s)
+        --- PASS: TestHashKeyHandler/_Should_fallback_to_murmur64_if_wrong_algHash_fn:_wrong/Create,_get_and_delete_key_with_key_hashing (0.02s)
+    --- PASS: TestHashKeyHandler/_Should_fallback_to_murmur64_if_wrong_algHash_fn:_wrong_and_Basic_Auth (0.08s)
+=== RUN   TestHashKeyHandlerLegacyWithHashFunc
+
+ Primer 
+ KeyName: defaultuser, ApiID: , orgID: default, isHashed: false
+ COde: 200
+ Primer 
+ KeyName: eyJvcmciOiJkZWZhdWx0IiwiaWQiOiJ1c2VyIiwiaCI6Im11cm11cjY0In0=, ApiID: , orgID: default, isHashed: false
+ COde: 404
+ SEGUNDOOOOOOOO--- PASS: TestHashKeyHandlerLegacyWithHashFunc (0.08s)
+=== RUN   TestHashKeyListingDisabled
+=== RUN   TestHashKeyListingDisabled/Create,_get_and_delete_key_with_key_hashing
+
+ Primer 
+ KeyName: my_key_id, ApiID: test, orgID: , isHashed: false
+ COde: 200
+ Primer 
+ KeyName: 563ba3f939bdd1c0, ApiID: , orgID: , isHashed: true
+ COde: 200
+ Primer 
+ KeyName: 563ba3f939bdd1c0, ApiID: test, orgID: , isHashed: true
+ COde: 200
+ Primer 
+ KeyName: 563ba3f939bdd1c0, ApiID: , orgID: , isHashed: false
+ COde: 404
+ SEGUNDOOOOOOOO
+ Primer 
+ KeyName: 563ba3f939bdd1c0, ApiID: test, orgID: , isHashed: true
+ COde: 404
+ SEGUNDOOOOOOOO--- PASS: TestHashKeyListingDisabled (0.03s)
+    --- PASS: TestHashKeyListingDisabled/Create,_get_and_delete_key_with_key_hashing (0.01s)
+=== RUN   TestKeyHandler_HashingDisabled
+=== RUN   TestKeyHandler_HashingDisabled/Create,_get_and_delete_key_with_key_hashing
+
+ Primer 
+ KeyName: eyJvcmciOiJkZWZhdWx0IiwiaWQiOiJteV9rZXlfaWQiLCJoIjoibXVybXVyNjQifQ==, ApiID: , orgID: , isHashed: false
+ COde: 200
+ Primer 
+ KeyName: eyJvcmciOiJkZWZhdWx0IiwiaWQiOiJteV9rZXlfaWQiLCJoIjoibXVybXVyNjQifQ==, ApiID: , orgID: , isHashed: true
+ COde: 400
+ SEGUNDOOOOOOOO
+ Primer 
+ KeyName: eyJvcmciOiJkZWZhdWx0IiwiaWQiOiJteV9rZXlfaWQiLCJoIjoibXVybXVyNjQifQ==, ApiID: test, orgID: , isHashed: true
+ COde: 400
+ SEGUNDOOOOOOOO--- PASS: TestKeyHandler_HashingDisabled (0.02s)
+    --- PASS: TestKeyHandler_HashingDisabled/Create,_get_and_delete_key_with_key_hashing (0.01s)
+=== RUN   TestInvalidateCache
+--- PASS: TestInvalidateCache (0.02s)
+=== RUN   TestGetOAuthClients
+--- PASS: TestGetOAuthClients (0.03s)
+=== RUN   TestCreateOAuthClient
+=== RUN   TestCreateOAuthClient/API_is_not_OAuth
+=== RUN   TestCreateOAuthClient/no_api_id_but_policy_id_provided
+=== RUN   TestCreateOAuthClient/no_policy_id_but_api_id_provided
+=== RUN   TestCreateOAuthClient/policy_does_not_exist
+=== RUN   TestCreateOAuthClient/API_does_not_exist
+--- PASS: TestCreateOAuthClient (0.02s)
+    --- PASS: TestCreateOAuthClient/API_is_not_OAuth (0.00s)
+    --- PASS: TestCreateOAuthClient/no_api_id_but_policy_id_provided (0.00s)
+    --- PASS: TestCreateOAuthClient/no_policy_id_but_api_id_provided (0.00s)
+    --- PASS: TestCreateOAuthClient/policy_does_not_exist (0.00s)
+    --- PASS: TestCreateOAuthClient/API_does_not_exist (0.00s)
+=== RUN   TestUpdateOauthClientHandler
+=== RUN   TestUpdateOauthClientHandler/Update_description
+=== RUN   TestUpdateOauthClientHandler/Secret_remains_the_same
+=== RUN   TestUpdateOauthClientHandler/Secret_cannot_be_updated
+--- PASS: TestUpdateOauthClientHandler (0.04s)
+    --- PASS: TestUpdateOauthClientHandler/Update_description (0.00s)
+    --- PASS: TestUpdateOauthClientHandler/Secret_remains_the_same (0.01s)
+    --- PASS: TestUpdateOauthClientHandler/Secret_cannot_be_updated (0.01s)
+=== RUN   TestGroupResetHandler
+--- PASS: TestGroupResetHandler (0.00s)
+=== RUN   TestHotReloadSingle
+--- PASS: TestHotReloadSingle (0.01s)
+=== RUN   TestContextData
+--- PASS: TestContextData (0.00s)
+=== RUN   TestContextSession
+--- PASS: TestContextSession (0.00s)
+=== RUN   TestApiLoaderLongestPathFirst
+--- PASS: TestApiLoaderLongestPathFirst (0.03s)
+=== RUN   TestRotateClientSecretHandler
+=== RUN   TestRotateClientSecretHandler/Secret_can_be_rotated
+--- PASS: TestRotateClientSecretHandler (0.03s)
+    --- PASS: TestRotateClientSecretHandler/Secret_can_be_rotated (0.00s)
+=== RUN   TestHandleAddOrUpdateApi
+=== RUN   TestHandleAddOrUpdateApi/should_return_error_when_api_definition_json_is_invalid
+=== RUN   TestHandleAddOrUpdateApi/should_return_error_when_api_ids_are_different
+=== RUN   TestHandleAddOrUpdateApi/should_return_error_when_semantic_validation_fails
+=== RUN   TestHandleAddOrUpdateApi/should_return_success_when_no_error_occurs
+--- PASS: TestHandleAddOrUpdateApi (0.00s)
+    --- PASS: TestHandleAddOrUpdateApi/should_return_error_when_api_definition_json_is_invalid (0.00s)
+    --- PASS: TestHandleAddOrUpdateApi/should_return_error_when_api_ids_are_different (0.00s)
+    --- PASS: TestHandleAddOrUpdateApi/should_return_error_when_semantic_validation_fails (0.00s)
+    --- PASS: TestHandleAddOrUpdateApi/should_return_success_when_no_error_occurs (0.00s)
+=== RUN   TestAuthenticationAfterDeleteKey
+=== RUN   TestAuthenticationAfterDeleteKey/HashKeys=false
+=== RUN   TestAuthenticationAfterDeleteKey/HashKeys=true
+--- PASS: TestAuthenticationAfterDeleteKey (0.05s)
+    --- PASS: TestAuthenticationAfterDeleteKey/HashKeys=false (0.03s)
+    --- PASS: TestAuthenticationAfterDeleteKey/HashKeys=true (0.03s)
+=== RUN   TestAuthenticationAfterUpdateKey
+=== RUN   TestAuthenticationAfterUpdateKey/HashKeys=false
+=== RUN   TestAuthenticationAfterUpdateKey/HashKeys=true
+--- PASS: TestAuthenticationAfterUpdateKey (0.05s)
+    --- PASS: TestAuthenticationAfterUpdateKey/HashKeys=false (0.03s)
+    --- PASS: TestAuthenticationAfterUpdateKey/HashKeys=true (0.03s)
+=== RUN   TestHashKeyFunctionChanged
+=== RUN   TestHashKeyFunctionChanged/custom_key
+=== RUN   TestHashKeyFunctionChanged/basic_auth_key
+=== RUN   TestHashKeyFunctionChanged/client_certificate
+--- PASS: TestHashKeyFunctionChanged (0.22s)
+    --- PASS: TestHashKeyFunctionChanged/custom_key (0.01s)
+    --- PASS: TestHashKeyFunctionChanged/basic_auth_key (0.13s)
+    --- PASS: TestHashKeyFunctionChanged/client_certificate (0.02s)
+=== RUN   TestBatch
+--- PASS: TestBatch (0.02s)
+=== RUN   TestVirtualEndpointBatch
+=== RUN   TestVirtualEndpointBatch/Skip_verification
+=== RUN   TestVirtualEndpointBatch/Verification_required
+--- PASS: TestVirtualEndpointBatch (0.19s)
+    --- PASS: TestVirtualEndpointBatch/Skip_verification (0.01s)
+    --- PASS: TestVirtualEndpointBatch/Verification_required (0.14s)
+=== RUN   TestBatchIgnoreCanonicalHeaderKey
+--- PASS: TestBatchIgnoreCanonicalHeaderKey (0.53s)
+=== RUN   TestPublicKeyPinning
+=== RUN   TestPublicKeyPinning/Pub_key_match
+=== RUN   TestPublicKeyPinning/Pub_key_not_match
+=== RUN   TestPublicKeyPinning/Global_setting
+=== RUN   TestPublicKeyPinning/Though_proxy
+=== RUN   TestPublicKeyPinning/Enable_Common_Name_check
+--- PASS: TestPublicKeyPinning (0.20s)
+    --- PASS: TestPublicKeyPinning/Pub_key_match (0.02s)
+    --- PASS: TestPublicKeyPinning/Pub_key_not_match (0.02s)
+    --- PASS: TestPublicKeyPinning/Global_setting (0.02s)
+    --- PASS: TestPublicKeyPinning/Though_proxy (0.03s)
+    --- PASS: TestPublicKeyPinning/Enable_Common_Name_check (0.06s)
+=== RUN   TestProxyTransport
+=== RUN   TestProxyTransport/Global:_Cipher_match
+=== RUN   TestProxyTransport/Global:_Cipher_not_match
+=== RUN   TestProxyTransport/API:_Cipher_override
+=== RUN   TestProxyTransport/API:_MinTLS_not_match
+=== RUN   TestProxyTransport/API:_Invalid_proxy
+=== RUN   TestProxyTransport/API:_Valid_proxy
+--- PASS: TestProxyTransport (0.08s)
+    --- PASS: TestProxyTransport/Global:_Cipher_match (0.01s)
+    --- PASS: TestProxyTransport/Global:_Cipher_not_match (0.01s)
+    --- PASS: TestProxyTransport/API:_Cipher_override (0.01s)
+    --- PASS: TestProxyTransport/API:_MinTLS_not_match (0.01s)
+    --- PASS: TestProxyTransport/API:_Invalid_proxy (0.01s)
+    --- PASS: TestProxyTransport/API:_Valid_proxy (0.03s)
+=== RUN   TestGatewayTLS
+=== RUN   TestGatewayTLS/Without_certificates
+=== RUN   TestGatewayTLS/Legacy_TLS_certificate_path
+=== RUN   TestGatewayTLS/File_certificate_path
+=== RUN   TestGatewayTLS/Redis_certificate
+--- PASS: TestGatewayTLS (0.11s)
+    --- PASS: TestGatewayTLS/Without_certificates (0.02s)
+    --- PASS: TestGatewayTLS/Legacy_TLS_certificate_path (0.02s)
+    --- PASS: TestGatewayTLS/File_certificate_path (0.02s)
+    --- PASS: TestGatewayTLS/Redis_certificate (0.02s)
+=== RUN   TestGatewayControlAPIMutualTLS
+=== RUN   TestGatewayControlAPIMutualTLS/Separate_domain
+--- PASS: TestGatewayControlAPIMutualTLS (0.05s)
+    --- PASS: TestGatewayControlAPIMutualTLS/Separate_domain (0.03s)
+=== RUN   TestAPIMutualTLS
+=== RUN   TestAPIMutualTLS/SNI_and_domain_per_API
+=== RUN   TestAPIMutualTLS/SNI_and_domain_per_API/API_without_mutual_TLS
+=== RUN   TestAPIMutualTLS/SNI_and_domain_per_API/MutualTLSCertificate_not_set
+=== RUN   TestAPIMutualTLS/SNI_and_domain_per_API/Client_certificate_match
+=== RUN   TestAPIMutualTLS/SNI_and_domain_per_API/Client_certificate_differ
+=== RUN   TestAPIMutualTLS/Multiple_APIs_on_same_domain
+=== RUN   TestAPIMutualTLS/Multiple_APIs_on_same_domain/Empty_domain
+=== RUN   TestAPIMutualTLS/Multiple_APIs_on_same_domain/Empty_domain/Without_certificate
+=== RUN   TestAPIMutualTLS/Multiple_APIs_on_same_domain/Empty_domain/Client_certificate_not_match
+=== RUN   TestAPIMutualTLS/Multiple_APIs_on_same_domain/Empty_domain/Client_certificate_match
+=== RUN   TestAPIMutualTLS/Multiple_APIs_on_same_domain/Custom_domain
+=== RUN   TestAPIMutualTLS/Multiple_APIs_on_same_domain/Custom_domain/Without_certificate
+=== RUN   TestAPIMutualTLS/Multiple_APIs_on_same_domain/Custom_domain/Client_certificate_not_match
+=== RUN   TestAPIMutualTLS/Multiple_APIs_on_same_domain/Custom_domain/Client_certificate_match
+=== RUN   TestAPIMutualTLS/Multiple_APIs_with_Mutual_TLS_on_the_same_domain
+=== RUN   TestAPIMutualTLS/Multiple_APIs_with_Mutual_TLS_on_the_same_domain/Empty_domain
+=== RUN   TestAPIMutualTLS/Multiple_APIs_with_Mutual_TLS_on_the_same_domain/Empty_domain/Without_certificate
+=== RUN   TestAPIMutualTLS/Multiple_APIs_with_Mutual_TLS_on_the_same_domain/Empty_domain/Client_certificate_not_match
+=== RUN   TestAPIMutualTLS/Multiple_APIs_with_Mutual_TLS_on_the_same_domain/Empty_domain/Client_certificate_match
+=== RUN   TestAPIMutualTLS/Multiple_APIs_with_Mutual_TLS_on_the_same_domain/Custom_domain
+=== RUN   TestAPIMutualTLS/Multiple_APIs_with_Mutual_TLS_on_the_same_domain/Custom_domain/Without_certificate
+=== RUN   TestAPIMutualTLS/Multiple_APIs_with_Mutual_TLS_on_the_same_domain/Custom_domain/Client_certificate_not_match
+=== RUN   TestAPIMutualTLS/Multiple_APIs_with_Mutual_TLS_on_the_same_domain/Custom_domain/Client_certificate_match
+=== RUN   TestAPIMutualTLS/Multiple_APIs,_mutual_on_custom
+=== RUN   TestAPIMutualTLS/Multiple_APIs,_mutual_on_custom/Empty_domain
+=== RUN   TestAPIMutualTLS/Multiple_APIs,_mutual_on_custom/Empty_domain/Without_certificate
+=== RUN   TestAPIMutualTLS/Multiple_APIs,_mutual_on_custom/Empty_domain/Client_certificate_not_match
+=== RUN   TestAPIMutualTLS/Multiple_APIs,_mutual_on_custom/Empty_domain/Client_certificate_match
+=== RUN   TestAPIMutualTLS/Multiple_APIs,_mutual_on_custom/Custom_domain
+=== RUN   TestAPIMutualTLS/Multiple_APIs,_mutual_on_custom/Custom_domain/Without_certificate
+=== RUN   TestAPIMutualTLS/Multiple_APIs,_mutual_on_custom/Custom_domain/Client_certificate_not_match
+=== RUN   TestAPIMutualTLS/Multiple_APIs,_mutual_on_custom/Custom_domain/Client_certificate_match
+=== RUN   TestAPIMutualTLS/Multiple_APIs,_mutual_on_empty
+=== RUN   TestAPIMutualTLS/Multiple_APIs,_mutual_on_empty/Empty_domain
+=== RUN   TestAPIMutualTLS/Multiple_APIs,_mutual_on_empty/Empty_domain/Without_certificate
+=== RUN   TestAPIMutualTLS/Multiple_APIs,_mutual_on_empty/Empty_domain/Client_certificate_not_match
+=== RUN   TestAPIMutualTLS/Multiple_APIs,_mutual_on_empty/Empty_domain/Client_certificate_match
+=== RUN   TestAPIMutualTLS/Multiple_APIs,_mutual_on_empty/Custom_domain
+=== RUN   TestAPIMutualTLS/Multiple_APIs,_mutual_on_empty/Custom_domain/Without_certificate
+=== RUN   TestAPIMutualTLS/Multiple_APIs,_mutual_on_empty/Custom_domain/Client_certificate_not_match
+=== RUN   TestAPIMutualTLS/Multiple_APIs,_mutual_on_empty/Custom_domain/Client_certificate_match
+--- PASS: TestAPIMutualTLS (0.41s)
+    --- PASS: TestAPIMutualTLS/SNI_and_domain_per_API (0.06s)
+        --- PASS: TestAPIMutualTLS/SNI_and_domain_per_API/API_without_mutual_TLS (0.01s)
+        --- PASS: TestAPIMutualTLS/SNI_and_domain_per_API/MutualTLSCertificate_not_set (0.01s)
+        --- PASS: TestAPIMutualTLS/SNI_and_domain_per_API/Client_certificate_match (0.01s)
+        --- PASS: TestAPIMutualTLS/SNI_and_domain_per_API/Client_certificate_differ (0.03s)
+    --- PASS: TestAPIMutualTLS/Multiple_APIs_on_same_domain (0.06s)
+        --- PASS: TestAPIMutualTLS/Multiple_APIs_on_same_domain/Empty_domain (0.03s)
+            --- PASS: TestAPIMutualTLS/Multiple_APIs_on_same_domain/Empty_domain/Without_certificate (0.01s)
+            --- PASS: TestAPIMutualTLS/Multiple_APIs_on_same_domain/Empty_domain/Client_certificate_not_match (0.01s)
+            --- PASS: TestAPIMutualTLS/Multiple_APIs_on_same_domain/Empty_domain/Client_certificate_match (0.01s)
+        --- PASS: TestAPIMutualTLS/Multiple_APIs_on_same_domain/Custom_domain (0.04s)
+            --- PASS: TestAPIMutualTLS/Multiple_APIs_on_same_domain/Custom_domain/Without_certificate (0.01s)
+            --- PASS: TestAPIMutualTLS/Multiple_APIs_on_same_domain/Custom_domain/Client_certificate_not_match (0.01s)
+            --- PASS: TestAPIMutualTLS/Multiple_APIs_on_same_domain/Custom_domain/Client_certificate_match (0.02s)
+    --- PASS: TestAPIMutualTLS/Multiple_APIs_with_Mutual_TLS_on_the_same_domain (0.08s)
+        --- PASS: TestAPIMutualTLS/Multiple_APIs_with_Mutual_TLS_on_the_same_domain/Empty_domain (0.04s)
+            --- PASS: TestAPIMutualTLS/Multiple_APIs_with_Mutual_TLS_on_the_same_domain/Empty_domain/Without_certificate (0.01s)
+            --- PASS: TestAPIMutualTLS/Multiple_APIs_with_Mutual_TLS_on_the_same_domain/Empty_domain/Client_certificate_not_match (0.01s)
+            --- PASS: TestAPIMutualTLS/Multiple_APIs_with_Mutual_TLS_on_the_same_domain/Empty_domain/Client_certificate_match (0.02s)
+        --- PASS: TestAPIMutualTLS/Multiple_APIs_with_Mutual_TLS_on_the_same_domain/Custom_domain (0.04s)
+            --- PASS: TestAPIMutualTLS/Multiple_APIs_with_Mutual_TLS_on_the_same_domain/Custom_domain/Without_certificate (0.01s)
+            --- PASS: TestAPIMutualTLS/Multiple_APIs_with_Mutual_TLS_on_the_same_domain/Custom_domain/Client_certificate_not_match (0.01s)
+            --- PASS: TestAPIMutualTLS/Multiple_APIs_with_Mutual_TLS_on_the_same_domain/Custom_domain/Client_certificate_match (0.02s)
+    --- PASS: TestAPIMutualTLS/Multiple_APIs,_mutual_on_custom (0.07s)
+        --- PASS: TestAPIMutualTLS/Multiple_APIs,_mutual_on_custom/Empty_domain (0.03s)
+            --- PASS: TestAPIMutualTLS/Multiple_APIs,_mutual_on_custom/Empty_domain/Without_certificate (0.01s)
+            --- PASS: TestAPIMutualTLS/Multiple_APIs,_mutual_on_custom/Empty_domain/Client_certificate_not_match (0.01s)
+            --- PASS: TestAPIMutualTLS/Multiple_APIs,_mutual_on_custom/Empty_domain/Client_certificate_match (0.01s)
+        --- PASS: TestAPIMutualTLS/Multiple_APIs,_mutual_on_custom/Custom_domain (0.04s)
+            --- PASS: TestAPIMutualTLS/Multiple_APIs,_mutual_on_custom/Custom_domain/Without_certificate (0.01s)
+            --- PASS: TestAPIMutualTLS/Multiple_APIs,_mutual_on_custom/Custom_domain/Client_certificate_not_match (0.01s)
+            --- PASS: TestAPIMutualTLS/Multiple_APIs,_mutual_on_custom/Custom_domain/Client_certificate_match (0.01s)
+    --- PASS: TestAPIMutualTLS/Multiple_APIs,_mutual_on_empty (0.06s)
+        --- PASS: TestAPIMutualTLS/Multiple_APIs,_mutual_on_empty/Empty_domain (0.03s)
+            --- PASS: TestAPIMutualTLS/Multiple_APIs,_mutual_on_empty/Empty_domain/Without_certificate (0.01s)
+            --- PASS: TestAPIMutualTLS/Multiple_APIs,_mutual_on_empty/Empty_domain/Client_certificate_not_match (0.01s)
+            --- PASS: TestAPIMutualTLS/Multiple_APIs,_mutual_on_empty/Empty_domain/Client_certificate_match (0.01s)
+        --- PASS: TestAPIMutualTLS/Multiple_APIs,_mutual_on_empty/Custom_domain (0.03s)
+            --- PASS: TestAPIMutualTLS/Multiple_APIs,_mutual_on_empty/Custom_domain/Without_certificate (0.01s)
+            --- PASS: TestAPIMutualTLS/Multiple_APIs,_mutual_on_empty/Custom_domain/Client_certificate_not_match (0.01s)
+            --- PASS: TestAPIMutualTLS/Multiple_APIs,_mutual_on_empty/Custom_domain/Client_certificate_match (0.01s)
+=== RUN   TestUpstreamMutualTLS
+=== RUN   TestUpstreamMutualTLS/Without_API
+=== RUN   TestUpstreamMutualTLS/Upstream_API
+--- PASS: TestUpstreamMutualTLS (0.05s)
+    --- PASS: TestUpstreamMutualTLS/Without_API (0.00s)
+    --- PASS: TestUpstreamMutualTLS/Upstream_API (0.02s)
+=== RUN   TestSSLForceCommonName
+=== RUN   TestSSLForceCommonName/Force_Common_Name_Check_is_Disabled
+=== RUN   TestSSLForceCommonName/Force_Common_Name_Check_is_Enabled
+--- PASS: TestSSLForceCommonName (0.06s)
+    --- PASS: TestSSLForceCommonName/Force_Common_Name_Check_is_Disabled (0.02s)
+    --- PASS: TestSSLForceCommonName/Force_Common_Name_Check_is_Enabled (0.02s)
+=== RUN   TestKeyWithCertificateTLS
+=== RUN   TestKeyWithCertificateTLS/Without_domain
+=== RUN   TestKeyWithCertificateTLS/Without_domain/Cert_unknown
+=== RUN   TestKeyWithCertificateTLS/Without_domain/Cert_known
+=== RUN   TestKeyWithCertificateTLS/With_custom_domain
+=== RUN   TestKeyWithCertificateTLS/With_custom_domain/Cert_unknown
+=== RUN   TestKeyWithCertificateTLS/With_custom_domain/Cert_known
+=== RUN   TestKeyWithCertificateTLS/With_regex_custom_domain
+=== RUN   TestKeyWithCertificateTLS/Cert_removed
+--- PASS: TestKeyWithCertificateTLS (0.22s)
+    --- PASS: TestKeyWithCertificateTLS/Without_domain (0.04s)
+        --- PASS: TestKeyWithCertificateTLS/Without_domain/Cert_unknown (0.00s)
+        --- PASS: TestKeyWithCertificateTLS/Without_domain/Cert_known (0.01s)
+    --- PASS: TestKeyWithCertificateTLS/With_custom_domain (0.04s)
+        --- PASS: TestKeyWithCertificateTLS/With_custom_domain/Cert_unknown (0.01s)
+        --- PASS: TestKeyWithCertificateTLS/With_custom_domain/Cert_known (0.01s)
+    --- PASS: TestKeyWithCertificateTLS/With_regex_custom_domain (0.03s)
+    --- PASS: TestKeyWithCertificateTLS/Cert_removed (0.08s)
+=== RUN   TestAPICertificate
+=== RUN   TestAPICertificate/Cert_set_via_API
+=== RUN   TestAPICertificate/Cert_unknown
+--- PASS: TestAPICertificate (0.06s)
+    --- PASS: TestAPICertificate/Cert_set_via_API (0.01s)
+    --- PASS: TestAPICertificate/Cert_unknown (0.01s)
+=== RUN   TestCertificateHandlerTLS
+=== RUN   TestCertificateHandlerTLS/List_certificates,_empty
+=== RUN   TestCertificateHandlerTLS/Should_add_certificates_with_and_without_private_keys
+=== RUN   TestCertificateHandlerTLS/List_certificates,_non_empty
+=== RUN   TestCertificateHandlerTLS/Certificate_meta_info
+=== RUN   TestCertificateHandlerTLS/Certificate_removal
+--- PASS: TestCertificateHandlerTLS (0.09s)
+    --- PASS: TestCertificateHandlerTLS/List_certificates,_empty (0.00s)
+    --- PASS: TestCertificateHandlerTLS/Should_add_certificates_with_and_without_private_keys (0.00s)
+    --- PASS: TestCertificateHandlerTLS/List_certificates,_non_empty (0.00s)
+    --- PASS: TestCertificateHandlerTLS/Certificate_meta_info (0.00s)
+    --- PASS: TestCertificateHandlerTLS/Certificate_removal (0.00s)
+=== RUN   TestCipherSuites
+=== RUN   TestCipherSuites/Cipher_match
+=== RUN   TestCipherSuites/Cipher_non-match
+--- PASS: TestCipherSuites (0.04s)
+    --- PASS: TestCipherSuites/Cipher_match (0.00s)
+    --- PASS: TestCipherSuites/Cipher_non-match (0.00s)
+=== RUN   TestBundleLoader
+=== RUN   TestBundleLoader/Nonexistent_bundle
+=== RUN   TestBundleLoader/Existing_bundle_with_auth_check
+--- PASS: TestBundleLoader (0.02s)
+    --- PASS: TestBundleLoader/Nonexistent_bundle (0.01s)
+    --- PASS: TestBundleLoader/Existing_bundle_with_auth_check (0.01s)
+=== RUN   TestBundleFetcher
+=== RUN   TestBundleFetcher/Simple_bundle_base_URL
+=== RUN   TestBundleFetcher/Bundle_base_URL_with_querystring
+--- PASS: TestBundleFetcher (0.02s)
+    --- PASS: TestBundleFetcher/Simple_bundle_base_URL (0.01s)
+    --- PASS: TestBundleFetcher/Bundle_base_URL_with_querystring (0.01s)
+=== RUN   TestValueExtractor
+=== RUN   TestValueExtractor/HeaderSource
+=== RUN   TestValueExtractor/FormSource
+--- PASS: TestValueExtractor (0.00s)
+    --- PASS: TestValueExtractor/HeaderSource (0.00s)
+    --- PASS: TestValueExtractor/FormSource (0.00s)
+=== RUN   TestRegexExtractor
+=== RUN   TestRegexExtractor/HeaderSource
+=== RUN   TestRegexExtractor/BodySource
+=== RUN   TestRegexExtractor/FormSource
+--- PASS: TestRegexExtractor (0.00s)
+    --- PASS: TestRegexExtractor/HeaderSource (0.00s)
+    --- PASS: TestRegexExtractor/BodySource (0.00s)
+    --- PASS: TestRegexExtractor/FormSource (0.00s)
+=== RUN   TestXPathExtractor
+=== RUN   TestXPathExtractor/HeaderSource
+=== RUN   TestXPathExtractor/BodySource
+=== RUN   TestXPathExtractor/FormSource
+--- PASS: TestXPathExtractor (0.00s)
+    --- PASS: TestXPathExtractor/HeaderSource (0.00s)
+    --- PASS: TestXPathExtractor/BodySource (0.00s)
+    --- PASS: TestXPathExtractor/FormSource (0.00s)
+=== RUN   TestNewValid
+--- PASS: TestNewValid (0.00s)
+=== RUN   TestNewInvalid
+--- PASS: TestNewInvalid (0.00s)
+=== RUN   TestChecksum
+--- PASS: TestChecksum (0.00s)
+=== RUN   TestBuildRequest
+--- PASS: TestBuildRequest (0.00s)
+=== RUN   TestBuildRequestIngoreCanonicalHeaderKey
+--- PASS: TestBuildRequestIngoreCanonicalHeaderKey (0.00s)
+=== RUN   TestCreateBody
+--- PASS: TestCreateBody (0.00s)
+=== RUN   TestGet
+--- PASS: TestGet (0.00s)
+=== RUN   TestPost
+--- PASS: TestPost (0.00s)
+=== RUN   TestNewCustomTemplate
+=== RUN   TestNewCustomTemplate/UseDefault
+=== RUN   TestNewCustomTemplate/FallbackToDefault
+=== RUN   TestNewCustomTemplate/UseCustom
+=== RUN   TestNewCustomTemplate/MissingDefault
+=== RUN   TestNewCustomTemplate/MissingDefaultFallback
+=== RUN   TestNewCustomTemplate/MissingDefaultNotNeeded
+--- PASS: TestNewCustomTemplate (0.00s)
+    --- PASS: TestNewCustomTemplate/UseDefault (0.00s)
+    --- PASS: TestNewCustomTemplate/FallbackToDefault (0.00s)
+    --- PASS: TestNewCustomTemplate/UseCustom (0.00s)
+    --- PASS: TestNewCustomTemplate/MissingDefault (0.00s)
+    --- PASS: TestNewCustomTemplate/MissingDefaultFallback (0.00s)
+    --- PASS: TestNewCustomTemplate/MissingDefaultNotNeeded (0.00s)
+=== RUN   TestWebhookContentTypeHeader
+=== RUN   TestWebhookContentTypeHeader/MissingTemplatePath
+=== RUN   TestWebhookContentTypeHeader/MissingTemplatePath/CustomHeaders
+=== RUN   TestWebhookContentTypeHeader/InvalidTemplatePath
+=== RUN   TestWebhookContentTypeHeader/InvalidTemplatePath/CustomHeaders
+=== RUN   TestWebhookContentTypeHeader/CustomTemplate
+=== RUN   TestWebhookContentTypeHeader/CustomTemplate/CustomHeaders
+--- PASS: TestWebhookContentTypeHeader (0.00s)
+    --- PASS: TestWebhookContentTypeHeader/MissingTemplatePath (0.00s)
+    --- PASS: TestWebhookContentTypeHeader/MissingTemplatePath/CustomHeaders (0.00s)
+    --- PASS: TestWebhookContentTypeHeader/InvalidTemplatePath (0.00s)
+    --- PASS: TestWebhookContentTypeHeader/InvalidTemplatePath/CustomHeaders (0.00s)
+    --- PASS: TestWebhookContentTypeHeader/CustomTemplate (0.00s)
+    --- PASS: TestWebhookContentTypeHeader/CustomTemplate/CustomHeaders (0.00s)
+=== RUN   TestEventHandlerByName
+--- PASS: TestEventHandlerByName (0.00s)
+=== RUN   TestLogMessageEventHandler
+--- PASS: TestLogMessageEventHandler (0.00s)
+=== RUN   TestInitGenericEventHandlers
+--- PASS: TestInitGenericEventHandlers (0.00s)
+=== RUN   TestAA
+--- PASS: TestAA (0.04s)
+=== RUN   TestParambasedAuth
+--- PASS: TestParambasedAuth (0.03s)
+=== RUN   TestStripPathWithURLRewrite
+=== RUN   TestStripPathWithURLRewrite/rewrite_URL_containing_listen_path
+--- PASS: TestStripPathWithURLRewrite (0.02s)
+    --- PASS: TestStripPathWithURLRewrite/rewrite_URL_containing_listen_path (0.01s)
+=== RUN   TestSkipTargetPassEscapingOff
+=== RUN   TestSkipTargetPassEscapingOff/With_escaping,_default
+=== RUN   TestSkipTargetPassEscapingOff/Without_escaping
+=== RUN   TestSkipTargetPassEscapingOff/With_escaping,_listen_path_and_target_URL_are_set,_StripListenPath_is_OFF
+=== RUN   TestSkipTargetPassEscapingOff/Without_escaping,_listen_path_and_target_URL_are_set,_StripListenPath_is_OFF
+=== RUN   TestSkipTargetPassEscapingOff/With_escaping,_listen_path_and_target_URL_are_set,_StripListenPath_is_ON
+=== RUN   TestSkipTargetPassEscapingOff/Without_escaping,_listen_path_and_target_URL_are_set,_StripListenPath_is_ON
+--- PASS: TestSkipTargetPassEscapingOff (0.06s)
+    --- PASS: TestSkipTargetPassEscapingOff/With_escaping,_default (0.01s)
+    --- PASS: TestSkipTargetPassEscapingOff/Without_escaping (0.01s)
+    --- PASS: TestSkipTargetPassEscapingOff/With_escaping,_listen_path_and_target_URL_are_set,_StripListenPath_is_OFF (0.01s)
+    --- PASS: TestSkipTargetPassEscapingOff/Without_escaping,_listen_path_and_target_URL_are_set,_StripListenPath_is_OFF (0.01s)
+    --- PASS: TestSkipTargetPassEscapingOff/With_escaping,_listen_path_and_target_URL_are_set,_StripListenPath_is_ON (0.01s)
+    --- PASS: TestSkipTargetPassEscapingOff/Without_escaping,_listen_path_and_target_URL_are_set,_StripListenPath_is_ON (0.01s)
+=== RUN   TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue
+=== RUN   TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue/With_escaping,_default
+=== RUN   TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue/Without_escaping,_default
+=== RUN   TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue/With_escaping,_listen_path_and_target_URL_are_set,_StripListenPath_is_OFF
+=== RUN   TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue/Without_escaping,_listen_path_and_target_URL_are_set,_StripListenPath_is_OFF
+=== RUN   TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue/With_escaping,_listen_path_and_target_URL_are_set,_StripListenPath_is_ON
+=== RUN   TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue/Without_escaping,_listen_path_and_target_URL_are_set,_StripListenPath_is_ON
+--- PASS: TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue (0.05s)
+    --- PASS: TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue/With_escaping,_default (0.01s)
+    --- PASS: TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue/Without_escaping,_default (0.01s)
+    --- PASS: TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue/With_escaping,_listen_path_and_target_URL_are_set,_StripListenPath_is_OFF (0.01s)
+    --- PASS: TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue/Without_escaping,_listen_path_and_target_URL_are_set,_StripListenPath_is_OFF (0.01s)
+    --- PASS: TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue/With_escaping,_listen_path_and_target_URL_are_set,_StripListenPath_is_ON (0.01s)
+    --- PASS: TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue/Without_escaping,_listen_path_and_target_URL_are_set,_StripListenPath_is_ON (0.01s)
+=== RUN   TestQuota
+--- PASS: TestQuota (0.03s)
+=== RUN   TestAnalytics
+=== RUN   TestAnalytics/Log_errors
+=== RUN   TestAnalytics/Log_success
+=== RUN   TestAnalytics/Detailed_analytics_with_api_spec_config_enabled
+=== RUN   TestAnalytics/Detailed_analytics_with_only_key_flag_set
+=== RUN   TestAnalytics/Detailed_analytics
+=== RUN   TestAnalytics/Detailed_analytics_with_latency
+=== RUN   TestAnalytics/Detailed_analytics_with_cache
+--- PASS: TestAnalytics (1.89s)
+    --- PASS: TestAnalytics/Log_errors (0.24s)
+    --- PASS: TestAnalytics/Log_success (0.23s)
+    --- PASS: TestAnalytics/Detailed_analytics_with_api_spec_config_enabled (0.23s)
+    --- PASS: TestAnalytics/Detailed_analytics_with_only_key_flag_set (0.23s)
+    --- PASS: TestAnalytics/Detailed_analytics (0.23s)
+    --- PASS: TestAnalytics/Detailed_analytics_with_latency (0.24s)
+    --- PASS: TestAnalytics/Detailed_analytics_with_cache (0.25s)
+=== RUN   TestListener
+=== RUN   TestListener/hotReload:_false,_overrideDefaults:_false
+=== RUN   TestListener/hotReload:_false,_overrideDefaults:_true
+=== RUN   TestListener/hotReload:_true,_overrideDefaults:_true
+=== RUN   TestListener/hotReload:_true,_overrideDefaults:_false
+--- PASS: TestListener (0.24s)
+    --- PASS: TestListener/hotReload:_false,_overrideDefaults:_false (0.03s)
+    --- PASS: TestListener/hotReload:_false,_overrideDefaults:_true (0.03s)
+    --- PASS: TestListener/hotReload:_true,_overrideDefaults:_true (0.03s)
+    --- PASS: TestListener/hotReload:_true,_overrideDefaults:_false (0.03s)
+=== RUN   TestControlListener
+=== RUN   TestControlListener/hotReload:_false,_overrideDefaults:_false
+=== RUN   TestControlListener/hotReload:_false,_overrideDefaults:_true
+=== RUN   TestControlListener/hotReload:_true,_overrideDefaults:_true
+=== RUN   TestControlListener/hotReload:_true,_overrideDefaults:_false
+=== RUN   TestControlListener/hotReload:_false,_overrideDefaults:_false#01
+=== RUN   TestControlListener/hotReload:_false,_overrideDefaults:_true#01
+=== RUN   TestControlListener/hotReload:_true,_overrideDefaults:_true#01
+=== RUN   TestControlListener/hotReload:_true,_overrideDefaults:_false#01
+--- PASS: TestControlListener (0.20s)
+    --- PASS: TestControlListener/hotReload:_false,_overrideDefaults:_false (0.00s)
+    --- PASS: TestControlListener/hotReload:_false,_overrideDefaults:_true (0.00s)
+    --- PASS: TestControlListener/hotReload:_true,_overrideDefaults:_true (0.00s)
+    --- PASS: TestControlListener/hotReload:_true,_overrideDefaults:_false (0.00s)
+    --- PASS: TestControlListener/hotReload:_false,_overrideDefaults:_false#01 (0.00s)
+    --- PASS: TestControlListener/hotReload:_false,_overrideDefaults:_true#01 (0.00s)
+    --- PASS: TestControlListener/hotReload:_true,_overrideDefaults:_true#01 (0.00s)
+    --- PASS: TestControlListener/hotReload:_true,_overrideDefaults:_false#01 (0.00s)
+=== RUN   TestHttpPprof
+--- PASS: TestHttpPprof (0.05s)
+=== RUN   TestManagementNodeRedisEvents
+=== RUN   TestManagementNodeRedisEvents/Without_signing:
+=== RUN   TestManagementNodeRedisEvents/With_signature
+--- PASS: TestManagementNodeRedisEvents (0.00s)
+    --- PASS: TestManagementNodeRedisEvents/Without_signing: (0.00s)
+    --- PASS: TestManagementNodeRedisEvents/With_signature (0.00s)
+=== RUN   TestListenPathTykPrefix
+--- PASS: TestListenPathTykPrefix (0.02s)
+=== RUN   TestReloadGoroutineLeakWithCircuitBreaker
+--- PASS: TestReloadGoroutineLeakWithCircuitBreaker (0.12s)
+=== RUN   TestProxyProtocol
+--- PASS: TestProxyProtocol (0.02s)
+=== RUN   TestProxyUserAgent
+--- PASS: TestProxyUserAgent (0.02s)
+=== RUN   TestSkipUrlCleaning
+--- PASS: TestSkipUrlCleaning (0.02s)
+=== RUN   TestMultiTargetProxy
+--- PASS: TestMultiTargetProxy (0.02s)
+=== RUN   TestCustomDomain
+=== RUN   TestCustomDomain/With_custom_domain_support
+=== RUN   TestCustomDomain/Without_custom_domain_support
+--- PASS: TestCustomDomain (0.06s)
+    --- PASS: TestCustomDomain/With_custom_domain_support (0.03s)
+    --- PASS: TestCustomDomain/Without_custom_domain_support (0.03s)
+=== RUN   TestGatewayHealthCheck
+=== RUN   TestGatewayHealthCheck/control_api_port_==_listen_port
+=== RUN   TestGatewayHealthCheck/control_api_port_==_listen_port/Without_APIs
+=== RUN   TestGatewayHealthCheck/control_api_port_==_listen_port/With_API
+=== RUN   TestGatewayHealthCheck/control_api_port_!=_listen_port
+=== RUN   TestGatewayHealthCheck/control_api_port_!=_listen_port/Without_APIs
+=== RUN   TestGatewayHealthCheck/control_api_port_!=_listen_port/With_API
+--- PASS: TestGatewayHealthCheck (0.06s)
+    --- PASS: TestGatewayHealthCheck/control_api_port_==_listen_port (0.02s)
+        --- PASS: TestGatewayHealthCheck/control_api_port_==_listen_port/Without_APIs (0.00s)
+        --- PASS: TestGatewayHealthCheck/control_api_port_==_listen_port/With_API (0.01s)
+    --- PASS: TestGatewayHealthCheck/control_api_port_!=_listen_port (0.03s)
+        --- PASS: TestGatewayHealthCheck/control_api_port_!=_listen_port/Without_APIs (0.00s)
+        --- PASS: TestGatewayHealthCheck/control_api_port_!=_listen_port/With_API (0.01s)
+=== RUN   TestCacheAllSafeRequests
+--- PASS: TestCacheAllSafeRequests (0.08s)
+=== RUN   TestCacheAllSafeRequestsWithCachedHeaders
+--- PASS: TestCacheAllSafeRequestsWithCachedHeaders (0.09s)
+=== RUN   TestCacheWithAdvanceUrlRewrite
+--- PASS: TestCacheWithAdvanceUrlRewrite (0.04s)
+=== RUN   TestCachePostRequest
+--- PASS: TestCachePostRequest (0.11s)
+=== RUN   TestAdvanceCachePutRequest
+--- PASS: TestAdvanceCachePutRequest (0.29s)
+=== RUN   TestCacheAllSafeRequestsWithAdvancedCacheEndpoint
+--- PASS: TestCacheAllSafeRequestsWithAdvancedCacheEndpoint (0.04s)
+=== RUN   TestCacheEtag
+--- PASS: TestCacheEtag (0.13s)
+=== RUN   TestWebsocketsSeveralOpenClose
+--- PASS: TestWebsocketsSeveralOpenClose (0.03s)
+=== RUN   TestWebsocketsAndHTTPEndpointMatch
+--- PASS: TestWebsocketsAndHTTPEndpointMatch (0.03s)
+=== RUN   TestKeepAliveConns
+=== RUN   TestKeepAliveConns/Should_use_same_connection
+=== RUN   TestKeepAliveConns/Should_use_separate_connection
+=== RUN   TestKeepAliveConns/Should_respect_max_conn_time
+--- PASS: TestKeepAliveConns (0.04s)
+    --- PASS: TestKeepAliveConns/Should_use_same_connection (0.01s)
+    --- PASS: TestKeepAliveConns/Should_use_separate_connection (0.01s)
+    --- PASS: TestKeepAliveConns/Should_respect_max_conn_time (0.01s)
+=== RUN   TestRateLimitForAPIAndRateLimitAndQuotaCheck
+--- PASS: TestRateLimitForAPIAndRateLimitAndQuotaCheck (0.24s)
+=== RUN   TestTracing
+=== RUN   TestTracing/Custom_auth_header
+--- PASS: TestTracing (0.03s)
+    --- PASS: TestTracing/Custom_auth_header (0.00s)
+=== RUN   TestBrokenClients
+=== RUN   TestBrokenClients/Valid_client
+=== RUN   TestBrokenClients/Invalid_client:_close_without_read
+--- PASS: TestBrokenClients (0.53s)
+    --- PASS: TestBrokenClients/Valid_client (0.00s)
+    --- PASS: TestBrokenClients/Invalid_client:_close_without_read (0.50s)
+=== RUN   TestStripRegex
+--- PASS: TestStripRegex (0.00s)
+=== RUN   TestCache_singleErrorResponse
+--- PASS: TestCache_singleErrorResponse (1.03s)
+=== RUN   TestOverrideErrors
+=== RUN   TestOverrideErrors/Partial_override
+--- PASS: TestOverrideErrors (0.00s)
+    --- PASS: TestOverrideErrors/Partial_override (0.00s)
+=== RUN   TestHTTP2_h2C
+--- PASS: TestHTTP2_h2C (0.03s)
+=== RUN   TestGRPC_H2C
+--- PASS: TestGRPC_H2C (0.03s)
+=== RUN   TestHTTP2_TLS
+--- PASS: TestHTTP2_TLS (1.13s)
+=== RUN   TestTLSTyk_H2cUpstream
+--- PASS: TestTLSTyk_H2cUpstream (1.16s)
+=== RUN   TestGRPC_TLS
+--- PASS: TestGRPC_TLS (0.08s)
+=== RUN   TestGRPC_MutualTLS
+--- PASS: TestGRPC_MutualTLS (0.08s)
+=== RUN   TestGRPC_BasicAuthentication
+--- PASS: TestGRPC_BasicAuthentication (0.17s)
+=== RUN   TestGRPC_TokenBasedAuthentication
+--- PASS: TestGRPC_TokenBasedAuthentication (0.05s)
+=== RUN   TestGRPC_Stream_MutualTLS
+=== RUN   TestGRPC_Stream_MutualTLS/Valid_feature
+=== RUN   TestGRPC_Stream_MutualTLS/Feature_missing.
+=== RUN   TestGRPC_Stream_MutualTLS/Range_features
+=== RUN   TestGRPC_Stream_MutualTLS/RecordRoute
+    grpc_streamin_client_test.go:97: Traversing 51 points.
+=== RUN   TestGRPC_Stream_MutualTLS/RouteChat
+    grpc_streamin_client_test.go:160: Sending one note
+    grpc_streamin_client_test.go:147: Got message First message at point(0, 1)
+    grpc_streamin_client_test.go:160: Sending one note
+    grpc_streamin_client_test.go:147: Got message Second message at point(0, 2)
+    grpc_streamin_client_test.go:160: Sending one note
+    grpc_streamin_client_test.go:147: Got message Third message at point(0, 3)
+    grpc_streamin_client_test.go:160: Sending one note
+    grpc_streamin_client_test.go:147: Got message First message at point(0, 1)
+    grpc_streamin_client_test.go:147: Got message Fourth message at point(0, 1)
+    grpc_streamin_client_test.go:160: Sending one note
+    grpc_streamin_client_test.go:160: Sending one note
+    grpc_streamin_client_test.go:163: finish to send the notes
+--- PASS: TestGRPC_Stream_MutualTLS (0.13s)
+    --- PASS: TestGRPC_Stream_MutualTLS/Valid_feature (0.00s)
+    --- PASS: TestGRPC_Stream_MutualTLS/Feature_missing. (0.00s)
+    --- PASS: TestGRPC_Stream_MutualTLS/Range_features (0.00s)
+    --- PASS: TestGRPC_Stream_MutualTLS/RecordRoute (0.00s)
+    --- PASS: TestGRPC_Stream_MutualTLS/RouteChat (0.06s)
+=== RUN   TestGRPC_Stream_TokenBasedAuthentication
+=== RUN   TestGRPC_Stream_TokenBasedAuthentication/Valid_feature
+=== RUN   TestGRPC_Stream_TokenBasedAuthentication/Feature_missing.
+=== RUN   TestGRPC_Stream_TokenBasedAuthentication/Range_features
+=== RUN   TestGRPC_Stream_TokenBasedAuthentication/RecordRoute
+    grpc_streamin_client_test.go:97: Traversing 61 points.
+=== RUN   TestGRPC_Stream_TokenBasedAuthentication/RouteChat
+    grpc_streamin_client_test.go:160: Sending one note
+    grpc_streamin_client_test.go:147: Got message First message at point(0, 1)
+    grpc_streamin_client_test.go:160: Sending one note
+    grpc_streamin_client_test.go:147: Got message Second message at point(0, 2)
+    grpc_streamin_client_test.go:160: Sending one note
+    grpc_streamin_client_test.go:147: Got message Third message at point(0, 3)
+    grpc_streamin_client_test.go:160: Sending one note
+    grpc_streamin_client_test.go:147: Got message First message at point(0, 1)
+    grpc_streamin_client_test.go:147: Got message Fourth message at point(0, 1)
+    grpc_streamin_client_test.go:160: Sending one note
+    grpc_streamin_client_test.go:160: Sending one note
+    grpc_streamin_client_test.go:163: finish to send the notes
+--- PASS: TestGRPC_Stream_TokenBasedAuthentication (0.13s)
+    --- PASS: TestGRPC_Stream_TokenBasedAuthentication/Valid_feature (0.00s)
+    --- PASS: TestGRPC_Stream_TokenBasedAuthentication/Feature_missing. (0.00s)
+    --- PASS: TestGRPC_Stream_TokenBasedAuthentication/Range_features (0.00s)
+    --- PASS: TestGRPC_Stream_TokenBasedAuthentication/RecordRoute (0.00s)
+    --- PASS: TestGRPC_Stream_TokenBasedAuthentication/RouteChat (0.06s)
+=== RUN   TestGRPC_Stream_BasicAuthentication
+=== RUN   TestGRPC_Stream_BasicAuthentication/Valid_feature
+=== RUN   TestGRPC_Stream_BasicAuthentication/Feature_missing.
+=== RUN   TestGRPC_Stream_BasicAuthentication/Range_features
+=== RUN   TestGRPC_Stream_BasicAuthentication/RecordRoute
+    grpc_streamin_client_test.go:97: Traversing 43 points.
+=== RUN   TestGRPC_Stream_BasicAuthentication/RouteChat
+    grpc_streamin_client_test.go:160: Sending one note
+    grpc_streamin_client_test.go:147: Got message First message at point(0, 1)
+    grpc_streamin_client_test.go:160: Sending one note
+    grpc_streamin_client_test.go:147: Got message Second message at point(0, 2)
+    grpc_streamin_client_test.go:160: Sending one note
+    grpc_streamin_client_test.go:147: Got message Third message at point(0, 3)
+    grpc_streamin_client_test.go:160: Sending one note
+    grpc_streamin_client_test.go:147: Got message First message at point(0, 1)
+    grpc_streamin_client_test.go:147: Got message Fourth message at point(0, 1)
+    grpc_streamin_client_test.go:160: Sending one note
+    grpc_streamin_client_test.go:160: Sending one note
+    grpc_streamin_client_test.go:163: finish to send the notes
+--- PASS: TestGRPC_Stream_BasicAuthentication (0.22s)
+    --- PASS: TestGRPC_Stream_BasicAuthentication/Valid_feature (0.00s)
+    --- PASS: TestGRPC_Stream_BasicAuthentication/Feature_missing. (0.00s)
+    --- PASS: TestGRPC_Stream_BasicAuthentication/Range_features (0.00s)
+    --- PASS: TestGRPC_Stream_BasicAuthentication/RecordRoute (0.00s)
+    --- PASS: TestGRPC_Stream_BasicAuthentication/RouteChat (0.06s)
+=== RUN   TestGRPC_Stream_H2C
+=== RUN   TestGRPC_Stream_H2C/Valid_feature
+=== RUN   TestGRPC_Stream_H2C/Feature_missing.
+=== RUN   TestGRPC_Stream_H2C/Range_features
+=== RUN   TestGRPC_Stream_H2C/RecordRoute
+    grpc_streamin_client_test.go:97: Traversing 22 points.
+=== RUN   TestGRPC_Stream_H2C/RouteChat
+    grpc_streamin_client_test.go:160: Sending one note
+    grpc_streamin_client_test.go:147: Got message First message at point(0, 1)
+    grpc_streamin_client_test.go:160: Sending one note
+    grpc_streamin_client_test.go:147: Got message Second message at point(0, 2)
+    grpc_streamin_client_test.go:160: Sending one note
+    grpc_streamin_client_test.go:147: Got message Third message at point(0, 3)
+    grpc_streamin_client_test.go:160: Sending one note
+    grpc_streamin_client_test.go:147: Got message First message at point(0, 1)
+    grpc_streamin_client_test.go:147: Got message Fourth message at point(0, 1)
+    grpc_streamin_client_test.go:160: Sending one note
+    grpc_streamin_client_test.go:160: Sending one note
+    grpc_streamin_client_test.go:163: finish to send the notes
+--- PASS: TestGRPC_Stream_H2C (0.10s)
+    --- PASS: TestGRPC_Stream_H2C/Valid_feature (0.00s)
+    --- PASS: TestGRPC_Stream_H2C/Feature_missing. (0.00s)
+    --- PASS: TestGRPC_Stream_H2C/Range_features (0.00s)
+    --- PASS: TestGRPC_Stream_H2C/RecordRoute (0.00s)
+    --- PASS: TestGRPC_Stream_H2C/RouteChat (0.07s)
+=== RUN   TestHandleError_text_xml
+--- PASS: TestHandleError_text_xml (0.03s)
+=== RUN   TestHandleDefaultErrorXml
+--- PASS: TestHandleDefaultErrorXml (0.03s)
+=== RUN   TestHandleDefaultErrorJSON
+--- PASS: TestHandleDefaultErrorJSON (0.02s)
+=== RUN   TestHostCheckerManagerInit
+--- PASS: TestHostCheckerManagerInit (0.00s)
+=== RUN   TestAmIPolling
+--- PASS: TestAmIPolling (0.00s)
+=== RUN   TestGenerateCheckerId
+--- PASS: TestGenerateCheckerId (0.00s)
+=== RUN   TestCheckActivePollerLoop
+--- PASS: TestCheckActivePollerLoop (0.00s)
+=== RUN   TestStartPoller
+--- PASS: TestStartPoller (0.00s)
+=== RUN   TestRecordUptimeAnalytics
+--- PASS: TestRecordUptimeAnalytics (0.00s)
+=== RUN   TestHostChecker
+--- PASS: TestHostChecker (0.00s)
+=== RUN   TestReverseProxyAllDown
+--- PASS: TestReverseProxyAllDown (0.00s)
+=== RUN   TestTestCheckerTCPHosts_correct_answers
+--- PASS: TestTestCheckerTCPHosts_correct_answers (1.00s)
+=== RUN   TestTestCheckerTCPHosts_correct_answers_proxy_protocol
+--- PASS: TestTestCheckerTCPHosts_correct_answers_proxy_protocol (1.00s)
+=== RUN   TestTestCheckerTCPHosts_correct_wrong_answers
+--- PASS: TestTestCheckerTCPHosts_correct_wrong_answers (1.00s)
+=== RUN   TestProxyWhenHostIsDown
+--- PASS: TestProxyWhenHostIsDown (0.14s)
+=== RUN   TestChecker_triggerSampleLimit
+--- PASS: TestChecker_triggerSampleLimit (4.00s)
+=== RUN   TestGetLogEntryForRequest
+--- PASS: TestGetLogEntryForRequest (0.00s)
+=== RUN   TestLooping
+=== RUN   TestLooping/Using_advanced_URL_rewrite
+=== RUN   TestLooping/Test_multiple_url_rewrites
+=== RUN   TestLooping/Loop_to_another_API
+=== RUN   TestLooping/VirtualEndpoint_or_plugins
+=== RUN   TestLooping/Loop_limit
+=== RUN   TestLooping/Quota_and_rate_limit_calculation
+--- PASS: TestLooping (0.09s)
+    --- PASS: TestLooping/Using_advanced_URL_rewrite (0.01s)
+    --- PASS: TestLooping/Test_multiple_url_rewrites (0.01s)
+    --- PASS: TestLooping/Loop_to_another_API (0.01s)
+    --- PASS: TestLooping/VirtualEndpoint_or_plugins (0.02s)
+    --- PASS: TestLooping/Loop_limit (0.01s)
+    --- PASS: TestLooping/Quota_and_rate_limit_calculation (0.01s)
+=== RUN   TestConcurrencyReloads
+--- PASS: TestConcurrencyReloads (0.05s)
+=== RUN   TestBaseMiddleware_OrgSessionExpiry
+--- PASS: TestBaseMiddleware_OrgSessionExpiry (0.00s)
+=== RUN   TestBaseMiddleware_getAuthType
+--- PASS: TestBaseMiddleware_getAuthType (0.00s)
+=== RUN   TestSessionLimiter_RedisQuotaExceeded_PerAPI
+
+ Primer 
+ KeyName: eyJvcmciOiJkZWZhdWx0IiwiaWQiOiIxZDU2YzNiOTcxN2E0NjVlYjRkNDlmY2RhOGQ5YjliNCIsImgiOiJtdXJtdXI2NCJ9, ApiID: , orgID: , isHashed: false
+ COde: 200
+ Primer 
+ KeyName: eyJvcmciOiJkZWZhdWx0IiwiaWQiOiIxZDU2YzNiOTcxN2E0NjVlYjRkNDlmY2RhOGQ5YjliNCIsImgiOiJtdXJtdXI2NCJ9, ApiID: , orgID: , isHashed: false
+ COde: 200
+ Primer 
+ KeyName: eyJvcmciOiJkZWZhdWx0IiwiaWQiOiIxZDU2YzNiOTcxN2E0NjVlYjRkNDlmY2RhOGQ5YjliNCIsImgiOiJtdXJtdXI2NCJ9, ApiID: , orgID: , isHashed: false
+ COde: 200
+ Primer 
+ KeyName: eyJvcmciOiJkZWZhdWx0IiwiaWQiOiIxZDU2YzNiOTcxN2E0NjVlYjRkNDlmY2RhOGQ5YjliNCIsImgiOiJtdXJtdXI2NCJ9, ApiID: , orgID: , isHashed: false
+ COde: 200
+ Primer 
+ KeyName: eyJvcmciOiJkZWZhdWx0IiwiaWQiOiIxZDU2YzNiOTcxN2E0NjVlYjRkNDlmY2RhOGQ5YjliNCIsImgiOiJtdXJtdXI2NCJ9, ApiID: , orgID: , isHashed: false
+ COde: 200
+ Primer 
+ KeyName: eyJvcmciOiJkZWZhdWx0IiwiaWQiOiIxZDU2YzNiOTcxN2E0NjVlYjRkNDlmY2RhOGQ5YjliNCIsImgiOiJtdXJtdXI2NCJ9, ApiID: , orgID: , isHashed: false
+ COde: 200
+ Primer 
+ KeyName: eyJvcmciOiJkZWZhdWx0IiwiaWQiOiIxZDU2YzNiOTcxN2E0NjVlYjRkNDlmY2RhOGQ5YjliNCIsImgiOiJtdXJtdXI2NCJ9, ApiID: , orgID: , isHashed: false
+ COde: 200--- PASS: TestSessionLimiter_RedisQuotaExceeded_PerAPI (0.07s)
+=== RUN   TestMultiSession_BA_Standard_OK
+--- PASS: TestMultiSession_BA_Standard_OK (0.01s)
+=== RUN   TestMultiSession_BA_Standard_Identity
+--- PASS: TestMultiSession_BA_Standard_Identity (0.01s)
+=== RUN   TestMultiSession_BA_Standard_FAILBA
+--- PASS: TestMultiSession_BA_Standard_FAILBA (0.00s)
+=== RUN   TestMultiSession_BA_Standard_FAILAuth
+--- PASS: TestMultiSession_BA_Standard_FAILAuth (0.00s)
+=== RUN   TestJWTAuthKeyMultiAuth
+--- PASS: TestJWTAuthKeyMultiAuth (0.04s)
+=== RUN   TestRLOpen
+--- PASS: TestRLOpen (0.00s)
+=== RUN   TestRequestThrottling
+=== RUN   TestRequestThrottling/PolicyLevel
+=== RUN   TestRequestThrottling/PolicyLevel/InMemoryRateLimiter
+=== RUN   TestRequestThrottling/PolicyLevel/SentinelRateLimiter
+=== RUN   TestRequestThrottling/PolicyLevel/RedisRollingRateLimiter
+=== RUN   TestRequestThrottling/APILevel
+=== RUN   TestRequestThrottling/APILevel/InMemoryRateLimiter
+=== RUN   TestRequestThrottling/APILevel/SentinelRateLimiter
+=== RUN   TestRequestThrottling/APILevel/RedisRollingRateLimiter
+--- PASS: TestRequestThrottling (16.31s)
+    --- PASS: TestRequestThrottling/PolicyLevel (8.15s)
+        --- PASS: TestRequestThrottling/PolicyLevel/InMemoryRateLimiter (2.70s)
+        --- PASS: TestRequestThrottling/PolicyLevel/SentinelRateLimiter (2.72s)
+        --- PASS: TestRequestThrottling/PolicyLevel/RedisRollingRateLimiter (2.73s)
+    --- PASS: TestRequestThrottling/APILevel (8.17s)
+        --- PASS: TestRequestThrottling/APILevel/InMemoryRateLimiter (2.71s)
+        --- PASS: TestRequestThrottling/APILevel/SentinelRateLimiter (2.73s)
+        --- PASS: TestRequestThrottling/APILevel/RedisRollingRateLimiter (2.73s)
+=== RUN   TestRLClosed
+--- PASS: TestRLClosed (0.01s)
+=== RUN   TestRLOpenWithReload
+--- PASS: TestRLOpenWithReload (0.01s)
+=== RUN   TestMurmur3CharBug
+=== RUN   TestMurmur3CharBug/Without_hashing
+=== RUN   TestMurmur3CharBug/murmur32_hashing,_legacy
+=== RUN   TestMurmur3CharBug/murmur32_hashing,_json_keys
+=== RUN   TestMurmur3CharBug/murmur64_hashing
+--- PASS: TestMurmur3CharBug (0.07s)
+    --- PASS: TestMurmur3CharBug/Without_hashing (0.01s)
+    --- PASS: TestMurmur3CharBug/murmur32_hashing,_legacy (0.01s)
+    --- PASS: TestMurmur3CharBug/murmur32_hashing,_json_keys (0.01s)
+    --- PASS: TestMurmur3CharBug/murmur64_hashing (0.01s)
+=== RUN   TestSignatureValidation
+=== RUN   TestSignatureValidation/Static_signature
+=== RUN   TestSignatureValidation/Dynamic_signature
+--- PASS: TestSignatureValidation (2.03s)
+    --- PASS: TestSignatureValidation/Static_signature (1.01s)
+    --- PASS: TestSignatureValidation/Dynamic_signature (1.01s)
+=== RUN   TestBearerTokenAuthKeySession
+--- PASS: TestBearerTokenAuthKeySession (0.01s)
+=== RUN   TestMultiAuthBackwardsCompatibleSession
+--- PASS: TestMultiAuthBackwardsCompatibleSession (0.00s)
+=== RUN   TestMultiAuthSession
+--- PASS: TestMultiAuthSession (0.01s)
+=== RUN   TestStripBearer
+=== RUN   TestStripBearer/Bearer_abc
+=== RUN   TestStripBearer/bearer_abc
+=== RUN   TestStripBearer/bEaReR_abc
+=== RUN   TestStripBearer/Bearer:_abc
+=== RUN   TestStripBearer/Basic_abc
+=== RUN   TestStripBearer/abc
+--- PASS: TestStripBearer (0.00s)
+    --- PASS: TestStripBearer/Bearer_abc (0.00s)
+    --- PASS: TestStripBearer/bearer_abc (0.00s)
+    --- PASS: TestStripBearer/bEaReR_abc (0.00s)
+    --- PASS: TestStripBearer/Bearer:_abc (0.00s)
+    --- PASS: TestStripBearer/Basic_abc (0.00s)
+    --- PASS: TestStripBearer/abc (0.00s)
+=== RUN   TestBasicAuth
+--- PASS: TestBasicAuth (0.20s)
+=== RUN   TestBasicAuthFromBody
+--- PASS: TestBasicAuthFromBody (0.14s)
+=== RUN   TestBasicAuthLegacyWithHashFunc
+--- PASS: TestBasicAuthLegacyWithHashFunc (0.14s)
+=== RUN   TestBasicAuthCachedUserCollision
+--- PASS: TestBasicAuthCachedUserCollision (0.15s)
+=== RUN   TestBasicAuthCachedPasswordCollision
+=== RUN   TestBasicAuthCachedPasswordCollision/Cache_disabled:true
+=== RUN   TestBasicAuthCachedPasswordCollision/Cache_disabled:false
+--- PASS: TestBasicAuthCachedPasswordCollision (1.20s)
+    --- PASS: TestBasicAuthCachedPasswordCollision/Cache_disabled:true (0.62s)
+    --- PASS: TestBasicAuthCachedPasswordCollision/Cache_disabled:false (0.56s)
+=== RUN   TestContextVarsMiddleware
+--- PASS: TestContextVarsMiddleware (0.02s)
+=== RUN   TestContextVarsMiddlewareProcessRequest
+=== RUN   TestContextVarsMiddlewareProcessRequest/GET_with_query_string
+=== RUN   TestContextVarsMiddlewareProcessRequest/POST_with_query_string_and_encoded_form_data
+=== RUN   TestContextVarsMiddlewareProcessRequest/POST_with_query_string_and_encoded_form_data_and_cookies
+--- PASS: TestContextVarsMiddlewareProcessRequest (0.00s)
+    --- PASS: TestContextVarsMiddlewareProcessRequest/GET_with_query_string (0.00s)
+    --- PASS: TestContextVarsMiddlewareProcessRequest/POST_with_query_string_and_encoded_form_data (0.00s)
+    --- PASS: TestContextVarsMiddlewareProcessRequest/POST_with_query_string_and_encoded_form_data_and_cookies (0.00s)
+=== RUN   TestGranularAccessMiddleware_ProcessRequest
+=== RUN   TestGranularAccessMiddleware_ProcessRequest/Direct_key
+=== RUN   TestGranularAccessMiddleware_ProcessRequest/Direct_key/should_return_200_OK_on_allowed_path_with_allowed_method
+=== RUN   TestGranularAccessMiddleware_ProcessRequest/Direct_key/should_return_403_Forbidden_on_allowed_path_with_disallowed_method
+=== RUN   TestGranularAccessMiddleware_ProcessRequest/Direct_key/should_return_403_Forbidden_on_disallowed_path_with_allowed_method
+=== RUN   TestGranularAccessMiddleware_ProcessRequest/Policy_applied_key
+=== RUN   TestGranularAccessMiddleware_ProcessRequest/Policy_applied_key/should_return_200_OK_on_allowed_path_with_allowed_method
+=== RUN   TestGranularAccessMiddleware_ProcessRequest/Policy_applied_key/should_return_403_Forbidden_on_allowed_path_with_disallowed_method
+=== RUN   TestGranularAccessMiddleware_ProcessRequest/Policy_applied_key/should_return_403_Forbidden_on_disallowed_path_with_allowed_method
+--- PASS: TestGranularAccessMiddleware_ProcessRequest (0.03s)
+    --- PASS: TestGranularAccessMiddleware_ProcessRequest/Direct_key (0.00s)
+        --- PASS: TestGranularAccessMiddleware_ProcessRequest/Direct_key/should_return_200_OK_on_allowed_path_with_allowed_method (0.00s)
+        --- PASS: TestGranularAccessMiddleware_ProcessRequest/Direct_key/should_return_403_Forbidden_on_allowed_path_with_disallowed_method (0.00s)
+        --- PASS: TestGranularAccessMiddleware_ProcessRequest/Direct_key/should_return_403_Forbidden_on_disallowed_path_with_allowed_method (0.00s)
+    --- PASS: TestGranularAccessMiddleware_ProcessRequest/Policy_applied_key (0.00s)
+        --- PASS: TestGranularAccessMiddleware_ProcessRequest/Policy_applied_key/should_return_200_OK_on_allowed_path_with_allowed_method (0.00s)
+        --- PASS: TestGranularAccessMiddleware_ProcessRequest/Policy_applied_key/should_return_403_Forbidden_on_allowed_path_with_disallowed_method (0.00s)
+        --- PASS: TestGranularAccessMiddleware_ProcessRequest/Policy_applied_key/should_return_403_Forbidden_on_disallowed_path_with_allowed_method (0.00s)
+=== RUN   TestGraphQLComplexityMiddleware_DepthLimitEnabled
+=== RUN   TestGraphQLComplexityMiddleware_DepthLimitEnabled/Per_field
+=== RUN   TestGraphQLComplexityMiddleware_DepthLimitEnabled/Global
+--- PASS: TestGraphQLComplexityMiddleware_DepthLimitEnabled (0.00s)
+    --- PASS: TestGraphQLComplexityMiddleware_DepthLimitEnabled/Per_field (0.00s)
+    --- PASS: TestGraphQLComplexityMiddleware_DepthLimitEnabled/Global (0.00s)
+=== RUN   TestGraphQLComplexityMiddleware_DepthLimitExceeded
+=== RUN   TestGraphQLComplexityMiddleware_DepthLimitExceeded/should_use_global_limit_and_exceed_when_no_per_field_rights
+=== RUN   TestGraphQLComplexityMiddleware_DepthLimitExceeded/should_respect_unlimited_specific_field_depth_limit_and_not_exceed
+=== RUN   TestGraphQLComplexityMiddleware_DepthLimitExceeded/should_respect_higher_specific_field_depth_limit_and_not_exceed
+=== RUN   TestGraphQLComplexityMiddleware_DepthLimitExceeded/should_respect_lower_specific_field_depth_limit_and_exceed
+=== RUN   TestGraphQLComplexityMiddleware_DepthLimitExceeded/should_respect_specific_field_depth_limits_and_not_exceed
+=== RUN   TestGraphQLComplexityMiddleware_DepthLimitExceeded/should_fallback_to_global_limit_when_continents_limits_is_not_specified
+=== RUN   TestGraphQLComplexityMiddleware_DepthLimitExceeded/should_fallback_to_global_limit_when_countries_limits_is_not_specified
+--- PASS: TestGraphQLComplexityMiddleware_DepthLimitExceeded (0.00s)
+    --- PASS: TestGraphQLComplexityMiddleware_DepthLimitExceeded/should_use_global_limit_and_exceed_when_no_per_field_rights (0.00s)
+    --- PASS: TestGraphQLComplexityMiddleware_DepthLimitExceeded/should_respect_unlimited_specific_field_depth_limit_and_not_exceed (0.00s)
+    --- PASS: TestGraphQLComplexityMiddleware_DepthLimitExceeded/should_respect_higher_specific_field_depth_limit_and_not_exceed (0.00s)
+    --- PASS: TestGraphQLComplexityMiddleware_DepthLimitExceeded/should_respect_lower_specific_field_depth_limit_and_exceed (0.00s)
+    --- PASS: TestGraphQLComplexityMiddleware_DepthLimitExceeded/should_respect_specific_field_depth_limits_and_not_exceed (0.00s)
+    --- PASS: TestGraphQLComplexityMiddleware_DepthLimitExceeded/should_fallback_to_global_limit_when_continents_limits_is_not_specified (0.00s)
+    --- PASS: TestGraphQLComplexityMiddleware_DepthLimitExceeded/should_fallback_to_global_limit_when_countries_limits_is_not_specified (0.00s)
+=== RUN   TestGraphQLComplexityMiddleware_ProcessRequest_GraphqlLimits
+=== RUN   TestGraphQLComplexityMiddleware_ProcessRequest_GraphqlLimits/should_fail_when_no_access_rights_for_the_given_spec
+=== RUN   TestGraphQLComplexityMiddleware_ProcessRequest_GraphqlLimits/should_take_limit_from_access_rights_and_fail
+=== RUN   TestGraphQLComplexityMiddleware_ProcessRequest_GraphqlLimits/should_take_field_limits_from_access_rights_and_proceed
+=== RUN   TestGraphQLComplexityMiddleware_ProcessRequest_GraphqlLimits/should_take_limit_from_session_and_fail_when_access_rights_with_not_matching_field_and_empty_limit
+--- PASS: TestGraphQLComplexityMiddleware_ProcessRequest_GraphqlLimits (0.00s)
+    --- PASS: TestGraphQLComplexityMiddleware_ProcessRequest_GraphqlLimits/should_fail_when_no_access_rights_for_the_given_spec (0.00s)
+    --- PASS: TestGraphQLComplexityMiddleware_ProcessRequest_GraphqlLimits/should_take_limit_from_access_rights_and_fail (0.00s)
+    --- PASS: TestGraphQLComplexityMiddleware_ProcessRequest_GraphqlLimits/should_take_field_limits_from_access_rights_and_proceed (0.00s)
+    --- PASS: TestGraphQLComplexityMiddleware_ProcessRequest_GraphqlLimits/should_take_limit_from_session_and_fail_when_access_rights_with_not_matching_field_and_empty_limit (0.00s)
+=== RUN   TestGraphQL_RestrictedTypes
+=== RUN   TestGraphQL_RestrictedTypes/Direct_key
+=== RUN   TestGraphQL_RestrictedTypes/Policy_applied_key
+--- PASS: TestGraphQL_RestrictedTypes (0.03s)
+    --- PASS: TestGraphQL_RestrictedTypes/Direct_key (0.00s)
+    --- PASS: TestGraphQL_RestrictedTypes/Policy_applied_key (0.00s)
+=== RUN   TestGraphQLMiddleware_RequestValidation
+=== RUN   TestGraphQLMiddleware_RequestValidation/Bad_schema
+=== RUN   TestGraphQLMiddleware_RequestValidation/Introspection_query_with_custom_query_type_should_successfully_work
+=== RUN   TestGraphQLMiddleware_RequestValidation/Empty_request_shouldn't_be_unmarshalled
+=== RUN   TestGraphQLMiddleware_RequestValidation/Invalid_query_should_fail
+=== RUN   TestGraphQLMiddleware_RequestValidation/Introspection_query_should_successfully_work
+=== RUN   TestGraphQLMiddleware_RequestValidation/with_policies
+=== RUN   TestGraphQLMiddleware_RequestValidation/with_policies/Depth_limit_exceeded
+=== RUN   TestGraphQLMiddleware_RequestValidation/with_policies/Unlimited_query_depth
+=== RUN   TestGraphQLMiddleware_RequestValidation/with_policies/Unlimited_query_depth/0
+=== RUN   TestGraphQLMiddleware_RequestValidation/with_policies/Unlimited_query_depth/-1
+=== RUN   TestGraphQLMiddleware_RequestValidation/with_policies/Valid_query_should_successfully_work
+=== RUN   TestGraphQLMiddleware_RequestValidation/with_policies/Invalid_query_should_return_403_when_auth_is_failing
+--- PASS: TestGraphQLMiddleware_RequestValidation (0.06s)
+    --- PASS: TestGraphQLMiddleware_RequestValidation/Bad_schema (0.01s)
+    --- PASS: TestGraphQLMiddleware_RequestValidation/Introspection_query_with_custom_query_type_should_successfully_work (0.01s)
+    --- PASS: TestGraphQLMiddleware_RequestValidation/Empty_request_shouldn't_be_unmarshalled (0.01s)
+    --- PASS: TestGraphQLMiddleware_RequestValidation/Invalid_query_should_fail (0.00s)
+    --- PASS: TestGraphQLMiddleware_RequestValidation/Introspection_query_should_successfully_work (0.00s)
+    --- PASS: TestGraphQLMiddleware_RequestValidation/with_policies (0.03s)
+        --- PASS: TestGraphQLMiddleware_RequestValidation/with_policies/Depth_limit_exceeded (0.00s)
+        --- PASS: TestGraphQLMiddleware_RequestValidation/with_policies/Unlimited_query_depth (0.01s)
+            --- PASS: TestGraphQLMiddleware_RequestValidation/with_policies/Unlimited_query_depth/0 (0.00s)
+            --- PASS: TestGraphQLMiddleware_RequestValidation/with_policies/Unlimited_query_depth/-1 (0.00s)
+        --- PASS: TestGraphQLMiddleware_RequestValidation/with_policies/Valid_query_should_successfully_work (0.00s)
+        --- PASS: TestGraphQLMiddleware_RequestValidation/with_policies/Invalid_query_should_return_403_when_auth_is_failing (0.00s)
+=== RUN   TestGraphQLMiddleware_EngineMode
+=== RUN   TestGraphQLMiddleware_EngineMode/on_invalid_graphql_config_version
+=== RUN   TestGraphQLMiddleware_EngineMode/on_invalid_graphql_config_version/should_return_an_error_with_code_500
+=== RUN   TestGraphQLMiddleware_EngineMode/graphql_engine_v2
+=== RUN   TestGraphQLMiddleware_EngineMode/graphql_engine_v2/subgraph
+=== RUN   TestGraphQLMiddleware_EngineMode/graphql_engine_v2/subgraph/should_execute_subgraph_successfully
+=== RUN   TestGraphQLMiddleware_EngineMode/graphql_engine_v2/proxy-only
+=== RUN   TestGraphQLMiddleware_EngineMode/graphql_engine_v2/proxy-only/on_disabled_websockets
+=== RUN   TestGraphQLMiddleware_EngineMode/graphql_engine_v2/proxy-only/on_disabled_websockets/should_respond_with_422_when_trying_to_upgrade_to_websockets
+=== RUN   TestGraphQLMiddleware_EngineMode/graphql_engine_v2/proxy-only/graphql_websocket_upgrade
+=== RUN   TestGraphQLMiddleware_EngineMode/graphql_engine_v2/proxy-only/graphql_websocket_upgrade/should_deny_upgrade_with_400_when_protocol_is_not_graphql-ws
+=== RUN   TestGraphQLMiddleware_EngineMode/graphql_engine_v2/proxy-only/graphql_websocket_upgrade/should_upgrade_to_websocket_connection_with_correct_protocol
+=== RUN   TestGraphQLMiddleware_EngineMode/graphql_engine_v2/proxy-only/graphql_api_requests
+=== RUN   TestGraphQLMiddleware_EngineMode/graphql_engine_v2/proxy-only/introspection_query
+=== RUN   TestGraphQLMiddleware_EngineMode/graphql_engine_v1
+=== RUN   TestGraphQLMiddleware_EngineMode/graphql_engine_v1/on_disabled_websockets
+=== RUN   TestGraphQLMiddleware_EngineMode/graphql_engine_v1/on_disabled_websockets/should_respond_with_422_when_trying_to_upgrade_to_websockets
+=== RUN   TestGraphQLMiddleware_EngineMode/graphql_engine_v1/graphql_websocket_upgrade
+=== RUN   TestGraphQLMiddleware_EngineMode/graphql_engine_v1/graphql_websocket_upgrade/should_deny_upgrade_with_400_when_protocol_is_not_graphql-ws
+=== RUN   TestGraphQLMiddleware_EngineMode/graphql_engine_v1/graphql_websocket_upgrade/should_upgrade_to_websocket_connection_with_correct_protocol
+=== RUN   TestGraphQLMiddleware_EngineMode/graphql_engine_v1/graphql_api_requests
+=== RUN   TestGraphQLMiddleware_EngineMode/graphql_engine_v1/introspection_query
+=== RUN   TestGraphQLMiddleware_EngineMode/graphql_engine_v1/should_return_error_when_supergraph_is_used_with_v1
+--- PASS: TestGraphQLMiddleware_EngineMode (0.06s)
+    --- PASS: TestGraphQLMiddleware_EngineMode/on_invalid_graphql_config_version (0.01s)
+        --- PASS: TestGraphQLMiddleware_EngineMode/on_invalid_graphql_config_version/should_return_an_error_with_code_500 (0.00s)
+    --- PASS: TestGraphQLMiddleware_EngineMode/graphql_engine_v2 (0.02s)
+        --- PASS: TestGraphQLMiddleware_EngineMode/graphql_engine_v2/subgraph (0.01s)
+            --- PASS: TestGraphQLMiddleware_EngineMode/graphql_engine_v2/subgraph/should_execute_subgraph_successfully (0.00s)
+        --- PASS: TestGraphQLMiddleware_EngineMode/graphql_engine_v2/proxy-only (0.01s)
+            --- PASS: TestGraphQLMiddleware_EngineMode/graphql_engine_v2/proxy-only/on_disabled_websockets (0.00s)
+                --- PASS: TestGraphQLMiddleware_EngineMode/graphql_engine_v2/proxy-only/on_disabled_websockets/should_respond_with_422_when_trying_to_upgrade_to_websockets (0.00s)
+            --- PASS: TestGraphQLMiddleware_EngineMode/graphql_engine_v2/proxy-only/graphql_websocket_upgrade (0.00s)
+                --- PASS: TestGraphQLMiddleware_EngineMode/graphql_engine_v2/proxy-only/graphql_websocket_upgrade/should_deny_upgrade_with_400_when_protocol_is_not_graphql-ws (0.00s)
+                --- PASS: TestGraphQLMiddleware_EngineMode/graphql_engine_v2/proxy-only/graphql_websocket_upgrade/should_upgrade_to_websocket_connection_with_correct_protocol (0.00s)
+            --- PASS: TestGraphQLMiddleware_EngineMode/graphql_engine_v2/proxy-only/graphql_api_requests (0.00s)
+            --- PASS: TestGraphQLMiddleware_EngineMode/graphql_engine_v2/proxy-only/introspection_query (0.00s)
+    --- PASS: TestGraphQLMiddleware_EngineMode/graphql_engine_v1 (0.02s)
+        --- PASS: TestGraphQLMiddleware_EngineMode/graphql_engine_v1/on_disabled_websockets (0.00s)
+            --- PASS: TestGraphQLMiddleware_EngineMode/graphql_engine_v1/on_disabled_websockets/should_respond_with_422_when_trying_to_upgrade_to_websockets (0.00s)
+        --- PASS: TestGraphQLMiddleware_EngineMode/graphql_engine_v1/graphql_websocket_upgrade (0.00s)
+            --- PASS: TestGraphQLMiddleware_EngineMode/graphql_engine_v1/graphql_websocket_upgrade/should_deny_upgrade_with_400_when_protocol_is_not_graphql-ws (0.00s)
+            --- PASS: TestGraphQLMiddleware_EngineMode/graphql_engine_v1/graphql_websocket_upgrade/should_upgrade_to_websocket_connection_with_correct_protocol (0.00s)
+        --- PASS: TestGraphQLMiddleware_EngineMode/graphql_engine_v1/graphql_api_requests (0.00s)
+        --- PASS: TestGraphQLMiddleware_EngineMode/graphql_engine_v1/introspection_query (0.00s)
+        --- PASS: TestGraphQLMiddleware_EngineMode/graphql_engine_v1/should_return_error_when_supergraph_is_used_with_v1 (0.01s)
+=== RUN   TestHMACAuthSessionPass
+--- PASS: TestHMACAuthSessionPass (0.02s)
+=== RUN   TestHMACAuthSessionSHA512Pass
+--- PASS: TestHMACAuthSessionSHA512Pass (0.02s)
+=== RUN   TestHMACAuthSessionAuxDateHeader
+--- PASS: TestHMACAuthSessionAuxDateHeader (0.03s)
+=== RUN   TestHMACAuthSessionFailureDateExpired
+--- PASS: TestHMACAuthSessionFailureDateExpired (0.00s)
+=== RUN   TestHMACAuthSessionKeyMissing
+--- PASS: TestHMACAuthSessionKeyMissing (0.00s)
+=== RUN   TestHMACAuthSessionMalformedHeader
+--- PASS: TestHMACAuthSessionMalformedHeader (0.00s)
+=== RUN   TestHMACAuthSessionPassWithHeaderField
+--- PASS: TestHMACAuthSessionPassWithHeaderField (0.02s)
+=== RUN   TestHMACAuthSessionPassWithHeaderFieldLowerCase
+--- PASS: TestHMACAuthSessionPassWithHeaderFieldLowerCase (0.02s)
+=== RUN   TestGetFieldValues
+--- PASS: TestGetFieldValues (0.00s)
+=== RUN   TestRSAAuthSessionPass
+--- PASS: TestRSAAuthSessionPass (0.05s)
+=== RUN   TestRSAAuthSessionKeyMissing
+--- PASS: TestRSAAuthSessionKeyMissing (0.04s)
+=== RUN   TestIPBlacklistMiddleware
+--- PASS: TestIPBlacklistMiddleware (0.00s)
+=== RUN   TestIPMiddlewarePass
+--- PASS: TestIPMiddlewarePass (0.00s)
+=== RUN   TestJSVMLogs
+--- PASS: TestJSVMLogs (0.00s)
+=== RUN   TestJSVMBody
+=== RUN   TestJSVMBody/check_request_body_is_re-readable
+--- PASS: TestJSVMBody (0.01s)
+    --- PASS: TestJSVMBody/check_request_body_is_re-readable (0.00s)
+=== RUN   TestJSVMSessionMetadataUpdate
+--- PASS: TestJSVMSessionMetadataUpdate (0.01s)
+=== RUN   TestJSVMProcessTimeout
+--- PASS: TestJSVMProcessTimeout (0.01s)
+=== RUN   TestJSVMConfigData
+--- PASS: TestJSVMConfigData (0.01s)
+=== RUN   TestJSVM_IgnoreCanonicalHeader
+--- PASS: TestJSVM_IgnoreCanonicalHeader (0.01s)
+=== RUN   TestJSVMUserCore
+--- PASS: TestJSVMUserCore (0.02s)
+=== RUN   TestJSVMRequestScheme
+--- PASS: TestJSVMRequestScheme (0.01s)
+=== RUN   TestTykMakeHTTPRequest
+=== RUN   TestTykMakeHTTPRequest/Existing_endpoint
+=== RUN   TestTykMakeHTTPRequest/Nonexistent_endpoint
+=== RUN   TestTykMakeHTTPRequest/Endpoint_with_query
+=== RUN   TestTykMakeHTTPRequest/Endpoint_with_skip_cleaning
+--- PASS: TestTykMakeHTTPRequest (0.12s)
+    --- PASS: TestTykMakeHTTPRequest/Existing_endpoint (0.02s)
+    --- PASS: TestTykMakeHTTPRequest/Nonexistent_endpoint (0.02s)
+    --- PASS: TestTykMakeHTTPRequest/Endpoint_with_query (0.02s)
+    --- PASS: TestTykMakeHTTPRequest/Endpoint_with_skip_cleaning (0.04s)
+=== RUN   TestJSVMBase64
+=== RUN   TestJSVMBase64/b64dec_with_simple_string_input
+=== RUN   TestJSVMBase64/b64dec_with_a_JWT_payload
+=== RUN   TestJSVMBase64/b64enc_with_simple_string_input
+=== RUN   TestJSVMBase64/rawb64dec_with_simple_string_input
+=== RUN   TestJSVMBase64/rawb64enc_with_simple_string_input
+--- PASS: TestJSVMBase64 (0.01s)
+    --- PASS: TestJSVMBase64/b64dec_with_simple_string_input (0.00s)
+    --- PASS: TestJSVMBase64/b64dec_with_a_JWT_payload (0.00s)
+    --- PASS: TestJSVMBase64/b64enc_with_simple_string_input (0.00s)
+    --- PASS: TestJSVMBase64/rawb64dec_with_simple_string_input (0.00s)
+    --- PASS: TestJSVMBase64/rawb64enc_with_simple_string_input (0.00s)
+=== RUN   TestJSVMStagesRequest
+=== RUN   TestJSVMStagesRequest/Bundles
+=== RUN   TestJSVMStagesRequest/Files
+=== RUN   TestJSVMStagesRequest/API_definition
+--- PASS: TestJSVMStagesRequest (0.07s)
+    --- PASS: TestJSVMStagesRequest/Bundles (0.02s)
+    --- PASS: TestJSVMStagesRequest/Files (0.02s)
+    --- PASS: TestJSVMStagesRequest/API_definition (0.02s)
+=== RUN   TestMiniRequestObject_ReconstructParams
+=== RUN   TestMiniRequestObject_ReconstructParams/Don't_touch_queries_if_no_change_on_params
+=== RUN   TestMiniRequestObject_ReconstructParams/Update_params
+--- PASS: TestMiniRequestObject_ReconstructParams (0.00s)
+    --- PASS: TestMiniRequestObject_ReconstructParams/Don't_touch_queries_if_no_change_on_params (0.00s)
+    --- PASS: TestMiniRequestObject_ReconstructParams/Update_params (0.00s)
+=== RUN   TestJSVM_Auth
+--- PASS: TestJSVM_Auth (0.04s)
+=== RUN   TestJWTSessionHMAC
+=== RUN   TestJWTSessionHMAC/Request_with_valid_JWT_signed_with_HMAC
+--- PASS: TestJWTSessionHMAC (0.03s)
+    --- PASS: TestJWTSessionHMAC/Request_with_valid_JWT_signed_with_HMAC (0.00s)
+=== RUN   TestJWTHMACIdInSubClaim
+=== RUN   TestJWTHMACIdInSubClaim/Request_with_valid_JWT/HMAC/Id_in_SuB/Global-skip-kid/Api-skip-kid
+=== RUN   TestJWTHMACIdInSubClaim/Request_with_valid_JWT/HMAC/Id_in_SuB/Global-dont-skip-kid/Api-dont-skip-kid
+=== RUN   TestJWTHMACIdInSubClaim/Request_with_valid_JWT/HMAC/Id_in_SuB/Global-dont-skip-kid/Api-skip-kid
+--- PASS: TestJWTHMACIdInSubClaim (0.05s)
+    --- PASS: TestJWTHMACIdInSubClaim/Request_with_valid_JWT/HMAC/Id_in_SuB/Global-skip-kid/Api-skip-kid (0.00s)
+    --- PASS: TestJWTHMACIdInSubClaim/Request_with_valid_JWT/HMAC/Id_in_SuB/Global-dont-skip-kid/Api-dont-skip-kid (0.00s)
+    --- PASS: TestJWTHMACIdInSubClaim/Request_with_valid_JWT/HMAC/Id_in_SuB/Global-dont-skip-kid/Api-skip-kid (0.00s)
+=== RUN   TestJWTRSAIdInSubClaim
+=== RUN   TestJWTRSAIdInSubClaim/Request_with_valid_JWT/RSA/Id_in_SuB/Global-skip-kid/Api-skip-kid
+=== RUN   TestJWTRSAIdInSubClaim/Request_with_valid_JWT/RSA/Id_in_SuB/Global-dont-skip-kid/Api-dont-skip-kid
+=== RUN   TestJWTRSAIdInSubClaim/Request_with_valid_JWT/RSA/Id_in_SuB/Global-dont-skip-kid/Api-skip-kid
+--- PASS: TestJWTRSAIdInSubClaim (0.05s)
+    --- PASS: TestJWTRSAIdInSubClaim/Request_with_valid_JWT/RSA/Id_in_SuB/Global-skip-kid/Api-skip-kid (0.00s)
+    --- PASS: TestJWTRSAIdInSubClaim/Request_with_valid_JWT/RSA/Id_in_SuB/Global-dont-skip-kid/Api-dont-skip-kid (0.00s)
+    --- PASS: TestJWTRSAIdInSubClaim/Request_with_valid_JWT/RSA/Id_in_SuB/Global-dont-skip-kid/Api-skip-kid (0.00s)
+=== RUN   TestJWTSessionRSA
+=== RUN   TestJWTSessionRSA/Request_with_valid_JWT
+--- PASS: TestJWTSessionRSA (0.02s)
+    --- PASS: TestJWTSessionRSA/Request_with_valid_JWT (0.00s)
+=== RUN   TestJWTSessionFailRSA_EmptyJWT
+=== RUN   TestJWTSessionFailRSA_EmptyJWT/Request_with_empty_authorization_header
+--- PASS: TestJWTSessionFailRSA_EmptyJWT (0.02s)
+    --- PASS: TestJWTSessionFailRSA_EmptyJWT/Request_with_empty_authorization_header (0.00s)
+=== RUN   TestJWTSessionFailRSA_NoAuthHeader
+=== RUN   TestJWTSessionFailRSA_NoAuthHeader/Request_without_authorization_header
+--- PASS: TestJWTSessionFailRSA_NoAuthHeader (0.03s)
+    --- PASS: TestJWTSessionFailRSA_NoAuthHeader/Request_without_authorization_header (0.00s)
+=== RUN   TestJWTSessionFailRSA_MalformedJWT
+=== RUN   TestJWTSessionFailRSA_MalformedJWT/Request_with_malformed_JWT
+--- PASS: TestJWTSessionFailRSA_MalformedJWT (0.02s)
+    --- PASS: TestJWTSessionFailRSA_MalformedJWT/Request_with_malformed_JWT (0.00s)
+=== RUN   TestJWTSessionFailRSA_MalformedJWT_NOTRACK
+=== RUN   TestJWTSessionFailRSA_MalformedJWT_NOTRACK/Request_with_malformed_JWT_no_track
+--- PASS: TestJWTSessionFailRSA_MalformedJWT_NOTRACK (0.03s)
+    --- PASS: TestJWTSessionFailRSA_MalformedJWT_NOTRACK/Request_with_malformed_JWT_no_track (0.00s)
+=== RUN   TestJWTSessionFailRSA_WrongJWT
+=== RUN   TestJWTSessionFailRSA_WrongJWT/Request_with_invalid_JWT
+--- PASS: TestJWTSessionFailRSA_WrongJWT (0.03s)
+    --- PASS: TestJWTSessionFailRSA_WrongJWT/Request_with_invalid_JWT (0.00s)
+=== RUN   TestJWTSessionRSABearer
+=== RUN   TestJWTSessionRSABearer/Request_with_valid_Bearer
+--- PASS: TestJWTSessionRSABearer (0.02s)
+    --- PASS: TestJWTSessionRSABearer/Request_with_valid_Bearer (0.00s)
+=== RUN   TestJWTSessionRSABearerInvalid
+=== RUN   TestJWTSessionRSABearerInvalid/Request_with_invalid_Bearer
+--- PASS: TestJWTSessionRSABearerInvalid (0.02s)
+    --- PASS: TestJWTSessionRSABearerInvalid/Request_with_invalid_Bearer (0.00s)
+=== RUN   TestJWTSessionRSABearerInvalidTwoBears
+=== RUN   TestJWTSessionRSABearerInvalidTwoBears/Request_with_Bearer_bearer
+=== RUN   TestJWTSessionRSABearerInvalidTwoBears/Request_with_bearer_Bearer
+--- PASS: TestJWTSessionRSABearerInvalidTwoBears (0.02s)
+    --- PASS: TestJWTSessionRSABearerInvalidTwoBears/Request_with_Bearer_bearer (0.00s)
+    --- PASS: TestJWTSessionRSABearerInvalidTwoBears/Request_with_bearer_Bearer (0.00s)
+=== RUN   TestJWTSessionRSAWithRawSourceOnWithClientID
+=== RUN   TestJWTSessionRSAWithRawSourceOnWithClientID/Initial_request_with_no_policy_base_field_in_JWT
+--- PASS: TestJWTSessionRSAWithRawSourceOnWithClientID (0.03s)
+    --- PASS: TestJWTSessionRSAWithRawSourceOnWithClientID/Initial_request_with_no_policy_base_field_in_JWT (0.00s)
+=== RUN   TestJWTSessionRSAWithRawSource
+=== RUN   TestJWTSessionRSAWithRawSource/Initial_request_with_valid_policy
+--- PASS: TestJWTSessionRSAWithRawSource (0.03s)
+    --- PASS: TestJWTSessionRSAWithRawSource/Initial_request_with_valid_policy (0.00s)
+=== RUN   TestJWTSessionRSAWithRawSourceInvalidPolicyID
+=== RUN   TestJWTSessionRSAWithRawSourceInvalidPolicyID/Initial_request_with_invalid_policy
+--- PASS: TestJWTSessionRSAWithRawSourceInvalidPolicyID (0.02s)
+    --- PASS: TestJWTSessionRSAWithRawSourceInvalidPolicyID/Initial_request_with_invalid_policy (0.00s)
+=== RUN   TestJWTSessionExpiresAtValidationConfigs
+=== RUN   TestJWTSessionExpiresAtValidationConfigs/Expiry_After_now--Valid_jwt
+=== RUN   TestJWTSessionExpiresAtValidationConfigs/Expiry_After_now-Add_skew--Valid_jwt
+=== RUN   TestJWTSessionExpiresAtValidationConfigs/Expiry_Before_now--Invalid_jwt
+=== RUN   TestJWTSessionExpiresAtValidationConfigs/Expired_token-Before_now-Huge_skew--Valid_jwt
+=== RUN   TestJWTSessionExpiresAtValidationConfigs/Expired_token-Before_now-Add_skew--Valid_jwt
+--- PASS: TestJWTSessionExpiresAtValidationConfigs (0.06s)
+    --- PASS: TestJWTSessionExpiresAtValidationConfigs/Expiry_After_now--Valid_jwt (0.01s)
+    --- PASS: TestJWTSessionExpiresAtValidationConfigs/Expiry_After_now-Add_skew--Valid_jwt (0.01s)
+    --- PASS: TestJWTSessionExpiresAtValidationConfigs/Expiry_Before_now--Invalid_jwt (0.01s)
+    --- PASS: TestJWTSessionExpiresAtValidationConfigs/Expired_token-Before_now-Huge_skew--Valid_jwt (0.01s)
+    --- PASS: TestJWTSessionExpiresAtValidationConfigs/Expired_token-Before_now-Add_skew--Valid_jwt (0.01s)
+=== RUN   TestJWTSessionIssueAtValidationConfigs
+=== RUN   TestJWTSessionIssueAtValidationConfigs/IssuedAt_Before_now-no_skew--Valid_jwt
+=== RUN   TestJWTSessionIssueAtValidationConfigs/Expiry_after_now--Invalid_jwt
+=== RUN   TestJWTSessionIssueAtValidationConfigs/IssueAt-After_now-no_skew--Invalid_jwt
+=== RUN   TestJWTSessionIssueAtValidationConfigs/IssueAt--After_now-Huge_skew--valid_jwt
+=== RUN   TestJWTSessionIssueAtValidationConfigs/IssueAt-Before_now-Add_skew--not_valid_jwt
+=== RUN   TestJWTSessionIssueAtValidationConfigs/IssueAt-After_now-Add_skew--Valid_jwt
+--- PASS: TestJWTSessionIssueAtValidationConfigs (0.06s)
+    --- PASS: TestJWTSessionIssueAtValidationConfigs/IssuedAt_Before_now-no_skew--Valid_jwt (0.01s)
+    --- PASS: TestJWTSessionIssueAtValidationConfigs/Expiry_after_now--Invalid_jwt (0.01s)
+    --- PASS: TestJWTSessionIssueAtValidationConfigs/IssueAt-After_now-no_skew--Invalid_jwt (0.01s)
+    --- PASS: TestJWTSessionIssueAtValidationConfigs/IssueAt--After_now-Huge_skew--valid_jwt (0.01s)
+    --- PASS: TestJWTSessionIssueAtValidationConfigs/IssueAt-Before_now-Add_skew--not_valid_jwt (0.01s)
+    --- PASS: TestJWTSessionIssueAtValidationConfigs/IssueAt-After_now-Add_skew--Valid_jwt (0.01s)
+=== RUN   TestJWTSessionNotBeforeValidationConfigs
+=== RUN   TestJWTSessionNotBeforeValidationConfigs/NotBefore_Before_now-Valid_jwt
+=== RUN   TestJWTSessionNotBeforeValidationConfigs/NotBefore_After_now--Invalid_jwt
+=== RUN   TestJWTSessionNotBeforeValidationConfigs/NotBefore_After_now-Add_skew--valid_jwt
+=== RUN   TestJWTSessionNotBeforeValidationConfigs/NotBefore_After_now-Huge_skew--valid_jwt
+--- PASS: TestJWTSessionNotBeforeValidationConfigs (0.05s)
+    --- PASS: TestJWTSessionNotBeforeValidationConfigs/NotBefore_Before_now-Valid_jwt (0.01s)
+    --- PASS: TestJWTSessionNotBeforeValidationConfigs/NotBefore_After_now--Invalid_jwt (0.01s)
+    --- PASS: TestJWTSessionNotBeforeValidationConfigs/NotBefore_After_now-Add_skew--valid_jwt (0.01s)
+    --- PASS: TestJWTSessionNotBeforeValidationConfigs/NotBefore_After_now-Huge_skew--valid_jwt (0.01s)
+=== RUN   TestJWTExistingSessionRSAWithRawSourceInvalidPolicyID
+=== RUN   TestJWTExistingSessionRSAWithRawSourceInvalidPolicyID/Initial_request_with_valid_policy
+=== RUN   TestJWTExistingSessionRSAWithRawSourceInvalidPolicyID/Request_with_invalid_policy_in_JWT
+--- PASS: TestJWTExistingSessionRSAWithRawSourceInvalidPolicyID (0.03s)
+    --- PASS: TestJWTExistingSessionRSAWithRawSourceInvalidPolicyID/Initial_request_with_valid_policy (0.00s)
+    --- PASS: TestJWTExistingSessionRSAWithRawSourceInvalidPolicyID/Request_with_invalid_policy_in_JWT (0.00s)
+=== RUN   TestJWTScopeToPolicyMapping
+=== RUN   TestJWTScopeToPolicyMapping/Create_JWT_session_with_base_and_scopes
+=== RUN   TestJWTScopeToPolicyMapping/Create_JWT_session_without_base_and_with_scopes
+=== RUN   TestJWTScopeToPolicyMapping/Create_JWT_session_without_base_and_without_scopes
+=== RUN   TestJWTScopeToPolicyMapping/Request_to_check_that_session_has_got_both_based_and_scope_policies
+
+ Primer 
+ KeyName: eyJvcmciOiJkZWZhdWx0IiwiaWQiOiJjZmFmNWUxYTNjZDA5OGUyODExYjBjNDY4NTI3NTRmNiIsImgiOiJtdXJtdXI2NCJ9, ApiID: , orgID: , isHashed: false
+ COde: 200=== RUN   TestJWTScopeToPolicyMapping/If_scopes_present_no_default_policy_should_be_used
+
+ Primer 
+ KeyName: eyJvcmciOiJkZWZhdWx0IiwiaWQiOiI3NDFmYTQxY2I5NzFmN2Y3Mzc1YzRjMDQ1M2M2ZDI3ZSIsImgiOiJtdXJtdXI2NCJ9, ApiID: , orgID: , isHashed: false
+ COde: 200=== RUN   TestJWTScopeToPolicyMapping/Default_policy_should_be_applied_if_no_scopes_found
+
+ Primer 
+ KeyName: eyJvcmciOiJkZWZhdWx0IiwiaWQiOiI2MDgxNzU1M2E2MGNhMGU5NWY1ODM3MDMyOTk1Zjc3YyIsImgiOiJtdXJtdXI2NCJ9, ApiID: , orgID: , isHashed: false
+ COde: 200=== RUN   TestJWTScopeToPolicyMapping/Request_to_api1
+=== RUN   TestJWTScopeToPolicyMapping/Request_to_api2
+=== RUN   TestJWTScopeToPolicyMapping/Request_to_api3
+=== RUN   TestJWTScopeToPolicyMapping/Request_with_changed_scope_in_JWT_and_key_with_existing_session
+=== RUN   TestJWTScopeToPolicyMapping/Request_with_a_wrong_scope_in_JWT_and_then_correct_scope
+=== RUN   TestJWTScopeToPolicyMapping/Request_to_check_that_session_has_got_changed_apply_policies_value
+
+ Primer 
+ KeyName: eyJvcmciOiJkZWZhdWx0IiwiaWQiOiJjZmFmNWUxYTNjZDA5OGUyODExYjBjNDY4NTI3NTRmNiIsImgiOiJtdXJtdXI2NCJ9, ApiID: , orgID: , isHashed: false
+ COde: 200--- PASS: TestJWTScopeToPolicyMapping (0.06s)
+    --- PASS: TestJWTScopeToPolicyMapping/Create_JWT_session_with_base_and_scopes (0.00s)
+    --- PASS: TestJWTScopeToPolicyMapping/Create_JWT_session_without_base_and_with_scopes (0.00s)
+    --- PASS: TestJWTScopeToPolicyMapping/Create_JWT_session_without_base_and_without_scopes (0.00s)
+    --- PASS: TestJWTScopeToPolicyMapping/Request_to_check_that_session_has_got_both_based_and_scope_policies (0.00s)
+    --- PASS: TestJWTScopeToPolicyMapping/If_scopes_present_no_default_policy_should_be_used (0.00s)
+    --- PASS: TestJWTScopeToPolicyMapping/Default_policy_should_be_applied_if_no_scopes_found (0.00s)
+    --- PASS: TestJWTScopeToPolicyMapping/Request_to_api1 (0.00s)
+    --- PASS: TestJWTScopeToPolicyMapping/Request_to_api2 (0.00s)
+    --- PASS: TestJWTScopeToPolicyMapping/Request_to_api3 (0.00s)
+    --- PASS: TestJWTScopeToPolicyMapping/Request_with_changed_scope_in_JWT_and_key_with_existing_session (0.00s)
+    --- PASS: TestJWTScopeToPolicyMapping/Request_with_a_wrong_scope_in_JWT_and_then_correct_scope (0.00s)
+    --- PASS: TestJWTScopeToPolicyMapping/Request_to_check_that_session_has_got_changed_apply_policies_value (0.00s)
+=== RUN   TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged
+=== RUN   TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged/Initial_request_with_1st_policy
+
+ Primer 
+ KeyName: eyJvcmciOiJkZWZhdWx0IiwiaWQiOiI5OTEyOWEwY2IzOGIwYmRkY2FlNzFlNDM2ODEyNjgyOSIsImgiOiJtdXJtdXI2NCJ9, ApiID: , orgID: , isHashed: false
+ COde: 200=== RUN   TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged/Request_with_new_valid_policy_in_JWT
+
+ Primer 
+ KeyName: eyJvcmciOiJkZWZhdWx0IiwiaWQiOiI5OTEyOWEwY2IzOGIwYmRkY2FlNzFlNDM2ODEyNjgyOSIsImgiOiJtdXJtdXI2NCJ9, ApiID: , orgID: , isHashed: false
+ COde: 200--- PASS: TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged (0.03s)
+    --- PASS: TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged/Initial_request_with_1st_policy (0.01s)
+    --- PASS: TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged/Request_with_new_valid_policy_in_JWT (0.00s)
+=== RUN   TestJWTSessionRSAWithJWK
+=== RUN   TestJWTSessionRSAWithJWK/JWTSessionRSAWithJWK
+--- PASS: TestJWTSessionRSAWithJWK (0.03s)
+    --- PASS: TestJWTSessionRSAWithJWK/JWTSessionRSAWithJWK (0.00s)
+=== RUN   TestJWTSessionRSAWithEncodedJWK
+=== RUN   TestJWTSessionRSAWithEncodedJWK/Direct_JWK_URL
+=== RUN   TestJWTSessionRSAWithEncodedJWK/Direct_JWK_URL_with_legacy_jwk
+=== RUN   TestJWTSessionRSAWithEncodedJWK/Base64
+=== RUN   TestJWTSessionRSAWithEncodedJWK/Base64_legacy_jwk
+--- PASS: TestJWTSessionRSAWithEncodedJWK (0.05s)
+    --- PASS: TestJWTSessionRSAWithEncodedJWK/Direct_JWK_URL (0.01s)
+    --- PASS: TestJWTSessionRSAWithEncodedJWK/Direct_JWK_URL_with_legacy_jwk (0.01s)
+    --- PASS: TestJWTSessionRSAWithEncodedJWK/Base64 (0.01s)
+    --- PASS: TestJWTSessionRSAWithEncodedJWK/Base64_legacy_jwk (0.01s)
+=== RUN   TestParseRSAKeyFromJWK
+--- PASS: TestParseRSAKeyFromJWK (0.00s)
+=== RUN   TestJWTHMACIdNewClaim
+=== RUN   TestJWTHMACIdNewClaim/Request_with_valid_JWT/HMAC_signature/id_in_user-id_claim
+--- PASS: TestJWTHMACIdNewClaim (0.03s)
+    --- PASS: TestJWTHMACIdNewClaim/Request_with_valid_JWT/HMAC_signature/id_in_user-id_claim (0.00s)
+=== RUN   TestJWTRSAIdInClaimsWithBaseField
+=== RUN   TestJWTRSAIdInClaimsWithBaseField/Request_with_valid_JWT/RSA_signature/user_id_in_user_id_claim
+=== RUN   TestJWTRSAIdInClaimsWithBaseField/Request_with_valid_JWT/RSA_signature/empty_user_id_claim
+=== RUN   TestJWTRSAIdInClaimsWithBaseField/Request_with_valid_JWT/RSA_signature/user_id_in_sub_claim
+=== RUN   TestJWTRSAIdInClaimsWithBaseField/Request_with_valid_JWT/RSA_signature/empty_sub_claim
+=== RUN   TestJWTRSAIdInClaimsWithBaseField/Request_with_valid_JWT/RSA_signature/no_base_field_or_sub_claims
+--- PASS: TestJWTRSAIdInClaimsWithBaseField (0.04s)
+    --- PASS: TestJWTRSAIdInClaimsWithBaseField/Request_with_valid_JWT/RSA_signature/user_id_in_user_id_claim (0.00s)
+    --- PASS: TestJWTRSAIdInClaimsWithBaseField/Request_with_valid_JWT/RSA_signature/empty_user_id_claim (0.00s)
+    --- PASS: TestJWTRSAIdInClaimsWithBaseField/Request_with_valid_JWT/RSA_signature/user_id_in_sub_claim (0.00s)
+    --- PASS: TestJWTRSAIdInClaimsWithBaseField/Request_with_valid_JWT/RSA_signature/empty_sub_claim (0.00s)
+    --- PASS: TestJWTRSAIdInClaimsWithBaseField/Request_with_valid_JWT/RSA_signature/no_base_field_or_sub_claims (0.00s)
+=== RUN   TestJWTRSAIdInClaimsWithoutBaseField
+=== RUN   TestJWTRSAIdInClaimsWithoutBaseField/Request_with_valid_JWT/RSA_signature/id_found_in_default_sub
+=== RUN   TestJWTRSAIdInClaimsWithoutBaseField/Request_with_valid_JWT/RSA_signature/no_id_claims
+--- PASS: TestJWTRSAIdInClaimsWithoutBaseField (0.03s)
+    --- PASS: TestJWTRSAIdInClaimsWithoutBaseField/Request_with_valid_JWT/RSA_signature/id_found_in_default_sub (0.00s)
+    --- PASS: TestJWTRSAIdInClaimsWithoutBaseField/Request_with_valid_JWT/RSA_signature/no_id_claims (0.00s)
+=== RUN   TestJWTDefaultPolicies
+=== RUN   TestJWTDefaultPolicies/Policy_field_name_empty
+=== RUN   TestJWTDefaultPolicies/Policy_field_name_nonempty_but_empty_claim
+=== RUN   TestJWTDefaultPolicies/Policy_field_name_nonempty_invalid_policy_ID_in_claim
+=== RUN   TestJWTDefaultPolicies/Default_to_Claim_transition
+=== RUN   TestJWTDefaultPolicies/Claim_to_Default_transition
+--- PASS: TestJWTDefaultPolicies (0.14s)
+    --- PASS: TestJWTDefaultPolicies/Policy_field_name_empty (0.03s)
+    --- PASS: TestJWTDefaultPolicies/Policy_field_name_nonempty_but_empty_claim (0.03s)
+    --- PASS: TestJWTDefaultPolicies/Policy_field_name_nonempty_invalid_policy_ID_in_claim (0.01s)
+    --- PASS: TestJWTDefaultPolicies/Default_to_Claim_transition (0.02s)
+    --- PASS: TestJWTDefaultPolicies/Claim_to_Default_transition (0.02s)
+=== RUN   TestJWTECDSASign
+=== RUN   TestJWTECDSASign/Request_with_valid_JWT/ECDSA
+--- PASS: TestJWTECDSASign (0.04s)
+    --- PASS: TestJWTECDSASign/Request_with_valid_JWT/ECDSA (0.00s)
+=== RUN   TestJWTUnknownSign
+=== RUN   TestJWTUnknownSign/Request_with_valid_JWT/ECDSA_signature_needs_a_test._currently_defaults_to_HMAC
+--- PASS: TestJWTUnknownSign (0.03s)
+    --- PASS: TestJWTUnknownSign/Request_with_valid_JWT/ECDSA_signature_needs_a_test._currently_defaults_to_HMAC (0.00s)
+=== RUN   TestJWTRSAInvalidPublickKey
+=== RUN   TestJWTRSAInvalidPublickKey/Request_with_valid_JWT/RSA_signature/invalid_public_key
+--- PASS: TestJWTRSAInvalidPublickKey (0.03s)
+    --- PASS: TestJWTRSAInvalidPublickKey/Request_with_valid_JWT/RSA_signature/invalid_public_key (0.00s)
+=== RUN   TestJWTExpOverride
+=== RUN   TestJWTExpOverride/JWT_expiration_bigger_then_policy
+=== RUN   TestJWTExpOverride/JWT_expiration_smaller_then_policy
+=== RUN   TestJWTExpOverride/JWT_expired_but_renewed,_policy_without_expiration
+--- PASS: TestJWTExpOverride (2.25s)
+    --- PASS: TestJWTExpOverride/JWT_expiration_bigger_then_policy (1.11s)
+    --- PASS: TestJWTExpOverride/JWT_expiration_smaller_then_policy (0.00s)
+    --- PASS: TestJWTExpOverride/JWT_expired_but_renewed,_policy_without_expiration (1.11s)
+=== RUN   TestMethodTransform
+=== RUN   TestMethodTransform/Using_URL_rewrite
+=== RUN   TestMethodTransform/Using_cache
+--- PASS: TestMethodTransform (0.04s)
+    --- PASS: TestMethodTransform/Using_URL_rewrite (0.01s)
+    --- PASS: TestMethodTransform/Using_cache (0.01s)
+=== RUN   TestProcessRequestLiveQuotaLimit
+=== RUN   TestProcessRequestLiveQuotaLimit/Process_request_live_with_quota
+--- PASS: TestProcessRequestLiveQuotaLimit (3.07s)
+    --- PASS: TestProcessRequestLiveQuotaLimit/Process_request_live_with_quota (2.05s)
+=== RUN   TestProcessRequestOffThreadQuotaLimit
+=== RUN   TestProcessRequestOffThreadQuotaLimit/Process_request_off_thread_with_quota
+    mw_organization_activity_test.go:170: Failed with 403 after 3 requests over quota
+    mw_organization_activity_test.go:189: Started responding with 200 after 1 requests after quota renewal
+--- PASS: TestProcessRequestOffThreadQuotaLimit (4.99s)
+    --- PASS: TestProcessRequestOffThreadQuotaLimit/Process_request_off_thread_with_quota (4.04s)
+=== RUN   TestProcessRequestLiveRedisRollingLimiter
+=== RUN   TestProcessRequestLiveRedisRollingLimiter/Process_request_live_with_rate_limit
+    mw_organization_activity_test.go:281: Started failing after 1 requests over limit
+--- PASS: TestProcessRequestLiveRedisRollingLimiter (2.03s)
+    --- PASS: TestProcessRequestLiveRedisRollingLimiter/Process_request_live_with_rate_limit (1.07s)
+=== RUN   TestProcessRequestOffThreadRedisRollingLimiter
+=== RUN   TestProcessRequestOffThreadRedisRollingLimiter/Process_request_off_thread_with_rate_limit
+    mw_organization_activity_test.go:369: Started failing after 3 requests over limit
+--- PASS: TestProcessRequestOffThreadRedisRollingLimiter (2.96s)
+    --- PASS: TestProcessRequestOffThreadRedisRollingLimiter/Process_request_off_thread_with_rate_limit (2.04s)
+=== RUN   TestRateLimit_Unlimited
+=== RUN   TestRateLimit_Unlimited/-1_rate_means_unlimited
+=== RUN   TestRateLimit_Unlimited/0_rate_means_unlimited
+--- PASS: TestRateLimit_Unlimited (0.03s)
+    --- PASS: TestRateLimit_Unlimited/-1_rate_means_unlimited (0.00s)
+    --- PASS: TestRateLimit_Unlimited/0_rate_means_unlimited (0.00s)
+=== RUN   TestNeverRenewQuota
+--- PASS: TestNeverRenewQuota (0.03s)
+=== RUN   TestMwRateLimiting_DepthLimit
+=== RUN   TestMwRateLimiting_DepthLimit/Global_Level
+=== RUN   TestMwRateLimiting_DepthLimit/API_Level
+=== RUN   TestMwRateLimiting_DepthLimit/Field_Level
+--- PASS: TestMwRateLimiting_DepthLimit (0.03s)
+    --- PASS: TestMwRateLimiting_DepthLimit/Global_Level (0.00s)
+    --- PASS: TestMwRateLimiting_DepthLimit/API_Level (0.00s)
+    --- PASS: TestMwRateLimiting_DepthLimit/Field_Level (0.00s)
+=== RUN   TestRedisCacheMiddleware_WithCompressedResponse
+=== RUN   TestRedisCacheMiddleware_WithCompressedResponse/without_cache
+=== RUN   TestRedisCacheMiddleware_WithCompressedResponse/with_cache
+=== RUN   TestRedisCacheMiddleware_WithCompressedResponse/with_cache_and__dynamic_redis
+--- PASS: TestRedisCacheMiddleware_WithCompressedResponse (0.87s)
+    --- PASS: TestRedisCacheMiddleware_WithCompressedResponse/without_cache (0.01s)
+    --- PASS: TestRedisCacheMiddleware_WithCompressedResponse/with_cache (0.01s)
+    --- PASS: TestRedisCacheMiddleware_WithCompressedResponse/with_cache_and__dynamic_redis (0.84s)
+=== RUN   Test_isSafeMethod
+=== RUN   Test_isSafeMethod/Test_if_Get_is_a_safe_method
+=== RUN   Test_isSafeMethod/Test_if_Head_is_a_safe_method
+=== RUN   Test_isSafeMethod/Test_if_Options_is_a_safe_method
+=== RUN   Test_isSafeMethod/Test_if_Post_is_a_safe_method
+=== RUN   Test_isSafeMethod/Test_if_Put_is_a_safe_method
+=== RUN   Test_isSafeMethod/Test_if_Patch_is_a_safe_method
+=== RUN   Test_isSafeMethod/Test_if_Delete_is_a_safe_method
+=== RUN   Test_isSafeMethod/Test_if_Connect_is_a_safe_method
+=== RUN   Test_isSafeMethod/Test_if_Trace_is_a_safe_method
+--- PASS: Test_isSafeMethod (0.00s)
+    --- PASS: Test_isSafeMethod/Test_if_Get_is_a_safe_method (0.00s)
+    --- PASS: Test_isSafeMethod/Test_if_Head_is_a_safe_method (0.00s)
+    --- PASS: Test_isSafeMethod/Test_if_Options_is_a_safe_method (0.00s)
+    --- PASS: Test_isSafeMethod/Test_if_Post_is_a_safe_method (0.00s)
+    --- PASS: Test_isSafeMethod/Test_if_Put_is_a_safe_method (0.00s)
+    --- PASS: Test_isSafeMethod/Test_if_Patch_is_a_safe_method (0.00s)
+    --- PASS: Test_isSafeMethod/Test_if_Delete_is_a_safe_method (0.00s)
+    --- PASS: Test_isSafeMethod/Test_if_Connect_is_a_safe_method (0.00s)
+    --- PASS: Test_isSafeMethod/Test_if_Trace_is_a_safe_method (0.00s)
+=== RUN   Test_isBodyHashRequired
+=== RUN   Test_isBodyHashRequired/Put_no_body
+=== RUN   Test_isBodyHashRequired/Get_no_body
+=== RUN   Test_isBodyHashRequired/Get_with_body
+=== RUN   Test_isBodyHashRequired/Put_with_body
+=== RUN   Test_isBodyHashRequired/Post_with_body
+=== RUN   Test_isBodyHashRequired/Patch_with_body
+--- PASS: Test_isBodyHashRequired (0.00s)
+    --- PASS: Test_isBodyHashRequired/Put_no_body (0.00s)
+    --- PASS: Test_isBodyHashRequired/Get_no_body (0.00s)
+    --- PASS: Test_isBodyHashRequired/Get_with_body (0.00s)
+    --- PASS: Test_isBodyHashRequired/Put_with_body (0.00s)
+    --- PASS: Test_isBodyHashRequired/Post_with_body (0.00s)
+    --- PASS: Test_isBodyHashRequired/Patch_with_body (0.00s)
+=== RUN   Test_addBodyHash
+=== RUN   Test_addBodyHash/No_body
+=== RUN   Test_addBodyHash/Hash_the_entire_body_by_regexp
+=== RUN   Test_addBodyHash/Hash_the_entire_body_no_regexp
+=== RUN   Test_addBodyHash/Hash_by_id_regexp
+--- PASS: Test_addBodyHash (0.00s)
+    --- PASS: Test_addBodyHash/No_body (0.00s)
+    --- PASS: Test_addBodyHash/Hash_the_entire_body_by_regexp (0.00s)
+    --- PASS: Test_addBodyHash/Hash_the_entire_body_no_regexp (0.00s)
+    --- PASS: Test_addBodyHash/Hash_by_id_regexp (0.00s)
+=== RUN   TestHMACRequestSigning
+=== RUN   TestHMACRequestSigning/Test_with_hmac-sha1
+=== RUN   TestHMACRequestSigning/Test_with_hmac-sha256
+=== RUN   TestHMACRequestSigning/Test_with_hmac-sha384
+=== RUN   TestHMACRequestSigning/Test_with_hmac-sha512
+=== RUN   TestHMACRequestSigning/Empty_secret
+=== RUN   TestHMACRequestSigning/Invalid_secret
+=== RUN   TestHMACRequestSigning/Valid_Custom_headerList
+=== RUN   TestHMACRequestSigning/Invalid_Custom_headerList
+=== RUN   TestHMACRequestSigning/Invalid_algorithm
+=== RUN   TestHMACRequestSigning/Invalid_Date_field
+=== RUN   TestHMACRequestSigning/Custom_Signature_header
+--- PASS: TestHMACRequestSigning (0.11s)
+    --- PASS: TestHMACRequestSigning/Test_with_hmac-sha1 (0.01s)
+    --- PASS: TestHMACRequestSigning/Test_with_hmac-sha256 (0.01s)
+    --- PASS: TestHMACRequestSigning/Test_with_hmac-sha384 (0.01s)
+    --- PASS: TestHMACRequestSigning/Test_with_hmac-sha512 (0.01s)
+    --- PASS: TestHMACRequestSigning/Empty_secret (0.01s)
+    --- PASS: TestHMACRequestSigning/Invalid_secret (0.01s)
+    --- PASS: TestHMACRequestSigning/Valid_Custom_headerList (0.01s)
+    --- PASS: TestHMACRequestSigning/Invalid_Custom_headerList (0.01s)
+    --- PASS: TestHMACRequestSigning/Invalid_algorithm (0.01s)
+    --- PASS: TestHMACRequestSigning/Invalid_Date_field (0.01s)
+    --- PASS: TestHMACRequestSigning/Custom_Signature_header (0.01s)
+=== RUN   TestRSARequestSigning
+=== RUN   TestRSARequestSigning/Test_with_rsa-sha256
+=== RUN   TestRSARequestSigning/Invalid_certificate_id
+=== RUN   TestRSARequestSigning/empty_certificate_id
+=== RUN   TestRSARequestSigning/Invalid_algorithm
+=== RUN   TestRSARequestSigning/Invalid_Date_field
+=== RUN   TestRSARequestSigning/Custom_headerList
+=== RUN   TestRSARequestSigning/Non-existing_Custom_headers
+=== RUN   TestRSARequestSigning/Custom_Signature_header
+--- PASS: TestRSARequestSigning (0.11s)
+    --- PASS: TestRSARequestSigning/Test_with_rsa-sha256 (0.01s)
+    --- PASS: TestRSARequestSigning/Invalid_certificate_id (0.01s)
+    --- PASS: TestRSARequestSigning/empty_certificate_id (0.01s)
+    --- PASS: TestRSARequestSigning/Invalid_algorithm (0.01s)
+    --- PASS: TestRSARequestSigning/Invalid_Date_field (0.01s)
+    --- PASS: TestRSARequestSigning/Custom_headerList (0.01s)
+    --- PASS: TestRSARequestSigning/Non-existing_Custom_headers (0.01s)
+    --- PASS: TestRSARequestSigning/Custom_Signature_header (0.01s)
+=== RUN   TestStripListenPath
+=== RUN   TestStripListenPath/Off
+=== RUN   TestStripListenPath/On
+--- PASS: TestStripListenPath (0.03s)
+    --- PASS: TestStripListenPath/Off (0.01s)
+    --- PASS: TestStripListenPath/On (0.01s)
+=== RUN   TestWithURLRewrite
+=== RUN   TestWithURLRewrite/looping
+=== RUN   TestWithURLRewrite/external
+--- PASS: TestWithURLRewrite (0.03s)
+    --- PASS: TestWithURLRewrite/looping (0.01s)
+    --- PASS: TestWithURLRewrite/external (0.01s)
+=== RUN   TestRequestSigning_getRequestPath
+=== RUN   TestRequestSigning_getRequestPath/StripListenPath=true
+=== RUN   TestRequestSigning_getRequestPath/StripListenPath=true/path_is_empty
+=== RUN   TestRequestSigning_getRequestPath/URL_rewrite
+--- PASS: TestRequestSigning_getRequestPath (0.00s)
+    --- PASS: TestRequestSigning_getRequestPath/StripListenPath=true (0.00s)
+        --- PASS: TestRequestSigning_getRequestPath/StripListenPath=true/path_is_empty (0.00s)
+    --- PASS: TestRequestSigning_getRequestPath/URL_rewrite (0.00s)
+=== RUN   TestStripAuth_stripFromHeaders
+=== RUN   TestStripAuth_stripFromHeaders/stripping_{AuthConfig:{UseParam:false_ParamName:_UseCookie:false_CookieName:_AuthHeaderName:Authorization_UseCertificate:false_ValidateSignature:false_Signature:{Algorithm:_Header:_Secret:_AllowedClockSkew:0_ErrorCode:0_ErrorMessage:}}_HeaderKey:Authorization_QueryParam:}
+=== RUN   TestStripAuth_stripFromHeaders/stripping_{AuthConfig:{UseParam:false_ParamName:_UseCookie:false_CookieName:_AuthHeaderName:_UseCertificate:false_ValidateSignature:false_Signature:{Algorithm:_Header:_Secret:_AllowedClockSkew:0_ErrorCode:0_ErrorMessage:}}_HeaderKey:Authorization_QueryParam:}
+=== RUN   TestStripAuth_stripFromHeaders/stripping_{AuthConfig:{UseParam:false_ParamName:_UseCookie:false_CookieName:_AuthHeaderName:MyAuth_UseCertificate:false_ValidateSignature:false_Signature:{Algorithm:_Header:_Secret:_AllowedClockSkew:0_ErrorCode:0_ErrorMessage:}}_HeaderKey:MyAuth_QueryParam:}
+=== RUN   TestStripAuth_stripFromHeaders/strip_authorization_from_cookie
+--- PASS: TestStripAuth_stripFromHeaders (0.00s)
+    --- PASS: TestStripAuth_stripFromHeaders/stripping_{AuthConfig:{UseParam:false_ParamName:_UseCookie:false_CookieName:_AuthHeaderName:Authorization_UseCertificate:false_ValidateSignature:false_Signature:{Algorithm:_Header:_Secret:_AllowedClockSkew:0_ErrorCode:0_ErrorMessage:}}_HeaderKey:Authorization_QueryParam:} (0.00s)
+    --- PASS: TestStripAuth_stripFromHeaders/stripping_{AuthConfig:{UseParam:false_ParamName:_UseCookie:false_CookieName:_AuthHeaderName:_UseCertificate:false_ValidateSignature:false_Signature:{Algorithm:_Header:_Secret:_AllowedClockSkew:0_ErrorCode:0_ErrorMessage:}}_HeaderKey:Authorization_QueryParam:} (0.00s)
+    --- PASS: TestStripAuth_stripFromHeaders/stripping_{AuthConfig:{UseParam:false_ParamName:_UseCookie:false_CookieName:_AuthHeaderName:MyAuth_UseCertificate:false_ValidateSignature:false_Signature:{Algorithm:_Header:_Secret:_AllowedClockSkew:0_ErrorCode:0_ErrorMessage:}}_HeaderKey:MyAuth_QueryParam:} (0.00s)
+    --- PASS: TestStripAuth_stripFromHeaders/strip_authorization_from_cookie (0.00s)
+=== RUN   TestStripAuth_stripFromParams
+=== RUN   TestStripAuth_stripFromParams/stripping_password1
+    mw_strip_auth_test.go:184: PARAM: map[ABC:[QCvFr] Authorisation:[xJDLS] Def:[fZXwi] GHI:[pRtSB] password1:[aUdAWtrdom]]
+=== RUN   TestStripAuth_stripFromParams/stripping_auth1
+    mw_strip_auth_test.go:184: PARAM: map[ABC:[NTnaN] Authorisation:[UKgKK] Def:[CVNnn] GHI:[iTtjZ] auth1:[CnZITCGLrE]]
+=== RUN   TestStripAuth_stripFromParams/stripping_auth2
+    mw_strip_auth_test.go:184: PARAM: map[ABC:[BmrJD] Authorisation:[hLzgB] Def:[ZLTUJ] GHI:[pgvZF] auth2:[VEOhAcLQmn]]
+=== RUN   TestStripAuth_stripFromParams/stripping_Authorization
+    mw_strip_auth_test.go:184: PARAM: map[ABC:[hrswq] Authorisation:[jOOLW] Authorization:[aTuYxRjCyE] Def:[vTNgb] GHI:[VcRIG]]
+--- PASS: TestStripAuth_stripFromParams (0.00s)
+    --- PASS: TestStripAuth_stripFromParams/stripping_password1 (0.00s)
+    --- PASS: TestStripAuth_stripFromParams/stripping_auth1 (0.00s)
+    --- PASS: TestStripAuth_stripFromParams/stripping_auth2 (0.00s)
+    --- PASS: TestStripAuth_stripFromParams/stripping_Authorization (0.00s)
+=== RUN   TestTransformNonAscii
+--- PASS: TestTransformNonAscii (0.00s)
+=== RUN   TestTransformXMLCrash
+--- PASS: TestTransformXMLCrash (0.00s)
+=== RUN   TestTransformJSONMarshalXMLInput
+--- PASS: TestTransformJSONMarshalXMLInput (0.00s)
+=== RUN   TestTransformJSONMarshalJSONInput
+--- PASS: TestTransformJSONMarshalJSONInput (0.00s)
+=== RUN   TestTransformJSONMarshalJSONArrayInput
+--- PASS: TestTransformJSONMarshalJSONArrayInput (0.00s)
+=== RUN   TestTransformXMLMarshal
+=== RUN   TestTransformXMLMarshal/XMLInput
+=== RUN   TestTransformXMLMarshal/JSONInput
+=== RUN   TestTransformXMLMarshal/JSONInput_with_escaped_char
+=== RUN   TestTransformXMLMarshal/JSONInput_with_escaped_char,_template_applied_to_a_single_value
+--- PASS: TestTransformXMLMarshal (0.00s)
+    --- PASS: TestTransformXMLMarshal/XMLInput (0.00s)
+    --- PASS: TestTransformXMLMarshal/JSONInput (0.00s)
+    --- PASS: TestTransformXMLMarshal/JSONInput_with_escaped_char (0.00s)
+    --- PASS: TestTransformXMLMarshal/JSONInput_with_escaped_char,_template_applied_to_a_single_value (0.00s)
+=== RUN   TestBodyTransformCaseSensitivity
+=== RUN   TestBodyTransformCaseSensitivity/Relative_path_lower,_requested_path_lower
+=== RUN   TestBodyTransformCaseSensitivity/Relative_path_lower,_requested_path_upper
+=== RUN   TestBodyTransformCaseSensitivity/Relative_path_upper,_requested_path_lower
+=== RUN   TestBodyTransformCaseSensitivity/Relative_path_upper,_requested_path_upper
+--- PASS: TestBodyTransformCaseSensitivity (0.04s)
+    --- PASS: TestBodyTransformCaseSensitivity/Relative_path_lower,_requested_path_lower (0.01s)
+    --- PASS: TestBodyTransformCaseSensitivity/Relative_path_lower,_requested_path_upper (0.01s)
+    --- PASS: TestBodyTransformCaseSensitivity/Relative_path_upper,_requested_path_lower (0.01s)
+    --- PASS: TestBodyTransformCaseSensitivity/Relative_path_upper,_requested_path_upper (0.01s)
+=== RUN   TestRewriter
+=== RUN   TestRewriter/Straight
+=== RUN   TestRewriter/OneVal
+=== RUN   TestRewriter/ThreeVals
+=== RUN   TestRewriter/Reverse
+=== RUN   TestRewriter/Missing
+=== RUN   TestRewriter/MissingAgain
+=== RUN   TestRewriter/QS
+=== RUN   TestRewriter/QS2
+--- PASS: TestRewriter (0.00s)
+    --- PASS: TestRewriter/Straight (0.00s)
+    --- PASS: TestRewriter/OneVal (0.00s)
+    --- PASS: TestRewriter/ThreeVals (0.00s)
+    --- PASS: TestRewriter/Reverse (0.00s)
+    --- PASS: TestRewriter/Missing (0.00s)
+    --- PASS: TestRewriter/MissingAgain (0.00s)
+    --- PASS: TestRewriter/QS (0.00s)
+    --- PASS: TestRewriter/QS2 (0.00s)
+=== RUN   TestRewriterTriggers
+=== RUN   TestRewriterTriggers/Header_Single
+=== RUN   TestRewriterTriggers/Header_Single_Group
+=== RUN   TestRewriterTriggers/Header_Multi_Any
+=== RUN   TestRewriterTriggers/Header_Multi_All_Fail
+=== RUN   TestRewriterTriggers/Header_Multi_All_Pass
+=== RUN   TestRewriterTriggers/Header_Many_Multi_Any_Pass
+=== RUN   TestRewriterTriggers/Header_Reverse_Logic_Any_Pass
+=== RUN   TestRewriterTriggers/Header_Reverse_Logic_All_Fail
+=== RUN   TestRewriterTriggers/Query_Single
+=== RUN   TestRewriterTriggers/Query_Single_Group
+=== RUN   TestRewriterTriggers/Query_Multi_All
+=== RUN   TestRewriterTriggers/Multi_Multi_Type_Any
+=== RUN   TestRewriterTriggers/Multi_Multi_Type_All
+=== RUN   TestRewriterTriggers/Multi_Multi_Type_All_Fail
+=== RUN   TestRewriterTriggers/Multi_Multi_Type_Reverse_Logic_All_Fail
+=== RUN   TestRewriterTriggers/Multi_Multi_Type_Reverse_Logic_All_Fail#01
+=== RUN   TestRewriterTriggers/Payload_Single
+=== RUN   TestRewriterTriggers/Payload_Multiple_Match
+=== RUN   TestRewriterTriggers/Payload_Multiple_Match_Groups
+=== RUN   TestRewriterTriggers/Payload_Multiple_Match_Groups#01
+=== RUN   TestRewriterTriggers/Multi_Type_All
+=== RUN   TestRewriterTriggers/Multi_Multi_Type_Reverse_Logic_Any_1
+=== RUN   TestRewriterTriggers/PathPart_Single
+=== RUN   TestRewriterTriggers/Multi_Multi_Type_Reverse_Logic_Any_2
+=== RUN   TestRewriterTriggers/Multi_Multi_Type_Reverse_Logic_Any_3
+=== RUN   TestRewriterTriggers/PathPart_Single_Group
+=== RUN   TestRewriterTriggers/PathPart_MoreParts
+=== RUN   TestRewriterTriggers/Meta_Simple
+=== RUN   TestRewriterTriggers/Meta_Simple_Group
+=== RUN   TestRewriterTriggers/Meta_Value_from_Session
+=== RUN   TestRewriterTriggers/Request_context
+=== RUN   TestRewriterTriggers/Variable_not_found
+=== RUN   TestRewriterTriggers/Session_not_found
+--- PASS: TestRewriterTriggers (0.00s)
+    --- PASS: TestRewriterTriggers/Header_Single (0.00s)
+    --- PASS: TestRewriterTriggers/Header_Single_Group (0.00s)
+    --- PASS: TestRewriterTriggers/Header_Multi_Any (0.00s)
+    --- PASS: TestRewriterTriggers/Header_Multi_All_Fail (0.00s)
+    --- PASS: TestRewriterTriggers/Header_Multi_All_Pass (0.00s)
+    --- PASS: TestRewriterTriggers/Header_Many_Multi_Any_Pass (0.00s)
+    --- PASS: TestRewriterTriggers/Header_Reverse_Logic_Any_Pass (0.00s)
+    --- PASS: TestRewriterTriggers/Header_Reverse_Logic_All_Fail (0.00s)
+    --- PASS: TestRewriterTriggers/Query_Single (0.00s)
+    --- PASS: TestRewriterTriggers/Query_Single_Group (0.00s)
+    --- PASS: TestRewriterTriggers/Query_Multi_All (0.00s)
+    --- PASS: TestRewriterTriggers/Multi_Multi_Type_Any (0.00s)
+    --- PASS: TestRewriterTriggers/Multi_Multi_Type_All (0.00s)
+    --- PASS: TestRewriterTriggers/Multi_Multi_Type_All_Fail (0.00s)
+    --- PASS: TestRewriterTriggers/Multi_Multi_Type_Reverse_Logic_All_Fail (0.00s)
+    --- PASS: TestRewriterTriggers/Multi_Multi_Type_Reverse_Logic_All_Fail#01 (0.00s)
+    --- PASS: TestRewriterTriggers/Payload_Single (0.00s)
+    --- PASS: TestRewriterTriggers/Payload_Multiple_Match (0.00s)
+    --- PASS: TestRewriterTriggers/Payload_Multiple_Match_Groups (0.00s)
+    --- PASS: TestRewriterTriggers/Payload_Multiple_Match_Groups#01 (0.00s)
+    --- PASS: TestRewriterTriggers/Multi_Type_All (0.00s)
+    --- PASS: TestRewriterTriggers/Multi_Multi_Type_Reverse_Logic_Any_1 (0.00s)
+    --- PASS: TestRewriterTriggers/PathPart_Single (0.00s)
+    --- PASS: TestRewriterTriggers/Multi_Multi_Type_Reverse_Logic_Any_2 (0.00s)
+    --- PASS: TestRewriterTriggers/Multi_Multi_Type_Reverse_Logic_Any_3 (0.00s)
+    --- PASS: TestRewriterTriggers/PathPart_Single_Group (0.00s)
+    --- PASS: TestRewriterTriggers/PathPart_MoreParts (0.00s)
+    --- PASS: TestRewriterTriggers/Meta_Simple (0.00s)
+    --- PASS: TestRewriterTriggers/Meta_Simple_Group (0.00s)
+    --- PASS: TestRewriterTriggers/Meta_Value_from_Session (0.00s)
+    --- PASS: TestRewriterTriggers/Request_context (0.00s)
+    --- PASS: TestRewriterTriggers/Variable_not_found (0.00s)
+    --- PASS: TestRewriterTriggers/Session_not_found (0.00s)
+=== RUN   TestInitTriggerRx
+--- PASS: TestInitTriggerRx (0.00s)
+=== RUN   TestURLRewriteCaseSensitivity
+=== RUN   TestURLRewriteCaseSensitivity/Relative_path_lower,_requested_path_lower
+=== RUN   TestURLRewriteCaseSensitivity/Relative_path_lower,_requested_path_upper
+=== RUN   TestURLRewriteCaseSensitivity/Relative_path_upper,_requested_path_lower
+=== RUN   TestURLRewriteCaseSensitivity/Relative_path_upper,_requested_path_upper
+--- PASS: TestURLRewriteCaseSensitivity (0.04s)
+    --- PASS: TestURLRewriteCaseSensitivity/Relative_path_lower,_requested_path_lower (0.01s)
+    --- PASS: TestURLRewriteCaseSensitivity/Relative_path_lower,_requested_path_upper (0.01s)
+    --- PASS: TestURLRewriteCaseSensitivity/Relative_path_upper,_requested_path_lower (0.01s)
+    --- PASS: TestURLRewriteCaseSensitivity/Relative_path_upper,_requested_path_upper (0.01s)
+=== RUN   TestValToStr
+--- PASS: TestValToStr (0.00s)
+=== RUN   TestLoopingUrl
+=== RUN   TestLoopingUrl/__api
+=== RUN   TestLoopingUrl/__api__
+=== RUN   TestLoopingUrl/___api___
+=== RUN   TestLoopingUrl/@api@
+=== RUN   TestLoopingUrl/___api____name___
+--- PASS: TestLoopingUrl (0.00s)
+    --- PASS: TestLoopingUrl/__api (0.00s)
+    --- PASS: TestLoopingUrl/__api__ (0.00s)
+    --- PASS: TestLoopingUrl/___api___ (0.00s)
+    --- PASS: TestLoopingUrl/@api@ (0.00s)
+    --- PASS: TestLoopingUrl/___api____name___ (0.00s)
+=== RUN   TestValidateJSONSchema
+--- PASS: TestValidateJSONSchema (0.02s)
+=== RUN   TestVersioning
+--- PASS: TestVersioning (0.03s)
+=== RUN   TestNotVersioned
+=== RUN   TestNotVersioned/Versioning_enabled,_override_target_URL
+=== RUN   TestNotVersioned/Versioning_disabled,_use_original_target_URL
+--- PASS: TestNotVersioned (0.03s)
+    --- PASS: TestNotVersioned/Versioning_enabled,_override_target_URL (0.01s)
+    --- PASS: TestNotVersioned/Versioning_disabled,_use_original_target_URL (0.01s)
+=== RUN   TestVirtualEndpoint
+--- PASS: TestVirtualEndpoint (0.03s)
+=== RUN   TestVirtualEndpoint500
+--- PASS: TestVirtualEndpoint500 (0.03s)
+=== RUN   TestVirtualEndpointSessionMetadata
+--- PASS: TestVirtualEndpointSessionMetadata (0.03s)
+=== RUN   TestOauthMultipleAPIs
+--- PASS: TestOauthMultipleAPIs (0.03s)
+=== RUN   TestAuthCodeRedirect
+=== RUN   TestAuthCodeRedirect/Authorize_request_with_redirect
+--- PASS: TestAuthCodeRedirect (0.03s)
+    --- PASS: TestAuthCodeRedirect/Authorize_request_with_redirect (0.00s)
+=== RUN   TestAuthCodeRedirectMultipleURL
+=== RUN   TestAuthCodeRedirectMultipleURL/Client_authorize_request_with_multiple_redirect_URI
+--- PASS: TestAuthCodeRedirectMultipleURL (0.03s)
+    --- PASS: TestAuthCodeRedirectMultipleURL/Client_authorize_request_with_multiple_redirect_URI (0.00s)
+=== RUN   TestAuthCodeRedirectInvalidMultipleURL
+=== RUN   TestAuthCodeRedirectInvalidMultipleURL/Client_authorize_request_with_invalid_redirect_URI
+--- PASS: TestAuthCodeRedirectInvalidMultipleURL (0.03s)
+    --- PASS: TestAuthCodeRedirectInvalidMultipleURL/Client_authorize_request_with_invalid_redirect_URI (0.00s)
+=== RUN   TestAPIClientAuthorizeAuthCode
+=== RUN   TestAPIClientAuthorizeAuthCode/Client_authorize_code_request
+--- PASS: TestAPIClientAuthorizeAuthCode (0.03s)
+    --- PASS: TestAPIClientAuthorizeAuthCode/Client_authorize_code_request (0.00s)
+=== RUN   TestAPIClientAuthorizeToken
+=== RUN   TestAPIClientAuthorizeToken/Client_authorize_token_request
+=== RUN   TestAPIClientAuthorizeToken/Client_authorize_token_request_with_metadata
+--- PASS: TestAPIClientAuthorizeToken (0.03s)
+    --- PASS: TestAPIClientAuthorizeToken/Client_authorize_token_request (0.00s)
+    --- PASS: TestAPIClientAuthorizeToken/Client_authorize_token_request_with_metadata (0.00s)
+=== RUN   TestDeleteOauthClient
+=== RUN   TestDeleteOauthClient/Client_authorize_token_request
+=== RUN   TestDeleteOauthClient/Make_request_to_API_with_supplying_token
+=== RUN   TestDeleteOauthClient/Delete_OAuth-client_and_check_that_it_is_gone
+=== RUN   TestDeleteOauthClient/Make_sure_token_issued_for_deleted_oauth-client_cannot_be_used
+--- PASS: TestDeleteOauthClient (1.14s)
+    --- PASS: TestDeleteOauthClient/Client_authorize_token_request (0.00s)
+    --- PASS: TestDeleteOauthClient/Make_request_to_API_with_supplying_token (0.00s)
+    --- PASS: TestDeleteOauthClient/Delete_OAuth-client_and_check_that_it_is_gone (1.10s)
+    --- PASS: TestDeleteOauthClient/Make_sure_token_issued_for_deleted_oauth-client_cannot_be_used (0.00s)
+=== RUN   TestAPIClientAuthorizeTokenWithPolicy
+=== RUN   TestAPIClientAuthorizeTokenWithPolicy/Client_authorize_token_with_policy_request
+--- PASS: TestAPIClientAuthorizeTokenWithPolicy (0.04s)
+    --- PASS: TestAPIClientAuthorizeTokenWithPolicy/Client_authorize_token_with_policy_request (0.00s)
+=== RUN   TestGetPaginatedClientTokens
+=== RUN   TestGetPaginatedClientTokens/Negative_value_should_return_first_page
+=== RUN   TestGetPaginatedClientTokens/First_page,_less_than_items_per_page
+=== RUN   TestGetPaginatedClientTokens/First_page,_greater_than_items_per_page
+=== RUN   TestGetPaginatedClientTokens/Second_page,_greater_than_items_per_page
+=== RUN   TestGetPaginatedClientTokens/Second_page,_multiple_of_items_per_page
+--- PASS: TestGetPaginatedClientTokens (2.28s)
+    --- PASS: TestGetPaginatedClientTokens/Negative_value_should_return_first_page (0.42s)
+    --- PASS: TestGetPaginatedClientTokens/First_page,_less_than_items_per_page (0.33s)
+    --- PASS: TestGetPaginatedClientTokens/First_page,_greater_than_items_per_page (0.41s)
+    --- PASS: TestGetPaginatedClientTokens/Second_page,_greater_than_items_per_page (0.42s)
+    --- PASS: TestGetPaginatedClientTokens/Second_page,_multiple_of_items_per_page (0.71s)
+=== RUN   TestGetClientTokens
+=== RUN   TestGetClientTokens/Without_hashing
+=== RUN   TestGetClientTokens/Without_hashing/Send_three_token_requests
+=== RUN   TestGetClientTokens/Without_hashing/Get_list_of_tokens
+=== RUN   TestGetClientTokens/Without_hashing/Get_list_of_tokens_after_they_expire
+=== RUN   TestGetClientTokens/With_hashing
+=== RUN   TestGetClientTokens/With_hashing/Send_three_token_requests
+=== RUN   TestGetClientTokens/With_hashing/Get_list_of_tokens
+=== RUN   TestGetClientTokens/With_hashing/Get_list_of_tokens_after_they_expire
+--- PASS: TestGetClientTokens (4.09s)
+    --- PASS: TestGetClientTokens/Without_hashing (2.05s)
+        --- PASS: TestGetClientTokens/Without_hashing/Send_three_token_requests (0.01s)
+        --- PASS: TestGetClientTokens/Without_hashing/Get_list_of_tokens (0.00s)
+        --- PASS: TestGetClientTokens/Without_hashing/Get_list_of_tokens_after_they_expire (2.00s)
+    --- PASS: TestGetClientTokens/With_hashing (2.04s)
+        --- PASS: TestGetClientTokens/With_hashing/Send_three_token_requests (0.01s)
+        --- PASS: TestGetClientTokens/With_hashing/Get_list_of_tokens (0.00s)
+        --- PASS: TestGetClientTokens/With_hashing/Get_list_of_tokens_after_they_expire (2.00s)
+=== RUN   TestOAuthClientCredsGrant
+=== RUN   TestOAuthClientCredsGrant/Client_credentials_grant_token_request
+--- PASS: TestOAuthClientCredsGrant (0.04s)
+    --- PASS: TestOAuthClientCredsGrant/Client_credentials_grant_token_request (0.01s)
+=== RUN   TestClientAccessRequest
+=== RUN   TestClientAccessRequest/Exchane_access_code_for_token_request
+--- PASS: TestClientAccessRequest (0.04s)
+    --- PASS: TestClientAccessRequest/Exchane_access_code_for_token_request (0.01s)
+=== RUN   TestOAuthAPIRefreshInvalidate
+=== RUN   TestOAuthAPIRefreshInvalidate/Invalidate_token_request
+=== RUN   TestOAuthAPIRefreshInvalidate/Refresh_token_request
+--- PASS: TestOAuthAPIRefreshInvalidate (0.04s)
+    --- PASS: TestOAuthAPIRefreshInvalidate/Invalidate_token_request (0.00s)
+    --- PASS: TestOAuthAPIRefreshInvalidate/Refresh_token_request (0.00s)
+=== RUN   TestClientRefreshRequest
+=== RUN   TestClientRefreshRequest/Refresh_token_request
+--- PASS: TestClientRefreshRequest (0.04s)
+    --- PASS: TestClientRefreshRequest/Refresh_token_request (0.01s)
+=== RUN   TestClientRefreshRequestDouble
+=== RUN   TestClientRefreshRequestDouble/1st_refresh_token_request
+=== RUN   TestClientRefreshRequestDouble/2nd_refresh_token_request
+--- PASS: TestClientRefreshRequestDouble (0.05s)
+    --- PASS: TestClientRefreshRequestDouble/1st_refresh_token_request (0.01s)
+    --- PASS: TestClientRefreshRequestDouble/2nd_refresh_token_request (0.01s)
+=== RUN   TestTokenEndpointHeaders
+--- PASS: TestTokenEndpointHeaders (0.03s)
+=== RUN   TestJSONToFormValues
+=== RUN   TestJSONToFormValues/no_application/json_header
+=== RUN   TestJSONToFormValues/with_application/json_header
+--- PASS: TestJSONToFormValues (0.00s)
+    --- PASS: TestJSONToFormValues/no_application/json_header (0.00s)
+    --- PASS: TestJSONToFormValues/with_application/json_header (0.00s)
+=== RUN   TestLoadPoliciesFromDashboardReLogin
+--- PASS: TestLoadPoliciesFromDashboardReLogin (0.00s)
+=== RUN   TestApplyPolicies
+=== RUN   TestApplyPolicies/Empty
+=== RUN   TestApplyPolicies/Single
+=== RUN   TestApplyPolicies/Missing
+=== RUN   TestApplyPolicies/DiffOrg
+=== RUN   TestApplyPolicies/MultiNonPart
+=== RUN   TestApplyPolicies/MultiACLPolicy
+=== RUN   TestApplyPolicies/NonpartAndPart
+=== RUN   TestApplyPolicies/TagMerge
+=== RUN   TestApplyPolicies/InactiveMergeOne
+=== RUN   TestApplyPolicies/InactiveMergeAll
+=== RUN   TestApplyPolicies/InactiveWithSession
+=== RUN   TestApplyPolicies/QuotaPart_with_unlimited
+=== RUN   TestApplyPolicies/QuotaPart
+=== RUN   TestApplyPolicies/QuotaParts
+=== RUN   TestApplyPolicies/QuotaPart_with_access_rights
+=== RUN   TestApplyPolicies/QuotaPart_with_access_rights_in_multi-policy
+=== RUN   TestApplyPolicies/RatePart_with_unlimited
+=== RUN   TestApplyPolicies/RatePart
+=== RUN   TestApplyPolicies/RateParts
+=== RUN   TestApplyPolicies/ComplexityPart_with_unlimited
+=== RUN   TestApplyPolicies/ComplexityPart
+=== RUN   TestApplyPolicies/ComplexityParts
+=== RUN   TestApplyPolicies/AclPart
+=== RUN   TestApplyPolicies/AclPart#01
+=== RUN   TestApplyPolicies/RightsUpdate
+=== RUN   TestApplyPolicies/Per_API_is_set_with_other_partitions_to_true
+=== RUN   TestApplyPolicies/Per_API_is_set_to_true_with_some_partitions_set_to_true
+=== RUN   TestApplyPolicies/Per_API_is_set_to_true_with_no_other_partitions_set_to_true
+=== RUN   TestApplyPolicies/several_policies_with_Per_API_set_to_true_but_specifying_limit_for_the_same_API
+=== RUN   TestApplyPolicies/several_policies,_mixed_the_one_which_has_Per_API_set_to_true_and_partitioned_ones
+=== RUN   TestApplyPolicies/several_policies,_mixed_the_one_which_has_Per_API_set_to_true_and_partitioned_ones_(different_order)
+=== RUN   TestApplyPolicies/Per_API_is_set_to_true_and_some_API_gets_limit_set_from_policy's_fields
+=== RUN   TestApplyPolicies/Merge_per_path_rules_for_the_same_API
+=== RUN   TestApplyPolicies/Merge_restricted_fields_for_the_same_GraphQL_API
+=== RUN   TestApplyPolicies/Merge_field_level_depth_limit_for_the_same_GraphQL_API
+=== RUN   TestApplyPolicies/Throttle_interval_from_policy
+=== RUN   TestApplyPolicies/Throttle_retry_limit_from_policy
+=== RUN   TestApplyPolicies/inherit_quota_and_rate_from_partitioned_policies
+=== RUN   TestApplyPolicies/inherit_quota_and_rate_from_partitioned_policies_applied_in_different_order
+--- PASS: TestApplyPolicies (0.00s)
+    --- PASS: TestApplyPolicies/Empty (0.00s)
+    --- PASS: TestApplyPolicies/Single (0.00s)
+    --- PASS: TestApplyPolicies/Missing (0.00s)
+    --- PASS: TestApplyPolicies/DiffOrg (0.00s)
+    --- PASS: TestApplyPolicies/MultiNonPart (0.00s)
+    --- PASS: TestApplyPolicies/MultiACLPolicy (0.00s)
+    --- PASS: TestApplyPolicies/NonpartAndPart (0.00s)
+    --- PASS: TestApplyPolicies/TagMerge (0.00s)
+    --- PASS: TestApplyPolicies/InactiveMergeOne (0.00s)
+    --- PASS: TestApplyPolicies/InactiveMergeAll (0.00s)
+    --- PASS: TestApplyPolicies/InactiveWithSession (0.00s)
+    --- PASS: TestApplyPolicies/QuotaPart_with_unlimited (0.00s)
+    --- PASS: TestApplyPolicies/QuotaPart (0.00s)
+    --- PASS: TestApplyPolicies/QuotaParts (0.00s)
+    --- PASS: TestApplyPolicies/QuotaPart_with_access_rights (0.00s)
+    --- PASS: TestApplyPolicies/QuotaPart_with_access_rights_in_multi-policy (0.00s)
+    --- PASS: TestApplyPolicies/RatePart_with_unlimited (0.00s)
+    --- PASS: TestApplyPolicies/RatePart (0.00s)
+    --- PASS: TestApplyPolicies/RateParts (0.00s)
+    --- PASS: TestApplyPolicies/ComplexityPart_with_unlimited (0.00s)
+    --- PASS: TestApplyPolicies/ComplexityPart (0.00s)
+    --- PASS: TestApplyPolicies/ComplexityParts (0.00s)
+    --- PASS: TestApplyPolicies/AclPart (0.00s)
+    --- PASS: TestApplyPolicies/AclPart#01 (0.00s)
+    --- PASS: TestApplyPolicies/RightsUpdate (0.00s)
+    --- PASS: TestApplyPolicies/Per_API_is_set_with_other_partitions_to_true (0.00s)
+    --- PASS: TestApplyPolicies/Per_API_is_set_to_true_with_some_partitions_set_to_true (0.00s)
+    --- PASS: TestApplyPolicies/Per_API_is_set_to_true_with_no_other_partitions_set_to_true (0.00s)
+    --- PASS: TestApplyPolicies/several_policies_with_Per_API_set_to_true_but_specifying_limit_for_the_same_API (0.00s)
+    --- PASS: TestApplyPolicies/several_policies,_mixed_the_one_which_has_Per_API_set_to_true_and_partitioned_ones (0.00s)
+    --- PASS: TestApplyPolicies/several_policies,_mixed_the_one_which_has_Per_API_set_to_true_and_partitioned_ones_(different_order) (0.00s)
+    --- PASS: TestApplyPolicies/Per_API_is_set_to_true_and_some_API_gets_limit_set_from_policy's_fields (0.00s)
+    --- PASS: TestApplyPolicies/Merge_per_path_rules_for_the_same_API (0.00s)
+    --- PASS: TestApplyPolicies/Merge_restricted_fields_for_the_same_GraphQL_API (0.00s)
+    --- PASS: TestApplyPolicies/Merge_field_level_depth_limit_for_the_same_GraphQL_API (0.00s)
+    --- PASS: TestApplyPolicies/Throttle_interval_from_policy (0.00s)
+    --- PASS: TestApplyPolicies/Throttle_retry_limit_from_policy (0.00s)
+    --- PASS: TestApplyPolicies/inherit_quota_and_rate_from_partitioned_policies (0.00s)
+    --- PASS: TestApplyPolicies/inherit_quota_and_rate_from_partitioned_policies_applied_in_different_order (0.00s)
+=== RUN   TestApplyPoliciesQuotaAPILimit
+=== RUN   TestApplyPoliciesQuotaAPILimit/requests_to_different_apis
+=== RUN   TestApplyPoliciesQuotaAPILimit/Check_session_key
+
+ Primer 
+ KeyName: 819df8a3-2a4c-40f4-bc72-e4ab63967304, ApiID: , orgID: default, isHashed: false
+ COde: 200=== RUN   TestApplyPoliciesQuotaAPILimit/Reset_quota
+
+ Primer 
+ KeyName: 819df8a3-2a4c-40f4-bc72-e4ab63967304, ApiID: , orgID: , isHashed: false
+ COde: 200--- PASS: TestApplyPoliciesQuotaAPILimit (0.06s)
+    --- PASS: TestApplyPoliciesQuotaAPILimit/requests_to_different_apis (0.02s)
+    --- PASS: TestApplyPoliciesQuotaAPILimit/Check_session_key (0.00s)
+    --- PASS: TestApplyPoliciesQuotaAPILimit/Reset_quota (0.01s)
+=== RUN   TestApplyMultiPolicies
+
+ Primer 
+ KeyName: b6a1aa78-0fd3-41d5-960c-d0e7c1db8171, ApiID: , orgID: default, isHashed: false
+ COde: 200
+ Primer 
+ KeyName: b6a1aa78-0fd3-41d5-960c-d0e7c1db8171, ApiID: , orgID: , isHashed: false
+ COde: 200--- PASS: TestApplyMultiPolicies (0.06s)
+=== RUN   TestPerAPIPolicyUpdate
+
+ Primer 
+ KeyName: 15189b09-b83b-4e50-af7b-492b01498767, ApiID: api1, orgID: , isHashed: false
+ COde: 200
+ Primer 
+ KeyName: 15189b09-b83b-4e50-af7b-492b01498767, ApiID: api1, orgID: , isHashed: false
+ COde: 200--- PASS: TestPerAPIPolicyUpdate (0.03s)
+=== RUN   TestTCPDial_with_service_discovery
+--- PASS: TestTCPDial_with_service_discovery (0.02s)
+=== RUN   TestTCP_missing_port
+--- PASS: TestTCP_missing_port (0.02s)
+=== RUN   TestCheckPortWhiteList
+=== RUN   TestCheckPortWhiteList/gw_port_empty_protocol
+=== RUN   TestCheckPortWhiteList/gw_port_http_protocol
+=== RUN   TestCheckPortWhiteList/unknown_tls
+=== RUN   TestCheckPortWhiteList/unknown_tcp
+=== RUN   TestCheckPortWhiteList/whitelisted_tcp
+=== RUN   TestCheckPortWhiteList/whitelisted_tls
+=== RUN   TestCheckPortWhiteList/black_listed_tcp
+=== RUN   TestCheckPortWhiteList/blacklisted_tls
+=== RUN   TestCheckPortWhiteList/whitelisted_tls_range
+=== RUN   TestCheckPortWhiteList/whitelisted_tcp_range
+=== RUN   TestCheckPortWhiteList/whitelisted_http_range
+--- PASS: TestCheckPortWhiteList (0.00s)
+    --- PASS: TestCheckPortWhiteList/gw_port_empty_protocol (0.00s)
+    --- PASS: TestCheckPortWhiteList/gw_port_http_protocol (0.00s)
+    --- PASS: TestCheckPortWhiteList/unknown_tls (0.00s)
+    --- PASS: TestCheckPortWhiteList/unknown_tcp (0.00s)
+    --- PASS: TestCheckPortWhiteList/whitelisted_tcp (0.00s)
+    --- PASS: TestCheckPortWhiteList/whitelisted_tls (0.00s)
+    --- PASS: TestCheckPortWhiteList/black_listed_tcp (0.00s)
+    --- PASS: TestCheckPortWhiteList/blacklisted_tls (0.00s)
+    --- PASS: TestCheckPortWhiteList/whitelisted_tls_range (0.00s)
+    --- PASS: TestCheckPortWhiteList/whitelisted_tcp_range (0.00s)
+    --- PASS: TestCheckPortWhiteList/whitelisted_http_range (0.00s)
+=== RUN   TestHTTP_custom_ports
+--- PASS: TestHTTP_custom_ports (0.02s)
+=== RUN   TestHandle404
+--- PASS: TestHandle404 (0.02s)
+=== RUN   TestReloadLoop_basic
+--- PASS: TestReloadLoop_basic (0.01s)
+=== RUN   TestReloadLoop_handler
+--- PASS: TestReloadLoop_handler (0.01s)
+=== RUN   TestReloadLoop_handlerWithBlock
+--- PASS: TestReloadLoop_handlerWithBlock (0.01s)
+=== RUN   TestReloadLoop_group
+--- PASS: TestReloadLoop_group (1.02s)
+=== RUN   TestResponseHeaderInjection
+--- PASS: TestResponseHeaderInjection (0.03s)
+=== RUN   TestGlobalResponseHeaders
+--- PASS: TestGlobalResponseHeaders (0.03s)
+=== RUN   TestTransformResponseWithURLRewrite
+=== RUN   TestTransformResponseWithURLRewrite/Transform_without_rewrite
+=== RUN   TestTransformResponseWithURLRewrite/Transform_path_equals_rewrite_to_
+=== RUN   TestTransformResponseWithURLRewrite/Transform_path_equals_rewrite_path
+--- PASS: TestTransformResponseWithURLRewrite (0.07s)
+    --- PASS: TestTransformResponseWithURLRewrite/Transform_without_rewrite (0.02s)
+    --- PASS: TestTransformResponseWithURLRewrite/Transform_path_equals_rewrite_to_ (0.02s)
+    --- PASS: TestTransformResponseWithURLRewrite/Transform_path_equals_rewrite_path (0.02s)
+=== RUN   TestTransformResponse_ContextVars
+--- PASS: TestTransformResponse_ContextVars (0.03s)
+=== RUN   TestTransformResponse_WithCache
+--- PASS: TestTransformResponse_WithCache (0.13s)
+=== RUN   TestCopyHeader_NoDuplicateCORSHeaders
+--- PASS: TestCopyHeader_NoDuplicateCORSHeaders (0.00s)
+=== RUN   TestReverseProxyRetainHost
+=== RUN   TestReverseProxyRetainHost/no-retain-same-path
+=== RUN   TestReverseProxyRetainHost/no-retain-minus-slash
+=== RUN   TestReverseProxyRetainHost/retain-same-path
+=== RUN   TestReverseProxyRetainHost/retain-minus-slash
+--- PASS: TestReverseProxyRetainHost (0.00s)
+    --- PASS: TestReverseProxyRetainHost/no-retain-same-path (0.00s)
+    --- PASS: TestReverseProxyRetainHost/no-retain-minus-slash (0.00s)
+    --- PASS: TestReverseProxyRetainHost/retain-same-path (0.00s)
+    --- PASS: TestReverseProxyRetainHost/retain-minus-slash (0.00s)
+=== RUN   TestReverseProxyDnsCache
+=== RUN   TestReverseProxyDnsCache/Should_cache_first_request_to_Host1
+=== RUN   TestReverseProxyDnsCache/Should_cache_first_request_to_Host2
+=== RUN   TestReverseProxyDnsCache/Should_populate_from_cache_second_request_to_Host1
+=== RUN   TestReverseProxyDnsCache/Should_populate_from_cache_second_request_to_Host2_with_different_protocol
+=== RUN   TestReverseProxyDnsCache/Shouldn't_cache_request_with_different_http_verb_to_same_host
+=== RUN   TestReverseProxyDnsCache/Shouldn't_cache_dns_record_when_cache_is_disabled
+=== RUN   TestReverseProxyDnsCache/Should_cache_ws_protocol_host_dns_records
+--- PASS: TestReverseProxyDnsCache (0.71s)
+    --- PASS: TestReverseProxyDnsCache/Should_cache_first_request_to_Host1 (0.10s)
+    --- PASS: TestReverseProxyDnsCache/Should_cache_first_request_to_Host2 (0.10s)
+    --- PASS: TestReverseProxyDnsCache/Should_populate_from_cache_second_request_to_Host1 (0.10s)
+    --- PASS: TestReverseProxyDnsCache/Should_populate_from_cache_second_request_to_Host2_with_different_protocol (0.10s)
+    --- PASS: TestReverseProxyDnsCache/Shouldn't_cache_request_with_different_http_verb_to_same_host (0.10s)
+    --- PASS: TestReverseProxyDnsCache/Shouldn't_cache_dns_record_when_cache_is_disabled (0.10s)
+    --- PASS: TestReverseProxyDnsCache/Should_cache_ws_protocol_host_dns_records (0.10s)
+=== RUN   TestWrappedServeHTTP
+--- PASS: TestWrappedServeHTTP (0.00s)
+=== RUN   TestCircuitBreaker5xxs
+=== RUN   TestCircuitBreaker5xxs/Extended_Paths
+--- PASS: TestCircuitBreaker5xxs (0.03s)
+    --- PASS: TestCircuitBreaker5xxs/Extended_Paths (0.01s)
+=== RUN   TestSingleJoiningSlash
+=== RUN   TestSingleJoiningSlash/foo+
+=== RUN   TestSingleJoiningSlash/foo+bar
+=== RUN   TestSingleJoiningSlash/foo/+bar
+=== RUN   TestSingleJoiningSlash/foo+/bar
+=== RUN   TestSingleJoiningSlash/foo/+/bar
+=== RUN   TestSingleJoiningSlash/foo//+//bar
+=== RUN   TestSingleJoiningSlash/foo/+
+=== RUN   TestSingleJoiningSlash/foo+#01
+--- PASS: TestSingleJoiningSlash (0.00s)
+    --- PASS: TestSingleJoiningSlash/foo+ (0.00s)
+    --- PASS: TestSingleJoiningSlash/foo+bar (0.00s)
+    --- PASS: TestSingleJoiningSlash/foo/+bar (0.00s)
+    --- PASS: TestSingleJoiningSlash/foo+/bar (0.00s)
+    --- PASS: TestSingleJoiningSlash/foo/+/bar (0.00s)
+    --- PASS: TestSingleJoiningSlash/foo//+//bar (0.00s)
+    --- PASS: TestSingleJoiningSlash/foo/+ (0.00s)
+    --- PASS: TestSingleJoiningSlash/foo+#01 (0.00s)
+=== RUN   TestRequestIP
+--- PASS: TestRequestIP (0.00s)
+=== RUN   TestCheckHeaderInRemoveList
+=== RUN   TestCheckHeaderInRemoveList/X-Forwarded-For:false
+=== RUN   TestCheckHeaderInRemoveList/X-Forwarded-For:false#01
+=== RUN   TestCheckHeaderInRemoveList/X-Forwarded-For:false#02
+=== RUN   TestCheckHeaderInRemoveList/X-Forwarded-For:true
+=== RUN   TestCheckHeaderInRemoveList/X-Forwarded-For:true#01
+=== RUN   TestCheckHeaderInRemoveList/X-Forwarded-For:true#02
+--- PASS: TestCheckHeaderInRemoveList (0.00s)
+    --- PASS: TestCheckHeaderInRemoveList/X-Forwarded-For:false (0.00s)
+    --- PASS: TestCheckHeaderInRemoveList/X-Forwarded-For:false#01 (0.00s)
+    --- PASS: TestCheckHeaderInRemoveList/X-Forwarded-For:false#02 (0.00s)
+    --- PASS: TestCheckHeaderInRemoveList/X-Forwarded-For:true (0.00s)
+    --- PASS: TestCheckHeaderInRemoveList/X-Forwarded-For:true#01 (0.00s)
+    --- PASS: TestCheckHeaderInRemoveList/X-Forwarded-For:true#02 (0.00s)
+=== RUN   TestRequestIPHops
+--- PASS: TestRequestIPHops (0.00s)
+=== RUN   TestNopCloseRequestBody
+--- PASS: TestNopCloseRequestBody (0.00s)
+=== RUN   TestNopCloseResponseBody
+--- PASS: TestNopCloseResponseBody (0.00s)
+=== RUN   TestGraphQL_HeadersInjection
+--- PASS: TestGraphQL_HeadersInjection (0.03s)
+=== RUN   TestGraphQL_InternalDataSource
+=== RUN   TestGraphQL_InternalDataSource/supergraph_(engine_v2)
+=== RUN   TestGraphQL_InternalDataSource/graphql_engine_v2
+=== RUN   TestGraphQL_InternalDataSource/graphql_engine_v1
+--- PASS: TestGraphQL_InternalDataSource (0.05s)
+    --- PASS: TestGraphQL_InternalDataSource/supergraph_(engine_v2) (0.01s)
+    --- PASS: TestGraphQL_InternalDataSource/graphql_engine_v2 (0.01s)
+    --- PASS: TestGraphQL_InternalDataSource/graphql_engine_v1 (0.01s)
+=== RUN   TestGraphQL_ProxyIntrospectionInterrupt
+=== RUN   TestGraphQL_ProxyIntrospectionInterrupt/introspection_request_should_be_interrupted
+=== RUN   TestGraphQL_ProxyIntrospectionInterrupt/normal_requests_should_be_proxied
+--- PASS: TestGraphQL_ProxyIntrospectionInterrupt (0.02s)
+    --- PASS: TestGraphQL_ProxyIntrospectionInterrupt/introspection_request_should_be_interrupted (0.00s)
+    --- PASS: TestGraphQL_ProxyIntrospectionInterrupt/normal_requests_should_be_proxied (0.00s)
+=== RUN   TestGraphQL_OptionsPassThrough
+=== RUN   TestGraphQL_OptionsPassThrough/ProxyOnly_should_pass_through
+=== RUN   TestGraphQL_OptionsPassThrough/UDG_should_not_pass_through
+=== RUN   TestGraphQL_OptionsPassThrough/Supergraph_should_not_pass_through
+--- PASS: TestGraphQL_OptionsPassThrough (0.03s)
+    --- PASS: TestGraphQL_OptionsPassThrough/ProxyOnly_should_pass_through (0.01s)
+    --- PASS: TestGraphQL_OptionsPassThrough/UDG_should_not_pass_through (0.01s)
+    --- PASS: TestGraphQL_OptionsPassThrough/Supergraph_should_not_pass_through (0.01s)
+=== RUN   TestEnsureTransport
+=== RUN   TestEnsureTransport/case-0
+=== RUN   TestEnsureTransport/case-1
+=== RUN   TestEnsureTransport/case-2
+=== RUN   TestEnsureTransport/case-3
+=== RUN   TestEnsureTransport/case-4
+--- PASS: TestEnsureTransport (0.00s)
+    --- PASS: TestEnsureTransport/case-0 (0.00s)
+    --- PASS: TestEnsureTransport/case-1 (0.00s)
+    --- PASS: TestEnsureTransport/case-2 (0.00s)
+    --- PASS: TestEnsureTransport/case-3 (0.00s)
+    --- PASS: TestEnsureTransport/case-4 (0.00s)
+=== RUN   TestReverseProxyWebSocketCancelation
+--- PASS: TestReverseProxyWebSocketCancelation (0.00s)
+=== RUN   TestProcessKeySpaceChangesForOauth
+=== RUN   TestProcessKeySpaceChangesForOauth/RevokeOauthToken
+=== RUN   TestProcessKeySpaceChangesForOauth/RevokeOauthHashedToken
+=== RUN   TestProcessKeySpaceChangesForOauth/RevokeOauthRefreshToken
+--- PASS: TestProcessKeySpaceChangesForOauth (0.11s)
+    --- PASS: TestProcessKeySpaceChangesForOauth/RevokeOauthToken (0.04s)
+    --- PASS: TestProcessKeySpaceChangesForOauth/RevokeOauthHashedToken (0.04s)
+    --- PASS: TestProcessKeySpaceChangesForOauth/RevokeOauthRefreshToken (0.03s)
+=== RUN   TestProcessKeySpaceChanges_ResetQuota
+--- PASS: TestProcessKeySpaceChanges_ResetQuota (0.11s)
+=== RUN   TestSyncAPISpecsRPCFailure_CheckGlobals
+--- PASS: TestSyncAPISpecsRPCFailure_CheckGlobals (0.04s)
+=== RUN   TestSyncAPISpecsRPCSuccess
+=== RUN   TestSyncAPISpecsRPCSuccess/RPC_is_live
+=== RUN   TestSyncAPISpecsRPCSuccess/RPC_down,_cold_start,_load_backup
+=== RUN   TestSyncAPISpecsRPCSuccess/RPC_is_back,_hard_reload
+=== RUN   TestSyncAPISpecsRPCSuccess/RPC_is_back,_live_reload
+--- PASS: TestSyncAPISpecsRPCSuccess (3.91s)
+    --- PASS: TestSyncAPISpecsRPCSuccess/RPC_is_live (0.03s)
+    --- PASS: TestSyncAPISpecsRPCSuccess/RPC_down,_cold_start,_load_backup (2.40s)
+    --- PASS: TestSyncAPISpecsRPCSuccess/RPC_is_back,_hard_reload (0.14s)
+    --- PASS: TestSyncAPISpecsRPCSuccess/RPC_is_back,_live_reload (1.34s)
+=== RUN   TestSyncAPISpecsRPC_redis_failure
+=== RUN   TestSyncAPISpecsRPC_redis_failure/Should_load_apis_when_redis_is_down
+=== RUN   TestSyncAPISpecsRPC_redis_failure/Should_reload_when_redis_is_back_up
+--- PASS: TestSyncAPISpecsRPC_redis_failure (3.90s)
+    --- PASS: TestSyncAPISpecsRPC_redis_failure/Should_load_apis_when_redis_is_down (0.90s)
+    --- PASS: TestSyncAPISpecsRPC_redis_failure/Should_reload_when_redis_is_back_up (3.00s)
+=== RUN   TestOrgSessionWithRPCDown
+--- PASS: TestOrgSessionWithRPCDown (1.94s)
+=== RUN   TestServiceDiscovery_EUREKA
+--- PASS: TestServiceDiscovery_EUREKA (0.00s)
+=== RUN   TestServiceDiscovery_CONSUL
+--- PASS: TestServiceDiscovery_CONSUL (0.00s)
+=== RUN   TestServiceDiscovery_NESTED_CONSUL
+--- PASS: TestServiceDiscovery_NESTED_CONSUL (0.00s)
+=== RUN   TestServiceDiscovery_ETCD_NESTED_LIST
+--- PASS: TestServiceDiscovery_ETCD_NESTED_LIST (0.00s)
+=== RUN   TestServiceDiscovery_ETCD_NESTED_NOLIST
+--- PASS: TestServiceDiscovery_ETCD_NESTED_NOLIST (0.00s)
+=== RUN   TestServiceDiscovery_ETCD_NOLIST
+--- PASS: TestServiceDiscovery_ETCD_NOLIST (0.00s)
+=== RUN   TestServiceDiscovery_MESOSPHERE
+--- PASS: TestServiceDiscovery_MESOSPHERE (0.00s)
+=== RUN   TestGetAccessDefinitionByAPIIDOrSession
+=== RUN   TestGetAccessDefinitionByAPIIDOrSession/should_return_error_when_api_is_missing_in_access_rights
+=== RUN   TestGetAccessDefinitionByAPIIDOrSession/should_return_access_definition_from_session_when_limits_for_api_are_not_defined
+=== RUN   TestGetAccessDefinitionByAPIIDOrSession/should_return_access_definition_with_api_limits
+--- PASS: TestGetAccessDefinitionByAPIIDOrSession (0.00s)
+    --- PASS: TestGetAccessDefinitionByAPIIDOrSession/should_return_error_when_api_is_missing_in_access_rights (0.00s)
+    --- PASS: TestGetAccessDefinitionByAPIIDOrSession/should_return_access_definition_from_session_when_limits_for_api_are_not_defined (0.00s)
+    --- PASS: TestGetAccessDefinitionByAPIIDOrSession/should_return_access_definition_with_api_limits (0.00s)
+=== RUN   TestTraceHttpRequest_toRequest
+--- PASS: TestTraceHttpRequest_toRequest (0.00s)
+=== RUN   TestMascotShowsUpOnceOnly
+--- PASS: TestMascotShowsUpOnceOnly (0.01s)
+PASS
+ok  	github.com/TykTechnologies/tyk/gateway	82.073s
