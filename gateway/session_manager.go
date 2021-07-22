@@ -254,10 +254,11 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 		quotaScope = scope + "-"
 	}
 
-	key := currentSession.KeyHash()
+	key := currentSession.KeyID
 	if config.Global().HashKeys {
 		key = storage.HashStr(currentSession.KeyID)
 	}
+	fmt.Printf("\n Key after hash: %+v", key)
 	rawKey := QuotaKeyPrefix + quotaScope + key
 	quotaRenewalRate := limit.QuotaRenewalRate
 	quotaRenews := limit.QuotaRenews
