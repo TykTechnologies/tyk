@@ -2,9 +2,8 @@ package ctx
 
 import (
 	"context"
-	"net/http"
-
 	"github.com/TykTechnologies/tyk/apidef"
+	"net/http"
 
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
@@ -46,6 +45,7 @@ func setContext(r *http.Request, ctx context.Context) {
 	*r = *r2
 }
 
+// ctxSetSession stores in ctx the s.KeyID
 func ctxSetSession(r *http.Request, s *user.SessionState, token string, scheduleUpdate bool) {
 	if s == nil {
 		panic("setting a nil context SessionData")
@@ -61,11 +61,8 @@ func ctxSetSession(r *http.Request, s *user.SessionState, token string, schedule
 
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, SessionData, s)
-	keyID := s.KeyID
-	if keyID == "" {
-		keyID = token
-	}
-	ctx = context.WithValue(ctx, AuthToken, keyID)
+
+	ctx = context.WithValue(ctx, AuthToken, s.KeyID)
 	if scheduleUpdate {
 		ctx = context.WithValue(ctx, UpdateSession, true)
 	}

@@ -387,7 +387,9 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 
 	k.Logger().Debug("JWT Temporary session ID is: ", sessionID)
 
+	// CheckSessionAndIdentityForValidKey returns a session with keyID populated
 	session, exists := k.CheckSessionAndIdentityForValidKey(sessionID, r)
+
 	sessionID = session.KeyID
 	isDefaultPol := false
 	basePolicyID := ""
@@ -570,6 +572,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 				k.Logger().WithError(err).Error("Could not several policies from scope-claim mapping to JWT to session")
 				return errors.New("key not authorized: could not apply several policies"), http.StatusForbidden
 			}
+
 		}
 	}
 
@@ -608,6 +611,8 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		}
 	}
 
+	// ensure to set the sessionID
+	session.KeyID = sessionID
 	k.Logger().Debug("Key found")
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.JWTClaim, apidef.UnsetAuth:
