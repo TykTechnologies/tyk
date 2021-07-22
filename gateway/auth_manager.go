@@ -153,7 +153,6 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 				if val != "" {
 					jsonKeyVal = val
 					keyId = toSearchList[idx]
-					log.Infof("\n###Key ID set to: %+v\n", keyId)
 					break
 				}
 			}

@@ -504,7 +504,6 @@ func handleGetDetail(sessionKey, apiID, orgID string, byHash bool) (interface{},
 		}
 
 		if usedQuota, err := GlobalSessionManager.Store().GetRawKey(quotaKey); err == nil {
-			fmt.Printf("###\n Quota: %+v value: %+v", quotaKey, usedQuota)
 			qInt, _ := strconv.Atoi(usedQuota)
 			remaining := session.QuotaMax - int64(qInt)
 
