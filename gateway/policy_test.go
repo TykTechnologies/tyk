@@ -931,6 +931,7 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 						t.Log(err.Error())
 						return false
 					}
+
 					api1Limit := sessionData.AccessRights["api1"].Limit
 					if api1Limit == nil {
 						t.Log("api1 limit is not set")
@@ -1177,14 +1178,14 @@ func TestApplyMultiPolicies(t *testing.T) {
 	ts.Run(t, []test.TestCase{
 		{
 			Method:    http.MethodPut,
-			Path:      "/tyk/keys/" + key,
+			Path:      fmt.Sprintf("/tyk/keys/%v", key),
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			Data:      session,
 		},
 		{
 			Method:    http.MethodGet,
-			Path:      "/tyk/keys/" + key,
+			Path:      fmt.Sprintf("/tyk/keys/%v?org_id=%v", key, DefaultOrg),
 			AdminAuth: true,
 			Code:      http.StatusOK,
 			BodyMatchFunc: func(data []byte) bool {

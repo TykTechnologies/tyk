@@ -202,6 +202,7 @@ func applyPoliciesAndSave(keyName string, session *user.SessionState, spec *APIS
 	mw := BaseMiddleware{
 		Spec: spec,
 	}
+
 	if err := mw.ApplyPolicies(session); err != nil {
 		return err
 	}
@@ -486,6 +487,7 @@ func handleGetDetail(sessionKey, apiID, orgID string, byHash bool) (interface{},
 	}
 
 	session, ok := GlobalSessionManager.SessionDetail(orgID, sessionKey, byHash)
+	sessionKey = session.KeyID
 
 	if !ok {
 		return apiError("Key not found"), http.StatusNotFound
@@ -502,6 +504,7 @@ func handleGetDetail(sessionKey, apiID, orgID string, byHash bool) (interface{},
 		}
 
 		if usedQuota, err := GlobalSessionManager.Store().GetRawKey(quotaKey); err == nil {
+			fmt.Printf("###\n Quota: %+v value: %+v", quotaKey, usedQuota)
 			qInt, _ := strconv.Atoi(usedQuota)
 			remaining := session.QuotaMax - int64(qInt)
 
