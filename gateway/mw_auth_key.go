@@ -119,7 +119,12 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		_, err := CertificateManager.GetRaw(certID)
 		if err != nil {
 			// Try alternative approach:
-			id := storage.TokenID(session.KeyID)
+			id, err := storage.TokenID(session.KeyID)
+			if err != nil {
+				log.Error(err)
+				return k.reportInvalidKey(key, r, MsgNonExistentCert, ErrAuthCertNotFound)
+			}
+
 			certID = session.OrgID + id
 			_, err = CertificateManager.GetRaw(certID)
 			if err != nil {
