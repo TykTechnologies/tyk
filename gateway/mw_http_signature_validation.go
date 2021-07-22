@@ -201,7 +201,8 @@ func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWrite
 	// Set session state on context, we will need it later
 	switch hm.Spec.BaseIdentityProvidedBy {
 	case apidef.HMACKey, apidef.UnsetAuth:
-		ctxSetSession(r, &session, fieldValues.KeyID, false)
+		session.KeyID = fieldValues.KeyID
+		ctxSetSession(r, &session, false)
 		hm.setContextVars(r, fieldValues.KeyID)
 	}
 

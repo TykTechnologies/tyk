@@ -139,7 +139,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	// Set session state on context, we will need it later
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.AuthToken, apidef.UnsetAuth:
-		ctxSetSession(r, &session, key, false)
+		ctxSetSession(r, &session, false)
 		k.setContextVars(r, key)
 	}
 

@@ -294,7 +294,8 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	}
 
 	if d.Auth {
-		ctxSetSession(r, &newRequestData.Session, newRequestData.AuthValue, true)
+		newRequestData.Session.KeyID = newRequestData.AuthValue
+		ctxSetSession(r, &newRequestData.Session, true)
 	}
 
 	return nil, http.StatusOK

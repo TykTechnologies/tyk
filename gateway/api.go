@@ -2326,8 +2326,8 @@ func ctxGetSession(r *http.Request) *user.SessionState {
 	return ctx.GetSession(r)
 }
 
-func ctxSetSession(r *http.Request, s *user.SessionState, token string, scheduleUpdate bool) {
-	ctx.SetSession(r, s, token, scheduleUpdate)
+func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool) {
+	ctx.SetSession(r, s, scheduleUpdate)
 }
 
 func ctxScheduleSessionUpdate(r *http.Request) {

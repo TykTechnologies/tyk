@@ -2,8 +2,9 @@ package ctx
 
 import (
 	"context"
-	"github.com/TykTechnologies/tyk/apidef"
 	"net/http"
+
+	"github.com/TykTechnologies/tyk/apidef"
 
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
@@ -46,17 +47,17 @@ func setContext(r *http.Request, ctx context.Context) {
 }
 
 // ctxSetSession stores in ctx the s.KeyID
-func ctxSetSession(r *http.Request, s *user.SessionState, token string, scheduleUpdate bool) {
+func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool) {
 	if s == nil {
 		panic("setting a nil context SessionData")
 	}
 
-	if token == "" {
-		token = GetAuthToken(r)
+	if s.KeyID == "" {
+		s.KeyID = GetAuthToken(r)
 	}
 
 	if s.KeyHashEmpty() {
-		s.SetKeyHash(storage.HashKey(token))
+		s.SetKeyHash(storage.HashKey(s.KeyID))
 	}
 
 	ctx := r.Context()
@@ -84,8 +85,8 @@ func GetSession(r *http.Request) *user.SessionState {
 	return nil
 }
 
-func SetSession(r *http.Request, s *user.SessionState, token string, scheduleUpdate bool) {
-	ctxSetSession(r, s, token, scheduleUpdate)
+func SetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool) {
+	ctxSetSession(r, s, scheduleUpdate)
 }
 
 func SetDefinition(r *http.Request, s *apidef.APIDefinition) {

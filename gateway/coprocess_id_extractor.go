@@ -138,7 +138,7 @@ func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (sessionID string, ret
 
 	if keyExists {
 		if previousSession.IdExtractorDeadline > time.Now().Unix() {
-			ctxSetSession(r, &previousSession, sessionID, true)
+			ctxSetSession(r, &previousSession, true)
 			returnOverrides = ReturnOverrides{
 				ResponseCode: 200,
 			}
@@ -212,7 +212,7 @@ func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 
 	if keyExists {
 		if previousSession.IdExtractorDeadline > time.Now().Unix() {
-			ctxSetSession(r, &previousSession, SessionID, true)
+			ctxSetSession(r, &previousSession, true)
 			returnOverrides = ReturnOverrides{
 				ResponseCode: 200,
 			}
@@ -288,7 +288,7 @@ func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 	SessionID = previousSession.KeyID
 	if keyExists {
 		if previousSession.IdExtractorDeadline > time.Now().Unix() {
-			ctxSetSession(r, &previousSession, SessionID, true)
+			ctxSetSession(r, &previousSession, true)
 			returnOverrides = ReturnOverrides{
 				ResponseCode: 200,
 			}

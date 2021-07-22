@@ -480,7 +480,8 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			AuthFailed(m, r, authToken)
 			return errors.New(http.StatusText(http.StatusForbidden)), http.StatusForbidden
 		}
-		ctxSetSession(r, returnedSession, sessionID, true)
+		returnedSession.KeyID = sessionID
+		ctxSetSession(r, returnedSession, true)
 	}
 
 	return nil, http.StatusOK

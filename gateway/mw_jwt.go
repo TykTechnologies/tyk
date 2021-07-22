@@ -616,7 +616,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	k.Logger().Debug("Key found")
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.JWTClaim, apidef.UnsetAuth:
-		ctxSetSession(r, &session, sessionID, updateSession)
+		ctxSetSession(r, &session, updateSession)
 
 		if updateSession {
 			SessionCache.Set(session.KeyHash(), session.Clone(), cache.DefaultExpiration)
@@ -653,7 +653,7 @@ func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Toke
 	}
 
 	k.Logger().Debug("Raw key ID found.")
-	ctxSetSession(r, &session, tykId, false)
+	ctxSetSession(r, &session, false)
 	ctxSetJWTContextVars(k.Spec, r, token)
 	return nil, http.StatusOK
 }
