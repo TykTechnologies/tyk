@@ -131,7 +131,7 @@ func TestJSVMSessionMetadataUpdate(t *testing.T) {
 	s.MetaData["same"] = "same"
 	s.MetaData["updated"] = "old"
 	s.MetaData["removed"] = "dummy"
-	ctxSetSession(req, s, "", true)
+	ctxSetSession(req, s, true)
 
 	const js = `
 var testJSVMMiddleware = new TykJS.TykMiddleware.NewMiddleware({});
