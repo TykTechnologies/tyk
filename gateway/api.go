@@ -338,13 +338,13 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 	mw := BaseMiddleware{}
 	// TODO: handle apply policies error
 	mw.ApplyPolicies(newSession)
-
 	// DO ADD OR UPDATE
 
 	// get original session in case of update and preserve fields that SHOULD NOT be updated
 	originalKey := user.SessionState{}
 	if r.Method == http.MethodPut {
 		key, found := GlobalSessionManager.SessionDetail(newSession.OrgID, keyName, isHashed)
+		keyName = key.KeyID
 		if !found {
 			log.Error("Could not find key when updating")
 			return apiError("Key is not found"), http.StatusNotFound
@@ -534,7 +534,6 @@ func handleGetDetail(sessionKey, apiID, orgID string, byHash bool) (interface{},
 		}
 
 		limQuotaKey := QuotaKeyPrefix + quotaScope + storage.HashKey(sessionKey)
-		fmt.Printf("\n Session for Pol: %+v",limQuotaKey)
 		if byHash {
 			limQuotaKey = QuotaKeyPrefix + quotaScope + sessionKey
 		}
@@ -938,10 +937,8 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		obj, code = handleAddOrUpdate(keyName, r, isHashed)
 	case http.MethodPut:
-		fmt.Printf("\nWill update: %+v", keyName)
 		obj, code = handleAddOrUpdate(keyName, r, isHashed)
 		if code != http.StatusOK && hashKeyFunction != "" {
-			fmt.Printf("\n Entra al else")
 			// try to use legacy key format
 			obj, code = handleAddOrUpdate(origKeyName, r, isHashed)
 		}
