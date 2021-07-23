@@ -1231,10 +1231,10 @@ var hostDetails struct {
 func getHostDetails() {
 	var err error
 	if hostDetails.PID, err = readPIDFromFile(); err != nil {
-		mainLog.Error("Failed ot get host pid: ", err)
+		mainLog.Error("Failed to get host pid: ", err)
 	}
 	if hostDetails.Hostname, err = os.Hostname(); err != nil {
-		mainLog.Error("Failed ot get hostname: ", err)
+		mainLog.Error("Failed to get hostname: ", err)
 	}
 }
 
