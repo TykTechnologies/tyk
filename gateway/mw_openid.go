@@ -192,7 +192,8 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 		}
 	}
 
-	session, exists := k.CheckSessionAndIdentityForValidKey(&sessionID, r)
+	session, exists := k.CheckSessionAndIdentityForValidKey(sessionID, r)
+	sessionID = session.KeyID
 	if !exists {
 		// Create it
 		logger.Debug("Key does not exist, creating")
@@ -230,7 +231,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 	// 4. Set session state on context, we will need it later
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.OIDCUser, apidef.UnsetAuth:
-		ctxSetSession(r, &session, sessionID, true)
+		ctxSetSession(r, &session, true)
 	}
 	ctxSetJWTContextVars(k.Spec, r, token)
 

@@ -36,8 +36,9 @@ func MyPluginAuthCheck(rw http.ResponseWriter, r *http.Request) {
 	session := &user.SessionState{
 		OrgID: "default",
 		Alias: "abc-session",
+		KeyID: token,
 	}
-	ctx.SetSession(r, session, token, true)
+	ctx.SetSession(r, session, true)
 
 	rw.Header().Add(headers.XAuthResult, "OK")
 }

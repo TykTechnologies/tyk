@@ -200,6 +200,7 @@ func applyPoliciesAndSave(keyName string, session *user.SessionState, spec *APIS
 	mw := BaseMiddleware{
 		Spec: spec,
 	}
+
 	if err := mw.ApplyPolicies(session); err != nil {
 		return err
 	}
@@ -334,13 +335,13 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 
 	mw := BaseMiddleware{}
 	mw.ApplyPolicies(newSession)
-
 	// DO ADD OR UPDATE
 
 	// get original session in case of update and preserve fields that SHOULD NOT be updated
 	originalKey := user.SessionState{}
 	if r.Method == http.MethodPut {
 		key, found := GlobalSessionManager.SessionDetail(newSession.OrgID, keyName, isHashed)
+		keyName = key.KeyID
 		if !found {
 			log.Error("Could not find key when updating")
 			return apiError("Key is not found"), http.StatusNotFound
@@ -472,18 +473,18 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 	return response, http.StatusOK
 }
 
-func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
+func handleGetDetail(sessionKey, apiID, orgID string, byHash bool) (interface{}, int) {
 	if byHash && !config.Global().HashKeys {
 		return apiError("Key requested by hash but key hashing is not enabled"), http.StatusBadRequest
 	}
 
 	spec := getApiSpec(apiID)
-	orgID := ""
 	if spec != nil {
 		orgID = spec.OrgID
 	}
 
 	session, ok := GlobalSessionManager.SessionDetail(orgID, sessionKey, byHash)
+	sessionKey = session.KeyID
 
 	if !ok {
 		return apiError("Key not found"), http.StatusNotFound
@@ -632,6 +633,7 @@ func handleAddKey(keyName, hashedName, sessionString, apiID string) {
 
 func handleDeleteKey(keyName, orgID, apiID string, resetQuota bool) (interface{}, int) {
 	session, ok := GlobalSessionManager.SessionDetail(orgID, keyName, false)
+	keyName = session.KeyID
 	if !ok {
 		return apiError("There is no such key found"), http.StatusNotFound
 	}
@@ -720,6 +722,7 @@ func handleDeleteHashedKeyWithLogs(keyName, orgID, apiID string, resetQuota bool
 func handleDeleteHashedKey(keyName, orgID, apiID string, resetQuota bool) (interface{}, int) {
 
 	session, ok := GlobalSessionManager.SessionDetail(orgID, keyName, true)
+	keyName = session.KeyID
 	if !ok {
 		return apiError("There is no such key found"), http.StatusNotFound
 	}
@@ -929,10 +932,10 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		if keyName != "" {
 			// Return single key detail
-			obj, code = handleGetDetail(keyName, apiID, isHashed)
+			obj, code = handleGetDetail(keyName, apiID, orgID, isHashed)
 			if code != http.StatusOK && hashKeyFunction != "" {
 				// try to use legacy key format
-				obj, code = handleGetDetail(origKeyName, apiID, isHashed)
+				obj, code = handleGetDetail(origKeyName, apiID, orgID, isHashed)
 			}
 		} else {
 			// Return list of keys
@@ -1008,6 +1011,7 @@ func handleUpdateHashedKey(keyName string, applyPolicies []string) (interface{},
 	}
 
 	sess, ok := GlobalSessionManager.SessionDetail(orgID, keyName, true)
+	keyName = sess.KeyID
 	if !ok {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -2281,8 +2285,8 @@ func ctxGetSession(r *http.Request) *user.SessionState {
 	return ctx.GetSession(r)
 }
 
-func ctxSetSession(r *http.Request, s *user.SessionState, token string, scheduleUpdate bool) {
-	ctx.SetSession(r, s, token, scheduleUpdate)
+func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool) {
+	ctx.SetSession(r, s, scheduleUpdate)
 }
 
 func ctxScheduleSessionUpdate(r *http.Request) {
