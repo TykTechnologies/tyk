@@ -996,14 +996,14 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 			{
 				Method:    http.MethodPut,
-				Path:      fmt.Sprintf("/tyk/keys/%v?org_id=%v", key, DefaultOrg),
+				Path:      fmt.Sprintf("/tyk/keys/%v", key),
 				AdminAuth: true,
 				Code:      http.StatusOK,
 				Data:      session,
 			},
 			{
 				Method:    http.MethodGet,
-				Path:      "/tyk/keys/" + key,
+				Path:      fmt.Sprintf("/tyk/keys/%v?org_id=%v", key, DefaultOrg),
 				AdminAuth: true,
 				Code:      http.StatusOK,
 				BodyMatchFunc: func(data []byte) bool {

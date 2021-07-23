@@ -637,6 +637,7 @@ func handleAddKey(keyName, hashedName, sessionString, apiID string) {
 
 func handleDeleteKey(keyName, orgID, apiID string, resetQuota bool) (interface{}, int) {
 	session, ok := GlobalSessionManager.SessionDetail(orgID, keyName, false)
+	keyName = session.KeyID
 	if !ok {
 		return apiError("There is no such key found"), http.StatusNotFound
 	}
@@ -725,6 +726,7 @@ func handleDeleteHashedKeyWithLogs(keyName, orgID, apiID string, resetQuota bool
 func handleDeleteHashedKey(keyName, orgID, apiID string, resetQuota bool) (interface{}, int) {
 
 	session, ok := GlobalSessionManager.SessionDetail(orgID, keyName, true)
+	keyName = session.KeyID
 	if !ok {
 		return apiError("There is no such key found"), http.StatusNotFound
 	}
@@ -1024,6 +1026,7 @@ func handleUpdateHashedKey(keyName string, applyPolicies []string) (interface{},
 	}
 
 	sess, ok := GlobalSessionManager.SessionDetail(orgID, keyName, true)
+	keyName = sess.KeyID
 	if !ok {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
