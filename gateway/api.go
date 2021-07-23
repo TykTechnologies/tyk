@@ -534,6 +534,7 @@ func handleGetDetail(sessionKey, apiID, orgID string, byHash bool) (interface{},
 		}
 
 		limQuotaKey := QuotaKeyPrefix + quotaScope + storage.HashKey(sessionKey)
+		fmt.Printf("\n Session for Pol: %+v",limQuotaKey)
 		if byHash {
 			limQuotaKey = QuotaKeyPrefix + quotaScope + sessionKey
 		}
@@ -937,8 +938,10 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		obj, code = handleAddOrUpdate(keyName, r, isHashed)
 	case http.MethodPut:
+		fmt.Printf("\nWill update: %+v", keyName)
 		obj, code = handleAddOrUpdate(keyName, r, isHashed)
 		if code != http.StatusOK && hashKeyFunction != "" {
+			fmt.Printf("\n Entra al else")
 			// try to use legacy key format
 			obj, code = handleAddOrUpdate(origKeyName, r, isHashed)
 		}

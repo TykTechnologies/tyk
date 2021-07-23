@@ -1112,103 +1112,115 @@ func TestApplyMultiPolicies(t *testing.T) {
 
 	// run requests to different APIs
 	authHeader := map[string]string{"Authorization": key}
-	ts.Run(t, []test.TestCase{
-		// 2 requests to api1, API limit quota remaining should be 48
-		{Path: "/api1", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "49"}},
-		{Path: "/api1", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "48"}},
 
-		// 3 requests to api2, API limit quota remaining should be 197
-		{Path: "/api2", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "99"}},
-		{Path: "/api2", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "98"}},
-		{Path: "/api2", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "97"}},
+	t.Run("Requests different apis", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			// 2 requests to api1, API limit quota remaining should be 48
+			{Path: "/api1", Headers: authHeader, Code: http.StatusOK,
+				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "49"}},
+			{Path: "/api1", Headers: authHeader, Code: http.StatusOK,
+				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "48"}},
 
-		// 3 requests to api3, should consume policy2 quota, same as for api2
-		{Path: "/api3", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "96"}},
-		{Path: "/api3", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "95"}},
-		{Path: "/api3", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "94"}},
-	}...)
+			// 3 requests to api2, API limit quota remaining should be 197
+			{Path: "/api2", Headers: authHeader, Code: http.StatusOK,
+				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "99"}},
+			{Path: "/api2", Headers: authHeader, Code: http.StatusOK,
+				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "98"}},
+			{Path: "/api2", Headers: authHeader, Code: http.StatusOK,
+				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "97"}},
+
+			// 3 requests to api3, should consume policy2 quota, same as for api2
+			{Path: "/api3", Headers: authHeader, Code: http.StatusOK,
+				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "96"}},
+			{Path: "/api3", Headers: authHeader, Code: http.StatusOK,
+				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "95"}},
+			{Path: "/api3", Headers: authHeader, Code: http.StatusOK,
+				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "94"}},
+		}...)
+
+	})
 
 	// check key session
-	ts.Run(t, []test.TestCase{
-		{
-			Method:    http.MethodGet,
-			Path:      fmt.Sprintf("/tyk/keys/%v?org_id=%v", key, DefaultOrg),
-			AdminAuth: true,
-			Code:      http.StatusOK,
-			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{}
-				json.Unmarshal(data, &sessionData)
+	t.Run("Check key session", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			{
+				Method:    http.MethodGet,
+				Path:      fmt.Sprintf("/tyk/keys/%v?org_id=%v", key, DefaultOrg),
+				AdminAuth: true,
+				Code:      http.StatusOK,
+				BodyMatchFunc: func(data []byte) bool {
+					sessionData := user.SessionState{}
+					json.Unmarshal(data, &sessionData)
 
-				policy1Expected := user.APILimit{
-					Rate:             1000,
-					Per:              1,
-					QuotaMax:         50,
-					QuotaRenewalRate: 3600,
-					QuotaRenews:      sessionData.AccessRights["api1"].Limit.QuotaRenews,
-					QuotaRemaining:   48,
-				}
-				assert.Equal(t, policy1Expected, *sessionData.AccessRights["api1"].Limit, "API1 limit do not match")
+					policy1Expected := user.APILimit{
+						Rate:             1000,
+						Per:              1,
+						QuotaMax:         50,
+						QuotaRenewalRate: 3600,
+						QuotaRenews:      sessionData.AccessRights["api1"].Limit.QuotaRenews,
+						QuotaRemaining:   48,
+					}
+					assert.Equal(t, policy1Expected, *sessionData.AccessRights["api1"].Limit, "API1 limit do not match")
 
-				policy2Expected := user.APILimit{
-					Rate:             100,
-					Per:              1,
-					QuotaMax:         100,
-					QuotaRenewalRate: 3600,
-					QuotaRenews:      sessionData.AccessRights["api2"].Limit.QuotaRenews,
-					QuotaRemaining:   94,
-				}
+					policy2Expected := user.APILimit{
+						Rate:             100,
+						Per:              1,
+						QuotaMax:         100,
+						QuotaRenewalRate: 3600,
+						QuotaRenews:      sessionData.AccessRights["api2"].Limit.QuotaRenews,
+						QuotaRemaining:   94,
+					}
 
-				assert.Equal(t, policy2Expected, *sessionData.AccessRights["api2"].Limit, "API2 limit do not match")
-				assert.Equal(t, policy2Expected, *sessionData.AccessRights["api3"].Limit, "API3 limit do not match")
+					assert.Equal(t, policy2Expected, *sessionData.AccessRights["api2"].Limit, "API2 limit do not match")
+					assert.Equal(t, policy2Expected, *sessionData.AccessRights["api3"].Limit, "API3 limit do not match")
 
-				return true
+					return true
+				},
 			},
-		},
-	}...)
+		}...)
+
+	})
 
 	// Reset quota
-	ts.Run(t, []test.TestCase{
-		{
-			Method:    http.MethodPut,
-			Path:      fmt.Sprintf("/tyk/keys/%v", key),
-			AdminAuth: true,
-			Code:      http.StatusOK,
-			Data:      session,
-		},
-		{
-			Method:    http.MethodGet,
-			Path:      fmt.Sprintf("/tyk/keys/%v?org_id=%v", key, DefaultOrg),
-			AdminAuth: true,
-			Code:      http.StatusOK,
-			BodyMatchFunc: func(data []byte) bool {
-				sessionData := user.SessionState{}
-				json.Unmarshal(data, &sessionData)
-
-				assert.EqualValues(t, 50, sessionData.AccessRights["api1"].Limit.QuotaRemaining, "should reset policy1 quota")
-				assert.EqualValues(t, 100, sessionData.AccessRights["api2"].Limit.QuotaRemaining, "should reset policy2 quota")
-				assert.EqualValues(t, 100, sessionData.AccessRights["api3"].Limit.QuotaRemaining, "should reset policy2 quota")
-
-				return true
+	t.Run("Reset quota", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			{
+				Method:    http.MethodPut,
+				Path:      fmt.Sprintf("/tyk/keys/%v", key),
+				AdminAuth: true,
+				Code:      http.StatusOK,
+				Data:      session,
 			},
-		},
-	}...)
+			{
+				Method:    http.MethodGet,
+				Path:      fmt.Sprintf("/tyk/keys/%v?org_id=%v", key, DefaultOrg),
+				AdminAuth: true,
+				Code:      http.StatusOK,
+				BodyMatchFunc: func(data []byte) bool {
+					sessionData := user.SessionState{}
+					json.Unmarshal(data, &sessionData)
+
+					assert.EqualValues(t, 50, sessionData.AccessRights["api1"].Limit.QuotaRemaining, "should reset policy1 quota")
+					assert.EqualValues(t, 100, sessionData.AccessRights["api2"].Limit.QuotaRemaining, "should reset policy2 quota")
+					assert.EqualValues(t, 100, sessionData.AccessRights["api3"].Limit.QuotaRemaining, "should reset policy2 quota")
+
+					return true
+				},
+			},
+		}...)
+
+	})
 
 	// Rate limits before
-	ts.Run(t, []test.TestCase{
-		// 2 requests to api1, API limit quota remaining should be 48
-		{Path: "/api1", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "49"}},
-		{Path: "/api1", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "48"}},
-	}...)
+	t.Run("Rate limits before policy update", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			// 2 requests to api1, API limit quota remaining should be 48
+			{Path: "/api1", Headers: authHeader, Code: http.StatusOK,
+				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "49"}},
+			{Path: "/api1", Headers: authHeader, Code: http.StatusOK,
+				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "48"}},
+		}...)
+	})
 
 	policiesMu.RLock()
 	policy1.Rate = 1
@@ -1223,12 +1235,13 @@ func TestApplyMultiPolicies(t *testing.T) {
 	policiesMu.RUnlock()
 
 	// Rate limits after policy update
-	ts.Run(t, []test.TestCase{
-		{Path: "/api1", Headers: authHeader, Code: http.StatusOK,
-			HeadersMatch: map[string]string{headers.XRateLimitRemaining: "47"}},
-		{Path: "/api1", Headers: authHeader, Code: http.StatusTooManyRequests},
-	}...)
-
+	t.Run("Rate limits after policy update", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			{Path: "/api1", Headers: authHeader, Code: http.StatusOK,
+				HeadersMatch: map[string]string{headers.XRateLimitRemaining: "47"}},
+			{Path: "/api1", Headers: authHeader, Code: http.StatusTooManyRequests},
+		}...)
+	})
 }
 
 func TestPerAPIPolicyUpdate(t *testing.T) {
