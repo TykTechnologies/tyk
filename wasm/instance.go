@@ -217,6 +217,13 @@ func (w *Instance) Malloc(size int32) (uint64, error) {
 
 	malloc, err := w.GetExportsFunc("malloc")
 	if err != nil {
+		// This is a work around to work with
+		// https://github.com/tetratelabs/proxy-wasm-go-sdk
+		//
+		// See PR https://github.com/tetratelabs/proxy-wasm-go-sdk/pull/145
+		malloc, err = w.GetExportsFunc("proxy_on_memory_allocate")
+	}
+	if err != nil {
 		return 0, err
 	}
 
