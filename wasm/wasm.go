@@ -2,7 +2,7 @@ package wasm
 
 import (
 	"errors"
-	"os"
+	"io/ioutil"
 	"path/filepath"
 	"sync"
 
@@ -82,7 +82,7 @@ func (w *Wasm) NewInstance(mw *Config, m *wasmerGo.Module) (*Instance, error) {
 }
 
 func (w *Wasm) CompileFile(path string) (*wasmerGo.Module, error) {
-	b, err := os.ReadFile(path)
+	b, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
