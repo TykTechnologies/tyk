@@ -341,7 +341,10 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 			if err != nil {
 				wasmLogger.WithError(err).Error("Failed to create wasm plugin")
 			} else {
-				chainArray = append(chainArray, h.Handle)
+				mwAppendEnabled(&chainArray, &WasmMiddleware{
+					BaseMiddleware: baseMid,
+					H:              h,
+				})
 			}
 		default:
 			chainArray = append(chainArray, createDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
@@ -493,7 +496,10 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 			if err != nil {
 				wasmLogger.WithError(err).Error("Failed to create wasm plugin")
 			} else {
-				chainArray = append(chainArray, h.Handle)
+				mwAppendEnabled(&chainArray, &WasmMiddleware{
+					BaseMiddleware: baseMid,
+					H:              h,
+				})
 			}
 		default:
 			chainArray = append(chainArray, createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))

@@ -133,6 +133,53 @@ func (h *H) Handle(next http.Handler) http.Handler {
 	})
 }
 
+func (h *H) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) {
+	// create a http context
+	httpContextID := h.id.Inc()
+	mwLog := h.log.WithField("httpContextID", httpContextID)
+	ctxBuf, releaseBuffers := safeBuffer()
+	defer releaseBuffers()
+
+	abi := h.abi(
+		// set request
+		func(n *Wasm) {
+			n.Logger.L = mwLog
+			n.Request.Request = r
+			n.Response.Response = w
+			n.Plugin.Config = h.mw.Plugin
+			n.Plugin.Instance = h.mw.Instance
+			n.Plugin.NewBuffer = ctxBuf
+
+			n.HTTPCall.log = mwLog
+			n.HTTPCall.newBuffer = ctxBuf
+		},
+	)
+	abi.Instance.Lock(abi)
+	defer abi.Instance.Unlock()
+
+	exports := abi.GetExports()
+	ctx := &ExecContext{
+		Log:         mwLog,
+		ContextID:   httpContextID,
+		RootContext: h.rootContext,
+		Exports:     exports,
+		Request:     r,
+		Response:    w,
+	}
+	if err := ctx.Before(); err != nil {
+		mwLog.WithError(err).Error("ProxyOnContextCreate")
+		return err, http.StatusInternalServerError
+	}
+	defer func() {
+		if err := ctx.After(); err != nil {
+			mwLog.WithError(err).Error("ProxyOnContextFinalize")
+		}
+	}()
+	ctx.Apply()
+	ws := abi.Imports.(*Wasm)
+	return ws.GetStatusDetail(), ws.GetStatus()
+}
+
 func (h *H) abi(modify ...func(*Wasm)) *proxywasm.ABIContext {
 	w := &Wasm{}
 	for _, fn := range modify {
