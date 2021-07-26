@@ -68,6 +68,7 @@ type HTTPResponse interface {
 	GetHttpResponseBody() common.IoBuffer
 	GetHttpResponseTrailer() common.HeaderMap
 	GetHttpResponseMetadata() common.HeaderMap
+	SendHttpResp(respCode int32, respCodeDetail common.IoBuffer, respBody common.IoBuffer, additionalHeaderMap common.HeaderMap, grpcCode int32) x.WasmResult
 }
 
 type HTTPCall interface {
@@ -77,7 +78,6 @@ type HTTPCall interface {
 	GetHttpCallResponseTrailer() common.HeaderMap
 	ResumeHttpRequest() x.WasmResult
 	ResumeHttpResponse() x.WasmResult
-	SendHttpResp(respCode int32, respCodeDetail common.IoBuffer, respBody common.IoBuffer, additionalHeaderMap common.HeaderMap, grpcCode int32) x.WasmResult
 }
 
 type SharedData interface {

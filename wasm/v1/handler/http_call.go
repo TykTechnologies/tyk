@@ -18,6 +18,3 @@ func (HTTPCall) GetHttpCallResponseBody() common.IoBuffer     { return nil }
 func (HTTPCall) GetHttpCallResponseTrailer() common.HeaderMap { return nil }
 func (HTTPCall) ResumeHttpRequest() x.WasmResult              { return x.WasmResultUnimplemented }
 func (HTTPCall) ResumeHttpResponse() x.WasmResult             { return x.WasmResultUnimplemented }
-func (HTTPCall) SendHttpResp(respCode int32, respCodeDetail common.IoBuffer, respBody common.IoBuffer, additionalHeaderMap common.HeaderMap, grpcCode int32) x.WasmResult {
-	return x.WasmResultUnimplemented
-}

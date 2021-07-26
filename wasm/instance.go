@@ -58,7 +58,12 @@ func NewWasmerInstance(vm *Wasm,
 	}
 	ins.stopCond = sync.NewCond(&ins.lock)
 	v1.RegisterImports(ins)
+	shim(ins)
 	return ins
+}
+
+func shim(instance common.WasmInstance) {
+	_ = instance.RegisterFunc("env", "proxy_send_local_response", v1.ProxySendHttpResponse)
 }
 
 func (w *Instance) GetData() interface{} {
