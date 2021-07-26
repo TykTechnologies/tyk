@@ -7,7 +7,6 @@ import (
 	"github.com/TykTechnologies/tyk/wasm"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/atomic"
-	"go.uber.org/zap"
 	proxywasm "mosn.io/proxy-wasm-go-host/proxywasm/v1"
 )
 
@@ -45,14 +44,14 @@ func New(
 	mwLog.Info("Creating new wasm instance")
 	instance, err := vm.NewInstance(mw, m)
 	if err != nil {
-		mwLog.Error("Failed to create wasm instance", zap.Error(err))
+		mwLog.WithError(err).Error("Failed to create wasm instance")
 		return nil, err
 	}
 	// we start the module instance beforehand.
 	mwLog.Info("Starting wasm module instance")
 	err = instance.Start()
 	if err != nil {
-		mwLog.Error("Failed to start wasm instance", zap.Error(err))
+		mwLog.WithError(err).Error("Failed to start wasm instance")
 		return nil, err
 	}
 	base := &Wasm{}
@@ -69,7 +68,7 @@ func New(
 	mwLog.Info("Creating root context")
 	err = export.ProxyOnContextCreate(rootContext, 0)
 	if err != nil {
-		mwLog.Error("Failed creating root context", zap.Error(err))
+		mwLog.WithError(err).Error("Failed creating root context")
 		return nil, err
 	}
 	return &H{
@@ -100,6 +99,9 @@ func (h *H) Handle(next http.Handler) http.Handler {
 				n.Plugin.Config = h.mw.Plugin
 				n.Plugin.Instance = h.mw.Instance
 				n.Plugin.NewBuffer = ctxBuf
+
+				n.HTTPCall.log = mwLog
+				n.HTTPCall.newBuffer = ctxBuf
 			},
 		)
 		abi.Instance.Lock(abi)
@@ -115,14 +117,14 @@ func (h *H) Handle(next http.Handler) http.Handler {
 			Response:    w,
 		}
 		if err := ctx.Before(); err != nil {
-			mwLog.Error("ProxyOnContextCreate", zap.Error(err))
+			mwLog.WithError(err).Error("ProxyOnContextCreate")
 			h.E500(w, r)
 			return
 		}
 		//make sure we destroy the context when we are done
 		defer func() {
 			if err := ctx.After(); err != nil {
-				mwLog.Error("ProxyOnContextFinalize", zap.Error(err))
+				mwLog.WithError(err).Error("ProxyOnContextFinalize")
 			}
 		}()
 		if ctx.Apply() {
@@ -171,7 +173,7 @@ func (e *ExecContext) apply(fns ...applyFn) (applyNext bool) {
 	for _, fn := range fns {
 		action, name, err := fn()
 		if err != nil {
-			e.Log.Error(name, zap.Error(err))
+			e.Log.WithError(err).Error(name)
 			return false
 		}
 		if action != proxywasm.ActionContinue {
