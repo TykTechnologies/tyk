@@ -15,7 +15,11 @@ type Header struct {
 }
 
 func (h *Header) Get(key string) (string, bool) {
-	return h.head.Get(key), true
+	headerVal := h.head.Get(key)
+	if headerVal == "" {
+		return "", false
+	}
+	return headerVal, true
 }
 
 func (h *Header) Set(key, value string) {
