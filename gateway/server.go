@@ -336,10 +336,11 @@ func syncAPISpecs() (int, error) {
 
 	apisMu.Lock()
 	apiSpecs = filter
+	apiLen := len(apiSpecs)
 	tlsConfigCache.Flush()
 	apisMu.Unlock()
 
-	return len(apiSpecs), nil
+	return apiLen, nil
 }
 
 func syncPolicies() (count int, err error) {
