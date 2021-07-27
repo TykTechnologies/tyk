@@ -121,11 +121,7 @@ FPMCOMMON=(
     --before-install $TEMPLATEDIR/install/before_install.sh
     --after-install $TEMPLATEDIR/install/post_install.sh
     --after-remove $TEMPLATEDIR/install/post_remove.sh
-)
-[ -z $PKGCONFLICTS ] || FPMCOMMON+=( --conflicts $PKGCONFLICTS )
-FPMRPM=(
-    --before-upgrade $TEMPLATEDIR/install/post_remove.sh
-    --after-upgrade $TEMPLATEDIR/install/post_install.sh
+    --after-upgrade $TEMPLATEDIR/install/posttrans.sh
 )
 
 cd $BUILDDIR
