@@ -293,7 +293,8 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	}
 
 	if d.Auth {
-		ctxSetSession(r, &newRequestData.Session, newRequestData.AuthValue, true, d.Gw.GetConfig().HashKeys)
+		newRequestData.Session.KeyID = newRequestData.AuthValue
+		ctxSetSession(r, &newRequestData.Session, true, d.Gw.GetConfig().HashKeys)
 	}
 
 	return nil, http.StatusOK
@@ -581,7 +582,7 @@ func (j *JSVM) LoadTykJSApi() {
 		apiKey := call.Argument(0).String()
 		apiId := call.Argument(1).String()
 
-		obj, _ := j.Gw.handleGetDetail(apiKey, apiId, false)
+		obj, _ := j.Gw.handleGetDetail(apiKey, apiId, "", false)
 		bs, _ := json.Marshal(obj)
 
 		returnVal, err := j.VM.ToValue(string(bs))

@@ -132,12 +132,12 @@ func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (sessionID string, ret
 	}
 
 	sessionID = e.GenerateSessionID(extractorOutput, e.BaseMiddleware)
-
-	previousSession, keyExists := e.CheckSessionAndIdentityForValidKey(&sessionID, r)
+	previousSession, keyExists := e.CheckSessionAndIdentityForValidKey(sessionID, r)
+	sessionID = previousSession.KeyID
 
 	if keyExists {
 		if previousSession.IdExtractorDeadline > time.Now().Unix() {
-			ctxSetSession(r, &previousSession, sessionID, true, e.Gw.GetConfig().HashKeys)
+			ctxSetSession(r, &previousSession, true, e.Gw.GetConfig().HashKeys)
 			returnOverrides = ReturnOverrides{
 				ResponseCode: 200,
 			}
@@ -206,11 +206,12 @@ func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 	}
 
 	SessionID = e.GenerateSessionID(regexOutput[e.cfg.RegexMatchIndex], e.BaseMiddleware)
-	previousSession, keyExists := e.CheckSessionAndIdentityForValidKey(&SessionID, r)
+	previousSession, keyExists := e.BaseMiddleware.CheckSessionAndIdentityForValidKey(SessionID, r)
+	SessionID = previousSession.KeyID
 
 	if keyExists {
 		if previousSession.IdExtractorDeadline > time.Now().Unix() {
-			ctxSetSession(r, &previousSession, SessionID, true, e.Gw.GetConfig().HashKeys)
+			ctxSetSession(r, &previousSession, true, e.Gw.GetConfig().HashKeys)
 			returnOverrides = ReturnOverrides{
 				ResponseCode: 200,
 			}
@@ -281,11 +282,12 @@ func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 	}
 
 	SessionID = e.GenerateSessionID(output, e.BaseMiddleware)
+	previousSession, keyExists := e.BaseMiddleware.CheckSessionAndIdentityForValidKey(SessionID, r)
+	SessionID = previousSession.KeyID
 
-	previousSession, keyExists := e.CheckSessionAndIdentityForValidKey(&SessionID, r)
 	if keyExists {
 		if previousSession.IdExtractorDeadline > time.Now().Unix() {
-			ctxSetSession(r, &previousSession, SessionID, true, e.Gw.GetConfig().HashKeys)
+			ctxSetSession(r, &previousSession, true, e.Gw.GetConfig().HashKeys)
 			returnOverrides = ReturnOverrides{
 				ResponseCode: 200,
 			}

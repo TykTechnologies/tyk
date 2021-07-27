@@ -316,7 +316,6 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	if m.HookType == coprocess.HookType_CustomKeyCheck && extractor != nil {
 		sessionID, returnOverrides = extractor.ExtractAndCheck(r)
-
 		if returnOverrides.ResponseCode != 0 {
 			if returnOverrides.ResponseError == "" {
 				return nil, returnOverrides.ResponseCode
@@ -455,6 +454,8 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}
 
 		returnedSession.OrgID = m.Spec.OrgID
+		// set a Key ID as default
+		returnedSession.KeyID = token
 
 		if err := m.ApplyPolicies(returnedSession); err != nil {
 			AuthFailed(m, r, authToken)
@@ -482,7 +483,8 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			return errors.New(http.StatusText(http.StatusForbidden)), http.StatusForbidden
 		}
 
-		ctxSetSession(r, returnedSession, sessionID, true, m.Gw.GetConfig().HashKeys)
+		returnedSession.KeyID = sessionID
+		ctxSetSession(r, returnedSession, true, m.Gw.GetConfig().HashKeys)
 	}
 
 	return nil, http.StatusOK

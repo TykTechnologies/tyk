@@ -179,7 +179,9 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	// Check if API key valid
 	keyName := username
 	logger := k.Logger().WithField("key", k.Gw.obfuscateKey(keyName))
-	session, keyExists := k.CheckSessionAndIdentityForValidKey(&keyName, r)
+	session, keyExists := k.CheckSessionAndIdentityForValidKey(keyName, r)
+	keyName = session.KeyID
+
 	if !keyExists {
 		if k.Gw.GetConfig().HashKeyFunction == "" {
 			logger.Warning("Attempted access with non-existent user.")
@@ -188,7 +190,8 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			logger.Info("Could not find user, falling back to legacy format key.")
 			legacyKeyName := strings.TrimPrefix(username, k.Spec.OrgID)
 			keyName, _ = storage.GenerateToken(k.Spec.OrgID, legacyKeyName, "")
-			session, keyExists = k.CheckSessionAndIdentityForValidKey(&keyName, r)
+			session, keyExists = k.CheckSessionAndIdentityForValidKey(keyName, r)
+			keyName = session.KeyID
 			if !keyExists {
 				logger.Warning("Attempted access with non-existent user.")
 				return k.handleAuthFail(w, r, token)
@@ -212,7 +215,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	// Set session state on context, we will need it later
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.BasicAuthUser, apidef.UnsetAuth:
-		ctxSetSession(r, &session, keyName, false, k.Gw.GetConfig().HashKeys)
+		ctxSetSession(r, &session, false, k.Gw.GetConfig().HashKeys)
 	}
 
 	return nil, http.StatusOK

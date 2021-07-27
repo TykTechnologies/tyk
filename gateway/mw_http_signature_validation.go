@@ -201,7 +201,8 @@ func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWrite
 	// Set session state on context, we will need it later
 	switch hm.Spec.BaseIdentityProvidedBy {
 	case apidef.HMACKey, apidef.UnsetAuth:
-		ctxSetSession(r, &session, fieldValues.KeyID, false, hm.Gw.GetConfig().HashKeys)
+		session.KeyID = fieldValues.KeyID
+		ctxSetSession(r, &session, false, hm.Gw.GetConfig().HashKeys)
 		hm.setContextVars(r, fieldValues.KeyID)
 	}
 
@@ -293,7 +294,8 @@ type HMACFieldValues struct {
 }
 
 func (hm *HTTPSignatureValidationMiddleware) getSecretAndSessionForKeyID(r *http.Request, keyId string) (string, user.SessionState, error) {
-	session, keyExists := hm.CheckSessionAndIdentityForValidKey(&keyId, r)
+	session, keyExists := hm.CheckSessionAndIdentityForValidKey(keyId, r)
+	keyId = session.KeyID
 	if !keyExists {
 		return "", session.Clone(), errors.New("Key ID does not exist")
 	}
@@ -308,7 +310,8 @@ func (hm *HTTPSignatureValidationMiddleware) getSecretAndSessionForKeyID(r *http
 }
 
 func (hm *HTTPSignatureValidationMiddleware) getRSACertificateIdAndSessionForKeyID(r *http.Request, keyId string) (string, user.SessionState, error) {
-	session, keyExists := hm.CheckSessionAndIdentityForValidKey(&keyId, r)
+	session, keyExists := hm.CheckSessionAndIdentityForValidKey(keyId, r)
+	keyId = session.KeyID
 	if !keyExists {
 		return "", session.Clone(), errors.New("Key ID does not exist")
 	}

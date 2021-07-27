@@ -912,7 +912,7 @@ func TestRewriterTriggers(t *testing.T) {
 				MetaData: map[string]interface{}{
 					"rewrite": "bar-baz",
 				},
-			}, "", false, ts.Gw.GetConfig().HashKeys)
+			}, false, ts.Gw.GetConfig().HashKeys)
 
 			return TestDef{
 				"Meta Simple",
@@ -941,7 +941,7 @@ func TestRewriterTriggers(t *testing.T) {
 				MetaData: map[string]interface{}{
 					"rewrite": "bar-baz",
 				},
-			}, "", false, ts.Gw.GetConfig().HashKeys)
+			}, false, ts.Gw.GetConfig().HashKeys)
 
 			return TestDef{
 				"Meta Simple Group",
@@ -971,7 +971,7 @@ func TestRewriterTriggers(t *testing.T) {
 					"rewrite": "bar-baz",
 					"somevar": "someval",
 				},
-			}, "", false, ts.Gw.GetConfig().HashKeys)
+			}, false, ts.Gw.GetConfig().HashKeys)
 
 			return TestDef{
 				"Meta Value from Session",
@@ -1027,7 +1027,7 @@ func TestRewriterTriggers(t *testing.T) {
 				MetaData: map[string]interface{}{
 					"rewrite": "bar-baz",
 				},
-			}, "", false, ts.Gw.GetConfig().HashKeys)
+			}, false, ts.Gw.GetConfig().HashKeys)
 
 			return TestDef{
 				"Variable not found",

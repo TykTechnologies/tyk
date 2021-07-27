@@ -103,6 +103,16 @@ func TokenHashAlgo(token string) string {
 	return ""
 }
 
+// TODO: add checks
+func TokenID(token string) (id string, err error) {
+	jsonToken, err := base64.StdEncoding.DecodeString(token)
+	if err != nil {
+		return "", err
+	}
+
+	return jsonparser.GetString(jsonToken, "id")
+}
+
 func TokenOrg(token string) string {
 	if strings.HasPrefix(token, B64JSONPrefix) {
 		if jsonToken, err := base64.StdEncoding.DecodeString(token); err == nil {

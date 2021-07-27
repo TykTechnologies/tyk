@@ -202,6 +202,7 @@ func (gw *Gateway) applyPoliciesAndSave(keyName string, session *user.SessionSta
 		Spec: spec,
 		Gw:   gw,
 	}
+
 	if err := mw.ApplyPolicies(session); err != nil {
 		return err
 	}
@@ -338,13 +339,13 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 	mw := BaseMiddleware{Gw: gw}
 	// TODO: handle apply policies error
 	mw.ApplyPolicies(newSession)
-
 	// DO ADD OR UPDATE
 
 	// get original session in case of update and preserve fields that SHOULD NOT be updated
 	originalKey := user.SessionState{}
 	if r.Method == http.MethodPut {
 		key, found := gw.GlobalSessionManager.SessionDetail(newSession.OrgID, keyName, isHashed)
+		keyName = key.KeyID
 		if !found {
 			log.Error("Could not find key when updating")
 			return apiError("Key is not found"), http.StatusNotFound
@@ -475,19 +476,18 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 	return response, http.StatusOK
 }
 
-func (gw *Gateway) handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
+func (gw *Gateway) handleGetDetail(sessionKey, apiID, orgID string, byHash bool) (interface{}, int) {
 	if byHash && !gw.GetConfig().HashKeys {
 		return apiError("Key requested by hash but key hashing is not enabled"), http.StatusBadRequest
 	}
 
 	spec := gw.getApiSpec(apiID)
-	orgID := ""
 	if spec != nil {
 		orgID = spec.OrgID
 	}
 
 	session, ok := gw.GlobalSessionManager.SessionDetail(orgID, sessionKey, byHash)
-
+	sessionKey = session.KeyID
 	if !ok {
 		return apiError("Key not found"), http.StatusNotFound
 	}
@@ -634,21 +634,19 @@ func (gw *Gateway) handleAddKey(keyName, hashedName, sessionString, apiID string
 	}).Info("Updated hashed key in slave storage.")
 }
 
-func (gw *Gateway) handleDeleteKey(keyName, apiID string, resetQuota bool) (interface{}, int) {
-	orgID := ""
-	if spec := gw.getApiSpec(apiID); spec != nil {
-		orgID = spec.OrgID
+func (gw *Gateway) handleDeleteKey(keyName, orgID, apiID string, resetQuota bool) (interface{}, int) {
+	session, ok := gw.GlobalSessionManager.SessionDetail(orgID, keyName, false)
+	keyName = session.KeyID
+	if !ok {
+		return apiError("There is no such key found"), http.StatusNotFound
+
 	}
 
 	if apiID == "-1" {
 		// Go through ALL managed API's and delete the key
 		gw.apisMu.RLock()
 		removed := gw.GlobalSessionManager.RemoveSession(orgID, keyName, false)
-		gw.GlobalSessionManager.ResetQuota(
-			keyName,
-			&user.SessionState{},
-			false)
-
+		gw.GlobalSessionManager.ResetQuota(keyName, &session, false)
 		gw.apisMu.RUnlock()
 
 		if !removed {
@@ -679,10 +677,7 @@ func (gw *Gateway) handleDeleteKey(keyName, apiID string, resetQuota bool) (inte
 	}
 
 	if resetQuota {
-		gw.GlobalSessionManager.ResetQuota(
-			keyName,
-			&user.SessionState{},
-			false)
+		gw.GlobalSessionManager.ResetQuota(keyName, &session, false)
 	}
 
 	statusObj := apiModifyKeySuccess{
@@ -707,8 +702,8 @@ func (gw *Gateway) handleDeleteKey(keyName, apiID string, resetQuota bool) (inte
 }
 
 // handleDeleteHashedKeyWithLogs is a wrapper for handleDeleteHashedKey with logs
-func (gw *Gateway) handleDeleteHashedKeyWithLogs(keyName, apiID string, resetQuota bool) (interface{}, int) {
-	res, code := gw.handleDeleteHashedKey(keyName, apiID, resetQuota)
+func (gw *Gateway) handleDeleteHashedKeyWithLogs(keyName, orgID, apiID string, resetQuota bool) (interface{}, int) {
+	res, code := gw.handleDeleteHashedKey(keyName, orgID, apiID, resetQuota)
 
 	if code != http.StatusOK {
 		log.WithFields(logrus.Fields{
@@ -727,10 +722,13 @@ func (gw *Gateway) handleDeleteHashedKeyWithLogs(keyName, apiID string, resetQuo
 	return res, code
 }
 
-func (gw *Gateway) handleDeleteHashedKey(keyName, apiID string, resetQuota bool) (interface{}, int) {
-	orgID := ""
-	if spec := gw.getApiSpec(apiID); spec != nil {
-		orgID = spec.OrgID
+func (gw *Gateway) handleDeleteHashedKey(keyName, orgID, apiID string, resetQuota bool) (interface{}, int) {
+
+	session, ok := gw.GlobalSessionManager.SessionDetail(orgID, keyName, true)
+	keyName = session.KeyID
+	if !ok {
+		return apiError("There is no such key found"), http.StatusNotFound
+
 	}
 
 	if apiID == "-1" {
@@ -751,10 +749,7 @@ func (gw *Gateway) handleDeleteHashedKey(keyName, apiID string, resetQuota bool)
 	}
 
 	if resetQuota {
-		gw.GlobalSessionManager.ResetQuota(
-			keyName,
-			&user.SessionState{},
-			true)
+		gw.GlobalSessionManager.ResetQuota(keyName, &session, true)
 	}
 
 	statusObj := apiModifyKeySuccess{
@@ -956,10 +951,10 @@ func (gw *Gateway) keyHandler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		if keyName != "" {
 			// Return single key detail
-			obj, code = gw.handleGetDetail(keyName, apiID, isHashed)
+			obj, code = gw.handleGetDetail(keyName, apiID, orgID, isHashed)
 			if code != http.StatusOK && hashKeyFunction != "" {
 				// try to use legacy key format
-				obj, code = gw.handleGetDetail(origKeyName, apiID, isHashed)
+				obj, code = gw.handleGetDetail(origKeyName, apiID, orgID, isHashed)
 			}
 		} else {
 			// Return list of keys
@@ -985,16 +980,16 @@ func (gw *Gateway) keyHandler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodDelete:
 		// Remove a key
 		if !isHashed {
-			obj, code = gw.handleDeleteKey(keyName, apiID, true)
+			obj, code = gw.handleDeleteKey(keyName, orgID, apiID, true)
 		} else {
-			obj, code = gw.handleDeleteHashedKeyWithLogs(keyName, apiID, true)
+			obj, code = gw.handleDeleteHashedKeyWithLogs(keyName, orgID, apiID, true)
 		}
 		if code != http.StatusOK && hashKeyFunction != "" {
 			// try to use legacy key format
 			if !isHashed {
-				obj, code = gw.handleDeleteKey(origKeyName, apiID, true)
+				obj, code = gw.handleDeleteKey(origKeyName, orgID, apiID, true)
 			} else {
-				obj, code = gw.handleDeleteHashedKeyWithLogs(origKeyName, apiID, true)
+				obj, code = gw.handleDeleteHashedKeyWithLogs(origKeyName, orgID, apiID, true)
 			}
 		}
 	}
@@ -1035,6 +1030,7 @@ func (gw *Gateway) handleUpdateHashedKey(keyName string, applyPolicies []string)
 	}
 
 	sess, ok := gw.GlobalSessionManager.SessionDetail(orgID, keyName, true)
+	keyName = sess.KeyID
 	if !ok {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -2343,8 +2339,8 @@ func ctxGetSession(r *http.Request) *user.SessionState {
 	return ctx.GetSession(r)
 }
 
-func ctxSetSession(r *http.Request, s *user.SessionState, token string, scheduleUpdate bool, hashKey bool) {
-	ctx.SetSession(r, s, token, scheduleUpdate, hashKey)
+func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
+	ctx.SetSession(r, s, scheduleUpdate, hashKey)
 }
 
 func ctxScheduleSessionUpdate(r *http.Request) {

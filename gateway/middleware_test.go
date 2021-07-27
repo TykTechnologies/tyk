@@ -119,6 +119,8 @@ func TestBaseMiddleware_getAuthType(t *testing.T) {
 func TestSessionLimiter_RedisQuotaExceeded_PerAPI(t *testing.T) {
 	g := StartTest(nil)
 	defer g.Close()
+	GlobalSessionManager.Store().DeleteAllKeys()
+	defer GlobalSessionManager.Store().DeleteAllKeys()
 
 	apis := BuildAPI(func(spec *APISpec) {
 		spec.APIID = "api1"

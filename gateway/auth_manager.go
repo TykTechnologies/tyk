@@ -133,6 +133,7 @@ func (b *DefaultSessionManager) RemoveSession(orgID string, keyName string, hash
 func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool) {
 	var jsonKeyVal string
 	var err error
+	keyId := keyName
 
 	// get session by key
 	if hashed {
@@ -150,9 +151,10 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 			jsonKeyValList, err = b.store.GetMultiKey(toSearchList)
 
 			// pick the 1st non empty from the returned list
-			for _, val := range jsonKeyValList {
+			for idx, val := range jsonKeyValList {
 				if val != "" {
 					jsonKeyVal = val
+					keyId = toSearchList[idx]
 					break
 				}
 			}
@@ -175,7 +177,7 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 		log.Error("Couldn't unmarshal session object (may be cache miss): ", err)
 		return user.SessionState{}, false
 	}
-
+	session.KeyID = keyId
 	return session.Clone(), true
 }
 

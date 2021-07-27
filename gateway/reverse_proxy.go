@@ -22,7 +22,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"strconv"
 	"strings"
@@ -755,21 +754,27 @@ type TykRoundTripper struct {
 }
 
 func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
-	if r.URL.Scheme == "tyk" {
+
+	hasInternalHeader := r.Header.Get(apidef.TykInternalApiHeader) != ""
+
+	if r.URL.Scheme == "tyk" || hasInternalHeader {
+		if hasInternalHeader {
+			r.Header.Del(apidef.TykInternalApiHeader)
+		}
+
 		handler, found := rt.Gw.findInternalHttpHandlerByNameOrID(r.Host)
 		if !found {
 			rt.logger.WithField("looping_url", "tyk://"+r.Host).Error("Couldn't detect target")
 			return nil, errors.New("handler could")
 		}
 
-		r.URL.Scheme = ""
-
 		rt.logger.WithField("looping_url", "tyk://"+r.Host).Debug("Executing request on internal route")
-		recorder := httptest.NewRecorder()
 
-		nopCloseRequestBody(r)
-		handler.ServeHTTP(recorder, r)
-		return recorder.Result(), nil
+		srv := NewInMemoryServer(handler)
+		defer func() { _ = srv.Close() }()
+
+		r.URL.Scheme = "http"
+		return srv.NewClient().Do(r)
 	}
 
 	if rt.h2ctransport != nil {
@@ -785,52 +790,53 @@ func (p *ReverseProxy) handleOutboundRequest(roundTripper *TykRoundTripper, outr
 	}()
 
 	if p.TykAPISpec.GraphQL.Enabled {
-		if isNotCORSPreflight(outreq) {
-			res, hijacked, err = p.handleGraphQL(roundTripper, outreq, w)
-			return
-		}
-		if needsGraphQLExecutionEngine(p.TykAPISpec) {
-			err = errors.New("options passthrough not allowed")
-			return
-		}
-		// request is pre-flight and the GQL execution mode is probably Proxy only,
-		// so fallback to sending request with normal mechanisms
+		res, hijacked, err = p.handleGraphQL(roundTripper, outreq, w)
+		return
 	}
 
 	res, err = p.sendRequestToUpstream(roundTripper, outreq)
 	return
 }
 
-func isNotCORSPreflight(r *http.Request) bool {
-	return r.Method != http.MethodOptions
+func isCORSPreflight(r *http.Request) bool {
+	return r.Method == http.MethodOptions
 }
 
 func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, err error) {
 	isWebSocketUpgrade := ctxGetGraphQLIsWebSocketUpgrade(outreq)
-	if isWebSocketUpgrade {
-		return p.handleGraphQLEngineWebsocketUpgrade(roundTripper, outreq, w)
-	}
+	needEngine := needsGraphQLExecutionEngine(p.TykAPISpec)
 
-	gqlRequest := ctxGetGraphQLRequest(outreq)
-	if gqlRequest == nil {
-		err = errors.New("graphql request is nil")
-		return
-	}
-	gqlRequest.SetHeader(outreq.Header)
+	switch {
+	case isCORSPreflight(outreq):
+		if needEngine {
+			err = errors.New("options passthrough not allowed")
+			return
+		}
+	case isWebSocketUpgrade:
+		if needEngine {
+			return p.handleGraphQLEngineWebsocketUpgrade(roundTripper, outreq, w)
+		}
+	default:
+		gqlRequest := ctxGetGraphQLRequest(outreq)
+		if gqlRequest == nil {
+			err = errors.New("graphql request is nil")
+			return
+		}
+		gqlRequest.SetHeader(outreq.Header)
 
-	var isIntrospection bool
-	isIntrospection, err = gqlRequest.IsIntrospectionQuery()
-	if err != nil {
-		return
-	}
+		var isIntrospection bool
+		isIntrospection, err = gqlRequest.IsIntrospectionQuery()
+		if err != nil {
+			return
+		}
 
-	if isIntrospection {
-		res, err = p.handleGraphQLIntrospection()
-		return
-	}
-
-	if needsGraphQLExecutionEngine(p.TykAPISpec) {
-		return p.handoverRequestToGraphQLExecutionEngine(roundTripper, gqlRequest)
+		if isIntrospection {
+			res, err = p.handleGraphQLIntrospection()
+			return
+		}
+		if needEngine {
+			return p.handoverRequestToGraphQLExecutionEngine(roundTripper, gqlRequest)
+		}
 	}
 
 	res, err = p.sendRequestToUpstream(roundTripper, outreq)
@@ -1260,7 +1266,10 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 		rw.Header().Add("Trailer", strings.Join(trailerKeys, ", "))
 	}
 
-	rw.WriteHeader(res.StatusCode)
+	// do not write on a hijacked connection
+	if res.StatusCode != http.StatusSwitchingProtocols {
+		rw.WriteHeader(res.StatusCode)
+	}
 
 	if len(res.Trailer) > 0 {
 		// Force chunking if we saw a response trailer.

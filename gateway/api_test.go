@@ -1493,7 +1493,6 @@ func TestContextSession(t *testing.T) {
 
 	ctxSetSession(r,
 		&user.SessionState{},
-		"",
 		false,
 		false)
 
@@ -1505,7 +1504,7 @@ func TestContextSession(t *testing.T) {
 			t.Fatal("expected ctxSetSession of zero val to panic")
 		}
 	}()
-	ctxSetSession(r, nil, "", false, false)
+	ctxSetSession(r, nil, false, false)
 }
 
 func TestApiLoaderLongestPathFirst(t *testing.T) {

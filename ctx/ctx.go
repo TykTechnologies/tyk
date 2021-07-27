@@ -46,23 +46,24 @@ func setContext(r *http.Request, ctx context.Context) {
 	*r = *r2
 }
 
-func ctxSetSession(r *http.Request, s *user.SessionState, token string, scheduleUpdate bool, hashKey bool) {
+func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
+
 	if s == nil {
 		panic("setting a nil context SessionData")
 	}
 
-	if token == "" {
-		token = GetAuthToken(r)
+	if s.KeyID == "" {
+		s.KeyID = GetAuthToken(r)
 	}
 
 	if s.KeyHashEmpty() {
-		s.SetKeyHash(storage.HashKey(token, hashKey))
+		s.SetKeyHash(storage.HashKey(s.KeyID, hashKey))
 	}
 
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, SessionData, s)
-	ctx = context.WithValue(ctx, AuthToken, token)
 
+	ctx = context.WithValue(ctx, AuthToken, s.KeyID)
 	if scheduleUpdate {
 		ctx = context.WithValue(ctx, UpdateSession, true)
 	}
@@ -84,8 +85,8 @@ func GetSession(r *http.Request) *user.SessionState {
 	return nil
 }
 
-func SetSession(r *http.Request, s *user.SessionState, token string, scheduleUpdate bool, hashKey bool) {
-	ctxSetSession(r, s, token, scheduleUpdate, hashKey)
+func SetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
+	ctxSetSession(r, s, scheduleUpdate, hashKey)
 }
 
 func SetDefinition(r *http.Request, s *apidef.APIDefinition) {
