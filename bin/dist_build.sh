@@ -121,7 +121,7 @@ FPMCOMMON=(
     --before-install $TEMPLATEDIR/install/before_install.sh
     --after-install $TEMPLATEDIR/install/post_install.sh
     --after-remove $TEMPLATEDIR/install/post_remove.sh
-    --before-upgrade $TEMPLATEDIR/install/backup.sh
+    --rpm-pretrans $TEMPLATEDIR/install/backup.sh
     --rpm-posttrans $TEMPLATEDIR/install/posttrans.sh
 )
 
