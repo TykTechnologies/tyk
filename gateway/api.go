@@ -636,11 +636,10 @@ func (gw *Gateway) handleAddKey(keyName, hashedName, sessionString, apiID string
 
 func (gw *Gateway) handleDeleteKey(keyName, orgID, apiID string, resetQuota bool) (interface{}, int) {
 	session, ok := gw.GlobalSessionManager.SessionDetail(orgID, keyName, false)
-	keyName = session.KeyID
 	if !ok {
 		return apiError("There is no such key found"), http.StatusNotFound
-
 	}
+	keyName = session.KeyID
 
 	if apiID == "-1" {
 		// Go through ALL managed API's and delete the key

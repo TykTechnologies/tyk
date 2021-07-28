@@ -175,6 +175,7 @@ func NewGateway(config config.Config) *Gateway {
 			again: again.New(),
 		},
 	}
+
 	gw.analytics = RedisAnalyticsHandler{Gw: &gw}
 	gw.SetConfig(config)
 	sessionManager := DefaultSessionManager{Gw: &gw}

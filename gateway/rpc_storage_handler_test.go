@@ -146,13 +146,16 @@ func TestProcessKeySpaceChangesForOauth(t *testing.T) {
 }
 
 func TestProcessKeySpaceChanges_ResetQuota(t *testing.T) {
+
+	g := StartTest(nil)
+	defer g.Close()
+
 	rpcListener := RPCStorageHandler{
 		KeyPrefix:        "rpc.listener.",
 		SuppressRegister: true,
 		HashKeys:         false,
+		Gw: g.Gw,
 	}
-	g := StartTest()
-	defer g.Close()
 
 	g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
 	defer g.Gw.GlobalSessionManager.Store().DeleteAllKeys()

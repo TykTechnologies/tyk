@@ -188,7 +188,9 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 		log.WithField("apiID", api.APIID).Debugf("[RATE] %s", err.Error())
 		return sessionFailRateLimit
 	}
-
+	if l.Gw == nil {
+		panic("viene nulo")
+	}
 	// If rate is -1 or 0, it means unlimited and no need for rate limiting.
 	if enableRL && accessDef.Limit.Rate > 0 {
 		rateScope := ""
@@ -234,7 +236,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			currentSession.Allowance = currentSession.Allowance - 1
 		}
 
-		if l.RedisQuotaExceeded(r, currentSession, allowanceScope, accessDef.Limit, store) {
+		if l.RedisQuotaExceeded(r, currentSession, allowanceScope, accessDef.Limit, store, globalConf.HashKeys) {
 			return sessionFailQuota
 		}
 	}
@@ -243,7 +245,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 
 }
 
-func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *user.SessionState, scope string, limit *user.APILimit, store storage.Handler) bool {
+func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *user.SessionState, scope string, limit *user.APILimit, store storage.Handler, hashKeys bool) bool {
 	// Unlimited?
 	if limit.QuotaMax == -1 || limit.QuotaMax == 0 {
 		// No quota set
@@ -256,7 +258,8 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 	}
 
 	key := currentSession.KeyID
-	if l.Gw.GetConfig().HashKeys {
+
+	if hashKeys {
 		key = storage.HashStr(currentSession.KeyID)
 	}
 

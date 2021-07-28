@@ -103,7 +103,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession *us
 	}
 
 	// We found a session, apply the quota and rate limiter
-	reason := k.sessionlimiter.ForwardMessage(
+	reason := k.Gw.SessionLimiter.ForwardMessage(
 		r,
 		orgSession,
 		k.Spec.OrgID,
@@ -233,9 +233,8 @@ func (k *OrganizationMonitor) AllowAccessNext(
 		orgChan <- false
 		return
 	}
-
 	// We found a session, apply the quota and rate limiter
-	reason := k.sessionlimiter.ForwardMessage(
+	reason := k.Gw.SessionLimiter.ForwardMessage(
 		r,
 		session,
 		k.Spec.OrgID,
