@@ -9,7 +9,7 @@ import (
 )
 
 var pool = &sync.Pool{
-	New: func() interface{} { return new(IO) },
+	New: func() interface{} { return New() },
 }
 
 var _ common.IoBuffer = (*IO)(nil)
