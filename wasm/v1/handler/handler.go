@@ -161,7 +161,7 @@ func (h *H) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interfac
 	exports := abi.GetExports()
 	abi.Imports.(*Wasm).HTTPCall.exports = exports
 	abi.Imports.(*Wasm).HTTPCall.contextID = httpContextID
-	err := exports.ProxyOnContextCreate(h.rootContext, httpContextID)
+	err := exports.ProxyOnContextCreate(httpContextID, h.rootContext)
 	if err != nil {
 		mwLog.WithError(err).Error("Failed creating http context")
 		return err, http.StatusInternalServerError
