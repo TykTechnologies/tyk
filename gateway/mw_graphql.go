@@ -146,11 +146,13 @@ func (m *GraphQLMiddleware) initGraphQLEngineV2(logger *abstractlogger.LogrusLog
 	engineConfig, err := configAdapter.EngineConfigV2()
 	if err != nil {
 		m.Logger().WithError(err).Error("could not create engine v2 config")
+		return
 	}
 
 	engine, err := gql.NewExecutionEngineV2(logger, *engineConfig)
 	if err != nil {
 		m.Logger().WithError(err).Error("could not create execution engine v2")
+		return
 	}
 
 	m.Spec.GraphQLExecutor.EngineV2 = engine

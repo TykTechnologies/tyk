@@ -111,6 +111,12 @@ type ErrorHandler struct {
 	BaseMiddleware
 }
 
+// TemplateExecutor is an interface used to switch between text/templates and html/template.
+// It only switch to text/template (templatesRaw) when contentType is XML related
+type TemplateExecutor interface {
+	Execute(wr io.Writer, data interface{}) error
+}
+
 // HandleError is the actual error handler and will store the error details in analytics if analytics processing is enabled.
 func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMsg string, errCode int, writeResponse bool) {
 	defer e.Base().UpdateRequestSession(r)
@@ -135,7 +141,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		w.Header().Set(headers.ContentType, contentType)
 		response.Header = http.Header{}
 		response.Header.Set(headers.ContentType, contentType)
-
 		templateName := "error_" + strconv.Itoa(errCode) + "." + templateExtension
 
 		// Try to use an error template that matches the HTTP error code and the content type: 500.json, 400.xml, etc.
@@ -173,12 +178,22 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		if errMsg != errCustomBodyResponse.Error() {
 			w.WriteHeader(errCode)
 			response.StatusCode = errCode
+			var tmplExecutor TemplateExecutor
+			tmplExecutor = tmpl
 
 			apiError := APIError{template.HTML(template.JSEscapeString(errMsg))}
+			if contentType == headers.ApplicationXML || contentType == headers.TextXML {
+				apiError.Message = template.HTML(errMsg)
+
+				//we look up in the last defined templateName to obtain the template.
+				rawTmpl := templatesRaw.Lookup(templateName)
+				tmplExecutor = rawTmpl
+			}
+
 			var log bytes.Buffer
 
 			rsp := io.MultiWriter(w, &log)
-			tmpl.Execute(rsp, &apiError)
+			tmplExecutor.Execute(rsp, &apiError)
 			response.Body = ioutil.NopCloser(&log)
 		}
 	}

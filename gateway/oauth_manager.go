@@ -471,12 +471,12 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 					log.WithField("oauthClientID", ar.Client.GetId()).
 						Error("Could not set session meta_data from oauth-client fields, type mismatch")
 				} else {
-					session.SetMetaData(metadata)
+					session.MetaData = metadata
 					// set session alias to developer email as we do it for regular API keys created for developer
-					if devEmail, found := session.GetMetaData()[keyDataDeveloperEmail].(string); found {
+					if devEmail, found := session.MetaData[keyDataDeveloperEmail].(string); found {
 						session.Alias = devEmail
 						// we don't need it in meta-data as we set it to alias
-						session.RemoveMetaData(keyDataDeveloperEmail)
+						delete(session.MetaData, keyDataDeveloperEmail)
 					}
 				}
 			}
@@ -602,7 +602,6 @@ func (r *RedisOsinStorageInterface) GetClient(id string) (osin.Client, error) {
 	key := prefixClient + id
 
 	log.Info("Getting client ID:", id)
-
 	clientJSON, err := r.store.GetKey(key)
 	if err != nil {
 		log.Errorf("Failure retrieving client ID key %q: %v", key, err)
@@ -613,7 +612,6 @@ func (r *RedisOsinStorageInterface) GetClient(id string) (osin.Client, error) {
 	if err := json.Unmarshal([]byte(clientJSON), &client); err != nil {
 		log.Error("Couldn't unmarshal OAuth client object: ", err)
 	}
-
 	return client, nil
 }
 
@@ -985,14 +983,14 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 
 	c, ok := accessData.Client.(*OAuthClient)
 	if ok && c.MetaData != nil {
-		if newSession.GetMetaData() == nil {
-			newSession.SetMetaData(make(map[string]interface{}))
+		if newSession.MetaData == nil {
+			newSession.MetaData = make(map[string]interface{})
 		}
 
 		// Allow session inherit and *override* client values
 		for k, v := range c.MetaData.(map[string]interface{}) {
-			if _, found := newSession.GetMetaDataByKey(k); !found {
-				newSession.SetMetaDataKey(k, v)
+			if _, found := newSession.MetaData[k]; !found {
+				newSession.MetaData[k] = v
 			}
 		}
 	}
@@ -1144,7 +1142,7 @@ func (r *RedisOsinStorageInterface) GetUser(username string) (*user.SessionState
 	}
 
 	// new interface means having to make this nested... ick.
-	session := user.NewSessionState()
+	session := &user.SessionState{}
 	if err := json.Unmarshal([]byte(accessJSON), session); err != nil {
 		log.Error("Couldn't unmarshal OAuth auth data object (LoadRefresh): ", err,
 			"; Decoding: ", accessJSON)

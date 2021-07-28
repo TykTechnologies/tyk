@@ -238,7 +238,7 @@ func replaceTykVariables(r *http.Request, in string, escape bool) string {
 		if session == nil {
 			in = replaceVariables(in, vars, nil, metaLabel, escape)
 		} else {
-			in = replaceVariables(in, vars, session.GetMetaData(), metaLabel, escape)
+			in = replaceVariables(in, vars, session.MetaData, metaLabel, escape)
 		}
 	}
 	//todo add config_data
@@ -584,7 +584,7 @@ func checkSessionTrigger(r *http.Request, sess *user.SessionState, options map[s
 	contextData := ctxGetData(r)
 	fCount := 0
 	for mh, mr := range options {
-		rawVal, ok := sess.GetMetaDataByKey(mh)
+		rawVal, ok := sess.MetaData[mh]
 		if ok {
 			val, valOk := rawVal.(string)
 			if valOk {

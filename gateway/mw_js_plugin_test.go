@@ -6,10 +6,13 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/user"
@@ -99,15 +102,15 @@ leakMid.NewProcessRequest(function(request, session) {
 	dynMid.Spec.JSVM = jsvm
 	dynMid.ProcessRequest(nil, req, nil)
 
-	bs, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		t.Fatalf("failed to read final body: %v", err)
-	}
 	want := body + " appended"
-	if got := string(bs); want != got {
-		t.Fatalf("JS plugin broke non-UTF8 body %q into %q",
-			want, got)
-	}
+
+	newBodyInBytes, _ := ioutil.ReadAll(req.Body)
+	assert.Equal(t, want, string(newBodyInBytes))
+
+	t.Run("check request body is re-readable", func(t *testing.T) {
+		newBodyInBytes, _ = ioutil.ReadAll(req.Body)
+		assert.Equal(t, want, string(newBodyInBytes))
+	})
 }
 
 func TestJSVMSessionMetadataUpdate(t *testing.T) {
@@ -128,7 +131,7 @@ func TestJSVMSessionMetadataUpdate(t *testing.T) {
 	s.MetaData["same"] = "same"
 	s.MetaData["updated"] = "old"
 	s.MetaData["removed"] = "dummy"
-	ctxSetSession(req, s, "", true)
+	ctxSetSession(req, s, true)
 
 	const js = `
 var testJSVMMiddleware = new TykJS.TykMiddleware.NewMiddleware({});
@@ -634,6 +637,31 @@ post.NewProcessRequest(function(request, session) {
 			{Path: "/test", Code: 200, BodyMatch: `"Pre":"foobar"`},
 			{Path: "/test", Code: 200, BodyMatch: `"Post":"foobar"`},
 		}...)
+	})
+}
+
+func TestMiniRequestObject_ReconstructParams(t *testing.T) {
+	const exampleURL = "http://example.com/get?b=1&c=2&a=3"
+	r, _ := http.NewRequest(http.MethodGet, exampleURL, nil)
+	mr := MiniRequestObject{}
+
+	t.Run("Don't touch queries if no change on params", func(t *testing.T) {
+		mr.ReconstructParams(r)
+		assert.Equal(t, exampleURL, r.URL.String())
+	})
+
+	t.Run("Update params", func(t *testing.T) {
+		mr.AddParams = map[string]string{
+			"d": "4",
+		}
+		mr.DeleteParams = append(mr.DeleteHeaders, "b")
+		mr.ReconstructParams(r)
+
+		assert.Equal(t, url.Values{
+			"a": []string{"3"},
+			"c": []string{"2"},
+			"d": []string{"4"},
+		}, r.URL.Query())
 	})
 }
 

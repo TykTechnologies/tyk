@@ -112,7 +112,7 @@ func loadTestOAuthSpec() *APISpec {
 	return LoadAPI(buildTestOAuthSpec())[0]
 }
 
-func createTestOAuthClient(spec *APISpec, clientID string) {
+func createTestOAuthClient(spec *APISpec, clientID string) OAuthClient {
 	pID := CreatePolicy(func(p *user.Policy) {
 		p.ID = "TEST-4321"
 		p.AccessRights = map[string]user.AccessDefinition{
@@ -142,6 +142,7 @@ func createTestOAuthClient(spec *APISpec, clientID string) {
 		MetaData:          map[string]interface{}{"foo": "bar", "client": "meta"},
 	}
 	spec.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, "org-id-1", &testClient, false)
+	return testClient
 }
 
 func TestOauthMultipleAPIs(t *testing.T) {
@@ -440,15 +441,15 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 		if !ok {
 			t.Error("Key was not created (Can't find it)!")
 		}
-		if session.GetMetaData() == nil {
+		if session.MetaData == nil {
 			t.Fatal("Session metadata is nil")
 		}
-		if len(session.GetMetaData()) != 3 {
-			t.Fatal("Unexpected session metadata length", session.GetMetaData())
+		if len(session.MetaData) != 3 {
+			t.Fatal("Unexpected session metadata length", session.MetaData)
 		}
 
-		if !reflect.DeepEqual(session.GetMetaData(), map[string]interface{}{"foo": "keybar", "client": "meta", "key": "meta"}) {
-			t.Fatal("Metadata not match:", session.GetMetaData())
+		if !reflect.DeepEqual(session.MetaData, map[string]interface{}{"foo": "keybar", "client": "meta", "key": "meta"}) {
+			t.Fatal("Metadata not match:", session.MetaData)
 		}
 	})
 }
@@ -592,8 +593,8 @@ func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 			t.Error("Key was not created (Can't find it)!")
 		}
 
-		if !reflect.DeepEqual(session.GetPolicyIDs(), []string{"TEST-4321"}) {
-			t.Error("Policy not added to token!", session.GetPolicyIDs())
+		if !reflect.DeepEqual(session.PolicyIDs(), []string{"TEST-4321"}) {
+			t.Error("Policy not added to token!", session.PolicyIDs())
 		}
 	})
 }

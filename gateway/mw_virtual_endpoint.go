@@ -163,7 +163,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	// Encode the configuration data too
 	specAsJson := specToJson(d.Spec)
 
-	session := user.NewSessionState()
+	session := new(user.SessionState)
 
 	// Encode the session object (if not a pre-process)
 	if vmeta.UseSession {
@@ -227,9 +227,9 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	// Save the sesison data (if modified)
 	if vmeta.UseSession {
 		newMeta := mapStrsToIfaces(newResponseData.SessionMeta)
-		if !reflect.DeepEqual(session.GetMetaData(), newMeta) {
-			session.SetMetaData(newMeta)
-			ctxSetSession(r, session, "", true)
+		if !reflect.DeepEqual(session.MetaData, newMeta) {
+			session.MetaData = newMeta
+			ctxSetSession(r, session, true)
 		}
 	}
 

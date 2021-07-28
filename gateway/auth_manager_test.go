@@ -32,9 +32,9 @@ func TestAuthenticationAfterDeleteKey(t *testing.T) {
 		})[0]
 
 		key := CreateSession(func(s *user.SessionState) {
-			s.SetAccessRights(map[string]user.AccessDefinition{api.APIID: {
+			s.AccessRights = map[string]user.AccessDefinition{api.APIID: {
 				APIID: api.APIID,
-			}})
+			}}
 		})
 		deletePath := "/tyk/keys/" + key
 		authHeader := map[string]string{
@@ -74,9 +74,9 @@ func TestAuthenticationAfterUpdateKey(t *testing.T) {
 		key := generateToken("", "")
 
 		session := CreateStandardSession()
-		session.SetAccessRights(map[string]user.AccessDefinition{api.APIID: {
+		session.AccessRights = map[string]user.AccessDefinition{api.APIID: {
 			APIID: api.APIID,
-		}})
+		}}
 
 		GlobalSessionManager.UpdateSession(storage.HashKey(key), session, 0, config.Global().HashKeys)
 
@@ -88,9 +88,9 @@ func TestAuthenticationAfterUpdateKey(t *testing.T) {
 			{Path: "/get", Headers: authHeader, Code: http.StatusOK},
 		}...)
 
-		session.SetAccessRights(map[string]user.AccessDefinition{"dummy": {
+		session.AccessRights = map[string]user.AccessDefinition{"dummy": {
 			APIID: "dummy",
-		}})
+		}}
 
 		GlobalSessionManager.UpdateSession(storage.HashKey(key), session, 0, config.Global().HashKeys)
 
