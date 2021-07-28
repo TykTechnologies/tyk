@@ -74,6 +74,7 @@ func TestRLOpen(t *testing.T) {
 	ts.Gw.DRLManager.SetCurrentTokenValue(1)
 	ts.Gw.DRLManager.RequestTokenValue = 1
 
+	ts.Gw.DoReload()
 	chain := ts.getRLOpenChain(spec)
 	for a := 0; a <= 10; a++ {
 		recorder := httptest.NewRecorder()
@@ -112,6 +113,7 @@ func requestThrottlingTest(limiter string, testLevel string) func(t *testing.T) 
 		}
 
 		ts.Gw.SetConfig(globalCfg)
+		ts.Gw.DoReload()
 
 		var per, rate float64
 		var throttleRetryLimit int
@@ -174,7 +176,7 @@ func requestThrottlingTest(limiter string, testLevel string) func(t *testing.T) 
 					}
 				})
 
-				key := CreateSession(ts.Gw, func(s *user.SessionState) {
+				_, key := ts.CreateSession(func(s *user.SessionState) {
 					s.ApplyPolicies = []string{policyID}
 				})
 

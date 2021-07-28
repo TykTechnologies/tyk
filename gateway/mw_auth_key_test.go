@@ -204,9 +204,7 @@ func createAuthKeyAuthSession(isBench bool) *user.SessionState {
 	return session
 }
 
-func getAuthKeyChain(spec *APISpec) http.Handler {
-	ts := StartTest(nil)
-	defer ts.Close()
+func getAuthKeyChain(spec *APISpec, ts *Test) http.Handler {
 
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := ts.Gw.TykNewSingleHostReverseProxy(remote, spec, nil)
@@ -252,7 +250,7 @@ func TestBearerTokenAuthKeySession(t *testing.T) {
 
 	req.Header.Set("authorization", "Bearer "+customToken)
 
-	chain := getAuthKeyChain(spec)
+	chain := getAuthKeyChain(spec, ts)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 200 {
@@ -276,7 +274,7 @@ func BenchmarkBearerTokenAuthKeySession(b *testing.B) {
 
 	req.Header.Set("authorization", "Bearer "+customToken)
 
-	chain := getAuthKeyChain(spec)
+	chain := getAuthKeyChain(spec, ts)
 
 	for i := 0; i < b.N; i++ {
 		chain.ServeHTTP(recorder, req)
@@ -314,7 +312,7 @@ func TestMultiAuthBackwardsCompatibleSession(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	req := TestReq(t, "GET", fmt.Sprintf("/auth_key_test/?token=%s", customToken), nil)
 
-	chain := getAuthKeyChain(spec)
+	chain := getAuthKeyChain(spec, ts)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 200 {
@@ -336,7 +334,7 @@ func BenchmarkMultiAuthBackwardsCompatibleSession(b *testing.B) {
 	recorder := httptest.NewRecorder()
 	req := TestReq(b, "GET", fmt.Sprintf("/auth_key_test/?token=%s", customToken), nil)
 
-	chain := getAuthKeyChain(spec)
+	chain := getAuthKeyChain(spec, ts)
 
 	for i := 0; i < b.N; i++ {
 		chain.ServeHTTP(recorder, req)
@@ -383,7 +381,7 @@ func TestMultiAuthSession(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	req := TestReq(t, "GET", fmt.Sprintf("/auth_key_test/?token=%s", customToken), nil)
 
-	chain := getAuthKeyChain(spec)
+	chain := getAuthKeyChain(spec, ts)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 200 {
