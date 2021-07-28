@@ -20,12 +20,13 @@ var _ imports.HTTPCall = (*HTTPCall)(nil)
 var httpCalloutID atomic.Int32
 
 type HTTPCall struct {
-	calloutID int32
-	log       *logrus.Entry
-	response  *http.Response
-	body      *buffers.IO
-	client    *http.Client
-	newBuffer func() *buffers.IO
+	calloutID, contextID int32
+	log                  *logrus.Entry
+	response             *http.Response
+	body                 *buffers.IO
+	client               *http.Client
+	newBuffer            func() *buffers.IO
+	exports              x.Exports
 }
 
 func (h *HTTPCall) setupClient(timeout int32) {
@@ -72,6 +73,10 @@ func (h *HTTPCall) HttpCall(reqURL string, headers common.HeaderMap, body common
 	h.body.Reset()
 	io.Copy(h.body, res.Body)
 	h.calloutID = calloutID
+	go h.exports.ProxyOnHttpCallResponse(
+		h.contextID, calloutID, int32(len(res.Header)), int32(h.body.Len()),
+		int32(len(res.Trailer)),
+	)
 	return calloutID, x.WasmResultOk
 }
 

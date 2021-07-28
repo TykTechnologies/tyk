@@ -158,6 +158,8 @@ func (h *H) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interfac
 	defer abi.Instance.Unlock()
 
 	exports := abi.GetExports()
+	abi.Imports.(*Wasm).HTTPCall.exports = exports
+	abi.Imports.(*Wasm).HTTPCall.contextID = httpContextID
 	ctx := &ExecContext{
 		Log:         mwLog,
 		ContextID:   httpContextID,
