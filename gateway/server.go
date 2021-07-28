@@ -389,8 +389,7 @@ func buildConnStr(resource string, conf config.Config) string {
 
 func (gw *Gateway) syncAPISpecs() (int, error) {
 	loader := APIDefinitionLoader{gw}
-	gw.apisMu.Lock()
-	defer gw.apisMu.Unlock()
+
 	var s []*APISpec
 	if gw.GetConfig().UseDBAppConfigs {
 		connStr := buildConnStr("/system/apis", gw.GetConfig())
@@ -437,10 +436,13 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 		filter = append(filter, v)
 	}
 
+	gw.apisMu.Lock()
 	gw.apiSpecs = filter
+	apiLen := len(gw.apiSpecs)
 	tlsConfigCache.Flush()
+	gw.apisMu.Unlock()
 
-	return len(gw.apiSpecs), nil
+	return apiLen, nil
 }
 
 func (gw *Gateway) syncPolicies() (count int, err error) {
