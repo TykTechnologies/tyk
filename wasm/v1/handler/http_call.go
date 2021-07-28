@@ -73,11 +73,17 @@ func (h *HTTPCall) HttpCall(reqURL string, headers common.HeaderMap, body common
 	h.body.Reset()
 	io.Copy(h.body, res.Body)
 	h.calloutID = calloutID
-	go h.exports.ProxyOnHttpCallResponse(
-		h.contextID, calloutID, int32(len(res.Header)), int32(h.body.Len()),
-		int32(len(res.Trailer)),
-	)
 	return calloutID, x.WasmResultOk
+}
+
+func (h *HTTPCall) ProxyOnHttpCallResponse() error {
+	if h.response != nil {
+		return h.exports.ProxyOnHttpCallResponse(
+			h.contextID, h.calloutID, int32(len(h.response.Header)), int32(h.body.Len()),
+			int32(len(h.response.Trailer)),
+		)
+	}
+	return nil
 }
 
 func (h *HTTPCall) GetHttpCallResponseHeaders() common.HeaderMap {

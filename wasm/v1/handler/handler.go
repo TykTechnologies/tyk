@@ -82,58 +82,6 @@ func New(
 	}, nil
 }
 
-func (h *H) Handle(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// create a http context
-		httpContextID := h.id.Inc()
-
-		mwLog := h.log.WithField("httpContextID", httpContextID)
-		ctxBuf, releaseBuffers := safeBuffer()
-		defer releaseBuffers()
-
-		abi := h.abi(
-			// set request
-			func(n *Wasm) {
-				n.Logger.L = mwLog
-				n.Request.Request = r
-				n.Response.Response = w
-				n.Plugin.Config = h.mw.Plugin
-				n.Plugin.Instance = h.mw.Instance
-				n.Plugin.NewBuffer = ctxBuf
-
-				n.HTTPCall.log = mwLog
-				n.HTTPCall.newBuffer = ctxBuf
-			},
-		)
-		abi.Instance.Lock(abi)
-		defer abi.Instance.Unlock()
-
-		exports := abi.GetExports()
-		ctx := &ExecContext{
-			Log:         mwLog,
-			ContextID:   httpContextID,
-			RootContext: h.rootContext,
-			Exports:     exports,
-			Request:     r,
-			Response:    w,
-		}
-		if err := ctx.Before(); err != nil {
-			mwLog.WithError(err).Error("ProxyOnContextCreate")
-			h.E500(w, r)
-			return
-		}
-		//make sure we destroy the context when we are done
-		defer func() {
-			if err := ctx.After(); err != nil {
-				mwLog.WithError(err).Error("ProxyOnContextFinalize")
-			}
-		}()
-		if ctx.Apply() {
-			next.ServeHTTP(w, r)
-		}
-	})
-}
-
 func (h *H) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) {
 	// create a http context
 	httpContextID := h.id.Inc()
@@ -159,17 +107,14 @@ func (h *H) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interfac
 	defer abi.Instance.Unlock()
 
 	exports := abi.GetExports()
-	abi.Imports.(*Wasm).HTTPCall.exports = exports
-	abi.Imports.(*Wasm).HTTPCall.contextID = httpContextID
-	err := exports.ProxyOnContextCreate(httpContextID, h.rootContext)
-	if err != nil {
-		mwLog.WithError(err).Error("Failed creating http context")
-		return err, http.StatusInternalServerError
-	}
+	wsm := abi.Imports.(*Wasm)
+	wsm.HTTPCall.exports = exports
+	wsm.HTTPCall.contextID = h.rootContext
 	ctx := &ExecContext{
 		Log:         mwLog,
 		ContextID:   httpContextID,
 		RootContext: h.rootContext,
+		Wasm:        wsm,
 		Exports:     exports,
 		Request:     r,
 		Response:    w,
@@ -207,6 +152,7 @@ type ExecContext struct {
 	Log         *logrus.Entry
 	ContextID   int32
 	RootContext int32
+	Wasm        *Wasm
 	Exports     proxywasm.Exports
 	Request     *http.Request
 	Response    http.ResponseWriter
@@ -251,6 +197,9 @@ func (e *ExecContext) httpRequest() []applyFn {
 			a, err := e.Exports.ProxyOnRequestHeaders(
 				e.ContextID, int32(len(e.Request.Header)), 0,
 			)
+			if err == nil {
+				err = e.Wasm.ProxyOnHttpCallResponse()
+			}
 			return a, "ProxyOnHttpRequestHeaders", err
 		},
 		func() (action proxywasm.Action, name string, err error) {

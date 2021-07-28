@@ -28,7 +28,7 @@ func New() *IO {
 }
 
 func (h *IO) Bytes() []byte {
-	return h.Bytes()
+	return h.buf.Bytes()
 }
 
 func (h *IO) Write(p []byte) (int, error) {
