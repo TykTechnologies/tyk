@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -46,20 +47,34 @@ func (h *HTTPCall) HttpCall(reqURL string, headers common.HeaderMap, body common
 		"url":       reqURL,
 		"calloutID": calloutID,
 	})
-	u, err := url.Parse(reqURL)
+
+	method, _ := headers.Get(":method")
+	path, _ := headers.Get(":path")
+
+	headers.Del(":method")
+	headers.Del(":path")
+
+	u, err := url.Parse(fmt.Sprintf("%s%s", reqURL, path))
 	if err != nil {
 		log.WithError(err).Error("HttpCall fail to parse url")
 		return 0, x.WasmResultBadArgument
 	}
+
 	h.setupClient(timeoutMilliseconds)
+
 	req, err := http.NewRequest(
-		http.MethodGet, u.String(),
+		method, u.String(),
 		bytes.NewReader(body.Bytes()),
 	)
 	if err != nil {
 		log.WithError(err).Error("failed to create new request")
 		return 0, x.WasmResultInternalFailure
 	}
+
+	headers.Range(func(k string, v string) bool {
+		req.Header.Set(k, v)
+		return true
+	})
 	res, err := h.client.Do(req)
 	if err != nil {
 		log.WithError(err).Error("failed to make client call")
