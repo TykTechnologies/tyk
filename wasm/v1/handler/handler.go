@@ -86,6 +86,7 @@ func (h *H) Handle(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// create a http context
 		httpContextID := h.id.Inc()
+
 		mwLog := h.log.WithField("httpContextID", httpContextID)
 		ctxBuf, releaseBuffers := safeBuffer()
 		defer releaseBuffers()
@@ -160,6 +161,11 @@ func (h *H) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interfac
 	exports := abi.GetExports()
 	abi.Imports.(*Wasm).HTTPCall.exports = exports
 	abi.Imports.(*Wasm).HTTPCall.contextID = httpContextID
+	err := exports.ProxyOnContextCreate(h.rootContext, httpContextID)
+	if err != nil {
+		mwLog.WithError(err).Error("Failed creating http context")
+		return err, http.StatusInternalServerError
+	}
 	ctx := &ExecContext{
 		Log:         mwLog,
 		ContextID:   httpContextID,
