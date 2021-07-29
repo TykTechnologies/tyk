@@ -146,18 +146,18 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		templateName := "error_" + strconv.Itoa(errCode) + "." + templateExtension
 
 		// Try to use an error template that matches the HTTP error code and the content type: 500.json, 400.xml, etc.
-		tmpl := templates.Lookup(templateName)
+		tmpl := e.Gw.templates.Lookup(templateName)
 
 		// Fallback to a generic error template, but match the content type: error.json, error.xml, etc.
 		if tmpl == nil {
 			templateName = defaultTemplateName + "." + templateExtension
-			tmpl = templates.Lookup(templateName)
+			tmpl = e.Gw.templates.Lookup(templateName)
 		}
 
 		// If no template is available for this content type, fallback to "error.json".
 		if tmpl == nil {
 			templateName = defaultTemplateName + "." + defaultTemplateFormat
-			tmpl = templates.Lookup(templateName)
+			tmpl = e.Gw.templates.Lookup(templateName)
 			w.Header().Set(headers.ContentType, defaultContentType)
 			response.Header.Set(headers.ContentType, defaultContentType)
 
@@ -188,7 +188,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 				apiError.Message = template.HTML(errMsg)
 
 				//we look up in the last defined templateName to obtain the template.
-				rawTmpl := templatesRaw.Lookup(templateName)
+				rawTmpl := e.Gw.templatesRaw.Lookup(templateName)
 				tmplExecutor = rawTmpl
 			}
 

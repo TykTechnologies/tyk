@@ -59,12 +59,10 @@ import (
 )
 
 var (
-	log          = logger.Get()
-	mainLog      = log.WithField("prefix", "main")
-	pubSubLog    = log.WithField("prefix", "pub-sub")
-	rawLog       = logger.GetRaw()
-	templates    *template.Template
-	templatesRaw *textTemplate.Template
+	log       = logger.Get()
+	mainLog   = log.WithField("prefix", "main")
+	pubSubLog = log.WithField("prefix", "pub-sub")
+	rawLog    = logger.GetRaw()
 
 	memProfFile         *os.File
 	NewRelicApplication newrelic.Application
@@ -167,6 +165,9 @@ type Gateway struct {
 	// map[bundleName]map[fileName]fileContent used for tests
 	TestBundles  map[string]map[string]string
 	TestBundleMu sync.Mutex
+
+	templates    *template.Template
+	templatesRaw *textTemplate.Template
 }
 
 func NewGateway(config config.Config) *Gateway {
@@ -329,11 +330,9 @@ func (gw *Gateway) setupGlobals(ctx context.Context) {
 
 	// Load all the files that have the "error" prefix.
 	//	gwConfig.TemplatePath = "/Users/sredny/go/src/github.com/TykTechnologies/tyk/templates"
-
 	templatesDir := filepath.Join(gwConfig.TemplatePath, "error*")
-	templates = template.Must(template.ParseGlob(templatesDir))
-	templatesRaw = textTemplate.Must(textTemplate.ParseGlob(templatesDir))
-
+	gw.templates = template.Must(template.ParseGlob(templatesDir))
+	gw.templatesRaw = textTemplate.Must(textTemplate.ParseGlob(templatesDir))
 	gw.CoProcessInit()
 
 	// Get the notifier ready

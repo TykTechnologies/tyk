@@ -1009,16 +1009,17 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 	}
 
 	configs := s.Gw.GetConfig()
+
 	go storage.ConnectToRedis(ctx, func() {
 		if s.Gw.OnConnect != nil {
 			s.Gw.OnConnect()
 		}
 	}, &configs)
+
 	for {
 		if storage.Connected() {
 			break
 		}
-
 		time.Sleep(10 * time.Millisecond)
 	}
 
@@ -1088,6 +1089,7 @@ func (s *Test) Close() {
 	}
 
 	os.RemoveAll(s.Gw.GetConfig().AppPath)
+	//s.Gw = nil
 }
 
 func (s *Test) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, error) {

@@ -113,7 +113,6 @@ func requestThrottlingTest(limiter string, testLevel string) func(t *testing.T) 
 		}
 
 		ts.Gw.SetConfig(globalCfg)
-		ts.Gw.DoReload()
 
 		var per, rate float64
 		var throttleRetryLimit int

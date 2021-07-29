@@ -154,7 +154,7 @@ func TestProcessKeySpaceChanges_ResetQuota(t *testing.T) {
 		KeyPrefix:        "rpc.listener.",
 		SuppressRegister: true,
 		HashKeys:         false,
-		Gw: g.Gw,
+		Gw:               g.Gw,
 	}
 
 	g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
