@@ -269,7 +269,6 @@ func (s *Test) reloadSimulation() {
 		delete(s.Gw.apisByID, "_")
 		s.Gw.apisMu.Unlock()
 		s.gwMu.Unlock()
-
 		time.Sleep(5 * time.Millisecond)
 	}
 }
@@ -1085,6 +1084,12 @@ func (s *Test) Close() {
 		s.Gw.SetConfig(gwConfig)
 	}
 
+	// if jsvm enabled we need to unmount to prevent high memory consumption
+	if s.Gw.GetConfig().EnableJSVM{
+		s.Gw.GlobalEventsJSVM.VM = nil
+	}
+
+	s.Gw.ReloadTestCase = nil
 	ctxShutDown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -1095,8 +1100,11 @@ func (s *Test) Close() {
 		log.Info("server exited properly")
 	}
 
+	s.Gw.analytics.Stop()
+	s.Gw.ReloadTestCase.Disable()
+
 	os.RemoveAll(s.Gw.GetConfig().AppPath)
-	//s.Gw = nil
+//	s.Gw = nil
 }
 
 func (s *Test) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, error) {
