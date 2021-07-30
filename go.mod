@@ -24,6 +24,7 @@ require (
 	github.com/certifi/gocertifi v0.0.0-20190905060710-a5e0173ced67 // indirect
 	github.com/clbanning/mxj v1.8.4
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
+	github.com/dgraph-io/badger/v3 v3.2103.1 // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/emanoelxavier/openid2go v0.0.0-20190718021401-6345b638bfc9 // indirect
 	github.com/evalphobia/logrus_sentry v0.8.2
@@ -82,7 +83,7 @@ require (
 	github.com/xenolf/lego v0.3.2-0.20170618175828-28ead50ff1ca // indirect
 	golang.org/x/crypto v0.0.0-20210314154223-e6e6c4f2bb5b
 	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
-	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
+	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 	google.golang.org/appengine v1.6.1 // indirect
 	google.golang.org/grpc v1.29.1
 	gopkg.in/Masterminds/sprig.v2 v2.21.0
