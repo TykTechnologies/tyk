@@ -252,7 +252,7 @@ func (s *Test) emptyRedis() error {
 // simulate reloads in the background, i.e. writes to
 // global variables that should not be accessed in a
 // racy way like the policies and api specs maps.
-func (s *Test) reloadSimulation() {
+func (s *Test) reloadSimulation(ctx context.Context) {
 	for {
 		s.gwMu.Lock()
 		s.Gw.policiesMu.Lock()
@@ -1058,7 +1058,7 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 	//	go s.Gw.reloadQueueLoop(ctx)
 	go s.Gw.reloadLoop(ctx, s.Gw.ReloadTestCase.ReloadTicker(), s.Gw.ReloadTestCase.OnReload)
 	go s.Gw.reloadQueueLoop(ctx, s.Gw.ReloadTestCase.OnQueued)
-	go s.reloadSimulation()
+	go s.reloadSimulation(ctx)
 }
 
 func (s *Test) Do(tc test.TestCase) (*http.Response, error) {
@@ -1089,7 +1089,6 @@ func (s *Test) Close() {
 		s.Gw.GlobalEventsJSVM.VM = nil
 	}
 
-	s.Gw.ReloadTestCase = nil
 	ctxShutDown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -1099,12 +1098,12 @@ func (s *Test) Close() {
 	} else {
 		log.Info("server exited properly")
 	}
+	s.HttpHandler = nil
+	s.TestServerRouter = nil
 
 	s.Gw.analytics.Stop()
-	s.Gw.ReloadTestCase.Disable()
-
 	os.RemoveAll(s.Gw.GetConfig().AppPath)
-	//	s.Gw = nil
+	//s.Gw = nil
 }
 
 func (s *Test) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, error) {
