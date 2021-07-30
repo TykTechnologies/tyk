@@ -1085,7 +1085,7 @@ func (s *Test) Close() {
 	}
 
 	// if jsvm enabled we need to unmount to prevent high memory consumption
-	if s.Gw.GetConfig().EnableJSVM{
+	if s.Gw.GetConfig().EnableJSVM {
 		s.Gw.GlobalEventsJSVM.VM = nil
 	}
 
@@ -1104,7 +1104,7 @@ func (s *Test) Close() {
 	s.Gw.ReloadTestCase.Disable()
 
 	os.RemoveAll(s.Gw.GetConfig().AppPath)
-//	s.Gw = nil
+	//	s.Gw = nil
 }
 
 func (s *Test) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, error) {
