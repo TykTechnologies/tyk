@@ -913,6 +913,11 @@ func (s *Test) Start(genConf func(globalConf *config.Config)) *Gateway {
 	return s.Gw
 }
 
+// pubSubOnce for testing we only need to connect one time
+// until stop pubSub is implemented, otherwise
+// we would endup spawning redis connections
+var pubSubOnce sync.Once
+
 func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.Config)) {
 	var gwConfig config.Config
 	if err := config.WriteDefault("", &gwConfig); err != nil {
@@ -1030,9 +1035,11 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 	}
 
 	// Start listening for reload messages
-	if !s.Gw.GetConfig().SuppressRedisSignalReload {
-		go s.Gw.startPubSubLoop()
-	}
+	pubSubOnce.Do(func() {
+		if !s.Gw.GetConfig().SuppressRedisSignalReload {
+			go s.Gw.startPubSubLoop()
+		}
+	})
 
 	if slaveOptions := s.Gw.GetConfig().SlaveOptions; slaveOptions.UseRPC {
 		mainLog.Debug("Starting RPC reload listener")
