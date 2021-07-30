@@ -254,22 +254,27 @@ func (s *Test) emptyRedis() error {
 // racy way like the policies and api specs maps.
 func (s *Test) reloadSimulation(ctx context.Context) {
 	for {
-		s.gwMu.Lock()
-		s.Gw.policiesMu.Lock()
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			s.gwMu.Lock()
+			s.Gw.policiesMu.Lock()
 
-		s.Gw.policiesByID["_"] = user.Policy{}
-		delete(s.Gw.policiesByID, "_")
-		s.Gw.policiesMu.Unlock()
+			s.Gw.policiesByID["_"] = user.Policy{}
+			delete(s.Gw.policiesByID, "_")
+			s.Gw.policiesMu.Unlock()
 
-		s.Gw.apisMu.Lock()
-		//	old := s.Gw.apiSpecs
-		//	s.Gw.apiSpecs = append(old, nil)
-		//	s.Gw.apiSpecs = old
-		s.Gw.apisByID["_"] = nil
-		delete(s.Gw.apisByID, "_")
-		s.Gw.apisMu.Unlock()
-		s.gwMu.Unlock()
-		time.Sleep(5 * time.Millisecond)
+			s.Gw.apisMu.Lock()
+			//	old := s.Gw.apiSpecs
+			//	s.Gw.apiSpecs = append(old, nil)
+			//	s.Gw.apiSpecs = old
+			s.Gw.apisByID["_"] = nil
+			delete(s.Gw.apisByID, "_")
+			s.Gw.apisMu.Unlock()
+			s.gwMu.Unlock()
+			time.Sleep(5 * time.Millisecond)
+		}
 	}
 }
 
@@ -1098,12 +1103,19 @@ func (s *Test) Close() {
 	} else {
 		log.Info("server exited properly")
 	}
+
+	// force just in case
+	s.HttpHandler.Close()
 	s.HttpHandler = nil
 	s.TestServerRouter = nil
 
 	s.Gw.analytics.Stop()
 	os.RemoveAll(s.Gw.GetConfig().AppPath)
-	//s.Gw = nil
+	s.gwMu.Lock()
+	s.Gw = nil
+	s.gwMu.Unlock()
+
+	runtime.GC()
 }
 
 func (s *Test) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, error) {
