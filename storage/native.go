@@ -1,6 +1,9 @@
 package storage
 
 import (
+	"path/filepath"
+
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/dgraph-io/badger/v3"
 )
 
@@ -14,6 +17,37 @@ type nativeDB struct {
 	rate *badger.DB
 
 	general *badger.DB
+}
+
+func SetupNative() {
+	g := config.Global().Storage
+	if g.Type == "native" {
+		// create general database
+		{
+			path := filepath.Join(g.Host, "general")
+			o := badger.DefaultOptions(path)
+			db, err := badger.Open(o)
+			if err != nil {
+				// This is fatal if we can't open the database we need to make sure we have
+				// a working database to proceed
+				log.Fatal("Failed to setup general database", err)
+			}
+			simple.general = db
+		}
+		{
+			path := filepath.Join(g.Host, "rates")
+			o := badger.DefaultOptions(path)
+			// Tunable value for rolling window use.
+			o.NumVersionsToKeep = 200
+			db, err := badger.Open(o)
+			if err != nil {
+				// This is fatal if we can't open the database we need to make sure we have
+				// a working database to proceed
+				log.Fatal("Failed to setup rates limiting database", err)
+			}
+			simple.rate = db
+		}
+	}
 }
 
 var _ Handler = (*Native)(nil)
