@@ -132,6 +132,10 @@ func (o *Options) FixKey(key string) string {
 	return o.KeyPrefix + o.hashKey(key)
 }
 
+func (o *Options) CleanKey(key string) string {
+	return strings.TrimPrefix(key, o.KeyPrefix)
+}
+
 func (o *Options) hashKey(key string) string {
 	if !o.HashKeys {
 		// Not hashing? Return the raw key

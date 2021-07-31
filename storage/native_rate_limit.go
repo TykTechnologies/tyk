@@ -29,7 +29,7 @@ func (r *rate) SetRollingWindow(key string, per int64, _ string, _ bool) (total 
 			result = append(result, struct{}{})
 		}
 		e := badger.NewEntry([]byte(key), []byte{})
-		e.ExpiresAt = timestamp(rightnow.Add(time.Duration(per) * time.Second))
+		e.WithTTL(time.Duration(per) * time.Second)
 		return txn.SetEntry(e)
 	})
 	if err != nil {
