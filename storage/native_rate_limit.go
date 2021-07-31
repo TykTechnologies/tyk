@@ -47,7 +47,7 @@ func timestamp(ts time.Time) uint64 {
 func (r *rate) GetRollingWindow(key string, per int64, pipeline bool) (total int, result []interface{}) {
 	rightnow := time.Now()
 	onePeriodAgo := rightnow.Add(time.Duration(-1*per) * time.Second)
-	err := r.db.Update(func(txn *badger.Txn) error {
+	err := r.db.View(func(txn *badger.Txn) error {
 		from := timestamp(onePeriodAgo)
 		it := txn.NewKeyIterator([]byte(key), badger.IteratorOptions{
 			AllVersions: true,
