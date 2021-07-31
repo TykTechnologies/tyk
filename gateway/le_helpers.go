@@ -19,7 +19,9 @@ func StoreLEState(m *letsencrypt.Manager) {
 
 	log.Debug("[SSL] --> Connecting to DB")
 
-	store := storage.RedisCluster{KeyPrefix: LEKeyPrefix}
+	store := storage.New(storage.Options{
+		KeyPrefix: LEKeyPrefix,
+	})
 	connected := store.Connect()
 
 	log.Debug("--> Connected to DB")
@@ -42,7 +44,9 @@ func StoreLEState(m *letsencrypt.Manager) {
 func GetLEState(m *letsencrypt.Manager) {
 	checkKey := "cache"
 
-	store := storage.RedisCluster{KeyPrefix: LEKeyPrefix}
+	store := storage.New(storage.Options{
+		KeyPrefix: LEKeyPrefix,
+	})
 
 	connected := store.Connect()
 	log.Debug("[SSL] --> Connected to DB")

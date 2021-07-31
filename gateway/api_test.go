@@ -1367,7 +1367,7 @@ func TestUpdateOauthClientHandler(t *testing.T) {
 func TestGroupResetHandler(t *testing.T) {
 	didSubscribe := make(chan bool)
 	didReload := make(chan bool)
-	cacheStore := storage.RedisCluster{}
+	cacheStore := storage.New(storage.Options{})
 	cacheStore.Connect()
 
 	go func() {

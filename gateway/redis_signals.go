@@ -52,7 +52,7 @@ func (n *Notification) Sign() {
 }
 
 func startPubSubLoop() {
-	cacheStore := storage.RedisCluster{}
+	cacheStore := storage.New(storage.Options{})
 	cacheStore.Connect()
 	// On message, synchronise
 	for {
@@ -195,7 +195,7 @@ func isPayloadSignatureValid(notification Notification) bool {
 
 // RedisNotifier will use redis pub/sub channels to send notifications
 type RedisNotifier struct {
-	store   *storage.RedisCluster
+	store   storage.Notify
 	channel string
 }
 

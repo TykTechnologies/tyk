@@ -71,7 +71,9 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 		return err
 	}
 
-	w.store = &storage.RedisCluster{KeyPrefix: "webhook.cache."}
+	w.store = storage.New(storage.Options{
+		KeyPrefix: "webhook.cache.",
+	})
 	w.store.Connect()
 
 	// Pre-load template on init

@@ -183,16 +183,22 @@ func setupGlobals(ctx context.Context) {
 		if config.Global().ManagementNode {
 			mainLog.Warn("Running Uptime checks in a management node.")
 		}
-		healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:", IsAnalytics: true}
-		InitHostCheckManager(ctx, &healthCheckStore)
+		healthCheckStore := storage.New(storage.Options{
+			KeyPrefix: "host-checker:", IsAnalytics: true,
+		})
+		InitHostCheckManager(ctx, healthCheckStore)
 	}
 
 	initHealthCheck(ctx)
 
-	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
-	GlobalSessionManager.Init(&redisStore)
+	redisStore := storage.New(storage.Options{
+		KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys,
+	})
+	GlobalSessionManager.Init(redisStore)
 
-	versionStore := storage.RedisCluster{KeyPrefix: "version-check-"}
+	versionStore := storage.New(storage.Options{
+		KeyPrefix: "version-check-",
+	})
 	versionStore.Connect()
 	_ = versionStore.SetKey("gateway", VERSION, 0)
 
@@ -202,13 +208,17 @@ func setupGlobals(ctx context.Context) {
 		config.SetGlobal(globalConf)
 		mainLog.Debug("Setting up analytics DB connection")
 
-		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true}
-		analytics.Store = &analyticsStore
+		analyticsStore := storage.New(storage.Options{
+			KeyPrefix: "analytics-", IsAnalytics: true,
+		})
+		analytics.Store = analyticsStore
 		analytics.Init(globalConf)
 
 		redisPurgeOnce.Do(func() {
-			store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true}
-			redisPurger := RedisPurger{Store: &store}
+			store := storage.New(storage.Options{
+				KeyPrefix: "analytics-", IsAnalytics: true,
+			})
+			redisPurger := RedisPurger{Store: store}
 			go redisPurger.PurgeLoop(ctx)
 		})
 
@@ -216,9 +226,11 @@ func setupGlobals(ctx context.Context) {
 			mainLog.Debug("Using RPC cache purge")
 
 			rpcPurgeOnce.Do(func() {
-				store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true}
+				store := storage.New(storage.Options{
+					KeyPrefix: "analytics-", IsAnalytics: true,
+				})
 				purger := rpc.Purger{
-					Store: &store,
+					Store: store,
 				}
 				purger.Connect()
 				go purger.PurgeLoop(ctx)
@@ -236,7 +248,7 @@ func setupGlobals(ctx context.Context) {
 
 	// Get the notifier ready
 	mainLog.Debug("Notifier will not work in hybrid mode")
-	mainNotifierStore := &storage.RedisCluster{}
+	mainNotifierStore := storage.New(storage.Options{})
 	mainNotifierStore.Connect()
 	MainNotifier = RedisNotifier{mainNotifierStore, RedisPubSubChannel}
 
@@ -535,7 +547,10 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 	prefix := generateOAuthPrefix(spec.APIID)
 	storageManager := getGlobalStorageHandler(prefix, false)
 	storageManager.Connect()
-	osinStorage := &RedisOsinStorageInterface{storageManager, GlobalSessionManager, &storage.RedisCluster{KeyPrefix: prefix, HashKeys: false}, spec.OrgID}
+	osinStorage := &RedisOsinStorageInterface{storageManager, GlobalSessionManager,
+		storage.New(storage.Options{
+			KeyPrefix: prefix, HashKeys: false,
+		}), spec.OrgID}
 
 	osinServer := TykOsinNewServer(serverConfig, osinStorage)
 
@@ -1245,7 +1260,9 @@ func getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 			HashKeys:  hashKeys,
 		}
 	}
-	return &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys}
+	return storage.New(storage.Options{
+		KeyPrefix: keyPrefix, HashKeys: hashKeys,
+	})
 }
 
 func Start() {

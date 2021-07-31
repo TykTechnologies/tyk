@@ -18,7 +18,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/storage"
 )
 
 const sampleUptimeTestAPI = `{
@@ -156,7 +155,7 @@ func TestHostChecker(t *testing.T) {
 		t.Error("Should set defaults", GlobalHostChecker.checker.checkTimeout)
 	}
 
-	redisStore := GlobalHostChecker.store.(*storage.RedisCluster)
+	redisStore := GlobalHostChecker.store
 	if ttl, _ := redisStore.GetKeyTTL(PoolerHostSentinelKeyPrefix + testHttpFailure); int(ttl) != GlobalHostChecker.checker.checkTimeout*GlobalHostChecker.checker.sampleTriggerLimit {
 		t.Error("HostDown expiration key should be checkTimeout + 1", ttl)
 	}

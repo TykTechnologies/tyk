@@ -34,7 +34,9 @@ func LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 	tagList := getTagListAsString()
 	checkKey := BackupApiKeyBase + tagList
 
-	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix}
+	store := storage.New(storage.Options{
+		KeyPrefix: RPCKeyPrefix,
+	})
 	connected := store.Connect()
 	log.Info("[RPC] --> Loading API definitions from backup")
 
@@ -64,7 +66,9 @@ func saveRPCDefinitionsBackup(list string) error {
 
 	log.Info("--> Connecting to DB")
 
-	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix}
+	store := storage.New(storage.Options{
+		KeyPrefix: RPCKeyPrefix,
+	})
 	connected := store.Connect()
 
 	log.Info("--> Connected to DB")
@@ -87,7 +91,9 @@ func LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
 	tagList := getTagListAsString()
 	checkKey := BackupPolicyKeyBase + tagList
 
-	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix}
+	store := storage.New(storage.Options{
+		KeyPrefix: RPCKeyPrefix,
+	})
 
 	connected := store.Connect()
 	log.Info("[RPC] Loading Policies from backup")
@@ -124,7 +130,9 @@ func saveRPCPoliciesBackup(list string) error {
 
 	log.Info("--> Connecting to DB")
 
-	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix}
+	store := storage.New(storage.Options{
+		KeyPrefix: RPCKeyPrefix,
+	})
 	connected := store.Connect()
 
 	log.Info("--> Connected to DB")

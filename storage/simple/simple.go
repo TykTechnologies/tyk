@@ -5,5 +5,6 @@ import (
 )
 
 type Simple struct {
-	db *badger.DB
+	KeyPrefix string
+	db        *badger.DB
 }

@@ -18,6 +18,12 @@ type LDAPStorageHandler struct {
 	store                *ldap.LDAPConnection
 }
 
+func (LDAPStorageHandler) GetKeyTTL(keyName string) (ttl int64, err error) { return 0, nil }
+func (LDAPStorageHandler) AppendToSetPipelined(string, [][]byte)           {}
+func (LDAPStorageHandler) Publish(channel, message string) error           { return nil }
+func (LDAPStorageHandler) StartPubSubHandler(channel string, callback func(interface{})) error {
+	return nil
+}
 func (l *LDAPStorageHandler) LoadConfFromMeta(meta map[string]interface{}) {
 	l.LDAPServer = meta["ldap_server"].(string)
 	l.LDAPPort = uint16(meta["ldap_port"].(float64))

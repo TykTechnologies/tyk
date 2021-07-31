@@ -1576,7 +1576,9 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 							&RedisOsinStorageInterface{
 								storageManager,
 								GlobalSessionManager,
-								&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false},
+								storage.New(storage.Options{
+									KeyPrefix: prefix, HashKeys: false,
+								}),
 								apiSpec.OrgID}),
 					}
 				}
@@ -1960,7 +1962,9 @@ func getOauthClientDetails(keyName, apiID string) (interface{}, int) {
 				&RedisOsinStorageInterface{
 					storageManager,
 					GlobalSessionManager,
-					&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false},
+					storage.New(storage.Options{
+						KeyPrefix: prefix, HashKeys: false,
+					}),
 					apiSpec.OrgID}),
 		}
 	}
@@ -2160,7 +2164,9 @@ func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 
 	keyPrefix := "cache-" + apiID
 	matchPattern := keyPrefix + "*"
-	store := storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true}
+	store := storage.New(storage.Options{
+		KeyPrefix: keyPrefix, IsCache: true,
+	})
 
 	if ok := store.DeleteScanMatch(matchPattern); !ok {
 		err := errors.New("scan/delete failed")

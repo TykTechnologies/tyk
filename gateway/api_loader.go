@@ -39,9 +39,15 @@ type ChainObject struct {
 
 func prepareStorage() generalStores {
 	var gs generalStores
-	gs.redisStore = &storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
-	gs.redisOrgStore = &storage.RedisCluster{KeyPrefix: "orgkey."}
-	gs.healthStore = &storage.RedisCluster{KeyPrefix: "apihealth."}
+	gs.redisStore = storage.New(storage.Options{
+		KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys,
+	})
+	gs.redisOrgStore = storage.New(storage.Options{
+		KeyPrefix: "orgkey.",
+	})
+	gs.healthStore = storage.New(storage.Options{
+		KeyPrefix: "apihealth.",
+	})
 	gs.rpcAuthStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
 	gs.rpcOrgStore = &RPCStorageHandler{KeyPrefix: "orgkey."}
 	GlobalSessionManager.Init(gs.redisStore)
@@ -293,7 +299,9 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	}
 
 	keyPrefix := "cache-" + spec.APIID
-	cacheStore := storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true}
+	cacheStore := storage.New(storage.Options{
+		KeyPrefix: keyPrefix, IsCache: true,
+	})
 	cacheStore.Connect()
 
 	var chain http.Handler
@@ -457,7 +465,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	}
 	//Do not add middlewares after cache middleware.
 	//It will not get executed
-	mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: &cacheStore})
+	mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: cacheStore})
 
 	chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid}})
 

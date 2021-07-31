@@ -104,7 +104,9 @@ type SafeHealthCheck struct {
 func gatherHealthChecks() {
 	allInfos := SafeHealthCheck{info: make(map[string]HealthCheckItem, 3)}
 
-	redisStore := storage.RedisCluster{KeyPrefix: "livenesscheck-"}
+	redisStore := storage.New(storage.Options{
+		KeyPrefix: "livenesscheck-",
+	})
 
 	key := "tyk-liveness-probe"
 

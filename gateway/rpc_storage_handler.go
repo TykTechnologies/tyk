@@ -12,7 +12,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
-	"github.com/go-redis/redis/v8"
 
 	"github.com/sirupsen/logrus"
 )
@@ -94,6 +93,9 @@ type RPCStorageHandler struct {
 	HashKeys         bool
 	SuppressRegister bool
 }
+
+func (RPCStorageHandler) AppendToSetPipelined(string, [][]byte)           {}
+func (RPCStorageHandler) GetKeyTTL(keyName string) (ttl int64, err error) { return 0, nil }
 
 var RPCGlobalCache = cache.New(30*time.Second, 15*time.Second)
 
@@ -500,7 +502,7 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 }
 
 // StartPubSubHandler will listen for a signal and run the callback with the message
-func (r *RPCStorageHandler) StartPubSubHandler(channel string, callback func(*redis.Message)) error {
+func (r *RPCStorageHandler) StartPubSubHandler(channel string, callback func(interface{})) error {
 	log.Warning("RPCStorageHandler.StartPubSubHandler - NO PUBSUB DEFINED")
 	return nil
 }

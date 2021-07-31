@@ -14,7 +14,9 @@ import (
 func TestHostCheckerManagerInit(t *testing.T) {
 
 	hc := HostCheckerManager{}
-	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test:"}
+	redisStorage := storage.New(storage.Options{
+		KeyPrefix: "host-checker-test:",
+	})
 	hc.Init(redisStorage)
 
 	if hc.Id == "" {
@@ -43,7 +45,9 @@ func TestAmIPolling(t *testing.T) {
 	config.SetGlobal(globalConf)
 	defer ResetTestConfig()
 
-	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test:"}
+	redisStorage := storage.New(storage.Options{
+		KeyPrefix: "host-checker-test:",
+	})
 	hc.Init(redisStorage)
 	hc2 := HostCheckerManager{}
 	hc2.Init(redisStorage)
@@ -73,7 +77,9 @@ func TestAmIPolling(t *testing.T) {
 
 	//Testing if the PollerCacheKey doesn't contains the poller_group by default
 	hc = HostCheckerManager{}
-	redisStorage = &storage.RedisCluster{KeyPrefix: "host-checker-test:"}
+	redisStorage = storage.New(storage.Options{
+		KeyPrefix: "host-checker-test:",
+	})
 	hc.Init(redisStorage)
 	hc.AmIPolling()
 
@@ -103,7 +109,9 @@ func TestGenerateCheckerId(t *testing.T) {
 func TestCheckActivePollerLoop(t *testing.T) {
 
 	hc := &HostCheckerManager{}
-	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test-1:"}
+	redisStorage := storage.New(storage.Options{
+		KeyPrefix: "host-checker-test-1:",
+	})
 	hc.Init(redisStorage)
 
 	ctx, cancel := context.WithCancel(context.TODO())
@@ -129,7 +137,9 @@ func TestCheckActivePollerLoop(t *testing.T) {
 
 func TestStartPoller(t *testing.T) {
 	hc := HostCheckerManager{}
-	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-TestStartPoller:"}
+	redisStorage := storage.New(storage.Options{
+		KeyPrefix: "host-checker-TestStartPoller:",
+	})
 	hc.Init(redisStorage)
 	ctx, cancel := context.WithCancel(context.TODO())
 
@@ -144,7 +154,9 @@ func TestStartPoller(t *testing.T) {
 func TestRecordUptimeAnalytics(t *testing.T) {
 
 	hc := &HostCheckerManager{}
-	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test-analytics:"}
+	redisStorage := storage.New(storage.Options{
+		KeyPrefix: "host-checker-test-analytics:",
+	})
 	hc.Init(redisStorage)
 
 	spec := &APISpec{}

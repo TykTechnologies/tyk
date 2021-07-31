@@ -57,6 +57,17 @@ type Handler interface {
 	RemoveFromList(string, string) error
 	AppendToSet(string, string)
 	Exists(string) (bool, error)
+
+	AppendToSetPipelined(string, [][]byte)
+	GetKeyTTL(keyName string) (ttl int64, err error)
+
+	Notify
+}
+
+type Notify interface {
+	// notifications
+	Publish(channel, message string) error
+	StartPubSubHandler(channel string, callback func(interface{})) error
 }
 
 type AnalyticsHandler interface {
