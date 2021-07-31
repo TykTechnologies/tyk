@@ -1,4 +1,4 @@
-package simple
+package storage
 
 import (
 	"time"
@@ -6,11 +6,7 @@ import (
 	"github.com/dgraph-io/badger/v3"
 )
 
-type RateLimiting interface {
-	SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{})
-	GetRollingWindow(key string, per int64, pipeline bool) (int, []interface{})
-}
-
+// rate implements SetRollingWindow and GetRollingWindow
 type rate struct {
 	db *badger.DB
 }
