@@ -77,7 +77,7 @@ func (n Native) GetKeysAndValuesWithFilter(filter string) map[string]string {
 	return (&kv{Options: n.Options, db: simple.general}).GetKeysAndValuesWithFilter(filter)
 }
 func (n Native) DeleteKeys(keys []string) bool {
-	return (&kv{Options: n.Options, db: simple.general}).DeleteKeys(key)
+	return (&kv{Options: n.Options, db: simple.general}).DeleteKeys(keys)
 }
 func (n Native) Decrement(key string) {
 	(&kv{Options: n.Options, db: simple.general}).Decrement(key)
@@ -98,7 +98,7 @@ func (n Native) Exists(key string) (bool, error) {
 	return (&kv{Options: n.Options, db: simple.general}).Exists(key)
 }
 
-func (n Native) GetKeyTTL(keyName string) (ttl int64, err error) {
+func (n Native) GetKeyTTL(key string) (ttl int64, err error) {
 	return (&kv{Options: n.Options, db: simple.general}).GetKeyTTL(key)
 }
 
