@@ -29,6 +29,7 @@ type Handler interface {
 	RateLimit
 	KeyValue
 	Redis
+	Analytics
 	Notify
 }
 
@@ -43,8 +44,6 @@ type KeyValue interface {
 	GetRawKey(string) (string, error)
 	SetKey(string, string, int64) error // Second input string is expected to be a JSON object (user.SessionState)
 	SetRawKey(string, string, int64) error
-	SetExp(string, int64) error   // Set key expiration
-	GetExp(string) (int64, error) // Returns expiry of a key
 	GetKeys(string) []string
 	DeleteKey(string) bool
 	DeleteAllKeys() bool
@@ -64,14 +63,19 @@ type Redis interface {
 	AddToSet(string, string)
 	GetSet(string) (map[string]string, error)
 	AddToSortedSet(string, string, float64)
-	GetAndDeleteSet(string) []interface{}
 	RemoveFromSet(string, string)
 	GetSortedSetRange(string, string, string) ([]string, []float64, error)
 	RemoveSortedSetRange(string, string, string) error
 	GetListRange(string, int64, int64) ([]string, error)
 	RemoveFromList(string, string) error
 	AppendToSet(string, string)
+}
+
+type Analytics interface {
 	AppendToSetPipelined(string, [][]byte)
+	GetAndDeleteSet(string) []interface{}
+	SetExp(string, int64) error   // Set key expiration
+	GetExp(string) (int64, error) // Returns expiry of a key
 }
 
 type Notify interface {
@@ -82,10 +86,7 @@ type Notify interface {
 
 type AnalyticsHandler interface {
 	Connect() bool
-	AppendToSetPipelined(string, [][]byte)
-	GetAndDeleteSet(string) []interface{}
-	SetExp(string, int64) error   // Set key expiration
-	GetExp(string) (int64, error) // Returns expiry of a key
+	Analytics
 }
 
 const defaultHashAlgorithm = "murmur64"

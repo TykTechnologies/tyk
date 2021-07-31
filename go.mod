@@ -35,7 +35,7 @@ require (
 	github.com/getsentry/raven-go v0.2.0 // indirect
 	github.com/go-redis/redis/v8 v8.3.1
 	github.com/gocraft/health v0.0.0-20170925182251-8675af27fef0
-	github.com/golang/protobuf v1.4.2
+	github.com/golang/protobuf v1.4.3
 	github.com/google/btree v1.0.0 // indirect
 	github.com/gorilla/mux v1.7.3
 	github.com/gorilla/websocket v1.4.2
@@ -81,6 +81,7 @@ require (
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/xeipuuv/gojsonschema v0.0.0-20171025060643-212d8a0df7ac
 	github.com/xenolf/lego v0.3.2-0.20170618175828-28ead50ff1ca // indirect
+	go.opencensus.io v0.22.5 // indirect
 	golang.org/x/crypto v0.0.0-20210314154223-e6e6c4f2bb5b
 	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
