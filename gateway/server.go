@@ -166,13 +166,14 @@ func setupGlobals(ctx context.Context) {
 	defer reloadMu.Unlock()
 
 	checkup.Run(config.Global())
-
 	dnsCacheManager = dnscache.NewDnsCacheManager(config.Global().DnsCache.MultipleIPsHandleStrategy)
 	if config.Global().DnsCache.Enabled {
 		dnsCacheManager.InitDNSCaching(
 			time.Duration(config.Global().DnsCache.TTL)*time.Second,
 			time.Duration(config.Global().DnsCache.CheckInterval)*time.Second)
 	}
+
+	storage.SetupNative()
 
 	if config.Global().EnableAnalytics && config.Global().Storage.Type != "redis" {
 		mainLog.Fatal("Analytics requires Redis Storage backend, please enable Redis in the tyk.conf file.")
@@ -1002,9 +1003,7 @@ func initialiseSystem(ctx context.Context) error {
 		}
 	}
 
-	if config.Global().Storage.Type != "redis" {
-		mainLog.Fatal("Redis connection details not set, please ensure that the storage type is set to Redis and that the connection parameters are correct.")
-	}
+	storage.ValidateConfig(mainLog)
 
 	// suply rpc client globals to join it main loging and instrumentation sub systems
 	rpc.Log = log
@@ -1318,10 +1317,15 @@ func Start() {
 		defer trace.Close()
 	}
 	start(ctx)
-	go storage.ConnectToRedis(ctx, func() {
-		reloadURLStructure(func() {})
-	})
-
+	switch config.Global().Storage.Type {
+	case "redis":
+		go storage.ConnectToRedis(ctx, func() {
+			reloadURLStructure(func() {})
+		})
+	case "native":
+		// Ensure we properly close the database and leave it in a better state.
+		defer storage.TearDownNative()
+	}
 	if *cli.MemProfile {
 		mainLog.Debug("Memory profiling active")
 		var err error

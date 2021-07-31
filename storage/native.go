@@ -19,13 +19,25 @@ type nativeDB struct {
 	general *badger.DB
 }
 
+func (n *nativeDB) Close() {
+	if n.general != nil {
+		n.general.Close()
+	}
+	if n.rate != nil {
+		n.rate.Close()
+	}
+}
+
 func SetupNative() {
 	g := config.Global().Storage
 	if g.Type == "native" {
 		// create general database
 		{
+			log.Info(" setting up global storage")
 			path := filepath.Join(g.Host, "general")
+
 			o := badger.DefaultOptions(path)
+			o.Logger = nativeLog
 			db, err := badger.Open(o)
 			if err != nil {
 				// This is fatal if we can't open the database we need to make sure we have
@@ -35,18 +47,28 @@ func SetupNative() {
 			simple.general = db
 		}
 		{
+			log.Info(" setting up rate limiters storage")
 			path := filepath.Join(g.Host, "rates")
 			o := badger.DefaultOptions(path)
+			o.Logger = nativeLog
 			// Tunable value for rolling window use.
 			o.NumVersionsToKeep = 200
 			db, err := badger.Open(o)
 			if err != nil {
 				// This is fatal if we can't open the database we need to make sure we have
 				// a working database to proceed
-				log.Fatal("Failed to setup rates limiting database", err)
+				nativeLog.Fatal("Failed to setup rates limiting database", err)
 			}
 			simple.rate = db
 		}
+	}
+}
+
+func TearDownNative() {
+	g := config.Global().Storage
+	if g.Type == "native" {
+		nativeLog.Info("closing  storage databases")
+		simple.Close()
 	}
 }
 

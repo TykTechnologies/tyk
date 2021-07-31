@@ -149,10 +149,6 @@ type RedisCluster struct {
 	Options
 }
 
-func New(opt Options) Handler {
-	return &RedisCluster{Options: opt}
-}
-
 func clusterConnectionIsOpen(cluster *RedisCluster) bool {
 	c := singleton(cluster.IsCache, cluster.IsAnalytics)
 	testKey := "redis-test-" + uuid.NewV4().String()

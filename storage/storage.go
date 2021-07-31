@@ -11,6 +11,7 @@ import (
 
 	"github.com/buger/jsonparser"
 	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/murmur3"
 	"github.com/TykTechnologies/tyk/config"
@@ -18,6 +19,7 @@ import (
 )
 
 var log = logger.Get()
+var nativeLog = log.WithField("prefix", "native-storage")
 
 // ErrKeyNotFound is a standard error for when a key is not found in the storage engine
 var ErrKeyNotFound = errors.New("key not found")
@@ -195,4 +197,21 @@ func HashKey(in string) string {
 		return in
 	}
 	return HashStr(in)
+}
+
+func ValidateConfig(xlg *logrus.Entry) {
+	g := config.Global().Storage
+	switch g.Type {
+	case "redis":
+	case "native":
+	default:
+		xlg.Fatal("Storage  details not set, please ensure that the storage type is set to either redis or native and that the connection parameters are correct.")
+	}
+}
+
+func New(opt Options) Handler {
+	if config.Global().Storage.Type == "redis" {
+		return &RedisCluster{Options: opt}
+	}
+	return &Native{Options: opt}
 }
