@@ -26,13 +26,19 @@ func (gw *Gateway) startRateLimitNotifications() {
 	go func() {
 		log.Info("Starting gateway rate limiter notifications...")
 		for {
-			if gw.GetNodeID() != "" {
-				gw.NotifyCurrentServerStatus()
-			} else {
-				log.Warning("Node not registered yet, skipping DRL Notification")
+			select {
+			case <-gw.ctx.Done():
+				return
+			default:
+				if gw.GetNodeID() != "" {
+					gw.NotifyCurrentServerStatus()
+				} else {
+					log.Warning("Node not registered yet, skipping DRL Notification")
+				}
+
+				time.Sleep(time.Duration(notificationFreq) * time.Second)
 			}
 
-			time.Sleep(time.Duration(notificationFreq) * time.Second)
 		}
 	}()
 }

@@ -869,6 +869,7 @@ func (s *Test) Start(genConf func(globalConf *config.Config)) *Gateway {
 
 	s.BootstrapGw(ctx, genConf)
 
+	s.Gw.ctx = ctx
 	s.Gw.setupPortsWhitelist()
 	s.Gw.startServer()
 	s.Gw.setupGlobals(ctx)
@@ -1104,18 +1105,12 @@ func (s *Test) Close() {
 		log.Info("server exited properly")
 	}
 
-	// force just in case
-	s.HttpHandler.Close()
-	s.HttpHandler = nil
-	s.TestServerRouter = nil
-
 	s.Gw.analytics.Stop()
 	os.RemoveAll(s.Gw.GetConfig().AppPath)
 	s.gwMu.Lock()
 	s.Gw = nil
 	s.gwMu.Unlock()
 
-	runtime.GC()
 }
 
 func (s *Test) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, error) {

@@ -86,6 +86,8 @@ type Gateway struct {
 	config          atomic.Value
 	configMu        sync.Mutex
 
+	ctx context.Context
+
 	muNodeID   sync.Mutex // guards NodeID
 	NodeID     string
 	drlOnce    sync.Once
