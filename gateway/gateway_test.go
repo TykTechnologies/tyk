@@ -2176,6 +2176,7 @@ func TestOverrideErrors(t *testing.T) {
 }
 
 func TestMultiGatewayEnv(t *testing.T) {
+	t.Skip() //skipping it for now
 	for i := 0; i < 1000; i++ {
 		t.Logf("Creando gateway N %v", i)
 		ts := StartTest(nil)

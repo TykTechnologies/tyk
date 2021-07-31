@@ -1105,12 +1105,11 @@ func (s *Test) Close() {
 		log.Info("server exited properly")
 	}
 
-	s.Gw.analytics.Stop()
-	os.RemoveAll(s.Gw.GetConfig().AppPath)
 	s.gwMu.Lock()
-	s.Gw = nil
+	s.Gw.analytics.Stop()
+	s.Gw.GlobalHostChecker.StopPoller()
 	s.gwMu.Unlock()
-
+	os.RemoveAll(s.Gw.GetConfig().AppPath)
 }
 
 func (s *Test) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, error) {
