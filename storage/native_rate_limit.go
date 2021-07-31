@@ -6,6 +6,8 @@ import (
 	"github.com/dgraph-io/badger/v3"
 )
 
+var _ RateLimit = (*rate)(nil)
+
 // rate implements SetRollingWindow and GetRollingWindow
 type rate struct {
 	db *badger.DB

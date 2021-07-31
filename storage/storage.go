@@ -26,11 +26,15 @@ var ErrKeyNotFound = errors.New("key not found")
 // AuthorisationManager to read and write key values to the backend
 type Handler interface {
 	Connect() bool
-	SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{})
-	GetRollingWindow(key string, per int64, pipeline bool) (int, []interface{})
+	RateLimit
 	KeyValue
 	Redis
 	Notify
+}
+
+type RateLimit interface {
+	SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{})
+	GetRollingWindow(key string, per int64, pipeline bool) (int, []interface{})
 }
 
 type KeyValue interface {
