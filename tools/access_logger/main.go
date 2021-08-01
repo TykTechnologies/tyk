@@ -62,6 +62,5 @@ func access(data [][]byte) {
 			"path":   r.RawPath,
 			"status": strconv.Itoa(r.ResponseCode),
 		})
-		fmt.Fprintln(os.Stdout)
 	}
 }
