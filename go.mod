@@ -86,7 +86,8 @@ require (
 	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	google.golang.org/appengine v1.6.1 // indirect
-	google.golang.org/grpc v1.29.1
+	google.golang.org/grpc v1.39.0
+	google.golang.org/protobuf v1.25.0 // indirect
 	gopkg.in/Masterminds/sprig.v2 v2.21.0
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22

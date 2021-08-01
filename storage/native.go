@@ -3,6 +3,7 @@ package storage
 import (
 	"path/filepath"
 
+	"github.com/TykTechnologies/tyk/api"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/dgraph-io/badger/v3"
 )
@@ -17,6 +18,9 @@ type nativeDB struct {
 	rate *badger.DB
 
 	general *badger.DB
+
+	// A connection to a pubsub server used for notifications
+	pubsub api.PubSubClient
 }
 
 func (n *nativeDB) Close() {
@@ -77,7 +81,6 @@ var _ Handler = (*Native)(nil)
 type Native struct {
 	Options
 
-	nativeNotify
 	nativeAnalytics
 }
 
@@ -192,4 +195,12 @@ func (n Native) RemoveFromList(key string, value string) error {
 
 func (n Native) AppendToSet(key string, value string) {
 	(&nativeRedis{Options: n.Options, db: simple.general}).AppendToSet(key, value)
+}
+
+func (n Native) Publish(channel, message string) error {
+	return (&nativeNotify{client: simple.pubsub}).Publish(channel, message)
+}
+
+func (n Native) StartPubSubHandler(channel string, callback func(interface{})) error {
+	return (&nativeNotify{client: simple.pubsub}).StartPubSubHandler(channel, callback)
 }

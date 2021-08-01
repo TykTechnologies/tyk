@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+option go_package = "github.com/TykTechnologies/tyk/api";
+
+message Message {
+  string channel = 1;
+  string pattern = 2;
+  string payload = 3;
+  repeated string payload_slice = 4;
+}
+
+message PublishRequest {
+  string channel = 1;
+  string message = 2;
+}
+message PublishResponse {}
+
+message SubscribeRequest { string channel = 1; }
+
+service PubSub {
+  rpc Subscribe(SubscribeRequest) returns (stream Message);
+  rpc Publish(PublishRequest) returns (PublishResponse);
+}
