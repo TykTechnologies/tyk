@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+option go_package = "github.com/TykTechnologies/tyk/api";
+
+message AnalyticsRecords {
+  string key = 1;
+  repeated bytes data = 2;
+}
+
+message SyncResponse {}
+
+service AnalyticsSync {
+  rpc Sync(stream AnalyticsRecords) returns (SyncResponse);
+}

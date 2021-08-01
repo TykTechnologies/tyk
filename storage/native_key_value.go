@@ -147,27 +147,6 @@ func (r *kv) GetRawKey(keyName string) (string, error) {
 	return string(value), nil
 }
 
-func (r *kv) GetExp(keyName string) (exp int64, err error) {
-	return r.GetKeyTTL(keyName)
-}
-
-func (r *kv) SetExp(keyName string, timeout int64) error {
-	keyName = r.FixKey(keyName)
-	return r.db.View(func(txn *badger.Txn) error {
-		x, err := txn.Get([]byte(keyName))
-		if err != nil {
-			return err
-		}
-		v, err := x.ValueCopy(nil)
-		if err != nil {
-			return err
-		}
-		e := badger.NewEntry([]byte(keyName), v)
-		e.WithTTL(time.Duration(timeout) * time.Second)
-		return txn.SetEntry(e)
-	})
-}
-
 // SetKey will create (or update) a key value in the store
 func (r *kv) SetKey(keyName, session string, timeout int64) error {
 	keyName = r.FixKey(keyName)

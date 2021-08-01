@@ -21,6 +21,9 @@ type nativeDB struct {
 
 	// A connection to a pubsub server used for notifications
 	pubsub api.PubSubClient
+
+	// analytics a grpc sync to which we send analytics records
+	analytics api.AnalyticsSync_SyncClient
 }
 
 func (n *nativeDB) Close() {
@@ -29,6 +32,9 @@ func (n *nativeDB) Close() {
 	}
 	if n.rate != nil {
 		n.rate.Close()
+	}
+	if n.analytics != nil {
+		n.analytics.CloseSend()
 	}
 }
 
@@ -80,8 +86,6 @@ var _ Handler = (*Native)(nil)
 
 type Native struct {
 	Options
-
-	nativeAnalytics
 }
 
 func (n Native) Connect() bool {
@@ -204,3 +208,11 @@ func (n Native) Publish(channel, message string) error {
 func (n Native) StartPubSubHandler(channel string, callback func(interface{})) error {
 	return (&nativeNotify{client: simple.pubsub}).StartPubSubHandler(channel, callback)
 }
+
+func (n Native) AppendToSetPipelined(key string, records [][]byte) {
+	(&nativeAnalytics{client: simple.analytics}).AppendToSetPipelined(key, records)
+}
+
+func (n Native) GetAndDeleteSet(string) []interface{} { return nil }
+func (n Native) SetExp(string, int64) error           { return nil }
+func (n Native) GetExp(string) (int64, error)         { return 0, nil }
