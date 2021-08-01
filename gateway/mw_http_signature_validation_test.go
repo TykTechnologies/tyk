@@ -182,9 +182,7 @@ func testPrepareHMACAuthSessionPass(tb testing.TB, hashFn func() hash.Hash, even
 	return encodedString, spec, req, sessionKey
 }
 
-func testPrepareRSAAuthSessionPass(tb testing.TB, eventWG *sync.WaitGroup, privateKey *rsa.PrivateKey, pubCertId string, withHeader bool, isBench bool) (string, *APISpec, *http.Request, string) {
-	ts := StartTest(nil)
-	defer ts.Close()
+func testPrepareRSAAuthSessionPass(tb testing.TB, eventWG *sync.WaitGroup, privateKey *rsa.PrivateKey, pubCertId string, withHeader bool, isBench bool, ts *Test) (string, *APISpec, *http.Request, string) {
 
 	spec := ts.Gw.LoadSampleAPI(hmacAuthDef)
 	session := createRSAAuthSession(pubCertId)
@@ -708,7 +706,7 @@ func TestRSAAuthSessionPass(t *testing.T) {
 	// Should not receive an AuthFailure event
 	var eventWG sync.WaitGroup
 	eventWG.Add(1)
-	encodedString, spec, req, sessionKey := testPrepareRSAAuthSessionPass(t, &eventWG, privateKey, pubID, false, false)
+	encodedString, spec, req, sessionKey := testPrepareRSAAuthSessionPass(t, &eventWG, privateKey, pubID, false, false, ts)
 
 	recorder := httptest.NewRecorder()
 	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"%s\",algorithm=\"rsa-sha256\",signature=\"%s\"", sessionKey, encodedString))
@@ -742,7 +740,7 @@ func BenchmarkRSAAuthSessionPass(b *testing.B) {
 
 	var eventWG sync.WaitGroup
 	eventWG.Add(b.N)
-	encodedString, spec, req, sessionKey := testPrepareRSAAuthSessionPass(b, &eventWG, privateKey, pubID, false, true)
+	encodedString, spec, req, sessionKey := testPrepareRSAAuthSessionPass(b, &eventWG, privateKey, pubID, false, true, ts)
 
 	recorder := httptest.NewRecorder()
 	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"%s\",algorithm=\"rsa-sha256\",signature=\"%s\"", sessionKey, encodedString))
@@ -782,7 +780,7 @@ func TestRSAAuthSessionKeyMissing(t *testing.T) {
 	}
 
 	recorder := httptest.NewRecorder()
-	encodedString, spec, req, _ := testPrepareRSAAuthSessionPass(t, &eventWG, privateKey, pubID, false, false)
+	encodedString, spec, req, _ := testPrepareRSAAuthSessionPass(t, &eventWG, privateKey, pubID, false, false, ts)
 
 	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"98765\",algorithm=\"rsa-sha256\",signature=\"%s\"", encodedString))
 
