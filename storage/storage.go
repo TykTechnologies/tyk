@@ -209,6 +209,24 @@ func ValidateConfig(xlg *logrus.Entry) {
 	}
 }
 
+func ValidateAnalyticsConfig(xlg *logrus.Entry) {
+	g := config.Global()
+	if g.EnableAnalytics {
+		switch g.Storage.Type {
+		case "redis":
+		case "native":
+			// for native we need a connection to a grpc server to push analytics to. So
+			// configuration for this are on Analytics config and type should be grpc
+			if g.AnalyticsStorage.Type != "grpc" {
+				xlg.Fatal("Analytics requires grpc Storage backend, when running with native storage")
+			}
+		default:
+			xlg.Fatal("Analytics requires Redis or Native Storage backend, please enable Redis in the tyk.conf file.")
+		}
+	}
+
+}
+
 func New(opt Options) Handler {
 	if config.Global().Storage.Type == "redis" {
 		return &RedisCluster{Options: opt}

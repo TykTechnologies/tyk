@@ -1,11 +1,13 @@
 package storage
 
 import (
+	"context"
 	"path/filepath"
 
 	"github.com/TykTechnologies/tyk/api"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/dgraph-io/badger/v3"
+	"google.golang.org/grpc"
 )
 
 var simple nativeDB
@@ -23,7 +25,8 @@ type nativeDB struct {
 	pubsub api.PubSubClient
 
 	// analytics a grpc sync to which we send analytics records
-	analytics api.AnalyticsSync_SyncClient
+	analytics     api.AnalyticsSync_SyncClient
+	analyticsConn *grpc.ClientConn
 }
 
 func (n *nativeDB) Close() {
@@ -36,15 +39,18 @@ func (n *nativeDB) Close() {
 	if n.analytics != nil {
 		n.analytics.CloseSend()
 	}
+	if n.analyticsConn != nil {
+		n.analyticsConn.Close()
+	}
 }
 
 func SetupNative() {
-	g := config.Global().Storage
-	if g.Type == "native" {
+	g := config.Global()
+	if g.Storage.Type == "native" {
 		// create general database
 		{
 			log.Info(" setting up global storage")
-			path := filepath.Join(g.Host, "general")
+			path := filepath.Join(g.Storage.Host, "general")
 
 			o := badger.DefaultOptions(path)
 			o.Logger = nativeLog
@@ -58,7 +64,7 @@ func SetupNative() {
 		}
 		{
 			log.Info(" setting up rate limiters storage")
-			path := filepath.Join(g.Host, "rates")
+			path := filepath.Join(g.Storage.Host, "rates")
 			o := badger.DefaultOptions(path)
 			o.Logger = nativeLog
 			// Tunable value for rolling window use.
@@ -71,6 +77,22 @@ func SetupNative() {
 			}
 			simple.rate = db
 		}
+		if g.EnableAnalytics {
+			// setup grpc server to push analytics to
+			conn, err := grpc.Dial(g.AnalyticsStorage.Host, grpc.WithInsecure())
+			if err != nil {
+				nativeLog.Fatal("Failed to establish connection with analytics grpc server", err)
+			}
+			simple.analyticsConn = conn
+			ac := api.NewAnalyticsSyncClient(conn)
+			nativeLog.Info("preparing analytics sync")
+			sink, err := ac.Sync(context.Background())
+			if err != nil {
+				nativeLog.Fatal("Failed to open sync stream to analytics service", err)
+			}
+			simple.analytics = sink
+		}
+		nativeLog.Info("Native store is ready")
 	}
 }
 

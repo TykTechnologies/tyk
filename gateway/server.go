@@ -173,11 +173,8 @@ func setupGlobals(ctx context.Context) {
 			time.Duration(config.Global().DnsCache.CheckInterval)*time.Second)
 	}
 
+	storage.ValidateAnalyticsConfig(mainLog)
 	storage.SetupNative()
-
-	if config.Global().EnableAnalytics && config.Global().Storage.Type != "redis" {
-		mainLog.Fatal("Analytics requires Redis Storage backend, please enable Redis in the tyk.conf file.")
-	}
 
 	// Initialise HostCheckerManager only if uptime tests are enabled.
 	if !config.Global().UptimeTests.Disable {
