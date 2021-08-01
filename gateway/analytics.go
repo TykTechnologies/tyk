@@ -189,6 +189,7 @@ type RedisAnalyticsHandler struct {
 	enableMultipleAnalyticsKeys bool
 	Clean                       Purger
 	Gw                          *Gateway `json:"-"`
+	mu                          sync.Mutex
 }
 
 func (r *RedisAnalyticsHandler) Init() {
@@ -223,7 +224,9 @@ func (r *RedisAnalyticsHandler) Stop() {
 	atomic.SwapUint32(&r.shouldStop, 1)
 
 	// close channel to stop workers
+	r.mu.Lock()
 	close(r.recordsChan)
+	r.mu.Unlock()
 
 	// wait for all workers to be done
 	r.poolWg.Wait()
@@ -238,7 +241,9 @@ func (r *RedisAnalyticsHandler) RecordHit(record *AnalyticsRecord) error {
 
 	// just send record to channel consumed by pool of workers
 	// leave all data crunching and Redis I/O work for pool workers
+	r.mu.Lock()
 	r.recordsChan <- record
+	r.mu.Unlock()
 
 	return nil
 }
