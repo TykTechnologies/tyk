@@ -3,7 +3,7 @@ package storage
 import (
 	"context"
 
-	"github.com/TykTechnologies/tyk/api"
+	"github.com/gernest/notify"
 	"github.com/go-redis/redis/v8"
 )
 
@@ -11,7 +11,7 @@ var _ Notify = (*nativeNotify)(nil)
 
 // nativeNotify implements Notify interface by using api.PubSubClient
 type nativeNotify struct {
-	client api.PubSubClient
+	client notify.PubSubClient
 }
 
 // Publish sends a publish request to a remove pubsub server
@@ -19,7 +19,7 @@ func (n *nativeNotify) Publish(channel, message string) error {
 	if n.client == nil {
 		return nil
 	}
-	_, err := n.client.Publish(context.Background(), &api.PublishRequest{
+	_, err := n.client.Publish(context.Background(), &notify.PublishRequest{
 		Channel: channel,
 		Message: message,
 	})
@@ -33,7 +33,7 @@ func (n *nativeNotify) StartPubSubHandler(channel string, callback func(interfac
 	if n.client == nil {
 		return nil
 	}
-	stream, err := n.client.Subscribe(context.Background(), &api.SubscribeRequest{
+	stream, err := n.client.Subscribe(context.Background(), &notify.SubscribeRequest{
 		Channel: channel,
 	})
 	if err != nil {

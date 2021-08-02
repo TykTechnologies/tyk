@@ -7,6 +7,7 @@ import (
 	"github.com/TykTechnologies/tyk/api"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/dgraph-io/badger/v3"
+	"github.com/gernest/notify"
 	"google.golang.org/grpc"
 )
 
@@ -22,7 +23,7 @@ type nativeDB struct {
 	general *badger.DB
 
 	// A connection to a pubsub server used for notifications
-	pubsub api.PubSubClient
+	pubsub notify.PubSubClient
 
 	// analytics a grpc sync to which we send analytics records
 	analytics     api.AnalyticsSync_SyncClient
