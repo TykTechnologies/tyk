@@ -22,6 +22,8 @@ type nativeDB struct {
 
 	general *badger.DB
 
+	pubsubConn *grpc.ClientConn
+
 	// A connection to a pubsub server used for notifications
 	pubsub notify.PubSubClient
 
@@ -36,6 +38,9 @@ func (n *nativeDB) Close() {
 	}
 	if n.rate != nil {
 		n.rate.Close()
+	}
+	if n.pubsubConn != nil {
+		n.pubsubConn.Close()
 	}
 	if n.analytics != nil {
 		n.analytics.CloseSend()
@@ -92,6 +97,19 @@ func SetupNative() {
 				nativeLog.Fatal("Failed to open sync stream to analytics service", err)
 			}
 			simple.analytics = sink
+		}
+		{
+			if g.UseDBAppConfigs {
+				if g.DBAppConfOptions.PubSubConnection == "" {
+					nativeLog.Fatal("pub_sub_connection needs to be set to use Native store with use_db_app_configs")
+				}
+				conn, err := grpc.Dial(g.DBAppConfOptions.PubSubConnection, grpc.WithInsecure())
+				if err != nil {
+					nativeLog.Fatal("Failed to connect to pub sub server", err)
+				}
+				simple.pubsubConn = conn
+				simple.pubsub = notify.NewPubSubClient(conn)
+			}
 		}
 		nativeLog.Info("Native store is ready")
 	}
