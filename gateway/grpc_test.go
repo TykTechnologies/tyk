@@ -822,6 +822,7 @@ func TestGRPC_Stream_BasicAuthentication(t *testing.T) {
 }
 
 func TestGRPC_Stream_H2C(t *testing.T) {
+	t.Skip()
 	ts := StartTest(nil)
 	defer ts.Close()
 
