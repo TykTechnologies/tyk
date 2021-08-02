@@ -1434,6 +1434,12 @@ func TestHotReloadSingle(t *testing.T) {
 	ts.Gw.ReloadTestCase.Enable()
 	defer ts.Gw.ReloadTestCase.Disable()
 	oldRouter := ts.mainRouter()
+
+	cfg := ts.Gw.GetConfig()
+	//Changing the UseSSL option so the main router change its protocol
+	cfg.HttpServerOptions.UseSSL = true
+	ts.Gw.SetConfig(cfg)
+
 	var wg sync.WaitGroup
 	wg.Add(1)
 	ts.Gw.reloadURLStructure(wg.Done)
