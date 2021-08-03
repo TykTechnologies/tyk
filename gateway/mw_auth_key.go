@@ -143,6 +143,10 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		k.setContextVars(r, key)
 	}
 
+	if session.OrgID != "" {
+		key = storage.StripOrg(key, session.OrgID)
+	}
+
 	return k.validateSignature(r, key)
 }
 
