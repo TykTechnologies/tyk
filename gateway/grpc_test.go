@@ -669,32 +669,35 @@ func (*loginCredsOrToken) RequireTransportSecurity() bool {
 func TestGRPC_Stream_MutualTLS(t *testing.T) {
 	// Mutual Authentication for both downstream-tyk and tyk-upstream
 
-	certManager := getCertManager()
-	_, _, combinedClientPEM, clientCert := genCertificate(&x509.Certificate{})
-	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
+	//certManager := getCertManager()
 	serverCertPem, _, combinedPEM, _ := genServerCertificate()
-
-	certID, _ := certManager.Add(combinedPEM, "") // For tyk to know downstream
-	defer certManager.Delete(certID, "")
-
-	clientCertID, _ := certManager.Add(combinedClientPEM, "") // For upstream to know tyk
-	defer certManager.Delete(clientCertID, "")
-
-	// Protected gRPC server
-	target, s := startGRPCServer(t, clientCert.Leaf, setupStreamSVC)
-	defer target.Close()
-	defer s.GracefulStop()
+	serverCertID, _, _ := certs.GetCertIDAndChainPEM(serverCertPem, "")
 
 	// Tyk
 	conf := func(globalConf *config.Config) {
 		globalConf.ProxySSLInsecureSkipVerify = true
 		globalConf.ProxyEnableHttp2 = true
 		globalConf.HttpServerOptions.EnableHttp2 = true
-		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+		globalConf.HttpServerOptions.SSLCertificates = []string{serverCertID}
 		globalConf.HttpServerOptions.UseSSL = true
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
+
+	_, _, combinedClientPEM, clientCert := genCertificate(&x509.Certificate{})
+	certID, _ := ts.Gw.CertificateManager.Add(combinedPEM, "") // For tyk to know downstream
+	defer ts.Gw.CertificateManager.Delete(certID, "")
+	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
+	ts.ReloadGatewayProxy()
+
+	clientCertID, _ := ts.Gw.CertificateManager.Add(combinedClientPEM, "") // For upstream to know tyk
+	defer ts.Gw.CertificateManager.Delete(clientCertID, "")
+
+	// Protected gRPC server
+	target, s := startGRPCServer(t, clientCert.Leaf, setupStreamSVC)
+	defer target.Close()
+	defer s.GracefulStop()
+
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
