@@ -497,7 +497,6 @@ func TestUpdateKeyWithCert(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	//CertificateManager := getCertManager()
 	apiId := "MTLSApi"
 	pID := ts.CreatePolicy(func(p *user.Policy) {})
 

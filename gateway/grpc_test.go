@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/TykTechnologies/tyk/certs"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -144,8 +145,8 @@ func TestHTTP2_TLS(t *testing.T) {
 	// Certificates
 	_, _, _, clientCert := genCertificate(&x509.Certificate{})
 	serverCertPem, _, combinedPEM, _ := genServerCertificate()
-	certID, _ := certManager.Add(combinedPEM, "")
-	defer certManager.Delete(certID, "")
+	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
+
 
 	// Upstream server supporting HTTP/2
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -172,6 +173,11 @@ func TestHTTP2_TLS(t *testing.T) {
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
+
+	certID, _ = certManager.Add(combinedPEM, "")
+	defer certManager.Delete(certID, "")
+
+	ts.ReloadGatewayProxy()
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
