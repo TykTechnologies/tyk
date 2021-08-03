@@ -255,19 +255,18 @@ func TestHMACRequestSigning(t *testing.T) {
 
 func TestRSARequestSigning(t *testing.T) {
 
-	certManager := getCertManager()
-	_, _, combinedPem, cert := genServerCertificate()
-	privCertId, _ := certManager.Add(combinedPem, "")
-	defer certManager.Delete(privCertId, "")
-
 	ts := StartTest(nil)
 	defer ts.Close()
+
+	_, _, combinedPem, cert := genServerCertificate()
+	privCertId, _ := ts.Gw.CertificateManager.Add(combinedPem, "")
+	defer ts.Gw.CertificateManager.Delete(privCertId, "")
 
 	x509Cert, _ := x509.ParseCertificate(cert.Certificate[0])
 	pubDer, _ := x509.MarshalPKIXPublicKey(x509Cert.PublicKey)
 	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDer})
-	pubCertId, _ := certManager.Add(pubPem, "")
-	defer certManager.Delete(pubCertId, "")
+	pubCertId, _ := ts.Gw.CertificateManager.Add(pubPem, "")
+	defer ts.Gw.CertificateManager.Delete(pubCertId, "")
 
 	name := "Test with rsa-sha256"
 	t.Run(name, func(t *testing.T) {

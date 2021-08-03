@@ -17,7 +17,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -59,20 +58,6 @@ func genServerCertificate() ([]byte, []byte, []byte, tls.Certificate) {
 	})
 
 	return certPem, privPem, combinedPEM, cert
-}
-
-// ToDo: makes this configurable and create certManager without a GW
-var certManagerOnce sync.Once
-var cm *certs.CertificateManager
-
-func getCertManager() *certs.CertificateManager {
-	certManagerOnce.Do(func() {
-		ts := StartTest(nil)
-		cm = ts.Gw.CertificateManager
-		ts.Close()
-	})
-
-	return cm
 }
 
 const (
