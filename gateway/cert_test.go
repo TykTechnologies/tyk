@@ -1169,12 +1169,10 @@ func TestCertificateHandlerTLS(t *testing.T) {
 }
 
 func TestCipherSuites(t *testing.T) {
-	certManager := getCertManager()
 
 	//configure server so we can useSSL and utilize the logic, but skip verification in the clients
 	_, _, combinedPEM, _ := genServerCertificate()
-	serverCertID, _ := certManager.Add(combinedPEM, "")
-	defer certManager.Delete(serverCertID, "")
+	serverCertID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
 	conf := func(globalConf *config.Config) {
 		globalConf.HttpServerOptions.UseSSL = true
@@ -1183,6 +1181,10 @@ func TestCipherSuites(t *testing.T) {
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
+
+	serverCertID, _ = ts.Gw.CertificateManager.Add(combinedPEM, "")
+	defer ts.Gw.CertificateManager.Delete(serverCertID, "")
+	ts.ReloadGatewayProxy()
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
