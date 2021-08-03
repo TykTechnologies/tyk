@@ -38,7 +38,7 @@ func (m Monitor) Check(sessionData *user.SessionState, key string) {
 		return
 	}
 
-	for _, ac := range sessionData.GetAccessRights() {
+	for _, ac := range sessionData.AccessRights {
 		if ac.Limit == nil {
 			continue
 		}

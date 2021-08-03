@@ -121,10 +121,6 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		"prefix": "coprocess",
 	})
 
-	if strings.Contains(spec.Proxy.TargetURL, "h2c://") {
-		spec.Proxy.TargetURL = strings.Replace(spec.Proxy.TargetURL, "h2c://", "http://", 1)
-	}
-
 	if spec.Proxy.Transport.SSLMaxVersion > 0 {
 		spec.Proxy.Transport.SSLMaxVersion = tls.VersionTLS12
 	}
@@ -636,6 +632,10 @@ func trimCategories(name string) string {
 	return name
 }
 
+func APILoopingName(name string) string {
+	return replaceNonAlphaNumeric(trimCategories(name))
+}
+
 func fuzzyFindAPI(search string) *APISpec {
 	if search == "" {
 		return nil
@@ -647,7 +647,8 @@ func fuzzyFindAPI(search string) *APISpec {
 	for _, api := range apisByID {
 		if api.APIID == search ||
 			api.Id.Hex() == search ||
-			strings.EqualFold(replaceNonAlphaNumeric(trimCategories(api.Name)), search) {
+			strings.EqualFold(APILoopingName(api.Name), search) {
+
 			return api
 		}
 	}
@@ -826,9 +827,6 @@ func loadApps(specs []*APISpec) {
 	shouldTrace := trace.IsEnabled()
 	for _, spec := range specs {
 		func() {
-			if strings.Contains(spec.Proxy.TargetURL, "h2c://") {
-				spec.Protocol = "h2c"
-			}
 			defer func() {
 				// recover from panic if one occured. Set err to nil otherwise.
 				if err := recover(); err != nil {

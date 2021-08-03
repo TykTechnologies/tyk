@@ -2,12 +2,6 @@ version: "3"
 services:
   redis:
     image: redis
-
-  # compiler:
-  #   image: tykio/tyk-plugin-compiler:${tag}
-  #   volumes:
-  #     - ./testplugin:/plugin-source
-  #   command: testplugin.so
       
   gw:
     image: tykio/tyk-gateway:${tag}

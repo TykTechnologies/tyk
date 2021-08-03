@@ -3,10 +3,10 @@ package adapter
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"testing"
 
 	graphqlDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
-	"github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/httpclient"
 	restDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/rest_datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/plan"
 	"github.com/stretchr/testify/assert"
@@ -16,13 +16,23 @@ import (
 )
 
 func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
-	t.Run("should create v2 config without err", func(t *testing.T) {
+	t.Run("should create v2 config for engine execution mode without error", func(t *testing.T) {
 		var gqlConfig apidef.GraphQLConfig
 		require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2ConfigJson), &gqlConfig))
 
 		httpClient := &http.Client{}
-		adapter := NewGraphQLConfigAdapter(gqlConfig)
-		adapter.SetHttpClient(httpClient)
+		adapter := NewGraphQLConfigAdapter(gqlConfig, WithHttpClient(httpClient))
+
+		_, err := adapter.EngineConfigV2()
+		assert.NoError(t, err)
+	})
+
+	t.Run("should create v2 config for supergraph execution mode without error", func(t *testing.T) {
+		var gqlConfig apidef.GraphQLConfig
+		require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2SupergraphConfigJson), &gqlConfig))
+
+		httpClient := &http.Client{}
+		adapter := NewGraphQLConfigAdapter(gqlConfig, WithHttpClient(httpClient))
 
 		_, err := adapter.EngineConfigV2()
 		assert.NoError(t, err)
@@ -38,6 +48,70 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 		assert.Error(t, err)
 		assert.Equal(t, ErrUnsupportedGraphQLConfigVersion, err)
 	})
+}
+
+func TestGraphQLConfigAdapter_supergraphDataSourceConfigs(t *testing.T) {
+	expectedDataSourceConfigs := []graphqlDataSource.Configuration{
+		{
+			Fetch: graphqlDataSource.FetchConfiguration{
+				URL:    "http://accounts.service",
+				Method: http.MethodPost,
+				Header: http.Header{
+					"Header1":        []string{"value1"},
+					"Header2":        []string{"value2"},
+					"X-Tyk-Internal": []string{"true"},
+				},
+			},
+			Subscription: graphqlDataSource.SubscriptionConfiguration{
+				URL: "http://accounts.service",
+			},
+			Federation: graphqlDataSource.FederationConfiguration{
+				Enabled:    true,
+				ServiceSDL: federationAccountsServiceSDL,
+			},
+		},
+		{
+			Fetch: graphqlDataSource.FetchConfiguration{
+				URL:    "http://products.service",
+				Method: http.MethodPost,
+				Header: http.Header{
+					"Header1": []string{"value1"},
+					"Header2": []string{"value2"},
+				},
+			},
+			Subscription: graphqlDataSource.SubscriptionConfiguration{
+				URL: "http://products.service",
+			},
+			Federation: graphqlDataSource.FederationConfiguration{
+				Enabled:    true,
+				ServiceSDL: federationProductsServiceSDL,
+			},
+		},
+		{
+			Fetch: graphqlDataSource.FetchConfiguration{
+				URL:    "http://reviews.service",
+				Method: http.MethodPost,
+				Header: http.Header{
+					"Header1": []string{"value1"},
+					"Header2": []string{"value2"},
+				},
+			},
+			Subscription: graphqlDataSource.SubscriptionConfiguration{
+				URL: "http://reviews.service",
+			},
+			Federation: graphqlDataSource.FederationConfiguration{
+				Enabled:    true,
+				ServiceSDL: federationReviewsServiceSDL,
+			},
+		},
+	}
+
+	var gqlConfig apidef.GraphQLConfig
+	require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2SupergraphConfigJson), &gqlConfig))
+
+	adapter := NewGraphQLConfigAdapter(gqlConfig)
+	actualGraphQLConfigs := adapter.subgraphDataSourceConfigs()
+	assert.Equal(t, expectedDataSourceConfigs, actualGraphQLConfigs)
 }
 
 func TestGraphQLConfigAdapter_engineConfigV2FieldConfigs(t *testing.T) {
@@ -96,11 +170,11 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 				},
 			},
 			Factory: &restDataSource.Factory{
-				Client: httpclient.NewNetHttpClient(httpClient),
+				Client: httpClient,
 			},
 			Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
 				Fetch: restDataSource.FetchConfiguration{
-					URL:    "https://rest.example.com",
+					URL:    "tyk://rest-example",
 					Method: "POST",
 					Header: map[string][]string{
 						"Authorization": {"123"},
@@ -132,12 +206,18 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 				},
 			},
 			Factory: &graphqlDataSource.Factory{
-				Client: httpclient.NewNetHttpClient(httpClient),
+				Client: httpClient,
 			},
 			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
 				Fetch: graphqlDataSource.FetchConfiguration{
-					URL:    "https://graphql.example.com",
+					URL:    "http://graphql-example",
 					Method: "POST",
+					Header: http.Header{
+						"X-Tyk-Internal": []string{"true"},
+					},
+				},
+				Subscription: graphqlDataSource.SubscriptionConfiguration{
+					URL: "http://graphql-example",
 				},
 			}),
 		},
@@ -155,7 +235,7 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 				},
 			},
 			Factory: &restDataSource.Factory{
-				Client: httpclient.NewNetHttpClient(httpClient),
+				Client: httpClient,
 			},
 			Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
 				Fetch: restDataSource.FetchConfiguration{
@@ -178,7 +258,7 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 				},
 			},
 			Factory: &restDataSource.Factory{
-				Client: httpclient.NewNetHttpClient(httpClient),
+				Client: httpClient,
 			},
 			Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
 				Fetch: restDataSource.FetchConfiguration{
@@ -205,7 +285,7 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 				},
 			},
 			Factory: &graphqlDataSource.Factory{
-				Client: httpclient.NewNetHttpClient(httpClient),
+				Client: httpClient,
 			},
 			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
 				Fetch: graphqlDataSource.FetchConfiguration{
@@ -215,6 +295,9 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 						"Auth": {"123"},
 					},
 				},
+				Subscription: graphqlDataSource.SubscriptionConfiguration{
+					URL: "https://graphql.example.com",
+				},
 			}),
 		},
 	}
@@ -222,8 +305,7 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 	var gqlConfig apidef.GraphQLConfig
 	require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2ConfigJson), &gqlConfig))
 
-	adapter := NewGraphQLConfigAdapter(gqlConfig)
-	adapter.SetHttpClient(httpClient)
+	adapter := NewGraphQLConfigAdapter(gqlConfig, WithHttpClient(httpClient))
 	require.NoError(t, adapter.parseSchema())
 
 	actualDataSources, err := adapter.engineConfigV2DataSources()
@@ -265,7 +347,7 @@ const graphqlEngineV2ConfigJson = `{
 					{ "type": "Query", "fields": ["rest"] }
 				],
 				"config": {
-					"url": "https://rest.example.com",
+					"url": "tyk://rest-example",
 					"method": "POST",
 					"headers": {
 						"Authorization": "123",
@@ -290,12 +372,12 @@ const graphqlEngineV2ConfigJson = `{
 			},
 			{
 				"kind": "GraphQL",
-				"internal": false,
+				"internal": true,
 				"root_fields": [
 					{ "type": "Query", "fields": ["gql"] }
 				],
 				"config": {
-					"url": "https://graphql.example.com",
+					"url": "tyk://graphql-example",
 					"method": "POST"
 				}
 			},
@@ -344,6 +426,53 @@ const graphqlEngineV2ConfigJson = `{
 				}
 			}
 		]
+	},
+	"playground": {}
+}`
+
+const federationAccountsServiceSDL = `extend type Query {me: User} type User @key(fields: "id"){ id: ID! username: String!}`
+const federationProductsServiceSDL = `extend type Query {topProducts(first: Int = 5): [Product]} type Product @key(fields: "upc") {upc: String! name: String! price: Int!}`
+const federationReviewsServiceSDL = `type Review { body: String! author: User! @provides(fields: "username") product: Product! } extend type User @key(fields: "id") { id: ID! @external reviews: [Review] } extend type Product @key(fields: "upc") { upc: String! @external reviews: [Review] }`
+const federationMergedSDL = `type Query { me: User topProducts(first: Int = 5): [Product] } type User { id: ID! username: String! reviews: [Review] } type Product { upc: String! name: String! price: Int! reviews: [Review] } type Review { body: String! author: User! product: Product! }`
+
+var graphqlEngineV2SupergraphConfigJson = `{
+	"enabled": true,
+	"execution_mode": "supergraph",
+	"version": "2",
+	"schema": "",
+	"last_schema_update": "2020-11-11T11:11:11.000+01:00",
+	"engine": {
+		"field_configs": [],
+		"data_sources": []
+	},
+	"supergraph": {
+		"subgraphs": [
+			{
+				"api_id": "",
+				"url": "tyk://accounts.service",
+				"sdl": ` + strconv.Quote(federationAccountsServiceSDL) + `
+			},
+			{
+				"api_id": "",
+				"url": "http://products.service",
+				"sdl": ` + strconv.Quote(federationProductsServiceSDL) + `
+			},
+			{
+				"api_id": "",
+				"url": "http://ignored.service",
+				"sdl": ""
+			},
+			{
+				"api_id": "",
+				"url": "http://reviews.service",
+				"sdl": ` + strconv.Quote(federationReviewsServiceSDL) + `
+			}
+		],
+		"global_headers": {
+			"header1": "value1",
+			"header2": "value2"
+		},
+		"merged_sdl": "` + federationMergedSDL + `"
 	},
 	"playground": {}
 }`

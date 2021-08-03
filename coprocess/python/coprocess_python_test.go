@@ -217,7 +217,6 @@ func TestPythonBundles(t *testing.T) {
 		CoprocessConfig: config.CoProcessConfig{
 			EnableCoProcess:  true,
 			PythonPathPrefix: pkgPath,
-			PythonVersion:    "3.5",
 		}})
 	defer ts.Close()
 

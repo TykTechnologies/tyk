@@ -162,7 +162,8 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	specAsJson := specToJson(d.Spec)
 
-	session := user.NewSessionState()
+	session := new(user.SessionState)
+
 	// Encode the session object (if not a pre-process)
 	if !d.Pre && d.UseSession {
 		session = ctxGetSession(r)
@@ -231,6 +232,9 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		r.Body = ioutil.NopCloser(bytes.NewReader(newRequestData.Request.Body))
 	}
 
+	// make sure request's body can be re-read again
+	nopCloseRequestBody(r)
+
 	r.URL, err = url.Parse(newRequestData.Request.URL)
 	if err != nil {
 		return nil, http.StatusOK
@@ -255,8 +259,8 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	// Save the session data (if modified)
 	if !d.Pre && d.UseSession {
 		newMeta := mapStrsToIfaces(newRequestData.SessionMeta)
-		if !reflect.DeepEqual(session.GetMetaData(), newMeta) {
-			session.SetMetaData(newMeta)
+		if !reflect.DeepEqual(session.MetaData, newMeta) {
+			session.MetaData = newMeta
 			ctxScheduleSessionUpdate(r)
 		}
 	}
@@ -290,7 +294,8 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	}
 
 	if d.Auth {
-		ctxSetSession(r, &newRequestData.Session, newRequestData.AuthValue, true)
+		newRequestData.Session.KeyID = newRequestData.AuthValue
+		ctxSetSession(r, &newRequestData.Session, true)
 	}
 
 	return nil, http.StatusOK
@@ -576,7 +581,7 @@ func (j *JSVM) LoadTykJSApi() {
 		apiKey := call.Argument(0).String()
 		apiId := call.Argument(1).String()
 
-		obj, _ := handleGetDetail(apiKey, apiId, false)
+		obj, _ := handleGetDetail(apiKey, apiId, "", false)
 		bs, _ := json.Marshal(obj)
 
 		returnVal, err := j.VM.ToValue(string(bs))
@@ -593,14 +598,14 @@ func (j *JSVM) LoadTykJSApi() {
 		encoddedSession := call.Argument(1).String()
 		suppressReset := call.Argument(2).String()
 
-		newSession := user.NewSessionState()
-		err := json.Unmarshal([]byte(encoddedSession), newSession)
+		newSession := user.SessionState{}
+		err := json.Unmarshal([]byte(encoddedSession), &newSession)
 		if err != nil {
 			j.Log.WithError(err).Error("Failed to decode the sesison data")
 			return otto.Value{}
 		}
 
-		doAddOrUpdate(apiKey, newSession, suppressReset == "1", false)
+		doAddOrUpdate(apiKey, &newSession, suppressReset == "1", false)
 
 		return otto.Value{}
 	})

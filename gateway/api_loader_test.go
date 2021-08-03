@@ -7,6 +7,8 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/apidef"
+
 	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -90,14 +92,79 @@ func TestInternalAPIUsage(t *testing.T) {
 }
 
 func TestFuzzyFindAPI(t *testing.T) {
-	BuildAndLoadAPI(func(spec *APISpec) {
-		spec.Name = "IgnoreCase"
-		spec.APIID = "123456"
-		spec.Proxy.ListenPath = "/"
-	})
+	objectId := apidef.NewObjectId()
 
-	spec := fuzzyFindAPI("ignoreCase")
-	assert.Equal(t, "123456", spec.APIID)
+	BuildAndLoadAPI(
+		func(spec *APISpec) {
+			spec.Name = "IgnoreCase"
+			spec.APIID = "1"
+		},
+		func(spec *APISpec) {
+			spec.Name = "IgnoreCategories #a #b"
+			spec.APIID = "2"
+		},
+		func(spec *APISpec) {
+			spec.Name = "__replace-underscores__"
+			spec.APIID = "3"
+		},
+		func(spec *APISpec) {
+			spec.Name = "@@replace-ats@@"
+			spec.APIID = "4"
+		},
+		func(spec *APISpec) {
+			spec.Name = "matchByHex"
+			spec.APIID = "5"
+			spec.Id = objectId
+		},
+		func(spec *APISpec) {
+			spec.Name = "matchByApiID"
+			spec.APIID = "6"
+		})
+
+	cases := []struct {
+		name, search, expectedAPIID string
+		expectNil                   bool
+	}{
+		{"ignore case", "ignoreCase", "1", false},
+		{"ignore categories", "IgnoreCategories", "2", false},
+		{"replace underscores", "-replace-underscores-", "3", false},
+		{"replace @", "-replace-ats-", "4", false},
+		{"supply hex", objectId.Hex(), "5", false},
+		{"supply APIID", "6", "6", false},
+		{"empty search string", "", "", true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			spec := fuzzyFindAPI(tc.search)
+
+			if tc.expectNil {
+				assert.Nil(t, spec)
+			} else {
+				assert.Equal(t, tc.expectedAPIID, spec.APIID)
+			}
+		})
+	}
+}
+
+func TestAPILoopingName(t *testing.T) {
+	cases := []struct {
+		apiName, expectedOut string
+	}{
+		{"api #a #b #c", "api"},
+		{"__api #a #b #c", "-api"},
+		{"@api #a #b #c", "-api"},
+		{"api", "api"},
+		{"__api__", "-api-"},
+		{"@__ api -_ name @__", "-api-name-"},
+		{"@__ api -_ name @__ #a #b", "-api-name-"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.apiName, func(t *testing.T) {
+			assert.Equal(t, tc.expectedOut, APILoopingName(tc.apiName))
+		})
+	}
 }
 
 func TestGraphQLPlayground(t *testing.T) {
@@ -124,7 +191,9 @@ func TestGraphQLPlayground(t *testing.T) {
 		t.Run("playground html is loaded", func(t *testing.T) {
 			_, _ = g.Run(t, []test.TestCase{
 				{Path: playgroundPath, BodyMatch: `<title>API Playground</title>`, Code: http.StatusOK},
-				{Path: playgroundPath, BodyMatch: fmt.Sprintf(`const apiUrl = "%s"`, endpoint), Code: http.StatusOK},
+				{Path: playgroundPath, BodyMatchFunc: func(bytes []byte) bool {
+					return assert.Contains(t, string(bytes), fmt.Sprintf(`const apiUrl = window.location.origin + "%s";`, endpoint))
+				}, Code: http.StatusOK},
 			}...)
 		})
 		t.Run("playground.js is loaded", func(t *testing.T) {

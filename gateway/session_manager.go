@@ -100,8 +100,8 @@ const (
 func (l *SessionLimiter) limitSentinel(currentSession *user.SessionState, key string, rateScope string, store storage.Handler,
 	globalConf *config.Config, apiLimit *user.APILimit, dryRun bool) bool {
 
-	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.GetKeyHash()
-	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.GetKeyHash() + ".BLOCKED"
+	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash()
+	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash() + ".BLOCKED"
 
 	go l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun)
 
@@ -117,8 +117,8 @@ func (l *SessionLimiter) limitSentinel(currentSession *user.SessionState, key st
 func (l *SessionLimiter) limitRedis(currentSession *user.SessionState, key string, rateScope string, store storage.Handler,
 	globalConf *config.Config, apiLimit *user.APILimit, dryRun bool) bool {
 
-	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.GetKeyHash()
-	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.GetKeyHash() + ".BLOCKED"
+	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash()
+	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash() + ".BLOCKED"
 
 	if l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun) {
 		return true
@@ -254,7 +254,12 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 		quotaScope = scope + "-"
 	}
 
-	rawKey := QuotaKeyPrefix + quotaScope + currentSession.GetKeyHash()
+	key := currentSession.KeyID
+	if config.Global().HashKeys {
+		key = storage.HashStr(currentSession.KeyID)
+	}
+
+	rawKey := QuotaKeyPrefix + quotaScope + key
 	quotaRenewalRate := limit.QuotaRenewalRate
 	quotaRenews := limit.QuotaRenews
 	quotaMax := limit.QuotaMax
@@ -300,7 +305,7 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 		remaining = 0
 	}
 
-	for k, v := range currentSession.GetAccessRights() {
+	for k, v := range currentSession.AccessRights {
 		if v.Limit == nil {
 			continue
 		}
@@ -309,7 +314,7 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 			v.Limit.QuotaRemaining = remaining
 			v.Limit.QuotaRenews = quotaRenews
 		}
-		currentSession.SetAccessRight(k, v)
+		currentSession.AccessRights[k] = v
 	}
 
 	if scope == "" {
@@ -322,8 +327,8 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 
 func GetAccessDefinitionByAPIIDOrSession(currentSession *user.SessionState, api *APISpec) (accessDef *user.AccessDefinition, allowanceScope string, err error) {
 	accessDef = &user.AccessDefinition{}
-	if len(currentSession.GetAccessRights()) > 0 {
-		if rights, ok := currentSession.GetAccessRightByAPIID(api.APIID); !ok {
+	if len(currentSession.AccessRights) > 0 {
+		if rights, ok := currentSession.AccessRights[api.APIID]; !ok {
 			return nil, "", errors.New("unexpected apiID")
 		} else {
 			accessDef.Limit = rights.Limit
@@ -331,19 +336,16 @@ func GetAccessDefinitionByAPIIDOrSession(currentSession *user.SessionState, api 
 			allowanceScope = rights.AllowanceScope
 		}
 	}
-
 	if accessDef.Limit == nil {
-		accessDef = &user.AccessDefinition{
-			Limit: &user.APILimit{
-				QuotaMax:           currentSession.QuotaMax,
-				QuotaRenewalRate:   currentSession.QuotaRenewalRate,
-				QuotaRenews:        currentSession.QuotaRenews,
-				Rate:               currentSession.Rate,
-				Per:                currentSession.Per,
-				ThrottleInterval:   currentSession.ThrottleInterval,
-				ThrottleRetryLimit: currentSession.ThrottleRetryLimit,
-				MaxQueryDepth:      currentSession.MaxQueryDepth,
-			},
+		accessDef.Limit = &user.APILimit{
+			QuotaMax:           currentSession.QuotaMax,
+			QuotaRenewalRate:   currentSession.QuotaRenewalRate,
+			QuotaRenews:        currentSession.QuotaRenews,
+			Rate:               currentSession.Rate,
+			Per:                currentSession.Per,
+			ThrottleInterval:   currentSession.ThrottleInterval,
+			ThrottleRetryLimit: currentSession.ThrottleRetryLimit,
+			MaxQueryDepth:      currentSession.MaxQueryDepth,
 		}
 	}
 

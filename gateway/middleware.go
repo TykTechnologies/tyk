@@ -297,8 +297,7 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 	ctxDisableSessionUpdate(r)
 
 	if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-		clone := session.Clone()
-		SessionCache.Set(session.GetKeyHash(), &clone, cache.DefaultExpiration)
+		SessionCache.Set(session.KeyHash(), session.Clone(), cache.DefaultExpiration)
 	}
 
 	return true
@@ -309,12 +308,12 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	rights := make(map[string]user.AccessDefinition)
 	tags := make(map[string]bool)
-	if session.GetMetaData() == nil {
-		session.SetMetaData(make(map[string]interface{}))
+	if session.MetaData == nil {
+		session.MetaData = make(map[string]interface{})
 	}
 
 	didQuota, didRateLimit, didACL, didComplexity := make(map[string]bool), make(map[string]bool), make(map[string]bool), make(map[string]bool)
-	policies := session.GetPolicyIDs()
+	policies := session.PolicyIDs()
 
 	for _, polID := range policies {
 		policiesMu.RLock()
@@ -350,7 +349,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				}
 
 				idForScope := apiID
-				// check if we already have limit on API level specified when policy was created
+				// check if we don't have limit on API level specified when policy was created
 				if accessRights.Limit == nil || *accessRights.Limit == (user.APILimit{}) {
 					// limit was not specified on API level so we will populate it from policy
 					idForScope = policy.ID
@@ -368,7 +367,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				accessRights.Limit.SetBy = idForScope
 
 				// respect current quota renews (on API limit level)
-				if r, ok := session.GetAccessRightByAPIID(apiID); ok && r.Limit != nil {
+				if r, ok := session.AccessRights[apiID]; ok && r.Limit != nil {
 					accessRights.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
 
@@ -385,11 +384,11 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 			usePartitions := policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl || policy.Partitions.Complexity
 
 			for k, v := range policy.AccessRights {
-				ar := &v
-
 				if v.Limit == nil {
 					v.Limit = &user.APILimit{}
 				}
+
+				ar := v
 
 				if !usePartitions || policy.Partitions.Acl {
 					didACL[k] = true
@@ -440,7 +439,11 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 							}
 						}
 
-						ar = &r
+						if r.Limit == nil {
+							r.Limit = &user.APILimit{}
+						}
+
+						ar = r
 					}
 
 					ar.Limit.SetBy = policy.ID
@@ -510,12 +513,12 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				}
 
 				// Respect existing QuotaRenews
-				if r, ok := session.GetAccessRightByAPIID(k); ok && r.Limit != nil {
+				if r, ok := session.AccessRights[k]; ok && r.Limit != nil {
 					ar.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
 
 				if !usePartitions || policy.Partitions.Acl {
-					rights[k] = *ar
+					rights[k] = ar
 				}
 			}
 
@@ -554,7 +557,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		}
 
 		for k, v := range policy.MetaData {
-			session.SetMetaDataKey(k, v)
+			session.MetaData[k] = v
 		}
 
 		if policy.LastUpdated > session.LastUpdated {
@@ -572,7 +575,18 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		session.Tags = append(session.Tags, tag)
 	}
 
-	distinctACL := map[string]bool{}
+	if len(policies) == 0 {
+		for apiID, accessRight := range session.AccessRights {
+			// check if the api in the session has per api limit
+			if accessRight.Limit != nil && *accessRight.Limit != (user.APILimit{}) {
+				accessRight.AllowanceScope = apiID
+				session.AccessRights[apiID] = accessRight
+			}
+		}
+	}
+
+	distinctACL := make(map[string]bool)
+
 	for _, v := range rights {
 		if v.Limit.SetBy != "" {
 			distinctACL[v.Limit.SetBy] = true
@@ -632,7 +646,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 	// Override session ACL if at least one policy define it
 	if len(didACL) > 0 {
-		session.SetAccessRights(rights)
+		session.AccessRights = rights
 	}
 
 	return nil
@@ -640,8 +654,8 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
 // the Auth Handler, if not found it will fail
-func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, r *http.Request) (user.SessionState, bool) {
-	key := *originalKey
+func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r *http.Request) (user.SessionState, bool) {
+	key := originalKey
 	minLength := t.Spec.GlobalConfig.MinTokenLength
 	if minLength == 0 {
 		// See https://github.com/TykTechnologies/tyk/issues/1681
@@ -657,7 +671,6 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 	keyHash := key
 	cacheKey := key
 	if t.Spec.GlobalConfig.HashKeys {
-		keyHash = storage.HashStr(key)
 		cacheKey = storage.HashStr(key, storage.HashMurmur64) // always hash cache keys with murmur64 to prevent collisions
 	}
 
@@ -666,34 +679,38 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 		cachedVal, found := SessionCache.Get(cacheKey)
 		if found {
 			t.Logger().Debug("--> Key found in local cache")
-			session := cachedVal.(*user.SessionState)
-			if err := t.ApplyPolicies(session); err != nil {
+			session := cachedVal.(user.SessionState).Clone()
+			if err := t.ApplyPolicies(&session); err != nil {
 				t.Logger().Error(err)
-				return session.Clone(), false
+				return session, false
 			}
-			return session.Clone(), true
+			return session, true
 		}
 	}
 
 	// Check session store
 	t.Logger().Debug("Querying keystore")
 	session, found := GlobalSessionManager.SessionDetail(t.Spec.OrgID, key, false)
+
 	if found {
+		if t.Spec.GlobalConfig.HashKeys {
+			keyHash = storage.HashStr(session.KeyID)
+		}
+		session := session.Clone()
 		session.SetKeyHash(keyHash)
 		// If exists, assume it has been authorized and pass on
 		// cache it
-		clone := session.Clone()
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			go SessionCache.Set(cacheKey, &clone, cache.DefaultExpiration)
+			SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
 		}
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		if err := t.ApplyPolicies(&session); err != nil {
 			t.Logger().Error(err)
-			return session.Clone(), false
+			return session, false
 		}
 		t.Logger().Debug("Got key")
-		return session.Clone(), true
+		return session, true
 	}
 
 	if _, ok := t.Spec.AuthManager.Store().(*RPCStorageHandler); ok && rpc.IsEmergencyMode() {
@@ -705,30 +722,33 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 	// 2. If not there, get it from the AuthorizationHandler
 	session, found = t.Spec.AuthManager.SessionDetail(t.Spec.OrgID, key, false)
 	if found {
-		// update value of originalKey, as for custom-keys it might get updated (the key is generated again using alias)
-		*originalKey = key
+		key = session.KeyID
 
+		session := session.Clone()
 		session.SetKeyHash(keyHash)
 		// If not in Session, and got it from AuthHandler, create a session with a new TTL
+
 		t.Logger().Info("Recreating session for key: ", obfuscateKey(key))
 
 		// cache it
-		clone := session.Clone()
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			go SessionCache.Set(cacheKey, &clone, cache.DefaultExpiration)
+			SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
 		}
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		if err := t.ApplyPolicies(&session); err != nil {
 			t.Logger().Error(err)
-			return session.Clone(), false
+			return session, false
 		}
 
 		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.SessionLifetime))
 		ctxScheduleSessionUpdate(r)
+	} else {
+		// defaulting
+		session.KeyID = key
 	}
 
-	return session.Clone(), found
+	return session, found
 }
 
 // FireEvent is added to the BaseMiddleware object so it is available across the entire stack
