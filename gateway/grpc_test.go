@@ -298,21 +298,13 @@ func TestGRPC_TLS(t *testing.T) {
 
 func TestGRPC_MutualTLS(t *testing.T) {
 	// Mutual Authentication for both downstream-tyk and tyk-upstream
-	certManager := getCertManager()
+
+	//generate certificates
 	_, _, combinedClientPEM, clientCert := genCertificate(&x509.Certificate{})
 	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
 	serverCertPem, _, combinedPEM, _ := genServerCertificate()
-
-	certID, _ := certManager.Add(combinedPEM, "") // For tyk to know downstream
-	defer certManager.Delete(certID, "")
-
-	clientCertID, _ := certManager.Add(combinedClientPEM, "") // For upstream to know tyk
-	defer certManager.Delete(clientCertID, "")
-
-	// Protected gRPC server
-	target, s := startGRPCServer(t, clientCert.Leaf, setupHelloSVC)
-	defer target.Close()
-	defer s.GracefulStop()
+	// we can know the certId before add it to cert manager
+	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
 	// Tyk
 	conf := func(globalConf *config.Config) {
@@ -324,6 +316,19 @@ func TestGRPC_MutualTLS(t *testing.T) {
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
+
+	certID, _ = ts.Gw.CertificateManager.Add(combinedPEM, "") // For tyk to know downstream
+	defer ts.Gw.CertificateManager.Delete(certID, "")
+	// reload so the gw loads the cert
+	ts.ReloadGatewayProxy()
+
+	clientCertID, _ := ts.Gw.CertificateManager.Add(combinedClientPEM, "") // For upstream to know tyk
+	defer ts.Gw.CertificateManager.Delete(clientCertID, "")
+
+	// Protected gRPC server
+	target, s := startGRPCServer(t, clientCert.Leaf, setupHelloSVC)
+	defer target.Close()
+	defer s.GracefulStop()
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
