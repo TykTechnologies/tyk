@@ -193,7 +193,7 @@ func TestHTTP2_TLS(t *testing.T) {
 // but consume it internally via h2c
 // user -> tyk = HTTPS | tyk -> upstream = H2C
 func TestTLSTyk_H2cUpstream(t *testing.T) {
-	certManager := getCertManager()
+//	certManager := getCertManager()
 
 	// Certificates
 	_, _, _, clientCert := genCertificate(&x509.Certificate{})
@@ -214,8 +214,8 @@ func TestTLSTyk_H2cUpstream(t *testing.T) {
 	ts := StartTest(conf)
 	defer ts.Close()
 
-	certID, _ = certManager.Add(combinedPEM, "")
-	defer certManager.Delete(certID, "")
+	certID, _ = ts.Gw.CertificateManager.Add(combinedPEM, "")
+	defer ts.Gw.CertificateManager.Delete(certID, "")
 
 	ts.ReloadGatewayProxy()
 
