@@ -858,14 +858,9 @@ func TestSSLForceCommonName(t *testing.T) {
 	})
 }
 
-// fail
 func TestKeyWithCertificateTLS(t *testing.T) {
-
-	certificateManager := getCertManager()
-
 	_, _, combinedPEM, _ := genServerCertificate()
-	serverCertID, _ := certificateManager.Add(combinedPEM, "")
-	defer certificateManager.Delete(serverCertID, "")
+	serverCertID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
 	conf := func(globalConf *config.Config) {
 		globalConf.HttpServerOptions.UseSSL = true
@@ -877,10 +872,14 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 	ts := StartTest(conf)
 	defer ts.Close()
 
+	serverCertID, _ = ts.Gw.CertificateManager.Add(combinedPEM, "")
+	defer ts.Gw.CertificateManager.Delete(serverCertID, "")
+	ts.ReloadGatewayProxy()
+
 	orgId := "default"
 	t.Run("Without domain", func(t *testing.T) {
 		clientPEM, _, _, clientCert := genCertificate(&x509.Certificate{})
-		clientCertID, err := certificateManager.Add(clientPEM, orgId)
+		clientCertID, err := ts.Gw.CertificateManager.Add(clientPEM, orgId)
 
 		if err != nil {
 			t.Fatal("certificate should be added to cert manager")
@@ -935,7 +934,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 
 	t.Run("With custom domain", func(t *testing.T) {
 		clientPEM, _, _, clientCert := genCertificate(&x509.Certificate{})
-		clientCertID, err := certificateManager.Add(clientPEM, orgId)
+		clientCertID, err := ts.Gw.CertificateManager.Add(clientPEM, orgId)
 
 		if err != nil {
 			t.Fatal("certificate should be added to cert manager")
@@ -999,7 +998,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 
 	t.Run("With regex custom domain", func(t *testing.T) {
 		clientPEM, _, _, clientCert := genCertificate(&x509.Certificate{})
-		clientCertID, err := certificateManager.Add(clientPEM, orgId)
+		clientCertID, err := ts.Gw.CertificateManager.Add(clientPEM, orgId)
 
 		if err != nil {
 			t.Fatal("certificate should be added to cert manager")
@@ -1040,7 +1039,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 	// check that a key no longer works after the cert is removed
 	t.Run("Cert removed", func(t *testing.T) {
 		clientPEM, _, _, clientCert := genCertificate(&x509.Certificate{})
-		clientCertID, err := certificateManager.Add(clientPEM, orgId)
+		clientCertID, err := ts.Gw.CertificateManager.Add(clientPEM, orgId)
 
 		if err != nil {
 			t.Fatal("certificate should be added to cert manager")
@@ -1069,7 +1068,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 
 		// check we can use the key after remove the cert
 		ts.Run(t, test.TestCase{Path: "/", Code: 200, Client: client})
-		certificateManager.Delete(clientCertID, orgId)
+		ts.Gw.CertificateManager.Delete(clientCertID, orgId)
 		// now we should not be allowed to use the key
 		ts.Run(t, test.TestCase{Path: "/", Code: 403, Client: client})
 	})
