@@ -669,7 +669,6 @@ func (*loginCredsOrToken) RequireTransportSecurity() bool {
 func TestGRPC_Stream_MutualTLS(t *testing.T) {
 	// Mutual Authentication for both downstream-tyk and tyk-upstream
 
-	//certManager := getCertManager()
 	serverCertPem, _, combinedPEM, _ := genServerCertificate()
 	serverCertID, _, _ := certs.GetCertIDAndChainPEM(serverCertPem, "")
 
@@ -720,14 +719,8 @@ func TestGRPC_Stream_MutualTLS(t *testing.T) {
 
 func TestGRPC_Stream_TokenBasedAuthentication(t *testing.T) {
 
-	certManager := getCertManager()
 	_, _, combinedPEM, _ := genServerCertificate()
-	certID, err := certManager.Add(combinedPEM, "")
-	defer certManager.Delete(certID, "")
-
-	if err != nil {
-		t.Errorf("could not add certificate: %v", err.Error())
-	}
+	serverCertID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
 	// gRPC server
 	target, s := startGRPCServer(t, nil, setupStreamSVC)
@@ -739,11 +732,19 @@ func TestGRPC_Stream_TokenBasedAuthentication(t *testing.T) {
 		globalConf.ProxySSLInsecureSkipVerify = true
 		globalConf.ProxyEnableHttp2 = true
 		globalConf.HttpServerOptions.EnableHttp2 = true
-		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+		globalConf.HttpServerOptions.SSLCertificates = []string{serverCertID}
 		globalConf.HttpServerOptions.UseSSL = true
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
+
+	certID, err := ts.Gw.CertificateManager.Add(combinedPEM, "")
+	if err != nil {
+		t.Errorf("could not add certificate: %v", err.Error())
+	}
+
+	defer ts.Gw.CertificateManager.Delete(certID, "")
+	ts.ReloadGatewayProxy()
 
 	session := CreateStandardSession()
 	session.AccessRights = map[string]user.AccessDefinition{"test": {APIID: "test", Versions: []string{"v1"}}}
@@ -842,7 +843,7 @@ func TestGRPC_Stream_BasicAuthentication(t *testing.T) {
 }
 
 func TestGRPC_Stream_H2C(t *testing.T) {
-	t.Skip()
+
 	ts := StartTest(nil)
 	defer ts.Close()
 
