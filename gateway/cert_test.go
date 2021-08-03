@@ -277,15 +277,8 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 
 func TestAPIMutualTLS(t *testing.T) {
 
-	// Just a hack to get a Certificate manager
-	certManager := getCertManager()
-
 	serverCertPem, _, combinedPEM, _ := genServerCertificate()
-	certID, err := certManager.Add(combinedPEM, "")
-	if err != nil {
-		panic(err)
-	}
-	defer certManager.Delete(certID, "")
+	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
 	conf := func(globalConf *config.Config) {
 		globalConf.EnableCustomDomains = true
@@ -294,6 +287,13 @@ func TestAPIMutualTLS(t *testing.T) {
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
+
+	certID, err := ts.Gw.CertificateManager.Add(combinedPEM, "")
+	if err != nil {
+		panic(err)
+	}
+	defer ts.Gw.CertificateManager.Delete(certID, "")
+	ts.ReloadGatewayProxy()
 
 	// Initialize client certificates
 	clientCertPem, _, _, clientCert := genCertificate(&x509.Certificate{})
