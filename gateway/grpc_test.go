@@ -738,12 +738,12 @@ func TestGRPC_Stream_TokenBasedAuthentication(t *testing.T) {
 	ts := StartTest(conf)
 	defer ts.Close()
 
-	certID, err := ts.Gw.CertificateManager.Add(combinedPEM, "")
+	serverCertID, err := ts.Gw.CertificateManager.Add(combinedPEM, "")
 	if err != nil {
 		t.Errorf("could not add certificate: %v", err.Error())
 	}
 
-	defer ts.Gw.CertificateManager.Delete(certID, "")
+	defer ts.Gw.CertificateManager.Delete(serverCertID, "")
 	ts.ReloadGatewayProxy()
 
 	session := CreateStandardSession()
@@ -791,10 +791,8 @@ func TestGRPC_Stream_TokenBasedAuthentication(t *testing.T) {
 
 func TestGRPC_Stream_BasicAuthentication(t *testing.T) {
 
-	certManager := getCertManager()
 	_, _, combinedPEM, _ := genServerCertificate()
-	certID, _ := certManager.Add(combinedPEM, "")
-	defer certManager.Delete(certID, "")
+	serverCertID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
 	// gRPC server
 	target, s := startGRPCServer(t, nil, setupStreamSVC)
@@ -806,11 +804,15 @@ func TestGRPC_Stream_BasicAuthentication(t *testing.T) {
 		globalConf.ProxySSLInsecureSkipVerify = true
 		globalConf.ProxyEnableHttp2 = true
 		globalConf.HttpServerOptions.EnableHttp2 = true
-		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+		globalConf.HttpServerOptions.SSLCertificates = []string{serverCertID}
 		globalConf.HttpServerOptions.UseSSL = true
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
+
+	serverCertID, _ = ts.Gw.CertificateManager.Add(combinedPEM, "")
+	defer ts.Gw.CertificateManager.Delete(serverCertID, "")
+	ts.ReloadGatewayProxy()
 
 	session := CreateStandardSession()
 	session.BasicAuthData.Password = "password"
