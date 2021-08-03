@@ -356,10 +356,8 @@ func TestGRPC_MutualTLS(t *testing.T) {
 
 func TestGRPC_BasicAuthentication(t *testing.T) {
 
-	certManager := getCertManager()
 	_, _, combinedPEM, _ := genServerCertificate()
-	certID, _ := certManager.Add(combinedPEM, "")
-	defer certManager.Delete(certID, "")
+	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
 	// gRPC server
 	target, s := startGRPCServer(t, nil, setupHelloSVC)
@@ -376,6 +374,10 @@ func TestGRPC_BasicAuthentication(t *testing.T) {
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
+
+	certID, _ = ts.Gw.CertificateManager.Add(combinedPEM, "")
+	defer ts.Gw.CertificateManager.Delete(certID, "")
+	ts.ReloadGatewayProxy()
 
 	session := CreateStandardSession()
 	session.BasicAuthData.Password = "password"
