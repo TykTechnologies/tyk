@@ -138,7 +138,7 @@ func TestGRPC_H2C(t *testing.T) {
 
 // For gRPC, we should be sure that HTTP/2 works with Tyk.
 func TestHTTP2_TLS(t *testing.T) {
-	certManager := getCertManager()
+	//certManager := getCertManager()
 
 	expected := "HTTP/2.0"
 
@@ -147,16 +147,13 @@ func TestHTTP2_TLS(t *testing.T) {
 	serverCertPem, _, combinedPEM, _ := genServerCertificate()
 	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
-
 	// Upstream server supporting HTTP/2
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		actual := r.Proto
 		if expected != actual {
 			t.Fatalf("Tyk-Upstream connection protocol is expected %s, actual %s", expected, actual)
 		}
-
 		fmt.Fprintln(w, "Hello, I am an HTTP/2 Server")
-
 	}))
 	upstream.TLS = new(tls.Config)
 	upstream.TLS.NextProtos = []string{"h2"}
@@ -174,9 +171,10 @@ func TestHTTP2_TLS(t *testing.T) {
 	ts := StartTest(conf)
 	defer ts.Close()
 
-	certID, _ = certManager.Add(combinedPEM, "")
-	defer certManager.Delete(certID, "")
+	certID, _ = ts.Gw.CertificateManager.Add(combinedPEM, "")
+	defer ts.Gw.CertificateManager.Delete(certID, "")
 
+	// reload server so it takes the new cert
 	ts.ReloadGatewayProxy()
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
