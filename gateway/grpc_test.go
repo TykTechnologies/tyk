@@ -138,7 +138,6 @@ func TestGRPC_H2C(t *testing.T) {
 
 // For gRPC, we should be sure that HTTP/2 works with Tyk.
 func TestHTTP2_TLS(t *testing.T) {
-	//certManager := getCertManager()
 
 	expected := "HTTP/2.0"
 
@@ -199,8 +198,7 @@ func TestTLSTyk_H2cUpstream(t *testing.T) {
 	// Certificates
 	_, _, _, clientCert := genCertificate(&x509.Certificate{})
 	serverCertPem, _, combinedPEM, _ := genServerCertificate()
-	certID, _ := certManager.Add(combinedPEM, "")
-	defer certManager.Delete(certID, "")
+	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
 	var port = 6666
 	// run Tyk in HTTPS
@@ -215,6 +213,11 @@ func TestTLSTyk_H2cUpstream(t *testing.T) {
 
 	ts := StartTest(conf)
 	defer ts.Close()
+
+	certID, _ = certManager.Add(combinedPEM, "")
+	defer certManager.Delete(certID, "")
+
+	ts.ReloadGatewayProxy()
 
 	h2cServ := &http2.Server{}
 	expected := "HTTP/2.0"
