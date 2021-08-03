@@ -125,9 +125,7 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 
 	//We generate the combinedPEM and get its serverCertID
 	_, _, combinedPEM, _ := genServerCertificate()
-	serverCertID, _ , _ := certs.GetCertIDAndChainPEM(combinedPEM,"")
-
-
+	serverCertID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
 	client := GetTLSClient(nil, nil)
 	conf := func(globalConf *config.Config) {

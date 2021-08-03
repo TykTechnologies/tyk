@@ -497,7 +497,7 @@ func TestUpdateKeyWithCert(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	CertificateManager := getCertManager()
+	//CertificateManager := getCertManager()
 	apiId := "MTLSApi"
 	pID := ts.CreatePolicy(func(p *user.Policy) {})
 
@@ -515,13 +515,13 @@ func TestUpdateKeyWithCert(t *testing.T) {
 	t.Run("Update key with valid cert", func(t *testing.T) {
 		// create cert
 		clientCertPem, _, _, _ := genCertificate(&x509.Certificate{})
-		certID, _ := CertificateManager.Add(clientCertPem, "")
-		defer CertificateManager.Delete(certID, "")
+		certID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		defer ts.Gw.CertificateManager.Delete(certID, "")
 
 		// new valid cert
 		newClientCertPem, _, _, _ := genCertificate(&x509.Certificate{})
-		newCertID, _ := CertificateManager.Add(newClientCertPem, "")
-		defer CertificateManager.Delete(newCertID, "")
+		newCertID, _ := ts.Gw.CertificateManager.Add(newClientCertPem, "")
+		defer ts.Gw.CertificateManager.Delete(newCertID, "")
 
 		// create session base and set cert
 		session, key := ts.CreateSession(func(s *user.SessionState) {
@@ -543,7 +543,7 @@ func TestUpdateKeyWithCert(t *testing.T) {
 
 	t.Run("Update key with empty cert", func(t *testing.T) {
 		clientCertPem, _, _, _ := genCertificate(&x509.Certificate{})
-		certID, _ := CertificateManager.Add(clientCertPem, "")
+		certID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
 
 		// create session base and set cert
 		session, key := ts.CreateSession(func(s *user.SessionState) {
@@ -566,7 +566,7 @@ func TestUpdateKeyWithCert(t *testing.T) {
 
 	t.Run("Update key with invalid cert", func(t *testing.T) {
 		clientCertPem, _, _, _ := genCertificate(&x509.Certificate{})
-		certID, _ := CertificateManager.Add(clientCertPem, "")
+		certID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
 
 		// create session base and set cert
 		session, key := ts.CreateSession(func(s *user.SessionState) {

@@ -1072,7 +1072,7 @@ func (s *Test) Do(tc test.TestCase) (*http.Response, error) {
 	return s.testRunner.Do(req, &tc)
 }
 
-func (s *Test) ReloadGatewayProxy(){
+func (s *Test) ReloadGatewayProxy() {
 	s.gwMu.Lock()
 	s.Gw.DefaultProxyMux.swap(&proxyMux{}, s.Gw)
 	s.Gw.startServer()
