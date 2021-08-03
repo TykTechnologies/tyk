@@ -201,21 +201,16 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 	serverCertPem, _, combinedPEM, _ := genServerCertificate()
 	dir, _ := ioutil.TempDir("", "certs")
 
-	certManager := getCertManager()
-
 	defer func() {
 		os.RemoveAll(dir)
-		certManager.FlushCache()
 		tlsConfigCache.Flush()
 	}()
 
+	clientWithoutCert := GetTLSClient(nil, nil)
 	clientCertPem, _, _, clientCert := genCertificate(&x509.Certificate{})
 	clientWithCert := GetTLSClient(&clientCert, serverCertPem)
 
-	clientWithoutCert := GetTLSClient(nil, nil)
-	certID, _ := certManager.Add(combinedPEM, "")
-	defer certManager.Delete(certID, "")
-
+	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 	t.Run("Separate domain", func(t *testing.T) {
 
 		conf := func(globalConf *config.Config) {
@@ -226,6 +221,10 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 		}
 		ts := StartTest(conf)
 		defer ts.Close()
+
+		certID, _ := ts.Gw.CertificateManager.Add(combinedPEM, "")
+		defer ts.Gw.CertificateManager.Delete(certID, "")
+		ts.ReloadGatewayProxy()
 
 		defer func() {
 			ts.Gw.CertificateManager.FlushCache()
@@ -239,7 +238,7 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 		unknownErr := "x509: certificate signed by unknown authority"
 
 		ts.Run(t, []test.TestCase{
-			// Should acess tyk without client certificates
+			// Should access tyk without client certificates
 			{Client: clientWithoutCert},
 			// Should raise error for ControlAPI without certificate
 			{ControlRequest: true, ErrorMatch: unknownErr},
@@ -249,9 +248,8 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 	})
 
 	t.Run("Separate domain/ control api with valid cert", func(t *testing.T) {
-		clientCertID, _ := certManager.Add(clientCertPem, "")
-		defer certManager.Delete(clientCertID, "")
 
+		clientCertID, _, _ := certs.GetCertIDAndChainPEM(clientCertPem, "")
 		conf := func(globalConf *config.Config) {
 			globalConf.HttpServerOptions.UseSSL = true
 			globalConf.Security.ControlAPIUseMutualTLS = true
@@ -262,6 +260,13 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 
 		ts := StartTest(conf)
 		defer ts.Close()
+
+		certID, _ := ts.Gw.CertificateManager.Add(combinedPEM, "")
+		defer ts.Gw.CertificateManager.Delete(certID, "")
+
+		clientCertID, _ = ts.Gw.CertificateManager.Add(clientCertPem, "")
+		defer ts.Gw.CertificateManager.Delete(clientCertID, "")
+		ts.ReloadGatewayProxy()
 
 		// Should pass request with valid client cert
 		ts.Run(t, test.TestCase{

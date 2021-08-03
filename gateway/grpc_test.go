@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/TykTechnologies/tyk/certs"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -16,6 +15,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/TykTechnologies/tyk/certs"
 
 	"github.com/TykTechnologies/tyk/config"
 
@@ -696,7 +697,6 @@ func TestGRPC_Stream_MutualTLS(t *testing.T) {
 	target, s := startGRPCServer(t, clientCert.Leaf, setupStreamSVC)
 	defer target.Close()
 	defer s.GracefulStop()
-
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
