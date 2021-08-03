@@ -193,7 +193,6 @@ func TestHTTP2_TLS(t *testing.T) {
 // but consume it internally via h2c
 // user -> tyk = HTTPS | tyk -> upstream = H2C
 func TestTLSTyk_H2cUpstream(t *testing.T) {
-//	certManager := getCertManager()
 
 	// Certificates
 	_, _, _, clientCert := genCertificate(&x509.Certificate{})
@@ -253,10 +252,8 @@ func TestTLSTyk_H2cUpstream(t *testing.T) {
 
 func TestGRPC_TLS(t *testing.T) {
 
-	certManager := getCertManager()
 	_, _, combinedPEM, _ := genServerCertificate()
-	certID, _ := certManager.Add(combinedPEM, "")
-	defer certManager.Delete(certID, "")
+	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
 	// gRPC server
 	target, s := startGRPCServer(t, nil, setupHelloSVC)
@@ -273,6 +270,10 @@ func TestGRPC_TLS(t *testing.T) {
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
+
+	certID, _ = ts.Gw.CertificateManager.Add(combinedPEM, "")
+	defer ts.Gw.CertificateManager.Delete(certID, "")
+	ts.ReloadGatewayProxy()
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
