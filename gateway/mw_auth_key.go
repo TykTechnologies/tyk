@@ -143,12 +143,25 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		k.setContextVars(r, key)
 	}
 
-	// Try to decode JSON key first, fallback to org-key format:
-	keyID, err := storage.TokenID(key)
-	if err != nil {
-		keyID = storage.StripOrg(key, session.OrgID)
+	// Try using org-key format first:
+	if strings.HasPrefix(key, session.OrgID) {
+		err, statusCode := k.validateSignature(r, key[len(session.OrgID):])
+		if err == nil && statusCode == http.StatusOK {
+			return err, statusCode
+		}
 	}
-	return k.validateSignature(r, keyID)
+
+	// As a second approach, try to use the internal ID that's part of the B64 JSON key:
+	keyID, err := storage.TokenID(key)
+	if err == nil {
+		err, statusCode := k.validateSignature(r, keyID)
+		if err == nil {
+			return err, statusCode
+		}
+	}
+
+	// Last try is to take the key as is:
+	return k.validateSignature(r, key)
 }
 
 func (k *AuthKey) reportInvalidKey(key string, r *http.Request, msg string, errMsg string) (error, int) {

@@ -132,10 +132,6 @@ func TokenOrg(token string) string {
 	return ""
 }
 
-func StripOrg(token string, orgID string) string {
-	return strings.TrimPrefix(token, orgID)
-}
-
 var (
 	HashSha256    = "sha256"
 	HashMurmur32  = "murmur32"
