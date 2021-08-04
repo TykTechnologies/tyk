@@ -143,11 +143,12 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		k.setContextVars(r, key)
 	}
 
-	if session.OrgID != "" {
-		key = storage.StripOrg(key, session.OrgID)
+	// Try to decode JSON key first, fallback to org-key format:
+	keyID, err := storage.TokenID(key)
+	if err != nil {
+		keyID = storage.StripOrg(key, session.OrgID)
 	}
-
-	return k.validateSignature(r, key)
+	return k.validateSignature(r, keyID)
 }
 
 func (k *AuthKey) reportInvalidKey(key string, r *http.Request, msg string, errMsg string) (error, int) {

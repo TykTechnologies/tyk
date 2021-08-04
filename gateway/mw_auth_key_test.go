@@ -123,7 +123,8 @@ func TestSignatureValidation(t *testing.T) {
 
 		key := CreateSession()
 		hasher := signature_validator.MasheryMd5sum{}
-		validHash := hasher.Hash(key, "foobar", time.Now().Unix())
+		keyID, _ := storage.TokenID(key)
+		validHash := hasher.Hash(keyID, "foobar", time.Now().Unix())
 
 		validSigHeader := map[string]string{
 			"authorization": key,
@@ -161,9 +162,10 @@ func TestSignatureValidation(t *testing.T) {
 				"signature_secret": "foobar",
 			}
 		})
+		keyID, _ := storage.TokenID(key)
 
 		hasher := signature_validator.MasheryMd5sum{}
-		validHash := hasher.Hash(key, "foobar", time.Now().Unix())
+		validHash := hasher.Hash(keyID, "foobar", time.Now().Unix())
 
 		validSigHeader := map[string]string{
 			"authorization": key,
