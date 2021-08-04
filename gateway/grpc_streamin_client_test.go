@@ -173,6 +173,7 @@ func runRouteChat(t *testing.T, client pb.RouteGuideClient) {
 	if err != nil {
 		t.Logf("Error closing the grpc stream: %+v", err)
 	}
+	t.Logf("grpc stream closed")
 }
 
 func randomPoint(r *rand.Rand) *pb.Point {
