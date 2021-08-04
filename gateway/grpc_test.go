@@ -688,10 +688,11 @@ func TestGRPC_Stream_MutualTLS(t *testing.T) {
 	certID, _ := ts.Gw.CertificateManager.Add(combinedPEM, "") // For tyk to know downstream
 	defer ts.Gw.CertificateManager.Delete(certID, "")
 	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
-	ts.ReloadGatewayProxy()
 
 	clientCertID, _ := ts.Gw.CertificateManager.Add(combinedClientPEM, "") // For upstream to know tyk
 	defer ts.Gw.CertificateManager.Delete(clientCertID, "")
+
+	ts.ReloadGatewayProxy()
 
 	// Protected gRPC server
 	target, s := startGRPCServer(t, clientCert.Leaf, setupStreamSVC)
