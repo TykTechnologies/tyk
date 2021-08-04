@@ -726,7 +726,7 @@ func TestGRPC_Stream_TokenBasedAuthentication(t *testing.T) {
 	// gRPC server
 	target, s := startGRPCServer(t, nil, setupStreamSVC)
 	defer target.Close()
-	defer s.GracefulStop()
+	defer s.Stop()
 
 	// Tyk
 	conf := func(globalConf *config.Config) {
