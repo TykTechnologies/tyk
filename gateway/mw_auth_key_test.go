@@ -123,8 +123,7 @@ func TestSignatureValidation(t *testing.T) {
 
 		key := CreateSession()
 		hasher := signature_validator.MasheryMd5sum{}
-		keyID, _ := storage.TokenID(key)
-		validHash := hasher.Hash(keyID, "foobar", time.Now().Unix())
+		validHash := hasher.Hash(key, "foobar", time.Now().Unix())
 
 		validSigHeader := map[string]string{
 			"authorization": key,
@@ -162,10 +161,9 @@ func TestSignatureValidation(t *testing.T) {
 				"signature_secret": "foobar",
 			}
 		})
-		keyID, _ := storage.TokenID(key)
 
 		hasher := signature_validator.MasheryMd5sum{}
-		validHash := hasher.Hash(keyID, "foobar", time.Now().Unix())
+		validHash := hasher.Hash(key, "foobar", time.Now().Unix())
 
 		validSigHeader := map[string]string{
 			"authorization": key,
@@ -185,6 +183,79 @@ func TestSignatureValidation(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 			{Headers: invalidSigHeader, Code: 401},
 			{Headers: validSigHeader, Code: 200},
+		}...)
+	})
+
+	t.Run("Dynamic signature with custom key", func(t *testing.T) {
+		api.Auth.Signature.Secret = "$tyk_meta.signature_secret"
+		LoadAPI(api)
+
+		customKey := "c8zj99aze7hdvtaqh4qvcck7"
+		secret := "foobar"
+
+		session := CreateStandardSession()
+		session.AccessRights = map[string]user.AccessDefinition{"test": {
+			APIID: "test", Versions: []string{"v1"},
+		}}
+		session.MetaData = map[string]interface{}{
+			"signature_secret": secret,
+		}
+
+		client := GetTLSClient(nil, nil)
+		_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/keys/" + customKey,
+			Data: session, Client: client, Code: http.StatusOK})
+
+		hasher := signature_validator.MasheryMd5sum{}
+
+		// First request is for raw key scenarios, signature is based on this key:
+		validHash := hasher.Hash(customKey, secret, time.Now().Unix())
+		validSigHeader := map[string]string{
+			"authorization": customKey,
+			"signature":     hex.EncodeToString(validHash),
+		}
+
+		// Second request uses token (org ID + key) and token-based signature:
+		token, err := storage.GenerateToken("default", customKey, "murmur64")
+		if err != nil {
+			t.Fatal(err)
+		}
+		validHash2 := hasher.Hash(token, secret, time.Now().Unix())
+		validSigHeader2 := map[string]string{
+			"authorization": token,
+			"signature":     hex.EncodeToString(validHash2),
+		}
+
+		// Third request uses token (org ID + key) and raw key based signature:
+		validSigHeader3 := map[string]string{
+			"authorization": token,
+			"signature":     hex.EncodeToString(validHash),
+		}
+
+		// Fourth request uses raw key and token-based signature:
+		validSigHeader4 := map[string]string{
+			"authorization": customKey,
+			"signature":     hex.EncodeToString(validHash2),
+		}
+
+		invalidSigHeader := map[string]string{
+			"authorization": customKey,
+			"signature":     "junk",
+		}
+		storage.DisableRedis(true)
+		ts.Run(t, []test.TestCase{
+			{Headers: invalidSigHeader, Code: http.StatusForbidden},
+			{Headers: validSigHeader, Code: http.StatusForbidden},
+			{Headers: validSigHeader2, Code: http.StatusForbidden},
+			{Headers: validSigHeader3, Code: http.StatusForbidden},
+			{Headers: validSigHeader4, Code: http.StatusForbidden},
+		}...)
+		storage.DisableRedis(false)
+		ts.Run(t, []test.TestCase{
+			{Headers: invalidSigHeader, Code: http.StatusUnauthorized},
+			{Headers: validSigHeader, Code: http.StatusOK},
+			{Headers: validSigHeader2, Code: http.StatusOK},
+			{Headers: validSigHeader3, Code: http.StatusOK},
+			{Headers: validSigHeader4, Code: http.StatusOK},
 		}...)
 	})
 }
