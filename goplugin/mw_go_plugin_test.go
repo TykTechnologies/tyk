@@ -3,9 +3,7 @@
 package goplugin_test
 
 import (
-	"context"
 	"net/http"
-	"os"
 	"testing"
 	"time"
 
@@ -14,19 +12,19 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
-func TestMain(m *testing.M) {
+/*func TestMain(m *testing.M) {
 	os.Exit(gateway.InitTestMain(context.Background(), m))
-}
+}*/
 
 // TestGoPluginMWs tests all possible Go-plugin MWs ("pre", "auth_check", "post_key_auth" and "post")
 // Please see ./test/goplugins/test_goplugin.go for plugin implementation details
 
 // run go build -buildmode=plugin -o goplugins.so in ./test/goplugins directory prior to running tests
 func TestGoPluginMWs(t *testing.T) {
-	ts := gateway.StartTest()
+	ts := gateway.StartTest(nil)
 	defer ts.Close()
 
-	gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+	ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 		spec.APIID = "plugin_api"
 		spec.Proxy.ListenPath = "/goplugin"
 		spec.UseKeylessAccess = false
@@ -98,10 +96,10 @@ func TestGoPluginMWs(t *testing.T) {
 }
 
 func TestGoPluginResponseHook(t *testing.T) {
-	ts := gateway.StartTest()
+	ts := gateway.StartTest(nil)
 	defer ts.Close()
 
-	gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+	ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 		spec.APIID = "plugin_api"
 		spec.Proxy.ListenPath = "/goplugin"
 		spec.UseKeylessAccess = true
@@ -141,10 +139,10 @@ func TestGoPluginResponseHook(t *testing.T) {
 }
 
 func TestGoPluginPerPathSingleFile(t *testing.T) {
-	ts := gateway.StartTest()
+	ts := gateway.StartTest(nil)
 	defer ts.Close()
 
-	gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+	ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 		spec.APIID = "plugin_api"
 		spec.Proxy.ListenPath = "/goplugin"
 		spec.UseKeylessAccess = true
@@ -218,10 +216,10 @@ func TestGoPluginPerPathSingleFile(t *testing.T) {
 }
 
 func TestGoPluginAPIandPerPath(t *testing.T) {
-	ts := gateway.StartTest()
+	ts := gateway.StartTest(nil)
 	defer ts.Close()
 
-	gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+	ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 		spec.APIID = "plugin_api"
 		spec.Proxy.ListenPath = "/goplugin"
 		spec.UseKeylessAccess = true
