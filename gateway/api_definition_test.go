@@ -14,8 +14,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/TykTechnologies/tyk/config"
-
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -849,7 +847,12 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 }
 
 func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
-	return
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.ReloadTestCase.Enable()
+	defer ts.Gw.ReloadTestCase.Disable()
+
 	// Test Dashboard
 	callNum := 0
 	tsDash := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -867,19 +870,15 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 	}))
 	defer tsDash.Close()
 
-	conf := func(conf *config.Config) {
-		conf.UseDBAppConfigs = true
-		conf.AllowInsecureConfigs = true
-		conf.DBAppConfOptions.ConnectionString = tsDash.URL
-	}
-	ts := StartTest(conf)
-	defer ts.Close()
-
-	ts.Gw.ReloadTestCase.Enable()
-	defer ts.Gw.ReloadTestCase.Disable()
 	ts.Gw.apisMu.Lock()
 	ts.Gw.apisByID = make(map[string]*APISpec)
 	ts.Gw.apisMu.Unlock()
+
+	globalConf := ts.Gw.GetConfig()
+	globalConf.UseDBAppConfigs = true
+	globalConf.AllowInsecureConfigs = true
+	globalConf.DBAppConfOptions.ConnectionString = tsDash.URL
+	ts.Gw.SetConfig(globalConf)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
