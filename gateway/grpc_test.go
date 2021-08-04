@@ -107,7 +107,7 @@ func TestGRPC_H2C(t *testing.T) {
 	// gRPC server
 	target, s := startGRPCServerH2C(t, setupHelloSVC)
 	defer target.Close()
-	defer s.GracefulStop()
+	defer s.Stop()
 
 	// Tyk
 	globalConf := ts.Gw.GetConfig()
@@ -259,7 +259,7 @@ func TestGRPC_TLS(t *testing.T) {
 	// gRPC server
 	target, s := startGRPCServer(t, nil, setupHelloSVC)
 	defer target.Close()
-	defer s.GracefulStop()
+	defer s.Stop()
 
 	// Tyk
 	conf := func(globalConf *config.Config) {
@@ -329,7 +329,7 @@ func TestGRPC_MutualTLS(t *testing.T) {
 	// Protected gRPC server
 	target, s := startGRPCServer(t, clientCert.Leaf, setupHelloSVC)
 	defer target.Close()
-	defer s.GracefulStop()
+	defer s.Stop()
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
@@ -363,7 +363,7 @@ func TestGRPC_BasicAuthentication(t *testing.T) {
 	// gRPC server
 	target, s := startGRPCServer(t, nil, setupHelloSVC)
 	defer target.Close()
-	defer s.GracefulStop()
+	defer s.Stop()
 
 	// Tyk
 	conf := func(globalConf *config.Config) {
@@ -422,7 +422,7 @@ func TestGRPC_TokenBasedAuthentication(t *testing.T) {
 	// gRPC server
 	target, s := startGRPCServer(t, nil, setupHelloSVC)
 	defer target.Close()
-	defer s.GracefulStop()
+	defer s.Stop()
 
 	// Tyk
 	conf := func(globalConf *config.Config) {
@@ -806,7 +806,7 @@ func TestGRPC_Stream_BasicAuthentication(t *testing.T) {
 	// gRPC server
 	target, s := startGRPCServer(t, nil, setupStreamSVC)
 	defer target.Close()
-	defer s.GracefulStop()
+	defer s.Stop()
 
 	// Tyk
 	conf := func(globalConf *config.Config) {
@@ -864,7 +864,7 @@ func TestGRPC_Stream_H2C(t *testing.T) {
 	// gRPC server
 	target, s := startGRPCServerH2C(t, setupStreamSVC)
 	defer target.Close()
-	defer s.GracefulStop()
+	defer s.Stop()
 
 	// Tyk
 	globalConf := ts.Gw.GetConfig()
