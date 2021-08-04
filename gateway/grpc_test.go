@@ -697,7 +697,11 @@ func TestGRPC_Stream_MutualTLS(t *testing.T) {
 	// Protected gRPC server
 	target, s := startGRPCServer(t, clientCert.Leaf, setupStreamSVC)
 	defer target.Close()
-	defer s.GracefulStop()
+	defer func() {
+		t.Log("Will stop grpc server")
+		s.Stop()
+		t.Log("grpc server stopped")
+	}()
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
@@ -726,7 +730,11 @@ func TestGRPC_Stream_TokenBasedAuthentication(t *testing.T) {
 	// gRPC server
 	target, s := startGRPCServer(t, nil, setupStreamSVC)
 	defer target.Close()
-	defer s.Stop()
+	defer func() {
+		t.Log("Will stop grpc server")
+		s.Stop()
+		t.Log("grpc server stopped")
+	}()
 
 	// Tyk
 	conf := func(globalConf *config.Config) {
