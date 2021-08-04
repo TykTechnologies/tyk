@@ -152,16 +152,9 @@ func TestGatewayTLS(t *testing.T) {
 	})
 
 	t.Run("Redis certificate", func(t *testing.T) {
-		// just a hack to get a working certManager
 		s := StartTest(nil)
-		certManager := s.Gw.CertificateManager
-		s.Close()
-
-		certID, err := certManager.Add(combinedPEM, "")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer certManager.Delete(certID, "")
+		defer s.Close()
+		certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
 		conf := func(globalConf *config.Config) {
 			globalConf.HttpServerOptions.UseSSL = true
@@ -169,6 +162,13 @@ func TestGatewayTLS(t *testing.T) {
 		}
 		ts := StartTest(conf)
 		defer ts.Close()
+
+		certID, err := ts.Gw.CertificateManager.Add(combinedPEM, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer ts.Gw.CertificateManager.Delete(certID, "")
+		ts.ReloadGatewayProxy()
 
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
