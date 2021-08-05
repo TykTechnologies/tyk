@@ -159,7 +159,7 @@ func runRouteChat(t *testing.T, client pb.RouteGuideClient) {
 			if err := stream.Send(note); err != nil {
 				t.Fatalf("Failed to send a note: %v", err)
 			}
-			t.Logf("Sending note %v",note.Message)
+			t.Logf("Sending note %v", note.Message)
 		}
 		wg.Done()
 		t.Logf("finish to send the notes")

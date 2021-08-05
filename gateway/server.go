@@ -1358,6 +1358,7 @@ func Start() {
 
 	// ToDo:Config replace for get default conf
 	gw := NewGateway(config.Default)
+	gw.ctx = ctx
 	gw.SetNodeID("solo-" + uuid.NewV4().String())
 
 	gw.SessionID = uuid.NewV4().String()
