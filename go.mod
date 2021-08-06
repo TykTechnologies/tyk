@@ -44,7 +44,8 @@ require (
 	github.com/huandu/xstrings v1.3.0 // indirect
 	github.com/imdario/mergo v0.3.9 // indirect
 	github.com/jensneuse/abstractlogger v0.0.4
-	github.com/jensneuse/graphql-go-tools v1.13.7
+	github.com/jensneuse/graphql-go-tools v1.20.2
+	github.com/jensneuse/graphql-go-tools/examples/federation v0.0.0-20210804084050-3c2e37945919 // indirect
 	github.com/justinas/alice v0.0.0-20171023064455-03f45bd4b7da
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/lonelycode/go-uuid v0.0.0-20141202165402-ed3ca8a15a93
@@ -54,6 +55,7 @@ require (
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
 	github.com/miekg/dns v1.0.14
 	github.com/mitchellh/mapstructure v1.4.1
+	github.com/nats-io/nats-server/v2 v2.3.4 // indirect
 	github.com/newrelic/go-agent v2.13.0+incompatible
 	github.com/nsf/jsondiff v0.0.0-20210303162244-6ea32392771e
 	github.com/opentracing/opentracing-go v1.1.0
@@ -80,9 +82,9 @@ require (
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/xeipuuv/gojsonschema v0.0.0-20171025060643-212d8a0df7ac
 	github.com/xenolf/lego v0.3.2-0.20170618175828-28ead50ff1ca // indirect
-	golang.org/x/crypto v0.0.0-20210314154223-e6e6c4f2bb5b
+	golang.org/x/crypto v0.0.0-20210616213533-5ff15b29337e
 	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
-	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
+	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 	google.golang.org/appengine v1.6.1 // indirect
 	google.golang.org/grpc v1.29.1
 	gopkg.in/Masterminds/sprig.v2 v2.21.0
@@ -97,6 +99,6 @@ require (
 	rsc.io/letsencrypt v0.0.2
 )
 
-replace github.com/jensneuse/graphql-go-tools => github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20210719163346-e69d4234c60e
+replace github.com/jensneuse/graphql-go-tools => github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20210804084050-3c2e37945919
 
 //replace github.com/jensneuse/graphql-go-tools => ../graphql-go-tools
