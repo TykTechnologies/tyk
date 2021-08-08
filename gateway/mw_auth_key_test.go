@@ -185,7 +185,7 @@ func TestSignatureValidation(t *testing.T) {
 
 	t.Run("Dynamic signature with custom key", func(t *testing.T) {
 		api.Auth.Signature.Secret = "$tyk_meta.signature_secret"
-		LoadAPI(api)
+		ts.Gw.LoadAPI(api)
 
 		customKey := "c8zj99aze7hdvtaqh4qvcck7"
 		secret := "foobar"
