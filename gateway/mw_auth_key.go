@@ -143,6 +143,24 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		k.setContextVars(r, key)
 	}
 
+	// Try using org-key format first:
+	if strings.HasPrefix(key, session.OrgID) {
+		err, statusCode := k.validateSignature(r, key[len(session.OrgID):])
+		if err == nil && statusCode == http.StatusOK {
+			return err, statusCode
+		}
+	}
+
+	// As a second approach, try to use the internal ID that's part of the B64 JSON key:
+	keyID, err := storage.TokenID(key)
+	if err == nil {
+		err, statusCode := k.validateSignature(r, keyID)
+		if err == nil {
+			return err, statusCode
+		}
+	}
+
+	// Last try is to take the key as is:
 	return k.validateSignature(r, key)
 }
 
