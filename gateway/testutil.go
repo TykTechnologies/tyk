@@ -849,7 +849,6 @@ type Test struct {
 	// GlobalConfig deprecate this and instead use GW.getConfig()
 	GlobalConfig     config.Config
 	config           TestConfig
-	cancel           func()
 	gwMu             sync.Mutex
 	Gw               *Gateway `json:"-"`
 	HttpHandler      *http.Server
@@ -865,8 +864,6 @@ type SlaveDataCenter struct {
 func (s *Test) Start(genConf func(globalConf *config.Config)) *Gateway {
 	// init and create gw
 	ctx, cancel := context.WithCancel(context.Background())
-	s.cancel = cancel
-
 	s.BootstrapGw(ctx, cancel, genConf)
 
 	s.Gw.setupPortsWhitelist()
@@ -1072,8 +1069,8 @@ func (s *Test) ReloadGatewayProxy() {
 }
 
 func (s *Test) Close() {
-	if s.cancel != nil {
-		s.cancel()
+	if s.Gw.cancelFn != nil {
+		s.Gw.cancelFn()
 	}
 
 	for _, p := range s.Gw.DefaultProxyMux.proxies {
