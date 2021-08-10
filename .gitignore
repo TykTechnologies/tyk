@@ -51,3 +51,4 @@ __pycache__/
 tyk.test
 
 tyk_linux_*
+/dist/

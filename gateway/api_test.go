@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"crypto/x509"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -375,8 +376,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 		}...)
 
 		sessionState, found := GlobalSessionManager.SessionDetail("default", key, false)
-		accessRight, _ := sessionState.GetAccessRightByAPIID(testAPIID)
-		if !found || accessRight.APIID != testAPIID || len(sessionState.ApplyPolicies) != 2 {
+		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 2 {
 			t.Fatal("Adding policy to the list failed")
 		}
 	})
@@ -391,8 +391,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 		}...)
 
 		sessionState, found := GlobalSessionManager.SessionDetail("default", key, false)
-		accessRight, _ := sessionState.GetAccessRightByAPIID(testAPIID)
-		if !found || accessRight.APIID != testAPIID || len(sessionState.ApplyPolicies) != 0 {
+		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 0 {
 			t.Fatal("Removing policy from the list failed")
 		}
 	})
@@ -449,8 +448,8 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 
 			sessionState, found := GlobalSessionManager.SessionDetail(session.OrgID, key, false)
 
-			if !found || !reflect.DeepEqual(expected, sessionState.GetMetaData()) {
-				t.Fatalf("Expected %v, returned %v", expected, sessionState.GetMetaData())
+			if !found || !reflect.DeepEqual(expected, sessionState.MetaData) {
+				t.Fatalf("Expected %v, returned %v", expected, sessionState.MetaData)
 			}
 		}
 
@@ -483,11 +482,104 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 				"key-meta2": "key-value2",
 			}
 			session.ApplyPolicies = []string{pID, pID2}
-			session.SetMetaData(map[string]interface{}{
+			session.MetaData = map[string]interface{}{
 				"key-meta2": "key-value2",
-			})
+			}
 			assertMetaData(session, expected)
 		})
+	})
+}
+
+func TestUpdateKeyWithCert(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+
+	apiId := "MTLSApi"
+	pID := CreatePolicy(func(p *user.Policy) {})
+
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = apiId
+		spec.UseKeylessAccess = false
+		spec.Auth.UseCertificate = true
+		spec.OrgID = "default"
+		spec.UseStandardAuth = true
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"authToken": {UseCertificate: true},
+		}
+	})
+
+	t.Run("Update key with valid cert", func(t *testing.T) {
+		// create cert
+		clientCertPem, _, _, _ := genCertificate(&x509.Certificate{})
+		certID, _ := CertificateManager.Add(clientCertPem, "")
+		defer CertificateManager.Delete(certID, "")
+
+		// new valid cert
+		newClientCertPem, _, _, _ := genCertificate(&x509.Certificate{})
+		newCertID, _ := CertificateManager.Add(newClientCertPem, "")
+		defer CertificateManager.Delete(newCertID, "")
+
+		// create session base and set cert
+		session, key := ts.CreateSession(func(s *user.SessionState) {
+			s.ApplyPolicies = []string{pID}
+			s.AccessRights = map[string]user.AccessDefinition{apiId: {
+				APIID: apiId, Versions: []string{"v1"},
+			}}
+			s.Certificate = certID
+		})
+
+		session.Certificate = newCertID
+		sessionData, _ := json.Marshal(session)
+
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+
+	t.Run("Update key with empty cert", func(t *testing.T) {
+		clientCertPem, _, _, _ := genCertificate(&x509.Certificate{})
+		certID, _ := CertificateManager.Add(clientCertPem, "")
+
+		// create session base and set cert
+		session, key := ts.CreateSession(func(s *user.SessionState) {
+			s.ApplyPolicies = []string{pID}
+			s.AccessRights = map[string]user.AccessDefinition{apiId: {
+				APIID: apiId, Versions: []string{"v1"},
+			}}
+			s.Certificate = certID
+		})
+
+		// attempt to set an empty cert
+		session.Certificate = ""
+		sessionData, _ := json.Marshal(session)
+
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 400},
+		}...)
+	})
+
+	t.Run("Update key with invalid cert", func(t *testing.T) {
+		clientCertPem, _, _, _ := genCertificate(&x509.Certificate{})
+		certID, _ := CertificateManager.Add(clientCertPem, "")
+
+		// create session base and set cert
+		session, key := ts.CreateSession(func(s *user.SessionState) {
+			s.ApplyPolicies = []string{pID}
+			s.AccessRights = map[string]user.AccessDefinition{apiId: {
+				APIID: apiId, Versions: []string{"v1"},
+			}}
+			s.Certificate = certID
+		})
+
+		session.Certificate = "invalid-cert-id"
+		sessionData, _ := json.Marshal(session)
+
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 400},
+		}...)
 	})
 }
 
@@ -1387,10 +1479,7 @@ func TestContextSession(t *testing.T) {
 	if ctxGetSession(r) != nil {
 		t.Fatal("expected ctxGetSession to return nil")
 	}
-	ctxSetSession(r,
-		user.NewSessionState(),
-		"",
-		false)
+	ctxSetSession(r, &user.SessionState{}, false)
 	if ctxGetSession(r) == nil {
 		t.Fatal("expected ctxGetSession to return non-nil")
 	}
@@ -1399,7 +1488,7 @@ func TestContextSession(t *testing.T) {
 			t.Fatal("expected ctxSetSession of zero val to panic")
 		}
 	}()
-	ctxSetSession(r, nil, "", false)
+	ctxSetSession(r, nil, false)
 }
 
 func TestApiLoaderLongestPathFirst(t *testing.T) {

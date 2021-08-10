@@ -30,14 +30,19 @@ jobs:
         with:
             python-version: '3.5'
 
-      - name: Setup Lua
-        run:
-          sudo apt-get install libluajit-5.1-dev
-
-      - name: Install Dependencies
+      - name: Install Dependencies and basic hygiene test
+        id: hygiene
         run: |
-          go get golang.org/x/tools/cmd/goimports
-
+          sudo apt-get install libluajit-5.1-dev
+          GO111MODULE=off go get golang.org/x/tools/cmd/goimports
+          gofmt -l . 2>&1 | tee fmt.log
+          fmt_code=${PIPESTATUS[0]}
+          echo "::set-output name=fmt::$(sed -ze 's/%/%25/g;s/\n/%0A/g' fmt.log)"
+          goimports -l . 2>&1 | tee imports.log
+          imports_code=${PIPESTATUS[0]}
+          echo "::set-output name=imports::$(sed -ze 's/%/%25/g;s/\n/%0A/g' imports.log)"
+          [[ $fmt_code -ne 0 || $imports_code -ne 0 ]] && exit 1
+          
           python -m pip install --upgrade pip
           pip install setuptools
           pip install google
@@ -57,5 +62,27 @@ jobs:
             ${{ runner.os }}-go-
 
       - name: Run Gateway Tests
+        id: ci-tests
         run: |
-          ./bin/ci-tests.sh
+          ./bin/ci-tests.sh 2>&1 | tee test.log
+          result_code=${PIPESTATUS[0]}
+          echo "::set-output name=log::$(sed -ze 's/%/%25/g;s/\n/%0A/g' test.log)"
+          exit $result_code
+
+      - name: Notify status
+        if: ${{ failure() && github.event.pull_request.number }}
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            # :boom: CI tests failed :see_no_evil:
+            ## CI test log
+            ```shellsession
+            ${{ steps.ci-tests.outputs.log || 'all ok' }}
+            ```
+            ## gofmt
+            ${{ steps.hygiene.outputs.fmt || 'all ok' }}
+            ## goimports
+            ${{ steps.hygiene.outputs.imports || 'all ok' }}
+
+            If the above are ok, please look at [the run](https://github.com/TykTechnologies/tyk/pull/${{ github.event.pull_request.number }}/checks?check_run_id=${{ github.run_id }}) or in the _Checks_ tab.

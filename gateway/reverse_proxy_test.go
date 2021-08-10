@@ -743,6 +743,76 @@ func TestGraphQL_InternalDataSource(t *testing.T) {
 		spec.Proxy.ListenPath = "/tyk-rest"
 	})[0]
 
+	tykSubgraphAccounts := BuildAPI(func(spec *APISpec) {
+		spec.Name = "subgraph-accounts"
+		spec.APIID = "subgraph1"
+		spec.Proxy.TargetURL = testSubgraphAccounts
+		spec.Proxy.ListenPath = "/tyk-subgraph-accounts"
+		spec.GraphQL = apidef.GraphQLConfig{
+			Enabled:       true,
+			ExecutionMode: apidef.GraphQLExecutionModeSubgraph,
+			Version:       apidef.GraphQLConfigVersion2,
+			Schema:        gqlSubgraphSchemaAccounts,
+			Subgraph: apidef.GraphQLSubgraphConfig{
+				SDL: gqlSubgraphSDLAccounts,
+			},
+		}
+	})[0]
+
+	tykSubgraphReviews := BuildAPI(func(spec *APISpec) {
+		spec.Name = "subgraph-reviews"
+		spec.APIID = "subgraph2"
+		spec.Proxy.TargetURL = testSubgraphReviews
+		spec.Proxy.ListenPath = "/tyk-subgraph-reviews"
+		spec.GraphQL = apidef.GraphQLConfig{
+			Enabled:       true,
+			ExecutionMode: apidef.GraphQLExecutionModeSubgraph,
+			Version:       apidef.GraphQLConfigVersion2,
+			Schema:        gqlSubgraphSchemaReviews,
+			Subgraph: apidef.GraphQLSubgraphConfig{
+				SDL: gqlSubgraphSDLReviews,
+			},
+		}
+	})[0]
+
+	t.Run("supergraph (engine v2)", func(t *testing.T) {
+		supergraph := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.APIID = "supergraph"
+			spec.GraphQL = apidef.GraphQLConfig{
+				Enabled:       true,
+				Version:       apidef.GraphQLConfigVersion2,
+				ExecutionMode: apidef.GraphQLExecutionModeSupergraph,
+				Supergraph: apidef.GraphQLSupergraphConfig{
+					Subgraphs: []apidef.GraphQLSubgraphEntity{
+						{
+							APIID: "subgraph1",
+							URL:   "tyk://" + tykSubgraphAccounts.Name,
+							SDL:   gqlSubgraphSDLAccounts,
+						},
+						{
+							APIID: "subgraph2",
+							URL:   "tyk://" + tykSubgraphReviews.Name,
+							SDL:   gqlSubgraphSDLReviews,
+						},
+					},
+					MergedSDL: gqlMergedSupergraphSDL,
+				},
+				Schema: gqlMergedSupergraphSDL,
+			}
+		})[0]
+
+		LoadAPI(tykSubgraphAccounts, tykSubgraphReviews, supergraph)
+
+		reviews := graphql.Request{
+			Query: `query Query { me { id username reviews { body } } }`,
+		}
+
+		_, _ = g.Run(t, []test.TestCase{
+			{Data: reviews, BodyMatch: `{"data":{"me":{"id":"1","username":"tyk","reviews":\[{"body":"A highly effective form of birth control."},{"body":"Fedoras are one of the most fashionable hats around and can look great with a variety of outfits."}\]}}}`, Code: http.StatusOK},
+		}...)
+	})
+
 	t.Run("graphql engine v2", func(t *testing.T) {
 		composedAPI := BuildAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
@@ -847,6 +917,85 @@ func TestGraphQL_ProxyIntrospectionInterrupt(t *testing.T) {
 		_, _ = g.Run(t, []test.TestCase{
 			{Data: validRequest, BodyMatch: `"Headers":{"Accept-Encoding"`, Code: http.StatusOK},
 		}...)
+	})
+}
+
+func TestGraphQL_OptionsPassThrough(t *testing.T) {
+	g := StartTest()
+	defer g.Close()
+
+	var headers = map[string]string{
+		"Host":                           g.URL,
+		"Connection":                     "keep-alive",
+		"Accept":                         "*/*",
+		"Access-Control-Request-Method":  http.MethodPost,
+		"Access-Control-Request-Headers": "content-type",
+		"Origin":                         "http://192.168.1.123:3000",
+		"User-Agent":                     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36",
+		"Sec-Fetch-Mode":                 "cors",
+		"Referer":                        "http://192.168.1.123:3000/",
+		"Accept-Encoding":                "gzip, deflate",
+		"Accept-Language":                "en-US,en;q=0.9",
+	}
+
+	t.Run("ProxyOnly should pass through", func(t *testing.T) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.GraphQL.Enabled = true
+			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
+			spec.GraphQL.Schema = "schema { query: query_root } type query_root { hello: String }"
+			spec.Proxy.ListenPath = "/starwars"
+			spec.CORS = apidef.CORSConfig{
+				Enable:             true,
+				OptionsPassthrough: true,
+			}
+		})
+		_, _ = g.Run(t, test.TestCase{
+			Method:  http.MethodOptions,
+			Path:    "/starwars",
+			Headers: headers,
+			Code:    http.StatusOK,
+			HeadersMatch: map[string]string{
+				"Access-Control-Allow-Methods": http.MethodPost,
+				"Access-Control-Allow-Headers": "Content-Type",
+				"Access-Control-Allow-Origin":  "*",
+			},
+		})
+	})
+	t.Run("UDG should not pass through", func(t *testing.T) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.GraphQL.Enabled = true
+			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+			spec.GraphQL.Schema = "schema { query: query_root } type query_root { hello: String }"
+			spec.Proxy.ListenPath = "/starwars-udg"
+			spec.CORS = apidef.CORSConfig{
+				Enable:             true,
+				OptionsPassthrough: true,
+			}
+		})
+		_, _ = g.Run(t, test.TestCase{
+			Method:  http.MethodOptions,
+			Path:    "/starwars-udg",
+			Headers: headers,
+			Code:    http.StatusInternalServerError,
+		})
+	})
+	t.Run("Supergraph should not pass through", func(t *testing.T) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.GraphQL.Enabled = true
+			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+			spec.GraphQL.Schema = "schema { query: query_root } type query_root { hello: String }"
+			spec.Proxy.ListenPath = "/starwars-supergraph"
+			spec.CORS = apidef.CORSConfig{
+				Enable:             true,
+				OptionsPassthrough: true,
+			}
+		})
+		_, _ = g.Run(t, test.TestCase{
+			Method:  http.MethodOptions,
+			Path:    "/starwars-supergraph",
+			Headers: headers,
+			Code:    http.StatusInternalServerError,
+		})
 	})
 }
 

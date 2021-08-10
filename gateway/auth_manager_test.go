@@ -5,9 +5,10 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/headers"
+
+	"github.com/TykTechnologies/tyk/apidef"
+	_ "github.com/TykTechnologies/tyk/headers"
 
 	"github.com/TykTechnologies/tyk/storage"
 
@@ -31,9 +32,9 @@ func TestAuthenticationAfterDeleteKey(t *testing.T) {
 		})[0]
 
 		key := CreateSession(func(s *user.SessionState) {
-			s.SetAccessRights(map[string]user.AccessDefinition{api.APIID: {
+			s.AccessRights = map[string]user.AccessDefinition{api.APIID: {
 				APIID: api.APIID,
-			}})
+			}}
 		})
 		deletePath := "/tyk/keys/" + key
 		authHeader := map[string]string{
@@ -73,9 +74,9 @@ func TestAuthenticationAfterUpdateKey(t *testing.T) {
 		key := generateToken("", "")
 
 		session := CreateStandardSession()
-		session.SetAccessRights(map[string]user.AccessDefinition{api.APIID: {
+		session.AccessRights = map[string]user.AccessDefinition{api.APIID: {
 			APIID: api.APIID,
-		}})
+		}}
 
 		GlobalSessionManager.UpdateSession(storage.HashKey(key), session, 0, config.Global().HashKeys)
 
@@ -87,9 +88,9 @@ func TestAuthenticationAfterUpdateKey(t *testing.T) {
 			{Path: "/get", Headers: authHeader, Code: http.StatusOK},
 		}...)
 
-		session.SetAccessRights(map[string]user.AccessDefinition{"dummy": {
+		session.AccessRights = map[string]user.AccessDefinition{"dummy": {
 			APIID: "dummy",
-		}})
+		}}
 
 		GlobalSessionManager.UpdateSession(storage.HashKey(key), session, 0, config.Global().HashKeys)
 
@@ -111,12 +112,17 @@ func TestAuthenticationAfterUpdateKey(t *testing.T) {
 func TestHashKeyFunctionChanged(t *testing.T) {
 	_, _, combinedPEM, _ := genServerCertificate()
 	serverCertID, _ := CertificateManager.Add(combinedPEM, "")
-	defer CertificateManager.Delete(serverCertID, "")
+	orgId := "default"
+	defer CertificateManager.Delete(serverCertID, orgId)
 
-	_, _, _, clientCert := genCertificate(&x509.Certificate{})
-	clientCertID := certs.HexSHA256(clientCert.Certificate[0])
+	clientPEM, _, _, clientCert := genCertificate(&x509.Certificate{})
+
+	clientCertID, err := CertificateManager.Add(clientPEM, orgId)
+	if err != nil {
+		t.Fatal("certificate should be added to cert manager")
+	}
+
 	client := GetTLSClient(nil, nil)
-
 	globalConf := config.Global()
 	globalConf.HttpServerOptions.UseSSL = true
 	globalConf.HttpServerOptions.SSLCertificates = []string{serverCertID}
@@ -134,7 +140,7 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = false
 		spec.AuthConfigs = map[string]apidef.AuthConfig{
-			authTokenType: {UseCertificate: true},
+			authTokenType: {UseCertificate: false},
 		}
 	})[0]
 
@@ -160,6 +166,7 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 	}
 
 	t.Run("custom key", func(t *testing.T) {
+
 		const customKey = "custom-key"
 
 		session := CreateStandardSession()
@@ -175,6 +182,9 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 
 	t.Run("basic auth key", func(t *testing.T) {
 		api.UseBasicAuth = true
+		api.AuthConfigs = map[string]apidef.AuthConfig{
+			authTokenType: {UseCertificate: true},
+		}
 		LoadAPI(api)
 		globalConf = config.Global()
 
@@ -197,6 +207,11 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 	})
 
 	t.Run("client certificate", func(t *testing.T) {
+		api.UseBasicAuth = false
+		api.AuthConfigs = map[string]apidef.AuthConfig{
+			authTokenType: {UseCertificate: true},
+		}
+		LoadAPI(api)
 		session := CreateStandardSession()
 		session.Certificate = clientCertID
 		session.BasicAuthData.Password = "password"
@@ -210,4 +225,5 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 		client = GetTLSClient(&clientCert, nil)
 		testChangeHashFunc(t, nil, client, http.StatusForbidden)
 	})
+
 }

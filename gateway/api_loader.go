@@ -121,10 +121,6 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		"prefix": "coprocess",
 	})
 
-	if strings.Contains(spec.Proxy.TargetURL, "h2c://") {
-		spec.Proxy.TargetURL = strings.Replace(spec.Proxy.TargetURL, "h2c://", "http://", 1)
-	}
-
 	if spec.Proxy.Transport.SSLMaxVersion > 0 {
 		spec.Proxy.Transport.SSLMaxVersion = tls.VersionTLS12
 	}
@@ -317,6 +313,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 					BaseMiddleware: baseMid,
 					Path:           obj.Path,
 					SymbolName:     obj.Name,
+					APILevel:       true,
 				},
 			)
 		} else if mwDriver != apidef.OttoDriver {
@@ -387,6 +384,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 					BaseMiddleware: baseMid,
 					Path:           mwAuthCheckFunc.Path,
 					SymbolName:     mwAuthCheckFunc.Name,
+					APILevel:       true,
 				},
 			)
 		}
@@ -406,6 +404,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 						BaseMiddleware: baseMid,
 						Path:           obj.Path,
 						SymbolName:     obj.Name,
+						APILevel:       true,
 					},
 				)
 			} else {
@@ -434,6 +433,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid})
+	mwAppendEnabled(&chainArray, &GoPluginMiddleware{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &RequestSigning{BaseMiddleware: baseMid})
 
@@ -445,6 +445,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 					BaseMiddleware: baseMid,
 					Path:           obj.Path,
 					SymbolName:     obj.Name,
+					APILevel:       true,
 				},
 			)
 		} else if mwDriver != apidef.OttoDriver {
@@ -631,6 +632,10 @@ func trimCategories(name string) string {
 	return name
 }
 
+func APILoopingName(name string) string {
+	return replaceNonAlphaNumeric(trimCategories(name))
+}
+
 func fuzzyFindAPI(search string) *APISpec {
 	if search == "" {
 		return nil
@@ -642,7 +647,8 @@ func fuzzyFindAPI(search string) *APISpec {
 	for _, api := range apisByID {
 		if api.APIID == search ||
 			api.Id.Hex() == search ||
-			strings.EqualFold(replaceNonAlphaNumeric(trimCategories(api.Name)), search) {
+			strings.EqualFold(APILoopingName(api.Name), search) {
+
 			return api
 		}
 	}
@@ -744,9 +750,15 @@ func readGraphqlPlaygroundTemplate() {
 	}
 }
 
+const (
+	playgroundJSTemplateName   = "playground.js"
+	playgroundHTMLTemplateName = "index.html"
+)
+
 func loadGraphQLPlayground(spec *APISpec, subrouter *mux.Router) {
-	// endpoint is the endpoint of the url which playground makes request to.
+	// endpoint is a graphql server url to which a playground makes the request.
 	endpoint := spec.Proxy.ListenPath
+	playgroundPath := path.Join("/", spec.GraphQL.GraphQLPlayground.Path)
 
 	// If tyk-cloud is enabled, listen path will be api id and slug is mapped to listen path in nginx config.
 	// So, requests should be sent to slug endpoint, nginx will route them to internal gateway's listen path.
@@ -754,21 +766,26 @@ func loadGraphQLPlayground(spec *APISpec, subrouter *mux.Router) {
 		endpoint = fmt.Sprintf("/%s/", spec.Slug)
 	}
 
-	subrouter.PathPrefix(spec.GraphQL.GraphQLPlayground.Path).Methods(http.MethodGet).HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+	subrouter.Methods(http.MethodGet).Path(path.Join(playgroundPath, playgroundJSTemplateName)).HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		if playgroundTemplate == nil {
 			rw.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
-		var err error
-		switch {
-		case strings.HasSuffix(req.URL.Path, "playground.js"):
-			err = playgroundTemplate.ExecuteTemplate(rw, "playground.js", nil)
-		default:
-			err = playgroundTemplate.ExecuteTemplate(rw, "index.html", struct {
-				Url, Schema string
-			}{endpoint, strconv.Quote(spec.GraphQL.Schema)})
+		if err := playgroundTemplate.ExecuteTemplate(rw, playgroundJSTemplateName, nil); err != nil {
+			rw.WriteHeader(http.StatusInternalServerError)
 		}
+	})
+
+	subrouter.Methods(http.MethodGet).Path(playgroundPath).HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		if playgroundTemplate == nil {
+			rw.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		err := playgroundTemplate.ExecuteTemplate(rw, playgroundHTMLTemplateName, struct {
+			Url, Schema, PathPrefix string
+		}{endpoint, strconv.Quote(spec.GraphQL.Schema), path.Join(endpoint, playgroundPath)})
 
 		if err != nil {
 			rw.WriteHeader(http.StatusInternalServerError)
@@ -810,9 +827,6 @@ func loadApps(specs []*APISpec) {
 	shouldTrace := trace.IsEnabled()
 	for _, spec := range specs {
 		func() {
-			if strings.Contains(spec.Proxy.TargetURL, "h2c://") {
-				spec.Protocol = "h2c"
-			}
 			defer func() {
 				// recover from panic if one occured. Set err to nil otherwise.
 				if err := recover(); err != nil {
@@ -873,4 +887,5 @@ func loadApps(specs []*APISpec) {
 	mainLog.Debug("Checker host Done")
 
 	mainLog.Info("Initialised API Definitions")
+
 }

@@ -837,9 +837,14 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
 
+	orgId := "default"
 	t.Run("Without domain", func(t *testing.T) {
-		_, _, _, clientCert := genCertificate(&x509.Certificate{})
-		clientCertID := certs.HexSHA256(clientCert.Certificate[0])
+		clientPEM, _, _, clientCert := genCertificate(&x509.Certificate{})
+		clientCertID, err := CertificateManager.Add(clientPEM, orgId)
+
+		if err != nil {
+			t.Fatal("certificate should be added to cert manager")
+		}
 
 		BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
@@ -848,7 +853,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 				authTokenType: {UseCertificate: true},
 			}
 			spec.Proxy.ListenPath = "/"
-			spec.OrgID = "default"
+			spec.OrgID = orgId
 		})
 
 		client := GetTLSClient(&clientCert, nil)
@@ -860,9 +865,9 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 		t.Run("Cert known", func(t *testing.T) {
 			_, key := ts.CreateSession(func(s *user.SessionState) {
 				s.Certificate = clientCertID
-				s.SetAccessRights(map[string]user.AccessDefinition{"test": {
+				s.AccessRights = map[string]user.AccessDefinition{"test": {
 					APIID: "test", Versions: []string{"v1"},
-				}})
+				}}
 			})
 
 			if key == "" {
@@ -871,14 +876,15 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 
 			_, key = ts.CreateSession(func(s *user.SessionState) {
 				s.Certificate = clientCertID
-				s.SetAccessRights(map[string]user.AccessDefinition{"test": {
+				s.AccessRights = map[string]user.AccessDefinition{"test": {
 					APIID: "test", Versions: []string{"v1"},
-				}})
+				}}
 			})
 
 			if key != "" {
 				t.Fatal("Should not allow create key based on the same certificate")
 			}
+			client := GetTLSClient(&clientCert, nil)
 
 			ts.Run(t, test.TestCase{Path: "/", Code: 200, Client: client})
 
@@ -888,8 +894,12 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 	})
 
 	t.Run("With custom domain", func(t *testing.T) {
-		_, _, _, clientCert := genCertificate(&x509.Certificate{})
-		clientCertID := certs.HexSHA256(clientCert.Certificate[0])
+		clientPEM, _, _, clientCert := genCertificate(&x509.Certificate{})
+		clientCertID, err := CertificateManager.Add(clientPEM, orgId)
+
+		if err != nil {
+			t.Fatal("certificate should be added to cert manager")
+		}
 
 		BuildAndLoadAPI(
 			func(spec *APISpec) {
@@ -899,12 +909,12 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 					authTokenType: {UseCertificate: true},
 				}
 				spec.Proxy.ListenPath = "/test1"
-				spec.OrgID = "default"
+				spec.OrgID = orgId
 				spec.Domain = "localhost"
 			},
 			func(spec *APISpec) {
 				spec.Proxy.ListenPath = "/test2"
-				spec.OrgID = "default"
+				spec.OrgID = orgId
 			},
 		)
 
@@ -920,9 +930,9 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 		t.Run("Cert known", func(t *testing.T) {
 			_, key := ts.CreateSession(func(s *user.SessionState) {
 				s.Certificate = clientCertID
-				s.SetAccessRights(map[string]user.AccessDefinition{"test": {
+				s.AccessRights = map[string]user.AccessDefinition{"test": {
 					APIID: "test", Versions: []string{"v1"},
-				}})
+				}}
 			})
 
 			if key == "" {
@@ -931,9 +941,9 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 
 			_, key = ts.CreateSession(func(s *user.SessionState) {
 				s.Certificate = clientCertID
-				s.SetAccessRights(map[string]user.AccessDefinition{"test": {
+				s.AccessRights = map[string]user.AccessDefinition{"test": {
 					APIID: "test", Versions: []string{"v1"},
-				}})
+				}}
 			})
 
 			if key != "" {
@@ -948,8 +958,12 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 	})
 
 	t.Run("With regex custom domain", func(t *testing.T) {
-		_, _, _, clientCert := genCertificate(&x509.Certificate{})
-		clientCertID := certs.HexSHA256(clientCert.Certificate[0])
+		clientPEM, _, _, clientCert := genCertificate(&x509.Certificate{})
+		clientCertID, err := CertificateManager.Add(clientPEM, orgId)
+
+		if err != nil {
+			t.Fatal("certificate should be added to cert manager")
+		}
 
 		api := BuildAndLoadAPI(
 			func(spec *APISpec) {
@@ -960,7 +974,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 					authTokenType: {UseCertificate: true},
 				}
 				spec.Proxy.ListenPath = "/test1"
-				spec.OrgID = "default"
+				spec.OrgID = orgId
 				spec.Domain = "{?:host1|host2}" // gorilla type regex
 			},
 		)[0]
@@ -975,13 +989,51 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 
 		_, _ = ts.CreateSession(func(s *user.SessionState) {
 			s.Certificate = clientCertID
-			s.SetAccessRights(map[string]user.AccessDefinition{api.APIID: {
+			s.AccessRights = map[string]user.AccessDefinition{api.APIID: {
 				APIID: api.APIID, Versions: []string{"v1"},
-			}})
+			}}
 		})
 
 		_, _ = ts.Run(t, test.TestCase{Code: http.StatusOK, Path: "/test1", Domain: "host2", Client: client})
 	})
+
+	// check that a key no longer works after the cert is removed
+	t.Run("Cert removed", func(t *testing.T) {
+		clientPEM, _, _, clientCert := genCertificate(&x509.Certificate{})
+		clientCertID, err := CertificateManager.Add(clientPEM, orgId)
+
+		if err != nil {
+			t.Fatal("certificate should be added to cert manager")
+		}
+
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = false
+			spec.BaseIdentityProvidedBy = apidef.AuthToken
+			spec.AuthConfigs = map[string]apidef.AuthConfig{
+				authTokenType: {UseCertificate: true},
+			}
+			spec.Proxy.ListenPath = "/"
+			spec.OrgID = orgId
+		})
+		client := GetTLSClient(&clientCert, nil)
+		_, key := ts.CreateSession(func(s *user.SessionState) {
+			s.Certificate = clientCertID
+			s.AccessRights = map[string]user.AccessDefinition{"test": {
+				APIID: "test", Versions: []string{"v1"},
+			}}
+		})
+
+		if key == "" {
+			t.Fatal("Should create key based on certificate")
+		}
+
+		// check we can use the key after remove the cert
+		ts.Run(t, test.TestCase{Path: "/", Code: 200, Client: client})
+		CertificateManager.Delete(clientCertID, orgId)
+		// now we should not be allowed to use the key
+		ts.Run(t, test.TestCase{Path: "/", Code: 403, Client: client})
+	})
+
 }
 
 func TestAPICertificate(t *testing.T) {

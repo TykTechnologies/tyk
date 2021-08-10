@@ -23,6 +23,12 @@ const (
 	defaultTemplateName   = "error"
 	defaultTemplateFormat = "json"
 	defaultContentType    = headers.ApplicationJSON
+
+	MsgAuthFieldMissing    = "Authorization field missing"
+	MsgApiAccessDisallowed = "Access to this API has been disallowed"
+	MsgBearerMailformed    = "Bearer token malformed"
+	MsgKeyNotAuthorized    = "Key not authorised"
+	MsgOauthClientRevoked  = "Key not authorised. OAuth client access was revoked"
 )
 
 var errCustomBodyResponse = errors.New("errCustomBodyResponse")
@@ -37,32 +43,42 @@ func errorAndStatusCode(errType string) (error, int) {
 func defaultTykErrors() {
 	TykErrors = make(map[string]config.TykError)
 	TykErrors[ErrAuthAuthorizationFieldMissing] = config.TykError{
-		Message: "Authorization field missing",
+		Message: MsgAuthFieldMissing,
 		Code:    http.StatusUnauthorized,
 	}
 
 	TykErrors[ErrAuthKeyNotFound] = config.TykError{
-		Message: "Access to this API has been disallowed",
+		Message: MsgApiAccessDisallowed,
+		Code:    http.StatusForbidden,
+	}
+
+	TykErrors[ErrAuthCertNotFound] = config.TykError{
+		Message: MsgApiAccessDisallowed,
+		Code:    http.StatusForbidden,
+	}
+
+	TykErrors[ErrAuthKeyIsInvalid] = config.TykError{
+		Message: MsgApiAccessDisallowed,
 		Code:    http.StatusForbidden,
 	}
 
 	TykErrors[ErrOAuthAuthorizationFieldMissing] = config.TykError{
-		Message: "Authorization field missing",
+		Message: MsgAuthFieldMissing,
 		Code:    http.StatusBadRequest,
 	}
 
 	TykErrors[ErrOAuthAuthorizationFieldMalformed] = config.TykError{
-		Message: "Bearer token malformed",
+		Message: MsgBearerMailformed,
 		Code:    http.StatusBadRequest,
 	}
 
 	TykErrors[ErrOAuthKeyNotFound] = config.TykError{
-		Message: "Key not authorised",
+		Message: MsgKeyNotAuthorized,
 		Code:    http.StatusForbidden,
 	}
 
 	TykErrors[ErrOAuthClientDeleted] = config.TykError{
-		Message: "Key not authorised. OAuth client access was revoked",
+		Message: MsgOauthClientRevoked,
 		Code:    http.StatusForbidden,
 	}
 }

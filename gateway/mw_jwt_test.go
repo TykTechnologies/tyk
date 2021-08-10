@@ -1053,8 +1053,8 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 				AdminAuth: true,
 				Code:      http.StatusOK,
 				BodyMatchFunc: func(data []byte) bool {
-					sessionData := user.NewSessionState()
-					json.Unmarshal(data, sessionData)
+					sessionData := user.SessionState{}
+					json.Unmarshal(data, &sessionData)
 
 					expect := []string{basePolicyID, p1ID, p2ID}
 					sort.Strings(sessionData.ApplyPolicies)
@@ -1078,8 +1078,8 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 				AdminAuth: true,
 				Code:      http.StatusOK,
 				BodyMatchFunc: func(data []byte) bool {
-					sessionData := user.NewSessionState()
-					json.Unmarshal(data, sessionData)
+					sessionData := user.SessionState{}
+					json.Unmarshal(data, &sessionData)
 					expect := []string{p1ID, p2ID}
 					sort.Strings(sessionData.ApplyPolicies)
 					sort.Strings(expect)
@@ -1101,8 +1101,8 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 				AdminAuth: true,
 				Code:      http.StatusOK,
 				BodyMatchFunc: func(data []byte) bool {
-					sessionData := user.NewSessionState()
-					json.Unmarshal(data, sessionData)
+					sessionData := user.SessionState{}
+					json.Unmarshal(data, &sessionData)
 
 					assert.Equal(t, sessionData.ApplyPolicies, []string{defaultPolicyID})
 
@@ -1213,8 +1213,8 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 				AdminAuth: true,
 				Code:      http.StatusOK,
 				BodyMatchFunc: func(data []byte) bool {
-					sessionData := user.NewSessionState()
-					json.Unmarshal(data, sessionData)
+					sessionData := user.SessionState{}
+					json.Unmarshal(data, &sessionData)
 
 					assert.Equal(t, sessionData.ApplyPolicies, []string{basePolicyID, p3ID})
 
@@ -1765,7 +1765,7 @@ func TestJWTDefaultPolicies(t *testing.T) {
 
 	assert := func(t *testing.T, expected []string) {
 		session, _ := GlobalSessionManager.SessionDetail(spec.OrgID, sessionID, false)
-		actual := session.GetPolicyIDs()
+		actual := session.PolicyIDs()
 		if !reflect.DeepEqual(expected, actual) {
 			t.Fatalf("Expected %v, actaul %v", expected, actual)
 		}

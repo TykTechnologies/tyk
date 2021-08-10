@@ -36,7 +36,6 @@ func (a *AccessRightsCheck) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		versionList, apiExists := session.AccessRights[a.Spec.APIID]
 		if !apiExists {
 			a.Logger().Info("Attempted access to unauthorised API")
-
 			return errors.New("Access to this API has been disallowed"), http.StatusForbidden
 		}
 

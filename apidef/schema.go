@@ -439,11 +439,16 @@ const Schema = `{
                 "enabled": {
                     "type": "boolean"
                 },
+                "version": {
+                    "type": "string"
+                },
                 "execution_mode": {
                     "type": "string",
                     "enum": [
                         "proxyOnly",
                         "executionEngine",
+                        "subgraph",
+                        "supergraph",
                         ""
                     ]
                 },
@@ -496,6 +501,112 @@ const Schema = `{
                         "type_name",
                         "field_name"
                     ]
+                },
+                "engine": {
+                    "type": ["object", "null"],
+                    "properties": {
+                        "field_configs": {
+                            "type": ["array", "null"],
+                            "properties": {
+                                "type_name": {
+                                    "type": "string"
+                                },
+                                "field_name": {
+                                    "type": "string"
+                                },
+                                "disable_default_mapping": {
+                                    "type": "boolean"
+                                },
+                                "path": {
+                                    "type": ["array", "null"]
+                                }
+                            }
+                        },
+                        "data_sources": {
+                            "type": ["array", "null"],
+                            "properties": {
+                                "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                        "REST",
+                                        "GraphQL",
+                                        ""
+                                    ]
+                                },
+                                "name": {
+                                    "type": "string"
+                                },
+                                "internal": {
+                                    "type": "boolean"
+                                },
+                                "root_fields": {
+                                    "type": ["array", "null"],
+                                    "properties": {
+                                        "type": {
+                                            "type": "string"
+                                        },
+                                        "fields": {
+                                            "type": ["array", "null"]
+                                        }
+                                    }
+                                },
+                                "config": {
+                                    "type": ["object", "null"]
+                                }
+                            },
+                            "required": [
+                                "kind"
+                            ]
+                        }
+                    }
+                },
+                "proxy": {
+                    "type": ["object", "null"],
+                    "properties": {
+                        "auth_headers": {
+                            "type": ["object", "null"]
+                        }
+                    }
+                },
+                "subgraph": {
+                    "type": ["object", "null"],
+                    "properties": {
+                        "sdl": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "supergraph": {
+                    "type": ["object", "null"],
+                    "properties": {
+                        "updated_at": {
+                            "type": "string",
+                            "format": "date-time"
+                        },
+                        "subgraphs": {
+                            "type": ["array", "null"],
+                            "properties": {
+                                "api_id": {
+                                    "type": "string"
+                                },
+                                "name": {
+                                    "type": "string"
+                                },
+                                "url": {
+                                    "type": "string"
+                                },
+                                "sdl": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "global_headers": {
+                            "type": ["object", "null"]
+                        },
+                        "merged_sdl": {
+                            "type": "string"
+                        }
+                    }
                 },
                 "playground": {
                     "type": ["object", "null"],

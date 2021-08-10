@@ -3,8 +3,11 @@ package gateway
 import (
 	"fmt"
 	"net/http"
+	"path"
 	"sync/atomic"
 	"testing"
+
+	"github.com/TykTechnologies/tyk/apidef"
 
 	"github.com/TykTechnologies/tyk/user"
 
@@ -89,14 +92,79 @@ func TestInternalAPIUsage(t *testing.T) {
 }
 
 func TestFuzzyFindAPI(t *testing.T) {
-	BuildAndLoadAPI(func(spec *APISpec) {
-		spec.Name = "IgnoreCase"
-		spec.APIID = "123456"
-		spec.Proxy.ListenPath = "/"
-	})
+	objectId := apidef.NewObjectId()
 
-	spec := fuzzyFindAPI("ignoreCase")
-	assert.Equal(t, "123456", spec.APIID)
+	BuildAndLoadAPI(
+		func(spec *APISpec) {
+			spec.Name = "IgnoreCase"
+			spec.APIID = "1"
+		},
+		func(spec *APISpec) {
+			spec.Name = "IgnoreCategories #a #b"
+			spec.APIID = "2"
+		},
+		func(spec *APISpec) {
+			spec.Name = "__replace-underscores__"
+			spec.APIID = "3"
+		},
+		func(spec *APISpec) {
+			spec.Name = "@@replace-ats@@"
+			spec.APIID = "4"
+		},
+		func(spec *APISpec) {
+			spec.Name = "matchByHex"
+			spec.APIID = "5"
+			spec.Id = objectId
+		},
+		func(spec *APISpec) {
+			spec.Name = "matchByApiID"
+			spec.APIID = "6"
+		})
+
+	cases := []struct {
+		name, search, expectedAPIID string
+		expectNil                   bool
+	}{
+		{"ignore case", "ignoreCase", "1", false},
+		{"ignore categories", "IgnoreCategories", "2", false},
+		{"replace underscores", "-replace-underscores-", "3", false},
+		{"replace @", "-replace-ats-", "4", false},
+		{"supply hex", objectId.Hex(), "5", false},
+		{"supply APIID", "6", "6", false},
+		{"empty search string", "", "", true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			spec := fuzzyFindAPI(tc.search)
+
+			if tc.expectNil {
+				assert.Nil(t, spec)
+			} else {
+				assert.Equal(t, tc.expectedAPIID, spec.APIID)
+			}
+		})
+	}
+}
+
+func TestAPILoopingName(t *testing.T) {
+	cases := []struct {
+		apiName, expectedOut string
+	}{
+		{"api #a #b #c", "api"},
+		{"__api #a #b #c", "-api"},
+		{"@api #a #b #c", "-api"},
+		{"api", "api"},
+		{"__api__", "-api-"},
+		{"@__ api -_ name @__", "-api-name-"},
+		{"@__ api -_ name @__ #a #b", "-api-name-"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.apiName, func(t *testing.T) {
+			assert.Equal(t, tc.expectedOut, APILoopingName(tc.apiName))
+		})
+	}
 }
 
 func TestGraphQLPlayground(t *testing.T) {
@@ -114,24 +182,36 @@ func TestGraphQLPlayground(t *testing.T) {
 		spec.GraphQL.GraphQLPlayground.Enabled = true
 	})[0]
 
-	run := func(t *testing.T, path string, api *APISpec, env string) {
+	run := func(t *testing.T, playgroundPath string, api *APISpec, env string) {
 		endpoint := api.Proxy.ListenPath
 		if env == "cloud" {
 			endpoint = fmt.Sprintf("/%s/", api.Slug)
 		}
 
-		_, _ = g.Run(t, []test.TestCase{
-			{Path: path, BodyMatch: `<title>API Playground</title>`, Code: http.StatusOK},
-			{Path: path, BodyMatch: fmt.Sprintf(`const apiUrl = "%s"`, endpoint), Code: http.StatusOK},
-			{Path: path + "playground.js", BodyMatch: "var TykGraphiqlExplorer", Code: http.StatusOK},
-			{
-				Path:         path,
-				Method:       http.MethodPost,
-				BodyNotMatch: `<title>API Playground</title>`,
-				BodyMatch:    `"error": "the provided request is empty"`,
-				Code:         http.StatusBadRequest,
-			},
-		}...)
+		t.Run("playground html is loaded", func(t *testing.T) {
+			_, _ = g.Run(t, []test.TestCase{
+				{Path: playgroundPath, BodyMatch: `<title>API Playground</title>`, Code: http.StatusOK},
+				{Path: playgroundPath, BodyMatchFunc: func(bytes []byte) bool {
+					return assert.Contains(t, string(bytes), fmt.Sprintf(`const apiUrl = window.location.origin + "%s";`, endpoint))
+				}, Code: http.StatusOK},
+			}...)
+		})
+		t.Run("playground.js is loaded", func(t *testing.T) {
+			_, _ = g.Run(t, []test.TestCase{
+				{Path: path.Join(playgroundPath, "playground.js"), BodyMatch: "var TykGraphiqlExplorer", Code: http.StatusOK},
+			}...)
+		})
+		t.Run("should get error on post request to playground path", func(t *testing.T) {
+			_, _ = g.Run(t, []test.TestCase{
+				{
+					Path:         playgroundPath,
+					Method:       http.MethodPost,
+					BodyNotMatch: `<title>API Playground</title>`,
+					BodyMatch:    `"error": "the provided request is empty"`,
+					Code:         http.StatusBadRequest,
+				},
+			}...)
+		})
 	}
 
 	for _, env := range []string{"on-premise", "cloud"} {
@@ -144,23 +224,42 @@ func TestGraphQLPlayground(t *testing.T) {
 		}
 
 		t.Run(env, func(t *testing.T) {
-			t.Run("path is empty", func(t *testing.T) {
+			t.Run("playground path is empty", func(t *testing.T) {
 				api.GraphQL.GraphQLPlayground.Path = ""
 				LoadAPI(api)
 				run(t, api.Proxy.ListenPath, api, env)
 			})
 
-			t.Run("path is '/'", func(t *testing.T) {
+			t.Run("playground path is '/'", func(t *testing.T) {
 				api.GraphQL.GraphQLPlayground.Path = "/"
 				LoadAPI(api)
 				run(t, api.Proxy.ListenPath, api, env)
 			})
 
-			t.Run("path is '/playground'", func(t *testing.T) {
+			t.Run("playground path is '/playground'", func(t *testing.T) {
 				api.GraphQL.GraphQLPlayground.Path = "/playground"
 				LoadAPI(api)
-				run(t, api.Proxy.ListenPath+"playground", api, env)
+				run(t, path.Join(api.Proxy.ListenPath, "playground"), api, env)
 			})
+
+			t.Run("playground path is '/ppp'", func(t *testing.T) {
+				api.GraphQL.GraphQLPlayground.Path = "/ppp"
+				LoadAPI(api)
+				run(t, path.Join(api.Proxy.ListenPath, "/ppp"), api, env)
+			})
+
+			t.Run("playground path is '/zzz/'", func(t *testing.T) {
+				api.GraphQL.GraphQLPlayground.Path = "/zzz/"
+				LoadAPI(api)
+				run(t, path.Join(api.Proxy.ListenPath, "/zzz"), api, env)
+			})
+
+			t.Run("playground path is 'aaa'", func(t *testing.T) {
+				api.GraphQL.GraphQLPlayground.Path = "aaa"
+				LoadAPI(api)
+				run(t, path.Join(api.Proxy.ListenPath, "aaa"), api, env)
+			})
+
 		})
 	}
 }
