@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"context"
 	"encoding/json"
 
 	"rsc.io/letsencrypt"
@@ -89,11 +88,11 @@ func (gw *Gateway) onLESSLStatusReceivedHandler(payload string) {
 
 }
 
-func (gw *Gateway) StartPeriodicStateBackup(ctx context.Context, m *letsencrypt.Manager) {
+func (gw *Gateway) StartPeriodicStateBackup(m *letsencrypt.Manager) {
 
 	for {
 		select {
-		case <-ctx.Done():
+		case <-gw.ctx.Done():
 			return
 		case <-m.Watch():
 			if gw.LE_FIRSTRUN {

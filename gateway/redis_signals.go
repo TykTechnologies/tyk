@@ -56,15 +56,20 @@ func (gw *Gateway) startPubSubLoop() {
 	cacheStore.Connect()
 	// On message, synchronise
 	for {
-		err := cacheStore.StartPubSubHandler(RedisPubSubChannel, func(v interface{}) {
-			gw.handleRedisEvent(v, nil, nil)
-		})
-		if err != nil {
-			if err != storage.ErrRedisIsDown {
-				pubSubLog.WithField("err", err).Error("Connection to Redis failed, reconnect in 10s")
+		select {
+		case <-gw.ctx.Done():
+			return
+		default:
+			err := cacheStore.StartPubSubHandler(RedisPubSubChannel, func(v interface{}) {
+				gw.handleRedisEvent(v, nil, nil)
+			})
+			if err != nil {
+				if err != storage.ErrRedisIsDown {
+					pubSubLog.WithField("err", err).Error("Connection to Redis failed, reconnect in 10s")
+				}
+				time.Sleep(10 * time.Second)
+				pubSubLog.Warning("Reconnecting ", err)
 			}
-			time.Sleep(10 * time.Second)
-			pubSubLog.Warning("Reconnecting ", err)
 		}
 	}
 }

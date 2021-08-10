@@ -177,9 +177,9 @@ func (r *ReloadMachinery) EnsureQueued(t *testing.T) {
 }
 
 // EnsureReloaded this will block until any reload happens. It will timeout after
-// 100ms
+// 200ms
 func (r *ReloadMachinery) EnsureReloaded(t *testing.T) {
-	deadline := time.NewTimer(100 * time.Millisecond)
+	deadline := time.NewTimer(200 * time.Millisecond)
 	defer deadline.Stop()
 	tick := time.NewTicker(time.Millisecond)
 	defer tick.Stop()
@@ -252,10 +252,10 @@ func (s *Test) emptyRedis() error {
 // simulate reloads in the background, i.e. writes to
 // global variables that should not be accessed in a
 // racy way like the policies and api specs maps.
-func (s *Test) reloadSimulation(ctx context.Context) {
+func (s *Test) reloadSimulation() {
 	for {
 		select {
-		case <-ctx.Done():
+		case <-s.Gw.ctx.Done():
 			return
 		default:
 			s.gwMu.Lock()
@@ -867,12 +867,11 @@ func (s *Test) Start(genConf func(globalConf *config.Config)) *Gateway {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 
-	s.BootstrapGw(ctx, genConf)
+	s.BootstrapGw(ctx, cancel, genConf)
 
-	s.Gw.ctx = ctx
 	s.Gw.setupPortsWhitelist()
 	s.Gw.startServer()
-	s.Gw.setupGlobals(ctx)
+	s.Gw.setupGlobals()
 
 	// Set up a default org manager so we can traverse non-live paths
 	if !s.Gw.GetConfig().SupressDefaultOrgStore {
@@ -918,12 +917,7 @@ func (s *Test) Start(genConf func(globalConf *config.Config)) *Gateway {
 	return s.Gw
 }
 
-// pubSubOnce for testing we only need to connect one time
-// until stop pubSub is implemented, otherwise
-// we would endup spawning redis connections
-var pubSubOnce sync.Once
-
-func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.Config)) {
+func (s *Test) BootstrapGw(ctx context.Context, cancelFn context.CancelFunc, genConf func(globalConf *config.Config)) {
 	var gwConfig config.Config
 	if err := config.WriteDefault("", &gwConfig); err != nil {
 		panic(err)
@@ -943,7 +937,7 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 	gwConfig.CoProcessOptions = s.config.CoprocessConfig
 
 	s.gwMu.Lock()
-	s.Gw = NewGateway(gwConfig)
+	s.Gw = NewGateway(gwConfig, ctx, cancelFn)
 	s.Gw.setTestMode(true)
 	s.gwMu.Unlock()
 
@@ -1009,7 +1003,7 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 
 	cli.Init(VERSION, confPaths)
 
-	err = s.Gw.initialiseSystem(ctx)
+	err = s.Gw.initialiseSystem()
 	if err != nil {
 		panic(err)
 	}
@@ -1040,11 +1034,9 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 	}
 
 	// Start listening for reload messages
-	pubSubOnce.Do(func() {
-		if !s.Gw.GetConfig().SuppressRedisSignalReload {
-			go s.Gw.startPubSubLoop()
-		}
-	})
+	if !s.Gw.GetConfig().SuppressRedisSignalReload {
+		go s.Gw.startPubSubLoop()
+	}
 
 	if slaveOptions := s.Gw.GetConfig().SlaveOptions; slaveOptions.UseRPC {
 		mainLog.Debug("Starting RPC reload listener")
@@ -1062,9 +1054,9 @@ func (s *Test) BootstrapGw(ctx context.Context, genConf func(globalConf *config.
 
 	//	go s.Gw.reloadLoop(ctx, time.Tick(time.Second))
 	//	go s.Gw.reloadQueueLoop(ctx)
-	go s.Gw.reloadLoop(ctx, s.Gw.ReloadTestCase.ReloadTicker(), s.Gw.ReloadTestCase.OnReload)
-	go s.Gw.reloadQueueLoop(ctx, s.Gw.ReloadTestCase.OnQueued)
-	go s.reloadSimulation(ctx)
+	go s.Gw.reloadLoop(s.Gw.ReloadTestCase.ReloadTicker(), s.Gw.ReloadTestCase.OnReload)
+	go s.Gw.reloadQueueLoop(s.Gw.ReloadTestCase.OnQueued)
+	go s.reloadSimulation()
 }
 
 func (s *Test) Do(tc test.TestCase) (*http.Response, error) {

@@ -86,7 +86,8 @@ type Gateway struct {
 	config          atomic.Value
 	configMu        sync.Mutex
 
-	ctx context.Context
+	ctx      context.Context
+	cancelFn context.CancelFunc
 
 	muNodeID   sync.Mutex // guards NodeID
 	NodeID     string
@@ -172,11 +173,13 @@ type Gateway struct {
 	templatesRaw *textTemplate.Template
 }
 
-func NewGateway(config config.Config) *Gateway {
+func NewGateway(config config.Config, ctx context.Context, cancelFn context.CancelFunc) *Gateway {
 	gw := Gateway{
 		DefaultProxyMux: &proxyMux{
 			again: again.New(),
 		},
+		ctx:      ctx,
+		cancelFn: cancelFn,
 	}
 
 	gw.analytics = RedisAnalyticsHandler{Gw: &gw}
@@ -258,7 +261,7 @@ func (gw *Gateway) apisByIDLen() int {
 }
 
 // Create all globals and init connection handlers
-func (gw *Gateway) setupGlobals(ctx context.Context) {
+func (gw *Gateway) setupGlobals() {
 	gw.reloadMu.Lock()
 	defer gw.reloadMu.Unlock()
 
@@ -284,10 +287,10 @@ func (gw *Gateway) setupGlobals(ctx context.Context) {
 		}
 
 		healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:", IsAnalytics: true}
-		gw.InitHostCheckManager(ctx, &healthCheckStore)
+		gw.InitHostCheckManager(gw.ctx, &healthCheckStore)
 	}
 
-	gw.initHealthCheck(ctx)
+	gw.initHealthCheck(gw.ctx)
 
 	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: gwConfig.HashKeys}
 	gw.GlobalSessionManager.Init(&redisStore)
@@ -312,7 +315,7 @@ func (gw *Gateway) setupGlobals(ctx context.Context) {
 		gw.RedisPurgeOnce.Do(func() {
 			store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true}
 			redisPurger := RedisPurger{Store: &store, Gw: gw}
-			go redisPurger.PurgeLoop(ctx)
+			go redisPurger.PurgeLoop(gw.ctx)
 		})
 
 		if gw.GetConfig().AnalyticsConfig.Type == "rpc" {
@@ -324,10 +327,10 @@ func (gw *Gateway) setupGlobals(ctx context.Context) {
 					Store: &store,
 				}
 				purger.Connect()
-				go purger.PurgeLoop(ctx, time.Duration(gw.GetConfig().AnalyticsConfig.PurgeInterval))
+				go purger.PurgeLoop(gw.ctx, time.Duration(gw.GetConfig().AnalyticsConfig.PurgeInterval))
 			})
 		}
-		go gw.flushNetworkAnalytics(ctx)
+		go gw.flushNetworkAnalytics(gw.ctx)
 	}
 
 	// Load all the files that have the "error" prefix.
@@ -875,10 +878,10 @@ func (gw *Gateway) shouldReload() ([]func(), bool) {
 	return n, true
 }
 
-func (gw *Gateway) reloadLoop(ctx context.Context, tick <-chan time.Time, complete ...func()) {
+func (gw *Gateway) reloadLoop(tick <-chan time.Time, complete ...func()) {
 	for {
 		select {
-		case <-ctx.Done():
+		case <-gw.ctx.Done():
 			return
 		// We don't check for reload right away as the gateway peroms this on the
 		// startup sequence. We expect to start checking on the first tick after the
@@ -910,10 +913,10 @@ func (gw *Gateway) reloadLoop(ctx context.Context, tick <-chan time.Time, comple
 	}
 }
 
-func (gw *Gateway) reloadQueueLoop(ctx context.Context, cb ...func()) {
+func (gw *Gateway) reloadQueueLoop(cb ...func()) {
 	for {
 		select {
-		case <-ctx.Done():
+		case <-gw.ctx.Done():
 			return
 		case fn := <-gw.reloadQueue:
 			gw.requeueLock.Lock()
@@ -1032,7 +1035,7 @@ func (gw *Gateway) setupLogger() {
 	}
 }
 
-func (gw *Gateway) initialiseSystem(ctx context.Context) error {
+func (gw *Gateway) initialiseSystem() error {
 	if gw.isRunningTests() && os.Getenv("TYK_LOGLEVEL") == "" {
 		// `go test` without TYK_LOGLEVEL set defaults to no log
 		// output
@@ -1096,7 +1099,7 @@ func (gw *Gateway) initialiseSystem(ctx context.Context) error {
 	rpc.Log = log
 	rpc.Instrument = instrument
 
-	gw.setupGlobals(ctx)
+	gw.setupGlobals()
 	gwConfig = gw.GetConfig()
 	if *cli.Port != "" {
 		portNum, err := strconv.Atoi(*cli.Port)
@@ -1153,7 +1156,7 @@ func (gw *Gateway) initialiseSystem(ctx context.Context) error {
 	gw.setupInstrumentation()
 
 	if gw.GetConfig().HttpServerOptions.UseLE_SSL {
-		go gw.StartPeriodicStateBackup(ctx, &gw.LE_MANAGER)
+		go gw.StartPeriodicStateBackup(&gw.LE_MANAGER)
 	}
 	return nil
 }
@@ -1357,12 +1360,11 @@ func Start() {
 	}
 
 	// ToDo:Config replace for get default conf
-	gw := NewGateway(config.Default)
-	gw.ctx = ctx
+	gw := NewGateway(config.Default, ctx, cancel)
 	gw.SetNodeID("solo-" + uuid.NewV4().String())
 
 	gw.SessionID = uuid.NewV4().String()
-	if err := gw.initialiseSystem(ctx); err != nil {
+	if err := gw.initialiseSystem(); err != nil {
 		mainLog.Fatalf("Error initialising system: %v", err)
 	}
 
@@ -1403,9 +1405,9 @@ func Start() {
 		trace.SetLogger(mainLog)
 		defer trace.Close()
 	}
-	gw.start(ctx)
+	gw.start()
 	configs := gw.GetConfig()
-	go storage.ConnectToRedis(ctx, func() {
+	go storage.ConnectToRedis(gw.ctx, func() {
 		gw.reloadURLStructure(func() {})
 	}, &configs)
 
@@ -1501,7 +1503,7 @@ func writeProfiles() {
 	}
 }
 
-func (gw *Gateway) start(ctx context.Context) {
+func (gw *Gateway) start() {
 	// Set up a default org manager so we can traverse non-live paths
 	if !gw.GetConfig().SupressDefaultOrgStore {
 		mainLog.Debug("Initialising default org store")
@@ -1531,8 +1533,8 @@ func (gw *Gateway) start(ctx context.Context) {
 
 	// 1s is the minimum amount of time between hot reloads. The
 	// interval counts from the start of one reload to the next.
-	go gw.reloadLoop(ctx, time.Tick(time.Second))
-	go gw.reloadQueueLoop(ctx)
+	go gw.reloadLoop(time.Tick(time.Second))
+	go gw.reloadQueueLoop()
 }
 
 func dashboardServiceInit(gw *Gateway) {
