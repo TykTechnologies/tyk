@@ -1005,7 +1005,7 @@ func (s *Test) BootstrapGw(ctx context.Context, cancelFn context.CancelFunc, gen
 		panic(err)
 	}
 
-	if s.Gw.analytics.GeoIPDB == nil {
+	if s.Gw.GetConfig().EnableAnalytics && s.Gw.analytics.GeoIPDB == nil {
 		panic("GeoIPDB was not initialized")
 	}
 

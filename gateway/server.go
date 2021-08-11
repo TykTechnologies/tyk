@@ -312,23 +312,19 @@ func (gw *Gateway) setupGlobals() {
 		gw.analytics.Store = &analyticsStore
 		gw.analytics.Init()
 
-		gw.RedisPurgeOnce.Do(func() {
-			store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true}
-			redisPurger := RedisPurger{Store: &store, Gw: gw}
-			go redisPurger.PurgeLoop(gw.ctx)
-		})
+		store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true}
+		redisPurger := RedisPurger{Store: &store, Gw: gw}
+		go redisPurger.PurgeLoop(gw.ctx)
 
 		if gw.GetConfig().AnalyticsConfig.Type == "rpc" {
 			mainLog.Debug("Using RPC cache purge")
 
-			gw.RpcPurgeOnce.Do(func() {
-				store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true}
-				purger := rpc.Purger{
-					Store: &store,
-				}
-				purger.Connect()
-				go purger.PurgeLoop(gw.ctx, time.Duration(gw.GetConfig().AnalyticsConfig.PurgeInterval))
-			})
+			store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true}
+			purger := rpc.Purger{
+				Store: &store,
+			}
+			purger.Connect()
+			go purger.PurgeLoop(gw.ctx, time.Duration(gw.GetConfig().AnalyticsConfig.PurgeInterval))
 		}
 		go gw.flushNetworkAnalytics(gw.ctx)
 	}
