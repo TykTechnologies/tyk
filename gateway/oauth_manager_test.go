@@ -625,18 +625,15 @@ func getAuthCode(t *testing.T, ts *Test) map[string]string {
 }
 
 func TestGetPaginatedClientTokens(t *testing.T) {
-
+	conf := func(globalConf *config.Config) {
+		// set tokens to be expired after 100 seconds
+		globalConf.OauthTokenExpire = 100
+		// cleanup tokens older than 300 seconds
+		globalConf.OauthTokenExpiredRetainPeriod = 300
+	}
+	ts := StartTest(conf)
+	defer ts.Close()
 	testPagination := func(pageParam int, expectedPageNumber int, tokenRequestCount int, expectedRes int) {
-		conf := func(globalConf *config.Config) {
-			// set tokens to be expired after 100 seconds
-			globalConf.OauthTokenExpire = 100
-			// cleanup tokens older than 300 seconds
-			globalConf.OauthTokenExpiredRetainPeriod = 300
-		}
-
-		ts := StartTest(conf)
-		defer ts.Close()
-
 		spec := ts.LoadTestOAuthSpec()
 
 		clientID := uuid.NewV4().String()
@@ -672,8 +669,17 @@ func TestGetPaginatedClientTokens(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			// save tokens for future check
-			tokensID[response["access_token"].(string)] = true
+			if val, ok := response["access_token"]; !ok {
+				t.Fatal("response doesn't have access_token value")
+			} else {
+				if accessToken, ok := val.(string); !ok {
+					t.Fatal("access token is not a string value.")
+				} else {
+					// save tokens for future check
+					tokensID[accessToken] = true
+				}
+			}
+
 		}
 
 		resp, err := ts.Run(t, test.TestCase{
