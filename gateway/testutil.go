@@ -1047,12 +1047,14 @@ func (s *Test) BootstrapGw(ctx context.Context, cancelFn context.CancelFunc, gen
 		go s.Gw.rpcReloadLoop(slaveOptions.RPCKey)
 		go s.Gw.RPCListener.StartRPCKeepaliveWatcher()
 		go s.Gw.RPCListener.StartRPCLoopCheck(slaveOptions.RPCKey)
+
+		go s.Gw.reloadLoop(time.Tick(time.Second))
+		go s.Gw.reloadQueueLoop()
+	} else {
+		go s.Gw.reloadLoop(s.Gw.ReloadTestCase.ReloadTicker(), s.Gw.ReloadTestCase.OnReload)
+		go s.Gw.reloadQueueLoop(s.Gw.ReloadTestCase.OnQueued)
 	}
 
-	//	go s.Gw.reloadLoop(ctx, time.Tick(time.Second))
-	//	go s.Gw.reloadQueueLoop(ctx)
-	go s.Gw.reloadLoop(s.Gw.ReloadTestCase.ReloadTicker(), s.Gw.ReloadTestCase.OnReload)
-	go s.Gw.reloadQueueLoop(s.Gw.ReloadTestCase.OnQueued)
 	go s.reloadSimulation()
 }
 
