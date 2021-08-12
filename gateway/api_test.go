@@ -590,21 +590,49 @@ func TestKeyHandler_CheckKeysNotDuplicateOnUpdate(t *testing.T) {
 		spec.Auth.UseParam = true
 	})
 
+	const shortCustomKey = "aaaa"                                     // should be bigger than 24
+	const longCustomKey = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" // should be bigger than 24
+
 	cases := []struct {
-		Name        string
-		IsCustomKey bool
-		KeyName     string
+		Name     string
+		KeyName  string
+		HashKeys bool
 	}{
 		{
-			Name:        "duplicity on update custom key",
-			IsCustomKey: true,
-			KeyName:     "my_custom_key",
+			Name:     "short,custom,notHashed",
+			KeyName:  shortCustomKey,
+			HashKeys: false,
 		},
 		{
-			Name:        "duplicity on update regular key",
-			IsCustomKey: false,
+			Name:     "short,custom,hashed",
+			KeyName:  shortCustomKey,
+			HashKeys: true,
+		},
+		{
+			Name:     "long,custom,notHashed",
+			KeyName:  longCustomKey,
+			HashKeys: false,
+		},
+		{
+			Name:     "long,custom,hashed",
+			KeyName:  longCustomKey,
+			HashKeys: true,
+		},
+		{
+			Name:     "regular,notHashed",
+			HashKeys: false,
+		},
+		{
+			Name:     "regular,hashed",
+			HashKeys: true,
 		},
 	}
+
+	globalConf := config.Global()
+	globalConf.HashKeyFunction = ""
+	config.SetGlobal(globalConf)
+
+	defer ResetTestConfig()
 
 	for _, tc := range cases {
 		t.Run(tc.Name, func(t *testing.T) {
@@ -614,24 +642,23 @@ func TestKeyHandler_CheckKeysNotDuplicateOnUpdate(t *testing.T) {
 				APIID: "test", Versions: []string{"v1"},
 			}}
 
-			keyName := tc.KeyName
-			if !tc.IsCustomKey {
-				keyName = generateToken(session.OrgID, "")
-			}
+			globalConf := config.Global()
+			globalConf.HashKeys = tc.HashKeys
+			config.SetGlobal(globalConf)
 
-			if err := doAddOrUpdate(keyName, session, false, true); err != nil {
+			keyName := tc.KeyName
+			if err := doAddOrUpdate(generateToken(session.OrgID, keyName), session, false, tc.HashKeys); err != nil {
 				t.Error("Failed to create key, ensure security settings are correct:" + err.Error())
 			}
 
 			requestByte, _ := json.Marshal(session)
 			r := httptest.NewRequest(http.MethodPut, "/tyk/keys/"+keyName, bytes.NewReader(requestByte))
-			handleAddOrUpdate(keyName, r, true)
+			handleAddOrUpdate(keyName, r, tc.HashKeys)
 
 			sessions := GlobalSessionManager.Sessions("")
 			if len(sessions) != 1 {
 				t.Errorf("Sessions stored in global manager should be 1. But got: %v", len(sessions))
 			}
-
 		})
 	}
 }
