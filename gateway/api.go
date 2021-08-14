@@ -215,9 +215,9 @@ func applyPoliciesAndSave(keyName string, session *user.SessionState, spec *APIS
 
 func resetAPILimits(accessRights map[string]user.AccessDefinition) {
 	for apiID := range accessRights {
-		// reset API-level limit to nil if it has a zero-value
-		if access := accessRights[apiID]; access.Limit != nil && *access.Limit == (user.APILimit{}) {
-			access.Limit = nil
+		// reset API-level limit to empty Value if it has a zero-value
+		if access := accessRights[apiID]; !access.Limit.IsEmpty() {
+			access.Limit = user.APILimit{}
 			accessRights[apiID] = access
 		}
 	}
@@ -231,7 +231,7 @@ func doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool
 	}
 
 	if len(newSession.AccessRights) > 0 {
-		// reset API-level limit to nil if any has a zero-value
+		// reset API-level limit to empty APILimit if any has a zero-value
 		resetAPILimits(newSession.AccessRights)
 		// We have a specific list of access rules, only add / update those
 		for apiId := range newSession.AccessRights {
@@ -380,10 +380,10 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 
 			// on ACL API limit level
 			for apiID, access := range originalKey.AccessRights {
-				if access.Limit == nil {
+				if access.Limit.IsEmpty() {
 					continue
 				}
-				if newAccess, ok := newSession.AccessRights[apiID]; ok && newAccess.Limit != nil {
+				if newAccess, ok := newSession.AccessRights[apiID]; ok && !newAccess.Limit.IsEmpty() {
 					newAccess.Limit.QuotaRenews = access.Limit.QuotaRenews
 					newSession.AccessRights[apiID] = newAccess
 				}
@@ -520,7 +520,7 @@ func handleGetDetail(sessionKey, apiID, orgID string, byHash bool) (interface{},
 
 	// populate remaining quota for API limits (if any)
 	for id, access := range session.AccessRights {
-		if access.Limit == nil || access.Limit.QuotaMax == -1 || access.Limit.QuotaMax == 0 {
+		if access.Limit.IsEmpty() || access.Limit.QuotaMax == -1 || access.Limit.QuotaMax == 0 {
 			continue
 		}
 

@@ -32,7 +32,7 @@ func (d *DBAccessDefinition) ToRegularAD() user.AccessDefinition {
 		Versions:        d.Versions,
 		AllowedURLs:     d.AllowedURLs,
 		RestrictedTypes: d.RestrictedTypes,
-		Limit:           d.Limit,
+		Limit:           *d.Limit,
 	}
 }
 
