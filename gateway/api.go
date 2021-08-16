@@ -218,7 +218,7 @@ func applyPoliciesAndSave(keyName string, session *user.SessionState, spec *APIS
 func resetAPILimits(accessRights map[string]user.AccessDefinition) {
 	for apiID := range accessRights {
 		// reset API-level limit to nil if it has a zero-value
-		if access := accessRights[apiID]; access.Limit.IsEmpty() {
+		if access := accessRights[apiID]; !access.Limit.IsEmpty() {
 			access.Limit = user.APILimit{}
 			accessRights[apiID] = access
 		}

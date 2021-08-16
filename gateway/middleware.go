@@ -384,10 +384,6 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 			usePartitions := policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl || policy.Partitions.Complexity
 
 			for k, v := range policy.AccessRights {
-				if v.Limit.IsEmpty() {
-					v.Limit = user.APILimit{}
-				}
-
 				ar := v
 
 				if !usePartitions || policy.Partitions.Acl {
@@ -437,10 +433,6 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 							if !exists {
 								r.FieldAccessRights = append(r.FieldAccessRights, far)
 							}
-						}
-
-						if r.Limit.IsEmpty() {
-							r.Limit = user.APILimit{}
 						}
 
 						ar = r
@@ -513,7 +505,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				}
 
 				// Respect existing QuotaRenews
-				if r, ok := session.AccessRights[k]; ok && r.Limit.IsEmpty() {
+				if r, ok := session.AccessRights[k]; ok && !r.Limit.IsEmpty() {
 					ar.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
 
