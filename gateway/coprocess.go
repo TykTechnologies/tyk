@@ -467,7 +467,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 			for api := range returnedSession.AccessRights {
 				if _, found := existingSession.AccessRights[api]; found {
-					if returnedSession.AccessRights[api].Limit.IsEmpty() {
+					if !returnedSession.AccessRights[api].Limit.IsEmpty() {
 						ar := returnedSession.AccessRights[api]
 						ar.Limit.QuotaRenews = existingSession.AccessRights[api].Limit.QuotaRenews
 						ar.Limit.QuotaRemaining = existingSession.AccessRights[api].Limit.QuotaRemaining
