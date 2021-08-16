@@ -57,7 +57,6 @@ type AccessDefinition struct {
 }
 
 func (limit APILimit) IsEmpty() bool {
-	return limit == APILimit{}
 	if limit.Rate != 0 || limit.Per != 0 || limit.ThrottleInterval != 0 || limit.ThrottleRetryLimit != 0 || limit.MaxQueryDepth != 0 || limit.QuotaMax != 0 || limit.QuotaRenews != 0 || limit.QuotaRemaining != 0 || limit.QuotaRenewalRate != 0 || limit.SetBy != "" {
 		return false
 	}
