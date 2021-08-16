@@ -234,7 +234,6 @@ func TestPythonBundles(t *testing.T) {
 			spec.CustomMiddlewareBundle = authCheckBundle
 			spec.VersionData.NotVersioned = true
 		})
-
 		time.Sleep(1 * time.Second)
 
 		validAuth := map[string]string{"Authorization": "valid_token"}
