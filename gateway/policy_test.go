@@ -172,7 +172,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				Acl:       true,
 			},
 			AccessRights: map[string]user.AccessDefinition{"d": {
-				Limit: &user.APILimit{
+				Limit: user.APILimit{
 					QuotaMax:         1000,
 					QuotaRenewalRate: 3600,
 					Rate:             20,
@@ -189,7 +189,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				Acl:       false,
 			},
 			AccessRights: map[string]user.AccessDefinition{"d": {
-				Limit: &user.APILimit{
+				Limit: user.APILimit{
 					QuotaMax:         1000,
 					QuotaRenewalRate: 3600,
 					Rate:             20,
@@ -207,7 +207,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			},
 			AccessRights: map[string]user.AccessDefinition{
 				"d": {
-					Limit: &user.APILimit{
+					Limit: user.APILimit{
 						QuotaMax:         1000,
 						QuotaRenewalRate: 3600,
 						Rate:             20,
@@ -215,7 +215,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 					},
 				},
 				"c": {
-					Limit: &user.APILimit{
+					Limit: user.APILimit{
 						QuotaMax: -1,
 						Rate:     2000,
 						Per:      60,
@@ -233,7 +233,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			},
 			AccessRights: map[string]user.AccessDefinition{
 				"d": {
-					Limit: &user.APILimit{
+					Limit: user.APILimit{
 						QuotaMax:         5000,
 						QuotaRenewalRate: 3600,
 						Rate:             200,
@@ -255,7 +255,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			},
 			AccessRights: map[string]user.AccessDefinition{
 				"d": {
-					Limit: &user.APILimit{
+					Limit: user.APILimit{
 						QuotaMax:         5000,
 						QuotaRenewalRate: 3600,
 						Rate:             200,
@@ -310,7 +310,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			ID: "field-level-depth-limit1",
 			AccessRights: map[string]user.AccessDefinition{
 				"graphql-api": {
-					Limit: &user.APILimit{},
+					Limit: user.APILimit{},
 					FieldAccessRights: []user.FieldAccessDefinition{
 						{TypeName: "Query", FieldName: "people", Limits: user.FieldLimits{MaxQueryDepth: 4}},
 						{TypeName: "Mutation", FieldName: "putPerson", Limits: user.FieldLimits{MaxQueryDepth: 3}},
@@ -322,7 +322,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			ID: "field-level-depth-limit2",
 			AccessRights: map[string]user.AccessDefinition{
 				"graphql-api": {
-					Limit: &user.APILimit{},
+					Limit: user.APILimit{},
 					FieldAccessRights: []user.FieldAccessDefinition{
 						{TypeName: "Query", FieldName: "people", Limits: user.FieldLimits{MaxQueryDepth: 2}},
 						{TypeName: "Mutation", FieldName: "putPerson", Limits: user.FieldLimits{MaxQueryDepth: -1}},
@@ -364,11 +364,11 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			sessMatch: func(t *testing.T, s *user.SessionState) {
 				want := map[string]user.AccessDefinition{
 					"a": {
-						Limit:          &user.APILimit{},
+						Limit:          user.APILimit{},
 						AllowanceScope: "p1",
 					},
 					"b": {
-						Limit:          &user.APILimit{},
+						Limit:          user.APILimit{},
 						AllowanceScope: "p2",
 					},
 				}
@@ -382,10 +382,10 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			sessMatch: func(t *testing.T, s *user.SessionState) {
 				want := map[string]user.AccessDefinition{
 					"a": {
-						Limit: &user.APILimit{},
+						Limit: user.APILimit{},
 					},
 					"b": {
-						Limit: &user.APILimit{},
+						Limit: user.APILimit{},
 					},
 				}
 
@@ -473,7 +473,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 				}
 
 				// Don't apply api 'b' coming from quota4 policy
-				want := map[string]user.AccessDefinition{"a": {Limit: &user.APILimit{}}}
+				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{}}}
 				assert.Equal(t, want, s.AccessRights)
 			}, nil,
 		},
@@ -528,7 +528,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 		{
 			"AclPart", []string{"acl1"},
 			"", func(t *testing.T, s *user.SessionState) {
-				want := map[string]user.AccessDefinition{"a": {Limit: &user.APILimit{}}}
+				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{}}}
 
 				assert.Equal(t, want, s.AccessRights)
 			}, nil,
@@ -536,7 +536,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 		{
 			"AclPart", []string{"acl1", "acl2"},
 			"", func(t *testing.T, s *user.SessionState) {
-				want := map[string]user.AccessDefinition{"a": {Limit: &user.APILimit{}}, "b": {Limit: &user.APILimit{}}}
+				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{}}, "b": {Limit: user.APILimit{}}}
 				assert.Equal(t, want, s.AccessRights)
 			}, nil,
 		},
@@ -544,7 +544,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			"RightsUpdate", []string{"acl3"},
 			"", func(t *testing.T, s *user.SessionState) {
 				newPolicy := user.Policy{
-					AccessRights: map[string]user.AccessDefinition{"a": {Limit: &user.APILimit{}}, "b": {Limit: &user.APILimit{}}, "c": {Limit: &user.APILimit{}}},
+					AccessRights: map[string]user.AccessDefinition{"a": {Limit: user.APILimit{}}, "b": {Limit: user.APILimit{}}, "c": {Limit: user.APILimit{}}},
 				}
 				policiesMu.Lock()
 				policiesByID["acl3"] = newPolicy
@@ -572,7 +572,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			sessMatch: func(t *testing.T, s *user.SessionState) {
 				want := map[string]user.AccessDefinition{
 					"d": {
-						Limit: &user.APILimit{
+						Limit: user.APILimit{
 							QuotaMax:         1000,
 							QuotaRenewalRate: 3600,
 							Rate:             20,
@@ -581,7 +581,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 						AllowanceScope: "d",
 					},
 					"c": {
-						Limit: &user.APILimit{
+						Limit: user.APILimit{
 							QuotaMax: -1,
 							Rate:     2000,
 							Per:      60,
@@ -614,7 +614,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			sessMatch: func(t *testing.T, s *user.SessionState) {
 				want := map[string]user.AccessDefinition{
 					"e": {
-						Limit: &user.APILimit{
+						Limit: user.APILimit{
 							QuotaMax: -1,
 							Rate:     300,
 							Per:      1,
@@ -622,7 +622,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 						AllowanceScope: "per_api_with_limit_set_from_policy",
 					},
 					"d": {
-						Limit: &user.APILimit{
+						Limit: user.APILimit{
 							QuotaMax:         5000,
 							QuotaRenewalRate: 3600,
 							Rate:             200,
@@ -645,13 +645,13 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 							{URL: "/user", Methods: []string{"GET", "POST", "GET"}},
 							{URL: "/companies", Methods: []string{"GET", "POST"}},
 						},
-						Limit: &user.APILimit{},
+						Limit: user.APILimit{},
 					},
 					"b": {
 						AllowedURLs: []user.AccessSpec{
 							{URL: "/", Methods: []string{"PUT"}},
 						},
-						Limit: &user.APILimit{},
+						Limit: user.APILimit{},
 					},
 				}
 
@@ -668,7 +668,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 							{Name: "Country", Fields: []string{"code"}},
 							{Name: "Person", Fields: []string{"name"}},
 						},
-						Limit: &user.APILimit{},
+						Limit: user.APILimit{},
 					},
 				}
 
@@ -681,7 +681,7 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 			sessMatch: func(t *testing.T, s *user.SessionState) {
 				want := map[string]user.AccessDefinition{
 					"graphql-api": {
-						Limit: &user.APILimit{},
+						Limit: user.APILimit{},
 						FieldAccessRights: []user.FieldAccessDefinition{
 							{TypeName: "Query", FieldName: "people", Limits: user.FieldLimits{MaxQueryDepth: 4}},
 							{TypeName: "Mutation", FieldName: "putPerson", Limits: user.FieldLimits{MaxQueryDepth: -1}},
@@ -807,7 +807,7 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 		AccessRights: map[string]user.AccessDefinition{
 			"api1": {
 				Versions: []string{"v1"},
-				Limit: &user.APILimit{
+				Limit: user.APILimit{
 					QuotaMax:         100,
 					QuotaRenewalRate: 3600,
 					Rate:             1000,
@@ -816,7 +816,7 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 			},
 			"api2": {
 				Versions: []string{"v1"},
-				Limit: &user.APILimit{
+				Limit: user.APILimit{
 					QuotaMax:         200,
 					QuotaRenewalRate: 3600,
 					Rate:             1000,
@@ -933,7 +933,7 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 					}
 
 					api1Limit := sessionData.AccessRights["api1"].Limit
-					if api1Limit == nil {
+					if api1Limit.IsEmpty() {
 						t.Log("api1 limit is not set")
 						return false
 					}
@@ -945,12 +945,12 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 						QuotaRenews:      api1Limit.QuotaRenews,
 						QuotaRemaining:   98,
 					}
-					if !reflect.DeepEqual(*api1Limit, api1LimitExpected) {
-						t.Log("api1 limit received:", *api1Limit, "expected:", api1LimitExpected)
+					if !reflect.DeepEqual(api1Limit, api1LimitExpected) {
+						t.Log("api1 limit received:", api1Limit, "expected:", api1LimitExpected)
 						return false
 					}
 					api2Limit := sessionData.AccessRights["api2"].Limit
-					if api2Limit == nil {
+					if api2Limit.IsEmpty() {
 						t.Log("api2 limit is not set")
 						return false
 					}
@@ -962,12 +962,12 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 						QuotaRenews:      api2Limit.QuotaRenews,
 						QuotaRemaining:   197,
 					}
-					if !reflect.DeepEqual(*api2Limit, api2LimitExpected) {
-						t.Log("api2 limit received:", *api2Limit, "expected:", api2LimitExpected)
+					if !reflect.DeepEqual(api2Limit, api2LimitExpected) {
+						t.Log("api2 limit received:", api2Limit, "expected:", api2LimitExpected)
 						return false
 					}
 					api3Limit := sessionData.AccessRights["api3"].Limit
-					if api3Limit == nil {
+					if api3Limit.IsEmpty() {
 						t.Log("api3 limit is not set")
 						return false
 					}
@@ -980,8 +980,8 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 						QuotaRemaining:   45,
 					}
 
-					if !reflect.DeepEqual(*api3Limit, api3LimitExpected) {
-						t.Log("api3 limit received:", *api3Limit, "expected:", api3LimitExpected)
+					if !reflect.DeepEqual(api3Limit, api3LimitExpected) {
+						t.Log("api3 limit received:", api3Limit, "expected:", api3LimitExpected)
 						return false
 					}
 					return true
@@ -1013,7 +1013,7 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 						return false
 					}
 					api1Limit := sessionData.AccessRights["api1"].Limit
-					if api1Limit == nil {
+					if api1Limit.IsEmpty() {
 						t.Error("api1 limit is not set")
 						return false
 					}
@@ -1160,7 +1160,7 @@ func TestApplyMultiPolicies(t *testing.T) {
 						QuotaRenews:      sessionData.AccessRights["api1"].Limit.QuotaRenews,
 						QuotaRemaining:   48,
 					}
-					assert.Equal(t, policy1Expected, *sessionData.AccessRights["api1"].Limit, "API1 limit do not match")
+					assert.Equal(t, policy1Expected, sessionData.AccessRights["api1"].Limit, "API1 limit do not match")
 
 					policy2Expected := user.APILimit{
 						Rate:             100,
@@ -1171,8 +1171,8 @@ func TestApplyMultiPolicies(t *testing.T) {
 						QuotaRemaining:   94,
 					}
 
-					assert.Equal(t, policy2Expected, *sessionData.AccessRights["api2"].Limit, "API2 limit do not match")
-					assert.Equal(t, policy2Expected, *sessionData.AccessRights["api3"].Limit, "API3 limit do not match")
+					assert.Equal(t, policy2Expected, sessionData.AccessRights["api2"].Limit, "API2 limit do not match")
+					assert.Equal(t, policy2Expected, sessionData.AccessRights["api3"].Limit, "API3 limit do not match")
 
 					return true
 				},

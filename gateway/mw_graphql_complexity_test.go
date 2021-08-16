@@ -20,13 +20,13 @@ func TestGraphQLComplexityMiddleware_DepthLimitEnabled(t *testing.T) {
 			{TypeName: "Query", FieldName: "continents", Limits: user.FieldLimits{MaxQueryDepth: -1}},
 			{TypeName: "Mutation", FieldName: "putCountry", Limits: user.FieldLimits{MaxQueryDepth: 2}},
 		},
-		Limit: &user.APILimit{
+		Limit: user.APILimit{
 			MaxQueryDepth: 0,
 		},
 	}
 
 	accessDefWithGlobal := &user.AccessDefinition{
-		Limit: &user.APILimit{
+		Limit: user.APILimit{
 			MaxQueryDepth: 2,
 		},
 	}
@@ -68,7 +68,7 @@ func TestGraphQLComplexityMiddleware_DepthLimitExceeded(t *testing.T) {
 			name:  "should use global limit and exceed when no per field rights",
 			query: countriesQuery,
 			accessDef: &user.AccessDefinition{
-				Limit:             &user.APILimit{MaxQueryDepth: 3},
+				Limit:             user.APILimit{MaxQueryDepth: 3},
 				FieldAccessRights: []user.FieldAccessDefinition{},
 			},
 			result: ComplexityFailReasonDepthLimitExceeded,
@@ -77,7 +77,7 @@ func TestGraphQLComplexityMiddleware_DepthLimitExceeded(t *testing.T) {
 			name:  "should respect unlimited specific field depth limit and not exceed",
 			query: countriesQuery,
 			accessDef: &user.AccessDefinition{
-				Limit: &user.APILimit{MaxQueryDepth: 3},
+				Limit: user.APILimit{MaxQueryDepth: 3},
 				FieldAccessRights: []user.FieldAccessDefinition{
 					{
 						TypeName: "Query", FieldName: "countries",
@@ -91,7 +91,7 @@ func TestGraphQLComplexityMiddleware_DepthLimitExceeded(t *testing.T) {
 			name:  "should respect higher specific field depth limit and not exceed",
 			query: countriesQuery,
 			accessDef: &user.AccessDefinition{
-				Limit: &user.APILimit{MaxQueryDepth: 3},
+				Limit: user.APILimit{MaxQueryDepth: 3},
 				FieldAccessRights: []user.FieldAccessDefinition{
 					{
 						TypeName: "Query", FieldName: "countries",
@@ -105,7 +105,7 @@ func TestGraphQLComplexityMiddleware_DepthLimitExceeded(t *testing.T) {
 			name:  "should respect lower specific field depth limit and exceed",
 			query: countriesQuery,
 			accessDef: &user.AccessDefinition{
-				Limit: &user.APILimit{MaxQueryDepth: 100},
+				Limit: user.APILimit{MaxQueryDepth: 100},
 				FieldAccessRights: []user.FieldAccessDefinition{
 					{
 						TypeName: "Query", FieldName: "countries",
@@ -119,7 +119,7 @@ func TestGraphQLComplexityMiddleware_DepthLimitExceeded(t *testing.T) {
 			name:  "should respect specific field depth limits and not exceed",
 			query: countriesContinentsQuery,
 			accessDef: &user.AccessDefinition{
-				Limit: &user.APILimit{MaxQueryDepth: 1},
+				Limit: user.APILimit{MaxQueryDepth: 1},
 				FieldAccessRights: []user.FieldAccessDefinition{
 					{
 						TypeName: "Query", FieldName: "countries",
@@ -137,7 +137,7 @@ func TestGraphQLComplexityMiddleware_DepthLimitExceeded(t *testing.T) {
 			name:  "should fallback to global limit when continents limits is not specified",
 			query: countriesContinentsQuery,
 			accessDef: &user.AccessDefinition{
-				Limit: &user.APILimit{MaxQueryDepth: 1},
+				Limit: user.APILimit{MaxQueryDepth: 1},
 				FieldAccessRights: []user.FieldAccessDefinition{
 					{
 						TypeName: "Query", FieldName: "countries",
@@ -151,7 +151,7 @@ func TestGraphQLComplexityMiddleware_DepthLimitExceeded(t *testing.T) {
 			name:  "should fallback to global limit when countries limits is not specified",
 			query: countriesContinentsQuery,
 			accessDef: &user.AccessDefinition{
-				Limit: &user.APILimit{MaxQueryDepth: 1},
+				Limit: user.APILimit{MaxQueryDepth: 1},
 				FieldAccessRights: []user.FieldAccessDefinition{
 					{
 						TypeName: "Query", FieldName: "continents",
@@ -218,7 +218,7 @@ func TestGraphQLComplexityMiddleware_ProcessRequest_GraphqlLimits(t *testing.T) 
 			name: "should take limit from access rights and fail",
 			rights: map[string]user.AccessDefinition{
 				apiSpec.APIID: {
-					Limit: &user.APILimit{MaxQueryDepth: 1},
+					Limit: user.APILimit{MaxQueryDepth: 1},
 				},
 			},
 			result: http.StatusForbidden,
