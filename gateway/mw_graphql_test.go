@@ -345,7 +345,6 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 
 				t.Run("graphql over websockets", func(t *testing.T) {
 					api.UseKeylessAccess = false
-					api.GraphQL.Schema = "type Query { hello: String! }"
 					LoadAPI(api)
 
 					t.Run("field-based permissions", func(t *testing.T) {
@@ -357,7 +356,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 									RestrictedTypes: []gql.Type{
 										{
 											Name:   "Query",
-											Fields: []string{"hello"},
+											Fields: []string{"countries"},
 										},
 									},
 								},
@@ -381,7 +380,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 						require.Equal(t, `{"id":"","type":"connection_ack","payload":null}`, string(msg))
 						require.NoError(t, err)
 
-						err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"id": "1", "type": "start", "payload": {"query": "{ hello }", "variables": null}}`))
+						err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"id": "1", "type": "start", "payload": {"query": "{ countries { name } }", "variables": null}}`))
 						require.NoError(t, err)
 
 						_, msg, err = wsConn.ReadMessage()
