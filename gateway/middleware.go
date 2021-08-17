@@ -350,10 +350,10 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 				idForScope := apiID
 				// check if we don't have limit on API level specified when policy was created
-				if accessRights.Limit == nil || *accessRights.Limit == (user.APILimit{}) {
+				if accessRights.Limit.IsEmpty() {
 					// limit was not specified on API level so we will populate it from policy
 					idForScope = policy.ID
-					accessRights.Limit = &user.APILimit{
+					accessRights.Limit = user.APILimit{
 						QuotaMax:           policy.QuotaMax,
 						QuotaRenewalRate:   policy.QuotaRenewalRate,
 						Rate:               policy.Rate,
@@ -367,7 +367,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				accessRights.Limit.SetBy = idForScope
 
 				// respect current quota renews (on API limit level)
-				if r, ok := session.AccessRights[apiID]; ok && r.Limit != nil {
+				if r, ok := session.AccessRights[apiID]; ok && !r.Limit.IsEmpty() {
 					accessRights.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
 
@@ -384,10 +384,6 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 			usePartitions := policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl || policy.Partitions.Complexity
 
 			for k, v := range policy.AccessRights {
-				if v.Limit == nil {
-					v.Limit = &user.APILimit{}
-				}
-
 				ar := v
 
 				if !usePartitions || policy.Partitions.Acl {
@@ -437,10 +433,6 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 							if !exists {
 								r.FieldAccessRights = append(r.FieldAccessRights, far)
 							}
-						}
-
-						if r.Limit == nil {
-							r.Limit = &user.APILimit{}
 						}
 
 						ar = r
@@ -513,7 +505,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				}
 
 				// Respect existing QuotaRenews
-				if r, ok := session.AccessRights[k]; ok && r.Limit != nil {
+				if r, ok := session.AccessRights[k]; ok && !r.Limit.IsEmpty() {
 					ar.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
 
@@ -578,7 +570,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	if len(policies) == 0 {
 		for apiID, accessRight := range session.AccessRights {
 			// check if the api in the session has per api limit
-			if accessRight.Limit != nil && *accessRight.Limit != (user.APILimit{}) {
+			if !accessRight.Limit.IsEmpty() {
 				accessRight.AllowanceScope = apiID
 				session.AccessRights[apiID] = accessRight
 			}

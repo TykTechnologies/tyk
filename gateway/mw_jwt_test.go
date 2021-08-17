@@ -904,7 +904,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		p.ID = "base"
 		p.AccessRights = map[string]user.AccessDefinition{
 			"base-api": {
-				Limit: &user.APILimit{
+				Limit: user.APILimit{
 					Rate:     111,
 					Per:      3600,
 					QuotaMax: -1,
@@ -920,7 +920,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		p.ID = "default"
 		p.AccessRights = map[string]user.AccessDefinition{
 			"base-api": {
-				Limit: &user.APILimit{
+				Limit: user.APILimit{
 					QuotaMax: -1,
 				},
 			},
@@ -931,7 +931,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		p.ID = "p1"
 		p.AccessRights = map[string]user.AccessDefinition{
 			"api1": {
-				Limit: &user.APILimit{
+				Limit: user.APILimit{
 					Rate:     100,
 					Per:      60,
 					QuotaMax: -1,
@@ -947,7 +947,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		p.ID = "p2"
 		p.AccessRights = map[string]user.AccessDefinition{
 			"api2": {
-				Limit: &user.APILimit{
+				Limit: user.APILimit{
 					Rate:     500,
 					Per:      30,
 					QuotaMax: -1,
@@ -1158,7 +1158,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		p.ID = "p3"
 		p.AccessRights = map[string]user.AccessDefinition{
 			spec3.APIID: {
-				Limit: &user.APILimit{
+				Limit: user.APILimit{
 					Rate:     500,
 					Per:      30,
 					QuotaMax: -1,
