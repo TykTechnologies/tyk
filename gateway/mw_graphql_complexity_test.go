@@ -12,7 +12,7 @@ import (
 )
 
 func TestGraphQLComplexityMiddleware_DepthLimitEnabled(t *testing.T) {
-	m := GraphQLComplexityMiddleware{}
+	m := GraphqlComplexityChecker{}
 
 	accessDefPerField := &user.AccessDefinition{
 		FieldAccessRights: []user.FieldAccessDefinition{
@@ -45,7 +45,7 @@ func TestGraphQLComplexityMiddleware_DepthLimitEnabled(t *testing.T) {
 }
 
 func TestGraphQLComplexityMiddleware_DepthLimitExceeded(t *testing.T) {
-	m := GraphQLComplexityMiddleware{}
+	m := GraphqlComplexityChecker{}
 	countriesSchema, err := graphql.NewSchemaFromString(gqlCountriesSchema)
 	require.NoError(t, err)
 

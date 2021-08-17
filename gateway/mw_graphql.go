@@ -15,7 +15,9 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/adapter"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/user"
 
 	gql "github.com/jensneuse/graphql-go-tools/pkg/graphql"
 )
@@ -275,8 +277,32 @@ func (m *GraphQLMiddleware) loadSupergraphMergedSDLAsSchema() {
 	m.Spec.GraphQL.Schema = m.Spec.GraphQL.Supergraph.MergedSDL
 }
 
-func (m *GraphQLMiddleware) OnBeforeExecute(operation *gql.Request) error {
-	return errors.New("fail here")
+func (m *GraphQLMiddleware) OnBeforeExecute(reqCtx context.Context, operation *gql.Request) error {
+	var session *user.SessionState
+
+	v := reqCtx.Value(ctx.SessionData)
+	if v == nil {
+		return errors.New("empty session")
+	}
+	session = v.(*user.SessionState)
+	accessDef, _, err := GetAccessDefinitionByAPIIDOrSession(session, m.Spec)
+	if err != nil {
+		return err
+	}
+
+	complexityCheck := &GraphqlComplexityChecker{}
+	depthResult := complexityCheck.DepthLimitExceeded(operation, accessDef, m.Spec.GraphQLExecutor.Schema)
+	if depthResult != ComplexityFailReasonNone {
+		return errors.New("failed complexity check")
+	}
+
+	granularAccessCheck := &GraphqlGranularAccessChecker{}
+	reason, _, _ := granularAccessCheck.CheckGraphqlRequestFieldAllowance(operation, accessDef, m.Spec.GraphQLExecutor.Schema)
+	if reason != GranularAccessFailReasonNone {
+		return errors.New("failed access check")
+	}
+
+	return nil
 }
 
 func (m *GraphQLMiddleware) OnBeforeFetch(ctx resolve.HookContext, input []byte) {

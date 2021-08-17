@@ -42,29 +42,32 @@ func (m *GraphQLComplexityMiddleware) ProcessRequest(w http.ResponseWriter, r *h
 		return nil, http.StatusOK
 	}
 
-	// If MaxQueryDepth is -1 or 0, it means unlimited and no need for depth limiting.
-	if m.DepthLimitEnabled(accessDef) {
-		if failReason := m.DepthLimitExceeded(gqlRequest, accessDef, m.Spec.GraphQLExecutor.Schema); failReason != ComplexityFailReasonNone {
-			return m.handleComplexityFailReason(failReason)
-		}
-	}
-
-	return nil, http.StatusOK
+	checker := &GraphqlComplexityChecker{}
+	failReason := checker.DepthLimitExceeded(gqlRequest, accessDef, m.Spec.GraphQLExecutor.Schema)
+	return m.handleComplexityFailReason(failReason)
 }
 
-func (m *GraphQLComplexityMiddleware) DepthLimitEnabled(accessDef *user.AccessDefinition) bool {
+type GraphqlComplexityChecker struct{}
+
+func (m *GraphqlComplexityChecker) DepthLimitEnabled(accessDef *user.AccessDefinition) bool {
 	// There is a possibility that depth limit is disabled on field level too,
 	// but we could not determine this without analyzing actual requested fields.
 	if len(accessDef.FieldAccessRights) > 0 {
 		return true
 	}
 
+	// If MaxQueryDepth is -1 or 0, it means unlimited and no need for depth limiting.
 	return accessDef.Limit.MaxQueryDepth > 0
 }
 
-func (m *GraphQLComplexityMiddleware) DepthLimitExceeded(gqlRequest *graphql.Request, accessDef *user.AccessDefinition, schema *graphql.Schema) ComplexityFailReason {
+func (m *GraphqlComplexityChecker) DepthLimitExceeded(gqlRequest *graphql.Request, accessDef *user.AccessDefinition, schema *graphql.Schema) ComplexityFailReason {
+	if !m.DepthLimitEnabled(accessDef) {
+		return ComplexityFailReasonNone
+	}
+
 	complexityRes, err := gqlRequest.CalculateComplexity(graphql.DefaultComplexityCalculator, schema)
 	if err != nil {
+		// TODO: should we use m.Logger() here?
 		log.Errorf("Error while calculating complexity of GraphQL request: '%s'", err)
 		return ComplexityFailReasonInternalError
 	}

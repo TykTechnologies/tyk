@@ -860,7 +860,10 @@ func (p *ReverseProxy) handleGraphQLEngineWebsocketUpgrade(roundTripper *TykRoun
 		return nil, false, err
 	}
 
-	p.handoverWebSocketConnectionToGraphQLExecutionEngine(roundTripper, conn.UnderlyingConn())
+	session := ctxGetSession(r)
+	newCtx := context.WithValue(context.Background(), ctx.SessionData, session)
+
+	p.handoverWebSocketConnectionToGraphQLExecutionEngine(roundTripper, conn.UnderlyingConn(), newCtx)
 	return nil, true, nil
 }
 
@@ -908,7 +911,7 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 	return nil, false, errors.New("graphql configuration is invalid")
 }
 
-func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(roundTripper *TykRoundTripper, conn net.Conn) {
+func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(roundTripper *TykRoundTripper, conn net.Conn, reqCtx context.Context) {
 	p.TykAPISpec.GraphQLExecutor.Client.Transport = roundTripper
 
 	absLogger := abstractlogger.NewLogrusLogger(log, absLoggerLevel(log.Level))
@@ -930,7 +933,7 @@ func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(round
 			log.Error("could not start graphql websocket handler: execution engine is nil")
 			return
 		}
-		executorPool = subscription.NewExecutorV2Pool(p.TykAPISpec.GraphQLExecutor.EngineV2)
+		executorPool = subscription.NewExecutorV2Pool(p.TykAPISpec.GraphQLExecutor.EngineV2, reqCtx)
 	}
 
 	go gqlhttp.HandleWebsocket(done, errChan, conn, executorPool, absLogger)
