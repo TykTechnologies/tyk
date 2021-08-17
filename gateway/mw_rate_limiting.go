@@ -93,7 +93,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 
 	if len(session.AccessRights) > 0 {
 		if rights, ok := session.AccessRights[k.Spec.APIID]; ok {
-			if rights.Limit != nil {
+			if !rights.Limit.IsEmpty() {
 				throttleInterval = rights.Limit.ThrottleInterval
 				throttleRetryLimit = rights.Limit.ThrottleRetryLimit
 			}

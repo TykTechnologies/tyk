@@ -196,11 +196,11 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			rateScope = allowanceScope + "-"
 		}
 		if globalConf.EnableSentinelRateLimiter {
-			if l.limitSentinel(currentSession, key, rateScope, store, globalConf, apiLimit, dryRun) {
+			if l.limitSentinel(currentSession, key, rateScope, store, globalConf, &apiLimit, dryRun) {
 				return sessionFailRateLimit
 			}
 		} else if globalConf.EnableRedisRollingLimiter {
-			if l.limitRedis(currentSession, key, rateScope, store, globalConf, apiLimit, dryRun) {
+			if l.limitRedis(currentSession, key, rateScope, store, globalConf, &apiLimit, dryRun) {
 				return sessionFailRateLimit
 			}
 		} else {
@@ -218,11 +218,11 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			if n <= 1 || n*c < rate {
 				// If we have 1 server, there is no need to strain redis at all the leaky
 				// bucket algorithm will suffice.
-				if l.limitDRL(currentSession, key, rateScope, apiLimit, dryRun) {
+				if l.limitDRL(currentSession, key, rateScope, &apiLimit, dryRun) {
 					return sessionFailRateLimit
 				}
 			} else {
-				if l.limitRedis(currentSession, key, rateScope, store, globalConf, apiLimit, dryRun) {
+				if l.limitRedis(currentSession, key, rateScope, store, globalConf, &apiLimit, dryRun) {
 					return sessionFailRateLimit
 				}
 			}
@@ -234,7 +234,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			currentSession.Allowance = currentSession.Allowance - 1
 		}
 
-		if l.RedisQuotaExceeded(r, currentSession, allowanceScope, apiLimit, store) {
+		if l.RedisQuotaExceeded(r, currentSession, allowanceScope, &apiLimit, store) {
 			return sessionFailQuota
 		}
 	}
@@ -307,7 +307,7 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 	}
 
 	for k, v := range currentSession.AccessRights {
-		if v.Limit == nil {
+		if v.Limit.IsEmpty() {
 			continue
 		}
 
@@ -337,9 +337,9 @@ func GetAccessDefinitionByAPIIDOrSession(currentSession *user.SessionState, apiI
 		}
 	}
 
-	if accessDef.Limit == nil {
+	if accessDef.Limit.IsEmpty() {
 		accessDef = &user.AccessDefinition{
-			Limit: &user.APILimit{
+			Limit: user.APILimit{
 				QuotaMax:           currentSession.QuotaMax,
 				QuotaRenewalRate:   currentSession.QuotaRenewalRate,
 				QuotaRenews:        currentSession.QuotaRenews,
