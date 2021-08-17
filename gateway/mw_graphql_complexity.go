@@ -38,6 +38,9 @@ func (m *GraphQLComplexityMiddleware) ProcessRequest(w http.ResponseWriter, r *h
 	}
 
 	gqlRequest := ctxGetGraphQLRequest(r)
+	if gqlRequest == nil {
+		return nil, http.StatusOK
+	}
 
 	// If MaxQueryDepth is -1 or 0, it means unlimited and no need for depth limiting.
 	if m.DepthLimitEnabled(accessDef) {

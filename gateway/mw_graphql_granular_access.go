@@ -39,6 +39,9 @@ func (m *GraphQLGranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, 
 	}
 
 	gqlRequest := ctxGetGraphQLRequest(r)
+	if gqlRequest == nil {
+		return nil, http.StatusOK
+	}
 
 	restrictedFieldsList := graphql.FieldRestrictionList{
 		Kind:  graphql.BlockList,

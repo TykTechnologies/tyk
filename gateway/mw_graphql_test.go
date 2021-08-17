@@ -229,69 +229,6 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				spec.GraphQL.Version = apidef.GraphQLConfigVersion2
 			})
 
-			t.Run("on disabled websockets", func(t *testing.T) {
-				cfg := config.Global()
-				cfg.HttpServerOptions.EnableWebSockets = false
-				config.SetGlobal(cfg)
-
-				t.Run("should respond with 422 when trying to upgrade to websockets", func(t *testing.T) {
-					_, _ = g.Run(t, []test.TestCase{
-						{
-							Headers: map[string]string{
-								headers.Connection:           "upgrade",
-								headers.Upgrade:              "websocket",
-								headers.SecWebSocketProtocol: "graphql-ws",
-								headers.SecWebSocketVersion:  "13",
-								headers.SecWebSocketKey:      "123abc",
-							},
-							Code:      http.StatusUnprocessableEntity,
-							BodyMatch: "websockets are not allowed",
-						},
-					}...)
-				})
-			})
-
-			t.Run("graphql websocket upgrade", func(t *testing.T) {
-				cfg := config.Global()
-				cfg.HttpServerOptions.EnableWebSockets = true
-				config.SetGlobal(cfg)
-
-				t.Run("should deny upgrade with 400 when protocol is not graphql-ws", func(t *testing.T) {
-					_, _ = g.Run(t, []test.TestCase{
-						{
-							Headers: map[string]string{
-								headers.Connection:           "upgrade",
-								headers.Upgrade:              "websocket",
-								headers.SecWebSocketProtocol: "invalid",
-								headers.SecWebSocketVersion:  "13",
-								headers.SecWebSocketKey:      "123abc",
-							},
-							Code:      http.StatusBadRequest,
-							BodyMatch: "invalid websocket protocol for upgrading to a graphql websocket connection",
-						},
-					}...)
-				})
-
-				t.Run("should upgrade to websocket connection with correct protocol", func(t *testing.T) {
-					baseURL := strings.Replace(g.URL, "http://", "ws://", -1)
-					wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
-						headers.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
-					})
-					require.NoError(t, err)
-					defer wsConn.Close()
-
-					// Send a connection init message to gateway
-					err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"type":"connection_init","payload":{}}`))
-					require.NoError(t, err)
-
-					_, msg, err := wsConn.ReadMessage()
-
-					// Gateway should acknowledge the connection
-					assert.Equal(t, `{"id":"","type":"connection_ack","payload":null}`, string(msg))
-					assert.NoError(t, err)
-				})
-			})
-
 			t.Run("graphql api requests", func(t *testing.T) {
 				countries1 := gql.Request{
 					Query: "query Query { countries { name } }",
@@ -330,78 +267,140 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				_, _ = g.Run(t, test.TestCase{Data: request, BodyMatch: `{"kind":"OBJECT","name":"Country"`, Code: http.StatusOK})
 			})
 		})
-	})
 
-	t.Run("graphql engine v1", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
-			spec.UseKeylessAccess = true
-			spec.Proxy.ListenPath = "/"
-			spec.GraphQL.Enabled = true
-			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
-		})
-
-		t.Run("on disabled websockets", func(t *testing.T) {
-			cfg := config.Global()
-			cfg.HttpServerOptions.EnableWebSockets = false
-			config.SetGlobal(cfg)
-
-			t.Run("should respond with 422 when trying to upgrade to websockets", func(t *testing.T) {
-				_, _ = g.Run(t, []test.TestCase{
-					{
-						Headers: map[string]string{
-							headers.Connection:           "upgrade",
-							headers.Upgrade:              "websocket",
-							headers.SecWebSocketProtocol: "graphql-ws",
-							headers.SecWebSocketVersion:  "13",
-							headers.SecWebSocketKey:      "123abc",
-						},
-						Code:      http.StatusUnprocessableEntity,
-						BodyMatch: "websockets are not allowed",
-					},
-				}...)
-			})
-		})
-
-		t.Run("graphql websocket upgrade", func(t *testing.T) {
+		t.Run("websockets", func(t *testing.T) {
 			cfg := config.Global()
 			cfg.HttpServerOptions.EnableWebSockets = true
 			config.SetGlobal(cfg)
 
-			t.Run("should deny upgrade with 400 when protocol is not graphql-ws", func(t *testing.T) {
-				_, _ = g.Run(t, []test.TestCase{
-					{
-						Headers: map[string]string{
-							headers.Connection:           "upgrade",
-							headers.Upgrade:              "websocket",
-							headers.SecWebSocketProtocol: "invalid",
-							headers.SecWebSocketVersion:  "13",
-							headers.SecWebSocketKey:      "123abc",
+			baseURL := strings.Replace(g.URL, "http://", "ws://", -1)
+			api := BuildAndLoadAPI(func(spec *APISpec) {
+				spec.UseKeylessAccess = true
+				spec.Proxy.ListenPath = "/"
+				spec.GraphQL.Enabled = true
+				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+				spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+			})[0]
+
+			t.Run("on disabled websockets", func(t *testing.T) {
+				cfg := config.Global()
+				cfg.HttpServerOptions.EnableWebSockets = false
+				config.SetGlobal(cfg)
+
+				t.Run("should respond with 422 when trying to upgrade to websockets", func(t *testing.T) {
+					_, _ = g.Run(t, []test.TestCase{
+						{
+							Headers: map[string]string{
+								headers.Connection:           "upgrade",
+								headers.Upgrade:              "websocket",
+								headers.SecWebSocketProtocol: "graphql-ws",
+								headers.SecWebSocketVersion:  "13",
+								headers.SecWebSocketKey:      "123abc",
+							},
+							Code:      http.StatusUnprocessableEntity,
+							BodyMatch: "websockets are not allowed",
 						},
-						Code:      http.StatusBadRequest,
-						BodyMatch: "invalid websocket protocol for upgrading to a graphql websocket connection",
-					},
-				}...)
+					}...)
+				})
 			})
 
-			t.Run("should upgrade to websocket connection with correct protocol", func(t *testing.T) {
-				baseURL := strings.Replace(g.URL, "http://", "ws://", -1)
-				wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
-					headers.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+			t.Run("on enabled websockets", func(t *testing.T) {
+				cfg := config.Global()
+				cfg.HttpServerOptions.EnableWebSockets = true
+				config.SetGlobal(cfg)
+
+				t.Run("should deny upgrade with 400 when protocol is not graphql-ws", func(t *testing.T) {
+					_, _ = g.Run(t, []test.TestCase{
+						{
+							Headers: map[string]string{
+								headers.Connection:           "upgrade",
+								headers.Upgrade:              "websocket",
+								headers.SecWebSocketProtocol: "invalid",
+								headers.SecWebSocketVersion:  "13",
+								headers.SecWebSocketKey:      "123abc",
+							},
+							Code:      http.StatusBadRequest,
+							BodyMatch: "invalid websocket protocol for upgrading to a graphql websocket connection",
+						},
+					}...)
 				})
-				require.NoError(t, err)
-				defer wsConn.Close()
 
-				// Send a connection init message to gateway
-				err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"type":"connection_init","payload":{}}`))
-				require.NoError(t, err)
+				t.Run("should upgrade to websocket connection with correct protocol", func(t *testing.T) {
+					wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
+						headers.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+					})
+					require.NoError(t, err)
+					defer wsConn.Close()
 
-				_, msg, err := wsConn.ReadMessage()
+					// Send a connection init message to gateway
+					err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"type":"connection_init","payload":{}}`))
+					require.NoError(t, err)
 
-				// Gateway should acknowledge the connection
-				assert.Equal(t, `{"id":"","type":"connection_ack","payload":null}`, string(msg))
-				assert.NoError(t, err)
+					_, msg, err := wsConn.ReadMessage()
+
+					// Gateway should acknowledge the connection
+					assert.Equal(t, `{"id":"","type":"connection_ack","payload":null}`, string(msg))
+					assert.NoError(t, err)
+				})
+
+				t.Run("graphql over websockets", func(t *testing.T) {
+					api.UseKeylessAccess = false
+					api.GraphQL.Schema = "type Query { hello: String! }"
+					LoadAPI(api)
+
+					t.Run("field-based permissions", func(t *testing.T) {
+						_, directKey := g.CreateSession(func(s *user.SessionState) {
+							s.AccessRights = map[string]user.AccessDefinition{
+								api.APIID: {
+									APIID:   api.APIID,
+									APIName: api.Name,
+									RestrictedTypes: []gql.Type{
+										{
+											Name:   "Query",
+											Fields: []string{"hello"},
+										},
+									},
+								},
+							}
+						})
+
+						wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
+							headers.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+							headers.Authorization:        {directKey},
+						})
+						require.NoError(t, err)
+						defer wsConn.Close()
+
+						// Send a connection init message to gateway
+						err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"type":"connection_init","payload":{}}`))
+						require.NoError(t, err)
+
+						_, msg, err := wsConn.ReadMessage()
+
+						// Gateway should acknowledge the connection
+						require.Equal(t, `{"id":"","type":"connection_ack","payload":null}`, string(msg))
+						require.NoError(t, err)
+
+						err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"id": "1", "type": "start", "payload": {"query": "{ hello }", "variables": null}}`))
+						require.NoError(t, err)
+
+						_, msg, err = wsConn.ReadMessage()
+						assert.Equal(t, `{"id":"1","type":"error","payload":"error"}`, string(msg))
+						assert.NoError(t, err)
+					})
+				})
+
 			})
 		})
+	})
+
+	t.Run("graphql engine v1", func(t *testing.T) {
+		api := BuildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = true
+			spec.Proxy.ListenPath = "/"
+			spec.GraphQL.Enabled = true
+			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+		})[0]
 
 		t.Run("graphql api requests", func(t *testing.T) {
 			countries1 := gql.Request{
@@ -442,18 +441,130 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 		})
 
 		t.Run("should return error when supergraph is used with v1", func(t *testing.T) {
-			BuildAndLoadAPI(func(spec *APISpec) {
-				spec.UseKeylessAccess = true
-				spec.Proxy.ListenPath = "/"
-				spec.GraphQL.Enabled = true
-				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeSupergraph
-			})
+			api.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeSupergraph
+			LoadAPI(api)
 
 			request := gql.Request{
 				Query: "query Query { countries { name } }",
 			}
 
 			_, _ = g.Run(t, test.TestCase{Data: request, BodyMatch: `there was a problem proxying the request`, Code: http.StatusInternalServerError})
+		})
+
+		t.Run("websockets", func(t *testing.T) {
+			baseURL := strings.Replace(g.URL, "http://", "ws://", -1)
+			api.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+			LoadAPI(api)
+
+			t.Run("on disabled websockets", func(t *testing.T) {
+				cfg := config.Global()
+				cfg.HttpServerOptions.EnableWebSockets = false
+				config.SetGlobal(cfg)
+
+				t.Run("should respond with 422 when trying to upgrade to websockets", func(t *testing.T) {
+					_, _ = g.Run(t, []test.TestCase{
+						{
+							Headers: map[string]string{
+								headers.Connection:           "upgrade",
+								headers.Upgrade:              "websocket",
+								headers.SecWebSocketProtocol: "graphql-ws",
+								headers.SecWebSocketVersion:  "13",
+								headers.SecWebSocketKey:      "123abc",
+							},
+							Code:      http.StatusUnprocessableEntity,
+							BodyMatch: "websockets are not allowed",
+						},
+					}...)
+				})
+			})
+
+			t.Run("on enabled websockets", func(t *testing.T) {
+				cfg := config.Global()
+				cfg.HttpServerOptions.EnableWebSockets = true
+				config.SetGlobal(cfg)
+
+				t.Run("should deny upgrade with 400 when protocol is not graphql-ws", func(t *testing.T) {
+					_, _ = g.Run(t, []test.TestCase{
+						{
+							Headers: map[string]string{
+								headers.Connection:           "upgrade",
+								headers.Upgrade:              "websocket",
+								headers.SecWebSocketProtocol: "invalid",
+								headers.SecWebSocketVersion:  "13",
+								headers.SecWebSocketKey:      "123abc",
+							},
+							Code:      http.StatusBadRequest,
+							BodyMatch: "invalid websocket protocol for upgrading to a graphql websocket connection",
+						},
+					}...)
+				})
+
+				t.Run("should upgrade to websocket connection with correct protocol", func(t *testing.T) {
+					wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
+						headers.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+					})
+					require.NoError(t, err)
+					defer wsConn.Close()
+
+					// Send a connection init message to gateway
+					err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"type":"connection_init","payload":{}}`))
+					require.NoError(t, err)
+
+					_, msg, err := wsConn.ReadMessage()
+
+					// Gateway should acknowledge the connection
+					assert.Equal(t, `{"id":"","type":"connection_ack","payload":null}`, string(msg))
+					assert.NoError(t, err)
+				})
+
+				t.Run("graphql over websockets", func(t *testing.T) {
+					api.UseKeylessAccess = false
+					api.GraphQL.Schema = "type Query { hello: String! }"
+					LoadAPI(api)
+
+					t.Run("field-based permissions", func(t *testing.T) {
+						_, directKey := g.CreateSession(func(s *user.SessionState) {
+							s.AccessRights = map[string]user.AccessDefinition{
+								api.APIID: {
+									APIID:   api.APIID,
+									APIName: api.Name,
+									RestrictedTypes: []gql.Type{
+										{
+											Name:   "Query",
+											Fields: []string{"hello"},
+										},
+									},
+								},
+							}
+						})
+
+						wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
+							headers.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+							headers.Authorization:        {directKey},
+						})
+						require.NoError(t, err)
+						defer wsConn.Close()
+
+						// Send a connection init message to gateway
+						err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"type":"connection_init","payload":{}}`))
+						require.NoError(t, err)
+
+						_, msg, err := wsConn.ReadMessage()
+
+						// Gateway should acknowledge the connection
+						require.Equal(t, `{"id":"","type":"connection_ack","payload":null}`, string(msg))
+						require.NoError(t, err)
+
+						err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"id": "1", "type": "start", "payload": {"query": "{ hello }", "variables": null}}`))
+						require.NoError(t, err)
+
+						_, msg, err = wsConn.ReadMessage()
+						assert.Equal(t, `{"id":"1","type":"error","payload":"error"}`, string(msg))
+						assert.NoError(t, err)
+					})
+				})
+			})
+
 		})
 	})
 
