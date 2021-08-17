@@ -84,7 +84,7 @@ func TestNeverRenewQuota(t *testing.T) {
 			api.APIID: {
 				APIName: api.Name,
 				APIID:   api.APIID,
-				Limit: &user.APILimit{
+				Limit: user.APILimit{
 					QuotaRenewalRate: 0,
 					QuotaMax:         1,
 				},

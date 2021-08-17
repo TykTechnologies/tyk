@@ -26,14 +26,17 @@ type DBAccessDefinition struct {
 }
 
 func (d *DBAccessDefinition) ToRegularAD() user.AccessDefinition {
-	return user.AccessDefinition{
+	ad := user.AccessDefinition{
 		APIName:         d.APIName,
 		APIID:           d.APIID,
 		Versions:        d.Versions,
 		AllowedURLs:     d.AllowedURLs,
 		RestrictedTypes: d.RestrictedTypes,
-		Limit:           d.Limit,
 	}
+	if d.Limit != nil {
+		ad.Limit = *d.Limit
+	}
+	return ad
 }
 
 type DBPolicy struct {

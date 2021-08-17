@@ -40,6 +40,13 @@ type APILimit struct {
 	SetBy              string  `json:"-" msg:"-"`
 }
 
+func (limit APILimit) IsEmpty() bool {
+	if limit.Rate != 0 || limit.Per != 0 || limit.ThrottleInterval != 0 || limit.ThrottleRetryLimit != 0 || limit.MaxQueryDepth != 0 || limit.QuotaMax != 0 || limit.QuotaRenews != 0 || limit.QuotaRemaining != 0 || limit.QuotaRenewalRate != 0 || limit.SetBy != "" {
+		return false
+	}
+	return true
+}
+
 // AccessDefinition defines which versions of an API a key has access to
 type AccessDefinition struct {
 	APIName         string         `json:"api_name" msg:"api_name"`
@@ -47,7 +54,7 @@ type AccessDefinition struct {
 	Versions        []string       `json:"versions" msg:"versions"`
 	AllowedURLs     []AccessSpec   `bson:"allowed_urls" json:"allowed_urls" msg:"allowed_urls"` // mapped string MUST be a valid regex
 	RestrictedTypes []graphql.Type `json:"restricted_types" msg:"restricted_types"`
-	Limit           *APILimit      `json:"limit" msg:"limit"`
+	Limit           APILimit       `json:"limit" msg:"limit"`
 
 	AllowanceScope string `json:"allowance_scope" msg:"allowance_scope"`
 }
@@ -258,7 +265,7 @@ func (s *SessionState) PoliciesEqualTo(ids []string) bool {
 
 // GetQuotaLimitByAPIID return quota max, quota remaining, quota renewal rate and quota renews for the given session
 func (s *SessionState) GetQuotaLimitByAPIID(apiID string) (int64, int64, int64, int64) {
-	if access, ok := s.AccessRights[apiID]; ok && access.Limit != nil {
+	if access, ok := s.AccessRights[apiID]; ok && !access.Limit.IsEmpty() {
 		return access.Limit.QuotaMax,
 			access.Limit.QuotaRemaining,
 			access.Limit.QuotaRenewalRate,
