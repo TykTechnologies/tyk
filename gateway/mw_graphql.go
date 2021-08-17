@@ -161,6 +161,7 @@ func (m *GraphQLMiddleware) initGraphQLEngineV2(logger *abstractlogger.LogrusLog
 		m.Logger().WithError(err).Error("could not create engine v2 config")
 		return
 	}
+	engineConfig.SetWsBeforeExecuteHook(m)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	engine, err := gql.NewExecutionEngineV2(ctx, logger, *engineConfig)
@@ -272,6 +273,10 @@ func (m *GraphQLMiddleware) isSupergraphAPIDefinition() bool {
 
 func (m *GraphQLMiddleware) loadSupergraphMergedSDLAsSchema() {
 	m.Spec.GraphQL.Schema = m.Spec.GraphQL.Supergraph.MergedSDL
+}
+
+func (m *GraphQLMiddleware) OnBeforeExecute(operation *gql.Request) error {
+	return errors.New("fail here")
 }
 
 func (m *GraphQLMiddleware) OnBeforeFetch(ctx resolve.HookContext, input []byte) {
