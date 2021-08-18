@@ -163,10 +163,10 @@ func (m *GraphQLMiddleware) initGraphQLEngineV2(logger *abstractlogger.LogrusLog
 		m.Logger().WithError(err).Error("could not create engine v2 config")
 		return
 	}
-	engineConfig.SetWsBeforeExecuteHook(m)
+	engineConfig.SetWebsocketBeforeStartHook(m)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	engine, err := gql.NewExecutionEngineV2(ctx, logger, *engineConfig)
+	specCtx, cancel := context.WithCancel(context.Background())
+	engine, err := gql.NewExecutionEngineV2(specCtx, logger, *engineConfig)
 	if err != nil {
 		m.Logger().WithError(err).Error("could not create execution engine v2")
 		cancel()
@@ -277,7 +277,7 @@ func (m *GraphQLMiddleware) loadSupergraphMergedSDLAsSchema() {
 	m.Spec.GraphQL.Schema = m.Spec.GraphQL.Supergraph.MergedSDL
 }
 
-func (m *GraphQLMiddleware) OnBeforeExecute(reqCtx context.Context, operation *gql.Request) error {
+func (m *GraphQLMiddleware) OnBeforeStart(reqCtx context.Context, operation *gql.Request) error {
 	var session *user.SessionState
 
 	v := reqCtx.Value(ctx.SessionData)
@@ -297,9 +297,9 @@ func (m *GraphQLMiddleware) OnBeforeExecute(reqCtx context.Context, operation *g
 	}
 
 	granularAccessCheck := &GraphqlGranularAccessChecker{}
-	reason, _, _ := granularAccessCheck.CheckGraphqlRequestFieldAllowance(operation, accessDef, m.Spec.GraphQLExecutor.Schema)
-	if reason != GranularAccessFailReasonNone {
-		return errors.New("failed access check")
+	result := granularAccessCheck.CheckGraphqlRequestFieldAllowance(operation, accessDef, m.Spec.GraphQLExecutor.Schema)
+	if result.failReason != GranularAccessFailReasonNone {
+		return errors.New("failed restricted fields check")
 	}
 
 	return nil

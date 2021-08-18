@@ -860,10 +860,7 @@ func (p *ReverseProxy) handleGraphQLEngineWebsocketUpgrade(roundTripper *TykRoun
 		return nil, false, err
 	}
 
-	session := ctxGetSession(r)
-	newCtx := context.WithValue(context.Background(), ctx.SessionData, session)
-
-	p.handoverWebSocketConnectionToGraphQLExecutionEngine(roundTripper, conn.UnderlyingConn(), newCtx)
+	p.handoverWebSocketConnectionToGraphQLExecutionEngine(roundTripper, conn.UnderlyingConn(), r.Context())
 	return nil, true, nil
 }
 

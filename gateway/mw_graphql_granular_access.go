@@ -49,30 +49,36 @@ func (m *GraphQLGranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, 
 	}
 
 	checker := &GraphqlGranularAccessChecker{}
-	failReason, validationResult, err := checker.CheckGraphqlRequestFieldAllowance(gqlRequest, &accessDef, m.Spec.GraphQLExecutor.Schema)
+	result := checker.CheckGraphqlRequestFieldAllowance(gqlRequest, &accessDef, m.Spec.GraphQLExecutor.Schema)
 
-	switch failReason {
+	switch result.failReason {
 	case GranularAccessFailReasonNone:
 		return nil, http.StatusOK
 	case GranularAccessFailReasonInternalError:
-		m.Logger().Errorf("Error during GraphQL request restricted fields validation: '%s'", err)
+		m.Logger().Errorf("Error during GraphQL request restricted fields validation: '%s'", result.internalErr)
 		return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
 	case GranularAccessFailReasonValidationError:
 		w.Header().Set(headers.ContentType, headers.ApplicationJSON)
 		w.WriteHeader(http.StatusBadRequest)
-		_, _ = validationResult.Errors.WriteResponse(w)
-		m.Logger().Debugf("Error during GraphQL request restricted fields validation: '%s'", validationResult.Errors)
+		_, _ = result.validationResult.Errors.WriteResponse(w)
+		m.Logger().Debugf("Error during GraphQL request restricted fields validation: '%s'", result.validationResult.Errors)
 		return errCustomBodyResponse, http.StatusBadRequest
 	}
 
 	return nil, http.StatusOK
 }
 
+type GraphqlGranularAccessResult struct {
+	failReason       GranularAccessFailReason
+	validationResult *graphql.RequestFieldsValidationResult
+	internalErr      error
+}
+
 type GraphqlGranularAccessChecker struct{}
 
-func (GraphqlGranularAccessChecker) CheckGraphqlRequestFieldAllowance(gqlRequest *graphql.Request, accessDef *user.AccessDefinition, schema *graphql.Schema) (failReason GranularAccessFailReason, validationResult *graphql.RequestFieldsValidationResult, err error) {
+func (GraphqlGranularAccessChecker) CheckGraphqlRequestFieldAllowance(gqlRequest *graphql.Request, accessDef *user.AccessDefinition, schema *graphql.Schema) GraphqlGranularAccessResult {
 	if len(accessDef.RestrictedTypes) == 0 {
-		return GranularAccessFailReasonNone, nil, nil
+		return GraphqlGranularAccessResult{failReason: GranularAccessFailReasonNone}
 	}
 
 	restrictedFieldsList := graphql.FieldRestrictionList{
@@ -82,12 +88,12 @@ func (GraphqlGranularAccessChecker) CheckGraphqlRequestFieldAllowance(gqlRequest
 
 	result, err := gqlRequest.ValidateFieldRestrictions(schema, restrictedFieldsList, graphql.DefaultFieldsValidator{})
 	if err != nil {
-		return GranularAccessFailReasonInternalError, nil, err
+		return GraphqlGranularAccessResult{failReason: GranularAccessFailReasonInternalError, internalErr: err}
 	}
 
 	if !result.Valid || (result.Errors != nil && result.Errors.Count() > 0) {
-		return GranularAccessFailReasonValidationError, &result, nil
+		return GraphqlGranularAccessResult{failReason: GranularAccessFailReasonValidationError, validationResult: &result}
 	}
 
-	return GranularAccessFailReasonNone, nil, nil
+	return GraphqlGranularAccessResult{failReason: GranularAccessFailReasonNone}
 }

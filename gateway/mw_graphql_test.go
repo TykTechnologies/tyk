@@ -384,7 +384,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 						require.NoError(t, err)
 
 						_, msg, err = wsConn.ReadMessage()
-						assert.Equal(t, `{"id":"1","type":"error","payload":"failed access check"}`, string(msg))
+						assert.Equal(t, `{"id":"1","type":"error","payload":"failed restricted fields check"}`, string(msg))
 						assert.NoError(t, err)
 					})
 				})
