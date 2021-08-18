@@ -920,6 +920,85 @@ func TestGraphQL_ProxyIntrospectionInterrupt(t *testing.T) {
 	})
 }
 
+func TestGraphQL_OptionsPassThrough(t *testing.T) {
+	g := StartTest()
+	defer g.Close()
+
+	var headers = map[string]string{
+		"Host":                           g.URL,
+		"Connection":                     "keep-alive",
+		"Accept":                         "*/*",
+		"Access-Control-Request-Method":  http.MethodPost,
+		"Access-Control-Request-Headers": "content-type",
+		"Origin":                         "http://192.168.1.123:3000",
+		"User-Agent":                     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36",
+		"Sec-Fetch-Mode":                 "cors",
+		"Referer":                        "http://192.168.1.123:3000/",
+		"Accept-Encoding":                "gzip, deflate",
+		"Accept-Language":                "en-US,en;q=0.9",
+	}
+
+	t.Run("ProxyOnly should pass through", func(t *testing.T) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.GraphQL.Enabled = true
+			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
+			spec.GraphQL.Schema = "schema { query: query_root } type query_root { hello: String }"
+			spec.Proxy.ListenPath = "/starwars"
+			spec.CORS = apidef.CORSConfig{
+				Enable:             true,
+				OptionsPassthrough: true,
+			}
+		})
+		_, _ = g.Run(t, test.TestCase{
+			Method:  http.MethodOptions,
+			Path:    "/starwars",
+			Headers: headers,
+			Code:    http.StatusOK,
+			HeadersMatch: map[string]string{
+				"Access-Control-Allow-Methods": http.MethodPost,
+				"Access-Control-Allow-Headers": "Content-Type",
+				"Access-Control-Allow-Origin":  "*",
+			},
+		})
+	})
+	t.Run("UDG should not pass through", func(t *testing.T) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.GraphQL.Enabled = true
+			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+			spec.GraphQL.Schema = "schema { query: query_root } type query_root { hello: String }"
+			spec.Proxy.ListenPath = "/starwars-udg"
+			spec.CORS = apidef.CORSConfig{
+				Enable:             true,
+				OptionsPassthrough: true,
+			}
+		})
+		_, _ = g.Run(t, test.TestCase{
+			Method:  http.MethodOptions,
+			Path:    "/starwars-udg",
+			Headers: headers,
+			Code:    http.StatusInternalServerError,
+		})
+	})
+	t.Run("Supergraph should not pass through", func(t *testing.T) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.GraphQL.Enabled = true
+			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+			spec.GraphQL.Schema = "schema { query: query_root } type query_root { hello: String }"
+			spec.Proxy.ListenPath = "/starwars-supergraph"
+			spec.CORS = apidef.CORSConfig{
+				Enable:             true,
+				OptionsPassthrough: true,
+			}
+		})
+		_, _ = g.Run(t, test.TestCase{
+			Method:  http.MethodOptions,
+			Path:    "/starwars-supergraph",
+			Headers: headers,
+			Code:    http.StatusInternalServerError,
+		})
+	})
+}
+
 func BenchmarkRequestIPHops(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {

@@ -87,9 +87,9 @@ func TestParambasedAuth(t *testing.T) {
 	})
 
 	key := CreateSession(func(s *user.SessionState) {
-		s.SetAccessRights(map[string]user.AccessDefinition{"test": {
+		s.AccessRights = map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v1"},
-		}})
+		}}
 	})
 
 	form := url.Values{}

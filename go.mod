@@ -44,17 +44,18 @@ require (
 	github.com/imdario/mergo v0.3.9 // indirect
 	github.com/jeffail/tunny v0.0.0-20171107125207-452a8e97d6a3
 	github.com/jensneuse/abstractlogger v0.0.4
-	github.com/jensneuse/graphql-go-tools v0.0.0-00010101000000-000000000000
+	github.com/jensneuse/graphql-go-tools v1.20.2
+	github.com/jensneuse/graphql-go-tools/examples/federation v0.0.0-20210804084050-3c2e37945919 // indirect
 	github.com/justinas/alice v0.0.0-20171023064455-03f45bd4b7da
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/lonelycode/go-uuid v0.0.0-20141202165402-ed3ca8a15a93
 	github.com/lonelycode/osin v0.0.0-20160423095202-da239c9dacb6
-	github.com/mattn/go-colorable v0.1.4 // indirect
 	github.com/mavricknz/asn1-ber v0.0.0-20151103223136-b9df1c2f4213 // indirect
 	github.com/mavricknz/ldap v0.0.0-20160227184754-f5a958005e43
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
 	github.com/miekg/dns v1.0.14
-	github.com/mitchellh/mapstructure v1.2.2
+	github.com/mitchellh/mapstructure v1.4.1
+	github.com/nats-io/nats-server/v2 v2.3.4 // indirect
 	github.com/newrelic/go-agent v2.13.0+incompatible
 	github.com/nsf/jsondiff v0.0.0-20210303162244-6ea32392771e
 	github.com/opentracing/opentracing-go v1.1.0
@@ -69,9 +70,9 @@ require (
 	github.com/rs/cors v1.7.0
 	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.4.2
-	github.com/spf13/afero v1.5.1
+	github.com/spf13/afero v1.6.0
 	github.com/square/go-jose v2.4.1+incompatible
-	github.com/stretchr/testify v1.6.1
+	github.com/stretchr/testify v1.7.0
 	github.com/uber-go/atomic v1.4.0 // indirect
 	github.com/uber/jaeger-client-go v2.19.0+incompatible
 	github.com/uber/jaeger-lib v2.2.0+incompatible // indirect
@@ -81,10 +82,9 @@ require (
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/xeipuuv/gojsonschema v0.0.0-20171025060643-212d8a0df7ac
 	github.com/xenolf/lego v0.3.2-0.20170618175828-28ead50ff1ca // indirect
-	golang.org/x/crypto v0.0.0-20200709230013-948cd5f35899
-	golang.org/x/net v0.0.0-20200602114024-627f9648deb9
-	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
-	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect
+	golang.org/x/crypto v0.0.0-20210616213533-5ff15b29337e
+	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
+	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 	google.golang.org/appengine v1.6.1 // indirect
 	google.golang.org/grpc v1.29.1
 	gopkg.in/Masterminds/sprig.v2 v2.21.0
@@ -95,9 +95,10 @@ require (
 	gopkg.in/vmihailenco/msgpack.v2 v2.9.1
 	gopkg.in/xmlpath.v2 v2.0.0-20150820204837-860cbeca3ebc
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+	gorm.io/gorm v1.21.11
 	rsc.io/letsencrypt v0.0.2
 )
 
-replace github.com/jensneuse/graphql-go-tools => github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20210609111804-af8c15678972
+replace github.com/jensneuse/graphql-go-tools => github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20210812125449-1d05c608ae43
 
 //replace github.com/jensneuse/graphql-go-tools => ../graphql-go-tools

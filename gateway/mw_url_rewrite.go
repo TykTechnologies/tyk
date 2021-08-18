@@ -238,7 +238,7 @@ func replaceTykVariables(r *http.Request, in string, escape bool) string {
 		if session == nil {
 			in = replaceVariables(in, vars, nil, metaLabel, escape)
 		} else {
-			in = replaceVariables(in, vars, session.GetMetaData(), metaLabel, escape)
+			in = replaceVariables(in, vars, session.MetaData, metaLabel, escape)
 		}
 	}
 	//todo add config_data
@@ -450,6 +450,10 @@ func replaceNonAlphaNumeric(in string) string {
 	return NonAlphaNumRE.ReplaceAllString(in, "-")
 }
 
+func LoopingUrl(host string) string {
+	return LoopScheme + "://" + replaceNonAlphaNumeric(host)
+}
+
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	_, versionPaths, _, _ := m.Spec.Version(r)
@@ -478,7 +482,7 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	if strings.HasPrefix(p, LoopScheme) {
 		p = LoopHostRE.ReplaceAllStringFunc(p, func(match string) string {
 			host := strings.TrimPrefix(match, LoopScheme+"://")
-			return LoopScheme + "://" + replaceNonAlphaNumeric(host)
+			return LoopingUrl(host)
 		})
 	}
 
@@ -584,7 +588,7 @@ func checkSessionTrigger(r *http.Request, sess *user.SessionState, options map[s
 	contextData := ctxGetData(r)
 	fCount := 0
 	for mh, mr := range options {
-		rawVal, ok := sess.GetMetaDataByKey(mh)
+		rawVal, ok := sess.MetaData[mh]
 		if ok {
 			val, valOk := rawVal.(string)
 			if valOk {

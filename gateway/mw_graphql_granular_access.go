@@ -29,7 +29,7 @@ func (m *GraphQLGranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, 
 
 	session := ctxGetSession(r)
 
-	sessionVersionData, foundAPI := session.GetAccessRightByAPIID(m.Spec.APIID)
+	sessionVersionData, foundAPI := session.AccessRights[m.Spec.APIID]
 	if !foundAPI {
 		return nil, http.StatusOK
 	}
