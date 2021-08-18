@@ -103,3 +103,37 @@ func BenchmarkResponseHeaderInjection(b *testing.B) {
 		}...)
 	}
 }
+
+func TestGlobalResponseHeaders(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = true
+		spec.Proxy.ListenPath = "/"
+
+		spec.ResponseProcessors = []apidef.ResponseProcessor{{Name: "header_injector"}}
+
+	})[0]
+	LoadAPI(spec)
+
+	addedHeaders := map[string]string{"X-Tyk-Test": "1"}
+	removedHeaders := map[string]string{}
+
+	_, _ = ts.Run(t, test.TestCase{HeadersMatch: addedHeaders, HeadersNotMatch: removedHeaders})
+
+	// Add and remove global response headers
+	UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+		v.UseExtendedPaths = true
+		v.GlobalResponseHeaders = map[string]string{
+			"global-header": "global-value",
+		}
+		v.GlobalResponseHeadersRemove = []string{"X-Tyk-Test"}
+	})
+	LoadAPI(spec)
+
+	addedHeaders = map[string]string{"global-header": "global-value"}
+	removedHeaders = map[string]string{"X-Tyk-Test": "1"}
+
+	_, _ = ts.Run(t, test.TestCase{HeadersMatch: addedHeaders, HeadersNotMatch: removedHeaders})
+}

@@ -117,7 +117,7 @@ func (h *DefaultHealthChecker) ApiHealthValues() (HealthCheckValues, error) {
 	}
 	var runningTotal int
 	for _, v := range vals {
-		s := string(v.([]byte))
+		s := v.(string)
 		log.Debug("V is: ", s)
 		splitValues := strings.Split(s, ".")
 		if len(splitValues) > 1 {

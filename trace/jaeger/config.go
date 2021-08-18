@@ -2,7 +2,7 @@ package jaeger
 
 import (
 	"github.com/uber/jaeger-client-go/config"
-	yaml "gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v3"
 )
 
 // Load returns jaeger configuration from opts. Please see jaeger configuration
@@ -11,7 +11,7 @@ import (
 // https://github.com/jaegertracing/jaeger-client-go/blob/master/config/config.go#L37
 func Load(opts map[string]interface{}) (*config.Configuration, error) {
 	// The object opts is loaded from json. Instead of decoding every single value
-	// by had we marshal to then fro yaml.
+	// by had we marshal to then to yaml.
 	//
 	// This is possible because the tags are the same for both json and yaml.
 	b, err := yaml.Marshal(opts)
@@ -20,5 +20,8 @@ func Load(opts map[string]interface{}) (*config.Configuration, error) {
 	}
 	var c config.Configuration
 	err = yaml.Unmarshal(b, &c)
+	if err != nil {
+		return nil, err
+	}
 	return &c, nil
 }

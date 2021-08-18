@@ -1,3 +1,0 @@
-- Add support for channel request and response.
-- Add support for io.Writer, io.Reader and io.ReadWriter request and response.
-- Add HTTP transport via HTTP connection hijacking similar to net/rpc.

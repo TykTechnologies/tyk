@@ -21,7 +21,7 @@ func (t *TrackEndpointMiddleware) EnabledForSpec() bool {
 	}
 
 	for _, version := range t.Spec.VersionData.Versions {
-		if len(version.ExtendedPaths.TrackEndpoints) > 0 {
+		if len(version.ExtendedPaths.TrackEndpoints) > 0 || len(version.ExtendedPaths.DoNotTrackEndpoints) > 0 {
 			return true
 		}
 	}

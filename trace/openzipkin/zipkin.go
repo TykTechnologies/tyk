@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/config"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/log"
 	zipkin "github.com/openzipkin/zipkin-go"
@@ -277,7 +278,7 @@ func Init(service string, opts map[string]interface{}) (*Tracer, error) {
 	return &Tracer{Tracer: NewTracer(tr), Reporter: r}, nil
 }
 
-func getSampler(s Sampler) (zipkin.Sampler, error) {
+func getSampler(s config.Sampler) (zipkin.Sampler, error) {
 	if s.Name == "" {
 		return zipkin.AlwaysSample, nil
 	}

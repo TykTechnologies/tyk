@@ -246,6 +246,18 @@ func replaceTykVariables(r *http.Request, in string, escape bool) string {
 }
 
 func replaceVariables(in string, vars []string, vals map[string]interface{}, label string, escape bool) string {
+
+	emptyStringFn := func(key, in, val string) string {
+		in = strings.Replace(in, val, "", -1)
+		log.WithFields(logrus.Fields{
+			"key":       key,
+			"value":     val,
+			"in string": in,
+		}).Debug("Replaced with an empty string")
+
+		return in
+	}
+
 	for _, v := range vars {
 		key := strings.Replace(v, label, "", 1)
 
@@ -257,13 +269,7 @@ func replaceVariables(in string, vars []string, vals map[string]interface{}, lab
 
 			val, ok := secrets[key]
 			if !ok || val == "" {
-				in = strings.Replace(in, val, "", -1)
-				log.WithFields(logrus.Fields{
-					"key":       key,
-					"value":     val,
-					"in string": in,
-				}).Debug("Replaced with an empty string")
-
+				in = emptyStringFn(key, in, v)
 				continue
 			}
 
@@ -273,13 +279,7 @@ func replaceVariables(in string, vars []string, vals map[string]interface{}, lab
 
 			val := os.Getenv(fmt.Sprintf("TYK_SECRET_%s", strings.ToUpper(key)))
 			if val == "" {
-				in = strings.Replace(in, v, "", -1)
-				log.WithFields(logrus.Fields{
-					"key":       key,
-					"value":     v,
-					"in string": in,
-				}).Debug("Replaced with an empty string")
-
+				in = emptyStringFn(key, in, v)
 				continue
 			}
 
@@ -287,17 +287,14 @@ func replaceVariables(in string, vars []string, vals map[string]interface{}, lab
 
 		case vaultLabel:
 
-			setUpVault()
+			if err := setUpVault(); err != nil {
+				in = emptyStringFn(key, in, v)
+				continue
+			}
 
 			val, err := vaultKVStore.Get(key)
 			if err != nil {
-				in = strings.Replace(in, v, "", -1)
-				log.WithFields(logrus.Fields{
-					"key":       key,
-					"value":     v,
-					"in string": in,
-				}).Debug("Replaced with an empty string")
-
+				in = emptyStringFn(key, in, v)
 				continue
 			}
 
@@ -305,17 +302,14 @@ func replaceVariables(in string, vars []string, vals map[string]interface{}, lab
 
 		case consulLabel:
 
-			setUpConsul()
+			if err := setUpConsul(); err != nil {
+				in = emptyStringFn(key, in, v)
+				continue
+			}
 
 			val, err := consulKVStore.Get(key)
 			if err != nil {
 				in = strings.Replace(in, v, "", -1)
-				log.WithFields(logrus.Fields{
-					"key":       key,
-					"value":     v,
-					"in string": in,
-				}).Debug("Replaced with an empty string")
-
 				continue
 			}
 
@@ -331,15 +325,10 @@ func replaceVariables(in string, vars []string, vals map[string]interface{}, lab
 					valStr = url.QueryEscape(valStr)
 				}
 				in = strings.Replace(in, v, valStr, -1)
-			} else {
-				in = strings.Replace(in, v, "", -1)
-				log.WithFields(logrus.Fields{
-					"key":       key,
-					"value":     v,
-					"in string": in,
-				}).Debug("Replaced with an empty string")
+				continue
 			}
 
+			in = emptyStringFn(key, in, v)
 		}
 	}
 
@@ -461,6 +450,10 @@ func replaceNonAlphaNumeric(in string) string {
 	return NonAlphaNumRE.ReplaceAllString(in, "-")
 }
 
+func LoopingUrl(host string) string {
+	return LoopScheme + "://" + replaceNonAlphaNumeric(host)
+}
+
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	_, versionPaths, _, _ := m.Spec.Version(r)
@@ -489,7 +482,7 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	if strings.HasPrefix(p, LoopScheme) {
 		p = LoopHostRE.ReplaceAllStringFunc(p, func(match string) string {
 			host := strings.TrimPrefix(match, LoopScheme+"://")
-			return LoopScheme + "://" + replaceNonAlphaNumeric(host)
+			return LoopingUrl(host)
 		})
 	}
 

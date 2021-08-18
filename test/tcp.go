@@ -39,6 +39,7 @@ func (r TCPTestRunner) Run(t testing.TB, testCases ...TCPTestCase) error {
 			r.TLSClientConfig = &tls.Config{
 				ServerName:         r.Hostname,
 				InsecureSkipVerify: true,
+				MaxVersion:         tls.VersionTLS12,
 			}
 		}
 		client, err = tls.Dial("tcp", r.Target, r.TLSClientConfig)
@@ -97,6 +98,7 @@ func TcpMock(useSSL bool, cb func(in []byte, err error) (out []byte)) net.Listen
 		tlsConfig := &tls.Config{
 			Certificates:       []tls.Certificate{Cert("localhost")},
 			InsecureSkipVerify: true,
+			MaxVersion:         tls.VersionTLS12,
 		}
 		tlsConfig.BuildNameToCertificate()
 		l, _ = tls.Listen("tcp", ":0", tlsConfig)

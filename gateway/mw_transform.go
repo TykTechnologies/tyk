@@ -105,8 +105,14 @@ func transformBody(r *http.Request, tmeta *TransformSpec, contextVars bool) erro
 	if err := tmeta.Template.Execute(&bodyBuffer, bodyData); err != nil {
 		return fmt.Errorf("failed to apply template to request: %v", err)
 	}
-	r.Body = ioutil.NopCloser(&bodyBuffer)
-	r.ContentLength = int64(bodyBuffer.Len())
+
+	s := replaceTykVariables(r, bodyBuffer.String(), true)
+
+	newBuf := bytes.NewBufferString(s)
+
+	r.Body = ioutil.NopCloser(newBuf)
+
+	r.ContentLength = int64(newBuf.Len())
 	nopCloseRequestBody(r)
 
 	return nil

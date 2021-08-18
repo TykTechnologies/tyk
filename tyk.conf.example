@@ -26,7 +26,6 @@
     "ttl": 3600,
     "check_interval": 60
   },
-  "optimisations_use_async_session_write": true,
   "allow_master_keys": false,
   "policies": {
     "policy_source": "file"

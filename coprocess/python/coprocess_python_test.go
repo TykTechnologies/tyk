@@ -38,27 +38,27 @@ var pythonBundleWithAuthCheck = map[string]string{
 		        }
 		    }
 		}
-	`,
+`,
 	"middleware.py": `
 from tyk.decorators import *
 from gateway import TykGateway as tyk
 
 @Hook
 def MyAuthHook(request, session, metadata, spec):
-    auth_header = request.get_header('Authorization')
-    if auth_header == 'valid_token':
-        session.rate = 1000.0
-        session.per = 1.0
-        session.quota_max = 1
-        session.quota_renewal_rate = 60
-        metadata["token"] = "valid_token"
-    elif auth_header == 'policy':
-    	session.apply_policy_id = request.get_header('Policy')
-    	metadata["token"] = "policy"
-
-    return request, session, metadata
-
-	`,
+  auth_header = request.get_header('Authorization')
+  if auth_header == 'valid_token':
+    session.rate = 1000.0
+    session.per = 1.0
+    session.max_query_depth = 1
+    session.quota_max = 1
+    session.quota_renewal_rate = 60
+    metadata["token"] = "valid_token"
+  if auth_header == '47a0c79c427728b3df4af62b9228c8ae11':
+    policy_id = request.get_header('Policy')
+    session.apply_policy_id = policy_id
+    metadata["token"] = "47a0c79c427728b3df4af62b9228c8ae11"
+  return request, session, metadata
+`,
 }
 
 var pythonBundleWithPostHook = map[string]string{
@@ -248,7 +248,8 @@ func TestPythonBundles(t *testing.T) {
 	})
 
 	t.Run("Auth with policy", func(t *testing.T) {
-		gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+		specs := gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+			spec.Auth.AuthHeaderName = "Authorization"
 			spec.Proxy.ListenPath = "/test-api/"
 			spec.UseKeylessAccess = false
 			spec.EnableCoProcessAuth = true
@@ -261,9 +262,13 @@ func TestPythonBundles(t *testing.T) {
 		pID := gateway.CreatePolicy(func(p *user.Policy) {
 			p.QuotaMax = 1
 			p.QuotaRenewalRate = 60
+			p.AccessRights = map[string]user.AccessDefinition{"test": {
+				APIID:    specs[0].APIID,
+				Versions: []string{"Default"},
+			}}
 		})
 
-		policyAuth := map[string]string{"Authorization": "policy", "Policy": pID}
+		policyAuth := map[string]string{"authorization": "47a0c79c427728b3df4af62b9228c8ae11", "policy": pID}
 
 		ts.Run(t, []test.TestCase{
 			{Path: "/test-api/", Code: http.StatusOK, Headers: policyAuth},
