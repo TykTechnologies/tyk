@@ -118,6 +118,9 @@
         "enable_detailed_recording": {
           "type": "boolean"
         },
+        "purge_interval": {
+          "type": "number"
+        },
         "enable_geo_ip": {
           "type": "boolean"
         },
@@ -432,6 +435,22 @@
         "murmur128",
         "sha256"
       ]
+    },
+    "hash_key_function_fallback": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string",
+        "enum": [
+          "",
+          "murmur32",
+          "murmur64",
+          "murmur128",
+          "sha256"
+        ]
+      }
     },
     "health_check": {
       "type": [

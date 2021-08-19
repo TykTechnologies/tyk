@@ -38,8 +38,9 @@ func MyPluginAuthCheck(rw http.ResponseWriter, r *http.Request) {
 	session := &user.SessionState{
 		OrgID: "default",
 		Alias: "abc-session",
+		KeyID: token,
 	}
-	ctx.SetSession(r, session, token, true)
+	ctx.SetSession(r, session, true)
 
 	rw.Header().Add(headers.XAuthResult, "OK")
 }
@@ -86,6 +87,46 @@ func MyPluginResponse(rw http.ResponseWriter, res *http.Response, req *http.Requ
 
 	res.Body = ioutil.NopCloser(&buf)
 
+	apiDefinition := ctx.GetDefinition(req)
+	if apiDefinition == nil {
+		res.Header.Add("X-Plugin-Data", "null")
+		return
+	}
+	pluginConfig, ok := apiDefinition.ConfigData["my-context-data"].(string)
+	if !ok || pluginConfig == "" {
+		res.Header.Add("X-Plugin-Data", "null")
+		return
+	}
+	res.Header.Add("X-Plugin-Data", pluginConfig)
+}
+
+func MyPluginPerPathFoo(rw http.ResponseWriter, r *http.Request) {
+
+	rw.Header().Add("X-foo", "foo")
+
+}
+
+func MyPluginPerPathBar(rw http.ResponseWriter, r *http.Request) {
+	rw.Header().Add("X-bar", "bar")
+
+}
+
+func MyPluginPerPathResp(rw http.ResponseWriter, r *http.Request) {
+	// prepare data to send
+	replyData := map[string]string{
+		"current_time": "now",
+	}
+
+	jsonData, err := json.Marshal(replyData)
+	if err != nil {
+		rw.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// send HTTP response from Golang plugin
+	rw.Header().Set("Content-Type", "application/json")
+	rw.WriteHeader(http.StatusOK)
+	rw.Write(jsonData)
 }
 
 func main() {}

@@ -1,72 +1,50 @@
 package jaeger
 
 import (
-	"encoding/json"
 	"reflect"
 	"testing"
 
+	tykconf "github.com/TykTechnologies/tyk/config"
 	jaeger "github.com/uber/jaeger-client-go"
 	"github.com/uber/jaeger-client-go/config"
 )
 
-const sampleConfig = `{
-    "serviceName": "your_service_name",
-    "disabled": false,
-    "rpc_metrics": false,
-    "tags": null,
-    "sampler": {
-        "type": "const",
-        "param": 1,
-        "samplingServerURL": "",
-        "maxOperations": 0,
-        "samplingRefreshInterval": 0
-    },
-    "reporter": {
-        "queueSize": 0,
-        "BufferFlushInterval": 0,
-        "logSpans": true,
-        "localAgentHostPort": "",
-        "collectorEndpoint": "",
-        "user": "",
-        "password": ""
-    },
-    "headers": null,
-    "baggage_restrictions": null,
-    "throttler": null
-}`
-
 func TestLoad(t *testing.T) {
+	f := "testdata/jaeger.json"
+	var c tykconf.Config
+	err := tykconf.Load([]string{f}, &c)
+	if err != nil {
+		t.Fatal(err)
+	}
 	cfg := config.Configuration{
-		ServiceName: "your_service_name",
+		ServiceName: "tyk-gateway",
 		Sampler: &config.SamplerConfig{
 			Type:  jaeger.SamplerTypeConst,
 			Param: 1,
 		},
 		Reporter: &config.ReporterConfig{
-			LogSpans: true,
+			LogSpans:           true,
+			LocalAgentHostPort: "jaeger:6831",
 		},
 	}
-	var o map[string]interface{}
-	err := json.Unmarshal([]byte(sampleConfig), &o)
+
+	loadedConfig, err := Load(c.Tracer.Options)
 	if err != nil {
 		t.Fatal(err)
 	}
-	loadedConfig, err := Load(o)
-	if err != nil {
-		t.Fatal(err)
+	e := []struct {
+		field  string
+		expect interface{}
+		got    interface{}
+	}{
+		{"serviceName", cfg.ServiceName, loadedConfig.ServiceName},
+		{"rpc_metrics", cfg.RPCMetrics, loadedConfig.RPCMetrics},
+		{"sampler", cfg.Sampler, loadedConfig.Sampler},
+		{"reporter", cfg.Reporter, loadedConfig.Reporter},
 	}
-	a := []interface{}{
-		cfg.ServiceName, cfg.Disabled,
-		cfg.RPCMetrics, cfg.Tags, cfg.Sampler,
-		cfg.Reporter, cfg.Headers, cfg.BaggageRestrictions,
-	}
-	b := []interface{}{
-		loadedConfig.ServiceName, loadedConfig.Disabled,
-		loadedConfig.RPCMetrics, loadedConfig.Tags,
-		loadedConfig.Sampler, loadedConfig.Reporter,
-		loadedConfig.Headers, loadedConfig.BaggageRestrictions,
-	}
-	if !reflect.DeepEqual(a, b) {
-		t.Errorf("expected %v\n got  %v\n", cfg, loadedConfig)
+	for _, v := range e {
+		if !reflect.DeepEqual(v.expect, v.got) {
+			t.Errorf("%v: expected %#v got %#v", v.field, v.expect, v.got)
+		}
 	}
 }

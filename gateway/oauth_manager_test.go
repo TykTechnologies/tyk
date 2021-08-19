@@ -437,19 +437,19 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 		if !ok {
 			t.Fatal("No access token found")
 		}
-		session, ok := spec.AuthManager.KeyAuthorised(token)
+		session, ok := spec.AuthManager.SessionDetail("", token, false)
 		if !ok {
 			t.Error("Key was not created (Can't find it)!")
 		}
-		if session.GetMetaData() == nil {
+		if session.MetaData == nil {
 			t.Fatal("Session metadata is nil")
 		}
-		if len(session.GetMetaData()) != 3 {
-			t.Fatal("Unexpected session metadata length", session.GetMetaData())
+		if len(session.MetaData) != 3 {
+			t.Fatal("Unexpected session metadata length", session.MetaData)
 		}
 
-		if !reflect.DeepEqual(session.GetMetaData(), map[string]interface{}{"foo": "keybar", "client": "meta", "key": "meta"}) {
-			t.Fatal("Metadata not match:", session.GetMetaData())
+		if !reflect.DeepEqual(session.MetaData, map[string]interface{}{"foo": "keybar", "client": "meta", "key": "meta"}) {
+			t.Fatal("Metadata not match:", session.MetaData)
 		}
 	})
 }
@@ -588,13 +588,13 @@ func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 		}
 
 		// Verify the token is correct
-		session, ok := spec.AuthManager.KeyAuthorised(token)
+		session, ok := spec.AuthManager.SessionDetail("", token, false)
 		if !ok {
 			t.Error("Key was not created (Can't find it)!")
 		}
 
-		if !reflect.DeepEqual(session.GetPolicyIDs(), []string{"TEST-4321"}) {
-			t.Error("Policy not added to token!", session.GetPolicyIDs())
+		if !reflect.DeepEqual(session.PolicyIDs(), []string{"TEST-4321"}) {
+			t.Error("Policy not added to token!", session.PolicyIDs())
 		}
 	})
 }

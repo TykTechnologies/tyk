@@ -18,11 +18,24 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	textTemplate "text/template"
 	"time"
 
 	"github.com/TykTechnologies/again"
 	gas "github.com/TykTechnologies/goautosocket"
 	"github.com/TykTechnologies/gorpc"
+	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
+	"github.com/evalphobia/logrus_sentry"
+	graylogHook "github.com/gemnasium/logrus-graylog-hook"
+	"github.com/gorilla/mux"
+	"github.com/lonelycode/osin"
+	newrelic "github.com/newrelic/go-agent"
+	"github.com/rs/cors"
+	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
+	logrus_syslog "github.com/sirupsen/logrus/hooks/syslog"
+	"rsc.io/letsencrypt"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/checkup"
@@ -37,17 +50,6 @@ import (
 	"github.com/TykTechnologies/tyk/storage/kv"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
-	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
-	"github.com/evalphobia/logrus_sentry"
-	graylogHook "github.com/gemnasium/logrus-graylog-hook"
-	"github.com/gorilla/mux"
-	"github.com/lonelycode/osin"
-	newrelic "github.com/newrelic/go-agent"
-	"github.com/rs/cors"
-	uuid "github.com/satori/go.uuid"
-	"github.com/sirupsen/logrus"
-	logrus_syslog "github.com/sirupsen/logrus/hooks/syslog"
-	"rsc.io/letsencrypt"
 )
 
 var (
@@ -56,6 +58,7 @@ var (
 	pubSubLog            = log.WithField("prefix", "pub-sub")
 	rawLog               = logger.GetRaw()
 	templates            *template.Template
+	templatesRaw         *textTemplate.Template
 	analytics            RedisAnalyticsHandler
 	GlobalEventsJSVM     JSVM
 	memProfFile          *os.File
@@ -84,6 +87,9 @@ var (
 
 	muNodeID sync.Mutex // guards NodeID
 	NodeID   string
+
+	// SessionID is the unique session id which is used while connecting to dashboard to prevent multiple node allocation.
+	SessionID string
 
 	runningTestsMu sync.RWMutex
 	testMode       bool
@@ -224,6 +230,7 @@ func setupGlobals(ctx context.Context) {
 	// Load all the files that have the "error" prefix.
 	templatesDir := filepath.Join(config.Global().TemplatePath, "error*")
 	templates = template.Must(template.ParseGlob(templatesDir))
+	templatesRaw = textTemplate.Must(textTemplate.ParseGlob(templatesDir))
 
 	CoProcessInit()
 
@@ -258,6 +265,8 @@ func setupGlobals(ctx context.Context) {
 	if config.Global().NewRelic.AppName != "" {
 		NewRelicApplication = SetupNewRelic()
 	}
+
+	readGraphqlPlaygroundTemplate()
 }
 
 func buildConnStr(resource string) string {
@@ -278,8 +287,7 @@ func buildConnStr(resource string) string {
 
 func syncAPISpecs() (int, error) {
 	loader := APIDefinitionLoader{}
-	apisMu.Lock()
-	defer apisMu.Unlock()
+
 	var s []*APISpec
 	if config.Global().UseDBAppConfigs {
 		connStr := buildConnStr("/system/apis")
@@ -325,11 +333,14 @@ func syncAPISpecs() (int, error) {
 		}
 		filter = append(filter, v)
 	}
+
+	apisMu.Lock()
 	apiSpecs = filter
-
+	apiLen := len(apiSpecs)
 	tlsConfigCache.Flush()
+	apisMu.Unlock()
 
-	return len(apiSpecs), nil
+	return apiLen, nil
 }
 
 func syncPolicies() (count int, err error) {
@@ -1083,6 +1094,11 @@ func afterConfSetup(conf *config.Config) {
 		conf.SlaveOptions.KeySpaceSyncInterval = 10
 	}
 
+	if conf.AnalyticsConfig.PurgeInterval == 0 {
+		// as default 10 seconds
+		conf.AnalyticsConfig.PurgeInterval = 10
+	}
+
 	rpc.GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)
 	rpc.GlobalRPCCallTimeout = time.Second * time.Duration(conf.SlaveOptions.CallTimeout)
 	initGenericEventHandlers(conf)
@@ -1157,6 +1173,7 @@ func kvStore(value string) (string, error) {
 		key := strings.TrimPrefix(value, "consul://")
 		log.Debugf("Retrieving %s from consul", key)
 		if err := setUpConsul(); err != nil {
+			log.Error("Failed to setup consul: ", err)
 			// Return value as is. If consul cannot be set up
 			return value, nil
 		}
@@ -1168,6 +1185,7 @@ func kvStore(value string) (string, error) {
 		key := strings.TrimPrefix(value, "vault://")
 		log.Debugf("Retrieving %s from vault", key)
 		if err := setUpVault(); err != nil {
+			log.Error("Failed to setup vault: ", err)
 			// Return value as is If vault cannot be set up
 			return value, nil
 		}
@@ -1216,10 +1234,10 @@ var hostDetails struct {
 func getHostDetails() {
 	var err error
 	if hostDetails.PID, err = readPIDFromFile(); err != nil {
-		mainLog.Error("Failed ot get host pid: ", err)
+		mainLog.Error("Failed to get host pid: ", err)
 	}
 	if hostDetails.Hostname, err = os.Hostname(); err != nil {
-		mainLog.Error("Failed ot get hostname: ", err)
+		mainLog.Error("Failed to get hostname: ", err)
 	}
 }
 
@@ -1244,6 +1262,8 @@ func Start() {
 	}
 
 	SetNodeID("solo-" + uuid.NewV4().String())
+
+	SessionID = uuid.NewV4().String()
 
 	if err := initialiseSystem(ctx); err != nil {
 		mainLog.Fatalf("Error initialising system: %v", err)

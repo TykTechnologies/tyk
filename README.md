@@ -18,42 +18,37 @@ Built from the ground up to be the fastest API gateway on the planet. It does no
 
 # Open Source API Gateway Features
 
-**Use any protocol:** REST, SOAP, GraphQL, gRPC, and TCP.
+Use any protocol: REST, SOAP, [GraphQL](https://tyk.io/docs/tyk-apis/tyk-gateway-api/api-definition-objects/graphql/), [gRPC](https://tyk.io/docs/key-concepts/grpc-proxy/), and [TCP](https://tyk.io/docs/key-concepts/tcp-proxy/).
 
-**Industry Standard Authentication**: OIDC, JWT, bearer Tokens, Basic Auth, Client Certificates and more.
+Industry Standard Authentication: [OIDC](https://tyk.io/docs/advanced-configuration/integrate/api-auth-mode/open-id-connect/#setting-up-oidc), [JWT,](https://tyk.io/docs/tyk-apis/tyk-gateway-api/api-definition-objects/jwt/) [bearer Tokens](https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/bearer-tokens/), [Basic Auth](https://tyk.io/docs/tyk-apis/tyk-dashboard-api/basic-authentication/), Client Certificates and more.
 
-**Open API Standards**: Import your Swagger and OAS2/3 documents to scaffold APIs in Tyk.
+[Open API Standards:](https://tyk.io/docs/getting-started/import-apis/) Import your Swagger and OAS2/3 documents to scaffold APIs in Tyk.
 
-**Ultra performant:** Low latency, and thousands of rps with just a single CPU, horizontally and vertically scalable.
+[Ultra performant](https://tyk.io/performance-tuning-your-tyk-api-gateway/): Low latency, and thousands of rps with just a single CPU, horizontally and vertically scalable.
 
-**Content mediation**: Transform all the things, from request or response headers to converting between SOAP and GraphQL. 
+[Content mediation](https://tyk.io/docs/advanced-configuration/transform-traffic/): Transform all the things, from request or response headers to converting between SOAP and GraphQL.
 
-**Extensible Plugin Architecture**: Customize Tyk’s middleware chain by writing plugins in your language of choice - from Python to Javascript to Go, or any language which supports gRPC.
+[Extensible Plugin Architecture](https://tyk.io/docs/plugins/): Customize Tyk’s middleware chain by writing plugins in your language of choice - from Python to Javascript to Go, or any language which supports gRPC.
 
+[Rate Limiting](https://tyk.io/docs/basic-config-and-security/control-limit-traffic/rate-limiting/#setting-rate-limits-in-the-tyk-community-edition-gateway-ce) & Quotas: Protect your upstreams from becoming overloaded and/or apply limits for each consumer.
 
-**Rate Limiting & Quotas:** Protect your upstreams from becoming overloaded and/or apply limits for each consumer. 
+[API Versioning](https://tyk.io/docs/tyk-apis/tyk-gateway-api/api-definition-objects/versioning-endpoint/) - API Versions can be easily set and deprecated at a specific time and date.
 
-**API Versioning** - API Versions can be easily set and deprecated at a specific time and date.
+[Granular Access Control](https://tyk.io/docs/security/security-policies/secure-apis-method-path/) - Grant access to one or more APIs on a per version and operation basis.
 
-**Granular Access Control** - Grant access to one or more APIs on a per version and operation basis.
+[Blocklist](https://tyk.io/docs/tyk-apis/tyk-gateway-api/api-definition-objects/ip-blacklisting/)/[Allowlist](https://tyk.io/docs/tyk-apis/tyk-gateway-api/api-definition-objects/ip-whitelisting/)/Ignored endpoint access - Enforce strict security models on a version-by-version basis to your access points.
 
-**Blocklist/Allowlist/Ignored endpoint access** - Enforce strict security models on a version-by-version basis to your access points.
+Analytics logging - Record detailed usage data on who is using your API's (raw data only)
 
-**Analytics logging** - Record detailed usage data on who is using your API's (raw data only)
+[CORS](https://tyk.io/docs/tyk-apis/tyk-gateway-api/api-definition-objects/cors/) - Enable CORS for certain APIs so users can make browser-based requests
 
-**CORS** - Enable [CORS](https://tyk.io/docs/tyk-apis/tyk-gateway-api/api-definition-objects/cors/) for certain APIs so users can make browser-based requests
+[Webhooks](https://tyk.io/docs/basic-config-and-security/report-monitor-trigger-events/webhooks/) - Trigger webhooks against events such as Quota Violations and Authentication failures
 
-**Webhooks** - Trigger webhooks against events such as Quota Violations and Authentication failures
+[IP AllowListing](https://tyk.io/docs/tyk-apis/tyk-gateway-api/api-definition-objects/ip-whitelisting/) - Block access to non-trusted IP addresses for more secure interactions
 
-**IP AllowListing** - Block access to non-trusted IP addresses for more secure interactions
+[Hitless reloads](https://tyk.io/docs/tyk-configuration-reference/hot-restart-tyk-gateway-process/) - Tyk configurations can be altered dynamically and the service restarted without affecting any active request
 
-**Hitless reloads** - Tyk configurations can be altered dynamically and the service restarted without affecting any active request
-
-**Kubernetes native declarative API:** using Open Source [Tyk Operator](https://github.com/TykTechnologies/tyk-operator) (more info in OSS section)
-
-_And everything else you expect from a Cloud Native API Gateway_
-
-
+[Kubernetes native](https://tyk.io/docs/tyk-oss/ce-helm-chart/) declarative API: using Open Source [Tyk Operator](https://github.com/TykTechnologies/tyk-operator) (more info in OSS section)
 
 
 # Quick Start on your platform

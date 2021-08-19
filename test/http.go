@@ -229,6 +229,23 @@ type HTTPTestRunner struct {
 	RequestBuilder func(*TestCase) (*http.Request, error)
 }
 
+const maxRetryCount = 2
+
+var retryReasons = []string{
+	"broken pipe",
+	"protocol wrong type for socket",
+	"connection reset by peer",
+}
+
+func needRetry(errString string) bool {
+	for _, reason := range retryReasons {
+		if strings.Contains(errString, reason) {
+			return true
+		}
+	}
+	return false
+}
+
 func (r HTTPTestRunner) Run(t testing.TB, testCases ...TestCase) (*http.Response, error) {
 	t.Helper()
 	var lastResponse *http.Response
@@ -252,10 +269,19 @@ func (r HTTPTestRunner) Run(t testing.TB, testCases ...TestCase) (*http.Response
 			t.Errorf("[%d] Request build error: %s", ti, err.Error())
 			continue
 		}
+
+		retryCount := 0
+	retry:
+
 		lastResponse, lastError = r.Do(req, &tc)
 		tcJSON, _ := json.Marshal(tc)
 
 		if lastError != nil {
+			if retryCount < maxRetryCount && needRetry(lastError.Error()) {
+				retryCount++
+				goto retry
+			}
+
 			if tc.ErrorMatch != "" {
 				if !strings.Contains(lastError.Error(), tc.ErrorMatch) {
 					t.Errorf("[%d] Expect error `%s` to contain `%s`. %s", ti, lastError.Error(), tc.ErrorMatch, string(tcJSON))

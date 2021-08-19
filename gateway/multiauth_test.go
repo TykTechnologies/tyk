@@ -70,7 +70,7 @@ func createMultiBasicAuthSession(isBench bool) *user.SessionState {
 	session.QuotaRenews = time.Now().Unix() + 20
 	session.QuotaRemaining = 1
 	session.QuotaMax = -1
-	session.BasicAuthData = user.BasicAuthData{Password: "TEST"}
+	session.BasicAuthData.Password = "TEST"
 	session.AccessRights = map[string]user.AccessDefinition{"55": {APIName: "Tyk Multi Key Test", APIID: "55", Versions: []string{"default"}}}
 	return session
 }

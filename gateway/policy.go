@@ -27,15 +27,19 @@ type DBAccessDefinition struct {
 }
 
 func (d *DBAccessDefinition) ToRegularAD() user.AccessDefinition {
-	return user.AccessDefinition{
+	ad := user.AccessDefinition{
 		APIName:           d.APIName,
 		APIID:             d.APIID,
 		Versions:          d.Versions,
 		AllowedURLs:       d.AllowedURLs,
 		RestrictedTypes:   d.RestrictedTypes,
 		FieldAccessRights: d.FieldAccessRights,
-		Limit:             d.Limit,
 	}
+
+	if d.Limit != nil {
+		ad.Limit = *d.Limit
+	}
+	return ad
 }
 
 type DBPolicy struct {
@@ -101,7 +105,7 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusForbidden {
+	if resp.StatusCode != http.StatusOK {
 		body, _ := ioutil.ReadAll(resp.Body)
 		log.Error("Policy request login failure, Response was: ", string(body))
 		reLogin()

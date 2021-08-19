@@ -4,17 +4,33 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	graphqlDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/httpclient"
 	restDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/rest_datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/plan"
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+	"github.com/jensneuse/graphql-go-tools/pkg/graphql/federation"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
 var ErrUnsupportedGraphQLConfigVersion = errors.New("provided version of GraphQL config is not supported for this operation")
+
+type GraphQLConfigAdapterOption func(adapter *GraphQLConfigAdapter)
+
+func WithSchema(schema *graphql.Schema) GraphQLConfigAdapterOption {
+	return func(adapter *GraphQLConfigAdapter) {
+		adapter.schema = schema
+	}
+}
+
+func WithHttpClient(httpClient *http.Client) GraphQLConfigAdapterOption {
+	return func(adapter *GraphQLConfigAdapter) {
+		adapter.httpClient = httpClient
+	}
+}
 
 type GraphQLConfigAdapter struct {
 	config     apidef.GraphQLConfig
@@ -22,8 +38,13 @@ type GraphQLConfigAdapter struct {
 	schema     *graphql.Schema
 }
 
-func NewGraphQLConfigAdapter(config apidef.GraphQLConfig) GraphQLConfigAdapter {
-	return GraphQLConfigAdapter{config: config}
+func NewGraphQLConfigAdapter(config apidef.GraphQLConfig, options ...GraphQLConfigAdapterOption) GraphQLConfigAdapter {
+	adapter := GraphQLConfigAdapter{config: config}
+	for _, option := range options {
+		option(&adapter)
+	}
+
+	return adapter
 }
 
 func (g *GraphQLConfigAdapter) EngineConfigV2() (*graphql.EngineV2Configuration, error) {
@@ -31,9 +52,31 @@ func (g *GraphQLConfigAdapter) EngineConfigV2() (*graphql.EngineV2Configuration,
 		return nil, ErrUnsupportedGraphQLConfigVersion
 	}
 
-	var err error
-	g.schema, err = graphql.NewSchemaFromString(g.config.Schema)
+	if g.isSupergraphAPIDefinition() {
+		return g.createV2ConfigForSupergraphExecutionMode()
+	}
+
+	return g.createV2ConfigForEngineExecutionMode()
+}
+
+func (g *GraphQLConfigAdapter) createV2ConfigForSupergraphExecutionMode() (*graphql.EngineV2Configuration, error) {
+	dataSourceConfs := g.subgraphDataSourceConfigs()
+	federationConfigV2Factory := federation.NewEngineConfigV2Factory(g.getHttpClient(), dataSourceConfs...)
+	err := federationConfigV2Factory.SetMergedSchemaFromString(g.config.Supergraph.MergedSDL)
 	if err != nil {
+		return nil, err
+	}
+
+	conf, err := federationConfigV2Factory.EngineV2Configuration()
+	if err != nil {
+		return nil, err
+	}
+
+	return &conf, nil
+}
+
+func (g *GraphQLConfigAdapter) createV2ConfigForEngineExecutionMode() (*graphql.EngineV2Configuration, error) {
+	if err := g.parseSchema(); err != nil {
 		return nil, err
 	}
 
@@ -49,6 +92,28 @@ func (g *GraphQLConfigAdapter) EngineConfigV2() (*graphql.EngineV2Configuration,
 	conf.SetDataSources(datsSources)
 
 	return &conf, nil
+}
+
+func (g *GraphQLConfigAdapter) parseSchema() (err error) {
+	if g.schema != nil {
+		return nil
+	}
+
+	g.schema, err = graphql.NewSchemaFromString(g.config.Schema)
+	if err != nil {
+		return err
+	}
+
+	normalizationResult, err := g.schema.Normalize()
+	if err != nil {
+		return err
+	}
+
+	if !normalizationResult.Successful && normalizationResult.Errors != nil {
+		return normalizationResult.Errors
+	}
+
+	return nil
 }
 
 func (g *GraphQLConfigAdapter) engineConfigV2FieldConfigs() (planFieldConfigs plan.FieldConfigurations) {
@@ -93,11 +158,9 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 				return nil, err
 			}
 
-			factory := &restDataSource.Factory{}
-			if g.httpClient != nil {
-				factory.Client = httpclient.NewNetHttpClient(g.httpClient)
+			planDataSource.Factory = &restDataSource.Factory{
+				Client: g.getHttpClient(),
 			}
-			planDataSource.Factory = factory
 
 			planDataSource.Custom = restDataSource.ConfigJSON(restDataSource.Configuration{
 				Fetch: restDataSource.FetchConfiguration{
@@ -105,7 +168,7 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 					Method: restConfig.Method,
 					Body:   restConfig.Body,
 					Query:  g.convertURLQueriesToEngineV2Queries(restConfig.Query),
-					Header: g.convertHttpHeadersToEngineV2Headers(restConfig.Headers),
+					Header: g.convertHeadersToHttpHeaders(restConfig.Headers),
 				},
 			})
 
@@ -116,19 +179,15 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 				return nil, err
 			}
 
-			factory := &graphqlDataSource.Factory{}
-			if g.httpClient != nil {
-				factory.Client = httpclient.NewNetHttpClient(g.httpClient)
+			planDataSource.Factory = &graphqlDataSource.Factory{
+				Client: g.getHttpClient(),
 			}
-			planDataSource.Factory = factory
 
-			planDataSource.Custom = graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
-				Fetch: graphqlDataSource.FetchConfiguration{
-					URL:    graphqlConfig.URL,
-					Method: graphqlConfig.Method,
-					Header: g.convertHttpHeadersToEngineV2Headers(graphqlConfig.Headers),
-				},
-			})
+			planDataSource.Custom = graphqlDataSource.ConfigJson(g.graphqlDataSourceConfiguration(
+				graphqlConfig.URL,
+				graphqlConfig.Method,
+				graphqlConfig.Headers,
+			))
 		}
 
 		planDataSources = append(planDataSources, planDataSource)
@@ -136,6 +195,54 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 
 	err = g.determineChildNodes(planDataSources)
 	return planDataSources, err
+}
+
+func (g *GraphQLConfigAdapter) subgraphDataSourceConfigs() []graphqlDataSource.Configuration {
+	confs := make([]graphqlDataSource.Configuration, 0)
+	if len(g.config.Supergraph.Subgraphs) == 0 {
+		return confs
+	}
+
+	for _, apiDefSubgraphConf := range g.config.Supergraph.Subgraphs {
+		if len(apiDefSubgraphConf.SDL) == 0 {
+			continue
+		}
+
+		conf := g.graphqlDataSourceConfiguration(apiDefSubgraphConf.URL, http.MethodPost, g.config.Supergraph.GlobalHeaders)
+		conf.Federation = graphqlDataSource.FederationConfiguration{
+			Enabled:    true,
+			ServiceSDL: apiDefSubgraphConf.SDL,
+		}
+
+		confs = append(confs, conf)
+	}
+
+	return confs
+}
+
+func (g *GraphQLConfigAdapter) graphqlDataSourceConfiguration(url string, method string, headers map[string]string) graphqlDataSource.Configuration {
+	dataSourceHeaders := make(map[string]string)
+	for name, value := range headers {
+		dataSourceHeaders[name] = value
+	}
+
+	if strings.HasPrefix(url, "tyk://") {
+		url = strings.ReplaceAll(url, "tyk://", "http://")
+		dataSourceHeaders[apidef.TykInternalApiHeader] = "true"
+	}
+
+	cfg := graphqlDataSource.Configuration{
+		Fetch: graphqlDataSource.FetchConfiguration{
+			URL:    url,
+			Method: method,
+			Header: g.convertHeadersToHttpHeaders(dataSourceHeaders),
+		},
+		Subscription: graphqlDataSource.SubscriptionConfiguration{
+			URL: url,
+		},
+	}
+
+	return cfg
 }
 
 func (g *GraphQLConfigAdapter) engineConfigV2Arguments(fieldConfs *plan.FieldConfigurations, generatedArgs map[graphql.TypeFieldLookupKey]graphql.TypeFieldArguments) {
@@ -177,10 +284,6 @@ func (g *GraphQLConfigAdapter) createArgumentConfigurationsForArgumentNames(argu
 	return argConfs
 }
 
-func (g *GraphQLConfigAdapter) SetHttpClient(httpClient *http.Client) {
-	g.httpClient = httpClient
-}
-
 func (g *GraphQLConfigAdapter) convertURLQueriesToEngineV2Queries(apiDefQueries []apidef.QueryVariable) []restDataSource.QueryConfiguration {
 	if len(apiDefQueries) == 0 {
 		return nil
@@ -199,14 +302,14 @@ func (g *GraphQLConfigAdapter) convertURLQueriesToEngineV2Queries(apiDefQueries 
 	return engineV2Queries
 }
 
-func (g *GraphQLConfigAdapter) convertHttpHeadersToEngineV2Headers(apiDefHeaders map[string]string) http.Header {
+func (g *GraphQLConfigAdapter) convertHeadersToHttpHeaders(apiDefHeaders map[string]string) http.Header {
 	if len(apiDefHeaders) == 0 {
 		return nil
 	}
 
 	engineV2Headers := make(http.Header)
 	for apiDefHeaderKey, apiDefHeaderValue := range apiDefHeaders {
-		engineV2Headers[apiDefHeaderKey] = []string{apiDefHeaderValue}
+		engineV2Headers.Add(apiDefHeaderKey, apiDefHeaderValue)
 	}
 
 	return engineV2Headers
@@ -233,4 +336,16 @@ func (g *GraphQLConfigAdapter) determineChildNodes(planDataSources []plan.DataSo
 		}
 	}
 	return nil
+}
+
+func (g *GraphQLConfigAdapter) isSupergraphAPIDefinition() bool {
+	return g.config.Enabled && g.config.ExecutionMode == apidef.GraphQLExecutionModeSupergraph
+}
+
+func (g *GraphQLConfigAdapter) getHttpClient() *http.Client {
+	if g.httpClient == nil {
+		g.httpClient = httpclient.DefaultNetHttpClient
+	}
+
+	return g.httpClient
 }

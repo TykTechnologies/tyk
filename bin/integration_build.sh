@@ -33,13 +33,15 @@ mkdir -p ${bdir}/apps \
          ${bdir}/middleware/lua \
          ${bdir}/event_handlers \
          ${bdir}/event_handlers/sample \
-         ${bdir}/templates \
+         ${bdir}/templates/playground \
          ${bdir}/policies \
          ${bdir}/utils \
          ${bdir}/install
 
 cp apps/app_sample.json ${bdir}/apps
 cp templates/*.json ${bdir}/templates
+cp templates/playground/index.html ${bdir}/templates/playground
+cp templates/playground/playground.js ${bdir}/templates/playground
 cp -R install/* ${bdir}/install
 cp middleware/*.js ${bdir}/middleware
 cp event_handlers/sample/*.js ${bdir}/event_handlers/sample
