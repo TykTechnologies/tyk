@@ -12,6 +12,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/request"
+	"github.com/sirupsen/logrus"
+
 	"github.com/lonelycode/osin"
 	uuid "github.com/satori/go.uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -143,6 +146,7 @@ func (o *OAuthHandlers) HandleGenerateAuthCodeData(w http.ResponseWriter, r *htt
 	resp := o.Manager.HandleAuthorisation(r, true, sessionJSONData)
 	code := http.StatusOK
 	msg := o.generateOAuthOutputFromOsinResponse(resp)
+
 	if resp.IsError {
 		code = resp.ErrorStatusCode
 		log.Error("[OAuth] OAuth response marked as error: ", resp)
@@ -157,7 +161,7 @@ func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *htt
 	// Extract client data and check
 	resp := o.Manager.HandleAuthorisation(r, false, "")
 	if resp.IsError {
-		log.Error("There was an error with the request: ", resp)
+		log.Error("[OAuth] There was an error with the request: ", resp)
 		// Something went wrong, write out the error details and kill the response
 		doJSONWrite(w, resp.ErrorStatusCode, apiError(resp.StatusText))
 		return
@@ -467,12 +471,12 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 					log.WithField("oauthClientID", ar.Client.GetId()).
 						Error("Could not set session meta_data from oauth-client fields, type mismatch")
 				} else {
-					session.SetMetaData(metadata)
+					session.MetaData = metadata
 					// set session alias to developer email as we do it for regular API keys created for developer
-					if devEmail, found := session.GetMetaData()[keyDataDeveloperEmail].(string); found {
+					if devEmail, found := session.MetaData[keyDataDeveloperEmail].(string); found {
 						session.Alias = devEmail
 						// we don't need it in meta-data as we set it to alias
-						session.RemoveMetaData(keyDataDeveloperEmail)
+						delete(session.MetaData, keyDataDeveloperEmail)
 					}
 				}
 			}
@@ -486,9 +490,15 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			}
 		}
 	}
-
-	if resp.IsError && resp.InternalError != nil {
-		log.Error("ERROR: ", resp.InternalError)
+	if resp.IsError {
+		clientId := r.Form.Get("client_id")
+		log.WithFields(logrus.Fields{
+			"org_id":         o.API.OrgID,
+			"client_id":      clientId,
+			"response error": resp.StatusText,
+			"response code":  resp.ErrorStatusCode,
+			"RemoteAddr":     request.RealIP(r), //r.RemoteAddr,
+		}).Error("[OAuth] OAuth response marked as error")
 	}
 
 	return resp
@@ -973,14 +983,14 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 
 	c, ok := accessData.Client.(*OAuthClient)
 	if ok && c.MetaData != nil {
-		if newSession.GetMetaData() == nil {
-			newSession.SetMetaData(make(map[string]interface{}))
+		if newSession.MetaData == nil {
+			newSession.MetaData = make(map[string]interface{})
 		}
 
 		// Allow session inherit and *override* client values
 		for k, v := range c.MetaData.(map[string]interface{}) {
-			if _, found := newSession.GetMetaDataByKey(k); !found {
-				newSession.SetMetaDataKey(k, v)
+			if _, found := newSession.MetaData[k]; !found {
+				newSession.MetaData[k] = v
 			}
 		}
 	}
@@ -1132,7 +1142,7 @@ func (r *RedisOsinStorageInterface) GetUser(username string) (*user.SessionState
 	}
 
 	// new interface means having to make this nested... ick.
-	session := user.NewSessionState()
+	session := &user.SessionState{}
 	if err := json.Unmarshal([]byte(accessJSON), session); err != nil {
 		log.Error("Couldn't unmarshal OAuth auth data object (LoadRefresh): ", err,
 			"; Decoding: ", accessJSON)

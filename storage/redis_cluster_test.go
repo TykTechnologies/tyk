@@ -1,15 +1,28 @@
 package storage
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/go-redis/redis/v8"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/stretchr/testify/assert"
 )
 
+func init() {
+	go ConnectToRedis(context.Background(), nil)
+	for {
+		if Connected() {
+			break
+		}
+
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
 func TestRedisClusterGetMultiKey(t *testing.T) {
-	t.Skip()
 
 	keys := []string{"first", "second"}
 	r := RedisCluster{KeyPrefix: "test-cluster"}
@@ -90,4 +103,33 @@ func TestRedisAddressConfiguration(t *testing.T) {
 			t.Fatal("Wrong default sentinel mode address")
 		}
 	})
+}
+
+func TestRedisExpirationTime(t *testing.T) {
+	storage := &RedisCluster{KeyPrefix: "test-"}
+
+	testKey := "test-key"
+	testValue := "test-value"
+	storage.SetKey(testKey, testValue, 0)
+	key, err := storage.GetKey(testKey)
+	assert.Equal(t, testValue, key)
+	assert.Equal(t, nil, err)
+
+	//testing if GetExp returns -2 for non existent keys
+	ttl, errGetExp := storage.GetExp(testKey + "random")
+	assert.Equal(t, int64(-2), ttl)
+	assert.Equal(t, nil, errGetExp)
+
+	//testing if GetExp returns -1 for keys without expiration
+	ttl, errGetExp = storage.GetExp(testKey)
+	assert.Equal(t, int64(-1), ttl)
+	assert.Equal(t, nil, errGetExp)
+
+	//Testing if SetExp actually sets the expiration.
+	errSetExp := storage.SetExp(testKey, 40)
+	assert.Equal(t, nil, errSetExp)
+	ttl, errGetExp = storage.GetExp(testKey)
+	assert.Equal(t, int64(40), ttl)
+	assert.Equal(t, nil, errGetExp)
+
 }

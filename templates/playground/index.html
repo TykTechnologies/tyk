@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>API Playground</title>
+</head>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+  }
+
+  .graphiql-container {
+    border-radius: 0px !important;
+    height: 100vh !important;
+  }
+</style>
+<body>
+  <div id="root">
+  </div>
+  <script src="{{.PathPrefix}}/playground.js"> </script>
+  <script>
+    const apiUrl = window.location.origin + "{{.Url}}";
+    const schema = {{.Schema}};
+    const GraphiQlInitInstance = new window.GraphiqlInit({
+      containerId: 'root',
+      url: apiUrl,
+      schema: schema
+    });
+  </script>
+</html>

@@ -5,8 +5,12 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
+	"github.com/TykTechnologies/tyk/storage"
+
+	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/signature_validator"
@@ -20,16 +24,32 @@ const (
 const (
 	ErrAuthAuthorizationFieldMissing = "auth.auth_field_missing"
 	ErrAuthKeyNotFound               = "auth.key_not_found"
+	ErrAuthCertNotFound              = "auth.cert_not_found"
+	ErrAuthKeyIsInvalid              = "auth.key_is_invalid"
+
+	MsgNonExistentKey  = "Attempted access with non-existent key."
+	MsgNonExistentCert = "Attempted access with non-existent cert."
+	MsgInvalidKey      = "Attempted access with invalid key."
 )
 
 func init() {
 	TykErrors[ErrAuthAuthorizationFieldMissing] = config.TykError{
-		Message: "Authorization field missing",
+		Message: MsgAuthFieldMissing,
 		Code:    http.StatusUnauthorized,
 	}
 
 	TykErrors[ErrAuthKeyNotFound] = config.TykError{
-		Message: "Access to this API has been disallowed",
+		Message: MsgApiAccessDisallowed,
+		Code:    http.StatusForbidden,
+	}
+
+	TykErrors[ErrAuthCertNotFound] = config.TykError{
+		Message: MsgApiAccessDisallowed,
+		Code:    http.StatusForbidden,
+	}
+
+	TykErrors[ErrAuthKeyIsInvalid] = config.TykError{
+		Message: MsgApiAccessDisallowed,
 		Code:    http.StatusForbidden,
 	}
 }
@@ -61,54 +81,103 @@ func (k *AuthKey) getAuthType() string {
 	return authTokenType
 }
 
-func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
 		return nil, http.StatusOK
 	}
 
-	key, config := k.getAuthToken(k.getAuthType(), r)
+	key, authConfig := k.getAuthToken(k.getAuthType(), r)
+	var certHash string
 
-	// If key not provided in header or cookie and client certificate is provided, try to find certificate based key
-	if config.UseCertificate && key == "" && r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
-		key = generateToken(k.Spec.OrgID, certs.HexSHA256(r.TLS.PeerCertificates[0].Raw))
-	}
+	keyExists := false
+	var session user.SessionState
+	if key != "" {
+		key = stripBearer(key)
+	} else if authConfig.UseCertificate && key == "" && r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
+		log.Debug("Trying to find key by client certificate")
+		certHash = certs.HexSHA256(r.TLS.PeerCertificates[0].Raw)
+		key = generateToken(k.Spec.OrgID, certHash)
 
-	if key == "" {
-		// No header value, fail
+	} else {
 		k.Logger().Info("Attempted access with malformed header, no auth header found.")
-
 		return errorAndStatusCode(ErrAuthAuthorizationFieldMissing)
 	}
 
-	// Ignore Bearer prefix on token if it exists
-	key = stripBearer(key)
-
-	// Check if API key valid
-	session, keyExists := k.CheckSessionAndIdentityForValidKey(&key, r)
+	session, keyExists = k.CheckSessionAndIdentityForValidKey(key, r)
+	key = session.KeyID
 	if !keyExists {
-		k.Logger().WithField("key", obfuscateKey(key)).Info("Attempted access with non-existent key.")
-
-		// Fire Authfailed Event
-		AuthFailed(k, r, key)
-
-		// Report in health check
-		reportHealthValue(k.Spec, KeyFailure, "1")
-
-		return errorAndStatusCode(ErrAuthKeyNotFound)
+		// fallback to search by cert
+		session, keyExists = k.CheckSessionAndIdentityForValidKey(certHash, r)
+		certHash = session.KeyID
+		if !keyExists {
+			return k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)
+		}
 	}
 
+	if authConfig.UseCertificate {
+		certID := session.OrgID + certHash
+		_, err := CertificateManager.GetRaw(certID)
+		if err != nil {
+			// Try alternative approach:
+			id, err := storage.TokenID(session.KeyID)
+			if err != nil {
+				log.Error(err)
+				return k.reportInvalidKey(key, r, MsgNonExistentCert, ErrAuthCertNotFound)
+			}
+
+			certID = session.OrgID + id
+			_, err = CertificateManager.GetRaw(certID)
+			if err != nil {
+				return k.reportInvalidKey(key, r, MsgNonExistentCert, ErrAuthCertNotFound)
+			}
+		}
+
+		if session.Certificate != certID {
+			return k.reportInvalidKey(key, r, MsgInvalidKey, ErrAuthKeyIsInvalid)
+		}
+	}
 	// Set session state on context, we will need it later
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.AuthToken, apidef.UnsetAuth:
-		ctxSetSession(r, &session, key, false)
+		ctxSetSession(r, &session, false)
 		k.setContextVars(r, key)
 	}
 
+	// Try using org-key format first:
+	if strings.HasPrefix(key, session.OrgID) {
+		err, statusCode := k.validateSignature(r, key[len(session.OrgID):])
+		if err == nil && statusCode == http.StatusOK {
+			return err, statusCode
+		}
+	}
+
+	// As a second approach, try to use the internal ID that's part of the B64 JSON key:
+	keyID, err := storage.TokenID(key)
+	if err == nil {
+		err, statusCode := k.validateSignature(r, keyID)
+		if err == nil {
+			return err, statusCode
+		}
+	}
+
+	// Last try is to take the key as is:
 	return k.validateSignature(r, key)
 }
 
+func (k *AuthKey) reportInvalidKey(key string, r *http.Request, msg string, errMsg string) (error, int) {
+	k.Logger().WithField("key", obfuscateKey(key)).Info(msg)
+
+	// Fire Authfailed Event
+	AuthFailed(k, r, key)
+
+	// Report in health check
+	reportHealthValue(k.Spec, KeyFailure, "1")
+
+	return errorAndStatusCode(errMsg)
+}
+
 func (k *AuthKey) validateSignature(r *http.Request, key string) (error, int) {
-	config := k.Spec.Auth
+	_, config := k.getAuthToken(k.getAuthType(), r)
 	logger := k.Logger().WithField("key", obfuscateKey(key))
 
 	if !config.ValidateSignature {
@@ -159,6 +228,7 @@ func stripBearer(token string) string {
 	return token
 }
 
+// TODO: move this method to base middleware?
 func AuthFailed(m TykMiddleware, r *http.Request, token string) {
 	m.Base().FireEvent(EventAuthFailure, EventKeyFailureMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Auth Failure", OriginatingRequest: EncodeRequestToEvent(r)},

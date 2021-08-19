@@ -13,20 +13,6 @@ fatal() {
 	exit 1
 }
 
-FMT_FILES=$(gofmt -l . | grep -v vendor)
-if [[ -n ${FMT_FILES} ]]; then
-    fatal "Run 'gofmt -w' on these files:\n$FMT_FILES"
-fi
-
-echo "gofmt check is ok!"
-
-IMP_FILES="$(goimports -l . | grep -v vendor)"
-if [[ -n ${IMP_FILES} ]]; then
-    fatal "Run 'goimports -w' on these files:\n$IMP_FILES"
-fi
-
-echo "goimports check is ok!"
-
 PKGS="$(go list ./...)"
 
 export PKG_PATH=${GOPATH}/src/github.com/TykTechnologies/tyk
@@ -52,12 +38,10 @@ for pkg in ${PKGS}; do
         race=""
     fi
 
-    show go test -v ${race} -timeout ${TEST_TIMEOUT} -coverprofile=test.cov ${pkg} ${tags} || fatal "Test Failed"
+    show go test ${race} -timeout ${TEST_TIMEOUT} -coverprofile=test.cov ${pkg} ${tags} || fatal "Test Failed"
     show go vet ${tags} ${pkg} || fatal "go vet errored"
 done
 
 # run rpc tests separately
-# TODO: fix rpc tests and enable this
-#rpc_tests='SyncAPISpecsRPC|OrgSessionWithRPCDown'
-rpc_tests='OrgSessionWithRPCDown'
-show go test -v -timeout ${TEST_TIMEOUT} -coverprofile=test.cov github.com/TykTechnologies/tyk/gateway -p 1 -run '"'${rpc_tests}'"' || fatal "Test Failed"
+rpc_tests='SyncAPISpecsRPC|OrgSessionWithRPCDown'
+show go test -timeout ${TEST_TIMEOUT} -coverprofile=test.cov github.com/TykTechnologies/tyk/gateway -p 1 -run '"'${rpc_tests}'"' || fatal "Test Failed"

@@ -1,14 +1,14 @@
 package gateway
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
-	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
-
 	"github.com/TykTechnologies/leakybucket"
 	"github.com/TykTechnologies/leakybucket/memorycache"
+
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
@@ -94,15 +94,14 @@ const (
 	sessionFailNone sessionFailReason = iota
 	sessionFailRateLimit
 	sessionFailQuota
-	sessionFailDepthLimit
 	sessionFailInternalServerError
 )
 
 func (l *SessionLimiter) limitSentinel(currentSession *user.SessionState, key string, rateScope string, store storage.Handler,
 	globalConf *config.Config, apiLimit *user.APILimit, dryRun bool) bool {
 
-	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.GetKeyHash()
-	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.GetKeyHash() + ".BLOCKED"
+	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash()
+	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash() + ".BLOCKED"
 
 	go l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun)
 
@@ -118,8 +117,8 @@ func (l *SessionLimiter) limitSentinel(currentSession *user.SessionState, key st
 func (l *SessionLimiter) limitRedis(currentSession *user.SessionState, key string, rateScope string, store storage.Handler,
 	globalConf *config.Config, apiLimit *user.APILimit, dryRun bool) bool {
 
-	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.GetKeyHash()
-	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.GetKeyHash() + ".BLOCKED"
+	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash()
+	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash() + ".BLOCKED"
 
 	if l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun) {
 		return true
@@ -183,45 +182,10 @@ func (sfr sessionFailReason) String() string {
 // Per 10 seconds
 func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.SessionState, key string, store storage.Handler, enableRL, enableQ bool, globalConf *config.Config, api *APISpec, dryRun bool) sessionFailReason {
 	// check for limit on API level (set to session by ApplyPolicies)
-	accessDef := &user.AccessDefinition{}
-	var allowanceScope string
-
-	var gqlRequest *graphql.Request
-	if api.GraphQL.Enabled {
-		gqlRequest = ctxGetGraphQLRequest(r)
-	}
-
-	if len(currentSession.GetAccessRights()) > 0 {
-		if rights, ok := currentSession.GetAccessRightByAPIID(api.APIID); !ok {
-			log.WithField("apiID", api.APIID).Debug("[RATE] unexpected apiID")
-			return sessionFailRateLimit
-		} else {
-			accessDef.Limit = rights.Limit
-			accessDef.FieldAccessRights = rights.FieldAccessRights
-			allowanceScope = rights.AllowanceScope
-		}
-	}
-
-	if accessDef.Limit == nil {
-		accessDef = &user.AccessDefinition{
-			Limit: &user.APILimit{
-				QuotaMax:           currentSession.QuotaMax,
-				QuotaRenewalRate:   currentSession.QuotaRenewalRate,
-				QuotaRenews:        currentSession.QuotaRenews,
-				Rate:               currentSession.Rate,
-				Per:                currentSession.Per,
-				ThrottleInterval:   currentSession.ThrottleInterval,
-				ThrottleRetryLimit: currentSession.ThrottleRetryLimit,
-				MaxQueryDepth:      currentSession.MaxQueryDepth,
-			},
-		}
-	}
-
-	// If MaxQueryDepth is -1 or 0, it means unlimited and no need for depth limiting.
-	if l.DepthLimitEnabled(api.GraphQL.Enabled, accessDef) {
-		if failReason := l.DepthLimitExceeded(gqlRequest, accessDef, api.GraphQLExecutor.Schema); failReason != sessionFailNone {
-			return failReason
-		}
+	accessDef, allowanceScope, err := GetAccessDefinitionByAPIIDOrSession(currentSession, api)
+	if err != nil {
+		log.WithField("apiID", api.APIID).Debugf("[RATE] %s", err.Error())
+		return sessionFailRateLimit
 	}
 
 	// If rate is -1 or 0, it means unlimited and no need for rate limiting.
@@ -231,11 +195,11 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			rateScope = allowanceScope + "-"
 		}
 		if globalConf.EnableSentinelRateLimiter {
-			if l.limitSentinel(currentSession, key, rateScope, store, globalConf, accessDef.Limit, dryRun) {
+			if l.limitSentinel(currentSession, key, rateScope, store, globalConf, &accessDef.Limit, dryRun) {
 				return sessionFailRateLimit
 			}
 		} else if globalConf.EnableRedisRollingLimiter {
-			if l.limitRedis(currentSession, key, rateScope, store, globalConf, accessDef.Limit, dryRun) {
+			if l.limitRedis(currentSession, key, rateScope, store, globalConf, &accessDef.Limit, dryRun) {
 				return sessionFailRateLimit
 			}
 		} else {
@@ -253,11 +217,11 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			if n <= 1 || n*c < rate {
 				// If we have 1 server, there is no need to strain redis at all the leaky
 				// bucket algorithm will suffice.
-				if l.limitDRL(currentSession, key, rateScope, accessDef.Limit, dryRun) {
+				if l.limitDRL(currentSession, key, rateScope, &accessDef.Limit, dryRun) {
 					return sessionFailRateLimit
 				}
 			} else {
-				if l.limitRedis(currentSession, key, rateScope, store, globalConf, accessDef.Limit, dryRun) {
+				if l.limitRedis(currentSession, key, rateScope, store, globalConf, &accessDef.Limit, dryRun) {
 					return sessionFailRateLimit
 				}
 			}
@@ -269,65 +233,13 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			currentSession.Allowance = currentSession.Allowance - 1
 		}
 
-		if l.RedisQuotaExceeded(r, currentSession, allowanceScope, accessDef.Limit, store) {
+		if l.RedisQuotaExceeded(r, currentSession, allowanceScope, &accessDef.Limit, store) {
 			return sessionFailQuota
 		}
 	}
 
 	return sessionFailNone
 
-}
-
-func (l *SessionLimiter) DepthLimitEnabled(graphqlEnabled bool, accessDef *user.AccessDefinition) bool {
-	if !graphqlEnabled {
-		return false
-	}
-
-	// There is a possibility that depth limit is disabled on field level too,
-	// but we continue with this because of the explanation above.
-	if len(accessDef.FieldAccessRights) > 0 {
-		return true
-	}
-
-	return accessDef.Limit.MaxQueryDepth > 0
-}
-
-func (l *SessionLimiter) DepthLimitExceeded(gqlRequest *graphql.Request, accessDef *user.AccessDefinition, schema *graphql.Schema) sessionFailReason {
-	complexityRes, err := gqlRequest.CalculateComplexity(graphql.DefaultComplexityCalculator, schema)
-	if err != nil {
-		log.Errorf("Error while calculating complexity of GraphQL request: '%s'", err)
-		return sessionFailInternalServerError
-	}
-
-	// do per query depth check
-	if len(accessDef.FieldAccessRights) == 0 {
-		if complexityRes.Depth > accessDef.Limit.MaxQueryDepth {
-			log.Debugf("Complexity of the request is higher than the allowed limit '%d'", accessDef.Limit.MaxQueryDepth)
-			return sessionFailDepthLimit
-		}
-		return sessionFailNone
-	}
-
-	// do per query field depth check
-	for _, fieldAccessDef := range accessDef.FieldAccessRights {
-		for _, fieldComplexityRes := range complexityRes.PerRootField {
-			if fieldComplexityRes.TypeName != fieldAccessDef.TypeName {
-				continue
-			}
-			if fieldComplexityRes.FieldName != fieldAccessDef.FieldName {
-				continue
-			}
-
-			if greaterThanInt(fieldComplexityRes.Depth, fieldAccessDef.Limits.MaxQueryDepth) {
-				log.Debugf("Complexity of the field: %s.%s is higher than the allowed limit '%d'",
-					fieldAccessDef.TypeName, fieldAccessDef.FieldName, accessDef.Limit.MaxQueryDepth)
-
-				return sessionFailDepthLimit
-			}
-		}
-	}
-
-	return sessionFailNone
 }
 
 func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *user.SessionState, scope string, limit *user.APILimit, store storage.Handler) bool {
@@ -342,7 +254,12 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 		quotaScope = scope + "-"
 	}
 
-	rawKey := QuotaKeyPrefix + quotaScope + currentSession.GetKeyHash()
+	key := currentSession.KeyID
+	if config.Global().HashKeys {
+		key = storage.HashStr(currentSession.KeyID)
+	}
+
+	rawKey := QuotaKeyPrefix + quotaScope + key
 	quotaRenewalRate := limit.QuotaRenewalRate
 	quotaRenews := limit.QuotaRenews
 	quotaMax := limit.QuotaMax
@@ -388,8 +305,8 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 		remaining = 0
 	}
 
-	for k, v := range currentSession.GetAccessRights() {
-		if v.Limit == nil {
+	for k, v := range currentSession.AccessRights {
+		if v.Limit.IsEmpty() {
 			continue
 		}
 
@@ -397,7 +314,7 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 			v.Limit.QuotaRemaining = remaining
 			v.Limit.QuotaRenews = quotaRenews
 		}
-		currentSession.SetAccessRight(k, v)
+		currentSession.AccessRights[k] = v
 	}
 
 	if scope == "" {
@@ -406,4 +323,31 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 	}
 
 	return false
+}
+
+func GetAccessDefinitionByAPIIDOrSession(currentSession *user.SessionState, api *APISpec) (accessDef *user.AccessDefinition, allowanceScope string, err error) {
+	accessDef = &user.AccessDefinition{}
+	if len(currentSession.AccessRights) > 0 {
+		if rights, ok := currentSession.AccessRights[api.APIID]; !ok {
+			return nil, "", errors.New("unexpected apiID")
+		} else {
+			accessDef.Limit = rights.Limit
+			accessDef.FieldAccessRights = rights.FieldAccessRights
+			allowanceScope = rights.AllowanceScope
+		}
+	}
+	if accessDef.Limit.IsEmpty() {
+		accessDef.Limit = user.APILimit{
+			QuotaMax:           currentSession.QuotaMax,
+			QuotaRenewalRate:   currentSession.QuotaRenewalRate,
+			QuotaRenews:        currentSession.QuotaRenews,
+			Rate:               currentSession.Rate,
+			Per:                currentSession.Per,
+			ThrottleInterval:   currentSession.ThrottleInterval,
+			ThrottleRetryLimit: currentSession.ThrottleRetryLimit,
+			MaxQueryDepth:      currentSession.MaxQueryDepth,
+		}
+	}
+
+	return accessDef, allowanceScope, nil
 }

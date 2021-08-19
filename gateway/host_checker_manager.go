@@ -307,9 +307,17 @@ func (hc *HostCheckerManager) HostDown(urlStr string) bool {
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
 	}).Debug("Key is: ", PoolerHostSentinelKeyPrefix+u.Host)
-	_, ok := hc.unhealthyHostList.Load(PoolerHostSentinelKeyPrefix + u.Host)
+
+	key := PoolerHostSentinelKeyPrefix + u.Host
+	// If the node doesn't perform any uptime checks, query the storage:
+	if hc.store != nil && !hc.pollerStarted {
+		v, _ := hc.store.GetKey(key)
+		return v == "1"
+	}
+	_, ok := hc.unhealthyHostList.Load(key)
 	// Found a key, the host is down
 	return ok
+
 }
 
 func (hc *HostCheckerManager) PrepareTrackingHost(checkObject apidef.HostCheckObject, apiID string) (HostData, error) {

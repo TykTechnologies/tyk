@@ -18,6 +18,7 @@ import (
 
 	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -683,6 +684,47 @@ func TestNopCloseResponseBody(t *testing.T) {
 	}
 }
 
+func TestGraphQL_HeadersInjection(t *testing.T) {
+	g := StartTest()
+	t.Cleanup(g.Close)
+
+	composedAPI := BuildAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.GraphQL.Enabled = true
+		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+		spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+
+		spec.GraphQL.Engine.DataSources = []apidef.GraphQLEngineDataSource{
+			generateRESTDataSourceV2(func(ds *apidef.GraphQLEngineDataSource, restConfig *apidef.GraphQLEngineDataSourceConfigREST) {
+				require.NoError(t, json.Unmarshal([]byte(testRESTHeadersDataSourceConfigurationV2), ds))
+				require.NoError(t, json.Unmarshal(ds.Config, restConfig))
+			}),
+		}
+
+		spec.GraphQL.TypeFieldConfigurations = nil
+	})[0]
+
+	LoadAPI(composedAPI)
+
+	headers := graphql.Request{
+		Query: "query Query { headers { name value } }",
+	}
+
+	_, _ = g.Run(t, []test.TestCase{
+		{
+			Data:    headers,
+			Headers: map[string]string{"injected": "FOO"},
+			Code:    http.StatusOK,
+
+			BodyMatchFunc: func(b []byte) bool {
+				return strings.Contains(string(b), `"headers":`) &&
+					strings.Contains(string(b), `{"name":"Injected","value":"FOO"}`) &&
+					strings.Contains(string(b), `{"name":"Static","value":"barbaz"}`)
+			},
+		},
+	}...)
+}
+
 func TestGraphQL_InternalDataSource(t *testing.T) {
 	g := StartTest()
 	defer g.Close()
@@ -701,35 +743,142 @@ func TestGraphQL_InternalDataSource(t *testing.T) {
 		spec.Proxy.ListenPath = "/tyk-rest"
 	})[0]
 
-	composedAPI := BuildAPI(func(spec *APISpec) {
-		spec.Proxy.ListenPath = "/"
-		spec.APIID = "test3"
-		spec.GraphQL.Enabled = true
-		spec.GraphQL.TypeFieldConfigurations[0].DataSource.Config = generateGraphQLDataSource(func(graphQLDataSource *datasource.GraphQLDataSourceConfig) {
-			graphQLDataSource.URL = fmt.Sprintf("tyk://%s", tykGraphQL.Name)
-		})
-		spec.GraphQL.TypeFieldConfigurations[1].DataSource.Config = generateRESTDataSource(func(restDataSource *datasource.HttpJsonDataSourceConfig) {
-			restDataSource.URL = fmt.Sprintf("tyk://%s", tykREST.Name)
-		})
+	tykSubgraphAccounts := BuildAPI(func(spec *APISpec) {
+		spec.Name = "subgraph-accounts"
+		spec.APIID = "subgraph1"
+		spec.Proxy.TargetURL = testSubgraphAccounts
+		spec.Proxy.ListenPath = "/tyk-subgraph-accounts"
+		spec.GraphQL = apidef.GraphQLConfig{
+			Enabled:       true,
+			ExecutionMode: apidef.GraphQLExecutionModeSubgraph,
+			Version:       apidef.GraphQLConfigVersion2,
+			Schema:        gqlSubgraphSchemaAccounts,
+			Subgraph: apidef.GraphQLSubgraphConfig{
+				SDL: gqlSubgraphSDLAccounts,
+			},
+		}
 	})[0]
 
-	LoadAPI(tykGraphQL, tykREST, composedAPI)
+	tykSubgraphReviews := BuildAPI(func(spec *APISpec) {
+		spec.Name = "subgraph-reviews"
+		spec.APIID = "subgraph2"
+		spec.Proxy.TargetURL = testSubgraphReviews
+		spec.Proxy.ListenPath = "/tyk-subgraph-reviews"
+		spec.GraphQL = apidef.GraphQLConfig{
+			Enabled:       true,
+			ExecutionMode: apidef.GraphQLExecutionModeSubgraph,
+			Version:       apidef.GraphQLConfigVersion2,
+			Schema:        gqlSubgraphSchemaReviews,
+			Subgraph: apidef.GraphQLSubgraphConfig{
+				SDL: gqlSubgraphSDLReviews,
+			},
+		}
+	})[0]
 
-	countries := graphql.Request{
-		Query: "query Query { countries { name } }",
-	}
+	t.Run("supergraph (engine v2)", func(t *testing.T) {
+		supergraph := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.APIID = "supergraph"
+			spec.GraphQL = apidef.GraphQLConfig{
+				Enabled:       true,
+				Version:       apidef.GraphQLConfigVersion2,
+				ExecutionMode: apidef.GraphQLExecutionModeSupergraph,
+				Supergraph: apidef.GraphQLSupergraphConfig{
+					Subgraphs: []apidef.GraphQLSubgraphEntity{
+						{
+							APIID: "subgraph1",
+							URL:   "tyk://" + tykSubgraphAccounts.Name,
+							SDL:   gqlSubgraphSDLAccounts,
+						},
+						{
+							APIID: "subgraph2",
+							URL:   "tyk://" + tykSubgraphReviews.Name,
+							SDL:   gqlSubgraphSDLReviews,
+						},
+					},
+					MergedSDL: gqlMergedSupergraphSDL,
+				},
+				Schema: gqlMergedSupergraphSDL,
+			}
+		})[0]
 
-	people := graphql.Request{
-		Query: "query Query { people { name } }",
-	}
+		LoadAPI(tykSubgraphAccounts, tykSubgraphReviews, supergraph)
 
-	_, _ = g.Run(t, []test.TestCase{
-		// GraphQL Data Source
-		{Data: countries, BodyMatch: `"countries":.*{"name":"Turkey"},{"name":"Russia"}.*`, Code: http.StatusOK},
+		reviews := graphql.Request{
+			Query: `query Query { me { id username reviews { body } } }`,
+		}
 
-		// REST Data Source
-		{Data: people, BodyMatch: `"people":.*{"name":"Furkan"},{"name":"Leo"}.*`, Code: http.StatusOK},
-	}...)
+		_, _ = g.Run(t, []test.TestCase{
+			{Data: reviews, BodyMatch: `{"data":{"me":{"id":"1","username":"tyk","reviews":\[{"body":"A highly effective form of birth control."},{"body":"Fedoras are one of the most fashionable hats around and can look great with a variety of outfits."}\]}}}`, Code: http.StatusOK},
+		}...)
+	})
+
+	t.Run("graphql engine v2", func(t *testing.T) {
+		composedAPI := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.APIID = "test3"
+			spec.GraphQL.Enabled = true
+			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+			spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+			spec.GraphQL.Engine.DataSources[0] = generateRESTDataSourceV2(func(_ *apidef.GraphQLEngineDataSource, restConfig *apidef.GraphQLEngineDataSourceConfigREST) {
+				restConfig.URL = fmt.Sprintf("tyk://%s", tykREST.Name)
+			})
+			spec.GraphQL.Engine.DataSources[1] = generateGraphQLDataSourceV2(func(_ *apidef.GraphQLEngineDataSource, graphqlConf *apidef.GraphQLEngineDataSourceConfigGraphQL) {
+				graphqlConf.URL = fmt.Sprintf("tyk://%s", tykGraphQL.Name)
+			})
+			spec.GraphQL.TypeFieldConfigurations = nil
+		})[0]
+
+		LoadAPI(tykGraphQL, tykREST, composedAPI)
+
+		countries := graphql.Request{
+			Query: "query Query { countries { name } }",
+		}
+
+		people := graphql.Request{
+			Query: "query Query { people { name } }",
+		}
+
+		_, _ = g.Run(t, []test.TestCase{
+			// GraphQL Data Source
+			{Data: countries, BodyMatch: `"countries":.*{"name":"Turkey"},{"name":"Russia"}.*`, Code: http.StatusOK},
+
+			// REST Data Source
+			{Data: people, BodyMatch: `"people":.*{"name":"Furkan"},{"name":"Leo"}.*`, Code: http.StatusOK},
+		}...)
+	})
+
+	t.Run("graphql engine v1", func(t *testing.T) {
+		composedAPI := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.APIID = "test4"
+			spec.GraphQL.Enabled = true
+			spec.GraphQL.TypeFieldConfigurations[0].DataSource.Config = generateGraphQLDataSource(func(graphQLDataSource *datasource.GraphQLDataSourceConfig) {
+				graphQLDataSource.URL = fmt.Sprintf("tyk://%s", tykGraphQL.Name)
+			})
+			spec.GraphQL.TypeFieldConfigurations[1].DataSource.Config = generateRESTDataSource(func(restDataSource *datasource.HttpJsonDataSourceConfig) {
+				restDataSource.URL = fmt.Sprintf("tyk://%s", tykREST.Name)
+			})
+		})[0]
+
+		LoadAPI(tykGraphQL, tykREST, composedAPI)
+
+		countries := graphql.Request{
+			Query: "query Query { countries { name } }",
+		}
+
+		people := graphql.Request{
+			Query: "query Query { people { name } }",
+		}
+
+		_, _ = g.Run(t, []test.TestCase{
+			// GraphQL Data Source
+			{Data: countries, BodyMatch: `"countries":.*{"name":"Turkey"},{"name":"Russia"}.*`, Code: http.StatusOK},
+
+			// REST Data Source
+			{Data: people, BodyMatch: `"people":.*{"name":"Furkan"},{"name":"Leo"}.*`, Code: http.StatusOK},
+		}...)
+	})
 }
 
 func TestGraphQL_ProxyIntrospectionInterrupt(t *testing.T) {
@@ -768,6 +917,85 @@ func TestGraphQL_ProxyIntrospectionInterrupt(t *testing.T) {
 		_, _ = g.Run(t, []test.TestCase{
 			{Data: validRequest, BodyMatch: `"Headers":{"Accept-Encoding"`, Code: http.StatusOK},
 		}...)
+	})
+}
+
+func TestGraphQL_OptionsPassThrough(t *testing.T) {
+	g := StartTest()
+	defer g.Close()
+
+	var headers = map[string]string{
+		"Host":                           g.URL,
+		"Connection":                     "keep-alive",
+		"Accept":                         "*/*",
+		"Access-Control-Request-Method":  http.MethodPost,
+		"Access-Control-Request-Headers": "content-type",
+		"Origin":                         "http://192.168.1.123:3000",
+		"User-Agent":                     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36",
+		"Sec-Fetch-Mode":                 "cors",
+		"Referer":                        "http://192.168.1.123:3000/",
+		"Accept-Encoding":                "gzip, deflate",
+		"Accept-Language":                "en-US,en;q=0.9",
+	}
+
+	t.Run("ProxyOnly should pass through", func(t *testing.T) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.GraphQL.Enabled = true
+			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
+			spec.GraphQL.Schema = "schema { query: query_root } type query_root { hello: String }"
+			spec.Proxy.ListenPath = "/starwars"
+			spec.CORS = apidef.CORSConfig{
+				Enable:             true,
+				OptionsPassthrough: true,
+			}
+		})
+		_, _ = g.Run(t, test.TestCase{
+			Method:  http.MethodOptions,
+			Path:    "/starwars",
+			Headers: headers,
+			Code:    http.StatusOK,
+			HeadersMatch: map[string]string{
+				"Access-Control-Allow-Methods": http.MethodPost,
+				"Access-Control-Allow-Headers": "Content-Type",
+				"Access-Control-Allow-Origin":  "*",
+			},
+		})
+	})
+	t.Run("UDG should not pass through", func(t *testing.T) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.GraphQL.Enabled = true
+			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+			spec.GraphQL.Schema = "schema { query: query_root } type query_root { hello: String }"
+			spec.Proxy.ListenPath = "/starwars-udg"
+			spec.CORS = apidef.CORSConfig{
+				Enable:             true,
+				OptionsPassthrough: true,
+			}
+		})
+		_, _ = g.Run(t, test.TestCase{
+			Method:  http.MethodOptions,
+			Path:    "/starwars-udg",
+			Headers: headers,
+			Code:    http.StatusInternalServerError,
+		})
+	})
+	t.Run("Supergraph should not pass through", func(t *testing.T) {
+		BuildAndLoadAPI(func(spec *APISpec) {
+			spec.GraphQL.Enabled = true
+			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+			spec.GraphQL.Schema = "schema { query: query_root } type query_root { hello: String }"
+			spec.Proxy.ListenPath = "/starwars-supergraph"
+			spec.CORS = apidef.CORSConfig{
+				Enable:             true,
+				OptionsPassthrough: true,
+			}
+		})
+		_, _ = g.Run(t, test.TestCase{
+			Method:  http.MethodOptions,
+			Path:    "/starwars-supergraph",
+			Headers: headers,
+			Code:    http.StatusInternalServerError,
+		})
 	})
 }
 

@@ -1,0 +1,43 @@
+{
+  "listen_port": 8080,
+  "secret": "352d20ee67be67f6340b4c0605b044b7",
+  "template_path": "/etc/tyk/templates",
+  "tyk_js_path": "/etc/tyk/js/tyk.js",
+  "use_db_app_configs": false,
+  "app_path": "/etc/tyk/apps",
+  "middleware_path": "/etc/tyk/middleware",
+  "storage": {
+    "type": "redis",
+    "host": "localhost",
+    "port": 6379,
+    "username": "",
+    "password": "",
+    "database": 0,
+    "optimisation_max_idle": 2000,
+    "optimisation_max_active": 4000
+  },
+  "enable_analytics": false,
+  "analytics_config": {
+    "type": "csv",
+    "csv_dir": "/tmp",
+    "mongo_url": "",
+    "mongo_db_name": "",
+    "mongo_collection": "",
+    "purge_delay": -1,
+    "ignored_ips": []
+  },
+  "health_check": {
+    "enable_health_checks": true,
+    "health_check_value_timeouts": 60
+  },
+  "optimisations_use_async_session_write": true,
+  "allow_master_keys": false,
+  "policies": {
+    	"policy_source": "mongo",
+    	"policy_record_name": "tyk_policies"
+    },
+  "hash_keys": true,
+  "suppress_redis_signal_reload": false,
+  "close_connections": false,
+  "max_idle_connections_per_host": 500,
+}

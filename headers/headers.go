@@ -34,10 +34,19 @@ const (
 	XXSSProtection      = "X-XSS-Protection"
 	XFrameOptions       = "X-Frame-Options"
 	XTykNodeID          = "x-tyk-nodeid"
+	XTykSessionID       = "x-tyk-session-id"
 	XTykNonce           = "x-tyk-nonce"
 	XTykHostname        = "x-tyk-hostname"
 	XGenerator          = "X-Generator"
 	XTykAuthorization   = "X-Tyk-Authorization"
+)
+
+// upgrade and websocket
+const (
+	Upgrade              = "Upgrade"
+	SecWebSocketProtocol = "Sec-WebSocket-Protocol"
+	SecWebSocketVersion  = "Sec-WebSocket-Version"
+	SecWebSocketKey      = "Sec-WebSocket-Key"
 )
 
 // Gateway's custom response headers

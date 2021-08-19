@@ -118,6 +118,9 @@
         "enable_detailed_recording": {
           "type": "boolean"
         },
+        "purge_interval": {
+          "type": "number"
+        },
         "enable_geo_ip": {
           "type": "boolean"
         },
@@ -160,6 +163,9 @@
         },
         "records_buffer_size": {
           "type": "integer"
+        },
+        "enable_multiple_analytics_keys": {
+          "type": "boolean"
         },
         "storage_expiration_time": {
           "type": "integer"
@@ -314,6 +320,9 @@
     "disable_dashboard_zeroconf": {
       "type": "boolean"
     },
+    "jwt_ssl_insecure_skip_verify": {
+      "type": "boolean"
+    },
     "disable_virtual_path_blobs": {
       "type": "boolean"
     },
@@ -328,6 +337,12 @@
     },
     "enable_analytics": {
       "type": "boolean"
+    },
+    "enable_separate_analytics_store": {
+      "type": "boolean"
+    },
+    "analytics_storage": {
+      "$ref": "#/definitions/StorageOptions"
     },
     "enable_api_segregation": {
       "type": "boolean"
@@ -421,6 +436,22 @@
         "sha256"
       ]
     },
+    "hash_key_function_fallback": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string",
+        "enum": [
+          "",
+          "murmur32",
+          "murmur64",
+          "murmur128",
+          "sha256"
+        ]
+      }
+    },
     "health_check": {
       "type": [
         "object",
@@ -504,6 +535,9 @@
           "type": "integer"
         },
         "min_version": {
+          "type": "integer"
+        },
+        "max_version": {
           "type": "integer"
         },
         "override_defaults": {
@@ -782,6 +816,9 @@
       "type": "boolean"
     },
     "proxy_ssl_min_version": {
+      "type": "integer"
+    },
+    "proxy_ssl_max_version": {
       "type": "integer"
     },
     "proxy_ssl_ciphers": {

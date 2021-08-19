@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -17,11 +18,24 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	textTemplate "text/template"
 	"time"
 
 	"github.com/TykTechnologies/again"
 	gas "github.com/TykTechnologies/goautosocket"
 	"github.com/TykTechnologies/gorpc"
+	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
+	"github.com/evalphobia/logrus_sentry"
+	graylogHook "github.com/gemnasium/logrus-graylog-hook"
+	"github.com/gorilla/mux"
+	"github.com/lonelycode/osin"
+	newrelic "github.com/newrelic/go-agent"
+	"github.com/rs/cors"
+	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
+	logrus_syslog "github.com/sirupsen/logrus/hooks/syslog"
+	"rsc.io/letsencrypt"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/checkup"
@@ -36,18 +50,6 @@ import (
 	"github.com/TykTechnologies/tyk/storage/kv"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
-	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
-	"github.com/evalphobia/logrus_sentry"
-	graylogHook "github.com/gemnasium/logrus-graylog-hook"
-	"github.com/gorilla/mux"
-	"github.com/justinas/alice"
-	"github.com/lonelycode/osin"
-	newrelic "github.com/newrelic/go-agent"
-	"github.com/rs/cors"
-	uuid "github.com/satori/go.uuid"
-	"github.com/sirupsen/logrus"
-	logrus_syslog "github.com/sirupsen/logrus/hooks/syslog"
-	"rsc.io/letsencrypt"
 )
 
 var (
@@ -56,6 +58,7 @@ var (
 	pubSubLog            = log.WithField("prefix", "pub-sub")
 	rawLog               = logger.GetRaw()
 	templates            *template.Template
+	templatesRaw         *textTemplate.Template
 	analytics            RedisAnalyticsHandler
 	GlobalEventsJSVM     JSVM
 	memProfFile          *os.File
@@ -84,6 +87,9 @@ var (
 
 	muNodeID sync.Mutex // guards NodeID
 	NodeID   string
+
+	// SessionID is the unique session id which is used while connecting to dashboard to prevent multiple node allocation.
+	SessionID string
 
 	runningTestsMu sync.RWMutex
 	testMode       bool
@@ -177,7 +183,7 @@ func setupGlobals(ctx context.Context) {
 		if config.Global().ManagementNode {
 			mainLog.Warn("Running Uptime checks in a management node.")
 		}
-		healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:"}
+		healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:", IsAnalytics: true}
 		InitHostCheckManager(ctx, &healthCheckStore)
 	}
 
@@ -196,15 +202,21 @@ func setupGlobals(ctx context.Context) {
 		config.SetGlobal(globalConf)
 		mainLog.Debug("Setting up analytics DB connection")
 
-		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-"}
+		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true}
 		analytics.Store = &analyticsStore
 		analytics.Init(globalConf)
+
+		redisPurgeOnce.Do(func() {
+			store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true}
+			redisPurger := RedisPurger{Store: &store}
+			go redisPurger.PurgeLoop(ctx)
+		})
 
 		if config.Global().AnalyticsConfig.Type == "rpc" {
 			mainLog.Debug("Using RPC cache purge")
 
 			rpcPurgeOnce.Do(func() {
-				store := storage.RedisCluster{KeyPrefix: "analytics-"}
+				store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true}
 				purger := rpc.Purger{
 					Store: &store,
 				}
@@ -218,6 +230,7 @@ func setupGlobals(ctx context.Context) {
 	// Load all the files that have the "error" prefix.
 	templatesDir := filepath.Join(config.Global().TemplatePath, "error*")
 	templates = template.Must(template.ParseGlob(templatesDir))
+	templatesRaw = textTemplate.Must(textTemplate.ParseGlob(templatesDir))
 
 	CoProcessInit()
 
@@ -247,11 +260,13 @@ func setupGlobals(ctx context.Context) {
 		certificateSecret = config.Global().Security.PrivateCertificateEncodingSecret
 	}
 
-	CertificateManager = certs.NewCertificateManager(getGlobalStorageHandler("cert-", false), certificateSecret, log)
+	CertificateManager = certs.NewCertificateManager(getGlobalStorageHandler("cert-", false), certificateSecret, log, !config.Global().Cloud)
 
 	if config.Global().NewRelic.AppName != "" {
 		NewRelicApplication = SetupNewRelic()
 	}
+
+	readGraphqlPlaygroundTemplate()
 }
 
 func buildConnStr(resource string) string {
@@ -272,8 +287,7 @@ func buildConnStr(resource string) string {
 
 func syncAPISpecs() (int, error) {
 	loader := APIDefinitionLoader{}
-	apisMu.Lock()
-	defer apisMu.Unlock()
+
 	var s []*APISpec
 	if config.Global().UseDBAppConfigs {
 		connStr := buildConnStr("/system/apis")
@@ -319,11 +333,14 @@ func syncAPISpecs() (int, error) {
 		}
 		filter = append(filter, v)
 	}
+
+	apisMu.Lock()
 	apiSpecs = filter
-
+	apiLen := len(apiSpecs)
 	tlsConfigCache.Flush()
+	apisMu.Unlock()
 
-	return len(apiSpecs), nil
+	return apiLen, nil
 }
 
 func syncPolicies() (count int, err error) {
@@ -413,6 +430,8 @@ func loadControlAPIEndpoints(muxer *mux.Router) {
 		}
 	}
 
+	muxer.HandleFunc("/"+config.Global().HealthCheckEndpointName, liveCheckHandler)
+
 	r := mux.NewRouter()
 	muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
 		stripSlashes(checkIsAPIOwner(controlAPICheckClientCertificate("/gateway/client", InstrumentationMW(r)))),
@@ -495,16 +514,12 @@ func generateOAuthPrefix(apiID string) string {
 
 // Create API-specific OAuth handlers and respective auth servers
 func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
-	var pathSeparator string
-	if !strings.HasSuffix(spec.Proxy.ListenPath, "/") {
-		pathSeparator = "/"
-	}
 
-	apiAuthorizePath := spec.Proxy.ListenPath + pathSeparator + "tyk/oauth/authorize-client{_:/?}"
-	clientAuthPath := spec.Proxy.ListenPath + pathSeparator + "oauth/authorize{_:/?}"
-	clientAccessPath := spec.Proxy.ListenPath + pathSeparator + "oauth/token{_:/?}"
-	revokeToken := spec.Proxy.ListenPath + pathSeparator + "oauth/revoke"
-	revokeAllTokens := spec.Proxy.ListenPath + pathSeparator + "oauth/revoke_all"
+	apiAuthorizePath := "/tyk/oauth/authorize-client{_:/?}"
+	clientAuthPath := "/oauth/authorize{_:/?}"
+	clientAccessPath := "/oauth/token{_:/?}"
+	revokeToken := "/oauth/revoke"
+	revokeAllTokens := "/oauth/revoke_all"
 
 	serverConfig := osin.NewServerConfig()
 
@@ -536,11 +551,10 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 	return &oauthManager
 }
 
-func addBatchEndpoint(spec *APISpec, muxer *mux.Router) {
+func addBatchEndpoint(spec *APISpec, subrouter *mux.Router) {
 	mainLog.Debug("Batch requests enabled for API")
-	apiBatchPath := spec.Proxy.ListenPath + "tyk/batch/"
 	batchHandler := BatchRequestHandler{API: spec}
-	muxer.HandleFunc(apiBatchPath, batchHandler.HandleBatchRequest)
+	subrouter.HandleFunc("/tyk/batch/", batchHandler.HandleBatchRequest)
 }
 
 func loadCustomMiddleware(spec *APISpec) ([]string, apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, apidef.MiddlewareDriver) {
@@ -653,12 +667,20 @@ func createResponseMiddlewareChain(spec *APISpec, responseFuncs []apidef.Middlew
 	}
 
 	for _, mw := range responseFuncs {
-		processor := responseProcessorByName("custom_mw_res_hook")
+		var processor TykResponseHandler
+		//is it goplugin or other middleware
+		if strings.HasSuffix(mw.Path, ".so") {
+			processor = responseProcessorByName("goplugin_res_hook")
+		} else {
+			processor = responseProcessorByName("custom_mw_res_hook")
+		}
+
 		// TODO: perhaps error when plugin support is disabled?
 		if processor == nil {
 			mainLog.Error("Couldn't find custom middleware processor")
 			return
 		}
+
 		if err := processor.Init(mw, spec); err != nil {
 			mainLog.Debug("Failed to init processor: ", err)
 		}
@@ -668,7 +690,7 @@ func createResponseMiddlewareChain(spec *APISpec, responseFuncs []apidef.Middlew
 	spec.ResponseChain = responseChain
 }
 
-func handleCORS(chain *[]alice.Constructor, spec *APISpec) {
+func handleCORS(router *mux.Router, spec *APISpec) {
 
 	if spec.CORS.Enable {
 		mainLog.Debug("CORS ENABLED")
@@ -683,7 +705,7 @@ func handleCORS(chain *[]alice.Constructor, spec *APISpec) {
 			Debug:              spec.CORS.Debug,
 		})
 
-		*chain = append(*chain, c.Handler)
+		router.Use(c.Handler)
 	}
 }
 
@@ -1005,6 +1027,32 @@ func initialiseSystem(ctx context.Context) error {
 		}
 	}
 
+	if globalConf.ProxySSLMaxVersion == 0 {
+		globalConf.ProxySSLMaxVersion = tls.VersionTLS12
+	}
+
+	if globalConf.ProxySSLMinVersion > globalConf.ProxySSLMaxVersion {
+		globalConf.ProxySSLMaxVersion = globalConf.ProxySSLMinVersion
+	}
+
+	if globalConf.HttpServerOptions.MaxVersion == 0 {
+		globalConf.HttpServerOptions.MaxVersion = tls.VersionTLS12
+	}
+
+	if globalConf.HttpServerOptions.MinVersion > globalConf.HttpServerOptions.MaxVersion {
+		globalConf.HttpServerOptions.MaxVersion = globalConf.HttpServerOptions.MinVersion
+	}
+
+	if globalConf.UseDBAppConfigs && globalConf.Policies.PolicySource != config.DefaultDashPolicySource {
+		globalConf.Policies.PolicySource = config.DefaultDashPolicySource
+		globalConf.Policies.PolicyConnectionString = globalConf.DBAppConfOptions.ConnectionString
+		if globalConf.Policies.PolicyRecordName == "" {
+			globalConf.Policies.PolicyRecordName = config.DefaultDashPolicyRecordName
+		}
+	}
+
+	config.SetGlobal(globalConf)
+
 	getHostDetails()
 	setupInstrumentation()
 
@@ -1044,6 +1092,11 @@ func afterConfSetup(conf *config.Config) {
 
 	if conf.SlaveOptions.KeySpaceSyncInterval == 0 {
 		conf.SlaveOptions.KeySpaceSyncInterval = 10
+	}
+
+	if conf.AnalyticsConfig.PurgeInterval == 0 {
+		// as default 10 seconds
+		conf.AnalyticsConfig.PurgeInterval = 10
 	}
 
 	rpc.GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)
@@ -1181,10 +1234,10 @@ var hostDetails struct {
 func getHostDetails() {
 	var err error
 	if hostDetails.PID, err = readPIDFromFile(); err != nil {
-		mainLog.Error("Failed ot get host pid: ", err)
+		mainLog.Error("Failed to get host pid: ", err)
 	}
 	if hostDetails.Hostname, err = os.Hostname(); err != nil {
-		mainLog.Error("Failed ot get hostname: ", err)
+		mainLog.Error("Failed to get hostname: ", err)
 	}
 }
 
@@ -1209,6 +1262,8 @@ func Start() {
 	}
 
 	SetNodeID("solo-" + uuid.NewV4().String())
+
+	SessionID = uuid.NewV4().String()
 
 	if err := initialiseSystem(ctx); err != nil {
 		mainLog.Fatalf("Error initialising system: %v", err)
@@ -1249,7 +1304,9 @@ func Start() {
 		defer trace.Close()
 	}
 	start(ctx)
-	go storage.ConnectToRedis(ctx)
+	go storage.ConnectToRedis(ctx, func() {
+		reloadURLStructure(func() {})
+	})
 
 	if *cli.MemProfile {
 		mainLog.Debug("Memory profiling active")

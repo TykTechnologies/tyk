@@ -6,98 +6,43 @@ import (
 	"strings"
 	"time"
 
-	uuid "github.com/satori/go.uuid"
-
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
-
+	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 )
-
-// AuthorisationHandler is used to validate a session key,
-// implementing KeyAuthorised() to validate if a key exists or
-// is valid in any way (e.g. cryptographic signing etc.). Returns
-// a user.SessionState object (deserialised JSON)
-type AuthorisationHandler interface {
-	Init(storage.Handler)
-	KeyAuthorised(string) (user.SessionState, bool)
-	KeyExpired(*user.SessionState) bool
-}
 
 // SessionHandler handles all update/create/access session functions and deals exclusively with
 // user.SessionState objects, not identity
 type SessionHandler interface {
 	Init(store storage.Handler)
+	Store() storage.Handler
 	UpdateSession(keyName string, session *user.SessionState, resetTTLTo int64, hashed bool) error
 	RemoveSession(orgID string, keyName string, hashed bool) bool
 	SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool)
+	KeyExpired(newSession *user.SessionState) bool
 	Sessions(filter string) []string
-	Store() storage.Handler
 	ResetQuota(string, *user.SessionState, bool)
 	Stop()
 }
 
-// DefaultAuthorisationManager implements AuthorisationHandler,
-// requires a storage.Handler to interact with key store
-type DefaultAuthorisationManager struct {
-	store storage.Handler
-}
-
 type DefaultSessionManager struct {
-	store                    storage.Handler
-	disableCacheSessionState bool
-	orgID                    string
-}
-
-type SessionUpdate struct {
-	isHashed bool
-	keyVal   string
-	session  *user.SessionState
-	ttl      int64
-}
-
-func (b *DefaultAuthorisationManager) Init(store storage.Handler) {
-	b.store = store
-	b.store.Connect()
-}
-
-// KeyAuthorised checks if key exists and can be read into a user.SessionState object
-func (b *DefaultAuthorisationManager) KeyAuthorised(keyName string) (user.SessionState, bool) {
-	jsonKeyVal, err := b.store.GetKey(keyName)
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix":      "auth-mgr",
-			"inbound-key": obfuscateKey(keyName),
-			"err":         err,
-		}).Warning("Key not found in storage engine")
-		return user.SessionState{}, false
-	}
-	newSession := &user.SessionState{}
-	if err := json.Unmarshal([]byte(jsonKeyVal), newSession); err != nil {
-		log.Error("Couldn't unmarshal session object: ", err)
-		return user.SessionState{}, false
-	}
-	return newSession.Clone(), true
-}
-
-// KeyExpired checks if a key has expired, if the value of user.SessionState.Expires is 0, it will be ignored
-func (b *DefaultAuthorisationManager) KeyExpired(newSession *user.SessionState) bool {
-	if newSession.Expires >= 1 {
-		return time.Now().After(time.Unix(newSession.Expires, 0))
-	}
-	return false
+	store storage.Handler
+	orgID string
 }
 
 func (b *DefaultSessionManager) Init(store storage.Handler) {
 	b.store = store
 	b.store.Connect()
+}
 
-	// for RPC we don't need to setup async session writes
-	switch store.(type) {
-	case *RPCStorageHandler:
-		return
+// KeyExpired checks if a key has expired, if the value of user.SessionState.Expires is 0, it will be ignored
+func (b *DefaultSessionManager) KeyExpired(newSession *user.SessionState) bool {
+	if newSession.Expires >= 1 {
+		return time.Now().After(time.Unix(newSession.Expires, 0))
 	}
+	return false
 }
 
 func (b *DefaultSessionManager) Store() storage.Handler {
@@ -124,7 +69,7 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 	go b.store.DeleteRawKey(rawKey)
 	//go b.store.SetKey(rawKey, "0", session.QuotaRenewalRate)
 
-	for _, acl := range session.GetAccessRights() {
+	for _, acl := range session.AccessRights {
 		rawKey = QuotaKeyPrefix + acl.AllowanceScope + "-" + keyName
 		go b.store.DeleteRawKey(rawKey)
 	}
@@ -187,6 +132,7 @@ func (b *DefaultSessionManager) RemoveSession(orgID string, keyName string, hash
 func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool) {
 	var jsonKeyVal string
 	var err error
+	keyId := keyName
 
 	// get session by key
 	if hashed {
@@ -194,18 +140,19 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 	} else {
 		if storage.TokenOrg(keyName) != orgID {
 			// try to get legacy and new format key at once
+			toSearchList := []string{generateToken(orgID, keyName), keyName}
+			for _, fallback := range config.Global().HashKeyFunctionFallback {
+				toSearchList = append(toSearchList, generateToken(orgID, keyName, fallback))
+			}
+
 			var jsonKeyValList []string
-			jsonKeyValList, err = b.store.GetMultiKey(
-				[]string{
-					generateToken(orgID, keyName),
-					keyName,
-				},
-			)
+			jsonKeyValList, err = b.store.GetMultiKey(toSearchList)
 
 			// pick the 1st non empty from the returned list
-			for _, val := range jsonKeyValList {
+			for idx, val := range jsonKeyValList {
 				if val != "" {
 					jsonKeyVal = val
+					keyId = toSearchList[idx]
 					break
 				}
 			}
@@ -228,7 +175,7 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 		log.Error("Couldn't unmarshal session object (may be cache miss): ", err)
 		return user.SessionState{}, false
 	}
-
+	session.KeyID = keyId
 	return session.Clone(), true
 }
 
@@ -241,10 +188,15 @@ func (b *DefaultSessionManager) Sessions(filter string) []string {
 
 type DefaultKeyGenerator struct{}
 
-func generateToken(orgID, keyID string) string {
+func generateToken(orgID, keyID string, customHashKeyFunction ...string) string {
 	keyID = strings.TrimPrefix(keyID, orgID)
-	token, err := storage.GenerateToken(orgID, keyID, config.Global().HashKeyFunction)
+	hashKeyFunction := config.Global().HashKeyFunction
 
+	if len(customHashKeyFunction) > 0 {
+		hashKeyFunction = customHashKeyFunction[0]
+	}
+
+	token, err := storage.GenerateToken(orgID, keyID, hashKeyFunction)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "auth-mgr",

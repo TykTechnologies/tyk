@@ -3,118 +3,134 @@ package gateway
 import (
 	"testing"
 
-	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/user"
 )
 
-func TestSessionLimiter_DepthLimitEnabled(t *testing.T) {
-	l := SessionLimiter{}
-
-	accessDefPerField := &user.AccessDefinition{
-		FieldAccessRights: []user.FieldAccessDefinition{
-			{TypeName: "Query", FieldName: "countries", Limits: user.FieldLimits{MaxQueryDepth: 0}},
-			{TypeName: "Query", FieldName: "continents", Limits: user.FieldLimits{MaxQueryDepth: -1}},
-			{TypeName: "Mutation", FieldName: "putCountry", Limits: user.FieldLimits{MaxQueryDepth: 2}},
-		},
-		Limit: &user.APILimit{
-			MaxQueryDepth: 0,
+func TestGetAccessDefinitionByAPIIDOrSession(t *testing.T) {
+	api := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID: "api",
 		},
 	}
 
-	accessDefWithGlobal := &user.AccessDefinition{
-		Limit: &user.APILimit{
-			MaxQueryDepth: 2,
-		},
-	}
+	t.Run("should return error when api is missing in access rights", func(t *testing.T) {
+		sessionWithMissingAPI := &user.SessionState{
+			QuotaMax:           int64(1),
+			QuotaRenewalRate:   int64(1),
+			QuotaRenews:        int64(1),
+			Rate:               1.0,
+			Per:                1.0,
+			ThrottleInterval:   1.0,
+			ThrottleRetryLimit: 1.0,
+			MaxQueryDepth:      1.0,
+			AccessRights: map[string]user.AccessDefinition{
+				"another-api": {},
+			},
+		}
 
-	t.Run("graphqlEnabled", func(t *testing.T) {
-		assert.False(t, l.DepthLimitEnabled(false, accessDefWithGlobal))
-		assert.True(t, l.DepthLimitEnabled(true, accessDefWithGlobal))
+		accessDef, allowanceScope, err := GetAccessDefinitionByAPIIDOrSession(sessionWithMissingAPI, api)
+		assert.Nil(t, accessDef)
+		assert.Equal(t, "", allowanceScope)
+		assert.Error(t, err)
+		assert.Equal(t, "unexpected apiID", err.Error())
 	})
 
-	t.Run("Per field", func(t *testing.T) {
-		assert.True(t, l.DepthLimitEnabled(true, accessDefPerField))
-		accessDefPerField.FieldAccessRights = []user.FieldAccessDefinition{}
-		assert.False(t, l.DepthLimitEnabled(true, accessDefPerField))
-	})
-
-	t.Run("Global", func(t *testing.T) {
-		assert.True(t, l.DepthLimitEnabled(true, accessDefWithGlobal))
-		accessDefWithGlobal.Limit.MaxQueryDepth = 0
-		assert.False(t, l.DepthLimitEnabled(true, accessDefWithGlobal))
-	})
-}
-
-func TestSessionLimiter_DepthLimitExceeded(t *testing.T) {
-	l := SessionLimiter{}
-	countriesSchema, err := graphql.NewSchemaFromString(gqlCountriesSchema)
-	require.NoError(t, err)
-
-	req := &graphql.Request{
-		OperationName: "TestQuery",
-		Variables:     nil,
-		Query:         "query TestQuery { countries { code name continent { code name countries { code name } } } }",
-	}
-
-	accessDef := &user.AccessDefinition{
-		Limit: &user.APILimit{
-			MaxQueryDepth: 3,
-		},
-		FieldAccessRights: []user.FieldAccessDefinition{},
-	}
-
-	t.Run("should fallback to global limit and exceed", func(t *testing.T) {
-		failReason := l.DepthLimitExceeded(req, accessDef, countriesSchema)
-		assert.Equal(t, sessionFailDepthLimit, failReason)
-	})
-
-	t.Run("should respect unlimited specific field depth limit and not exceed", func(t *testing.T) {
-		accessDef.FieldAccessRights = []user.FieldAccessDefinition{
-			{
-				TypeName:  "Query",
-				FieldName: "countries",
-				Limits: user.FieldLimits{
-					MaxQueryDepth: -1,
+	t.Run("should return access definition from session when limits for api are not defined", func(t *testing.T) {
+		sessionWithoutAPILimits := &user.SessionState{
+			QuotaMax:           int64(1),
+			QuotaRenewalRate:   int64(1),
+			QuotaRenews:        int64(1),
+			Rate:               1.0,
+			Per:                1.0,
+			ThrottleInterval:   1.0,
+			ThrottleRetryLimit: 1.0,
+			MaxQueryDepth:      1.0,
+			AccessRights: map[string]user.AccessDefinition{
+				"api": {
+					Limit: user.APILimit{},
 				},
 			},
 		}
 
-		failReason := l.DepthLimitExceeded(req, accessDef, countriesSchema)
-		assert.Equal(t, sessionFailNone, failReason)
+		accessDef, allowanceScope, err := GetAccessDefinitionByAPIIDOrSession(sessionWithoutAPILimits, api)
+		assert.Equal(t, &user.AccessDefinition{
+			Limit: user.APILimit{
+				QuotaMax:           int64(1),
+				QuotaRenewalRate:   int64(1),
+				QuotaRenews:        int64(1),
+				Rate:               1.0,
+				Per:                1.0,
+				ThrottleInterval:   1.0,
+				ThrottleRetryLimit: 1.0,
+				MaxQueryDepth:      1.0,
+			},
+		}, accessDef)
+		assert.Equal(t, "", allowanceScope)
+		assert.NoError(t, err)
 	})
 
-	t.Run("should respect higher specific field depth limit and not exceed", func(t *testing.T) {
-		accessDef.FieldAccessRights = []user.FieldAccessDefinition{
-			{
-				TypeName:  "Query",
-				FieldName: "countries",
-				Limits: user.FieldLimits{
-					MaxQueryDepth: 10,
+	t.Run("should return access definition with api limits", func(t *testing.T) {
+		sessionWithAPILimits := &user.SessionState{
+			QuotaMax:           int64(1),
+			QuotaRenewalRate:   int64(1),
+			QuotaRenews:        int64(1),
+			Rate:               1.0,
+			Per:                1.0,
+			ThrottleInterval:   1.0,
+			ThrottleRetryLimit: 1.0,
+			MaxQueryDepth:      1.0,
+			AccessRights: map[string]user.AccessDefinition{
+				"api": {
+					AllowanceScope: "b",
+					FieldAccessRights: []user.FieldAccessDefinition{
+						{
+							TypeName:  "Query",
+							FieldName: "hello",
+							Limits: user.FieldLimits{
+								MaxQueryDepth: 2,
+							},
+						},
+					},
+					Limit: user.APILimit{
+						QuotaMax:           int64(2),
+						QuotaRenewalRate:   int64(2),
+						QuotaRenews:        int64(2),
+						Rate:               2.0,
+						Per:                2.0,
+						ThrottleInterval:   2.0,
+						ThrottleRetryLimit: 2.0,
+						MaxQueryDepth:      2.0,
+					},
 				},
 			},
 		}
 
-		failReason := l.DepthLimitExceeded(req, accessDef, countriesSchema)
-		assert.Equal(t, sessionFailNone, failReason)
-	})
-
-	t.Run("should respect lower specific field depth limit and exceed", func(t *testing.T) {
-		accessDef.Limit.MaxQueryDepth = 100
-		accessDef.FieldAccessRights = []user.FieldAccessDefinition{
-			{
-				TypeName:  "Query",
-				FieldName: "countries",
-				Limits: user.FieldLimits{
-					MaxQueryDepth: 1,
+		accessDef, allowanceScope, err := GetAccessDefinitionByAPIIDOrSession(sessionWithAPILimits, api)
+		assert.Equal(t, &user.AccessDefinition{
+			FieldAccessRights: []user.FieldAccessDefinition{
+				{
+					TypeName:  "Query",
+					FieldName: "hello",
+					Limits: user.FieldLimits{
+						MaxQueryDepth: 2,
+					},
 				},
 			},
-		}
-
-		failReason := l.DepthLimitExceeded(req, accessDef, countriesSchema)
-		assert.Equal(t, sessionFailDepthLimit, failReason)
+			Limit: user.APILimit{
+				QuotaMax:           int64(2),
+				QuotaRenewalRate:   int64(2),
+				QuotaRenews:        int64(2),
+				Rate:               2.0,
+				Per:                2.0,
+				ThrottleInterval:   2.0,
+				ThrottleRetryLimit: 2.0,
+				MaxQueryDepth:      2.0,
+			},
+		}, accessDef)
+		assert.Equal(t, "b", allowanceScope)
+		assert.NoError(t, err)
 	})
-
 }

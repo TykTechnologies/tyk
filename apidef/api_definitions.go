@@ -1,11 +1,14 @@
 package apidef
 
 import (
+	"database/sql/driver"
 	"encoding/base64"
 	"encoding/json"
 	"encoding/xml"
+	"fmt"
 	"net/http"
 	"text/template"
+	"time"
 
 	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
 
@@ -13,10 +16,11 @@ import (
 
 	"github.com/lonelycode/osin"
 	"gopkg.in/mgo.v2/bson"
-
-	"time"
+	_ "gorm.io/gorm"
+	_ "gorm.io/gorm/schema"
 
 	"github.com/TykTechnologies/gojsonschema"
+
 	"github.com/TykTechnologies/tyk/regexp"
 )
 
@@ -73,7 +77,80 @@ const (
 	All    RoutingTriggerOnType = "all"
 	Any    RoutingTriggerOnType = "any"
 	Ignore RoutingTriggerOnType = ""
+
+	// TykInternalApiHeader - flags request as internal api looping request
+	TykInternalApiHeader = "x-tyk-internal"
 )
+
+type ObjectId bson.ObjectId
+
+func (j *ObjectId) Scan(value interface{}) error {
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		return fmt.Errorf("Failed to unmarshal JSON value: %v", value)
+	}
+
+	// reflect magic to update existing string without creating new one
+	if len(bytes) > 0 {
+		bs := ObjectId(bson.ObjectIdHex(string(bytes)))
+		*j = bs
+	}
+
+	return nil
+}
+
+func (j ObjectId) Value() (driver.Value, error) {
+	return bson.ObjectId(j).Hex(), nil
+}
+
+func (j ObjectId) Hex() string {
+	return bson.ObjectId(j).Hex()
+}
+
+func (j ObjectId) Time() time.Time {
+	return bson.ObjectId(j).Time()
+}
+
+func (j ObjectId) Valid() bool {
+	return bson.ObjectId(j).Valid()
+}
+
+func (j ObjectId) String() string {
+	return j.Hex()
+}
+
+func (j ObjectId) GetBSON() (interface{}, error) {
+	return bson.ObjectId(j), nil
+}
+
+func ObjectIdHex(hex string) ObjectId {
+	return ObjectId(bson.ObjectIdHex(hex))
+}
+
+func NewObjectId() ObjectId {
+	return ObjectId(bson.NewObjectId())
+}
+
+func IsObjectIdHex(hex string) bool {
+	return bson.IsObjectIdHex(hex)
+}
+
+func (j ObjectId) MarshalJSON() ([]byte, error) {
+	return bson.ObjectId(j).MarshalJSON()
+}
+
+func (j *ObjectId) UnmarshalJSON(buf []byte) error {
+	var b bson.ObjectId
+	b.UnmarshalJSON(buf)
+	*j = ObjectId(string(b))
+
+	return nil
+}
 
 type EndpointMethodMeta struct {
 	Action  EndpointMethodAction `bson:"action" json:"action"`
@@ -211,6 +288,13 @@ type ValidatePathMeta struct {
 	ErrorResponseCode int `bson:"error_response_code" json:"error_response_code"`
 }
 
+type GoPluginMeta struct {
+	Path       string `bson:"path" json:"path"`
+	Method     string `bson:"method" json:"method"`
+	PluginPath string `bson:"plugin_path" json:"plugin_path"`
+	SymbolName string `bson:"func_name" json:"func_name"`
+}
+
 type ExtendedPathsSet struct {
 	Ignored                 []EndPointMeta        `bson:"ignored" json:"ignored,omitempty"`
 	WhiteList               []EndPointMeta        `bson:"white_list" json:"white_list,omitempty"`
@@ -233,6 +317,7 @@ type ExtendedPathsSet struct {
 	DoNotTrackEndpoints     []TrackEndpointMeta   `bson:"do_not_track_endpoints" json:"do_not_track_endpoints,omitempty"`
 	ValidateJSON            []ValidatePathMeta    `bson:"validate_json" json:"validate_json,omitempty"`
 	Internal                []InternalMeta        `bson:"internal" json:"internal,omitempty"`
+	GoPlugin                []GoPluginMeta        `bson:"go_plugin" json:"go_plugin,omitempty"`
 }
 
 type VersionInfo struct {
@@ -358,7 +443,7 @@ type OpenIDOptions struct {
 //
 // swagger:model
 type APIDefinition struct {
-	Id                  bson.ObjectId `bson:"_id,omitempty" json:"id,omitempty"`
+	Id                  ObjectId      `bson:"_id,omitempty" json:"id,omitempty" gorm:"primaryKey;column:_id"`
 	Name                string        `bson:"name" json:"name"`
 	Slug                string        `bson:"slug" json:"slug"`
 	ListenPort          int           `bson:"listen_port" json:"listen_port"`
@@ -520,6 +605,7 @@ type ProxyConfig struct {
 		SSLInsecureSkipVerify   bool     `bson:"ssl_insecure_skip_verify" json:"ssl_insecure_skip_verify"`
 		SSLCipherSuites         []string `bson:"ssl_ciphers" json:"ssl_ciphers"`
 		SSLMinVersion           uint16   `bson:"ssl_min_version" json:"ssl_min_version"`
+		SSLMaxVersion           uint16   `bson:"ssl_max_version" json:"ssl_max_version"`
 		SSLForceCommonNameCheck bool     `json:"ssl_force_common_name_check"`
 		ProxyURL                string   `bson:"proxy_url" json:"proxy_url"`
 	} `bson:"transport" json:"transport"`
@@ -543,14 +629,106 @@ type GraphQLConfig struct {
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// ExecutionMode is the mode to define how an api behaves.
 	ExecutionMode GraphQLExecutionMode `bson:"execution_mode" json:"execution_mode"`
+	// Version defines the version of the GraphQL config and engine to be used.
+	Version GraphQLConfigVersion `bson:"version" json:"version"`
 	// Schema is the GraphQL Schema exposed by the GraphQL API/Upstream/Engine.
 	Schema string `bson:"schema" json:"schema"`
-	// LastSchemaUpdate contains the date and time of the last triggered schema update to the upstream
+	// LastSchemaUpdate contains the date and time of the last triggered schema update to the upstream.
 	LastSchemaUpdate *time.Time `bson:"last_schema_update" json:"last_schema_update,omitempty"`
 	// TypeFieldConfigurations is a rule set of data source and mapping of a schema field.
 	TypeFieldConfigurations []datasource.TypeFieldConfiguration `bson:"type_field_configurations" json:"type_field_configurations"`
 	// GraphQLPlayground is the Playground specific configuration.
 	GraphQLPlayground GraphQLPlayground `bson:"playground" json:"playground"`
+	// Engine holds the configuration for engine v2 and upwards.
+	Engine GraphQLEngineConfig `bson:"engine" json:"engine"`
+	// Proxy holds the configuration for a proxy only api.
+	Proxy GraphQLProxyConfig `bson:"proxy" json:"proxy"`
+	// Subgraph holds the configuration for a GraphQL federation subgraph.
+	Subgraph GraphQLSubgraphConfig `bson:"subgraph" json:"subgraph"`
+	// Supergraph holds the configuration for a GraphQL federation supergraph.
+	Supergraph GraphQLSupergraphConfig `bson:"supergraph" json:"supergraph"`
+}
+
+type GraphQLConfigVersion string
+
+const (
+	GraphQLConfigVersionNone GraphQLConfigVersion = ""
+	GraphQLConfigVersion1    GraphQLConfigVersion = "1"
+	GraphQLConfigVersion2    GraphQLConfigVersion = "2"
+)
+
+type GraphQLProxyConfig struct {
+	AuthHeaders map[string]string `bson:"auth_headers" json:"auth_headers"`
+}
+
+type GraphQLSubgraphConfig struct {
+	SDL string `bson:"sdl" json:"sdl"`
+}
+
+type GraphQLSupergraphConfig struct {
+	// UpdatedAt contains the date and time of the last update of a supergraph API.
+	UpdatedAt     *time.Time              `bson:"updated_at" json:"updated_at,omitempty"`
+	Subgraphs     []GraphQLSubgraphEntity `bson:"subgraphs" json:"subgraphs"`
+	MergedSDL     string                  `bson:"merged_sdl" json:"merged_sdl"`
+	GlobalHeaders map[string]string       `bson:"global_headers" json:"global_headers"`
+}
+
+type GraphQLSubgraphEntity struct {
+	APIID string `bson:"api_id" json:"api_id"`
+	Name  string `bson:"name" json:"name"`
+	URL   string `bson:"url" json:"url"`
+	SDL   string `bson:"sdl" json:"sdl"`
+}
+
+type GraphQLEngineConfig struct {
+	FieldConfigs []GraphQLFieldConfig      `bson:"field_configs" json:"field_configs"`
+	DataSources  []GraphQLEngineDataSource `bson:"data_sources" json:"data_sources"`
+}
+
+type GraphQLFieldConfig struct {
+	TypeName              string   `bson:"type_name" json:"type_name"`
+	FieldName             string   `bson:"field_name" json:"field_name"`
+	DisableDefaultMapping bool     `bson:"disable_default_mapping" json:"disable_default_mapping"`
+	Path                  []string `bson:"path" json:"path"`
+}
+
+type GraphQLEngineDataSourceKind string
+
+const (
+	GraphQLEngineDataSourceKindREST    = "REST"
+	GraphQLEngineDataSourceKindGraphQL = "GraphQL"
+)
+
+type GraphQLEngineDataSource struct {
+	Kind       GraphQLEngineDataSourceKind `bson:"kind" json:"kind"`
+	Name       string                      `bson:"name" json:"name"`
+	Internal   bool                        `bson:"internal" json:"internal"`
+	RootFields []GraphQLTypeFields         `bson:"root_fields" json:"root_fields"`
+	Config     json.RawMessage             `bson:"config" json:"config"`
+}
+
+type GraphQLTypeFields struct {
+	Type   string   `bson:"type" json:"type"`
+	Fields []string `bson:"fields" json:"fields"`
+}
+
+type GraphQLEngineDataSourceConfigREST struct {
+	URL     string            `bson:"url" json:"url"`
+	Method  string            `bson:"method" json:"method"`
+	Headers map[string]string `bson:"headers" json:"headers"`
+	Query   []QueryVariable   `bson:"query" json:"query"`
+	Body    string            `bson:"body" json:"body"`
+}
+
+type GraphQLEngineDataSourceConfigGraphQL struct {
+	URL     string            `bson:"url" json:"url"`
+	Method  string            `bson:"method" json:"method"`
+	Headers map[string]string `bson:"headers" json:"headers"`
+}
+
+type QueryVariable struct {
+	Name  string `bson:"name" json:"name"`
+	Value string `bson:"value" json:"value"`
 }
 
 // GraphQLExecutionMode is the mode in which the GraphQL Middleware should operate.
@@ -564,6 +742,11 @@ const (
 	// GraphQLExecutionModeExecutionEngine is the mode in which the GraphQL Middleware will evaluate every request.
 	// This means the Middleware will act as a independent GraphQL service which might delegate partial execution to upstreams.
 	GraphQLExecutionModeExecutionEngine GraphQLExecutionMode = "executionEngine"
+	// GraphQLExecutionModeSubgraph is the mode if the API is defined as a subgraph for usage in GraphQL federation.
+	// It will basically act the same as an API in proxyOnly mode but can be used in a supergraph.
+	GraphQLExecutionModeSubgraph GraphQLExecutionMode = "subgraph"
+	// GraphQLExecutionModeSupergraph is the mode where an API is able to use subgraphs to build a supergraph in GraphQL federation.
+	GraphQLExecutionModeSupergraph GraphQLExecutionMode = "supergraph"
 )
 
 // GraphQLPlayground represents the configuration for the public playground which will be hosted alongside the api.
@@ -842,7 +1025,11 @@ func DummyAPI() APIDefinition {
 	graphql := GraphQLConfig{
 		Enabled:          false,
 		ExecutionMode:    GraphQLExecutionModeProxyOnly,
+		Version:          GraphQLConfigVersion2,
 		LastSchemaUpdate: nil,
+		Proxy: GraphQLProxyConfig{
+			AuthHeaders: map[string]string{},
+		},
 	}
 
 	return APIDefinition{
