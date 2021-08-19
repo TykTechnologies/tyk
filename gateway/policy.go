@@ -17,23 +17,29 @@ import (
 )
 
 type DBAccessDefinition struct {
-	APIName         string            `json:"apiname"`
-	APIID           string            `json:"apiid"`
-	Versions        []string          `json:"versions"`
-	AllowedURLs     []user.AccessSpec `bson:"allowed_urls" json:"allowed_urls"` // mapped string MUST be a valid regex
-	RestrictedTypes []graphql.Type    `json:"restricted_types"`
-	Limit           *user.APILimit    `json:"limit"`
+	APIName           string                       `json:"apiname"`
+	APIID             string                       `json:"apiid"`
+	Versions          []string                     `json:"versions"`
+	AllowedURLs       []user.AccessSpec            `bson:"allowed_urls" json:"allowed_urls"` // mapped string MUST be a valid regex
+	RestrictedTypes   []graphql.Type               `json:"restricted_types"`
+	FieldAccessRights []user.FieldAccessDefinition `json:"field_access_rights"`
+	Limit             *user.APILimit               `json:"limit"`
 }
 
 func (d *DBAccessDefinition) ToRegularAD() user.AccessDefinition {
-	return user.AccessDefinition{
-		APIName:         d.APIName,
-		APIID:           d.APIID,
-		Versions:        d.Versions,
-		AllowedURLs:     d.AllowedURLs,
-		RestrictedTypes: d.RestrictedTypes,
-		Limit:           d.Limit,
+	ad := user.AccessDefinition{
+		APIName:           d.APIName,
+		APIID:             d.APIID,
+		Versions:          d.Versions,
+		AllowedURLs:       d.AllowedURLs,
+		RestrictedTypes:   d.RestrictedTypes,
+		FieldAccessRights: d.FieldAccessRights,
 	}
+
+	if d.Limit != nil {
+		ad.Limit = *d.Limit
+	}
+	return ad
 }
 
 type DBPolicy struct {
@@ -99,7 +105,7 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusForbidden {
+	if resp.StatusCode != http.StatusOK {
 		body, _ := ioutil.ReadAll(resp.Body)
 		log.Error("Policy request login failure, Response was: ", string(body))
 		reLogin()
@@ -183,7 +189,7 @@ func LoadPoliciesFromRPC(orgId string) (map[string]user.Policy, error) {
 	}
 
 	if err := saveRPCPoliciesBackup(rpcPolicies); err != nil {
-		return nil, err
+		log.Error(err)
 	}
 
 	return policies, nil

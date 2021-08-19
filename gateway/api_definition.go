@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -17,7 +18,10 @@ import (
 	"text/template"
 	"time"
 
-	sprig "gopkg.in/Masterminds/sprig.v2"
+	"github.com/cenk/backoff"
+	"github.com/jensneuse/graphql-go-tools/pkg/engine/resolve"
+
+	"gopkg.in/Masterminds/sprig.v2"
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
 	"github.com/gorilla/mux"
@@ -25,6 +29,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/gojsonschema"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
@@ -76,6 +81,7 @@ const (
 	RequestNotTracked
 	ValidateJSONRequest
 	Internal
+	GoPlugin
 )
 
 // RequestStatus is a custom type to avoid collisions
@@ -108,6 +114,7 @@ const (
 	StatusRequestNotTracked        RequestStatus = "Request Not Tracked"
 	StatusValidateJSON             RequestStatus = "Validate JSON"
 	StatusInternal                 RequestStatus = "Internal path"
+	StatusGoPlugin                 RequestStatus = "Go plugin"
 )
 
 // URLSpec represents a flattened specification for URLs, used to check if a proxy URL
@@ -134,7 +141,9 @@ type URLSpec struct {
 	DoNotTrackEndpoint        apidef.TrackEndpointMeta
 	ValidatePathMeta          apidef.ValidatePathMeta
 	Internal                  apidef.InternalMeta
-	IgnoreCase                bool
+	GoPluginMeta              GoPluginMiddleware
+
+	IgnoreCase bool
 }
 
 type EndPointCacheMeta struct {
@@ -162,7 +171,7 @@ type APISpec struct {
 	RxPaths                  map[string][]URLSpec
 	WhiteListEnabled         map[string]bool
 	target                   *url.URL
-	AuthManager              AuthorisationHandler
+	AuthManager              SessionHandler
 	OAuthManager             *OAuthManager
 	OrgSessionManager        SessionHandler
 	EventPaths               map[apidef.TykEvent][]config.TykEventHandler
@@ -188,13 +197,19 @@ type APISpec struct {
 	network NetworkStats
 
 	GraphQLExecutor struct {
-		Engine *graphql.ExecutionEngine
+		Engine   *graphql.ExecutionEngine
+		CancelV2 context.CancelFunc
+		EngineV2 *graphql.ExecutionEngineV2
+		HooksV2  struct {
+			BeforeFetchHook resolve.BeforeFetchHook
+			AfterFetchHook  resolve.AfterFetchHook
+		}
 		Client *http.Client
 		Schema *graphql.Schema
-	}
+	} `json:"-"`
 }
 
-// Release re;leases all resources associated with API spec
+// Release releases all resources associated with API spec
 func (s *APISpec) Release() {
 	// release circuit breaker resources
 	for _, path := range s.RxPaths {
@@ -204,6 +219,11 @@ func (s *APISpec) Release() {
 				urlSpec.CircuitBreaker.CB.Stop()
 			}
 		}
+	}
+
+	// cancel execution contexts
+	if s.GraphQLExecutor.CancelV2 != nil {
+		s.GraphQLExecutor.CancelV2()
 	}
 
 	// release all other resources associated with spec
@@ -270,7 +290,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 	}
 
 	// Add any new session managers or auth handlers here
-	spec.AuthManager = &DefaultAuthorisationManager{}
+	spec.AuthManager = &DefaultSessionManager{}
 
 	spec.OrgSessionManager = &DefaultSessionManager{
 		orgID: spec.OrgID,
@@ -430,7 +450,6 @@ func (a APIDefinitionLoader) FromRPC(orgId string) ([]*APISpec, error) {
 	if rpc.IsEmergencyMode() {
 		return LoadDefinitionsFromRPCBackup()
 	}
-
 	store := RPCStorageHandler{}
 	if !store.Connect() {
 		return nil, errors.New("Can't connect RPC layer")
@@ -449,7 +468,7 @@ func (a APIDefinitionLoader) FromRPC(orgId string) ([]*APISpec, error) {
 
 	if rpc.LoadCount() > 0 {
 		if err := saveRPCDefinitionsBackup(apiCollection); err != nil {
-			return nil, err
+			log.Error(err)
 		}
 	}
 
@@ -749,6 +768,12 @@ func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circui
 		newSpec.CircuitBreaker = ExtendedCircuitBreakerMeta{CircuitBreakerMeta: stringSpec}
 		log.Debug("Initialising circuit breaker for: ", stringSpec.Path)
 		newSpec.CircuitBreaker.CB = circuit.NewRateBreaker(stringSpec.ThresholdPercent, stringSpec.Samples)
+
+		// override backoff algorithm when is not desired to recheck the upstream before the ReturnToServiceAfter happens
+		if stringSpec.DisableHalfOpenState {
+			newSpec.CircuitBreaker.CB.BackOff = &backoff.StopBackOff{}
+		}
+
 		events := newSpec.CircuitBreaker.CB.Subscribe()
 		go func(path string, spec *APISpec, breakerPtr *circuit.Breaker) {
 			timerActive := false
@@ -845,6 +870,29 @@ func (a APIDefinitionLoader) compileVirtualPathspathSpec(paths []apidef.VirtualM
 	return urlSpec
 }
 
+func (a APIDefinitionLoader) compileGopluginPathspathSpec(paths []apidef.GoPluginMeta, stat URLStatus, apiSpec *APISpec) []URLSpec {
+
+	// transform an extended configuration URL into an array of URLSpecs
+	// This way we can iterate the whole array once, on match we break with status
+	var urlSpec []URLSpec
+
+	for _, stringSpec := range paths {
+		newSpec := URLSpec{}
+		a.generateRegex(stringSpec.Path, &newSpec, stat)
+		// Extend with method actions
+		newSpec.GoPluginMeta.Path = stringSpec.PluginPath
+		newSpec.GoPluginMeta.SymbolName = stringSpec.SymbolName
+		newSpec.GoPluginMeta.Meta.Method = stringSpec.Method
+		newSpec.GoPluginMeta.Meta.Path = stringSpec.Path
+
+		newSpec.GoPluginMeta.loadPlugin()
+
+		urlSpec = append(urlSpec, newSpec)
+	}
+
+	return urlSpec
+}
+
 func (a APIDefinitionLoader) compileTrackedEndpointPathspathSpec(paths []apidef.TrackEndpointMeta, stat URLStatus) []URLSpec {
 	urlSpec := []URLSpec{}
 
@@ -926,6 +974,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	hardTimeouts := a.compileTimeoutPathSpec(apiVersionDef.ExtendedPaths.HardTimeouts, HardTimeout)
 	circuitBreakers := a.compileCircuitBreakerPathSpec(apiVersionDef.ExtendedPaths.CircuitBreaker, CircuitBreaker, apiSpec)
 	urlRewrites := a.compileURLRewritesPathSpec(apiVersionDef.ExtendedPaths.URLRewrite, URLRewrite)
+	goPlugins := a.compileGopluginPathspathSpec(apiVersionDef.ExtendedPaths.GoPlugin, GoPlugin, apiSpec)
 	virtualPaths := a.compileVirtualPathspathSpec(apiVersionDef.ExtendedPaths.Virtual, VirtualPath, apiSpec)
 	requestSizes := a.compileRequestSizePathSpec(apiVersionDef.ExtendedPaths.SizeLimit, RequestSizeLimit)
 	methodTransforms := a.compileMethodTransformSpec(apiVersionDef.ExtendedPaths.MethodTransforms, MethodTransformed)
@@ -949,6 +998,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	combinedPath = append(combinedPath, circuitBreakers...)
 	combinedPath = append(combinedPath, urlRewrites...)
 	combinedPath = append(combinedPath, requestSizes...)
+	combinedPath = append(combinedPath, goPlugins...)
 	combinedPath = append(combinedPath, virtualPaths...)
 	combinedPath = append(combinedPath, methodTransforms...)
 	combinedPath = append(combinedPath, trackedPaths...)
@@ -1011,6 +1061,8 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusValidateJSON
 	case Internal:
 		return StatusInternal
+	case GoPlugin:
+		return StatusGoPlugin
 
 	default:
 		log.Error("URL Status was not one of Ignored, Blacklist or WhiteList! Blocking.")
@@ -1195,6 +1247,10 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 		case Internal:
 			if method == rxPaths[i].Internal.Method {
 				return true, &rxPaths[i].Internal
+			}
+		case GoPlugin:
+			if method == rxPaths[i].GoPluginMeta.Meta.Method {
+				return true, &rxPaths[i].GoPluginMeta
 			}
 		}
 	}

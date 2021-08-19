@@ -4,8 +4,6 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/TykTechnologies/tyk/headers"
-
 	"github.com/TykTechnologies/tyk/regexp"
 )
 
@@ -30,31 +28,6 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 	sessionVersionData, foundAPI := session.AccessRights[m.Spec.APIID]
 	if !foundAPI {
 		return nil, http.StatusOK
-	}
-
-	if m.Spec.GraphQL.Enabled {
-		if len(sessionVersionData.RestrictedTypes) == 0 {
-			return nil, http.StatusOK
-		}
-
-		gqlRequest := ctxGetGraphQLRequest(r)
-
-		result, err := gqlRequest.ValidateRestrictedFields(m.Spec.GraphQLExecutor.Schema, sessionVersionData.RestrictedTypes)
-		if err != nil {
-			m.Logger().Errorf("Error during GraphQL request restricted fields validation: '%s'", err)
-			return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
-		}
-
-		if !result.Valid || (result.Errors != nil && result.Errors.Count() > 0) {
-			w.Header().Set(headers.ContentType, headers.ApplicationJSON)
-			w.WriteHeader(http.StatusBadRequest)
-			_, _ = result.Errors.WriteResponse(w)
-			m.Logger().Debugf("Error during GraphQL request restricted fields validation: '%s'", result.Errors)
-			return errCustomBodyResponse, http.StatusBadRequest
-		}
-
-		return nil, http.StatusOK
-
 	}
 
 	if len(sessionVersionData.AllowedURLs) == 0 {

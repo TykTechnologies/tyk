@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/websocket"
 	proxyproto "github.com/pires/go-proxyproto"
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
@@ -39,7 +39,7 @@ func TestMain(m *testing.M) {
 }
 
 func createNonThrottledSession() *user.SessionState {
-	session := new(user.SessionState)
+	session := user.NewSessionState()
 	session.Rate = 100.0
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
@@ -772,6 +772,12 @@ func TestListener(t *testing.T) {
 	// Specs will be reseted when we do `StartTest`
 	BuildAndLoadAPI()
 
+	ReloadTestCase.Enable()
+	defer ReloadTestCase.Disable()
+
+	ReloadTestCase.StartTicker()
+	defer ReloadTestCase.StopTicker()
+
 	ts := StartTest()
 	defer ts.Close()
 
@@ -800,20 +806,13 @@ func TestListener(t *testing.T) {
 		{Method: "GET", Path: "/sample/foo", Code: 200},
 	}
 
-	// have all needed reload ticks ready
-	go func() {
-		for i := 0; i < 4*4; i++ {
-			ReloadTick <- time.Time{}
-		}
-	}()
-
 	ts.RunExt(t, tests...)
 }
 
 // Admin api located on separate port
 func TestControlListener(t *testing.T) {
 	ts := StartTest(TestConfig{
-		sepatateControlAPI: true,
+		SeparateControlAPI: true,
 	})
 	defer ts.Close()
 
@@ -848,7 +847,7 @@ func TestHttpPprof(t *testing.T) {
 	defer func() { cli.HTTPProfile = old }()
 
 	ts := StartTest(TestConfig{
-		sepatateControlAPI: true,
+		SeparateControlAPI: true,
 	})
 
 	ts.Run(t, []test.TestCase{
@@ -952,33 +951,6 @@ func TestListenPathTykPrefix(t *testing.T) {
 		Path: "/tyk-foo/",
 		Code: 200,
 	})
-}
-
-func TestReloadGoroutineLeakWithAsyncWrites(t *testing.T) {
-	ts := StartTest()
-	defer ts.Close()
-
-	globalConf := config.Global()
-	globalConf.UseAsyncSessionWrite = true
-	globalConf.EnableJSVM = false
-	config.SetGlobal(globalConf)
-	defer ResetTestConfig()
-
-	specs := BuildAndLoadAPI(func(spec *APISpec) {
-		spec.Proxy.ListenPath = "/"
-	})
-
-	before := runtime.NumGoroutine()
-
-	LoadAPI(specs...) // just doing DoReload() doesn't load anything as BuildAndLoadAPI cleans up folder with API specs
-
-	time.Sleep(100 * time.Millisecond)
-
-	after := runtime.NumGoroutine()
-
-	if before < after {
-		t.Errorf("Goroutine leak, was: %d, after reload: %d", before, after)
-	}
 }
 
 func TestReloadGoroutineLeakWithCircuitBreaker(t *testing.T) {
@@ -1217,25 +1189,54 @@ func TestCustomDomain(t *testing.T) {
 	})
 }
 
-func TestHelloHealthcheck(t *testing.T) {
-	ts := StartTest()
-	defer ts.Close()
+func TestGatewayHealthCheck(t *testing.T) {
 
-	t.Run("Without APIs", func(t *testing.T) {
-		ts.Run(t, []test.TestCase{
-			{Method: "GET", Path: "/hello", Code: 200},
-		}...)
-	})
+	t.Run("control api port == listen port", func(t *testing.T) {
+		ts := StartTest()
+		defer ts.Close()
 
-	t.Run("With APIs", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
-			spec.Proxy.ListenPath = "/sample"
+		t.Run("Without APIs", func(t *testing.T) {
+			_, _ = ts.Run(t, []test.TestCase{
+				{Path: "/hello", BodyMatch: `"status":"pass"`, Code: http.StatusOK},
+			}...)
 		})
 
-		ts.Run(t, []test.TestCase{
-			{Method: "GET", Path: "/hello", Code: 200},
-			{Method: "GET", Path: "/sample/hello", Code: 200},
-		}...)
+		t.Run("With API", func(t *testing.T) {
+			BuildAndLoadAPI(func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/sample"
+			})
+
+			_, _ = ts.Run(t, []test.TestCase{
+				{Path: "/hello", BodyMatch: `"status":"pass"`, Code: http.StatusOK},
+			}...)
+		})
+	})
+
+	DoReload()
+
+	t.Run("control api port != listen port", func(t *testing.T) {
+		ts := StartTest(TestConfig{
+			SeparateControlAPI: true,
+		})
+		defer ts.Close()
+
+		t.Run("Without APIs", func(t *testing.T) {
+			_, _ = ts.Run(t, []test.TestCase{
+				{Path: "/hello", Code: http.StatusNotFound},
+				{ControlRequest: true, Path: "/hello", BodyMatch: `"status":"pass"`, Code: http.StatusOK},
+			}...)
+		})
+
+		t.Run("With API", func(t *testing.T) {
+			BuildAndLoadAPI(func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/sample"
+			})
+
+			_, _ = ts.Run(t, []test.TestCase{
+				{Path: "/hello", Code: http.StatusNotFound},
+				{ControlRequest: true, Path: "/hello", BodyMatch: `"status":"pass"`, Code: http.StatusOK},
+			}...)
+		})
 	})
 }
 
@@ -1947,7 +1948,7 @@ func TestTracing(t *testing.T) {
 		spec.UseKeylessAccess = false
 	})[0]
 
-	keyID := CreateSession(func(s *user.SessionState) {})
+	keyID := CreateSession()
 	authHeaders := map[string][]string{"Authorization": {keyID}}
 
 	ts.Run(t, []test.TestCase{
@@ -2066,7 +2067,9 @@ func TestStripRegex(t *testing.T) {
 func TestCache_singleErrorResponse(t *testing.T) {
 	ts := StartTest()
 	defer ts.Close()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("{}"))
+	}))
 	defer srv.Close()
 	BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = true

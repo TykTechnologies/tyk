@@ -7,8 +7,8 @@ temp/
 /middleware/e1d21f942ec746ed416ab97fe1bf07e8/
 /middleware/e1d21f942ec746ed416ab97fe1bf07e8_IGNORED/
 testapps/
-/vendor/github.com/TykTechnologies_hotfix/
-/vendor/github.com/dgrijalva_hotfix/
+
+/vendor
 
 /utils/release_live.sh
 /utils/release_rc.sh
@@ -51,3 +51,4 @@ __pycache__/
 tyk.test
 
 tyk_linux_*
+/dist/

@@ -18,6 +18,7 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/murmur3"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/request"
@@ -334,7 +335,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		newRes.Header.Del(h)
 	}
 
-	copyHeader(w.Header(), newRes.Header)
+	copyHeader(w.Header(), newRes.Header, config.Global().IgnoreCanonicalMIMEHeaderKey)
 	session := ctxGetSession(r)
 
 	// Only add ratelimit data to keyed sessions
@@ -356,7 +357,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	w.WriteHeader(newRes.StatusCode)
 	if newRes.StatusCode != http.StatusNotModified {
-		m.Proxy.CopyResponse(w, newRes.Body)
+		m.Proxy.CopyResponse(w, newRes.Body, 0)
 	}
 
 	// Record analytics

@@ -4,6 +4,9 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -84,7 +87,7 @@ func TestNeverRenewQuota(t *testing.T) {
 			api.APIID: {
 				APIName: api.Name,
 				APIID:   api.APIID,
-				Limit: &user.APILimit{
+				Limit: user.APILimit{
 					QuotaRenewalRate: 0,
 					QuotaMax:         1,
 				},
@@ -101,4 +104,94 @@ func TestNeverRenewQuota(t *testing.T) {
 		{Headers: authHeader, Code: http.StatusForbidden},
 	}...)
 
+}
+
+func TestMwRateLimiting_DepthLimit(t *testing.T) {
+	g := StartTest()
+	defer g.Close()
+
+	spec := BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = false
+		spec.Proxy.ListenPath = "/"
+		spec.GraphQL.Enabled = true
+	})[0]
+
+	sessionWithGlobalDepthLimit, keyWithGlobalDepthLimit := g.CreateSession(func(s *user.SessionState) {
+		s.MaxQueryDepth = -1
+		s.AccessRights = map[string]user.AccessDefinition{
+			spec.APIID: {
+				APIID:   spec.APIID,
+				APIName: spec.Name,
+			},
+		}
+	})
+
+	sessionWithAPILevelDepthLimit, keyWithAPILevelDepthLimit := g.CreateSession(func(s *user.SessionState) {
+		s.MaxQueryDepth = -1
+		s.AccessRights = map[string]user.AccessDefinition{
+			spec.APIID: {
+				APIID:   spec.APIID,
+				APIName: spec.Name,
+				Limit: user.APILimit{
+					MaxQueryDepth: 1,
+				},
+			},
+		}
+	})
+
+	sessionWithFieldLevelDepthLimit, keyWithFieldLevelDepthLimit := g.CreateSession(func(s *user.SessionState) {
+		s.MaxQueryDepth = -1
+		s.AccessRights = map[string]user.AccessDefinition{
+			spec.APIID: {
+				APIID:   spec.APIID,
+				APIName: spec.Name,
+				Limit: user.APILimit{
+					MaxQueryDepth: -1,
+				},
+				FieldAccessRights: []user.FieldAccessDefinition{
+					{TypeName: "Query", FieldName: "people", Limits: user.FieldLimits{MaxQueryDepth: 1}},
+				},
+			},
+		}
+	})
+
+	authHeader := map[string]string{headers.Authorization: keyWithGlobalDepthLimit}
+	authHeaderWithAPILevelDepthLimit := map[string]string{headers.Authorization: keyWithAPILevelDepthLimit}
+	authHeaderWithFieldLevelDepthLimit := map[string]string{headers.Authorization: keyWithFieldLevelDepthLimit}
+
+	request := graphql.Request{
+		OperationName: "Query",
+		Variables:     nil,
+		Query:         "query Query { people { name country { name } } }",
+	}
+
+	t.Run("Global Level", func(t *testing.T) {
+		assert.Equal(t, -1, sessionWithGlobalDepthLimit.MaxQueryDepth)
+
+		// Global depth will be used.
+		_, _ = g.Run(t, []test.TestCase{
+			{Headers: authHeader, Data: request, Code: http.StatusOK},
+		}...)
+	})
+
+	t.Run("API Level", func(t *testing.T) {
+		assert.Equal(t, -1, sessionWithAPILevelDepthLimit.MaxQueryDepth)
+		assert.Equal(t, 1, sessionWithAPILevelDepthLimit.AccessRights[spec.APIID].Limit.MaxQueryDepth)
+
+		// Although global is unlimited, it will be ignored because api level depth value is set.
+		_, _ = g.Run(t, []test.TestCase{
+			{Headers: authHeaderWithAPILevelDepthLimit, Data: request, BodyMatch: "depth limit exceeded", Code: http.StatusForbidden},
+		}...)
+	})
+
+	t.Run("Field Level", func(t *testing.T) {
+		assert.Equal(t, -1, sessionWithFieldLevelDepthLimit.MaxQueryDepth)
+		assert.Equal(t, -1, sessionWithFieldLevelDepthLimit.AccessRights[spec.APIID].Limit.MaxQueryDepth)
+		assert.Equal(t, 1, sessionWithFieldLevelDepthLimit.AccessRights[spec.APIID].FieldAccessRights[0].Limits.MaxQueryDepth)
+
+		// Although global and api level depths are unlimited, it will be ignored because field level depth value is set.
+		_, _ = g.Run(t, []test.TestCase{
+			{Headers: authHeaderWithFieldLevelDepthLimit, Data: request, BodyMatch: "depth limit exceeded", Code: http.StatusForbidden},
+		}...)
+	})
 }

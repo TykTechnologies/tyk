@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/nsf/jsondiff"
 )
 
 func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
@@ -63,6 +65,9 @@ func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
 			}
 			expectedValue := fmt.Sprint(tc.expectedValue)
 			os.Setenv(tc.EnvVarName, expectedValue)
+			defer func() {
+				os.Unsetenv(tc.EnvVarName)
+			}()
 			if err := WriteDefault("", conf); err != nil {
 				t.Fatal(err)
 			}
@@ -183,4 +188,99 @@ func TestConfig_GetEventTriggers(t *testing.T) {
 		assert(t, both, "current")
 	})
 
+}
+
+func TestLoad_tracing(t *testing.T) {
+	dir, err := ioutil.TempDir("", "tyk")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	t.Run("Read and write config with tracing", func(t *testing.T) {
+		files := []string{"testdata/jaeger.json", "testdata/zipkin.json"}
+		for _, f := range files {
+			t.Run(f, func(t *testing.T) {
+				var c Config
+				err = Load([]string{f}, &c)
+				if err != nil {
+					t.Fatal(err)
+				}
+				o := filepath.Join(
+					filepath.Dir(f),
+					"expect."+filepath.Base(f),
+				)
+				expect, err := ioutil.ReadFile(o)
+				if err != nil {
+					t.Fatal(err)
+				}
+				got, err := json.MarshalIndent(c.Tracer.Options, "", "    ")
+				if err != nil {
+					t.Fatal(err)
+				}
+				diff, s := jsondiff.Compare(expect, got, &jsondiff.Options{
+					PrintTypes: true,
+				})
+				if diff == jsondiff.NoMatch {
+					t.Error(s)
+				}
+			})
+		}
+	})
+	t.Run("Env only", func(t *testing.T) {
+		type env struct {
+			name, value string
+		}
+		sample := []struct {
+			file string
+			env  []env
+		}{
+			{"testdata/env.jaeger.json", []env{
+				{"TYK_GW_TRACER_OPTIONS_SERVICENAME", "jaeger-test-service"},
+			}},
+			{"testdata/env.zipkin.json", []env{
+				{"TYK_GW_TRACER_OPTIONS_REPORTER_URL", "http://example.com"},
+				{"TYK_GW_TRACER_OPTIONS_REPORTER_BATCHSIZE", "10"},
+				{"TYK_GW_TRACER_OPTIONS_REPORTER_MAXBACKLOG", "20"},
+				{"TYK_GW_TRACER_OPTIONS_SAMPLER_NAME", "boundary"},
+				{"TYK_GW_TRACER_OPTIONS_SAMPLER_RATE", "10.1"},
+				{"TYK_GW_TRACER_OPTIONS_SAMPLER_SALT", "10"},
+				{"TYK_GW_TRACER_OPTIONS_SAMPLER_MOD", "12"},
+			}},
+		}
+		for _, v := range sample {
+			t.Run(v.file, func(t *testing.T) {
+				for _, e := range v.env {
+					os.Setenv(e.name, e.value)
+				}
+				defer func() {
+					for _, e := range v.env {
+						os.Unsetenv(e.name)
+					}
+				}()
+				var c Config
+				err = Load([]string{v.file}, &c)
+				if err != nil {
+					t.Fatal(err)
+				}
+				o := filepath.Join(
+					filepath.Dir(v.file),
+					"expect."+filepath.Base(v.file),
+				)
+				expect, err := ioutil.ReadFile(o)
+				if err != nil {
+					t.Fatal(err)
+				}
+				got, err := json.MarshalIndent(c.Tracer.Options, "", "    ")
+				if err != nil {
+					t.Fatal(err)
+				}
+				diff, s := jsondiff.Compare(expect, got, &jsondiff.Options{
+					PrintTypes: true,
+				})
+				if diff == jsondiff.NoMatch {
+					t.Error(s)
+				}
+			})
+		}
+	})
 }

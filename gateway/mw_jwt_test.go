@@ -45,7 +45,7 @@ jQIDAQAB!!!!
 `
 
 func createJWTSession() *user.SessionState {
-	session := new(user.SessionState)
+	session := user.NewSessionState()
 	session.Rate = 1000000.0
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix() - 10
@@ -54,7 +54,7 @@ func createJWTSession() *user.SessionState {
 	session.QuotaRenews = time.Now().Unix() + 20
 	session.QuotaRemaining = 1
 	session.QuotaMax = -1
-	session.JWTData.Secret = jwtSecret
+	session.JWTData = user.JWTData{Secret: jwtSecret}
 	return session
 }
 
@@ -904,7 +904,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		p.ID = "base"
 		p.AccessRights = map[string]user.AccessDefinition{
 			"base-api": {
-				Limit: &user.APILimit{
+				Limit: user.APILimit{
 					Rate:     111,
 					Per:      3600,
 					QuotaMax: -1,
@@ -920,7 +920,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		p.ID = "default"
 		p.AccessRights = map[string]user.AccessDefinition{
 			"base-api": {
-				Limit: &user.APILimit{
+				Limit: user.APILimit{
 					QuotaMax: -1,
 				},
 			},
@@ -931,7 +931,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		p.ID = "p1"
 		p.AccessRights = map[string]user.AccessDefinition{
 			"api1": {
-				Limit: &user.APILimit{
+				Limit: user.APILimit{
 					Rate:     100,
 					Per:      60,
 					QuotaMax: -1,
@@ -947,7 +947,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		p.ID = "p2"
 		p.AccessRights = map[string]user.AccessDefinition{
 			"api2": {
-				Limit: &user.APILimit{
+				Limit: user.APILimit{
 					Rate:     500,
 					Per:      30,
 					QuotaMax: -1,
@@ -1158,7 +1158,7 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		p.ID = "p3"
 		p.AccessRights = map[string]user.AccessDefinition{
 			spec3.APIID: {
-				Limit: &user.APILimit{
+				Limit: user.APILimit{
 					Rate:     500,
 					Per:      30,
 					QuotaMax: -1,
@@ -1183,6 +1183,24 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 				Path:    "/base",
 				Code:    http.StatusOK,
 			})
+	})
+
+	t.Run("Request with a wrong scope in JWT and then correct scope", func(t *testing.T) {
+
+		jwtTokenWrongScope := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["user_id"] = userID
+			t.Claims.(jwt.MapClaims)["scope"] = "nonexisting"
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
+		})
+
+		authHeadersWithWrongScope := map[string]string{"authorization": jwtTokenWrongScope}
+
+		_, _ = ts.Run(t, []test.TestCase{
+			// Make consecutively to check whether caching becomes a problem
+			{Path: "/base", Headers: authHeadersWithWrongScope, BodyMatch: "no matching policy found in scope claim", Code: http.StatusForbidden},
+			{Path: "/base", Headers: authHeaders, Code: http.StatusOK},
+			{Path: "/base", Headers: authHeadersWithWrongScope, BodyMatch: "no matching policy found in scope claim", Code: http.StatusForbidden},
+		}...)
 	})
 
 	// check that key has right set of policies assigned - there should be updated list (base one and one from scope)
@@ -1379,37 +1397,39 @@ func TestJWTSessionRSAWithEncodedJWK(t *testing.T) {
 	spec, jwtToken := prepareJWTSessionRSAWithEncodedJWK()
 
 	authHeaders := map[string]string{"authorization": jwtToken}
-
+	flush := func() {
+		if JWKCache != nil {
+			JWKCache.Flush()
+		}
+	}
 	t.Run("Direct JWK URL", func(t *testing.T) {
 		spec.JWTSource = testHttpJWK
 		LoadAPI(spec)
-
+		flush()
 		ts.Run(t, test.TestCase{
 			Headers: authHeaders, Code: http.StatusOK,
 		})
 	})
-
-	t.Run("Base64 JWK URL", func(t *testing.T) {
+	t.Run("Direct JWK URL with legacy jwk", func(t *testing.T) {
+		spec.JWTSource = testHttpJWKLegacy
+		LoadAPI(spec)
+		flush()
+		ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+	})
+	t.Run("Base64", func(t *testing.T) {
 		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(testHttpJWK))
 		LoadAPI(spec)
-
+		flush()
 		ts.Run(t, test.TestCase{
 			Headers: authHeaders, Code: http.StatusOK,
 		})
 	})
-	t.Run("Direct JWK URL with der encoding", func(t *testing.T) {
-		spec.JWTSource = testHttpJWKDER
+	t.Run("Base64 legacy jwk", func(t *testing.T) {
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(testHttpJWKLegacy))
 		LoadAPI(spec)
-
-		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: http.StatusOK,
-		})
-	})
-
-	t.Run("Base64 JWK URL with der encoding", func(t *testing.T) {
-		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(testHttpJWKDER))
-		LoadAPI(spec)
-
+		flush()
 		ts.Run(t, test.TestCase{
 			Headers: authHeaders, Code: http.StatusOK,
 		})

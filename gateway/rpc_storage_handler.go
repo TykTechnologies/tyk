@@ -12,7 +12,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v8"
 
 	"github.com/sirupsen/logrus"
 )
@@ -103,6 +103,8 @@ func (r *RPCStorageHandler) Connect() bool {
 	rpcConfig := rpc.Config{
 		UseSSL:                slaveOptions.UseSSL,
 		SSLInsecureSkipVerify: slaveOptions.SSLInsecureSkipVerify,
+		SSLMinVersion:         config.Global().HttpServerOptions.MinVersion,
+		SSLMaxVersion:         config.Global().HttpServerOptions.MaxVersion,
 		ConnectionString:      slaveOptions.ConnectionString,
 		RPCKey:                slaveOptions.RPCKey,
 		APIKey:                slaveOptions.APIKey,
@@ -184,7 +186,7 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 				"keyName": keyName,
 			},
 		)
-		if r.IsAccessError(err) {
+		if r.IsRetriableError(err) {
 			if rpc.Login() {
 				return r.GetRawKey(keyName)
 			}
@@ -227,7 +229,7 @@ func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
 				"fixedKeyName": r.fixKey(keyName),
 			},
 		)
-		if r.IsAccessError(err) {
+		if r.IsRetriableError(err) {
 			if rpc.Login() {
 				return r.GetExp(keyName)
 			}
@@ -264,7 +266,7 @@ func (r *RPCStorageHandler) SetKey(keyName, session string, timeout int64) error
 			},
 		)
 
-		if r.IsAccessError(err) {
+		if r.IsRetriableError(err) {
 			if rpc.Login() {
 				return r.SetKey(keyName, session, timeout)
 			}
@@ -298,7 +300,7 @@ func (r *RPCStorageHandler) Decrement(keyName string) {
 			},
 		)
 	}
-	if r.IsAccessError(err) {
+	if r.IsRetriableError(err) {
 		if rpc.Login() {
 			r.Decrement(keyName)
 			return
@@ -325,7 +327,7 @@ func (r *RPCStorageHandler) IncrememntWithExpire(keyName string, expire int64) i
 			},
 		)
 	}
-	if r.IsAccessError(err) {
+	if r.IsRetriableError(err) {
 		if rpc.Login() {
 			return r.IncrememntWithExpire(keyName, expire)
 		}
@@ -363,7 +365,7 @@ func (r *RPCStorageHandler) GetKeysAndValuesWithFilter(filter string) map[string
 			},
 		)
 
-		if r.IsAccessError(err) {
+		if r.IsRetriableError(err) {
 			if rpc.Login() {
 				return r.GetKeysAndValuesWithFilter(filter)
 			}
@@ -390,7 +392,7 @@ func (r *RPCStorageHandler) GetKeysAndValues() map[string]string {
 	if err != nil {
 		rpc.EmitErrorEvent(rpc.FuncClientSingletonCall, "GetKeysAndValues", err)
 
-		if r.IsAccessError(err) {
+		if r.IsRetriableError(err) {
 			if rpc.Login() {
 				return r.GetKeysAndValues()
 			}
@@ -425,7 +427,7 @@ func (r *RPCStorageHandler) DeleteKey(keyName string) bool {
 			},
 		)
 
-		if r.IsAccessError(err) {
+		if r.IsRetriableError(err) {
 			if rpc.Login() {
 				return r.DeleteKey(keyName)
 			}
@@ -453,7 +455,7 @@ func (r *RPCStorageHandler) DeleteRawKey(keyName string) bool {
 			},
 		)
 
-		if r.IsAccessError(err) {
+		if r.IsRetriableError(err) {
 			if rpc.Login() {
 				return r.DeleteRawKey(keyName)
 			}
@@ -484,7 +486,7 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 				},
 			)
 
-			if r.IsAccessError(err) {
+			if r.IsRetriableError(err) {
 				if rpc.Login() {
 					return r.DeleteKeys(keys)
 				}
@@ -530,7 +532,7 @@ func (r *RPCStorageHandler) AppendToSet(keyName, value string) {
 			},
 		)
 	}
-	if r.IsAccessError(err) {
+	if r.IsRetriableError(err) {
 		if rpc.Login() {
 			r.AppendToSet(keyName, value)
 		}
@@ -558,7 +560,7 @@ func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, val stri
 			},
 		)
 
-		if r.IsAccessError(err) {
+		if r.IsRetriableError(err) {
 			if rpc.Login() {
 				return r.SetRollingWindow(keyName, per, val, false)
 			}
@@ -595,7 +597,7 @@ func (r RPCStorageHandler) RemoveFromSet(keyName, value string) {
 	log.Error("RPCStorageHandler.RemoveFromSet - Not implemented")
 }
 
-func (r RPCStorageHandler) IsAccessError(err error) bool {
+func (r RPCStorageHandler) IsRetriableError(err error) bool {
 	if err != nil {
 		return err.Error() == "Access Denied"
 	}
@@ -621,7 +623,7 @@ func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) strin
 			},
 		)
 
-		if r.IsAccessError(err) {
+		if r.IsRetriableError(err) {
 			if rpc.Login() {
 				return r.GetApiDefinitions(orgId, tags)
 			}
@@ -651,7 +653,7 @@ func (r *RPCStorageHandler) GetPolicies(orgId string) string {
 			},
 		)
 
-		if r.IsAccessError(err) {
+		if r.IsRetriableError(err) {
 			if rpc.Login() {
 				return r.GetPolicies(orgId)
 			}
@@ -679,7 +681,7 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) {
 				"orgId": orgId,
 			},
 		)
-		if r.IsAccessError(err) {
+		if r.IsRetriableError(err) {
 			log.Warning("[RPC STORE] CheckReload: Not logged in")
 			if rpc.Login() {
 				r.CheckForReload(orgId)
@@ -723,7 +725,7 @@ func (r *RPCStorageHandler) StartRPCKeepaliveWatcher() {
 				"prefix": "RPC Conn Mgr",
 			}).Warning("Can't connect to RPC layer")
 
-			if r.IsAccessError(err) {
+			if r.IsRetriableError(err) {
 				if rpc.Login() {
 					continue
 				}
@@ -770,7 +772,7 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 			err,
 			reqData,
 		)
-		if r.IsAccessError(err) {
+		if r.IsRetriableError(err) {
 			if rpc.Login() {
 				r.CheckForKeyspaceChanges(orgId)
 			}
@@ -786,7 +788,7 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 
 	if len(keys.([]string)) > 0 {
 		log.Info("Keyspace changes detected, updating local cache")
-		go r.ProcessKeySpaceChanges(keys.([]string))
+		go r.ProcessKeySpaceChanges(keys.([]string), orgId)
 	}
 }
 
@@ -800,7 +802,7 @@ func getSessionAndCreate(keyName string, r *RPCStorageHandler) {
 	}
 }
 
-func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
+func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) {
 	keysToReset := map[string]bool{}
 	TokensToBeRevoked := map[string]string{}
 	ClientsToBeRevoked := map[string]string{}
@@ -857,7 +859,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 			RevokeToken(storage, token, tokenTypeHint)
 		} else {
 			token = strings.Split(token, "#")[0]
-			handleDeleteHashedKey(token, apiId, false)
+			handleDeleteHashedKey(token, orgId, apiId, false)
 		}
 		SessionCache.Delete(token)
 		RPCGlobalCache.Delete(r.KeyPrefix + token)
@@ -871,11 +873,15 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 			if len(splitKeys) > 1 && splitKeys[1] == "hashed" {
 				key = splitKeys[0]
 				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
-				handleDeleteHashedKey(splitKeys[0], "", resetQuota)
+				handleDeleteHashedKey(splitKeys[0], orgId, "", resetQuota)
 				getSessionAndCreate(splitKeys[0], r)
 			} else {
 				log.Info("--> removing cached key: ", key)
-				handleDeleteKey(key, "-1", resetQuota)
+				// in case it's an username (basic auth) then generate the token
+				if storage.TokenOrg(key) == "" {
+					key = generateToken(orgId, key)
+				}
+				handleDeleteKey(key, orgId, "-1", resetQuota)
 				getSessionAndCreate(splitKeys[0], r)
 			}
 			SessionCache.Delete(key)

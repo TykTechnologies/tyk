@@ -44,11 +44,11 @@ func LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 
 	secret := rightPad2Len(config.Global().Secret, "=", 32)
 	cryptoText, err := store.GetKey(checkKey)
-	apiListAsString := decrypt([]byte(secret), cryptoText)
-
 	if err != nil {
 		return nil, errors.New("[RPC] --> Failed to get node backup (" + checkKey + "): " + err.Error())
 	}
+
+	apiListAsString := decrypt([]byte(secret), cryptoText)
 
 	a := APIDefinitionLoader{}
 	return a.processRPCDefinitions(apiListAsString)

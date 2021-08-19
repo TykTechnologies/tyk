@@ -140,7 +140,10 @@ type MockBundleGetter struct {
 // Get performs an HTTP GET request.
 func (g *HTTPBundleGetter) Get() ([]byte, error) {
 	tr := &(*http.DefaultTransport.(*http.Transport))
-	tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: g.InsecureSkipVerify}
+	tr.TLSClientConfig = &tls.Config{
+		InsecureSkipVerify: g.InsecureSkipVerify,
+		MaxVersion:         tls.VersionTLS12,
+	}
 	client := &http.Client{Transport: tr}
 
 	resp, err := client.Get(g.URL)
