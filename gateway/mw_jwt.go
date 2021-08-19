@@ -238,7 +238,8 @@ func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.T
 
 	// Couldn't base64 decode the kid, so lets try it raw
 	k.Logger().Debug("Getting key: ", tykId)
-	session, rawKeyExists := k.CheckSessionAndIdentityForValidKey(&tykId, r)
+	session, rawKeyExists := k.CheckSessionAndIdentityForValidKey(tykId, r)
+	tykId = session.KeyID
 	if !rawKeyExists {
 		return nil, errors.New("token invalid, key not found")
 	}
@@ -272,7 +273,8 @@ func (k *JWTMiddleware) getBasePolicyID(r *http.Request, claims jwt.MapClaims) (
 		}
 
 		// Check for a regular token that matches this client ID
-		clientSession, exists := k.CheckSessionAndIdentityForValidKey(&clientID, r)
+		clientSession, exists := k.CheckSessionAndIdentityForValidKey(clientID, r)
+		clientID = clientSession.KeyID
 		if !exists {
 			return
 		}
@@ -385,7 +387,10 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 
 	k.Logger().Debug("JWT Temporary session ID is: ", sessionID)
 
-	session, exists := k.CheckSessionAndIdentityForValidKey(&sessionID, r)
+	// CheckSessionAndIdentityForValidKey returns a session with keyID populated
+	session, exists := k.CheckSessionAndIdentityForValidKey(sessionID, r)
+
+	sessionID = session.KeyID
 	isDefaultPol := false
 	basePolicyID := ""
 	foundPolicy := false
@@ -567,6 +572,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 				k.Logger().WithError(err).Error("Could not several policies from scope-claim mapping to JWT to session")
 				return errors.New("key not authorized: could not apply several policies"), http.StatusForbidden
 			}
+
 		}
 	}
 
@@ -605,10 +611,12 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		}
 	}
 
+	// ensure to set the sessionID
+	session.KeyID = sessionID
 	k.Logger().Debug("Key found")
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.JWTClaim, apidef.UnsetAuth:
-		ctxSetSession(r, &session, sessionID, updateSession)
+		ctxSetSession(r, &session, updateSession)
 
 		if updateSession {
 			SessionCache.Set(session.KeyHash(), session.Clone(), cache.DefaultExpiration)
@@ -636,14 +644,16 @@ func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Toke
 	}
 
 	k.Logger().Debug("Using raw key ID: ", tykId)
-	session, exists := k.CheckSessionAndIdentityForValidKey(&tykId, r)
+	session, exists := k.CheckSessionAndIdentityForValidKey(tykId, r)
+	tykId = session.KeyID
+
 	if !exists {
 		k.reportLoginFailure(tykId, r)
 		return errors.New("Key not authorized"), http.StatusForbidden
 	}
 
 	k.Logger().Debug("Raw key ID found.")
-	ctxSetSession(r, &session, tykId, false)
+	ctxSetSession(r, &session, false)
 	ctxSetJWTContextVars(k.Spec, r, token)
 	return nil, http.StatusOK
 }

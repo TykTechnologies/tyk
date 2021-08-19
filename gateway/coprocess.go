@@ -315,7 +315,6 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	if m.HookType == coprocess.HookType_CustomKeyCheck && extractor != nil {
 		sessionID, returnOverrides = extractor.ExtractAndCheck(r)
-
 		if returnOverrides.ResponseCode != 0 {
 			if returnOverrides.ResponseError == "" {
 				return nil, returnOverrides.ResponseCode
@@ -454,12 +453,13 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}
 
 		returnedSession.OrgID = m.Spec.OrgID
+		// set a Key ID as default
+		returnedSession.KeyID = token
 
 		if err := m.ApplyPolicies(returnedSession); err != nil {
 			AuthFailed(m, r, authToken)
 			return errors.New(http.StatusText(http.StatusForbidden)), http.StatusForbidden
 		}
-
 		existingSession, found := GlobalSessionManager.SessionDetail(m.Spec.OrgID, sessionID, false)
 		if found {
 			returnedSession.QuotaRenews = existingSession.QuotaRenews
@@ -467,9 +467,11 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 			for api := range returnedSession.AccessRights {
 				if _, found := existingSession.AccessRights[api]; found {
-					if returnedSession.AccessRights[api].Limit != nil {
-						returnedSession.AccessRights[api].Limit.QuotaRenews = existingSession.AccessRights[api].Limit.QuotaRenews
-						returnedSession.AccessRights[api].Limit.QuotaRemaining = existingSession.AccessRights[api].Limit.QuotaRemaining
+					if !returnedSession.AccessRights[api].Limit.IsEmpty() {
+						ar := returnedSession.AccessRights[api]
+						ar.Limit.QuotaRenews = existingSession.AccessRights[api].Limit.QuotaRenews
+						ar.Limit.QuotaRemaining = existingSession.AccessRights[api].Limit.QuotaRemaining
+						returnedSession.AccessRights[api] = ar
 					}
 				}
 			}
@@ -480,8 +482,8 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			AuthFailed(m, r, authToken)
 			return errors.New(http.StatusText(http.StatusForbidden)), http.StatusForbidden
 		}
-
-		ctxSetSession(r, returnedSession, sessionID, true)
+		returnedSession.KeyID = sessionID
+		ctxSetSession(r, returnedSession, true)
 	}
 
 	return nil, http.StatusOK

@@ -600,6 +600,9 @@ const Schema = `{
                                 }
                             }
                         },
+                        "global_headers": {
+                            "type": ["object", "null"]
+                        },
                         "merged_sdl": {
                             "type": "string"
                         }

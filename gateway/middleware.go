@@ -350,10 +350,10 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 				idForScope := apiID
 				// check if we don't have limit on API level specified when policy was created
-				if accessRights.Limit == nil || *accessRights.Limit == (user.APILimit{}) {
+				if accessRights.Limit.IsEmpty() {
 					// limit was not specified on API level so we will populate it from policy
 					idForScope = policy.ID
-					accessRights.Limit = &user.APILimit{
+					accessRights.Limit = user.APILimit{
 						QuotaMax:           policy.QuotaMax,
 						QuotaRenewalRate:   policy.QuotaRenewalRate,
 						Rate:               policy.Rate,
@@ -367,7 +367,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				accessRights.Limit.SetBy = idForScope
 
 				// respect current quota renews (on API limit level)
-				if r, ok := session.AccessRights[apiID]; ok && r.Limit != nil {
+				if r, ok := session.AccessRights[apiID]; ok && !r.Limit.IsEmpty() {
 					accessRights.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
 
@@ -384,10 +384,6 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 			usePartitions := policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl || policy.Partitions.Complexity
 
 			for k, v := range policy.AccessRights {
-				if v.Limit == nil {
-					v.Limit = &user.APILimit{}
-				}
-
 				ar := v
 
 				if !usePartitions || policy.Partitions.Acl {
@@ -437,10 +433,6 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 							if !exists {
 								r.FieldAccessRights = append(r.FieldAccessRights, far)
 							}
-						}
-
-						if r.Limit == nil {
-							r.Limit = &user.APILimit{}
 						}
 
 						ar = r
@@ -513,7 +505,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				}
 
 				// Respect existing QuotaRenews
-				if r, ok := session.AccessRights[k]; ok && r.Limit != nil {
+				if r, ok := session.AccessRights[k]; ok && !r.Limit.IsEmpty() {
 					ar.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
 
@@ -578,7 +570,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	if len(policies) == 0 {
 		for apiID, accessRight := range session.AccessRights {
 			// check if the api in the session has per api limit
-			if accessRight.Limit != nil && *accessRight.Limit != (user.APILimit{}) {
+			if !accessRight.Limit.IsEmpty() {
 				accessRight.AllowanceScope = apiID
 				session.AccessRights[apiID] = accessRight
 			}
@@ -654,8 +646,8 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
 // the Auth Handler, if not found it will fail
-func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, r *http.Request) (user.SessionState, bool) {
-	key := *originalKey
+func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r *http.Request) (user.SessionState, bool) {
+	key := originalKey
 	minLength := t.Spec.GlobalConfig.MinTokenLength
 	if minLength == 0 {
 		// See https://github.com/TykTechnologies/tyk/issues/1681
@@ -671,7 +663,6 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 	keyHash := key
 	cacheKey := key
 	if t.Spec.GlobalConfig.HashKeys {
-		keyHash = storage.HashStr(key)
 		cacheKey = storage.HashStr(key, storage.HashMurmur64) // always hash cache keys with murmur64 to prevent collisions
 	}
 
@@ -692,7 +683,11 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 	// Check session store
 	t.Logger().Debug("Querying keystore")
 	session, found := GlobalSessionManager.SessionDetail(t.Spec.OrgID, key, false)
+
 	if found {
+		if t.Spec.GlobalConfig.HashKeys {
+			keyHash = storage.HashStr(session.KeyID)
+		}
 		session := session.Clone()
 		session.SetKeyHash(keyHash)
 		// If exists, assume it has been authorized and pass on
@@ -719,16 +714,15 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 	// 2. If not there, get it from the AuthorizationHandler
 	session, found = t.Spec.AuthManager.SessionDetail(t.Spec.OrgID, key, false)
 	if found {
-		// update value of originalKey, as for custom-keys it might get updated (the key is generated again using alias)
-		*originalKey = key
+		key = session.KeyID
 
 		session := session.Clone()
 		session.SetKeyHash(keyHash)
 		// If not in Session, and got it from AuthHandler, create a session with a new TTL
+
 		t.Logger().Info("Recreating session for key: ", obfuscateKey(key))
 
 		// cache it
-
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
 			SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
 		}
@@ -741,6 +735,9 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey *string, 
 
 		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.SessionLifetime))
 		ctxScheduleSessionUpdate(r)
+	} else {
+		// defaulting
+		session.KeyID = key
 	}
 
 	return session, found
