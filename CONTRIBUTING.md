@@ -31,7 +31,7 @@ we have a semi-curated list of issues that have should not need deep knowledge
 of the system.  [Have a look and see if anything sounds
 interesting](https://github.com/TykTechnologies/tyk/issues?q=is%3Aopen+is%3Aissue+label%3Ahelp-wanted).
 
-Alternatively, read some of the [many docs on the system](https://tyk.io/tyk-documentation/get-started/), and pick a component that seems
+Alternatively, read some of the [many docs on the system](https://tyk.io/docs/getting-started/), and pick a component that seems
 interesting.  Start with `main()` and read
 until you find something you want to fix.  The best way to learn is to hack!
 There's always code that can be clarified and variables or functions that can
