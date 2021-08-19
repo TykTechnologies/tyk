@@ -50,14 +50,14 @@ func TestGetAccessDefinitionByAPIIDOrSession(t *testing.T) {
 			MaxQueryDepth:      1.0,
 			AccessRights: map[string]user.AccessDefinition{
 				"api": {
-					Limit: nil,
+					Limit: user.APILimit{},
 				},
 			},
 		}
 
 		accessDef, allowanceScope, err := GetAccessDefinitionByAPIIDOrSession(sessionWithoutAPILimits, api)
 		assert.Equal(t, &user.AccessDefinition{
-			Limit: &user.APILimit{
+			Limit: user.APILimit{
 				QuotaMax:           int64(1),
 				QuotaRenewalRate:   int64(1),
 				QuotaRenews:        int64(1),
@@ -94,7 +94,7 @@ func TestGetAccessDefinitionByAPIIDOrSession(t *testing.T) {
 							},
 						},
 					},
-					Limit: &user.APILimit{
+					Limit: user.APILimit{
 						QuotaMax:           int64(2),
 						QuotaRenewalRate:   int64(2),
 						QuotaRenews:        int64(2),
@@ -119,7 +119,7 @@ func TestGetAccessDefinitionByAPIIDOrSession(t *testing.T) {
 					},
 				},
 			},
-			Limit: &user.APILimit{
+			Limit: user.APILimit{
 				QuotaMax:           int64(2),
 				QuotaRenewalRate:   int64(2),
 				QuotaRenews:        int64(2),
