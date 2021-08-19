@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,7 +18,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/gorilla/mux"
-	cache "github.com/pmylund/go-cache"
+	"github.com/pmylund/go-cache"
 )
 
 type APICertificateStatusMessage struct {
@@ -354,7 +355,7 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 						}
 					}
 				}
-			case spec.Auth.UseCertificate:
+			case spec.AuthConfigs[authTokenType].UseCertificate:
 				// Dynamic certificate check required, falling back to HTTP level check
 				// TODO: Change to VerifyPeerCertificate hook instead, when possible
 				if domainRequireCert[spec.Domain] < tls.RequestClientCert {
@@ -362,7 +363,7 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 				}
 			default:
 				// For APIs which do not use certificates, indicate that there is API for such domain already
-				if domainRequireCert[spec.Domain] == 0 {
+				if domainRequireCert[spec.Domain] <= 0 {
 					domainRequireCert[spec.Domain] = -1
 				} else {
 					domainRequireCert[spec.Domain] = tls.RequestClientCert
@@ -389,8 +390,17 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 			}
 		}
 
-		newConfig.ClientAuth = domainRequireCert[hello.ServerName]
-		if newConfig.ClientAuth == 0 {
+		newConfig.ClientAuth = tls.NoClientCert
+
+		for key, clientAuth := range domainRequireCert {
+			req := http.Request{Host: hello.ServerName, URL: &url.URL{}}
+			if mux.NewRouter().Host(key).Match(&req, &mux.RouteMatch{}) {
+				newConfig.ClientAuth = clientAuth
+				break
+			}
+		}
+
+		if newConfig.ClientAuth == tls.NoClientCert {
 			newConfig.ClientAuth = domainRequireCert[""]
 		}
 

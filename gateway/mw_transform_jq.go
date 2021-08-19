@@ -13,6 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 type TransformJQMiddleware struct {
@@ -89,8 +90,9 @@ func (t *TransformJQMiddleware) transformJQBody(r *http.Request, ts *TransformJQ
 	r.ContentLength = int64(bodyBuffer.Len())
 
 	// Replace header in the request
+	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
 	for hName, hValue := range jqResult.RewriteHeaders {
-		r.Header.Set(hName, hValue)
+		setCustomHeader(r.Header, hName, hValue, ignoreCanonical)
 	}
 
 	if t.Spec.EnableContextVars {

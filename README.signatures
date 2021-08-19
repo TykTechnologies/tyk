@@ -4,15 +4,20 @@ tl;dr
 RHEL does not support signing RPMs with subkeys. This is supposedly
 fixed in RHEL 8. Thus, we use the same key to sign rpms and debs.
 
+It is best to have a key with _no_ subkeys as RPM seems to process
+these type of keyrings incorrectly.
+
 These keys DO NOT expire.
 
-Fingerprints:
+Keygrip:
 Main key                : 12B5D62C28F57592D1575BD51ED14C59E37DAC20
-Signing subkey (deb)    : 9ADE11DA6DD70355E7C1C270543ABE02AC6AC40A
-Signing subkey (unused) : 9A4FA354841E41E39A49A461B34B3EF69DCBD7FE
 
-These fingerprints above should match between this document and your
-keyring. The other numbers in the gpg output will probably not match.
+This fingerprints above should match between this document and your
+keyring. The other numbers in the gpg output below will probably not
+match.
+
+This keygrip corresponds to the cache_id for the gpg passphrase
+seeding.
 
 Verification
 ============

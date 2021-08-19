@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/url"
+	"reflect"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -182,18 +183,18 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 	for _, dh := range object.Request.DeleteHeaders {
 		r.Header.Del(dh)
 	}
-
+	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
 	for h, v := range object.Request.SetHeaders {
-		r.Header.Set(h, v)
+		setCustomHeader(r.Header, h, v, ignoreCanonical)
 	}
 
-	values := r.URL.Query()
+	updatedValues := r.URL.Query()
 	for _, k := range object.Request.DeleteParams {
-		values.Del(k)
+		updatedValues.Del(k)
 	}
 
 	for p, v := range object.Request.AddParams {
-		values.Set(p, v)
+		updatedValues.Set(p, v)
 	}
 
 	parsedURL, err := url.ParseRequestURI(object.Request.Url)
@@ -222,7 +223,9 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 		r.Method = object.Request.Method
 	}
 
-	r.URL.RawQuery = values.Encode()
+	if !reflect.DeepEqual(r.URL.Query(), updatedValues) {
+		r.URL.RawQuery = updatedValues.Encode()
+	}
 
 	return
 }
@@ -291,9 +294,16 @@ func (m *CoProcessMiddleware) EnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	if m.HookType == coprocess.HookType_CustomKeyCheck {
+		if ctxGetRequestStatus(r) == StatusOkAndIgnore {
+			return nil, http.StatusOK
+		}
+	}
+
 	logger := m.Logger()
 	logger.Debug("CoProcess Request, HookType: ", m.HookType)
 	originalURL := r.URL
+	authToken, _ := m.getAuthToken(coprocessType, r)
 
 	var extractor IdExtractor
 	if m.Spec.EnableCoProcessAuth && m.Spec.CustomMiddleware.IdExtractor.Extractor != nil {
@@ -305,7 +315,6 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	if m.HookType == coprocess.HookType_CustomKeyCheck && extractor != nil {
 		sessionID, returnOverrides = extractor.ExtractAndCheck(r)
-
 		if returnOverrides.ResponseCode != 0 {
 			if returnOverrides.ResponseError == "" {
 				return nil, returnOverrides.ResponseCode
@@ -444,19 +453,37 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}
 
 		returnedSession.OrgID = m.Spec.OrgID
+		// set a Key ID as default
+		returnedSession.KeyID = token
 
+		if err := m.ApplyPolicies(returnedSession); err != nil {
+			AuthFailed(m, r, authToken)
+			return errors.New(http.StatusText(http.StatusForbidden)), http.StatusForbidden
+		}
 		existingSession, found := GlobalSessionManager.SessionDetail(m.Spec.OrgID, sessionID, false)
 		if found {
 			returnedSession.QuotaRenews = existingSession.QuotaRenews
 			returnedSession.QuotaRemaining = existingSession.QuotaRemaining
+
+			for api := range returnedSession.AccessRights {
+				if _, found := existingSession.AccessRights[api]; found {
+					if !returnedSession.AccessRights[api].Limit.IsEmpty() {
+						ar := returnedSession.AccessRights[api]
+						ar.Limit.QuotaRenews = existingSession.AccessRights[api].Limit.QuotaRenews
+						ar.Limit.QuotaRemaining = existingSession.AccessRights[api].Limit.QuotaRemaining
+						returnedSession.AccessRights[api] = ar
+					}
+				}
+			}
 		}
 
+		// Apply it second time to fix the quota
 		if err := m.ApplyPolicies(returnedSession); err != nil {
-			AuthFailed(m, r, r.Header.Get(m.Spec.Auth.AuthHeaderName))
+			AuthFailed(m, r, authToken)
 			return errors.New(http.StatusText(http.StatusForbidden)), http.StatusForbidden
 		}
-
-		ctxSetSession(r, returnedSession, sessionID, true)
+		returnedSession.KeyID = sessionID
+		ctxSetSession(r, returnedSession, true)
 	}
 
 	return nil, http.StatusOK
@@ -521,8 +548,9 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 	}
 
 	// Set headers:
+	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
 	for k, v := range retObject.Response.Headers {
-		res.Header.Set(k, v)
+		setCustomHeader(res.Header, k, v, ignoreCanonical)
 	}
 
 	// Set response body:

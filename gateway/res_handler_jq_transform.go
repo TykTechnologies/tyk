@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -60,8 +61,9 @@ func (h *ResponseTransformJQMiddleware) HandleResponse(rw http.ResponseWriter, r
 	res.Body = ioutil.NopCloser(bodyBuffer)
 
 	// Replace header in the response
+	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
 	for hName, hValue := range jqResult.RewriteHeaders {
-		res.Header.Set(hName, hValue)
+		setCustomHeader(res.Header, hName, hValue, ignoreCanonical)
 	}
 
 	return nil
