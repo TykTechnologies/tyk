@@ -69,7 +69,7 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 	go b.store.DeleteRawKey(rawKey)
 	//go b.store.SetKey(rawKey, "0", session.QuotaRenewalRate)
 
-	for _, acl := range session.GetAccessRights() {
+	for _, acl := range session.AccessRights {
 		rawKey = QuotaKeyPrefix + acl.AllowanceScope + "-" + keyName
 		go b.store.DeleteRawKey(rawKey)
 	}
@@ -132,6 +132,7 @@ func (b *DefaultSessionManager) RemoveSession(orgID string, keyName string, hash
 func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool) {
 	var jsonKeyVal string
 	var err error
+	keyId := keyName
 
 	// get session by key
 	if hashed {
@@ -148,9 +149,10 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 			jsonKeyValList, err = b.store.GetMultiKey(toSearchList)
 
 			// pick the 1st non empty from the returned list
-			for _, val := range jsonKeyValList {
+			for idx, val := range jsonKeyValList {
 				if val != "" {
 					jsonKeyVal = val
+					keyId = toSearchList[idx]
 					break
 				}
 			}
@@ -173,7 +175,7 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 		log.Error("Couldn't unmarshal session object (may be cache miss): ", err)
 		return user.SessionState{}, false
 	}
-
+	session.KeyID = keyId
 	return session.Clone(), true
 }
 

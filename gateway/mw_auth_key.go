@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/TykTechnologies/tyk/certs"
+	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/TykTechnologies/tyk/user"
 
@@ -102,10 +103,12 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		return errorAndStatusCode(ErrAuthAuthorizationFieldMissing)
 	}
 
-	session, keyExists = k.CheckSessionAndIdentityForValidKey(&key, r)
+	session, keyExists = k.CheckSessionAndIdentityForValidKey(key, r)
+	key = session.KeyID
 	if !keyExists {
 		// fallback to search by cert
-		session, keyExists = k.CheckSessionAndIdentityForValidKey(&certHash, r)
+		session, keyExists = k.CheckSessionAndIdentityForValidKey(certHash, r)
+		certHash = session.KeyID
 		if !keyExists {
 			return k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)
 		}
@@ -113,8 +116,20 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 
 	if authConfig.UseCertificate {
 		certID := session.OrgID + certHash
-		if _, err := CertificateManager.GetRaw(certID); err != nil {
-			return k.reportInvalidKey(key, r, MsgNonExistentCert, ErrAuthCertNotFound)
+		_, err := CertificateManager.GetRaw(certID)
+		if err != nil {
+			// Try alternative approach:
+			id, err := storage.TokenID(session.KeyID)
+			if err != nil {
+				log.Error(err)
+				return k.reportInvalidKey(key, r, MsgNonExistentCert, ErrAuthCertNotFound)
+			}
+
+			certID = session.OrgID + id
+			_, err = CertificateManager.GetRaw(certID)
+			if err != nil {
+				return k.reportInvalidKey(key, r, MsgNonExistentCert, ErrAuthCertNotFound)
+			}
 		}
 
 		if session.Certificate != certID {
@@ -124,10 +139,28 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	// Set session state on context, we will need it later
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.AuthToken, apidef.UnsetAuth:
-		ctxSetSession(r, &session, key, false)
+		ctxSetSession(r, &session, false)
 		k.setContextVars(r, key)
 	}
 
+	// Try using org-key format first:
+	if strings.HasPrefix(key, session.OrgID) {
+		err, statusCode := k.validateSignature(r, key[len(session.OrgID):])
+		if err == nil && statusCode == http.StatusOK {
+			return err, statusCode
+		}
+	}
+
+	// As a second approach, try to use the internal ID that's part of the B64 JSON key:
+	keyID, err := storage.TokenID(key)
+	if err == nil {
+		err, statusCode := k.validateSignature(r, keyID)
+		if err == nil {
+			return err, statusCode
+		}
+	}
+
+	// Last try is to take the key as is:
 	return k.validateSignature(r, key)
 }
 

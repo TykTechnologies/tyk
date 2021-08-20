@@ -358,7 +358,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	w.WriteHeader(newRes.StatusCode)
 	if newRes.StatusCode != http.StatusNotModified {
-		m.Proxy.CopyResponse(w, newRes.Body)
+		m.Proxy.CopyResponse(w, newRes.Body, 0)
 	}
 
 	// Record analytics

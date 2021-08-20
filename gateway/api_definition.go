@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -20,7 +21,7 @@ import (
 	"github.com/cenk/backoff"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/resolve"
 
-	sprig "gopkg.in/Masterminds/sprig.v2"
+	"gopkg.in/Masterminds/sprig.v2"
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
 	"github.com/gorilla/mux"
@@ -28,6 +29,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/gojsonschema"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
@@ -196,6 +198,7 @@ type APISpec struct {
 
 	GraphQLExecutor struct {
 		Engine   *graphql.ExecutionEngine
+		CancelV2 context.CancelFunc
 		EngineV2 *graphql.ExecutionEngineV2
 		HooksV2  struct {
 			BeforeFetchHook resolve.BeforeFetchHook
@@ -203,10 +206,10 @@ type APISpec struct {
 		}
 		Client *http.Client
 		Schema *graphql.Schema
-	}
+	} `json:"-"`
 }
 
-// Release re;leases all resources associated with API spec
+// Release releases all resources associated with API spec
 func (s *APISpec) Release() {
 	// release circuit breaker resources
 	for _, path := range s.RxPaths {
@@ -216,6 +219,11 @@ func (s *APISpec) Release() {
 				urlSpec.CircuitBreaker.CB.Stop()
 			}
 		}
+	}
+
+	// cancel execution contexts
+	if s.GraphQLExecutor.CancelV2 != nil {
+		s.GraphQLExecutor.CancelV2()
 	}
 
 	// release all other resources associated with spec

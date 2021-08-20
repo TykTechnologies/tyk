@@ -1,9 +1,11 @@
 package apidef
 
 import (
+	"database/sql/driver"
 	"encoding/base64"
 	"encoding/json"
 	"encoding/xml"
+	"fmt"
 	"net/http"
 	"text/template"
 	"time"
@@ -14,6 +16,8 @@ import (
 
 	"github.com/lonelycode/osin"
 	"gopkg.in/mgo.v2/bson"
+	_ "gorm.io/gorm"
+	_ "gorm.io/gorm/schema"
 
 	"github.com/TykTechnologies/gojsonschema"
 
@@ -73,7 +77,80 @@ const (
 	All    RoutingTriggerOnType = "all"
 	Any    RoutingTriggerOnType = "any"
 	Ignore RoutingTriggerOnType = ""
+
+	// TykInternalApiHeader - flags request as internal api looping request
+	TykInternalApiHeader = "x-tyk-internal"
 )
+
+type ObjectId bson.ObjectId
+
+func (j *ObjectId) Scan(value interface{}) error {
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		return fmt.Errorf("Failed to unmarshal JSON value: %v", value)
+	}
+
+	// reflect magic to update existing string without creating new one
+	if len(bytes) > 0 {
+		bs := ObjectId(bson.ObjectIdHex(string(bytes)))
+		*j = bs
+	}
+
+	return nil
+}
+
+func (j ObjectId) Value() (driver.Value, error) {
+	return bson.ObjectId(j).Hex(), nil
+}
+
+func (j ObjectId) Hex() string {
+	return bson.ObjectId(j).Hex()
+}
+
+func (j ObjectId) Time() time.Time {
+	return bson.ObjectId(j).Time()
+}
+
+func (j ObjectId) Valid() bool {
+	return bson.ObjectId(j).Valid()
+}
+
+func (j ObjectId) String() string {
+	return j.Hex()
+}
+
+func (j ObjectId) GetBSON() (interface{}, error) {
+	return bson.ObjectId(j), nil
+}
+
+func ObjectIdHex(hex string) ObjectId {
+	return ObjectId(bson.ObjectIdHex(hex))
+}
+
+func NewObjectId() ObjectId {
+	return ObjectId(bson.NewObjectId())
+}
+
+func IsObjectIdHex(hex string) bool {
+	return bson.IsObjectIdHex(hex)
+}
+
+func (j ObjectId) MarshalJSON() ([]byte, error) {
+	return bson.ObjectId(j).MarshalJSON()
+}
+
+func (j *ObjectId) UnmarshalJSON(buf []byte) error {
+	var b bson.ObjectId
+	b.UnmarshalJSON(buf)
+	*j = ObjectId(string(b))
+
+	return nil
+}
 
 type EndpointMethodMeta struct {
 	Action  EndpointMethodAction `bson:"action" json:"action"`
@@ -366,7 +443,7 @@ type OpenIDOptions struct {
 //
 // swagger:model
 type APIDefinition struct {
-	Id                  bson.ObjectId `bson:"_id,omitempty" json:"id,omitempty"`
+	Id                  ObjectId      `bson:"_id,omitempty" json:"id,omitempty" gorm:"primaryKey;column:_id"`
 	Name                string        `bson:"name" json:"name"`
 	Slug                string        `bson:"slug" json:"slug"`
 	ListenPort          int           `bson:"listen_port" json:"listen_port"`
@@ -589,12 +666,16 @@ type GraphQLSubgraphConfig struct {
 }
 
 type GraphQLSupergraphConfig struct {
-	Subgraphs []GraphQLSubgraphEntity `bson:"subgraphs" json:"subgraphs"`
-	MergedSDL string                  `bson:"merged_sdl" json:"merged_sdl"`
+	// UpdatedAt contains the date and time of the last update of a supergraph API.
+	UpdatedAt     *time.Time              `bson:"updated_at" json:"updated_at,omitempty"`
+	Subgraphs     []GraphQLSubgraphEntity `bson:"subgraphs" json:"subgraphs"`
+	MergedSDL     string                  `bson:"merged_sdl" json:"merged_sdl"`
+	GlobalHeaders map[string]string       `bson:"global_headers" json:"global_headers"`
 }
 
 type GraphQLSubgraphEntity struct {
 	APIID string `bson:"api_id" json:"api_id"`
+	Name  string `bson:"name" json:"name"`
 	URL   string `bson:"url" json:"url"`
 	SDL   string `bson:"sdl" json:"sdl"`
 }
