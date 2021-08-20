@@ -1,64 +1,133 @@
 # Tyk API Gateway
 
-[![Build Status](https://travis-ci.org/TykTechnologies/tyk.svg?branch=master)](https://travis-ci.org/TykTechnologies/tyk)
+<!-- [![Build Status](https://travis-ci.org/TykTechnologies/tyk.svg?branch=master)](https://travis-ci.org/TykTechnologies/tyk) -->
 [![Go Report Card](https://goreportcard.com/badge/github.com/TykTechnologies/tyk)](https://goreportcard.com/report/github.com/TykTechnologies/tyk)
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk?ref=badge_shield)
 
-Tyk is a lightweight, open source API Gateway and Management Platform enables you to control who accesses your API, when they access it and how they access it. Tyk will
-also record detailed analytics on how your users are interacting with your API and when things go wrong.
+Tyk is an open source Enterprise API Gateway, supporting REST, GraphQL, TCP and gRPC protocols. 
 
-Go version 1.10 is required to build `master`, the current
-development version. Tyk is officially supported on `linux/amd64`,
-`linux/i386` and `linux/arm64`.
+Tyk Gateway is provided ‘Batteries-included’, with no feature lockout. Enabling your organization to control who accesses your APIs, when they access, and how they access it. 
 
-Tests are run against both Go versions 1.10 & 1.11, however at present, only Go 1.10 is officially supported.
+Tyk Technologies uses the same API Gateway for all it’s applications. Protecting, securing, and processing APIs for thousands of organizations and businesses around the world. Ideal for Open Banking, building software in the clouds as well as exposing APIs to teams, partners & consumers. 
 
-## What is an API Gateway?
+Built from the ground up to be the fastest API gateway on the planet. It does not depend on a legacy proxy underneath. It has no 3rd party dependencies aside from [Redis](https://github.com/redis/redis) for distributed rate-limiting and token storage. Tyk Gateway can also be deployed as part of a larger Full Lifecycle API Management platform [Tyk Self-Managed](https://tyk.io/features/dashboard/) which also includes Management Control Plane, Dashboard GUI and Developer Portal.
 
-An API Gateway sits in front of your application(s) and manages the heavy lifting of authorisation, access control and throughput limiting to your services. Ideally, 
-it should mean that you can focus on creating services instead of implementing management infrastructure. For example if you have written a really awesome web service
-that provides geolocation data for all the cats in NYC, and you want to make it public, integrating an API gateway is a faster, more secure route than writing your own 
-authorisation middleware.
-
-## Key Features of Tyk
-
-Tyk offers powerful, yet lightweight features that allow fine grained control over your API ecosystem.
-
-* **RESTFul API** - Full programmatic access to the internals makes it easy to manage your API users, keys and Api Configuration from within your systems
-* **Multiple access protocols** - Out of the box, Tyk supports Token-based, HMAC Signed, Basic Auth and Keyless access methods
-* **Rate Limiting** - Easily rate limit your API users, rate limiting is granular and can be applied on a per-key basis
-* **Quotas** - Enforce usage quotas on users to manage capacity or charge for tiered access
-* **Granular Access Control** - Grant api access on a version by version basis, grant keys access to multiple API's or just a single version
-* **Key Expiry** - Control how long keys are valid for
-* **API Versioning** - API Versions can be easily set and deprecated at a specific time and date
-* **Blacklist/Whitelist/Ignored endpoint access** - Enforce strict security models on a version-by-version basis to your access points
-* **Analytics logging** - Record detailed usage data on who is using your API's (raw data only)
-* **Webhooks** - Trigger webhooks against events such as Quota Violations and Authentication failures
-* **IP Whitelisting** - Block access to non-trusted IP addresses for more secure interactions
-* **Zero downtime restarts** - Tyk configurations can be altered dynamically and the service restarted without affecting any active request
-
-Tyk is written in Go, which makes it fast and easy to set up. Its only dependencies are a Mongo database (for analytics) and Redis, 
-though it can be deployed without either (not recommended).
-
-## Tyk API Management Platform
-The Tyk Dashboard and Developer portal can be used with the Tyk API Gateway, to provide a full lifecycle API Management platform. You can find more details at https://tyk.io and for a full featureset, you can visit https://tyk.io/features.
-
-## Why?
-
-Tyk was built because other open source API Gateways in the market come with dependencies and bloat, attempting to be too many things to too many people. Tyk is focused,
-simple and does one thing well - protecting your API from unauthorised access.
-
-### Documentation
-
-All the documentation can be found at http://tyk.io/docs/.
-
-### License
-
-Tyk is released under the MPL v2.0; please see [LICENSE.md](LICENSE.md) for a full version of the license.
+![image](https://user-images.githubusercontent.com/14009/109156132-8ae9d980-7781-11eb-88d7-0b77c753a9ca.png)
 
 
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk?ref=badge_large)
 
-### Contributing
+# Open Source API Gateway Features
 
-For more information about contributing PRs and issues, see [CONTRIBUTING.md](CONTRIBUTING.md).
+Use any protocol: REST, SOAP, [GraphQL](https://tyk.io/docs/tyk-apis/tyk-gateway-api/api-definition-objects/graphql/), [gRPC](https://tyk.io/docs/key-concepts/grpc-proxy/), and [TCP](https://tyk.io/docs/key-concepts/tcp-proxy/).
+
+Industry Standard Authentication: [OIDC](https://tyk.io/docs/advanced-configuration/integrate/api-auth-mode/open-id-connect/#setting-up-oidc), [JWT,](https://tyk.io/docs/tyk-apis/tyk-gateway-api/api-definition-objects/jwt/) [bearer Tokens](https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/bearer-tokens/), [Basic Auth](https://tyk.io/docs/tyk-apis/tyk-dashboard-api/basic-authentication/), Client Certificates and more.
+
+[Open API Standards:](https://tyk.io/docs/getting-started/import-apis/) Import your Swagger and OAS2/3 documents to scaffold APIs in Tyk.
+
+[Ultra performant](https://tyk.io/performance-tuning-your-tyk-api-gateway/): Low latency, and thousands of rps with just a single CPU, horizontally and vertically scalable.
+
+[Content mediation](https://tyk.io/docs/advanced-configuration/transform-traffic/): Transform all the things, from request or response headers to converting between SOAP and GraphQL.
+
+[Extensible Plugin Architecture](https://tyk.io/docs/plugins/): Customize Tyk’s middleware chain by writing plugins in your language of choice - from Python to Javascript to Go, or any language which supports gRPC.
+
+[Rate Limiting](https://tyk.io/docs/basic-config-and-security/control-limit-traffic/rate-limiting/#setting-rate-limits-in-the-tyk-community-edition-gateway-ce) & Quotas: Protect your upstreams from becoming overloaded and/or apply limits for each consumer.
+
+[API Versioning](https://tyk.io/docs/tyk-apis/tyk-gateway-api/api-definition-objects/versioning-endpoint/) - API Versions can be easily set and deprecated at a specific time and date.
+
+[Granular Access Control](https://tyk.io/docs/security/security-policies/secure-apis-method-path/) - Grant access to one or more APIs on a per version and operation basis.
+
+[Blocklist](https://tyk.io/docs/tyk-apis/tyk-gateway-api/api-definition-objects/ip-blacklisting/)/[Allowlist](https://tyk.io/docs/tyk-apis/tyk-gateway-api/api-definition-objects/ip-whitelisting/)/Ignored endpoint access - Enforce strict security models on a version-by-version basis to your access points.
+
+Analytics logging - Record detailed usage data on who is using your API's (raw data only)
+
+[CORS](https://tyk.io/docs/tyk-apis/tyk-gateway-api/api-definition-objects/cors/) - Enable CORS for certain APIs so users can make browser-based requests
+
+[Webhooks](https://tyk.io/docs/basic-config-and-security/report-monitor-trigger-events/webhooks/) - Trigger webhooks against events such as Quota Violations and Authentication failures
+
+[IP AllowListing](https://tyk.io/docs/tyk-apis/tyk-gateway-api/api-definition-objects/ip-whitelisting/) - Block access to non-trusted IP addresses for more secure interactions
+
+[Hitless reloads](https://tyk.io/docs/tyk-configuration-reference/hot-restart-tyk-gateway-process/) - Tyk configurations can be altered dynamically and the service restarted without affecting any active request
+
+[Kubernetes native](https://tyk.io/docs/tyk-oss/ce-helm-chart/) declarative API: using Open Source [Tyk Operator](https://github.com/TykTechnologies/tyk-operator) (more info in OSS section)
+
+
+# Quick Start on your platform
+
+Get Started today with Tyk Gateway (standalone) 
+
+Install 
+
+1. [Docker](https://tyk.io/docs/tyk-oss/ce-docker/) (Recommended method)
+2. [ Kubernetes-Native  ](https://github.com/TykTechnologies/tyk-oss-k8s-deployment)
+3. [Kubernetes-Helm](https://github.com/TykTechnologies/tyk-helm-chart#install-tyk-community-edition)
+4. [Ansible](https://tyk.io/docs/tyk-oss/ce-ansible/)
+5. [Red Hat](https://tyk.io/docs/tyk-oss/ce-redhat/)  
+6. [Ubuntu](https://tyk.io/docs/tyk-oss/ce-ubuntu/)  
+7. [CentOS](https://tyk.io/docs/tyk-oss/ce-centos/) 
+8. Compile from Source (see instructions below)
+
+# Compiling Tyk Gateway
+
+Compile from Source
+
+```
+git clone https://github.com/TykTechnologies/tyk
+go build
+```
+
+
+Go version 1.12 is required to build `master`, the current development version. Tyk is officially supported on `linux/amd64`, `linux/i386` and `linux/arm64`.
+
+Tests are run against both Go versions 1.12, 1.13, 1.14 and 1.15, however at present, only Go 1.12 is officially supported.
+In order to run tests locally use the following command:
+
+```
+go test ./...
+```
+
+Note that tests require Redis to be running on the same machine (default port).
+
+In order to write your own test pls use this guide [https://github.com/TykTechnologies/tyk/blob/master/TESTING.md](https://github.com/TykTechnologies/tyk/blob/master/TESTING.md)
+
+# Contributing
+
+For more information about contributing PRs and issues, see [CONTRIBUTING.md](https://github.com/TykTechnologies/tyk/blob/master/CONTRIBUTING.md).
+
+
+# Tyk OSS Integrations
+
+Tyk Technologies maintains other Open Source Software which can be used in conjunction with Tyk API Gateway:
+
+[Tyk Pump](https://github.com/TykTechnologies/tyk-pump) - Pluggable analytics purger to move Analytics generated by your Tyk nodes to any back-end.
+
+[Tyk Operator](https://github.com/TykTechnologies/tyk-operator) - Brings API Management capabilities to Kubernetes. Configure Ingress, APIs, Security Policies, Authentication, Authorization, Mediation and more - all using Custom Resources and Kubernetes Native primitives
+
+[Tyk Identity Broker](https://github.com/TykTechnologies/tyk-identity-broker) - Tyk Authentication Proxy for third-party login
+
+[Tyk Sync ](https://github.com/TykTechnologies/tyk-sync)- Command line tool and library to manage and synchronise a Tyk installation with your version control system (VCS).
+
+[Tyk Mserv](https://github.com/TykTechnologies/mserv) - Asset Server and gRPC host
+
+![image](https://user-images.githubusercontent.com/14009/112309048-ea210800-8cb3-11eb-8e8e-dceb4cae4cad.png)
+
+# Documentation
+
+All the documentation for Tyk Gateway and other OSS can be found at [https://tyk.io/docs/tyk-oss-gateway/](https://tyk.io/docs/tyk-oss-gateway/)
+
+
+# Community
+
+
+
+*   [Tyk Community Board](https://community.tyk.io) - Technical support from the Tyk Community
+*   [Write a GitHub Issue](https://github.com/TykTechnologies/tyk/issues/new/choose) - Feature requests & bug reports welcome
+*   [Technical blog](https://tyk.io/api-expertise/blog/) - Tyk announcements and updates
+*   [Newsletters ](https://pages.tyk.io/newsletter)- Subscribe to our GraphQL & API newsletters
+*   If you are using Tyk give us a star ⭐️  
+
+
+# Open Source License
+
+Tyk is released under the MPL v2.0; please see [LICENSE.md](https://github.com/TykTechnologies/tyk/blob/master/LICENSE.md) for a full version of the license.
+
+![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk.svg?type=large)

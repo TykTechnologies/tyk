@@ -1,12 +1,14 @@
 package gateway
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/TykTechnologies/leakybucket"
 	"github.com/TykTechnologies/leakybucket/memorycache"
+
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
@@ -66,7 +68,7 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 
 	// Subtract by 1 because of the delayed add in the window
 	subtractor := 1
-	if globalConf.EnableSentinelRateLimiter {
+	if globalConf.EnableSentinelRateLimiter || globalConf.DRLEnableSentinelRateLimiter {
 		// and another subtraction because of the preemptive limit
 		subtractor = 2
 	}
@@ -75,7 +77,7 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 	//log.Info("break: ", (int(currentSession.Rate) - subtractor))
 	if ratePerPeriodNow > int(rate)-subtractor {
 		// Set a sentinel value with expire
-		if globalConf.EnableSentinelRateLimiter {
+		if globalConf.EnableSentinelRateLimiter || globalConf.DRLEnableSentinelRateLimiter {
 			if !dryRun {
 				store.SetRawKey(rateLimiterSentinelKey, "1", int64(per))
 			}
@@ -92,6 +94,7 @@ const (
 	sessionFailNone sessionFailReason = iota
 	sessionFailRateLimit
 	sessionFailQuota
+	sessionFailInternalServerError
 )
 
 func (l *SessionLimiter) limitSentinel(currentSession *user.SessionState, key string, rateScope string, store storage.Handler,
@@ -177,44 +180,26 @@ func (sfr sessionFailReason) String() string {
 // sessionFailReason if session limits have been exceeded.
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages
 // Per 10 seconds
-func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.SessionState, key string, store storage.Handler, enableRL, enableQ bool, globalConf *config.Config, apiID string, dryRun bool) sessionFailReason {
+func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.SessionState, key string, store storage.Handler, enableRL, enableQ bool, globalConf *config.Config, api *APISpec, dryRun bool) sessionFailReason {
 	// check for limit on API level (set to session by ApplyPolicies)
-	var apiLimit *user.APILimit
-	var allowanceScope string
-	if len(currentSession.AccessRights) > 0 {
-		if rights, ok := currentSession.AccessRights[apiID]; !ok {
-			log.WithField("apiID", apiID).Debug("[RATE] unexpected apiID")
-			return sessionFailRateLimit
-		} else {
-			apiLimit = rights.Limit
-			allowanceScope = rights.AllowanceScope
-		}
-	}
-
-	if apiLimit == nil {
-		apiLimit = &user.APILimit{
-			QuotaMax:           currentSession.QuotaMax,
-			QuotaRenewalRate:   currentSession.QuotaRenewalRate,
-			QuotaRenews:        currentSession.QuotaRenews,
-			Rate:               currentSession.Rate,
-			Per:                currentSession.Per,
-			ThrottleInterval:   currentSession.ThrottleInterval,
-			ThrottleRetryLimit: currentSession.ThrottleRetryLimit,
-		}
+	accessDef, allowanceScope, err := GetAccessDefinitionByAPIIDOrSession(currentSession, api)
+	if err != nil {
+		log.WithField("apiID", api.APIID).Debugf("[RATE] %s", err.Error())
+		return sessionFailRateLimit
 	}
 
 	// If rate is -1 or 0, it means unlimited and no need for rate limiting.
-	if enableRL && apiLimit.Rate > 0 {
+	if enableRL && accessDef.Limit.Rate > 0 {
 		rateScope := ""
 		if allowanceScope != "" {
 			rateScope = allowanceScope + "-"
 		}
 		if globalConf.EnableSentinelRateLimiter {
-			if l.limitSentinel(currentSession, key, rateScope, store, globalConf, apiLimit, dryRun) {
+			if l.limitSentinel(currentSession, key, rateScope, store, globalConf, &accessDef.Limit, dryRun) {
 				return sessionFailRateLimit
 			}
 		} else if globalConf.EnableRedisRollingLimiter {
-			if l.limitRedis(currentSession, key, rateScope, store, globalConf, apiLimit, dryRun) {
+			if l.limitRedis(currentSession, key, rateScope, store, globalConf, &accessDef.Limit, dryRun) {
 				return sessionFailRateLimit
 			}
 		} else {
@@ -222,7 +207,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			if DRLManager.Servers != nil {
 				n = float64(DRLManager.Servers.Count())
 			}
-			rate := apiLimit.Rate / apiLimit.Per
+			rate := accessDef.Limit.Rate / accessDef.Limit.Per
 			c := globalConf.DRLThreshold
 			if c == 0 {
 				// defaults to 5
@@ -232,11 +217,11 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			if n <= 1 || n*c < rate {
 				// If we have 1 server, there is no need to strain redis at all the leaky
 				// bucket algorithm will suffice.
-				if l.limitDRL(currentSession, key, rateScope, apiLimit, dryRun) {
+				if l.limitDRL(currentSession, key, rateScope, &accessDef.Limit, dryRun) {
 					return sessionFailRateLimit
 				}
 			} else {
-				if l.limitRedis(currentSession, key, rateScope, store, globalConf, apiLimit, dryRun) {
+				if l.limitRedis(currentSession, key, rateScope, store, globalConf, &accessDef.Limit, dryRun) {
 					return sessionFailRateLimit
 				}
 			}
@@ -245,10 +230,10 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 
 	if enableQ {
 		if globalConf.LegacyEnableAllowanceCountdown {
-			currentSession.Allowance--
+			currentSession.Allowance = currentSession.Allowance - 1
 		}
 
-		if l.RedisQuotaExceeded(r, currentSession, allowanceScope, apiLimit, store) {
+		if l.RedisQuotaExceeded(r, currentSession, allowanceScope, &accessDef.Limit, store) {
 			return sessionFailQuota
 		}
 	}
@@ -269,7 +254,12 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 		quotaScope = scope + "-"
 	}
 
-	rawKey := QuotaKeyPrefix + quotaScope + currentSession.KeyHash()
+	key := currentSession.KeyID
+	if config.Global().HashKeys {
+		key = storage.HashStr(currentSession.KeyID)
+	}
+
+	rawKey := QuotaKeyPrefix + quotaScope + key
 	quotaRenewalRate := limit.QuotaRenewalRate
 	quotaRenews := limit.QuotaRenews
 	quotaMax := limit.QuotaMax
@@ -316,7 +306,7 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 	}
 
 	for k, v := range currentSession.AccessRights {
-		if v.Limit == nil {
+		if v.Limit.IsEmpty() {
 			continue
 		}
 
@@ -333,4 +323,31 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 	}
 
 	return false
+}
+
+func GetAccessDefinitionByAPIIDOrSession(currentSession *user.SessionState, api *APISpec) (accessDef *user.AccessDefinition, allowanceScope string, err error) {
+	accessDef = &user.AccessDefinition{}
+	if len(currentSession.AccessRights) > 0 {
+		if rights, ok := currentSession.AccessRights[api.APIID]; !ok {
+			return nil, "", errors.New("unexpected apiID")
+		} else {
+			accessDef.Limit = rights.Limit
+			accessDef.FieldAccessRights = rights.FieldAccessRights
+			allowanceScope = rights.AllowanceScope
+		}
+	}
+	if accessDef.Limit.IsEmpty() {
+		accessDef.Limit = user.APILimit{
+			QuotaMax:           currentSession.QuotaMax,
+			QuotaRenewalRate:   currentSession.QuotaRenewalRate,
+			QuotaRenews:        currentSession.QuotaRenews,
+			Rate:               currentSession.Rate,
+			Per:                currentSession.Per,
+			ThrottleInterval:   currentSession.ThrottleInterval,
+			ThrottleRetryLimit: currentSession.ThrottleRetryLimit,
+			MaxQueryDepth:      currentSession.MaxQueryDepth,
+		}
+	}
+
+	return accessDef, allowanceScope, nil
 }

@@ -201,6 +201,7 @@ func testRunner(t *testing.T, proxy *Proxy, hostname string, useSSL bool, testCa
 		tlsConfig := &tls.Config{
 			Certificates:       []tls.Certificate{test.Cert("localhost")},
 			InsecureSkipVerify: true,
+			MaxVersion:         tls.VersionTLS12,
 		}
 		tlsConfig.BuildNameToCertificate()
 		proxyLn, err = tls.Listen("tcp", ":0", tlsConfig)

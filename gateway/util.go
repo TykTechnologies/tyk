@@ -19,6 +19,23 @@ func appendIfMissing(slice []string, newSlice ...string) []string {
 	return slice
 }
 
+// intersection gets intersection of the given two slices.
+func intersection(a []string, b []string) (inter []string) {
+	m := make(map[string]bool)
+
+	for _, item := range a {
+		m[item] = true
+	}
+
+	for _, item := range b {
+		if _, ok := m[item]; ok {
+			inter = append(inter, item)
+		}
+	}
+
+	return
+}
+
 // contains checks whether the given slice contains the given item.
 func contains(s []string, i string) bool {
 	for _, a := range s {

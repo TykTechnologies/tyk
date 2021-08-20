@@ -7,17 +7,15 @@ import (
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
-	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 )
 
-func TestGraphQL_RestrictedTypes(t *testing.T) {
+func TestGranularAccessMiddleware_ProcessRequest(t *testing.T) {
 	g := StartTest()
 	defer g.Close()
 
 	api := BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = false
-		spec.GraphQL.Enabled = true
 	})[0]
 
 	_, directKey := g.CreateSession(func(s *user.SessionState) {
@@ -25,10 +23,10 @@ func TestGraphQL_RestrictedTypes(t *testing.T) {
 			api.APIID: {
 				APIID:   api.APIID,
 				APIName: api.Name,
-				RestrictedTypes: []graphql.Type{
+				AllowedURLs: []user.AccessSpec{
 					{
-						Name:   "Country",
-						Fields: []string{"code"},
+						URL:     "^/valid_path.*",
+						Methods: []string{"GET"},
 					},
 				},
 			},
@@ -40,10 +38,10 @@ func TestGraphQL_RestrictedTypes(t *testing.T) {
 			api.APIID: {
 				APIID:   api.APIID,
 				APIName: api.Name,
-				RestrictedTypes: []graphql.Type{
+				AllowedURLs: []user.AccessSpec{
 					{
-						Name:   "Country",
-						Fields: []string{"name"},
+						URL:     "^/valid_path.*",
+						Methods: []string{"GET"},
 					},
 				},
 			},
@@ -54,24 +52,44 @@ func TestGraphQL_RestrictedTypes(t *testing.T) {
 		s.ApplyPolicies = []string{pID}
 	})
 
-	q1 := graphql.Request{
-		Query: "query Query { countries { code } }",
-	}
-
-	q2 := graphql.Request{
-		Query: "query Query { countries { name } }",
-	}
-
 	t.Run("Direct key", func(t *testing.T) {
 		authHeaderWithDirectKey := map[string]string{
 			headers.Authorization: directKey,
 		}
 
-		_, _ = g.Run(t, []test.TestCase{
-			{Data: q1, Headers: authHeaderWithDirectKey,
-				BodyMatch: `{"errors":\[{"message":"field: code is restricted on type: Country"}\]}`, Code: http.StatusBadRequest},
-			{Data: q2, Headers: authHeaderWithDirectKey, Code: http.StatusOK},
-		}...)
+		t.Run("should return 200 OK on allowed path with allowed method", func(t *testing.T) {
+			_, _ = g.Run(t, []test.TestCase{
+				{
+					Path:    "/valid_path",
+					Method:  http.MethodGet,
+					Code:    http.StatusOK,
+					Headers: authHeaderWithDirectKey,
+				},
+			}...)
+		})
+
+		t.Run("should return 403 Forbidden on allowed path with disallowed method", func(t *testing.T) {
+			_, _ = g.Run(t, []test.TestCase{
+				{
+					Path:    "/valid_path",
+					Method:  http.MethodPost,
+					Code:    http.StatusForbidden,
+					Headers: authHeaderWithDirectKey,
+				},
+			}...)
+		})
+
+		t.Run("should return 403 Forbidden on disallowed path with allowed method", func(t *testing.T) {
+			_, _ = g.Run(t, []test.TestCase{
+				{
+					Path:    "/invalid_path",
+					Method:  http.MethodGet,
+					Code:    http.StatusForbidden,
+					Headers: authHeaderWithDirectKey,
+				},
+			}...)
+		})
+
 	})
 
 	t.Run("Policy applied key", func(t *testing.T) {
@@ -79,10 +97,37 @@ func TestGraphQL_RestrictedTypes(t *testing.T) {
 			headers.Authorization: policyAppliedKey,
 		}
 
-		_, _ = g.Run(t, []test.TestCase{
-			{Data: q2, Headers: authHeaderWithPolicyAppliedKey,
-				BodyMatch: `{"errors":\[{"message":"field: name is restricted on type: Country"}\]}`, Code: http.StatusBadRequest},
-			{Data: q1, Headers: authHeaderWithPolicyAppliedKey, Code: http.StatusOK},
-		}...)
+		t.Run("should return 200 OK on allowed path with allowed method", func(t *testing.T) {
+			_, _ = g.Run(t, []test.TestCase{
+				{
+					Path:    "/valid_path",
+					Method:  http.MethodGet,
+					Code:    http.StatusOK,
+					Headers: authHeaderWithPolicyAppliedKey,
+				},
+			}...)
+		})
+
+		t.Run("should return 403 Forbidden on allowed path with disallowed method", func(t *testing.T) {
+			_, _ = g.Run(t, []test.TestCase{
+				{
+					Path:    "/valid_path",
+					Method:  http.MethodPost,
+					Code:    http.StatusForbidden,
+					Headers: authHeaderWithPolicyAppliedKey,
+				},
+			}...)
+		})
+
+		t.Run("should return 403 Forbidden on disallowed path with allowed method", func(t *testing.T) {
+			_, _ = g.Run(t, []test.TestCase{
+				{
+					Path:    "/invalid_path",
+					Method:  http.MethodGet,
+					Code:    http.StatusForbidden,
+					Headers: authHeaderWithPolicyAppliedKey,
+				},
+			}...)
+		})
 	})
 }

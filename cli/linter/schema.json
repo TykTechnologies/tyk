@@ -41,6 +41,9 @@
         "master_name": {
           "type": "string"
         },
+        "sentinel_password": {
+          "type": "string"
+        },
         "optimisation_max_active": {
           "type": "integer"
         },
@@ -115,6 +118,9 @@
         "enable_detailed_recording": {
           "type": "boolean"
         },
+        "purge_interval": {
+          "type": "number"
+        },
         "enable_geo_ip": {
           "type": "boolean"
         },
@@ -157,6 +163,9 @@
         },
         "records_buffer_size": {
           "type": "integer"
+        },
+        "enable_multiple_analytics_keys": {
+          "type": "boolean"
         },
         "storage_expiration_time": {
           "type": "integer"
@@ -278,6 +287,9 @@
     "ignore_endpoint_case": {
       "type": "boolean"
     },
+    "ignore_canonical_mime_header_key": {
+      "type": "boolean"
+    },
     "db_app_conf_options": {
       "type": [
         "object",
@@ -308,17 +320,29 @@
     "disable_dashboard_zeroconf": {
       "type": "boolean"
     },
+    "jwt_ssl_insecure_skip_verify": {
+      "type": "boolean"
+    },
     "disable_virtual_path_blobs": {
       "type": "boolean"
     },
     "drl_notification_frequency": {
       "type": "integer"
     },
+    "drl_enable_sentinel_rate_limiter": {
+      "type": "boolean"
+    },
     "drl_threshold": {
       "type": "number"
     },
     "enable_analytics": {
       "type": "boolean"
+    },
+    "enable_separate_analytics_store": {
+      "type": "boolean"
+    },
+    "analytics_storage": {
+      "$ref": "#/definitions/StorageOptions"
     },
     "enable_api_segregation": {
       "type": "boolean"
@@ -412,6 +436,22 @@
         "sha256"
       ]
     },
+    "hash_key_function_fallback": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string",
+        "enum": [
+          "",
+          "murmur32",
+          "murmur64",
+          "murmur128",
+          "sha256"
+        ]
+      }
+    },
     "health_check": {
       "type": [
         "object",
@@ -495,6 +535,9 @@
           "type": "integer"
         },
         "min_version": {
+          "type": "integer"
+        },
+        "max_version": {
           "type": "integer"
         },
         "override_defaults": {
@@ -710,15 +753,6 @@
     "oauth_error_status_code": {
       "type": "integer"
     },
-    "optimisations_use_async_session_write": {
-      "type": "boolean"
-    },
-    "session_update_pool_size": {
-      "type": "integer"
-    },
-    "session_update_buffer_size": {
-      "type": "integer"
-    },
     "pid_file_location": {
       "type": "string"
     },
@@ -782,6 +816,9 @@
       "type": "boolean"
     },
     "proxy_ssl_min_version": {
+      "type": "integer"
+    },
+    "proxy_ssl_max_version": {
       "type": "integer"
     },
     "proxy_ssl_ciphers": {
@@ -931,6 +968,9 @@
         },
         "disable": {
           "type": "boolean"
+        },
+        "poller_group": {
+          "type": "string"
         }
       }
     },

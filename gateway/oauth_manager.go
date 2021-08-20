@@ -12,6 +12,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/request"
+	"github.com/sirupsen/logrus"
+
 	"github.com/lonelycode/osin"
 	uuid "github.com/satori/go.uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -143,6 +146,7 @@ func (o *OAuthHandlers) HandleGenerateAuthCodeData(w http.ResponseWriter, r *htt
 	resp := o.Manager.HandleAuthorisation(r, true, sessionJSONData)
 	code := http.StatusOK
 	msg := o.generateOAuthOutputFromOsinResponse(resp)
+
 	if resp.IsError {
 		code = resp.ErrorStatusCode
 		log.Error("[OAuth] OAuth response marked as error: ", resp)
@@ -157,7 +161,7 @@ func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *htt
 	// Extract client data and check
 	resp := o.Manager.HandleAuthorisation(r, false, "")
 	if resp.IsError {
-		log.Error("There was an error with the request: ", resp)
+		log.Error("[OAuth] There was an error with the request: ", resp)
 		// Something went wrong, write out the error details and kill the response
 		doJSONWrite(w, resp.ErrorStatusCode, apiError(resp.StatusText))
 		return
@@ -417,7 +421,6 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 				}
 
 				if passMatch {
-					log.Info("Here we are")
 					ar.Authorized = true
 					// not ideal, but we need to copy the session state across
 					pw := session.BasicAuthData.Password
@@ -463,12 +466,12 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 
 			// add oauth-client user_fields to session's meta
 			if userData := ar.Client.GetUserData(); userData != nil {
-				var ok bool
-				session.MetaData, ok = userData.(map[string]interface{})
+				metadata, ok := userData.(map[string]interface{})
 				if !ok {
 					log.WithField("oauthClientID", ar.Client.GetId()).
 						Error("Could not set session meta_data from oauth-client fields, type mismatch")
 				} else {
+					session.MetaData = metadata
 					// set session alias to developer email as we do it for regular API keys created for developer
 					if devEmail, found := session.MetaData[keyDataDeveloperEmail].(string); found {
 						session.Alias = devEmail
@@ -487,9 +490,15 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			}
 		}
 	}
-
-	if resp.IsError && resp.InternalError != nil {
-		log.Error("ERROR: ", resp.InternalError)
+	if resp.IsError {
+		clientId := r.Form.Get("client_id")
+		log.WithFields(logrus.Fields{
+			"org_id":         o.API.OrgID,
+			"client_id":      clientId,
+			"response error": resp.StatusText,
+			"response code":  resp.ErrorStatusCode,
+			"RemoteAddr":     request.RealIP(r), //r.RemoteAddr,
+		}).Error("[OAuth] OAuth response marked as error")
 	}
 
 	return resp
@@ -593,7 +602,6 @@ func (r *RedisOsinStorageInterface) GetClient(id string) (osin.Client, error) {
 	key := prefixClient + id
 
 	log.Info("Getting client ID:", id)
-
 	clientJSON, err := r.store.GetKey(key)
 	if err != nil {
 		log.Errorf("Failure retrieving client ID key %q: %v", key, err)
@@ -604,7 +612,6 @@ func (r *RedisOsinStorageInterface) GetClient(id string) (osin.Client, error) {
 	if err := json.Unmarshal([]byte(clientJSON), &client); err != nil {
 		log.Error("Couldn't unmarshal OAuth client object: ", err)
 	}
-
 	return client, nil
 }
 
@@ -943,13 +950,13 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 	)
 
 	// Create a user.SessionState object and register it with the authmanager
-	var newSession user.SessionState
+	newSession := user.NewSessionState()
 
 	// ------
 	checkPolicy := true
 	if accessData.UserData != nil {
 		checkPolicy = false
-		err := json.Unmarshal([]byte(accessData.UserData.(string)), &newSession)
+		err := json.Unmarshal([]byte(accessData.UserData.(string)), newSession)
 		if err != nil {
 			log.Info("Couldn't decode user.SessionState from UserData, checking policy: ", err)
 			checkPolicy = true
@@ -963,7 +970,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 			return errors.New("Couldn't use policy or key rules to create token, failing")
 		}
 
-		newSession = sessionFromPolicy
+		newSession = &sessionFromPolicy
 	}
 
 	// ------
@@ -989,7 +996,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 	}
 
 	// Use the default session expiry here as this is OAuth
-	r.sessionManager.UpdateSession(accessData.AccessToken, &newSession, int64(accessData.ExpiresIn), false)
+	r.sessionManager.UpdateSession(accessData.AccessToken, newSession, int64(accessData.ExpiresIn), false)
 
 	// Store the refresh token too
 	if accessData.RefreshToken != "" {
@@ -1112,7 +1119,7 @@ func (accessTokenGen) GenerateAccessToken(data *osin.AccessData, generaterefresh
 			return "", "", errors.New("Couldn't use policy or key rules to create token, failing")
 		}
 
-		newSession = sessionFromPolicy
+		newSession = sessionFromPolicy.Clone()
 	}
 
 	accesstoken = keyGen.GenerateAuthKey(newSession.OrgID)
@@ -1135,14 +1142,14 @@ func (r *RedisOsinStorageInterface) GetUser(username string) (*user.SessionState
 	}
 
 	// new interface means having to make this nested... ick.
-	session := user.SessionState{}
-	if err := json.Unmarshal([]byte(accessJSON), &session); err != nil {
+	session := &user.SessionState{}
+	if err := json.Unmarshal([]byte(accessJSON), session); err != nil {
 		log.Error("Couldn't unmarshal OAuth auth data object (LoadRefresh): ", err,
 			"; Decoding: ", accessJSON)
 		return nil, err
 	}
 
-	return &session, nil
+	return session, nil
 }
 
 func (r *RedisOsinStorageInterface) SetUser(username string, session *user.SessionState, timeout int64) error {
