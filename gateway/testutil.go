@@ -24,15 +24,15 @@ import (
 	"testing"
 	"time"
 
-	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/go-redis/redis"
+	"github.com/dgrijalva/jwt-go"
+	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-
+	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
+	uuid "github.com/satori/go.uuid"
 	"golang.org/x/net/context"
 
 	"github.com/TykTechnologies/tyk/apidef"
-
 	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
@@ -40,15 +40,11 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 	_ "github.com/TykTechnologies/tyk/testdata" // Don't delete
 	"github.com/TykTechnologies/tyk/user"
-	uuid "github.com/satori/go.uuid"
 )
 
 var (
 	// to register to, but never used
 	discardMuxer = mux.NewRouter()
-
-	// to simulate time ticks for tests that do reloads
-	ReloadTick = make(chan time.Time)
 
 	// Used to store the test bundles:
 	testMiddlewarePath, _ = ioutil.TempDir("", "tyk-middleware-path")
@@ -59,7 +55,163 @@ var (
 	defaultTestConfig config.Config
 
 	EnableTestDNSMock = true
+
+	// ReloadTestCase use this when in any test for gateway reloads
+	ReloadTestCase = NewReloadMachinery()
+	// OnConnect this is a callback which is called whenever we transition redis Disconnected to connected
+	OnConnect func()
 )
+
+// ReloadMachinery is a helper struct to use when writing tests that do manual
+// gateway reloads
+type ReloadMachinery struct {
+	run    bool
+	count  int
+	cycles int
+	mu     sync.RWMutex
+
+	// to simulate time ticks for tests that do reloads
+	reloadTick chan time.Time
+	stop       chan struct{}
+}
+
+func NewReloadMachinery() *ReloadMachinery {
+	return &ReloadMachinery{
+		reloadTick: make(chan time.Time),
+	}
+}
+
+func (r *ReloadMachinery) StartTicker() {
+	r.stop = make(chan struct{})
+
+	go func() {
+		for {
+			select {
+			case <-r.stop:
+				return
+			default:
+				r.Tick()
+			}
+		}
+	}()
+}
+
+func (r *ReloadMachinery) StopTicker() {
+	close(r.stop)
+}
+
+func (r *ReloadMachinery) ReloadTicker() <-chan time.Time {
+	return r.reloadTick
+}
+
+// OnQueued is called when a reload has been queued. This increments the queue
+// count
+func (r *ReloadMachinery) OnQueued() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.run {
+		r.count++
+	}
+}
+
+// OnReload is called when a reload has been completed. This increments the
+// reload cycles count.
+func (r *ReloadMachinery) OnReload() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.run {
+		r.cycles++
+	}
+}
+
+// Reloaded returns true if a read has occured since r was enabled
+func (r *ReloadMachinery) Reloaded() bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.cycles > 0
+}
+
+// Enable  when callled it will allow r to keep track of reload cycles and queues
+func (r *ReloadMachinery) Enable() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.run = true
+}
+
+// Disable turns off tracking of reload cycles and queues
+func (r *ReloadMachinery) Disable() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.run = true
+	r.count = 0
+	r.cycles = 0
+}
+
+// Reset sets reloads counts and queues to 0
+func (r *ReloadMachinery) Reset() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.count = 0
+	r.cycles = 0
+}
+
+// Queued returns true if any queue happened
+func (r *ReloadMachinery) Queued() bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.count > 0
+}
+
+// EnsureQueued this will block until any queue happens. It will timeout after
+// 100ms
+func (r *ReloadMachinery) EnsureQueued(t *testing.T) {
+	deadline := time.NewTimer(100 * time.Millisecond)
+	defer deadline.Stop()
+	tick := time.NewTicker(time.Millisecond)
+	defer tick.Stop()
+	for {
+		select {
+		case <-deadline.C:
+			t.Fatal("Timedout waiting for reload to be queue")
+		case <-tick.C:
+			if r.Queued() {
+				return
+			}
+		}
+	}
+}
+
+// EnsureReloaded this will block until any reload happens. It will timeout after
+// 100ms
+func (r *ReloadMachinery) EnsureReloaded(t *testing.T) {
+	deadline := time.NewTimer(100 * time.Millisecond)
+	defer deadline.Stop()
+	tick := time.NewTicker(time.Millisecond)
+	defer tick.Stop()
+	for {
+		select {
+		case <-deadline.C:
+			t.Fatal("Timedout waiting for reload to be queue")
+		case <-tick.C:
+			if r.Reloaded() {
+				return
+			}
+		}
+	}
+}
+
+// Tick triggers reload
+func (r *ReloadMachinery) Tick() {
+	r.reloadTick <- time.Time{}
+}
+
+// TickOk triggers a reload and ensures a queue happend and a reload cycle
+// happens. This will block until all the cases are met.
+func (r *ReloadMachinery) TickOk(t *testing.T) {
+	r.EnsureQueued(t)
+	r.Tick()
+	r.EnsureReloaded(t)
+}
 
 func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf *config.Config)) int {
 	setTestMode(true)
@@ -137,7 +289,11 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 	if analytics.GeoIPDB == nil {
 		panic("GeoIPDB was not initialized")
 	}
-	go storage.ConnectToRedis(ctx)
+	go storage.ConnectToRedis(ctx, func() {
+		if OnConnect != nil {
+			OnConnect()
+		}
+	})
 	for {
 		if storage.Connected() {
 			break
@@ -146,8 +302,8 @@ func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf 
 		time.Sleep(10 * time.Millisecond)
 	}
 	go startPubSubLoop()
-	go reloadLoop(ReloadTick)
-	go reloadQueueLoop()
+	go reloadLoop(ctx, ReloadTestCase.ReloadTicker(), ReloadTestCase.OnReload)
+	go reloadQueueLoop(ctx, ReloadTestCase.OnQueued)
 	go reloadSimulation()
 	exitCode := m.Run()
 	os.RemoveAll(config.Global().AppPath)
@@ -159,14 +315,15 @@ func ResetTestConfig() {
 }
 
 func emptyRedis() error {
+	ctx := context.Background()
 	addr := config.Global().Storage.Host + ":" + strconv.Itoa(config.Global().Storage.Port)
 	c := redis.NewClient(&redis.Options{Addr: addr})
 	defer c.Close()
 	dbName := strconv.Itoa(config.Global().Storage.Database)
-	if err := c.Do("SELECT", dbName).Err(); err != nil {
+	if err := c.Do(ctx, "SELECT", dbName).Err(); err != nil {
 		return err
 	}
-	err := c.FlushDB().Err()
+	err := c.FlushDB(ctx).Err()
 	return err
 }
 
@@ -302,24 +459,37 @@ func ProxyHandler(p *ReverseProxy, apiSpec *APISpec) http.Handler {
 }
 
 const (
+	handlerPathRestDataSource        = "/rest-data-source"
+	handlerPathGraphQLDataSource     = "/graphql-data-source"
+	handlerPathHeadersRestDataSource = "/rest-headers-data-source"
+	handlerSubgraphAccounts          = "/subgraph-accounts"
+	handlerSubgraphReviews           = "/subgraph-reviews"
+
 	// We need a static port so that the urls can be used in static
 	// test data, and to prevent the requests from being randomized
 	// for checksums. Port 16500 should be obscure and unused.
 	testHttpListen = "127.0.0.1:16500"
 	// Accepts any http requests on /, only allows GET on /get, etc.
 	// All return a JSON with request info.
-	TestHttpAny     = "http://" + testHttpListen
-	TestHttpGet     = TestHttpAny + "/get"
-	testHttpPost    = TestHttpAny + "/post"
-	testHttpJWK     = TestHttpAny + "/jwk.json"
-	testHttpJWKDER  = TestHttpAny + "/jwk-der.json"
-	testHttpBundles = TestHttpAny + "/bundles/"
+	TestHttpAny               = "http://" + testHttpListen
+	TestHttpGet               = TestHttpAny + "/get"
+	testHttpPost              = TestHttpAny + "/post"
+	testGraphQLDataSource     = TestHttpAny + handlerPathGraphQLDataSource
+	testRESTDataSource        = TestHttpAny + handlerPathRestDataSource
+	testRESTHeadersDataSource = TestHttpAny + handlerPathHeadersRestDataSource
+	testSubgraphAccounts      = TestHttpAny + handlerSubgraphAccounts
+	testSubgraphReviews       = TestHttpAny + handlerSubgraphReviews
+	testHttpJWK               = TestHttpAny + "/jwk.json"
+	testHttpJWKLegacy         = TestHttpAny + "/jwk-legacy.json"
+	testHttpBundles           = TestHttpAny + "/bundles/"
+	testReloadGroup           = TestHttpAny + "/groupReload"
 
 	// Nothing should be listening on port 16501 - useful for
 	// testing TCP and HTTP failures.
-	testHttpFailure    = "127.0.0.1:16501"
-	testHttpFailureAny = "http://" + testHttpFailure
-	MockOrgID          = "507f1f77bcf86cd799439011"
+	testHttpFailure       = "127.0.0.1:16501"
+	testHttpFailureAny    = "http://" + testHttpFailure
+	MockOrgID             = "507f1f77bcf86cd799439011"
+	NonCanonicalHeaderKey = "X-CertificateOuid"
 )
 
 func testHttpHandler() *mux.Router {
@@ -386,13 +556,21 @@ func testHttpHandler() *mux.Router {
 
 	r.HandleFunc("/get", handleMethod("GET"))
 	r.HandleFunc("/post", handleMethod("POST"))
+
+	r.HandleFunc(handlerPathGraphQLDataSource, graphqlDataSourceHandler)
+	r.HandleFunc(handlerPathRestDataSource, restDataSourceHandler)
+	r.HandleFunc(handlerPathHeadersRestDataSource, restHeadersDataSourceHandler)
+	r.HandleFunc(handlerSubgraphAccounts, subgraphAccountsHandler)
+	r.HandleFunc(handlerSubgraphReviews, subgraphReviewsHandler)
+
 	r.HandleFunc("/ws", wsHandler)
 	r.HandleFunc("/jwk.json", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, jwkTestJson)
 	})
-	r.HandleFunc("/jwk-der.json", func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, jwkTestDERJson)
+	r.HandleFunc("/jwk-legacy.json", func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, jwkTestJsonLegacy)
 	})
+
 	r.HandleFunc("/compressed", func(w http.ResponseWriter, r *http.Request) {
 		response := "This is a compressed response"
 		w.Header().Set("Content-Encoding", "gzip")
@@ -400,6 +578,7 @@ func testHttpHandler() *mux.Router {
 		json.NewEncoder(gz).Encode(response)
 		gz.Close()
 	})
+	r.HandleFunc("/groupReload", groupResetHandler)
 	r.HandleFunc("/bundles/{rest:.*}", bundleHandleFunc)
 	r.HandleFunc("/errors/{status}", func(w http.ResponseWriter, r *http.Request) {
 		statusCode, _ := strconv.Atoi(mux.Vars(r)["status"])
@@ -410,26 +589,124 @@ func testHttpHandler() *mux.Router {
 	return r
 }
 
+func graphqlDataSourceHandler(w http.ResponseWriter, r *http.Request) {
+	_, _ = w.Write([]byte(`{
+			"data": {
+				"countries": [
+					{
+						"code": "TR",
+						"name": "Turkey"
+					},
+					{
+						"code": "RU",
+						"name": "Russia"
+					},
+					{
+						"code": "GB",
+						"name": "United Kingdom"
+					},
+					{
+						"code": "DE",
+						"name": "Germany"
+					}
+				]
+			}
+		}`))
+}
+
+func restHeadersDataSourceHandler(w http.ResponseWriter, r *http.Request) {
+	type KeyVal struct {
+		Name  string `json:"name"`
+		Value string `json:"value"`
+	}
+
+	var headers []KeyVal
+	for name, values := range r.Header {
+		for _, value := range values {
+			headers = append(headers, KeyVal{name, value})
+		}
+	}
+	json.NewEncoder(w).Encode(headers)
+}
+
+func restDataSourceHandler(w http.ResponseWriter, r *http.Request) {
+	_, _ = w.Write([]byte(`[
+			{
+				"name": "Furkan",
+				"country":  {
+					"name": "Turkey"
+				}
+			},
+			{
+				"name": "Leo",
+				"country":  {
+					"name": "Russia"
+				}
+			},
+			{
+				"name": "Josh",
+				"country":  {
+					"name": "UK"
+				}
+			},
+			{
+				"name": "Patric",
+				"country":  {
+					"name": "Germany"
+				}
+			}
+		]`))
+}
+
+func subgraphAccountsHandler(w http.ResponseWriter, r *http.Request) {
+	_, _ = w.Write([]byte(`{
+		"data": {
+			"me": {
+				"id": "1",
+				"username": "tyk"
+			}
+		}
+	}`))
+}
+
+func subgraphReviewsHandler(w http.ResponseWriter, r *http.Request) {
+	_, _ = w.Write([]byte(`{
+			"data": {
+				"_entities": [
+					{
+						"reviews": [
+							{
+								"body": "A highly effective form of birth control."
+							},
+							{
+								"body": "Fedoras are one of the most fashionable hats around and can look great with a variety of outfits."
+							}
+						]
+					}
+				]
+			}
+		}`))
+}
+
 const jwkTestJson = `{
+    "keys": [
+        {
+            "use": "sig",
+            "kty": "RSA",
+            "kid": "12345",
+            "alg": "RS256",
+            "n": "yqZ4rwKF8qCExS7kpY4cnJa_37FMkJNkalZ3OuslLB0oRL8T4c94kdF4aeNzSFkSe2n99IBI6Ssl79vbfMZb-t06L0Q94k-_P37x7-_RJZiff4y1VGjrnrnMI2iu9l4iBBRYzNmG6eblroEMMWlgk5tysHgxB59CSNIcD9gqk1hx4n_FgOmvKsfQgWHNlPSDTRcWGWGhB2_XgNVYG2pOlQxAPqLhBHeqGTXBbPfGF9cHzixpsPr6GtbzPwhsQ_8bPxoJ7hdfn-rzztks3d6-HWURcyNTLRe0mjXjjee9Z6-gZ-H-fS4pnP9tqT7IgU6ePUWTpjoiPtLexgsAa_ctjQ",
+            "e": "AQAB"
+        }
+    ]
+}`
+
+const jwkTestJsonLegacy = `{
     "keys": [{
         "alg": "RS256",
         "kty": "RSA",
         "use": "sig",
         "x5c": ["Ci0tLS0tQkVHSU4gUFVCTElDIEtFWS0tLS0tCk1JSUJJakFOQmdrcWhraUc5dzBCQVFFRkFBT0NBUThBTUlJQkNnS0NBUUVBeXFaNHJ3S0Y4cUNFeFM3a3BZNGMKbkphLzM3Rk1rSk5rYWxaM091c2xMQjBvUkw4VDRjOTRrZEY0YWVOelNGa1NlMm45OUlCSTZTc2w3OXZiZk1aYgordDA2TDBROTRrKy9QMzd4NysvUkpaaWZmNHkxVkdqcm5ybk1JMml1OWw0aUJCUll6Tm1HNmVibHJvRU1NV2xnCms1dHlzSGd4QjU5Q1NOSWNEOWdxazFoeDRuL0ZnT212S3NmUWdXSE5sUFNEVFJjV0dXR2hCMi9YZ05WWUcycE8KbFF4QVBxTGhCSGVxR1RYQmJQZkdGOWNIeml4cHNQcjZHdGJ6UHdoc1EvOGJQeG9KN2hkZm4rcnp6dGtzM2Q2KwpIV1VSY3lOVExSZTBtalhqamVlOVo2K2daK0grZlM0cG5QOXRxVDdJZ1U2ZVBVV1Rwam9pUHRMZXhnc0FhL2N0CmpRSURBUUFCCi0tLS0tRU5EIFBVQkxJQyBLRVktLS0tLQo="],
-        "n": "xofiG8gsnv9-I_g-5OWTLhaZtgAGq1QEsBCPK9lmLqhuonHe8lT-nK1DM49f6J9QgaOjZ3DB50QkhBysnIFNcXFyzaYIPMoccvuHLPgdBawX4WYKm5gficD0WB0XnTt4sqTI5usFpuop9vvW44BwVGhRqMT7c11gA8TSWMBxDI4A5ARc4MuQtfm64oN-JQodSztArwb9wcmH8WrBvSUkR4pyi9MT8W27gqJ2e2Xn8jgGnswNQWOyCTN84PawOYaN-2ORHeIea1g-URln1bofcHN73vZCIrVbE6iA2D7Ybh22AVrCfunekEDEe2GZfLZLejiZiBWG7enJhcrQIzAQGw",
-        "e": "AQAB",
-        "kid": "12345",
-        "x5t": "12345"
-    }]
-}`
-
-// This has public key encoded as PKIX, ASN.1 DER form.
-const jwkTestDERJson = `{
-    "keys": [{
-        "alg": "RS256",
-        "kty": "RSA",
-        "use": "sig",
-        "x5c": ["MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyqZ4rwKF8qCExS7kpY4cnJa/37FMkJNkalZ3OuslLB0oRL8T4c94kdF4aeNzSFkSe2n99IBI6Ssl79vbfMZb+t06L0Q94k+/P37x7+/RJZiff4y1VGjrnrnMI2iu9l4iBBRYzNmG6eblroEMMWlgk5tysHgxB59CSNIcD9gqk1hx4n/FgOmvKsfQgWHNlPSDTRcWGWGhB2/XgNVYG2pOlQxAPqLhBHeqGTXBbPfGF9cHzixpsPr6GtbzPwhsQ/8bPxoJ7hdfn+rzztks3d6+HWURcyNTLRe0mjXjjee9Z6+gZ+H+fS4pnP9tqT7IgU6ePUWTpjoiPtLexgsAa/ctjQIDAQAB"],
         "n": "xofiG8gsnv9-I_g-5OWTLhaZtgAGq1QEsBCPK9lmLqhuonHe8lT-nK1DM49f6J9QgaOjZ3DB50QkhBysnIFNcXFyzaYIPMoccvuHLPgdBawX4WYKm5gficD0WB0XnTt4sqTI5usFpuop9vvW44BwVGhRqMT7c11gA8TSWMBxDI4A5ARc4MuQtfm64oN-JQodSztArwb9wcmH8WrBvSUkR4pyi9MT8W27gqJ2e2Xn8jgGnswNQWOyCTN84PawOYaN-2ORHeIea1g-URln1bofcHN73vZCIrVbE6iA2D7Ybh22AVrCfunekEDEe2GZfLZLejiZiBWG7enJhcrQIzAQGw",
         "e": "AQAB",
         "kid": "12345",
@@ -459,7 +736,7 @@ func CreateSession(sGen ...func(s *user.SessionState)) string {
 }
 
 func CreateStandardSession() *user.SessionState {
-	session := new(user.SessionState)
+	session := user.NewSessionState()
 	session.Rate = 10000
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
@@ -610,7 +887,7 @@ func firstVals(vals map[string][]string) map[string]string {
 }
 
 type TestConfig struct {
-	sepatateControlAPI bool
+	SeparateControlAPI bool
 	Delay              time.Duration
 	HotReload          bool
 	overrideDefaults   bool
@@ -623,7 +900,7 @@ type Test struct {
 	testRunner   *test.HTTPTestRunner
 	GlobalConfig config.Config
 	config       TestConfig
-	cacnel       func()
+	cancel       func()
 }
 
 func (s *Test) Start() {
@@ -633,7 +910,7 @@ func (s *Test) Start() {
 	globalConf := config.Global()
 	globalConf.ListenPort, _ = strconv.Atoi(port)
 
-	if s.config.sepatateControlAPI {
+	if s.config.SeparateControlAPI {
 		l, _ := net.Listen("tcp", "127.0.0.1:0")
 
 		_, port, _ = net.SplitHostPort(l.Addr().String())
@@ -647,7 +924,7 @@ func (s *Test) Start() {
 
 	startServer()
 	ctx, cancel := context.WithCancel(context.Background())
-	s.cacnel = cancel
+	s.cancel = cancel
 	setupGlobals(ctx)
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.Global().SupressDefaultOrgStore {
@@ -667,7 +944,7 @@ func (s *Test) Start() {
 		RequestBuilder: func(tc *test.TestCase) (*http.Request, error) {
 			tc.BaseURL = s.URL
 			if tc.ControlRequest {
-				if s.config.sepatateControlAPI {
+				if s.config.SeparateControlAPI {
 					tc.BaseURL = scheme + controlProxy().listener.Addr().String()
 				} else if s.GlobalConfig.ControlAPIHostname != "" {
 					tc.Domain = s.GlobalConfig.ControlAPIHostname
@@ -695,11 +972,11 @@ func (s *Test) Do(tc test.TestCase) (*http.Response, error) {
 }
 
 func (s *Test) Close() {
-	if s.cacnel != nil {
-		s.cacnel()
+	if s.cancel != nil {
+		s.cancel()
 	}
 	defaultProxyMux.swap(&proxyMux{})
-	if s.config.sepatateControlAPI {
+	if s.config.SeparateControlAPI {
 		globalConf := config.Global()
 		globalConf.ControlAPIPort = 0
 		config.SetGlobal(globalConf)
@@ -707,6 +984,7 @@ func (s *Test) Close() {
 }
 
 func (s *Test) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, error) {
+	t.Helper()
 	return s.testRunner.Run(t, testCases...)
 }
 
@@ -828,8 +1106,224 @@ const sampleAPI = `{
     "proxy": {
         "listen_path": "/sample",
         "target_url": "` + TestHttpAny + `"
+    },
+	"graphql": {
+      "enabled": false,
+      "execution_mode": "executionEngine",
+	  "version": "",
+      "schema": "` + testComposedSchema + `",
+      "type_field_configurations": [
+        ` + testGraphQLDataSourceConfiguration + `,
+        ` + testRESTDataSourceConfiguration + `
+      ],
+	  "engine": {
+		"field_configs": [
+			{
+				"type_name": "Query",
+				"field_name": "people",
+				"disable_default_mapping": true,
+				"path": [""]
+			},
+			{
+				"type_name": "Query",
+				"field_name": "headers",
+				"disable_default_mapping": true,
+				"path": [""]
+			}
+		],
+		"data_sources": [
+		    ` + testRESTDataSourceConfigurationV2 + `,
+			` + testGraphQLDataSourceConfigurationV2 + `,
+			` + testRESTHeadersDataSourceConfigurationV2 + `
+		]
+	},
+      "playground": {
+        "enabled": false,
+        "path": "/playground"
+      }
     }
 }`
+
+const testComposedSchema = "type Query {countries: [Country] headers: [Header]} " +
+	"extend type Query {people: [Person]}" +
+	"type Person {name: String country: Country} " +
+	"type Country {code: String name: String} " +
+	"type Header {name:String value: String}"
+
+const testGraphQLDataSourceConfigurationV2 = `
+{
+	"kind": "GraphQL",
+	"name": "countries",
+	"internal": true,
+	"root_fields": [
+		{ "type": "Query", "fields": ["countries"] }
+	],
+	"config": {
+		"url": "` + testGraphQLDataSource + `",
+		"method": "POST"
+	}
+}`
+
+const testGraphQLDataSourceConfiguration = `
+{
+  "type_name": "Query",
+  "field_name": "countries",
+  "mapping": {
+	"disabled": false,
+	"path": "countries"
+  },
+  "data_source": {
+	"kind": "GraphQLDataSource",
+	"data_source_config": {
+	  "url": "` + testGraphQLDataSource + `",
+	  "method": "POST"
+	}
+  }
+}
+`
+
+const testRESTHeadersDataSourceConfigurationV2 = `
+{
+	"kind": "REST",
+	"name": "headers",
+	"internal": true,
+	"root_fields": [
+		{ "type": "Query", "fields": ["headers"] }
+	],
+	"config": {
+		"url": "` + testRESTHeadersDataSource + `",
+		"method": "GET",
+		"headers": {
+			"static": "barbaz",
+			"injected": "{{ .request.headers.injected }}"
+		},
+		"query": [],
+		"body": ""
+	}
+}`
+
+const testRESTDataSourceConfigurationV2 = `
+{
+	"kind": "REST",
+	"name": "people",
+	"internal": true,
+	"root_fields": [
+		{ "type": "Query", "fields": ["people"] }
+	],
+	"config": {
+		"url": "` + testRESTDataSource + `",
+		"method": "GET",
+		"headers": {},
+		"query": [],
+		"body": ""
+	}
+}`
+
+const testRESTDataSourceConfiguration = `
+{
+ "type_name": "Query",
+ "field_name": "people",
+  "mapping": {
+	"disabled": false,
+	"path": ""
+  },
+  "data_source": {
+    "kind": "HTTPJSONDataSource",
+	"data_source_config": {
+	  "url": "` + testRESTDataSource + `",
+	  "method": "GET",
+	  "body": "",
+	  "headers": [],
+	  "default_type_name": "People",
+	  "status_code_type_name_mappings": [
+		{
+		  "status_code": 200,
+		  "type_name": ""
+		}
+	  ]
+	}
+  }
+}`
+
+func generateRESTDataSourceV2(gen func(dataSource *apidef.GraphQLEngineDataSource, restConf *apidef.GraphQLEngineDataSourceConfigREST)) apidef.GraphQLEngineDataSource {
+	ds := apidef.GraphQLEngineDataSource{}
+	if err := json.Unmarshal([]byte(testRESTDataSourceConfigurationV2), &ds); err != nil {
+		panic(err)
+	}
+
+	restConf := apidef.GraphQLEngineDataSourceConfigREST{}
+	if err := json.Unmarshal(ds.Config, &restConf); err != nil {
+		panic(err)
+	}
+
+	gen(&ds, &restConf)
+
+	rawConfig, err := json.Marshal(restConf)
+	if err != nil {
+		panic(err)
+	}
+
+	ds.Config = rawConfig
+	return ds
+}
+
+func generateGraphQLDataSourceV2(gen func(dataSource *apidef.GraphQLEngineDataSource, graphqlConf *apidef.GraphQLEngineDataSourceConfigGraphQL)) apidef.GraphQLEngineDataSource {
+	ds := apidef.GraphQLEngineDataSource{}
+	if err := json.Unmarshal([]byte(testGraphQLDataSourceConfigurationV2), &ds); err != nil {
+		panic(err)
+	}
+
+	graphqlConf := apidef.GraphQLEngineDataSourceConfigGraphQL{}
+	if err := json.Unmarshal(ds.Config, &graphqlConf); err != nil {
+		panic(err)
+	}
+
+	gen(&ds, &graphqlConf)
+
+	rawConfig, err := json.Marshal(graphqlConf)
+	if err != nil {
+		panic(err)
+	}
+
+	ds.Config = rawConfig
+	return ds
+}
+
+func generateRESTDataSource(gen ...func(restDataSource *datasource.HttpJsonDataSourceConfig)) json.RawMessage {
+	typeFieldConfiguration := datasource.TypeFieldConfiguration{}
+	if err := json.Unmarshal([]byte(testRESTDataSourceConfiguration), &typeFieldConfiguration); err != nil {
+		panic(err)
+	}
+
+	restDataSource := datasource.HttpJsonDataSourceConfig{}
+	_ = json.Unmarshal(typeFieldConfiguration.DataSource.Config, &restDataSource)
+
+	if len(gen) > 0 {
+		gen[0](&restDataSource)
+	}
+
+	rawData, _ := json.Marshal(restDataSource)
+
+	return rawData
+}
+
+func generateGraphQLDataSource(gen ...func(graphQLDataSource *datasource.GraphQLDataSourceConfig)) json.RawMessage {
+	typeFieldConfiguration := datasource.TypeFieldConfiguration{}
+	if err := json.Unmarshal([]byte(testGraphQLDataSourceConfiguration), &typeFieldConfiguration); err != nil {
+		panic(err)
+	}
+
+	graphQLDataSource := datasource.GraphQLDataSourceConfig{}
+	_ = json.Unmarshal(typeFieldConfiguration.DataSource.Config, &graphQLDataSource)
+
+	if len(gen) > 0 {
+		gen[0](&graphQLDataSource)
+	}
+
+	rawData, _ := json.Marshal(graphQLDataSource)
+
+	return rawData
+}
 
 func UpdateAPIVersion(spec *APISpec, name string, verGen func(version *apidef.VersionInfo)) {
 	version := spec.VersionData.Versions[name]

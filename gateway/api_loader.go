@@ -1,16 +1,19 @@
 package gateway
 
 import (
+	"crypto/tls"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
+	"path"
 	"path/filepath"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
-
-	"github.com/jensneuse/graphql-go-tools/pkg/playground"
+	"text/template"
 
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
@@ -23,16 +26,15 @@ import (
 	"github.com/TykTechnologies/tyk/trace"
 )
 
+const (
+	rateLimitEndpoint = "/tyk/rate-limits/"
+)
+
 type ChainObject struct {
-	Domain         string
-	ListenOn       string
 	ThisHandler    http.Handler
 	RateLimitChain http.Handler
-	RateLimitPath  string
 	Open           bool
-	Index          int
 	Skip           bool
-	Subrouter      *mux.Router
 }
 
 func prepareStorage() generalStores {
@@ -59,7 +61,6 @@ func skipSpecBecauseInvalid(spec *APISpec, logger *logrus.Entry) bool {
 			return true
 		}
 	}
-
 	if val, err := kvStore(spec.Proxy.TargetURL); err == nil {
 		spec.Proxy.TargetURL = val
 	}
@@ -107,7 +108,8 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	gs *generalStores, subrouter *mux.Router, logger *logrus.Entry) *ChainObject {
 
 	var chainDef ChainObject
-	chainDef.Subrouter = subrouter
+
+	handleCORS(subrouter, spec)
 
 	logger = logger.WithFields(logrus.Fields{
 		"org_id":   spec.OrgID,
@@ -118,6 +120,14 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	var coprocessLog = logger.WithFields(logrus.Fields{
 		"prefix": "coprocess",
 	})
+
+	if spec.Proxy.Transport.SSLMaxVersion > 0 {
+		spec.Proxy.Transport.SSLMaxVersion = tls.VersionTLS12
+	}
+
+	if spec.Proxy.Transport.SSLMinVersion > spec.Proxy.Transport.SSLMaxVersion {
+		spec.Proxy.Transport.SSLMaxVersion = spec.Proxy.Transport.SSLMinVersion
+	}
 
 	if len(spec.TagHeaders) > 0 {
 		// Ensure all headers marked for tagging are lowercase
@@ -229,7 +239,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		fixFuncPath(prefix, mwPreFuncs)
 		fixFuncPath(prefix, mwPostFuncs)
 		fixFuncPath(prefix, mwPostAuthCheckFuncs)
-		// TODO: add mwResponseFuncs here when Golang response custom MW support implemented
+		fixFuncPath(prefix, mwResponseFuncs)
 	}
 
 	if spec.GraphQL.GraphQLPlayground.Enabled {
@@ -295,8 +305,6 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		logger.Info("Checking security policy: Open")
 	}
 
-	handleCORS(&chainArray, spec)
-
 	for _, obj := range mwPreFuncs {
 		if mwDriver == apidef.GoPluginDriver {
 			mwAppendEnabled(
@@ -305,6 +313,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 					BaseMiddleware: baseMid,
 					Path:           obj.Path,
 					SymbolName:     obj.Name,
+					APILevel:       true,
 				},
 			)
 		} else if mwDriver != apidef.OttoDriver {
@@ -324,7 +333,6 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid})
 	mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid})
-	mwAppendEnabled(&chainArray, &GraphQLMiddleware{BaseMiddleware: baseMid})
 
 	if !spec.UseKeylessAccess {
 		// Select the keying method to use for setting session states
@@ -351,7 +359,6 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		coprocessAuth := mwDriver != apidef.OttoDriver && spec.EnableCoProcessAuth
 		ottoAuth := !coprocessAuth && mwDriver == apidef.OttoDriver && spec.EnableCoProcessAuth
 		gopluginAuth := !coprocessAuth && !ottoAuth && mwDriver == apidef.GoPluginDriver && spec.UseGoPluginAuth
-
 		if coprocessAuth {
 			// TODO: check if mwAuthCheckFunc is available/valid
 			coprocessLog.Debug("Registering coprocess middleware, hook name: ", mwAuthCheckFunc.Name, "hook type: CustomKeyCheck", ", driver: ", mwDriver)
@@ -362,8 +369,12 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 		if ottoAuth {
 			logger.Info("----> Checking security policy: JS Plugin")
-
-			authArray = append(authArray, createDynamicMiddleware(mwAuthCheckFunc.Name, true, false, baseMid))
+			authArray = append(authArray, createMiddleware(&DynamicMiddleware{
+				BaseMiddleware:      baseMid,
+				MiddlewareClassName: mwAuthCheckFunc.Name,
+				Pre:                 true,
+				Auth:                true,
+			}))
 		}
 
 		if gopluginAuth {
@@ -373,6 +384,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 					BaseMiddleware: baseMid,
 					Path:           mwAuthCheckFunc.Path,
 					SymbolName:     mwAuthCheckFunc.Name,
+					APILevel:       true,
 				},
 			)
 		}
@@ -392,6 +404,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 						BaseMiddleware: baseMid,
 						Path:           obj.Path,
 						SymbolName:     obj.Name,
+						APILevel:       true,
 					},
 				)
 			} else {
@@ -408,12 +421,19 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	}
 
 	mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid})
+	mwAppendEnabled(&chainArray, &GraphQLMiddleware{BaseMiddleware: baseMid})
+	if !spec.UseKeylessAccess {
+		mwAppendEnabled(&chainArray, &GraphQLComplexityMiddleware{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &GraphQLGranularAccessMiddleware{BaseMiddleware: baseMid})
+	}
+
 	mwAppendEnabled(&chainArray, &ValidateJSON{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &TransformMiddleware{baseMid})
 	mwAppendEnabled(&chainArray, &TransformJQMiddleware{baseMid})
 	mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid})
+	mwAppendEnabled(&chainArray, &GoPluginMiddleware{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
 	mwAppendEnabled(&chainArray, &RequestSigning{BaseMiddleware: baseMid})
 
@@ -425,6 +445,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 					BaseMiddleware: baseMid,
 					Path:           obj.Path,
 					SymbolName:     obj.Name,
+					APILevel:       true,
 				},
 			)
 		} else if mwDriver != apidef.OttoDriver {
@@ -437,6 +458,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	//Do not add middlewares after cache middleware.
 	//It will not get executed
 	mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: &cacheStore})
+
 	chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid}})
 
 	if !spec.UseKeylessAccess {
@@ -449,11 +471,9 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		mwAppendEnabled(&simpleArray, &KeyExpired{baseMid})
 		mwAppendEnabled(&simpleArray, &AccessRightsCheck{baseMid})
 
-		rateLimitPath := spec.Proxy.ListenPath + "tyk/rate-limits/"
-
+		rateLimitPath := path.Join(spec.Proxy.ListenPath, rateLimitEndpoint)
 		logger.Debug("Rate limit endpoint is: ", rateLimitPath)
 
-		chainDef.RateLimitPath = rateLimitPath
 		chainDef.RateLimitChain = alice.New(simpleArray...).
 			Then(http.HandlerFunc(userRatesCheck))
 	}
@@ -465,8 +485,6 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	} else {
 		chainDef.ThisHandler = chain
 	}
-	chainDef.ListenOn = spec.Proxy.ListenPath + "{rest:.*}"
-	chainDef.Domain = spec.Domain
 
 	logger.WithFields(logrus.Fields{
 		"prefix":      "gateway",
@@ -569,6 +587,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		handler.ServeHTTP(w, r)
 		return
 	}
+
 	d.SH.ServeHTTP(w, r)
 }
 
@@ -613,6 +632,10 @@ func trimCategories(name string) string {
 	return name
 }
 
+func APILoopingName(name string) string {
+	return replaceNonAlphaNumeric(trimCategories(name))
+}
+
 func fuzzyFindAPI(search string) *APISpec {
 	if search == "" {
 		return nil
@@ -624,7 +647,8 @@ func fuzzyFindAPI(search string) *APISpec {
 	for _, api := range apisByID {
 		if api.APIID == search ||
 			api.Id.Hex() == search ||
-			replaceNonAlphaNumeric(trimCategories(api.Name)) == search {
+			strings.EqualFold(APILoopingName(api.Name), search) {
+
 			return api
 		}
 	}
@@ -653,18 +677,18 @@ func loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStor
 		router = router.Host(hostname).Subrouter()
 	}
 
-	chainObj := processSpec(spec, apisByListen, gs, router, logrus.NewEntry(log))
+	subrouter := router.PathPrefix(spec.Proxy.ListenPath).Subrouter()
 
+	chainObj := processSpec(spec, apisByListen, gs, subrouter, logrus.NewEntry(log))
 	if chainObj.Skip {
 		return chainObj.ThisHandler
 	}
 
 	if !chainObj.Open {
-		router.Handle(chainObj.RateLimitPath, chainObj.RateLimitChain)
+		subrouter.Handle(rateLimitEndpoint, chainObj.RateLimitChain)
 	}
 
-	router.Handle(chainObj.ListenOn, chainObj.ThisHandler)
-
+	subrouter.NewRoute().Handler(chainObj.ThisHandler)
 	return chainObj.ThisHandler
 }
 
@@ -702,22 +726,71 @@ type generalStores struct {
 	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore storage.Handler
 }
 
-func loadGraphQLPlayground(spec *APISpec, router *mux.Router) {
-	p := playground.New(playground.Config{
-		PathPrefix:                      spec.Proxy.ListenPath,
-		PlaygroundPath:                  spec.GraphQL.GraphQLPlayground.Path,
-		GraphqlEndpointPath:             spec.Proxy.ListenPath,
-		GraphQLSubscriptionEndpointPath: spec.Proxy.ListenPath,
+var playgroundTemplate *template.Template
+
+func readGraphqlPlaygroundTemplate() {
+	playgroundPath := filepath.Join(config.Global().TemplatePath, "playground")
+	files, err := ioutil.ReadDir(playgroundPath)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "playground",
+		}).Error("Could not load the default playground templates: ", err)
+	}
+
+	var paths []string
+	for _, file := range files {
+		paths = append(paths, filepath.Join(playgroundPath, file.Name()))
+	}
+
+	playgroundTemplate, err = template.ParseFiles(paths...)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "playground",
+		}).Error("Could not parse the default playground templates: ", err)
+	}
+}
+
+const (
+	playgroundJSTemplateName   = "playground.js"
+	playgroundHTMLTemplateName = "index.html"
+)
+
+func loadGraphQLPlayground(spec *APISpec, subrouter *mux.Router) {
+	// endpoint is a graphql server url to which a playground makes the request.
+	endpoint := spec.Proxy.ListenPath
+	playgroundPath := path.Join("/", spec.GraphQL.GraphQLPlayground.Path)
+
+	// If tyk-cloud is enabled, listen path will be api id and slug is mapped to listen path in nginx config.
+	// So, requests should be sent to slug endpoint, nginx will route them to internal gateway's listen path.
+	if config.Global().Cloud {
+		endpoint = fmt.Sprintf("/%s/", spec.Slug)
+	}
+
+	subrouter.Methods(http.MethodGet).Path(path.Join(playgroundPath, playgroundJSTemplateName)).HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		if playgroundTemplate == nil {
+			rw.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		if err := playgroundTemplate.ExecuteTemplate(rw, playgroundJSTemplateName, nil); err != nil {
+			rw.WriteHeader(http.StatusInternalServerError)
+		}
 	})
 
-	handlers, err := p.Handlers()
-	if err != nil {
-		log.WithError(err).Error("Could not setup graphql playground handlers")
-	}
+	subrouter.Methods(http.MethodGet).Path(playgroundPath).HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		if playgroundTemplate == nil {
+			rw.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 
-	for _, cfg := range handlers {
-		router.HandleFunc(cfg.Path, cfg.Handler)
-	}
+		err := playgroundTemplate.ExecuteTemplate(rw, playgroundHTMLTemplateName, struct {
+			Url, Schema, PathPrefix string
+		}{endpoint, strconv.Quote(spec.GraphQL.Schema), path.Join(endpoint, playgroundPath)})
+
+		if err != nil {
+			rw.WriteHeader(http.StatusInternalServerError)
+		}
+	})
 }
 
 // Create the individual API (app) specs based on live configurations and assign middleware
@@ -753,31 +826,40 @@ func loadApps(specs []*APISpec) {
 	gs := prepareStorage()
 	shouldTrace := trace.IsEnabled()
 	for _, spec := range specs {
-		if spec.ListenPort != spec.GlobalConfig.ListenPort {
-			mainLog.Info("API bind on custom port:", spec.ListenPort)
-		}
-
-		if converted, err := kvStore(spec.Proxy.ListenPath); err == nil {
-			spec.Proxy.ListenPath = converted
-		}
-
-		tmpSpecRegister[spec.APIID] = spec
-
-		switch spec.Protocol {
-		case "", "http", "https":
-			if shouldTrace {
-				// opentracing works only with http services.
-				err := trace.AddTracer("", spec.Name)
-				if err != nil {
-					mainLog.Errorf("Failed to initialize tracer for %q error:%v", spec.Name, err)
-				} else {
-					mainLog.Infof("Intialized tracer  api_name=%q", spec.Name)
+		func() {
+			defer func() {
+				// recover from panic if one occured. Set err to nil otherwise.
+				if err := recover(); err != nil {
+					log.Errorf("Panic while loading an API: %v, panic: %v, stacktrace: %v", spec.APIDefinition, err, string(debug.Stack()))
 				}
+			}()
+
+			if spec.ListenPort != spec.GlobalConfig.ListenPort {
+				mainLog.Info("API bind on custom port:", spec.ListenPort)
 			}
-			tmpSpecHandles.Store(spec.APIID, loadHTTPService(spec, apisByListen, &gs, muxer))
-		case "tcp", "tls":
-			loadTCPService(spec, &gs, muxer)
-		}
+
+			if converted, err := kvStore(spec.Proxy.ListenPath); err == nil {
+				spec.Proxy.ListenPath = converted
+			}
+
+			tmpSpecRegister[spec.APIID] = spec
+
+			switch spec.Protocol {
+			case "", "http", "https", "h2c":
+				if shouldTrace {
+					// opentracing works only with http services.
+					err := trace.AddTracer("", spec.Name)
+					if err != nil {
+						mainLog.Errorf("Failed to initialize tracer for %q error:%v", spec.Name, err)
+					} else {
+						mainLog.Infof("Intialized tracer  api_name=%q", spec.Name)
+					}
+				}
+				tmpSpecHandles.Store(spec.APIID, loadHTTPService(spec, apisByListen, &gs, muxer))
+			case "tcp", "tls":
+				loadTCPService(spec, &gs, muxer)
+			}
+		}()
 	}
 
 	defaultProxyMux.swap(muxer)
@@ -805,4 +887,5 @@ func loadApps(specs []*APISpec) {
 	mainLog.Debug("Checker host Done")
 
 	mainLog.Info("Initialised API Definitions")
+
 }

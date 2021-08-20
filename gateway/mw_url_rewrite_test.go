@@ -1,13 +1,14 @@
 package gateway
 
 import (
+	"bytes"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/test"
+	"github.com/stretchr/testify/assert"
 
-	"bytes"
-	"net/http"
+	"github.com/TykTechnologies/tyk/test"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/user"
@@ -901,7 +902,7 @@ func TestRewriterTriggers(t *testing.T) {
 				MetaData: map[string]interface{}{
 					"rewrite": "bar-baz",
 				},
-			}, "", false)
+			}, false)
 
 			return TestDef{
 				"Meta Simple",
@@ -930,7 +931,7 @@ func TestRewriterTriggers(t *testing.T) {
 				MetaData: map[string]interface{}{
 					"rewrite": "bar-baz",
 				},
-			}, "", false)
+			}, false)
 
 			return TestDef{
 				"Meta Simple Group",
@@ -960,7 +961,7 @@ func TestRewriterTriggers(t *testing.T) {
 					"rewrite": "bar-baz",
 					"somevar": "someval",
 				},
-			}, "", false)
+			}, false)
 
 			return TestDef{
 				"Meta Value from Session",
@@ -1016,7 +1017,7 @@ func TestRewriterTriggers(t *testing.T) {
 				MetaData: map[string]interface{}{
 					"rewrite": "bar-baz",
 				},
-			}, "", false)
+			}, false)
 
 			return TestDef{
 				"Variable not found",
@@ -1234,5 +1235,21 @@ func TestValToStr(t *testing.T) {
 
 	if str != expected {
 		t.Errorf("expected (%s) got (%s)", expected, str)
+	}
+}
+
+func TestLoopingUrl(t *testing.T) {
+	cases := []struct{ host, expectedHost string }{
+		{"__api", "tyk://-api"},
+		{"__api__", "tyk://-api-"},
+		{"__ api __", "tyk://-api-"},
+		{"@api@", "tyk://-api-"},
+		{"__ api __ name __", "tyk://-api-name-"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.host, func(t *testing.T) {
+			assert.Equal(t, tc.expectedHost, LoopingUrl(tc.host))
+		})
 	}
 }

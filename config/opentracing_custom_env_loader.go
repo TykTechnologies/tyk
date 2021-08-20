@@ -5,6 +5,7 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 	jaeger "github.com/uber/jaeger-client-go/config"
+	"gopkg.in/yaml.v3"
 )
 
 // ZipkinConfig configuration options used to initialize openzipkin opentracing
@@ -56,6 +57,14 @@ func DecodeJSON(dest, src interface{}) error {
 	return json.Unmarshal(b, dest)
 }
 
+func DecodeYAML(dest, src interface{}) error {
+	b, err := yaml.Marshal(src)
+	if err != nil {
+		return err
+	}
+	return yaml.Unmarshal(b, dest)
+}
+
 // loadZipkin tries to lad zipkin configuration from environment variables.
 //
 // list of zipkin configuration env variables
@@ -68,7 +77,7 @@ func DecodeJSON(dest, src interface{}) error {
 // TYK_GW_TRACER_OPTIONS_SAMPLER_SALT
 // TYK_GW_TRACER_OPTIONS_SAMPLER_MOD
 func loadZipkin(prefix string, c *Config) error {
-	if c.Tracer.Name != "zipkin" || c.Tracer.Options == nil {
+	if c.Tracer.Name != "zipkin" {
 		return nil
 	}
 	var zip ZipkinConfig
@@ -119,11 +128,11 @@ func loadZipkin(prefix string, c *Config) error {
 // TYK_GW_TRACER_OPTIONS_THROTTLER_REFRESHINTERVAL
 // TYK_GW_TRACER_OPTIONS_THROTTLER_SYNCHRONOUSINITIALIZATION
 func loadJaeger(prefix string, c *Config) error {
-	if c.Tracer.Name != "jaeger" || c.Tracer.Options == nil {
+	if c.Tracer.Name != "jaeger" {
 		return nil
 	}
 	var j jaeger.Configuration
-	if err := DecodeJSON(&j, c.Tracer.Options); err != nil {
+	if err := DecodeYAML(&j, c.Tracer.Options); err != nil {
 		return err
 	}
 	qualifyPrefix := prefix + "_TRACER_OPTIONS"
@@ -132,7 +141,7 @@ func loadJaeger(prefix string, c *Config) error {
 		return err
 	}
 	o := make(map[string]interface{})
-	if err := DecodeJSON(&o, j); err != nil {
+	if err := DecodeYAML(&o, j); err != nil {
 		return err
 	}
 	c.Tracer.Options = o

@@ -1,6 +1,6 @@
 module github.com/TykTechnologies/tyk
 
-go 1.12
+go 1.15
 
 require (
 	github.com/Jeffail/gabs v1.4.0
@@ -19,7 +19,7 @@ require (
 	github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d // indirect
 	github.com/bshuster-repo/logrus-logstash-hook v0.4.1
 	github.com/buger/jsonparser v0.0.0-20181115193947-bf1c66bbce23
-	github.com/cenk/backoff v2.2.1+incompatible // indirect
+	github.com/cenk/backoff v2.2.1+incompatible
 	github.com/cenkalti/backoff/v4 v4.0.2
 	github.com/certifi/gocertifi v0.0.0-20190905060710-a5e0173ced67 // indirect
 	github.com/clbanning/mxj v1.8.4
@@ -32,68 +32,73 @@ require (
 	github.com/franela/goreq v0.0.0-20171204163338-bcd34c9993f8
 	github.com/gemnasium/logrus-graylog-hook v2.0.7+incompatible
 	github.com/getsentry/raven-go v0.2.0 // indirect
-	github.com/go-redis/redis v6.15.6+incompatible
+	github.com/go-redis/redis/v8 v8.3.1
 	github.com/gocraft/health v0.0.0-20170925182251-8675af27fef0
-	github.com/golang/protobuf v1.3.2
+	github.com/golang/protobuf v1.4.2
 	github.com/google/btree v1.0.0 // indirect
 	github.com/gorilla/mux v1.7.3
-	github.com/gorilla/websocket v1.4.1
+	github.com/gorilla/websocket v1.4.2
 	github.com/hashicorp/consul/api v1.3.0
 	github.com/hashicorp/go-msgpack v0.5.4 // indirect
 	github.com/hashicorp/vault/api v1.0.4
 	github.com/huandu/xstrings v1.3.0 // indirect
 	github.com/imdario/mergo v0.3.9 // indirect
 	github.com/jensneuse/abstractlogger v0.0.4
-	github.com/jensneuse/graphql-go-tools v0.0.0-00010101000000-000000000000
+	github.com/jensneuse/graphql-go-tools v1.20.2
+	github.com/jensneuse/graphql-go-tools/examples/federation v0.0.0-20210804084050-3c2e37945919 // indirect
 	github.com/justinas/alice v0.0.0-20171023064455-03f45bd4b7da
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/lonelycode/go-uuid v0.0.0-20141202165402-ed3ca8a15a93
 	github.com/lonelycode/osin v0.0.0-20160423095202-da239c9dacb6
-	github.com/mattn/go-colorable v0.1.4 // indirect
 	github.com/mavricknz/asn1-ber v0.0.0-20151103223136-b9df1c2f4213 // indirect
 	github.com/mavricknz/ldap v0.0.0-20160227184754-f5a958005e43
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
 	github.com/miekg/dns v1.0.14
-	github.com/mitchellh/mapstructure v1.1.2
+	github.com/mitchellh/mapstructure v1.4.1
+	github.com/nats-io/nats-server/v2 v2.3.4 // indirect
 	github.com/newrelic/go-agent v2.13.0+incompatible
+	github.com/nsf/jsondiff v0.0.0-20210303162244-6ea32392771e
 	github.com/opentracing/opentracing-go v1.1.0
 	github.com/openzipkin/zipkin-go v0.2.2
 	github.com/oschwald/maxminddb-golang v1.5.0
 	github.com/paulbellamy/ratecounter v0.2.0
 	github.com/peterbourgon/g2s v0.0.0-20170223122336-d4e7ad98afea // indirect
 	github.com/pires/go-proxyproto v0.0.0-20190615163442-2c19fd512994
-	github.com/pkg/errors v0.8.1
+	github.com/pkg/errors v0.9.1
 	github.com/pmylund/go-cache v2.1.0+incompatible
 	github.com/robertkrimen/otto v0.0.0-20180617131154-15f95af6e78d
 	github.com/rs/cors v1.7.0
 	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.4.2
-	github.com/square/go-jose v2.4.1+incompatible // indirect
-	github.com/stretchr/testify v1.5.1
+	github.com/spf13/afero v1.6.0
+	github.com/square/go-jose v2.4.1+incompatible
+	github.com/stretchr/testify v1.7.0
 	github.com/uber-go/atomic v1.4.0 // indirect
 	github.com/uber/jaeger-client-go v2.19.0+incompatible
 	github.com/uber/jaeger-lib v2.2.0+incompatible // indirect
+	github.com/valyala/fasthttp v1.15.1
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/xeipuuv/gojsonschema v0.0.0-20171025060643-212d8a0df7ac
 	github.com/xenolf/lego v0.3.2-0.20170618175828-28ead50ff1ca // indirect
-	golang.org/x/crypto v0.0.0-20191227163750-53104e6ec876
-	golang.org/x/net v0.0.0-20191009170851-d66e71096ffb
-	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
-	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect
+	golang.org/x/crypto v0.0.0-20210616213533-5ff15b29337e
+	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
+	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 	google.golang.org/appengine v1.6.1 // indirect
-	google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55 // indirect
-	google.golang.org/grpc v1.23.1
+	google.golang.org/grpc v1.29.1
 	gopkg.in/Masterminds/sprig.v2 v2.21.0
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
-	gopkg.in/sourcemap.v1 v1.0.5 // indirect
+	gopkg.in/sourcemap.v1 v1.0.5 // indirect; indi    rect
 	gopkg.in/square/go-jose.v1 v1.1.2 // indirect
 	gopkg.in/vmihailenco/msgpack.v2 v2.9.1
 	gopkg.in/xmlpath.v2 v2.0.0-20150820204837-860cbeca3ebc
-	gopkg.in/yaml.v2 v2.2.8
+	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+	gorm.io/gorm v1.21.11
 	rsc.io/letsencrypt v0.0.2
 )
 
-replace github.com/jensneuse/graphql-go-tools => github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20200529113941-1680f6de7eef
+replace github.com/jensneuse/graphql-go-tools => github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20210812125449-1d05c608ae43
+
+//replace github.com/jensneuse/graphql-go-tools => ../graphql-go-tools

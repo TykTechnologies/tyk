@@ -38,6 +38,7 @@ const (
 	Definition
 	RequestStatus
 	GraphQLRequest
+	GraphQLIsWebSocketUpgrade
 )
 
 func setContext(r *http.Request, ctx context.Context) {
@@ -45,23 +46,24 @@ func setContext(r *http.Request, ctx context.Context) {
 	*r = *r2
 }
 
-func ctxSetSession(r *http.Request, s *user.SessionState, token string, scheduleUpdate bool) {
+// ctxSetSession stores in ctx the s.KeyID
+func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool) {
 	if s == nil {
 		panic("setting a nil context SessionData")
 	}
 
-	if token == "" {
-		token = GetAuthToken(r)
+	if s.KeyID == "" {
+		s.KeyID = GetAuthToken(r)
 	}
 
 	if s.KeyHashEmpty() {
-		s.SetKeyHash(storage.HashKey(token))
+		s.SetKeyHash(storage.HashKey(s.KeyID))
 	}
 
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, SessionData, s)
-	ctx = context.WithValue(ctx, AuthToken, token)
 
+	ctx = context.WithValue(ctx, AuthToken, s.KeyID)
 	if scheduleUpdate {
 		ctx = context.WithValue(ctx, UpdateSession, true)
 	}
@@ -83,8 +85,8 @@ func GetSession(r *http.Request) *user.SessionState {
 	return nil
 }
 
-func SetSession(r *http.Request, s *user.SessionState, token string, scheduleUpdate bool) {
-	ctxSetSession(r, s, token, scheduleUpdate)
+func SetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool) {
+	ctxSetSession(r, s, scheduleUpdate)
 }
 
 func SetDefinition(r *http.Request, s *apidef.APIDefinition) {

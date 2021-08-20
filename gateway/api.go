@@ -43,8 +43,10 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/lonelycode/osin"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/afero"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -200,6 +202,7 @@ func applyPoliciesAndSave(keyName string, session *user.SessionState, spec *APIS
 	mw := BaseMiddleware{
 		Spec: spec,
 	}
+
 	if err := mw.ApplyPolicies(session); err != nil {
 		return err
 	}
@@ -215,8 +218,8 @@ func applyPoliciesAndSave(keyName string, session *user.SessionState, spec *APIS
 func resetAPILimits(accessRights map[string]user.AccessDefinition) {
 	for apiID := range accessRights {
 		// reset API-level limit to nil if it has a zero-value
-		if access := accessRights[apiID]; access.Limit != nil && *access.Limit == (user.APILimit{}) {
-			access.Limit = nil
+		if access := accessRights[apiID]; !access.Limit.IsEmpty() && access.Limit == (user.APILimit{}) {
+			access.Limit = user.APILimit{}
 			accessRights[apiID] = access
 		}
 	}
@@ -230,7 +233,7 @@ func doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool
 	}
 
 	if len(newSession.AccessRights) > 0 {
-		// reset API-level limit to nil if any has a zero-value
+		// reset API-level limit to empty APILimit if any has a zero-value
 		resetAPILimits(newSession.AccessRights)
 		// We have a specific list of access rules, only add / update those
 		for apiId := range newSession.AccessRights {
@@ -322,32 +325,51 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 	suppressReset := r.URL.Query().Get("suppress_reset") == "1"
 
 	// decode payload
-	newSession := user.SessionState{}
+	newSession := &user.SessionState{}
 
 	contents, _ := ioutil.ReadAll(r.Body)
 	r.Body = ioutil.NopCloser(bytes.NewReader(contents))
 
-	if err := json.Unmarshal(contents, &newSession); err != nil {
+	if err := json.Unmarshal(contents, newSession); err != nil {
 		log.Error("Couldn't decode new session object: ", err)
 		return apiError("Request malformed"), http.StatusBadRequest
 	}
 
 	mw := BaseMiddleware{}
-	mw.ApplyPolicies(&newSession)
-
+	// TODO: handle apply policies error
+	mw.ApplyPolicies(newSession)
 	// DO ADD OR UPDATE
 
 	// get original session in case of update and preserve fields that SHOULD NOT be updated
 	originalKey := user.SessionState{}
 	if r.Method == http.MethodPut {
-		originalKey, found := GlobalSessionManager.SessionDetail(newSession.OrgID, keyName, isHashed)
+		key, found := GlobalSessionManager.SessionDetail(newSession.OrgID, keyName, isHashed)
+		keyName = key.KeyID
 		if !found {
 			log.Error("Could not find key when updating")
 			return apiError("Key is not found"), http.StatusNotFound
 		}
+		originalKey = key.Clone()
 
-		//remain the creation date
+		isCertificateChanged := newSession.Certificate != originalKey.Certificate
+		if isCertificateChanged {
+			if newSession.Certificate == "" {
+				log.Error("Key must contain a certificate")
+				return apiError("Key cannot be used without a certificate"), http.StatusBadRequest
+			}
+
+			// check that the certificate exists in the system
+			_, err := CertificateManager.GetRaw(newSession.Certificate)
+			if err != nil {
+				log.Error("Key must contain an existing certificate")
+				return apiError("Key must be used with an existent certificate"), http.StatusBadRequest
+
+			}
+		}
+
+		// preserve the creation date
 		newSession.DateCreated = originalKey.DateCreated
+
 		// don't change fields related to quota and rate limiting if was passed as "suppress_reset=1"
 		if suppressReset {
 			// save existing quota_renews and last_updated if suppress_reset was passed
@@ -361,10 +383,10 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 
 			// on ACL API limit level
 			for apiID, access := range originalKey.AccessRights {
-				if access.Limit == nil {
+				if access.Limit.IsEmpty() {
 					continue
 				}
-				if newAccess, ok := newSession.AccessRights[apiID]; ok && newAccess.Limit != nil {
+				if newAccess, ok := newSession.AccessRights[apiID]; ok && !newAccess.Limit.IsEmpty() {
 					newAccess.Limit.QuotaRenews = access.Limit.QuotaRenews
 					newSession.AccessRights[apiID] = newAccess
 				}
@@ -387,30 +409,39 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 		switch r.Method {
 		case http.MethodPost:
 			// It's a create, so lets hash the password
-			setSessionPassword(&newSession)
+			setSessionPassword(newSession)
 		case http.MethodPut:
 			if originalKey.BasicAuthData.Password != newSession.BasicAuthData.Password {
 				// passwords dont match assume it's new, lets hash it
 				log.Debug("Passwords dont match, original: ", originalKey.BasicAuthData.Password)
 				log.Debug("New: newSession.BasicAuthData.Password")
 				log.Debug("Changing password")
-				setSessionPassword(&newSession)
+				setSessionPassword(newSession)
 			}
 		}
+	} else if originalKey.BasicAuthData.Password != "" {
+		// preserve basic auth data
+		newSession.BasicAuthData.Hash = originalKey.BasicAuthData.Hash
+		newSession.BasicAuthData.Password = originalKey.BasicAuthData.Password
 	}
 
 	if r.Method == http.MethodPost || storage.TokenOrg(keyName) != "" {
 		// use new key format if key gets created or updating key with new format
-		if err := doAddOrUpdate(keyName, &newSession, suppressReset, isHashed); err != nil {
+		if err := doAddOrUpdate(keyName, newSession, suppressReset, isHashed); err != nil {
 			return apiError("Failed to create key, ensure security settings are correct."), http.StatusInternalServerError
 		}
 	} else {
-		// update legacy key format one
-		if err := doAddOrUpdate(keyName, &newSession, suppressReset, isHashed); err != nil {
-			return apiError("Failed to create key, ensure security settings are correct."), http.StatusInternalServerError
+
+		newFormatKey := generateToken(newSession.OrgID, keyName)
+		// search as a custom key
+		_, err := GlobalSessionManager.Store().GetKey(newFormatKey)
+
+		if err == nil {
+			// update new format key for custom keys, as it was found then its a customKey
+			keyName = newFormatKey
 		}
-		// update new format key
-		if err := doAddOrUpdate(generateToken(newSession.OrgID, keyName), &newSession, suppressReset, isHashed); err != nil {
+
+		if err := doAddOrUpdate(keyName, newSession, suppressReset, isHashed); err != nil {
 			return apiError("Failed to create key, ensure security settings are correct."), http.StatusInternalServerError
 		}
 	}
@@ -445,26 +476,25 @@ func handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interfac
 	return response, http.StatusOK
 }
 
-func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
+func handleGetDetail(sessionKey, apiID, orgID string, byHash bool) (interface{}, int) {
 	if byHash && !config.Global().HashKeys {
 		return apiError("Key requested by hash but key hashing is not enabled"), http.StatusBadRequest
 	}
 
 	spec := getApiSpec(apiID)
-	orgID := ""
 	if spec != nil {
 		orgID = spec.OrgID
 	}
 
-	var session user.SessionState
-	var ok bool
-	session, ok = GlobalSessionManager.SessionDetail(orgID, sessionKey, byHash)
+	session, ok := GlobalSessionManager.SessionDetail(orgID, sessionKey, byHash)
+	sessionKey = session.KeyID
 
 	if !ok {
 		return apiError("Key not found"), http.StatusNotFound
 	}
 
 	mw := BaseMiddleware{Spec: spec}
+	// TODO: handle apply policies error
 	mw.ApplyPolicies(&session)
 
 	if session.QuotaMax != -1 {
@@ -494,7 +524,7 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 
 	// populate remaining quota for API limits (if any)
 	for id, access := range session.AccessRights {
-		if access.Limit == nil || access.Limit.QuotaMax == -1 || access.Limit.QuotaMax == 0 {
+		if access.Limit.IsEmpty() || access.Limit.QuotaMax == -1 || access.Limit.QuotaMax == 0 {
 			continue
 		}
 
@@ -531,13 +561,20 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 		}
 	}
 
+	// If it's a basic auth key and a valid Base64 string, use it as the key ID:
+	if session.BasicAuthData.Password != "" {
+		if storage.TokenOrg(sessionKey) != "" {
+			session.KeyID = sessionKey
+		}
+	}
+
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
 		"key":    obfuscateKey(sessionKey),
 		"status": "ok",
 	}).Info("Retrieved key detail.")
 
-	return session, http.StatusOK
+	return session.Clone(), http.StatusOK
 }
 
 // apiAllKeys represents a list of keys in the memory store
@@ -574,14 +611,14 @@ func handleGetAllKeys(filter string) (interface{}, int) {
 }
 
 func handleAddKey(keyName, hashedName, sessionString, apiID string) {
-	sess := user.SessionState{}
-	json.Unmarshal([]byte(sessionString), &sess)
+	sess := &user.SessionState{}
+	json.Unmarshal([]byte(sessionString), sess)
 	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 	var err error
 	if config.Global().HashKeys {
-		err = GlobalSessionManager.UpdateSession(hashedName, &sess, 0, true)
+		err = GlobalSessionManager.UpdateSession(hashedName, sess, 0, true)
 	} else {
-		err = GlobalSessionManager.UpdateSession(keyName, &sess, 0, false)
+		err = GlobalSessionManager.UpdateSession(keyName, sess, 0, false)
 	}
 	if err != nil {
 		log.WithFields(logrus.Fields{
@@ -598,17 +635,18 @@ func handleAddKey(keyName, hashedName, sessionString, apiID string) {
 	}).Info("Updated hashed key in slave storage.")
 }
 
-func handleDeleteKey(keyName, apiID string, resetQuota bool) (interface{}, int) {
-	orgID := ""
-	if spec := getApiSpec(apiID); spec != nil {
-		orgID = spec.OrgID
+func handleDeleteKey(keyName, orgID, apiID string, resetQuota bool) (interface{}, int) {
+	session, ok := GlobalSessionManager.SessionDetail(orgID, keyName, false)
+	keyName = session.KeyID
+	if !ok {
+		return apiError("There is no such key found"), http.StatusNotFound
 	}
 
 	if apiID == "-1" {
 		// Go through ALL managed API's and delete the key
 		apisMu.RLock()
 		removed := GlobalSessionManager.RemoveSession(orgID, keyName, false)
-		GlobalSessionManager.ResetQuota(keyName, &user.SessionState{}, false)
+		GlobalSessionManager.ResetQuota(keyName, &session, false)
 
 		apisMu.RUnlock()
 
@@ -640,7 +678,7 @@ func handleDeleteKey(keyName, apiID string, resetQuota bool) (interface{}, int) 
 	}
 
 	if resetQuota {
-		GlobalSessionManager.ResetQuota(keyName, &user.SessionState{}, false)
+		GlobalSessionManager.ResetQuota(keyName, &session, false)
 	}
 
 	statusObj := apiModifyKeySuccess{
@@ -665,8 +703,8 @@ func handleDeleteKey(keyName, apiID string, resetQuota bool) (interface{}, int) 
 }
 
 // handleDeleteHashedKeyWithLogs is a wrapper for handleDeleteHashedKey with logs
-func handleDeleteHashedKeyWithLogs(keyName, apiID string, resetQuota bool) (interface{}, int) {
-	res, code := handleDeleteHashedKey(keyName, apiID, resetQuota)
+func handleDeleteHashedKeyWithLogs(keyName, orgID, apiID string, resetQuota bool) (interface{}, int) {
+	res, code := handleDeleteHashedKey(keyName, orgID, apiID, resetQuota)
 
 	if code != http.StatusOK {
 		log.WithFields(logrus.Fields{
@@ -685,10 +723,12 @@ func handleDeleteHashedKeyWithLogs(keyName, apiID string, resetQuota bool) (inte
 	return res, code
 }
 
-func handleDeleteHashedKey(keyName, apiID string, resetQuota bool) (interface{}, int) {
-	orgID := ""
-	if spec := getApiSpec(apiID); spec != nil {
-		orgID = spec.OrgID
+func handleDeleteHashedKey(keyName, orgID, apiID string, resetQuota bool) (interface{}, int) {
+
+	session, ok := GlobalSessionManager.SessionDetail(orgID, keyName, true)
+	keyName = session.KeyID
+	if !ok {
+		return apiError("There is no such key found"), http.StatusNotFound
 	}
 
 	if apiID == "-1" {
@@ -709,7 +749,7 @@ func handleDeleteHashedKey(keyName, apiID string, resetQuota bool) (interface{},
 	}
 
 	if resetQuota {
-		GlobalSessionManager.ResetQuota(keyName, &user.SessionState{}, true)
+		GlobalSessionManager.ResetQuota(keyName, &session, true)
 	}
 
 	statusObj := apiModifyKeySuccess{
@@ -757,7 +797,7 @@ func handleGetAPI(apiID string) (interface{}, int) {
 	return apiError("API not found"), http.StatusNotFound
 }
 
-func handleAddOrUpdateApi(apiID string, r *http.Request) (interface{}, int) {
+func handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.Fs) (interface{}, int) {
 	if config.Global().UseDBAppConfigs {
 		log.Error("Rejected new API Definition due to UseDBAppConfigs = true")
 		return apiError("Due to enabled use_db_app_configs, please use the Dashboard API"), http.StatusInternalServerError
@@ -771,16 +811,27 @@ func handleAddOrUpdateApi(apiID string, r *http.Request) (interface{}, int) {
 
 	if apiID != "" && newDef.APIID != apiID {
 		log.Error("PUT operation on different APIIDs")
-		return apiError("Request APIID does not match that in Definition! For Updtae operations these must match."), http.StatusBadRequest
+		return apiError("Request APIID does not match that in Definition! For Update operations these must match."), http.StatusBadRequest
+	}
+
+	validationResult := apidef.Validate(newDef, apidef.DefaultValidationRuleSet)
+	if !validationResult.IsValid {
+		reason := "unknown"
+		if validationResult.ErrorCount() > 0 {
+			reason = validationResult.FirstError().Error()
+		}
+
+		log.Debugf("Semantic validation for API Definition failed. Reason: %s.", reason)
+		return apiError(fmt.Sprintf("Validation of API Definition failed. Reason: %s.", reason)), http.StatusBadRequest
 	}
 
 	// Create a filename
 	defFilePath := filepath.Join(config.Global().AppPath, newDef.APIID+".json")
 
 	// If it exists, delete it
-	if _, err := os.Stat(defFilePath); err == nil {
+	if _, err := fs.Stat(defFilePath); err == nil {
 		log.Warning("API Definition with this ID already exists, deleting file...")
-		os.Remove(defFilePath)
+		fs.Remove(defFilePath)
 	}
 
 	// unmarshal the object into the file
@@ -847,11 +898,11 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	case "POST":
 		log.Debug("Creating new definition file")
-		obj, code = handleAddOrUpdateApi(apiID, r)
+		obj, code = handleAddOrUpdateApi(apiID, r, afero.NewOsFs())
 	case "PUT":
 		if apiID != "" {
 			log.Debug("Updating existing API: ", apiID)
-			obj, code = handleAddOrUpdateApi(apiID, r)
+			obj, code = handleAddOrUpdateApi(apiID, r, afero.NewOsFs())
 		} else {
 			obj, code = apiError("Must specify an apiID to update"), http.StatusBadRequest
 		}
@@ -896,10 +947,10 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		if keyName != "" {
 			// Return single key detail
-			obj, code = handleGetDetail(keyName, apiID, isHashed)
+			obj, code = handleGetDetail(keyName, apiID, orgID, isHashed)
 			if code != http.StatusOK && hashKeyFunction != "" {
 				// try to use legacy key format
-				obj, code = handleGetDetail(origKeyName, apiID, isHashed)
+				obj, code = handleGetDetail(origKeyName, apiID, orgID, isHashed)
 			}
 		} else {
 			// Return list of keys
@@ -925,16 +976,16 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodDelete:
 		// Remove a key
 		if !isHashed {
-			obj, code = handleDeleteKey(keyName, apiID, true)
+			obj, code = handleDeleteKey(keyName, orgID, apiID, true)
 		} else {
-			obj, code = handleDeleteHashedKeyWithLogs(keyName, apiID, true)
+			obj, code = handleDeleteHashedKeyWithLogs(keyName, orgID, apiID, true)
 		}
 		if code != http.StatusOK && hashKeyFunction != "" {
 			// try to use legacy key format
 			if !isHashed {
-				obj, code = handleDeleteKey(origKeyName, apiID, true)
+				obj, code = handleDeleteKey(origKeyName, orgID, apiID, true)
 			} else {
-				obj, code = handleDeleteHashedKeyWithLogs(origKeyName, apiID, true)
+				obj, code = handleDeleteHashedKeyWithLogs(origKeyName, orgID, apiID, true)
 			}
 		}
 	}
@@ -975,6 +1026,7 @@ func handleUpdateHashedKey(keyName string, applyPolicies []string) (interface{},
 	}
 
 	sess, ok := GlobalSessionManager.SessionDetail(orgID, keyName, true)
+	keyName = sess.KeyID
 	if !ok {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -1127,7 +1179,7 @@ func handleGetOrgDetail(orgID string) (interface{}, int) {
 		"org":    orgID,
 		"status": "ok",
 	}).Info("Retrieved record for ORG ID.")
-	return session, http.StatusOK
+	return session.Clone(), http.StatusOK
 }
 
 func handleGetAllOrgKeys(filter string) (interface{}, int) {
@@ -1256,6 +1308,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	newSession.DateCreated = time.Now()
 
 	mw := BaseMiddleware{}
+	// TODO: handle apply policies error
 	mw.ApplyPolicies(newSession)
 
 	if len(newSession.AccessRights) > 0 {
@@ -1263,6 +1316,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 		resetAPILimits(newSession.AccessRights)
 		for apiID := range newSession.AccessRights {
 			apiSpec := getApiSpec(apiID)
+
 			if apiSpec != nil {
 				checkAndApplyTrialPeriod(newKey, newSession, false)
 				// If we have enabled HMAC checking for keys, we need to generate a secret for the client to use
@@ -1384,6 +1438,7 @@ func previewKeyHandler(w http.ResponseWriter, r *http.Request) {
 	newSession.DateCreated = time.Now()
 
 	mw := BaseMiddleware{}
+	// TODO: handle apply policies error
 	mw.ApplyPolicies(newSession)
 
 	doJSONWrite(w, http.StatusOK, newSession)
@@ -1508,9 +1563,24 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			// set oauth client if it is oauth API
-			if apiSpec.UseOauth2 {
+			if apiSpec.UseOauth2 || apiSpec.EnableJWT {
 				oauth2 = true
-				err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, apiSpec.OrgID, &newClient, true)
+				if apiSpec.OAuthManager == nil {
+
+					prefix := generateOAuthPrefix(apiSpec.APIID)
+					storageManager := getGlobalStorageHandler(prefix, false)
+					storageManager.Connect()
+
+					apiSpec.OAuthManager = &OAuthManager{
+						OsinServer: TykOsinNewServer(&osin.ServerConfig{},
+							&RedisOsinStorageInterface{
+								storageManager,
+								GlobalSessionManager,
+								&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false},
+								apiSpec.OrgID}),
+					}
+				}
+				err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, apiSpec.APIDefinition.OrgID, &newClient, true)
 				if err != nil {
 					log.WithFields(logrus.Fields{
 						"prefix": "api",
@@ -1647,6 +1717,7 @@ func updateOauthClient(keyName, apiID string, r *http.Request) (interface{}, int
 	// update client
 	updatedClient := OAuthClient{
 		ClientID:          client.GetId(),
+		ClientSecret:      client.GetSecret(),
 		ClientRedirectURI: updateClientData.ClientRedirectURI, // update
 		PolicyID:          updateClientData.PolicyID,          // update
 		MetaData:          updateClientData.MetaData,          // update
@@ -1878,6 +1949,20 @@ func getOauthClientDetails(keyName, apiID string) (interface{}, int) {
 			"err":    "not found",
 		}).Error("Failed to retrieve OAuth client details")
 		return apiError("OAuth Client ID not found"), http.StatusNotFound
+	}
+
+	if apiSpec.OAuthManager == nil {
+		prefix := generateOAuthPrefix(apiSpec.APIID)
+		storageManager := getGlobalStorageHandler(prefix, false)
+		storageManager.Connect()
+		apiSpec.OAuthManager = &OAuthManager{
+			OsinServer: TykOsinNewServer(&osin.ServerConfig{},
+				&RedisOsinStorageInterface{
+					storageManager,
+					GlobalSessionManager,
+					&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false},
+					apiSpec.OrgID}),
+		}
 	}
 
 	clientData, err := apiSpec.OAuthManager.OsinServer.Storage.GetExtendedClientNoPrefix(storageID)
@@ -2246,8 +2331,8 @@ func ctxGetSession(r *http.Request) *user.SessionState {
 	return ctx.GetSession(r)
 }
 
-func ctxSetSession(r *http.Request, s *user.SessionState, token string, scheduleUpdate bool) {
-	ctx.SetSession(r, s, token, scheduleUpdate)
+func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool) {
+	ctx.SetSession(r, s, scheduleUpdate)
 }
 
 func ctxScheduleSessionUpdate(r *http.Request) {
@@ -2400,6 +2485,20 @@ func ctxGetGraphQLRequest(r *http.Request) (gqlRequest *gql.Request) {
 	return nil
 }
 
+func ctxSetGraphQLIsWebSocketUpgrade(r *http.Request, isWebSocketUpgrade bool) {
+	setCtxValue(r, ctx.GraphQLIsWebSocketUpgrade, isWebSocketUpgrade)
+}
+
+func ctxGetGraphQLIsWebSocketUpgrade(r *http.Request) (isWebSocketUpgrade bool) {
+	if v := r.Context().Value(ctx.GraphQLIsWebSocketUpgrade); v != nil {
+		if isWebSocketUpgrade, ok := v.(bool); ok {
+			return isWebSocketUpgrade
+		}
+	}
+
+	return false
+}
+
 func ctxGetDefaultVersion(r *http.Request) bool {
 	return r.Context().Value(ctx.VersionDefault) != nil
 }
@@ -2503,7 +2602,7 @@ func ctxGetRequestStatus(r *http.Request) (stat RequestStatus) {
 	return
 }
 
-func createOauthClientSecret() string {
+var createOauthClientSecret = func() string {
 	secret := uuid.NewV4()
 	return base64.StdEncoding.EncodeToString([]byte(secret.String()))
 }

@@ -51,6 +51,28 @@ type MiniRequestObject struct {
 	Scheme          string
 }
 
+func (mr *MiniRequestObject) ReconstructParams(r *http.Request) {
+	updatedValues := r.URL.Query()
+
+	for _, k := range mr.DeleteParams {
+		updatedValues.Del(k)
+	}
+
+	for p, v := range mr.AddParams {
+		updatedValues.Set(p, v)
+	}
+
+	for p, v := range mr.ExtendedParams {
+		for _, val := range v {
+			updatedValues.Add(p, val)
+		}
+	}
+
+	if !reflect.DeepEqual(r.URL.Query(), updatedValues) {
+		r.URL.RawQuery = updatedValues.Encode()
+	}
+}
+
 type VMReturnObject struct {
 	Request     MiniRequestObject
 	SessionMeta map[string]string
@@ -210,37 +232,29 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		r.Body = ioutil.NopCloser(bytes.NewReader(newRequestData.Request.Body))
 	}
 
-	r.URL, err = url.ParseRequestURI(newRequestData.Request.URL)
+	// make sure request's body can be re-read again
+	nopCloseRequestBody(r)
+
+	r.URL, err = url.Parse(newRequestData.Request.URL)
 	if err != nil {
 		return nil, http.StatusOK
 	}
 
+	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
 	// Delete and set headers
 	for _, dh := range newRequestData.Request.DeleteHeaders {
 		r.Header.Del(dh)
+		if ignoreCanonical {
+			// Make sure we delete the header in case the header key was not canonical.
+			delete(r.Header, dh)
+		}
 	}
-
 	for h, v := range newRequestData.Request.SetHeaders {
-		r.Header.Set(h, v)
+		setCustomHeader(r.Header, h, v, ignoreCanonical)
 	}
 
 	// Delete and set request parameters
-	values := r.URL.Query()
-	for _, k := range newRequestData.Request.DeleteParams {
-		values.Del(k)
-	}
-
-	for p, v := range newRequestData.Request.AddParams {
-		values.Set(p, v)
-	}
-
-	for p, v := range newRequestData.Request.ExtendedParams {
-		for _, val := range v {
-			values.Add(p, val)
-		}
-	}
-
-	r.URL.RawQuery = values.Encode()
+	newRequestData.Request.ReconstructParams(r)
 
 	// Save the session data (if modified)
 	if !d.Pre && d.UseSession {
@@ -280,7 +294,8 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	}
 
 	if d.Auth {
-		ctxSetSession(r, &newRequestData.Session, newRequestData.AuthValue, true)
+		newRequestData.Session.KeyID = newRequestData.AuthValue
+		ctxSetSession(r, &newRequestData.Session, true)
 	}
 
 	return nil, http.StatusOK
@@ -356,6 +371,11 @@ func (j *JSVM) LoadJSPaths(paths []string, prefix string) {
 	for _, mwPath := range paths {
 		if prefix != "" {
 			mwPath = filepath.Join(prefix, mwPath)
+		}
+		extension := filepath.Ext(mwPath)
+		if !strings.Contains(extension, ".js") {
+			j.Log.Errorf("Unsupported extension '%s' (%s)", extension, mwPath)
+			continue
 		}
 		j.Log.Info("Loading JS File: ", mwPath)
 		f, err := os.Open(mwPath)
@@ -460,7 +480,7 @@ func (j *JSVM) LoadTykJSApi() {
 		}
 		return returnVal
 	})
-
+	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
 	// Enable the creation of HTTP Requsts
 	j.VM.Set("TykMakeHttpRequest", func(call otto.FunctionCall) otto.Value {
 		jsonHRO := call.Argument(0).String()
@@ -498,11 +518,19 @@ func (j *JSVM) LoadTykJSApi() {
 		}
 
 		for k, v := range hro.Headers {
-			r.Header.Set(k, v)
+			setCustomHeader(r.Header, k, v, ignoreCanonical)
 		}
 		r.Close = true
 
-		tr := &http.Transport{TLSClientConfig: &tls.Config{}}
+		maxSSLVersion := config.Global().ProxySSLMaxVersion
+		if j.Spec.Proxy.Transport.SSLMaxVersion > 0 {
+			maxSSLVersion = j.Spec.Proxy.Transport.SSLMaxVersion
+		}
+
+		tr := &http.Transport{TLSClientConfig: &tls.Config{
+			MaxVersion: maxSSLVersion,
+		}}
+
 		if cert := getUpstreamCertificate(r.Host, j.Spec); cert != nil {
 			tr.TLSClientConfig.Certificates = []tls.Certificate{*cert}
 		}
@@ -553,7 +581,7 @@ func (j *JSVM) LoadTykJSApi() {
 		apiKey := call.Argument(0).String()
 		apiId := call.Argument(1).String()
 
-		obj, _ := handleGetDetail(apiKey, apiId, false)
+		obj, _ := handleGetDetail(apiKey, apiId, "", false)
 		bs, _ := json.Marshal(obj)
 
 		returnVal, err := j.VM.ToValue(string(bs))
@@ -587,7 +615,6 @@ func (j *JSVM) LoadTykJSApi() {
 	j.VM.Set("TykBatchRequest", func(call otto.FunctionCall) otto.Value {
 		requestSet := call.Argument(0).String()
 		j.Log.Debug("Batch input is: ", requestSet)
-
 		bs, err := unsafeBatchHandler.ManualBatchRequest([]byte(requestSet))
 		if err != nil {
 			j.Log.WithError(err).Error("Batch request error")

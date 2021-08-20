@@ -30,15 +30,35 @@ func (Monitor) Fire(sessionData *user.SessionState, key string, triggerLimit, us
 }
 
 func (m Monitor) Check(sessionData *user.SessionState, key string) {
-	if !m.Enabled() || sessionData.QuotaMax == -1 {
+	if !m.Enabled() {
 		return
 	}
 
-	remainder := sessionData.QuotaMax - sessionData.QuotaRemaining
-	usagePerc := (float64(remainder) / float64(sessionData.QuotaMax)) * 100.0
+	if m.checkLimit(sessionData, key, sessionData.QuotaMax, sessionData.QuotaRemaining, sessionData.QuotaRenews) {
+		return
+	}
+
+	for _, ac := range sessionData.AccessRights {
+		if ac.Limit.IsEmpty() {
+			continue
+		}
+
+		if m.checkLimit(sessionData, key, ac.Limit.QuotaMax, ac.Limit.QuotaRemaining, ac.Limit.QuotaRenews) {
+			return
+		}
+	}
+}
+
+func (m Monitor) checkLimit(sessionData *user.SessionState, key string, quotaMax, quotaRemaining, quotaRenews int64) bool {
+	if quotaMax <= 0 {
+		return false
+	}
+
+	remainder := quotaMax - quotaRemaining
+	usagePerc := (float64(remainder) / float64(quotaMax)) * 100.0
 
 	log.Debug("Perc is: ", usagePerc)
-	renewalDate := time.Unix(sessionData.QuotaRenews, 0)
+	renewalDate := time.Unix(quotaRenews, 0)
 
 	log.Debug("Now is: ", time.Now())
 	log.Debug("Renewal is: ", renewalDate)
@@ -46,19 +66,22 @@ func (m Monitor) Check(sessionData *user.SessionState, key string) {
 		// Make sure that renewal is still in the future, If renewal is in the past,
 		// then the quota can expire and will auto-renew
 		log.Debug("Renewal date is in the past, skipping")
-		return
+		return false
 	}
 
 	if config.Global().Monitor.GlobalTriggerLimit > 0.0 && usagePerc >= config.Global().Monitor.GlobalTriggerLimit {
 		log.Info("Firing...")
 		m.Fire(sessionData, key, config.Global().Monitor.GlobalTriggerLimit, usagePerc)
+		return true
 	}
 
 	for _, triggerLimit := range sessionData.Monitor.TriggerLimits {
 		if usagePerc >= triggerLimit && triggerLimit != config.Global().Monitor.GlobalTriggerLimit {
 			log.Info("Firing...")
 			m.Fire(sessionData, key, triggerLimit, usagePerc)
-			break
+			return true
 		}
 	}
+
+	return false
 }

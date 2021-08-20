@@ -4,11 +4,15 @@ import (
 	"bytes"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/user"
@@ -98,15 +102,15 @@ leakMid.NewProcessRequest(function(request, session) {
 	dynMid.Spec.JSVM = jsvm
 	dynMid.ProcessRequest(nil, req, nil)
 
-	bs, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		t.Fatalf("failed to read final body: %v", err)
-	}
 	want := body + " appended"
-	if got := string(bs); want != got {
-		t.Fatalf("JS plugin broke non-UTF8 body %q into %q",
-			want, got)
-	}
+
+	newBodyInBytes, _ := ioutil.ReadAll(req.Body)
+	assert.Equal(t, want, string(newBodyInBytes))
+
+	t.Run("check request body is re-readable", func(t *testing.T) {
+		newBodyInBytes, _ = ioutil.ReadAll(req.Body)
+		assert.Equal(t, want, string(newBodyInBytes))
+	})
 }
 
 func TestJSVMSessionMetadataUpdate(t *testing.T) {
@@ -122,11 +126,12 @@ func TestJSVMSessionMetadataUpdate(t *testing.T) {
 	jsvm := JSVM{}
 	jsvm.Init(nil, logrus.NewEntry(log))
 
-	s := &user.SessionState{MetaData: make(map[string]interface{})}
+	s := &user.SessionState{
+		MetaData: make(map[string]interface{})}
 	s.MetaData["same"] = "same"
 	s.MetaData["updated"] = "old"
 	s.MetaData["removed"] = "dummy"
-	ctxSetSession(req, s, "", true)
+	ctxSetSession(req, s, true)
 
 	const js = `
 var testJSVMMiddleware = new TykJS.TykMiddleware.NewMiddleware({});
@@ -222,6 +227,46 @@ testJSVMData.NewProcessRequest(function(request, session, spec) {
 	r := TestReq(t, "GET", "/v1/test-data", nil)
 	dynMid.ProcessRequest(nil, r, nil)
 	if want, got := "bar", r.Header.Get("data-foo"); want != got {
+		t.Fatalf("wanted header to be %q, got %q", want, got)
+	}
+}
+func TestJSVM_IgnoreCanonicalHeader(t *testing.T) {
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+	const js = `
+var testJSVMData = new TykJS.TykMiddleware.NewMiddleware({})
+
+testJSVMData.NewProcessRequest(function(request, session, spec) {
+	request.SetHeaders["X-CertificateOuid"] = "X-CertificateOuid"
+	return testJSVMData.ReturnData(request, {})
+});`
+	dynMid := &DynamicMiddleware{
+		BaseMiddleware:      BaseMiddleware{Spec: spec, Proxy: nil},
+		MiddlewareClassName: "testJSVMData",
+		Pre:                 true,
+	}
+	jsvm := JSVM{}
+	jsvm.Init(nil, logrus.NewEntry(log))
+	if _, err := jsvm.VM.Run(js); err != nil {
+		t.Fatalf("failed to set up js plugin: %v", err)
+	}
+	dynMid.Spec.JSVM = jsvm
+
+	r := TestReq(t, "GET", "/v1/test-data", nil)
+	dynMid.ProcessRequest(nil, r, nil)
+	if want, got := NonCanonicalHeaderKey, r.Header.Get(NonCanonicalHeaderKey); want != got {
+		t.Fatalf("wanted header to be %q, got %q", want, got)
+	}
+	r.Header.Del(NonCanonicalHeaderKey)
+
+	c := config.Global()
+	c.IgnoreCanonicalMIMEHeaderKey = true
+	config.SetGlobal(c)
+	defer ResetTestConfig()
+	dynMid.ProcessRequest(nil, r, nil)
+	if want, got := "", r.Header.Get(NonCanonicalHeaderKey); want != got {
+		t.Fatalf("wanted header to be %q, got %q", want, got)
+	}
+	if want, got := NonCanonicalHeaderKey, r.Header[NonCanonicalHeaderKey][0]; want != got {
 		t.Fatalf("wanted header to be %q, got %q", want, got)
 	}
 }
@@ -593,4 +638,123 @@ post.NewProcessRequest(function(request, session) {
 			{Path: "/test", Code: 200, BodyMatch: `"Post":"foobar"`},
 		}...)
 	})
+}
+
+func TestMiniRequestObject_ReconstructParams(t *testing.T) {
+	const exampleURL = "http://example.com/get?b=1&c=2&a=3"
+	r, _ := http.NewRequest(http.MethodGet, exampleURL, nil)
+	mr := MiniRequestObject{}
+
+	t.Run("Don't touch queries if no change on params", func(t *testing.T) {
+		mr.ReconstructParams(r)
+		assert.Equal(t, exampleURL, r.URL.String())
+	})
+
+	t.Run("Update params", func(t *testing.T) {
+		mr.AddParams = map[string]string{
+			"d": "4",
+		}
+		mr.DeleteParams = append(mr.DeleteHeaders, "b")
+		mr.ReconstructParams(r)
+
+		assert.Equal(t, url.Values{
+			"a": []string{"3"},
+			"c": []string{"2"},
+			"d": []string{"4"},
+		}, r.URL.Query())
+	})
+}
+
+func TestJSVM_Auth(t *testing.T) {
+	ts := StartTest()
+	defer ts.Close()
+
+	bundle := RegisterBundle("custom_auth", map[string]string{
+		"manifest.json": `{
+			"file_list": [
+				"testmw.js"
+			],
+			"custom_middleware": {
+				"pre": null,
+				"post": null,
+				"post_key_auth": null,
+				"auth_check": {
+					"name": "ottoAuthExample",
+					"path": "testmw.js",
+					"require_session": false
+				},
+				"response": null,
+				"driver": "otto",
+				"id_extractor": {
+					"extract_from": "",
+					"extract_with": "",
+					"extractor_config": null
+				}
+			},
+			"checksum": "65694908d609b14df0e280c1a95a8ca4",
+			"signature": ""
+		}`,
+		"testmw.js": `log("====> JS Auth initialising");
+
+		var ottoAuthExample = new TykJS.TykMiddleware.NewMiddleware({});
+		
+		ottoAuthExample.NewProcessRequest(function(request, session) {
+			log("----> Running ottoAuthExample JSVM Auth Middleware")
+		
+			var thisToken = request.Headers["Authorization"];
+		
+			if (thisToken == undefined) {
+				// no token at all?
+				request.ReturnOverrides.ResponseCode = 401
+				request.ReturnOverrides.ResponseError = 'Header missing (JS middleware)'
+				return ottoAuthExample.ReturnData(request, {});
+			}
+		
+			if (thisToken != "foobar") {
+				request.ReturnOverrides.ResponseCode = 401
+				request.ReturnOverrides.ResponseError = 'Not authorized (JS middleware)'
+				return ottoAuthExample.ReturnData(request, {});
+			}
+		
+			log("auth is ok")
+		
+			var thisSession = {
+				"allowance": 100,
+				"rate": 100,
+				"per": 1,
+				"quota_max": -1,
+				"quota_renews": 1906121006,
+				"expires": 1906121006,
+				"access_rights": {}
+			};
+		
+			return ottoAuthExample.ReturnAuthData(request, thisSession);
+		});
+		
+		// Ensure init with a post-declaration log message
+		log("====> JS Auth initialised");
+		`,
+	})
+	BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/sample"
+		spec.ConfigData = map[string]interface{}{
+			"base_url": ts.URL,
+		}
+		spec.CustomMiddlewareBundle = bundle
+		spec.EnableCoProcessAuth = true
+		spec.UseKeylessAccess = false
+	})
+	ts.Run(t,
+		test.TestCase{Path: "/sample", Code: http.StatusUnauthorized, BodyMatchFunc: func(b []byte) bool {
+			return strings.Contains(string(b), "Header missing (JS middleware)")
+		}},
+		test.TestCase{Path: "/sample", Code: http.StatusUnauthorized, BodyMatchFunc: func(b []byte) bool {
+			return strings.Contains(string(b), "Not authorized (JS middleware)")
+		},
+			Headers: map[string]string{"Authorization": "foo"},
+		},
+		test.TestCase{Path: "/sample", Code: http.StatusOK, Headers: map[string]string{
+			"Authorization": "foobar",
+		}},
+	)
 }
