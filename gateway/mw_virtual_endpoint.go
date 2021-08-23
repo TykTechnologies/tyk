@@ -266,9 +266,9 @@ func forceResponse(w http.ResponseWriter,
 		ReadSeeker: bytes.NewReader(responseMessage),
 	}
 	newResponse.StatusCode = newResponseData.Response.Code
-	newResponse.Proto = "HTTP/1.0"
-	newResponse.ProtoMajor = 1
-	newResponse.ProtoMinor = 0
+	newResponse.Proto = r.Proto
+	newResponse.ProtoMajor = r.ProtoMajor
+	newResponse.ProtoMinor = r.ProtoMinor
 	newResponse.Header.Set("Server", "tyk")
 	newResponse.Header.Set("Date", requestTime)
 
