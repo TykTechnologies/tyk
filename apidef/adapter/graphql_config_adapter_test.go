@@ -6,22 +6,79 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	graphqlDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
 	restDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/rest_datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/plan"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
 func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
+	t.Run("should create v2 config for proxy-only mode", func(t *testing.T) {
+		var gqlConfig apidef.GraphQLConfig
+		require.NoError(t, json.Unmarshal([]byte(graphqlProxyOnlyGraphQLConfig), &gqlConfig))
+
+		apiDef := apidef.APIDefinition{
+			GraphQL: gqlConfig,
+			Proxy: apidef.ProxyConfig{
+				TargetURL: "http://localhost:8080",
+			},
+		}
+
+		httpClient := &http.Client{}
+		adapter := NewGraphQLConfigAdapter(apiDef, WithHttpClient(httpClient))
+
+		engineV2Config, err := adapter.EngineConfigV2()
+		assert.NoError(t, err)
+
+		expectedDataSource := plan.DataSourceConfiguration{
+			RootNodes: []plan.TypeField{
+				{
+					TypeName:   "Query",
+					FieldNames: []string{"hello"},
+				},
+			},
+			ChildNodes: nil,
+			Factory:    &graphqlDataSource.Factory{Client: httpClient},
+			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
+				Fetch: graphqlDataSource.FetchConfiguration{
+					URL:    "http://localhost:8080",
+					Method: http.MethodPost,
+					Header: http.Header{
+						"Authorization": []string{"123abc"},
+					},
+				},
+			}),
+		}
+
+		expectedFieldConfig := plan.FieldConfiguration{
+			TypeName:  "Query",
+			FieldName: "hello",
+			Arguments: plan.ArgumentsConfigurations{
+				{
+					Name:       "name",
+					SourceType: plan.FieldArgumentSource,
+				},
+			},
+		}
+
+		assert.Containsf(t, engineV2Config.DataSources(), expectedDataSource, "engine configuration does not contain proxy-only data source")
+		assert.Containsf(t, engineV2Config.FieldConfigurations(), expectedFieldConfig, "engine configuration does not contain expected field config")
+	})
+
 	t.Run("should create v2 config for engine execution mode without error", func(t *testing.T) {
 		var gqlConfig apidef.GraphQLConfig
 		require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2ConfigJson), &gqlConfig))
 
+		apiDef := apidef.APIDefinition{
+			GraphQL: gqlConfig,
+		}
+
 		httpClient := &http.Client{}
-		adapter := NewGraphQLConfigAdapter(gqlConfig, WithHttpClient(httpClient))
+		adapter := NewGraphQLConfigAdapter(apiDef, WithHttpClient(httpClient))
 
 		_, err := adapter.EngineConfigV2()
 		assert.NoError(t, err)
@@ -31,8 +88,12 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 		var gqlConfig apidef.GraphQLConfig
 		require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2SupergraphConfigJson), &gqlConfig))
 
+		apiDef := apidef.APIDefinition{
+			GraphQL: gqlConfig,
+		}
+
 		httpClient := &http.Client{}
-		adapter := NewGraphQLConfigAdapter(gqlConfig, WithHttpClient(httpClient))
+		adapter := NewGraphQLConfigAdapter(apiDef, WithHttpClient(httpClient))
 
 		_, err := adapter.EngineConfigV2()
 		assert.NoError(t, err)
@@ -42,7 +103,11 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 		var gqlConfig apidef.GraphQLConfig
 		require.NoError(t, json.Unmarshal([]byte(graphqlEngineV1ConfigJson), &gqlConfig))
 
-		adapter := NewGraphQLConfigAdapter(gqlConfig)
+		apiDef := apidef.APIDefinition{
+			GraphQL: gqlConfig,
+		}
+
+		adapter := NewGraphQLConfigAdapter(apiDef)
 		_, err := adapter.EngineConfigV2()
 
 		assert.Error(t, err)
@@ -109,7 +174,11 @@ func TestGraphQLConfigAdapter_supergraphDataSourceConfigs(t *testing.T) {
 	var gqlConfig apidef.GraphQLConfig
 	require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2SupergraphConfigJson), &gqlConfig))
 
-	adapter := NewGraphQLConfigAdapter(gqlConfig)
+	apiDef := apidef.APIDefinition{
+		GraphQL: gqlConfig,
+	}
+
+	adapter := NewGraphQLConfigAdapter(apiDef)
 	actualGraphQLConfigs := adapter.subgraphDataSourceConfigs()
 	assert.Equal(t, expectedDataSourceConfigs, actualGraphQLConfigs)
 }
@@ -151,7 +220,11 @@ func TestGraphQLConfigAdapter_engineConfigV2FieldConfigs(t *testing.T) {
 	var gqlConfig apidef.GraphQLConfig
 	require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2ConfigJson), &gqlConfig))
 
-	adapter := NewGraphQLConfigAdapter(gqlConfig)
+	apiDef := apidef.APIDefinition{
+		GraphQL: gqlConfig,
+	}
+
+	adapter := NewGraphQLConfigAdapter(apiDef)
 	require.NoError(t, adapter.parseSchema())
 
 	actualFieldCfgs := adapter.engineConfigV2FieldConfigs()
@@ -305,7 +378,11 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 	var gqlConfig apidef.GraphQLConfig
 	require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2ConfigJson), &gqlConfig))
 
-	adapter := NewGraphQLConfigAdapter(gqlConfig, WithHttpClient(httpClient))
+	apiDef := apidef.APIDefinition{
+		GraphQL: gqlConfig,
+	}
+
+	adapter := NewGraphQLConfigAdapter(apiDef, WithHttpClient(httpClient))
 	require.NoError(t, adapter.parseSchema())
 
 	actualDataSources, err := adapter.engineConfigV2DataSources()
@@ -473,6 +550,29 @@ var graphqlEngineV2SupergraphConfigJson = `{
 			"header2": "value2"
 		},
 		"merged_sdl": "` + federationMergedSDL + `"
+	},
+	"playground": {}
+}`
+
+var graphqlProxyOnlyGraphQLConfig = `{
+	"enabled": true,
+	"execution_mode": "proxyOnly",
+	"version": "2",
+	"schema": "type Query { hello(name: String!): String! }",
+	"last_schema_update": "2020-11-11T11:11:11.000+01:00",
+	"proxy": {
+		"auth_headers": {
+			"Authorization": "123abc"
+		}
+	},
+	"engine": {
+		"field_configs": [],
+		"data_sources": []
+	},
+	"supergraph": {
+		"subgraphs": [],
+		"global_headers": {},
+		"merged_sdl": ""
 	},
 	"playground": {}
 }`
