@@ -19,7 +19,7 @@ import (
 func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 	t.Run("should create v2 config for proxy-only mode", func(t *testing.T) {
 		var gqlConfig apidef.GraphQLConfig
-		require.NoError(t, json.Unmarshal([]byte(graphqlProxyOnlyGraphQLConfig), &gqlConfig))
+		require.NoError(t, json.Unmarshal([]byte(graphqlProxyOnlyConfig), &gqlConfig))
 
 		apiDef := &apidef.APIDefinition{
 			GraphQL: gqlConfig,
@@ -97,6 +97,67 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 
 		_, err := adapter.EngineConfigV2()
 		assert.NoError(t, err)
+	})
+
+	t.Run("should create v2 config for subgraph without error", func(t *testing.T) {
+		var gqlConfig apidef.GraphQLConfig
+		require.NoError(t, json.Unmarshal([]byte(graphqlSubgraphConfig), &gqlConfig))
+
+		apiDef := &apidef.APIDefinition{
+			GraphQL: gqlConfig,
+			Proxy: apidef.ProxyConfig{
+				TargetURL: "http://localhost:8080",
+			},
+		}
+
+		httpClient := &http.Client{}
+		adapter := NewGraphQLConfigAdapter(apiDef, WithHttpClient(httpClient))
+
+		engineV2Config, err := adapter.EngineConfigV2()
+		assert.NoError(t, err)
+
+		expectedDataSource := plan.DataSourceConfiguration{
+			RootNodes: []plan.TypeField{
+				{
+					TypeName:   "Query",
+					FieldNames: []string{"me", "_entities", "_service"},
+				},
+			},
+			ChildNodes: []plan.TypeField{
+				{
+					TypeName:   "User",
+					FieldNames: []string{"id", "username"},
+				},
+				{
+					TypeName:   "_Service",
+					FieldNames: []string{"sdl"},
+				},
+			},
+			Factory: &graphqlDataSource.Factory{Client: httpClient},
+			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
+				Fetch: graphqlDataSource.FetchConfiguration{
+					URL:    "http://localhost:8080",
+					Method: http.MethodPost,
+					Header: http.Header{
+						"Authorization": []string{"123abc"},
+					},
+				},
+			}),
+		}
+
+		expectedFieldConfig := plan.FieldConfiguration{
+			TypeName:  "Query",
+			FieldName: "_entities",
+			Arguments: plan.ArgumentsConfigurations{
+				{
+					Name:       "representations",
+					SourceType: plan.FieldArgumentSource,
+				},
+			},
+		}
+
+		assert.Containsf(t, engineV2Config.DataSources(), expectedDataSource, "engine configuration does not contain proxy-only data source")
+		assert.Containsf(t, engineV2Config.FieldConfigurations(), expectedFieldConfig, "engine configuration does not contain expected field config")
 	})
 
 	t.Run("should return an error for unsupported config", func(t *testing.T) {
@@ -554,7 +615,7 @@ var graphqlEngineV2SupergraphConfigJson = `{
 	"playground": {}
 }`
 
-var graphqlProxyOnlyGraphQLConfig = `{
+var graphqlProxyOnlyConfig = `{
 	"enabled": true,
 	"execution_mode": "proxyOnly",
 	"version": "2",
@@ -576,3 +637,26 @@ var graphqlProxyOnlyGraphQLConfig = `{
 	},
 	"playground": {}
 }`
+
+var graphqlSubgraphConfig = `{
+	"enabled": true,
+	"execution_mode": "subgraph",
+	"version": "2",
+	"schema": ` + strconv.Quote(graphqlSubgraphSchema) + `,
+	"last_schema_update": "2020-11-11T11:11:11.000+01:00",
+	"proxy": {
+		"auth_headers": {
+			"Authorization": "123abc"
+		}
+	},
+	"engine": {
+		"field_configs": [],
+		"data_sources": []
+	},
+	"subgraph": {
+		"sdl": ` + strconv.Quote(federationAccountsServiceSDL) + `
+	},
+	"playground": {}
+}`
+
+const graphqlSubgraphSchema = `scalar _Any scalar _FieldSet union _Entity = User type _Service { sdl: String } type Query { me: User _entities(representations: [_Any!]!): [_Entity]! _service: _Service! } type User { id: ID! username: String! }`

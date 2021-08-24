@@ -370,7 +370,8 @@ func (g *GraphQLConfigAdapter) isSupergraphAPIDefinition() bool {
 }
 
 func (g *GraphQLConfigAdapter) isProxyOnlyAPIDefinition() bool {
-	return g.apiDefinition.GraphQL.Enabled && g.apiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeProxyOnly
+	return g.apiDefinition.GraphQL.Enabled &&
+		(g.apiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeProxyOnly || g.apiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSubgraph)
 }
 
 func (g *GraphQLConfigAdapter) getHttpClient() *http.Client {
