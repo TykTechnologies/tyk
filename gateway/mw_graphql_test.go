@@ -193,6 +193,27 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 	})
 
 	t.Run("graphql engine v2", func(t *testing.T) {
+		t.Run("proxy-only", func(t *testing.T) {
+			BuildAndLoadAPI(func(spec *APISpec) {
+				spec.UseKeylessAccess = true
+				spec.GraphQL.Enabled = true
+				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
+				spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+				spec.GraphQL.Schema = gqlProxyUpstreamSchema
+				spec.Proxy.ListenPath = "/"
+				spec.Proxy.TargetURL = testGraphQLProxyUpstream
+			})
+
+			request := gql.Request{
+				Query: `{ hello(name: "World") }`,
+			}
+
+			_, _ = g.Run(t, []test.TestCase{
+				{Data: request, Method: http.MethodPost, BodyMatch: `{"data":{"hello":"World"}}`, Code: http.StatusOK},
+			}...)
+
+		})
+
 		t.Run("subgraph", func(t *testing.T) {
 			BuildAndLoadAPI(func(spec *APISpec) {
 				spec.UseKeylessAccess = true
@@ -220,7 +241,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 			})
 		})
 
-		t.Run("proxy-only", func(t *testing.T) {
+		t.Run("udg", func(t *testing.T) {
 			BuildAndLoadAPI(func(spec *APISpec) {
 				spec.UseKeylessAccess = true
 				spec.Proxy.ListenPath = "/"
@@ -702,6 +723,10 @@ fragment TypeRef on __Type {
       }
     }
   }
+}`
+
+const gqlProxyUpstreamSchema = `type Query {
+	hello(name: String!): String!
 }`
 
 const gqlCountriesSchema = `directive @cacheControl(

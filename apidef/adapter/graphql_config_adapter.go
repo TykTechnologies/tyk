@@ -32,12 +32,12 @@ func WithHttpClient(httpClient *http.Client) GraphQLConfigAdapterOption {
 }
 
 type GraphQLConfigAdapter struct {
-	apiDefinition apidef.APIDefinition
+	apiDefinition *apidef.APIDefinition
 	httpClient    *http.Client
 	schema        *graphql.Schema
 }
 
-func NewGraphQLConfigAdapter(apiDefinition apidef.APIDefinition, options ...GraphQLConfigAdapterOption) GraphQLConfigAdapter {
+func NewGraphQLConfigAdapter(apiDefinition *apidef.APIDefinition, options ...GraphQLConfigAdapterOption) GraphQLConfigAdapter {
 	adapter := GraphQLConfigAdapter{apiDefinition: apiDefinition}
 	for _, option := range options {
 		option(&adapter)
@@ -74,10 +74,12 @@ func (g *GraphQLConfigAdapter) createV2ConfigForProxyOnlyExecutionMode() (*graph
 		StaticHeaders: staticHeaders,
 	}
 
-	var err error
-	g.schema, err = graphql.NewSchemaFromString(g.apiDefinition.GraphQL.Schema)
-	if err != nil {
-		return nil, err
+	if g.schema == nil {
+		var err error
+		g.schema, err = graphql.NewSchemaFromString(g.apiDefinition.GraphQL.Schema)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	v2Config, err := graphql.NewProxyEngineConfigFactory(g.schema, upstreamConfig, graphql.WithProxyHttpClient(g.httpClient)).EngineV2Configuration()

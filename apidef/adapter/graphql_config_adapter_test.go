@@ -21,7 +21,7 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 		var gqlConfig apidef.GraphQLConfig
 		require.NoError(t, json.Unmarshal([]byte(graphqlProxyOnlyGraphQLConfig), &gqlConfig))
 
-		apiDef := apidef.APIDefinition{
+		apiDef := &apidef.APIDefinition{
 			GraphQL: gqlConfig,
 			Proxy: apidef.ProxyConfig{
 				TargetURL: "http://localhost:8080",
@@ -73,7 +73,7 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 		var gqlConfig apidef.GraphQLConfig
 		require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2ConfigJson), &gqlConfig))
 
-		apiDef := apidef.APIDefinition{
+		apiDef := &apidef.APIDefinition{
 			GraphQL: gqlConfig,
 		}
 
@@ -88,7 +88,7 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 		var gqlConfig apidef.GraphQLConfig
 		require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2SupergraphConfigJson), &gqlConfig))
 
-		apiDef := apidef.APIDefinition{
+		apiDef := &apidef.APIDefinition{
 			GraphQL: gqlConfig,
 		}
 
@@ -103,7 +103,7 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 		var gqlConfig apidef.GraphQLConfig
 		require.NoError(t, json.Unmarshal([]byte(graphqlEngineV1ConfigJson), &gqlConfig))
 
-		apiDef := apidef.APIDefinition{
+		apiDef := &apidef.APIDefinition{
 			GraphQL: gqlConfig,
 		}
 
@@ -174,7 +174,7 @@ func TestGraphQLConfigAdapter_supergraphDataSourceConfigs(t *testing.T) {
 	var gqlConfig apidef.GraphQLConfig
 	require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2SupergraphConfigJson), &gqlConfig))
 
-	apiDef := apidef.APIDefinition{
+	apiDef := &apidef.APIDefinition{
 		GraphQL: gqlConfig,
 	}
 
@@ -220,7 +220,7 @@ func TestGraphQLConfigAdapter_engineConfigV2FieldConfigs(t *testing.T) {
 	var gqlConfig apidef.GraphQLConfig
 	require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2ConfigJson), &gqlConfig))
 
-	apiDef := apidef.APIDefinition{
+	apiDef := &apidef.APIDefinition{
 		GraphQL: gqlConfig,
 	}
 
@@ -378,7 +378,7 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 	var gqlConfig apidef.GraphQLConfig
 	require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2ConfigJson), &gqlConfig))
 
-	apiDef := apidef.APIDefinition{
+	apiDef := &apidef.APIDefinition{
 		GraphQL: gqlConfig,
 	}
 

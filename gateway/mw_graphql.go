@@ -8,9 +8,10 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/jensneuse/abstractlogger"
+	"github.com/sirupsen/logrus"
+
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/resolve"
 	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
-	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/adapter"
@@ -158,7 +159,7 @@ func (m *GraphQLMiddleware) initGraphQLEngineV1(logger *abstractlogger.LogrusLog
 }
 
 func (m *GraphQLMiddleware) initGraphQLEngineV2(logger *abstractlogger.LogrusLogger) {
-	configAdapter := adapter.NewGraphQLConfigAdapter(m.Spec.GraphQL,
+	configAdapter := adapter.NewGraphQLConfigAdapter(m.Spec.APIDefinition,
 		adapter.WithHttpClient(m.Spec.GraphQLExecutor.Client),
 		adapter.WithSchema(m.Spec.GraphQLExecutor.Schema),
 	)
@@ -355,7 +356,8 @@ func (m *GraphQLMiddleware) OnError(ctx resolve.HookContext, output []byte, sing
 
 func needsGraphQLExecutionEngine(apiSpec *APISpec) bool {
 	return apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeExecutionEngine ||
-		apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph
+		apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph ||
+		(apiSpec.GraphQL.Version == apidef.GraphQLConfigVersion2 && apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeProxyOnly)
 }
 
 func absLoggerLevel(level logrus.Level) abstractlogger.Level {
