@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -217,26 +216,24 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 		t.Run("subgraph", func(t *testing.T) {
 			BuildAndLoadAPI(func(spec *APISpec) {
 				spec.UseKeylessAccess = true
+				spec.Proxy.TargetURL = testSubgraphReviews
 				spec.Proxy.ListenPath = "/"
 				spec.GraphQL.Enabled = true
 				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeSubgraph
-				spec.GraphQL.Schema = gqlSubgraphSchemaAccounts
+				spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+				spec.GraphQL.Schema = gqlSubgraphSchemaReviews
 			})
 
 			t.Run("should execute subgraph successfully", func(t *testing.T) {
 				request := gql.Request{
-					Query:     gqlSubgraphQueryAccounts,
+					Query:     gqlSubgraphQueryReviews,
 					Variables: []byte(gqlSubgraphVariables),
 				}
 
 				_, _ = g.Run(t, test.TestCase{
-					Data: request,
-					BodyMatchFunc: func(bytes []byte) bool {
-						gqlRequest := graphQLRequestFromBodyMatchFuncBytes(t, bytes)
-						assertionResult := assert.Equal(t, `{"_representations":[{"__typename":"User","id":"1"}]}`, string(gqlRequest.Variables))
-						return assertionResult && assert.Equal(t, `query Subgraph($_representations: [_Any!]!) { _entities(representations: $_representations) { ... on User { id username } } }`, strings.Join(strings.Fields(gqlRequest.Query), " "))
-					},
-					Code: http.StatusOK,
+					Data:      request,
+					BodyMatch: `{"data":{"\_entities":\[{"reviews":\[{"body":"A highly effective form of birth control."},{"body":"Fedoras are one of the most fashionable hats around and can look great with a variety of outfits."}\]}\]}}`,
+					Code:      http.StatusOK,
 				})
 			})
 		})
@@ -625,6 +622,70 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 
 }
 
+func TestNeedsGraphQLExecutionEngine(t *testing.T) {
+	testCases := []struct {
+		name          string
+		version       apidef.GraphQLConfigVersion
+		executionMode apidef.GraphQLExecutionMode
+		expected      bool
+	}{
+		{
+			name:          "true for executionMode = executionEngine in v2",
+			version:       apidef.GraphQLConfigVersion2,
+			executionMode: apidef.GraphQLExecutionModeExecutionEngine,
+			expected:      true,
+		},
+		{
+			name:          "true for executionMode = supergraph in v2",
+			version:       apidef.GraphQLConfigVersion2,
+			executionMode: apidef.GraphQLExecutionModeSupergraph,
+			expected:      true,
+		},
+		{
+			name:          "true for executionMode = subgraph in v2",
+			version:       apidef.GraphQLConfigVersion2,
+			executionMode: apidef.GraphQLExecutionModeExecutionEngine,
+			expected:      true,
+		},
+		{
+			name:          "true for executionMode = proxyOnly in v2",
+			version:       apidef.GraphQLConfigVersion2,
+			executionMode: apidef.GraphQLExecutionModeProxyOnly,
+			expected:      true,
+		},
+		{
+			name:          "true for executionMode = executionEngine in v1",
+			version:       apidef.GraphQLConfigVersion1,
+			executionMode: apidef.GraphQLExecutionModeExecutionEngine,
+			expected:      true,
+		},
+		{
+			name:          "false for executionMode = proxyOnly in v1",
+			version:       apidef.GraphQLConfigVersion1,
+			executionMode: apidef.GraphQLExecutionModeProxyOnly,
+			expected:      false,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			apiSpec := &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					GraphQL: apidef.GraphQLConfig{
+						Enabled:       true,
+						Version:       tc.version,
+						ExecutionMode: tc.executionMode,
+					},
+				},
+			}
+
+			result := needsGraphQLExecutionEngine(apiSpec)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
 const gqlIntrospectionQuery = `query IntrospectionQuery {
   __schema {
     queryType {
@@ -891,11 +952,12 @@ extend type Product @key(fields: "upc") {
 	reviews: [Review]
 }`
 
-const gqlSubgraphQueryAccounts = `query Subgraph($_representations: [_Any!]!) {
+const gqlSubgraphQueryReviews = `query Subgraph($_representations: [_Any!]!) {
   _entities(representations: $_representations) {
     ... on User {
-      id
-      username
+      reviews {
+		body
+	  }
     }
   }
 }`
@@ -936,15 +998,3 @@ type Review {
 	author: User!
 	product: Product!
 }`
-
-func graphQLRequestFromBodyMatchFuncBytes(t *testing.T, bytes []byte) gql.Request {
-	bodyContent := make(map[string]interface{})
-	err := json.Unmarshal(bytes, &bodyContent)
-	require.NoError(t, err)
-
-	gqlRequest := gql.Request{}
-	err = json.Unmarshal([]byte(bodyContent["Body"].(string)), &gqlRequest)
-	require.NoError(t, err)
-
-	return gqlRequest
-}

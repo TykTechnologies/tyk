@@ -357,6 +357,7 @@ func (m *GraphQLMiddleware) OnError(ctx resolve.HookContext, output []byte, sing
 func needsGraphQLExecutionEngine(apiSpec *APISpec) bool {
 	return apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeExecutionEngine ||
 		apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph ||
+		apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSubgraph ||
 		(apiSpec.GraphQL.Version == apidef.GraphQLConfigVersion2 && apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeProxyOnly)
 }
 

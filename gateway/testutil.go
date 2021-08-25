@@ -707,6 +707,7 @@ func subgraphReviewsHandler(w http.ResponseWriter, r *http.Request) {
 			"data": {
 				"_entities": [
 					{
+						"__typename": "User",
 						"reviews": [
 							{
 								"body": "A highly effective form of birth control."
