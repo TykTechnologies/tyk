@@ -46,7 +46,7 @@ type ProxyResponse struct {
 type ReturningHttpHandler interface {
 	ServeHTTP(http.ResponseWriter, *http.Request) ProxyResponse
 	ServeHTTPForCache(http.ResponseWriter, *http.Request) ProxyResponse
-	CopyResponse(io.Writer, io.Reader)
+	CopyResponse(io.Writer, io.Reader, time.Duration)
 }
 
 // SuccessHandler represents the final ServeHTTP() request for a proxied API request
@@ -130,7 +130,7 @@ func getSessionTags(session *user.SessionState) []string {
 
 func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, responseCopy *http.Response) {
 
-	if s.Spec.DoNotTrack {
+	if s.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
 		return
 	}
 
@@ -200,7 +200,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 
 		trackEP := false
 		trackedPath := r.URL.Path
-		if p := ctxGetTrackedPath(r); p != "" && !ctxGetDoNotTrack(r) {
+		if p := ctxGetTrackedPath(r); p != "" {
 			trackEP = true
 			trackedPath = p
 		}
@@ -273,13 +273,19 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing Latency, code int, re
 }
 
 func recordDetail(r *http.Request, spec *APISpec) bool {
+
+	// when streaming in grpc, we do not record the request
+	if IsGrpcStreaming(r) {
+		return false
+	}
+
 	if spec.EnableDetailedRecording {
 		return true
 	}
 
 	session := ctxGetSession(r)
 	if session != nil {
-		if session.EnableDetailedRecording {
+		if session.EnableDetailedRecording || session.EnableDetailRecording {
 			return true
 		}
 	}
@@ -297,7 +303,8 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 	}
 
 	// Session found
-	return ses.(user.SessionState).EnableDetailedRecording
+	sess := ses.(*user.SessionState)
+	return sess.EnableDetailRecording || sess.EnableDetailedRecording
 }
 
 // ServeHTTP will store the request details in the analytics store if necessary and proxy the request to it's
@@ -311,7 +318,7 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	if !s.Spec.VersionData.NotVersioned && versionDef.Location == "url" && versionDef.StripPath {
 		part := s.Spec.getVersionFromRequest(r)
 
-		log.Info("Stripping version from url: ", part)
+		log.Debug("Stripping version from url: ", part)
 
 		r.URL.Path = strings.Replace(r.URL.Path, part+"/", "", 1)
 		r.URL.RawPath = strings.Replace(r.URL.RawPath, part+"/", "", 1)

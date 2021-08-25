@@ -3,6 +3,7 @@ package gateway
 import (
 	"encoding/base64"
 	"testing"
+	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
@@ -171,8 +172,8 @@ func TestTransformResponse_WithCache(t *testing.T) {
 	createAPI(true)
 
 	ts.Run(t, []test.TestCase{
-		{Path: path, Headers: map[string]string{"Foo": "Bar"}, Code: 200, BodyMatch: `{"foo":"Bar"}`},  // Returns response and caches it
-		{Path: path, Headers: map[string]string{"Foo": "Bar2"}, Code: 200, BodyMatch: `{"foo":"Bar"}`}, // Returns cached response directly
+		{Path: path, Headers: map[string]string{"Foo": "Bar"}, Code: 200, BodyMatch: `{"foo":"Bar"}`, Delay: 100 * time.Millisecond}, // Returns response and caches it
+		{Path: path, Headers: map[string]string{"Foo": "Bar2"}, Code: 200, BodyMatch: `{"foo":"Bar"}`},                               // Returns cached response directly
 	}...)
 
 }

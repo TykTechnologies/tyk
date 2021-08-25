@@ -24,6 +24,7 @@ the code, etc. -->
 - [ ] Bug fix (non-breaking change which fixes an issue)
 - [ ] New feature (non-breaking change which adds functionality)
 - [ ] Breaking change (fix or feature that would cause existing functionality to change)
+- [ ] Refactoring or add test (improvements in base code or adds test coverage to functionality)
 
 ## Checklist
 <!-- Go over all the following points, and put an `x` in all the boxes that apply -->
@@ -34,6 +35,7 @@ the code, etc. -->
       *your branch* off *our latest `master`*.
 - [ ] My change requires a change to the documentation.
   - [ ] If you've changed APIs, describe what needs to be updated in the documentation.
+  - [ ] If new config option added, ensure that it can be set via ENV variable
 - [ ] I have updated the documentation accordingly.
 - [ ] Modules and vendor dependencies have been updated; run `go mod tidy && go mod vendor`
 - [ ] When updating library version must provide reason/explanation for this update.

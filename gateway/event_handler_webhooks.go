@@ -191,8 +191,9 @@ func (w *WebHookHandler) BuildRequest(reqBody string) (*http.Request, error) {
 
 	req.Header.Set(headers.UserAgent, headers.TykHookshot)
 
+	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
 	for key, val := range w.conf.HeaderList {
-		req.Header.Set(key, val)
+		setCustomHeader(req.Header, key, val, ignoreCanonical)
 	}
 
 	if req.Header.Get(headers.ContentType) == "" {

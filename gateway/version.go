@@ -1,3 +1,4 @@
 package gateway
 
-const VERSION = "v2.10"
+var VERSION = "v3.0.0"
+var builtBy, Commit, buildDate string

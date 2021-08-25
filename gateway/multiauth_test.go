@@ -42,7 +42,7 @@ const multiAuthDev = `{
 }`
 
 func createMultiAuthKeyAuthSession(isBench bool) *user.SessionState {
-	session := new(user.SessionState)
+	session := user.NewSessionState()
 	session.Rate = 100.0
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
@@ -61,7 +61,7 @@ func createMultiAuthKeyAuthSession(isBench bool) *user.SessionState {
 }
 
 func createMultiBasicAuthSession(isBench bool) *user.SessionState {
-	session := new(user.SessionState)
+	session := user.NewSessionState()
 	session.Rate = 8.0
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()

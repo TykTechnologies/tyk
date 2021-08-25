@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/justinas/alice"
 	"github.com/sirupsen/logrus"
 
@@ -535,4 +537,34 @@ func TestWithURLRewrite(t *testing.T) {
 		}...)
 	})
 
+}
+
+func TestRequestSigning_getRequestPath(t *testing.T) {
+	api := BuildAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/test/"
+		spec.Proxy.StripListenPath = false
+	})[0]
+
+	rs := RequestSigning{BaseMiddleware{Spec: api}}
+
+	req, _ := http.NewRequest(http.MethodGet, "http://example.com/test/get?param1=value1", nil)
+
+	t.Run("StripListenPath=true", func(t *testing.T) {
+		api.Proxy.StripListenPath = true
+		assert.Equal(t, "/get?param1=value1", rs.getRequestPath(req))
+
+		t.Run("path is empty", func(t *testing.T) {
+			reqWithEmptyPath, _ := http.NewRequest(http.MethodGet, "http://example.com/test/", nil)
+			assert.Equal(t, "/", rs.getRequestPath(reqWithEmptyPath))
+		})
+
+		api.Proxy.StripListenPath = false
+	})
+
+	t.Run("URL rewrite", func(t *testing.T) {
+		rewrittenURL := &url.URL{Path: "/test/rewritten", RawQuery: "param1=value1"}
+		ctxSetURLRewriteTarget(req, rewrittenURL)
+		assert.Equal(t, "/test/rewritten?param1=value1", rs.getRequestPath(req))
+		ctxSetURLRewriteTarget(req, nil)
+	})
 }
