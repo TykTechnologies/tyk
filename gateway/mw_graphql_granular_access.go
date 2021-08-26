@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
@@ -17,6 +16,8 @@ const (
 	GranularAccessFailReasonInternalError
 	GranularAccessFailReasonValidationError
 )
+
+const RestrictedFieldValidationFailedLogMsg = "Error during GraphQL request restricted fields validation: '%s'"
 
 type GraphQLGranularAccessMiddleware struct {
 	BaseMiddleware
@@ -55,13 +56,13 @@ func (m *GraphQLGranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, 
 	case GranularAccessFailReasonNone:
 		return nil, http.StatusOK
 	case GranularAccessFailReasonInternalError:
-		m.Logger().Errorf("Error during GraphQL request restricted fields validation: '%s'", result.internalErr)
-		return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
+		m.Logger().Errorf(RestrictedFieldValidationFailedLogMsg, result.internalErr)
+		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	case GranularAccessFailReasonValidationError:
 		w.Header().Set(headers.ContentType, headers.ApplicationJSON)
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = result.validationResult.Errors.WriteResponse(w)
-		m.Logger().Debugf("Error during GraphQL request restricted fields validation: '%s'", result.validationResult.Errors)
+		m.Logger().Debugf(RestrictedFieldValidationFailedLogMsg, result.validationResult.Errors)
 		return errCustomBodyResponse, http.StatusBadRequest
 	}
 
