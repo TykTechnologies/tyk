@@ -1061,11 +1061,8 @@ func (gw *Gateway) initialiseSystem() error {
 		if gwConfig.PIDFileLocation == "" {
 			gwConfig.PIDFileLocation = "/var/run/tyk/tyk-gateway.pid"
 		}
-		// It's necessary to set global conf before and after calling afterConfSetup as global conf
-		// is being used by dependencies of the even handler init and then conf is modified again.
 		gw.SetConfig(gwConfig)
 		gw.afterConfSetup()
-		gw.SetConfig(gwConfig)
 	}
 
 	overrideTykErrors(gw)
