@@ -384,7 +384,43 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 						require.NoError(t, err)
 
 						_, msg, err = wsConn.ReadMessage()
-						assert.Equal(t, `{"id":"1","type":"error","payload":"failed restricted fields check"}`, string(msg))
+						assert.Equal(t, `{"id":"1","type":"error","payload":[{"message":"field: countries is restricted on type: Query"}]}`, string(msg))
+						assert.NoError(t, err)
+					})
+
+					t.Run("depth limit", func(t *testing.T) {
+						_, directKey := g.CreateSession(func(s *user.SessionState) {
+							s.AccessRights = map[string]user.AccessDefinition{
+								api.APIID: {
+									APIID:   api.APIID,
+									APIName: api.Name,
+									Limit:   &user.APILimit{MaxQueryDepth: 1},
+								},
+							}
+						})
+
+						wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
+							headers.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
+							headers.Authorization:        {directKey},
+						})
+						require.NoError(t, err)
+						defer wsConn.Close()
+
+						// Send a connection init message to gateway
+						err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"type":"connection_init","payload":{}}`))
+						require.NoError(t, err)
+
+						_, msg, err := wsConn.ReadMessage()
+
+						// Gateway should acknowledge the connection
+						require.Equal(t, `{"id":"","type":"connection_ack","payload":null}`, string(msg))
+						require.NoError(t, err)
+
+						err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"id": "1", "type": "start", "payload": {"query": "{ countries { name } }", "variables": null}}`))
+						require.NoError(t, err)
+
+						_, msg, err = wsConn.ReadMessage()
+						assert.Equal(t, `{"id":"1","type":"error","payload":[{"message":"depth limit exceeded"}]}`, string(msg))
 						assert.NoError(t, err)
 					})
 				})
@@ -518,10 +554,9 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 
 				t.Run("graphql over websockets", func(t *testing.T) {
 					api.UseKeylessAccess = false
-					api.GraphQL.Schema = "type Query { hello: String! }"
 					LoadAPI(api)
 
-					t.Run("field-based permissions", func(t *testing.T) {
+					t.Run("field-based permissions checks are skipped", func(t *testing.T) {
 						_, directKey := g.CreateSession(func(s *user.SessionState) {
 							s.AccessRights = map[string]user.AccessDefinition{
 								api.APIID: {
@@ -554,11 +589,11 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 						require.Equal(t, `{"id":"","type":"connection_ack","payload":null}`, string(msg))
 						require.NoError(t, err)
 
-						err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"id": "1", "type": "start", "payload": {"query": "{ hello }", "variables": null}}`))
+						err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"id": "1", "type": "start", "payload": {"query": "query Query { countries { name } }", "variables": null}}`))
 						require.NoError(t, err)
 
 						_, msg, err = wsConn.ReadMessage()
-						assert.Equal(t, `{"id":"1","type":"error","payload":"error"}`, string(msg))
+						assert.Equal(t, `{"id":"1","type":"data","payload":{"data":{"countries":[{"name":"Turkey"},{"name":"Russia"},{"name":"United Kingdom"},{"name":"Germany"}]}}}`, string(msg))
 						assert.NoError(t, err)
 					})
 				})
