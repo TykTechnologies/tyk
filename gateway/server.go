@@ -1243,6 +1243,8 @@ func (gw *Gateway) afterConfSetup() {
 			log.Fatalf("Could not fetch policy connection string... %v", err)
 		}
 	}
+
+	gw.SetConfig(conf)
 }
 
 func (gw *Gateway) kvStore(value string) (string, error) {
