@@ -18,6 +18,8 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/getkin/kin-openapi/openapi3"
+
 	"github.com/cenk/backoff"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/resolve"
 
@@ -166,6 +168,7 @@ type ExtendedCircuitBreakerMeta struct {
 // flattened URL list is checked for matching paths and then it's status evaluated if found.
 type APISpec struct {
 	*apidef.APIDefinition
+	OAS openapi3.Swagger
 	sync.RWMutex
 
 	RxPaths                  map[string][]URLSpec
@@ -503,12 +506,24 @@ func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string) ([]*API
 	return specs, nil
 }
 
-func (a APIDefinitionLoader) ParseDefinition(r io.Reader) *apidef.APIDefinition {
-	def := &apidef.APIDefinition{}
-	if err := json.NewDecoder(r).Decode(def); err != nil {
-		log.Error("[RPC] --> Couldn't unmarshal api configuration: ", err)
+func (a APIDefinitionLoader) ParseDefinition(r io.Reader) (api apidef.APIDefinition) {
+	if err := json.NewDecoder(r).Decode(&api); err != nil {
+		log.Error("Couldn't unmarshal api configuration: ", err)
 	}
-	return def
+
+	return
+}
+
+func (a APIDefinitionLoader) ParseOAS(r io.Reader) (oas openapi3.Swagger) {
+	if err := json.NewDecoder(r).Decode(&oas); err != nil {
+		log.Error("Couldn't unmarshal oas configuration: ", err)
+	}
+
+	return
+}
+
+func (a APIDefinitionLoader) GetOASFilepath(path string) string {
+	return strings.TrimSuffix(path, ".json") + "-oas.json"
 }
 
 // FromDir will load APIDefinitions from a directory on the filesystem. Definitions need
@@ -518,15 +533,29 @@ func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 	// Grab json files from directory
 	paths, _ := filepath.Glob(filepath.Join(dir, "*.json"))
 	for _, path := range paths {
+		if strings.HasSuffix(path, "-oas.json") {
+			continue
+		}
+
 		log.Info("Loading API Specification from ", path)
 		f, err := os.Open(path)
 		if err != nil {
 			log.Error("Couldn't open api configuration file: ", err)
 			continue
 		}
+
 		def := a.ParseDefinition(f)
-		f.Close()
-		spec := a.MakeSpec(def, nil)
+		spec := a.MakeSpec(&def, nil)
+
+		_, _ = f.Seek(0, io.SeekStart)
+		_ = f.Close()
+
+		f, err = os.Open(a.GetOASFilepath(path))
+		if err == nil {
+			spec.OAS = a.ParseOAS(f)
+			_ = f.Close()
+		}
+
 		specs = append(specs, spec)
 	}
 	return specs
