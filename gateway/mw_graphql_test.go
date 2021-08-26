@@ -394,7 +394,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 								api.APIID: {
 									APIID:   api.APIID,
 									APIName: api.Name,
-									Limit:   &user.APILimit{MaxQueryDepth: 1},
+									Limit:   user.APILimit{MaxQueryDepth: 1},
 								},
 							}
 						})
