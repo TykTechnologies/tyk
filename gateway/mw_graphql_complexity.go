@@ -1,10 +1,10 @@
 package gateway
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -38,38 +38,56 @@ func (m *GraphQLComplexityMiddleware) ProcessRequest(w http.ResponseWriter, r *h
 	}
 
 	gqlRequest := ctxGetGraphQLRequest(r)
+	if gqlRequest == nil {
+		return nil, http.StatusOK
+	}
 
-	// If MaxQueryDepth is -1 or 0, it means unlimited and no need for depth limiting.
-	if m.DepthLimitEnabled(accessDef) {
-		if failReason := m.DepthLimitExceeded(gqlRequest, accessDef, m.Spec.GraphQLExecutor.Schema); failReason != ComplexityFailReasonNone {
-			return m.handleComplexityFailReason(failReason)
-		}
+	complexityCheck := &GraphqlComplexityChecker{logger: m.Logger()}
+	failReason := complexityCheck.DepthLimitExceeded(gqlRequest, accessDef, m.Spec.GraphQLExecutor.Schema)
+	return m.handleComplexityFailReason(failReason)
+}
+
+func (m *GraphQLComplexityMiddleware) handleComplexityFailReason(failReason ComplexityFailReason) (error, int) {
+	switch failReason {
+	case ComplexityFailReasonInternalError:
+		return ProxyingRequestFailedErr, http.StatusInternalServerError
+	case ComplexityFailReasonDepthLimitExceeded:
+		return GraphQLDepthLimitExceededErr, http.StatusForbidden
 	}
 
 	return nil, http.StatusOK
 }
 
-func (m *GraphQLComplexityMiddleware) DepthLimitEnabled(accessDef *user.AccessDefinition) bool {
+type GraphqlComplexityChecker struct {
+	logger *logrus.Entry
+}
+
+func (c *GraphqlComplexityChecker) DepthLimitEnabled(accessDef *user.AccessDefinition) bool {
 	// There is a possibility that depth limit is disabled on field level too,
 	// but we could not determine this without analyzing actual requested fields.
 	if len(accessDef.FieldAccessRights) > 0 {
 		return true
 	}
 
+	// If MaxQueryDepth is -1 or 0, it means unlimited and no need for depth limiting.
 	return accessDef.Limit.MaxQueryDepth > 0
 }
 
-func (m *GraphQLComplexityMiddleware) DepthLimitExceeded(gqlRequest *graphql.Request, accessDef *user.AccessDefinition, schema *graphql.Schema) ComplexityFailReason {
+func (c *GraphqlComplexityChecker) DepthLimitExceeded(gqlRequest *graphql.Request, accessDef *user.AccessDefinition, schema *graphql.Schema) ComplexityFailReason {
+	if !c.DepthLimitEnabled(accessDef) {
+		return ComplexityFailReasonNone
+	}
+
 	complexityRes, err := gqlRequest.CalculateComplexity(graphql.DefaultComplexityCalculator, schema)
 	if err != nil {
-		log.Errorf("Error while calculating complexity of GraphQL request: '%s'", err)
+		c.logger.Errorf("Error while calculating complexity of GraphQL request: '%s'", err)
 		return ComplexityFailReasonInternalError
 	}
 
 	// do per query depth check
 	if len(accessDef.FieldAccessRights) == 0 {
 		if complexityRes.Depth > accessDef.Limit.MaxQueryDepth {
-			log.Debugf("Complexity of the request is higher than the allowed limit '%d'", accessDef.Limit.MaxQueryDepth)
+			c.logger.Debugf("Complexity of the request is higher than the allowed limit '%d'", accessDef.Limit.MaxQueryDepth)
 			return ComplexityFailReasonDepthLimitExceeded
 		}
 		return ComplexityFailReasonNone
@@ -97,7 +115,7 @@ func (m *GraphQLComplexityMiddleware) DepthLimitExceeded(gqlRequest *graphql.Req
 
 		if hasPerFieldLimits {
 			if greaterThanInt(fieldComplexityRes.Depth, fieldAccessDefinition.Limits.MaxQueryDepth) {
-				log.Debugf("Depth '%d' of the root field: %s.%s is higher than the allowed field limit '%d'",
+				c.logger.Debugf("Depth '%d' of the root field: %s.%s is higher than the allowed field limit '%d'",
 					fieldComplexityRes.Depth, fieldAccessDefinition.TypeName, fieldAccessDefinition.FieldName, fieldAccessDefinition.Limits.MaxQueryDepth)
 
 				return ComplexityFailReasonDepthLimitExceeded
@@ -109,22 +127,11 @@ func (m *GraphQLComplexityMiddleware) DepthLimitExceeded(gqlRequest *graphql.Req
 		// have to increase resulting field depth by 1 to get a global depth
 		queryDepth := fieldComplexityRes.Depth + 1
 		if greaterThanInt(queryDepth, accessDef.Limit.MaxQueryDepth) {
-			log.Debugf("Depth '%d' of the root field: %s.%s is higher than the allowed global limit '%d'",
+			c.logger.Debugf("Depth '%d' of the root field: %s.%s is higher than the allowed global limit '%d'",
 				queryDepth, fieldComplexityRes.TypeName, fieldComplexityRes.FieldName, accessDef.Limit.MaxQueryDepth)
 
 			return ComplexityFailReasonDepthLimitExceeded
 		}
 	}
 	return ComplexityFailReasonNone
-}
-
-func (m *GraphQLComplexityMiddleware) handleComplexityFailReason(failReason ComplexityFailReason) (error, int) {
-	switch failReason {
-	case ComplexityFailReasonInternalError:
-		return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
-	case ComplexityFailReasonDepthLimitExceeded:
-		return errors.New("depth limit exceeded"), http.StatusForbidden
-	}
-
-	return nil, http.StatusOK
 }
