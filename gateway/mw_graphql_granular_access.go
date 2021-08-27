@@ -1,13 +1,23 @@
 package gateway
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/user"
 )
+
+type GranularAccessFailReason int
+
+const (
+	GranularAccessFailReasonNone GranularAccessFailReason = iota
+	GranularAccessFailReasonInternalError
+	GranularAccessFailReasonValidationError
+)
+
+const RestrictedFieldValidationFailedLogMsg = "Error during GraphQL request restricted fields validation: '%s'"
 
 type GraphQLGranularAccessMiddleware struct {
 	BaseMiddleware
@@ -29,35 +39,62 @@ func (m *GraphQLGranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, 
 
 	session := ctxGetSession(r)
 
-	sessionVersionData, foundAPI := session.AccessRights[m.Spec.APIID]
+	accessDef, foundAPI := session.AccessRights[m.Spec.APIID]
 	if !foundAPI {
 		return nil, http.StatusOK
 	}
 
-	if len(sessionVersionData.RestrictedTypes) == 0 {
+	gqlRequest := ctxGetGraphQLRequest(r)
+	if gqlRequest == nil {
 		return nil, http.StatusOK
 	}
 
-	gqlRequest := ctxGetGraphQLRequest(r)
+	checker := &GraphqlGranularAccessChecker{}
+	result := checker.CheckGraphqlRequestFieldAllowance(gqlRequest, &accessDef, m.Spec.GraphQLExecutor.Schema)
 
-	restrictedFieldsList := graphql.FieldRestrictionList{
-		Kind:  graphql.BlockList,
-		Types: sessionVersionData.RestrictedTypes,
-	}
-
-	result, err := gqlRequest.ValidateFieldRestrictions(m.Spec.GraphQLExecutor.Schema, restrictedFieldsList, graphql.DefaultFieldsValidator{})
-	if err != nil {
-		m.Logger().Errorf("Error during GraphQL request restricted fields validation: '%s'", err)
-		return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
-	}
-
-	if !result.Valid || (result.Errors != nil && result.Errors.Count() > 0) {
+	switch result.failReason {
+	case GranularAccessFailReasonNone:
+		return nil, http.StatusOK
+	case GranularAccessFailReasonInternalError:
+		m.Logger().Errorf(RestrictedFieldValidationFailedLogMsg, result.internalErr)
+		return ProxyingRequestFailedErr, http.StatusInternalServerError
+	case GranularAccessFailReasonValidationError:
 		w.Header().Set(headers.ContentType, headers.ApplicationJSON)
 		w.WriteHeader(http.StatusBadRequest)
-		_, _ = result.Errors.WriteResponse(w)
-		m.Logger().Debugf("Error during GraphQL request restricted fields validation: '%s'", result.Errors)
+		_, _ = result.validationResult.Errors.WriteResponse(w)
+		m.Logger().Debugf(RestrictedFieldValidationFailedLogMsg, result.validationResult.Errors)
 		return errCustomBodyResponse, http.StatusBadRequest
 	}
 
 	return nil, http.StatusOK
+}
+
+type GraphqlGranularAccessResult struct {
+	failReason       GranularAccessFailReason
+	validationResult *graphql.RequestFieldsValidationResult
+	internalErr      error
+}
+
+type GraphqlGranularAccessChecker struct{}
+
+func (GraphqlGranularAccessChecker) CheckGraphqlRequestFieldAllowance(gqlRequest *graphql.Request, accessDef *user.AccessDefinition, schema *graphql.Schema) GraphqlGranularAccessResult {
+	if len(accessDef.RestrictedTypes) == 0 {
+		return GraphqlGranularAccessResult{failReason: GranularAccessFailReasonNone}
+	}
+
+	restrictedFieldsList := graphql.FieldRestrictionList{
+		Kind:  graphql.BlockList,
+		Types: accessDef.RestrictedTypes,
+	}
+
+	result, err := gqlRequest.ValidateFieldRestrictions(schema, restrictedFieldsList, graphql.DefaultFieldsValidator{})
+	if err != nil {
+		return GraphqlGranularAccessResult{failReason: GranularAccessFailReasonInternalError, internalErr: err}
+	}
+
+	if !result.Valid || (result.Errors != nil && result.Errors.Count() > 0) {
+		return GraphqlGranularAccessResult{failReason: GranularAccessFailReasonValidationError, validationResult: &result}
+	}
+
+	return GraphqlGranularAccessResult{failReason: GranularAccessFailReasonNone}
 }
