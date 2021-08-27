@@ -333,6 +333,7 @@ func GetAccessDefinitionByAPIIDOrSession(currentSession *user.SessionState, api 
 		} else {
 			accessDef.Limit = rights.Limit
 			accessDef.FieldAccessRights = rights.FieldAccessRights
+			accessDef.RestrictedTypes = rights.RestrictedTypes
 			allowanceScope = rights.AllowanceScope
 		}
 	}
