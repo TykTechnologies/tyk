@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -12,7 +13,7 @@ import (
 )
 
 func TestGraphQLComplexityMiddleware_DepthLimitEnabled(t *testing.T) {
-	m := GraphQLComplexityMiddleware{}
+	m := GraphqlComplexityChecker{logger: logrus.NewEntry(log)}
 
 	accessDefPerField := &user.AccessDefinition{
 		FieldAccessRights: []user.FieldAccessDefinition{
@@ -45,7 +46,7 @@ func TestGraphQLComplexityMiddleware_DepthLimitEnabled(t *testing.T) {
 }
 
 func TestGraphQLComplexityMiddleware_DepthLimitExceeded(t *testing.T) {
-	m := GraphQLComplexityMiddleware{}
+	m := GraphqlComplexityChecker{logger: logrus.NewEntry(log)}
 	countriesSchema, err := graphql.NewSchemaFromString(gqlCountriesSchema)
 	require.NoError(t, err)
 
