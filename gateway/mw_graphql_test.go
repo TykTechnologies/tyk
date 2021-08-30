@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"encoding/json"
-	"github.com/TykTechnologies/tyk-analytics/config"
 	"net/http"
 	"strings"
 	"testing"
