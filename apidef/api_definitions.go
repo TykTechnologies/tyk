@@ -506,14 +506,7 @@ type APIDefinition struct {
 		DefaultVersion string                 `bson:"default_version" json:"default_version"`
 		Versions       map[string]VersionInfo `bson:"versions" json:"versions"`
 	} `bson:"version_data" json:"version_data"`
-	UptimeTests struct {
-		CheckList []HostCheckObject `bson:"check_list" json:"check_list"`
-		Config    struct {
-			ExpireUptimeAnalyticsAfter int64                         `bson:"expire_utime_after" json:"expire_utime_after"` // must have an expireAt TTL index set (http://docs.mongodb.org/manual/tutorial/expire-data/)
-			ServiceDiscovery           ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
-			RecheckWait                int                           `bson:"recheck_wait" json:"recheck_wait"`
-		} `bson:"config" json:"config"`
-	} `bson:"uptime_tests" json:"uptime_tests"`
+	UptimeTests               UptimeTests            `bson:"uptime_tests" json:"uptime_tests"`
 	Proxy                     ProxyConfig            `bson:"proxy" json:"proxy"`
 	DisableRateLimit          bool                   `bson:"disable_rate_limit" json:"disable_rate_limit"`
 	DisableQuota              bool                   `bson:"disable_quota" json:"disable_quota"`
@@ -546,6 +539,15 @@ type APIDefinition struct {
 	StripAuthData             bool                   `bson:"strip_auth_data" json:"strip_auth_data"`
 	EnableDetailedRecording   bool                   `bson:"enable_detailed_recording" json:"enable_detailed_recording"`
 	GraphQL                   GraphQLConfig          `bson:"graphql" json:"graphql"`
+}
+
+type UptimeTests struct {
+	CheckList []HostCheckObject `bson:"check_list" json:"check_list"`
+	Config    struct {
+		ExpireUptimeAnalyticsAfter int64                         `bson:"expire_utime_after" json:"expire_utime_after"` // must have an expireAt TTL index set (http://docs.mongodb.org/manual/tutorial/expire-data/)
+		ServiceDiscovery           ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
+		RecheckWait                int                           `bson:"recheck_wait" json:"recheck_wait"`
+	} `bson:"config" json:"config"`
 }
 
 type AuthConfig struct {

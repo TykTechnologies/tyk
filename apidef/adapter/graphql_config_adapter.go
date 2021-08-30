@@ -180,7 +180,7 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 			}
 
 			planDataSource.Factory = &graphqlDataSource.Factory{
-				Client: g.getHttpClient(),
+				HTTPClient: g.getHttpClient(),
 			}
 
 			planDataSource.Custom = graphqlDataSource.ConfigJson(g.graphqlDataSourceConfiguration(
