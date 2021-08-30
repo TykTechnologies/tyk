@@ -906,15 +906,17 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 			return
 		}
 
+		httpStatus := http.StatusOK
 		header := make(http.Header)
 		header.Set("Content-Type", "application/json")
 
 		if isProxyOnly {
 			proxyOnlyCtx := reqCtx.(*GraphQLProxyOnlyContext)
 			header = proxyOnlyCtx.upstreamResponse.Header
+			httpStatus = proxyOnlyCtx.upstreamResponse.StatusCode
 		}
 
-		res = resultWriter.AsHTTPResponse(http.StatusOK, header)
+		res = resultWriter.AsHTTPResponse(httpStatus, header)
 		return
 	}
 
