@@ -620,8 +620,20 @@ func graphqlProxyUpstreamHandler(w http.ResponseWriter, r *http.Request) {
 		http.CanonicalHeaderKey("Content-Length"): true,
 	}
 
+	responseCode := http.StatusOK
 	for reqHeaderKey, reqHeaderValues := range r.Header {
 		if ignoreHeaders[reqHeaderKey] {
+			continue
+		}
+
+		if reqHeaderKey == "X-Response-Code" {
+			var err error
+			responseCode, err = strconv.Atoi(reqHeaderValues[0])
+			if err != nil {
+				responseCode = http.StatusBadRequest
+				return
+			}
+
 			continue
 		}
 
@@ -630,6 +642,7 @@ func graphqlProxyUpstreamHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	w.WriteHeader(responseCode)
 	_, _ = w.Write([]byte(`{
 		"data": {
 			"hello": "` + name + `",
