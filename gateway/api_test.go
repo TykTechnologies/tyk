@@ -1781,7 +1781,7 @@ func TestHandleAddOrUpdateApi(t *testing.T) {
 }
 
 func TestOAS(t *testing.T) {
-	g := StartTest()
+	g := StartTest(nil)
 	defer g.Close()
 
 	const (
