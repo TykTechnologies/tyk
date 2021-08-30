@@ -84,7 +84,7 @@ func TestNeverRenewQuota(t *testing.T) {
 			api.APIID: {
 				APIName: api.Name,
 				APIID:   api.APIID,
-				Limit: &user.APILimit{
+				Limit: user.APILimit{
 					QuotaRenewalRate: 0,
 					QuotaMax:         1,
 				},
@@ -129,7 +129,7 @@ func TestMwRateLimiting_DepthLimit(t *testing.T) {
 			spec.APIID: {
 				APIID:   spec.APIID,
 				APIName: spec.Name,
-				Limit: &user.APILimit{
+				Limit: user.APILimit{
 					MaxQueryDepth: 1,
 				},
 			},
@@ -142,7 +142,7 @@ func TestMwRateLimiting_DepthLimit(t *testing.T) {
 			spec.APIID: {
 				APIID:   spec.APIID,
 				APIName: spec.Name,
-				Limit: &user.APILimit{
+				Limit: user.APILimit{
 					MaxQueryDepth: -1,
 				},
 				FieldAccessRights: []user.FieldAccessDefinition{

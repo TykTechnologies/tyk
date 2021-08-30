@@ -304,7 +304,7 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	if !s.Spec.VersionData.NotVersioned && versionDef.Location == "url" && versionDef.StripPath {
 		part := s.Spec.getVersionFromRequest(r)
 
-		log.Info("Stripping version from url: ", part)
+		log.Debug("Stripping version from url: ", part)
 
 		r.URL.Path = strings.Replace(r.URL.Path, part+"/", "", 1)
 		r.URL.RawPath = strings.Replace(r.URL.RawPath, part+"/", "", 1)

@@ -432,8 +432,18 @@ func (m *URLRewriteMiddleware) EnabledForSpec() bool {
 }
 
 func (m *URLRewriteMiddleware) CheckHostRewrite(oldPath, newTarget string, r *http.Request) {
-	oldAsURL, _ := url.Parse(oldPath)
-	newAsURL, _ := url.Parse(newTarget)
+	oldAsURL, errParseOld := url.Parse(oldPath)
+	if errParseOld != nil {
+		log.WithError(errParseOld).WithField("url", oldPath).Error("could not parse")
+		return
+	}
+
+	newAsURL, errParseNew := url.Parse(newTarget)
+	if errParseNew != nil {
+		log.WithError(errParseNew).WithField("url", newTarget).Error("could not parse")
+		return
+	}
+
 	if newAsURL.Scheme != LoopScheme && oldAsURL.Host != newAsURL.Host {
 		log.Debug("Detected a host rewrite in pattern!")
 		setCtxValue(r, ctx.RetainHost, true)

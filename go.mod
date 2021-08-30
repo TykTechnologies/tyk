@@ -18,7 +18,7 @@ require (
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
 	github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d // indirect
 	github.com/bshuster-repo/logrus-logstash-hook v0.4.1
-	github.com/buger/jsonparser v0.0.0-20181115193947-bf1c66bbce23
+	github.com/buger/jsonparser v1.1.1
 	github.com/cenk/backoff v2.2.1+incompatible
 	github.com/cenkalti/backoff/v4 v4.0.2
 	github.com/certifi/gocertifi v0.0.0-20190905060710-a5e0173ced67 // indirect
@@ -31,6 +31,7 @@ require (
 	github.com/franela/goblin v0.0.0-20181003173013-ead4ad1d2727 // indirect
 	github.com/franela/goreq v0.0.0-20171204163338-bcd34c9993f8
 	github.com/gemnasium/logrus-graylog-hook v2.0.7+incompatible
+	github.com/getkin/kin-openapi v0.32.0
 	github.com/getsentry/raven-go v0.2.0 // indirect
 	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/go-redis/redis/v8 v8.3.1
@@ -102,6 +103,6 @@ require (
 	rsc.io/letsencrypt v0.0.2
 )
 
-replace github.com/jensneuse/graphql-go-tools => github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20210804084050-3c2e37945919
+replace github.com/jensneuse/graphql-go-tools => github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20210826094453-7375417588e2
 
 //replace github.com/jensneuse/graphql-go-tools => ../graphql-go-tools

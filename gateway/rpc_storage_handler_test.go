@@ -168,7 +168,7 @@ func TestProcessKeySpaceChanges_ResetQuota(t *testing.T) {
 	session, key := g.CreateSession(func(s *user.SessionState) {
 		s.AccessRights = map[string]user.AccessDefinition{api.APIID: {
 			APIID: api.APIID,
-			Limit: &user.APILimit{
+			Limit: user.APILimit{
 				QuotaMax: 30,
 			},
 		}}

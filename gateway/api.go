@@ -42,9 +42,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/getkin/kin-openapi/openapi3"
+	uuid "github.com/satori/go.uuid"
+
 	"github.com/gorilla/mux"
 	"github.com/lonelycode/osin"
-	uuid "github.com/satori/go.uuid"
+
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"golang.org/x/crypto/bcrypt"
@@ -218,8 +222,8 @@ func (gw *Gateway) applyPoliciesAndSave(keyName string, session *user.SessionSta
 func resetAPILimits(accessRights map[string]user.AccessDefinition) {
 	for apiID := range accessRights {
 		// reset API-level limit to nil if it has a zero-value
-		if access := accessRights[apiID]; access.Limit != nil && *access.Limit == (user.APILimit{}) {
-			access.Limit = nil
+		if access := accessRights[apiID]; !access.Limit.IsEmpty() && access.Limit == (user.APILimit{}) {
+			access.Limit = user.APILimit{}
 			accessRights[apiID] = access
 		}
 	}
@@ -233,7 +237,7 @@ func (gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, 
 	}
 
 	if len(newSession.AccessRights) > 0 {
-		// reset API-level limit to nil if any has a zero-value
+		// reset API-level limit to empty APILimit if any has a zero-value
 		resetAPILimits(newSession.AccessRights)
 		// We have a specific list of access rules, only add / update those
 
@@ -383,10 +387,10 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 
 			// on ACL API limit level
 			for apiID, access := range originalKey.AccessRights {
-				if access.Limit == nil {
+				if access.Limit.IsEmpty() {
 					continue
 				}
-				if newAccess, ok := newSession.AccessRights[apiID]; ok && newAccess.Limit != nil {
+				if newAccess, ok := newSession.AccessRights[apiID]; ok && !newAccess.Limit.IsEmpty() {
 					newAccess.Limit.QuotaRenews = access.Limit.QuotaRenews
 					newSession.AccessRights[apiID] = newAccess
 				}
@@ -523,7 +527,7 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID, orgID string, byHash bool)
 
 	// populate remaining quota for API limits (if any)
 	for id, access := range session.AccessRights {
-		if access.Limit == nil || access.Limit.QuotaMax == -1 || access.Limit.QuotaMax == 0 {
+		if access.Limit.IsEmpty() || access.Limit.QuotaMax == -1 || access.Limit.QuotaMax == 0 {
 			continue
 		}
 
@@ -784,9 +788,13 @@ func (gw *Gateway) handleGetAPIList() (interface{}, int) {
 	return apiIDList, http.StatusOK
 }
 
-func (gw *Gateway) handleGetAPI(apiID string) (interface{}, int) {
+func (gw *Gateway) handleGetAPI(apiID string, oasTyped bool) (interface{}, int) {
 	if spec := gw.getApiSpec(apiID); spec != nil {
-		return spec.APIDefinition, http.StatusOK
+		if oasTyped {
+			return &spec.OAS, http.StatusOK
+		} else {
+			return spec.APIDefinition, http.StatusOK
+		}
 	}
 
 	log.WithFields(logrus.Fields{
@@ -796,17 +804,51 @@ func (gw *Gateway) handleGetAPI(apiID string) (interface{}, int) {
 	return apiError("API not found"), http.StatusNotFound
 }
 
-func (gw *Gateway) handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.Fs) (interface{}, int) {
+func (gw *Gateway) handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.Fs, oasTyped bool) (interface{}, int) {
 	if gw.GetConfig().UseDBAppConfigs {
-
 		log.Error("Rejected new API Definition due to UseDBAppConfigs = true")
 		return apiError("Due to enabled use_db_app_configs, please use the Dashboard API"), http.StatusInternalServerError
 	}
 
-	newDef := &apidef.APIDefinition{}
-	if err := json.NewDecoder(r.Body).Decode(newDef); err != nil {
-		log.Error("Couldn't decode new API Definition object: ", err)
-		return apiError("Request malformed"), http.StatusBadRequest
+	var newDef apidef.APIDefinition
+	var oasDoc openapi3.Swagger
+	var xTykAPIGateway oas.XTykAPIGateway
+
+	if oasTyped {
+		if err := json.NewDecoder(r.Body).Decode(&oasDoc); err != nil {
+			log.Error("Couldn't decode new OAS object: ", err)
+			return apiError("Request malformed"), http.StatusBadRequest
+		}
+
+		if intTykAPIGateway, ok := oasDoc.Extensions[oas.ExtensionTykAPIGateway]; ok {
+			rawTykAPIGateway := intTykAPIGateway.(json.RawMessage)
+			err := json.Unmarshal(rawTykAPIGateway, &xTykAPIGateway)
+			if err != nil {
+				return apiError("Couldn't unmarshal " + oas.ExtensionTykAPIGateway + " extension in the document"), http.StatusBadRequest
+			}
+		} else {
+			return apiError("Couldn't find " + oas.ExtensionTykAPIGateway + " extension in the document"), http.StatusBadRequest
+		}
+
+		xTykAPIGateway.ExtractTo(&newDef)
+	} else {
+		if err := json.NewDecoder(r.Body).Decode(&newDef); err != nil {
+			log.Error("Couldn't decode new API Definition object: ", err)
+			return apiError("Request malformed"), http.StatusBadRequest
+		}
+
+		xTykAPIGateway.Fill(newDef)
+
+		spec := gw.getApiSpec(newDef.APIID)
+		if spec != nil {
+			oasDoc = spec.OAS
+		}
+
+		if oasDoc.Extensions == nil {
+			oasDoc.Extensions = make(map[string]interface{})
+		}
+
+		oasDoc.Extensions[oas.ExtensionTykAPIGateway] = xTykAPIGateway
 	}
 
 	if apiID != "" && newDef.APIID != apiID {
@@ -814,7 +856,7 @@ func (gw *Gateway) handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.
 		return apiError("Request APIID does not match that in Definition! For Update operations these must match."), http.StatusBadRequest
 	}
 
-	validationResult := apidef.Validate(newDef, apidef.DefaultValidationRuleSet)
+	validationResult := apidef.Validate(&newDef, apidef.DefaultValidationRuleSet)
 	if !validationResult.IsValid {
 		reason := "unknown"
 		if validationResult.ErrorCount() > 0 {
@@ -825,27 +867,16 @@ func (gw *Gateway) handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.
 		return apiError(fmt.Sprintf("Validation of API Definition failed. Reason: %s.", reason)), http.StatusBadRequest
 	}
 
-	// Create a filename
-	defFilePath := filepath.Join(gw.GetConfig().AppPath, newDef.APIID+".json")
-
-	log.Infof("App path: %v", gw.GetConfig().AppPath)
-	// If it exists, delete it
-	if _, err := fs.Stat(defFilePath); err == nil {
-		log.Warning("API Definition with this ID already exists, deleting file...")
-		fs.Remove(defFilePath)
-	}
-
-	// unmarshal the object into the file
-	asByte, err := json.MarshalIndent(newDef, "", "  ")
+	// api
+	err, errCode := gw.writeToFile(fs, newDef, newDef.APIID)
 	if err != nil {
-		log.Error("Marshalling of API Definition failed: ", err)
-		return apiError("Marshalling failed"), http.StatusInternalServerError
+		return apiError(err.Error()), errCode
 	}
 
-	if err := ioutil.WriteFile(defFilePath, asByte, 0644); err != nil {
-		log.Infof("EL file path: %v", defFilePath)
-		log.Error("Failed to create file! - ", err)
-		return apiError("File object creation failed, write error"), http.StatusInternalServerError
+	// oas
+	err, errCode = gw.writeToFile(fs, &oasDoc, newDef.APIID+"-oas")
+	if err != nil {
+		return apiError(err.Error()), errCode
 	}
 
 	action := "modified"
@@ -862,9 +893,37 @@ func (gw *Gateway) handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.
 	return response, http.StatusOK
 }
 
+func(gw *Gateway) writeToFile(fs afero.Fs, newDef interface{}, filename string) (err error, errCode int) {
+	// Create a filename
+	defFilePath := filepath.Join(gw.GetConfig().AppPath, filename+".json")
+
+	log.Infof("App path: %v", gw.GetConfig().AppPath)
+	// If it exists, delete it
+	if _, err := fs.Stat(defFilePath); err == nil {
+		log.Warning("API Definition with this ID already exists, deleting file...")
+		fs.Remove(defFilePath)
+	}
+
+	// unmarshal the object into the file
+	asByte, err := json.MarshalIndent(newDef, "", "  ")
+	if err != nil {
+		log.Error("Marshalling of API Definition failed: ", err)
+		return errors.New("marshalling failed"), http.StatusInternalServerError
+	}
+
+	if err := ioutil.WriteFile(defFilePath, asByte, 0644); err != nil {
+		log.Infof("EL file path: %v", defFilePath)
+		log.Error("Failed to create file! - ", err)
+		return errors.New("file object creation failed, write error"), http.StatusInternalServerError
+	}
+
+	return nil, 0
+}
+
 func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 	// Generate a filename
 	defFilePath := filepath.Join(gw.GetConfig().AppPath, apiID+".json")
+	defOASFilePath := filepath.Join(gw.GetConfig().AppPath, apiID+"-oas.json")
 
 	// If it exists, delete it
 	if _, err := os.Stat(defFilePath); err != nil {
@@ -873,6 +932,7 @@ func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 	}
 
 	os.Remove(defFilePath)
+	os.Remove(defOASFilePath)
 
 	response := apiModifyKeySuccess{
 		Key:    apiID,
@@ -885,6 +945,7 @@ func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 
 func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
+	oasTyped := r.FormValue("type") == "oas"
 
 	var obj interface{}
 	var code int
@@ -893,18 +954,18 @@ func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
 	case "GET":
 		if apiID != "" {
 			log.Debug("Requesting API definition for", apiID)
-			obj, code = gw.handleGetAPI(apiID)
+			obj, code = gw.handleGetAPI(apiID, oasTyped)
 		} else {
 			log.Debug("Requesting API list")
 			obj, code = gw.handleGetAPIList()
 		}
 	case "POST":
 		log.Debug("Creating new definition file")
-		obj, code = gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs())
+		obj, code = gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), oasTyped)
 	case "PUT":
 		if apiID != "" {
 			log.Debug("Updating existing API: ", apiID)
-			obj, code = gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs())
+			obj, code = gw.handleAddOrUpdateApi(apiID, r, afero.NewOsFs(), oasTyped)
 		} else {
 			obj, code = apiError("Must specify an apiID to update"), http.StatusBadRequest
 		}

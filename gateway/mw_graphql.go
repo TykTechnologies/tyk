@@ -15,7 +15,9 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/adapter"
 
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/user"
 
 	gql "github.com/jensneuse/graphql-go-tools/pkg/graphql"
 )
@@ -30,6 +32,11 @@ const (
 
 const (
 	GraphQLWebSocketProtocol = "graphql-ws"
+)
+
+var (
+	ProxyingRequestFailedErr     = errors.New("there was a problem proxying the request")
+	GraphQLDepthLimitExceededErr = errors.New("depth limit exceeded")
 )
 
 type GraphQLMiddleware struct {
@@ -161,9 +168,10 @@ func (m *GraphQLMiddleware) initGraphQLEngineV2(logger *abstractlogger.LogrusLog
 		m.Logger().WithError(err).Error("could not create engine v2 config")
 		return
 	}
+	engineConfig.SetWebsocketBeforeStartHook(m)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	engine, err := gql.NewExecutionEngineV2(ctx, logger, *engineConfig)
+	specCtx, cancel := context.WithCancel(context.Background())
+	engine, err := gql.NewExecutionEngineV2(specCtx, logger, *engineConfig)
 	if err != nil {
 		m.Logger().WithError(err).Error("could not create execution engine v2")
 		cancel()
@@ -184,12 +192,12 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	err := m.checkForUnsupportedUsage()
 	if err != nil {
 		m.Logger().WithError(err).Error("request could not be executed because of unsupported usage")
-		return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
+		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	}
 
 	if m.Spec.GraphQLExecutor.Schema == nil {
 		m.Logger().Error("Schema is not created")
-		return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
+		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	}
 
 	if websocket.IsWebSocketUpgrade(r) {
@@ -221,7 +229,7 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	normalizationResult, err := gqlRequest.Normalize(m.Spec.GraphQLExecutor.Schema)
 	if err != nil {
 		m.Logger().Errorf("Error while normalizing GraphQL request: '%s'", err)
-		return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
+		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	}
 
 	if normalizationResult.Errors != nil && normalizationResult.Errors.Count() > 0 {
@@ -231,7 +239,7 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	validationResult, err := gqlRequest.ValidateForSchema(m.Spec.GraphQLExecutor.Schema)
 	if err != nil {
 		m.Logger().Errorf("Error while validating GraphQL request: '%s'", err)
-		return errors.New("there was a problem proxying the request"), http.StatusInternalServerError
+		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	}
 
 	if validationResult.Errors != nil && validationResult.Errors.Count() > 0 {
@@ -272,6 +280,48 @@ func (m *GraphQLMiddleware) isSupergraphAPIDefinition() bool {
 
 func (m *GraphQLMiddleware) loadSupergraphMergedSDLAsSchema() {
 	m.Spec.GraphQL.Schema = m.Spec.GraphQL.Supergraph.MergedSDL
+}
+
+// OnBeforeStart - is a graphql.WebsocketBeforeStartHook which allows to perform security checks for all operations over websocket connections
+func (m *GraphQLMiddleware) OnBeforeStart(reqCtx context.Context, operation *gql.Request) error {
+	if m.Spec.UseKeylessAccess {
+		return nil
+	}
+
+	v := reqCtx.Value(ctx.SessionData)
+	if v == nil {
+		m.Logger().Error("failed to get session in OnBeforeStart hook")
+		return errors.New("empty session")
+	}
+	session := v.(*user.SessionState)
+
+	accessDef, _, err := GetAccessDefinitionByAPIIDOrSession(session, m.Spec)
+	if err != nil {
+		m.Logger().Errorf("failed to get access definition in OnBeforeStart hook: '%s'", err)
+		return err
+	}
+
+	complexityCheck := &GraphqlComplexityChecker{logger: m.Logger()}
+	depthResult := complexityCheck.DepthLimitExceeded(operation, accessDef, m.Spec.GraphQLExecutor.Schema)
+	switch depthResult {
+	case ComplexityFailReasonInternalError:
+		return ProxyingRequestFailedErr
+	case ComplexityFailReasonDepthLimitExceeded:
+		return GraphQLDepthLimitExceededErr
+	}
+
+	granularAccessCheck := &GraphqlGranularAccessChecker{}
+	result := granularAccessCheck.CheckGraphqlRequestFieldAllowance(operation, accessDef, m.Spec.GraphQLExecutor.Schema)
+	switch result.failReason {
+	case GranularAccessFailReasonInternalError:
+		m.Logger().Errorf(RestrictedFieldValidationFailedLogMsg, result.internalErr)
+		return ProxyingRequestFailedErr
+	case GranularAccessFailReasonValidationError:
+		m.Logger().Debugf(RestrictedFieldValidationFailedLogMsg, result.validationResult.Errors)
+		return result.validationResult.Errors
+	}
+
+	return nil
 }
 
 func (m *GraphQLMiddleware) OnBeforeFetch(ctx resolve.HookContext, input []byte) {

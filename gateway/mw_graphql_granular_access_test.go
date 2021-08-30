@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/test"
@@ -69,8 +70,14 @@ func TestGraphQL_RestrictedTypes(t *testing.T) {
 		}
 
 		_, _ = g.Run(t, []test.TestCase{
-			{Data: restrictedQuery, Headers: authHeaderWithDirectKey,
-				BodyMatch: `{"errors":\[{"message":"field: code is restricted on type: Country","path":null}\]}`, Code: http.StatusBadRequest},
+			{
+				Data:    restrictedQuery,
+				Headers: authHeaderWithDirectKey,
+				BodyMatchFunc: func(bytes []byte) bool {
+					return assert.Contains(t, string(bytes), `{"errors":[{"message":"field: code is restricted on type: Country"}]}`)
+				},
+				Code: http.StatusBadRequest,
+			},
 			{Data: unrestrictedQuery, Headers: authHeaderWithDirectKey, Code: http.StatusOK},
 		}...)
 	})
@@ -89,8 +96,14 @@ func TestGraphQL_RestrictedTypes(t *testing.T) {
 		}
 
 		_, _ = g.Run(t, []test.TestCase{
-			{Data: restrictedQuery, Headers: authHeaderWithPolicyAppliedKey,
-				BodyMatch: `{"errors":\[{"message":"field: name is restricted on type: Country","path":null}\]}`, Code: http.StatusBadRequest},
+			{
+				Data:    restrictedQuery,
+				Headers: authHeaderWithPolicyAppliedKey,
+				BodyMatchFunc: func(bytes []byte) bool {
+					return assert.Contains(t, string(bytes), `{"errors":[{"message":"field: name is restricted on type: Country"}]}`)
+				},
+				Code: http.StatusBadRequest,
+			},
 			{Data: unrestrictedQuery, Headers: authHeaderWithPolicyAppliedKey, Code: http.StatusOK},
 		}...)
 	})

@@ -270,7 +270,7 @@ func (gw *Gateway) setupGlobals() {
 	defer gw.reloadMu.Unlock()
 
 	gwConfig := gw.GetConfig()
-	checkup.Run(&gwConfig)
+	checkup.Run(gwConfig)
 
 	gw.SetConfig(gwConfig)
 	gw.dnsCacheManager = dnscache.NewDnsCacheManager(gwConfig.DnsCache.MultipleIPsHandleStrategy)
@@ -1271,6 +1271,8 @@ func (gw *Gateway) kvStore(value string) (string, error) {
 		key := strings.TrimPrefix(value, "consul://")
 		log.Debugf("Retrieving %s from consul", key)
 		if err := gw.setUpConsul(); err != nil {
+			log.Error("Failed to setup consul: ", err)
+
 			// Return value as is. If consul cannot be set up
 			return value, nil
 		}
@@ -1282,6 +1284,7 @@ func (gw *Gateway) kvStore(value string) (string, error) {
 		key := strings.TrimPrefix(value, "vault://")
 		log.Debugf("Retrieving %s from vault", key)
 		if err := gw.setUpVault(); err != nil {
+			log.Error("Failed to setup vault: ", err)
 			// Return value as is If vault cannot be set up
 			return value, nil
 		}
