@@ -42,11 +42,10 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 				},
 			},
 			ChildNodes: nil,
-			Factory:    &graphqlDataSource.Factory{Client: httpClient},
+			Factory:    &graphqlDataSource.Factory{HTTPClient: httpClient},
 			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
 				Fetch: graphqlDataSource.FetchConfiguration{
-					URL:    "http://localhost:8080",
-					Method: http.MethodPost,
+					URL: "http://localhost:8080",
 					Header: http.Header{
 						"Authorization": []string{"123abc"},
 					},
@@ -133,11 +132,10 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 					FieldNames: []string{"sdl"},
 				},
 			},
-			Factory: &graphqlDataSource.Factory{Client: httpClient},
+			Factory: &graphqlDataSource.Factory{HTTPClient: httpClient},
 			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
 				Fetch: graphqlDataSource.FetchConfiguration{
-					URL:    "http://localhost:8080",
-					Method: http.MethodPost,
+					URL: "http://localhost:8080",
 					Header: http.Header{
 						"Authorization": []string{"123abc"},
 					},

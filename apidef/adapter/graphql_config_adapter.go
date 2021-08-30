@@ -70,7 +70,6 @@ func (g *GraphQLConfigAdapter) createV2ConfigForProxyOnlyExecutionMode() (*graph
 
 	upstreamConfig := graphql.ProxyUpstreamConfig{
 		URL:           g.apiDefinition.Proxy.TargetURL,
-		Method:        http.MethodPost, // todo: need to think about this
 		StaticHeaders: staticHeaders,
 	}
 
