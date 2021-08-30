@@ -128,7 +128,9 @@ func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 
 	req.Header.Set("authorization", h.Secret)
 	req.Header.Set(headers.XTykNodeID, h.Gw.GetNodeID())
+	h.Gw.ServiceNonceMutex.RLock()
 	req.Header.Set(headers.XTykNonce, h.Gw.ServiceNonce)
+	h.Gw.ServiceNonceMutex.RUnlock()
 
 	c := h.Gw.initialiseClient()
 
@@ -151,7 +153,9 @@ func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 		return err
 	}
 
+	h.Gw.ServiceNonceMutex.Lock()
 	h.Gw.ServiceNonce = val.Nonce
+	h.Gw.ServiceNonceMutex.Unlock()
 
 	return nil
 }
@@ -195,8 +199,10 @@ func (h *HTTPDashboardHandler) Register() error {
 	dashLog.WithField("id", h.Gw.GetNodeID()).Info("Node Registered")
 
 	// Set the nonce
+	h.Gw.ServiceNonceMutex.Lock()
 	h.Gw.ServiceNonce = val.Nonce
-	dashLog.Debug("Registration Finished: Nonce Set: ", h.Gw.ServiceNonce)
+	h.Gw.ServiceNonceMutex.Unlock()
+	dashLog.Debug("Registration Finished: Nonce Set: ", val.Nonce)
 
 	return nil
 }
@@ -242,7 +248,9 @@ func (h *HTTPDashboardHandler) newRequest(method, endpoint string) *http.Request
 
 func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Client) error {
 	req.Header.Set(headers.XTykNodeID, h.Gw.GetNodeID())
+	h.Gw.ServiceNonceMutex.RLock()
 	req.Header.Set(headers.XTykNonce, h.Gw.ServiceNonce)
+	h.Gw.ServiceNonceMutex.RUnlock()
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -264,7 +272,9 @@ func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Cli
 	}
 
 	// Set the nonce
+	h.Gw.ServiceNonceMutex.Lock()
 	h.Gw.ServiceNonce = val.Nonce
+	h.Gw.ServiceNonceMutex.Unlock()
 	//log.Debug("Heartbeat Finished: Nonce Set: ", h.Gw.ServiceNonce)
 
 	return nil
@@ -274,7 +284,9 @@ func (h *HTTPDashboardHandler) DeRegister() error {
 	req := h.newRequest(http.MethodDelete, h.DeRegistrationEndpoint)
 
 	req.Header.Set(headers.XTykNodeID, h.Gw.GetNodeID())
+	h.Gw.ServiceNonceMutex.RLock()
 	req.Header.Set(headers.XTykNonce, h.Gw.ServiceNonce)
+	h.Gw.ServiceNonceMutex.RUnlock()
 
 	c := h.Gw.initialiseClient()
 	resp, err := c.Do(req)
@@ -293,7 +305,9 @@ func (h *HTTPDashboardHandler) DeRegister() error {
 	}
 
 	// Set the nonce
+	h.Gw.ServiceNonceMutex.Lock()
 	h.Gw.ServiceNonce = val.Nonce
+	h.Gw.ServiceNonceMutex.Unlock()
 	dashLog.Info("De-registered.")
 
 	return nil

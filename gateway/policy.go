@@ -84,7 +84,9 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 	newRequest.Header.Set("authorization", secret)
 	newRequest.Header.Set("x-tyk-nodeid", gw.GetNodeID())
 
+	gw.ServiceNonceMutex.RLock()
 	newRequest.Header.Set("x-tyk-nonce", gw.ServiceNonce)
+	gw.ServiceNonceMutex.RUnlock()
 
 	log.WithFields(logrus.Fields{
 		"prefix": "policy",
@@ -118,8 +120,10 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 		return nil
 	}
 
+	gw.ServiceNonceMutex.Lock()
 	gw.ServiceNonce = list.Nonce
-	log.Debug("Loading Policies Finished: Nonce Set: ", gw.ServiceNonce)
+	gw.ServiceNonceMutex.Unlock()
+	log.Debug("Loading Policies Finished: Nonce Set: ", list.Nonce)
 
 	policies := make(map[string]user.Policy, len(list.Message))
 

@@ -369,7 +369,9 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	log.Debug("Using: NodeID: ", a.Gw.GetNodeID())
 	newRequest.Header.Set(headers.XTykNodeID, a.Gw.GetNodeID())
 
+	a.Gw.ServiceNonceMutex.RLock()
 	newRequest.Header.Set(headers.XTykNonce, a.Gw.ServiceNonce)
+	a.Gw.ServiceNonceMutex.RUnlock()
 
 	c := a.Gw.initialiseClient()
 	resp, err := c.Do(newRequest)
@@ -438,8 +440,10 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	}
 
 	// Set the nonce
+	a.Gw.ServiceNonceMutex.Lock()
 	a.Gw.ServiceNonce = list.Nonce
-	log.Debug("Loading APIS Finished: Nonce Set: ", a.Gw.ServiceNonce)
+	a.Gw.ServiceNonceMutex.Unlock()
+	log.Debug("Loading APIS Finished: Nonce Set: ", list.Nonce)
 
 	return specs, nil
 }

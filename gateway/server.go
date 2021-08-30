@@ -123,7 +123,8 @@ type Gateway struct {
 	UtilCache *cache.Cache
 
 	// Nonce to use when interacting with the dashboard service
-	ServiceNonce string
+	ServiceNonce      string
+	ServiceNonceMutex sync.RWMutex
 
 	apisMu          sync.RWMutex
 	apiSpecs        []*APISpec
