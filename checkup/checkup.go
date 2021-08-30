@@ -33,8 +33,8 @@ func Run(c config.Config) {
 
 	fileDescriptors()
 	cpus()
-	defaultSecrets(*c)
-	defaultAnalytics(c)
+	defaultSecrets(c)
+	defaultAnalytics(&c)
 }
 
 func legacyRateLimiters(c config.Config) {
