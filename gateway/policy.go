@@ -84,7 +84,7 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 	newRequest.Header.Set("authorization", secret)
 	newRequest.Header.Set("x-tyk-nodeid", gw.GetNodeID())
 
-	newRequest.Header.Set("x-tyk-nonce", ServiceNonce)
+	newRequest.Header.Set("x-tyk-nonce", gw.ServiceNonce)
 
 	log.WithFields(logrus.Fields{
 		"prefix": "policy",
