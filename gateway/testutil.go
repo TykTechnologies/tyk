@@ -615,9 +615,25 @@ func graphqlProxyUpstreamHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ignoreHeaders := map[string]bool{
+		http.CanonicalHeaderKey("Date"):           true,
+		http.CanonicalHeaderKey("Content-Length"): true,
+	}
+
+	for reqHeaderKey, reqHeaderValues := range r.Header {
+		if ignoreHeaders[reqHeaderKey] {
+			continue
+		}
+
+		for _, reqHeaderValue := range reqHeaderValues {
+			w.Header().Add(reqHeaderKey, reqHeaderValue)
+		}
+	}
+
 	_, _ = w.Write([]byte(`{
 		"data": {
-			"hello": "` + name + `"
+			"hello": "` + name + `",
+			"httpMethod": "` + r.Method + `",
 		}
 	}`))
 }

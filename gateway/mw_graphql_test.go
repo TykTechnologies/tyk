@@ -199,16 +199,48 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
 				spec.GraphQL.Version = apidef.GraphQLConfigVersion2
 				spec.GraphQL.Schema = gqlProxyUpstreamSchema
+				spec.GraphQL.Proxy.AuthHeaders = map[string]string{
+					"Authorization": "123abc",
+				}
 				spec.Proxy.ListenPath = "/"
 				spec.Proxy.TargetURL = testGraphQLProxyUpstream
 			})
 
 			request := gql.Request{
-				Query: `{ hello(name: "World") }`,
+				Query: `{ hello(name: "World") httpMethod }`,
 			}
 
 			_, _ = g.Run(t, []test.TestCase{
-				{Data: request, Method: http.MethodPost, BodyMatch: `{"data":{"hello":"World"}}`, Code: http.StatusOK},
+				{
+					Data:   request,
+					Method: http.MethodPost,
+					Headers: map[string]string{
+						"X-Tyk-Key":   "tyk-value",
+						"X-Other-Key": "other-value",
+					},
+					Code:      http.StatusOK,
+					BodyMatch: `{"data":{"hello":"World","httpMethod":"POST"}}`,
+					HeadersMatch: map[string]string{
+						"Authorization": "123abc",
+						"X-Tyk-Key":     "tyk-value",
+						"X-Other-Key":   "other-value",
+					},
+				},
+				{
+					Data:   request,
+					Method: http.MethodPut,
+					Headers: map[string]string{
+						"X-Tyk-Key":   "tyk-value",
+						"X-Other-Key": "other-value",
+					},
+					Code:      http.StatusOK,
+					BodyMatch: `{"data":{"hello":"World","httpMethod":"PUT"}}`,
+					HeadersMatch: map[string]string{
+						"Authorization": "123abc",
+						"X-Tyk-Key":     "tyk-value",
+						"X-Other-Key":   "other-value",
+					},
+				},
 			}...)
 
 		})
@@ -686,6 +718,52 @@ func TestNeedsGraphQLExecutionEngine(t *testing.T) {
 	}
 }
 
+func TestIsGraphQLProxyOnly(t *testing.T) {
+	testCases := []struct {
+		name          string
+		executionMode apidef.GraphQLExecutionMode
+		expected      bool
+	}{
+		{
+			name:          "true for executionMode = proxyOnly",
+			executionMode: apidef.GraphQLExecutionModeProxyOnly,
+			expected:      true,
+		},
+		{
+			name:          "true for executionMode = subgraph",
+			executionMode: apidef.GraphQLExecutionModeSubgraph,
+			expected:      true,
+		},
+		{
+			name:          "false for executionMode = supergraph",
+			executionMode: apidef.GraphQLExecutionModeSupergraph,
+			expected:      false,
+		},
+		{
+			name:          "false for executionMode = executionEngine",
+			executionMode: apidef.GraphQLExecutionModeExecutionEngine,
+			expected:      false,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			apiSpec := &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					GraphQL: apidef.GraphQLConfig{
+						Enabled:       true,
+						ExecutionMode: tc.executionMode,
+					},
+				},
+			}
+
+			result := isGraphQLProxyOnly(apiSpec)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
 const gqlIntrospectionQuery = `query IntrospectionQuery {
   __schema {
     queryType {
@@ -788,6 +866,7 @@ fragment TypeRef on __Type {
 
 const gqlProxyUpstreamSchema = `type Query {
 	hello(name: String!): String!
+	httpMethod: String!
 }`
 
 const gqlCountriesSchema = `directive @cacheControl(

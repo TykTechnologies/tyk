@@ -72,7 +72,9 @@ func (m *GraphQLMiddleware) Init() {
 
 	if needsGraphQLExecutionEngine(m.Spec) {
 		absLogger := abstractlogger.NewLogrusLogger(log, absLoggerLevel(log.Level))
-		m.Spec.GraphQLExecutor.Client = &http.Client{Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec)}}
+		m.Spec.GraphQLExecutor.Client = &http.Client{
+			Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec)},
+		}
 
 		if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersionNone || m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion1 {
 			m.initGraphQLEngineV1(absLogger)
@@ -359,6 +361,11 @@ func needsGraphQLExecutionEngine(apiSpec *APISpec) bool {
 		apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph ||
 		apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSubgraph ||
 		(apiSpec.GraphQL.Version == apidef.GraphQLConfigVersion2 && apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeProxyOnly)
+}
+
+func isGraphQLProxyOnly(apiSpec *APISpec) bool {
+	return apiSpec.GraphQL.Enabled &&
+		(apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeProxyOnly || apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSubgraph)
 }
 
 func absLoggerLevel(level logrus.Level) abstractlogger.Level {
