@@ -270,7 +270,7 @@ func (gw *Gateway) setupGlobals() {
 	defer gw.reloadMu.Unlock()
 
 	gwConfig := gw.GetConfig()
-	checkup.Run(gwConfig)
+	checkup.Run(&gwConfig)
 
 	gw.SetConfig(gwConfig)
 	gw.dnsCacheManager = dnscache.NewDnsCacheManager(gwConfig.DnsCache.MultipleIPsHandleStrategy)
