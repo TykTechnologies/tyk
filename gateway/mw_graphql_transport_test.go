@@ -131,6 +131,7 @@ func TestGraphQLEngineTransport_RoundTrip(t *testing.T) {
 		require.NoError(t, err)
 
 		transportResponse, err := httpClient.Do(upstreamRequest)
+		require.NoError(t, err)
 		assert.Equal(t, response.statusCode, transportResponse.StatusCode)
 
 		for expectedTransportResponseHeaderKey, expectedTransportResponseHeaderValue := range response.headers {
@@ -177,6 +178,7 @@ func TestGraphQLEngineTransport_RoundTrip(t *testing.T) {
 		require.NoError(t, err)
 
 		transportResponse, err := httpClient.Do(upstreamRequest)
+		require.NoError(t, err)
 		assert.Equal(t, response.statusCode, transportResponse.StatusCode)
 
 		for expectedTransportResponseHeaderKey, expectedTransportResponseHeaderValue := range response.headers {
@@ -223,6 +225,7 @@ func TestGraphQLEngineTransport_RoundTrip(t *testing.T) {
 		require.NoError(t, err)
 
 		transportResponse, err := httpClient.Do(upstreamRequest)
+		require.NoError(t, err)
 		assert.Equal(t, response.statusCode, transportResponse.StatusCode)
 
 		for expectedTransportResponseHeaderKey, expectedTransportResponseHeaderValue := range response.headers {

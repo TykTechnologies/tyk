@@ -630,7 +630,7 @@ func graphqlProxyUpstreamHandler(w http.ResponseWriter, r *http.Request) {
 			var err error
 			responseCode, err = strconv.Atoi(reqHeaderValues[0])
 			if err != nil {
-				responseCode = http.StatusBadRequest
+				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
 
