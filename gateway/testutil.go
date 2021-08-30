@@ -721,6 +721,7 @@ func restDataSourceHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func subgraphAccountsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	_, _ = w.Write([]byte(`{
 		"data": {
 			"me": {
@@ -732,6 +733,7 @@ func subgraphAccountsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func subgraphReviewsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	_, _ = w.Write([]byte(`{
 			"data": {
 				"_entities": [
