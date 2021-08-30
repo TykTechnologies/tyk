@@ -348,7 +348,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 
 				t.Run("graphql over websockets", func(t *testing.T) {
 					api.UseKeylessAccess = false
-					LoadAPI(api)
+					g.Gw.LoadAPI(api)
 
 					t.Run("field-based permissions", func(t *testing.T) {
 						_, directKey := g.CreateSession(func(s *user.SessionState) {
