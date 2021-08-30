@@ -118,8 +118,8 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 		return nil
 	}
 
-	ServiceNonce = list.Nonce
-	log.Debug("Loading Policies Finished: Nonce Set: ", ServiceNonce)
+	gw.ServiceNonce = list.Nonce
+	log.Debug("Loading Policies Finished: Nonce Set: ", gw.ServiceNonce)
 
 	policies := make(map[string]user.Policy, len(list.Message))
 

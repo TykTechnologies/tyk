@@ -128,7 +128,7 @@ func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 
 	req.Header.Set("authorization", h.Secret)
 	req.Header.Set(headers.XTykNodeID, h.Gw.GetNodeID())
-	req.Header.Set(headers.XTykNonce, ServiceNonce)
+	req.Header.Set(headers.XTykNonce, h.Gw.ServiceNonce)
 
 	c := h.Gw.initialiseClient()
 
@@ -151,7 +151,7 @@ func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 		return err
 	}
 
-	ServiceNonce = val.Nonce
+	h.Gw.ServiceNonce = val.Nonce
 
 	return nil
 }
@@ -195,8 +195,8 @@ func (h *HTTPDashboardHandler) Register() error {
 	dashLog.WithField("id", h.Gw.GetNodeID()).Info("Node Registered")
 
 	// Set the nonce
-	ServiceNonce = val.Nonce
-	dashLog.Debug("Registration Finished: Nonce Set: ", ServiceNonce)
+	h.Gw.ServiceNonce = val.Nonce
+	dashLog.Debug("Registration Finished: Nonce Set: ", h.Gw.ServiceNonce)
 
 	return nil
 }
@@ -242,7 +242,7 @@ func (h *HTTPDashboardHandler) newRequest(method, endpoint string) *http.Request
 
 func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Client) error {
 	req.Header.Set(headers.XTykNodeID, h.Gw.GetNodeID())
-	req.Header.Set(headers.XTykNonce, ServiceNonce)
+	req.Header.Set(headers.XTykNonce, h.Gw.ServiceNonce)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -264,8 +264,8 @@ func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Cli
 	}
 
 	// Set the nonce
-	ServiceNonce = val.Nonce
-	//log.Debug("Heartbeat Finished: Nonce Set: ", ServiceNonce)
+	h.Gw.ServiceNonce = val.Nonce
+	//log.Debug("Heartbeat Finished: Nonce Set: ", h.Gw.ServiceNonce)
 
 	return nil
 }
@@ -274,7 +274,7 @@ func (h *HTTPDashboardHandler) DeRegister() error {
 	req := h.newRequest(http.MethodDelete, h.DeRegistrationEndpoint)
 
 	req.Header.Set(headers.XTykNodeID, h.Gw.GetNodeID())
-	req.Header.Set(headers.XTykNonce, ServiceNonce)
+	req.Header.Set(headers.XTykNonce, h.Gw.ServiceNonce)
 
 	c := h.Gw.initialiseClient()
 	resp, err := c.Do(req)
@@ -293,7 +293,7 @@ func (h *HTTPDashboardHandler) DeRegister() error {
 	}
 
 	// Set the nonce
-	ServiceNonce = val.Nonce
+	h.Gw.ServiceNonce = val.Nonce
 	dashLog.Info("De-registered.")
 
 	return nil

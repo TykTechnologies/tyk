@@ -258,9 +258,6 @@ type APIDefinitionLoader struct {
 	Gw *Gateway `json:"-"`
 }
 
-// Nonce to use when interacting with the dashboard service
-var ServiceNonce string
-
 // MakeSpec will generate a flattened URLSpec from and APIDefinitions' VersionInfo data. paths are
 // keyed to the Api version name, which is determined during routing to speed up lookups
 func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.Entry) *APISpec {
@@ -372,7 +369,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	log.Debug("Using: NodeID: ", a.Gw.GetNodeID())
 	newRequest.Header.Set(headers.XTykNodeID, a.Gw.GetNodeID())
 
-	newRequest.Header.Set(headers.XTykNonce, ServiceNonce)
+	newRequest.Header.Set(headers.XTykNonce, a.Gw.ServiceNonce)
 
 	c := a.Gw.initialiseClient()
 	resp, err := c.Do(newRequest)
@@ -441,8 +438,8 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	}
 
 	// Set the nonce
-	ServiceNonce = list.Nonce
-	log.Debug("Loading APIS Finished: Nonce Set: ", ServiceNonce)
+	a.Gw.ServiceNonce = list.Nonce
+	log.Debug("Loading APIS Finished: Nonce Set: ", a.Gw.ServiceNonce)
 
 	return specs, nil
 }

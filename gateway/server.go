@@ -122,6 +122,9 @@ type Gateway struct {
 	// memory cache to store arbitrary items
 	UtilCache *cache.Cache
 
+	// Nonce to use when interacting with the dashboard service
+	ServiceNonce string
+
 	apisMu          sync.RWMutex
 	apiSpecs        []*APISpec
 	apisByID        map[string]*APISpec
@@ -1386,7 +1389,7 @@ func Start() {
 			mainLog.Info("Waiting to de-register")
 			time.Sleep(10 * time.Second)
 
-			os.Setenv("TYK_SERVICE_NONCE", ServiceNonce)
+			os.Setenv("TYK_SERVICE_NONCE", gw.ServiceNonce)
 			os.Setenv("TYK_SERVICE_NODEID", gw.GetNodeID())
 		}
 	}
