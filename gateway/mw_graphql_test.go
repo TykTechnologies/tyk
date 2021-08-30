@@ -230,10 +230,11 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 					Data:   request,
 					Method: http.MethodPut,
 					Headers: map[string]string{
-						"X-Tyk-Key":   "tyk-value",
-						"X-Other-Key": "other-value",
+						"X-Tyk-Key":       "tyk-value",
+						"X-Other-Key":     "other-value",
+						"X-Response-Code": "201",
 					},
-					Code:      http.StatusOK,
+					Code:      201,
 					BodyMatch: `{"data":{"hello":"World","httpMethod":"PUT"}}`,
 					HeadersMatch: map[string]string{
 						"Authorization": "123abc",
@@ -537,7 +538,6 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 		})
 
 		t.Run("websockets", func(t *testing.T) {
-			baseURL := strings.Replace(g.URL, "http://", "ws://", -1)
 			api.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
 			LoadAPI(api)
 
@@ -568,84 +568,20 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				cfg.HttpServerOptions.EnableWebSockets = true
 				config.SetGlobal(cfg)
 
-				t.Run("should deny upgrade with 400 when protocol is not graphql-ws", func(t *testing.T) {
+				t.Run("should respond with 422 when trying to upgrade to websockets", func(t *testing.T) {
 					_, _ = g.Run(t, []test.TestCase{
 						{
 							Headers: map[string]string{
 								headers.Connection:           "upgrade",
 								headers.Upgrade:              "websocket",
-								headers.SecWebSocketProtocol: "invalid",
+								headers.SecWebSocketProtocol: "graphql-ws",
 								headers.SecWebSocketVersion:  "13",
 								headers.SecWebSocketKey:      "123abc",
 							},
-							Code:      http.StatusBadRequest,
-							BodyMatch: "invalid websocket protocol for upgrading to a graphql websocket connection",
+							Code:      http.StatusUnprocessableEntity,
+							BodyMatch: "websockets are not allowed",
 						},
 					}...)
-				})
-
-				t.Run("should upgrade to websocket connection with correct protocol", func(t *testing.T) {
-					wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
-						headers.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
-					})
-					require.NoError(t, err)
-					defer wsConn.Close()
-
-					// Send a connection init message to gateway
-					err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"type":"connection_init","payload":{}}`))
-					require.NoError(t, err)
-
-					_, msg, err := wsConn.ReadMessage()
-
-					// Gateway should acknowledge the connection
-					assert.Equal(t, `{"id":"","type":"connection_ack","payload":null}`, string(msg))
-					assert.NoError(t, err)
-				})
-
-				t.Run("graphql over websockets", func(t *testing.T) {
-					api.UseKeylessAccess = false
-					LoadAPI(api)
-
-					t.Run("field-based permissions checks are skipped", func(t *testing.T) {
-						_, directKey := g.CreateSession(func(s *user.SessionState) {
-							s.AccessRights = map[string]user.AccessDefinition{
-								api.APIID: {
-									APIID:   api.APIID,
-									APIName: api.Name,
-									RestrictedTypes: []gql.Type{
-										{
-											Name:   "Query",
-											Fields: []string{"hello"},
-										},
-									},
-								},
-							}
-						})
-
-						wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
-							headers.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
-							headers.Authorization:        {directKey},
-						})
-						require.NoError(t, err)
-						defer wsConn.Close()
-
-						// Send a connection init message to gateway
-						err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"type":"connection_init","payload":{}}`))
-						require.NoError(t, err)
-
-						_, msg, err := wsConn.ReadMessage()
-
-						// Gateway should acknowledge the connection
-						require.Equal(t, `{"id":"","type":"connection_ack","payload":null}`, string(msg))
-						require.NoError(t, err)
-
-						err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"id": "1", "type": "start", "payload": {"query": "query Query { countries { name } }", "variables": null}}`))
-						require.NoError(t, err)
-
-						_, msg, err = wsConn.ReadMessage()
-						assert.Equal(t, `{"id":"1","type":"data","payload":{"data":{"countries":[{"name":"Turkey"},{"name":"Russia"},{"name":"United Kingdom"},{"name":"Germany"}]}}}`, string(msg))
-						assert.NoError(t, err)
-					})
 				})
 			})
 

@@ -204,7 +204,7 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	}
 
 	if websocket.IsWebSocketUpgrade(r) {
-		if !config.Global().HttpServerOptions.EnableWebSockets {
+		if !m.websocketUpgradeAllowed() {
 			return errors.New("websockets are not allowed"), http.StatusUnprocessableEntity
 		}
 
@@ -354,6 +354,18 @@ func (m *GraphQLMiddleware) OnError(ctx resolve.HookContext, output []byte, sing
 				"single_flight": singleFlight,
 			},
 		).Debugf("%s (afterFetchHook.OnError): %s", ctx.CurrentPath, string(output))
+}
+
+func (m *GraphQLMiddleware) websocketUpgradeAllowed() bool {
+	if !config.Global().HttpServerOptions.EnableWebSockets {
+		return false
+	}
+
+	if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion1 || m.Spec.GraphQL.Version == apidef.GraphQLConfigVersionNone {
+		return false
+	}
+
+	return true
 }
 
 func needsGraphQLExecutionEngine(apiSpec *APISpec) bool {
