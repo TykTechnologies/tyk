@@ -229,6 +229,10 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			tags = tagHeaders(r, e.Spec.TagHeaders, tags)
 		}
 
+		if len(e.Spec.Tags) > 0 {
+			tags = append(tags, e.Spec.Tags...)
+		}
+
 		rawRequest := ""
 		rawResponse := ""
 		if recordDetail(r, e.Spec) {
