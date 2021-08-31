@@ -35,7 +35,8 @@ func (h *HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Respon
 	// TODO: This should only target specific paths
 
 	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
-	vInfo, versionPaths, _, _ := h.Spec.Version(req)
+	vInfo, _ := h.Spec.Version(req)
+	versionPaths := h.Spec.RxPaths[vInfo.Name]
 	found, meta := h.Spec.CheckSpecMatchesStatus(req, versionPaths, HeaderInjectedResponse)
 	if found {
 		hmeta := meta.(*apidef.HeaderInjectionMeta)
