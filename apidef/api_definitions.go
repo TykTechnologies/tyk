@@ -865,6 +865,32 @@ func (a *APIDefinition) DecodeFromDB() {
 	makeCompatible("jwt")
 }
 
+// Expired returns true if this Version has expired
+// and false if it has not expired (or does not have any expiry)
+func (v *VersionInfo) Expired() bool {
+	// Never expires
+	if v.Expires == "" || v.Expires == "-1" {
+		return false
+	}
+
+	// otherwise use parsed timestamp
+	if v.ExpiresTs.IsZero() {
+		log.Error("Could not parse expiry date, disallow")
+		return true
+	}
+
+	return time.Since(v.ExpiresTs) >= 0
+}
+
+// ExpiryTime returns the time that this version is due to expire
+func (v *VersionInfo) ExpiryTime() (exp time.Time) {
+	if v.Expired() {
+		return exp
+	}
+	exp = v.ExpiresTs
+	return
+}
+
 func (s *StringRegexMap) Check(value string) (match string) {
 	if s.matchRegex == nil {
 		return
