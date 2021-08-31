@@ -43,7 +43,10 @@ func (t *TransformJQMiddleware) EnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (t *TransformJQMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	_, versionPaths, _, _ := t.Spec.Version(r)
+	vInfo, _ := t.Spec.Version(r)
+	
+	versionPaths, _ := a.RxPaths[vInfo.Name]
+
 	found, meta := t.Spec.CheckSpecMatchesStatus(r, versionPaths, TransformedJQ)
 	if !found {
 		return nil, http.StatusOK
