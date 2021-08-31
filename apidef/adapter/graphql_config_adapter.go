@@ -68,8 +68,14 @@ func (g *GraphQLConfigAdapter) createV2ConfigForProxyOnlyExecutionMode() (*graph
 		staticHeaders.Add(authHeaderKey, authHeaderValue)
 	}
 
+	url := g.apiDefinition.Proxy.TargetURL
+	if strings.HasPrefix(url, "tyk://") {
+		url = strings.ReplaceAll(url, "tyk://", "http://")
+		staticHeaders.Set(apidef.TykInternalApiHeader, "true")
+	}
+
 	upstreamConfig := graphql.ProxyUpstreamConfig{
-		URL:           g.apiDefinition.Proxy.TargetURL,
+		URL:           url,
 		StaticHeaders: staticHeaders,
 	}
 

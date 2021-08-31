@@ -68,6 +68,58 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 		assert.Containsf(t, engineV2Config.FieldConfigurations(), expectedFieldConfig, "engine configuration does not contain expected field config")
 	})
 
+	t.Run("should create v2 config for internal proxy-only api", func(t *testing.T) {
+		var gqlConfig apidef.GraphQLConfig
+		require.NoError(t, json.Unmarshal([]byte(graphqlProxyOnlyConfig), &gqlConfig))
+
+		apiDef := &apidef.APIDefinition{
+			GraphQL: gqlConfig,
+			Proxy: apidef.ProxyConfig{
+				TargetURL: "tyk://api-name",
+			},
+		}
+
+		httpClient := &http.Client{}
+		adapter := NewGraphQLConfigAdapter(apiDef, WithHttpClient(httpClient))
+
+		engineV2Config, err := adapter.EngineConfigV2()
+		assert.NoError(t, err)
+
+		expectedDataSource := plan.DataSourceConfiguration{
+			RootNodes: []plan.TypeField{
+				{
+					TypeName:   "Query",
+					FieldNames: []string{"hello"},
+				},
+			},
+			ChildNodes: nil,
+			Factory:    &graphqlDataSource.Factory{HTTPClient: httpClient},
+			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
+				Fetch: graphqlDataSource.FetchConfiguration{
+					URL: "http://api-name",
+					Header: http.Header{
+						"Authorization":  []string{"123abc"},
+						"X-Tyk-Internal": []string{"true"},
+					},
+				},
+			}),
+		}
+
+		expectedFieldConfig := plan.FieldConfiguration{
+			TypeName:  "Query",
+			FieldName: "hello",
+			Arguments: plan.ArgumentsConfigurations{
+				{
+					Name:       "name",
+					SourceType: plan.FieldArgumentSource,
+				},
+			},
+		}
+
+		assert.Containsf(t, engineV2Config.DataSources(), expectedDataSource, "engine configuration does not contain proxy-only data source")
+		assert.Containsf(t, engineV2Config.FieldConfigurations(), expectedFieldConfig, "engine configuration does not contain expected field config")
+	})
+
 	t.Run("should create v2 config for engine execution mode without error", func(t *testing.T) {
 		var gqlConfig apidef.GraphQLConfig
 		require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2ConfigJson), &gqlConfig))

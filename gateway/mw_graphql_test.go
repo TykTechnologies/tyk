@@ -271,6 +271,46 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 			})
 		})
 
+		t.Run("subgraph as internal data source", func(t *testing.T) {
+			subgraph := BuildAPI(func(spec *APISpec) {
+				spec.UseKeylessAccess = true
+				spec.Proxy.TargetURL = testSubgraphReviews
+				spec.Proxy.ListenPath = "/internal-subgraph"
+				spec.Internal = true
+				spec.Name = "my-internal-subgraph"
+				spec.APIID = "internal-subgraph"
+				spec.GraphQL.Enabled = true
+				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeSubgraph
+				spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+				spec.GraphQL.Schema = gqlSubgraphSchemaReviews
+			})[0]
+
+			proxyOnlyAPI := BuildAPI(func(spec *APISpec) {
+				spec.UseKeylessAccess = true
+				spec.Proxy.TargetURL = "tyk://" + subgraph.Name
+				spec.Proxy.ListenPath = "/"
+				spec.GraphQL.Enabled = true
+				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
+				spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+				spec.GraphQL.Schema = gqlSubgraphSchemaReviews
+			})[0]
+
+			LoadAPI(subgraph, proxyOnlyAPI)
+
+			t.Run("should execute internal subgraph successfully", func(t *testing.T) {
+				request := gql.Request{
+					Query:     gqlSubgraphQueryReviews,
+					Variables: []byte(gqlSubgraphVariables),
+				}
+
+				_, _ = g.Run(t, test.TestCase{
+					Data:      request,
+					BodyMatch: `{"data":{"\_entities":\[{"reviews":\[{"body":"A highly effective form of birth control."},{"body":"Fedoras are one of the most fashionable hats around and can look great with a variety of outfits."}\]}\]}}`,
+					Code:      http.StatusOK,
+				})
+			})
+		})
+
 		t.Run("udg", func(t *testing.T) {
 			BuildAndLoadAPI(func(spec *APISpec) {
 				spec.UseKeylessAccess = true
