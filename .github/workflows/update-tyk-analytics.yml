@@ -1,0 +1,22 @@
+# Keep the branch on tyk-analytics in sync with this branch
+
+name: Update go.mod
+
+on:
+  push:
+    branches:
+      - master
+      - release-**
+      - integration/**
+
+jobs:
+  sync:
+    name: tyk-analytics
+    runs-on: ubuntu-latest
+    steps:
+      - uses: peter-evans/repository-dispatch@v1
+        with:
+          token: ${{ secrets.TYK_ANALYTICS_TOKEN }}
+          repository: TykTechnologies/tyk-analytics
+          event-type: new-tyk
+          client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}"}'

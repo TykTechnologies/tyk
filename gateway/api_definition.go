@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -17,20 +18,25 @@ import (
 	"text/template"
 	"time"
 
-	sprig "gopkg.in/Masterminds/sprig.v2"
+	"github.com/getkin/kin-openapi/openapi3"
 
-	"github.com/gorilla/mux"
+	"github.com/cenk/backoff"
+	"github.com/jensneuse/graphql-go-tools/pkg/engine/resolve"
 
-	"github.com/TykTechnologies/tyk/headers"
-	"github.com/TykTechnologies/tyk/rpc"
-
-	"github.com/sirupsen/logrus"
+	"gopkg.in/Masterminds/sprig.v2"
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
+	"github.com/gorilla/mux"
+	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+	"github.com/sirupsen/logrus"
+
 	"github.com/TykTechnologies/gojsonschema"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/regexp"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -77,6 +83,7 @@ const (
 	RequestNotTracked
 	ValidateJSONRequest
 	Internal
+	GoPlugin
 )
 
 // RequestStatus is a custom type to avoid collisions
@@ -109,6 +116,7 @@ const (
 	StatusRequestNotTracked        RequestStatus = "Request Not Tracked"
 	StatusValidateJSON             RequestStatus = "Validate JSON"
 	StatusInternal                 RequestStatus = "Internal path"
+	StatusGoPlugin                 RequestStatus = "Go plugin"
 )
 
 // URLSpec represents a flattened specification for URLs, used to check if a proxy URL
@@ -135,7 +143,9 @@ type URLSpec struct {
 	DoNotTrackEndpoint        apidef.TrackEndpointMeta
 	ValidatePathMeta          apidef.ValidatePathMeta
 	Internal                  apidef.InternalMeta
-	IgnoreCase                bool
+	GoPluginMeta              GoPluginMiddleware
+
+	IgnoreCase bool
 }
 
 type EndPointCacheMeta struct {
@@ -158,12 +168,13 @@ type ExtendedCircuitBreakerMeta struct {
 // flattened URL list is checked for matching paths and then it's status evaluated if found.
 type APISpec struct {
 	*apidef.APIDefinition
+	OAS openapi3.Swagger
 	sync.RWMutex
 
 	RxPaths                  map[string][]URLSpec
 	WhiteListEnabled         map[string]bool
 	target                   *url.URL
-	AuthManager              AuthorisationHandler
+	AuthManager              SessionHandler
 	OAuthManager             *OAuthManager
 	OrgSessionManager        SessionHandler
 	EventPaths               map[apidef.TykEvent][]config.TykEventHandler
@@ -177,7 +188,7 @@ type APISpec struct {
 	LastGoodHostList         *apidef.HostList
 	HasRun                   bool
 	ServiceRefreshInProgress bool
-	HTTPTransport            http.RoundTripper
+	HTTPTransport            *TykRoundTripper
 	HTTPTransportCreated     time.Time
 	WSTransport              http.RoundTripper
 	WSTransportCreated       time.Time
@@ -187,9 +198,21 @@ type APISpec struct {
 	middlewareChain *ChainObject
 
 	network NetworkStats
+
+	GraphQLExecutor struct {
+		Engine   *graphql.ExecutionEngine
+		CancelV2 context.CancelFunc
+		EngineV2 *graphql.ExecutionEngineV2
+		HooksV2  struct {
+			BeforeFetchHook resolve.BeforeFetchHook
+			AfterFetchHook  resolve.AfterFetchHook
+		}
+		Client *http.Client
+		Schema *graphql.Schema
+	} `json:"-"`
 }
 
-// Release re;leases all resources associated with API spec
+// Release releases all resources associated with API spec
 func (s *APISpec) Release() {
 	// release circuit breaker resources
 	for _, path := range s.RxPaths {
@@ -199,6 +222,11 @@ func (s *APISpec) Release() {
 				urlSpec.CircuitBreaker.CB.Stop()
 			}
 		}
+	}
+
+	// cancel execution contexts
+	if s.GraphQLExecutor.CancelV2 != nil {
+		s.GraphQLExecutor.CancelV2()
 	}
 
 	// release all other resources associated with spec
@@ -265,7 +293,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 	}
 
 	// Add any new session managers or auth handlers here
-	spec.AuthManager = &DefaultAuthorisationManager{}
+	spec.AuthManager = &DefaultSessionManager{}
 
 	spec.OrgSessionManager = &DefaultSessionManager{
 		orgID: spec.OrgID,
@@ -425,7 +453,6 @@ func (a APIDefinitionLoader) FromRPC(orgId string) ([]*APISpec, error) {
 	if rpc.IsEmergencyMode() {
 		return LoadDefinitionsFromRPCBackup()
 	}
-
 	store := RPCStorageHandler{}
 	if !store.Connect() {
 		return nil, errors.New("Can't connect RPC layer")
@@ -444,7 +471,7 @@ func (a APIDefinitionLoader) FromRPC(orgId string) ([]*APISpec, error) {
 
 	if rpc.LoadCount() > 0 {
 		if err := saveRPCDefinitionsBackup(apiCollection); err != nil {
-			return nil, err
+			log.Error(err)
 		}
 	}
 
@@ -479,12 +506,24 @@ func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string) ([]*API
 	return specs, nil
 }
 
-func (a APIDefinitionLoader) ParseDefinition(r io.Reader) *apidef.APIDefinition {
-	def := &apidef.APIDefinition{}
-	if err := json.NewDecoder(r).Decode(def); err != nil {
-		log.Error("[RPC] --> Couldn't unmarshal api configuration: ", err)
+func (a APIDefinitionLoader) ParseDefinition(r io.Reader) (api apidef.APIDefinition) {
+	if err := json.NewDecoder(r).Decode(&api); err != nil {
+		log.Error("Couldn't unmarshal api configuration: ", err)
 	}
-	return def
+
+	return
+}
+
+func (a APIDefinitionLoader) ParseOAS(r io.Reader) (oas openapi3.Swagger) {
+	if err := json.NewDecoder(r).Decode(&oas); err != nil {
+		log.Error("Couldn't unmarshal oas configuration: ", err)
+	}
+
+	return
+}
+
+func (a APIDefinitionLoader) GetOASFilepath(path string) string {
+	return strings.TrimSuffix(path, ".json") + "-oas.json"
 }
 
 // FromDir will load APIDefinitions from a directory on the filesystem. Definitions need
@@ -494,15 +533,29 @@ func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 	// Grab json files from directory
 	paths, _ := filepath.Glob(filepath.Join(dir, "*.json"))
 	for _, path := range paths {
+		if strings.HasSuffix(path, "-oas.json") {
+			continue
+		}
+
 		log.Info("Loading API Specification from ", path)
 		f, err := os.Open(path)
 		if err != nil {
 			log.Error("Couldn't open api configuration file: ", err)
 			continue
 		}
+
 		def := a.ParseDefinition(f)
-		f.Close()
-		spec := a.MakeSpec(def, nil)
+		spec := a.MakeSpec(&def, nil)
+
+		_, _ = f.Seek(0, io.SeekStart)
+		_ = f.Close()
+
+		f, err = os.Open(a.GetOASFilepath(path))
+		if err == nil {
+			spec.OAS = a.ParseOAS(f)
+			_ = f.Close()
+		}
+
 		specs = append(specs, spec)
 	}
 	return specs
@@ -744,6 +797,12 @@ func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circui
 		newSpec.CircuitBreaker = ExtendedCircuitBreakerMeta{CircuitBreakerMeta: stringSpec}
 		log.Debug("Initialising circuit breaker for: ", stringSpec.Path)
 		newSpec.CircuitBreaker.CB = circuit.NewRateBreaker(stringSpec.ThresholdPercent, stringSpec.Samples)
+
+		// override backoff algorithm when is not desired to recheck the upstream before the ReturnToServiceAfter happens
+		if stringSpec.DisableHalfOpenState {
+			newSpec.CircuitBreaker.CB.BackOff = &backoff.StopBackOff{}
+		}
+
 		events := newSpec.CircuitBreaker.CB.Subscribe()
 		go func(path string, spec *APISpec, breakerPtr *circuit.Breaker) {
 			timerActive := false
@@ -840,6 +899,29 @@ func (a APIDefinitionLoader) compileVirtualPathspathSpec(paths []apidef.VirtualM
 	return urlSpec
 }
 
+func (a APIDefinitionLoader) compileGopluginPathspathSpec(paths []apidef.GoPluginMeta, stat URLStatus, apiSpec *APISpec) []URLSpec {
+
+	// transform an extended configuration URL into an array of URLSpecs
+	// This way we can iterate the whole array once, on match we break with status
+	var urlSpec []URLSpec
+
+	for _, stringSpec := range paths {
+		newSpec := URLSpec{}
+		a.generateRegex(stringSpec.Path, &newSpec, stat)
+		// Extend with method actions
+		newSpec.GoPluginMeta.Path = stringSpec.PluginPath
+		newSpec.GoPluginMeta.SymbolName = stringSpec.SymbolName
+		newSpec.GoPluginMeta.Meta.Method = stringSpec.Method
+		newSpec.GoPluginMeta.Meta.Path = stringSpec.Path
+
+		newSpec.GoPluginMeta.loadPlugin()
+
+		urlSpec = append(urlSpec, newSpec)
+	}
+
+	return urlSpec
+}
+
 func (a APIDefinitionLoader) compileTrackedEndpointPathspathSpec(paths []apidef.TrackEndpointMeta, stat URLStatus) []URLSpec {
 	urlSpec := []URLSpec{}
 
@@ -921,6 +1003,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	hardTimeouts := a.compileTimeoutPathSpec(apiVersionDef.ExtendedPaths.HardTimeouts, HardTimeout)
 	circuitBreakers := a.compileCircuitBreakerPathSpec(apiVersionDef.ExtendedPaths.CircuitBreaker, CircuitBreaker, apiSpec)
 	urlRewrites := a.compileURLRewritesPathSpec(apiVersionDef.ExtendedPaths.URLRewrite, URLRewrite)
+	goPlugins := a.compileGopluginPathspathSpec(apiVersionDef.ExtendedPaths.GoPlugin, GoPlugin, apiSpec)
 	virtualPaths := a.compileVirtualPathspathSpec(apiVersionDef.ExtendedPaths.Virtual, VirtualPath, apiSpec)
 	requestSizes := a.compileRequestSizePathSpec(apiVersionDef.ExtendedPaths.SizeLimit, RequestSizeLimit)
 	methodTransforms := a.compileMethodTransformSpec(apiVersionDef.ExtendedPaths.MethodTransforms, MethodTransformed)
@@ -944,6 +1027,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	combinedPath = append(combinedPath, circuitBreakers...)
 	combinedPath = append(combinedPath, urlRewrites...)
 	combinedPath = append(combinedPath, requestSizes...)
+	combinedPath = append(combinedPath, goPlugins...)
 	combinedPath = append(combinedPath, virtualPaths...)
 	combinedPath = append(combinedPath, methodTransforms...)
 	combinedPath = append(combinedPath, trackedPaths...)
@@ -1006,6 +1090,8 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusValidateJSON
 	case Internal:
 		return StatusInternal
+	case GoPlugin:
+		return StatusGoPlugin
 
 	default:
 		log.Error("URL Status was not one of Ignored, Blacklist or WhiteList! Blocking.")
@@ -1191,6 +1277,10 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 			if method == rxPaths[i].Internal.Method {
 				return true, &rxPaths[i].Internal
 			}
+		case GoPlugin:
+			if method == rxPaths[i].GoPluginMeta.Meta.Method {
+				return true, &rxPaths[i].GoPluginMeta
+			}
 		}
 	}
 	return false, nil
@@ -1220,69 +1310,52 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 	return ""
 }
 
-// VersionExpired checks if an API version (during a proxied
-// request) is expired. If it isn't and the configured time was valid,
-// it also returns the expiration time.
-func (a *APISpec) VersionExpired(versionDef *apidef.VersionInfo) (bool, *time.Time) {
-	if a.VersionData.NotVersioned {
-		return false, nil
-	}
-
-	// Never expires
-	if versionDef.Expires == "" || versionDef.Expires == "-1" {
-		return false, nil
-	}
-
-	// otherwise use parsed timestamp
-	if versionDef.ExpiresTs.IsZero() {
-		log.Error("Could not parse expiry date for API, disallow")
-		return true, nil
-	}
-
-	// It's in the past, expire
-	// It's in the future, keep going
-	return time.Since(versionDef.ExpiresTs) >= 0, &versionDef.ExpiresTs
-}
-
 // RequestValid will check if an incoming request has valid version
 // data and return a RequestStatus that describes the status of the
 // request
-func (a *APISpec) RequestValid(r *http.Request) (bool, RequestStatus, interface{}) {
-	versionMetaData, versionPaths, whiteListStatus, vstat := a.Version(r)
+func (a *APISpec) RequestValid(r *http.Request) (bool, RequestStatus) {
+	versionInfo, status := a.Version(r)
 
 	// Screwed up version info - fail and pass through
-	if vstat != StatusOk {
-		return false, vstat, nil
+	if status != StatusOk {
+		return false, status
 	}
 
-	// Is the API version expired?
-	// TODO: Don't abuse the interface{} return value for both
-	// *apidef.EndpointMethodMeta and *time.Time. Probably need to
-	// redesign or entirely remove RequestValid. See discussion on
-	// https://github.com/TykTechnologies/tyk/pull/776
-	expired, expTime := a.VersionExpired(versionMetaData)
-	if expired {
-		return false, VersionExpired, nil
+	// Load path data and whitelist data for version
+	versionPaths, ok := a.RxPaths[versionInfo.Name]
+	if !ok {
+		log.Error("no RX Paths found for version ", versionInfo.Name)
+		return false, VersionDoesNotExist
+	}
+
+	whiteListStatus, ok := a.WhiteListEnabled[versionInfo.Name]
+	if !ok {
+		log.Error("no whitelist data found")
+		return false, VersionWhiteListStatusNotFound
+	}
+
+	if !a.VersionData.NotVersioned && versionInfo.Expired() {
+		return false, VersionExpired
 	}
 
 	// not expired, let's check path info
-	status, meta := a.URLAllowedAndIgnored(r, versionPaths, whiteListStatus)
+	status, _ = a.URLAllowedAndIgnored(r, versionPaths, whiteListStatus)
 	switch status {
 	case EndPointNotAllowed:
-		return false, status, expTime
+		return false, status
 	case StatusRedirectFlowByReply:
-		return true, status, meta
+		return true, status
 	case StatusOkAndIgnore, StatusCached, StatusTransform,
 		StatusHeaderInjected, StatusMethodTransformed:
-		return true, status, expTime
+		return true, status
 	default:
-		return true, StatusOk, expTime
+		return true, StatusOk
 	}
 }
 
 // Version attempts to extract the version data from a request, depending on where it is stored in the
 // request (currently only "header" is supported)
-func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, []URLSpec, bool, RequestStatus) {
+func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, RequestStatus) {
 	var version apidef.VersionInfo
 
 	// try the context first
@@ -1302,7 +1375,7 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, []URLSpec, bool
 			vName := a.getVersionFromRequest(r)
 			if vName == "" {
 				if a.VersionData.DefaultVersion == "" {
-					return &version, nil, false, VersionNotFound
+					return &version, VersionNotFound
 				}
 				vName = a.VersionData.DefaultVersion
 				ctxSetDefaultVersion(r)
@@ -1310,7 +1383,7 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, []URLSpec, bool
 			// Load Version Data - General
 			var ok bool
 			if version, ok = a.VersionData.Versions[vName]; !ok {
-				return &version, nil, false, VersionDoesNotExist
+				return &version, VersionDoesNotExist
 			}
 		}
 
@@ -1318,20 +1391,7 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, []URLSpec, bool
 		ctxSetVersionInfo(r, &version)
 	}
 
-	// Load path data and whitelist data for version
-	rxPaths, rxOk := a.RxPaths[version.Name]
-	if !rxOk {
-		log.Error("no RX Paths found for version ", version.Name)
-		return &version, nil, false, VersionDoesNotExist
-	}
-
-	whiteListStatus, wlOk := a.WhiteListEnabled[version.Name]
-	if !wlOk {
-		log.Error("No whitelist data found")
-		return &version, nil, false, VersionWhiteListStatusNotFound
-	}
-
-	return &version, rxPaths, whiteListStatus, StatusOk
+	return &version, StatusOk
 }
 
 func (a *APISpec) StripListenPath(r *http.Request, path string) string {

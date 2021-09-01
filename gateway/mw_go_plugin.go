@@ -7,10 +7,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/tyk/apidef"
 
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/goplugin"
+	"github.com/TykTechnologies/tyk/request"
+	"github.com/sirupsen/logrus"
 )
 
 // customResponseWriter is a wrapper around standard http.ResponseWriter
@@ -82,6 +84,8 @@ type GoPluginMiddleware struct {
 	handler        http.HandlerFunc
 	logger         *logrus.Entry
 	successHandler *SuccessHandler // to record analytics
+	Meta           apidef.GoPluginMeta
+	APILevel       bool
 }
 
 func (m *GoPluginMiddleware) Name() string {
@@ -89,6 +93,24 @@ func (m *GoPluginMiddleware) Name() string {
 }
 
 func (m *GoPluginMiddleware) EnabledForSpec() bool {
+
+	// global go plugins
+	if m.Path != "" && m.SymbolName != "" {
+		m.loadPlugin()
+		return true
+	}
+
+	// per path go plugins
+	for _, version := range m.Spec.VersionData.Versions {
+		if len(version.ExtendedPaths.GoPlugin) > 0 {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (m *GoPluginMiddleware) loadPlugin() bool {
 	m.logger = log.WithFields(logrus.Fields{
 		"mwPath":       m.Path,
 		"mwSymbolName": m.SymbolName,
@@ -108,11 +130,30 @@ func (m *GoPluginMiddleware) EnabledForSpec() bool {
 
 	// to record 2XX hits in analytics
 	m.successHandler = &SuccessHandler{BaseMiddleware: m.BaseMiddleware}
-
 	return true
 }
 
+func (m *GoPluginMiddleware) goPluginConfigFromRequest(r *http.Request) {
+
+	version, _ := m.Spec.Version(r)
+	versionPaths := m.Spec.RxPaths[version.Name]
+
+	found, perPathPerMethodGoPlugin := m.Spec.CheckSpecMatchesStatus(r, versionPaths, GoPlugin)
+	if found {
+		m.handler = perPathPerMethodGoPlugin.(*GoPluginMiddleware).handler
+		m.Meta = perPathPerMethodGoPlugin.(*GoPluginMiddleware).Meta
+		m.Path = perPathPerMethodGoPlugin.(*GoPluginMiddleware).Path
+		m.SymbolName = perPathPerMethodGoPlugin.(*GoPluginMiddleware).SymbolName
+		m.logger = perPathPerMethodGoPlugin.(*GoPluginMiddleware).logger
+	}
+}
 func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (err error, respCode int) {
+
+	// is there a go plugin per path - we copy the handler etc from the urlspec if we find one
+	if !m.APILevel {
+		m.goPluginConfigFromRequest(r)
+	}
+
 	// make sure tyk recover in case Go-plugin function panics
 	defer func() {
 		if e := recover(); e != nil {
@@ -148,12 +189,22 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 	// check if response was sent
 	if rw.responseSent {
 		// check if response code was an error one
-		if rw.statusCodeSent >= http.StatusBadRequest {
+		switch {
+		case rw.statusCodeSent == http.StatusForbidden:
+			m.logger.WithError(err).Error("Authentication error in Go-plugin middleware func")
+			m.Base().FireEvent(EventAuthFailure, EventKeyFailureMeta{
+				EventMetaDefault: EventMetaDefault{Message: "Auth Failure", OriginatingRequest: EncodeRequestToEvent(r)},
+				Path:             r.URL.Path,
+				Origin:           request.RealIP(r),
+				Key:              "n/a",
+			})
+			fallthrough
+		case rw.statusCodeSent >= http.StatusBadRequest:
 			// base middleware will report this error to analytics if needed
 			respCode = rw.statusCodeSent
 			err = fmt.Errorf("plugin function sent error response code: %d", rw.statusCodeSent)
 			m.logger.WithError(err).Error("Failed to process request with Go-plugin middleware func")
-		} else {
+		default:
 			// record 2XX to analytics
 			m.successHandler.RecordHit(r, Latency{Total: int64(ms)}, rw.statusCodeSent, rw.getHttpResponse(r))
 

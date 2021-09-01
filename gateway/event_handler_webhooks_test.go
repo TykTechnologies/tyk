@@ -105,6 +105,33 @@ func TestBuildRequest(t *testing.T) {
 	}
 }
 
+func TestBuildRequestIngoreCanonicalHeaderKey(t *testing.T) {
+	c := config.Global()
+	defer ResetTestConfig()
+	c.IgnoreCanonicalMIMEHeaderKey = true
+	config.SetGlobal(c)
+	eventHandlerConf := config.WebHookHandlerConf{
+		TargetPath:   TestHttpGet,
+		Method:       "GET",
+		EventTimeout: 10,
+		TemplatePath: "../templates/default_webhook.json",
+		HeaderList:   map[string]string{NonCanonicalHeaderKey: NonCanonicalHeaderKey},
+	}
+
+	ev := &WebHookHandler{}
+	if err := ev.Init(eventHandlerConf); err != nil {
+		t.Fatal(err)
+	}
+	req, err := ev.BuildRequest("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := req.Header[NonCanonicalHeaderKey][0]
+	if got != NonCanonicalHeaderKey {
+		t.Errorf("expected %q got %q", NonCanonicalHeaderKey, got)
+	}
+}
+
 func TestCreateBody(t *testing.T) {
 	em := config.EventMessage{
 		Type:      EventQuotaExceeded,

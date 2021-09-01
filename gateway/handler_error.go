@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"errors"
 	"html/template"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"runtime/pprof"
 	"strconv"
@@ -21,7 +23,15 @@ const (
 	defaultTemplateName   = "error"
 	defaultTemplateFormat = "json"
 	defaultContentType    = headers.ApplicationJSON
+
+	MsgAuthFieldMissing    = "Authorization field missing"
+	MsgApiAccessDisallowed = "Access to this API has been disallowed"
+	MsgBearerMailformed    = "Bearer token malformed"
+	MsgKeyNotAuthorized    = "Key not authorised"
+	MsgOauthClientRevoked  = "Key not authorised. OAuth client access was revoked"
 )
+
+var errCustomBodyResponse = errors.New("errCustomBodyResponse")
 
 var TykErrors = make(map[string]config.TykError)
 
@@ -33,32 +43,42 @@ func errorAndStatusCode(errType string) (error, int) {
 func defaultTykErrors() {
 	TykErrors = make(map[string]config.TykError)
 	TykErrors[ErrAuthAuthorizationFieldMissing] = config.TykError{
-		Message: "Authorization field missing",
+		Message: MsgAuthFieldMissing,
 		Code:    http.StatusUnauthorized,
 	}
 
 	TykErrors[ErrAuthKeyNotFound] = config.TykError{
-		Message: "Access to this API has been disallowed",
+		Message: MsgApiAccessDisallowed,
+		Code:    http.StatusForbidden,
+	}
+
+	TykErrors[ErrAuthCertNotFound] = config.TykError{
+		Message: MsgApiAccessDisallowed,
+		Code:    http.StatusForbidden,
+	}
+
+	TykErrors[ErrAuthKeyIsInvalid] = config.TykError{
+		Message: MsgApiAccessDisallowed,
 		Code:    http.StatusForbidden,
 	}
 
 	TykErrors[ErrOAuthAuthorizationFieldMissing] = config.TykError{
-		Message: "Authorization field missing",
+		Message: MsgAuthFieldMissing,
 		Code:    http.StatusBadRequest,
 	}
 
 	TykErrors[ErrOAuthAuthorizationFieldMalformed] = config.TykError{
-		Message: "Bearer token malformed",
+		Message: MsgBearerMailformed,
 		Code:    http.StatusBadRequest,
 	}
 
 	TykErrors[ErrOAuthKeyNotFound] = config.TykError{
-		Message: "Key not authorised",
+		Message: MsgKeyNotAuthorized,
 		Code:    http.StatusForbidden,
 	}
 
 	TykErrors[ErrOAuthClientDeleted] = config.TykError{
-		Message: "Key not authorised. OAuth client access was revoked",
+		Message: MsgOauthClientRevoked,
 		Code:    http.StatusForbidden,
 	}
 }
@@ -91,25 +111,37 @@ type ErrorHandler struct {
 	BaseMiddleware
 }
 
+// TemplateExecutor is an interface used to switch between text/templates and html/template.
+// It only switch to text/template (templatesRaw) when contentType is XML related
+type TemplateExecutor interface {
+	Execute(wr io.Writer, data interface{}) error
+}
+
 // HandleError is the actual error handler and will store the error details in analytics if analytics processing is enabled.
 func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMsg string, errCode int, writeResponse bool) {
 	defer e.Base().UpdateRequestSession(r)
+	response := &http.Response{}
 
 	if writeResponse {
 		var templateExtension string
-		var contentType string
+		contentType := r.Header.Get(headers.ContentType)
+		contentType = strings.Split(contentType, ";")[0]
 
-		switch r.Header.Get(headers.ContentType) {
+		switch contentType {
 		case headers.ApplicationXML:
 			templateExtension = "xml"
 			contentType = headers.ApplicationXML
+		case headers.TextXML:
+			templateExtension = "xml"
+			contentType = headers.TextXML
 		default:
 			templateExtension = "json"
 			contentType = headers.ApplicationJSON
 		}
 
 		w.Header().Set(headers.ContentType, contentType)
-
+		response.Header = http.Header{}
+		response.Header.Set(headers.ContentType, contentType)
 		templateName := "error_" + strconv.Itoa(errCode) + "." + templateExtension
 
 		// Try to use an error template that matches the HTTP error code and the content type: 500.json, 400.xml, etc.
@@ -126,29 +158,52 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			templateName = defaultTemplateName + "." + defaultTemplateFormat
 			tmpl = templates.Lookup(templateName)
 			w.Header().Set(headers.ContentType, defaultContentType)
+			response.Header.Set(headers.ContentType, defaultContentType)
+
 		}
 
 		//If the config option is not set or is false, add the header
 		if !e.Spec.GlobalConfig.HideGeneratorHeader {
 			w.Header().Add(headers.XGenerator, "tyk.io")
+			response.Header.Add(headers.XGenerator, "tyk.io")
 		}
 
 		// Close connections
 		if e.Spec.GlobalConfig.CloseConnections {
 			w.Header().Add(headers.Connection, "close")
+			response.Header.Add(headers.Connection, "close")
+
 		}
 
-		// Need to return the correct error code!
-		w.WriteHeader(errCode)
-		apiError := APIError{template.HTML(template.JSEscapeString(errMsg))}
-		tmpl.Execute(w, &apiError)
+		// If error is not customized write error in default way
+		if errMsg != errCustomBodyResponse.Error() {
+			w.WriteHeader(errCode)
+			response.StatusCode = errCode
+			var tmplExecutor TemplateExecutor
+			tmplExecutor = tmpl
+
+			apiError := APIError{template.HTML(template.JSEscapeString(errMsg))}
+			if contentType == headers.ApplicationXML || contentType == headers.TextXML {
+				apiError.Message = template.HTML(errMsg)
+
+				//we look up in the last defined templateName to obtain the template.
+				rawTmpl := templatesRaw.Lookup(templateName)
+				tmplExecutor = rawTmpl
+			}
+
+			var log bytes.Buffer
+
+			rsp := io.MultiWriter(w, &log)
+			tmplExecutor.Execute(rsp, &apiError)
+			response.Body = ioutil.NopCloser(&log)
+		}
 	}
 
 	if memProfFile != nil {
 		pprof.WriteHeapProfile(memProfFile)
 	}
 
-	if e.Spec.DoNotTrack {
+	if e.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
 		return
 	}
 
@@ -158,6 +213,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 	ip := request.RealIP(r)
 	if e.Spec.GlobalConfig.StoreAnalytics(ip) {
+
 		t := time.Now()
 
 		addVersionHeader(w, r, e.Spec.GlobalConfig)
@@ -190,18 +246,29 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			tags = tagHeaders(r, e.Spec.TagHeaders, tags)
 		}
 
+		if len(e.Spec.Tags) > 0 {
+			tags = append(tags, e.Spec.Tags...)
+		}
+
 		rawRequest := ""
 		rawResponse := ""
 		if recordDetail(r, e.Spec) {
+
 			// Get the wire format representation
+
 			var wireFormatReq bytes.Buffer
 			r.Write(&wireFormatReq)
 			rawRequest = base64.StdEncoding.EncodeToString(wireFormatReq.Bytes())
+
+			var wireFormatRes bytes.Buffer
+			response.Write(&wireFormatRes)
+			rawResponse = base64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
+
 		}
 
 		trackEP := false
 		trackedPath := r.URL.Path
-		if p := ctxGetTrackedPath(r); p != "" && !ctxGetDoNotTrack(r) {
+		if p := ctxGetTrackedPath(r); p != "" {
 			trackEP = true
 			trackedPath = p
 		}
@@ -261,7 +328,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		if e.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
 			record.NormalisePath(&e.Spec.GlobalConfig)
 		}
-
 		analytics.RecordHit(&record)
 	}
 	// Report in health check

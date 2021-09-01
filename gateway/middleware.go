@@ -10,13 +10,15 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/TykTechnologies/tyk/rpc"
+
 	"github.com/TykTechnologies/tyk/headers"
 
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
 	newrelic "github.com/newrelic/go-agent"
 	"github.com/paulbellamy/ratecounter"
-	cache "github.com/pmylund/go-cache"
+	"github.com/pmylund/go-cache"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
 
@@ -68,6 +70,7 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		setContext(r, ctx)
 		return tr.TykMiddleware.ProcessRequest(w, r, conf)
 	}
+
 	return tr.TykMiddleware.ProcessRequest(w, r, conf)
 }
 
@@ -132,6 +135,7 @@ func createMiddleware(actualMW TykMiddleware) func(http.Handler) http.Handler {
 				h.ServeHTTP(w, r)
 				return
 			}
+
 			err, errCode := mw.ProcessRequest(w, r, mwConf)
 			if err != nil {
 				// GoPluginMiddleware are expected to send response in case of error
@@ -226,6 +230,11 @@ func (t BaseMiddleware) Config() (interface{}, error) {
 }
 
 func (t BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
+
+	if rpc.IsEmergencyMode() {
+		return user.SessionState{}, false
+	}
+
 	// Try and get the session from the session store
 	session, found := t.Spec.OrgSessionManager.SessionDetail(orgID, orgID, false)
 	if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
@@ -236,7 +245,8 @@ func (t BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
 	}
 
 	session.SetKeyHash(storage.HashKey(orgID))
-	return session, found
+
+	return session.Clone(), found
 }
 
 func (t BaseMiddleware) SetOrgExpiry(orgid string, expiry int64) {
@@ -287,7 +297,7 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 	ctxDisableSessionUpdate(r)
 
 	if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-		SessionCache.Set(session.KeyHash(), *session, cache.DefaultExpiration)
+		SessionCache.Set(session.KeyHash(), session.Clone(), cache.DefaultExpiration)
 	}
 
 	return true
@@ -302,7 +312,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		session.MetaData = make(map[string]interface{})
 	}
 
-	didQuota, didRateLimit, didACL := make(map[string]bool), make(map[string]bool), make(map[string]bool)
+	didQuota, didRateLimit, didACL, didComplexity := make(map[string]bool), make(map[string]bool), make(map[string]bool), make(map[string]bool)
 	policies := session.PolicyIDs()
 
 	for _, polID := range policies {
@@ -323,7 +333,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		}
 
 		if policy.Partitions.PerAPI &&
-			(policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl) {
+			(policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl || policy.Partitions.Complexity) {
 			err := fmt.Errorf("cannot apply policy %s which has per_api and any of partitions set", policy.ID)
 			log.Error(err)
 			return err
@@ -332,31 +342,32 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		if policy.Partitions.PerAPI {
 			for apiID, accessRights := range policy.AccessRights {
 				// new logic when you can specify quota or rate in more than one policy but for different APIs
-				if didQuota[apiID] || didRateLimit[apiID] || didACL[apiID] { // no other partitions allowed
+				if didQuota[apiID] || didRateLimit[apiID] || didACL[apiID] || didComplexity[apiID] { // no other partitions allowed
 					err := fmt.Errorf("cannot apply multiple policies when some have per_api set and some are partitioned")
 					log.Error(err)
 					return err
 				}
 
 				idForScope := apiID
-				// check if we already have limit on API level specified when policy was created
-				if accessRights.Limit == nil || *accessRights.Limit == (user.APILimit{}) {
+				// check if we don't have limit on API level specified when policy was created
+				if accessRights.Limit.IsEmpty() {
 					// limit was not specified on API level so we will populate it from policy
 					idForScope = policy.ID
-					accessRights.Limit = &user.APILimit{
+					accessRights.Limit = user.APILimit{
 						QuotaMax:           policy.QuotaMax,
 						QuotaRenewalRate:   policy.QuotaRenewalRate,
 						Rate:               policy.Rate,
 						Per:                policy.Per,
 						ThrottleInterval:   policy.ThrottleInterval,
 						ThrottleRetryLimit: policy.ThrottleRetryLimit,
+						MaxQueryDepth:      policy.MaxQueryDepth,
 					}
 				}
 				accessRights.AllowanceScope = idForScope
 				accessRights.Limit.SetBy = idForScope
 
 				// respect current quota renews (on API limit level)
-				if r, ok := session.AccessRights[apiID]; ok && r.Limit != nil {
+				if r, ok := session.AccessRights[apiID]; ok && !r.Limit.IsEmpty() {
 					accessRights.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
 
@@ -367,15 +378,13 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				didACL[apiID] = true
 				didQuota[apiID] = true
 				didRateLimit[apiID] = true
+				didComplexity[apiID] = true
 			}
 		} else {
-			usePartitions := policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl
-			for k, v := range policy.AccessRights {
-				ar := &v
+			usePartitions := policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl || policy.Partitions.Complexity
 
-				if v.Limit == nil {
-					v.Limit = &user.APILimit{}
-				}
+			for k, v := range policy.AccessRights {
+				ar := v
 
 				if !usePartitions || policy.Partitions.Acl {
 					didACL[k] = true
@@ -398,7 +407,35 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 							}
 						}
 
-						ar = &r
+						for _, t := range v.RestrictedTypes {
+							for ri, rt := range r.RestrictedTypes {
+								if t.Name == rt.Name {
+									r.RestrictedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
+								}
+							}
+						}
+
+						mergeFieldLimits := func(res *user.FieldLimits, new user.FieldLimits) {
+							if greaterThanInt(new.MaxQueryDepth, res.MaxQueryDepth) {
+								res.MaxQueryDepth = new.MaxQueryDepth
+							}
+						}
+
+						for _, far := range v.FieldAccessRights {
+							exists := false
+							for i, rfar := range r.FieldAccessRights {
+								if far.TypeName == rfar.TypeName && far.FieldName == rfar.FieldName {
+									exists = true
+									mergeFieldLimits(&r.FieldAccessRights[i].Limits, far.Limits)
+								}
+							}
+
+							if !exists {
+								r.FieldAccessRights = append(r.FieldAccessRights, far)
+							}
+						}
+
+						ar = r
 					}
 
 					ar.Limit.SetBy = policy.ID
@@ -406,11 +443,11 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 				if !usePartitions || policy.Partitions.Quota {
 					didQuota[k] = true
+					if greaterThanInt64(policy.QuotaMax, ar.Limit.QuotaMax) {
 
-					// -1 is special "unlimited" case
-					if ar.Limit.QuotaMax != -1 && policy.QuotaMax > ar.Limit.QuotaMax {
 						ar.Limit.QuotaMax = policy.QuotaMax
-						if policy.QuotaMax > session.QuotaMax {
+						//if partition for quota is set the we must use this value in the global information of the key
+						if greaterThanInt64(policy.QuotaMax, session.QuotaMax) || policy.Partitions.Quota {
 							session.QuotaMax = policy.QuotaMax
 						}
 					}
@@ -426,9 +463,10 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				if !usePartitions || policy.Partitions.RateLimit {
 					didRateLimit[k] = true
 
-					if ar.Limit.Rate != -1 && policy.Rate > ar.Limit.Rate {
+					if greaterThanFloat64(policy.Rate, ar.Limit.Rate) {
 						ar.Limit.Rate = policy.Rate
-						if policy.Rate > session.Rate {
+						//if policy.Partitions.RateLimit then we must set this value in the global data of the key
+						if greaterThanFloat64(policy.Rate, session.Rate) || policy.Partitions.RateLimit {
 							session.Rate = policy.Rate
 						}
 					}
@@ -455,13 +493,24 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					}
 				}
 
+				if !usePartitions || policy.Partitions.Complexity {
+					didComplexity[k] = true
+
+					if greaterThanInt(policy.MaxQueryDepth, ar.Limit.MaxQueryDepth) {
+						ar.Limit.MaxQueryDepth = policy.MaxQueryDepth
+						if greaterThanInt(policy.MaxQueryDepth, session.MaxQueryDepth) {
+							session.MaxQueryDepth = policy.MaxQueryDepth
+						}
+					}
+				}
+
 				// Respect existing QuotaRenews
-				if r, ok := session.AccessRights[k]; ok && r.Limit != nil {
+				if r, ok := session.AccessRights[k]; ok && !r.Limit.IsEmpty() {
 					ar.Limit.QuotaRenews = r.Limit.QuotaRenews
 				}
 
 				if !usePartitions || policy.Partitions.Acl {
-					rights[k] = *ar
+					rights[k] = ar
 				}
 			}
 
@@ -472,6 +521,10 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 					session.Per = policy.Per
 					session.ThrottleInterval = policy.ThrottleInterval
 					session.ThrottleRetryLimit = policy.ThrottleRetryLimit
+				}
+
+				if !usePartitions || policy.Partitions.Complexity {
+					session.MaxQueryDepth = policy.MaxQueryDepth
 				}
 
 				if !usePartitions || policy.Partitions.Quota {
@@ -514,7 +567,18 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		session.Tags = append(session.Tags, tag)
 	}
 
-	distinctACL := map[string]bool{}
+	if len(policies) == 0 {
+		for apiID, accessRight := range session.AccessRights {
+			// check if the api in the session has per api limit
+			if !accessRight.Limit.IsEmpty() {
+				accessRight.AllowanceScope = apiID
+				session.AccessRights[apiID] = accessRight
+			}
+		}
+	}
+
+	distinctACL := make(map[string]bool)
+
 	for _, v := range rights {
 		if v.Limit.SetBy != "" {
 			distinctACL[v.Limit.SetBy] = true
@@ -528,6 +592,10 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 			v.Limit.Per = session.Per
 			v.Limit.ThrottleInterval = session.ThrottleInterval
 			v.Limit.ThrottleRetryLimit = session.ThrottleRetryLimit
+		}
+
+		if !didComplexity[k] {
+			v.Limit.MaxQueryDepth = session.MaxQueryDepth
 		}
 
 		if !didQuota[k] {
@@ -549,7 +617,7 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	}
 
 	// If we have policies defining rules for one single API, update session root vars (legacy)
-	if len(didQuota) == 1 && len(didRateLimit) == 1 {
+	if len(didQuota) == 1 && len(didRateLimit) == 1 && len(didComplexity) == 1 {
 		for _, v := range rights {
 			if len(didRateLimit) == 1 {
 				session.Rate = v.Limit.Rate
@@ -560,6 +628,10 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				session.QuotaMax = v.Limit.QuotaMax
 				session.QuotaRenews = v.Limit.QuotaRenews
 				session.QuotaRenewalRate = v.Limit.QuotaRenewalRate
+			}
+
+			if len(didComplexity) == 1 {
+				session.MaxQueryDepth = v.Limit.MaxQueryDepth
 			}
 		}
 	}
@@ -574,7 +646,8 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
 // the Auth Handler, if not found it will fail
-func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.Request) (user.SessionState, bool) {
+func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r *http.Request) (user.SessionState, bool) {
+	key := originalKey
 	minLength := t.Spec.GlobalConfig.MinTokenLength
 	if minLength == 0 {
 		// See https://github.com/TykTechnologies/tyk/issues/1681
@@ -587,9 +660,10 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 
 	// Try and get the session from the session store
 	t.Logger().Debug("Querying local cache")
+	keyHash := key
 	cacheKey := key
 	if t.Spec.GlobalConfig.HashKeys {
-		cacheKey = storage.HashStr(key)
+		cacheKey = storage.HashStr(key, storage.HashMurmur64) // always hash cache keys with murmur64 to prevent collisions
 	}
 
 	// Check in-memory cache
@@ -597,7 +671,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 		cachedVal, found := SessionCache.Get(cacheKey)
 		if found {
 			t.Logger().Debug("--> Key found in local cache")
-			session := cachedVal.(user.SessionState)
+			session := cachedVal.(user.SessionState).Clone()
 			if err := t.ApplyPolicies(&session); err != nil {
 				t.Logger().Error(err)
 				return session, false
@@ -609,12 +683,17 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 	// Check session store
 	t.Logger().Debug("Querying keystore")
 	session, found := GlobalSessionManager.SessionDetail(t.Spec.OrgID, key, false)
+
 	if found {
-		session.SetKeyHash(cacheKey)
+		if t.Spec.GlobalConfig.HashKeys {
+			keyHash = storage.HashStr(session.KeyID)
+		}
+		session := session.Clone()
+		session.SetKeyHash(keyHash)
 		// If exists, assume it has been authorized and pass on
 		// cache it
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			go SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
+			SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
 		}
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
@@ -626,17 +705,26 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 		return session, true
 	}
 
+	if _, ok := t.Spec.AuthManager.Store().(*RPCStorageHandler); ok && rpc.IsEmergencyMode() {
+		return session.Clone(), false
+	}
+
+	// Only search in RPC if it's not in emergency mode
 	t.Logger().Debug("Querying authstore")
 	// 2. If not there, get it from the AuthorizationHandler
-	session, found = t.Spec.AuthManager.KeyAuthorised(key)
+	session, found = t.Spec.AuthManager.SessionDetail(t.Spec.OrgID, key, false)
 	if found {
-		session.SetKeyHash(cacheKey)
+		key = session.KeyID
+
+		session := session.Clone()
+		session.SetKeyHash(keyHash)
 		// If not in Session, and got it from AuthHandler, create a session with a new TTL
+
 		t.Logger().Info("Recreating session for key: ", obfuscateKey(key))
 
 		// cache it
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			go SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
+			SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
 		}
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
@@ -647,6 +735,9 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 
 		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.SessionLifetime))
 		ctxScheduleSessionUpdate(r)
+	} else {
+		// defaulting
+		session.KeyID = key
 	}
 
 	return session, found
@@ -715,6 +806,11 @@ type TykResponseHandler interface {
 	HandleError(http.ResponseWriter, *http.Request)
 }
 
+type TykGoPluginResponseHandler interface {
+	TykResponseHandler
+	HandleGoPluginResponse(http.ResponseWriter, *http.Response, *http.Request) error
+}
+
 func responseProcessorByName(name string) TykResponseHandler {
 	switch name {
 	case "header_injector":
@@ -727,7 +823,11 @@ func responseProcessorByName(name string) TykResponseHandler {
 		return &HeaderTransform{}
 	case "custom_mw_res_hook":
 		return &CustomMiddlewareResponseHook{}
+	case "goplugin_res_hook":
+		return &ResponseGoPluginMiddleware{}
+
 	}
+
 	return nil
 }
 

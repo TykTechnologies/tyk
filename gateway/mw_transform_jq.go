@@ -13,6 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 type TransformJQMiddleware struct {
@@ -42,7 +43,10 @@ func (t *TransformJQMiddleware) EnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (t *TransformJQMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	_, versionPaths, _, _ := t.Spec.Version(r)
+	vInfo, _ := t.Spec.Version(r)
+	
+	versionPaths, _ := a.RxPaths[vInfo.Name]
+
 	found, meta := t.Spec.CheckSpecMatchesStatus(r, versionPaths, TransformedJQ)
 	if !found {
 		return nil, http.StatusOK
@@ -89,8 +93,9 @@ func (t *TransformJQMiddleware) transformJQBody(r *http.Request, ts *TransformJQ
 	r.ContentLength = int64(bodyBuffer.Len())
 
 	// Replace header in the request
+	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
 	for hName, hValue := range jqResult.RewriteHeaders {
-		r.Header.Set(hName, hValue)
+		setCustomHeader(r.Header, hName, hValue, ignoreCanonical)
 	}
 
 	if t.Spec.EnableContextVars {

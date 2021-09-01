@@ -84,7 +84,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 		!k.Spec.DisableRateLimit,
 		!k.Spec.DisableQuota,
 		&k.Spec.GlobalConfig,
-		k.Spec.APIID,
+		k.Spec,
 		false,
 	)
 
@@ -93,7 +93,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 
 	if len(session.AccessRights) > 0 {
 		if rights, ok := session.AccessRights[k.Spec.APIID]; ok {
-			if rights.Limit != nil {
+			if !rights.Limit.IsEmpty() {
 				throttleInterval = rights.Limit.ThrottleInterval
 				throttleRetryLimit = rights.Limit.ThrottleRetryLimit
 			}
@@ -117,7 +117,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 					!k.Spec.DisableRateLimit,
 					!k.Spec.DisableQuota,
 					&k.Spec.GlobalConfig,
-					k.Spec.APIID,
+					k.Spec,
 					true,
 				)
 
@@ -139,6 +139,8 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 
 	case sessionFailQuota:
 		return k.handleQuotaFailure(r, token)
+	case sessionFailInternalServerError:
+		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	default:
 		// Other reason? Still not allowed
 		return errors.New("Access denied"), http.StatusForbidden

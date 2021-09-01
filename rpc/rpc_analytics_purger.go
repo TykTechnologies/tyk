@@ -3,7 +3,10 @@ package rpc
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
+
+	"github.com/TykTechnologies/tyk/config"
 
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
@@ -55,7 +58,7 @@ type GeoData struct {
 	} `maxminddb:"location"`
 }
 
-const analyticsKeyName = "tyk-system-analytics"
+const ANALYTICS_KEYNAME = "tyk-system-analytics"
 
 // RPCPurger will purge analytics data into a Mongo database, requires that the Mongo DB string is specified
 // in the Config object
@@ -65,7 +68,7 @@ type Purger struct {
 
 // Connect Connects to RPC
 func (r *Purger) Connect() {
-	if !clientIsConnected {
+	if !values.ClientIsConnected() {
 		Log.Error("RPC client is not connected, use Connect method 1st")
 	}
 
@@ -89,7 +92,9 @@ func (r *Purger) Connect() {
 // PurgeLoop starts the loop that will pull data out of the in-memory
 // store and into RPC.
 func (r Purger) PurgeLoop(ctx context.Context) {
-	tick := time.NewTicker(10 * time.Second)
+	interval := time.Duration(config.Global().AnalyticsConfig.PurgeInterval)
+	tick := time.NewTicker(interval * time.Second)
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -102,7 +107,7 @@ func (r Purger) PurgeLoop(ctx context.Context) {
 
 // PurgeCache will pull the data from the in-memory store and drop it into the specified MongoDB collection
 func (r *Purger) PurgeCache() {
-	if !clientIsConnected {
+	if !values.ClientIsConnected() {
 		Log.Error("RPC client is not connected, use Connect method 1st")
 	}
 
@@ -111,31 +116,41 @@ func (r *Purger) PurgeCache() {
 		return
 	}
 
-	analyticsValues := r.Store.GetAndDeleteSet(analyticsKeyName)
-	if len(analyticsValues) == 0 {
-		return
-	}
-	keys := make([]interface{}, len(analyticsValues))
-
-	for i, v := range analyticsValues {
-		decoded := AnalyticsRecord{}
-		if err := msgpack.Unmarshal([]byte(v.(string)), &decoded); err != nil {
-			Log.WithError(err).Error("Couldn't unmarshal analytics data")
+	for i := -1; i < 10; i++ {
+		var analyticsKeyName string
+		if i == -1 {
+			//if it's the first iteration, we look for tyk-system-analytics to maintain backwards compatibility or if analytics_config.enable_multiple_analytics_keys is disabled in the gateway
+			analyticsKeyName = ANALYTICS_KEYNAME
 		} else {
-			Log.WithField("decoded", decoded).Debug("Decoded Record")
-			keys[i] = decoded
+			analyticsKeyName = fmt.Sprintf("%v_%v", ANALYTICS_KEYNAME, i)
 		}
-	}
 
-	data, err := json.Marshal(keys)
-	if err != nil {
-		Log.WithError(err).Error("Failed to marshal analytics data")
-		return
-	}
+		analyticsValues := r.Store.GetAndDeleteSet(analyticsKeyName)
+		if len(analyticsValues) == 0 {
+			continue
+		}
+		keys := make([]interface{}, len(analyticsValues))
 
-	// Send keys to RPC
-	if _, err := FuncClientSingleton("PurgeAnalyticsData", string(data)); err != nil {
-		EmitErrorEvent(FuncClientSingletonCall, "PurgeAnalyticsData", err)
-		Log.Warn("Failed to call purge, retrying: ", err)
+		for i, v := range analyticsValues {
+			decoded := AnalyticsRecord{}
+			if err := msgpack.Unmarshal([]byte(v.(string)), &decoded); err != nil {
+				Log.WithError(err).Error("Couldn't unmarshal analytics data")
+			} else {
+				Log.WithField("decoded", decoded).Debug("Decoded Record")
+				keys[i] = decoded
+			}
+		}
+
+		data, err := json.Marshal(keys)
+		if err != nil {
+			Log.WithError(err).Error("Failed to marshal analytics data")
+			return
+		}
+
+		// Send keys to RPC
+		if _, err := FuncClientSingleton("PurgeAnalyticsData", string(data)); err != nil {
+			EmitErrorEvent(FuncClientSingletonCall, "PurgeAnalyticsData", err)
+			Log.Warn("Failed to call purge, retrying: ", err)
+		}
 	}
 }
