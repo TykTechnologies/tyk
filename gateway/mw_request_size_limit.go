@@ -78,7 +78,7 @@ func (t *RequestSizeLimitMiddleware) ProcessRequest(w http.ResponseWriter, r *ht
 	}
 
 	versionPaths := t.Spec.RxPaths[vInfo.Name]
-	
+
 	// If there's a potential match, try to match
 	found, meta := t.Spec.CheckSpecMatchesStatus(r, versionPaths, RequestSizeLimit)
 	if found {

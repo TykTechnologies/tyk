@@ -893,7 +893,7 @@ func (gw *Gateway) handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.
 	return response, http.StatusOK
 }
 
-func(gw *Gateway) writeToFile(fs afero.Fs, newDef interface{}, filename string) (err error, errCode int) {
+func (gw *Gateway) writeToFile(fs afero.Fs, newDef interface{}, filename string) (err error, errCode int) {
 	// Create a filename
 	defFilePath := filepath.Join(gw.GetConfig().AppPath, filename+".json")
 
