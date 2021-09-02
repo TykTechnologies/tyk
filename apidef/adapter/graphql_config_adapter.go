@@ -11,7 +11,6 @@ import (
 	restDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/rest_datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/plan"
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
-	"github.com/jensneuse/graphql-go-tools/pkg/graphql/federation"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -33,13 +32,13 @@ func WithHttpClient(httpClient *http.Client) GraphQLConfigAdapterOption {
 }
 
 type GraphQLConfigAdapter struct {
-	config     apidef.GraphQLConfig
-	httpClient *http.Client
-	schema     *graphql.Schema
+	apiDefinition *apidef.APIDefinition
+	httpClient    *http.Client
+	schema        *graphql.Schema
 }
 
-func NewGraphQLConfigAdapter(config apidef.GraphQLConfig, options ...GraphQLConfigAdapterOption) GraphQLConfigAdapter {
-	adapter := GraphQLConfigAdapter{config: config}
+func NewGraphQLConfigAdapter(apiDefinition *apidef.APIDefinition, options ...GraphQLConfigAdapterOption) GraphQLConfigAdapter {
+	adapter := GraphQLConfigAdapter{apiDefinition: apiDefinition}
 	for _, option := range options {
 		option(&adapter)
 	}
@@ -48,8 +47,12 @@ func NewGraphQLConfigAdapter(config apidef.GraphQLConfig, options ...GraphQLConf
 }
 
 func (g *GraphQLConfigAdapter) EngineConfigV2() (*graphql.EngineV2Configuration, error) {
-	if g.config.Version != apidef.GraphQLConfigVersion2 {
+	if g.apiDefinition.GraphQL.Version != apidef.GraphQLConfigVersion2 {
 		return nil, ErrUnsupportedGraphQLConfigVersion
+	}
+
+	if g.isProxyOnlyAPIDefinition() {
+		return g.createV2ConfigForProxyOnlyExecutionMode()
 	}
 
 	if g.isSupergraphAPIDefinition() {
@@ -59,10 +62,39 @@ func (g *GraphQLConfigAdapter) EngineConfigV2() (*graphql.EngineV2Configuration,
 	return g.createV2ConfigForEngineExecutionMode()
 }
 
+func (g *GraphQLConfigAdapter) createV2ConfigForProxyOnlyExecutionMode() (*graphql.EngineV2Configuration, error) {
+	staticHeaders := make(http.Header)
+	for authHeaderKey, authHeaderValue := range g.apiDefinition.GraphQL.Proxy.AuthHeaders {
+		staticHeaders.Add(authHeaderKey, authHeaderValue)
+	}
+
+	url := g.apiDefinition.Proxy.TargetURL
+	if strings.HasPrefix(url, "tyk://") {
+		url = strings.ReplaceAll(url, "tyk://", "http://")
+		staticHeaders.Set(apidef.TykInternalApiHeader, "true")
+	}
+
+	upstreamConfig := graphql.ProxyUpstreamConfig{
+		URL:           url,
+		StaticHeaders: staticHeaders,
+	}
+
+	if g.schema == nil {
+		var err error
+		g.schema, err = graphql.NewSchemaFromString(g.apiDefinition.GraphQL.Schema)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	v2Config, err := graphql.NewProxyEngineConfigFactory(g.schema, upstreamConfig, graphql.WithProxyHttpClient(g.httpClient)).EngineV2Configuration()
+	return &v2Config, err
+}
+
 func (g *GraphQLConfigAdapter) createV2ConfigForSupergraphExecutionMode() (*graphql.EngineV2Configuration, error) {
 	dataSourceConfs := g.subgraphDataSourceConfigs()
-	federationConfigV2Factory := federation.NewEngineConfigV2Factory(g.getHttpClient(), dataSourceConfs...)
-	err := federationConfigV2Factory.SetMergedSchemaFromString(g.config.Supergraph.MergedSDL)
+	federationConfigV2Factory := graphql.NewFederationEngineConfigFactory(dataSourceConfs, graphql.WithFederationHttpClient(g.getHttpClient()))
+	err := federationConfigV2Factory.SetMergedSchemaFromString(g.apiDefinition.GraphQL.Supergraph.MergedSDL)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +131,7 @@ func (g *GraphQLConfigAdapter) parseSchema() (err error) {
 		return nil
 	}
 
-	g.schema, err = graphql.NewSchemaFromString(g.config.Schema)
+	g.schema, err = graphql.NewSchemaFromString(g.apiDefinition.GraphQL.Schema)
 	if err != nil {
 		return err
 	}
@@ -117,7 +149,7 @@ func (g *GraphQLConfigAdapter) parseSchema() (err error) {
 }
 
 func (g *GraphQLConfigAdapter) engineConfigV2FieldConfigs() (planFieldConfigs plan.FieldConfigurations) {
-	for _, fc := range g.config.Engine.FieldConfigs {
+	for _, fc := range g.apiDefinition.GraphQL.Engine.FieldConfigs {
 		planFieldConfig := plan.FieldConfiguration{
 			TypeName:              fc.TypeName,
 			FieldName:             fc.FieldName,
@@ -136,7 +168,7 @@ func (g *GraphQLConfigAdapter) engineConfigV2FieldConfigs() (planFieldConfigs pl
 }
 
 func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []plan.DataSourceConfiguration, err error) {
-	for _, ds := range g.config.Engine.DataSources {
+	for _, ds := range g.apiDefinition.GraphQL.Engine.DataSources {
 		planDataSource := plan.DataSourceConfiguration{
 			RootNodes: []plan.TypeField{},
 		}
@@ -199,16 +231,16 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 
 func (g *GraphQLConfigAdapter) subgraphDataSourceConfigs() []graphqlDataSource.Configuration {
 	confs := make([]graphqlDataSource.Configuration, 0)
-	if len(g.config.Supergraph.Subgraphs) == 0 {
+	if len(g.apiDefinition.GraphQL.Supergraph.Subgraphs) == 0 {
 		return confs
 	}
 
-	for _, apiDefSubgraphConf := range g.config.Supergraph.Subgraphs {
+	for _, apiDefSubgraphConf := range g.apiDefinition.GraphQL.Supergraph.Subgraphs {
 		if len(apiDefSubgraphConf.SDL) == 0 {
 			continue
 		}
 
-		conf := g.graphqlDataSourceConfiguration(apiDefSubgraphConf.URL, http.MethodPost, g.config.Supergraph.GlobalHeaders)
+		conf := g.graphqlDataSourceConfiguration(apiDefSubgraphConf.URL, http.MethodPost, g.apiDefinition.GraphQL.Supergraph.GlobalHeaders)
 		conf.Federation = graphqlDataSource.FederationConfiguration{
 			Enabled:    true,
 			ServiceSDL: apiDefSubgraphConf.SDL,
@@ -339,7 +371,12 @@ func (g *GraphQLConfigAdapter) determineChildNodes(planDataSources []plan.DataSo
 }
 
 func (g *GraphQLConfigAdapter) isSupergraphAPIDefinition() bool {
-	return g.config.Enabled && g.config.ExecutionMode == apidef.GraphQLExecutionModeSupergraph
+	return g.apiDefinition.GraphQL.Enabled && g.apiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph
+}
+
+func (g *GraphQLConfigAdapter) isProxyOnlyAPIDefinition() bool {
+	return g.apiDefinition.GraphQL.Enabled &&
+		(g.apiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeProxyOnly || g.apiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSubgraph)
 }
 
 func (g *GraphQLConfigAdapter) getHttpClient() *http.Client {

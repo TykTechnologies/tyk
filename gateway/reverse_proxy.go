@@ -30,6 +30,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/jensneuse/abstractlogger"
+
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 	gqlhttp "github.com/jensneuse/graphql-go-tools/pkg/http"
 	"github.com/jensneuse/graphql-go-tools/pkg/subscription"
@@ -836,7 +837,7 @@ func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http
 			return
 		}
 		if needEngine {
-			return p.handoverRequestToGraphQLExecutionEngine(roundTripper, gqlRequest)
+			return p.handoverRequestToGraphQLExecutionEngine(roundTripper, gqlRequest, outreq)
 		}
 	}
 
@@ -867,8 +868,8 @@ func (p *ReverseProxy) handleGraphQLEngineWebsocketUpgrade(roundTripper *TykRoun
 	return nil, true, nil
 }
 
-func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *TykRoundTripper, gqlRequest *graphql.Request) (res *http.Response, hijacked bool, err error) {
-	p.TykAPISpec.GraphQLExecutor.Client.Transport = roundTripper
+func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *TykRoundTripper, gqlRequest *graphql.Request, outreq *http.Request) (res *http.Response, hijacked bool, err error) {
+	p.TykAPISpec.GraphQLExecutor.Client.Transport = NewGraphQLEngineTransport(DetermineGraphQLEngineTransportType(p.TykAPISpec), roundTripper)
 
 	switch p.TykAPISpec.GraphQL.Version {
 	case apidef.GraphQLConfigVersionNone:
@@ -893,8 +894,14 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 			return
 		}
 
+		isProxyOnly := isGraphQLProxyOnly(p.TykAPISpec)
+		reqCtx := context.Background()
+		if isProxyOnly {
+			reqCtx = NewGraphQLProxyOnlyContext(context.Background(), outreq)
+		}
+
 		resultWriter := graphql.NewEngineResultWriter()
-		err = p.TykAPISpec.GraphQLExecutor.EngineV2.Execute(context.Background(), gqlRequest, &resultWriter,
+		err = p.TykAPISpec.GraphQLExecutor.EngineV2.Execute(reqCtx, gqlRequest, &resultWriter,
 			graphql.WithBeforeFetchHook(p.TykAPISpec.GraphQLExecutor.HooksV2.BeforeFetchHook),
 			graphql.WithAfterFetchHook(p.TykAPISpec.GraphQLExecutor.HooksV2.AfterFetchHook),
 		)
@@ -902,9 +909,17 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 			return
 		}
 
+		httpStatus := http.StatusOK
 		header := make(http.Header)
 		header.Set("Content-Type", "application/json")
-		res = resultWriter.AsHTTPResponse(http.StatusOK, header)
+
+		if isProxyOnly {
+			proxyOnlyCtx := reqCtx.(*GraphQLProxyOnlyContext)
+			header = proxyOnlyCtx.upstreamResponse.Header
+			httpStatus = proxyOnlyCtx.upstreamResponse.StatusCode
+		}
+
+		res = resultWriter.AsHTTPResponse(httpStatus, header)
 		return
 	}
 
@@ -912,7 +927,7 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 }
 
 func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(roundTripper *TykRoundTripper, conn net.Conn, reqCtx context.Context) {
-	p.TykAPISpec.GraphQLExecutor.Client.Transport = roundTripper
+	p.TykAPISpec.GraphQLExecutor.Client.Transport = NewGraphQLEngineTransport(DetermineGraphQLEngineTransportType(p.TykAPISpec), roundTripper)
 
 	absLogger := abstractlogger.NewLogrusLogger(log, absLoggerLevel(log.Level))
 	done := make(chan bool)
@@ -1540,7 +1555,10 @@ func copyBody(body io.ReadCloser) io.ReadCloser {
 
 	// body is http's io.ReadCloser - read it up until EOF
 	var bodyRead bytes.Buffer
-	io.Copy(&bodyRead, body)
+	_, err := io.Copy(&bodyRead, body)
+	if err != nil {
+		log.Error("copyBody failed", err)
+	}
 
 	// use seek-able reader for further body usage
 	reusableBody := bytes.NewReader(bodyRead.Bytes())
@@ -1562,6 +1580,13 @@ func copyRequest(r *http.Request) *http.Request {
 func copyResponse(r *http.Response) *http.Response {
 	// for the case of streaming for which Content-Length might be unset = -1.
 	if r.ContentLength == -1 {
+		return r
+	}
+
+	// If the response is 101 Switching Protocols then the body will contain a
+	// `*http.readWriteCloserBody` which cannot be copied (see stdlib documentation).
+	// In this case we want to return immediately to avoid a silent crash.
+	if r.StatusCode == http.StatusSwitchingProtocols {
 		return r
 	}
 
