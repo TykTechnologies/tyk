@@ -28,9 +28,11 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
 	uuid "github.com/satori/go.uuid"
 	"golang.org/x/net/context"
+
+	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
+	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/cli"
@@ -459,6 +461,7 @@ func ProxyHandler(p *ReverseProxy, apiSpec *APISpec) http.Handler {
 }
 
 const (
+	handlerPathGraphQLProxyUpstream  = "/graphql-proxy-upstream"
 	handlerPathRestDataSource        = "/rest-data-source"
 	handlerPathGraphQLDataSource     = "/graphql-data-source"
 	handlerPathHeadersRestDataSource = "/rest-headers-data-source"
@@ -474,6 +477,7 @@ const (
 	TestHttpAny               = "http://" + testHttpListen
 	TestHttpGet               = TestHttpAny + "/get"
 	testHttpPost              = TestHttpAny + "/post"
+	testGraphQLProxyUpstream  = TestHttpAny + handlerPathGraphQLProxyUpstream
 	testGraphQLDataSource     = TestHttpAny + handlerPathGraphQLDataSource
 	testRESTDataSource        = TestHttpAny + handlerPathRestDataSource
 	testRESTHeadersDataSource = TestHttpAny + handlerPathHeadersRestDataSource
@@ -557,6 +561,7 @@ func testHttpHandler() *mux.Router {
 	r.HandleFunc("/get", handleMethod("GET"))
 	r.HandleFunc("/post", handleMethod("POST"))
 
+	r.HandleFunc(handlerPathGraphQLProxyUpstream, graphqlProxyUpstreamHandler)
 	r.HandleFunc(handlerPathGraphQLDataSource, graphqlDataSourceHandler)
 	r.HandleFunc(handlerPathRestDataSource, restDataSourceHandler)
 	r.HandleFunc(handlerPathHeadersRestDataSource, restHeadersDataSourceHandler)
@@ -587,6 +592,63 @@ func testHttpHandler() *mux.Router {
 	r.HandleFunc("/{rest:.*}", handleMethod(""))
 
 	return r
+}
+
+func graphqlProxyUpstreamHandler(w http.ResponseWriter, r *http.Request) {
+	gqlRequest := graphql.Request{}
+	err := graphql.UnmarshalHttpRequest(r, &gqlRequest)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	variables := map[string]string{}
+	err = json.Unmarshal(gqlRequest.Variables, &variables)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	name, ok := variables["a"]
+	if !ok {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	ignoreHeaders := map[string]bool{
+		http.CanonicalHeaderKey("Date"):           true,
+		http.CanonicalHeaderKey("Content-Length"): true,
+	}
+
+	responseCode := http.StatusOK
+	for reqHeaderKey, reqHeaderValues := range r.Header {
+		if ignoreHeaders[reqHeaderKey] {
+			continue
+		}
+
+		if reqHeaderKey == "X-Response-Code" {
+			var err error
+			responseCode, err = strconv.Atoi(reqHeaderValues[0])
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+
+			continue
+		}
+
+		for _, reqHeaderValue := range reqHeaderValues {
+			w.Header().Add(reqHeaderKey, reqHeaderValue)
+		}
+	}
+
+	w.WriteHeader(responseCode)
+	_, _ = w.Write([]byte(`{
+		"data": {
+			"hello": "` + name + `",
+			"httpMethod": "` + r.Method + `",
+		}
+	}`))
 }
 
 func graphqlDataSourceHandler(w http.ResponseWriter, r *http.Request) {
@@ -659,6 +721,7 @@ func restDataSourceHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func subgraphAccountsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	_, _ = w.Write([]byte(`{
 		"data": {
 			"me": {
@@ -670,10 +733,12 @@ func subgraphAccountsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func subgraphReviewsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	_, _ = w.Write([]byte(`{
 			"data": {
 				"_entities": [
 					{
+						"__typename": "User",
 						"reviews": [
 							{
 								"body": "A highly effective form of birth control."
