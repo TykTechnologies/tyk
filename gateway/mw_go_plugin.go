@@ -133,8 +133,7 @@ func (m *GoPluginMiddleware) loadPlugin() bool {
 	return true
 }
 
-func (m *GoPluginMiddleware) goPluginConfigFromRequest(r *http.Request) {
-
+func (m *GoPluginMiddleware) goPluginConfigFromRequest(r *http.Request) bool {
 	version, _ := m.Spec.Version(r)
 	versionPaths := m.Spec.RxPaths[version.Name]
 
@@ -146,15 +145,16 @@ func (m *GoPluginMiddleware) goPluginConfigFromRequest(r *http.Request) {
 		m.SymbolName = perPathPerMethodGoPlugin.(*GoPluginMiddleware).SymbolName
 		m.logger = perPathPerMethodGoPlugin.(*GoPluginMiddleware).logger
 	}
+	return found
 }
 func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (err error, respCode int) {
 	// is there a go plugin per path - we copy the handler etc from the urlspec if we find one
 	if !m.APILevel {
-		m.goPluginConfigFromRequest(r)
-		// if no handler is available, skip this middleware call:
-		if m.handler == nil {
+		// if no path matches, skip plugin exection for this path:
+		if found := m.goPluginConfigFromRequest(r); !found {
 			return
 		}
+
 	}
 
 	// make sure tyk recover in case Go-plugin function panics
