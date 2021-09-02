@@ -148,10 +148,13 @@ func (m *GoPluginMiddleware) goPluginConfigFromRequest(r *http.Request) {
 	}
 }
 func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (err error, respCode int) {
-
 	// is there a go plugin per path - we copy the handler etc from the urlspec if we find one
 	if !m.APILevel {
 		m.goPluginConfigFromRequest(r)
+		// if no handler is available, skip this middleware call:
+		if m.handler == nil {
+			return
+		}
 	}
 
 	// make sure tyk recover in case Go-plugin function panics
