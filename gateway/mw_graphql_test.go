@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -193,34 +192,126 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 	})
 
 	t.Run("graphql engine v2", func(t *testing.T) {
+		t.Run("proxy-only", func(t *testing.T) {
+			BuildAndLoadAPI(func(spec *APISpec) {
+				spec.UseKeylessAccess = true
+				spec.GraphQL.Enabled = true
+				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
+				spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+				spec.GraphQL.Schema = gqlProxyUpstreamSchema
+				spec.GraphQL.Proxy.AuthHeaders = map[string]string{
+					"Authorization": "123abc",
+				}
+				spec.Proxy.ListenPath = "/"
+				spec.Proxy.TargetURL = testGraphQLProxyUpstream
+			})
+
+			request := gql.Request{
+				Query: `{ hello(name: "World") httpMethod }`,
+			}
+
+			_, _ = g.Run(t, []test.TestCase{
+				{
+					Data:   request,
+					Method: http.MethodPost,
+					Headers: map[string]string{
+						"X-Tyk-Key":   "tyk-value",
+						"X-Other-Key": "other-value",
+					},
+					Code:      http.StatusOK,
+					BodyMatch: `{"data":{"hello":"World","httpMethod":"POST"}}`,
+					HeadersMatch: map[string]string{
+						"Authorization": "123abc",
+						"X-Tyk-Key":     "tyk-value",
+						"X-Other-Key":   "other-value",
+					},
+				},
+				{
+					Data:   request,
+					Method: http.MethodPut,
+					Headers: map[string]string{
+						"X-Tyk-Key":       "tyk-value",
+						"X-Other-Key":     "other-value",
+						"X-Response-Code": "201",
+					},
+					Code:      201,
+					BodyMatch: `{"data":{"hello":"World","httpMethod":"PUT"}}`,
+					HeadersMatch: map[string]string{
+						"Authorization": "123abc",
+						"X-Tyk-Key":     "tyk-value",
+						"X-Other-Key":   "other-value",
+					},
+				},
+			}...)
+
+		})
+
 		t.Run("subgraph", func(t *testing.T) {
 			BuildAndLoadAPI(func(spec *APISpec) {
 				spec.UseKeylessAccess = true
+				spec.Proxy.TargetURL = testSubgraphReviews
 				spec.Proxy.ListenPath = "/"
 				spec.GraphQL.Enabled = true
 				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeSubgraph
-				spec.GraphQL.Schema = gqlSubgraphSchemaAccounts
+				spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+				spec.GraphQL.Schema = gqlSubgraphSchemaReviews
 			})
 
 			t.Run("should execute subgraph successfully", func(t *testing.T) {
 				request := gql.Request{
-					Query:     gqlSubgraphQueryAccounts,
+					Query:     gqlSubgraphQueryReviews,
 					Variables: []byte(gqlSubgraphVariables),
 				}
 
 				_, _ = g.Run(t, test.TestCase{
-					Data: request,
-					BodyMatchFunc: func(bytes []byte) bool {
-						gqlRequest := graphQLRequestFromBodyMatchFuncBytes(t, bytes)
-						assertionResult := assert.Equal(t, `{"_representations":[{"__typename":"User","id":"1"}]}`, string(gqlRequest.Variables))
-						return assertionResult && assert.Equal(t, `query Subgraph($_representations: [_Any!]!) { _entities(representations: $_representations) { ... on User { id username } } }`, strings.Join(strings.Fields(gqlRequest.Query), " "))
-					},
-					Code: http.StatusOK,
+					Data:      request,
+					BodyMatch: `{"data":{"\_entities":\[{"reviews":\[{"body":"A highly effective form of birth control."},{"body":"Fedoras are one of the most fashionable hats around and can look great with a variety of outfits."}\]}\]}}`,
+					Code:      http.StatusOK,
 				})
 			})
 		})
 
-		t.Run("proxy-only", func(t *testing.T) {
+		t.Run("subgraph as internal data source", func(t *testing.T) {
+			subgraph := BuildAPI(func(spec *APISpec) {
+				spec.UseKeylessAccess = true
+				spec.Proxy.TargetURL = testSubgraphReviews
+				spec.Proxy.ListenPath = "/internal-subgraph"
+				spec.Internal = true
+				spec.Name = "my-internal-subgraph"
+				spec.APIID = "internal-subgraph"
+				spec.GraphQL.Enabled = true
+				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeSubgraph
+				spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+				spec.GraphQL.Schema = gqlSubgraphSchemaReviews
+			})[0]
+
+			proxyOnlyAPI := BuildAPI(func(spec *APISpec) {
+				spec.UseKeylessAccess = true
+				spec.Proxy.TargetURL = "tyk://" + subgraph.Name
+				spec.Proxy.ListenPath = "/"
+				spec.GraphQL.Enabled = true
+				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
+				spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+				spec.GraphQL.Schema = gqlSubgraphSchemaReviews
+			})[0]
+
+			LoadAPI(subgraph, proxyOnlyAPI)
+
+			t.Run("should execute internal subgraph successfully", func(t *testing.T) {
+				request := gql.Request{
+					Query:     gqlSubgraphQueryReviews,
+					Variables: []byte(gqlSubgraphVariables),
+				}
+
+				_, _ = g.Run(t, test.TestCase{
+					Data:      request,
+					BodyMatch: `{"data":{"\_entities":\[{"reviews":\[{"body":"A highly effective form of birth control."},{"body":"Fedoras are one of the most fashionable hats around and can look great with a variety of outfits."}\]}\]}}`,
+					Code:      http.StatusOK,
+				})
+			})
+		})
+
+		t.Run("udg", func(t *testing.T) {
 			BuildAndLoadAPI(func(spec *APISpec) {
 				spec.UseKeylessAccess = true
 				spec.Proxy.ListenPath = "/"
@@ -487,7 +578,6 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 		})
 
 		t.Run("websockets", func(t *testing.T) {
-			baseURL := strings.Replace(g.URL, "http://", "ws://", -1)
 			api.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
 			LoadAPI(api)
 
@@ -518,90 +608,136 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				cfg.HttpServerOptions.EnableWebSockets = true
 				config.SetGlobal(cfg)
 
-				t.Run("should deny upgrade with 400 when protocol is not graphql-ws", func(t *testing.T) {
+				t.Run("should respond with 422 when trying to upgrade to websockets", func(t *testing.T) {
 					_, _ = g.Run(t, []test.TestCase{
 						{
 							Headers: map[string]string{
 								headers.Connection:           "upgrade",
 								headers.Upgrade:              "websocket",
-								headers.SecWebSocketProtocol: "invalid",
+								headers.SecWebSocketProtocol: "graphql-ws",
 								headers.SecWebSocketVersion:  "13",
 								headers.SecWebSocketKey:      "123abc",
 							},
-							Code:      http.StatusBadRequest,
-							BodyMatch: "invalid websocket protocol for upgrading to a graphql websocket connection",
+							Code:      http.StatusUnprocessableEntity,
+							BodyMatch: "websockets are not allowed",
 						},
 					}...)
-				})
-
-				t.Run("should upgrade to websocket connection with correct protocol", func(t *testing.T) {
-					wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
-						headers.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
-					})
-					require.NoError(t, err)
-					defer wsConn.Close()
-
-					// Send a connection init message to gateway
-					err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"type":"connection_init","payload":{}}`))
-					require.NoError(t, err)
-
-					_, msg, err := wsConn.ReadMessage()
-
-					// Gateway should acknowledge the connection
-					assert.Equal(t, `{"id":"","type":"connection_ack","payload":null}`, string(msg))
-					assert.NoError(t, err)
-				})
-
-				t.Run("graphql over websockets", func(t *testing.T) {
-					api.UseKeylessAccess = false
-					LoadAPI(api)
-
-					t.Run("field-based permissions checks are skipped", func(t *testing.T) {
-						_, directKey := g.CreateSession(func(s *user.SessionState) {
-							s.AccessRights = map[string]user.AccessDefinition{
-								api.APIID: {
-									APIID:   api.APIID,
-									APIName: api.Name,
-									RestrictedTypes: []gql.Type{
-										{
-											Name:   "Query",
-											Fields: []string{"hello"},
-										},
-									},
-								},
-							}
-						})
-
-						wsConn, _, err := websocket.DefaultDialer.Dial(baseURL, map[string][]string{
-							headers.SecWebSocketProtocol: {GraphQLWebSocketProtocol},
-							headers.Authorization:        {directKey},
-						})
-						require.NoError(t, err)
-						defer wsConn.Close()
-
-						// Send a connection init message to gateway
-						err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"type":"connection_init","payload":{}}`))
-						require.NoError(t, err)
-
-						_, msg, err := wsConn.ReadMessage()
-
-						// Gateway should acknowledge the connection
-						require.Equal(t, `{"id":"","type":"connection_ack","payload":null}`, string(msg))
-						require.NoError(t, err)
-
-						err = wsConn.WriteMessage(websocket.BinaryMessage, []byte(`{"id": "1", "type": "start", "payload": {"query": "query Query { countries { name } }", "variables": null}}`))
-						require.NoError(t, err)
-
-						_, msg, err = wsConn.ReadMessage()
-						assert.Equal(t, `{"id":"1","type":"data","payload":{"data":{"countries":[{"name":"Turkey"},{"name":"Russia"},{"name":"United Kingdom"},{"name":"Germany"}]}}}`, string(msg))
-						assert.NoError(t, err)
-					})
 				})
 			})
 
 		})
 	})
 
+}
+
+func TestNeedsGraphQLExecutionEngine(t *testing.T) {
+	testCases := []struct {
+		name          string
+		version       apidef.GraphQLConfigVersion
+		executionMode apidef.GraphQLExecutionMode
+		expected      bool
+	}{
+		{
+			name:          "true for executionMode = executionEngine in v2",
+			version:       apidef.GraphQLConfigVersion2,
+			executionMode: apidef.GraphQLExecutionModeExecutionEngine,
+			expected:      true,
+		},
+		{
+			name:          "true for executionMode = supergraph in v2",
+			version:       apidef.GraphQLConfigVersion2,
+			executionMode: apidef.GraphQLExecutionModeSupergraph,
+			expected:      true,
+		},
+		{
+			name:          "true for executionMode = subgraph in v2",
+			version:       apidef.GraphQLConfigVersion2,
+			executionMode: apidef.GraphQLExecutionModeExecutionEngine,
+			expected:      true,
+		},
+		{
+			name:          "true for executionMode = proxyOnly in v2",
+			version:       apidef.GraphQLConfigVersion2,
+			executionMode: apidef.GraphQLExecutionModeProxyOnly,
+			expected:      true,
+		},
+		{
+			name:          "true for executionMode = executionEngine in v1",
+			version:       apidef.GraphQLConfigVersion1,
+			executionMode: apidef.GraphQLExecutionModeExecutionEngine,
+			expected:      true,
+		},
+		{
+			name:          "false for executionMode = proxyOnly in v1",
+			version:       apidef.GraphQLConfigVersion1,
+			executionMode: apidef.GraphQLExecutionModeProxyOnly,
+			expected:      false,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			apiSpec := &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					GraphQL: apidef.GraphQLConfig{
+						Enabled:       true,
+						Version:       tc.version,
+						ExecutionMode: tc.executionMode,
+					},
+				},
+			}
+
+			result := needsGraphQLExecutionEngine(apiSpec)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+func TestIsGraphQLProxyOnly(t *testing.T) {
+	testCases := []struct {
+		name          string
+		executionMode apidef.GraphQLExecutionMode
+		expected      bool
+	}{
+		{
+			name:          "true for executionMode = proxyOnly",
+			executionMode: apidef.GraphQLExecutionModeProxyOnly,
+			expected:      true,
+		},
+		{
+			name:          "true for executionMode = subgraph",
+			executionMode: apidef.GraphQLExecutionModeSubgraph,
+			expected:      true,
+		},
+		{
+			name:          "false for executionMode = supergraph",
+			executionMode: apidef.GraphQLExecutionModeSupergraph,
+			expected:      false,
+		},
+		{
+			name:          "false for executionMode = executionEngine",
+			executionMode: apidef.GraphQLExecutionModeExecutionEngine,
+			expected:      false,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			apiSpec := &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					GraphQL: apidef.GraphQLConfig{
+						Enabled:       true,
+						ExecutionMode: tc.executionMode,
+					},
+				},
+			}
+
+			result := isGraphQLProxyOnly(apiSpec)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
 }
 
 const gqlIntrospectionQuery = `query IntrospectionQuery {
@@ -702,6 +838,11 @@ fragment TypeRef on __Type {
       }
     }
   }
+}`
+
+const gqlProxyUpstreamSchema = `type Query {
+	hello(name: String!): String!
+	httpMethod: String!
 }`
 
 const gqlCountriesSchema = `directive @cacheControl(
@@ -866,11 +1007,12 @@ extend type Product @key(fields: "upc") {
 	reviews: [Review]
 }`
 
-const gqlSubgraphQueryAccounts = `query Subgraph($_representations: [_Any!]!) {
+const gqlSubgraphQueryReviews = `query Subgraph($_representations: [_Any!]!) {
   _entities(representations: $_representations) {
     ... on User {
-      id
-      username
+      reviews {
+		body
+	  }
     }
   }
 }`
@@ -911,15 +1053,3 @@ type Review {
 	author: User!
 	product: Product!
 }`
-
-func graphQLRequestFromBodyMatchFuncBytes(t *testing.T, bytes []byte) gql.Request {
-	bodyContent := make(map[string]interface{})
-	err := json.Unmarshal(bytes, &bodyContent)
-	require.NoError(t, err)
-
-	gqlRequest := gql.Request{}
-	err = json.Unmarshal([]byte(bodyContent["Body"].(string)), &gqlRequest)
-	require.NoError(t, err)
-
-	return gqlRequest
-}
