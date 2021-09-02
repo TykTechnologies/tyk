@@ -8,9 +8,10 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/jensneuse/abstractlogger"
+	"github.com/sirupsen/logrus"
+
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/resolve"
 	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
-	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/adapter"
@@ -71,7 +72,9 @@ func (m *GraphQLMiddleware) Init() {
 
 	if needsGraphQLExecutionEngine(m.Spec) {
 		absLogger := abstractlogger.NewLogrusLogger(log, absLoggerLevel(log.Level))
-		m.Spec.GraphQLExecutor.Client = &http.Client{Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec)}}
+		m.Spec.GraphQLExecutor.Client = &http.Client{
+			Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec)},
+		}
 
 		if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersionNone || m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion1 {
 			m.initGraphQLEngineV1(absLogger)
@@ -158,7 +161,7 @@ func (m *GraphQLMiddleware) initGraphQLEngineV1(logger *abstractlogger.LogrusLog
 }
 
 func (m *GraphQLMiddleware) initGraphQLEngineV2(logger *abstractlogger.LogrusLogger) {
-	configAdapter := adapter.NewGraphQLConfigAdapter(m.Spec.GraphQL,
+	configAdapter := adapter.NewGraphQLConfigAdapter(m.Spec.APIDefinition,
 		adapter.WithHttpClient(m.Spec.GraphQLExecutor.Client),
 		adapter.WithSchema(m.Spec.GraphQLExecutor.Schema),
 	)
@@ -201,7 +204,7 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	}
 
 	if websocket.IsWebSocketUpgrade(r) {
-		if !m.Gw.GetConfig().HttpServerOptions.EnableWebSockets {
+		if !m.websocketUpgradeAllowed() {
 			return errors.New("websockets are not allowed"), http.StatusUnprocessableEntity
 		}
 
@@ -353,9 +356,28 @@ func (m *GraphQLMiddleware) OnError(ctx resolve.HookContext, output []byte, sing
 		).Debugf("%s (afterFetchHook.OnError): %s", ctx.CurrentPath, string(output))
 }
 
+func (m *GraphQLMiddleware) websocketUpgradeAllowed() bool {
+	if !m.Gw.GetConfig().HttpServerOptions.EnableWebSockets {
+		return false
+	}
+
+	if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion1 || m.Spec.GraphQL.Version == apidef.GraphQLConfigVersionNone {
+		return false
+	}
+
+	return true
+}
+
 func needsGraphQLExecutionEngine(apiSpec *APISpec) bool {
 	return apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeExecutionEngine ||
-		apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph
+		apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph ||
+		apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSubgraph ||
+		(apiSpec.GraphQL.Version == apidef.GraphQLConfigVersion2 && apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeProxyOnly)
+}
+
+func isGraphQLProxyOnly(apiSpec *APISpec) bool {
+	return apiSpec.GraphQL.Enabled &&
+		(apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeProxyOnly || apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSubgraph)
 }
 
 func absLoggerLevel(level logrus.Level) abstractlogger.Level {
