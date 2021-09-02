@@ -1555,7 +1555,10 @@ func copyBody(body io.ReadCloser) io.ReadCloser {
 
 	// body is http's io.ReadCloser - read it up until EOF
 	var bodyRead bytes.Buffer
-	io.Copy(&bodyRead, body)
+	_, err := io.Copy(&bodyRead, body)
+	if err != nil {
+		log.Error("copyBody failed", err)
+	}
 
 	// use seek-able reader for further body usage
 	reusableBody := bytes.NewReader(bodyRead.Bytes())
@@ -1577,6 +1580,13 @@ func copyRequest(r *http.Request) *http.Request {
 func copyResponse(r *http.Response) *http.Response {
 	// for the case of streaming for which Content-Length might be unset = -1.
 	if r.ContentLength == -1 {
+		return r
+	}
+
+	// If the response is 101 Switching Protocols then the body will contain a
+	// `*http.readWriteCloserBody` which cannot be copied (see stdlib documentation).
+	// In this case we want to return immediately to avoid a silent crash.
+	if r.StatusCode == http.StatusSwitchingProtocols {
 		return r
 	}
 

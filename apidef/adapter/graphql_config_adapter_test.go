@@ -50,6 +50,9 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 						"Authorization": []string{"123abc"},
 					},
 				},
+				Subscription: graphqlDataSource.SubscriptionConfiguration{
+					URL: "http://localhost:8080",
+				},
 			}),
 		}
 
@@ -101,6 +104,9 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 						"Authorization":  []string{"123abc"},
 						"X-Tyk-Internal": []string{"true"},
 					},
+				},
+				Subscription: graphqlDataSource.SubscriptionConfiguration{
+					URL: "http://api-name",
 				},
 			}),
 		}
@@ -191,6 +197,9 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 					Header: http.Header{
 						"Authorization": []string{"123abc"},
 					},
+				},
+				Subscription: graphqlDataSource.SubscriptionConfiguration{
+					URL: "http://localhost:8080",
 				},
 			}),
 		}
