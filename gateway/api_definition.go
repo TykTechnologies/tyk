@@ -257,10 +257,9 @@ func (s *APISpec) validateHTTP() error {
 
 // APIDefinitionLoader will load an Api definition from a storage
 // system.
-type APIDefinitionLoader struct{}
-
-// Nonce to use when interacting with the dashboard service
-var ServiceNonce string
+type APIDefinitionLoader struct {
+	Gw *Gateway `json:"-"`
+}
 
 // MakeSpec will generate a flattened URLSpec from and APIDefinitions' VersionInfo data. paths are
 // keyed to the Api version name, which is determined during routing to speed up lookups
@@ -289,21 +288,22 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 
 	// We'll push the default HealthChecker:
 	spec.Health = &DefaultHealthChecker{
+		Gw:    a.Gw,
 		APIID: spec.APIID,
 	}
 
 	// Add any new session managers or auth handlers here
-	spec.AuthManager = &DefaultSessionManager{}
-
+	spec.AuthManager = &DefaultSessionManager{Gw: a.Gw}
 	spec.OrgSessionManager = &DefaultSessionManager{
 		orgID: spec.OrgID,
+		Gw:    a.Gw,
 	}
 
-	spec.GlobalConfig = config.Global()
+	spec.GlobalConfig = a.Gw.GetConfig()
 
 	// Create and init the virtual Machine
-	if config.Global().EnableJSVM {
-		mwPaths, _, _, _, _, _, _ := loadCustomMiddleware(spec)
+	if a.Gw.GetConfig().EnableJSVM {
+		mwPaths, _, _, _, _, _, _ := a.Gw.loadCustomMiddleware(spec)
 
 		hasVirtualEndpoint := false
 
@@ -315,7 +315,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 		}
 
 		if spec.CustomMiddlewareBundle != "" || len(mwPaths) > 0 || hasVirtualEndpoint {
-			spec.JSVM.Init(spec, logger)
+			spec.JSVM.Init(spec, logger, a.Gw)
 		}
 	}
 
@@ -328,7 +328,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 		logger.Debug("FOUND EVENTS TO INIT")
 		for _, handlerConf := range eventHandlerConfs {
 			logger.Debug("CREATING EVENT HANDLERS")
-			eventHandlerInstance, err := EventHandlerByName(handlerConf, spec)
+			eventHandlerInstance, err := a.Gw.EventHandlerByName(handlerConf, spec)
 
 			if err != nil {
 				logger.Error("Failed to init event handler: ", err)
@@ -336,7 +336,6 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 				logger.Debug("Init Event Handler: ", eventName)
 				spec.EventPaths[eventName] = append(spec.EventPaths[eventName], eventHandlerInstance)
 			}
-
 		}
 	}
 
@@ -348,10 +347,10 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 
 		// If we have transitioned to extended path specifications, we should use these now
 		if v.UseExtendedPaths {
-			pathSpecs, whiteListSpecs = a.getExtendedPathSpecs(v, spec)
+			pathSpecs, whiteListSpecs = a.getExtendedPathSpecs(v, spec, a.Gw.GetConfig())
 		} else {
 			logger.Warning("Legacy path detected! Upgrade to extended.")
-			pathSpecs, whiteListSpecs = a.getPathSpecs(v)
+			pathSpecs, whiteListSpecs = a.getPathSpecs(v, a.Gw.GetConfig())
 		}
 		spec.RxPaths[v.Name] = pathSpecs
 		spec.WhiteListEnabled[v.Name] = whiteListSpecs
@@ -361,7 +360,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 }
 
 // FromDashboardService will connect and download ApiDefintions from a Tyk Dashboard instance.
-func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*APISpec, error) {
+func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, error) {
 	// Get the definitions
 	log.Debug("Calling: ", endpoint)
 	newRequest, err := http.NewRequest("GET", endpoint, nil)
@@ -369,13 +368,15 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*A
 		log.Error("Failed to create request: ", err)
 	}
 
-	newRequest.Header.Set("authorization", secret)
-	log.Debug("Using: NodeID: ", GetNodeID())
-	newRequest.Header.Set(headers.XTykNodeID, GetNodeID())
+	newRequest.Header.Set("authorization", a.Gw.GetConfig().NodeSecret)
+	log.Debug("Using: NodeID: ", a.Gw.GetNodeID())
+	newRequest.Header.Set(headers.XTykNodeID, a.Gw.GetNodeID())
 
-	newRequest.Header.Set(headers.XTykNonce, ServiceNonce)
+	a.Gw.ServiceNonceMutex.RLock()
+	newRequest.Header.Set(headers.XTykNonce, a.Gw.ServiceNonce)
+	a.Gw.ServiceNonceMutex.RUnlock()
 
-	c := initialiseClient()
+	c := a.Gw.initialiseClient()
 	resp, err := c.Do(newRequest)
 	if err != nil {
 		return nil, err
@@ -384,13 +385,13 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*A
 
 	if resp.StatusCode == http.StatusForbidden {
 		body, _ := ioutil.ReadAll(resp.Body)
-		reLogin()
+		a.Gw.reLogin()
 		return nil, fmt.Errorf("login failure, Response was: %v", string(body))
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := ioutil.ReadAll(resp.Body)
-		reLogin()
+		a.Gw.reLogin()
 		return nil, fmt.Errorf("dashboard API error, response was: %v", string(body))
 	}
 
@@ -409,11 +410,11 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*A
 	// Extract tagged entries only
 	apiDefs := make([]*apidef.APIDefinition, 0)
 
-	if config.Global().DBAppConfOptions.NodeIsSegmented {
-		tagList := make(map[string]bool, len(config.Global().DBAppConfOptions.Tags))
+	if a.Gw.GetConfig().DBAppConfOptions.NodeIsSegmented {
+		tagList := make(map[string]bool, len(a.Gw.GetConfig().DBAppConfOptions.Tags))
 		toLoad := make(map[string]*apidef.APIDefinition)
 
-		for _, mt := range config.Global().DBAppConfOptions.Tags {
+		for _, mt := range a.Gw.GetConfig().DBAppConfOptions.Tags {
 			tagList[mt] = true
 		}
 
@@ -442,27 +443,34 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*A
 	}
 
 	// Set the nonce
-	ServiceNonce = list.Nonce
-	log.Debug("Loading APIS Finished: Nonce Set: ", ServiceNonce)
+	a.Gw.ServiceNonceMutex.Lock()
+	a.Gw.ServiceNonce = list.Nonce
+	a.Gw.ServiceNonceMutex.Unlock()
+	log.Debug("Loading APIS Finished: Nonce Set: ", list.Nonce)
 
 	return specs, nil
 }
 
 // FromCloud will connect and download ApiDefintions from a Mongo DB instance.
-func (a APIDefinitionLoader) FromRPC(orgId string) ([]*APISpec, error) {
+func (a APIDefinitionLoader) FromRPC(orgId string, gw *Gateway) ([]*APISpec, error) {
 	if rpc.IsEmergencyMode() {
-		return LoadDefinitionsFromRPCBackup()
+		return gw.LoadDefinitionsFromRPCBackup()
 	}
-	store := RPCStorageHandler{}
+
+	store := RPCStorageHandler{
+		DoReload: gw.DoReload,
+		Gw:       a.Gw,
+	}
+
 	if !store.Connect() {
 		return nil, errors.New("Can't connect RPC layer")
 	}
 
 	// enable segments
 	var tags []string
-	if config.Global().DBAppConfOptions.NodeIsSegmented {
-		log.Info("Segmented node, loading: ", config.Global().DBAppConfOptions.Tags)
-		tags = config.Global().DBAppConfOptions.Tags
+	if gw.GetConfig().DBAppConfOptions.NodeIsSegmented {
+		log.Info("Segmented node, loading: ", gw.GetConfig().DBAppConfOptions.Tags)
+		tags = gw.GetConfig().DBAppConfOptions.Tags
 	}
 
 	apiCollection := store.GetApiDefinitions(orgId, tags)
@@ -470,15 +478,15 @@ func (a APIDefinitionLoader) FromRPC(orgId string) ([]*APISpec, error) {
 	//store.Disconnect()
 
 	if rpc.LoadCount() > 0 {
-		if err := saveRPCDefinitionsBackup(apiCollection); err != nil {
+		if err := gw.saveRPCDefinitionsBackup(apiCollection); err != nil {
 			log.Error(err)
 		}
 	}
 
-	return a.processRPCDefinitions(apiCollection)
+	return a.processRPCDefinitions(apiCollection, gw)
 }
 
-func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string) ([]*APISpec, error) {
+func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw *Gateway) ([]*APISpec, error) {
 
 	var apiDefs []*apidef.APIDefinition
 	if err := json.Unmarshal([]byte(apiCollection), &apiDefs); err != nil {
@@ -489,7 +497,7 @@ func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string) ([]*API
 	for _, def := range apiDefs {
 		def.DecodeFromDB()
 
-		if config.Global().SlaveOptions.BindToSlugsInsteadOfListenPaths {
+		if gw.GetConfig().SlaveOptions.BindToSlugsInsteadOfListenPaths {
 			newListenPath := "/" + def.Slug //+ "/"
 			log.Warning("Binding to ",
 				newListenPath,
@@ -561,10 +569,10 @@ func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 	return specs
 }
 
-func (a APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo) ([]URLSpec, bool) {
-	ignoredPaths := a.compilePathSpec(apiVersionDef.Paths.Ignored, Ignored)
-	blackListPaths := a.compilePathSpec(apiVersionDef.Paths.BlackList, BlackList)
-	whiteListPaths := a.compilePathSpec(apiVersionDef.Paths.WhiteList, WhiteList)
+func (a APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo, conf config.Config) ([]URLSpec, bool) {
+	ignoredPaths := a.compilePathSpec(apiVersionDef.Paths.Ignored, Ignored, conf)
+	blackListPaths := a.compilePathSpec(apiVersionDef.Paths.BlackList, BlackList, conf)
+	whiteListPaths := a.compilePathSpec(apiVersionDef.Paths.WhiteList, WhiteList, conf)
 
 	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, ignoredPaths...)
@@ -574,11 +582,11 @@ func (a APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo) ([]U
 	return combinedPath, len(whiteListPaths) > 0
 }
 
-func (a APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, specType URLStatus) {
+func (a APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, specType URLStatus, conf config.Config) {
 	apiLangIDsRegex := regexp.MustCompile(`{([^}]*)}`)
 	asRegexStr := apiLangIDsRegex.ReplaceAllString(stringSpec, `([^/]*)`)
 	// Case insensitive match
-	if newSpec.IgnoreCase || config.Global().IgnoreEndpointCase {
+	if newSpec.IgnoreCase || conf.IgnoreEndpointCase {
 		asRegexStr = "(?i)" + asRegexStr
 	}
 	asRegex, _ := regexp.Compile(asRegexStr)
@@ -586,28 +594,28 @@ func (a APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, 
 	newSpec.Spec = asRegex
 }
 
-func (a APIDefinitionLoader) compilePathSpec(paths []string, specType URLStatus) []URLSpec {
+func (a APIDefinitionLoader) compilePathSpec(paths []string, specType URLStatus, conf config.Config) []URLSpec {
 	// transform a configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
 
 	for _, stringSpec := range paths {
 		newSpec := URLSpec{}
-		a.generateRegex(stringSpec, &newSpec, specType)
+		a.generateRegex(stringSpec, &newSpec, specType, conf)
 		urlSpec = append(urlSpec, newSpec)
 	}
 
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileExtendedPathSpec(ignoreEndpointCase bool, paths []apidef.EndPointMeta, specType URLStatus) []URLSpec {
+func (a APIDefinitionLoader) compileExtendedPathSpec(ignoreEndpointCase bool, paths []apidef.EndPointMeta, specType URLStatus, conf config.Config) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
 
 	for _, stringSpec := range paths {
 		newSpec := URLSpec{IgnoreCase: stringSpec.IgnoreCase || ignoreEndpointCase}
-		a.generateRegex(stringSpec.Path, &newSpec, specType)
+		a.generateRegex(stringSpec.Path, &newSpec, specType, conf)
 
 		// Extend with method actions
 		newSpec.MethodActions = stringSpec.MethodActions
@@ -617,14 +625,14 @@ func (a APIDefinitionLoader) compileExtendedPathSpec(ignoreEndpointCase bool, pa
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileCachedPathSpec(oldpaths []string, newpaths []apidef.CacheMeta) []URLSpec {
+func (a APIDefinitionLoader) compileCachedPathSpec(oldpaths []string, newpaths []apidef.CacheMeta, conf config.Config) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
 
 	for _, stringSpec := range oldpaths {
 		newSpec := URLSpec{}
-		a.generateRegex(stringSpec, &newSpec, Cached)
+		a.generateRegex(stringSpec, &newSpec, Cached, conf)
 		newSpec.CacheConfig.Method = SAFE_METHODS
 		newSpec.CacheConfig.CacheKeyRegex = ""
 		// Extend with method actions
@@ -633,7 +641,7 @@ func (a APIDefinitionLoader) compileCachedPathSpec(oldpaths []string, newpaths [
 
 	for _, spec := range newpaths {
 		newSpec := URLSpec{}
-		a.generateRegex(spec.Path, &newSpec, Cached)
+		a.generateRegex(spec.Path, &newSpec, Cached, conf)
 		newSpec.CacheConfig.Method = spec.Method
 		newSpec.CacheConfig.CacheKeyRegex = spec.CacheKeyRegex
 		newSpec.CacheConfig.CacheOnlyResponseCodes = spec.CacheOnlyResponseCodes
@@ -667,7 +675,7 @@ func (a APIDefinitionLoader) loadBlobTemplate(blob string) (*template.Template, 
 	return apidef.Template.New("").Funcs(a.filterSprigFuncs()).Parse(string(uDec))
 }
 
-func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMeta, stat URLStatus) []URLSpec {
+func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMeta, stat URLStatus, conf config.Config) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
@@ -676,7 +684,7 @@ func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMet
 	for _, stringSpec := range paths {
 		log.Debug("-- Generating path")
 		newSpec := URLSpec{}
-		a.generateRegex(stringSpec.Path, &newSpec, stat)
+		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
 		// Extend with template actions
 
 		newTransformSpec := TransformSpec{TemplateMeta: stringSpec}
@@ -714,14 +722,14 @@ func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMet
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileInjectedHeaderSpec(paths []apidef.HeaderInjectionMeta, stat URLStatus) []URLSpec {
+func (a APIDefinitionLoader) compileInjectedHeaderSpec(paths []apidef.HeaderInjectionMeta, stat URLStatus, conf config.Config) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
 
 	for _, stringSpec := range paths {
 		newSpec := URLSpec{}
-		a.generateRegex(stringSpec.Path, &newSpec, stat)
+		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
 		// Extend with method actions
 		if stat == HeaderInjected {
 			newSpec.InjectHeaders = stringSpec
@@ -735,14 +743,14 @@ func (a APIDefinitionLoader) compileInjectedHeaderSpec(paths []apidef.HeaderInje
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileMethodTransformSpec(paths []apidef.MethodTransformMeta, stat URLStatus) []URLSpec {
+func (a APIDefinitionLoader) compileMethodTransformSpec(paths []apidef.MethodTransformMeta, stat URLStatus, conf config.Config) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
 
 	for _, stringSpec := range paths {
 		newSpec := URLSpec{}
-		a.generateRegex(stringSpec.Path, &newSpec, stat)
+		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
 		newSpec.MethodTransform = stringSpec
 
 		urlSpec = append(urlSpec, newSpec)
@@ -751,14 +759,14 @@ func (a APIDefinitionLoader) compileMethodTransformSpec(paths []apidef.MethodTra
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileTimeoutPathSpec(paths []apidef.HardTimeoutMeta, stat URLStatus) []URLSpec {
+func (a APIDefinitionLoader) compileTimeoutPathSpec(paths []apidef.HardTimeoutMeta, stat URLStatus, conf config.Config) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
 
 	for _, stringSpec := range paths {
 		newSpec := URLSpec{}
-		a.generateRegex(stringSpec.Path, &newSpec, stat)
+		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
 		// Extend with method actions
 		newSpec.HardTimeout = stringSpec
 
@@ -768,14 +776,14 @@ func (a APIDefinitionLoader) compileTimeoutPathSpec(paths []apidef.HardTimeoutMe
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileRequestSizePathSpec(paths []apidef.RequestSizeMeta, stat URLStatus) []URLSpec {
+func (a APIDefinitionLoader) compileRequestSizePathSpec(paths []apidef.RequestSizeMeta, stat URLStatus, conf config.Config) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
 
 	for _, stringSpec := range paths {
 		newSpec := URLSpec{}
-		a.generateRegex(stringSpec.Path, &newSpec, stat)
+		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
 		// Extend with method actions
 		newSpec.RequestSize = stringSpec
 
@@ -785,14 +793,14 @@ func (a APIDefinitionLoader) compileRequestSizePathSpec(paths []apidef.RequestSi
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.CircuitBreakerMeta, stat URLStatus, apiSpec *APISpec) []URLSpec {
+func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.CircuitBreakerMeta, stat URLStatus, apiSpec *APISpec, conf config.Config) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
 
 	for _, stringSpec := range paths {
 		newSpec := URLSpec{}
-		a.generateRegex(stringSpec.Path, &newSpec, stat)
+		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
 		// Extend with method actions
 		newSpec.CircuitBreaker = ExtendedCircuitBreakerMeta{CircuitBreakerMeta: stringSpec}
 		log.Debug("Initialising circuit breaker for: ", stringSpec.Path)
@@ -859,7 +867,7 @@ func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circui
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileURLRewritesPathSpec(paths []apidef.URLRewriteMeta, stat URLStatus) []URLSpec {
+func (a APIDefinitionLoader) compileURLRewritesPathSpec(paths []apidef.URLRewriteMeta, stat URLStatus, conf config.Config) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
@@ -867,7 +875,7 @@ func (a APIDefinitionLoader) compileURLRewritesPathSpec(paths []apidef.URLRewrit
 	for _, stringSpec := range paths {
 		curStringSpec := stringSpec
 		newSpec := URLSpec{}
-		a.generateRegex(curStringSpec.Path, &newSpec, stat)
+		a.generateRegex(curStringSpec.Path, &newSpec, stat, conf)
 		// Extend with method actions
 		newSpec.URLRewrite = &curStringSpec
 
@@ -877,8 +885,8 @@ func (a APIDefinitionLoader) compileURLRewritesPathSpec(paths []apidef.URLRewrit
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileVirtualPathspathSpec(paths []apidef.VirtualMeta, stat URLStatus, apiSpec *APISpec) []URLSpec {
-	if !config.Global().EnableJSVM {
+func (a APIDefinitionLoader) compileVirtualPathspathSpec(paths []apidef.VirtualMeta, stat URLStatus, apiSpec *APISpec, conf config.Config) []URLSpec {
+	if !conf.EnableJSVM {
 		return nil
 	}
 
@@ -887,11 +895,11 @@ func (a APIDefinitionLoader) compileVirtualPathspathSpec(paths []apidef.VirtualM
 	urlSpec := []URLSpec{}
 	for _, stringSpec := range paths {
 		newSpec := URLSpec{}
-		a.generateRegex(stringSpec.Path, &newSpec, stat)
+		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
 		// Extend with method actions
 		newSpec.VirtualPathSpec = stringSpec
 
-		preLoadVirtualMetaCode(&newSpec.VirtualPathSpec, &apiSpec.JSVM)
+		a.Gw.preLoadVirtualMetaCode(&newSpec.VirtualPathSpec, &apiSpec.JSVM)
 
 		urlSpec = append(urlSpec, newSpec)
 	}
@@ -899,7 +907,7 @@ func (a APIDefinitionLoader) compileVirtualPathspathSpec(paths []apidef.VirtualM
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileGopluginPathspathSpec(paths []apidef.GoPluginMeta, stat URLStatus, apiSpec *APISpec) []URLSpec {
+func (a APIDefinitionLoader) compileGopluginPathspathSpec(paths []apidef.GoPluginMeta, stat URLStatus, apiSpec *APISpec, conf config.Config) []URLSpec {
 
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
@@ -907,7 +915,7 @@ func (a APIDefinitionLoader) compileGopluginPathspathSpec(paths []apidef.GoPlugi
 
 	for _, stringSpec := range paths {
 		newSpec := URLSpec{}
-		a.generateRegex(stringSpec.Path, &newSpec, stat)
+		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
 		// Extend with method actions
 		newSpec.GoPluginMeta.Path = stringSpec.PluginPath
 		newSpec.GoPluginMeta.SymbolName = stringSpec.SymbolName
@@ -922,12 +930,13 @@ func (a APIDefinitionLoader) compileGopluginPathspathSpec(paths []apidef.GoPlugi
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileTrackedEndpointPathspathSpec(paths []apidef.TrackEndpointMeta, stat URLStatus) []URLSpec {
+func (a APIDefinitionLoader) compileTrackedEndpointPathspathSpec(paths []apidef.TrackEndpointMeta, stat URLStatus, conf config.Config) []URLSpec {
+
 	urlSpec := []URLSpec{}
 
 	for _, stringSpec := range paths {
 		newSpec := URLSpec{}
-		a.generateRegex(stringSpec.Path, &newSpec, stat)
+		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
 
 		// set Path if it wasn't set
 		if stringSpec.Path == "" {
@@ -943,12 +952,12 @@ func (a APIDefinitionLoader) compileTrackedEndpointPathspathSpec(paths []apidef.
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileValidateJSONPathspathSpec(paths []apidef.ValidatePathMeta, stat URLStatus) []URLSpec {
+func (a APIDefinitionLoader) compileValidateJSONPathspathSpec(paths []apidef.ValidatePathMeta, stat URLStatus, conf config.Config) []URLSpec {
 	urlSpec := make([]URLSpec, len(paths))
 
 	for i, stringSpec := range paths {
 		newSpec := URLSpec{}
-		a.generateRegex(stringSpec.Path, &newSpec, stat)
+		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
 		// Extend with method actions
 
 		stringSpec.SchemaCache = gojsonschema.NewGoLoader(stringSpec.Schema)
@@ -959,12 +968,12 @@ func (a APIDefinitionLoader) compileValidateJSONPathspathSpec(paths []apidef.Val
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileUnTrackedEndpointPathspathSpec(paths []apidef.TrackEndpointMeta, stat URLStatus) []URLSpec {
+func (a APIDefinitionLoader) compileUnTrackedEndpointPathspathSpec(paths []apidef.TrackEndpointMeta, stat URLStatus, conf config.Config) []URLSpec {
 	urlSpec := []URLSpec{}
 
 	for _, stringSpec := range paths {
 		newSpec := URLSpec{}
-		a.generateRegex(stringSpec.Path, &newSpec, stat)
+		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
 		// Extend with method actions
 		newSpec.DoNotTrackEndpoint = stringSpec
 		urlSpec = append(urlSpec, newSpec)
@@ -973,12 +982,12 @@ func (a APIDefinitionLoader) compileUnTrackedEndpointPathspathSpec(paths []apide
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileInternalPathspathSpec(paths []apidef.InternalMeta, stat URLStatus) []URLSpec {
+func (a APIDefinitionLoader) compileInternalPathspathSpec(paths []apidef.InternalMeta, stat URLStatus, conf config.Config) []URLSpec {
 	urlSpec := []URLSpec{}
 
 	for _, stringSpec := range paths {
 		newSpec := URLSpec{}
-		a.generateRegex(stringSpec.Path, &newSpec, stat)
+		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
 		// Extend with method actions
 		newSpec.Internal = stringSpec
 		urlSpec = append(urlSpec, newSpec)
@@ -987,30 +996,30 @@ func (a APIDefinitionLoader) compileInternalPathspathSpec(paths []apidef.Interna
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionInfo, apiSpec *APISpec) ([]URLSpec, bool) {
+func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionInfo, apiSpec *APISpec, conf config.Config) ([]URLSpec, bool) {
 	// TODO: New compiler here, needs to put data into a different structure
 
-	ignoredPaths := a.compileExtendedPathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.Ignored, Ignored)
-	blackListPaths := a.compileExtendedPathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.BlackList, BlackList)
-	whiteListPaths := a.compileExtendedPathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.WhiteList, WhiteList)
-	cachedPaths := a.compileCachedPathSpec(apiVersionDef.ExtendedPaths.Cached, apiVersionDef.ExtendedPaths.AdvanceCacheConfig)
-	transformPaths := a.compileTransformPathSpec(apiVersionDef.ExtendedPaths.Transform, Transformed)
-	transformResponsePaths := a.compileTransformPathSpec(apiVersionDef.ExtendedPaths.TransformResponse, TransformedResponse)
+	ignoredPaths := a.compileExtendedPathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.Ignored, Ignored, conf)
+	blackListPaths := a.compileExtendedPathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.BlackList, BlackList, conf)
+	whiteListPaths := a.compileExtendedPathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.WhiteList, WhiteList, conf)
+	cachedPaths := a.compileCachedPathSpec(apiVersionDef.ExtendedPaths.Cached, apiVersionDef.ExtendedPaths.AdvanceCacheConfig, conf)
+	transformPaths := a.compileTransformPathSpec(apiVersionDef.ExtendedPaths.Transform, Transformed, conf)
+	transformResponsePaths := a.compileTransformPathSpec(apiVersionDef.ExtendedPaths.TransformResponse, TransformedResponse, conf)
 	transformJQPaths := a.compileTransformJQPathSpec(apiVersionDef.ExtendedPaths.TransformJQ, TransformedJQ)
 	transformJQResponsePaths := a.compileTransformJQPathSpec(apiVersionDef.ExtendedPaths.TransformJQResponse, TransformedJQResponse)
-	headerTransformPaths := a.compileInjectedHeaderSpec(apiVersionDef.ExtendedPaths.TransformHeader, HeaderInjected)
-	headerTransformPathsOnResponse := a.compileInjectedHeaderSpec(apiVersionDef.ExtendedPaths.TransformResponseHeader, HeaderInjectedResponse)
-	hardTimeouts := a.compileTimeoutPathSpec(apiVersionDef.ExtendedPaths.HardTimeouts, HardTimeout)
-	circuitBreakers := a.compileCircuitBreakerPathSpec(apiVersionDef.ExtendedPaths.CircuitBreaker, CircuitBreaker, apiSpec)
-	urlRewrites := a.compileURLRewritesPathSpec(apiVersionDef.ExtendedPaths.URLRewrite, URLRewrite)
-	goPlugins := a.compileGopluginPathspathSpec(apiVersionDef.ExtendedPaths.GoPlugin, GoPlugin, apiSpec)
-	virtualPaths := a.compileVirtualPathspathSpec(apiVersionDef.ExtendedPaths.Virtual, VirtualPath, apiSpec)
-	requestSizes := a.compileRequestSizePathSpec(apiVersionDef.ExtendedPaths.SizeLimit, RequestSizeLimit)
-	methodTransforms := a.compileMethodTransformSpec(apiVersionDef.ExtendedPaths.MethodTransforms, MethodTransformed)
-	trackedPaths := a.compileTrackedEndpointPathspathSpec(apiVersionDef.ExtendedPaths.TrackEndpoints, RequestTracked)
-	unTrackedPaths := a.compileUnTrackedEndpointPathspathSpec(apiVersionDef.ExtendedPaths.DoNotTrackEndpoints, RequestNotTracked)
-	validateJSON := a.compileValidateJSONPathspathSpec(apiVersionDef.ExtendedPaths.ValidateJSON, ValidateJSONRequest)
-	internalPaths := a.compileInternalPathspathSpec(apiVersionDef.ExtendedPaths.Internal, Internal)
+	headerTransformPaths := a.compileInjectedHeaderSpec(apiVersionDef.ExtendedPaths.TransformHeader, HeaderInjected, conf)
+	headerTransformPathsOnResponse := a.compileInjectedHeaderSpec(apiVersionDef.ExtendedPaths.TransformResponseHeader, HeaderInjectedResponse, conf)
+	hardTimeouts := a.compileTimeoutPathSpec(apiVersionDef.ExtendedPaths.HardTimeouts, HardTimeout, conf)
+	circuitBreakers := a.compileCircuitBreakerPathSpec(apiVersionDef.ExtendedPaths.CircuitBreaker, CircuitBreaker, apiSpec, conf)
+	urlRewrites := a.compileURLRewritesPathSpec(apiVersionDef.ExtendedPaths.URLRewrite, URLRewrite, conf)
+	virtualPaths := a.compileVirtualPathspathSpec(apiVersionDef.ExtendedPaths.Virtual, VirtualPath, apiSpec, conf)
+	requestSizes := a.compileRequestSizePathSpec(apiVersionDef.ExtendedPaths.SizeLimit, RequestSizeLimit, conf)
+	methodTransforms := a.compileMethodTransformSpec(apiVersionDef.ExtendedPaths.MethodTransforms, MethodTransformed, conf)
+	trackedPaths := a.compileTrackedEndpointPathspathSpec(apiVersionDef.ExtendedPaths.TrackEndpoints, RequestTracked, conf)
+	unTrackedPaths := a.compileUnTrackedEndpointPathspathSpec(apiVersionDef.ExtendedPaths.DoNotTrackEndpoints, RequestNotTracked, conf)
+	validateJSON := a.compileValidateJSONPathspathSpec(apiVersionDef.ExtendedPaths.ValidateJSON, ValidateJSONRequest, conf)
+	internalPaths := a.compileInternalPathspathSpec(apiVersionDef.ExtendedPaths.Internal, Internal, conf)
+	goPlugins := a.compileGopluginPathspathSpec(apiVersionDef.ExtendedPaths.GoPlugin, GoPlugin, apiSpec, conf)
 
 	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, ignoredPaths...)

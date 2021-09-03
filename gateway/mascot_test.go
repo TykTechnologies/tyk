@@ -10,13 +10,13 @@ import (
 )
 
 func TestMascotShowsUpOnceOnly(t *testing.T) {
-	ts := gateway.StartTest()
+	ts := gateway.StartTest(nil)
 	defer ts.Close()
 
 	for i := 0; i < 7; i++ {
 		resp, _ := ts.Run(t, test.TestCase{
 			Method: http.MethodGet,
-			Path:   "/" + ts.GlobalConfig.HealthCheckEndpointName,
+			Path:   "/" + ts.Gw.GetConfig().HealthCheckEndpointName,
 			Code:   http.StatusOK,
 		})
 		defer resp.Body.Close()

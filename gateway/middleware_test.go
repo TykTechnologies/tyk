@@ -31,6 +31,9 @@ func (mockStore) SessionDetail(orgID string, keyName string, hashed bool) (user.
 }
 
 func TestBaseMiddleware_OrgSessionExpiry(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	m := BaseMiddleware{
 		Spec: &APISpec{
 			GlobalConfig: config.Config{
@@ -39,15 +42,16 @@ func TestBaseMiddleware_OrgSessionExpiry(t *testing.T) {
 			OrgSessionManager: mockStore{},
 		},
 		logger: mainLog,
+		Gw:     ts.Gw,
 	}
 	v := int64(100)
-	ExpiryCache.Set(sess.OrgID, v, cache.DefaultExpiration)
+	ts.Gw.ExpiryCache.Set(sess.OrgID, v, cache.DefaultExpiration)
 
 	got := m.OrgSessionExpiry(sess.OrgID)
 	if got != v {
 		t.Errorf("expected %d got %d", v, got)
 	}
-	ExpiryCache.Delete(sess.OrgID)
+	ts.Gw.ExpiryCache.Delete(sess.OrgID)
 	got = m.OrgSessionExpiry(sess.OrgID)
 	if got != sess.DataExpires {
 		t.Errorf("expected %d got %d", sess.DataExpires, got)
@@ -66,7 +70,10 @@ func TestBaseMiddleware_getAuthType(t *testing.T) {
 		"oidc":      {AuthHeaderName: "h7"},
 	}
 
-	baseMid := BaseMiddleware{Spec: spec}
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	baseMid := BaseMiddleware{Spec: spec, Gw: ts.Gw}
 
 	r, _ := http.NewRequest(http.MethodGet, "", nil)
 	r.Header.Set("h1", "t1")
@@ -110,10 +117,10 @@ func TestBaseMiddleware_getAuthType(t *testing.T) {
 }
 
 func TestSessionLimiter_RedisQuotaExceeded_PerAPI(t *testing.T) {
-	g := StartTest()
+	g := StartTest(nil)
 	defer g.Close()
-	GlobalSessionManager.Store().DeleteAllKeys()
-	defer GlobalSessionManager.Store().DeleteAllKeys()
+	g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+	defer g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
 
 	apis := BuildAPI(func(spec *APISpec) {
 		spec.APIID = "api1"
@@ -129,7 +136,7 @@ func TestSessionLimiter_RedisQuotaExceeded_PerAPI(t *testing.T) {
 		spec.Proxy.ListenPath = "/api3/"
 	})
 
-	LoadAPI(apis...)
+	g.Gw.LoadAPI(apis...)
 
 	const globalQuotaMax int64 = 25
 

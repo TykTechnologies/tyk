@@ -1,6 +1,6 @@
 #!/bin/bash
 
-TEST_TIMEOUT=5m
+TEST_TIMEOUT=15m
 
 # print a command and execute it
 show() {
@@ -38,10 +38,10 @@ for pkg in ${PKGS}; do
         race=""
     fi
 
-    show go test ${race} -timeout ${TEST_TIMEOUT} -coverprofile=test.cov ${pkg} ${tags} || fatal "Test Failed"
+    show go test ${race} -timeout ${TEST_TIMEOUT} -v -coverprofile=test.cov ${pkg} ${tags} || fatal "Test Failed"
     show go vet ${tags} ${pkg} || fatal "go vet errored"
 done
 
 # run rpc tests separately
 rpc_tests='SyncAPISpecsRPC|OrgSessionWithRPCDown'
-show go test -timeout ${TEST_TIMEOUT} -coverprofile=test.cov github.com/TykTechnologies/tyk/gateway -p 1 -run '"'${rpc_tests}'"' || fatal "Test Failed"
+show go test -timeout ${TEST_TIMEOUT} -v -coverprofile=test.cov github.com/TykTechnologies/tyk/gateway -p 1 -run '"'${rpc_tests}'"' || fatal "Test Failed"

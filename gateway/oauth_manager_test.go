@@ -12,6 +12,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/config"
+
 	"fmt"
 
 	"net/http"
@@ -22,7 +24,6 @@ import (
 	uuid "github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -108,12 +109,13 @@ func buildTestOAuthSpec(apiGens ...func(spec *APISpec)) *APISpec {
 	})[0]
 }
 
-func loadTestOAuthSpec() *APISpec {
-	return LoadAPI(buildTestOAuthSpec())[0]
+func (s *Test) LoadTestOAuthSpec() *APISpec {
+	return s.Gw.LoadAPI(buildTestOAuthSpec())[0]
 }
 
-func createTestOAuthClient(spec *APISpec, clientID string) OAuthClient {
-	pID := CreatePolicy(func(p *user.Policy) {
+func (ts *Test) createTestOAuthClient(spec *APISpec, clientID string) OAuthClient {
+
+	pID := ts.CreatePolicy(func(p *user.Policy) {
 		p.ID = "TEST-4321"
 		p.AccessRights = map[string]user.AccessDefinition{
 			"test": {
@@ -127,12 +129,12 @@ func createTestOAuthClient(spec *APISpec, clientID string) OAuthClient {
 
 	var redirectURI string
 	// If separator is not set that means multiple redirect uris not supported
-	if config.Global().OauthRedirectUriSeparator == "" {
+	if ts.Gw.GetConfig().OauthRedirectUriSeparator == "" {
 		redirectURI = "http://client.oauth.com"
 
 		// If separator config is set that means multiple redirect uris are supported
 	} else {
-		redirectURI = strings.Join([]string{"http://client.oauth.com", "http://client2.oauth.com", "http://client3.oauth.com"}, config.Global().OauthRedirectUriSeparator)
+		redirectURI = strings.Join([]string{"http://client.oauth.com", "http://client2.oauth.com", "http://client3.oauth.com"}, ts.Gw.GetConfig().OauthRedirectUriSeparator)
 	}
 	testClient := OAuthClient{
 		ClientID:          clientID,
@@ -146,7 +148,7 @@ func createTestOAuthClient(spec *APISpec, clientID string) OAuthClient {
 }
 
 func TestOauthMultipleAPIs(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
 	spec := buildTestOAuthSpec(func(spec *APISpec) {
@@ -165,11 +167,11 @@ func TestOauthMultipleAPIs(t *testing.T) {
 
 	})
 
-	apis := LoadAPI(spec, spec2)
+	apis := ts.Gw.LoadAPI(spec, spec2)
 	spec = apis[0]
 	spec2 = apis[1]
 
-	pID := CreatePolicy(func(p *user.Policy) {
+	pID := ts.CreatePolicy(func(p *user.Policy) {
 		p.AccessRights = map[string]user.AccessDefinition{
 			"oauth2": {
 				APIID: "oauth2",
@@ -236,12 +238,12 @@ func TestOauthMultipleAPIs(t *testing.T) {
 }
 
 func TestAuthCodeRedirect(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := loadTestOAuthSpec()
+	spec := ts.LoadTestOAuthSpec()
 
-	createTestOAuthClient(spec, authClientID)
+	ts.createTestOAuthClient(spec, authClientID)
 
 	client := &http.Client{
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
@@ -270,17 +272,15 @@ func TestAuthCodeRedirect(t *testing.T) {
 
 func TestAuthCodeRedirectMultipleURL(t *testing.T) {
 	// Enable multiple Redirect URIs
-	globalConf := config.Global()
-	globalConf.OauthRedirectUriSeparator = ","
-	config.SetGlobal(globalConf)
-	defer ResetTestConfig()
-
-	ts := StartTest()
+	conf := func(globalConf *config.Config) {
+		globalConf.OauthRedirectUriSeparator = ","
+	}
+	ts := StartTest(conf)
 	defer ts.Close()
 
-	spec := loadTestOAuthSpec()
+	spec := ts.LoadTestOAuthSpec()
 
-	createTestOAuthClient(spec, authClientID)
+	ts.createTestOAuthClient(spec, authClientID)
 
 	client := &http.Client{
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
@@ -311,17 +311,15 @@ func TestAuthCodeRedirectMultipleURL(t *testing.T) {
 
 func TestAuthCodeRedirectInvalidMultipleURL(t *testing.T) {
 	// Disable multiple Redirect URIs
-	globalConf := config.Global()
-	globalConf.OauthRedirectUriSeparator = ""
-	config.SetGlobal(globalConf)
-	defer ResetTestConfig()
-
-	ts := StartTest()
+	conf := func(globalConf *config.Config) {
+		globalConf.OauthRedirectUriSeparator = ""
+	}
+	ts := StartTest(conf)
 	defer ts.Close()
 
-	spec := loadTestOAuthSpec()
+	spec := ts.LoadTestOAuthSpec()
 
-	createTestOAuthClient(spec, authClientID)
+	ts.createTestOAuthClient(spec, authClientID)
 
 	t.Run("Client authorize request with invalid redirect URI", func(t *testing.T) {
 		param := make(url.Values)
@@ -344,12 +342,12 @@ func TestAuthCodeRedirectInvalidMultipleURL(t *testing.T) {
 }
 
 func TestAPIClientAuthorizeAuthCode(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := loadTestOAuthSpec()
+	spec := ts.LoadTestOAuthSpec()
 
-	createTestOAuthClient(spec, authClientID)
+	ts.createTestOAuthClient(spec, authClientID)
 
 	t.Run("Client authorize code request", func(t *testing.T) {
 		param := make(url.Values)
@@ -375,12 +373,12 @@ func TestAPIClientAuthorizeAuthCode(t *testing.T) {
 }
 
 func TestAPIClientAuthorizeToken(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := loadTestOAuthSpec()
+	spec := ts.LoadTestOAuthSpec()
 
-	createTestOAuthClient(spec, authClientID)
+	ts.createTestOAuthClient(spec, authClientID)
 
 	t.Run("Client authorize token request", func(t *testing.T) {
 		param := make(url.Values)
@@ -455,12 +453,12 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 }
 
 func TestDeleteOauthClient(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := loadTestOAuthSpec()
+	spec := ts.LoadTestOAuthSpec()
 
-	createTestOAuthClient(spec, authClientID)
+	ts.createTestOAuthClient(spec, authClientID)
 
 	var resp *http.Response
 
@@ -548,12 +546,12 @@ func TestDeleteOauthClient(t *testing.T) {
 }
 
 func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := loadTestOAuthSpec()
+	spec := ts.LoadTestOAuthSpec()
 
-	createTestOAuthClient(spec, authClientID)
+	ts.createTestOAuthClient(spec, authClientID)
 
 	t.Run("Client authorize token with policy request", func(t *testing.T) {
 		param := make(url.Values)
@@ -627,24 +625,19 @@ func getAuthCode(t *testing.T, ts *Test) map[string]string {
 }
 
 func TestGetPaginatedClientTokens(t *testing.T) {
-	testPagination := func(pageParam int, expectedPageNumber int, tokenRequestCount int, expectedRes int) {
-		globalConf := config.Global()
+	conf := func(globalConf *config.Config) {
 		// set tokens to be expired after 100 seconds
 		globalConf.OauthTokenExpire = 100
 		// cleanup tokens older than 300 seconds
 		globalConf.OauthTokenExpiredRetainPeriod = 300
-
-		config.SetGlobal(globalConf)
-
-		defer ResetTestConfig()
-
-		ts := StartTest()
-		defer ts.Close()
-
-		spec := loadTestOAuthSpec()
+	}
+	ts := StartTest(conf)
+	defer ts.Close()
+	testPagination := func(pageParam int, expectedPageNumber int, tokenRequestCount int, expectedRes int) {
+		spec := ts.LoadTestOAuthSpec()
 
 		clientID := uuid.NewV4().String()
-		createTestOAuthClient(spec, clientID)
+		ts.createTestOAuthClient(spec, clientID)
 
 		tokensID := map[string]bool{}
 		param := make(url.Values)
@@ -676,8 +669,17 @@ func TestGetPaginatedClientTokens(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			// save tokens for future check
-			tokensID[response["access_token"].(string)] = true
+			if val, ok := response["access_token"]; !ok {
+				t.Fatal("response doesn't have access_token value")
+			} else {
+				if accessToken, ok := val.(string); !ok {
+					t.Fatal("access token is not a string value.")
+				} else {
+					// save tokens for future check
+					tokensID[accessToken] = true
+				}
+			}
+
 		}
 
 		resp, err := ts.Run(t, test.TestCase{
@@ -745,25 +747,21 @@ func TestGetClientTokens(t *testing.T) {
 }
 
 func testGetClientTokens(t *testing.T, hashed bool) {
-	globalConf := config.Global()
-	// set tokens to be expired after 1 second
-	globalConf.OauthTokenExpire = 1
-	// cleanup tokens older than 3 seconds
-	globalConf.OauthTokenExpiredRetainPeriod = 3
+	conf := func(globalConf *config.Config) {
+		// set tokens to be expired after 1 second
+		globalConf.OauthTokenExpire = 1
+		// cleanup tokens older than 3 seconds
+		globalConf.OauthTokenExpiredRetainPeriod = 3
+		globalConf.HashKeys = hashed
+	}
 
-	globalConf.HashKeys = hashed
-
-	config.SetGlobal(globalConf)
-
-	defer ResetTestConfig()
-
-	ts := StartTest()
+	ts := StartTest(conf)
 	defer ts.Close()
 
-	spec := loadTestOAuthSpec()
+	spec := ts.LoadTestOAuthSpec()
 
 	clientID := uuid.NewV4().String()
-	createTestOAuthClient(spec, clientID)
+	ts.createTestOAuthClient(spec, clientID)
 
 	// make three tokens
 	tokensID := map[string]bool{}
@@ -799,7 +797,7 @@ func testGetClientTokens(t *testing.T, hashed bool) {
 
 			if hashed {
 				// save tokens for future check
-				tokensID[storage.HashKey(response["access_token"].(string))] = true
+				tokensID[storage.HashKey(response["access_token"].(string), ts.Gw.GetConfig().HashKeys)] = true
 			} else {
 				tokensID[response["access_token"].(string)] = true
 			}
@@ -897,12 +895,12 @@ func getToken(t *testing.T, ts *Test) tokenData {
 }
 
 func TestOAuthClientCredsGrant(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := loadTestOAuthSpec()
+	spec := ts.LoadTestOAuthSpec()
 
-	createTestOAuthClient(spec, authClientID)
+	ts.createTestOAuthClient(spec, authClientID)
 
 	t.Run("Client credentials grant token request", func(t *testing.T) {
 		param := make(url.Values)
@@ -936,12 +934,12 @@ func TestOAuthClientCredsGrant(t *testing.T) {
 }
 
 func TestClientAccessRequest(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := loadTestOAuthSpec()
+	spec := ts.LoadTestOAuthSpec()
 
-	createTestOAuthClient(spec, authClientID)
+	ts.createTestOAuthClient(spec, authClientID)
 
 	authData := getAuthCode(t, ts)
 
@@ -968,12 +966,12 @@ func TestClientAccessRequest(t *testing.T) {
 }
 
 func TestOAuthAPIRefreshInvalidate(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := loadTestOAuthSpec()
+	spec := ts.LoadTestOAuthSpec()
 
-	createTestOAuthClient(spec, authClientID)
+	ts.createTestOAuthClient(spec, authClientID)
 
 	// Step 1 create token
 	tokenData := getToken(t, ts)
@@ -996,7 +994,7 @@ func TestOAuthAPIRefreshInvalidate(t *testing.T) {
 		json.NewDecoder(resp.Body).Decode(&newSuccess)
 		if newSuccess.Status != "ok" {
 			t.Errorf("key not deleted, status error: %s\n", newSuccess.Status)
-			t.Error(apisByID)
+			t.Error(ts.Gw.apisByID)
 		}
 		if newSuccess.Action != "deleted" {
 			t.Errorf("Response is incorrect - action is not 'deleted': %s\n", newSuccess.Action)
@@ -1025,12 +1023,12 @@ func TestOAuthAPIRefreshInvalidate(t *testing.T) {
 }
 
 func TestClientRefreshRequest(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := loadTestOAuthSpec()
+	spec := ts.LoadTestOAuthSpec()
 
-	createTestOAuthClient(spec, authClientID)
+	ts.createTestOAuthClient(spec, authClientID)
 
 	tokenData := getToken(t, ts)
 
@@ -1057,12 +1055,12 @@ func TestClientRefreshRequest(t *testing.T) {
 }
 
 func TestClientRefreshRequestDouble(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := loadTestOAuthSpec()
+	spec := ts.LoadTestOAuthSpec()
 
-	createTestOAuthClient(spec, authClientID)
+	ts.createTestOAuthClient(spec, authClientID)
 
 	tokenData := getToken(t, ts)
 
@@ -1118,11 +1116,11 @@ func TestClientRefreshRequestDouble(t *testing.T) {
 }
 
 func TestTokenEndpointHeaders(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := loadTestOAuthSpec()
-	createTestOAuthClient(spec, authClientID)
+	spec := ts.LoadTestOAuthSpec()
+	ts.createTestOAuthClient(spec, authClientID)
 
 	param := make(url.Values)
 	param.Set("grant_type", "client_credentials")

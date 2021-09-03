@@ -77,7 +77,7 @@ func LoadPoliciesFromFile(filePath string) map[string]user.Policy {
 }
 
 // LoadPoliciesFromDashboard will connect and download Policies from a Tyk Dashboard instance.
-func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[string]user.Policy {
+func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[string]user.Policy {
 
 	// Get the definitions
 	newRequest, err := http.NewRequest("GET", endpoint, nil)
@@ -86,14 +86,16 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 	}
 
 	newRequest.Header.Set("authorization", secret)
-	newRequest.Header.Set("x-tyk-nodeid", GetNodeID())
+	newRequest.Header.Set("x-tyk-nodeid", gw.GetNodeID())
 
-	newRequest.Header.Set("x-tyk-nonce", ServiceNonce)
+	gw.ServiceNonceMutex.RLock()
+	newRequest.Header.Set("x-tyk-nonce", gw.ServiceNonce)
+	gw.ServiceNonceMutex.RUnlock()
 
 	log.WithFields(logrus.Fields{
 		"prefix": "policy",
 	}).Info("Mutex lock acquired... calling")
-	c := initialiseClient()
+	c := gw.initialiseClient()
 
 	log.WithFields(logrus.Fields{
 		"prefix": "policy",
@@ -108,7 +110,7 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 	if resp.StatusCode != http.StatusOK {
 		body, _ := ioutil.ReadAll(resp.Body)
 		log.Error("Policy request login failure, Response was: ", string(body))
-		reLogin()
+		gw.reLogin()
 		return nil
 	}
 
@@ -122,8 +124,10 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 		return nil
 	}
 
-	ServiceNonce = list.Nonce
-	log.Debug("Loading Policies Finished: Nonce Set: ", ServiceNonce)
+	gw.ServiceNonceMutex.Lock()
+	gw.ServiceNonce = list.Nonce
+	gw.ServiceNonceMutex.Unlock()
+	log.Debug("Loading Policies Finished: Nonce Set: ", list.Nonce)
 
 	policies := make(map[string]user.Policy, len(list.Message))
 
@@ -167,12 +171,12 @@ func parsePoliciesFromRPC(list string) (map[string]user.Policy, error) {
 	return policies, nil
 }
 
-func LoadPoliciesFromRPC(orgId string) (map[string]user.Policy, error) {
+func (gw *Gateway) LoadPoliciesFromRPC(orgId string) (map[string]user.Policy, error) {
 	if rpc.IsEmergencyMode() {
-		return LoadPoliciesFromRPCBackup()
+		return gw.LoadPoliciesFromRPCBackup()
 	}
 
-	store := &RPCStorageHandler{}
+	store := &RPCStorageHandler{Gw: gw}
 	if !store.Connect() {
 		return nil, errors.New("Policies backup: Failed connecting to database")
 	}
@@ -188,7 +192,7 @@ func LoadPoliciesFromRPC(orgId string) (map[string]user.Policy, error) {
 		return nil, err
 	}
 
-	if err := saveRPCPoliciesBackup(rpcPolicies); err != nil {
+	if err := gw.saveRPCPoliciesBackup(rpcPolicies); err != nil {
 		log.Error(err)
 	}
 

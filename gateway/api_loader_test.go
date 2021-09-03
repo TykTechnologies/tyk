@@ -4,42 +4,39 @@ import (
 	"fmt"
 	"net/http"
 	"path"
+	_ "path"
 	"sync/atomic"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/apidef"
-
 	"github.com/TykTechnologies/tyk/user"
 
-	"github.com/TykTechnologies/tyk/config"
-
-	"github.com/stretchr/testify/assert"
-
 	"github.com/TykTechnologies/tyk/test"
-
 	"github.com/TykTechnologies/tyk/trace"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestOpenTracing(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 	trace.SetupTracing("test", nil)
 	defer trace.Close()
 
 	t.Run("ensure the manager is enabled", func(ts *testing.T) {
+
 		if !trace.IsEnabled() {
 			ts.Error("expected tracing manager should be enabled")
 		}
 	})
 
-	t.Run("ensure services are initialized", func(ts *testing.T) {
+	t.Run("ensure services are initialized", func(tst *testing.T) {
 		var s atomic.Value
 		trace.SetInit(func(name string, service string, opts map[string]interface{}, logger trace.Logger) (trace.Tracer, error) {
 			s.Store(service)
 			return trace.NoopTracer{}, nil
 		})
 		name := "trace"
-		BuildAndLoadAPI(
+		ts.Gw.BuildAndLoadAPI(
 			func(spec *APISpec) {
 				spec.Name = name
 				spec.UseOauth2 = true
@@ -50,13 +47,13 @@ func TestOpenTracing(t *testing.T) {
 			n = v.(string)
 		}
 		if name != n {
-			ts.Errorf("expected %s got %s", name, n)
+			tst.Errorf("expected %s got %s", name, n)
 		}
 	})
 }
 
 func TestInternalAPIUsage(t *testing.T) {
-	g := StartTest()
+	g := StartTest(nil)
 	defer g.Close()
 
 	internal := BuildAPI(func(spec *APISpec) {
@@ -72,7 +69,7 @@ func TestInternalAPIUsage(t *testing.T) {
 		spec.Proxy.ListenPath = "/normal-api"
 	})[0]
 
-	LoadAPI(internal, normal)
+	g.Gw.LoadAPI(internal, normal)
 
 	t.Run("with name", func(t *testing.T) {
 		_, _ = g.Run(t, []test.TestCase{
@@ -83,7 +80,7 @@ func TestInternalAPIUsage(t *testing.T) {
 	t.Run("with api id", func(t *testing.T) {
 		normal.Proxy.TargetURL = fmt.Sprintf("tyk://%s", internal.APIID)
 
-		LoadAPI(internal, normal)
+		g.Gw.LoadAPI(internal, normal)
 
 		_, _ = g.Run(t, []test.TestCase{
 			{Path: "/normal-api", Code: http.StatusOK},
@@ -92,9 +89,12 @@ func TestInternalAPIUsage(t *testing.T) {
 }
 
 func TestFuzzyFindAPI(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
 	objectId := apidef.NewObjectId()
 
-	BuildAndLoadAPI(
+	ts.Gw.BuildAndLoadAPI(
 		func(spec *APISpec) {
 			spec.Name = "IgnoreCase"
 			spec.APIID = "1"
@@ -136,7 +136,7 @@ func TestFuzzyFindAPI(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			spec := fuzzyFindAPI(tc.search)
+			spec := ts.Gw.fuzzyFindAPI(tc.search)
 
 			if tc.expectNil {
 				assert.Nil(t, spec)
@@ -168,10 +168,8 @@ func TestAPILoopingName(t *testing.T) {
 }
 
 func TestGraphQLPlayground(t *testing.T) {
-	g := StartTest()
+	g := StartTest(nil)
 	defer g.Close()
-
-	defer ResetTestConfig()
 
 	const apiName = "graphql-api"
 
@@ -217,46 +215,46 @@ func TestGraphQLPlayground(t *testing.T) {
 	for _, env := range []string{"on-premise", "cloud"} {
 		if env == "cloud" {
 			api.Proxy.ListenPath = fmt.Sprintf("/%s/", api.APIID)
+			globalConf := g.Gw.GetConfig()
 			api.Slug = "someslug"
-			globalConf := config.Global()
 			globalConf.Cloud = true
-			config.SetGlobal(globalConf)
+			g.Gw.SetConfig(globalConf)
 		}
 
 		t.Run(env, func(t *testing.T) {
 			t.Run("playground path is empty", func(t *testing.T) {
 				api.GraphQL.GraphQLPlayground.Path = ""
-				LoadAPI(api)
+				g.Gw.LoadAPI(api)
 				run(t, api.Proxy.ListenPath, api, env)
 			})
 
 			t.Run("playground path is '/'", func(t *testing.T) {
 				api.GraphQL.GraphQLPlayground.Path = "/"
-				LoadAPI(api)
+				g.Gw.LoadAPI(api)
 				run(t, api.Proxy.ListenPath, api, env)
 			})
 
 			t.Run("playground path is '/playground'", func(t *testing.T) {
 				api.GraphQL.GraphQLPlayground.Path = "/playground"
-				LoadAPI(api)
+				g.Gw.LoadAPI(api)
 				run(t, path.Join(api.Proxy.ListenPath, "playground"), api, env)
 			})
 
 			t.Run("playground path is '/ppp'", func(t *testing.T) {
 				api.GraphQL.GraphQLPlayground.Path = "/ppp"
-				LoadAPI(api)
+				g.Gw.LoadAPI(api)
 				run(t, path.Join(api.Proxy.ListenPath, "/ppp"), api, env)
 			})
 
 			t.Run("playground path is '/zzz/'", func(t *testing.T) {
 				api.GraphQL.GraphQLPlayground.Path = "/zzz/"
-				LoadAPI(api)
+				g.Gw.LoadAPI(api)
 				run(t, path.Join(api.Proxy.ListenPath, "/zzz"), api, env)
 			})
 
 			t.Run("playground path is 'aaa'", func(t *testing.T) {
 				api.GraphQL.GraphQLPlayground.Path = "aaa"
-				LoadAPI(api)
+				g.Gw.LoadAPI(api)
 				run(t, path.Join(api.Proxy.ListenPath, "aaa"), api, env)
 			})
 
@@ -265,10 +263,10 @@ func TestGraphQLPlayground(t *testing.T) {
 }
 
 func TestCORS(t *testing.T) {
-	g := StartTest()
+	g := StartTest(nil)
 	defer g.Close()
 
-	apis := BuildAndLoadAPI(func(spec *APISpec) {
+	apis := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Name = "CORS test API"
 		spec.APIID = "cors-api"
 		spec.Proxy.ListenPath = "/cors-api/"
@@ -300,7 +298,7 @@ func TestCORS(t *testing.T) {
 
 	t.Run("CORS enabled", func(t *testing.T) {
 		apis[0].CORS.Enable = true
-		LoadAPI(apis...)
+		g.Gw.LoadAPI(apis...)
 
 		_, _ = g.Run(t, []test.TestCase{
 			{Path: "/cors-api/", Headers: headers, HeadersMatch: headersMatch, Code: http.StatusOK},
@@ -314,7 +312,7 @@ func TestCORS(t *testing.T) {
 	t.Run("oauth endpoints", func(t *testing.T) {
 		apis[0].UseOauth2 = true
 		apis[0].CORS.Enable = false
-		LoadAPI(apis...)
+		g.Gw.LoadAPI(apis...)
 
 		t.Run("CORS disabled", func(t *testing.T) {
 			_, _ = g.Run(t, []test.TestCase{
@@ -324,7 +322,7 @@ func TestCORS(t *testing.T) {
 
 		t.Run("CORS enabled", func(t *testing.T) {
 			apis[0].CORS.Enable = true
-			LoadAPI(apis...)
+			g.Gw.LoadAPI(apis...)
 
 			_, _ = g.Run(t, []test.TestCase{
 				{Path: "/cors-api/oauth/token", Headers: headers, HeadersMatch: headersMatch, Code: http.StatusForbidden},
@@ -334,7 +332,7 @@ func TestCORS(t *testing.T) {
 }
 
 func TestTykRateLimitsStatusOfAPI(t *testing.T) {
-	g := StartTest()
+	g := StartTest(nil)
 	defer g.Close()
 
 	const (
@@ -344,7 +342,7 @@ func TestTykRateLimitsStatusOfAPI(t *testing.T) {
 		per            = 3
 	)
 
-	BuildAndLoadAPI(func(spec *APISpec) {
+	g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.APIID = "test"
 		spec.Proxy.ListenPath = "/my-api/"
 		spec.UseKeylessAccess = false

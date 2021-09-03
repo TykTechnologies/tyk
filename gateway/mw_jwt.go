@@ -21,8 +21,8 @@ import (
 	jose "github.com/square/go-jose"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
+
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -89,7 +89,7 @@ func (k *JWTMiddleware) legacyGetSecretFromURL(url, kid, keyType string) (interf
 
 	var client http.Client
 	client.Transport = &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Global().JWTSSLInsecureSkipVerify},
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: k.Gw.GetConfig().JWTSSLInsecureSkipVerify},
 	}
 
 	var jwkSet JWKs
@@ -144,7 +144,7 @@ func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) (interface{},
 	var jwkSet *jose.JSONWebKeySet
 	var client http.Client
 	client.Transport = &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Global().JWTSSLInsecureSkipVerify},
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: k.Gw.GetConfig().JWTSSLInsecureSkipVerify},
 	}
 
 	cachedJWK, found := JWKCache.Get(k.Spec.APIID)
@@ -382,7 +382,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	// Generate a virtual token
 	data := []byte(baseFieldData)
 	keyID := fmt.Sprintf("%x", md5.Sum(data))
-	sessionID := generateToken(k.Spec.OrgID, keyID)
+	sessionID := k.Gw.generateToken(k.Spec.OrgID, keyID)
 	updateSession := false
 
 	k.Logger().Debug("JWT Temporary session ID is: ", sessionID)
@@ -410,7 +410,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			}
 		}
 
-		session, err = generateSessionFromPolicy(basePolicyID,
+		session, err = k.Gw.generateSessionFromPolicy(basePolicyID,
 			k.Spec.OrgID,
 			true)
 
@@ -459,9 +459,9 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			}
 		}
 		// check if we received a valid policy ID in claim
-		policiesMu.RLock()
-		policy, ok := policiesByID[basePolicyID]
-		policiesMu.RUnlock()
+		k.Gw.policiesMu.RLock()
+		policy, ok := k.Gw.policiesByID[basePolicyID]
+		k.Gw.policiesMu.RUnlock()
 		if !ok {
 			k.reportLoginFailure(baseFieldData, r)
 			k.Logger().Error("Policy ID found is invalid!")
@@ -581,15 +581,17 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		// Initialize the OAuthManager if empty:
 		if k.Spec.OAuthManager == nil {
 			prefix := generateOAuthPrefix(k.Spec.APIID)
-			storageManager := getGlobalStorageHandler(prefix, false)
+			storageManager := k.Gw.getGlobalStorageHandler(prefix, false)
 			storageManager.Connect()
 			k.Spec.OAuthManager = &OAuthManager{
-				OsinServer: TykOsinNewServer(&osin.ServerConfig{},
+				OsinServer: k.Gw.TykOsinNewServer(&osin.ServerConfig{},
 					&RedisOsinStorageInterface{
 						storageManager,
-						GlobalSessionManager,
+						k.Gw.GlobalSessionManager,
 						&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false},
-						k.Spec.OrgID}),
+						k.Spec.OrgID,
+						k.Gw,
+					}),
 			}
 		}
 
@@ -616,10 +618,9 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	k.Logger().Debug("Key found")
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.JWTClaim, apidef.UnsetAuth:
-		ctxSetSession(r, &session, updateSession)
-
+		ctxSetSession(r, &session, updateSession, k.Gw.GetConfig().HashKeys)
 		if updateSession {
-			SessionCache.Set(session.KeyHash(), session.Clone(), cache.DefaultExpiration)
+			k.Gw.SessionCache.Set(session.KeyHash(), session.Clone(), cache.DefaultExpiration)
 		}
 	}
 	ctxSetJWTContextVars(k.Spec, r, token)
@@ -653,7 +654,7 @@ func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Toke
 	}
 
 	k.Logger().Debug("Raw key ID found.")
-	ctxSetSession(r, &session, false)
+	ctxSetSession(r, &session, false, k.Gw.GetConfig().HashKeys)
 	ctxSetJWTContextVars(k.Spec, r, token)
 	return nil, http.StatusOK
 }
@@ -837,16 +838,17 @@ func ctxSetJWTContextVars(s *APISpec, r *http.Request, token *jwt.Token) {
 	}
 }
 
-func generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.SessionState, error) {
-	policiesMu.RLock()
-	policy, ok := policiesByID[policyID]
-	policiesMu.RUnlock()
+func (gw *Gateway) generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.SessionState, error) {
+	gw.policiesMu.RLock()
+	policy, ok := gw.policiesByID[policyID]
+	gw.policiesMu.RUnlock()
 	session := user.SessionState{}
+
 	if !ok {
 		return session.Clone(), errors.New("Policy not found")
 	}
 	// Check ownership, policy org owner must be the same as API,
-	// otherwise youcould overwrite a session key with a policy from a different org!
+	// otherwise you could overwrite a session key with a policy from a different org!
 
 	if enforceOrg {
 		if policy.OrgID != orgID {

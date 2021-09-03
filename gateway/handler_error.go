@@ -83,8 +83,9 @@ func defaultTykErrors() {
 	}
 }
 
-func overrideTykErrors() {
-	for id, err := range config.Global().OverrideMessages {
+func overrideTykErrors(gw *Gateway) {
+	gwConfig := gw.GetConfig()
+	for id, err := range gwConfig.OverrideMessages {
 
 		overridenErr := TykErrors[id]
 
@@ -145,18 +146,18 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		templateName := "error_" + strconv.Itoa(errCode) + "." + templateExtension
 
 		// Try to use an error template that matches the HTTP error code and the content type: 500.json, 400.xml, etc.
-		tmpl := templates.Lookup(templateName)
+		tmpl := e.Gw.templates.Lookup(templateName)
 
 		// Fallback to a generic error template, but match the content type: error.json, error.xml, etc.
 		if tmpl == nil {
 			templateName = defaultTemplateName + "." + templateExtension
-			tmpl = templates.Lookup(templateName)
+			tmpl = e.Gw.templates.Lookup(templateName)
 		}
 
 		// If no template is available for this content type, fallback to "error.json".
 		if tmpl == nil {
 			templateName = defaultTemplateName + "." + defaultTemplateFormat
-			tmpl = templates.Lookup(templateName)
+			tmpl = e.Gw.templates.Lookup(templateName)
 			w.Header().Set(headers.ContentType, defaultContentType)
 			response.Header.Set(headers.ContentType, defaultContentType)
 
@@ -187,7 +188,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 				apiError.Message = template.HTML(errMsg)
 
 				//we look up in the last defined templateName to obtain the template.
-				rawTmpl := templatesRaw.Lookup(templateName)
+				rawTmpl := e.Gw.templatesRaw.Lookup(templateName)
 				tmplExecutor = rawTmpl
 			}
 
@@ -311,7 +312,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		}
 
 		if e.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
-			record.GetGeo(ip)
+			record.GetGeo(ip, e.Gw)
 		}
 
 		expiresAfter := e.Spec.ExpireAnalyticsAfter
@@ -328,7 +329,10 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		if e.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
 			record.NormalisePath(&e.Spec.GlobalConfig)
 		}
-		analytics.RecordHit(&record)
+		err := e.Gw.analytics.RecordHit(&record)
+		if err != nil {
+			log.WithError(err).Error("could not store analytic record")
+		}
 	}
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")

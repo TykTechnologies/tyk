@@ -30,7 +30,18 @@ func TestTransformNonAscii(t *testing.T) {
 	want := `["Jyväskylä", "Hyvinkää"]`
 
 	r := TestReq(t, "GET", "/", in)
-	if err := transformBody(r, tmeta, false); err != nil {
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ad := apidef.APIDefinition{}
+	spec := APISpec{APIDefinition: &ad}
+	spec.EnableContextVars = false
+	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
+	base.Spec.EnableContextVars = false
+	transform := TransformMiddleware{base}
+
+	if err := transformBody(r, tmeta, &transform); err != nil {
 		t.Fatalf("wanted nil error, got %v", err)
 	}
 	gotBs, err := ioutil.ReadAll(r.Body)
@@ -46,9 +57,19 @@ func BenchmarkTransformNonAscii(b *testing.B) {
 	b.ReportAllocs()
 
 	tmeta, in := testPrepareTransformNonAscii()
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	spec := APISpec{}
+	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
+	base.Spec.EnableContextVars = false
+	transform := TransformMiddleware{base}
+
 	for i := 0; i < b.N; i++ {
 		r := TestReq(b, "GET", "/", in)
-		if err := transformBody(r, tmeta, false); err != nil {
+
+		if err := transformBody(r, tmeta, &transform); err != nil {
 			b.Fatalf("wanted nil error, got %v", err)
 		}
 	}
@@ -62,7 +83,17 @@ func TestTransformXMLCrash(t *testing.T) {
 	tmeta := &TransformSpec{}
 	tmeta.TemplateData.Input = apidef.RequestXML
 	tmeta.Template = template.Must(apidef.Template.New("").Parse(""))
-	if err := transformBody(r, tmeta, false); err == nil {
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ad := apidef.APIDefinition{}
+	spec := APISpec{APIDefinition: &ad}
+	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
+	base.Spec.EnableContextVars = false
+	transform := TransformMiddleware{base}
+
+	if err := transformBody(r, tmeta, &transform); err == nil {
 		t.Fatalf("wanted error, got nil")
 	}
 }
@@ -107,7 +138,17 @@ func TestTransformJSONMarshalXMLInput(t *testing.T) {
 
 	want := `["Foo\"oo", "Bàr"]`
 	r := TestReq(t, "GET", "/", in)
-	if err := transformBody(r, tmeta, false); err != nil {
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ad := apidef.APIDefinition{}
+	spec := APISpec{APIDefinition: &ad}
+	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
+	base.Spec.EnableContextVars = false
+	transform := TransformMiddleware{base}
+
+	if err := transformBody(r, tmeta, &transform); err != nil {
 		t.Fatalf("wanted nil error, got %v", err)
 	}
 	gotBs, err := ioutil.ReadAll(r.Body)
@@ -124,7 +165,17 @@ func TestTransformJSONMarshalJSONInput(t *testing.T) {
 
 	want := `["Foo\"oo", "Bàr"]`
 	r := TestReq(t, "GET", "/", in)
-	if err := transformBody(r, tmeta, false); err != nil {
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ad := apidef.APIDefinition{}
+	spec := APISpec{APIDefinition: &ad}
+	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
+	base.Spec.EnableContextVars = false
+	transform := TransformMiddleware{base}
+
+	if err := transformBody(r, tmeta, &transform); err != nil {
 		t.Fatalf("wanted nil error, got %v", err)
 	}
 	gotBs, err := ioutil.ReadAll(r.Body)
@@ -153,7 +204,17 @@ func TestTransformJSONMarshalJSONArrayInput(t *testing.T) {
 
 	want := `[123,456]`
 	r := TestReq(t, "GET", "/", in)
-	if err := transformBody(r, tmeta, false); err != nil {
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ad := apidef.APIDefinition{}
+	spec := APISpec{APIDefinition: &ad}
+	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
+	base.Spec.EnableContextVars = false
+	transform := TransformMiddleware{base}
+
+	if err := transformBody(r, tmeta, &transform); err != nil {
 		t.Fatalf("wanted nil error, got %v", err)
 	}
 	gotBs, err := ioutil.ReadAll(r.Body)
@@ -169,10 +230,17 @@ func BenchmarkTransformJSONMarshal(b *testing.B) {
 	b.ReportAllocs()
 
 	tmeta, in := testPrepareTransformJSONMarshal("xml")
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	spec := APISpec{}
+	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
+	base.Spec.EnableContextVars = false
+	transform := TransformMiddleware{base}
 
 	for i := 0; i < b.N; i++ {
 		r := TestReq(b, "GET", "/", in)
-		if err := transformBody(r, tmeta, false); err != nil {
+		if err := transformBody(r, tmeta, &transform); err != nil {
 			b.Fatalf("wanted nil error, got %v", err)
 		}
 	}
@@ -182,7 +250,17 @@ func TestTransformXMLMarshal(t *testing.T) {
 	assert := func(t *testing.T, input string, tmpl string, output string, inputType apidef.RequestInputType) {
 		tmeta := testPrepareTransformXMLMarshal(tmpl, inputType)
 		r := TestReq(t, "GET", "/", input)
-		if err := transformBody(r, tmeta, false); err != nil {
+
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ad := apidef.APIDefinition{}
+		spec := APISpec{APIDefinition: &ad}
+		base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
+		base.Spec.EnableContextVars = false
+		transform := TransformMiddleware{base}
+
+		if err := transformBody(r, tmeta, &transform); err != nil {
 			t.Fatalf("wanted nil error, got %v", err)
 		}
 		gotBs, err := ioutil.ReadAll(r.Body)
@@ -221,7 +299,7 @@ func TestTransformXMLMarshal(t *testing.T) {
 }
 
 func TestBodyTransformCaseSensitivity(t *testing.T) {
-	ts := StartTest()
+	ts := StartTest(nil)
 	defer ts.Close()
 
 	assert := func(relativePath string, requestedPath string, bodyMatch string) {
@@ -236,7 +314,7 @@ func TestBodyTransformCaseSensitivity(t *testing.T) {
 
 		responseProcessorConf := []apidef.ResponseProcessor{{Name: "response_body_transform"}}
 
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.ResponseProcessors = responseProcessorConf
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {

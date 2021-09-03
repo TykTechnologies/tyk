@@ -42,6 +42,7 @@ type WebHookHandler struct {
 
 	contentType      string
 	dashboardService DashboardServiceSender
+	Gw               *Gateway
 }
 
 // createConfigObject by default tyk will provide a map[string]interface{} type as a conf, converting it
@@ -96,7 +97,7 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 			"prefix": "webhooks",
 			"target": w.conf.TargetPath,
 		}).Info("Loading default template.")
-		defaultPath := filepath.Join(config.Global().TemplatePath, "default_webhook.json")
+		defaultPath := filepath.Join(w.Gw.GetConfig().TemplatePath, "default_webhook.json")
 		w.template, err = template.ParseFiles(defaultPath)
 		if err != nil {
 			log.WithFields(logrus.Fields{
@@ -117,9 +118,9 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 		}).Error("Init failed for this webhook, invalid URL, URL must be absolute")
 	}
 
-	if config.Global().UseDBAppConfigs {
-		dashboardServiceInit()
-		w.dashboardService = DashService
+	if w.Gw.GetConfig().UseDBAppConfigs {
+		dashboardServiceInit(w.Gw)
+		w.dashboardService = w.Gw.DashService
 	}
 
 	return nil
@@ -143,7 +144,10 @@ func (w *WebHookHandler) setHookFired(checksum string) {
 	log.WithFields(logrus.Fields{
 		"prefix": "webhooks",
 	}).Debug("Setting Webhook Checksum: ", checksum)
-	w.store.SetKey(checksum, "1", w.conf.EventTimeout)
+	err := w.store.SetKey(checksum, "1", w.conf.EventTimeout)
+	if err != nil {
+		log.WithError(err).Error("could not set key")
+	}
 }
 
 func (w *WebHookHandler) getRequestMethod(m string) WebHookRequestMethod {
@@ -191,7 +195,7 @@ func (w *WebHookHandler) BuildRequest(reqBody string) (*http.Request, error) {
 
 	req.Header.Set(headers.UserAgent, headers.TykHookshot)
 
-	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
+	ignoreCanonical := w.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
 	for key, val := range w.conf.HeaderList {
 		setCustomHeader(req.Header, key, val, ignoreCanonical)
 	}

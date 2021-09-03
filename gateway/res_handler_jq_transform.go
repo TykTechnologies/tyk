@@ -9,12 +9,12 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"
 )
 
 type ResponseTransformJQMiddleware struct {
 	Spec *APISpec
+	Gw   *Gateway `json:"-"`
 }
 
 func (h *ResponseTransformJQMiddleware) Init(c interface{}, spec *APISpec) error {
@@ -62,7 +62,7 @@ func (h *ResponseTransformJQMiddleware) HandleResponse(rw http.ResponseWriter, r
 	res.Body = ioutil.NopCloser(bodyBuffer)
 
 	// Replace header in the response
-	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
+	ignoreCanonical := h.GetConfig().IgnoreCanonicalMIMEHeaderKey
 	for hName, hValue := range jqResult.RewriteHeaders {
 		setCustomHeader(res.Header, hName, hValue, ignoreCanonical)
 	}

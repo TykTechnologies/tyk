@@ -19,7 +19,6 @@ import (
 	_ "github.com/robertkrimen/otto/underscore"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/user"
 
@@ -56,7 +55,7 @@ func (d *VirtualEndpoint) Name() string {
 	return "VirtualEndpoint"
 }
 
-func preLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
+func (gw *Gateway) preLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
 	// the only call site uses (&foo, &bar) so meta and j won't be
 	// nil.
 	var src interface{}
@@ -70,7 +69,7 @@ func preLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
 		}
 		src = f
 	case "blob":
-		if config.Global().DisableVirtualPathBlobs {
+		if gw.GetConfig().DisableVirtualPathBlobs {
 			j.Log.Error("[JSVM] Blobs not allowed on this node")
 			return
 		}
@@ -177,6 +176,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Run the middleware
+
 	vm := d.Spec.JSVM.VM.Copy()
 	vm.Interrupt = make(chan func(), 1)
 	d.Logger().Debug("Running: ", vmeta.ResponseFunctionName)
@@ -229,11 +229,11 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 		newMeta := newResponseData.SessionMeta
 		if !reflect.DeepEqual(session.MetaData, newMeta) {
 			session.MetaData = newMeta
-			ctxSetSession(r, session, true)
+			ctxSetSession(r, session, true, d.Gw.GetConfig().HashKeys)
 		}
 	}
 
-	copiedResponse := forceResponse(w, r, &newResponseData, d.Spec, session, false, d.Logger())
+	copiedResponse := d.Gw.forceResponse(w, r, &newResponseData, d.Spec, session, false, d.Logger())
 	ms := DurationToMillisecond(time.Since(t1))
 	d.Logger().Debug("JSVM Virtual Endpoint execution took: (ms) ", ms)
 
@@ -244,7 +244,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	return copiedResponse
 }
 
-func forceResponse(w http.ResponseWriter,
+func (gw *Gateway) forceResponse(w http.ResponseWriter,
 	r *http.Request,
 	newResponseData *VMResponseObject,
 	spec *APISpec,
@@ -256,7 +256,7 @@ func forceResponse(w http.ResponseWriter,
 	newResponse.Header = make(map[string][]string)
 
 	requestTime := time.Now().UTC().Format(http.TimeFormat)
-	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
+	ignoreCanonical := gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
 	for header, value := range newResponseData.Response.Headers {
 		setCustomHeader(newResponse.Header, header, value, ignoreCanonical)
 	}
@@ -293,7 +293,7 @@ func forceResponse(w http.ResponseWriter,
 		}
 	}
 
-	handleForcedResponse(w, newResponse, session, spec)
+	gw.handleForcedResponse(w, newResponse, session, spec)
 
 	// Record analytics
 	return newResponse
@@ -320,10 +320,10 @@ func (d *VirtualEndpoint) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 func (d *VirtualEndpoint) HandleResponse(rw http.ResponseWriter, res *http.Response, ses *user.SessionState) {
 	// Externalising this from the MW so we can re-use it elsewhere
-	handleForcedResponse(rw, res, ses, d.Spec)
+	d.Gw.handleForcedResponse(rw, res, ses, d.Spec)
 }
 
-func handleForcedResponse(rw http.ResponseWriter, res *http.Response, ses *user.SessionState, spec *APISpec) {
+func (gw *Gateway) handleForcedResponse(rw http.ResponseWriter, res *http.Response, ses *user.SessionState, spec *APISpec) {
 	defer res.Body.Close()
 
 	// Close connections
@@ -340,7 +340,7 @@ func handleForcedResponse(rw http.ResponseWriter, res *http.Response, ses *user.
 		res.Header.Set(headers.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
 	}
 
-	copyHeader(rw.Header(), res.Header, config.Global().IgnoreCanonicalMIMEHeaderKey)
+	copyHeader(rw.Header(), res.Header, gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
 
 	rw.WriteHeader(res.StatusCode)
 	io.Copy(rw, res.Body)

@@ -99,13 +99,13 @@ const (
 	recordsBufferForcedFlushInterval = 1 * time.Second
 )
 
-func (a *AnalyticsRecord) GetGeo(ipStr string) {
+func (a *AnalyticsRecord) GetGeo(ipStr string, gw *Gateway) {
 	// Not great, tightly coupled
-	if analytics.GeoIPDB == nil {
+	if gw.analytics.GeoIPDB == nil {
 		return
 	}
 
-	record, err := geoIPLookup(ipStr)
+	record, err := geoIPLookup(ipStr, gw)
 	if err != nil {
 		log.Error("GeoIP Failure (not recorded): ", err)
 		return
@@ -123,7 +123,7 @@ func (a *AnalyticsRecord) GetGeo(ipStr string) {
 	a.Geo = *record
 }
 
-func geoIPLookup(ipStr string) (*GeoData, error) {
+func geoIPLookup(ipStr string, gw *Gateway) (*GeoData, error) {
 	if ipStr == "" {
 		return nil, nil
 	}
@@ -132,17 +132,17 @@ func geoIPLookup(ipStr string) (*GeoData, error) {
 		return nil, fmt.Errorf("invalid IP address %q", ipStr)
 	}
 	record := new(GeoData)
-	if err := analytics.GeoIPDB.Lookup(ip, record); err != nil {
+	if err := gw.analytics.GeoIPDB.Lookup(ip, record); err != nil {
 		return nil, fmt.Errorf("geoIPDB lookup of %q failed: %v", ipStr, err)
 	}
 	return record, nil
 }
 
-func initNormalisationPatterns() (pats config.NormaliseURLPatterns) {
+func (gw *Gateway) initNormalisationPatterns() (pats config.NormaliseURLPatterns) {
 	pats.UUIDs = regexp.MustCompile(`[0-9a-fA-F]{8}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{12}`)
 	pats.IDs = regexp.MustCompile(`\/(\d+)`)
 
-	for _, pattern := range config.Global().AnalyticsConfig.NormaliseUrls.Custom {
+	for _, pattern := range gw.GetConfig().AnalyticsConfig.NormaliseUrls.Custom {
 		if patRe, err := regexp.Compile(pattern); err != nil {
 			log.Error("failed to compile custom pattern: ", err)
 		} else {
@@ -188,11 +188,12 @@ type RedisAnalyticsHandler struct {
 	poolWg                      sync.WaitGroup
 	enableMultipleAnalyticsKeys bool
 	Clean                       Purger
+	Gw                          *Gateway `json:"-"`
+	mu                          sync.Mutex
 }
 
-func (r *RedisAnalyticsHandler) Init(globalConf config.Config) {
-	r.globalConf = globalConf
-
+func (r *RedisAnalyticsHandler) Init() {
+	r.globalConf = r.Gw.GetConfig()
 	if r.globalConf.AnalyticsConfig.EnableGeoIP {
 		if db, err := maxminddb.Open(r.globalConf.AnalyticsConfig.GeoIPDBLocation); err != nil {
 			log.Error("Failed to init GeoIP Database: ", err)
@@ -201,12 +202,13 @@ func (r *RedisAnalyticsHandler) Init(globalConf config.Config) {
 		}
 	}
 
-	analytics.Store.Connect()
-	ps := config.Global().AnalyticsConfig.PoolSize
-	recordsBufferSize := config.Global().AnalyticsConfig.RecordsBufferSize
+	r.Store.Connect()
+	ps := r.Gw.GetConfig().AnalyticsConfig.PoolSize
+	recordsBufferSize := r.globalConf.AnalyticsConfig.RecordsBufferSize
+
 	r.workerBufferSize = recordsBufferSize / uint64(ps)
 	log.WithField("workerBufferSize", r.workerBufferSize).Debug("Analytics pool worker buffer size")
-	r.enableMultipleAnalyticsKeys = config.Global().AnalyticsConfig.EnableMultipleAnalyticsKeys
+	r.enableMultipleAnalyticsKeys = r.Gw.GetConfig().AnalyticsConfig.EnableMultipleAnalyticsKeys
 	r.recordsChan = make(chan *AnalyticsRecord, recordsBufferSize)
 
 	// start worker pool
@@ -222,7 +224,9 @@ func (r *RedisAnalyticsHandler) Stop() {
 	atomic.SwapUint32(&r.shouldStop, 1)
 
 	// close channel to stop workers
+	r.mu.Lock()
 	close(r.recordsChan)
+	r.mu.Unlock()
 
 	// wait for all workers to be done
 	r.poolWg.Wait()
@@ -237,7 +241,9 @@ func (r *RedisAnalyticsHandler) RecordHit(record *AnalyticsRecord) error {
 
 	// just send record to channel consumed by pool of workers
 	// leave all data crunching and Redis I/O work for pool workers
+	r.mu.Lock()
 	r.recordsChan <- record
+	r.mu.Unlock()
 
 	return nil
 }
@@ -272,7 +278,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 			// we have new record - prepare it and add to buffer
 
 			// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
-			record.APIKey = storage.HashKey(record.APIKey)
+			record.APIKey = storage.HashKey(record.APIKey, r.globalConf.HashKeys)
 
 			if r.globalConf.SlaveOptions.UseRPC {
 				// Extend tag list to include this data so wecan segment by node if necessary

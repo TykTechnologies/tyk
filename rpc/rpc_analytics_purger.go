@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/TykTechnologies/tyk/config"
-
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk/storage"
@@ -91,8 +89,7 @@ func (r *Purger) Connect() {
 
 // PurgeLoop starts the loop that will pull data out of the in-memory
 // store and into RPC.
-func (r Purger) PurgeLoop(ctx context.Context) {
-	interval := time.Duration(config.Global().AnalyticsConfig.PurgeInterval)
+func (r Purger) PurgeLoop(ctx context.Context, interval time.Duration) {
 	tick := time.NewTicker(interval * time.Second)
 
 	for {

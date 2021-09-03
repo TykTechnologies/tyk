@@ -25,18 +25,19 @@ const (
 	minRecordsBufferSize = 1000
 )
 
-func Run(c config.Config) {
+func Run(c *config.Config) {
 	legacyRateLimiters(c)
 	allowInsecureConfigs(c)
 	healthCheck(c)
 	sessionLifetimeCheck(c)
+
 	fileDescriptors()
 	cpus()
 	defaultSecrets(c)
 	defaultAnalytics(c)
 }
 
-func legacyRateLimiters(c config.Config) {
+func legacyRateLimiters(c *config.Config) {
 	if c.ManagementNode {
 		return
 	}
@@ -46,20 +47,20 @@ func legacyRateLimiters(c config.Config) {
 	}
 }
 
-func allowInsecureConfigs(c config.Config) {
+func allowInsecureConfigs(c *config.Config) {
 	if c.AllowInsecureConfigs {
 		log.WithField("config.allow_insecure_configs", true).
 			Warning("Insecure configuration allowed")
 	}
 }
 
-func healthCheck(c config.Config) {
+func healthCheck(c *config.Config) {
 	if c.HealthCheck.EnableHealthChecks {
 		log.Warn("Health Checker is deprecated and not recommended")
 	}
 }
 
-func sessionLifetimeCheck(c config.Config) {
+func sessionLifetimeCheck(c *config.Config) {
 	if c.GlobalSessionLifetime <= 0 {
 		log.Warn("Tyk has not detected any setting for session lifetime (`global_session_lifetime` defaults to 0 seconds). \n" +
 			"\tThis means that in case there's also no `session_lifetime` defined in the api, Tyk will not set expiration on keys\n" +
@@ -93,7 +94,7 @@ func cpus() {
 	}
 }
 
-func defaultSecrets(c config.Config) {
+func defaultSecrets(c *config.Config) {
 	if c.Secret == defaultConfigs.Secret {
 		log.WithField("config.secret", defaultConfigs.Secret).
 			Warning("Default secret should be changed for production.")
@@ -105,7 +106,7 @@ func defaultSecrets(c config.Config) {
 	}
 }
 
-func defaultAnalytics(c config.Config) {
+func defaultAnalytics(c *config.Config) {
 	if !c.EnableAnalytics {
 		return
 	}
@@ -129,6 +130,4 @@ func defaultAnalytics(c config.Config) {
 			Warning("AnalyticsConfig.StorageExpirationTime is 0, defaulting to 60s")
 		c.AnalyticsConfig.StorageExpirationTime = 60
 	}
-
-	config.SetGlobal(c)
 }
