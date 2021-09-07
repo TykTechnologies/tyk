@@ -1140,6 +1140,7 @@ func (s *Test) Close() {
 		s.Gw.cancelFn()
 	}
 
+	s.Gw.DashService.StopBeating()
 	for _, p := range s.Gw.DefaultProxyMux.proxies {
 		if p.listener != nil {
 			p.listener.Close()
