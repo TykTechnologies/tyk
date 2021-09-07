@@ -284,7 +284,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 				record.Tags = append(record.Tags, r.globalConf.DBAppConfOptions.Tags...)
 			}
 
-			// Lets add some metadata
+			// Let's add some metadata
 			if record.APIKey != "" {
 				record.Tags = append(record.Tags, "key-"+record.APIKey)
 			}
@@ -294,6 +294,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 			}
 
 			record.Tags = append(record.Tags, "api-"+record.APIID)
+			record.Tags = removeDuplicateStr(record.Tags)
 
 			// fix paths in record as they might have omitted leading "/"
 			if !strings.HasPrefix(record.Path, "/") {
