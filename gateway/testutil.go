@@ -1169,8 +1169,12 @@ func (s *Test) Close() {
 	}
 
 	s.gwMu.Lock()
-	s.Gw.analytics.Stop()
-	s.Gw.GlobalHostChecker.StopPoller()
+	if s.Gw.analytics != nil {
+		s.Gw.analytics.Stop()
+	}
+	if s.Gw.GlobalHostChecker != nil {
+		s.Gw.GlobalHostChecker.StopPoller()
+	}
 	s.gwMu.Unlock()
 	os.RemoveAll(s.Gw.GetConfig().AppPath)
 }
