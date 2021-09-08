@@ -155,9 +155,9 @@ func TestSignatureValidation(t *testing.T) {
 
 	t.Run("Static signature in params", func(t *testing.T) {
 		api.Auth.Signature.Secret = "foobar"
-		LoadAPI(api)
+		ts.Gw.LoadAPI(api)
 
-		key := CreateSession()
+		key := CreateSession(ts.Gw)
 		hasher := signature_validator.MasheryMd5sum{}
 		validHash := hasher.Hash(key, "foobar", time.Now().Unix())
 
