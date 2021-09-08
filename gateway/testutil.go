@@ -1169,10 +1169,10 @@ func (s *Test) Close() {
 	}
 
 	s.gwMu.Lock()
-	if s.Gw.analytics != nil {
+	if s.Gw.GetConfig().EnableAnalytics {
 		s.Gw.analytics.Stop()
 	}
-	if s.Gw.GlobalHostChecker != nil {
+	if !s.Gw.GetConfig().UptimeTests.Disable {
 		s.Gw.GlobalHostChecker.StopPoller()
 	}
 	s.gwMu.Unlock()
