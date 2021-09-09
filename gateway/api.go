@@ -776,8 +776,8 @@ func (gw *Gateway) handleRemoveSortedSetRange(keyName, scoreFrom, scoreTo string
 	return gw.GlobalSessionManager.Store().RemoveSortedSetRange(keyName, scoreFrom, scoreTo)
 }
 
-func handleGetPolicy(polID string) (interface{}, int) {
-	if pol := getPolicy(polID); pol.ID != "" {
+func (gw *Gateway) handleGetPolicy(polID string) (interface{}, int) {
+	if pol := gw.getPolicy(polID); pol.ID != "" {
 		return pol, http.StatusOK
 	}
 
@@ -788,20 +788,20 @@ func handleGetPolicy(polID string) (interface{}, int) {
 	return apiError("Policy not found"), http.StatusNotFound
 }
 
-func handleGetPolicyList() (interface{}, int) {
-	policiesMu.RLock()
-	defer policiesMu.RUnlock()
-	polIDList := make([]user.Policy, len(policiesByID))
+func (gw *Gateway) handleGetPolicyList() (interface{}, int) {
+	gw.policiesMu.RLock()
+	defer gw.policiesMu.RUnlock()
+	polIDList := make([]user.Policy, len(gw.policiesByID))
 	c := 0
-	for _, pol := range policiesByID {
+	for _, pol := range gw.policiesByID {
 		polIDList[c] = pol
 		c++
 	}
 	return polIDList, http.StatusOK
 }
 
-func handleAddOrUpdatePolicy(polID string, r *http.Request) (interface{}, int) {
-	if config.Global().Policies.PolicySource == "service" {
+func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (interface{}, int) {
+	if gw.GetConfig().Policies.PolicySource == "service" {
 		log.Error("Rejected new policy due to PolicySource = service")
 		return apiError("Due to enabled service policy source, please use the Dashboard API"), http.StatusInternalServerError
 	}
@@ -818,7 +818,7 @@ func handleAddOrUpdatePolicy(polID string, r *http.Request) (interface{}, int) {
 	}
 
 	// Create a filename
-	polFilePath := filepath.Join(config.Global().Policies.PolicyPath, newPol.ID+".json")
+	polFilePath := filepath.Join(gw.GetConfig().Policies.PolicyPath, newPol.ID+".json")
 
 	asByte, err := json.MarshalIndent(newPol, "", "  ")
 	if err != nil {
@@ -834,9 +834,9 @@ func handleAddOrUpdatePolicy(polID string, r *http.Request) (interface{}, int) {
 	action := "modified"
 	if r.Method == "POST" {
 		action = "added"
-		policiesMu.Lock()
-		policiesByID[polID] = *newPol
-		policiesMu.Unlock()
+		gw.policiesMu.Lock()
+		gw.policiesByID[polID] = *newPol
+		gw.policiesMu.Unlock()
 	}
 
 	response := apiModifyKeySuccess{
@@ -848,9 +848,9 @@ func handleAddOrUpdatePolicy(polID string, r *http.Request) (interface{}, int) {
 	return response, http.StatusOK
 }
 
-func handleDeletePolicy(polID string) (interface{}, int) {
+func (gw *Gateway) handleDeletePolicy(polID string) (interface{}, int) {
 	// Generate a filename
-	defFilePath := filepath.Join(config.Global().Policies.PolicyPath, polID+".json")
+	defFilePath := filepath.Join(gw.GetConfig().Policies.PolicyPath, polID+".json")
 
 	// If it exists, delete it
 	if _, err := os.Stat(defFilePath); err != nil {
@@ -1039,35 +1039,35 @@ func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 	return response, http.StatusOK
 }
 
-func polHandler(w http.ResponseWriter, r *http.Request) {
+func (gw *Gateway) polHandler(w http.ResponseWriter, r *http.Request) {
 	polID := mux.Vars(r)["polID"]
 
 	var obj interface{}
 	var code int
 
 	switch r.Method {
-	case "GET":
+	case http.MethodGet:
 		if polID != "" {
 			log.Debug("Requesting policy for", polID)
-			obj, code = handleGetPolicy(polID)
+			obj, code = gw.handleGetPolicy(polID)
 		} else {
 			log.Debug("Requesting Policy list")
-			obj, code = handleGetPolicyList()
+			obj, code = gw.handleGetPolicyList()
 		}
-	case "POST":
+	case http.MethodPost:
 		log.Debug("Creating new definition file")
-		obj, code = handleAddOrUpdatePolicy(polID, r)
-	case "PUT":
+		obj, code = gw.handleAddOrUpdatePolicy(polID, r)
+	case http.MethodPut:
 		if polID != "" {
 			log.Debug("Updating existing Policy: ", polID)
-			obj, code = handleAddOrUpdatePolicy(polID, r)
+			obj, code = gw.handleAddOrUpdatePolicy(polID, r)
 		} else {
 			obj, code = apiError("Must specify an apiID to update"), http.StatusBadRequest
 		}
-	case "DELETE":
+	case http.MethodDelete:
 		if polID != "" {
 			log.Debug("Deleting policy for: ", polID)
-			obj, code = handleDeletePolicy(polID)
+			obj, code = gw.handleDeletePolicy(polID)
 		} else {
 			obj, code = apiError("Must specify an apiID to delete"), http.StatusBadRequest
 		}

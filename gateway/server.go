@@ -258,10 +258,10 @@ func (gw *Gateway) getApiSpec(apiID string) *APISpec {
 	return spec
 }
 
-func getPolicy(polID string) user.Policy {
-	policiesMu.RLock()
-	pol := policiesByID[polID]
-	policiesMu.RUnlock()
+func (gw *Gateway) getPolicy(polID string) user.Policy {
+	gw.policiesMu.RLock()
+	pol := gw.policiesByID[polID]
+	gw.policiesMu.RUnlock()
 	return pol
 }
 
@@ -582,8 +582,8 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/apis", gw.apiHandler).Methods("GET", "POST", "PUT", "DELETE")
 		r.HandleFunc("/apis/{apiID}", gw.apiHandler).Methods("GET", "POST", "PUT", "DELETE")
 		r.HandleFunc("/health", gw.healthCheckhandler).Methods("GET")
-		r.HandleFunc("/policies", polHandler).Methods("GET", "POST", "PUT", "DELETE")
-		r.HandleFunc("/policies/{polID}", polHandler).Methods("GET", "POST", "PUT", "DELETE")
+		r.HandleFunc("/policies", gw.polHandler).Methods("GET", "POST", "PUT", "DELETE")
+		r.HandleFunc("/policies/{polID}",gw.polHandler).Methods("GET", "POST", "PUT", "DELETE")
 		r.HandleFunc("/oauth/clients/create", gw.createOauthClient).Methods("POST")
 		r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", gw.oAuthClientHandler).Methods("PUT")
 		r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}/rotate", gw.rotateOauthClientHandler).Methods("PUT")
