@@ -96,15 +96,14 @@ const defaultTestPolUpdated = `{
 }`
 
 func TestPolicyAPI(t *testing.T) {
-
-	globalConf := config.Global()
+	ts := StartTest(nil)
+	globalConf := ts.Gw.GetConfig()
 	globalConf.Policies.PolicyPath = "."
 	globalConf.Policies.PolicySource = "file"
-	config.SetGlobal(globalConf)
+	ts.Gw.SetConfig(globalConf)
 
-	ts := StartTest()
 	defer ts.Close()
-	BuildAndLoadAPI()
+	ts.Gw.BuildAndLoadAPI()
 
 	ts.Run(t, []test.TestCase{
 		// get nonexistant policy
