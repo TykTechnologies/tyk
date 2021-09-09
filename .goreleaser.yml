@@ -66,6 +66,7 @@ dockers:
     - "docker.tyk.io/tyk-gateway/tyk-gateway:{{ .Tag }}"
   build_flag_templates:
     - "--build-arg=PORTS=8080"
+    - "--build-arg=TYK_GW_TAG={{ .Tag }}"
     - "--platform=linux/amd64"
     - "--label=org.opencontainers.image.created={{.Date}}"
     - "--label=org.opencontainers.image.title={{.ProjectName}}"
