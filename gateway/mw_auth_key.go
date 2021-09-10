@@ -201,6 +201,21 @@ func (k *AuthKey) validateSignature(r *http.Request, key string) (error, int) {
 	}
 
 	signature := r.Header.Get(config.Signature.Header)
+
+	paramName := config.Signature.ParamName
+	if config.Signature.UseParam || paramName != "" {
+		if paramName == "" {
+			paramName = config.Signature.Header
+		}
+
+		paramValue := r.URL.Query().Get(paramName)
+
+		// Only use the paramValue if it has an actual value
+		if paramValue != "" {
+			signature = paramValue
+		}
+	}
+
 	if signature == "" {
 		logger.Info("Request signature header not found or empty")
 		return errors.New(errorMessage), errorCode
