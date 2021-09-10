@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef"
+
 	"github.com/justinas/alice"
 	"github.com/lonelycode/go-uuid/uuid"
 
@@ -110,17 +112,26 @@ func TestSignatureValidation(t *testing.T) {
 	api := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.Proxy.ListenPath = "/"
-		spec.Auth.ValidateSignature = true
-		spec.Auth.Signature.Algorithm = "MasheryMD5"
-		spec.Auth.Signature.Header = "Signature"
-		spec.Auth.Signature.Secret = "foobar"
-		spec.Auth.Signature.AllowedClockSkew = 1
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			authTokenType: {
+				ValidateSignature: true,
+				UseParam:          true,
+				ParamName:         "api_key",
+				Signature: apidef.SignatureConfig{
+					UseParam:         true,
+					ParamName:        "sig",
+					Secret:           "foobar",
+					Algorithm:        "MasheryMD5",
+					Header:           "Signature",
+					AllowedClockSkew: 1,
+				},
+			},
+		}
 	})[0]
 
-	t.Run("Static signature", func(t *testing.T) {
-		api.Auth.Signature.Secret = "foobar"
-		LoadAPI(api)
+	LoadAPI(api)
 
+	t.Run("Static signature", func(t *testing.T) {
 		key := CreateSession()
 		hasher := signature_validator.MasheryMd5sum{}
 		validHash := hasher.Hash(key, "foobar", time.Now().Unix())
@@ -146,14 +157,39 @@ func TestSignatureValidation(t *testing.T) {
 		}...)
 		storage.DisableRedis(false)
 		ts.Run(t, []test.TestCase{
-			{Headers: emptySigHeader, Code: 401},
-			{Headers: invalidSigHeader, Code: 401},
-			{Headers: validSigHeader, Code: 200},
+			{Headers: emptySigHeader, Code: http.StatusUnauthorized},
+			{Headers: invalidSigHeader, Code: http.StatusUnauthorized},
+			{Headers: validSigHeader, Code: http.StatusOK},
+		}...)
+	})
+
+	t.Run("Static signature in params", func(t *testing.T) {
+		key := CreateSession()
+		hasher := signature_validator.MasheryMd5sum{}
+		validHash := hasher.Hash(key, "foobar", time.Now().Unix())
+
+		emptySigPath := "?api_key=" + key
+		invalidSigPath := emptySigPath + "&sig=junk"
+		validSigPath := emptySigPath + "&sig=" + hex.EncodeToString(validHash)
+
+		storage.DisableRedis(true)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: emptySigPath, Code: http.StatusForbidden},
+			{Path: invalidSigPath, Code: http.StatusForbidden},
+			{Path: validSigPath, Code: http.StatusForbidden},
+		}...)
+		storage.DisableRedis(false)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: emptySigPath, Code: http.StatusUnauthorized},
+			{Path: invalidSigPath, Code: http.StatusUnauthorized},
+			{Path: validSigPath, Code: http.StatusOK},
 		}...)
 	})
 
 	t.Run("Dynamic signature", func(t *testing.T) {
-		api.Auth.Signature.Secret = "$tyk_meta.signature_secret"
+		authConfig := api.AuthConfigs[authTokenType]
+		authConfig.Signature.Secret = "$tyk_meta.signature_secret"
+		api.AuthConfigs[authTokenType] = authConfig
 		LoadAPI(api)
 
 		key := CreateSession(func(s *user.SessionState) {
@@ -181,13 +217,15 @@ func TestSignatureValidation(t *testing.T) {
 		}...)
 		storage.DisableRedis(false)
 		ts.Run(t, []test.TestCase{
-			{Headers: invalidSigHeader, Code: 401},
-			{Headers: validSigHeader, Code: 200},
+			{Headers: invalidSigHeader, Code: http.StatusUnauthorized},
+			{Headers: validSigHeader, Code: http.StatusOK},
 		}...)
 	})
 
 	t.Run("Dynamic signature with custom key", func(t *testing.T) {
-		api.Auth.Signature.Secret = "$tyk_meta.signature_secret"
+		authConfig := api.AuthConfigs[authTokenType]
+		authConfig.Signature.Secret = "$tyk_meta.signature_secret"
+		api.AuthConfigs[authTokenType] = authConfig
 		LoadAPI(api)
 
 		customKey := "c8zj99aze7hdvtaqh4qvcck7"
