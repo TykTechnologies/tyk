@@ -75,26 +75,6 @@ const defaultTestPol = `{
 
 }`
 
-const defaultTestPolUpdated = `{
-"ID": "default-test",
-"rate": 1000,
-"per": 1,
-"quota_max": 100,
-"quota_renewal_rate": 60,
-"access_rights": {
-"41433797848f41a558c1573d3e55a410": {
-"api_name": "My Updated API",
-"api_id": "41433797848f41a558c1573d3e55a410",
-"versions": [
-"Default"
-]
-}
-},
-"org_id": "54de205930c55e15bd000001",
-"hmac_enabled": false
-
-}`
-
 func TestPolicyAPI(t *testing.T) {
 	ts := StartTest(nil)
 	globalConf := ts.Gw.GetConfig()
@@ -106,7 +86,7 @@ func TestPolicyAPI(t *testing.T) {
 	ts.Gw.BuildAndLoadAPI()
 
 	_, _ = ts.Run(t, []test.TestCase{
-		// get nonexistant policy
+		// get non existent policy
 		{Path: "/tyk/policies/not-here", AdminAuth: true, Method: "GET", BodyMatch: `{"status":"error","message":"Policy not found"}`},
 		// create Policy
 		{Path: "/tyk/policies", AdminAuth: true, Method: "POST", Data: defaultTestPol, BodyMatch: `{"key":"default-test","status":"ok","action":"added"}`},

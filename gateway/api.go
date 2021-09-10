@@ -832,7 +832,7 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 	}
 
 	action := "modified"
-	if r.Method == "POST" {
+	if r.Method == http.MethodPost {
 		action = "added"
 		gw.policiesMu.Lock()
 		gw.policiesByID[polID] = *newPol
@@ -976,7 +976,7 @@ func (gw *Gateway) handleAddOrUpdateApi(apiID string, r *http.Request, fs afero.
 	}
 
 	action := "modified"
-	if r.Method == "POST" {
+	if r.Method == http.MethodPost {
 		action = "added"
 	}
 
@@ -1342,7 +1342,7 @@ func (gw *Gateway) handleOrgAddOrUpdate(orgID string, r *http.Request) (interfac
 	}).Info("New organization key added or updated.")
 
 	action := "modified"
-	if r.Method == "POST" {
+	if r.Method == http.MethodPost {
 		action = "added"
 	}
 
