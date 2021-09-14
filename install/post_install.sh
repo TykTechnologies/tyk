@@ -22,17 +22,21 @@ fi
 
 cleanup() {
     # After installing, remove files that were not needed on this platform / system
-    if [ "${use_systemctl}" = "False" ]; then
+    if [ "${use_systemctl}" = "True" ]; then
         rm -f /lib/systemd/system/tyk-gateway.service
     else
         rm -f /etc/init.d/tyk-gateway
     fi
 }
 
-restoreSystemd() {
+restoreServices() {
     if [ "${use_systemctl}" = "True" ]; then
         if [ ! -f /lib/systemd/system/tyk-gateway.service ]; then
             cp /opt/tyk-gateway/install/inits/systemd/system/tyk-gateway.service /lib/systemd/system/tyk-gateway.service
+        fi
+    else
+        if [ ! -f /etc/init.d/tyk-gateway ]; then
+            cp /opt/tyk-gateway/install/inits/sysv/init.d/tyk-gateway /etc/init.d/tyk-gateway
         fi
     fi
 }
@@ -104,7 +108,7 @@ case "$action" in
     "2" | "upgrade")
         printf "\033[32m Post Install of an upgrade\033[0m\n"
         setupOwnership
-        restoreSystemd
+        restoreServices
         upgrade
         ;;
     *)
