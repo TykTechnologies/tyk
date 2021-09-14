@@ -30,6 +30,7 @@ on:
 
 env:
   SLACK_CLI_TOKEN: ${{ secrets.BENDER_TOKEN }}
+  GOPRIVATE: github.com/TykTechnologies
   
 jobs:
   goreleaser:
@@ -43,6 +44,11 @@ jobs:
       pc: ${{ steps.targets.outputs.pc }}
 
     steps:
+      - name: Fix private module deps
+        env:
+          TOKEN: '${{ secrets.repo_token }}'
+        run: >
+          git config --global url."https://${TOKEN}@github.com".insteadOf "https://github.com"
       - name: Checkout of tyk
         uses: actions/checkout@v2
         with:
