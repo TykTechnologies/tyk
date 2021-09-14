@@ -10,6 +10,6 @@
 
 if command -V systemctl >/dev/null 2>&1; then
     if [ ! -f /lib/systemd/system/tyk-gateway.service ]; then
-        cp /opt/tyk-gateway/install/tyk-gateway.service /lib/systemd/system/tyk-gateway.service
+        cp /opt/tyk-gateway/install/inits/systemd/system/tyk-gateway.service /lib/systemd/system/tyk-gateway.service
     fi
 fi

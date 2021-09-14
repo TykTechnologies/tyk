@@ -32,7 +32,7 @@ cleanup() {
 restoreSystemd() {
     if [ "${use_systemctl}" = "True" ]; then
         if [ ! -f /lib/systemd/system/tyk-gateway.service ]; then
-            cp /opt/tyk-gateway/install/tyk-gateway.service /lib/systemd/system/tyk-gateway.service
+            cp /opt/tyk-gateway/install/inits/systemd/system/tyk-gateway.service /lib/systemd/system/tyk-gateway.service
         fi
     fi
 }
@@ -82,7 +82,7 @@ upgrade() {
         service tyk-gateway restart
     else
         systemctl daemon-reload ||:
-        systemctl restart tyk-gateway ||:  
+        systemctl restart tyk-gateway ||:
     fi
 }
 
