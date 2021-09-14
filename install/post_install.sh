@@ -79,10 +79,10 @@ cleanInstall() {
 upgrade() {
     printf "\033[32m Post Install of an upgrade\033[0m\n"
     if [ "${use_systemctl}" = "False" ]; then
-        systemctl daemon-reload ||:
-        systemctl restart tyk-gateway ||:
-    else
         service tyk-gateway restart
+    else
+        systemctl daemon-reload ||:
+        systemctl restart tyk-gateway ||:  
     fi
 }
 
