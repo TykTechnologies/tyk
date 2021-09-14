@@ -14,7 +14,6 @@ import (
 
 	"github.com/Jeffail/tunny"
 	proxyproto "github.com/pires/go-proxyproto"
-	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -45,6 +44,11 @@ type HostHealthReport struct {
 	IsTCPError   bool
 }
 
+type HostSample struct {
+	count        int
+	reachedLimit bool
+}
+
 type HostUptimeChecker struct {
 	cb                 HostCheckCallBacks
 	workerPoolSize     int
@@ -54,11 +58,11 @@ type HostUptimeChecker struct {
 	unHealthyList      map[string]bool
 	pool               *tunny.WorkPool
 
-	errorChan   chan HostHealthReport
-	okChan      chan HostHealthReport
-	sampleCache *cache.Cache
-	stopLoop    bool
-	muStopLoop  sync.RWMutex
+	errorChan  chan HostHealthReport
+	okChan     chan HostHealthReport
+	samples    *sync.Map
+	stopLoop   bool
+	muStopLoop sync.RWMutex
 
 	resetListMu sync.Mutex
 	doResetList bool
@@ -146,24 +150,25 @@ func (h *HostUptimeChecker) HostReporter(ctx context.Context) {
 			}
 			return
 		case okHost := <-h.okChan:
-			// Clear host from unhealthylist if it exists
-			if h.unHealthyList[okHost.CheckURL] {
-				newVal := 1
-				if count, found := h.sampleCache.Get(okHost.CheckURL); found {
-					newVal = count.(int) - 1
-				}
+			// check if the the host url is in the sample map
+			if hostSample, found := h.samples.Load(okHost.CheckURL); found {
+				sample := hostSample.(HostSample)
+				//if it reached the h.sampleTriggerLimit, we're going to start decreasing the count value
+				if sample.reachedLimit {
+					newCount := sample.count - 1
 
-				if newVal <= 0 {
-					// Reset the count
-					h.sampleCache.Delete(okHost.CheckURL)
-					log.Warning("[HOST CHECKER] [HOST UP]: ", okHost.CheckURL)
-					if h.cb.Up != nil {
+					if newCount <= 0 {
+						//if the count-1 is equals to zero, it means that the host is fully up.
+
+						h.samples.Delete(okHost.CheckURL)
+						log.Warning("[HOST CHECKER] [HOST UP]: ", okHost.CheckURL)
 						go h.cb.Up(ctx, okHost)
+					} else {
+						//in another case, we are one step closer. We just update the count number
+						sample.count = newCount
+						log.Warning("[HOST CHECKER] [HOST UP BUT NOT REACHED LIMIT]: ", okHost.CheckURL)
+						h.samples.Store(okHost.CheckURL, sample)
 					}
-					delete(h.unHealthyList, okHost.CheckURL)
-				} else {
-					log.Warning("[HOST CHECKER] [HOST UP BUT NOT REACHED LIMIT]: ", okHost.CheckURL)
-					h.sampleCache.Set(okHost.CheckURL, newVal, cache.DefaultExpiration)
 				}
 			}
 			if h.cb.Ping != nil {
@@ -171,23 +176,36 @@ func (h *HostUptimeChecker) HostReporter(ctx context.Context) {
 			}
 
 		case failedHost := <-h.errorChan:
-			newVal := 1
-			if count, found := h.sampleCache.Get(failedHost.CheckURL); found {
-				newVal = count.(int) + 1
+			sample := HostSample{
+				count: 1,
 			}
 
-			if newVal >= h.sampleTriggerLimit {
-				log.Warning("[HOST CHECKER] [HOST DOWN]: ", failedHost.CheckURL)
-				// track it
-				h.unHealthyList[failedHost.CheckURL] = true
-				// Call the custom callback hook
-				if h.cb.Fail != nil {
-					go h.cb.Fail(ctx, failedHost)
-				}
-			} else {
-				log.Warning("[HOST CHECKER] [HOST DOWN BUT NOT REACHED LIMIT]: ", failedHost.CheckURL)
-				h.sampleCache.Set(failedHost.CheckURL, newVal, cache.DefaultExpiration)
+			//If a host fails, we check if it has failed already
+			if hostSample, found := h.samples.Load(failedHost.CheckURL); found {
+				sample = hostSample.(HostSample)
+				// we add THIS failure to the count
+				sample.count = sample.count + 1
 			}
+
+			if sample.count >= h.sampleTriggerLimit {
+				// if it reached the h.sampleTriggerLimit, it means the host is down for us. We update the reachedLimit flag and store it in the sample map
+				log.Warning("[HOST CHECKER] [HOST DOWN]: ", failedHost.CheckURL)
+
+				//if this is the first time it reached the h.sampleTriggerLimit, the value of the reachedLimit flag is stored with the new count
+				if sample.reachedLimit == false {
+					sample.reachedLimit = true
+					h.samples.Store(failedHost.CheckURL, sample)
+				}
+
+				//we call the failureCallback to keep the redis key and the host checker manager updated
+				go h.cb.Fail(ctx, failedHost)
+
+			} else {
+				//if it failed but not reached the h.sampleTriggerLimit yet, we just add the counter to the map.
+				log.Warning("[HOST CHECKER] [HOST DOWN BUT NOT REACHED LIMIT]: ", failedHost.CheckURL)
+				h.samples.Store(failedHost.CheckURL, sample)
+			}
+
 			if h.cb.Ping != nil {
 				go h.cb.Ping(ctx, failedHost)
 			}
@@ -324,7 +342,7 @@ type HostCheckCallBacks struct {
 }
 
 func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList map[string]HostData, cb HostCheckCallBacks) {
-	h.sampleCache = cache.New(30*time.Second, 30*time.Second)
+	h.samples = new(sync.Map)
 	h.errorChan = make(chan HostHealthReport)
 	h.okChan = make(chan HostHealthReport)
 	h.HostList = hostList
@@ -377,6 +395,7 @@ func (h *HostUptimeChecker) Start(ctx context.Context) {
 func (h *HostUptimeChecker) Stop() {
 	if !h.getStopLoop() {
 		h.setStopLoop(true)
+		h.samples = new(sync.Map)
 		log.Info("[HOST CHECKER] Stopping poller")
 		h.pool.Close()
 	}
