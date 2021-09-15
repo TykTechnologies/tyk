@@ -569,6 +569,114 @@ func TestChecker_triggerSampleLimit(t *testing.T) {
 	assert.Equal(t, 1, failed.Load().(int), "expected host down to be fired once")
 }
 
+func TestChecker_HostReporter_up_then_down(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := HostData{
+		CheckURL:            l.Addr().String(),
+		Protocol:            "tcp",
+		EnableProxyProtocol: true,
+		Commands: []apidef.CheckCommand{
+			{
+				Name: "send", Message: "ping",
+			}, {
+				Name: "expect", Message: "pong",
+			},
+		},
+	}
+	defer l.Close()
+
+	changeResponse := make(chan bool)
+	ctx, _ := context.WithCancel(context.Background())
+
+	go func(ls net.Listener, change chan bool) {
+		ls = &proxyproto.Listener{Listener: ls}
+		accept := false
+		for {
+			select {
+			case <-change:
+				accept = true
+			default:
+				s, err := ls.Accept()
+				if err != nil {
+					return
+				}
+				buf := make([]byte, 4)
+				_, err = s.Read(buf)
+				if err != nil {
+					return
+				}
+				if !accept {
+					s.Write([]byte("pong"))
+				} else {
+					s.Write([]byte("unknown"))
+				}
+			}
+
+		}
+	}(l, changeResponse)
+
+	ts.Gw.setTestMode(false)
+	defer func() {
+		ts.Gw.setTestMode(true)
+	}()
+
+	var (
+		limit  = 2
+		ping   atomic.Value
+		failed atomic.Value
+	)
+	failed.Store(0)
+	ping.Store(0)
+
+	hs := &HostUptimeChecker{}
+	hs.Init(1, limit, 1, map[string]HostData{
+		l.Addr().String(): data,
+	},
+		HostCheckCallBacks{
+			Fail: func(_ context.Context, _ HostHealthReport) {
+				failed.Store(failed.Load().(int) + 1)
+			},
+			Up: func(_ context.Context, _ HostHealthReport) {
+			},
+			Ping: func(_ context.Context, _ HostHealthReport) {
+				ping.Store(ping.Load().(int) + 1)
+			},
+		},
+	)
+
+	go hs.Start(ctx)
+	defer hs.Stop()
+
+	for {
+		val := ping.Load()
+		if val != nil && val == 1 {
+			break
+		}
+	}
+
+	changeResponse <- true
+	for {
+		val := failed.Load()
+		if val != nil && val.(int) == 1 {
+			break
+		}
+	}
+
+	val, found := hs.samples.Load(data.CheckURL)
+	assert.Equal(t, true, found, "the host url should be in samples")
+	assert.Equal(t, 1, failed.Load().(int), "expected host down to be fired once")
+
+	samples := val.(HostSample)
+	assert.Equal(t, true, samples.reachedLimit, "the host failures should have reached the error limit")
+	assert.Equal(t, 2, samples.count, "samples count should be 2")
+}
+
 func TestChecker_HostReporter_down_then_up(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()

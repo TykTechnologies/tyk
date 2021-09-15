@@ -100,27 +100,18 @@ func (h *HostUptimeChecker) HostCheckLoop(ctx context.Context) {
 	defer func() {
 		log.Info("[HOST CHECKER] Checker stopped")
 	}()
-	if h.Gw.isRunningTests() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-h.Gw.HostCheckTicker:
-				h.execCheck()
-			}
-		}
-	} else {
-		tick := time.NewTicker(h.getStaggeredTime())
-		defer tick.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-tick.C:
-				h.execCheck()
-			}
+
+	tick := time.NewTicker(h.getStaggeredTime())
+	defer tick.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+			h.execCheck()
 		}
 	}
+
 }
 
 func (h *HostUptimeChecker) execCheck() {
