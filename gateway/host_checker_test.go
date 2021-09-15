@@ -67,7 +67,6 @@ func (w *testEventHandler) HandleEvent(em config.EventMessage) {
 }
 
 //// ToDo check why it blocks
-
 func TestHostChecker(t *testing.T) {
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.UptimeTests.PollerGroup = uuid.NewV4().String()
@@ -523,6 +522,8 @@ func TestProxyWhenHostIsDown(t *testing.T) {
 func TestChecker_triggerSampleLimit(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
+	ts.Gw.setTestMode(false)
+	defer ts.Gw.setTestMode(true)
 
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -572,6 +573,8 @@ func TestChecker_triggerSampleLimit(t *testing.T) {
 func TestChecker_HostReporter_up_then_down(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
+	ts.Gw.setTestMode(false)
+	defer ts.Gw.setTestMode(true)
 
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -592,7 +595,8 @@ func TestChecker_HostReporter_up_then_down(t *testing.T) {
 	defer l.Close()
 
 	changeResponse := make(chan bool)
-	ctx, _ := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	go func(ls net.Listener, change chan bool) {
 		ls = &proxyproto.Listener{Listener: ls}
@@ -621,11 +625,6 @@ func TestChecker_HostReporter_up_then_down(t *testing.T) {
 		}
 	}(l, changeResponse)
 
-	ts.Gw.setTestMode(false)
-	defer func() {
-		ts.Gw.setTestMode(true)
-	}()
-
 	var (
 		limit  = 2
 		ping   atomic.Value
@@ -634,7 +633,7 @@ func TestChecker_HostReporter_up_then_down(t *testing.T) {
 	failed.Store(0)
 	ping.Store(0)
 
-	hs := &HostUptimeChecker{}
+	hs := &HostUptimeChecker{Gw: ts.Gw}
 	hs.Init(1, limit, 1, map[string]HostData{
 		l.Addr().String(): data,
 	},
@@ -680,6 +679,8 @@ func TestChecker_HostReporter_up_then_down(t *testing.T) {
 func TestChecker_HostReporter_down_then_up(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
+	ts.Gw.setTestMode(false)
+	defer ts.Gw.setTestMode(true)
 
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -728,11 +729,6 @@ func TestChecker_HostReporter_down_then_up(t *testing.T) {
 		}
 	}(l, changeResponse)
 
-	ts.Gw.setTestMode(false)
-	defer func() {
-		ts.Gw.setTestMode(true)
-	}()
-
 	var (
 		limit  = 2
 		up     atomic.Value
@@ -741,9 +737,10 @@ func TestChecker_HostReporter_down_then_up(t *testing.T) {
 	failed.Store(0)
 	up.Store(0)
 
-	ctx, _ := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	hs := &HostUptimeChecker{}
+	hs := &HostUptimeChecker{Gw: ts.Gw}
 	hs.Init(1, limit, 1, map[string]HostData{
 		l.Addr().String(): data,
 	}, HostCheckCallBacks{
