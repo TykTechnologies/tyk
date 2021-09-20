@@ -121,6 +121,7 @@ jobs:
           NFPM_PAYG_PASSPHRASE: ${{ secrets.SIGNING_KEY_PASSPHRASE }}
           GPG_FINGERPRINT: 12B5D62C28F57592D1575BD51ED14C59E37DAC20
           PKG_SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          GO111MODULE: off
 
       - uses: actions/upload-artifact@v2
         with:
