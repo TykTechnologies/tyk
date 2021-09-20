@@ -30,7 +30,8 @@ on:
 
 env:
   SLACK_CLI_TOKEN: ${{ secrets.BENDER_TOKEN }}
-  
+  BUILD_PATH: /go/src/github.com/TykTechnologies/tyk
+
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
@@ -76,6 +77,7 @@ jobs:
           PKG_SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
         run: |
           bin/unlock-agent.sh
+          mkdir -p ${{ env.BUILD_PATH }} && cp -r . ${{ env.BUILD_PATH }}
           DOCKER_CFG_PATH="${DOCKER_CONFIG:-$HOME/.docker}/config.json"
           jq '. + {"experimental": "enabled"}' "$DOCKER_CFG_PATH" > c.json && mv c.json "$DOCKER_CFG_PATH" || rm c.json
           current_tag=${GITHUB_REF##*/}
@@ -114,6 +116,7 @@ jobs:
         with:
           version: latest
           args: release --rm-dist
+          workdir: ${{ env.BUILD_PATH }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CGO_ENABLED: 1
@@ -122,29 +125,28 @@ jobs:
           GPG_FINGERPRINT: 12B5D62C28F57592D1575BD51ED14C59E37DAC20
           PKG_SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
           GO111MODULE: off
-          GOPATH: ${{ env.GITHUB_WORKSPACE }}
 
       - uses: actions/upload-artifact@v2
         with:
           name: deb
           retention-days: 1
           path: |
-            dist/*.deb
-            !dist/*PAYG*.deb
+            ${{ env.BUILD_PATH }}/dist/*.deb
+            !${{ env.BUILD_PATH }}/dist/*PAYG*.deb
 
       - uses: actions/upload-artifact@v2
         with:
           name: rpm
           retention-days: 1
           path: |
-            dist/*.rpm
-            !dist/*PAYG*.rpm
+            ${{ env.BUILD_PATH }}/dist/*.rpm
+            !${{ env.BUILD_PATH }}/dist/*PAYG*.rpm
 
       - uses: actions/upload-artifact@v2
         with:
           name: payg
           retention-days: 1
-          path: dist/*PAYG*
+          path: ${{ env.BUILD_PATH }}/dist/*PAYG*
 
   ci:
     needs:
