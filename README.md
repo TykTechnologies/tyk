@@ -1,8 +1,8 @@
 # Tyk API Gateway
 
 <!-- [![Build Status](https://travis-ci.org/TykTechnologies/tyk.svg?branch=master)](https://travis-ci.org/TykTechnologies/tyk) -->
-[![Go Report Card](https://goreportcard.com/badge/github.com/TykTechnologies/tyk)](https://goreportcard.com/report/github.com/TykTechnologies/tyk)
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk?ref=badge_shield)
+[![Go Report Card](https://goreportcard.com/badge/github.com/TykTechnologies/tyk)](https://goreportcard.com/report/github.com/TykTechnologies/tyk)  [![Stars](https://img.shields.io/github/stars/TykTechnologies/tyk?style=flat-square)](https://github.com/TykTechnologies/tyk/stargazers)  [![Latest Release](https://img.shields.io/github/v/release/TykTechnologies/tyk?style=flat-square)](https://github.com/TykTechnologies/tyk/release)  [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk?ref=badge_shield)  [![Forks](https://img.shields.io/github/forks/TykTechnologies/tyk.svg?style=flat-square)](https://github.com/TykTechnologies/tyk/fork)
+---
 
 Tyk is an open source Enterprise API Gateway, supporting REST, GraphQL, TCP and gRPC protocols. 
 
