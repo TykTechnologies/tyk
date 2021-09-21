@@ -13,7 +13,7 @@ ENV PLUGIN_BUILD_PATH=/go/src/plugin-build
 COPY images/plugin-compiler/data/build.sh /build.sh
 RUN chmod +x /build.sh
 
-COPY . $TYK_GW_PATH/
+ADD ./ $TYK_GW_PATH/
 RUN mkdir -p $PLUGIN_SOURCE_PATH $PLUGIN_BUILD_PATH
 
 ENTRYPOINT ["/build.sh"]
