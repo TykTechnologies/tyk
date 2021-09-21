@@ -146,10 +146,11 @@ def MyAuthHook(request, session, metadata, spec):
 // Our `pythonBundleWithAuthCheck` plugin restrict more then 1 call
 // With ID extractor, it should run multiple times (because cache)
 func TestValueExtractorHeaderSource(t *testing.T) {
-	ts := gateway.StartTest(gateway.TestConfig{
+	ts := gateway.StartTest(nil, gateway.TestConfig{
 		CoprocessConfig: config.CoProcessConfig{
 			EnableCoProcess:  true,
 			PythonPathPrefix: pkgPath,
+			PythonVersion:    "3.5",
 		},
 		Delay: 10 * time.Millisecond,
 	})
@@ -161,11 +162,11 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 		spec.EnableCoProcessAuth = true
 	})[0]
 	t.Run("Header value", func(t *testing.T) {
-		bundleID := gateway.RegisterBundle("id_extractor_header_value", pythonIDExtractorHeaderValue)
+		bundleID := ts.RegisterBundle("id_extractor_header_value", pythonIDExtractorHeaderValue)
 		spec.CustomMiddlewareBundle = bundleID
 		spec.APIID = "api1"
 
-		gateway.LoadAPI(spec)
+		ts.Gw.LoadAPI(spec)
 		time.Sleep(1 * time.Second)
 
 		ts.Run(t, []test.TestCase{
@@ -175,11 +176,11 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 		}...)
 	})
 	t.Run("Form value", func(t *testing.T) {
-		bundleID := gateway.RegisterBundle("id_extractor_form_value", pythonIDExtractorFormValue)
+		bundleID := ts.RegisterBundle("id_extractor_form_value", pythonIDExtractorFormValue)
 		spec.CustomMiddlewareBundle = bundleID
 		spec.APIID = "api2"
 
-		gateway.LoadAPI(spec)
+		ts.Gw.LoadAPI(spec)
 		time.Sleep(1 * time.Second)
 
 		formHeaders := map[string]string{"Content-Type": "application/x-www-form-urlencoded"}
@@ -191,11 +192,11 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 		}...)
 	})
 	t.Run("Header regex", func(t *testing.T) {
-		bundleID := gateway.RegisterBundle("id_extractor_header_regex", pythonIDExtractorHeaderRegex)
+		bundleID := ts.RegisterBundle("id_extractor_header_regex", pythonIDExtractorHeaderRegex)
 		spec.CustomMiddlewareBundle = bundleID
 		spec.APIID = "api3"
 
-		gateway.LoadAPI(spec)
+		ts.Gw.LoadAPI(spec)
 		time.Sleep(1 * time.Second)
 
 		ts.Run(t, []test.TestCase{

@@ -76,17 +76,16 @@ func generateHeaderList(r *http.Request, headerList []string) []string {
 }
 
 func (s *RequestSigning) getRequestPath(r *http.Request) string {
-	path := r.URL.Path
+	path := r.URL.RequestURI()
 
 	if newURL := ctxGetURLRewriteTarget(r); newURL != nil {
-		path = newURL.Path
+		path = newURL.RequestURI()
 	} else {
 		if s.Spec.Proxy.StripListenPath {
-			path = s.Spec.StripListenPath(r, r.URL.Path)
-			if path[:1] != "/" {
+			path = s.Spec.StripListenPath(r, path)
+			if !strings.HasPrefix(path, "/") {
 				path = "/" + path
 			}
-
 		}
 	}
 
@@ -137,7 +136,7 @@ func (s *RequestSigning) ProcessRequest(w http.ResponseWriter, r *http.Request, 
 			return errors.New("CertificateID is empty"), http.StatusInternalServerError
 		}
 
-		certList := CertificateManager.List([]string{s.Spec.RequestSigning.CertificateId}, certs.CertificatePrivate)
+		certList := s.Gw.CertificateManager.List([]string{s.Spec.RequestSigning.CertificateId}, certs.CertificatePrivate)
 		if len(certList) == 0 || certList[0] == nil {
 			log.Error("Certificate not found")
 			return errors.New("Certificate not found"), http.StatusInternalServerError

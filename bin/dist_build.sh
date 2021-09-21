@@ -1,10 +1,13 @@
 #!/bin/bash
 
+# This file is deprecated in favour of .goreleaser.yml
+# Automation in .g/w/release.yml
+
 set -ex
 
 : ${ORGDIR:="/go/src/github.com/TykTechnologies"}
 : ${SOURCEBINPATH:="${ORGDIR}/tyk"}
-: ${SIGNKEY:="9ADE11DA6DD70355E7C1C270543ABE02AC6AC40A"}
+: ${SIGNKEY:="12B5D62C28F57592D1575BD51ED14C59E37DAC20"}
 : ${BUILDPKGS:="1"}
 : ${SIGNPKGS:="1"}
 : ${PKGNAME:="tyk-gateway"}

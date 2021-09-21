@@ -11,16 +11,14 @@ import (
 
 	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/request"
-
-	"github.com/TykTechnologies/tyk/config"
 )
 
 var applicationGCStats = debug.GCStats{}
 var instrument = health.NewStream()
 var instrumentationEnabled bool
 
-// setupInstrumentation handles all the intialisation of the instrumentation handler
-func setupInstrumentation() {
+// setupInstrumentation handles all the initialisation of the instrumentation handler
+func (gw *Gateway) setupInstrumentation() {
 	switch {
 	case *cli.LogInstrumentation:
 	case os.Getenv("TYK_INSTRUMENTATION") == "1":
@@ -28,16 +26,17 @@ func setupInstrumentation() {
 		return
 	}
 
-	if config.Global().StatsdConnectionString == "" {
+	gwConfig := gw.GetConfig()
+	if gwConfig.StatsdConnectionString == "" {
 		log.Error("Instrumentation is enabled, but no connectionstring set for statsd")
 		return
 	}
 
 	instrumentationEnabled = true
 
-	log.Info("Sending stats to: ", config.Global().StatsdConnectionString, " with prefix: ", config.Global().StatsdPrefix)
-	statsdSink, err := NewStatsDSink(config.Global().StatsdConnectionString,
-		&StatsDSinkOptions{Prefix: config.Global().StatsdPrefix})
+	log.Info("Sending stats to: ", gwConfig.StatsdConnectionString, " with prefix: ", gwConfig.StatsdPrefix)
+	statsdSink, err := NewStatsDSink(gwConfig.StatsdConnectionString,
+		&StatsDSinkOptions{Prefix: gwConfig.StatsdPrefix})
 
 	if err != nil {
 		log.Fatal("Failed to start StatsD check: ", err)

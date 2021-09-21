@@ -14,7 +14,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/user"
@@ -39,7 +38,7 @@ var envValueMatch = regexp.MustCompile(`\$secret_env.([A-Za-z0-9_\-\.]+)`)
 var metaMatch = regexp.MustCompile(`\$tyk_meta.([A-Za-z0-9_\-\.]+)`)
 var secretsConfMatch = regexp.MustCompile(`\$secret_conf.([A-Za-z0-9[.\-\_]+)`)
 
-func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
+func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 	path := r.URL.String()
 	log.Debug("Inbound path: ", path)
 	newpath := path
@@ -195,57 +194,69 @@ func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 		ctxSetUrlRewritePath(r, meta.Path)
 	}
 
-	newpath = replaceTykVariables(r, newpath, true)
+	newpath = gw.replaceTykVariables(r, newpath, true)
 
 	return newpath, nil
 }
 
-func replaceTykVariables(r *http.Request, in string, escape bool) string {
+func (gw *Gateway) replaceTykVariables(r *http.Request, in string, escape bool) string {
 
 	if strings.Contains(in, secretsConfLabel) {
 		contextData := ctxGetData(r)
 		vars := secretsConfMatch.FindAllString(in, -1)
-		in = replaceVariables(in, vars, contextData, secretsConfLabel, escape)
+		in = gw.replaceVariables(in, vars, contextData, secretsConfLabel, escape)
 	}
 
 	if strings.Contains(in, envLabel) {
 		contextData := ctxGetData(r)
 		vars := envValueMatch.FindAllString(in, -1)
-		in = replaceVariables(in, vars, contextData, envLabel, escape)
+		in = gw.replaceVariables(in, vars, contextData, envLabel, escape)
 	}
 
 	if strings.Contains(in, vaultLabel) {
 		contextData := ctxGetData(r)
 		vars := vaultMatch.FindAllString(in, -1)
-		in = replaceVariables(in, vars, contextData, vaultLabel, escape)
+		in = gw.replaceVariables(in, vars, contextData, vaultLabel, escape)
 	}
 
 	if strings.Contains(in, consulLabel) {
 		contextData := ctxGetData(r)
 		vars := consulMatch.FindAllString(in, -1)
-		in = replaceVariables(in, vars, contextData, consulLabel, escape)
+		in = gw.replaceVariables(in, vars, contextData, consulLabel, escape)
 	}
 
 	if strings.Contains(in, contextLabel) {
 		contextData := ctxGetData(r)
 		vars := contextMatch.FindAllString(in, -1)
-		in = replaceVariables(in, vars, contextData, contextLabel, escape)
+		in = gw.replaceVariables(in, vars, contextData, contextLabel, escape)
 	}
 
 	if strings.Contains(in, metaLabel) {
 		vars := metaMatch.FindAllString(in, -1)
 		session := ctxGetSession(r)
 		if session == nil {
-			in = replaceVariables(in, vars, nil, metaLabel, escape)
+			in = gw.replaceVariables(in, vars, nil, metaLabel, escape)
 		} else {
-			in = replaceVariables(in, vars, session.MetaData, metaLabel, escape)
+			in = gw.replaceVariables(in, vars, session.MetaData, metaLabel, escape)
 		}
 	}
 	//todo add config_data
 	return in
 }
 
-func replaceVariables(in string, vars []string, vals map[string]interface{}, label string, escape bool) string {
+func (gw *Gateway) replaceVariables(in string, vars []string, vals map[string]interface{}, label string, escape bool) string {
+
+	emptyStringFn := func(key, in, val string) string {
+		in = strings.Replace(in, val, "", -1)
+		log.WithFields(logrus.Fields{
+			"key":       key,
+			"value":     val,
+			"in string": in,
+		}).Debug("Replaced with an empty string")
+
+		return in
+	}
+
 	for _, v := range vars {
 		key := strings.Replace(v, label, "", 1)
 
@@ -253,17 +264,11 @@ func replaceVariables(in string, vars []string, vals map[string]interface{}, lab
 
 		case secretsConfLabel:
 
-			secrets := config.Global().Secrets
+			secrets := gw.GetConfig().Secrets
 
 			val, ok := secrets[key]
 			if !ok || val == "" {
-				in = strings.Replace(in, val, "", -1)
-				log.WithFields(logrus.Fields{
-					"key":       key,
-					"value":     val,
-					"in string": in,
-				}).Debug("Replaced with an empty string")
-
+				in = emptyStringFn(key, in, v)
 				continue
 			}
 
@@ -273,13 +278,7 @@ func replaceVariables(in string, vars []string, vals map[string]interface{}, lab
 
 			val := os.Getenv(fmt.Sprintf("TYK_SECRET_%s", strings.ToUpper(key)))
 			if val == "" {
-				in = strings.Replace(in, v, "", -1)
-				log.WithFields(logrus.Fields{
-					"key":       key,
-					"value":     v,
-					"in string": in,
-				}).Debug("Replaced with an empty string")
-
+				in = emptyStringFn(key, in, v)
 				continue
 			}
 
@@ -287,17 +286,14 @@ func replaceVariables(in string, vars []string, vals map[string]interface{}, lab
 
 		case vaultLabel:
 
-			setUpVault()
+			if err := gw.setUpVault(); err != nil {
+				in = emptyStringFn(key, in, v)
+				continue
+			}
 
-			val, err := vaultKVStore.Get(key)
+			val, err := gw.vaultKVStore.Get(key)
 			if err != nil {
-				in = strings.Replace(in, v, "", -1)
-				log.WithFields(logrus.Fields{
-					"key":       key,
-					"value":     v,
-					"in string": in,
-				}).Debug("Replaced with an empty string")
-
+				in = emptyStringFn(key, in, v)
 				continue
 			}
 
@@ -305,17 +301,14 @@ func replaceVariables(in string, vars []string, vals map[string]interface{}, lab
 
 		case consulLabel:
 
-			setUpConsul()
+			if err := gw.setUpConsul(); err != nil {
+				in = emptyStringFn(key, in, v)
+				continue
+			}
 
-			val, err := consulKVStore.Get(key)
+			val, err := gw.consulKVStore.Get(key)
 			if err != nil {
 				in = strings.Replace(in, v, "", -1)
-				log.WithFields(logrus.Fields{
-					"key":       key,
-					"value":     v,
-					"in string": in,
-				}).Debug("Replaced with an empty string")
-
 				continue
 			}
 
@@ -331,15 +324,10 @@ func replaceVariables(in string, vars []string, vals map[string]interface{}, lab
 					valStr = url.QueryEscape(valStr)
 				}
 				in = strings.Replace(in, v, valStr, -1)
-			} else {
-				in = strings.Replace(in, v, "", -1)
-				log.WithFields(logrus.Fields{
-					"key":       key,
-					"value":     v,
-					"in string": in,
-				}).Debug("Replaced with an empty string")
+				continue
 			}
 
+			in = emptyStringFn(key, in, v)
 		}
 	}
 
@@ -444,8 +432,18 @@ func (m *URLRewriteMiddleware) EnabledForSpec() bool {
 }
 
 func (m *URLRewriteMiddleware) CheckHostRewrite(oldPath, newTarget string, r *http.Request) {
-	oldAsURL, _ := url.Parse(oldPath)
-	newAsURL, _ := url.Parse(newTarget)
+	oldAsURL, errParseOld := url.Parse(oldPath)
+	if errParseOld != nil {
+		log.WithError(errParseOld).WithField("url", oldPath).Error("could not parse")
+		return
+	}
+
+	newAsURL, errParseNew := url.Parse(newTarget)
+	if errParseNew != nil {
+		log.WithError(errParseNew).WithField("url", newTarget).Error("could not parse")
+		return
+	}
+
 	if newAsURL.Scheme != LoopScheme && oldAsURL.Host != newAsURL.Host {
 		log.Debug("Detected a host rewrite in pattern!")
 		setCtxValue(r, ctx.RetainHost, true)
@@ -461,10 +459,14 @@ func replaceNonAlphaNumeric(in string) string {
 	return NonAlphaNumRE.ReplaceAllString(in, "-")
 }
 
+func LoopingUrl(host string) string {
+	return LoopScheme + "://" + replaceNonAlphaNumeric(host)
+}
+
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	_, versionPaths, _, _ := m.Spec.Version(r)
-	found, meta := m.Spec.CheckSpecMatchesStatus(r, versionPaths, URLRewrite)
+	vInfo, _ := m.Spec.Version(r)
+	found, meta := m.Spec.CheckSpecMatchesStatus(r, m.Spec.RxPaths[vInfo.Name], URLRewrite)
 
 	if !found {
 		return nil, http.StatusOK
@@ -478,7 +480,7 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	umeta := meta.(*apidef.URLRewriteMeta)
 	log.Debug(r.URL)
 	oldPath := r.URL.String()
-	p, err := urlRewrite(umeta, r)
+	p, err := m.Gw.urlRewrite(umeta, r)
 	if err != nil {
 		log.Error(err)
 		return err, http.StatusInternalServerError
@@ -489,7 +491,7 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	if strings.HasPrefix(p, LoopScheme) {
 		p = LoopHostRE.ReplaceAllStringFunc(p, func(match string) string {
 			host := strings.TrimPrefix(match, LoopScheme+"://")
-			return LoopScheme + "://" + replaceNonAlphaNumeric(host)
+			return LoopingUrl(host)
 		})
 	}
 

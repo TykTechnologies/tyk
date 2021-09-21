@@ -1,50 +1,53 @@
 package gateway
 
 import (
+	"crypto/tls"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
+	"path"
 	"path/filepath"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"text/template"
 
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/trace"
 )
 
+const (
+	rateLimitEndpoint = "/tyk/rate-limits/"
+)
+
 type ChainObject struct {
-	Domain         string
-	ListenOn       string
 	ThisHandler    http.Handler
 	RateLimitChain http.Handler
-	RateLimitPath  string
 	Open           bool
-	Index          int
 	Skip           bool
-	Subrouter      *mux.Router
 }
 
-func prepareStorage() generalStores {
+func (gw *Gateway) prepareStorage() generalStores {
 	var gs generalStores
-	gs.redisStore = &storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
+	gs.redisStore = &storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: gw.GetConfig().HashKeys}
 	gs.redisOrgStore = &storage.RedisCluster{KeyPrefix: "orgkey."}
 	gs.healthStore = &storage.RedisCluster{KeyPrefix: "apihealth."}
-	gs.rpcAuthStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
-	gs.rpcOrgStore = &RPCStorageHandler{KeyPrefix: "orgkey."}
-	GlobalSessionManager.Init(gs.redisStore)
+	gs.rpcAuthStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: gw.GetConfig().HashKeys, Gw: gw}
+	gs.rpcOrgStore = &RPCStorageHandler{KeyPrefix: "orgkey.", Gw: gw}
+	gw.GlobalSessionManager.Init(gs.redisStore)
 	return gs
 }
 
-func skipSpecBecauseInvalid(spec *APISpec, logger *logrus.Entry) bool {
+func (gw *Gateway) skipSpecBecauseInvalid(spec *APISpec, logger *logrus.Entry) bool {
 
 	switch spec.Protocol {
 	case "", "http", "https":
@@ -57,8 +60,7 @@ func skipSpecBecauseInvalid(spec *APISpec, logger *logrus.Entry) bool {
 			return true
 		}
 	}
-
-	if val, err := kvStore(spec.Proxy.TargetURL); err == nil {
+	if val, err := gw.kvStore(spec.Proxy.TargetURL); err == nil {
 		spec.Proxy.TargetURL = val
 	}
 
@@ -101,11 +103,12 @@ func fixFuncPath(pathPrefix string, funcs []apidef.MiddlewareDefinition) {
 	}
 }
 
-func processSpec(spec *APISpec, apisByListen map[string]int,
+func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	gs *generalStores, subrouter *mux.Router, logger *logrus.Entry) *ChainObject {
 
 	var chainDef ChainObject
-	chainDef.Subrouter = subrouter
+
+	handleCORS(subrouter, spec)
 
 	logger = logger.WithFields(logrus.Fields{
 		"org_id":   spec.OrgID,
@@ -117,6 +120,14 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		"prefix": "coprocess",
 	})
 
+	if spec.Proxy.Transport.SSLMaxVersion > 0 {
+		spec.Proxy.Transport.SSLMaxVersion = tls.VersionTLS12
+	}
+
+	if spec.Proxy.Transport.SSLMinVersion > spec.Proxy.Transport.SSLMaxVersion {
+		spec.Proxy.Transport.SSLMaxVersion = spec.Proxy.Transport.SSLMinVersion
+	}
+
 	if len(spec.TagHeaders) > 0 {
 		// Ensure all headers marked for tagging are lowercase
 		lowerCaseHeaders := make([]string, len(spec.TagHeaders))
@@ -127,7 +138,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		spec.TagHeaders = lowerCaseHeaders
 	}
 
-	if skipSpecBecauseInvalid(spec, logger) {
+	if gw.skipSpecBecauseInvalid(spec, logger) {
 		logger.Warning("Spec not valid, skipped!")
 		chainDef.Skip = true
 		return &chainDef
@@ -147,7 +158,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 			break
 		}
 		if !pathModified {
-			prev := getApiSpec(spec.APIID)
+			prev := gw.getApiSpec(spec.APIID)
 			if prev != nil && prev.Proxy.ListenPath == spec.Proxy.ListenPath {
 				// if this APIID was already loaded and
 				// had this listen path, let it keep it.
@@ -182,9 +193,9 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		authStore = gs.rpcAuthStore
 		orgStore = gs.rpcOrgStore
 		spec.GlobalConfig.EnforceOrgDataAge = true
-		globalConf := config.Global()
+		globalConf := gw.GetConfig()
 		globalConf.EnforceOrgDataAge = true
-		config.SetGlobal(globalConf)
+		gw.SetConfig(globalConf)
 	}
 
 	sessionStore := gs.redisStore
@@ -207,17 +218,17 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 	var prefix string
 	if spec.CustomMiddlewareBundle != "" {
-		if err := loadBundle(spec); err != nil {
+		if err := gw.loadBundle(spec); err != nil {
 			logger.WithError(err).Error("Couldn't load bundle")
 		}
-		prefix = getBundleDestPath(spec)
+		prefix = gw.getBundleDestPath(spec)
 	}
 
 	logger.Debug("Initializing API")
 	var mwPaths []string
 
-	mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwResponseFuncs, mwDriver = loadCustomMiddleware(spec)
-	if config.Global().EnableJSVM && mwDriver == apidef.OttoDriver {
+	mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwResponseFuncs, mwDriver = gw.loadCustomMiddleware(spec)
+	if gw.GetConfig().EnableJSVM && mwDriver == apidef.OttoDriver {
 		spec.JSVM.LoadJSPaths(mwPaths, prefix)
 	}
 
@@ -227,16 +238,20 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		fixFuncPath(prefix, mwPreFuncs)
 		fixFuncPath(prefix, mwPostFuncs)
 		fixFuncPath(prefix, mwPostAuthCheckFuncs)
-		// TODO: add mwResponseFuncs here when Golang response custom MW support implemented
+		fixFuncPath(prefix, mwResponseFuncs)
+	}
+
+	if spec.GraphQL.GraphQLPlayground.Enabled {
+		gw.loadGraphQLPlayground(spec, subrouter)
 	}
 
 	if spec.EnableBatchRequestSupport {
-		addBatchEndpoint(spec, subrouter)
+		gw.addBatchEndpoint(spec, subrouter)
 	}
 
 	if spec.UseOauth2 {
 		logger.Debug("Loading OAuth Manager")
-		oauthManager := addOAuthHandlers(spec, subrouter)
+		oauthManager := gw.addOAuthHandlers(spec, subrouter)
 		logger.Debug("-- Added OAuth Handlers")
 
 		spec.OAuthManager = oauthManager
@@ -257,15 +272,15 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	var proxy ReturningHttpHandler
 	if enableVersionOverrides {
 		logger.Info("Multi target enabled")
-		proxy = NewMultiTargetProxy(spec, logger)
+		proxy = gw.NewMultiTargetProxy(spec, logger)
 	} else {
-		proxy = TykNewSingleHostReverseProxy(spec.target, spec, logger)
+		proxy = gw.TykNewSingleHostReverseProxy(spec.target, spec, logger)
 	}
 
 	// Create the response processors, pass all the loaded custom middleware response functions:
-	createResponseMiddlewareChain(spec, mwResponseFuncs)
+	gw.createResponseMiddlewareChain(spec, mwResponseFuncs)
 
-	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy, logger: logger}
+	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy, logger: logger, Gw: gw}
 
 	for _, v := range baseMid.Spec.VersionData.Versions {
 		if len(v.ExtendedPaths.CircuitBreaker) > 0 {
@@ -289,164 +304,175 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		logger.Info("Checking security policy: Open")
 	}
 
-	handleCORS(&chainArray, spec)
-
 	for _, obj := range mwPreFuncs {
 		if mwDriver == apidef.GoPluginDriver {
-			mwAppendEnabled(
+			gw.mwAppendEnabled(
 				&chainArray,
 				&GoPluginMiddleware{
 					BaseMiddleware: baseMid,
 					Path:           obj.Path,
 					SymbolName:     obj.Name,
+					APILevel:       true,
 				},
 			)
 		} else if mwDriver != apidef.OttoDriver {
 			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
-			mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver, obj.RawBodyOnly, nil})
+			gw.mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver, obj.RawBodyOnly, nil})
 		} else {
-			chainArray = append(chainArray, createDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
+			chainArray = append(chainArray, gw.createDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
 		}
 	}
 
-	mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid})
-	mwAppendEnabled(&chainArray, &RateCheckMW{BaseMiddleware: baseMid})
-	mwAppendEnabled(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
-	mwAppendEnabled(&chainArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
-	mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid})
-	mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid})
-	mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid})
-	mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid})
-	mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid})
+	gw.mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &RateCheckMW{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid})
+	gw.mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid})
 
 	if !spec.UseKeylessAccess {
 		// Select the keying method to use for setting session states
-		if mwAppendEnabled(&authArray, &Oauth2KeyExists{baseMid}) {
+		if gw.mwAppendEnabled(&authArray, &Oauth2KeyExists{baseMid}) {
 			logger.Info("Checking security policy: OAuth")
 		}
 
-		if mwAppendEnabled(&authArray, &BasicAuthKeyIsValid{baseMid, nil, nil}) {
+		if gw.mwAppendEnabled(&authArray, &BasicAuthKeyIsValid{baseMid, nil, nil}) {
 			logger.Info("Checking security policy: Basic")
 		}
 
-		if mwAppendEnabled(&authArray, &HTTPSignatureValidationMiddleware{BaseMiddleware: baseMid}) {
+		if gw.mwAppendEnabled(&authArray, &HTTPSignatureValidationMiddleware{BaseMiddleware: baseMid}) {
 			logger.Info("Checking security policy: HMAC")
 		}
 
-		if mwAppendEnabled(&authArray, &JWTMiddleware{baseMid}) {
+		if gw.mwAppendEnabled(&authArray, &JWTMiddleware{baseMid}) {
 			logger.Info("Checking security policy: JWT")
 		}
 
-		if mwAppendEnabled(&authArray, &OpenIDMW{BaseMiddleware: baseMid}) {
+		if gw.mwAppendEnabled(&authArray, &OpenIDMW{BaseMiddleware: baseMid}) {
 			logger.Info("Checking security policy: OpenID")
 		}
 
 		coprocessAuth := mwDriver != apidef.OttoDriver && spec.EnableCoProcessAuth
 		ottoAuth := !coprocessAuth && mwDriver == apidef.OttoDriver && spec.EnableCoProcessAuth
 		gopluginAuth := !coprocessAuth && !ottoAuth && mwDriver == apidef.GoPluginDriver && spec.UseGoPluginAuth
-
 		if coprocessAuth {
 			// TODO: check if mwAuthCheckFunc is available/valid
 			coprocessLog.Debug("Registering coprocess middleware, hook name: ", mwAuthCheckFunc.Name, "hook type: CustomKeyCheck", ", driver: ", mwDriver)
 
 			newExtractor(spec, baseMid)
-			mwAppendEnabled(&authArray, &CoProcessMiddleware{baseMid, coprocess.HookType_CustomKeyCheck, mwAuthCheckFunc.Name, mwDriver, mwAuthCheckFunc.RawBodyOnly, nil})
+			gw.mwAppendEnabled(&authArray, &CoProcessMiddleware{baseMid, coprocess.HookType_CustomKeyCheck, mwAuthCheckFunc.Name, mwDriver, mwAuthCheckFunc.RawBodyOnly, nil})
 		}
 
 		if ottoAuth {
 			logger.Info("----> Checking security policy: JS Plugin")
-
-			authArray = append(authArray, createDynamicMiddleware(mwAuthCheckFunc.Name, true, false, baseMid))
+			authArray = append(authArray, gw.createMiddleware(&DynamicMiddleware{
+				BaseMiddleware:      baseMid,
+				MiddlewareClassName: mwAuthCheckFunc.Name,
+				Pre:                 true,
+				Auth:                true,
+			}))
 		}
 
 		if gopluginAuth {
-			mwAppendEnabled(
+			gw.mwAppendEnabled(
 				&authArray,
 				&GoPluginMiddleware{
 					BaseMiddleware: baseMid,
 					Path:           mwAuthCheckFunc.Path,
 					SymbolName:     mwAuthCheckFunc.Name,
+					APILevel:       true,
 				},
 			)
 		}
 
 		if spec.UseStandardAuth || len(authArray) == 0 {
 			logger.Info("Checking security policy: Token")
-			authArray = append(authArray, createMiddleware(&AuthKey{baseMid}))
+			authArray = append(authArray, gw.createMiddleware(&AuthKey{baseMid}))
 		}
 
 		chainArray = append(chainArray, authArray...)
 
 		for _, obj := range mwPostAuthCheckFuncs {
 			if mwDriver == apidef.GoPluginDriver {
-				mwAppendEnabled(
+				gw.mwAppendEnabled(
 					&chainArray,
 					&GoPluginMiddleware{
 						BaseMiddleware: baseMid,
 						Path:           obj.Path,
 						SymbolName:     obj.Name,
+						APILevel:       true,
 					},
 				)
 			} else {
 				coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
-				mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_PostKeyAuth, obj.Name, mwDriver, obj.RawBodyOnly, nil})
+				gw.mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_PostKeyAuth, obj.Name, mwDriver, obj.RawBodyOnly, nil})
 			}
 		}
 
-		mwAppendEnabled(&chainArray, &StripAuth{baseMid})
-		mwAppendEnabled(&chainArray, &KeyExpired{baseMid})
-		mwAppendEnabled(&chainArray, &AccessRightsCheck{baseMid})
-		mwAppendEnabled(&chainArray, &GranularAccessMiddleware{baseMid})
-		mwAppendEnabled(&chainArray, &RateLimitAndQuotaCheck{baseMid})
+		gw.mwAppendEnabled(&chainArray, &StripAuth{baseMid})
+		gw.mwAppendEnabled(&chainArray, &KeyExpired{baseMid})
+		gw.mwAppendEnabled(&chainArray, &AccessRightsCheck{baseMid})
+		gw.mwAppendEnabled(&chainArray, &GranularAccessMiddleware{baseMid})
+		gw.mwAppendEnabled(&chainArray, &RateLimitAndQuotaCheck{baseMid})
 	}
 
-	mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid})
-	mwAppendEnabled(&chainArray, &ValidateJSON{BaseMiddleware: baseMid})
-	mwAppendEnabled(&chainArray, &TransformMiddleware{baseMid})
-	mwAppendEnabled(&chainArray, &TransformJQMiddleware{baseMid})
-	mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
-	mwAppendEnabled(&chainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid})
-	mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid})
-	mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
-	mwAppendEnabled(&chainArray, &RequestSigning{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &GraphQLMiddleware{BaseMiddleware: baseMid})
+	if !spec.UseKeylessAccess {
+		gw.mwAppendEnabled(&chainArray, &GraphQLComplexityMiddleware{BaseMiddleware: baseMid})
+		gw.mwAppendEnabled(&chainArray, &GraphQLGranularAccessMiddleware{BaseMiddleware: baseMid})
+	}
+
+	gw.mwAppendEnabled(&chainArray, &ValidateJSON{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &TransformMiddleware{baseMid})
+	gw.mwAppendEnabled(&chainArray, &TransformJQMiddleware{baseMid})
+	gw.mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &RequestSigning{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &GoPluginMiddleware{BaseMiddleware: baseMid})
 
 	for _, obj := range mwPostFuncs {
 		if mwDriver == apidef.GoPluginDriver {
-			mwAppendEnabled(
+			gw.mwAppendEnabled(
 				&chainArray,
 				&GoPluginMiddleware{
 					BaseMiddleware: baseMid,
 					Path:           obj.Path,
 					SymbolName:     obj.Name,
+					APILevel:       true,
 				},
 			)
 		} else if mwDriver != apidef.OttoDriver {
 			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
-			mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver, obj.RawBodyOnly, nil})
+			gw.mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver, obj.RawBodyOnly, nil})
 		} else {
-			chainArray = append(chainArray, createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
+			chainArray = append(chainArray, gw.createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
 		}
 	}
 	//Do not add middlewares after cache middleware.
 	//It will not get executed
-	mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: &cacheStore})
-	chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid}})
+	gw.mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: &cacheStore})
+
+	chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid}, Gw: gw})
 
 	if !spec.UseKeylessAccess {
 		var simpleArray []alice.Constructor
-		mwAppendEnabled(&simpleArray, &IPWhiteListMiddleware{baseMid})
-		mwAppendEnabled(&simpleArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
-		mwAppendEnabled(&simpleArray, &OrganizationMonitor{BaseMiddleware: baseMid})
-		mwAppendEnabled(&simpleArray, &VersionCheck{BaseMiddleware: baseMid})
+		gw.mwAppendEnabled(&simpleArray, &IPWhiteListMiddleware{baseMid})
+		gw.mwAppendEnabled(&simpleArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
+		gw.mwAppendEnabled(&simpleArray, &OrganizationMonitor{BaseMiddleware: baseMid})
+		gw.mwAppendEnabled(&simpleArray, &VersionCheck{BaseMiddleware: baseMid})
 		simpleArray = append(simpleArray, authArray...)
-		mwAppendEnabled(&simpleArray, &KeyExpired{baseMid})
-		mwAppendEnabled(&simpleArray, &AccessRightsCheck{baseMid})
+		gw.mwAppendEnabled(&simpleArray, &KeyExpired{baseMid})
+		gw.mwAppendEnabled(&simpleArray, &AccessRightsCheck{baseMid})
 
-		rateLimitPath := spec.Proxy.ListenPath + "tyk/rate-limits/"
-
+		rateLimitPath := path.Join(spec.Proxy.ListenPath, rateLimitEndpoint)
 		logger.Debug("Rate limit endpoint is: ", rateLimitPath)
 
-		chainDef.RateLimitPath = rateLimitPath
 		chainDef.RateLimitChain = alice.New(simpleArray...).
 			Then(http.HandlerFunc(userRatesCheck))
 	}
@@ -458,8 +484,6 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	} else {
 		chainDef.ThisHandler = chain
 	}
-	chainDef.ListenOn = spec.Proxy.ListenPath + "{rest:.*}"
-	chainDef.Domain = spec.Domain
 
 	logger.WithFields(logrus.Fields{
 		"prefix":      "gateway",
@@ -493,6 +517,7 @@ func isLoop(r *http.Request) (bool, error) {
 
 type DummyProxyHandler struct {
 	SH SuccessHandler
+	Gw *Gateway `json:"-"`
 }
 
 func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -518,14 +543,14 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		var handler http.Handler
 		if r.URL.Hostname() == "self" {
-			if h, found := apisHandlesByID.Load(d.SH.Spec.APIID); found {
+			if h, found := d.Gw.apisHandlesByID.Load(d.SH.Spec.APIID); found {
 				handler = h.(http.Handler)
 			}
 		} else {
 			ctxSetVersionInfo(r, nil)
 
-			if targetAPI := fuzzyFindAPI(r.URL.Hostname()); targetAPI != nil {
-				if h, found := apisHandlesByID.Load(targetAPI.APIID); found {
+			if targetAPI := d.Gw.fuzzyFindAPI(r.URL.Hostname()); targetAPI != nil {
+				if h, found := d.Gw.apisHandlesByID.Load(targetAPI.APIID); found {
 					handler = h.(http.Handler)
 				}
 			} else {
@@ -551,31 +576,52 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if d.SH.Spec.target.Scheme == "tyk" {
-		if targetAPI := fuzzyFindAPI(d.SH.Spec.target.Host); targetAPI != nil {
-			if h, found := apisHandlesByID.Load(d.SH.Spec.APIID); found {
-				if d.SH.Spec.Proxy.StripListenPath {
-					r.URL.Path = d.SH.Spec.StripListenPath(r, r.URL.Path)
-					r.URL.RawPath = d.SH.Spec.StripListenPath(r, r.URL.RawPath)
-				}
-				h.(http.Handler).ServeHTTP(w, r)
-				return
-			}
+		handler, found := d.Gw.findInternalHttpHandlerByNameOrID(d.SH.Spec.target.Host)
+		if !found {
+			handler := ErrorHandler{*d.SH.Base()}
+			handler.HandleError(w, r, "Couldn't detect target", http.StatusInternalServerError, true)
+			return
 		}
-		handler := ErrorHandler{*d.SH.Base()}
-		handler.HandleError(w, r, "Couldn't detect target", http.StatusInternalServerError, true)
+
+		sanitizeProxyPaths(d.SH.Spec, r)
+		handler.ServeHTTP(w, r)
 		return
 	}
+
 	d.SH.ServeHTTP(w, r)
 }
 
-func loadGlobalApps() {
+func (gw *Gateway) findInternalHttpHandlerByNameOrID(apiNameOrID string) (handler http.Handler, ok bool) {
+	targetAPI := gw.fuzzyFindAPI(apiNameOrID)
+	if targetAPI == nil {
+		return nil, false
+	}
+
+	h, found := gw.apisHandlesByID.Load(targetAPI.APIID)
+	if !found {
+		return nil, false
+	}
+
+	return h.(http.Handler), true
+}
+
+func sanitizeProxyPaths(apiSpec *APISpec, request *http.Request) {
+	if !apiSpec.Proxy.StripListenPath {
+		return
+	}
+
+	request.URL.Path = apiSpec.StripListenPath(request, request.URL.Path)
+	request.URL.RawPath = apiSpec.StripListenPath(request, request.URL.RawPath)
+}
+
+func (gw *Gateway) loadGlobalApps() {
 	// we need to make a full copy of the slice, as loadApps will
 	// use in-place to sort the apis.
-	apisMu.RLock()
-	specs := make([]*APISpec, len(apiSpecs))
-	copy(specs, apiSpecs)
-	apisMu.RUnlock()
-	loadApps(specs)
+	gw.apisMu.RLock()
+	specs := make([]*APISpec, len(gw.apiSpecs))
+	copy(specs, gw.apiSpecs)
+	gw.apisMu.RUnlock()
+	gw.loadApps(specs)
 }
 
 func trimCategories(name string) string {
@@ -586,18 +632,23 @@ func trimCategories(name string) string {
 	return name
 }
 
-func fuzzyFindAPI(search string) *APISpec {
+func APILoopingName(name string) string {
+	return replaceNonAlphaNumeric(trimCategories(name))
+}
+
+func (gw *Gateway) fuzzyFindAPI(search string) *APISpec {
 	if search == "" {
 		return nil
 	}
 
-	apisMu.RLock()
-	defer apisMu.RUnlock()
+	gw.apisMu.RLock()
+	defer gw.apisMu.RUnlock()
 
-	for _, api := range apisByID {
+	for _, api := range gw.apisByID {
 		if api.APIID == search ||
 			api.Id.Hex() == search ||
-			replaceNonAlphaNumeric(trimCategories(api.Name)) == search {
+			strings.EqualFold(APILoopingName(api.Name), search) {
+
 			return api
 		}
 	}
@@ -605,19 +656,20 @@ func fuzzyFindAPI(search string) *APISpec {
 	return nil
 }
 
-func loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStores, muxer *proxyMux) http.Handler {
-	port := config.Global().ListenPort
+func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStores, muxer *proxyMux) http.Handler {
+	gwConfig := gw.GetConfig()
+	port := gwConfig.ListenPort
 	if spec.ListenPort != 0 {
 		port = spec.ListenPort
 	}
-	router := muxer.router(port, spec.Protocol)
+	router := muxer.router(port, spec.Protocol, gw.GetConfig())
 	if router == nil {
 		router = mux.NewRouter()
-		muxer.setRouter(port, spec.Protocol, router)
+		muxer.setRouter(port, spec.Protocol, router, gw.GetConfig())
 	}
 
-	hostname := config.Global().HostName
-	if config.Global().EnableCustomDomains && spec.Domain != "" {
+	hostname := gwConfig.HostName
+	if gwConfig.EnableCustomDomains && spec.Domain != "" {
 		hostname = spec.Domain
 	}
 
@@ -626,22 +678,21 @@ func loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStor
 		router = router.Host(hostname).Subrouter()
 	}
 
-	chainObj := processSpec(spec, apisByListen, gs, router, logrus.NewEntry(log))
-
+	subrouter := router.PathPrefix(spec.Proxy.ListenPath).Subrouter()
+	chainObj := gw.processSpec(spec, apisByListen, gs, subrouter, logrus.NewEntry(log))
 	if chainObj.Skip {
 		return chainObj.ThisHandler
 	}
 
 	if !chainObj.Open {
-		router.Handle(chainObj.RateLimitPath, chainObj.RateLimitChain)
+		subrouter.Handle(rateLimitEndpoint, chainObj.RateLimitChain)
 	}
 
-	router.Handle(chainObj.ListenOn, chainObj.ThisHandler)
-
+	subrouter.NewRoute().Handler(chainObj.ThisHandler)
 	return chainObj.ThisHandler
 }
 
-func loadTCPService(spec *APISpec, gs *generalStores, muxer *proxyMux) {
+func (gw *Gateway) loadTCPService(spec *APISpec, gs *generalStores, muxer *proxyMux) {
 	// Initialise the auth and session managers (use Redis for now)
 	authStore := gs.redisStore
 	orgStore := gs.redisOrgStore
@@ -654,9 +705,9 @@ func loadTCPService(spec *APISpec, gs *generalStores, muxer *proxyMux) {
 		authStore = gs.rpcAuthStore
 		orgStore = gs.rpcOrgStore
 		spec.GlobalConfig.EnforceOrgDataAge = true
-		globalConf := config.Global()
-		globalConf.EnforceOrgDataAge = true
-		config.SetGlobal(globalConf)
+		gwConfig := gw.GetConfig()
+		gwConfig.EnforceOrgDataAge = true
+		gw.SetConfig(gwConfig)
 	}
 
 	sessionStore := gs.redisStore
@@ -668,15 +719,83 @@ func loadTCPService(spec *APISpec, gs *generalStores, muxer *proxyMux) {
 	// Health checkers are initialised per spec so that each API handler has it's own connection and redis storage pool
 	spec.Init(authStore, sessionStore, gs.healthStore, orgStore)
 
-	muxer.addTCPService(spec, nil)
+	muxer.addTCPService(spec, nil, gw)
 }
 
 type generalStores struct {
 	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore storage.Handler
 }
 
+var playgroundTemplate *template.Template
+
+func (gw *Gateway) readGraphqlPlaygroundTemplate() {
+	playgroundPath := filepath.Join(gw.GetConfig().TemplatePath, "playground")
+	files, err := ioutil.ReadDir(playgroundPath)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "playground",
+		}).Error("Could not load the default playground templates: ", err)
+	}
+
+	var paths []string
+	for _, file := range files {
+		paths = append(paths, filepath.Join(playgroundPath, file.Name()))
+	}
+
+	playgroundTemplate, err = template.ParseFiles(paths...)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "playground",
+		}).Error("Could not parse the default playground templates: ", err)
+	}
+}
+
+const (
+	playgroundJSTemplateName   = "playground.js"
+	playgroundHTMLTemplateName = "index.html"
+)
+
+func (gw *Gateway) loadGraphQLPlayground(spec *APISpec, subrouter *mux.Router) {
+	// endpoint is a graphql server url to which a playground makes the request.
+
+	endpoint := spec.Proxy.ListenPath
+	playgroundPath := path.Join("/", spec.GraphQL.GraphQLPlayground.Path)
+
+	// If tyk-cloud is enabled, listen path will be api id and slug is mapped to listen path in nginx config.
+	// So, requests should be sent to slug endpoint, nginx will route them to internal gateway's listen path.
+	if gw.GetConfig().Cloud {
+		endpoint = fmt.Sprintf("/%s/", spec.Slug)
+	}
+
+	subrouter.Methods(http.MethodGet).Path(path.Join(playgroundPath, playgroundJSTemplateName)).HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		if playgroundTemplate == nil {
+			rw.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		if err := playgroundTemplate.ExecuteTemplate(rw, playgroundJSTemplateName, nil); err != nil {
+			rw.WriteHeader(http.StatusInternalServerError)
+		}
+	})
+
+	subrouter.Methods(http.MethodGet).Path(playgroundPath).HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		if playgroundTemplate == nil {
+			rw.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		err := playgroundTemplate.ExecuteTemplate(rw, playgroundHTMLTemplateName, struct {
+			Url, Schema, PathPrefix string
+		}{endpoint, strconv.Quote(spec.GraphQL.Schema), path.Join(endpoint, playgroundPath)})
+
+		if err != nil {
+			rw.WriteHeader(http.StatusInternalServerError)
+		}
+	})
+}
+
 // Create the individual API (app) specs based on live configurations and assign middleware
-func loadApps(specs []*APISpec) {
+func (gw *Gateway) loadApps(specs []*APISpec) {
 	mainLog.Info("Loading API configurations.")
 
 	tmpSpecRegister := make(map[string]*APISpec)
@@ -691,72 +810,85 @@ func loadApps(specs []*APISpec) {
 	// Create a new handler for each API spec
 	apisByListen := countApisByListenHash(specs)
 
-	globalConf := config.Global()
-	port := globalConf.ListenPort
+	gwConf := gw.GetConfig()
+	port := gwConf.ListenPort
 
-	if globalConf.ControlAPIPort != 0 {
-		port = globalConf.ControlAPIPort
+	if gwConf.ControlAPIPort != 0 {
+		port = gwConf.ControlAPIPort
 	}
 
-	muxer := &proxyMux{}
+	muxer := &proxyMux{
+		track404Logs: gwConf.Track404Logs,
+	}
 	router := mux.NewRouter()
 	router.NotFoundHandler = http.HandlerFunc(muxer.handle404)
-	loadControlAPIEndpoints(router)
-	muxer.setRouter(port, "", router)
+	gw.loadControlAPIEndpoints(router)
 
-	gs := prepareStorage()
+	muxer.setRouter(port, "", router, gw.GetConfig())
+
+	gs := gw.prepareStorage()
 	shouldTrace := trace.IsEnabled()
 	for _, spec := range specs {
-		if spec.ListenPort != spec.GlobalConfig.ListenPort {
-			mainLog.Info("API bind on custom port:", spec.ListenPort)
-		}
-
-		if converted, err := kvStore(spec.Proxy.ListenPath); err == nil {
-			spec.Proxy.ListenPath = converted
-		}
-
-		tmpSpecRegister[spec.APIID] = spec
-
-		switch spec.Protocol {
-		case "", "http", "https":
-			if shouldTrace {
-				// opentracing works only with http services.
-				err := trace.AddTracer("", spec.Name)
-				if err != nil {
-					mainLog.Errorf("Failed to initialize tracer for %q error:%v", spec.Name, err)
-				} else {
-					mainLog.Infof("Intialized tracer  api_name=%q", spec.Name)
+		func() {
+			defer func() {
+				// recover from panic if one occured. Set err to nil otherwise.
+				if err := recover(); err != nil {
+					log.Errorf("Panic while loading an API: %v, panic: %v, stacktrace: %v", spec.APIDefinition, err, string(debug.Stack()))
 				}
+			}()
+
+			if spec.ListenPort != spec.GlobalConfig.ListenPort {
+				mainLog.Info("API bind on custom port:", spec.ListenPort)
 			}
-			tmpSpecHandles.Store(spec.APIID, loadHTTPService(spec, apisByListen, &gs, muxer))
-		case "tcp", "tls":
-			loadTCPService(spec, &gs, muxer)
-		}
+
+			if converted, err := gw.kvStore(spec.Proxy.ListenPath); err == nil {
+				spec.Proxy.ListenPath = converted
+			}
+
+			tmpSpecRegister[spec.APIID] = spec
+
+			switch spec.Protocol {
+			case "", "http", "https", "h2c":
+				if shouldTrace {
+					// opentracing works only with http services.
+					err := trace.AddTracer("", spec.Name)
+					if err != nil {
+						mainLog.Errorf("Failed to initialize tracer for %q error:%v", spec.Name, err)
+					} else {
+						mainLog.Infof("Intialized tracer  api_name=%q", spec.Name)
+					}
+				}
+				tmpSpecHandles.Store(spec.APIID, gw.loadHTTPService(spec, apisByListen, &gs, muxer))
+			case "tcp", "tls":
+				gw.loadTCPService(spec, &gs, muxer)
+			}
+		}()
 	}
 
-	defaultProxyMux.swap(muxer)
+	gw.DefaultProxyMux.swap(muxer, gw)
 
 	// Swap in the new register
-	apisMu.Lock()
+	gw.apisMu.Lock()
 
 	// release current specs resources before overwriting map
-	for _, curSpec := range apisByID {
+	for _, curSpec := range gw.apisByID {
 		curSpec.Release()
 	}
 
-	apisByID = tmpSpecRegister
-	apisHandlesByID = tmpSpecHandles
+	gw.apisByID = tmpSpecRegister
+	gw.apisHandlesByID = tmpSpecHandles
 
-	apisMu.Unlock()
+	gw.apisMu.Unlock()
 
 	mainLog.Debug("Checker host list")
 
 	// Kick off our host checkers
-	if !config.Global().UptimeTests.Disable {
-		SetCheckerHostList()
+	if !gw.GetConfig().UptimeTests.Disable {
+		gw.SetCheckerHostList()
 	}
 
 	mainLog.Debug("Checker host Done")
 
 	mainLog.Info("Initialised API Definitions")
+
 }

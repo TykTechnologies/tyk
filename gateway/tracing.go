@@ -21,20 +21,19 @@ type traceHttpRequest struct {
 	Headers http.Header `json:"headers"`
 }
 
-func (tr *traceHttpRequest) toRequest() *http.Request {
-	r := httptest.NewRequest(tr.Method, tr.Path, strings.NewReader(tr.Body))
-	// It sets example.com by default. Setting it to empty will not show a value because it is not necessary.
-	r.Host = ""
+func (tr *traceHttpRequest) toRequest(ignoreCanonicalMIMEHeaderKey bool) (*http.Request, error) {
+	r, err := http.NewRequest(tr.Method, tr.Path, strings.NewReader(tr.Body))
+	if err != nil {
+		return nil, err
+	}
 
 	for key, values := range tr.Headers {
-		for _, v := range values {
-			r.Header.Add(key, v)
-		}
+		addCustomHeader(r.Header, key, values, ignoreCanonicalMIMEHeaderKey)
 	}
 
 	ctxSetTrace(r)
 
-	return r
+	return r, nil
 }
 
 // TraceRequest is for tracing an HTTP request
@@ -83,7 +82,7 @@ type traceResponse struct {
 //           Header: value
 //         body: body-value
 //       logs: {...}\n{...}
-func traceHandler(w http.ResponseWriter, r *http.Request) {
+func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 	var traceReq traceRequest
 	if err := json.NewDecoder(r.Body).Decode(&traceReq); err != nil {
 		log.Error("Couldn't decode trace request: ", err)
@@ -110,13 +109,13 @@ func traceHandler(w http.ResponseWriter, r *http.Request) {
 	logger.Level = logrus.DebugLevel
 	logger.Out = &logStorage
 
-	gs := prepareStorage()
+	gs := gw.prepareStorage()
 	subrouter := mux.NewRouter()
 
-	loader := &APIDefinitionLoader{}
+	loader := &APIDefinitionLoader{gw}
 	spec := loader.MakeSpec(traceReq.Spec, logrus.NewEntry(logger))
 
-	chainObj := processSpec(spec, nil, &gs, subrouter, logrus.NewEntry(logger))
+	chainObj := gw.processSpec(spec, nil, &gs, subrouter, logrus.NewEntry(logger))
 	spec.middlewareChain = chainObj
 
 	if chainObj.ThisHandler == nil {
@@ -125,7 +124,12 @@ func traceHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	wr := httptest.NewRecorder()
-	tr := traceReq.Request.toRequest()
+	tr, err := traceReq.Request.toRequest(gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
+	if err != nil {
+		doJSONWrite(w, http.StatusInternalServerError, apiError("Unexpected failure: "+err.Error()))
+		return
+	}
+	nopCloseRequestBody(tr)
 	chainObj.ThisHandler.ServeHTTP(wr, tr)
 
 	var response string

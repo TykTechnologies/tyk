@@ -1,13 +1,29 @@
 package storage
 
 import (
+	"context"
 	"testing"
+	"time"
+
+	"github.com/go-redis/redis/v8"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/stretchr/testify/assert"
 )
 
+func init() {
+	conf := config.Default
+	go ConnectToRedis(context.Background(), nil, &conf)
+	for {
+		if Connected() {
+			break
+		}
+
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
 func TestRedisClusterGetMultiKey(t *testing.T) {
-	t.Skip()
 
 	keys := []string{"first", "second"}
 	r := RedisCluster{KeyPrefix: "test-cluster"}
@@ -67,25 +83,54 @@ func TestRedisAddressConfiguration(t *testing.T) {
 	})
 
 	t.Run("Default addresses", func(t *testing.T) {
-		opts := &RedisOpts{}
-		simpleOpts := opts.simple()
+		opts := &redis.UniversalOptions{}
+		simpleOpts := opts.Simple()
 
 		if simpleOpts.Addr != "127.0.0.1:6379" {
 			t.Fatal("Wrong default single node address")
 		}
 
 		opts.Addrs = []string{}
-		clusterOpts := opts.cluster()
+		clusterOpts := opts.Cluster()
 
 		if clusterOpts.Addrs[0] != "127.0.0.1:6379" || len(clusterOpts.Addrs) != 1 {
 			t.Fatal("Wrong default cluster mode address")
 		}
 
 		opts.Addrs = []string{}
-		failoverOpts := opts.failover()
+		failoverOpts := opts.Failover()
 
 		if failoverOpts.SentinelAddrs[0] != "127.0.0.1:26379" || len(failoverOpts.SentinelAddrs) != 1 {
 			t.Fatal("Wrong default sentinel mode address")
 		}
 	})
+}
+
+func TestRedisExpirationTime(t *testing.T) {
+	storage := &RedisCluster{KeyPrefix: "test-"}
+
+	testKey := "test-key"
+	testValue := "test-value"
+	storage.SetKey(testKey, testValue, 0)
+	key, err := storage.GetKey(testKey)
+	assert.Equal(t, testValue, key)
+	assert.Equal(t, nil, err)
+
+	//testing if GetExp returns -2 for non existent keys
+	ttl, errGetExp := storage.GetExp(testKey + "random")
+	assert.Equal(t, int64(-2), ttl)
+	assert.Equal(t, nil, errGetExp)
+
+	//testing if GetExp returns -1 for keys without expiration
+	ttl, errGetExp = storage.GetExp(testKey)
+	assert.Equal(t, int64(-1), ttl)
+	assert.Equal(t, nil, errGetExp)
+
+	//Testing if SetExp actually sets the expiration.
+	errSetExp := storage.SetExp(testKey, 40)
+	assert.Equal(t, nil, errSetExp)
+	ttl, errGetExp = storage.GetExp(testKey)
+	assert.Equal(t, int64(40), ttl)
+	assert.Equal(t, nil, errGetExp)
+
 }

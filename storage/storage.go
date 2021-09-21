@@ -13,7 +13,6 @@ import (
 	uuid "github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/murmur3"
-	"github.com/TykTechnologies/tyk/config"
 	logger "github.com/TykTechnologies/tyk/log"
 )
 
@@ -104,6 +103,16 @@ func TokenHashAlgo(token string) string {
 	return ""
 }
 
+// TODO: add checks
+func TokenID(token string) (id string, err error) {
+	jsonToken, err := base64.StdEncoding.DecodeString(token)
+	if err != nil {
+		return "", err
+	}
+
+	return jsonparser.GetString(jsonToken, "id")
+}
+
 func TokenOrg(token string) string {
 	if strings.HasPrefix(token, B64JSONPrefix) {
 		if jsonToken, err := base64.StdEncoding.DecodeString(token); err == nil {
@@ -144,14 +153,21 @@ func hashFunction(algorithm string) (hash.Hash, error) {
 	}
 }
 
-func HashStr(in string) string {
-	h, _ := hashFunction(TokenHashAlgo(in))
+func HashStr(in string, withAlg ...string) string {
+	var algo string
+	if len(withAlg) > 0 && withAlg[0] != "" {
+		algo = withAlg[0]
+	} else {
+		algo = TokenHashAlgo(in)
+	}
+
+	h, _ := hashFunction(algo)
 	h.Write([]byte(in))
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func HashKey(in string) string {
-	if !config.Global().HashKeys {
+func HashKey(in string, hashKey bool) string {
+	if !hashKey {
 		// Not hashing? Return the raw key
 		return in
 	}

@@ -22,7 +22,10 @@ func TykStoreData(CKey, CValue *C.char, CTTL C.int) {
 	ttl := int64(CTTL)
 
 	store := storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix}
-	store.SetKey(key, value, ttl)
+	err := store.SetKey(key, value, ttl)
+	if err != nil {
+		log.WithError(err).Error("could not set key")
+	}
 }
 
 // TykGetData is a CoProcess API function for fetching data.
@@ -36,13 +39,16 @@ func TykGetData(CKey *C.char) *C.char {
 	return C.CString(val)
 }
 
+// GatewayFireSystemEvent declared as global variable, set during gw start
+var GatewayFireSystemEvent func(name apidef.TykEvent, meta interface{})
+
 // TykTriggerEvent is a CoProcess API function for triggering Tyk system events.
 //export TykTriggerEvent
 func TykTriggerEvent(CEventName, CPayload *C.char) {
 	eventName := C.GoString(CEventName)
 	payload := C.GoString(CPayload)
 
-	FireSystemEvent(apidef.TykEvent(eventName), EventMetaDefault{
+	GatewayFireSystemEvent(apidef.TykEvent(eventName), EventMetaDefault{
 		Message: payload,
 	})
 }

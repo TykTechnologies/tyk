@@ -86,10 +86,12 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	}
 
 	accessToken := parts[1]
-	logger = logger.WithField("key", obfuscateKey(accessToken))
+	logger = logger.WithField("key", k.Gw.obfuscateKey(accessToken))
 
 	// get session for the given oauth token
 	session, keyExists := k.CheckSessionAndIdentityForValidKey(accessToken, r)
+	accessToken = session.KeyID
+
 	if !keyExists {
 		logger.Warning("Attempted access with non-existent key.")
 
@@ -105,17 +107,17 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	oauthClientDeletedKey := "oauth-del-" + k.Spec.APIID + session.OauthClientID
 	oauthClientDeleted := false
 	// check if that oauth client was deleted with using  memory cache first
-	if val, found := UtilCache.Get(oauthClientDeletedKey); found {
+	if val, found := k.Gw.UtilCache.Get(oauthClientDeletedKey); found {
 		oauthClientDeleted = val.(bool)
 	} else {
 		// if not cached in memory then hit Redis to get oauth-client from there
 		if _, err := k.Spec.OAuthManager.OsinServer.Storage.GetClient(session.OauthClientID); err != nil {
 			// set this oauth client as deleted in memory cache for the next N sec
-			UtilCache.Set(oauthClientDeletedKey, true, checkOAuthClientDeletedInetrval)
+			k.Gw.UtilCache.Set(oauthClientDeletedKey, true, checkOAuthClientDeletedInetrval)
 			oauthClientDeleted = true
 		} else {
 			// set this oauth client as NOT deleted in memory cache for next N sec
-			UtilCache.Set(oauthClientDeletedKey, false, checkOAuthClientDeletedInetrval)
+			k.Gw.UtilCache.Set(oauthClientDeletedKey, false, checkOAuthClientDeletedInetrval)
 		}
 	}
 	if oauthClientDeleted {
@@ -126,7 +128,7 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	// Set session state on context, we will need it later
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.OAuthKey, apidef.UnsetAuth:
-		ctxSetSession(r, &session, accessToken, false)
+		ctxSetSession(r, &session, false, k.Gw.GetConfig().HashKeys)
 	}
 
 	// Request is valid, carry on

@@ -28,7 +28,7 @@ func (t *TransformHeaders) EnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	vInfo, versionPaths, _, _ := t.Spec.Version(r)
+	vInfo, _ := t.Spec.Version(r)
 
 	// Manage global headers first - remove
 	for _, gdKey := range vInfo.GlobalHeadersRemove {
@@ -37,11 +37,13 @@ func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request
 	}
 
 	// Add
+	ignoreCanonical := t.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
 	for nKey, nVal := range vInfo.GlobalHeaders {
 		t.Logger().Debug("Adding: ", nKey)
-		r.Header.Set(nKey, replaceTykVariables(r, nVal, false))
+		setCustomHeader(r.Header, nKey, t.Gw.replaceTykVariables(r, nVal, false), ignoreCanonical)
 	}
 
+	versionPaths := t.Spec.RxPaths[vInfo.Name]
 	found, meta := t.Spec.CheckSpecMatchesStatus(r, versionPaths, HeaderInjected)
 	if found {
 		hmeta := meta.(*apidef.HeaderInjectionMeta)
@@ -49,7 +51,7 @@ func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request
 			r.Header.Del(dKey)
 		}
 		for nKey, nVal := range hmeta.AddHeaders {
-			r.Header.Set(nKey, replaceTykVariables(r, nVal, false))
+			setCustomHeader(r.Header, nKey, t.Gw.replaceTykVariables(r, nVal, false), ignoreCanonical)
 		}
 	}
 

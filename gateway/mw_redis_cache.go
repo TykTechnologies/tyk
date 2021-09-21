@@ -174,7 +174,8 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	var cacheKeyRegex string
 	var cacheMeta *EndPointCacheMeta
 
-	_, versionPaths, _, _ := m.Spec.Version(r)
+	version, _ := m.Spec.Version(r)
+	versionPaths := m.Spec.RxPaths[version.Name]
 	isVirtual, _ := m.Spec.CheckSpecMatchesStatus(r, versionPaths, VirtualPath)
 
 	// Lets see if we can throw a sledgehammer at this
@@ -303,7 +304,12 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 			log.Debug("Cache TTL is:", cacheTTL)
 			ts := m.getTimeTTL(cacheTTL)
 			toStore := m.encodePayload(wireFormatReq.String(), ts)
-			go m.CacheStore.SetKey(key, toStore, cacheTTL)
+			go func() {
+				err := m.CacheStore.SetKey(key, toStore, cacheTTL)
+				if err != nil {
+					log.WithError(err).Error("could not save key in cache store")
+				}
+			}()
 		}
 
 		return nil, mwStatusRespond
@@ -334,7 +340,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		newRes.Header.Del(h)
 	}
 
-	copyHeader(w.Header(), newRes.Header)
+	copyHeader(w.Header(), newRes.Header, m.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
 	session := ctxGetSession(r)
 
 	// Only add ratelimit data to keyed sessions
@@ -356,7 +362,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	w.WriteHeader(newRes.StatusCode)
 	if newRes.StatusCode != http.StatusNotModified {
-		m.Proxy.CopyResponse(w, newRes.Body)
+		m.Proxy.CopyResponse(w, newRes.Body, 0)
 	}
 
 	// Record analytics

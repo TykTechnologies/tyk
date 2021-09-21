@@ -25,9 +25,9 @@ type IdExtractor interface {
 
 // BaseExtractor is the base structure for an ID extractor, it implements the IdExtractor interface. Other extractors may override some of its methods.
 type BaseExtractor struct {
-	Config  *apidef.MiddlewareIdExtractor
-	BaseMid BaseMiddleware
-	Spec    *APISpec
+	Config *apidef.MiddlewareIdExtractor
+	BaseMiddleware
+	Spec *APISpec
 }
 
 // ExtractAndCheck is called from the CP middleware, if ID extractor is enabled for the current API.
@@ -75,7 +75,7 @@ func (e *BaseExtractor) ExtractBody(r *http.Request) (string, error) {
 
 // Error is a helper for logging the extractor errors. It always returns HTTP 400 (so we don't expose any details).
 func (e *BaseExtractor) Error(r *http.Request, err error, message string) (returnOverrides ReturnOverrides) {
-	logEntry := getLogEntryForRequest(e.BaseMid.Logger(), r, "", nil)
+	logEntry := e.Gw.getLogEntryForRequest(e.Logger(), r, "", nil)
 	logEntry.Info("Extractor error: ", message, ", ", err)
 
 	return ReturnOverrides{
@@ -88,7 +88,7 @@ func (e *BaseExtractor) Error(r *http.Request, err error, message string) (retur
 func (e *BaseExtractor) GenerateSessionID(input string, mw BaseMiddleware) (sessionID string) {
 	data := []byte(input)
 	tokenID := fmt.Sprintf("%x", md5.Sum(data))
-	sessionID = generateToken(mw.Spec.OrgID, tokenID)
+	sessionID = e.Gw.generateToken(mw.Spec.OrgID, tokenID)
 	return sessionID
 }
 
@@ -131,13 +131,13 @@ func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (sessionID string, ret
 		return sessionID, returnOverrides
 	}
 
-	sessionID = e.GenerateSessionID(extractorOutput, e.BaseMid)
-
-	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(sessionID, r)
+	sessionID = e.GenerateSessionID(extractorOutput, e.BaseMiddleware)
+	previousSession, keyExists := e.CheckSessionAndIdentityForValidKey(sessionID, r)
+	sessionID = previousSession.KeyID
 
 	if keyExists {
 		if previousSession.IdExtractorDeadline > time.Now().Unix() {
-			ctxSetSession(r, &previousSession, sessionID, true)
+			ctxSetSession(r, &previousSession, true, e.Gw.GetConfig().HashKeys)
 			returnOverrides = ReturnOverrides{
 				ResponseCode: 200,
 			}
@@ -205,12 +205,13 @@ func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 		return SessionID, returnOverrides
 	}
 
-	SessionID = e.GenerateSessionID(regexOutput[e.cfg.RegexMatchIndex], e.BaseMid)
-	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(SessionID, r)
+	SessionID = e.GenerateSessionID(regexOutput[e.cfg.RegexMatchIndex], e.BaseMiddleware)
+	previousSession, keyExists := e.BaseMiddleware.CheckSessionAndIdentityForValidKey(SessionID, r)
+	SessionID = previousSession.KeyID
 
 	if keyExists {
 		if previousSession.IdExtractorDeadline > time.Now().Unix() {
-			ctxSetSession(r, &previousSession, SessionID, true)
+			ctxSetSession(r, &previousSession, true, e.Gw.GetConfig().HashKeys)
 			returnOverrides = ReturnOverrides{
 				ResponseCode: 200,
 			}
@@ -280,12 +281,13 @@ func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 		return SessionID, returnOverrides
 	}
 
-	SessionID = e.GenerateSessionID(output, e.BaseMid)
+	SessionID = e.GenerateSessionID(output, e.BaseMiddleware)
+	previousSession, keyExists := e.BaseMiddleware.CheckSessionAndIdentityForValidKey(SessionID, r)
+	SessionID = previousSession.KeyID
 
-	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(SessionID, r)
 	if keyExists {
 		if previousSession.IdExtractorDeadline > time.Now().Unix() {
-			ctxSetSession(r, &previousSession, SessionID, true)
+			ctxSetSession(r, &previousSession, true, e.Gw.GetConfig().HashKeys)
 			returnOverrides = ReturnOverrides{
 				ResponseCode: 200,
 			}

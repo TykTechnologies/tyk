@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/url"
+	"reflect"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -11,7 +12,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tyk/user"
 
@@ -51,7 +51,7 @@ func CreateCoProcessMiddleware(hookName string, hookType coprocess.HookType, mwD
 		successHandler:   &SuccessHandler{baseMid},
 	}
 
-	return createMiddleware(dMiddleware)
+	return baseMid.Gw.createMiddleware(dMiddleware)
 }
 
 func DoCoprocessReload() {
@@ -182,18 +182,18 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 	for _, dh := range object.Request.DeleteHeaders {
 		r.Header.Del(dh)
 	}
-
+	ignoreCanonical := c.Middleware.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
 	for h, v := range object.Request.SetHeaders {
-		r.Header.Set(h, v)
+		setCustomHeader(r.Header, h, v, ignoreCanonical)
 	}
 
-	values := r.URL.Query()
+	updatedValues := r.URL.Query()
 	for _, k := range object.Request.DeleteParams {
-		values.Del(k)
+		updatedValues.Del(k)
 	}
 
 	for p, v := range object.Request.AddParams {
-		values.Set(p, v)
+		updatedValues.Set(p, v)
 	}
 
 	parsedURL, err := url.ParseRequestURI(object.Request.Url)
@@ -222,14 +222,16 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 		r.Method = object.Request.Method
 	}
 
-	r.URL.RawQuery = values.Encode()
+	if !reflect.DeepEqual(r.URL.Query(), updatedValues) {
+		r.URL.RawQuery = updatedValues.Encode()
+	}
 
 	return
 }
 
 // CoProcessInit creates a new CoProcessDispatcher, it will be called when Tyk starts.
-func CoProcessInit() {
-	if !config.Global().CoProcessOptions.EnableCoProcess {
+func (gw *Gateway) CoProcessInit() {
+	if !gw.GetConfig().CoProcessOptions.EnableCoProcess {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
 		}).Info("Rich plugins are disabled")
@@ -237,9 +239,9 @@ func CoProcessInit() {
 	}
 
 	// Load gRPC dispatcher:
-	if config.Global().CoProcessOptions.CoProcessGRPCServer != "" {
+	if gw.GetConfig().CoProcessOptions.CoProcessGRPCServer != "" {
 		var err error
-		loadedDrivers[apidef.GrpcDriver], err = NewGRPCDispatcher()
+		loadedDrivers[apidef.GrpcDriver], err = gw.NewGRPCDispatcher()
 		if err == nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "coprocess",
@@ -250,11 +252,13 @@ func CoProcessInit() {
 			}).WithError(err).Error("Couldn't load gRPC dispatcher")
 		}
 	}
+
 }
 
 // EnabledForSpec checks if this middleware should be enabled for a given API.
 func (m *CoProcessMiddleware) EnabledForSpec() bool {
-	if !config.Global().CoProcessOptions.EnableCoProcess {
+
+	if !m.Gw.GetConfig().CoProcessOptions.EnableCoProcess {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
 		}).Error("Your API specifies a CP custom middleware, either Tyk wasn't build with CP support or CP is not enabled in your Tyk configuration file!")
@@ -291,9 +295,16 @@ func (m *CoProcessMiddleware) EnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	if m.HookType == coprocess.HookType_CustomKeyCheck {
+		if ctxGetRequestStatus(r) == StatusOkAndIgnore {
+			return nil, http.StatusOK
+		}
+	}
+
 	logger := m.Logger()
 	logger.Debug("CoProcess Request, HookType: ", m.HookType)
 	originalURL := r.URL
+	authToken, _ := m.getAuthToken(coprocessType, r)
 
 	var extractor IdExtractor
 	if m.Spec.EnableCoProcessAuth && m.Spec.CustomMiddleware.IdExtractor.Extractor != nil {
@@ -305,7 +316,6 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	if m.HookType == coprocess.HookType_CustomKeyCheck && extractor != nil {
 		sessionID, returnOverrides = extractor.ExtractAndCheck(r)
-
 		if returnOverrides.ResponseCode != 0 {
 			if returnOverrides.ResponseError == "" {
 				return nil, returnOverrides.ResponseCode
@@ -382,7 +392,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	// The CP middleware indicates this is a bad auth:
 	if returnObject.Request.ReturnOverrides.ResponseCode >= http.StatusBadRequest && !returnObject.Request.ReturnOverrides.OverrideError {
-		logger.WithField("key", obfuscateKey(token)).Info("Attempted access with invalid key")
+		logger.WithField("key", m.Gw.obfuscateKey(token)).Info("Attempted access with invalid key")
 
 		for h, v := range returnObject.Request.ReturnOverrides.Headers {
 			w.Header().Set(h, v)
@@ -444,19 +454,39 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}
 
 		returnedSession.OrgID = m.Spec.OrgID
-
-		existingSession, found := GlobalSessionManager.SessionDetail(m.Spec.OrgID, sessionID, false)
-		if found {
-			returnedSession.QuotaRenews = existingSession.QuotaRenews
-			returnedSession.QuotaRemaining = existingSession.QuotaRemaining
-		}
+		// set a Key ID as default
+		returnedSession.KeyID = token
 
 		if err := m.ApplyPolicies(returnedSession); err != nil {
-			AuthFailed(m, r, r.Header.Get(m.Spec.Auth.AuthHeaderName))
+			AuthFailed(m, r, authToken)
 			return errors.New(http.StatusText(http.StatusForbidden)), http.StatusForbidden
 		}
 
-		ctxSetSession(r, returnedSession, sessionID, true)
+		existingSession, found := m.Gw.GlobalSessionManager.SessionDetail(m.Spec.OrgID, sessionID, false)
+		if found {
+			returnedSession.QuotaRenews = existingSession.QuotaRenews
+			returnedSession.QuotaRemaining = existingSession.QuotaRemaining
+
+			for api := range returnedSession.AccessRights {
+				if _, found := existingSession.AccessRights[api]; found {
+					if !returnedSession.AccessRights[api].Limit.IsEmpty() {
+						ar := returnedSession.AccessRights[api]
+						ar.Limit.QuotaRenews = existingSession.AccessRights[api].Limit.QuotaRenews
+						ar.Limit.QuotaRemaining = existingSession.AccessRights[api].Limit.QuotaRemaining
+						returnedSession.AccessRights[api] = ar
+					}
+				}
+			}
+		}
+
+		// Apply it second time to fix the quota
+		if err := m.ApplyPolicies(returnedSession); err != nil {
+			AuthFailed(m, r, authToken)
+			return errors.New(http.StatusText(http.StatusForbidden)), http.StatusForbidden
+		}
+
+		returnedSession.KeyID = sessionID
+		ctxSetSession(r, returnedSession, true, m.Gw.GetConfig().HashKeys)
 	}
 
 	return nil, http.StatusOK
@@ -464,13 +494,16 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 type CustomMiddlewareResponseHook struct {
 	mw *CoProcessMiddleware
+	Gw *Gateway `json:"-"`
 }
 
 func (h *CustomMiddlewareResponseHook) Init(mwDef interface{}, spec *APISpec) error {
 	mwDefinition := mwDef.(apidef.MiddlewareDefinition)
+
 	h.mw = &CoProcessMiddleware{
 		BaseMiddleware: BaseMiddleware{
 			Spec: spec,
+			Gw:   h.Gw,
 		},
 		HookName:         mwDefinition.Name,
 		HookType:         coprocess.HookType_Response,
@@ -521,8 +554,9 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 	}
 
 	// Set headers:
+	ignoreCanonical := h.mw.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
 	for k, v := range retObject.Response.Headers {
-		res.Header.Set(k, v)
+		setCustomHeader(res.Header, k, v, ignoreCanonical)
 	}
 
 	// Set response body:

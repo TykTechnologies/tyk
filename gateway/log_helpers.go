@@ -6,15 +6,13 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/request"
-
-	"github.com/TykTechnologies/tyk/config"
 )
 
 // identifies that field value was hidden before output to the log
 const logHiddenValue = "<hidden>"
 
-func obfuscateKey(keyName string) string {
-	if config.Global().EnableKeyLogging {
+func (gw *Gateway) obfuscateKey(keyName string) string {
+	if gw.GetConfig().EnableKeyLogging {
 		return keyName
 	}
 
@@ -24,7 +22,7 @@ func obfuscateKey(keyName string) string {
 	return "--"
 }
 
-func getLogEntryForRequest(logger *logrus.Entry, r *http.Request, key string, data map[string]interface{}) *logrus.Entry {
+func (gw *Gateway) getLogEntryForRequest(logger *logrus.Entry, r *http.Request, key string, data map[string]interface{}) *logrus.Entry {
 	if logger == nil {
 		logger = logrus.NewEntry(log)
 	}
@@ -37,8 +35,8 @@ func getLogEntryForRequest(logger *logrus.Entry, r *http.Request, key string, da
 	// add key to log if configured to do so
 	if key != "" {
 		fields["key"] = key
-		if !config.Global().EnableKeyLogging {
-			fields["key"] = obfuscateKey(key)
+		if !gw.GetConfig().EnableKeyLogging {
+			fields["key"] = gw.obfuscateKey(key)
 		}
 	}
 	// add to log additional fields if any passed
@@ -48,7 +46,7 @@ func getLogEntryForRequest(logger *logrus.Entry, r *http.Request, key string, da
 	return logger.WithFields(fields)
 }
 
-func getExplicitLogEntryForRequest(logger *logrus.Entry, path string, IP string, key string, data map[string]interface{}) *logrus.Entry {
+func (gw *Gateway) getExplicitLogEntryForRequest(logger *logrus.Entry, path string, IP string, key string, data map[string]interface{}) *logrus.Entry {
 	// populate http request fields
 	fields := logrus.Fields{
 		"path":   path,
@@ -57,7 +55,7 @@ func getExplicitLogEntryForRequest(logger *logrus.Entry, path string, IP string,
 	// add key to log if configured to do so
 	if key != "" {
 		fields["key"] = key
-		if !config.Global().EnableKeyLogging {
+		if !gw.GetConfig().EnableKeyLogging {
 			fields["key"] = logHiddenValue
 		}
 	}

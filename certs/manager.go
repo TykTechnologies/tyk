@@ -37,22 +37,24 @@ type StorageHandler interface {
 }
 
 type CertificateManager struct {
-	storage StorageHandler
-	logger  *logrus.Entry
-	cache   *cache.Cache
-	secret  string
+	storage         StorageHandler
+	logger          *logrus.Entry
+	cache           *cache.Cache
+	secret          string
+	migrateCertList bool
 }
 
-func NewCertificateManager(storage StorageHandler, secret string, logger *logrus.Logger) *CertificateManager {
+func NewCertificateManager(storage StorageHandler, secret string, logger *logrus.Logger, migrateCertList bool) *CertificateManager {
 	if logger == nil {
 		logger = logrus.New()
 	}
 
 	return &CertificateManager{
-		storage: storage,
-		logger:  logger.WithFields(logrus.Fields{"prefix": "cert_storage"}),
-		cache:   cache.New(5*time.Minute, 10*time.Minute),
-		secret:  secret,
+		storage:         storage,
+		logger:          logger.WithFields(logrus.Fields{"prefix": "cert_storage"}),
+		cache:           cache.New(5*time.Minute, 10*time.Minute),
+		secret:          secret,
+		migrateCertList: migrateCertList,
 	}
 }
 
@@ -209,8 +211,6 @@ func isCertCanBeListed(cert *tls.Certificate, mode CertificateType) bool {
 	switch mode {
 	case CertificatePrivate:
 		return !isPrivateKeyEmpty(cert)
-	case CertificatePublic:
-		return isPrivateKeyEmpty(cert)
 	case CertificateAny:
 		return true
 	}
@@ -242,6 +242,96 @@ func ExtractCertificateMeta(cert *tls.Certificate, certID string) *CertificateMe
 	}
 }
 
+func GetCertIDAndChainPEM(certData []byte, secret string) (string, []byte, error) {
+	var keyPEM, keyRaw []byte
+	var publicKeyPem []byte
+	var certBlocks [][]byte
+	var certID string
+	var certChainPEM []byte
+
+	rest := certData
+
+	for {
+		var block *pem.Block
+
+		block, rest = pem.Decode(rest)
+		if block == nil {
+			break
+		}
+
+		if strings.HasSuffix(block.Type, "PRIVATE KEY") {
+			if len(keyRaw) > 0 {
+				err := errors.New("Found multiple private keys")
+				return certID, certChainPEM, err
+			}
+
+			keyRaw = block.Bytes
+			keyPEM = pem.EncodeToMemory(block)
+		} else if block.Type == "CERTIFICATE" {
+
+			cert, err := x509.ParseCertificate(block.Bytes)
+			if err != nil {
+				return certID, certChainPEM, err
+			}
+
+			if cert.NotAfter.Before(time.Now()) {
+				return certID, certChainPEM, errors.New("certificate is expired")
+			}
+
+			certBlocks = append(certBlocks, pem.EncodeToMemory(block))
+		} else if block.Type == "PUBLIC KEY" {
+			publicKeyPem = pem.EncodeToMemory(block)
+		}
+	}
+
+	certChainPEM = bytes.Join(certBlocks, []byte("\n"))
+
+	if len(certChainPEM) == 0 {
+		if len(publicKeyPem) == 0 {
+			err := errors.New("Failed to decode certificate. It should be PEM encoded.")
+			return certID, certChainPEM, err
+		} else {
+			certChainPEM = publicKeyPem
+		}
+	} else if len(publicKeyPem) > 0 {
+		err := errors.New("Public keys can't be combined with certificates")
+		return certID, certChainPEM, err
+	}
+
+	// Found private key, check if it match the certificate
+	if len(keyPEM) > 0 {
+		cert, err := tls.X509KeyPair(certChainPEM, keyPEM)
+		if err != nil {
+			return certID, certChainPEM, err
+		}
+
+		// Encrypt private key and append it to the chain
+		encryptedKeyPEMBlock, err := x509.EncryptPEMBlock(rand.Reader, "ENCRYPTED PRIVATE KEY", keyRaw, []byte(secret), x509.PEMCipherAES256)
+		if err != nil {
+			return certID, certChainPEM, err
+		}
+
+		certChainPEM = append(certChainPEM, []byte("\n")...)
+		certChainPEM = append(certChainPEM, pem.EncodeToMemory(encryptedKeyPEMBlock)...)
+
+		certID = HexSHA256(cert.Certificate[0])
+	} else if len(publicKeyPem) > 0 {
+		publicKey, _ := pem.Decode(publicKeyPem)
+		certID = HexSHA256(publicKey.Bytes)
+	} else {
+		// Get first cert
+		certRaw, _ := pem.Decode(certChainPEM)
+		cert, err := x509.ParseCertificate(certRaw.Bytes)
+		if err != nil {
+			err := errors.New("Error while parsing certificate: " + err.Error())
+			return certID, certChainPEM, err
+		}
+
+		certID = HexSHA256(cert.Raw)
+	}
+	return certID, certChainPEM, nil
+}
+
 func (c *CertificateManager) List(certIDs []string, mode CertificateType) (out []*tls.Certificate) {
 	var cert *tls.Certificate
 	var rawCert []byte
@@ -255,22 +345,18 @@ func (c *CertificateManager) List(certIDs []string, mode CertificateType) (out [
 			continue
 		}
 
-		if isSHA256(id) {
-			var val string
-			val, err = c.storage.GetKey("raw-" + id)
-			if err != nil {
-				c.logger.Warn("Can't retrieve certificate from Redis:", id, err)
-				out = append(out, nil)
-				continue
-			}
-			rawCert = []byte(val)
-		} else {
+		var val string
+		val, err = c.storage.GetKey("raw-" + id)
+		if err != nil {
+			// Try read from file
 			rawCert, err = ioutil.ReadFile(id)
 			if err != nil {
-				c.logger.Error("Error while reading certificate from file:", id, err)
+				c.logger.Warn("Can't retrieve certificate:", id, err)
 				out = append(out, nil)
 				continue
 			}
+		} else {
+			rawCert = []byte(val)
 		}
 
 		cert, err = ParsePEMCertificate(rawCert, c.secret)
@@ -374,13 +460,19 @@ func (c *CertificateManager) ListRawPublicKey(keyID string) (out interface{}) {
 func (c *CertificateManager) ListAllIds(prefix string) (out []string) {
 	indexKey := prefix + "-index"
 	exists, _ := c.storage.Exists(indexKey)
-	if exists && prefix != "" {
+	if !c.migrateCertList || (exists && prefix != "") {
 		keys, _ := c.storage.GetListRange(indexKey, 0, -1)
 		for _, key := range keys {
 			out = append(out, strings.TrimPrefix(key, "raw-"))
 		}
 	} else {
+		// If list is not exists, but migrated record exists, it means it just empty
+		if _, err := c.storage.GetKey(indexKey + "-migrated"); err == nil {
+			return out
+		}
+
 		keys := c.storage.GetKeys("raw-" + prefix + "*")
+
 		for _, key := range keys {
 			if prefix != "" {
 				c.storage.AppendToSet(indexKey, key)
@@ -388,6 +480,8 @@ func (c *CertificateManager) ListAllIds(prefix string) (out []string) {
 			out = append(out, strings.TrimPrefix(key, "raw-"))
 		}
 	}
+	c.storage.SetKey(indexKey+"-migrated", "1", 0)
+
 	return out
 }
 
@@ -396,102 +490,13 @@ func (c *CertificateManager) GetRaw(certID string) (string, error) {
 }
 
 func (c *CertificateManager) Add(certData []byte, orgID string) (string, error) {
-	var certBlocks [][]byte
-	var keyPEM, keyRaw []byte
-	var publicKeyPem []byte
 
-	rest := certData
-
-	for {
-		var block *pem.Block
-
-		block, rest = pem.Decode(rest)
-		if block == nil {
-			break
-		}
-
-		if strings.HasSuffix(block.Type, "PRIVATE KEY") {
-			if len(keyRaw) > 0 {
-				err := errors.New("Found multiple private keys")
-				c.logger.Error(err)
-				return "", err
-			}
-
-			keyRaw = block.Bytes
-			keyPEM = pem.EncodeToMemory(block)
-		} else if block.Type == "CERTIFICATE" {
-
-			cert, err := x509.ParseCertificate(block.Bytes)
-			if err != nil {
-				c.logger.Error(err)
-				return "", err
-			}
-
-			if cert.NotAfter.Before(time.Now()) {
-				c.logger.Error(errors.New("certificate is expired"))
-				return "", errors.New("certificate is expired")
-			}
-
-			certBlocks = append(certBlocks, pem.EncodeToMemory(block))
-		} else if block.Type == "PUBLIC KEY" {
-			publicKeyPem = pem.EncodeToMemory(block)
-		} else {
-			c.logger.Info("Ingnoring PEM block with type:", block.Type)
-		}
-	}
-
-	certChainPEM := bytes.Join(certBlocks, []byte("\n"))
-
-	if len(certChainPEM) == 0 {
-		if len(publicKeyPem) == 0 {
-			err := errors.New("Failed to decode certificate. It should be PEM encoded.")
-			c.logger.Error(err)
-			return "", err
-		} else {
-			certChainPEM = publicKeyPem
-		}
-	} else if len(publicKeyPem) > 0 {
-		err := errors.New("Public keys can't be combined with certificates")
+	certID, certChainPEM, err := GetCertIDAndChainPEM(certData, c.secret)
+	if err != nil {
 		c.logger.Error(err)
 		return "", err
 	}
-
-	var certID string
-
-	// Found private key, check if it match the certificate
-	if len(keyPEM) > 0 {
-		cert, err := tls.X509KeyPair(certChainPEM, keyPEM)
-		if err != nil {
-			c.logger.Error(err)
-			return "", err
-		}
-
-		// Encrypt private key and append it to the chain
-		encryptedKeyPEMBlock, err := x509.EncryptPEMBlock(rand.Reader, "ENCRYPTED PRIVATE KEY", keyRaw, []byte(c.secret), x509.PEMCipherAES256)
-		if err != nil {
-			c.logger.Error("Failed to encode private key", err)
-			return "", err
-		}
-
-		certChainPEM = append(certChainPEM, []byte("\n")...)
-		certChainPEM = append(certChainPEM, pem.EncodeToMemory(encryptedKeyPEMBlock)...)
-
-		certID = orgID + HexSHA256(cert.Certificate[0])
-	} else if len(publicKeyPem) > 0 {
-		publicKey, _ := pem.Decode(publicKeyPem)
-		certID = orgID + HexSHA256(publicKey.Bytes)
-	} else {
-		// Get first cert
-		certRaw, _ := pem.Decode(certChainPEM)
-		cert, err := x509.ParseCertificate(certRaw.Bytes)
-		if err != nil {
-			err := errors.New("Error while parsing certificate: " + err.Error())
-			c.logger.Error(err)
-			return "", err
-		}
-
-		certID = orgID + HexSHA256(cert.Raw)
-	}
+	certID = orgID + certID
 
 	if cert, err := c.storage.GetKey("raw-" + certID); err == nil && cert != "" {
 		return "", errors.New("Certificate with " + certID + " id already exists")

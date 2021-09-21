@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
+
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/gateway"
 	"github.com/TykTechnologies/tyk/test"
@@ -38,27 +39,27 @@ var pythonBundleWithAuthCheck = map[string]string{
 		        }
 		    }
 		}
-	`,
+`,
 	"middleware.py": `
 from tyk.decorators import *
 from gateway import TykGateway as tyk
 
 @Hook
 def MyAuthHook(request, session, metadata, spec):
-    auth_header = request.get_header('Authorization')
-    if auth_header == 'valid_token':
-        session.rate = 1000.0
-        session.per = 1.0
-        session.quota_max = 1
-        session.quota_renewal_rate = 60
-        metadata["token"] = "valid_token"
-    elif auth_header == 'policy':
-    	session.apply_policy_id = request.get_header('Policy')
-    	metadata["token"] = "policy"
-
-    return request, session, metadata
-
-	`,
+  auth_header = request.get_header('Authorization')
+  if auth_header == 'valid_token':
+    session.rate = 1000.0
+    session.per = 1.0
+    session.max_query_depth = 1
+    session.quota_max = 1
+    session.quota_renewal_rate = 60
+    metadata["token"] = "valid_token"
+  if auth_header == '47a0c79c427728b3df4af62b9228c8ae11':
+    policy_id = request.get_header('Policy')
+    session.apply_policy_id = policy_id
+    metadata["token"] = "47a0c79c427728b3df4af62b9228c8ae11"
+  return request, session, metadata
+`,
 }
 
 var pythonBundleWithPostHook = map[string]string{
@@ -213,21 +214,21 @@ func TestMain(m *testing.M) {
 }
 
 func TestPythonBundles(t *testing.T) {
-	ts := gateway.StartTest(gateway.TestConfig{
+	ts := gateway.StartTest(nil, gateway.TestConfig{
 		CoprocessConfig: config.CoProcessConfig{
 			EnableCoProcess:  true,
 			PythonPathPrefix: pkgPath,
 		}})
 	defer ts.Close()
 
-	authCheckBundle := gateway.RegisterBundle("python_with_auth_check", pythonBundleWithAuthCheck)
-	postHookBundle := gateway.RegisterBundle("python_with_post_hook", pythonBundleWithPostHook)
-	preHookBundle := gateway.RegisterBundle("python_with_pre_hook", pythonBundleWithPreHook)
-	responseHookBundle := gateway.RegisterBundle("python_with_response_hook", pythonBundleWithResponseHook)
-	postRequestTransformHookBundle := gateway.RegisterBundle("python_post_with_request_transform_hook", pythonPostRequestTransform)
+	authCheckBundle := ts.RegisterBundle("python_with_auth_check", pythonBundleWithAuthCheck)
+	postHookBundle := ts.RegisterBundle("python_with_post_hook", pythonBundleWithPostHook)
+	preHookBundle := ts.RegisterBundle("python_with_pre_hook", pythonBundleWithPreHook)
+	responseHookBundle := ts.RegisterBundle("python_with_response_hook", pythonBundleWithResponseHook)
+	postRequestTransformHookBundle := ts.RegisterBundle("python_post_with_request_transform_hook", pythonPostRequestTransform)
 
 	t.Run("Single-file bundle with authentication hook", func(t *testing.T) {
-		gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 			spec.Proxy.ListenPath = "/test-api/"
 			spec.UseKeylessAccess = false
 			spec.EnableCoProcessAuth = true
@@ -248,7 +249,8 @@ func TestPythonBundles(t *testing.T) {
 	})
 
 	t.Run("Auth with policy", func(t *testing.T) {
-		gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+		specs := ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+			spec.Auth.AuthHeaderName = "Authorization"
 			spec.Proxy.ListenPath = "/test-api/"
 			spec.UseKeylessAccess = false
 			spec.EnableCoProcessAuth = true
@@ -258,12 +260,16 @@ func TestPythonBundles(t *testing.T) {
 
 		time.Sleep(1 * time.Second)
 
-		pID := gateway.CreatePolicy(func(p *user.Policy) {
+		pID := ts.CreatePolicy(func(p *user.Policy) {
 			p.QuotaMax = 1
 			p.QuotaRenewalRate = 60
+			p.AccessRights = map[string]user.AccessDefinition{"test": {
+				APIID:    specs[0].APIID,
+				Versions: []string{"Default"},
+			}}
 		})
 
-		policyAuth := map[string]string{"Authorization": "policy", "Policy": pID}
+		policyAuth := map[string]string{"authorization": "47a0c79c427728b3df4af62b9228c8ae11", "policy": pID}
 
 		ts.Run(t, []test.TestCase{
 			{Path: "/test-api/", Code: http.StatusOK, Headers: policyAuth},
@@ -273,14 +279,14 @@ func TestPythonBundles(t *testing.T) {
 
 	t.Run("Single-file bundle with post hook", func(t *testing.T) {
 
-		keyID := gateway.CreateSession(func(s *user.SessionState) {
+		keyID := gateway.CreateSession(ts.Gw, func(s *user.SessionState) {
 			s.MetaData = map[string]interface{}{
 				"testkey":   map[string]interface{}{"nestedkey": "nestedvalue"},
 				"stringkey": "testvalue",
 			}
 		})
 
-		gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 			spec.Proxy.ListenPath = "/test-api-2/"
 			spec.UseKeylessAccess = false
 			spec.EnableCoProcessAuth = false
@@ -299,14 +305,14 @@ func TestPythonBundles(t *testing.T) {
 
 	t.Run("Single-file bundle with response hook", func(t *testing.T) {
 
-		keyID := gateway.CreateSession(func(s *user.SessionState) {
+		keyID := gateway.CreateSession(ts.Gw, func(s *user.SessionState) {
 			s.MetaData = map[string]interface{}{
 				"testkey":   map[string]interface{}{"nestedkey": "nestedvalue"},
 				"stringkey": "testvalue",
 			}
 		})
 
-		gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 			spec.Proxy.ListenPath = "/test-api-3/"
 			spec.UseKeylessAccess = false
 			spec.EnableCoProcessAuth = false
@@ -324,7 +330,7 @@ func TestPythonBundles(t *testing.T) {
 	})
 
 	t.Run("Single-file bundle with pre hook and UTF-8/non-UTF-8 request data", func(t *testing.T) {
-		gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 			spec.Proxy.ListenPath = "/test-api-2/"
 			spec.UseKeylessAccess = true
 			spec.EnableCoProcessAuth = false
@@ -365,7 +371,7 @@ func TestPythonBundles(t *testing.T) {
 	})
 
 	t.Run("python post hook with url rewrite and method transform", func(t *testing.T) {
-		gateway.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 			spec.Proxy.ListenPath = "/test-api-1/"
 			spec.UseKeylessAccess = true
 			spec.EnableCoProcessAuth = false

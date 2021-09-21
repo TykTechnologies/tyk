@@ -17,7 +17,6 @@ import (
 	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 )
 
 const (
@@ -25,13 +24,7 @@ const (
 	defaultSampletTriggerLimit = 3
 )
 
-var (
-	HostCheckerClient = &http.Client{
-		Timeout: 500 * time.Millisecond,
-	}
-	defaultWorkerPoolSize = runtime.NumCPU()
-	hostCheckTicker       = make(chan struct{})
-)
+var defaultWorkerPoolSize = runtime.NumCPU()
 
 type HostData struct {
 	CheckURL            string
@@ -70,6 +63,7 @@ type HostUptimeChecker struct {
 	resetListMu sync.Mutex
 	doResetList bool
 	newList     map[string]HostData
+	Gw          *Gateway `json:"-"`
 }
 
 func (h *HostUptimeChecker) getStopLoop() bool {
@@ -102,12 +96,12 @@ func (h *HostUptimeChecker) HostCheckLoop(ctx context.Context) {
 	defer func() {
 		log.Info("[HOST CHECKER] Checker stopped")
 	}()
-	if isRunningTests() {
+	if h.Gw.isRunningTests() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case <-hostCheckTicker:
+			case <-h.Gw.HostCheckTicker:
 				h.execCheck()
 			}
 		}
@@ -136,8 +130,8 @@ func (h *HostUptimeChecker) execCheck() {
 	h.resetListMu.Unlock()
 	for _, host := range h.HostList {
 		_, err := h.pool.SendWork(host)
-		if err != nil {
-			log.Errorf("[HOST CHECKER] could not send work, error: %v", err)
+		if err != nil && err != tunny.ErrPoolNotRunning {
+			log.Warnf("[HOST CHECKER] could not send work, error: %v", err)
 		}
 	}
 }
@@ -276,19 +270,21 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 			log.Error("Could not create request: ", err)
 			return
 		}
+		ignoreCanonical := h.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
 		for headerName, headerValue := range toCheck.Headers {
-			req.Header.Set(headerName, headerValue)
+			setCustomHeader(req.Header, headerName, headerValue, ignoreCanonical)
 		}
 		req.Header.Set("Connection", "close")
-		HostCheckerClient.Transport = &http.Transport{
+		h.Gw.HostCheckerClient.Transport = &http.Transport{
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: config.Global().ProxySSLInsecureSkipVerify,
+				InsecureSkipVerify: h.Gw.GetConfig().ProxySSLInsecureSkipVerify,
+				MaxVersion:         h.Gw.GetConfig().ProxySSLMaxVersion,
 			},
 		}
 		if toCheck.Timeout != 0 {
-			HostCheckerClient.Timeout = toCheck.Timeout
+			h.Gw.HostCheckerClient.Timeout = toCheck.Timeout
 		}
-		response, err := HostCheckerClient.Do(req)
+		response, err := h.Gw.HostCheckerClient.Do(req)
 		if err != nil {
 			report.IsTCPError = true
 			break

@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
 )
 
@@ -40,20 +39,23 @@ type HTTPDashboardHandler struct {
 	Secret string
 
 	heartBeatStopSentinel bool
+	Gw                    *Gateway `json:"-"`
 }
 
 var dashClient *http.Client
 
-func initialiseClient() *http.Client {
+func (gw *Gateway) initialiseClient() *http.Client {
 	if dashClient == nil {
 		dashClient = &http.Client{
 			Timeout: 30 * time.Second,
 		}
 
-		if config.Global().HttpServerOptions.UseSSL {
+		if gw.GetConfig().HttpServerOptions.UseSSL {
 			// Setup HTTPS client
 			tlsConfig := &tls.Config{
-				InsecureSkipVerify: config.Global().HttpServerOptions.SSLInsecureSkipVerify,
+				InsecureSkipVerify: gw.GetConfig().HttpServerOptions.SSLInsecureSkipVerify,
+				MinVersion:         gw.GetConfig().HttpServerOptions.MinVersion,
+				MaxVersion:         gw.GetConfig().HttpServerOptions.MaxVersion,
 			}
 
 			dashClient.Transport = &http.Transport{TLSClientConfig: tlsConfig}
@@ -63,36 +65,41 @@ func initialiseClient() *http.Client {
 	return dashClient
 }
 
-func reLogin() {
-	if !config.Global().UseDBAppConfigs {
+func (gw *Gateway) reLogin() {
+	if !gw.GetConfig().UseDBAppConfigs {
 		return
 	}
 
 	dashLog.Info("Registering node (again).")
-	DashService.StopBeating()
-	if err := DashService.DeRegister(); err != nil {
+	gw.DashService.StopBeating()
+	if err := gw.DashService.DeRegister(); err != nil {
 		dashLog.Error("Could not deregister: ", err)
 	}
 
 	time.Sleep(5 * time.Second)
 
-	if err := DashService.Register(); err != nil {
+	if err := gw.DashService.Register(); err != nil {
 		dashLog.Error("Could not register: ", err)
 	} else {
-		go DashService.StartBeating()
+		go func() {
+			beatErr := gw.DashService.StartBeating()
+			if beatErr != nil {
+				dashLog.Error("Could not start beating. ", beatErr.Error())
+			}
+		}()
 	}
 
 	dashLog.Info("Recovering configurations, reloading...")
-	reloadURLStructure(nil)
+	gw.reloadURLStructure(nil)
 }
 
 func (h *HTTPDashboardHandler) Init() error {
-	h.RegistrationEndpoint = buildConnStr("/register/node")
-	h.DeRegistrationEndpoint = buildConnStr("/system/node")
-	h.HeartBeatEndpoint = buildConnStr("/register/ping")
-	h.KeyQuotaTriggerEndpoint = buildConnStr("/system/key/quota_trigger")
+	h.RegistrationEndpoint = buildConnStr("/register/node", h.Gw.GetConfig())
+	h.DeRegistrationEndpoint = buildConnStr("/system/node", h.Gw.GetConfig())
+	h.HeartBeatEndpoint = buildConnStr("/register/ping", h.Gw.GetConfig())
+	h.KeyQuotaTriggerEndpoint = buildConnStr("/system/key/quota_trigger", h.Gw.GetConfig())
 
-	if h.Secret = config.Global().NodeSecret; h.Secret == "" {
+	if h.Secret = h.Gw.GetConfig().NodeSecret; h.Secret == "" {
 		dashLog.Fatal("Node secret is not set, required for dashboard connection")
 	}
 	return nil
@@ -120,10 +127,12 @@ func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 	}
 
 	req.Header.Set("authorization", h.Secret)
-	req.Header.Set(headers.XTykNodeID, GetNodeID())
-	req.Header.Set(headers.XTykNonce, ServiceNonce)
+	req.Header.Set(headers.XTykNodeID, h.Gw.GetNodeID())
+	h.Gw.ServiceNonceMutex.RLock()
+	req.Header.Set(headers.XTykNonce, h.Gw.ServiceNonce)
+	h.Gw.ServiceNonceMutex.RUnlock()
 
-	c := initialiseClient()
+	c := h.Gw.initialiseClient()
 
 	resp, err := c.Do(req)
 	if err != nil {
@@ -144,21 +153,27 @@ func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 		return err
 	}
 
-	ServiceNonce = val.Nonce
+	h.Gw.ServiceNonceMutex.Lock()
+	h.Gw.ServiceNonce = val.Nonce
+	h.Gw.ServiceNonceMutex.Unlock()
 
 	return nil
 }
 
 func (h *HTTPDashboardHandler) Register() error {
 	dashLog.Info("Registering gateway node with Dashboard")
-	req := h.newRequest(h.RegistrationEndpoint)
-	c := initialiseClient()
+	req := h.newRequest(http.MethodGet, h.RegistrationEndpoint)
+	c := h.Gw.initialiseClient()
+
 	resp, err := c.Do(req)
 
 	if err != nil {
 		dashLog.Errorf("Request failed with error %v; retrying in 5s", err)
 		time.Sleep(time.Second * 5)
 		return h.Register()
+	} else if resp.StatusCode == http.StatusConflict {
+		dashLog.Debug("Node is already registered")
+		return nil
 	} else if resp != nil && resp.StatusCode != 200 {
 		dashLog.Errorf("Response failed with code %d; retrying in 5s", resp.StatusCode)
 		time.Sleep(time.Second * 5)
@@ -174,33 +189,35 @@ func (h *HTTPDashboardHandler) Register() error {
 	// Set the NodeID
 	var found bool
 	nodeID, found := val.Message["NodeID"]
-	SetNodeID(nodeID)
+	h.Gw.SetNodeID(nodeID)
 	if !found {
 		dashLog.Error("Failed to register node, retrying in 5s")
 		time.Sleep(time.Second * 5)
 		return h.Register()
 	}
 
-	dashLog.WithField("id", GetNodeID()).Info("Node Registered")
+	dashLog.WithField("id", h.Gw.GetNodeID()).Info("Node Registered")
 
 	// Set the nonce
-	ServiceNonce = val.Nonce
-	dashLog.Debug("Registration Finished: Nonce Set: ", ServiceNonce)
+	h.Gw.ServiceNonceMutex.Lock()
+	h.Gw.ServiceNonce = val.Nonce
+	h.Gw.ServiceNonceMutex.Unlock()
+	dashLog.Debug("Registration Finished: Nonce Set: ", val.Nonce)
 
 	return nil
 }
 
 func (h *HTTPDashboardHandler) Ping() error {
 	return h.sendHeartBeat(
-		h.newRequest(h.HeartBeatEndpoint),
-		initialiseClient())
+		h.newRequest(http.MethodGet, h.HeartBeatEndpoint),
+		h.Gw.initialiseClient())
 }
 
 func (h *HTTPDashboardHandler) StartBeating() error {
 
-	req := h.newRequest(h.HeartBeatEndpoint)
+	req := h.newRequest(http.MethodGet, h.HeartBeatEndpoint)
 
-	client := initialiseClient()
+	client := h.Gw.initialiseClient()
 
 	for !h.heartBeatStopSentinel {
 		if err := h.sendHeartBeat(req, client); err != nil {
@@ -218,19 +235,22 @@ func (h *HTTPDashboardHandler) StopBeating() {
 	h.heartBeatStopSentinel = true
 }
 
-func (h *HTTPDashboardHandler) newRequest(endpoint string) *http.Request {
-	req, err := http.NewRequest("GET", endpoint, nil)
+func (h *HTTPDashboardHandler) newRequest(method, endpoint string) *http.Request {
+	req, err := http.NewRequest(method, endpoint, nil)
 	if err != nil {
 		panic(err)
 	}
 	req.Header.Set("authorization", h.Secret)
 	req.Header.Set(headers.XTykHostname, hostDetails.Hostname)
+	req.Header.Set(headers.XTykSessionID, h.Gw.SessionID)
 	return req
 }
 
 func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Client) error {
-	req.Header.Set(headers.XTykNodeID, GetNodeID())
-	req.Header.Set(headers.XTykNonce, ServiceNonce)
+	req.Header.Set(headers.XTykNodeID, h.Gw.GetNodeID())
+	h.Gw.ServiceNonceMutex.RLock()
+	req.Header.Set(headers.XTykNonce, h.Gw.ServiceNonce)
+	h.Gw.ServiceNonceMutex.RUnlock()
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -240,7 +260,7 @@ func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Cli
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusForbidden {
-		return DashService.Register()
+		return h.Gw.DashService.Register()
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -252,19 +272,23 @@ func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Cli
 	}
 
 	// Set the nonce
-	ServiceNonce = val.Nonce
-	//log.Debug("Heartbeat Finished: Nonce Set: ", ServiceNonce)
+	h.Gw.ServiceNonceMutex.Lock()
+	h.Gw.ServiceNonce = val.Nonce
+	h.Gw.ServiceNonceMutex.Unlock()
+	//log.Debug("Heartbeat Finished: Nonce Set: ", h.Gw.ServiceNonce)
 
 	return nil
 }
 
 func (h *HTTPDashboardHandler) DeRegister() error {
-	req := h.newRequest(h.DeRegistrationEndpoint)
+	req := h.newRequest(http.MethodDelete, h.DeRegistrationEndpoint)
 
-	req.Header.Set(headers.XTykNodeID, GetNodeID())
-	req.Header.Set(headers.XTykNonce, ServiceNonce)
+	req.Header.Set(headers.XTykNodeID, h.Gw.GetNodeID())
+	h.Gw.ServiceNonceMutex.RLock()
+	req.Header.Set(headers.XTykNonce, h.Gw.ServiceNonce)
+	h.Gw.ServiceNonceMutex.RUnlock()
 
-	c := initialiseClient()
+	c := h.Gw.initialiseClient()
 	resp, err := c.Do(req)
 
 	if err != nil {
@@ -281,7 +305,9 @@ func (h *HTTPDashboardHandler) DeRegister() error {
 	}
 
 	// Set the nonce
-	ServiceNonce = val.Nonce
+	h.Gw.ServiceNonceMutex.Lock()
+	h.Gw.ServiceNonce = val.Nonce
+	h.Gw.ServiceNonceMutex.Unlock()
 	dashLog.Info("De-registered.")
 
 	return nil

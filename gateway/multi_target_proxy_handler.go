@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/sirupsen/logrus"
 )
@@ -15,7 +16,7 @@ type MultiTargetProxy struct {
 }
 
 func (m *MultiTargetProxy) proxyForRequest(r *http.Request) *ReverseProxy {
-	version, _, _, _ := m.specReference.Version(r)
+	version, _ := m.specReference.Version(r)
 	if proxy := m.versionProxies[version.Name]; proxy != nil {
 		return proxy
 	}
@@ -36,15 +37,15 @@ func (m *MultiTargetProxy) ServeHTTPForCache(w http.ResponseWriter, r *http.Requ
 	return m.proxyForRequest(r).ServeHTTPForCache(w, r)
 }
 
-func (m *MultiTargetProxy) CopyResponse(dst io.Writer, src io.Reader) {
-	m.defaultProxy.CopyResponse(dst, src)
+func (m *MultiTargetProxy) CopyResponse(dst io.Writer, src io.Reader, flushInterval time.Duration) {
+	m.defaultProxy.CopyResponse(dst, src, flushInterval)
 }
 
-func NewMultiTargetProxy(spec *APISpec, logger *logrus.Entry) *MultiTargetProxy {
+func (gw *Gateway) NewMultiTargetProxy(spec *APISpec, logger *logrus.Entry) *MultiTargetProxy {
 	m := &MultiTargetProxy{}
 	m.versionProxies = make(map[string]*ReverseProxy)
 	m.specReference = spec
-	m.defaultProxy = TykNewSingleHostReverseProxy(spec.target, spec, logger)
+	m.defaultProxy = gw.TykNewSingleHostReverseProxy(spec.target, spec, logger)
 
 	for vname, vdata := range spec.VersionData.Versions {
 		if vdata.OverrideTarget == "" {
@@ -69,7 +70,7 @@ func NewMultiTargetProxy(spec *APISpec, logger *logrus.Entry) *MultiTargetProxy 
 				"prefix": "multi-target",
 			}).Error("Couldn't parse version target URL in MultiTarget: ", err)
 		}
-		m.versionProxies[vname] = TykNewSingleHostReverseProxy(remote, spec, logger)
+		m.versionProxies[vname] = gw.TykNewSingleHostReverseProxy(remote, spec, logger)
 	}
 	return m
 }

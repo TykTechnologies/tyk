@@ -6,6 +6,9 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
+
+	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/rpc"
 
@@ -15,21 +18,29 @@ import (
 )
 
 type DBAccessDefinition struct {
-	APIName     string            `json:"apiname"`
-	APIID       string            `json:"apiid"`
-	Versions    []string          `json:"versions"`
-	AllowedURLs []user.AccessSpec `bson:"allowed_urls" json:"allowed_urls"` // mapped string MUST be a valid regex
-	Limit       *user.APILimit    `json:"limit"`
+	APIName           string                       `json:"apiname"`
+	APIID             string                       `json:"apiid"`
+	Versions          []string                     `json:"versions"`
+	AllowedURLs       []user.AccessSpec            `bson:"allowed_urls" json:"allowed_urls"` // mapped string MUST be a valid regex
+	RestrictedTypes   []graphql.Type               `json:"restricted_types"`
+	FieldAccessRights []user.FieldAccessDefinition `json:"field_access_rights"`
+	Limit             *user.APILimit               `json:"limit"`
 }
 
 func (d *DBAccessDefinition) ToRegularAD() user.AccessDefinition {
-	return user.AccessDefinition{
-		APIName:     d.APIName,
-		APIID:       d.APIID,
-		Versions:    d.Versions,
-		AllowedURLs: d.AllowedURLs,
-		Limit:       d.Limit,
+	ad := user.AccessDefinition{
+		APIName:           d.APIName,
+		APIID:             d.APIID,
+		Versions:          d.Versions,
+		AllowedURLs:       d.AllowedURLs,
+		RestrictedTypes:   d.RestrictedTypes,
+		FieldAccessRights: d.FieldAccessRights,
 	}
+
+	if d.Limit != nil {
+		ad.Limit = *d.Limit
+	}
+	return ad
 }
 
 type DBPolicy struct {
@@ -66,8 +77,29 @@ func LoadPoliciesFromFile(filePath string) map[string]user.Policy {
 	return policies
 }
 
+func LoadPoliciesFromDir(dir string) map[string]user.Policy {
+	policies := make(map[string]user.Policy)
+	// Grab json files from directory
+	paths, _ := filepath.Glob(filepath.Join(dir, "*.json"))
+	for _, path := range paths {
+		log.Info("Loading policy from dir ", path)
+		f, err := os.Open(path)
+		if err != nil {
+			log.Error("Couldn't open policy file from dir: ", err)
+			continue
+		}
+		pol := &user.Policy{}
+		if err := json.NewDecoder(f).Decode(pol); err != nil {
+			log.Errorf("Couldn't unmarshal policy configuration from dir: %v : %v", path, err)
+		}
+		f.Close()
+		policies[pol.ID] = *pol
+	}
+	return policies
+}
+
 // LoadPoliciesFromDashboard will connect and download Policies from a Tyk Dashboard instance.
-func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[string]user.Policy {
+func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[string]user.Policy {
 
 	// Get the definitions
 	newRequest, err := http.NewRequest("GET", endpoint, nil)
@@ -76,14 +108,16 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 	}
 
 	newRequest.Header.Set("authorization", secret)
-	newRequest.Header.Set("x-tyk-nodeid", GetNodeID())
+	newRequest.Header.Set("x-tyk-nodeid", gw.GetNodeID())
 
-	newRequest.Header.Set("x-tyk-nonce", ServiceNonce)
+	gw.ServiceNonceMutex.RLock()
+	newRequest.Header.Set("x-tyk-nonce", gw.ServiceNonce)
+	gw.ServiceNonceMutex.RUnlock()
 
 	log.WithFields(logrus.Fields{
 		"prefix": "policy",
 	}).Info("Mutex lock acquired... calling")
-	c := initialiseClient()
+	c := gw.initialiseClient()
 
 	log.WithFields(logrus.Fields{
 		"prefix": "policy",
@@ -95,10 +129,10 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusForbidden {
+	if resp.StatusCode != http.StatusOK {
 		body, _ := ioutil.ReadAll(resp.Body)
 		log.Error("Policy request login failure, Response was: ", string(body))
-		reLogin()
+		gw.reLogin()
 		return nil
 	}
 
@@ -112,8 +146,10 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 		return nil
 	}
 
-	ServiceNonce = list.Nonce
-	log.Debug("Loading Policies Finished: Nonce Set: ", ServiceNonce)
+	gw.ServiceNonceMutex.Lock()
+	gw.ServiceNonce = list.Nonce
+	gw.ServiceNonceMutex.Unlock()
+	log.Debug("Loading Policies Finished: Nonce Set: ", list.Nonce)
 
 	policies := make(map[string]user.Policy, len(list.Message))
 
@@ -157,12 +193,12 @@ func parsePoliciesFromRPC(list string) (map[string]user.Policy, error) {
 	return policies, nil
 }
 
-func LoadPoliciesFromRPC(orgId string) (map[string]user.Policy, error) {
+func (gw *Gateway) LoadPoliciesFromRPC(orgId string) (map[string]user.Policy, error) {
 	if rpc.IsEmergencyMode() {
-		return LoadPoliciesFromRPCBackup()
+		return gw.LoadPoliciesFromRPCBackup()
 	}
 
-	store := &RPCStorageHandler{}
+	store := &RPCStorageHandler{Gw: gw}
 	if !store.Connect() {
 		return nil, errors.New("Policies backup: Failed connecting to database")
 	}
@@ -178,8 +214,8 @@ func LoadPoliciesFromRPC(orgId string) (map[string]user.Policy, error) {
 		return nil, err
 	}
 
-	if err := saveRPCPoliciesBackup(rpcPolicies); err != nil {
-		return nil, err
+	if err := gw.saveRPCPoliciesBackup(rpcPolicies); err != nil {
+		log.Error(err)
 	}
 
 	return policies, nil

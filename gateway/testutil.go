@@ -24,15 +24,20 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TykTechnologies/tyk/rpc"
+
 	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/go-redis/redis"
+	redis "github.com/go-redis/redis/v8"
+
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-
+	uuid "github.com/satori/go.uuid"
 	"golang.org/x/net/context"
 
-	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
+	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
@@ -40,187 +45,278 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 	_ "github.com/TykTechnologies/tyk/testdata" // Don't delete
 	"github.com/TykTechnologies/tyk/user"
-	uuid "github.com/satori/go.uuid"
 )
 
 var (
 	// to register to, but never used
 	discardMuxer = mux.NewRouter()
 
-	// to simulate time ticks for tests that do reloads
-	ReloadTick = make(chan time.Time)
-
 	// Used to store the test bundles:
 	testMiddlewarePath, _ = ioutil.TempDir("", "tyk-middleware-path")
 
-	mockHandle *test.DnsMockHandle
-
-	testServerRouter  *mux.Router
 	defaultTestConfig config.Config
-
 	EnableTestDNSMock = true
+	MockHandle        *test.DnsMockHandle
 )
 
-func InitTestMain(ctx context.Context, m *testing.M, genConf ...func(globalConf *config.Config)) int {
-	setTestMode(true)
-	testServerRouter = testHttpHandler()
-	testServer := &http.Server{
-		Addr:           testHttpListen,
-		Handler:        testServerRouter,
-		ReadTimeout:    1 * time.Second,
-		WriteTimeout:   1 * time.Second,
-		MaxHeaderBytes: 1 << 20,
-	}
+// ReloadMachinery is a helper struct to use when writing tests that do manual
+// gateway reloads
+type ReloadMachinery struct {
+	run    bool
+	count  int
+	cycles int
+	mu     sync.RWMutex
 
-	globalConf := config.Global()
-	if err := config.WriteDefault("", &globalConf); err != nil {
-		panic(err)
-	}
-	globalConf.Storage.Database = rand.Intn(15)
-	var err error
-	globalConf.AppPath, err = ioutil.TempDir("", "tyk-test-")
-	if err != nil {
-		panic(err)
-	}
-	globalConf.EnableAnalytics = true
-	globalConf.AnalyticsConfig.EnableGeoIP = true
-	_, b, _, _ := runtime.Caller(0)
-	gatewayPath := filepath.Dir(b)
-	rootPath := filepath.Dir(gatewayPath)
-	globalConf.AnalyticsConfig.GeoIPDBLocation = filepath.Join(rootPath, "testdata", "MaxMind-DB-test-ipv4-24.mmdb")
-	globalConf.EnableJSVM = true
-	globalConf.HashKeyFunction = storage.HashMurmur64
-	globalConf.Monitor.EnableTriggerMonitors = true
-	globalConf.AnalyticsConfig.NormaliseUrls.Enabled = true
-	globalConf.AllowInsecureConfigs = true
-	// Enable coprocess and bundle downloader:
-	globalConf.CoProcessOptions.EnableCoProcess = true
-	globalConf.EnableBundleDownloader = true
-	globalConf.BundleBaseURL = testHttpBundles
-	globalConf.MiddlewarePath = testMiddlewarePath
-	// force ipv4 for now, to work around the docker bug affecting
-	// Go 1.8 and ealier
-	globalConf.ListenAddress = "127.0.0.1"
-	if len(genConf) > 0 {
-		genConf[0](&globalConf)
-	}
+	// to simulate time ticks for tests that do reloads
+	reloadTick chan time.Time
+	stop       chan struct{}
+}
 
-	if EnableTestDNSMock {
-		mockHandle, err = test.InitDNSMock(test.DomainsToAddresses, nil)
-		if err != nil {
-			panic(err)
-		}
-
-		defer mockHandle.ShutdownDnsMock()
+func NewReloadMachinery() *ReloadMachinery {
+	return &ReloadMachinery{
+		reloadTick: make(chan time.Time),
 	}
+}
+
+func (r *ReloadMachinery) StartTicker() {
+	r.stop = make(chan struct{})
 
 	go func() {
-		err := testServer.ListenAndServe()
-		if err != nil {
-			log.Warn("testServer.ListenAndServe() err: ", err.Error())
+		for {
+			select {
+			case <-r.stop:
+				return
+			default:
+				r.Tick()
+			}
 		}
 	}()
+}
 
-	defer testServer.Shutdown(context.Background())
+func (r *ReloadMachinery) StopTicker() {
+	close(r.stop)
+}
 
-	CoProcessInit()
-	afterConfSetup(&globalConf)
-	defaultTestConfig = globalConf
-	config.SetGlobal(globalConf)
-	if err := emptyRedis(); err != nil {
-		panic(err)
+func (r *ReloadMachinery) ReloadTicker() <-chan time.Time {
+	return r.reloadTick
+}
+
+// OnQueued is called when a reload has been queued. This increments the queue
+// count
+func (r *ReloadMachinery) OnQueued() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.run {
+		r.count++
 	}
-	cli.Init(VERSION, confPaths)
-	initialiseSystem(ctx)
-	// Small part of start()
-	loadControlAPIEndpoints(mainRouter())
-	if analytics.GeoIPDB == nil {
-		panic("GeoIPDB was not initialized")
+}
+
+// OnReload is called when a reload has been completed. This increments the
+// reload cycles count.
+func (r *ReloadMachinery) OnReload() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.run {
+		r.cycles++
 	}
-	go storage.ConnectToRedis(ctx)
+}
+
+// Reloaded returns true if a read has occured since r was enabled
+func (r *ReloadMachinery) Reloaded() bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.cycles > 0
+}
+
+// Enable  when callled it will allow r to keep track of reload cycles and queues
+func (r *ReloadMachinery) Enable() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.run = true
+}
+
+// Disable turns off tracking of reload cycles and queues
+func (r *ReloadMachinery) Disable() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.run = true
+	r.count = 0
+	r.cycles = 0
+}
+
+// Reset sets reloads counts and queues to 0
+func (r *ReloadMachinery) Reset() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.count = 0
+	r.cycles = 0
+}
+
+// Queued returns true if any queue happened
+func (r *ReloadMachinery) Queued() bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.count > 0
+}
+
+// EnsureQueued this will block until any queue happens. It will timeout after
+// 100ms
+func (r *ReloadMachinery) EnsureQueued(t *testing.T) {
+	deadline := time.NewTimer(100 * time.Millisecond)
+	defer deadline.Stop()
+	tick := time.NewTicker(time.Millisecond)
+	defer tick.Stop()
 	for {
-		if storage.Connected() {
-			break
+		select {
+		case <-deadline.C:
+			t.Fatal("Timedout waiting for reload to be queue")
+		case <-tick.C:
+			if r.Queued() {
+				return
+			}
+		}
+	}
+}
+
+// EnsureReloaded this will block until any reload happens. It will timeout after
+// 200ms
+func (r *ReloadMachinery) EnsureReloaded(t *testing.T) {
+	deadline := time.NewTimer(200 * time.Millisecond)
+	defer deadline.Stop()
+	tick := time.NewTicker(time.Millisecond)
+	defer tick.Stop()
+	for {
+		select {
+		case <-deadline.C:
+			t.Fatal("Timedout waiting for reload to be queue")
+		case <-tick.C:
+			if r.Reloaded() {
+				return
+			}
+		}
+	}
+}
+
+// Tick triggers reload
+func (r *ReloadMachinery) Tick() {
+	r.reloadTick <- time.Time{}
+}
+
+// TickOk triggers a reload and ensures a queue happend and a reload cycle
+// happens. This will block until all the cases are met.
+func (r *ReloadMachinery) TickOk(t *testing.T) {
+	r.EnsureQueued(t)
+	r.Tick()
+	r.EnsureReloaded(t)
+}
+
+func InitTestMain(ctx context.Context, m *testing.M) int {
+
+	if EnableTestDNSMock {
+		var errMock error
+		MockHandle, errMock = test.InitDNSMock(test.DomainsToAddresses, nil)
+		if errMock != nil {
+			panic(errMock)
 		}
 
-		time.Sleep(10 * time.Millisecond)
+		defer MockHandle.ShutdownDnsMock()
 	}
-	go startPubSubLoop()
-	go reloadLoop(ReloadTick)
-	go reloadQueueLoop()
-	go reloadSimulation()
+
 	exitCode := m.Run()
-	os.RemoveAll(config.Global().AppPath)
+
 	return exitCode
 }
 
-func ResetTestConfig() {
-	config.SetGlobal(defaultTestConfig)
+// TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue
+// TestBrokenClients
+// TestGRPC_TokenBasedAuthentication
+
+// ResetTestConfig resets the config for the global gateway
+func (s *Test) ResetTestConfig() {
+	s.Gw.SetConfig(defaultTestConfig)
 }
 
-func emptyRedis() error {
-	addr := config.Global().Storage.Host + ":" + strconv.Itoa(config.Global().Storage.Port)
+func (s *Test) emptyRedis() error {
+	ctx := context.Background()
+	//addr := config.Global().Storage.Host + ":" + strconv.Itoa(config.Global().Storage.Port)
+	gwConfig := s.Gw.GetConfig()
+	addr := gwConfig.Storage.Host + ":" + strconv.Itoa(gwConfig.Storage.Port)
 	c := redis.NewClient(&redis.Options{Addr: addr})
 	defer c.Close()
-	dbName := strconv.Itoa(config.Global().Storage.Database)
-	if err := c.Do("SELECT", dbName).Err(); err != nil {
+	dbName := strconv.Itoa(gwConfig.Storage.Database)
+	if err := c.Do(ctx, "SELECT", dbName).Err(); err != nil {
 		return err
 	}
-	err := c.FlushDB().Err()
+	err := c.FlushDB(ctx).Err()
 	return err
 }
 
 // simulate reloads in the background, i.e. writes to
 // global variables that should not be accessed in a
 // racy way like the policies and api specs maps.
-func reloadSimulation() {
+func (s *Test) reloadSimulation() {
 	for {
-		policiesMu.Lock()
-		policiesByID["_"] = user.Policy{}
-		delete(policiesByID, "_")
-		policiesMu.Unlock()
-		apisMu.Lock()
-		old := apiSpecs
-		apiSpecs = append(apiSpecs, nil)
-		apiSpecs = old
-		apisByID["_"] = nil
-		delete(apisByID, "_")
-		apisMu.Unlock()
-		time.Sleep(5 * time.Millisecond)
+		select {
+		case <-s.Gw.ctx.Done():
+			return
+		default:
+			s.gwMu.Lock()
+			s.Gw.policiesMu.Lock()
+
+			s.Gw.policiesByID["_"] = user.Policy{}
+			delete(s.Gw.policiesByID, "_")
+			s.Gw.policiesMu.Unlock()
+
+			s.Gw.apisMu.Lock()
+			//	old := s.Gw.apiSpecs
+			//	s.Gw.apiSpecs = append(old, nil)
+			//	s.Gw.apiSpecs = old
+			s.Gw.apisByID["_"] = nil
+			delete(s.Gw.apisByID, "_")
+			s.Gw.apisMu.Unlock()
+			s.gwMu.Unlock()
+			time.Sleep(5 * time.Millisecond)
+		}
 	}
 }
 
-// map[bundleName]map[fileName]fileContent
-var testBundles = map[string]map[string]string{}
-var testBundleMu sync.Mutex
-
-func RegisterBundle(name string, files map[string]string) string {
-	testBundleMu.Lock()
-	defer testBundleMu.Unlock()
+func (s *Test) RegisterBundle(name string, files map[string]string) string {
+	s.Gw.TestBundleMu.Lock()
+	defer s.Gw.TestBundleMu.Unlock()
 
 	bundleID := name + "-" + uuid.NewV4().String() + ".zip"
-	testBundles[bundleID] = files
+	s.Gw.TestBundles[bundleID] = files
 
 	return bundleID
 }
 
-func RegisterJSFileMiddleware(apiid string, files map[string]string) {
-	os.MkdirAll(config.Global().MiddlewarePath+"/"+apiid+"/post", 0755)
-	os.MkdirAll(config.Global().MiddlewarePath+"/"+apiid+"/pre", 0755)
+func (s *Test) RegisterJSFileMiddleware(apiid string, files map[string]string) {
+	gwConfig := s.Gw.GetConfig()
+	err := os.MkdirAll(gwConfig.MiddlewarePath+"/"+apiid+"/post", 0755)
+	if err != nil {
+		log.WithError(err).Error("creating directory in middleware post path")
+	}
+	err = os.MkdirAll(gwConfig.MiddlewarePath+"/"+apiid+"/pre", 0755)
+	if err != nil {
+		log.WithError(err).Error("creating directory in middleware pre path")
+	}
 
 	for file, content := range files {
-		ioutil.WriteFile(config.Global().MiddlewarePath+"/"+apiid+"/"+file, []byte(content), 0755)
+		err = ioutil.WriteFile(gwConfig.MiddlewarePath+"/"+apiid+"/"+file, []byte(content), 0755)
+		if err != nil {
+			log.WithError(err).Error("writing in file")
+		}
 	}
 }
 
-func bundleHandleFunc(w http.ResponseWriter, r *http.Request) {
-	testBundleMu.Lock()
-	defer testBundleMu.Unlock()
+func (s *Test) BundleHandleFunc(w http.ResponseWriter, r *http.Request) {
+	s.Gw.TestBundleMu.Lock()
+	defer s.Gw.TestBundleMu.Unlock()
 
 	bundleName := strings.Replace(r.URL.Path, "/bundles/", "", -1)
-	bundle, exists := testBundles[bundleName]
+	bundle, exists := s.Gw.TestBundles[bundleName]
 	if !exists {
-		log.Warning(testBundles)
+		log.Warning(s.Gw.TestBundles)
 		http.Error(w, "Bundle not found", http.StatusNotFound)
 		return
 	}
@@ -234,24 +330,25 @@ func bundleHandleFunc(w http.ResponseWriter, r *http.Request) {
 	}
 	z.Close()
 }
-func mainRouter() *mux.Router {
-	return getMainRouter(defaultProxyMux)
+
+func (s *Test) mainRouter() *mux.Router {
+	return s.getMainRouter(s.Gw.DefaultProxyMux)
 }
 
-func mainProxy() *proxy {
-	return defaultProxyMux.getProxy(config.Global().ListenPort)
+func (s *Test) mainProxy() *proxy {
+	return s.Gw.DefaultProxyMux.getProxy(s.Gw.GetConfig().ListenPort, s.Gw.GetConfig())
 }
 
-func controlProxy() *proxy {
-	p := defaultProxyMux.getProxy(config.Global().ControlAPIPort)
+func (s *Test) controlProxy() *proxy {
+	p := s.Gw.DefaultProxyMux.getProxy(s.Gw.GetConfig().ControlAPIPort, s.Gw.GetConfig())
 	if p != nil {
 		return p
 	}
-	return mainProxy()
+	return s.mainProxy()
 }
 
-func EnablePort(port int, protocol string) {
-	c := config.Global()
+func (s *Test) EnablePort(port int, protocol string) {
+	c := s.Gw.GetConfig()
 	if c.PortWhiteList == nil {
 		c.PortWhiteList = map[string]config.PortWhiteList{
 			protocol: {
@@ -269,17 +366,18 @@ func EnablePort(port int, protocol string) {
 		}
 		c.PortWhiteList[protocol] = m
 	}
-	config.SetGlobal(c)
+	s.Gw.SetConfig(c)
 }
 
-func getMainRouter(m *proxyMux) *mux.Router {
+func (s *Test) getMainRouter(m *proxyMux) *mux.Router {
 	var protocol string
-	if config.Global().HttpServerOptions.UseSSL {
+	gwConfig := s.Gw.GetConfig()
+	if gwConfig.HttpServerOptions.UseSSL {
 		protocol = "https"
 	} else {
 		protocol = "http"
 	}
-	return m.router(config.Global().ListenPort, protocol)
+	return m.router(gwConfig.ListenPort, protocol, gwConfig)
 }
 
 type TestHttpResponse struct {
@@ -294,7 +392,7 @@ type TestHttpResponse struct {
 // ProxyHandler Proxies requests through to their final destination, if they make it through the middleware chain.
 func ProxyHandler(p *ReverseProxy, apiSpec *APISpec) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		baseMid := BaseMiddleware{Spec: apiSpec, Proxy: p}
+		baseMid := BaseMiddleware{Spec: apiSpec, Proxy: p, Gw: p.Gw}
 		handler := SuccessHandler{baseMid}
 		// Skip all other execution
 		handler.ServeHTTP(w, r)
@@ -302,27 +400,42 @@ func ProxyHandler(p *ReverseProxy, apiSpec *APISpec) http.Handler {
 }
 
 const (
+	handlerPathGraphQLProxyUpstream  = "/graphql-proxy-upstream"
+	handlerPathRestDataSource        = "/rest-data-source"
+	handlerPathGraphQLDataSource     = "/graphql-data-source"
+	handlerPathHeadersRestDataSource = "/rest-headers-data-source"
+	handlerSubgraphAccounts          = "/subgraph-accounts"
+	handlerSubgraphReviews           = "/subgraph-reviews"
+
 	// We need a static port so that the urls can be used in static
 	// test data, and to prevent the requests from being randomized
 	// for checksums. Port 16500 should be obscure and unused.
 	testHttpListen = "127.0.0.1:16500"
 	// Accepts any http requests on /, only allows GET on /get, etc.
 	// All return a JSON with request info.
-	TestHttpAny     = "http://" + testHttpListen
-	TestHttpGet     = TestHttpAny + "/get"
-	testHttpPost    = TestHttpAny + "/post"
-	testHttpJWK     = TestHttpAny + "/jwk.json"
-	testHttpJWKDER  = TestHttpAny + "/jwk-der.json"
-	testHttpBundles = TestHttpAny + "/bundles/"
+	TestHttpAny               = "http://" + testHttpListen
+	TestHttpGet               = TestHttpAny + "/get"
+	testHttpPost              = TestHttpAny + "/post"
+	testGraphQLProxyUpstream  = TestHttpAny + handlerPathGraphQLProxyUpstream
+	testGraphQLDataSource     = TestHttpAny + handlerPathGraphQLDataSource
+	testRESTDataSource        = TestHttpAny + handlerPathRestDataSource
+	testRESTHeadersDataSource = TestHttpAny + handlerPathHeadersRestDataSource
+	testSubgraphAccounts      = TestHttpAny + handlerSubgraphAccounts
+	testSubgraphReviews       = TestHttpAny + handlerSubgraphReviews
+	testHttpJWK               = TestHttpAny + "/jwk.json"
+	testHttpJWKLegacy         = TestHttpAny + "/jwk-legacy.json"
+	testHttpBundles           = TestHttpAny + "/bundles/"
+	testReloadGroup           = TestHttpAny + "/groupReload"
 
 	// Nothing should be listening on port 16501 - useful for
 	// testing TCP and HTTP failures.
-	testHttpFailure    = "127.0.0.1:16501"
-	testHttpFailureAny = "http://" + testHttpFailure
-	MockOrgID          = "507f1f77bcf86cd799439011"
+	testHttpFailure       = "127.0.0.1:16501"
+	testHttpFailureAny    = "http://" + testHttpFailure
+	MockOrgID             = "507f1f77bcf86cd799439011"
+	NonCanonicalHeaderKey = "X-CertificateOuid"
 )
 
-func testHttpHandler() *mux.Router {
+func (s *Test) testHttpHandler() *mux.Router {
 	var upgrader = websocket.Upgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
@@ -386,13 +499,22 @@ func testHttpHandler() *mux.Router {
 
 	r.HandleFunc("/get", handleMethod("GET"))
 	r.HandleFunc("/post", handleMethod("POST"))
+
+	r.HandleFunc(handlerPathGraphQLProxyUpstream, graphqlProxyUpstreamHandler)
+	r.HandleFunc(handlerPathGraphQLDataSource, graphqlDataSourceHandler)
+	r.HandleFunc(handlerPathRestDataSource, restDataSourceHandler)
+	r.HandleFunc(handlerPathHeadersRestDataSource, restHeadersDataSourceHandler)
+	r.HandleFunc(handlerSubgraphAccounts, subgraphAccountsHandler)
+	r.HandleFunc(handlerSubgraphReviews, subgraphReviewsHandler)
+
 	r.HandleFunc("/ws", wsHandler)
 	r.HandleFunc("/jwk.json", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, jwkTestJson)
 	})
-	r.HandleFunc("/jwk-der.json", func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, jwkTestDERJson)
+	r.HandleFunc("/jwk-legacy.json", func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, jwkTestJsonLegacy)
 	})
+
 	r.HandleFunc("/compressed", func(w http.ResponseWriter, r *http.Request) {
 		response := "This is a compressed response"
 		w.Header().Set("Content-Encoding", "gzip")
@@ -400,7 +522,8 @@ func testHttpHandler() *mux.Router {
 		json.NewEncoder(gz).Encode(response)
 		gz.Close()
 	})
-	r.HandleFunc("/bundles/{rest:.*}", bundleHandleFunc)
+	r.HandleFunc("/groupReload", s.Gw.groupResetHandler)
+	r.HandleFunc("/bundles/{rest:.*}", s.BundleHandleFunc)
 	r.HandleFunc("/errors/{status}", func(w http.ResponseWriter, r *http.Request) {
 		statusCode, _ := strconv.Atoi(mux.Vars(r)["status"])
 		httpError(w, statusCode)
@@ -410,7 +533,179 @@ func testHttpHandler() *mux.Router {
 	return r
 }
 
+func graphqlProxyUpstreamHandler(w http.ResponseWriter, r *http.Request) {
+	gqlRequest := graphql.Request{}
+	err := graphql.UnmarshalHttpRequest(r, &gqlRequest)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	variables := map[string]string{}
+	err = json.Unmarshal(gqlRequest.Variables, &variables)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	name, ok := variables["a"]
+	if !ok {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	ignoreHeaders := map[string]bool{
+		http.CanonicalHeaderKey("Date"):           true,
+		http.CanonicalHeaderKey("Content-Length"): true,
+	}
+
+	responseCode := http.StatusOK
+	for reqHeaderKey, reqHeaderValues := range r.Header {
+		if ignoreHeaders[reqHeaderKey] {
+			continue
+		}
+
+		if reqHeaderKey == "X-Response-Code" {
+			var err error
+			responseCode, err = strconv.Atoi(reqHeaderValues[0])
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+
+			continue
+		}
+
+		for _, reqHeaderValue := range reqHeaderValues {
+			w.Header().Add(reqHeaderKey, reqHeaderValue)
+		}
+	}
+
+	w.WriteHeader(responseCode)
+	_, _ = w.Write([]byte(`{
+		"data": {
+			"hello": "` + name + `",
+			"httpMethod": "` + r.Method + `",
+		}
+	}`))
+}
+
+func graphqlDataSourceHandler(w http.ResponseWriter, r *http.Request) {
+	_, _ = w.Write([]byte(`{
+			"data": {
+				"countries": [
+					{
+						"code": "TR",
+						"name": "Turkey"
+					},
+					{
+						"code": "RU",
+						"name": "Russia"
+					},
+					{
+						"code": "GB",
+						"name": "United Kingdom"
+					},
+					{
+						"code": "DE",
+						"name": "Germany"
+					}
+				]
+			}
+		}`))
+}
+
+func restHeadersDataSourceHandler(w http.ResponseWriter, r *http.Request) {
+	type KeyVal struct {
+		Name  string `json:"name"`
+		Value string `json:"value"`
+	}
+
+	var headers []KeyVal
+	for name, values := range r.Header {
+		for _, value := range values {
+			headers = append(headers, KeyVal{name, value})
+		}
+	}
+	json.NewEncoder(w).Encode(headers)
+}
+
+func restDataSourceHandler(w http.ResponseWriter, r *http.Request) {
+	_, _ = w.Write([]byte(`[
+			{
+				"name": "Furkan",
+				"country":  {
+					"name": "Turkey"
+				}
+			},
+			{
+				"name": "Leo",
+				"country":  {
+					"name": "Russia"
+				}
+			},
+			{
+				"name": "Josh",
+				"country":  {
+					"name": "UK"
+				}
+			},
+			{
+				"name": "Patric",
+				"country":  {
+					"name": "Germany"
+				}
+			}
+		]`))
+}
+
+func subgraphAccountsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write([]byte(`{
+		"data": {
+			"me": {
+				"id": "1",
+				"username": "tyk"
+			}
+		}
+	}`))
+}
+
+func subgraphReviewsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write([]byte(`{
+			"data": {
+				"_entities": [
+					{
+						"__typename": "User",
+						"reviews": [
+							{
+								"body": "A highly effective form of birth control."
+							},
+							{
+								"body": "Fedoras are one of the most fashionable hats around and can look great with a variety of outfits."
+							}
+						]
+					}
+				]
+			}
+		}`))
+}
+
 const jwkTestJson = `{
+    "keys": [
+        {
+            "use": "sig",
+            "kty": "RSA",
+            "kid": "12345",
+            "alg": "RS256",
+            "n": "yqZ4rwKF8qCExS7kpY4cnJa_37FMkJNkalZ3OuslLB0oRL8T4c94kdF4aeNzSFkSe2n99IBI6Ssl79vbfMZb-t06L0Q94k-_P37x7-_RJZiff4y1VGjrnrnMI2iu9l4iBBRYzNmG6eblroEMMWlgk5tysHgxB59CSNIcD9gqk1hx4n_FgOmvKsfQgWHNlPSDTRcWGWGhB2_XgNVYG2pOlQxAPqLhBHeqGTXBbPfGF9cHzixpsPr6GtbzPwhsQ_8bPxoJ7hdfn-rzztks3d6-HWURcyNTLRe0mjXjjee9Z6-gZ-H-fS4pnP9tqT7IgU6ePUWTpjoiPtLexgsAa_ctjQ",
+            "e": "AQAB"
+        }
+    ]
+}`
+
+const jwkTestJsonLegacy = `{
     "keys": [{
         "alg": "RS256",
         "kty": "RSA",
@@ -423,43 +718,35 @@ const jwkTestJson = `{
     }]
 }`
 
-// This has public key encoded as PKIX, ASN.1 DER form.
-const jwkTestDERJson = `{
-    "keys": [{
-        "alg": "RS256",
-        "kty": "RSA",
-        "use": "sig",
-        "x5c": ["MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyqZ4rwKF8qCExS7kpY4cnJa/37FMkJNkalZ3OuslLB0oRL8T4c94kdF4aeNzSFkSe2n99IBI6Ssl79vbfMZb+t06L0Q94k+/P37x7+/RJZiff4y1VGjrnrnMI2iu9l4iBBRYzNmG6eblroEMMWlgk5tysHgxB59CSNIcD9gqk1hx4n/FgOmvKsfQgWHNlPSDTRcWGWGhB2/XgNVYG2pOlQxAPqLhBHeqGTXBbPfGF9cHzixpsPr6GtbzPwhsQ/8bPxoJ7hdfn+rzztks3d6+HWURcyNTLRe0mjXjjee9Z6+gZ+H+fS4pnP9tqT7IgU6ePUWTpjoiPtLexgsAa/ctjQIDAQAB"],
-        "n": "xofiG8gsnv9-I_g-5OWTLhaZtgAGq1QEsBCPK9lmLqhuonHe8lT-nK1DM49f6J9QgaOjZ3DB50QkhBysnIFNcXFyzaYIPMoccvuHLPgdBawX4WYKm5gficD0WB0XnTt4sqTI5usFpuop9vvW44BwVGhRqMT7c11gA8TSWMBxDI4A5ARc4MuQtfm64oN-JQodSztArwb9wcmH8WrBvSUkR4pyi9MT8W27gqJ2e2Xn8jgGnswNQWOyCTN84PawOYaN-2ORHeIea1g-URln1bofcHN73vZCIrVbE6iA2D7Ybh22AVrCfunekEDEe2GZfLZLejiZiBWG7enJhcrQIzAQGw",
-        "e": "AQAB",
-        "kid": "12345",
-        "x5t": "12345"
-    }]
-}`
-
-func withAuth(r *http.Request) *http.Request {
+func (s *Test) withAuth(r *http.Request) *http.Request {
 	// This is the default config secret
-	r.Header.Set("x-tyk-authorization", config.Global().Secret)
+	r.Header.Set("x-tyk-authorization", s.Gw.GetConfig().Secret)
 	return r
 }
 
 // Deprecated: Use Test.CreateSession instead.
-func CreateSession(sGen ...func(s *user.SessionState)) string {
-	key := generateToken("default", "")
+func CreateSession(gw *Gateway, sGen ...func(s *user.SessionState)) string {
+	key := gw.generateToken("default", "")
 	session := CreateStandardSession()
 	if len(sGen) > 0 {
 		sGen[0](session)
 	}
+
 	if session.Certificate != "" {
-		key = generateToken("default", session.Certificate)
+		key = gw.generateToken("default", session.Certificate)
 	}
 
-	GlobalSessionManager.UpdateSession(storage.HashKey(key), session, 60, config.Global().HashKeys)
+	hashKeys := gw.GetConfig().HashKeys
+	hashedKey := storage.HashKey(key, hashKeys)
+	err := gw.GlobalSessionManager.UpdateSession(hashedKey, session, 60, hashKeys)
+	if err != nil {
+		log.WithError(err).Error("updating session.")
+	}
 	return key
 }
 
 func CreateStandardSession() *user.SessionState {
-	session := new(user.SessionState)
+	session := user.NewSessionState()
 	session.Rate = 10000
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
@@ -488,8 +775,9 @@ func CreateStandardPolicy() *user.Policy {
 	}
 }
 
-func CreatePolicy(pGen ...func(p *user.Policy)) string {
-	pID := keyGen.GenerateAuthKey("")
+func (s *Test) CreatePolicy(pGen ...func(p *user.Policy)) string {
+
+	pID := s.Gw.keyGen.GenerateAuthKey("")
 	pol := CreateStandardPolicy()
 	pol.ID = pID
 
@@ -497,9 +785,9 @@ func CreatePolicy(pGen ...func(p *user.Policy)) string {
 		pGen[0](pol)
 	}
 
-	policiesMu.Lock()
-	policiesByID[pol.ID] = *pol
-	policiesMu.Unlock()
+	s.Gw.policiesMu.Lock()
+	s.Gw.policiesByID[pol.ID] = *pol
+	s.Gw.policiesMu.Unlock()
 
 	return pol.ID
 }
@@ -588,16 +876,16 @@ func TestReq(t testing.TB, method, urlStr string, body interface{}) *http.Reques
 	return httptest.NewRequest(method, urlStr, TestReqBody(t, body))
 }
 
-func CreateDefinitionFromString(defStr string) *APISpec {
-	loader := APIDefinitionLoader{}
+func (gw *Gateway) CreateDefinitionFromString(defStr string) *APISpec {
+	loader := APIDefinitionLoader{Gw: gw}
 	def := loader.ParseDefinition(strings.NewReader(defStr))
-	spec := loader.MakeSpec(def, nil)
+	spec := loader.MakeSpec(&def, nil)
 	return spec
 }
 
-func LoadSampleAPI(def string) (spec *APISpec) {
-	spec = CreateDefinitionFromString(def)
-	loadApps([]*APISpec{spec})
+func (gw *Gateway) LoadSampleAPI(def string) (spec *APISpec) {
+	spec = gw.CreateDefinitionFromString(def)
+	gw.loadApps([]*APISpec{spec})
 	return
 }
 
@@ -610,65 +898,65 @@ func firstVals(vals map[string][]string) map[string]string {
 }
 
 type TestConfig struct {
-	sepatateControlAPI bool
+	SeparateControlAPI bool
 	Delay              time.Duration
 	HotReload          bool
 	overrideDefaults   bool
 	CoprocessConfig    config.CoProcessConfig
+	// SkipEmptyRedis to avoid restart the storage
+	SkipEmptyRedis    bool
+	EnableTestDNSMock bool
 }
 
 type Test struct {
-	URL string
-
-	testRunner   *test.HTTPTestRunner
-	GlobalConfig config.Config
-	config       TestConfig
-	cacnel       func()
+	URL        string
+	testRunner *test.HTTPTestRunner
+	// GlobalConfig deprecate this and instead use GW.getConfig()
+	GlobalConfig     config.Config
+	config           TestConfig
+	gwMu             sync.Mutex
+	Gw               *Gateway `json:"-"`
+	HttpHandler      *http.Server
+	TestServerRouter *mux.Router
+	MockHandle       *test.DnsMockHandle
 }
 
-func (s *Test) Start() {
-	l, _ := net.Listen("tcp", "127.0.0.1:0")
-	_, port, _ := net.SplitHostPort(l.Addr().String())
-	l.Close()
-	globalConf := config.Global()
-	globalConf.ListenPort, _ = strconv.Atoi(port)
+type SlaveDataCenter struct {
+	SlaveOptions config.SlaveOptionsConfig
+	Redis        config.StorageOptionsConf
+}
 
-	if s.config.sepatateControlAPI {
-		l, _ := net.Listen("tcp", "127.0.0.1:0")
-
-		_, port, _ = net.SplitHostPort(l.Addr().String())
-		l.Close()
-		globalConf.ControlAPIPort, _ = strconv.Atoi(port)
-	}
-	globalConf.CoProcessOptions = s.config.CoprocessConfig
-	config.SetGlobal(globalConf)
-
-	setupPortsWhitelist()
-
-	startServer()
+func (s *Test) Start(genConf func(globalConf *config.Config)) *Gateway {
+	// init and create gw
 	ctx, cancel := context.WithCancel(context.Background())
-	s.cacnel = cancel
-	setupGlobals(ctx)
+	s.BootstrapGw(ctx, cancel, genConf)
+
+	s.Gw.setupPortsWhitelist()
+	s.Gw.startServer()
+	s.Gw.setupGlobals()
+
 	// Set up a default org manager so we can traverse non-live paths
-	if !config.Global().SupressDefaultOrgStore {
-		DefaultOrgStore.Init(getGlobalStorageHandler("orgkey.", false))
-		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
+	if !s.Gw.GetConfig().SupressDefaultOrgStore {
+		s.Gw.DefaultOrgStore.Init(s.Gw.getGlobalStorageHandler("orgkey.", false))
+		s.Gw.DefaultQuotaStore.Init(s.Gw.getGlobalStorageHandler("orgkey.", false))
 	}
 
-	s.GlobalConfig = globalConf
+	s.GlobalConfig = s.Gw.GetConfig()
 
 	scheme := "http://"
 	if s.GlobalConfig.HttpServerOptions.UseSSL {
 		scheme = "https://"
 	}
-	s.URL = scheme + mainProxy().listener.Addr().String()
+
+	s.URL = scheme + s.Gw.DefaultProxyMux.getProxy(s.Gw.GetConfig().ListenPort, s.Gw.GetConfig()).listener.Addr().String()
 
 	s.testRunner = &test.HTTPTestRunner{
 		RequestBuilder: func(tc *test.TestCase) (*http.Request, error) {
 			tc.BaseURL = s.URL
 			if tc.ControlRequest {
-				if s.config.sepatateControlAPI {
-					tc.BaseURL = scheme + controlProxy().listener.Addr().String()
+
+				if s.config.SeparateControlAPI {
+					tc.BaseURL = scheme + s.controlProxy().listener.Addr().String()
 				} else if s.GlobalConfig.ControlAPIHostname != "" {
 					tc.Domain = s.GlobalConfig.ControlAPIHostname
 				}
@@ -676,7 +964,7 @@ func (s *Test) Start() {
 			r, err := test.NewRequest(tc)
 
 			if tc.AdminAuth {
-				r = withAuth(r)
+				r = s.withAuth(r)
 			}
 
 			if s.config.Delay > 0 {
@@ -687,6 +975,152 @@ func (s *Test) Start() {
 		},
 		Do: test.HttpServerRunner(),
 	}
+
+	return s.Gw
+}
+
+func (s *Test) BootstrapGw(ctx context.Context, cancelFn context.CancelFunc, genConf func(globalConf *config.Config)) {
+	var gwConfig config.Config
+	if err := config.WriteDefault("", &gwConfig); err != nil {
+		panic(err)
+	}
+
+	l, _ := net.Listen("tcp", "127.0.0.1:0")
+	_, port, _ := net.SplitHostPort(l.Addr().String())
+	l.Close()
+	gwConfig.ListenPort, _ = strconv.Atoi(port)
+
+	if s.config.SeparateControlAPI {
+		l, _ := net.Listen("tcp", "127.0.0.1:0")
+		_, port, _ = net.SplitHostPort(l.Addr().String())
+		l.Close()
+		gwConfig.ControlAPIPort, _ = strconv.Atoi(port)
+	}
+	gwConfig.CoProcessOptions = s.config.CoprocessConfig
+
+	s.gwMu.Lock()
+	s.Gw = NewGateway(gwConfig, ctx, cancelFn)
+	s.Gw.setTestMode(true)
+	s.gwMu.Unlock()
+
+	s.MockHandle = MockHandle
+
+	var err error
+	gwConfig.Storage.Database = rand.Intn(15)
+	gwConfig.AppPath, err = ioutil.TempDir("", "tyk-test-")
+
+	if err != nil {
+		panic(err)
+	}
+	gwConfig.EnableAnalytics = true
+	gwConfig.AnalyticsConfig.EnableGeoIP = true
+
+	_, b, _, _ := runtime.Caller(0)
+	gatewayPath := filepath.Dir(b)
+	rootPath := filepath.Dir(gatewayPath)
+
+	gwConfig.AnalyticsConfig.GeoIPDBLocation = filepath.Join(rootPath, "testdata", "MaxMind-DB-test-ipv4-24.mmdb")
+	gwConfig.EnableJSVM = true
+	gwConfig.HashKeyFunction = storage.HashMurmur64
+	gwConfig.Monitor.EnableTriggerMonitors = true
+	gwConfig.AnalyticsConfig.NormaliseUrls.Enabled = true
+	gwConfig.AllowInsecureConfigs = true
+	// Enable coprocess and bundle downloader:
+	gwConfig.CoProcessOptions.EnableCoProcess = true
+	gwConfig.EnableBundleDownloader = true
+	gwConfig.BundleBaseURL = testHttpBundles
+	gwConfig.MiddlewarePath = testMiddlewarePath
+
+	// force ipv4 for now, to work around the docker bug affecting
+	// Go 1.8 and earlier
+	gwConfig.ListenAddress = "127.0.0.1"
+	if genConf != nil {
+		genConf(&gwConfig)
+	}
+
+	s.TestServerRouter = s.testHttpHandler()
+
+	skip := gwConfig.HttpServerOptions.SkipURLCleaning
+	s.TestServerRouter.SkipClean(skip)
+	s.HttpHandler = &http.Server{
+		Addr:           testHttpListen,
+		Handler:        s.TestServerRouter,
+		ReadTimeout:    1 * time.Second,
+		WriteTimeout:   1 * time.Second,
+		MaxHeaderBytes: 1 << 20,
+	}
+
+	go func() {
+		if err := s.HttpHandler.ListenAndServe(); err != http.ErrServerClosed {
+			log.Warn("testServer.ListenAndServe() err: ", err.Error())
+		}
+	}()
+
+	s.Gw.keyGen = DefaultKeyGenerator{Gw: s.Gw}
+	s.Gw.CoProcessInit()
+	s.Gw.afterConfSetup()
+
+	defaultTestConfig = gwConfig
+	s.Gw.SetConfig(gwConfig)
+
+	cli.Init(VERSION, confPaths)
+
+	err = s.Gw.initialiseSystem()
+	if err != nil {
+		panic(err)
+	}
+
+	if s.Gw.GetConfig().EnableAnalytics && s.Gw.analytics.GeoIPDB == nil {
+		panic("GeoIPDB was not initialized")
+	}
+
+	configs := s.Gw.GetConfig()
+
+	go storage.ConnectToRedis(ctx, func() {
+		if s.Gw.OnConnect != nil {
+			s.Gw.OnConnect()
+		}
+	}, &configs)
+
+	for {
+		if storage.Connected() {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	if !s.config.SkipEmptyRedis {
+		if err := s.emptyRedis(); err != nil {
+			panic(err)
+		}
+	}
+
+	// Start listening for reload messages
+	if !s.Gw.GetConfig().SuppressRedisSignalReload {
+		go s.Gw.startPubSubLoop()
+	}
+
+	if slaveOptions := s.Gw.GetConfig().SlaveOptions; slaveOptions.UseRPC {
+		mainLog.Debug("Starting RPC reload listener")
+		s.Gw.RPCListener = RPCStorageHandler{
+			KeyPrefix:        "rpc.listener.",
+			SuppressRegister: true,
+			Gw:               s.Gw,
+		}
+
+		s.Gw.RPCListener.Connect()
+		go s.Gw.rpcReloadLoop(slaveOptions.RPCKey)
+		go s.Gw.RPCListener.StartRPCKeepaliveWatcher()
+		go s.Gw.RPCListener.StartRPCLoopCheck(slaveOptions.RPCKey)
+
+		go s.Gw.reloadLoop(time.Tick(time.Second))
+		go s.Gw.reloadQueueLoop()
+	} else {
+		go s.Gw.reloadLoop(s.Gw.ReloadTestCase.ReloadTicker(), s.Gw.ReloadTestCase.OnReload)
+		go s.Gw.reloadQueueLoop(s.Gw.ReloadTestCase.OnQueued)
+	}
+
+	go s.reloadSimulation()
 }
 
 func (s *Test) Do(tc test.TestCase) (*http.Response, error) {
@@ -694,23 +1128,59 @@ func (s *Test) Do(tc test.TestCase) (*http.Response, error) {
 	return s.testRunner.Do(req, &tc)
 }
 
+func (s *Test) ReloadGatewayProxy() {
+	s.gwMu.Lock()
+	s.Gw.DefaultProxyMux.swap(&proxyMux{}, s.Gw)
+	s.Gw.startServer()
+	s.gwMu.Unlock()
+}
+
 func (s *Test) Close() {
-	if s.cacnel != nil {
-		s.cacnel()
+	if s.Gw.cancelFn != nil {
+		s.Gw.cancelFn()
 	}
-	defaultProxyMux.swap(&proxyMux{})
-	if s.config.sepatateControlAPI {
-		globalConf := config.Global()
-		globalConf.ControlAPIPort = 0
-		config.SetGlobal(globalConf)
+
+	for _, p := range s.Gw.DefaultProxyMux.proxies {
+		if p.listener != nil {
+			p.listener.Close()
+		}
 	}
+
+	s.Gw.DefaultProxyMux.swap(&proxyMux{}, s.Gw)
+	if s.config.SeparateControlAPI {
+		gwConfig := s.Gw.GetConfig()
+		gwConfig.ControlAPIPort = 0
+		s.Gw.SetConfig(gwConfig)
+	}
+
+	// if jsvm enabled we need to unmount to prevent high memory consumption
+	if s.Gw.GetConfig().EnableJSVM {
+		s.Gw.GlobalEventsJSVM.VM = nil
+	}
+
+	ctxShutDown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := s.HttpHandler.Shutdown(ctxShutDown)
+	if err != nil {
+		log.WithError(err).Error("shutting down the http handler")
+	} else {
+		log.Info("server exited properly")
+	}
+
+	s.gwMu.Lock()
+	s.Gw.analytics.Stop()
+	s.Gw.GlobalHostChecker.StopPoller()
+	s.gwMu.Unlock()
+	os.RemoveAll(s.Gw.GetConfig().AppPath)
 }
 
 func (s *Test) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, error) {
+	t.Helper()
 	return s.testRunner.Run(t, testCases...)
 }
 
-//TODO:(gernest) when hot reload is suppored enable this.
+//TODO:(gernest) when hot reload is supported enable this.
 func (s *Test) RunExt(t testing.TB, testCases ...test.TestCase) {
 	s.Run(t, testCases...)
 	var testMatrix = []struct {
@@ -723,14 +1193,9 @@ func (s *Test) RunExt(t testing.TB, testCases ...test.TestCase) {
 		{true, false},
 	}
 
-	for i, m := range testMatrix {
+	for _, m := range testMatrix {
 		s.config.HotReload = m.goagain
 		s.config.overrideDefaults = m.overrideDefaults
-
-		if i > 0 {
-			s.Close()
-			s.Start()
-		}
 
 		title := fmt.Sprintf("hotReload: %v, overrideDefaults: %v", m.goagain, m.overrideDefaults)
 		t.(*testing.T).Run(title, func(t *testing.T) {
@@ -789,15 +1254,36 @@ func (s *Test) CreateSession(sGen ...func(s *user.SessionState)) (*user.SessionS
 		return nil, ""
 	}
 
-	return session, keySuccess.Key
+	createdSession, _ := s.Gw.GlobalSessionManager.SessionDetail(session.OrgID, keySuccess.Key, false)
+
+	return &createdSession, keySuccess.Key
 }
 
-func StartTest(config ...TestConfig) *Test {
+func (s *Test) GetApiById(apiId string) *APISpec {
+	return s.Gw.getApiSpec(apiId)
+}
+
+func (s *Test) StopRPCClient() {
+	rpc.Reset()
+}
+
+func (s *Test) GetPolicyById(policyId string) (user.Policy, bool) {
+	s.Gw.policiesMu.Lock()
+	defer s.Gw.policiesMu.Unlock()
+	pol, found := s.Gw.policiesByID[policyId]
+	return pol, found
+}
+
+func StartTest(genConf func(globalConf *config.Config), testConfig ...TestConfig) *Test {
 	t := &Test{}
-	if len(config) > 0 {
-		t.config = config[0]
+
+	// DNS mock enabled by default
+	t.config.EnableTestDNSMock = true
+	if len(testConfig) > 0 {
+		t.config = testConfig[0]
 	}
-	t.Start()
+
+	t.Start(genConf)
 
 	return t
 }
@@ -826,8 +1312,224 @@ const sampleAPI = `{
     "proxy": {
         "listen_path": "/sample",
         "target_url": "` + TestHttpAny + `"
+    },
+	"graphql": {
+      "enabled": false,
+      "execution_mode": "executionEngine",
+	  "version": "",
+      "schema": "` + testComposedSchema + `",
+      "type_field_configurations": [
+        ` + testGraphQLDataSourceConfiguration + `,
+        ` + testRESTDataSourceConfiguration + `
+      ],
+	  "engine": {
+		"field_configs": [
+			{
+				"type_name": "Query",
+				"field_name": "people",
+				"disable_default_mapping": true,
+				"path": [""]
+			},
+			{
+				"type_name": "Query",
+				"field_name": "headers",
+				"disable_default_mapping": true,
+				"path": [""]
+			}
+		],
+		"data_sources": [
+		    ` + testRESTDataSourceConfigurationV2 + `,
+			` + testGraphQLDataSourceConfigurationV2 + `,
+			` + testRESTHeadersDataSourceConfigurationV2 + `
+		]
+	},
+      "playground": {
+        "enabled": false,
+        "path": "/playground"
+      }
     }
 }`
+
+const testComposedSchema = "type Query {countries: [Country] headers: [Header]} " +
+	"extend type Query {people: [Person]}" +
+	"type Person {name: String country: Country} " +
+	"type Country {code: String name: String} " +
+	"type Header {name:String value: String}"
+
+const testGraphQLDataSourceConfigurationV2 = `
+{
+	"kind": "GraphQL",
+	"name": "countries",
+	"internal": true,
+	"root_fields": [
+		{ "type": "Query", "fields": ["countries"] }
+	],
+	"config": {
+		"url": "` + testGraphQLDataSource + `",
+		"method": "POST"
+	}
+}`
+
+const testGraphQLDataSourceConfiguration = `
+{
+  "type_name": "Query",
+  "field_name": "countries",
+  "mapping": {
+	"disabled": false,
+	"path": "countries"
+  },
+  "data_source": {
+	"kind": "GraphQLDataSource",
+	"data_source_config": {
+	  "url": "` + testGraphQLDataSource + `",
+	  "method": "POST"
+	}
+  }
+}
+`
+
+const testRESTHeadersDataSourceConfigurationV2 = `
+{
+	"kind": "REST",
+	"name": "headers",
+	"internal": true,
+	"root_fields": [
+		{ "type": "Query", "fields": ["headers"] }
+	],
+	"config": {
+		"url": "` + testRESTHeadersDataSource + `",
+		"method": "GET",
+		"headers": {
+			"static": "barbaz",
+			"injected": "{{ .request.headers.injected }}"
+		},
+		"query": [],
+		"body": ""
+	}
+}`
+
+const testRESTDataSourceConfigurationV2 = `
+{
+	"kind": "REST",
+	"name": "people",
+	"internal": true,
+	"root_fields": [
+		{ "type": "Query", "fields": ["people"] }
+	],
+	"config": {
+		"url": "` + testRESTDataSource + `",
+		"method": "GET",
+		"headers": {},
+		"query": [],
+		"body": ""
+	}
+}`
+
+const testRESTDataSourceConfiguration = `
+{
+ "type_name": "Query",
+ "field_name": "people",
+  "mapping": {
+	"disabled": false,
+	"path": ""
+  },
+  "data_source": {
+    "kind": "HTTPJSONDataSource",
+	"data_source_config": {
+	  "url": "` + testRESTDataSource + `",
+	  "method": "GET",
+	  "body": "",
+	  "headers": [],
+	  "default_type_name": "People",
+	  "status_code_type_name_mappings": [
+		{
+		  "status_code": 200,
+		  "type_name": ""
+		}
+	  ]
+	}
+  }
+}`
+
+func generateRESTDataSourceV2(gen func(dataSource *apidef.GraphQLEngineDataSource, restConf *apidef.GraphQLEngineDataSourceConfigREST)) apidef.GraphQLEngineDataSource {
+	ds := apidef.GraphQLEngineDataSource{}
+	if err := json.Unmarshal([]byte(testRESTDataSourceConfigurationV2), &ds); err != nil {
+		panic(err)
+	}
+
+	restConf := apidef.GraphQLEngineDataSourceConfigREST{}
+	if err := json.Unmarshal(ds.Config, &restConf); err != nil {
+		panic(err)
+	}
+
+	gen(&ds, &restConf)
+
+	rawConfig, err := json.Marshal(restConf)
+	if err != nil {
+		panic(err)
+	}
+
+	ds.Config = rawConfig
+	return ds
+}
+
+func generateGraphQLDataSourceV2(gen func(dataSource *apidef.GraphQLEngineDataSource, graphqlConf *apidef.GraphQLEngineDataSourceConfigGraphQL)) apidef.GraphQLEngineDataSource {
+	ds := apidef.GraphQLEngineDataSource{}
+	if err := json.Unmarshal([]byte(testGraphQLDataSourceConfigurationV2), &ds); err != nil {
+		panic(err)
+	}
+
+	graphqlConf := apidef.GraphQLEngineDataSourceConfigGraphQL{}
+	if err := json.Unmarshal(ds.Config, &graphqlConf); err != nil {
+		panic(err)
+	}
+
+	gen(&ds, &graphqlConf)
+
+	rawConfig, err := json.Marshal(graphqlConf)
+	if err != nil {
+		panic(err)
+	}
+
+	ds.Config = rawConfig
+	return ds
+}
+
+func generateRESTDataSource(gen ...func(restDataSource *datasource.HttpJsonDataSourceConfig)) json.RawMessage {
+	typeFieldConfiguration := datasource.TypeFieldConfiguration{}
+	if err := json.Unmarshal([]byte(testRESTDataSourceConfiguration), &typeFieldConfiguration); err != nil {
+		panic(err)
+	}
+
+	restDataSource := datasource.HttpJsonDataSourceConfig{}
+	_ = json.Unmarshal(typeFieldConfiguration.DataSource.Config, &restDataSource)
+
+	if len(gen) > 0 {
+		gen[0](&restDataSource)
+	}
+
+	rawData, _ := json.Marshal(restDataSource)
+
+	return rawData
+}
+
+func generateGraphQLDataSource(gen ...func(graphQLDataSource *datasource.GraphQLDataSourceConfig)) json.RawMessage {
+	typeFieldConfiguration := datasource.TypeFieldConfiguration{}
+	if err := json.Unmarshal([]byte(testGraphQLDataSourceConfiguration), &typeFieldConfiguration); err != nil {
+		panic(err)
+	}
+
+	graphQLDataSource := datasource.GraphQLDataSourceConfig{}
+	_ = json.Unmarshal(typeFieldConfiguration.DataSource.Config, &graphQLDataSource)
+
+	if len(gen) > 0 {
+		gen[0](&graphQLDataSource)
+	}
+
+	rawData, _ := json.Marshal(graphQLDataSource)
+
+	return rawData
+}
 
 func UpdateAPIVersion(spec *APISpec, name string, verGen func(version *apidef.VersionInfo)) {
 	version := spec.VersionData.Versions[name]
@@ -858,40 +1560,41 @@ func BuildAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 	return specs
 }
 
-func LoadAPI(specs ...*APISpec) (out []*APISpec) {
-	globalConf := config.Global()
-	oldPath := globalConf.AppPath
-	globalConf.AppPath, _ = ioutil.TempDir("", "apps")
-	config.SetGlobal(globalConf)
+func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
+	gwConf := gw.GetConfig()
+	oldPath := gwConf.AppPath
+	gwConf.AppPath, _ = ioutil.TempDir("", "apps")
+	gw.SetConfig(gwConf)
 	defer func() {
-		globalConf := config.Global()
+		globalConf := gw.GetConfig()
 		os.RemoveAll(globalConf.AppPath)
 		globalConf.AppPath = oldPath
-		config.SetGlobal(globalConf)
+		gw.SetConfig(globalConf)
 	}()
 
 	for i, spec := range specs {
 		specBytes, err := json.Marshal(spec)
 		if err != nil {
+			fmt.Printf(" \n %+v \n", spec)
 			panic(err)
 		}
-		specFilePath := filepath.Join(config.Global().AppPath, spec.APIID+strconv.Itoa(i)+".json")
+
+		specFilePath := filepath.Join(gwConf.AppPath, spec.APIID+strconv.Itoa(i)+".json")
 		if err := ioutil.WriteFile(specFilePath, specBytes, 0644); err != nil {
 			panic(err)
 		}
 	}
 
-	DoReload()
-
+	gw.DoReload()
 	for _, spec := range specs {
-		out = append(out, getApiSpec(spec.APIID))
+		out = append(out, gw.getApiSpec(spec.APIID))
 	}
 
 	return out
 }
 
-func BuildAndLoadAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
-	return LoadAPI(BuildAPI(apiGens...)...)
+func (gw *Gateway) BuildAndLoadAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
+	return gw.LoadAPI(BuildAPI(apiGens...)...)
 }
 
 func CloneAPI(a *APISpec) *APISpec {
@@ -947,8 +1650,8 @@ func (p *httpProxyHandler) handleHTTP(w http.ResponseWriter, req *http.Request) 
 	io.Copy(w, resp.Body)
 }
 
-func (p *httpProxyHandler) Stop() error {
-	ResetTestConfig()
+func (p *httpProxyHandler) Stop(s *Test) error {
+	s.ResetTestConfig()
 	return p.server.Close()
 }
 

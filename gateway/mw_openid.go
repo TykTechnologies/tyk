@@ -167,12 +167,12 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 
 	data := []byte(ouser.ID)
 	keyID := fmt.Sprintf("%x", md5.Sum(data))
-	sessionID := generateToken(k.Spec.OrgID, keyID)
+	sessionID := k.Gw.generateToken(k.Spec.OrgID, keyID)
 
 	if k.Spec.OpenIDOptions.SegregateByClient {
 		// We are segregating by client, so use it as part of the internal token
 		logger.Debug("Client ID:", clientID)
-		sessionID = generateToken(k.Spec.OrgID, fmt.Sprintf("%x", md5.Sum([]byte(clientID)))+keyID)
+		sessionID = k.Gw.generateToken(k.Spec.OrgID, fmt.Sprintf("%x", md5.Sum([]byte(clientID)))+keyID)
 	}
 
 	logger.Debug("Generated Session ID: ", sessionID)
@@ -193,6 +193,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 	}
 
 	session, exists := k.CheckSessionAndIdentityForValidKey(sessionID, r)
+	sessionID = session.KeyID
 	if !exists {
 		// Create it
 		logger.Debug("Key does not exist, creating")
@@ -200,7 +201,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 
 		if !useScope {
 			// We need a base policy as a template, either get it from the token itself OR a proxy client ID within Tyk
-			newSession, err := generateSessionFromPolicy(policyID,
+			newSession, err := k.Gw.generateSessionFromPolicy(policyID,
 				k.Spec.OrgID,
 				true)
 
@@ -210,7 +211,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 				return errors.New("Key not authorized: no matching policy"), http.StatusForbidden
 			}
 
-			session = newSession
+			session = newSession.Clone()
 		}
 
 		session.OrgID = k.Spec.OrgID
@@ -230,7 +231,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 	// 4. Set session state on context, we will need it later
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.OIDCUser, apidef.UnsetAuth:
-		ctxSetSession(r, &session, sessionID, true)
+		ctxSetSession(r, &session, true, k.Gw.GetConfig().HashKeys)
 	}
 	ctxSetJWTContextVars(k.Spec, r, token)
 
@@ -239,7 +240,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 
 func (k *OpenIDMW) reportLoginFailure(tykId string, r *http.Request) {
 	k.Logger().WithFields(logrus.Fields{
-		"key": obfuscateKey(tykId),
+		"key": k.Gw.obfuscateKey(tykId),
 	}).Warning("Attempted access with invalid key.")
 
 	// Fire Authfailed Event

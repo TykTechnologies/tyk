@@ -1,19 +1,26 @@
 package apidef
 
 import (
+	"database/sql/driver"
 	"encoding/base64"
 	"encoding/json"
 	"encoding/xml"
+	"fmt"
+	"net/http"
 	"text/template"
+	"time"
+
+	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
 
 	"github.com/clbanning/mxj"
 
 	"github.com/lonelycode/osin"
 	"gopkg.in/mgo.v2/bson"
-
-	"time"
+	_ "gorm.io/gorm"
+	_ "gorm.io/gorm/schema"
 
 	"github.com/TykTechnologies/gojsonschema"
+
 	"github.com/TykTechnologies/tyk/regexp"
 )
 
@@ -70,7 +77,80 @@ const (
 	All    RoutingTriggerOnType = "all"
 	Any    RoutingTriggerOnType = "any"
 	Ignore RoutingTriggerOnType = ""
+
+	// TykInternalApiHeader - flags request as internal api looping request
+	TykInternalApiHeader = "x-tyk-internal"
 )
+
+type ObjectId bson.ObjectId
+
+func (j *ObjectId) Scan(value interface{}) error {
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		return fmt.Errorf("Failed to unmarshal JSON value: %v", value)
+	}
+
+	// reflect magic to update existing string without creating new one
+	if len(bytes) > 0 {
+		bs := ObjectId(bson.ObjectIdHex(string(bytes)))
+		*j = bs
+	}
+
+	return nil
+}
+
+func (j ObjectId) Value() (driver.Value, error) {
+	return bson.ObjectId(j).Hex(), nil
+}
+
+func (j ObjectId) Hex() string {
+	return bson.ObjectId(j).Hex()
+}
+
+func (j ObjectId) Time() time.Time {
+	return bson.ObjectId(j).Time()
+}
+
+func (j ObjectId) Valid() bool {
+	return bson.ObjectId(j).Valid()
+}
+
+func (j ObjectId) String() string {
+	return j.Hex()
+}
+
+func (j ObjectId) GetBSON() (interface{}, error) {
+	return bson.ObjectId(j), nil
+}
+
+func ObjectIdHex(hex string) ObjectId {
+	return ObjectId(bson.ObjectIdHex(hex))
+}
+
+func NewObjectId() ObjectId {
+	return ObjectId(bson.NewObjectId())
+}
+
+func IsObjectIdHex(hex string) bool {
+	return bson.IsObjectIdHex(hex)
+}
+
+func (j ObjectId) MarshalJSON() ([]byte, error) {
+	return bson.ObjectId(j).MarshalJSON()
+}
+
+func (j *ObjectId) UnmarshalJSON(buf []byte) error {
+	var b bson.ObjectId
+	b.UnmarshalJSON(buf)
+	*j = ObjectId(string(b))
+
+	return nil
+}
 
 type EndpointMethodMeta struct {
 	Action  EndpointMethodAction `bson:"action" json:"action"`
@@ -149,6 +229,7 @@ type CircuitBreakerMeta struct {
 	ThresholdPercent     float64 `bson:"threshold_percent" json:"threshold_percent"`
 	Samples              int64   `bson:"samples" json:"samples"`
 	ReturnToServiceAfter int     `bson:"return_to_service_after" json:"return_to_service_after"`
+	DisableHalfOpenState bool    `bson:"disable_half_open_state" json:"disable_half_open_state"`
 }
 
 type StringRegexMap struct {
@@ -207,6 +288,13 @@ type ValidatePathMeta struct {
 	ErrorResponseCode int `bson:"error_response_code" json:"error_response_code"`
 }
 
+type GoPluginMeta struct {
+	Path       string `bson:"path" json:"path"`
+	Method     string `bson:"method" json:"method"`
+	PluginPath string `bson:"plugin_path" json:"plugin_path"`
+	SymbolName string `bson:"func_name" json:"func_name"`
+}
+
 type ExtendedPathsSet struct {
 	Ignored                 []EndPointMeta        `bson:"ignored" json:"ignored,omitempty"`
 	WhiteList               []EndPointMeta        `bson:"white_list" json:"white_list,omitempty"`
@@ -229,6 +317,7 @@ type ExtendedPathsSet struct {
 	DoNotTrackEndpoints     []TrackEndpointMeta   `bson:"do_not_track_endpoints" json:"do_not_track_endpoints,omitempty"`
 	ValidateJSON            []ValidatePathMeta    `bson:"validate_json" json:"validate_json,omitempty"`
 	Internal                []InternalMeta        `bson:"internal" json:"internal,omitempty"`
+	GoPlugin                []GoPluginMeta        `bson:"go_plugin" json:"go_plugin,omitempty"`
 }
 
 type VersionInfo struct {
@@ -354,7 +443,7 @@ type OpenIDOptions struct {
 //
 // swagger:model
 type APIDefinition struct {
-	Id                  bson.ObjectId `bson:"_id,omitempty" json:"id,omitempty"`
+	Id                  ObjectId      `bson:"_id,omitempty" json:"id,omitempty" gorm:"primaryKey;column:_id"`
 	Name                string        `bson:"name" json:"name"`
 	Slug                string        `bson:"slug" json:"slug"`
 	ListenPort          int           `bson:"listen_port" json:"listen_port"`
@@ -417,33 +506,8 @@ type APIDefinition struct {
 		DefaultVersion string                 `bson:"default_version" json:"default_version"`
 		Versions       map[string]VersionInfo `bson:"versions" json:"versions"`
 	} `bson:"version_data" json:"version_data"`
-	UptimeTests struct {
-		CheckList []HostCheckObject `bson:"check_list" json:"check_list"`
-		Config    struct {
-			ExpireUptimeAnalyticsAfter int64                         `bson:"expire_utime_after" json:"expire_utime_after"` // must have an expireAt TTL index set (http://docs.mongodb.org/manual/tutorial/expire-data/)
-			ServiceDiscovery           ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
-			RecheckWait                int                           `bson:"recheck_wait" json:"recheck_wait"`
-		} `bson:"config" json:"config"`
-	} `bson:"uptime_tests" json:"uptime_tests"`
-	Proxy struct {
-		PreserveHostHeader          bool                          `bson:"preserve_host_header" json:"preserve_host_header"`
-		ListenPath                  string                        `bson:"listen_path" json:"listen_path"`
-		TargetURL                   string                        `bson:"target_url" json:"target_url"`
-		DisableStripSlash           bool                          `bson:"disable_strip_slash" json:"disable_strip_slash"`
-		StripListenPath             bool                          `bson:"strip_listen_path" json:"strip_listen_path"`
-		EnableLoadBalancing         bool                          `bson:"enable_load_balancing" json:"enable_load_balancing"`
-		Targets                     []string                      `bson:"target_list" json:"target_list"`
-		StructuredTargetList        *HostList                     `bson:"-" json:"-"`
-		CheckHostAgainstUptimeTests bool                          `bson:"check_host_against_uptime_tests" json:"check_host_against_uptime_tests"`
-		ServiceDiscovery            ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
-		Transport                   struct {
-			SSLInsecureSkipVerify   bool     `bson:"ssl_insecure_skip_verify" json:"ssl_insecure_skip_verify"`
-			SSLCipherSuites         []string `bson:"ssl_ciphers" json:"ssl_ciphers"`
-			SSLMinVersion           uint16   `bson:"ssl_min_version" json:"ssl_min_version"`
-			SSLForceCommonNameCheck bool     `json:"ssl_force_common_name_check"`
-			ProxyURL                string   `bson:"proxy_url" json:"proxy_url"`
-		} `bson:"transport" json:"transport"`
-	} `bson:"proxy" json:"proxy"`
+	UptimeTests               UptimeTests            `bson:"uptime_tests" json:"uptime_tests"`
+	Proxy                     ProxyConfig            `bson:"proxy" json:"proxy"`
 	DisableRateLimit          bool                   `bson:"disable_rate_limit" json:"disable_rate_limit"`
 	DisableQuota              bool                   `bson:"disable_quota" json:"disable_quota"`
 	CustomMiddleware          MiddlewareSection      `bson:"custom_middleware" json:"custom_middleware"`
@@ -463,27 +527,27 @@ type APIDefinition struct {
 	DontSetQuotasOnCreate     bool                   `mapstructure:"dont_set_quota_on_create" bson:"dont_set_quota_on_create" json:"dont_set_quota_on_create"`
 	ExpireAnalyticsAfter      int64                  `mapstructure:"expire_analytics_after" bson:"expire_analytics_after" json:"expire_analytics_after"` // must have an expireAt TTL index set (http://docs.mongodb.org/manual/tutorial/expire-data/)
 	ResponseProcessors        []ResponseProcessor    `bson:"response_processors" json:"response_processors"`
-	CORS                      struct {
-		Enable             bool     `bson:"enable" json:"enable"`
-		AllowedOrigins     []string `bson:"allowed_origins" json:"allowed_origins"`
-		AllowedMethods     []string `bson:"allowed_methods" json:"allowed_methods"`
-		AllowedHeaders     []string `bson:"allowed_headers" json:"allowed_headers"`
-		ExposedHeaders     []string `bson:"exposed_headers" json:"exposed_headers"`
-		AllowCredentials   bool     `bson:"allow_credentials" json:"allow_credentials"`
-		MaxAge             int      `bson:"max_age" json:"max_age"`
-		OptionsPassthrough bool     `bson:"options_passthrough" json:"options_passthrough"`
-		Debug              bool     `bson:"debug" json:"debug"`
-	} `bson:"CORS" json:"CORS"`
-	Domain                  string                 `bson:"domain" json:"domain"`
-	Certificates            []string               `bson:"certificates" json:"certificates"`
-	DoNotTrack              bool                   `bson:"do_not_track" json:"do_not_track"`
-	Tags                    []string               `bson:"tags" json:"tags"`
-	EnableContextVars       bool                   `bson:"enable_context_vars" json:"enable_context_vars"`
-	ConfigData              map[string]interface{} `bson:"config_data" json:"config_data"`
-	TagHeaders              []string               `bson:"tag_headers" json:"tag_headers"`
-	GlobalRateLimit         GlobalRateLimit        `bson:"global_rate_limit" json:"global_rate_limit"`
-	StripAuthData           bool                   `bson:"strip_auth_data" json:"strip_auth_data"`
-	EnableDetailedRecording bool                   `bson:"enable_detailed_recording" json:"enable_detailed_recording"`
+	CORS                      CORSConfig             `bson:"CORS" json:"CORS"`
+	Domain                    string                 `bson:"domain" json:"domain"`
+	Certificates              []string               `bson:"certificates" json:"certificates"`
+	DoNotTrack                bool                   `bson:"do_not_track" json:"do_not_track"`
+	Tags                      []string               `bson:"tags" json:"tags"`
+	EnableContextVars         bool                   `bson:"enable_context_vars" json:"enable_context_vars"`
+	ConfigData                map[string]interface{} `bson:"config_data" json:"config_data"`
+	TagHeaders                []string               `bson:"tag_headers" json:"tag_headers"`
+	GlobalRateLimit           GlobalRateLimit        `bson:"global_rate_limit" json:"global_rate_limit"`
+	StripAuthData             bool                   `bson:"strip_auth_data" json:"strip_auth_data"`
+	EnableDetailedRecording   bool                   `bson:"enable_detailed_recording" json:"enable_detailed_recording"`
+	GraphQL                   GraphQLConfig          `bson:"graphql" json:"graphql"`
+}
+
+type UptimeTests struct {
+	CheckList []HostCheckObject `bson:"check_list" json:"check_list"`
+	Config    struct {
+		ExpireUptimeAnalyticsAfter int64                         `bson:"expire_utime_after" json:"expire_utime_after"` // must have an expireAt TTL index set (http://docs.mongodb.org/manual/tutorial/expire-data/)
+		ServiceDiscovery           ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
+		RecheckWait                int                           `bson:"recheck_wait" json:"recheck_wait"`
+	} `bson:"config" json:"config"`
 }
 
 type AuthConfig struct {
@@ -500,6 +564,8 @@ type AuthConfig struct {
 type SignatureConfig struct {
 	Algorithm        string `mapstructure:"algorithm" bson:"algorithm" json:"algorithm"`
 	Header           string `mapstructure:"header" bson:"header" json:"header"`
+	UseParam         bool   `mapstructure:"use_param" bson:"use_param" json:"use_param"`
+	ParamName        string `mapstructure:"param_name" bson:"param_name" json:"param_name"`
 	Secret           string `mapstructure:"secret" bson:"secret" json:"secret"`
 	AllowedClockSkew int64  `mapstructure:"allowed_clock_skew" bson:"allowed_clock_skew" json:"allowed_clock_skew"`
 	ErrorCode        int    `mapstructure:"error_code" bson:"error_code" json:"error_code"`
@@ -526,6 +592,173 @@ type RequestSigningMeta struct {
 	HeaderList      []string `bson:"header_list" json:"header_list"`
 	CertificateId   string   `bson:"certificate_id" json:"certificate_id"`
 	SignatureHeader string   `bson:"signature_header" json:"signature_header"`
+}
+
+type ProxyConfig struct {
+	PreserveHostHeader          bool                          `bson:"preserve_host_header" json:"preserve_host_header"`
+	ListenPath                  string                        `bson:"listen_path" json:"listen_path"`
+	TargetURL                   string                        `bson:"target_url" json:"target_url"`
+	DisableStripSlash           bool                          `bson:"disable_strip_slash" json:"disable_strip_slash"`
+	StripListenPath             bool                          `bson:"strip_listen_path" json:"strip_listen_path"`
+	EnableLoadBalancing         bool                          `bson:"enable_load_balancing" json:"enable_load_balancing"`
+	Targets                     []string                      `bson:"target_list" json:"target_list"`
+	StructuredTargetList        *HostList                     `bson:"-" json:"-"`
+	CheckHostAgainstUptimeTests bool                          `bson:"check_host_against_uptime_tests" json:"check_host_against_uptime_tests"`
+	ServiceDiscovery            ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
+	Transport                   struct {
+		SSLInsecureSkipVerify   bool     `bson:"ssl_insecure_skip_verify" json:"ssl_insecure_skip_verify"`
+		SSLCipherSuites         []string `bson:"ssl_ciphers" json:"ssl_ciphers"`
+		SSLMinVersion           uint16   `bson:"ssl_min_version" json:"ssl_min_version"`
+		SSLMaxVersion           uint16   `bson:"ssl_max_version" json:"ssl_max_version"`
+		SSLForceCommonNameCheck bool     `json:"ssl_force_common_name_check"`
+		ProxyURL                string   `bson:"proxy_url" json:"proxy_url"`
+	} `bson:"transport" json:"transport"`
+}
+
+type CORSConfig struct {
+	Enable             bool     `bson:"enable" json:"enable"`
+	AllowedOrigins     []string `bson:"allowed_origins" json:"allowed_origins"`
+	AllowedMethods     []string `bson:"allowed_methods" json:"allowed_methods"`
+	AllowedHeaders     []string `bson:"allowed_headers" json:"allowed_headers"`
+	ExposedHeaders     []string `bson:"exposed_headers" json:"exposed_headers"`
+	AllowCredentials   bool     `bson:"allow_credentials" json:"allow_credentials"`
+	MaxAge             int      `bson:"max_age" json:"max_age"`
+	OptionsPassthrough bool     `bson:"options_passthrough" json:"options_passthrough"`
+	Debug              bool     `bson:"debug" json:"debug"`
+}
+
+// GraphQLConfig is the root config object for a GraphQL API.
+type GraphQLConfig struct {
+	// Enabled indicates if GraphQL should be enabled.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// ExecutionMode is the mode to define how an api behaves.
+	ExecutionMode GraphQLExecutionMode `bson:"execution_mode" json:"execution_mode"`
+	// Version defines the version of the GraphQL config and engine to be used.
+	Version GraphQLConfigVersion `bson:"version" json:"version"`
+	// Schema is the GraphQL Schema exposed by the GraphQL API/Upstream/Engine.
+	Schema string `bson:"schema" json:"schema"`
+	// LastSchemaUpdate contains the date and time of the last triggered schema update to the upstream.
+	LastSchemaUpdate *time.Time `bson:"last_schema_update" json:"last_schema_update,omitempty"`
+	// TypeFieldConfigurations is a rule set of data source and mapping of a schema field.
+	TypeFieldConfigurations []datasource.TypeFieldConfiguration `bson:"type_field_configurations" json:"type_field_configurations"`
+	// GraphQLPlayground is the Playground specific configuration.
+	GraphQLPlayground GraphQLPlayground `bson:"playground" json:"playground"`
+	// Engine holds the configuration for engine v2 and upwards.
+	Engine GraphQLEngineConfig `bson:"engine" json:"engine"`
+	// Proxy holds the configuration for a proxy only api.
+	Proxy GraphQLProxyConfig `bson:"proxy" json:"proxy"`
+	// Subgraph holds the configuration for a GraphQL federation subgraph.
+	Subgraph GraphQLSubgraphConfig `bson:"subgraph" json:"subgraph"`
+	// Supergraph holds the configuration for a GraphQL federation supergraph.
+	Supergraph GraphQLSupergraphConfig `bson:"supergraph" json:"supergraph"`
+}
+
+type GraphQLConfigVersion string
+
+const (
+	GraphQLConfigVersionNone GraphQLConfigVersion = ""
+	GraphQLConfigVersion1    GraphQLConfigVersion = "1"
+	GraphQLConfigVersion2    GraphQLConfigVersion = "2"
+)
+
+type GraphQLProxyConfig struct {
+	AuthHeaders map[string]string `bson:"auth_headers" json:"auth_headers"`
+}
+
+type GraphQLSubgraphConfig struct {
+	SDL string `bson:"sdl" json:"sdl"`
+}
+
+type GraphQLSupergraphConfig struct {
+	// UpdatedAt contains the date and time of the last update of a supergraph API.
+	UpdatedAt     *time.Time              `bson:"updated_at" json:"updated_at,omitempty"`
+	Subgraphs     []GraphQLSubgraphEntity `bson:"subgraphs" json:"subgraphs"`
+	MergedSDL     string                  `bson:"merged_sdl" json:"merged_sdl"`
+	GlobalHeaders map[string]string       `bson:"global_headers" json:"global_headers"`
+}
+
+type GraphQLSubgraphEntity struct {
+	APIID string `bson:"api_id" json:"api_id"`
+	Name  string `bson:"name" json:"name"`
+	URL   string `bson:"url" json:"url"`
+	SDL   string `bson:"sdl" json:"sdl"`
+}
+
+type GraphQLEngineConfig struct {
+	FieldConfigs []GraphQLFieldConfig      `bson:"field_configs" json:"field_configs"`
+	DataSources  []GraphQLEngineDataSource `bson:"data_sources" json:"data_sources"`
+}
+
+type GraphQLFieldConfig struct {
+	TypeName              string   `bson:"type_name" json:"type_name"`
+	FieldName             string   `bson:"field_name" json:"field_name"`
+	DisableDefaultMapping bool     `bson:"disable_default_mapping" json:"disable_default_mapping"`
+	Path                  []string `bson:"path" json:"path"`
+}
+
+type GraphQLEngineDataSourceKind string
+
+const (
+	GraphQLEngineDataSourceKindREST    = "REST"
+	GraphQLEngineDataSourceKindGraphQL = "GraphQL"
+)
+
+type GraphQLEngineDataSource struct {
+	Kind       GraphQLEngineDataSourceKind `bson:"kind" json:"kind"`
+	Name       string                      `bson:"name" json:"name"`
+	Internal   bool                        `bson:"internal" json:"internal"`
+	RootFields []GraphQLTypeFields         `bson:"root_fields" json:"root_fields"`
+	Config     json.RawMessage             `bson:"config" json:"config"`
+}
+
+type GraphQLTypeFields struct {
+	Type   string   `bson:"type" json:"type"`
+	Fields []string `bson:"fields" json:"fields"`
+}
+
+type GraphQLEngineDataSourceConfigREST struct {
+	URL     string            `bson:"url" json:"url"`
+	Method  string            `bson:"method" json:"method"`
+	Headers map[string]string `bson:"headers" json:"headers"`
+	Query   []QueryVariable   `bson:"query" json:"query"`
+	Body    string            `bson:"body" json:"body"`
+}
+
+type GraphQLEngineDataSourceConfigGraphQL struct {
+	URL     string            `bson:"url" json:"url"`
+	Method  string            `bson:"method" json:"method"`
+	Headers map[string]string `bson:"headers" json:"headers"`
+}
+
+type QueryVariable struct {
+	Name  string `bson:"name" json:"name"`
+	Value string `bson:"value" json:"value"`
+}
+
+// GraphQLExecutionMode is the mode in which the GraphQL Middleware should operate.
+type GraphQLExecutionMode string
+
+const (
+	// GraphQLExecutionModeProxyOnly is the mode in which the GraphQL Middleware doesn't evaluate the GraphQL request
+	// In other terms, the GraphQL Middleware will not act as a GraphQL server in itself.
+	// The GraphQL Middleware will (optionally) validate the request and leave the execution up to the upstream.
+	GraphQLExecutionModeProxyOnly GraphQLExecutionMode = "proxyOnly"
+	// GraphQLExecutionModeExecutionEngine is the mode in which the GraphQL Middleware will evaluate every request.
+	// This means the Middleware will act as a independent GraphQL service which might delegate partial execution to upstreams.
+	GraphQLExecutionModeExecutionEngine GraphQLExecutionMode = "executionEngine"
+	// GraphQLExecutionModeSubgraph is the mode if the API is defined as a subgraph for usage in GraphQL federation.
+	// It will basically act the same as an API in proxyOnly mode but can be used in a supergraph.
+	GraphQLExecutionModeSubgraph GraphQLExecutionMode = "subgraph"
+	// GraphQLExecutionModeSupergraph is the mode where an API is able to use subgraphs to build a supergraph in GraphQL federation.
+	GraphQLExecutionModeSupergraph GraphQLExecutionMode = "supergraph"
+)
+
+// GraphQLPlayground represents the configuration for the public playground which will be hosted alongside the api.
+type GraphQLPlayground struct {
+	// Enabled indicates if the playground should be enabled.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Path sets the path on which the playground will be hosted if enabled.
+	Path string `bson:"path" json:"path"`
 }
 
 // Clean will URL encode map[string]struct variables for saving
@@ -633,6 +866,32 @@ func (a *APIDefinition) DecodeFromDB() {
 
 	makeCompatible("authToken")
 	makeCompatible("jwt")
+}
+
+// Expired returns true if this Version has expired
+// and false if it has not expired (or does not have any expiry)
+func (v *VersionInfo) Expired() bool {
+	// Never expires
+	if v.Expires == "" || v.Expires == "-1" {
+		return false
+	}
+
+	// otherwise use parsed timestamp
+	if v.ExpiresTs.IsZero() {
+		log.Error("Could not parse expiry date, disallow")
+		return true
+	}
+
+	return time.Since(v.ExpiresTs) >= 0
+}
+
+// ExpiryTime returns the time that this version is due to expire
+func (v *VersionInfo) ExpiryTime() (exp time.Time) {
+	if v.Expired() {
+		return exp
+	}
+	exp = v.ExpiresTs
+	return
 }
 
 func (s *StringRegexMap) Check(value string) (match string) {
@@ -786,6 +1045,23 @@ func DummyAPI() APIDefinition {
 		},
 	}
 
+	defaultCORSConfig := CORSConfig{
+		Enable:         false,
+		AllowedOrigins: []string{"*"},
+		AllowedMethods: []string{http.MethodGet, http.MethodPost, http.MethodHead},
+		AllowedHeaders: []string{"Origin", "Accept", "Content-Type", "X-Requested-With", "Authorization"},
+	}
+
+	graphql := GraphQLConfig{
+		Enabled:          false,
+		ExecutionMode:    GraphQLExecutionModeProxyOnly,
+		Version:          GraphQLConfigVersion2,
+		LastSchemaUpdate: nil,
+		Proxy: GraphQLProxyConfig{
+			AuthHeaders: map[string]string{},
+		},
+	}
+
 	return APIDefinition{
 		VersionData:             versionData,
 		ConfigData:              map[string]interface{}{},
@@ -807,7 +1083,12 @@ func DummyAPI() APIDefinition {
 				ExtractorConfig: map[string]interface{}{},
 			},
 		},
-		Tags: []string{},
+		Proxy: ProxyConfig{
+			DisableStripSlash: true,
+		},
+		CORS:    defaultCORSConfig,
+		Tags:    []string{},
+		GraphQL: graphql,
 	}
 }
 

@@ -17,6 +17,7 @@ type HeaderInjectorOptions struct {
 type HeaderInjector struct {
 	Spec   *APISpec
 	config HeaderInjectorOptions
+	Gw     *Gateway `json:"-"`
 }
 
 func (HeaderInjector) Name() string {
@@ -33,7 +34,10 @@ func (h *HeaderInjector) HandleError(rw http.ResponseWriter, req *http.Request) 
 func (h *HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
 	// TODO: This should only target specific paths
 
-	vInfo, versionPaths, _, _ := h.Spec.Version(req)
+	ignoreCanonical := h.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
+	vInfo, _ := h.Spec.Version(req)
+	versionPaths := h.Spec.RxPaths[vInfo.Name]
+
 	found, meta := h.Spec.CheckSpecMatchesStatus(req, versionPaths, HeaderInjectedResponse)
 	if found {
 		hmeta := meta.(*apidef.HeaderInjectionMeta)
@@ -41,7 +45,7 @@ func (h *HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Respon
 			res.Header.Del(dKey)
 		}
 		for nKey, nVal := range hmeta.AddHeaders {
-			res.Header.Set(nKey, replaceTykVariables(req, nVal, false))
+			setCustomHeader(res.Header, nKey, h.Gw.replaceTykVariables(req, nVal, false), ignoreCanonical)
 		}
 	}
 
@@ -53,15 +57,15 @@ func (h *HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Respon
 
 	for key, val := range vInfo.GlobalResponseHeaders {
 		log.Debug("Adding: ", key)
-		res.Header.Set(key, replaceTykVariables(req, val, false))
+		setCustomHeader(res.Header, key, h.Gw.replaceTykVariables(req, val, false), ignoreCanonical)
 	}
 
 	// Manage global response header options with response_processors
 	for _, n := range h.config.RemoveHeaders {
 		res.Header.Del(n)
 	}
-	for h, v := range h.config.AddHeaders {
-		res.Header.Set(h, replaceTykVariables(req, v, false))
+	for header, v := range h.config.AddHeaders {
+		setCustomHeader(res.Header, header, h.Gw.replaceTykVariables(req, v, false), ignoreCanonical)
 	}
 
 	return nil
