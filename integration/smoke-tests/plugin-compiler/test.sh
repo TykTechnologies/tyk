@@ -18,10 +18,11 @@ EOF
 export tag=$1
 
 rm -fv testplugin/*.so || true
+docker-compose down 
 docker run --rm -v `pwd`/testplugin:/plugin-source tykio/tyk-plugin-compiler:${tag} testplugin.so
 docker-compose up -d
 sleep 2 # Wait for init
 curl -vvv http://localhost:8080/goplugin/headers
-curl http://localhost:8080/goplugin/headers | jq -e '.headers.Foo == "Bar"'
 docker-compose logs
+curl http://localhost:8080/goplugin/headers | jq -e '.headers.Foo == "Bar"'
 docker-compose down 
