@@ -117,7 +117,7 @@ jobs:
           rm -rf vendor
           ls $GOPATH/src/
           
-          rm go.mod && rm go.sum
+          # rm go.mod && rm go.sum
           export GO111MODULE=off 
           mkdir -p /go/src/github.com/TykTechnologies/tyk
           ls /go/src/github.com/TykTechnologies/tyk
