@@ -114,12 +114,18 @@ jobs:
         run: |
           echo "Moving vendor"
           mv -f vendor/* $GOPATH/src/
+          rm -rf vendor
+          ls $GOPATH/src/
+          
           rm go.mod && rm go.sum
           export GO111MODULE=off 
           mkdir -p /go/src/github.com/TykTechnologies/tyk
           ls /go/src/github.com/TykTechnologies/tyk
           cp -r ./* /go/src/github.com/TykTechnologies/tyk
+          
+          echo "Current Dir"
           ls ./
+          echo "GOPATH Tyk"
           ls /go/src/github.com/TykTechnologies/tyk
 
       - uses: goreleaser/goreleaser-action@v2
@@ -134,7 +140,7 @@ jobs:
           GPG_FINGERPRINT: 12B5D62C28F57592D1575BD51ED14C59E37DAC20
           PKG_SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
           GO111MODULE: off
-          GOPATH: ${{ env.GITHUB_WORKSPACE }}
+#           GOPATH: ${{ env.GITHUB_WORKSPACE }}
 
       - uses: actions/upload-artifact@v2
         with:
