@@ -77,9 +77,10 @@ jobs:
           PKG_SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
         run: |
           bin/unlock-agent.sh
+          #pwd && ls -lR __w ${{ github.workspace }} ${{ github.workspace }}/..
           # Build in ${{ env.BUILD_PATH }} and vendor'd code in /go/src
-          mkdir -p ${{ env.BUILD_PATH }} && cp -r . ${{ env.BUILD_PATH }} \
-            && tar -C ${{ env.BUILD_PATH }}/vendor/ cf - | tar -C /go/src -xf - \
+          mkdir -p ${{ env.BUILD_PATH }} && tar -cf - . | tar -C ${{ env.BUILD_PATH }} -xf -\
+            && tar -C ${{ env.BUILD_PATH }}/vendor -cf - | tar -C /go/src -xf - \
             && rm -rf ${{ env.BUILD_PATH }}/vendor ${{ env.BUILD_PATH }}/go.{sum,mod}
           DOCKER_CFG_PATH="${DOCKER_CONFIG:-$HOME/.docker}/config.json"
           jq '. + {"experimental": "enabled"}' "$DOCKER_CFG_PATH" > c.json && mv c.json "$DOCKER_CFG_PATH" || rm c.json
