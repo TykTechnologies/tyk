@@ -110,11 +110,19 @@ jobs:
             *.txt.sig
             *.txt
 
+      - name: Fix vendor
+        run: |
+          echo "Moving vendor"
+          mv -f vendor/* $GOPATH/src/
+          rm go.mod && rm go.sum
+          export GO111MODULE=off 
+          mkdir -p /go/src/github.com/TykTechnologies/tyk
+          cp -r ./* /go/src/github.com/TykTechnologies/tyk
+
       - uses: goreleaser/goreleaser-action@v2
         with:
           version: latest
-          args: release --rm-dist
-          install-only: true
+          args: release --rm-dist --skip-validate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CGO_ENABLED: 1
@@ -125,23 +133,7 @@ jobs:
           GO111MODULE: off
           GOPATH: ${{ env.GITHUB_WORKSPACE }}
 
-      - name: Run GoReleaser
-        run: |
-          echo "Moving vendor"
-          mv -f vendor/* $GOPATH/src/
-          rm go.mod && rm go.sum
-          export GO111MODULE=off 
-          mkdir -p /go/src/github.com/TykTechnologies/tyk
-          cp -r ./* /go/src/github.com/TykTechnologies/tyk
-
-          snapshot="--snapshot"
-          if [[ ${{steps.targets.outputs.tag}} = $(git describe --tags) ]]; then
-              snapshot=""
-          fi
-          goreleaser release --rm-dist $snapshot
-          goreleaser release --skip-validate --rm-dist $snapshot
-
-      - uses: actions/upload-artifact@v2
+     - uses: actions/upload-artifact@v2
         with:
           name: deb
           retention-days: 1
