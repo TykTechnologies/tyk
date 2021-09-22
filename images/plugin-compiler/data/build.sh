@@ -51,5 +51,5 @@ yes | cp -rf $TYK_GW_PATH/vendor/* $GOPATH/src
 rm -rf $TYK_GW_PATH/vendor
 
 
-go build -buildmode=plugin -ldflags "-pluginpath=$plugin_path" -o $plugin_name \
+go build -trimpath -buildmode=plugin -ldflags "-pluginpath=$plugin_path" -o $plugin_name \
 && mv $plugin_name $PLUGIN_SOURCE_PATH
