@@ -115,18 +115,11 @@ jobs:
           echo "Moving vendor"
           mv -f vendor/* $GOPATH/src/
           rm -rf vendor
-          ls $GOPATH/src/
           
           # rm go.mod && rm go.sum
           export GO111MODULE=off 
           mkdir -p /go/src/github.com/TykTechnologies/tyk
-          ls /go/src/github.com/TykTechnologies/tyk
           cp -r ./* /go/src/github.com/TykTechnologies/tyk
-          
-          echo "Current Dir"
-          ls ./
-          echo "GOPATH Tyk"
-          ls /go/src/github.com/TykTechnologies/tyk
 
       - uses: goreleaser/goreleaser-action@v2
         with:
