@@ -133,7 +133,7 @@ jobs:
           GO111MODULE: off
           GOPATH: ${{ env.GITHUB_WORKSPACE }}
 
-     - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v2
         with:
           name: deb
           retention-days: 1
