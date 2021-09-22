@@ -114,6 +114,7 @@ jobs:
         with:
           version: latest
           args: release --rm-dist
+          install-only: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CGO_ENABLED: 1
@@ -123,6 +124,22 @@ jobs:
           PKG_SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
           GO111MODULE: off
           GOPATH: ${{ env.GITHUB_WORKSPACE }}
+
+      - name: Run GoReleaser
+	run: |
+          echo "Moving vendor"
+          mv -f vendor/* $GOPATH/src/
+          rm go.mod && rm go.sum
+          export GO111MODULE=off 
+          mkdir -p /go/src/github.com/TykTechnologies/tyk
+          cp -r ./* /go/src/github.com/TykTechnologies/tyk
+
+          snapshot="--snapshot"
+          if [[ ${{steps.targets.outputs.tag}} = $(git describe --tags) ]]; then
+              snapshot=""
+          fi
+          goreleaser release --rm-dist $snapshot
+          goreleaser release --skip-validate --rm-dist $snapshot
 
       - uses: actions/upload-artifact@v2
         with:
