@@ -126,7 +126,7 @@ jobs:
           GOPATH: ${{ env.GITHUB_WORKSPACE }}
 
       - name: Run GoReleaser
-	run: |
+        run: |
           echo "Moving vendor"
           mv -f vendor/* $GOPATH/src/
           rm go.mod && rm go.sum
