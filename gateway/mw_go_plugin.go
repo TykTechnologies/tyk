@@ -93,7 +93,6 @@ func (m *GoPluginMiddleware) Name() string {
 }
 
 func (m *GoPluginMiddleware) EnabledForSpec() bool {
-
 	// global go plugins
 	if m.Path != "" && m.SymbolName != "" {
 		m.loadPlugin()
@@ -133,24 +132,21 @@ func (m *GoPluginMiddleware) loadPlugin() bool {
 	return true
 }
 
-func (m *GoPluginMiddleware) goPluginConfigFromRequest(r *http.Request) {
-
-	_, versionPaths, _, _ := m.Spec.Version(r)
-
+func (m *GoPluginMiddleware) goPluginFromRequest(r *http.Request) (*GoPluginMiddleware, bool) {
+	version, _ := m.Spec.Version(r)
+	versionPaths := m.Spec.RxPaths[version.Name]
 	found, perPathPerMethodGoPlugin := m.Spec.CheckSpecMatchesStatus(r, versionPaths, GoPlugin)
-	if found {
-		m.handler = perPathPerMethodGoPlugin.(*GoPluginMiddleware).handler
-		m.Meta = perPathPerMethodGoPlugin.(*GoPluginMiddleware).Meta
-		m.Path = perPathPerMethodGoPlugin.(*GoPluginMiddleware).Path
-		m.SymbolName = perPathPerMethodGoPlugin.(*GoPluginMiddleware).SymbolName
-		m.logger = perPathPerMethodGoPlugin.(*GoPluginMiddleware).logger
-	}
+	return perPathPerMethodGoPlugin.(*GoPluginMiddleware), found
 }
 func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (err error, respCode int) {
-
-	// is there a go plugin per path - we copy the handler etc from the urlspec if we find one
+	// if a Go plugin is found for this path, override the base handler and logger:
+	logger := m.logger
+	handler := m.handler
 	if !m.APILevel {
-		m.goPluginConfigFromRequest(r)
+		if pluginMw, found := m.goPluginFromRequest(r); found {
+			logger = pluginMw.logger
+			handler = pluginMw.handler
+		}
 	}
 
 	// make sure tyk recover in case Go-plugin function panics
@@ -158,7 +154,7 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 		if e := recover(); e != nil {
 			err = fmt.Errorf("%v", e)
 			respCode = http.StatusInternalServerError
-			m.logger.WithError(err).Error("Recovered from panic while running Go-plugin middleware func")
+			logger.WithError(err).Error("Recovered from panic while running Go-plugin middleware func")
 		}
 	}()
 
@@ -179,18 +175,18 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 	// Inject definition into request context:
 	ctx.SetDefinition(r, m.Spec.APIDefinition)
 
-	m.handler(rw, r)
+	handler(w, r)
 
 	// calculate latency
 	ms := DurationToMillisecond(time.Since(t1))
-	m.logger.WithField("ms", ms).Debug("Go-plugin request processing took")
+	logger.WithField("ms", ms).Debug("Go-plugin request processing took")
 
 	// check if response was sent
 	if rw.responseSent {
 		// check if response code was an error one
 		switch {
 		case rw.statusCodeSent == http.StatusForbidden:
-			m.logger.WithError(err).Error("Authentication error in Go-plugin middleware func")
+			logger.WithError(err).Error("Authentication error in Go-plugin middleware func")
 			m.Base().FireEvent(EventAuthFailure, EventKeyFailureMeta{
 				EventMetaDefault: EventMetaDefault{Message: "Auth Failure", OriginatingRequest: EncodeRequestToEvent(r)},
 				Path:             r.URL.Path,
@@ -202,7 +198,7 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 			// base middleware will report this error to analytics if needed
 			respCode = rw.statusCodeSent
 			err = fmt.Errorf("plugin function sent error response code: %d", rw.statusCodeSent)
-			m.logger.WithError(err).Error("Failed to process request with Go-plugin middleware func")
+			logger.WithError(err).Error("Failed to process request with Go-plugin middleware func")
 		default:
 			// record 2XX to analytics
 			m.successHandler.RecordHit(r, Latency{Total: int64(ms)}, rw.statusCodeSent, rw.getHttpResponse(r))
