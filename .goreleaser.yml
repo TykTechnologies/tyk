@@ -34,7 +34,6 @@ builds:
     goarch:
       - amd64
   - id: std-arm64
-
     flags:
       - -tags=goplugin
     ldflags:
