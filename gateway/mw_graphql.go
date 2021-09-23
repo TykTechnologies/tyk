@@ -369,10 +369,18 @@ func (m *GraphQLMiddleware) websocketUpgradeAllowed() bool {
 }
 
 func needsGraphQLExecutionEngine(apiSpec *APISpec) bool {
-	return apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeExecutionEngine ||
-		apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph ||
-		apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSubgraph ||
-		(apiSpec.GraphQL.Version == apidef.GraphQLConfigVersion2 && apiSpec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeProxyOnly)
+	switch apiSpec.GraphQL.ExecutionMode {
+	case apidef.GraphQLExecutionModeExecutionEngine,
+		apidef.GraphQLExecutionModeSupergraph:
+		return true
+	case apidef.GraphQLExecutionModeSubgraph:
+		return false
+	case apidef.GraphQLExecutionModeProxyOnly:
+		if apiSpec.GraphQL.Version == apidef.GraphQLConfigVersion2 {
+			return true
+		}
+	}
+	return false
 }
 
 func isGraphQLProxyOnly(apiSpec *APISpec) bool {
