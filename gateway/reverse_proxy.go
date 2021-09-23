@@ -35,6 +35,7 @@ import (
 	gqlhttp "github.com/jensneuse/graphql-go-tools/pkg/http"
 	"github.com/jensneuse/graphql-go-tools/pkg/subscription"
 
+	"github.com/akutz/memconn"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	"github.com/pmylund/go-cache"
@@ -772,17 +773,47 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 
 		rt.logger.WithField("looping_url", "tyk://"+r.Host).Debug("Executing request on internal route")
 
-		srv := NewInMemoryServer(handler)
-		defer func() { _ = srv.Close() }()
-
-		r.URL.Scheme = "http"
-		return srv.NewClient().Do(r)
+		return handleInMemoryLoop(handler, r)
 	}
 
 	if rt.h2ctransport != nil {
 		return rt.h2ctransport.RoundTrip(r)
 	}
 	return rt.transport.RoundTrip(r)
+}
+
+const (
+	inMemNetworkName = "in-mem-network"
+	inMemNetworkType = "memu"
+)
+
+func handleInMemoryLoop(handler http.Handler, r *http.Request) (resp *http.Response, err error) {
+	// use separate provider for each request
+	provider := memconn.Provider{}
+
+	// start in mem listener
+	lis, err := provider.Listen(inMemNetworkType, inMemNetworkName)
+	// on lis.Close http.Serve will return with error and stop goroutine
+	defer func() { _ = lis.Close() }()
+
+	// start http server with in mem listener
+	// Note: do not try to use http.Server it is working only with mux
+	mux := http.NewServeMux()
+	mux.Handle("/", handler)
+	go func() { _ = http.Serve(lis, mux) }()
+
+	r.URL.Scheme = "http"
+
+	// create http client with in mem transport
+	client := &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+				return provider.DialContext(ctx, inMemNetworkType, inMemNetworkName)
+			},
+		},
+	}
+
+	return client.Do(r)
 }
 
 func (p *ReverseProxy) handleOutboundRequest(roundTripper *TykRoundTripper, outreq *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, latency time.Duration, err error) {
@@ -1561,6 +1592,7 @@ func copyRequest(r *http.Request) *http.Request {
 
 func copyResponse(r *http.Response) *http.Response {
 	// for the case of streaming for which Content-Length might be unset = -1.
+
 	if r.ContentLength == -1 {
 		return r
 	}
