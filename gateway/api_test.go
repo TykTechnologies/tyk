@@ -84,19 +84,28 @@ func TestPolicyAPI(t *testing.T) {
 
 	defer ts.Close()
 	ts.Gw.BuildAndLoadAPI()
+	ts.Gw.DoReload()
 
-	_, _ = ts.Run(t, []test.TestCase{
-		// get non existent policy
-		{Path: "/tyk/policies/not-here", AdminAuth: true, Method: "GET", BodyMatch: `{"status":"error","message":"Policy not found"}`},
-		// create Policy
-		{Path: "/tyk/policies/default-test", AdminAuth: true, Method: "POST", Data: defaultTestPol, BodyMatch: `{"key":"default-test","status":"ok","action":"added"}`},
-		//update policy with new values
-		{Path: "/tyk/policies/default-test", AdminAuth: true, Method: "PUT", Data: defaultTestPol, BodyMatch: `{"key":"default-test","status":"ok","action":"modified"}`},
-		//get by ID
-		{Path: "/tyk/policies/default-test", AdminAuth: true, Method: "GET", Code: 200},
-		//delete to clean up
-		{Path: "/tyk/policies/default-test", AdminAuth: true, Method: "DELETE", BodyMatch: `{"key":"default-test","status":"ok","action":"deleted"}`},
-	}...)
+	_, _ = ts.Run(t, test.TestCase{
+		Path: "/tyk/policies/not-here", AdminAuth: true, Method: "GET", BodyMatch: `{"status":"error","message":"Policy not found"}`, Code: http.StatusNotFound,
+	})
+	_, _ = ts.Run(t, test.TestCase{
+		Path: "/tyk/policies/default-test", AdminAuth: true, Method: "POST", Data: defaultTestPol, BodyMatch: `{"key":"default-test","status":"ok","action":"added"}`,
+	})
+	_, _ = ts.Run(t, test.TestCase{
+		Path: "/tyk/policies/default-test", AdminAuth: true, Method: "PUT", Data: defaultTestPol, BodyMatch: `{"key":"default-test","status":"ok","action":"modified"}`,
+	})
+	ts.Gw.DoReload()
+	_, _ = ts.Run(t, test.TestCase{
+		Path: "/tyk/policies/default-test", AdminAuth: true, Method: "GET", Code: http.StatusOK,
+	})
+	_, _ = ts.Run(t, test.TestCase{
+		Path: "/tyk/policies/default-test", AdminAuth: true, Method: "DELETE", BodyMatch: `{"key":"default-test","status":"ok","action":"deleted"}`,
+	})
+	ts.Gw.DoReload()
+	_, _ = ts.Run(t, test.TestCase{
+		Path: "/tyk/policies/not-here", AdminAuth: true, Method: "GET", BodyMatch: `{"status":"error","message":"Policy not found"}`, Code: http.StatusNotFound,
+	})
 
 }
 
