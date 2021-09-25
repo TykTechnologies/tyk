@@ -1,7 +1,7 @@
-openapi: 3.0.0
+openapi: 3.0.7
 info:
   title: Tyk Gateway API
-  version: 2.8.0
+  version: 3.0.7
   description: |-
     The Tyk Gateway REST API is the primary means for integrating your application with the Tyk API Gateway system. This API is very small, and has no granular permissions system. It is intended to be used purely for internal automation and integration.
 
@@ -26,8 +26,8 @@ info:
     <br/>
     <b>The Tyk Gateway API is subsumed by the Tyk Dashboard API in Pro installations.</b>
 servers:
-  - url: 'http://localhost/'
-  - url: 'https://localhost/'
+  - url: 'http://localhost:8080'
+  - url: 'https://localhost:8080'
 tags:
   - name: Keys
     description: |-
@@ -71,7 +71,7 @@ tags:
       
       <h4>Example token.json file<h4>
       
-      ```
+      ```json
       {
         "allowance": 1000,
         "rate": 1000,
@@ -540,38 +540,16 @@ paths:
                 $ref: '#/components/schemas/apiStatusMessage'
               example:
                 status: ok
-  '/tyk/hello':
+  '/hello':
     get:
       summary: Check the Health of the Gateway
       description: |
-          From v2.7.5 you can now rename the `/hello`  endpoint by using the `health_check_endpoint_name` option
+          You can rename the `/hello` endpoint by setting   `health_check_endpoint_name` field in `tyk.conf`
 
           Returns 200 response in case of success
       tags:
         - Health Checking
       operationId: hello
-      responses:
-        '200':
-          description: Success
-          content:
-            text/html:
-              schema:
-                type: string
-              example: "Hello Tiki"
-  '/tyk/{listenPath}/hello':
-    parameters:
-      - in: path
-        name: listenPath
-        required: true
-        description: "Listen path of loaded API"
-        schema:
-          type: string
-    get:
-      summary: Check the Health of the API
-      description: Should point to API domain if it has own
-      tags:
-        - Health Checking
-      operationId: helloAPI
       responses:
         '200':
           description: Success
