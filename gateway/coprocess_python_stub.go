@@ -7,9 +7,10 @@ package gateway
 import (
 	"errors"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/coprocess"
 )
 
-func NewPythonDispatcher() (dispatcher coprocess.Dispatcher, err error) {
+func NewPythonDispatcher(conf config.Config) (dispatcher coprocess.Dispatcher, err error) {
 	return nil, errors.New("python support not compiled")
 }
