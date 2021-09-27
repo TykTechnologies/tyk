@@ -69,3 +69,4 @@ To coordinate development and be completely transparent as to where the project 
 and adopted proposals can be viewed on our public [Tyk Roadmap Repository](https://github.com/TykTechnologies/tyk-roadmap).
 
 Any proposals can be made in the Github issue tracker. Proposals that are adopted will be placed into roadmap.
+
