@@ -93,6 +93,10 @@ func TestPolicyAPI(t *testing.T) {
 	_, _ = ts.Run(t, test.TestCase{
 		Path: "/tyk/policies/default-test", AdminAuth: true, Method: "POST", Data: defaultTestPol, BodyMatch: `{"key":"default-test","status":"ok","action":"added"}`,
 	})
+	ts.Gw.DoReload()
+	_, _ = ts.Run(t, test.TestCase{
+		Path: "/tyk/policies/default-test", AdminAuth: true, Method: "GET", Code: http.StatusOK,
+	})
 	_, _ = ts.Run(t, test.TestCase{
 		Path: "/tyk/policies/default-test", AdminAuth: true, Method: "PUT", Data: defaultTestPol, BodyMatch: `{"key":"default-test","status":"ok","action":"modified"}`,
 	})
