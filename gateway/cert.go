@@ -290,11 +290,16 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 	}
 
 	if len(gwConfig.HttpServerOptions.SSLCertificates) > 0 {
+		var waitingRedisLog sync.Once
 		// ensure that we are connected to redis
 		for {
 			if storage.Connected() {
 				break
 			}
+
+			waitingRedisLog.Do(func() {
+				log.Warning("Redis is not ready. Waiting for a living connection")
+			})
 			time.Sleep(10 * time.Millisecond)
 		}
 	}
