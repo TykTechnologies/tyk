@@ -395,7 +395,9 @@ func (h *HostUptimeChecker) Start(ctx context.Context) {
 func (h *HostUptimeChecker) Stop() {
 	if !h.getStopLoop() {
 		h.setStopLoop(true)
+		h.muStopLoop.Lock()
 		h.samples = new(sync.Map)
+		h.muStopLoop.Unlock()
 		log.Info("[HOST CHECKER] Stopping poller")
 		h.pool.Close()
 	}
