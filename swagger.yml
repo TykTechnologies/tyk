@@ -21,7 +21,7 @@ info:
     The shared secret you set should then be sent along as a header with each REST API Request in order for it to be successful:
 
     ```
-    x-tyk-authorization: <your-secret>
+    x-tyk-authorization: <tyk-gateway-secret>
     ```
     <br/>
     <b>The Tyk Gateway API is subsumed by the Tyk Dashboard API in Pro installations.</b>
