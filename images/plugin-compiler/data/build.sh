@@ -23,7 +23,7 @@ yes | cp -r $PLUGIN_SOURCE_PATH/* $PLUGIN_BUILD_PATH || true
 cd $PLUGIN_BUILD_PATH
 # if plugin has go.mod
 [ -f go.mod ] && [ ! -d vendor ] && go mod vendor
-rm go.mod
+rm go.mod || true
 
 # Ensure that GW package versions have priorities
 
