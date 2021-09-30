@@ -100,7 +100,7 @@ This component is in charge of dispatching your HTTP requests to the custom midd
 
 ## Coprocess Gateway API
 
-[`coprocess_api.go`](../coprocess_api.go) provides a bridge between the gateway API and C, any function that needs to be exported should have the `export` keyword:
+[`coprocess_api.go`](../gateway/coprocess_api.go) provides a bridge between the gateway API and C, any function that needs to be exported should have the `export` keyword:
 
 ```go
 //export TykTriggerEvent
