@@ -5,17 +5,31 @@
 # ./pr.zsh -title [TT-2932] Fixes broken init services post-install procedures -branch fix/packaging -base master -repos tyk,tyk-analytics
 # m4 -E -DxREPO=tyk
 
-variable "aws_access_key" {
-  type      = string
-  default   = "${env("AWS_ACCESS_KEY_ID")}"
-  sensitive = true
+packer {
+  required_plugins {
+    amazon = {
+      version = ">= 0.0.2"
+      source  = "github.com/hashicorp/amazon"
+    }
+  }
 }
 
-variable "aws_secret_key" {
-  type      = string
-  default   = "${env("AWS_SECRET_ACCESS_KEY")}"
-  sensitive = true
-}
+# variable "aws_access_key" {
+#   type      = string
+#   default   = env("AWS_ACCESS_KEY_ID")
+#   sensitive = true
+# }
+
+# variable "aws_secret_key" {
+#   type      = string
+#   default   = env("AWS_SECRET_ACCESS_KEY")
+#   sensitive = true
+# }
+
+# variable "region" {
+#   type    = string
+#   default = "us-east-1"
+# }
 
 variable "flavour" {
   description = "OS Flavour"
@@ -32,26 +46,31 @@ variable "ami_search_string" {
 
 variable "geoip_license" {
   type    = string
-  default = "${env("GEOIP_LICENSE")}"
-}
-
-variable "region" {
-  type    = string
-  default = "us-east-1"
+  default = env("GEOIP_LICENSE")
 }
 
 variable "version" {
   type    = string
-  default = "${env("VERSION")}"
+  default = env("VERSION")
+}
+
+# Latest at this time
+data "amazon-ami" "base-os" {
+  filters = {
+    architecture                       = "x86_64"
+    "block-device-mapping.volume-type" = "gp2"
+    name                               = "${var.ami_search_string}"
+    root-device-type                   = "ebs"
+    sriov-net-support                  = "simple"
+    virtualization-type                = "hvm"
+  }
+  most_recent = true
+  owners      = ["${var.source_ami_owner}"]
 }
 
 # "timestamp" template function replacement
 locals {
        timestamp = regex_replace(timestamp(), "[- TZ:]", "")
-       extn_map = {
-         AWSLinux = "deb"
-         Redhat   = "rpm"
-       }
 }
 
 # source blocks are generated from your builders; a source can be referenced in
@@ -59,28 +78,12 @@ locals {
 # source. Read the documentation for source blocks here:
 # https://www.packer.io/docs/from-1.5/blocks/source
 source "amazon-ebs" "byol" {
-  access_key            = "${var.aws_access_key}"
   ami_name              = "BYOL tyk ${var.version} (${var.flavour})"
-  ami_regions           = "${var.destination_regions}"
   ena_support           = true
   force_delete_snapshot = true
   force_deregister      = true
   instance_type         = "t3.micro"
-  region                = "${var.region}"
-  secret_key            = "${var.aws_secret_key}"
-  source_ami            = "${var.source_ami}"
-  source_ami_filter {
-    filters = {
-      architecture                       = "x86_64"
-      "block-device-mapping.volume-type" = "gp2"
-      name                               = "${var.ami_search_string}"
-      root-device-type                   = "ebs"
-      sriov-net-support                  = "simple"
-      virtualization-type                = "hvm"
-    }
-    most_recent = true
-    owners      = ["${var.source_ami_owner}"]
-  }
+  source_ami            = data.amazon-ami.base-os.id
   sriov_support = true
   ssh_username  = "ec2-user"
   subnet_filter {
@@ -107,18 +110,18 @@ build {
 
   provisioner "file" {
     destination = "/tmp/semver.sh"
-    source      = "utils/semver.sh"
+    source      = "semver.sh"
   }
   provisioner "file" {
-    destination = "/tyk-gateway.${lookup(local.extn_map, var.flavour)}"
-    source      = "deb/*amd64.deb"
+    destination = "/tmp/tyk-gateway.rpm"
+    source      = "deb/tyk-gateway_x86_64.rpm"
   }
   provisioner "file" {
     destination = "/tmp/10-run-tyk.conf"
-    source      = "utils/10-run-tyk.conf"
+    source      = "10-run-tyk.conf"
   }
   provisioner "shell" {
-    environment_vars = ["VERSION=${var.version}" , "GEOIP_LICENSE=${var.geoip_license}"]
+    environment_vars = ["GEOIP_LICENSE=${var.geoip_license}"]
     script           = "byol/install-tyk.sh"
   }
 }
