@@ -1,4 +1,4 @@
-module github.com/TykTechnologies/tyk
+module github.com/TykTechnologies/tyk/v3.2
 
 go 1.15
 
