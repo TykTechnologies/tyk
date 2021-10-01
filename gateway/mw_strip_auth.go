@@ -92,9 +92,8 @@ func (sa *StripAuth) stripFromHeaders(r *http.Request, config *apidef.AuthConfig
 		if strings.HasPrefix(c, cookieName) {
 			cookies = append(cookies[:i], cookies[i+1:]...)
 			cookieValue = strings.Join(cookies, ";")
-			r.Header.Set(cookieName, cookieValue)
+			r.Header.Set("Cookie", cookieValue)
 			break
 		}
-
 	}
 }
