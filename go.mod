@@ -12,6 +12,7 @@ require (
 	github.com/TykTechnologies/gojsonschema v0.0.0-20170222154038-dcb3e4bb7990
 	github.com/TykTechnologies/gorpc v0.0.0-20190515174534-b9c10befc5f4
 	github.com/TykTechnologies/goverify v0.0.0-20160822133757-7ccc57452ade
+	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20211001194709-50e67f5336d7 // indirect
 	github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c
 	github.com/TykTechnologies/murmur3 v0.0.0-20180602122059-1915e687e465
 	github.com/TykTechnologies/openid2go v0.0.0-20200312160651-00c254a52b19
@@ -19,7 +20,7 @@ require (
 	github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d // indirect
 	github.com/bshuster-repo/logrus-logstash-hook v0.4.1
 	github.com/buger/jsonparser v1.1.1
-	github.com/cenk/backoff v2.2.1+incompatible // indirect
+	github.com/cenk/backoff v2.2.1+incompatible
 	github.com/cenkalti/backoff/v4 v4.0.2
 	github.com/certifi/gocertifi v0.0.0-20190905060710-a5e0173ced67 // indirect
 	github.com/clbanning/mxj v1.8.4
