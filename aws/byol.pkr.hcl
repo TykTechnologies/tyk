@@ -14,22 +14,10 @@ packer {
   }
 }
 
-# variable "aws_access_key" {
-#   type      = string
-#   default   = env("AWS_ACCESS_KEY_ID")
-#   sensitive = true
-# }
-
-# variable "aws_secret_key" {
-#   type      = string
-#   default   = env("AWS_SECRET_ACCESS_KEY")
-#   sensitive = true
-# }
-
-# variable "region" {
-#   type    = string
-#   default = "us-east-1"
-# }
+variable "region" {
+  type    = string
+  default = "us-east-1"
+}
 
 variable "flavour" {
   description = "OS Flavour"
