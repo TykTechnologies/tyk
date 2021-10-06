@@ -93,3 +93,15 @@ func TestSignature(t *testing.T) {
 
 	assert.Equal(t, emptySignature, resultSignature)
 }
+
+func TestBasic(t *testing.T) {
+	var emptyBasic Basic
+
+	var convertedAPI apidef.APIDefinition
+	emptyBasic.ExtractTo(&convertedAPI)
+
+	var resultBasic Basic
+	resultBasic.Fill(convertedAPI)
+
+	assert.Equal(t, emptyBasic, resultBasic)
+}
