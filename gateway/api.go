@@ -613,10 +613,16 @@ func (gw *Gateway) handleGetAllKeys(filter string) (interface{}, int) {
 	return sessionsObj, http.StatusOK
 }
 
-func (gw *Gateway) handleAddKey(keyName, hashedName, sessionString, apiID string) {
+func (gw *Gateway) handleAddKey(keyName, hashedName, sessionString, apiID string, orgId string) {
 	sess := &user.SessionState{}
 	json.Unmarshal([]byte(sessionString), sess)
 	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
+
+	if sess.OrgID != orgId {
+		log.Infof("Sess Org: %v    orgId: %v", sess.OrgID, orgId)
+		return
+	}
+
 	var err error
 	if gw.GetConfig().HashKeys {
 		err = gw.GlobalSessionManager.UpdateSession(hashedName, sess, 0, true)
