@@ -1,6 +1,9 @@
 name: CI tests
 
-on: pull_request
+on: 
+  pull_request:
+  push:
+    branches: [master]
 
 env:
   TYK_DB_REDISHOST: localhost
