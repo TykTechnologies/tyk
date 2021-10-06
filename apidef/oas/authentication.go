@@ -204,7 +204,7 @@ func (s *Signature) ExtractTo(authConfig *apidef.AuthConfig) {
 type JWT struct {
 	Enabled                 bool `bson:"enabled" json:"enabled"` // required
 	AuthSources             `bson:",inline" json:",inline"`
-	Source                  string            `json:"source,omitempty"`
+	Source                  string            `bson:"source,omitempty" json:"source,omitempty"`
 	SigningMethod           string            `bson:"signingMethod,omitempty" json:"signingMethod,omitempty"`
 	IdentityBaseField       string            `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
 	SkipKid                 bool              `bson:"skipKid,omitempty" json:"skipKid,omitempty"`
