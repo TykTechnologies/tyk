@@ -89,12 +89,13 @@ func (gw *Gateway) onLESSLStatusReceivedHandler(payload string) {
 }
 
 func (gw *Gateway) StartPeriodicStateBackup(m *letsencrypt.Manager) {
+	watch := m.Watch()
 
 	for {
 		select {
 		case <-gw.ctx.Done():
 			return
-		case <-m.Watch():
+		case <-watch:
 			if gw.LE_FIRSTRUN {
 				log.Info("[SSL] State change detected, storing")
 				gw.StoreLEState(m)
