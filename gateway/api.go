@@ -619,7 +619,6 @@ func (gw *Gateway) handleAddKey(keyName, hashedName, sessionString, apiID string
 	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 
 	if sess.OrgID != orgId {
-		log.Infof("Sess Org: %v    orgId: %v", sess.OrgID, orgId)
 		return
 	}
 
