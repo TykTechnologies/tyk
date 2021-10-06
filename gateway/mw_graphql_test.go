@@ -171,7 +171,7 @@ func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
 func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 	g := StartTest()
 	defer g.Close()
-	
+
 	assertReviewsSubgraphResponse := func(t *testing.T) func(bytes []byte) bool {
 		return func(bytes []byte) bool {
 			expected := `{"data":{"_entities":[{"__typename":"User","reviews":[{"body":"A highly effective form of birth control."},{"body":"Fedoras are one of the most fashionable hats around and can look great with a variety of outfits."}]}]}}`
