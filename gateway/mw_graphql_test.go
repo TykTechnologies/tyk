@@ -169,6 +169,18 @@ func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
 }
 
 func TestGraphQLMiddleware_EngineMode(t *testing.T) {
+	assertReviewsSubgraphResponse := func(t *testing.T) func(bytes []byte) bool {
+		return func(bytes []byte) bool {
+			expected := `{"data":{"_entities":[{"__typename":"User","reviews":[{"body":"A highly effective form of birth control."},{"body":"Fedoras are one of the most fashionable hats around and can look great with a variety of outfits."}]}]}}`
+			var body json.RawMessage
+			assert.NoError(t, json.Unmarshal(bytes, &body))
+
+			compactBody, err := json.Marshal(body)
+			assert.NoError(t, err)
+
+			return assert.Equal(t, expected, string(compactBody))
+		}
+	}
 
 	t.Run("on invalid graphql config version", func(t *testing.T) {
 		g := StartTest(nil)
@@ -267,18 +279,9 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				}
 
 				_, _ = g.Run(t, test.TestCase{
-					Data: request,
-					BodyMatchFunc: func(bytes []byte) bool {
-						expected := `{"data":{"_entities":[{"__typename":"User","reviews":[{"body":"A highly effective form of birth control."},{"body":"Fedoras are one of the most fashionable hats around and can look great with a variety of outfits."}]}]}}`
-						var body json.RawMessage
-						assert.NoError(t, json.Unmarshal(bytes, &body))
-
-						compactBody, err := json.Marshal(body)
-						assert.NoError(t, err)
-
-						return assert.Equal(t, expected, string(compactBody))
-					},
-					Code: http.StatusOK,
+					Data:          request,
+					BodyMatchFunc: assertReviewsSubgraphResponse(t),
+					Code:          http.StatusOK,
 				})
 			})
 		})
@@ -316,18 +319,9 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				}
 
 				_, _ = g.Run(t, test.TestCase{
-					Data: request,
-					BodyMatchFunc: func(bytes []byte) bool {
-						expected := `{"data":{"_entities":[{"__typename":"User","reviews":[{"body":"A highly effective form of birth control."},{"body":"Fedoras are one of the most fashionable hats around and can look great with a variety of outfits."}]}]}}`
-						var body json.RawMessage
-						assert.NoError(t, json.Unmarshal(bytes, &body))
-
-						compactBody, err := json.Marshal(body)
-						assert.NoError(t, err)
-
-						return assert.Equal(t, expected, string(compactBody))
-					},
-					Code: http.StatusOK,
+					Data:          request,
+					BodyMatchFunc: assertReviewsSubgraphResponse(t),
+					Code:          http.StatusOK,
 				})
 			})
 		})
