@@ -58,6 +58,22 @@ func NewCertificateManager(storage StorageHandler, secret string, logger *logrus
 	}
 }
 
+func NewSlaveCertManager(storage,rpcStorage StorageHandler, secret string, logger *logrus.Logger, migrateCertList bool) *CertificateManager {
+	if logger == nil {
+		logger = logrus.New()
+	}
+	log:= logger.WithFields(logrus.Fields{"prefix": "cert_storage"})
+
+	mdcbStorage := newMdcbCertStorage(storage,rpcStorage, log)
+	return &CertificateManager{
+		storage:         mdcbStorage,
+		logger:          log,
+		cache:           cache.New(5*time.Minute, 10*time.Minute),
+		secret:          secret,
+		migrateCertList: migrateCertList,
+	}
+}
+
 // Extracted from: https://golang.org/src/crypto/tls/tls.go
 //
 // Attempt to parse the given private key DER block. OpenSSL 0.9.8 generates
@@ -335,7 +351,6 @@ func GetCertIDAndChainPEM(certData []byte, secret string) (string, []byte, error
 func (c *CertificateManager) List(certIDs []string, mode CertificateType) (out []*tls.Certificate) {
 	var cert *tls.Certificate
 	var rawCert []byte
-	var err error
 
 	for _, id := range certIDs {
 		if cert, found := c.cache.Get(id); found {
@@ -345,8 +360,8 @@ func (c *CertificateManager) List(certIDs []string, mode CertificateType) (out [
 			continue
 		}
 
-		var val string
-		val, err = c.storage.GetKey("raw-" + id)
+		val, err := c.storage.GetKey("raw-" + id)
+		// fallback to file
 		if err != nil {
 			// Try read from file
 			rawCert, err = ioutil.ReadFile(id)
@@ -390,7 +405,7 @@ func (c *CertificateManager) ListPublicKeys(keyIDs []string) (out []string) {
 
 		if isSHA256(id) {
 			var val string
-			val, err = c.storage.GetKey("raw-" + id)
+			val, err := c.storage.GetKey("raw-" + id)
 			if err != nil {
 				c.logger.Warn("Can't retrieve public key from Redis:", id, err)
 				out = append(out, "")
@@ -428,7 +443,7 @@ func (c *CertificateManager) ListRawPublicKey(keyID string) (out interface{}) {
 
 	if isSHA256(keyID) {
 		var val string
-		val, err = c.storage.GetKey("raw-" + keyID)
+		val, err := c.storage.GetKey("raw-" + keyID)
 		if err != nil {
 			c.logger.Warn("Can't retrieve public key from Redis:", keyID, err)
 			return nil
@@ -467,6 +482,7 @@ func (c *CertificateManager) ListAllIds(prefix string) (out []string) {
 		}
 	} else {
 		// If list is not exists, but migrated record exists, it means it just empty
+
 		if _, err := c.storage.GetKey(indexKey + "-migrated"); err == nil {
 			return out
 		}
@@ -493,12 +509,13 @@ func (c *CertificateManager) Add(certData []byte, orgID string) (string, error) 
 
 	certID, certChainPEM, err := GetCertIDAndChainPEM(certData, c.secret)
 	if err != nil {
+		c.logger.Info("------------------AQUI ES----------------------")
 		c.logger.Error(err)
 		return "", err
 	}
 	certID = orgID + certID
 
-	if cert, err := c.storage.GetKey("raw-" + certID); err == nil && cert != "" {
+	if certFound, err := c.storage.Exists("raw-" + certID); err == nil && certFound {
 		return "", errors.New("Certificate with " + certID + " id already exists")
 	}
 

@@ -97,7 +97,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		log.Debug("Trying to find key by client certificate")
 		certHash = certs.HexSHA256(r.TLS.PeerCertificates[0].Raw)
 		key = k.Gw.generateToken(k.Spec.OrgID, certHash)
-
+		log.Infof("El key del cert: %+v", key)
 	} else {
 		k.Logger().Info("Attempted access with malformed header, no auth header found.")
 		return errorAndStatusCode(ErrAuthAuthorizationFieldMissing)
@@ -114,13 +114,19 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		}
 	}
 
+	log.Infof("UseCertificate: %v", authConfig.UseCertificate)
 	if authConfig.UseCertificate {
 		certID := session.OrgID + certHash
 		_, err := k.Gw.CertificateManager.GetRaw(certID)
+
+		/*s, errsave := k.Gw.CertificateManager.Add([]byte(certContent), session.OrgID)
+		log.Infof("S: %v --- err: %v",s,errsave)*/
 		if err != nil {
+			log.Info("1")
 			// Try alternative approach:
 			id, err := storage.TokenID(session.KeyID)
 			if err != nil {
+				log.Info("2")
 				log.Error(err)
 				return k.reportInvalidKey(key, r, MsgNonExistentCert, ErrAuthCertNotFound)
 			}
@@ -128,11 +134,17 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 			certID = session.OrgID + id
 			_, err = k.Gw.CertificateManager.GetRaw(certID)
 			if err != nil {
+				log.Info("3")
 				return k.reportInvalidKey(key, r, MsgNonExistentCert, ErrAuthCertNotFound)
 			}
+			log.Info("4")
 		}
 
+		log.Infof("CertId:%v", certID)
+		log.Infof("Session: %+v", session.Certificate)
+		log.Info("5")
 		if session.Certificate != certID {
+			log.Info("certifictae is different than cert id")
 			return k.reportInvalidKey(key, r, MsgInvalidKey, ErrAuthKeyIsInvalid)
 		}
 	}
