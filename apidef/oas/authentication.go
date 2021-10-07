@@ -11,6 +11,7 @@ type Authentication struct {
 	StripAuthorizationData bool   `bson:"stripAuthorizationData,omitempty" json:"stripAuthorizationData,omitempty"`
 	Token                  *Token `bson:"token,omitempty" json:"token,omitempty"`
 	JWT                    *JWT   `bson:"jwt,omitempty" json:"jwt,omitempty"`
+	Basic                  *Basic `bson:"basic,omitempty" json:"basic,omitempty"`
 }
 
 func (a *Authentication) Fill(api apidef.APIDefinition) {
@@ -44,6 +45,18 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 	if reflect.DeepEqual(a.JWT, &JWT{}) {
 		a.JWT = nil
 	}
+
+	if _, ok := api.AuthConfigs["basic"]; ok {
+		if a.Basic == nil {
+			a.Basic = &Basic{}
+		}
+
+		a.Basic.Fill(api)
+	}
+
+	if reflect.DeepEqual(a.Basic, &Basic{}) {
+		a.Basic = nil
+	}
 }
 
 func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
@@ -56,6 +69,10 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 
 	if a.JWT != nil {
 		a.JWT.ExtractTo(api)
+	}
+
+	if a.Basic != nil {
+		a.Basic.ExtractTo(api)
 	}
 }
 
@@ -204,7 +221,7 @@ func (s *Signature) ExtractTo(authConfig *apidef.AuthConfig) {
 type JWT struct {
 	Enabled                 bool `bson:"enabled" json:"enabled"` // required
 	AuthSources             `bson:",inline" json:",inline"`
-	Source                  string            `json:"source,omitempty"`
+	Source                  string            `bson:"source,omitempty" json:"source,omitempty"`
 	SigningMethod           string            `bson:"signingMethod,omitempty" json:"signingMethod,omitempty"`
 	IdentityBaseField       string            `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
 	SkipKid                 bool              `bson:"skipKid,omitempty" json:"skipKid,omitempty"`
@@ -259,4 +276,69 @@ func (j *JWT) ExtractTo(api *apidef.APIDefinition) {
 	api.JWTIssuedAtValidationSkew = j.IssuedAtValidationSkew
 	api.JWTNotBeforeValidationSkew = j.NotBeforeValidationSkew
 	api.JWTExpiresAtValidationSkew = j.ExpiresAtValidationSkew
+}
+
+type Basic struct {
+	Enabled                    bool `bson:"enabled" json:"enabled"` // required
+	AuthSources                `bson:",inline" json:",inline"`
+	DisableCaching             bool                        `bson:"disableCaching,omitempty" json:"disableCaching,omitempty"`
+	CacheTTL                   int                         `bson:"cacheTTL,omitempty" json:"cacheTTL,omitempty"`
+	ExtractCredentialsFromBody *ExtractCredentialsFromBody `bson:"extractCredentialsFromBody,omitempty" json:"extractCredentialsFromBody,omitempty"`
+}
+
+func (b *Basic) Fill(api apidef.APIDefinition) {
+	b.Enabled = api.UseBasicAuth
+
+	b.AuthSources.Fill(api.AuthConfigs["basic"])
+
+	b.DisableCaching = api.BasicAuth.DisableCaching
+	b.CacheTTL = api.BasicAuth.CacheTTL
+
+	if b.ExtractCredentialsFromBody == nil {
+		b.ExtractCredentialsFromBody = &ExtractCredentialsFromBody{}
+	}
+
+	b.ExtractCredentialsFromBody.Fill(api)
+
+	if reflect.DeepEqual(b.ExtractCredentialsFromBody, &ExtractCredentialsFromBody{}) {
+		b.ExtractCredentialsFromBody = nil
+	}
+}
+
+func (b *Basic) ExtractTo(api *apidef.APIDefinition) {
+	api.UseBasicAuth = b.Enabled
+
+	authConfig := apidef.AuthConfig{}
+	b.AuthSources.ExtractTo(&authConfig)
+
+	if api.AuthConfigs == nil {
+		api.AuthConfigs = make(map[string]apidef.AuthConfig)
+	}
+
+	api.AuthConfigs["basic"] = authConfig
+
+	api.BasicAuth.DisableCaching = b.DisableCaching
+	api.BasicAuth.CacheTTL = b.CacheTTL
+
+	if b.ExtractCredentialsFromBody != nil {
+		b.ExtractCredentialsFromBody.ExtractTo(api)
+	}
+}
+
+type ExtractCredentialsFromBody struct {
+	Enabled        bool   `bson:"enabled" json:"enabled"` // required
+	UserRegexp     string `bson:"userRegexp,omitempty" json:"userRegexp,omitempty"`
+	PasswordRegexp string `bson:"passwordRegexp,omitempty" json:"passwordRegexp,omitempty"`
+}
+
+func (e *ExtractCredentialsFromBody) Fill(api apidef.APIDefinition) {
+	e.Enabled = api.BasicAuth.ExtractFromBody
+	e.UserRegexp = api.BasicAuth.BodyUserRegexp
+	e.PasswordRegexp = api.BasicAuth.BodyPasswordRegexp
+}
+
+func (e *ExtractCredentialsFromBody) ExtractTo(api *apidef.APIDefinition) {
+	api.BasicAuth.ExtractFromBody = e.Enabled
+	api.BasicAuth.BodyUserRegexp = e.UserRegexp
+	api.BasicAuth.BodyPasswordRegexp = e.PasswordRegexp
 }
