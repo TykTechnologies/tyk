@@ -98,7 +98,7 @@ func stripFromCookieTest(t *testing.T, req *http.Request, key string, sa StripAu
 	config := sa.Spec.AuthConfigs[authTokenType]
 	sa.stripFromHeaders(req, &config)
 
-	actual := req.Header.Get(key)
+	actual := req.Header.Get("Cookie")
 
 	if expected != actual {
 		t.Fatalf("Expected %s, actual %s", expected, actual)
