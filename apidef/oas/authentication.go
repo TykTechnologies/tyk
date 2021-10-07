@@ -3,6 +3,8 @@ package oas
 import (
 	"reflect"
 
+	"github.com/lonelycode/osin"
+
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
@@ -12,6 +14,7 @@ type Authentication struct {
 	Token                  *Token `bson:"token,omitempty" json:"token,omitempty"`
 	JWT                    *JWT   `bson:"jwt,omitempty" json:"jwt,omitempty"`
 	Basic                  *Basic `bson:"basic,omitempty" json:"basic,omitempty"`
+	OAuth                  *OAuth `bson:"oauth,omitempty" json:"oauth,omitempty"`
 }
 
 func (a *Authentication) Fill(api apidef.APIDefinition) {
@@ -57,6 +60,18 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 	if reflect.DeepEqual(a.Basic, &Basic{}) {
 		a.Basic = nil
 	}
+
+	if _, ok := api.AuthConfigs["oauth"]; ok {
+		if a.OAuth == nil {
+			a.OAuth = &OAuth{}
+		}
+
+		a.OAuth.Fill(api)
+	}
+
+	if reflect.DeepEqual(a.OAuth, &OAuth{}) {
+		a.OAuth = nil
+	}
 }
 
 func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
@@ -73,6 +88,10 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 
 	if a.Basic != nil {
 		a.Basic.ExtractTo(api)
+	}
+
+	if a.OAuth != nil {
+		a.OAuth.ExtractTo(api)
 	}
 }
 
@@ -341,4 +360,69 @@ func (e *ExtractCredentialsFromBody) ExtractTo(api *apidef.APIDefinition) {
 	api.BasicAuth.ExtractFromBody = e.Enabled
 	api.BasicAuth.BodyUserRegexp = e.UserRegexp
 	api.BasicAuth.BodyPasswordRegexp = e.PasswordRegexp
+}
+
+type OAuth struct {
+	Enabled               bool `bson:"enabled" json:"enabled"` // required
+	AuthSources           `bson:",inline" json:",inline"`
+	AllowedAccessTypes    []osin.AccessRequestType    `bson:"allowedAccessTypes,omitempty" json:"allowedAccessTypes,omitempty"`
+	AllowedAuthorizeTypes []osin.AuthorizeRequestType `bson:"allowedAuthorizeTypes,omitempty" json:"allowedAuthorizeTypes,omitempty"`
+	AuthLoginRedirect     string                      `bson:"authLoginRedirect,omitempty" json:"authLoginRedirect,omitempty"`
+	Notifications         *Notifications              `bson:"notifications,omitempty" json:"notifications,omitempty"`
+}
+
+func (o *OAuth) Fill(api apidef.APIDefinition) {
+	o.Enabled = api.UseOauth2
+
+	o.AuthSources.Fill(api.AuthConfigs["oauth"])
+
+	o.AllowedAccessTypes = api.Oauth2Meta.AllowedAccessTypes
+	o.AllowedAuthorizeTypes = api.Oauth2Meta.AllowedAuthorizeTypes
+	o.AuthLoginRedirect = api.Oauth2Meta.AuthorizeLoginRedirect
+
+	if o.Notifications == nil {
+		o.Notifications = &Notifications{}
+	}
+
+	o.Notifications.Fill(api.NotificationsDetails)
+
+	if reflect.DeepEqual(o.Notifications, &Notifications{}) {
+		o.Notifications = nil
+	}
+}
+
+func (o *OAuth) ExtractTo(api *apidef.APIDefinition) {
+	api.UseOauth2 = o.Enabled
+
+	authConfig := apidef.AuthConfig{}
+	o.AuthSources.ExtractTo(&authConfig)
+
+	if api.AuthConfigs == nil {
+		api.AuthConfigs = make(map[string]apidef.AuthConfig)
+	}
+
+	api.AuthConfigs["oauth"] = authConfig
+
+	api.Oauth2Meta.AllowedAccessTypes = o.AllowedAccessTypes
+	api.Oauth2Meta.AllowedAuthorizeTypes = o.AllowedAuthorizeTypes
+	api.Oauth2Meta.AuthorizeLoginRedirect = o.AuthLoginRedirect
+
+	if o.Notifications != nil {
+		o.Notifications.ExtractTo(&api.NotificationsDetails)
+	}
+}
+
+type Notifications struct {
+	SharedSecret   string `bson:"sharedSecret,omitempty" json:"sharedSecret,omitempty"`
+	OnKeyChangeURL string `bson:"onKeyChangeURL,omitempty" json:"onKeyChangeURL,omitempty"`
+}
+
+func (n *Notifications) Fill(nm apidef.NotificationsManager) {
+	n.SharedSecret = nm.SharedSecret
+	n.OnKeyChangeURL = nm.OAuthKeyChangeURL
+}
+
+func (n *Notifications) ExtractTo(nm *apidef.NotificationsManager) {
+	nm.SharedSecret = n.SharedSecret
+	nm.OAuthKeyChangeURL = n.OnKeyChangeURL
 }
