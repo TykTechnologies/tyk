@@ -147,6 +147,8 @@ func FillTestAuthConfigs(t *testing.T, index int) map[string]apidef.AuthConfig {
 	a.Signature = apidef.SignatureConfig{}
 	a.ValidateSignature = false
 	authConfigs["jwt"] = a
+	authConfigs["basic"] = a
+	authConfigs["oauth"] = a
 
 	return authConfigs
 }
