@@ -58,20 +58,22 @@ func NewCertificateManager(storage StorageHandler, secret string, logger *logrus
 	}
 }
 
-func NewSlaveCertManager(storage,rpcStorage StorageHandler, secret string, logger *logrus.Logger, migrateCertList bool) *CertificateManager {
+func NewSlaveCertManager(storage, rpcStorage StorageHandler, secret string, logger *logrus.Logger, migrateCertList bool) *CertificateManager {
 	if logger == nil {
 		logger = logrus.New()
 	}
-	log:= logger.WithFields(logrus.Fields{"prefix": "cert_storage"})
+	log := logger.WithFields(logrus.Fields{"prefix": "cert_storage"})
 
-	mdcbStorage := newMdcbCertStorage(storage,rpcStorage, log)
-	return &CertificateManager{
-		storage:         mdcbStorage,
+	cm := &CertificateManager{
 		logger:          log,
 		cache:           cache.New(5*time.Minute, 10*time.Minute),
 		secret:          secret,
 		migrateCertList: migrateCertList,
 	}
+
+	mdcbStorage := newMdcbCertStorage(storage, rpcStorage, log, cm.Add)
+	cm.storage = mdcbStorage
+	return cm
 }
 
 // Extracted from: https://golang.org/src/crypto/tls/tls.go
@@ -502,6 +504,7 @@ func (c *CertificateManager) ListAllIds(prefix string) (out []string) {
 }
 
 func (c *CertificateManager) GetRaw(certID string) (string, error) {
+
 	return c.storage.GetKey("raw-" + certID)
 }
 
@@ -509,7 +512,6 @@ func (c *CertificateManager) Add(certData []byte, orgID string) (string, error) 
 
 	certID, certChainPEM, err := GetCertIDAndChainPEM(certData, c.secret)
 	if err != nil {
-		c.logger.Info("------------------AQUI ES----------------------")
 		c.logger.Error(err)
 		return "", err
 	}

@@ -122,11 +122,9 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		/*s, errsave := k.Gw.CertificateManager.Add([]byte(certContent), session.OrgID)
 		log.Infof("S: %v --- err: %v",s,errsave)*/
 		if err != nil {
-			log.Info("1")
 			// Try alternative approach:
 			id, err := storage.TokenID(session.KeyID)
 			if err != nil {
-				log.Info("2")
 				log.Error(err)
 				return k.reportInvalidKey(key, r, MsgNonExistentCert, ErrAuthCertNotFound)
 			}
@@ -134,17 +132,13 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 			certID = session.OrgID + id
 			_, err = k.Gw.CertificateManager.GetRaw(certID)
 			if err != nil {
-				log.Info("3")
 				return k.reportInvalidKey(key, r, MsgNonExistentCert, ErrAuthCertNotFound)
 			}
-			log.Info("4")
 		}
 
 		log.Infof("CertId:%v", certID)
 		log.Infof("Session: %+v", session.Certificate)
-		log.Info("5")
 		if session.Certificate != certID {
-			log.Info("certifictae is different than cert id")
 			return k.reportInvalidKey(key, r, MsgInvalidKey, ErrAuthKeyIsInvalid)
 		}
 	}
