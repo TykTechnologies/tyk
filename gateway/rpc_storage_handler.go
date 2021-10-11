@@ -87,6 +87,15 @@ var (
 	}
 )
 
+const (
+	ResetQuota              string = "resetQuota"
+	CertificateRemoved      string = "CertificateRemoved"
+	OAuthRevokeToken        string = "oAuthRevokeToken"
+	OAuthRevokeAccessToken  string = "oAuthRevokeAccessToken"
+	OAuthRevokeRefreshToken string = "oAuthRevokeRefreshToken"
+	OAuthRevokeAllTokens    string = "revoke_all_tokens"
+)
+
 // RPCStorageHandler is a storage manager that uses the redis database.
 type RPCStorageHandler struct {
 	KeyPrefix        string
@@ -805,20 +814,27 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 	keysToReset := map[string]bool{}
 	TokensToBeRevoked := map[string]string{}
 	ClientsToBeRevoked := map[string]string{}
-	oauthTokenKeys := map[string]bool{}
+	notRegularKeys := map[string]bool{}
+	CertificatesToRemove := map[string]string{}
 
 	for _, key := range keys {
 		splitKeys := strings.Split(key, ":")
-		if len(splitKeys) > 1 && splitKeys[1] == "resetQuota" {
-			keysToReset[splitKeys[0]] = true
-		} else if len(splitKeys) > 2 {
+		if len(splitKeys) > 1 {
 			action := splitKeys[len(splitKeys)-1]
-			if action == "oAuthRevokeToken" || action == "oAuthRevokeAccessToken" || action == "oAuthRevokeRefreshToken" {
+			switch action {
+			case ResetQuota:
+				keysToReset[splitKeys[0]] = true
+			case CertificateRemoved:
+				CertificatesToRemove[key] = splitKeys[0]
+				notRegularKeys[key] = true
+			case OAuthRevokeToken, OAuthRevokeAccessToken, OAuthRevokeRefreshToken:
 				TokensToBeRevoked[splitKeys[0]] = key
-				oauthTokenKeys[key] = true
-			} else if action == "revoke_all_tokens" {
+				notRegularKeys[key] = true
+			case OAuthRevokeAllTokens:
 				ClientsToBeRevoked[splitKeys[1]] = key
-				oauthTokenKeys[key] = true
+				notRegularKeys[key] = true
+			default:
+				log.Debug("ignoring processing of action:", action)
 			}
 		}
 	}
@@ -850,9 +866,9 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			}
 			var tokenTypeHint string
 			switch tokenActionTypeHint {
-			case "oAuthRevokeAccessToken":
+			case OAuthRevokeAccessToken:
 				tokenTypeHint = "access_token"
-			case "oAuthRevokeRefreshToken":
+			case OAuthRevokeRefreshToken:
 				tokenTypeHint = "refresh_token"
 			}
 			RevokeToken(storage, token, tokenTypeHint)
@@ -864,8 +880,14 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		r.Gw.RPCGlobalCache.Delete(r.KeyPrefix + token)
 	}
 
+	// remove certs
+	for _, certId := range CertificatesToRemove {
+		log.Debugf("Removing certificate: %v", certId)
+		r.Gw.CertificateManager.Delete(certId, orgId)
+	}
+
 	for _, key := range keys {
-		_, isOauthTokenKey := oauthTokenKeys[key]
+		_, isOauthTokenKey := notRegularKeys[key]
 		if !isOauthTokenKey {
 			splitKeys := strings.Split(key, ":")
 			_, resetQuota := keysToReset[splitKeys[0]]
