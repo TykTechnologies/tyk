@@ -35,6 +35,7 @@ type StorageHandler interface {
 	AppendToSet(string, string)
 	Exists(string) (bool, error)
 }
+
 var CertManagerLogPrefix = "cert_storage"
 
 type CertificateManager struct {

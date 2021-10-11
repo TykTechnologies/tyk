@@ -2,8 +2,9 @@ package certs
 
 import (
 	"errors"
-	"github.com/sirupsen/logrus"
 	"strings"
+
+	"github.com/sirupsen/logrus"
 )
 
 type mdcbCertStorage struct {
