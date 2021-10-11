@@ -892,10 +892,9 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			splitKeys := strings.Split(key, ":")
 			_, resetQuota := keysToReset[splitKeys[0]]
 			if len(splitKeys) > 1 && splitKeys[1] == "hashed" {
-				key = splitKeys[0]
 				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
+				key = splitKeys[0]
 				r.Gw.handleDeleteHashedKey(splitKeys[0], orgId, "", resetQuota)
-				r.Gw.getSessionAndCreate(splitKeys[0], r)
 			} else {
 				log.Info("--> removing cached key: ", key)
 				// in case it's an username (basic auth) then generate the token
@@ -903,10 +902,10 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 					key = r.Gw.generateToken(orgId, key)
 				}
 				r.Gw.handleDeleteKey(key, orgId, "-1", resetQuota)
-				r.Gw.getSessionAndCreate(splitKeys[0], r)
 			}
 			r.Gw.SessionCache.Delete(key)
 			r.Gw.RPCGlobalCache.Delete(r.KeyPrefix + key)
+			r.Gw.getSessionAndCreate(splitKeys[0], r)
 		}
 	}
 	// Notify rest of gateways in cluster to flush cache
