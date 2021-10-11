@@ -49,8 +49,6 @@ func (m *mdcbCertStorage) SetKey(key string, content string, TTL int64) error {
 	errLocal := m.local.SetKey(key, content, TTL)
 	errRpc := m.rpc.SetKey(key, content, TTL)
 
-	m.logger.Infof("Err Local: %+v", errLocal)
-	m.logger.Infof("err RPC: %+v", errRpc)
 	if errLocal != nil && errRpc != nil {
 		return errors.New("cannot save cert in storages")
 	}
