@@ -113,7 +113,6 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		}
 	}
 
-	log.Infof("UseCertificate: %v", authConfig.UseCertificate)
 	if authConfig.UseCertificate {
 		certID := session.OrgID + certHash
 
