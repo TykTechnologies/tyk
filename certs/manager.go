@@ -35,6 +35,7 @@ type StorageHandler interface {
 	AppendToSet(string, string)
 	Exists(string) (bool, error)
 }
+var CertManagerLogPrefix = "cert_storage"
 
 type CertificateManager struct {
 	storage         StorageHandler
@@ -51,7 +52,7 @@ func NewCertificateManager(storage StorageHandler, secret string, logger *logrus
 
 	return &CertificateManager{
 		storage:         storage,
-		logger:          logger.WithFields(logrus.Fields{"prefix": "cert_storage"}),
+		logger:          logger.WithFields(logrus.Fields{"prefix": CertManagerLogPrefix}),
 		cache:           cache.New(5*time.Minute, 10*time.Minute),
 		secret:          secret,
 		migrateCertList: migrateCertList,
@@ -62,7 +63,7 @@ func NewSlaveCertManager(storage, rpcStorage StorageHandler, secret string, logg
 	if logger == nil {
 		logger = logrus.New()
 	}
-	log := logger.WithFields(logrus.Fields{"prefix": "cert_storage"})
+	log := logger.WithFields(logrus.Fields{"prefix": CertManagerLogPrefix})
 
 	cm := &CertificateManager{
 		logger:          log,
