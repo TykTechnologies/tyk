@@ -105,3 +105,15 @@ func TestBasic(t *testing.T) {
 
 	assert.Equal(t, emptyBasic, resultBasic)
 }
+
+func TestOAuth(t *testing.T) {
+	var emptyOAuth OAuth
+
+	var convertedAPI apidef.APIDefinition
+	emptyOAuth.ExtractTo(&convertedAPI)
+
+	var resultOAuth OAuth
+	resultOAuth.Fill(convertedAPI)
+
+	assert.Equal(t, emptyOAuth, resultOAuth)
+}
