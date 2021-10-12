@@ -38,7 +38,16 @@ func (gw *Gateway) uploadCertPublicKey(serverCert tls.Certificate) (string, erro
 
 func TestPublicKeyPinning(t *testing.T) {
 
-	_, _, _, serverCert := genServerCertificate()
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	_, _, _, serverCert := certs.GenServerCertificate()
+	pubID, err := ts.Gw.uploadCertPublicKey(serverCert)
+	if err != nil {
+		t.Error(err)
+	}
+	defer ts.Gw.CertificateManager.Delete(pubID, "")
+
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	}))
 	upstream.TLS = &tls.Config{
@@ -115,7 +124,7 @@ func TestPublicKeyPinning(t *testing.T) {
 			t.Error(err)
 		}
 
-		_, _, _, proxyCert := genServerCertificate()
+		_, _, _, proxyCert := certs.GenServerCertificate()
 		proxy := initProxy("https", &tls.Config{
 			Certificates: []tls.Certificate{proxyCert},
 			MaxVersion:   tls.VersionTLS12,
@@ -150,7 +159,7 @@ func TestPublicKeyPinning(t *testing.T) {
 		}
 
 		// start upstream server
-		_, _, _, serverCert := genCertificate(&x509.Certificate{
+		_, _, _, serverCert := certs.GenCertificate(&x509.Certificate{
 			EmailAddresses: []string{"test@test.com"},
 			Subject:        pkix.Name{CommonName: "localhost"},
 		})
@@ -170,7 +179,7 @@ func TestPublicKeyPinning(t *testing.T) {
 		defer upstream.Close()
 
 		// start proxy
-		_, _, _, proxyCert := genCertificate(&x509.Certificate{
+		_, _, _, proxyCert := certs.GenCertificate(&x509.Certificate{
 			Subject: pkix.Name{CommonName: "local1.host"},
 		})
 		proxyPubID, err := ts.Gw.uploadCertPublicKey(proxyCert)
@@ -324,7 +333,7 @@ func TestProxyTransport(t *testing.T) {
 		globalConf.ProxySSLMinVersion = 771
 		ts.Gw.SetConfig(globalConf)
 
-		_, _, _, proxyCert := genServerCertificate()
+		_, _, _, proxyCert := certs.GenServerCertificate()
 		proxy := initProxy("https", &tls.Config{
 			Certificates: []tls.Certificate{proxyCert},
 			MaxVersion:   tls.VersionTLS12,
