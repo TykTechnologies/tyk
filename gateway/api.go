@@ -847,9 +847,6 @@ func handleAddOrUpdatePolicy(polID string, r *http.Request) (interface{}, int) {
 	action := "modified"
 	if r.Method == http.MethodPost {
 		action = "added"
-		policiesMu.Lock()
-		policiesByID[polID] = *newPol
-		policiesMu.Unlock()
 	}
 
 	response := apiModifyKeySuccess{
