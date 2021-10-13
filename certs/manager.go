@@ -506,7 +506,6 @@ func (c *CertificateManager) ListAllIds(prefix string) (out []string) {
 }
 
 func (c *CertificateManager) GetRaw(certID string) (string, error) {
-
 	return c.storage.GetKey("raw-" + certID)
 }
 

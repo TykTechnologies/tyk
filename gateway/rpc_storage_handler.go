@@ -90,6 +90,7 @@ var (
 const (
 	ResetQuota              string = "resetQuota"
 	CertificateRemoved      string = "CertificateRemoved"
+	CertificateAdded        string = "CertificateAdded"
 	OAuthRevokeToken        string = "oAuthRevokeToken"
 	OAuthRevokeAccessToken  string = "oAuthRevokeAccessToken"
 	OAuthRevokeRefreshToken string = "oAuthRevokeRefreshToken"
@@ -816,6 +817,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 	ClientsToBeRevoked := map[string]string{}
 	notRegularKeys := map[string]bool{}
 	CertificatesToRemove := map[string]string{}
+	CertificatesToAdd := map[string]string{}
 
 	for _, key := range keys {
 		splitKeys := strings.Split(key, ":")
@@ -826,6 +828,9 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 				keysToReset[splitKeys[0]] = true
 			case CertificateRemoved:
 				CertificatesToRemove[key] = splitKeys[0]
+				notRegularKeys[key] = true
+			case CertificateAdded:
+				CertificatesToAdd[key] = splitKeys[0]
 				notRegularKeys[key] = true
 			case OAuthRevokeToken, OAuthRevokeAccessToken, OAuthRevokeRefreshToken:
 				TokensToBeRevoked[splitKeys[0]] = key
@@ -884,6 +889,14 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 	for _, certId := range CertificatesToRemove {
 		log.Debugf("Removing certificate: %v", certId)
 		r.Gw.CertificateManager.Delete(certId, orgId)
+	}
+	for _, certId ;= range CertificatesToAdd{
+		log.Debugf("Adding certificate: %v", certId)
+		//If we are in a slave node, MDCB Storage GetRaw should get the certificate from MDCB and cache it locally 
+		content, err := r.Gw.CertificateManager.GetRaw(certId)
+		if content == "" && err != nil {
+			log.Debugf("Error getting certificate content")
+		}
 	}
 
 	for _, key := range keys {
