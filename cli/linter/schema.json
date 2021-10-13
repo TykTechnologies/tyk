@@ -779,6 +779,9 @@
             "service",
             "rpc"
           ]
+        },
+        "policy_path": {
+          "type": "string"
         }
       }
     },

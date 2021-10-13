@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 
@@ -72,6 +73,27 @@ func LoadPoliciesFromFile(filePath string) map[string]user.Policy {
 		log.WithFields(logrus.Fields{
 			"prefix": "policy",
 		}).Error("Couldn't unmarshal policies: ", err)
+	}
+	return policies
+}
+
+func LoadPoliciesFromDir(dir string) map[string]user.Policy {
+	policies := make(map[string]user.Policy)
+	// Grab json files from directory
+	paths, _ := filepath.Glob(filepath.Join(dir, "*.json"))
+	for _, path := range paths {
+		log.Info("Loading policy from dir ", path)
+		f, err := os.Open(path)
+		if err != nil {
+			log.Error("Couldn't open policy file from dir: ", err)
+			continue
+		}
+		pol := &user.Policy{}
+		if err := json.NewDecoder(f).Decode(pol); err != nil {
+			log.Errorf("Couldn't unmarshal policy configuration from dir: %v : %v", path, err)
+		}
+		f.Close()
+		policies[pol.ID] = *pol
 	}
 	return policies
 }
