@@ -133,9 +133,11 @@ func (m *GoPluginMiddleware) loadPlugin() bool {
 }
 
 func (m *GoPluginMiddleware) goPluginFromRequest(r *http.Request) (*GoPluginMiddleware, bool) {
-	version, _ := m.Spec.Version(r)
-	versionPaths := m.Spec.RxPaths[version.Name]
+	_, versionPaths, _, _ := m.Spec.Version(r)
 	found, perPathPerMethodGoPlugin := m.Spec.CheckSpecMatchesStatus(r, versionPaths, GoPlugin)
+	if !found {
+		return nil, false
+	}
 	return perPathPerMethodGoPlugin.(*GoPluginMiddleware), found
 }
 func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (err error, respCode int) {
@@ -147,6 +149,9 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 			logger = pluginMw.logger
 			handler = pluginMw.handler
 		}
+	}
+	if handler == nil {
+		return
 	}
 
 	// make sure tyk recover in case Go-plugin function panics
@@ -174,7 +179,6 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 
 	// Inject definition into request context:
 	ctx.SetDefinition(r, m.Spec.APIDefinition)
-
 	handler(w, r)
 
 	// calculate latency
