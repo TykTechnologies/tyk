@@ -32,13 +32,17 @@ func (m *mdcbCertStorage) GetKey(key string) (string, error) {
 			m.logger.Infof("Retrieving certificate from rpc.")
 			val, err = m.rpc.GetKey(key)
 
+			if err != nil  {
+				m.logger.Error("cannot retrieve cert from rpc:"+err.Error())
+				return val, err
+			}
 			// calculate the orgId from the keyId
 			certID, _, _ := GetCertIDAndChainPEM([]byte(val), "")
 			orgId := strings.ReplaceAll(key, "raw-", "")
 			orgId = strings.ReplaceAll(orgId, certID, "")
-
 			// save the cert in local redis
 			m.addCert([]byte(val), orgId)
+
 		}
 	} else {
 		val, err = m.rpc.GetKey(key)

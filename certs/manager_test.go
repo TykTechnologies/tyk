@@ -94,8 +94,9 @@ func (s *dummyStorage) GetListRange(keyName string, from, to int64) ([]string, e
 }
 
 func (s *dummyStorage) Exists(keyName string) (bool, error) {
-	_, exist := s.indexList[keyName]
-	return exist, nil
+	_, existIndex := s.indexList[keyName]
+	_, existRaw := s.data[keyName]
+	return existIndex || existRaw, nil
 }
 
 func (s *dummyStorage) AppendToSet(keyName string, value string) {

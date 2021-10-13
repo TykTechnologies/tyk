@@ -890,7 +890,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		log.Debugf("Removing certificate: %v", certId)
 		r.Gw.CertificateManager.Delete(certId, orgId)
 	}
-	for _, certId ;= range CertificatesToAdd{
+	for _, certId := range CertificatesToAdd{
 		log.Debugf("Adding certificate: %v", certId)
 		//If we are in a slave node, MDCB Storage GetRaw should get the certificate from MDCB and cache it locally 
 		content, err := r.Gw.CertificateManager.GetRaw(certId)
