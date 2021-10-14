@@ -790,13 +790,18 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 	}
 }
 
-func getSessionAndCreate(keyName string, r *RPCStorageHandler) {
-	newKeyName := "apikey-" + storage.HashStr(keyName)
-	sessionString, err := r.GetRawKey(keyName)
+func getSessionAndCreate(keyName string, r *RPCStorageHandler, isHashed bool, orgId string) {
+	hashedKeyName := keyName
+	// avoid double hashing
+	if !isHashed {
+		hashedKeyName = storage.HashKey(keyName)
+	}
+
+	sessionString, err := r.GetRawKey("apikey-" + hashedKeyName)
 	if err != nil {
 		log.Error("Key not found in master - skipping")
 	} else {
-		handleAddKey(keyName, newKeyName[7:], sessionString, "-1")
+		handleAddKey(keyName, hashedKeyName, sessionString, "-1", orgId)
 	}
 }
 
@@ -868,11 +873,13 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		if !isOauthTokenKey {
 			splitKeys := strings.Split(key, ":")
 			_, resetQuota := keysToReset[splitKeys[0]]
+
 			if len(splitKeys) > 1 && splitKeys[1] == "hashed" {
 				key = splitKeys[0]
 				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
 				handleDeleteHashedKey(splitKeys[0], orgId, "", resetQuota)
-				getSessionAndCreate(splitKeys[0], r)
+				getSessionAndCreate(splitKeys[0], r, true, orgId)
+
 			} else {
 				log.Info("--> removing cached key: ", key)
 				// in case it's an username (basic auth) then generate the token
@@ -880,7 +887,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 					key = generateToken(orgId, key)
 				}
 				handleDeleteKey(key, orgId, "-1", resetQuota)
-				getSessionAndCreate(splitKeys[0], r)
+				getSessionAndCreate(splitKeys[0], r, false, orgId)
 			}
 			SessionCache.Delete(key)
 			RPCGlobalCache.Delete(r.KeyPrefix + key)
