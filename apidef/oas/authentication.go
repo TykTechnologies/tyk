@@ -15,6 +15,7 @@ type Authentication struct {
 	JWT                    *JWT   `bson:"jwt,omitempty" json:"jwt,omitempty"`
 	Basic                  *Basic `bson:"basic,omitempty" json:"basic,omitempty"`
 	OAuth                  *OAuth `bson:"oauth,omitempty" json:"oauth,omitempty"`
+	HMAC                   *HMAC  `bson:"hmac,omitempty" json:"hmac,omitempty"`
 }
 
 func (a *Authentication) Fill(api apidef.APIDefinition) {
@@ -72,6 +73,18 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 	if reflect.DeepEqual(a.OAuth, &OAuth{}) {
 		a.OAuth = nil
 	}
+
+	if _, ok := api.AuthConfigs["hmac"]; ok {
+		if a.HMAC == nil {
+			a.HMAC = &HMAC{}
+		}
+
+		a.HMAC.Fill(api)
+	}
+
+	if reflect.DeepEqual(a.HMAC, &HMAC{}) {
+		a.HMAC = nil
+	}
 }
 
 func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
@@ -92,6 +105,10 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 
 	if a.OAuth != nil {
 		a.OAuth.ExtractTo(api)
+	}
+
+	if a.HMAC != nil {
+		a.HMAC.ExtractTo(api)
 	}
 }
 
@@ -425,4 +442,36 @@ func (n *Notifications) Fill(nm apidef.NotificationsManager) {
 func (n *Notifications) ExtractTo(nm *apidef.NotificationsManager) {
 	nm.SharedSecret = n.SharedSecret
 	nm.OAuthKeyChangeURL = n.OnKeyChangeURL
+}
+
+type HMAC struct {
+	Enabled           bool `bson:"enabled" json:"enabled"` // required
+	AuthSources       `bson:",inline" json:",inline"`
+	AllowedAlgorithms []string `bson:"allowedAlgorithms,omitempty" json:"allowedAlgorithms,omitempty"`
+	AllowedClockSkew  float64  `bson:"allowedClockSkew,omitempty" json:"allowedClockSkew,omitempty"`
+}
+
+func (h *HMAC) Fill(api apidef.APIDefinition) {
+	h.Enabled = api.EnableSignatureChecking
+
+	h.AuthSources.Fill(api.AuthConfigs["hmac"])
+
+	h.AllowedAlgorithms = api.HmacAllowedAlgorithms
+	h.AllowedClockSkew = api.HmacAllowedClockSkew
+}
+
+func (h *HMAC) ExtractTo(api *apidef.APIDefinition) {
+	api.EnableSignatureChecking = h.Enabled
+
+	authConfig := apidef.AuthConfig{}
+	h.AuthSources.ExtractTo(&authConfig)
+
+	if api.AuthConfigs == nil {
+		api.AuthConfigs = make(map[string]apidef.AuthConfig)
+	}
+
+	api.AuthConfigs["hmac"] = authConfig
+
+	api.HmacAllowedAlgorithms = h.AllowedAlgorithms
+	api.HmacAllowedClockSkew = h.AllowedClockSkew
 }
