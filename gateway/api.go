@@ -614,10 +614,15 @@ func handleGetAllKeys(filter string) (interface{}, int) {
 	return sessionsObj, http.StatusOK
 }
 
-func handleAddKey(keyName, hashedName, sessionString, apiID string) {
+func handleAddKey(keyName, hashedName, sessionString, apiID string, orgId string) {
 	sess := &user.SessionState{}
 	json.Unmarshal([]byte(sessionString), sess)
 	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
+
+	if sess.OrgID != orgId {
+		return
+	}
+
 	var err error
 	if config.Global().HashKeys {
 		err = GlobalSessionManager.UpdateSession(hashedName, sess, 0, true)
