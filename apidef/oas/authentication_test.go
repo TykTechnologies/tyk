@@ -117,3 +117,15 @@ func TestOAuth(t *testing.T) {
 
 	assert.Equal(t, emptyOAuth, resultOAuth)
 }
+
+func TestHMAC(t *testing.T) {
+	var emptyHMAC HMAC
+
+	var convertedAPI apidef.APIDefinition
+	emptyHMAC.ExtractTo(&convertedAPI)
+
+	var resultHMAC HMAC
+	resultHMAC.Fill(convertedAPI)
+
+	assert.Equal(t, emptyHMAC, resultHMAC)
+}

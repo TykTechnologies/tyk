@@ -839,9 +839,6 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 	action := "modified"
 	if r.Method == http.MethodPost {
 		action = "added"
-		gw.policiesMu.Lock()
-		gw.policiesByID[polID] = *newPol
-		gw.policiesMu.Unlock()
 	}
 
 	response := apiModifyKeySuccess{

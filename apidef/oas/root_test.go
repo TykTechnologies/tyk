@@ -149,6 +149,7 @@ func FillTestAuthConfigs(t *testing.T, index int) map[string]apidef.AuthConfig {
 	authConfigs["jwt"] = a
 	authConfigs["basic"] = a
 	authConfigs["oauth"] = a
+	authConfigs["hmac"] = a
 
 	return authConfigs
 }
