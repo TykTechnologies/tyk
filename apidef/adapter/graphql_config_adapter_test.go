@@ -245,6 +245,7 @@ func TestGraphQLConfigAdapter_supergraphDataSourceConfigs(t *testing.T) {
 					"Header1":        []string{"value1"},
 					"Header2":        []string{"value2"},
 					"X-Tyk-Internal": []string{"true"},
+					"Auth":           []string{"appended_header"},
 				},
 			},
 			Subscription: graphqlDataSource.SubscriptionConfiguration{
@@ -278,6 +279,7 @@ func TestGraphQLConfigAdapter_supergraphDataSourceConfigs(t *testing.T) {
 				Method: http.MethodPost,
 				Header: http.Header{
 					"Header1": []string{"value1"},
+					"Auth":    []string{"appended_header"},
 					"Header2": []string{"value2"},
 				},
 			},
@@ -647,7 +649,11 @@ var graphqlEngineV2SupergraphConfigJson = `{
 			{
 				"api_id": "",
 				"url": "tyk://accounts.service",
-				"sdl": ` + strconv.Quote(federationAccountsServiceSDL) + `
+				"sdl": ` + strconv.Quote(federationAccountsServiceSDL) + `,
+				"headers": {
+					"header1": "to be ignored",
+					"Auth": "appended_header"
+				}
 			},
 			{
 				"api_id": "",
@@ -662,7 +668,12 @@ var graphqlEngineV2SupergraphConfigJson = `{
 			{
 				"api_id": "",
 				"url": "http://reviews.service",
-				"sdl": ` + strconv.Quote(federationReviewsServiceSDL) + `
+				"sdl": ` + strconv.Quote(federationReviewsServiceSDL) + `,
+				"headers": {
+					"header1": "to be ignored",
+					"header2": "value",
+					"Auth": "appended_header"
+				}
 			}
 		],
 		"global_headers": {

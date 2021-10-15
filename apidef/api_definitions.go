@@ -678,10 +678,11 @@ type GraphQLSupergraphConfig struct {
 }
 
 type GraphQLSubgraphEntity struct {
-	APIID string `bson:"api_id" json:"api_id"`
-	Name  string `bson:"name" json:"name"`
-	URL   string `bson:"url" json:"url"`
-	SDL   string `bson:"sdl" json:"sdl"`
+	APIID   string            `bson:"api_id" json:"api_id"`
+	Name    string            `bson:"name" json:"name"`
+	URL     string            `bson:"url" json:"url"`
+	SDL     string            `bson:"sdl" json:"sdl"`
+	Headers map[string]string `bson:"headers" json:"headers"`
 }
 
 type GraphQLEngineConfig struct {

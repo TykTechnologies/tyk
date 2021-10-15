@@ -597,6 +597,9 @@ const Schema = `{
                                 },
                                 "sdl": {
                                     "type": "string"
+                                },
+                                "headers": {
+                                    "type": ["object", "null"]
                                 }
                             }
                         },
