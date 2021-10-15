@@ -460,7 +460,8 @@ type APIDefinition struct {
 		AllowedAuthorizeTypes  []osin.AuthorizeRequestType `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
 		AuthorizeLoginRedirect string                      `bson:"auth_login_redirect" json:"auth_login_redirect"`
 	} `bson:"oauth_meta" json:"oauth_meta"`
-	Auth         AuthConfig            `bson:"auth" json:"auth"` // Deprecated: Use AuthConfigs instead.
+	// Deprecated: Use AuthConfigs instead.
+	Auth         AuthConfig            `bson:"auth" json:"auth"`
 	AuthConfigs  map[string]AuthConfig `bson:"auth_configs" json:"auth_configs"`
 	UseBasicAuth bool                  `bson:"use_basic_auth" json:"use_basic_auth"`
 	BasicAuth    struct {
