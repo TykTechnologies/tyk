@@ -367,7 +367,7 @@ jobs:
   packagecloud:
     if: needs.goreleaser.outputs.upload == 'true'
     needs:
-      - smoke-tests
+#      - smoke-tests
       - goreleaser
     runs-on: ubuntu-latest
 
