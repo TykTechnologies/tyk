@@ -242,7 +242,7 @@ func TestGraphQLConfigAdapter_supergraphDataSourceConfigs(t *testing.T) {
 				URL:    "http://accounts.service",
 				Method: http.MethodPost,
 				Header: http.Header{
-					"Header1":        []string{"value1"},
+					"Header1":        []string{"override_global"},
 					"Header2":        []string{"value2"},
 					"X-Tyk-Internal": []string{"true"},
 					"Auth":           []string{"appended_header"},
@@ -278,7 +278,7 @@ func TestGraphQLConfigAdapter_supergraphDataSourceConfigs(t *testing.T) {
 				URL:    "http://reviews.service",
 				Method: http.MethodPost,
 				Header: http.Header{
-					"Header1": []string{"value1"},
+					"Header1": []string{"override_global"},
 					"Auth":    []string{"appended_header"},
 					"Header2": []string{"value2"},
 				},
@@ -651,7 +651,7 @@ var graphqlEngineV2SupergraphConfigJson = `{
 				"url": "tyk://accounts.service",
 				"sdl": ` + strconv.Quote(federationAccountsServiceSDL) + `,
 				"headers": {
-					"header1": "to be ignored",
+					"header1": "override_global",
 					"Auth": "appended_header"
 				}
 			},
@@ -670,8 +670,8 @@ var graphqlEngineV2SupergraphConfigJson = `{
 				"url": "http://reviews.service",
 				"sdl": ` + strconv.Quote(federationReviewsServiceSDL) + `,
 				"headers": {
-					"header1": "to be ignored",
-					"header2": "value",
+					"header1": "override_global",
+					"header2": "value2",
 					"Auth": "appended_header"
 				}
 			}

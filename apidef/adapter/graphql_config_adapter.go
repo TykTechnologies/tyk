@@ -239,7 +239,7 @@ func (g *GraphQLConfigAdapter) subgraphDataSourceConfigs() []graphqlDataSource.C
 		if len(apiDefSubgraphConf.SDL) == 0 {
 			continue
 		}
-		hdr := g.removeDuplicateHeaders(g.apiDefinition.GraphQL.Supergraph.GlobalHeaders, apiDefSubgraphConf.Headers)
+		hdr := g.removeDuplicateHeaders(apiDefSubgraphConf.Headers, g.apiDefinition.GraphQL.Supergraph.GlobalHeaders)
 		conf := g.graphqlDataSourceConfiguration(apiDefSubgraphConf.URL, http.MethodPost, hdr)
 		conf.Federation = graphqlDataSource.FederationConfiguration{
 			Enabled:    true,
