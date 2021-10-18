@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/headers"
+
 	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -811,6 +813,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 	conf := func(globalConf *config.Config) {
 		globalConf.HttpServerOptions.UseSSL = true
 		globalConf.EnableCustomDomains = true
+		globalConf.HashKeyFunction = ""
 		globalConf.HttpServerOptions.SSLCertificates = []string{serverCertID}
 		globalConf.HealthCheckEndpointName = "hello"
 	}
@@ -924,14 +927,14 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 				t.Fatal("Should create key based on certificate")
 			}
 
-			_, key = ts.CreateSession(func(s *user.SessionState) {
+			_, secondKey := ts.CreateSession(func(s *user.SessionState) {
 				s.Certificate = clientCertID
 				s.AccessRights = map[string]user.AccessDefinition{"test": {
 					APIID: "test", Versions: []string{"v1"},
 				}}
 			})
 
-			if key != "" {
+			if secondKey != "" {
 				t.Fatal("Should not allow create key based on the same certificate")
 			}
 
@@ -939,6 +942,17 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 
 			// Domain is not set, but we still pass it, it should still work
 			ts.Run(t, test.TestCase{Path: "/test1", Code: 200, Domain: "localhost", Client: client})
+
+			// key should also work without cert
+			header := map[string]string{
+				headers.Authorization: key,
+			}
+			client := &http.Client{
+				Transport: &http.Transport{
+					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+				},
+			}
+			ts.Run(t, test.TestCase{Path: "/test1", Headers: header, Code: http.StatusOK, Domain: "localhost", Client: client})
 		})
 	})
 

@@ -114,28 +114,11 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	}
 
 	if authConfig.UseCertificate {
-		certID := session.OrgID + certHash
-
-		_, err := k.Gw.CertificateManager.GetRaw(certID)
-		if err != nil {
-			// Try alternative approach:
-			id, err := storage.TokenID(session.KeyID)
-			if err != nil {
-				log.Error(err)
-				return k.reportInvalidKey(key, r, MsgNonExistentCert, ErrAuthCertNotFound)
-			}
-
-			certID = session.OrgID + id
-			_, err = k.Gw.CertificateManager.GetRaw(certID)
-			if err != nil {
-				return k.reportInvalidKey(key, r, MsgNonExistentCert, ErrAuthCertNotFound)
-			}
-		}
-
-		if session.Certificate != certID {
-			return k.reportInvalidKey(key, r, MsgInvalidKey, ErrAuthKeyIsInvalid)
+		if _, err := k.Gw.CertificateManager.GetRaw(session.Certificate); err != nil {
+			return k.reportInvalidKey(key, r, MsgNonExistentCert, ErrAuthCertNotFound)
 		}
 	}
+
 	// Set session state on context, we will need it later
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.AuthToken, apidef.UnsetAuth:
