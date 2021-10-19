@@ -14,6 +14,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TykTechnologies/tyk/storage"
+
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
 
@@ -284,6 +286,21 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 		}
 		serverCerts = append(serverCerts, cert)
 		certNameMap[certData.Name] = &cert
+	}
+
+	if len(config.Global().HttpServerOptions.SSLCertificates) > 0 {
+		var waitingRedisLog sync.Once
+		// ensure that we are connected to redis
+		for {
+			if storage.Connected() {
+				break
+			}
+
+			waitingRedisLog.Do(func() {
+				log.Warning("Redis is not ready. Waiting for a living connection")
+			})
+			time.Sleep(10 * time.Millisecond)
+		}
 	}
 
 	for _, cert := range CertificateManager.List(config.Global().HttpServerOptions.SSLCertificates, certs.CertificatePrivate) {
