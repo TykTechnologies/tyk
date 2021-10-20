@@ -340,19 +340,19 @@ func toStrings(v interface{}) []string {
 	return nil
 }
 
-func NestedMapLookup(m map[string]interface{}, ks ...string) interface{} {
+func nestedMapLookup(m map[string]interface{}, ks ...string) interface{} {
 	var c interface{} = m
 	for _, k := range ks {
 		if _, ok := c.(map[string]interface{}); !ok {
 			//fmt.Errorf("key not found; remaining keys: %v", ks)
 			return nil
 		}
-		c = nestedMapLookup(c, k)
+		c = getMapContext(c, k)
 	}
 	return c
 }
 
-func nestedMapLookup(m interface{}, k string) (rval interface{}) {
+func getMapContext(m interface{}, k string) (rval interface{}) {
 	switch e := m.(type) {
 	case map[string]interface{}:
 		return e[k]
@@ -362,7 +362,7 @@ func nestedMapLookup(m interface{}, k string) (rval interface{}) {
 }
 
 func getScopeFromClaim(claims jwt.MapClaims, scopeClaimName string) []string {
-	lookedUp := NestedMapLookup(claims, strings.Split(scopeClaimName, ".")...)
+	lookedUp := nestedMapLookup(claims, strings.Split(scopeClaimName, ".")...)
 
 	return toStrings(lookedUp)
 }
