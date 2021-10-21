@@ -25,9 +25,9 @@ func init() {
 
 func TestRedisClusterGetMultiKey(t *testing.T) {
 
-	rc := RedisController{ctx:context.Background()}
+	rc := RedisController{ctx: context.Background()}
 	keys := []string{"first", "second"}
-	r := RedisCluster{KeyPrefix: "test-cluster", RedisController:rc}
+	r := RedisCluster{KeyPrefix: "test-cluster", RedisController: rc}
 	for _, v := range keys {
 		r.DeleteKey(v)
 	}
@@ -108,8 +108,8 @@ func TestRedisAddressConfiguration(t *testing.T) {
 }
 
 func TestRedisExpirationTime(t *testing.T) {
-	rc := RedisController{ctx:context.Background()}
-	storage := &RedisCluster{KeyPrefix: "test-", RedisController:rc}
+	rc := RedisController{ctx: context.Background()}
+	storage := &RedisCluster{KeyPrefix: "test-", RedisController: rc}
 
 	testKey := "test-key"
 	testValue := "test-value"

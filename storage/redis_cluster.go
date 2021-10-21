@@ -5,10 +5,11 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	uuid "github.com/satori/go.uuid"
 	"strconv"
 	"strings"
 	"time"
+
+	uuid "github.com/satori/go.uuid"
 
 	redis "github.com/go-redis/redis/v8"
 
@@ -35,7 +36,6 @@ type RedisCluster struct {
 	// RedisController must be passed from the gateway
 	RedisController *RedisController
 }
-
 
 func NewRedisClusterPool(isCache, isAnalytics bool, conf config.Config) redis.UniversalClient {
 	// redisSingletonMu is locked and we know the singleton is nil
@@ -261,10 +261,7 @@ func (r *RedisCluster) GetExp(keyName string) (int64, error) {
 	if err := r.up(); err != nil {
 		return 0, err
 	}
-log.Infof("cache: %v aalytics: %v", r.IsCache, r.IsAnalytics)
-	if r.singleton() == nil {
-		panic("ay es nilo")
-	}
+
 	value, err := r.singleton().TTL(r.RedisController.ctx, r.fixKey(keyName)).Result()
 	if err != nil {
 		log.Error("Error trying to get TTL: ", err)
@@ -1083,6 +1080,6 @@ func (r *RedisCluster) RemoveSortedSetRange(keyName, scoreFrom, scoreTo string) 
 	return nil
 }
 
-func(r *RedisCluster) ControllerInitiated()bool{
+func (r *RedisCluster) ControllerInitiated() bool {
 	return r.RedisController != nil
 }
