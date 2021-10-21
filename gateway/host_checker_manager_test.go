@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"context"
 	"net/http"
 	"testing"
 
@@ -113,9 +112,7 @@ func TestCheckActivePollerLoop(t *testing.T) {
 	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test-1:", RedisController: ts.Gw.RedisController}
 	hc.Init(redisStorage)
 
-	ctx, cancel := context.WithCancel(context.TODO())
-	go hc.CheckActivePollerLoop(ctx)
-	defer cancel()
+	go hc.CheckActivePollerLoop(ts.Gw.ctx)
 
 	found := false
 
@@ -141,10 +138,8 @@ func TestStartPoller(t *testing.T) {
 	hc := HostCheckerManager{Gw: ts.Gw}
 	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-TestStartPoller:", RedisController: ts.Gw.RedisController}
 	hc.Init(redisStorage)
-	ctx, cancel := context.WithCancel(context.TODO())
 
-	hc.StartPoller(ctx)
-	defer cancel()
+	hc.StartPoller(ts.Gw.ctx)
 
 	if hc.checker == nil {
 		t.Error("StartPoller should have initialized the HostUptimeChecker")
