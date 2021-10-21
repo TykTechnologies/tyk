@@ -7,9 +7,13 @@ import (
 const ExtensionTykAPIGateway = "x-tyk-api-gateway"
 
 type XTykAPIGateway struct {
-	Info       Info        `bson:"info" json:"info"`         // required
-	Upstream   Upstream    `bson:"upstream" json:"upstream"` // required
-	Server     Server      `bson:"server" json:"server"`     // required
+	// Info contains the main metadata about the API definition.
+	Info     Info     `bson:"info" json:"info"`         // required
+	// Upstream contains the configurations related to the upstream.
+	Upstream Upstream `bson:"upstream" json:"upstream"` // required
+	// Server contains the configurations related to the server.
+	Server     Server      `bson:"server" json:"server"` // required
+	// Middleware contains the configurations related to the proxy middleware.
 	Middleware *Middleware `bson:"middleware,omitempty" json:"middleware,omitempty"`
 }
 
@@ -46,11 +50,20 @@ func (x *XTykAPIGateway) ExtractTo(api *apidef.APIDefinition) {
 }
 
 type Info struct {
-	ID    string          `bson:"id" json:"id,omitempty"`       // just required on database
-	DBID  apidef.ObjectId `bson:"dbID" json:"dbID,omitempty"`   // just required on database
-	OrgID string          `bson:"orgID" json:"orgID,omitempty"` // just required on database
-	Name  string          `bson:"name" json:"name"`             // required
-	State State           `bson:"state" json:"state"`           // required
+	// ID is the unique ID of the API.
+	// Old API Definition: `api_id`
+	ID string `bson:"id" json:"id,omitempty"`
+	// DBID is the unique database ID of the API.
+	// Old API Definition: `id`
+	DBID  apidef.ObjectId `bson:"dbID" json:"dbID,omitempty"`
+	// OrgID is the ID of the organisation which the API belongs to.
+	// Old API Definition: `org_id`
+	OrgID string          `bson:"orgID" json:"orgID,omitempty"`
+	// Name is the name of the API.
+	// Old API Definition: `name`
+	Name  string          `bson:"name" json:"name"` // required
+	// State contains the configurations related to the state of the API.
+	State State `bson:"state" json:"state"` // required
 }
 
 func (i *Info) Fill(api apidef.APIDefinition) {
@@ -70,7 +83,11 @@ func (i *Info) ExtractTo(api *apidef.APIDefinition) {
 }
 
 type State struct {
+	// Active enables the API.
+	// Old API Definition: `active`
 	Active   bool `bson:"active" json:"active"` // required
+	// Internal makes the API accessible only internally.
+	// Old API Definition: `internal`
 	Internal bool `bson:"internal,omitempty" json:"internal,omitempty"`
 }
 
