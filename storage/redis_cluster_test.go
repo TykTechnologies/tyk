@@ -13,9 +13,11 @@ import (
 
 func init() {
 	conf := config.Default
-	go ConnectToRedis(context.Background(), nil, &conf)
+	rc := RedisController{ctx: context.Background()}
+
+	go rc.ConnectToRedis(context.Background(), nil, &conf)
 	for {
-		if Connected() {
+		if rc.Connected() {
 			break
 		}
 
@@ -27,7 +29,7 @@ func TestRedisClusterGetMultiKey(t *testing.T) {
 
 	rc := RedisController{ctx: context.Background()}
 	keys := []string{"first", "second"}
-	r := RedisCluster{KeyPrefix: "test-cluster", RedisController: rc}
+	r := RedisCluster{KeyPrefix: "test-cluster", RedisController: &rc}
 	for _, v := range keys {
 		r.DeleteKey(v)
 	}
@@ -109,7 +111,7 @@ func TestRedisAddressConfiguration(t *testing.T) {
 
 func TestRedisExpirationTime(t *testing.T) {
 	rc := RedisController{ctx: context.Background()}
-	storage := &RedisCluster{KeyPrefix: "test-", RedisController: rc}
+	storage := &RedisCluster{KeyPrefix: "test-", RedisController: &rc}
 
 	testKey := "test-key"
 	testValue := "test-value"
