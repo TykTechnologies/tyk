@@ -119,14 +119,16 @@ func (rc *RedisController) ConnectToRedis(ctx context.Context, onConnect func(),
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 	c := []RedisCluster{
-		{}, {IsCache: true, RedisController:rc},
-		    {IsAnalytics: true, RedisController:rc},
+		{RedisController:rc},
+		{IsCache: true, RedisController:rc},
+		{IsAnalytics: true, RedisController:rc},
 	}
 	var ok bool
 	for _, v := range c {
 		if !rc.connectSingleton(v.IsCache, v.IsAnalytics, *conf) {
 			break
 		}
+
 		if !clusterConnectionIsOpen(&v) {
 			rc.redisUp.Store(false)
 			break

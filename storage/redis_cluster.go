@@ -115,9 +115,6 @@ func getRedisAddrs(config config.StorageOptionsConf) (addrs []string) {
 	return addrs
 }
 func clusterConnectionIsOpen(cluster *RedisCluster) bool {
-	if !cluster.ControllerInitiated() {
-		return false
-	}
 
 	c := cluster.RedisController.singleton(cluster.IsCache, cluster.IsAnalytics)
 	testKey := "redis-test-" + uuid.NewV4().String()

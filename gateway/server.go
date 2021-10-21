@@ -217,7 +217,7 @@ func NewGateway(config config.Config, ctx context.Context, cancelFn context.Canc
 	gw.ReloadTestCase = NewReloadMachinery()
 	gw.TestBundles = map[string]map[string]string{}
 
-	gw.RedisController =  storage.NewRedisController()
+	gw.RedisController = storage.NewRedisController()
 
 	return &gw
 }
@@ -302,16 +302,16 @@ func (gw *Gateway) setupGlobals() {
 			mainLog.Warn("Running Uptime checks in a management node.")
 		}
 
-		healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:", IsAnalytics: true, RedisController:gw.RedisController}
+		healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:", IsAnalytics: true, RedisController: gw.RedisController}
 		gw.InitHostCheckManager(gw.ctx, &healthCheckStore)
 	}
 
 	gw.initHealthCheck(gw.ctx)
 
-	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: gwConfig.HashKeys, RedisController:gw.RedisController}
+	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: gwConfig.HashKeys, RedisController: gw.RedisController}
 	gw.GlobalSessionManager.Init(&redisStore)
 
-	versionStore := storage.RedisCluster{KeyPrefix: "version-check-", RedisController:gw.RedisController}
+	versionStore := storage.RedisCluster{KeyPrefix: "version-check-", RedisController: gw.RedisController}
 	versionStore.Connect()
 	err := versionStore.SetKey("gateway", VERSION, 0)
 	if err != nil {
@@ -324,18 +324,18 @@ func (gw *Gateway) setupGlobals() {
 		gw.SetConfig(Conf)
 		mainLog.Debug("Setting up analytics DB connection")
 
-		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, RedisController:gw.RedisController}
+		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, RedisController: gw.RedisController}
 		gw.analytics.Store = &analyticsStore
 		gw.analytics.Init()
 
-		store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, RedisController:gw.RedisController}
+		store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, RedisController: gw.RedisController}
 		redisPurger := RedisPurger{Store: &store, Gw: gw}
 		go redisPurger.PurgeLoop(gw.ctx)
 
 		if gw.GetConfig().AnalyticsConfig.Type == "rpc" {
 			mainLog.Debug("Using RPC cache purge")
 
-			store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, RedisController:gw.RedisController}
+			store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, RedisController: gw.RedisController}
 			purger := rpc.Purger{
 				Store: &store,
 			}
@@ -354,7 +354,7 @@ func (gw *Gateway) setupGlobals() {
 
 	// Get the notifier ready
 	mainLog.Debug("Notifier will not work in hybrid mode")
-	mainNotifierStore := &storage.RedisCluster{RedisController:gw.RedisController}
+	mainNotifierStore := &storage.RedisCluster{RedisController: gw.RedisController}
 	mainNotifierStore.Connect()
 	gw.MainNotifier = RedisNotifier{mainNotifierStore, RedisPubSubChannel, gw}
 
@@ -666,7 +666,7 @@ func (gw *Gateway) addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthMana
 	osinStorage := &RedisOsinStorageInterface{
 		storageManager,
 		gw.GlobalSessionManager,
-		&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, RedisController:gw.RedisController},
+		&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, RedisController: gw.RedisController},
 		spec.OrgID,
 		gw,
 	}
@@ -1368,7 +1368,7 @@ func (gw *Gateway) getGlobalStorageHandler(keyPrefix string, hashKeys bool) stor
 			Gw:        gw,
 		}
 	}
-	return &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys, RedisController:gw.RedisController}
+	return &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys, RedisController: gw.RedisController}
 }
 
 func Start() {

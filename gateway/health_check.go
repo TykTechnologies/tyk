@@ -103,7 +103,7 @@ type SafeHealthCheck struct {
 func (gw *Gateway) gatherHealthChecks() {
 	allInfos := SafeHealthCheck{info: make(map[string]HealthCheckItem, 3)}
 
-	redisStore := storage.RedisCluster{KeyPrefix: "livenesscheck-", RedisController:gw.RedisController}
+	redisStore := storage.RedisCluster{KeyPrefix: "livenesscheck-", RedisController: gw.RedisController}
 
 	key := "tyk-liveness-probe"
 
