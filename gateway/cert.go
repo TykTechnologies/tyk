@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
-	"github.com/TykTechnologies/tyk/storage"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -293,7 +292,7 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 		var waitingRedisLog sync.Once
 		// ensure that we are connected to redis
 		for {
-			if storage.Connected() {
+			if gw.RedisController.Connected() {
 				break
 			}
 

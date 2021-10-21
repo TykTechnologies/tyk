@@ -1471,7 +1471,7 @@ func TestGroupResetHandler(t *testing.T) {
 
 	didSubscribe := make(chan bool)
 	didReload := make(chan bool)
-	cacheStore := storage.RedisCluster{}
+	cacheStore := storage.RedisCluster{ RedisController:ts.Gw.RedisController}
 	cacheStore.Connect()
 
 	go func() {

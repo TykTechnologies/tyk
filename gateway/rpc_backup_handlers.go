@@ -33,7 +33,7 @@ func (gw *Gateway) LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 	tagList := getTagListAsString(gw.GetConfig().DBAppConfOptions.Tags)
 	checkKey := BackupApiKeyBase + tagList
 
-	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix}
+	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix, RedisController:gw.RedisController}
 	connected := store.Connect()
 	log.Info("[RPC] --> Loading API definitions from backup")
 
@@ -63,7 +63,7 @@ func (gw *Gateway) saveRPCDefinitionsBackup(list string) error {
 
 	log.Info("--> Connecting to DB")
 
-	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix}
+	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix, RedisController:gw.RedisController}
 	connected := store.Connect()
 
 	log.Info("--> Connected to DB")
@@ -86,7 +86,7 @@ func (gw *Gateway) LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
 	tagList := getTagListAsString(gw.GetConfig().DBAppConfOptions.Tags)
 	checkKey := BackupPolicyKeyBase + tagList
 
-	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix}
+	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix, RedisController:gw.RedisController}
 
 	connected := store.Connect()
 	log.Info("[RPC] Loading Policies from backup")
@@ -123,7 +123,7 @@ func (gw *Gateway) saveRPCPoliciesBackup(list string) error {
 
 	log.Info("--> Connecting to DB")
 
-	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix}
+	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix, RedisController:gw.RedisController}
 	connected := store.Connect()
 
 	log.Info("--> Connected to DB")

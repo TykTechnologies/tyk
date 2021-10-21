@@ -15,7 +15,7 @@ func TestHostCheckerManagerInit(t *testing.T) {
 	defer ts.Close()
 
 	hc := HostCheckerManager{Gw: ts.Gw}
-	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test:"}
+	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test:", RedisController:ts.Gw.RedisController}
 	hc.Init(redisStorage)
 
 	if hc.Id == "" {
@@ -46,7 +46,7 @@ func TestAmIPolling(t *testing.T) {
 	globalConf.UptimeTests.PollerGroup = groupID
 	ts.Gw.SetConfig(globalConf)
 
-	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test:"}
+	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test:", RedisController:ts.Gw.RedisController}
 	hc.Init(redisStorage)
 	hc2 := HostCheckerManager{Gw: ts.Gw}
 	hc2.Init(redisStorage)
@@ -75,7 +75,7 @@ func TestAmIPolling(t *testing.T) {
 
 	//Testing if the PollerCacheKey doesn't contains the poller_group by default
 	hc = HostCheckerManager{Gw: ts.Gw}
-	redisStorage = &storage.RedisCluster{KeyPrefix: "host-checker-test:"}
+	redisStorage = &storage.RedisCluster{KeyPrefix: "host-checker-test:", RedisController:ts.Gw.RedisController}
 	hc.Init(redisStorage)
 	hc.AmIPolling()
 
@@ -110,7 +110,7 @@ func TestCheckActivePollerLoop(t *testing.T) {
 	defer ts.Close()
 
 	hc := &HostCheckerManager{Gw: ts.Gw}
-	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test-1:"}
+	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test-1:", RedisController:ts.Gw.RedisController}
 	hc.Init(redisStorage)
 
 	ctx, cancel := context.WithCancel(context.TODO())
@@ -139,7 +139,7 @@ func TestStartPoller(t *testing.T) {
 	defer ts.Close()
 
 	hc := HostCheckerManager{Gw: ts.Gw}
-	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-TestStartPoller:"}
+	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-TestStartPoller:", RedisController:ts.Gw.RedisController}
 	hc.Init(redisStorage)
 	ctx, cancel := context.WithCancel(context.TODO())
 
@@ -156,7 +156,7 @@ func TestRecordUptimeAnalytics(t *testing.T) {
 	defer ts.Close()
 	hc := &HostCheckerManager{Gw: ts.Gw}
 
-	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test-analytics:"}
+	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test-analytics:", RedisController:ts.Gw.RedisController}
 	hc.Init(redisStorage)
 
 	spec := &APISpec{}

@@ -17,7 +17,7 @@ func (gw *Gateway) StoreLEState(m *letsencrypt.Manager) {
 
 	log.Debug("[SSL] --> Connecting to DB")
 
-	store := storage.RedisCluster{KeyPrefix: LEKeyPrefix}
+	store := storage.RedisCluster{KeyPrefix: LEKeyPrefix, RedisController:gw.RedisController}
 	connected := store.Connect()
 
 	log.Debug("--> Connected to DB")
@@ -40,7 +40,7 @@ func (gw *Gateway) StoreLEState(m *letsencrypt.Manager) {
 func (gw *Gateway) GetLEState(m *letsencrypt.Manager) {
 	checkKey := "cache"
 
-	store := storage.RedisCluster{KeyPrefix: LEKeyPrefix}
+	store := storage.RedisCluster{KeyPrefix: LEKeyPrefix, RedisController:gw.RedisController}
 
 	connected := store.Connect()
 	log.Debug("[SSL] --> Connected to DB")
