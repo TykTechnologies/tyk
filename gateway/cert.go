@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"github.com/TykTechnologies/tyk/storage"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -288,6 +289,20 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 		certNameMap[certData.Name] = &cert
 	}
 
+	if len(gwConfig.HttpServerOptions.SSLCertificates) > 0 {
+		var waitingRedisLog sync.Once
+		// ensure that we are connected to redis
+		for {
+			if storage.Connected() {
+				break
+			}
+
+			waitingRedisLog.Do(func() {
+				log.Warning("Redis is not ready. Waiting for a living connection")
+			})
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
 	for _, cert := range gw.CertificateManager.List(gwConfig.HttpServerOptions.SSLCertificates, certs.CertificatePrivate) {
 		if cert != nil {
 			serverCerts = append(serverCerts, *cert)
