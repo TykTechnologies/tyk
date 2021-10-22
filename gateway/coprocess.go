@@ -559,11 +559,10 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 		setCustomHeader(res.Header, k, v, ignoreCanonical)
 	}
 
-	// Set response body:
+	res.StatusCode = int(retObject.Response.StatusCode)
 	bodyBuf := bytes.NewBuffer(retObject.Response.RawBody)
 	res.Body = ioutil.NopCloser(bodyBuf)
-
-	res.StatusCode = int(retObject.Response.StatusCode)
+	res.ContentLength = int64(len(retObject.Response.RawBody))
 	return nil
 }
 
