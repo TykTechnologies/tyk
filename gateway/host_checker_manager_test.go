@@ -3,6 +3,7 @@ package gateway
 import (
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/storage"
@@ -114,18 +115,11 @@ func TestCheckActivePollerLoop(t *testing.T) {
 
 	go hc.CheckActivePollerLoop(ts.Gw.ctx)
 
-	found := false
+	//We give some warmup time to CheckActivePollerLoop to avoid random tests fail. The sleep time is the same of CheckActivePollerLoop ticker.
+	time.Sleep(11 * time.Second)
 
-	//Giving 15 retries to find the poller active key
-	for i := 0; i < 15; i++ {
-		activeInstance, err := hc.store.GetKey(PollerCacheKey)
-		if activeInstance == hc.Id && err == nil {
-			found = true
-			break
-		}
-	}
-
-	if !found {
+	activeInstance, err := redisStorage.GetKey(PollerCacheKey)
+	if activeInstance != hc.Id || err != nil {
 		t.Errorf("activeInstance should be %q when the CheckActivePollerLoop is running", hc.Id)
 	}
 
