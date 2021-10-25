@@ -1772,7 +1772,7 @@ func createTestUptream(t *testing.T, allowedConns int, readsPerConn int) net.Lis
 			conns++
 
 			if conns > allowedConns {
-				t.Fatal("Too many connections")
+				t.Error("Too many connections")
 				conn.Close()
 				return
 			}

@@ -1482,7 +1482,7 @@ func TestGroupResetHandler(t *testing.T) {
 			case *redis.Message:
 				notf := Notification{Gw: ts.Gw}
 				if err := json.Unmarshal([]byte(x.Payload), &notf); err != nil {
-					t.Fatal(err)
+					t.Error(err)
 				}
 				if notf.Command == NoticeGroupReload {
 					didReload <- true
