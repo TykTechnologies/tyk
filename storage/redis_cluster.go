@@ -114,6 +114,7 @@ func getRedisAddrs(config config.StorageOptionsConf) (addrs []string) {
 
 	return addrs
 }
+
 func clusterConnectionIsOpen(cluster *RedisCluster) bool {
 
 	c := cluster.RedisController.singleton(cluster.IsCache, cluster.IsAnalytics)

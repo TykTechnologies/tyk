@@ -28,9 +28,9 @@ func NewRedisController() *RedisController {
 
 // DisableRedis very handy when testsing it allows to dynamically enable/disable talking with
 // redisW
-func (rc *RedisController) DisableRedis(ok bool) {
-	if ok {
-		// we make sure to set that redis is down
+func (rc *RedisController) DisableRedis(setRedisDown bool) {
+	if setRedisDown {
+		// we make sure x set that redis is down
 		rc.redisUp.Store(false)
 		rc.disableRedis.Store(true)
 		return
