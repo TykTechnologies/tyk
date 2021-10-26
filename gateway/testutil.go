@@ -1076,14 +1076,14 @@ func (s *Test) BootstrapGw(ctx context.Context, cancelFn context.CancelFunc, gen
 
 	configs := s.Gw.GetConfig()
 
-	go storage.ConnectToRedis(ctx, func() {
+	go s.Gw.RedisController.ConnectToRedis(ctx, func() {
 		if s.Gw.OnConnect != nil {
 			s.Gw.OnConnect()
 		}
 	}, &configs)
 
 	for {
-		if storage.Connected() {
+		if s.Gw.RedisController.Connected() {
 			break
 		}
 		time.Sleep(10 * time.Millisecond)

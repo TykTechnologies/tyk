@@ -588,7 +588,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 					&RedisOsinStorageInterface{
 						storageManager,
 						k.Gw.GlobalSessionManager,
-						&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false},
+						&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, RedisController: k.Gw.RedisController},
 						k.Spec.OrgID,
 						k.Gw,
 					}),
