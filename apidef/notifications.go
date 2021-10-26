@@ -50,7 +50,11 @@ func (n NotificationsManager) SendRequest(wait bool, count int, notification int
 		}
 	}
 
-	postBody, _ := json.Marshal(notification)
+	postBody, errMarshaling := json.Marshal(notification)
+	if errMarshaling != nil {
+		log.Error("Error Marshaling the notification body.")
+		return
+	}
 	responseBody := bytes.NewBuffer(postBody)
 
 	req, err := http.NewRequest("POST", n.OAuthKeyChangeURL, responseBody)
@@ -69,7 +73,13 @@ func (n NotificationsManager) SendRequest(wait bool, count int, notification int
 		return
 	}
 	defer resp.Body.Close()
-	ioutil.ReadAll(resp.Body)
+	_, errRead := ioutil.ReadAll(resp.Body)
+	if errRead != nil {
+		log.Error("Request failed, trying again in 10s. Error was: ", err)
+		count++
+		n.SendRequest(true, count, notification)
+		return
+	}
 
 	if resp.StatusCode != 200 {
 		log.Error("Request returned non-200 status, trying again in 10s.")
