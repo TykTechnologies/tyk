@@ -175,6 +175,9 @@ type Gateway struct {
 
 	templates    *template.Template
 	templatesRaw *textTemplate.Template
+
+	// RedisController keeps track of redis connection and singleton
+	RedisController *storage.RedisController
 }
 
 func NewGateway(config config.Config, ctx context.Context, cancelFn context.CancelFunc) *Gateway {
@@ -213,6 +216,8 @@ func NewGateway(config config.Config, ctx context.Context, cancelFn context.Canc
 	// only for tests
 	gw.ReloadTestCase = NewReloadMachinery()
 	gw.TestBundles = map[string]map[string]string{}
+
+	gw.RedisController = storage.NewRedisController()
 
 	return &gw
 }
@@ -297,16 +302,16 @@ func (gw *Gateway) setupGlobals() {
 			mainLog.Warn("Running Uptime checks in a management node.")
 		}
 
-		healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:", IsAnalytics: true}
+		healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:", IsAnalytics: true, RedisController: gw.RedisController}
 		gw.InitHostCheckManager(gw.ctx, &healthCheckStore)
 	}
 
 	gw.initHealthCheck(gw.ctx)
 
-	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: gwConfig.HashKeys}
+	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: gwConfig.HashKeys, RedisController: gw.RedisController}
 	gw.GlobalSessionManager.Init(&redisStore)
 
-	versionStore := storage.RedisCluster{KeyPrefix: "version-check-"}
+	versionStore := storage.RedisCluster{KeyPrefix: "version-check-", RedisController: gw.RedisController}
 	versionStore.Connect()
 	err := versionStore.SetKey("gateway", VERSION, 0)
 	if err != nil {
@@ -319,18 +324,18 @@ func (gw *Gateway) setupGlobals() {
 		gw.SetConfig(Conf)
 		mainLog.Debug("Setting up analytics DB connection")
 
-		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true}
+		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, RedisController: gw.RedisController}
 		gw.analytics.Store = &analyticsStore
 		gw.analytics.Init()
 
-		store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true}
+		store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, RedisController: gw.RedisController}
 		redisPurger := RedisPurger{Store: &store, Gw: gw}
 		go redisPurger.PurgeLoop(gw.ctx)
 
 		if gw.GetConfig().AnalyticsConfig.Type == "rpc" {
 			mainLog.Debug("Using RPC cache purge")
 
-			store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true}
+			store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, RedisController: gw.RedisController}
 			purger := rpc.Purger{
 				Store: &store,
 			}
@@ -349,7 +354,7 @@ func (gw *Gateway) setupGlobals() {
 
 	// Get the notifier ready
 	mainLog.Debug("Notifier will not work in hybrid mode")
-	mainNotifierStore := &storage.RedisCluster{}
+	mainNotifierStore := &storage.RedisCluster{RedisController: gw.RedisController}
 	mainNotifierStore.Connect()
 	gw.MainNotifier = RedisNotifier{mainNotifierStore, RedisPubSubChannel, gw}
 
@@ -661,7 +666,7 @@ func (gw *Gateway) addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthMana
 	osinStorage := &RedisOsinStorageInterface{
 		storageManager,
 		gw.GlobalSessionManager,
-		&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false},
+		&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, RedisController: gw.RedisController},
 		spec.OrgID,
 		gw,
 	}
@@ -1042,7 +1047,7 @@ func (gw *Gateway) setupLogger() {
 	}
 
 	if gwConfig.UseRedisLog {
-		hook := newRedisHook()
+		hook := gw.newRedisHook()
 		log.Hooks.Add(hook)
 		rawLog.Hooks.Add(hook)
 
@@ -1363,7 +1368,7 @@ func (gw *Gateway) getGlobalStorageHandler(keyPrefix string, hashKeys bool) stor
 			Gw:        gw,
 		}
 	}
-	return &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys}
+	return &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys, RedisController: gw.RedisController}
 }
 
 func Start() {
@@ -1424,7 +1429,7 @@ func Start() {
 	}
 	gw.start()
 	configs := gw.GetConfig()
-	go storage.ConnectToRedis(gw.ctx, func() {
+	go gw.RedisController.ConnectToRedis(gw.ctx, func() {
 		gw.reloadURLStructure(func() {})
 	}, &configs)
 

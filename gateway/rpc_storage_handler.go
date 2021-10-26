@@ -791,7 +791,7 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 	}
 }
 
-func (gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler, isHashed bool,orgId string) {
+func (gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler, isHashed bool, orgId string) {
 
 	hashedKeyName := keyName
 	// avoid double hashing
