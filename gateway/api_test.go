@@ -1483,6 +1483,7 @@ func TestGroupResetHandler(t *testing.T) {
 				notf := Notification{Gw: ts.Gw}
 				if err := json.Unmarshal([]byte(x.Payload), &notf); err != nil {
 					t.Error(err)
+					return
 				}
 				if notf.Command == NoticeGroupReload {
 					didReload <- true
