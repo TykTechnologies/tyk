@@ -135,17 +135,40 @@ func TestSignatureValidation(t *testing.T) {
 		emptySigHeader := map[string]string{
 			"authorization": key,
 		}
-		storage.DisableRedis(true)
+		ts.Gw.RedisController.DisableRedis(true)
 		ts.Run(t, []test.TestCase{
 			{Headers: emptySigHeader, Code: http.StatusForbidden},
 			{Headers: invalidSigHeader, Code: http.StatusForbidden},
 			{Headers: validSigHeader, Code: http.StatusForbidden},
 		}...)
-		storage.DisableRedis(false)
+		ts.Gw.RedisController.DisableRedis(false)
 		ts.Run(t, []test.TestCase{
-			{Headers: emptySigHeader, Code: 401},
-			{Headers: invalidSigHeader, Code: 401},
-			{Headers: validSigHeader, Code: 200},
+			{Headers: emptySigHeader, Code: http.StatusUnauthorized},
+			{Headers: invalidSigHeader, Code: http.StatusUnauthorized},
+			{Headers: validSigHeader, Code: http.StatusOK},
+		}...)
+	})
+
+	t.Run("Static signature in params", func(t *testing.T) {
+		key := CreateSession(ts.Gw)
+		hasher := signature_validator.MasheryMd5sum{}
+		validHash := hasher.Hash(key, "foobar", time.Now().Unix())
+
+		emptySigPath := "?api_key=" + key
+		invalidSigPath := emptySigPath + "&sig=junk"
+		validSigPath := emptySigPath + "&sig=" + hex.EncodeToString(validHash)
+
+		ts.Gw.RedisController.DisableRedis(true)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: emptySigPath, Code: http.StatusForbidden},
+			{Path: invalidSigPath, Code: http.StatusForbidden},
+			{Path: validSigPath, Code: http.StatusForbidden},
+		}...)
+		ts.Gw.RedisController.DisableRedis(false)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: emptySigPath, Code: http.StatusUnauthorized},
+			{Path: invalidSigPath, Code: http.StatusUnauthorized},
+			{Path: validSigPath, Code: http.StatusOK},
 		}...)
 	})
 
@@ -171,12 +194,12 @@ func TestSignatureValidation(t *testing.T) {
 			"authorization": key,
 			"signature":     "junk",
 		}
-		storage.DisableRedis(true)
+		ts.Gw.RedisController.DisableRedis(true)
 		ts.Run(t, []test.TestCase{
 			{Headers: invalidSigHeader, Code: http.StatusForbidden},
 			{Headers: validSigHeader, Code: http.StatusForbidden},
 		}...)
-		storage.DisableRedis(false)
+		ts.Gw.RedisController.DisableRedis(false)
 		ts.Run(t, []test.TestCase{
 			{Headers: invalidSigHeader, Code: 401},
 			{Headers: validSigHeader, Code: 200},
@@ -238,7 +261,7 @@ func TestSignatureValidation(t *testing.T) {
 			"authorization": customKey,
 			"signature":     "junk",
 		}
-		storage.DisableRedis(true)
+		ts.Gw.RedisController.DisableRedis(true)
 		ts.Run(t, []test.TestCase{
 			{Headers: invalidSigHeader, Code: http.StatusForbidden},
 			{Headers: validSigHeader, Code: http.StatusForbidden},
@@ -246,7 +269,7 @@ func TestSignatureValidation(t *testing.T) {
 			{Headers: validSigHeader3, Code: http.StatusForbidden},
 			{Headers: validSigHeader4, Code: http.StatusForbidden},
 		}...)
-		storage.DisableRedis(false)
+		ts.Gw.RedisController.DisableRedis(false)
 		ts.Run(t, []test.TestCase{
 			{Headers: invalidSigHeader, Code: http.StatusUnauthorized},
 			{Headers: validSigHeader, Code: http.StatusOK},

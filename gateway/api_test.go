@@ -1401,7 +1401,7 @@ func TestGroupResetHandler(t *testing.T) {
 
 	didSubscribe := make(chan bool)
 	didReload := make(chan bool)
-	cacheStore := storage.RedisCluster{}
+	cacheStore := storage.RedisCluster{RedisController: ts.Gw.RedisController}
 	cacheStore.Connect()
 
 	go func() {
@@ -1412,7 +1412,7 @@ func TestGroupResetHandler(t *testing.T) {
 			case *redis.Message:
 				notf := Notification{Gw: ts.Gw}
 				if err := json.Unmarshal([]byte(x.Payload), &notf); err != nil {
-					t.Fatal(err)
+					t.Error(err)
 				}
 				if notf.Command == NoticeGroupReload {
 					didReload <- true

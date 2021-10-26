@@ -52,7 +52,7 @@ func (n *Notification) Sign() {
 }
 
 func (gw *Gateway) startPubSubLoop() {
-	cacheStore := storage.RedisCluster{}
+	cacheStore := storage.RedisCluster{RedisController: gw.RedisController}
 	cacheStore.Connect()
 	// On message, synchronise
 	for {

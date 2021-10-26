@@ -138,30 +138,31 @@ func runRouteChat(t *testing.T, client pb.RouteGuideClient) {
 
 	// goroutine to receive streaming data
 	go func() {
+		defer wg.Done()
 		// lets receive some messages
 		for i := 0; i < 5; i++ {
 			in, err := stream.Recv()
 			if err != nil {
-				t.Fatalf("Failed to receive a note : %v", err)
+				t.Errorf("Failed to receive a note : %v", err)
+				return
 			}
 			t.Logf("Got message %s at point(%d, %d)", in.Message, in.Location.Latitude, in.Location.Longitude)
 		}
-
-		wg.Done()
 		t.Logf("finish to receive the notes")
 	}()
 
 	// goroutine to send data
 	go func() {
+		defer wg.Done()
 		for _, note := range notes {
 			// wait some time until we send more data so we can see the parallelism
 			time.Sleep(10 * time.Millisecond)
 			if err := stream.Send(note); err != nil {
-				t.Fatalf("Failed to send a note: %v", err)
+				t.Errorf("Failed to send a note: %v", err)
+				return
 			}
 			t.Logf("Sending note %v", note.Message)
 		}
-		wg.Done()
 		t.Logf("finish to send the notes")
 	}()
 

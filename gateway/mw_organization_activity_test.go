@@ -10,7 +10,6 @@ import (
 	uuid "github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -25,7 +24,7 @@ func (ts *Test) testPrepareProcessRequestQuotaLimit(tb testing.TB, data map[stri
 	})
 
 	data["org_id"] = orgID
-	storage.DisableRedis(true)
+	ts.Gw.RedisController.DisableRedis(true)
 	expectBody := `{"status":"error","message":"Error writing to key store storage: Redis is either down or was not configured"}`
 	// create org key with quota
 	ts.Run(tb, test.TestCase{
@@ -36,7 +35,7 @@ func (ts *Test) testPrepareProcessRequestQuotaLimit(tb testing.TB, data map[stri
 		Code:      http.StatusInternalServerError,
 		BodyMatch: expectBody,
 	})
-	storage.DisableRedis(false)
+	ts.Gw.RedisController.DisableRedis(false)
 
 	ts.Run(tb, test.TestCase{
 		Path:      "/tyk/org/keys/" + orgID + "?reset_quota=1",

@@ -10,6 +10,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/TykTechnologies/tyk/config"
+
 	//	"net"
 	"net/http"
 	"net/http/httptest"
@@ -36,16 +38,7 @@ func (gw *Gateway) uploadCertPublicKey(serverCert tls.Certificate) (string, erro
 
 func TestPublicKeyPinning(t *testing.T) {
 
-	ts := StartTest(nil)
-	defer ts.Close()
-
 	_, _, _, serverCert := genServerCertificate()
-	pubID, err := ts.Gw.uploadCertPublicKey(serverCert)
-	if err != nil {
-		t.Error(err)
-	}
-	defer ts.Gw.CertificateManager.Delete(pubID, "")
-
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	}))
 	upstream.TLS = &tls.Config{
@@ -57,11 +50,15 @@ func TestPublicKeyPinning(t *testing.T) {
 	defer upstream.Close()
 
 	t.Run("Pub key match", func(t *testing.T) {
-		globalConf := ts.Gw.GetConfig()
-		// For host using pinning, it should ignore standard verification in all cases, e.g setting variable below does nothing
-		globalConf.ProxySSLInsecureSkipVerify = false
-		ts.Gw.SetConfig(globalConf)
-		defer ts.ResetTestConfig()
+		ts := StartTest(func(globalConf *config.Config) {
+			// For host using pinning, it should ignore standard verification in all cases, e.g setting variable below does nothing
+			globalConf.ProxySSLInsecureSkipVerify = false
+		})
+		defer ts.Close()
+		pubID, err := ts.Gw.uploadCertPublicKey(serverCert)
+		if err != nil {
+			t.Error(err)
+		}
 
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
@@ -73,6 +70,12 @@ func TestPublicKeyPinning(t *testing.T) {
 	})
 
 	t.Run("Pub key not match", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+		_, err := ts.Gw.uploadCertPublicKey(serverCert)
+		if err != nil {
+			t.Error(err)
+		}
 
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
@@ -84,13 +87,14 @@ func TestPublicKeyPinning(t *testing.T) {
 	})
 
 	t.Run("Global setting", func(t *testing.T) {
-		globalConf := ts.Gw.GetConfig()
-		globalConf.Security.PinnedPublicKeys = map[string]string{"127.0.0.1": "wrong"}
-		ts.Gw.SetConfig(globalConf)
-		defer ts.ResetTestConfig()
-
-		ts := StartTest(nil)
+		ts := StartTest(func(globalConf *config.Config) {
+			globalConf.Security.PinnedPublicKeys = map[string]string{"127.0.0.1": "wrong"}
+		})
 		defer ts.Close()
+		_, err := ts.Gw.uploadCertPublicKey(serverCert)
+		if err != nil {
+			t.Error(err)
+		}
 
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
@@ -101,16 +105,21 @@ func TestPublicKeyPinning(t *testing.T) {
 	})
 
 	t.Run("Though proxy", func(t *testing.T) {
+		ts := StartTest(func(globalConf *config.Config) {
+			globalConf.ProxySSLInsecureSkipVerify = true
+		})
+		defer ts.Close()
+
+		_, err := ts.Gw.uploadCertPublicKey(serverCert)
+		if err != nil {
+			t.Error(err)
+		}
+
 		_, _, _, proxyCert := genServerCertificate()
 		proxy := initProxy("https", &tls.Config{
 			Certificates: []tls.Certificate{proxyCert},
 			MaxVersion:   tls.VersionTLS12,
 		})
-
-		globalConf := ts.Gw.GetConfig()
-		globalConf.ProxySSLInsecureSkipVerify = true
-		ts.Gw.SetConfig(globalConf)
-		defer ts.ResetTestConfig()
 
 		defer func() {
 			proxyErr := proxy.Stop(ts)
@@ -118,9 +127,6 @@ func TestPublicKeyPinning(t *testing.T) {
 				t.Errorf("Cannot stop proxy: %v", proxyErr.Error())
 			}
 		}()
-
-		ts := StartTest(nil)
-		defer ts.Close()
 
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
@@ -133,6 +139,16 @@ func TestPublicKeyPinning(t *testing.T) {
 	})
 
 	t.Run("Enable Common Name check", func(t *testing.T) {
+		ts := StartTest(func(globalConf *config.Config) {
+			globalConf.SSLForceCommonNameCheck = true
+			globalConf.ProxySSLInsecureSkipVerify = true
+		})
+		defer ts.Close()
+		_, err := ts.Gw.uploadCertPublicKey(serverCert)
+		if err != nil {
+			t.Error(err)
+		}
+
 		// start upstream server
 		_, _, _, serverCert := genCertificate(&x509.Certificate{
 			EmailAddresses: []string{"test@test.com"},
@@ -142,10 +158,8 @@ func TestPublicKeyPinning(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		defer ts.Gw.CertificateManager.Delete(serverPubID, "")
 
-		upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		}))
+		upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 		upstream.TLS = &tls.Config{
 			InsecureSkipVerify: true,
 			Certificates:       []tls.Certificate{serverCert},
@@ -163,7 +177,6 @@ func TestPublicKeyPinning(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		defer ts.Gw.CertificateManager.Delete(proxyPubID, "")
 
 		proxy := initProxy("http", &tls.Config{
 			Certificates: []tls.Certificate{proxyCert},
@@ -176,15 +189,6 @@ func TestPublicKeyPinning(t *testing.T) {
 				t.Errorf("Cannot stop proxy: %v", proxyErr.Error())
 			}
 		}()
-
-		globalConf := ts.Gw.GetConfig()
-		globalConf.SSLForceCommonNameCheck = true
-		globalConf.ProxySSLInsecureSkipVerify = true
-		ts.Gw.SetConfig(globalConf)
-		defer ts.ResetTestConfig()
-
-		ts := StartTest(nil)
-		defer ts.Close()
 
 		pubKeys := fmt.Sprintf("%s,%s", serverPubID, proxyPubID)
 		upstream.URL = strings.Replace(upstream.URL, "127.0.0.1", "localhost", 1)

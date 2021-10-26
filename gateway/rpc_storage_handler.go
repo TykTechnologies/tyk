@@ -791,13 +791,19 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 	}
 }
 
-func (gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler) {
-	newKeyName := "apikey-" + storage.HashStr(keyName)
-	sessionString, err := r.GetRawKey(keyName)
+func (gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler, isHashed bool, orgId string) {
+
+	hashedKeyName := keyName
+	// avoid double hashing
+	if !isHashed {
+		hashedKeyName = storage.HashKey(keyName, gw.GetConfig().HashKeys)
+	}
+
+	sessionString, err := r.GetRawKey("apikey-" + hashedKeyName)
 	if err != nil {
 		log.Error("Key not found in master - skipping")
 	} else {
-		gw.handleAddKey(keyName, newKeyName[7:], sessionString, "-1")
+		gw.handleAddKey(keyName, hashedKeyName, sessionString, "-1")
 	}
 }
 
@@ -873,7 +879,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 				key = splitKeys[0]
 				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
 				r.Gw.handleDeleteHashedKey(splitKeys[0], orgId, "", resetQuota)
-				r.Gw.getSessionAndCreate(splitKeys[0], r)
+				r.Gw.getSessionAndCreate(splitKeys[0], r, true, orgId)
 			} else {
 				log.Info("--> removing cached key: ", key)
 				// in case it's an username (basic auth) then generate the token
@@ -881,7 +887,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 					key = r.Gw.generateToken(orgId, key)
 				}
 				r.Gw.handleDeleteKey(key, orgId, "-1", resetQuota)
-				r.Gw.getSessionAndCreate(splitKeys[0], r)
+				r.Gw.getSessionAndCreate(splitKeys[0], r, false, orgId)
 			}
 			r.Gw.SessionCache.Delete(key)
 			r.Gw.RPCGlobalCache.Delete(r.KeyPrefix + key)
