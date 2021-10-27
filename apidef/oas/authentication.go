@@ -9,18 +9,20 @@ import (
 )
 
 type Authentication struct {
-	Enabled                bool   `bson:"enabled" json:"enabled"` // required
-	StripAuthorizationData bool   `bson:"stripAuthorizationData,omitempty" json:"stripAuthorizationData,omitempty"`
-	Token                  *Token `bson:"token,omitempty" json:"token,omitempty"`
-	JWT                    *JWT   `bson:"jwt,omitempty" json:"jwt,omitempty"`
-	Basic                  *Basic `bson:"basic,omitempty" json:"basic,omitempty"`
-	OAuth                  *OAuth `bson:"oauth,omitempty" json:"oauth,omitempty"`
-	HMAC                   *HMAC  `bson:"hmac,omitempty" json:"hmac,omitempty"`
+	Enabled                bool                `bson:"enabled" json:"enabled"` // required
+	StripAuthorizationData bool                `bson:"stripAuthorizationData,omitempty" json:"stripAuthorizationData,omitempty"`
+	BaseIdentityProvider   apidef.AuthTypeEnum `bson:"baseIdentityProvider,omitempty" json:"baseIdentityProvider,omitempty"`
+	Token                  *Token              `bson:"token,omitempty" json:"token,omitempty"`
+	JWT                    *JWT                `bson:"jwt,omitempty" json:"jwt,omitempty"`
+	Basic                  *Basic              `bson:"basic,omitempty" json:"basic,omitempty"`
+	OAuth                  *OAuth              `bson:"oauth,omitempty" json:"oauth,omitempty"`
+	HMAC                   *HMAC               `bson:"hmac,omitempty" json:"hmac,omitempty"`
 }
 
 func (a *Authentication) Fill(api apidef.APIDefinition) {
 	a.Enabled = !api.UseKeylessAccess
 	a.StripAuthorizationData = api.StripAuthData
+	a.BaseIdentityProvider = api.BaseIdentityProvidedBy
 
 	if api.AuthConfigs == nil || len(api.AuthConfigs) == 0 {
 		return
@@ -90,6 +92,7 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 	api.UseKeylessAccess = !a.Enabled
 	api.StripAuthData = a.StripAuthorizationData
+	api.BaseIdentityProvidedBy = a.BaseIdentityProvider
 
 	if a.Token != nil {
 		a.Token.ExtractTo(api)
