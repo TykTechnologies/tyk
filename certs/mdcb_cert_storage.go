@@ -94,14 +94,16 @@ func (m *mdcbCertStorage) DeleteScanMatch(key string) bool {
 func (m *mdcbCertStorage) GetListRange(keyName string, from int64, to int64) ([]string, error) {
 	var val []string
 	var err error
-	if m.local != nil {
-		val, err = m.local.GetListRange(keyName, from, to)
-		if err != nil {
-			val, err = m.rpc.GetListRange(keyName, from, to)
-		}
-	} else {
+
+	if m.local == nil {
+		return m.rpc.GetListRange(keyName, from, to)
+	}
+
+	val, err = m.local.GetListRange(keyName, from, to)
+	if err != nil {
 		val, err = m.rpc.GetListRange(keyName, from, to)
 	}
+
 	return val, err
 }
 
