@@ -813,6 +813,9 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 	ClientsToBeRevoked := map[string]string{}
 	oauthTokenKeys := map[string]bool{}
 
+	// Create oauth client = pull client
+	// update oauth client = delete locally and pull again
+	// delete oauth client = delete locally and revoke tokens
 	for _, key := range keys {
 		splitKeys := strings.Split(key, ":")
 		if len(splitKeys) > 1 && splitKeys[1] == "resetQuota" {
@@ -825,6 +828,13 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			} else if action == "revoke_all_tokens" {
 				ClientsToBeRevoked[splitKeys[1]] = key
 				oauthTokenKeys[key] = true
+			}else if action == "OauthClientAdded" || action == "OauthClientRemoved" || action == "OauthClientUpdated" {
+				info := strings.Split(splitKeys[0],".")
+				apiId: = info[0]
+				clientId := info[1]
+				orgId := info[2]
+
+				
 			}
 		}
 	}
