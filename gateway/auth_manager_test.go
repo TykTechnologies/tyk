@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/certs"
+
 	"github.com/TykTechnologies/tyk/headers"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -110,12 +112,12 @@ func TestAuthenticationAfterUpdateKey(t *testing.T) {
 }
 
 func TestHashKeyFunctionChanged(t *testing.T) {
-	_, _, combinedPEM, _ := genServerCertificate()
+	_, _, combinedPEM, _ := certs.GenServerCertificate()
 	serverCertID, _ := CertificateManager.Add(combinedPEM, "")
 	orgId := "default"
 	defer CertificateManager.Delete(serverCertID, orgId)
 
-	clientPEM, _, _, clientCert := genCertificate(&x509.Certificate{})
+	clientPEM, _, _, clientCert := certs.GenCertificate(&x509.Certificate{})
 
 	clientCertID, err := CertificateManager.Add(clientPEM, orgId)
 	if err != nil {

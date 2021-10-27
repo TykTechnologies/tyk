@@ -88,6 +88,16 @@ var (
 	}
 )
 
+const (
+	ResetQuota              string = "resetQuota"
+	CertificateRemoved      string = "CertificateRemoved"
+	CertificateAdded        string = "CertificateAdded"
+	OAuthRevokeToken        string = "oAuthRevokeToken"
+	OAuthRevokeAccessToken  string = "oAuthRevokeAccessToken"
+	OAuthRevokeRefreshToken string = "oAuthRevokeRefreshToken"
+	OAuthRevokeAllTokens    string = "revoke_all_tokens"
+)
+
 // RPCStorageHandler is a storage manager that uses the redis database.
 type RPCStorageHandler struct {
 	KeyPrefix        string
@@ -811,20 +821,31 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 	keysToReset := map[string]bool{}
 	TokensToBeRevoked := map[string]string{}
 	ClientsToBeRevoked := map[string]string{}
-	oauthTokenKeys := map[string]bool{}
+	notRegularKeys := map[string]bool{}
+	CertificatesToRemove := map[string]string{}
+	CertificatesToAdd := map[string]string{}
 
 	for _, key := range keys {
 		splitKeys := strings.Split(key, ":")
-		if len(splitKeys) > 1 && splitKeys[1] == "resetQuota" {
-			keysToReset[splitKeys[0]] = true
-		} else if len(splitKeys) > 2 {
+		if len(splitKeys) > 1 {
 			action := splitKeys[len(splitKeys)-1]
-			if action == "oAuthRevokeToken" || action == "oAuthRevokeAccessToken" || action == "oAuthRevokeRefreshToken" {
+			switch action {
+			case ResetQuota:
+				keysToReset[splitKeys[0]] = true
+			case CertificateRemoved:
+				CertificatesToRemove[key] = splitKeys[0]
+				notRegularKeys[key] = true
+			case CertificateAdded:
+				CertificatesToAdd[key] = splitKeys[0]
+				notRegularKeys[key] = true
+			case OAuthRevokeToken, OAuthRevokeAccessToken, OAuthRevokeRefreshToken:
 				TokensToBeRevoked[splitKeys[0]] = key
-				oauthTokenKeys[key] = true
-			} else if action == "revoke_all_tokens" {
+				notRegularKeys[key] = true
+			case OAuthRevokeAllTokens:
 				ClientsToBeRevoked[splitKeys[1]] = key
-				oauthTokenKeys[key] = true
+				notRegularKeys[key] = true
+			default:
+				log.Debug("ignoring processing of action:", action)
 			}
 		}
 	}
@@ -856,9 +877,9 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			}
 			var tokenTypeHint string
 			switch tokenActionTypeHint {
-			case "oAuthRevokeAccessToken":
+			case OAuthRevokeAccessToken:
 				tokenTypeHint = "access_token"
-			case "oAuthRevokeRefreshToken":
+			case OAuthRevokeRefreshToken:
 				tokenTypeHint = "refresh_token"
 			}
 			RevokeToken(storage, token, tokenTypeHint)
@@ -870,18 +891,31 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		RPCGlobalCache.Delete(r.KeyPrefix + token)
 	}
 
+	// remove certs
+	for _, certId := range CertificatesToRemove {
+		log.Debugf("Removing certificate: %v", certId)
+		CertificateManager.Delete(certId, orgId)
+	}
+	for _, certId := range CertificatesToAdd {
+		log.Debugf("Adding certificate: %v", certId)
+		//If we are in a slave node, MDCB Storage GetRaw should get the certificate from MDCB and cache it locally
+		content, err := CertificateManager.GetRaw(certId)
+		if content == "" && err != nil {
+			log.Debugf("Error getting certificate content")
+		}
+	}
+
 	for _, key := range keys {
-		_, isOauthTokenKey := oauthTokenKeys[key]
+		_, isOauthTokenKey := notRegularKeys[key]
 		if !isOauthTokenKey {
 			splitKeys := strings.Split(key, ":")
 			_, resetQuota := keysToReset[splitKeys[0]]
 
 			if len(splitKeys) > 1 && splitKeys[1] == "hashed" {
-				key = splitKeys[0]
 				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
+				key = splitKeys[0]
 				handleDeleteHashedKey(splitKeys[0], orgId, "", resetQuota)
 				getSessionAndCreate(splitKeys[0], r, true, orgId)
-
 			} else {
 				log.Info("--> removing cached key: ", key)
 				// in case it's an username (basic auth) then generate the token

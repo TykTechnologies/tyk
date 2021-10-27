@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TykTechnologies/tyk/certs"
+
 	"google.golang.org/grpc/metadata"
 
 	"golang.org/x/net/http2/h2c"
@@ -151,8 +153,8 @@ func TestHTTP2_TLS(t *testing.T) {
 	expected := "HTTP/2.0"
 
 	// Certificates
-	_, _, _, clientCert := genCertificate(&x509.Certificate{})
-	serverCertPem, _, combinedPEM, _ := genServerCertificate()
+	_, _, _, clientCert := certs.GenCertificate(&x509.Certificate{})
+	serverCertPem, _, combinedPEM, _ := certs.GenServerCertificate()
 	certID, _ := CertificateManager.Add(combinedPEM, "")
 	defer CertificateManager.Delete(certID, "")
 
@@ -203,8 +205,8 @@ func TestHTTP2_TLS(t *testing.T) {
 func TestTLSTyk_H2cUpstream(t *testing.T) {
 
 	// Certificates
-	_, _, _, clientCert := genCertificate(&x509.Certificate{})
-	serverCertPem, _, combinedPEM, _ := genServerCertificate()
+	_, _, _, clientCert := certs.GenCertificate(&x509.Certificate{})
+	serverCertPem, _, combinedPEM, _ := certs.GenServerCertificate()
 	certID, _ := CertificateManager.Add(combinedPEM, "")
 	defer CertificateManager.Delete(certID, "")
 
@@ -258,7 +260,7 @@ func TestTLSTyk_H2cUpstream(t *testing.T) {
 func TestGRPC_TLS(t *testing.T) {
 	defer ResetTestConfig()
 
-	_, _, combinedPEM, _ := genServerCertificate()
+	_, _, combinedPEM, _ := certs.GenServerCertificate()
 	certID, _ := CertificateManager.Add(combinedPEM, "")
 	defer CertificateManager.Delete(certID, "")
 
@@ -305,9 +307,9 @@ func TestGRPC_MutualTLS(t *testing.T) {
 	// Mutual Authentication for both downstream-tyk and tyk-upstream
 	defer ResetTestConfig()
 
-	_, _, combinedClientPEM, clientCert := genCertificate(&x509.Certificate{})
+	_, _, combinedClientPEM, clientCert := certs.GenCertificate(&x509.Certificate{})
 	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
-	serverCertPem, _, combinedPEM, _ := genServerCertificate()
+	serverCertPem, _, combinedPEM, _ := certs.GenServerCertificate()
 
 	certID, _ := CertificateManager.Add(combinedPEM, "") // For tyk to know downstream
 	defer CertificateManager.Delete(certID, "")
@@ -359,7 +361,7 @@ func TestGRPC_MutualTLS(t *testing.T) {
 
 func TestGRPC_BasicAuthentication(t *testing.T) {
 	defer ResetTestConfig()
-	_, _, combinedPEM, _ := genServerCertificate()
+	_, _, combinedPEM, _ := certs.GenServerCertificate()
 	certID, _ := CertificateManager.Add(combinedPEM, "")
 	defer CertificateManager.Delete(certID, "")
 
@@ -417,7 +419,7 @@ func TestGRPC_BasicAuthentication(t *testing.T) {
 
 func TestGRPC_TokenBasedAuthentication(t *testing.T) {
 	defer ResetTestConfig()
-	_, _, combinedPEM, _ := genServerCertificate()
+	_, _, combinedPEM, _ := certs.GenServerCertificate()
 	certID, _ := CertificateManager.Add(combinedPEM, "")
 	defer CertificateManager.Delete(certID, "")
 
@@ -521,7 +523,7 @@ func openListener(t *testing.T) net.Listener {
 }
 
 func grpcServerCreds(t *testing.T, clientCert *x509.Certificate) []grpc.ServerOption {
-	cert, key, _, _ := genCertificate(&x509.Certificate{})
+	cert, key, _, _ := certs.GenCertificate(&x509.Certificate{})
 	certificate, _ := tls.X509KeyPair(cert, key)
 
 	pool := x509.NewCertPool()
@@ -670,9 +672,9 @@ func TestGRPC_Stream_MutualTLS(t *testing.T) {
 	// Mutual Authentication for both downstream-tyk and tyk-upstream
 	defer ResetTestConfig()
 
-	_, _, combinedClientPEM, clientCert := genCertificate(&x509.Certificate{})
+	_, _, combinedClientPEM, clientCert := certs.GenCertificate(&x509.Certificate{})
 	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
-	serverCertPem, _, combinedPEM, _ := genServerCertificate()
+	serverCertPem, _, combinedPEM, _ := certs.GenServerCertificate()
 
 	certID, _ := CertificateManager.Add(combinedPEM, "") // For tyk to know downstream
 	defer CertificateManager.Delete(certID, "")
@@ -719,7 +721,7 @@ func TestGRPC_Stream_MutualTLS(t *testing.T) {
 
 func TestGRPC_Stream_TokenBasedAuthentication(t *testing.T) {
 	defer ResetTestConfig()
-	_, _, combinedPEM, _ := genServerCertificate()
+	_, _, combinedPEM, _ := certs.GenServerCertificate()
 	certID, _ := CertificateManager.Add(combinedPEM, "")
 	defer CertificateManager.Delete(certID, "")
 
@@ -779,7 +781,7 @@ func TestGRPC_Stream_TokenBasedAuthentication(t *testing.T) {
 
 func TestGRPC_Stream_BasicAuthentication(t *testing.T) {
 	defer ResetTestConfig()
-	_, _, combinedPEM, _ := genServerCertificate()
+	_, _, combinedPEM, _ := certs.GenServerCertificate()
 	certID, _ := CertificateManager.Add(combinedPEM, "")
 	defer CertificateManager.Delete(certID, "")
 
