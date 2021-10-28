@@ -20,14 +20,14 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 
+	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/resolve"
 	"github.com/cenk/backoff"
-	"github.com/jensneuse/graphql-go-tools/pkg/engine/resolve"
 
 	"gopkg.in/Masterminds/sprig.v2"
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/gorilla/mux"
-	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/gojsonschema"
