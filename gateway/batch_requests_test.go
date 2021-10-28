@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TykTechnologies/tyk/certs"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/valyala/fasthttp"
@@ -124,7 +126,7 @@ func TestVirtualEndpointBatch(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	_, _, combinedClientPEM, clientCert := genCertificate(&x509.Certificate{})
+	_, _, combinedClientPEM, clientCert := certs.GenCertificate(&x509.Certificate{})
 	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	}))

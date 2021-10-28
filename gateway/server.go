@@ -378,7 +378,16 @@ func (gw *Gateway) setupGlobals() {
 		certificateSecret = gw.GetConfig().Security.PrivateCertificateEncodingSecret
 	}
 
-	gw.CertificateManager = certs.NewCertificateManager(gw.getGlobalStorageHandler("cert-", false), certificateSecret, log, !gw.GetConfig().Cloud)
+	storeCert := &storage.RedisCluster{KeyPrefix: "cert-", HashKeys: false, RedisController: gw.RedisController}
+	gw.CertificateManager = certs.NewCertificateManager(storeCert, certificateSecret, log, !gw.GetConfig().Cloud)
+	if gw.GetConfig().SlaveOptions.UseRPC {
+		rpcStore := &RPCStorageHandler{
+			KeyPrefix: "cert-",
+			HashKeys:  false,
+			Gw:        gw,
+		}
+		gw.CertificateManager = certs.NewSlaveCertManager(storeCert, rpcStore, certificateSecret, log, !gw.GetConfig().Cloud)
+	}
 
 	if gw.GetConfig().NewRelic.AppName != "" {
 		NewRelicApplication = gw.SetupNewRelic()
