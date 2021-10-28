@@ -50,22 +50,28 @@ func (n NotificationsManager) SendRequest(wait bool, count int, notification int
 		}
 	}
 
-	postBody, errMarshaling := json.Marshal(notification)
-	if errMarshaling != nil {
-		log.Error("Error Marshaling the notification body.")
+	var req *http.Request
+	var resp *http.Response
+	var postBody []byte
+	var err error
+
+	postBody, err = json.Marshal(notification)
+	if err != nil {
+		log.Error("Error Marshaling the notification body:", err)
 		return
 	}
 	responseBody := bytes.NewBuffer(postBody)
 
-	req, err := http.NewRequest("POST", n.OAuthKeyChangeURL, responseBody)
+	req, err = http.NewRequest("POST", n.OAuthKeyChangeURL, responseBody)
 	if err != nil {
-		log.Fatalln(err)
+		log.Error("Cannot create a new notification request:", err)
+		return
 	}
 	req.Header.Set("User-Agent", "Tyk-Gatewy-Notifications")
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Tyk-Shared-Secret", n.SharedSecret)
 
-	resp, err := httpClient.Do(req)
+	resp, err = httpClient.Do(req)
 	if err != nil {
 		log.Error("Request failed, trying again in 10s. Error was: ", err)
 		count++
@@ -73,8 +79,8 @@ func (n NotificationsManager) SendRequest(wait bool, count int, notification int
 		return
 	}
 	defer resp.Body.Close()
-	_, errRead := ioutil.ReadAll(resp.Body)
-	if errRead != nil {
+	_, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
 		log.Error("Request failed, trying again in 10s. Error was: ", err)
 		count++
 		n.SendRequest(true, count, notification)
