@@ -97,7 +97,6 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		log.Debug("Trying to find key by client certificate")
 		certHash = certs.HexSHA256(r.TLS.PeerCertificates[0].Raw)
 		key = k.Gw.generateToken(k.Spec.OrgID, certHash)
-
 	} else {
 		k.Logger().Info("Attempted access with malformed header, no auth header found.")
 		return errorAndStatusCode(ErrAuthAuthorizationFieldMissing)
