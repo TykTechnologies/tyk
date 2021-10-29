@@ -335,7 +335,6 @@ func (certs *CertsData) Decode(value string) error {
 	return nil
 }
 
-
 type HttpServerOptionsConfig struct {
 	// No longer used
 	OverrideDefaults bool `json:"-"`
@@ -1077,8 +1076,8 @@ type CertData struct {
 	// Path to private key file
 	KeyFile string `json:"key_file"`
 }
-// [{""}]
 
+// [{""}]
 
 // EventMessage is a standard form to send event data to handlers
 type EventMessage struct {

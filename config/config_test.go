@@ -287,16 +287,15 @@ func TestLoad_tracing(t *testing.T) {
 	})
 }
 
-func TestCustomEnvDecoders(t *testing.T){
+func TestCustomEnvDecoders(t *testing.T) {
 	var c Config
-	os.Setenv("TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES","[{\"domain_name\":\"testCerts\"}]")
+	os.Setenv("TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES", "[{\"domain_name\":\"testCerts\"}]")
 	err := envconfig.Process("TYK_GW", &c)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-
 	assert.Len(t, c.HttpServerOptions.Certificates, 1, "TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES should have len 1")
-	assert.Equal(t, "testCerts",c.HttpServerOptions.Certificates[0].Name,"TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES domain_name should be equals to testCerts")
+	assert.Equal(t, "testCerts", c.HttpServerOptions.Certificates[0].Name, "TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES domain_name should be equals to testCerts")
 
 }
