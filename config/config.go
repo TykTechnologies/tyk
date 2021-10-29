@@ -325,6 +325,16 @@ type LocalSessionCacheConf struct {
 	CachedSessionTimeout int `json:"cached_session_timeout"`
 	CacheSessionEviction int `json:"cached_session_eviction"`
 }
+type CertsData []CertData
+
+func (certs *CertsData) Decode(value string) error {
+	err := json.Unmarshal([]byte(value), certs)
+	if err != nil {
+		log.Info("Error unmarshaling TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES")
+	}
+	return nil
+}
+
 
 type HttpServerOptionsConfig struct {
 	// No longer used
@@ -352,7 +362,7 @@ type HttpServerOptionsConfig struct {
 	EnableWebSockets bool `json:"enable_websockets"`
 
 	// Deprecated. SSL certificates used by Gateway server.
-	Certificates []CertData `json:"certificates"`
+	Certificates CertData `json:"certificates"`
 
 	// SSL certificates used by your Gateway server. A list of certificate IDs or path to files.
 	SSLCertificates []string `json:"ssl_certificates"`
@@ -1067,6 +1077,8 @@ type CertData struct {
 	// Path to private key file
 	KeyFile string `json:"key_file"`
 }
+// [{""}]
+
 
 // EventMessage is a standard form to send event data to handlers
 type EventMessage struct {
