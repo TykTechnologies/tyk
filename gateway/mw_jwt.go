@@ -327,14 +327,45 @@ func (k *JWTMiddleware) getUserIdFromClaim(claims jwt.MapClaims) (string, error)
 	return "", errors.New(message)
 }
 
-func getScopeFromClaim(claims jwt.MapClaims, scopeClaimName string) []string {
-	// get claim with scopes and turn it into slice of strings
-	if scope, found := claims[scopeClaimName].(string); found {
-		return strings.Split(scope, " ") // by standard is space separated list of values
+func toStrings(v interface{}) []string {
+	switch e := v.(type) {
+	case string:
+		return strings.Split(e, " ")
+	case []interface{}:
+		var r []string
+		for _, x := range e {
+			r = append(r, toStrings(x)...)
+		}
+		return r
 	}
-
-	// claim with scopes is optional so return nothing if it is not present
 	return nil
+}
+
+func nestedMapLookup(m map[string]interface{}, ks ...string) interface{} {
+	var c interface{} = m
+	for _, k := range ks {
+		if _, ok := c.(map[string]interface{}); !ok {
+			//fmt.Errorf("key not found; remaining keys: %v", ks)
+			return nil
+		}
+		c = getMapContext(c, k)
+	}
+	return c
+}
+
+func getMapContext(m interface{}, k string) (rval interface{}) {
+	switch e := m.(type) {
+	case map[string]interface{}:
+		return e[k]
+	default:
+		return e
+	}
+}
+
+func getScopeFromClaim(claims jwt.MapClaims, scopeClaimName string) []string {
+	lookedUp := nestedMapLookup(claims, strings.Split(scopeClaimName, ".")...)
+
+	return toStrings(lookedUp)
 }
 
 func mapScopeToPolicies(mapping map[string]string, scope []string) []string {

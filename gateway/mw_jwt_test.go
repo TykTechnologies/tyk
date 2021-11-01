@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/lonelycode/go-uuid/uuid"
 	"github.com/stretchr/testify/assert"
 
@@ -1229,7 +1229,81 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 			},
 		)
 	})
+}
 
+func TestGetScopeFromClaim(t *testing.T) {
+	type tableTest struct {
+		jwt            string
+		key            string
+		expectedClaims []string
+		name           string
+	}
+
+	tests := []tableTest{
+		{
+			jwt:            `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMiwic2NvcGUiOiJmb28gYmFyIGJheiJ9.iS5FYY99ccB1oTGtMmNjM1lppS18FSKPytrV9oQouSM`,
+			key:            "scope",
+			expectedClaims: []string{"foo", "bar", "baz"},
+			name:           "space separated",
+		},
+		{
+			jwt:            `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMiwic2NvcGUiOlsiZm9vIiwiYmFyIiwiYmF6Il19.Lo_7J1FpUcsKWC4E9nMiouyVdUClA3KujHu9EwqHEwo`,
+			key:            "scope",
+			expectedClaims: []string{"foo", "bar", "baz"},
+			name:           "slice strings",
+		},
+		{
+			jwt:            `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMiwic2NvcGUxIjp7InNjb3BlMiI6ImZvbyBiYXIgYmF6In19.IsCBEl-GozS-sgZaTHoLwuBKmxYLOCYYVCiLLVmGu8o`,
+			key:            "scope1.scope2",
+			expectedClaims: []string{"foo", "bar", "baz"},
+			name:           "nested space separated",
+		},
+		{
+			jwt:            `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMiwic2NvcGUxIjp7InNjb3BlMiI6WyJmb28iLCJiYXIiLCJiYXoiXX19.VDBnH2U7KWl-fajAHGq6PzzWp4mnNCkfKAodfhHc0gY`,
+			key:            "scope1.scope2",
+			expectedClaims: []string{"foo", "bar", "baz"},
+			name:           "nested slice strings",
+		},
+	}
+
+	pubKey := []byte(`mysecret`)
+
+	for i, mytest := range tests {
+		t.Run(fmt.Sprintf("%d %s", i, mytest.name), func(t *testing.T) {
+			tok, err := jwt.Parse(mytest.jwt, func(token *jwt.Token) (interface{}, error) {
+				return pubKey, nil
+			})
+			if err != nil {
+				t.Fatal(err.Error())
+			}
+
+			scopes := getScopeFromClaim(tok.Claims.(jwt.MapClaims), mytest.key)
+			if !testEq(mytest.expectedClaims, scopes) {
+				t.Logf("expected: %v", mytest.expectedClaims)
+				t.Logf("actual: %v", scopes)
+				t.Fatal(i, "slices not equal")
+			}
+		})
+	}
+}
+
+func testEq(a, b []string) bool {
+	// If one is nil, the other must also be nil.
+	if (a == nil) != (b == nil) {
+		return false
+	}
+
+	if len(a) != len(b) {
+		return false
+	}
+
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+
+	return true
 }
 
 func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
