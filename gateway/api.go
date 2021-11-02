@@ -32,6 +32,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/aws/aws-sdk-go/service/apigateway"
 	"io/ioutil"
 	"net/http"
 	"net/url"

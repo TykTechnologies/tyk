@@ -95,6 +95,9 @@ const (
 	OAuthRevokeAccessToken  string = "oAuthRevokeAccessToken"
 	OAuthRevokeRefreshToken string = "oAuthRevokeRefreshToken"
 	OAuthRevokeAllTokens    string = "revoke_all_tokens"
+	OauthClientAdded        string = "OauthClientAdded"
+	OauthClientRemoved      string = "OauthClientRemoved"
+	OauthClientUpdated      string = "OauthClientUpdated"
 )
 
 // RPCStorageHandler is a storage manager that uses the redis database.
@@ -817,6 +820,38 @@ func (gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler, isH
 	}
 }
 
+func(gw *Gateway) ProcessOauthClientsOps(clients map[string]string){
+	for v,action := range clients{
+		// value is: APIID.ClientID.OrgID
+		eventValues := strings.Split(v,".")
+		apiId := eventValues[0]
+		oauthClientId := eventValues[1]
+		orgID := eventValues[2]
+
+		store,_, err := gw.GetStorageForApi(apiId)
+		if err != nil {
+			log.Error("Could not get oath storage for api")
+			return
+		}
+		switch action {
+		case OauthClientAdded:
+
+			log.Info("se agrego")
+		case OauthClientRemoved:
+			err := store.DeleteClient(oauthClientId,orgID,false)
+			if err != nil {
+				log.Errorf("Could not delete oauth client with id: %v", oauthClientId)
+				return
+			}
+			log.Infof("Oauth Client deleted successfully")
+		case OauthClientUpdated:
+			log.Info("se actualizo")
+		default:
+			log.Warningf("Oauth client event not supported:%v",action)
+		}
+	}
+}
+
 func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) {
 	keysToReset := map[string]bool{}
 	TokensToBeRevoked := map[string]string{}
@@ -824,6 +859,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 	notRegularKeys := map[string]bool{}
 	CertificatesToRemove := map[string]string{}
 	CertificatesToAdd := map[string]string{}
+	OauthClients := map[string]string{}
 
 	for _, key := range keys {
 		splitKeys := strings.Split(key, ":")
@@ -844,12 +880,15 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			case OAuthRevokeAllTokens:
 				ClientsToBeRevoked[splitKeys[1]] = key
 				notRegularKeys[key] = true
+			case OauthClientAdded, OauthClientUpdated, OauthClientRemoved:
+				OauthClients[splitKeys[0]] = action
+				notRegularKeys[key] = true
 			default:
 				log.Debug("ignoring processing of action:", action)
 			}
 		}
 	}
-
+	r.Gw.ProcessOauthClientsOps(OauthClients)
 	for clientId, key := range ClientsToBeRevoked {
 		splitKeys := strings.Split(key, ":")
 		apiId := splitKeys[0]
