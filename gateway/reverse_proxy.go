@@ -1651,11 +1651,6 @@ func IsUpgrade(req *http.Request) (bool, string) {
 		return false, ""
 	}
 
-	EncodeAccept := strings.ToLower(strings.TrimSpace(req.Header.Get(headers.Accept)))
-	if EncodeAccept == "text/event-stream" {
-		return true, ""
-	}
-
 	connection := strings.ToLower(strings.TrimSpace(req.Header.Get(headers.Connection)))
 	if connection != "upgrade" {
 		return false, ""
