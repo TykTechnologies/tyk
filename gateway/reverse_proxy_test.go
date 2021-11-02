@@ -1,17 +1,22 @@
 package gateway
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 	"text/template"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/jensneuse/graphql-go-tools/pkg/execution/datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
@@ -1045,4 +1050,74 @@ func BenchmarkCopyRequestResponse(b *testing.B) {
 			res = copyResponse(res)
 		}
 	}
+}
+
+func TestSSE(t *testing.T) {
+	// send and receive should be in order
+	var wg sync.WaitGroup
+
+	sseServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Connection", "keep-alive")
+
+		flusher, _ := w.(http.Flusher)
+		for i := 0; i < 5; i++ {
+			wg.Wait()
+			fmt.Fprintf(w, "data: %d\n", i)
+			flusher.Flush()
+			wg.Add(1)
+		}
+	}))
+
+	conf := func(globalConf *config.Config) {
+		globalConf.HttpServerOptions.EnableWebSockets = false
+	}
+	ts := StartTest(conf)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.TargetURL = sseServer.URL
+		spec.Proxy.ListenPath = "/"
+	})
+
+	req, _ := http.NewRequest(http.MethodGet, ts.URL, nil)
+	req.Header.Set("Accept", "text/event-stream")
+
+	client := http.Client{}
+
+	stream := func(enableWebSockets bool) {
+		globalConf := ts.Gw.GetConfig()
+		globalConf.HttpServerOptions.EnableWebSockets = enableWebSockets
+		ts.Gw.SetConfig(globalConf)
+
+		res, err := client.Do(req)
+		assert.NoError(t, err)
+
+		reader := bufio.NewReader(res.Body)
+		defer res.Body.Close()
+
+		i := 0
+		for {
+			line, err := reader.ReadBytes('\n')
+			if err != nil && err != io.EOF {
+				t.Fatal(err)
+			}
+
+			if len(line) == 0 {
+				break
+			}
+
+			assert.Equal(t, fmt.Sprintf("data: %v\n", i), string(line))
+			i++
+			wg.Done()
+		}
+	}
+
+	t.Run("websockets disabled", func(t *testing.T) {
+		stream(false)
+	})
+
+	t.Run("websockets enabled", func(t *testing.T) {
+		stream(true)
+	})
 }
