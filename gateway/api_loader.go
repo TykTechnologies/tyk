@@ -575,8 +575,29 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if d.SH.Spec.target.Scheme == "tyk" {
-		handler, found := d.Gw.findInternalHttpHandlerByNameOrID(d.SH.Spec.target.Host)
+	var versionName string
+	if d.SH.Spec.Versioning.Enabled {
+		versionName = d.SH.Spec.getVersionFromRequest(r)
+	}
+
+	if d.SH.Spec.target.Scheme == "tyk" || versionName != "" {
+		var handler http.Handler
+		var found bool
+
+		if versionName != "" {
+			handler, found = d.Gw.findVersionOfAPIHandler(d.SH.Spec.APIID, versionName)
+			if !found {
+				log.WithFields(logrus.Fields{
+					"version-name": versionName,
+				}).Debug("No proxy found, using default")
+
+				d.SH.ServeHTTP(w, r)
+				return
+			}
+		} else {
+			handler, found = d.Gw.findInternalHttpHandlerByNameOrID(d.SH.Spec.target.Host)
+		}
+
 		if !found {
 			handler := ErrorHandler{*d.SH.Base()}
 			handler.HandleError(w, r, "Couldn't detect target", http.StatusInternalServerError, true)
@@ -593,6 +614,20 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (gw *Gateway) findInternalHttpHandlerByNameOrID(apiNameOrID string) (handler http.Handler, ok bool) {
 	targetAPI := gw.fuzzyFindAPI(apiNameOrID)
+	if targetAPI == nil {
+		return nil, false
+	}
+
+	h, found := gw.apisHandlesByID.Load(targetAPI.APIID)
+	if !found {
+		return nil, false
+	}
+
+	return h.(http.Handler), true
+}
+
+func (gw *Gateway) findVersionOfAPIHandler(defaultAPIID, versionName string) (handler http.Handler, ok bool) {
+	targetAPI := gw.fuzzyFindVersionOfAPI(defaultAPIID, versionName)
 	if targetAPI == nil {
 		return nil, false
 	}
@@ -649,6 +684,19 @@ func (gw *Gateway) fuzzyFindAPI(search string) *APISpec {
 			api.Id.Hex() == search ||
 			strings.EqualFold(APILoopingName(api.Name), search) {
 
+			return api
+		}
+	}
+
+	return nil
+}
+
+func (gw *Gateway) fuzzyFindVersionOfAPI(defaultAPIID, versionName string) *APISpec {
+	gw.apisMu.RLock()
+	defer gw.apisMu.RUnlock()
+
+	for _, api := range gw.apisByID {
+		if api.Versioning.VersionOf == defaultAPIID && api.Versioning.Name == versionName {
 			return api
 		}
 	}

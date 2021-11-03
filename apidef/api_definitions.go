@@ -506,6 +506,11 @@ type APIDefinition struct {
 		DefaultVersion string                 `bson:"default_version" json:"default_version"`
 		Versions       map[string]VersionInfo `bson:"versions" json:"versions"`
 	} `bson:"version_data" json:"version_data"`
+	Versioning struct {
+		Enabled   bool   `bson:"versioned" json:"versioned"`
+		Name      string `bson:"name" json:"name"`
+		VersionOf string `bson:"version_of" json:"version_of"`
+	} `bson:"versioning" json:"versioning"`
 	UptimeTests               UptimeTests            `bson:"uptime_tests" json:"uptime_tests"`
 	Proxy                     ProxyConfig            `bson:"proxy" json:"proxy"`
 	DisableRateLimit          bool                   `bson:"disable_rate_limit" json:"disable_rate_limit"`

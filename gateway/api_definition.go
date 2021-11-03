@@ -1296,7 +1296,7 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 }
 
 func (a *APISpec) getVersionFromRequest(r *http.Request) string {
-	if a.VersionData.NotVersioned {
+	if a.VersionData.NotVersioned && !a.Versioning.Enabled {
 		return ""
 	}
 

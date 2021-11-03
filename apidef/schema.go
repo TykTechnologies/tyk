@@ -339,6 +339,20 @@ const Schema = `{
         "hook_references": {
             "type": ["object", "null"]
         },
+		"versioning": {
+            "type":["object", "null"],
+            "properties": {
+				"enabled": {
+					"type": "boolean"
+				},
+                "name": {
+                    "type": "string"
+                },
+                "version_of": {
+                    "type": "string"
+                }
+            }
+        },
         "version_data": {
             "type": ["object", "null"],
             "id": "http://jsonschema.net/version_data",
