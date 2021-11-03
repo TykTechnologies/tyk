@@ -8,8 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/storage"
-
 	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -370,8 +368,8 @@ func TestSyncAPISpecsRPC_redis_failure(t *testing.T) {
 
 	t.Run("Should load apis when redis is down", func(t *testing.T) {
 
-		storage.DisableRedis(true)
-		//defer storage.DisableRedis(false)
+		ts.Gw.RedisController.DisableRedis(true)
+		//defer ts.Gw.RedisController.DisableRedis((false)
 
 		authHeaders := map[string]string{"Authorization": "test"}
 		ts.Run(t, []test.TestCase{
@@ -381,7 +379,7 @@ func TestSyncAPISpecsRPC_redis_failure(t *testing.T) {
 
 	t.Run("Should reload when redis is back up", func(t *testing.T) {
 
-		storage.DisableRedis(true)
+		ts.Gw.RedisController.DisableRedis(true)
 		event := make(chan struct{}, 1)
 		ts.Gw.OnConnect = func() {
 			event <- struct{}{}
@@ -393,7 +391,7 @@ func TestSyncAPISpecsRPC_redis_failure(t *testing.T) {
 			t.Fatal("OnConnect should only run after reconnection")
 		case <-time.After(1 * time.Second):
 		}
-		storage.DisableRedis(false)
+		ts.Gw.RedisController.DisableRedis(false)
 
 		select {
 		case <-event:
