@@ -841,7 +841,7 @@ func(gw *Gateway) ProcessOauthClientsOps(clients map[string]string){
 				log.WithError(err).Error("Could not retrieve new oauth client information")
 			}
 			store.SetClient(oauthClientId,orgID,client,false)
-			log.Info("oauth client created succesfully")
+			log.Info("oauth client created successfully")
 		case OauthClientRemoved:
 			// on remove: remove from local redis
 			err := store.DeleteClient(oauthClientId,orgID,false)
@@ -866,6 +866,7 @@ func(gw *Gateway) ProcessOauthClientsOps(clients map[string]string){
 				log.WithError(err).Error("Could not retrieve oauth client information")
 			}
 			store.SetClient(oauthClientId,orgID,client,false)
+			log.Info("oauth client updated successfully")
 		default:
 			log.Warningf("Oauth client event not supported:%v",action)
 		}
