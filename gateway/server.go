@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"github.com/hashicorp/consul/agent/cache"
 	"html/template"
 	"io/ioutil"
 	stdlog "log"
@@ -1375,7 +1374,7 @@ func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) 
 	logger := logrus.New().WithFields(logrus.Fields{"prefix": "mdcb-storage-handler"})
 
 	if gw.GetConfig().SlaveOptions.UseRPC {
-		return certs.NewMdcbStorage(
+		return storage.NewMdcbStorage(
 			localStorage,
 			&RPCStorageHandler{
 				KeyPrefix: keyPrefix,

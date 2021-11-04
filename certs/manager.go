@@ -54,7 +54,7 @@ func getOrgFromKeyID(key, certID string) string {
 	return orgId
 }
 
-func NewSlaveCertManager(storage, rpcStorage storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool) *CertificateManager {
+func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool) *CertificateManager {
 	if logger == nil {
 		logger = logrus.New()
 	}
@@ -76,7 +76,7 @@ func NewSlaveCertManager(storage, rpcStorage storage.Handler, secret string, log
 		return err
 	}
 
-	mdcbStorage := NewMdcbStorage(storage, rpcStorage, log)
+	mdcbStorage := storage.NewMdcbStorage(localStorage, rpcStorage, log)
 	mdcbStorage.CallbackonPullfromRPC = &callbackOnPullCertFromRPC
 
 	cm.storage = mdcbStorage

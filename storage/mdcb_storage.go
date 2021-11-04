@@ -1,20 +1,19 @@
-package certs
+package storage
 
 import (
 	"errors"
 
-	"github.com/TykTechnologies/tyk/storage"
 	"github.com/sirupsen/logrus"
 )
 
 type MdcbStorage struct {
-	local                 storage.Handler
-	rpc                   storage.Handler
+	local                 Handler
+	rpc                   Handler
 	logger                *logrus.Entry
 	CallbackonPullfromRPC *func(key string, val string) error
 }
 
-func NewMdcbStorage(local, rpc storage.Handler, log *logrus.Entry) *MdcbStorage {
+func NewMdcbStorage(local, rpc Handler, log *logrus.Entry) *MdcbStorage {
 	return &MdcbStorage{
 		local:  local,
 		rpc:    rpc,
