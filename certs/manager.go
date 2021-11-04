@@ -75,7 +75,6 @@ func NewSlaveCertManager(storage, rpcStorage storage.Handler, secret string, log
 		return err
 	}
 
-	//mdcbStorage := newMdcbCertStorage(storage, rpcStorage, log, cm.Add)
 	mdcbStorage := NewMdcbStorage(storage,rpcStorage,log)
 	mdcbStorage.CallbackonPullfromRPC = &callbackOnPullCertFromRPC
 
