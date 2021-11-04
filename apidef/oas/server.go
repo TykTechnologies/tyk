@@ -5,10 +5,10 @@ import "github.com/TykTechnologies/tyk/apidef"
 type Server struct {
 	// ListenPath represents the path to listen on. Any requests coming into the host, on the port that Tyk is configured to run on,
 	// that match this path will have the rules defined in the API Definition applied.
-	ListenPath     ListenPath      `bson:"listenPath" json:"listenPath"` // required
+	ListenPath ListenPath `bson:"listenPath" json:"listenPath"` // required
 	// Slug is the Tyk Cloud equivalent of listen path.
 	// Old API Definition: `slug`
-	Slug           string          `bson:"slug,omitempty" json:"slug,omitempty"`
+	Slug string `bson:"slug,omitempty" json:"slug,omitempty"`
 	// Authentication contains the configurations related to authentication to the API.
 	Authentication *Authentication `bson:"authentication,omitempty" json:"authentication,omitempty"`
 }
@@ -22,7 +22,7 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 	}
 
 	s.Authentication.Fill(api)
-	if (*s.Authentication == Authentication{}) {
+	if ShouldOmit(s.Authentication) {
 		s.Authentication = nil
 	}
 }
@@ -46,7 +46,7 @@ type ListenPath struct {
 	// is the listen path. The `httpbin` listen path which is used to identify the API loaded in Tyk is removed,
 	// and the outbound request would be `http://httpbin.org/get`.
 	// Old API Definition: `proxy.strip_listen_path`
-	Strip bool   `bson:"strip,omitempty" json:"strip,omitempty"`
+	Strip bool `bson:"strip,omitempty" json:"strip,omitempty"`
 }
 
 func (lp *ListenPath) Fill(api apidef.APIDefinition) {

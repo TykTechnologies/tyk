@@ -1,8 +1,6 @@
 package oas
 
 import (
-	"reflect"
-
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
@@ -17,7 +15,7 @@ func (m *Middleware) Fill(api apidef.APIDefinition) {
 	}
 
 	m.Global.Fill(api)
-	if reflect.DeepEqual(m.Global, &Global{}) {
+	if ShouldOmit(m.Global) {
 		m.Global = nil
 	}
 }
@@ -29,7 +27,7 @@ func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
 }
 
 type Global struct {
-	CORS  *CORS  `bson:"cors,omitempty" json:"cors,omitempty"`
+	CORS *CORS `bson:"cors,omitempty" json:"cors,omitempty"`
 	// Cache contains the configurations related to caching.
 	// Old API Definition: `cache_options`
 	Cache *Cache `bson:"cache,omitempty" json:"cache,omitempty"`
@@ -42,7 +40,7 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 	}
 
 	g.CORS.Fill(api.CORS)
-	if reflect.DeepEqual(g.CORS, &CORS{}) {
+	if ShouldOmit(g.CORS) {
 		g.CORS = nil
 	}
 
@@ -52,7 +50,7 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 	}
 
 	g.Cache.Fill(api.CacheOptions)
-	if reflect.DeepEqual(g.Cache, &Cache{}) {
+	if ShouldOmit(g.Cache) {
 		g.Cache = nil
 	}
 }
@@ -107,26 +105,26 @@ type Cache struct {
 	// Enabled turns global cache middleware on or off. It is still possible to enable caching on a per-path basis
 	// by explicitly setting the endpoint cache middleware.
 	// Old API Definition: `cache_options.enable_cache`
-	Enabled                    bool     `bson:"enabled" json:"enabled"` // required
+	Enabled bool `bson:"enabled" json:"enabled"` // required
 	// Timeout is the TTL for a cached object in seconds.
 	// Old API Definition: `cache_options.cache_timeout`
-	Timeout                    int64    `bson:"timeout,omitempty" json:"timeout,omitempty"`
+	Timeout int64 `bson:"timeout,omitempty" json:"timeout,omitempty"`
 	// CacheAllSafeRequests caches responses to (`GET`, `HEAD`, `OPTIONS`) requests overrides per-path cache settings in versions,
 	// applies across versions.
 	// Old API Definition: `cache_options.cache_all_safe_requests`
-	CacheAllSafeRequests       bool     `bson:"cacheAllSafeRequests,omitempty" json:"cacheAllSafeRequests,omitempty"`
+	CacheAllSafeRequests bool `bson:"cacheAllSafeRequests,omitempty" json:"cacheAllSafeRequests,omitempty"`
 	// CacheResponseCodes is an array of response codes which are safe to cache e.g. `404`.
 	// Old API Definition: `cache_options.cache_response_codes`
-	CacheResponseCodes         []int    `bson:"cacheResponseCodes,omitempty" json:"cacheResponseCodes,omitempty"`
+	CacheResponseCodes []int `bson:"cacheResponseCodes,omitempty" json:"cacheResponseCodes,omitempty"`
 	// CacheByHeaders allows header values to be used as part of the cache key.
 	// Old API Definition: `cache_options.cache_by_headers`
-	CacheByHeaders             []string `bson:"cacheByHeaders,omitempty" json:"cacheByHeaders,omitempty"`
+	CacheByHeaders []string `bson:"cacheByHeaders,omitempty" json:"cacheByHeaders,omitempty"`
 	// EnableUpstreamCacheControl instructs Tyk Cache to respect upstream cache control headers.
 	// Old API Definition: `cache_options.enable_upstream_cache_control`
-	EnableUpstreamCacheControl bool     `bson:"enableUpstreamCacheControl,omitempty" json:"enableUpstreamCacheControl,omitempty"`
+	EnableUpstreamCacheControl bool `bson:"enableUpstreamCacheControl,omitempty" json:"enableUpstreamCacheControl,omitempty"`
 	// ControlTTLHeaderName is the response header which tells Tyk how long it is safe to cache the response for.
 	// Old API Definition: `cache_options.cache_control_ttl_header`
-	ControlTTLHeaderName       string   `bson:"controlTTLHeaderName,omitempty" json:"controlTTLHeaderName,omitempty"`
+	ControlTTLHeaderName string `bson:"controlTTLHeaderName,omitempty" json:"controlTTLHeaderName,omitempty"`
 }
 
 func (c *Cache) Fill(cache apidef.CacheOptions) {
