@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"github.com/hashicorp/consul/agent/cache"
 	"html/template"
 	"io/ioutil"
 	stdlog "log"
@@ -670,7 +671,6 @@ func (gw *Gateway) addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthMana
 	serverConfig.RedirectUriSeparator = gwConfig.OauthRedirectUriSeparator
 
 	prefix := generateOAuthPrefix(spec.APIID)
-	//storageManager := gw.getGlobalStorageHandler(prefix, false)
 	storageManager := gw.getGlobalMDCBStorageHandler(prefix, false)
 	storageManager.Connect()
 	osinStorage := &RedisOsinStorageInterface{

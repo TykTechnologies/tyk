@@ -1766,7 +1766,6 @@ func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 				if apiSpec.OAuthManager == nil {
 
 					prefix := generateOAuthPrefix(apiSpec.APIID)
-					//storageManager := gw.getGlobalStorageHandler(prefix, false)
 					storageManager := gw.getGlobalMDCBStorageHandler(prefix, false)
 					storageManager.Connect()
 
@@ -2155,7 +2154,6 @@ func (gw *Gateway) getOauthClientDetails(keyName, apiID string) (interface{}, in
 
 	if apiSpec.OAuthManager == nil {
 		prefix := generateOAuthPrefix(apiSpec.APIID)
-		//storageManager := gw.getGlobalStorageHandler(prefix, false)
 		storageManager := gw.getGlobalMDCBStorageHandler(prefix, false)
 		storageManager.Connect()
 		apiSpec.OAuthManager = &OAuthManager{

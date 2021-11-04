@@ -593,9 +593,6 @@ type RedisOsinStorageInterface struct {
 	Gw             *Gateway `json:"-"`
 }
 
-type MDCBOsinStorageInterface struct {
-}
-
 func (r *RedisOsinStorageInterface) Clone() osin.Storage {
 	return r
 }
