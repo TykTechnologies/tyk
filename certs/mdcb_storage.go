@@ -2,6 +2,7 @@ package certs
 
 import (
 	"errors"
+
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/sirupsen/logrus"
 )
@@ -10,14 +11,14 @@ type MdcbStorage struct {
 	local                 storage.Handler
 	rpc                   storage.Handler
 	logger                *logrus.Entry
-	CallbackonPullfromRPC *func(key string,val string) error
+	CallbackonPullfromRPC *func(key string, val string) error
 }
 
 func NewMdcbStorage(local, rpc storage.Handler, log *logrus.Entry) *MdcbStorage {
 	return &MdcbStorage{
-		local:   local,
-		rpc:     rpc,
-		logger:  log,
+		local:  local,
+		rpc:    rpc,
+		logger: log,
 	}
 }
 
@@ -40,7 +41,7 @@ func (m MdcbStorage) GetKey(key string) (string, error) {
 		}
 
 		if m.CallbackonPullfromRPC != nil {
-			err := (*m.CallbackonPullfromRPC)(key,val)
+			err := (*m.CallbackonPullfromRPC)(key, val)
 			if err != nil {
 				m.logger.Error(err)
 			}
@@ -58,7 +59,7 @@ func (m MdcbStorage) GetRawKey(string) (string, error) {
 	panic("implement me")
 }
 
-func (m MdcbStorage) SetKey(key string,content string,TTL int64) error {
+func (m MdcbStorage) SetKey(key string, content string, TTL int64) error {
 	errLocal := m.local.SetKey(key, content, TTL)
 	errRpc := m.rpc.SetKey(key, content, TTL)
 
@@ -143,8 +144,8 @@ func (m MdcbStorage) GetRollingWindow(key string, per int64, pipeline bool) (int
 }
 
 func (m MdcbStorage) GetSet(key string) (map[string]string, error) {
-	val, err:=  m.local.GetSet(key)
-	if err != nil{
+	val, err := m.local.GetSet(key)
+	if err != nil {
 		// try rpc
 		val, err = m.rpc.GetSet(key)
 	}
@@ -152,7 +153,7 @@ func (m MdcbStorage) GetSet(key string) (map[string]string, error) {
 }
 
 func (m MdcbStorage) AddToSet(key string, value string) {
-	m.local.AddToSet(key,value)
+	m.local.AddToSet(key, value)
 }
 
 func (m MdcbStorage) GetAndDeleteSet(string) []interface{} {
@@ -160,7 +161,7 @@ func (m MdcbStorage) GetAndDeleteSet(string) []interface{} {
 }
 
 func (m MdcbStorage) RemoveFromSet(key string, value string) {
-	m.local.RemoveFromSet(key,value)
+	m.local.RemoveFromSet(key, value)
 }
 
 func (m MdcbStorage) DeleteScanMatch(key string) bool {
@@ -186,7 +187,7 @@ func (m MdcbStorage) RemoveSortedSetRange(string, string, string) error {
 	panic("implement me")
 }
 
-func (m MdcbStorage) GetListRange(key string,from int64, to int64) ([]string, error) {
+func (m MdcbStorage) GetListRange(key string, from int64, to int64) ([]string, error) {
 	var val []string
 	var err error
 
@@ -228,4 +229,3 @@ func (m MdcbStorage) Exists(key string) (bool, error) {
 
 	return foundLocal && foundRpc, nil
 }
-

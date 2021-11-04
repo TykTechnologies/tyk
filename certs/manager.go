@@ -13,11 +13,12 @@ import (
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
-	"github.com/TykTechnologies/tyk/storage"
 	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/TykTechnologies/tyk/storage"
 
 	cache "github.com/pmylund/go-cache"
 	"github.com/sirupsen/logrus"
@@ -47,7 +48,7 @@ func NewCertificateManager(storage storage.Handler, secret string, logger *logru
 	}
 }
 
-func getOrgFromKeyID(key, certID string) string{
+func getOrgFromKeyID(key, certID string) string {
 	orgId := strings.ReplaceAll(key, "raw-", "")
 	orgId = strings.ReplaceAll(orgId, certID, "")
 	return orgId
@@ -69,13 +70,13 @@ func NewSlaveCertManager(storage, rpcStorage storage.Handler, secret string, log
 	callbackOnPullCertFromRPC := func(key, val string) error {
 		// calculate the orgId from the keyId
 		certID, _, _ := GetCertIDAndChainPEM([]byte(val), "")
-		orgID := getOrgFromKeyID(key,certID)
+		orgID := getOrgFromKeyID(key, certID)
 		// save the cert in local redis
 		_, err := cm.Add([]byte(val), orgID)
 		return err
 	}
 
-	mdcbStorage := NewMdcbStorage(storage,rpcStorage,log)
+	mdcbStorage := NewMdcbStorage(storage, rpcStorage, log)
 	mdcbStorage.CallbackonPullfromRPC = &callbackOnPullCertFromRPC
 
 	cm.storage = mdcbStorage

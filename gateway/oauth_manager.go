@@ -594,7 +594,6 @@ type RedisOsinStorageInterface struct {
 }
 
 type MDCBOsinStorageInterface struct {
-
 }
 
 func (r *RedisOsinStorageInterface) Clone() osin.Storage {

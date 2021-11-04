@@ -671,7 +671,7 @@ func (gw *Gateway) addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthMana
 
 	prefix := generateOAuthPrefix(spec.APIID)
 	//storageManager := gw.getGlobalStorageHandler(prefix, false)
-	storageManager := gw.getGlobalMDCBStorageHandler(prefix,false)
+	storageManager := gw.getGlobalMDCBStorageHandler(prefix, false)
 	storageManager.Connect()
 	osinStorage := &RedisOsinStorageInterface{
 		storageManager,
@@ -1370,10 +1370,9 @@ func getHostDetails(file string) {
 	}
 }
 
-
 func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 	localStorage := &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys, RedisController: gw.RedisController}
-	logger:= logrus.New().WithFields(logrus.Fields{"prefix":"mdcb-storage-handler"})
+	logger := logrus.New().WithFields(logrus.Fields{"prefix": "mdcb-storage-handler"})
 
 	if gw.GetConfig().SlaveOptions.UseRPC {
 		return certs.NewMdcbStorage(

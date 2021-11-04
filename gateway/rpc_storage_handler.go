@@ -820,15 +820,15 @@ func (gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler, isH
 	}
 }
 
-func(gw *Gateway) ProcessOauthClientsOps(clients map[string]string){
-	for v,action := range clients{
+func (gw *Gateway) ProcessOauthClientsOps(clients map[string]string) {
+	for v, action := range clients {
 		// value is: APIID.ClientID.OrgID
-		eventValues := strings.Split(v,".")
+		eventValues := strings.Split(v, ".")
 		apiId := eventValues[0]
 		oauthClientId := eventValues[1]
 		orgID := eventValues[2]
 
-		store,_, err := gw.GetStorageForApi(apiId)
+		store, _, err := gw.GetStorageForApi(apiId)
 		if err != nil {
 			log.Error("Could not get oath storage for api")
 			return
@@ -840,11 +840,11 @@ func(gw *Gateway) ProcessOauthClientsOps(clients map[string]string){
 			if err != nil {
 				log.WithError(err).Error("Could not retrieve new oauth client information")
 			}
-			store.SetClient(oauthClientId,orgID,client,false)
+			store.SetClient(oauthClientId, orgID, client, false)
 			log.Info("oauth client created successfully")
 		case OauthClientRemoved:
 			// on remove: remove from local redis
-			err := store.DeleteClient(oauthClientId,orgID,false)
+			err := store.DeleteClient(oauthClientId, orgID, false)
 			if err != nil {
 				log.Errorf("Could not delete oauth client with id: %v", oauthClientId)
 				return
@@ -856,7 +856,7 @@ func(gw *Gateway) ProcessOauthClientsOps(clients map[string]string){
 			if err != nil {
 				log.WithError(err).Error("Could not retrieve oauth client information")
 			}
-			err = store.DeleteClient(oauthClientId,orgID,false)
+			err = store.DeleteClient(oauthClientId, orgID, false)
 
 			if err != nil {
 				log.WithError(err).Error("Could not delete oauth client")
@@ -865,10 +865,10 @@ func(gw *Gateway) ProcessOauthClientsOps(clients map[string]string){
 			if err != nil {
 				log.WithError(err).Error("Could not retrieve oauth client information")
 			}
-			store.SetClient(oauthClientId,orgID,client,false)
+			store.SetClient(oauthClientId, orgID, client, false)
 			log.Info("oauth client updated successfully")
 		default:
-			log.Warningf("Oauth client event not supported:%v",action)
+			log.Warningf("Oauth client event not supported:%v", action)
 		}
 	}
 }
