@@ -32,7 +32,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/aws/aws-sdk-go/service/apigateway"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -1767,11 +1766,13 @@ func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 				if apiSpec.OAuthManager == nil {
 
 					prefix := generateOAuthPrefix(apiSpec.APIID)
-					storageManager := gw.getGlobalStorageHandler(prefix, false)
+					//storageManager := gw.getGlobalStorageHandler(prefix, false)
+					storageManager := gw.getGlobalMDCBStorageHandler(prefix, false)
 					storageManager.Connect()
 
 					apiSpec.OAuthManager = &OAuthManager{
-						OsinServer: gw.TykOsinNewServer(&osin.ServerConfig{},
+						OsinServer: gw.TykOsinNewServer(
+							&osin.ServerConfig{},
 							&RedisOsinStorageInterface{
 								storageManager,
 								gw.GlobalSessionManager,
@@ -2154,7 +2155,8 @@ func (gw *Gateway) getOauthClientDetails(keyName, apiID string) (interface{}, in
 
 	if apiSpec.OAuthManager == nil {
 		prefix := generateOAuthPrefix(apiSpec.APIID)
-		storageManager := gw.getGlobalStorageHandler(prefix, false)
+		//storageManager := gw.getGlobalStorageHandler(prefix, false)
+		storageManager := gw.getGlobalMDCBStorageHandler(prefix, false)
 		storageManager.Connect()
 		apiSpec.OAuthManager = &OAuthManager{
 			OsinServer: gw.TykOsinNewServer(&osin.ServerConfig{},

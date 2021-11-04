@@ -2,25 +2,26 @@ package certs
 
 import (
 	"errors"
+	"github.com/TykTechnologies/tyk/storage"
 	"strings"
 
 	"github.com/sirupsen/logrus"
 )
 
-type mdcbCertStorage struct {
-	local   StorageHandler
-	rpc     StorageHandler
-	logger  *logrus.Entry
-	addCert func([]byte, string) (string, error)
-}
-
-func newMdcbCertStorage(local, rpc StorageHandler, log *logrus.Entry, addCert func([]byte, string) (string, error)) *mdcbCertStorage {
+func newMdcbCertStorage(local, rpc storage.Handler, log *logrus.Entry, addCert func([]byte, string) (string, error)) *mdcbCertStorage {
 	return &mdcbCertStorage{
 		local:   local,
 		rpc:     rpc,
 		logger:  log,
 		addCert: addCert,
 	}
+}
+
+type mdcbCertStorage struct {
+	local   storage.Handler
+	rpc     storage.Handler
+	logger  *logrus.Entry
+	addCert func([]byte, string) (string, error)
 }
 
 func (m *mdcbCertStorage) GetKey(key string) (string, error) {

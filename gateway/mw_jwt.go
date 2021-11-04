@@ -581,7 +581,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		// Initialize the OAuthManager if empty:
 		if k.Spec.OAuthManager == nil {
 			prefix := generateOAuthPrefix(k.Spec.APIID)
-			storageManager := k.Gw.getGlobalStorageHandler(prefix, false)
+			storageManager := k.Gw.getGlobalMDCBStorageHandler(prefix, false)
 			storageManager.Connect()
 			k.Spec.OAuthManager = &OAuthManager{
 				OsinServer: k.Gw.TykOsinNewServer(&osin.ServerConfig{},
