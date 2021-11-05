@@ -30,7 +30,6 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/jensneuse/abstractlogger"
-	"github.com/patrickmn/go-cache"
 
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
 	gqlhttp "github.com/jensneuse/graphql-go-tools/pkg/http"
