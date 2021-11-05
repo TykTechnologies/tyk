@@ -624,6 +624,14 @@ const Schema = `{
                     "required": [
                         "enabled"
                     ]
+                },
+                "query_batching": {
+                    "type": ["object", "null"],
+                    "properties": {
+                        "disabled": {
+                            "type": "boolean"
+                        }
+                    }
                 }
             },
             "required": [
