@@ -119,12 +119,7 @@ func (m MdcbStorage) GetKeysAndValues() map[string]string {
 }
 
 func (m MdcbStorage) GetKeysAndValuesWithFilter(key string) map[string]string {
-	local:= m.local.GetKeysAndValuesWithFilter(key)
-	if len(local) > 0 {
-		return local
-	}
-
-	return m.rpc.GetKeysAndValuesWithFilter(key)
+	return m.local.GetKeysAndValuesWithFilter(key)
 }
 
 func (m MdcbStorage) DeleteKeys([]string) bool {
