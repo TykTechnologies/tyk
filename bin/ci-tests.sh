@@ -37,8 +37,8 @@ for pkg in ${PKGS}; do
     if [[ ${skipRace} = true ]]; then
         race=""
     fi
-
-    show go test ${race} -timeout ${TEST_TIMEOUT} -v -coverprofile=test.cov ${pkg} ${tags} || fatal "Test Failed"
+    coveragefile=`echo "$pkg" | awk -F/ '{print $NF}'`
+    show go test ${race} -timeout ${TEST_TIMEOUT} -v -coverprofile=${coveragefile}.cov ${pkg} ${tags} || fatal "Test Failed"
     show go vet ${tags} ${pkg} || fatal "go vet errored"
 done
 
