@@ -351,10 +351,14 @@ type HttpServerOptionsConfig struct {
 	// Enabled WebSockets and server side events support
 	EnableWebSockets bool `json:"enable_websockets"`
 
-	// Deprecated. SSL certificates used by Gateway server.
+	// Deprecated. Replaced by `ssl_certificates`.
+	// SSL certificates used by Gateway server.
 	Certificates []CertData `json:"certificates"`
 
-	// SSL certificates used by your Gateway server. A list of certificate IDs or path to files.
+	// The certificate store of the Gateway.
+	// The string value in the array can be two of the following options:
+	// 1. A certificate IDs
+	// 2. A path to a PEM file. The PEM file will have both the private key and the certificated concatenated.
 	SSLCertificates []string `json:"ssl_certificates"`
 
 	// Start your Gateway HTTP server on specific server name
