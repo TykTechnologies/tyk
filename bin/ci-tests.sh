@@ -44,4 +44,4 @@ done
 
 # run rpc tests separately
 rpc_tests='SyncAPISpecsRPC|OrgSessionWithRPCDown'
-show go test -timeout ${TEST_TIMEOUT} -v -coverprofile=test.cov github.com/TykTechnologies/tyk/gateway -p 1 -run '"'${rpc_tests}'"' || fatal "Test Failed"
+show go test -timeout ${TEST_TIMEOUT} -v -coverprofile=gateway-rpc.cov github.com/TykTechnologies/tyk/gateway -p 1 -run '"'${rpc_tests}'"' || fatal "Test Failed"
