@@ -22,6 +22,8 @@ jobs:
     steps:
       - name: Checkout Tyk
         uses: actions/checkout@v2
+        with:
+          fetch-depth: 2
 
       - name: Setup Golang
         uses: actions/setup-go@v2
