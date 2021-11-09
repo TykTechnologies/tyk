@@ -71,13 +71,15 @@ mkdir -p $TEMPLATEDIR/middleware/python
 mkdir -p $TEMPLATEDIR/middleware/lua
 mkdir -p $TEMPLATEDIR/event_handlers
 mkdir -p $TEMPLATEDIR/event_handlers/sample
-mkdir -p $TEMPLATEDIR/templates
+mkdir -p $TEMPLATEDIR/templates/playground
 mkdir -p $TEMPLATEDIR/policies
 mkdir -p $TEMPLATEDIR/utils
 mkdir -p $TEMPLATEDIR/install
 
 cp $SOURCEBINPATH/apps/app_sample.json $TEMPLATEDIR/apps
 cp $SOURCEBINPATH/templates/*.json $TEMPLATEDIR/templates
+cp $SOURCEBINPATH/templates/playground/index.html $TEMPLATEDIR/templates/playground
+cp $SOURCEBINPATH/templates/playground/playground.js $TEMPLATEDIR/templates/playground
 cp -R $SOURCEBINPATH/install/* $TEMPLATEDIR/install
 cp $SOURCEBINPATH/middleware/*.js $TEMPLATEDIR/middleware
 cp $SOURCEBINPATH/event_handlers/sample/*.js $TEMPLATEDIR/event_handlers/sample
