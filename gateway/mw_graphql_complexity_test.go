@@ -203,7 +203,7 @@ func TestGraphQLComplexityMiddleware_ProcessRequest_GraphqlLimits(t *testing.T) 
 
 	session := user.NewSessionState()
 	session.MaxQueryDepth = 3
-	ctxSetSession(httpReq, session, false)
+	ctxSetSession(httpReq, session, false, false)
 
 	cases := []struct {
 		name   string

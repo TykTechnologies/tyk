@@ -18,7 +18,6 @@ import (
 	"github.com/robertkrimen/otto"
 	_ "github.com/robertkrimen/otto/underscore"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/sirupsen/logrus"
@@ -240,7 +239,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return nil, http.StatusOK
 	}
 
-	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
+	ignoreCanonical := d.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
 	// Delete and set headers
 	for _, dh := range newRequestData.Request.DeleteHeaders {
 		r.Header.Del(dh)
@@ -289,13 +288,13 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 			},
 		}
 
-		forceResponse(w, r, &responseObject, d.Spec, session, d.Pre, logger)
+		d.Gw.forceResponse(w, r, &responseObject, d.Spec, session, d.Pre, logger)
 		return nil, mwStatusRespond
 	}
 
 	if d.Auth {
 		newRequestData.Session.KeyID = newRequestData.AuthValue
-		ctxSetSession(r, &newRequestData.Session, true)
+		ctxSetSession(r, &newRequestData.Session, true, d.Gw.GetConfig().HashKeys)
 	}
 
 	return nil, http.StatusOK
@@ -315,18 +314,20 @@ func mapStrsToIfaces(m map[string]string) map[string]interface{} {
 
 type JSVM struct {
 	Spec    *APISpec
-	VM      *otto.Otto
+	VM      *otto.Otto `json:"-"`
 	Timeout time.Duration
-	Log     *logrus.Entry  // logger used by the JS code
-	RawLog  *logrus.Logger // logger used by `rawlog` func to avoid formatting
+	Log     *logrus.Entry  `json:"-"` // logger used by the JS code
+	RawLog  *logrus.Logger `json:"-"` // logger used by `rawlog` func to avoid formatting
+	Gw      *Gateway       `json:"-"`
 }
 
 const defaultJSVMTimeout = 5
 
 // Init creates the JSVM with the core library and sets up a default
 // timeout.
-func (j *JSVM) Init(spec *APISpec, logger *logrus.Entry) {
+func (j *JSVM) Init(spec *APISpec, logger *logrus.Entry, gw *Gateway) {
 	vm := otto.New()
+	j.Gw = gw
 	logger = logger.WithField("prefix", "jsvm")
 
 	// Init TykJS namespace, constructors etc.
@@ -336,7 +337,7 @@ func (j *JSVM) Init(spec *APISpec, logger *logrus.Entry) {
 	}
 
 	// Load user's TykJS on top, if any
-	if path := config.Global().TykJSPath; path != "" {
+	if path := gw.GetConfig().TykJSPath; path != "" {
 		f, err := os.Open(path)
 		if err == nil {
 			_, err = vm.Run(f)
@@ -354,7 +355,7 @@ func (j *JSVM) Init(spec *APISpec, logger *logrus.Entry) {
 	// Add environment API
 	j.LoadTykJSApi()
 
-	if jsvmTimeout := config.Global().JSVMTimeout; jsvmTimeout <= 0 {
+	if jsvmTimeout := gw.GetConfig().JSVMTimeout; jsvmTimeout <= 0 {
 		j.Timeout = time.Duration(defaultJSVMTimeout) * time.Second
 		logger.Debugf("Default JSVM timeout used: %v", j.Timeout)
 	} else {
@@ -371,6 +372,11 @@ func (j *JSVM) LoadJSPaths(paths []string, prefix string) {
 	for _, mwPath := range paths {
 		if prefix != "" {
 			mwPath = filepath.Join(prefix, mwPath)
+		}
+		extension := filepath.Ext(mwPath)
+		if !strings.Contains(extension, ".js") {
+			j.Log.Errorf("Unsupported extension '%s' (%s)", extension, mwPath)
+			continue
 		}
 		j.Log.Info("Loading JS File: ", mwPath)
 		f, err := os.Open(mwPath)
@@ -475,7 +481,7 @@ func (j *JSVM) LoadTykJSApi() {
 		}
 		return returnVal
 	})
-	ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
+	ignoreCanonical := j.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
 	// Enable the creation of HTTP Requsts
 	j.VM.Set("TykMakeHttpRequest", func(call otto.FunctionCall) otto.Value {
 		jsonHRO := call.Argument(0).String()
@@ -517,7 +523,7 @@ func (j *JSVM) LoadTykJSApi() {
 		}
 		r.Close = true
 
-		maxSSLVersion := config.Global().ProxySSLMaxVersion
+		maxSSLVersion := j.Gw.GetConfig().ProxySSLMaxVersion
 		if j.Spec.Proxy.Transport.SSLMaxVersion > 0 {
 			maxSSLVersion = j.Spec.Proxy.Transport.SSLMaxVersion
 		}
@@ -526,11 +532,11 @@ func (j *JSVM) LoadTykJSApi() {
 			MaxVersion: maxSSLVersion,
 		}}
 
-		if cert := getUpstreamCertificate(r.Host, j.Spec); cert != nil {
+		if cert := j.Gw.getUpstreamCertificate(r.Host, j.Spec); cert != nil {
 			tr.TLSClientConfig.Certificates = []tls.Certificate{*cert}
 		}
 
-		if config.Global().ProxySSLInsecureSkipVerify {
+		if j.Gw.GetConfig().ProxySSLInsecureSkipVerify {
 			tr.TLSClientConfig.InsecureSkipVerify = true
 		}
 
@@ -538,7 +544,7 @@ func (j *JSVM) LoadTykJSApi() {
 			tr.TLSClientConfig.InsecureSkipVerify = true
 		}
 
-		tr.DialTLS = customDialTLSCheck(j.Spec, tr.TLSClientConfig)
+		tr.DialTLS = j.Gw.customDialTLSCheck(j.Spec, tr.TLSClientConfig)
 
 		tr.Proxy = proxyFromAPI(j.Spec)
 
@@ -576,7 +582,7 @@ func (j *JSVM) LoadTykJSApi() {
 		apiKey := call.Argument(0).String()
 		apiId := call.Argument(1).String()
 
-		obj, _ := handleGetDetail(apiKey, apiId, "", false)
+		obj, _ := j.Gw.handleGetDetail(apiKey, apiId, "", false)
 		bs, _ := json.Marshal(obj)
 
 		returnVal, err := j.VM.ToValue(string(bs))
@@ -600,13 +606,12 @@ func (j *JSVM) LoadTykJSApi() {
 			return otto.Value{}
 		}
 
-		doAddOrUpdate(apiKey, &newSession, suppressReset == "1", false)
-
+		j.Gw.doAddOrUpdate(apiKey, &newSession, suppressReset == "1", false)
 		return otto.Value{}
 	})
 
 	// Batch request method
-	unsafeBatchHandler := BatchRequestHandler{}
+	unsafeBatchHandler := BatchRequestHandler{Gw: j.Gw}
 	j.VM.Set("TykBatchRequest", func(call otto.FunctionCall) otto.Value {
 		requestSet := call.Argument(0).String()
 		j.Log.Debug("Batch input is: ", requestSet)

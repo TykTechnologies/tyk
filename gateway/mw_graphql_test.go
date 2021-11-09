@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/user"
 
@@ -22,7 +21,7 @@ import (
 
 // Note: here we test only validation behaviour and do not expect real graphql responses here
 func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
-	g := StartTest()
+	g := StartTest(nil)
 	defer g.Close()
 
 	spec := BuildAPI(func(spec *APISpec) {
@@ -34,14 +33,14 @@ func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
 
 	t.Run("Bad schema", func(t *testing.T) {
 		spec.GraphQL.Schema = "query: Query"
-		LoadAPI(spec)
+		g.Gw.LoadAPI(spec)
 
 		_, _ = g.Run(t, test.TestCase{BodyMatch: "there was a problem proxying the request", Code: http.StatusInternalServerError})
 	})
 
 	t.Run("Introspection query with custom query type should successfully work", func(t *testing.T) {
 		spec.GraphQL.Schema = "schema { query: query_root } type query_root { hello: word } type word { numOfLetters: Int }"
-		LoadAPI(spec)
+		g.Gw.LoadAPI(spec)
 
 		request := gql.Request{
 			OperationName: "IntrospectionQuery",
@@ -54,7 +53,7 @@ func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
 
 	t.Run("Empty request shouldn't be unmarshalled", func(t *testing.T) {
 		spec.GraphQL.Schema = "schema { query: Query } type Query { hello: word } type word { numOfLetters: Int }"
-		LoadAPI(spec)
+		g.Gw.LoadAPI(spec)
 
 		emptyRequest := ``
 
@@ -83,10 +82,11 @@ func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
 
 	t.Run("with policies", func(t *testing.T) {
 		spec.UseKeylessAccess = false
-		spec.GraphQL.Schema = "schema { query: Query } type Query { hello: word } type word { numOfLetters: Int }"
-		LoadAPI(spec)
 
-		pID := CreatePolicy(func(p *user.Policy) {
+		spec.GraphQL.Schema = "schema { query: Query } type Query { hello: word } type word { numOfLetters: Int }"
+		g.Gw.LoadAPI(spec)
+
+		pID := g.CreatePolicy(func(p *user.Policy) {
 			p.MaxQueryDepth = 1
 			p.AccessRights = map[string]user.AccessDefinition{
 				spec.APIID: {
@@ -138,14 +138,14 @@ func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
 		t.Run("Unlimited query depth", func(t *testing.T) {
 			t.Run("0", func(t *testing.T) {
 				directSession.MaxQueryDepth = 0
-				_ = GlobalSessionManager.UpdateSession(directKey, directSession, 0, false)
+				_ = g.Gw.GlobalSessionManager.UpdateSession(directKey, directSession, 0, false)
 
 				_, _ = g.Run(t, test.TestCase{Headers: authHeaderWithDirectKey, Data: request, BodyMatch: "hello", Code: http.StatusOK})
 			})
 
 			t.Run("-1", func(t *testing.T) {
 				directSession.MaxQueryDepth = -1
-				_ = GlobalSessionManager.UpdateSession(directKey, directSession, 0, false)
+				_ = g.Gw.GlobalSessionManager.UpdateSession(directKey, directSession, 0, false)
 
 				_, _ = g.Run(t, test.TestCase{Headers: authHeaderWithDirectKey, Data: request, BodyMatch: "hello", Code: http.StatusOK})
 			})
@@ -153,7 +153,7 @@ func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
 
 		t.Run("Valid query should successfully work", func(t *testing.T) {
 			directSession.MaxQueryDepth = 2
-			_ = GlobalSessionManager.UpdateSession(directKey, directSession, 0, false)
+			_ = g.Gw.GlobalSessionManager.UpdateSession(directKey, directSession, 0, false)
 
 			_, _ = g.Run(t, test.TestCase{Headers: authHeaderWithDirectKey, Data: request, BodyMatch: "hello", Code: http.StatusOK})
 		})
@@ -169,9 +169,6 @@ func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
 }
 
 func TestGraphQLMiddleware_EngineMode(t *testing.T) {
-	g := StartTest()
-	defer g.Close()
-
 	assertReviewsSubgraphResponse := func(t *testing.T) func(bytes []byte) bool {
 		return func(bytes []byte) bool {
 			expected := `{"data":{"_entities":[{"__typename":"User","reviews":[{"body":"A highly effective form of birth control."},{"body":"Fedoras are one of the most fashionable hats around and can look great with a variety of outfits."}]}]}}`
@@ -186,7 +183,10 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 	}
 
 	t.Run("on invalid graphql config version", func(t *testing.T) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		g := StartTest(nil)
+		defer g.Close()
+
+		g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = true
 			spec.Proxy.ListenPath = "/"
 			spec.GraphQL.Enabled = true
@@ -198,7 +198,6 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 			countries1 := gql.Request{
 				Query: "query Query { countries { name } }",
 			}
-
 			_, _ = g.Run(t, []test.TestCase{
 				{Data: countries1, BodyMatch: `"There was a problem proxying the request`, Code: http.StatusInternalServerError},
 			}...)
@@ -206,8 +205,10 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 	})
 
 	t.Run("graphql engine v2", func(t *testing.T) {
+		g := StartTest(nil)
+		defer g.Close()
 		t.Run("proxy-only", func(t *testing.T) {
-			BuildAndLoadAPI(func(spec *APISpec) {
+			g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 				spec.UseKeylessAccess = true
 				spec.GraphQL.Enabled = true
 				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
@@ -261,7 +262,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 		})
 
 		t.Run("subgraph", func(t *testing.T) {
-			BuildAndLoadAPI(func(spec *APISpec) {
+			g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 				spec.UseKeylessAccess = true
 				spec.Proxy.TargetURL = testSubgraphReviews
 				spec.Proxy.ListenPath = "/"
@@ -309,7 +310,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				spec.GraphQL.Schema = gqlSubgraphSchemaReviews
 			})[0]
 
-			LoadAPI(subgraph, proxyOnlyAPI)
+			g.Gw.LoadAPI(subgraph, proxyOnlyAPI)
 
 			t.Run("should execute internal subgraph successfully", func(t *testing.T) {
 				request := gql.Request{
@@ -326,7 +327,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 		})
 
 		t.Run("udg", func(t *testing.T) {
-			BuildAndLoadAPI(func(spec *APISpec) {
+			g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 				spec.UseKeylessAccess = true
 				spec.Proxy.ListenPath = "/"
 				spec.GraphQL.Enabled = true
@@ -374,12 +375,12 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 		})
 
 		t.Run("websockets", func(t *testing.T) {
-			cfg := config.Global()
+			cfg := g.Gw.GetConfig()
 			cfg.HttpServerOptions.EnableWebSockets = true
-			config.SetGlobal(cfg)
+			g.Gw.SetConfig(cfg)
 
 			baseURL := strings.Replace(g.URL, "http://", "ws://", -1)
-			api := BuildAndLoadAPI(func(spec *APISpec) {
+			api := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 				spec.UseKeylessAccess = true
 				spec.Proxy.ListenPath = "/"
 				spec.GraphQL.Enabled = true
@@ -388,9 +389,9 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 			})[0]
 
 			t.Run("on disabled websockets", func(t *testing.T) {
-				cfg := config.Global()
+				cfg := g.Gw.GetConfig()
 				cfg.HttpServerOptions.EnableWebSockets = false
-				config.SetGlobal(cfg)
+				g.Gw.SetConfig(cfg)
 
 				t.Run("should respond with 422 when trying to upgrade to websockets", func(t *testing.T) {
 					_, _ = g.Run(t, []test.TestCase{
@@ -410,9 +411,9 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 			})
 
 			t.Run("on enabled websockets", func(t *testing.T) {
-				cfg := config.Global()
+				cfg := g.Gw.GetConfig()
 				cfg.HttpServerOptions.EnableWebSockets = true
-				config.SetGlobal(cfg)
+				g.Gw.SetConfig(cfg)
 
 				t.Run("should deny upgrade with 400 when protocol is not graphql-ws", func(t *testing.T) {
 					_, _ = g.Run(t, []test.TestCase{
@@ -450,7 +451,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 
 				t.Run("graphql over websockets", func(t *testing.T) {
 					api.UseKeylessAccess = false
-					LoadAPI(api)
+					g.Gw.LoadAPI(api)
 
 					t.Run("field-based permissions", func(t *testing.T) {
 						_, directKey := g.CreateSession(func(s *user.SessionState) {
@@ -535,7 +536,10 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 	})
 
 	t.Run("graphql engine v1", func(t *testing.T) {
-		api := BuildAndLoadAPI(func(spec *APISpec) {
+		g := StartTest(nil)
+		defer g.Close()
+
+		api := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = true
 			spec.Proxy.ListenPath = "/"
 			spec.GraphQL.Enabled = true
@@ -582,7 +586,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 
 		t.Run("should return error when supergraph is used with v1", func(t *testing.T) {
 			api.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeSupergraph
-			LoadAPI(api)
+			g.Gw.LoadAPI(api)
 
 			request := gql.Request{
 				Query: "query Query { countries { name } }",
@@ -593,12 +597,12 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 
 		t.Run("websockets", func(t *testing.T) {
 			api.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
-			LoadAPI(api)
+			g.Gw.LoadAPI(api)
 
 			t.Run("on disabled websockets", func(t *testing.T) {
-				cfg := config.Global()
+				cfg := g.Gw.GetConfig()
 				cfg.HttpServerOptions.EnableWebSockets = false
-				config.SetGlobal(cfg)
+				g.Gw.SetConfig(cfg)
 
 				t.Run("should respond with 422 when trying to upgrade to websockets", func(t *testing.T) {
 					_, _ = g.Run(t, []test.TestCase{
@@ -618,9 +622,9 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 			})
 
 			t.Run("on enabled websockets", func(t *testing.T) {
-				cfg := config.Global()
+				cfg := g.Gw.GetConfig()
 				cfg.HttpServerOptions.EnableWebSockets = true
-				config.SetGlobal(cfg)
+				g.Gw.SetConfig(cfg)
 
 				t.Run("should respond with 422 when trying to upgrade to websockets", func(t *testing.T) {
 					_, _ = g.Run(t, []test.TestCase{
@@ -641,7 +645,6 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 
 		})
 	})
-
 }
 
 func TestNeedsGraphQLExecutionEngine(t *testing.T) {

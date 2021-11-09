@@ -8,24 +8,23 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/storage"
+
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
 )
 
 func TestRedisCacheMiddleware_WithCompressedResponse(t *testing.T) {
 	const path = "/compressed"
 
-	globalConf := config.Global()
-	globalConf.AnalyticsConfig.EnableDetailedRecording = true
-	config.SetGlobal(globalConf)
-
-	ts := StartTest()
+	conf := func(globalConf *config.Config) {
+		globalConf.AnalyticsConfig.EnableDetailedRecording = true
+	}
+	ts := StartTest(conf)
 	defer ts.Close()
 
 	createAPI := func(withCache bool) {
-		BuildAndLoadAPI(func(spec *APISpec) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.CacheOptions.CacheTimeout = 60
 			spec.CacheOptions.EnableCache = withCache
@@ -55,12 +54,12 @@ func TestRedisCacheMiddleware_WithCompressedResponse(t *testing.T) {
 
 	t.Run("with cache and  dynamic redis", func(t *testing.T) {
 		createAPI(true)
-		storage.DisableRedis(true)
+		ts.Gw.RedisController.DisableRedis(true)
 		ts.Run(t, []test.TestCase{
 			{Path: path, Code: 200, BodyMatch: "This is a compressed response"},
 			{Path: path, Code: 200, BodyMatch: "This is a compressed response"},
 		}...)
-		storage.DisableRedis(false)
+		ts.Gw.RedisController.DisableRedis(false)
 		ts.Run(t, []test.TestCase{
 			{Path: path, Code: 200, BodyMatch: "This is a compressed response"},
 			{Path: path, Code: 200, BodyMatch: "This is a compressed response"},

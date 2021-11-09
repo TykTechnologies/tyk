@@ -53,7 +53,7 @@ def MyPreMiddleware(request, session, spec):
 
 ### Authenticating an API with Python
 
-See example: https://tyk.io/docs/customise-tyk/plugins/rich-plugins/python/custom-auth-python-tutorial/
+See example: https://tyk.io/docs/plugins/supported-languages/rich-plugins/python/custom-auth-python-tutorial/
 
 ### Writing events handlers with Python
 

@@ -12,7 +12,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -21,20 +20,20 @@ const RPCKeyPrefix = "rpc:"
 const BackupApiKeyBase = "node-definition-backup:"
 const BackupPolicyKeyBase = "node-policy-backup:"
 
-func getTagListAsString() string {
+func getTagListAsString(tags []string) string {
 	tagList := ""
-	if tags := config.Global().DBAppConfOptions.Tags; len(tags) > 0 {
+	if len(tags) > 0 {
 		tagList = strings.Join(tags, "-")
 	}
 
 	return tagList
 }
 
-func LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
-	tagList := getTagListAsString()
+func (gw *Gateway) LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
+	tagList := getTagListAsString(gw.GetConfig().DBAppConfOptions.Tags)
 	checkKey := BackupApiKeyBase + tagList
 
-	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix}
+	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix, RedisController: gw.RedisController}
 	connected := store.Connect()
 	log.Info("[RPC] --> Loading API definitions from backup")
 
@@ -42,7 +41,7 @@ func LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 		return nil, errors.New("[RPC] --> RPC Backup recovery failed: redis connection failed")
 	}
 
-	secret := rightPad2Len(config.Global().Secret, "=", 32)
+	secret := rightPad2Len(gw.GetConfig().Secret, "=", 32)
 	cryptoText, err := store.GetKey(checkKey)
 	if err != nil {
 		return nil, errors.New("[RPC] --> Failed to get node backup (" + checkKey + "): " + err.Error())
@@ -50,21 +49,21 @@ func LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 
 	apiListAsString := decrypt([]byte(secret), cryptoText)
 
-	a := APIDefinitionLoader{}
-	return a.processRPCDefinitions(apiListAsString)
+	a := APIDefinitionLoader{gw}
+	return a.processRPCDefinitions(apiListAsString, gw)
 }
 
-func saveRPCDefinitionsBackup(list string) error {
+func (gw *Gateway) saveRPCDefinitionsBackup(list string) error {
 	if !json.Valid([]byte(list)) {
 		return errors.New("--> RPC Backup save failure: wrong format, skipping.")
 	}
 
 	log.Info("Storing RPC Definitions backup")
-	tagList := getTagListAsString()
+	tagList := getTagListAsString(gw.GetConfig().DBAppConfOptions.Tags)
 
 	log.Info("--> Connecting to DB")
 
-	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix}
+	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix, RedisController: gw.RedisController}
 	connected := store.Connect()
 
 	log.Info("--> Connected to DB")
@@ -73,7 +72,7 @@ func saveRPCDefinitionsBackup(list string) error {
 		return errors.New("--> RPC Backup save failed: redis connection failed")
 	}
 
-	secret := rightPad2Len(config.Global().Secret, "=", 32)
+	secret := rightPad2Len(gw.GetConfig().Secret, "=", 32)
 	cryptoText := encrypt([]byte(secret), list)
 	err := store.SetKey(BackupApiKeyBase+tagList, cryptoText, -1)
 	if err != nil {
@@ -83,11 +82,11 @@ func saveRPCDefinitionsBackup(list string) error {
 	return nil
 }
 
-func LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
-	tagList := getTagListAsString()
+func (gw *Gateway) LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
+	tagList := getTagListAsString(gw.GetConfig().DBAppConfOptions.Tags)
 	checkKey := BackupPolicyKeyBase + tagList
 
-	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix}
+	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix, RedisController: gw.RedisController}
 
 	connected := store.Connect()
 	log.Info("[RPC] Loading Policies from backup")
@@ -96,7 +95,7 @@ func LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
 		return nil, errors.New("[RPC] --> RPC Policy Backup recovery failed: redis connection failed")
 	}
 
-	secret := rightPad2Len(config.Global().Secret, "=", 32)
+	secret := rightPad2Len(gw.GetConfig().Secret, "=", 32)
 	cryptoText, err := store.GetKey(checkKey)
 	listAsString := decrypt([]byte(secret), cryptoText)
 
@@ -114,17 +113,17 @@ func LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
 	}
 }
 
-func saveRPCPoliciesBackup(list string) error {
+func (gw *Gateway) saveRPCPoliciesBackup(list string) error {
 	if !json.Valid([]byte(list)) {
 		return errors.New("--> RPC Backup save failure: wrong format, skipping.")
 	}
 
 	log.Info("Storing RPC policies backup")
-	tagList := getTagListAsString()
+	tagList := getTagListAsString(gw.GetConfig().DBAppConfOptions.Tags)
 
 	log.Info("--> Connecting to DB")
 
-	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix}
+	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix, RedisController: gw.RedisController}
 	connected := store.Connect()
 
 	log.Info("--> Connected to DB")
@@ -133,7 +132,7 @@ func saveRPCPoliciesBackup(list string) error {
 		return errors.New("--> RPC Backup save failed: redis connection failed")
 	}
 
-	secret := rightPad2Len(config.Global().Secret, "=", 32)
+	secret := rightPad2Len(gw.GetConfig().Secret, "=", 32)
 	cryptoText := encrypt([]byte(secret), list)
 	err := store.SetKey(BackupPolicyKeyBase+tagList, cryptoText, -1)
 	if err != nil {

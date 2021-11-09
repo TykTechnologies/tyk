@@ -13,10 +13,10 @@ import (
 )
 
 func TestGraphQL_RestrictedTypes(t *testing.T) {
-	g := StartTest()
+	g := StartTest(nil)
 	defer g.Close()
 
-	api := BuildAndLoadAPI(func(spec *APISpec) {
+	api := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = false
 		spec.GraphQL.Enabled = true
@@ -37,7 +37,7 @@ func TestGraphQL_RestrictedTypes(t *testing.T) {
 		}
 	})
 
-	pID := CreatePolicy(func(p *user.Policy) {
+	pID := g.CreatePolicy(func(p *user.Policy) {
 		p.AccessRights = map[string]user.AccessDefinition{
 			api.APIID: {
 				APIID:   api.APIID,

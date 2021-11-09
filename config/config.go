@@ -46,6 +46,10 @@ var (
 			CheckInterval:             dnsCacheDefaultCheckInterval,
 			MultipleIPsHandleStrategy: NoCacheStrategy,
 		},
+		HealthCheckEndpointName: "hello",
+		CoProcessOptions: CoProcessConfig{
+			EnableCoProcess: false,
+		},
 	}
 )
 
@@ -917,7 +921,6 @@ type Config struct {
 
 	// Enable global API token expiration. Can be needed if all your APIs using JWT or oAuth 2.0 auth methods with dynamically generated keys.
 	ForceGlobalSessionLifetime bool `bson:"force_global_session_lifetime" json:"force_global_session_lifetime"`
-
 	// global session lifetime, in seconds.
 	GlobalSessionLifetime int64 `bson:"global_session_lifetime" json:"global_session_lifetime"`
 
@@ -1076,20 +1079,6 @@ type EventMessage struct {
 type TykEventHandler interface {
 	Init(interface{}) error
 	HandleEvent(EventMessage)
-}
-
-func init() {
-	SetGlobal(Config{})
-}
-
-func Global() Config {
-	return global.Load().(Config)
-}
-
-func SetGlobal(conf Config) {
-	globalMu.Lock()
-	defer globalMu.Unlock()
-	global.Store(conf)
 }
 
 func WriteConf(path string, conf *Config) error {

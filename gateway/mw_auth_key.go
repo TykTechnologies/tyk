@@ -96,8 +96,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	} else if authConfig.UseCertificate && key == "" && r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
 		log.Debug("Trying to find key by client certificate")
 		certHash = certs.HexSHA256(r.TLS.PeerCertificates[0].Raw)
-		key = generateToken(k.Spec.OrgID, certHash)
-
+		key = k.Gw.generateToken(k.Spec.OrgID, certHash)
 	} else {
 		k.Logger().Info("Attempted access with malformed header, no auth header found.")
 		return errorAndStatusCode(ErrAuthAuthorizationFieldMissing)
@@ -115,31 +114,15 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	}
 
 	if authConfig.UseCertificate {
-		certID := session.OrgID + certHash
-		_, err := CertificateManager.GetRaw(certID)
-		if err != nil {
-			// Try alternative approach:
-			id, err := storage.TokenID(session.KeyID)
-			if err != nil {
-				log.Error(err)
-				return k.reportInvalidKey(key, r, MsgNonExistentCert, ErrAuthCertNotFound)
-			}
-
-			certID = session.OrgID + id
-			_, err = CertificateManager.GetRaw(certID)
-			if err != nil {
-				return k.reportInvalidKey(key, r, MsgNonExistentCert, ErrAuthCertNotFound)
-			}
-		}
-
-		if session.Certificate != certID {
-			return k.reportInvalidKey(key, r, MsgInvalidKey, ErrAuthKeyIsInvalid)
+		if _, err := k.Gw.CertificateManager.GetRaw(session.Certificate); err != nil {
+			return k.reportInvalidKey(key, r, MsgNonExistentCert, ErrAuthCertNotFound)
 		}
 	}
+
 	// Set session state on context, we will need it later
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.AuthToken, apidef.UnsetAuth:
-		ctxSetSession(r, &session, false)
+		ctxSetSession(r, &session, false, k.Gw.GetConfig().HashKeys)
 		k.setContextVars(r, key)
 	}
 
@@ -165,7 +148,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 }
 
 func (k *AuthKey) reportInvalidKey(key string, r *http.Request, msg string, errMsg string) (error, int) {
-	k.Logger().WithField("key", obfuscateKey(key)).Info(msg)
+	k.Logger().WithField("key", k.Gw.obfuscateKey(key)).Info(msg)
 
 	// Fire Authfailed Event
 	AuthFailed(k, r, key)
@@ -177,35 +160,36 @@ func (k *AuthKey) reportInvalidKey(key string, r *http.Request, msg string, errM
 }
 
 func (k *AuthKey) validateSignature(r *http.Request, key string) (error, int) {
-	_, config := k.getAuthToken(k.getAuthType(), r)
-	logger := k.Logger().WithField("key", obfuscateKey(key))
 
-	if !config.ValidateSignature {
+	_, authConfig := k.getAuthToken(k.getAuthType(), r)
+	logger := k.Logger().WithField("key", k.Gw.obfuscateKey(key))
+
+	if !authConfig.ValidateSignature {
 		return nil, http.StatusOK
 	}
 
 	errorCode := defaultSignatureErrorCode
-	if config.Signature.ErrorCode != 0 {
-		errorCode = config.Signature.ErrorCode
+	if authConfig.Signature.ErrorCode != 0 {
+		errorCode = authConfig.Signature.ErrorCode
 	}
 
 	errorMessage := defaultSignatureErrorMessage
-	if config.Signature.ErrorMessage != "" {
-		errorMessage = config.Signature.ErrorMessage
+	if authConfig.Signature.ErrorMessage != "" {
+		errorMessage = authConfig.Signature.ErrorMessage
 	}
 
 	validator := signature_validator.SignatureValidator{}
-	if err := validator.Init(config.Signature.Algorithm); err != nil {
+	if err := validator.Init(authConfig.Signature.Algorithm); err != nil {
 		logger.WithError(err).Info("Invalid signature verification algorithm")
 		return errors.New("internal server error"), http.StatusInternalServerError
 	}
 
-	signature := r.Header.Get(config.Signature.Header)
+	signature := r.Header.Get(authConfig.Signature.Header)
 
-	paramName := config.Signature.ParamName
-	if config.Signature.UseParam || paramName != "" {
+	paramName := authConfig.Signature.ParamName
+	if authConfig.Signature.UseParam || paramName != "" {
 		if paramName == "" {
-			paramName = config.Signature.Header
+			paramName = authConfig.Signature.Header
 		}
 
 		paramValue := r.URL.Query().Get(paramName)
@@ -221,14 +205,14 @@ func (k *AuthKey) validateSignature(r *http.Request, key string) (error, int) {
 		return errors.New(errorMessage), errorCode
 	}
 
-	secret := replaceTykVariables(r, config.Signature.Secret, false)
+	secret := k.Gw.replaceTykVariables(r, authConfig.Signature.Secret, false)
 
 	if secret == "" {
 		logger.Info("Request signature secret not found or empty")
 		return errors.New(errorMessage), errorCode
 	}
 
-	if err := validator.Validate(signature, key, secret, config.Signature.AllowedClockSkew); err != nil {
+	if err := validator.Validate(signature, key, secret, authConfig.Signature.AllowedClockSkew); err != nil {
 		logger.WithError(err).Info("Request signature validation failed")
 		return errors.New(errorMessage), errorCode
 	}

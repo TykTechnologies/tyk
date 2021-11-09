@@ -16,7 +16,6 @@ import (
 	proxyproto "github.com/pires/go-proxyproto"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 )
 
 const (
@@ -24,13 +23,7 @@ const (
 	defaultSampletTriggerLimit = 3
 )
 
-var (
-	HostCheckerClient = &http.Client{
-		Timeout: 500 * time.Millisecond,
-	}
-	defaultWorkerPoolSize = runtime.NumCPU()
-	hostCheckTicker       = make(chan struct{})
-)
+var defaultWorkerPoolSize = runtime.NumCPU()
 
 type HostData struct {
 	CheckURL            string
@@ -74,6 +67,7 @@ type HostUptimeChecker struct {
 	resetListMu sync.Mutex
 	doResetList bool
 	newList     map[string]HostData
+	Gw          *Gateway `json:"-"`
 }
 
 func (h *HostUptimeChecker) getStopLoop() bool {
@@ -106,12 +100,12 @@ func (h *HostUptimeChecker) HostCheckLoop(ctx context.Context) {
 	defer func() {
 		log.Info("[HOST CHECKER] Checker stopped")
 	}()
-	if isRunningTests() {
+	if h.Gw.isRunningTests() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case <-hostCheckTicker:
+			case <-h.Gw.HostCheckTicker:
 				h.execCheck()
 			}
 		}
@@ -294,21 +288,21 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 			log.Error("Could not create request: ", err)
 			return
 		}
-		ignoreCanonical := config.Global().IgnoreCanonicalMIMEHeaderKey
+		ignoreCanonical := h.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
 		for headerName, headerValue := range toCheck.Headers {
 			setCustomHeader(req.Header, headerName, headerValue, ignoreCanonical)
 		}
 		req.Header.Set("Connection", "close")
-		HostCheckerClient.Transport = &http.Transport{
+		h.Gw.HostCheckerClient.Transport = &http.Transport{
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: config.Global().ProxySSLInsecureSkipVerify,
-				MaxVersion:         config.Global().ProxySSLMaxVersion,
+				InsecureSkipVerify: h.Gw.GetConfig().ProxySSLInsecureSkipVerify,
+				MaxVersion:         h.Gw.GetConfig().ProxySSLMaxVersion,
 			},
 		}
 		if toCheck.Timeout != 0 {
-			HostCheckerClient.Timeout = toCheck.Timeout
+			h.Gw.HostCheckerClient.Timeout = toCheck.Timeout
 		}
-		response, err := HostCheckerClient.Do(req)
+		response, err := h.Gw.HostCheckerClient.Do(req)
 		if err != nil {
 			report.IsTCPError = true
 			break

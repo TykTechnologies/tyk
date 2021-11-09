@@ -1,0 +1,5 @@
+{
+    "ami_search_string": "RHEL-7.?*GA*",
+    "flavour": "RedHat",
+    "source_ami_owner": "309956199498"
+}

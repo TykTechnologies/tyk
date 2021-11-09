@@ -29,8 +29,6 @@ require (
 	github.com/emanoelxavier/openid2go v0.0.0-20190718021401-6345b638bfc9 // indirect
 	github.com/evalphobia/logrus_sentry v0.8.2
 	github.com/facebookgo/clock v0.0.0-20150410010913-600d898af40a // indirect
-	github.com/franela/goblin v0.0.0-20211003143422-0a4f594942bf // indirect
-	github.com/franela/goreq v0.0.0-20171204163338-bcd34c9993f8
 	github.com/gemnasium/logrus-graylog-hook v2.0.7+incompatible
 	github.com/getkin/kin-openapi v0.32.0
 	github.com/getsentry/raven-go v0.2.0 // indirect

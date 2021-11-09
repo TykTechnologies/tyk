@@ -87,14 +87,3 @@ func greaterThanInt(first, second int) bool {
 
 	return first > second
 }
-
-// removeDuplicateStr removes duplicates values from items string slice by respecting the order.
-func removeDuplicateStr(items []string) []string {
-	var list []string
-	for _, item := range items {
-		if !contains(list, item) {
-			list = append(list, item)
-		}
-	}
-	return list
-}

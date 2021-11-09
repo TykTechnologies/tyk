@@ -18,7 +18,6 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/murmur3"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/headers"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/request"
@@ -305,7 +304,12 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 			log.Debug("Cache TTL is:", cacheTTL)
 			ts := m.getTimeTTL(cacheTTL)
 			toStore := m.encodePayload(wireFormatReq.String(), ts)
-			go m.CacheStore.SetKey(key, toStore, cacheTTL)
+			go func() {
+				err := m.CacheStore.SetKey(key, toStore, cacheTTL)
+				if err != nil {
+					log.WithError(err).Error("could not save key in cache store")
+				}
+			}()
 		}
 
 		return nil, mwStatusRespond
@@ -336,7 +340,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		newRes.Header.Del(h)
 	}
 
-	copyHeader(w.Header(), newRes.Header, config.Global().IgnoreCanonicalMIMEHeaderKey)
+	copyHeader(w.Header(), newRes.Header, m.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
 	session := ctxGetSession(r)
 
 	// Only add ratelimit data to keyed sessions
