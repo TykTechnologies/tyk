@@ -87,13 +87,24 @@ func (g *GraphQLConfigAdapter) createV2ConfigForProxyOnlyExecutionMode() (*graph
 		}
 	}
 
-	v2Config, err := graphql.NewProxyEngineConfigFactory(g.schema, upstreamConfig, graphql.WithProxyHttpClient(g.httpClient)).EngineV2Configuration()
+	v2Config, err := graphql.NewProxyEngineConfigFactory(
+		g.schema,
+		upstreamConfig,
+		graphqlDataSource.NewBatchFactory(),
+		graphql.WithProxyHttpClient(g.httpClient),
+	).EngineV2Configuration()
+
 	return &v2Config, err
 }
 
 func (g *GraphQLConfigAdapter) createV2ConfigForSupergraphExecutionMode() (*graphql.EngineV2Configuration, error) {
 	dataSourceConfs := g.subgraphDataSourceConfigs()
-	federationConfigV2Factory := graphql.NewFederationEngineConfigFactory(dataSourceConfs, graphql.WithFederationHttpClient(g.getHttpClient()))
+	federationConfigV2Factory := graphql.NewFederationEngineConfigFactory(
+		dataSourceConfs,
+		graphqlDataSource.NewBatchFactory(),
+		graphql.WithFederationHttpClient(g.getHttpClient()),
+	)
+
 	err := federationConfigV2Factory.SetMergedSchemaFromString(g.apiDefinition.GraphQL.Supergraph.MergedSDL)
 	if err != nil {
 		return nil, err
