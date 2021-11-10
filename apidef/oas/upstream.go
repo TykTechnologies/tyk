@@ -58,7 +58,7 @@ type ServiceDiscovery struct {
 	// then your namespace would be `node.value`.
 	// Old API Definition: `service_discovery.data_path`
 	DataPath            string `bson:"dataPath,omitempty" json:"dataPath,omitempty"`
-	// UseNestedQuery enables using a combination of the data_path and parent_data_path.
+	// UseNestedQuery enables using a combination of the `dataPath` and `parentDataPath`.
 	// It is necessary when the data lives within this string-encoded JSON object.
 	// ```
 	// {
@@ -74,15 +74,15 @@ type ServiceDiscovery struct {
 	// Old API Definition: `service_discovery.use_nested_query`
 	UseNestedQuery      bool   `bson:"useNestedQuery,omitempty" json:"useNestedQuery,omitempty"`
 	// ParentDataPath is the namespace of the where to find the nested value, if `useNestedQuery` is `true`.
-	// In the above example, it would be `node.value`. You would then change the `data_path` setting to be `hostname`,
+	// In the above example, it would be `node.value`. You would then change the `dataPath` setting to be `hostname`,
 	// since this is where the host name data resides in the JSON string.
-	// Tyk automatically assumes that the `data_path` in this case is in a string-encoded JSON object and will try to deserialize it.
+	// Tyk automatically assumes that the `dataPath` in this case is in a string-encoded JSON object and will try to deserialize it.
 	// Old API Definition: `service_discovery.parent_data_path`
 	ParentDataPath      string `bson:"parentDataPath,omitempty" json:"parentDataPath,omitempty"`
 	// PortDataPath is the port of the data path. In the above nested example, we can see that there is a separate `port` value
-	// for the service in the nested JSON. In this case, you can set the `port_data_path` value and Tyk will treat `data_path`
+	// for the service in the nested JSON. In this case, you can set the `portDataPath` value and Tyk will treat `dataPath`
 	// as the hostname and zip them together (this assumes that the hostname element does not end in a slash or resource identifier
-	// such as `/widgets/`). In the above example, the `port_data_path` would be `port`.
+	// such as `/widgets/`). In the above example, the `portDataPath` would be `port`.
 	// Old API Definition: `service_discovery.port_data_path`
 	PortDataPath        string `bson:"portDataPath,omitempty" json:"portDataPath,omitempty"`
 	// UseTargetList is set this value true, if you are using load balancing. Tyk will treat the data path as a list and
