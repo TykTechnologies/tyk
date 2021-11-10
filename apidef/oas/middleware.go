@@ -30,7 +30,7 @@ func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
 
 type Global struct {
 	CORS  *CORS  `bson:"cors,omitempty" json:"cors,omitempty"`
-	// Cache contains the configurations related to the caching.
+	// Cache contains the configurations related to caching.
 	// Old API Definition: `cache_options`
 	Cache *Cache `bson:"cache,omitempty" json:"cache,omitempty"`
 }
@@ -115,7 +115,7 @@ type Cache struct {
 	// applies across versions.
 	// Old API Definition: `cache_options.cache_all_safe_requests`
 	CacheAllSafeRequests       bool     `bson:"cacheAllSafeRequests,omitempty" json:"cacheAllSafeRequests,omitempty"`
-	// CacheResponseCodes is the array of response codes which are safe to cache e.g. `404`.
+	// CacheResponseCodes is an array of response codes which are safe to cache e.g. `404`.
 	// Old API Definition: `cache_options.cache_response_codes`
 	CacheResponseCodes         []int    `bson:"cacheResponseCodes,omitempty" json:"cacheResponseCodes,omitempty"`
 	// CacheByHeaders allows header values to be used as part of the cache key.

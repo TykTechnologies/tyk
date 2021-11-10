@@ -39,7 +39,7 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 }
 
 type ListenPath struct {
-	// Value is value of the listen path e.g. `/api/` or `/` or `/httpbin/`.
+	// Value is the value of the listen path e.g. `/api/` or `/` or `/httpbin/`.
 	// Old API Definition: `proxy.listen_path`
 	Value string `bson:"value" json:"value"` // required
 	// Strip removes the inbound listen path in the outgoing request. e.g. `http://acme.com/httpbin/get` where `httpbin`

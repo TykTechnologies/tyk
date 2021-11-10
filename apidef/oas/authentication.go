@@ -9,14 +9,14 @@ import (
 )
 
 type Authentication struct {
-	// Enabled makes the API protected when one of the authentication modes are enabled.
+	// Enabled makes the API protected when one of the authentication modes is enabled.
 	// Old API Definition: `!use_keyless`
 	Enabled                bool                `bson:"enabled" json:"enabled"` // required
 	// StripAuthorizationData ensures that any security tokens used for accessing APIs are stripped and not leaked to the upstream.
 	// Old API Definition: `strip_auth_data`
 	StripAuthorizationData bool                `bson:"stripAuthorizationData,omitempty" json:"stripAuthorizationData,omitempty"`
 	// BaseIdentityProvider enables multi authentication mechanism and provides the session object that determines rate limits, ACL rules and quotas.
-	// It should be set to one of the followings:
+	// It should be set to one of the following:
 	// - `auth_token`
 	// - `hmac_key`
 	// - `basic_auth_user`
@@ -510,7 +510,7 @@ type HMAC struct {
 	// - `hmac-sha384`
 	// - `hmac-sha512`
 	//
-	// and reads value from algorithm header.
+	// and reads the value from algorithm header.
 	// Old API Definition: `hmac_allowed_algorithms`
 	AllowedAlgorithms []string `bson:"allowedAlgorithms,omitempty" json:"allowedAlgorithms,omitempty"`
 	// AllowedClockSkew is the amount of milliseconds that will be tolerated for clock skew. It is used against replay attacks.

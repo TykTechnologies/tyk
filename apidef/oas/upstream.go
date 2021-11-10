@@ -35,10 +35,10 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 }
 
 type ServiceDiscovery struct {
-	// Enabled enables the Service Discovery.
+	// Enabled enables Service Discovery.
 	// Old API Definition: `service_discovery.use_discovery_service`
 	Enabled             bool   `bson:"enabled" json:"enabled"` // required
-	// QueryEndpoint is the endpoint to call, this would probably be Consul, etcd or Eureka K/V store.
+	// QueryEndpoint is the endpoint to call, this would usually be Consul, etcd or Eureka K/V store.
 	// Old API Definition: `service_discovery.query_endpoint`
 	QueryEndpoint       string `bson:"queryEndpoint,omitempty" json:"queryEndpoint,omitempty"`
 	// DataPath is the namespace of the data path - where exactly in your service response the namespace can be found.
@@ -58,7 +58,7 @@ type ServiceDiscovery struct {
 	// then your namespace would be `node.value`.
 	// Old API Definition: `service_discovery.data_path`
 	DataPath            string `bson:"dataPath,omitempty" json:"dataPath,omitempty"`
-	// UseNestedQuery enables using a combination of the `dataPath` and `parentDataPath`.
+	// UseNestedQuery enables using a combination of `dataPath` and `parentDataPath`.
 	// It is necessary when the data lives within this string-encoded JSON object.
 	// ```
 	// {
@@ -76,7 +76,7 @@ type ServiceDiscovery struct {
 	// ParentDataPath is the namespace of the where to find the nested value, if `useNestedQuery` is `true`.
 	// In the above example, it would be `node.value`. You would then change the `dataPath` setting to be `hostname`,
 	// since this is where the host name data resides in the JSON string.
-	// Tyk automatically assumes that the `dataPath` in this case is in a string-encoded JSON object and will try to deserialize it.
+	// Tyk automatically assumes that `dataPath` in this case is in a string-encoded JSON object and will try to deserialize it.
 	// Old API Definition: `service_discovery.parent_data_path`
 	ParentDataPath      string `bson:"parentDataPath,omitempty" json:"parentDataPath,omitempty"`
 	// PortDataPath is the port of the data path. In the above nested example, we can see that there is a separate `port` value
@@ -85,7 +85,7 @@ type ServiceDiscovery struct {
 	// such as `/widgets/`). In the above example, the `portDataPath` would be `port`.
 	// Old API Definition: `service_discovery.port_data_path`
 	PortDataPath        string `bson:"portDataPath,omitempty" json:"portDataPath,omitempty"`
-	// UseTargetList is set this value true, if you are using load balancing. Tyk will treat the data path as a list and
+	// UseTargetList should be set to `true`, if you are using load balancing. Tyk will treat the data path as a list and
 	// inject it into the target list of your API Definition.
 	// Old API Definition: `service_discovery.use_target_list`
 	UseTargetList       bool   `bson:"useTargetList,omitempty" json:"useTargetList,omitempty"`
@@ -99,7 +99,7 @@ type ServiceDiscovery struct {
 	// Setting this value will enable that.
 	// Old API Definition: `service_discovery.target_path`
 	TargetPath          string `bson:"targetPath,omitempty" json:"targetPath,omitempty"`
-	// EndpointReturnsList is set `true` when the response type is a list instead of object.
+	// EndpointReturnsList is set `true` when the response type is a list instead of an object.
 	// Old API Definition: `service_discovery.endpoint_returns_list`
 	EndpointReturnsList bool   `bson:"endpointReturnsList,omitempty" json:"endpointReturnsList,omitempty"`
 }
