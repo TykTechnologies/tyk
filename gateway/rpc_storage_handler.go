@@ -820,6 +820,8 @@ func (gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler, isH
 	}
 }
 
+// ProcessOauthClientsOps performs the appropiate action for the received clients
+// it can be any of the Create,Update and Delete operations
 func (gw *Gateway) ProcessOauthClientsOps(clients map[string]string) {
 	for v, action := range clients {
 		// value is: APIID.ClientID.OrgID
