@@ -42,7 +42,10 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 				},
 			},
 			ChildNodes: nil,
-			Factory:    &graphqlDataSource.Factory{HTTPClient: httpClient},
+			Factory: &graphqlDataSource.Factory{
+				BatchFactory: graphqlDataSource.NewBatchFactory(),
+				HTTPClient:   httpClient,
+			},
 			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
 				Fetch: graphqlDataSource.FetchConfiguration{
 					URL: "http://localhost:8080",
@@ -96,7 +99,10 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 				},
 			},
 			ChildNodes: nil,
-			Factory:    &graphqlDataSource.Factory{HTTPClient: httpClient},
+			Factory: &graphqlDataSource.Factory{
+				BatchFactory: graphqlDataSource.NewBatchFactory(),
+				HTTPClient:   httpClient,
+			},
 			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
 				Fetch: graphqlDataSource.FetchConfiguration{
 					URL: "http://api-name",
@@ -190,7 +196,10 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 					FieldNames: []string{"sdl"},
 				},
 			},
-			Factory: &graphqlDataSource.Factory{HTTPClient: httpClient},
+			Factory: &graphqlDataSource.Factory{
+				BatchFactory: graphqlDataSource.NewBatchFactory(),
+				HTTPClient:   httpClient,
+			},
 			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
 				Fetch: graphqlDataSource.FetchConfiguration{
 					URL: "http://localhost:8080",
