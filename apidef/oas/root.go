@@ -8,11 +8,11 @@ const ExtensionTykAPIGateway = "x-tyk-api-gateway"
 
 type XTykAPIGateway struct {
 	// Info contains the main metadata about the API definition.
-	Info     Info     `bson:"info" json:"info"`         // required
+	Info Info `bson:"info" json:"info"` // required
 	// Upstream contains the configurations related to the upstream.
 	Upstream Upstream `bson:"upstream" json:"upstream"` // required
 	// Server contains the configurations related to the server.
-	Server     Server      `bson:"server" json:"server"` // required
+	Server Server `bson:"server" json:"server"` // required
 	// Middleware contains the configurations related to the proxy middleware.
 	Middleware *Middleware `bson:"middleware,omitempty" json:"middleware,omitempty"`
 }
@@ -27,7 +27,7 @@ func (x *XTykAPIGateway) Fill(api apidef.APIDefinition) {
 	}
 
 	x.Middleware.Fill(api)
-	if (*x.Middleware == Middleware{}) {
+	if ShouldOmit(x.Middleware) {
 		x.Middleware = nil
 	}
 }
@@ -55,13 +55,13 @@ type Info struct {
 	ID string `bson:"id" json:"id,omitempty"`
 	// DBID is the unique database ID of the API.
 	// Old API Definition: `id`
-	DBID  apidef.ObjectId `bson:"dbID" json:"dbID,omitempty"`
+	DBID apidef.ObjectId `bson:"dbID" json:"dbID,omitempty"`
 	// OrgID is the ID of the organisation which the API belongs to.
 	// Old API Definition: `org_id`
-	OrgID string          `bson:"orgID" json:"orgID,omitempty"`
+	OrgID string `bson:"orgID" json:"orgID,omitempty"`
 	// Name is the name of the API.
 	// Old API Definition: `name`
-	Name  string          `bson:"name" json:"name"` // required
+	Name string `bson:"name" json:"name"` // required
 	// State contains the configurations related to the state of the API.
 	State State `bson:"state" json:"state"` // required
 }
@@ -85,7 +85,7 @@ func (i *Info) ExtractTo(api *apidef.APIDefinition) {
 type State struct {
 	// Active enables the API.
 	// Old API Definition: `active`
-	Active   bool `bson:"active" json:"active"` // required
+	Active bool `bson:"active" json:"active"` // required
 	// Internal makes the API accessible only internally.
 	// Old API Definition: `internal`
 	Internal bool `bson:"internal,omitempty" json:"internal,omitempty"`
