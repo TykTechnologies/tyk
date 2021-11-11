@@ -1,8 +1,6 @@
 package oas
 
 import (
-	"reflect"
-
 	"github.com/lonelycode/osin"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -11,10 +9,10 @@ import (
 type Authentication struct {
 	// Enabled makes the API protected when one of the authentication modes is enabled.
 	// Old API Definition: `!use_keyless`
-	Enabled                bool                `bson:"enabled" json:"enabled"` // required
+	Enabled bool `bson:"enabled" json:"enabled"` // required
 	// StripAuthorizationData ensures that any security tokens used for accessing APIs are stripped and not leaked to the upstream.
 	// Old API Definition: `strip_auth_data`
-	StripAuthorizationData bool                `bson:"stripAuthorizationData,omitempty" json:"stripAuthorizationData,omitempty"`
+	StripAuthorizationData bool `bson:"stripAuthorizationData,omitempty" json:"stripAuthorizationData,omitempty"`
 	// BaseIdentityProvider enables multi authentication mechanism and provides the session object that determines rate limits, ACL rules and quotas.
 	// It should be set to one of the following:
 	// - `auth_token`
@@ -25,18 +23,18 @@ type Authentication struct {
 	// - `oauth_key`
 	//
 	// Old API Definition: `base_identity_provided_by`
-	BaseIdentityProvider   apidef.AuthTypeEnum `bson:"baseIdentityProvider,omitempty" json:"baseIdentityProvider,omitempty"`
+	BaseIdentityProvider apidef.AuthTypeEnum `bson:"baseIdentityProvider,omitempty" json:"baseIdentityProvider,omitempty"`
 	// Token contains the configurations related to standard token based authentication mode.
 	// Old API Definition: `auth_configs["authToken"]`
-	Token                  *Token              `bson:"token,omitempty" json:"token,omitempty"`
-	JWT                    *JWT                `bson:"jwt,omitempty" json:"jwt,omitempty"`
+	Token *Token `bson:"token,omitempty" json:"token,omitempty"`
+	JWT   *JWT   `bson:"jwt,omitempty" json:"jwt,omitempty"`
 	// Basic contains the configurations related to basic authentication mode.
 	// Old API Definition: `auth_configs["basic"]`
-	Basic                  *Basic              `bson:"basic,omitempty" json:"basic,omitempty"`
-	OAuth                  *OAuth              `bson:"oauth,omitempty" json:"oauth,omitempty"`
+	Basic *Basic `bson:"basic,omitempty" json:"basic,omitempty"`
+	OAuth *OAuth `bson:"oauth,omitempty" json:"oauth,omitempty"`
 	// HMAC contains the configurations related to HMAC authentication mode.
 	// Old API Definition: `auth_configs["hmac"]`
-	HMAC                   *HMAC               `bson:"hmac,omitempty" json:"hmac,omitempty"`
+	HMAC *HMAC `bson:"hmac,omitempty" json:"hmac,omitempty"`
 }
 
 func (a *Authentication) Fill(api apidef.APIDefinition) {
@@ -56,7 +54,7 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 		a.Token.Fill(api.UseStandardAuth, authToken)
 	}
 
-	if reflect.DeepEqual(a.Token, &Token{}) {
+	if ShouldOmit(a.Token) {
 		a.Token = nil
 	}
 
@@ -68,7 +66,7 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 		a.JWT.Fill(api)
 	}
 
-	if reflect.DeepEqual(a.JWT, &JWT{}) {
+	if ShouldOmit(a.JWT) {
 		a.JWT = nil
 	}
 
@@ -80,7 +78,7 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 		a.Basic.Fill(api)
 	}
 
-	if reflect.DeepEqual(a.Basic, &Basic{}) {
+	if ShouldOmit(a.Basic) {
 		a.Basic = nil
 	}
 
@@ -92,7 +90,7 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 		a.OAuth.Fill(api)
 	}
 
-	if reflect.DeepEqual(a.OAuth, &OAuth{}) {
+	if ShouldOmit(a.OAuth) {
 		a.OAuth = nil
 	}
 
@@ -104,7 +102,7 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 		a.HMAC.Fill(api)
 	}
 
-	if reflect.DeepEqual(a.HMAC, &HMAC{}) {
+	if ShouldOmit(a.HMAC) {
 		a.HMAC = nil
 	}
 }
@@ -138,14 +136,14 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 type Token struct {
 	// Enabled enables the token based authentication mode.
 	// Old API Definition: `api_id`
-	Enabled                 bool `bson:"enabled" json:"enabled"` // required
-	AuthSources             `bson:",inline" json:",inline"`
+	Enabled     bool `bson:"enabled" json:"enabled"` // required
+	AuthSources `bson:",inline" json:",inline"`
 	// EnableClientCertificate allows to create dynamic keys based on certificates.
 	// Old API Definition: `auth_configs["authToken"].use_certificate`
-	EnableClientCertificate bool       `bson:"enableClientCertificate,omitempty" json:"enableClientCertificate,omitempty"`
+	EnableClientCertificate bool `bson:"enableClientCertificate,omitempty" json:"enableClientCertificate,omitempty"`
 	//
 	// Old API Definition:
-	Signature               *Signature `bson:"signatureValidation,omitempty" json:"signatureValidation,omitempty"`
+	Signature *Signature `bson:"signatureValidation,omitempty" json:"signatureValidation,omitempty"`
 }
 
 func (t *Token) Fill(enabled bool, authToken apidef.AuthConfig) {
@@ -161,7 +159,7 @@ func (t *Token) Fill(enabled bool, authToken apidef.AuthConfig) {
 	}
 
 	t.Signature.Fill(authToken)
-	if (*t.Signature == Signature{}) {
+	if ShouldOmit(t.Signature) {
 		t.Signature = nil
 	}
 }
@@ -191,10 +189,10 @@ type AuthSources struct {
 	Header HeaderAuthSource `bson:"header" json:"header"` // required
 	// Cookie contains configurations of the cookie auth source.
 	// Old API Definition: `api_id`
-	Cookie *AuthSource      `bson:"cookie,omitempty" json:"cookie,omitempty"`
+	Cookie *AuthSource `bson:"cookie,omitempty" json:"cookie,omitempty"`
 	// Param contains configurations of the param auth source.
 	// Old API Definition: `api_id`
-	Param  *AuthSource      `bson:"param,omitempty" json:"param,omitempty"`
+	Param *AuthSource `bson:"param,omitempty" json:"param,omitempty"`
 }
 
 func (as *AuthSources) Fill(authConfig apidef.AuthConfig) {
@@ -207,7 +205,7 @@ func (as *AuthSources) Fill(authConfig apidef.AuthConfig) {
 	}
 
 	as.Param.Fill(authConfig.UseParam, authConfig.ParamName)
-	if (*as.Param == AuthSource{}) {
+	if ShouldOmit(as.Param) {
 		as.Param = nil
 	}
 
@@ -217,7 +215,7 @@ func (as *AuthSources) Fill(authConfig apidef.AuthConfig) {
 	}
 
 	as.Cookie.Fill(authConfig.UseCookie, authConfig.CookieName)
-	if (*as.Cookie == AuthSource{}) {
+	if ShouldOmit(as.Cookie) {
 		as.Cookie = nil
 	}
 }
@@ -246,10 +244,10 @@ type HeaderAuthSource struct {
 type AuthSource struct {
 	// Enabled enables the auth source.
 	// Old API Definition: `auth_configs[X].use_param/use_cookie`
-	Enabled bool   `bson:"enabled" json:"enabled"` // required
+	Enabled bool `bson:"enabled" json:"enabled"` // required
 	// Name is the name of the auth source.
 	// Old API Definition: `auth_configs[X].param_name/cookie_name`
-	Name    string `bson:"name,omitempty" json:"name,omitempty"`
+	Name string `bson:"name,omitempty" json:"name,omitempty"`
 }
 
 func (as *AuthSource) Fill(enabled bool, name string) {
@@ -358,14 +356,14 @@ func (j *JWT) ExtractTo(api *apidef.APIDefinition) {
 type Basic struct {
 	// Enabled enables the basic authentication mode.
 	// Old API Definition: `use_basic_auth`
-	Enabled                    bool `bson:"enabled" json:"enabled"` // required
-	AuthSources                `bson:",inline" json:",inline"`
+	Enabled     bool `bson:"enabled" json:"enabled"` // required
+	AuthSources `bson:",inline" json:",inline"`
 	// DisableCaching disables the caching of basic authentication key.
 	// Old API Definition: `basic_auth.disable_caching`
-	DisableCaching             bool                        `bson:"disableCaching,omitempty" json:"disableCaching,omitempty"`
+	DisableCaching bool `bson:"disableCaching,omitempty" json:"disableCaching,omitempty"`
 	// CacheTTL is the TTL for a cached basic authentication key in seconds.
 	// Old API Definition: `basic_auth.cache_ttl`
-	CacheTTL                   int                         `bson:"cacheTTL,omitempty" json:"cacheTTL,omitempty"`
+	CacheTTL int `bson:"cacheTTL,omitempty" json:"cacheTTL,omitempty"`
 	// ExtractCredentialsFromBody helps to extract username and password from body. In some cases, like dealing with SOAP,
 	// user credentials can be passed via request body.
 	ExtractCredentialsFromBody *ExtractCredentialsFromBody `bson:"extractCredentialsFromBody,omitempty" json:"extractCredentialsFromBody,omitempty"`
@@ -385,7 +383,7 @@ func (b *Basic) Fill(api apidef.APIDefinition) {
 
 	b.ExtractCredentialsFromBody.Fill(api)
 
-	if reflect.DeepEqual(b.ExtractCredentialsFromBody, &ExtractCredentialsFromBody{}) {
+	if ShouldOmit(b.ExtractCredentialsFromBody) {
 		b.ExtractCredentialsFromBody = nil
 	}
 }
@@ -413,10 +411,10 @@ func (b *Basic) ExtractTo(api *apidef.APIDefinition) {
 type ExtractCredentialsFromBody struct {
 	// Enabled enables extracting credentials from body.
 	// Old API Definition: `basic_auth.extract_from_body`
-	Enabled        bool   `bson:"enabled" json:"enabled"` // required
+	Enabled bool `bson:"enabled" json:"enabled"` // required
 	// UserRegexp is the regex for username e.g. `<User>(.*)</User>`.
 	// Old API Definition: `basic_auth.userRegexp`
-	UserRegexp     string `bson:"userRegexp,omitempty" json:"userRegexp,omitempty"`
+	UserRegexp string `bson:"userRegexp,omitempty" json:"userRegexp,omitempty"`
 	// PasswordRegexp is the regex for password e.g. `<Password>(.*)</Password>`.
 	// Old API Definition: `basic_auth.passwordRegexp`
 	PasswordRegexp string `bson:"passwordRegexp,omitempty" json:"passwordRegexp,omitempty"`
@@ -458,7 +456,7 @@ func (o *OAuth) Fill(api apidef.APIDefinition) {
 
 	o.Notifications.Fill(api.NotificationsDetails)
 
-	if reflect.DeepEqual(o.Notifications, &Notifications{}) {
+	if ShouldOmit(o.Notifications) {
 		o.Notifications = nil
 	}
 }
@@ -502,8 +500,8 @@ func (n *Notifications) ExtractTo(nm *apidef.NotificationsManager) {
 type HMAC struct {
 	// Enabled enables the HMAC authentication mode.
 	// Old API Definition: `enable_signature_checking`
-	Enabled           bool `bson:"enabled" json:"enabled"` // required
-	AuthSources       `bson:",inline" json:",inline"`
+	Enabled     bool `bson:"enabled" json:"enabled"` // required
+	AuthSources `bson:",inline" json:",inline"`
 	// AllowedAlgorithms is the array of HMAC algorithms which are allowed. Tyk supports the following HMAC algorithms:
 	// - `hmac-sha1`
 	// - `hmac-sha256`
@@ -516,7 +514,7 @@ type HMAC struct {
 	// AllowedClockSkew is the amount of milliseconds that will be tolerated for clock skew. It is used against replay attacks.
 	// The default value is `0`, which deactivates clock skew checks.
 	// Old API Definition: `hmac_allowed_clock_skew`
-	AllowedClockSkew  float64  `bson:"allowedClockSkew,omitempty" json:"allowedClockSkew,omitempty"`
+	AllowedClockSkew float64 `bson:"allowedClockSkew,omitempty" json:"allowedClockSkew,omitempty"`
 }
 
 func (h *HMAC) Fill(api apidef.APIDefinition) {
