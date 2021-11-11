@@ -41,7 +41,6 @@ petstore.json
 *.mutexprof
 *.pdf
 *.mmdb
-*.cov
 *.so
 !testdata/*.mmdb
 *.pid

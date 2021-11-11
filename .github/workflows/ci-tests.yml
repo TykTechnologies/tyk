@@ -22,6 +22,8 @@ jobs:
     steps:
       - name: Checkout Tyk
         uses: actions/checkout@v2
+        with:
+          fetch-depth: 2
 
       - name: Setup Golang
         uses: actions/setup-go@v2
@@ -50,7 +52,9 @@ jobs:
           pip install setuptools
           pip install google
           pip install protobuf
-
+      - name: Fetch base branch
+        if: ${{ github.event_name == 'pull_request' }}
+        run: git fetch origin ${{ github.base_ref }}
       - name: Start Redis
         uses: supercharge/redis-github-action@1.2.0
         with:
@@ -89,3 +93,33 @@ jobs:
             ${{ steps.hygiene.outputs.imports || 'all ok' }}
 
             If the above are ok, please look at [the run](https://github.com/TykTechnologies/tyk/pull/${{ github.event.pull_request.number }}/checks?check_run_id=${{ github.run_id }}) or in the _Checks_ tab.
+
+      - name: Download golangci-lint
+        run: curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
+
+      - name: golangci-lint
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          $(go env GOPATH)/bin/golangci-lint run --out-format checkstyle --tests=false --timeout=300s --max-issues-per-linter=0 --max-same-issues=0 --new-from-rev=HEAD~ ./... > golanglint.xml
+
+      - name: golangci-lint
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          $(go env GOPATH)/bin/golangci-lint run --out-format checkstyle --tests=false --timeout=300s --max-issues-per-linter=0 --max-same-issues=0 ./... > golanglint.xml
+
+      - name: SonarCloud Scan
+        uses: sonarsource/sonarcloud-github-action@master
+        with:
+          args: >
+            -Dsonar.organization=tyktechnologies
+            -Dsonar.projectKey=TykTechnologies_tyk
+            -Dsonar.sources=.
+            -Dsonar.exclusions=coprocess/**/*
+            -Dsonar.coverage.exclusions=**/*_test.go
+            -Dsonar.test.inclusions=**/*_test.go
+            -Dsonar.tests=.
+            -Dsonar.go.coverage.reportPaths=*.cov
+            -Dsonar.go.golangci-lint.reportPaths=golanglint.xml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
