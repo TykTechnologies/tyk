@@ -87,13 +87,24 @@ func (g *GraphQLConfigAdapter) createV2ConfigForProxyOnlyExecutionMode() (*graph
 		}
 	}
 
-	v2Config, err := graphql.NewProxyEngineConfigFactory(g.schema, upstreamConfig, graphql.WithProxyHttpClient(g.httpClient)).EngineV2Configuration()
+	v2Config, err := graphql.NewProxyEngineConfigFactory(
+		g.schema,
+		upstreamConfig,
+		graphqlDataSource.NewBatchFactory(),
+		graphql.WithProxyHttpClient(g.httpClient),
+	).EngineV2Configuration()
+
 	return &v2Config, err
 }
 
 func (g *GraphQLConfigAdapter) createV2ConfigForSupergraphExecutionMode() (*graphql.EngineV2Configuration, error) {
 	dataSourceConfs := g.subgraphDataSourceConfigs()
-	federationConfigV2Factory := graphql.NewFederationEngineConfigFactory(dataSourceConfs, graphql.WithFederationHttpClient(g.getHttpClient()))
+	federationConfigV2Factory := graphql.NewFederationEngineConfigFactory(
+		dataSourceConfs,
+		graphqlDataSource.NewBatchFactory(),
+		graphql.WithFederationHttpClient(g.getHttpClient()),
+	)
+
 	err := federationConfigV2Factory.SetMergedSchemaFromString(g.apiDefinition.GraphQL.Supergraph.MergedSDL)
 	if err != nil {
 		return nil, err
@@ -239,8 +250,8 @@ func (g *GraphQLConfigAdapter) subgraphDataSourceConfigs() []graphqlDataSource.C
 		if len(apiDefSubgraphConf.SDL) == 0 {
 			continue
 		}
-
-		conf := g.graphqlDataSourceConfiguration(apiDefSubgraphConf.URL, http.MethodPost, g.apiDefinition.GraphQL.Supergraph.GlobalHeaders)
+		hdr := g.removeDuplicateHeaders(apiDefSubgraphConf.Headers, g.apiDefinition.GraphQL.Supergraph.GlobalHeaders)
+		conf := g.graphqlDataSourceConfiguration(apiDefSubgraphConf.URL, http.MethodPost, hdr)
 		conf.Federation = graphqlDataSource.FederationConfiguration{
 			Enabled:    true,
 			ServiceSDL: apiDefSubgraphConf.SDL,
@@ -345,6 +356,22 @@ func (g *GraphQLConfigAdapter) convertHeadersToHttpHeaders(apiDefHeaders map[str
 	}
 
 	return engineV2Headers
+}
+
+func (g *GraphQLConfigAdapter) removeDuplicateHeaders(headers ...map[string]string) map[string]string {
+	hdr := make(map[string]string)
+	// headers priority depends on the order of arguments
+	for _, header := range headers {
+		for k, v := range header {
+			keyCanonical := http.CanonicalHeaderKey(k)
+			if _, ok := hdr[keyCanonical]; ok {
+				// skip because header is present
+				continue
+			}
+			hdr[keyCanonical] = v
+		}
+	}
+	return hdr
 }
 
 func (g *GraphQLConfigAdapter) determineChildNodes(planDataSources []plan.DataSourceConfiguration) error {
