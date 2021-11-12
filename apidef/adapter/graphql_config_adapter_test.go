@@ -168,7 +168,7 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 		apiDef := &apidef.APIDefinition{
 			GraphQL: gqlConfig,
 		}
-		apiDef.GraphQL.Supergraph.DisableQueryBactching = true
+		apiDef.GraphQL.Supergraph.DisableQueryBatching = true
 
 		httpClient := &http.Client{}
 		adapter := NewGraphQLConfigAdapter(apiDef, WithHttpClient(httpClient))

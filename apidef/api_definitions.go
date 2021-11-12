@@ -671,11 +671,11 @@ type GraphQLSubgraphConfig struct {
 
 type GraphQLSupergraphConfig struct {
 	// UpdatedAt contains the date and time of the last update of a supergraph API.
-	UpdatedAt             *time.Time              `bson:"updated_at" json:"updated_at,omitempty"`
-	Subgraphs             []GraphQLSubgraphEntity `bson:"subgraphs" json:"subgraphs"`
-	MergedSDL             string                  `bson:"merged_sdl" json:"merged_sdl"`
-	GlobalHeaders         map[string]string       `bson:"global_headers" json:"global_headers"`
-	DisableQueryBactching bool                    `bson:"disable_query_batching" json:"disable_query_batching"`
+	UpdatedAt            *time.Time              `bson:"updated_at" json:"updated_at,omitempty"`
+	Subgraphs            []GraphQLSubgraphEntity `bson:"subgraphs" json:"subgraphs"`
+	MergedSDL            string                  `bson:"merged_sdl" json:"merged_sdl"`
+	GlobalHeaders        map[string]string       `bson:"global_headers" json:"global_headers"`
+	DisableQueryBatching bool                    `bson:"disable_query_batching" json:"disable_query_batching"`
 }
 
 type GraphQLSubgraphEntity struct {

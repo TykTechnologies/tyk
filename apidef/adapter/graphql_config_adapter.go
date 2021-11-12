@@ -100,7 +100,7 @@ func (g *GraphQLConfigAdapter) createV2ConfigForProxyOnlyExecutionMode() (*graph
 func (g *GraphQLConfigAdapter) createV2ConfigForSupergraphExecutionMode() (*graphql.EngineV2Configuration, error) {
 	dataSourceConfs := g.subgraphDataSourceConfigs()
 	var federationConfigV2Factory *graphql.FederationEngineConfigFactory
-	if g.apiDefinition.GraphQL.Supergraph.DisableQueryBactching {
+	if g.apiDefinition.GraphQL.Supergraph.DisableQueryBatching {
 		federationConfigV2Factory = graphql.NewFederationEngineConfigFactory(dataSourceConfs, nil, graphql.WithFederationHttpClient(g.getHttpClient()))
 	} else {
 		federationConfigV2Factory = graphql.NewFederationEngineConfigFactory(
