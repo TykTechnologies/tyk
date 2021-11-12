@@ -583,6 +583,9 @@ const Schema = `{
                             "type": "string",
                             "format": "date-time"
                         },
+                        "disable_query_batching": {
+                            "type": "boolean"
+                        },
                         "subgraphs": {
                             "type": ["array", "null"],
                             "properties": {
@@ -624,14 +627,6 @@ const Schema = `{
                     "required": [
                         "enabled"
                     ]
-                },
-                "query_batching": {
-                    "type": ["object", "null"],
-                    "properties": {
-                        "disabled": {
-                            "type": "boolean"
-                        }
-                    }
                 }
             },
             "required": [

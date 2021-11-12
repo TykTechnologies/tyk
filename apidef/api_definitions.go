@@ -651,8 +651,6 @@ type GraphQLConfig struct {
 	Subgraph GraphQLSubgraphConfig `bson:"subgraph" json:"subgraph"`
 	// Supergraph holds the configuration for a GraphQL federation supergraph.
 	Supergraph GraphQLSupergraphConfig `bson:"supergraph" json:"supergraph"`
-	// QueryBatching is the query batching specific configuration.
-	QueryBatching GraphQLQueryBatching `bson:"query_batching" json:"query_batching"`
 }
 
 type GraphQLConfigVersion string
@@ -673,10 +671,11 @@ type GraphQLSubgraphConfig struct {
 
 type GraphQLSupergraphConfig struct {
 	// UpdatedAt contains the date and time of the last update of a supergraph API.
-	UpdatedAt     *time.Time              `bson:"updated_at" json:"updated_at,omitempty"`
-	Subgraphs     []GraphQLSubgraphEntity `bson:"subgraphs" json:"subgraphs"`
-	MergedSDL     string                  `bson:"merged_sdl" json:"merged_sdl"`
-	GlobalHeaders map[string]string       `bson:"global_headers" json:"global_headers"`
+	UpdatedAt             *time.Time              `bson:"updated_at" json:"updated_at,omitempty"`
+	Subgraphs             []GraphQLSubgraphEntity `bson:"subgraphs" json:"subgraphs"`
+	MergedSDL             string                  `bson:"merged_sdl" json:"merged_sdl"`
+	GlobalHeaders         map[string]string       `bson:"global_headers" json:"global_headers"`
+	DisableQueryBactching bool                    `bson:"disable_query_batching" json:"disable_query_batching"`
 }
 
 type GraphQLSubgraphEntity struct {
@@ -762,12 +761,6 @@ type GraphQLPlayground struct {
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Path sets the path on which the playground will be hosted if enabled.
 	Path string `bson:"path" json:"path"`
-}
-
-// GraphQLQueryBatching is a configuration for query batching
-// https://www.apollographql.com/blog/apollo-client/performance/batching-client-graphql-queries/
-type GraphQLQueryBatching struct {
-	Disabled bool `bson:"disabled" json:"disabled"`
 }
 
 // Clean will URL encode map[string]struct variables for saving

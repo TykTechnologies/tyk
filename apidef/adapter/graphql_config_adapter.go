@@ -99,11 +99,16 @@ func (g *GraphQLConfigAdapter) createV2ConfigForProxyOnlyExecutionMode() (*graph
 
 func (g *GraphQLConfigAdapter) createV2ConfigForSupergraphExecutionMode() (*graphql.EngineV2Configuration, error) {
 	dataSourceConfs := g.subgraphDataSourceConfigs()
-	federationConfigV2Factory := graphql.NewFederationEngineConfigFactory(
-		dataSourceConfs,
-		graphqlDataSource.NewBatchFactory(),
-		graphql.WithFederationHttpClient(g.getHttpClient()),
-	)
+	var federationConfigV2Factory *graphql.FederationEngineConfigFactory
+	if g.apiDefinition.GraphQL.Supergraph.DisableQueryBactching {
+		federationConfigV2Factory = graphql.NewFederationEngineConfigFactory(dataSourceConfs, nil, graphql.WithFederationHttpClient(g.getHttpClient()))
+	} else {
+		federationConfigV2Factory = graphql.NewFederationEngineConfigFactory(
+			dataSourceConfs,
+			graphqlDataSource.NewBatchFactory(),
+			graphql.WithFederationHttpClient(g.getHttpClient()),
+		)
+	}
 
 	err := federationConfigV2Factory.SetMergedSchemaFromString(g.apiDefinition.GraphQL.Supergraph.MergedSDL)
 	if err != nil {

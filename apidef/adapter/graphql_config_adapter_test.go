@@ -161,6 +161,63 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 		_, err := adapter.EngineConfigV2()
 		assert.NoError(t, err)
 	})
+	t.Run("should create v2 config for supergraph with batching disabled", func(t *testing.T) {
+		var gqlConfig apidef.GraphQLConfig
+		require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2SupergraphConfigJson), &gqlConfig))
+
+		apiDef := &apidef.APIDefinition{
+			GraphQL: gqlConfig,
+		}
+		apiDef.GraphQL.Supergraph.DisableQueryBactching = true
+
+		httpClient := &http.Client{}
+		adapter := NewGraphQLConfigAdapter(apiDef, WithHttpClient(httpClient))
+
+		v2Config, err := adapter.EngineConfigV2()
+		assert.NoError(t, err)
+		expectedDataSource := plan.DataSourceConfiguration{
+			RootNodes: []plan.TypeField{
+				{
+					TypeName:   "Query",
+					FieldNames: []string{"me"},
+				},
+				{
+					TypeName:   "User",
+					FieldNames: []string{"id", "username"},
+				},
+			},
+			ChildNodes: []plan.TypeField{
+				{
+					TypeName:   "User",
+					FieldNames: []string{"id", "username"},
+				},
+			},
+			Factory: &graphqlDataSource.Factory{
+				HTTPClient: httpClient,
+			},
+			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
+				Fetch: graphqlDataSource.FetchConfiguration{
+					URL:    "http://accounts.service",
+					Method: http.MethodPost,
+					Header: http.Header{
+						"Auth":           []string{"appended_header"},
+						"Header1":        []string{"override_global"},
+						"Header2":        []string{"value2"},
+						"X-Tyk-Internal": []string{"true"},
+					},
+				},
+				Subscription: graphqlDataSource.SubscriptionConfiguration{
+					URL: "http://accounts.service",
+				},
+				Federation: graphqlDataSource.FederationConfiguration{
+					Enabled:    true,
+					ServiceSDL: `extend type Query {me: User} type User @key(fields: "id"){ id: ID! username: String!}`,
+				},
+			}),
+		}
+		assert.Containsf(t, v2Config.DataSources(), expectedDataSource, "engine configuration does not contain proxy-only data source")
+
+	})
 
 	t.Run("should create v2 config for subgraph without error", func(t *testing.T) {
 		var gqlConfig apidef.GraphQLConfig
