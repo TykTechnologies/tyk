@@ -129,3 +129,15 @@ func TestHMAC(t *testing.T) {
 
 	assert.Equal(t, emptyHMAC, resultHMAC)
 }
+
+func TestGoPlugin(t *testing.T) {
+	var emptyGoPlugin GoPlugin
+
+	var convertedAPI apidef.APIDefinition
+	emptyGoPlugin.ExtractTo(&convertedAPI)
+
+	var resultGoPlugin GoPlugin
+	resultGoPlugin.Fill(convertedAPI)
+
+	assert.Equal(t, emptyGoPlugin, resultGoPlugin)
+}

@@ -35,6 +35,8 @@ type Authentication struct {
 	// HMAC contains the configurations related to HMAC authentication mode.
 	// Old API Definition: `auth_configs["hmac"]`
 	HMAC *HMAC `bson:"hmac,omitempty" json:"hmac,omitempty"`
+	// GoPlugin contains the configurations related to GoPlugin authentication mode.
+	GoPlugin *GoPlugin `bson:"goPlugin,omitempty" json:"goPlugin,omitempty"`
 }
 
 func (a *Authentication) Fill(api apidef.APIDefinition) {
@@ -105,6 +107,16 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(a.HMAC) {
 		a.HMAC = nil
 	}
+
+	if a.GoPlugin == nil {
+		a.GoPlugin = &GoPlugin{}
+	}
+
+	a.GoPlugin.Fill(api)
+
+	if ShouldOmit(a.GoPlugin) {
+		a.GoPlugin = nil
+	}
 }
 
 func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
@@ -130,6 +142,10 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 
 	if a.HMAC != nil {
 		a.HMAC.ExtractTo(api)
+	}
+
+	if a.GoPlugin != nil {
+		a.GoPlugin.ExtractTo(api)
 	}
 }
 
@@ -540,4 +556,18 @@ func (h *HMAC) ExtractTo(api *apidef.APIDefinition) {
 
 	api.HmacAllowedAlgorithms = h.AllowedAlgorithms
 	api.HmacAllowedClockSkew = h.AllowedClockSkew
+}
+
+type GoPlugin struct {
+	// Enabled enables the GoPlugin authentication mode.
+	// Old API Definition: `use_go_plugin_auth`
+	Enabled bool `bson:"enabled" json:"enabled"` // required
+}
+
+func (g *GoPlugin) Fill(api apidef.APIDefinition) {
+	g.Enabled = api.UseGoPluginAuth
+}
+
+func (g *GoPlugin) ExtractTo(api *apidef.APIDefinition) {
+	api.UseGoPluginAuth = g.Enabled
 }
