@@ -130,6 +130,30 @@ func TestHMAC(t *testing.T) {
 	assert.Equal(t, emptyHMAC, resultHMAC)
 }
 
+func TestOIDC(t *testing.T) {
+	var emptyOIDC OIDC
+
+	var convertedAPI apidef.APIDefinition
+	emptyOIDC.ExtractTo(&convertedAPI)
+
+	var resultOIDC OIDC
+	emptyOIDC.Fill(convertedAPI)
+
+	assert.Equal(t, emptyOIDC, resultOIDC)
+}
+
+func TestScopes(t *testing.T) {
+	var emptyScopes Scopes
+
+	var convertedAPI apidef.APIDefinition
+	emptyScopes.ExtractTo(&convertedAPI)
+
+	var resultScopes Scopes
+	emptyScopes.Fill(convertedAPI)
+
+	assert.Equal(t, emptyScopes, resultScopes)
+}
+
 func TestGoPlugin(t *testing.T) {
 	var emptyGoPlugin GoPlugin
 
