@@ -55,10 +55,10 @@ type Info struct {
 	ID string `bson:"id" json:"id,omitempty"`
 	// DBID is the unique database ID of the API.
 	// Old API Definition: `id`
-	DBID apidef.ObjectId `bson:"dbID" json:"dbID,omitempty"`
+	DBID apidef.ObjectId `bson:"dbId" json:"dbId,omitempty"`
 	// OrgID is the ID of the organisation which the API belongs to.
 	// Old API Definition: `org_id`
-	OrgID string `bson:"orgID" json:"orgID,omitempty"`
+	OrgID string `bson:"orgId" json:"orgId,omitempty"`
 	// Name is the name of the API.
 	// Old API Definition: `name`
 	Name string `bson:"name" json:"name"` // required
