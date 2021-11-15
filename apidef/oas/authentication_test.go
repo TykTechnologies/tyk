@@ -141,3 +141,15 @@ func TestGoPlugin(t *testing.T) {
 
 	assert.Equal(t, emptyGoPlugin, resultGoPlugin)
 }
+
+func TestCustomPlugin(t *testing.T) {
+	var emptyCustomPlugin CustomPlugin
+
+	var convertedAPI apidef.APIDefinition
+	emptyCustomPlugin.ExtractTo(&convertedAPI)
+
+	var resultCustomPlugin CustomPlugin
+	resultCustomPlugin.Fill(convertedAPI)
+
+	assert.Equal(t, emptyCustomPlugin, resultCustomPlugin)
+}
