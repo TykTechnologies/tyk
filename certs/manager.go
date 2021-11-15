@@ -145,17 +145,6 @@ func ParsePEM(data []byte, secret string) ([]*pem.Block, error) {
 	return pemBlocks, nil
 }
 
-func publicKey(priv interface{}) interface{} {
-	switch k := priv.(type) {
-	case *rsa.PrivateKey:
-		return &k.PublicKey
-	case *ecdsa.PrivateKey:
-		return &k.PublicKey
-	default:
-		return nil
-	}
-}
-
 func ParsePEMCertificate(data []byte, secret string) (*tls.Certificate, error) {
 	var cert tls.Certificate
 

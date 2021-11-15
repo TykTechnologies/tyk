@@ -114,7 +114,7 @@ func (k *JWTMiddleware) legacyGetSecretFromURL(url, kid, keyType string) (interf
 	}
 
 	for _, val := range jwkSet.Keys {
-		if val.KID != kid || strings.ToLower(val.Kty) != strings.ToLower(keyType) {
+		if val.KID != kid || !strings.EqualFold(val.Kty, keyType) {
 			continue
 		}
 		if len(val.X5c) > 0 {
@@ -239,7 +239,6 @@ func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.T
 	// Couldn't base64 decode the kid, so lets try it raw
 	k.Logger().Debug("Getting key: ", tykId)
 	session, rawKeyExists := k.CheckSessionAndIdentityForValidKey(tykId, r)
-	tykId = session.KeyID
 	if !rawKeyExists {
 		return nil, errors.New("token invalid, key not found")
 	}
@@ -274,7 +273,6 @@ func (k *JWTMiddleware) getBasePolicyID(r *http.Request, claims jwt.MapClaims) (
 
 		// Check for a regular token that matches this client ID
 		clientSession, exists := k.CheckSessionAndIdentityForValidKey(clientID, r)
-		clientID = clientSession.KeyID
 		if !exists {
 			return
 		}
@@ -293,7 +291,7 @@ func (k *JWTMiddleware) getBasePolicyID(r *http.Request, claims jwt.MapClaims) (
 
 func (k *JWTMiddleware) getUserIdFromClaim(claims jwt.MapClaims) (string, error) {
 	var userId string
-	var found = false
+	var found bool
 
 	if k.Spec.JWTIdentityBaseField != "" {
 		if userId, found = claims[k.Spec.JWTIdentityBaseField].(string); found {
@@ -827,12 +825,12 @@ func (k *JWTMiddleware) timeValidateJWTClaims(c jwt.MapClaims) *jwt.ValidationEr
 		vErr.Errors |= jwt.ValidationErrorExpired
 	}
 
-	if c.VerifyIssuedAt(now+int64(k.Spec.JWTIssuedAtValidationSkew), false) == false {
+	if !c.VerifyIssuedAt(now+int64(k.Spec.JWTIssuedAtValidationSkew), false) {
 		vErr.Inner = errors.New("token used before issued")
 		vErr.Errors |= jwt.ValidationErrorIssuedAt
 	}
 
-	if c.VerifyNotBefore(now+int64(k.Spec.JWTNotBeforeValidationSkew), false) == false {
+	if !c.VerifyNotBefore(now+int64(k.Spec.JWTNotBeforeValidationSkew), false) {
 		vErr.Inner = errors.New("token is not valid yet")
 		vErr.Errors |= jwt.ValidationErrorNotValidYet
 	}

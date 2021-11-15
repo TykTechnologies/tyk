@@ -149,7 +149,7 @@ func (s *SwaggerAST) ToAPIDefinition(orgId, upstreamURL string, as_mock bool) (*
 		return nil, err
 	}
 
-	s.InsertIntoAPIDefinitionAsVersion(versionData, &ad, strings.Trim(s.Info.Version, " "))
+	_ = s.InsertIntoAPIDefinitionAsVersion(versionData, &ad, strings.Trim(s.Info.Version, " "))
 
 	return &ad, nil
 }

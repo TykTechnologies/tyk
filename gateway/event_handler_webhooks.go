@@ -180,7 +180,7 @@ func (w *WebHookHandler) Checksum(reqBody string) (string, error) {
 	// We do this twice because fuck it.
 	localRequest, _ := http.NewRequest(string(w.getRequestMethod(w.conf.Method)), w.conf.TargetPath, strings.NewReader(reqBody))
 	h := md5.New()
-	localRequest.Write(h)
+	_ = localRequest.Write(h)
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
@@ -209,7 +209,7 @@ func (w *WebHookHandler) BuildRequest(reqBody string) (*http.Request, error) {
 
 func (w *WebHookHandler) CreateBody(em config.EventMessage) (string, error) {
 	var reqBody bytes.Buffer
-	w.template.Execute(&reqBody, em)
+	_ = w.template.Execute(&reqBody, em)
 
 	return reqBody.String(), nil
 }
@@ -265,7 +265,7 @@ func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 	}
 
 	if w.dashboardService != nil && em.Type == EventTriggerExceeded {
-		w.dashboardService.NotifyDashboardOfEvent(em.Meta)
+		_ = w.dashboardService.NotifyDashboardOfEvent(em.Meta)
 	}
 
 	w.setHookFired(reqChecksum)

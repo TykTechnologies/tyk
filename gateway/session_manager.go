@@ -80,7 +80,7 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 		// Set a sentinel value with expire
 		if globalConf.EnableSentinelRateLimiter || globalConf.DRLEnableSentinelRateLimiter {
 			if !dryRun {
-				store.SetRawKey(rateLimiterSentinelKey, "1", int64(per))
+				_ = store.SetRawKey(rateLimiterSentinelKey, "1", int64(per))
 			}
 		}
 		return true
@@ -108,11 +108,7 @@ func (l *SessionLimiter) limitSentinel(currentSession *user.SessionState, key st
 
 	// Check sentinel
 	_, sentinelActive := store.GetRawKey(rateLimiterSentinelKey)
-	if sentinelActive == nil {
-		// Sentinel is set, fail
-		return true
-	}
-	return false
+	return sentinelActive == nil
 }
 
 func (l *SessionLimiter) limitRedis(currentSession *user.SessionState, key string, rateScope string, store storage.Handler,
@@ -121,10 +117,7 @@ func (l *SessionLimiter) limitRedis(currentSession *user.SessionState, key strin
 	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash()
 	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash() + ".BLOCKED"
 
-	if l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun) {
-		return true
-	}
-	return false
+	return l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun)
 }
 
 func (l *SessionLimiter) limitDRL(currentSession *user.SessionState, key string, rateScope string,

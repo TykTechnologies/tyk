@@ -180,7 +180,6 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	keyName := username
 	logger := k.Logger().WithField("key", k.Gw.obfuscateKey(keyName))
 	session, keyExists := k.CheckSessionAndIdentityForValidKey(keyName, r)
-	keyName = session.KeyID
 
 	if !keyExists {
 		if k.Gw.GetConfig().HashKeyFunction == "" {
@@ -191,7 +190,6 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			legacyKeyName := strings.TrimPrefix(username, k.Spec.OrgID)
 			keyName, _ = storage.GenerateToken(k.Spec.OrgID, legacyKeyName, "")
 			session, keyExists = k.CheckSessionAndIdentityForValidKey(keyName, r)
-			keyName = session.KeyID
 			if !keyExists {
 				logger.Warning("Attempted access with non-existent user.")
 				return k.handleAuthFail(w, r, token)

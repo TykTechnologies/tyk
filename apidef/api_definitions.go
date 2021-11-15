@@ -146,7 +146,7 @@ func (j ObjectId) MarshalJSON() ([]byte, error) {
 
 func (j *ObjectId) UnmarshalJSON(buf []byte) error {
 	var b bson.ObjectId
-	b.UnmarshalJSON(buf)
+	_ = b.UnmarshalJSON(buf)
 	*j = ObjectId(string(b))
 
 	return nil
@@ -846,7 +846,7 @@ func (a *APIDefinition) DecodeFromDB() {
 		for j, oldSchema := range version.ExtendedPaths.ValidateJSON {
 			jsBytes, _ := base64.StdEncoding.DecodeString(oldSchema.SchemaB64)
 
-			json.Unmarshal(jsBytes, &oldSchema.Schema)
+			_ = json.Unmarshal(jsBytes, &oldSchema.Schema)
 			oldSchema.SchemaB64 = ""
 
 			a.VersionData.Versions[i].ExtendedPaths.ValidateJSON[j] = oldSchema

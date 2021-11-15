@@ -342,7 +342,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 
 	mw := BaseMiddleware{Gw: gw}
 	// TODO: handle apply policies error
-	mw.ApplyPolicies(newSession)
+	_ = mw.ApplyPolicies(newSession)
 	// DO ADD OR UPDATE
 
 	// get original session in case of update and preserve fields that SHOULD NOT be updated
@@ -498,7 +498,7 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID, orgID string, byHash bool)
 
 	mw := BaseMiddleware{Spec: spec, Gw: gw}
 	// TODO: handle apply policies error
-	mw.ApplyPolicies(&session)
+	_ = mw.ApplyPolicies(&session)
 
 	if session.QuotaMax != -1 {
 		quotaKey := QuotaKeyPrefix + storage.HashKey(sessionKey, gw.GetConfig().HashKeys)
@@ -615,7 +615,7 @@ func (gw *Gateway) handleGetAllKeys(filter string) (interface{}, int) {
 
 func (gw *Gateway) handleAddKey(keyName, hashedName, sessionString, apiID string, orgId string) {
 	sess := &user.SessionState{}
-	json.Unmarshal([]byte(sessionString), sess)
+	_ = json.Unmarshal([]byte(sessionString), sess)
 	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 
 	if sess.OrgID != orgId {
@@ -999,7 +999,7 @@ func (gw *Gateway) writeToFile(fs afero.Fs, newDef interface{}, filename string)
 	// If it exists, delete it
 	if _, err := fs.Stat(defFilePath); err == nil {
 		log.Warning("API Definition with this ID already exists, deleting file...")
-		fs.Remove(defFilePath)
+		_ = fs.Remove(defFilePath)
 	}
 
 	// unmarshal the object into the file
@@ -1507,7 +1507,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 	mw := BaseMiddleware{Gw: gw}
 	// TODO: handle apply policies error
-	mw.ApplyPolicies(newSession)
+	_ = mw.ApplyPolicies(newSession)
 
 	if len(newSession.AccessRights) > 0 {
 		// reset API-level limit to nil if any has a zero-value
@@ -1637,7 +1637,7 @@ func (gw *Gateway) previewKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 	mw := BaseMiddleware{Gw: gw}
 	// TODO: handle apply policies error
-	mw.ApplyPolicies(newSession)
+	_ = mw.ApplyPolicies(newSession)
 
 	doJSONWrite(w, http.StatusOK, newSession)
 }

@@ -347,7 +347,7 @@ func (p *Proxy) pipe(src, dst net.Conn, opts pipeOpts) {
 		if p.ReadTimeout != 0 {
 			readDeadline = time.Now().Add(p.ReadTimeout)
 		}
-		src.SetReadDeadline(readDeadline)
+		_ = src.SetReadDeadline(readDeadline)
 		n, err := src.Read(buf)
 		if err != nil {
 			if opts.onReadError != nil {
@@ -372,7 +372,7 @@ func (p *Proxy) pipe(src, dst net.Conn, opts pipeOpts) {
 		if p.WriteTimeout != 0 {
 			writeDeadline = time.Now().Add(p.WriteTimeout)
 		}
-		dst.SetWriteDeadline(writeDeadline)
+		_ = dst.SetWriteDeadline(writeDeadline)
 		_, err = dst.Write(b)
 		if err != nil {
 			if opts.onWriteError != nil {

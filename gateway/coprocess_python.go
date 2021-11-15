@@ -76,7 +76,7 @@ func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object
 		return nil, err
 	}
 
-	python.PyTupleSetItem(args, 0, objectBytes)
+	_ = python.PyTupleSetItem(args, 0, objectBytes)
 	result, err := python.PyObjectCallObject(dispatchHookFunc, args)
 	if err != nil {
 		log.WithFields(logrus.Fields{
@@ -167,7 +167,7 @@ func (d *PythonDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, baseP
 		python.PyErr_Print()
 		return
 	}
-	python.PyTupleSetItem(args, 0, basePath)
+	_ = python.PyTupleSetItem(args, 0, basePath)
 	_, err = python.PyObjectCallObject(dispatcherLoadBundle, args)
 	if err != nil {
 		log.WithFields(logrus.Fields{

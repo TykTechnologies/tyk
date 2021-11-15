@@ -106,7 +106,9 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 
 			if gw.GetConfig().NewRelic.AppName != "" {
 				if txn, ok := w.(newrelic.Transaction); ok {
-					defer newrelic.StartSegment(txn, mw.Name()).End()
+					defer func() {
+						_ = newrelic.StartSegment(txn, mw.Name()).End()
+					}()
 				}
 			}
 
@@ -861,11 +863,11 @@ func parseForm(r *http.Request) {
 		var b bytes.Buffer
 		r.Body = ioutil.NopCloser(io.TeeReader(r.Body, &b))
 
-		r.ParseForm()
+		_ = r.ParseForm()
 
 		r.Body = ioutil.NopCloser(&b)
 		return
 	}
 
-	r.ParseForm()
+	_ = r.ParseForm()
 }

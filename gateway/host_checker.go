@@ -192,7 +192,7 @@ func (h *HostUptimeChecker) HostReporter(ctx context.Context) {
 				log.Warning("[HOST CHECKER] [HOST DOWN]: ", failedHost.CheckURL)
 
 				//if this is the first time it reached the h.sampleTriggerLimit, the value of the reachedLimit flag is stored with the new count
-				if sample.reachedLimit == false {
+				if !sample.reachedLimit {
 					sample.reachedLimit = true
 					h.samples.Store(failedHost.CheckURL, sample)
 				}

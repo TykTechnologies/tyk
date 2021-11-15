@@ -270,8 +270,6 @@ func dummyGetCertificate(*tls.ClientHelloInfo) (*tls.Certificate, error) {
 
 var tlsConfigCache = cache.New(60*time.Second, 60*time.Minute)
 
-var tlsConfigMu sync.Mutex
-
 func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
 	gwConfig := gw.GetConfig()
 	// Supporting legacy certificate configuration
@@ -318,8 +316,8 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 	listenPortStr := strconv.Itoa(listenPort)
 
 	return func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
-		if config, found := tlsConfigCache.Get(hello.ServerName + listenPortStr); found {
-			return config.(*tls.Config).Clone(), nil
+		if tlsConfig, found := tlsConfigCache.Get(hello.ServerName + listenPortStr); found {
+			return tlsConfig.(*tls.Config).Clone(), nil
 		}
 
 		newConfig := baseConfig.Clone()

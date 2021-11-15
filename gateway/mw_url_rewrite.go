@@ -389,27 +389,27 @@ func (m *URLRewriteMiddleware) InitTriggerRx() {
 				tr := rewrite.Triggers[trKey]
 
 				for key, h := range tr.Options.HeaderMatches {
-					h.Init()
+					_ = h.Init()
 					tr.Options.HeaderMatches[key] = h
 				}
 				for key, q := range tr.Options.QueryValMatches {
-					q.Init()
+					_ = q.Init()
 					tr.Options.QueryValMatches[key] = q
 				}
 				for key, h := range tr.Options.SessionMetaMatches {
-					h.Init()
+					_ = h.Init()
 					tr.Options.SessionMetaMatches[key] = h
 				}
 				for key, h := range tr.Options.RequestContextMatches {
-					h.Init()
+					_ = h.Init()
 					tr.Options.RequestContextMatches[key] = h
 				}
 				for key, h := range tr.Options.PathPartMatches {
-					h.Init()
+					_ = h.Init()
 					tr.Options.PathPartMatches[key] = h
 				}
 				if tr.Options.PayloadMatches.MatchPattern != "" {
-					tr.Options.PayloadMatches.Init()
+					_ = tr.Options.PayloadMatches.Init()
 				}
 
 				rewrite.Triggers[trKey] = tr

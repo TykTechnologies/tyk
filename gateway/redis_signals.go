@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -143,8 +142,6 @@ func (gw *Gateway) handleKeySpaceEventCacheFlush(payload string) {
 		gw.SessionCache.Delete(key)
 	}
 }
-
-var redisInsecureWarn sync.Once
 
 func isPayloadSignatureValid(notification Notification) bool {
 	if notification.Gw.GetConfig().AllowInsecureConfigs {

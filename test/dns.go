@@ -51,7 +51,7 @@ func (d *dnsMockHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 		if rcode, ok := d.domainsToErrors[domain]; ok {
 			m := new(dns.Msg)
 			m.SetRcode(r, rcode)
-			w.WriteMsg(m)
+			_ = w.WriteMsg(m)
 			return
 		}
 
@@ -62,14 +62,14 @@ func (d *dnsMockHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 				if err != nil {
 					m := new(dns.Msg)
 					m.SetRcode(r, dns.RcodeServerFailure)
-					w.WriteMsg(m)
+					_ = w.WriteMsg(m)
 					return
 				}
 				msg.Answer = append(msg.Answer, &dns.A{
 					Hdr: dns.RR_Header{Name: domain, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 60},
 					A:   ipAddrs[0].IP,
 				})
-				w.WriteMsg(&msg)
+				_ = w.WriteMsg(&msg)
 				return
 			}
 		}
@@ -102,7 +102,7 @@ func (d *dnsMockHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 			})
 		}
 	}
-	w.WriteMsg(&msg)
+	_ = w.WriteMsg(&msg)
 }
 
 type DnsMockHandle struct {

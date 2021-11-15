@@ -185,7 +185,7 @@ type nopCloser struct {
 func (n nopCloser) Read(p []byte) (int, error) {
 	num, err := n.ReadSeeker.Read(p)
 	if err == io.EOF { // move to start to have it ready for next read cycle
-		n.Seek(0, io.SeekStart)
+		_, _ = n.Seek(0, io.SeekStart)
 	}
 	return num, err
 }
@@ -199,7 +199,7 @@ func copyBody(body io.ReadCloser) io.ReadCloser {
 	// check if body was already read and converted into our nopCloser
 	if nc, ok := body.(nopCloser); ok {
 		// seek to the beginning to have it ready for next read
-		nc.Seek(0, io.SeekStart)
+		_, _ = nc.Seek(0, io.SeekStart)
 		return body
 	}
 
@@ -208,7 +208,7 @@ func copyBody(body io.ReadCloser) io.ReadCloser {
 
 	// body is http's io.ReadCloser - read it up until EOF
 	var bodyRead bytes.Buffer
-	io.Copy(&bodyRead, body)
+	_, _ = io.Copy(&bodyRead, body)
 
 	// use seek-able reader for further body usage
 	reusableBody := bytes.NewReader(bodyRead.Bytes())
@@ -322,7 +322,7 @@ func TestHttpHandler(t testing.TB, handle http.HandlerFunc, testCases ...TestCas
 	runner := HTTPTestRunner{
 		Do: HttpHandlerRunner(handle),
 	}
-	runner.Run(t, testCases...)
+	_, _ = runner.Run(t, testCases...)
 }
 
 func HttpServerRequestBuilder(baseURL string) func(tc *TestCase) (*http.Request, error) {
@@ -343,5 +343,5 @@ func TestHttpServer(t testing.TB, baseURL string, testCases ...TestCase) {
 		Do:             HttpServerRunner(),
 		RequestBuilder: HttpServerRequestBuilder(baseURL),
 	}
-	runner.Run(t, testCases...)
+	_, _ = runner.Run(t, testCases...)
 }

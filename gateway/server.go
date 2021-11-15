@@ -783,9 +783,7 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 	}
 
 	// Load response hooks
-	for _, mw := range spec.CustomMiddleware.Response {
-		mwResponseFuncs = append(mwResponseFuncs, mw)
-	}
+	mwResponseFuncs = append(mwResponseFuncs, spec.CustomMiddleware.Response...)
 
 	return mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostKeyAuthFuncs, mwResponseFuncs, mwDriver
 
@@ -1456,7 +1454,7 @@ func Start() {
 		if err != nil {
 			panic(err)
 		}
-		pprof.StartCPUProfile(cpuProfFile)
+		_ = pprof.StartCPUProfile(cpuProfFile)
 		defer pprof.StopCPUProfile()
 	}
 	if *cli.BlockProfile {

@@ -59,7 +59,7 @@ func (gw *Gateway) GetLEState(m *letsencrypt.Manager) {
 	secret := rightPad2Len(gw.GetConfig().Secret, "=", 32)
 	sslState := decrypt([]byte(secret), cryptoText)
 
-	m.Unmarshal(sslState)
+	_ = m.Unmarshal(sslState)
 }
 
 type LE_ServerInfo struct {

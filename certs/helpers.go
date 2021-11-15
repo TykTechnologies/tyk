@@ -25,8 +25,8 @@ func GenCertificate(template *x509.Certificate) ([]byte, []byte, []byte, tls.Cer
 	derBytes, _ := x509.CreateCertificate(rand.Reader, template, template, &priv.PublicKey, priv)
 
 	var certPem, keyPem bytes.Buffer
-	pem.Encode(&certPem, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
-	pem.Encode(&keyPem, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
+	_ = pem.Encode(&certPem, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
+	_ = pem.Encode(&keyPem, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
 
 	clientCert, _ := tls.X509KeyPair(certPem.Bytes(), keyPem.Bytes())
 

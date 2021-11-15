@@ -151,7 +151,7 @@ func (o *OAuthHandlers) HandleGenerateAuthCodeData(w http.ResponseWriter, r *htt
 		log.Error("[OAuth] OAuth response marked as error: ", resp)
 	}
 	w.WriteHeader(code)
-	w.Write(msg)
+	_, _ = w.Write(msg)
 }
 
 // HandleAuthorizePassthrough handles a Client Auth request, first it checks if the client
@@ -187,7 +187,7 @@ func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Reque
 	if resp.IsError {
 		// Something went wrong, write out the error details and kill the response
 		w.WriteHeader(resp.ErrorStatusCode)
-		w.Write(msg)
+		_, _ = w.Write(msg)
 		return
 	}
 
@@ -223,7 +223,7 @@ func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Reque
 	o.notifyClientOfNewOauth(newNotification)
 
 	w.WriteHeader(http.StatusOK)
-	w.Write(msg)
+	_, _ = w.Write(msg)
 }
 
 const (
@@ -255,12 +255,12 @@ func (o *OAuthHandlers) HandleRevokeToken(w http.ResponseWriter, r *http.Request
 func RevokeToken(storage ExtendedOsinStorageInterface, token, tokenTypeHint string) {
 	switch tokenTypeHint {
 	case accessToken:
-		storage.RemoveAccess(token)
+		_ = storage.RemoveAccess(token)
 	case refreshToken:
-		storage.RemoveRefresh(token)
+		_ = storage.RemoveRefresh(token)
 	default:
-		storage.RemoveAccess(token)
-		storage.RemoveRefresh(token)
+		_ = storage.RemoveAccess(token)
+		_ = storage.RemoveRefresh(token)
 	}
 }
 
@@ -322,8 +322,8 @@ func RevokeAllTokens(storage ExtendedOsinStorageInterface, clientId, clientSecre
 		access, err := storage.LoadAccess(token.Token)
 		if err == nil {
 			resp = append(resp, access.AccessToken)
-			storage.RemoveAccess(access.AccessToken)
-			storage.RemoveRefresh(access.RefreshToken)
+			_ = storage.RemoveAccess(access.AccessToken)
+			_ = storage.RemoveRefresh(access.RefreshToken)
 		} else {
 			log.Debug("error loading access:", err.Error())
 		}
@@ -388,7 +388,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 	// we are intentionally ignoring errors, because this is called again by
 	// osin.We are only doing this to ensure r.From is properly initialized incase
 	// r.ParseForm was success
-	r.ParseForm()
+	_ = r.ParseForm()
 	if err := JSONToFormValues(r); err != nil {
 		log.Errorf("trying to set url values decoded from json body :%v", err)
 	}
@@ -839,7 +839,7 @@ func (r *RedisOsinStorageInterface) SetClient(id string, orgID string, client os
 	}
 	// if it exists, delete it to avoid duplicity in the client index list
 	if exists {
-		r.store.RemoveFromList(indexKey, key)
+		_ = r.store.RemoveFromList(indexKey, key)
 	}
 	// append to oauth client index list
 	r.store.AppendToSet(indexKey, key)
@@ -875,12 +875,12 @@ func (r *RedisOsinStorageInterface) DeleteClient(id string, orgID string, ignore
 
 	indexKey := prefixClientIndexList + orgID
 	// delete from oauth client
-	r.store.RemoveFromList(indexKey, key)
+	_ = r.store.RemoveFromList(indexKey, key)
 
 	// delete list of tokens for this client
 	r.store.DeleteKey(prefixClientTokens + id)
 	if r.Gw.GetConfig().SlaveOptions.UseRPC {
-		r.redisStore.RemoveFromList(indexKey, key)
+		_ = r.redisStore.RemoveFromList(indexKey, key)
 		r.redisStore.DeleteKey(prefixClientTokens + id)
 		r.redisStore.RemoveFromSet(keyForSet, clientJSON)
 	}
@@ -1004,7 +1004,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 	}
 
 	// Use the default session expiry here as this is OAuth
-	r.sessionManager.UpdateSession(accessData.AccessToken, newSession, int64(accessData.ExpiresIn), false)
+	_ = r.sessionManager.UpdateSession(accessData.AccessToken, newSession, int64(accessData.ExpiresIn), false)
 
 	// Store the refresh token too
 	if accessData.RefreshToken != "" {
@@ -1063,7 +1063,7 @@ func (r *RedisOsinStorageInterface) RemoveAccess(token string) error {
 		//remove from set oauth.client-tokens
 		log.Info("removing token from oauth client tokens list")
 		limit := strconv.FormatFloat(float64(access.ExpireAt().Unix()), 'f', 0, 64)
-		r.redisStore.RemoveSortedSetRange(key, limit, limit)
+		_ = r.redisStore.RemoveSortedSetRange(key, limit, limit)
 	} else {
 		log.Warning("Cannot load access token:", token)
 	}

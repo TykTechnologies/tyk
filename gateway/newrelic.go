@@ -66,23 +66,23 @@ type newRelicSink struct {
 }
 
 func (s *newRelicSink) EmitEvent(job string, event string, kvs map[string]string) {
-	s.relic.RecordCustomEvent(job+":"+event, makeParams(kvs))
+	_ = s.relic.RecordCustomEvent(job+":"+event, makeParams(kvs))
 }
 
 func (s *newRelicSink) EmitEventErr(job string, event string, err error, kvs map[string]string) {
-	s.relic.RecordCustomEvent(job+":"+event+":msg:"+err.Error(), makeParams(kvs))
+	_ = s.relic.RecordCustomEvent(job+":"+event+":msg:"+err.Error(), makeParams(kvs))
 }
 
 func (s *newRelicSink) EmitTiming(job string, event string, nanoseconds int64, kvs map[string]string) {
-	s.relic.RecordCustomEvent(job+":"+event+":dur(ns):"+strconv.FormatInt(nanoseconds, 10), makeParams(kvs))
+	_ = s.relic.RecordCustomEvent(job+":"+event+":dur(ns):"+strconv.FormatInt(nanoseconds, 10), makeParams(kvs))
 }
 
 func (s *newRelicSink) EmitComplete(job string, status health.CompletionStatus, nanoseconds int64, kvs map[string]string) {
-	s.relic.RecordCustomEvent(job+":health:"+status.String()+":dur(ns):"+strconv.FormatInt(nanoseconds, 10), makeParams(kvs))
+	_ = s.relic.RecordCustomEvent(job+":health:"+status.String()+":dur(ns):"+strconv.FormatInt(nanoseconds, 10), makeParams(kvs))
 }
 
 func (s *newRelicSink) EmitGauge(job string, event string, value float64, kvs map[string]string) {
-	s.relic.RecordCustomEvent(job+":"+event+":value:"+fmt.Sprintf("%.2f", value), makeParams(kvs))
+	_ = s.relic.RecordCustomEvent(job+":"+event+":value:"+fmt.Sprintf("%.2f", value), makeParams(kvs))
 }
 
 func makeParams(kvs map[string]string) (params map[string]interface{}) {

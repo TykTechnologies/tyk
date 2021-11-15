@@ -56,7 +56,7 @@ func (r TCPTestRunner) Run(t testing.TB, testCases ...TCPTestCase) error {
 
 	for ti, tc := range testCases {
 		var n int
-		client.SetDeadline(time.Now().Add(time.Second))
+		_ = client.SetDeadline(time.Now().Add(time.Second))
 		switch tc.Action {
 		case "write":
 			_, err = client.Write([]byte(tc.Payload))
@@ -125,7 +125,7 @@ func TcpMock(useSSL bool, cb func(in []byte, err error) (out []byte)) net.Listen
 			}
 
 			if len(resp) > 0 {
-				if n, err = conn.Write(resp); err != nil {
+				if _, err = conn.Write(resp); err != nil {
 					log.Println("Mock Conn write error", err.Error())
 				}
 			}
@@ -155,8 +155,8 @@ func Cert(domain string) tls.Certificate {
 	derBytes, _ := x509.CreateCertificate(rand.Reader, template, template, &private.PublicKey, private)
 
 	var cert, key bytes.Buffer
-	pem.Encode(&cert, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
-	pem.Encode(&key, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(private)})
+	_ = pem.Encode(&cert, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
+	_ = pem.Encode(&key, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(private)})
 
 	tlscert, _ := tls.X509KeyPair(cert.Bytes(), key.Bytes())
 

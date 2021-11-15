@@ -11,7 +11,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/cli/bundler"
 	"github.com/TykTechnologies/tyk/cli/importer"
-	logger "github.com/TykTechnologies/tyk/log"
 )
 
 const (
@@ -43,8 +42,6 @@ var (
 	DefaultMode bool
 
 	app *kingpin.Application
-
-	log = logger.Get()
 )
 
 // Init sets all flags and subcommands.

@@ -34,7 +34,7 @@ func (c *cache) enabled() bool {
 }
 
 func (c *cache) add(key string, value interface{}) {
-	c.Add(key, value, c.ttl)
+	_ = c.Add(key, value, c.ttl)
 }
 
 func (c *cache) getRegexp(key string) (*regexp.Regexp, bool) {
