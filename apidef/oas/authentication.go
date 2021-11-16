@@ -35,6 +35,11 @@ type Authentication struct {
 	// HMAC contains the configurations related to HMAC authentication mode.
 	// Old API Definition: `auth_configs["hmac"]`
 	HMAC *HMAC `bson:"hmac,omitempty" json:"hmac,omitempty"`
+	// GoPlugin contains the configurations related to GoPlugin authentication mode.
+	GoPlugin *GoPlugin `bson:"goPlugin,omitempty" json:"goPlugin,omitempty"`
+	// CustomPlugin contains the configurations related to CustomPlugin authentication mode.
+	// Old API Definition: `auth_configs["coprocess"]`
+	CustomPlugin *CustomPlugin `bson:"customPlugin,omitempty" json:"customPlugin,omitempty"`
 }
 
 func (a *Authentication) Fill(api apidef.APIDefinition) {
@@ -105,6 +110,28 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(a.HMAC) {
 		a.HMAC = nil
 	}
+
+	if a.GoPlugin == nil {
+		a.GoPlugin = &GoPlugin{}
+	}
+
+	a.GoPlugin.Fill(api)
+
+	if ShouldOmit(a.GoPlugin) {
+		a.GoPlugin = nil
+	}
+
+	if _, ok := api.AuthConfigs["coprocess"]; ok {
+		if a.CustomPlugin == nil {
+			a.CustomPlugin = &CustomPlugin{}
+		}
+
+		a.CustomPlugin.Fill(api)
+	}
+
+	if ShouldOmit(a.CustomPlugin) {
+		a.CustomPlugin = nil
+	}
 }
 
 func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
@@ -130,6 +157,14 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 
 	if a.HMAC != nil {
 		a.HMAC.ExtractTo(api)
+	}
+
+	if a.GoPlugin != nil {
+		a.GoPlugin.ExtractTo(api)
+	}
+
+	if a.CustomPlugin != nil {
+		a.CustomPlugin.ExtractTo(api)
 	}
 }
 
@@ -540,4 +575,44 @@ func (h *HMAC) ExtractTo(api *apidef.APIDefinition) {
 
 	api.HmacAllowedAlgorithms = h.AllowedAlgorithms
 	api.HmacAllowedClockSkew = h.AllowedClockSkew
+}
+
+type GoPlugin struct {
+	// Enabled enables the GoPlugin authentication mode.
+	// Old API Definition: `use_go_plugin_auth`
+	Enabled bool `bson:"enabled" json:"enabled"` // required
+}
+
+func (g *GoPlugin) Fill(api apidef.APIDefinition) {
+	g.Enabled = api.UseGoPluginAuth
+}
+
+func (g *GoPlugin) ExtractTo(api *apidef.APIDefinition) {
+	api.UseGoPluginAuth = g.Enabled
+}
+
+type CustomPlugin struct {
+	// Enabled enables the CustomPlugin authentication mode.
+	// Old API Definition: `enable_coprocess_auth`
+	Enabled     bool `bson:"enabled" json:"enabled"` // required
+	AuthSources `bson:",inline" json:",inline"`
+}
+
+func (c *CustomPlugin) Fill(api apidef.APIDefinition) {
+	c.Enabled = api.EnableCoProcessAuth
+
+	c.AuthSources.Fill(api.AuthConfigs["coprocess"])
+}
+
+func (c *CustomPlugin) ExtractTo(api *apidef.APIDefinition) {
+	api.EnableCoProcessAuth = c.Enabled
+
+	authConfig := apidef.AuthConfig{}
+	c.AuthSources.ExtractTo(&authConfig)
+
+	if api.AuthConfigs == nil {
+		api.AuthConfigs = make(map[string]apidef.AuthConfig)
+	}
+
+	api.AuthConfigs["coprocess"] = authConfig
 }
