@@ -353,8 +353,8 @@ func (j *JWT) Fill(api apidef.APIDefinition) {
 	j.SigningMethod = api.JWTSigningMethod
 	j.IdentityBaseField = api.JWTIdentityBaseField
 	j.SkipKid = api.JWTSkipKid
-	j.ScopeClaimName = api.JWTScopeClaimName
-	j.ScopeToPolicyMapping = api.JWTScopeToPolicyMapping
+	j.ScopeClaimName = api.Scopes.JWT.ScopeClaimName
+	j.ScopeToPolicyMapping = api.Scopes.JWT.ScopeToPolicy
 	j.PolicyFieldName = api.JWTPolicyFieldName
 	j.ClientBaseField = api.JWTClientIDBaseField
 	j.DefaultPolicies = api.JWTDefaultPolicies
@@ -378,8 +378,8 @@ func (j *JWT) ExtractTo(api *apidef.APIDefinition) {
 	api.JWTSigningMethod = j.SigningMethod
 	api.JWTIdentityBaseField = j.IdentityBaseField
 	api.JWTSkipKid = j.SkipKid
-	api.JWTScopeClaimName = j.ScopeClaimName
-	api.JWTScopeToPolicyMapping = j.ScopeToPolicyMapping
+	api.Scopes.JWT.ScopeClaimName = j.ScopeClaimName
+	api.Scopes.JWT.ScopeToPolicy = j.ScopeToPolicyMapping
 	api.JWTPolicyFieldName = j.PolicyFieldName
 	api.JWTClientIDBaseField = j.ClientBaseField
 	api.JWTDefaultPolicies = j.DefaultPolicies
