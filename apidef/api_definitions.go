@@ -813,6 +813,14 @@ func (a *APIDefinition) EncodeForDB() {
 	if a.Auth.AuthHeaderName == "" {
 		a.Auth = a.AuthConfigs["authToken"]
 	}
+	// JWTScopeToPolicyMapping and JWTScopeClaimName are deprecated and following code ensures backward compatibility
+	if a.UseOpenID && a.Scopes.OIDC.ScopeToPolicy != nil {
+		a.JWTScopeToPolicyMapping = a.Scopes.OIDC.ScopeToPolicy
+		a.JWTScopeClaimName = a.Scopes.OIDC.ScopeClaimName
+	} else if !a.UseOpenID && a.Scopes.JWT.ScopeToPolicy != nil {
+		a.JWTScopeToPolicyMapping = a.Scopes.JWT.ScopeToPolicy
+		a.JWTScopeClaimName = a.Scopes.JWT.ScopeClaimName
+	}
 }
 
 func (a *APIDefinition) DecodeFromDB() {
@@ -879,6 +887,14 @@ func (a *APIDefinition) DecodeFromDB() {
 
 	makeCompatible("authToken")
 	makeCompatible("jwt")
+	// JWTScopeToPolicyMapping and JWTScopeClaimName are deprecated and following code ensures backward compatibility
+	if a.JWTScopeToPolicyMapping != nil && a.UseOpenID && a.Scopes.OIDC.ScopeToPolicy == nil {
+		a.Scopes.OIDC.ScopeToPolicy = a.JWTScopeToPolicyMapping
+		a.Scopes.OIDC.ScopeClaimName = a.JWTScopeClaimName
+	} else if a.JWTScopeToPolicyMapping != nil && a.Scopes.JWT.ScopeToPolicy == nil {
+		a.Scopes.JWT.ScopeToPolicy = a.JWTScopeToPolicyMapping
+		a.Scopes.JWT.ScopeClaimName = a.JWTScopeClaimName
+	}
 }
 
 // Expired returns true if this Version has expired
