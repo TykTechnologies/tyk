@@ -17,6 +17,18 @@ func TestAuthentication(t *testing.T) {
 	resultAuthentication.Fill(convertedAPI)
 
 	assert.Equal(t, emptyAuthentication, resultAuthentication)
+
+	t.Run("Fill just GoPlugin", func(t *testing.T) {
+		// GoPlugin is different from others, it is not set inside AuthConfigs.
+
+		goPluginAuth := Authentication{GoPlugin: &GoPlugin{Enabled: true}}
+
+		goPluginAuth.ExtractTo(&convertedAPI)
+
+		resultAuthentication.Fill(convertedAPI)
+
+		assert.Equal(t, goPluginAuth, resultAuthentication)
+	})
 }
 
 func TestToken(t *testing.T) {
