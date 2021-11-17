@@ -43,6 +43,18 @@ func TestJWT(t *testing.T) {
 	assert.Equal(t, emptyJWT, resultJWT)
 }
 
+func TestScopes(t *testing.T) {
+	var emptyScopes Scopes
+
+	var convertedAPI apidef.APIDefinition
+	emptyScopes.ExtractTo(&convertedAPI)
+
+	var resultScopes Scopes
+	resultScopes.Fill(convertedAPI)
+
+	assert.Equal(t, emptyScopes, resultScopes)
+}
+
 func TestAuthSources(t *testing.T) {
 	var emptyAuthSources AuthSources
 
