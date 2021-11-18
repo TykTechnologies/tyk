@@ -814,12 +814,12 @@ func (a *APIDefinition) EncodeForDB() {
 		a.Auth = a.AuthConfigs["authToken"]
 	}
 	// JWTScopeToPolicyMapping and JWTScopeClaimName are deprecated and following code ensures backward compatibility
-	if a.UseOpenID && a.Scopes.OIDC.ScopeClaimName != "" {
-		a.JWTScopeToPolicyMapping = a.Scopes.OIDC.ScopeToPolicy
-		a.JWTScopeClaimName = a.Scopes.OIDC.ScopeClaimName
-	} else if !a.UseOpenID && a.Scopes.JWT.ScopeClaimName != "" {
+	if a.Scopes.JWT.ScopeClaimName != "" {
 		a.JWTScopeToPolicyMapping = a.Scopes.JWT.ScopeToPolicy
 		a.JWTScopeClaimName = a.Scopes.JWT.ScopeClaimName
+	} else if a.UseOpenID && a.Scopes.OIDC.ScopeClaimName != "" {
+		a.JWTScopeToPolicyMapping = a.Scopes.OIDC.ScopeToPolicy
+		a.JWTScopeClaimName = a.Scopes.OIDC.ScopeClaimName
 	}
 }
 
