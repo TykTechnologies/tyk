@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/TykTechnologies/tyk/apidef"
 	"net/http"
 	"reflect"
 	"sort"
@@ -975,9 +976,13 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		spec.JWTPolicyFieldName = "policy_id"
 		spec.JWTDefaultPolicies = []string{defaultPolicyID}
 		spec.Proxy.ListenPath = "/base"
-		spec.JWTScopeToPolicyMapping = map[string]string{
-			"user:read":  p1ID,
-			"user:write": p2ID,
+		spec.Scopes = apidef.Scopes{
+			JWT: apidef.ScopeClaim{
+				ScopeToPolicy: map[string]string{
+					"user:read":  p1ID,
+					"user:write": p2ID,
+				},
+			},
 		}
 		spec.OrgID = "default"
 	})[0]
@@ -1176,8 +1181,12 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		}
 	})
 
-	base.JWTScopeToPolicyMapping = map[string]string{
-		"user:read": p3ID,
+	base.Scopes = apidef.Scopes{
+		JWT: apidef.ScopeClaim{
+			ScopeToPolicy: map[string]string{
+				"user:read": p3ID,
+			},
+		},
 	}
 
 	ts.Gw.LoadAPI(base)
