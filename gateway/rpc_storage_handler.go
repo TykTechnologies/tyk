@@ -823,7 +823,7 @@ func (gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler, isH
 func (gw *Gateway) ProcessSingleOauthClientEvent(apiId, oauthClientId, orgID, event string) {
 	store, _, err := gw.GetStorageForApi(apiId)
 	if err != nil {
-		log.Error("Could not get oath storage for api")
+		log.Error("Could not get oauth storage for api")
 		return
 	}
 
@@ -836,7 +836,12 @@ func (gw *Gateway) ProcessSingleOauthClientEvent(apiId, oauthClientId, orgID, ev
 			return
 		}
 
-		store.SetClient(oauthClientId, orgID, client, false)
+		err = store.SetClient(oauthClientId, orgID, client, false)
+		if err != nil {
+			log.WithError(err).Error("Could not save oauth client.")
+			return
+		}
+
 		log.Info("oauth client created successfully")
 	case OauthClientRemoved:
 		// on remove: remove from local redis
@@ -866,7 +871,11 @@ func (gw *Gateway) ProcessSingleOauthClientEvent(apiId, oauthClientId, orgID, ev
 			return
 		}
 
-		store.SetClient(oauthClientId, orgID, client, false)
+		err = store.SetClient(oauthClientId, orgID, client, false)
+		if err != nil {
+			log.WithError(err).Error("Could not save oauth client.")
+			return
+		}
 		log.Info("oauth client updated successfully")
 	default:
 		log.Warningf("Oauth client event not supported:%v", event)
